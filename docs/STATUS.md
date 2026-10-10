@@ -10,7 +10,7 @@
 - 公司资料按公开来源填空；FC2 卖家按作品来源快照补入。回执见 `peach-data/review/`。
 - 核查：`peach-data/review/creator-boundary-delivery.md`；StraplessDildo 归厂牌。
 - 关注作者 25 位、来源 111 条、身份关联 71 条、别名 30 条（ADR-0096）。
-- 身份合并 18 组，旧址跳转；分卷、版本计作品，文件保留。
+- 身份合并 18 组；版本核查：`peach-data/review/version-evidence-review.md`。
 - JAV 头像 816 张，38 张水印待复核；17 位档案、253 张头像候选、2 张官方封面。
 - 「整理」（ADR-0039）支持预览、执行、回滚；英文视频名分词 169 条。
 - 产地是独立维度、JAV 是其投影：`region` 空时按厂牌、创作者、番号逐层推断，不落库；韩国 MIB 不算 JAV。
@@ -24,7 +24,7 @@
 - 访问密码未开，局域网匿名可读；首启可跳过密码，配置页可改可关，登录可记住设备。
 - macOS 是 reader，代码与 `peach-data` 在内置盘；`peach.local` 经 8900/8443 和 pf 提供 80/443，GET 正常、写入回 409。
 - 两端各用本机 CA，私钥与凭据不跨机；代码用 Git、账本单写者复制、图片用 Syncthing；坐标见 `<数据根>/config.toml`。
-- Windows ledger `0045`，资源 80,209 行；字幕 195 行（孤立 19），175 部带字幕轨；R 盘暂缓。
+- Windows ledger `0045`，76,259 行；字幕 195 行（孤立 19），175 部带字幕轨；R 盘暂缓。
 - Mac ledger 使用已授权共享副本，`in-sync`；`sources` 在内置盘，`archive`、`tools` 可在外置盘。
 - Windows doctor、诊断页通过 CA；本地目录缺失，115/PikPak 可读；密码未开、历史失败为警告。
 - Python 3.14（下限 3.12，CI 测两版）；Windows FFmpeg/ffprobe 在 `peach-data/tools/ffmpeg`，macOS 走 PATH。

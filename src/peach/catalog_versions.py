@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import re
+from pathlib import PureWindowsPath
 
 from .catalog_rules import (
     names_without_shared_part_tail, normalise_code_key, ordered_multipart_items,
     _jav_code_pattern, duration_clusters, part_marker, release_code_from_filename,
 )
+from .field_owners import owner_of
+from .metadata import identifies_code
 
 
 def resolution_label(row: dict) -> str:
@@ -28,14 +31,21 @@ def version_signature(row: dict) -> tuple[str, str, str]:
 
 
 def filename_matches_code(row: dict) -> bool:
-    """已有提取器优先；带标题或修复标记的文件复用显示层的番号形态。"""
+    """核对显式文件号；通用文件名使用已刮削标题与所属番号目录。"""
     code = normalise_code_key(row.get('code'))
     name = str(row.get('name') or '')
     extracted = release_code_from_filename(name)
     if extracted:
-        return normalise_code_key(extracted) == code
+        return identifies_code(code, {'id': extracted})
+    if identifies_code(code, {'content_id': PureWindowsPath(name).stem}):
+        return True
     pattern = _jav_code_pattern(code)
-    return bool(pattern and re.search(rf'(?<![A-Z0-9]){pattern}(?!\d)', name, re.I))
+    if pattern and re.search(rf'(?<![A-Z0-9]){pattern}(?!\d)', name, re.I):
+        return True
+    owner = owner_of(row.get('field_owners'), 'catalog_title')
+    scraped = bool(row.get('catalog_title') and owner.startswith(('auto:', 'review:', 'user:')))
+    return scraped and any(identifies_code(code, {'id': component})
+                           for component in PureWindowsPath(str(row.get('path') or '')).parts[:-1])
 
 
 def _version(items: list[dict], *, multipart: bool = False) -> dict:
