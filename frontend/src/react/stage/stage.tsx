@@ -339,8 +339,11 @@ function dispose({ miniplayer = true }: { miniplayer?: boolean } = {}): void {
 }
 
 function update(patch: StagePatch): void {
-  if (!view || view.content.kind !== 'item') return;
-  view = { ...view, content: { kind: 'item', props: { ...view.content.props, ...patch } } };
+  if (!view) return;
+  view = { ...view, content: view.content.kind === 'item'
+    ? { kind: 'item', props: { ...view.content.props, ...patch } }
+    : { kind: 'follow', props: { ...view.content.props,
+      ...(patch.relatedLimit === undefined ? {} : { relatedLimit: patch.relatedLimit }) } } };
   paint();
 }
 

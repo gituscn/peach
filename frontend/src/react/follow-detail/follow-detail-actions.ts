@@ -10,6 +10,7 @@ export interface FollowDetailActionPorts {
   rememberReturn(path: string): void;
   close(): void;
   open(id: number, mediaIndex: number | null, preserveReturn: boolean): void;
+  openAuthor(name: string): void;
   drawer(drawer: Pick<FollowDrawer, 'tags'>): void;
 }
 
@@ -20,6 +21,7 @@ export function createFollowDetailActions(ports: FollowDetailActionPorts,
     ...receipts,
     close: () => ports.close(),
     openItem: (id, mediaIndex = null) => ports.open(id, mediaIndex, true),
+    openAuthor: name => ports.openAuthor(name),
     openTag: tag => {
       const view = ports.view(), tags = new Set(view.tags);
       if (tags.has(tag)) tags.delete(tag); else tags.add(tag);

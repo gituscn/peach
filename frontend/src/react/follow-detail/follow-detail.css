@@ -4,7 +4,7 @@
  * `[data-stage-side-content]`）、队列（`[data-mix-queue]` 一族）与操作键条（`[data-stage-actions]`）是和
  * 作品详情共用的，几何归 `../stage/stage.css` 与 `../../player/player.css`；外链的显示方式、内距与
  * 字色归 `board.css` 的全站外链规则（`a[target=_blank]`）。这里只写关注详情自己多出来的几块，标签、
- * 创作者圆框的盒子也在这里，照全站标签与头像的同一组 token 写。
+ * 创作者身份格共用作品详情的身份样式。
  *
  * 选择器全用 `data-*`，前面挂 `[data-follow-detail]`：舞台样式表与遗留样式表都排在后面，同权重时
  * 它们赢，多一层属性才压得住 `[data-stage-title]`、`[data-stage-actions] button` 这类通用规则。 */
@@ -186,55 +186,12 @@
   margin: calc((var(--fs-lg) * 1.5 - 30px) / 2) 0;
 }
 .peach-react [data-follow-detail] :is([data-follow-origin], [data-follow-resources] a) svg { flex: none; width: 18px; height: 18px; }
-.peach-react [data-follow-detail] [data-follow-detail-identity] {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 2px 0 12px;
-}
-.peach-react [data-follow-detail] [data-follow-detail-identity] > div { min-width: 0; overflow-wrap: anywhere; }
-.peach-react [data-follow-detail] [data-follow-detail-identity] b,
-.peach-react [data-follow-detail] [data-follow-detail-identity] span { display: block; }
-.peach-react [data-follow-detail] [data-follow-detail-identity] > div > span {
-  margin-top: 3px;
+.peach-react [data-follow-detail] [data-follow-detail-credit] {
+  overflow-wrap: anywhere;
   color: var(--muted);
   font-size: var(--fs-xs);
 }
-/* 创作者圆框：38px，与卡片上的创作者头像同一档；头像铺满，取不到时首字母居中。它不是入口，
-   不带悬停描边。 */
-.peach-react [data-follow-detail] [data-follow-source-avatar] {
-  position: relative;
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  margin-top: 2px;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--line-soft);
-  border-radius: 50%;
-  background: var(--overlay-5);
-  color: inherit;
-  cursor: default;
-}
-/* 头像与取不到时的首字母（壳的 `favatar`，图坏了也就地换成首字母）都铺满圆框。 */
-.peach-react [data-follow-detail] [data-follow-source-avatar] > * {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  outline: 0;
-  object-fit: cover;
-}
-.peach-react [data-follow-detail] [data-follow-source-avatar] > span {
-  display: grid;
-  place-items: center;
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
+.peach-react [data-follow-detail] [data-follow-detail-credit] > span { display: block; }
 .peach-react [data-follow-detail] [data-follow-badges] {
   display: flex;
   flex-wrap: nowrap;
@@ -280,40 +237,8 @@
 
 /* 操作键条：几何取 `[data-stage-actions]`（`../stage/stage.css`）。下载是 `<a download>`，
    不是按钮：让浏览器自己落盘，不经过 JS，几何与同排按钮一致。 */
-.peach-react [data-follow-detail] [data-follow-detail-actions] button:disabled { opacity: .45; cursor: not-allowed; }
 /* 想要过的那一条，星是填实的；色调借保存那一档（`later`）。 */
 .peach-react [data-follow-detail] [data-follow-detail-want][aria-pressed="true"] svg { fill: currentColor; }
-.peach-react [data-follow-detail] [data-follow-download] {
-  box-sizing: border-box;
-  flex: 0 0 36px;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--ink-2);
-}
-.peach-react [data-follow-detail] [data-follow-download]:hover { background: var(--hover); color: var(--ink); }
-.peach-react [data-follow-detail] [data-follow-download] svg {
-  display: block;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-/* 关注详情只有三四个动作键，撑满一行就是四个大得离谱的方块。 */
-@media (max-width: 760px) {
-  .peach-react [data-follow-detail] [data-follow-detail-actions] { width: max-content; max-width: 100%; }
-  .peach-react [data-follow-detail] [data-follow-detail-actions] :is(button, [data-follow-download]) { flex: 0 0 auto; }
-}
 
 /* 被隐藏的图退到这条恢复带：一行小缩略图，各带一枚撤销角标。整带保持安静（灰调、小尺寸），
    它们是「不在看」的那部分，不能和正片抢视线。 */
