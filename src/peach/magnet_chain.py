@@ -123,6 +123,7 @@ def _normalise(item: dict, source: Source, code: str) -> dict | None:
         " ".join((name, str(item.get("quality") or ""), " ".join(attributes)))))
     return {
         "id": magnet.info_hash, "info_hash": magnet.info_hash,
+        'protocol': 'magnet', 'attributes': attributes,
         "uri": magnet.uri, "name": name, "size": size_bytes(item.get("size")),
         "size_text": str(item.get("size") or ""), "files": str(item.get("files") or ""),
         "file_count": int(item.get("file_count") or len(files) or 0),
@@ -286,6 +287,9 @@ def search(root: Path, code: str, *, transport=None, min_size: int = 0,
             trace.append(f"{source.label}：取得 {len(items)} 条" if items else f"{source.label}：无结果")
     finally:
         fetcher.close()
+    incomplete = bool(warnings) and not found
     return {"items": rank_candidates(found, goal), "warnings": warnings, "trace": trace,
+            'state': 'error' if incomplete else 'ready',
+            'error': '部分来源未取得，请稍后重试或检查来源连接。' if incomplete else '',
             "next_sources": [source.label for source in CHAIN[3:]],
             "reference_only": list(REFERENCE_ONLY)}

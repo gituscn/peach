@@ -168,6 +168,8 @@ class WebContract:
         self.keyed_cache: OrderedDict[str, tuple[float, object]] = OrderedDict()
         #: 每次 cache_bust 递增。在途计算据此判断自己出发后缓存是否失效过。
         self.cache_generation = 0
+        self.revision_cache_keys: set[str] = set()
+        self.aggregate_locks: dict[str, threading.RLock] = {}
         self.follow_check_lock = threading.Lock()
         #: 任务中心。每个后台任务的开始、进度与结束都写这一张表，`/activity` 只读它。
         #: 只读端由 `api` 关掉写入：那边的账本是复制来的，写一行就是一处合不回去的分叉。
@@ -288,31 +290,44 @@ class WebContract:
                     self.keyed_cache.popitem(last=False)
         return value
 
-    def ledger_revision(self) -> int | None:
+    def ledger_revision(self, tables=()) -> int | None:
         """账本版本号：`ledger_revision` 各行之和（migration 0038）。
 
         每张账本表的增删改都由触发器给自己那一行加一，不论写的是服务、CLI 脚本还是
         账本同步，所以这个数变了就是账本变了。任务中心的心跳不挂触发器。库还没迁移到
         0038（或根本没有库）时返回 None。
+        `tables` 非空时只累计这些表的版本。
         """
         try:
             with self.read_connection() as connection:
-                row = connection.execute("SELECT total(n) FROM ledger_revision").fetchone()
+                clause = " WHERE tbl IN (" + ','.join('?' for _ in tables) + ")" if tables else ''
+                row = connection.execute("SELECT total(n) FROM ledger_revision" + clause, tables).fetchone()
         except sqlite3.Error:
             return None
         return int(row[0])
 
-    def cached_until_changed(self, key: str, fn, *inputs):
+    def cached_until_changed(self, key: str, fn, *inputs, tables=()):
         """只读账本聚合的缓存：账本版本号与 `inputs` 都没变就一直命中，不按时间过期。
 
         `inputs` 是聚合读到的账本之外的东西的版本（候选目录、头像目录、浏览历史库），
         由调用方给出：漏一样，那一样变了页面就一直是旧的。版本号在计算前读，计算期间
         有进程外的写，结果记在旧版本下，下一次请求读到新版本照样重算。库还没有版本号时
         退回 `CACHE_TTL`。
+        `tables` 声明聚合依赖的表；这类缓存经过提交通知后仍按声明的版本核验，
+        同键的并发请求共用一次计算。
         """
-        revision = self.ledger_revision()
-        return self.cached(key, fn, ttl=CACHE_TTL if revision is None else math.inf,
-                           version=(revision, *inputs))
+        if not tables:
+            revision = self.ledger_revision()
+            return self.cached(key, fn, ttl=CACHE_TTL if revision is None else math.inf,
+                               version=(revision, *inputs))
+        # 指定依赖表的聚合共用一次计算；提交后仍按这些表的代次核验。
+        with self.cache_lock:
+            lock = self.aggregate_locks.setdefault(key, threading.RLock())
+            self.revision_cache_keys.add(key)
+        with lock:
+            revision = self.ledger_revision(tables)
+            return self.cached(key, fn, ttl=CACHE_TTL if revision is None else math.inf,
+                               version=(tuple(tables), revision, *inputs))
 
     def stop_background_jobs(self) -> None:
         """服务关停时丢掉后台任务状态并等线程收工。
@@ -335,7 +350,8 @@ class WebContract:
 
     def cache_bust(self):
         with self.cache_lock:
-            self.cache.clear()
+            self.cache = OrderedDict((key, value) for key, value in self.cache.items()
+                                     if key in self.revision_cache_keys)
             self.keyed_cache.clear()
             # 在途计算靠这个数认出「我出发之后缓存失效过」，从而放弃写回。
             self.cache_generation += 1

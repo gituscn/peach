@@ -1,5 +1,7 @@
 """磁力抓取链的纯判据；不连接真实站点。"""
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 from peach.downloads import parse_magnet
 from peach.magnet_chain import (CHAIN, _normalise, decode_base91, rank_candidates,
@@ -23,6 +25,33 @@ def item(info_hash, **fields):
 
 
 class MagnetChainTests(unittest.TestCase):
+    def test_wishlist_candidates_have_display_and_download_fields(self):
+        from peach.wants_magnets import fetch
+        candidate = _normalise({'uri': item(HASH_A)['uri'], 'size': '2 GiB',
+                                'attributes': ['中字']}, CHAIN[1], 'ABC-123')
+        with patch('peach.magnet_chain.search', return_value={'items': [candidate]}):
+            result = fetch(Path('.'), 'ABC-123')['items'][0]
+        self.assertEqual(result['protocol'], 'magnet')
+        self.assertEqual(result['attributes'], ['中字'])
+        self.assertEqual(result['size'], '2 GiB')
+
+    def test_unavailable_sources_without_results_use_the_failure_cooldown(self):
+        from peach.magnet_chain import Fetcher, search
+        from peach.wants_magnets import MagnetSearch
+        now = [100.0]
+        with patch.object(Fetcher, '__init__', return_value=None), patch.object(Fetcher, 'close'), \
+                patch.object(Fetcher, 'manko', side_effect=RuntimeError), \
+                patch.object(Fetcher, 'javdb', return_value=[]), \
+                patch.object(Fetcher, 'sukebei', return_value=[]):
+            calls = []
+            def fetcher(root, code):
+                calls.append(code)
+                return search(root, code)
+            lookup = MagnetSearch(Path('.'), fetcher=fetcher, clock=lambda: now[0], sleeper=lambda _: None)
+            self.assertEqual(lookup.query('ABC-123')['state'], 'error')
+            now[0] += 120
+            self.assertEqual(lookup.query('ABC-123')['state'], 'error')
+        self.assertEqual(len(calls), 2)
     def test_base91_decodes_the_api_envelope_payload(self):
         # basE91 官方示例：编码后的这一段解回 ASCII "test"。
         self.assertEqual(decode_base91("fPNKd"), b"test")

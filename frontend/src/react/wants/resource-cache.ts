@@ -22,7 +22,11 @@ function entries(): Entry[] {
   try {
     const value = JSON.parse(localStorage.getItem(KEY) || '[]');
     return Array.isArray(value) ? value.filter((row) => typeof row?.code === 'string' &&
-      Number.isFinite(row.saved) && row.result?.state === 'ready' && Array.isArray(row.result.items)) : [];
+      Number.isFinite(row.saved) && row.result?.state === 'ready' && Array.isArray(row.result.items) &&
+      (row.result.items.length > 0 || !row.result.warnings?.length) &&
+      row.result.items.every((item: Record<string, unknown>) =>
+        item && ['magnet', 'ed2k', 'url'].includes(String(item.protocol)) &&
+        typeof item.size === 'string' && Array.isArray(item.attributes))) : [];
   } catch { return [] }
 }
 

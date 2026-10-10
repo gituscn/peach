@@ -71,6 +71,36 @@ class LedgerRevisionTests(unittest.TestCase):
         self.contract.task_runs.heartbeat(run.id, throttle=0)
         self.assertEqual(self.contract.cached_until_changed("review", self.compute), 1)
 
+    def test_catalog_cache_survives_download_progress_and_commit_notifications(self):
+        from peach.downloads import DownloadStore, DownloadTask, POSTPROCESS_RUNNING
+        tables = ('asset', 'asset_entity', 'entity')
+        self.assertEqual(self.contract.cached_until_changed('catalog', self.compute, tables=tables), 1)
+        task = DownloadStore(self.contract.database).save(DownloadTask(
+            id=0, info_hash='a' * 40, provider='115', source_uri='', display_name='',
+            target='/115/test', state='ingested'))
+        DownloadStore(self.contract.database).postprocess(task.id, POSTPROCESS_RUNNING)
+        self.contract.cache_bust()
+        self.assertEqual(self.contract.cached_until_changed('catalog', self.compute, tables=tables), 1)
+        insert_asset(self.db_path, 1)
+        self.assertEqual(self.contract.cached_until_changed('catalog', self.compute, tables=tables), 2)
+
+    def test_concurrent_catalog_requests_share_one_computation(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        entered, release = Event(), Event()
+        def derive():
+            self.calls += 1
+            entered.set()
+            release.wait(5)
+            return self.calls
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(self.contract.cached_until_changed, 'catalog', derive, tables=('asset',))
+            self.assertTrue(entered.wait(5))
+            second = pool.submit(self.contract.cached_until_changed, 'catalog', derive, tables=('asset',))
+            release.set()
+            self.assertEqual((first.result(), second.result()), (1, 1))
+        self.assertEqual(self.calls, 1)
+
     def test_a_changed_file_input_recomputes(self):
         self.contract.cached_until_changed("review", self.compute, "csv-1")
         self.assertEqual(self.contract.cached_until_changed("review", self.compute, "csv-1"), 1)

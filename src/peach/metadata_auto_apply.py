@@ -1393,7 +1393,7 @@ def _performer_external_provider(performer: dict, source: str,
 
 
 def auto_apply_metadata(database, candidate_root, *, batch_size=AUTO_APPLY_BATCH,
-                        active=lambda: True, snapshot_root=None):
+                        active=lambda: True, snapshot_root=None, asset_ids=None):
     """把确定的那部分直接落库，不占人工队列。
 
     ADR-0018：这是「刮削结果只作候选、不直接改写真相字段」的一个**窄例外**，
@@ -1415,8 +1415,12 @@ def auto_apply_metadata(database, candidate_root, *, batch_size=AUTO_APPLY_BATCH
     `snapshot_root` 是本机落盘的来源快照目录，企划名义解析要读它（ADR-0038）。缺省
     是 None，也就是只走 `entity_alias` 那一条路：这一层不去猜真实数据根在哪儿，
     猜错的表现是测试悄悄读起了真实库。
+    `asset_ids` 非空时只结算给定资产的候选；空集合不落库，None 表示全部候选。
     """
     rows, _source, _skipped = read_candidates("metadata_fields", Path(candidate_root))
+    if asset_ids is not None:
+        chosen = {str(value) for value in asset_ids}
+        rows = [row for row in rows if str(row.get('asset_id') or '') in chosen]
     applied, skipped, rejected, refreshed = [], 0, 0, 0
     # 一次运行一个批次号，并集补进来的标签按它整批撤回。
     union_batch = f"{UNION_TAGS_SOURCE}@{time.strftime('%Y%m%dT%H%M%S')}"

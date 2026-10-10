@@ -18,6 +18,7 @@ from .catalog_rules import (
     LENGTH_TAGS,
     fc2_collection_label,
     is_jav_asset,
+    jav_edition_badges,
     jav_display_metadata,
     names_without_shared_part_tail,
     normalise_code_key,
@@ -37,6 +38,7 @@ from .western_artwork import artwork_key
 
 
 COST = {"local": "free", "115": "free", "pikpak": "metered", "online": "metered"}
+GROUP_TABLES = ('asset', 'asset_entity', 'entity')
 
 #: 卡片随每条记录返回的女优上限。共演作品必须带上全部出镜者，而不是只留第一位；
 #: 但 BEST 合集实测有 41 位，全量下发会把列表响应撑大，所以截断并同时给出总数，
@@ -365,7 +367,7 @@ def q_items(contract: WebContract, args):
         # 为它单独再发一次请求只是把同一条 WHERE 又跑一遍。
         cnt, total_bytes, work_total = (
             c.execute("SELECT count(*),COALESCE(sum(a.size),0),count(DISTINCT "
-                      + video_work_key(contract) + ") FROM asset a WHERE "
+                      + video_work_key(contract, c) + ") FROM asset a WHERE "
                       + " AND ".join(where), par).fetchone()
             if include_total else (None, None, None))
     # 卡片要显示出镜者和高权重标签，不能只有番号 —— 一次批量取，别 N+1
@@ -560,12 +562,10 @@ EDITION_ORDER = ("有码", "中字", "无码", "无码破解")
 def _edition_label(row: dict, tags: tuple[str, ...] = ()) -> str:
     """这一份是哪个版次。
 
-    判据只有 `jav_display_metadata` 一份。自己按文件名再写一套「像不像无码」的判断，
+    判据只有 `jav_edition_badges` 一份。自己按文件名再写一套「像不像无码」的判断，
     会和卡片上已经显示的徽章各说各话——同一个文件，角标写着无码、分组却当它是正片。
     """
-    badges = jav_display_metadata(
-        row.get("name"), row.get("code"), tags,
-    ).get("edition_badges") or []
+    badges = jav_edition_badges(row.get('name'), row.get('code'), tags)
     return str(badges[0]) if badges else "有码"
 
 
@@ -577,7 +577,8 @@ def _edition_rows(contract: WebContract, codes) -> list[dict]:
 
 def _catalog_group_rows(contract: WebContract) -> list[dict]:
     """规范番号、版次、探测规格共用一次全库只读快照。"""
-    return contract.cached_until_changed('catalog-group-rows', lambda: _read_group_rows(contract))
+    return contract.cached_until_changed('catalog-group-rows', lambda: _read_group_rows(contract),
+                                        tables=GROUP_TABLES)
 
 
 def _read_group_rows(contract: WebContract) -> list[dict]:
@@ -611,7 +612,8 @@ def _edition_groups(contract: WebContract, codes) -> dict[str, list[dict]]:
     """播放版本按规范番号归组，分卷属于各自的版本。"""
     keys = {normalise_code_key(code) for code in codes}
     return {code: group for code, group in contract.cached_until_changed(
-        'catalog-edition-groups', lambda: _derive_edition_groups(contract)).items() if code in keys}
+        'catalog-edition-groups', lambda: _derive_edition_groups(contract),
+        tables=GROUP_TABLES).items() if code in keys}
 
 
 def _derive_edition_groups(contract: WebContract) -> dict[str, list[dict]]:
@@ -704,13 +706,15 @@ def multipart_groups(contract: WebContract) -> dict[str, list[dict]]:
                 candidates.setdefault(code, []).append(row)
         groups = {}
         for code, items in candidates.items():
+            if len(items) < 2:
+                continue
             versions = partition_versions(items)
             for version in versions:
                 if version['multipart']:
                     key = code if len(versions) == 1 else f"{code}:{version['id']}"
                     groups[key] = version['items']
         return groups
-    return contract.cached_until_changed("catalog-multipart-groups", derive)
+    return contract.cached_until_changed("catalog-multipart-groups", derive, tables=GROUP_TABLES)
 
 
 def _live_parts(group) -> list[dict]:
@@ -719,21 +723,21 @@ def _live_parts(group) -> list[dict]:
     return live if len(live) > 1 else []
 
 
-def video_work_key(contract: WebContract) -> str:
+def video_work_key(contract: WebContract, connection) -> str:
     """分卷与版本按一部作品计数，其余文件各自计数。"""
     def derive():
         editions = _edition_groups(contract, [row['code'] for row in _catalog_group_rows(contract)])
-        cases = [
-            f"WHEN a.id IN ({','.join(str(int(item['id'])) for item in group)}) "
-            f"THEN 'edition:{int(group[0]['id'])}'"
-            for group in editions.values()
-        ] + [
-            f"WHEN a.id IN ({','.join(str(int(item['id'])) for item in group)}) "
-            f"THEN 'multipart:{int(group[0]['id'])}'"
-            for group in multipart_groups(contract).values()
-        ]
-        return ('CASE ' + ' '.join(cases) + " ELSE 'asset:'||a.id END") if cases else "'asset:'||a.id"
-    return contract.cached_until_changed('catalog-video-work-key', derive)
+        keys = {int(item['id']): f"edition:{int(group[0]['id'])}"
+                for group in editions.values() for item in group}
+        for group in multipart_groups(contract).values():
+            for item in group:
+                keys.setdefault(int(item['id']), f"multipart:{int(group[0]['id'])}")
+        return keys
+    keys = contract.cached_until_changed('catalog-video-work-key', derive, tables=GROUP_TABLES)
+    connection.create_function('peach_video_work_key', 1,
+                               lambda asset_id: keys.get(asset_id, f'asset:{asset_id}'),
+                               deterministic=True)
+    return 'peach_video_work_key(a.id)'
 
 
 def attach_multipart_groups(contract: WebContract, rows) -> None:
@@ -787,7 +791,8 @@ def q_parts(contract: WebContract, args):
 
 def _parts_by_asset(contract: WebContract) -> dict[int, tuple[str, list[dict]]]:
     return contract.cached_until_changed('catalog-parts-by-asset', lambda: {
-        int(row['id']): (key, group) for key, group in multipart_groups(contract).items() for row in group})
+        int(row['id']): (key, group) for key, group in multipart_groups(contract).items() for row in group},
+        tables=GROUP_TABLES)
 
 
 def _part_labels(group: list[dict]) -> dict[int, str]:
