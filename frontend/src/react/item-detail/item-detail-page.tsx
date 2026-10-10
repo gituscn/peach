@@ -24,6 +24,7 @@ import type { MediaItem } from '../catalog-grid/types';
 import { RetryNote } from '../components/grid-reveal';
 import { MixQueue, MixQueueRow } from '../components/mix-queue';
 import { RelatedSection } from '../components/related-section';
+import { DetailContinuation } from '../components/detail-continuation';
 import { CoverCrop } from '../cover-crop/cover-crop-page';
 import { queryClient } from '../query';
 import {
@@ -105,10 +106,12 @@ function Detail(props: ItemDetailProps & { item: DetailItem; queue: DetailQueue 
       <div data-stage-grid="" data-with-queue={queue ? '' : undefined} data-item-detail="">
         <MediaFrame item={item} gate={gate} helpers={helpers} actions={actions}
           autoplay={props.queue?.autoplay} onEnded={continuePart} />
-        {queue ? <Queue queue={queue} itemId={item.id} helpers={helpers} actions={actions} /> : null}
         <Side item={item} queue={queue} write={write} helpers={helpers} actions={actions} />
       </div>
-      {!queue && props.relatedLimit > 0 ? <Related {...props} /> : null}
+      <DetailContinuation queue={queue ? <Queue queue={queue} itemId={item.id} helpers={helpers} actions={actions} /> : null}>
+        {props.relatedLimit > 0 && (!queue || queue.kind === 'parts' || queue.kind === 'editions')
+          ? <Related {...props} item={queue ? { ...item, id: queue.seedId ?? item.id } : item} /> : null}
+      </DetailContinuation>
     </>
   );
 }
@@ -723,14 +726,14 @@ function Related(props: ItemDetailProps & { item: DetailItem }) {
     },
   });
   const [skeleton] = useState(() => helpers.relatedSkeletonHtml());
-  if (result.data && !result.data.length) return null;
+  if (result.isError || (result.data && !result.data.length)) return null;
   return (
     <RelatedSection wireDrag={helpers.wireDrag} busy={result.isPending}>
         {result.data ? (
           <CatalogGridPage mode="items" variant="next" items={result.data} helpers={grid.helpers} actions={grid.actions}
             layout={props.layout} selectMode={props.selectMode} selected={props.selected} seekSeconds={props.seekSeconds}
             revision={0} wireDrag={helpers.wireDrag} skeletonHtml={() => ''} />
-        ) : result.isError ? null : <Html html={skeleton} />}
+        ) : <Html html={skeleton} />}
     </RelatedSection>
   );
 }

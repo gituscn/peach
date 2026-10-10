@@ -24,7 +24,7 @@
 .peach-react [data-media-grid] > [data-media-card]:not([data-variant="resource"], [data-variant="junk"]) { align-self: start; }
 body[data-surface="/trash"] .peach-react [data-media-grid] > [data-media-card] { align-self: stretch; }
 /* 详情页接着看那一排：岛根挂在作品详情的横排 `[data-related-row]` 里，卡片在这一层横着排，卡距同那一排。 */
-.peach-react [data-media-next-row] { display: flex; gap: 11px; }
+.peach-react [data-media-next-row] { display: flex; gap: 16px; }
 body[data-surface="/trash"] .peach-react [data-media-grid] {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 20px;

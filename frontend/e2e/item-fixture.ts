@@ -63,7 +63,11 @@ const card = (id: number) => {
 };
 export const CATALOG = [11, 12, 13, 14, 15, 16];
 export const RELATED = [14, 15, 16, 12];
-const PARTS = { title: 'PCH-021', items: [21, 22, 23].map((id, at) => ({ ...card(id), part_label: String(at + 1) })) };
+const PARTS = { title: 'PCH-021', items: [21, 22, 23].map((id, at) => ({
+  ...DETAILS.get(id), part_label: String(at + 1), performer_entities: undefined,
+  performers: NAMES.slice(0, 2),
+  entity_refs: { performer: NAMES.slice(0, 2).map((name, index) => ref(name, index + 1, { has_image: true })) },
+})) };
 const EDITIONS = { title: 'PCH-031', items: [{ ...card(31), edition_label: '中字' }, { ...card(32), edition_label: '无码' }] };
 export const PLAYLIST = { id: 7, name: '周末片单', items: [11, 14, 15, 16] };
 

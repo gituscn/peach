@@ -129,12 +129,12 @@
 /* ── 队列 ──
    合集队列卡的出处与时间：标记、站点图标和时间按盒子居中成一行，不靠基线偏移去凑。标记可收窄
    （自带尾部省略），时间不收。 */
-.peach-react [data-follow-detail] [data-follow-queue-meta] { display: flex; align-items: center; gap: 6px; }
+.peach-react [data-follow-queue] [data-follow-queue-meta] { display: flex; align-items: center; gap: 6px; }
 /* 包图标的那层不占盒子，图标本身是这一行的弹性子项；不用 `contents` 工具类，队列行里的
    `[data-mix-item-text] span{display:block}`（`../stage/stage.css`）比它权重高。 */
-.peach-react [data-follow-detail] [data-follow-queue-meta] > [data-follow-queue-source] { display: contents; }
-.peach-react [data-follow-detail] [data-follow-queue-meta] img { flex: none; margin: 0; }
-.peach-react [data-follow-detail] [data-follow-queue-meta] time { flex: none; white-space: nowrap; }
+.peach-react [data-follow-queue] [data-follow-queue-meta] > [data-follow-queue-source] { display: contents; }
+.peach-react [data-follow-queue] [data-follow-queue-meta] img { flex: none; margin: 0; }
+.peach-react [data-follow-queue] [data-follow-queue-meta] time { flex: none; white-space: nowrap; }
 .peach-react [data-follow-detail] [data-follow-variant] {
   display: inline-block;
   flex: 0 1 auto;
