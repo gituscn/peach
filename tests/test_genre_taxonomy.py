@@ -30,6 +30,19 @@ def _catalog_vocabulary() -> set[str]:
 
 
 class GenreTaxonomyTests(unittest.TestCase):
+    def test_office_role_and_uniform_keep_separate_dimensions(self):
+        tags, unknown = map_genres(["OL", "Secretary", "Office Lady", "スーツ", "Business Suit"])
+        self.assertEqual(tags, ["秘书OL", "OL制服"])
+        self.assertEqual(unknown, [])
+        self.assertEqual(catalog_rules.current_tags(["OL", "秘书OL", "OL制服"]),
+                         ["秘书OL", "OL制服"])
+        self.assertEqual(catalog_rules.tag_cat("秘书OL"), "role")
+        self.assertEqual(catalog_rules.tag_cat("OL制服"), "appearance")
+        self.assertEqual(catalog_rules.tag_cat("JK制服"), "appearance")
+
+    def test_cat_ears_share_one_target_across_source_spellings(self):
+        self.assertEqual(map_genres(["猫耳", "貓耳女"]), (["猫耳"], []))
+
     def test_anal_region_is_distinct_from_anal_intercourse(self):
         for raw in ("Anal", "Anal Play", "アナル", "アナル責め", "アナルシリーズ", "肛門・肛交"):
             with self.subTest(raw=raw):
@@ -532,7 +545,7 @@ class Fc2SellerTagTests(unittest.TestCase):
         for spellings, tag in (
             (("ぱいぱん",), "白虎"),
             (("スジマン",), "美穴"),
-            (("猫耳",), "兽耳兽装"),
+            (("猫耳",), "猫耳"),
             (("セーラー",), "制服"),
             (("体操着", "体操服"), "体操服"),
             (("バニー",), "兔女郎"),

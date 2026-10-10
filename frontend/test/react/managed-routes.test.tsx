@@ -376,7 +376,7 @@ it('统计页：点标签交壳回目录；「添加媒体文件夹」先交页�
   props.openMediaSettings();
   expect(vi.mocked(actions.openTag).mock.calls).toEqual([['痴女']]);
   expect(order).toEqual(['section 媒体', 'go /configuration']);
-  expect([props.configurable, props.tagLabel('JK制服')]).toEqual([false, 'JK']);
+  expect([props.configurable, props.tagLabel('JK制服')]).toEqual([false, 'JK制服']);
 });
 
 it('口味页：总结里的下一步按路径走 go', async () => {
@@ -595,7 +595,7 @@ it('索引页：页内写地址、存版式、头像与去处都接到壳的那�
     actions.routeIndex, actions.savePeopleLayout, actions.exitSelectMode, actions.personAvatar, actions.authorAvatar,
     actions.openEntity, actions.showIndexTags, actions.openFollowAuthor, actions.openFollowTag]);
   expect([props.kind, props.layout, props.selectMode, props.configurable]).toEqual(['performers', 'big', false, false]);
-  expect((props.tagLabel as (tag: string) => string)('JK制服')).toBe('JK');
+  expect((props.tagLabel as (tag: string) => string)('JK制服')).toBe('JK制服');
 });
 
 it('索引页的路径不经 React Router 的 navigate：同页换 search 与跨页进来都交壳写地址', async () => {
