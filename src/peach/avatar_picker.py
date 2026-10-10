@@ -532,13 +532,11 @@ def _distinct_choices(items: list[Choice], providers_root: Path,
         first = overlapping[0]
         merged = [groups[index][0] for index in overlapping] + [choice]
         winner = min(merged, key=lambda item: rank.get(item.source, 3))
-        bases = list(winner.bases)
-        if winner.source == "asset":
-            bases = list(dict.fromkeys([*bases, *(item.ref for item in merged)]))
+        bases = tuple(dict.fromkeys(ref for item in merged for ref in item.bases))
         details = list(dict.fromkeys(text for item in merged for text in (item.detail, item.label)
                                     if text and text != winner.label))
         winner = replace(winner, current=any(item.current for item in merged),
-                         bases=tuple(bases), detail=" · ".join(details))
+                         bases=bases, detail=" · ".join(details))
         for index in overlapping:
             keys.update(groups[index][1])
         groups[first] = (winner, keys)
