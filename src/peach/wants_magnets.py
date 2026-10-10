@@ -9,19 +9,12 @@ import time
 from datetime import date
 from calendar import monthrange
 
-from .sources import FailureReason, JavDBSource, Session, SourceFailure
+from .sources import FailureReason, SourceFailure
 
 
 def fetch(root: Path, code: str) -> dict:
-    from .jav_cover_fetch import HostLimitedTransport
-    from .scraping_access import SourceTransport
-
-    transport = HostLimitedTransport(
-        SourceTransport(root, max_requests=6, max_bytes=12 * 1024 * 1024, max_seconds=45), 3)
-    try:
-        return JavDBSource().resources(code, session=Session(transport, time.monotonic() + 45))
-    finally:
-        transport.close()
+    from .magnet_chain import search
+    return search(root, code)
 
 
 def cache_lifetime(released: str | None, today: date | None = None) -> int:
@@ -64,7 +57,7 @@ class MagnetSearch:
                 if error.reason != FailureReason.NOT_FOUND:
                     result.update(state="error", error=str(error))
             except Exception:  # 来源异常只报告查询失败，不泄露请求或凭据
-                result.update(state="error", error="JavDB 磁链未取得，请稍后重试或检查来源连接。")
+                result.update(state="error", error="磁力抓取链未取得，请稍后重试或检查来源连接。")
             self.next_request = self.clock() + 3
             self.cache[code] = (self.clock(), result)
             self.cache.move_to_end(code)

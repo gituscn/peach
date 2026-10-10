@@ -46,7 +46,8 @@ from .web_entity import (
     w_entity_alias,
     w_entity_name,
 )
-from .web_downloads import q_downloads, w_download_cancel, w_download_submit
+from .web_downloads import (q_downloads, w_download_cancel, w_download_postprocess,
+                            w_download_submit)
 from .web_resource_search import q_resource_search
 from .web_feeds import (
     q_feed_check,
@@ -368,6 +369,7 @@ GET_HANDLERS = {
 POST_HANDLERS = {
     "/api/downloads": w_download_submit,
     "/api/downloads/cancel": w_download_cancel,
+    "/api/downloads/postprocess": w_download_postprocess,
     "/api/library-processing": w_library_processing,
     "/api/thumbnail-jobs": w_thumbnail_jobs,
     "/api/scraping/settings": w_scraping_settings,

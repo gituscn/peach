@@ -25,9 +25,10 @@ import { momentText } from './tasks';
 export const DOWNLOADS_URL = '/api/downloads';
 export const DOWNLOADS_KEY = ['downloads'] as const;
 const CANCEL_URL = '/api/downloads/cancel';
+const POSTPROCESS_URL = '/api/downloads/postprocess';
 
 export const downloadPollInterval = (data: DownloadsSnapshot | undefined) =>
-  data?.tasks.some((task) => task.cancellable) ? 5_000 : 30_000;
+  data?.tasks.some((task) => task.cancellable || task.postprocess_active) ? 5_000 : 30_000;
 
 const STATE_COLORS: Record<string, 'lime' | 'rose' | 'yellow'> = {
   ingested: 'lime', failed: 'rose', cancelled: 'yellow', stalled: 'yellow',
@@ -66,7 +67,7 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
   const action = useAction();
   const [copied, setCopied] = useState(false);
   const reason = failureText(task);
-  const failed = task.state === 'failed';
+  const failed = task.state === 'failed' || task.postprocess_state === 'failed';
   const meta = [task.provider_label, task.code, task.target, momentText(task.submitted_at)]
     .filter(Boolean).join(' · ');
   const refresh = () => { void client.invalidateQueries({ queryKey: DOWNLOADS_KEY }) };
@@ -82,6 +83,10 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
   const copy = () => {
     void navigator.clipboard.writeText(task.source_uri).then(() => setCopied(true), () => setCopied(false));
   };
+  const retryPostprocess = () => {
+    void action.run('postprocess', (signal) => apiSend(
+      POSTPROCESS_URL, { id: task.id }, 'POST', signal), refresh);
+  };
 
   return (
     <li data-download-state={task.state} data-download-id={task.id}
@@ -93,6 +98,10 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
         <div className="flex flex-wrap items-center gap-2">
           <strong className="min-w-0 break-words text-title-1-medium text-text-primary">{taskName(task)}</strong>
           <Chip color={STATE_COLORS[task.state] ?? 'neutral'}>{task.state_label}</Chip>
+          {task.state === 'ingested'
+            ? <Chip color={task.postprocess_state === 'complete' ? 'lime'
+              : task.postprocess_state === 'failed' ? 'rose' : 'yellow'}>{task.postprocess_label}</Chip>
+            : null}
         </div>
         <p className="min-w-0 break-words text-caption-1-regular text-text-secondary">{meta}</p>
         {task.state === 'remote_running' && task.progress != null
@@ -109,12 +118,16 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
           {writable && task.resubmittable
             ? <Button variant="secondary" size="small" {...busyProps(action.busy === 'resubmit')} onClick={resubmit}>重新提交</Button>
             : null}
+          {writable && task.postprocess_retryable
+            ? <Button variant="secondary" size="small" {...busyProps(action.busy === 'postprocess')}
+                onClick={retryPostprocess}>重试后处理</Button>
+            : null}
           <Button variant="ghost" size="small" onClick={copy}>{copied ? '已复制磁力' : '复制磁力'}</Button>
         </div>
       </div>
-      {reason
+      {reason || task.postprocess_detail
         ? <div className="flex min-h-14 flex-col justify-center rounded-b-2xl border-t border-separator-border bg-card-footer px-5 py-3">
-            <p className="text-caption-1-regular text-text-secondary">{reason}</p>
+            <p className="text-caption-1-regular text-text-secondary">{reason || task.postprocess_detail}</p>
           </div>
         : null}
     </li>

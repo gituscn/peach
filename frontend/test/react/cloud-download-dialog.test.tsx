@@ -15,6 +15,8 @@ const task = (patch: Partial<DownloadTask> = {}): DownloadTask => ({
   state: 'submitted', state_label: '已提交', failure: null, failure_label: null, failure_detail: null,
   progress: null, remote_name: null, ledger_path: null, asset_id: null, submitted_at: '2026-10-01T08:00:00Z',
   updated_at: '2026-10-01T08:01:00Z', finished_at: null, blocked: false, cancellable: true, resubmittable: false,
+  postprocess_state: 'not_requested', postprocess_label: '未开始', postprocess_detail: null,
+  postprocess_run_id: null, postprocessed_at: null, postprocess_active: false, postprocess_retryable: false,
   ...patch,
 });
 

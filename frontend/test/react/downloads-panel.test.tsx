@@ -15,6 +15,8 @@ const task = (patch: Partial<DownloadTask> = {}): DownloadTask => ({
   state: 'remote_running', state_label: '远端下载中', failure: null, failure_label: null, failure_detail: null,
   progress: 0.42, remote_name: null, ledger_path: null, asset_id: null, submitted_at: '2026-10-01T08:00:00Z',
   updated_at: '2026-10-01T08:01:00Z', finished_at: null, blocked: false, cancellable: true, resubmittable: false,
+  postprocess_state: 'not_requested', postprocess_label: '未开始', postprocess_detail: null,
+  postprocess_run_id: null, postprocessed_at: null, postprocess_active: false, postprocess_retryable: false,
   ...patch,
 });
 
@@ -92,6 +94,22 @@ it('只读端任务照常列出，但没有取消键', async () => {
   expect(buttonNamed('取消', host)).toBeNull();
 });
 
+it('后处理失败可以单独重试，不会重新提交磁力', async () => {
+  const failed = task({
+    state: 'ingested', state_label: '已入库', cancellable: false,
+    postprocess_state: 'failed', postprocess_label: '后处理失败',
+    postprocess_detail: '资料采集失败', postprocess_retryable: true,
+  });
+  const { posts } = serve(snapshot({ tasks: [failed] }), {
+    '/api/downloads/postprocess': { ok: true, task: failed },
+  });
+  const host = await show();
+  expect(host.textContent).toContain('资料采集失败');
+  await click(buttonNamed('重试后处理', host));
+  await settle();
+  expect(posts()).toEqual([['/api/downloads/postprocess', { id: 1 }]]);
+});
+
 it('一条任务都没有时整段不画，也没有提交表单', async () => {
   const { calls } = serve(snapshot());
   const host = await mount(<QueryClientProvider client={queryClient}><DownloadsPanel /></QueryClientProvider>);
@@ -106,5 +124,8 @@ it('一条任务都没有时整段不画，也没有提交表单', async () => {
 it('有任务还在跟进时五秒查一次，全是终态三十秒一次', () => {
   expect(downloadPollInterval(snapshot({ tasks: [task()] }))).toBe(5_000);
   expect(downloadPollInterval(snapshot({ tasks: [task({ cancellable: false, state: 'ingested' })] }))).toBe(30_000);
+  expect(downloadPollInterval(snapshot({ tasks: [task({
+    cancellable: false, state: 'ingested', postprocess_active: true, postprocess_state: 'running',
+  })] }))).toBe(5_000);
   expect(downloadPollInterval(undefined)).toBe(30_000);
 });

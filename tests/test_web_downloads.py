@@ -13,6 +13,7 @@ from unittest import mock
 import httpx
 from fastapi.testclient import TestClient
 
+from peach import download_postprocess
 from peach import downloads as dl
 from peach import downloads_clouddrive, web_downloads
 from peach.api import create_app
@@ -114,6 +115,40 @@ class RouteTests(_App):
         self.assertEqual(response.status_code, 400)
         self.assertIn("infohash", response.text)
         self.assertEqual(self.client.post("/api/downloads/cancel", json={}).status_code, 400)
+
+    def test_failed_postprocess_can_be_requeued_without_resubmitting(self):
+        result = self.service.submit(
+            source=f"magnet:?xt=urn:btih:{HASH}&dn=ABC-123", provider="115",
+            target="/115/云下载", code="ABC-123")
+        result.task.state = dl.INGESTED
+        result.task.postprocess_state = dl.POSTPROCESS_FAILED
+        self.service.store.save(result.task)
+        queued = []
+        self.service.after_ingest = lambda task: queued.append(task.id)
+        response = self.client.post("/api/downloads/postprocess", json={"id": result.task.id})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["task"]["postprocess_state"], dl.POSTPROCESS_PENDING)
+        self.assertEqual(queued, [result.task.id])
+
+    def test_postprocess_enqueue_is_persisted_and_adopts_an_existing_queue_row(self):
+        result = self.service.submit(
+            source=f"magnet:?xt=urn:btih:{HASH}&dn=ABC-123", provider="115",
+            target="/115/云下载", code="ABC-123")
+        result.task.state = dl.INGESTED
+        result.task.postprocess_state = dl.POSTPROCESS_PENDING
+        self.service.store.save(result.task)
+        contract = self.app.state.web_contract
+        wake = mock.patch.object(contract.followups, "wake")
+        wake.start()
+        self.addCleanup(wake.stop)
+        first = download_postprocess.enqueue(contract, result.task)
+        self.assertIsNotNone(first)
+        self.assertEqual(self.service.store.get(result.task.id).postprocess_state,
+                         dl.POSTPROCESS_QUEUED)
+        self.service.store.postprocess(result.task.id, dl.POSTPROCESS_PENDING)
+        second = download_postprocess.enqueue(contract, self.service.store.get(result.task.id))
+        self.assertEqual(second, first)
+        self.assertEqual(self.service.store.get(result.task.id).postprocess_run_id, first)
 
 
 class SettingsBlockTests(_App):
@@ -359,12 +394,16 @@ class ResourceIndexerRoutes(_App):
         from peach.resource_search import Indexers
         Indexers(self.service.credentials).save({"indexers": [{
             "key": "one", "name": "测试源", "url": "http://indexer.test/api", "enabled": True}]})
-        with mock.patch("peach.web_resource_search._SEARCH.run", return_value={
+        with mock.patch("peach.web_resource_search.direct_search", return_value={
+                "items": [], "warnings": [], "trace": [],
+                "next_sources": [], "reference_only": []}) as direct, \
+             mock.patch("peach.web_resource_search._SEARCH.run", return_value={
                 "ok": True, "state": "ready", "items": [], "warnings": [], "error": ""}) as search:
             response = self.client.get("/api/resources/search?code=ABC-123&goal=chinese")
         self.assertEqual(response.status_code, 200, response.text)
         args = search.call_args.args
         self.assertEqual((args[0][0]["key"], args[1], args[2].goal), ("one", "ABC-123", "chinese"))
+        self.assertEqual(direct.call_args.kwargs["goal"], "chinese")
         self.assertEqual(self.client.get("/api/resources/search?code=ABC-123&min_size=-1").status_code, 400)
 
 

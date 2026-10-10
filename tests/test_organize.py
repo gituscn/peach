@@ -182,6 +182,15 @@ class PlanTests(unittest.TestCase):
         skipped = [row for row in plan["rows"] if row["action"] == "skip"]
         self.assertEqual(skipped[0]["reason"], organize.SKIP_TARGET_EXISTS)
 
+    def test_scoped_plan_only_contains_requested_assets(self):
+        _seed(self.db_path, [
+            {"id": 1, "path": "R:\\media\\a.mp4", "name": "a.mp4", "code": "ABC-123"},
+            {"id": 2, "path": "R:\\media\\b.mp4", "name": "b.mp4", "code": "DEF-456"},
+        ])
+        plan = _plan(self.db_path, file_template="{number}", asset_ids=[2])
+        self.assertEqual(plan["counts"], {"total": 1, "unchanged": 0, "change": 1, "skip": 0})
+        self.assertEqual([row["asset_id"] for row in plan["rows"]], [2])
+
     def test_offline_source_skips_every_row(self):
         _seed(self.db_path, [
             {"id": 1, "path": "R:\\media\\a.mp4", "name": "a.mp4", "code": "ABC-123"},

@@ -189,6 +189,13 @@ export interface DownloadTask {
   blocked: boolean;
   cancellable: boolean;
   resubmittable: boolean;
+  postprocess_state: string;
+  postprocess_label: string;
+  postprocess_detail: string | null;
+  postprocess_run_id: number | null;
+  postprocessed_at: string | null;
+  postprocess_active: boolean;
+  postprocess_retryable: boolean;
 }
 
 export interface DownloadsSnapshot {

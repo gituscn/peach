@@ -1005,7 +1005,7 @@ class WebDataTests(unittest.TestCase):
             "/api/wants", "/api/wants/magnets",
         })
         self.assertEqual(set(rm_web.POST_HANDLERS), {
-            "/api/downloads", "/api/downloads/cancel",
+            "/api/downloads", "/api/downloads/cancel", "/api/downloads/postprocess",
             "/api/library-processing", "/api/thumbnail-jobs", "/api/media-repair",
             "/api/scraping/settings", "/api/scraping/check", "/api/scraping/cover",
             "/api/scraping/amane-bridge/check", "/api/scraping/amane-bridge/rebuild",

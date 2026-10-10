@@ -54,6 +54,18 @@ FAILED = "failed"
 CANCELLED = "cancelled"
 STALLED = "stalled"
 
+POSTPROCESS_NOT_REQUESTED = "not_requested"
+POSTPROCESS_PENDING = "pending"
+POSTPROCESS_QUEUED = "queued"
+POSTPROCESS_RUNNING = "running"
+POSTPROCESS_COMPLETE = "complete"
+POSTPROCESS_FAILED = "failed"
+POSTPROCESS_LABELS = {
+    POSTPROCESS_NOT_REQUESTED: "未开始", POSTPROCESS_PENDING: "待后处理",
+    POSTPROCESS_QUEUED: "已排队", POSTPROCESS_RUNNING: "后处理中",
+    POSTPROCESS_COMPLETE: "后处理完成", POSTPROCESS_FAILED: "后处理失败",
+}
+
 STATE_LABELS = {
     CANDIDATE: "候选", SELECTED: "已选定", SUBMITTED: "已提交", REMOTE_RUNNING: "远端进行中",
     REMOTE_DONE: "远端完成", LANDED: "已落地", INGESTED: "已入库",
@@ -272,6 +284,10 @@ class DownloadTask:
     finished_at: str | None = None
     next_check_at: str | None = None
     blocked_at: str | None = None
+    postprocess_state: str = POSTPROCESS_NOT_REQUESTED
+    postprocess_detail: str | None = None
+    postprocess_run_id: int | None = None
+    postprocessed_at: str | None = None
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "DownloadTask":
@@ -291,6 +307,14 @@ class DownloadTask:
             "ledger_path": self.ledger_path, "asset_id": self.asset_id,
             "submitted_at": self.submitted_at, "updated_at": self.updated_at,
             "finished_at": self.finished_at, "blocked": bool(self.blocked_at),
+            "postprocess_state": self.postprocess_state,
+            "postprocess_label": POSTPROCESS_LABELS.get(self.postprocess_state, self.postprocess_state),
+            "postprocess_detail": self.postprocess_detail,
+            "postprocess_run_id": self.postprocess_run_id,
+            "postprocessed_at": self.postprocessed_at,
+            "postprocess_active": self.postprocess_state in {
+                POSTPROCESS_PENDING, POSTPROCESS_QUEUED, POSTPROCESS_RUNNING},
+            "postprocess_retryable": self.state == INGESTED and self.postprocess_state == POSTPROCESS_FAILED,
             "cancellable": self.state in TRACKED_STATES,
             "resubmittable": self.state in RESUBMITTABLE_STATES and not self.blocked_at,
         }
@@ -301,6 +325,7 @@ _TASK_COLUMNS = (
     "origin", "failure", "failure_detail", "remote_id", "remote_name", "progress",
     "ledger_path", "asset_id", "checks", "submitted_at", "remote_done_at", "updated_at",
     "finished_at", "next_check_at", "blocked_at",
+    "postprocess_state", "postprocess_detail", "postprocess_run_id", "postprocessed_at",
 )
 
 
@@ -379,15 +404,54 @@ class DownloadStore:
                 "WHERE task_id=? ORDER BY id", (task_id,)).fetchall()
         return [dict(row) for row in rows]
 
-    def asset_under(self, location: str, ledger_path: str) -> int | None:
-        """账本里有没有这条路径，或这个目录下的文件。路径大小写按 Windows 口径不区分。"""
+    def assets_under(self, location: str, ledger_path: str) -> list[dict]:
+        """账本里这条路径或目录下的全部活动资产；路径按 Windows 口径不区分。"""
         escaped = ledger_path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         with self.database.read_connection() as connection:
-            row = connection.execute(
-                "SELECT id FROM asset WHERE location=? AND (path=? COLLATE NOCASE "
-                "OR path LIKE ? ESCAPE '\\') ORDER BY id LIMIT 1",
-                (location, ledger_path, escaped + "\\\\%")).fetchone()
-        return int(row[0]) if row else None
+            rows = connection.execute(
+                "SELECT id,path,name,code,medium,size,duration,width,height FROM asset "
+                "WHERE location=? AND disposal IS NULL "
+                "AND (path=? COLLATE NOCASE OR path LIKE ? ESCAPE '\\') ORDER BY id",
+                (location, ledger_path, escaped + "\\\\%")).fetchall()
+        return [dict(row) for row in rows]
+
+    def asset_under(self, location: str, ledger_path: str, code: str | None = None) -> int | None:
+        """选择正片，而不是目录中最早登记的一条推广视频。"""
+        from .catalog_rules import release_code_from_filename, same_release_code
+        rows = [row for row in self.assets_under(location, ledger_path)
+                if row.get("medium") == "video"]
+        if not rows:
+            return None
+        def rank(row):
+            shown = row.get("code") or release_code_from_filename(row.get("name") or "")
+            exact = bool(code and shown and same_release_code(code, shown))
+            promo = bool(re.search(r"(?i)(?:manko\.fun|广告|廣告|扫码|掃碼|最新地址)",
+                                   str(row.get("name") or "")))
+            duration = float(row.get("duration") or 0)
+            pixels = int(row.get("width") or 0) * int(row.get("height") or 0)
+            return (exact, not promo, duration, pixels, int(row.get("size") or 0), -int(row["id"]))
+        return int(max(rows, key=rank)["id"])
+
+    def pending_postprocess(self) -> list[DownloadTask]:
+        with self.database.read_connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM download_task WHERE state=? AND postprocess_state=? ORDER BY id",
+                (INGESTED, POSTPROCESS_PENDING)).fetchall()
+        return [DownloadTask.from_row(row) for row in rows]
+
+    def postprocess(self, task_id: int, state: str, *, detail: str | None = None,
+                    run_id: int | None = None, finished: str | None = None) -> None:
+        assignments = ["postprocess_state=?", "postprocess_detail=?"]
+        values: list[object] = [state, detail]
+        if run_id is not None:
+            assignments.append("postprocess_run_id=?")
+            values.append(run_id)
+        if finished is not None:
+            assignments.append("postprocessed_at=?")
+            values.append(finished)
+        with self.database.write_transaction(notify=False) as connection:
+            connection.execute(f"UPDATE download_task SET {','.join(assignments)} WHERE id=?",
+                               (*values, int(task_id)))
 
 
 # ---------------------------------------------------------------- 设置
@@ -513,6 +577,7 @@ class DownloadService:
         self, *, database: LedgerDatabase, state_root: Path, credentials: CredentialStore,
         providers: Callable[[str], OfflineProvider], landing: "Landing",
         available: bool = True, clock: Callable[[], float] = time.time,
+        after_ingest: Callable[[DownloadTask], None] | None = None,
     ):
         self.store = DownloadStore(database)
         self.settings = DownloadSettings(state_root)
@@ -521,6 +586,7 @@ class DownloadService:
         self.landing = landing
         self.available = bool(available)
         self.clock = clock
+        self.after_ingest = after_ingest
         self.config = self.settings.load()
         self._submit_lock = threading.Lock()
         self._wake = threading.Event()
@@ -620,6 +686,17 @@ class DownloadService:
             "tasks": [task.payload() for task in tasks],
         }
 
+    def retry_postprocess(self, task_id: int) -> DownloadTask:
+        task = self.store.get(int(task_id))
+        if task is None:
+            raise ValueError("没有这个下载任务")
+        if task.state != INGESTED or task.postprocess_state != POSTPROCESS_FAILED:
+            raise ValueError("这个任务没有失败的后处理可以重试")
+        self.store.postprocess(task.id, POSTPROCESS_PENDING, detail="等待重新处理")
+        task = self.store.get(task.id)
+        self._dispatch_postprocess(task)
+        return self.store.get(task.id)
+
     def _provider_state(self, key: str) -> dict:
         credential = CLOUDDRIVE_CREDENTIAL if key == "115" else PIKPAK_CREDENTIAL
         needed = "token" if key == "115" else "refresh_token"
@@ -636,6 +713,14 @@ class DownloadService:
         self._stop.clear()
         self._thread = threading.Thread(target=self._loop, name="PeachDownloads", daemon=True)
         self._thread.start()
+        if self.after_ingest is not None:
+            try:
+                pending = self.store.pending_postprocess()
+            except sqlite3.Error:
+                # 未配置实例的 lifespan 也会装配服务；账本尚不存在时没有待恢复任务。
+                pending = []
+            for task in pending:
+                self._dispatch_postprocess(task)
 
     def stop(self) -> None:
         thread, self._thread = self._thread, None
@@ -741,10 +826,10 @@ class DownloadService:
                 "PikPak 在「云下载」设置里选 PikPak 根目录对应的媒体文件夹")
         location, ledger_path = mapped
         task.ledger_path = ledger_path
-        asset_id = self.store.asset_under(location, ledger_path)
+        asset_id = self.store.asset_under(location, ledger_path, task.code)
         if asset_id is None and self.landing.ingest(location, ledger_path):
             task.state = LANDED
-            asset_id = self.store.asset_under(location, ledger_path)
+            asset_id = self.store.asset_under(location, ledger_path, task.code)
         if asset_id is not None:
             task.state = INGESTED
             task.asset_id = asset_id
@@ -752,7 +837,12 @@ class DownloadService:
             task.updated_at = iso(now)
             task.next_check_at = None
             task.failure = task.failure_detail = None
+            task.postprocess_state = POSTPROCESS_PENDING
+            task.postprocess_detail = None
+            task.postprocess_run_id = None
+            task.postprocessed_at = None
             self.store.save(task)
+            self._dispatch_postprocess(task)
             return
         done = parse_iso(task.remote_done_at) or now
         if now - done > LANDING_TIMEOUT:
@@ -761,6 +851,16 @@ class DownloadService:
         task.updated_at = iso(now)
         task.next_check_at = iso(now + LANDING_GRACE)
         self.store.save(task)
+
+    def _dispatch_postprocess(self, task: DownloadTask) -> None:
+        if self.after_ingest is None:
+            return
+        try:
+            self.after_ingest(task)
+        except Exception as error:
+            LOGGER.exception("云下载任务 %s 后处理入队失败", task.id)
+            self.store.postprocess(task.id, POSTPROCESS_FAILED,
+                                   detail=f"{type(error).__name__}: {error}")
 
     # -- 设置
 
@@ -857,4 +957,3 @@ def submit_offline_download(
     """
     return service.submit(source=magnet, provider=provider, target=target, code=code,
                           title=title, origin=origin).payload()
-
