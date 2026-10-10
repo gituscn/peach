@@ -294,6 +294,41 @@ class LandingTests(_Deployment):
         self.assertEqual(paths, [self.ledger("云下载", "ABC-123", "ABC-123.mp4")])
         self.assertEqual(task.asset_id is not None, True)
 
+    def test_the_main_video_is_bound_instead_of_the_first_promo_file(self):
+        task_id = self.submit(code="ABC-123")["task"]["id"]
+        self.provider.statuses = [dl.RemoteStatus(dl.DONE, "r1", "ABC-123", 1.0)]
+        self.tick(10)
+        folder = self.cloud / "云下载" / "ABC-123"
+        folder.mkdir()
+        (folder / "manko.fun.mp4").write_bytes(b"ad")
+        (folder / "ABC-123.mp4").write_bytes(b"main")
+        self.tick(dl.LANDING_GRACE)
+        task = self.service.store.get(task_id)
+        with closing(sqlite3.connect(self.db)) as connection:
+            name = connection.execute("SELECT name FROM asset WHERE id=?", (task.asset_id,)).fetchone()[0]
+        self.assertEqual(name, "ABC-123.mp4")
+        self.assertEqual(task.postprocess_state, dl.POSTPROCESS_PENDING)
+
+    def test_folder_assets_include_attachments_without_treating_them_as_the_main_video(self):
+        task_id = self.submit(code="ABC-123")["task"]["id"]
+        self.provider.statuses = [dl.RemoteStatus(dl.DONE, "r1", "ABC-123", 1.0)]
+        self.tick(10)
+        folder = self.cloud / "云下载" / "ABC-123"
+        folder.mkdir()
+        (folder / "ABC-123.mp4").write_bytes(b"main")
+        self.tick(dl.LANDING_GRACE)
+        task = self.service.store.get(task_id)
+        attachment = self.ledger("云下载", "ABC-123", "推广页.url")
+        with closing(sqlite3.connect(self.db)) as connection:
+            connection.execute(
+                "INSERT INTO asset(location,path,name,medium,size) VALUES(?,?,?,?,?)",
+                ("115", attachment, "推广页.url", "other", 128))
+            connection.commit()
+        rows = self.service.store.assets_under("115", task.ledger_path)
+        self.assertEqual({row["medium"] for row in rows}, {"video", "other"})
+        self.assertEqual(self.service.store.asset_under("115", task.ledger_path, "ABC-123"),
+                         task.asset_id)
+
     def test_a_wishlist_download_that_lands_marks_the_want_acquired(self):
         with closing(sqlite3.connect(self.db)) as connection:
             want_id = wants.add_code(connection, "ABC-123")["id"]

@@ -54,6 +54,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
                 "test_jav_code_domain.py",
                 "test_taste_history.py", "test_web_ui.py", "test_web_js.py",
                 "test_web_perf.py", "test_web_resource_sync.py", "test_record_rehome.py", "test_wants.py",
+                "test_magnet_chain.py",
                 "test_web_orphan_records.py",
                 "test_web_review.py", "test_web_settings.py"),
     # 任务中心的两个文件跟着 `test_jobs.py` 走：`jobs.py` 与 `task_runs.py` 是同一条

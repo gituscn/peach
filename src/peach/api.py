@@ -30,7 +30,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES, GZipMiddleware
 
-from . import __version__, browser_transport, feeds, tunnel, web_contract, web_feeds, web_follow
+from . import (__version__, browser_transport, feeds, tunnel, web_batch, web_contract,
+               web_feeds, web_follow, web_settings)
 from . import routes_api, routes_auth, routes_configuration, routes_media, routes_pages
 from .buildinfo import frozen_build
 from .config import LOCATION_ROOT_DECLARATIONS, PeachSettings
@@ -195,6 +196,8 @@ def create_app(
         taste_history_manifest=settings.taste_history_manifest,
         database=database,
     )
+    contract.download_junk_candidates = lambda: web_batch.automatic_junk_candidates(contract)
+    contract.download_organize_templates = lambda: web_settings.organize_templates(contract)
     repository = LedgerRepository(database)
     from .mount_reachability import source_roots
     mount_reachability = MountReachability(source_roots())
@@ -260,11 +263,13 @@ def create_app(
         after_ingest=contract.cache_bust,
     )
     # 云下载：远端完成后的文件由推送发现登记，这里只对账与兜底定向登记。凭据只在本机。
+    from .download_postprocess import enqueue as enqueue_download_postprocess
     downloads = build_download_service(
         database=database, state_root=settings.follow_state_root,
         credentials=credential_store_for(settings.secrets_root,
                                          shared_root=contract.follow_shared_root),
-        push_discovery=push_discovery, available=_writer(sync))
+        push_discovery=push_discovery, available=_writer(sync),
+        after_ingest=lambda task: enqueue_download_postprocess(contract, task))
     contract.downloads = downloads
     contract.follow_scheduler = follow_scheduler
     # 订阅源拉取（ADR-0042）用同一个调度实现，只换 job id、状态文件与默认间隔。

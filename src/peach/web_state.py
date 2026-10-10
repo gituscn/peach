@@ -172,10 +172,15 @@ class WebContract:
         #: 任务中心。每个后台任务的开始、进度与结束都写这一张表，`/activity` 只读它。
         #: 只读端由 `api` 关掉写入：那边的账本是复制来的，写一行就是一处合不回去的分叉。
         self.task_runs = TaskRunStore(self.database)
+        #: 云下载后处理复用 Web 层的垃圾评分与整理设置，但核心后继不反向依赖 Web。
+        #: `api` 作为组合根接入真实实现；裸契约用于单元测试时保持无副作用。
+        self.download_junk_candidates = lambda: []
+        self.download_organize_templates = lambda: {}
         #: 后继调度（ADR-0040）。导入 `avatar_followup` 就是它的登记动作：调度器本身
         #: 不认识任何一种后继，登记表在 `followups.REGISTRY` 里。
         from . import avatar_followup  # noqa: F401  登记补头像后继
         from . import creator_identity_followup  # noqa: F401  登记查创作者身份后继
+        from . import download_postprocess  # noqa: F401  登记云下载后处理
         from . import feed_followup  # noqa: F401  登记取新作资料后继
         from . import follow_creators  # noqa: F401  登记关注作者建档后继
         from . import performer_alias_followup  # noqa: F401  登记补女优别名后继

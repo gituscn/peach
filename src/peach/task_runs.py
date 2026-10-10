@@ -105,6 +105,7 @@ TASK_LABELS = {
     "feed-scrape": "取新作资料",
     "want-scrape": "取想要的资料",
     "timeline-thumbnails": "视频缩略图采集",
+    "download-postprocess": "云下载后处理",
     "seed-import": "导入实体种子",
 }
 

@@ -154,7 +154,8 @@ def _performers(connection: sqlite3.Connection, location: str) -> dict[int, list
     return found
 
 
-def _rows(connection: sqlite3.Connection, location: str) -> list[sqlite3.Row]:
+def _rows(connection: sqlite3.Connection, location: str,
+          asset_ids: Sequence[int] | None = None) -> list[sqlite3.Row]:
     """这个来源上会被整理的行：只有视频，且不在回收站里。
 
     只取视频不是图省事。旁挂的封面、截图、下载页残渣（`.jpg`／`.gif`／`.js`）在账本里
@@ -163,11 +164,15 @@ def _rows(connection: sqlite3.Connection, location: str) -> list[sqlite3.Row]:
     它回答不了一张封面该叫什么。
     """
     connection.row_factory = sqlite3.Row
+    ids = list(dict.fromkeys(int(value) for value in (asset_ids or ())))
+    selected = f" AND id IN ({','.join('?' * len(ids))})" if asset_ids is not None else ""
+    if asset_ids is not None and not ids:
+        return []
     return connection.execute(
         "SELECT id,location,path,name,code,catalog_title,original_title,studio,series,"
         f"release_date,width,height FROM asset WHERE location=? AND {ACTIVE_ASSET_SQL} "
-        "AND medium='video' AND path IS NOT NULL AND trim(path)<>'' ORDER BY id",
-        (location,),
+        f"AND medium='video' AND path IS NOT NULL AND trim(path)<>''{selected} ORDER BY id",
+        (location, *ids),
     ).fetchall()
 
 
@@ -178,7 +183,8 @@ def _extension(name: str) -> str:
 
 def build_plan(connection: sqlite3.Connection, *, location: str,
                file_template: str = "", dir_template: str = "",
-               roots=None, online: bool | None = None) -> dict:
+               roots=None, online: bool | None = None,
+               asset_ids: Sequence[int] | None = None) -> dict:
     """按模板给一个来源生成逐文件计划。
 
     返回 `{"rows": [...], "counts": {...}}`：`rows` 只含会变的行与被跳过的行，
@@ -194,7 +200,7 @@ def build_plan(connection: sqlite3.Connection, *, location: str,
         raise OrganizeError("至少要给一个模板")
 
     declared = dict(location_roots() if roots is None else roots)
-    rows = _rows(connection, location)
+    rows = _rows(connection, location, asset_ids)
     counts: dict[str, int] = {"total": len(rows), "unchanged": 0, "change": 0, "skip": 0}
     reasons: dict[str, int] = {}
     plan: list[dict] = []

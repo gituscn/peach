@@ -531,6 +531,14 @@ def _scored_junk(contract: WebContract) -> tuple[list[dict], frozenset[int]]:
     return out, frozenset(dismissed_ids)
 
 
+def automatic_junk_candidates(contract: WebContract) -> list[dict]:
+    """返回达到自动隔离线且未被用户驳回的候选，供组合根接入下载后处理。"""
+    scored, dismissed = contract.cached_until_changed(
+        "junk-scored", lambda: _scored_junk(contract))
+    return [row for row in scored
+            if int(row["id"]) not in dismissed and int(row["score"]) >= AUTO_TRASH_SCORE]
+
+
 def _restore_staged_media(staged):
     """数据库失败时恢复隔离文件；本地备份带原路径与内容摘要。"""
     for original, quarantine in reversed(staged):

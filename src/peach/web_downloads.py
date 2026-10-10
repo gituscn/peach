@@ -26,7 +26,7 @@ def _values(credentials: CredentialStore, provider: str) -> dict:
 
 def build_download_service(*, database: LedgerDatabase, state_root: Path,
                            credentials: CredentialStore, push_discovery,
-                           available: bool) -> DownloadService:
+                           available: bool, after_ingest=None) -> DownloadService:
     """按 provider 键现取客户端，地址与凭据在设置页改了立刻生效。
 
     PikPak 浏览器登录挂在 `service.pikpak_browser` 上：profile 放在凭据根下 `browser-pikpak/`，
@@ -49,7 +49,7 @@ def build_download_service(*, database: LedgerDatabase, state_root: Path,
 
     service = DownloadService(database=database, state_root=state_root, credentials=credentials,
                               providers=providers, landing=Landing(push_discovery),
-                              available=available)
+                              available=available, after_ingest=after_ingest)
     holder["service"] = service
     service.pikpak_browser = BrowserLogin(
         profile_dir(Path(credentials.root).parent),
@@ -88,6 +88,13 @@ def w_download_cancel(contract, body) -> dict:
     if not isinstance(body, dict) or not str(body.get("id") or "").isdigit():
         raise ValueError("缺少任务编号")
     task = _service(contract).cancel(int(body["id"]))
+    return {"ok": True, "task": task.payload()}
+
+
+def w_download_postprocess(contract, body) -> dict:
+    if not isinstance(body, dict) or not str(body.get("id") or "").isdigit():
+        raise ValueError("缺少任务编号")
+    task = _service(contract).retry_postprocess(int(body["id"]))
     return {"ok": True, "task": task.payload()}
 
 

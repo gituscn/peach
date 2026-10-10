@@ -65,6 +65,12 @@ SOURCES = {
               "cookie": True, "session": True, "blocked_pause": 24 * 3600},
     "javbus": {"label": "JavBus", "domains": ("javbus.com",), "login": "https://www.javbus.com/", "cookie": True,
                "session": True, "blocked_pause": 6 * 3600},
+    # 磁力候选链。manko.fun 的页面数据来自同一产品使用的 healertanker API；Sukebei
+    # 只读搜索结果。两者仍走统一的请求预算、来源冷却与域名白名单。
+    "manko": {"label": "manko.fun", "domains": ("manko.fun", "healertanker.com"),
+              "login": "https://manko.fun/", "blocked_pause": 6 * 3600},
+    "sukebei": {"label": "sukebei", "domains": ("sukebei.nyaa.si",),
+                "login": "https://sukebei.nyaa.si/", "blocked_pause": 6 * 3600},
     "avbase": {"label": "AVBase", "domains": ("avbase.net",), "login": "https://www.avbase.net/", "blocked_pause": 6 * 3600},
     # 女优编号与资料交叉核对（ADR-0067）。httpx 直连就回整页，不收 Cookie、不走浏览器；
     # 拒绝访问时和 AVBase 一样停一段，不反复撞。
