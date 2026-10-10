@@ -308,8 +308,8 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
   - 番号取封面（`POST /api/avatar-code-cover` → `avatar_picker.code_cover`）不要求番号在馆藏：本机封面目录优先，没有才走 `jav_cover_fetch.best_cover`，按番号只存对象、不写证据，之后的 `cover:<番号>` 只读本机。
   - 默认框围着 `avatar_picker.cover_focus` 取景：有脸取 `avatar_cover_face.face_square`（要边车里有脸宽与 `px`，缺的 `detect_cover_faces.py --redo`），没脸取 `jav_poster_crop` 的正封，前端不另抄判据。
 - 整张作品封面不装成头像：单人作品关联不证明画面里是谁，`cover_fallback` 标身份未核实，采集脚本的安装闸门拒收。图库给不出唯一人像时，补头像后继（`peach.avatar_followup`）从单人作品封面截脸周围一块方图（`peach.avatar_cover_face`，YuNet 脸框放大 2.4 倍），按脸宽像素挑封面、最差是缩略图，其余检得出脸的封面各截一张进候选缓存（至多 8 张）。面具、眼罩照样算脸，检不出的不降门槛去捞（低分框多落在手和身体上）。来源记 `cover-face` 与 `identity_verified: false`。
-  - 图库同名多张时先按脸认人（`peach.face_match`，互证与小图作证见 ADR-0056、0057、0062、0066），认不出才截封面；封面也截不出时装认得准的那张小图，标 `gallery_small`，之后可换。
-  - 整张封面装的头像和截过的脸遇到更宽的脸自动替换，图库装的与人挑的不碰；头像选择器的作品组按封面像素面积排序。
+  - 图库同名多张时先按脸认人（`peach.face_match`，互证与小图作证见 ADR-0056、0057、0062、0066）；短边至少 300 像素的档案小图优先于封面裁片（ADR-0102），更小的图在封面落空时兜底。身份判据复用 `match_gallery`，来源标 `gallery_small`，可升级至标准图库人像。
+  - 自动封面头像可换为合格档案人像或更清晰封面，人挑的不碰；候选列表按本机内容及默认裁切哈希去重，保留在用状态、具体来源与作品全部底图。展示去重不参与身份判断，不联网取图，不删除历史缓存。
 - 外部来源 genre 只在 `peach.genre_taxonomy` 投影：JavDB `類別` 与日英来源词共用词表，非内容分类排除，未收录原文回传登记；查表只有 `resolve_genre` 一处，抓取与复核折叠共用。r18dev 取 `categories[].name_ja`，日文取不到才用英文。有码标签的来源选择复用 `metadata_policy.preferred_tag_source(code)`，排序、采集与复核一致；替换走 `metadata_auto_apply` 的来源归属与人工判断保护（ADR-0100），不另写直写流程。
 - 一件事只留一个标签名：`catalog_rules.RETIRED_TAGS` 存「不该再用的写法 → 规范名」，唯一写入口是 `scripts/rename_retired_tags.py --apply --backup`，实体按 `entities.merge_entity` 并、旧名留作别名；`pixiv_tag` 是作者原话，不参与。规范名取馆藏通行写法（`合集` 来自文件名，`混合集` 全来自已关停的 Stash 导入，ADR-0021）。
 - 手动添加标签复用 `current_tags`，API 返回规范名，详情缓存、最近使用与撤销沿用该名称。`core/tags.ts` 保留 `OL制服`、`JK制服` 完整名称，制服归外观，`秘书OL` 归角色；词表审查见 [标签词表审查](reference-snapshots/tag-vocabulary-audit.md)。
