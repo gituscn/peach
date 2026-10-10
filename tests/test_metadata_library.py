@@ -1969,6 +1969,53 @@ class LibraryWatchdogTests(unittest.TestCase):
         self.assertEqual(retried['status'], 'complete')
 
     @windows_ledger_roots
+    def test_retry_ignores_an_unrelated_offline_source(self):
+        missing = self.root / 'missing-local'
+        cloud = self.root / 'cloud'
+        cloud.mkdir()
+        (cloud / 'ABW-203.mp4').write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        config = PeachConfig(
+            self.root, self.root / 'config.toml', present=True,
+            locations={'local': (str(missing),), '115': (str(cloud),)})
+        first = process_library(
+            config, db, self.root / 'generated', self.root / 'covers', stage='scan',
+            provider_factory=lambda: self._provider())
+        self.assertEqual(first['status'], 'failed')
+        self.assertEqual(first['issue_preview'][0]['message'], 'local 来源离线')
+        with closing(sqlite3.connect(db)) as connection:
+            asset_id = connection.execute(
+                "SELECT id FROM asset WHERE name='ABW-203.mp4'").fetchone()[0]
+        retried = process_library(
+            config, db, self.root / 'generated', self.root / 'covers',
+            retry_ids=[asset_id], stage='collect', provider_factory=lambda: self._provider())
+        self.assertEqual(
+            (retried['status'], retried['total'], retried['checked'], retried['issue_count']),
+            ('complete', 1, 1, 0))
+
+    @windows_ledger_roots
+    def test_retry_still_reports_the_target_source_offline(self):
+        cloud = self.root / 'cloud'
+        cloud.mkdir()
+        (cloud / 'ABW-204.mp4').write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        config = PeachConfig(
+            self.root, self.root / 'config.toml', present=True,
+            locations={'115': (str(cloud),)})
+        process_library(
+            config, db, self.root / 'generated', self.root / 'covers', stage='scan',
+            provider_factory=lambda: self._provider())
+        with closing(sqlite3.connect(db)) as connection:
+            asset_id = connection.execute(
+                "SELECT id FROM asset WHERE name='ABW-204.mp4'").fetchone()[0]
+        cloud.rename(self.root / 'offline-cloud')
+        retried = process_library(
+            config, db, self.root / 'generated', self.root / 'covers',
+            retry_ids=[asset_id], stage='collect', provider_factory=lambda: self._provider())
+        self.assertEqual((retried['status'], retried['issue_count']), ('failed', 1))
+        self.assertEqual(retried['issue_preview'][0]['message'], '115 来源离线')
+
+    @windows_ledger_roots
     def test_scanning_alone_registers_the_files_and_asks_no_source(self):
         """只扫描那一段登记完文件就收工，不读本地资料也不联网。
 

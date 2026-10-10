@@ -1520,6 +1520,37 @@ def _ffprobe_path(config):
     return str(choice.path) if choice else None
 
 
+def _chosen_asset_paths(db_path, asset_ids):
+    """定向重试只关心这批资产所在的来源根。
+
+    配置里其他来源离线不能让一条已落地的云下载后处理失败；
+    如果离线的正是目标资产所在的根，仍保留原有的离线问题。
+    """
+    if not asset_ids:
+        return {}
+    placeholders = ','.join('?' * len(asset_ids))
+    with closing(sqlite3.connect(db_path, timeout=30)) as connection:
+        rows = connection.execute(
+            f"SELECT location,path FROM asset WHERE id IN ({placeholders}) "
+            "AND medium='video' AND disposal IS NULL", asset_ids).fetchall()
+    chosen = {}
+    for source, path in rows:
+        chosen.setdefault(str(source), []).append(translate_ledger_path(path))
+    return {source: tuple(paths) for source, paths in chosen.items()}
+
+
+def _online_source_root(source, root, chosen_paths, *, retrying, issue):
+    translated_root = translate_ledger_path(root)
+    if root_online(translated_root):
+        return translated_root
+    relevant = not retrying or any(
+        path.is_relative_to(translated_root)
+        for path in chosen_paths.get(source, ()))
+    if relevant:
+        issue(None, f'{source} 来源离线', action='reading_local')
+    return None
+
+
 def process_library(config, db_path, candidate_root, cover_root, *, location='configured',
                     report=lambda state: None, provider_factory=None, job_id=None,
                     retry_ids=None, active=lambda: True, stage=ALL_STAGES,
@@ -1546,6 +1577,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
     path.parent.mkdir(parents=True, exist_ok=True)
     retrying = retry_ids is not None
     chosen_ids = list(dict.fromkeys(int(value) for value in (retry_ids or [])))
+    chosen_paths = _chosen_asset_paths(db_path, chosen_ids)
     with FileLock(str(path) + '.lock', timeout=0):
         state = dict(job_id=job_id or uuid.uuid4().hex, status='running',
                      stage='读取本地资料' if retrying else '扫描文件',
@@ -1620,10 +1652,11 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             for source, roots in locations.items():
                 for root in roots:
                     guard.check()
-                    if not root_online(translate_ledger_path(root)):
-                        issue(None, f'{source} 来源离线', action='reading_local')
+                    translated_root = _online_source_root(
+                        source, root, chosen_paths, retrying=retrying, issue=issue)
+                    if translated_root is None:
                         continue
-                    online_roots.append(translate_ledger_path(root))
+                    online_roots.append(translated_root)
                     if not retrying and stage != COLLECT_STAGE:
                         result = scan_location(db_path, source, root, declared_roots=config.locations,
                                                mounts=mounts, report=lambda line: update(stage='扫描文件'))
