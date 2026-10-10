@@ -74,10 +74,12 @@ describe('关注详情岛', () => {
       await page.locator(DETAIL_READY).waitFor();
       assert.equal((await page.locator('#stage [data-follow-detail-name]').innerText()).trim(), '演示更新 1002');
       assert.deepEqual(seen.item, [], '列表缓存里有的这一条又单条取了一次');
+      await page.locator('[data-follow-related] [data-follow-item]').first().waitFor();
+      const listedBeforeClose = seen.list;
       await page.locator('#closeStage').click();
       await pathIs(page, '/follow');
       await page.locator('[data-follow-list] > [data-follow-item]').first().waitFor();
-      assert.equal(seen.list, 0, '关掉详情回列表重取了一遍');
+      assert.equal(seen.list, listedBeforeClose, '关掉详情回列表重取了一遍');
       assert.deepEqual(withoutPlayer(opened.problems), []);
     } finally {
       await opened.close();

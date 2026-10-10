@@ -107,6 +107,7 @@ export interface FollowDetailActions {
   close(): void;
   /** 换到组里的另一条：经壳换地址（`preserveReturn` 语义），舞台原地换内容。 */
   openItem(id: number, mediaIndex?: number | null): void;
+  openAuthor(name: string): void;
   /** 点详情里的一枚标签：壳切换那一枚筛选，回到带上它的列表。 */
   openTag(tag: string): void;
   /** 这一条、这一份媒体画出来了：壳据此更新小窗元数据、侧栏标签抽屉与舞台的氛围光、剧场模式。 */
@@ -126,6 +127,7 @@ export interface FollowDetailProps {
   mediaIndex: number | null;
   /** 列表停在视频还是图片：多媒体帖先挑这种媒体。 */
   mediaView: FollowMedia;
+  relatedLimit: number;
   helpers: FollowFeedHelpers;
   actions: FollowDetailActions;
 }
@@ -240,7 +242,7 @@ export function detailTags(item: FollowDetailItem, label: (tag: string) => strin
 }
 
 /** 署名那一组来源：同一创作者的全部来源，认不出创作者时只有这一条自己的来源。 */
-export function authorSources(item: FollowDetailItem, sources: readonly FollowSource[]): FollowSource[] {
+export function authorSources(item: Pick<FollowItem, 'source_id'>, sources: readonly FollowSource[]): FollowSource[] {
   const source = sources.find((row) => row.id === item.source_id);
   const group = sources.filter((row) => source?.author_key && row.author_key === source.author_key);
   if (!group.length && source) group.push(source);

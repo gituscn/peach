@@ -11,12 +11,15 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProper
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { esc, fmtDur, foldName, icon, requestErrorMessage } from '@peach/legacy/core';
 import { noteHtml } from '@peach/legacy/ui';
+import { pageSkeletonHtml } from '../../management-placeholder';
 
 import { Button } from '@/components/base/buttons/button';
 
 import { ApiError, apiSend } from '../../api';
 import { RetryNote } from '../components/grid-reveal';
 import { MixGroupLabel, MixQueue, MixQueueRow } from '../components/mix-queue';
+import { RelatedSection } from '../components/related-section';
+import { FollowAuthorLink, FollowCard } from '../follow-feed/follow-card';
 import {
   FOLLOW_CREDENTIALS_KEY, fetchFollowCredentials, replaceFollowItem, setFollowItemStatus, videoItems,
   type FollowContext, type FollowFeedHelpers, type FollowGroup,
@@ -34,6 +37,7 @@ import {
   type DetailMedia, type FollowDetailActions, type FollowDetailData, type FollowDetailItem, type FollowDetailMedia,
   type FollowDetailProps,
 } from './follow-detail';
+import { fetchFollowRelated, followRelatedGroups, followRelatedKey } from './follow-related';
 
 const realDuration = (value: unknown) => Number(value) > 0;
 /** 轮播张数多于它时，圆点条换成「当前 / 总数」：1280 宽下四十来个点就碰到画框边了。 */
@@ -95,7 +99,7 @@ const CloseStage = ({ onClose }: { onClose(): void }) => (
     dangerouslySetInnerHTML={{ __html: icon('x') }} />
 );
 
-function Detail({ data, context, mediaIndex, onMedia, mediaView, helpers, actions }: FollowDetailProps & {
+function Detail({ data, context, mediaIndex, onMedia, mediaView, relatedLimit, helpers, actions }: FollowDetailProps & {
   data: FollowDetailData; context: FollowContext; onMedia(index: number | null): void;
 }) {
   const { item, group } = data;
@@ -121,6 +125,7 @@ function Detail({ data, context, mediaIndex, onMedia, mediaView, helpers, action
       : null;
 
   return (
+    <>
     <div data-stage-grid="" data-with-queue={queue ? '' : undefined} data-follow-detail="">
       <MediaFrame key={frameKey} item={item} media={media}
         helpers={helpers} actions={actions} onMedia={onMedia} issues={issues} />
@@ -128,7 +133,32 @@ function Detail({ data, context, mediaIndex, onMedia, mediaView, helpers, action
       <Side item={item} data={data} context={context} media={media} write={write}
         issue={issue.key === frameKey ? issue.kind : ''} helpers={helpers} actions={actions} />
     </div>
+    {relatedLimit > 0 ? <Related data={data} media={media.kind === 'image' ? 'images' : media.kind === 'video' ? 'videos' : mediaView}
+      limit={relatedLimit} context={context} helpers={helpers} actions={actions} /> : null}
+    </>
   );
+}
+
+function Related({ data, media, limit, context, helpers, actions }: {
+  data: FollowDetailData; media: FollowDetailProps['mediaView']; limit: number; context: FollowContext;
+  helpers: FollowFeedHelpers; actions: FollowDetailActions;
+}) {
+  const result = useQuery({ queryKey: followRelatedKey(data.item.id, media, limit),
+    queryFn: ({ signal }) => fetchFollowRelated(data, media, limit, signal) });
+  const [skeleton] = useState(() => pageSkeletonHtml('正在读取推荐', { cards: true, className: 'related-skeleton' }));
+  const cardActions = useMemo(() => ({
+    openDetail: actions.openItem, openAuthor: actions.openAuthor, canFlip: () => false,
+  }), [actions]);
+  const groups = followRelatedGroups(result.data?.pages || [], data, media, limit);
+  if (result.isError || (result.data && !groups.length)) return null;
+  const sources = result.data?.pages.at(-1)?.sources || data.sources;
+  const relatedContext = { ...context, sources, aliases: result.data?.pages.at(-1)?.author_aliases || context.aliases };
+  return <RelatedSection data-follow-related="" wireDrag={helpers.wireDrag} busy={result.isPending}>
+    {result.data ? groups.map(group => <FollowCard key={group.primary.id} variant="next" group={group} media={media}
+      authorSources={authorSources(group.primary, sources)} context={relatedContext} selected={false} selectMode={false}
+      busy="" failure="" actions={cardActions} />)
+      : <div className="contents" dangerouslySetInnerHTML={{ __html: skeleton }} />}
+  </RelatedSection>;
 }
 
 /* ── 媒体区 ── */
@@ -344,18 +374,30 @@ function Side({ item, data, context, media, write, issue, helpers, actions }: {
               dangerouslySetInnerHTML={{ __html: EXTERNAL_MARK }} />
           ) : null}
         </div>
-        <div data-follow-detail-identity="">
-          <span data-follow-source-avatar="" dangerouslySetInnerHTML={{ __html: identity.avatar }} />
-          <div>
-            <b>{identity.author}</b>
-            {postedBy ? <span>发布者 {postedBy}</span> : null}
-            {identity.credited ? <span>署名含 {identity.credited}</span> : null}
-          </div>
-        </div>
         <div className="mono" data-stage-meta="" data-reveal-line="">
           <span>{followWhen(item)}</span>
           {realDuration(item.duration) ? <span>{fmtDur(item.duration)}</span> : null}
           {badges ? <span data-follow-badges="" dangerouslySetInnerHTML={{ __html: badges }} /> : null}
+        </div>
+        <div data-item-identity="" data-follow-detail-identity="">
+          <section data-id-group="creator">
+            <h5 data-id-label="">创作者</h5>
+            <div data-id-row="">
+              {identity.entityName ? <FollowAuthorLink name={identity.entityName} actions={actions}
+                data-id-cell="creator" data-entity-kind="creator" data-follow-source-avatar=""
+                title={identity.author} aria-label={`查看 ${identity.author} 的作者页`}>
+                <span data-id-face="" dangerouslySetInnerHTML={{ __html: identity.avatar }} />
+                <span data-id-name="">{identity.author}</span>
+              </FollowAuthorLink> : <span data-id-cell="creator" data-follow-source-avatar="">
+                <span data-id-face="" dangerouslySetInnerHTML={{ __html: identity.avatar }} />
+                <span data-id-name="">{identity.author}</span>
+              </span>}
+            </div>
+          </section>
+          {postedBy || identity.credited ? <div data-follow-detail-credit="">
+            {postedBy ? <span>发布者 {postedBy}</span> : null}
+            {identity.credited ? <span>署名含 {identity.credited}</span> : null}
+          </div> : null}
         </div>
         {item.summary ? <Summary key={item.id} text={item.summary} /> : null}
         {mediaIssue ? <p data-follow-media-issue="">{mediaIssue}</p> : null}
@@ -400,7 +442,7 @@ function Side({ item, data, context, media, write, issue, helpers, actions }: {
               dangerouslySetInnerHTML={{ __html: icon('image-off') }} />
           ) : null}
           {src ? (
-            <a data-follow-download="" href={`${src}${src.includes('?') ? '&' : '?'}download=1`} download=""
+            <a data-stage-action-link="" data-follow-download="" href={`${src}${src.includes('?') ? '&' : '?'}download=1`} download=""
               aria-label="下载到本地" title="下载到本地" dangerouslySetInnerHTML={{ __html: icon('download') }} />
           ) : null}
         </div>

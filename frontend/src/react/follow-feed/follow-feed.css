@@ -443,14 +443,15 @@
 }
 
 /* 元信息区：署名行一行排开，作者名可截断、时间不收；署名含那一行弱于作者名。 */
-.peach-react [data-follow-avatar] { display: grid; place-items: center; cursor: default; background: var(--overlay-5); border: 1px solid var(--line-soft); }
+.peach-react [data-follow-avatar] { display: grid; place-items: center; cursor: default; }
 .peach-react [data-follow-avatar] > img { border-radius: 50%; }
 .peach-react a[data-follow-avatar] { cursor: pointer; }
+.peach-react a[data-follow-author] { color: inherit; text-decoration: none; }
 .peach-react a:is([data-follow-avatar], [data-follow-author]):focus-visible {
   outline: 2px solid var(--tungsten);
   outline-offset: 2px;
 }
-.peach-react [data-follow-byline] > a[data-follow-author]:hover { text-decoration: underline; }
+.peach-react a[data-follow-author]:hover { text-decoration: underline; }
 /* 作品卡的首字母用 Bahnschrift，关注卡同遗留层 `.fsourceavatar .favatar.none` 走正文字体。 */
 .peach-react [data-follow-avatar] > span:first-child {
   display: grid;

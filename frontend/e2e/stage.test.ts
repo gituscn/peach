@@ -94,10 +94,12 @@ describe('舞台岛', () => {
       await page.locator('[data-follow-item="1002"] [data-follow-open]').click();
       await page.locator(FOLLOW_READY).waitFor();
       assert.deepEqual(await stageShape(page), { host: true, modal: true, stages: 1, hosts: 1 });
+      await page.locator('[data-follow-related] [data-follow-item]').first().waitFor();
+      const listedBeforeClose = listed;
       await page.locator('#closeStage').click();
       await pathIs(page, '/follow');
       await page.locator('[data-follow-list] > [data-follow-item]').first().waitFor();
-      assert.equal(listed, 0, '关掉详情回关注列表重取了一遍');
+      assert.equal(listed, listedBeforeClose, '关掉详情回关注列表重取了一遍');
       assert.deepEqual(withoutPlayer(follow.problems), []);
     } finally {
       await follow.close();

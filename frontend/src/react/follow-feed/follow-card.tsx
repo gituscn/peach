@@ -41,6 +41,7 @@ export function FollowAuthorLink({ name, actions, children, ...attrs }: {
 }
 
 export interface FollowCardProps {
+  variant?: 'grid' | 'next';
   group: FollowGroup;
   /** 这张卡的创作者名下那几个来源：头像与署名读它。 */
   authorSources: readonly FollowSource[];
@@ -51,9 +52,9 @@ export interface FollowCardProps {
   /** 这张卡正在写的那一下（状态或保存），和写失败时留在卡上的那一句。 */
   busy: string;
   failure: string;
-  actions: FollowFeedActions;
-  onStatus(id: number, to: string): void;
-  onSave(id: number): void;
+  actions: Pick<FollowFeedActions, 'openDetail' | 'openAuthor' | 'canFlip'> & Partial<Pick<FollowFeedActions, 'toggleSelection'>>;
+  onStatus?(id: number, to: string): void;
+  onSave?(id: number): void;
 }
 
 /** 卡面没有画面时的那一格：来源的站标居中，和本来就没给缩略图的卡同一个样子。 */
@@ -137,7 +138,7 @@ function FollowCardView(props: FollowCardProps) {
     const target = event.target as HTMLElement;
     /* 标签在这张卡上只是读的，点它什么都不做，多选里也不算点了这张卡。 */
     if (target.closest('[data-media-tag]')) return;
-    if (selectMode || event.shiftKey || event.ctrlKey || event.metaKey) {
+    if (actions.toggleSelection && (selectMode || event.shiftKey || event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       actions.toggleSelection(item.id, event.shiftKey);
       return;
@@ -147,7 +148,7 @@ function FollowCardView(props: FollowCardProps) {
   const act = (event: MouseEvent, run: () => void) => { event.stopPropagation(); run() };
 
   return (
-    <article ref={attach} data-media-card="" data-follow-item={item.id} data-status={item.status}
+    <article ref={attach} data-media-card="" data-variant={props.variant || 'grid'} data-follow-item={item.id} data-status={item.status}
       data-follow-image={imageView ? '' : undefined} data-collection={stack.isMix ? '' : undefined}
       data-selected={selected ? '' : undefined} onClick={click} onMouseDown={suppressShiftTextSelection}
       onMouseEnter={flip.onPointerEnter} onMouseLeave={flip.onPointerLeave}>
@@ -170,11 +171,11 @@ function FollowCardView(props: FollowCardProps) {
           <span data-media-badge="" title={item.provider_label || item.provider}
             aria-label={`来源：${item.provider_label || item.provider}`}
             dangerouslySetInnerHTML={{ __html: sourceMark(item.provider, item.provider_label) }} />
-          <span data-media-check="" onClick={(event) => {
+          {actions.toggleSelection ? <span data-media-check="" onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            actions.toggleSelection(item.id, event.shiftKey);
-          }} dangerouslySetInnerHTML={{ __html: icon('check') }} />
+            actions.toggleSelection?.(item.id, event.shiftKey);
+          }} dangerouslySetInnerHTML={{ __html: icon('check') }} /> : null}
           {realDuration(item.duration) ? <span data-media-duration="">{fmtDur(item.duration)}</span> : null}
           <div data-follow-corner="">
             {stack.isMix ? (
@@ -183,29 +184,29 @@ function FollowCardView(props: FollowCardProps) {
                 <span className="contents" dangerouslySetInnerHTML={{ __html: icon(stack.glyph) }} />{stack.label}
               </button>
             ) : null}
-            <div data-follow-actions="">
+            {props.variant !== 'next' ? <div data-follow-actions="">
               <button type="button" data-follow-save={item.id} title={saved ? '已保存' : '保存到账本'}
                 aria-label={saved ? '已保存' : '保存到账本'} disabled={saved}
                 aria-busy={busy === 'save' || undefined} aria-disabled={busy === 'save' || undefined}
-                onClick={(event) => act(event, () => props.onSave(item.id))}
+                onClick={(event) => act(event, () => props.onSave?.(item.id))}
                 dangerouslySetInnerHTML={{ __html: icon(saved ? 'check' : 'bookmark-plus') }} />
               <button type="button" data-follow-status={item.id} data-to="seen" title="标记已看" aria-label="标记已看"
                 disabled={item.status === 'seen'} aria-busy={busy === 'seen' || undefined}
                 aria-disabled={busy === 'seen' || undefined}
-                onClick={(event) => act(event, () => props.onStatus(item.id, 'seen'))}
+                onClick={(event) => act(event, () => props.onStatus?.(item.id, 'seen'))}
                 dangerouslySetInnerHTML={{ __html: icon('eye') }} />
               <button type="button" data-follow-status={item.id} data-to="ignored" title="忽略" aria-label="忽略"
                 disabled={item.status === 'ignored'} aria-busy={busy === 'ignored' || undefined}
                 aria-disabled={busy === 'ignored' || undefined}
-                onClick={(event) => act(event, () => props.onStatus(item.id, 'ignored'))}
+                onClick={(event) => act(event, () => props.onStatus?.(item.id, 'ignored'))}
                 dangerouslySetInnerHTML={{ __html: icon('eye-off') }} />
               {item.status === 'seen' || item.status === 'ignored' ? (
                 <button type="button" data-follow-status={item.id} data-to="new" title="恢复未看" aria-label="恢复未看"
                   aria-busy={busy === 'new' || undefined} aria-disabled={busy === 'new' || undefined}
-                  onClick={(event) => act(event, () => props.onStatus(item.id, 'new'))}
+                  onClick={(event) => act(event, () => props.onStatus?.(item.id, 'new'))}
                   dangerouslySetInnerHTML={{ __html: icon('rotate-ccw') }} />
               ) : null}
-            </div>
+            </div> : null}
           </div>
         </div>
       </div>

@@ -114,6 +114,7 @@ export async function openFollowDetail(id,push=true,mediaIndex=null,preserveRetu
   if(push)navigationState.route(`/follow/item/${id}`,false,overlayState('follow'));
   const stage=await loadStage(mediaState.stageHost);
   await stage.open({kind:'follow',id,mediaIndex,mediaView:followState.followMediaView,
+    relatedLimit:preferencesState.appSettings.relatedLimit>0?+preferencesState.appSettings.relatedLimit:0,
     helpers:followState.followFeedHelpers,actions:followState.followDetailActions,resume:push?null:urlResume()});
   scheduleStickySurfaces();
 }
@@ -168,7 +169,8 @@ followState.followFeedShell = {
 };
 followState.followDetailActions = createFollowDetailActions({view:followView,adoptView:adoptFollowView,
     rememberReturn:path=>writeShell({followDetailReturnPath:path}),close:()=>void closeFollowDetail(),
-    open:(id,index,preserve)=>void openFollowDetail(id,true,index,preserve),drawer:renderFollowDrawer},
+    open:(id,index,preserve)=>void openFollowDetail(id,true,index,preserve),drawer:renderFollowDrawer,
+    openAuthor:name=>navigationState.navigatePath(`/creators/${encodeURIComponent(name)}`)},
     {toast:(message,{undo}={})=>receiptsState.actionReceipt(message,{undo}),failure:receiptsState.actionFailure});
 }
 

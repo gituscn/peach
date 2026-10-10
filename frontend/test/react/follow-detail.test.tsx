@@ -3,6 +3,7 @@
  * 从列表进出不重取、舞台在媒体框里挂 Video.js、轮播圆点、恢复带、标签回列表与手机布局要真浏览器，
  * 在 `frontend/e2e/follow-detail.test.ts` 里量；尺寸与色板在 `e2e/design-*.test.ts`。 */
 import { notifyManager, QueryClientProvider } from '@tanstack/react-query';
+import { act } from 'react';
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import {
@@ -10,7 +11,8 @@ import {
   type FollowDetailActions, type FollowDetailData, type FollowDetailItem, type FollowDetailProps,
 } from '../../src/react/follow-detail/follow-detail';
 import { FOLLOW_DOTS_MAX, FollowDetailPage } from '../../src/react/follow-detail/follow-detail-page';
-import { FOLLOW_CREDENTIALS_KEY, type FollowFeedHelpers, type FollowGroup } from '../../src/react/follow-feed/follow-feed';
+import { followRelatedKey } from '../../src/react/follow-detail/follow-related';
+import { FOLLOW_CREDENTIALS_KEY, setFollowItemStatus, type FollowFeedHelpers, type FollowGroup } from '../../src/react/follow-feed/follow-feed';
 import { openPhotoLightbox } from '../../src/react/photo-lightbox/photo-lightbox-dialog';
 import { queryClient } from '../../src/react/query';
 import { wantFollowKey } from '../../src/react/wants/wants';
@@ -45,7 +47,7 @@ type ActionMocks = { [K in keyof FollowDetailActions]: Mock<FollowDetailActions[
 
 function actions(): ActionMocks {
   return {
-    close: vi.fn(), openItem: vi.fn(), openTag: vi.fn(), present: vi.fn(), mountPlayer: vi.fn(() => vi.fn()),
+    close: vi.fn(), openItem: vi.fn(), openAuthor: vi.fn(), openTag: vi.fn(), present: vi.fn(), mountPlayer: vi.fn(() => vi.fn()),
     toast: vi.fn(), failure: vi.fn(),
   };
 }
@@ -74,7 +76,7 @@ async function show(given: FollowDetailData, patch: Partial<FollowDetailProps> =
   queryClient.setQueryData(FOLLOW_CREDENTIALS_KEY, { providers: [] });
   queryClient.setQueryData(wantFollowKey(given.item.id), { want: null });
   const props: FollowDetailProps = {
-    id: given.item.id, mediaIndex: null, mediaView: 'videos', helpers: helpers(), actions: actions(), ...patch,
+    id: given.item.id, mediaIndex: null, mediaView: 'videos', relatedLimit: 0, helpers: helpers(), actions: actions(), ...patch,
   };
   const host = await mount(<QueryClientProvider client={queryClient}><FollowDetailPage {...props} /></QueryClientProvider>);
   await settle();
@@ -84,7 +86,7 @@ async function show(given: FollowDetailData, patch: Partial<FollowDetailProps> =
 describe('取数', () => {
   it('缓存里没有这一条就单条取 `/api/follow?item=`，取回的组里找不到这一条就报出来', async () => {
     const fetcher = serve({ page: { groups: [group(item(8))], sources: [], author_aliases: [] } });
-    const props: FollowDetailProps = { id: 8, mediaIndex: null, mediaView: 'videos', helpers: helpers(), actions: actions() };
+    const props: FollowDetailProps = { id: 8, mediaIndex: null, mediaView: 'videos', relatedLimit: 0, helpers: helpers(), actions: actions() };
     const host = await mount(<QueryClientProvider client={queryClient}><FollowDetailPage {...props} /></QueryClientProvider>);
     await settle();
     expect(fetcher.mock.calls.map(([url]) => url)).toContain('/api/follow?item=8');
@@ -107,6 +109,19 @@ describe('取数', () => {
 });
 
 describe('侧栏', () => {
+  it('创作者头像和姓名打开同一资料页，组合键保留浏览器链接行为', async () => {
+    const { host, props } = await show({ ...data(item(14)), sources: [
+      { id: 1, provider: 'kemono', author_name: 'Kou', author_key: 'name:kou', entity_id: 1, entity_name: 'Kou' },
+    ] });
+    const avatar = host.querySelector<HTMLAnchorElement>('a[data-follow-source-avatar]')!;
+    expect(avatar.getAttribute('href')).toBe('/creators/Kou');
+    await click(avatar);
+    expect(props.actions.openAuthor).toHaveBeenCalledWith('Kou');
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true });
+    avatar.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
   it('自上而下：正文、操作、状态一行、标签；标签按 rule34 的类型顺序', async () => {
     const { host } = await show(data(item(1, {
       summary: '正文', detail_tags: ['solo', 'kou', 'ow', 'animated', 'odd', 'tracer'],
@@ -134,7 +149,8 @@ describe('侧栏', () => {
     const download = host.querySelector('[data-follow-download]')!;
     expect(download.hasAttribute('download')).toBe(true);
     expect(download.getAttribute('href')).toBe('/follow-stream?id=2&download=1');
-    expect(host.querySelector('[data-follow-detail-identity] > div')?.textContent).toBe('作者发布者 Poster');
+    expect(host.querySelector('[data-follow-detail-identity] [data-id-name]')?.textContent).toBe('作者');
+    expect(host.querySelector('[data-follow-detail-credit]')?.textContent).toBe('发布者 Poster');
   });
 
   it('标题为空时标题区与多媒体队列写同一句「未命名内容」', async () => {
@@ -310,6 +326,24 @@ describe('媒体', () => {
 });
 
 describe('文案与排序', () => {
+  it('接着看换条并保留详情来处，状态更新后移走已看卡，关闭推荐不取数', async () => {
+    const fetcher = serve();
+    const next = item(42);
+    queryClient.setQueryData(followRelatedKey(41, 'videos', 20), {
+      pages: [{ groups: [group(next)], sources: [], author_aliases: [], counts: {}, facets: {}, offset: 0, has_more: false }],
+      pageParams: [0],
+    });
+    const { host, props } = await show(data(item(41)), { relatedLimit: 20 });
+    expect(host.querySelector('[data-follow-related] h3')?.textContent).toBe('接着看');
+    await click(host.querySelector('[data-follow-related] [data-follow-open]'));
+    expect(props.actions.openItem).toHaveBeenCalledWith(42);
+    await act(async () => { setFollowItemStatus(42, 'seen') });
+    expect(host.querySelector('[data-follow-related]')).toBeNull();
+    const { host: disabled } = await show(data(item(43)), { relatedLimit: 0 });
+    expect(disabled.querySelector('[data-follow-related]')).toBeNull();
+    expect(fetcher.mock.calls.some(([url]) => String(url).startsWith('/api/follow?limit='))).toBe(false);
+  });
+
   it('合集行首：发布串不拿发布时间当版本标签，正文带上作者', () => {
     const reply = item(30, { author: 'kou', summary: '第二段更新', variant_kind: '', published_at: '2026-09-18T00:00:00Z' });
     expect(collectionCopy(group(item(29), { is_release: true }), reply)).toEqual({ label: '视频', title: 'kou：第二段更新' });

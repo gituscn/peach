@@ -68,13 +68,13 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
       const page = opened.page;
       const shown = await page.evaluate(() => ({
         placeholder: getComputedStyle(document.querySelector('#stage [data-follow-detail-placeholder]')!).aspectRatio,
-        tags: Object.fromEntries([...document.querySelectorAll<HTMLElement>('#stage [data-follow-tag]')].map((tag) =>
+        tags: Object.fromEntries([...document.querySelectorAll<HTMLElement>('#stage [data-follow-detail-tags] [data-follow-tag]')].map((tag) =>
           [tag.dataset.followTag, getComputedStyle(tag).getPropertyValue('--tag-color').trim()])),
       }));
       assert.equal(shown.placeholder, '16 / 9');
       const muted = await tokenColor(page, '#stage [data-follow-detail]', '--muted');
       const unknown = await page.evaluate(() => {
-        const tag = document.querySelector<HTMLElement>('#stage [data-follow-tag="odd"]')!;
+        const tag = document.querySelector<HTMLElement>('#stage [data-follow-detail-tags] [data-follow-tag="odd"]')!;
         const probe = document.createElement('div');
         probe.style.backgroundColor = 'var(--tag-color)';
         tag.append(probe);

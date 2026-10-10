@@ -13,7 +13,7 @@ import { esc, firstGrapheme, fmtDur, fmtSize, icon, leadingGraphemes, requestErr
 import {
   coverUrl, entityFaceImg, logoUrl, mixLabel, performerLabel, queueAvatarHtml, queueThumbHtml,
 } from '@peach/card-art';
-import { confirmModal, dismissMenu, fitSkeleton, presentMenu, spinnerHtml } from '@peach/legacy/ui';
+import { confirmModal, dismissMenu, presentMenu, spinnerHtml } from '@peach/legacy/ui';
 
 import { apiGet, apiSend } from '../../api';
 import { Button } from '@/components/base/buttons/button';
@@ -23,6 +23,7 @@ import { patchCatalogItems, replaceCatalogItem } from '../catalog-grid/catalog-g
 import type { MediaItem } from '../catalog-grid/types';
 import { RetryNote } from '../components/grid-reveal';
 import { MixQueue, MixQueueRow } from '../components/mix-queue';
+import { RelatedSection } from '../components/related-section';
 import { CoverCrop } from '../cover-crop/cover-crop-page';
 import { queryClient } from '../query';
 import {
@@ -722,20 +723,15 @@ function Related(props: ItemDetailProps & { item: DetailItem }) {
     },
   });
   const [skeleton] = useState(() => helpers.relatedSkeletonHtml());
-  const row = useCallback((node: HTMLDivElement | null) => { if (node) { fitSkeleton(node); helpers.wireDrag(node) } }, [helpers]);
   if (result.data && !result.data.length) return null;
   return (
-    <div data-item-related="">
-      {/* 作用域 Preflight 把标题字重清成 inherit，同队列头按字重三档取 semibold。 */}
-      <h3 className="font-semibold">接着看</h3>
-      <div ref={row} id="nrow" data-related-row="">
+    <RelatedSection wireDrag={helpers.wireDrag} busy={result.isPending}>
         {result.data ? (
           <CatalogGridPage mode="items" variant="next" items={result.data} helpers={grid.helpers} actions={grid.actions}
             layout={props.layout} selectMode={props.selectMode} selected={props.selected} seekSeconds={props.seekSeconds}
             revision={0} wireDrag={helpers.wireDrag} skeletonHtml={() => ''} />
         ) : result.isError ? null : <Html html={skeleton} />}
-      </div>
-    </div>
+    </RelatedSection>
   );
 }
 

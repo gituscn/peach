@@ -118,12 +118,13 @@ const detailPayload = (id: number, statuses: Map<number, string>, hidden: Map<nu
 };
 
 /** 写成功的状态记在这里，重读时读得到，同服务端。 */
-const payload = (url: URL, statuses: Map<number, string>) => {
+const payload = (url: URL, statuses: Map<number, string>, bindAuthors = false) => {
   const offset = Number(url.searchParams.get('offset') || 0);
   const groups = (offset ? MORE : FIRST).map((row) => statuses.has(row.primary.id)
     ? { ...row, primary: { ...row.primary, status: statuses.get(row.primary.id)! } } : row);
   return {
-    ok: true, sources: SOURCES, author_aliases: [], alias_suggestions: [], suggestions: [],
+    ok: true, sources: bindAuthors ? SOURCES.map(source => ({ ...source, entity_id: source.id, entity_name: source.author_name })) : SOURCES,
+    author_aliases: [], alias_suggestions: [], suggestions: [],
     groups, counts: { new: 40, seen: 3, saved: 2, ignored: 1 },
     sort: url.searchParams.get('sort') || 'new', dir: url.searchParams.get('dir') || 'desc', seed: 1,
     facets: {
@@ -149,7 +150,7 @@ export interface FollowStub {
   release(): Promise<void>;
 }
 
-async function stub(page: Page): Promise<FollowStub> {
+async function stub(page: Page, bindAuthors = false): Promise<FollowStub> {
   const held: { route: Route; url: URL }[] = [];
   const statuses = new Map<number, string>();
   const hidden = new Map([[DETAIL.hidden, new Set([3, 4])]]);
@@ -157,7 +158,7 @@ async function stub(page: Page): Promise<FollowStub> {
     writes: [], hold: null,
     release: async () => {
       state.hold = null;
-      for (const { route, url } of held.splice(0)) await route.fulfill({ json: payload(url, statuses) }).catch(() => {});
+      for (const { route, url } of held.splice(0)) await route.fulfill({ json: payload(url, statuses, bindAuthors) }).catch(() => {});
     },
   };
   await page.route((url) => url.pathname === '/api/follow', (route) => {
@@ -168,7 +169,7 @@ async function stub(page: Page): Promise<FollowStub> {
       held.push({ route, url });
       return;
     }
-    return route.fulfill({ json: payload(url, statuses) });
+    return route.fulfill({ json: payload(url, statuses, bindAuthors) });
   });
   await page.route('**/api/follow/credentials', (route) => route.fulfill({ json: { providers: [] } }));
   // 起过一趟之后 GET 一直报「在跑」：画面停在忙态，量得到两枚键一起忙。
@@ -225,7 +226,9 @@ export interface FollowVisit extends Visit {
 
 /** 打开关注页：桩与定种子装好之后重新载入，等到岛的卡片画出来、等待态结束。 */
 export async function openFollowFeed(browser: import('playwright-core').Browser, path: string, viewport: Viewport,
-  { settings = {}, ready = '[data-follow-list] > [data-follow-item]' }: { settings?: Record<string, unknown>; ready?: string } = {},
+  { settings = {}, ready = '[data-follow-list] > [data-follow-item]', bindAuthors = false }: {
+    settings?: Record<string, unknown>; ready?: string; bindAuthors?: boolean;
+  } = {},
 ): Promise<FollowVisit> {
   const opened = await visit(browser, '/', viewport);
   const page = opened.page;
@@ -234,7 +237,7 @@ export async function openFollowFeed(browser: import('playwright-core').Browser,
     let state = 20260928;
     Math.random = () => { state = (state * 1664525 + 1013904223) >>> 0; return state / 4294967296 };
   }, { detailAutoplay: false, ...settings });
-  const stubbed = await stub(page);
+  const stubbed = await stub(page, bindAuthors);
   await page.goto(new URL(path, page.url()).toString(), { waitUntil: 'load' });
   await page.locator(ready).first().waitFor({ timeout: 15_000 });
   await settle(page);
