@@ -43,6 +43,7 @@
 }
 .peach-react [data-search-option]:is(:hover, [data-active]) { background: var(--hover); }
 .peach-react [data-search-option] svg { width: 18px; height: 18px; stroke: var(--muted); fill: none; flex: none; }
+.peach-react [data-search-option="more"] { margin-top: 7px; justify-content: space-between; }
 .peach-react [data-search-option] span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .peach-react [data-remove-history] {
   margin-left: auto;

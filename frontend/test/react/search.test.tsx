@@ -50,6 +50,13 @@ describe('下拉栏里摆什么', () => {
     expect([model.left.length, model.right[0]?.kind, model.tabs]).toEqual([0, 'asset', null]);
   });
 
+  it('视频总数超过预览时，完整结果入口排在作品之后并参与键盘选择', () => {
+    const group = { ...asset, total: 53 };
+    const model = menuModel({ ...base, query: 'ABW', suggestFor: 'ABW', groups: [group], tabs: [group] });
+    expect(model.right[0]?.more).toEqual({ index: 1, type: 'more', value: 'ABW', total: 53 });
+    expect(model.options.map((o) => o.type)).toEqual(['suggest', 'more']);
+  });
+
   it('推荐不再推搜过的词，一次最多几条', () => {
     const pool = ['剧情', '单体作品', '高画质', '中出', '巨乳', '美少女', '独占'];
     const picks = shufflePicks(pool, ['高画质'], () => 0.5);
@@ -114,6 +121,21 @@ async function stage({ pool = ['剧情'], loadPool = async () => pool,
 const debounce = () => act(async () => { vi.advanceTimersByTime(SUGGEST_DEBOUNCE) });
 
 describe('输入框上的时序', () => {
+  it('单类视频预览请求二十条，完整结果入口用当前搜索词', async () => {
+    vi.useFakeTimers();
+    const s = await stage({ suggest: async (q) => ({ q, groups: [{ ...asset, total: 53 }] }) });
+    await act(async () => s.input.focus());
+    await settle();
+    await s.typeInto('ABW');
+    await debounce();
+    await settle();
+    const requests = vi.mocked(fetch).mock.calls.map(([url]) => String(url));
+    expect(requests.some((url) => url.includes('/api/suggest?q=ABW&limit=20'))).toBe(true);
+    await act(async () => s.menu.querySelector<HTMLButtonElement>('[data-search-option="more"]')!.click());
+    expect(s.actions.search).toHaveBeenCalledWith('ABW');
+    expect(s.actions.openItem).not.toHaveBeenCalled();
+    expect(s.menu.hidden).toBe(true);
+  });
   it('聚焦时占位换成一个真搜得出东西的词；空输入回车就搜它，并记进搜索记录', async () => {
     const s = await stage({ pool: ['温泉旅行'] });
     await act(async () => s.input.focus());
