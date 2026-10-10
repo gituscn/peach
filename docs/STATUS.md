@@ -17,10 +17,9 @@
 - Windows 托盘自动恢复，重启用 `restart_windows_tray.py --source`；代码与数据在内置盘，媒体在外置盘。
 - 托盘须普通权限启动：提权令牌看不到 CloudDrive 的 `A:`/`B:`，误报脱盘。
 - Windows：80 跳 HTTPS，LAN:443；`peach-win`、`0.38.0`。10-10 重启，CA、健康、前端产物通过。
-- 主界面 `peach-app.js/css`，登录、配置页 `peach-pages.js/css`；Application 管理路由与资源，域控制器适配原生宿主。
+- 主界面 `peach-app.js/css`，登录、配置页 `peach-pages.js/css`。
 - `/healthz` 报 `configurable=true`；配置与选目录共用连接判据，托盘管理 HTTPS 地址、端口及重载。
 - 首启、配置页列缺失依赖（CloudDrive、挂载驱动、FFmpeg/ffprobe、OpenSSL）；Windows 识别 CloudDrive、WinFsp。
-- 文件检查含本地与网盘，来源等分、共用确认弹层；CloudDrive 分档建议首启与配置页共用。
 - 访问密码未开，局域网匿名可读；首启可跳过密码，配置页可改可关，登录可记住设备。
 - macOS 是 reader，代码与 `peach-data` 在内置盘；`peach.local` 经 8900/8443 和 pf 提供 80/443，GET 正常、写入回 409。
 - 两端各用本机 CA，私钥与凭据不跨机；代码用 Git、账本单写者复制、图片用 Syncthing；坐标见 `<数据根>/config.toml`。
@@ -32,6 +31,7 @@
 - 发行名 `peach`、目录名 `peach-app`。macOS 按待办第 26 条处理后重启菜单栏；无口令的 `peach serve --host 0.0.0.0` 拒绝启动。
 - 扫描、采集 120 秒无进展预警；资料 90 秒、封面 240 秒超时可重试；见 `state/library-processing-<job_id>.issues.jsonl`。
 - 口味、复核、关注等聚合按账本与文件版本缓存；女优资料后继每轮存量至多 16 条。
+- 下载后处理：16 条旧失败任务保留，部分资产已移动；既有 `task_run` 外键异常 102 条，未清理。
 - 实体种子（ADR-0075）由扫描结算后继 `seed-import` 导入，只填空、换旧种子行；冲突与重复身份在 `generated/seed-landing.csv`。
 - 推送发现开：本地 watch 加 CloudDrive 云端前缀 `/115open→B:`、`/Pikpak→A:`；关注每 60 分钟轮询；自动更新关闭。
 - Cloudflare 公网入口默认关，配置页启停前须设密码；临时链接写状态文件，命名隧道限源码部署、令牌存设置文件；整站 `noindex` 与 `/robots.txt`。

@@ -86,6 +86,42 @@ def _archive_pages(url):
 
 
 class LibraryNfoTests(unittest.TestCase):
+    @windows_ledger_roots
+    def test_targeted_collection_keeps_global_progress_and_unrelated_candidates(self):
+        media = self.root / 'media'
+        media.mkdir()
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        db = fresh_ledger(self.root)
+        database = LedgerDatabase(db)
+        with database.write_transaction() as connection:
+            for aid, code in ((1, 'ABW-358'), (2, 'ABW-359')):
+                video = media / f'{code}.mp4'
+                video.write_bytes(b'video')
+                video.with_suffix('.nfo').write_text(
+                    f'<movie><title>作品 {aid}</title><sorttitle>{code}</sorttitle></movie>', encoding='utf-8')
+                connection.execute('INSERT INTO asset(id,location,path,name,medium,code) VALUES(?,?,?,?,?,?)',
+                                   (aid, 'local', str(video), video.name, 'video', code))
+        provider = stub_provider()
+        provider.query.return_value = {}
+        generated = self.root / 'generated'
+        covers = self.root / 'covers'
+        with patch('peach.library_processing._enrich_finished_performers',
+                   return_value={'aliases': 0, 'avatars': 0, 'conflicts': 0, 'failed': 0}):
+            process_library(config, db, generated, covers, provider_factory=lambda: provider)
+            prior = state_path(config).read_bytes()
+            output = self.root / 'state/download-processing/1.json'
+            result = process_library(config, db, generated, covers, retry_ids=[1], stage='collect',
+                                     state_file=output, provider_factory=lambda: provider, database=database)
+        self.assertEqual(state_path(config).read_bytes(), prior)
+        self.assertTrue(output.exists())
+        self.assertEqual(result['total'], 1)
+        candidates = read_rows(generated / 'library-metadata-field-candidates.csv')
+        self.assertEqual(result['candidates'], sum(row['asset_id'] == '1' for row in candidates))
+        with database.read_connection() as connection:
+            self.assertIsNotNone(connection.execute('SELECT catalog_title FROM asset WHERE id=1').fetchone()[0])
+            self.assertIsNone(connection.execute('SELECT catalog_title FROM asset WHERE id=2').fetchone()[0])
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

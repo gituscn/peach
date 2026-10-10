@@ -14,7 +14,8 @@ from .sources import FailureReason, SourceFailure
 
 def fetch(root: Path, code: str) -> dict:
     from .magnet_chain import search
-    return search(root, code)
+    result = search(root, code)
+    return {**result, 'items': [{**row, 'size': row['size_text']} for row in result['items']]}
 
 
 def cache_lifetime(released: str | None, today: date | None = None) -> int:

@@ -1397,7 +1397,7 @@ class _RemoteSession:
         return 0
 
 
-def _apply_finished_candidates(database, candidate_root, active):
+def _apply_finished_candidates(database, candidate_root, active, asset_ids=None):
     """候选落盘后立即执行窄规则自动落库；没有账本实例时只采集候选。
 
     停止后一条都不再写：任务已经不属于这次运行，用户按下停止之后账本还在变，
@@ -1410,7 +1410,7 @@ def _apply_finished_candidates(database, candidate_root, active):
     # 快照目录是企划名义解析的证据来源（ADR-0038）。路径只有 `DEFAULT_METADATA_ROOT`
     # 一份定义，这里传它而不是再拼一次：两处各拼一份，改数据根时会有一处留在原地。
     return auto_apply_metadata(database, Path(candidate_root), active=active,
-                               snapshot_root=DEFAULT_METADATA_ROOT)
+                               snapshot_root=DEFAULT_METADATA_ROOT, asset_ids=asset_ids)
 
 
 def _enrich_finished_performers(database, groups, config, candidate_root, remote, active,
@@ -1448,7 +1448,7 @@ def _entity_watermark(database):
     return int(row[0] or 0)
 
 
-def _entity_followups(database, config, watermark, covered=()):
+def _entity_followups(database, config, watermark, covered=(), *, include_stock=True):
     """这一轮新登记的实体缺什么就补什么，一件事一条后继（ADR-0040、ADR-0052）。
 
     女优没有头像的派补头像后继；`covered` 是每行换上的封面张数，换上了的作品，它们的
@@ -1486,6 +1486,8 @@ def _entity_followups(database, config, watermark, covered=()):
             found += performer_alias_followup.plan(connection, since_entity_id=watermark)
             found += performer_profile_followup.plan(connection, since_entity_id=watermark)
             found += creator_identity_followup.plan(connection, since_entity_id=watermark)
+            if not include_stock:
+                return [{'key': item.key, 'task_key': item.task_key, 'label': item.label} for item in found]
             taken = {item.key for item in found}
             aliases = min(performer_alias_followup.STOCK_SHARE, max(0, MAX_FOLLOWUPS - len(found)))
             profiles = min(performer_profile_followup.STOCK_SHARE,
@@ -1551,10 +1553,43 @@ def _online_source_root(source, root, chosen_paths, *, retrying, issue):
     return None
 
 
+def _processing_issue_log(config, path, job_id, isolated):
+    """定向任务保留独立问题清单；全库任务只留本趟的清单。"""
+    log_path = path.with_suffix('.issues.jsonl') if isolated else issues_path(config, job_id)
+    log_path.unlink(missing_ok=True)
+    if not isolated:
+        for stale in log_path.parent.glob('library-processing-*.issues.jsonl'):
+            stale.unlink(missing_ok=True)
+    return log_path
+
+
+def _candidate_scope(groups, asset_ids):
+    """按资产选择候选，保留共享 CSV 中其余资产的记录。"""
+    if asset_ids is None:
+        return groups
+    chosen = {str(value) for value in asset_ids}
+    return {key: value for key, value in groups.items()
+            if str(value.get('asset_id') or '') in chosen}
+
+
+def _finish_collection(config, database, candidate_root, cover_root, groups, remote, *,
+                       asset_ids, active, update, issue, watermark, covered):
+    """结算本趟候选并补人物资料，全库任务同时推进存量后继。"""
+    auto_apply = _apply_finished_candidates(database, candidate_root, active, asset_ids)
+    profiles = _enrich_finished_performers(
+        database, _candidate_scope(groups, asset_ids), config, candidate_root, remote, active, update, issue)
+    followups = [] if asset_ids is not None else sample_followup.plan(database, config, cover_root)
+    followups += _entity_followups(database, config, watermark, covered, include_stock=asset_ids is None)
+    return dict(followups=followups, auto_applied=auto_apply['applied'],
+                auto_rejected=auto_apply['auto_rejected'], performer_aliases=profiles['aliases'],
+                performer_avatars=profiles['avatars'], performer_profile_conflicts=profiles['conflicts'],
+                performer_profile_failed=profiles['failed'])
+
+
 def process_library(config, db_path, candidate_root, cover_root, *, location='configured',
                     report=lambda state: None, provider_factory=None, job_id=None,
                     retry_ids=None, active=lambda: True, stage=ALL_STAGES,
-                    database=None, route_overrides=None):
+                    database=None, route_overrides=None, state_file=None):
     """登记文件与确定的番号，外部资料保留为可复核候选。
 
     `retry_ids` 为 `None` 时处理整个馆藏；给定时只处理这些项目（上一任务记录的
@@ -1570,15 +1605,17 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
 
     `route_overrides` 覆盖某几种内容类型的来源链，形状与判据见
     `metadata_routes.parse_route_overrides`；不给就用内建那张表。
+    `state_file` 给后台定向任务保存独立进度，共享候选写入仍使用全库处理锁。
     """
     _require_writer(config, db_path)
     routes = metadata_routes.parse_route_overrides(route_overrides)
-    path = state_path(config)
+    path = Path(state_file) if state_file is not None else state_path(config)
     path.parent.mkdir(parents=True, exist_ok=True)
     retrying = retry_ids is not None
-    chosen_ids = list(dict.fromkeys(int(value) for value in (retry_ids or [])))
+    chosen_ids = list(dict.fromkeys(map(int, retry_ids or [])))
+    scope_ids = chosen_ids if retrying else None
     chosen_paths = _chosen_asset_paths(db_path, chosen_ids)
-    with FileLock(str(path) + '.lock', timeout=0):
+    with FileLock(str(state_path(config)) + '.lock', timeout=0):
         state = dict(job_id=job_id or uuid.uuid4().hex, status='running',
                      stage='读取本地资料' if retrying else '扫描文件',
                      checked=0, total=0, scanned=0, probed=0, identified=0, candidates=0, covers=0,
@@ -1593,12 +1630,10 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
         entity_watermark = _entity_watermark(database)
         # 每行这一轮换上了几张封面，`(asset_id, 张数)`：换上了的作品，女优可能截得出更清楚的脸。
         covered = []
-        log_path = issues_path(config, state['job_id'])
+        log_path = _processing_issue_log(config, path, state['job_id'], state_file is not None)
         # 界面只展示前 20 条，完整清单在这个文件里；地址跟着状态一起给出，
         # 不让人按 job_id 自己去拼路径。
         state['issues_log'] = str(log_path)
-        for stale in log_path.parent.glob('library-processing-*.issues.jsonl'):
-            stale.unlink(missing_ok=True)
 
         saved_at = 0.0
 
@@ -1702,6 +1737,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 genre_decisions = load_genre_decisions(connection)
             output = candidate_root / 'library-metadata-field-candidates.csv'
             groups = {row['item_key']: row for row in read_rows(output, missing_ok=True)}
+            scoped_groups = lambda: _candidate_scope(groups, scope_ids)
             listing = _DirectoryIndex()
             csv_dirty = False
             csv_written_at = time.monotonic()
@@ -1726,7 +1762,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 if row['code'] and not remote.open_fields(row, target_key, groups) and (
                         not _asks_cover(row['code'], *_studio_evidence(row))
                         or cover_settled(cover_root / (row['code'] + '.jpg'))):
-                    update(checked=index + 1, candidates=len(groups),
+                    update(checked=index + 1, candidates=len(scoped_groups()),
                            current_asset_id=None, current_asset_name='', current_action='',
                            current_started_at=None, current_deadline_at=None)
                     continue
@@ -1761,7 +1797,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                             config.directory('generated') / 'posters', posters=posters))
                     except (OSError, ValueError):
                         issue(row, '本地封面无法读取', action='reading_local', retryable=True)
-                    update(checked=index + 1, candidates=len(groups),
+                    update(checked=index + 1, candidates=len(scoped_groups()),
                            current_asset_id=None, current_asset_name='', current_action='',
                            current_started_at=None, current_deadline_at=None)
                     continue
@@ -1797,24 +1833,18 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 if entries:
                     csv_dirty = True
                 flush_candidates()
-                update(checked=index + 1, candidates=len(groups),
+                update(checked=index + 1, candidates=len(scoped_groups()),
                        current_asset_id=None, current_asset_name='', current_action='',
                        current_started_at=None, current_deadline_at=None)
             flush_candidates(force=True)
             # 候选完整落盘后立即执行调用方注入的窄规则，不再等人打开复核页才触发。
             # 核心处理层不反向依赖 Web 复核层；CLI 与 Web 两个组装入口都传入同一实现。
-            auto_apply = _apply_finished_candidates(database, candidate_root, active)
-            profiles = _enrich_finished_performers(
-                database, groups, config, candidate_root, remote, active, update, issue)
+            summary = _finish_collection(
+                config, database, candidate_root, cover_root, groups, remote, asset_ids=scope_ids,
+                active=active, update=update, issue=issue, watermark=entity_watermark, covered=covered)
             update(status='failed' if state['issue_count'] else 'complete', stage='处理结束',
                    checked=len(rows),
-                   followups=sample_followup.plan(database, config, cover_root)
-                   + _entity_followups(database, config, entity_watermark, covered),
-                   auto_applied=auto_apply['applied'],
-                   auto_rejected=auto_apply['auto_rejected'],
-                   performer_aliases=profiles['aliases'], performer_avatars=profiles['avatars'],
-                   performer_profile_conflicts=profiles['conflicts'],
-                   performer_profile_failed=profiles['failed'],
+                   **summary,
                    error=issue_summary(state['issue_count'], state['paused_count']),
                    completed_at=time.time(), current_asset_id=None, current_asset_name='',
                    current_action='', current_started_at=None, current_deadline_at=None)
