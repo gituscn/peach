@@ -583,7 +583,7 @@ def _catalog_group_rows(contract: WebContract) -> list[dict]:
 def _read_group_rows(contract: WebContract) -> list[dict]:
     with contract.read_connection() as connection:
         rows = [dict(row) for row in connection.execute(
-            "SELECT id,name,code,size,duration,width,height,disposal FROM asset "
+            "SELECT id,name,path,code,size,duration,width,height,disposal,catalog_title,field_owners FROM asset "
             "WHERE medium='video' "
             "AND COALESCE(disposal,'')<>'vanished' ORDER BY id",
         )]

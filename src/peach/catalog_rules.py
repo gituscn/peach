@@ -1222,15 +1222,7 @@ def duration_clusters(items: list[dict]) -> list[list[dict]]:
 
 
 def _merged_by_filename(clusters: list[list[dict]]) -> list[list[dict]]:
-    """同番号下文件名一样的那些，并回同一组。
-
-    时长是唯一判据时，同一版的两份会被分开：一份原盘一份转码，容器里写的时长
-    差出十几秒就超了容差；一份根本没探过时长，那更是自己单独一组。两组各只有
-    一个，重复清单于是一条都不提示——而这两份恰恰是最该提示的那种。
-
-    番号已经把范围收在同一发行上，这一层只看文件名：同番号下名字一样的就是同
-    一版。分卷不受影响，`ABC-001-A` 和 `ABC-001-B` 本来就不同名。
-    """
+    """同番号同名副本可进复核簇；已知时长差超过 10% 的保持独立。"""
     home = list(range(len(clusters)))
 
     def root(index: int) -> int:
@@ -1240,6 +1232,12 @@ def _merged_by_filename(clusters: list[list[dict]]) -> list[list[dict]]:
         return index
 
     first: dict[str, int] = {}
+    named_durations: dict[str, list[float]] = {}
+    for cluster in clusters:
+        for item in cluster:
+            stem = PureWindowsPath(str(item.get('name') or '')).stem.casefold()
+            if float(item.get('duration') or 0) > 0:
+                named_durations.setdefault(stem, []).append(float(item['duration']))
     for index, cluster in enumerate(clusters):
         for item in cluster:
             stem = PureWindowsPath(str(item.get("name") or "")).stem.casefold()
@@ -1247,6 +1245,16 @@ def _merged_by_filename(clusters: list[list[dict]]) -> list[list[dict]]:
                 continue
             known = first.setdefault(stem, index)
             if root(known) != root(index):
+                selected = {root(known), root(index)}
+                known_times = named_durations.get(stem, [])
+                if (known_times and max(known_times) - min(known_times) > max(15, max(known_times) * .10)
+                        and not any(float(row.get('duration') or 0) > 0 for row in clusters[index])):
+                    continue
+                durations = [float(row['duration']) for cluster_index, cluster in enumerate(clusters)
+                             if root(cluster_index) in selected for row in cluster
+                             if float(row.get('duration') or 0) > 0]
+                if durations and max(durations) - min(durations) > max(15, max(durations) * .10):
+                    continue
                 home[root(index)] = root(known)
     merged: dict[int, list[dict]] = {}
     for index, cluster in enumerate(clusters):

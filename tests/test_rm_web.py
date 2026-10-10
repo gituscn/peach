@@ -2639,13 +2639,8 @@ class DuplicateDetectionTests(unittest.TestCase):
         self.assertEqual(result["total"], 1)
         self.assertEqual(result["groups"][0]["count"], 2)
 
-    def test_two_files_with_the_same_name_are_one_duplicate_whatever_the_clock_says(self):
-        """同番号下同名的两份是同一版，时长差多少都算重复。
-
-        一份原盘一份转码，容器里写的时长能差出十几秒，超出容差就各成一组，
-        两组各只有一个，清单上一条都不提示——而这正是最该提示的那种。探时长
-        失败的那份（`duration` 为空）同理。
-        """
+    def test_shared_filename_rips_with_missing_duration_are_candidates(self):
+        """同名且已知时长在容差内的副本进入重复候选，缺测量的一份保留。"""
         kept = self.add("SSIS-001", 7200, 9_000_000_000, name="SSIS-001.mp4")
         drifted = self.add("SSIS-001", 7380, 4_000_000_000, drive="R", name="SSIS-001.mp4")
         unprobed = self.add("SSIS-001", None, 3_000_000_000, drive="A", name="SSIS-001.mp4")
@@ -2653,6 +2648,13 @@ class DuplicateDetectionTests(unittest.TestCase):
         self.assertEqual(result["total"], 1)
         self.assertEqual({item["id"] for item in result["groups"][0]["files"]},
                          {kept, drifted, unprobed})
+
+    def test_shared_filename_full_and_half_length_files_stay_independent(self):
+        self.add('YRH-110', 14663, 2_443_829_006, name='YRH-110.mp4')
+        self.add('YRH-110', 7597, 5_886_476_309, name='YRH-110.mp4')
+        self.add('YRH-110', None, 3_000_000_000, name='YRH-110.mp4')
+        result = self.groups()
+        self.assertEqual(result['total'], 0)
 
     def test_a_shared_name_does_not_drag_in_the_other_parts(self):
         """并的是同名那几份，别的簇不跟着合。"""
@@ -3277,6 +3279,36 @@ class CatalogVersionTests(unittest.TestCase):
                 'INSERT INTO asset(id,location,path,name,medium,code,size,duration,width,height,first_seen) '
                 "VALUES(?,'115',?,?,'video',?,1000000,?,?,?,'2026-01-01')",
                 (aid, f'B:\\{aid}\\{name}', name, code, duration, height * 16 // 9, height))
+
+    def test_dmm_content_id_filename_has_release_identity(self):
+        from peach.catalog_versions import filename_matches_code
+        self.assertTrue(filename_matches_code({'code': 'LXVS-039', 'name': '118lxvs00039.mp4'}))
+        self.assertFalse(filename_matches_code({'code': 'LXVS-039', 'name': '118lxvs00038.mp4'}))
+
+    def test_scraped_generic_filename_uses_exact_number_directory(self):
+        from peach.catalog_versions import filename_matches_code
+        row = {'code': 'n0780', 'name': 'Tokyo-Hot.mp4', 'path': r'B:\东京热\n0780\Tokyo-Hot.mp4',
+               'catalog_title': '发行标题', 'field_owners': '{"catalog_title":"auto:javdb"}'}
+        self.assertTrue(filename_matches_code(row))
+        self.assertFalse(filename_matches_code({**row, 'path': r'B:\东京热\n0781\Tokyo-Hot.mp4'}))
+        self.assertFalse(filename_matches_code({**row, 'field_owners': None}))
+
+    def test_explicit_filename_conflict_takes_priority_over_directory(self):
+        from peach.catalog_versions import filename_matches_code
+        row = {'code': '122614-947', 'name': '122614_001-1pon-whole1_hd.avi',
+               'path': r'B:\一本道\122614-947\122614_001-1pon-whole1_hd.avi',
+               'catalog_title': '发行标题', 'field_owners': '{"catalog_title":"auto:1pondo"}'}
+        self.assertFalse(filename_matches_code(row))
+
+    def test_catalog_query_keeps_scraped_identity_for_generic_video_names(self):
+        self.add(1, 'Tokyo-Hot.mp4', 5896, 720, code='n0780')
+        self.add(2, 'n0780.mkv', 5786, 1080, code='n0780')
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute('UPDATE asset SET path=?,catalog_title=?,field_owners=? WHERE id=1',
+                               (r'B:\东京热\n0780\Tokyo-Hot.mp4', '发行标题', '{"catalog_title":"auto:javdb"}'))
+        result = rm_web.q_editions(self.contract, {'id':1})
+        self.assertEqual(result['count'], 2)
+        self.assertEqual({row['id'] for row in result['items']}, {1,2})
 
     def test_related_keeps_one_version_card_when_a_later_part_ranks_first(self):
         self.add(1, 'FC-1110408.mp4', 3213)
