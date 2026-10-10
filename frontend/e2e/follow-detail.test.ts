@@ -230,16 +230,15 @@ describe('关注详情岛', () => {
       ]);
       assert.match(await queue.locator('[data-mix-queue-head]').innerText(), /视频合集[\s\S]*3 个视频/);
       assert.equal(await queue.locator('[data-queue-close]').isVisible(), false, '并排布局的队列头不该有关闭键');
-      /* 桌面上媒体在左、详情在右，队列是完整的第二行、横向排开。 */
+      /* 桌面上媒体在左、详情在右，底部队列横向排开。 */
       const grid = await page.evaluate(() => {
         const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
         const media = box('#stage [data-stage-media]'), side = box('#stage [data-follow-detail-side]');
-        const queue = box('#stage [data-follow-queue]'), whole = box('#stage [data-stage-grid]');
+        const queue = box('#stage [data-follow-queue]');
         return { sideRight: side.left >= media.right - 1, queueBelow: queue.top >= Math.max(media.bottom, side.bottom) - 1,
-          queueFull: Math.abs(queue.width - whole.width) <= 1,
           flow: getComputedStyle(document.querySelector('#stage [data-follow-queue] [data-mix-list]')!).gridAutoFlow };
       });
-      assert.deepEqual(grid, { sideRight: true, queueBelow: true, queueFull: true, flow: 'column' });
+      assert.deepEqual(grid, { sideRight: true, queueBelow: true, flow: 'column' });
       assert.deepEqual(withoutPlayer(opened.problems), []);
     } finally {
       await opened.close();

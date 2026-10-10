@@ -277,6 +277,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 - 「只采集」对齐全的行（番号已落库、字段有着落或已在候选表、封面在位）不碰磁盘；文件在不在看目录列表、同目录只列一次，扫描用目录列表自带的大小与时间、不逐个 stat；候选 CSV 每 5 秒写盘一次，被打断也在收尾写全。
 - 一个控件在两页出现时，选中态也归它：首页、资料页与关注页的「全部／没看过／稍后看／已标记」共用 `use-view-glide.ts` 那块滑动玻璃与 `[data-view-glide]`，填充只由玻璃给，各排自己不铺底。
 - 本地详情与关注详情的「接着看」共用 `RelatedSection`、横滚接线与卡片 `next` 版式，数量读同一设置。关注推荐复用 `/api/follow` 分页及 TanStack Query 缓存，最多读取三页；优先同创作者和共同标签，排除当前合集、已看、忽略与不同媒体类型。创作者头像链接复用卡片的 hover，下载链接复用舞台操作键几何；未新增依赖，推荐读取不写 ledger。
+- 详情底部共用 `DetailContinuation`：分集队列在左、接着看在右，手机上下排列，两区独立横滚并共用底色。`RelatedSection` 给卡片的 8px 悬停面留出滚动内距；分卷与版本的推荐按队列种子缓存。队列头像共用 `cardIdentity`、`avatarInner`，同时读取列表投影与详情 `entity_refs`，保留图片版本及人脸取景。
 - 统计与口味两页按登录态 Vercel Analytics／Speed Insights 的当前页面重做，排行与数据源共用父网格的引导线。
 - 口味页顶部给出结论与可点入口：浏览与 Peach 两侧的共同信号、可探索标签、待补证据的下一步动作。
 - 操作回执复用 Toast（Sonner 的栈，`frontend/src/react/toaster.tsx`；壳里只调 `toast()`／`actionReceipt()`）；按钮以 Spinner 和 `aria-busy` 标明忙态。后台任务显示可恢复进度，断线自动重连。

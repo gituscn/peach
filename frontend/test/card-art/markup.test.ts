@@ -327,6 +327,23 @@ describe('卡片署名的身份推导', () => {
     const html = queueAvatarHtml({ creator: 'cc', creator_entity: { id: 8, has_image: true } });
     expect(parse(html)!.getAttribute('src')).toBe('/entity-image?kind=creator&id=8');
   });
+
+  it('详情队列从 entity_refs 取得共演头像、版本和取景', () => {
+    const host = document.createElement('div');
+    host.innerHTML = queueAvatarHtml({ is_jav: true, performers: ['JULIA', '共演者'], entity_refs: {
+      performer: [{ id: 7846, has_image: true, image_version: 'portrait-v2', avatar_focus: { axis: 'y', pct: 15 } },
+        { id: 9, has_image: false }],
+    } });
+    expect(host.querySelectorAll('.mav')).toHaveLength(2);
+    expect(host.querySelector('img')?.getAttribute('src')).toBe('/entity-image?kind=performer&id=7846&v=portrait-v2');
+    expect(host.querySelector('img')?.style.objectPosition).toBe('50% 15%');
+    expect(host.querySelectorAll('.mav')[1]?.querySelector('img')).toBeNull();
+  });
+
+  it('详情队列的创作者头像使用 creator 实体引用', () => {
+    const html = queueAvatarHtml({ creator: '创作者', entity_refs: { creator: [{ id: 8, has_image: true }] } });
+    expect(parse(html)!.getAttribute('src')).toBe('/entity-image?kind=creator&id=8');
+  });
 });
 
 describe('称谓与 Mix 署名', () => {

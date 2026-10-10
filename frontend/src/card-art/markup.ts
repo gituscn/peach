@@ -293,6 +293,7 @@ export interface IdentityItem {
   performer_entities?: (FaceRef | null)[];
   performer_total?: number;
   creator_entity?: FaceRef | null;
+  entity_refs?: Partial<Record<'performer' | 'creator' | 'studio' | 'series', FaceRef[]>>;
   studio?: string;
   code?: string;
   tags?: string[];
@@ -311,7 +312,7 @@ export function cardIdentity(item: IdentityItem): {
   refs: (FaceRef | null)[]; total: number;
 } {
   const performers = item.performers || [];
-  const refs = item.performer_entities || [];
+  const refs = item.performer_entities ?? item.entity_refs?.performer ?? [];
   const performer = performers[0] || '';
   const primaryCreator = item.is_jav && performer ? '' : item.creator || '';
   const kind = primaryCreator ? 'creator' : performer ? 'performer' : '';
@@ -335,7 +336,7 @@ export function queueAvatarHtml(item: IdentityItem): string {
       .map((nm, i) => `<span class="mav">${avatarInner(nm, refs[i], representativeOf(nm))}</span>`)
       .join('')}</div>`;
   }
-  const ref = kind === 'performer' ? refs[0] : item.creator_entity;
+  const ref = kind === 'performer' ? refs[0] : item.creator_entity ?? item.entity_refs?.creator?.[0];
   return `<span class="mav">${avatarInner(name, ref, kind ? representativeOf(name) : null, kind || 'performer')}</span>`;
 }
 

@@ -575,7 +575,7 @@ describe('侧栏怎么读', () => {
     ]);
   });
 
-  it('接着看没有内容就整块不出现：推荐条数为 0、开着队列、取回空列表', async () => {
+  it('接着看没有内容就整块不出现：推荐条数为 0、Mix 队列、取回空列表', async () => {
     serve(undefined, { '/api/related': { items: [] } });
     const off = await show(item(1), { relatedLimit: 0 });
     expect(off.host.querySelector('[data-item-related]')).toBeNull();

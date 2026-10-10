@@ -19,6 +19,7 @@ import { ApiError, apiSend } from '../../api';
 import { RetryNote } from '../components/grid-reveal';
 import { MixGroupLabel, MixQueue, MixQueueRow } from '../components/mix-queue';
 import { RelatedSection } from '../components/related-section';
+import { DetailContinuation } from '../components/detail-continuation';
 import { FollowAuthorLink, FollowCard } from '../follow-feed/follow-card';
 import {
   FOLLOW_CREDENTIALS_KEY, fetchFollowCredentials, replaceFollowItem, setFollowItemStatus, videoItems,
@@ -129,12 +130,13 @@ function Detail({ data, context, mediaIndex, onMedia, mediaView, relatedLimit, h
     <div data-stage-grid="" data-with-queue={queue ? '' : undefined} data-follow-detail="">
       <MediaFrame key={frameKey} item={item} media={media}
         helpers={helpers} actions={actions} onMedia={onMedia} issues={issues} />
-      {queue}
       <Side item={item} data={data} context={context} media={media} write={write}
         issue={issue.key === frameKey ? issue.kind : ''} helpers={helpers} actions={actions} />
     </div>
-    {relatedLimit > 0 ? <Related data={data} media={media.kind === 'image' ? 'images' : media.kind === 'video' ? 'videos' : mediaView}
-      limit={relatedLimit} context={context} helpers={helpers} actions={actions} /> : null}
+    <DetailContinuation queue={queue}>
+      {relatedLimit > 0 ? <Related data={data} media={media.kind === 'image' ? 'images' : media.kind === 'video' ? 'videos' : mediaView}
+        limit={relatedLimit} context={context} helpers={helpers} actions={actions} /> : null}
+    </DetailContinuation>
     </>
   );
 }

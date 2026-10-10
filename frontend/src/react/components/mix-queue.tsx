@@ -40,7 +40,7 @@ export function MixQueue({ kind, title, summary, onClose, actions, listRef, chil
         <div><h2 className="font-semibold">{title}</h2><span>{summary}</span></div>
         <div data-mix-queue-actions="">
           {actions}
-          {/* 带队列的舞台格（`[data-with-queue]`）里队列头不放关闭键，关舞台用媒体框上那一枚（`stage.css`）。 */}
+          {/* 详情底部的队列头不放关闭键，关舞台用媒体框上那一枚（`stage.css`）。 */}
           <button type="button" data-queue-close="" title="关闭" aria-label="关闭" onClick={onClose}
             dangerouslySetInnerHTML={{ __html: icon('x') }} />
         </div>
