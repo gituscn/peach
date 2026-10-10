@@ -141,6 +141,17 @@ describe('avatarInner：首字母垫底，再叠真实图', () => {
       .toBe('/entity-image?kind=creator&id=3');
   });
 
+  it('卖家引用自带代表作头像，实体图优先，未取得的代表作不出图', () => {
+    const ref = { id: 80, rep: 18, has_avatar: true, avatar_stand_in: true };
+    const avatar = parse(entityAvatar('卖家账号', ref, 'creator'))!;
+    expect(avatar.getAttribute('src')).toBe('/avatar?id=18');
+    expect(avatar.getAttribute('title')).toBe('代表作画面，非本人');
+    const installed = parse(entityAvatar('卖家账号', { ...ref, has_image: true }, 'creator'))!;
+    expect(installed.getAttribute('src')).toBe('/entity-image?kind=creator&id=80');
+    expect(installed.hasAttribute('title')).toBe(false);
+    expect(parse(entityAvatar('卖家账号', { ...ref, has_avatar: false }, 'creator'))).toBeNull();
+  });
+
   it('引用上的 image_version 跟着拼进实体图地址', () => {
     expect(parse(avatarInner('A', { id: 3, has_image: true, image_version: '1727800000' }, null))!.getAttribute('src'))
       .toBe('/entity-image?kind=performer&id=3&v=1727800000');

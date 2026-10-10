@@ -388,6 +388,7 @@ def q_items(contract: WebContract, args):
                     entity_ref(contract, "performer", entity_id, name))
             elif kind == "creator" and aid not in creator_refs:
                 creator_refs[aid] = entity_ref(contract, kind, entity_id, name)
+        attach_creator_reference_details(contract, creator_refs.values())
         for r in rows:
             ts = tmap.get(r["id"], [])
             canonical = emap.get(r["id"], {})
@@ -520,6 +521,7 @@ def attach_card_performers(contract: WebContract, rows):
         names.setdefault(asset_id, []).append(name)
         refs.setdefault(asset_id, []).append(
             entity_ref(contract, "performer", entity_id, name))
+    attach_creator_reference_details(contract, creator_refs.values())
     for row in rows:
         row["performers"] = names.get(row["id"], [])[:CARD_PERFORMERS]
         row["performer_entities"] = refs.get(row["id"], [])[:CARD_PERFORMERS]
@@ -527,6 +529,33 @@ def attach_card_performers(contract: WebContract, rows):
         if row["creator_entity"]:
             row["creator"] = row["creator_entity"]["name"]
         row["performer_total"] = len(names.get(row["id"], []))
+
+
+def attach_creator_reference_details(contract: WebContract, refs):
+    """署名引用携带可信角色与资料页同源的代表作头像，按实体批量取数。"""
+    refs = list(refs)
+    ids = sorted({ref['id'] for ref in refs})
+    if not ids:
+        return
+    from .entity_classification import summaries
+    with contract.read_connection() as connection:
+        roles = summaries(connection, ids)
+        portraits = [dict(row) for row in connection.execute(
+            "SELECT e.id,(SELECT a.id FROM asset_entity ae CROSS JOIN asset a ON a.id=ae.asset_id "
+            "WHERE ae.entity_id=e.id AND a.medium='video' AND a.snapshot_path IS NOT NULL "
+            "ORDER BY a.size DESC LIMIT 1) rep FROM entity e "
+            f"WHERE e.id IN ({','.join('?' for _ in ids)})", ids)]
+    attach_avatar_availability(contract, portraits)
+    by_id = {row['id']: row for row in portraits}
+    for ref in refs:
+        categories = roles.get(ref['id'], {}).get('identity_categories', [])
+        if categories:
+            ref['identity_categories'] = categories
+        portrait = by_id.get(ref['id'], {})
+        if portrait.get('has_avatar'):
+            ref.update(rep=portrait['rep'], has_avatar=True)
+            if portrait.get('avatar_stand_in'):
+                ref['avatar_stand_in'] = True
 
 
 def attach_saved_follow_cards(contract: WebContract, rows):
@@ -928,6 +957,7 @@ def q_item(contract: WebContract, aid):
                for entity_id, item_kind, name in canonical if item_kind == kind]
         for kind in ("creator", "performer", "studio", "series")
     }
+    attach_creator_reference_details(contract, d['entity_refs']['creator'])
     if d["entities"]["creator"]:
         d["creator"] = d["entities"]["creator"][0]
     if d["entities"]["studio"]:

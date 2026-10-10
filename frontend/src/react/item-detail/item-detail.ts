@@ -8,7 +8,7 @@
  * 从外面重新进来（`fresh`）才重取——壳只记着此刻开的是哪一个队列，用来判这一下。 */
 import type { QueryKey } from '@tanstack/react-query';
 import { esc, foldName } from '@peach/legacy/core';
-import { mixLabel } from '@peach/card-art';
+import { mixLabel, type FaceRef } from '@peach/card-art';
 
 import { apiGet } from '../../api';
 import type { MediaCardActions, MediaCardHelpers, MediaCardLayout, MediaItem } from '../catalog-grid/types';
@@ -20,12 +20,9 @@ import { queryClient } from '../query';
 export interface DetailTag { k: string; cat?: string; official?: boolean }
 
 /** 身份区里的一个实体。扁平字段兜底来的那一格没有 `id`，只画、不能点。 */
-export interface DetailEntityRef {
+export interface DetailEntityRef extends FaceRef {
   id: number | null;
   name: string;
-  has_image?: boolean;
-  image_version?: string;
-  avatar_focus?: unknown;
   has_logo?: boolean;
   /** 标识文件的内容版本，拼进 `/logo` 地址的 `&v=`。 */
   logo_version?: string;

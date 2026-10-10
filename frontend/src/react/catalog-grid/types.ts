@@ -1,10 +1,9 @@
 /* 馆藏卡片网格的对外契约：props、卡片版式、壳递进来的助手与动作。
  * 条目与分页的形状以 `/api/items`（`src/peach/web_router.py`）为准。 */
 
+import type { FaceRef } from '@peach/card-art';
 /** 卡片署名行上一个实体的引用：头像取图与取景都从这里来。 */
-export interface MediaEntityRef {
-  id: number; has_image?: boolean; image_version?: string; avatar_focus?: unknown;
-}
+export interface MediaEntityRef extends FaceRef { id: number }
 
 /** `/api/items` 的一条。只列卡片读到的字段，其余原样带着，壳的缓存要的是整条。 */
 export interface MediaItem {
