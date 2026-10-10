@@ -330,6 +330,30 @@ class ChoiceTests(PickerFixture):
         self.assertTrue(stale["index_stale"])
         self.assertEqual(stale["index_age_hours"], round(old / 3600, 1))
 
+    def test_a_full_frame_library_crop_has_one_choice_and_keeps_current(self):
+        body = picture(350, 350, "purple")
+        url = gfriends.image_url("7-S1", "葵つかさ.jpg")
+        self.remember(body, provider="gfriends", url=url)
+        cut, origin = avatar_picker.crop(body, {"x0": 0, "y0": 0, "x1": 350, "y1": 350})
+        avatar_picker.install(self.providers, self.avatars, "performer", 7792, cut,
+                              {**origin, "provider": "gfriends", "upstream_url": url})
+        listed = self.listed()["choices"]
+        self.assertEqual([one["ref"] for one in listed if one["current"]], [LIBRARY_REF])
+        self.assertEqual(listed[0]["label"], "S1")
+        self.assertEqual(len(listed), 3)
+
+    def test_a_partial_library_crop_remains_a_distinct_composition(self):
+        body = picture(350, 350, "purple")
+        url = gfriends.image_url("7-S1", "葵つかさ.jpg")
+        self.remember(body, provider="gfriends", url=url)
+        cut, origin = avatar_picker.crop(body, {"x0": 50, "y0": 50, "x1": 300, "y1": 300})
+        avatar_picker.install(self.providers, self.avatars, "performer", 7792, cut,
+                              {**origin, "provider": "gfriends", "upstream_url": url})
+        listed = self.listed()["choices"]
+        self.assertEqual(len(listed), 4)
+        self.assertEqual(listed[0]["ref"], f"sha256:{inspect_avatar(cut).sha256}")
+        self.assertIn(LIBRARY_REF, [one["ref"] for one in listed])
+
 
 class AssetArtworkTests(PickerFixture):
     """从本人作品的画面里框头像：列哪些作品、谁递得进来、切出来是什么。"""
@@ -572,6 +596,27 @@ class CoverFocusTests(AssetArtworkTests):
                                        "performer", 7792, cover_root=self.covers)
         return next(one for one in listed["choices"] if one["source"] == "asset")["focus"]
 
+    def test_a_cover_crop_and_its_work_share_a_choice_with_all_bases(self):
+        self.add_asset(11, "ABW-232")
+        image = Image.open(io.BytesIO(self.cover.read_bytes()))
+        ImageDraw.Draw(image).rectangle((315, 60, 330, 90), fill="red")
+        image.save(self.cover, format="JPEG")
+        record = face_record(400, 260)
+        sidecar_path(self.cover).write_text(json.dumps(record), "utf-8")
+        box = avatar_picker.cover_focus("ABW-232", self.cover, record, 400, 260)
+        from peach.images import crop_to_box
+        body = crop_to_box(self.cover.read_bytes(), box)
+        avatar_picker.install(self.providers, self.avatars, "performer", 7792, body,
+                              {"provider": "cover-face", "source_kind": "cover_face_crop",
+                               "upstream_url": "peach:cover-face/ABW-232"})
+        listed = avatar_picker.choices(self.connection, self.providers, self.avatars,
+                                       "performer", 7792, cover_root=self.covers)["choices"]
+        current = [one for one in listed if one["current"]]
+        self.assertEqual([one["ref"] for one in current], ["asset:11:cover"])
+        self.assertIn("asset:11:cell4", current[0]["bases"])
+        self.assertIn(f"sha256:{inspect_avatar(body).sha256}", current[0]["bases"])
+        self.assertEqual(len(listed), 4)
+
     def test_a_detected_face_frames_the_same_square_the_batch_would_cut(self):
         self.add_asset(11, "ABW-232")
         sidecar_path(self.cover).write_text(json.dumps(face_record(400, 260)), "utf-8")
@@ -643,13 +688,18 @@ class CoverFocusTests(AssetArtworkTests):
         self.assertEqual(next(one for one in listed["choices"]
                               if one["source"] == "asset")["cast"], 1)
 
-    def test_a_whole_shared_cover_kept_by_the_batch_skips_the_face_too(self):
+    def test_a_whole_shared_cover_shares_the_work_and_skips_the_face(self):
         self.add_asset(11, "ABW-232")
         self.co_star(11)
         sidecar_path(self.cover).write_text(json.dumps(face_record(400, 260)), "utf-8")
-        choice = self.whole_cover_history()
+        self.remember(picture(400, 260, "green"), provider="cover-fallback",
+                      external_id="ABW-232")
+        listed = avatar_picker.choices(self.connection, self.providers, self.avatars,
+                                       "performer", 7792, cover_root=self.covers)
+        choice = next(one for one in listed["choices"] if one["source"] == "asset")
         self.assertEqual((choice["cast"], choice["focus"]),
                          (2, {"x0": 217, "y0": 0, "x1": 400, "y1": 260}))
+        self.assertFalse(any(one["source"] == "history" for one in listed["choices"]))
 
 
 class CodeCoverTests(PickerFixture):

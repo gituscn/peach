@@ -20,9 +20,10 @@
 * 馆里一张单人作品封面都截不出脸时（只有合集的那些人），按她的 avwikidb 编号读站上的单人
   作品，从馆外那几部的 DMM 封面上截脸，两部不同作品的脸互相过线才装（ADR-0074，
   `avatar_offsite_cover_face`）。装上的和馆藏封面截的同一档。
-* 两档都落空、图库里只有没过尺寸门槛的小图时，装认得准的那张小图（ADR-0066）：只有一张
+* 图库里认得准、短边至少 300 像素的小图优先于封面截脸（ADR-0102）；只有一张就装它，
+  多张仍按同一套互证判据挑。更小的图在图库与封面都落空时兜底（ADR-0066）：只有一张
   就装它，好几张照同一套互证判据挑，认定的几张里挑像素最大的。小图同样可以在上面几档里
-  作证，只是不当那张被装上的图。这一档装的图之后有了过门槛的图或封面人脸就换掉。
+  作证；清晰小图可升级至标准图库人像，更小的兜底可替换为封面人脸。
 * **个人博主**（过 `work_portrait_predicate` 的发布账号）不查图库，只从自己独占作品的
   画面上截脸（`avatar_cover_face.sheet_faces`，接触印相九格加有封面的那张）：两部不同作品
   截出的脸互相过线才装，判据与馆外单人作品封面同一条（ADR-0074、ADR-0099）。情侣号、
@@ -72,6 +73,8 @@ MAX_MATCH_CANDIDATES = 24
 NEAR_DUPLICATE = 0.9
 #: 小图兜底那一档装上的图，头像边车里记的 `source_kind`。
 SMALL_SOURCE_KIND = "gallery_small"
+#: 可优先于封面裁片的档案小图，沿用标准图库头像的短边下限。
+PROFILE_MIN_SIDE = MIN_SHORT_SIDE
 #: 派出之后账号分类被改、不再过 `work_portrait_predicate` 时的结论。它取决于分类而不是作品，
 #: 不记进 `Attempts`：分类改回来时照常再派。
 NO_IDENTITY = "账号没有本人身份依据"
@@ -179,8 +182,9 @@ _OFFSITE_COUNT = ("(SELECT count(*) FROM entity_external_ref x WHERE x.entity_id
 
 #: 认人判据的版本，进指纹。改了判据就加一：存量里缺图的女优按新判据各重比一次。
 #: 2 是 ADR-0057 的图库互证，3 是 ADR-0062 没有封面参照时的图库自证，4 是 ADR-0066 的
-#: 小图作证与兜底，5 是 ADR-0070 的小脸裁切放大再比，6 是 ADR-0074 的馆外单人作品封面。
-MATCH_RULE = 6
+#: 小图作证与兜底，5 是 ADR-0070 的小脸裁切放大再比，6 是 ADR-0074 的馆外单人作品封面，
+#: 7 是 ADR-0102 的清晰档案小图优先。
+MATCH_RULE = 7
 
 
 def _fingerprint(works, aliases, offsite) -> str:
@@ -278,7 +282,7 @@ def _run(contract, key: str, handle) -> dict:
                                          entity_id, name, cropped_px)
         # 图库索引只读本地缓存，这一步不联网；联网只发生在要量、要比、要装那几张的时候。
         listing = avatar_picker.choices(connection, providers_root, avatar_root,
-                                        kind, entity_id)
+                                        kind, entity_id, deduplicate=False)
         found = [choice for choice in listing["choices"]
                  if choice["source"] == "gfriends"]
         handle.progress(label=f"{TASK_LABEL}：{name}", throttle=0)
@@ -291,17 +295,10 @@ def _run(contract, key: str, handle) -> dict:
 
         probe = FaceProbe()
         covers = avatar_cover_face.faces(connection, contract.cover_root, entity_id, probe)
-        extra: dict = {}
-        if len(found) > 1:
-            matched = _install_matched(contract, connection, providers_root, avatar_root,
-                                       kind, entity_id, name, found, covers)
-            if matched["outcome"] == "已装上":
-                return matched
-            gallery = matched["outcome"]
-            extra = {key: value for key, value in matched.items()
-                     if key == "face_match_unavailable"}
-        else:
-            gallery = "图库里没有这个名字" if not found else "图库那张太小"
+        preferred, gallery, extra = _preferred_gallery(
+            contract, connection, providers_root, avatar_root, kind, entity_id, name, found, covers)
+        if preferred is not None:
+            return preferred
         fallen = {**_install_cover_face(contract, providers_root, avatar_root, kind,
                                         entity_id, name, gallery, len(found), cropped_px,
                                         covers, probe), **extra}
@@ -314,6 +311,31 @@ def _run(contract, key: str, handle) -> dict:
             return fallen
         return _install_small(contract, connection, providers_root, avatar_root, kind,
                               entity_id, found, covers, fallen)
+
+
+def _preferred_gallery(contract, connection, providers_root, avatar_root, kind: str,
+                       entity_id: int, name: str, found: list[dict], covers: list
+                       ) -> tuple[dict | None, str, dict]:
+    """多来源身份核验与清晰小图选择；返回安装结果或封面兜底所需的结论。"""
+    extra: dict = {}
+    if len(found) > 1:
+        matched = _install_matched(contract, connection, providers_root, avatar_root,
+                                   kind, entity_id, name, found, covers)
+        if matched["outcome"] == "已装上":
+            return matched, "", extra
+        gallery = matched["outcome"]
+        extra = {key: value for key, value in matched.items()
+                 if key == "face_match_unavailable"}
+    else:
+        gallery = "图库里没有这个名字" if not found else "图库那张太小"
+    if found and not extra:
+        profile = _install_small(contract, connection, providers_root, avatar_root, kind,
+                                 entity_id, found, covers, {"name": name, "outcome": gallery},
+                                 min_side=PROFILE_MIN_SIDE)
+        if (profile["outcome"] in ("已装上", "已装着认得准的小图")
+                or profile.get("face_match_unavailable")):
+            return profile, gallery, extra
+    return None, gallery, extra
 
 
 @dataclass(frozen=True)
@@ -342,7 +364,7 @@ class GalleryMatch:
 
 def match_gallery(found: list[dict], covers: list, matcher,
                   fetch: Callable[[dict], Candidate | None], *,
-                  allow_small: bool = False) -> GalleryMatch:
+                  allow_small: bool = False, min_small_side: int = 0) -> GalleryMatch:
     """图库里这几张候选，哪一张是她本人（ADR-0056）。只读：取图交给 `fetch`，不写任何东西。
 
     参照是她单人作品封面上截到的脸，按脸宽取前 `MATCH_COVERS` 张；候选要和其中
@@ -390,8 +412,9 @@ def match_gallery(found: list[dict], covers: list, matcher,
         }
 
     def eligible(candidate: Candidate) -> bool:
-        return allow_small or acceptable_avatar(candidate.inspected, MIN_LONG_SIDE,
-                                                MIN_SHORT_SIDE)
+        return (acceptable_avatar(candidate.inspected, min_small_side, min_small_side)
+                if allow_small else acceptable_avatar(candidate.inspected, MIN_LONG_SIDE,
+                                                      MIN_SHORT_SIDE))
 
     for choice in found[:MAX_MATCH_CANDIDATES]:
         candidate = fetch(choice)
@@ -564,8 +587,9 @@ def _install(contract, connection, providers_root, avatar_root, kind: str,
 
 
 def _install_small(contract, connection, providers_root, avatar_root, kind: str,
-                   entity_id: int, found: list[dict], covers: list, fallen: dict) -> dict:
-    """图库和封面都给不出过门槛的那一张时，装认得准的那张小图（ADR-0066）。
+                   entity_id: int, found: list[dict], covers: list, fallen: dict, *,
+                   min_side: int = 0) -> dict:
+    """装认得准且满足本档尺寸下限的小图（ADR-0066、0102）。
 
     `柊木なな` 两部作品都是多人封面，图库里只有 199×299 与 470×470 两张，余弦 0.42：
     两张认得同一个人，装 470×470 那张，比首字母占位强。`fallen` 是上一档的摘要，这一档
@@ -580,7 +604,7 @@ def _install_small(contract, connection, providers_root, avatar_root, kind: str,
             winner, evidence = fetch(found[0]), {}
         else:
             result = match_gallery(found, covers, face_match.FaceMatcher(), fetch,
-                                   allow_small=True)
+                                   allow_small=True, min_small_side=min_side)
             if result.unavailable:
                 return {**fallen, "face_match_unavailable": True}
             winner, evidence = result.winner, result.evidence
@@ -588,7 +612,7 @@ def _install_small(contract, connection, providers_root, avatar_root, kind: str,
         close = getattr(transport, "close", None)
         if close:
             close()
-    if winner is None:
+    if winner is None or not acceptable_avatar(winner.inspected, min_side, min_side):
         return fallen
     size = f"{winner.inspected.width}×{winner.inspected.height}"
     if winner.inspected.sha256 == avatar_picker.installed_digest(avatar_root, kind, entity_id):

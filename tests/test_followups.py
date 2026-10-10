@@ -837,7 +837,7 @@ class FaceMatchFollowupTests(FaceStubCase):
                                                    limit=10)]
 
         with self.database.read_connection() as connection:
-            self.assertEqual(fingerprint(connection, self.person), "1:0:0:r6")
+            self.assertEqual(fingerprint(connection, self.person), "1:0:0:r7")
         self.run_followup()
         self.assertEqual(planned(), [])
         with self.database.write_transaction(notify=False) as connection:
@@ -845,7 +845,7 @@ class FaceMatchFollowupTests(FaceStubCase):
                 "INSERT INTO entity_alias(entity_id,alias,normalized_alias,source)"
                 " VALUES(?,?,?,'test')", (self.person, "りな", "りな"))
         with self.database.read_connection() as connection:
-            self.assertEqual(fingerprint(connection, self.person), "1:1:0:r6")
+            self.assertEqual(fingerprint(connection, self.person), "1:1:0:r7")
         self.assertEqual(planned(), [followup_key("performer", self.person)])
 
     def test_a_small_picture_vouches_for_a_big_one_without_a_cover(self):
@@ -875,6 +875,44 @@ class FaceMatchFollowupTests(FaceStubCase):
         self.candidate("y-Minnano", (470, 470), self.OTHER)
         self.run_followup()
         self.assertFalse((self.avatars / f"performer-{self.person}.img").exists())
+
+    def test_a_350_pixel_profile_is_preferred_to_a_cover_face(self):
+        ref = self.candidate("y-Minnano", (350, 350), self.HER)
+        self.work(1, "IPX-001", self.HER)
+        self.assertEqual(self.run_followup()["size"], "350×350")
+        self.assertEqual(f"gfriends:{self.provenance()['external_id']}", ref)
+        self.assertEqual(self.run_followup()["outcome"], "已装着认得准的小图")
+
+    def test_a_profile_can_replace_an_automatic_cover_crop(self):
+        self.work(1, "IPX-001", self.HER)
+        self.run_followup()
+        self.assertEqual(self.provenance()["provider"], "cover-face")
+        self.candidate("y-Minnano", (350, 350), self.HER)
+        self.run_followup()
+        self.assertEqual(self.provenance()["provider"], "gfriends")
+
+    def test_profile_priority_requires_identity_matching_for_shared_names(self):
+        ref = self.candidate("y-AVDC", (350, 350), self.HER)
+        self.candidate("y-Minnano", (450, 450), self.OTHER)
+        self.work(1, "IPX-001", self.HER)
+        self.run_followup()
+        self.assertEqual(f"gfriends:{self.provenance()['external_id']}", ref)
+        self.assertEqual(self.provenance()["name_source"], "face-match")
+
+    def test_a_manual_crop_is_preserved_with_a_profile_candidate(self):
+        from peach import avatar_picker
+        body = self.picture((204, 204), self.HER_AGAIN)
+        avatar_picker.install(self.providers, self.avatars, "performer", self.person, body,
+                              {"provider": "gfriends", "source_kind": "user_cropped"})
+        self.candidate("y-Minnano", (350, 350), self.HER)
+        self.assertEqual(self.run_followup()["outcome"], "已有头像")
+        self.assertEqual((self.avatars / f"performer-{self.person}.img").read_bytes(), body)
+
+    def test_a_profile_smaller_than_300_pixels_remains_a_cover_fallback(self):
+        self.candidate("y-Minnano", (299, 350), self.HER)
+        self.work(1, "IPX-001", self.HER)
+        self.run_followup()
+        self.assertEqual(self.provenance()["provider"], "cover-face")
 
     def test_a_cover_face_replaces_a_small_picture_later(self):
         from peach.avatar_followup import stock
@@ -1062,11 +1100,11 @@ class OffsiteCoverFaceTests(FaceStubCase):
         self.compilation(1, "DVAJ-495")
         self.run_followup()
         with self.database.read_connection() as connection:
-            self.assertEqual(fingerprint(connection, self.person), "1:0:0:r6")
+            self.assertEqual(fingerprint(connection, self.person), "1:0:0:r7")
         self.assertEqual(planned(), [])
         self.bind()
         with self.database.read_connection() as connection:
-            self.assertEqual(fingerprint(connection, self.person), "1:0:1:r6")
+            self.assertEqual(fingerprint(connection, self.person), "1:0:1:r7")
         self.assertEqual(planned(), [key])
 
 

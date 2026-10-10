@@ -23,7 +23,7 @@ import json
 import sqlite3
 import urllib.parse
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from . import gfriends, images, jav_poster_crop
@@ -433,7 +433,7 @@ def typed_address(url: str, providers_root: Path, fetch: Callable[[str], bytes],
 
 def choices(connection: sqlite3.Connection, providers_root: Path,
             avatar_root: Path, kind: str, entity_id: int,
-            cover_root: Path | None = None) -> dict:
+            cover_root: Path | None = None, *, deduplicate: bool = True) -> dict:
     """页面要展示的一切：图库同名候选、取过的历史、当前装着的是哪一张。
 
     索引只读本地缓存。联网补索引是批处理的事——为一次点击同步拉 6 MB，页面会卡在
@@ -477,6 +477,8 @@ def choices(connection: sqlite3.Connection, providers_root: Path,
     listed = items[:MAX_CHOICES]
     if cover_root is not None:
         listed += asset_artwork(connection, cover_root, entity_id)
+    if deduplicate:
+        listed = _distinct_choices(listed, providers_root, cover_root)
     age = gfriends.index_age(index_dir)
     return {
         "kind": kind, "entity_id": int(entity_id),
@@ -485,6 +487,64 @@ def choices(connection: sqlite3.Connection, providers_root: Path,
         "index_age_hours": round(age / 3600, 1) if age is not None else None,
         "index_stale": age is None or age > gfriends.INDEX_MAX_AGE_SECONDS,
     }
+
+
+def _distinct_choices(items: list[Choice], providers_root: Path,
+                      cover_root: Path | None) -> list[Choice]:
+    """同一张本机图片及其默认裁片共用一格，作品底图仍可进入框选。
+
+    只比缓存字节与同一裁切函数的输出哈希，不联网、不做相似人脸猜测。
+    图库的整图框选会重编 JPEG，所以它与来源原图的字节哈希可以不同。
+    """
+    groups: list[tuple[Choice, set[str]]] = []
+    rank = {"asset": 0, "gfriends": 1, "history": 2}
+    for choice in items:
+        body = None
+        if choice.source == "gfriends":
+            category, _, filename = choice.ref.partition(":")[2].partition("/")
+            body = AvatarCandidateCache(providers_root / GFRIENDS_CACHE).lookup(
+                gfriends.image_url(category, filename))
+        elif choice.source == "history":
+            body = _object_bytes(providers_root, choice.ref.partition(":")[2])
+        elif choice.source == "asset" and cover_root is not None and choice.ref.endswith(":cover"):
+            # 作品组已核对归属；文件名取列表中真实番号，不从客户端 ref 推断路径。
+            key = artwork_key(int(choice.ref.split(":")[1]), choice.label)
+            path = Path(cover_root) / f"{key}.jpg"
+            try:
+                body = path.read_bytes()
+            except OSError:
+                pass
+        keys = {f"ref:{choice.ref}"}
+        if body is not None:
+            upright = images.upright(body)
+            box = choice.focus
+            if box is None:
+                keys.add(hashlib.sha256(body).hexdigest())
+                size = images.measure_image_size(upright)
+                box = (0, 0, *size) if size else None
+            cut = images.crop_to_box(upright, box) if box else None
+            if cut is not None:
+                keys.add(hashlib.sha256(cut).hexdigest())
+        overlapping = [index for index, (_, existing) in enumerate(groups) if keys & existing]
+        if not overlapping:
+            groups.append((choice, keys))
+            continue
+        first = overlapping[0]
+        merged = [groups[index][0] for index in overlapping] + [choice]
+        winner = min(merged, key=lambda item: rank.get(item.source, 3))
+        bases = list(winner.bases)
+        if winner.source == "asset":
+            bases = list(dict.fromkeys([*bases, *(item.ref for item in merged)]))
+        details = list(dict.fromkeys(text for item in merged for text in (item.detail, item.label)
+                                    if text and text != winner.label))
+        winner = replace(winner, current=any(item.current for item in merged),
+                         bases=tuple(bases), detail=" · ".join(details))
+        for index in overlapping:
+            keys.update(groups[index][1])
+        groups[first] = (winner, keys)
+        for index in reversed(overlapping[1:]):
+            groups.pop(index)
+    return sorted((choice for choice, _ in groups), key=lambda choice: not choice.current)
 
 
 def _object_bytes(providers_root: Path, digest: str) -> bytes | None:

@@ -11,12 +11,12 @@
 - 核查：`peach-data/review/creator-boundary-delivery.md`；StraplessDildo 归厂牌。
 - 关注作者 25 位、来源 111 条、身份关联 71 条、别名 30 条（ADR-0096）。
 - 身份合并 18 组；版本核查：`peach-data/review/version-evidence-review.md`。
-- JAV 头像 816 张，38 张水印待复核；17 位档案、253 张头像候选、2 张官方封面。
+- JAV 头像 816，水印待复核 38；档案 17、候选 253、官方封面 2；[选图规则](adr/0102-profile-avatar-priority.md)。
 - 「整理」（ADR-0039）支持预览、执行、回滚；英文视频名分词 169 条。
 - 产地是独立维度、JAV 是其投影：`region` 空时按厂牌、创作者、番号逐层推断，不落库；韩国 MIB 不算 JAV。
 - Windows 托盘自动恢复，重启用 `restart_windows_tray.py --source`；代码与数据在内置盘，媒体在外置盘。
 - 托盘须普通权限启动：提权令牌看不到 CloudDrive 的 `A:`/`B:`，误报脱盘。
-- Windows：80 跳 HTTPS，LAN:443；`peach-win`、`0.38.0`。10-10 重启，CA、健康、前端产物通过。
+- Windows：80→HTTPS、LAN:443；`peach-win`、`0.38.0`。CA、健康通过。
 - 主界面 `peach-app.js/css`，登录、配置页 `peach-pages.js/css`。
 - `/healthz` 报 `configurable=true`；配置与选目录共用连接判据，托盘管理 HTTPS 地址、端口及重载。
 - 首启、配置页列缺失依赖（CloudDrive、挂载驱动、FFmpeg/ffprobe、OpenSSL）；Windows 识别 CloudDrive、WinFsp。
