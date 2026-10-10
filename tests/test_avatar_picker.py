@@ -613,8 +613,12 @@ class CoverFocusTests(AssetArtworkTests):
                                        "performer", 7792, cover_root=self.covers)["choices"]
         current = [one for one in listed if one["current"]]
         self.assertEqual([one["ref"] for one in current], ["asset:11:cover"])
-        self.assertIn("asset:11:cell4", current[0]["bases"])
-        self.assertIn(f"sha256:{inspect_avatar(body).sha256}", current[0]["bases"])
+        self.assertEqual(current[0]["bases"], ["asset:11:cover"] +
+                         [f"asset:11:cell{cell}" for cell in range(9)])
+        source, _ = avatar_picker.resolve(current[0]["ref"], self.connection, self.providers,
+                                          7792, None, self.artwork)
+        restored, _ = avatar_picker.crop(source, current[0]["focus"])
+        self.assertEqual(restored, body)
         self.assertEqual(len(listed), 4)
 
     def test_a_detected_face_frames_the_same_square_the_batch_would_cut(self):
