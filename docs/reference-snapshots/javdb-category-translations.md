@@ -6,6 +6,8 @@
 
 2026-10-10 使用项目取页入口取得 [中文类别表](https://javdb.com/tags?locale=zh) 与 [英文类别表](https://javdb.com/tags?locale=en)，每页各有 345 个不同类别链接。同一链接只能证明名称属于同一来源类别，不能证明中英文准确互译；发现语义冲突时继续复核。`locale=ja` 返回英文，不能用它证明日文原词。
 
+本文件合并两个 locale 的页面与用户复核决定，不存在可重抓的单一上游 URL，因此不登记进 `docs/reference-sources.json`。
+
 | 类别链接 | 中文来源词 | 英文来源词 | 规范标签 |
 | --- | --- | --- | --- |
 | [`c1=107`](https://javdb.com/tags?c1=107) | 戀腿癖 | Leg Fetish | 恋腿 |
