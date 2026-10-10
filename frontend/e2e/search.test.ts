@@ -34,8 +34,8 @@ interface Search extends ItemVisit {
 
 const fold = (value: string) => value.normalize('NFKC').trim().toLocaleLowerCase();
 
-async function openSearch(browser: Browser, { limit = 10, history = [] as string[] } = {}): Promise<Search> {
-  const opened = await openItemPage(browser, '/', DESKTOP, {
+async function openSearch(browser: Browser, { limit = 10, history = [] as string[], viewport = DESKTOP } = {}): Promise<Search> {
+  const opened = await openItemPage(browser, '/', viewport, {
     settings: { searchHistoryLimit: limit }, ready: '#grid [data-media-card]',
   });
   const { page } = opened;
@@ -82,6 +82,47 @@ describe('顶栏搜索', () => {
   let browser: Browser;
   before(async () => { browser = await launch(); });
   after(async () => { await browser?.close(); });
+
+  for (const viewport of VIEWPORTS) {
+    it(`单类视频预览可滚动，完整结果入口可由键盘提交（${viewport.name}）`, { timeout: 60_000 }, async () => {
+      const opened = await openSearch(browser, { viewport });
+      try {
+        const { page } = opened;
+        await page.route(/\/api\/suggest\?/, (route) => {
+          const url = new URL(route.request().url());
+          const limit = Math.min(53, Number(url.searchParams.get('limit')) || 5);
+          const items = Array.from({ length: limit }, (_, i) => ({
+            value: `ABF-${i + 1}`, id: i + 1, code: `ABF-${i + 1}`, title: '演示作品',
+            card: { id: 11, code: `ABF-${i + 1}`, is_jav: true, has_cover: true },
+          }));
+          return route.fulfill({ json: { q: 'abf', groups: [{ kind: 'asset', label: '视频', total: 53, items }] } });
+        });
+        if (viewport.mobile) await page.locator('#searchBtn').click();
+        await page.locator('#q').fill('abf');
+        await page.locator(`${MENU} [data-search-option="work"]`).first().waitFor({ state: 'visible' });
+        assert.equal(await page.locator(`${MENU} [data-search-option="work"]`).count(), 20);
+        const geometry = await page.locator(MENU).evaluate((el) => ({
+          overflow: el.scrollHeight > el.clientHeight, bottom: el.getBoundingClientRect().bottom,
+          viewport: innerHeight, pageScroll: scrollY,
+        }));
+        assert.ok(geometry.overflow, '搜索面板没有可滚动内容');
+        assert.ok(geometry.bottom <= geometry.viewport, '搜索面板超出视口');
+        await page.locator(MENU).hover();
+        await page.mouse.wheel(0, 400);
+        await page.waitForFunction(() => document.querySelector('#searchMenu')!.scrollTop > 0);
+        assert.equal(await page.evaluate(() => scrollY), geometry.pageScroll, '滚动搜索面板带动了背景页面');
+        for (let i = 0; i < 21; i++) await page.keyboard.press('ArrowDown');
+        const more = page.locator(`${MENU} [data-search-option="more"]`);
+        assert.equal(await more.getAttribute('data-active'), '');
+        assert.equal(await more.textContent(), '查看全部 53 个视频');
+        await page.keyboard.press('Enter');
+        await page.waitForFunction(() => new URLSearchParams(location.search).get('q') === 'abf');
+        await page.locator(MENU).waitFor({ state: 'hidden' });
+      } finally {
+        await opened.close();
+      }
+    });
+  }
 
   it('连敲几个字只问一次补全；下拉栏照后端给的组次序摆', { timeout: 60_000 }, async () => {
     const opened = await openSearch(browser);

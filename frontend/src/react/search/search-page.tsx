@@ -112,6 +112,7 @@ export function SearchPage(props: SearchProps) {
     <section key={group.kind ?? group.label} data-search-group="" data-kind={group.kind}>
       <h3>{group.label}</h3>
       {group.kind ? <div data-search-items="">{group.options.map(option)}</div> : group.options.map(option)}
+      {group.more ? option(group.more) : null}
     </section>
   );
   const columns = (left: MenuSection[], right: MenuSection[]) => (left.length || right.length ? (
@@ -176,10 +177,13 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
     if (!kind) s.asked = query;
     try {
       const data = await apiGet<SuggestResponse>(`/api/suggest?q=${encodeURIComponent(query)}`
-        + (kind ? `&kind=${kind}&limit=${SUGGEST_ONE_KIND}` : `&limit=${SUGGEST_EACH}`));
+        + (kind ? `&kind=${kind}` : '') + `&limit=${SUGGEST_ONE_KIND}`);
       if (request !== s.suggestRequest) return;
       s.suggestFor = data.q || '';
       s.groups = data.groups || [];
+      if (!kind && s.groups.length > 1) {
+        s.groups = s.groups.map((group) => ({ ...group, items: group.items.slice(0, SUGGEST_EACH) }));
+      }
       if (!kind) s.tabs = s.groups.map(({ kind: k, label, total }) => ({ kind: k, label, total }));
     } catch {
       if (request === s.suggestRequest) { s.suggestFor = query; s.groups = [] }
@@ -253,6 +257,7 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
   };
   /** 选中一行，点它和回车落在同一处。作品开详情，有资料页的开资料页，其余按这个词搜。 */
   const choose = (entry: SearchOption) => {
+    if (entry.type === 'more') { runSearch(false, true); input().blur(); return }
     if (entry.type === 'suggest' && entry.kind === 'asset' && entry.item.id != null) {
       input().blur();
       props().actions.openItem(entry.item.id);
@@ -353,6 +358,14 @@ function Row({ entry, active, helpers, onPick, onPeek, onRemove }: {
       onPick(entry);
     },
   };
+  if (entry.type === 'more') {
+    return (
+      <button type="button" data-search-option="more" {...shared} onMouseDown={keep}>
+        查看全部 {entry.total.toLocaleString()} 个视频
+        <Sprite name="chevron-right" />
+      </button>
+    );
+  }
   if (entry.type !== 'suggest') {
     return (
       <div data-search-option="" {...shared}>

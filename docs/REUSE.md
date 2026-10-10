@@ -296,6 +296,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 - 图片的固有宽高只问文件头：`follow_image_dims.probe_image_dims` 发 `Range: bytes=0-65535`，`dims_from_header` 认 PNG／GIF／WebP（VP8、VP8L、VP8X）／JPEG（跳过 EXIF 到 SOF）；连接器、`backfill_follow_image_dims.py` 与 `/api/follow/image-dims` 落库前都经 `positive_dims` 归一，`FollowStore.set_image_dims` 只补空缺。宽高只为图片视图的卡面预留比例，回填每个条目只问卡面那张；原文件主机拦脚本（pawchive 的 `file.` 子域挂 ddos-guard）时按缩略图量，详情原图取不到也退回缩略图。
 - 归档站（kemono、coomer、pawchive）多图或视频的帖子由 `KemonoConnector._media_items` 列进 `media_items`（交付文件排第一、按路径去重），详情轮播与 `/follow-stream?media=N` 按条目自己站点的主机白名单取。
 - `/api/related` 用 Tag IDF 加 MMR 排序并缓存；搜索使用 FTS5 trigram，短查询回退 LIKE 并覆盖规范名、别名和检索词，搜索历史在 reader 写入被拒时降级到页面内存。
+- 搜索预览复用 `/api/suggest` 的分类总数、二十条上限与菜单滚动容器；多类各预览五条，单类预览二十条。视频总数超过预览时通过「查看全部」进入现有目录连续滚动，不新增分页接口或滚动依赖。
 - 复核页覆盖元数据、创作者标签、Logo、头像、身份、番号目录、FC2 证据和片尾出处；抓取与 AI 结果仍是候选，批准后才写真相字段，元数据候选保留 MetaTube 目录证据且不下载 URL。
 - 元数据旧决定是否过期只由 `metadata_auto_apply.metadata_decision_is_stale` 判，复核页与自动落库共用；过期后的重判、人批准标签只增不删、FC2 描述性称呼自动否决与两类撤回见 ADR-0079，`pending_genres` 收录后按并集补标签与 `genres_still_pending` 见 ADR-0082。
 - 资料页头像圆框角上的换头像入口有五条路：图库同名的其他图与这个人取过的每一张图、本机文件、https 地址、本人作品画面、输入番号取封面。

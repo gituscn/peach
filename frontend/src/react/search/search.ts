@@ -94,7 +94,7 @@ export interface SearchProps {
 
 /** 敲一下就查一次的补全：150ms 内继续敲就换掉上一次的排期，只发一次请求。 */
 export const SUGGEST_DEBOUNCE = 150;
-/** 「全部」每类给前几条，点一个页签再按这一类一次拉满。 */
+/** 多类预览每类五条；单类预览与分类页签各展示二十条。 */
 export const SUGGEST_EACH = 5;
 export const SUGGEST_ONE_KIND = 20;
 /** 有脸的那几类点开的是资料页；标签没有资料页，点它照旧是按这个词搜。 */
@@ -110,12 +110,14 @@ export const fold = (value: unknown): string => String(value ?? '').normalize('N
 /** 下拉栏里能被键盘选中的一行。`index` 是它在整栏里的次序，上下键按它走。 */
 export type SearchOption =
   | { index: number; type: 'history' | 'pick'; value: string }
+  | { index: number; type: 'more'; value: string; total: number }
   | { index: number; type: 'suggest'; value: string; kind: string; item: SuggestItem };
 
 export interface MenuSection {
   kind?: string;
   label: string;
   options: SearchOption[];
+  more?: SearchOption;
 }
 
 export interface MenuModel {
@@ -165,10 +167,12 @@ export function menuModel({ query, history, picks, suggestFor, groups, tabs, kin
     ? { label: '搜索记录', options: matching.map((value) => add({ type: 'history', value })) } : null;
   // 选了一类就只画这一类；拉满那一类的请求还在路上时，先用「全部」里的那几条顶着。
   const shown = (fresh ? groups : []).filter((group) => !kind || group.kind === kind);
-  const section = (group: SuggestGroup): MenuSection => ({
-    kind: group.kind, label: group.label,
-    options: group.items.map((item) => add({ type: 'suggest', value: item.value, kind: group.kind, item })),
-  });
+  const section = (group: SuggestGroup): MenuSection => {
+    const rows = group.items.map((item) => add({ type: 'suggest', value: item.value, kind: group.kind, item }));
+    const more = group.kind === 'asset' && (group.total ?? 0) > rows.length
+      ? add({ type: 'more', value: query, total: group.total! }) : undefined;
+    return { kind: group.kind, label: group.label, options: rows, more };
+  };
   const left = shown.filter((group) => !SUGGEST_RIGHT_KINDS.has(group.kind)).map(section);
   const right = shown.filter((group) => SUGGEST_RIGHT_KINDS.has(group.kind)).map(section);
   const empty = fresh && !shown.some((group) => group.items.length);
