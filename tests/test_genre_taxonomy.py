@@ -43,7 +43,7 @@ class GenreTaxonomyTests(unittest.TestCase):
                                     "第一人稱攝影", "4小時以上作品", "單體作品", "尚未收錄的分類"])
         self.assertEqual(tags, ["高跟", "丝袜", "出轨", "学生", "主观视角"])
         self.assertEqual(unknown, ["尚未收錄的分類"])
-        self.assertEqual(resolve_genre("靴子"), UNMAPPED)
+        self.assertEqual(resolve_genre("靴子"), "靴子")
 
     def test_javdb_aliases_share_the_existing_semantic_targets(self):
         aliases = (
@@ -79,12 +79,46 @@ class GenreTaxonomyTests(unittest.TestCase):
                 self.assertEqual(unknown, [])
 
     def test_javdb_aliases_keep_distinct_or_unsupported_meanings_unmapped(self):
-        raw = ["靴子", "濕身", "濕透", "飲尿", "妓女", "雙性人", "母親",
-               "女醫生", "女檢察官", "戀腿癖", "戀乳癖", "口爆/吞精", "車站性交",
-               "無碼流出", "無碼破解", "子宮頸", "正太控", "瘦小身型"]
+        raw = ["口爆/吞精", "車站性交", "天賦", "觸摸打字", "養尊處優",
+               "婆婆", "女主播", "女檢察官"]
         tags, unknown = map_genres(raw)
         self.assertEqual(tags, [])
         self.assertEqual(unknown, raw)
+
+    def test_confirmed_javdb_translations_preserve_semantic_dimensions(self):
+        raw = ["靴子", "高跟鞋", "濕身", "濕透", "流汗", "飲尿", "尿失禁",
+               "妓女", "風俗嬢", "風俗", "雙性人", "變性者", "母親", "亂倫",
+               "女醫生", "護士", "Female Investigator", "戀腿癖", "美腳", "戀乳癖", "美乳",
+               "子宮頸", "正太控", "瘦小身型"]
+        tags, unknown = map_genres(raw)
+        self.assertEqual(tags, ["靴子", "高跟", "湿身", "汗湿", "饮尿", "放尿",
+                                "风俗女郎", "风俗店", "扶她", "跨性别", "母亲角色", "近亲",
+                                "女医生", "护士", "女搜查官", "恋腿", "美腿", "恋乳", "美乳",
+                                "宫颈", "正太控", "娇小"])
+        self.assertEqual(unknown, [])
+
+    def test_javdb_category_link_identities_share_chinese_and_english_targets(self):
+        for chinese, english, target in (
+            ("雙性人", "Futanari", "扶她"), ("妓女", "Prostitutes", "风俗女郎"),
+            ("戀腿癖", "Leg Fetish", "恋腿"), ("戀乳癖", "Busty Fetish", "恋乳"),
+            ("蠻橫嬌羞", "Tsundere", "傲娇"), ("子宮頸", "Cervix", "宫颈"),
+        ):
+            with self.subTest(chinese=chinese):
+                self.assertEqual(map_genres([chinese, english, chinese]), ([target], []))
+
+    def test_javdb_source_version_labels_do_not_assert_local_file_attributes(self):
+        self.assertEqual(map_genres(["無碼流出", "無碼破解", "HDTV", "共演", "店長推薦"]), ([], []))
+        self.assertEqual(map_genres(["無修正", "肛交", "女醫生"]), (["无码", "肛交", "女医生"], []))
+
+    def test_confirmed_tags_have_filter_groups(self):
+        for group, names in (
+            (catalog_rules.ROLE_TAGS, ["风俗女郎", "扶她", "女医生", "母亲角色"]),
+            (catalog_rules.STORY_TAGS, ["恋腿", "恋乳", "正太控"]),
+            (catalog_rules.APPEARANCE_TAGS, ["靴子", "湿身"]),
+            (catalog_rules.POSITION_TAGS, ["饮尿", "宫颈"]),
+        ):
+            with self.subTest(names=names):
+                self.assertTrue(set(names) <= group)
 
     def test_javdb_aliases_preserve_scene_behavior_and_anal_boundaries(self):
         tags, unknown = map_genres(["戶外", "Exhibitionism", "洗澡", "溫泉",
