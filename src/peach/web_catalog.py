@@ -16,6 +16,7 @@ from . import media_libraries, settings_file
 
 from .catalog_rules import (
     LENGTH_TAGS,
+    current_tags,
     fc2_collection_label,
     is_jav_asset,
     jav_edition_badges,
@@ -1327,6 +1328,11 @@ def w_item_tag(contract: WebContract, body):
         raise ValueError("operation must be add or remove")
     if not tag or len(tag) > 80 or tag.startswith("演员:"):
         raise ValueError("tag must be 1 to 80 characters and cannot be a performer marker")
+    if operation == "add":
+        canonical = current_tags([tag])
+        if not canonical:
+            raise ValueError("该标签不在当前词表中")
+        tag = canonical[0]
     normalized = normalize_entity_name(tag)
     stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     # 事务边界只有一个入口：write_transaction 自己取 database.write_lock 并在异常时回滚。

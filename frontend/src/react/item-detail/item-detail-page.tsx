@@ -871,14 +871,19 @@ function useDetailWrite(item: DetailItem, actions: ItemDetailActions, label: (ta
       const tag = raw.trim();
       if (!tag) return;
       start(`add:${tag}`, '添加标签', async () => {
-        const result = await post<{ ok?: boolean }>(ITEM_TAG_URL, { operation: 'add', tag });
+        const result = await post<{ ok?: boolean; tag?: string }>(ITEM_TAG_URL, { operation: 'add', tag });
         if (!result.ok) return;
-        apply((now) => withTag(now, { k: tag, cat: 'general' }));
-        rememberTag(tag);
-        actions.toast(`已添加标签「${label(tag)}」`, {
+        const canonical = result.tag || tag;
+        if (hasTag(current(), canonical)) {
+          actions.toast(`标签「${label(canonical)}」已存在`);
+          return;
+        }
+        apply((now) => withTag(now, { k: canonical, cat: 'general' }));
+        rememberTag(canonical);
+        actions.toast(`已添加标签「${label(canonical)}」`, {
           undo: async () => {
-            await post(ITEM_TAG_URL, { operation: 'remove', tag });
-            apply((now) => withoutTag(now, tag));
+            await post(ITEM_TAG_URL, { operation: 'remove', tag: canonical });
+            apply((now) => withoutTag(now, canonical));
           },
         });
       });

@@ -14,10 +14,11 @@ import {
   type DetailItem, type DetailQueue, type ItemDetailActions, type ItemDetailHelpers, type ItemDetailProps, type QueueItem,
 } from '../../src/react/item-detail/item-detail';
 import { ItemDetailPage } from '../../src/react/item-detail/item-detail-page';
+import { tagLabel } from '../../src/core/tags';
 import { queryClient } from '../../src/react/query';
 import { click, mount, pending, settle, type } from './render';
 
-afterEach(() => { queryClient.clear() });
+afterEach(() => { queryClient.clear(); localStorage.removeItem('peach.recentTags') });
 notifyManager.setScheduler((notify) => notify());
 
 const item = (id: number, extra: Partial<DetailItem> = {}): DetailItem => ({
@@ -82,6 +83,45 @@ async function show(shown: DetailItem, patch: Partial<ItemDetailProps> = {}) {
   await settle();
   return { host, props: given, actions: given.actions as ActionMocks };
 }
+
+describe('标签身份', () => {
+  it('详情显示完整制服名与角色名', async () => {
+    serve();
+    const { host } = await show(item(1, { tags: [{ k: 'OL制服' }, { k: '秘书OL' }] }),
+      { helpers: helpers({ tagLabel }) });
+    expect([...host.querySelectorAll('[data-detail-tag] [data-tag]')].map((node) => node.textContent))
+      .toEqual(['OL制服', '秘书OL']);
+  });
+
+  it('已有规范标签时添加同义词保持一枚标签且不撤销原标签', async () => {
+    const fetcher = serve((_url, body) => ({ ok: true, tag: body.operation === 'add' ? '秘书OL' : body.tag }));
+    const { host, actions: given } = await show(item(1, { tags: [{ k: '秘书OL' }] }));
+    await click(host.querySelector('#tagPlus'));
+    await type(host.querySelector('#tagPickSearch') as HTMLInputElement, 'OL');
+    await click(host.querySelector('[data-pick="OL"]'));
+    await settle();
+    expect([...host.querySelectorAll('[data-detail-tag] [data-tag]')].map((node) => node.textContent))
+      .toEqual(['秘书OL']);
+    expect(given.toast.mock.calls.at(-1)?.[1]?.undo).toBeUndefined();
+    expect(posts(fetcher).map(([, body]) => [body.operation, body.tag])).toEqual([['add', 'OL']]);
+  });
+
+  it('添加同义标签使用服务端规范名并以相同身份撤销', async () => {
+    const fetcher = serve((_url, body) => ({ ok: true, tag: body.operation === 'add' ? '秘书OL' : body.tag }));
+    const { host, actions: given } = await show(item(1, { tags: [] }));
+    await click(host.querySelector('#tagPlus'));
+    await type(host.querySelector('#tagPickSearch') as HTMLInputElement, 'OL');
+    await click(host.querySelector('[data-pick="OL"]'));
+    await settle();
+    expect([...host.querySelectorAll('[data-detail-tag] [data-tag]')].map((node) => node.textContent))
+      .toEqual(['秘书OL']);
+    const undo = given.toast.mock.calls.at(-1)?.[1]?.undo;
+    expect(undo).toBeTypeOf('function');
+    await act(async () => { await undo?.() });
+    expect(posts(fetcher).map(([, body]) => [body.operation, body.tag]))
+      .toEqual([['add', 'OL'], ['remove', '秘书OL']]);
+  });
+});
 
 describe('停在队列哪一条', () => {
   it('分卷接同一版本的下一卷，版本边界保持停止', async () => {

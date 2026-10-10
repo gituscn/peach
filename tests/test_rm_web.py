@@ -1075,6 +1075,24 @@ class WebDataTests(unittest.TestCase):
         )
         con.close()
 
+    def test_item_tag_alias_uses_the_canonical_name_and_can_be_hidden(self):
+        first = rm_web.w_item_tag(self.contract, {
+            "id": 1, "operation": "add", "tag": "秘书OL",
+        })
+        repeated = rm_web.w_item_tag(self.contract, {
+            "id": 1, "operation": "add", "tag": "OL",
+        })
+        self.assertEqual(repeated["tag"], "秘书OL")
+        self.assertEqual(repeated["tags"], first["tags"])
+        with closing(sqlite3.connect(self.db_path)) as con:
+            self.assertEqual(con.execute(
+                "SELECT tag FROM asset_tag WHERE asset_id=1 AND tag IN ('OL','秘书OL')"
+            ).fetchall(), [("秘书OL",)])
+        removed = rm_web.w_item_tag(self.contract, {
+            "id": 1, "operation": "remove", "tag": repeated["tag"],
+        })
+        self.assertNotIn("秘书OL", removed["tags"])
+
     def _seed_editions(self, rows):
         con = sqlite3.connect(self.db_path)
         for asset_id, name, code in rows:
