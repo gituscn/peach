@@ -69,7 +69,8 @@ function GoalCard({ item, openItem, searchResources, javTitleHtml, javDisplayNam
       <footer className="flex flex-wrap justify-end gap-2">
         {item.code ? <Button variant="secondary" size="small" onClick={() => searchResources({
           code: item.code!, title: javDisplayName(item), origin: `asset:${item.id}`, searchReason: item.reason || '',
-        })}>搜索资源</Button> : null}
+          duration: item.duration, cover: previewUrl(item),
+        })}>查找资源</Button> : null}
         <Button variant="secondary" size="small" onClick={open}>查看版本</Button>
       </footer>
     </li>

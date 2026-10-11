@@ -25,6 +25,7 @@ import {
 
 import { managementSkeletonHtml, paintManagementPlaceholder } from '../../../management-placeholder';
 import { isReviewCategory } from '../../review/review';
+import { javTab } from '../../jav/jav';
 import { ShellActionsContext, useOpenEpoch } from '../router';
 import type { ManagedOpenProps, ManagedPath, ShellActions } from '../shell-actions';
 
@@ -44,7 +45,7 @@ interface Runtime {
   ledger_writer_origin?: string;
 }
 
-const FOLLOW_MANAGE_TABS = ['list', 'add', 'feeds', 'wants', 'source'];
+const FOLLOW_MANAGE_TABS = ['list', 'add', 'feeds'];
 
 const readStarted = () => pageOpens > 0;
 /** 壳开始路由没有（`pageOpens` 大于 0）。 */
@@ -80,6 +81,11 @@ function writerProps(runtime: Runtime | null, path: string) {
 
 /** 这一次打开交给页面的值，从地址、偏好与壳的状态算。等 `/healthz` 期间走开了回 null。 */
 async function openProps(path: ManagedPath, run: Run): Promise<object | null> {
+  if (path === '/jav') {
+    const runtime = await readRuntime(run);
+    if (!run.live) return null;
+    return { tab: javTab(search().get('tab')), readOnly: !!runtime?.ledger_read_only } satisfies ManagedOpenProps['/jav'];
+  }
   if (path === '/stats') return { configurable: !!runtimeConfigurable } satisfies ManagedOpenProps['/stats'];
   if (path === '/taste') {
     const onboarding = cameFromSetup;
@@ -88,7 +94,7 @@ async function openProps(path: ManagedPath, run: Run): Promise<object | null> {
   }
   if (path === '/configuration') {
     if (window.location.hash === '#peachProxy') writeShell({ configurationRequestedSection: '网络与访问' });
-    const section = configurationRequestedSection;
+    const section = search().get('section') || configurationRequestedSection;
     return (section ? { section } : {}) satisfies ManagedOpenProps['/configuration'];
   }
   if (path === '/review') {
@@ -122,6 +128,12 @@ const SCROLL_ALWAYS = new Set<ManagedPath>(['/stats', '/taste']);
 const SCROLL_WHEN_CURRENT = new Set<ManagedPath>(['/review', '/quality-goals', '/activity', '/follow-manage']);
 
 async function openPage(path: ManagedPath, actions: ShellActions, run: Run): Promise<void> {
+  if (path === '/follow-manage' && search().get('tab') === 'wants') {
+    shellNavigate('/jav?tab=wants', { replace: true }); return;
+  }
+  if (path === '/follow-manage' && search().get('tab') === 'source') {
+    shellNavigate('/configuration?section=' + encodeURIComponent('来源与订阅'), { replace: true }); return;
+  }
   const stats = document.getElementById('stats');
   if (!stats) return;
   actions.surfaceChanged('management', path);

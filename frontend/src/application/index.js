@@ -52,7 +52,7 @@ export function openFollowAuthorFromIndex(key){indexState.controller.openFollowA
 export function openFollowTagFromIndex(tag){indexState.controller.openFollowTag(tag)}
 
 export function installIndex16() {
-followState.FOLLOW_MANAGE_TABS = ['list','add','feeds','wants','source'];
+followState.FOLLOW_MANAGE_TABS = ['list','add','feeds'];
 applicationEffects.listen(document, 'click', event=>{
   if(event.target.closest?.('[data-empty-settings]')){openConfigurationSection('媒体');return}
   const link=event.target.closest?.('a[href="/follow-manage?tab=add"]');

@@ -237,6 +237,7 @@ export interface ConfigurationFact {
 }
 
 export interface ConfigurationData {
+  ledger_read_only?: boolean;
   startup?: StartupState;
   uninstall?: UninstallState;
   peach_proxy?: PeachProxyState;
@@ -282,8 +283,8 @@ export interface ConfigurationPanel {
   active: boolean;
 }
 
-/** 配置页的一个分组（「通用」「媒体」「下载」「网络与访问」「维护」）。
- *  重开教程那一半只归「维护」，别的分组不必接它。`panel` 只在配置页里给，单独挂一组时没有。 */
+/** 服务配置的分组：媒体库与入库、来源与订阅、下载渠道、网络与访问、应用与维护。
+ *  `panel` 只在配置页里给，单独挂一组时没有。 */
 export interface ConfigurationGroupProps extends Pick<ConfigurationProps, 'receipt'> {
   data: ConfigurationData;
   panel?: ConfigurationPanel;
@@ -339,7 +340,7 @@ export interface ScrapingProps {
  *  走；`pageSize`／`layout` 是这台浏览器的习惯，跟着 `appSettings` 走。两组都由壳持有存储、
  *  React 持有实时状态，各只有一份。 */
 export interface FollowManageProps {
-  /** 地址栏此刻带着的页签（`list`／`add`／`feeds`／`wants`／`source`）。 */
+  /** 地址栏此刻带着的页签（`list`／`add`／`feeds`）。 */
   tab: string;
   page: number;
   sort: string;
@@ -355,6 +356,7 @@ export interface FollowManageProps {
   toast(message: string): void;
   /** 去「看更新」那一页（`/follow`）。整页换成哪一屏仍归遗留壳。 */
   openFollow(): void;
+  openServiceConfiguration(): void;
   /** 账本只读：这台机器只能浏览，写操作全部不给点。 */
   readOnly: boolean;
   readOnlyMessage: string;

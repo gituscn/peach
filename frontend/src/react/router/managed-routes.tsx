@@ -41,6 +41,8 @@ import { ImmerseSurface } from '../immerse/immerse-island';
 import { prefetchIndex } from '../index/index-data';
 import { IndexPage } from '../index/index-page';
 import { JunkQueuePage } from '../junk-queue/junk-queue-page';
+import { JavPage } from '../jav/jav-page';
+import { prefetchJav } from '../jav/jav';
 import { prefetchLibraryProcessing } from '../library-processing/library-processing';
 import { LibraryProcessingCard } from '../library-processing/library-processing-card';
 import { LibraryProcessingNotice } from '../library-processing/library-processing-notice';
@@ -103,6 +105,11 @@ function openCleanupSection(section: DataCleanupSection, actions: ShellActions, 
 /* 第一帧在宿主放进 `#stats` 的同一个任务里同步画完（`router.tsx` 的 `ManagedSurface`）：壳画完这一页
  * 紧接着就读它画出来的结构（配置页按地址里的 `#peachProxy` 滚过去，那一刻选中的页签已经是「网络与访问」）。 */
 export const MANAGED_ROUTES: ManagedRouteTable = {
+  '/jav': {
+    element: <ManagedMatch path="/jav" />,
+    prefetch: (open, signal) => prefetchJav(open.tab, signal),
+    page: (open, actions) => <JavPage {...open} navigate={actions.navigate} receipt={message => actions.receipt(message)} grid={actions.grid} />,
+  },
   '/stats': {
     element: <ManagedMatch path="/stats" />,
     prefetch: (_open, signal) => prefetchStats(signal),
@@ -189,7 +196,8 @@ export const MANAGED_ROUTES: ManagedRouteTable = {
     prefetch: (open, signal) => prefetchFollowManage(signal, open.tab),
     page: (open, actions) => (
       <FollowManagePage {...open} route={actions.routeFollowManage} savePreference={actions.saveFollowPreference}
-        toast={(message) => actions.receipt(message)} openFollow={actions.openFollow} />
+        toast={(message) => actions.receipt(message)} openFollow={actions.openFollow}
+        openServiceConfiguration={() => actions.navigate('/configuration?section=' + encodeURIComponent('来源与订阅'))} />
     ),
   },
 };
