@@ -65,6 +65,24 @@ class PublicProtocolTests(unittest.TestCase):
             api.movie('EXM-001')
         self.assertEqual(len(self.requests), count)
 
+    def test_local_retry_does_not_extend_source_cooldown(self):
+        api = self.api(blocked=True)
+        stamp = [100.0]
+        api.clock = lambda: stamp[0]
+        with self.assertRaises(PublicSourceUnavailable):
+            api.movie('EXM-001')
+        deadline = api.paused_until
+        stamp[0] += 890
+        with self.assertRaises(PublicSourceUnavailable):
+            api.movie('EXM-001')
+        self.assertEqual(api.paused_until, deadline)
+
+    def test_missing_work_does_not_block_another_work(self):
+        api = self.api()
+        with self.assertRaises(PublicSourceUnavailable):
+            api.movie('EXM-999')
+        self.assertEqual(api.movie('EXM-001')['id'], 'Exact')
+
     def test_reviews_request_page_and_enforce_budget(self):
         api = self.api()
         self.assertEqual(api.reviews('EXM-001', 2)[0]['id'], 'second')

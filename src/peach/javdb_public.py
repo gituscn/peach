@@ -67,11 +67,13 @@ class PublicAPI:
         html = response_text(self._get(WEB + "/"))
         entry = re.search(r'src="(/assets/index-[A-Za-z0-9_-]+\.js)"', html)
         if not entry:
+            self.paused_until = self.clock() + 60
             raise PublicSourceUnavailable("作品资料来源格式未识别")
         js = response_text(self._get(WEB + entry[1]))
         middle = re.search(r'\bS1="([^"\r\n]{1,256})"', js)
         suffix = re.search(r'\bE1="([^"\r\n]{1,256})"', js)
         if not middle or not suffix:
+            self.paused_until = self.clock() + 60
             raise PublicSourceUnavailable("作品资料来源格式未识别")
         self.signature_parts = middle[1], suffix[1]
         self.signature_until = self.clock() + 24 * 3600
@@ -84,12 +86,14 @@ class PublicAPI:
         try:
             payload = json.loads(response.body)
         except (ValueError, UnicodeError) as error:
+            self.paused_until = self.clock() + 60
             raise PublicSourceUnavailable("作品资料来源格式未识别") from error
         if not isinstance(payload, dict) or payload.get("success") != 1:
             self.paused_until = self.clock() + 60
             raise PublicSourceUnavailable("作品资料未取得，请稍后重试")
         data = payload.get("data")
         if not isinstance(data, dict):
+            self.paused_until = self.clock() + 60
             raise PublicSourceUnavailable("作品资料来源格式未识别")
         return data
 
@@ -99,11 +103,7 @@ class PublicAPI:
             if hit and hit[0] > self.clock():
                 self.cache.move_to_end(key)
                 return hit[1]
-            try:
-                result = fetch()
-            except PublicSourceUnavailable:
-                self.paused_until = max(self.paused_until, self.clock() + 60)
-                raise
+            result = fetch()
             self.cache[key] = (self.clock() + 6 * 3600, result)
             self.cache.move_to_end(key)
             while len(self.cache) > 128:
@@ -130,6 +130,7 @@ class PublicAPI:
     def _rows(self, path, key, query=None):
         rows = self._json(path, query).get(key, [])
         if not isinstance(rows, list):
+            self.paused_until = self.clock() + 60
             raise PublicSourceUnavailable("作品资料来源格式未识别")
         return [row for row in rows if isinstance(row, dict)]
 
