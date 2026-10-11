@@ -766,6 +766,21 @@ def _solo_representatives(linked: list[tuple[int, int, str, str]]) -> dict[str, 
     return chosen
 
 
+def _positive_behavior_score(row: dict, *, exclude_disliked: bool) -> float:
+    """按观看与明确反馈计算正向证据，不从不合口味推导负向标签。"""
+    if exclude_disliked and row.get("feedback") == "dislike":
+        return 0.0
+    seconds = max(float(row.get("play_seconds") or 0), 0)
+    plays = max(int(row.get("play_count") or 0), 0)
+    o_count = max(int(row.get("o_count") or 0), 0)
+    rating = max(int(row.get("rating") or 0), 0)
+    score = (1.0 if plays or seconds else 0.0) + math.log2(1 + seconds / 60)
+    score += min(plays, 12) * .75 + min(o_count, 8) * 1.5 + rating / 20
+    score += 3.0 if row.get("liked") else 0.0
+    score += .5 if row.get("feedback") == "seen" else 0.0
+    return max(score, 0.0)
+
+
 def _peach_dashboard_evidence(connection: sqlite3.Connection, since: str | None, *, exclude_disliked: bool = False) -> dict[str, object]:
     since_epoch = datetime.fromisoformat(since).timestamp() if since else None
     rows = connection.execute(
@@ -785,16 +800,9 @@ def _peach_dashboard_evidence(connection: sqlite3.Connection, since: str | None,
         if since_epoch is not None and (played_at is None or played_at < since_epoch):
             continue
         seconds = max(float(row.get("play_seconds") or 0), 0)
-        plays = max(int(row.get("play_count") or 0), 0)
-        o_count = max(int(row.get("o_count") or 0), 0)
-        rating = max(int(row.get("rating") or 0), 0)
         is_liked = bool(row.get("liked"))
         is_disliked = row.get("feedback") == "dislike"
-        positive = (1.0 if plays or seconds else 0.0) + math.log2(1 + seconds / 60)
-        positive += min(plays, 12) * .75 + min(o_count, 8) * 1.5 + rating / 20
-        positive += 3.0 if is_liked else 0.0
-        positive += .5 if row.get("feedback") == "seen" else 0.0
-        row["positive"] = 0.0 if exclude_disliked and is_disliked else max(positive, 0.0)
+        row["positive"] = _positive_behavior_score(row, exclude_disliked=exclude_disliked)
         assets[int(row["id"])] = row
         total_seconds += seconds
         liked += int(is_liked)
