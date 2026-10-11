@@ -183,8 +183,8 @@ _OFFSITE_COUNT = ("(SELECT count(*) FROM entity_external_ref x WHERE x.entity_id
 #: 认人判据的版本，进指纹。改了判据就加一：存量里缺图的女优按新判据各重比一次。
 #: 2 是 ADR-0057 的图库互证，3 是 ADR-0062 没有封面参照时的图库自证，4 是 ADR-0066 的
 #: 小图作证与兜底，5 是 ADR-0070 的小脸裁切放大再比，6 是 ADR-0074 的馆外单人作品封面，
-#: 7 是 ADR-0102 的清晰档案小图优先。
-MATCH_RULE = 7
+#: 7 是 ADR-0102 的清晰档案小图优先，8 是封面未匹配时的图库独立互证。
+MATCH_RULE = 8
 
 
 def _fingerprint(works, aliases, offsite) -> str:
@@ -383,7 +383,7 @@ def match_gallery(found: list[dict], covers: list, matcher,
     张照片的候选也对上同一张参照、两张彼此也过线，三方互相认得，就算她。石川祐奈的两张
     参照里有一张截的不是她（和谁都只有 0.0x），另一张和三家图库各 0.55～0.61。
 
-    一张参照都没有（没有单人封面、封面上截不出脸、截出的脸提不出特征）时，图库自己作证
+    没有参照或封面未匹配时，图库自己作证
     （ADR-0062，`_gallery_agrees`）：两个不同来源目录里她名下的两张不同照片彼此过线，
     而且和这一张认得的候选在全部候选里占多数，就算她。
     """
@@ -440,7 +440,18 @@ def match_gallery(found: list[dict], covers: list, matcher,
     for candidate, _vector, row in order:
         if eligible(candidate) and sum(score >= threshold for score in row) >= required:
             return GalleryMatch(winner=candidate, evidence=evidence(row), scores=scores)
-    return _covers_corroborate(found, compared, scores, evidence, order, eligible)
+    corroborated = _covers_corroborate(found, compared, scores, evidence, order, eligible)
+    if corroborated.winner is not None:
+        return corroborated
+
+    def gallery_evidence(_row, **extra):
+        return evidence([], required=0, unmatched_covers=[
+            {"code": face.code, "asset_id": face.asset_id,
+             "scores": {key: values[index] for key, values in scores.items()}}
+            for index, (face, _vector) in enumerate(references)
+        ], **extra)
+
+    return _gallery_agrees(found, compared, scores, gallery_evidence, order, eligible)
 
 
 def _covers_corroborate(found: list[dict], compared: list, scores: dict, evidence,
@@ -473,7 +484,7 @@ def _area(candidate: Candidate) -> int:
 
 def _gallery_agrees(found: list[dict], compared: list, scores: dict, evidence,
                     order: list, eligible: Callable[[Candidate], bool]) -> GalleryMatch:
-    """没有封面参照时，图库候选之间互相作证（ADR-0062）。
+    """没有匹配的封面参照时，图库候选之间独立互证（ADR-0062、0104）。
 
     `叶芽ゆきな` 四部作品都是多人封面，截不出参照；图库里 Javrave 与 DMM 各存她一张，
     两张余弦 0.56。同名下几家片商各存一张的多半是同一个人，`ななみ` 这种单名命中的
