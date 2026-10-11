@@ -766,7 +766,7 @@ def _solo_representatives(linked: list[tuple[int, int, str, str]]) -> dict[str, 
     return chosen
 
 
-def _peach_dashboard_evidence(connection: sqlite3.Connection, since: str | None) -> dict[str, object]:
+def _peach_dashboard_evidence(connection: sqlite3.Connection, since: str | None, *, exclude_disliked: bool = False) -> dict[str, object]:
     since_epoch = datetime.fromisoformat(since).timestamp() if since else None
     rows = connection.execute(
         "SELECT a.id,a.creator,a.studio,a.play_count,a.play_seconds,a.o_count,a.rating,"
@@ -794,7 +794,7 @@ def _peach_dashboard_evidence(connection: sqlite3.Connection, since: str | None)
         positive += min(plays, 12) * .75 + min(o_count, 8) * 1.5 + rating / 20
         positive += 3.0 if is_liked else 0.0
         positive += .5 if row.get("feedback") == "seen" else 0.0
-        row["positive"] = max(positive, 0.0)
+        row["positive"] = 0.0 if exclude_disliked and is_disliked else max(positive, 0.0)
         assets[int(row["id"])] = row
         total_seconds += seconds
         liked += int(is_liked)
@@ -1064,10 +1064,11 @@ def build_taste_dashboard(
     ledger_connection: sqlite3.Connection,
     *,
     since: str | None = None,
+    exclude_disliked: bool = False,
 ) -> dict[str, object]:
     """Build a privacy-bounded, read-only taste view from both evidence stores."""
     history = _history_dashboard_evidence(history_store, since)
-    peach = _peach_dashboard_evidence(ledger_connection, since)
+    peach = _peach_dashboard_evidence(ledger_connection, since, exclude_disliked=exclude_disliked)
     all_tags = [row for row in _rank_combined("tag", history["tags"], peach, limit=1000)
                 if row["name"] not in LENGTH_TAGS]
     all_creators = _rank_combined("creator", history["creators"], peach, limit=1000)
@@ -1075,6 +1076,8 @@ def build_taste_dashboard(
         source_counts = history["creator_domains"].get(str(row["name"]).casefold().strip(), Counter())
         row["source_domain"] = source_counts.most_common(1)[0][0] if source_counts else None
     all_performers = _rank_combined("performer", Counter(), peach, limit=1000)
+    all_studios = _rank_combined("studio", Counter(), peach, limit=1000)
+    all_series = _rank_combined("series", Counter(), peach, limit=1000)
     tags, creators, performers = all_tags[:30], all_creators[:30], all_performers[:30]
 
     category_scores: Counter[str] = Counter(history["categories"])
@@ -1129,6 +1132,8 @@ def build_taste_dashboard(
             "peach_tags": _rank_for_source(all_tags, "peach"),
             "peach_creators": _rank_for_source(all_creators, "peach"),
             "peach_performers": _rank_for_source(all_performers, "peach"),
+            "peach_studios": _rank_for_source(all_studios, "peach"),
+            "peach_series": _rank_for_source(all_series, "peach"),
             "domains": [{"name": name, "visits": count}
                         for name, count in history["domains"].most_common(20)],
         },

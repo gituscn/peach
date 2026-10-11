@@ -34,7 +34,7 @@ FC2 卖家名册复用 `sources/fc2.py` 的 `label`、`seller_url` 来源契约�
 
 关注页的创作者行与卡片头像、署名复用 `FollowAuthorLink` 和来源的唯一实体绑定，进入创作者资料页；卡片按实际发布者取身份。未建档作者沿用关注筛选。创作者行横滚访问全部作者。筛选条件与卡片悬停面留 16px；首页、关注页和资料页共用交集条。`useViewGlide` 复用 `ResizeObserver` 监听显隐与相邻控件尺寸，`moveGlidePane` 在重新落位时取消位移和形变动画，无新增依赖。
 
-JAV 发现卡复用馆藏的 `data-media-card` 悬停面、`coverImage` 封面取景和新作的 `feedIdentity` 身份头像。出演者引用由 `web_catalog.entity_ref` 提供图片版本与取景；标题保留两行，操作区贴底。JAV 与名册的静态搜索框复用 `islandSearchInput`，按 Board Input 的尺寸生成首屏结构。无新增依赖。
+JAV 发现卡复用馆藏的 `data-media-card` 网格与悬停面、`coverImage` 封面取景、`cardRatio` 大小图比例和 `feedIdentity` 身份头像；筛选复用 `FilterGlassRows`、`FilterPill`、`Segments` 与 `SortKeys`。出演者引用由 `web_catalog.entity_ref` 提供图片版本与取景；标题保留两行，操作区贴底。发现只读查询复用口味汇总与 `related.rank_related` 的 IDF/MMR，覆盖库外已知作品及少看的馆藏；来源资料只读 `PUBLIC_API.peek_movie`，未取得资料不联网补齐。`WantMagnets` 以 `queryUrl` 共用作品详情和想要清单的资源布局，缓存按来源分开，容量复用 `fmtSize`。JAV 与名册的静态搜索框复用 `islandSearchInput`。资料扩展见 [JAV 发现](JAV_DISCOVERY.md)，无新增依赖。
 
 账号归属复用 `review_decision`、`creator_collection_base`、`write_owned_fields` 和全库归属审计。明确拒绝的资产与账号组合在自动摄取时跳过；用户写入保留复核入口。网黄博主只命中可信个人、内容创作者或发布账号断言，未分类账号保留全部名册入口。`attach_avatar_availability` 集中处理资料页、索引、搜索与统计的作品头像：发布账号缺少本人或出演职业证据时作品帧照常兜底，另标 `avatar_stand_in`，已安装图片独立保留。个人博主的补头像复用 `avatar_cover_face.face_square`、`readable_cut` 与 ADR-0074 的 `agreeing` 两部互证，画面取自接触印相九格（ADR-0099）。来源核查清单、逐关系回执和备份存于 `peach-data/review/`。
 

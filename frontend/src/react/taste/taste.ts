@@ -63,6 +63,8 @@ export interface TasteRankings {
   peach_tags?: RankRow[];
   peach_creators?: RankRow[];
   peach_performers?: RankRow[];
+  peach_studios?: RankRow[];
+  peach_series?: RankRow[];
 }
 
 export interface TasteSummary {

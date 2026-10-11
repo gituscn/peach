@@ -261,6 +261,8 @@ class TasteHistoryTests(unittest.TestCase):
             history["domains"].update({f"popular-{index}.example": 1000 for index in range(7)})
             with mock.patch.object(taste_history, "_history_dashboard_evidence", return_value=history):
                 unrelated_traffic = build_taste_dashboard(store, db)
+            db.execute("UPDATE asset SET feedback='dislike' WHERE id=1")
+            discovery_taste = build_taste_dashboard(store, db, exclude_disliked=True)
 
         self.assertEqual(dashboard["summary"]["history_visits"], 2)
         self.assertEqual(dashboard["activity"]["days"], [{"date": "2023-11-15", "count": 2}])
@@ -285,6 +287,9 @@ class TasteHistoryTests(unittest.TestCase):
         self.assertEqual(dashboard["rankings"]["browser_creators"][0]["source_domain"], "onlyfans.com")
         self.assertEqual(dashboard["rankings"]["peach_creators"][0]["name"], "Alice")
         self.assertEqual(dashboard["rankings"]["peach_performers"][0]["entity_id"], 4)
+        self.assertEqual(dashboard["rankings"]["peach_studios"][0]["name"], "Studio")
+        self.assertTrue(all(float(row["score"]) == 0 for row in discovery_taste["rankings"]["peach_performers"]))
+        self.assertEqual(discovery_taste["summary"]["disliked"], 1)
         browser_tags = {row["name"] for row in dashboard["rankings"]["browser_tags"]}
         self.assertIn("detroit_become_human", browser_tags)
         self.assertIn("big_breasts", browser_tags)

@@ -875,5 +875,52 @@ class FeedFollowByNameTest(PerformerFeedSwitchTest):
         self.assertEqual(self._sources(), [])
 
 
+class JavDiscoveryTest(FeedWebFixture):
+    def _discover(self, scope="external", rankings=None, metadata=None):
+        from peach import web_jav_discovery
+        with patch.object(web_jav_discovery, "build_taste_dashboard", return_value={"rankings": rankings or {}}), \
+                patch.object(web_jav_discovery, "_cached_movie", return_value=metadata or {}):
+            return web_jav_discovery.q_jav_discoveries(self.contract, {"scope": scope})
+
+    def test_external_discovery_includes_older_known_works_and_studio_matches(self):
+        self._add()
+        self._check()
+        with self.contract.database.write_transaction() as connection:
+            connection.execute("UPDATE feed_discovery SET release_date='2010-01-01',studio='示例厂牌'")
+        result = self._discover(rankings={"peach_studios": [{"name": "示例厂牌", "score": 4}]})
+        self.assertEqual(len(result["items"]), 2)
+        self.assertTrue(all(row["release_date"] == "2010-01-01" for row in result["items"]))
+        self.assertTrue(all(row["reasons"] == ["常看的厂牌：示例厂牌"] for row in result["items"]))
+        self.assertEqual(self._discover()["items"], [])
+
+    def test_external_discovery_uses_only_metadata_already_obtained(self):
+        self._add()
+        self._check()
+        rankings = {"browser_tags": [{"name": "恋足", "score": 4}],
+                    "peach_series": [{"name": "示例系列", "score": 2}]}
+        self.assertEqual(self._discover(rankings=rankings)["items"], [])
+        rows = self._discover(rankings=rankings, metadata={"tags": [{"name": "恋足"}], "series_name": "示例系列"})["items"]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["tags"], ["恋足"])
+        self.assertEqual(rows[0]["reasons"], ["偏好的标签：恋足", "常看的系列：示例系列"])
+
+    def test_library_exploration_excludes_completed_disliked_and_frequently_watched(self):
+        with self.contract.database.write_transaction() as connection:
+            entity_id = connection.execute(
+                "INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at)"
+                " VALUES('tag','恋足','恋足','2026-10-01','2026-10-01')").lastrowid
+            for aid, plays, reached, feedback, disposal in (
+                    (1, 0, 0, None, None), (2, 1, 10, None, None), (3, 1, 95, None, None),
+                    (4, 2, 10, None, None), (5, 0, 0, 'dislike', None), (6, 0, 0, None, 'vanished')):
+                connection.execute("INSERT INTO asset(id,location,path,name,medium,code,studio,duration,play_count,max_reached,feedback,disposal)"
+                    " VALUES(?,'local',?,'示例作品','video',?,'示例厂牌',100,?,?,?,?)",
+                    (aid, f"R:\\media\\SSIS-{aid:03d}.mp4", f"SSIS-{aid:03d}", plays, reached, feedback, disposal))
+                connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source) VALUES(?,?,'tag','test')", (aid, entity_id))
+        result = self._discover("library", {"peach_tags": [{"name": "恋足", "entity_id": entity_id, "score": 4}]})
+        self.assertEqual({row["asset_id"] for row in result["items"]}, {1, 2})
+        self.assertTrue(all(row["tags"] == ["恋足"] for row in result["items"]))
+        self.assertTrue(all(row["reasons"] == ["偏好的标签：恋足"] for row in result["items"]))
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
