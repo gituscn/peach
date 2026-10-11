@@ -491,28 +491,37 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
     }
   });
 
-  /* 「关注自动更新」在这台机器上不可用时，开着的那颗开关也被禁：轨道得读成灰的，不能还留着那抹蓝。 */
-  it('开着又被禁的开关是灰轨道加禁止光标，跟开着能点的那颗分得开', { timeout: 60_000 }, async () => {
+  it('来源与订阅中禁用的自动检查开关降低轨道不透明度并使用禁止光标', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/', DESKTOP);
     const { page } = opened;
     try {
       const server = await stubServer(page);
       server.schedule.available = false;
+      await page.goto(new URL('/configuration', page.url()).href, { waitUntil: 'load' });
+      await settle(page);
+      const source = () => page.getByRole('tablist', { name: '配置分区' }).getByRole('tab', { name: '来源与订阅', exact: true });
+      await source().click();
+      const toggle = page.getByRole('switch', { name: '自动检查更新', exact: true });
+      await toggle.and(page.locator(':disabled:checked')).waitFor({ state: 'attached', timeout: 10_000 });
+      const face = (node: Element) => {
+        const label = node.closest('label')!;
+        const track = getComputedStyle(label.querySelector(':scope > span[aria-hidden]')!);
+        return { opacity: Number(track.opacity), gradient: track.backgroundImage, cursor: getComputedStyle(label).cursor };
+      };
+      const blocked = await toggle.evaluate(face);
+      assert.equal(blocked.opacity, 0.5);
+      assert.equal(blocked.cursor, 'not-allowed');
+      server.schedule.available = true;
       await page.reload({ waitUntil: 'load' });
       await settle(page);
-      await openPanel(page, '关注');
-      const blocked = page.locator(`${PANEL} #followScheduleSetting [data-toggle]`);
-      await blocked.and(page.locator(':disabled:checked')).waitFor({ state: 'attached', timeout: 10_000 });
-      const surface = await tokenColor(page, PANEL, '--surface');
-      const face = (node: Element) => {
-        const style = getComputedStyle(node);
-        return { face: style.backgroundColor, knob: getComputedStyle(node, '::before').backgroundImage, cursor: style.cursor };
-      };
-      const grey = await blocked.evaluate(face);
-      const live = await page.locator(`${PANEL} #uiSoundsSetting`).evaluate(face);
-      assert.equal(grey.face, surface, '被禁的开关轨道不是 --surface');
-      assert.equal(grey.cursor, 'not-allowed');
-      assert.notDeepEqual([grey.face, grey.knob], [live.face, live.knob], '被禁的开关和能点的开着那颗长得一样');
+      await source().click();
+      await toggle.and(page.locator(':enabled:checked')).waitFor({ state: 'attached', timeout: 10_000 });
+      const live = await toggle.evaluate(face);
+      assert.equal(live.opacity, 1);
+      assert.equal(live.cursor, 'pointer');
+      assert.notEqual(live.gradient, 'none');
+      assert.equal(blocked.gradient, live.gradient, '两种状态应比较同一个已开启的开关');
+      assert.ok(blocked.opacity < live.opacity, '禁用轨道的视觉强度没有降低');
       assert.deepEqual(opened.problems, []);
     } finally {
       await opened.close();

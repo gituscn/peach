@@ -77,7 +77,7 @@ describe('新作封面显示时机',()=>{
     await page.locator('#grid [data-media-card]').first().waitFor({state:'visible'});
     if(viewport.name==='mobile')await page.locator('#filterBtn').click();
     await page.locator('#settingsBtn').click();
-    await page.locator('#settingsPanel').getByRole('tab',{name:'浏览',exact:true}).click();
+    await page.locator('#settingsPanel').getByRole('tab',{name:'浏览与播放',exact:true}).click();
     await page.locator('#javSizeSetting label:has(input[value="small"])').click();
     const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('peach.settings.v1')||'{}'));
     assert.equal(saved.homeLayout,'small');assert.equal(saved.javLayout,'small');
