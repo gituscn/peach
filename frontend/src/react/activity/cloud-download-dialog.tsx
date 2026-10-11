@@ -16,6 +16,7 @@ import { ErrorText, FieldLabel, Help } from '../settings/section';
 import { busyProps, useAction } from '../settings/use-action';
 import { DOWNLOADS_KEY, DOWNLOADS_URL, downloadPollInterval, failureText } from './downloads-panel';
 import { ResourceSearch } from './resource-search';
+import { sameWorkCode } from './work-code';
 
 /** 入口带进来的上下文。`origin` 记在任务上，如 `asset:12`、`wishlist:5`。 */
 export interface DownloadPrefill { code?: string; title?: string; origin?: string; searchReason?: string;
@@ -114,20 +115,22 @@ function SubmitForm({ header, snapshot, prefill, close, receipt, provider: prefe
     <form aria-label="提交下载" noValidate onSubmit={submit} className="flex min-h-0 flex-col">
       {header}
       <div className="flex min-h-0 flex-col gap-4 overflow-y-auto p-5">
-        <ResourceSearch initialCode={prefill.code ?? ''} reason={prefill.searchReason} onSearch={requested => {
-          if (requested !== work?.code) { setWork(requested === prefill.code ? prefill : null); setCode(requested); setMagnet('') }
-        }} onWork={next => setWork(current => next ? { ...current, ...next, origin: current && current.code === next.code ? current.origin : next.origin }
-          : current?.code === prefill.code ? current : null)} choose={(uri, selectedCode) => {
-          setMagnet(uri); setCode(selectedCode); input.current?.focus();
-        }} />
-        <div className="flex min-w-0 items-start gap-4" data-resource-work="">
+        {work?.code || code.trim() ? <div className="flex min-w-0 items-start gap-4" data-resource-work="">
           {work?.cover ? <img src={work.cover} alt="" referrerPolicy="no-referrer" onError={event => event.currentTarget.remove()}
             className="w-card-cover shrink-0 rounded-2lg" /> : null}
           <div className="flex min-w-0 flex-col gap-2">
             <p className="break-words text-body-medium text-text-primary">{work ? [work.code, work.title].filter(Boolean).join(' · ') : '作品资料未取得'}</p>
             {work ? <Help>{[work.performers, work.studio, work.release_date, work.duration ? `${Math.round(work.duration / 60)} 分钟` : ''].filter(Boolean).join(' · ')}</Help> : null}
           </div>
-        </div>
+        </div> : null}
+        <ResourceSearch initialCode={prefill.code ?? ''} reason={prefill.searchReason} onSearch={requested => {
+          if (!sameWorkCode(requested, work?.code)) { setWork(sameWorkCode(requested, prefill.code) ? prefill : null); setMagnet('') }
+          setCode(requested);
+        }} onWork={next => setWork(current => next ? sameWorkCode(current?.code, next.code)
+          ? { ...current, ...next, origin: current?.origin || next.origin } : next
+          : sameWorkCode(current?.code, prefill.code) ? current : null)} choose={(uri, selectedCode) => {
+          setMagnet(uri); setCode(selectedCode); input.current?.focus();
+        }} />
         <Input ref={input} label="磁力链接" placeholder="magnet:?xt=urn:btih:…" autoComplete="off" maxLength={4000}
           value={magnet} onChange={setMagnet} />
         <div className="flex flex-col gap-1">
@@ -145,7 +148,7 @@ function SubmitForm({ header, snapshot, prefill, close, receipt, provider: prefe
         {/* 带着番号进来时它和搜索框是同一个值，选中候选也会跟着换，不再单列一格。 */}
         {prefill.code ? null
           : <Input label="番号" placeholder="可不填" autoComplete="off" maxLength={60} value={code} onChange={value => {
-            setCode(value); if (value !== work?.code) setWork(null);
+            setCode(value); if (!sameWorkCode(value, work?.code)) setWork(null);
           }} />}
         {failure || action.error ? <ErrorText>{failure || action.error}</ErrorText> : null}
       </div>

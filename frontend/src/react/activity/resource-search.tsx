@@ -11,6 +11,7 @@ import { useAction } from '../settings/use-action';
 import { coverUrl } from '@peach/card-art';
 import type { MediaPage } from '../catalog-grid/types';
 import type { DownloadPrefill } from './cloud-download-dialog';
+import { sameWorkCode } from './work-code';
 
 interface Candidate {
   id: string; uri: string; name: string; size: number; seeders: number; origins: string[];
@@ -59,10 +60,9 @@ export function ResourceSearch({ initialCode, reason, choose, onSearch, onWork }
     if (onWork) {
       const controller = new AbortController();
       metadataRequest.current = controller;
-      const key = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, '');
       void apiGet<MediaPage>(`/api/items?jav=1&q=${encodeURIComponent(requested)}&limit=10`, controller.signal).then(page => {
         if (controller.signal.aborted) return;
-        const item = (page.items || []).find(row => row.code && key(row.code) === key(requested));
+        const item = (page.items || []).find(row => sameWorkCode(row.code, requested));
         onWork(item ? { code: item.code, title: String(item.catalog_title || item.name || ''), performers: item.performers?.join('、'),
           release_date: String(item.release_date || ''), duration: item.duration, studio: item.studio,
           cover: item.has_cover ? coverUrl(item, true) : '', origin: `asset:${item.id}` } : null);
