@@ -774,6 +774,41 @@ class FaceMatchFollowupTests(FaceStubCase):
                          ([], 0, 2, 2))
         self.assertEqual(match["corroborated_by"], {"ref": again, "score": 0.8})
 
+    def test_independent_gallery_majority_can_identify_her_with_an_unmatched_cover(self):
+        hers = self.candidate("1-S1", (400, 600), self.HER)
+        again = self.candidate("3-Moodyz", (400, 600), self.HER_AGAIN)
+        self.work(1, "IPX-001", self.STRANGER)
+        summary = self.run_followup()
+        self.assertEqual(summary["source"], "S1（按图库互证认定）")
+        record = self.provenance()
+        self.assertEqual(f"gfriends:{record['external_id']}", hers)
+        match = record["face_match"]
+        self.assertEqual((match["covers"], match["required"], match["agreeing"], match["faces"]),
+                         ([], 0, 2, 2))
+        self.assertEqual(match["corroborated_by"], {"ref": again, "score": 0.8})
+        rejected = match["unmatched_covers"]
+        self.assertEqual(rejected[0]["code"], "IPX-001")
+        self.assertEqual(set(rejected[0]["scores"]), {hers, again})
+        self.assertTrue(all(score < 0.363 for score in rejected[0]["scores"].values()))
+
+    def test_independent_gallery_minority_cannot_override_an_unmatched_cover(self):
+        self.candidate("1-S1", (400, 600), self.HER)
+        self.candidate("2-Ideapocket", (400, 600), self.HER_AGAIN)
+        self.candidate("3-Moodyz", (400, 600), self.OTHER)
+        self.candidate("4-Fitch", (400, 600), self.STRANGER)
+        self.work(1, "IPX-001", self.BLANK)
+        self.run_followup()
+        self.assertNotEqual(self.provenance().get("source_kind"), "gallery_face_matched")
+
+    def test_independent_profile_pictures_are_eligible_with_an_unmatched_cover(self):
+        self.candidate("1-S1", (350, 350), self.HER)
+        self.candidate("3-Moodyz", (350, 350), self.HER_AGAIN)
+        self.work(1, "IPX-001", self.STRANGER)
+        self.run_followup()
+        record = self.provenance()
+        self.assertEqual(record["source_kind"], "gallery_small")
+        self.assertEqual(record["face_match"]["required"], 0)
+
     def test_the_same_photo_in_two_directories_does_not_stand_in_for_a_cover(self):
         self.candidate("1-S1", (400, 600), self.HER)
         self.candidate("2-Ideapocket", (400, 600), self.HER)
@@ -799,7 +834,7 @@ class FaceMatchFollowupTests(FaceStubCase):
         self.assertFalse((self.avatars / f"performer-{self.person}.img").exists())
 
     def test_no_match_falls_back_to_the_cover_face(self):
-        """封面上的人和图库里哪一张都对不上：不装图库的，照旧截封面上那张脸。"""
+        """图库候选既未匹配封面、也不满足独立互证时，从封面截脸。"""
         self.candidate("1-S1", (400, 600), self.OTHER)
         self.candidate("2-Ideapocket", (400, 600), self.OTHER)
         self.work(1, "IPX-001", self.HER)
@@ -837,7 +872,7 @@ class FaceMatchFollowupTests(FaceStubCase):
                                                    limit=10)]
 
         with self.database.read_connection() as connection:
-            self.assertEqual(fingerprint(connection, self.person), "1:0:0:r7")
+            self.assertEqual(fingerprint(connection, self.person), "1:0:0:r8")
         self.run_followup()
         self.assertEqual(planned(), [])
         with self.database.write_transaction(notify=False) as connection:
@@ -845,7 +880,7 @@ class FaceMatchFollowupTests(FaceStubCase):
                 "INSERT INTO entity_alias(entity_id,alias,normalized_alias,source)"
                 " VALUES(?,?,?,'test')", (self.person, "りな", "りな"))
         with self.database.read_connection() as connection:
-            self.assertEqual(fingerprint(connection, self.person), "1:1:0:r7")
+            self.assertEqual(fingerprint(connection, self.person), "1:1:0:r8")
         self.assertEqual(planned(), [followup_key("performer", self.person)])
 
     def test_a_small_picture_vouches_for_a_big_one_without_a_cover(self):
@@ -1100,11 +1135,11 @@ class OffsiteCoverFaceTests(FaceStubCase):
         self.compilation(1, "DVAJ-495")
         self.run_followup()
         with self.database.read_connection() as connection:
-            self.assertEqual(fingerprint(connection, self.person), "1:0:0:r7")
+            self.assertEqual(fingerprint(connection, self.person), "1:0:0:r8")
         self.assertEqual(planned(), [])
         self.bind()
         with self.database.read_connection() as connection:
-            self.assertEqual(fingerprint(connection, self.person), "1:0:1:r7")
+            self.assertEqual(fingerprint(connection, self.person), "1:0:1:r8")
         self.assertEqual(planned(), [key])
 
 
