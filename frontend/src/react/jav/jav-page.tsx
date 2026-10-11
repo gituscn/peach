@@ -31,8 +31,7 @@ export function JavPage({ tab, readOnly, navigate, receipt, grid }: {
   const settings = appSettingsStore().value;
   const search = (event: FormEvent) => { event.preventDefault(); setQuery(text.trim()) };
   return <Page>
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <h2 className="text-title-2-semibold text-text-primary">JAV</h2>
+    <div className="flex flex-wrap justify-end gap-2">
       <Button variant={tab === 'wants' ? 'secondary' : 'primary'} onClick={() => setDownload({})}>查找资源</Button>
     </div>
     <Tabs selectedKey={tab} onSelectionChange={key => navigate(`/jav?tab=${key}`)} className="flex flex-col gap-6">

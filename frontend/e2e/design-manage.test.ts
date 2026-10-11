@@ -805,7 +805,10 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
   it('凭据的四种处境四副底色：待办和完成一眼分得开', { timeout: 60_000 }, async () => {
     const opened = await openFollowManage(browser);
     try {
-      await followTab(opened, '来源和凭证');
+      await opened.page.getByRole('button', { name: /^来源与订阅设置/ }).click();
+      await opened.page.getByRole('tab', { name: '来源与订阅', exact: true, selected: true }).waitFor();
+      await opened.page.getByRole('region', { name: '可配置凭据', exact: true }).waitFor();
+      await settle(opened.page);
       const faces: Record<string, string> = {};
       for (const state of ['需要', '已配置', '接不进来', '不需要']) {
         faces[state] = await opened.page.getByText(state, { exact: true }).first()

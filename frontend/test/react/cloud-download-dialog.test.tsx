@@ -138,6 +138,30 @@ it('没有下载渠道时可以查找资源，提交下载禁用', async () => {
   expect(section(page, '查找资源')).not.toBeNull();
   expect(buttonNamed('提交下载', page)?.disabled).toBe(true);
   expect(page.textContent).toContain('下载渠道设置');
+  expect(page.querySelector('[data-resource-work]')).toBeNull();
+});
+
+it.each(['abf-258', 'ABF258', 'ABF-258'])('查询同番号 %s 保留已知作品资料和来处', async requested => {
+  const posts: unknown[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.method === 'POST') posts.push(JSON.parse(String(init.body)));
+    return { ok: true, status: 200, json: async () => init?.method === 'POST'
+      ? { ok: true, outcome: 'submitted', task: task() }
+      : url.startsWith('/api/items') ? { items: [] }
+      : url.startsWith('/api/resources') ? { state: 'ready', warnings: [], error: '', items: [] }
+      : snapshot() };
+  }));
+  const { page } = await open({ code: 'ABF-258', title: '同一作品', origin: 'wishlist:12', cover: '/cover?code=ABF-258', performers: '甲' });
+  const details = page.querySelector('[data-resource-work]')!;
+  expect(details.compareDocumentPosition(section(page, '查找资源')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  await type(field(page, '按番号查找资源'), requested);
+  await act(async () => field(page, '按番号查找资源')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  await settle();
+  expect(details.textContent).toContain('同一作品');
+  expect(details.querySelector('img')?.getAttribute('src')).toBe('/cover?code=ABF-258');
+  await type(field(page, '磁力链接'), MAGNET);
+  await submit(section(page, '提交下载'));
+  expect(posts).toEqual([{ magnet: MAGNET, provider: '115', target: '/115/云下载', code: requested, title: '同一作品', origin: 'wishlist:12' }]);
 });
 
 it('只读端可查找资源，提交下载禁用', async () => {
