@@ -9,7 +9,7 @@
 落点是 `profile.settings_json`——0001 建表时就留好的字段，一直是空的 `{}`。
 不新建表也就不需要迁移。
 
-写入受 ledger 只读闸门约束：reader（macOS）改不了顺序，但读到的是 writer 的那份，
+写入受 ledger 只读闸门约束：reader（只读端）改不了顺序，但读到的是 writer 的那份，
 这正是「同一份习惯」的意思。
 """
 from __future__ import annotations

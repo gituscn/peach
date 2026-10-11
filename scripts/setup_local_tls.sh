@@ -14,22 +14,18 @@
 #   PEACH_EXTRA_IP=198.51.100.20 sh scripts/setup_local_tls.sh   # 再多加一个地址
 set -eu
 
-# 数据根的定位口径和 `peach.settings_file.discover_data_root` 一致：先看
-# `PEACH_DATA_ROOT`，否则从仓库往上找同级的 `peach-data/`。
+# TLS 路径由两种 shell 共用的 Python 入口解析；PEACH_TLS_DIR 可显式覆盖。
 PEACH_REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PEACH_DATA_ROOT_GUESS="${PEACH_DATA_ROOT:-}"
-if [ -z "$PEACH_DATA_ROOT_GUESS" ]; then
-    PEACH_SEARCH="$PEACH_REPO_ROOT"
-    PEACH_DATA_ROOT_GUESS="$(dirname "$PEACH_REPO_ROOT")/peach-data"
-    while [ "$PEACH_SEARCH" != "/" ]; do
-        PEACH_SEARCH="$(dirname "$PEACH_SEARCH")"
-        if [ -d "$PEACH_SEARCH/peach-data" ]; then
-            PEACH_DATA_ROOT_GUESS="$PEACH_SEARCH/peach-data"
-            break
-        fi
-    done
+TLS_DIR="${PEACH_TLS_DIR:-}"
+if [ -z "$TLS_DIR" ]; then
+    PEACH_TLS_PYTHON="$PEACH_REPO_ROOT/.venv/bin/python"
+    if [ ! -x "$PEACH_TLS_PYTHON" ]; then
+        PEACH_TLS_COMMON_GIT="$(git -C "$PEACH_REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)"
+        PEACH_TLS_PYTHON="$(dirname "$PEACH_TLS_COMMON_GIT")/.venv/bin/python"
+    fi
+    [ -x "$PEACH_TLS_PYTHON" ] || { echo "找不到项目 Python：$PEACH_TLS_PYTHON" >&2; exit 1; }
+    TLS_DIR="$("$PEACH_TLS_PYTHON" -X utf8 "$PEACH_REPO_ROOT/scripts/resolve_tls_directory.py")"
 fi
-TLS_DIR="${PEACH_TLS_DIR:-$PEACH_DATA_ROOT_GUESS/secrets/tls}"
 CA_CRT="$TLS_DIR/peach-local-ca.crt"
 CA_KEY="$TLS_DIR/peach-local-ca.key"
 NAME="${PEACH_MDNS_NAME:-peach}.local"

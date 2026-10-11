@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -50,6 +51,216 @@ def load_script(name: str):
         sys.modules.pop(spec.name, None)
         raise
     return module
+
+
+class Sha1SyncOptionsTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.script = load_script("sync_sha1_115")
+
+    def test_import_does_not_create_files_or_connect_to_ledger(self):
+        with mock.patch("pathlib.Path.mkdir") as mkdir, \
+                mock.patch("pathlib.Path.open") as open_path, \
+                mock.patch("sqlite3.connect") as connect, \
+                mock.patch.dict(sys.modules, {"p115client": None}):
+            load_script("sync_sha1_115")
+        mkdir.assert_not_called()
+        open_path.assert_not_called()
+        connect.assert_not_called()
+
+    def test_default_paths_follow_configured_data_directories(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            with mock.patch.dict("os.environ", {}, clear=True), \
+                    mock.patch.object(self.script, "SECRETS_DIR", root / "secrets"), \
+                    mock.patch.object(self.script, "REVIEW_DIR", root / "review"):
+                args = self.script.parse_args([])
+            self.assertEqual(args.cookie_file, root / "secrets" / "115-cookies.txt")
+            self.assertEqual(args.dupes_out, root / "review" / "115-sha1重复.csv")
+            self.assertEqual(args.deprioritize_dir, [])
+            self.assertFalse((root / "secrets").exists())
+            self.assertFalse((root / "review").exists())
+
+    def test_explicit_paths_override_environment_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            environment = {"PEACH_115_COOKIE_FILE": str(root / "env-cookie.txt"),
+                           "PEACH_115_DUPES_OUT": str(root / "env-report.csv")}
+            with mock.patch.dict("os.environ", environment):
+                defaults = self.script.parse_args([])
+                explicit = self.script.parse_args([
+                    "--cookie-file", str(root / "cli-cookie.txt"),
+                    "--dupes", "--dupes-out", str(root / "cli-report.csv"),
+                    "--deprioritize-dir", "incoming", "--deprioritize-dir", "temporary"])
+            self.assertEqual(defaults.cookie_file, root / "env-cookie.txt")
+            self.assertEqual(defaults.dupes_out, root / "env-report.csv")
+            self.assertEqual(explicit.cookie_file, root / "cli-cookie.txt")
+            self.assertEqual(explicit.dupes_out, root / "cli-report.csv")
+            self.assertTrue(explicit.dupes)
+            self.assertEqual(explicit.deprioritize_dir, ["incoming", "temporary"])
+
+    def test_directory_preference_requires_exact_component_and_explicit_opt_in(self):
+        score = self.script.duplicate_score
+        self.assertEqual(score(r"B:\云下载\a.mp4"), score(r"B:\library\a.mp4"))
+        self.assertLess(score(r"B:\Incoming\a.mp4", ["incoming"]),
+                        score(r"B:\incoming-archive\a.mp4", ["incoming"]))
+        self.assertEqual(score("B:/Incoming/a.mp4", ["incoming"]),
+                         score(r"B:\Incoming\a.mp4", ["incoming"]))
+
+    def test_report_uses_selected_path_and_preference_without_mutating_assets(self):
+        with tempfile.TemporaryDirectory() as directory, closing(sqlite3.connect(":memory:")) as conn:
+            root = Path(directory).resolve()
+            conn.execute("CREATE TABLE asset (id INTEGER, path TEXT, size INTEGER, hash TEXT, location TEXT)")
+            assets = [(1, r"B:\incoming\a.mp4", 1024**3, "sha-a", "115"),
+                      (2, r"B:\library\b.mp4", 1024**3, "sha-a", "115"),
+                      (3, r"R:\a.mp4", 1024**3, "sha-a", "local"),
+                      (4, r"B:\single.mp4", 1024, "sha-b", "115")]
+            conn.executemany("INSERT INTO asset VALUES (?, ?, ?, ?, ?)", assets)
+            output = root / "review" / "custom.csv"
+            self.assertEqual(self.script.write_duplicate_report(conn, output, ["incoming"]),
+                             (1, 1024**3))
+            with output.open(encoding=self.script.ENCODING, newline="") as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual([(row["动作"], row["路径"]) for row in rows],
+                             [("保留", r"B:\library\b.mp4"), ("删除", r"B:\incoming\a.mp4")])
+            self.assertEqual(conn.execute("SELECT * FROM asset ORDER BY id").fetchall(), assets)
+
+
+@unittest.skipUnless(sys.platform == "win32" and shutil.which("pwsh"), "需要 Windows PowerShell 7")
+class LocalTlsDirectoryTests(unittest.TestCase):
+    def resolve_directory(self, root, override=""):
+        harness = root / "resolve-tls.ps1"
+        harness.write_text(
+            "$ErrorActionPreference = 'Stop'\n"
+            "$TlsTokens = $null\n$TlsErrors = $null\n"
+            "$TlsAst = [System.Management.Automation.Language.Parser]::ParseFile("
+            "$env:PEACH_TLS_SCRIPT, [ref]$TlsTokens, [ref]$TlsErrors)\n"
+            "$TlsFunction = $TlsAst.Find({ param($TlsNode) "
+            "$TlsNode -is [System.Management.Automation.Language.FunctionDefinitionAst] "
+            "-and $TlsNode.Name -eq 'Resolve-PeachTlsDirectory' }, $true)\n"
+            ". ([ScriptBlock]::Create($TlsFunction.Extent.Text))\n"
+            "Resolve-PeachTlsDirectory -RequestedDirectory $env:PEACH_TLS_OVERRIDE "
+            "-ProjectRoot $env:PEACH_TLS_PROJECT\n",
+            encoding="utf-8")
+        environment = dict(os.environ, PEACH_DATA_ROOT=str(root / "data"),
+                           PEACH_TLS_SCRIPT=str(ROOT / "scripts" / "setup_local_tls.ps1"),
+                           PEACH_TLS_PROJECT=str(ROOT), PEACH_TLS_OVERRIDE=override)
+        return subprocess.run([shutil.which("pwsh"), "-NoProfile", "-File", str(harness)],
+                              env=environment, capture_output=True, text=True, encoding="utf-8",
+                              check=False, timeout=30)
+
+    def test_environment_data_root_resolves_without_creating_tls_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            result = self.resolve_directory(root)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(Path(result.stdout.strip()), root / "data" / "secrets" / "tls")
+            self.assertFalse((root / "data").exists())
+
+    def test_configured_secrets_directory_is_used(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "data").mkdir()
+            (root / "data" / "config.toml").write_text('[directories]\nsecrets = "private"\n', encoding="utf-8")
+            result = self.resolve_directory(root)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(Path(result.stdout.strip()), root / "data" / "private" / "tls")
+            self.assertFalse((root / "data" / "private").exists())
+
+    def test_explicit_directory_bypasses_config_parsing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "data").mkdir()
+            (root / "data" / "config.toml").write_text('invalid [', encoding="utf-8")
+            output = root / "explicit" / "tls"
+            result = self.resolve_directory(root, str(output))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(Path(result.stdout.strip()), output)
+            self.assertFalse(output.exists())
+
+    def test_invalid_configuration_refuses_default_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "data").mkdir()
+            (root / "data" / "config.toml").write_text('invalid [', encoding="utf-8")
+            result = self.resolve_directory(root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((root / "data" / "secrets").exists())
+
+
+class PosixTlsDirectoryTests(unittest.TestCase):
+    def resolve_directory(self, root, override=""):
+        shells = ("/bin/sh", r"C:\Program Files\Git\bin\sh.exe", shutil.which("sh"))
+        shell = next((candidate for candidate in shells if candidate and Path(candidate).is_file()), None)
+        if not shell:
+            self.skipTest("需要 POSIX shell")
+        project = root / "project"
+        (project / "scripts").mkdir(parents=True)
+        (project / ".venv" / "bin").mkdir(parents=True)
+        interpreter = project / ".venv" / "bin" / "python"
+        interpreter.write_text(
+            '#!/bin/sh\nPYTHONPATH="$PEACH_TLS_TEST_SOURCE" exec "$PEACH_TLS_TEST_PYTHON" "$@"\n',
+            encoding="utf-8")
+        interpreter.chmod(0o755)
+        shutil.copyfile(ROOT / "scripts" / "resolve_tls_directory.py",
+                        project / "scripts" / "resolve_tls_directory.py")
+        source = (ROOT / "scripts" / "setup_local_tls.sh").read_text(encoding="utf-8")
+        # 只运行路径解析段，证书签发与私钥读取不进入夹具。
+        harness = project / "scripts" / "resolve-tls.sh"
+        harness.write_text(source.partition("CA_CRT=")[0] + 'printf \'%s\\n\' "$TLS_DIR"\n', encoding="utf-8")
+        environment = dict(os.environ, PEACH_DATA_ROOT=str(root / "data"), PEACH_TLS_DIR=override,
+                           PEACH_TLS_TEST_PYTHON=Path(sys.executable).resolve().as_posix(),
+                           PEACH_TLS_TEST_SOURCE=str(ROOT / "src"))
+        return subprocess.run([shell, harness.as_posix()], env=environment,
+                              capture_output=True, text=True, encoding="utf-8", check=False, timeout=30)
+
+    def test_shell_uses_the_shared_settings_helper(self):
+        for contents, tail in ((None, "secrets"), ('[directories]\nsecrets = "private"\n', "private")):
+            with self.subTest(contents=contents), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                if contents:
+                    (root / "data").mkdir()
+                    (root / "data" / "config.toml").write_text(contents, encoding="utf-8")
+                result = self.resolve_directory(root)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(Path(result.stdout.strip()), root / "data" / tail / "tls")
+                self.assertFalse((root / "data" / tail).exists())
+
+    def test_explicit_directory_bypasses_invalid_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "data").mkdir()
+            (root / "data" / "config.toml").write_text("invalid [", encoding="utf-8")
+            output = root / "explicit" / "tls"
+            result = self.resolve_directory(root, str(output))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(Path(result.stdout.strip()), output)
+            self.assertFalse(output.exists())
+
+    def test_invalid_settings_stop_before_certificate_access(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "data").mkdir()
+            (root / "data" / "config.toml").write_text("invalid [", encoding="utf-8")
+            result = self.resolve_directory(root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((root / "data" / "secrets").exists())
+
+
+class UnknownStudioDirectoryOptionsTests(unittest.TestCase):
+    def test_ledger_directory_is_explicit_and_independent_of_physical_path(self):
+        script = load_script("rehome_unknown_jav")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            arguments = ["--mappings", str(root / "mappings.csv"),
+                         "--physical-unknown-root", str(root / "unassigned")]
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
+                script.build_parser().parse_args(arguments)
+            self.assertEqual(caught.exception.code, 2)
+            args = script.build_parser().parse_args([
+                *arguments, "--ledger-unknown-root", r"F:\Library\unassigned"])
+            self.assertEqual(args.ledger_unknown_root, r"F:\Library\unassigned")
+            self.assertEqual(args.physical_unknown_root, root / "unassigned")
 
 
 class EnglishNameSpacingTests(unittest.TestCase):
@@ -1624,6 +1835,7 @@ class OperationalScriptTests(unittest.TestCase):
             result = self.rehome_unknown.main([
                 "--db", str(db), "--mappings", str(mappings),
                 "--physical-unknown-root", str(unknown),
+                "--ledger-unknown-root", r"B:\番号\_未知厂牌",
                 "--plan", str(plan), "--apply", "--backup", str(backup),
             ])
 
@@ -1666,6 +1878,7 @@ class OperationalScriptTests(unittest.TestCase):
             result = self.rehome_unknown.main([
                 "--db", str(db), "--mappings", str(mappings),
                 "--physical-unknown-root", str(unknown),
+                "--ledger-unknown-root", r"B:\番号\_未知厂牌",
                 "--plan", str(root / "plan.csv"),
             ])
 
