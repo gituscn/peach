@@ -82,13 +82,29 @@ describe('详情底部的队列与推荐', () => {
           const queue = document.querySelector('#stage [data-mix-queue]')!;
           const related = document.querySelector('#stage [data-item-related]')!;
           const q = queue.getBoundingClientRect(), r = related.getBoundingClientRect();
+          const queuePic = queue.querySelector('[data-mix-item-pic]')!.getBoundingClientRect();
+          const relatedPic = related.querySelector('[data-media-pic]')!.getBoundingClientRect();
           return { q: { top: q.top, bottom: q.bottom, right: q.right }, r: { top: r.top, left: r.left },
+            covers: { queue: { top: queuePic.top, height: queuePic.height }, related: { top: relatedPic.top, height: relatedPic.height } },
             sameSurface: getComputedStyle(queue).backgroundColor === getComputedStyle(related).backgroundColor };
         });
         if (viewport.mobile) assert.ok(boxes.r.top >= boxes.q.bottom - .5, JSON.stringify(boxes));
         else {
           assert.ok(Math.abs(boxes.q.top - boxes.r.top) <= .5 && boxes.q.right <= boxes.r.left + .5, JSON.stringify(boxes));
           assert.ok(boxes.sameSurface, '队列与推荐应使用同一底色');
+          assert.ok(Math.abs(boxes.covers.queue.top - boxes.covers.related.top) <= .5,
+            `封面上沿需对齐：${JSON.stringify(boxes.covers)}`);
+          assert.ok(Math.abs(boxes.covers.queue.height - boxes.covers.related.height) <= .5,
+            `封面高度需相同：${JSON.stringify(boxes.covers)}`);
+          const bigCover = await page.locator('#stage [data-related-row] [data-media-pic]').first().evaluate(node => {
+            const picture = node as HTMLElement;
+            const ratio = picture.style.getPropertyValue('--card-ratio');
+            picture.style.setProperty('--card-ratio', '.75');
+            const height = picture.getBoundingClientRect().height;
+            picture.style.setProperty('--card-ratio', ratio);
+            return height;
+          });
+          assert.ok(Math.abs(bigCover - boxes.covers.queue.height) <= .5, `大图比例的推荐封面高度需相同：${bigCover}`);
         }
         await hoverClearance(page, kind === 'local' && !viewport.mobile);
         await page.locator('#stage [data-related-row]').evaluate(node => { node.scrollLeft = 0 });

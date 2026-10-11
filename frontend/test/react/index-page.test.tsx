@@ -84,6 +84,19 @@ describe('地址栏上的类型', () => {
 });
 
 describe('名册', () => {
+  it('订阅标记随名册状态显示，标记区域仍打开人物资料', async () => {
+    seed(indexKey('performers', ''), [person('甲', { following: true }), person('乙', { entity_id: 2, following: false })]);
+    const given = props();
+    const host = await open(given);
+    const marker = host.querySelector('[data-index-feed]');
+    expect(marker?.getAttribute('aria-label')).toBe('已订阅新作');
+    expect(host.querySelectorAll('[data-index-feed]')).toHaveLength(1);
+    await click(marker);
+    expect(given.openEntity).toHaveBeenCalledWith('performer', '甲');
+    await act(async () => { seed(indexKey('performers', ''), [person('甲', { following: false })]) });
+    await settle();
+    expect(host.querySelector('[data-index-feed]')).toBeNull();
+  });
   it('浏览分类写回地址并隔离分页缓存，筛选只显示有内容的分类', async () => {
     seed(indexKey('performers', ''), [person('动画作者', { entity_kind:'creator', identity_labels: ['动画作者'] })], false, { animation:1 });
     const fetcher = serve(() => ({ items: [person('动画作者', { entity_kind:'creator', identity_labels: ['动画作者'] })], categories:{ animation:1 }, has_more: false }));
