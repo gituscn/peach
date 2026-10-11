@@ -24,6 +24,8 @@ import { prefetchFollowDetail, type FollowDetailActions, type FollowDetailProps 
 import { FollowDetailPage } from '../follow-detail/follow-detail-page';
 import { prefetchItemDetail, type ItemDetailActions, type ItemDetailProps } from '../item-detail/item-detail';
 import { ItemDetailPage } from '../item-detail/item-detail-page';
+import { prefetchJavDetail, type JavDetailProps } from '../jav-detail/jav-detail';
+import { JavDetailPage } from '../jav-detail/jav-detail-page';
 import { Miniplayer } from './miniplayer';
 import * as player from './stage-player';
 import type { StageApi, StageHost, StagePatch, StageRequest } from './stage-api';
@@ -32,6 +34,7 @@ type Phase = 'skeleton' | 'reveal' | 'content';
 
 type Content =
   | { kind: 'item'; props: ItemDetailProps }
+  | { kind: 'jav'; props: JavDetailProps }
   | { kind: 'follow'; props: FollowDetailProps };
 
 interface View {
@@ -118,6 +121,7 @@ function StageDialog({ view: current }: { view: View }) {
      自己按条目给 `Detail` 换键，队列取数留在外层不重来。 */
   const body = content.kind === 'item'
     ? <ItemDetailPage {...content.props} />
+    : content.kind === 'jav' ? <JavDetailPage key={content.props.code} {...content.props} />
     : <FollowDetailPage key={content.props.id} {...content.props} />;
   return (
     <dialog ref={ref} id="stage" data-stage="" aria-label="作品详情"
@@ -156,6 +160,8 @@ function toggleStageModes(ambient: boolean, theater: boolean): void {
 /* 两座详情的动作经舞台包一层：关闭走 `requestClose`；画出来那一刻登记小窗元数据、切氛围光与剧场
    模式；媒体框交给舞台的播放器。续播时刻只给第一次挂上的那一条。 */
 function contentFor(request: StageRequest): Content {
+  if (request.kind === 'jav') return { kind: 'jav', props: { code: request.code, readOnly: request.readOnly,
+    actions: { ...request.actions, close: requestClose } } };
   let resume: PlayerResume | null = request.resume ?? null;
   const takeResume = (id: number) => {
     const hit = resume && (request.id == null || request.id === id) ? resume : null;
@@ -234,7 +240,8 @@ async function open(request: StageRequest): Promise<void> {
   controller = abort;
   closeRequested = false;
   dismissArmed = false;
-  player.prepareStageFor(request.kind, request.id ?? Number.NaN);
+  if (request.kind === 'jav') player.closeMiniplayer();
+  else player.prepareStageFor(request.kind, request.id ?? Number.NaN);
   view = { generation: mine, request, content: contentFor(request), phase: 'skeleton' };
   paint();
   const dialog = stageDialog();
@@ -245,6 +252,7 @@ async function open(request: StageRequest): Promise<void> {
   const content = view.content;
   try {
     if (content.kind === 'item') await prefetchItemDetail(content.props, abort.signal);
+    else if (content.kind === 'jav') await prefetchJavDetail(content.props, abort.signal);
     else await prefetchFollowDetail(content.props, abort.signal);
   } catch {
     // 中止就是用户已经走开。其余失败照画：原因和重试的节律都在详情自己手里。
@@ -276,12 +284,14 @@ async function swap(request: StageRequest, dialog: HTMLDialogElement): Promise<v
   const content = contentFor(request);
   try {
     if (content.kind === 'item') await prefetchItemDetail(content.props, abort.signal);
+    else if (content.kind === 'jav') await prefetchJavDetail(content.props, abort.signal);
     else await prefetchFollowDetail(content.props, abort.signal);
   } catch {
     if (abort.signal.aborted) return;
   }
   if (mine !== generation || !view || swappable(request.kind) !== dialog) return;
-  player.prepareStageFor(request.kind, request.id ?? Number.NaN);
+  if (request.kind === 'jav') player.closeMiniplayer();
+  else player.prepareStageFor(request.kind, request.id ?? Number.NaN);
   releaseHoverPreviews(dialog);
   closePlayerMenu();
   view = { ...view, request, content, phase: 'content' };
@@ -342,6 +352,7 @@ function update(patch: StagePatch): void {
   if (!view) return;
   view = { ...view, content: view.content.kind === 'item'
     ? { kind: 'item', props: { ...view.content.props, ...patch } }
+    : view.content.kind === 'jav' ? view.content
     : { kind: 'follow', props: { ...view.content.props,
       ...(patch.relatedLimit === undefined ? {} : { relatedLimit: patch.relatedLimit }) } } };
   paint();

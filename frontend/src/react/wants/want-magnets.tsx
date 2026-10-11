@@ -1,6 +1,6 @@
 /* 卡片下方的磁链候选。可见时查询，提交复用云下载的幂等与失败分类。 */
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { RiP2pLine, RiFileDownloadLine, RiLink, RiHardDrive2Line, RiFileList2Line,
+import { RiLink, RiHardDrive2Line, RiFileList2Line,
   RiCalendarLine, RiPriceTag3Line, RiExternalLinkLine, RiFileCopyLine, RiCloudLine, RiRefreshLine } from '@remixicon/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, ButtonLink } from '@/components/base/buttons/button';
@@ -15,6 +15,7 @@ import type { Want } from './wants';
 import { Disclosure } from '../settings/section';
 import { cachedResources, rememberResources, resourceLifetime } from './resource-cache';
 import { PROVIDER_ICONS } from '../components/source-label';
+import { resourceNotice, resourceSize } from './resource-display';
 
 export interface MagnetCandidate {
   id: string; protocol: 'magnet' | 'ed2k' | 'url'; info_hash: string; uri: string;
@@ -31,9 +32,10 @@ function ResourceFact({ icon: Icon, children }: { icon: ComponentType<{ classNam
   return <span className="inline-flex items-center gap-1"><Icon aria-hidden className="size-3.5 shrink-0" />{children}</span>;
 }
 
-export function WantMagnets({ want, readOnly, downloads, provider, toast, onSource }: {
-  want: Want; readOnly: boolean; downloads?: DownloadsSnapshot; provider: string; toast(message: string): void;
+export function WantMagnets({ want, readOnly, downloads, provider, toast, onSource, queryUrl }: {
+  want: Pick<Want, 'id' | 'code' | 'title' | 'release_date'>; readOnly: boolean; downloads?: DownloadsSnapshot; provider: string; toast(message: string): void;
   onSource?(url: string): void;
+  queryUrl?: string;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(typeof IntersectionObserver === 'undefined');
@@ -41,7 +43,8 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
   const action = useAction();
   const client = useQueryClient();
   const refresh = useRef(false);
-  const cached = useMemo(() => cachedResources(want.code || '', want.release_date), [want.code, want.release_date]);
+  const cacheCode = queryUrl ? `${queryUrl}:${want.code}` : want.code || '';
+  const cached = useMemo(() => cachedResources(cacheCode, want.release_date), [cacheCode, want.release_date]);
   useEffect(() => {
     if (!root.current || visible) return;
     const observer = new IntersectionObserver((entries) => {
@@ -51,12 +54,13 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
     return () => observer.disconnect();
   }, [visible]);
   const query = useQuery({
-    queryKey: ['want-magnets', want.id, want.code],
+    queryKey: queryUrl ? ['work-resources', queryUrl, want.code] : ['want-magnets', want.id, want.code],
     queryFn: async ({ signal }) => {
       const forced = refresh.current;
-      const result = await apiGet<MagnetResult>(`/api/wants/magnets?id=${want.id}${forced ? '&refresh=1' : ''}`, signal);
+      const url = queryUrl || `/api/wants/magnets?id=${want.id}`;
+      const result = await apiGet<MagnetResult>(`${url}${forced ? `${url.includes('?') ? '&' : '?'}refresh=1` : ''}`, signal);
       refresh.current = forced && result.state === 'busy';
-      rememberResources(want.code || '', result);
+      rememberResources(cacheCode, result);
       return result;
     },
     initialData: cached?.result, initialDataUpdatedAt: cached?.saved,
@@ -79,7 +83,7 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
     void action.run(candidate.id, async (signal) => {
       const result = await apiSend<DownloadSubmitResult>(DOWNLOADS_URL, {
         magnet: candidate.uri, provider: configured.key, target: configured.target,
-        code: want.code, title: want.title, origin: `wishlist:${want.id}`,
+        code: want.code, title: want.title, origin: queryUrl ? `work:${want.code}` : `wishlist:${want.id}`,
       }, 'POST', signal);
       if (!result.ok) throw new Error(result.task.failure_detail || result.task.failure_label || '添加下载失败');
       return result;
@@ -105,7 +109,9 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
       </div>
       {waiting ? <LoadingDots label="正在查找资源链接…" /> : null}
       {failure ? <Note tone="error" title="资源链接未取得">{failure}</Note> : null}
-      {query.data?.warnings?.map((warning) => <Note key={warning} tone="neutral">{warning}</Note>)}
+      {query.data?.warnings?.map((warning) => <Note key={warning} tone="neutral">{resourceNotice(warning)}</Note>)}
+      {query.data?.warnings?.length && query.data.source_url ? <ButtonLink variant="secondary" size="small" className="self-start"
+        trailingIcon={RiExternalLinkLine} href={query.data.source_url} target="_blank" rel="noopener noreferrer">查看来源页</ButtonLink> : null}
       {query.data?.state === 'ready' && !query.data.items.length && !query.data.warnings?.length
         ? <Note tone="neutral">暂未找到资源链接。</Note> : null}
       {action.error ? <Note tone="error" title="操作未完成">{action.error}</Note> : null}
@@ -113,21 +119,17 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
         const rows = query.data.items.map((candidate) => {
           const added = submitted.includes(candidate.id) || downloads?.tasks.some((task) => candidate.protocol === 'magnet' &&
             task.info_hash === candidate.info_hash && (task.cancellable || task.state === 'ingested'));
-          return <li key={candidate.id} data-resource-protocol={candidate.protocol} className="flex min-w-0 items-start justify-between gap-3 max-sm:flex-col">
+          return <li key={candidate.id} data-resource-protocol={candidate.protocol} className="flex min-w-0 items-center justify-between gap-3 max-sm:flex-col max-sm:items-start">
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Chip variant="caption" color={candidate.protocol === 'magnet' ? 'blue' : candidate.protocol === 'ed2k' ? 'purple' : 'neutral'}>
-                  <span className="inline-flex items-center gap-1">
-                  {candidate.protocol === 'magnet' ? <RiP2pLine aria-hidden className="size-3.5" /> :
-                    candidate.protocol === 'ed2k' ? <RiFileDownloadLine aria-hidden className="size-3.5" /> : <RiLink aria-hidden className="size-3.5" />}
-                  {candidate.protocol === 'magnet' ? '磁链' : candidate.protocol === 'ed2k' ? 'ed2k' : '网页链接'}
-                  </span>
+                  {candidate.protocol === 'magnet' ? '磁链' : candidate.protocol === 'ed2k' ? 'ED2K' : '网页链接'}
                 </Chip>
                 <p className="min-w-0 break-all text-body-2-medium text-text-primary">{candidate.name}</p>
               </div>
               <div className="flex flex-wrap gap-x-3 gap-y-1 break-words text-caption-1-regular text-text-secondary">
                 <ResourceFact icon={RiLink}>{candidate.source}</ResourceFact>
-                <ResourceFact icon={RiHardDrive2Line}>{candidate.size || '大小未知'}</ResourceFact>
+                <ResourceFact icon={RiHardDrive2Line}>{resourceSize(candidate.size)}</ResourceFact>
                 {candidate.files ? <ResourceFact icon={RiFileList2Line}>{candidate.files.replaceAll('個', '个')}</ResourceFact> : null}
                 <ResourceFact icon={RiCalendarLine}>{candidate.date ? `${candidate.source === 'JavDB 评论' ? '评论' : '收录'} ${candidate.date}` : '日期未知'}</ResourceFact>
                 {candidate.attributes.map((value) => <ResourceFact key={value} icon={RiPriceTag3Line}>{value}</ResourceFact>)}

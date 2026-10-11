@@ -20,20 +20,21 @@ describe('JAV 推荐与加载结构', () => {
           peach_performers: [{ entity_id: 42, name: '规范姓名', score: 8 }],
         } } });
       });
-      await page.route('**/api/feeds/discoveries?*', async route => {
+      await page.route('**/api/jav/discoveries?*', async route => {
         await responseReady;
         await route.fulfill({ json: { items: [
           { id: 777, code: 'DEMO-777', title: '演示新作', performers: '來源姓名' },
           { id: 778, code: 'DEMO-778', title: '很长的作品标题用于检查截断与卡片等高'.repeat(8), performers: '來源姓名' },
           { id: 779, code: 'DEMO-779', title: '短标题', performers: '來源姓名' },
         ].map(item => ({ ...item, performer_refs: [{ id: 42, name: '规范姓名', has_image: false }],
-          link: 'https://example.com/work', release_date: '2026-10-01', has_cover: false, wanted: false })) } });
+          link: 'https://example.com/work', release_date: '2010-10-01', has_cover: false, wanted: false,
+          score: 1, tags: ['恋足'], reasons: ['常看的女优：规范姓名'] })) } });
       });
       await page.goto(new URL('/jav?tab=discover', page.url()).href, { waitUntil: 'load' });
       await page.locator('[data-jav-skeleton-cover]').first().waitFor();
       const cover = await page.locator('[data-jav-skeleton-cover]').first().boundingBox();
       assert.ok(cover && cover.width >= 100 && cover.height >= 60, JSON.stringify(cover));
-      assert.ok(cover && Math.abs(cover.width / cover.height - 1.6) < 0.02, '封面占位应与作品封面同一比例');
+      assert.ok(cover && Math.abs(cover.width / cover.height - 0.75) < 0.02, '大图封面占位应与馆藏正封同一比例');
       const skeletonWidth = await page.locator('[data-skeleton="jav-discover"]').first().boundingBox();
       const skeletonCard = await page.locator('[data-jav-skeleton-card]').first().boundingBox();
       const searchBox = await page.locator('input[aria-label="筛选推荐"]').locator('xpath=../../..').boundingBox();
@@ -76,6 +77,13 @@ describe('JAV 推荐与加载结构', () => {
       assert.equal(await cards.count(), 1);
       await search.fill('');
       await page.waitForFunction(() => document.querySelectorAll('[aria-label="为你推荐"] article').length === 3);
+      await page.locator('label:has(input[aria-label="小图"])').click();
+      const smallCover = await cards.first().locator('[data-jav-cover-box]').boundingBox();
+      assert.ok(smallCover && Math.abs(smallCover.width / smallCover.height - 16 / 9) < 0.02);
+      await page.locator('label:has(input[aria-label="大图"])').click();
+      await cards.first().getByRole('button', { name: '恋足', exact: true }).click();
+      await page.getByRole('button', { name: '清除筛选', exact: true }).click();
+      assert.equal(await cards.count(), 3);
       await cards.first().getByRole('button', { name: '查找资源', exact: true }).click();
       await page.getByRole('dialog').getByRole('button', { name: '关闭资源面板', exact: true }).click();
       await page.getByRole('dialog').waitFor({ state: 'hidden' });

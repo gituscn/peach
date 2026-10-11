@@ -102,7 +102,7 @@ class JavDBSource(SiteSource):
                     warnings.append("评论链接未取得，请打开来源页查看。")
                     break
                 if body.select_one('.more a[href="/plans"]'):
-                    warnings.append("更多评论需要 JavDB VIP 或官方 App。")
+                    warnings.append("来源只返回了部分评论，资源链接可能不完整。")
                 following = body.select_one('a[rel="next"], .pagination-next:not([disabled])')
                 next_url = str(following.get('href', '')) if following else ""
             else:

@@ -638,6 +638,7 @@ def index_directory_redirect(request: Request, args: dict[str, str] = Depends(re
 @router.api_route("/agencies", methods=["GET", "HEAD"])
 @router.api_route("/tags", methods=["GET", "HEAD"])
 @router.api_route("/jav", methods=["GET", "HEAD"])
+@router.api_route("/jav/movie/{code}", methods=["GET", "HEAD"])
 @router.api_route("/unseen", methods=["GET", "HEAD"])
 @router.api_route("/watch-later", methods=["GET", "HEAD"])
 @router.api_route("/flagged", methods=["GET", "HEAD"])
@@ -667,6 +668,6 @@ def client_route(request: Request, item_id: int | None = None,
                  part_seed_id: int | None = None, part_item_id: int | None = None,
                  edition_seed_id: int | None = None, edition_item_id: int | None = None,
                  playlist_id: int | None = None, playlist_item_id: int | None = None,
-                 kind: str | None = None, name: str | None = None,
+                 kind: str | None = None, name: str | None = None, code: str | None = None,
                  args: dict[str, str] = Depends(require_page_auth)):
     return index(request, args)

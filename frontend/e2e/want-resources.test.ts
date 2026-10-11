@@ -29,7 +29,7 @@ describe('JAV 入库作品卡', () => {
             origins: ['https://example.test/resources'],
           }, {
             id: 'ed2k:abc', protocol: 'ed2k', info_hash: '', uri: 'ed2k://|file|demo|1|abc|/', name: '评论补充文件',
-            size: '1 B', files: '', date: '2026-10-02', attributes: [], source: 'JavDB 评论',
+            size: '27,311,519,717 B', files: '', date: '2026-10-02', attributes: [], source: 'JavDB 评论',
             source_url: 'https://example.test/comment', origins: ['https://example.test/comment'],
           }, ...Array.from({ length: 6 }, (_, index) => ({
             id: `magnet:extra-${index}`, protocol: 'magnet', info_hash: `extra-${index}`, uri: `magnet:?xt=urn:btih:extra-${index}`,
@@ -56,6 +56,10 @@ describe('JAV 入库作品卡', () => {
         assert.equal(await source.getAttribute('href'), 'https://example.test/work');
         assert.equal(await card.locator('[data-resource-protocol]:visible').count(), 3);
         assert.equal((await card.textContent())!.includes('個'), false);
+        const ed2k = card.locator('[data-resource-protocol="ed2k"]');
+        assert.ok((await ed2k.textContent())!.includes('ED2K'));
+        assert.ok((await ed2k.textContent())!.includes('25.4 GB'));
+        assert.equal(await ed2k.locator('span').first().locator('svg').count(), 0);
         const magnetStyle = await card.locator('[data-resource-protocol="magnet"]').first().locator('span').first().evaluate(el => getComputedStyle(el).backgroundColor);
         const ed2kStyle = await card.locator('[data-resource-protocol="ed2k"] span').first().evaluate(el => getComputedStyle(el).backgroundColor);
         assert.notEqual(magnetStyle, ed2kStyle);
@@ -63,6 +67,14 @@ describe('JAV 入库作品卡', () => {
         const copy = card.getByRole('button', { name: '复制链接', exact: true }).first();
         assert.notEqual(await add.evaluate(el => getComputedStyle(el).backgroundColor), await copy.evaluate(el => getComputedStyle(el).backgroundColor));
         assert.equal(await add.locator('img').count(), 1, '下载渠道使用对应的网盘图标');
+        if (viewport.name === 'desktop') {
+          const centers = await add.evaluate(el => {
+            const row = el.closest('[data-resource-protocol]')!.getBoundingClientRect();
+            const button = el.getBoundingClientRect();
+            return { row: row.top + row.height / 2, button: button.top + button.height / 2 };
+          });
+          assert.ok(Math.abs(centers.row - centers.button) <= 1, JSON.stringify(centers));
+        }
         const geometry = await layout(page);
         assert.ok(geometry.scrollWidth <= geometry.viewportWidth + 1, JSON.stringify(geometry));
         assert.deepEqual(geometry.offenders, []);

@@ -34,7 +34,7 @@ FC2 卖家名册复用 `sources/fc2.py` 的 `label`、`seller_url` 来源契约�
 
 关注页的创作者行与卡片头像、署名复用 `FollowAuthorLink` 和来源的唯一实体绑定，进入创作者资料页；卡片按实际发布者取身份。未建档作者沿用关注筛选。创作者行横滚访问全部作者。筛选条件与卡片悬停面留 16px；首页、关注页和资料页共用交集条。`useViewGlide` 复用 `ResizeObserver` 监听显隐与相邻控件尺寸，`moveGlidePane` 在重新落位时取消位移和形变动画，无新增依赖。
 
-JAV 发现卡复用馆藏的 `data-media-card` 悬停面、`coverImage` 封面取景和新作的 `feedIdentity` 身份头像。出演者引用由 `web_catalog.entity_ref` 提供图片版本与取景；标题保留两行，操作区贴底。JAV 与名册的静态搜索框复用 `islandSearchInput`，按 Board Input 的尺寸生成首屏结构。无新增依赖。
+JAV 发现卡复用馆藏的 `data-media-card` 网格与悬停面、`coverImage` 封面取景、`cardRatio` 大小图比例和 `feedIdentity` 身份头像；筛选复用 `FilterGlassRows`、`FilterPill`、`Segments` 与 `SortKeys`。出演者引用由 `web_catalog.entity_ref` 提供图片版本与取景；标题保留两行，操作区贴底。发现只读查询复用口味汇总与 `related.rank_related` 的 IDF/MMR，覆盖库外已知作品及少看的馆藏；来源资料只读 `PUBLIC_API.peek_movie`，未取得资料不联网补齐。`WantMagnets` 以 `queryUrl` 共用作品详情和想要清单的资源布局，缓存按来源分开，容量复用 `fmtSize`。JAV 与名册的静态搜索框复用 `islandSearchInput`。资料扩展见 [JAV 发现](JAV_DISCOVERY.md)，无新增依赖。
 
 账号归属复用 `review_decision`、`creator_collection_base`、`write_owned_fields` 和全库归属审计。明确拒绝的资产与账号组合在自动摄取时跳过；用户写入保留复核入口。网黄博主只命中可信个人、内容创作者或发布账号断言，未分类账号保留全部名册入口。`attach_avatar_availability` 集中处理资料页、索引、搜索与统计的作品头像：发布账号缺少本人或出演职业证据时作品帧照常兜底，另标 `avatar_stand_in`，已安装图片独立保留。个人博主的补头像复用 `avatar_cover_face.face_square`、`readable_cut` 与 ADR-0074 的 `agreeing` 两部互证，画面取自接触印相九格（ADR-0099）。来源核查清单、逐关系回执和备份存于 `peach-data/review/`。
 
@@ -174,7 +174,8 @@ JAV 默认封面（官方封面／预览图）与视频默认大小（大图／�
 
 - 页面、框体、操作条与选中项共用一套灰阶，操作条用 `--overlay-5`。
 - javdb 属有码与素人链的社区档，候选保留 community 来源性质，不自动写真相字段。
-- [JavDB Web UI 只读实证](reference-snapshots/javdb-web-ui-poc.md)：用户提供的入口使用独立 API，匿名搜索与样本详情成功，评论正文、资源列表和不限流未证明。现有 HTML 解析器不能只替换域名复用；站内新作详情可复用封面、人物、想要与资源组件，接入需独立适配和缓存，本轮未新增依赖。
+- [JavDB Web UI 实证](reference-snapshots/javdb-web-ui-poc.md)：库外作品详情复用舞台、人物身份、想要、`WantMagnets` 与云下载组件；`javdb_public.PublicAPI` 复用 `HttpxTransport`（httpx 0.28.1，BSD-3-Clause）、`HostLimiter`、Pillow 12.3.0 与标准库 MD5/XOR，独立映射公开协议。匿名详情、两页评论、6 条样本资源、封面与预览图像素已取得；全站完整性和不限流未证明。请求串行、3 秒间隔、6 小时有界缓存，评论最多 8 页，失败保留资料并冷却；只读 `peek_movie` 可用于发现匹配。未新增依赖或写入 ledger。
+- 候选 `ANDonekey/javapi` revision `9a2a245a659a4008ee75bc148b0af9c7126e7a71` 未归档、最后推送为 2026-05-11，使用 Go 和部署服务，GitHub 未标明许可证，不能作为 Python 依赖或复制其源码。仅以部署公开前端与匿名实测确定协议事实；原始取证脚本及脱敏概要保留在工作树 `build/javdb-public-api/`。`phoenixthrush/javdb-python`（MIT、Python ≥3.11、无运行依赖）解析的是 `javdatabase.com` HTML，站点与协议不匹配；现有 `sources.javdb` 同样只适用于 HTML。Peach 保留番号核对、权限失败、字段投影和缓存策略。
 - 编码边界依据 [MDN 视频编码说明](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/Video_codecs) 与 [ffprobe 文档](https://ffmpeg.org/ffprobe.html)，用当前 FFmpeg；Peach 只持有兼容格式判定与缓存策略。
 - CloudDrive 引导用现有 `settings_file`、`platform.root_online`、`scan_location` 与 React 配置页，来源为 `local`、`115`、`pikpak`。挂载由用户安装的 CloudDrive 负责（[官方帮助](https://www.clouddrive2.com/help.html)：Windows 用盘符、macOS 用目录挂载点），Peach 不捆绑其二进制，挂载引导不依赖管理 API，路径处理用 `pathlib`、`os.scandir`、`tomllib`；表单、来源归属与扫描选择归 Peach。云下载经官方 proto 子集（`downloads_clouddrive.proto`，version 1.1.0）走 gRPC，令牌存 CredentialStore，不用非官方 SDK（ADR-0089）。
 - JAV 入库资源查询复用 `sources.javdb` 的身份核对、`SourceTransport` 的 Cookie 与冷却、`HostLimitedTransport` 的 3 秒间隔、`beautifulsoup4==4.15.0` 和 `downloads.parse_magnet`。JavPack 的 `JavDB.magnet.user.js` 0.0.2（GPL-3.0，仓库 revision `b546e1881147e15796c697e8e086db9d3ac0c5be`）只作页面字段参考；它依赖浏览器用户脚本 API，不能直接作为 Python 服务端依赖。Peach 负责评论链接、协议分流、去重、60 秒缓存和最多三页评论的预算，不新增依赖。2026-10-02 单作品只读实测取得 4 条磁链和含 ed2k 的评论页；评论入口从 `.review-tab[data-url]` 读取，受限评论保留来源限制提示。磁链可交现有云下载服务，ed2k 与其他网页链接提供复制。

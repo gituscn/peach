@@ -1,15 +1,28 @@
-import type { TasteData } from '../taste/taste';
-import { fetchTaste, tasteKey } from '../taste/taste';
 import { apiGet } from '../../api';
 import { queryClient } from '../query';
 import { fetchWants, WANTS_KEY } from '../wants/wants';
-import type { FaceRef } from '@peach/card-art';
+import type { FaceRef, CoverItem } from '@peach/card-art';
+import { coverImage, javArtwork } from '@peach/card-art';
+import { esc } from '@peach/legacy/core';
 
 export { JAV_TABS, javTab, javPath, javLibraryPath } from './jav-navigation';
-export interface Discovery {
+export interface Discovery extends CoverItem {
   id: number; code: string; title: string; performers: string; release_date: string;
   studio: string; link: string; cover_url: string; has_cover: boolean; wanted: boolean;
   performer_refs?: (FaceRef & { id: number; name: string })[];
+  asset_id?: number | null; tags?: string[]; reasons?: string[]; score?: number;
+}
+export type DiscoveryScope = 'external' | 'library';
+export interface DiscoveryResult { items: Discovery[]; candidate_total: number; limited: boolean }
+export const discoveryKey = (scope: DiscoveryScope) => ['jav-discoveries', scope] as const;
+export const fetchDiscoveries = (scope: DiscoveryScope, signal: AbortSignal) =>
+  apiGet<DiscoveryResult>(`/api/jav/discoveries?scope=${scope}&limit=100`, signal);
+
+export function discoveryArtwork(item: Discovery, layout: 'big' | 'small', javImage: unknown): string {
+  const local = javArtwork(item, layout, false, javImage);
+  if (local.html || !item.cover_url) return local.html;
+  return coverImage(item, layout).replace(/ src="[^"]*"/,
+    ` src="${esc(item.cover_url)}" referrerpolicy="no-referrer"${layout === 'big' ? ' data-panel-prior="1"' : ''}`);
 }
 
 export async function prefetchJav(tab: string, signal: AbortSignal) {
@@ -17,21 +30,6 @@ export async function prefetchJav(tab: string, signal: AbortSignal) {
     await queryClient.fetchQuery({ queryKey: WANTS_KEY, queryFn: () => fetchWants(signal) }); return;
   }
   if (tab === 'discover') {
-    await Promise.all([
-      queryClient.fetchQuery({ queryKey: tasteKey('all'), queryFn: () => fetchTaste('all', signal) }),
-      queryClient.fetchQuery({ queryKey: ['jav-discoveries'], queryFn: () => apiGet<{ items: Discovery[] }>('/api/feeds/discoveries?limit=100', signal) }),
-    ]); return;
+    await queryClient.fetchQuery({ queryKey: discoveryKey('external'), queryFn: () => fetchDiscoveries('external', signal) }); return;
   }
-}
-
-/** 推荐按账本中的出演者身份匹配口味信号；没有身份引用时使用同名信号。 */
-export function rankedDiscoveries(items: Discovery[], taste: TasteData) {
-  const signals = [...(taste.rankings?.peach_performers || []), ...(taste.rankings?.browser_creators || [])];
-  return items.map(item => {
-    const names = (item.performers || '').split(/[,，、;/]/).map(name => name.trim()).filter(Boolean);
-    const matches = signals.filter(signal => (item.performer_refs || []).some(ref =>
-      (signal.entity_id != null && ref.id === signal.entity_id) || ref.name === signal.name) || names.includes(signal.name));
-    return { ...item, matches: [...new Set(matches.map(signal => signal.name))],
-      score: matches.reduce((sum, signal) => sum + (signal.score || signal.visits || signal.web_visits || 1), 0) };
-  }).filter(item => item.matches.length).sort((a, b) => b.score - a.score || (b.release_date || '').localeCompare(a.release_date || ''));
 }

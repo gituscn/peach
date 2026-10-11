@@ -4,6 +4,8 @@
 
 ## 待复核的元数据
 
+- JAV 发现的历史目录候选、年代与时长偏好、质量参考、近期偏好衰减及可撤回的负向探索反馈待取得并验证，范围与有界采集方案见 [JAV 发现](JAV_DISCOVERY.md)。
+
 - 有码内容标签按 ADR-0100 优先 JavDB；真实馆藏回填待逐资产来源归属预览与同轮授权。歧义词 `口爆/吞精`、`車站性交`、`觸摸打字` 等保留原文复核；已核对的类别身份与译名见 [来源词复核](reference-snapshots/javdb-category-translations.md)。
 - 未收录的标签来源词保留出处；「其他内容」分组的 24 个名称见 [标签词表审查](reference-snapshots/tag-vocabulary-audit.md)。
 - 账号身份来源待复核，当前名册见 `peach-data/review/creators-current-inventory-2.csv`；候选与查询记录见同目录 `creator-identity-findings.json`、`creator-identity-lookups.json`。「しらたま」「ひな」短名不能唯一对应艺人，保留独立身份。

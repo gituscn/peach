@@ -18,6 +18,7 @@ import { after, before, describe, it } from 'node:test';
 import type { Browser, Locator, Page } from 'playwright-core';
 
 import { configurationBody, expectBody, layout, launch, requiredEnv, settle, visit, VIEWPORTS } from './harness.ts';
+import { mockJavDetail } from './jav-detail-fixture.ts';
 
 interface Route {
   path: string;
@@ -41,8 +42,9 @@ const statsInventoryTab = (page: Page): Locator =>
   page.locator('#stats').getByRole('tab', { name: /^馆藏视频/ });
 
 const ROUTES: readonly Route[] = [
+  { path: '/jav/movie/EXM-001', body: page => [page.locator('#stage [data-jav-detail] h1'), page.getByRole('img', { name: 'EXM-001 封面', exact: true })] },
   { path: '/jav', body: page => [heading(page, '#javLibraryHeader', 'JAV'), page.getByRole('tab', { name: '我的馆藏', exact: true, selected: true }), page.locator('#grid [data-media-card]:visible, #grid [data-media-empty]:visible').first()] },
-  { path: '/jav?tab=discover', body: page => [heading(page, '#stats', 'JAV'), page.getByRole('tab', { name: '发现', exact: true, selected: true }), page.getByText('暂无匹配口味的新作', { exact: true })] },
+  { path: '/jav?tab=discover', body: page => [heading(page, '#stats', 'JAV'), page.getByRole('tab', { name: '发现', exact: true, selected: true }), page.getByText('暂无匹配口味的作品', { exact: true })] },
   { path: '/jav?tab=wants', body: page => [heading(page, '#stats', 'JAV'), page.getByRole('tab', { name: '想要', exact: true, selected: true }), page.getByText('还没有想要的作品', { exact: true })] },
   { path: '/', body: (page) => [page.locator('#grid [data-media-card]').first()] },
   { path: '/performers', body: (page) => [heading(page, '#index', '艺人'), indexEntries(page)] },
@@ -167,8 +169,12 @@ describe('路由冒烟', () => {
     for (const route of ROUTES) {
       // 单条超时远小于 Python 侧的整轮超时：卡住的那一条自己报名字，不拖垮整轮输出。
       it(`${route.path} @ ${viewport.name}`, { timeout: 60_000 }, async () => {
-        const opened = await visit(browser, route.path, viewport);
+        const opened = await visit(browser, route.path.startsWith('/jav/movie/') ? '/stats' : route.path, viewport);
         try {
+          if (route.path.startsWith('/jav/movie/')) {
+            await mockJavDetail(opened.page);
+            await opened.page.goto(requiredEnv('PEACH_E2E_ORIGIN') + route.path);
+          }
           await expectBody(opened.page, route.path, route.body(opened.page));
           await settle(opened.page);
           await assertHolds(opened.page, opened.problems, route.path);

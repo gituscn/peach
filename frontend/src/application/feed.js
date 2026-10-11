@@ -30,9 +30,8 @@ export function feedNewCardHtml(item){
   const heading=item.code
     ?javTitleHtml({is_jav:true,code:item.code,name:item.code,display_title:item.title||''})
     :esc(name);
-  /* 点击区用自己的类 `.feednewopen`：这一条通向别人的站，不是站内跳转。 */
-  const open=item.link
-    ?`<a class="feednewopen" href="${esc(item.link)}" target="_blank" rel="noreferrer" aria-label="打开 ${esc(name)} 的作品页"></a>`:'';
+  const open=item.code
+    ?`<a class="feednewopen" href="/jav/movie/${encodeURIComponent(item.code)}" aria-label="打开 ${esc(name)} 的作品详情"></a>`:'';
   return `<article class="card feednewcard${item.read?' isread':''}" data-feed-id="${item.id}">
     ${open}<div class="pic" style="--card-ratio:${COVER_FRONT_RATIO}">${cover}
       <div class="hovertools feednewtools">
