@@ -1,6 +1,6 @@
 # Peach 运行核验记录
 
-最后核验：2026-10-11
+最后核验：2026-10-12
 
 查 `/healthz`；[待办](PRODUCT_BACKLOG.md)、[复用清单](REUSE.md)、[长期约定](HANDOFF.md)。
 
