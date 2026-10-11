@@ -171,36 +171,30 @@ function watchReports() {
 }
 
 describe('设置面板与壳的接缝', () => {
-  it('首次采集范围选择写入设置接口，成功后保存服务端值并给出回执', async () => {
-    const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) => ({
-      ok: true, status: 200,
-      json: async () => init?.method === 'POST' ? { followInitialDays: 7 } : {},
-    }));
-    vi.stubGlobal('fetch', fetcher);
+  it('五个分区按使用场景组织，服务配置入口遵守设备权限', async () => {
     const current = await setup();
-    const receipt = vi.fn();
-    current.host.receipt = receipt;
-    const panel = await open(current, '关注');
-    const field = panel.querySelector<HTMLElement>('#followInitialDaysSetting .ui-gselect')!;
-    expect([...field.querySelectorAll('[role="option"]')].map((option) => option.textContent))
-      .toEqual(['不限时间', '最近 7 天', '最近 30 天', '最近 90 天']);
-    current.save.mockClear();
-    // happy-dom 不实现浏览器顶层弹出 API；选项与 change 使用正式控件。
-    const menu = field.querySelector<HTMLElement>('[data-select-menu]')!;
-    menu.showPopover = vi.fn();
-    menu.hidePopover = vi.fn();
-    await click(field.querySelector('[data-select-trigger]'));
-    await click(field.querySelector('[data-select-option="7"]'));
-    await settle();
-    const posts = fetcher.mock.calls.filter(([url, init]) => url === '/api/settings' && init?.method === 'POST');
-    expect(posts).toHaveLength(1);
-    expect(JSON.parse(String(posts[0]![1]!.body))).toEqual({ followInitialDays: 7 });
-    expect(current.value.followInitialDays).toBe(7);
-    expect(current.save).toHaveBeenCalledTimes(1);
-    expect(receipt).toHaveBeenCalledWith('已保存首次采集历史范围');
-    expect(field.querySelector('[data-select-label]')?.textContent).toBe('最近 7 天');
-    expect(panel.textContent).toContain('已保存，适用于尚未开始采集的来源。');
+    const openConfiguration = vi.fn();
+    current.host.openConfiguration = openConfiguration;
+    const panel = await open(current, 'JAV 与新作');
+    expect([...panel.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent))
+      .toEqual(['外观与导航', '浏览与播放', 'JAV 与新作', '搜索与推荐', '内容显示']);
+    expect(panel.querySelector('#javImageSetting')?.closest('section')?.hidden).toBe(false);
+    expect(panel.querySelector('#detailAutoplaySetting')?.closest('section')?.hidden).toBe(true);
+    expect(panel.querySelector('#videoThumbnailSetting')).toBeNull();
+    expect(panel.querySelector('#followScheduleSetting')).toBeNull();
+    const entry = panel.querySelector<HTMLButtonElement>('[data-settings-service] button')!;
+    expect(entry.disabled).toBe(true);
+    await click(entry);
+    expect(openConfiguration).not.toHaveBeenCalled();
     await close(current);
+    current.host.configurable = async () => true;
+    await open(current);
+    await settle();
+    expect(entry.disabled).toBe(false);
+    await click(entry);
+    await settle();
+    expect(openConfiguration).toHaveBeenCalledTimes(1);
+    expect(panel.hidden).toBe(true);
   });
 
   it('每一个开关只落一次盘、只报自己那一个效果名', async () => {
@@ -270,7 +264,7 @@ describe('设置面板与壳的接缝', () => {
     const dial = panel.querySelector('[data-glow-dial="speed"]');
     await close(current);
     expect(panel.hidden).toBe(true);
-    const again = await open(current, '浏览');
+    const again = await open(current, '浏览与播放');
     expect(document.querySelectorAll('[data-settings-host]')).toHaveLength(1);
     expect(again).toBe(panel);
     expect(again.querySelector('#homeGlowControls')).toBe(glow);
@@ -311,10 +305,10 @@ describe('常驻面', () => {
     trigger.focus();
     /* 不包 act：act 会把 flushSync 推到它结束时，看不出句柄自己同步没有。 */
     (globalThis as ActFlag).IS_REACT_ACT_ENVIRONMENT = false;
-    current.api.open('浏览');
+    current.api.open('浏览与播放');
     const panel = document.querySelector<HTMLElement>('#settingsPanel')!;
     expect([panel.hidden, panel.querySelector('#settingsTitle')?.textContent, current.api.isOpen()])
-      .toEqual([false, '浏览', true]);
+      .toEqual([false, '浏览与播放', true]);
     expect([document.documentElement.style.overflow, document.body.classList.contains('settings-open')])
       .toEqual(['hidden', true]);
     expect(document.activeElement).toBe(trigger);
@@ -355,7 +349,7 @@ describe('常驻面', () => {
     await act(async () => { expect(() => current.api.close()).not.toThrow() });
     await settle();
     glyph.broken = false;
-    await act(async () => { expect(() => current.api.open('浏览')).not.toThrow() });
+    await act(async () => { expect(() => current.api.open('浏览与播放')).not.toThrow() });
     await settle();
     expect(reported, '确定性抛错只报那一次').toHaveBeenCalledTimes(1);
     expect(host.childNodes.length, '空到刷新为止，不自愈').toBe(0);

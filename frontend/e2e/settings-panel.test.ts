@@ -49,6 +49,30 @@ describe('设置面板', () => {
   before(async () => { browser = await launch() });
   after(async () => { await browser?.close() });
 
+  it('五个偏好分区各自显示对应设置，服务配置单独直达配置页', { timeout: 60_000 }, async () => {
+    const opened = await openHome(browser);
+    const { page } = opened;
+    try {
+      await openPanel(page);
+      assert.deepEqual(await page.locator(PANEL).getByRole('tab').allTextContents(),
+        ['外观与导航', '浏览与播放', 'JAV 与新作', '搜索与推荐', '内容显示']);
+      for (const [name, field] of [
+        ['外观与导航', '#themeSetting'], ['浏览与播放', '#detailAutoplaySetting'],
+        ['JAV 与新作', '#javImageSetting'], ['搜索与推荐', '#relatedLimitSetting'], ['内容显示', '#censorSetting'],
+      ]) {
+        await page.locator(PANEL).getByRole('tab', { name, exact: true }).click();
+        await page.locator(field!).waitFor({ state: 'visible' });
+        assert.deepEqual((await layout(page)).offenders, []);
+      }
+      assert.equal(await page.locator(`${PANEL} #videoThumbnailSetting, ${PANEL} #followScheduleSetting`).count(), 0);
+      const configuration = page.locator(PANEL).getByRole('button', { name: '服务配置', exact: true });
+      await configuration.click();
+      await page.waitForURL((url) => url.pathname === '/configuration');
+      await page.locator(PANEL).waitFor({ state: 'hidden' });
+      assert.deepEqual(opened.problems, []);
+    } finally { await opened.close() }
+  });
+
   it('齿轮打开、关闭键与 Escape 关上；焦点进来落在关闭键、Tab 在面板里转圈、关上后回到齿轮', { timeout: 60_000 }, async () => {
     const opened = await openHome(browser);
     const { page } = opened;
@@ -132,12 +156,12 @@ describe('设置面板', () => {
       assert.equal(await box.isChecked(), false);
       assert.equal((await stored(page)).uiSounds, false);
       const silent = await tones();
-      await page.locator(PANEL).getByRole('tab', { name: '浏览', exact: true }).click();
-      await page.locator(PANEL).getByRole('tab', { name: '界面', exact: true }).click();
+      await page.locator(PANEL).getByRole('tab', { name: '浏览与播放', exact: true }).click();
+      await page.locator(PANEL).getByRole('tab', { name: '外观与导航', exact: true }).click();
       assert.equal(await tones(), silent, '关掉界面音效之后点分区还在出声');
       await box.click();
       assert.equal((await stored(page)).uiSounds, true);
-      await page.locator(PANEL).getByRole('tab', { name: '浏览', exact: true }).click();
+      await page.locator(PANEL).getByRole('tab', { name: '浏览与播放', exact: true }).click();
       assert.ok(await tones() > silent, '打开界面音效之后点分区不出声');
       assert.deepEqual(opened.problems, []);
     } finally {
@@ -187,14 +211,14 @@ describe('设置面板', () => {
     const opened = await openHome(browser);
     const { page } = opened;
     try {
-      await openPanel(page, '浏览');
+      await openPanel(page, 'JAV 与新作');
       await page.locator('#javImageSetting label:has(input[value="thumbnail"])').click();
       assert.equal((await stored(page)).javImage, 'thumbnail');
       assert.equal(await page.locator('#javImageSetting input[value="thumbnail"]').isChecked(), true);
 
+      await page.locator(PANEL).getByRole('tab', { name: '浏览与播放', exact: true }).click();
       await pick(page, '#defaultSortSetting', 'seed');
       await page.locator('#defaultSortDirectionSetting').waitFor({ state: 'hidden', timeout: 5_000 });
-      assert.equal(await page.locator('#sortDirectionHelp').textContent(), '随机排序不使用方向。');
 
       await pick(page, '#defaultSortSetting', 'rating');
       await page.locator('#defaultSortDirectionSetting').waitFor({ state: 'visible', timeout: 5_000 });
@@ -204,38 +228,6 @@ describe('设置面板', () => {
       const saved = await stored(page);
       assert.equal(saved.defaultSort, 'rating');
       assert.equal(saved.defaultSortDirection, 'asc');
-      assert.deepEqual(opened.problems, []);
-    } finally {
-      await opened.close();
-    }
-  });
-
-  it('视频缩略图档位与关注自动更新写这台机器的接口，回来的状态当场换上', { timeout: 60_000 }, async () => {
-    const opened = await openHome(browser);
-    const { page, server } = opened;
-    try {
-      await openPanel(page, '播放');
-      await page.locator('#videoThumbnailSetting [data-select-trigger]:not([disabled])').waitFor({ timeout: 10_000 });
-      await pick(page, '#videoThumbnailSetting', 'coarse');
-      assert.deepEqual(await posted(page, server, '/api/thumbnail-jobs', 'mode'), { mode: 'coarse' });
-      await page.waitForFunction(() =>
-        document.querySelector('#videoThumbnailSetting [data-select-label]')?.textContent?.includes('粗略'));
-      assert.match(await page.locator('#videoThumbnailState').textContent() || '', /选定档位后/);
-
-      await page.locator(PANEL).getByRole('tab', { name: '关注', exact: true }).click();
-      const minutes = page.locator('#followScheduleSetting input[type="number"]');
-      await minutes.waitFor({ state: 'visible', timeout: 10_000 });
-      await page.waitForFunction(() => {
-        const input = document.querySelector<HTMLInputElement>('#followScheduleSetting input[type="number"]');
-        return input && !input.disabled && input.value === '180';
-      });
-      await minutes.fill('240');
-      await minutes.press('Enter');
-      assert.deepEqual(await posted(page, server, '/api/follow/schedule', 'interval_minutes'),
-        { enabled: true, interval_minutes: 240 });
-      await page.waitForFunction(() =>
-        document.querySelector('#followScheduleState')?.textContent?.includes('新增 3'));
-      assert.equal(await minutes.inputValue(), '240');
       assert.deepEqual(opened.problems, []);
     } finally {
       await opened.close();
@@ -275,42 +267,6 @@ describe('设置面板', () => {
     }
   });
 
-  /* 面板与配置页没有重复的控件；两边共用的是配置快照那一个 Query 键：摘要卡读它，配置页
-     「刷新挂载状态」把重取回来的整份写回它。 */
-  it('配置页刷新回来的配置，面板「这台电脑」那一格当场看到，不再自己重取', { timeout: 60_000 }, async () => {
-    const opened = await openHome(browser);
-    const { page } = opened;
-    let libraries = 1;
-    let reads = 0;
-    try {
-      await page.route((url) => url.pathname === '/api/configuration', async (route) => {
-        reads += 1;
-        const response = await route.fetch();
-        return route.fulfill({ response, json: { ...(await response.json()), library_count: libraries } });
-      });
-      await openPanel(page, '这台电脑');
-      const machine = page.locator('#machineSettings');
-      await machine.getByText('1 个', { exact: true }).waitFor({ timeout: 10_000 });
-      await machine.getByRole('button', { name: '打开配置页', exact: true }).click();
-      await page.locator(PANEL).waitFor({ state: 'hidden', timeout: 5_000 });
-      await page.waitForURL((url) => url.pathname === '/configuration');
-      await page.getByRole('tablist', { name: '配置分区' }).getByRole('tab', { name: '媒体', exact: true }).click();
-      const refresh = page.getByRole('button', { name: '刷新挂载状态', exact: true });
-      await refresh.waitFor({ timeout: 15_000 });
-      libraries = 2;
-      const before = reads;
-      await refresh.click();
-      await until(page, () => reads === before + 1, '刷新挂载状态没有重取配置');
-      await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
-      await openPanel(page, '这台电脑');
-      await machine.getByText('2 个', { exact: true }).waitFor({ timeout: 5_000 });
-      assert.equal(reads, before + 1, '面板为「这台电脑」又取了一遍配置，没用配置页刚写回的那一份');
-      assert.deepEqual(opened.problems, []);
-    } finally {
-      await opened.close();
-    }
-  });
-
   it(`手机 ${MOBILE.width} 宽：面板铺满不横向溢出，分区横排可切换`, { timeout: 60_000 }, async () => {
     const opened = await openHome(browser, MOBILE);
     const { page } = opened;
@@ -324,7 +280,7 @@ describe('设置面板', () => {
       const tops = await page.locator(PANEL).getByRole('tab').evaluateAll((nodes) =>
         nodes.slice(0, 3).map((node) => Math.round(node.getBoundingClientRect().top)));
       assert.equal(new Set(tops).size, 1, '窄屏下分区没有横排');
-      await page.locator(PANEL).getByRole('tab', { name: '浏览', exact: true }).click();
+      await page.locator(PANEL).getByRole('tab', { name: 'JAV 与新作', exact: true }).click();
       await page.locator('#javImageSetting').waitFor({ state: 'visible', timeout: 5_000 });
       assert.deepEqual((await layout(page)).offenders, []);
       assert.deepEqual(opened.problems, []);

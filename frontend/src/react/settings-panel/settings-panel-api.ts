@@ -80,7 +80,7 @@ export interface SettingsPanelHost {
 }
 
 export interface SettingsPanelApi {
-  /** 打开面板；`section` 给分区名（「界面」「浏览」…）时直接落到那一页。 */
+  /** 打开面板；`section` 给分区名（「外观与导航」「浏览与播放」…）时直接落到那一页。 */
   open(section?: string): void;
   close(): void;
   isOpen(): boolean;

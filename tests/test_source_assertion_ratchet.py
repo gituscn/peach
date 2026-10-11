@@ -52,7 +52,7 @@ BASELINE: dict[str, int] = {
     "test_subprocess_encoding.py": 2,
     "test_tray.py": 3,
     "test_web_js.py": 1,
-    "test_web_settings.py": 2,
+    "test_web_settings.py": 1,
     "test_web_ui.py": 14,
     "test_windows_update.py": 3,
 }
