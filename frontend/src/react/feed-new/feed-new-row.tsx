@@ -2,7 +2,8 @@
  * 那一份模板（`feedNewCardHtml`）。忽略的那条当场消失，已看过的留在原位只是变淡，想要那颗键
  * 按下去换成填实的星；三样都直接改这一行的节点，不重画整行——重画会把横滚的位置和自动滚动
  * 一起打回起点。一条都没有就整块不出。 */
-import { useEffect, useLayoutEffect, useRef, type MouseEvent } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, type MouseEvent } from 'react';
+import { ShellActionsContext } from '../router/router';
 
 import type { FeedNew } from './feed-new';
 
@@ -16,6 +17,7 @@ export function FeedNewRow({ feedNew, host, wire, act, settled }: {
   /** 有没有卡：画出来、或最后一张被收起时报一次。 */
   settled?(hasItems: boolean): void;
 }) {
+  const actions = useContext(ShellActionsContext);
   const box = useRef<HTMLDivElement>(null);
   const html = feedNew?.items.length ? feedNew.html : '';
   useLayoutEffect(() => {
@@ -27,6 +29,10 @@ export function FeedNewRow({ feedNew, host, wire, act, settled }: {
     if (html) wire(box.current?.querySelector('.feednewrow') ?? null);
   }, [wire, html]);
   const click = async (event: MouseEvent<HTMLDivElement>) => {
+    const link = (event.target as Element).closest<HTMLAnchorElement>('a.feednewopen');
+    if (link && actions && !event.button && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
+      event.preventDefault(); actions.navigate(link.getAttribute('href')!); return;
+    }
     const button = (event.target as Element).closest<HTMLElement>('[data-feed-action]');
     const card = button?.closest<HTMLElement>('[data-feed-id]');
     if (!button || !card) return;

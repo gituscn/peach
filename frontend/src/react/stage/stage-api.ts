@@ -3,6 +3,7 @@ import type { PlayerItem, PlayerResume } from '../../player';
 import type { FollowDetailActions, FollowDetailProps } from '../follow-detail/follow-detail';
 import type { ItemDetailActions, ItemDetailProps } from '../item-detail/item-detail';
 import type { StagePlayerHost } from './stage-player';
+import type { JavDetailProps } from '../jav-detail/jav-detail';
 
 export type StageHost = StagePlayerHost;
 
@@ -20,7 +21,8 @@ export interface StageFollowRequest extends Omit<FollowDetailProps, 'actions'> {
   resume?: PlayerResume | null;
 }
 
-export type StageRequest = StageItemRequest | StageFollowRequest;
+export interface StageJavRequest extends JavDetailProps { kind: 'jav'; id?: never; resume?: never }
+export type StageRequest = StageItemRequest | StageFollowRequest | StageJavRequest;
 
 /** 开着的详情上会变的那几样：选择态与版式推给「接着看」那一排。 */
 export type StagePatch = Partial<Pick<ItemDetailProps, 'layout' | 'selectMode' | 'selected' | 'seekSeconds' | 'relatedLimit'>>;

@@ -4,7 +4,7 @@ import { receiptsState } from './receipts.js';
 import { followState, followViewPath, openFollowDetail } from './follow.js';
 import { immerseApi, loadImmerse, loadStage, stageApi } from '../react/application-residents';
 import { cancelQueueRequest, navigationState, openRoutedPage, requestOverlay } from './navigation.js';
-import { activeQueue, barsContext, detailOriginAbove, detailOriginAnchor, detailReturnBarsContext, detailReturnNeedsRestore, detailReturnPath, pageOpens, pendingQueueRoute, presentedItem, queueOpens, selectMode, selected, state, writeShell } from './../shell/index';
+import { activeQueue, barsContext, detailOriginAbove, detailOriginAnchor, detailReturnBarsContext, detailReturnNeedsRestore, detailReturnPath, pageOpens, pendingQueueRoute, presentedItem, queueOpens, runtimeConfigurable, selectMode, selected, state, writeShell } from './../shell/index';
 import { scheduleStickySurfaces } from './layout.js';
 import { clearOverlayBackground, holdOverlayBackground, overlayState, takeOverlayReturn } from './../history/overlay';
 import { peachHistory, retagOverlay } from './../history/index';
@@ -132,6 +132,28 @@ export async function closeItemDetail(){
   if(restoreSurface)writeShell({pageOpens:pageOpens+1});
   // 播放列表页回来就从头重开、取最新的那一份（详情里可能刚加进或移出了一条）。
   else{buildBars();if(location.pathname==='/playlists')writeShell({pageOpens:pageOpens+1})}
+}
+
+/** 库外作品在同一个详情舞台打开，来处与关闭行为跟随覆盖条目。 */
+export async function openJavMovie(code,push=true){
+  if(push){
+    writeShell({detailReturnPath:location.pathname+location.search});
+    requestOverlay('/jav/movie/'+encodeURIComponent(code),'jav',()=>openJavMovie(code,false));
+    return;
+  }
+  const seq=peachHistory.navigation.seq;
+  const restore=entityState.cloneBarsContext(currentBarsContext());
+  const needsRestore=!hasReturnSurface();
+  const returnPath=takeOverlayReturn()||(needsRestore?'/jav?tab=discover':detailReturnPath)||'/jav?tab=discover';
+  if(stageApi()?.showing()!=='jav')disposeStage(false,true,{miniplayer:false});
+  writeShell({detailReturnPath:returnPath,detailReturnBarsContext:restore,detailReturnNeedsRestore:needsRestore});
+  releaseHoverPreviews();
+  const stage=await loadStage(mediaState.stageHost);
+  if(peachHistory.navigation.seq!==seq)return;
+  await stage.open({kind:'jav',code,readOnly:!runtimeConfigurable,
+    actions:{close:()=>void closeItemDetail(),navigate:path=>navigationState.navigatePath(path),
+      receipt:message=>receiptsState.toast({text:message})}});
+  scheduleStickySurfaces();
 }
 
 export async function openTok(startId=null,push=true){

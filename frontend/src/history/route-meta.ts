@@ -63,6 +63,7 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
   '/parts/:seed/:item': {},
   '/editions/:seed/:item': {},
   '/item/:id': { title: '作品' },
+  '/jav/movie/:code': { nav: 'jav', title: 'JAV 作品' },
   '/follow/item/:id': { title: '关注' },
   // 沉浸模式进页面组，不算覆盖。
   '/immerse': { nav: 'immerse', title: '沉浸模式' },

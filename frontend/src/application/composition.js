@@ -2,7 +2,7 @@
 import { loadingState, renderInitialSurfaceLoading } from './loading.js';
 import { clearHomeFeed, loadEntityShapes } from './feed.js';
 import { buildManageBar, closeStats, enterManagementSurface, loadSyncedSettings, mountManageHeader, mountSidebar, openManage, paintListTitle, scheduleStickySurfaces, showHomeSurfaces, showManagementBody, syncHeaderActions } from './layout.js';
-import { disposeStage, mediaState, openItem, openPlaylist, openQueue, openTok } from './media.js';
+import { disposeStage, mediaState, openItem, openJavMovie, openPlaylist, openQueue, openTok } from './media.js';
 import { currentBarsContext, entityState, openEntity, revealForIsland, routeEntityPage } from './entity.js';
 import { applyFilterStateInPlace, buildBars, catalogState, clearCatalogGrid, gridTaken, loadCatalog, onlineDefaultLoc, paintCatalogGrid, refreshFacetCounts, syncCatalogFilterScreen, toggleTag } from './catalog.js';
 import { openTasteSignal, routeReview } from './playlists.js';
@@ -37,7 +37,10 @@ compositionState.shellActions = {
   /* 点一个内容标签是「回目录并按它筛选」：整页换成目录仍归壳，页面只说点了哪个键。 */
   openTag:key=>{closeStats();toggleTag(key)},
   openTasteSignal,
-  navigate:path=>navigationState.navigatePath(path),
+  navigate:path=>{
+    const movie=/^\/jav\/movie\/([A-Za-z0-9_-]{2,64})$/.exec(path);
+    if(movie)void openJavMovie(movie[1]);else navigationState.navigatePath(path);
+  },
   openManage,
   managePath:section=>navigationState.routePathOf('section',section)||'',
   openFollow:()=>enterFollow(),
@@ -101,6 +104,7 @@ compositionState.shellActions = {
     }
     if(bootEntry())navigationState.initialOverlayOpened=true;
     if(target.kind==='item')void openItem(target.id,false);
+    else if(target.kind==='jav')void openJavMovie(target.code,false);
     else if(target.kind==='follow')void openFollowDetail(target.id,false);
     else void openQueue(target.queue,target.key,target.item,false);
   },

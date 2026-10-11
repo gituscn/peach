@@ -185,7 +185,8 @@ function RouteGroups({ children }: { children?: ReactNode }) {
 
         {/* ── 没有背景的覆盖地址 ── 作品与队列挂目录元素，补画网格；关注详情只让出 `#stats`。 */}
         {OVERLAY_PATHS.map((path) => (
-          <Route key={path} path={path} element={path === '/follow/item/:id' ? <FollowDetailGround /> : CATALOG_ROUTES['/'].element} />
+          <Route key={path} path={path} element={path === '/jav/movie/:code' ? null
+            : path === '/follow/item/:id' ? <FollowDetailGround /> : CATALOG_ROUTES['/'].element} />
         ))}
 
 

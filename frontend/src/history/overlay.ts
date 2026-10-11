@@ -15,25 +15,31 @@ import { matchPath } from 'react-router';
 export const OVERLAY_PATHS = [
   '/item/:id', '/mix/:seed/:item', '/parts/:seed/:item', '/editions/:seed/:item', '/playlists/:playlist/:item',
   '/follow/item/:id',
+  '/jav/movie/:code',
 ] as const;
 
 export type OverlayPath = typeof OVERLAY_PATHS[number];
 
-export type OverlayKind = 'item' | 'follow';
+export type OverlayKind = 'item' | 'follow' | 'jav';
 
 /** 一条覆盖地址要打开的那一条：作品详情、关注详情，或四种队列里的一条（`key` 是种子或播放列表）。 */
 export type OverlayTarget =
+  | { kind: 'jav'; code: string }
   | { kind: 'item' | 'follow'; id: number }
   | { kind: 'queue'; queue: 'mix' | 'parts' | 'editions' | 'playlist'; key: number; item: number };
 
 const QUEUES = { '/mix/:seed/:item': 'mix', '/parts/:seed/:item': 'parts', '/editions/:seed/:item': 'editions',
   '/playlists/:playlist/:item': 'playlist' } as const;
 
-/** 地址匹配哪一条覆盖路径；参数要全是数字，`/item/abc` 不算。 */
+/** 地址匹配哪一条覆盖路径；本地条目使用数字，库外作品使用有效番号。 */
 export function overlayMatch(pathname: string): { path: OverlayPath; target: OverlayTarget } | null {
   for (const path of OVERLAY_PATHS) {
     const match = matchPath(path, pathname);
     if (!match) continue;
+    if (path === '/jav/movie/:code') {
+      const code = match.params.code || '';
+      return /^[A-Za-z0-9_-]{2,64}$/.test(code) ? { path, target: { kind: 'jav', code } } : null;
+    }
     const values = Object.values(match.params);
     if (!values.every((value) => /^\d+$/.test(value ?? ''))) return null;
     const [first, second] = values.map(Number) as [number, number];
@@ -43,7 +49,7 @@ export function overlayMatch(pathname: string): { path: OverlayPath; target: Ove
   return null;
 }
 
-/** 地址要打开的那一条覆盖；不是覆盖地址或参数不是数字时是 null。 */
+/** 地址要打开的那一条覆盖；路径或身份参数无效时是 null。 */
 export const overlayTarget = (pathname: string): OverlayTarget | null => overlayMatch(pathname)?.target ?? null;
 
 export interface BackgroundLocation {
