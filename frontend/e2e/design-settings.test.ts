@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Browser, Page } from 'playwright-core';
 import { openFollowFeed } from './follow-fixture.ts';
-import { configurationBody, expectBody, requiredEnv, settle, visit, VIEWPORTS } from './harness.ts';
+import { requiredEnv, settle, visit, VIEWPORTS } from './harness.ts';
 import { openHome, openPanel, ORDER, PANEL, stubServer } from './settings-fixture.ts';
 import {
   DESKTOP, MOBILE, tokenColor, settledRun, openActivity, TASTE_CATEGORIES, TASTE_FACE, openTaste, openIndexPage,
@@ -276,42 +276,6 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
 
   /* ADR-0050：设置弹层只放一行一个值、改完就生效的控件；带「保存配置」的表单在配置页，
      要确认、要看进度的长任务在数据管理页，订阅源在关注管理页。 */
-  it('设置弹层「这台电脑」只有摘要卡，按钮直达配置页；媒体修复与订阅源都不在设置和配置页里', { timeout: 60_000 }, async () => {
-    const opened = await visit(browser, '/', DESKTOP);
-    try {
-      const { page } = opened;
-      await settle(page);
-      await page.locator('#settingsBtn').click();
-      const panel = page.locator('#settingsPanel');
-      await panel.getByRole('tab', { name: '这台电脑' }).click({ timeout: 10_000 });
-      const machine = panel.locator('#machineSettings');
-      const go = machine.getByRole('button', { name: '打开配置页', exact: true });
-      await go.waitFor({ state: 'visible', timeout: 10_000 });
-      assert.deepEqual(await machine.locator('dt').allTextContents(), ['媒体库', '端口', '更新']);
-      assert.equal(await machine.locator('input, textarea, select, form, [role="switch"], [aria-haspopup="listbox"]').count(), 0,
-        '摘要卡里出现了可编辑的控件');
-      assert.equal(await panel.locator('.ui-configpage').count(), 0, '设置弹层里又挂了一份配置页');
-      for (const text of ['媒体修复', '订阅源', '保持登录时间']) {
-        assert.equal(await panel.getByText(text, { exact: true }).count(), 0, `设置弹层里还有「${text}」`);
-      }
-
-      await go.click();
-      await expectBody(page, '/configuration', configurationBody(page));
-      assert.equal(new URL(page.url()).pathname, '/configuration');
-      assert.equal(await panel.isHidden(), true, '去配置页之后设置弹层没有关');
-      await settle(page);
-      for (const text of ['媒体修复', '订阅源']) {
-        assert.equal(await page.locator('#stats').getByText(text, { exact: true }).count(), 0, `配置页上还有「${text}」`);
-      }
-      const entry = page.locator('[data-manage-bar] [data-manage="configuration"]');
-      await entry.waitFor({ state: 'attached', timeout: 10_000 });
-      assert.equal(await entry.getAttribute('aria-pressed'), 'true', '管理菜单里的「配置」没有标成当前页');
-      assert.deepEqual(opened.problems, []);
-    } finally {
-      await opened.close();
-    }
-  });
-
   /* 设置面板：盖住整页的弹层与作品详情浮窗同一档遮罩、同一组进出场；遮罩不带模糊，值只来自 `--scrim`。
      动效要真跑起来才读得到关键帧名，这一条自建不减动态的上下文。 */
   it('设置面板的遮罩取 --scrim、不带模糊、压在最顶层，卡片用弹层那一组关键帧进出', { timeout: 60_000 }, async () => {
@@ -413,7 +377,7 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
       const glide = () => nav.locator('[data-settings-glide]').evaluate((node) => Math.round(node.getBoundingClientRect().top));
       const top = (name: string) => nav.getByRole('tab', { name, exact: true })
         .evaluate((node) => Math.round(node.getBoundingClientRect().top));
-      const selected = await nav.getByRole('tab', { name: '界面', exact: true }).evaluate((node) => {
+      const selected = await nav.getByRole('tab', { name: '外观与导航', exact: true }).evaluate((node) => {
         const style = getComputedStyle(node), icon = getComputedStyle(node.querySelector('svg')!);
         return { face: style.backgroundColor, ring: style.boxShadow, icon: [icon.width, icon.height, icon.fill === style.color, icon.stroke] };
       });
@@ -421,16 +385,16 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
       assert.equal(selected.ring, 'none');
       // Remix 的线条是 `fill` 画出的轮廓，全站默认的 `stroke:currentColor;fill:none` 会让它整枚消失。
       assert.deepEqual(selected.icon, ['20px', '20px', true, 'none']);
-      assert.equal(await glide(), await top('界面'), '玻璃没有落在当前项上');
+      assert.equal(await glide(), await top('外观与导航'), '玻璃没有落在当前项上');
 
-      await nav.getByRole('tab', { name: '播放', exact: true }).hover();
-      const target = await top('播放');
+      await nav.getByRole('tab', { name: '浏览与播放', exact: true }).hover();
+      const target = await top('浏览与播放');
       await page.waitForFunction(([want]) => Math.round(document.querySelector(
         '#settingsPanel [data-settings-glide]')!.getBoundingClientRect().top) === want, [target]);
-      assert.equal(await nav.getByRole('tab', { name: '界面', exact: true }).getAttribute('aria-selected'), 'true',
+      assert.equal(await nav.getByRole('tab', { name: '外观与导航', exact: true }).getAttribute('aria-selected'), 'true',
         '指针移上去就换了分区');
       await page.locator(`${PANEL} [data-settings-scroll]`).hover();
-      const home = await top('界面');
+      const home = await top('外观与导航');
       await page.waitForFunction(([want]) => Math.round(document.querySelector(
         '#settingsPanel [data-settings-glide]')!.getBoundingClientRect().top) === want, [home]);
       assert.deepEqual(opened.problems, []);

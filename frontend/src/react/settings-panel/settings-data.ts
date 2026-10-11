@@ -1,4 +1,4 @@
-/* 设置面板的三份服务端数据，各一个 Query 键。
+/* 设置偏好与服务配置的三份服务端数据，各一个 Query 键。
  *
  * - `['settings']`：跟账本走、所有访问端同一份的那几项（`/api/settings`，`src/peach/web_settings.py`）。
  *   面板每次打开都重取一次，取回来交给壳对账（`host.syncRemote`）：界面偏好的真相仍是壳里那一份
@@ -6,13 +6,11 @@
  * - `['follow-schedule']`：这台机器上关注自动更新的档位与上次运行状态。
  * - `['thumbnail-jobs']`：视频缩略图采集的档位与状态。档位跟着机器走，不存在浏览器里。
  *
- * 面板常驻不卸载，缓存默认挂载不重取（`../query.ts`），所以每次打开面板都由它自己重取一遍。 */
+ * 面板常驻不卸载，每次打开重取设置；服务配置在挂载时重取各自的数据。 */
 import { useMutation, type QueryClient } from '@tanstack/react-query';
 
 import { apiGet, apiSend } from '../../api';
-import { errorHeadline } from '../activity/tasks';
 import { queryClient } from '../query';
-import { localTime } from '../time';
 
 export const SETTINGS_URL = '/api/settings';
 export const FOLLOW_SCHEDULE_URL = '/api/follow/schedule';
@@ -58,15 +56,8 @@ export const fetchFollowSchedule = (signal?: AbortSignal) =>
 export const fetchThumbnailJobs = (signal?: AbortSignal) =>
   apiGet<ThumbnailJobStatus>(THUMBNAIL_JOBS_URL, signal);
 
-/** 打开面板那一下：三份都按服务端此刻的值重取，在途的那一趟直接复用。返回账本那一份，
- *  取不到时是 null——失败由两行机器状态各自显示，账本那份取不到就不对账。 */
+/** 打开偏好弹窗时重取共享设置；采集状态由服务配置中的控件读取。 */
 export function refreshPanelData(client: QueryClient = queryClient): Promise<SyncedSettings | null> {
-  void client.fetchQuery({
-    queryKey: FOLLOW_SCHEDULE_KEY, queryFn: ({ signal }) => fetchFollowSchedule(signal), staleTime: 0,
-  }).catch(() => null);
-  void client.fetchQuery({
-    queryKey: THUMBNAIL_JOBS_KEY, queryFn: ({ signal }) => fetchThumbnailJobs(signal), staleTime: 0,
-  }).catch(() => null);
   return client.fetchQuery({
     queryKey: SETTINGS_KEY, queryFn: ({ signal }) => fetchSettings(signal), staleTime: 0,
   }).catch(() => null);
@@ -93,23 +84,4 @@ export function useSaveThumbnailMode() {
     mutationFn: (mode: string) => apiSend<ThumbnailJobStatus>(THUMBNAIL_JOBS_URL, { mode }),
     onSuccess: (status) => queryClient.setQueryData(THUMBNAIL_JOBS_KEY, status),
   });
-}
-
-export function followScheduleCopy(status: FollowScheduleStatus): string {
-  if (!status.available) return '只在账本写入端运行';
-  if (status.running) return '正在检查全部来源…';
-  // 面板里一行说明放不下整段堆栈，只说异常那一行；全文在活动页这一轮的卡片里。
-  if (status.last_error) return `上次失败：${errorHeadline(status.last_error)}`;
-  if (status.last_finished_at) return `上次完成 ${localTime(status.last_finished_at)} · 新增 ${(status.last_added || 0).toLocaleString()}`;
-  if (status.next_run_at) return `下次 ${localTime(status.next_run_at)}`;
-  return status.enabled ? '等待首次运行' : '已关闭';
-}
-
-export function videoThumbnailCopy(status: ThumbnailJobStatus): string {
-  if (status.status === 'running') return '正在采集，进度在活动页查看。';
-  if (status.status === 'failed') return `上一轮采集停下了：${errorHeadline(status.stopped) || '原因未取得'}`;
-  if (status.status === 'complete') return status.stopped ? '上一轮采集已按停。' : '上一轮采集已完成。';
-  return status.mode === 'off'
-    ? '关闭时不采集；已经生成的图留在盘上，清理走数据管理页。'
-    : '选定档位后从最近看过的片子开始采集。';
 }
