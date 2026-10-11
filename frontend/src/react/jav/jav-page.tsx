@@ -66,8 +66,9 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
   const all = discoveries.data?.items || [];
   const tags = [...new Set(all.flatMap(item => item.tags || []))];
   const items = all.filter(item => (!tag || item.tags?.includes(tag)) &&
-    (!query || [item.code, item.title, item.performers, item.studio, ...(item.tags || []), ...(item.performer_refs || []).map(ref => ref.name)].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase())))
-    .sort((a, b) => (sort === 'release' ? (a.release_date || '').localeCompare(b.release_date || '') : (a.score || 0) - (b.score || 0)) * (ascending ? 1 : -1));
+    (!query || [item.code, item.title, item.performers, item.studio, ...(item.tags || []), ...(item.performer_refs || []).map(ref => ref.name)].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase())));
+  if (sort === 'release') items.sort((a, b) => (a.release_date || '').localeCompare(b.release_date || '') * (ascending ? 1 : -1));
+  else if (ascending) items.reverse();
   const waiting = discoveries.isPending;
   return <section ref={section} aria-label="为你推荐" aria-busy={waiting} className="flex min-w-0 flex-col gap-4">
     <FilterGlassRows label="发现筛选与排序" topLabel="发现范围与标签" attrs={{ 'data-filter-frame': '', 'data-jav-filter': '' }}
@@ -99,7 +100,7 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
       }}>
         <a href={item.asset_id ? `/item/${item.asset_id}` : `/jav/movie/${encodeURIComponent(item.code)}`} aria-label={`查看 ${item.code} 详情`}
           onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate(event.currentTarget.getAttribute('href')!) } }}
-          data-media-pic="" data-jav-cover="" className="relative inline-grid place-items-center overflow-hidden rounded-2lg bg-background-tertiary-default">
+          data-media-pic="" data-jav-cover-box="" className="relative inline-grid place-items-center overflow-hidden rounded-2lg bg-background-tertiary-default">
           <span className="text-text-secondary">无封面</span>
           <span className="contents" dangerouslySetInnerHTML={{ __html: discoveryArtwork(item, layout, settings.value.javImage) }} />
         </a>

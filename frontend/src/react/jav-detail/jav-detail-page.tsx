@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { RiExternalLinkLine } from '@remixicon/react';
 import { entityPath, icon } from '@peach/legacy/core';
 import { coverUrl } from '@peach/card-art';
 import { feedIdentity } from '../../card-art/feed-identity';
@@ -77,7 +78,7 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
         <Button variant="secondary" disabled={readOnly} aria-pressed={!!wantId} {...busyProps(!!want.busy)} onClick={toggleWant}>{wantId ? '取消想要' : '想要'}</Button>
         <Button variant="primary" onClick={() => setDownload({ code: item.code, title: item.title, performers: item.performers,
           studio: item.studio, release_date: item.release_date, origin: `jav:${item.code}` })}>查找资源</Button>
-        {item.source_url ? <ButtonLink href={item.source_url} target="_blank" rel="noreferrer" variant="secondary">JavDB</ButtonLink> : null}
+        {item.source_url ? <ButtonLink href={item.source_url} target="_blank" rel="noreferrer" variant="secondary" trailingIcon={RiExternalLinkLine}>作品来源</ButtonLink> : null}
       </div>
       {want.error ? <Note tone="error">{want.error}</Note> : null}
       <Reviews code={item.code} count={item.comments_count} />

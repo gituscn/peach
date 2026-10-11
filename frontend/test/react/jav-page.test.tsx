@@ -37,13 +37,14 @@ it('发现按范围读取，清除文字和标签恢复列表，卡片打开对�
     release_date: '2010-01-01', wanted: false, reasons: ['常看的厂牌：厂牌'] };
   const fetcher = vi.fn(async (url: string) => ({ ok: true, status: 200, json: async () => ({
     items: url.includes('scope=library') ? [{ ...common, id: 22, asset_id: 22, code: 'ABC-022', tags: ['恋足'] }]
-      : [{ ...common, id: 1, code: 'ABC-001', tags: ['恋足'], link: 'https://example.test/work' },
-        { ...common, id: 2, code: 'ABC-002', tags: ['剧情'] }],
+      : [{ ...common, id: 1, code: 'ABC-001', score: 1, tags: ['恋足'], link: 'https://example.test/work' },
+        { ...common, id: 2, code: 'ABC-002', score: 2, tags: ['剧情'] }],
   }) }));
   vi.stubGlobal('fetch', fetcher);
   const host = await mount(<QueryClientProvider client={queryClient}><JavPage tab="discover" readOnly navigate={navigate} receipt={vi.fn()} /></QueryClientProvider>);
   await settle();
   expect(host.querySelectorAll('[data-jav-card]')).toHaveLength(2);
+  expect(host.querySelector('[data-jav-card] h3')?.textContent).toContain('ABC-001');
   await click(host.querySelector('[data-jav-card] [data-media-tag]'));
   expect(host.querySelectorAll('[data-jav-card]')).toHaveLength(1);
   await click(buttonNamed('清除筛选', host));
