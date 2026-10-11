@@ -3,12 +3,13 @@ import { fetchTaste, tasteKey } from '../taste/taste';
 import { apiGet } from '../../api';
 import { queryClient } from '../query';
 import { fetchWants, WANTS_KEY } from '../wants/wants';
+import type { FaceRef } from '@peach/card-art';
 
 export { JAV_TABS, javTab, javPath, javLibraryPath } from './jav-navigation';
 export interface Discovery {
   id: number; code: string; title: string; performers: string; release_date: string;
   studio: string; link: string; cover_url: string; has_cover: boolean; wanted: boolean;
-  performer_refs?: { id: number; name: string }[];
+  performer_refs?: (FaceRef & { id: number; name: string })[];
 }
 
 export async function prefetchJav(tab: string, signal: AbortSignal) {

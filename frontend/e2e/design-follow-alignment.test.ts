@@ -10,6 +10,24 @@ describe('关注与馆藏共用卡片交互', () => {
   before(async () => { browser = await launch() });
   after(async () => { await browser.close() });
 
+  for (const viewport of VIEWPORTS) it(`${viewport.name}：关注标题在等待与内容态采用相同几何`, async () => {
+    const opened = await openFollowFeed(browser, '/follow', viewport);
+    try {
+      opened.stub.hold = () => true;
+      await opened.page.reload({ waitUntil: 'domcontentloaded' });
+      const title = opened.page.locator('[data-follow-title]');
+      await title.waitFor();
+      const read = () => title.evaluate(node => {
+        const style = getComputedStyle(node), box = node.getBoundingClientRect();
+        return { size: style.fontSize, line: style.lineHeight, height: box.height, left: box.left };
+      });
+      const pending = await read();
+      await opened.stub.release();
+      await opened.page.locator('[data-follow-list] > [data-follow-item]').first().waitFor();
+      assert.deepEqual(await read(), pending);
+    } finally { await opened.stub.release(); await opened.close() }
+  });
+
   it('创作者头像悬停显示描边，键盘焦点可见', async () => {
     const opened = await openFollowFeed(browser, '/follow', VIEWPORTS[0]!, { bindAuthors: true });
     try {

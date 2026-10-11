@@ -7,8 +7,9 @@
  * 每次打开前再铺；屏幕上已经是同一张骨架就不重画。
  *
  * 版式偏好由调用方读好交进来：这个模块壳与 React 包各带一份，设置 store 只能有一份。 */
-import { boardTabsHtml, fitSkeleton, iconSwitchHtml, indexSkeletonHtml, searchInputHtml } from '@peach/legacy/ui';
+import { boardTabsHtml, fitSkeleton, iconSwitchHtml, indexSkeletonHtml } from '@peach/legacy/ui';
 import { identityFilterSkeletonHtml } from './identity-filter';
+import { islandSearchInput } from './island-skeleton';
 
 export type IndexPageKind = 'performers' | 'creators' | 'studios' | 'agencies' | 'tags';
 
@@ -63,10 +64,10 @@ export function indexPlaceholderHtml({ kind, q, scope, view, category }: IndexPa
   const title = INDEX_TITLES[kind] || '标签', people = kind !== 'tags', company = kind === 'studios' || kind === 'agencies';
   const switcher = people
     ? iconSwitchHtml('people-layout', title + '索引版式', company ? COMPANY_LAYOUTS : PEOPLE_LAYOUTS, layout) : '';
-  return `<div class="ihead">
+  return `<div class="ihead peach-react">
       <h2 class="disp indexheading">${title}</h2>
       ${people ? '<span class="mono" id="indexCount"><span class="countskeleton"></span></span>' : ''}${switcher}
-      ${searchInputHtml({ label: '过滤' + title, value: q || '' })}
+      <div data-index-search class="ml-auto min-w-35 max-w-80 flex-1 max-board-narrow:order-1 max-board-narrow:basis-40">${islandSearchInput('', q, '过滤' + title)}</div>
     </div>
     ${kind === 'tags' ? tabs(INDEX_SCOPES, scope, '词表') : kind === 'performers' || kind === 'creators'
       ? tabs(PEOPLE_INDEX_TABS, kind === 'performers' && scope === 'online' ? 'online' : kind, '人物名册')

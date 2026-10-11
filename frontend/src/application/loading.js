@@ -127,14 +127,14 @@ export function installLoading3() {
 followState.followContentSkeletonHtml = (media=new URLSearchParams(location.search).get('media')==='images'?'images':'videos',
   label='正在读取关注内容')=>pageSkeletonHtml(label,{cards:true,className:'follow-content-skeleton postercard-skeleton',
   gridClass:media==='images'?'followlist followphotowall':'',gridSize:photoSize()});
-followState.followSkeletonHtml = (label='正在读取关注内容')=>`<div class="follow">
-  <div class="followhead"><h2 class="pagetitle">关注</h2></div>
+followState.followSkeletonHtml = (label='正在读取关注内容')=>`<div class="peach-react"><div class="follow" data-follow-feed>
+  <div data-follow-head><h2 data-follow-title>关注</h2></div>
   <div class="tier followauthors" data-skeleton-tier="av"></div>
   <div class="tier followworks" data-skeleton-tier="brandpill"></div>
   <div class="board-filter-frame" data-filter-frame>
     <div class="tagbar followfilters" data-filter-row="top" data-skeleton-tier="pill"></div>
     <div class="count followcount" data-filter-row="bottom"><span class="mono"><span class="countskeleton"></span></span></div></div>
-  ${followState.followContentSkeletonHtml(undefined,label)}</div>`;
+  ${followState.followContentSkeletonHtml(undefined,label)}</div></div>`;
 $('#loadSentinel').innerHTML=loadingDotsHtml('继续载入中…');
 loadingState.setGridCards = html=>revealSkeleton($('#grid'),()=>{$('#grid').innerHTML=`<div class="grid">${html}</div>`});
 loadingState.gridCards = ()=>document.querySelectorAll(

@@ -72,7 +72,7 @@ describe('管理区页头', () => {
   before(async () => { browser = await launch(); });
   after(async () => { await browser?.close(); });
 
-  it('管理页标题在内容左上角，导航同列，回收站说明按正文宽度居中', { timeout: 180_000 }, async () => {
+  it('管理页标题、导航与正文同宽居中', { timeout: 180_000 }, async () => {
     const opened = await visit(browser, '/stats', WIDE);
     try {
       for (const [path, title, crumb] of HEADS) {
@@ -84,8 +84,8 @@ describe('管理区页头', () => {
         const [left, width] = head.columns[0]!;
         const [start, end] = head.main;
         assert.ok(head.titleFirst, `${path} 标题没有位于导航之前`);
-        assert.equal(left, Math.round(start), `${path} 页头没有对齐内容左边缘`);
-        assert.equal(width, Math.round(end - start), `${path} 页头没有使用内容宽度`);
+        assert.equal(width, Math.min(1120, Math.round(end - start)), `${path} 页头没有使用正文宽度`);
+        assert.ok(Math.abs((left - start) - (end - left - width)) <= 1, `${path} 页头没有与正文居中对齐`);
         if (head.lede) {
           const [ledeLeft, ledeWidth] = head.lede;
           assert.equal(Math.round(ledeWidth), Math.min(1120, Math.round(end - start)));

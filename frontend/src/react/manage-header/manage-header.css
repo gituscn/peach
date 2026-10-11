@@ -1,6 +1,6 @@
 /* 管理区页头（常驻面 `manage-header`，`frontend/src/react/manage-header/`）：管理条、面包屑、页面标题与回收站说明行。
  *
- * 标题与导航对齐内容左上角，回收站说明行跟随正文的 `--board-content` 宽度。
+ * 标题、导航与说明行跟随正文的 `--board-content` 宽度。
  * `peach-app.css` 先于 `/app.css` 加载，遗留层里同权重的规则会压过这里，所以选择器都比遗留层的
  * 元素规则多一级。与遗留层同名的类一条不写（`test/legacy-class-names.test.ts`）；扫光占位沿用全站的
  * `.skeleton`，只在这里定尺寸与底色。 */
@@ -11,7 +11,7 @@
 /* ── 管理条 ──
    一排页面去处，当前项使用中性填充。超宽时横滚，
    两端渐隐与滚轮转横向由壳的横滚层清单接（`src/ui-kit/scroll.ts` 的 `BOARD_EDGE_SCROLLERS`）。 */
-[data-manage-bar]{display:block;max-width:none;margin-top:0;margin-bottom:24px}
+[data-manage-bar]{display:block;margin-top:0;margin-bottom:24px}
 [data-manage-menu]{position:relative;display:flex;flex-wrap:nowrap;gap:4px;margin:0;padding:0;overflow-x:auto;scrollbar-width:none}
 [data-manage-menu]::-webkit-scrollbar{display:none}
 [data-manage-menu]>button{position:relative;display:inline-flex;flex:none;align-items:center;gap:7px;margin:0;padding:8px 12px;min-height:36px;border:0;border-radius:var(--control-radius);background:none;color:var(--ink-2);font-size:14px;font-weight:400;white-space:nowrap;cursor:pointer}
@@ -22,7 +22,7 @@
 /* ── 面包屑 ──
    Geist Breadcrumbs（vercel.com/geist/breadcrumbs 实测）：上一级与分隔符 `--muted`、当前页 `--ink`，
    悬停同样升亮；分隔符是 16px chevron，钉在 `--muted` 上不随当前项提亮；项与项、字与分隔符都留 6px。 */
-[data-manage-crumb]{display:block;max-width:none;margin-top:0;margin-bottom:12px}
+[data-manage-crumb]{display:block;margin-top:0;margin-bottom:12px}
 [data-manage-crumb] ol{display:flex;align-items:center;gap:6px;margin:0;padding:0;list-style:none}
 [data-manage-crumb] li{display:flex;align-items:center;gap:6px;font-size:var(--fs-md);line-height:20px;color:var(--muted);transition:color .2s ease}
 [data-manage-crumb] li[aria-current]{color:var(--ink)}
@@ -32,7 +32,7 @@
 
 /* ── 页面标题 ──
    字形同全站页面标题（Board Title，窄屏 Board Figure）；正文是 812px 窄列的那几页在窄屏上再收一档。 */
-h2[data-manage-title]{max-width:none;margin-top:0;margin-bottom:24px;font:var(--board-title);letter-spacing:0}
+h2[data-manage-title]{margin-top:0;margin-bottom:24px;font:var(--board-title);letter-spacing:0}
 @media(max-width:760px){
   h2[data-manage-title]{font:var(--board-figure)}
   h2[data-manage-title][data-compact]{font-size:22px}

@@ -1,13 +1,13 @@
 /* 关注页（`follow-feed-page.tsx`、`follow-card.tsx`）。
  *
- * 取值同遗留层：页头与两排取 `web/css/21-online.css` 的 `.follow`／`.followhead`／`.followauthors`／
+ * 取值同遗留层：页头与两排取 `web/css/21-online.css` 的 `.follow`／`.followauthors`／
  * `.followworks` 与 `web/board.css` 对 `.av`、`.brandpill` 的覆盖；卡片在作品卡（`../components/
  * media-card.css`）之上补关注卡自己多出来的几格，取 `21-online.css` 的 `.followitem` 一族。筛选浮层、
  * 状态药丸、读数与排序键、交集条与资料页那一块同一套（`../entity-filter/entity-filter.css`），这里只补
  * 来源图标键、类型色标签、「仅显示图片」键与页脚那一行。
  *
  * 进页整块骨架由壳的 `followSkeletonHtml` 画，用的是遗留类名（`.follow`、`.tier`、`.board-filter-frame`），
- * 几何仍归遗留样式表；这里的高度、内边距要和它对上，骨架换成真内容时版面不跳。
+ * 页头几何共用本文件的 `data-follow-head`、`data-follow-title`；其余骨架由共享布局样式占位。
  *
  * 选择器全用 `data-*`：遗留样式表不分层、排在后面，写遗留类名会被接管。 */
 

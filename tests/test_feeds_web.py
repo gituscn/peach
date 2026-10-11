@@ -7,6 +7,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -407,7 +408,16 @@ class FeedWebTest(FeedWebFixture):
         self.assertEqual(item["title"], "SSIS-950 的标题")
         self.assertEqual(item["studio"], "示例厂牌")
         self.assertEqual(item["performers"], "深田えいみ")
-        self.assertEqual(item["performer_refs"], [{"id": 1, "name": "深田えいみ"}])
+        self.assertEqual(item["performer_refs"], [{"id": 1, "name": "深田えいみ", "has_image": False}])
+        focus = {"axis": "y", "pct": 20}
+        with (patch.object(WebContract, "has_entity_image", return_value=True),
+              patch.object(WebContract, "entity_image_version", return_value="face-v1"),
+              patch.object(WebContract, "avatar_focus", return_value=focus)):
+            pictured = dispatch_api_get(self.contract, "/api/feeds/discoveries", {})["items"]
+        self.assertEqual(pictured[0]["performer_refs"], [{
+            "id": 1, "name": "深田えいみ", "has_image": True,
+            "image_version": "face-v1", "avatar_focus": focus,
+        }])
         # 壳只认已有的人，不新建实体；关联上了人物页那一块才看得到。
         self.assertEqual(len(dispatch_api_get(
             self.contract, "/api/feeds/discoveries", {"entity": 1})["items"]), 2)

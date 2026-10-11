@@ -3,6 +3,7 @@
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Heading } from 'react-aria-components';
+import { RiCloseLine } from '@remixicon/react';
 
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
@@ -54,8 +55,9 @@ function Body({ prefill, close, receipt, provider }: {
   });
   const data = query.data;
   const header = (
-    <div className="flex flex-col gap-1 px-5 pt-5">
+    <div className="flex items-center justify-between gap-4 px-5 pt-5">
       <Heading slot="title" className="text-title-2-semibold text-text-primary">查找资源</Heading>
+      <Button variant="ghost" iconOnly leadingIcon={RiCloseLine} aria-label="关闭资源面板" onClick={close} />
     </div>
   );
   if (data) {

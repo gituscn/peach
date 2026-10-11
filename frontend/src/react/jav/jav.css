@@ -1,0 +1,18 @@
+/* 推荐卡复用馆藏的悬停、封面和身份头像；文字区和操作区保持同一排版高度。 */
+.peach-react [data-jav-card] { align-self: stretch; gap: 12px; cursor: default; }
+.peach-react [data-jav-cover] { aspect-ratio: 1.6; }
+.peach-react [data-jav-skeleton-avatar],
+.peach-react [data-jav-skeleton-actions] { height: 36px; }
+.peach-react [data-jav-title] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  min-height: 40px;
+  margin: 0;
+  font: var(--board-body-medium);
+}
+.peach-react [data-jav-identity] { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 40px; }
+.peach-react [data-jav-identity] [data-media-avatars] { max-width: 50%; }
+.peach-react [data-jav-actions] { margin-top: auto; }

@@ -1,7 +1,5 @@
 /* ── 在线追更 ── */
 .follow{padding:4px 0 42px}
-.followhead{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:20px}
-.followhead .pagetitle{margin:0}
 /* 这个文件只剩进页骨架（`followContentSkeletonHtml`）在用；页面本身归 `follow-feed` 岛
    （`frontend/src/react/follow-feed/follow-feed.css`，卡上的站点图标、版本字样与另见徽章也在那里），
    详情归 `follow-detail` 岛（`frontend/src/react/follow-detail/follow-detail.css`）。 */
@@ -13,7 +11,7 @@
 @media (max-width:1400px){.followlist.followphotowall{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media (max-width:1000px){.followlist.followphotowall{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .followphotowall[data-images-only="true"] .skeletoncard :is(b,em){display:none}
-@media (max-width:640px){.followhead{align-items:center}
+@media (max-width:640px){
   .followauthors{margin-right:-12px;padding-top:3px}
   .followlist.followphotowall{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 8px}
 }

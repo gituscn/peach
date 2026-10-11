@@ -509,7 +509,8 @@ def q_feed_discoveries(contract, args) -> dict:
             for name in re.split(r"[,，、;/]", row["performers"] or ""):
                 found = identities.get(name.strip())
                 if found and found["id"] not in {ref["id"] for ref in refs}:
-                    refs.append({"id": int(found["id"]), "name": found["canonical_name"]})
+                    refs.append(web_catalog.entity_ref(
+                        contract, "performer", int(found["id"]), found["canonical_name"]))
             performers[int(row["id"])] = refs
     more = len(rows) > limit
     # 最近一轮取新作资料里封面断在连接上的部数。只看最近这一轮：换了线路之后下一轮取到，
