@@ -25,7 +25,7 @@ import {
 
 import { managementSkeletonHtml, paintManagementPlaceholder } from '../../../management-placeholder';
 import { isReviewCategory } from '../../review/review';
-import { javTab } from '../../jav/jav';
+import { javLibraryPath, javTab } from '../../jav/jav';
 import { ShellActionsContext, useOpenEpoch } from '../router';
 import type { ManagedOpenProps, ManagedPath, ShellActions } from '../shell-actions';
 
@@ -128,6 +128,9 @@ const SCROLL_ALWAYS = new Set<ManagedPath>(['/stats', '/taste']);
 const SCROLL_WHEN_CURRENT = new Set<ManagedPath>(['/review', '/quality-goals', '/activity', '/follow-manage']);
 
 async function openPage(path: ManagedPath, actions: ShellActions, run: Run): Promise<void> {
+  if (path === '/jav' && javTab(search().get('tab')) === 'library') {
+    peachHistory.replace(javLibraryPath(window.location.search)); return;
+  }
   if (path === '/follow-manage' && search().get('tab') === 'wants') {
     shellNavigate('/jav?tab=wants', { replace: true }); return;
   }

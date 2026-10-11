@@ -41,7 +41,7 @@ const statsInventoryTab = (page: Page): Locator =>
   page.locator('#stats').getByRole('tab', { name: /^馆藏视频/ });
 
 const ROUTES: readonly Route[] = [
-  { path: '/jav', body: page => [heading(page, '#stats', 'JAV'), page.getByRole('tab', { name: '我的馆藏', exact: true, selected: true })] },
+  { path: '/jav', body: page => [heading(page, '#javLibraryHeader', 'JAV'), page.getByRole('tab', { name: '我的馆藏', exact: true, selected: true }), page.locator('#grid [data-media-card]:visible, #grid [data-media-empty]:visible').first()] },
   { path: '/jav?tab=discover', body: page => [heading(page, '#stats', 'JAV'), page.getByRole('tab', { name: '发现', exact: true, selected: true }), page.getByText('暂无匹配口味的新作', { exact: true })] },
   { path: '/jav?tab=wants', body: page => [heading(page, '#stats', 'JAV'), page.getByRole('tab', { name: '想要', exact: true, selected: true }), page.getByText('还没有想要的作品', { exact: true })] },
   { path: '/', body: (page) => [page.locator('#grid [data-media-card]').first()] },

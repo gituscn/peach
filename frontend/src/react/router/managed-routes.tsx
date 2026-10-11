@@ -108,7 +108,7 @@ export const MANAGED_ROUTES: ManagedRouteTable = {
   '/jav': {
     element: <ManagedMatch path="/jav" />,
     prefetch: (open, signal) => prefetchJav(open.tab, signal),
-    page: (open, actions) => <JavPage {...open} navigate={actions.navigate} receipt={message => actions.receipt(message)} grid={actions.grid} />,
+    page: (open, actions) => <JavPage {...open} navigate={actions.navigate} receipt={message => actions.receipt(message)} />,
   },
   '/stats': {
     element: <ManagedMatch path="/stats" />,

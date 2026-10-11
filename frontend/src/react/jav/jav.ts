@@ -1,13 +1,17 @@
 import type { TasteData } from '../taste/taste';
 import { fetchTaste, tasteKey } from '../taste/taste';
-import { appSettingsStore } from '@peach/appearance';
 import { apiGet } from '../../api';
 import { queryClient } from '../query';
-import { catalogKey, catalogParams, fetchCatalogPage, nextOffset } from '../catalog-grid/catalog-grid';
 import { fetchWants, WANTS_KEY } from '../wants/wants';
 
 export const JAV_TABS = [['library', '我的馆藏'], ['discover', '发现'], ['wants', '想要']] as const;
 export const javTab = (value: string | null) => JAV_TABS.some(([key]) => key === value) ? value! : 'library';
+export const javPath = (tab: string) => javTab(tab) === 'library' ? '/?jav=1' : `/jav?tab=${tab}`;
+export function javLibraryPath(search: string) {
+  const params = new URLSearchParams(search);
+  params.delete('tab'); params.set('jav', '1');
+  return '/?' + params;
+}
 export interface Discovery {
   id: number; code: string; title: string; performers: string; release_date: string;
   studio: string; link: string; cover_url: string; has_cover: boolean; wanted: boolean;
@@ -23,12 +27,6 @@ export async function prefetchJav(tab: string, signal: AbortSignal) {
       queryClient.fetchQuery({ queryKey: ['jav-discoveries'], queryFn: () => apiGet<{ items: Discovery[] }>('/api/feeds/discoveries?limit=100', signal) }),
     ]); return;
   }
-  const settings = appSettingsStore().value;
-  const batch = settings.batchSize || 60;
-  const params = catalogParams({ jav: '1', q: '', sort: settings.defaultSort, dir: settings.defaultSortDirection || '' }, true);
-  // 每批数量对应独立的分页缓存，页码和下一批偏移使用同一数量。
-  await queryClient.fetchInfiniteQuery({ queryKey: catalogKey(params, batch), initialPageParam: 0,
-    queryFn: ({ pageParam }) => fetchCatalogPage(params, pageParam, batch, false, signal), getNextPageParam: nextOffset(batch) });
 }
 
 /** 推荐只来自作品的真实出演者与口味榜单中的同名信号。 */

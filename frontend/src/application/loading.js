@@ -14,6 +14,7 @@ import { navigationState, paintNav } from './navigation.js';
 import { indexParams, paintIndexSkeleton } from './../index-skeleton';
 import { showEntityLoading } from './entity.js';
 import { routeMetaOf } from './../history/route-meta';
+import { javTab } from '../react/jav/jav';
 export const loadingState = { setGridCards: undefined, gridCards: undefined, managementPlaceholder: undefined, wantsDiscoveryBars: undefined, entityShapesReady: undefined, ENTITY_SHAPES_WAIT: undefined, syncPageTitle: undefined };
 
 export function renderCatalogLoading(label='正在读取作品'){
@@ -82,6 +83,9 @@ export function renderInitialSurfaceLoading(){
        「还在跑」，这里要说的是「等下会出现几张什么形状的卡」，所以用目录骨架。 */
     renderCatalogLoading('正在读取垃圾文件');
     return;
+  }
+  if(path==='/jav'&&javTab(new URLSearchParams(location.search).get('tab'))==='library'){
+    renderCatalogLoading('正在读取馆藏');return;
   }
   /* 管理区、播放列表页与关注页的占位由各页面接手。 */
   if(navigationState.managedPagePath(path)){

@@ -1,27 +1,26 @@
-import { act } from 'react';
-import { afterEach, expect, it, vi } from 'vitest';
-import { appSettingsStore } from '../../src/appearance';
-import { JavPage } from '../../src/react/jav/jav-page';
-import { mount } from './render';
+import { expect, it, vi } from 'vitest';
+import { JavHeader } from '../../src/react/jav/jav-header';
+import { buttonNamed, click, mount } from './render';
 
-vi.mock('../../src/react/catalog-grid/catalog-grid-page', () => ({
-  CatalogGridPage: (props: Record<string, unknown>) => <div data-grid={JSON.stringify(props)} />,
-}));
+it('JAV 分区导航保留三个入口，馆藏使用目录搜索', async () => {
+  const navigate = vi.fn(), find = vi.fn();
+  const host = await mount(<JavHeader tab="library" navigate={navigate} find={find} />);
+  const tabs = [...host.querySelectorAll('[role="tab"]')];
+  expect(tabs.map(tab => tab.textContent?.trim())).toEqual(['我的馆藏', '发现', '想要']);
+  expect(tabs[0]?.getAttribute('aria-selected')).toBe('true');
+  expect(host.querySelector('input')).toBeNull();
+  await click(tabs[1]);
+  expect(navigate).toHaveBeenLastCalledWith('/jav?tab=discover');
+  await click(tabs[2]);
+  expect(navigate).toHaveBeenLastCalledWith('/jav?tab=wants');
+  await click(buttonNamed('查找资源', host));
+  expect(find).toHaveBeenCalledOnce();
+});
 
-const store = appSettingsStore();
-const initial = { batchSize: store.value.batchSize, groupCollapse: store.value.groupCollapse,
-  seekSeconds: store.value.seekSeconds, javLayout: store.value.javLayout, javImage: store.value.javImage };
-afterEach(async () => { await act(async () => { Object.assign(store.value, initial); store.save() }) });
-
-it('JAV 馆藏读取浏览偏好，修改后立即更新网格并使用对应分页缓存', async () => {
-  Object.assign(store.value, { batchSize: 24, groupCollapse: false, seekSeconds: 45, javLayout: 'big', javImage: 'cover' });
-  const grid = {} as Parameters<typeof JavPage>[0]['grid'];
-  grid.helpers = {} as typeof grid.helpers;
-  grid.actions = {} as typeof grid.actions;
-  const host = await mount(<JavPage tab="library" readOnly={false} navigate={vi.fn()} receipt={vi.fn()} grid={grid} />);
-  expect(host.querySelector('h2')?.textContent).toBe('JAV');
-  const props = () => JSON.parse(host.querySelector('[data-grid]')!.getAttribute('data-grid')!);
-  expect(props()).toMatchObject({ batchSize: 24, revision: 24, groupCollapse: false, seekSeconds: 45 });
-  await act(async () => { Object.assign(store.value, { batchSize: 12, groupCollapse: true, javLayout: 'small' }); store.save() });
-  expect(props()).toMatchObject({ batchSize: 12, revision: 12, groupCollapse: true, layout: { size: 'small' } });
+it('从想要分区返回馆藏时打开 JAV 目录', async () => {
+  const navigate = vi.fn();
+  const host = await mount(<JavHeader tab="wants" navigate={navigate} find={vi.fn()} />);
+  expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim()).toBe('想要');
+  await click(host.querySelector('[role="tab"]'));
+  expect(navigate).toHaveBeenCalledWith('/?jav=1');
 });
