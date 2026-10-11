@@ -7,6 +7,7 @@
 import { act } from 'react';
 import { notifyManager, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, expect, it, vi } from 'vitest';
+import { MEDIA_SOURCE_ICONS } from '@peach/legacy/ui';
 
 import { queryClient } from '../../src/react/query';
 import { shortCount } from '../../src/react/charts/bar-card';
@@ -130,6 +131,8 @@ it('库存那一层每个来源一圈，图例用来源的界面名称', async (
   const tiles = [...charts[0]!.closest('section')!.querySelectorAll('button')];
   expect(tiles.map((tile) => tile.querySelector('span')?.textContent)).toEqual(['本地', '115']);
   expect(tiles.map((tile) => tile.querySelector('b')?.textContent)).toEqual(['3', '1']);
+  expect(tiles[1]!.querySelector('svg use')?.getAttribute('href')).toBe(`#i-${MEDIA_SOURCE_ICONS['115']}`);
+  expect(charts[1]!.closest('section')!.querySelector('button svg use')?.getAttribute('href')).toBe('#i-film');
 });
 
 it('满圈是最长那段的 1.1 倍，圈数越多每圈越细', () => {
@@ -145,6 +148,7 @@ it('点图例把那一段钉住，读数跟着换；再点一次放开', async (
   await click(tile);
   expect(tile.getAttribute('aria-pressed')).toBe('true');
   expect(card.querySelector('h3')?.textContent).toBe('115');
+  expect(card.querySelector('h3 svg use')?.getAttribute('href')).toBe(`#i-${MEDIA_SOURCE_ICONS['115']}`);
   expect(card.querySelector('header b')?.textContent).toBe('1');
   await click(tile);
   expect(tile.getAttribute('aria-pressed')).toBe('false');

@@ -44,6 +44,8 @@ describe('JAV 入库作品卡', () => {
         await page.getByRole('heading', { name: '资源链接 · 8' }).waitFor();
         await settle(page);
         const card = page.locator('[data-want-id="9001"]');
+        assert.equal(await page.locator('#stats').getByRole('button', { name: '查找资源', exact: true }).count(), 2, '通用入口与作品入口分别保留一处');
+        assert.equal(await page.getByRole('combobox', { name: '下载到', exact: true }).count(), 0, '下载目标在资源下载面板中选择');
         const source = card.getByRole('link', { name: '来源页', exact: true });
         const style = await card.evaluate(el => ({ radius: getComputedStyle(el).borderRadius,
           border: getComputedStyle(el).borderTopWidth }));
@@ -60,7 +62,7 @@ describe('JAV 入库作品卡', () => {
         const add = card.getByRole('button', { name: '添加下载', exact: true }).first();
         const copy = card.getByRole('button', { name: '复制链接', exact: true }).first();
         assert.notEqual(await add.evaluate(el => getComputedStyle(el).backgroundColor), await copy.evaluate(el => getComputedStyle(el).backgroundColor));
-        assert.equal(await add.locator('svg').count(), 1);
+        assert.equal(await add.locator('img').count(), 1, '下载渠道使用对应的网盘图标');
         const geometry = await layout(page);
         assert.ok(geometry.scrollWidth <= geometry.viewportWidth + 1, JSON.stringify(geometry));
         assert.deepEqual(geometry.offenders, []);

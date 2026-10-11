@@ -5,8 +5,8 @@
  * 先同步在宿主里写一份同结构的骨架（`manageHeaderSkeletonHtml`）；打开这一面时 `place` 清掉骨架，路由树在
  * 同一个任务里画出首帧。首帧还没有 props，画成空，壳拿到句柄就把手上那份推进来。之后壳只经
  * `configureManageHeader` 给的句柄推 props：句柄写本模块的 store 再 `flushSync` 通知，返回时已经画好——壳紧接着
- * 就读 `[data-manage-title]` 做标题揭示。换页、换读数都落在同一个组件上，管理条下面那条指示线从上一页的位置
- * 滑到这一页，回收站读数原地换字。
+ * 就读 `[data-manage-title]` 做标题揭示。换页、换读数都落在同一个组件上，导航选中态随地址同步，
+ * 回收站读数原地换字。
  *
  * 宿主不包 `.peach-react`：这一块一直在 Preflight 之外，按钮与字号继承的是遗留层的全局规则，样式全在
  * `manage-header.css`，不用工具类。 */
@@ -57,55 +57,17 @@ function ManageHeader({ host: at, props: current }: { host: ManageHeaderHost; pr
   if (!view) return null;
   return (
     <>
-      <ManageBar host={at} pressed={view.pressed} menu={current.menu} />
-      {view.crumb ? <Crumb host={at} label={view.crumb} /> : null}
       <h2 data-manage-title="" data-compact={view.compact ? '' : undefined}>{view.title}</h2>
+      {view.crumb ? <Crumb host={at} label={view.crumb} /> : null}
+      <ManageBar host={at} pressed={view.pressed} menu={current.menu} />
       {view.lede.kind === 'none' ? null : <TrashLede host={at} lede={view.lede} />}
     </>
   );
 }
 
-/* ── 管理条 ──
-   一排下划线页签：按下那一项由一条 2px 的线标出来。线是这一排里的一个绝对定位元素，位置与宽度
-   量出来写成 `--tab-x`、`--tab-width`；换页沿弹簧滑过去。离开管理区再回来时这一排是新挂上的，
-   线先落在上一次停的那一项下面、下一帧再滑到这一页：上一次停在哪儿按模块记，不按节点记。
-   真正头一次出现时没有上一次，直接落位。数据管理那几张卡通往的子页按下「数据管理」；管理条上没有
-   按下项的页面（`pressedManageKey` 判出空串）线收成 0 宽。窄屏这一排横向滚，换页时把按下那一项
-   滚进视口；只在换页时滚，用户自己横滑之后不被拉回去。 */
-let lastTab: { x: number; width: number } | null = null;
-
-function placeLine(mark: HTMLElement, x: number, width: number) {
-  mark.style.setProperty('--tab-x', `${x}px`);
-  mark.style.setProperty('--tab-width', `${width}px`);
-}
-
+/** 管理导航使用中性填充选中态；切换后把当前项滚入可见区域。 */
 function ManageBar({ host: at, pressed: key, menu }: Pick<ManageHeaderProps, 'menu'> & { host: ManageHeaderHost; pressed: string }) {
   const row = useRef<HTMLDivElement>(null);
-  const line = useRef<HTMLSpanElement>(null);
-
-  const measure = () => {
-    const group = row.current, mark = line.current;
-    if (!group || !mark) return;
-    const pressed = group.querySelector<HTMLElement>('button[aria-pressed="true"]');
-    if (pressed && !pressed.offsetWidth) return;
-    placeLine(mark, pressed?.offsetLeft ?? 0, pressed?.offsetWidth ?? 0);
-    if (pressed) lastTab = { x: pressed.offsetLeft, width: pressed.offsetWidth };
-  };
-
-  useLayoutEffect(() => {
-    const group = row.current!, mark = line.current!;
-    if (lastTab) placeLine(mark, lastTab.x, lastTab.width); else measure();
-    let second = 0;
-    const first = requestAnimationFrame(() => {
-      mark.setAttribute('data-ready', '');
-      second = requestAnimationFrame(measure);
-    });
-    const resize = new ResizeObserver(measure);
-    resize.observe(group);
-    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); resize.disconnect() };
-  }, []);
-
-  useLayoutEffect(() => { if (line.current?.hasAttribute('data-ready')) measure() }, [key, menu]);
 
   useLayoutEffect(() => {
     const group = row.current;
@@ -128,7 +90,6 @@ function ManageBar({ host: at, pressed: key, menu }: Pick<ManageHeaderProps, 'me
             </button>
           );
         })}
-        <span ref={line} data-manage-indicator="" aria-hidden="true" />
       </div>
     </nav>
   );

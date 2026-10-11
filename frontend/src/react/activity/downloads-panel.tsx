@@ -21,6 +21,7 @@ import { Progress } from '../components/progress';
 import { ErrorText } from '../settings/section';
 import { busyProps, useAction } from '../settings/use-action';
 import { momentText } from './tasks';
+import { SourceLabel } from '../components/source-label';
 
 export const DOWNLOADS_URL = '/api/downloads';
 export const DOWNLOADS_KEY = ['downloads'] as const;
@@ -68,7 +69,7 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
   const [copied, setCopied] = useState(false);
   const reason = failureText(task);
   const failed = task.state === 'failed' || task.postprocess_state === 'failed';
-  const meta = [task.provider_label, task.code, task.target, momentText(task.submitted_at)]
+  const meta = [task.code, task.target, momentText(task.submitted_at)]
     .filter(Boolean).join(' · ');
   const refresh = () => { void client.invalidateQueries({ queryKey: DOWNLOADS_KEY }) };
 
@@ -103,7 +104,7 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
               : task.postprocess_state === 'failed' ? 'rose' : 'yellow'}>{task.postprocess_label}</Chip>
             : null}
         </div>
-        <p className="min-w-0 break-words text-caption-1-regular text-text-secondary">{meta}</p>
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-caption-1-regular text-text-secondary"><SourceLabel source={task.provider} label={task.provider_label} /><span className="break-words">{meta}</span></div>
         {task.state === 'remote_running' && task.progress != null
           ? <Progress label="远端下载进度" value={Math.round(task.progress * 100)} max={100} />
           : null}

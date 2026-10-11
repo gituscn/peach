@@ -500,6 +500,17 @@ def q_feed_discoveries(contract, args) -> dict:
         studios = {name: _studio_name(connection, name)
                    for name in {row["studio"] for row in rows[:limit]} if name}
         wanted = wants.wanted_keys(connection, (normalise_code_key(row["code"]) for row in rows[:limit]))
+        names = {name.strip() for row in rows[:limit]
+                 for name in re.split(r"[,，、;/]", row["performers"] or "") if name.strip()}
+        identities = {name: entities.resolve_entity(connection, "performer", name) for name in names}
+        performers = {}
+        for row in rows[:limit]:
+            refs = []
+            for name in re.split(r"[,，、;/]", row["performers"] or ""):
+                found = identities.get(name.strip())
+                if found and found["id"] not in {ref["id"] for ref in refs}:
+                    refs.append({"id": int(found["id"]), "name": found["canonical_name"]})
+            performers[int(row["id"])] = refs
     more = len(rows) > limit
     # 最近一轮取新作资料里封面断在连接上的部数。只看最近这一轮：换了线路之后下一轮取到，
     # 提示就该跟着消失，而不是让一次旧故障一直挂在页面上。
@@ -519,6 +530,7 @@ def q_feed_discoveries(contract, args) -> dict:
         "release_date": row["release_date"],
         "studio": studios.get(row["studio"], row["studio"]),
         "performers": row["performers"],
+        "performer_refs": performers[int(row["id"])],
         "source_name": row["source_name"],
         "read": bool(row["read_at"]),
         "ignored": bool(row["ignored_at"]),

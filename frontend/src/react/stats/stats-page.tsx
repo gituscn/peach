@@ -15,6 +15,7 @@ import type { ReactNode } from 'react';
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 
 import { fmtSize, LOC } from '@peach/legacy/core';
+import { MEDIA_SOURCE_ICONS } from '@peach/legacy/ui';
 
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 
@@ -134,9 +135,9 @@ function InventoryDetail({ data, configurable, openMediaSettings }: { data: Stat
     <div className="flex flex-col gap-5">
       <div className="inline-grid w-full gap-5 md:grid-cols-2">
         <RadialCard title="网盘与本地" empty={NO_VIDEO_HINT} rows={data.by_loc.map((row) => (
-          { name: LOC[row.k] ?? row.k, value: row.videos, bytes: row.bytes }))} />
+          { name: LOC[row.k] ?? row.k, value: row.videos, bytes: row.bytes, mark: MEDIA_SOURCE_ICONS[row.k] || 'database' }))} />
         <RadialCard title="媒体库" empty={NO_LIBRARY_HINT} rows={data.by_library.map((row) => (
-          { name: row.name, value: row.videos, bytes: row.bytes }))} />
+          { name: row.name, value: row.videos, bytes: row.bytes, mark: MEDIA_SOURCE_ICONS[row.icon] || row.icon || 'database' }))} />
       </div>
       <div className="inline-grid w-full gap-5 md:grid-cols-2 xl:grid-cols-3">
         <BarCard title="时长" unit="个视频" series="视频" color={INVENTORY_COLOR}

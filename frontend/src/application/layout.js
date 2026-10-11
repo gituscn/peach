@@ -171,6 +171,7 @@ export function manageHeaderProps(section){
 }
 
 export function paintManageHeader(section=manageSection()){
+  paintListTitle();
   const props=manageHeaderProps(section),header=manageHeaderApi();
   if(header)header.render(props);
   else{
@@ -206,6 +207,7 @@ export function paintListTitle(){
   const path=decodeURIComponent(location.pathname);
   const label=!manageSection()&&isCatalogPath(path)?STATE_LABELS[state.state]||'':'';
   el.hidden=!label;if(label)el.textContent=label;
+  $('#catalogPageHeading').hidden=!!manageSection()||!isCatalogPath(path)||!!label||state.jav==='1';
 }
 
 export function openManage(section='stats'){

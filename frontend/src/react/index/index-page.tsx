@@ -226,7 +226,7 @@ export function IndexPage(props: IndexProps) {
 
   return (
     <div ref={root} data-index-page={kind} className="flex min-w-0 flex-col">
-      <div data-index-head="" className="mb-5 flex min-w-0 flex-wrap items-center gap-3 p-1">
+      <div data-index-head="" className="mb-5 flex min-w-0 flex-wrap items-center gap-3">
         <h2 data-index-title="" className="flex items-center text-display-4-medium whitespace-nowrap text-text-primary max-board-narrow:text-title-1-medium">
           {title}
         </h2>

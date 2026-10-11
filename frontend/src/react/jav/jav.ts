@@ -4,17 +4,11 @@ import { apiGet } from '../../api';
 import { queryClient } from '../query';
 import { fetchWants, WANTS_KEY } from '../wants/wants';
 
-export const JAV_TABS = [['library', '我的馆藏'], ['discover', '发现'], ['wants', '想要']] as const;
-export const javTab = (value: string | null) => JAV_TABS.some(([key]) => key === value) ? value! : 'library';
-export const javPath = (tab: string) => javTab(tab) === 'library' ? '/?jav=1' : `/jav?tab=${tab}`;
-export function javLibraryPath(search: string) {
-  const params = new URLSearchParams(search);
-  params.delete('tab'); params.set('jav', '1');
-  return '/?' + params;
-}
+export { JAV_TABS, javTab, javPath, javLibraryPath } from './jav-navigation';
 export interface Discovery {
   id: number; code: string; title: string; performers: string; release_date: string;
   studio: string; link: string; cover_url: string; has_cover: boolean; wanted: boolean;
+  performer_refs?: { id: number; name: string }[];
 }
 
 export async function prefetchJav(tab: string, signal: AbortSignal) {
@@ -29,12 +23,13 @@ export async function prefetchJav(tab: string, signal: AbortSignal) {
   }
 }
 
-/** 推荐只来自作品的真实出演者与口味榜单中的同名信号。 */
+/** 推荐按账本中的出演者身份匹配口味信号；没有身份引用时使用同名信号。 */
 export function rankedDiscoveries(items: Discovery[], taste: TasteData) {
   const signals = [...(taste.rankings?.peach_performers || []), ...(taste.rankings?.browser_creators || [])];
   return items.map(item => {
     const names = (item.performers || '').split(/[,，、;/]/).map(name => name.trim()).filter(Boolean);
-    const matches = signals.filter(signal => names.includes(signal.name));
+    const matches = signals.filter(signal => (item.performer_refs || []).some(ref =>
+      (signal.entity_id != null && ref.id === signal.entity_id) || ref.name === signal.name) || names.includes(signal.name));
     return { ...item, matches: [...new Set(matches.map(signal => signal.name))],
       score: matches.reduce((sum, signal) => sum + (signal.score || signal.visits || signal.web_visits || 1), 0) };
   }).filter(item => item.matches.length).sort((a, b) => b.score - a.score || (b.release_date || '').localeCompare(a.release_date || ''));

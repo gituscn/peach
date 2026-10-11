@@ -25,6 +25,7 @@ import type {
 } from '../bundle';
 import { LoadingDots } from '../components/loading-dots';
 import { Note } from '../components/note';
+import { SourceLabel, PROVIDER_ICONS } from '../components/source-label';
 import { groupRoot } from './configuration-panel';
 import {
   Disclosure, ErrorText, ExternalLink, Fact, FactList, FieldLabel, Footer, Help, Section, Stack,
@@ -182,15 +183,15 @@ function DownloadForm({ state, settle, receipt, pikpakAccount }: CardProps & { p
           placeholder={state.token_set ? '已保存，留空不改' : '在 CloudDrive2「设置 → API 令牌」中生成'}
           hint="需要离线任务权限。"
           value={token} isDisabled={!state.available} onChange={setToken} />
-        <Input label="115 目标目录" placeholder="留空时按推送发现自动填写" autoComplete="off" maxLength={300}
+        <Input label={<SourceLabel source="115" label="115 目标目录" />} placeholder="留空时按推送发现自动填写" autoComplete="off" maxLength={300}
           validationBehavior="aria" isInvalid={missing}
           hint={missing ? (saveBlocked ? '先新建这个目录，或填写已有目录。' : '这个目录不存在。') : '应位于自动入库的云端路径前缀内。'}
           value={target('115')} isDisabled={!state.available} onChange={(value) => setTarget('115', value)} />
-        <Input label="PikPak 目标目录" placeholder="以 / 开头的网盘路径" autoComplete="off" maxLength={300}
+        <Input label={<SourceLabel source="pikpak" label="PikPak 目标目录" />} placeholder="以 / 开头的网盘路径" autoComplete="off" maxLength={300}
           hint="目录要已经存在。"
           value={target('pikpak')} isDisabled={!state.available} onChange={(value) => setTarget('pikpak', value)} />
         <div className="flex flex-col gap-1">
-          <FieldLabel>PikPak 根目录对应的媒体文件夹</FieldLabel>
+          <FieldLabel><SourceLabel source="pikpak" label="PikPak 根目录对应的媒体文件夹" /></FieldLabel>
           {state.pikpak_roots.length ? (
             <Select aria-label="PikPak 根目录对应的媒体文件夹" selectedKey={config.pikpak_root || null}
               isDisabled={!state.available} placeholder="检查时按推送发现选"
@@ -249,17 +250,17 @@ function CheckReport({ report, detected, suggested, create, creating }: {
       <FactList>
         {detected ? <Fact term="CloudDrive2 地址">{`探测到 ${detected}，保存配置后生效`}</Fact> : null}
         {folder?.exists ? (
-          <Fact term="115 目标目录">
+          <Fact term={<SourceLabel source="115" label="115 目标目录" />}>
             {suggested.saved ? `已按推送发现填入 ${folder.path}` : `按推送发现填入 ${folder.path}，保存配置后生效`}
           </Fact>
         ) : null}
         {folder && !folder.exists ? (
-          <Fact term="115 目标目录">
+          <Fact term={<SourceLabel source="115" label="115 目标目录" />}>
             {`${folder.path} 不存在`}
             {create ? <Button variant="secondary" size="small" onClick={() => create(folder.path)} {...busyProps(creating)}>新建这个目录</Button> : null}
           </Fact>
         ) : null}
-        {suggested.root ? <Fact term="PikPak 根目录">{`按推送发现填入 ${suggested.root}，保存配置后生效`}</Fact> : null}
+        {suggested.root ? <Fact term={<SourceLabel source="pikpak" label="PikPak 根目录" />}>{`按推送发现填入 ${suggested.root}，保存配置后生效`}</Fact> : null}
         {report.permissions.length ? (
           <Fact term="离线权限">
             {report.missing.length ? `缺少：${report.missing.join('、')}` : '齐全'}
@@ -269,7 +270,7 @@ function CheckReport({ report, detected, suggested, create, creating }: {
           <Fact term="目标目录">{report.folder.can_offline ? `${report.folder.path} 可以离线下载` : `${report.folder.path} 不支持离线下载`}</Fact>
         ) : null}
         {report.quota ? (
-          <Fact term="115 离线配额">{`本月还剩 ${report.quota.left} 条，共 ${report.quota.total} 条`}</Fact>
+          <Fact term={<SourceLabel source="115" label="115 离线配额" />}>{`本月还剩 ${report.quota.left} 条，共 ${report.quota.total} 条`}</Fact>
         ) : null}
       </FactList>
       {report.problems.map((problem) => <ErrorText key={problem}>{problem}</ErrorText>)}
@@ -377,7 +378,7 @@ function PikPakAccount({ state, settle, receipt, username, setUsername }: CardPr
   const outcomeFailed = browser.state === 'timeout' || browser.state === 'failed';
 
   return (
-    <Section title="PikPak 账号" onSubmit={login}>
+    <Section title="PikPak 账号" icon={<PROVIDER_ICONS.pikpak />} onSubmit={login}>
       {account.logged_in ? (
         <FactList>
           <Fact term="账号">{account.username || '已登录'}</Fact>

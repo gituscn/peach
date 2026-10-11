@@ -17,6 +17,7 @@ import { busyProps, useAction } from '../settings/use-action';
 import { DOWNLOADS_KEY, DOWNLOADS_URL, downloadPollInterval, failureText } from './downloads-panel';
 import { ResourceSearch } from './resource-search';
 import { sameWorkCode } from './work-code';
+import { SourceLabel } from '../components/source-label';
 
 /** 入口带进来的上下文。`origin` 记在任务上，如 `asset:12`、`wishlist:5`。 */
 export interface DownloadPrefill { code?: string; title?: string; origin?: string; searchReason?: string;
@@ -137,7 +138,7 @@ function SubmitForm({ header, snapshot, prefill, close, receipt, provider: prefe
           <FieldLabel>下载到</FieldLabel>
           <Select aria-label="下载到" selectedKey={provider} isDisabled={!configured.length}
             onSelectionChange={(key) => { if (key !== null) choose(String(key) as DownloadProviderKey) }}>
-            {configured.map((row) => <SelectItem key={row.key} id={row.key}>{row.label}</SelectItem>)}
+            {configured.map((row) => <SelectItem key={row.key} id={row.key} textValue={row.label}><SourceLabel source={row.key} label={row.label} /></SelectItem>)}
           </Select>
           {provider === '115' ? <Help>每提交一次扣一条离线配额，重新提交也算。</Help> : null}
         </div>

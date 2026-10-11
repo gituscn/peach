@@ -15,6 +15,7 @@ import { EvilRadialChart } from '@/registry/charts/recharts-radial-chart';
 
 import { CHART_CARD, ChartEmpty, sliceConfig, sliceKey } from '../charts/chart-card';
 import { ChartTip } from '../charts/chart-tip';
+import { SourceMark } from '../settings/section';
 import { radialArc, radialBarSize, radialCeiling, radialSlices, type RadialSlice } from './stats';
 
 /** 六档图表色循环。类名写成整串，Tailwind 扫得到。 */
@@ -55,7 +56,9 @@ export function RadialCard(
     <section className={CHART_CARD}>
       <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
         <span className="flex min-w-0 flex-col gap-1">
-          <h3 className="text-title-2-medium wrap-anywhere text-text-primary">{shown ? shown.name : title}</h3>
+          <h3 className="flex items-center gap-1.5 text-title-2-medium wrap-anywhere text-text-primary">
+            {shown?.mark ? <SourceMark mark={shown.mark} /> : null}{shown ? shown.name : title}
+          </h3>
           <b className="text-display-4-medium tabular-nums text-text-primary">
             {(shown ? shown.value : total).toLocaleString()}
           </b>
@@ -88,7 +91,9 @@ export function RadialCard(
             {/* 名字折成几行时色块跟第一行对齐，不悬在几行中间。 */}
             <span className="flex min-w-0 max-w-full items-start gap-1.5 text-caption-1-regular text-text-secondary">
               <i aria-hidden className={`mt-0.5 size-3 shrink-0 rounded-sm ${TILE_SWATCH[index % 6]}`} />
-              <span className="min-w-0 wrap-anywhere">{row.name}</span>
+              <span className="inline-flex min-w-0 items-start gap-1.5 wrap-anywhere">
+                {row.mark ? <SourceMark mark={row.mark} /> : null}{row.name}
+              </span>
             </span>
             <b className="text-title-2-medium tabular-nums text-text-primary">{row.value.toLocaleString()}</b>
             {row.bytes != null ? <small className="text-caption-1-regular text-text-secondary">{fmtSize(row.bytes)}</small> : null}

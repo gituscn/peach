@@ -407,6 +407,7 @@ class FeedWebTest(FeedWebFixture):
         self.assertEqual(item["title"], "SSIS-950 的标题")
         self.assertEqual(item["studio"], "示例厂牌")
         self.assertEqual(item["performers"], "深田えいみ")
+        self.assertEqual(item["performer_refs"], [{"id": 1, "name": "深田えいみ"}])
         # 壳只认已有的人，不新建实体；关联上了人物页那一块才看得到。
         self.assertEqual(len(dispatch_api_get(
             self.contract, "/api/feeds/discoveries", {"entity": 1})["items"]), 2)
@@ -429,6 +430,23 @@ class FeedWebTest(FeedWebFixture):
         with self.contract.database.read_connection() as connection:
             self.assertEqual({row[0] for row in connection.execute(
                 "SELECT studio FROM feed_discovery")}, {"示例厂牌"})
+
+    def test_discovery_performer_references_resolve_existing_aliases_without_writing_names(self):
+        with self.contract.database.write_transaction() as connection:
+            connection.execute(
+                "INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at)"
+                " VALUES('performer','规范姓名',peach_normalize('规范姓名'),?,?)",
+                (feeds.stamp(), feeds.stamp()))
+            connection.execute(
+                "INSERT INTO entity_alias(entity_id,alias,normalized_alias,source)"
+                " VALUES(last_insert_rowid(),'深田えいみ',peach_normalize('深田えいみ'),'test')")
+        self._add()
+        self._check()
+        self._drain(1)
+        items = dispatch_api_get(self.contract, "/api/feeds/discoveries", {})["items"]
+        self.assertEqual({tuple((ref["id"], ref["name"]) for ref in item["performer_refs"])
+                          for item in items}, {((1, "规范姓名"),)})
+        self.assertEqual({item["performers"] for item in items}, {"深田えいみ"})
 
     def test_one_batch_installs_each_cover_with_the_sidecars_the_cards_frame_by(self):
         self.cover_misses.add("HMN-071")

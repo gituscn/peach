@@ -14,6 +14,8 @@
 /* 标签页骨架里的视图切换靠在读数行右缘，同页面落地后那一枚的位置。 */
 .index .board-filter-frame .count>.iconswitch{margin:0 0 0 auto}
 .skeleton{display:block;height:18px;border-radius:var(--control-radius);background:var(--hover)}
+[data-jav-skeleton-cover]{height:auto}
+.board-page-skeleton[data-skeleton="board/jav"]{max-width:none}
 /* 读数占位是行内的一截：它坐在最终那枚 `b`、`strong`、说明行里，行高仍由那枚元素自己给，
    数字一到这一行不长不缩。它和 `.skeleton` 挂在同一个元素上、同一档特指度，靠排在后面压住。 */
 .skeleton-text{display:inline-block;vertical-align:middle;height:1em;width:12em;max-width:70%}
