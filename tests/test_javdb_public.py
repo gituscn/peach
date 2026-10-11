@@ -83,6 +83,17 @@ class PublicProtocolTests(unittest.TestCase):
             api.movie('EXM-999')
         self.assertEqual(api.movie('EXM-001')['id'], 'Exact')
 
+    def test_transport_failure_cools_source_without_repeating_io(self):
+        api = self.api()
+        api._signature()
+        with patch.object(api, 'transport', side_effect=OSError('连接未取得')) as transport:
+            with self.assertRaises(PublicSourceUnavailable):
+                api.movie('EXM-001')
+            self.assertGreater(api.paused_until, api.clock())
+            with self.assertRaises(PublicSourceUnavailable):
+                api.movie('EXM-001')
+            self.assertEqual(transport.call_count, 1)
+
     def test_reviews_request_page_and_enforce_budget(self):
         api = self.api()
         self.assertEqual(api.reviews('EXM-001', 2)[0]['id'], 'second')
