@@ -310,12 +310,18 @@ it('配置页打开返回的那一刻，页签条已经在容器里，选中的�
   const { stats } = surface();
   await mount(r);
   r.connectManagedRoutes(Promise.resolve(r.prefetchManagedRoute));
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => configuration })));
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, status: 200, json: async () => {
+    if (url === '/api/configuration') return configuration;
+    if (url === '/api/configuration/indexers') return { indexers: [], max_indexers: 4 };
+    if (url === '/api/follow/credentials') return { root: '', providers: [] };
+    if (url === '/api/follow/schedule') return { enabled: false, available: true, interval_minutes: 60 };
+    return { mode: 'off', status: 'idle' };
+  } })));
   await act(async () => {
     const open = { section: '网络与访问' };
     expect(await r.openManagedRoute('/configuration', open, { container: stats, isCurrent: () => true })).toBe(true);
     const tabs = [...stats.querySelectorAll('.ui-configpage > .ui-board-local-nav[role="tablist"] > [role="tab"]')];
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['通用', '媒体', '网络与访问', '维护']);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['媒体库与入库', '来源与订阅', '网络与访问', '应用与维护']);
     expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'false', 'true', 'false']);
     const active = stats.querySelector('.ui-board-group-active');
     expect(active?.id).toBe(tabs[2].getAttribute('aria-controls'));
@@ -375,7 +381,7 @@ it('统计页：点标签交壳回目录；「添加媒体文件夹」先交页�
   props.onTag('痴女');
   props.openMediaSettings();
   expect(vi.mocked(actions.openTag).mock.calls).toEqual([['痴女']]);
-  expect(order).toEqual(['section 媒体', 'go /configuration']);
+  expect(order).toEqual(['section 媒体库与入库', 'go /configuration']);
   expect([props.configurable, props.tagLabel('JK制服')]).toEqual([false, 'JK制服']);
 });
 
@@ -432,9 +438,9 @@ it('回执、打开作品与资料页都交回壳：都走过去时回执', asyn
   duplicates.toast('已删除', { undo });
   duplicates.toast('已保留');
   duplicates.failure('删除', 'boom');
-  const configuration = element<ConfigurationProps>('/configuration', r, { section: '媒体' }, actions, vi.fn());
+  const configuration = element<ConfigurationProps>('/configuration', r, { section: '媒体库与入库' }, actions, vi.fn());
   configuration.receipt('已保存配置');
-  expect([configuration.reopenTutorial, configuration.section]).toEqual([actions.reopenTutorial, '媒体']);
+  expect([configuration.reopenTutorial, configuration.section]).toEqual([actions.reopenTutorial, '媒体库与入库']);
   const review = element<ReviewProps>('/review', r,
     { category: '', readOnly: false, readOnlyMessage: '', writerUrl: '' }, actions, vi.fn());
   review.openEntity('performer', '某人');

@@ -1782,6 +1782,26 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         removed = await self.client.get("/entity/performer/Alice")
         self.assertEqual(removed.status_code, 404)
 
+    async def test_jav_section_deep_links_serve_the_authenticated_application_shell(self):
+        paths = ("/jav", "/jav?tab=discover", "/jav?tab=wants")
+        for path in paths:
+            response = await self.client.get(path, follow_redirects=False)
+            self.assertEqual(response.status_code, 303, path)
+            self.assertTrue(response.headers["location"].startswith("/login?next="))
+        await self.client.post(
+            "/login", content="token=secret&next=%2F",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        for path in paths:
+            with self.subTest(path=path):
+                response = await self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("Peach test", response.text)
+                head = await self.client.head(path)
+                self.assertEqual(head.status_code, 200)
+                self.assertEqual(head.content, b"")
+                self.assertEqual(head.headers["content-type"], response.headers["content-type"])
+
     async def test_playlist_api_saves_and_reads_a_mix_without_exposing_paths(self):
         await self.client.post(
             "/login", content="token=secret&next=%2F",

@@ -5,12 +5,40 @@ param(
     [string]$Address = (Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway } |
         Select-Object -First 1).IPv4Address.IPAddress,
     [string]$DnsName = 'peach.local',
-    [string]$OutDir = (Join-Path ([Environment]::GetFolderPath('Desktop')) 'peach\peach-data\secrets\tls'),
+    [string]$OutDir = '',
     [switch]$TrustCurrentUser,
     [switch]$Force
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Resolve-PeachTlsDirectory {
+    param(
+        [string]$RequestedDirectory = '',
+        [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot)
+    )
+    if ($RequestedDirectory) { return $RequestedDirectory }
+
+    # Reuse the settings authority for environment, discovery and directory overrides.
+    $TlsPython = Join-Path $ProjectRoot '.venv\Scripts\python.exe'
+    if (-not (Test-Path -LiteralPath $TlsPython -PathType Leaf)) {
+        $TlsCommonGit = (& git -C $ProjectRoot rev-parse --path-format=absolute --git-common-dir).Trim()
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot locate the Peach project Python.' }
+        $TlsPython = Join-Path (Split-Path -Parent $TlsCommonGit) '.venv\Scripts\python.exe'
+    }
+    if (-not (Test-Path -LiteralPath $TlsPython -PathType Leaf)) {
+        throw "Project Python not found: $TlsPython"
+    }
+
+    $TlsHelper = Join-Path $ProjectRoot 'scripts\resolve_tls_directory.py'
+    $TlsDirectory = & $TlsPython -X utf8 $TlsHelper
+    if ($LASTEXITCODE -ne 0 -or -not $TlsDirectory) {
+        throw 'Cannot resolve the configured Peach TLS directory.'
+    }
+    return $TlsDirectory.Trim()
+}
+
+$OutDir = Resolve-PeachTlsDirectory -RequestedDirectory $OutDir
 $openssl = (Get-Command openssl -ErrorAction SilentlyContinue).Source
 if (-not $openssl) {
     $bundled = 'C:\Program Files\Git\usr\bin\openssl.exe'

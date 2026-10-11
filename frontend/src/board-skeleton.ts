@@ -20,7 +20,7 @@ const block = (width: number, height: number, round = false) =>
 const STAT = 'min-w-0 bg-background-secondary-default rounded-2xl shadow-card flex flex-col gap-3 px-6 py-5 max-sm:gap-2 max-sm:p-4';
 const followReadings = () => `<div class="inline-grid w-full grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6">${['关注创作者', '启用来源', '检查失败', '未看更新', 'JAV 订阅', '未看新作'].map(term => `<div class="${STAT}"><span class="text-body-medium text-text-secondary">${term}</span><b class="text-title-1-medium tabular-nums text-text-primary">${text('3em')}</b></div>`).join('')}</div>`;
 /** 页签与 React `follow-manage-page.tsx` 的 `TABS` 同名同序；选中的是地址栏 `?tab=` 那一枚，认不出时是第一枚。 */
-const FOLLOW_TABS = [['list', '关注列表'], ['add', '添加关注'], ['feeds', 'JAV 订阅源'], ['wants', 'JAV 入库'], ['source', '来源和凭证']] as const;
+const FOLLOW_TABS = [['list', '关注列表'], ['add', '添加关注'], ['feeds', 'JAV 订阅源']] as const;
 const followTabKey = (tab = '') => (FOLLOW_TABS.some(([key]) => key === tab) ? tab : 'list');
 const followTabs = (tab: string) => `<div data-section-nav data-section-items class="flex max-w-full flex-nowrap overflow-x-auto">${FOLLOW_TABS.map(([key, name]) => `<span class="whitespace-nowrap" aria-selected="${key === tab}">${name}</span>`).join('')}</div>`;
 /** Board UI `Checkbox` 的未勾静止态；给了字就是「全选本页」那种带标签的一枚。 */
@@ -91,6 +91,8 @@ export function boardPageSkeleton(
   let body = '';
   if (path === '/stats') {
     body = statsSkeleton();
+  } else if (path === '/jav') {
+    body = `<div class="peach-react"><div class="mx-auto flex w-full max-w-board flex-col gap-6"><div class="flex items-center justify-between gap-2"><h2 class="text-title-2-semibold text-text-primary">JAV</h2>${islandButton({ label: '查找资源', attrs: WAITING })}</div><div class="flex gap-4">${['我的馆藏', '发现', '想要'].map(label => `<span>${label}</span>`).join('')}</div><div class="ui-skeleton-lines">${line('100%')}</div><div class="inline-grid gap-5 sm:grid-cols-2 lg:grid-cols-3">${repeat(`<span class="skeleton aspect-card-cover rounded-2lg"></span>`, 6)}</div></div></div>`;
   } else if (path === '/taste') {
     body = tasteSkeleton();
   } else if (path === '/follow-manage') {

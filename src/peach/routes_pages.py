@@ -637,6 +637,7 @@ def index_directory_redirect(request: Request, args: dict[str, str] = Depends(re
 @router.api_route("/studios", methods=["GET", "HEAD"])
 @router.api_route("/agencies", methods=["GET", "HEAD"])
 @router.api_route("/tags", methods=["GET", "HEAD"])
+@router.api_route("/jav", methods=["GET", "HEAD"])
 @router.api_route("/unseen", methods=["GET", "HEAD"])
 @router.api_route("/watch-later", methods=["GET", "HEAD"])
 @router.api_route("/flagged", methods=["GET", "HEAD"])

@@ -408,6 +408,13 @@ html[class~=board-high-contrast] [data-settings-panel] [data-settings-card][data
 /* ── 分区切换与开合 ──
  * 分区切换靠 `hidden`：分组上写了 `display`，这一条要压过它们。 */
 [data-settings-panel] [data-setting-group][hidden]{display:none!important}
+[data-settings-panel] [data-settings-service]{position:relative;z-index:1;margin-top:auto;padding-top:16px;border-top:1px solid var(--line-soft)}
+[data-settings-panel] [data-settings-service] button{width:100%}
+[data-settings-panel] [data-settings-service] button>svg:last-child{margin-left:auto}
+[data-settings-panel] [data-settings-service] button:disabled{color:var(--muted);cursor:not-allowed}
+[data-settings-panel] [data-settings-subheading]{margin:0;padding:16px 0 6px;color:var(--muted);font:var(--board-compact)}
+[data-settings-panel] [data-settings-scroll] [data-settings-subheading]+[data-setting-row]{border-top:0}
+@media(max-width:760px){[data-settings-panel] [data-settings-service]{margin-top:0;padding:0 0 0 12px;border-top:0;border-left:1px solid var(--line-soft);flex-shrink:0}}
 @keyframes settings-backdrop-in{from{opacity:0}to{opacity:1}}
 @keyframes settings-backdrop-out{from{opacity:1}to{opacity:0}}
 @keyframes settings-dialog-in{from{transform:translate3d(0,-40px,0);opacity:0}to{transform:translate3d(0,0,0);opacity:1}}

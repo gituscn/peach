@@ -1,4 +1,4 @@
-/* 「通用」分组：开机自启与桌面快捷方式，自动更新与检查更新。 */
+/* 「应用与维护」中的开机自启、桌面快捷方式与版本更新。 */
 import { useState, type FormEvent } from 'react';
 
 import { SettingsRow } from '@/components/application/settings/settings-rows';
@@ -45,10 +45,10 @@ export function StartupSettings({ startup, receipt }: { startup: StartupState; r
         <SettingsRow label="开机后启动 Peach">
           <Switch aria-label="开机后启动 Peach" isSelected={enabled} isDisabled={!startup.available} onChange={setEnabled} />
         </SettingsRow>
-        <SettingsRow label="静默启动" description="开机后只显示托盘图标，不打开网页。">
-          <Switch aria-label="静默启动" isSelected={silent} isDisabled={!startup.available || !enabled} onChange={setSilent} />
+        <SettingsRow label="只启动托盘，不打开网页">
+          <Switch aria-label="只启动托盘，不打开网页" isSelected={silent} isDisabled={!startup.available || !enabled} onChange={setSilent} />
         </SettingsRow>
-        <SettingsRow label="在桌面创建快捷方式" description={startup.desktop_message || '双击图标打开 Peach 网页。'}>
+        <SettingsRow label="在桌面创建快捷方式" description={startup.desktop_message || undefined}>
           <Switch aria-label="在桌面创建快捷方式" isSelected={desktop} isDisabled={!desktopReady} onChange={setDesktop} />
         </SettingsRow>
       </Rows>

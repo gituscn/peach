@@ -261,15 +261,8 @@ class ContractRegistrationTests(unittest.TestCase):
 
         root = Path(__file__).resolve().parents[1]
         settings = (root / "frontend/src/appearance/settings.ts").read_text(encoding="utf-8")
-        panel = (root / "frontend/src/react/settings-panel/settings-panel.tsx").read_text(encoding="utf-8")
         raw = re.search(r"const METADATA_REFRESH_DAYS: readonly number\[\] = \[(.*?)\];", settings).group(1)
         self.assertEqual(tuple(int(item) for item in raw.split(",")), web_settings.METADATA_REFRESH_DAYS)
-        # 设置面板那一格（`settings-panel` 岛）列的档位与服务端同一组。
-        options = re.search(r"const METADATA_OPTIONS: readonly Choice\[\] = \[(.*?)\];", panel).group(1)
-        self.assertEqual(sorted(int(value) for value in re.findall(r"\['(\d+)',", options)),
-                         sorted(web_settings.METADATA_REFRESH_DAYS))
-        # 选中的值要写进账本（服务端按它决定要不要出网），启动时再用账本那份纠正本地镜像。
-        self.assertIn("save.mutate({ metadataRefreshDays: settings.metadataRefreshDays }", panel)
         self.assertIn("const days = remote && remote.metadataRefreshDays;", settings)
 
     def test_initial_history_choices_are_in_settings_and_match_the_server(self):

@@ -30,7 +30,7 @@ describe('Board 页面骨架', () => {
     ['/duplicates', '[data-duplicate-group] .duplicate-row', 4],
     ['/quality-goals', '.peach-react .card-grid-cover > li', 6],
     ['/follow-manage', '.peach-react .ui-follow-skeleton-surface .follow-skeleton-author', 3],
-    ['/configuration', '.peach-react .ui-configpage section', 2],
+    ['/configuration', '.peach-react .ui-configpage section[aria-label="媒体文件夹"]', 1],
     ['/playlists', '.ui-playlistcards > .playlistcard', 6],
   ] as const)('%s 复用最终内容容器', (path, selector, count) => {
     const root = document.createElement('div');
@@ -56,14 +56,14 @@ describe('Board 页面骨架', () => {
     expect(root.querySelector('.board-segment-thumb')).toBeNull();
     expect(root.querySelector('[data-section-items] [aria-selected=true]')?.textContent).toBe('关注列表');
     const track = root.querySelector('[data-section-items]')!;
-    expect([...track.children].map((span) => span.textContent)).toEqual(['关注列表', '添加关注', 'JAV 订阅源', 'JAV 入库', '来源和凭证']);
+    expect([...track.children].map((span) => span.textContent)).toEqual(['关注列表', '添加关注', 'JAV 订阅源']);
   });
   it('关注骨架选中地址栏 `?tab=` 那一枚页签，列表以外的页签不画关注列表的工具行', () => {
     const feeds = follow({ followTab: 'feeds' });
     expect(feeds.querySelector('[data-section-items] [aria-selected=true]')?.textContent).toBe('JAV 订阅源');
     expect(feeds.querySelector('.ui-follow-skeleton-toolbar')).toBeNull();
     expect(feeds.querySelector('.ui-follow-skeleton-surface')).not.toBeNull();
-    expect(follow({ followTab: 'wants' }).querySelector('[data-section-items] [aria-selected=true]')?.textContent).toBe('JAV 入库');
+    expect(follow({ followTab: 'wants' }).querySelector('[data-section-items] [aria-selected=true]')?.textContent).toBe('关注列表');
     expect(follow({ followTab: 'nope' }).querySelector('[data-section-items] [aria-selected=true]')?.textContent).toBe('关注列表');
   });
   it('关注骨架的工具行按 Board UI 最终变体画：检查全部是主按钮，视图切换是按版式选中的按钮组', () => {

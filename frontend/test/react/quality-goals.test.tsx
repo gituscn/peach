@@ -140,12 +140,12 @@ it('封面、标题和页脚三处都打开同一部作品，无障碍名称用�
 
 it('搜索资源原地打开云下载弹层，带入番号与原版本目标；无番号只提供查看版本', async () => {
   const { host } = await open(payload([goal({ id: 42, code: 'ABC-123', reason: '中字' }), goal({ id: 43 })]));
-  const buttons = [...host.querySelectorAll('button')].filter((node) => node.textContent === '搜索资源');
+  const buttons = [...host.querySelectorAll('button')].filter((node) => node.textContent === '查找资源');
   expect(buttons).toHaveLength(1);
   await click(buttons[0]);
   await settle();
   const dialog = document.querySelector('[role=dialog]');
-  expect(dialog?.textContent).toContain('ABC-123 名称 one.mp4');
+  expect(dialog?.textContent).toContain('ABC-123 · 名称 one.mp4');
 });
 
 it('一条目标都没有时给空态，不是一片白', async () => {

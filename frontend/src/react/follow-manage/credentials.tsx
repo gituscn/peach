@@ -25,8 +25,6 @@ import {
 import { SourceIcon } from './source-view';
 import { RiKey2Line } from '@remixicon/react';
 
-const STORAGE_TITLE = '这些账号信息存在哪里';
-const STORAGE_BODY = '存成运行 Peach 那台电脑上的一个文件。在 Windows 上它不额外加锁，能登录那台电脑的人都能打开。';
 const CLEAR_BODY = '将清除这个来源在本机和共享副本中的登录凭据。';
 const WORLD_READABLE = '文件权限过宽。在运行 Peach 的 POSIX 主机上收紧为 0600。';
 
@@ -76,7 +74,7 @@ function CredentialForm({ row, readOnly, toast }:
       <Help>
         {row.why}
         {/* 「去取」跳到那个站自己的页面，会离开 Peach，所以带外链标。 */}
-        {row.where ? <> <ExternalLink href={row.where}>去取</ExternalLink></> : null}
+        {row.where ? <> <ExternalLink href={row.where}>获取凭据</ExternalLink></> : null}
       </Help>
       {row.howto ? <Help>{row.howto}</Help> : null}
       <div className="flex w-full flex-col gap-3">
@@ -103,9 +101,8 @@ function CredentialForm({ row, readOnly, toast }:
         ? <Help>{`${row.shared_fields!.join('、')} 是从共享副本回填的，本机没有单独存。清除会把两边一起删。`}</Help>
         : null}
       {row.path
-        ? <PathLine path={row.path} className="font-mono text-caption-1-regular text-text-tertiary" onRevealed={toast} />
+        ? <Disclosure summary="凭据文件"><PathLine path={row.path} className="font-mono text-caption-1-regular text-text-tertiary" onRevealed={toast} /></Disclosure>
         : null}
-      {row.world_readable ? <Note tone="error" title="凭据文件权限过宽">{WORLD_READABLE}</Note> : null}
     </div>
   );
 }
@@ -139,6 +136,7 @@ function CredentialSection({ row, readOnly, toast }:
         defaultOpen={row.requirement === 'required' && !credentialDone(row)}>
         <CredentialForm row={row} readOnly={readOnly} toast={toast} />
       </Disclosure>
+      {row.world_readable ? <Note tone="error" title="凭据文件权限过宽">{WORLD_READABLE}</Note> : null}
     </div>
   );
 }
@@ -155,7 +153,7 @@ export function Credentials(
   return (
     <div className={cardClass({ padding: 'none', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })}>
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="mr-auto text-title-2-medium text-text-primary">来源和凭证</h3>
+        <h3 className="mr-auto text-title-2-medium text-text-primary">来源凭据</h3>
         {pending.length
           ? <span className="text-body-2-regular text-text-error-primary">{`${pending.length} 个待配置`}</span>
           : null}
@@ -174,12 +172,6 @@ export function Credentials(
           </div>
         </section>
       ))}
-      <div className="flex flex-col gap-1">
-        <b className="text-body-medium text-text-primary">{STORAGE_TITLE}</b>
-        <span className="text-body-2-regular text-text-secondary">{STORAGE_BODY}</span>
-        <PathLine path={data.root} prefix="凭据文件在 " className="text-body-2-regular text-text-secondary"
-          onRevealed={toast} />
-      </div>
     </div>
   );
 }

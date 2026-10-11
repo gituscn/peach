@@ -240,22 +240,30 @@ describe('首页筛选条', () => {
     }
   });
 
-  it('JAV 开关：下排换成 JAV 那一份版式与「发行时间」，按 JAV 口径重取；再按一次回到首页那一份', { timeout: 60_000 }, async () => {
+  it('JAV 入口打开独立馆藏，作品搜索按 JAV 口径取数，首页入口恢复首页筛选条', { timeout: 60_000 }, async () => {
     const opened = await openHome(browser);
     try {
       const { page, counts } = opened;
       const before = counts.items.length;
       await page.locator('button[data-nav="jav"]:visible').first().click();
-      await page.waitForFunction(() => new URLSearchParams(location.search).get('jav') === '1');
-      await page.locator(`${FILTER} input[name="jav-layout"]`).first().waitFor({ state: 'attached' });
-      await page.locator(`${FILTER} [data-entity-sort="release"]`).waitFor();
+      await pathIs(page, '/jav');
+      await page.getByRole('tab', { name: '我的馆藏', exact: true, selected: true }).waitFor();
+      await page.locator('#stats [data-media-card]').first().waitFor();
       await settle(page);
       assert.ok(counts.items.slice(before).some((url) => url.searchParams.get('jav') === '1'), 'JAV 口径没有重取列表');
-      assert.equal(await page.locator(`${FILTER} input[name="home-layout"]`).count(), 0);
-      await page.locator('button[data-nav="jav"]:visible').first().click();
-      await page.waitForFunction(() => !new URLSearchParams(location.search).has('jav'));
+      assert.equal(await page.locator(`${FILTER} input[name="home-layout"]`).first().isVisible(), false);
+      const beforeSearch = counts.items.length;
+      await page.getByRole('textbox', { name: '搜索作品', exact: true }).fill('演示作品');
+      await page.getByRole('textbox', { name: '搜索作品', exact: true }).press('Enter');
+      await until(() => counts.items.length > beforeSearch, '作品搜索没有重取 JAV 馆藏');
+      assert.equal(counts.items.at(-1)?.searchParams.get('jav'), '1');
+      assert.equal(counts.items.at(-1)?.searchParams.get('q'), '演示作品');
+      await page.locator('button[data-nav=""]:visible').first().click();
+      await page.waitForFunction(() => location.pathname === '/' && !new URLSearchParams(location.search).has('jav'));
       await page.locator(`${FILTER} input[name="home-layout"]`).first().waitFor({ state: 'attached' });
-      assert.equal(await page.locator(`${FILTER} [data-entity-sort="release"]`).count(), 0);
+      await page.locator(READOUT, { hasText: '个符合' }).waitFor();
+      await settle(page);
+      assert.notEqual(counts.items.at(-1)?.searchParams.get('jav'), '1');
       assert.deepEqual(withoutPlayer(opened.problems), []);
     } finally {
       await opened.close();

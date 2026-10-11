@@ -31,6 +31,7 @@
 | --- | --- | --- |
 | 开发流程 | 隔离工作树自动同步 Python 依赖，主检出只读核对；commit-msg 检查署名、已有 README 声明和分段 | `scripts/test_environment.py`、`scripts/test.ps1`、`scripts/test.sh`、`scripts/check_commit_message.py`、`scripts/githooks/` |
 | 首次前端导入 | React 导入钩子各有 30 秒上限，普通用例沿用默认超时 | `frontend/test/islands.test.ts` |
+| JAV 与设置结构 | JAV 包含馆藏、按出演者口味匹配的新作与想要；查找资源展示作品资料并保留搜索和磁力输入。设置弹窗管理偏好，服务配置按用途分类 | [ADR-0103](adr/0103-jav-hub-and-settings-groups.md)、`frontend/src/react/jav/`、设置与配置组件及回归 |
 | 42、43 | 云下载、manko.fun → JavDB → sukebei 直查与 Torznab 后备、体积和质量筛选、入库后正片绑定／定向采集／推广附件隔离／模板整理已具备；本地下载、非 manko 候选到盘水印抽查、JavBus 直连接口与真实索引器验收仍待补 | `src/peach/magnet_chain.py`、`src/peach/download_postprocess.py`、云下载弹层的资源搜索与来源配置 |
 | 46 | 周期挂载快照、故障分类、托盘提示和 NAS 目录过滤已合入，正式全量、桌面、手机与 Windows 生产 HTTPS 核验通过；本地来源目录不存在，115 与 PikPak 可读取；Mac 挂载验收待补 | `src/peach/mount_reachability.py`、`src/peach/platform.py`、API、扫描与托盘回归 |
 | 21、26 | doctor、分级健康检查和系统诊断页已在 Windows 上线，全量 5959 项、浏览器 389 项及严格 CA 核验通过；库健康清单、来源证据和冷却可查，Mac 验收待补 | `src/peach/diagnostics.py`、`src/peach/library_diagnostics.py`、诊断页面与回归 |

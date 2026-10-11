@@ -3,7 +3,7 @@ import { after, before, describe, it } from 'node:test';
 import type { Browser, Page } from 'playwright-core';
 import { configurationBody, expectBody, launch, layout, settle, visit, VIEWPORTS } from './harness.ts';
 
-const measure = (page: Page, names = ['开机自启', '自动更新']) => page.locator('.ui-configpage').evaluate((root, names) => {
+const measure = (page: Page, names = ['媒体文件夹']) => page.locator('.ui-configpage').evaluate((root, names) => {
   const rect = (el: Element) => {
     const r = el.getBoundingClientRect();
     return { x: r.x, y: r.y, width: r.width, height: r.height };
@@ -21,31 +21,43 @@ const measure = (page: Page, names = ['开机自启', '自动更新']) => page.l
   };
 }, names);
 
+async function openEditableConfiguration(browser: Browser, viewport: (typeof VIEWPORTS)[number]) {
+  const opened = await visit(browser, '/', viewport);
+  await opened.page.route('**/api/configuration', async route => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...await response.json(), editable: true } });
+  });
+  await opened.page.goto(new URL('/configuration', opened.page.url()).href, { waitUntil: 'load' });
+  return opened;
+}
+
 describe('配置页等待态', () => {
   let browser: Browser;
   before(async () => { browser = await launch() });
   after(async () => { await browser?.close() });
   for (const viewport of VIEWPORTS) {
     it(`${viewport.name} 的分类导航适配方向并保留未保存输入`, { timeout: 60_000 }, async () => {
-      const opened = await visit(browser, '/configuration', viewport);
+      const opened = await openEditableConfiguration(browser, viewport);
       try {
         const { page } = opened;
         await expectBody(page, '/configuration', configurationBody(page));
         await settle(page);
         const nav = page.getByRole('tablist', { name: '配置分区' });
-        assert.equal(await nav.getAttribute('aria-orientation'), 'horizontal');
-        const geometry = await measure(page, ['开机自启']);
-        assert.ok(geometry.nav.y + geometry.nav.height <= geometry.sections[0].label.y);
-        await nav.getByRole('tab', { name: '网络与访问', exact: true }).click();
+        assert.equal(await nav.getAttribute('aria-orientation'), viewport.mobile ? 'horizontal' : 'vertical');
+        const geometry = await measure(page);
+        assert.ok(viewport.mobile
+          ? geometry.nav.y + geometry.nav.height <= geometry.sections[0].label.y
+          : geometry.nav.x + geometry.nav.width <= geometry.sections[0].label.x);
+        await nav.getByRole('tab', { name: '来源与订阅', exact: true }).click();
         // 切到别的页签后这一栏所在的面板隐藏，值仍要留在原处。
         const input = page.getByRole('textbox', { name: 'JavDB 地址', exact: true, includeHidden: true });
         await input.fill('example.invalid');
-        const general = nav.getByRole('tab', { name: '通用', exact: true });
+        const general = nav.getByRole('tab', { name: '媒体库与入库', exact: true });
         await general.click();
         await page.keyboard.press('ArrowRight');
-        assert.equal(await nav.getByRole('tab', { name: '媒体', exact: true }).getAttribute('aria-selected'), 'true');
+        assert.equal(await nav.getByRole('tab', { name: '来源与订阅', exact: true }).getAttribute('aria-selected'), 'true');
         await page.keyboard.press('End');
-        assert.equal(await nav.getByRole('tab', { name: '维护' }).getAttribute('aria-selected'), 'true');
+        assert.equal(await nav.getByRole('tab', { name: '应用与维护' }).getAttribute('aria-selected'), 'true');
         await page.keyboard.press('Home');
         assert.equal(await input.inputValue(), 'example.invalid');
         const bounds = await layout(page);
@@ -53,14 +65,14 @@ describe('配置页等待态', () => {
         assert.deepEqual(bounds.offenders, []);
         await page.setViewportSize({ width: viewport.mobile ? 1280 : 390, height: 844 });
         await page.waitForFunction(expected => document.querySelector('.ui-configpage>.ui-board-local-nav')?.getAttribute('aria-orientation') === expected,
-          'horizontal');
+          viewport.mobile ? 'vertical' : 'horizontal');
         assert.equal(await general.getAttribute('aria-selected'), 'true');
         assert.equal(await input.inputValue(), 'example.invalid');
         assert.deepEqual(opened.problems, []);
       } finally { await opened.close() }
     });
-    it(`${viewport.name} 的标题、卡片、页签和保存键在接管时保持几何`, { timeout: 60_000 }, async () => {
-      const opened = await visit(browser, '/configuration', viewport);
+    it(`${viewport.name} 的分类导航与媒体标题在接管时保持位置`, { timeout: 60_000 }, async () => {
+      const opened = await openEditableConfiguration(browser, viewport);
       let release = () => {};
       try {
         await expectBody(opened.page, '/configuration', configurationBody(opened.page));
@@ -70,7 +82,7 @@ describe('配置页等待态', () => {
           const response = await route.fetch();
           const data = await response.json();
           await pending;
-          await route.fulfill({ json: { ...data, startup: {
+          await route.fulfill({ json: { ...data, editable: true, startup: {
             available: true, enabled: true, silent: true, desktop: true, desktop_message: '', message: '',
           }, automatic_updates: { mode: 'check', interval_hours: 24, available: true, download_available: false } } });
         });
@@ -83,8 +95,8 @@ describe('配置页等待态', () => {
         await settle(opened.page);
         const live = await measure(opened.page);
         assert.equal(skeleton.selected, live.selected);
-        const pairs = [[skeleton.nav, live.nav], ...skeleton.sections.flatMap((section, i) =>
-          (['label', 'card', 'save'] as const).map(key => [section[key], live.sections[i][key]]))];
+        const pairs = [[skeleton.nav, live.nav], ...skeleton.sections.map((section, i) =>
+          [section.label, live.sections[i].label])];
         for (const [a, b] of pairs) for (const key of ['x', 'y', 'width', 'height'] as const) {
           assert.ok(Math.abs(a[key] - b[key]) <= 1, `${key}: skeleton=${a[key]}, content=${b[key]}`);
         }

@@ -1,7 +1,4 @@
-/* JAV 入库：按状态分组的作品卡，卡片下方查询磁链并提交云下载。
- *
- * 卡片下方的候选来自 JavDB；「搜索资源」打开云下载弹层，查自配索引器或贴磁力。页上那颗
- * 「提交磁力」是不挂在任何作品上的同一个弹层。 */
+/* JAV 想要：按状态分组的作品卡，复用资源链接查询与查找资源弹层。 */
 import { useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -75,7 +72,7 @@ function WantRow({ want, readOnly, busy, onReset, onRemove, onCloudDownload, dow
           {source ? <ButtonLink data-button-link="" variant="secondary" size="small" trailingIcon={RiExternalLinkLine} href={source} target="_blank" rel="noopener noreferrer">来源页</ButtonLink> : null}
           {/* 还在找的两段才给云下载：未发售的没有资源可下，已入库的已经到手。 */}
           {want.phase === 'searching' || want.phase === 'given_up' ? (
-            <Button variant="secondary" size="small" disabled={readOnly} onClick={onCloudDownload}>搜索资源</Button>
+            <Button variant="secondary" size="small" onClick={onCloudDownload}>查找资源</Button>
           ) : null}
           {want.phase === 'given_up' ? (
             <Button variant="secondary" size="small" disabled={readOnly} {...busyProps(busy === `reset:${want.id}`)}
@@ -120,9 +117,10 @@ function WantPhase({ phase, label, rows, row }: {
 export interface WantListProps {
   readOnly: boolean;
   toast(message: string): void;
+  query?: string;
 }
 
-export function WantList({ readOnly, toast }: WantListProps) {
+export function WantList({ readOnly, toast, query = '' }: WantListProps) {
   const [code, setCode] = useState('');
   const [download, setDownload] = useState<DownloadPrefill | null>(null);
   const [provider, setProvider] = useState('');
@@ -159,7 +157,8 @@ export function WantList({ readOnly, toast }: WantListProps) {
   };
 
   const data = wants.data;
-  const items = data?.items || [];
+  const items = (data?.items || []).filter(want => !query || [want.code, want.title, want.performers]
+    .join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   const downloads = useQuery({
     queryKey: DOWNLOADS_KEY,
     queryFn: ({ signal }) => apiGet<DownloadsSnapshot>(`${DOWNLOADS_URL}?limit=100`, signal),
@@ -191,17 +190,17 @@ export function WantList({ readOnly, toast }: WantListProps) {
           <Select aria-label="下载到" selectedKey={selected} onSelectionChange={(key) => setProvider(String(key))}>
             {configured.map((row) => <SelectItem key={row.key} id={row.key}>{row.label}</SelectItem>)}
           </Select>
-          <Button variant="secondary" disabled={readOnly} onClick={() => setDownload({})}>提交磁力</Button>
+          <Button variant="secondary" onClick={() => setDownload({})}>查找资源</Button>
         </div>
         <Help>{configured.find((row) => row.key === selected)?.target || '使用已配置的目标目录'}</Help>
       </div> : null}
       {downloads.error ? <Note tone="error" title="下载配置未取得">{errorMessage(downloads.error)}</Note> : null}
-      {downloads.data && !configured.length ? <Note tone="neutral">先在配置页「下载」分组登录 PikPak，或填好 CloudDrive2 的地址与令牌。</Note> : null}
+      {downloads.data && !configured.length ? <Note tone="neutral">尚未配置下载渠道。<a href={'/configuration?section=' + encodeURIComponent('下载渠道')}>下载渠道设置</a></Note> : null}
       {downloads.data && !downloads.data.available ? <Note tone="neutral">云下载只在账本写入端可用。</Note> : null}
 
       {data && !items.length ? (
-        <EmptyState shell="plain" icon={RiStarLine} title="还没有想要的作品">
-          在上面输入番号，或在 Feed 新作卡、关注详情上点「想要」。
+        <EmptyState shell="plain" icon={RiStarLine} title={query ? '没有符合条件的作品' : '还没有想要的作品'}>
+          {query ? '试试其他番号、女优或标题。' : '在上面输入番号，或在 Feed 新作卡、关注详情上点「想要」。'}
         </EmptyState>
       ) : null}
 
@@ -215,6 +214,7 @@ export function WantList({ readOnly, toast }: WantListProps) {
               onReset={() => reset(want)} onRemove={() => remove(want)}
               onCloudDownload={() => setDownload({
                 code: want.code || '', title: want.title || '', origin: `wishlist:${want.id}`,
+                cover: want.cover || '', performers: want.performers || '', release_date: want.release_date || '', studio: want.studio || '',
               })} />
           )} />
         );

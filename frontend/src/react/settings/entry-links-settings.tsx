@@ -39,7 +39,7 @@ export function EntryLinksForm({ initial, receipt }: {
   };
 
   return (
-    <Section title="外部入口" onSubmit={submit}>
+    <Section title="作品资料站点" onSubmit={submit}>
       <Stack>
         <Help>{ENTRY_LINKS_HELP}</Help>
         {sites.map((site) => (

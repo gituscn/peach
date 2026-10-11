@@ -20,6 +20,7 @@ import {
   type FollowSource, type ResolveJob, type SuggestData,
 } from '../../src/react/follow-manage/follow-manage';
 import { FollowManagePage } from '../../src/react/follow-manage/follow-manage-page';
+import { Credentials } from '../../src/react/follow-manage/credentials';
 
 import { buttonNamed, choose, click, mountRoot, settle, type } from './render';
 
@@ -144,6 +145,7 @@ const shellProps = (over: Partial<Props> = {}): Props => ({
   savePreference: vi.fn(),
   toast: vi.fn(),
   openFollow: vi.fn(),
+  openServiceConfiguration: vi.fn(),
   readOnly: false, readOnlyMessage: '', writerUrl: '',
   ...over,
 });
@@ -154,7 +156,9 @@ async function open(plan: Plan = {}, over: Partial<Props> = {}) {
   const props = shellProps(over);
   await prefetchFollowManage(new AbortController().signal, props.tab).catch(() => {});
   const mounted = await mountRoot(
-    <QueryClientProvider client={queryClient}><FollowManagePage {...props} /></QueryClientProvider>);
+    <QueryClientProvider client={queryClient}>{over.tab === 'source'
+      ? <Credentials data={plan.creds || credentials()} readOnly={props.readOnly} toast={props.toast} />
+      : <FollowManagePage {...props} />}</QueryClientProvider>);
   await settle();
   return { fetcher, props, ...mounted };
 }
@@ -627,7 +631,8 @@ it('一条来源都没有时空态给出添加关注的去处', async () => {
 it('各栏按做事的先后排，缺凭据的数挂在最后一栏上', async () => {
   const { host } = await open({ creds: { root: 'C:\\creds', providers: [credential({ provider: 'fanbox' })] } });
   expect([...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent))
-    .toEqual(['关注列表', '添加关注', 'JAV 订阅源', 'JAV 入库', '来源和凭证（1）']);
+    .toEqual(['关注列表', '添加关注', 'JAV 订阅源']);
+  expect(buttonNamed('来源与订阅设置（1）', host)).not.toBeNull();
 });
 
 const FEEDS: FeedsData = {
@@ -1171,8 +1176,7 @@ it('筛选里撞见缺凭据的站，一步跳到凭据那一栏', async () => {
   const { host, props } = await open({ creds }, { tab: 'add' });
   await click(buttonLabelled(host, '全部来源'));
   await click(buttonNamed('需要配置凭据'));
-  expect(props.route).toHaveBeenLastCalledWith(expect.objectContaining({ tab: 'source' }));
-  expect([...host.querySelectorAll('h3')].map((h) => h.textContent)).toContain('来源和凭证');
+  expect(props.openServiceConfiguration).toHaveBeenCalledOnce();
 });
 
 it('「猜你喜欢」点一下就拿那个名字去查', async () => {
@@ -1355,7 +1359,7 @@ it('缺什么、为什么要、去哪儿取都写在那一行上，非配不可�
   expect(fanbox.textContent).toContain('缺 FANBOXSESSID、cf_clearance');
   expect(fanbox.textContent).toContain('会员内容要登录后才看得到。');
   expect(fanbox.textContent).toContain('从浏览器开发者工具里复制。');
-  expect([...fanbox.querySelectorAll('a')].find((a) => a.textContent?.includes('去取'))?.getAttribute('href'))
+  expect([...fanbox.querySelectorAll('a')].find((a) => a.textContent?.includes('获取凭据'))?.getAttribute('href'))
     .toBe('https://www.fanbox.cc/');
   expect(fanbox.querySelector('details')?.open).toBe(true);
   expect(fanbox.querySelector('summary')?.textContent).toContain('填写凭据');
@@ -1391,11 +1395,17 @@ it('凭据填在页面上，保存后输入框清空，空着点保存会被拦�
   expect(buttonNamed('清除', credentialRow(host, 'Patreon'))).not.toBeNull();
 });
 
-it('凭据存在哪、权限过宽的警告跟在列表后面常驻', async () => {
+it('凭据文件路径可展开，权限过宽警告在凭据收起时可见', async () => {
   const { host } = await open({ creds: CREDENTIAL_CAST }, { tab: 'source' });
-  expect(host.textContent).toContain('能登录那台电脑的人都能打开');
-  expect(credentialRow(host, 'Patreon').textContent).toContain('凭据文件权限过宽');
-  const storage = [...host.querySelectorAll('b')].find((b) => b.textContent === '这些账号信息存在哪里')!;
-  const lastRow = credentialRow(host, 'Kemono');
-  expect(lastRow.compareDocumentPosition(storage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const patreon = credentialRow(host, 'Patreon');
+  expect(patreon.querySelector('details')?.open).toBe(false);
+  const warning = patreon.querySelector('[role="alert"]')!;
+  expect(warning.textContent).toContain('凭据文件权限过宽');
+  expect(warning.closest('details')).toBeNull();
+  const file = [...credentialRow(host, 'Fanbox').querySelectorAll('details')]
+    .find(node => node.querySelector('summary')?.textContent === '凭据文件')!;
+  expect(file.open).toBe(false);
+  await click(file.querySelector('summary'));
+  expect(file.open).toBe(true);
+  expect(file.textContent).toContain('fanbox.json');
 });

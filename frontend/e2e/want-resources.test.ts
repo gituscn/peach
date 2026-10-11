@@ -9,7 +9,7 @@ describe('JAV 入库作品卡', () => {
   after(async () => { await browser?.close(); });
   for (const viewport of VIEWPORTS) {
     it(`资源链接与操作完整可见（${viewport.name}）`, { timeout: 60_000 }, async () => {
-      const opened = await visit(browser, '/follow-manage', viewport);
+      const opened = await visit(browser, '/jav', viewport);
       const page = opened.page;
       try {
         await settle(page);
@@ -39,7 +39,7 @@ describe('JAV 入库作品卡', () => {
         } }); });
         await page.route('**/api/downloads?*', route => route.fulfill({ json: { available: true,
           providers: [{ key: '115', label: '115', configured: true, target: '/下载' }], tasks: [] } }));
-        await page.getByRole('tab', { name: 'JAV 入库', exact: true }).click();
+        await page.getByRole('tab', { name: '想要', exact: true }).click();
         await page.locator('[data-want-magnets]').scrollIntoViewIfNeeded();
         await page.getByRole('heading', { name: '资源链接 · 8' }).waitFor();
         await settle(page);
@@ -69,12 +69,12 @@ describe('JAV 入库作品卡', () => {
         await page.waitForFunction(() => document.querySelectorAll('[data-resource-protocol]').length === 8 &&
           !document.querySelector('details [inert=""]'));
         assert.equal(await card.locator('[data-resource-protocol]:visible').count(), 8);
-        await page.getByRole('tab', { name: '关注列表', exact: true }).click();
-        await page.getByRole('tab', { name: 'JAV 入库', exact: true }).click();
+        await page.getByRole('tab', { name: '我的馆藏', exact: true }).click();
+        await page.getByRole('tab', { name: '想要', exact: true }).click();
         await page.getByRole('heading', { name: '资源链接 · 8' }).waitFor();
         assert.equal(resourceRequests, 1, '返回页面重复查询资源');
         await page.reload();
-        await page.getByRole('tab', { name: 'JAV 入库', exact: true }).click();
+        await page.getByRole('tab', { name: '想要', exact: true }).click();
         await page.getByRole('heading', { name: '资源链接 · 8' }).waitFor();
         assert.equal(resourceRequests, 1, '刷新页面未复用持久缓存');
         assert.deepEqual(opened.problems, []);

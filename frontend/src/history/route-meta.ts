@@ -23,6 +23,7 @@ export interface RouteMeta {
 }
 
 export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
+  '/jav': { nav: 'jav', title: 'JAV', refresh: 'reopen' },
   '/stats': { section: 'stats', title: '统计' },
   '/taste': { section: 'taste', title: '口味', refresh: 'reopen' },
   '/review': { section: 'review', title: '人工复核', refresh: 'reopen' },
@@ -31,7 +32,7 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
   '/quality-goals': { section: 'quality', title: '高清版', refresh: 'reopen' },
   '/scraping': { section: 'cleanup', title: '来源和凭证', refresh: 'reopen' },
   '/follow-manage': { section: 'follow', title: '关注管理', refresh: 'skip' },
-  '/configuration': { section: 'configuration', title: '配置', refresh: 'reopen' },
+  '/configuration': { section: 'configuration', title: '服务配置', refresh: 'reopen' },
   '/activity': { section: 'activity', title: '活动', refresh: 'reopen' },
   '/diagnostics': { section: 'configuration', title: '系统诊断', refresh: 'reopen' },
   // 旧直达地址，改写到数据管理页的锚点，没有自己的管理身份。

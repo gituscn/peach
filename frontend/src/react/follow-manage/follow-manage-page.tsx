@@ -1,8 +1,6 @@
-/* 关注管理页：加来源、检查更新、移除来源、管订阅源、管想要清单、看凭据状态。
+/* 关注管理页：加来源、检查更新、移除来源与管理 JAV 订阅源。
  *
- * 五栏是五件事，所以整块切换而不是一屏铺开：看的那一页（`/follow`）不联网，联网只发生
- * 在这里点「检查更新」的那一刻。「JAV 入库」排在订阅源后面：想要的作品多半是从 Feed 新作和关注
- * 条目上点进来的，两处的来源都在这一页管。
+ * 来源凭据由服务配置管理，想要清单位于 JAV 分区。
  *
  * 地址栏与个人偏好各管各的（ADR-0031「迁移桥接」）：
  * - `tab`、`page`、`sort`、`dir` 在地址栏上。判据是「外面链接得过来吗」——把一条关注列表
@@ -28,18 +26,17 @@ import { Page } from '../components/page';
 import { STAT_STRIP_SIX } from '../components/stat-card';
 import { AddSource } from './add-source';
 import { AliasManager } from './alias-manager';
-import { Credentials } from './credentials';
+import { Button } from '@/components/base/buttons/button';
 import { FeedSources } from './feed-sources';
 import {
   credentialDone, DEFAULT_SORT, FEEDS_KEY, fetchCredentials, fetchFeeds, fetchFollow, FOLLOW_CREDENTIALS_KEY,
   FOLLOW_MANAGE_KEY, groupByAuthor, isBroken, isLayout, keepSelected, pageSizeOf,
   SORT_DEFAULT_DIR, type CredentialData, type FollowData, type Layout, type SortDir, type SortKey,
 } from './follow-manage';
-import { WantList } from '../wants/want-list';
 import { SourceList } from './source-list';
 
 const TABS = [
-  ['list', '关注列表'], ['add', '添加关注'], ['feeds', 'JAV 订阅源'], ['wants', 'JAV 入库'], ['source', '来源和凭证'],
+  ['list', '关注列表'], ['add', '添加关注'], ['feeds', 'JAV 订阅源'],
 ] as const;
 type TabKey = (typeof TABS)[number][0];
 
@@ -62,7 +59,7 @@ function Reading({ term, figure, unit }: { term: string; figure: number; unit: s
 
 export function FollowManagePage(props: FollowManageProps) {
   const {
-    route, savePreference, toast, openFollow, readOnly, readOnlyMessage, writerUrl,
+    route, savePreference, toast, openFollow, openServiceConfiguration, readOnly, readOnlyMessage, writerUrl,
   } = props;
   const [tab, setTab] = useState<TabKey>(isTab(props.tab) ? props.tab : 'list');
   const [page, setPage] = useState(Math.max(1, Math.floor(props.page) || 1));
@@ -148,9 +145,7 @@ export function FollowManagePage(props: FollowManageProps) {
         <TabList aria-label="关注管理区域" data-section-nav data-section-items
           className="flex max-w-full flex-nowrap overflow-x-auto">
           {TABS.map(([key, name]) => (
-            <Tab key={key} id={key} className="cursor-pointer whitespace-nowrap">
-              {key === 'source' && pending ? `${name}（${pending}）` : name}
-            </Tab>
+            <Tab key={key} id={key} className="cursor-pointer whitespace-nowrap">{name}</Tab>
           ))}
         </TabList>
 
@@ -182,7 +177,7 @@ export function FollowManagePage(props: FollowManageProps) {
 
         <TabPanel id="add" className="flex flex-col gap-8">
           <AddSource data={data} credentials={creds} readOnly={readOnly} toast={toast}
-            openCredentials={() => { setTab('source'); go({ tab: 'source' }) }} />
+            openCredentials={openServiceConfiguration} />
           <AliasManager groups={data.author_aliases || []} readOnly={readOnly} toast={toast}
             suggestions={data.alias_suggestions || []} sources={data.sources} />
         </TabPanel>
@@ -191,14 +186,8 @@ export function FollowManagePage(props: FollowManageProps) {
           <FeedSources readOnly={readOnly} toast={toast} />
         </TabPanel>
 
-        <TabPanel id="wants" className="flex flex-col gap-4">
-          <WantList readOnly={readOnly} toast={toast} />
-        </TabPanel>
-
-        <TabPanel id="source" className="flex flex-col gap-4">
-          <Credentials data={creds} readOnly={readOnly} toast={toast} />
-        </TabPanel>
       </Tabs>
+      <div><Button variant="secondary" onClick={openServiceConfiguration}>来源与订阅设置{pending ? `（${pending}）` : ''}</Button></div>
     </Page>
   );
 }

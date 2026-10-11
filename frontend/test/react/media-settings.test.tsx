@@ -5,7 +5,9 @@ import { CONFIGURATION_URL, PICK_FOLDER_URL } from '../../src/configuration-endp
 import type { ConfigurationData } from '../../src/react/bundle';
 import { CloudDriveGuide } from '../../src/react/settings/clouddrive-guide';
 import { MediaSettings } from '../../src/react/settings/media-settings';
-import { buttonNamed, choose, click, fetchMock, mount, section, sentBody, settle, submit, type } from './render';
+import { buttonNamed, choose, click, fetchMock, mount, section, sentBody, settle, submit } from './render';
+
+vi.mock('../../src/react/settings/service-preferences', () => ({ VideoThumbnailRow: () => null }));
 
 const data = (over: Partial<ConfigurationData> = {}): ConfigurationData => ({
   editable: true, notice: '', revision: 'rev-1', media_dirs: ['D:\\Media'], library_count: 1, port: 9123, facts: [], ...over,
@@ -16,10 +18,10 @@ const open = (over: Partial<ConfigurationData> = {}, receipt = vi.fn()) =>
 const rows = (root: ParentNode) => [...root.querySelectorAll('[data-folder-row]')];
 const paths = (root: ParentNode) => [...root.querySelectorAll<HTMLInputElement>('input[aria-label^="媒体文件夹 "]')];
 
-it('托盘管理访问端口时不画端口字段，底栏不带说明', async () => {
+it('媒体表单保留重启提示，访问端口由网络分区管理', async () => {
   const host = await open({ port_editable: false });
   expect(host.querySelector('#configPort')).toBeNull();
-  expect(host.textContent).not.toContain('保存后 Peach');
+  expect(host.textContent).toContain('保存后 Peach 会重新启动');
   expect(host.querySelector('form')).not.toBeNull();
 });
 
@@ -139,13 +141,13 @@ describe('保存', () => {
     vi.stubGlobal('fetch', fetcher);
     const receipt = vi.fn();
     const host = await open({}, receipt);
-    await type(host.querySelector<HTMLInputElement>('#configPort'), '9124');
+    expect(host.querySelector('#configPort')).toBeNull();
     await submit(host.querySelector('form'));
     await settle();
     const [url, init] = fetcher.mock.calls[0] ?? [];
     expect(url).toBe(CONFIGURATION_URL);
     expect(init?.method).toBe('POST');
-    expect(sentBody(fetcher)).toEqual({ revision: 'rev-1', media_dirs: ['D:\\Media'], port: '9124', scan_now: false });
+    expect(sentBody(fetcher)).toEqual({ revision: 'rev-1', media_dirs: ['D:\\Media'], port: '9123', scan_now: false });
     expect(receipt).toHaveBeenCalledWith('已保存配置');
     expect(host.querySelector('[role="status"]')?.textContent).toContain('正在重新启动');
     expect(host.querySelector('a[href="http://127.0.0.1:9124/"]')?.textContent).toBe('进入馆藏');
@@ -155,7 +157,7 @@ describe('保存', () => {
   it('服务端按字段退回的原因写回原位，不发回执', async () => {
     vi.stubGlobal('fetch', fetchMock(400, {
       error: '有几项需要修改',
-      errors: { media_dirs: ['', '和上面的文件夹重复了'], port: '端口要在 1024 到 65535 之间' },
+      errors: { media_dirs: ['', '和上面的文件夹重复了'] },
     }));
     const receipt = vi.fn();
     const host = await open({ media_dirs: ['D:\\Media', 'D:\\Media'] }, receipt);
@@ -163,8 +165,7 @@ describe('保存', () => {
     await settle();
     expect(paths(host).map((input) => input.getAttribute('aria-invalid'))).toEqual([null, 'true']);
     expect(rows(host)[1]?.textContent).toContain('和上面的文件夹重复了');
-    expect(host.querySelector('#configPort')?.getAttribute('aria-invalid')).toBe('true');
-    expect(host.textContent).toContain('端口要在 1024 到 65535 之间');
+    expect(host.querySelector('#configPort')).toBeNull();
     expect(receipt).not.toHaveBeenCalled();
     expect(host.textContent, '字段级原因不再叠一条整体提示').not.toContain('没有保存');
   });
@@ -191,7 +192,7 @@ it('CloudDrive 建议按硬盘分三档，页内只留怎么填，原理链到�
   expect(host.querySelector('details')?.open).toBe(false);
   expect([...host.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual([
     'https://www.clouddrive2.com/help.html',
-    'https://github.com/longmeidao/peach/blob/master/docs/CLOUDDRIVE.md',
+    'https://github.com/peach-mitao/peach/blob/master/docs/CLOUDDRIVE.md',
   ]);
 });
 

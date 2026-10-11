@@ -295,8 +295,8 @@ export function navOn(k){
     const current=manageSection();
     return !!current&&!preferencesState.appSettings.sidebarOrder.some(key=>layoutState.DIRECT_MANAGE_NAV[key]===current);
   }
-  // JAV 和竖屏不是路径，是内存里的筛选开关，所以这两条只能问 state。
-  if(k==='jav')return javActive();
+  // JAV 分区及馆藏 JAV 筛选共用导航状态；竖屏由内存里的筛选开关判定。
+  if(k==='jav')return path==='/jav'||javActive();
   if(k==='shorts')return state.orient==='竖屏';
   // 首页只在真的停在首页列表上时亮：管理区、索引页、实体页都不算，
   // 否则它会和当前所在的入口同时高亮。
@@ -311,7 +311,7 @@ export function navTo(k){
   closeDrawerAfterNav();                 // 点了就收起抽屉，且短暂禁止悬停把它立刻弹回
   if(layoutState.DIRECT_MANAGE_NAV[k]){openManage(layoutState.DIRECT_MANAGE_NAV[k]);return}
   if(k==='manage'){openManage();return}
-  if(k==='jav'){toggleJavMode();return}
+  if(k==='jav'){navigationState.navigatePath('/jav');return}
   if(k===''){goHome();return}
   // 有自己路径的入口（追更、播放列表、沉浸模式、索引页）按路由元数据的 `nav` 找路径进。
   const path=STATE_ROUTES[k]?null:navigationState.routePathOf('nav',k);

@@ -1,5 +1,4 @@
-/* 「维护」分组：运行信息与系统诊断、重开安装教程，卸载排在最后。自动更新卡定义在这里，
- * 摆在「通用」分组。 */
+/* 「应用与维护」中的运行信息、诊断、安装教程与卸载。 */
 import { useState, type FormEvent } from 'react';
 import { confirmModal } from '@peach/legacy/ui';
 
@@ -40,10 +39,7 @@ export function TutorialSettings({ receipt, reopenTutorial }: ConfigurationProps
     () => receipt('已重新打开安装教程'));
   return (
     <Section title="安装教程">
-      <Stack>
-        <Help>重新显示已关闭或跳过的安装步骤，保留已完成的记录。</Help>
-        {action.error ? <ErrorText>{action.error}</ErrorText> : null}
-      </Stack>
+      {action.error ? <Stack><ErrorText>{action.error}</ErrorText></Stack> : null}
       <Footer>
         <Button onClick={reopen} {...busyProps(action.busy === 'reopen')}>重新打开教程</Button>
       </Footer>

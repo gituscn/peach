@@ -1,4 +1,4 @@
-/* 「网络与访问」分组：Peach 代理、外部入口镜像、本机访问密码与公网入口。 */
+/* 「网络与访问」分组：本机端口、Peach 代理、访问密码与公网入口。 */
 import { useState, type FormEvent } from 'react';
 
 import { SettingsRow } from '@/components/application/settings/settings-rows';
@@ -11,7 +11,7 @@ import type { ConfigurationGroupProps, PeachProxyState } from '../bundle';
 import { Note } from '../components/note';
 import { AccessSettings } from './access-settings';
 import { groupRoot } from './configuration-panel';
-import { EntryLinksForm } from './entry-links-settings';
+import { PortSettings } from './port-settings';
 import { TunnelSettings } from './tunnel-settings';
 import { ErrorText, Footer, Rows, Section, Stack } from './section';
 import { busyProps, useAction } from './use-action';
@@ -21,8 +21,8 @@ const PROXY_MODES = [['environment', '系统代理'], ['direct', '直连'], ['pr
 export function NetworkSettings({ data, receipt, panel }: ConfigurationGroupProps) {
   return (
     <div {...groupRoot(panel)}>
+      {data.editable && data.port_editable !== false ? <PortSettings data={data} receipt={receipt} /> : null}
       {data.peach_proxy ? <PeachProxy initial={data.peach_proxy} receipt={receipt} /> : null}
-      {data.entry_links ? <EntryLinksForm initial={data.entry_links} receipt={receipt} /> : null}
       {data.access ? <AccessSettings initial={data.access} receipt={receipt} /> : null}
       {data.tunnel ? <TunnelSettings revision={data.revision} initial={data.tunnel} receipt={receipt} /> : null}
     </div>
@@ -44,7 +44,7 @@ export function PeachProxy({ initial, receipt }: { initial: PeachProxyState; rec
   return (
     <Section id="peachProxy" title="Peach 代理" onSubmit={submit}>
       <Rows>
-        <SettingsRow label="连接方式" description="采集来源选「Peach 代理」时共用这里的连接方式。">
+        <SettingsRow label="连接方式">
           <Select aria-label="连接方式" selectedKey={mode} onSelectionChange={(key) => { if (key !== null) setMode(String(key)); }}>
             {PROXY_MODES.map(([key, name]) => <SelectItem key={key} id={key}>{name}</SelectItem>)}
           </Select>

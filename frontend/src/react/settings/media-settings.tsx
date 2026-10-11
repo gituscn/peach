@@ -1,4 +1,4 @@
-/* 「媒体」分组：这台电脑的媒体文件夹、本机端口与推送发现，每个文件夹标着挂载状态。
+/* 「媒体库与入库」分组：媒体文件夹与自动入库，每个文件夹标着挂载状态。
  *
  * 服务端按两道门放行：托盘管理的服务、且从运行 Peach 的这台电脑打开时 `editable` 才为真；
  * 其它情况表单不画，只留一句为什么。保存成功后 Peach 会重启，这里给一句持久提示、一条新地址
@@ -24,6 +24,7 @@ import { groupRoot } from './configuration-panel';
 import { FolderRow, isCloudSource, MEDIA_SOURCES, SourceSelect, sourceMark, useFolderRows, WindowsRootInput } from './folder-rows';
 import { LibraryIconPicker } from './library-icon-picker';
 import { PushDiscoveryForm } from './push-discovery-settings';
+import { VideoThumbnailRow } from './service-preferences';
 import {
   ErrorText, ExternalLink, Fact, FactList, FieldLabel, Footer, Help, Section, SourceMark, Stack,
 } from './section';
@@ -63,6 +64,7 @@ export function MediaSettings({ data, receipt, panel }: ConfigurationGroupProps)
       {data.push_discovery
         ? <PushDiscoveryForm initial={data.push_discovery} receipt={receipt} />
         : null}
+      <VideoThumbnailRow />
     </div>
   );
 }
@@ -71,9 +73,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
   const { rows, edit, add, remove, errors: rowErrors, setErrors: setRowErrors, picking, pick, inputRef } = useFolderRows({
     initial: () => initialRows(data), blank: () => blankRow(), pickFolder, describe: errorMessage,
   });
-  const [port, setPort] = useState(String(data.port));
   const [scanNow, setScanNow] = useState(false);
-  const [portError, setPortError] = useState('');
   const [failure, setFailure] = useState('');
   const [saved, setSaved] = useState<SaveResult | null>(null);
   const revision = useRef(data.revision);
@@ -92,25 +92,23 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
       revision: revision.current,
       media_dirs: rows.map((row) => row.path),
       ...(data.media_sources ? { media_sources: rows } : {}),
-      port,
+      port: String(data.port),
       scan_now: scanNow,
     }, 'POST', signal), (result) => {
       revision.current = result.revision;
       setRowErrors([]);
-      setPortError('');
       receipt('已保存配置');
       setSaved(result);
     }, (cause) => {
       const fields = fieldErrorsOf(cause);
       setRowErrors(fields?.media_dirs ?? []);
-      setPortError(fields?.port ?? '');
-      if (!fields) setFailure(errorMessage(cause));
+      if (!fields || fields.port) setFailure(fields?.port || errorMessage(cause));
     });
   };
 
   if (saved) {
     return (
-      <Section title="这台电脑">
+      <Section title="媒体文件夹">
         <Stack>
           <Note tone="success" title="配置已保存">
             Peach 正在重新启动。稍后自动跳转，或点击<LinkButton href={saved.url} size="small">进入馆藏</LinkButton>。
@@ -125,7 +123,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
   const cloud = rows.some((row) => isCloudSource(row.location));
   const missing = cloud ? (data.mount_dependencies ?? []).filter((dependency) => !dependency.available) : [];
   return (
-    <Section title="这台电脑" onSubmit={submit}>
+    <Section title="媒体文件夹" onSubmit={submit}>
       <Stack>
         <div className="flex flex-col gap-3">
           <FieldLabel>媒体文件夹</FieldLabel>
@@ -138,7 +136,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                 status={mountOf(row.path) ? <MountBadge online={mountOf(row.path)?.online} /> : null}>
                 <SourceSelect index={index} value={row.location} onChange={(location) => edit(index, { location })} />
                 <Input className="min-w-40 flex-1" aria-label={`媒体库名称 ${index + 1}`} maxLength={80}
-                  placeholder="媒体库名称，同名归为一个库"
+                  placeholder="媒体库名称"
                   value={row.library} onChange={(library) => edit(index, { library })} />
                 <LibraryIconPicker label={`媒体库图标 ${index + 1}`} value={row.library_icon} kind={row.location}
                   onChange={(library_icon) => edit(index, { library_icon })} />
@@ -157,16 +155,12 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
           </Help>
         ))}
         {data.windows === false
-          ? <Help>本机文件夹是这台电脑读取媒体的位置。Windows 中的对应路径用于匹配馆藏中已有的路径，例如 B:\ 对应本机挂载文件夹。</Help>
-          : null}
-        {data.port_editable !== false
-          ? <Input id="configPort" label="本机访问端口" inputMode="numeric" value={port} onChange={setPort}
-              validationBehavior="aria" isInvalid={Boolean(portError)} hint={portError || '浏览器地址里冒号后面的数字，一般不用改。'} />
+          ? <Help>Windows 对应路径应与馆藏中记录的路径一致。</Help>
           : null}
         <Checkbox isSelected={scanNow} onChange={setScanNow}>保存后扫描并补全资料</Checkbox>
         {failure ? <Note tone="error" title="没有保存">{failure}</Note> : null}
       </Stack>
-      <Footer status={data.port_editable === false ? undefined : '保存后 Peach 会重新启动，端口改了就用新地址打开。'}>
+      <Footer status="保存后 Peach 会重新启动。">
         <Button type="submit" {...busyProps(action.busy === 'save')}>保存配置</Button>
       </Footer>
     </Section>
