@@ -1,5 +1,6 @@
 /* feed 域控制器：本域状态与动作，启动由 Application 的生命周期统一安装。 */
 import { coverImage } from './../card-art/markup';
+import { feedIdentity } from './../card-art/feed-identity';
 import { $, api, esc, foldName, icon, isCatalogPath } from '../core';
 import { javTitleHtml } from '../core/jav-title';
 import { COVER_FRONT_RATIO } from './../appearance/layout';
@@ -19,10 +20,10 @@ export function feedNewCoverHtml(item){
 }
 
 export function feedNewCardHtml(item){
-  // 女优名与发行日各占一段：订阅按人订，底行说是谁的新片；放不下时只收女优名，日期整段留着。
-  const label=[item.performers&&`<span class="feednewperformers">${esc(item.performers)}</span>`,
+  // 署名与日期各占一行，长出演名单可从悬停说明查看。
+  const label=[item.performers&&`<span class="feednewperformers" title="${esc(item.performers)}">${esc(item.performers)}</span>`,
     item.release_date&&`<span>${esc(item.release_date)}</span>`].filter(Boolean)
-    .join('<span aria-hidden="true">·</span>');
+    .join('');
   const cover=feedNewCoverHtml(item);
   // 番号与标题排在同一个两行的标题块里，和资产卡一样：番号加粗打头，标题接在后面截断。
   const name=item.code||String(item.title||'').trim()||'未命名新作';
@@ -38,7 +39,7 @@ export function feedNewCardHtml(item){
         <button type="button" data-feed-action="${item.wanted?'unwant':'want'}" aria-pressed="${!!item.wanted}" title="${item.wanted?'取消想要':'想要'}" aria-label="想要 ${esc(name)}">${icon('star')}</button>
         <button type="button" data-feed-action="ignore" title="不想看" aria-label="不想看 ${esc(name)}">${icon('x')}</button>
         <button type="button" data-feed-action="read" title="标为已看过" aria-label="标为已看过 ${esc(name)}">${icon('check')}</button></div></div>
-    <div class="meta"><div class="mtext"><span class="t">${heading}</span>
+    <div class="meta">${feedIdentity(item)}<div class="mtext"><span class="t">${heading}</span>
       <div class="s mono">${label||(item.title?'':'资料还没取到')}</div></div></div></article>`;
 }
 

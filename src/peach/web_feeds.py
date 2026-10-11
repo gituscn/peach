@@ -466,6 +466,25 @@ LISTED = (
 )
 
 
+def _discovery_performers(connection, contract, rows) -> dict[int, list[dict]]:
+    """新作出演名单按已有身份解析，头像契约与馆藏卡片共用。"""
+    names = {name.strip() for row in rows
+             for name in re.split(r"[,，、;/]", row["performers"] or "") if name.strip()}
+    identities = {name: entities.resolve_entity(connection, "performer", name) for name in names}
+    identity_refs = {int(found["id"]): web_catalog.entity_ref(
+        contract, "performer", int(found["id"]), found["canonical_name"])
+        for found in identities.values() if found}
+    performers = {}
+    for row in rows:
+        refs = []
+        for name in re.split(r"[,，、;/]", row["performers"] or ""):
+            found = identities.get(name.strip())
+            if found and found["id"] not in {ref["id"] for ref in refs}:
+                refs.append(identity_refs[int(found["id"])])
+        performers[int(row["id"])] = refs
+    return performers
+
+
 def q_feed_discoveries(contract, args) -> dict:
     """未入库的新作。`entity` 限定到某个人，`state` 切换忽略视图。
 
@@ -500,18 +519,7 @@ def q_feed_discoveries(contract, args) -> dict:
         studios = {name: _studio_name(connection, name)
                    for name in {row["studio"] for row in rows[:limit]} if name}
         wanted = wants.wanted_keys(connection, (normalise_code_key(row["code"]) for row in rows[:limit]))
-        names = {name.strip() for row in rows[:limit]
-                 for name in re.split(r"[,，、;/]", row["performers"] or "") if name.strip()}
-        identities = {name: entities.resolve_entity(connection, "performer", name) for name in names}
-        performers = {}
-        for row in rows[:limit]:
-            refs = []
-            for name in re.split(r"[,，、;/]", row["performers"] or ""):
-                found = identities.get(name.strip())
-                if found and found["id"] not in {ref["id"] for ref in refs}:
-                    refs.append(web_catalog.entity_ref(
-                        contract, "performer", int(found["id"]), found["canonical_name"]))
-            performers[int(row["id"])] = refs
+        performers = _discovery_performers(connection, contract, rows[:limit])
     more = len(rows) > limit
     # 最近一轮取新作资料里封面断在连接上的部数。只看最近这一轮：换了线路之后下一轮取到，
     # 提示就该跟着消失，而不是让一次旧故障一直挂在页面上。

@@ -14,5 +14,5 @@
   font: var(--board-body-medium);
 }
 .peach-react [data-jav-identity] { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 40px; }
-.peach-react [data-jav-identity] [data-media-avatars] { max-width: 50%; }
+.peach-react [data-jav-faces] { display: flex; align-items: center; max-width: 50%; flex-shrink: 0; }
 .peach-react [data-jav-actions] { margin-top: auto; }

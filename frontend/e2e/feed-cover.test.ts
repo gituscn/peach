@@ -1,12 +1,47 @@
 import assert from 'node:assert/strict';
 import {after,before,describe,it} from 'node:test';
 import type {Browser} from 'playwright-core';
-import {launch,requiredEnv,VIEWPORTS} from './harness.ts';
+import {launch,layout,requiredEnv,VIEWPORTS} from './harness.ts';
 
 describe('新作封面显示时机',()=>{
  let browser:Browser;
  before(async()=>{browser=await launch()});
  after(async()=>{await browser?.close()});
+ for(const viewport of VIEWPORTS){
+  it(`${viewport.name} 新作头像显示人物图与首字并提供独立资料入口`,{timeout:60000},async()=>{
+   const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},reducedMotion:'reduce'});
+   try{
+    await context.addInitScript(()=>localStorage.setItem('peach.settings.v1',JSON.stringify({detailAutoplay:false,feedAutoScroll:false})));
+    const page=await context.newPage();
+    const name='有很长名字的规范人物';
+    await page.route(/\/entity-image\?kind=performer&id=42/,route=>route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" fill="#777"/></svg>'}));
+    await page.route(/\/api\/entity\/shapes/,route=>route.fulfill({json:{home:{feed:true},entities:[]}}));
+    await page.route(/\/api\/feeds\/discoveries\?/,route=>route.fulfill({json:{ok:true,items:[
+     {id:1,code:'EXM-001',title:'示例新作',link:'https://javdb.com/v/example',performers:name+'、乙、丙、丁',release_date:'2026-10-30',
+      performer_refs:[{id:42,name,has_image:true,image_version:'7'},...['乙','丙','丁'].map((name,index)=>({id:43+index,name,has_image:false}))]},
+     {id:2,code:'EXM-002',title:'未建档新作',performers:'未建档人物'}]}}));
+    await page.goto(requiredEnv('PEACH_E2E_ORIGIN')+'/stats');
+    await page.evaluate(()=>{history.pushState({},'','/');window.dispatchEvent(new PopStateEvent('popstate'))});
+    const card=page.locator('#feedNew [data-feed-id="1"]');
+    await card.waitFor({state:'visible'});
+    const avatar=card.getByRole('link',{name:'打开女优页：'+name,exact:true});
+    await avatar.locator('img').waitFor({state:'visible'});
+    assert.equal(await card.locator('.mav').count(),3);
+    assert.equal(await card.locator('.mav img').count(),1);
+    assert.equal(await avatar.getAttribute('href'),'/performers/'+encodeURIComponent(name));
+    assert.equal(await avatar.evaluate(el=>getComputedStyle(el).pointerEvents),'auto');
+    const names=await card.locator('.feednewperformers').boundingBox();
+    const date=await card.locator('.meta .s>span').last().boundingBox();
+    assert.ok(names&&date&&names.width>=30&&date.y>=names.y+names.height-1,'姓名和完整日期各有可见的一行');
+    assert.equal(await page.locator('#feedNew [data-feed-id="2"] .mav .ini').textContent(),'未');
+    const geometry=await layout(page);
+    assert.ok(geometry.scrollWidth<=geometry.viewportWidth+1);
+    await page.screenshot({path:`../build/feed-avatars-${viewport.name}.png`});
+    await avatar.click();
+    await page.waitForURL('**/performers/'+encodeURIComponent(name));
+   }finally{await context.close()}
+  });
+ }
  for(const viewport of VIEWPORTS)for(const delay of [0,1800]){
   it(`${viewport.name} ${delay?'慢图':'预加载'}完成取景才显示`,{timeout:60000},async()=>{
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height}});

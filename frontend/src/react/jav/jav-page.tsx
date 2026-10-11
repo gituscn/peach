@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { RiCompassLine, RiExternalLinkLine } from '@remixicon/react';
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
-import { coverUrl, coverImage, entityAvatar } from '@peach/card-art';
+import { coverUrl, coverImage } from '@peach/card-art';
+import { feedIdentity } from '../../card-art/feed-identity';
 import { javContentSkeleton, JAV_RECOMMENDATION_GRID } from '../../jav-skeleton';
 import { apiGet, errorMessage } from '../../api';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
@@ -32,13 +33,13 @@ export function JavPage({ tab, readOnly, navigate, receipt }: {
         value={text} onChange={setText} enterKeyHint="search" />
     </form>
     {tab === 'discover'
-      ? <Discover readOnly={readOnly} receipt={receipt} resource={setDownload} query={text.trim()} navigate={navigate} />
+      ? <Discover readOnly={readOnly} receipt={receipt} resource={setDownload} query={text.trim()} />
       : <WantList readOnly={readOnly} toast={receipt} query={text.trim()} />}
     <CloudDownloadDialog prefill={download} close={() => setDownload(null)} receipt={receipt} />
   </div>;
 }
 
-function Discover({ readOnly, receipt, resource, query, navigate }: { readOnly: boolean; receipt(message: string): void; resource(work: DownloadPrefill): void; query: string; navigate(path: string): void }) {
+function Discover({ readOnly, receipt, resource, query }: { readOnly: boolean; receipt(message: string): void; resource(work: DownloadPrefill): void; query: string }) {
   const taste = useQuery({ queryKey: tasteKey('all'), queryFn: ({ signal }) => fetchTaste('all', signal) });
   const discoveries = useQuery({ queryKey: ['jav-discoveries'], queryFn: ({ signal }) => apiGet<{ items: Discovery[] }>('/api/feeds/discoveries?limit=100', signal) });
   const action = useAction();
@@ -63,12 +64,7 @@ function Discover({ readOnly, receipt, resource, query, navigate }: { readOnly: 
         </div>
         <h3 data-jav-title="" title={`${item.code} · ${item.title || '标题未取得'}`}>{item.code} · {item.title || '标题未取得'}</h3>
         <div data-jav-identity="">
-          <div data-media-avatars="">
-            {(item.performer_refs || []).slice(0, 5).map(ref => <a key={ref.id} data-media-avatar=""
-              href={`/performers/${encodeURIComponent(ref.name)}`} aria-label={`查看 ${ref.name}`} title={ref.name}
-              onClick={event => { event.preventDefault(); navigate(`/performers/${encodeURIComponent(ref.name)}`) }}
-              dangerouslySetInnerHTML={{ __html: entityAvatar(ref.name, ref, 'performer') }} />)}
-          </div>
+          <div data-jav-faces="" dangerouslySetInnerHTML={{ __html: feedIdentity(item) }} />
           <p className="min-w-0 truncate text-body-2-regular text-text-secondary" title={item.performers}>{[item.performers, item.release_date].filter(Boolean).join(' · ')}</p>
         </div>
         <p className="truncate text-body-2-regular text-text-secondary" title={`你常看的女优：${item.matches.join('、')}`}>你常看的女优：{item.matches.join('、')}</p>
