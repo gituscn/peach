@@ -56,14 +56,14 @@ function IndexerForm({ initial, receipt }: { initial: State; receipt(message: st
               isDisabled={Boolean(action.busy)} onChange={(clear_api_key) => update(row.key, { clear_api_key })}>
               清除已保存的 API key
             </Checkbox> : null}
-            <div><Button type="button" disabled={Boolean(action.busy)}
+            <div><Button variant="danger" type="button" disabled={Boolean(action.busy)}
               onClick={() => setRows(rows.filter((item) => item.key !== row.key))}>移除索引器 {index + 1}</Button></div>
           </div>
         ))}
         {action.error ? <ErrorText>{action.error}</ErrorText> : null}
       </Stack>
       <Footer>
-        <Button type="button" disabled={Boolean(action.busy) || rows.length >= initial.max_indexers}
+        <Button variant="secondary" type="button" disabled={Boolean(action.busy) || rows.length >= initial.max_indexers}
           onClick={() => setRows([...rows, { key: crypto.randomUUID(), name: '', url: '', enabled: true, api_key_set: false }])}>
           添加索引器
         </Button>

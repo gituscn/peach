@@ -115,7 +115,8 @@ export function ReleaseUpdates({ initial, initialJob }: { initial: ReleaseState;
         {data.state === 'available' && data.installation === '独立测试包' && job.state !== 'ready'
           ? <Button onClick={download} {...busyProps(running || action.busy === 'download')}>下载并安装</Button>
           : null}
-        <Button disabled={running} onClick={check} {...busyProps(action.busy === 'check')}>检查更新</Button>
+        <Button variant={job.state === 'ready' || (data.state === 'available' && data.installation === '独立测试包') ? 'secondary' : 'primary'}
+          disabled={running} onClick={check} {...busyProps(action.busy === 'check')}>检查更新</Button>
       </Footer>
     </Section>
   );

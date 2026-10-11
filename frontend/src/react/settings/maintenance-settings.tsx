@@ -2,12 +2,11 @@
 import { useState, type FormEvent } from 'react';
 import { confirmModal } from '@peach/legacy/ui';
 
-import { SettingsRow } from '@/components/application/settings/settings-rows';
+import { SettingsCard, SettingsRow } from '@/components/application/settings/settings-rows';
 import { Button } from '@/components/base/buttons/button';
-import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Select, SelectItem } from '@/components/base/select/select';
 import { Switch } from '@/components/base/switch/switch';
-import { LinkButton } from '@/components/base/buttons/link-button';
+import { ButtonLink } from '@/components/base/buttons/button';
 
 import { apiSend } from '../../api';
 import type {
@@ -38,12 +37,12 @@ export function TutorialSettings({ receipt, reopenTutorial }: ConfigurationProps
   const reopen = () => void action.run('reopen', () => reopenTutorial(),
     () => receipt('已重新打开安装教程'));
   return (
-    <Section title="安装教程">
+    <section aria-label="安装教程" className="w-full"><SettingsCard>
+      <Rows><SettingsRow label="安装教程">
+        <Button variant="secondary" onClick={reopen} {...busyProps(action.busy === 'reopen')}>重新打开教程</Button>
+      </SettingsRow></Rows>
       {action.error ? <Stack><ErrorText>{action.error}</ErrorText></Stack> : null}
-      <Footer>
-        <Button onClick={reopen} {...busyProps(action.busy === 'reopen')}>重新打开教程</Button>
-      </Footer>
-    </Section>
+    </SettingsCard></section>
   );
 }
 
@@ -102,9 +101,9 @@ function Facts({ facts }: { facts: ConfigurationFact[] }) {
           </Fact>
         ))}
       </FactList>
-      <Footer>
-        <LinkButton href="/diagnostics">打开系统诊断</LinkButton>
-      </Footer>
+      <Rows><SettingsRow label="系统诊断">
+        <ButtonLink variant="secondary" href="/diagnostics">打开系统诊断</ButtonLink>
+      </SettingsRow></Rows>
     </Section>
   );
 }
@@ -134,9 +133,9 @@ export function UninstallSettings(
     <Section id="uninstallPeach" title="卸载 Peach">
       <Stack>
         {uninstall.available ? <Help>卸载移除 Peach 程序本身，原始媒体文件保留。</Help> : null}
-        <Checkbox isSelected={removeData} isDisabled={!uninstall.full_available || Boolean(accepted)} onChange={setRemoveData}>
-          完全卸载：同时删除设置、本地数据库、观看记录、凭据和缓存
-        </Checkbox>
+        <SettingsRow label="完全卸载" description="同时删除设置、本地数据库、观看记录、凭据和缓存">
+          <Switch aria-label="完全卸载" isSelected={removeData} isDisabled={!uninstall.full_available || Boolean(accepted)} onChange={setRemoveData} />
+        </SettingsRow>
         <Disclosure summary="数据目录">
           {paths.map((path) => (
             <PathLine key={path} path={path} className="text-body-2-regular text-text-secondary" onRevealed={receipt} />

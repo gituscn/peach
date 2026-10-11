@@ -81,10 +81,10 @@ export async function expectBody(page: Page, where: string, body: readonly Locat
   }
 }
 
-/** 服务配置页的主体：标题与默认的媒体库分区。 */
+/** Peach 配置页的主体：标题与默认的媒体库分区。 */
 export function configurationBody(page: Page): Locator[] {
   return [
-    page.locator('#main').getByRole('heading', { name: '服务配置', exact: true }),
+    page.locator('#main').getByRole('heading', { name: 'Peach 配置', exact: true }),
     page.locator('#stats').getByRole('tab', { name: '媒体库与入库' }),
   ];
 }

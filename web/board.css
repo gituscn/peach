@@ -287,6 +287,7 @@ body #stats [data-section-items]{gap:4px;border:0;overflow:visible}
 body #stats [data-section-items]>[aria-selected]{flex:none;min-height:40px;height:auto;padding:10px 12px;border:0;border-radius:var(--control-radius);background:none;box-shadow:none;text-align:left;font:var(--board-body-medium);color:var(--color-text-secondary)}
 body #stats [data-section-items]>[aria-selected]:hover{background:var(--color-background-primary-hover);color:var(--color-text-primary)}
 body #stats [data-section-items]>[aria-selected=true]{background:var(--color-background-tertiary-default);color:var(--color-text-primary)}
+body #stats :is([aria-label="配置分区"],[aria-labelledby="reviewcategories"])>[aria-selected=false]:hover{background:none;color:var(--color-text-primary)}
 body #stats [data-section-items]>[aria-selected]:focus-visible{outline:2px solid var(--color-border-focus-ring);outline-offset:-2px}
 @media(max-width:900px){
  body #stats [data-section-items]{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain}
@@ -899,12 +900,12 @@ body .review{width:100%;max-width:var(--board-content);margin:0 auto;box-sizing:
 body .review .reviewcontrols{position:static;z-index:auto;padding-block:0;display:block;border-radius:0}
 
 /* 数据管理子页：结果标题、证据区域和操作栏各有固定归属。 */
-body[data-surface="/review"] .review-workspace{display:grid;grid-template-columns:minmax(0,1fr) 184px;column-gap:24px;align-items:start}
-body[data-surface="/review"] .review-workspace>.reviewcontrols{grid-column:2;grid-row:1 / span 4;position:sticky;top:var(--topH);padding:16px 8px;border-radius:var(--surface-radius)}
+body[data-surface="/review"] .review-workspace{display:grid;grid-template-columns:184px minmax(0,1fr);column-gap:24px;align-items:start}
+body[data-surface="/review"] .review-workspace>.reviewcontrols{grid-column:1;grid-row:1 / span 4;position:sticky;top:var(--topH);padding:16px 8px;border-radius:var(--surface-radius)}
 body[data-surface="/review"] .review-category-title{font:var(--board-caption);color:var(--muted);margin:0 12px 12px}
 body[data-surface="/review"] .reviewtabs{display:flex;flex-direction:column;gap:4px;align-items:stretch;white-space:normal}
 body[data-surface="/review"] .reviewtabs button{height:auto;min-height:40px;text-align:left;justify-content:space-between;padding:10px 12px;white-space:normal}
-body[data-surface="/review"] .review-workspace>:is(.reviewsection,.reviewbulktoolbar){grid-column:1;min-width:0}
+body[data-surface="/review"] .review-workspace>:is(.reviewsection,.reviewbulktoolbar){grid-column:2;min-width:0}
 body[data-surface="/review"] .reviewlist{grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:20px}
 /* 卡片是一块填充的面：底色、圆角和那层极浅的投影都跟到货的卡逐字对上。占位和到货
    差一档底色或圆角，读完数据整片网格会跳一下。 */

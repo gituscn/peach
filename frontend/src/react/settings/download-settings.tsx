@@ -212,7 +212,7 @@ function DownloadForm({ state, settle, receipt, pikpakAccount }: CardProps & { p
       ) : null}
       {failure || action.error ? <Stack divided><ErrorText>{failure || action.error}</ErrorText></Stack> : null}
       <Footer status={state.available ? undefined : '云下载只在账本写入端可用。'}>
-        <Button onClick={check} disabled={!state.available} {...busyProps(action.busy === 'check')}>检查连接</Button>
+        <Button variant="secondary" onClick={check} disabled={!state.available} {...busyProps(action.busy === 'check')}>检查连接</Button>
         <Button type="submit" disabled={!state.available} {...busyProps(action.busy === 'save')}>保存配置</Button>
       </Footer>
     </Section>
@@ -256,7 +256,7 @@ function CheckReport({ report, detected, suggested, create, creating }: {
         {folder && !folder.exists ? (
           <Fact term="115 目标目录">
             {`${folder.path} 不存在`}
-            {create ? <Button size="small" onClick={() => create(folder.path)} {...busyProps(creating)}>新建这个目录</Button> : null}
+            {create ? <Button variant="secondary" size="small" onClick={() => create(folder.path)} {...busyProps(creating)}>新建这个目录</Button> : null}
           </Fact>
         ) : null}
         {suggested.root ? <Fact term="PikPak 根目录">{`按推送发现填入 ${suggested.root}，保存配置后生效`}</Fact> : null}
@@ -406,9 +406,9 @@ function PikPakAccount({ state, settle, receipt, username, setUsername }: CardPr
       <Footer status={!account.logged_in && waiting
         ? <LoadingDots label={browser.message || '等你在浏览器窗口里登录 PikPak'} /> : null}>
         {account.logged_in ? (
-          <Button onClick={logout} disabled={!state.available} {...busyProps(action.busy === 'logout')}>登出</Button>
+          <Button variant="secondary" onClick={logout} disabled={!state.available} {...busyProps(action.busy === 'logout')}>登出</Button>
         ) : !browser.available ? passwordLogin : waiting ? (
-          <Button type="button" onClick={cancelBrowser} {...busyProps(action.busy === 'cancel')}>取消</Button>
+          <Button variant="secondary" type="button" onClick={cancelBrowser} {...busyProps(action.busy === 'cancel')}>取消</Button>
         ) : (
           <Button type="button" onClick={openBrowser} disabled={!state.available}
             {...busyProps(action.busy === 'browser')}>用浏览器登录</Button>

@@ -239,11 +239,11 @@ export function ReviewPage(props: ReviewProps) {
       ) : null}
       <GenreTagList tags={genreTags} />
 
-      {/* 分类列位于正文右侧；窄屏使用正文上方的单行导航。 */}
+      {/* 分类目录位于正文左侧；窄屏使用正文上方的导航。 */}
       <Tabs orientation={narrow ? 'horizontal' : 'vertical'} selectedKey={category} onSelectionChange={(key) => {
         const next = String(key);
         if (isReviewCategory(next)) goCategory(next);
-      }} className="flex flex-col gap-5 review-split:flex-row-reverse review-split:items-start review-split:gap-6">
+      }} className="flex flex-col gap-5 review-split:flex-row review-split:items-start review-split:gap-6">
         <div data-section-nav className="w-full min-w-0 review-split:sticky review-split:top-topbar review-split:w-review-tabs review-split:shrink-0">
           <h2 id="reviewcategories">复核分类</h2>
           <TabList aria-labelledby="reviewcategories" data-section-items

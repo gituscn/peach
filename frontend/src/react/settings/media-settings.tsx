@@ -146,7 +146,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
               </FolderRow>
             ))}
           </div>
-          <Button className="self-start" onClick={add}>添加文件夹</Button>
+          <Button variant="secondary" className="self-start" onClick={add}>添加文件夹</Button>
         </div>
         {cloud ? <CloudDriveGuide /> : null}
         {missing.map((dependency) => (
@@ -196,7 +196,7 @@ function MountStatus({ data }: { data: ConfigurationData }) {
       </FactList>
       {action.error ? <Stack divided><ErrorText>{action.error}</ErrorText></Stack> : null}
       <Footer>
-        <Button onClick={refresh} {...busyProps(action.busy === 'refresh')}>刷新挂载状态</Button>
+        <Button variant="secondary" onClick={refresh} {...busyProps(action.busy === 'refresh')}>刷新挂载状态</Button>
       </Footer>
     </Section>
   );

@@ -17,6 +17,7 @@ import {
   type KeyboardEvent, type ReactNode,
 } from 'react';
 import { flushSync } from 'react-dom';
+import { ButtonLink } from '@/components/base/buttons/button';
 import {
   attachOverlayScrollbar, closeAnchoredMenu, iconSwapHtml, moveGlidePane, revealTexts,
   setActionBusy, setIconSwap, wireHorizontalScroller,
@@ -25,7 +26,7 @@ import {
 import { normalizeJavImage } from '../../jav-artwork';
 import { boundedPreference } from '../../number-setting';
 import { GlowSettings } from './glow-settings';
-import { RemixIcon } from './icon';
+import { Icon, RemixIcon } from './icon';
 import { IconSwitch, SelectField } from './legacy-controls';
 import { NumberSetting } from './number-setting';
 import type { Choice, PanelSettings, SettingsPanelApi, SettingsPanelHost } from './settings-panel-api';
@@ -36,7 +37,7 @@ import { SidebarOrder } from './sidebar-order';
    才一样粗。 */
 const SECTIONS = [
   ['外观与导航', 'ri-palette-line'], ['浏览与播放', 'ri-play-circle-line'],
-  ['JAV 与新作', 'ri-film-line'], ['搜索与推荐', 'ri-search-line'], ['内容显示', 'ri-shield-check-line'],
+  ['JAV 与新作', 'jav'], ['搜索与推荐', 'ri-search-line'], ['内容显示', 'ri-shield-check-line'],
 ] as const;
 
 const SORT_OPTIONS: readonly Choice[] = [
@@ -79,7 +80,7 @@ function update(patch: Partial<View>): void {
   flushSync(notify);
 }
 
-/* 服务配置入口按当前设备的配置权限放行。 */
+/* Peach 配置入口按当前设备的配置权限放行。 */
 async function checkMachine(current: SettingsPanelHost): Promise<void> {
   const epoch = view.epoch;
   const configurable = await current.configurable();
@@ -224,13 +225,13 @@ function SettingsNav({ tab, epoch, configurable, openConfiguration, onSelect }: 
           ref={(node) => { buttons.current[index] = node }}
           onClick={() => onSelect(index)} onKeyDown={(event) => keys(event, index)}
           onPointerEnter={(event) => { if (event.pointerType !== 'touch') place(event.currentTarget, true) }}>
-          <RemixIcon name={icon} />{title}
+          {icon === 'jav' ? <Icon name={icon} /> : <RemixIcon name={icon} />}{title}
         </button>
       ))}
       <div data-settings-service="" role="presentation">
         <button type="button" disabled={configurable !== true} onClick={openConfiguration}
-          title={configurable === false ? '请在运行 Peach 的设备上打开服务配置' : undefined}>
-          <RemixIcon name="ri-settings-3-line" />服务配置<RemixIcon name="ri-arrow-right-line" />
+          title={configurable === false ? '请在运行 Peach 的设备上打开 Peach 配置' : undefined}>
+          <Icon name="folder-cog" />Peach 配置<Icon name="chevron-right" />
         </button>
       </div>
     </div>
@@ -363,7 +364,7 @@ function SettingsPanel({ host: current, view: shown }: { host: SettingsPanelHost
                   onApply={(value) => { settings.relatedLimit = value; save() }} />
               </div>
             </Row>
-            <Row title="口味与记录"><a href="/taste" onClick={close}>打开口味与记录</a></Row>
+            <Row title="口味与记录"><div className="peach-react"><ButtonLink variant="secondary" href="/taste" onClick={close}>打开口味与记录</ButtonLink></div></Row>
           </Group>
           <Group index={4} tab={shown.tab}>
             <ToggleRow id="censorSetting" title="SFW 模式" describedBy="sfwDescription" checked={current.censored()}

@@ -52,7 +52,7 @@ const press = (target: Element, key: string) => act(async () => {
   target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
 });
 
-it('服务配置按用途分类，媒体库与入库默认打开，各分类关联独立面板', async () => {
+it('Peach 配置按用途分类，媒体库与入库默认打开，各分类关联独立面板', async () => {
   const host = await open();
   expect(tabs(host).map(tab => tab.textContent)).toEqual(names);
   expect(chosen(host).textContent).toBe(names[0]);

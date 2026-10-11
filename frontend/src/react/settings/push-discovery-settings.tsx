@@ -13,11 +13,10 @@
  * 前缀表排在最后。读数与配置跟着各自的开关收起：网盘通道关着时那段配置指向一件不会
  * 发生的事；本机监视在总开关关着时读作「没有运行」，分不出是没开还是坏了。 */
 import { useState, type FormEvent } from 'react';
-import { RiCloseLine } from '@remixicon/react';
+import { RiDeleteBinLine } from '@remixicon/react';
 
 import { SettingsRow } from '@/components/application/settings/settings-rows';
 import { Button } from '@/components/base/buttons/button';
-import { IconButton } from '@/components/base/buttons/icon-button';
 import { Input } from '@/components/base/input/input';
 import { Select, SelectItem } from '@/components/base/select/select';
 import { Switch } from '@/components/base/switch/switch';
@@ -105,7 +104,7 @@ export function PushDiscoveryForm({ initial, receipt }: {
             : live.origin
               ? '还没有共享密钥，保存配置后生成。'
               : '要先有 CloudDrive2 能访问的 HTTPS 地址才能生成。'}>
-            {live.config_toml ? <Button size="small" onClick={copy}>复制配置</Button> : null}
+            {live.config_toml ? <Button variant="secondary" size="small" onClick={copy}>复制配置</Button> : null}
           </SettingsRow>
         ) : null}
       </Rows>
@@ -146,13 +145,13 @@ export function PushDiscoveryForm({ initial, receipt }: {
                     onSelectionChange={(key) => { if (key !== null) edit(index, { root: String(key) }); }}>
                     {roots.map((root) => <SelectItem key={root} id={root}>{root}</SelectItem>)}
                   </Select>
-                  <IconButton icon={RiCloseLine} aria-label="移除这一条"
+                  <Button variant="danger" iconOnly leadingIcon={RiDeleteBinLine} aria-label="移除这一条"
                     onClick={() => setRows((list) => list.filter((_row, i) => i !== index))} />
                 </div>
               ))}
             </div>
             <div>
-              <Button size="small"
+              <Button variant="secondary" size="small"
                 onClick={() => setRows((list) => [...list, { prefix: '', root: roots[0] ?? '' }])}>
                 添加前缀
               </Button>
@@ -166,7 +165,7 @@ export function PushDiscoveryForm({ initial, receipt }: {
         ? <Stack divided><ErrorText>{failure || action.error}</ErrorText></Stack> : null}
       <Footer>
         {live.enabled && live.cloud && live.config_toml ? (
-          <Button onClick={rotate} disabled={!state.available}
+          <Button variant="secondary" onClick={rotate} disabled={!state.available}
             {...busyProps(action.busy === 'secret')}>更换密钥</Button>
         ) : null}
         <Button type="submit" disabled={!state.available} {...busyProps(action.busy === 'save')}>

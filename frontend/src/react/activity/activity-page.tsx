@@ -27,6 +27,7 @@ import { Note } from '../components/note';
 import { Page } from '../components/page';
 import { Progress } from '../components/progress';
 import { busyProps } from '../settings/use-action';
+import { Disclosure } from '../settings/section';
 import { DownloadsPanel } from './downloads-panel';
 import { ErrorExcerpt } from './error-excerpt';
 import {
@@ -93,7 +94,12 @@ function RunCard(
         <p className="text-caption-1-regular text-text-secondary">{meta}</p>
         {children}
       </div>
-      {followups?.length ? <FollowupList rows={followups} /> : null}
+      {followups?.length ? <div className="border-t border-separator-border px-5 py-2.5">
+        <Disclosure summary={`任务明细 · ${followups.length} 项`}
+          defaultOpen={followups.some((row) => isActive(row) || row.status === 'failed')}>
+          <FollowupList rows={followups} />
+        </Disclosure>
+      </div> : null}
       {footer
         ? <div className="flex min-h-14 flex-col justify-center rounded-b-2xl border-t border-separator-border bg-card-footer px-5 py-3">
             <ErrorExcerpt text={footer} className="text-caption-1-regular text-text-secondary" />

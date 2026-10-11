@@ -51,7 +51,7 @@ it('保存时令牌随表单交给服务端，回来后清空，提示改成已�
   expect(field(host, 'CloudDrive2 API 令牌')?.placeholder).toBe('已保存，留空不改');
 });
 
-it('检查报出缺的权限、目标目录与剩余配额，操作键都是主按钮', async () => {
+it('检查报出缺的权限、目标目录与剩余配额，保存与登录使用主按钮', async () => {
   vi.stubGlobal('fetch', fetchMock(200, {
     ok: true, address: 'http://127.0.0.1:19798', permissions: [{ name: 'a', label: '提交离线任务', granted: true },
       { name: 'b', label: '取消离线任务', granted: false }],
@@ -59,9 +59,10 @@ it('检查报出缺的权限、目标目录与剩余配额，操作键都是主�
     quota: { total: 1500, used: 3, left: 1497 }, problems: [],
   }));
   const host = await mount(<DownloadSettings initial={state()} receipt={vi.fn()} />);
-  for (const name of ['检查连接', '保存配置', '用浏览器登录', '登录']) {
+  for (const name of ['保存配置', '用浏览器登录', '登录']) {
     expect(buttonNamed(name, host)?.className, name).toContain('bg-button-primary');
   }
+  expect(buttonNamed('检查连接', host)?.className).not.toContain('bg-button-primary');
   await click(buttonNamed('检查连接', host));
   await settle();
   expect(host.textContent).toContain('缺少：取消离线任务');
