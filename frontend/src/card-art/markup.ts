@@ -22,6 +22,9 @@ export interface FaceFocus {
 export interface FaceRef {
   id?: number | null; has_image?: boolean; image_version?: string; logo_version?: string; avatar_focus?: unknown;
   avatar_stand_in?: boolean;
+  rep?: number | null;
+  has_avatar?: boolean;
+  identity_categories?: string[];
 }
 
 /** 代表作画面替账号顶着圆框时，悬停与读屏读到的那句。 */
@@ -137,13 +140,14 @@ export function avatarInner(name: string, ref: FaceRef | null | undefined, repId
   const hint = focus === undefined ? (ref && ref.avatar_focus) || null : focus;
   return `<span class="ini">${esc(firstGrapheme(name))}</span>`
     + entityFaceImg({
-      kind, id: ref && ref.id, hasImage: !!(ref && ref.has_image), version: ref && ref.image_version, rep: repId, mark: markId,
+      kind, id: ref && ref.id, hasImage: !!(ref && ref.has_image), version: ref && ref.image_version,
+      rep: ref?.has_avatar && ref.rep ? ref.rep : repId, mark: markId,
       logo: logoName, logoVersion: ref && ref.logo_version, logoVariant, focus: hint, thumb,
       standIn: !!(ref && ref.avatar_stand_in),
     });
 }
 
-/** 卡片署名、Mix 叠放头像、沉浸作者那一格：`avatarInner` 加顶栏那张代表作表。`kind` 为空是
+/** 卡片署名、Mix 叠放头像、沉浸作者那一格：`avatarInner` 读取引用或顶栏代表作表。`kind` 为空是
  *  「没有署名人」，不退代表作，按女优那一档出首字母。 */
 export function entityAvatar(name: string, ref: FaceRef | null | undefined, kind: string): string {
   return avatarInner(name, ref, kind ? representativeOf(name) : null, kind || 'performer');

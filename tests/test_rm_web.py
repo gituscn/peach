@@ -116,6 +116,34 @@ class WebDataTests(unittest.TestCase):
             con.execute("UPDATE asset SET name='must-not-write' WHERE id=1")
         con.close()
 
+    def test_seller_references_share_profile_work_portrait_and_trusted_role(self):
+        from peach.entity_classification import write_claim
+        with closing(sqlite3.connect(self.db_path)) as con:
+            write_claim(con, entity_id=12, facet='account_role', value='seller',
+                        source='source:fc2', source_url='https://adult.contents.fc2.com/article/42/',
+                        evidence='seller account', status='observed', confidence=1)
+            con.execute("UPDATE asset SET snapshot_path='seller.jpg' WHERE id=2")
+            con.commit()
+        (self.avatars / '2.jpg').write_bytes(b'portrait')
+        profile = web_entity.q_entity(self.contract, {'kind':'creator', 'name':'Canonical Creator'})
+        detail = rm_web.q_item(self.contract, 2)
+        cards = rm_web.q_items(self.contract, {'limit':'10'})['items']
+        attached = [{'id':2}]
+        rm_web.attach_card_performers(self.contract, attached)
+        for ref in [detail['entity_refs']['creator'][0], attached[0]['creator_entity'],
+                    next(card for card in cards if card['id'] == 2)['creator_entity']]:
+            self.assertEqual(ref['rep'], profile['representative_asset_id'])
+            self.assertTrue(ref['has_avatar'])
+            self.assertTrue(ref['avatar_stand_in'])
+            self.assertEqual(ref['identity_categories'], ['seller'])
+            self.assertFalse(ref['has_image'])
+        self.assertEqual(detail['performers'], [])
+        with closing(sqlite3.connect(self.db_path)) as con:
+            con.execute("UPDATE entity_classification SET status='candidate' WHERE entity_id=12")
+            con.commit()
+        pending = rm_web.q_item(self.contract, 2)['entity_refs']['creator'][0]
+        self.assertNotIn('seller', pending.get('identity_categories', []))
+
     def test_items_are_filtered_and_do_not_expose_paths(self):
         result = rm_web.q_items(
             self.contract, {"loc": "local", "sort": "new", "limit": "10"},

@@ -483,9 +483,10 @@ function Identity({ item, actions }: { item: DetailItem; helpers: ItemDetailHelp
   const overflow = Math.max(0, groups.cast.length - CAST_SHOWN);
   const cell = (kind: string, ref: DetailEntityRef, index: number) => {
     const hide = kind === 'performer' && index >= CAST_SHOWN && !castOpen;
-    const face = kind === 'performer'
+    const face = kind === 'performer' || kind === 'creator'
       ? <span data-id-face="" dangerouslySetInnerHTML={{ __html: `<span>${esc(firstGrapheme(ref.name))}</span>`
-        + entityFaceImg({ id: ref.id, hasImage: ref.has_image, version: ref.image_version, focus: ref.avatar_focus }) }} />
+        + entityFaceImg({ kind, id: ref.id, hasImage: ref.has_image, version: ref.image_version, focus: ref.avatar_focus,
+          rep: ref.has_avatar ? ref.rep : null, standIn: ref.avatar_stand_in }) }} />
       : <span data-id-face="">{kind === 'studio'
         ? <><span>{leadingGraphemes(ref.name, 2)}</span>{ref.has_logo
           ? <img src={logoUrl(ref.name, 'icon', ref.logo_version)} alt="" loading="lazy" data-drop="self" /> : null}</>
@@ -520,11 +521,12 @@ function Identity({ item, actions }: { item: DetailItem; helpers: ItemDetailHelp
         aria-expanded={false} onClick={() => setCastOpen(true)}>还有 {overflow} 位</Button> : null),
     group('厂牌', 'studio', groups.studios),
     group('片商', 'studio', groups.makers),
+    group('卖家', 'creator', groups.creators.filter(ref => ref.identity_categories?.includes('seller'))),
+    group('创作者', 'creator', groups.creators.filter(ref => !ref.identity_categories?.includes('seller'))),
   ].filter(Boolean);
   return (
     <div data-item-identity="">
       {primary.length ? <div data-identity-primary="">{primary}</div> : null}
-      {group('创作者', 'creator', groups.creators)}
       {groups.series.length ? (
         <section data-id-group="series">
           <h5 data-id-label="">系列</h5>

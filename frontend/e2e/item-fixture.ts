@@ -39,7 +39,7 @@ const jav = (id: number, code: string, extra: Record<string, unknown> = {}) =>
   detail(id, { is_jav: true, code, has_cover: true, ...extra });
 
 /** 几种形态的条目 id。 */
-export const ITEM = { plain: 11, cast: 12, offline: 13, long: 17, part: 21, edition: 31 } as const;
+export const ITEM = { plain: 11, cast: 12, offline: 13, long: 17, seller: 18, part: 21, edition: 31 } as const;
 const PART_GROUP = { key: 'p', seed_id: 21, count: 3 };
 const EDITION_GROUP = { key: 'e', seed_id: 31, count: 2, editions: ['中字', '无码'] };
 const DETAILS = new Map<number, Row>([
@@ -49,6 +49,11 @@ const DETAILS = new Map<number, Row>([
   [14, detail(14)], [15, detail(15)], [16, detail(16)],
   // 非番号作品的标题栏印的是文件名。
   [17, detail(17, { name: `演示作品 17 ${'标题很长，写满了这一条的剧情梗概、出演与拍摄地点。'.repeat(8)}.mp4` })],
+  [18, jav(18, 'FC2-PPV-4075681', { performers: [], creator: '演示卖家', studio: 'FC2-PPV',
+    creator_entity: ref('演示卖家', 80, { rep: 18, has_avatar: true, avatar_stand_in: true, identity_categories: ['seller'] }),
+    entity_refs: { performer: [], series: [], studio: [ref('FC2-PPV', 50, { has_logo: true })],
+      creator: [ref('演示卖家', 80, { rep: 18, has_avatar: true, avatar_stand_in: true, identity_categories: ['seller'] })] },
+  })],
   [21, jav(21, 'PCH-021', { part_group: PART_GROUP })],
   [22, jav(22, 'PCH-021', { part_group: PART_GROUP })],
   [23, jav(23, 'PCH-021', { part_group: PART_GROUP })],

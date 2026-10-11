@@ -11938,7 +11938,7 @@ function $i(e, t, n, r = "performer", i = null, a = "", o = "icon", s = void 0, 
 		id: t && t.id,
 		hasImage: !!(t && t.has_image),
 		version: t && t.image_version,
-		rep: n,
+		rep: t?.has_avatar && t.rep ? t.rep : n,
 		mark: i,
 		logo: a,
 		logoVersion: t && t.logo_version,
@@ -61915,13 +61915,16 @@ function Lke({ item: e, write: t }) {
 }
 function Rke({ item: e, actions: t }) {
 	let n = (0, b.useMemo)(() => ole(e), [e]), [r, i] = (0, b.useState)(!1), a = Math.max(0, n.cast.length - 8), o = (e, n, i) => {
-		let a = e === "performer" && i >= 8 && !r, o = e === "performer" ? /* @__PURE__ */ (0, x.jsx)("span", {
+		let a = e === "performer" && i >= 8 && !r, o = e === "performer" || e === "creator" ? /* @__PURE__ */ (0, x.jsx)("span", {
 			"data-id-face": "",
 			dangerouslySetInnerHTML: { __html: `<span>${R(qt(n.name))}</span>` + Qi({
+				kind: e,
 				id: n.id,
 				hasImage: n.has_image,
 				version: n.image_version,
-				focus: n.avatar_focus
+				focus: n.avatar_focus,
+				rep: n.has_avatar ? n.rep : null,
+				standIn: n.avatar_stand_in
 			}) }
 		}) : /* @__PURE__ */ (0, x.jsx)("span", {
 			"data-id-face": "",
@@ -61999,39 +62002,37 @@ function Rke({ item: e, actions: t }) {
 			]
 		}) : null),
 		s("厂牌", "studio", n.studios),
-		s("片商", "studio", n.makers)
+		s("片商", "studio", n.makers),
+		s("卖家", "creator", n.creators.filter((e) => e.identity_categories?.includes("seller"))),
+		s("创作者", "creator", n.creators.filter((e) => !e.identity_categories?.includes("seller")))
 	].filter(Boolean);
 	return /* @__PURE__ */ (0, x.jsxs)("div", {
 		"data-item-identity": "",
-		children: [
-			c.length ? /* @__PURE__ */ (0, x.jsx)("div", {
-				"data-identity-primary": "",
-				children: c
-			}) : null,
-			s("创作者", "creator", n.creators),
-			n.series.length ? /* @__PURE__ */ (0, x.jsxs)("section", {
-				"data-id-group": "series",
-				children: [/* @__PURE__ */ (0, x.jsx)("h5", {
-					"data-id-label": "",
-					children: "系列"
-				}), /* @__PURE__ */ (0, x.jsx)("div", {
-					"data-series-rows": "",
-					children: n.series.map((e) => e.id ? /* @__PURE__ */ (0, x.jsxs)("button", {
-						type: "button",
-						"data-series-link": "",
-						"data-entity-kind": "series",
-						"data-entity-name": e.name,
-						title: e.name,
-						onClick: () => t.openEntity("series", e.name),
-						children: [/* @__PURE__ */ (0, x.jsx)(QB, { name: "tags" }), /* @__PURE__ */ (0, x.jsx)("span", { children: e.name })]
-					}, e.name) : /* @__PURE__ */ (0, x.jsxs)("span", {
-						"data-series-link": "",
-						title: e.name,
-						children: [/* @__PURE__ */ (0, x.jsx)(QB, { name: "tags" }), /* @__PURE__ */ (0, x.jsx)("span", { children: e.name })]
-					}, e.name))
-				})]
-			}) : null
-		]
+		children: [c.length ? /* @__PURE__ */ (0, x.jsx)("div", {
+			"data-identity-primary": "",
+			children: c
+		}) : null, n.series.length ? /* @__PURE__ */ (0, x.jsxs)("section", {
+			"data-id-group": "series",
+			children: [/* @__PURE__ */ (0, x.jsx)("h5", {
+				"data-id-label": "",
+				children: "系列"
+			}), /* @__PURE__ */ (0, x.jsx)("div", {
+				"data-series-rows": "",
+				children: n.series.map((e) => e.id ? /* @__PURE__ */ (0, x.jsxs)("button", {
+					type: "button",
+					"data-series-link": "",
+					"data-entity-kind": "series",
+					"data-entity-name": e.name,
+					title: e.name,
+					onClick: () => t.openEntity("series", e.name),
+					children: [/* @__PURE__ */ (0, x.jsx)(QB, { name: "tags" }), /* @__PURE__ */ (0, x.jsx)("span", { children: e.name })]
+				}, e.name) : /* @__PURE__ */ (0, x.jsxs)("span", {
+					"data-series-link": "",
+					title: e.name,
+					children: [/* @__PURE__ */ (0, x.jsx)(QB, { name: "tags" }), /* @__PURE__ */ (0, x.jsx)("span", { children: e.name })]
+				}, e.name))
+			})]
+		}) : null]
 	});
 }
 function zke({ item: e, write: t, helpers: n, actions: r }) {
