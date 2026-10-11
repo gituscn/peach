@@ -6,7 +6,7 @@ import { manageHeaderSkeletonHtml, manageHeaderView, type ManageEntry, type Mana
 
 const SECTIONS: ManageEntry[] = [
   ['stats', '统计', 'chart'], ['cleanup', '数据管理', 'database'], ['trash', '回收站', 'trash'],
-  ['configuration', '配置', 'settings'],
+  ['configuration', '服务配置', 'settings'],
 ];
 const MENU = SECTIONS.filter(([key]) => key !== 'trash');
 

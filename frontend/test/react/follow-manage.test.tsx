@@ -20,6 +20,7 @@ import {
   type FollowSource, type ResolveJob, type SuggestData,
 } from '../../src/react/follow-manage/follow-manage';
 import { FollowManagePage } from '../../src/react/follow-manage/follow-manage-page';
+import { Credentials } from '../../src/react/follow-manage/credentials';
 
 import { buttonNamed, choose, click, mountRoot, settle, type } from './render';
 
@@ -144,6 +145,7 @@ const shellProps = (over: Partial<Props> = {}): Props => ({
   savePreference: vi.fn(),
   toast: vi.fn(),
   openFollow: vi.fn(),
+  openServiceConfiguration: vi.fn(),
   readOnly: false, readOnlyMessage: '', writerUrl: '',
   ...over,
 });
@@ -154,7 +156,9 @@ async function open(plan: Plan = {}, over: Partial<Props> = {}) {
   const props = shellProps(over);
   await prefetchFollowManage(new AbortController().signal, props.tab).catch(() => {});
   const mounted = await mountRoot(
-    <QueryClientProvider client={queryClient}><FollowManagePage {...props} /></QueryClientProvider>);
+    <QueryClientProvider client={queryClient}>{over.tab === 'source'
+      ? <Credentials data={plan.creds || credentials()} readOnly={props.readOnly} toast={props.toast} />
+      : <FollowManagePage {...props} />}</QueryClientProvider>);
   await settle();
   return { fetcher, props, ...mounted };
 }
@@ -627,7 +631,8 @@ it('一条来源都没有时空态给出添加关注的去处', async () => {
 it('各栏按做事的先后排，缺凭据的数挂在最后一栏上', async () => {
   const { host } = await open({ creds: { root: 'C:\\creds', providers: [credential({ provider: 'fanbox' })] } });
   expect([...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent))
-    .toEqual(['关注列表', '添加关注', 'JAV 订阅源', 'JAV 入库', '来源和凭证（1）']);
+    .toEqual(['关注列表', '添加关注', 'JAV 订阅源']);
+  expect(buttonNamed('来源与订阅设置（1）', host)).not.toBeNull();
 });
 
 const FEEDS: FeedsData = {
@@ -1171,8 +1176,7 @@ it('筛选里撞见缺凭据的站，一步跳到凭据那一栏', async () => {
   const { host, props } = await open({ creds }, { tab: 'add' });
   await click(buttonLabelled(host, '全部来源'));
   await click(buttonNamed('需要配置凭据'));
-  expect(props.route).toHaveBeenLastCalledWith(expect.objectContaining({ tab: 'source' }));
-  expect([...host.querySelectorAll('h3')].map((h) => h.textContent)).toContain('来源和凭证');
+  expect(props.openServiceConfiguration).toHaveBeenCalledOnce();
 });
 
 it('「猜你喜欢」点一下就拿那个名字去查', async () => {

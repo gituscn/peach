@@ -34,7 +34,7 @@ const HEADS = [
   ['/trash', '回收站', '回收站', false],
   ['/follow-manage', '关注管理', '', false],
   ['/activity', '活动', '', false],
-  ['/configuration', '配置', '', true],
+  ['/configuration', '服务配置', '', true],
 ] as const;
 
 const BLOCKS = '[data-manage-header] > :is([data-manage-bar], [data-manage-crumb], [data-manage-title], [data-manage-lede])';
