@@ -41,9 +41,10 @@ describe('库外 JAV 作品详情', () => {
         assert.equal(await page.getByRole('button', { name: '更多评论', exact: true }).count(), 0);
         await page.getByRole('button', { name: '查看资源', exact: true }).click();
         await page.getByText('EXM-001 示例资源 1', { exact: true }).waitFor({ state: 'visible' });
-        assert.equal(await page.locator('[data-jav-resources] [data-resource-protocol]').count(), 3);
+        assert.equal(await page.locator('[data-jav-resources] [data-resource-protocol]:visible').count(), 3);
         await page.getByText('更多资源（3 条）', { exact: true }).click();
         await page.getByText('EXM-001 示例资源 6', { exact: true }).waitFor({ state: 'visible' });
+        assert.equal(await page.locator('[data-jav-resources] [data-resource-protocol]:visible').count(), 6);
         assert.ok(await page.locator('[data-jav-resources]').getByRole('button', { name: '添加下载', exact: true }).first().isDisabled());
         await page.getByRole('button', { name: '想要', exact: true }).click();
         await page.getByRole('button', { name: '取消想要', exact: true }).waitFor({ state: 'visible' });
