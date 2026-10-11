@@ -26,7 +26,6 @@ import type {
 import { LoadingDots } from '../components/loading-dots';
 import { Note } from '../components/note';
 import { groupRoot } from './configuration-panel';
-import { IndexerSettings } from './indexer-settings';
 import {
   Disclosure, ErrorText, ExternalLink, Fact, FactList, FieldLabel, Footer, Help, Section, Stack,
 } from './section';
@@ -40,7 +39,7 @@ const LOGOUT_URL = '/api/configuration/downloads/pikpak/logout';
 const BROWSER_URL = '/api/configuration/downloads/pikpak/browser-login';
 const POLL_MS = 2000;
 
-/** 「下载」分组：云下载、PikPak 账号与资源索引器。 */
+/** 「下载渠道」分组：CloudDrive2 与 PikPak 账号。 */
 export function DownloadGroup({ initial, receipt, panel }: {
   initial: DownloadSettingsState;
   receipt(message: string): void;
@@ -49,7 +48,6 @@ export function DownloadGroup({ initial, receipt, panel }: {
   return (
     <div {...groupRoot(panel)}>
       <DownloadSettings initial={initial} receipt={receipt} />
-      <IndexerSettings receipt={receipt} />
     </div>
   );
 }
@@ -177,17 +175,16 @@ function DownloadForm({ state, settle, receipt, pikpakAccount }: CardProps & { p
   return (
     <Section title="云下载" onSubmit={submit}>
       <Stack>
-        <Help>磁力交给 115 或 PikPak 离线下载，下完自动入库。</Help>
-        <Input label="CloudDrive2 地址" placeholder="留空自动探测本机 19798 / 29798" autoComplete="off" maxLength={200}
+        <Input label="CloudDrive2 地址" placeholder="留空自动查找" autoComplete="off" maxLength={200}
           value={config.clouddrive_address} isDisabled={!state.available}
           onChange={(value) => setConfig({ ...config, clouddrive_address: value })} />
         <Input label="CloudDrive2 API 令牌" type="password" autoComplete="off" maxLength={400}
           placeholder={state.token_set ? '已保存，留空不改' : '在 CloudDrive2「设置 → API 令牌」中生成'}
-          hint="生成时勾选离线任务相关权限，缺哪项「检查」会列出来。"
+          hint="需要离线任务权限。"
           value={token} isDisabled={!state.available} onChange={setToken} />
         <Input label="115 目标目录" placeholder="留空时按推送发现自动填写" autoComplete="off" maxLength={300}
           validationBehavior="aria" isInvalid={missing}
-          hint={missing ? (saveBlocked ? '这个目录还不存在，保存前先在下方新建它，或改成 CloudDrive2 里已有的目录。' : 'CloudDrive2 里还没有这个目录。') : '要在推送发现的云端路径前缀下面，留空自动填写。'}
+          hint={missing ? (saveBlocked ? '先新建这个目录，或填写已有目录。' : '这个目录不存在。') : '应位于自动入库的云端路径前缀内。'}
           value={target('115')} isDisabled={!state.available} onChange={(value) => setTarget('115', value)} />
         <Input label="PikPak 目标目录" placeholder="以 / 开头的网盘路径" autoComplete="off" maxLength={300}
           hint="目录要已经存在。"
@@ -201,11 +198,11 @@ function DownloadForm({ state, settle, receipt, pikpakAccount }: CardProps & { p
               {state.pikpak_roots.map((root) => <SelectItem key={root} id={root}>{root}</SelectItem>)}
             </Select>
           ) : (
-            <Help>先在「媒体」分组添加 PikPak 挂载的文件夹，这里才能选。</Help>
+            <Help>先在「媒体库与入库」添加 PikPak 挂载文件夹。</Help>
           )}
         </div>
         <Input label="等待上限（小时）" type="number" inputMode="numeric" autoComplete="off"
-          hint={`超过这么久还没下完就标为停滞，1 到 ${state.max_wait_hours} 小时。`}
+          hint={`超时标为停滞；可填 1–${state.max_wait_hours} 小时。`}
           value={hours} isDisabled={!state.available} onChange={setHours} />
       </Stack>
       {action.busy === 'auto' ? <Stack divided><LoadingDots label="正在检查 CloudDrive2" /></Stack> : null}
@@ -215,7 +212,7 @@ function DownloadForm({ state, settle, receipt, pikpakAccount }: CardProps & { p
       ) : null}
       {failure || action.error ? <Stack divided><ErrorText>{failure || action.error}</ErrorText></Stack> : null}
       <Footer status={state.available ? undefined : '云下载只在账本写入端可用。'}>
-        <Button onClick={check} disabled={!state.available} {...busyProps(action.busy === 'check')}>检查</Button>
+        <Button onClick={check} disabled={!state.available} {...busyProps(action.busy === 'check')}>检查连接</Button>
         <Button type="submit" disabled={!state.available} {...busyProps(action.busy === 'save')}>保存配置</Button>
       </Footer>
     </Section>
@@ -392,11 +389,9 @@ function PikPakAccount({ state, settle, receipt, username, setUsername }: CardPr
         </FactList>
       ) : browser.available ? (
         <Stack>
-          <Help>在弹出的浏览器窗口里登录 PikPak，之后由 Peach 自动续期。</Help>
           {outcome ? (outcomeFailed ? <ErrorText>{outcome}</ErrorText> : <Help role="status">{outcome}</Help>) : null}
           <Disclosure summary="用账号密码登录">
             <div className="flex flex-col gap-4">
-              <Help>账号密码只用来换登录令牌，令牌存在这台电脑上。</Help>
               {passwordForm}
               <div className="flex justify-end">{passwordLogin}</div>
             </div>
@@ -404,7 +399,6 @@ function PikPakAccount({ state, settle, receipt, username, setUsername }: CardPr
         </Stack>
       ) : (
         <Stack>
-          <Help>账号密码只用来换登录令牌，令牌存在这台电脑上。</Help>
           {passwordForm}
         </Stack>
       )}

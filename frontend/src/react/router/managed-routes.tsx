@@ -116,7 +116,7 @@ export const MANAGED_ROUTES: ManagedRouteTable = {
     /* 点一个内容标签是「回目录并按它筛选」，整页换成目录仍归壳。 */
     page: (open, actions, go) => (
       <StatsPage tagLabel={tagLabel} onTag={actions.openTag} configurable={open.configurable}
-        openMediaSettings={() => { actions.requestConfigurationSection('媒体'); go('/configuration') }} />
+        openMediaSettings={() => { actions.requestConfigurationSection('媒体库与入库'); go('/configuration') }} />
     ),
   },
   '/taste': {

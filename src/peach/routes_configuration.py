@@ -190,6 +190,8 @@ def read_configuration(request: Request, _args=Depends(require_auth)):
     if not config.present:
         raise HTTPException(409, "请先完成首次设置")
     result = snapshot(config)
+    sync = getattr(request.app.state, "sync", None)
+    result["ledger_read_only"] = bool(sync is not None and sync.read_only)
     state = request.app.state.tunnel.snapshot()
     result["tunnel"] = tunnel_payload(config, state, config.tunnel.enabled)
     result["automatic_updates"] = request.app.state.automatic_updates.snapshot()

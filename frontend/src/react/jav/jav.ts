@@ -24,9 +24,11 @@ export async function prefetchJav(tab: string, signal: AbortSignal) {
     ]); return;
   }
   const settings = appSettingsStore().value;
+  const batch = settings.batchSize || 60;
   const params = catalogParams({ jav: '1', q: '', sort: settings.defaultSort, dir: settings.defaultSortDirection || '' }, true);
-  await queryClient.fetchInfiniteQuery({ queryKey: catalogKey(params, 0), initialPageParam: 0,
-    queryFn: ({ pageParam }) => fetchCatalogPage(params, pageParam, 60, false, signal), getNextPageParam: nextOffset(60) });
+  // 每批数量对应独立的分页缓存，页码和下一批偏移使用同一数量。
+  await queryClient.fetchInfiniteQuery({ queryKey: catalogKey(params, batch), initialPageParam: 0,
+    queryFn: ({ pageParam }) => fetchCatalogPage(params, pageParam, batch, false, signal), getNextPageParam: nextOffset(batch) });
 }
 
 /** 推荐只来自作品的真实出演者与口味榜单中的同名信号。 */

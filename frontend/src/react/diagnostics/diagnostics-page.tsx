@@ -29,7 +29,7 @@ export interface DiagnosticsProps {
 function Check({ name, check, navigate, configure }: Pick<DiagnosticsProps, 'navigate' | 'configure'> & {
   name: string; check: DiagnosticCheck;
 }) {
-  const section = name === 'security' ? '网络与访问' : name === 'configured' ? '通用' : '媒体';
+  const section = name === 'security' || name === 'port' ? '网络与访问' : '媒体库与入库';
   return <div className="flex flex-col gap-2 border-b border-separator-border py-4 pr-3 last:border-b-0">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h3 className="text-body-medium text-text-primary">{check.label}</h3>
@@ -38,7 +38,7 @@ function Check({ name, check, navigate, configure }: Pick<DiagnosticsProps, 'nav
     <p className="text-body-regular text-text-primary break-words">{check.reason}</p>
     {check.action ? <p className="text-body-2-regular text-text-secondary">{check.action}</p> : null}
     {check.target ? <div><Button size="small" variant="secondary" onClick={() => check.target === '/configuration'
-      ? configure(section) : navigate(check.target!)}>{check.target === '/configuration' ? `打开${section}配置` : '查看任务'}</Button></div> : null}
+      ? configure(section) : navigate(check.target!)}>{check.target === '/configuration' ? `打开${section}` : '查看任务'}</Button></div> : null}
   </div>;
 }
 

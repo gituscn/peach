@@ -43,8 +43,7 @@ export function CloudDriveGuide() {
           <li>Buffer Cache 占内存，磁盘缓存和文件夹缓存占硬盘，改一个管不住另外两个。</li>
         </ul>
         <Help>
-          三处缓存的分工、往上调的方法和这些起步值的来源在
-          <ExternalLink href="https://github.com/longmeidao/peach/blob/master/docs/CLOUDDRIVE.md">CloudDrive 配置与调优</ExternalLink>。
+          <ExternalLink href="https://github.com/peach-mitao/peach/blob/master/docs/CLOUDDRIVE.md">完整配置与调优说明</ExternalLink>
         </Help>
       </Disclosure>
     </div>

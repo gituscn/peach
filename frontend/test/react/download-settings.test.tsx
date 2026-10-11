@@ -59,10 +59,10 @@ it('检查报出缺的权限、目标目录与剩余配额，操作键都是主�
     quota: { total: 1500, used: 3, left: 1497 }, problems: [],
   }));
   const host = await mount(<DownloadSettings initial={state()} receipt={vi.fn()} />);
-  for (const name of ['检查', '保存配置', '用浏览器登录', '登录']) {
+  for (const name of ['检查连接', '保存配置', '用浏览器登录', '登录']) {
     expect(buttonNamed(name, host)?.className, name).toContain('bg-button-primary');
   }
-  await click(buttonNamed('检查', host));
+  await click(buttonNamed('检查连接', host));
   await settle();
   expect(host.textContent).toContain('缺少：取消离线任务');
   expect(host.textContent).toContain('/115/云下载 可以离线下载');
@@ -79,8 +79,8 @@ it('地址留空时检查把探测到的本机地址填回表单，保存配置�
   });
   vi.stubGlobal('fetch', fetcher);
   const host = await mount(<DownloadSettings initial={blank} receipt={vi.fn()} />);
-  expect(field(host, 'CloudDrive2 地址')?.placeholder).toBe('留空自动探测本机 19798 / 29798');
-  await click(buttonNamed('检查', host));
+  expect(field(host, 'CloudDrive2 地址')?.placeholder).toBe('留空自动查找');
+  await click(buttonNamed('检查连接', host));
   await settle();
   expect(sentBody(fetcher)).toMatchObject({ clouddrive_address: '' });
   expect(field(host, 'CloudDrive2 地址')?.value).toBe('http://127.0.0.1:29798');
@@ -101,7 +101,7 @@ it('目标目录与 PikPak 根留空时检查按推送发现填回，保存配�
   vi.stubGlobal('fetch', fetcher);
   const host = await mount(<DownloadSettings initial={unfilled()} receipt={vi.fn()} />);
   expect(field(host, '115 目标目录')?.placeholder).toBe('留空时按推送发现自动填写');
-  await click(buttonNamed('检查', host));
+  await click(buttonNamed('检查连接', host));
   await settle();
   expect(sentBody(fetcher)).toMatchObject({ target: '', pikpak_root: '', pikpak_account: false });
   expect(field(host, '115 目标目录')?.value).toBe('/115open/云下载');
@@ -118,7 +118,7 @@ it('目标目录与 PikPak 根留空时检查按推送发现填回，保存配�
 it('用户填过的目标目录不被建议值覆盖', async () => {
   vi.stubGlobal('fetch', fetchMock(200, report({ suggested_target: { path: '/115open/云下载', exists: true } })));
   const host = await mount(<DownloadSettings initial={state()} receipt={vi.fn()} />);
-  await click(buttonNamed('检查', host));
+  await click(buttonNamed('检查连接', host));
   await settle();
   expect(field(host, '115 目标目录')?.value).toBe('/115/云下载');
   expect(host.textContent).not.toContain('按推送发现填入');
@@ -129,12 +129,12 @@ it('在账号框里填了 PikPak 账号或已登录时，检查才问 PikPak 根
   vi.stubGlobal('fetch', fetcher);
   const host = await mount(<DownloadSettings initial={unfilled()} receipt={vi.fn()} />);
   await type(field(host, '账号'), 'me@example.com');
-  await click(buttonNamed('检查', host));
+  await click(buttonNamed('检查连接', host));
   await settle();
   expect(sentBody(fetcher)).toMatchObject({ pikpak_account: true });
   const signedIn = await mount(<DownloadSettings receipt={vi.fn()}
     initial={state({ pikpak: { logged_in: true, username: 'me@example.com', remember: false, method: 'password' } })} />);
-  await click(buttonNamed('检查', signedIn));
+  await click(buttonNamed('检查连接', signedIn));
   await settle();
   expect(sentBody(fetcher, 1)).toMatchObject({ pikpak_account: true });
 });
@@ -144,17 +144,17 @@ it('推出的目录不存在时标成无效，点了「新建这个目录」才�
   vi.stubGlobal('fetch', fetcher);
   const receipt = vi.fn();
   const host = await mount(<DownloadSettings initial={unfilled()} receipt={receipt} />);
-  await click(buttonNamed('检查', host));
+  await click(buttonNamed('检查连接', host));
   await settle();
   const input = field(host, '115 目标目录');
   expect(input?.value).toBe('/115open/云下载');
   expect(input?.getAttribute('aria-invalid')).toBe('true');
-  expect(host.textContent).toContain('CloudDrive2 里还没有这个目录');
+  expect(host.textContent).toContain('这个目录不存在');
   expect(host.textContent).toContain('/115open/云下载 不存在');
   await submit(section(host, '云下载'));
   await settle();
   expect(fetcher).toHaveBeenCalledTimes(1);
-  expect(host.textContent).toContain('保存前先在下方新建它，或改成 CloudDrive2 里已有的目录');
+  expect(host.textContent).toContain('先新建这个目录，或填写已有目录');
 
   const hold = pending<unknown>();
   fetcher.mockImplementation(() => hold.answer);
@@ -183,7 +183,7 @@ it('地址和令牌都已保存时一打开就按已保存的配置检查，检�
   expect(fetcher.mock.calls[0]?.[1]?.method).toBeUndefined();
   expect(fetcher.mock.calls[0]?.[1]?.body).toBeUndefined();
   expect(host.textContent).toContain('正在检查 CloudDrive2');
-  expect(buttonNamed('检查', host)?.getAttribute('aria-busy')).not.toBe('true');
+  expect(buttonNamed('检查连接', host)?.getAttribute('aria-busy')).not.toBe('true');
   await hold.release({ ok: true, status: 200, json: async () => report({
     permissions: [{ name: 'a', label: '提交离线任务', granted: true }],
     folder: { path: '/115/云下载', can_offline: true, cloud: '115open' },
@@ -247,14 +247,14 @@ it('保存时推出的目录不存在，照常保存其他字段，目录填回�
   await submit(section(host, '云下载'));
   await settle();
   expect(fetcher).toHaveBeenCalledTimes(1);
-  expect(host.textContent).toContain('保存前先在下方新建它，或改成 CloudDrive2 里已有的目录');
+  expect(host.textContent).toContain('先新建这个目录，或填写已有目录');
 });
 
 it('保存的响应不带检查报告时收起上一次的报告', async () => {
   const fetcher = fetchMock(200, report({ folder: { path: '/115/云下载', can_offline: true, cloud: '115open' } }));
   vi.stubGlobal('fetch', fetcher);
   const host = await mount(<DownloadSettings initial={state()} receipt={vi.fn()} />);
-  await click(buttonNamed('检查', host));
+  await click(buttonNamed('检查连接', host));
   await settle();
   expect(host.textContent).toContain('/115/云下载 可以离线下载');
   fetcher.mockImplementation(async () => ({ ok: true, status: 200, json: async () => ({ ...state(), report: null }) }));
@@ -271,7 +271,7 @@ it('两个本机端口都不应答时原样报出服务端列的地址，表单�
     problems: [problem],
   }));
   const host = await mount(<DownloadSettings initial={blank} receipt={vi.fn()} />);
-  await click(buttonNamed('检查', host));
+  await click(buttonNamed('检查连接', host));
   await settle();
   expect(host.textContent).toContain(problem);
   expect(field(host, 'CloudDrive2 地址')?.value).toBe('');

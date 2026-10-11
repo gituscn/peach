@@ -1359,7 +1359,7 @@ it('缺什么、为什么要、去哪儿取都写在那一行上，非配不可�
   expect(fanbox.textContent).toContain('缺 FANBOXSESSID、cf_clearance');
   expect(fanbox.textContent).toContain('会员内容要登录后才看得到。');
   expect(fanbox.textContent).toContain('从浏览器开发者工具里复制。');
-  expect([...fanbox.querySelectorAll('a')].find((a) => a.textContent?.includes('去取'))?.getAttribute('href'))
+  expect([...fanbox.querySelectorAll('a')].find((a) => a.textContent?.includes('获取凭据'))?.getAttribute('href'))
     .toBe('https://www.fanbox.cc/');
   expect(fanbox.querySelector('details')?.open).toBe(true);
   expect(fanbox.querySelector('summary')?.textContent).toContain('填写凭据');
@@ -1395,11 +1395,17 @@ it('凭据填在页面上，保存后输入框清空，空着点保存会被拦�
   expect(buttonNamed('清除', credentialRow(host, 'Patreon'))).not.toBeNull();
 });
 
-it('凭据存在哪、权限过宽的警告跟在列表后面常驻', async () => {
+it('凭据文件路径可展开，权限过宽警告在凭据收起时可见', async () => {
   const { host } = await open({ creds: CREDENTIAL_CAST }, { tab: 'source' });
-  expect(host.textContent).toContain('能登录那台电脑的人都能打开');
-  expect(credentialRow(host, 'Patreon').textContent).toContain('凭据文件权限过宽');
-  const storage = [...host.querySelectorAll('b')].find((b) => b.textContent === '这些账号信息存在哪里')!;
-  const lastRow = credentialRow(host, 'Kemono');
-  expect(lastRow.compareDocumentPosition(storage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const patreon = credentialRow(host, 'Patreon');
+  expect(patreon.querySelector('details')?.open).toBe(false);
+  const warning = patreon.querySelector('[role="alert"]')!;
+  expect(warning.textContent).toContain('凭据文件权限过宽');
+  expect(warning.closest('details')).toBeNull();
+  const file = [...credentialRow(host, 'Fanbox').querySelectorAll('details')]
+    .find(node => node.querySelector('summary')?.textContent === '凭据文件')!;
+  expect(file.open).toBe(false);
+  await click(file.querySelector('summary'));
+  expect(file.open).toBe(true);
+  expect(file.textContent).toContain('fanbox.json');
 });

@@ -6,7 +6,8 @@ import { Button } from '@/components/base/buttons/button';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
 import { apiGet, apiSend, errorMessage } from '../../api';
-import { ErrorText, Footer, Help, Section, Stack } from './section';
+import { LoadingDots } from '../components/loading-dots';
+import { Disclosure, ErrorText, Footer, Help, Section, Stack } from './section';
 import { busyProps, useAction } from './use-action';
 
 const URL = '/api/configuration/indexers';
@@ -17,8 +18,9 @@ interface Indexer {
 interface State { indexers: Indexer[]; max_indexers: number }
 
 export function IndexerSettings({ receipt }: { receipt(message: string): void }) {
-  const query = useQuery({ queryKey: ['indexers'], queryFn: ({ signal }) => apiGet<State>(URL, signal) });
+  const query = useQuery({ queryKey: ['indexers'], queryFn: ({ signal }) => apiGet<State>(URL, signal), refetchOnMount: 'always' });
   if (query.error) return <ErrorText>{errorMessage(query.error)}</ErrorText>;
+  if (query.isFetching) return <LoadingDots label="正在读取资源搜索设置" />;
   return query.data ? <IndexerForm initial={query.data} receipt={receipt} /> : null;
 }
 
@@ -35,16 +37,15 @@ function IndexerForm({ initial, receipt }: { initial: State; receipt(message: st
     });
   };
   return (
-    <Section title="资源索引器" onSubmit={save}>
+    <Section title="资源搜索" onSubmit={save}>
       <Stack>
-        <Help>接入 Prowlarr 或 Jackett 后可以按番号搜磁力。Torznab 地址在 Prowlarr 每个索引器的详情里，
-          API key 在 Settings → General。</Help>
+        <Disclosure summary="索引器连接帮助"><Help>填写 Prowlarr 或 Jackett 提供的 Torznab 地址和 API key。</Help></Disclosure>
         {rows.map((row, index) => (
           <div key={row.key} className="flex min-w-0 flex-col gap-4 border-t border-separator-border pt-4">
             <Input label={`索引器 ${index + 1} 名称`} value={row.name} maxLength={80}
               isDisabled={Boolean(action.busy)} onChange={(name) => update(row.key, { name })} />
             <Input label={`索引器 ${index + 1} Torznab 地址`} value={row.url} type="url" autoComplete="off"
-              placeholder="http://127.0.0.1:9696/1/api" isDisabled={Boolean(action.busy)}
+              placeholder="索引器提供的 API 地址" isDisabled={Boolean(action.busy)}
               onChange={(url) => update(row.key, { url })} />
             <Input label={`索引器 ${index + 1} API key`} type="password" autoComplete="new-password"
               value={row.api_key || ''} placeholder={row.api_key_set ? '已保存，留空不改' : undefined}

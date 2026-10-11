@@ -32,7 +32,7 @@ describe('来源链接与凭据布局', () => {
       } finally { await opened.close(); }
     });
     it(`凭据的每个输入字段占满正文宽度（${viewport.name}）`, async () => {
-      const opened = await visit(browser, '/follow-manage?tab=source', viewport);
+      const opened = await visit(browser, '/configuration?section='+encodeURIComponent('来源与订阅'), viewport);
       try {
         await opened.page.route('**/api/follow/credentials', route => route.fulfill({ json: {
           root: '', providers: [{ provider: 'simpcity', provider_label: 'SimpCity', followable: true,

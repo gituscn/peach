@@ -12,7 +12,7 @@ it('开机自启：静默启动跟着开机自启解锁，保存发出三颗开�
   const receipt = vi.fn();
   const host = await mount(<StartupSettings startup={startup} receipt={receipt} />);
   expect(switches(host).map((input) => input.getAttribute('aria-label')))
-    .toEqual(['开机后启动 Peach', '静默启动', '在桌面创建快捷方式']);
+    .toEqual(['开机后启动 Peach', '只启动托盘，不打开网页', '在桌面创建快捷方式']);
   expect(switches(host).map((input) => input.disabled)).toEqual([false, true, false]);
   expect(buttonNamed('保存配置', host)).not.toBeNull();
   await click(switches(host)[0]);

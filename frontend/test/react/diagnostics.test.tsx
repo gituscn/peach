@@ -23,9 +23,9 @@ async function open(report = data()) {
 }
 it('诊断跳到具体配置分栏，系统权限项只显示动作', async () => {
   const { host, props } = await open();
-  await click(buttonNamed('打开媒体配置', host));
-  await click(buttonNamed('打开网络与访问配置', host));
-  expect(props.configure.mock.calls).toEqual([['媒体'], ['网络与访问']]);
+  await click(buttonNamed('打开媒体库与入库', host));
+  await click(buttonNamed('打开网络与访问', host));
+  expect(props.configure.mock.calls).toEqual([['媒体库与入库'], ['网络与访问']]);
   const root = [...host.querySelectorAll('h3')].find(node => node.textContent === '数据目录')!.parentElement!.parentElement!;
   expect(root.textContent).toContain('调整权限');
   expect(root.querySelector('button')).toBeNull();

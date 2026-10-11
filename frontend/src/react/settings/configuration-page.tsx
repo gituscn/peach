@@ -1,12 +1,12 @@
 /* 配置页（`/configuration`）：这台运行 Peach 的电脑上那些要「保存配置」的多字段表单。
- * 五个分区各占一格页签，一次只摆一组；服务端按两道门放行，不能编辑时「媒体」那一组只留
- * 一句原因。设置弹层里只有一张摘要卡指到这里（ADR-0050）。
+ * 五个分区各占一格页签，一次只摆一组；本机配置权限与账本写入权限由服务端分别判定。
+ * 设置弹层里的「服务配置」入口指到这里。
  *
  * `.ui-configpage` 的第一层：最前面是页签条（`.ui-board-local-nav`），后面每组一个 `h2.ui-configgroup` 小标题
  * 紧跟这一组的根节点，根节点就是那一格页签面板。小标题在样式里不显示，它的字已经写在页签上；
  * 没有内容的组连标题与页签一起省略。页签条第一帧就在，和整页同一次提交画出来。 */
 import { useQuery } from '@tanstack/react-query';
-import { Fragment, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
 
 import { errorMessage } from '../../api';
 import type { ConfigurationData, ConfigurationPanel, ConfigurationProps } from '../bundle';
@@ -17,6 +17,8 @@ import { GeneralSettings } from './general-settings';
 import { MaintenanceSettings } from './maintenance-settings';
 import { MediaSettings } from './media-settings';
 import { NetworkSettings } from './network-settings';
+import { SourceSettings } from './source-settings';
+import { groupRoot } from './configuration-panel';
 
 export function ConfigurationPage({ receipt, reopenTutorial, section = '' }: ConfigurationProps) {
   const config = useQuery({
@@ -47,22 +49,31 @@ function ConfigurationGroups(
 ) {
   const [prefix] = useState(() => `board-tabs-${++tabSequence}`);
   const [chosen, choose] = useState(section);
+  const [narrow, setNarrow] = useState(() => matchMedia('(max-width:900px)').matches);
+  useEffect(() => {
+    const media = matchMedia('(max-width:900px)');
+    const changed = () => setNarrow(media.matches);
+    media.addEventListener('change', changed);
+    return () => media.removeEventListener('change', changed);
+  }, []);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const group = { data, receipt };
-  const general = Boolean(data.startup || data.automatic_updates || data.updates);
-  const network = Boolean(data.peach_proxy || data.entry_links || data.access || data.tunnel);
+  const network = Boolean(data.peach_proxy || data.access || data.tunnel || (data.editable && data.port_editable !== false));
   const downloads = data.downloads;
   const groups: Group[] = [
-    ...(general ? [{ title: '通用', body: (panel: ConfigurationPanel) => <GeneralSettings {...group} panel={panel} /> }] : []),
-    { title: '媒体', body: (panel) => <MediaSettings {...group} panel={panel} /> },
+    { title: '媒体库与入库', body: (panel) => <MediaSettings {...group} panel={panel} /> },
+    { title: '来源与订阅', body: (panel) => <SourceSettings {...group} panel={panel} /> },
     ...(downloads ? [{
-      title: '下载',
+      title: '下载渠道',
       body: (panel: ConfigurationPanel) => <DownloadGroup initial={downloads} receipt={receipt} panel={panel} />,
     }] : []),
     ...(network ? [{ title: '网络与访问', body: (panel: ConfigurationPanel) => <NetworkSettings {...group} panel={panel} /> }] : []),
     {
-      title: '维护',
-      body: (panel) => <MaintenanceSettings {...group} reopenTutorial={reopenTutorial} panel={panel} />,
+      title: '应用与维护',
+      body: (panel) => <div {...groupRoot(panel)}>
+        <GeneralSettings {...group} />
+        <MaintenanceSettings {...group} reopenTutorial={reopenTutorial} />
+      </div>,
     },
   ];
   const at = Math.max(0, groups.findIndex((item) => item.title === chosen));
@@ -81,7 +92,7 @@ function ConfigurationGroups(
   return (
     <div className="ui-configpage">
       <div className="ui-board-local-nav" role="tablist" aria-label="配置分区" data-section-nav="" data-section-items=""
-        aria-orientation="horizontal">
+        aria-orientation={narrow ? 'horizontal' : 'vertical'}>
         {groups.map(({ title }, i) => (
           <button key={title} ref={(node) => { buttons.current[i] = node }} type="button" role="tab"
             id={`${prefix}-tab-${i}`} aria-controls={`${prefix}-panel-${i}-0`} aria-selected={i === at}

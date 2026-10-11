@@ -72,11 +72,11 @@ Want to look around before installing? The [live demo](https://demo.peach.video)
 - **Playback**: play in the browser and pick up where you left off. Like, rate, save for later, add to a playlist, or "log a climax". Library and followed-post details offer a horizontally scrolling recommendation row; choose a card to switch directly.
 - **New releases**: subscribe on a performer page or by name in follow management, including performers not yet in your library. Peach checks for new titles regularly. Follow creators across sites such as FANBOX, Patreon and Kemono; the same work on different sites appears as one card.
 - **Online creators**: creator pages show local works and online updates separately, with video and image views and filters. Choose and crop an avatar from social profiles, online covers or post images, or use a local image or image URL.
-- **JAV intake**: mark a new-release card or followed post as wanted, or enter a video code. Work cards find and deduplicate links from JavDB's resource list and comments, showing attributes, size and date. Add magnets directly to 115 or PikPak, or copy other links. Files scanned into your library are marked as acquired; titles set aside can be searched again.
-- **Cloud download**: open Cloud download from JAV intake or a quality goal, paste a magnet link and hand it to 115 or PikPak for offline download. Once it lands, Peach selects the main video, isolates promotional attachments that meet the automatic threshold, collects metadata and applies that source's organization template. Progress and failed-step retries show up in Activity.
-- **Find a release**: the Cloud download dialog searches `manko.fun → JavDB → Sukebei` first and stops when manko.fun has a 1080p or 2160p match; without one, it continues through your Prowlarr or Jackett indexers. File count is not a hard rejection rule: obvious trailers and promotional attachments are ranked lower instead.
+- **JAV**: My library shows acquired titles; Discover matches collected new releases to your taste records; Wanted tracks titles to find. Mark a new-release card or followed post as wanted, or enter a video code. Files scanned into your library are marked as acquired.
+- **Cloud download**: open Find resources from JAV or a quality goal, search a video code or paste a magnet link, then submit the selected resource to 115 or PikPak. Once it lands, Peach selects the main video, isolates promotional attachments that meet the automatic threshold, collects metadata and applies that source's organization template. Progress and failed-step retries show up in Activity.
+- **Find a release**: Find resources searches `manko.fun → JavDB → Sukebei` first and stops when manko.fun has a 1080p or 2160p match; without one, it continues through your configured Prowlarr or Jackett indexers. Available covers and title details appear with the resource candidates.
 - **Statistics**: which drive holds what, how much you have watched and which tags dominate, on one page.
-- **Appearance**: light or dark, accent color and sidebar order are all yours to set.
+- **Settings**: the dialog groups appearance and navigation, browsing and playback, JAV and new releases, search and recommendations, and content display. Service configuration groups media intake, sources and subscriptions, download channels, network access, and application maintenance.
 - **Any screen**: works in the browser on desktop, tablet and phone.
 
 ## Download and use
@@ -108,7 +108,7 @@ On macOS, replace the last two lines with `uv sync --locked --python 3.14 --extr
 
 LAN access, access passwords, updates and uninstalling are covered in [Operations](docs/OPERATIONS.md).
 
-Open System diagnostics under Configuration → Maintenance to view library health lists, source parsing and cooldowns. `peach doctor` provides the same report; `--json` returns redacted JSON. See [Local diagnostics](docs/OPERATIONS.md#本机诊断) for status and actions.
+Open System diagnostics under Service configuration → Application and maintenance to view library health lists, source parsing and cooldowns. `peach doctor` provides the same report; `--json` returns redacted JSON. See [Local diagnostics](docs/OPERATIONS.md#本机诊断) for status and actions.
 
 ## FAQ
 

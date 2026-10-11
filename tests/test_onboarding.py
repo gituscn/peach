@@ -872,6 +872,7 @@ class StandaloneConfigurationTests(_Case):
             snapshot = client.get("/api/configuration", headers=headers).json()
             self.assertTrue(snapshot["editable"])
             self.assertEqual(snapshot["notice"], "")
+            self.assertFalse(snapshot["ledger_read_only"])
             self.assertEqual(snapshot["media_dirs"], [str(self.media)])
             self.assertEqual(snapshot["port"], 9123)
             # 运行信息和首启完成页共用同一份 `runtime_facts`，不再各写一份。
@@ -885,6 +886,15 @@ class StandaloneConfigurationTests(_Case):
             self.assertTrue(self.config.path.with_suffix(".previous.toml").is_file())
             self.assertTrue((self.config.directory("state") / RELOAD_NAME).is_file())
             self.assertFalse((self.config.directory("database") / "ledger.db").exists())
+
+    def test_configuration_reports_the_ledger_role_independently_of_local_editability(self):
+        from types import SimpleNamespace
+        with self.client() as client:
+            with mock.patch.object(client.app.state, "sync", SimpleNamespace(read_only=True), create=True):
+                response = client.get("/api/configuration", headers={"X-Token": "test-token"})
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(response.json()["editable"])
+                self.assertTrue(response.json()["ledger_read_only"])
 
     def test_the_snapshot_counts_libraries_the_way_the_library_switcher_groups_them(self):
         """摘要卡的「媒体库」由服务端给：同名的声明根算一个库，跨来源也一样。"""

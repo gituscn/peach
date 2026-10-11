@@ -8,7 +8,7 @@
 
 - NFO 见 [docs/REUSE.md](REUSE.md)；[Banner](https://vercel.com/geist/banner) 取证见 `vercel-geist-library-banner.md`。
 - 凭据焦点外扩 3px，正文左右留 4px；输入框可收缩，验收所有裁切祖先。
-- 截图与视觉验收的画面保护：SFW 模式（设置面板「安全」组，`#censorSetting`，localStorage `peach-censor`）默认关闭、不在导航栏。只在截图要交给会审查内容的模型（自动视觉审查或外发工具）时开启，用完关掉；普通个人浏览一律不遮挡。
+- 截图与视觉验收的画面保护：SFW 模式（设置面板「内容显示」组，`#censorSetting`，localStorage `peach-censor`）默认关闭、不在导航栏。只在截图要交给会审查内容的模型（自动视觉审查或外发工具）时开启，用完关掉；普通个人浏览一律不遮挡。
 - 卡片实体链接必须由同一个 `{kind,name}` 结构生成，不许先独立选显示名、再按别的字段推断类型；账本 `size` 为空或 0 时显示「大小未知」，不伪装成 `0 MB`。
 - 排除竖屏是首页取景而不是全局过滤器：`exclude_vertical` 进搜索或实体列表会让按名字搜竖屏视频返回 0 结果，`test_only_the_default_home_list_drops_portrait_videos` 守这条线。
 - 竖屏带整行占位，插在本页新增那几行的某个行边界上（`frontend/src/react/catalog-grid/catalog-grid.ts` 的 `shortsBoundaries`），首尾各留至少一行，不额外拉视频补余位。
