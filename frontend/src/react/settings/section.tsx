@@ -13,6 +13,7 @@ import { LinkButton } from '@/components/base/buttons/link-button';
 
 interface SectionProps {
   title: string;
+  icon?: ReactNode;
   id?: string;
   /** 跟着标题走的次要内容（来源站点的外链）。标题占剩下的宽度，它靠右。 */
   aside?: ReactNode;
@@ -23,16 +24,17 @@ interface SectionProps {
 
 /* 分区里的说明、报错与读数常带长 URL、堆栈和无空格路径：整个分区按 `overflow-wrap:anywhere`
    就地折断（属性会继承，行内说明、Help 与读数都跟着走），不把卡片撑出横向滚动。 */
-export function Section({ title, id, aside, onSubmit, children }: SectionProps) {
+export function Section({ title, icon, id, aside, onSubmit, children }: SectionProps) {
+  const label = icon ? <span className="inline-flex items-center gap-1.5">{icon}{title}</span> : title;
   const body = (
     <>
       {aside
         /* 标题至少留 10rem：放不下时外链换到下一行，不把标题挤成一字一行。 */
         ? <div className="flex w-full flex-wrap items-center justify-between gap-2">
-            <div className="min-w-40 flex-1"><SettingsSectionLabel>{title}</SettingsSectionLabel></div>
+            <div className="min-w-40 flex-1"><SettingsSectionLabel>{label}</SettingsSectionLabel></div>
             <div className="flex min-w-0 max-w-full">{aside}</div>
           </div>
-        : <SettingsSectionLabel>{title}</SettingsSectionLabel>}
+        : <SettingsSectionLabel>{label}</SettingsSectionLabel>}
       <SettingsCard>{children}</SettingsCard>
     </>
   );

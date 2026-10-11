@@ -14,7 +14,7 @@ import { navigationState, paintNav } from './navigation.js';
 import { indexParams, paintIndexSkeleton } from './../index-skeleton';
 import { showEntityLoading } from './entity.js';
 import { routeMetaOf } from './../history/route-meta';
-import { javTab } from '../react/jav/jav';
+import { javTab } from '../react/jav/jav-navigation';
 export const loadingState = { setGridCards: undefined, gridCards: undefined, managementPlaceholder: undefined, wantsDiscoveryBars: undefined, entityShapesReady: undefined, ENTITY_SHAPES_WAIT: undefined, syncPageTitle: undefined };
 
 export function renderCatalogLoading(label='正在读取作品'){

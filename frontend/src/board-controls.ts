@@ -40,20 +40,15 @@ export function initBoardControls() {
   document.addEventListener('scroll',event=>{if(target&&scrollMovesAnchor(event,target))hide()},true);window.addEventListener('resize',hide);
 }
 
-const tabPositions=new Map<string,{left:number;width:number}>();
-/** 全站的下划线 Tabs 共用一条会滑的 2px 蓝色指示条（boardui tabs.tsx：transform 与 width
-    各 200ms ease）。复核分类是药丸、统计与口味的维度是分段控件，选中都靠填充，不进这条。 */
+/** 页面导航只同步可见位置，选中态由共享样式绘制。 */
 export function wireBoardTabs(root:ParentNode){
   const selector='.ui-board-local-nav:not([data-section-nav])';
   const groups=[...root.querySelectorAll<HTMLElement>(selector)];
   if(root instanceof HTMLElement&&root.matches(selector))groups.push(root);
   groups.forEach(group=>{
     if(group.hasAttribute('data-board-tabs'))return;group.dataset.boardTabs='true';
-    const key=group.className+group.getAttribute('aria-label');
-    const paint=(position:{left:number;width:number})=>{group.style.setProperty('--tab-x',`${position.left}px`);group.style.setProperty('--tab-width',`${position.width}px`)};
-    const measure=()=>{const selected=group.querySelector<HTMLElement>('button[aria-selected=true],button[aria-pressed=true]');if(!selected||!selected.offsetWidth)return;const position={left:selected.offsetLeft,width:selected.offsetWidth};paint(position);tabPositions.set(key,position)};
-    const previous=tabPositions.get(key);if(previous)paint(previous);else measure();
-    requestAnimationFrame(()=>{group.classList.add('ui-board-tabs-ready');requestAnimationFrame(measure)});
+    const measure=()=>{const selected=group.querySelector<HTMLElement>('button[aria-selected=true],button[aria-pressed=true]');if(!selected||!selected.offsetWidth)return;const left=selected.offsetLeft,right=left+selected.offsetWidth;if(left<group.scrollLeft)group.scrollLeft=left;else if(right>group.scrollLeft+group.clientWidth)group.scrollLeft=right-group.clientWidth};
+    measure();
     const mutation=new MutationObserver(measure);mutation.observe(group,{subtree:true,attributes:true,attributeFilter:['aria-selected','aria-pressed']});
     const resize=new ResizeObserver(()=>{if(!group.isConnected){resize.disconnect();mutation.disconnect();return}measure()});resize.observe(group);
   });

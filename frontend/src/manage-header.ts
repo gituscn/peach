@@ -107,9 +107,9 @@ export function manageHeaderSkeletonHtml(props: ManageHeaderProps): string {
   const lede = view.lede.kind === 'none' ? ''
     : `<p class="mono" data-manage-lede="">${view.lede.kind === 'skeleton' ? TRASH_LEDE_SKELETON_HTML
       : `<span data-lede-text="">${escape(view.lede.text)}</span>${view.lede.total ? EMPTY_TRASH_HTML : ''}`}</p>`;
-  return `<nav data-manage-bar="" aria-label="管理"><div data-manage-menu="">${menu}<span data-manage-indicator="" aria-hidden="true"></span></div></nav>`
+  return `<h2 data-manage-title=""${view.compact ? ' data-compact=""' : ''}>${escape(view.title)}</h2>`
     + crumb
-    + `<h2 data-manage-title=""${view.compact ? ' data-compact=""' : ''}>${escape(view.title)}</h2>`
+    + `<nav data-manage-bar="" aria-label="管理"><div data-manage-menu="">${menu}</div></nav>`
     + lede;
 }
 

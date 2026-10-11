@@ -253,6 +253,8 @@ describe('首页筛选条', () => {
       await page.locator('#grid [data-media-card]').first().waitFor();
       await settle(page);
       assert.ok(counts.items.slice(before).some((url) => url.searchParams.get('jav') === '1'), 'JAV 口径没有重取列表');
+      assert.equal(await page.evaluate(() => document.querySelector('#javLibraryHeader')!.getBoundingClientRect().bottom <= document.querySelector('#catalogFilter [data-catalog-tier="performers"]')!.getBoundingClientRect().top), true, 'JAV 标题和分区应在可见筛选行之前');
+      assert.equal(await page.locator('#catalogPageHeading').isVisible(), false);
       assert.equal(await page.locator(`${FILTER} input[name="home-layout"]`).first().isVisible(), false);
       await page.locator(`${FILTER} input[name="jav-layout"]`).first().waitFor({ state: 'attached' });
       assert.ok(await page.locator(`${FILTER} [data-tier-performer]`).count() > 0, 'JAV 没有女优筛选');

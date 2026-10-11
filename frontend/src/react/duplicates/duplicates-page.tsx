@@ -16,6 +16,7 @@ import { CollectionSummary } from '../components/collection-summary';
 import { EmptyState } from '../components/empty-state';
 import { FilterGlass, GlassPill } from '../components/filter-glass';
 import { Note } from '../components/note';
+import { SourceLabel } from '../components/source-label';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { TRASH_KEY } from '../data-cleanup/data-cleanup';
 import { cloudLocations, fetchMediaSources, MEDIA_SOURCES_KEY } from '../media-sources';
@@ -156,7 +157,7 @@ export function DuplicatesPage({ openItem, toast, failure }: DuplicatesProps) {
             {bulkCloudPreferences(groups, configured).map((location) => (
               <GlassPill key={location} busy={pending === `all:${location}`}
                 onPress={() => run({ groups, keep: location, key: `all:${location}` })}>
-                {`全部优先 ${LOC[location] || location}`}
+                <SourceLabel source={location} label={`全部优先 ${LOC[location] || location}`} />
               </GlassPill>
             ))}
           </FilterGlass>
@@ -188,7 +189,7 @@ export function DuplicatesPage({ openItem, toast, failure }: DuplicatesProps) {
                     {mixedCloudPreferences(group.files, configured).map((location) => (
                       <Button key={location} variant="secondary" size="small" {...busy(key(location))}
                         onClick={() => run({ groups: one, keep: location, key: key(location) })}>
-                        {`留 ${LOC[location] || location}`}
+                        <SourceLabel source={location} label={`留 ${LOC[location] || location}`} />
                       </Button>
                     ))}
                     <Button variant="danger" size="small" {...busy(key('all'))}

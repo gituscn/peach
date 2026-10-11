@@ -122,6 +122,10 @@ it('「留 115」只出现在混着 115 与别处文件的那一组，批量条�
   expect(buttonNamed('留 115', card(host, 'ABC-001'))).toBeNull();
   expect(buttonNamed('留 115', card(host, 'ABC-002'))).not.toBeNull();
   expect(buttonNamed('全部优先 115', host)).not.toBeNull();
+  expect(buttonNamed('留 115', card(host, 'ABC-002'))?.querySelector('svg use')?.getAttribute('href'))
+    .toBe(`#i-${legacyUi.MEDIA_SOURCE_ICONS['115']}`);
+  expect(buttonNamed('全部优先 115', host)?.querySelector('svg use')?.getAttribute('href'))
+    .toBe(`#i-${legacyUi.MEDIA_SOURCE_ICONS['115']}`);
   expect(buttonNamed('全部优先 PikPak', host)).toBeNull();
 });
 

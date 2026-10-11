@@ -144,7 +144,7 @@ export const playedItemUrl = (row: RecentPlay): string =>
   `${row.kind === 'online' ? '/follow/item/' : '/item/'}${row.id}`;
 
 /** 径向图里的一段。`bytes` 是这一段占的体积，图例格子里读成它的大小。 */
-export interface RadialSlice { name: string; value: number; bytes?: number }
+export interface RadialSlice { name: string; value: number; bytes?: number; mark?: string }
 
 /** 一张径向图最多画几圈：图表色只有六档，第七圈起颜色就和前面的重了。 */
 export const RADIAL_MAX = 6;

@@ -6,9 +6,9 @@ import { RiStarLine, RiExternalLinkLine, RiDeleteBinLine } from '@remixicon/reac
 
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
-import { Select, SelectItem } from '@/components/base/select/select';
 
 import { apiGet, errorMessage } from '../../api';
+import { javContentSkeleton } from '../../jav-skeleton';
 import type { DownloadsSnapshot } from '../bundle';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
 import { DOWNLOADS_KEY, DOWNLOADS_URL } from '../activity/downloads-panel';
@@ -26,7 +26,7 @@ import {
   WANTS_KEY, type Want,
 } from './wants';
 
-const ORIGINS: Record<Want['origin'], string> = { code: '手动添加', feed: 'Feed 新作', follow: '关注' };
+const ORIGINS: Record<Want['origin'], string> = { code: '手动添加', feed: '订阅新作', follow: '关注' };
 /** 每一段一页摆多少张：一张卡二十来个节点，上千条一次摆开就是十几万像素高的一页。 */
 export const WANT_PAGE_SIZE = 20;
 
@@ -123,7 +123,6 @@ export interface WantListProps {
 export function WantList({ readOnly, toast, query = '' }: WantListProps) {
   const [code, setCode] = useState('');
   const [download, setDownload] = useState<DownloadPrefill | null>(null);
-  const [provider, setProvider] = useState('');
   const action = useAction();
   const wants = useQuery({
     queryKey: WANTS_KEY, queryFn: ({ signal }) => fetchWants(signal),
@@ -165,9 +164,9 @@ export function WantList({ readOnly, toast, query = '' }: WantListProps) {
     enabled: items.some((want) => want.code && (want.phase === 'searching' || want.phase === 'given_up')),
   });
   const configured = downloads.data?.providers.filter((row) => row.configured) || [];
-  const selected = configured.find((row) => row.key === provider)?.key || configured[0]?.key || '';
+  const selected = configured[0]?.key || '';
   return (
-    <div className="flex flex-col gap-8">
+    <div aria-busy={wants.isPending} className="flex flex-col gap-8">
       <div className={cardClass({ padding: 'none', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })}>
         <h3 className="text-title-2-medium text-text-primary">按番号添加</h3>
         <div className="flex flex-wrap items-end gap-2">
@@ -178,29 +177,19 @@ export function WantList({ readOnly, toast, query = '' }: WantListProps) {
           <Button variant="primary" disabled={readOnly || !code.trim()} {...busyProps(action.busy === 'add')}
             onClick={add}>添加</Button>
         </div>
-        <Help>Feed 新作卡和关注详情上点「想要」也会加到这里。文件扫进库后自动挪到「已入库」。</Help>
         {action.error ? <Note tone="error" title="这一次没有完成">{action.error}</Note> : null}
       </div>
 
       {wants.error ? <Note tone="error" title="想要清单读取失败">{errorMessage(wants.error)}</Note> : null}
+      {wants.isPending ? <div role="status" aria-label="正在读取想要" dangerouslySetInnerHTML={{ __html: javContentSkeleton('wants') }} /> : null}
       {data?.scraping ? <Help role="status">正在给刚加入的番号取资料与封面。</Help> : null}
-      {configured.length ? <div className="flex flex-col gap-2">
-        <p className="text-body-medium text-text-primary">下载到</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select aria-label="下载到" selectedKey={selected} onSelectionChange={(key) => setProvider(String(key))}>
-            {configured.map((row) => <SelectItem key={row.key} id={row.key}>{row.label}</SelectItem>)}
-          </Select>
-          <Button variant="secondary" onClick={() => setDownload({})}>查找资源</Button>
-        </div>
-        <Help>{configured.find((row) => row.key === selected)?.target || '使用已配置的目标目录'}</Help>
-      </div> : null}
       {downloads.error ? <Note tone="error" title="下载配置未取得">{errorMessage(downloads.error)}</Note> : null}
       {downloads.data && !configured.length ? <Note tone="neutral">尚未配置下载渠道。<a href={'/configuration?section=' + encodeURIComponent('下载渠道')}>下载渠道设置</a></Note> : null}
       {downloads.data && !downloads.data.available ? <Note tone="neutral">云下载只在账本写入端可用。</Note> : null}
 
       {data && !items.length ? (
         <EmptyState shell="plain" icon={RiStarLine} title={query ? '没有符合条件的作品' : '还没有想要的作品'}>
-          {query ? '试试其他番号、女优或标题。' : '在上面输入番号，或在 Feed 新作卡、关注详情上点「想要」。'}
+          {query ? '试试其他番号、女优或标题。' : '输入番号，添加想看的作品。'}
         </EmptyState>
       ) : null}
 

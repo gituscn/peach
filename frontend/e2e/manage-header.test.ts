@@ -1,6 +1,6 @@
 /* 管理区页头与底部批量条（`react/manage-header/`、`react/batch-dock/`）在真浏览器里的行为。
  *
- * 页头：每个管理区的标题与面包屑、四块（管理条、面包屑、标题、说明行）落在同一条居中窄列上、
+ * 页头：标题、面包屑与导航对齐内容左边缘，回收站说明行按正文宽度居中；
  * 窄屏标题收档的那几页，以及面包屑普通左键走路由不整页重载。回收站说明行先占位后落读数、同页重画
  * 不闪回占位，由 `design-cards.test.ts` 的回收站几何用例量。
  *
@@ -37,7 +37,7 @@ const HEADS = [
   ['/configuration', 'Peach 配置', '', true],
 ] as const;
 
-const BLOCKS = '[data-manage-header] > :is([data-manage-bar], [data-manage-crumb], [data-manage-title], [data-manage-lede])';
+const BLOCKS = '[data-manage-header] > :is([data-manage-bar], [data-manage-crumb], [data-manage-title])';
 
 async function readHead(page: Page) {
   await page.locator('[data-manage-title]').waitFor({ timeout: 15_000 });
@@ -53,6 +53,11 @@ async function readHead(page: Page) {
         const rect = node.getBoundingClientRect();
         return [Math.round(rect.left), Math.round(rect.width)];
       }),
+      titleFirst: document.querySelector('[data-manage-header]')!.firstElementChild === title,
+      lede: (() => {
+        const rect = document.querySelector('[data-manage-lede]')?.getBoundingClientRect();
+        return rect ? [rect.left, rect.width] : null;
+      })(),
       main: (() => {
         const rect = document.querySelector('#main')!.getBoundingClientRect();
         const style = getComputedStyle(document.querySelector('#main')!);
@@ -67,7 +72,7 @@ describe('管理区页头', () => {
   before(async () => { browser = await launch(); });
   after(async () => { await browser?.close(); });
 
-  it('每个管理区的标题与面包屑，四块落在同一条按 --board-content 居中的窄列上', { timeout: 180_000 }, async () => {
+  it('管理页标题在内容左上角，导航同列，回收站说明按正文宽度居中', { timeout: 180_000 }, async () => {
     const opened = await visit(browser, '/stats', WIDE);
     try {
       for (const [path, title, crumb] of HEADS) {
@@ -77,10 +82,16 @@ describe('管理区页头', () => {
         assert.ok(head.columns.length >= 2, `${path} 页头只量到 ${head.columns.length} 块`);
         for (const column of head.columns) assert.deepEqual(column, head.columns[0], `${path} 页头几块没落在同一列：${JSON.stringify(head.columns)}`);
         const [left, width] = head.columns[0]!;
-        assert.equal(width, 1120, `${path} 窄列宽 ${width}，没取 --board-content`);
         const [start, end] = head.main;
-        assert.ok(Math.abs((left - start) - (end - left - width)) <= 1,
-          `${path} 窄列没居中：左边 ${left - start}，右边 ${end - left - width}`);
+        assert.ok(head.titleFirst, `${path} 标题没有位于导航之前`);
+        assert.equal(left, Math.round(start), `${path} 页头没有对齐内容左边缘`);
+        assert.equal(width, Math.round(end - start), `${path} 页头没有使用内容宽度`);
+        if (head.lede) {
+          const [ledeLeft, ledeWidth] = head.lede;
+          assert.equal(Math.round(ledeWidth), Math.min(1120, Math.round(end - start)));
+          assert.ok(Math.abs((ledeLeft - start) - (end - ledeLeft - ledeWidth)) <= 1,
+            `${path} 回收站说明没有按正文宽度居中`);
+        }
       }
       assert.deepEqual(unrelated(opened.problems), []);
     } finally {

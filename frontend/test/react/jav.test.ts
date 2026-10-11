@@ -26,3 +26,8 @@ it('JAV 馆藏深链保留搜索和筛选条件，使用目录入口', () => {
   expect(javPath('discover')).toBe('/jav?tab=discover');
   expect(javPath('wants')).toBe('/jav?tab=wants');
 });
+it('按实体身份匹配来源别名与口味中的规范姓名', () => {
+  const item = { ...work(1, '來源姓名'), performer_refs: [{ id: 42, name: '规范姓名' }] };
+  expect(rankedDiscoveries([item], { rankings: { peach_performers: [{ name: '规范姓名', entity_id: 42, score: 3 }] } })[0]?.matches).toEqual(['规范姓名']);
+  expect(rankedDiscoveries([item], { rankings: { peach_performers: [{ name: '另一个姓名', entity_id: 43 }] } })).toEqual([]);
+});

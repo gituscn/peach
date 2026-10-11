@@ -423,7 +423,7 @@ body>.board-filter-frame{margin-inline:16px}
 :root{--motion-swap:.25s cubic-bezier(.4,0,.2,1);--motion-count:.25s cubic-bezier(.34,1.45,.64,1);--motion-reveal:.4s cubic-bezier(.4,0,.2,1);--motion-stagger:70ms;--motion-pop:.4s cubic-bezier(.34,1.36,.64,1)}
 body{font-size:14px;line-height:20px}
 button,input,select,textarea{font-family:inherit}
-.index .ihead{padding:4px;gap:12px;min-width:0;flex-wrap:wrap}
+.index .ihead{padding:0;gap:12px;min-width:0;flex-wrap:wrap}
 .index .ihead .geist-search{min-width:140px;margin-right:0}
 .index .ihead h2{font-size:24px;line-height:34px;font-weight:500}
 .indexheading{font-size:24px;line-height:34px}
@@ -717,8 +717,7 @@ body a[target=_blank]:not(:has([data-link-icon])):not(.cardlink):where(:not([dat
 .metricstrip>button[aria-selected=true]{background:var(--color-background-primary-default);box-shadow:none}.metricstrip>button[aria-selected=true]::after{box-sizing:border-box}
 body .gselectmenu [role=option][aria-selected=true],body .popmenu [aria-checked=true]{background:color-mix(in srgb,var(--color-text-primary) 10%,var(--color-background-primary-default));color:var(--color-text-primary)}
 .insightswitch{display:inline-flex;align-items:center;gap:2px;padding:3px;border:1px solid var(--line);border-radius:10px;background:var(--color-background-primary-default);box-shadow:var(--elevation-xs)}.insightswitch label>span{display:flex;align-items:center;min-height:28px;padding:4px 10px;border-radius:7px;color:var(--color-text-secondary);font:var(--board-body-medium)}.insightswitch label:has(input:checked)>span{background:var(--color-background-primary-hover);color:var(--color-text-primary);box-shadow:var(--elevation-xs)}
-[data-board-tabs]{position:relative!important}[data-board-tabs]::before{content:'';position:absolute;bottom:0;left:0;width:var(--tab-width,0px);height:2px;background:var(--tungsten);transform:translateX(var(--tab-x,0px));pointer-events:none;z-index:1}
-body [data-board-tabs] button[aria-selected=true]{border-bottom-color:transparent}
+[data-board-tabs]{position:relative!important}
 /* Split Button 照 Geist 实测（`vercel-geist-split-button.md`「悬停」）：两半各是一颗
    带自己填充的按钮，整组只管并排和外圆角，悬停只抬指针下那一半——抬的那一层就是
    `bg-button-primary` 自己的 `::before` 淡入。中缝那条 1px 线是触发档的 `::after`，
@@ -794,9 +793,6 @@ html.board-high-contrast :is(.card .badge,[data-glass-pane]){background:var(--gr
   backdrop-filter:var(--glass-pick);-webkit-backdrop-filter:var(--glass-pick);
   box-shadow:inset 0 0 0 1px var(--glass-rim),var(--glass-pick-shadow)}
 .board-filter-frame #count{min-height:48px}
-/* ── 下划线 Tabs（boardui tabs.tsx）：管理导航与设置内的分区同一副样子 ──
-   1px 基线、选中 2px 蓝线由 `[data-board-tabs]::before` 滑过去；选项 px 10 / py 8、Body 1、间隔 4px；
-   选中蓝字 Medium，未选主文字色 Regular。计数徽标 px 4 / py 1、Caption Medium、4px 圆角：选中蓝底蓝字，未选黑 10% 半透明。 */
 /* 复核分类长成次级菜单：底下那一屏是同一份复核队列换了个筛法，十枚下划线并排会
    把它读成十块各不相干的内容。药丸走全站横排互斥那一套——选中只有填充，未选中
    悬停只提文字色。键盘行为仍是 tablist，方向键在同一条里移动焦点。 */

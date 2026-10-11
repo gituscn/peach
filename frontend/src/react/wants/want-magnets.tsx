@@ -14,6 +14,7 @@ import { busyProps, useAction } from '../settings/use-action';
 import type { Want } from './wants';
 import { Disclosure } from '../settings/section';
 import { cachedResources, rememberResources, resourceLifetime } from './resource-cache';
+import { PROVIDER_ICONS } from '../components/source-label';
 
 export interface MagnetCandidate {
   id: string; protocol: 'magnet' | 'ed2k' | 'url'; info_hash: string; uri: string;
@@ -137,7 +138,7 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
               <Button variant="secondary" size="small" leadingIcon={RiFileCopyLine} {...busyProps(action.busy === `copy:${candidate.id}`)}
                 onClick={() => copy(candidate)}>复制链接</Button>
               {candidate.protocol === 'magnet' ?
-              <Button variant="primary" size="small" leadingIcon={RiCloudLine} disabled={readOnly || !downloads?.available || !configured || added}
+              <Button variant="primary" size="small" leadingIcon={configured ? PROVIDER_ICONS[configured.key] : RiCloudLine} title={configured ? `下载到 ${configured.label}` : undefined} disabled={readOnly || !downloads?.available || !configured || added}
                 {...busyProps(action.busy === candidate.id)} onClick={() => add(candidate)}>
                 {added ? '已添加' : '添加下载'}
               </Button> : null}

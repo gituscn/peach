@@ -1,25 +1,19 @@
 import { useState } from 'react';
-import { Tab, TabList, Tabs } from 'react-aria-components';
 import { Button } from '@/components/base/buttons/button';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
 import { JAV_TABS, javPath } from './jav';
+import { BoardTabs } from '../components/board-tabs';
 
 export function JavHeader({ tab, navigate, find }: {
   tab: string; navigate(path: string): void; find(): void;
 }) {
   return <div className="flex w-full flex-col gap-4">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <h2 className="text-title-2-semibold text-text-primary">JAV</h2>
-      <Button variant={tab === 'wants' ? 'secondary' : 'primary'} onClick={find}>查找资源</Button>
+      <h2 data-page-title="" className="text-display-4-medium text-text-primary max-board-narrow:text-title-1-medium">JAV</h2>
+      <Button variant="secondary" onClick={find}>查找资源</Button>
     </div>
-    <Tabs selectedKey={tab} onSelectionChange={key => navigate(javPath(String(key)))}>
-      <TabList aria-label="JAV 分区" data-section-nav data-section-items className="flex max-w-full gap-1 overflow-x-auto">
-        {JAV_TABS.map(([key, label]) => <Tab key={key} id={key}
-          className="cursor-pointer whitespace-nowrap rounded-md px-3 py-2 text-body-medium text-text-secondary hover:text-text-primary data-[selected]:bg-background-tertiary-default data-[selected]:text-text-primary focus-visible:outline-2 focus-visible:outline-border-focus-ring">
-          {label}
-        </Tab>)}
-      </TabList>
-    </Tabs>
+    <BoardTabs tabs={JAV_TABS.map(([value, label]) => ({ value, label }))} value={tab}
+      label="JAV 分区" className="" onChange={key => navigate(javPath(key))} />
   </div>;
 }
 

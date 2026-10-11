@@ -868,7 +868,7 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
     const wide = await openFollowFeed(browser, '/follow', DESKTOP);
     try {
       const shown = await read(wide.page);
-      assert.equal(shown.title, '24px');
+      assert.equal(shown.title, '32px');
       assert.deepEqual(shown.gaps, ['7px', '7px'], '关注页的药丸间距和首页那条不一样');
       assert.match(shown.readout, /Cascadia Mono|Consolas|monospace/, `读数不是等宽字：${shown.readout}`);
       assert.deepEqual(wide.problems, []);
@@ -877,7 +877,7 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
     }
     const narrow = await openFollowFeed(browser, '/follow', MOBILE);
     try {
-      assert.equal((await read(narrow.page)).title, '20px', '窄屏的关注标题没有收到 20px');
+      assert.equal((await read(narrow.page)).title, '24px', '窄屏标题使用统一的页面标题字号');
       assert.deepEqual(narrow.problems, []);
     } finally {
       await narrow.close();

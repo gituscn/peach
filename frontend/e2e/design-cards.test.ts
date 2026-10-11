@@ -346,39 +346,32 @@ describe('设计决定：作品卡、管理页与复核', () => {
     }
   });
 
-  it('管理区页头：面包屑当前项升到 --ink、上一级与分隔符钉在 --muted，按下的页签蓝字配一条同宽蓝线', { timeout: 60_000 }, async () => {
+  it('管理区标题位于导航上方，面包屑使用身份层级，导航选中态使用中性填充', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/duplicates', DESKTOP);
     try {
       const { page } = opened;
       await page.locator('[data-manage-crumb] [aria-current="true"]').waitFor({ timeout: 15_000 });
-      await page.locator('[data-manage-indicator][data-ready]').waitFor({ timeout: 15_000 });
       await settle(page);
-      /* 指示线落位走一条弹簧过渡：等它停在按下那一枚底下再读；停不下来由下面的断言报出偏差。 */
-      await page.waitForFunction(() => {
-        const a = document.querySelector('[data-manage][aria-pressed="true"]')!.getBoundingClientRect();
-        const b = document.querySelector('[data-manage-indicator]')!.getBoundingClientRect();
-        return Math.abs(a.left - b.left) < 0.5 && Math.abs(a.width - b.width) < 0.5;
-      }, null, { timeout: 5_000 }).catch(() => undefined);
-      const [ink, muted, accent] = await Promise.all(['--ink', '--muted', '--tungsten'].map((token) => tokenColor(page, 'body', token)));
+      const [ink, muted, fill] = await Promise.all(['--ink', '--muted', '--hover'].map((token) => tokenColor(page, 'body', token)));
       const read = await page.evaluate(() => {
         const items = [...document.querySelectorAll<HTMLElement>('[data-manage-crumb] li')];
         const pressed = document.querySelector<HTMLElement>('[data-manage][aria-pressed="true"]')!;
-        const line = document.querySelector<HTMLElement>('[data-manage-indicator]')!;
-        const [a, b] = [pressed.getBoundingClientRect(), line.getBoundingClientRect()];
         return {
           colors: items.map((item) => getComputedStyle(item).color),
           separators: items.map((item) => item.querySelector('svg') ? getComputedStyle(item.querySelector('svg')!).stroke : null),
           gap: getComputedStyle(document.querySelector('[data-manage-crumb] ol')!).columnGap,
           tab: getComputedStyle(pressed).color,
-          line: getComputedStyle(line).backgroundColor,
-          under: [Math.round(b.left - a.left), Math.round(b.width - a.width), Math.round(a.bottom - b.bottom)],
+          fill: getComputedStyle(pressed).backgroundColor,
+          titleBeforeNav: document.querySelector('[data-manage-title]')!.getBoundingClientRect().bottom <= document.querySelector('[data-manage-bar]')!.getBoundingClientRect().top,
+          titleLeft: Math.round(document.querySelector('[data-manage-title]')!.getBoundingClientRect().left - document.querySelector('#main')!.getBoundingClientRect().left),
         };
       });
       assert.deepEqual(read.colors, [muted, ink], '上一级不是 --muted，或当前项没升到 --ink');
       assert.deepEqual(read.separators, [muted, null], '分隔符跟着当前项提亮了，或最后一项也带了分隔符');
       assert.equal(read.gap, '6px');
-      assert.deepEqual([read.tab, read.line], [accent, accent], '按下的页签不是蓝字配蓝线');
-      assert.deepEqual(read.under, [0, 0, 0], `指示线没压在按下那一枚底下、同宽：${JSON.stringify(read.under)}`);
+      assert.deepEqual([read.tab, read.fill], [ink, fill]);
+      assert.equal(read.titleBeforeNav, true);
+      assert.equal(read.titleLeft, 16);
       assert.deepEqual(opened.problems.filter((line) => !line.includes('/api/links/check')), []);
     } finally {
       await opened.close();
@@ -758,12 +751,10 @@ describe('设计决定：作品卡、管理页与复核', () => {
     }
   });
 
-  it('垃圾文件的计数行是两块看得见、跟标题同宽的面', { timeout: 60_000 }, async () => {
+  it('垃圾文件的计数行与正文同宽，标题位于内容左上角', { timeout: 60_000 }, async () => {
     const opened = await openJunk(browser);
     try {
-      /* 三件事一起量，它们是同一条：这一行装着摘要和分类切换两块整宽的面，横排时后者
-         被挤成 0 宽；两块面和网格只要有一支不受 --board-content 约束，宽屏上标题就缩在
-         中间、卡片顶着两边；浅色下 primary 就是页面底色，不换一档这两块面整个消失。 */
+      /* 标题对齐内容左边缘；摘要、分类切换与网格共用正文宽度。 */
       const box = await opened.page.evaluate(() => {
         // 浅色是两块面最容易消失的那一档：深色下 primary 本来就比页面亮一级。
         document.documentElement.dataset.theme = 'light';
@@ -776,6 +767,7 @@ describe('设计决定：作品卡、管理页与复核', () => {
           getComputedStyle(document.querySelector(selector)!).backgroundColor;
         return {
           title: span('[data-manage-title]'),
+          main: span('#main'),
           summary: span('#count [data-collection-summary]'),
           filters: span('#count [data-junk-filters-frame]'),
           grid: span('#grid'),
@@ -785,10 +777,11 @@ describe('设计决定：作品卡、管理页与复核', () => {
         };
       });
       assert.ok(box.filters.width > 0, '分类切换被摘要挤成 0 宽，整条在宽屏上看不见');
-      for (const [label, measured] of [['摘要', box.summary], ['分类切换', box.filters],
-        ['网格', box.grid]] as const) {
-        assert.deepEqual(measured, box.title,
-          `${label}和标题不同宽：${measured.left}+${measured.width} 对 ${box.title.left}+${box.title.width}`);
+      assert.equal(box.title.left, box.main.left + 16);
+      assert.equal(box.title.width, box.main.width - 32);
+      for (const [label, measured] of [['摘要', box.summary], ['分类切换', box.filters]] as const) {
+        assert.deepEqual(measured, box.grid,
+          `${label}和正文网格不同宽：${measured.left}+${measured.width} 对 ${box.grid.left}+${box.grid.width}`);
       }
       assert.notEqual(box.summaryFace, box.page, '摘要那块面和页面底色同色，整块看不见');
       assert.notEqual(box.filtersFace, box.page, '分类切换那块面和页面底色同色，整块看不见');

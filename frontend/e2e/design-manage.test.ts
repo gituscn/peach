@@ -182,21 +182,21 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
     }
   });
 
-  it('索引页换一档 Tabs 时那条蓝线沿弹簧滑过去，不是一跳', { timeout: 60_000 }, async () => {
+  it('索引页分区使用中性填充选中态，方向键能切换', { timeout: 60_000 }, async () => {
     const opened = await openIndexPage(browser, '/studios');
     try {
       const page = opened.page;
-      await page.emulateMedia({ reducedMotion: 'no-preference' });
-      const indicator = page.locator('#index [data-tab-indicator]');
-      await page.waitForFunction(() => document.querySelector('#index [data-tab-indicator]')?.hasAttribute('data-ready'),
-        undefined, { timeout: 5_000 });
-      const motion = await indicator.evaluate((element) => {
+      const selected = page.locator('#index [role="tab"][aria-selected="true"]');
+      const look = await selected.evaluate((element) => {
         const style = getComputedStyle(element);
-        return { property: style.transitionProperty, duration: style.transitionDuration, height: style.height };
+        return { background: style.backgroundColor, border: style.borderBottomWidth, weight: style.fontWeight };
       });
-      assert.equal(motion.property, 'transform, width');
-      assert.notEqual(motion.duration.split(',')[0]!.trim(), '0s', '蓝线没有过渡时长');
-      assert.equal(motion.height, '2px');
+      assert.notEqual(look.background, 'rgba(0, 0, 0, 0)');
+      assert.equal(look.border, '0px');
+      assert.equal(look.weight, '400');
+      await selected.focus();
+      await page.keyboard.press('ArrowRight');
+      await page.locator('#index [role="tab"][aria-selected="true"][data-tab="agencies"]').waitFor({ timeout: 5_000 });
       assert.deepEqual(opened.problems, []);
     } finally {
       await opened.close();

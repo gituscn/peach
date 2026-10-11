@@ -74,6 +74,9 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 
 页面控件与交互由哪些共用件承担；组件映射、Board 上游证据与许可证见 [BoardUI 适配](BOARD_UI.md)。
 
+- 页面分区复用 `BoardTabs` 与遗留导航的中性填充选中态；显示方式开关使用 `Segmented`。标题位于内容左上角、导航与筛选之前。JAV 馆藏复用目录，推荐和想要的骨架由 `jav-skeleton.ts` 与页面共享容器、列数和封面比例。网盘标识复用 `SourceMark`、`MEDIA_SOURCE_ICONS` 与 `SourceLabel`，不增加图标依赖。
+- JAV 推荐通过 `/api/feeds/discoveries` 的 `performer_refs` 匹配口味中的实体身份与规范姓名；引用只来自现有 `entities.resolve_entity`，撞名时不选取身份、不改写来源原文，不在前端维护姓名对照表。
+
 - 外链按钮复用 BoardUI `ButtonLink`，调用处加 `data-button-link`，全站文字外链规则用 `:where` 排除它，保持实体页控件的样式优先级。浏览器验收使用一个渲染进程、进程内音频服务和合成音频输出，给演示服务与媒体进程保留资源预算；入口仍为 `scripts/test.ps1` / `scripts/test.sh`。
 
 - 功能性动效由 `frontend/src/react/components/use-moving-surface.ts`、`modal-frame.tsx`、`selection-dock.tsx` 承担，用现有 Motion 12.43.0（MIT）与 React Aria Components 1.21.1（Apache-2.0）。Fluid Functionalism 只作行为与短程参数参考（[取证](reference-snapshots/fluid-functionalism.md)），不装其 Registry（额外的 Radix、字体与上下文不合 BoardUI 组合）；Peach 保留单一选中底板、键盘即时反馈与原有主题。

@@ -20,10 +20,10 @@
   gap: 14px;
   margin-bottom: 20px;
 }
-/* 同遗留层 `.stats h2`：Title 那一档的行高，字号压到 24px。 */
-.peach-react [data-follow-title] { margin: 0; font: var(--board-title); font-size: var(--fs-2xl); letter-spacing: 0; }
+/* 页头复用全站页面标题的字号与行高。 */
+.peach-react [data-follow-title] { margin: 0; font: var(--board-title); letter-spacing: 0; }
 @media (max-width: 760px) {
-  .peach-react [data-follow-title] { font: var(--board-figure); font-size: var(--fs-xl); }
+  .peach-react [data-follow-title] { font: var(--board-figure); }
 }
 .peach-react [data-follow-head-actions] { display: inline-flex; flex: none; align-items: center; gap: 8px; }
 /* 「管理关注」「抓更早的一页」同遗留层 `.fbtn`：左边留 12px，图标 14px，与文字隔 4px（文字自带的内边距）。 */

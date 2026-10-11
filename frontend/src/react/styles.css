@@ -59,6 +59,7 @@
 @source not "./pages";
 @source "../management-skeletons.ts";
 @source "../catalog-filter-skeleton.ts";
+@source "../jav-skeleton.ts";
 /* 扫描不分代码与注释：这几个词各在注释里出现过，生成出来就和旧样式表的 `.ring`、`.grid`、
  * `.sr-only` 同名。React 子树三个类都不用——只读屏的文字走 `VisuallyHidden`，它把样式写在
  * 元素上。直接不生成。 */
@@ -368,20 +369,8 @@
 [data-danger]:not(:disabled):active { background: var(--board-red-active); }
 [data-danger]:not(:disabled):active::before { opacity: 0; }
 
-/* 下划线 Tabs 那条 2px 蓝线（`components/board-tabs.tsx`）。位置与宽度由组件量出来写在
- * tablist 上；位移跟侧栏、筛选条上那几块玻璃同一条弹簧，宽度匀速走——跟着弹簧过冲的话，
- * 它会在停下之前先抻出邻居的边界。第一帧之后才打开过渡，头一次画出来直接落位。 */
-.peach-react [data-tab-indicator] {
-  width: var(--tab-width, 0px);
-  transform: translateX(var(--tab-x, 0px));
-}
-.peach-react [data-tab-indicator][data-ready] {
-  transition: transform calc(var(--spring-pane-ms, 200) * 1ms) var(--spring-pane, ease),
-    width calc(var(--spring-pane-ms, 200) * 1ms) ease;
-}
-@media (prefers-reduced-motion: reduce) {
-  .peach-react [data-tab-indicator][data-ready] { transition: none; }
-}
+/* 页面分区使用与遗留导航相同的中性填充。 */
+.peach-react [data-board-tab-list] > button[aria-selected="true"] { background: var(--hover); color: var(--ink); }
 
 /* 玻璃浮层上分段控件选中的那一格（`components/segmented.tsx` 的 `SEGMENT_GLASS`）：
  * 白填充垫底、斜光一道、整圈 rim 描边，与浮层上其余「当前在哪儿」的那块同一副料。 */

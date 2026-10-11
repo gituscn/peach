@@ -178,7 +178,7 @@ describe('换手', () => {
     expect(seen.at(-1)).toBe('header');
     expect(title(host.root)).toBe('统计');
     expect(host.root.querySelector(':scope > .peach-react')).toBeNull();
-    expect(host.root.firstElementChild?.hasAttribute('data-manage-bar')).toBe(true);
+    expect(host.root.firstElementChild?.hasAttribute('data-manage-title')).toBe(true);
   });
 
   it('骨架阶段的点击由壳的委托接，句柄交出之后归组件，一次点击只到一处', async () => {

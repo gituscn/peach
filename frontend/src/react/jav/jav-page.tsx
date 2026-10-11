@@ -4,7 +4,7 @@ import { RiSearchLine, RiCompassLine } from '@remixicon/react';
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { coverUrl } from '@peach/card-art';
-import { pageSkeletonHtml } from '../../management-placeholder';
+import { javContentSkeleton, JAV_RECOMMENDATION_GRID } from '../../jav-skeleton';
 import { apiGet, errorMessage } from '../../api';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
 import { Note } from '../components/note';
@@ -25,8 +25,8 @@ export function JavPage({ tab, readOnly, navigate, receipt }: {
   const search = (event: FormEvent) => { event.preventDefault(); setQuery(text.trim()) };
   return <div className="flex w-full flex-col gap-6">
     <JavHeader tab={tab} navigate={navigate} find={() => setDownload({})} />
-    <form aria-label="搜索作品" onSubmit={search}>
-      <Input aria-label="搜索作品" placeholder="搜索番号、女优或标题" leadingIcon={RiSearchLine}
+    <form aria-label={tab === 'discover' ? '筛选推荐' : '筛选想要'} onSubmit={search}>
+      <Input aria-label={tab === 'discover' ? '筛选推荐' : '筛选想要'} placeholder="筛选番号、女优或标题" leadingIcon={RiSearchLine}
         value={text} onChange={setText} enterKeyHint="search" />
     </form>
     {tab === 'discover'
@@ -41,17 +41,17 @@ function Discover({ readOnly, receipt, resource, query }: { readOnly: boolean; r
   const discoveries = useQuery({ queryKey: ['jav-discoveries'], queryFn: ({ signal }) => apiGet<{ items: Discovery[] }>('/api/feeds/discoveries?limit=100', signal) });
   const action = useAction();
   const items = rankedDiscoveries(discoveries.data?.items || [], taste.data || {}).filter(item =>
-    !query || [item.code, item.title, item.performers].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+    !query || [item.code, item.title, item.performers, ...item.matches].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   const waiting = taste.isPending || discoveries.isPending;
   return <section aria-label="为你推荐" aria-busy={waiting} className="flex min-w-0 flex-col gap-4">
-    {waiting ? <div role="status" aria-label="正在读取推荐" dangerouslySetInnerHTML={{ __html: pageSkeletonHtml('正在读取推荐', { cards: true, count: 6 }) }} /> : null}
+    {waiting ? <div role="status" aria-label="正在读取推荐" dangerouslySetInnerHTML={{ __html: javContentSkeleton('discover') }} /> : null}
     {taste.error || discoveries.error ? <Note tone="error" title="推荐未取得">{errorMessage(taste.error || discoveries.error)}</Note> : null}
-    {!waiting && !taste.error && !discoveries.error && !items.length ? <EmptyState shell="plain" icon={RiCompassLine} title="暂无匹配口味的新作"
+    {!waiting && !taste.error && !discoveries.error && !items.length ? <EmptyState shell="plain" icon={RiCompassLine} title={query ? '没有符合条件的推荐' : '暂无匹配口味的新作'}
       actions={<><ButtonLink href="/taste" variant="secondary">查看口味</ButtonLink><ButtonLink href="/follow-manage?tab=feeds" variant="secondary">管理订阅</ButtonLink></>}>
-      先读取浏览记录，或关注女优的新作。
+      {query ? '试试其他番号、女优或标题。' : taste.data?.summary?.history_visits || taste.data?.summary?.peach_items ? '可以查找番号，或查看订阅的新作。' : '读取浏览记录后，可按口味推荐新作。'}
     </EmptyState> : null}
     {action.error ? <Note tone="error">{action.error}</Note> : null}
-    <div className="inline-grid min-w-0 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    <div className={JAV_RECOMMENDATION_GRID}>
       {items.map(item => <article key={item.id} className="flex min-w-0 flex-col gap-3">
         <div className="relative inline-grid aspect-card-cover place-items-center overflow-hidden rounded-2lg bg-background-tertiary-default">
           <span className="text-text-secondary">无封面</span>

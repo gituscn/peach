@@ -189,7 +189,7 @@ export function PlaylistsPage({ openPlaylist, openEntity, canFlip, toast, revisi
   };
 
   return (
-    <div className="mx-auto w-full max-w-board pt-1 pb-10.5">
+    <div className="w-full pt-1 pb-10.5">
       <header className="mb-4 flex items-start justify-between gap-4.5 max-board-narrow:flex-col max-board-narrow:items-stretch">
         <div>
           {/* 遗留样式表那条 `.stats h2` 不在层里，把二级标题定成 24px（窄屏 20px），工具类压不过，
@@ -199,6 +199,7 @@ export function PlaylistsPage({ openPlaylist, openEntity, canFlip, toast, revisi
         </div>
         <CreateForm toast={toast} />
       </header>
+      <div className="mx-auto w-full max-w-board">
       {/* 读取失败时页头与新建框照常在，提示与重试键落在列表的位置上。 */}
       {!data
         ? (playlists.isError
@@ -229,6 +230,7 @@ export function PlaylistsPage({ openPlaylist, openEntity, canFlip, toast, revisi
             保存 Mix 或新建列表后，会在这里按自己的顺序继续播放。
           </EmptyState>
         )}
+      </div>
       <RenameDialog target={renaming} close={() => setRenaming(null)} toast={toast} />
     </div>
   );

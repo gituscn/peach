@@ -1,6 +1,6 @@
 /* 管理区页头（常驻面 `manage-header`，`frontend/src/react/manage-header/`）：管理条、面包屑、页面标题与回收站说明行。
  *
- * 四块都钉在正文那条 `--board-content` 宽的中线上（同 `components/page.tsx` 的 `max-w-board`）。
+ * 标题与导航对齐内容左上角，回收站说明行跟随正文的 `--board-content` 宽度。
  * `peach-app.css` 先于 `/app.css` 加载，遗留层里同权重的规则会压过这里，所以选择器都比遗留层的
  * 元素规则多一级。与遗留层同名的类一条不写（`test/legacy-class-names.test.ts`）；扫光占位沿用全站的
  * `.skeleton`，只在这里定尺寸与底色。 */
@@ -9,24 +9,20 @@
 :is([data-manage-bar],[data-manage-crumb],[data-manage-title],[data-manage-lede]){box-sizing:border-box;width:100%;max-width:var(--board-content);margin-left:auto;margin-right:auto}
 
 /* ── 管理条 ──
-   一排下划线页签，1px 基线，按下项由 `[data-manage-indicator]` 那条 2px 的线标出来。超宽时横滚，
+   一排页面去处，当前项使用中性填充。超宽时横滚，
    两端渐隐与滚轮转横向由壳的横滚层清单接（`src/ui-kit/scroll.ts` 的 `BOARD_EDGE_SCROLLERS`）。 */
-[data-manage-bar]{display:block;margin-top:20px;margin-bottom:28px}
-[data-manage-menu]{position:relative;display:flex;flex-wrap:nowrap;gap:4px;margin:0;padding:0;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+[data-manage-bar]{display:block;max-width:none;margin-top:0;margin-bottom:24px}
+[data-manage-menu]{position:relative;display:flex;flex-wrap:nowrap;gap:4px;margin:0;padding:0;overflow-x:auto;scrollbar-width:none}
 [data-manage-menu]::-webkit-scrollbar{display:none}
-[data-manage-menu]>button{position:relative;display:inline-flex;flex:none;align-items:center;gap:7px;margin:0;padding:12px 10px;min-height:44px;border:0;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--ink-2);font-size:14px;font-weight:400;white-space:nowrap;cursor:pointer}
+[data-manage-menu]>button{position:relative;display:inline-flex;flex:none;align-items:center;gap:7px;margin:0;padding:8px 12px;min-height:36px;border:0;border-radius:var(--control-radius);background:none;color:var(--ink-2);font-size:14px;font-weight:400;white-space:nowrap;cursor:pointer}
 [data-manage-menu]>button svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 [data-manage-menu]>button:hover{color:var(--ink)}
-[data-manage-menu]>button[aria-pressed="true"]{color:var(--tungsten);font-weight:500}
-[data-manage-indicator]{position:absolute;bottom:0;left:0;z-index:1;width:var(--tab-width,0px);height:2px;background:var(--tungsten);transform:translateX(var(--tab-x,0px));pointer-events:none}
-/* 位移跟筛选条那几块玻璃同一条弹簧；宽度匀速走，跟着弹簧过冲的话会在停下之前先抻出邻居的边界。 */
-[data-manage-indicator][data-ready]{transition:transform calc(var(--spring-pane-ms,200) * 1ms) var(--spring-pane,ease),width calc(var(--spring-pane-ms,200) * 1ms) ease}
-@media(prefers-reduced-motion:reduce){[data-manage-indicator][data-ready]{transition:none}}
+[data-manage-menu]>button[aria-pressed="true"]{background:var(--hover);color:var(--ink)}
 
 /* ── 面包屑 ──
    Geist Breadcrumbs（vercel.com/geist/breadcrumbs 实测）：上一级与分隔符 `--muted`、当前页 `--ink`，
    悬停同样升亮；分隔符是 16px chevron，钉在 `--muted` 上不随当前项提亮；项与项、字与分隔符都留 6px。 */
-[data-manage-crumb]{display:block;margin-top:0;margin-bottom:6px}
+[data-manage-crumb]{display:block;max-width:none;margin-top:0;margin-bottom:12px}
 [data-manage-crumb] ol{display:flex;align-items:center;gap:6px;margin:0;padding:0;list-style:none}
 [data-manage-crumb] li{display:flex;align-items:center;gap:6px;font-size:var(--fs-md);line-height:20px;color:var(--muted);transition:color .2s ease}
 [data-manage-crumb] li[aria-current]{color:var(--ink)}
@@ -36,7 +32,7 @@
 
 /* ── 页面标题 ──
    字形同全站页面标题（Board Title，窄屏 Board Figure）；正文是 812px 窄列的那几页在窄屏上再收一档。 */
-h2[data-manage-title]{margin-top:0;margin-bottom:24px;font:var(--board-title);letter-spacing:0}
+h2[data-manage-title]{max-width:none;margin-top:0;margin-bottom:24px;font:var(--board-title);letter-spacing:0}
 @media(max-width:760px){
   h2[data-manage-title]{font:var(--board-figure)}
   h2[data-manage-title][data-compact]{font-size:22px}
@@ -64,7 +60,7 @@ p[data-manage-lede]{display:flex;flex-wrap:wrap;align-items:center;justify-conte
 
 /* 窄屏：管理条不再留左右中线，间距收一档、页签不带字形；说明行右端那颗键按本项目 44px 命中区来。 */
 @media(max-width:760px){
-  [data-manage-bar]{margin-top:16px;margin-bottom:24px}
+  [data-manage-bar]{margin-top:0;margin-bottom:24px}
   [data-manage-menu]{gap:0}
   [data-manage-menu]>button{padding:10px 9px;font-size:13px}
   [data-manage-menu]>button svg{display:none}
