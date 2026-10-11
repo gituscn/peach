@@ -92,7 +92,7 @@ export function boardPageSkeleton(
   if (path === '/stats') {
     body = statsSkeleton();
   } else if (path === '/jav') {
-    body = `<div class="peach-react"><div class="mx-auto flex w-full max-w-board flex-col gap-6"><div class="flex items-center justify-between gap-2"><h2 class="text-title-2-semibold text-text-primary">JAV</h2>${islandButton({ label: '查找资源', attrs: WAITING })}</div><div class="flex gap-4">${['我的馆藏', '发现', '想要'].map(label => `<span>${label}</span>`).join('')}</div><div class="ui-skeleton-lines">${line('100%')}</div><div class="inline-grid gap-5 sm:grid-cols-2 lg:grid-cols-3">${repeat(`<span class="skeleton aspect-card-cover rounded-2lg"></span>`, 6)}</div></div></div>`;
+    body = `<div class="peach-react"><div class="flex w-full flex-col gap-6"><div class="flex items-center justify-between gap-2"><h2 class="text-title-2-semibold text-text-primary">JAV</h2>${islandButton({ label: '查找资源', attrs: WAITING })}</div><div class="flex gap-4">${['我的馆藏', '发现', '想要'].map(label => `<span>${label}</span>`).join('')}</div><div class="ui-skeleton-lines">${line('100%')}</div><div class="inline-grid gap-5 sm:grid-cols-2 lg:grid-cols-3">${repeat(`<span class="skeleton aspect-card-cover rounded-2lg"></span>`, 6)}</div></div></div>`;
   } else if (path === '/taste') {
     body = tasteSkeleton();
   } else if (path === '/follow-manage') {

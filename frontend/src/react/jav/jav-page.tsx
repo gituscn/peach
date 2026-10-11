@@ -1,66 +1,39 @@
-import { useState, useSyncExternalStore, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { RiSearchLine, RiCompassLine } from '@remixicon/react';
-import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
-import { appSettingsStore } from '@peach/appearance';
 import { coverUrl } from '@peach/card-art';
 import { pageSkeletonHtml } from '../../management-placeholder';
-import { emptyStateHtml } from '../../ui-kit';
 import { apiGet, errorMessage } from '../../api';
-import { CatalogGridPage } from '../catalog-grid/catalog-grid-page';
-import type { MediaCardActions, MediaCardHelpers } from '../catalog-grid/types';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
-import { Page } from '../components/page';
 import { Note } from '../components/note';
 import { EmptyState } from '../components/empty-state';
 import { fetchTaste, tasteKey } from '../taste/taste';
 import { WantList } from '../wants/want-list';
 import { addWant, invalidateWants } from '../wants/wants';
 import { busyProps, useAction } from '../settings/use-action';
-import { JAV_TABS, rankedDiscoveries, type Discovery } from './jav';
+import { rankedDiscoveries, type Discovery } from './jav';
+import { JavHeader } from './jav-header';
 
-export function JavPage({ tab, readOnly, navigate, receipt, grid }: {
+export function JavPage({ tab, readOnly, navigate, receipt }: {
   tab: string; readOnly: boolean; navigate(path: string): void; receipt(message: string): void;
-  grid: { helpers: MediaCardHelpers; actions: MediaCardActions };
 }) {
   const [download, setDownload] = useState<DownloadPrefill | null>(null);
   const [text, setText] = useState('');
   const [query, setQuery] = useState('');
-  const store = appSettingsStore();
-  useSyncExternalStore(store.subscribe, store.version);
-  const settings = store.value;
-  const batch = settings.batchSize || 60;
   const search = (event: FormEvent) => { event.preventDefault(); setQuery(text.trim()) };
-  return <Page>
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <h2 className="text-title-2-semibold text-text-primary">JAV</h2>
-      <Button variant={tab === 'wants' ? 'secondary' : 'primary'} onClick={() => setDownload({})}>查找资源</Button>
-    </div>
-    <Tabs selectedKey={tab} onSelectionChange={key => navigate(`/jav?tab=${key}`)} className="flex flex-col gap-6">
-      <TabList aria-label="JAV 分区" data-section-nav data-section-items className="flex max-w-full overflow-x-auto">
-        {JAV_TABS.map(([key, label]) => <Tab key={key} id={key} className="cursor-pointer whitespace-nowrap">{label}</Tab>)}
-      </TabList>
-      <form aria-label="搜索作品" onSubmit={search}>
-        <Input aria-label="搜索作品" placeholder="搜索番号、女优或标题" leadingIcon={RiSearchLine}
-          value={text} onChange={setText} enterKeyHint="search" />
-      </form>
-      <TabPanel id="library" className="flex min-w-0 flex-col gap-4">
-        <CatalogGridPage mode="catalog" filters={{ jav: '1', q: query, sort: settings.defaultSort, dir: settings.defaultSortDirection || '' }}
-          helpers={grid.helpers} actions={grid.actions} layout={{ active: true, size: settings.javLayout === 'small' ? 'small' : 'big', portrait: false, javImage: settings.javImage }}
-          selectMode={false} selected={new Set()} seekSeconds={settings.seekSeconds} revision={batch}
-          batchSize={batch} groupCollapse={settings.groupCollapse}
-          skeletonHtml={() => pageSkeletonHtml('正在读取馆藏', { cards: true, count: 6 })} wireDrag={() => {}}
-          excludeVertical emptyHtml={() => emptyStateHtml('search', '没有符合条件的作品', '试试其他番号、女优或标题。')} />
-      </TabPanel>
-      <TabPanel id="discover" className="flex min-w-0 flex-col gap-4">
-        <Discover readOnly={readOnly} receipt={receipt} resource={setDownload} query={query} />
-      </TabPanel>
-      <TabPanel id="wants"><WantList readOnly={readOnly} toast={receipt} query={query} /></TabPanel>
-    </Tabs>
+  return <div className="flex w-full flex-col gap-6">
+    <JavHeader tab={tab} navigate={navigate} find={() => setDownload({})} />
+    <form aria-label="搜索作品" onSubmit={search}>
+      <Input aria-label="搜索作品" placeholder="搜索番号、女优或标题" leadingIcon={RiSearchLine}
+        value={text} onChange={setText} enterKeyHint="search" />
+    </form>
+    {tab === 'discover'
+      ? <Discover readOnly={readOnly} receipt={receipt} resource={setDownload} query={query} />
+      : <WantList readOnly={readOnly} toast={receipt} query={query} />}
     <CloudDownloadDialog prefill={download} close={() => setDownload(null)} receipt={receipt} />
-  </Page>;
+  </div>;
 }
 
 function Discover({ readOnly, receipt, resource, query }: { readOnly: boolean; receipt(message: string): void; resource(work: DownloadPrefill): void; query: string }) {

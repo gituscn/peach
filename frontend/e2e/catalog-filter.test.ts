@@ -240,35 +240,67 @@ describe('首页筛选条', () => {
     }
   });
 
-  it('JAV 入口打开独立馆藏，作品搜索按 JAV 口径取数，首页入口恢复首页筛选条', { timeout: 60_000 }, async () => {
-    const opened = await openHome(browser);
+  for (const viewport of [DESKTOP, PHONE]) {
+  it(`${viewport.name} JAV 馆藏保留目录版式、筛选和顶部搜索，三个分区可往返`, { timeout: 60_000 }, async () => {
+    const opened = await openHome(browser, '/', viewport);
     try {
       const { page, counts } = opened;
       const before = counts.items.length;
+      if (viewport.mobile) await page.locator('#filterBtn').click();
       await page.locator('button[data-nav="jav"]:visible').first().click();
-      await pathIs(page, '/jav');
+      await page.waitForFunction(() => location.pathname === '/' && new URLSearchParams(location.search).get('jav') === '1');
       await page.getByRole('tab', { name: '我的馆藏', exact: true, selected: true }).waitFor();
-      await page.locator('#stats [data-media-card]').first().waitFor();
+      await page.locator('#grid [data-media-card]').first().waitFor();
       await settle(page);
       assert.ok(counts.items.slice(before).some((url) => url.searchParams.get('jav') === '1'), 'JAV 口径没有重取列表');
       assert.equal(await page.locator(`${FILTER} input[name="home-layout"]`).first().isVisible(), false);
+      await page.locator(`${FILTER} input[name="jav-layout"]`).first().waitFor({ state: 'attached' });
+      assert.ok(await page.locator(`${FILTER} [data-tier-performer]`).count() > 0, 'JAV 没有女优筛选');
+      assert.ok(await page.locator(`${FILTER} [data-tier-studio]`).count() > 0, 'JAV 没有厂牌筛选');
+      assert.ok(await page.locator(`${FILTER} [data-catalog-tag]`).count() > 0, 'JAV 没有标签筛选');
+      assert.equal(await page.getByRole('textbox', { name: '搜索作品', exact: true }).count(), 0);
+      const width = await page.evaluate(() => ({
+        grid: document.querySelector('#grid')!.getBoundingClientRect().width,
+        main: document.querySelector('#main')!.clientWidth,
+      }));
+      assert.ok(width.grid >= width.main - 40, 'JAV 网格没有铺满目录宽度');
+      await page.locator(`${FILTER} label:has(input[name="jav-layout"][value="big"])`).click();
+      assert.equal(await page.locator(`${FILTER} input[name="jav-layout"][value="big"]`).isChecked(), true);
       const beforeSearch = counts.items.length;
-      await page.getByRole('textbox', { name: '搜索作品', exact: true }).fill('演示作品');
-      await page.getByRole('textbox', { name: '搜索作品', exact: true }).press('Enter');
+      if (viewport.mobile) await page.locator('#searchBtn').click();
+      await page.locator('#q').fill('演示作品');
+      await page.locator('#q').press('Enter');
       await until(() => counts.items.length > beforeSearch, '作品搜索没有重取 JAV 馆藏');
       assert.equal(counts.items.at(-1)?.searchParams.get('jav'), '1');
       assert.equal(counts.items.at(-1)?.searchParams.get('q'), '演示作品');
+      assert.equal(new URL(page.url()).searchParams.get('jav'), '1');
+      assert.equal(new URL(page.url()).searchParams.get('q'), '演示作品');
+      if (viewport.mobile) await page.locator('#searchBack').click();
+      await page.getByRole('tab', { name: '发现', exact: true }).click();
+      await page.getByRole('tab', { name: '发现', exact: true, selected: true }).waitFor();
+      assert.equal(await page.locator('#javLibraryHeader').isVisible(), false);
+      await page.getByRole('tab', { name: '想要', exact: true }).click();
+      await page.getByRole('tab', { name: '想要', exact: true, selected: true }).waitFor();
+      await page.getByRole('tab', { name: '我的馆藏', exact: true }).click();
+      await page.getByRole('tab', { name: '我的馆藏', exact: true, selected: true }).waitFor();
+      await page.locator('#grid [data-media-card]').first().waitFor();
+      assert.equal(await page.locator(`${FILTER} input[name="jav-layout"][value="big"]`).isChecked(), true);
+      const box = await layout(page);
+      assert.ok(box.scrollWidth <= box.viewportWidth, 'JAV 页面横向溢出');
+      if (viewport.mobile) await page.locator('#filterBtn').click();
       await page.locator('button[data-nav=""]:visible').first().click();
       await page.waitForFunction(() => location.pathname === '/' && !new URLSearchParams(location.search).has('jav'));
       await page.locator(`${FILTER} input[name="home-layout"]`).first().waitFor({ state: 'attached' });
       await page.locator(READOUT, { hasText: '个符合' }).waitFor();
       await settle(page);
       assert.notEqual(counts.items.at(-1)?.searchParams.get('jav'), '1');
+      assert.equal(await page.locator('#javLibraryHeader').isVisible(), false);
       assert.deepEqual(withoutPlayer(opened.problems), []);
     } finally {
       await opened.close();
     }
   });
+  }
 
   it('未归属跟着地址走：侧栏回首页按全库取，后退回到带它的地址再按它取', { timeout: 60_000 }, async () => {
     const opened = await openHome(browser, '/?owner=none');

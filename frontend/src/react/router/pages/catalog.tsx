@@ -18,7 +18,8 @@
  * `?state=ads` 落在首页上时不打开，改写成垃圾文件的地址（不加条目），由垃圾文件那一页的元素接着打开。卸载时去处
  * 不是目录、详情、沉浸或资料页，就收起 `#grid`、首页新作行与处理横幅：那三处离开目录也留着它们。判断、改写与收起
  * 都排进微任务：路由根在历史变化的同一次调用里同步提交，壳订阅历史早于路由根，它写标题与侧栏的那一轮排在前面。 */
-import { useContext, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router';
 
 import { appSettingsStore } from '@peach/appearance';
@@ -31,6 +32,7 @@ import { sortFromAddress } from '../../../sort-preferences';
 import { ShellActionsContext, useOpenEpoch } from '../router';
 import type { CatalogShell, ShellActions } from '../shell-actions';
 import { entityTarget } from './index-entity';
+import { JavLibraryHeader } from '../../jav/jav-header';
 
 const readOpens = () => pageOpens;
 
@@ -175,7 +177,19 @@ function CatalogOpen() {
 /** 目录六条路径共用的元素：首页、三个筛选态与回收站一个 key，垃圾文件另一个；页面组按背景匹配时取背景那一页。
  *  覆盖地址的参数不是数字（`/item/abc`）时什么都不挂：那不是一条详情，下面也不补画。 */
 export function CatalogMatch() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const actions = useContext(ShellActionsContext);
+  const host = document.getElementById('javLibraryHeader');
+  const jav = isCatalogPath(pathname) && new URLSearchParams(search).get('jav') === '1';
+  useLayoutEffect(() => {
+    if (!host) return;
+    host.hidden = !jav;
+    return () => { host.hidden = true };
+  }, [host, jav]);
   if (isOverlayPath(pathname) && !overlayTarget(pathname)) return null;
-  return <CatalogOpen key={pathname === '/junk-files' ? '/junk-files' : '/'} />;
+  return <>
+    <CatalogOpen key={pathname === '/junk-files' ? '/junk-files' : '/'} />
+    {jav && host && actions ? createPortal(<JavLibraryHeader navigate={actions.navigate}
+      receipt={message => actions.receipt(message)} />, host) : null}
+  </>;
 }

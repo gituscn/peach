@@ -2,7 +2,7 @@
 import { javImageKind } from './../jav-artwork';
 import { preferencesState } from './preferences.js';
 import { coverImage } from './../card-art/markup';
-import { catalogState, goHome } from './catalog.js';
+import { catalogState, goHome, homePath } from './catalog.js';
 import { disposeStage, mediaState, openItem } from './media.js';
 import { followSelected, notifyShell, selectMode, selected, state } from './../shell/index';
 import { navigationState } from './navigation.js';
@@ -73,7 +73,7 @@ searchState.searchControl = null;
 searchState.searchActions = {
   search:query=>{
     catalogState.rememberSearchValue();disposeStage(false);
-    state.q=query;notifyShell();navigationState.route(state.q?'/?q='+encodeURIComponent(state.q):'/',true);
+    state.q=query;notifyShell();navigationState.route(state.jav==='1'?homePath():state.q?'/?q='+encodeURIComponent(state.q):'/',true);
   },
   openItem:id=>openItem(id),
   openEntity:(kind,name)=>openEntity(kind,name),
