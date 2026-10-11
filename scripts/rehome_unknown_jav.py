@@ -329,7 +329,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--db", type=Path, default=DATABASE_PATH)
     parser.add_argument("--mappings", type=Path, required=True)
     parser.add_argument("--physical-unknown-root", type=Path, required=True)
-    parser.add_argument("--ledger-unknown-root", default=r"B:\番号\_未知厂牌")
+    parser.add_argument("--ledger-unknown-root", required=True,
+                        help="未知厂牌目录的账本路径，使用 Windows 绝对路径")
     parser.add_argument("--plan", type=Path,
                         default=GENERATED_DIR / "rehome-unknown-jav-plan.csv")
     parser.add_argument("--apply", action="store_true")
