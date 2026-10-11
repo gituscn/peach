@@ -6,6 +6,7 @@ import { WantMagnets, type MagnetCandidate } from '../../src/react/wants/want-ma
 import type { Want } from '../../src/react/wants/wants';
 import { buttonNamed, click, mount, mountRoot, pending, settle } from './render';
 import { cachedResources, rememberResources, resourceLifetime } from '../../src/react/wants/resource-cache';
+import { resourceNotice, resourceSize } from '../../src/react/wants/resource-display';
 
 notifyManager.setScheduler((notify) => notify());
 afterEach(() => { queryClient.clear(); localStorage.clear() });
@@ -86,6 +87,33 @@ it('更多资源默认折叠且协议有独立标记', async () => {
   expect(host.querySelector('[data-resource-protocol="magnet"] svg')).not.toBeNull();
   await click(more.querySelector('summary'));
   expect(more.open).toBe(true);
+});
+
+it('ED2K 类型使用文字，字节容量按馆藏口径展示', async () => {
+  const { host } = await open([{ ...candidate, protocol: 'ed2k', size: '27,311,519,717 B' }]);
+  expect(host.textContent).toContain('ED2K');
+  expect(host.textContent).toContain('25.4 GB');
+  expect(buttonNamed('添加下载', host)).toBeNull();
+  expect(resourceSize('1.61 GB')).toBe('1.61 GB');
+  expect(resourceSize('')).toBe('大小未知');
+  expect(resourceNotice('更多评论需要 JavDB VIP 或官方 App。')).toBe('来源只返回了部分评论，资源链接可能不完整。');
+});
+
+it('作品详情按自身来源查询资源，想要缓存不能代替公开来源结果', async () => {
+  vi.stubGlobal('IntersectionObserver', undefined);
+  rememberResources('DEMO-001', { state: 'ready', items: [candidate], error: '', checked_at: null });
+  const fetcher = vi.fn(async (_url: string) => ({ ok: true, status: 200,
+    json: async () => ({ state: 'ready', items: [], error: '', checked_at: null }) }));
+  vi.stubGlobal('fetch', fetcher);
+  const host = await mount(<QueryClientProvider client={queryClient}><WantMagnets
+    want={{ id: 0, code: 'DEMO-001', title: '示例作品', release_date: '2010-01-01' }}
+    queryUrl="/api/jav/resources?code=DEMO-001" readOnly provider="" toast={vi.fn()} /></QueryClientProvider>);
+  await settle();
+  expect(fetcher.mock.calls[0]?.[0]).toBe('/api/jav/resources?code=DEMO-001');
+  expect(host.textContent).toContain('暂未找到资源链接');
+  await click(buttonNamed('重新查询', host));
+  await settle();
+  expect(fetcher.mock.calls[1]?.[0]).toBe('/api/jav/resources?code=DEMO-001&refresh=1');
 });
 
 it('发行三个月边界、月末与缓存有效期一致', () => {
