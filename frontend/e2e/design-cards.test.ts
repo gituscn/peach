@@ -363,7 +363,7 @@ describe('设计决定：作品卡、管理页与复核', () => {
           tab: getComputedStyle(pressed).color,
           fill: getComputedStyle(pressed).backgroundColor,
           titleBeforeNav: document.querySelector('[data-manage-title]')!.getBoundingClientRect().bottom <= document.querySelector('[data-manage-bar]')!.getBoundingClientRect().top,
-          titleLeft: Math.round(document.querySelector('[data-manage-title]')!.getBoundingClientRect().left - document.querySelector('#main')!.getBoundingClientRect().left),
+          titleLeft: Math.round(document.querySelector('[data-manage-title]')!.getBoundingClientRect().left - document.querySelector('#grid')!.getBoundingClientRect().left),
         };
       });
       assert.deepEqual(read.colors, [muted, ink], '上一级不是 --muted，或当前项没升到 --ink');
@@ -371,7 +371,7 @@ describe('设计决定：作品卡、管理页与复核', () => {
       assert.equal(read.gap, '6px');
       assert.deepEqual([read.tab, read.fill], [ink, fill]);
       assert.equal(read.titleBeforeNav, true);
-      assert.equal(read.titleLeft, 16);
+      assert.equal(read.titleLeft, 0);
       assert.deepEqual(opened.problems.filter((line) => !line.includes('/api/links/check')), []);
     } finally {
       await opened.close();
@@ -777,8 +777,8 @@ describe('设计决定：作品卡、管理页与复核', () => {
         };
       });
       assert.ok(box.filters.width > 0, '分类切换被摘要挤成 0 宽，整条在宽屏上看不见');
-      assert.equal(box.title.left, box.main.left + 16);
-      assert.equal(box.title.width, box.main.width - 32);
+      assert.deepEqual(box.title, box.grid);
+      assert.equal(box.title.width, box.grid.width);
       for (const [label, measured] of [['摘要', box.summary], ['分类切换', box.filters]] as const) {
         assert.deepEqual(measured, box.grid,
           `${label}和正文网格不同宽：${measured.left}+${measured.width} 对 ${box.grid.left}+${box.grid.width}`);

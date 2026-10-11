@@ -279,6 +279,8 @@ body[data-density="dense"] .card .meta .size{flex:none;white-space:nowrap}
    接；这张卡只有这条外链，所以两块放行指针，落到下面的链接上，悬浮键自己再收回来。 */
 .feednewopen{position:absolute;inset:0;z-index:1;border-radius:inherit}
 .feednewcard>.pic,.feednewcard>.meta{pointer-events:none}
+.feednewcard .meta a.mav{pointer-events:auto}
+.feednewcard .meta span.mav{cursor:default}
 .feednewopen:focus-visible{outline:2px solid var(--tungsten);outline-offset:2px}
 /* 三颗动作键沿用 `.hovertools` 的磨砂圆底，只换尺寸和落点。`.hovertools` 默认
    `pointer-events:none`——那是为了让指针落到底下的预览上，而这三颗是这张卡唯一能按的
@@ -292,10 +294,10 @@ body[data-density="dense"] .card .meta .size{flex:none;white-space:nowrap}
 .feednewtools button[aria-pressed="true"] svg{fill:currentColor}
 .feednewcard .meta .t{font-size:var(--fs-sm)}
 /* 番号整段不折行；比卡还宽的长串在卡边收成省略号，不被标题块的溢出裁成半个字。 */
-/* 女优名加发行日一行放完，放不下截掉女优名的尾巴：折成两行时断在日期中间，读成两个数。 */
-.feednewcard .meta .s{flex-wrap:nowrap;white-space:nowrap;min-height:1lh}
-.feednewcard .meta .s>span{flex:none}
-.feednewcard .meta .s>.feednewperformers{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* 出演名单与完整日期分行，窄卡中的姓名仍有自己的宽度。 */
+.feednewcard .meta .s{display:grid;gap:0;white-space:nowrap;min-height:2lh}
+.feednewcard .meta .s>span{min-width:0}
+.feednewcard .meta .s>.feednewperformers{overflow:hidden;text-overflow:ellipsis}
 /* 占位卡直接套真卡的 `.t` 与 `.s`：标题块是两行 2.7em，下面那行放一个零宽字符，行高
    跟真卡那行字同一套规则，到货那一下整行不跳。 */
 .feednewskeleton{pointer-events:none}

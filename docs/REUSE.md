@@ -34,6 +34,8 @@ FC2 卖家名册复用 `sources/fc2.py` 的 `label`、`seller_url` 来源契约�
 
 关注页的创作者行与卡片头像、署名复用 `FollowAuthorLink` 和来源的唯一实体绑定，进入创作者资料页；卡片按实际发布者取身份。未建档作者沿用关注筛选。创作者行横滚访问全部作者。筛选条件与卡片悬停面留 16px；首页、关注页和资料页共用交集条。`useViewGlide` 复用 `ResizeObserver` 监听显隐与相邻控件尺寸，`moveGlidePane` 在重新落位时取消位移和形变动画，无新增依赖。
 
+JAV 发现卡复用馆藏的 `data-media-card` 悬停面、`coverImage` 封面取景和新作的 `feedIdentity` 身份头像。出演者引用由 `web_catalog.entity_ref` 提供图片版本与取景；标题保留两行，操作区贴底。JAV 与名册的静态搜索框复用 `islandSearchInput`，按 Board Input 的尺寸生成首屏结构。无新增依赖。
+
 账号归属复用 `review_decision`、`creator_collection_base`、`write_owned_fields` 和全库归属审计。明确拒绝的资产与账号组合在自动摄取时跳过；用户写入保留复核入口。网黄博主只命中可信个人、内容创作者或发布账号断言，未分类账号保留全部名册入口。`attach_avatar_availability` 集中处理资料页、索引、搜索与统计的作品头像：发布账号缺少本人或出演职业证据时作品帧照常兜底，另标 `avatar_stand_in`，已安装图片独立保留。个人博主的补头像复用 `avatar_cover_face.face_square`、`readable_cut` 与 ADR-0074 的 `agreeing` 两部互证，画面取自接触印相九格（ADR-0099）。来源核查清单、逐关系回执和备份存于 `peach-data/review/`。
 
 `entity_identity_research` 与 `apply_entity_identity_research.py` 复用规范实体写入、字段归属保护、只读预览、SQLite 备份及冻结计划。逐行撤回回执核对后续修改，新增实体有额外引用时拒绝删除；观看历史和人工判断不被回滚覆盖。资料站调研复用 `performer_alias_followup.WikiSitePages`（包着 `sources/seesaa.py` 的 `WikiPages`，加 404 记忆与按站冷却）、作品表解析 `rows()` 与 `person_profile`，以及 EUC-JP 页名直取写法，不新增依赖；`creator_identity_followup` 的后继壳照抄补厂牌、补别名两条。
@@ -81,6 +83,7 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 
 - 功能性动效由 `frontend/src/react/components/use-moving-surface.ts`、`modal-frame.tsx`、`selection-dock.tsx` 承担，用现有 Motion 12.43.0（MIT）与 React Aria Components 1.21.1（Apache-2.0）。Fluid Functionalism 只作行为与短程参数参考（[取证](reference-snapshots/fluid-functionalism.md)），不装其 Registry（额外的 Radix、字体与上下文不合 BoardUI 组合）；Peach 保留单一选中底板、键盘即时反馈与原有主题。
 - 首页新作与实体资料页共用 `/api/entity/shapes` 和 `feedNewSkeletonHtml`；`home.feed` 按新作列表同一套未入库、未忽略与合集条件判定，有内容才留位；同步设置先于最终横条和网格，同形骨架复用节点。
+- 首页、人物页和 JAV「发现」的新作头像共用 `feedIdentity`、`web_catalog.entity_ref` 与 `avatarInner`，携带实体图片版本和人脸取景，多人最多叠三枚，图片缺失时显示首字。已建档人物的头像通往规范资料页，不新增实体、头像采集或运行依赖。
 - 作者别名管理用逐字复制进 `frontend/src/react/boardui/` 的 BoardUI `Table`、关注列表共用的 `DataTableFrame`、`AuthorAvatar` 与既有别名 API。两张表只有几行，不接 `@tanstack/react-table`；合并范围是这一屏自己的勾选，勾写 `slot={null}`，不走 React Aria Table 的行选择。扫描与采集三种方式收在一颗 BoardUI `Button` 加 React Aria `Popover` 下拉里，行外观取注册表 `select` 条目带来的 `menu-styles.ts`（见 `frontend/src/react/boardui/ORIGIN.md`）。
 - 关注列表分页用 `pagination.ts` 的页码范围与边界裁剪（React 与遗留层共用这份纯函数）；默认视图按创作者组，表格按来源。表格视图用 `@tanstack/react-table`（MIT，https://github.com/TanStack/table ，按 ADR-0031「前端基础库」引入）：列定义、排序、行选择与分页交给它，行身份是来源 ID（`getRowId`），排序与分页跑在全集上。两种视图共用同一个来源 ID 集合，批量操作发整个集合。`frontend/test/react/follow-manage.test.tsx` 验了 25 位创作者、跨页跨视图勾选与批量写。
 - 窄屏筛选框共用 `filterScrollState()`、现有滚动帧调度和原生 sticky；同一方向累计 8px 再切换吸顶，保留文档占位与键盘可达性。
@@ -171,6 +174,7 @@ JAV 默认封面（官方封面／预览图）与视频默认大小（大图／�
 
 - 页面、框体、操作条与选中项共用一套灰阶，操作条用 `--overlay-5`。
 - javdb 属有码与素人链的社区档，候选保留 community 来源性质，不自动写真相字段。
+- [JavDB Web UI 只读实证](reference-snapshots/javdb-web-ui-poc.md)：用户提供的入口使用独立 API，匿名搜索与样本详情成功，评论正文、资源列表和不限流未证明。现有 HTML 解析器不能只替换域名复用；站内新作详情可复用封面、人物、想要与资源组件，接入需独立适配和缓存，本轮未新增依赖。
 - 编码边界依据 [MDN 视频编码说明](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/Video_codecs) 与 [ffprobe 文档](https://ffmpeg.org/ffprobe.html)，用当前 FFmpeg；Peach 只持有兼容格式判定与缓存策略。
 - CloudDrive 引导用现有 `settings_file`、`platform.root_online`、`scan_location` 与 React 配置页，来源为 `local`、`115`、`pikpak`。挂载由用户安装的 CloudDrive 负责（[官方帮助](https://www.clouddrive2.com/help.html)：Windows 用盘符、macOS 用目录挂载点），Peach 不捆绑其二进制，挂载引导不依赖管理 API，路径处理用 `pathlib`、`os.scandir`、`tomllib`；表单、来源归属与扫描选择归 Peach。云下载经官方 proto 子集（`downloads_clouddrive.proto`，version 1.1.0）走 gRPC，令牌存 CredentialStore，不用非官方 SDK（ADR-0089）。
 - JAV 入库资源查询复用 `sources.javdb` 的身份核对、`SourceTransport` 的 Cookie 与冷却、`HostLimitedTransport` 的 3 秒间隔、`beautifulsoup4==4.15.0` 和 `downloads.parse_magnet`。JavPack 的 `JavDB.magnet.user.js` 0.0.2（GPL-3.0，仓库 revision `b546e1881147e15796c697e8e086db9d3ac0c5be`）只作页面字段参考；它依赖浏览器用户脚本 API，不能直接作为 Python 服务端依赖。Peach 负责评论链接、协议分流、去重、60 秒缓存和最多三页评论的预算，不新增依赖。2026-10-02 单作品只读实测取得 4 条磁链和含 ed2k 的评论页；评论入口从 `.review-tab[data-url]` 读取，受限评论保留来源限制提示。磁链可交现有云下载服务，ed2k 与其他网页链接提供复制。

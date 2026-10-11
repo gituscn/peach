@@ -99,7 +99,7 @@ describe('本地与在线艺人共用名册布局', () => {
           assert.deepEqual(await page.locator('#index [role="tab"][aria-selected="true"]').allTextContents(), [selected]);
           assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
           const waiting = await headControls(page, {
-            search: '#index .geist-search input', icon: '#index .geist-search-prefix svg', layout: '#index .ihead .iconswitch' });
+            search: '#index [data-index-search] [data-rac]', icon: '#index [data-index-search] svg', layout: '#index .ihead .iconswitch' });
           release();
           await page.locator('#index [data-index-page]').waitFor();
           assert.deepEqual(await page.locator('#index [role="tab"]').allTextContents(), ['艺人', '卖家', '在线']);

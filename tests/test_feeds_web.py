@@ -9,6 +9,7 @@ import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -407,7 +408,7 @@ class FeedWebTest(FeedWebFixture):
         self.assertEqual(item["title"], "SSIS-950 的标题")
         self.assertEqual(item["studio"], "示例厂牌")
         self.assertEqual(item["performers"], "深田えいみ")
-        self.assertEqual(item["performer_refs"], [{"id": 1, "name": "深田えいみ"}])
+        self.assertEqual(item["performer_refs"], [{"id": 1, "name": "深田えいみ", "has_image": False}])
         # 壳只认已有的人，不新建实体；关联上了人物页那一块才看得到。
         self.assertEqual(len(dispatch_api_get(
             self.contract, "/api/feeds/discoveries", {"entity": 1})["items"]), 2)
@@ -447,6 +448,25 @@ class FeedWebTest(FeedWebFixture):
         self.assertEqual({tuple((ref["id"], ref["name"]) for ref in item["performer_refs"])
                           for item in items}, {((1, "规范姓名"),)})
         self.assertEqual({item["performers"] for item in items}, {"深田えいみ"})
+
+    def test_discovery_avatars_share_entity_image_version_and_focus(self):
+        with self.contract.database.write_transaction() as connection:
+            connection.execute(
+                "INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at)"
+                " VALUES('performer','深田えいみ',peach_normalize('深田えいみ'),?,?)",
+                (feeds.stamp(), feeds.stamp()))
+        self._add()
+        self._check()
+        self._drain(1)
+        focus = {"axis": "y", "pct": 12}
+        with patch.object(self.contract, "has_entity_image", return_value=True), \
+                patch.object(self.contract, "entity_image_version", return_value="image7"), \
+                patch.object(self.contract, "avatar_focus", return_value=focus):
+            items = dispatch_api_get(self.contract, "/api/feeds/discoveries", {})["items"]
+        for item in items:
+            self.assertEqual(item["performer_refs"], [{
+                "id": 1, "name": "深田えいみ", "has_image": True,
+                "image_version": "image7", "avatar_focus": focus}])
 
     def test_one_batch_installs_each_cover_with_the_sidecars_the_cards_frame_by(self):
         self.cover_misses.add("HMN-071")
