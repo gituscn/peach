@@ -77,10 +77,10 @@ describe('JAV 推荐与加载结构', () => {
       assert.equal(await cards.count(), 1);
       await search.fill('');
       await page.waitForFunction(() => document.querySelectorAll('[aria-label="为你推荐"] article').length === 3);
-      await page.getByRole('radio', { name: '小图', exact: true }).click();
+      await page.locator('label:has(input[aria-label="小图"])').click();
       const smallCover = await cards.first().locator('[data-jav-cover-box]').boundingBox();
       assert.ok(smallCover && Math.abs(smallCover.width / smallCover.height - 16 / 9) < 0.02);
-      await page.getByRole('radio', { name: '大图', exact: true }).click();
+      await page.locator('label:has(input[aria-label="大图"])').click();
       await cards.first().getByRole('button', { name: '恋足', exact: true }).click();
       await page.getByRole('button', { name: '清除筛选', exact: true }).click();
       assert.equal(await cards.count(), 3);
