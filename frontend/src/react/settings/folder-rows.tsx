@@ -5,10 +5,11 @@
  * 按行错误、新行接焦点与选择文件夹的忙态归 `useFolderRows`；弹系统对话框那一请求由调用方注入，这里不认识任何端点，首启页的独立
  * 页面包因此不必带上主界面的请求封装。 */
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { RiCloseLine } from '@remixicon/react';
+import { RiDeleteBinLine } from '@remixicon/react';
 import { MEDIA_SOURCE_ICONS } from '@peach/legacy/ui';
 
 import { IconButton } from '@/components/base/buttons/icon-button';
+import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { Select, SelectItem } from '@/components/base/select/select';
 
@@ -139,9 +140,9 @@ export function FolderRow({ label, path, onPath, error, inputRef, picking, onPic
           value={path} onChange={onPath} ref={attach}
           onBlur={() => requestAnimationFrame(showTail)}
           validationBehavior="aria" isInvalid={Boolean(error)} hint={error || undefined} />
-        {status ? <div className="flex h-10 shrink-0 items-center">{status}</div> : null}
+        {status ? <div className="flex h-9 shrink-0 items-center">{status}</div> : null}
         <IconButton icon={FolderSearchIcon} aria-label="选择文件夹" onClick={onPick} {...busyProps(picking)} />
-        {onRemove ? <IconButton icon={RiCloseLine} aria-label="移除这个文件夹" onClick={onRemove} /> : null}
+        {onRemove ? <Button variant="danger" iconOnly leadingIcon={RiDeleteBinLine} aria-label="移除这个文件夹" onClick={onRemove} /> : null}
       </div>
       <div className="flex flex-wrap items-end gap-2">
         {children}

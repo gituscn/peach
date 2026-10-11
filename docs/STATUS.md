@@ -17,7 +17,7 @@
 - Windows 托盘自动恢复，重启用 `restart_windows_tray.py --source`；代码与数据在内置盘，媒体在外置盘。
 - 托盘须普通权限启动：提权令牌看不到 CloudDrive 的 `A:`/`B:`，误报脱盘。
 - Windows：80→HTTPS、LAN:443；`peach-win`、`0.38.0`。CA、健康通过。
-- 主界面 `peach-app.js/css`，登录、配置页 `peach-pages.js/css`。
+- Peach 配置：目录左侧、教程单行；活动明细折叠。
 - `/healthz` 报 `configurable=true`；配置与选目录共用连接判据，托盘管理 HTTPS 地址、端口及重载。
 - 首启、配置页列缺失依赖（CloudDrive、挂载驱动、FFmpeg/ffprobe、OpenSSL）；Windows 识别 CloudDrive、WinFsp。
 - 访问密码未开，局域网匿名可读；首启可跳过密码，配置页可改可关，登录可记住设备。

@@ -18932,7 +18932,7 @@ var cp = ({ color: e = "currentColor", size: t = 24, className: n, ...r }) => _.
 	fill: e,
 	...r,
 	className: "remixicon " + (n || "")
-}, _.createElement("path", { d: "M11.9997 10.5865L16.9495 5.63672L18.3637 7.05093L13.4139 12.0007L18.3637 16.9504L16.9495 18.3646L11.9997 13.4149L7.04996 18.3646L5.63574 16.9504L10.5855 12.0007L5.63574 7.05093L7.04996 5.63672L11.9997 10.5865Z" })), dp = ({ color: e = "currentColor", size: t = 24, className: n, ...r }) => _.createElement("svg", {
+}, _.createElement("path", { d: "M17 6H22V8H20V21C20 21.5523 19.5523 22 19 22H5C4.44772 22 4 21.5523 4 21V8H2V6H7V3C7 2.44772 7.44772 2 8 2H16C16.5523 2 17 2.44772 17 3V6ZM18 8H6V20H18V8ZM9 11H11V17H9V11ZM13 11H15V17H13V11ZM9 4V6H15V4H9Z" })), dp = ({ color: e = "currentColor", size: t = 24, className: n, ...r }) => _.createElement("svg", {
 	viewBox: "0 0 24 24",
 	xmlns: "http://www.w3.org/2000/svg",
 	width: t,
@@ -20516,7 +20516,7 @@ function jh({ label: e, path: t, onPath: n, error: r, inputRef: i, picking: a, o
 					hint: r || void 0
 				}),
 				c ? /* @__PURE__ */ (0, z.jsx)("div", {
-					className: "flex h-10 shrink-0 items-center",
+					className: "flex h-9 shrink-0 items-center",
 					children: c
 				}) : null,
 				/* @__PURE__ */ (0, z.jsx)(hh, {
@@ -20525,8 +20525,10 @@ function jh({ label: e, path: t, onPath: n, error: r, inputRef: i, picking: a, o
 					onClick: o,
 					...ph(a)
 				}),
-				s ? /* @__PURE__ */ (0, z.jsx)(hh, {
-					icon: up,
+				s ? /* @__PURE__ */ (0, z.jsx)(bt, {
+					variant: "danger",
+					iconOnly: !0,
+					leadingIcon: up,
 					"aria-label": "移除这个文件夹",
 					onClick: s
 				}) : null

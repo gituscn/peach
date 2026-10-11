@@ -162,6 +162,32 @@ it('后继挂在派出它的那一轮下面，不另占一张卡', async () => {
   expect(host.textContent).toContain('派出后继 1');
 });
 
+it('完成的任务明细默认收起，展开和收起不丢失后继结果', async () => {
+  const parent = run({ id: 4, status: 'succeeded', finished_at: '2026-09-11T10:03:00Z' });
+  const { host } = await open(payload({ finished: [parent, followup(parent.id)] }));
+  const details = host.querySelector('details')!;
+  const trigger = details.querySelector('summary')!;
+  expect(trigger.textContent).toBe('任务明细 · 1 项');
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  await click(trigger);
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  expect(details.open).toBe(true);
+  expect(details.textContent).toContain('涼森れむ · 结果 已装上');
+  await click(trigger);
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+});
+
+it('进行中和失败的后继明细默认展开', async () => {
+  for (const status of ['running', 'failed']) {
+    queryClient.clear();
+    const parent = run({ id: 4, status: 'succeeded', finished_at: '2026-09-11T10:03:00Z' });
+    const child = followup(parent.id, { status });
+    const { host } = await open(payload({ finished: [parent, child] }));
+    expect(host.querySelector('details')?.open).toBe(true);
+    expect(host.querySelector('summary')?.getAttribute('aria-expanded')).toBe('true');
+  }
+});
+
 it('后继还在跑时，派出它的那一轮整张卡留在正在进行，那一行只说做到哪一部', async () => {
   const parent = run({ id: 4, status: 'succeeded', task_label: '订阅源拉取',
                        progress_total: null, finished_at: '2026-09-11T10:03:00Z',

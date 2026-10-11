@@ -76,7 +76,7 @@ Want to look around before installing? The [live demo](https://demo.peach.video)
 - **Cloud download**: open Find resources from JAV or a quality goal, search a video code or paste a magnet link, then submit the selected resource to 115 or PikPak. Once it lands, Peach selects the main video, isolates promotional attachments that meet the automatic threshold, collects metadata and applies that source's organization template. Progress and failed-step retries show up in Activity.
 - **Find a release**: Find resources searches `manko.fun → JavDB → Sukebei` first and stops when manko.fun has a 1080p or 2160p match; without one, it continues through your configured Prowlarr or Jackett indexers. Available covers and title details appear with the resource candidates.
 - **Statistics**: which drive holds what, how much you have watched and which tags dominate, on one page.
-- **Settings**: the dialog groups appearance and navigation, browsing and playback, JAV and new releases, search and recommendations, and content display. Service configuration groups media intake, sources and subscriptions, download channels, network access, and application maintenance.
+- **Settings**: the dialog groups appearance and navigation, browsing and playback, JAV and new releases, search and recommendations, and content display. Peach configuration groups media intake, sources and subscriptions, download channels, network access, and application maintenance.
 - **Any screen**: works in the browser on desktop, tablet and phone.
 
 ## Download and use
@@ -108,7 +108,7 @@ On macOS, replace the last two lines with `uv sync --locked --python 3.14 --extr
 
 LAN access, access passwords, updates and uninstalling are covered in [Operations](docs/OPERATIONS.md).
 
-Open System diagnostics under Service configuration → Application and maintenance to view library health lists, source parsing and cooldowns. `peach doctor` provides the same report; `--json` returns redacted JSON. See [Local diagnostics](docs/OPERATIONS.md#本机诊断) for status and actions.
+Open System diagnostics under Peach configuration → Application and maintenance to view library health lists, source parsing and cooldowns. `peach doctor` provides the same report; `--json` returns redacted JSON. See [Local diagnostics](docs/OPERATIONS.md#本机诊断) for status and actions.
 
 ## FAQ
 

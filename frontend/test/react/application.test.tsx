@@ -7,12 +7,14 @@ const boot = vi.hoisted(() => ({ initialize: vi.fn(), truncate: vi.fn(() => () =
 vi.mock('../../src/application/initialize.js', () => ({ initializeApplication: boot.initialize }));
 vi.mock('../../src/ui-kit/middle-truncate', () => ({ initMiddleTruncate: boot.truncate }));
 const roots = new Set<Root>();
+let runtime: Awaited<ReturnType<typeof load>>;
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.resetModules(); boot.initialize.mockReset(); boot.truncate.mockClear();
   window.history.replaceState(null, '', '/nowhere');
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-});
+  runtime = await load();
+}, 30_000);
 afterEach(async () => {
   for (const root of roots) await act(async () => { root.unmount(); });
   roots.clear(); document.body.innerHTML = ''; vi.useRealTimers(); vi.restoreAllMocks();
@@ -55,7 +57,7 @@ function actions(): ShellActions {
 }
 
 it('同宿主重复挂载沿用实际 Application，一次后退只打开一次覆盖', async () => {
-  const r = await load(), node = host(), capabilities = actions();
+  const r = runtime, node = host(), capabilities = actions();
   boot.initialize.mockImplementation(() => { void r.residents.loadRouter(capabilities); });
   let first!: Root, second!: Root;
   await act(async () => { first = r.mountApplication(node); second = r.mountApplication(node); });
@@ -70,7 +72,7 @@ it('同宿主重复挂载沿用实际 Application，一次后退只打开一次�
 });
 
 it('实际卸载后立即重挂同宿主重新初始化，旧资源信号已取消', async () => {
-  const r = await load(), node = host();
+  const r = runtime, node = host();
   const remove = vi.spyOn(window, 'removeEventListener'), menus: ReturnType<typeof openNativeMenu>[] = [];
   boot.initialize.mockImplementation(() => { menus.push(openNativeMenu(r.menus)); });
   let first!: Root, second!: Root, oldSignal!: AbortSignal;
@@ -97,7 +99,7 @@ it('实际卸载后立即重挂同宿主重新初始化，旧资源信号已取�
 
 it('StrictMode 诊断重取仅初始化一次，最终卸载移除监听和调度', async () => {
   vi.useFakeTimers();
-  const r = await load(), node = host(), heard = vi.fn(), timer = vi.fn();
+  const r = runtime, node = host(), heard = vi.fn(), timer = vi.fn();
   const remove = vi.spyOn(window, 'removeEventListener');
   let menu!: ReturnType<typeof openNativeMenu>;
   let signal!: AbortSignal;
