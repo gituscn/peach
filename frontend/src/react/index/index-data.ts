@@ -60,6 +60,7 @@ export const isCompany = (kind: IndexKind) => kind === 'studios' || kind === 'ag
 export interface IndexPerson {
   entity_kind?: string;
   identity_labels?: string[];
+  following?: boolean;
   entity_id?: number;
   id?: number;
   k: string;

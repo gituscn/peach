@@ -116,6 +116,51 @@ class WebDataTests(unittest.TestCase):
             con.execute("UPDATE asset SET name='must-not-write' WHERE id=1")
         con.close()
 
+    def test_people_index_subscription_uses_enabled_sources_bound_to_entity(self):
+        from peach import feeds
+        with closing(sqlite3.connect(self.db_path)) as con:
+            active = feeds.add_source(con, url='https://javdb.com/actors/Alice', entity_id=11)
+            paused = feeds.add_source(con, url='https://javdb.com/actors/AliceOld', entity_id=11)
+            feeds.set_enabled(con, paused, False)
+            feeds.add_source(con, url='https://javdb.com/actors/Other', name='Canonical Creator')
+            con.commit()
+        people = rm_web.q_index(self.contract, 'performers')['items']
+        self.assertTrue(next(row for row in people if row['entity_id'] == 11)['following'])
+        self.assertFalse(next(row for row in people if row['entity_id'] == 12)['following'])
+        filtered = rm_web.q_index(self.contract, 'performers', q='Alice', limit=1)['items']
+        self.assertEqual(len(filtered), 1)
+        self.assertTrue(filtered[0]['following'])
+        self.assertTrue(rm_web.q_index(self.contract, 'performers', limit=1, offset=1)['items'][0]['following'])
+        with closing(sqlite3.connect(self.db_path)) as con:
+            feeds.set_enabled(con, active, False)
+            con.commit()
+        self.assertFalse(rm_web.q_index(self.contract, 'performers', q='Alice')['items'][0]['following'])
+
+    def test_people_index_marks_enabled_follow_sources_by_confirmed_identity(self):
+        from peach.entity_classification import write_claim
+        with closing(sqlite3.connect(self.db_path)) as con:
+            con.execute("INSERT INTO follow_source(entity_id,provider,ref,label,url,created_at,updated_at) "
+                        "VALUES(12,'patreon','test','Canonical Creator','https://www.patreon.com/test',"
+                        "'2026-01-01','2026-01-01')")
+            con.commit()
+        rows = rm_web.q_index(self.contract, 'performers', q='Creator', limit=1)['items']
+        self.assertTrue(rows[0]['following'])
+        with closing(sqlite3.connect(self.db_path)) as con:
+            write_claim(con, entity_id=12, facet='account_role', value='seller',
+                        source='source:fc2', source_url='https://adult.contents.fc2.com/article/42/',
+                        evidence='seller account', status='observed', confidence=1)
+            con.commit()
+        rows = rm_web.q_index(self.contract, 'creators', q='Creator', limit=1)['items']
+        self.assertTrue(rows[0]['following'])
+        with closing(sqlite3.connect(self.db_path)) as con:
+            con.execute("UPDATE follow_source SET enabled=0")
+            con.commit()
+        self.assertFalse(rm_web.q_index(self.contract, 'creators')['items'][0]['following'])
+        with closing(sqlite3.connect(self.db_path)) as con:
+            con.execute("UPDATE follow_source SET enabled=1,entity_id=NULL")
+            con.commit()
+        self.assertFalse(rm_web.q_index(self.contract, 'creators')['items'][0]['following'])
+
     def test_seller_references_share_profile_work_portrait_and_trusted_role(self):
         from peach.entity_classification import write_claim
         with closing(sqlite3.connect(self.db_path)) as con:

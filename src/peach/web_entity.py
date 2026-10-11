@@ -521,6 +521,16 @@ def q_photo_set(contract: WebContract, args):
         }
 
 
+def _attach_index_following(connection, rows: list[dict]) -> None:
+    """名册人物的订阅状态按已启用、绑定实体的来源汇总。"""
+    following = {source[0] for source in connection.execute(
+        "SELECT entity_id FROM feed_source WHERE kind=? AND enabled=1 "
+        "UNION SELECT entity_id FROM follow_source WHERE enabled=1",
+        (feeds.KIND_JAVDB_ACTOR,))}
+    for row in rows:
+        row['following'] = row['entity_id'] in following
+
+
 def q_index(contract: WebContract, kind, q="", limit=600, offset=0, category=""):
     """全部艺人 / 创作者 / 厂牌 / 事务所 / 标签的索引页数据。"""
     with contract.read_connection() as c:
@@ -594,6 +604,7 @@ def q_index(contract: WebContract, kind, q="", limit=600, offset=0, category="")
             summaries = entity_classification.summaries(c, [row['entity_id'] for row in rows])
             for row in rows:
                 row.update(summaries[row['entity_id']])
+            _attach_index_following(c, rows)
             category_counts = entity_classification.counts(c,entity_kind,q,COUNTED_VIDEO)
         else:
             sql = ("SELECT e.canonical_name k, count(DISTINCT " + video_work_key(contract, c) + ") n "
