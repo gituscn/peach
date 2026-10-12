@@ -421,6 +421,69 @@ class WebDataTests(unittest.TestCase):
         self.assertEqual([row["k"] for row in item["tags"]], ["足交"])
         self.assertEqual(item["stats"]["duration"], 1)
 
+    def test_studio_spellings_share_videos_pagination_and_facets(self):
+        alias = 'CANONICAL STUDIO（カノニカル）'
+        with closing(sqlite3.connect(self.db_path)) as connection, connection:
+            connection.execute("INSERT INTO entity_alias VALUES(13,?,?,'merge:test',1)",
+                               (alias, alias.casefold()))
+        expected = rm_web.q_items(self.contract, {'studio': 'Canonical Studio', 'sort': 'new'})
+        facets = rm_web.q_facets(self.contract, scope_kind='studio', scope_name='Canonical Studio')
+        for name in ('CANONICAL STUDIO', alias):
+            with self.subTest(name=name):
+                items = rm_web.q_items(self.contract, {'studio': name, 'sort': 'new'})
+                self.assertEqual(items['total'], 2)
+                self.assertEqual([row['id'] for row in items['items']],
+                                 [row['id'] for row in expected['items']])
+                first = rm_web.q_items(self.contract, {'studio': name, 'sort': 'new', 'limit': '1'})
+                next_page = rm_web.q_items(self.contract, {'studio': name, 'sort': 'new',
+                                                         'limit': '1', 'offset': '1', 'count': '0'})
+                self.assertEqual([row['id'] for row in first['items'] + next_page['items']],
+                                 [row['id'] for row in expected['items']])
+                self.assertEqual(rm_web.q_facets(self.contract, scope_kind='studio', scope_name=name), facets)
+
+    def test_profile_kinds_share_registered_alias_scopes(self):
+        with closing(sqlite3.connect(self.db_path)) as connection, connection:
+            connection.executemany("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at) "
+                "VALUES(?,?,?,?, 't','t')", [(14,'series','Series','series'),(15,'agency','Agency','agency')])
+            connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) VALUES(2,14,'series','test',1)")
+            connection.execute("INSERT INTO entity_membership(member_id,agency_id,source,checked_at) "
+                               "VALUES(11,15,'test','t')")
+            connection.executemany("INSERT INTO entity_alias VALUES(?,?,?,'test',1)",
+                [(11,'Performer Alias','performer alias'),(12,'Creator Alias','creator alias'),
+                 (14,'Series Alias','series alias'),(15,'Agency Alias','agency alias')])
+        for kind, canonical, alias in [('performer','Canonical Alice','Performer Alias'),
+                                     ('creator','Canonical Creator','Creator Alias'),
+                                     ('series','Series','Series Alias'), ('agency','Agency','Agency Alias')]:
+            with self.subTest(kind=kind):
+                actual = rm_web.q_items(self.contract, {kind: alias})
+                expected = rm_web.q_items(self.contract, {kind: canonical})
+                self.assertGreater(actual['total'], 0)
+                self.assertEqual([row['id'] for row in actual['items']], [row['id'] for row in expected['items']])
+                self.assertEqual(rm_web.q_facets(self.contract, scope_kind=kind, scope_name=alias),
+                                 rm_web.q_facets(self.contract, scope_kind=kind, scope_name=canonical))
+
+    def test_unknown_or_ambiguous_studio_scopes_have_no_videos(self):
+        with closing(sqlite3.connect(self.db_path)) as connection, connection:
+            connection.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at) "
+                               "VALUES(14,'studio','Other','other','t','t')")
+            connection.executemany("INSERT INTO entity_alias VALUES(?,'Shared','shared','test',1)", [(13,),(14,)])
+        for name in ('Missing', 'Shared'):
+            self.assertEqual(rm_web.q_items(self.contract, {'studio': name})['total'], 0)
+            self.assertEqual(rm_web.q_facets(self.contract, scope_kind='studio', scope_name=name)['locations'], [])
+
+    def test_studio_facets_include_descendant_label_videos(self):
+        with closing(sqlite3.connect(self.db_path)) as connection, connection:
+            connection.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at) "
+                               "VALUES(14,'studio','Label','label','t','t')")
+            connection.execute('DELETE FROM asset_entity WHERE asset_id=2 AND entity_id=13')
+            connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) VALUES(2,14,'studio','test',1)")
+            connection.execute("INSERT INTO label_maker(label_id,maker_id,source,checked_at) "
+                               "VALUES(14,13,'test','t')")
+        videos = rm_web.q_items(self.contract, {'studio': 'Canonical Studio'})
+        facets = rm_web.q_facets(self.contract, scope_kind='studio', scope_name='Canonical Studio')
+        self.assertEqual(videos['total'], 2)
+        self.assertEqual(sum(row['n'] for row in facets['locations']), 2)
+
     def test_facets_and_tops_narrow_to_the_state_the_page_is_showing(self):
         """「已标记」页的顶部三层和筛选面板曾走全库口径。
 
