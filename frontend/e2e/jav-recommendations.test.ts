@@ -61,7 +61,7 @@ describe('JAV 推荐与加载结构', () => {
       assert.equal(await page.locator('[data-jav-filter] [data-entity-sep]').count(), 1);
       assert.equal(await page.locator('[data-jav-filter] [data-entity-sort]').count(), 2);
       assert.equal(await page.locator('[data-jav-filter]').getByText('正在读取', { exact: true }).count(), 0);
-      await page.screenshot({ path: `../build/jav-discover-pending-${viewport.name}.png`, fullPage: true });
+      await page.screenshot({ path: `../build/jav-discover-pending-${viewport.name}.png` });
       release();
       await page.getByRole('heading', { name: 'DEMO-777 · 演示新作', exact: true }).waitFor();
       const search = page.getByRole('searchbox', { name: '筛选推荐', exact: true });
@@ -70,7 +70,7 @@ describe('JAV 推荐与加载结构', () => {
       for (const cover of await cards.locator('img.poster').all()) await cover.scrollIntoViewIfNeeded();
       await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>('[data-jav-card] img.poster')].every(img => img.complete && img.naturalWidth > 0));
       await page.evaluate(() => window.scrollTo(0, 0));
-      await page.screenshot({ path: `../build/jav-discover-${viewport.name}.png`, fullPage: true });
+      await page.screenshot({ path: `../build/jav-discover-${viewport.name}.png` });
       const frames = await cards.evaluateAll(nodes => nodes.slice(0, 2).map(node => {
         const pic = node.querySelector('[data-jav-cover-box]')!.getBoundingClientRect();
         const img = node.querySelector<HTMLImageElement>('img.poster')!;
@@ -90,7 +90,7 @@ describe('JAV 推荐与加载结构', () => {
       const liveBottom = await page.locator('[data-jav-filter] [data-filter-row="bottom"]').boundingBox();
       const liveSize = await page.locator('[data-jav-filter] [data-entity-layout]').boundingBox();
       for (const [pending, live] of [[pendingFilter, liveFilter], [pendingBottom, liveBottom], [pendingSize, liveSize]]) {
-        assert.ok(pending && live && Math.abs(pending.y - live.y) <= 1 && Math.abs(pending.height - live.height) <= 1, JSON.stringify({ pending, live }));
+        assert.ok(pending && live && Math.abs(pending.y - live.y) <= 1 && Math.abs(pending.height - live.height) <= 1, JSON.stringify({ pending, live, pendingBottom, liveBottom, pendingSize, liveSize }));
       }
       const controls = await page.locator('[data-jav-filter] [data-entity-sorts]').boundingBox();
       assert.ok(liveSize && controls && liveSize.x >= controls.x && liveSize.x + liveSize.width <= controls.x + controls.width);
@@ -148,7 +148,7 @@ describe('JAV 推荐与加载结构', () => {
       assert.deepEqual(geometry.offenders, []);
       assert.deepEqual(opened.problems.filter(line => !line.includes('/api/links/check')), []);
       await page.evaluate(() => { (document.activeElement as HTMLElement)?.blur(); window.scrollTo(0, 0) });
-      await page.screenshot({ path: `../build/jav-discover-${viewport.name}.png`, fullPage: true });
+      await page.screenshot({ path: `../build/jav-discover-${viewport.name}.png` });
     } finally { release(); await opened.close(); }
   });
 });
