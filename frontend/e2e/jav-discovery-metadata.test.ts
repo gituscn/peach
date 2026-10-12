@@ -38,8 +38,16 @@ describe('发现资料与排序', () => {
       assert.equal(details, 0);
       assert.ok(requests.some(params => params.get('metadata_job_id') === 'fixed-batch'));
       const cards = page.locator('[data-jav-card]');
-      assert.match(await cards.first().locator('[data-jav-taste-score]').textContent() || '', /口味 0\.004 · 排序 0\.003 · 评分 4\.2 \/ 5/);
-      assert.match(await cards.last().locator('[data-jav-taste-score]').textContent() || '', /口味 0\.000 · 排序 -0\.020/);
+      assert.equal(await cards.first().locator('[data-jav-taste-score]').textContent(), '0');
+      const score = cards.first().getByRole('button', { name: '推荐分 0，探索', exact: true });
+      await score.scrollIntoViewIfNeeded();
+      await score.focus();
+      await page.getByRole('tooltip').filter({ hasText: '口味 0.004 · 排序 0.003 · 来源评分 4.2 / 5' }).waitFor({ state: 'visible' });
+      const otherScore = cards.last().getByRole('button', { name: '推荐分 0，探索', exact: true });
+      await otherScore.scrollIntoViewIfNeeded();
+      await otherScore.focus();
+      await page.getByRole('tooltip').filter({ hasText: '口味 0.000 · 排序 -0.020' }).waitFor({ state: 'visible' });
+      await page.getByRole('button', { name: '按口味匹配排序', exact: true }).focus();
       assert.equal(await cards.first().getByRole('button', { name: '恋足', exact: true }).count(), 1);
       for (const [sort, name, direction] of [
         ['source_score', '按来源评分排序', 'desc'], ['duration', '按时长排序', 'desc'],

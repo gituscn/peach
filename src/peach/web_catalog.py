@@ -889,7 +889,7 @@ def q_item(contract: WebContract, aid):
         if not r:
             return {"error": "not found"}
         d = dict(r)
-        d["sample_images"] = [{"n": n} for n in sample_images.positions(c, d.get("code"))]
+        d["sample_images"] = sample_images.detail_refs(c, d.get("code"))
         # 真相字段的字段级归属随详情一起下发：页面要显示某个值是谁写的、还能不能
         # 被自动写入者改，`mutation_revision` 则是编辑时回传的乐观并发凭据。
         d["field_owners"] = parse_owners(d.get("field_owners"))

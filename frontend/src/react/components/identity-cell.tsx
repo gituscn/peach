@@ -4,9 +4,9 @@ import { entityFaceImg, logoUrl } from '@peach/card-art';
 import type { DetailEntityRef } from '../item-detail/item-detail';
 
 /** 详情署名共用实体头像、厂牌标识与首字回退。 */
-export function IdentityCell({ kind, person, onOpen, hidden, overflow, face }: {
+export function IdentityCell({ kind, person, onOpen, hidden, overflow, face, openByName = false }: {
   kind: string; person: DetailEntityRef; onOpen(kind: string, name: string): void;
-  hidden?: boolean; overflow?: boolean; face?: ReactNode;
+  hidden?: boolean; overflow?: boolean; face?: ReactNode; openByName?: boolean;
 }) {
   const image = kind === 'performer' || kind === 'creator'
     ? <span data-id-face="" dangerouslySetInnerHTML={{ __html: `<span>${esc(firstGrapheme(person.name))}</span>`
@@ -16,7 +16,7 @@ export function IdentityCell({ kind, person, onOpen, hidden, overflow, face }: {
       {kind === 'studio' && person.has_logo ? <img src={logoUrl(person.name, 'icon', person.logo_version)} alt="" loading="lazy" data-drop="self" /> : null}</span>;
   const content = <>{face ?? image}<span data-id-name="">{person.name}</span></>;
   const attrs = { 'data-id-cell': kind, title: person.name, hidden, 'data-castoverflow': overflow ? '' : undefined };
-  return person.id ? <button type="button" {...attrs} data-entity-kind={kind} data-entity-name={person.name}
+  return person.id || openByName ? <button type="button" {...attrs} data-entity-kind={kind} data-entity-name={person.name}
     onClick={() => onOpen(kind, person.name)}>{content}</button> : <span {...attrs}>{content}</span>;
 }
 

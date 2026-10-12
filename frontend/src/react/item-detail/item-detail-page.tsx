@@ -7,7 +7,7 @@
  *
  * 写操作（评分、标签、反馈、稍后看、高清目标、偏好、播放列表排序与移出）都在岛里发，成功后
  * 把服务端回的那几个字段换进 `['item', id]`，目录网格缓存里的同一张卡一起换，不重读列表。 */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { fmtDur, fmtSize, icon, requestErrorMessage } from '@peach/legacy/core';
 import {
@@ -27,6 +27,8 @@ import { RelatedSection } from '../components/related-section';
 import { DetailContinuation } from '../components/detail-continuation';
 import { IdentityCell, IdentitySeries } from '../components/identity-cell';
 import { useFoldedTitle } from '../components/folded-title';
+import { MediaCarousel, useCarouselInset } from '../components/media-carousel';
+import { CatalogPicture } from './catalog-picture';
 import { CoverCrop } from '../cover-crop/cover-crop-page';
 import { queryClient } from '../query';
 import {
@@ -129,6 +131,16 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
   /* 播放器挂在这块框里，`<video>` 由舞台建：Video.js 会把它包进自己的 div，从小窗展开回来时
      整个实例还要搬进来，那一截 DOM 不归 React。 */
   const frameRef = useRef<HTMLDivElement>(null);
+  const [image, setImage] = useState(-2);
+  const inset = useCarouselInset(frameRef, '[data-catalog-picture]', image);
+  const media = item.is_jav && item.code ? [...(item.has_cover ? [{ index: -1, label: '封面' }] : []),
+    ...(item.sample_images || []).map((sample, index) => ({ index: sample.n, label: `预览 ${index + 1}` })),
+    { index: -2, label: '正片', video: true }] : [];
+  const hasPictures = media.length > 1;
+  const selectImage = (index: number) => {
+    if (index !== -2) frameRef.current?.querySelector('video')?.pause();
+    setImage(index);
+  };
   const mounting = useRef(item);
   const ended = useRef(onEnded);
   ended.current = onEnded;
@@ -143,8 +155,18 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
   }, [actions, started]);
   const badge = helpers.badgeHtml(item.location || '', item.cost || '', 'srcbig');
   return (
-    <div ref={frameRef} data-stage-media="" data-item-media={gate || 'video'}>
+    <div ref={frameRef} data-stage-media="" data-item-media={gate || 'video'} data-item-gallery={hasPictures ? '' : undefined}
+      data-item-picture={image !== -2 ? '' : undefined}
+      // oxlint-disable-next-line shadcn/no-inline-styles -- 图片黑边的真实宽度决定翻页箭头位置
+      style={{ '--follow-image-arrow-inset': image === -2 || inset === null ? undefined : `${inset}px` } as CSSProperties}>
       <CloseStage onClose={actions.close} />
+      {hasPictures ? <>
+        <button type="button" data-jav-preview-toggle="" aria-pressed={image !== -2}
+          onClick={() => selectImage(image === -2 ? media[0]!.index : -2)}><Glyph name={image === -2 ? 'image' : 'play'} />{image === -2 ? '查看图片' : '播放正片'}</button>
+        {image !== -2 ? <CatalogPicture key={image} item={item} image={image} /> : null}
+        <MediaCarousel items={media} position={Math.max(0, media.findIndex(entry => entry.index === image))} onSelect={selectImage}
+          below={image === -2} renderPreview={entry => <CatalogPicture item={item} image={entry.index === -2 ? media[0]!.index : entry.index} thumbnail />} />
+      </> : null}
       {gate === 'offline' ? <OfflineGate item={item} badge={badge} helpers={helpers} actions={actions} />
         : gate === 'online' ? (
           <div id="onlineGate" role="status" data-item-gate="online">

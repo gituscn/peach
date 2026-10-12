@@ -1,5 +1,6 @@
 import { icon } from '@peach/legacy/core';
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { MediaPreview } from './media-preview';
 import './media-carousel.css';
 
 export const MEDIA_DOTS_MAX = 20;
@@ -31,8 +32,9 @@ export function useCarouselInset(frame: RefObject<HTMLDivElement | null>, select
 }
 
 /** 关注与作品预览共用环形切换、圆点与大集合计数。 */
-export function MediaCarousel({ items, position, onSelect }: {
+export function MediaCarousel({ items, position, onSelect, below = false, renderPreview }: {
   items: readonly CarouselMedia[]; position: number; onSelect(index: number): void;
+  below?: boolean; renderPreview?(item: CarouselMedia): ReactNode;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [fits, setFits] = useState(true);
@@ -59,7 +61,11 @@ export function MediaCarousel({ items, position, onSelect }: {
   if (items.length < 2) return null;
   const step = (delta: number) => onSelect(items[(position + delta + items.length) % items.length]!.index);
   const unit = mixed ? '项媒体' : '张图片';
-  return <div ref={root} data-media-carousel="">
+  const indicator = (item: CarouselMedia, index: number, description?: string) => <button type="button" data-follow-image-item={item.index}
+    data-carousel-video={item.video ? '' : undefined} aria-current={index === position ? 'true' : 'false'}
+    aria-label={item.label || `第 ${index + 1} 张，共 ${items.length} 张`} aria-describedby={description} title={renderPreview ? undefined : item.label || `第 ${index + 1} 张`}
+    onClick={() => onSelect(item.index)}>{item.video ? <span dangerouslySetInnerHTML={{ __html: icon('play') }} /> : null}</button>;
+  return <div ref={root} data-media-carousel="" data-carousel-below={below ? '' : undefined}>
     <button type="button" data-follow-image-step="-1" data-follow-image-arrow="prev" aria-label={mixed ? '上一项媒体' : '上一张图片'} title="上一张"
       onClick={() => step(-1)} dangerouslySetInnerHTML={{ __html: icon('chevron-left') }} />
     <button type="button" data-follow-image-step="1" data-follow-image-arrow="next" aria-label={mixed ? '下一项媒体' : '下一张图片'} title="下一张"
@@ -67,10 +73,8 @@ export function MediaCarousel({ items, position, onSelect }: {
     {items.length > MEDIA_DOTS_MAX || !fits ? <span data-follow-image-count="" aria-live="polite" aria-label={`第 ${position + 1} 项，共 ${items.length} 项`}>
       {`${(position + 1).toLocaleString()} / ${items.length.toLocaleString()}`}
     </span> : <div data-follow-image-dots="" role="group" aria-label={`${items.length} ${unit}`}>
-      {items.map((item, index) => <button type="button" key={item.index} data-follow-image-item={item.index}
-        data-carousel-video={item.video ? '' : undefined} aria-current={index === position ? 'true' : 'false'}
-        aria-label={item.label || `第 ${index + 1} 张，共 ${items.length} 张`} title={item.label || `第 ${index + 1} 张`}
-        onClick={() => onSelect(item.index)}>{item.video ? <span dangerouslySetInnerHTML={{ __html: icon('play') }} /> : null}</button>)}
+      {items.map((item, index) => renderPreview ? <MediaPreview key={item.index} label={item.label || `第 ${index + 1} 张`}
+        render={() => renderPreview(item)}>{description => indicator(item, index, description)}</MediaPreview> : <span key={item.index} className="contents">{indicator(item, index)}</span>)}
     </div>}
   </div>;
 }

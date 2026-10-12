@@ -189,6 +189,28 @@ class DetailProjectionTests(unittest.TestCase):
             rows = q_jav_detail(self.contract, {"code": "EXM-001"})["performer_refs"]
         self.assertEqual([row["gender"] for row in rows], ["female", "male", "unknown"])
 
+    def test_source_studio_letter_case_uses_a_unique_local_identity(self):
+        with self.contract.database.write_transaction() as connection:
+            connection.executemany("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at) VALUES (?,'studio',?,?,'2026-10-12','2026-10-12')",
+                                   [(7, 'Idea Pocket', 'idea pocket'), (8, 'IDEAPOCKET', 'ideapocket')])
+        with patch('peach.web_jav_detail.PUBLIC_API.movie', return_value={'id': 'Exact', 'maker_name': 'IDEA POCKET'}):
+            reference = q_jav_detail(self.contract, {'code': 'EXM-001'})['studio_refs'][0]
+        self.assertEqual((reference['id'], reference['name']), (7, 'Idea Pocket'))
+        with self.contract.database.read_connection() as connection:
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM entity').fetchone()[0], 2)
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM entity_alias').fetchone()[0], 0)
+
+    def test_source_studio_case_collision_keeps_the_source_name(self):
+        with self.contract.database.write_transaction() as connection:
+            connection.executemany("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at) VALUES (?,'studio',?,?,'2026-10-12','2026-10-12')",
+                                   [(7, '厂牌甲', '厂牌甲'), (8, '厂牌乙', '厂牌乙')])
+            connection.executemany("INSERT INTO entity_alias(entity_id,alias,normalized_alias,source) VALUES (?,?,?,'test')",
+                                   [(7, 'IDEA POCKET', 'idea pocket'), (8, 'idea pocket', 'idea pocket')])
+        with patch('peach.web_jav_detail.PUBLIC_API.movie', return_value={'id': 'Exact', 'maker_name': 'Idea Pocket'}):
+            reference = q_jav_detail(self.contract, {'code': 'EXM-001'})['studio_refs'][0]
+        self.assertIsNone(reference['id'])
+        self.assertEqual(reference['name'], 'Idea Pocket')
+
 
     def test_source_failure_keeps_usable_detail_and_reviews_failure_is_explicit(self):
         with patch('peach.web_jav_detail.PUBLIC_API.movie', side_effect=PublicSourceUnavailable('资料未取得')):
