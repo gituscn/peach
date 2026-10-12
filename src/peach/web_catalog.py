@@ -28,7 +28,7 @@ from .catalog_rules import (
     solo_performer_clause,
     tag_cat,
 )
-from .entities import normalize_entity_name, upsert_asset_entity
+from .entities import normalize_entity_name, resolve_entity, upsert_asset_entity
 from .catalog_versions import foldable_versions, partition_versions, version_labels
 from .field_owners import parse_owners
 from .metadata_policy import SOURCE_SPECS
@@ -130,16 +130,6 @@ def tag_not_hidden(asset: str, tag: str) -> str:
             f"AND p.hidden=1 AND p.normalized_tag={tag})")
 
 
-#: 「这部作品属于某家事务所」的判据：它的出镜者里有这家的现役成员。
-#: 归属是人的属性，作品只是顺着人被算进来的——所以这里比的是 `entity_membership`，
-#: 不是给作品另存一个事务所字段。多存一份就会漂移，而漂移的那份没人会发现。
-AGENCY_ASSET_CLAUSE = (
-    "EXISTS(SELECT 1 FROM asset_entity ae "
-    "JOIN entity_membership m ON m.member_id=ae.entity_id "
-    "JOIN entity agency ON agency.id=m.agency_id "
-    "WHERE ae.asset_id=a.id AND agency.kind='agency' AND agency.canonical_name=?)"
-)
-
 #: 「未归属」是一个真实的集合，不是详情页上的一句说明文字：22509 部视频里 4566 部
 #: 没有任何署名人。判据和卡片署名同源（`cardIdentity` 取 creator 或 performer），
 #: 所以卡片上写着「未归属」的每一条，点进这个集合都必须在里面。厂牌和系列不算归属：
@@ -197,6 +187,17 @@ def region_facet_rows(rows) -> list[dict]:
              "label": region_label(row["k"]) or "未判定"} for row in rows]
 
 
+def _entity_asset_filter(connection, kind: str, name: str) -> tuple[str, list[int]]:
+    """名称按资料页身份解析，作品范围包含旗下厂牌或事务所成员。"""
+    from .web_entity import scope_predicate
+
+    entity = resolve_entity(connection, kind, name)
+    if entity is None:
+        return "0", []
+    predicate = scope_predicate(kind, "entity_id")
+    return f"a.id IN (SELECT asset_id FROM asset_entity WHERE {predicate})", [entity["id"]]
+
+
 def catalog_filter(contract: WebContract, args):
     """视频列表与侧栏使用同一组筛选条件。"""
     trash = args.get("state") == "trash"
@@ -212,32 +213,14 @@ def catalog_filter(contract: WebContract, args):
     if args.get("loc"):
         locs = [x for x in args["loc"].split(",") if x]
         where.append("a.location IN (%s)" % ",".join("?" * len(locs))); par += locs
-    if args.get("creator"):
-        where.append(
-            "a.id IN (SELECT ae.asset_id FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id "
-            "WHERE e.kind='creator' AND e.canonical_name=?)"
-        ); par.append(args["creator"])
-    if args.get("performer"):
-        where.append(
-            "a.id IN (SELECT ae.asset_id FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id "
-            "WHERE e.kind='performer' AND e.canonical_name=?)"
-        ); par.append(args["performer"])
-    # 片商连同旗下每一级 label 出的片（ADR-0051 修订），和资料页上那个合计是同一批。
-    if args.get("studio"):
-        where.append(
-            "a.id IN (SELECT ae.asset_id FROM asset_entity ae WHERE ae.entity_id IN ("
-            "WITH RECURSIVE down(id) AS (SELECT id FROM entity WHERE kind='studio' AND canonical_name=?"
-            " UNION SELECT lm.label_id FROM label_maker lm JOIN down ON lm.maker_id=down.id)"
-            " SELECT id FROM down))"
-        ); par.append(args["studio"])
-    if args.get("series"):
-        where.append(
-            "a.id IN (SELECT ae.asset_id FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id "
-            "WHERE e.kind='series' AND e.canonical_name=?)"
-        ); par.append(args["series"])
-    # 事务所隔一层：作品是它的成员拍的，`asset_entity` 里没有事务所的行。
-    if args.get("agency"):
-        where.append(AGENCY_ASSET_CLAUSE); par.append(args["agency"])
+    subjects = [(kind, args[kind]) for kind in ("creator", "performer", "studio", "series", "agency")
+                if args.get(kind)]
+    if subjects:
+        with contract.read_connection() as connection:
+            for kind, name in subjects:
+                clause, values = _entity_asset_filter(connection, kind, name)
+                where.append(clause)
+                par.extend(values)
     # 没有署名人的那批也是一类，和「某某的作品」并列，不是一句写在详情页上的说明。
     if args.get("owner") == "none":
         where.append(UNOWNED_ASSET_CLAUSE)
@@ -1264,18 +1247,9 @@ def q_facets(
             if (scope_kind not in {"creator", "performer", "studio", "series", "agency"}
                     or not scope_name):
                 raise ValueError("invalid facet scope")
-            if scope_kind == "agency":
-                # 事务所的筛选项必须和它的作品列表同源，否则右栏会给出点进去是 0 条的项。
-                scope += "AND " + AGENCY_ASSET_CLAUSE + " "
-                scope_params.append(scope_name)
-            else:
-                scope += (
-                    "AND EXISTS(SELECT 1 FROM asset_entity scope_ae "
-                    "JOIN entity scope_e ON scope_e.id=scope_ae.entity_id "
-                    "WHERE scope_ae.asset_id=a.id AND scope_e.kind=? "
-                    "AND scope_e.canonical_name=?) "
-                )
-                scope_params.extend((scope_kind, scope_name))
+            clause, values = _entity_asset_filter(c, scope_kind, scope_name)
+            scope += "AND " + clause + " "
+            scope_params.extend(values)
         out = {}
         out["locations"] = [dict(r) for r in c.execute(
             "SELECT a.location AS k, count(*) AS n, "
