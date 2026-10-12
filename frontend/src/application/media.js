@@ -4,11 +4,12 @@ import { receiptsState } from './receipts.js';
 import { followState, followViewPath, openFollowDetail } from './follow.js';
 import { immerseApi, loadImmerse, loadStage, stageApi } from '../react/application-residents';
 import { cancelQueueRequest, navigationState, openRoutedPage, requestOverlay } from './navigation.js';
-import { activeQueue, barsContext, detailOriginAbove, detailOriginAnchor, detailReturnBarsContext, detailReturnNeedsRestore, detailReturnPath, pageOpens, pendingQueueRoute, presentedItem, queueOpens, runtimeConfigurable, selectMode, selected, state, writeShell } from './../shell/index';
+import { activeQueue, barsContext, detailOriginAbove, detailOriginAnchor, detailReturnBarsContext, detailReturnNeedsRestore, detailReturnPath, pageOpens, pendingQueueRoute, presentedItem, queueOpens, selectMode, selected, state, writeShell } from './../shell/index';
 import { scheduleStickySurfaces } from './layout.js';
 import { clearOverlayBackground, holdOverlayBackground, overlayState, takeOverlayReturn } from './../history/overlay';
 import { peachHistory, retagOverlay } from './../history/index';
 import { $, DURATION_TAGS } from '../core';
+import { apiGet } from '../api';
 import { javDisplayName, javTitleHtml } from '../core/jav-title';
 import { tagLabel } from '../core/tags';
 import { pageSkeletonHtml } from './../management-placeholder';
@@ -148,9 +149,9 @@ export async function openJavMovie(code,push=true){
   if(stageApi()?.showing()!=='jav')disposeStage(false,true,{miniplayer:false});
   writeShell({detailReturnPath:returnPath,detailReturnBarsContext:restore,detailReturnNeedsRestore:needsRestore});
   releaseHoverPreviews();
-  const stage=await loadStage(mediaState.stageHost);
+  const [stage,runtime]=await Promise.all([loadStage(mediaState.stageHost),apiGet('/healthz')]);
   if(peachHistory.navigation.seq!==seq)return;
-  await stage.open({kind:'jav',code,readOnly:!runtimeConfigurable,
+  await stage.open({kind:'jav',code,readOnly:!!runtime.ledger_read_only,
     actions:{close:()=>void closeItemDetail(),navigate:path=>navigationState.navigatePath(path),
       openTag:tag=>{commitContextFilter(filters=>{filters.tag=tag});window.scrollTo({top:0,behavior:'smooth'})},
       receipt:message=>receiptsState.toast({text:message})}});

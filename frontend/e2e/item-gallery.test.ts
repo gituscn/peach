@@ -22,7 +22,7 @@ describe('馆藏 JAV 官方预览', () => {
       const frame = page.locator('[data-item-gallery]');
       await frame.waitFor({ state: 'visible' });
       await page.waitForFunction(() => document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.readyState === 4);
-      assert.equal(samples.length, 0, '播放入口不预取所有官方样张');
+      assert.ok(samples.every(url => new URL(url).pathname === '/sample-thumb'), '常驻缩略图条只读取小图');
       const stats = frame.getByRole('button', { name: '播放统计', exact: true });
       await stats.waitFor({ state: 'visible' });
       const statsBox = await stats.boundingBox(), toggleBox = await frame.getByRole('button', { name: '查看图片', exact: true }).boundingBox();
@@ -40,12 +40,13 @@ describe('馆藏 JAV 官方预览', () => {
       assert.ok(await frame.locator('.video-js').isHidden());
       await page.keyboard.press('Tab');
       await frame.getByRole('button', { name: '预览 1', exact: true }).focus();
-      const tip = page.locator('[data-media-preview-tip]');
-      await tip.locator('img').waitFor({ state: 'visible' });
-      assert.match(await tip.locator('img').getAttribute('src') || '', /\/sample-thumb\?.*n=1$/);
-      const tipBox = await tip.boundingBox(), focused = await frame.getByRole('button', { name: '预览 1', exact: true }).boundingBox();
-      assert.ok(tipBox && focused && tipBox.y + tipBox.height <= focused.y);
-      await page.keyboard.press('Escape');
+      const thumbnails = frame.locator('[data-media-thumbnails]');
+      await thumbnails.getByRole('button', { name: '切换到预览 1', exact: true }).locator('img').waitFor({ state: 'visible' });
+      const stripBox = await thumbnails.boundingBox(), imageBox = await frame.locator('[data-catalog-picture]').boundingBox();
+      assert.ok(stripBox && imageBox && stripBox.y >= imageBox.y + imageBox.height);
+      assert.equal(await page.locator('[data-media-preview-tip]').count(), 0);
+      await thumbnails.getByRole('button', { name: '切换到预览 1', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('[data-catalog-picture]')?.getAttribute('src')?.endsWith('n=1'));
       await frame.getByRole('button', { name: '播放正片', exact: true }).click();
       await frame.locator('.video-js').waitFor({ state: 'visible' });
       assert.ok(await frame.locator('video').evaluate(node => (node as HTMLVideoElement).currentTime > 0), '切回正片保留位置');

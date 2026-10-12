@@ -30,7 +30,7 @@
 .peach-react [data-item-gallery] > [data-carousel-below] { order: 1; flex: none; }
 .peach-react [data-item-gallery]:not([data-item-picture]) > [data-jav-preview-toggle] { left: 64px; }
 .peach-react [data-item-gallery][data-item-picture] > :is([class~="video-js"], video, [data-item-gate], #playerStatsBtn, #playerStats, #playerNet, [data-ambient-canvas]) { display: none; }
-.peach-react [data-catalog-picture] { display: block; width: 100%; height: auto; max-height: 76vh; object-fit: contain; min-height: 0; }
+.peach-react [data-catalog-picture] { display: block; width: 100%; height: auto; max-height: calc(76vh - 112px); object-fit: contain; min-height: 0; }
 .peach-react [data-item-gallery][data-item-picture] > [role="note"] { margin: 24px; }
 .peach-react [data-item-detail] [data-item-gate] {
   box-sizing: border-box;

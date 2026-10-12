@@ -2,7 +2,7 @@ import type { Page } from 'playwright-core';
 
 export const JAV_DETAIL = {
   ok: true, code: 'EXM-001', title: '示例作品资料与长标题，完整详情保持可读', state: 'ready',
-  release_date: '2026-10-30', duration: 120, score: 4.2, summary: '', director: '', publisher: '示例发行商',
+  release_date: '2026-10-30', duration: 120, score: 4.4, summary: '', director: '', publisher: '示例发行商',
   performers: '示例人物、第二位人物、待确认出演者', performer_refs: [{ id: null, name: '示例人物', gender: 'female', has_image: false },
     { id: null, name: '第二位人物', gender: 'male', has_image: false, source_actor_id: 'ExampleActor', source_avatar: true },
     { id: null, name: '待确认出演者', gender: 'unknown', has_image: false }],
@@ -23,7 +23,7 @@ export async function mockJavDetail(page: Page) {
     const count = pageNumber === 1 ? 10 : 2;
     return route.fulfill({ json: { ok: true, page: pageNumber, more: pageNumber === 1,
       items: Array.from({ length: count }, (_, index) => ({ id: `${pageNumber}:${index}`, username: '示例评论者',
-        content: index === 0 ? '<img src=x onerror=alert(1)> 这是来源正文' : '示例评论正文', score: 4, created_at: '2026-10-12' })) } });
+        content: index === 0 ? '<img src=x onerror=alert(1)> 这是来源正文' : '示例评论正文', score: 4.4, created_at: '2026-10-12T03:56:14.000Z' })) } });
   });
   await page.route(/\/api\/jav\/resources\?/, route => route.fulfill({ json: { state: 'ready', error: '',
     checked_at: '2026-10-12T00:00:00Z', items: Array.from({ length: 6 }, (_, index) => ({

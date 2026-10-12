@@ -11,6 +11,7 @@ from .genre_taxonomy import resolve_genre
 from .javdb_public import (MAX_REVIEW_PAGES, PAGE_SIZE, PUBLIC_API, PublicSourceUnavailable,
                           actor_gender, preview_video_url, public_image_url)
 from .jav_discovery_metadata import discovery_metadata
+from .sources.javdb import maker_writing
 
 
 def detail_code(args) -> str:
@@ -25,12 +26,13 @@ def _refs(contract, connection, kind, names):
     for name in dict.fromkeys(str(name or "").strip() for name in names):
         if not name:
             continue
-        entity = entities.resolve_entity(connection, kind, name)
+        lookup = maker_writing(name) if kind == "studio" else name
+        entity = entities.resolve_entity(connection, kind, lookup)
         if entity is None and kind == "studio":
             matches = connection.execute(
                 "SELECT DISTINCT e.* FROM entity e LEFT JOIN entity_alias a ON a.entity_id=e.id "
                 "WHERE e.kind='studio' AND (e.canonical_name=? COLLATE NOCASE OR a.alias=? COLLATE NOCASE) "
-                "ORDER BY e.id LIMIT 2", (name, name)).fetchall()
+                "ORDER BY e.id LIMIT 2", (lookup, lookup)).fetchall()
             entity = matches[0] if len(matches) == 1 else None
         refs.append(web_catalog.entity_ref(contract, kind, entity["id"], entity["canonical_name"])
                     if entity else {"id": None, "name": name, "has_image": False})

@@ -10,14 +10,13 @@ import { Glyph } from './glyph';
 /** 把 `pop` 摆到 `anchor` 下方，放不下翻上方，左右夹在视口内 8px。两边都放不下时摆到空间大的
  *  那一边，高度压到那一边真正剩下的空间、浮层里自己滚：浮层从不横跨锚点，盖住「+N」那一下
  *  指针就落在浮层上，按钮再也点不到。 */
-export function placePop(anchor: Element, pop: HTMLElement, preferAbove = false): void {
+export function placePop(anchor: Element, pop: HTMLElement): void {
   pop.style.removeProperty('max-height');
   const at = anchor.getBoundingClientRect(), box = pop.getBoundingClientRect();
   pop.style.left = `${Math.max(8, Math.min(innerWidth - box.width - 8, at.left))}px`;
   const below = at.bottom + 8;
   const roomBelow = innerHeight - 8 - below, roomAbove = at.top - 16;
-  const downward = preferAbove ? !(box.height <= roomAbove || (box.height > roomBelow && roomAbove >= roomBelow))
-    : box.height <= roomBelow || (box.height > roomAbove && roomBelow >= roomAbove);
+  const downward = box.height <= roomBelow || (box.height > roomAbove && roomBelow >= roomAbove);
   const room = Math.max(0, downward ? roomBelow : roomAbove);
   if (box.height > room) pop.style.maxHeight = `${room}px`;
   pop.style.top = `${downward ? below : at.top - 8 - Math.min(box.height, room)}px`;
