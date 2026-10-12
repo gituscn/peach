@@ -193,6 +193,8 @@ def q_jav_discoveries(contract, args):
             row["wanted"] = web_catalog.normalise_code_key(row["code"]) in wanted
             row.pop("why", None)
             row.pop("entities", None)
+        if sort == "taste" and args.get("direction") == "asc":
+            picked.reverse()
         for rank, row in enumerate(picked, 1):
             row["rank"] = rank
     if scope == "library":
@@ -211,7 +213,7 @@ def q_jav_discoveries(contract, args):
             row["poster_box"] = contract.poster_box(row["code"])
     response = {"scope": scope, "items": picked, "candidate_total": len(candidates), "sort": sort,
                 "ranking_method": "mmr" if sort == "taste" else "field-sort",
-                "direction": "asc" if sort != "taste" and args.get("direction") == "asc" else "desc",
+                "direction": "asc" if args.get("direction") == "asc" else "desc",
                 "limited": len(candidates) > 4000, "source": "library" if scope == "library" else "known-works"}
     response.update(_metadata_response(contract, args, bounded, picked, limit, scope))
     return response

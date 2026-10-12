@@ -899,12 +899,29 @@ class JavDiscoveryTest(FeedWebFixture):
         self.assertEqual([row["rank"] for row in result["items"]], [1, 2])
         self.assertTrue(all(row["taste_score"] == row["score"] for row in result["items"]))
 
-    def _discover(self, scope="external", rankings=None, metadata=None):
+    def _discover(self, scope="external", rankings=None, metadata=None, args=None):
         from peach import web_jav_discovery
         with patch.object(web_jav_discovery, "build_taste_dashboard", return_value={"rankings": rankings or {}}), \
                 patch.object(web_jav_discovery, "_cached_movie", return_value=metadata or {}), \
                 patch("peach.jav_discovery_metadata.DiscoveryMetadata.ensure", return_value=None):
-            return web_jav_discovery.q_jav_discoveries(self.contract, {"scope": scope})
+            return web_jav_discovery.q_jav_discoveries(self.contract, {"scope": scope, **(args or {})})
+
+    def test_taste_ascending_reverses_the_same_mmr_selection_and_preserves_scores(self):
+        self._add()
+        self._check()
+        with self.contract.database.write_transaction() as connection:
+            connection.execute("UPDATE feed_discovery SET studio='示例厂牌'")
+        rankings = {"peach_studios": [{"name": "示例厂牌", "score": 4}]}
+        descending = self._discover(rankings=rankings, args={"direction": "desc"})
+        ascending = self._discover(rankings=rankings, args={"direction": "asc"})
+        self.assertEqual(ascending["direction"], "asc")
+        self.assertEqual(ascending["ranking_method"], "mmr")
+        self.assertEqual([row["id"] for row in ascending["items"]],
+                         [row["id"] for row in reversed(descending["items"])])
+        self.assertEqual([row["rank"] for row in ascending["items"]], [1, 2])
+        def score_fields(rows):
+            return {row["id"]: (row["score"], row["taste_score"], row["ranking_score"]) for row in rows}
+        self.assertEqual(score_fields(ascending["items"]), score_fields(descending["items"]))
 
     def test_external_discovery_includes_older_known_works_and_studio_matches(self):
         self._add()
