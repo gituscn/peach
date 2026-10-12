@@ -1,0 +1,93 @@
+/* 左右翻页：48/24 的媒体圆钮压在图上，玻璃底；箭头落在黑边的视觉中心（`--follow-image-arrow-inset`
+   由页面按图片比例算）。 */
+.peach-react [data-media-carousel] [data-follow-image-arrow] {
+  box-sizing: border-box;
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: rgba(0, 0, 0, .6);
+  color: #fff;
+  backdrop-filter: blur(16px);
+}
+.peach-react [data-media-carousel] [data-follow-image-arrow]:hover { background: rgba(0, 0, 0, .78); }
+.peach-react [data-media-carousel] [data-follow-image-arrow]:focus-visible { outline: 2px solid var(--tungsten); outline-offset: 3px; }
+.peach-react [data-media-carousel] [data-follow-image-arrow] svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.peach-react [data-media-carousel] [data-follow-image-arrow="prev"] { left: var(--follow-image-arrow-inset); }
+.peach-react [data-media-carousel] [data-follow-image-arrow="next"] { right: var(--follow-image-arrow-inset); }
+.peach-react [data-media-carousel] [data-follow-image-dots] {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--media-dot-gap);
+  max-width: calc(100% - var(--media-dot-room));
+  padding: 8px var(--media-dot-padding);
+  border-radius: var(--pill-radius);
+  background: rgba(0, 0, 0, .5);
+  overflow: hidden;
+}
+.peach-react [data-media-carousel] [data-follow-image-dots] button {
+  flex: none;
+  width: var(--media-dot-size);
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .42);
+  cursor: pointer;
+}
+.peach-react [data-media-carousel] [data-follow-image-dots] button[aria-current="true"] {
+  width: var(--media-dot-selected);
+  border-radius: var(--pill-radius);
+  background: #fff;
+}
+/* 张数多于 `MEDIA_DOTS_MAX` 时圆点条换成「当前 / 总数」：位置与底衬同圆点条。 */
+.peach-react [data-media-carousel] [data-follow-image-count] {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  padding: 4px 11px;
+  border-radius: var(--pill-radius);
+  background: rgba(0, 0, 0, .5);
+  color: #fff;
+  font: 500 var(--fs-xs) / 16px var(--board-font);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+
+.peach-react [data-media-carousel] { display: contents; --media-dot-size: 8px; --media-dot-selected: 20px; --media-dot-gap: 8px; --media-dot-padding: 11px; --media-dot-room: 120px; }
+.peach-react [data-media-carousel] [data-follow-image-dots] button[data-carousel-video] { width: var(--media-dot-selected); height: 20px; display: grid; place-items: center; background: transparent; color: #fff; }
+.peach-react [data-media-carousel] [data-follow-image-dots] button[data-carousel-video][aria-current="true"] { background: transparent; }
+.peach-react [data-media-carousel] [data-carousel-video] svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+.peach-react [data-media-carousel] [data-carousel-video][aria-current="true"] svg { fill: currentColor; }
+@media (max-width: 640px) {
+  .peach-react [data-media-carousel] [data-follow-image-arrow] { width: 44px; height: 44px; }
+  .peach-react [data-media-carousel] [data-follow-image-dots] { bottom: 12px; }
+}

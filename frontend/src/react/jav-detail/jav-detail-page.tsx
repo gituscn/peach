@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { RiExternalLinkLine } from '@remixicon/react';
-import { entityPath, icon } from '@peach/legacy/core';
+import { entityPath, firstGrapheme, icon } from '@peach/legacy/core';
+import { tagLabel } from '@peach/legacy/tags';
 import { coverUrl } from '@peach/card-art';
-import { feedIdentity } from '../../card-art/feed-identity';
+import { ensureVideojs, disposePlayer, type VjsPlayer } from '../../player';
 import { apiGet, errorMessage } from '../../api';
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
 import { Note } from '../components/note';
 import { RetryNote } from '../components/grid-reveal';
+import { IdentityCell, IdentitySeries } from '../components/identity-cell';
+import { MediaCarousel, useCarouselInset } from '../components/media-carousel';
+import { useFoldedTitle } from '../components/folded-title';
 import { busyProps, useAction } from '../settings/use-action';
 import { addWant, invalidateWants, removeWants } from '../wants/wants';
 import { WantMagnets } from '../wants/want-magnets';
@@ -19,7 +23,7 @@ import { fetchJavDetail, fetchJavReviews, javDetailKey, nextReviewPage, type Jav
 
 export function JavDetailPage(props: JavDetailProps) {
   const result = useQuery({ queryKey: javDetailKey(props.code), queryFn: ({ signal }) => fetchJavDetail(props.code, signal) });
-  return <div data-jav-detail="" data-stage-grid="">
+  return <div data-jav-detail="" data-item-detail="" data-stage-grid="">
     {result.data ? <Work key={props.code} {...props} item={result.data} retry={() => { void result.refetch() }} retrying={result.isFetching} /> : <div data-jav-failure="">
       <Close close={props.actions.close} />
       {result.error ? <RetryNote message={errorMessage(result.error)} onRetry={() => { void result.refetch() }} /> : null}
@@ -32,7 +36,11 @@ const Close = ({ close }: { close(): void }) => <button type="button" data-stage
 
 function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps & { item: JavDetail; retry(): void; retrying: boolean }) {
   useEffect(() => { if (item.state === 'ready') void queryClient.invalidateQueries({ queryKey: ['jav-discoveries', 'external'] }) }, [item.code, item.state]);
-  const [preview, setPreview] = useState<number | null>(null);
+  const [preview, setPreview] = useState(-1);
+  const frame = useRef<HTMLDivElement>(null);
+  const inset = useCarouselInset(frame, '[data-jav-picture]', preview);
+  const media = [{ index: -1, label: '封面' }, ...Array.from({ length: item.preview_count }, (_, index) => ({ index, label: `预览 ${index + 1}` })),
+    ...(item.preview_video_url ? [{ index: -2, label: '视频预览', video: true }] : [])];
   const [download, setDownload] = useState<DownloadPrefill | null>(null);
   const [wantId, setWantId] = useState(item.want_id);
   const want = useAction();
@@ -48,30 +56,31 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
     void queryClient.invalidateQueries({ queryKey: ['jav-discoveries'] });
   }) };
   return <>
-    <div data-stage-media="" data-jav-art="">
+    <div ref={frame} data-stage-media="" data-jav-art=""
+      // oxlint-disable-next-line shadcn/no-inline-styles -- 图片黑边的真实宽度决定翻页箭头位置
+      style={{ '--follow-image-arrow-inset': inset === null || preview === -2 ? undefined : `${inset}px` } as CSSProperties}>
       <Close close={actions.close} />
-      <JavPicture item={item} image={preview === null ? 'cover' : String(preview)} />
-      {item.preview_count > 0 ? <div data-jav-pictures="">
-        <Button variant="secondary" aria-pressed={preview === null} onClick={() => setPreview(null)}>封面</Button>
-        <Button variant="secondary" disabled={preview === 0} onClick={() => setPreview(Math.max(0, (preview ?? 1) - 1))}>上一张</Button>
-        <span>{preview === null ? `${item.preview_count} 张预览` : `${preview + 1} / ${item.preview_count}`}</span>
-        <Button variant="secondary" disabled={preview === item.preview_count - 1} onClick={() => setPreview(Math.min(item.preview_count - 1, (preview ?? -1) + 1))}>下一张</Button>
-      </div> : null}
+      {item.preview_video_url ? <button type="button" data-jav-preview-toggle="" aria-pressed={preview === -2}
+        onClick={() => setPreview(preview === -2 ? -1 : -2)}><Glyph name={preview === -2 ? 'image' : 'play'} />{preview === -2 ? '查看图片' : '视频预览'}</button> : null}
+      {preview === -2 && item.preview_video_url ? <PreviewVideo key={item.preview_video_url} src={item.preview_video_url} />
+        : <JavPicture key={preview} item={item} image={preview === -1 ? 'cover' : String(preview)} />}
+      <MediaCarousel items={media} position={Math.max(0, media.findIndex(entry => entry.index === preview))} onSelect={setPreview} />
     </div>
     <aside data-stage-side=""><div data-stage-side-content="" data-jav-info="">
-      <h1 data-stage-title=""><b>{item.code}</b><span>{item.title === item.code ? '' : item.title}</span></h1>
-      <div data-jav-cast="" dangerouslySetInnerHTML={{ __html: feedIdentity({ performer_refs: item.performer_refs, performers: item.performers }) }} />
-      <p>{item.performers}</p>
-      <dl data-jav-facts="">
-        <Fact label="发行日期" value={item.release_date} />
-        <Fact label="时长" value={item.duration ? `${item.duration} 分钟` : undefined} />
-        <Fact label="评分" value={item.score ? String(item.score) : undefined} />
-        <EntityFact label="厂牌" kind="studio" refs={item.studio_refs} navigate={actions.navigate} />
-        <Fact label="发行商" value={item.publisher} />
-        <EntityFact label="系列" kind="series" refs={item.series_refs} navigate={actions.navigate} />
-        <Fact label="导演" value={item.director} />
-      </dl>
-      {item.tags.length ? <div data-jav-tags="">{item.tags.map(tag => <span key={tag}>{tag}</span>)}</div> : null}
+      <JavTitle item={item} />
+      {Number(item.score) > 0 ? <SourceRating score={Number(item.score)} /> : null}
+      <div className="mono" data-stage-meta="">
+        <Spec glyph="calendar" label="发行日期" value={item.release_date} />
+        <Spec glyph="clock" label="时长" value={item.duration ? `${item.duration} 分钟` : undefined} />
+      </div>
+      <JavIdentity item={item} navigate={actions.navigate} />
+      <div data-jav-facts="">
+        <Spec glyph="briefcase" label="发行商" value={item.publisher} />
+        <Spec glyph="clapperboard" label="导演" value={item.director} />
+      </div>
+      {(item.tag_refs?.length ?? item.tags.length) > 0 ? <div data-stage-tags="" data-jav-tags="">{(item.tag_refs || item.tags.map(name => ({ name, category: 'general', source_name: name }))).map(tag =>
+        <span data-detail-tag="" data-tag-cat={tag.category} key={tag.name}><button type="button" data-tag={tag.name}
+          title={tagLabel(tag.name)} onClick={() => actions.openTag(tag.name)}>{tagLabel(tag.name)}</button></span>)}</div> : null}
       {item.summary ? <p data-jav-summary="">{item.summary}</p> : null}
       {item.message ? <Note tone="neutral" action={<Button variant="secondary" {...busyProps(retrying)} onClick={retry}>重试</Button>}>{item.message}</Note> : null}
       <div data-jav-actions="">
@@ -100,10 +109,71 @@ function JavPicture({ item, image }: { item: JavDetail; image: string }) {
   return <div data-jav-picture-wait=""><Note tone="neutral" action={remote ? <Button variant="secondary" {...busyProps(result.isFetching)} onClick={() => { void result.refetch() }}>重试</Button> : undefined}>{result.data?.message || (result.error ? '图片未取得' : '暂无封面')}</Note></div>;
 }
 
-const Fact = ({ label, value }: { label: string; value?: string }) => value ? <><dt>{label}</dt><dd>{value}</dd></> : null;
-const EntityFact = ({ label, kind, refs, navigate }: { label: string; kind: string; refs: JavEntityRef[]; navigate(path: string): void }) => refs.length ? <><dt>{label}</dt><dd>{refs.map(ref => ref.id
-  ? <a key={ref.name} href={entityPath(kind, ref.name)} onClick={event => { if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(entityPath(kind, ref.name)) }}>{ref.name}</a>
-  : <span key={ref.name}>{ref.name}</span>)}</dd></> : null;
+const Glyph = ({ name }: { name: string }) => <span className="contents" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon(name) }} />;
+const Spec = ({ glyph, label, value }: { glyph: string; label: string; value?: string }) => value ? <span data-spec-item="" title={label}><Glyph name={glyph} /><span>{value}</span></span> : null;
+
+function JavTitle({ item }: { item: JavDetail }) {
+  const { text, expanded, foldable, toggle } = useFoldedTitle(item.title);
+  const title = item.title === item.code ? '' : item.title;
+  return <div data-item-title=""><h1 data-stage-title="" data-title-line=""><span ref={text} data-detail-title=""
+    data-expanded={expanded ? '' : undefined} data-foldable={foldable ? '' : undefined}
+    onClick={() => { if (foldable && !String(getSelection() || '')) toggle() }}><b>{item.code}</b>{title ? ` ${title}` : ''}</span></h1>
+    <span data-title-tools=""><button type="button" data-title-fold="" hidden={!foldable} aria-expanded={expanded}
+      aria-label={expanded ? '收起标题' : '展开标题'} title={expanded ? '收起标题' : '展开完整标题'} onClick={toggle}><Glyph name={expanded ? 'chevron-up' : 'chevron-down'} /></button></span>
+  </div>;
+}
+
+function SourceRating({ score }: { score: number }) {
+  return <div data-item-rating="" data-jav-rating="" role="img" aria-label={`JavDB 评分 ${score} / 5`}>
+    <div data-rating-stars="" aria-hidden="true">{[1, 2, 3, 4, 5].map(star => <span key={star} data-rate={star}
+      data-on={String(star <= Math.round(Math.min(5, score)))}><Glyph name="star" /></span>)}</div>
+    <span data-rating-value="">{score.toFixed(1)} / 5</span>
+  </div>;
+}
+
+function JavIdentity({ item, navigate }: { item: JavDetail; navigate(path: string): void }) {
+  const onOpen = (kind: string, name: string) => navigate(entityPath(kind, name));
+  const group = (kind: string, label: string, refs: JavEntityRef[]) => refs.length ? <section data-id-group={kind}>
+    <h5 data-id-label="">{label}</h5><div data-id-row="">{refs.map(person => <IdentityCell key={person.name} kind={kind}
+      person={{ ...person, id: person.id ?? null }} onOpen={onOpen}
+      face={kind === 'performer' && !person.has_image && !person.has_avatar && person.source_avatar && person.source_actor_id
+        ? <SourceAvatar code={item.code} person={person} /> : undefined} />)}</div>
+  </section> : null;
+  return <div data-item-identity=""><div data-identity-primary="">{group('performer', '女优', item.performer_refs)}{group('studio', '厂牌', item.studio_refs)}</div>
+    <IdentitySeries people={item.series_refs.map(person => ({ ...person, id: person.id ?? null }))} onOpen={onOpen} /></div>;
+}
+
+function SourceAvatar({ code, person }: { code: string; person: JavEntityRef }) {
+  const result = useQuery({ queryKey: ['jav-actor-image', code, person.source_actor_id], queryFn: ({ signal }) =>
+    apiGet<{ ok: boolean; image: string }>(`/api/jav/image?code=${encodeURIComponent(code)}&image=${encodeURIComponent('actor:' + person.source_actor_id)}`, signal) });
+  return <span data-id-face=""><span>{firstGrapheme(person.name)}</span>{result.data?.image
+    ? <img src={result.data.image} alt="" data-drop="self" /> : null}</span>;
+}
+
+function PreviewVideo({ src }: { src: string }) {
+  const frame = useRef<HTMLDivElement>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useLayoutEffect(() => {
+    const node = frame.current!;
+    let disposed = false;
+    let player: VjsPlayer | null = null;
+    const video = document.createElement('video');
+    video.className = 'video-js vjs-big-play-centered';
+    video.controls = true;
+    video.setAttribute('playsinline', '');
+    video.setAttribute('aria-label', '视频预览');
+    node.append(video);
+    void ensureVideojs().then(factory => {
+      if (disposed) return;
+      player = factory(video, { controls: true, preload: 'metadata', autoplay: false, language: 'zh-CN', responsive: true });
+      player.on('error', () => { if (!disposed) setFailed(true) });
+      player.src({ src, type: /\.m3u8(?:\?|$)/i.test(src) ? 'application/x-mpegURL' : 'video/mp4' });
+    }).catch(() => { if (!disposed) setFailed(true) });
+    return () => { disposed = true; disposePlayer(player); if (!player) { video.pause(); video.removeAttribute('src'); video.load(); video.remove() } };
+  }, [src, attempt]);
+  return <div ref={frame} data-jav-video="">{failed ? <Note tone="neutral" action={<Button variant="secondary" onClick={() => { setFailed(false); setAttempt(value => value + 1) }}>重试</Button>}>视频预览未取得</Note> : null}</div>;
+}
 
 function Reviews({ code, count }: { code: string; count: number }) {
   const [opened, setOpened] = useState(false);

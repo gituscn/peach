@@ -152,6 +152,7 @@ export async function openJavMovie(code,push=true){
   if(peachHistory.navigation.seq!==seq)return;
   await stage.open({kind:'jav',code,readOnly:!runtimeConfigurable,
     actions:{close:()=>void closeItemDetail(),navigate:path=>navigationState.navigatePath(path),
+      openTag:tag=>{commitContextFilter(filters=>{filters.tag=tag});window.scrollTo({top:0,behavior:'smooth'})},
       receipt:message=>receiptsState.toast({text:message})}});
   scheduleStickySurfaces();
 }

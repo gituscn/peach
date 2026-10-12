@@ -20,6 +20,7 @@ import { RetryNote } from '../components/grid-reveal';
 import { MixGroupLabel, MixQueue, MixQueueRow } from '../components/mix-queue';
 import { RelatedSection } from '../components/related-section';
 import { DetailContinuation } from '../components/detail-continuation';
+import { MediaCarousel, MEDIA_DOTS_MAX, useCarouselInset } from '../components/media-carousel';
 import { FollowAuthorLink, FollowCard } from '../follow-feed/follow-card';
 import {
   FOLLOW_CREDENTIALS_KEY, fetchFollowCredentials, replaceFollowItem, setFollowItemStatus, videoItems,
@@ -42,7 +43,7 @@ import { fetchFollowRelated, followRelatedGroups, followRelatedKey } from './fol
 
 const realDuration = (value: unknown) => Number(value) > 0;
 /** 轮播张数多于它时，圆点条换成「当前 / 总数」：1280 宽下四十来个点就碰到画框边了。 */
-export const FOLLOW_DOTS_MAX = 20;
+export const FOLLOW_DOTS_MAX = MEDIA_DOTS_MAX;
 
 /** 字形原样取壳那一份 `icon()`：骨架与遗留详情画的就是它，换成别的字形接管那一拍会跳。 */
 const Glyph = ({ name }: { name: string }) => (
@@ -171,7 +172,6 @@ function MediaFrame({ item, media, actions, onMedia, issues }: {
 }) {
   const { kind, selected, src, images, position, carousel, frameRatio } = media;
   const frame = useRef<HTMLDivElement>(null);
-  const [inset, setInset] = useState<number | null>(null);
   const slides = detailSlides(item, media);
   /* 原图经代理取，缩略图由浏览器直接读公开主机：归档站的原文件主机会拦下服务端（pawchive 的
      file. 子域挂着 ddos-guard，一律 403），缩略图主机照常给。 */
@@ -180,6 +180,7 @@ function MediaFrame({ item, media, actions, onMedia, issues }: {
   const imageSrc = item.playable && kind === 'image' ? src : item.thumb_url || '';
   const fallback = item.playable && kind === 'image' && thumb && thumb !== src ? thumb : '';
   const [shown, setShown] = useState(imageSrc);
+  const inset = useCarouselInset(frame, '[data-follow-detail-poster]', shown);
 
   /* 播放器只随这一块媒体区挂一次、卸一次：写完状态换的是同一条的新对象，不能因此拆了重挂。
      这一块本身按「条目:媒体」换，换条目或换媒体时整块重建，清理就在那一刻跑。`<video>` 由舞台
@@ -193,28 +194,6 @@ function MediaFrame({ item, media, actions, onMedia, issues }: {
     return actions.mountPlayer(node, mounting.current.item, mounting.current.selected, { onError: () => failed.current() });
   }, [actions, playable]);
 
-  /* object-fit:contain 之后图片左右的黑边随图片比例和窗口变。箭头落在黑边的视觉中心，不永远
-     贴着容器边缘；黑边太窄时才退回固定的安全内边距。 */
-  useLayoutEffect(() => {
-    const box = frame.current;
-    const image = box?.querySelector<HTMLImageElement>('[data-follow-detail-poster]');
-    const arrow = box?.querySelector<HTMLElement>('[data-follow-image-step]');
-    if (!box || !image || !arrow) return;
-    const align = () => {
-      if (!image.naturalWidth || !image.naturalHeight) return;
-      const rect = box.getBoundingClientRect();
-      const rendered = Math.min(rect.width, rect.height * (image.naturalWidth / image.naturalHeight));
-      const gutter = Math.max(0, (rect.width - rendered) / 2);
-      const safe = matchMedia('(max-width:640px)').matches ? 10 : 16;
-      setInset(Math.round(gutter >= arrow.offsetWidth + safe * 2 ? (gutter - arrow.offsetWidth) / 2 : safe));
-    };
-    const observer = new ResizeObserver(align);
-    observer.observe(box);
-    image.addEventListener('load', align);
-    return () => { observer.disconnect(); image.removeEventListener('load', align) };
-  }, [shown]);
-
-  const step = (delta: number) => onMedia(images[(position + delta + images.length) % images.length]!.index);
   return (
     <div ref={frame} data-stage-media="" data-follow-detail-media={kind || 'none'} data-framed={frameRatio ? '' : undefined}
       // oxlint-disable-next-line shadcn/no-inline-styles -- 画框比例与箭头内距是按这一组图的尺寸和当前视口算出来的
@@ -234,28 +213,7 @@ function MediaFrame({ item, media, actions, onMedia, issues }: {
           <span>没有可用预览</span>
         </div>
       )}
-      {carousel ? (
-        <>
-          <button type="button" data-follow-image-step="-1" data-follow-image-arrow="prev" aria-label="上一张图片" title="上一张"
-            onClick={() => step(-1)} dangerouslySetInnerHTML={{ __html: icon('chevron-left') }} />
-          <button type="button" data-follow-image-step="1" data-follow-image-arrow="next" aria-label="下一张图片" title="下一张"
-            onClick={() => step(1)} dangerouslySetInnerHTML={{ __html: icon('chevron-right') }} />
-          {images.length > FOLLOW_DOTS_MAX ? (
-            <span data-follow-image-count="" aria-live="polite" aria-label={`第 ${position + 1} 张，共 ${images.length} 张`}>
-              {`${(position + 1).toLocaleString()} / ${images.length.toLocaleString()}`}
-            </span>
-          ) : (
-            <div data-follow-image-dots="" role="group" aria-label={`${images.length} 张图片`}>
-              {images.map((image, index) => (
-                <button type="button" key={image.index} data-follow-image-item={image.index}
-                  aria-current={index === position ? 'true' : 'false'}
-                  aria-label={`第 ${index + 1} 张，共 ${images.length} 张`} title={`第 ${index + 1} 张`}
-                  onClick={() => onMedia(image.index)} />
-              ))}
-            </div>
-          )}
-        </>
-      ) : null}
+      {carousel ? <MediaCarousel items={images} position={position} onSelect={onMedia} /> : null}
     </div>
   );
 }

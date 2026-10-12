@@ -207,9 +207,9 @@
   stroke-linejoin: round;
 }
 .peach-react [data-item-detail] [data-rate][data-on="true"] svg { fill: currentColor; }
-.peach-react [data-item-detail] [data-rating-stars]:hover [data-rate] svg { fill: none; }
-.peach-react [data-item-detail] [data-rating-stars]:hover [data-rate]:hover svg,
-.peach-react [data-item-detail] [data-rating-stars]:hover [data-rate]:has(~ [data-rate]:hover) svg { fill: currentColor; }
+.peach-react [data-item-detail] [data-rating-stars]:hover button[data-rate] svg { fill: none; }
+.peach-react [data-item-detail] [data-rating-stars]:hover button[data-rate]:hover svg,
+.peach-react [data-item-detail] [data-rating-stars]:hover button[data-rate]:has(~ [data-rate]:hover) svg { fill: currentColor; }
 .peach-react [data-item-detail] [data-rate]:focus-visible { outline: 2px solid var(--tungsten); outline-offset: 2px; }
 .peach-react [data-item-detail] [data-rating-value] { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 

@@ -9,9 +9,9 @@
  * 把服务端回的那几个字段换进 `['item', id]`，目录网格缓存里的同一张卡一起换，不重读列表。 */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { esc, firstGrapheme, fmtDur, fmtSize, icon, leadingGraphemes, requestErrorMessage } from '@peach/legacy/core';
+import { fmtDur, fmtSize, icon, requestErrorMessage } from '@peach/legacy/core';
 import {
-  coverUrl, entityFaceImg, logoUrl, mixLabel, performerLabel, queueAvatarHtml, queueThumbHtml,
+  coverUrl, mixLabel, performerLabel, queueAvatarHtml, queueThumbHtml,
 } from '@peach/card-art';
 import { confirmModal, dismissMenu, presentMenu, spinnerHtml } from '@peach/legacy/ui';
 
@@ -25,6 +25,8 @@ import { RetryNote } from '../components/grid-reveal';
 import { MixQueue, MixQueueRow } from '../components/mix-queue';
 import { RelatedSection } from '../components/related-section';
 import { DetailContinuation } from '../components/detail-continuation';
+import { IdentityCell, IdentitySeries } from '../components/identity-cell';
+import { useFoldedTitle } from '../components/folded-title';
 import { CoverCrop } from '../cover-crop/cover-crop-page';
 import { queryClient } from '../query';
 import {
@@ -381,19 +383,7 @@ function DetailTitle({ item, queue, helpers, actions, onStatus }: {
   item: DetailItem; queue: DetailQueue | null; helpers: ItemDetailHelpers; actions: ItemDetailActions;
   onStatus(text: string): void;
 }) {
-  const text = useRef<HTMLSpanElement>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [foldable, setFoldable] = useState(false);
-  useLayoutEffect(() => {
-    const node = text.current;
-    if (!node) return;
-    const measure = () => { if (!node.hasAttribute('data-expanded')) setFoldable(node.scrollHeight > node.clientHeight + 1) };
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    measure();
-    return () => observer.disconnect();
-  }, []);
-  const toggle = () => setExpanded((open) => !open);
+  const { text, expanded, foldable, toggle } = useFoldedTitle(String(item.title || item.name || ''));
   const html = helpers.badgeHtml(item.location || '', item.cost || '', 'srcbig') + helpers.titleHtml(item) + partLabelHtml(item, queue);
   return (
     <div data-item-title="">
@@ -483,21 +473,8 @@ function Identity({ item, actions }: { item: DetailItem; helpers: ItemDetailHelp
   const overflow = Math.max(0, groups.cast.length - CAST_SHOWN);
   const cell = (kind: string, ref: DetailEntityRef, index: number) => {
     const hide = kind === 'performer' && index >= CAST_SHOWN && !castOpen;
-    const face = kind === 'performer' || kind === 'creator'
-      ? <span data-id-face="" dangerouslySetInnerHTML={{ __html: `<span>${esc(firstGrapheme(ref.name))}</span>`
-        + entityFaceImg({ kind, id: ref.id, hasImage: ref.has_image, version: ref.image_version, focus: ref.avatar_focus,
-          rep: ref.has_avatar ? ref.rep : null, standIn: ref.avatar_stand_in }) }} />
-      : <span data-id-face="">{kind === 'studio'
-        ? <><span>{leadingGraphemes(ref.name, 2)}</span>{ref.has_logo
-          ? <img src={logoUrl(ref.name, 'icon', ref.logo_version)} alt="" loading="lazy" data-drop="self" /> : null}</>
-        : <span>{firstGrapheme(ref.name)}</span>}</span>;
-    const content = <>{face}<span data-id-name="">{ref.name}</span></>;
-    const overflowAttrs = kind === 'performer' && index >= CAST_SHOWN ? { 'data-castoverflow': '' } : {};
-    if (!ref.id) return <span key={`${kind}:${ref.name}`} data-id-cell={kind} title={ref.name} hidden={hide} {...overflowAttrs}>{content}</span>;
-    return (
-      <button key={`${kind}:${ref.name}`} type="button" data-id-cell={kind} data-entity-kind={kind} data-entity-name={ref.name}
-        title={ref.name} hidden={hide} {...overflowAttrs} onClick={() => actions.openEntity(kind, ref.name)}>{content}</button>
-    );
+    return <IdentityCell key={`${kind}:${ref.name}`} kind={kind} person={ref} onOpen={actions.openEntity}
+      hidden={hide} overflow={kind === 'performer' && index >= CAST_SHOWN} />;
   };
   const group = (label: string, kind: string, list: DetailEntityRef[], extra: ReactNode = null) => (list.length ? (
     <section key={`${kind}:${label}`} data-id-group={kind}>
@@ -527,19 +504,7 @@ function Identity({ item, actions }: { item: DetailItem; helpers: ItemDetailHelp
   return (
     <div data-item-identity="">
       {primary.length ? <div data-identity-primary="">{primary}</div> : null}
-      {groups.series.length ? (
-        <section data-id-group="series">
-          <h5 data-id-label="">系列</h5>
-          <div data-series-rows="">
-            {groups.series.map((ref) => (ref.id ? (
-              <button key={ref.name} type="button" data-series-link="" data-entity-kind="series" data-entity-name={ref.name}
-                title={ref.name} onClick={() => actions.openEntity('series', ref.name)}><Glyph name="tags" /><span>{ref.name}</span></button>
-            ) : (
-              <span key={ref.name} data-series-link="" title={ref.name}><Glyph name="tags" /><span>{ref.name}</span></span>
-            )))}
-          </div>
-        </section>
-      ) : null}
+      <IdentitySeries people={groups.series} onOpen={actions.openEntity} />
     </div>
   );
 }
