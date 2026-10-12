@@ -89,6 +89,14 @@ it('更多资源默认折叠且协议有独立标记', async () => {
   expect(more.open).toBe(true);
 });
 
+it('待找清单查询多个来源，不采用快速添加的单来源持久缓存', async () => {
+  rememberResources('DEMO-001', { state: 'ready', items: [{ ...candidate, source: 'manko.fun' }], error: '', checked_at: null });
+  const { host, fetcher } = await open([candidate, { ...candidate, id: 'alternate', source: 'sukebei' }]);
+  expect(fetcher).toHaveBeenCalled();
+  expect(host.textContent).toContain('JavDB');
+  expect(host.textContent).toContain('sukebei');
+});
+
 it('ED2K 类型使用文字，字节容量按馆藏口径展示', async () => {
   const { host } = await open([{ ...candidate, protocol: 'ed2k', size: '27,311,519,717 B' }]);
   expect(host.textContent).toContain('ED2K');
@@ -141,7 +149,7 @@ it('资源缓存只接受可展示的字段和完整查询结果', () => {
 it('页面与查询客户端重建后复用持久缓存，手动查询强制更新来源', async () => {
   vi.stubGlobal('IntersectionObserver', undefined);
   const want = { id: 1, code: 'DEMO-001', release_date: '2020-01-01' } as Want;
-  rememberResources(want.code!, { state: 'ready', items: [candidate], error: '', checked_at: null });
+  rememberResources(`all-sources:${want.code!}`, { state: 'ready', items: [candidate], error: '', checked_at: null });
   const fetcher = vi.fn(async (_url: string) => ({ ok: true, status: 200, json: async () =>
     ({ state: 'ready', items: [candidate], error: '', checked_at: null }) }));
   vi.stubGlobal('fetch', fetcher);
@@ -158,7 +166,7 @@ it('页面与查询客户端重建后复用持久缓存，手动查询强制更�
   await click(buttonNamed('重新查询', second.host));
   await settle();
   expect(fetcher.mock.calls[0]?.[0]).toBe('/api/wants/magnets?id=1&refresh=1');
-  expect(cachedResources(want.code!, want.release_date)?.result.items).toHaveLength(1);
+  expect(cachedResources(`all-sources:${want.code!}`, want.release_date)?.result.items).toHaveLength(1);
 });
 
 it('过期的内存缓存随卡片进入视口重新查询', async () => {

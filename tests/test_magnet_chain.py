@@ -25,6 +25,39 @@ def item(info_hash, **fields):
 
 
 class MagnetChainTests(unittest.TestCase):
+    def test_wishlist_preserves_comment_links_and_more_than_eight_source_versions(self):
+        from peach.wants_magnets import fetch
+        links = [dict(id=f'magnet:{index:040x}', protocol='magnet', info_hash=f'{index:040x}',
+                      uri=f'magnet:?xt=urn:btih:{index:040x}', name='ABC-123', size='2 GB', files='',
+                      date='', attributes=[], source='JavDB', source_url='https://example.test/work', origins=['JavDB'])
+                 for index in range(10)]
+        links.append({**links[0], 'id': 'ed2k:example', 'protocol': 'ed2k', 'info_hash': '',
+                      'uri': 'ed2k://|file|ABC-123|1234|' + 'a' * 32 + '|/', 'source': 'JavDB 评论'})
+        direct = _normalise({'uri': item(HASH_A)['uri'], 'size': '8 GiB'}, CHAIN[0], 'ABC-123')
+        with patch('peach.magnet_chain.search', return_value={'items': [direct], 'linked_resources': links}):
+            shown = fetch(Path('.'), 'ABC-123')['items']
+        self.assertEqual(len(shown), 12)
+        self.assertEqual(shown[-1]['protocol'], 'ed2k')
+        self.assertEqual(shown[0]['source'], 'manko.fun')
+
+    def test_direct_add_stops_at_preferred_hd_but_wishlist_collects_other_sources(self):
+        from peach.magnet_chain import Fetcher, search
+        from peach.wants_magnets import fetch
+        preferred = item(HASH_A, source='manko.fun', origins=['manko.fun'], resolution=1080)
+        alternate = item(HASH_B, source='JavDB', origins=['JavDB'], resolution=2160)
+        with patch.object(Fetcher, '__init__', return_value=None), patch.object(Fetcher, 'close'), \
+                patch.object(Fetcher, 'manko', side_effect=lambda _: [dict(preferred)]), \
+                patch.object(Fetcher, 'javdb', side_effect=lambda _: [dict(alternate)]) as javdb, \
+                patch.object(Fetcher, 'sukebei', return_value=[]) as sukebei:
+            self.assertEqual(len(search(Path('.'), 'ABC-123')['items']), 1)
+            javdb.assert_not_called()
+            sukebei.assert_not_called()
+            found = fetch(Path('.'), 'ABC-123')['items']
+            self.assertEqual({row['source'] for row in found}, {'manko.fun', 'JavDB'})
+            self.assertEqual(found[0]['resolution'], 2160)
+            javdb.assert_called_once()
+            sukebei.assert_called_once()
+
     def test_wishlist_candidates_have_display_and_download_fields(self):
         from peach.wants_magnets import fetch
         candidate = _normalise({'uri': item(HASH_A)['uri'], 'size': '2 GiB',

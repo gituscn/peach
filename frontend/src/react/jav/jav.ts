@@ -19,10 +19,10 @@ export const fetchDiscoveries = (scope: DiscoveryScope, signal: AbortSignal) =>
   apiGet<DiscoveryResult>(`/api/jav/discoveries?scope=${scope}&limit=100`, signal);
 
 export function discoveryArtwork(item: Discovery, layout: 'big' | 'small', javImage: unknown): string {
-  const local = javArtwork(item, layout, false, javImage);
+  const local = javArtwork({ ...item, is_jav: true }, layout, false, javImage);
   if (local.html || !item.cover_url) return local.html;
   return coverImage(item, layout).replace(/ src="[^"]*"/,
-    ` src="${esc(item.cover_url)}" referrerpolicy="no-referrer"${layout === 'big' ? ' data-panel-prior="1"' : ''}`);
+    ` src="${esc(item.cover_url)}" referrerpolicy="no-referrer" data-jav-image="${item.id}" data-jav-cover="${esc(item.cover_url)}" data-jav-thumb="" data-jav-image-layout="${layout}"${layout === 'big' ? ' data-panel-prior="1"' : ''}`);
 }
 
 export async function prefetchJav(tab: string, signal: AbortSignal) {

@@ -8,15 +8,17 @@ export interface JavDetail {
   studio?: string; director: string; publisher: string;
   performers: string; performer_refs: JavEntityRef[]; studio_refs: JavEntityRef[]; series_refs: JavEntityRef[];
   tags: string[]; has_cover: boolean; cover_version?: string; cover_url?: string;
+  tag_refs?: { name: string; category: string; source_name: string }[];
+  preview_video_url?: string;
   source_image: boolean; preview_count: number; comments_count: number;
   source_url: string; wanted: boolean; want_id: number | null;
 }
-export interface JavEntityRef extends FaceRef { name: string }
+export interface JavEntityRef extends FaceRef { name: string; has_logo?: boolean; source_actor_id?: string; source_avatar?: boolean }
 export interface JavReview { id: string; username: string; content: string; score?: number; created_at: string }
 export interface JavReviews { ok: boolean; items: JavReview[]; page: number; more: boolean; message?: string }
 export interface JavDetailProps {
   code: string; readOnly: boolean;
-  actions: { close(): void; navigate(path: string): void; receipt(message: string): void };
+  actions: { close(): void; navigate(path: string): void; openTag(tag: string): void; receipt(message: string): void };
 }
 export const javDetailKey = (code: string) => ['jav-detail', code] as const;
 export const fetchJavDetail = (code: string, signal?: AbortSignal) =>

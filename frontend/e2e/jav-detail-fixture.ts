@@ -3,13 +3,18 @@ import type { Page } from 'playwright-core';
 export const JAV_DETAIL = {
   ok: true, code: 'EXM-001', title: '示例作品资料与长标题，完整详情保持可读', state: 'ready',
   release_date: '2026-10-30', duration: 120, score: 4.2, summary: '', director: '', publisher: '示例发行商',
-  performers: '示例人物', performer_refs: [{ id: null, name: '示例人物', has_image: false }],
-  studio_refs: [{ id: null, name: '示例厂牌' }], series_refs: [{ id: null, name: '示例系列' }],
-  tags: ['示例标签'], has_cover: false, source_image: true, preview_count: 2, comments_count: 12,
+  performers: '示例人物、第二位人物', performer_refs: [{ id: null, name: '示例人物', has_image: false },
+    { id: null, name: '第二位人物', has_image: false, source_actor_id: 'ExampleActor', source_avatar: true }],
+  studio_refs: [{ id: null, name: '示例厂牌', has_logo: true }], series_refs: [{ id: null, name: '示例系列' }],
+  tags: ['荡妇'], tag_refs: [{ name: '痴女', category: 'role', source_name: '荡妇' }],
+  has_cover: false, source_image: true, preview_count: 11, comments_count: 12,
   source_url: 'https://javdb.com/v/example', wanted: false, want_id: null,
 };
 export async function mockJavDetail(page: Page) {
-  await page.route(/\/api\/jav\/detail\?/, route => route.fulfill({ json: JAV_DETAIL }));
+  await page.route(/\/api\/jav\/detail\?/, route => route.fulfill({ json: { ...JAV_DETAIL,
+    preview_video_url: `/stream?id=${process.env.PEACH_E2E_ITEM}` } }));
+  await page.route(/\/logo\?/, route => route.fulfill({ contentType: 'image/svg+xml', body:
+    '<svg xmlns="http://www.w3.org/2000/svg" width="46" height="46"><rect width="46" height="46" fill="#ccc"/></svg>' }));
   await page.route(/\/api\/jav\/image\?/, route => route.fulfill({ json: { ok: true,
     image: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600"><rect width="900" height="600" fill="#777"/></svg>') } }));
   await page.route(/\/api\/jav\/reviews\?/, route => {

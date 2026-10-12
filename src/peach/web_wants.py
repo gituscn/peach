@@ -193,7 +193,7 @@ def _ids(body) -> list[int]:
 
 
 def q_want_magnets(contract, args) -> dict:
-    """只读磁链查询；未发售、已入库与没有番号的条目不请求来源。"""
+    """只读资源查询；未发售、已入库与没有番号的条目不请求来源。"""
     from .wants_magnets import search_for
 
     raw = str(args.get("id") or "")

@@ -1,5 +1,16 @@
 import { expect, it } from 'vitest';
-import { javLibraryPath, javPath, javTab } from '../../src/react/jav/jav';
+import { discoveryArtwork, javLibraryPath, javPath, javTab, type Discovery } from '../../src/react/jav/jav';
+
+it('发现封面优先本机缓存，远程封面保留原地大小图取景身份', () => {
+  const item = { id: 1, code: 'ABC-001', has_cover: true, cover_url: 'https://example.test/cover.jpg' } as Discovery;
+  const local = document.createElement('div');
+  local.innerHTML = discoveryArtwork(item, 'big', 'cover');
+  expect(local.querySelector('img')?.getAttribute('src')).toContain('/cover?code=ABC-001');
+  local.innerHTML = discoveryArtwork({ ...item, has_cover: false }, 'small', 'cover');
+  expect(local.querySelector('img')?.getAttribute('src')).toBe(item.cover_url);
+  expect(local.querySelector('img')?.dataset.javImageLayout).toBe('small');
+  expect(local.querySelector('img')?.dataset.javCover).toBe(item.cover_url);
+});
 it('JAV 分区从深链恢复，未知分区落在馆藏', () => {
   expect(javTab('discover')).toBe('discover'); expect(javTab('wants')).toBe('wants'); expect(javTab('other')).toBe('library');
 });

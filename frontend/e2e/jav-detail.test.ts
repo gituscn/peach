@@ -30,9 +30,56 @@ describe('库外 JAV 作品详情', () => {
         assert.ok(await page.locator('#stage').evaluate(el => (el as HTMLDialogElement).open));
         assert.equal(await card.count(), 1, '原列表留在详情底下');
         await page.getByRole('img', { name: 'EXM-001 封面', exact: true }).waitFor({ state: 'visible' });
-        await page.getByRole('button', { name: '下一张', exact: true }).click();
+        const shared = await page.locator('[data-jav-info]').evaluate(el => {
+          const faces = [...el.querySelectorAll('[data-identity-primary] [data-id-face]')].map(face => {
+            const box = face.getBoundingClientRect(); return { width: box.width, height: box.height, y: box.y };
+          });
+          const stars = [...el.querySelectorAll('[data-jav-rating] svg')];
+          const code = el.querySelector('[data-detail-title] b')!.getBoundingClientRect();
+          const range = document.createRange();
+          const text = el.querySelector('[data-detail-title]')!.lastChild!;
+          range.setStart(text, 1); range.setEnd(text, 2);
+          return { faces, stars: stars.length, filled: stars.filter(star => getComputedStyle(star).fill !== 'none').length,
+            icons: el.querySelectorAll('[data-stage-meta] [data-spec-item] svg').length,
+            codeY: code.y, titleY: range.getBoundingClientRect().y,
+            tag: el.querySelector('[data-jav-tags] [data-tag]')?.textContent,
+            tagCat: el.querySelector('[data-jav-tags] [data-tag-cat]')?.getAttribute('data-tag-cat') };
+        });
+        assert.equal(shared.faces.length, 3, '两位女优与厂牌各有独立身份格');
+        assert.ok(shared.faces.every(face => face.width === 46 && face.height === 46));
+        assert.ok(shared.faces.every(face => Math.abs(face.y - shared.faces[0]!.y) < 1));
+        assert.equal(shared.stars, 5);
+        assert.equal(shared.filled, 4);
+        await page.locator('[data-jav-rating] [data-rate="1"]').hover();
+        assert.equal(await page.locator('[data-jav-rating]').evaluate(el => [...el.querySelectorAll('svg')].filter(star => getComputedStyle(star).fill !== 'none').length), 4, '来源评分悬停保持原分数');
+        assert.equal(shared.icons, 2);
+        assert.ok(Math.abs(shared.codeY - shared.titleY) < 2, '番号与标题在同一行开始');
+        assert.equal(shared.tag, '痴女'); assert.equal(shared.tagCat, 'role');
+        await page.locator('[data-id-group="performer"] [data-id-face] img').waitFor({ state: 'visible' });
+        assert.equal(await page.locator('[data-follow-image-dots] button').count(), 13);
+        const dots = await page.locator('[data-follow-image-dots]').evaluate(el => {
+          const box = el.getBoundingClientRect();
+          return [...el.children].every(child => { const rect = child.getBoundingClientRect(); return rect.left >= box.left && rect.right <= box.right });
+        });
+        assert.ok(dots, '每个媒体入口都在圆点条内');
+        assert.equal(await page.locator('[data-carousel-video]').evaluate(el => el.getBoundingClientRect().width), 20);
+        if (viewport.mobile) {
+          await page.setViewportSize({ width: 350, height: viewport.height });
+          await page.locator('[data-follow-image-count]').waitFor({ state: 'visible' });
+          assert.equal(await page.locator('[data-follow-image-count]').textContent(), '1 / 13');
+          await page.setViewportSize({ width: viewport.width, height: viewport.height });
+          await page.locator('[data-follow-image-dots]').waitFor({ state: 'visible' });
+        }
+        await page.getByRole('button', { name: '下一项媒体', exact: true }).click();
         await page.getByRole('img', { name: 'EXM-001 预览 1', exact: true }).waitFor({ state: 'visible' });
-        await page.getByRole('button', { name: '封面', exact: true }).click();
+        await page.getByRole('button', { name: '上一项媒体', exact: true }).click();
+        await page.getByRole('button', { name: '视频预览', exact: true }).first().click();
+        await page.waitForFunction(() => { const video = document.querySelector<HTMLVideoElement>('[data-jav-video] video'); return video && video.readyState >= 1 && Number.isFinite(video.duration) && video.duration > 0 });
+        assert.ok(await page.locator('[data-jav-video] video').evaluate(video => (video as HTMLVideoElement).paused), '预览等待用户播放');
+        await page.locator('[data-jav-video] video').evaluate(async node => { const video = node as HTMLVideoElement; video.muted = true; await video.play() });
+        await page.waitForFunction(() => (document.querySelector<HTMLVideoElement>('[data-jav-video] video')?.currentTime || 0) > 0);
+        await page.getByRole('button', { name: '查看图片', exact: true }).click();
+        assert.equal(await page.locator('[data-jav-video] video').count(), 0, '切回图片卸下预览播放器');
         await page.getByRole('button', { name: '查看评论', exact: true }).click();
         await page.waitForFunction(() => document.querySelectorAll('[data-jav-review]').length === 10);
         assert.equal(await page.locator('[data-jav-review] img').count(), 0, '评论正文按文本呈现');

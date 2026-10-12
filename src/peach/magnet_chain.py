@@ -1,4 +1,4 @@
-"""按优先级查磁力：manko.fun 命中高清版本后短路，其余来源逐级兜底。
+"""按入口查磁力：直接添加优先命中，待找清单汇集多个来源。
 
 这一层只返回候选，不提交下载。站点解析与排序分开：来源顺序回答「先问谁」，
 ``rank_candidates`` 回答同一来源的多个版本选哪个。文件多不构成拒绝；只有明显预告、
@@ -164,6 +164,7 @@ def rank_candidates(items: list[dict], goal: str = "quality") -> list[dict]:
 class Fetcher:
     def __init__(self, root: Path, *, transport=None, deadline: float | None = None):
         self.root = Path(root)
+        self.resource_result = {}
         self.deadline = deadline or time.monotonic() + 45
         self._owned = transport is None
         self.transport = transport or HostLimitedTransport(
@@ -219,6 +220,7 @@ class Fetcher:
     def javdb(self, code: str) -> list[dict]:
         source = CHAIN[1]
         result = JavDBSource().resources(code, session=self.session)
+        self.resource_result = result
         return rank_candidates([candidate for item in result.get("items", ())
                                 if (candidate := _normalise({**item, "source_url": result.get("source_url")},
                                                             source, code))])
@@ -264,8 +266,8 @@ class Fetcher:
 
 
 def search(root: Path, code: str, *, transport=None, min_size: int = 0,
-           max_size: int = 1024 ** 4, goal: str = "quality") -> dict:
-    """依次查前三个可直连来源；manko 命中 1080p 后停止。其余来源由索引器层续接。"""
+           max_size: int = 1024 ** 4, goal: str = "quality", stop_on_preferred: bool = True) -> dict:
+    """有界查询三个可直连来源；直接添加允许在 manko 高清命中时结束。"""
     fetcher = Fetcher(root, transport=transport)
     trace, warnings, found = [], [], []
     try:
@@ -281,15 +283,20 @@ def search(root: Path, code: str, *, transport=None, min_size: int = 0,
                 warnings.append(f"{source.label}：未取得")
             items = [item for item in items if min_size <= item["size"] <= max_size]
             found.extend(items)
-            if source.key == "manko" and any(item["resolution"] >= HIGH_QUALITY for item in items):
+            if stop_on_preferred and source.key == "manko" and any(item["resolution"] >= HIGH_QUALITY for item in items):
                 trace.append(f"{source.label}：取得 1080p/2160p，已短路")
                 break
             trace.append(f"{source.label}：取得 {len(items)} 条" if items else f"{source.label}：无结果")
     finally:
         fetcher.close()
     incomplete = bool(warnings) and not found
-    return {"items": rank_candidates(found, goal), "warnings": warnings, "trace": trace,
+    result = {"items": rank_candidates(found, goal), "warnings": warnings, "trace": trace,
             'state': 'error' if incomplete else 'ready',
             'error': '部分来源未取得，请稍后重试或检查来源连接。' if incomplete else '',
             "next_sources": [source.label for source in CHAIN[3:]],
             "reference_only": list(REFERENCE_ONLY)}
+    if not stop_on_preferred:
+        linked = getattr(fetcher, 'resource_result', {})
+        result.update(linked_resources=linked.get('items', []), source_url=linked.get('source_url', ''))
+        result['warnings'].extend(linked.get('warnings') or [])
+    return result
