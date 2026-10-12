@@ -41,7 +41,8 @@ export function EntityPage(props: EntityPageProps) {
   /* 名字对不上任何一位时 `/api/entity` 回 `{error}`：整块换成壳里那一屏空态，骨架不留着闪。空态是
      遗留层的标记，不放进 React 子树的样式范围。 */
   const missing = !!entity.data?.error;
-  const redirect = entity.data?.redirect;
+  const canonical = entity.data?.canonical_name;
+  const redirect = entity.data?.redirect ?? (canonical && canonical !== name ? { kind, name: canonical } : undefined);
   const { actions } = props;
   useLayoutEffect(() => { if (missing) actions.missing() }, [actions, missing]);
   /* 换到规范资料页排到微任务里：壳换页会重排页头与选中态，那一路可能走到批量条的 `flushSync`，

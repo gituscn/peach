@@ -455,6 +455,8 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.16.10，版�
 
 ## 厂牌名称身份
 
+实体资料页的旧名与大小写变体按账本规范名统一地址：服务端复用 `RedirectResponse` 与 `resolve_entity`，站内复用实体控制器的 replace 导航；查询与片段保留，歧义或未知身份不重定向。规范名沿用账本，不新增独立 slug。
+
 作品列表、分页与筛选统计复用 `entities.resolve_entity` 将名称解析为实体 ID，再用 `web_entity.scope_predicate` 获取关系范围；五类资料实体共用此入口，厂牌覆盖旗下各级 label，事务所覆盖成员作品。未取得唯一身份时返回空集合。
 
 `entities.studio_name_key` 与 `studio_identity_ids` 供入库、元数据落地、名称解析和 `merge_studio_name_variants.py` 共用：NFKC、符号写法及唯一登记别名映射到规范身份。官方标题确认的 [ATTACKERS](https://attackers.net/)、[PREMIUM](https://premium-beauty.com/) 日英并写名和 [kawaii*](https://kawaiikawaii.jp/) 星号写法纳入精确映射。名称冲突保留来源原文；括号两侧须各自唯一指向同一实体；`AVOP` 跨厂牌共用，不作为合并证据。复用项目实体合并、字段归属、SQLite 备份和复核 CSV，无新增依赖。

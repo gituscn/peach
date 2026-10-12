@@ -13,7 +13,7 @@ export interface EntityControllerPorts {
   live(kind: string, name: string): boolean;
   current(): boolean;
   route(path: string, replace?: boolean): void;
-  search(): string;
+  suffix(): string;
   restoreHomeContext(): void;
   releaseBodyPreviews(): void;
   push(patch: Partial<EntityOpeningProps>): void;
@@ -78,7 +78,7 @@ export function createEntityController(ports: EntityControllerPorts, helpers: En
       setJavLayout: value => { ports.setJavLayout(value); ports.push({ javLayout: ports.javLayout() }) },
       setPhotoLayout: value => { ports.setPhotoLayout(value); ports.syncPhotoWalls() },
       openEntity: (target, to, replace = false) => {
-        if (replace) ports.route(entityPath(target, to) + ports.search(), true);
+        if (replace) ports.route(entityPath(target, to) + ports.suffix(), true);
         else ports.openEntity(target, to);
       },
       painted: (view, wall) => {
