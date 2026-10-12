@@ -346,6 +346,8 @@ class WebContract:
         self.link_check.stop()
         self.feed_job.stop()
         self.want_job.stop()
+        if hasattr(self, "jav_discovery_metadata"):
+            self.jav_discovery_metadata.stop()
         self.followups.stop()
 
     def cache_bust(self):

@@ -6,6 +6,9 @@ import re
 from . import entities, feeds, web_catalog, web_feeds, web_settings, wants
 from .related import rank_related
 from .taste_history import build_taste_dashboard
+from .genre_decisions import load_genre_decisions
+from .jav_discovery_metadata import discovery_metadata, source_number
+from .web_jav_detail import _source_fields
 
 DIMENSIONS = {
     "performer": ("peach_performers", "browser_creators"),
@@ -13,7 +16,7 @@ DIMENSIONS = {
     "studio": ("peach_studios",),
     "series": ("peach_series",),
 }
-LABELS = {"performer": "常看的女优", "tag": "偏好的标签", "studio": "常看的厂牌", "series": "常看的系列"}
+LABELS = {"performer": "常看的出演者", "tag": "偏好的标签", "studio": "常看的厂牌", "series": "常看的系列"}
 
 
 def _identity(connection, kind, name):
@@ -41,9 +44,14 @@ def _profile(connection, rankings):
     return {"id": 0, "entities": features}, names
 
 
-def _cached_movie(code):
+def _cached_movie(code, contract):
     from .javdb_public import PUBLIC_API
-    return PUBLIC_API.peek_movie(code) or {}
+    metadata = discovery_metadata(contract)
+    stored, _ = metadata.peek(code)
+    memory = PUBLIC_API.peek_movie(code)
+    if memory and not stored:
+        metadata.remember(code, memory)
+    return stored or memory or {}
 
 
 def _external(connection, contract):
@@ -52,16 +60,24 @@ def _external(connection, contract):
         "SELECT d.* FROM feed_discovery d WHERE d.ignored_at IS NULL AND "
         + " AND ".join(web_feeds.LISTED) + " ORDER BY d.id")]
     identities = {}
+    decisions = load_genre_decisions(connection)
     for row in rows:
-        detail = _cached_movie(row["code"])
-        tags = [tag["name"] for tag in detail.get("tags", ()) if tag.get("name")]
+        detail = _cached_movie(row["code"], contract)
+        projection = _source_fields(detail, decisions)
+        tags = [tag["name"] for tag in projection["tag_refs"]]
+        row["source_tags"] = projection["tags"]
+        row["tag_refs"] = projection["tag_refs"]
+        row["source_score"] = source_number(detail.get("score"))
+        _, metadata_fields = discovery_metadata(contract).peek(row["code"])
+        row.update(metadata_fields)
         series = detail.get("series_name") or ""
         if detail.get("maker_name"):
             row["studio"] = detail["maker_name"]
         actors = [actor["name"] for actor in detail.get("actors", ()) if actor.get("name")]
         if actors:
             row["performers"] = "、".join(actors)
-        row["duration"] = float(detail["duration"]) * 60 if detail.get("duration") else None
+        minutes = source_number(detail.get("duration"))
+        row["duration"] = minutes * 60 if minutes else None
         features = {}
         for kind, values in (("performer", re.split(r"[,，、;/]", row["performers"] or "")),
                              ("studio", [row["studio"] or ""]), ("tag", tags), ("series", [series])):
@@ -92,14 +108,16 @@ def _library(connection):
         " OR COALESCE(a.max_reached,0)<a.duration*0.5) ORDER BY a.id")]
     by_id = {row["id"]: row for row in rows}
     for row in rows:
-        row.update({"entities": {}, "tags": [], "asset_id": row["id"], "cover_url": "", "link": ""})
+        row.update({"entities": {}, "tags": [], "asset_id": row["id"], "cover_url": "", "link": "",
+                    "source_score": None, "metadata_state": "ready", "metadata_fields": {}})
     for offset in range(0, len(rows), 800):
         ids = [row["id"] for row in rows[offset:offset + 800]]
         marks = ",".join("?" * len(ids))
         for aid, identity, kind, name in connection.execute(
             "SELECT ae.asset_id,e.id,e.kind,e.canonical_name FROM asset_entity ae"
             " JOIN entity e ON e.id=ae.entity_id WHERE ae.asset_id IN (" + marks + ")"
-            " AND e.kind IN ('performer','tag','studio','series') ORDER BY e.canonical_name", ids):
+            " AND e.kind IN ('performer','tag','studio','series') AND (e.kind<>'tag' OR "
+            + web_catalog.tag_not_hidden("ae.asset_id", "e.normalized_name") + ") ORDER BY e.canonical_name", ids):
             row = by_id[aid]
             row["entities"].setdefault(kind, set()).add(identity)
             if kind == "tag" and web_catalog.tag_cat(name) in (
@@ -112,8 +130,40 @@ def _library(connection):
     return rows
 
 
+def _metadata_response(contract, args, candidates, picked, limit, scope):
+    if scope != "external":
+        return {}
+    cursor = max(0, min(int(args.get("metadata_cursor") or 0), len(candidates)))
+    cohort = picked if picked and not cursor else sorted(candidates, key=lambda row: row["id"])[cursor:cursor + limit]
+    metadata = discovery_metadata(contract)
+    if args.get("metadata_cancel") == "1":
+        job = metadata.cancel(args.get("metadata_job_id"))
+    else:
+        job = metadata.ensure([row["code"] for row in cohort], refresh=args.get("metadata_refresh") == "1",
+                              job_id=args.get("metadata_job_id"))
+    if not job:
+        return {}
+    public_job = {key: value for key, value in job.items() if key not in ("codes", "error")}
+    public_job["message"] = _metadata_message(job)
+    public_job["error"] = public_job["message"] if job["status"] == "failed" else ""
+    response = {"metadata_job": public_job,
+                "metadata_coverage": sum(row["metadata_state"] in ("ready", "partial", "stale") for row in picked),
+                "metadata_next_cursor": cursor + limit if not picked and cursor + limit < len(candidates) else None}
+    if job["status"] == "running":
+        response["poll_after_ms"] = 3000
+    return response
+
+
+def _metadata_message(job):
+    messages = {"running": "正在读取作品资料", "complete": "作品资料读取完成", "failed": "作品资料未取得"}
+    reasons = {"request_budget": "本轮请求预算已用完", "byte_budget": "本轮流量预算已用完",
+               "time_budget": "本轮时间预算已用完", "source_cooldown": "来源暂时不可用，已停止读取",
+               "cancelled": "已停止读取作品资料"}
+    return reasons.get(job.get("stop_reason"), messages.get(job["status"], "作品资料未取得"))
+
+
 def q_jav_discoveries(contract, args):
-    """发行时间只用于展示；选片依据已有身份、标签、厂牌和系列。"""
+    """口味采用 IDF/MMR；资料补齐只处理一次请求确定的有限集合。"""
     scope = "library" if args.get("scope") == "library" else "external"
     limit = max(1, min(int(args.get("limit") or 60), 100))
     with contract.read_connection() as connection:
@@ -128,7 +178,10 @@ def q_jav_discoveries(contract, args):
         # 已知候选按匹配维度排序后再限定计算量，不以发行时间裁掉旧作。
         candidates.sort(key=lambda row: (-sum(len(profile["entities"][kind] & row["entities"].get(kind, set()))
                                                    for kind in DIMENSIONS), row["id"]))
-        picked = rank_related(profile, candidates[:4000], limit, seed=f"jav:{scope}")
+        bounded = candidates[:4000]
+        sort = args.get("sort") if args.get("sort") in ("taste", "release_date", "source_score", "duration", "code") else "taste"
+        picked = rank_related(profile, bounded, limit, seed=f"jav:{scope}",
+                              order_by=None if sort == "taste" else sort, descending=args.get("direction") != "asc")
         wanted = wants.wanted_keys(connection, (web_catalog.normalise_code_key(row["code"]) for row in picked))
         refs = web_feeds._discovery_performers(connection, contract, picked) if scope == "external" else {}
         for row in picked:
@@ -136,9 +189,14 @@ def q_jav_discoveries(contract, args):
                 profile["entities"][kind] & row["entities"].get(kind, set())))
                 for kind in DIMENSIONS if profile["entities"][kind] & row["entities"].get(kind, set())]
             row["score"] = row.pop("related_score")
+            row["taste_score"] = row["score"]
             row["wanted"] = web_catalog.normalise_code_key(row["code"]) in wanted
             row.pop("why", None)
             row.pop("entities", None)
+        if sort == "taste" and args.get("direction") == "asc":
+            picked.reverse()
+        for rank, row in enumerate(picked, 1):
+            row["rank"] = rank
     if scope == "library":
         web_catalog.attach_card_performers(contract, picked)
         for row in picked:
@@ -153,5 +211,9 @@ def q_jav_discoveries(contract, args):
             row["cover_frame"] = contract.cover_frame(row["code"])
             row["cover_version"] = contract.cover_version(row["code"])
             row["poster_box"] = contract.poster_box(row["code"])
-    return {"scope": scope, "items": picked, "candidate_total": len(candidates),
-            "limited": len(candidates) > 4000, "source": "library" if scope == "library" else "known-works"}
+    response = {"scope": scope, "items": picked, "candidate_total": len(candidates), "sort": sort,
+                "ranking_method": "mmr" if sort == "taste" else "field-sort",
+                "direction": "asc" if args.get("direction") == "asc" else "desc",
+                "limited": len(candidates) > 4000, "source": "library" if scope == "library" else "known-works"}
+    response.update(_metadata_response(contract, args, bounded, picked, limit, scope))
+    return response

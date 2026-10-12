@@ -12,12 +12,12 @@
 .peach-react [data-jav-rating] [data-rate] { cursor: default; }
 .peach-react [data-jav-rating] [data-rate][data-on="true"] svg { fill: currentColor; }
 .peach-react [data-jav-video] { width: 100%; position: relative; }
-.peach-react [data-jav-video] > [class~="video-js"] { width: 100%; aspect-ratio: 16 / 9; }
+.peach-react [data-jav-video] > [class~="video-js"] { width: 100%; height: auto; max-height: 76vh; aspect-ratio: 16 / 9; }
 .peach-react [data-jav-video] > [role="note"] { margin: 16px; }
 .peach-react [data-jav-preview-toggle] { position: absolute; z-index: 5; top: 16px; left: 16px; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 0; border-radius: var(--pill-radius); background: rgba(0, 0, 0, .6); color: #fff; font-size: var(--fs-xs); cursor: pointer; }
 .peach-react [data-jav-preview-toggle]:hover { background: rgba(0, 0, 0, .78); }
 .peach-react [data-jav-preview-toggle] svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
-.peach-react [data-jav-art]:has([data-jav-video]) [data-follow-image-dots], .peach-react [data-jav-art]:has([data-jav-video]) [data-follow-image-count] { bottom: 58px; }
+.peach-react [data-jav-art]:has([data-jav-video]) [data-follow-image-dots], .peach-react [data-jav-art]:has([data-jav-video]) [data-follow-image-count] { bottom: 84px; }
 .peach-react [data-jav-reviews], .peach-react [data-jav-resources] { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
 .peach-react [data-jav-reviews] h2, .peach-react [data-jav-resources] h2 { font-size: var(--fs-md); font-weight: 600; }
 .peach-react [data-jav-review] { padding-top: 12px; border-top: 1px solid var(--line-soft); font-size: var(--fs-sm); }

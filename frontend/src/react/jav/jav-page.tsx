@@ -8,7 +8,6 @@ import { coverUrl } from '@peach/card-art';
 import { relayoutCovers } from '../../card-art/framing';
 import { wireHorizontalScroller } from '../../ui-kit/scroll';
 import { feedIdentity } from '../../card-art/feed-identity';
-import { JAV_RELEASE_SORT } from '../../sort-preferences';
 import { javContentSkeleton, JAV_RECOMMENDATION_GRID } from '../../jav-skeleton';
 import { errorMessage } from '../../api';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
@@ -23,6 +22,8 @@ import { spriteGlyph } from '../components/sprite-glyph';
 import { FilterGlassRows, FilterPill, GlassPill } from '../components/filter-glass';
 import { ArtSlot } from '../components/art-slot';
 import { Segments, SortKeys } from '../entity-filter/entity-filter-page';
+import { TaskProgress } from '../components/task-progress';
+import { DISCOVERY_SORTS, discoveryScore, type DiscoverySort } from './discovery-sorts';
 
 const SearchGlyph = spriteGlyph('search');
 
@@ -51,7 +52,7 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
 }) {
   const [scope, setScope] = useState<DiscoveryScope>('external');
   const [tag, setTag] = useState('');
-  const [sort, setSort] = useState('taste');
+  const [sort, setSort] = useState<DiscoverySort>('taste');
   const [ascending, setAscending] = useState(false);
   const section = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -63,14 +64,36 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
   useSyncExternalStore(settings.subscribe, settings.version, settings.version);
   const layout = javLayout();
   const ratio = cardRatio(gridLayout({ active: true, home: false, portrait: false }));
-  const discoveries = useQuery({ queryKey: discoveryKey(scope), queryFn: ({ signal }) => fetchDiscoveries(scope, signal) });
+  const metadataJobs = useRef<Partial<Record<DiscoveryScope, string>>>({});
+  const refreshMetadata = useRef(false);
+  const cancelMetadata = useRef(false);
+  const direction = ascending ? 'asc' : 'desc';
+  const discoveries = useQuery({ queryKey: discoveryKey(scope, sort, direction), retry: false, refetchOnWindowFocus: false,
+    queryFn: ({ signal }) => {
+      const refresh = refreshMetadata.current;
+      const cancel = cancelMetadata.current;
+      refreshMetadata.current = false;
+      cancelMetadata.current = false;
+      return fetchDiscoveries(scope, signal, { sort, direction, jobId: refresh ? undefined : metadataJobs.current[scope], refreshMetadata: refresh, cancelMetadata: cancel });
+    },
+    refetchInterval: current => current.state.data?.metadata_job?.status === 'running'
+      ? Math.max(1000, current.state.data.poll_after_ms || 3000) : false,
+  });
+  const metadata = discoveries.data?.metadata_job;
+  useEffect(() => { if (metadata?.job_id) metadataJobs.current[scope] = metadata.job_id }, [scope, metadata?.job_id]);
   const action = useAction();
+  const metadataAction = useAction();
+  const updateMetadata = (key: 'stop' | 'update' | 'retry') => {
+    void metadataAction.run(key, async () => {
+      cancelMetadata.current = key === 'stop';
+      refreshMetadata.current = key !== 'stop';
+      return discoveries.refetch({ cancelRefetch: true, throwOnError: true });
+    }, () => {});
+  };
   const all = discoveries.data?.items || [];
   const tags = [...new Set(all.flatMap(item => item.tags || []))];
   const items = all.filter(item => (!tag || item.tags?.includes(tag)) &&
     (!query || [item.code, item.title, item.performers, item.studio, ...(item.tags || []), ...(item.performer_refs || []).map(ref => ref.name)].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase())));
-  if (sort === 'release') items.sort((a, b) => (a.release_date || '').localeCompare(b.release_date || '') * (ascending ? 1 : -1));
-  else if (ascending) items.reverse();
   const waiting = discoveries.isPending;
   return <section ref={section} aria-label="为你推荐" aria-busy={waiting} className="flex min-w-0 flex-col gap-4">
     <FilterGlassRows label="发现筛选与排序" topLabel="发现范围与标签" attrs={{ 'data-filter-frame': '', 'data-jav-filter': '', 'data-catalog-frame': '' }}
@@ -88,13 +111,23 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         {query || tag ? <GlassPill onPress={() => { setTag(''); clearText() }}>清除筛选</GlassPill> : null}
         <span data-entity-sorts="">
         <Segments label="JAV 卡片版式" value={layout} options={JAV_LAYOUTS} onChange={storeJavLayout} />
-        <SortKeys sorts={[{ key: 'taste', label: '口味', pressed: sort === 'taste', dir: ascending ? 'asc' : 'desc', ariaLabel: '按口味匹配排序' },
-          { key: 'release', label: JAV_RELEASE_SORT[1], pressed: sort === 'release', dir: ascending ? 'asc' : 'desc', ariaLabel: '按发行日期排序' }]} onSort={key => {
-          if (key === sort) setAscending(!ascending); else { setSort(key); setAscending(false) }
+        <SortKeys sorts={DISCOVERY_SORTS.map(([key, label, ariaLabel]) => ({ key, label, ariaLabel,
+          pressed: key === sort, dir: direction }))} onSort={key => {
+          if (key === sort) setAscending(!ascending); else { setSort(key as DiscoverySort); setAscending(key === 'code') }
         }} /></span>
       </>} />
     {waiting ? <div role="status" aria-label="正在读取推荐" dangerouslySetInnerHTML={{ __html: javContentSkeleton('discover', layout) }} /> : null}
     {discoveries.error ? <Note tone="error" title="推荐未取得">{errorMessage(discoveries.error)}</Note> : null}
+    {scope === 'external' ? <div data-jav-metadata="" className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+      {metadata?.status === 'running' ? <div className="min-w-0 flex-1"><TaskProgress embedded
+        label={`正在读取作品资料 · ${metadata.completed} / ${metadata.total} 部`} value={metadata.completed} total={metadata.total} /></div> : null}
+      <Button variant="secondary" size="small" disabled={waiting} {...busyProps(metadataAction.busy === (metadata?.status === 'running' ? 'stop' : 'update'))}
+        onClick={() => updateMetadata(metadata?.status === 'running' ? 'stop' : 'update')}>{metadata?.status === 'running' ? '停止读取' : '更新资料'}</Button>
+    </div> : null}
+    {metadata && metadata.status !== 'running' && (metadata.status !== 'complete' || metadata.failed > 0)
+      ? <Note tone="neutral" action={<Button variant="secondary" {...busyProps(metadataAction.busy === 'retry')}
+        onClick={() => updateMetadata('retry')}>重新读取资料</Button>}>{metadata.message || `作品资料 ${metadata.completed} / ${metadata.total} 部`}</Note> : null}
+    {metadataAction.error ? <Note tone="error">{metadataAction.error}</Note> : null}
     {!waiting && !discoveries.error && !items.length ? <EmptyState shell="plain" icon={RiCompassLine} title={query || tag ? '没有符合条件的推荐' : '暂无匹配口味的作品'}
       actions={<ButtonLink href="/taste" variant="secondary">查看口味</ButtonLink>}>
       {query || tag ? '清除筛选后查看其他作品。' : scope === 'library' ? '观看或标记作品后，可以探索少看的馆藏。' : '可以查找番号，或更新关注来源。'}
@@ -119,6 +152,11 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         </div>
         <div data-jav-tags="" data-media-tags="">{(item.tags || []).slice(0, 4).map(name =>
           <button type="button" data-media-tag="" key={name} aria-pressed={tag === name} onClick={() => setTag(tag === name ? '' : name)}>{name}</button>)}</div>
+        <p data-jav-taste-score="" className="min-h-5 text-body-2-regular text-text-secondary">
+          口味 {discoveryScore(item.taste_score ?? item.score)}
+          {discoveries.data?.ranking_method === 'mmr' && item.ranking_score != null ? ` · 排序 ${discoveryScore(item.ranking_score)}` : ''}
+          {item.source_score != null ? ` · 评分 ${item.source_score.toFixed(1)} / 5` : ''}
+        </p>
         <p className="truncate text-body-2-regular text-text-secondary" title={item.reasons?.join(' · ')}>{item.reasons?.join(' · ')}</p>
         <div data-jav-actions="" className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => resource({ ...item, cover: item.has_cover ? coverUrl(item, true) : item.cover_url, origin: `${item.asset_id ? 'asset' : 'feed'}:${item.id}` })}>查找资源</Button>

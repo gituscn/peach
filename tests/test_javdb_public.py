@@ -10,6 +10,7 @@ from PIL import Image
 
 from peach.http import HttpResponse
 from peach.javdb_public import PublicAPI, PublicSourceUnavailable, decode_image, preview_video_url
+from peach.javdb_public import PublicBudgetExceeded, PublicRequestBudget, actor_gender
 from peach.web_jav_detail import q_jav_detail, q_jav_image, q_jav_reviews, q_jav_resources
 from peach.web_state import WebContract
 from peach.web_router import dispatch_api_get
@@ -17,6 +18,22 @@ from support.ledger import fresh_ledger
 
 
 class PublicProtocolTests(unittest.TestCase):
+    def test_gender_uses_only_explicit_supported_source_values(self):
+        for value, expected in ((0, "female"), (1, "male"), (None, "unknown"),
+                                (False, "unknown"), (2, "unknown"), ("male", "male"), ("0", "unknown")):
+            self.assertEqual(actor_gender({"gender": value}), expected)
+        self.assertEqual(actor_gender({"name": "示例姓名"}), "unknown")
+
+    def test_request_budget_stops_before_exceeding_transport_count(self):
+        api = self.api()
+        budget = PublicRequestBudget(max_requests=2)
+        with api.request_budget(budget):
+            with self.assertRaises(PublicBudgetExceeded):
+                api.movie("EXM-001")
+        self.assertEqual(len(self.requests), 2)
+        self.assertEqual(budget.requests, 2)
+        self.assertEqual(budget.stop_reason, "request_budget")
+
     def api(self, *, wrong_code=False, blocked=False):
         self.requests = []
 
@@ -164,6 +181,14 @@ class DetailProjectionTests(unittest.TestCase):
         self.assertEqual(result['source_url'], 'https://javdb.com/v/Exact')
         with self.contract.database.read_connection() as connection:
             self.assertEqual(connection.execute('SELECT COUNT(*) FROM feed_discovery').fetchone()[0], before)
+
+    def test_performer_refs_distinguish_female_male_and_unknown(self):
+        movie = {"id": "Exact", "number": "EXM-001", "actors": [
+            {"name": "甲", "gender": 0}, {"name": "乙", "gender": 1}, {"name": "丙"}]}
+        with patch("peach.web_jav_detail.PUBLIC_API.movie", return_value=movie):
+            rows = q_jav_detail(self.contract, {"code": "EXM-001"})["performer_refs"]
+        self.assertEqual([row["gender"] for row in rows], ["female", "male", "unknown"])
+
 
     def test_source_failure_keeps_usable_detail_and_reviews_failure_is_explicit(self):
         with patch('peach.web_jav_detail.PUBLIC_API.movie', side_effect=PublicSourceUnavailable('资料未取得')):

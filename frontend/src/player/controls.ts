@@ -509,10 +509,10 @@ interface TimelineSheets { frames: number; interval: number; columns?: number; r
  *  采集任务铺好了时间轴接触印相就按它走：每 10 或 30 秒一帧，指到哪一秒看到的就是那一秒。
  *  取不到退回九宫格那九格——那是全片九等分，两小时的片子格与格之间隔着十几分钟，指的位置和
  *  看到的画面对不上，但比没有画面强。关注条目没有本地图，只报时间。 */
-export function mountPlayerSeekPreview(player: VjsPlayer, item: PlayerItem, options: { thumbnail?: boolean } = {}): void {
+export function mountPlayerSeekPreview(player: VjsPlayer, item: PlayerItem | null, options: { thumbnail?: boolean } = {}): void {
   const progress = player.getChild('controlBar')?.el()?.querySelector<HTMLElement>('.vjs-progress-control');
   if (!progress || progress.querySelector('[data-player-seek-preview]')) return;
-  const hasThumbnail = options.thumbnail !== false;
+  const hasThumbnail = !!item && options.thumbnail !== false;
   const preview = document.createElement('div');
   preview.className = 'vjs-peach-seek-preview'; preview.dataset.playerSeekPreview = ''; preview.hidden = true;
   preview.innerHTML = `${hasThumbnail ? '<i class="vjs-peach-seek-frame" hidden><img alt=""></i>' : ''}<span class="mono">0:00</span>`;
@@ -520,11 +520,12 @@ export function mountPlayerSeekPreview(player: VjsPlayer, item: PlayerItem, opti
   const frame = preview.querySelector<HTMLElement>('.vjs-peach-seek-frame');
   const image = preview.querySelector('img'), label = preview.querySelector('span')!;
   let sheets: TimelineSheets | null = null, shown = '';
-  if (frame && item.id) {
+  if (frame && item?.id) {
     (api(`/api/timeline?id=${encodeURIComponent(item.id)}`) as Promise<TimelineSheets | null>)
       .then((meta) => { if (meta && meta.frames > 0 && meta.interval > 0) sheets = meta }).catch(() => {});
   }
   const showSheetFrame = (seconds: number, sheet: TimelineSheets, box: HTMLElement, img: HTMLImageElement) => {
+    if (!item) return;
     const columns = sheet.columns || 10, per = columns * (sheet.rows || 10);
     const index = Math.min(sheet.frames - 1, Math.max(0, Math.floor(seconds / sheet.interval)));
     const page = Math.floor(index / per), slot = index % per;
@@ -542,14 +543,14 @@ export function mountPlayerSeekPreview(player: VjsPlayer, item: PlayerItem, opti
   let cell = -1;
   const move = (event: PointerEvent) => {
     if (event.pointerType === 'touch') return;
-    const duration = realDuration(player.duration()) || realDuration(item.duration);
+    const duration = realDuration(player.duration()) || realDuration(item?.duration);
     if (!duration) return;
     const rect = progress.getBoundingClientRect();
     const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
     const width = frame ? Math.min(240, Math.max(160, rect.width * .28)) : 76;
     const x = Math.min(rect.width - width / 2, Math.max(width / 2, event.clientX - rect.left));
     preview.style.left = `${x}px`; preview.hidden = false; label.textContent = fmtClock(duration * ratio);
-    if (!frame || !image) return;
+    if (!frame || !image || !item) return;
     if (sheets) { showSheetFrame(duration * ratio, sheets, frame, image); return }
     const nextCell = Math.min(8, Math.floor(ratio * 9));
     if (nextCell === cell) return;

@@ -4,7 +4,7 @@ import { RiExternalLinkLine } from '@remixicon/react';
 import { entityPath, firstGrapheme, icon } from '@peach/legacy/core';
 import { tagLabel } from '@peach/legacy/tags';
 import { coverUrl } from '@peach/card-art';
-import { ensureVideojs, disposePlayer, type VjsPlayer } from '../../player';
+import { mountPreviewPlayer } from '../../player';
 import { apiGet, errorMessage } from '../../api';
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
@@ -133,13 +133,17 @@ function SourceRating({ score }: { score: number }) {
 
 function JavIdentity({ item, navigate }: { item: JavDetail; navigate(path: string): void }) {
   const onOpen = (kind: string, name: string) => navigate(entityPath(kind, name));
-  const group = (kind: string, label: string, refs: JavEntityRef[]) => refs.length ? <section data-id-group={kind}>
+  const group = (kind: string, label: string, refs: JavEntityRef[], gender?: string) => refs.length ? <section data-id-group={kind} data-id-gender={gender}>
     <h5 data-id-label="">{label}</h5><div data-id-row="">{refs.map(person => <IdentityCell key={person.name} kind={kind}
       person={{ ...person, id: person.id ?? null }} onOpen={onOpen}
       face={kind === 'performer' && !person.has_image && !person.has_avatar && person.source_avatar && person.source_actor_id
         ? <SourceAvatar code={item.code} person={person} /> : undefined} />)}</div>
   </section> : null;
-  return <div data-item-identity=""><div data-identity-primary="">{group('performer', '女优', item.performer_refs)}{group('studio', '厂牌', item.studio_refs)}</div>
+  return <div data-item-identity=""><div data-identity-primary="">
+    {group('performer', '女优', item.performer_refs.filter(person => person.gender === 'female'), 'female')}
+    {group('performer', '男优', item.performer_refs.filter(person => person.gender === 'male'), 'male')}
+    {group('performer', '出演者', item.performer_refs.filter(person => !person.gender || person.gender === 'unknown'), 'unknown')}
+    {group('studio', '厂牌', item.studio_refs)}</div>
     <IdentitySeries people={item.series_refs.map(person => ({ ...person, id: person.id ?? null }))} onOpen={onOpen} /></div>;
 }
 
@@ -156,21 +160,13 @@ function PreviewVideo({ src }: { src: string }) {
   const [attempt, setAttempt] = useState(0);
   useLayoutEffect(() => {
     const node = frame.current!;
-    let disposed = false;
-    let player: VjsPlayer | null = null;
     const video = document.createElement('video');
     video.className = 'video-js vjs-big-play-centered';
     video.controls = true;
     video.setAttribute('playsinline', '');
     video.setAttribute('aria-label', '视频预览');
     node.append(video);
-    void ensureVideojs().then(factory => {
-      if (disposed) return;
-      player = factory(video, { controls: true, preload: 'metadata', autoplay: false, language: 'zh-CN', responsive: true });
-      player.on('error', () => { if (!disposed) setFailed(true) });
-      player.src({ src, type: /\.m3u8(?:\?|$)/i.test(src) ? 'application/x-mpegURL' : 'video/mp4' });
-    }).catch(() => { if (!disposed) setFailed(true) });
-    return () => { disposed = true; disposePlayer(player); if (!player) { video.pause(); video.removeAttribute('src'); video.load(); video.remove() } };
+    return mountPreviewPlayer(video, { src, type: /\.m3u8(?:\?|$)/i.test(src) ? 'application/x-mpegURL' : 'video/mp4' }, () => setFailed(true));
   }, [src, attempt]);
   return <div ref={frame} data-jav-video="">{failed ? <Note tone="neutral" action={<Button variant="secondary" onClick={() => { setFailed(false); setAttempt(value => value + 1) }}>重试</Button>}>视频预览未取得</Note> : null}</div>;
 }

@@ -55,11 +55,11 @@ describe('JAV 推荐与加载结构', () => {
       });
       assert.deepEqual(avatarShape, { width: '38px', height: '38px', radius: '50%' });
       assert.deepEqual(await page.locator('[data-jav-skeleton-actions]').first().locator('.skeleton').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).height)), ['36px', '36px', '36px']);
-      assert.deepEqual(await page.locator('[data-jav-skeleton-card]').first().locator('[data-jav-skeleton-text]').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).height)), ['20px', '20px', '20px', '20px']);
+      assert.deepEqual(await page.locator('[data-jav-skeleton-card]').first().locator('[data-jav-skeleton-text]').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).height)), ['20px', '20px', '20px', '20px', '20px']);
       assert.equal(await page.locator('[data-jav-skeleton-cover]').first().evaluate(node => getComputedStyle(node).borderRadius),
         await page.locator('#main').evaluate(node => getComputedStyle(node).getPropertyValue('--surface-radius').trim()));
       assert.equal(await page.locator('[data-jav-filter] [data-entity-sep]').count(), 1);
-      assert.equal(await page.locator('[data-jav-filter] [data-entity-sort]').count(), 2);
+      assert.equal(await page.locator('[data-jav-filter] [data-entity-sort]').count(), 5);
       assert.equal(await page.locator('[data-jav-filter]').getByText('正在读取', { exact: true }).count(), 0);
       await page.screenshot({ path: `../build/jav-discover-pending-${viewport.name}.png` });
       release();

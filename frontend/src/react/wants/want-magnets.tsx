@@ -16,6 +16,7 @@ import { Disclosure } from '../settings/section';
 import { cachedResources, rememberResources, resourceLifetime } from './resource-cache';
 import { PROVIDER_ICONS } from '../components/source-label';
 import { resourceNotice, resourceSize } from './resource-display';
+import './want-magnets.css';
 
 export interface MagnetCandidate {
   id: string; protocol: 'magnet' | 'ed2k' | 'url'; info_hash: string; uri: string;
@@ -119,13 +120,13 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
         const rows = query.data.items.map((candidate) => {
           const added = submitted.includes(candidate.id) || downloads?.tasks.some((task) => candidate.protocol === 'magnet' &&
             task.info_hash === candidate.info_hash && (task.cancellable || task.state === 'ingested'));
-          return <li key={candidate.id} data-resource-protocol={candidate.protocol} className="flex min-w-0 items-center justify-between gap-3 max-sm:flex-col max-sm:items-start">
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
+          return <li key={candidate.id} data-resource-protocol={candidate.protocol}>
+            <div data-resource-main="" className="flex min-w-0 flex-col gap-1">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Chip variant="caption" color={candidate.protocol === 'magnet' ? 'blue' : candidate.protocol === 'ed2k' ? 'purple' : 'neutral'}>
                   {candidate.protocol === 'magnet' ? '磁链' : candidate.protocol === 'ed2k' ? 'ED2K' : '网页链接'}
                 </Chip>
-                <p className="min-w-0 break-all text-body-2-medium text-text-primary">{candidate.name}</p>
+                <p data-resource-title="" className="min-w-0 flex-1 text-body-2-medium text-text-primary">{candidate.name}</p>
               </div>
               <div className="flex flex-wrap gap-x-3 gap-y-1 break-words text-caption-1-regular text-text-secondary">
                 <ResourceFact icon={RiLink}>{candidate.source}</ResourceFact>
@@ -135,7 +136,7 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
                 {candidate.attributes.map((value) => <ResourceFact key={value} icon={RiPriceTag3Line}>{value}</ResourceFact>)}
               </div>
             </div>
-            <div className="flex shrink-0 flex-wrap gap-2">
+            <div data-resource-actions="" className="flex flex-wrap gap-2">
               <ButtonLink data-button-link="" variant="secondary" size="small" trailingIcon={RiExternalLinkLine} href={candidate.source_url} target="_blank" rel="noopener noreferrer">链接来源</ButtonLink>
               <Button variant="secondary" size="small" leadingIcon={RiFileCopyLine} {...busyProps(action.busy === `copy:${candidate.id}`)}
                 onClick={() => copy(candidate)}>复制链接</Button>
