@@ -165,7 +165,7 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
           onClick={() => selectImage(image === -2 ? media[0]!.index : -2)}><Glyph name={image === -2 ? 'image' : 'play'} />{image === -2 ? '查看图片' : '播放正片'}</button>
         {image !== -2 ? <CatalogPicture key={image} item={item} image={image} /> : null}
         <MediaCarousel items={media} position={Math.max(0, media.findIndex(entry => entry.index === image))} onSelect={selectImage}
-          below={image === -2} renderPreview={entry => <CatalogPicture item={item} image={entry.index === -2 ? media[0]!.index : entry.index} thumbnail />} />
+            below renderThumbnail={entry => <CatalogPicture item={item} image={entry.index === -2 ? media[0]!.index : entry.index} thumbnail />} />
       </> : null}
       {gate === 'offline' ? <OfflineGate item={item} badge={badge} helpers={helpers} actions={actions} />
         : gate === 'online' ? (

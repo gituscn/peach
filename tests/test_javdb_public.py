@@ -211,6 +211,19 @@ class DetailProjectionTests(unittest.TestCase):
         self.assertIsNone(reference['id'])
         self.assertEqual(reference['name'], 'Idea Pocket')
 
+    def test_combined_source_studio_writings_use_the_existing_identity_and_logo(self):
+        with self.contract.database.write_transaction() as connection:
+            connection.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at) VALUES (7,'studio','Prestige','prestige','2026-10-12','2026-10-12')")
+            connection.execute("INSERT INTO entity_alias(entity_id,alias,normalized_alias,source) VALUES (7,'プレステージ','プレステージ','test')")
+        with patch('peach.web_jav_detail.PUBLIC_API.movie', return_value={'id': 'Exact', 'maker_name': 'PRESTIGE,プレステージ'}), \
+                patch.object(self.contract, 'has_logo', side_effect=lambda name: name == 'Prestige') as logo:
+            reference = q_jav_detail(self.contract, {'code': 'EXM-001'})['studio_refs'][0]
+        self.assertEqual((reference['id'], reference['name'], reference['has_logo']), (7, 'Prestige', True))
+        logo.assert_called_once_with('Prestige')
+        with self.contract.database.read_connection() as connection:
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM entity').fetchone()[0], 1)
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM entity_alias').fetchone()[0], 1)
+
 
     def test_source_failure_keeps_usable_detail_and_reviews_failure_is_explicit(self):
         with patch('peach.web_jav_detail.PUBLIC_API.movie', side_effect=PublicSourceUnavailable('资料未取得')):

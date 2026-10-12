@@ -6,7 +6,7 @@ import { tagLabel } from '@peach/legacy/tags';
 import { coverUrl } from '@peach/card-art';
 import { mountPreviewPlayer } from '../../player';
 import { apiGet, errorMessage } from '../../api';
-import { Button, ButtonLink } from '@/components/base/buttons/button';
+import { Button } from '@/components/base/buttons/button';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
 import { Note } from '../components/note';
 import { RetryNote } from '../components/grid-reveal';
@@ -66,7 +66,7 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
       {preview === -2 && item.preview_video_url ? <PreviewVideo key={item.preview_video_url} src={item.preview_video_url} />
         : <JavPicture key={preview} item={item} image={preview === -1 ? 'cover' : String(preview)} />}
       <MediaCarousel items={media} position={Math.max(0, media.findIndex(entry => entry.index === preview))} onSelect={setPreview}
-        below={preview === -2} renderPreview={entry => <JavPicture item={item} image={entry.index < 0 ? 'cover' : String(entry.index)} thumbnail />} />
+        below renderThumbnail={entry => <JavPicture item={item} image={entry.index < 0 ? 'cover' : String(entry.index)} thumbnail />} />
     </div>
     <aside data-stage-side=""><div data-stage-side-content="" data-jav-info="">
       <JavTitle item={item} />
@@ -89,7 +89,8 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
         <Button variant="secondary" disabled={readOnly} aria-pressed={!!wantId} {...busyProps(!!want.busy)} onClick={toggleWant}>{wantId ? '取消想要' : '想要'}</Button>
         <Button variant="primary" onClick={() => setDownload({ code: item.code, title: item.title, performers: item.performers,
           studio: item.studio, release_date: item.release_date, origin: `jav:${item.code}` })}>查找资源</Button>
-        {item.source_url ? <ButtonLink href={item.source_url} target="_blank" rel="noreferrer" variant="secondary" trailingIcon={RiExternalLinkLine}>作品来源</ButtonLink> : null}
+        {item.source_url ? <Button variant="secondary" trailingIcon={RiExternalLinkLine}
+          onClick={() => window.open(item.source_url, '_blank', 'noopener,noreferrer')}>作品来源</Button> : null}
       </div>
       {want.error ? <Note tone="error">{want.error}</Note> : null}
       <Reviews code={item.code} count={item.comments_count} />
@@ -126,10 +127,15 @@ function JavTitle({ item }: { item: JavDetail }) {
   </div>;
 }
 
-function SourceRating({ score }: { score: number }) {
-  return <div data-item-rating="" data-jav-rating="" role="img" aria-label={`JavDB 评分 ${score} / 5`}>
-    <div data-rating-stars="" aria-hidden="true">{[1, 2, 3, 4, 5].map(star => <span key={star} data-rate={star}
-      data-on={String(star <= Math.round(Math.min(5, score)))}><Glyph name="star" /></span>)}</div>
+function SourceRating({ score, review = false }: { score: number; review?: boolean }) {
+  const value = Math.max(0, Math.min(5, score));
+  return <div data-item-rating="" data-jav-rating="" data-review-rating={review ? '' : undefined} role="img" aria-label={`${review ? '评论' : 'JavDB'}评分 ${score} / 5`}>
+    <div data-rating-stars="" aria-hidden="true">{[1, 2, 3, 4, 5].map(star => {
+      const fraction = Math.max(0, Math.min(1, value - star + 1));
+      return <span key={star} data-rate={star} data-on={String(fraction === 1)}><Glyph name="star" />
+        {/* oxlint-disable-next-line shadcn/no-inline-styles -- 星星填充宽度表示实际评分的小数比例 */}
+        <span data-rating-fill="" style={{ width: `${fraction * 100}%` }}><Glyph name="star" /></span></span>;
+    })}</div>
     <span data-rating-value="">{score.toFixed(1)} / 5</span>
   </div>;
 }
@@ -187,7 +193,9 @@ function Reviews({ code, count }: { code: string; count: number }) {
       onOpenChange={setOpened}>
     {opened || result.data ? <>
       {result.isPending ? <div data-skeleton="reviews" role="status" aria-label="正在读取评论"><span className="inline-block h-8 w-full skeleton-sheen" /></div> : null}
-      {items.map(item => <article key={item.id} data-jav-review=""><p><b>{item.username}</b><span>{item.score ? `${item.score} 分` : ''}</span><time>{item.created_at}</time></p><p>{item.content}</p></article>)}
+      {items.map(item => <article key={item.id} data-jav-review=""><div data-jav-review-meta=""><b>{item.username}</b>
+        {Number(item.score) > 0 ? <SourceRating score={Number(item.score)} review /> : null}
+        <time dateTime={item.created_at} title={item.created_at}>{item.created_at.slice(0, 10)}</time></div><p>{item.content}</p></article>)}
       {failure ? <Note tone="neutral" action={<Button variant="secondary" onClick={() => { void result.refetch() }}>重试</Button>}>{failure}</Note>
         : !result.isPending && !items.length ? <Note tone="neutral">暂无评论</Note> : null}
       {result.hasNextPage ? <Button variant="secondary" {...busyProps(result.isFetchingNextPage)} onClick={() => { if (!result.isFetchingNextPage) void result.fetchNextPage() }}>更多评论</Button> : null}
