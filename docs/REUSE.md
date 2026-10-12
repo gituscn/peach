@@ -168,6 +168,8 @@ JAV 默认封面（官方封面／预览图）与视频默认大小（大图／�
 
 测试与集成用 `test_runner.py`、`agent_worktree.py`，进程互斥用开发依赖 `filelock` 的 [`FileLock`](https://py-filelock.readthedocs.io/en/stable/tutorials.html)。全量验证与集成共用一把锁、最多等待 30 分钟；验证持锁至记录写入完成。临时 Git 仓库回归覆盖互斥、等待和释放；代码、环境和范围记录属于 Peach 的集成约束。记录失效返回 `4`，Windows 托盘据此最多重试三轮，用例失败返回 `1`。两端测试入口通过 `test_environment.py` 复用现有 `find_uv` 与主检出 `Dependencies.check`；隔离工作树使用 uv 官方锁文件同步，不新增包管理实现或运行依赖。同步失败停止测试，主检出只读检查；策略与行为回归见 `test_test_environment.py`。
 
+定向调试复用标准库 unittest 的按名字加载与现有浏览器夹具，记录复用沿用文件清单、影响域和 FileLock，不新增测试框架或缓存服务。局部成功记录保留未受影响域的原验证时间，失败域不能从历史基线恢复；浏览器失败即停。回归覆盖过期、环境差异、未知与共享文件、失败后再次验证、路径越界及不签调试证明，详见 [测试](TESTING.md#定向调试与局部记录)。
+
 提交消息复用 Git 的 [`interpret-trailers --parse`](https://git-scm.com/docs/git-interpret-trailers)，署名与 README 声明判据由 `co_author.py`、`check_readme_impact.py` 共用；`check_commit_message.py` 接到仓库 `commit-msg` 钩子。Git 自身处理注释与多行 trailer，Peach 只检查字段形态和分段。Windows Git 2.55.0.windows.3 的临时仓库回归覆盖拒绝提交、保留暂存、多署名、amend 和合并消息；不新增解析依赖。具体触发范围见 [README 维护](README_MAINTENANCE.md)。
 
 ### 播放、采集、发布与打包

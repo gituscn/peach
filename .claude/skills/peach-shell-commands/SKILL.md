@@ -5,7 +5,7 @@ description: 在写 PowerShell 或 Bash 命令、交给用户在终端跑命令�
 
 # 命令与路径的形态
 
-最后复核：2026-09-27
+最后复核：2026-10-13
 证据来源：`tests/test_agent_worktree.py` 与 `tests/test_scripts.py` 里临时目录 `.resolve()`
 和正斜杠路径的注释、`scripts/test.ps1` 与 `scripts/test.sh` 的编码约定、Git 历史里被
 heredoc 转义损坏的那几次补丁、`scripts/test_runner.py` 的外部工具预检，以及 2026-07 至 09
@@ -50,8 +50,7 @@ Claude 与 Codex 会话记录里交给用户、被贴回报错截图的 39 条�
   不改断言、不跳过用例。`scripts/test.ps1` 会在分片前报告无法启动的外部工具。
 - `danger-full-access` 是取消隔离，不是「提权沙箱」。除非用户明确要求承担全局风险，否则保留沙箱，
   只给当前项目入口所需的命令授权。
-- 测试入口自带机器级四槽位重任务限制（`docs/TESTING.md`「验证频率」），不要再外套资源守卫；
-  npm／PyInstaller、FFmpeg 与媒体批处理仍按资源预算使用外层守卫。
+- 测试、构建与媒体任务直接使用项目入口，不外套 CPU、内存、进程数或重任务槽位守卫；任务范围与取消按本机 `resource-budget.md`，进程清理只按本任务 PID。
 
 ## 多行内容一律先写成文件
 
