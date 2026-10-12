@@ -13,7 +13,7 @@ export interface JavDetail {
   source_image: boolean; preview_count: number; comments_count: number;
   source_url: string; wanted: boolean; want_id: number | null;
 }
-export interface JavEntityRef extends FaceRef { name: string; has_logo?: boolean; source_actor_id?: string; source_avatar?: boolean }
+export interface JavEntityRef extends FaceRef { name: string; gender?: 'female' | 'male' | 'unknown'; has_logo?: boolean; source_actor_id?: string; source_avatar?: boolean }
 export interface JavReview { id: string; username: string; content: string; score?: number; created_at: string }
 export interface JavReviews { ok: boolean; items: JavReview[]; page: number; more: boolean; message?: string }
 export interface JavDetailProps {

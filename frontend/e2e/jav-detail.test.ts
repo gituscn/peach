@@ -45,7 +45,11 @@ describe('库外 JAV 作品详情', () => {
             tag: el.querySelector('[data-jav-tags] [data-tag]')?.textContent,
             tagCat: el.querySelector('[data-jav-tags] [data-tag-cat]')?.getAttribute('data-tag-cat') };
         });
-        assert.equal(shared.faces.length, 3, '两位女优与厂牌各有独立身份格');
+        assert.equal(shared.faces.length, 4, '每位演员与厂牌各有独立身份格');
+        for (const [gender, label] of [['female', '女优'], ['male', '男优'], ['unknown', '出演者']]) {
+          assert.equal(await page.locator(`[data-id-gender="${gender}"] [data-id-label]`).textContent(), label);
+          assert.equal(await page.locator(`[data-id-gender="${gender}"] [data-id-face]`).count(), 1);
+        }
         assert.ok(shared.faces.every(face => face.width === 46 && face.height === 46));
         assert.ok(shared.faces.every(face => Math.abs(face.y - shared.faces[0]!.y) < 1));
         assert.equal(shared.stars, 5);
@@ -76,8 +80,19 @@ describe('库外 JAV 作品详情', () => {
         await page.getByRole('button', { name: '视频预览', exact: true }).first().click();
         await page.waitForFunction(() => { const video = document.querySelector<HTMLVideoElement>('[data-jav-video] video'); return video && video.readyState >= 1 && Number.isFinite(video.duration) && video.duration > 0 });
         assert.ok(await page.locator('[data-jav-video] video').evaluate(video => (video as HTMLVideoElement).paused), '预览等待用户播放');
-        await page.locator('[data-jav-video] video').evaluate(async node => { const video = node as HTMLVideoElement; video.muted = true; await video.play() });
+        const preview = page.locator('[data-jav-video]');
+        const playerBox = await preview.locator('.video-js').boundingBox();
+        assert.ok(playerBox && Math.abs(playerBox.width / playerBox.height - 16 / 9) < 0.02, JSON.stringify(playerBox));
+        await preview.getByRole('button', { name: '播放', exact: true }).waitFor({ state: 'visible' });
+        assert.equal(await preview.locator('.vjs-control-bar').evaluate(el => getComputedStyle(el).visibility), 'visible');
+        await preview.locator('video').evaluate(node => { (node as HTMLVideoElement).muted = true });
+        await preview.getByRole('button', { name: '播放', exact: true }).click();
         await page.waitForFunction(() => (document.querySelector<HTMLVideoElement>('[data-jav-video] video')?.currentTime || 0) > 0);
+        await preview.getByRole('button', { name: '暂停', exact: true }).click();
+        assert.ok(await preview.locator('video').evaluate(node => (node as HTMLVideoElement).paused));
+        await preview.getByRole('button', { name: '设置', exact: true }).click();
+        await preview.getByRole('menuitem', { name: /播放速度/ }).waitFor({ state: 'visible' });
+        await preview.getByRole('button', { name: '设置', exact: true }).click();
         await page.getByRole('button', { name: '查看图片', exact: true }).click();
         assert.equal(await page.locator('[data-jav-video] video').count(), 0, '切回图片卸下预览播放器');
         await page.getByRole('button', { name: '查看评论', exact: true }).click();
@@ -87,11 +102,17 @@ describe('库外 JAV 作品详情', () => {
         await page.waitForFunction(() => document.querySelectorAll('[data-jav-review]').length === 12);
         assert.equal(await page.getByRole('button', { name: '更多评论', exact: true }).count(), 0);
         await page.getByRole('button', { name: '查看资源', exact: true }).click();
-        await page.getByText('EXM-001 示例资源 1', { exact: true }).waitFor({ state: 'visible' });
+        await page.getByText('EXM-001 示例资源 1', { exact: false }).waitFor({ state: 'visible' });
         assert.equal(await page.locator('[data-jav-resources] [data-resource-protocol]:visible').count(), 3);
         await page.getByText('更多资源（3 条）', { exact: true }).click();
         await page.getByText('EXM-001 示例资源 6', { exact: true }).waitFor({ state: 'visible' });
         assert.equal(await page.locator('[data-jav-resources] [data-resource-protocol]:visible').count(), 6);
+        const resources = await page.locator('[data-jav-resources] [data-resource-protocol]:visible').evaluateAll(rows => rows.map(row => {
+          const box = row.getBoundingClientRect(), title = row.querySelector('[data-resource-main]')!.getBoundingClientRect();
+          const actions = row.querySelector('[data-resource-actions]')!.getBoundingClientRect();
+          return { width: box.width, titleWidth: title.width, titleBottom: title.bottom, actionsTop: actions.top, actionsRight: actions.right, right: box.right };
+        }));
+        assert.ok(resources.every(row => row.titleWidth >= row.width - 1 && row.actionsTop >= row.titleBottom - 1 && row.actionsRight <= row.right + 1), JSON.stringify(resources));
         assert.ok(await page.locator('[data-jav-resources]').getByRole('button', { name: '添加下载', exact: true }).first().isDisabled());
         await page.getByRole('button', { name: '想要', exact: true }).click();
         await page.getByRole('button', { name: '取消想要', exact: true }).waitFor({ state: 'visible' });

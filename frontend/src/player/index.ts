@@ -22,3 +22,4 @@ export type { TelemetryOptions } from './telemetry';
 export { wireFollowTelemetry, wireTelemetry } from './telemetry';
 export type { PlayerItem, VjsPlayer } from './types';
 export { ensureVideojs } from './videojs';
+export { mountPreviewPlayer } from './preview-player';
