@@ -2,12 +2,62 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from datetime import datetime, timezone
 from sqlite3 import Connection
 
 
 def normalize_entity_name(name: str) -> str:
     return strip_zero_width(name).strip().casefold()
+
+
+# 官方标题登记的并写名：https://attackers.net/、https://premium-beauty.com/、
+# https://kawaiikawaii.jp/。只折叠已核实的品牌，不剥任意括号或标点。
+STUDIO_BRAND_NAMES = {
+    'attackers(アタッカーズ)': 'attackers',
+    'アタッカーズ': 'attackers',
+    'premium(プレミアム)': 'premium',
+    'プレミアム': 'premium',
+    'kawaii*': 'kawaii',
+    'カワイイ': 'kawaii',
+}
+STUDIO_SYMBOL_FOLD = str.maketrans({
+    '’': "'", '‘': "'", '“': '"', '”': '"', '☆': '*', '★': '*', '♪': '*',
+})
+
+
+def studio_name_key(name: str) -> str:
+    """保留字种的厂牌写法键；官方登记的品牌并写名共用一个键。"""
+    folded = unicodedata.normalize('NFKC', strip_zero_width(name)).translate(STUDIO_SYMBOL_FOLD)
+    key = re.sub(r'\s+', '', folded).casefold()
+    return STUDIO_BRAND_NAMES.get(key, key)
+
+
+def studio_identity_ids(connection: Connection, name: str) -> set[int]:
+    """按规范名与登记别名取厂牌身份；多条命中由调用方保留冲突。"""
+    key = studio_name_key(name)
+    return {int(entity_id) for entity_id, spelling in connection.execute(
+        "SELECT id,canonical_name FROM entity WHERE kind='studio' UNION ALL "
+        "SELECT a.entity_id,a.alias FROM entity_alias a JOIN entity e ON e.id=a.entity_id "
+        "WHERE e.kind='studio'") if studio_name_key(spelling) == key}
+
+
+def _ingest_name_id(connection: Connection, kind: str, name: str) -> int | None:
+    """入库名称先取精确规范名，再取唯一的登记身份。"""
+    normalized = normalize_entity_name(name)
+    exact = connection.execute("SELECT id FROM entity WHERE kind=? AND normalized_name=?",
+                               (kind, normalized)).fetchone()
+    if exact:
+        return int(exact[0])
+    if kind == 'studio':
+        matches = studio_identity_ids(connection, name)
+    elif kind in PERSON_ENTITY_KINDS:
+        matches = {int(row[0]) for row in connection.execute(
+            "SELECT DISTINCT e.id FROM entity e JOIN entity_alias a ON a.entity_id=e.id "
+            "WHERE e.kind=? AND a.normalized_alias=? ORDER BY e.id LIMIT 2", (kind, normalized))}
+    else:
+        return None
+    return next(iter(matches)) if len(matches) == 1 else None
 
 
 KANA = re.compile(r"[぀-ゟ゠-ヿ]")
@@ -591,19 +641,7 @@ def upsert_asset_entity(
         ).fetchone()
         entity_id = int(matched[0]) if matched else None
     if entity_id is None:
-        matched = connection.execute(
-            "SELECT id FROM entity WHERE kind=? AND normalized_name=?",
-            (kind, normalized),
-        ).fetchone()
-        entity_id = int(matched[0]) if matched else None
-    if entity_id is None and kind in PERSON_ENTITY_KINDS:
-        alias_matches = connection.execute(
-            "SELECT DISTINCT e.id FROM entity e JOIN entity_alias a ON a.entity_id=e.id "
-            "WHERE e.kind=? AND a.normalized_alias=? ORDER BY e.id LIMIT 2",
-            (kind, normalized),
-        ).fetchall()
-        if len(alias_matches) == 1:
-            entity_id = int(alias_matches[0][0])
+        entity_id = _ingest_name_id(connection, kind, canonical)
     if entity_id is None:
         connection.execute(
             "INSERT INTO entity(kind,canonical_name,normalized_name,metadata_json,created_at,updated_at) "
@@ -660,6 +698,9 @@ def resolve_entity(connection: Connection, kind: str, name: str):
     ).fetchone()
     if canonical:
         return canonical
+    if kind == 'studio':
+        ids = studio_identity_ids(connection, name)
+        return connection.execute('SELECT * FROM entity WHERE id=?', (next(iter(ids)),)).fetchone() if len(ids) == 1 else None
     aliases = connection.execute(
         "SELECT DISTINCT e.* FROM entity e JOIN entity_alias a ON a.entity_id=e.id "
         "WHERE e.kind=? AND a.alias=? ORDER BY e.id LIMIT 2",

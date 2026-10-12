@@ -348,8 +348,9 @@ describe('作品详情岛', () => {
     });
   }
 
-  it('出演超过 8 位先收起，点「还有 N 位」全部展开', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.cast}`, DESKTOP);
+  for (const viewport of [DESKTOP, MOBILE]) {
+  it(`${viewport.name}：出演超过 8 位先收起，点「还有 N 位」全部展开`, { timeout: 60_000 }, async () => {
+    const opened = await openItemPage(browser, `/item/${ITEM.cast}`, viewport);
     try {
       const page = opened.page;
       const shown = () => page.locator('#stage [data-item-identity] [data-entity-kind="performer"]:visible').count();
@@ -366,6 +367,15 @@ describe('作品详情岛', () => {
       assert.notEqual(appearance.background, 'rgba(0, 0, 0, 0)');
       assert.equal(appearance.icon, true);
       assert.ok(appearance.height >= 32);
+      const centers = await button.evaluate((node) => {
+        const own = node.getBoundingClientRect();
+        const siblings = [...node.parentElement!.querySelectorAll<HTMLElement>('[data-id-cell]:not([hidden])')]
+          .map((cell) => cell.getBoundingClientRect()).filter((cell) => cell.top < own.bottom && cell.bottom > own.top);
+        return { margin: getComputedStyle(node).marginTop,
+          delta: siblings.map((cell) => own.top + own.height / 2 - cell.top - cell.height / 2) };
+      });
+      assert.equal(centers.margin, '0px', '展开按钮应在出演名单行内垂直居中');
+      assert.ok(centers.delta.every((delta) => Math.abs(delta) < 1), JSON.stringify(centers));
       await button.focus();
       await page.keyboard.press('Enter');
       assert.equal(await shown(), NAMES.length);
@@ -375,6 +385,7 @@ describe('作品详情岛', () => {
       await opened.close();
     }
   });
+  }
 
   it('标题折成两行，真溢出才给展开键；展开键与标题文字都能展开，再点收回', { timeout: 60_000 }, async () => {
     const short = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);

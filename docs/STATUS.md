@@ -8,6 +8,7 @@
 
 - 名册：艺人（含动画作者）｜卖家｜在线；素人须有非职业出演证据，FC2 仅筛作品。
 - 公司资料按公开来源填空；FC2 卖家按作品来源快照补入。回执见 `peach-data/review/`。
+- 厂牌 160；6 组名称变体已合并，17 条作品厂牌写法归一。旧名、作品关系完整保留，核查与备份见 `peach-data/review/studio-identity-audit.md`。厂牌入库与查询共用规范身份；多人详情的展开按钮垂直居中。
 - 核查：`peach-data/review/creator-boundary-delivery.md`；StraplessDildo 归厂牌。
 - 关注作者 25 位、来源 111 条、身份关联 71 条、别名 30 条（ADR-0096）。
 - 身份合并 18 组；版本核查：`peach-data/review/version-evidence-review.md`。

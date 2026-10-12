@@ -49,6 +49,12 @@ class VariantKeyTests(unittest.TestCase):
         self.assertNotEqual(self.module.variant_key("Fitch"),
                             self.module.variant_key("Fetish Box"))
 
+    def test_official_brand_spellings_share_a_key(self):
+        for plain, official in [('Attackers', 'ATTACKERS（アタッカーズ）'),
+                                ('PREMIUM', 'PREMIUM（プレミアム）'), ('kawaii', 'kawaii*')]:
+            self.assertEqual(self.module.variant_key(plain), self.module.variant_key(official))
+        self.assertNotEqual(self.module.variant_key('FALENO'), self.module.variant_key('FALENO(2)'))
+
 
 class SpellingVariantTests(unittest.TestCase):
     def setUp(self):
@@ -79,6 +85,19 @@ class SpellingVariantTests(unittest.TestCase):
 
     def test_a_studio_without_a_twin_is_not_a_pair(self):
         self.assertEqual(self.module.spelling_variants({1: "Prestige"}, {1: 425}), [])
+
+    def test_asset_counts_use_works_instead_of_source_relations(self):
+        with sqlite3.connect(':memory:') as connection:
+            connection.executescript(
+                "CREATE TABLE entity(id INTEGER,kind TEXT);"
+                "CREATE TABLE asset(id INTEGER,code TEXT);"
+                "CREATE TABLE asset_entity(entity_id INTEGER,asset_id INTEGER);"
+                "INSERT INTO entity VALUES(1,'studio');"
+                "INSERT INTO asset VALUES(10,'ATID-479');"
+                "INSERT INTO asset_entity VALUES(1,10),(1,10);")
+            counts, prefixes = self.module.asset_facts(connection)
+            self.assertEqual(dict(counts), {1: 1})
+            self.assertEqual(dict(prefixes), {1: {'ATID'}})
 
 
 class ScriptVariantTests(unittest.TestCase):
@@ -113,6 +132,11 @@ class ScriptVariantTests(unittest.TestCase):
     def test_no_shared_prefix_means_no_pair(self):
         """名字读起来像不算证据。这条捷径唯一的身份保证就是前缀。"""
         self.assertEqual(self.rows({1: {"MIDE"}, 2: {"ABP"}}), [])
+
+    def test_av_open_entries_keep_their_studio_identities(self):
+        self.assertEqual(self.module.script_variants(
+            {1: 'kawaii', 2: 'ダスッ！'}, {1: 48, 2: 23},
+            {1: {'AVOP'}, 2: {'AVOP'}}, set()), [])
 
     def test_a_prefix_shared_with_two_latin_studios_is_left_to_a_human(self):
         rows = self.rows({1: {"ABP"}, 2: {"ABP"}, 3: {"ABP"}})
@@ -181,6 +205,12 @@ class BracketedVariantTests(unittest.TestCase):
             "UPDATE entity SET canonical_name='Prestige(Faleno)',"
             "normalized_name='prestige(faleno)' WHERE id=2")
         self.connection.commit()
+        self.assertEqual(self.module.bracketed_variants(
+            self.connection, self.names(), self.counts, set()), [])
+
+    def test_an_alias_registered_on_two_studios_keeps_the_pair_unresolved(self):
+        self.connection.execute(
+            "INSERT INTO entity_alias VALUES(3,'Prestige Premium','prestige premium','mapping',1)")
         self.assertEqual(self.module.bracketed_variants(
             self.connection, self.names(), self.counts, set()), [])
 
@@ -288,7 +318,8 @@ class ApplyTests(unittest.TestCase):
             " PRIMARY KEY(discovery_id, entity_id));"
             "CREATE TABLE entity_redirect(old_id INTEGER PRIMARY KEY,"
             " target_id INTEGER NOT NULL, source TEXT NOT NULL, merged_at TEXT NOT NULL);"
-            "CREATE TABLE asset(id INTEGER PRIMARY KEY, code TEXT, studio TEXT);"
+            "CREATE TABLE asset(id INTEGER PRIMARY KEY, code TEXT, studio TEXT,"
+            " field_owners TEXT DEFAULT '{}', mutation_revision INTEGER DEFAULT 0);"
             "CREATE TABLE asset_entity(asset_id INTEGER, entity_id INTEGER, role TEXT,"
             " source TEXT, confidence REAL, metadata_json TEXT, first_seen_at TEXT,"
             " last_seen_at TEXT, UNIQUE(asset_id, entity_id, role));")
