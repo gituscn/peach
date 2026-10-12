@@ -55,7 +55,7 @@ describe('JAV 推荐与加载结构', () => {
       });
       assert.deepEqual(avatarShape, { width: '38px', height: '38px', radius: '50%' });
       assert.deepEqual(await page.locator('[data-jav-skeleton-actions]').first().locator('.skeleton').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).height)), ['36px', '36px', '36px']);
-      assert.deepEqual(await page.locator('[data-jav-skeleton-card]').first().locator('[data-jav-skeleton-text]').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).height)), ['20px', '20px', '20px', '20px', '20px']);
+      assert.deepEqual(await page.locator('[data-jav-skeleton-card]').first().locator('[data-jav-skeleton-text]').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).height)), ['20px', '20px', '20px']);
       assert.equal(await page.locator('[data-jav-skeleton-cover]').first().evaluate(node => getComputedStyle(node).borderRadius),
         await page.locator('#main').evaluate(node => getComputedStyle(node).getPropertyValue('--surface-radius').trim()));
       assert.equal(await page.locator('[data-jav-filter] [data-entity-sep]').count(), 1);
@@ -67,6 +67,11 @@ describe('JAV 推荐与加载结构', () => {
       const search = page.getByRole('searchbox', { name: '筛选推荐', exact: true });
       const cards = page.getByRole('region', { name: '为你推荐', exact: true }).locator('article');
       assert.equal(await cards.count(), 3);
+      assert.equal(await cards.first().locator('[data-jav-taste-score]').textContent(), '100');
+      const recommendation = cards.first().getByRole('button', { name: '推荐分 100，强烈推荐', exact: true });
+      await recommendation.focus();
+      await page.getByRole('tooltip').filter({ hasText: '常看的女优：规范姓名' }).waitFor({ state: 'visible' });
+      await recommendation.evaluate(node => (node as HTMLButtonElement).blur());
       for (const cover of await cards.locator('img.poster').all()) await cover.scrollIntoViewIfNeeded();
       await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>('[data-jav-card] img.poster')].every(img => img.complete && img.naturalWidth > 0));
       await page.evaluate(() => window.scrollTo(0, 0));

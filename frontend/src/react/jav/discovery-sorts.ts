@@ -13,3 +13,14 @@ export type DiscoveryDirection = 'asc' | 'desc';
 export function discoveryScore(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(3) : '—';
 }
+
+/** 口味相关度使用固定百分制；未知读数保留空值。 */
+export function recommendationScore(value: number | null | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return { score: '—', label: '资料未取得', color: 'neutral' as const };
+  const score = Math.round(Math.max(0, Math.min(1, value)) * 100);
+  const tier = score >= 75 ? { label: '强烈推荐', color: 'lime' as const }
+    : score >= 50 ? { label: '推荐', color: 'blue' as const }
+    : score >= 25 ? { label: '值得看看', color: 'yellow' as const }
+    : { label: '探索', color: 'neutral' as const };
+  return { score: String(score), ...tier };
+}

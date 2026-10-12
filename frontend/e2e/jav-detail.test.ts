@@ -60,6 +60,7 @@ describe('库外 JAV 作品详情', () => {
         assert.ok(Math.abs(shared.codeY - shared.titleY) < 2, '番号与标题在同一行开始');
         assert.equal(shared.tag, '痴女'); assert.equal(shared.tagCat, 'role');
         await page.locator('[data-id-group="performer"] [data-id-face] img').waitFor({ state: 'visible' });
+        assert.equal(await page.locator('[data-id-cell="studio"]').evaluate(node => node.tagName), 'BUTTON', '来源厂牌按名称提供站内入口');
         assert.equal(await page.locator('[data-follow-image-dots] button').count(), 13);
         const dots = await page.locator('[data-follow-image-dots]').evaluate(el => {
           const box = el.getBoundingClientRect();
@@ -67,6 +68,17 @@ describe('库外 JAV 作品详情', () => {
         });
         assert.ok(dots, '每个媒体入口都在圆点条内');
         assert.equal(await page.locator('[data-carousel-video]').evaluate(el => el.getBoundingClientRect().width), 20);
+        const imageDot = page.getByRole('button', { name: '预览 2', exact: true });
+        await page.keyboard.press('Tab');
+        await imageDot.focus();
+        const tip = page.locator('[data-media-preview-tip]');
+        await tip.locator('img').waitFor({ state: 'visible' });
+        const previewBounds = await tip.boundingBox(), dotBounds = await imageDot.boundingBox();
+        assert.ok(previewBounds && dotBounds && previewBounds.y + previewBounds.height <= dotBounds.y, '缩略图位于 indicator 上方');
+        assert.equal(await page.locator('[data-follow-image-item][aria-current="true"]').getAttribute('data-follow-image-item'), '-1', '聚焦预览保持当前图片');
+        await page.keyboard.press('Escape');
+        assert.equal(await tip.count(), 0);
+        assert.ok(await page.locator('#stage').evaluate(el => (el as HTMLDialogElement).open), '收起缩略图保持详情打开');
         if (viewport.mobile) {
           await page.setViewportSize({ width: 350, height: viewport.height });
           await page.locator('[data-follow-image-count]').waitFor({ state: 'visible' });
@@ -83,6 +95,8 @@ describe('库外 JAV 作品详情', () => {
         const preview = page.locator('[data-jav-video]');
         const playerBox = await preview.locator('.video-js').boundingBox();
         assert.ok(playerBox && Math.abs(playerBox.width / playerBox.height - 16 / 9) < 0.02, JSON.stringify(playerBox));
+        const indicatorBox = await page.locator('[data-follow-image-dots]').boundingBox();
+        assert.ok(playerBox && indicatorBox && indicatorBox.y >= playerBox.y + playerBox.height, '视频 indicator 位于播放器下方');
         await preview.getByRole('button', { name: '播放', exact: true }).waitFor({ state: 'visible' });
         assert.equal(await preview.locator('.vjs-control-bar').evaluate(el => getComputedStyle(el).visibility), 'visible');
         await preview.locator('video').evaluate(node => { (node as HTMLVideoElement).muted = true });
@@ -95,13 +109,24 @@ describe('库外 JAV 作品详情', () => {
         await preview.getByRole('button', { name: '设置', exact: true }).click();
         await page.getByRole('button', { name: '查看图片', exact: true }).click();
         assert.equal(await page.locator('[data-jav-video] video').count(), 0, '切回图片卸下预览播放器');
-        await page.getByRole('button', { name: '查看评论', exact: true }).click();
+        const reviewsToggle = page.locator('[data-jav-reviews] summary');
+        const resourcesToggle = page.locator('[data-jav-resources] > details > summary');
+        for (const toggle of [reviewsToggle, resourcesToggle]) {
+          assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
+          assert.equal(await toggle.locator('svg').count(), 2, '对象图标和展开箭头齐备');
+        }
+        await reviewsToggle.click();
         await page.waitForFunction(() => document.querySelectorAll('[data-jav-review]').length === 10);
         assert.equal(await page.locator('[data-jav-review] img').count(), 0, '评论正文按文本呈现');
         await page.getByRole('button', { name: '更多评论', exact: true }).click();
         await page.waitForFunction(() => document.querySelectorAll('[data-jav-review]').length === 12);
         assert.equal(await page.getByRole('button', { name: '更多评论', exact: true }).count(), 0);
-        await page.getByRole('button', { name: '查看资源', exact: true }).click();
+        await reviewsToggle.click();
+        await page.locator('[data-jav-review]').first().waitFor({ state: 'hidden' });
+        assert.equal(await reviewsToggle.getAttribute('aria-expanded'), 'false');
+        await reviewsToggle.click();
+        await page.locator('[data-jav-review]').last().waitFor({ state: 'visible' });
+        await resourcesToggle.click();
         await page.getByText('EXM-001 示例资源 1', { exact: false }).waitFor({ state: 'visible' });
         assert.equal(await page.locator('[data-jav-resources] [data-resource-protocol]:visible').count(), 3);
         await page.getByText('更多资源（3 条）', { exact: true }).click();
@@ -114,6 +139,10 @@ describe('库外 JAV 作品详情', () => {
         }));
         assert.ok(resources.every(row => row.titleWidth >= row.width - 1 && row.actionsTop >= row.titleBottom - 1 && row.actionsRight <= row.right + 1), JSON.stringify(resources));
         assert.ok(await page.locator('[data-jav-resources]').getByRole('button', { name: '添加下载', exact: true }).first().isDisabled());
+        await resourcesToggle.click();
+        await page.locator('[data-jav-resources] [data-resource-protocol]').first().waitFor({ state: 'hidden' });
+        await resourcesToggle.click();
+        await page.locator('[data-jav-resources] [data-resource-protocol]').first().waitFor({ state: 'visible' });
         await page.getByRole('button', { name: '想要', exact: true }).click();
         await page.getByRole('button', { name: '取消想要', exact: true }).waitFor({ state: 'visible' });
         await page.getByRole('button', { name: '取消想要', exact: true }).click();
@@ -131,6 +160,10 @@ describe('库外 JAV 作品详情', () => {
         await page.locator('#stage [data-jav-detail] h1').waitFor({ state: 'visible' });
         await page.keyboard.press('Escape');
         await page.waitForURL(requiredEnv('PEACH_E2E_ORIGIN') + '/');
+        await card.getByRole('link', { name: '打开 EXM-001 的作品详情' }).click();
+        await page.locator('[data-id-cell="studio"]').click();
+        await page.waitForURL(url => url.pathname === '/' && url.searchParams.get('studio') === '示例厂牌' && url.searchParams.get('jav') === '1');
+        assert.equal(await page.locator('#stage').count(), 0, '厂牌入口离开作品详情');
       } finally { await context.close() }
     });
     it(`${viewport.name} 深链刷新与来源未取得仍可关闭`, { timeout: 60000 }, async () => {

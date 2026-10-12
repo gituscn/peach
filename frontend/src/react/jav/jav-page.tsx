@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { RiCompassLine, RiExternalLinkLine } from '@remixicon/react';
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
+import { Chip } from '@/components/base/badges/chip';
 import { appSettingsStore, javLayout, storeJavLayout, JAV_LAYOUTS, cardRatio, gridLayout } from '@peach/appearance';
 import { coverUrl } from '@peach/card-art';
 import { relayoutCovers } from '../../card-art/framing';
@@ -23,7 +24,7 @@ import { FilterGlassRows, FilterPill, GlassPill } from '../components/filter-gla
 import { ArtSlot } from '../components/art-slot';
 import { Segments, SortKeys } from '../entity-filter/entity-filter-page';
 import { TaskProgress } from '../components/task-progress';
-import { DISCOVERY_SORTS, discoveryScore, type DiscoverySort } from './discovery-sorts';
+import { DISCOVERY_SORTS, discoveryScore, recommendationScore, type DiscoverySort } from './discovery-sorts';
 
 const SearchGlyph = spriteGlyph('search');
 
@@ -136,6 +137,10 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
     <div data-media-grid="" className={JAV_RECOMMENDATION_GRID} style={{ '--card-ratio': ratio } as CSSProperties}>
       {items.map(item => {
         const artwork = discoveryArtwork(item, layout, settings.value.javImage);
+        const recommendation = recommendationScore(item.taste_score ?? item.score);
+        const scoreDetails = [recommendation.label, `口味 ${discoveryScore(item.taste_score ?? item.score)}`,
+          discoveries.data?.ranking_method === 'mmr' && item.ranking_score != null ? `排序 ${discoveryScore(item.ranking_score)}` : '',
+          item.source_score != null ? `来源评分 ${item.source_score.toFixed(1)} / 5` : '', ...(item.reasons || [])].filter(Boolean).join(' · ');
         return <article key={item.id} data-media-card="" data-jav-card="" onClick={event => {
         if (!(event.target as HTMLElement).closest('a,button,input')) navigate(item.asset_id ? `/item/${item.asset_id}` : `/jav/movie/${encodeURIComponent(item.code)}`);
       }}>
@@ -152,12 +157,12 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         </div>
         <div data-jav-tags="" data-media-tags="">{(item.tags || []).slice(0, 4).map(name =>
           <button type="button" data-media-tag="" key={name} aria-pressed={tag === name} onClick={() => setTag(tag === name ? '' : name)}>{name}</button>)}</div>
-        <p data-jav-taste-score="" className="min-h-5 text-body-2-regular text-text-secondary">
-          口味 {discoveryScore(item.taste_score ?? item.score)}
-          {discoveries.data?.ranking_method === 'mmr' && item.ranking_score != null ? ` · 排序 ${discoveryScore(item.ranking_score)}` : ''}
-          {item.source_score != null ? ` · 评分 ${item.source_score.toFixed(1)} / 5` : ''}
-        </p>
-        <p className="truncate text-body-2-regular text-text-secondary" title={item.reasons?.join(' · ')}>{item.reasons?.join(' · ')}</p>
+        <div data-jav-taste-score="" className="flex h-6 items-center">
+          <button type="button" title={scoreDetails} aria-label={`推荐分 ${recommendation.score}，${recommendation.label}`}
+            className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring">
+            <Chip color={recommendation.color}>{recommendation.score}</Chip>
+          </button>
+        </div>
         <div data-jav-actions="" className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => resource({ ...item, cover: item.has_cover ? coverUrl(item, true) : item.cover_url, origin: `${item.asset_id ? 'asset' : 'feed'}:${item.id}` })}>查找资源</Button>
           <Button variant="ghost" disabled={readOnly || item.wanted || !!item.asset_id} {...busyProps(action.busy === String(item.id))} onClick={() => {

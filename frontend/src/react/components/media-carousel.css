@@ -87,6 +87,13 @@
 .peach-react [data-media-carousel] [data-follow-image-dots] button[data-carousel-video][aria-current="true"] { background: transparent; }
 .peach-react [data-media-carousel] [data-carousel-video] svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
 .peach-react [data-media-carousel] [data-carousel-video][aria-current="true"] svg { fill: currentColor; }
+.peach-react [data-media-carousel][data-carousel-below] { display: block; width: 100%; padding: 8px 0; }
+.peach-react [data-media-carousel][data-carousel-below] :is([data-follow-image-dots], [data-follow-image-count]) { position: relative; left: auto; bottom: auto; transform: none; width: fit-content; margin: 0 auto; }
+.peach-react [data-media-preview-anchor] { display: inline-flex; align-items: center; }
+.peach-react [data-media-preview-tip] { width: 160px; padding: 6px; text-align: center; }
+.peach-react [data-media-preview-tip] img { display: block; width: 100%; height: 96px; object-fit: contain; margin-bottom: 4px; }
+.peach-react [data-media-preview-tip] span { display: block; }
+.peach-react [data-media-carousel] [data-follow-image-dots] button:focus-visible { outline: 2px solid var(--tungsten); outline-offset: 2px; }
 @media (max-width: 640px) {
   .peach-react [data-media-carousel] [data-follow-image-arrow] { width: 44px; height: 44px; }
   .peach-react [data-media-carousel] [data-follow-image-dots] { bottom: 12px; }

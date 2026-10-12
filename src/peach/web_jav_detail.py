@@ -26,6 +26,12 @@ def _refs(contract, connection, kind, names):
         if not name:
             continue
         entity = entities.resolve_entity(connection, kind, name)
+        if entity is None and kind == "studio":
+            matches = connection.execute(
+                "SELECT DISTINCT e.* FROM entity e LEFT JOIN entity_alias a ON a.entity_id=e.id "
+                "WHERE e.kind='studio' AND (e.canonical_name=? COLLATE NOCASE OR a.alias=? COLLATE NOCASE) "
+                "ORDER BY e.id LIMIT 2", (name, name)).fetchall()
+            entity = matches[0] if len(matches) == 1 else None
         refs.append(web_catalog.entity_ref(contract, kind, entity["id"], entity["canonical_name"])
                     if entity else {"id": None, "name": name, "has_image": False})
     return refs

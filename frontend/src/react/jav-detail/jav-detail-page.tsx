@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { RiExternalLinkLine } from '@remixicon/react';
+import { RiChat3Line, RiExternalLinkLine } from '@remixicon/react';
 import { entityPath, firstGrapheme, icon } from '@peach/legacy/core';
 import { tagLabel } from '@peach/legacy/tags';
 import { coverUrl } from '@peach/card-art';
@@ -14,6 +14,7 @@ import { IdentityCell, IdentitySeries } from '../components/identity-cell';
 import { MediaCarousel, useCarouselInset } from '../components/media-carousel';
 import { useFoldedTitle } from '../components/folded-title';
 import { busyProps, useAction } from '../settings/use-action';
+import { Disclosure } from '../settings/section';
 import { addWant, invalidateWants, removeWants } from '../wants/wants';
 import { WantMagnets } from '../wants/want-magnets';
 import type { DownloadsSnapshot } from '../bundle';
@@ -56,7 +57,7 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
     void queryClient.invalidateQueries({ queryKey: ['jav-discoveries'] });
   }) };
   return <>
-    <div ref={frame} data-stage-media="" data-jav-art=""
+    <div ref={frame} data-stage-media="" data-jav-art="" data-jav-playing={preview === -2 ? '' : undefined}
       // oxlint-disable-next-line shadcn/no-inline-styles -- 图片黑边的真实宽度决定翻页箭头位置
       style={{ '--follow-image-arrow-inset': inset === null || preview === -2 ? undefined : `${inset}px` } as CSSProperties}>
       <Close close={actions.close} />
@@ -64,7 +65,8 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
         onClick={() => setPreview(preview === -2 ? -1 : -2)}><Glyph name={preview === -2 ? 'image' : 'play'} />{preview === -2 ? '查看图片' : '视频预览'}</button> : null}
       {preview === -2 && item.preview_video_url ? <PreviewVideo key={item.preview_video_url} src={item.preview_video_url} />
         : <JavPicture key={preview} item={item} image={preview === -1 ? 'cover' : String(preview)} />}
-      <MediaCarousel items={media} position={Math.max(0, media.findIndex(entry => entry.index === preview))} onSelect={setPreview} />
+      <MediaCarousel items={media} position={Math.max(0, media.findIndex(entry => entry.index === preview))} onSelect={setPreview}
+        below={preview === -2} renderPreview={entry => <JavPicture item={item} image={entry.index < 0 ? 'cover' : String(entry.index)} thumbnail />} />
     </div>
     <aside data-stage-side=""><div data-stage-side-content="" data-jav-info="">
       <JavTitle item={item} />
@@ -97,14 +99,15 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
   </>;
 }
 
-function JavPicture({ item, image }: { item: JavDetail; image: string }) {
+function JavPicture({ item, image, thumbnail = false }: { item: JavDetail; image: string; thumbnail?: boolean }) {
   const local = image === 'cover' && item.has_cover;
   const remote = !local && (image !== 'cover' || item.source_image);
   const result = useQuery({ queryKey: ['jav-image', item.code, image], enabled: remote,
     queryFn: ({ signal }) => apiGet<{ ok: boolean; image: string; message?: string }>(
       `/api/jav/image?code=${encodeURIComponent(item.code)}&image=${image}`, signal) });
   const src = local ? coverUrl(item, true) : result.data?.image || (image === 'cover' && !item.source_image ? item.cover_url : '');
-  if (src) return <img data-jav-picture="" src={src} alt={image === 'cover' ? `${item.code} 封面` : `${item.code} 预览 ${Number(image) + 1}`} referrerPolicy="no-referrer" />;
+  if (src) return <img data-jav-picture={thumbnail ? undefined : ''} src={src} alt={thumbnail ? '' : image === 'cover' ? `${item.code} 封面` : `${item.code} 预览 ${Number(image) + 1}`} referrerPolicy="no-referrer" />;
+  if (thumbnail) return remote && result.isPending ? <span className="block h-24 w-full skeleton-sheen" aria-label="正在读取预览" /> : <span>预览未取得</span>;
   if (remote && result.isPending) return <div data-jav-picture-wait="" data-skeleton="image" role="status" aria-label="正在读取图片"><span className="skeleton-sheen" /></div>;
   return <div data-jav-picture-wait=""><Note tone="neutral" action={remote ? <Button variant="secondary" {...busyProps(result.isFetching)} onClick={() => { void result.refetch() }}>重试</Button> : undefined}>{result.data?.message || (result.error ? '图片未取得' : '暂无封面')}</Note></div>;
 }
@@ -132,10 +135,11 @@ function SourceRating({ score }: { score: number }) {
 }
 
 function JavIdentity({ item, navigate }: { item: JavDetail; navigate(path: string): void }) {
-  const onOpen = (kind: string, name: string) => navigate(entityPath(kind, name));
+  const onOpen = (kind: string, name: string) => navigate(kind === 'studio' && !item.studio_refs.find(ref => ref.name === name)?.id
+    ? `/?jav=1&studio=${encodeURIComponent(name)}` : entityPath(kind, name));
   const group = (kind: string, label: string, refs: JavEntityRef[], gender?: string) => refs.length ? <section data-id-group={kind} data-id-gender={gender}>
     <h5 data-id-label="">{label}</h5><div data-id-row="">{refs.map(person => <IdentityCell key={person.name} kind={kind}
-      person={{ ...person, id: person.id ?? null }} onOpen={onOpen}
+      person={{ ...person, id: person.id ?? null }} onOpen={onOpen} openByName={kind === 'studio'}
       face={kind === 'performer' && !person.has_image && !person.has_avatar && person.source_avatar && person.source_actor_id
         ? <SourceAvatar code={item.code} person={person} /> : undefined} />)}</div>
   </section> : null;
@@ -173,21 +177,23 @@ function PreviewVideo({ src }: { src: string }) {
 
 function Reviews({ code, count }: { code: string; count: number }) {
   const [opened, setOpened] = useState(false);
-  const result = useInfiniteQuery({ queryKey: ['jav-reviews', code], enabled: opened, initialPageParam: 1,
+  const result = useInfiniteQuery({ queryKey: ['jav-reviews', code], enabled: opened, initialPageParam: 1, staleTime: 60_000,
     queryFn: ({ signal, pageParam }) => fetchJavReviews(code, pageParam, signal), getNextPageParam: nextReviewPage });
   const pages = result.data?.pages || [];
   const items = [...new Map(pages.flatMap(page => page.items).map(item => [item.id, item])).values()];
   const failure = result.error ? errorMessage(result.error) : pages.find(page => !page.ok)?.message;
   return <section data-jav-reviews="">
-    <h2>评论{count > 0 ? ` · ${count}` : ''}</h2>
-    {!opened ? <Button variant="secondary" onClick={() => setOpened(true)}>查看评论</Button> : <>
+    <Disclosure trailing summary={<><RiChat3Line aria-hidden />评论{count > 0 ? ` · ${count}` : ''}</>}
+      onOpenChange={setOpened}>
+    {opened || result.data ? <>
       {result.isPending ? <div data-skeleton="reviews" role="status" aria-label="正在读取评论"><span className="inline-block h-8 w-full skeleton-sheen" /></div> : null}
       {items.map(item => <article key={item.id} data-jav-review=""><p><b>{item.username}</b><span>{item.score ? `${item.score} 分` : ''}</span><time>{item.created_at}</time></p><p>{item.content}</p></article>)}
       {failure ? <Note tone="neutral" action={<Button variant="secondary" onClick={() => { void result.refetch() }}>重试</Button>}>{failure}</Note>
         : !result.isPending && !items.length ? <Note tone="neutral">暂无评论</Note> : null}
       {result.hasNextPage ? <Button variant="secondary" {...busyProps(result.isFetchingNextPage)} onClick={() => { if (!result.isFetchingNextPage) void result.fetchNextPage() }}>更多评论</Button> : null}
       {!failure && pages.at(-1)?.page === 8 && count > items.length ? <Note tone="neutral">已显示 {items.length} 条评论，其余评论可在 JavDB 查看。</Note> : null}
-    </>}
+    </> : null}
+    </Disclosure>
   </section>;
 }
 
@@ -196,10 +202,13 @@ function Resources({ item, actions, readOnly }: { item: JavDetail; actions: JavD
   const downloads = useQuery({ queryKey: DOWNLOADS_KEY, enabled: opened,
     queryFn: ({ signal }) => apiGet<DownloadsSnapshot>(`${DOWNLOADS_URL}?limit=50`, signal) });
   const provider = downloads.data?.providers.find(row => row.configured)?.key || '';
-  return <section data-jav-resources=""><h2>资源</h2>
-    {opened ? <WantMagnets want={{ id: 0, code: item.code, title: item.title, release_date: item.release_date || null }}
+  const [loaded, setLoaded] = useState(false);
+  return <section data-jav-resources="">
+    <Disclosure trailing summary={<><Glyph name="link" />资源</>} onOpenChange={value => { setOpened(value); if (value) setLoaded(true) }}>
+    {loaded ? <WantMagnets want={{ id: 0, code: item.code, title: item.title, release_date: item.release_date || null }}
       queryUrl={`/api/jav/resources?code=${encodeURIComponent(item.code)}`} readOnly={readOnly}
       downloads={downloads.data} provider={provider} toast={actions.receipt} />
-      : <Button variant="secondary" onClick={() => setOpened(true)}>查看资源</Button>}
+      : null}
+    </Disclosure>
   </section>;
 }

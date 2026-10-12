@@ -18,6 +18,11 @@ export function initBoardControls() {
   document.addEventListener('input',event=>{if(event.target instanceof HTMLInputElement&&event.target.type==='range')syncBoardRange(event.target)});
   const tip=document.createElement('div');tip.className='ui-board-tooltip';tip.id='board-control-tooltip';tip.role='tooltip';tip.popover='manual';tip.hidden=true;document.body.append(tip);
   let target:HTMLElement|null=null,title='',described:string|null=null,timer:ReturnType<typeof setTimeout>|undefined;
+  const placeTip=(next:HTMLElement)=>{
+    const rect=next.getBoundingClientRect(),box=tip.getBoundingClientRect();
+    tip.style.left=`${Math.max(8,Math.min(innerWidth-box.width-8,rect.left+(rect.width-box.width)/2))}px`;
+    tip.style.top=`${rect.top>=box.height+16?rect.top-box.height-8:Math.min(innerHeight-box.height-8,rect.bottom+8)}px`;
+  };
   const hide=()=>{clearTimeout(timer);if(tip.matches(':popover-open'))tip.hidePopover();tip.hidden=true;if(target){if(!target.hasAttribute('title'))target.title=title;if(described===null)target.removeAttribute('aria-describedby');else target.setAttribute('aria-describedby',described)}target=null};
   const show=(node:EventTarget|null,delay:number)=>{
     const next=node instanceof Element?node.closest<HTMLElement>('[title]'):null;
@@ -25,9 +30,7 @@ export function initBoardControls() {
     hide();target=next;title=next.title;described=next.getAttribute('aria-describedby');next.removeAttribute('title');
     timer=setTimeout(()=>{if(target!==next||!next.isConnected)return;
       (next.closest('dialog[open]')??document.body).append(tip);tip.textContent=title;tip.hidden=false;tip.showPopover();
-      const rect=next.getBoundingClientRect(),box=tip.getBoundingClientRect();
-      tip.style.left=`${Math.max(8,Math.min(innerWidth-box.width-8,rect.left+(rect.width-box.width)/2))}px`;
-      tip.style.top=`${rect.top>=box.height+16?rect.top-box.height-8:Math.min(innerHeight-box.height-8,rect.bottom+8)}px`;
+      placeTip(next);
       next.setAttribute('aria-describedby',[described,tip.id].filter(Boolean).join(' '));
     },delay);
   };
@@ -37,7 +40,13 @@ export function initBoardControls() {
   document.addEventListener('focusout',hide);
   document.addEventListener('keydown',event=>{if(event.key==='Escape')hide()});
   // 只在提示所指的那一枚被滚走时收：首页新作那一排每一帧都在横滚，任何 scroll 都收的话提示一出来就没了。
-  document.addEventListener('scroll',event=>{if(target&&scrollMovesAnchor(event,target))hide()},true);window.addEventListener('resize',hide);
+  document.addEventListener('scroll',event=>{
+    if(!target||!scrollMovesAnchor(event,target))return;
+    const rect=target.getBoundingClientRect();
+    if(target.matches(':focus-visible')&&rect.bottom>0&&rect.top<innerHeight){
+      if(tip.matches(':popover-open'))placeTip(target);
+    }else hide();
+  },true);window.addEventListener('resize',hide);
 }
 
 /** 页面导航只同步可见位置，选中态由共享样式绘制。 */

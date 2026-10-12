@@ -19341,27 +19341,34 @@ function Up({ term: e, children: t }) {
 		})]
 	});
 }
-function Wp({ summary: e, defaultOpen: t = !1, children: n }) {
-	let r = (0, _.useId)(), i = (0, _.useRef)(null), a = (0, _.useRef)(null), o = (0, _.useRef)(!1), [s, c] = (0, _.useState)(t);
+function Wp({ summary: e, defaultOpen: t = !1, children: n, trailing: r = !1, onOpenChange: i }) {
+	let a = (0, _.useId)(), o = (0, _.useRef)(null), s = (0, _.useRef)(null), c = (0, _.useRef)(!1), [l, u] = (0, _.useState)(t);
 	return /* @__PURE__ */ (0, z.jsxs)("details", {
 		ref: (e) => {
-			i.current = e, e && t && !o.current && (o.current = !0, e.open = !0);
+			o.current = e, e && t && !c.current && (c.current = !0, e.open = !0);
 		},
 		children: [/* @__PURE__ */ (0, z.jsxs)("summary", {
-			"aria-expanded": s,
-			"aria-controls": r,
+			"aria-expanded": l,
+			"aria-controls": a,
 			onClick: (e) => {
-				e.preventDefault(), i.current && a.current && (Np(i.current, a.current, !s), c(!s));
+				e.preventDefault(), o.current && s.current && (Np(o.current, s.current, !l), u(!l), i?.(!l));
 			},
-			className: "flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm text-body-2-medium text-text-secondary outline-none select-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring",
-			children: [/* @__PURE__ */ (0, z.jsx)(lp, {
-				"aria-hidden": !0,
-				className: s ? "size-4 shrink-0 rotate-90 transition-transform" : "size-4 shrink-0 transition-transform"
-			}), e]
+			className: `${r ? "w-full" : "w-fit"} flex cursor-pointer list-none items-center gap-1 rounded-sm text-body-2-medium text-text-secondary outline-none select-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring`,
+			children: [
+				r ? null : /* @__PURE__ */ (0, z.jsx)(lp, {
+					"aria-hidden": !0,
+					className: l ? "size-4 shrink-0 rotate-90 transition-transform" : "size-4 shrink-0 transition-transform"
+				}),
+				e,
+				r ? /* @__PURE__ */ (0, z.jsx)(lp, {
+					"aria-hidden": !0,
+					className: l ? "ml-auto size-4 shrink-0 -rotate-90 transition-transform" : "ml-auto size-4 shrink-0 rotate-90 transition-transform"
+				}) : null
+			]
 		}), /* @__PURE__ */ (0, z.jsx)("div", {
-			ref: a,
-			id: r,
-			inert: !s,
+			ref: s,
+			id: a,
+			inert: !l,
 			children: /* @__PURE__ */ (0, z.jsx)("div", {
 				className: "flex flex-col gap-2 pt-3",
 				children: n
