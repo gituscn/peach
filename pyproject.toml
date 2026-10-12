@@ -34,6 +34,7 @@ dependencies = [
   "beautifulsoup4==4.15.0",
   "bencode2==0.3.35",
   "browserexport==0.4.4",
+  "pyahocorasick==2.3.1",
   "curl_cffi==0.16.3",
   "fastapi==0.142.2",
   # grpcio 与 protobuf 给云下载调 CloudDrive2 的 gRPC 接口（`downloads_clouddrive.py`）。

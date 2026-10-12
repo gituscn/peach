@@ -67,7 +67,10 @@ describe('JAV 推荐与加载结构', () => {
       const search = page.getByRole('searchbox', { name: '筛选推荐', exact: true });
       const cards = page.getByRole('region', { name: '为你推荐', exact: true }).locator('article');
       assert.equal(await cards.count(), 3);
-      assert.equal(await cards.first().locator('[data-jav-taste-score]').textContent(), '100');
+      assert.equal(await cards.first().locator('[data-jav-taste-score]').textContent(), '强烈推荐');
+      const tierBox = await cards.first().locator('[data-jav-taste-score]').boundingBox();
+      const tagsBox = await cards.first().locator('[data-jav-tags]').boundingBox();
+      assert.ok(tierBox && tagsBox && tierBox.y + tierBox.height <= tagsBox.y, '推荐档位在标签前');
       const recommendation = cards.first().getByRole('button', { name: '推荐分 100，强烈推荐', exact: true });
       await recommendation.focus();
       await page.getByRole('tooltip').filter({ hasText: '常看的女优：规范姓名' }).waitFor({ state: 'visible' });

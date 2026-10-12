@@ -23,7 +23,6 @@ from .platform import is_unmapped, root_online, system_volume, translate_ledger_
 from .taste_history import (
     analyze_history,
     build_taste_dashboard,
-    discover_history_sources,
     refresh_history,
     remove_history_source,
     store_version,
@@ -32,6 +31,7 @@ from .taste_history import (
 from .web_activity import DEFAULT_PROFILE_ID
 from .web_catalog import COST, attach_avatar_availability, tag_is_not_a_performer_name
 from .web_state import WebContract, path_version
+from .taste_browsers import browser_sources, configure_browser, enabled_history_sources
 
 
 def q_search_history(contract: WebContract, limit: int = 10):
@@ -70,7 +70,7 @@ def taste_inputs(contract: WebContract, window: str) -> tuple:
 #: 不出脸，域名那排出的是站点 favicon，都不在这里。
 TASTE_FACE_RANKINGS = {
     "creator": ("creators", "browser_creators", "peach_creators"),
-    "performer": ("performers", "peach_performers"),
+    "performer": ("performers", "browser_performers", "peach_performers"),
 }
 
 
@@ -128,6 +128,7 @@ def q_taste(contract: WebContract, args=None):
         "window": window,
         "updated_at": updated_at,
         "storage": {"exports": export_count, "bytes": export_bytes},
+        "browsers": browser_sources(contract.taste_history_store),
     })
     return payload
 
@@ -138,11 +139,11 @@ def w_taste_refresh(contract: WebContract, body, *, progress=None):
         def work(job_id):
             result = w_taste_refresh(contract, {**body, "background": False},
                 progress=lambda **fields: job.update(job_id, **fields))
-            job.update(job_id, **result, status="complete", message="口味分析已更新", completed_at=time.time())
+            job.update(job_id, **result, status="complete", message="部分浏览记录未取得" if result["warnings"] else "口味分析已更新", completed_at=time.time())
         return job.start(work, restart=True, initial={
             "stage": "discovering", "message": "正在查找 Peach 主机上的浏览器资料"})
     window = str(body.get("window") or "all")
-    sources = discover_history_sources()
+    sources = enabled_history_sources(contract.taste_history_store)
     results = refresh_history(sources, contract.taste_history_store, progress=progress) if sources else []
     if contract.taste_history_store.is_file():
         analysis = analyze_history(contract.taste_history_store, contract.taste_history_root, progress=progress)
@@ -150,10 +151,15 @@ def w_taste_refresh(contract: WebContract, body, *, progress=None):
     contract.cache_bust()
     if progress:
         progress(stage="dashboard", checked=0, total=None, message="正在汇总口味分布、标签与创作者排名")
-    return {"refresh": results, "dashboard": q_taste(contract, {"window": window})}
+    return {"refresh": results, "warnings": [f"{row['browser']} · {row['profile']}：{row['error']}"
+            for row in results if row.get("status") == "failed"], "dashboard": q_taste(contract, {"window": window})}
 
 
 def w_taste_source(contract: WebContract, body):
+    if body.get("operation") in ("add", "disable", "enable"):
+        configure_browser(contract.taste_history_store, body["operation"], body)
+        contract.cache_bust()
+        return {"dashboard": q_taste(contract, {"window": str(body.get("window") or "all")})}
     if body.get("operation") != "remove":
         raise ValueError("invalid taste source operation")
     source_key = str(body.get("source_key") or "")

@@ -58,6 +58,7 @@ export interface RankRow {
 export interface TasteRankings {
   browser_tags?: RankRow[];
   browser_creators?: RankRow[];
+  browser_performers?: RankRow[];
   browser_categories?: RankRow[];
   domains?: RankRow[];
   peach_tags?: RankRow[];
@@ -99,6 +100,7 @@ export interface CreatorFlow { source: string; target: string; value: number }
 
 /** `/api/taste` 的响应。字段与 `web_stats.q_taste` 对齐。 */
 export interface TasteData {
+  browsers?: BrowserSource[];
   summary?: TasteSummary;
   coverage?: TasteCoverage;
   rankings?: TasteRankings;
@@ -112,6 +114,18 @@ export interface TasteData {
   updated_at?: string | null;
 }
 
+export interface BrowserSource {
+  id: string;
+  name: string;
+  path: string;
+  enabled: boolean;
+  available: boolean;
+  profiles: number;
+}
+
+export const configureTasteBrowser = (body: { operation: 'add' | 'disable' | 'enable'; name?: string; path?: string; id?: string }, window: string) =>
+  apiSend<{ dashboard: TasteData }>(TASTE_SOURCE_URL, { ...body, window });
+
 /** 读取浏览记录那一趟的快照。`status` 一次都没跑过是 `idle`。 */
 export interface TasteJob {
   status: string;
@@ -121,6 +135,7 @@ export interface TasteJob {
   checked?: number;
   total?: number | null;
   error?: string;
+  warnings?: string[];
 }
 
 export const fetchTaste = (window: string, signal?: AbortSignal) =>

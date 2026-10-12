@@ -308,6 +308,8 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
       await aligned();
       const endpoints = await choices.evaluateAll((nodes) => nodes.slice(0, 2).map((node) => node.getBoundingClientRect().x));
       await pane.evaluate((node) => {
+        const target = node.parentElement!.querySelectorAll('label')[1];
+        target.addEventListener('pointerdown', () => {
         const samples: number[] = [];
         const sample = () => {
           samples.push(node.getBoundingClientRect().x);
@@ -315,6 +317,7 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
           else (node as HTMLElement).dataset.motionSamples = JSON.stringify(samples);
         };
         requestAnimationFrame(sample);
+        }, { once: true });
       });
       await choices.nth(1).click();
       await page.waitForFunction(() => document.querySelector('[data-index-layout] [data-motion-samples]'));

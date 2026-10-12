@@ -93,6 +93,24 @@ class PublicProtocolTests(unittest.TestCase):
         self.assertEqual(budget.requests, 2)
         self.assertEqual(budget.stop_reason, "request_budget")
 
+    def test_known_movie_identity_skips_search_and_keeps_full_detail_validation(self):
+        api = self.api()
+        api.remember_movie_identity('EXM-001', {'id': 'Exact', 'number': 'EXM-001'})
+        self.assertEqual(api.movie('EXM-001')['id'], 'Exact')
+        self.assertFalse(any('/v2/search' in request.url for request in self.requests))
+        wrong = self.api(wrong_code=True)
+        wrong.remember_movie_identity('EXM-001', {'id': 'Exact', 'number': 'EXM-001'})
+        with self.assertRaises(PublicSourceUnavailable):
+            wrong.movie('EXM-001')
+
+    def test_identity_hint_requires_matching_number_and_safe_source_identifier(self):
+        api = self.api()
+        api.remember_movie_identity('EXM-001', {'id': '../Other', 'number': 'EXM-001'})
+        api.remember_movie_identity('EXM-001', {'id': 123, 'number': 'EXM-001'})
+        api.remember_movie_identity('EXM-001', {'id': 'Other', 'number': 'EXM-002'})
+        self.assertEqual(api.movie('EXM-001')['id'], 'Exact')
+        self.assertTrue(any('/v2/search' in request.url for request in self.requests))
+
     def api(self, *, wrong_code=False, blocked=False):
         self.requests = []
 

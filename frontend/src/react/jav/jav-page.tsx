@@ -155,14 +155,14 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
           <div data-jav-faces="" dangerouslySetInnerHTML={{ __html: feedIdentity(item) }} />
           <p className="min-w-0 truncate text-body-2-regular text-text-secondary" title={item.performers}>{[item.performers, item.release_date].filter(Boolean).join(' · ')}</p>
         </div>
-        <div data-jav-tags="" data-media-tags="">{(item.tags || []).slice(0, 4).map(name =>
-          <button type="button" data-media-tag="" key={name} aria-pressed={tag === name} onClick={() => setTag(tag === name ? '' : name)}>{name}</button>)}</div>
         <div data-jav-taste-score="" className="flex h-6 items-center">
           <button type="button" title={scoreDetails} aria-label={`推荐分 ${recommendation.score}，${recommendation.label}`}
             className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring">
-            <Chip color={recommendation.color}>{recommendation.score}</Chip>
+            <Chip color={recommendation.color}>{recommendation.label}</Chip>
           </button>
         </div>
+        <div data-jav-tags="" data-media-tags="">{(item.tags || []).slice(0, 4).map(name =>
+          <button type="button" data-media-tag="" key={name} aria-pressed={tag === name} onClick={() => setTag(tag === name ? '' : name)}>{name}</button>)}</div>
         <div data-jav-actions="" className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => resource({ ...item, cover: item.has_cover ? coverUrl(item, true) : item.cover_url, origin: `${item.asset_id ? 'asset' : 'feed'}:${item.id}` })}>查找资源</Button>
           <Button variant="ghost" disabled={readOnly || item.wanted || !!item.asset_id} {...busyProps(action.busy === String(item.id))} onClick={() => {

@@ -463,6 +463,12 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.16.10，版�
 
 `entities.studio_name_key` 与 `studio_identity_ids` 供入库、元数据落地、名称解析和 `merge_studio_name_variants.py` 共用：NFKC、符号写法及唯一登记别名映射到规范身份。官方标题确认的 [ATTACKERS](https://attackers.net/)、[PREMIUM](https://premium-beauty.com/) 日英并写名和 [kawaii*](https://kawaiikawaii.jp/) 星号写法纳入精确映射。名称冲突保留来源原文；括号两侧须各自唯一指向同一实体；`AVOP` 跨厂牌共用，不作为合并证据。复用项目实体合并、字段归属、SQLite 备份和复核 CSV，无新增依赖。
 
+## 口味来源与偏好
+
+历史快照与导入复用 SQLite backup API 和 `browserexport==0.4.4` 的 Chromium、Firefox、Safari 适配器。`taste_browsers` 管理本机资料目录及启停，配置在私有历史库内，停用保留已导入数据；一份资料未取得不阻塞其他资料。来源规则与账号关联见[口味来源](TASTE_SOURCES.md)，仅复用既有实体链接和启用的关注，不自行确认新身份。
+
+多维偏好复用行为计权、genre 归一和 `related.rank_related` 的 MMR；`taste_preferences` 保存规范身份、证据种类及候选强度。持久缓存复用 `fsutil.atomic_write_text`，按账本、历史库及规则源码版本失效，只读历史连接忽略没有数据帧的 WAL。名称扫描采用 [pyahocorasick 2.3.1](https://github.com/WojciechMula/pyahocorasick)（BSD-3-Clause，Unicode，Python 3.12–3.14，Windows/macOS/Linux）；已读固定版 C 实现，Windows CPython 3.14 wheel 实装通过，新增仅此直接依赖。长标题、多别名、重叠名字及 ASCII 词边界由 Peach 约束。真实只读汇总覆盖七类维度；偏好候选和私有缓存不改写 ledger。
+
 ## 原位改字
 
 `scripts/dev/copy-editor.js` 复用官网本地预览的 `edit-client.js` 交互：文字范围提示、原位编辑、按钮文字就近输入、回车和失焦保存、Esc 取消。

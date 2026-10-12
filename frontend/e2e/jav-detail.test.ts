@@ -156,6 +156,19 @@ describe('库外 JAV 作品详情', () => {
         const side = page.locator('[data-jav-info]');
         const before = await page.locator('#stage').boundingBox();
         const title = await side.locator('h1').elementHandle();
+        await reviewsToggle.evaluate(node => {
+          const state = window as unknown as { commentFrames: { height: number; y: number; media: number }[]; commentSampling: boolean };
+          state.commentFrames = []; state.commentSampling = true;
+          node.addEventListener('pointerdown', () => {
+            const sample = () => {
+              const shell = document.querySelector('#stage')!.getBoundingClientRect();
+              const media = document.querySelector('[data-jav-art]')!.getBoundingClientRect();
+              state.commentFrames.push({ height: shell.height, y: shell.y, media: media.height });
+              if (state.commentSampling && state.commentFrames.length < 600) requestAnimationFrame(sample);
+            };
+            requestAnimationFrame(sample);
+          }, { once: true });
+        });
         await reviewsToggle.click();
         await page.waitForFunction(() => document.querySelectorAll('[data-jav-review]').length === 10);
         assert.equal(await page.locator('[data-jav-review] img').count(), 0, '评论正文按文本呈现');
@@ -178,6 +191,15 @@ describe('库外 JAV 作品详情', () => {
         assert.equal(await reviewsToggle.getAttribute('aria-expanded'), 'false');
         await reviewsToggle.click();
         await page.locator('[data-jav-review]').last().waitFor({ state: 'visible' });
+        const commentFrames = await page.evaluate(() => {
+          const state = window as unknown as { commentFrames: { height: number; y: number; media: number }[]; commentSampling: boolean };
+          state.commentSampling = false; return state.commentFrames;
+        });
+        assert.ok(commentFrames.length > 3);
+        for (const field of ['height', 'y', 'media'] as const) {
+          const values = commentFrames.map(frame => frame[field]);
+          assert.ok(Math.max(...values) - Math.min(...values) < 1, `评论切换 ${field} 保持一致：${JSON.stringify(values)}`);
+        }
         await resourcesToggle.click();
         await page.getByText('EXM-001 示例资源 1', { exact: false }).waitFor({ state: 'visible' });
         assert.equal(await page.locator('[data-jav-resources] [data-resource-protocol]:visible').count(), 3);

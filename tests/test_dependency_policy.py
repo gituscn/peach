@@ -63,6 +63,7 @@ class DependencyPolicyTests(unittest.TestCase):
             "apscheduler": "APScheduler",
             "bencode2": "bencode2",
             "browserexport": "browserexport",
+            "ahocorasick": "pyahocorasick",
             "bs4": "beautifulsoup4",
             "curl_cffi": "curl_cffi",
             "cv2": "opencv-python-headless",

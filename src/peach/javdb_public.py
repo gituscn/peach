@@ -194,11 +194,7 @@ class PublicAPI:
         try:
             with nullcontext() if key.startswith('image:') else self.source_lock:
                 result = fetch()
-            with self.lock:
-                self.cache[key] = (self.clock() + 6 * 3600, result)
-                self.cache.move_to_end(key)
-                while len(self.cache) > 128:
-                    self.cache.popitem(last=False)
+            self._remember(key, result)
             future.set_result(result)
             return result
         except BaseException as error:
@@ -208,22 +204,41 @@ class PublicAPI:
             with self.lock:
                 self.pending.pop(key, None)
 
+    def _remember(self, key, result):
+        with self.lock:
+            self.cache[key] = (self.clock() + 6 * 3600, result)
+            self.cache.move_to_end(key)
+            while len(self.cache) > 128:
+                self.cache.popitem(last=False)
+
     def movie(self, code: str) -> dict:
         canonical = normalise_code_key(code)
 
-        def fetch():
+        def identify():
             rows = self._rows("/v2/search", "movies", {"q": canonical, "type": "movie", "page": 1})
             match = next((row for row in rows if isinstance(row, dict)
                           and normalise_code_key(row.get("number")) == canonical), None)
-            if not match or not re.fullmatch(r"[A-Za-z0-9]+", str(match.get("id", ""))):
+            if not match or not isinstance(match.get("id"), str) or not re.fullmatch(r"[A-Za-z0-9]+", match["id"]):
                 raise PublicSourceUnavailable("未取得这个番号的作品资料")
-            movie = self._json("/v4/movies/" + match["id"]).get("movie")
+            return match["id"]
+
+        def fetch():
+            movie_id = self._cached("movie-id:" + canonical, identify)
+            movie = self._json("/v4/movies/" + movie_id).get("movie")
             if (not isinstance(movie, dict) or normalise_code_key(movie.get("number")) != canonical
-                    or movie.get("id") != match["id"]):
+                    or movie.get("id") != movie_id):
                 raise PublicSourceUnavailable("来源作品身份不匹配")
             return movie
 
         return self._cached("movie:" + canonical, fetch)
+
+    def remember_movie_identity(self, code: str, source: dict):
+        """已取得的编目身份可复用，完整资料仍须通过来源的身份核对。"""
+        canonical = normalise_code_key(code)
+        identity = source.get("id")
+        if not isinstance(identity, str) or normalise_code_key(source.get("number")) != canonical or not re.fullmatch(r"[A-Za-z0-9]+", identity):
+            return
+        self._remember("movie-id:" + canonical, identity)
 
     def _rows(self, path, key, query=None):
         rows = self._json(path, query).get(key, [])

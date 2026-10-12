@@ -38,7 +38,7 @@ describe('发现资料与排序', () => {
       assert.equal(details, 0);
       assert.ok(requests.some(params => params.get('metadata_job_id') === 'fixed-batch'));
       const cards = page.locator('[data-jav-card]');
-      assert.equal(await cards.first().locator('[data-jav-taste-score]').textContent(), '0');
+      assert.equal(await cards.first().locator('[data-jav-taste-score]').textContent(), '探索');
       const score = cards.first().getByRole('button', { name: '推荐分 0，探索', exact: true });
       await score.scrollIntoViewIfNeeded();
       await score.focus();
