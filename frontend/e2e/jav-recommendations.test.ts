@@ -67,7 +67,10 @@ describe('JAV 推荐与加载结构', () => {
       const search = page.getByRole('searchbox', { name: '筛选推荐', exact: true });
       const cards = page.getByRole('region', { name: '为你推荐', exact: true }).locator('article');
       assert.equal(await cards.count(), 3);
+      for (const cover of await cards.locator('img.poster').all()) await cover.scrollIntoViewIfNeeded();
       await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>('[data-jav-card] img.poster')].every(img => img.complete && img.naturalWidth > 0));
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: `../build/jav-discover-${viewport.name}.png`, fullPage: true });
       const frames = await cards.evaluateAll(nodes => nodes.slice(0, 2).map(node => {
         const pic = node.querySelector('[data-jav-cover-box]')!.getBoundingClientRect();
         const img = node.querySelector<HTMLImageElement>('img.poster')!;

@@ -55063,7 +55063,7 @@ function KEe({ readOnly: e, receipt: t, resource: n, query: r, navigate: i, clea
 			/* @__PURE__ */ (0, x.jsx)("div", {
 				"data-media-grid": "",
 				className: Qz,
-				style: { "--jav-cover-ratio": _ },
+				style: { "--card-ratio": _ },
 				children: w.map((r) => {
 					let a = yB(r, g, h.value.javImage);
 					return /* @__PURE__ */ (0, x.jsxs)("article", {

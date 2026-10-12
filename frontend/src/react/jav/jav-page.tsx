@@ -100,7 +100,7 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
       {query || tag ? '清除筛选后查看其他作品。' : scope === 'library' ? '观看或标记作品后，可以探索少看的馆藏。' : '可以查找番号，或更新关注来源。'}
     </EmptyState> : null}
     {action.error ? <Note tone="error">{action.error}</Note> : null}
-    <div data-media-grid="" className={JAV_RECOMMENDATION_GRID} style={{ '--jav-cover-ratio': ratio } as CSSProperties}>
+    <div data-media-grid="" className={JAV_RECOMMENDATION_GRID} style={{ '--card-ratio': ratio } as CSSProperties}>
       {items.map(item => {
         const artwork = discoveryArtwork(item, layout, settings.value.javImage);
         return <article key={item.id} data-media-card="" data-jav-card="" onClick={event => {
