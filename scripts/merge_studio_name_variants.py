@@ -38,7 +38,6 @@ import argparse
 import re
 import sqlite3
 import sys
-import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -48,7 +47,8 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from peach.config import GENERATED_DIR   # noqa: E402
-from peach.entities import merge_entity   # noqa: E402
+from peach.entities import merge_entity, studio_name_key   # noqa: E402
+from peach.field_owners import write_owned_fields   # noqa: E402
 from peach.review_csv import read_rows, write_rows   # noqa: E402
 from peach.scripting import (   # noqa: E402
     add_ledger_write_args, counts_of, open_for_write, verify_after_write,
@@ -56,17 +56,14 @@ from peach.scripting import (   # noqa: E402
 
 MERGE_ALIAS_SOURCE = "merge:studio-name-variant"
 
-#: 同一个符号的不同写法。NFKC 已经处理了全角（`＆`→`&`），剩下这些它不动。
-SYMBOL_FOLD = str.maketrans({
-    "’": "'", "‘": "'", "“": '"', "”": '"',
-    "☆": "*", "★": "*", "♪": "*",
-})
 #: 假名、汉字与全角片假名。判「这个名字是日文写法」只看有没有这些字符。
 JAPANESE = re.compile(r"[぀-ヿ㐀-䶿一-鿿]")
 #: 汉字或平假名。日文名含它们，对面的拉丁名就是罗马音转写；只有片假名的是外来语写法。
 NATIVE_JAPANESE = re.compile(r"[぀-ゟ㐀-䶿一-鿿]")
 #: 番号前缀：连字符前那一段字母数字。`336KBI-042` 的前缀是 `336KBI`。
 CODE_PREFIX = re.compile(r"^([A-Za-z][A-Za-z0-9]*)-\d")
+# AV OPEN 参赛作品跨厂牌共用这一前缀，不承载厂牌身份。
+SHARED_EVENT_PREFIXES = frozenset({'AVOP'})
 #: 两种写法并在一串里：`プレステージプレミアム(PRESTIGE PREMIUM)`。括号里不许再套括号，
 #: 否则 `AVS collector's (2)` 这类带序号的名字会被当成并写。
 BRACKETED = re.compile(r"^(.+?)\s*[（(]\s*([^（()）]+?)\s*[)）]\s*$")
@@ -81,8 +78,7 @@ def variant_key(name: str) -> str:
     不能退化成「只留 ASCII 字母数字」。那样纯日文名全折成空串，`シロウトTV` 与
     `ラグジュTV` 都折成 `tv`，129 个厂牌会凭空长出一堆假的重复对。
     """
-    folded = unicodedata.normalize("NFKC", name).translate(SYMBOL_FOLD)
-    return re.sub(r"\s+", "", folded).casefold()
+    return studio_name_key(name)
 
 
 def studios(connection: sqlite3.Connection) -> dict[int, str]:
@@ -95,8 +91,8 @@ def asset_facts(connection: sqlite3.Connection
     """每个厂牌实体挂了多少作品、这些作品用过哪些番号前缀。"""
     counts: dict[int, int] = defaultdict(int)
     prefixes: dict[int, set[str]] = defaultdict(set)
-    for entity_id, code in connection.execute(
-            "SELECT ae.entity_id,a.code FROM asset_entity ae"
+    for entity_id, _asset_id, code in connection.execute(
+            "SELECT DISTINCT ae.entity_id,a.id,a.code FROM asset_entity ae"
             " JOIN asset a ON a.id=ae.asset_id"
             " JOIN entity e ON e.id=ae.entity_id WHERE e.kind='studio'"):
         counts[int(entity_id)] += 1
@@ -143,7 +139,8 @@ def script_variants(names: dict[int, str], counts: dict[int, int],
     for entity_id, name in sorted(names.items(), key=lambda item: item[1]):
         if not JAPANESE.search(name) or entity_id in taken or not prefixes.get(entity_id):
             continue
-        shared = [(other, sorted(prefixes[entity_id] & prefixes.get(other, set())))
+        shared = [(other, sorted((prefixes[entity_id] & prefixes.get(other, set()))
+                                 - SHARED_EVENT_PREFIXES))
                   for other in latin]
         hits = [item for item in shared if item[1]]
         if len(hits) != 1:
@@ -174,23 +171,22 @@ def bracketed_variants(connection: sqlite3.Connection, names: dict[int, str],
     `Faleno (2)` 这种带序号的名字就会被当成并写——括号里那个 `2` 说明不了任何事，
     剩下的等于只按「名字开头一样」合并。指到两家去的同样交人工：合并不可逆。
     """
-    registered: dict[str, int] = {}
+    registered: dict[str, set[int]] = defaultdict(set)
     for entity_id, name in names.items():
-        registered.setdefault(variant_key(name), entity_id)
+        registered[variant_key(name)].add(entity_id)
     for entity_id, alias in connection.execute(
             "SELECT ea.entity_id,ea.alias FROM entity_alias ea"
             " JOIN entity e ON e.id=ea.entity_id WHERE e.kind='studio'"):
-        registered.setdefault(variant_key(str(alias or "")), int(entity_id))
+        registered[variant_key(str(alias or ""))].add(int(entity_id))
     rows = []
     for entity_id, name in sorted(names.items(), key=lambda item: item[1]):
         shape = BRACKETED.match(name)
         if entity_id in taken or not shape:
             continue
-        sides = [registered.get(variant_key(part)) for part in shape.groups()]
-        hits = {found for found in sides if found is not None and found != entity_id}
-        if None in sides or len(hits) != 1:
+        sides = [registered[variant_key(part)] - {entity_id} for part in shape.groups()]
+        if any(len(side) != 1 for side in sides) or sides[0] != sides[1]:
             continue
-        keep = hits.pop()
+        keep = next(iter(sides[0]))
         if keep in taken:
             continue
         rows.append(_pair(keep, entity_id, names, counts, "并写名",
@@ -219,9 +215,11 @@ def apply_rows(connection: sqlite3.Connection, rows: list[dict]) -> dict[str, in
         counts["merged"] += 1
         for key in ("assets", "aliases", "links", "terms", "dropped_refs"):
             counts[key] += moved[key]
-        connection.execute("UPDATE asset SET studio=? WHERE studio=?",
-                           (row["keep_name"], row["drop_name"]))
-        counts["flat_rewritten"] += connection.execute("SELECT changes()").fetchone()[0]
+        assets = [int(asset[0]) for asset in connection.execute(
+            "SELECT id FROM asset WHERE studio=?", (row["drop_name"],))]
+        result = write_owned_fields(connection, assets, {'studio': row['keep_name']},
+                                    'review:studio-name-variant')
+        counts["flat_rewritten"] += result.assets
     return dict(counts)
 
 
@@ -301,13 +299,14 @@ def run(args: argparse.Namespace) -> int:
         with connection:
             moved = apply_rows(connection, rows)
         after = counts_of(connection, EXTRA_COUNTS)
-        _integrity, violations = verify_after_write(connection)
+        integrity, violations = verify_after_write(connection)
         print("  合并结果：", moved)
         for key in before:
             mark = "" if before[key] == after[key] else "  <-- 变化"
             print(f"    {key}: {before[key]} -> {after[key]}{mark}")
         print(f"  foreign_key_check 违规 {violations} 条")
-        return 1 if violations else 0
+        print(f"  integrity_check: {integrity}")
+        return 1 if violations or integrity != 'ok' else 0
     finally:
         connection.close()
 

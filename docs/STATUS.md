@@ -7,7 +7,7 @@
 ## 运行态
 
 - 名册：艺人（含动画作者）｜卖家｜在线；素人须有非职业出演证据，FC2 仅筛作品。
-- 公司资料按公开来源填空；FC2 卖家按作品来源快照补入。回执见 `peach-data/review/`。
+- 公司资料与 FC2 卖家按来源补空；厂牌去重 6 组。回执见 `peach-data/review/`。
 - 核查：`peach-data/review/creator-boundary-delivery.md`；StraplessDildo 归厂牌。
 - 关注作者 25 位、来源 111 条、身份关联 71 条、别名 30 条（ADR-0096）。
 - 身份合并 18 组；版本核查：`peach-data/review/version-evidence-review.md`。

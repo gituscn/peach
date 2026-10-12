@@ -53139,7 +53139,6 @@ function eEe({ label: e, value: t, onQuery: n }) {
 		children: /* @__PURE__ */ (0, x.jsx)(MP, {
 			"aria-label": e,
 			value: r,
-			enterKeyHint: "search",
 			onChange: (e) => {
 				i(e), a.current || s(e);
 			},
@@ -53148,6 +53147,7 @@ function eEe({ label: e, value: t, onQuery: n }) {
 				leadingIcon: $Te,
 				spellCheck: !1,
 				autoComplete: "off",
+				enterKeyHint: "search",
 				onKeyDown: (e) => {
 					e.key !== "Enter" || a.current || e.nativeEvent.isComposing || (e.preventDefault(), clearTimeout(o.current), n(r.trim()));
 				}

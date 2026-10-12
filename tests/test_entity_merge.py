@@ -12,6 +12,7 @@ from peach.entities import (
     collapse_repeated_entity_name,
     merge_entity,
     normalize_entity_name,
+    resolve_entity,
     upsert_asset_entity,
 )
 from peach.migrations import upgrade
@@ -172,6 +173,41 @@ class EntityMergeTests(unittest.TestCase):
         ).fetchone()[0], 2, "旧名别名不得被重新建成第三个实体")
         self.assertEqual(collapse_repeated_entity_name("A B A B"), "A B")
         self.assertEqual(canonicalize_entity_name("performer", "画像を拡大する"), "")
+
+    def test_studio_ingest_reuses_official_names_and_registered_aliases(self):
+        target = upsert_asset_entity(self.con, kind='studio', name='Attackers',
+                                    asset_id=1, role='studio', source='r18:studio')
+        self.con.execute("INSERT INTO entity_alias VALUES(?,? ,?,'mapping',1)",
+                         (target, 'アタッカーズ', 'アタッカーズ'))
+        for name in ('ATTACKERS（アタッカーズ）', 'アタッカーズ'):
+            self.assertEqual(upsert_asset_entity(self.con, kind='studio', name=name,
+                asset_id=3, role='studio', source='makers:studio'), target)
+            self.assertEqual(resolve_entity(self.con, 'studio', name)[0], target)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM entity WHERE kind='studio'").fetchone()[0], 1)
+
+    def test_studio_ingest_preserves_ambiguous_aliases(self):
+        for name in ('Alpha', 'Beta'):
+            entity_id = upsert_asset_entity(self.con, kind='studio', name=name,
+                asset_id=1, role='studio', source='mapping')
+            self.con.execute("INSERT INTO entity_alias VALUES(?,? ,?,'mapping',1)",
+                             (entity_id, 'Shared', 'shared'))
+        found = upsert_asset_entity(self.con, kind='studio', name='Shared',
+            asset_id=3, role='studio', source='makers:studio')
+        self.assertEqual(self.con.execute('SELECT canonical_name FROM entity WHERE id=?',
+                                         (found,)).fetchone()[0], 'Shared')
+
+    def test_metadata_landing_uses_one_studio_name_for_fields_and_relations(self):
+        from peach.metadata_auto_apply import _apply_metadata_candidate
+        self.con.row_factory = sqlite3.Row
+        target = upsert_asset_entity(self.con, kind='studio', name='Attackers',
+                                    asset_id=1, role='studio', source='r18:studio')
+        group = {'asset_id': '3', 'asset_path': '/x/3.mp4', 'code': '',
+                 'field': 'studio', 'item_key': 'asset:3:studio'}
+        candidate = {'source': 'makers', 'value': 'ATTACKERS（アタッカーズ）',
+                     'confidence': 1, 'candidate_key': 'studio-identity'}
+        _apply_metadata_candidate(self.con, group, candidate, '2026-10-12', 'review:makers')
+        self.assertEqual(self.con.execute('SELECT studio FROM asset WHERE id=3').fetchone()[0], 'Attackers')
+        self.assertEqual(self.con.execute("SELECT entity_id FROM asset_entity WHERE asset_id=3 AND role='studio'").fetchone()[0], target)
 
 
 class ZeroWidthNameTests(unittest.TestCase):
