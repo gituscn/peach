@@ -8,7 +8,8 @@ import re
 import threading
 import time
 from collections import OrderedDict
-from contextlib import contextmanager
+from concurrent.futures import Future
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from contextvars import ContextVar
 from urllib.parse import urlencode, urlsplit
@@ -86,7 +87,7 @@ def actor_gender(actor: dict) -> str:
 
 
 class PublicAPI:
-    """不带账号凭据；串行取数、3 秒间隔、6 小时缓存，失败冷却 60 秒。"""
+    """匿名资料请求间隔 3 秒；图片最多三个并发，同键合并，缓存 6 小时。"""
 
     def __init__(self, transport=None, *, clock=time.monotonic, sleeper=time.sleep):
         self.transport = transport
@@ -94,6 +95,9 @@ class PublicAPI:
         self.limiter = HostLimiter({}, default_interval=3.0, clock=clock, sleeper=sleeper)
         self.lock = threading.RLock()
         self.cache: OrderedDict[str, tuple[float, object]] = OrderedDict()
+        self.pending: dict[str, Future] = {}
+        self.image_slots = threading.BoundedSemaphore(3)
+        self.source_lock = threading.RLock()
         self.signature_parts: tuple[str, str] | None = None
         self.signature_until = 0.0
         self.paused_until = 0.0
@@ -108,10 +112,11 @@ class PublicAPI:
         finally:
             self.request_context.reset(token)
 
-    def _get(self, url: str, *, signed=False, limit=2 * 1024 * 1024):
+    def _get(self, url: str, *, signed=False, limit=2 * 1024 * 1024, image=False):
         if self.clock() < self.paused_until:
             raise PublicSourceUnavailable("作品资料来源暂时不可用，请稍后重试")
-        self.limiter.wait(url)
+        if not image:
+            self.limiter.wait(url)
         budget = self.request_context.get()
         if budget:
             budget.check()
@@ -180,29 +185,60 @@ class PublicAPI:
             if hit and hit[0] > self.clock():
                 self.cache.move_to_end(key)
                 return hit[1]
-            result = fetch()
+            future = self.pending.get(key)
+            owner = future is None
+            if owner:
+                future = self.pending[key] = Future()
+        if not owner:
+            return future.result()
+        try:
+            with nullcontext() if key.startswith('image:') else self.source_lock:
+                result = fetch()
+            self._remember(key, result)
+            future.set_result(result)
+            return result
+        except BaseException as error:
+            future.set_exception(error)
+            raise
+        finally:
+            with self.lock:
+                self.pending.pop(key, None)
+
+    def _remember(self, key, result):
+        with self.lock:
             self.cache[key] = (self.clock() + 6 * 3600, result)
             self.cache.move_to_end(key)
             while len(self.cache) > 128:
                 self.cache.popitem(last=False)
-            return result
 
     def movie(self, code: str) -> dict:
         canonical = normalise_code_key(code)
 
-        def fetch():
+        def identify():
             rows = self._rows("/v2/search", "movies", {"q": canonical, "type": "movie", "page": 1})
             match = next((row for row in rows if isinstance(row, dict)
                           and normalise_code_key(row.get("number")) == canonical), None)
-            if not match or not re.fullmatch(r"[A-Za-z0-9]+", str(match.get("id", ""))):
+            if not match or not isinstance(match.get("id"), str) or not re.fullmatch(r"[A-Za-z0-9]+", match["id"]):
                 raise PublicSourceUnavailable("未取得这个番号的作品资料")
-            movie = self._json("/v4/movies/" + match["id"]).get("movie")
+            return match["id"]
+
+        def fetch():
+            movie_id = self._cached("movie-id:" + canonical, identify)
+            movie = self._json("/v4/movies/" + movie_id).get("movie")
             if (not isinstance(movie, dict) or normalise_code_key(movie.get("number")) != canonical
-                    or movie.get("id") != match["id"]):
+                    or movie.get("id") != movie_id):
                 raise PublicSourceUnavailable("来源作品身份不匹配")
             return movie
 
         return self._cached("movie:" + canonical, fetch)
+
+    def remember_movie_identity(self, code: str, source: dict):
+        """已取得的编目身份可复用，完整资料仍须通过来源的身份核对。"""
+        canonical = normalise_code_key(code)
+        identity = source.get("id")
+        if not isinstance(identity, str) or normalise_code_key(source.get("number")) != canonical or not re.fullmatch(r"[A-Za-z0-9]+", identity):
+            return
+        self._remember("movie-id:" + canonical, identity)
 
     def _rows(self, path, key, query=None):
         rows = self._json(path, query).get(key, [])
@@ -256,8 +292,9 @@ class PublicAPI:
 
         def fetch():
             import base64
-            body = self._get(str(url), limit=4 * 1024 * 1024).body
-            decoded = decode_image(body)
+            with self.image_slots:
+                body = self._get(str(url), limit=4 * 1024 * 1024, image=True).body
+                decoded = decode_image(body)
             return "data:image/jpeg;base64," + base64.b64encode(decoded).decode("ascii")
 
         return self._cached(f"image:{movie['id']}:{index}", fetch)

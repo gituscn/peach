@@ -190,11 +190,18 @@ describe('本地与在线艺人共用名册布局', () => {
   });
   it('名册过滤框在手机上弹出的软键盘回车键标成「搜索」', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/performers', VIEWPORTS[1]);
+    let release = () => {};
     try {
+      const pending = new Promise<void>(resolve => { release = resolve });
+      await opened.page.route('**/api/index?**', async route => { await pending; await route.fallback() });
+      await opened.page.reload({ waitUntil: 'commit' });
       const input = opened.page.locator('#index [data-index-search] input');
-      await input.waitFor({ timeout: 15_000 });
+      await opened.page.locator('#index [data-index-search] input[readonly]').waitFor({ timeout: 15_000 });
+      assert.equal(await input.getAttribute('enterkeyhint'), 'search');
+      release();
+      await opened.page.locator('#index [data-index-search] input:not([readonly])').waitFor({ timeout: 15_000 });
       assert.equal(await input.getAttribute('enterkeyhint'), 'search');
       assert.deepEqual(opened.problems, []);
-    } finally { await opened.close() }
+    } finally { release(); await opened.close() }
   });
 });

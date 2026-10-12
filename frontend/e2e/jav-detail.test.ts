@@ -17,6 +17,13 @@ describe('库外 JAV 作品详情', () => {
         const errors: string[] = [];
         page.on('pageerror', error => errors.push(error.message));
         await mockJavDetail(page);
+        await page.route(/\/api\/jav\/image\?/, async route => {
+          const portrait = new URL(route.request().url()).searchParams.get('image') === '1';
+          if (portrait) await new Promise(resolve => setTimeout(resolve, 350));
+          const [width, height] = portrait ? [600, 900] : [900, 600];
+          await route.fulfill({ json: { ok: true, image: 'data:image/svg+xml,' + encodeURIComponent(
+            `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#777"/></svg>`) } });
+        });
         await page.route(/\/api\/entity\/shapes/, route => route.fulfill({ json: { home: { feed: true }, entities: [] } }));
         await page.route(/\/api\/feeds\/discoveries\?/, route => route.fulfill({ json: { ok: true, items: [
           { id: 1, code: 'EXM-001', title: '示例新作', performers: '示例人物', release_date: '2026-10-30' },
@@ -54,10 +61,17 @@ describe('库外 JAV 作品详情', () => {
         assert.ok(shared.faces.every(face => Math.abs(face.y - shared.faces[0]!.y) < 1));
         assert.equal(shared.stars, 5);
         assert.equal(shared.filled, 4);
+        assert.equal(await page.locator('[data-jav-art]').evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(0, 0, 0)');
         await page.locator('[data-jav-rating] [data-rate="1"]').hover();
         const fraction = await page.locator('[data-jav-info] > [data-jav-rating] [data-rate="5"]').evaluate(el =>
-          el.querySelector('[data-rating-fill]')!.getBoundingClientRect().width / el.getBoundingClientRect().width);
+          el.querySelector('[data-rating-fill]')!.getBoundingClientRect().width / el.querySelector('[data-rating-icon]')!.getBoundingClientRect().width);
         assert.ok(Math.abs(fraction - 0.4) < 0.01, '4.4 的第五颗星填充 40%');
+        const starLayers = await page.locator('[data-jav-info] > [data-jav-rating] [data-rate]').evaluateAll(nodes => nodes.map(node => {
+          const [outline, fill] = node.querySelectorAll('svg');
+          const a = outline!.getBoundingClientRect(), b = fill!.getBoundingClientRect();
+          return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.width - b.width), Math.abs(a.height - b.height));
+        }));
+        assert.ok(starLayers.every(error => error < .5), JSON.stringify(starLayers));
         assert.equal(shared.icons, 2);
         assert.ok(Math.abs(shared.codeY - shared.titleY) < 2, '番号与标题在同一行开始');
         assert.equal(shared.tag, '痴女'); assert.equal(shared.tagCat, 'role');
@@ -74,7 +88,19 @@ describe('库外 JAV 作品详情', () => {
         await thumbnails.locator('img').first().waitFor({ state: 'visible' });
         assert.equal(await thumbnails.locator('button').count(), 13);
         const stripBox = await thumbnails.boundingBox(), mainBox = await page.locator('[data-jav-picture]').boundingBox();
-        assert.ok(stripBox && mainBox && stripBox.y >= mainBox.y + mainBox.height, '缩略图常驻主图下方');
+        assert.ok(stripBox && mainBox && stripBox.y >= mainBox.y + mainBox.height, `缩略图常驻主图下方：${JSON.stringify({ stripBox, mainBox })}`);
+        await thumbnails.evaluate(node => { node.scrollLeft = 0 });
+        await thumbnails.hover();
+        await page.mouse.wheel(0, 180);
+        await page.waitForFunction(() => (document.querySelector('[data-media-thumbnails]')?.scrollLeft || 0) > 0);
+        await page.evaluate(() => {
+          const frames: { width: number; height: number }[] = [];
+          Object.assign(window, { detailHeightFrames: frames });
+          const sample = () => { const frame = document.querySelector('[data-stage-media]');
+            if (frame) frames.push({ width: innerWidth, height: frame.getBoundingClientRect().height });
+            if (frames.length < 120) requestAnimationFrame(sample);
+          }; sample();
+        });
         const imageDot = page.getByRole('button', { name: '预览 2', exact: true });
         await page.keyboard.press('Tab');
         await imageDot.focus();
@@ -113,6 +139,12 @@ describe('库外 JAV 作品详情', () => {
         await preview.getByRole('button', { name: '设置', exact: true }).click();
         await page.getByRole('button', { name: '查看图片', exact: true }).click();
         assert.equal(await page.locator('[data-jav-video] video').count(), 0, '切回图片卸下预览播放器');
+        const frames = await page.evaluate(() => (window as unknown as { detailHeightFrames: { width: number; height: number }[] }).detailHeightFrames);
+        assert.ok(frames.length > 3);
+        for (const width of new Set(frames.map(frame => frame.width))) {
+          const heights = frames.filter(frame => frame.width === width).map(frame => frame.height);
+          assert.ok(Math.max(...heights) - Math.min(...heights) < 1, JSON.stringify({ width, heights }));
+        }
         const reviewsToggle = page.locator('[data-jav-reviews] summary');
         const resourcesToggle = page.locator('[data-jav-resources] > details > summary');
         for (const toggle of [reviewsToggle, resourcesToggle]) {
@@ -124,11 +156,28 @@ describe('库外 JAV 作品详情', () => {
         const side = page.locator('[data-jav-info]');
         const before = await page.locator('#stage').boundingBox();
         const title = await side.locator('h1').elementHandle();
+        await reviewsToggle.evaluate(node => {
+          const state = window as unknown as { commentFrames: { height: number; y: number; media: number }[]; commentSampling: boolean };
+          state.commentFrames = []; state.commentSampling = true;
+          node.addEventListener('pointerdown', () => {
+            const sample = () => {
+              const shell = document.querySelector('#stage')!.getBoundingClientRect();
+              const media = document.querySelector('[data-jav-art]')!.getBoundingClientRect();
+              state.commentFrames.push({ height: shell.height, y: shell.y, media: media.height });
+              if (state.commentSampling && state.commentFrames.length < 600) requestAnimationFrame(sample);
+            };
+            requestAnimationFrame(sample);
+          }, { once: true });
+        });
         await reviewsToggle.click();
         await page.waitForFunction(() => document.querySelectorAll('[data-jav-review]').length === 10);
         assert.equal(await page.locator('[data-jav-review] img').count(), 0, '评论正文按文本呈现');
         assert.equal(await page.locator('[data-jav-review] time').first().textContent(), '2026-10-12');
         assert.equal(await page.locator('[data-jav-review] [data-rating-stars]').first().locator('[data-rate]').count(), 5);
+        const centers = await page.locator('[data-jav-review-meta]').first().evaluate(node => [...node.children].map(child => {
+          const box = child.getBoundingClientRect(); return box.y + box.height / 2;
+        }));
+        assert.ok(Math.max(...centers) - Math.min(...centers) < 1, JSON.stringify(centers));
         assert.ok(await title!.evaluate(node => node.isConnected), '评论加载保留标题节点');
         if (!viewport.mobile) {
           const after = await page.locator('#stage').boundingBox();
@@ -142,6 +191,15 @@ describe('库外 JAV 作品详情', () => {
         assert.equal(await reviewsToggle.getAttribute('aria-expanded'), 'false');
         await reviewsToggle.click();
         await page.locator('[data-jav-review]').last().waitFor({ state: 'visible' });
+        const commentFrames = await page.evaluate(() => {
+          const state = window as unknown as { commentFrames: { height: number; y: number; media: number }[]; commentSampling: boolean };
+          state.commentSampling = false; return state.commentFrames;
+        });
+        assert.ok(commentFrames.length > 3);
+        for (const field of ['height', 'y', 'media'] as const) {
+          const values = commentFrames.map(frame => frame[field]);
+          assert.ok(Math.max(...values) - Math.min(...values) < 1, `评论切换 ${field} 保持一致：${JSON.stringify(values)}`);
+        }
         await resourcesToggle.click();
         await page.getByText('EXM-001 示例资源 1', { exact: false }).waitFor({ state: 'visible' });
         assert.equal(await page.locator('[data-jav-resources] [data-resource-protocol]:visible').count(), 3);
@@ -187,10 +245,24 @@ describe('库外 JAV 作品详情', () => {
       try {
         const page = await context.newPage();
         await mockJavDetail(page);
-        await page.route(/\/api\/jav\/detail\?/, route => route.fulfill({ json: { ...JAV_DETAIL, state: 'partial', source_image: false,
-          preview_count: 0, message: '作品资料未取得，请稍后重试' } }));
+        await page.addInitScript(() => {
+          const heights: number[] = [];
+          Object.assign(window, { coldDetailHeights: heights });
+          const sample = () => {
+            const dialog = document.querySelector<HTMLDialogElement>('#stage[open]');
+            if (dialog) heights.push(dialog.clientHeight);
+            if (heights.length < 180) requestAnimationFrame(sample);
+          }; requestAnimationFrame(sample);
+        });
+        await page.route(/\/api\/jav\/detail\?/, async route => {
+          await new Promise(resolve => setTimeout(resolve, 400));
+          await route.fulfill({ json: { ...JAV_DETAIL, state: 'partial', source_image: false,
+            preview_count: 0, message: '作品资料未取得，请稍后重试' } });
+        });
         await page.goto(requiredEnv('PEACH_E2E_ORIGIN') + '/jav/movie/EXM-001');
         await page.getByText('作品资料未取得，请稍后重试', { exact: true }).waitFor({ state: 'visible' });
+        const heights = await page.evaluate(() => (window as unknown as { coldDetailHeights: number[] }).coldDetailHeights);
+        assert.ok(heights.length > 5 && Math.max(...heights) - Math.min(...heights) < 1, JSON.stringify(heights));
         await page.reload();
         await page.getByText('作品资料未取得，请稍后重试', { exact: true }).waitFor({ state: 'visible' });
         await page.locator('#closeStage').click();

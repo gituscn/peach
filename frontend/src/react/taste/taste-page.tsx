@@ -52,6 +52,7 @@ import { Disclosure } from '../settings/section';
 import { busyProps } from '../settings/use-action';
 import { ActivityHeat } from '../charts/heat-card';
 import { CreatorSankey, RankedBars, TasteRadar } from './charts';
+import { BrowserSources } from './browser-sources';
 import {
   DEFAULT_WINDOW, fetchTaste, fetchTasteJob, historySpan, IDLE_POLL_MS, importTasteExport, radarRows,
   rankDetail, rankShares, removeTasteSource, startTasteRefresh, tasteDate, tasteDimensions, tasteHours,
@@ -81,7 +82,7 @@ const NO_PEACH_PERFORMER_HINT = '在 Peach 里播放或评价作品后，这里�
 const GUIDE_LOCAL = '在运行 Peach 的电脑上使用浏览器：点上面的「读取浏览器历史」。';
 const GUIDE_REMOTE = '记录在其他设备上：导出文件后，点上面的「导入历史文件」。多台设备的文件分别导入。';
 const GUIDE_REFRESH = '需要刷新时再次读取或导入；数据源可在页面底部移除。';
-const REMOVE_BODY = '这个数据源将不再用于口味分析。原始导出文件保留。';
+const REMOVE_BODY = '删除这个来源的已导入记录，原始文件保留。若浏览器仍启用，下次读取会再次导入。';
 
 /** 跳过指南是这台浏览器的持久偏好，和分析结果无关，所以不进 Query。 */
 export const TASTE_GUIDE_KEY = 'peach-taste-guide-dismissed';
@@ -414,7 +415,7 @@ export function TastePage(props: TasteProps) {
     onFinish: (state) => {
       if (state.status === 'failed') return;
       void queryClient.invalidateQueries({ queryKey: ['taste'] });
-      toast('已更新口味分析');
+      toast(state.warnings?.length ? '部分浏览记录未取得' : '已更新口味分析');
     },
   });
   const load = useMutation({
@@ -497,6 +498,7 @@ export function TastePage(props: TasteProps) {
             value={job?.checked} total={job?.total} /> : null}
           {load.isPending ? <TaskProgress label="正在导入历史文件" /> : null}
           {problem ? <Note tone="error">{problem}</Note> : null}
+          {outcome?.warnings?.length ? <Note tone="warning">{outcome.warnings.join('；')}</Note> : null}
         </div>
         <TabPanel id="browser" className="flex flex-col gap-5">
           <div className={STAT_STRIP}>
@@ -535,6 +537,7 @@ export function TastePage(props: TasteProps) {
             panels={[
               { id: 'tags', name: '标签', props: { rows: rank.browser_tags || [], kind: 'tag', visual: 'none', empty: NO_BROWSER_TAG_HINT } },
               { id: 'creators', name: '创作者', props: { rows: rank.browser_creators || [], kind: 'creator', visual: 'creator', empty: NO_BROWSER_CREATOR_HINT } },
+              { id: 'performers', name: '女优', props: { rows: rank.browser_performers || [], kind: 'performer', visual: 'entity', empty: '还没有与已建档女优关联的浏览记录。' } },
               { id: 'domains', name: '常访问网站', props: { rows: rank.domains || [], kind: '', visual: 'domain', empty: NO_DOMAIN_HINT } },
               { id: 'gaps', name: '浏览候选', props: { rows: gaps, kind: '', visual: 'none', empty: GAP_HINT } },
             ]} />
@@ -571,6 +574,7 @@ export function TastePage(props: TasteProps) {
       </Tabs>
       <AnalysisCard data={data} onSignal={onSignal} navigate={navigate} />
       <SourceList sources={data.sources || []} window={range} toast={toast} />
+      <BrowserSources browsers={data.browsers || []} range={range} />
     </Page>
   );
 }

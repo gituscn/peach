@@ -44,6 +44,8 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 ## 播放器清晰度
 
+作品详情的画框几何由 `react/stage/stage.css` 管理，馆藏与库外 JAV 共用视口高度、媒体行及常驻缩略图预留。小数星星的两层 SVG 共用同一图标框。缩略图滚轮复用 `wireHorizontalScroller` 并在卸载时清理。公开图片缓存使用标准库 `Future` 合并同键请求，缓存锁只覆盖内存读写；图片下载使用三个槽位，资料取数使用独立锁与既有来源间隔，不添加依赖。
+
 清晰度控件复用已内置 VHS 的 Video.js 8.24.1（Apache-2.0）及其 [QualityLevelList](https://github.com/videojs/videojs-contrib-quality-levels)。多档自动播放通过 `selectedIndex`、`change` 事件取得当前轨道；单档 HLS 缺少尺寸时读取视频元素的实际尺寸，并响应 `loadedmetadata`、`resize`。尺寸未取得时显示「当前画质」，轨道 ID 不作界面名称；无需新增依赖。
 
 ## 分级诊断
@@ -460,6 +462,12 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.16.10，版�
 作品列表、分页与筛选统计复用 `entities.resolve_entity` 将名称解析为实体 ID，再用 `web_entity.scope_predicate` 获取关系范围；五类资料实体共用此入口，厂牌覆盖旗下各级 label，事务所覆盖成员作品。未取得唯一身份时返回空集合。
 
 `entities.studio_name_key` 与 `studio_identity_ids` 供入库、元数据落地、名称解析和 `merge_studio_name_variants.py` 共用：NFKC、符号写法及唯一登记别名映射到规范身份。官方标题确认的 [ATTACKERS](https://attackers.net/)、[PREMIUM](https://premium-beauty.com/) 日英并写名和 [kawaii*](https://kawaiikawaii.jp/) 星号写法纳入精确映射。名称冲突保留来源原文；括号两侧须各自唯一指向同一实体；`AVOP` 跨厂牌共用，不作为合并证据。复用项目实体合并、字段归属、SQLite 备份和复核 CSV，无新增依赖。
+
+## 口味来源与偏好
+
+历史快照与导入复用 SQLite backup API 和 `browserexport==0.4.4` 的 Chromium、Firefox、Safari 适配器。`taste_browsers` 管理本机资料目录及启停，配置在私有历史库内，停用保留已导入数据；一份资料未取得不阻塞其他资料。来源规则与账号关联见[口味来源](TASTE_SOURCES.md)，仅复用既有实体链接和启用的关注，不自行确认新身份。
+
+多维偏好复用行为计权、genre 归一和 `related.rank_related` 的 MMR；`taste_preferences` 保存规范身份、证据种类及候选强度。持久缓存复用 `fsutil.atomic_write_text`，按账本、历史库及规则源码版本失效，只读历史连接忽略没有数据帧的 WAL。名称扫描采用 [pyahocorasick 2.3.1](https://github.com/WojciechMula/pyahocorasick)（BSD-3-Clause，Unicode，Python 3.12–3.14，Windows/macOS/Linux）；已读固定版 C 实现，Windows CPython 3.14 wheel 实装通过，新增仅此直接依赖。长标题、多别名、重叠名字及 ASCII 词边界由 Peach 约束。真实只读汇总覆盖七类维度；偏好候选和私有缓存不改写 ledger。
 
 ## 原位改字
 

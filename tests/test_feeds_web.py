@@ -886,8 +886,8 @@ class JavDiscoveryTest(FeedWebFixture):
             codes = [row[0] for row in connection.execute("SELECT code FROM feed_discovery ORDER BY id")]
         for code, score in zip(codes, (None, "4.23")):
             metadata.remember(code, {"number": code, "tags": [{"name": "中出"}], "score": score, "duration": 180})
-        with patch.object(web_jav_discovery, "build_taste_dashboard", return_value={
-                "rankings": {"browser_tags": [{"name": "中出内射", "score": 4}]}}), \
+        with patch.object(web_jav_discovery, "preference_profile", return_value=self._preference_fixture(
+                {"browser_tags": [{"name": "中出内射", "score": 4}]})), \
                 patch("peach.javdb_public.PUBLIC_API.movie") as movie:
             result = web_jav_discovery.q_jav_discoveries(self.contract, {"sort": "source_score"})
             metadata.job.thread.join(5)
@@ -901,12 +901,26 @@ class JavDiscoveryTest(FeedWebFixture):
 
     def _discover(self, scope="external", rankings=None, metadata=None, args=None):
         from peach import web_jav_discovery
-        with patch.object(web_jav_discovery, "build_taste_dashboard", return_value={"rankings": rankings or {}}), \
+        with patch.object(web_jav_discovery, "preference_profile", return_value=self._preference_fixture(rankings or {})), \
                 patch.object(web_jav_discovery, "_cached_movie", return_value=metadata or {}), \
                 patch("peach.jav_discovery_metadata.DiscoveryMetadata.ensure", return_value=None):
             return web_jav_discovery.q_jav_discoveries(self.contract, {"scope": scope, **(args or {})})
 
-    def test_taste_ascending_reverses_the_same_mmr_selection_and_preserves_scores(self):
+    def _preference_fixture(self, rankings):
+        from peach import web_jav_discovery
+        from peach.taste_preferences import WEIGHTS
+        strengths, names, evidence = ({kind: {} for kind in WEIGHTS} for _ in range(3))
+        with self.contract.database.read_connection() as connection:
+            for key, kind in (("peach_studios", "studio"), ("peach_tags", "tag"),
+                              ("browser_tags", "tag"), ("peach_series", "series")):
+                for row in rankings.get(key, ()):
+                    eid = row.get("entity_id") or web_jav_discovery._identity(connection, kind, row["name"])
+                    strengths[kind][eid] = .7
+                    names[kind][eid] = row["name"]
+                    evidence[kind][eid] = ["浏览记录" if key.startswith("browser") else "观看与反馈"]
+        return strengths, names, evidence
+
+    def test_taste_ascending_preserves_the_selection_and_scores(self):
         self._add()
         self._check()
         with self.contract.database.write_transaction() as connection:
@@ -931,7 +945,7 @@ class JavDiscoveryTest(FeedWebFixture):
         result = self._discover(rankings={"peach_studios": [{"name": "示例厂牌", "score": 4}]})
         self.assertEqual(len(result["items"]), 2)
         self.assertTrue(all(row["release_date"] == "2010-01-01" for row in result["items"]))
-        self.assertTrue(all(row["reasons"] == ["常看的厂牌：示例厂牌"] for row in result["items"]))
+        self.assertTrue(all(row["reasons"] == ["厂牌偏好：示例厂牌（观看与反馈）"] for row in result["items"]))
         self.assertEqual(self._discover()["items"], [])
 
     def test_external_discovery_projects_obtained_metadata_and_canonical_tags(self):
@@ -943,7 +957,7 @@ class JavDiscoveryTest(FeedWebFixture):
         rows = self._discover(rankings=rankings, metadata={"tags": [{"name": "恋足"}], "series_name": "示例系列"})["items"]
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0]["tags"], ["恋足"])
-        self.assertEqual(rows[0]["reasons"], ["偏好的标签：恋足", "常看的系列：示例系列"])
+        self.assertEqual(rows[0]["reasons"], ["标签偏好：恋足（浏览记录）", "系列偏好：示例系列（观看与反馈）"])
 
     def test_library_exploration_excludes_completed_disliked_and_frequently_watched(self):
         with self.contract.database.write_transaction() as connection:
@@ -960,7 +974,7 @@ class JavDiscoveryTest(FeedWebFixture):
         result = self._discover("library", {"peach_tags": [{"name": "恋足", "entity_id": entity_id, "score": 4}]})
         self.assertEqual({row["asset_id"] for row in result["items"]}, {1, 2})
         self.assertTrue(all(row["tags"] == ["恋足"] for row in result["items"]))
-        self.assertTrue(all(row["reasons"] == ["偏好的标签：恋足"] for row in result["items"]))
+        self.assertTrue(all(row["reasons"] == ["标签偏好：恋足（观看与反馈）"] for row in result["items"]))
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import math
 from collections.abc import Iterable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 
 
@@ -82,7 +83,8 @@ class _Entry:
 
 def rank_related(source: Mapping, candidates: Iterable[Mapping], limit: int,
                  *, seed: str | None = None, diversity: float = 0.22,
-                 order_by: str | None = None, descending: bool = True) -> list[dict]:
+                 order_by: str | None = None, descending: bool = True,
+                 relevance_for: Callable[[Mapping], float] | None = None) -> list[dict]:
     """以 IDF 加权相关度选片，再用 MMR 抑制连续出现的近重复作品。
 
     朴素 MMR 的代价是 O(limit² × 候选池)：每选中一条，都要把整池和**全部**已选重算一遍
@@ -102,11 +104,11 @@ def rank_related(source: Mapping, candidates: Iterable[Mapping], limit: int,
     entries: list[_Entry] = []
     for candidate in pool:
         feature = _feature(candidate)
-        relevance = _closeness_features(source_feature, feature, weights)
+        relevance = relevance_for(candidate) if relevance_for else _closeness_features(source_feature, feature, weights)
         if relevance <= 0:
             continue
         reasons = _reasons_features(source_feature[0], feature[0])
-        if not reasons:
+        if not reasons and not relevance_for:
             continue
         candidate["why"] = " · ".join(reasons[:2])
         candidate["related_score"] = round(relevance, 4)

@@ -34,7 +34,7 @@ export const islandGlyph = (name: string, cls: string): string =>
 
 /** 与 Board Input 的中号外框、前缀和正文使用相同几何。 */
 export function islandSearchInput(placeholder: string, value = '', label = placeholder): string {
-  return `<div data-input-size="medium" class="group flex h-max w-full flex-col items-start gap-1"><div data-rac class="relative flex w-full items-center rounded-2lg bg-background-tertiary-default text-foreground-icon-tertiary ring-2 ring-inset ring-transparent p-2"><div class="flex w-full items-center gap-2 min-w-0"><div class="flex flex-1 items-center gap-0.5 min-w-0">${islandGlyph('search', 'size-5 shrink-0')}<input type="search" readonly tabindex="-1" aria-label="${esc(label)}" value="${esc(value)}" placeholder="${esc(placeholder)}" class="min-w-0 flex-1 bg-transparent border-0 outline-none p-0 m-0 font-sans text-body-regular text-text-primary pl-1 placeholder:text-text-tertiary"></div></div></div></div>`;
+  return `<div data-input-size="medium" class="group flex h-max w-full flex-col items-start gap-1"><div data-rac class="relative flex w-full items-center rounded-2lg bg-background-tertiary-default text-foreground-icon-tertiary ring-2 ring-inset ring-transparent p-2"><div class="flex w-full items-center gap-2 min-w-0"><div class="flex flex-1 items-center gap-0.5 min-w-0">${islandGlyph('search', 'size-5 shrink-0')}<input type="search" enterkeyhint="search" readonly tabindex="-1" aria-label="${esc(label)}" value="${esc(value)}" placeholder="${esc(placeholder)}" class="min-w-0 flex-1 bg-transparent border-0 outline-none p-0 m-0 font-sans text-body-regular text-text-primary pl-1 placeholder:text-text-tertiary"></div></div></div></div>`;
 }
 
 export interface IslandButton {

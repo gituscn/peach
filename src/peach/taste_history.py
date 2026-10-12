@@ -9,6 +9,7 @@ import sqlite3
 import tempfile
 import zipfile
 import math
+import time
 from collections import Counter, defaultdict
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
@@ -24,6 +25,7 @@ from browserexport.browsers.safari import Safari
 
 from .catalog_rules import LENGTH_TAGS, TECH_TAGS
 from .review_csv import read_rows, write_rows
+from .taste_sites import ADULT_DOMAINS, MIXED_DOMAINS, account_key, identity_context, linked_identities, mixed_adult
 
 
 @dataclass(frozen=True)
@@ -31,6 +33,8 @@ class HistorySource:
     browser: str
     profile: str
     path: Path
+    root: Path | None = None
+    engine: str | None = None
 
 
 @dataclass(frozen=True)
@@ -64,6 +68,8 @@ TASTE_DOMAIN_SUFFIXES = {
     "rule34video.com", "simpcity.cr", "simpcity.su", "south-plus.org", "spankbang.com",
     "supjav.com", "xhamster.com", "xsijishe.com", "xvideos.com",
 }
+TASTE_DOMAIN_SUFFIXES = (TASTE_DOMAIN_SUFFIXES | ADULT_DOMAINS) - MIXED_DOMAINS
+QUERY_KEYS |= {"searchstr", "search_word", "search_query", "k", "word", "text"}
 CATEGORY_TERMS: dict[str, set[str]] = {
     "足系": {"feet", "foot", "footjob", "soles", "toes", "足", "足交", "脚", "脚交"},
     "3D/动画": {"3d", "animation", "blender", "daz", "sfm", "动画"},
@@ -121,6 +127,11 @@ def discover_history_sources(
                 ("firefox", appdata / "Mozilla" / "Firefox" / "Profiles"),
                 ("zen", appdata / "zen" / "Profiles"),
                 ("chrome", localappdata / "Google" / "Chrome" / "User Data"),
+                ("aside", localappdata / "Aside" / "User Data"),
+                ("edge", localappdata / "Microsoft" / "Edge" / "User Data"),
+                ("brave", localappdata / "BraveSoftware" / "Brave-Browser" / "User Data"),
+                ("vivaldi", localappdata / "Vivaldi" / "User Data"),
+                ("opera", appdata / "Opera Software" / "Opera Stable"),
             ]
         )
     else:
@@ -129,6 +140,10 @@ def discover_history_sources(
                 ("firefox", home / "Library" / "Application Support" / "Firefox" / "Profiles"),
                 ("zen", home / "Library" / "Application Support" / "zen" / "Profiles"),
                 ("chrome", home / "Library" / "Application Support" / "Google" / "Chrome"),
+                ("aside", home / "Library" / "Application Support" / "Aside"),
+                ("edge", home / "Library" / "Application Support" / "Microsoft Edge"),
+                ("brave", home / "Library" / "Application Support" / "BraveSoftware" / "Brave-Browser"),
+                ("vivaldi", home / "Library" / "Application Support" / "Vivaldi"),
             ]
         )
 
@@ -136,10 +151,11 @@ def discover_history_sources(
     for browser, root in candidates:
         if not root.is_dir():
             continue
-        filename = "History" if browser == "chrome" else "places.sqlite"
-        for path in root.glob(f"*/{filename}"):
+        filename = "places.sqlite" if browser in {"firefox", "zen"} else "History"
+        for path in [root / filename, *root.glob(f"*/{filename}")]:
             if path.is_file():
-                found.append(HistorySource(browser, path.parent.name, path))
+                found.append(HistorySource(browser, path.parent.name, path, root,
+                                           "firefox" if browser in {"firefox", "zen"} else "chrome"))
     if platform_name == "macos":
         safari = home / "Library" / "Safari" / "History.db"
         if safari.is_file():
@@ -153,8 +169,13 @@ def _readonly_uri(path: Path) -> str:
 
 def _consistent_copy(source: Path, destination: Path) -> None:
     with closing(sqlite3.connect(_readonly_uri(source), uri=True)) as source_db:
+        source_db.execute("PRAGMA schema_version").fetchone()
+        started = time.monotonic()
+        def progress(_status, _remaining, _total):
+            if time.monotonic() - started > 20:
+                raise TimeoutError("浏览器历史快照未取得，请退出该浏览器后重新读取")
         with closing(sqlite3.connect(destination)) as destination_db:
-            source_db.backup(destination_db)
+            source_db.backup(destination_db, pages=256, progress=progress)
 
 
 def _iso_from_unix_microseconds(value: int | float) -> str:
@@ -269,15 +290,22 @@ def refresh_history(
                 if progress:
                     progress(stage="reading", checked=count, total=None,
                              message=f"读取浏览记录：第 {index + 1} / {len(sources)} 个浏览器资料，已读取 {count:,} 条")
-            with tempfile.TemporaryDirectory(prefix="peach-history-") as temp_dir:
-                snapshot = Path(temp_dir) / "history.sqlite"
-                if progress:
-                    progress(stage="snapshot", checked=0, total=None,
-                             message=f"准备浏览器快照：第 {index + 1} / {len(sources)} 个资料")
-                _consistent_copy(source.path, snapshot)
-                report()
-                visits = _read_visits(snapshot, source.browser, progress=report)
-                report(len(visits))
+            try:
+                with tempfile.TemporaryDirectory(prefix="peach-history-") as temp_dir:
+                    snapshot = Path(temp_dir) / "history.sqlite"
+                    if progress:
+                        progress(stage="snapshot", checked=0, total=None,
+                                 message=f"准备浏览器快照：第 {index + 1} / {len(sources)} 个资料")
+                    _consistent_copy(source.path, snapshot)
+                    report()
+                    visits = _read_visits(snapshot, source.engine or source.browser, progress=report)
+                    report(len(visits))
+            except (sqlite3.DatabaseError, OSError) as error:
+                message = ("历史文件正在使用，请退出该浏览器后重新读取" if "locked" in str(error).casefold()
+                           else "浏览器历史未取得，请检查资料目录或退出浏览器后重试")
+                results.append({"browser": source.browser, "profile": source.profile, "visits": 0,
+                                "added": 0, "status": "failed", "error": message})
+                continue
             source_key = _source_key(source, host)
             path_hash = hashlib.sha256(str(source.path.resolve()).encode("utf-8")).hexdigest()
             store.execute(
@@ -585,7 +613,7 @@ def history_source_count(store_path: Path) -> int:
     if not store_path.is_file():
         return 0
     try:
-        with closing(sqlite3.connect(store_path)) as store:
+        with closing(sqlite3.connect(_readonly_uri(store_path), uri=True)) as store:
             return int(store.execute("SELECT count(*) FROM history_source").fetchone()[0])
     except sqlite3.DatabaseError:
         return 0
@@ -611,6 +639,7 @@ class _HistoryRows:
     sources: tuple[dict, ...]
     visited: tuple[str, ...]
     taste: tuple[_TasteVisit, ...]
+    identity_visits: tuple[tuple[str, str, str], ...] = ()
 
 
 #: 按历史库文件的版本缓存解析结果。历史库只在导入与刷新时变，逐条解析网址要十几秒；
@@ -626,13 +655,14 @@ def store_version(store_path: Path) -> tuple:
         except OSError:
             version.append(None)
         else:
-            version.append((stat.st_mtime_ns, stat.st_size))
+            version.append(None if path.name.endswith("-wal") and stat.st_size <= 32 else (stat.st_mtime_ns, stat.st_size))
     return tuple(version)
 
 
 def _read_history_rows(store_path: Path) -> _HistoryRows | None:
-    with closing(sqlite3.connect(store_path)) as store:
+    with closing(sqlite3.connect(_readonly_uri(store_path), uri=True)) as store:
         store.row_factory = sqlite3.Row
+        store.execute("BEGIN")
         try:
             source_rows = tuple(dict(row) for row in store.execute(
                 "SELECT s.source_key,s.browser,s.profile,s.host,s.first_seen_at,s.last_seen_at,"
@@ -641,12 +671,13 @@ def _read_history_rows(store_path: Path) -> _HistoryRows | None:
                 "GROUP BY s.source_key ORDER BY s.last_seen_at DESC,s.browser,s.profile"
             ))
             rows = store.execute(
-                "SELECT v.visited_at,v.url FROM history_visit v "
+                "SELECT v.visited_at,v.url,v.title FROM history_visit v "
                 "JOIN history_source s ON s.source_key=v.source_key"
             )
             seen: set[tuple[str, int]] = set()
             visited: list[str] = []
             taste: list[_TasteVisit] = []
+            identity_visits: list[tuple[str, str, str]] = []
             for row in rows:
                 visited_at, url = str(row["visited_at"]), str(row["url"])
                 try:
@@ -658,8 +689,10 @@ def _read_history_rows(store_path: Path) -> _HistoryRows | None:
                     continue
                 seen.add(fingerprint)
                 visited.append(visited_at)
-                domain, row_tags, row_creators = _url_candidates(url)
-                if not domain or not _is_taste_domain(domain):
+                domain, row_tags, row_creators = _url_candidates(url, str(row["title"] or ""))
+                if domain:
+                    identity_visits.append((visited_at, url, str(row["title"] or "")))
+                if not domain or not (_is_taste_domain(domain) or mixed_adult(url, str(row["title"] or ""))):
                     # 不在口味站上的访问只计入访问数与时间范围：网址候选只从口味站取。
                     continue
                 if moment.tzinfo is None:
@@ -675,7 +708,7 @@ def _read_history_rows(store_path: Path) -> _HistoryRows | None:
                     tuple(row_tags), tuple(row_creators), tuple(categories)))
         except sqlite3.DatabaseError:
             return None
-    return _HistoryRows(source_rows, tuple(visited), tuple(taste))
+    return _HistoryRows(source_rows, tuple(visited), tuple(taste), tuple(identity_visits))
 
 
 def _history_rows(store_path: Path) -> _HistoryRows | None:
@@ -1067,6 +1100,28 @@ def _taste_analysis(
     }
 
 
+def _linked_history_evidence(history_store, ledger_connection, since, history):
+    """已登记账号的浏览计数，人物、创作者和网站分开汇总。"""
+    browser_performers = Counter()
+    accounts, _ = identity_context(ledger_connection)
+    cached = _history_rows(history_store) if history_store.is_file() else None
+    if cached and accounts:
+        for visited_at, url, title in cached.identity_visits:
+            if since and visited_at < since:
+                continue
+            matches = linked_identities(url, accounts)
+            domain = (urlparse(url).hostname or "").removeprefix("www.")
+            for _, kind, name in matches:
+                if kind == "performer":
+                    browser_performers[name] += 1
+                elif kind == "creator":
+                    history["creators"][name] += 1
+                    history["creator_domains"].setdefault(name.casefold(), Counter())[domain] += 1
+            if matches and not (_is_taste_domain(domain) or mixed_adult(url, title)):
+                history["domains"][domain] += 1
+    return browser_performers
+
+
 def build_taste_dashboard(
     history_store: Path,
     ledger_connection: sqlite3.Connection,
@@ -1076,6 +1131,7 @@ def build_taste_dashboard(
 ) -> dict[str, object]:
     """Build a privacy-bounded, read-only taste view from both evidence stores."""
     history = _history_dashboard_evidence(history_store, since)
+    browser_performers = _linked_history_evidence(history_store, ledger_connection, since, history)
     peach = _peach_dashboard_evidence(ledger_connection, since, exclude_disliked=exclude_disliked)
     all_tags = [row for row in _rank_combined("tag", history["tags"], peach, limit=1000)
                 if row["name"] not in LENGTH_TAGS]
@@ -1083,7 +1139,7 @@ def build_taste_dashboard(
     for row in all_creators:
         source_counts = history["creator_domains"].get(str(row["name"]).casefold().strip(), Counter())
         row["source_domain"] = source_counts.most_common(1)[0][0] if source_counts else None
-    all_performers = _rank_combined("performer", Counter(), peach, limit=1000)
+    all_performers = _rank_combined("performer", browser_performers, peach, limit=1000)
     all_studios = _rank_combined("studio", Counter(), peach, limit=1000)
     all_series = _rank_combined("series", Counter(), peach, limit=1000)
     tags, creators, performers = all_tags[:30], all_creators[:30], all_performers[:30]
@@ -1137,6 +1193,7 @@ def build_taste_dashboard(
             "performers": performers,
             "browser_tags": _rank_for_source(all_tags, "browser"),
             "browser_creators": _rank_for_source(all_creators, "browser"),
+            "browser_performers": _rank_for_source(all_performers, "browser"),
             "peach_tags": _rank_for_source(all_tags, "peach"),
             "peach_creators": _rank_for_source(all_creators, "peach"),
             "peach_performers": _rank_for_source(all_performers, "peach"),
@@ -1193,13 +1250,14 @@ def read_creator_candidates(output_dir: Path, limit: int = 200) -> list[dict]:
 
 def _tokens(value: str) -> set[str]:
     decoded = unquote(value).casefold()
+    decoded = re.sub(r"(?<!\S)(?:sort|order|rating|score|id|date|limit|page|artist):\S+", " ", decoded)
     # Search syntaxes use a leading minus for exclusion. Remove the whole
     # operand before tokenizing, including grouped forms such as -ai_generated.
     decoded = NEGATIVE_QUERY_TERM.sub(" ", decoded).replace("-", " ")
     # Underscores are part of one source tag (detroit_become_human,
     # big_breasts), not separators between independent preferences.
     values = re.findall(
-        r"(?:[a-z0-9]{2,}|[\u3400-\u9fff]{1,12})(?:_(?:[a-z0-9]+|[\u3400-\u9fff]+))*",
+        r"(?:[a-z0-9]{2,}|[\u3040-\u30ff\u3400-\u9fff]{1,30})(?:_(?:[a-z0-9]+|[\u3040-\u30ff\u3400-\u9fff]+))*",
         decoded,
     )
     return {value for value in values if value not in STOPWORDS and not value.isdigit()}
@@ -1226,23 +1284,41 @@ def _creator_candidate(value: str) -> str | None:
     return candidate
 
 
-def _url_candidates(url: str) -> tuple[str | None, set[str], set[str]]:
-    parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"}:
-        return None, set(), set()
-    domain = (parsed.hostname or "").casefold()
-    if domain.startswith("www."):
-        domain = domain[4:]
-    if not _is_taste_domain(domain):
-        return domain or None, set(), set()
+def _query_candidates(parsed):
+    """站内搜索与 Booru 艺术家语法，排除排序和负向条件。"""
     tags: set[str] = set()
+    query_creators: set[str] = set()
+    for value in re.findall(r"/(?:searchstr|search_word|keyword)=([^/]+)", unquote(parsed.path), re.I):
+        tags.update(_tokens(value.replace("+", " ")))
     for key, values in parse_qs(parsed.query).items():
         if key.casefold() in QUERY_KEYS:
             for value in values:
                 tags.update(_tokens(value))
+                for raw in re.findall(r"(?:^|\s)artist:([^\s]+)", value, re.I):
+                    candidate = _creator_candidate(raw)
+                    if candidate:
+                        query_creators.add(candidate)
+    return tags, query_creators
+
+
+def _url_candidates(url: str, title: str = "") -> tuple[str | None, set[str], set[str]]:
+    try:
+        parsed = urlparse(url)
+        domain = (parsed.hostname or "").casefold()
+    except ValueError:
+        return None, set(), set()
+    if parsed.scheme not in {"http", "https"}:
+        return None, set(), set()
+    if domain.startswith("www."):
+        domain = domain[4:]
+    if not (_is_taste_domain(domain) or mixed_adult(url, title)):
+        return domain or None, set(), set()
+    tags, creators = _query_candidates(parsed)
 
     segments = [unquote(segment).casefold() for segment in parsed.path.split("/") if segment]
-    creators: set[str] = set()
+    for index, segment in enumerate(segments[:-1]):
+        if segment in {"tag", "tags", "search"}:
+            tags.update(_tokens(segments[index + 1]))
     for index, segment in enumerate(segments[:-1]):
         candidate = _creator_candidate(segments[index + 1])
         if segment in CREATOR_MARKERS and candidate:
@@ -1252,6 +1328,10 @@ def _url_candidates(url: str) -> tuple[str | None, set[str], set[str]]:
             candidate = _creator_candidate(segments[-1] if domain == "rule34video.com" else segments[0])
             if candidate:
                 creators.add(candidate)
+    if domain in MIXED_DOMAINS:
+        account = account_key(url)
+        if account:
+            creators.add(account[1])
     return domain or None, tags, creators
 
 
@@ -1276,7 +1356,7 @@ def analyze_history(store_path: Path, output_dir: Path, *, since: str | None = N
     min_time: str | None = None
     max_time: str | None = None
     total = 0
-    with closing(sqlite3.connect(store_path)) as db:
+    with closing(sqlite3.connect(_readonly_uri(store_path), uri=True)) as db:
         source_count = db.execute("SELECT COUNT(*) FROM history_source").fetchone()[0]
         ceiling = db.execute("SELECT COUNT(*) FROM (" + query + ")", params).fetchone()[0]
         def report_analysis():

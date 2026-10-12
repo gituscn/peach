@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { RiChat3Line, RiExternalLinkLine } from '@remixicon/react';
 import { entityPath, firstGrapheme, icon } from '@peach/legacy/core';
@@ -39,7 +39,7 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
   useEffect(() => { if (item.state === 'ready') void queryClient.invalidateQueries({ queryKey: ['jav-discoveries', 'external'] }) }, [item.code, item.state]);
   const [preview, setPreview] = useState(-1);
   const frame = useRef<HTMLDivElement>(null);
-  const inset = useCarouselInset(frame, '[data-jav-picture]', preview);
+  useCarouselInset(frame, '[data-jav-picture]', preview);
   const media = [{ index: -1, label: '封面' }, ...Array.from({ length: item.preview_count }, (_, index) => ({ index, label: `预览 ${index + 1}` })),
     ...(item.preview_video_url ? [{ index: -2, label: '视频预览', video: true }] : [])];
   const [download, setDownload] = useState<DownloadPrefill | null>(null);
@@ -57,9 +57,7 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
     void queryClient.invalidateQueries({ queryKey: ['jav-discoveries'] });
   }) };
   return <>
-    <div ref={frame} data-stage-media="" data-jav-art="" data-jav-playing={preview === -2 ? '' : undefined}
-      // oxlint-disable-next-line shadcn/no-inline-styles -- 图片黑边的真实宽度决定翻页箭头位置
-      style={{ '--follow-image-arrow-inset': inset === null || preview === -2 ? undefined : `${inset}px` } as CSSProperties}>
+    <div ref={frame} data-stage-media="" data-jav-art="" data-jav-playing={preview === -2 ? '' : undefined}>
       <Close close={actions.close} />
       {item.preview_video_url ? <button type="button" data-jav-preview-toggle="" aria-pressed={preview === -2}
         onClick={() => setPreview(preview === -2 ? -1 : -2)}><Glyph name={preview === -2 ? 'image' : 'play'} />{preview === -2 ? '查看图片' : '视频预览'}</button> : null}
@@ -132,9 +130,9 @@ function SourceRating({ score, review = false }: { score: number; review?: boole
   return <div data-item-rating="" data-jav-rating="" data-review-rating={review ? '' : undefined} role="img" aria-label={`${review ? '评论' : 'JavDB'}评分 ${score} / 5`}>
     <div data-rating-stars="" aria-hidden="true">{[1, 2, 3, 4, 5].map(star => {
       const fraction = Math.max(0, Math.min(1, value - star + 1));
-      return <span key={star} data-rate={star} data-on={String(fraction === 1)}><Glyph name="star" />
+      return <span key={star} data-rate={star} data-on={String(fraction === 1)}><span data-rating-icon=""><Glyph name="star" />
         {/* oxlint-disable-next-line shadcn/no-inline-styles -- 星星填充宽度表示实际评分的小数比例 */}
-        <span data-rating-fill="" style={{ width: `${fraction * 100}%` }}><Glyph name="star" /></span></span>;
+        <span data-rating-fill="" style={{ width: `${fraction * 100}%` }}><Glyph name="star" /></span></span></span>;
     })}</div>
     <span data-rating-value="">{score.toFixed(1)} / 5</span>
   </div>;

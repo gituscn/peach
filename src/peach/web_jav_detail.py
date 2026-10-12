@@ -47,6 +47,8 @@ def q_jav_detail(contract, args) -> dict:
     source = None
     message = ""
     try:
+        stored, _ = discovery_metadata(contract).peek(code)
+        PUBLIC_API.remember_movie_identity(code, stored or {})
         source = PUBLIC_API.movie(code)
         discovery_metadata(contract).remember(code, source)
     except PublicSourceUnavailable as error:

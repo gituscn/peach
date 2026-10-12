@@ -85,7 +85,7 @@ class FollowContractTests(unittest.TestCase):
 
     def test_background_taste_refresh_has_a_readable_result(self):
         self.contract.taste_history_store = self.root / 'missing-history.sqlite'
-        with mock.patch.object(web_stats, 'discover_history_sources', return_value=[]), \
+        with mock.patch.object(web_stats, 'enabled_history_sources', return_value=[]), \
              mock.patch.object(web_stats, 'q_taste', return_value={'demo': True}):
             started = self._post('/api/taste/refresh', {'background': True})
             self.contract.taste_refresh_job.thread.join(5)

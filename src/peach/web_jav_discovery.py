@@ -5,43 +5,14 @@ import re
 
 from . import entities, feeds, web_catalog, web_feeds, web_settings, wants
 from .related import rank_related
-from .taste_history import build_taste_dashboard
+from .taste_preferences import preference_profile, preference_score
 from .genre_decisions import load_genre_decisions
 from .jav_discovery_metadata import discovery_metadata, source_number
 from .web_jav_detail import _source_fields
 
-DIMENSIONS = {
-    "performer": ("peach_performers", "browser_creators"),
-    "tag": ("peach_tags", "browser_tags"),
-    "studio": ("peach_studios",),
-    "series": ("peach_series",),
-}
-LABELS = {"performer": "常看的出演者", "tag": "偏好的标签", "studio": "常看的厂牌", "series": "常看的系列"}
-
-
 def _identity(connection, kind, name):
     found = entities.resolve_entity(connection, kind, name)
     return int(found["id"]) if found else f"name:{entities.normalize_entity_name(name)}"
-
-
-def _profile(connection, rankings):
-    features, names = {}, {}
-    for kind, keys in DIMENSIONS.items():
-        signals = {}
-        for key in keys:
-            for row in rankings.get(key, ()):
-                value = float(row.get("score") or row.get("visits") or row.get("web_visits") or 0)
-                if value <= 0 or not row.get("name"):
-                    continue
-                identity = row.get("entity_id") or _identity(connection, kind, row["name"])
-                # 同一身份的两种证据合并，排序不会因同名投影重复加分。
-                previous = signals.get(identity)
-                if previous is None or value > previous[0]:
-                    signals[identity] = (value, row["name"])
-        strongest = sorted(signals.items(), key=lambda pair: (-pair[1][0], str(pair[0])))[:30]
-        features[kind] = {identity for identity, _ in strongest}
-        names[kind] = {identity: name for identity, (_, name) in strongest}
-    return {"id": 0, "entities": features}, names
 
 
 def _cached_movie(code, contract):
@@ -91,6 +62,8 @@ def _external(connection, contract):
                     identities[key] = _identity(connection, kind, name)
                 features[kind].add(identities[key])
         row["entities"] = features
+        features["creator"] = {_identity(connection, "creator", name) for name in actors
+                               if entities.resolve_entity(connection, "creator", name)}
         row["tags"] = tags
         row["asset_id"] = None
     return rows
@@ -116,7 +89,7 @@ def _library(connection):
         for aid, identity, kind, name in connection.execute(
             "SELECT ae.asset_id,e.id,e.kind,e.canonical_name FROM asset_entity ae"
             " JOIN entity e ON e.id=ae.entity_id WHERE ae.asset_id IN (" + marks + ")"
-            " AND e.kind IN ('performer','tag','studio','series') AND (e.kind<>'tag' OR "
+            " AND e.kind IN ('performer','creator','tag','studio','series') AND (e.kind<>'tag' OR "
             + web_catalog.tag_not_hidden("ae.asset_id", "e.normalized_name") + ") ORDER BY e.canonical_name", ids):
             row = by_id[aid]
             row["entities"].setdefault(kind, set()).add(identity)
@@ -127,6 +100,8 @@ def _library(connection):
         for row in rows[offset:offset + 800]:
             if not row["entities"].get("studio") and row.get("studio"):
                 row["entities"]["studio"] = {_identity(connection, "studio", row["studio"])}
+            if not row["entities"].get("creator") and row.get("creator"):
+                row["entities"]["creator"] = {_identity(connection, "creator", row["creator"])}
     return rows
 
 
@@ -167,8 +142,8 @@ def q_jav_discoveries(contract, args):
     scope = "library" if args.get("scope") == "library" else "external"
     limit = max(1, min(int(args.get("limit") or 60), 100))
     with contract.read_connection() as connection:
-        taste = build_taste_dashboard(contract.taste_history_store, connection, exclude_disliked=True)
-        profile, names = _profile(connection, taste["rankings"])
+        strengths, names, evidence = preference_profile(connection, contract.taste_history_store)
+        profile = {"id": 0, "entities": {kind: set(values) for kind, values in strengths.items()}}
         candidates = _library(connection) if scope == "library" else _external(connection, contract)
         unique = {}
         for row in candidates:
@@ -176,25 +151,25 @@ def q_jav_discoveries(contract, args):
             unique.setdefault(key, row)
         candidates = list(unique.values())
         # 已知候选按匹配维度排序后再限定计算量，不以发行时间裁掉旧作。
-        candidates.sort(key=lambda row: (-sum(len(profile["entities"][kind] & row["entities"].get(kind, set()))
-                                                   for kind in DIMENSIONS), row["id"]))
+        for row in candidates:
+            row["preference_score"], row["reasons"] = preference_score(row, strengths, names, evidence)
+        candidates.sort(key=lambda row: (-row["preference_score"], row["id"]))
         bounded = candidates[:4000]
         sort = args.get("sort") if args.get("sort") in ("taste", "release_date", "source_score", "duration", "code") else "taste"
         picked = rank_related(profile, bounded, limit, seed=f"jav:{scope}",
-                              order_by=None if sort == "taste" else sort, descending=args.get("direction") != "asc")
+                              order_by=None if sort == "taste" else sort, descending=args.get("direction") != "asc",
+                              relevance_for=lambda row: row["preference_score"])
         wanted = wants.wanted_keys(connection, (web_catalog.normalise_code_key(row["code"]) for row in picked))
         refs = web_feeds._discovery_performers(connection, contract, picked) if scope == "external" else {}
         for row in picked:
-            row["reasons"] = [f"{LABELS[kind]}：" + "、".join(sorted(names[kind][key] for key in
-                profile["entities"][kind] & row["entities"].get(kind, set())))
-                for kind in DIMENSIONS if profile["entities"][kind] & row["entities"].get(kind, set())]
             row["score"] = row.pop("related_score")
             row["taste_score"] = row["score"]
+            row.pop("preference_score", None)
             row["wanted"] = web_catalog.normalise_code_key(row["code"]) in wanted
             row.pop("why", None)
             row.pop("entities", None)
-        if sort == "taste" and args.get("direction") == "asc":
-            picked.reverse()
+        if sort == "taste":
+            picked.sort(key=lambda row: (row["taste_score"], row["id"]), reverse=args.get("direction") != "asc")
         for rank, row in enumerate(picked, 1):
             row["rank"] = rank
     if scope == "library":
