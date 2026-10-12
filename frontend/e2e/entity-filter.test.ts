@@ -106,6 +106,22 @@ describe('实体页筛选浮层', () => {
   before(async () => { browser = await launch(); });
   after(async () => { await browser?.close(); });
 
+  for (const viewport of [DESKTOP, PHONE]) {
+    it(`${viewport.mobile ? '手机' : '桌面'}别名地址归一保留参数与片段，后退回到入口`, { timeout: 60_000 }, async () => {
+      const opened = await visit(browser, '/', viewport);
+      try {
+        const { page } = opened;
+        await serve(page);
+        const suffix = '?sort=release&dir=asc&tag=a%2Fb&offset=48#works';
+        await page.goto(new URL('/performers/OldName' + suffix, page.url()).href, { waitUntil: 'load' });
+        await page.waitForURL(url => url.pathname === PATH && url.search + url.hash === suffix);
+        await page.locator('[data-entity-filter-glass] [data-entity-readout]').waitFor();
+        await page.goBack({ waitUntil: 'load' });
+        assert.equal(new URL(page.url()).pathname, '/');
+      } finally { await opened.close(); }
+    });
+  }
+
   it('骨架里那块浮层换成真浮层时不跳：大小、离资料卡的距离与作品网格的上沿都留在原位', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/', DESKTOP);
     try {

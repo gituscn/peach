@@ -48155,27 +48155,30 @@ function uwe(e, t, n) {
 //#endregion
 //#region src/react/entity-page/entity-page-view.tsx
 function dwe(e) {
-	let { kind: t, name: n } = e, r = dt(nF(t, n)), i = !!r.data?.error, a = r.data?.redirect, { actions: o } = e;
+	let { kind: t, name: n } = e, r = dt(nF(t, n)), i = !!r.data?.error, a = r.data?.canonical_name, o = r.data?.redirect ?? (a && a !== n ? {
+		kind: t,
+		name: a
+	} : void 0), { actions: s } = e;
 	return (0, b.useLayoutEffect)(() => {
-		i && o.missing();
-	}, [o, i]), (0, b.useLayoutEffect)(() => {
-		if (!a) return;
+		i && s.missing();
+	}, [s, i]), (0, b.useLayoutEffect)(() => {
+		if (!o) return;
 		let e = !0;
 		return queueMicrotask(() => {
-			e && o.openEntity(a.kind, a.name, !0);
+			e && s.openEntity(o.kind, o.name, !0);
 		}), () => {
 			e = !1;
 		};
 	}, [
-		o,
-		a?.kind,
-		a?.name
+		s,
+		o?.kind,
+		o?.name
 	]), r.isError ? /* @__PURE__ */ (0, x.jsx)(qj, {
 		message: R(r.error),
 		onRetry: () => {
 			r.refetch();
 		}
-	}) : !r.data || i || a ? null : /* @__PURE__ */ (0, x.jsx)(mwe, {
+	}) : !r.data || i || o ? null : /* @__PURE__ */ (0, x.jsx)(mwe, {
 		...e,
 		entity: r.data
 	});
@@ -93265,7 +93268,7 @@ function Brt(e, t, n) {
 				e.setPhotoLayout(t), e.syncPhotoWalls();
 			},
 			openEntity: (t, n, r = !1) => {
-				r ? e.route(Dt(t, n) + e.search(), !0) : e.openEntity(t, n);
+				r ? e.route(Dt(t, n) + e.suffix(), !0) : e.openEntity(t, n);
 			},
 			painted: (t, n) => {
 				let r = e.photoViewActive();
@@ -93741,7 +93744,7 @@ function _it() {
 			live: (e, t) => o7.entityPageLive(e, t),
 			current: () => o7.entityPageCurrent(),
 			route: (e, t = !1) => Q.route(e, t),
-			search: () => location.search,
+			suffix: () => location.search + location.hash,
 			restoreHomeContext: () => kc({ barsContext: {
 				type: "home",
 				filters: H

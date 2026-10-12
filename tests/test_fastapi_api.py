@@ -1759,6 +1759,49 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(response.status_code, 307, (index, method))
                 self.assertEqual(response.headers['location'], f'/{index}?q=A%2FB&view=cloud')
 
+    async def test_entity_alias_urls_redirect_to_canonical_names_and_keep_query(self):
+        await self.client.post('/login', content='token=secret&next=%2F',
+                               headers={'Content-Type': 'application/x-www-form-urlencoded'})
+        kinds = [('performer', 'performers'), ('creator', 'creators'), ('studio', 'studios'),
+                 ('series', 'series'), ('agency', 'agencies')]
+        canonical = 'Canonical / 名%? #&'
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            for entity_id, (kind, prefix) in enumerate(kinds, 300):
+                connection.execute('INSERT INTO entity(id,kind,canonical_name,normalized_name) VALUES(?,?,?,?)',
+                                   (entity_id, kind, canonical, canonical.casefold()))
+                connection.execute("INSERT INTO entity_alias VALUES(?,?,?,'test',1)",
+                                   (entity_id, f'old-{kind}', f'old-{kind}'))
+        query = '?tag=a%2Fb&tag=second&media=photos&set=9&offset=48&sort=release&dir=asc'
+        for kind, prefix in kinds:
+            names = [f'old-{kind}'] + ([canonical.upper()] if kind == 'studio' else [])
+            target = f'/{prefix}/{quote(canonical, safe="")}' + query
+            for name in names:
+                for method in ('GET', 'HEAD'):
+                    response = await self.client.request(method, f'/{prefix}/{quote(name, safe="")}' + query,
+                                                         follow_redirects=False)
+                    self.assertEqual(response.status_code, 307, (kind, name, method))
+                    self.assertEqual(response.headers['location'], target)
+                    self.assertEqual(response.headers['cache-control'], 'no-store')
+            response = await self.client.get(target, follow_redirects=False)
+            self.assertEqual(response.status_code, 200, kind)
+            if kind != 'series':
+                response = await self.client.get(f'/{prefix}?name=old-{kind}', follow_redirects=False)
+                self.assertEqual(response.status_code, 200, kind)
+                self.assertNotIn('location', response.headers)
+
+    async def test_unknown_or_ambiguous_entity_urls_keep_the_page_shell(self):
+        await self.client.post('/login', content='token=secret&next=%2F',
+                               headers={'Content-Type': 'application/x-www-form-urlencoded'})
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            for entity_id in (300, 301):
+                connection.execute('INSERT INTO entity(id,kind,canonical_name,normalized_name) VALUES(?,?,?,?)',
+                                   (entity_id, 'studio', f'Studio {entity_id}', f'studio {entity_id}'))
+                connection.execute("INSERT INTO entity_alias VALUES(?,'Shared','shared','test',1)", (entity_id,))
+        for name in ('Missing', 'Shared'):
+            response = await self.client.get('/studios/' + name, follow_redirects=False)
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn('location', response.headers)
+
     async def test_client_routes_serve_the_single_page_surface(self):
         await self.client.post(
             "/login", content="token=secret&next=%2F",

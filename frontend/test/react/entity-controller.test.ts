@@ -22,7 +22,7 @@ function setup() {
   let context: EntityContext | null = { kind: 'creator', name: '甲', filters: { ...emptyEntityFilters(), tag: 'one' } };
   let seed = '7', live = true, current = true, photos = false;
   const ports: EntityControllerPorts = {
-    context: () => context, live: () => live, current: () => current, route: vi.fn(), search: () => '?media=online',
+    context: () => context, live: () => live, current: () => current, route: vi.fn(), suffix: () => '?media=online#works',
     restoreHomeContext: vi.fn(), releaseBodyPreviews: vi.fn(), push: vi.fn(), state: () => ({ seed, jav: false }),
     preferences: () => ({ revision: 3, feedRevision: 2, photoSize: 'small', photoLayout: 'fixed', followImagesOnly: false,
       javLayout: 'cover', javLayouts: [], photoLayouts: [], states: [], peopleLayout: 'compact',
@@ -87,7 +87,7 @@ describe('实体与索引域控制', () => {
     expect(actions.reshuffleVideos()).toBe('31');
     expect(ports.push).toHaveBeenLastCalledWith(expect.objectContaining({ seed: '31' }));
     actions.openEntity('creator', '乙', true);
-    expect(ports.route).toHaveBeenLastCalledWith('/creators/%E4%B9%99?media=online', true);
+    expect(ports.route).toHaveBeenLastCalledWith('/creators/%E4%B9%99?media=online#works', true);
     actions.avatarChanged();
     expect(ports.dropBars).toHaveBeenCalledOnce();
   });

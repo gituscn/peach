@@ -199,6 +199,20 @@ describe('首屏', () => {
     expect(page.host.querySelector('[data-entity-hero]')).toBeNull();
   });
 
+  it.each(['performer', 'creator', 'studio', 'series', 'agency'])('别名入口替换为 %s 的规范资料页', async kind => {
+    const page = await open({ entity: entity({ kind, canonical_name: 'Canonical' }) }, { kind, name: 'Alias' });
+    expect(page.props.actions.openEntity).toHaveBeenCalledExactlyOnceWith(kind, 'Canonical', true);
+    expect(page.props.actions.missing).not.toHaveBeenCalled();
+    expect(cards(page.props)).toEqual([]);
+  });
+
+  it('规范名入口直接显示资料页', async () => {
+    const page = await open();
+    expect(page.props.actions.openEntity).not.toHaveBeenCalled();
+    expect(cards(page.props)).toEqual(['1', '2', '3']);
+    expect(readout(page.props)).toBe('视频 · 3');
+  });
+
   it('资料、作品第一页、整组照片与新作在挂载前取齐，挂上之后不再补请求', async () => {
     const page = await open({ feed: { items: [{ id: 31, has_cover: true }] } });
     expect(page.calls('/api/entity')).toHaveLength(1);

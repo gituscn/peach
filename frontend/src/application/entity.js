@@ -242,7 +242,7 @@ export function connectPhotoController(){
     controller:{
       context:()=>{const context=currentBarsContext();return context.type==='entity'?context:null},
       live:(kind,name)=>entityState.entityPageLive(kind,name),current:()=>entityState.entityPageCurrent(),
-      route:(path,replace=false)=>navigationState.route(path,replace),search:()=>location.search,
+      route:(path,replace=false)=>navigationState.route(path,replace),suffix:()=>location.search+location.hash,
       restoreHomeContext:()=>writeShell({barsContext:{type:'home',filters:state}}),
       releaseBodyPreviews:()=>releaseHoverPreviews($('#index [data-entity-body]')),push:pushEntityPage,
       state:()=>({seed:String(state.seed||''),jav:state.jav==='1'}),

@@ -23,6 +23,7 @@ from collections.abc import Mapping, Sequence
 import re
 
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import (
@@ -36,6 +37,7 @@ from fastapi.responses import (
 
 from . import distribution, onboarding, settings_file
 from .config import PROJECT_ROOT
+from .entities import resolve_entity
 from .routes_auth import require_asset_auth, require_page_auth, set_auth_cookie
 from .web_entry import page_shell, runtime_fact_entries
 from .web_state import FAVICON
@@ -670,4 +672,20 @@ def client_route(request: Request, item_id: int | None = None,
                  playlist_id: int | None = None, playlist_item_id: int | None = None,
                  kind: str | None = None, name: str | None = None, code: str | None = None,
                  args: dict[str, str] = Depends(require_page_auth)):
+    settings = request.app.state.settings
+    if name and "name" in request.path_params and settings.configured and not (settings.token and args.get("t")):
+        from .web_entity import INDEX_ENTITY_KINDS
+
+        prefix = request.url.path.split("/", 2)[1]
+        entity_kind = {**INDEX_ENTITY_KINDS, "series": "series"}.get(prefix)
+        if entity_kind:
+            with request.app.state.web_contract.read_connection() as connection:
+                entity = resolve_entity(connection, entity_kind, name)
+            if entity is not None and entity["canonical_name"] != name:
+                raw_query = request.scope.get("query_string", b"").decode("utf-8")
+                query = f"?{raw_query}" if raw_query else ""
+                response = RedirectResponse(
+                    f"/{prefix}/{quote(entity['canonical_name'], safe='')}" + query, status_code=307)
+                response.headers["Cache-Control"] = "no-store"
+                return response
     return index(request, args)
