@@ -2,7 +2,9 @@
 import io
 import json
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,6 +20,63 @@ from support.ledger import fresh_ledger
 
 
 class PublicProtocolTests(unittest.TestCase):
+    def test_pending_image_keeps_metadata_readable_and_merges_same_key(self):
+        api = PublicAPI()
+        started, release = threading.Event(), threading.Event()
+        calls = []
+        def fetch():
+            calls.append(1)
+            started.set()
+            self.assertTrue(release.wait(3))
+            return 'pixels'
+        api._cached('movie:EXM-001', lambda: {'id': 'Exact'})
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            first = pool.submit(api._cached, 'image:Exact:0', fetch)
+            self.assertTrue(started.wait(1))
+            same = pool.submit(api._cached, 'image:Exact:0', fetch)
+            metadata = pool.submit(api.peek_movie, 'EXM-001')
+            try:
+                self.assertEqual(metadata.result(timeout=1), {'id': 'Exact'})
+            finally:
+                release.set()
+            self.assertEqual(first.result(timeout=1), 'pixels')
+            self.assertEqual(same.result(timeout=1), 'pixels')
+        self.assertEqual(calls, [1])
+        self.assertEqual(api.pending, {})
+
+    def test_images_use_three_slots_and_leave_api_interval_intact(self):
+        api = PublicAPI(lambda *_: HttpResponse(200, {}, b'pixels'))
+        api._cached('movie:EXM-001', lambda: {'id': 'Exact', 'number': 'EXM-001',
+                    'preview_images': [f'https://tp.spfcas.com/{index}.jpg' for index in range(6)]})
+        started, release = threading.Event(), threading.Event()
+        lock = threading.Lock()
+        active = peak = 0
+        def transport(*_):
+            nonlocal active, peak
+            with lock:
+                active += 1
+                peak = max(peak, active)
+                if active == 3:
+                    started.set()
+            self.assertTrue(release.wait(3))
+            with lock:
+                active -= 1
+            return HttpResponse(200, {}, b'pixels')
+        api.transport = transport
+        with patch.object(api.limiter, 'wait') as limiter, patch('peach.javdb_public.decode_image', return_value=b'jpeg'):
+            with ThreadPoolExecutor(max_workers=6) as pool:
+                images = [pool.submit(api.image, 'EXM-001', str(index)) for index in range(6)]
+                try:
+                    self.assertTrue(started.wait(1))
+                finally:
+                    release.set()
+                for image in images:
+                    self.assertTrue(image.result(timeout=2).startswith('data:image/jpeg;base64,'))
+            self.assertEqual(peak, 3)
+            limiter.assert_not_called()
+            api._get('https://javdb.com/example')
+            limiter.assert_called_once()
+
     def test_gender_uses_only_explicit_supported_source_values(self):
         for value, expected in ((0, "female"), (1, "male"), (None, "unknown"),
                                 (False, "unknown"), (2, "unknown"), ("male", "male"), ("0", "unknown")):

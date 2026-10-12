@@ -44,6 +44,8 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 ## 播放器清晰度
 
+作品详情的画框几何由 `react/stage/stage.css` 管理，馆藏与库外 JAV 共用视口高度、媒体行及常驻缩略图预留。小数星星的两层 SVG 共用同一图标框。缩略图滚轮复用 `wireHorizontalScroller` 并在卸载时清理。公开图片缓存使用标准库 `Future` 合并同键请求，缓存锁只覆盖内存读写；图片下载使用三个槽位，资料取数使用独立锁与既有来源间隔，不添加依赖。
+
 清晰度控件复用已内置 VHS 的 Video.js 8.24.1（Apache-2.0）及其 [QualityLevelList](https://github.com/videojs/videojs-contrib-quality-levels)。多档自动播放通过 `selectedIndex`、`change` 事件取得当前轨道；单档 HLS 缺少尺寸时读取视频元素的实际尺寸，并响应 `loadedmetadata`、`resize`。尺寸未取得时显示「当前画质」，轨道 ID 不作界面名称；无需新增依赖。
 
 ## 分级诊断

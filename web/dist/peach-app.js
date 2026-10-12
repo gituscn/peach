@@ -40853,7 +40853,7 @@ var VN = [
 	ghost: "bg-button-ghost-background text-button-ghost-foreground"
 }, GN = (e, t) => `<svg class="${t}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-${e}"/></svg>`;
 function KN(e, t = "", n = e) {
-	return `<div data-input-size="medium" class="group flex h-max w-full flex-col items-start gap-1"><div data-rac class="relative flex w-full items-center rounded-2lg bg-background-tertiary-default text-foreground-icon-tertiary ring-2 ring-inset ring-transparent p-2"><div class="flex w-full items-center gap-2 min-w-0"><div class="flex flex-1 items-center gap-0.5 min-w-0">${GN("search", "size-5 shrink-0")}<input type="search" readonly tabindex="-1" aria-label="${L(n)}" value="${L(t)}" placeholder="${L(e)}" class="min-w-0 flex-1 bg-transparent border-0 outline-none p-0 m-0 font-sans text-body-regular text-text-primary pl-1 placeholder:text-text-tertiary"></div></div></div></div>`;
+	return `<div data-input-size="medium" class="group flex h-max w-full flex-col items-start gap-1"><div data-rac class="relative flex w-full items-center rounded-2lg bg-background-tertiary-default text-foreground-icon-tertiary ring-2 ring-inset ring-transparent p-2"><div class="flex w-full items-center gap-2 min-w-0"><div class="flex flex-1 items-center gap-0.5 min-w-0">${GN("search", "size-5 shrink-0")}<input type="search" enterkeyhint="search" readonly tabindex="-1" aria-label="${L(n)}" value="${L(t)}" placeholder="${L(e)}" class="min-w-0 flex-1 bg-transparent border-0 outline-none p-0 m-0 font-sans text-body-regular text-text-primary pl-1 placeholder:text-text-tertiary"></div></div></div></div>`;
 }
 function qN({ variant: e = "primary", size: t = "medium", glyph: n, label: r, attrs: i = "", compact: a = !1 }) {
 	let o = r ? WN[t] : Jve[t], s = n ? GN(n, Yve[t]) : "", c = r ? `<span class="${Xve[t]}"${a ? " data-compact-label" : ""}>${r}</span>` : "";
@@ -62546,8 +62546,8 @@ function zH(e, t, n) {
 		let r = () => {
 			let e = n.querySelector(t), r = n.querySelector("[data-follow-image-step]");
 			if (!e?.naturalWidth || !e.naturalHeight || !r) return;
-			let a = n.getBoundingClientRect(), o = Math.min(a.width, a.height * e.naturalWidth / e.naturalHeight), s = Math.max(0, (a.width - o) / 2), c = matchMedia("(max-width:640px)").matches ? 10 : 16;
-			i(Math.round(s >= r.offsetWidth + c * 2 ? (s - r.offsetWidth) / 2 : c));
+			let a = n.getBoundingClientRect(), o = n.hasAttribute("data-jav-art") || n.hasAttribute("data-item-gallery") ? e.getBoundingClientRect() : a, s = Math.min(o.width, o.height * e.naturalWidth / e.naturalHeight), c = Math.max(0, (a.width - s) / 2), l = matchMedia("(max-width:640px)").matches ? 10 : 16;
+			i(Math.round(c >= r.offsetWidth + l * 2 ? (c - r.offsetWidth) / 2 : l));
 		}, a = new ResizeObserver(r);
 		return a.observe(n), n.addEventListener("load", r, !0), r(), () => {
 			a.disconnect(), n.removeEventListener("load", r, !0);
@@ -62559,8 +62559,11 @@ function zH(e, t, n) {
 	]), r;
 }
 function BH({ items: e, position: t, onSelect: n, below: r = !1, renderThumbnail: i }) {
-	let a = (0, b.useRef)(null), [o, s] = (0, b.useState)(!0), c = e.some((e) => e.video);
-	if ((0, b.useLayoutEffect)(() => {
+	let a = (0, b.useRef)(null), [o, s] = (0, b.useState)(!0), c = e.some((e) => e.video), l = !!i;
+	if ((0, b.useEffect)(() => {
+		let e = a.current?.querySelector("[data-media-thumbnails]"), t = Ao(e, { fade: !1 });
+		return () => t?.destroy();
+	}, [e.length, l]), (0, b.useLayoutEffect)(() => {
 		let e = a.current?.querySelector("[data-media-thumbnails]"), t = e?.querySelector("[aria-current=\"true\"]");
 		if (!e || !t) return;
 		let n = t.offsetLeft - e.offsetLeft;
@@ -62584,7 +62587,7 @@ function BH({ items: e, position: t, onSelect: n, below: r = !1, renderThumbnail
 		t,
 		r
 	]), e.length < 2) return null;
-	let l = (r) => n(e[(t + r + e.length) % e.length].index), u = c ? "项媒体" : "张图片", d = (r, i) => /* @__PURE__ */ (0, x.jsx)("button", {
+	let u = (r) => n(e[(t + r + e.length) % e.length].index), d = c ? "项媒体" : "张图片", f = (r, i) => /* @__PURE__ */ (0, x.jsx)("button", {
 		type: "button",
 		"data-follow-image-item": r.index,
 		"data-carousel-video": r.video ? "" : void 0,
@@ -62605,7 +62608,7 @@ function BH({ items: e, position: t, onSelect: n, below: r = !1, renderThumbnail
 				"data-follow-image-arrow": "prev",
 				"aria-label": c ? "上一项媒体" : "上一张图片",
 				title: "上一张",
-				onClick: () => l(-1),
+				onClick: () => u(-1),
 				dangerouslySetInnerHTML: { __html: I("chevron-left") }
 			}),
 			/* @__PURE__ */ (0, x.jsx)("button", {
@@ -62614,7 +62617,7 @@ function BH({ items: e, position: t, onSelect: n, below: r = !1, renderThumbnail
 				"data-follow-image-arrow": "next",
 				"aria-label": c ? "下一项媒体" : "下一张图片",
 				title: "下一张",
-				onClick: () => l(1),
+				onClick: () => u(1),
 				dangerouslySetInnerHTML: { __html: I("chevron-right") }
 			}),
 			i ? /* @__PURE__ */ (0, x.jsx)("div", {
@@ -62637,8 +62640,8 @@ function BH({ items: e, position: t, onSelect: n, below: r = !1, renderThumbnail
 			}) : /* @__PURE__ */ (0, x.jsx)("div", {
 				"data-follow-image-dots": "",
 				role: "group",
-				"aria-label": `${e.length} ${u}`,
-				children: e.map((e, t) => d(e, t))
+				"aria-label": `${e.length} ${d}`,
+				children: e.map((e, t) => f(e, t))
 			})
 		]
 	});
@@ -65146,14 +65149,17 @@ function dU({ score: e, review: t = !1 }) {
 				5
 			].map((e) => {
 				let t = Math.max(0, Math.min(1, n - e + 1));
-				return /* @__PURE__ */ (0, x.jsxs)("span", {
+				return /* @__PURE__ */ (0, x.jsx)("span", {
 					"data-rate": e,
 					"data-on": String(t === 1),
-					children: [/* @__PURE__ */ (0, x.jsx)(lU, { name: "star" }), /* @__PURE__ */ (0, x.jsx)("span", {
-						"data-rating-fill": "",
-						style: { width: `${t * 100}%` },
-						children: /* @__PURE__ */ (0, x.jsx)(lU, { name: "star" })
-					})]
+					children: /* @__PURE__ */ (0, x.jsxs)("span", {
+						"data-rating-icon": "",
+						children: [/* @__PURE__ */ (0, x.jsx)(lU, { name: "star" }), /* @__PURE__ */ (0, x.jsx)("span", {
+							"data-rating-fill": "",
+							style: { width: `${t * 100}%` },
+							children: /* @__PURE__ */ (0, x.jsx)(lU, { name: "star" })
+						})]
+					})
 				}, e);
 			})
 		}), /* @__PURE__ */ (0, x.jsxs)("span", {
@@ -65824,6 +65830,7 @@ function sMe({ view: e }) {
 		ref: t,
 		id: "stage",
 		"data-stage": "",
+		"data-stage-kind": r.kind,
 		"aria-label": "作品详情",
 		onKeyDown: (e) => {
 			e.key !== "Escape" || e.defaultPrevented || (e.preventDefault(), iW());

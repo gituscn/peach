@@ -132,9 +132,9 @@ function SourceRating({ score, review = false }: { score: number; review?: boole
   return <div data-item-rating="" data-jav-rating="" data-review-rating={review ? '' : undefined} role="img" aria-label={`${review ? '评论' : 'JavDB'}评分 ${score} / 5`}>
     <div data-rating-stars="" aria-hidden="true">{[1, 2, 3, 4, 5].map(star => {
       const fraction = Math.max(0, Math.min(1, value - star + 1));
-      return <span key={star} data-rate={star} data-on={String(fraction === 1)}><Glyph name="star" />
+      return <span key={star} data-rate={star} data-on={String(fraction === 1)}><span data-rating-icon=""><Glyph name="star" />
         {/* oxlint-disable-next-line shadcn/no-inline-styles -- 星星填充宽度表示实际评分的小数比例 */}
-        <span data-rating-fill="" style={{ width: `${fraction * 100}%` }}><Glyph name="star" /></span></span>;
+        <span data-rating-fill="" style={{ width: `${fraction * 100}%` }}><Glyph name="star" /></span></span></span>;
     })}</div>
     <span data-rating-value="">{score.toFixed(1)} / 5</span>
   </div>;

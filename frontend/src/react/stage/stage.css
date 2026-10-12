@@ -34,6 +34,28 @@
 [data-stage]::backdrop{background:var(--scrim)}
 /* 骨架期间焦点停在浮窗本身（里面还没有可操作的东西），外沿不画焦点环；内容到了焦点交给关闭键。 */
 [data-stage]:focus-visible{outline:none}
+/* 作品舞台与媒体区按视口预留空间，取数、媒体切换与推荐加载共用同一画框。 */
+[data-stage][data-stage-kind="item"],[data-stage][data-stage-kind="jav"]{height:calc(100dvh - 32px)}
+[data-stage][data-stage-kind]:is([data-stage-kind="item"],[data-stage-kind="jav"])>[data-stage-scroll]{display:block;max-height:100%;height:100%;overflow:hidden auto}
+[data-stage]:is([data-stage-kind="item"],[data-stage-kind="jav"]){--detail-media-height:76dvh;--detail-gallery-height:calc(var(--detail-media-height) - 116px)}
+@media(min-width:1081px){
+  [data-stage][data-stage-kind="jav"]{--detail-media-height:calc(100dvh - 34px)}
+  [data-stage][data-stage-kind="item"]{--detail-media-height:clamp(300px,calc(100dvh - 294px),76dvh)}
+}
+[data-stage]:is([data-stage-kind="item"],[data-stage-kind="jav"]):not([data-theater]) [data-stage-grid]{height:var(--detail-media-height);flex:none}
+[data-stage]:is([data-stage-kind="item"],[data-stage-kind="jav"]) [data-stage-media]{height:var(--detail-media-height);min-height:0}
+[data-stage] [data-stage-scroll] :is([data-jav-art],[data-item-gallery]){display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 116px;align-items:center;justify-items:center}
+[data-stage] [data-stage-scroll] :is([data-jav-art],[data-item-gallery])>:is([data-jav-picture],[data-catalog-picture],[data-jav-picture-wait],[data-jav-video],[class~="video-js"],[role="note"]){grid-area:1/1;min-height:0;max-height:var(--detail-gallery-height);height:var(--detail-gallery-height);width:100%;object-fit:contain}
+[data-stage] :is([data-jav-art],[data-item-gallery])>[data-carousel-below]{grid-area:2/1;box-sizing:border-box;min-width:0;align-self:end}
+[data-stage] [data-jav-video]{display:grid;place-items:center}
+[data-stage] [data-stage-scroll] :is([data-jav-video]>[class~="video-js"],[data-item-gallery]>[class~="video-js"]){width:min(100%,calc(var(--detail-gallery-height) * 16 / 9));height:auto;max-height:var(--detail-gallery-height);aspect-ratio:16/9}
+@media(max-width:1080px){
+  [data-stage]:is([data-stage-kind="item"],[data-stage-kind="jav"]){--detail-media-height:min(56dvh,calc(56.25vw + 116px))}
+  [data-stage]:is([data-stage-kind="item"],[data-stage-kind="jav"]):not([data-theater]) [data-stage-grid]{height:auto}
+}
+@media(max-width:760px){
+  [data-stage][data-stage-kind="item"],[data-stage][data-stage-kind="jav"]{height:calc(100dvh - env(safe-area-inset-top) - 16px)}
+}
 body[data-detail-open]{overflow:hidden;--glow-drift-play:paused}
 body[data-detail-open] [class~=glowlayer]::before{animation-play-state:paused,paused,running}
 [data-stage]:not([data-ambient]){background:color-mix(in srgb,var(--surface) 88%,transparent)}

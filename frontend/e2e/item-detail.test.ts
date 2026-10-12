@@ -30,13 +30,20 @@ const ids = (page: Page, selector: string, attribute: string) => page.locator(se
 
 /** 换条前记下舞台节点并盯住骨架：原地换条时浮窗还是同一个节点，中途不回骨架，焦点留在浮窗里。 */
 const watchStage = (page: Page) => page.evaluate(() => {
-  const watch = { stage: document.getElementById('stage'), skeleton: false };
+  const watch = { stage: document.getElementById('stage'), skeleton: false, heights: [] as number[] };
+  const sample = () => {
+    const media = document.querySelector('#stage [data-stage-media]');
+    if (media) watch.heights.push(media.getBoundingClientRect().height);
+    if (watch.heights.length < 120) requestAnimationFrame(sample);
+  }; sample();
   new MutationObserver(() => { if (document.querySelector('#stage [data-skeleton="detail"]')) watch.skeleton = true })
     .observe(document.body, { childList: true, subtree: true });
   Object.assign(window, { stageWatch: watch });
 });
 const stageKept = (page: Page) => page.evaluate(() => {
-  const watch = (window as unknown as { stageWatch: { stage: Element | null; skeleton: boolean } }).stageWatch;
+  const watch = (window as unknown as { stageWatch: { stage: Element | null; skeleton: boolean; heights: number[] } }).stageWatch;
+  if (Math.max(...watch.heights) - Math.min(...watch.heights) > 1)
+    throw new Error(`作品切换画框高度不稳定：${JSON.stringify(watch.heights)}`);
   return { same: document.getElementById('stage') === watch.stage, skeleton: watch.skeleton,
     focused: !!watch.stage?.contains(document.activeElement) };
 });
@@ -150,6 +157,19 @@ describe('作品详情岛', () => {
     try {
       const page = opened.page;
       await page.emulateMedia({reducedMotion:'no-preference'});
+      await page.route(/\/api\/item\?/, async route => {
+        await new Promise(resolve => setTimeout(resolve, 400));
+        await route.fallback();
+      });
+      await page.evaluate(() => {
+        const heights: number[] = [];
+        Object.assign(window, { coldCatalogHeights: heights });
+        const sample = () => {
+          const dialog = document.querySelector<HTMLDialogElement>('#stage[open]');
+          if (dialog) heights.push(dialog.clientHeight);
+          if (heights.length < 180) requestAnimationFrame(sample);
+        }; requestAnimationFrame(sample);
+      });
       const listed = opened.stub.reads.get('/api/items') || 0;
       const backgroundPlayState=()=>page.locator('.top .search').first().evaluate(
         node=>getComputedStyle(node).animationPlayState);
@@ -157,6 +177,8 @@ describe('作品详情岛', () => {
       await page.locator(`#grid [data-media-card][data-id="${ITEM.plain}"] [data-media-title]`).first().click();
       await pathIs(page, `/item/${ITEM.plain}`);
       await page.locator(DETAIL_READY).waitFor();
+      const heights = await page.evaluate(() => (window as unknown as { coldCatalogHeights: number[] }).coldCatalogHeights);
+      assert.ok(heights.length > 5 && Math.max(...heights) - Math.min(...heights) < 1, JSON.stringify(heights));
       assert.ok((await backgroundPlayState()).split(',').every(state=>state.trim()==='paused'));
       assert.equal(await page.evaluate(() => document.activeElement?.id), 'closeStage', '内容到了焦点不在关闭键上');
       await page.locator('#closeStage').click();

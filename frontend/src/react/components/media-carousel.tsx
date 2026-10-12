@@ -1,6 +1,7 @@
 import { icon } from '@peach/legacy/core';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import './media-carousel.css';
+import { wireHorizontalScroller } from '../../ui-kit/scroll';
 
 export const MEDIA_DOTS_MAX = 20;
 export interface CarouselMedia { index: number; label?: string; video?: boolean }
@@ -16,7 +17,9 @@ export function useCarouselInset(frame: RefObject<HTMLDivElement | null>, select
       const arrow = box.querySelector<HTMLElement>('[data-follow-image-step]');
       if (!image?.naturalWidth || !image.naturalHeight || !arrow) return;
       const rect = box.getBoundingClientRect();
-      const rendered = Math.min(rect.width, rect.height * image.naturalWidth / image.naturalHeight);
+      const picture = box.hasAttribute('data-jav-art') || box.hasAttribute('data-item-gallery')
+        ? image.getBoundingClientRect() : rect;
+      const rendered = Math.min(picture.width, picture.height * image.naturalWidth / image.naturalHeight);
       const gutter = Math.max(0, (rect.width - rendered) / 2);
       const safe = matchMedia('(max-width:640px)').matches ? 10 : 16;
       setInset(Math.round(gutter >= arrow.offsetWidth + safe * 2 ? (gutter - arrow.offsetWidth) / 2 : safe));
@@ -38,6 +41,12 @@ export function MediaCarousel({ items, position, onSelect, below = false, render
   const root = useRef<HTMLDivElement>(null);
   const [fits, setFits] = useState(true);
   const mixed = items.some(item => item.video);
+  const hasThumbnails = !!renderThumbnail;
+  useEffect(() => {
+    const strip = root.current?.querySelector<HTMLElement>('[data-media-thumbnails]');
+    const scroller = wireHorizontalScroller(strip, { fade: false });
+    return () => scroller?.destroy();
+  }, [items.length, hasThumbnails]);
   useLayoutEffect(() => {
     const strip = root.current?.querySelector<HTMLElement>('[data-media-thumbnails]');
     const selected = strip?.querySelector<HTMLElement>('[aria-current="true"]');

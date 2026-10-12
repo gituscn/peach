@@ -1,4 +1,4 @@
-.peach-react [data-jav-detail] [data-jav-art] { --follow-image-arrow-inset: 16px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 260px; background: var(--sunk); }
+.peach-react [data-jav-detail] [data-jav-art] { --follow-image-arrow-inset: 16px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 260px; }
 .peach-react [data-jav-picture] { display: block; width: 100%; height: auto; max-height: calc(76vh - 112px); object-fit: contain; min-height: 0; }
 .peach-react [data-jav-picture-wait] { display: grid; place-items: center; min-height: 300px; padding: 24px; }
 .peach-react [data-jav-picture-wait] [class~="skeleton-sheen"] { width: 100%; min-height: 260px; }
@@ -25,10 +25,13 @@
 .peach-react [data-jav-review] { padding-top: 12px; border-top: 1px solid var(--line-soft); font-size: var(--fs-sm); }
 .peach-react [data-jav-review-meta] { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
 .peach-react [data-jav-review] time { color: var(--muted); }
-.peach-react [data-jav-rating] [data-rate] { position: relative; }
+.peach-react [data-jav-rating] [data-rating-icon] { position: relative; display: block; width: 19px; height: 19px; }
+.peach-react [data-jav-rating] [data-rating-icon] svg { display: block; position: absolute; inset: 0; }
 .peach-react [data-jav-rating] [data-rating-fill] { position: absolute; inset: 0 auto 0 0; overflow: hidden; }
 .peach-react [data-jav-rating] [data-rating-fill] svg { fill: currentColor; max-width: none; }
-.peach-react [data-review-rating] { margin: 0; }
+.peach-react [data-item-detail] [data-review-rating] { margin: 0; }
+.peach-react [data-review-rating] [data-rating-stars] { margin-left: 0; }
+.peach-react [data-review-rating] [data-rating-icon] { width: 16px; height: 16px; }
 .peach-react [data-review-rating] [data-rate] { width: 16px; height: 16px; }
 .peach-react [data-review-rating] [data-rate] svg { width: 16px; height: 16px; }
 .peach-react [data-review-rating] [data-rating-value] { display: none; }
