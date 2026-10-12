@@ -81,7 +81,8 @@ class _Entry:
 
 
 def rank_related(source: Mapping, candidates: Iterable[Mapping], limit: int,
-                 *, seed: str | None = None, diversity: float = 0.22) -> list[dict]:
+                 *, seed: str | None = None, diversity: float = 0.22,
+                 order_by: str | None = None, descending: bool = True) -> list[dict]:
     """以 IDF 加权相关度选片，再用 MMR 抑制连续出现的近重复作品。
 
     朴素 MMR 的代价是 O(limit² × 候选池)：每选中一条，都要把整池和**全部**已选重算一遍
@@ -112,6 +113,16 @@ def rank_related(source: Mapping, candidates: Iterable[Mapping], limit: int,
         entries.append(_Entry(candidate, feature, relevance,
                               _stable_key(stable_seed, int(candidate["id"]))))
 
+    if order_by:
+        known = [entry for entry in entries if entry.row.get(order_by) not in (None, "")]
+        unknown = [entry for entry in entries if entry.row.get(order_by) in (None, "")]
+        known.sort(key=lambda entry: (entry.row[order_by], entry.key), reverse=descending)
+        unknown.sort(key=lambda entry: entry.key)
+        ordered = [entry.row for entry in (known + unknown)[:want]]
+        for row in ordered:
+            row["ranking_score"] = row["related_score"]
+        return ordered
+
     selected: list[dict] = []
     while entries and len(selected) < want:
         best = min(range(len(entries)), key=lambda index: (
@@ -119,6 +130,7 @@ def rank_related(source: Mapping, candidates: Iterable[Mapping], limit: int,
             entries[index].key,
         ))
         chosen = entries.pop(best)
+        chosen.row["ranking_score"] = round(chosen.relevance - diversity * chosen.redundancy, 4)
         selected.append(chosen.row)
         if len(selected) >= want:
             break

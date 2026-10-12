@@ -876,10 +876,34 @@ class FeedFollowByNameTest(PerformerFeedSwitchTest):
 
 
 class JavDiscoveryTest(FeedWebFixture):
+    def test_persistent_metadata_supplies_canonical_filters_and_sort_values_without_detail(self):
+        from peach import web_jav_discovery
+        from peach.jav_discovery_metadata import discovery_metadata
+        self._add()
+        self._check()
+        metadata = discovery_metadata(self.contract)
+        with self.contract.database.read_connection() as connection:
+            codes = [row[0] for row in connection.execute("SELECT code FROM feed_discovery ORDER BY id")]
+        for code, score in zip(codes, (None, "4.23")):
+            metadata.remember(code, {"number": code, "tags": [{"name": "中出"}], "score": score, "duration": 180})
+        with patch.object(web_jav_discovery, "build_taste_dashboard", return_value={
+                "rankings": {"browser_tags": [{"name": "中出内射", "score": 4}]}}), \
+                patch("peach.javdb_public.PUBLIC_API.movie") as movie:
+            result = web_jav_discovery.q_jav_discoveries(self.contract, {"sort": "source_score"})
+            metadata.job.thread.join(5)
+        movie.assert_not_called()
+        self.assertEqual([row["source_score"] for row in result["items"]], [4.23, None])
+        self.assertTrue(all(row["tags"] == ["中出内射"] for row in result["items"]))
+        self.assertTrue(all(row["duration"] == 10800 for row in result["items"]))
+        self.assertEqual(result["ranking_method"], "field-sort")
+        self.assertEqual([row["rank"] for row in result["items"]], [1, 2])
+        self.assertTrue(all(row["taste_score"] == row["score"] for row in result["items"]))
+
     def _discover(self, scope="external", rankings=None, metadata=None):
         from peach import web_jav_discovery
         with patch.object(web_jav_discovery, "build_taste_dashboard", return_value={"rankings": rankings or {}}), \
-                patch.object(web_jav_discovery, "_cached_movie", return_value=metadata or {}):
+                patch.object(web_jav_discovery, "_cached_movie", return_value=metadata or {}), \
+                patch("peach.jav_discovery_metadata.DiscoveryMetadata.ensure", return_value=None):
             return web_jav_discovery.q_jav_discoveries(self.contract, {"scope": scope})
 
     def test_external_discovery_includes_older_known_works_and_studio_matches(self):
@@ -893,7 +917,7 @@ class JavDiscoveryTest(FeedWebFixture):
         self.assertTrue(all(row["reasons"] == ["常看的厂牌：示例厂牌"] for row in result["items"]))
         self.assertEqual(self._discover()["items"], [])
 
-    def test_external_discovery_uses_only_metadata_already_obtained(self):
+    def test_external_discovery_projects_obtained_metadata_and_canonical_tags(self):
         self._add()
         self._check()
         rankings = {"browser_tags": [{"name": "恋足", "score": 4}],

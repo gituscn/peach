@@ -39,6 +39,7 @@ def _naive_rank(source, candidates, limit, *, seed=None, diversity=0.22):
             return (-mmr, related._stable_key(stable_seed, int(candidate["id"])))
 
         choice = min(pool, key=key)
+        choice["ranking_score"] = round(-key(choice)[0], 4)
         pool.remove(choice)
         reasons = choice.pop("_reasons")
         relevance = choice.pop("_relevance")
@@ -79,6 +80,21 @@ def _corpus_source():
 
 
 class RelatedRankerTests(unittest.TestCase):
+    def test_actual_mmr_score_contains_redundancy_penalty(self):
+        source = {"id": 1, "entities": {"tag": {10}}}
+        candidates = [{"id": aid, "entities": {"tag": {10}}} for aid in (2, 3)]
+        first, second = rank_related(source, candidates, 2)
+        self.assertEqual(first["ranking_score"], first["related_score"])
+        self.assertAlmostEqual(second["ranking_score"], second["related_score"] - 0.22 * 0.55)
+
+    def test_field_sort_covers_the_pool_and_keeps_missing_values_last(self):
+        source = {"id": 1, "entities": {"tag": {10}}}
+        candidates = [{"id": aid, "entities": {"tag": {10}}, "source_score": score}
+                      for aid, score in ((2, 1.0), (3, None), (4, 4.5))]
+        for descending, expected in ((True, [4, 2, 3]), (False, [2, 4, 3])):
+            rows = rank_related(source, candidates, 3, order_by="source_score", descending=descending)
+            self.assertEqual([row["id"] for row in rows], expected)
+
     def test_rare_shared_tag_beats_common_shared_tag(self):
         source = {"id": 1, "entities": {"tag": {10, 20}}}
         common = {"id": 2, "entities": {"tag": {10}}}

@@ -8,6 +8,9 @@ import re
 import threading
 import time
 from collections import OrderedDict
+from contextlib import contextmanager
+from dataclasses import dataclass
+from contextvars import ContextVar
 from urllib.parse import urlencode, urlsplit
 
 from PIL import Image
@@ -50,6 +53,38 @@ class PublicSourceUnavailable(ValueError):
     """公开来源当前未取得。"""
 
 
+class PublicBudgetExceeded(PublicSourceUnavailable):
+    """本轮匿名资料请求预算已用完。"""
+
+
+@dataclass
+class PublicRequestBudget:
+    max_requests: int = 202
+    max_bytes: int = 16 * 1024 * 1024
+    max_seconds: int = 900
+    requests: int = 0
+    bytes: int = 0
+    started: float = 0
+    stop_reason: str = ""
+
+    def check(self):
+        for reason, exhausted in (
+                ("request_budget", self.requests >= self.max_requests),
+                ("byte_budget", self.bytes >= self.max_bytes),
+                ("time_budget", time.monotonic() - self.started >= self.max_seconds)):
+            if exhausted:
+                self.stop_reason = reason
+                raise PublicBudgetExceeded("本轮作品资料预算已用完")
+
+
+def actor_gender(actor: dict) -> str:
+    """公开协议的明确性别字段；缺失和未知值保留未知。"""
+    value = actor.get("gender")
+    if type(value) is int:
+        return {0: "female", 1: "male"}.get(value, "unknown")
+    return value if value in ("female", "male") else "unknown"
+
+
 class PublicAPI:
     """不带账号凭据；串行取数、3 秒间隔、6 小时缓存，失败冷却 60 秒。"""
 
@@ -62,11 +97,25 @@ class PublicAPI:
         self.signature_parts: tuple[str, str] | None = None
         self.signature_until = 0.0
         self.paused_until = 0.0
+        self.request_context = ContextVar("jav_public_request_budget", default=None)
+
+    @contextmanager
+    def request_budget(self, budget: PublicRequestBudget):
+        budget.started = time.monotonic()
+        token = self.request_context.set(budget)
+        try:
+            yield budget
+        finally:
+            self.request_context.reset(token)
 
     def _get(self, url: str, *, signed=False, limit=2 * 1024 * 1024):
         if self.clock() < self.paused_until:
             raise PublicSourceUnavailable("作品资料来源暂时不可用，请稍后重试")
         self.limiter.wait(url)
+        budget = self.request_context.get()
+        if budget:
+            budget.check()
+            limit = min(limit, budget.max_bytes - budget.bytes)
         headers = {"Accept": "application/json" if signed else "*/*"}
         if signed:
             stamp = str(int(time.time()))
@@ -76,10 +125,14 @@ class PublicAPI:
         if self.transport is None:
             self.transport = HttpxTransport()
         try:
+            if budget:
+                budget.requests += 1
             response = self.transport(HttpRequest("GET", url, headers), 15, limit)
         except Exception as error:
             self.paused_until = self.clock() + 60
             raise PublicSourceUnavailable("作品资料未取得，请稍后重试") from error
+        if budget:
+            budget.bytes += len(response.body)
         if response.status != 200:
             self.paused_until = self.clock() + (900 if response.status in (403, 429) else 60)
             raise PublicSourceUnavailable("作品资料来源暂时不可用，请稍后重试")

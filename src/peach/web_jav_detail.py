@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import re
+import json
 
 from . import entities, wants, web_catalog
 from .catalog_rules import normalise_code_key, tag_cat
 from .genre_decisions import load_genre_decisions
 from .genre_taxonomy import resolve_genre
 from .javdb_public import (MAX_REVIEW_PAGES, PAGE_SIZE, PUBLIC_API, PublicSourceUnavailable,
-                          preview_video_url, public_image_url)
+                          actor_gender, preview_video_url, public_image_url)
+from .jav_discovery_metadata import discovery_metadata
 
 
 def detail_code(args) -> str:
@@ -38,8 +40,10 @@ def q_jav_detail(contract, args) -> dict:
     message = ""
     try:
         source = PUBLIC_API.movie(code)
+        discovery_metadata(contract).remember(code, source)
     except PublicSourceUnavailable as error:
         message = str(error)
+        discovery_metadata(contract).remember(code, error=message)
     if source:
         item.update(title=source.get("title") or source.get("origin_title") or item.get("title"),
                     release_date=source.get("release_date") or item.get("release_date"),
@@ -68,6 +72,14 @@ def _identity_fields(contract, code, item, source):
                 continue
             ref = refs[0]
             actor = next((actor for actor in actors if actor.get("name") == name), {})
+            ref["gender"] = actor_gender(actor)
+            if ref["gender"] == "unknown" and ref.get("id"):
+                local = connection.execute("SELECT metadata_json FROM entity WHERE id=?", (ref["id"],)).fetchone()
+                try:
+                    metadata = json.loads(local[0] or "{}") if local else {}
+                    ref["gender"] = actor_gender(metadata) if isinstance(metadata, dict) else "unknown"
+                except (ValueError, TypeError):
+                    pass
             actor_id = str(actor.get("id") or "")
             if re.fullmatch(r"[A-Za-z0-9]{1,64}", actor_id):
                 ref["source_actor_id"] = actor_id
