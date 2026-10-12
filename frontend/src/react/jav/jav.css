@@ -4,7 +4,7 @@
 .peach-react [data-jav-skeleton-avatar] { width: 38px; height: 38px; border-radius: 50%; }
 .peach-react [data-jav-skeleton-cover] { border-radius: var(--surface-radius); }
 .peach-react [data-jav-skeleton-text] { height: 20px; }
-.peach-react [data-jav-skeleton-actions] > .skeleton { height: 36px; border-radius: var(--control-radius); }
+.peach-react [data-jav-skeleton-action] { height: 36px; border-radius: var(--control-radius); }
 .peach-react [data-jav-title] {
   display: -webkit-box;
   -webkit-box-orient: vertical;

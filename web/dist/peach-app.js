@@ -53840,7 +53840,7 @@ function $z(e, t = _T()) {
     <div class="flex h-10 items-center gap-2"><span data-jav-skeleton-avatar class="skeleton block shrink-0"></span>${Zz("55%")}</div>
     <div data-media-tags><span class="skeleton block h-5 w-24 rounded-md"></span></div>
     ${Zz("55%")}
-    <div data-jav-skeleton-actions class="flex flex-wrap gap-2"><span class="skeleton block h-9 w-20 rounded-md"></span><span class="skeleton block h-9 w-12 rounded-md"></span><span class="skeleton block h-9 w-26 rounded-md"></span></div>
+    <div data-jav-skeleton-actions class="flex flex-wrap gap-2"><span data-jav-skeleton-action class="skeleton block h-9 w-20 rounded-md"></span><span data-jav-skeleton-action class="skeleton block h-9 w-12 rounded-md"></span><span data-jav-skeleton-action class="skeleton block h-9 w-26 rounded-md"></span></div>
   </div>`).join("")}</div>`;
 }
 function bEe(e) {
