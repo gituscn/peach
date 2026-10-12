@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { RiChat3Line, RiExternalLinkLine } from '@remixicon/react';
 import { entityPath, firstGrapheme, icon } from '@peach/legacy/core';
@@ -39,7 +39,7 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
   useEffect(() => { if (item.state === 'ready') void queryClient.invalidateQueries({ queryKey: ['jav-discoveries', 'external'] }) }, [item.code, item.state]);
   const [preview, setPreview] = useState(-1);
   const frame = useRef<HTMLDivElement>(null);
-  const inset = useCarouselInset(frame, '[data-jav-picture]', preview);
+  useCarouselInset(frame, '[data-jav-picture]', preview);
   const media = [{ index: -1, label: '封面' }, ...Array.from({ length: item.preview_count }, (_, index) => ({ index, label: `预览 ${index + 1}` })),
     ...(item.preview_video_url ? [{ index: -2, label: '视频预览', video: true }] : [])];
   const [download, setDownload] = useState<DownloadPrefill | null>(null);
@@ -57,9 +57,7 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
     void queryClient.invalidateQueries({ queryKey: ['jav-discoveries'] });
   }) };
   return <>
-    <div ref={frame} data-stage-media="" data-jav-art="" data-jav-playing={preview === -2 ? '' : undefined}
-      // oxlint-disable-next-line shadcn/no-inline-styles -- 图片黑边的真实宽度决定翻页箭头位置
-      style={{ '--follow-image-arrow-inset': inset === null || preview === -2 ? undefined : `${inset}px` } as CSSProperties}>
+    <div ref={frame} data-stage-media="" data-jav-art="" data-jav-playing={preview === -2 ? '' : undefined}>
       <Close close={actions.close} />
       {item.preview_video_url ? <button type="button" data-jav-preview-toggle="" aria-pressed={preview === -2}
         onClick={() => setPreview(preview === -2 ? -1 : -2)}><Glyph name={preview === -2 ? 'image' : 'play'} />{preview === -2 ? '查看图片' : '视频预览'}</button> : null}

@@ -180,7 +180,7 @@ function MediaFrame({ item, media, actions, onMedia, issues }: {
   const imageSrc = item.playable && kind === 'image' ? src : item.thumb_url || '';
   const fallback = item.playable && kind === 'image' && thumb && thumb !== src ? thumb : '';
   const [shown, setShown] = useState(imageSrc);
-  const inset = useCarouselInset(frame, '[data-follow-detail-poster]', shown);
+  useCarouselInset(frame, '[data-follow-detail-poster]', shown);
 
   /* 播放器只随这一块媒体区挂一次、卸一次：写完状态换的是同一条的新对象，不能因此拆了重挂。
      这一块本身按「条目:媒体」换，换条目或换媒体时整块重建，清理就在那一刻跑。`<video>` 由舞台
@@ -196,8 +196,8 @@ function MediaFrame({ item, media, actions, onMedia, issues }: {
 
   return (
     <div ref={frame} data-stage-media="" data-follow-detail-media={kind || 'none'} data-framed={frameRatio ? '' : undefined}
-      // oxlint-disable-next-line shadcn/no-inline-styles -- 画框比例与箭头内距是按这一组图的尺寸和当前视口算出来的
-      style={{ '--follow-frame-ratio': frameRatio ? frameRatio.toFixed(4) : undefined, '--follow-image-arrow-inset': inset === null ? undefined : `${inset}px` } as CSSProperties}>
+      // oxlint-disable-next-line shadcn/no-inline-styles -- 画框比例取这一组图的尺寸
+      style={{ '--follow-frame-ratio': frameRatio ? frameRatio.toFixed(4) : undefined } as CSSProperties}>
       <CloseStage onClose={actions.close} />
       {playable ? null : imageSrc ? (
         <img data-follow-detail-poster="" data-zoomable={slides.length ? '' : undefined} src={shown} alt={item.title}

@@ -8,7 +8,6 @@ export interface CarouselMedia { index: number; label?: string; video?: boolean 
 
 /** 翻页箭头按 contain 图片的黑边居中；窄边保留安全内距。 */
 export function useCarouselInset(frame: RefObject<HTMLDivElement | null>, selector: string, mediaKey: string | number) {
-  const [inset, setInset] = useState<number | null>(null);
   useLayoutEffect(() => {
     const box = frame.current;
     if (!box) return;
@@ -22,15 +21,18 @@ export function useCarouselInset(frame: RefObject<HTMLDivElement | null>, select
       const rendered = Math.min(picture.width, picture.height * image.naturalWidth / image.naturalHeight);
       const gutter = Math.max(0, (rect.width - rendered) / 2);
       const safe = matchMedia('(max-width:640px)').matches ? 10 : 16;
-      setInset(Math.round(gutter >= arrow.offsetWidth + safe * 2 ? (gutter - arrow.offsetWidth) / 2 : safe));
+      const inset = Math.round(gutter >= arrow.offsetWidth + safe * 2 ? (gutter - arrow.offsetWidth) / 2 : safe);
+      box.style.setProperty('--follow-image-arrow-inset', `${inset}px`);
     };
     const observer = new ResizeObserver(align);
     observer.observe(box);
     box.addEventListener('load', align, true);
     align();
-    return () => { observer.disconnect(); box.removeEventListener('load', align, true) };
+    return () => {
+      observer.disconnect(); box.removeEventListener('load', align, true);
+      box.style.removeProperty('--follow-image-arrow-inset');
+    };
   }, [frame, selector, mediaKey]);
-  return inset;
 }
 
 /** 关注与作品预览共用环形切换、圆点与大集合计数。 */

@@ -62539,24 +62539,23 @@ function RH({ queue: e, children: t }) {
 	});
 }
 function zH(e, t, n) {
-	let [r, i] = (0, b.useState)(null);
-	return (0, b.useLayoutEffect)(() => {
+	(0, b.useLayoutEffect)(() => {
 		let n = e.current;
 		if (!n) return;
 		let r = () => {
 			let e = n.querySelector(t), r = n.querySelector("[data-follow-image-step]");
 			if (!e?.naturalWidth || !e.naturalHeight || !r) return;
-			let a = n.getBoundingClientRect(), o = n.hasAttribute("data-jav-art") || n.hasAttribute("data-item-gallery") ? e.getBoundingClientRect() : a, s = Math.min(o.width, o.height * e.naturalWidth / e.naturalHeight), c = Math.max(0, (a.width - s) / 2), l = matchMedia("(max-width:640px)").matches ? 10 : 16;
-			i(Math.round(c >= r.offsetWidth + l * 2 ? (c - r.offsetWidth) / 2 : l));
-		}, a = new ResizeObserver(r);
-		return a.observe(n), n.addEventListener("load", r, !0), r(), () => {
-			a.disconnect(), n.removeEventListener("load", r, !0);
+			let i = n.getBoundingClientRect(), a = n.hasAttribute("data-jav-art") || n.hasAttribute("data-item-gallery") ? e.getBoundingClientRect() : i, o = Math.min(a.width, a.height * e.naturalWidth / e.naturalHeight), s = Math.max(0, (i.width - o) / 2), c = matchMedia("(max-width:640px)").matches ? 10 : 16, l = Math.round(s >= r.offsetWidth + c * 2 ? (s - r.offsetWidth) / 2 : c);
+			n.style.setProperty("--follow-image-arrow-inset", `${l}px`);
+		}, i = new ResizeObserver(r);
+		return i.observe(n), n.addEventListener("load", r, !0), r(), () => {
+			i.disconnect(), n.removeEventListener("load", r, !0), n.style.removeProperty("--follow-image-arrow-inset");
 		};
 	}, [
 		e,
 		t,
 		n
-	]), r;
+	]);
 }
 function BH({ items: e, position: t, onSelect: n, below: r = !1, renderThumbnail: i }) {
 	let a = (0, b.useRef)(null), [o, s] = (0, b.useState)(!0), c = e.some((e) => e.video), l = !!i;
@@ -62880,22 +62879,21 @@ function ije({ data: e, media: t, limit: n, context: r, helpers: i, actions: a }
 	});
 }
 function aje({ item: e, media: t, actions: n, onMedia: r, issues: i }) {
-	let { kind: a, selected: o, src: s, images: c, position: l, carousel: u, frameRatio: d } = t, f = (0, b.useRef)(null), p = WAe(e, t), m = o?.thumb_url || e.thumb_url || "", h = e.playable && a === "video", g = e.playable && a === "image" ? s : e.thumb_url || "", _ = e.playable && a === "image" && m && m !== s ? m : "", [v, y] = (0, b.useState)(g), S = zH(f, "[data-follow-detail-poster]", v), C = (0, b.useRef)({
+	let { kind: a, selected: o, src: s, images: c, position: l, carousel: u, frameRatio: d } = t, f = (0, b.useRef)(null), p = WAe(e, t), m = o?.thumb_url || e.thumb_url || "", h = e.playable && a === "video", g = e.playable && a === "image" ? s : e.thumb_url || "", _ = e.playable && a === "image" && m && m !== s ? m : "", [v, y] = (0, b.useState)(g);
+	zH(f, "[data-follow-detail-poster]", v);
+	let S = (0, b.useRef)({
 		item: e,
 		selected: o
-	}), w = (0, b.useRef)(i.failed);
-	return w.current = i.failed, (0, b.useLayoutEffect)(() => {
+	}), C = (0, b.useRef)(i.failed);
+	return C.current = i.failed, (0, b.useLayoutEffect)(() => {
 		let e = f.current;
-		if (e && h) return n.mountPlayer(e, C.current.item, C.current.selected, { onError: () => w.current() });
+		if (e && h) return n.mountPlayer(e, S.current.item, S.current.selected, { onError: () => C.current() });
 	}, [n, h]), /* @__PURE__ */ (0, x.jsxs)("div", {
 		ref: f,
 		"data-stage-media": "",
 		"data-follow-detail-media": a || "none",
 		"data-framed": d ? "" : void 0,
-		style: {
-			"--follow-frame-ratio": d ? d.toFixed(4) : void 0,
-			"--follow-image-arrow-inset": S === null ? void 0 : `${S}px`
-		},
+		style: { "--follow-frame-ratio": d ? d.toFixed(4) : void 0 },
 		children: [
 			/* @__PURE__ */ (0, x.jsx)(WH, { onClose: n.close }),
 			h ? null : g ? /* @__PURE__ */ (0, x.jsx)("img", {
@@ -63754,7 +63752,9 @@ function _je(e) {
 	})] });
 }
 function vje({ item: e, gate: t, helpers: n, actions: r, autoplay: i, onEnded: a }) {
-	let [o, s] = (0, b.useState)(t ? "" : "auto"), c = (0, b.useRef)(null), [l, u] = (0, b.useState)(-2), d = zH(c, "[data-catalog-picture]", l), f = e.is_jav && e.code ? [
+	let [o, s] = (0, b.useState)(t ? "" : "auto"), c = (0, b.useRef)(null), [l, u] = (0, b.useState)(-2);
+	zH(c, "[data-catalog-picture]", l);
+	let d = e.is_jav && e.code ? [
 		...e.has_cover ? [{
 			index: -1,
 			label: "封面"
@@ -63768,35 +63768,34 @@ function vje({ item: e, gate: t, helpers: n, actions: r, autoplay: i, onEnded: a
 			label: "正片",
 			video: !0
 		}
-	] : [], p = f.length > 1, m = (e) => {
+	] : [], f = d.length > 1, p = (e) => {
 		e !== -2 && c.current?.querySelector("video")?.pause(), u(e);
-	}, h = (0, b.useRef)(e), g = (0, b.useRef)(a);
-	g.current = a, (0, b.useLayoutEffect)(() => {
+	}, m = (0, b.useRef)(e), h = (0, b.useRef)(a);
+	h.current = a, (0, b.useLayoutEffect)(() => {
 		let e = c.current;
 		if (!e || !o) return;
-		let t = () => g.current();
+		let t = () => h.current();
 		e.addEventListener("ended", t, !0);
-		let n = r.mountPlayer(e, h.current, null, o === "clicked" || i ? { autoplay: !0 } : void 0);
+		let n = r.mountPlayer(e, m.current, null, o === "clicked" || i ? { autoplay: !0 } : void 0);
 		return () => {
 			e.removeEventListener("ended", t, !0), n();
 		};
 	}, [r, o]);
-	let _ = n.badgeHtml(e.location || "", e.cost || "", "srcbig");
+	let g = n.badgeHtml(e.location || "", e.cost || "", "srcbig");
 	return /* @__PURE__ */ (0, x.jsxs)("div", {
 		ref: c,
 		"data-stage-media": "",
 		"data-item-media": t || "video",
-		"data-item-gallery": p ? "" : void 0,
+		"data-item-gallery": f ? "" : void 0,
 		"data-item-picture": l === -2 ? void 0 : "",
-		style: { "--follow-image-arrow-inset": l === -2 || d === null ? void 0 : `${d}px` },
 		children: [
 			/* @__PURE__ */ (0, x.jsx)(rU, { onClose: r.close }),
-			p ? /* @__PURE__ */ (0, x.jsxs)(x.Fragment, { children: [
+			f ? /* @__PURE__ */ (0, x.jsxs)(x.Fragment, { children: [
 				/* @__PURE__ */ (0, x.jsxs)("button", {
 					type: "button",
 					"data-jav-preview-toggle": "",
 					"aria-pressed": l !== -2,
-					onClick: () => m(l === -2 ? f[0].index : -2),
+					onClick: () => p(l === -2 ? d[0].index : -2),
 					children: [/* @__PURE__ */ (0, x.jsx)(eU, { name: l === -2 ? "image" : "play" }), l === -2 ? "查看图片" : "播放正片"]
 				}),
 				l === -2 ? null : /* @__PURE__ */ (0, x.jsx)(QH, {
@@ -63804,20 +63803,20 @@ function vje({ item: e, gate: t, helpers: n, actions: r, autoplay: i, onEnded: a
 					image: l
 				}, l),
 				/* @__PURE__ */ (0, x.jsx)(BH, {
-					items: f,
-					position: Math.max(0, f.findIndex((e) => e.index === l)),
-					onSelect: m,
+					items: d,
+					position: Math.max(0, d.findIndex((e) => e.index === l)),
+					onSelect: p,
 					below: !0,
 					renderThumbnail: (t) => /* @__PURE__ */ (0, x.jsx)(QH, {
 						item: e,
-						image: t.index === -2 ? f[0].index : t.index,
+						image: t.index === -2 ? d[0].index : t.index,
 						thumbnail: !0
 					})
 				})
 			] }) : null,
 			t === "offline" ? /* @__PURE__ */ (0, x.jsx)(yje, {
 				item: e,
-				badge: _,
+				badge: g,
 				helpers: n,
 				actions: r
 			}) : t === "online" ? /* @__PURE__ */ (0, x.jsxs)("div", {
@@ -63825,7 +63824,7 @@ function vje({ item: e, gate: t, helpers: n, actions: r, autoplay: i, onEnded: a
 				role: "status",
 				"data-item-gate": "online",
 				children: [
-					/* @__PURE__ */ (0, x.jsx)(tU, { html: _ }),
+					/* @__PURE__ */ (0, x.jsx)(tU, { html: g }),
 					/* @__PURE__ */ (0, x.jsx)("b", { children: "在线资产" }),
 					/* @__PURE__ */ (0, x.jsx)("span", { children: "这条没有对应的关注条目，媒体地址无从解析。" }),
 					/* @__PURE__ */ (0, x.jsx)("button", {
@@ -63840,7 +63839,7 @@ function vje({ item: e, gate: t, helpers: n, actions: r, autoplay: i, onEnded: a
 				id: "gate",
 				"data-item-gate": "metered",
 				onClick: () => s("clicked"),
-				children: [/* @__PURE__ */ (0, x.jsx)(tU, { html: _ }), /* @__PURE__ */ (0, x.jsxs)("span", { children: ["点此开始拉流 · ", nU(e.size)] })]
+				children: [/* @__PURE__ */ (0, x.jsx)(tU, { html: g }), /* @__PURE__ */ (0, x.jsxs)("span", { children: ["点此开始拉流 · ", nU(e.size)] })]
 			}) : null
 		]
 	});
@@ -64869,7 +64868,9 @@ function Lje({ code: e, item: t, actions: n, readOnly: r, retry: i, retrying: a 
 	(0, b.useEffect)(() => {
 		t.state === "ready" && V.invalidateQueries({ queryKey: ["jav-discoveries", "external"] });
 	}, [t.code, t.state]);
-	let [o, s] = (0, b.useState)(-1), c = (0, b.useRef)(null), l = zH(c, "[data-jav-picture]", o), u = [
+	let [o, s] = (0, b.useState)(-1), c = (0, b.useRef)(null);
+	zH(c, "[data-jav-picture]", o);
+	let l = [
 		{
 			index: -1,
 			label: "封面"
@@ -64883,9 +64884,9 @@ function Lje({ code: e, item: t, actions: n, readOnly: r, retry: i, retrying: a 
 			label: "视频预览",
 			video: !0
 		}] : []
-	], [d, f] = (0, b.useState)(null), [p, m] = (0, b.useState)(t.want_id), h = XO(), g = () => {
-		h.run("want", async (e) => p ? (await mB([p], e), null) : (await pB({ code: t.code }, e)).want.id, (t) => {
-			m(t), V.setQueryData(iU(e), (e) => e && {
+	], [u, d] = (0, b.useState)(null), [f, p] = (0, b.useState)(t.want_id), m = XO(), h = () => {
+		m.run("want", async (e) => f ? (await mB([f], e), null) : (await pB({ code: t.code }, e)).want.id, (t) => {
+			p(t), V.setQueryData(iU(e), (e) => e && {
 				...e,
 				wanted: !!t,
 				want_id: t
@@ -64898,7 +64899,6 @@ function Lje({ code: e, item: t, actions: n, readOnly: r, retry: i, retrying: a 
 			"data-stage-media": "",
 			"data-jav-art": "",
 			"data-jav-playing": o === -2 ? "" : void 0,
-			style: { "--follow-image-arrow-inset": l === null || o === -2 ? void 0 : `${l}px` },
 			children: [
 				/* @__PURE__ */ (0, x.jsx)(sU, { close: n.close }),
 				t.preview_video_url ? /* @__PURE__ */ (0, x.jsxs)("button", {
@@ -64913,8 +64913,8 @@ function Lje({ code: e, item: t, actions: n, readOnly: r, retry: i, retrying: a 
 					image: o === -1 ? "cover" : String(o)
 				}, o),
 				/* @__PURE__ */ (0, x.jsx)(BH, {
-					items: u,
-					position: Math.max(0, u.findIndex((e) => e.index === o)),
+					items: l,
+					position: Math.max(0, l.findIndex((e) => e.index === o)),
 					onSelect: s,
 					below: !0,
 					renderThumbnail: (e) => /* @__PURE__ */ (0, x.jsx)(cU, {
@@ -65001,14 +65001,14 @@ function Lje({ code: e, item: t, actions: n, readOnly: r, retry: i, retrying: a 
 							/* @__PURE__ */ (0, x.jsx)(G, {
 								variant: "secondary",
 								disabled: r,
-								"aria-pressed": !!p,
-								...q(!!h.busy),
-								onClick: g,
-								children: p ? "取消想要" : "想要"
+								"aria-pressed": !!f,
+								...q(!!m.busy),
+								onClick: h,
+								children: f ? "取消想要" : "想要"
 							}),
 							/* @__PURE__ */ (0, x.jsx)(G, {
 								variant: "primary",
-								onClick: () => f({
+								onClick: () => d({
 									code: t.code,
 									title: t.title,
 									performers: t.performers,
@@ -65026,9 +65026,9 @@ function Lje({ code: e, item: t, actions: n, readOnly: r, retry: i, retrying: a 
 							}) : null
 						]
 					}),
-					h.error ? /* @__PURE__ */ (0, x.jsx)(K, {
+					m.error ? /* @__PURE__ */ (0, x.jsx)(K, {
 						tone: "error",
-						children: h.error
+						children: m.error
 					}) : null,
 					/* @__PURE__ */ (0, x.jsx)(Hje, {
 						code: t.code,
@@ -65043,8 +65043,8 @@ function Lje({ code: e, item: t, actions: n, readOnly: r, retry: i, retrying: a 
 			})
 		}),
 		/* @__PURE__ */ (0, x.jsx)(rB, {
-			prefill: d,
-			close: () => f(null),
+			prefill: u,
+			close: () => d(null),
 			receipt: n.receipt
 		})
 	] });

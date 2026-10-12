@@ -7,7 +7,7 @@
  *
  * 写操作（评分、标签、反馈、稍后看、高清目标、偏好、播放列表排序与移出）都在岛里发，成功后
  * 把服务端回的那几个字段换进 `['item', id]`，目录网格缓存里的同一张卡一起换，不重读列表。 */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { fmtDur, fmtSize, icon, requestErrorMessage } from '@peach/legacy/core';
 import {
@@ -132,7 +132,7 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
      整个实例还要搬进来，那一截 DOM 不归 React。 */
   const frameRef = useRef<HTMLDivElement>(null);
   const [image, setImage] = useState(-2);
-  const inset = useCarouselInset(frameRef, '[data-catalog-picture]', image);
+  useCarouselInset(frameRef, '[data-catalog-picture]', image);
   const media = item.is_jav && item.code ? [...(item.has_cover ? [{ index: -1, label: '封面' }] : []),
     ...(item.sample_images || []).map((sample, index) => ({ index: sample.n, label: `预览 ${index + 1}` })),
     { index: -2, label: '正片', video: true }] : [];
@@ -156,9 +156,7 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
   const badge = helpers.badgeHtml(item.location || '', item.cost || '', 'srcbig');
   return (
     <div ref={frameRef} data-stage-media="" data-item-media={gate || 'video'} data-item-gallery={hasPictures ? '' : undefined}
-      data-item-picture={image !== -2 ? '' : undefined}
-      // oxlint-disable-next-line shadcn/no-inline-styles -- 图片黑边的真实宽度决定翻页箭头位置
-      style={{ '--follow-image-arrow-inset': image === -2 || inset === null ? undefined : `${inset}px` } as CSSProperties}>
+      data-item-picture={image !== -2 ? '' : undefined}>
       <CloseStage onClose={actions.close} />
       {hasPictures ? <>
         <button type="button" data-jav-preview-toggle="" aria-pressed={image !== -2}
