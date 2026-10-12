@@ -207,7 +207,7 @@ class TestPlanningTests(unittest.TestCase):
         launched, spawn = launcher(failing=None)
         with contextlib.redirect_stdout(io.StringIO()) as output:
             passed, count, timings = runner.run_shards(('follow', 'tooling'), jobs=2, shard_count=3,
-                                                       spawn=spawn, slots=Path(slots.name))
+                                                       spawn=spawn)
         self.assertTrue(passed)
         self.assertEqual(count, 10 + 11 + 12)
         self.assertEqual(sorted(name for _, name in timings), ['test_0', 'test_1', 'test_2'])
@@ -222,13 +222,13 @@ class TestPlanningTests(unittest.TestCase):
         _, spawn = launcher(failing=2)
         with contextlib.redirect_stdout(io.StringIO()):
             passed, count, _ = runner.run_shards(('checks',), jobs=4, shard_count=3,
-                                                 spawn=spawn, slots=Path(slots.name))
+                                                 spawn=spawn)
         self.assertFalse(passed)
         self.assertEqual(count, 10 + 11 + 12, '失败那片的用例数也要算进总数，记录里的 count 才是实跑数')
 
     def test_jobs_accepts_auto_or_a_positive_integer(self):
         self.assertEqual(runner.resolve_jobs('3'), 3)
-        self.assertTrue(1 <= runner.resolve_jobs('auto') <= runner.MAX_JOBS)
+        self.assertTrue(1 <= runner.resolve_jobs('auto') <= runner.DEFAULT_JOBS)
         for bad in ('0', '-1', 'many'):
             with self.subTest(bad=bad), self.assertRaises(runner.argparse.ArgumentTypeError):
                 runner.resolve_jobs(bad)

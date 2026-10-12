@@ -9,7 +9,7 @@ import tempfile
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import ExitStack, redirect_stderr, redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -19,78 +19,31 @@ from scripts import test_runner as runner
 from support.gitrepo import seed_repository
 
 
-def holding(paths) -> ExitStack:
-    """同时占住给定的每个槽位，扮演别的会话。"""
-    stack = ExitStack()
-    for path in paths:
-        stack.enter_context(evidence.held(path))
-    return stack
 
 
-class HeavyTaskSlotTests(unittest.TestCase):
-    """机器级重任务槽位：别的会话占着的槽位，本轮分片不能再用。"""
-
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.slots = Path(temporary.name)
-
-    def launcher(self):
-        live, peak, commands = set(), [0], []
-
+class ParallelShardTests(unittest.TestCase):
+    def test_requested_parallelism_has_no_machine_slot_ceiling(self):
+        live, peak = set(), [0]
         class Shard:
             def __init__(self, command):
                 report = Path(command[command.index('--timings') + 1])
-                report.write_text(json.dumps({'success': True, 'count': 1, 'timings': []}),
-                                  encoding='utf-8')
+                report.write_text(json.dumps({'success': True, 'count': 1, 'timings': []}), encoding='utf-8')
                 self.polls, self.returncode = 0, None
                 live.add(self)
                 peak[0] = max(peak[0], len(live))
-
             def poll(self):
                 self.polls += 1
                 if self.polls >= 2:
                     live.discard(self)
                     self.returncode = 0
                 return self.returncode
-
-        def spawn(command, *, stdout, stderr, cwd):
-            commands.append(command)
+        def spawn(command, **kwargs):
             return Shard(command)
-        return spawn, peak, commands
-
-    def test_slots_held_elsewhere_leave_this_run_one_shard_at_a_time(self):
-        spawn, peak, commands = self.launcher()
-        busy = runner.heavy_slot_paths(self.slots)[1:]
-        with holding(busy), redirect_stdout(io.StringIO()), \
-                mock.patch.dict(os.environ, {'PEACH_TEST_RESOURCE_RUNNER': str(self.slots / 'gone.py')}):
-            passed, count, _ = runner.run_shards(('checks',), jobs=runner.HEAVY_TASK_SLOTS, shard_count=3,
-                                                 spawn=spawn, slots=self.slots)
-        self.assertTrue(passed)
-        self.assertEqual(count, 3)
-        self.assertEqual(peak[0], 1)
-        for command in commands:
-            self.assertEqual(command[:2], [sys.executable, str(runner.ROOT / 'scripts' / 'test_runner.py')])
-
-    def test_free_slots_let_the_run_use_every_one(self):
-        spawn, peak, _ = self.launcher()
         with redirect_stdout(io.StringIO()):
-            passed, _, _ = runner.run_shards(('checks',), jobs=runner.HEAVY_TASK_SLOTS,
-                                             shard_count=2 * runner.HEAVY_TASK_SLOTS,
-                                             spawn=spawn, slots=self.slots)
+            passed, count, _ = runner.run_shards(('checks',), jobs=6, shard_count=12, spawn=spawn)
         self.assertTrue(passed)
-        self.assertEqual(peak[0], runner.HEAVY_TASK_SLOTS)
-        for path in runner.heavy_slot_paths(self.slots):
-            with evidence.held(path):
-                pass  # 分片结束后每个槽位都还回去了，才能不等待地再拿到
-
-    def test_all_slots_busy_times_out_without_starting_a_shard(self):
-        spawn, _, commands = self.launcher()
-        with holding(runner.heavy_slot_paths(self.slots)), redirect_stdout(io.StringIO()):
-            with self.assertRaises(evidence.Timeout):
-                runner.run_shards(('checks',), jobs=2, shard_count=2, spawn=spawn,
-                                  slots=self.slots, slot_wait=0)
-        self.assertEqual(commands, [])
+        self.assertEqual(count, 12)
+        self.assertEqual(peak[0], 6)
 
 
 class VerificationTests(unittest.TestCase):
@@ -358,15 +311,6 @@ class VerificationTests(unittest.TestCase):
             self.assertIn("scope full", reader.result(timeout=5))
         self.assertFalse(note.exists())
 
-    def test_busy_heavy_slots_stop_an_unsharded_run_before_any_test(self):
-        output = io.StringIO()
-        with holding(runner.heavy_slot_paths(evidence.evidence_dir(self.repo))), \
-                redirect_stderr(io.StringIO()), redirect_stdout(output), \
-                mock.patch.object(runner, "ROOT", self.repo), \
-                mock.patch.object(runner, "build_suite", side_effect=AssertionError("不该开跑")):
-            self.assertEqual(runner.main(["--scope", "checks", "--lock-timeout", "0"]), 2)
-        self.assertIn("测试重任务槽位一直被占用", output.getvalue())
-        self.assertFalse(evidence.covers(evidence.read(self.repo, evidence.key(self.repo)), ("checks",)))
 
     def test_the_waiting_runner_names_the_holder_of_the_full_suite_lock(self):
         lock = evidence.evidence_dir(self.repo) / "full-suite.lock"
@@ -542,7 +486,7 @@ class VerificationTests(unittest.TestCase):
                 mock.patch.object(runner, "resolve_auto_scope", return_value=(("full",), "fixture")), \
                 mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
             self.assertEqual(runner.main(["--scope", "auto"]), 0)
-        run.assert_called_once_with(("full",), 1, slot_wait=1800)
+        run.assert_called_once_with(("full",), 1)
 
     def test_baseline_does_not_expand_a_small_requested_scope(self):
         self.certify(self.repo, ("full",))
@@ -599,6 +543,108 @@ class VerificationTests(unittest.TestCase):
                     unittest.FunctionTestCase(mutate)])):
             self.assertEqual(runner.main(["--scope", "checks"]), 4)
         self.assertFalse(evidence.covers(evidence.read(self.repo, evidence.key(self.repo)), ("checks",)))
+
+    def test_partial_baseline_preserves_unaffected_scopes_and_their_age(self):
+        original = self.certify(self.repo, ("catalog", "metadata", "web"))
+        stamps = evidence.read(self.repo, original)["validated"]
+        changed = self.repo / "frontend/src/react/example.tsx"
+        changed.parent.mkdir(parents=True)
+        changed.write_text("export const value = 1;\n", encoding="utf-8")
+        with redirect_stdout(io.StringIO()), mock.patch.object(runner, "ROOT", self.repo), \
+                mock.patch.object(runner, "environment_preflight"), \
+                mock.patch.object(runner, "resolve_auto_scope", return_value=(("catalog", "metadata", "web"), "fixture")), \
+                mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
+            self.assertEqual(runner.main(["--scope", "auto"]), 0)
+        run.assert_called_once_with(("web",), 1)
+        record = evidence.read(self.repo, evidence.key(self.repo))
+        self.assertTrue(evidence.covers(record, ("catalog", "metadata", "web")))
+        self.assertNotIn("full", record["validated"])
+        self.assertEqual(record["validated"]["catalog"], stamps["catalog"])
+        self.assertEqual(record["validated"]["metadata"], stamps["metadata"])
+
+    def test_partial_baseline_cannot_cover_shared_changes_or_full_validation(self):
+        self.certify(self.repo, ("catalog", "web"))
+        changed = self.repo / "scripts/test_runner.py"
+        changed.parent.mkdir(parents=True)
+        changed.write_text("# fixture\n", encoding="utf-8")
+        with redirect_stdout(io.StringIO()), mock.patch.object(runner, "ROOT", self.repo), \
+                mock.patch.object(runner, "environment_preflight"), \
+                mock.patch.object(runner, "resolve_auto_scope", return_value=(("full",), "fixture")), \
+                mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
+            self.assertEqual(runner.main(["--scope", "auto"]), 0)
+        run.assert_called_once_with(("full",), 1)
+
+    def test_same_state_only_runs_missing_scopes_and_failed_state_runs_all(self):
+        self.certify(self.repo, ("catalog",))
+        with redirect_stdout(io.StringIO()), mock.patch.object(runner, "ROOT", self.repo), \
+                mock.patch.object(runner, "environment_preflight"), \
+                mock.patch.object(runner, "resolve_auto_scope", return_value=(("catalog", "web"), "fixture")), \
+                mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
+            self.assertEqual(runner.main(["--scope", "auto"]), 0)
+            run.assert_called_once_with(("web",), 1)
+            run.reset_mock()
+            self.certify(self.repo, ("full",), success=False)
+            self.assertEqual(runner.main(["--scope", "auto"]), 0)
+            run.assert_called_once_with(("catalog", "web"), 1)
+
+    def test_partial_baseline_requires_live_timestamps_and_matching_environment(self):
+        original = self.certify(self.repo, ("catalog",))
+        path = evidence.evidence_dir(self.repo) / f"{original}.json"
+        record = json.loads(path.read_text(encoding="utf-8"))
+        for changes in ({"validated": {"catalog": 0}}, {"environment": "another"}):
+            path.write_text(json.dumps({**record, **changes}), encoding="utf-8")
+            self.assertEqual(list(evidence.baselines(self.repo, evidence.inputs(self.repo), partial=True)), [])
+
+    def test_failed_domain_preserves_other_domains_and_requires_its_own_revalidation(self):
+        self.certify(self.repo, ("catalog", "metadata", "web"))
+        state = evidence.key(self.repo)
+        stamps = evidence.read(self.repo, state)["validated"]
+        self.certify(self.repo, ("web",), success=False)
+        failed = evidence.read(self.repo, state)
+        self.assertTrue(evidence.covers(failed, ("catalog", "metadata")))
+        self.assertFalse(evidence.covers(failed, ("web",)))
+        with redirect_stdout(io.StringIO()), mock.patch.object(runner, "ROOT", self.repo), \
+                mock.patch.object(runner, "environment_preflight"), \
+                mock.patch.object(runner, "resolve_auto_scope", return_value=(("catalog", "metadata", "web"), "fixture")), \
+                mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
+            self.assertEqual(runner.main(["--scope", "auto"]), 0)
+        run.assert_called_once_with(("web",), 1)
+        self.assertEqual(evidence.read(self.repo, state)["validated"]["catalog"], stamps["catalog"])
+
+    def test_success_of_another_domain_cannot_restore_a_failed_domain_from_an_older_baseline(self):
+        self.certify(self.repo, ("full",))
+        (self.repo / "README.md").write_text("fixture difference\n", encoding="utf-8")
+        self.certify(self.repo, ("catalog", "web"))
+        self.certify(self.repo, ("web",), success=False)
+        self.certify(self.repo, ("checks",))
+        record = evidence.read(self.repo, evidence.key(self.repo))
+        self.assertEqual(record["failed_scopes"], ["web"])
+        with redirect_stdout(io.StringIO()), mock.patch.object(runner, "ROOT", self.repo), \
+                mock.patch.object(runner, "environment_preflight"), \
+                mock.patch.object(runner, "resolve_auto_scope", return_value=(("checks", "catalog", "web"), "fixture")), \
+                mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
+            self.assertEqual(runner.main(["--scope", "auto"]), 0)
+        run.assert_called_once_with(("web",), 1)
+
+    def test_focus_never_publishes_evidence_and_formal_run_rejects_focus_environment(self):
+        selector = self.repo / "tests/test_focus_sample.py"
+        selector.parent.mkdir(parents=True)
+        selector.write_text("import unittest\nclass Sample(unittest.TestCase):\n def test_value(self): self.assertEqual(1,1)\n", encoding="utf-8")
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()), \
+                mock.patch.object(runner, "ROOT", self.repo), mock.patch.object(evidence, "write") as write:
+            self.assertEqual(runner.main(["--focus", "test_focus_sample"]), 0)
+            write.assert_not_called()
+            with mock.patch.dict(os.environ, {"PEACH_E2E_FILES": "[]"}):
+                with self.assertRaises(SystemExit) as stopped:
+                    runner.main(["--scope", "checks"])
+            self.assertEqual(stopped.exception.code, 2)
+
+    def test_focus_rejects_missing_files_and_path_escape(self):
+        from scripts import test_focus
+        for selector in ("test_missing", "frontend/e2e/../../other.test.ts", "scripts/test_runner.py"):
+            with self.subTest(selector=selector), self.assertRaises(ValueError):
+                test_focus.selection(self.repo, [selector])
+
 
 
 if __name__ == "__main__":

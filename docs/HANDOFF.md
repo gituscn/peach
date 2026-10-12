@@ -41,6 +41,7 @@
 - 改变运行事实的任务同时更新 [docs/STATUS.md](STATUS.md)；长期规则更新本文件、[docs/REUSE.md](REUSE.md) 或 ADR；可执行流程写成 `.claude/skills/<name>/SKILL.md`。分层判据见 ADR-0015，步骤见 `peach-context-rules`。
 - 触发是概率性的：必须每次成立的规则要由脚本、测试或 hook 强制，不能只写成技能。
 - 结论、进度、待办和证据写进共享文档或机器可读产物，不靠人转述。
+- 任务耗时与重复验证的项目记忆见 [执行效率](VERIFICATION_EFFICIENCY.md)；定向调试与记录复用见 [测试](TESTING.md)。跨对话协调只处理实际依赖，已结束对话不承担收件确认职责。
 
 ## 并行智能体与 Git 工作树
 

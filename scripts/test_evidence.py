@@ -182,10 +182,11 @@ def recent_records(folder: Path, limit: int = 32) -> list[Path]:
     return [path for _, path in sorted(found, reverse=True)[:limit]]
 
 
-def baselines(root: Path, current: dict):
+def baselines(root: Path, current: dict, *, partial: bool = False):
     for path in recent_records(evidence_dir(root)):
         record = read(root, path.stem)
-        if "full" not in record.get("passed", ()) or record.get("environment") != current["environment"]:
+        if not record.get("passed") or (not partial and "full" not in record["passed"]) \
+                or record.get("environment") != current["environment"]:
             continue
         old = record.get("manifest", {})
         new = current["manifest"]
@@ -227,13 +228,22 @@ def write(root: Path, state: str, scopes: tuple[str, ...], *, success: bool,
     folder = evidence_dir(root)
     folder.mkdir(parents=True, exist_ok=True)
     prior = previous if previous is not None else read(root, state)
-    validated = dict(prior.get("validated", {})) if success else {}
+    failed = set(prior.get("failed_scopes", ()))
     if success:
-        validated.update({scope: time.time() for scope in scopes})
+        failed = set() if "full" in scopes else failed - set(scopes)
+    else:
+        failed.update(scopes)
+    validated = dict(prior.get("validated", {}))
+    if not success:
+        validated = {scope: stamp for scope, stamp in validated.items()
+                     if "full" not in scopes and scope != "full" and scope not in scopes}
+    if success:
         if baseline:
-            validated["full"] = baseline["validated"]["full"]
+            validated.update(baseline["validated"])
+        validated.update({scope: time.time() for scope in scopes})
     record = {**(context or inputs(root)), "state": state, "validated": validated, "finished": time.time(),
               "baseline": baseline.get("state") if baseline else None,
+              "failed_scopes": sorted(failed),
               "elapsed": elapsed, "count": count, "slowest": slowest}
     temporary = folder / f"{state}.{os.getpid()}.tmp"
     temporary.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")

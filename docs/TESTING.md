@@ -47,13 +47,14 @@ Dependabot 的 PR 一律在本地接管，不在网页上合：
 
 ## 验证频率
 
-整台机器同时最多跑四个测试重任务：一个分片子进程，或不分片时的整轮测试，各占一个槽位。槽位是 `build/agent-verification/heavy-slot-*.lock` 文件锁，所有工作树与会话共用；槽位全忙时入口排队，等待上限同 `--lock-timeout`，超时以 `2` 退出且不开跑。槽位只限并发，不改变测试内容，不进记录指纹。取消时按已创建的 PID 清理子进程树并归还槽位。
+测试直接使用项目入口，不设置机器级资源槽位、CPU、内存或进程数限额。每轮并发由 `-Jobs` / `--jobs` 选择，默认按本机核数取最多四路，显式正整数不设机器级上限。取消时只按已创建的 PID 清理本轮子进程树；全量测试与集成仍按代码一致性要求互斥。
 
 Python 静态检查使用开发依赖 Ruff，随每个正式测试域扫描全仓自有 Python 文件，覆盖应用、脚本、测试和打包入口。规则为 Pyflakes（`F`）、Ruff 支持的 Pylint 错误规则（`PLE`），以及可变默认参数、`finally` 跳转、无效表达式和循环闭包规则（`B006`、`B012`、`B018`、`B023`）。生成的 `downloads_clouddrive_pb2.py` 排除；公开导出的导入用显式同名别名声明。命名、行数、空行和复杂度偏好不属于这套 lint 门槛。
 
 文档与文案检查包含 seiso 稳定规则和最终状态检查，随正式入口执行。分类、范围、独立检查与预览规则用法见 [文档与界面文案](WRITING.md#检查与复核)。seiso 由开发依赖与锁文件固定，运行 Peach 不需要它。
 
 不是每次都跑全量：本机按改动涉及的域选测，CI 按提交类型决定覆盖多宽。
+调试先跑相关用例，冻结代码后运行一次 `auto`；不要手写逐域循环重复执行公共用例。测试失败先定向复现，修复后由 `auto` 判断哪些域需要补测。
 
 | 场景 | 验证 |
 | --- | --- |
@@ -69,11 +70,11 @@ Python 静态检查使用开发依赖 Ruff，随每个正式测试域扫描全�
 
 浏览器冒烟与设计决定断言（`tests/test_web_e2e.py`）由 `web-e2e` job 在 `windows-latest` 上执行 `web` 域。它装 Node 24、`frontend/node_modules`、ffmpeg，并经 `PEACH_E2E_CHROME` 指定 runner 自带的 Chrome。矩阵扩成全量（`plan` 输出的 `wide`）时，Windows 全量行本身就跑 `web` 域，这个 job 按条件跳过；`verified` 只在这种情况接受它的 skipped，别的 job 跳过照样算红。
 
-浏览器用例覆盖 `frontend/e2e` 下全部 `*.test.ts`，包括子目录，按文件并发、文件内串行。并发数取 `PEACH_E2E_CONCURRENCY`；未设时本机取逻辑核数的四分之一、上限 4，CI（`GITHUB_ACTIONS=true`）为 1。并发时分两批：其余文件一次并发跑完，断言帧数或动画中途位置的文件（`tests/test_web_e2e.py` 的 `CPU_SENSITIVE_SUITES`）随后串行；并发为 1 时按设计决定、交互回归和路由冒烟分组，每批最多 12 个文件。每批限时 600 秒，任一批失败，整轮验证失败。并发的文件共用一个服务和演示库：用例触发的写请求只能落在别的用例不断言的状态上，否则用 `page.route` 拦下或归进串行批。完整 TAP 日志与服务访问日志 `serve.log` 保存在 `build/agent-verification/browser/`，CI 在测试结束后上传其中的 TAP 日志。
+浏览器用例覆盖 `frontend/e2e` 下全部 `*.test.ts`，包括子目录，按文件并发、文件内串行。并发数取 `PEACH_E2E_CONCURRENCY`；未设时本机取逻辑核数的四分之一、上限 4，CI（`GITHUB_ACTIONS=true`）为 1。并发时分两批：其余文件一次并发跑完，测量动画、密度切换与等待态替换的文件（`tests/test_web_e2e.py` 的 `TIMING_SENSITIVE_SUITES`）随后串行；并发为 1 时按设计决定、交互回归和路由冒烟分组，每批最多 12 个文件。每批限时 600 秒，任一批失败，整轮验证失败。并发的文件共用一个服务和演示库：用例触发的写请求只能落在别的用例不断言的状态上，否则用 `page.route` 拦下或归进串行批。完整 TAP 日志与服务访问日志 `serve.log` 保存在 `build/agent-verification/browser/`，CI 在测试结束后上传其中的 TAP 日志。
 
 需要外部前置条件（Node、ffmpeg、Chrome 等）的用例，本机缺条件时跳过，在 CI（`GITHUB_ACTIONS=true`）里判失败，判定集中在 `tests/support/conditions.py` 的 `missing_prerequisite`。所以 `python` 矩阵里 `core` 以外的行也装 Node，Windows 行另装 ffmpeg 与 Chrome。
 
-本机默认并行：入口传 `--jobs auto`（Windows `-Jobs`），运行器按同一套稳定分片切成并发数四倍的片，最多四个子进程各领一片、先完成的接着领下一片，父进程汇总成败、用例数与逐用例耗时后按原口径签发一份记录，一片红整轮红。`-Jobs 1` 退回串行。测试之间没有共享的端口或全局目录，账本与仓库夹具都在各自的临时目录里，并行才是安全的；新增测试保持这一点。
+本机默认并行：入口传 `--jobs auto`（Windows `-Jobs`），运行器按同一套稳定分片切成并发数四倍的片，每个子进程各领一片、先完成的接着领下一片，父进程汇总成败、用例数与逐用例耗时后按原口径签发一份记录，一片红整轮红。`-Jobs 1` 退回串行。测试之间没有共享的端口或全局目录，账本与仓库夹具都在各自的临时目录里，并行才是安全的；新增测试保持这一点。
 
 Windows 的路径、挂载、托盘、证书、进程编码、更新、认证及迁移属于 `core`。构建和工作流修改选择 `packaging` 与 `tooling`；测试调度自身仍全量。仅 uv 工具版本或项目展示字段变化不算依赖图变化；无法解析时全量。
 
@@ -132,6 +133,32 @@ macOS 按影响域验证：
 判失败的只有本次所选域真的会用到的工具，其余启动受限的工具只打印一行提示：受限环境里
 ffmpeg 起不来是事实，但它不该挡住一次只改文档的 `checks`。域由选中的测试源码推出来。
 确认本次无关时用 `PEACH_SKIP_PREFLIGHT=1` 整体跳过预检；分片子进程不重复预检。
+
+## 定向调试与局部记录
+
+Windows 的 `-Focus` 接受 Python 模块、类、方法或仓库相对路径，可传数组；macOS/Linux 对每个选择器重复传 `--focus`。入口准备隔离依赖并核对源码。选择器不存在、浏览器路径超出 `frontend/e2e` 或与分片混用时拒绝执行。
+
+定向调试 Python 回归：
+
+```powershell
+& .\scripts\test.ps1 -Focus test_test_evidence
+```
+
+定向调试一个浏览器文件，包括它的桌面和手机用例：
+
+```powershell
+& .\scripts\test.ps1 -Focus frontend/e2e/jav-detail.test.ts
+```
+
+macOS/Linux 的相同入口：
+
+```sh
+./scripts/test.sh auto --focus frontend/e2e/jav-detail.test.ts
+```
+
+定向调试不签发记录，不能作为 `ready` / `integrate` 的验收证明。浏览器文件选择只在调试环境生效；正式入口拒绝残留的 `PEACH_TEST_FOCUS` / `PEACH_E2E_FILES`，防止局部运行被签成整域。某个浏览器批次失败或超时后立即结束该轮浏览器检查，保留完整 TAP 与服务日志。
+
+`auto` 从同环境、24 小时内的记录计算差异：有效全量基线保留原时间戳；有效局部基线只复用未受差异影响且本次需要的域。相同代码状态补跑缺少的域。新增、删除与修改文件均参与比较；共享设施、未知影响面和环境差异不能复用局部记录。局部记录不会变成全量，继承时间戳不延长有效期。单域失败撤销该域与全量证明，保留其他域的原成功时间；失败域必须补测，不能从旧基线恢复。全量失败撤销所有证明。`-Fresh` 与显式 `full` 始终实际执行。
 
 ## 记录的环境身份
 

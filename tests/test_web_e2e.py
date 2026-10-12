@@ -89,11 +89,13 @@ def refuse_network(*args, **kwargs):
     raise AssertionError("演示库的 process 不应向任何外部来源发请求")
 
 
-#: 断言帧数或动画中途位置的用例文件。别的文件并发跑时 CPU 被几个浏览器分走，
-#: 300ms 的过渡里出不了中间帧，就会误报「主线程整段被占住」或「瞬移过去」。
-CPU_SENSITIVE_SUITES = frozenset({
+#: 测量动画中间帧、密度切换和等待态替换的文件。独立测量这些时序，避免其他浏览器
+#: 的渲染与共享设置请求影响取值时刻；其余文件保留并行。
+TIMING_SENSITIVE_SUITES = frozenset({
     "e2e/sidebar-motion.test.ts",  # 开合过渡 300ms 里的帧数
     "e2e/sidebar.test.ts",         # 当前项那块玻璃 900ms 内要经过中间位置
+    "e2e/design-cards.test.ts",     # 紧凑密度切换的即时样式
+    "e2e/design-follow-alignment.test.ts",  # 等待标题与内容标题的替换
 })
 
 
@@ -117,16 +119,21 @@ def e2e_command(node: str, concurrency: int, files: tuple[str, ...]) -> list[str
     return [node, "--test", f"--test-concurrency={concurrency}", "--test-reporter=tap", *files]
 
 
-def e2e_batches(frontend: Path, concurrency: int) -> tuple[tuple[tuple[str, ...], int], ...]:
+def e2e_batches(frontend: Path, concurrency: int, selected: tuple[str, ...] = ()) -> tuple[tuple[tuple[str, ...], int], ...]:
     """把 `frontend/e2e` 下全部 `*.test.ts`（含子目录）分批，每批带自己的并发数，限时 600 秒。
 
-    并发时分两批：其余文件一次并发跑完，CPU 敏感的文件随后串行。并发为 1 时整轮是串行的，
+    并发时分两批：其余文件一次并发跑完，时序敏感的文件随后串行。并发为 1 时整轮是串行的，
     按设计决定、交互回归与路由冒烟分组，每批最多 12 个文件。
     """
     files = tuple(sorted(path.relative_to(frontend).as_posix()
                          for path in (frontend / "e2e").rglob("*.test.ts")))
     if not files:
         raise AssertionError("frontend/e2e 没有浏览器用例")
+    if selected:
+        missing = set(selected) - set(files)
+        if missing:
+            raise AssertionError(f"浏览器用例不存在：{sorted(missing)}")
+        files = tuple(path for path in files if path in selected)
     if concurrency == 1:
         design = tuple(path for path in files if path.startswith("e2e/design-"))
         routes = tuple(path for path in files if path == "e2e/smoke.test.ts")
@@ -134,7 +141,7 @@ def e2e_batches(frontend: Path, concurrency: int) -> tuple[tuple[tuple[str, ...]
         return tuple((group[start:start + SERIAL_E2E_BATCH_FILES], 1)
                      for group in (design, interactions, routes)
                      for start in range(0, len(group), SERIAL_E2E_BATCH_FILES))
-    sensitive = tuple(path for path in files if path in CPU_SENSITIVE_SUITES)
+    sensitive = tuple(path for path in files if path in TIMING_SENSITIVE_SUITES)
     shared = tuple(path for path in files if path not in sensitive)
     return tuple(batch for batch in ((shared, concurrency), (sensitive, 1)) if batch[0])
 
@@ -301,26 +308,25 @@ class WebE2ESmokeTests(unittest.TestCase):
         for stale in BROWSER_LOGS.glob("batch-*.tap"):
             stale.unlink()
         concurrency = e2e_concurrency(os.environ.get("PEACH_E2E_CONCURRENCY", "").strip())
-        for index, (batch, lanes) in enumerate(e2e_batches(FRONTEND, concurrency), 1):
+        selected = tuple(json.loads(os.environ.get("PEACH_E2E_FILES", "[]")))
+        for index, (batch, lanes) in enumerate(e2e_batches(FRONTEND, concurrency, selected), 1):
             log_path = BROWSER_LOGS / f"batch-{index}.tap"
-            with self.subTest(files=batch, concurrency=lanes):
-                try:
-                    completed = subprocess.run(
-                        e2e_command(self.node, lanes, batch),
-                        capture_output=True, text=True, encoding="utf-8", errors="replace",
-                        cwd=str(FRONTEND), env=env, timeout=E2E_SECONDS, check=False)
-                except subprocess.TimeoutExpired as expired:
-                    # TAP 行指出超时前的最后一条用例。
-                    partial = expired.stdout or ""
-                    if isinstance(partial, bytes):
-                        partial = partial.decode("utf-8", errors="replace")
-                    log_path.write_text(partial, encoding="utf-8")
-                    self.fail(f"本批 {E2E_SECONDS} 秒内没跑完，完整日志：{log_path}\n{partial[-4000:]}")
-                output = f"{completed.stdout}\n{completed.stderr}"
-                log_path.write_text(output, encoding="utf-8")
-                self.assertEqual(completed.returncode, 0, f"{output}\n--- serve.log ---\n{self._server_log()}")
-                self.assertRegex(output, r"# pass [1-9]\d*", output)
-                self.assertRegex(output, r"# fail 0\b", output)
+            try:
+                completed = subprocess.run(
+                    e2e_command(self.node, lanes, batch),
+                    capture_output=True, text=True, encoding="utf-8", errors="replace",
+                    cwd=str(FRONTEND), env=env, timeout=E2E_SECONDS, check=False)
+            except subprocess.TimeoutExpired as expired:
+                partial = expired.stdout or ""
+                if isinstance(partial, bytes):
+                    partial = partial.decode("utf-8", errors="replace")
+                log_path.write_text(partial, encoding="utf-8")
+                self.fail(f"本批 {E2E_SECONDS} 秒内没跑完，完整日志：{log_path}\n{partial[-4000:]}")
+            output = f"{completed.stdout}\n{completed.stderr}"
+            log_path.write_text(output, encoding="utf-8")
+            self.assertEqual(completed.returncode, 0, f"{output}\n--- serve.log ---\n{self._server_log()}")
+            self.assertRegex(output, r"# pass [1-9]\d*", output)
+            self.assertRegex(output, r"# fail 0\b", output)
 
 
 class SetupE2ETests(unittest.TestCase):
@@ -480,12 +486,12 @@ class MissingPrerequisiteTests(unittest.TestCase):
         flattened = tuple(path for files, _ in batches for path in files)
         self.assertCountEqual(flattened, self.PATHS)
 
-    def test_concurrent_run_puts_cpu_sensitive_suites_in_a_trailing_serial_batch(self):
+    def test_concurrent_run_puts_timing_sensitive_suites_in_a_trailing_serial_batch(self):
         batches = self.batches_for(4)
         self.assertEveryFileOnce(batches)
         (shared, lanes), (serial, serial_lanes) = batches
         self.assertEqual(lanes, 4)
-        self.assertEqual(serial, ("e2e/sidebar-motion.test.ts",))
+        self.assertEqual(serial, ("e2e/design-cards.test.ts", "e2e/sidebar-motion.test.ts"))
         self.assertEqual(serial_lanes, 1)
         self.assertIn("e2e/nested/feature.test.ts", shared)
 
@@ -512,6 +518,36 @@ class MissingPrerequisiteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaisesRegex(AssertionError, "没有浏览器用例"):
                 e2e_batches(Path(folder).resolve(), 4)
+
+    def test_focused_batches_only_collect_named_browser_files(self):
+        with tempfile.TemporaryDirectory() as folder:
+            frontend = Path(folder).resolve()
+            for name in self.PATHS:
+                path = frontend / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.touch()
+            chosen = ("e2e/nested/feature.test.ts",)
+            self.assertEqual(e2e_batches(frontend, 1, chosen), ((chosen, 1),))
+            with self.assertRaisesRegex(AssertionError, "不存在"):
+                e2e_batches(frontend, 1, ("e2e/missing.test.ts",))
+
+    def test_failed_browser_batch_stops_following_batches_and_keeps_its_log(self):
+        with tempfile.TemporaryDirectory() as folder:
+            log_root = Path(folder).resolve()
+            case = WebE2ESmokeTests("test_every_route_holds_the_layout_and_runtime_invariants")
+            case.origin, case.item, case.chrome, case.node = "http://fixture", 1, "chrome", "node"
+            failed = subprocess.CompletedProcess([], 1, "# pass 1\n# fail 1\n", "failure")
+            batches = ((("e2e/first.test.ts",), 1), (("e2e/second.test.ts",), 1))
+            with mock.patch.dict(os.environ, {"PEACH_E2E_FILES": "[]"}), \
+                    mock.patch(__name__ + ".BROWSER_LOGS", log_root), \
+                    mock.patch(__name__ + ".e2e_batches", return_value=batches), \
+                    mock.patch.object(case, "_server_log", return_value="serve fixture"), \
+                    mock.patch("subprocess.run", return_value=failed) as run:
+                with self.assertRaises(AssertionError):
+                    case.test_every_route_holds_the_layout_and_runtime_invariants()
+            self.assertEqual(run.call_count, 1)
+            self.assertIn("# fail 1", (log_root / "batch-1.tap").read_text(encoding="utf-8"))
+            self.assertFalse((log_root / "batch-2.tap").exists())
 
     def test_concurrency_is_serial_on_ci_bounded_locally_and_overridable(self):
         local = {key: value for key, value in os.environ.items() if key != "GITHUB_ACTIONS"}
