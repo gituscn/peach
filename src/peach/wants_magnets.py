@@ -14,7 +14,7 @@ from .sources import FailureReason, SourceFailure
 
 def fetch(root: Path, code: str) -> dict:
     from .magnet_chain import search
-    result = search(root, code)
+    result = search(root, code, stop_on_preferred=False)
     return {**result, 'items': [{**row, 'size': row['size_text']} for row in result['items']]}
 
 

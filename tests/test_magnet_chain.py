@@ -25,6 +25,24 @@ def item(info_hash, **fields):
 
 
 class MagnetChainTests(unittest.TestCase):
+    def test_direct_add_stops_at_preferred_hd_but_wishlist_collects_other_sources(self):
+        from peach.magnet_chain import Fetcher, search
+        from peach.wants_magnets import fetch
+        preferred = item(HASH_A, source='manko.fun', origins=['manko.fun'], resolution=1080)
+        alternate = item(HASH_B, source='JavDB', origins=['JavDB'], resolution=2160)
+        with patch.object(Fetcher, '__init__', return_value=None), patch.object(Fetcher, 'close'), \
+                patch.object(Fetcher, 'manko', side_effect=lambda _: [dict(preferred)]), \
+                patch.object(Fetcher, 'javdb', side_effect=lambda _: [dict(alternate)]) as javdb, \
+                patch.object(Fetcher, 'sukebei', return_value=[]) as sukebei:
+            self.assertEqual(len(search(Path('.'), 'ABC-123')['items']), 1)
+            javdb.assert_not_called()
+            sukebei.assert_not_called()
+            found = fetch(Path('.'), 'ABC-123')['items']
+            self.assertEqual({row['source'] for row in found}, {'manko.fun', 'JavDB'})
+            self.assertEqual(found[0]['resolution'], 2160)
+            javdb.assert_called_once()
+            sukebei.assert_called_once()
+
     def test_wishlist_candidates_have_display_and_download_fields(self):
         from peach.wants_magnets import fetch
         candidate = _normalise({'uri': item(HASH_A)['uri'], 'size': '2 GiB',

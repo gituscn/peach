@@ -5,6 +5,7 @@ import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { appSettingsStore, javLayout, storeJavLayout, JAV_LAYOUTS, cardRatio, gridLayout } from '@peach/appearance';
 import { coverUrl } from '@peach/card-art';
+import { relayoutCovers } from '../../card-art/framing';
 import { wireHorizontalScroller } from '../../ui-kit/scroll';
 import { feedIdentity } from '../../card-art/feed-identity';
 import { javContentSkeleton, JAV_RECOMMENDATION_GRID } from '../../jav-skeleton';
@@ -19,6 +20,7 @@ import { discoveryArtwork, discoveryKey, fetchDiscoveries, type DiscoveryScope }
 import { JavHeader } from './jav-header';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { FilterGlassRows, FilterPill, GlassPill } from '../components/filter-glass';
+import { ArtSlot } from '../components/art-slot';
 import { Segments, SortKeys } from '../entity-filter/entity-filter-page';
 
 const SearchGlyph = spriteGlyph('search');
@@ -52,10 +54,9 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
   const [ascending, setAscending] = useState(false);
   const section = useRef<HTMLElement>(null);
   useEffect(() => {
-    const row = section.current?.querySelector('[data-filter-row="top"]');
-    if (!row) return;
-    const scroller = wireHorizontalScroller(row, { drag: true });
-    return () => scroller.destroy();
+    const rows = section.current?.querySelectorAll('[data-catalog-scroll],[data-catalog-tags],[data-filter-row="bottom"]');
+    const scrollers = [...(rows || [])].map(row => wireHorizontalScroller(row, { drag: true }));
+    return () => scrollers.forEach(scroller => scroller.destroy());
   }, []);
   const settings = appSettingsStore();
   useSyncExternalStore(settings.subscribe, settings.version, settings.version);
@@ -71,18 +72,22 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
   else if (ascending) items.reverse();
   const waiting = discoveries.isPending;
   return <section ref={section} aria-label="为你推荐" aria-busy={waiting} className="flex min-w-0 flex-col gap-4">
-    <FilterGlassRows label="发现筛选与排序" topLabel="发现范围与标签" attrs={{ 'data-filter-frame': '', 'data-jav-filter': '' }}
-      busy={waiting} bottomClassName="flex-wrap" top={<>
+    <FilterGlassRows label="发现筛选与排序" topLabel="发现范围与标签" attrs={{ 'data-filter-frame': '', 'data-jav-filter': '', 'data-catalog-frame': '' }}
+      busy={waiting} topClassName="gap-1.5 overflow-visible" bottomClassName="min-h-12" top={<div data-catalog-scroll="">
+      <div data-catalog-views="">
         {([['external', '库外发现'], ['library', '馆藏探索']] as const).map(([key, label]) =>
           <FilterPill key={key} data-entity-tag={key} data-entity-press="" pressed={scope === key} onPress={() => { setScope(key); setTag('') }}>{label}</FilterPill>)}
-        {tags.map(name => <FilterPill key={name} data-entity-tag={name} data-entity-press="" pressed={tag === name} onPress={() => setTag(tag === name ? '' : name)}>
+        <span data-entity-sep="" aria-hidden="true" />
+      </div><div data-catalog-tags="">
+        {tags.map(name => <FilterPill key={name} data-catalog-tag={name} data-entity-press="" pressed={tag === name} onPress={() => setTag(tag === name ? '' : name)}>
           {name}<span data-count-badge="">{all.filter(item => item.tags?.includes(name)).length}</span>
         </FilterPill>)}
-      </>} bottom={<>
-        <span className="mr-auto whitespace-nowrap text-body-2-regular text-text-secondary">{waiting ? '正在读取' : `${items.length} 部`}</span>
+      </div></div>} bottom={<>
+        <span data-catalog-readout="">{waiting ? <span data-skeleton="count" aria-hidden className="relative inline-block h-3.5 w-37.5 rounded-md align-middle skeleton-sheen" /> : `${items.length} 部`}</span>
         {query || tag ? <GlassPill onPress={() => { setTag(''); clearText() }}>清除筛选</GlassPill> : null}
+        <span data-entity-sorts="">
         <Segments label="JAV 卡片版式" value={layout} options={JAV_LAYOUTS} onChange={storeJavLayout} />
-        <span data-entity-sorts=""><SortKeys sorts={[{ key: 'taste', label: '口味', pressed: sort === 'taste', dir: ascending ? 'asc' : 'desc', ariaLabel: '按口味匹配排序' },
+        <SortKeys sorts={[{ key: 'taste', label: '口味', pressed: sort === 'taste', dir: ascending ? 'asc' : 'desc', ariaLabel: '按口味匹配排序' },
           { key: 'release', label: '发行', pressed: sort === 'release', dir: ascending ? 'asc' : 'desc', ariaLabel: '按发行日期排序' }]} onSort={key => {
           if (key === sort) setAscending(!ascending); else { setSort(key); setAscending(false) }
         }} /></span>
@@ -95,14 +100,16 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
     </EmptyState> : null}
     {action.error ? <Note tone="error">{action.error}</Note> : null}
     <div data-media-grid="" className={JAV_RECOMMENDATION_GRID} style={{ '--jav-cover-ratio': ratio } as CSSProperties}>
-      {items.map(item => <article key={item.id} data-media-card="" data-jav-card="" onClick={event => {
+      {items.map(item => {
+        const artwork = discoveryArtwork(item, layout, settings.value.javImage);
+        return <article key={item.id} data-media-card="" data-jav-card="" onClick={event => {
         if (!(event.target as HTMLElement).closest('a,button,input')) navigate(item.asset_id ? `/item/${item.asset_id}` : `/jav/movie/${encodeURIComponent(item.code)}`);
       }}>
         <a href={item.asset_id ? `/item/${item.asset_id}` : `/jav/movie/${encodeURIComponent(item.code)}`} aria-label={`查看 ${item.code} 详情`}
           onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate(event.currentTarget.getAttribute('href')!) } }}
           data-media-pic="" data-jav-cover-box="" className="relative inline-grid place-items-center overflow-hidden rounded-2lg bg-background-tertiary-default">
-          <span className="text-text-secondary">无封面</span>
-          <span className="contents" dangerouslySetInnerHTML={{ __html: discoveryArtwork(item, layout, settings.value.javImage) }} />
+          {artwork ? <ArtSlot artwork={{ kind: 'cover', html: artwork }} identity={discoveryArtwork(item, 'small', settings.value.javImage)}
+            relayout={root => relayoutCovers(root, layout)} /> : <span data-media-nopic="">无封面</span>}
         </a>
         <h3 data-jav-title="" title={`${item.code} · ${item.title || '标题未取得'}`}>{item.code} · {item.title || '标题未取得'}</h3>
         <div data-jav-identity="">
@@ -121,7 +128,7 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
           }}>{item.asset_id ? '已入库' : item.wanted ? '已加入想要' : '想要'}</Button>
           {item.link ? <ButtonLink data-button-link="" variant="secondary" trailingIcon={RiExternalLinkLine} href={item.link} target="_blank" rel="noopener noreferrer">作品来源</ButtonLink> : null}
         </div>
-      </article>)}
+      </article>})}
     </div>
   </section>;
 }

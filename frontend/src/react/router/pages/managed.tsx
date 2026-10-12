@@ -139,6 +139,7 @@ async function openPage(path: ManagedPath, actions: ShellActions, run: Run): Pro
   }
   const stats = document.getElementById('stats');
   if (!stats) return;
+  if (path === '/jav') window.scrollTo({ top: 0, behavior: 'instant' });
   actions.surfaceChanged('management', path);
   if (path === '/taste') {
     writeShell({

@@ -1,4 +1,4 @@
-"""按优先级查磁力：manko.fun 命中高清版本后短路，其余来源逐级兜底。
+"""按入口查磁力：直接添加优先命中，待找清单汇集多个来源。
 
 这一层只返回候选，不提交下载。站点解析与排序分开：来源顺序回答「先问谁」，
 ``rank_candidates`` 回答同一来源的多个版本选哪个。文件多不构成拒绝；只有明显预告、
@@ -264,8 +264,8 @@ class Fetcher:
 
 
 def search(root: Path, code: str, *, transport=None, min_size: int = 0,
-           max_size: int = 1024 ** 4, goal: str = "quality") -> dict:
-    """依次查前三个可直连来源；manko 命中 1080p 后停止。其余来源由索引器层续接。"""
+           max_size: int = 1024 ** 4, goal: str = "quality", stop_on_preferred: bool = True) -> dict:
+    """有界查询三个可直连来源；直接添加允许在 manko 高清命中时结束。"""
     fetcher = Fetcher(root, transport=transport)
     trace, warnings, found = [], [], []
     try:
@@ -281,7 +281,7 @@ def search(root: Path, code: str, *, transport=None, min_size: int = 0,
                 warnings.append(f"{source.label}：未取得")
             items = [item for item in items if min_size <= item["size"] <= max_size]
             found.extend(items)
-            if source.key == "manko" and any(item["resolution"] >= HIGH_QUALITY for item in items):
+            if stop_on_preferred and source.key == "manko" and any(item["resolution"] >= HIGH_QUALITY for item in items):
                 trace.append(f"{source.label}：取得 1080p/2160p，已短路")
                 break
             trace.append(f"{source.label}：取得 {len(items)} 条" if items else f"{source.label}：无结果")

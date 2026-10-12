@@ -43,7 +43,7 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
   const action = useAction();
   const client = useQueryClient();
   const refresh = useRef(false);
-  const cacheCode = queryUrl ? `${queryUrl}:${want.code}` : want.code || '';
+  const cacheCode = queryUrl ? `${queryUrl}:${want.code}` : `all-sources:${want.code || ''}`;
   const cached = useMemo(() => cachedResources(cacheCode, want.release_date), [cacheCode, want.release_date]);
   useEffect(() => {
     if (!root.current || visible) return;
