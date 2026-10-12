@@ -164,6 +164,7 @@ def rank_candidates(items: list[dict], goal: str = "quality") -> list[dict]:
 class Fetcher:
     def __init__(self, root: Path, *, transport=None, deadline: float | None = None):
         self.root = Path(root)
+        self.resource_result = {}
         self.deadline = deadline or time.monotonic() + 45
         self._owned = transport is None
         self.transport = transport or HostLimitedTransport(
@@ -219,6 +220,7 @@ class Fetcher:
     def javdb(self, code: str) -> list[dict]:
         source = CHAIN[1]
         result = JavDBSource().resources(code, session=self.session)
+        self.resource_result = result
         return rank_candidates([candidate for item in result.get("items", ())
                                 if (candidate := _normalise({**item, "source_url": result.get("source_url")},
                                                             source, code))])
@@ -288,8 +290,13 @@ def search(root: Path, code: str, *, transport=None, min_size: int = 0,
     finally:
         fetcher.close()
     incomplete = bool(warnings) and not found
-    return {"items": rank_candidates(found, goal), "warnings": warnings, "trace": trace,
+    result = {"items": rank_candidates(found, goal), "warnings": warnings, "trace": trace,
             'state': 'error' if incomplete else 'ready',
             'error': '部分来源未取得，请稍后重试或检查来源连接。' if incomplete else '',
             "next_sources": [source.label for source in CHAIN[3:]],
             "reference_only": list(REFERENCE_ONLY)}
+    if not stop_on_preferred:
+        linked = getattr(fetcher, 'resource_result', {})
+        result.update(linked_resources=linked.get('items', []), source_url=linked.get('source_url', ''))
+        result['warnings'].extend(linked.get('warnings') or [])
+    return result

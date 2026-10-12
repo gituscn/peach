@@ -25,6 +25,21 @@ def item(info_hash, **fields):
 
 
 class MagnetChainTests(unittest.TestCase):
+    def test_wishlist_preserves_comment_links_and_more_than_eight_source_versions(self):
+        from peach.wants_magnets import fetch
+        links = [dict(id=f'magnet:{index:040x}', protocol='magnet', info_hash=f'{index:040x}',
+                      uri=f'magnet:?xt=urn:btih:{index:040x}', name='ABC-123', size='2 GB', files='',
+                      date='', attributes=[], source='JavDB', source_url='https://example.test/work', origins=['JavDB'])
+                 for index in range(10)]
+        links.append({**links[0], 'id': 'ed2k:example', 'protocol': 'ed2k', 'info_hash': '',
+                      'uri': 'ed2k://|file|ABC-123|1234|' + 'a' * 32 + '|/', 'source': 'JavDB 评论'})
+        direct = _normalise({'uri': item(HASH_A)['uri'], 'size': '8 GiB'}, CHAIN[0], 'ABC-123')
+        with patch('peach.magnet_chain.search', return_value={'items': [direct], 'linked_resources': links}):
+            shown = fetch(Path('.'), 'ABC-123')['items']
+        self.assertEqual(len(shown), 12)
+        self.assertEqual(shown[-1]['protocol'], 'ed2k')
+        self.assertEqual(shown[0]['source'], 'manko.fun')
+
     def test_direct_add_stops_at_preferred_hd_but_wishlist_collects_other_sources(self):
         from peach.magnet_chain import Fetcher, search
         from peach.wants_magnets import fetch

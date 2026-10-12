@@ -1,6 +1,7 @@
 import { islandButton, islandGlyph, islandSearchInput } from './island-skeleton';
 import { JAV_TABS } from './react/jav/jav-navigation';
 import { cardRatio, gridLayout, javLayout } from './appearance';
+import { JAV_RELEASE_SORT } from './sort-preferences';
 
 const text = (width: string) => `<span data-jav-skeleton-text class="skeleton block rounded-md" style="width:${width}" aria-hidden="true"></span>`;
 const cover = (classes: string) => `<span data-jav-skeleton-cover class="skeleton ${classes}"></span>`;
@@ -41,7 +42,7 @@ function javFilterSkeleton(): string {
     <div data-filter-row="bottom" aria-busy="true" class="flex min-h-12 min-w-0 items-center gap-3 px-3 py-2">
       <span data-catalog-readout><span data-skeleton="count" class="relative inline-block h-3.5 w-37.5 rounded-md align-middle skeleton-sheen"></span></span>
       <span data-entity-sorts><span data-entity-layout class="inline-flex w-max max-w-full flex-none items-center gap-0.5 rounded-lg">${size('big', 'maximize')}${size('small', 'layout-grid')}</span>
-        <button type="button" data-entity-sort="taste" data-entity-press aria-pressed="true">口味${islandGlyph('arrow-down', 'size-3.5')}</button><button type="button" data-entity-sort="release" data-entity-press aria-pressed="false">发行</button>
+        <button type="button" data-entity-sort="taste" data-entity-press aria-pressed="true">口味${islandGlyph('arrow-down', 'size-3.5')}</button><button type="button" data-entity-sort="release" data-entity-press aria-pressed="false">${JAV_RELEASE_SORT[1]}</button>
       </span>
     </div>
   </div>`;

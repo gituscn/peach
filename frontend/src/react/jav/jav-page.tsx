@@ -8,6 +8,7 @@ import { coverUrl } from '@peach/card-art';
 import { relayoutCovers } from '../../card-art/framing';
 import { wireHorizontalScroller } from '../../ui-kit/scroll';
 import { feedIdentity } from '../../card-art/feed-identity';
+import { JAV_RELEASE_SORT } from '../../sort-preferences';
 import { javContentSkeleton, JAV_RECOMMENDATION_GRID } from '../../jav-skeleton';
 import { errorMessage } from '../../api';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
@@ -88,7 +89,7 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         <span data-entity-sorts="">
         <Segments label="JAV 卡片版式" value={layout} options={JAV_LAYOUTS} onChange={storeJavLayout} />
         <SortKeys sorts={[{ key: 'taste', label: '口味', pressed: sort === 'taste', dir: ascending ? 'asc' : 'desc', ariaLabel: '按口味匹配排序' },
-          { key: 'release', label: '发行', pressed: sort === 'release', dir: ascending ? 'asc' : 'desc', ariaLabel: '按发行日期排序' }]} onSort={key => {
+          { key: 'release', label: JAV_RELEASE_SORT[1], pressed: sort === 'release', dir: ascending ? 'asc' : 'desc', ariaLabel: '按发行日期排序' }]} onSort={key => {
           if (key === sort) setAscending(!ascending); else { setSort(key); setAscending(false) }
         }} /></span>
       </>} />

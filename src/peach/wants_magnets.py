@@ -1,4 +1,4 @@
-"""JAV 入库的只读磁链查询：串行请求、有限缓存、来源限速与失败冷却。"""
+"""想要作品的只读资源查询：串行请求、有限缓存、来源限速与失败冷却。"""
 from __future__ import annotations
 
 from collections import OrderedDict
@@ -14,8 +14,11 @@ from .sources import FailureReason, SourceFailure
 
 def fetch(root: Path, code: str) -> dict:
     from .magnet_chain import search
+    from .sources.javdb import merge_resources
     result = search(root, code, stop_on_preferred=False)
-    return {**result, 'items': [{**row, 'size': row['size_text']} for row in result['items']]}
+    linked = result.pop('linked_resources', [])
+    ranked = [{**row, 'id': 'magnet:' + row['info_hash'], 'size': row['size_text']} for row in result['items']]
+    return {**result, 'items': merge_resources([*ranked, *linked])[:128]}
 
 
 def cache_lifetime(released: str | None, today: date | None = None) -> int:
