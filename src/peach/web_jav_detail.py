@@ -4,8 +4,11 @@ from __future__ import annotations
 import re
 
 from . import entities, wants, web_catalog
-from .catalog_rules import normalise_code_key
-from .javdb_public import MAX_REVIEW_PAGES, PAGE_SIZE, PUBLIC_API, PublicSourceUnavailable
+from .catalog_rules import normalise_code_key, tag_cat
+from .genre_decisions import load_genre_decisions
+from .genre_taxonomy import resolve_genre
+from .javdb_public import (MAX_REVIEW_PAGES, PAGE_SIZE, PUBLIC_API, PublicSourceUnavailable,
+                          preview_video_url, public_image_url)
 
 
 def detail_code(args) -> str:
@@ -44,19 +47,36 @@ def q_jav_detail(contract, args) -> dict:
     payload = {"ok": True, "state": "ready" if source else "partial", "message": message,
                "code": code, "title": item.get("title") or code,
                "release_date": item.get("release_date"), "studio": item.get("studio")}
-    payload.update(_source_fields(source or {}))
+    with contract.database.read_connection() as connection:
+        decisions = load_genre_decisions(connection)
+    payload.update(_source_fields(source or {}, decisions))
     payload.update(_artwork_fields(contract, code, item, source or {}))
     payload.update(_identity_fields(contract, code, item, source or {}))
     return payload
 
 
 def _identity_fields(contract, code, item, source):
-    names = [actor.get("name") for actor in (source or {}).get("actors", []) if isinstance(actor, dict)]
+    actors = [actor for actor in source.get("actors", []) if isinstance(actor, dict) and actor.get("name")]
+    names = [actor.get("name") for actor in actors]
     if not names:
         names = re.split(r"[、,，]", str(item.get("performers") or ""))
     with contract.database.read_connection() as connection:
-        performer_refs = _refs(contract, connection, "performer", names)
+        performer_refs = []
+        for name in dict.fromkeys(names):
+            refs = _refs(contract, connection, "performer", [name])
+            if not refs:
+                continue
+            ref = refs[0]
+            actor = next((actor for actor in actors if actor.get("name") == name), {})
+            actor_id = str(actor.get("id") or "")
+            if re.fullmatch(r"[A-Za-z0-9]{1,64}", actor_id):
+                ref["source_actor_id"] = actor_id
+                ref["source_avatar"] = public_image_url(actor.get("avatar_url"))
+            performer_refs.append(ref)
         studio_refs = _refs(contract, connection, "studio", [item.get("studio")])
+        for ref in studio_refs:
+            ref["has_logo"] = contract.has_logo(ref["name"])
+            ref["logo_version"] = contract.logo_version(ref["name"])
         series_refs = _refs(contract, connection, "series", [(source or {}).get("series_name")])
         wanted = code in wants.wanted_keys(connection, [code])
         want = connection.execute("SELECT id FROM want_item WHERE code_key=? AND state<>'acquired' LIMIT 1", (code,)).fetchone()
@@ -70,15 +90,25 @@ def _artwork_fields(contract, code, item, source):
             "cover_url": item.get("cover_url") or "",
             "source_image": bool(source and (source.get("cover_url") or source.get("thumb_url"))),
             "preview_count": min(len(source.get("preview_images") or []), 30),
+            "preview_video_url": preview_video_url(source),
             "source_url": "https://javdb.com/v/" + str(source["id"]) if source else item.get("link") or ""}
 
 
-def _source_fields(source):
+def _source_fields(source, decisions):
     tags = [str(tag.get("name") or "") if isinstance(tag, dict) else str(tag)
             for tag in source.get("tags", [])]
+    tag_refs = []
+    for raw in tags:
+        label = resolve_genre(raw, decisions)
+        if label is None:
+            continue
+        label = label or raw
+        if label and all(ref["name"] != label for ref in tag_refs):
+            tag_refs.append({"name": label, "category": tag_cat(label), "source_name": raw})
     return {"duration": source.get("duration"), "score": source.get("score"),
             "summary": source.get("summary") or "", "director": source.get("director_name") or "",
             "publisher": source.get("publisher_name") or "", "tags": [tag for tag in tags if tag],
+            "tag_refs": tag_refs,
             "comments_count": int(source.get("comments_count") or 0)}
 
 
@@ -100,7 +130,8 @@ def q_jav_reviews(contract, args) -> dict:
 def q_jav_image(contract, args) -> dict:
     code = detail_code(args)
     index = str(args.get("image") or "cover")
-    if index != "cover" and (not index.isdigit() or not 0 <= int(index) < 30):
+    if (index != "cover" and not re.fullmatch(r"actor:[A-Za-z0-9]{1,64}", index)
+            and (not index.isdigit() or not 0 <= int(index) < 30)):
         raise ValueError("预览图不存在")
     try:
         image = PUBLIC_API.image(code, index)

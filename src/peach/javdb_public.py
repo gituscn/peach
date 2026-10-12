@@ -22,6 +22,30 @@ PAGE_SIZE = 10
 MAX_REVIEW_PAGES = 8
 
 
+def public_image_url(value: object) -> bool:
+    """公开图片仅取已验证来源主机的 HTTPS 地址。"""
+    try:
+        parts = urlsplit(str(value or ""))
+        return (parts.scheme == "https" and parts.hostname == "tp.spfcas.com"
+                and not parts.username and not parts.password and parts.port in (None, 443))
+    except ValueError:
+        return False
+
+
+def preview_video_url(movie: dict) -> str:
+    """只投影来源作品的公开 HLS 预览入口，不替来源断言播放成功。"""
+    value = str(movie.get("preview_video_url") or "")
+    try:
+        parts = urlsplit(value)
+        allowed = (parts.scheme == "https" and parts.hostname == "jdforrepam.com"
+                   and not parts.username and not parts.password and parts.port in (None, 443)
+                   and not parts.fragment and not any(char.isspace() for char in value)
+                   and re.fullmatch(r"/api/v1/movies/ttm3u8/preview/[A-Za-z0-9/_-]+\.m3u8", parts.path))
+    except ValueError:
+        return ""
+    return value if allowed else ""
+
+
 class PublicSourceUnavailable(ValueError):
     """公开来源当前未取得。"""
 
@@ -159,6 +183,13 @@ class PublicAPI:
         movie = self.movie(code)
         if index == "cover":
             url = movie.get("cover_url") or movie.get("thumb_url")
+        elif index.startswith("actor:"):
+            actor_id = index.removeprefix("actor:")
+            actor = next((actor for actor in movie.get("actors") or []
+                          if isinstance(actor, dict) and str(actor.get("id")) == actor_id), None)
+            if not actor:
+                raise ValueError("出演者头像不存在")
+            url = actor.get("avatar_url")
         else:
             previews = movie.get("preview_images") or []
             try:
@@ -167,8 +198,7 @@ class PublicAPI:
                 raise ValueError("预览图不存在") from None
             if isinstance(url, dict):
                 url = url.get("large_url") or url.get("url")
-        parts = urlsplit(str(url or ""))
-        if parts.scheme != "https" or parts.hostname != "tp.spfcas.com" or parts.username or parts.password:
+        if not public_image_url(url):
             raise PublicSourceUnavailable("图片未取得")
 
         def fetch():

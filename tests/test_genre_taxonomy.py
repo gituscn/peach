@@ -43,6 +43,9 @@ class GenreTaxonomyTests(unittest.TestCase):
     def test_cat_ears_share_one_target_across_source_spellings(self):
         self.assertEqual(map_genres(["猫耳", "貓耳女"]), (["猫耳"], []))
 
+    def test_public_javdb_simplified_categories_share_verified_targets(self):
+        self.assertEqual(map_genres(['蕩婦', '荡妇', '戀腿癖', '恋腿癖']), (['痴女', '恋腿'], []))
+
     def test_anal_region_is_distinct_from_anal_intercourse(self):
         for raw in ("Anal", "Anal Play", "アナル", "アナル責め", "アナルシリーズ", "肛門・肛交"):
             with self.subTest(raw=raw):
