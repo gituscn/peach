@@ -154,6 +154,16 @@ def sample_url(connection: sqlite3.Connection, code: str, position: int) -> str 
     return str(row[0]) if row else None
 
 
+def positions(connection: sqlite3.Connection, code: str | None) -> list[int]:
+    """详情可浏览的本机样张序号，按顺序限量返回，不读取来源地址或出网。"""
+    key = code_key(code)
+    if not key or not table_ready(connection):
+        return []
+    return [int(row[0]) for row in connection.execute(
+        f"SELECT position FROM {TABLE} WHERE code=? AND position>0 ORDER BY position LIMIT ?",
+        (key, MAX_PER_CODE))]
+
+
 def counts(connection: sqlite3.Connection, codes: Iterable[str]) -> dict[str, tuple[int, str]]:
     """番号键 → （样张数，来源站）。没有样张的番号不在结果里。"""
     keys = sorted({key for key in (code_key(code) for code in codes) if key})

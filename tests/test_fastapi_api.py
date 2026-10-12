@@ -2601,6 +2601,34 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([item["kind"] for item in payload["sets"]], ["code", "dir", "dir"])
         self.assertNotIn("pics.dmm.co.jp", json.dumps(payload), "样张地址留在服务端")
 
+    async def test_item_samples_are_ordered_local_positions_without_source_requests(self):
+        self._seed_samples(40)
+        with closing(sqlite3.connect(self.db)) as connection:
+            connection.execute("DELETE FROM code_sample_image WHERE position IN (2,4)")
+            connection.execute("UPDATE asset SET code='ssis-057' WHERE id=11")
+            connection.commit()
+        with patch("peach.sample_images.downloader") as download, patch("peach.javdb_public.PUBLIC_API.movie") as movie:
+            response = await self.client.get("/api/item?id=11", headers={"X-Token": "secret"})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        expected = [{"n": n} for n in range(1, 33) if n not in (2, 4)]
+        self.assertEqual(payload["sample_images"], expected)
+        self.assertNotIn("pics.dmm.co.jp", response.text)
+        download.assert_not_called()
+        movie.assert_not_called()
+
+    async def test_item_without_sample_table_has_an_empty_sample_list(self):
+        payload = (await self.client.get("/api/item?id=1", headers={"X-Token": "secret"})).json()
+        self.assertEqual(payload["sample_images"], [])
+
+    async def test_item_without_matching_samples_has_an_empty_sample_list(self):
+        self._seed_samples()
+        with closing(sqlite3.connect(self.db)) as connection:
+            connection.execute("UPDATE asset SET code='UNKNOWN-001' WHERE id=11")
+            connection.commit()
+        payload = (await self.client.get("/api/item?id=11", headers={"X-Token": "secret"})).json()
+        self.assertEqual(payload["sample_images"], [])
+
     async def test_a_sample_is_downloaded_on_first_view_and_then_served_from_cache(self):
         from PIL import Image
 
