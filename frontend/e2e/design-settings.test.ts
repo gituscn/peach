@@ -497,7 +497,7 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
     try {
       const server = await stubServer(page);
       server.schedule.available = false;
-      await page.goto(new URL('/configuration', page.url()).href, { waitUntil: 'load' });
+      await page.goto(new URL('/settings/library', page.url()).href, { waitUntil: 'load' });
       await settle(page);
       const source = () => page.getByRole('tablist', { name: '配置分区' }).getByRole('tab', { name: '来源与订阅', exact: true });
       await source().click();

@@ -7,15 +7,16 @@
  *
  * 读：后退前进落到详情条目上时，路由树的覆盖元素（`react/router/pages/overlay.tsx`）调 `adoptOverlayState`
  * 接上这一条记的背景，壳打开详情的那一处再用 `takeOverlayReturn` 取来处，关掉回到那一页。冷启动（刷新、
- * 新标签页、深链）不读：条目跨刷新仍带着 `usr`，下面那页却从没画过，页面组照没有背景补画（`/item/:id` 补画
+ * 新标签页、深链）不读：条目跨刷新仍带着 `usr`，下面那页却从没画过，页面组照没有背景补画（`/assets/:id` 补画
  * 目录网格），关掉回各自的缺省来处。 */
 import { matchPath } from 'react-router';
+import { isPreferencePath } from './settings-route';
 
 /** 覆盖在页面上的那几种地址。不进 `isRoutedPath`：页面宿主不画它们。 */
 export const OVERLAY_PATHS = [
-  '/item/:id', '/mix/:seed/:item', '/parts/:seed/:item', '/editions/:seed/:item', '/playlists/:playlist/:item',
-  '/follow/item/:id',
-  '/jav/movie/:code',
+  '/assets/:id',
+  '/posts/:id',
+  '/works/:code',
 ] as const;
 
 export type OverlayPath = typeof OVERLAY_PATHS[number];
@@ -28,29 +29,42 @@ export type OverlayTarget =
   | { kind: 'item' | 'follow'; id: number }
   | { kind: 'queue'; queue: 'mix' | 'parts' | 'editions' | 'playlist'; key: number; item: number };
 
-const QUEUES = { '/mix/:seed/:item': 'mix', '/parts/:seed/:item': 'parts', '/editions/:seed/:item': 'editions',
-  '/playlists/:playlist/:item': 'playlist' } as const;
+const QUEUES = ['mix', 'parts', 'editions', 'playlist'] as const;
 
 /** 地址匹配哪一条覆盖路径；本地条目使用数字，库外作品使用有效番号。 */
-export function overlayMatch(pathname: string): { path: OverlayPath; target: OverlayTarget } | null {
+export function overlayMatch(pathname: string, search = ''): { path: OverlayPath; target: OverlayTarget } | null {
+  const address = new URL(pathname, 'https://peach.invalid');
+  pathname = address.pathname;
+  search ||= address.search;
   for (const path of OVERLAY_PATHS) {
     const match = matchPath(path, pathname);
     if (!match) continue;
-    if (path === '/jav/movie/:code') {
+    if (path === '/works/:code') {
       const code = match.params.code || '';
       return /^[A-Za-z0-9_-]{2,64}$/.test(code) ? { path, target: { kind: 'jav', code } } : null;
     }
     const values = Object.values(match.params);
     if (!values.every((value) => /^\d+$/.test(value ?? ''))) return null;
-    const [first, second] = values.map(Number) as [number, number];
-    if (path === '/item/:id' || path === '/follow/item/:id') return { path, target: { kind: path === '/item/:id' ? 'item' : 'follow', id: first } };
-    return { path, target: { kind: 'queue', queue: QUEUES[path], key: first, item: second } };
+    const first = Number(values[0]);
+    if (!Number.isSafeInteger(first) || first <= 0) return null;
+    if (path === '/assets/:id') {
+      const params = new URLSearchParams(search);
+      const contexts = QUEUES.filter(queue => params.has(queue));
+      if (contexts.length === 1) {
+        const queue = contexts[0]!, value = params.get(queue)!;
+        const key = Number(value);
+        if (/^[1-9]\d*$/.test(value) && Number.isSafeInteger(key)) {
+          return { path, target: { kind: 'queue', queue, key, item: first } };
+        }
+      }
+    }
+    return { path, target: { kind: path === '/assets/:id' ? 'item' : 'follow', id: first } };
   }
   return null;
 }
 
 /** 地址要打开的那一条覆盖；路径或身份参数无效时是 null。 */
-export const overlayTarget = (pathname: string): OverlayTarget | null => overlayMatch(pathname)?.target ?? null;
+export const overlayTarget = (pathname: string, search = ''): OverlayTarget | null => overlayMatch(pathname, search)?.target ?? null;
 
 export interface BackgroundLocation {
   pathname: string;
@@ -64,7 +78,7 @@ export interface OverlayState {
 }
 
 export const isOverlayPath = (pathname: string): boolean => (
-  OVERLAY_PATHS.some((pattern) => matchPath(pattern, pathname) !== null)
+  isPreferencePath(pathname.split(/[?#]/)[0]!) || OVERLAY_PATHS.some((pattern) => matchPath(pattern, pathname.split(/[?#]/)[0]!) !== null)
 );
 
 /** 条目里记的背景：详情与队列条目的 `usr` 里有 `{ backgroundLocation, overlay }`，别的条目没有。 */

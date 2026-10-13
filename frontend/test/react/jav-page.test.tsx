@@ -85,11 +85,11 @@ it('发现按范围读取，清除文字和标签恢复列表，卡片打开对�
   await type(host.querySelector('input[type="search"]'), '');
   expect(host.querySelectorAll('[data-jav-card]')).toHaveLength(2);
   await click(host.querySelector('[data-jav-card] h3'));
-  expect(navigate).toHaveBeenLastCalledWith('/jav/movie/ABC-001');
+  expect(navigate).toHaveBeenLastCalledWith('/works/ABC-001');
   await click(buttonNamed('馆藏探索', host));
   await settle();
   expect(fetcher.mock.calls.some(([url]) => url.includes('scope=library'))).toBe(true);
   await click(host.querySelector('[data-jav-card] h3'));
-  expect(navigate).toHaveBeenLastCalledWith('/item/22');
+  expect(navigate).toHaveBeenLastCalledWith('/assets/22');
   expect(buttonNamed('已入库', host)?.disabled).toBe(true);
 });

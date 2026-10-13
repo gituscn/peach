@@ -50,7 +50,7 @@ def configuration(config, configured, *, validate=True):
     except settings_file.SettingsFileError:
         return item("配置", "failed", "配置文件无法读取", action="在本机修复配置文件")
     if not configured:
-        return item("配置", "failed", "尚未完成首次配置", action="完成首次配置", target="/configuration")
+        return item("配置", "failed", "尚未完成首次配置", action="完成首次配置", target="/settings/library")
     return item("配置", "ok", "配置可读取")
 
 
@@ -82,7 +82,7 @@ def tools(settings):
     missing = [name for name, value in found.items() if not value["available"]]
     return item("FFmpeg／OpenSSL", "warning" if missing else "ok",
                 "未找到：" + "、".join(missing) if missing else "工具路径已找到",
-                action="安装缺失工具" if missing else "", target="/configuration" if missing else None, details=found)
+                action="安装缺失工具" if missing else "", target="/settings/maintenance" if missing else None, details=found)
 
 
 def security(settings):
@@ -97,7 +97,7 @@ def security(settings):
         return item("访问安全", "failed", "访问密码配置无法读取", action="在本机检查访问密码配置")
     if exposed and not protected:
         return item("访问安全", "warning", "局域网或公网入口未开启访问密码",
-                    action="在配置中开启访问密码", target="/configuration", details={"exposed": True, "protected": False})
+                    action="在配置中开启访问密码", target="/settings/network", details={"exposed": True, "protected": False})
     return item("访问安全", "ok", "已开启访问密码" if protected else "仅监听本机",
                 details={"exposed": exposed, "protected": protected})
 
@@ -108,7 +108,7 @@ def media_mounts(snapshot):
     states = {"ok": "ok", "degraded": "warning", "checking": "unknown"}
     reason = "来源可读取" if snapshot["state"] == "ok" else "；".join(snapshot["warnings"]) or "挂载检测尚未完成"
     return item("媒体挂载", states[snapshot["state"]], reason,
-                action="检查媒体目录与挂载状态" if snapshot["state"] != "ok" else "", target="/configuration",
+                action="检查媒体目录与挂载状态" if snapshot["state"] != "ok" else "", target="/settings/library",
                 details=snapshot)
 
 
@@ -165,7 +165,7 @@ def recent_failure(path):
     moment = str(row[1] or "")
     safe_time = moment if len(moment) <= 32 and all(c in "0123456789-:+.TZ " for c in moment) else None
     return item("后台任务", "warning", "存在已记录的任务失败", action="在活动页查看失败任务",
-                target="/activity", details={"id": row[0], "finished_at": safe_time})
+                target="/tasks", details={"id": row[0], "finished_at": safe_time})
 
 
 def probe_mounts(roots):

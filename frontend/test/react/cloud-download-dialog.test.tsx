@@ -80,7 +80,7 @@ it('带着番号与标题打开：标题行写番号与片名，搜索框与番�
   expect(posts).toEqual([{
     magnet: MAGNET, provider: '115', target: '/115/云下载', code: 'ABC-123', title: '一部作品', origin: 'asset:12',
   }]);
-  expect(receipt).toHaveBeenCalledWith('已提交离线下载，进度在活动页');
+  expect(receipt).toHaveBeenCalledWith('已提交离线下载，进度在任务中心');
   expect(close).toHaveBeenCalled();
 });
 

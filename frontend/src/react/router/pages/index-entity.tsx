@@ -20,8 +20,11 @@ import { useContext, useEffect, useLayoutEffect, useRef, useSyncExternalStore } 
 import { useLocation } from 'react-router';
 
 import { appSettingsStore } from '@peach/appearance';
-import { isOverlayPath, managedEntry, openManagedRoute, peachHistory, updateManagedRoute } from '@peach/history';
-import { ROUTE_ENTITIES } from '@peach/legacy/core';
+import { isOverlayPath, managedEntry, openManagedRoute, peachHistory, shellNavigate, updateManagedRoute } from '@peach/history';
+import { ROUTE_ENTITIES, entityPath } from '@peach/legacy/core';
+import { apiGet } from '../../../api';
+import { queryClient } from '../../query';
+import type { EntityPageData } from '../../entity-page/entity-page';
 import { pageOpens, selectMode, subscribeShell, writeShell } from '@peach/shell';
 
 import { indexParams, paintIndexSkeleton, peopleLayoutOf, type IndexPageKind } from '../../../index-skeleton';
@@ -168,7 +171,7 @@ function entityShown(): boolean {
 
 async function openEntity(
   actions: ShellActions, shell: EntityPageShell, target: { segment: string; kind: string; name: string },
-  pathname: string, search: string, live: () => boolean,
+  pathname: string, search: string, live: () => boolean, resolvedEntity: EntityPageData,
 ) {
   const host = indexHost();
   if (!host) return;
@@ -195,7 +198,7 @@ async function openEntity(
   const open = shell.props(kind, name, search);
   /* 这一页是不是 JAV 语境由页面按第一页作品推出来，写回壳的状态：壳的排序项、侧栏取数与卡片版式都读它。 */
   const props: EntityPageProps = {
-    ...open, hosts, card: entityCard(actions),
+    ...open, hosts, card: entityCard(actions), resolvedEntity,
     actions: { ...open.actions, javContext: (on) => { writeShell({ entityJavLayout: !!on }) } },
   };
   const painted = await openManagedRoute(`/${segment}/*` as EntityRoutePath, props, {
@@ -214,8 +217,28 @@ function EntityOpen({ target }: { target: { segment: string; kind: string; name:
   usePageOpen(epoch, (fresh, live) => {
     const shell = actions?.entity;
     if (!actions || !shell) return;
-    if (!fresh && shell.refresh(target.kind, target.name, location.search)) return;
-    void openEntity(actions, shell, target, location.pathname, location.search, live);
+    void (async () => {
+      const params = new URLSearchParams({ kind: target.kind });
+      params.set(/^[0-9]+$/.test(target.name) ? 'id' : 'name', target.name);
+      const entity = await queryClient.fetchQuery({ queryKey: ['entity-route', target.kind, target.name],
+        queryFn: ({ signal }) => apiGet<EntityPageData>(`/api/entity?${params}`, signal), staleTime: 0 })
+        .catch(() => null);
+      if (!live()) return;
+      if (entity?.redirect) {
+        shellNavigate(entityPath(entity.redirect.kind, entity.redirect.name, entity.redirect.id) + location.search + location.hash,
+          { replace: true, state: peachHistory.navigation.location.state });
+        return;
+      }
+      if (!entity?.id || entity.error) { shell.missing(target.kind); return }
+      const name = String(entity.canonical_name || target.name);
+      const path = entityPath(target.kind, name, Number(entity.id));
+      if (path !== location.pathname) {
+        shellNavigate(path + location.search + location.hash, { replace: true, state: peachHistory.navigation.location.state });
+        return;
+      }
+      if (!fresh && shell.refresh(target.kind, name, location.search)) return;
+      void openEntity(actions, shell, { ...target, name }, location.pathname, location.search, live, entity);
+    })();
   }, { shown: () => entityShown() && !indexHost()?.hidden });
   return null;
 }

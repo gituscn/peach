@@ -233,7 +233,7 @@ it('关注元素：进详情、关掉回列表都由壳认领写地址，列表�
   await until(() => page(stats) !== null, '整页画上');
   const painted = page(stats);
   const before = log.length;
-  await act(async () => { r.shellNavigate('/follow/item/2', { state: FOLLOW_ITEM_STATE }) });
+  await act(async () => { r.shellNavigate('/posts/2', { state: FOLLOW_ITEM_STATE }) });
   await settle();
   await act(async () => { r.shellNavigate('/follow', { replace: true }) });
   await settle();
@@ -243,7 +243,7 @@ it('关注元素：进详情、关掉回列表都由壳认领写地址，列表�
 });
 
 it('关注元素：深链直接进关注详情不挂列表，只交壳让出 `#stats`；关掉详情（壳认领写地址、要求重开）时才整页打开', async () => {
-  const r = await load('/follow/item/2');
+  const r = await load('/posts/2');
   const stats = statsSurface('');
   const calls = serve();
   const { actions, log } = shellActions(r);
@@ -261,7 +261,7 @@ it('关注元素：后退前进落在压着列表的详情上、列表没画着�
   serve();
   const { actions, log } = shellActions(r);
   await boot(r, actions);
-  await pop(r, '/follow/item/2', { usr: FOLLOW_ITEM_STATE, key: 'x', idx: 1 });
+  await pop(r, '/posts/2', { usr: FOLLOW_ITEM_STATE, key: 'x', idx: 1 });
   expect(log, '被详情压着挂上不打开').toEqual(['ground']);
   await act(async () => {
     r.shellNavigate('/follow');

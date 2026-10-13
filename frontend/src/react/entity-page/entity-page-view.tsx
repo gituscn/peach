@@ -177,6 +177,7 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false }, []);
   const refreshEntity = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['entity-route'] });
     await queryClient.invalidateQueries({ queryKey: entityKey(kind, name) });
     await queryClient.invalidateQueries({ queryKey: ['entity-items', kind, name] });
   }, [kind, name]);
@@ -189,6 +190,7 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
     mutationFn: ({ from, to }: { from: string; to: string }) => api('/api/entity-name',
       { method: 'POST', body: JSON.stringify({ kind, name: from, canonical: to }) }) as Promise<{
         changed?: boolean; canonical_name?: string; previous_name?: string }>,
+    onSuccess: () => refreshEntity(),
   });
   const follow = useMutation({
     mutationFn: (on: boolean) => api('/api/feeds/source',

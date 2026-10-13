@@ -176,7 +176,7 @@ function CatalogOpen() {
 }
 
 /** 目录六条路径共用的元素：首页、三个筛选态与回收站一个 key，垃圾文件另一个；页面组按背景匹配时取背景那一页。
- *  覆盖地址的参数不是数字（`/item/abc`）时什么都不挂：那不是一条详情，下面也不补画。 */
+ *  覆盖地址的参数不是数字（`/assets/abc`）时什么都不挂：那不是一条详情，下面也不补画。 */
 export function CatalogMatch() {
   const { pathname, search } = useLocation();
   useLayoutEffect(() => {

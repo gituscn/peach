@@ -1264,7 +1264,7 @@ def q_facets(
             scope += "AND a.id=? "
             scope_params.append(int(asset_id))
         elif scope_kind or scope_name:
-            if (scope_kind not in {"creator", "performer", "studio", "series", "agency"}
+            if (scope_kind not in {"creator", "performer", "studio", "series", "agency", "tag"}
                     or not scope_name):
                 raise ValueError("invalid facet scope")
             clause, values = _entity_asset_filter(c, scope_kind, scope_name)

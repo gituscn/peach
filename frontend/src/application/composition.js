@@ -1,9 +1,9 @@
 /* composition 域控制器：本域状态与动作，启动由 Application 的生命周期统一安装。 */
 import { loadingState, renderInitialSurfaceLoading } from './loading.js';
 import { clearHomeFeed, loadEntityShapes } from './feed.js';
-import { buildManageBar, closeStats, enterManagementSurface, loadSyncedSettings, mountManageHeader, mountSidebar, openManage, paintListTitle, scheduleStickySurfaces, showHomeSurfaces, showManagementBody, syncHeaderActions } from './layout.js';
+import { buildManageBar, closeStats, enterManagementSurface, loadSyncedSettings, mountManageHeader, mountSidebar, openManage, openSettings, paintListTitle, scheduleStickySurfaces, showHomeSurfaces, showManagementBody, syncHeaderActions } from './layout.js';
 import { disposeStage, mediaState, openItem, openJavMovie, openPlaylist, openQueue, openTok } from './media.js';
-import { currentBarsContext, entityState, openEntity, revealForIsland, routeEntityPage } from './entity.js';
+import { currentBarsContext, entityState, openEntity, revealForIsland, routeEntityPage, showEntityMissing } from './entity.js';
 import { applyFilterStateInPlace, buildBars, catalogState, clearCatalogGrid, gridTaken, loadCatalog, onlineDefaultLoc, paintCatalogGrid, refreshFacetCounts, syncCatalogFilterScreen, toggleTag } from './catalog.js';
 import { openTasteSignal, routeReview } from './playlists.js';
 import { navigationState, syncNavigation, syncRouteChrome } from './navigation.js';
@@ -20,7 +20,7 @@ import { $ } from '../core';
 import { dropBars } from './../catalog-bars';
 import { releaseManagedRoute } from './../history/managed';
 import { isOverlayPath } from './../history/overlay';
-import { loadRouter } from '../react/application-residents';
+import { loadRouter, settingsPanelApi } from '../react/application-residents';
 import { applicationEffects } from './effects';
 export const compositionState = { shellActions: undefined, routing: undefined };
 
@@ -32,14 +32,16 @@ loadingState.entityShapesReady=loadEntityShapes();
 renderInitialSurfaceLoading();
 mountSidebar();
 compositionState.shellActions = {
+  openSettings:section=>openSettings(section,true),
+  closeSettings:()=>settingsPanelApi()?.close(false),
   openItem:id=>void openItem(id),
   openEntity:(kind,name)=>void openEntity(kind,name),
   /* 点一个内容标签是「回目录并按它筛选」：整页换成目录仍归壳，页面只说点了哪个键。 */
   openTag:key=>{closeStats();toggleTag(key)},
   openTasteSignal,
   navigate:path=>{
-    const movie=/^\/jav\/movie\/([A-Za-z0-9_-]{2,64})$/.exec(path);
-    const item=/^\/item\/(\d+)$/.exec(path);
+    const movie=/^\/works\/([A-Za-z0-9_-]{2,64})$/.exec(path);
+    const item=/^\/assets\/(\d+)$/.exec(path);
     if(movie)void openJavMovie(movie[1]);else if(item)void openItem(+item[1]);else navigationState.navigatePath(path);
   },
   openManage,
@@ -117,6 +119,7 @@ compositionState.shellActions = {
   /* 整页画上之后：索引页重读侧栏按下态、重排吸顶；资料页重拉侧栏与顶部横条。 */
   surfaceShown:kind=>{if(kind==='index'){syncNavigation();scheduleStickySurfaces()}else buildBars()},
   entity:{
+    missing:kind=>{compositionState.shellActions.surfaceChanged('entity',location.pathname);showEntityMissing(kind)},
     /* 名单启动时就在取；深链直接落在资料页时它可能还在路上，稍等一下再画骨架，画出来就是最终的形状。等不到
        就先画，名单到了再补那两块。名单每进一页重取一遍，下一页用的就是服务端的现状。 */
     loading:(kind,name,current)=>entityState.application.loading(kind,name,current),

@@ -53,6 +53,8 @@ export type SettingsEffect =
 export type Choice = readonly [value: string, label: string, icon?: string];
 
 export interface SettingsPanelHost {
+  selectSection?(section: string): void;
+  closed?(): void;
   store: SettingsStore<PanelSettings>;
   changed(effect: SettingsEffect): void;
   sound(name: 'whoosh' | 'toggle-on'): void;
@@ -83,7 +85,7 @@ export interface SettingsPanelHost {
 export interface SettingsPanelApi {
   /** 打开面板；`section` 给分区名（「外观与导航」「浏览与播放」…）时直接落到那一页。 */
   open(section?: string): void;
-  close(): void;
+  close(notify?: boolean): void;
   isOpen(): boolean;
   /** 已经打开时把某一块滚进视野（配色弹层的「详细设置」落到光晕参数）。 */
   reveal(selector: string): void;

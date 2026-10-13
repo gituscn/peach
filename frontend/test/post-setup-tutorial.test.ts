@@ -62,7 +62,7 @@ describe('安装教程的状态', () => {
   it('未完成标记不看当前是哪一页，跨页一直成立', () => {
     setPostSetupTutorialMarker('pending');
     expect(localStorage.getItem(POST_SETUP_TUTORIAL_KEY)).toBe('pending');
-    for (const path of ['/', '/taste', '/follow-manage', '/review']) {
+    for (const path of ['/', '/taste', '/subscriptions', '/review']) {
       history.replaceState({}, '', path);
       expect(postSetupTutorialMarker()).toBe('pending');
     }

@@ -35,6 +35,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 - **Mount status**: media directories are checked periodically. A failed read is checked again before the tray and video page show the affected source and reason. Scans skip NAS recycle bins and system folders.
 - **Your data stays on your computer**: watch history, favorites and settings are stored locally. When filling in details, Peach only sends the video code or performer name to source sites. With cloud download, a magnet link goes only to the cloud drive you pick.
 - **Company profiles**: studio and agency pages can show company names, foundation dates, brand launch dates, locations and operating relationships when sourced information is available.
+- **Direct links**: assets use `/assets/:id`, works use `/works/:code` and followed posts use `/posts/:id`. Entity profiles use stable IDs; settings sections live under `/settings`. See the [page routes](docs/ROUTES.md).
 
 ## Screenshots
 

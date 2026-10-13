@@ -6,7 +6,7 @@
  * 头像（`mav`、`mavstack`）与共用拖动排序挂的 `dragging`、`drop-before`、`drop-after` 不是岛挂的，
  * 按 `[class~=…]` 认，权重与类选择器相同。
  *
- * 选择器不挂 `[data-stage]` 祖先：冷启动深链 `/follow/item/` 时壳先把同一份详情骨架画进 `#stats`，
+ * 选择器不挂 `[data-stage]` 祖先：冷启动深链 `/posts/` 时壳先把同一份详情骨架画进 `#stats`，
  * 那份骨架在舞台外面，格子与详情栏的几何照样要作用到它身上。
  *
  * 引入顺序排在播放器样式之后（`src/react/styles.css`）。本文件内部按来源的先后排：浮窗与队列、

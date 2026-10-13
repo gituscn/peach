@@ -42,7 +42,7 @@ const statsInventoryTab = (page: Page): Locator =>
   page.locator('#stats').getByRole('tab', { name: /^馆藏视频/ });
 
 const ROUTES: readonly Route[] = [
-  { path: '/jav/movie/EXM-001', body: page => [page.locator('#stage [data-jav-detail] h1'), page.getByRole('img', { name: 'EXM-001 封面', exact: true })] },
+  { path: '/works/EXM-001', body: page => [page.locator('#stage [data-jav-detail] h1'), page.getByRole('img', { name: 'EXM-001 封面', exact: true })] },
   { path: '/jav', body: page => [heading(page, '#javLibraryHeader', 'JAV'), page.getByRole('tab', { name: '馆藏', exact: true, selected: true }), page.locator('#grid [data-media-card]:visible, #grid [data-media-empty]:visible').first()] },
   { path: '/jav?tab=discover', body: page => [heading(page, '#stats', 'JAV'), page.getByRole('tab', { name: '发现', exact: true, selected: true }), page.getByText('暂无匹配口味的作品', { exact: true })] },
   { path: '/jav?tab=wants', body: page => [heading(page, '#stats', 'JAV'), page.getByRole('tab', { name: '想要', exact: true, selected: true }), page.getByText('还没有想要的作品', { exact: true })] },
@@ -65,13 +65,13 @@ const ROUTES: readonly Route[] = [
   },
   {
     // 骨架里也有「关注列表」那一排分段，可整块带 `aria-hidden`；按角色找得到页签的只有真页面。
-    path: '/follow-manage',
+    path: '/subscriptions',
     body: (page) => [heading(page, '#main', '关注管理'),
       page.locator('#stats').getByRole('tab', { name: '添加关注', exact: true })],
   },
   {
     // 订阅源页签由地址参数直达；演示库没有订阅源，等到的是那一节的页脚按钮。
-    path: '/follow-manage?tab=feeds',
+    path: '/subscriptions?tab=feeds',
     body: (page) => [page.locator('#stats').getByRole('tab', { name: 'JAV 订阅源', exact: true, selected: true }),
       page.locator('#stats').getByRole('button', { name: '立即拉取', exact: true })],
   },
@@ -121,16 +121,19 @@ const ROUTES: readonly Route[] = [
   },
   {
     // 「高清图片可能需要代理」那句遗留骨架里也有，认不出画完没有；「高清封面」那一张只有真页面有。
-    path: '/scraping',
+    path: '/sources',
     body: (page) => [heading(page, '#main', '来源和凭证'), page.locator('#stats form[aria-label="高清封面"]')],
   },
   // 名字对不上任何一家时要换成空态；骨架一直留着，读起来就是还在取。
   { path: '/agencies/不存在的事务所', body: (page) => [heading(page, '#index', '找不到这个事务所')] },
-  { path: '/configuration', body: configurationBody },
+  { path: '/settings/library', body: configurationBody },
   { path: '/diagnostics', body: page => [heading(page, '#main', '系统诊断'), page.locator('#stats section[aria-label="库健康"]')] },
-  { path: '/activity', body: (page) => [heading(page, '#main', '活动'), heading(page, '#stats', '还没有任务记录')] },
+  { path: '/tasks', body: (page) => [heading(page, '#main', '任务中心'), heading(page, '#stats', '还没有任务记录')] },
+  ...['', '/appearance', '/playback', '/jav', '/search', '/content'].map(section => ({ path: '/settings' + section,
+    body: (page: Page) => [page.getByRole('dialog', { name: /外观与导航|浏览与播放|JAV 与新作|搜索与推荐|内容显示/ })] })),
+  ...['subscriptions', 'downloads', 'network', 'maintenance'].map(section => ({ path: `/settings/${section}`, body: configurationBody })),
   {
-    path: `/item/${requiredEnv('PEACH_E2E_ITEM')}`,
+    path: `/assets/${requiredEnv('PEACH_E2E_ITEM')}`,
     body: (page) => {
       const stage = page.getByRole('dialog', { name: '作品详情' });
       return [stage, stage.locator('video')];
@@ -170,9 +173,9 @@ describe('路由冒烟', () => {
     for (const route of ROUTES) {
       // 单条超时远小于 Python 侧的整轮超时：卡住的那一条自己报名字，不拖垮整轮输出。
       it(`${route.path} @ ${viewport.name}`, { timeout: 60_000 }, async () => {
-        const opened = await visit(browser, route.path.startsWith('/jav/movie/') ? '/stats' : route.path, viewport);
+        const opened = await visit(browser, route.path.startsWith('/works/') ? '/stats' : route.path, viewport);
         try {
-          if (route.path.startsWith('/jav/movie/')) {
+          if (route.path.startsWith('/works/')) {
             await mockJavDetail(opened.page);
             await opened.page.goto(requiredEnv('PEACH_E2E_ORIGIN') + route.path);
           }
@@ -183,7 +186,7 @@ describe('路由冒烟', () => {
           const tabs = opened.page.locator('.ui-board-local-nav [role="tab"]:visible');
           const count = await tabs.count();
           // 选择器一旦对不上，循环一格都不跑也照样绿；配置页至少有媒体、网络与访问、维护三格。
-          if (route.path === '/configuration') assert.ok(count >= 3, `配置页只看到 ${count} 个分区 tab`);
+          if (route.path === '/settings/library') assert.ok(count >= 3, `配置页只看到 ${count} 个分区 tab`);
           for (let index = 0; index < count; index += 1) {
             const tab = tabs.nth(index);
             const name = (await tab.textContent())?.trim() || `第 ${index + 1} 格`;
@@ -203,7 +206,7 @@ describe('路由冒烟', () => {
      多数管理页直接 `innerHTML=`，根被挤出文档却照样活着——这一条盯的就是它有没有被卸掉。
      换页走 pushState + popstate：侧栏按钮、抽屉和浏览器后退最后走的都是这一条路。 */
   it('离开活动页之后轮询停下，回到这一页又接上', { timeout: 120_000 }, async () => {
-    const opened = await visit(browser, '/activity', DESKTOP);
+    const opened = await visit(browser, '/tasks', DESKTOP);
     try {
       const polls: string[] = [];
       opened.page.on('request', (request) => {
@@ -216,7 +219,7 @@ describe('路由冒烟', () => {
         }
         assert.fail(`${what}：只看到 ${polls.length} 次 /api/tasks，要 ${least} 次`);
       };
-      await expectBody(opened.page, '/activity',
+      await expectBody(opened.page, '/tasks',
         [heading(opened.page, '#stats', '还没有任务记录')]);
       // 先确认轮询真的在跑，否则下面「停下来了」在它从没开始时也成立。
       await waitForPolls(2, '活动页的轮询没有跑起来');
@@ -238,7 +241,7 @@ describe('路由冒烟', () => {
       assert.equal(polls.length, stopped, '离开活动页之后 /api/tasks 还在轮询');
 
       await opened.page.goBack();
-      await expectBody(opened.page, '/activity',
+      await expectBody(opened.page, '/tasks',
         [heading(opened.page, '#stats', '还没有任务记录')]);
       await waitForPolls(stopped + 2, '回到活动页之后轮询没有接上');
       await assertHolds(opened.page, opened.problems, '/activity 换页往返');
@@ -357,7 +360,7 @@ describe('路由冒烟', () => {
       const note = opened.page.locator('#feedNew .feednetwork');
       await expectBody(opened.page, '/', [note]);
       assert.match(await note.innerText(), /3 部新作的封面连不上 DMM 图片主机/);
-      assert.equal(await note.locator('a').getAttribute('href'), '/scraping');
+      assert.equal(await note.locator('a').getAttribute('href'), '/sources');
       await assertHolds(opened.page, opened.problems, '新作连不上图片主机的提示');
     } finally {
       await opened.close();

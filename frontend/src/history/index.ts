@@ -15,7 +15,11 @@
  * 一次打开只挂一次。判据用序号与代次不用地址：同一条目重放的 `popstate` 地址不变，那一页照样要重开。 */
 import { UNSAFE_createBrowserHistory, type Location, type NavigationType, type Navigator, type To } from 'react-router';
 
-import { backgroundOf, isOverlayPath, overlayState, type BackgroundLocation, type OverlayKind } from './overlay';
+import { backgroundOf, type BackgroundLocation } from './overlay';
+import { canonicalPath } from './canonical-path';
+import { settingsBackgroundOf, isPreferencePath } from './settings-route';
+export * from './settings-route';
+export { canonicalPath } from './canonical-path';
 
 /** 一次历史变化：动作、变化之后的地址、它领到的序号、到这一次为止的开次代次，和这一次是不是壳认领写的。 */
 export interface Navigation {
@@ -62,8 +66,8 @@ export const peachHistory: PeachHistory = {
   createURL: (to) => browser.createURL(to),
   encodeLocation: (to) => browser.encodeLocation(to),
   go: (delta) => browser.go(delta),
-  push: (to, state) => browser.push(to, state),
-  replace: (to, state) => browser.replace(to, state),
+  push: (to, state) => browser.push(typeof to === 'string' ? canonicalPath(new URL(to, window.location.href).href) : to, state),
+  replace: (to, state) => browser.replace(typeof to === 'string' ? canonicalPath(new URL(to, window.location.href).href) : to, state),
 };
 
 export interface ShellNavigateOptions {
@@ -78,7 +82,7 @@ export interface ShellNavigateOptions {
  * `history.pushState` 本来就是这样解析的；React Router 的 `To` 只认路径，`#x` 这种会丢掉查询串。 */
 export function shellNavigate(path: string | URL, { replace = false, state }: ShellNavigateOptions = {}): void {
   const url = new URL(path, window.location.href);
-  const to: To = `${url.pathname}${url.search}${url.hash}`;
+  const to: To = canonicalPath(`${url.pathname}${url.search}${url.hash}`);
   claiming = true;
   try {
     if (replace) browser.replace(to, state);
@@ -94,15 +98,11 @@ export const bootEntry = (): boolean => onBootEntry;
 /** 页面组按它匹配的背景：当前条目在 `usr` 里记的那一页。启动那一条不读（ADR-0031「详情条目记下压在哪一页
  *  上」）：`usr` 跨刷新仍在，下面那一页却从没画过，刷新、新标签页与深链落在详情上一律当作没有背景。 */
 export function navigationBackground(): BackgroundLocation | null {
+  if (isPreferencePath(current.location.pathname)) {
+    const settings = onBootEntry ? null : settingsBackgroundOf(current.location.state);
+    return settings ? backgroundOf(settings.state) || settings : null;
+  }
   return onBootEntry ? null : backgroundOf(current.location.state);
-}
-
-/** 原地改写当前详情条目压着的详情种类：作品详情取数后转成关注详情时地址照旧是 `/item/:id`，内容换了。
- * 背景不变，条目数不变；当前不在详情地址上、或没有记下背景时什么都不做。 */
-export function retagOverlay(overlay: OverlayKind): void {
-  const state = overlayState(overlay);
-  if (!state || !isOverlayPath(window.location.pathname)) return;
-  shellNavigate(window.location.href, { replace: true, state });
 }
 
 export {

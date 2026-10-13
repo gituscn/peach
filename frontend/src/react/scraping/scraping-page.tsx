@@ -189,7 +189,7 @@ function SourceCard({ source, toast }: { source: Source } & ScrapingProps) {
       {detailed ? <Stack divided>
         {network === 'peach'
           ? <span className="self-start">
-              <LinkButton href="/configuration#peachProxy" size="small" trailingIcon={RiArrowRightLine}>
+              <LinkButton href="/settings/library#peachProxy" size="small" trailingIcon={RiArrowRightLine}>
                 配置 Peach 代理
               </LinkButton>
             </span>

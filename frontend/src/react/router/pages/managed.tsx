@@ -17,6 +17,7 @@ import { useLocation } from 'react-router';
 import { appSettingsStore } from '@peach/appearance';
 import {
   isOverlayPath, managedEntry, openManagedRoute, peachHistory, releaseManagedRoute, shellNavigate,
+  configurationSection,
 } from '@peach/history';
 import { api, isAbort } from '@peach/legacy/core';
 import {
@@ -92,10 +93,10 @@ async function openProps(path: ManagedPath, run: Run): Promise<object | null> {
     writeShell({ cameFromSetup: false });
     return { onboarding } satisfies ManagedOpenProps['/taste'];
   }
-  if (path === '/configuration') {
+  if (path.startsWith('/settings/')) {
     if (window.location.hash === '#peachProxy') writeShell({ configurationRequestedSection: '网络与访问' });
-    const section = search().get('section') || configurationRequestedSection;
-    return (section ? { section } : {}) satisfies ManagedOpenProps['/configuration'];
+    const section = search().get('section') || configurationRequestedSection || configurationSection(path);
+    return (section ? { section } : {}) satisfies ManagedOpenProps['/settings/library'];
   }
   if (path === '/review') {
     const category = search().get('category') || '';
@@ -103,7 +104,7 @@ async function openProps(path: ManagedPath, run: Run): Promise<object | null> {
     if (!run.live) return null;
     return { category: isReviewCategory(category) ? category : '', ...writerProps(runtime, '/review') } satisfies ManagedOpenProps['/review'];
   }
-  if (path === '/follow-manage') {
+  if (path === '/subscriptions') {
     const params = search(), tab = params.get('tab') || '';
     const route = {
       tab: FOLLOW_MANAGE_TABS.includes(tab) ? tab : 'list',
@@ -114,8 +115,8 @@ async function openProps(path: ManagedPath, run: Run): Promise<object | null> {
     if (!run.live) return null;
     const preferences = appSettingsStore().value;
     return {
-      ...route, pageSize: Number(preferences.followPageSize) || 20, layout: followLayout(), ...writerProps(runtime, '/follow-manage'),
-    } satisfies ManagedOpenProps['/follow-manage'];
+      ...route, pageSize: Number(preferences.followPageSize) || 20, layout: followLayout(), ...writerProps(runtime, '/subscriptions'),
+    } satisfies ManagedOpenProps['/subscriptions'];
   }
   return {};
 }
@@ -125,17 +126,17 @@ const scrollToBlock = (id: string): void => { document.getElementById(id)?.scrol
 
 /* 统计页与口味页取完就回顶，不论这一页还在不在；其余几页只在还停在这一页时滚。 */
 const SCROLL_ALWAYS = new Set<ManagedPath>(['/stats', '/taste']);
-const SCROLL_WHEN_CURRENT = new Set<ManagedPath>(['/review', '/quality-goals', '/activity', '/follow-manage']);
+const SCROLL_WHEN_CURRENT = new Set<ManagedPath>(['/review', '/quality-goals', '/tasks', '/subscriptions']);
 
 async function openPage(path: ManagedPath, actions: ShellActions, run: Run): Promise<void> {
   if (path === '/jav' && javTab(search().get('tab')) === 'library') {
     peachHistory.replace(javLibraryPath(window.location.search)); return;
   }
-  if (path === '/follow-manage' && search().get('tab') === 'wants') {
+  if (path === '/subscriptions' && search().get('tab') === 'wants') {
     shellNavigate('/jav?tab=wants', { replace: true }); return;
   }
-  if (path === '/follow-manage' && search().get('tab') === 'source') {
-    shellNavigate('/configuration?section=' + encodeURIComponent('来源与订阅'), { replace: true }); return;
+  if (path === '/subscriptions' && search().get('tab') === 'source') {
+    shellNavigate('/settings/subscriptions', { replace: true }); return;
   }
   const stats = document.getElementById('stats');
   if (!stats) return;
@@ -158,12 +159,12 @@ async function openPage(path: ManagedPath, actions: ShellActions, run: Run): Pro
   const opened = await openManagedRoute(path, props, { container: stats, isCurrent: () => run.live });
   if (opened) run.revision = managedEntry(stats)?.revision ?? 0;
   /* 配置页选中的页签只交给画上的那一次：没画上（取数途中走开了）就留给下一次打开。 */
-  if (path === '/configuration' && opened) writeShell({ configurationRequestedSection: '' });
+  if (path.startsWith('/settings/') && opened) writeShell({ configurationRequestedSection: '' });
   if (SCROLL_ALWAYS.has(path)) scrollTop();
   if (run.live) {
     const { hash } = window.location;
     if (SCROLL_WHEN_CURRENT.has(path)) scrollTop();
-    if (path === '/configuration') {
+    if (path === '/settings/library') {
       /* 处理进度那一块搬到了数据管理页：改写地址（不加条目、不改标题），由数据管理页的元素接着打开。 */
       if (hash === '#libraryProcessing') {
         queueMicrotask(() => { if (run.live) shellNavigate('/data-cleanup#libraryProcessing', { replace: true, state: null }) });

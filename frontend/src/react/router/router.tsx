@@ -9,7 +9,7 @@
  * 默认包在 `startTransition` 里，接连两次变化会并成一次渲染，后退前进就少开一次。
  *
  * 页面宿主是两组 `<Routes>` 的兄弟，从头活到尾：画着的页面跟着登记的那几条走（`@peach/history` 的
- * `openManagedRoute`，每个容器一条），详情舞台压在上面、地址换成 `/item/:id` 时它留在原处。
+ * `openManagedRoute`，每个容器一条），详情舞台压在上面、地址换成 `/assets/:id` 时它留在原处。
  *
  * 路由分两组：页面组按条目自己记的背景（`usr.backgroundLocation`，启动那一条不读）匹配，详情压在哪一页上就还
  * 匹配那一页，背景页不重挂；覆盖组按真实地址匹配详情与队列那几条（`OVERLAY_PATHS`，`pages/overlay.tsx`）。页面组
@@ -29,10 +29,12 @@ import { Route, Router, Routes, useLocation, useNavigate, type NavigateFunction 
 
 import {
   failManagedRoute, listenManagedEntry, managedEntries, navigationBackground, OVERLAY_PATHS, peachHistory,
+  PREFERENCE_PATHS, isPreferencePath, settingsBackgroundOf, bootEntry,
   type ManagedEntry, type Navigation,
 } from '@peach/history';
 
 import { Providers } from '../providers';
+import { SettingsMatch } from './pages/settings';
 import {
   BROWSE_ROUTES, CATALOG_PATHS, CATALOG_ROUTES, ENTITY_ROUTES, IMMERSE_ROUTES, INDEX_ROUTES, MANAGED_ROUTES, REDIRECT_ROUTES,
   isManagedPath, isRoutedPath, managedPage,
@@ -148,6 +150,7 @@ function RouteGroups({ children }: { children?: ReactNode }) {
   // 同一条目重放时地址不变、`useLocation` 不触发重渲染，代次照样变：启动那一条重放之后要开始读背景。
   useOpenEpoch();
   const background = navigationBackground();
+  const settingsBackground = isPreferencePath(location.pathname) && !bootEntry() ? settingsBackgroundOf(location.state) : null;
   return (
     <>
       <Routes location={background ?? location}>
@@ -185,9 +188,10 @@ function RouteGroups({ children }: { children?: ReactNode }) {
 
         {/* ── 没有背景的覆盖地址 ── 作品与队列挂目录元素，补画网格；关注详情只让出 `#stats`。 */}
         {OVERLAY_PATHS.map((path) => (
-          <Route key={path} path={path} element={path === '/jav/movie/:code' ? null
-            : path === '/follow/item/:id' ? <FollowDetailGround /> : CATALOG_ROUTES['/'].element} />
+          <Route key={path} path={path} element={path === '/works/:code' ? null
+            : path === '/posts/:id' ? <FollowDetailGround /> : CATALOG_ROUTES['/'].element} />
         ))}
+        {PREFERENCE_PATHS.map(path => <Route key={path} path={path} element={null} />)}
 
 
 
@@ -198,8 +202,12 @@ function RouteGroups({ children }: { children?: ReactNode }) {
 
 
       {/* ── 覆盖 ── */}
-      <Routes>
+      <Routes location={settingsBackground ?? location}>
         {OVERLAY_PATHS.map((path) => <Route key={path} path={path} element={<OverlayMatch path={path} />} />)}
+        <Route path="*" element={null} />
+      </Routes>
+      <Routes>
+        {PREFERENCE_PATHS.map(path => <Route key={path} path={path} element={<SettingsMatch />} />)}
         <Route path="*" element={null} />
       </Routes>
     </>

@@ -38,7 +38,7 @@ describe('设计决定：配置控件', () => {
     });
 
     it(`媒体状态居中，辅助动作与保存有层级，安装教程是单行（${viewport.name}）`, { timeout: 60_000 }, async () => {
-      const opened = await visit(browser, '/configuration', viewport);
+      const opened = await visit(browser, '/settings/library', viewport);
       try {
         const page = opened.page;
         await page.route('**/api/configuration', async (route) => {
@@ -49,7 +49,7 @@ describe('设计决定：配置控件', () => {
           })) } });
         });
         await page.reload({ waitUntil: 'load' });
-        await expectBody(page, '/configuration', configurationBody(page));
+        await expectBody(page, '/settings/library', configurationBody(page));
         await settle(page);
         await page.locator('[data-mount]').first().waitFor();
         const centers = await page.locator('[data-folder-row]').evaluateAll((rows) => rows.map((row) => {
@@ -78,7 +78,7 @@ describe('设计决定：配置控件', () => {
     });
   }
 
-  for (const viewport of VIEWPORTS) for (const path of ['/configuration', '/review']) {
+  for (const viewport of VIEWPORTS) for (const path of ['/settings/library', '/review']) {
     it(`分类目录在桌面左侧、手机上方，选中态区别于悬停（${path} · ${viewport.name}）`, { timeout: 60_000 }, async () => {
       const opened = await visit(browser, path, viewport);
       try {

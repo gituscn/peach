@@ -11,6 +11,7 @@ import { receiptsState } from './receipts.js';
 import { applicationEffects } from './effects';
 import { releaseHoverPreviews } from './../card-art/hover';
 import { managedEntry } from './../history/managed';
+import { settingsPath } from '../history';
 export const playlistsState = { playlistWrite: undefined };
 
 export function openTasteSignal(kind,name){
@@ -96,7 +97,7 @@ export function routeReview(params){
 
 export function openConfigurationSection(section){
   writeShell({configurationRequestedSection:section});
-  navigationState.navigatePath('/configuration');
+  navigationState.navigatePath(settingsPath(section));
 }
 
 export function installPlaylists14() {

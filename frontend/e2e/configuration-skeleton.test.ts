@@ -32,7 +32,7 @@ async function openEditableConfiguration(browser: Browser, viewport: (typeof VIE
       if (route.request().method() !== 'GET') return route.continue();
       await route.fulfill({ json: { ...configuration, editable: true } });
     });
-    await opened.page.goto(new URL('/configuration', opened.page.url()).href, { waitUntil: 'load' });
+    await opened.page.goto(new URL('/settings/library', opened.page.url()).href, { waitUntil: 'load' });
     return { ...opened, configuration };
   } catch (error) {
     await opened.close();
@@ -49,7 +49,7 @@ describe('配置页等待态', () => {
       const opened = await openEditableConfiguration(browser, viewport);
       try {
         const { page } = opened;
-        await expectBody(page, '/configuration', configurationBody(page));
+        await expectBody(page, '/settings/library', configurationBody(page));
         await settle(page);
         const nav = page.getByRole('tablist', { name: '配置分区' });
         assert.equal(await nav.getAttribute('aria-orientation'), viewport.mobile ? 'horizontal' : 'vertical');
@@ -84,7 +84,7 @@ describe('配置页等待态', () => {
       const opened = await openEditableConfiguration(browser, viewport);
       let release = () => {};
       try {
-        await expectBody(opened.page, '/configuration', configurationBody(opened.page));
+        await expectBody(opened.page, '/settings/library', configurationBody(opened.page));
         await settle(opened.page);
         const pending = new Promise<void>(resolve => { release = resolve });
         await opened.page.route('**/api/configuration', async route => {
@@ -99,7 +99,7 @@ describe('配置页等待态', () => {
         const skeleton = await measure(opened.page);
         const waitingLayout = await layout(opened.page);
         release();
-        await expectBody(opened.page, '/configuration', configurationBody(opened.page));
+        await expectBody(opened.page, '/settings/library', configurationBody(opened.page));
         await settle(opened.page);
         const live = await measure(opened.page);
         assert.equal(skeleton.selected, live.selected);
@@ -117,7 +117,7 @@ describe('配置页等待态', () => {
       }
     });
   }
-  for (const path of ['/configuration', '/review']) {
+  for (const path of ['/settings/library', '/review']) {
     it(`${path} 的明暗主题使用透明容器与灰色 Pills 选中底色`, { timeout: 60_000 }, async () => {
       const opened = await visit(browser, path, VIEWPORTS[0]);
       try {

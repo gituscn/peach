@@ -4,12 +4,11 @@
  * 后退前进落到详情条目上时壳先清、再 `adoptOverlayState(usr)`，打开详情那一处 `takeOverlayReturn()` 取来处；
  * 启动那一次不调 `adoptOverlayState`，覆盖元素什么时候接背景见 `test/react/pages/overlay.test.tsx`。 */
 import { beforeEach, expect, it } from 'vitest';
-import { retagOverlay as sharedRetagOverlay } from '@peach/history';
 
 import * as overlay from '../../src/history/overlay';
 import {
   adoptOverlayState, clearOverlayBackground, holdOverlayBackground, isOverlayPath, overlayState, peachHistory,
-  retagOverlay, shellNavigate, takeOverlayReturn,
+  shellNavigate, takeOverlayReturn,
 } from '../../src/history';
 
 beforeEach(() => {
@@ -43,13 +42,12 @@ function revisit() {
 it('共享 history 入口与覆盖背景模块使用同一份绑定', () => {
   expect(overlay.holdOverlayBackground).toBe(holdOverlayBackground);
   expect(overlay.overlayState).toBe(overlayState);
-  expect(sharedRetagOverlay).toBe(retagOverlay);
   expect(overlay.adoptOverlayState).toBe(adoptOverlayState);
   expect(overlay.takeOverlayReturn).toBe(takeOverlayReturn);
 });
 
 it('覆盖层地址是作品详情、四种队列与关注详情，页面与沉浸不算', () => {
-  for (const path of ['/item/7', '/mix/4/5', '/parts/1/2', '/editions/3/3', '/playlists/2/9', '/follow/item/3']) {
+  for (const path of ['/assets/7', '/assets/5?mix=4', '/assets/2?parts=1', '/assets/3?editions=3', '/assets/9?playlist=2', '/posts/3']) {
     expect([path, isOverlayPath(path)]).toEqual([path, true]);
   }
   for (const path of ['/', '/playlists', '/follow', '/performers/x', '/immerse', '/trash', '/stats']) {
@@ -60,7 +58,7 @@ it('覆盖层地址是作品详情、四种队列与关注详情，页面与沉�
 it('从页面点进详情：push 带上打开那一刻的地址与查询串', () => {
   shellNavigate('/performers/x?sort=new');
   const before = length();
-  open('/item/7');
+  open('/assets/7');
   expect(usr()).toEqual({ backgroundLocation: { pathname: '/performers/x', search: '?sort=new' }, overlay: 'item' });
   expect(length()).toBe(before + 1);
 });
@@ -69,72 +67,68 @@ it('队列地址取完数才推：背景是决定那一刻的地址，不是推�
   shellNavigate('/?tag=a');
   holdOverlayBackground();
   shellNavigate('/stats', { replace: true });
-  shellNavigate('/mix/4/5', { state: overlayState('item') });
+  shellNavigate('/assets/5?mix=4', { state: overlayState('item') });
   expect(usr()).toEqual({ backgroundLocation: { pathname: '/', search: '?tag=a' }, overlay: 'item' });
 });
 
 it('同队列换条沿用上一条的背景，不把上一条详情当背景', () => {
   shellNavigate('/playlists');
-  open('/playlists/2/9');
-  open('/playlists/2/10');
+  open('/assets/9?playlist=2');
+  open('/assets/10?playlist=2');
   expect(usr()).toEqual({ backgroundLocation: { pathname: '/playlists', search: '' }, overlay: 'item' });
 });
 
 it('关注详情组内换条沿用列表那一页（带筛选）', () => {
   shellNavigate('/follow?view=saved');
-  open('/follow/item/3', 'follow');
-  open('/follow/item/4', 'follow');
+  open('/posts/3', 'follow');
+  open('/posts/4', 'follow');
   expect(usr()).toEqual({ backgroundLocation: { pathname: '/follow', search: '?view=saved' }, overlay: 'follow' });
 });
 
 it('关掉详情的 push 与别的地址都不带状态；清掉之后再进详情重新记', () => {
   shellNavigate('/trash');
-  open('/item/7');
+  open('/assets/7');
   clearOverlayBackground();
   shellNavigate('/trash');
   expect(usr()).toBeNull();
   shellNavigate('/immerse');
   expect(usr()).toBeNull();
-  open('/item/8');
+  open('/assets/8');
   expect(usr()).toEqual({ backgroundLocation: { pathname: '/immerse', search: '' }, overlay: 'item' });
 });
 
 it('页面上从不接着旧背景：没清也按这一页重新记', () => {
   shellNavigate('/');
-  open('/item/7');
+  open('/assets/7');
   shellNavigate('/stats');
-  open('/item/8');
+  open('/assets/8');
   expect(usr()).toEqual({ backgroundLocation: { pathname: '/stats', search: '' }, overlay: 'item' });
 });
 
 it('落在详情地址上又没有背景（深链、后退进来）：再开一条不带状态，不把详情地址当背景', () => {
-  shellNavigate('/item/7');
-  open('/item/8');
+  shellNavigate('/assets/7');
+  open('/assets/8');
   expect(usr()).toBeNull();
 });
 
-it('作品详情转成关注详情：原地改记种类，背景、地址与条目数不变', () => {
+it('资产跳到关注条目时替换当前条目并保留背景', () => {
   shellNavigate('/performers/x');
-  open('/item/7');
+  open('/assets/7');
   const before = length();
-  retagOverlay('follow');
-  expect([location.pathname, length()]).toEqual(['/item/7', before]);
+  shellNavigate('/posts/9', { replace: true, state: overlayState('follow') });
+  expect([location.pathname, length()]).toEqual(['/posts/9', before]);
   expect(usr()).toEqual({ backgroundLocation: { pathname: '/performers/x', search: '' }, overlay: 'follow' });
-  clearOverlayBackground();
-  shellNavigate('/item/9', { replace: true, state: null });
-  retagOverlay('follow');
-  expect(usr()).toBeNull();
 });
 
 it('后退回到从资料页打开的那一条：来处是条目记的资料页，不是之后点开别的详情时的那一页', async () => {
   shellNavigate('/performers/x?sort=new');
-  open('/item/7');
+  open('/assets/7');
   clearOverlayBackground();
   shellNavigate('/performers/x?sort=new');
   shellNavigate('/');
-  open('/item/8');
+  open('/assets/8');
   await back(3);
-  expect(location.pathname).toBe('/item/7');
+  expect(location.pathname).toBe('/assets/7');
   revisit();
   expect(takeOverlayReturn()).toBe('/performers/x?sort=new');
 });
@@ -157,24 +151,24 @@ it('清掉背景时连同没取走的来处一起清', () => {
 
 it('关注详情：后退回到详情，来处保住列表的筛选', async () => {
   shellNavigate('/follow?view=saved');
-  open('/follow/item/3', 'follow');
+  open('/posts/3', 'follow');
   clearOverlayBackground();
   shellNavigate('/follow?view=saved');
   await back();
-  expect(location.pathname).toBe('/follow/item/3');
+  expect(location.pathname).toBe('/posts/3');
   revisit();
   expect(takeOverlayReturn()).toBe('/follow?view=saved');
 });
 
 it('后退进详情之后再换条：新条目接着带同一个背景', async () => {
   shellNavigate('/playlists');
-  open('/playlists/2/9');
-  open('/playlists/2/10');
+  open('/assets/9?playlist=2');
+  open('/assets/10?playlist=2');
   shellNavigate('/stats');
   await back();
-  expect(location.pathname).toBe('/playlists/2/10');
+  expect(location.pathname + location.search).toBe('/assets/10?playlist=2');
   revisit();
   takeOverlayReturn();
-  open('/playlists/2/11');
+  open('/assets/11?playlist=2');
   expect(usr()).toEqual({ backgroundLocation: { pathname: '/playlists', search: '' }, overlay: 'item' });
 });

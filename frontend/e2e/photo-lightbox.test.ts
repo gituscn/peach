@@ -72,7 +72,7 @@ async function openFollowItem(browser: Browser): Promise<Visit> {
       is_release: false, newest_at: item.published_at, stack: null }],
     sources: [], counts: { new: 1, seen: 0, saved: 0, ignored: 0 }, facets: { authors: [], providers: ['fanbox'] },
     has_more: false } }));
-  await page.goto(new URL('/follow/item/501', page.url()).href, { waitUntil: 'load' });
+  await page.goto(new URL('/posts/501', page.url()).href, { waitUntil: 'load' });
   await page.locator('[data-follow-detail-poster]').waitFor({ timeout: 15_000 });
   await settle(page);
   return opened;

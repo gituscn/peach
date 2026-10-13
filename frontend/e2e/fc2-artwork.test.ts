@@ -12,7 +12,7 @@ describe('FC2 合集与封面取景', () => {
 
   for (const viewport of VIEWPORTS) {
     it(`${viewport.name}: 本篇与特典的标题和队列标签一致`, async () => {
-      const opened = await openItemPage(browser, `/parts/${ITEM.part}/22`, viewport);
+      const opened = await openItemPage(browser, `/assets/22?parts=${ITEM.part}`, viewport);
       try {
         const parts = await opened.page.evaluate(async (id) =>
           (await fetch(`/api/parts?id=${id}`)).json(), ITEM.part);

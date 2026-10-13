@@ -8,7 +8,7 @@ vi.mock('@peach/legacy/core', async importOriginal => ({
 }));
 
 describe('Board 页面骨架', () => {
-  it.each(['/stats', '/taste', '/follow-manage', '/configuration', '/activity', '/duplicates', '/quality-goals', '/playlists'])('为 %s 提供单一等待语义', path => {
+  it.each(['/stats', '/taste', '/subscriptions', '/settings/library', '/tasks', '/duplicates', '/quality-goals', '/playlists'])('为 %s 提供单一等待语义', path => {
     const root = document.createElement('div');
     root.innerHTML = boardPageSkeleton(path);
     expect(root.querySelectorAll('[role="status"]')).toHaveLength(1);
@@ -22,15 +22,15 @@ describe('Board 页面骨架', () => {
     const root = document.createElement('div');
     root.innerHTML = boardPageSkeleton('/stats');
     expect(root.querySelectorAll('[data-stats-metrics] > div')).toHaveLength(4);
-    expect(boardPageSkeleton('/item/5')).toBe('');
+    expect(boardPageSkeleton('/assets/5')).toBe('');
   });
   it.each([
     ['/stats', '[data-stats-chart]', 2],
-    ['/activity', '.activitysection', 3],
+    ['/tasks', '.activitysection', 3],
     ['/duplicates', '[data-duplicate-group] .duplicate-row', 4],
     ['/quality-goals', '.peach-react .card-grid-cover > li', 6],
-    ['/follow-manage', '.peach-react .ui-follow-skeleton-surface .follow-skeleton-author', 3],
-    ['/configuration', '.peach-react .ui-configpage section[aria-label="媒体文件夹"]', 1],
+    ['/subscriptions', '.peach-react .ui-follow-skeleton-surface .follow-skeleton-author', 3],
+    ['/settings/library', '.peach-react .ui-configpage section[aria-label="媒体文件夹"]', 1],
     ['/playlists', '.ui-playlistcards > .playlistcard', 6],
   ] as const)('%s 复用最终内容容器', (path, selector, count) => {
     const root = document.createElement('div');
@@ -47,7 +47,7 @@ describe('Board 页面骨架', () => {
   });
   const follow = (options: Parameters<typeof boardPageSkeleton>[1] = {}) => {
     const root = document.createElement('div');
-    root.innerHTML = boardPageSkeleton('/follow-manage', options);
+    root.innerHTML = boardPageSkeleton('/subscriptions', options);
     return root;
   };
   it('关注骨架的分类使用 Pills，选中关注列表', () => {

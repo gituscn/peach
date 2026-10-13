@@ -141,7 +141,7 @@ export const watchNote = (row: RecentPlay): string => {
 
 /** 点进去的去处。在线追更的条目不在馆藏里，走它自己那条详情路由。 */
 export const playedItemUrl = (row: RecentPlay): string =>
-  `${row.kind === 'online' ? '/follow/item/' : '/item/'}${row.id}`;
+  `${row.kind === 'online' ? '/posts/' : '/assets/'}${row.id}`;
 
 /** 径向图里的一段。`bytes` 是这一段占的体积，图例格子里读成它的大小。 */
 export interface RadialSlice { name: string; value: number; bytes?: number; mark?: string }

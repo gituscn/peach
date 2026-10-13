@@ -127,19 +127,19 @@ tutorialState.postSetupTutorialTasks = async()=>{
     {key:'scraping',label:'设置采集来源与凭证',description:savedScrapingCredentials.length
       ?`已为 ${savedScrapingCredentials.length.toLocaleString()} 个采集来源保存凭证。`
       :'检查来源连接方式，并为需要登录的来源保存凭证。',
-      href:'/scraping',done:savedScrapingCredentials.length>0,icon:'settings'},
+      href:'/sources',done:savedScrapingCredentials.length>0,icon:'settings'},
     {key:'history',label:'导入浏览器历史记录',description:Number(taste.history_sources||0)>0
       ?`已导入 ${Number(taste.history_sources).toLocaleString()} 份浏览器历史。`
       :'从这台电脑的浏览器导入口味分析记录。',
       href:'/taste',setupEntry:true,done:Number(taste.history_sources||0)>0,icon:'history'},
     {key:'follow',label:'添加一个关注来源',description:followReady
       ?`已启用 ${sources.length.toLocaleString()} 个来源。`:'添加想持续追踪的创作者或来源。',
-      href:'/follow-manage?tab=add',done:followReady,icon:'rss'},
+      href:'/subscriptions?tab=add',done:followReady,icon:'rss'},
     {key:'credentials',label:'补齐关注来源凭证',description:!followReady
       ?'添加关注后，会按来源检查必要凭证。':required.length
         ?(credentialsReady?'已配置当前来源需要的凭证。':`${required.length.toLocaleString()} 个来源需要凭证。`)
         :'当前关注来源不需要凭证。',
-      href:'/follow-manage?tab=source',done:credentialsReady,icon:'key-round'},
+      href:'/subscriptions?tab=source',done:credentialsReady,icon:'key-round'},
     {key:'review',label:'处理首次复核',description:!libraryReady
       ?'扫描完成后，这里会列出需要复核的资料。':pendingReview
         ?`还有 ${pendingReview.toLocaleString()} 条需要复核。`:'首次复核队列已清空。',

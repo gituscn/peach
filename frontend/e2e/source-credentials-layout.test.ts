@@ -9,7 +9,7 @@ describe('来源链接与凭据布局', () => {
   after(async () => { await browser?.close(); });
   for (const viewport of VIEWPORTS) {
     it(`自定义来源可试查、保存且表单无横向溢出（${viewport.name}）`, { timeout: 60_000 }, async () => {
-      const opened = await visit(browser, '/scraping', viewport);
+      const opened = await visit(browser, '/sources', viewport);
       const page = opened.page;
       const items: unknown[] = [];
       await page.route('**/api/custom-metadata', async route => {
@@ -46,7 +46,7 @@ describe('来源链接与凭据布局', () => {
       } finally { await opened.close(); }
     });
     it(`GitHub 标识、网址和外链箭头居中对齐（${viewport.name}）`, async () => {
-      const opened = await visit(browser, '/scraping', viewport);
+      const opened = await visit(browser, '/sources', viewport);
       try {
         await opened.page.route('**/api/scraping/amane-bridge', route => route.fulfill({ json: {
           installed: true, installed_version: '0.17.0', version: '0.17.0',
@@ -69,7 +69,7 @@ describe('来源链接与凭据布局', () => {
       } finally { await opened.close(); }
     });
     it(`凭据的每个输入字段占满正文宽度（${viewport.name}）`, async () => {
-      const opened = await visit(browser, '/configuration?section='+encodeURIComponent('来源与订阅'), viewport);
+      const opened = await visit(browser, '/settings/library?section='+encodeURIComponent('来源与订阅'), viewport);
       try {
         await opened.page.route('**/api/follow/credentials', route => route.fulfill({ json: {
           root: '', providers: [{ provider: 'simpcity', provider_label: 'SimpCity', followable: true,

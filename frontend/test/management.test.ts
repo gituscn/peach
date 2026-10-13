@@ -28,7 +28,7 @@ describe('数据管理首屏', () => {
     const scan = grid.querySelector('.cleanupscraping')!;
     expect(scan.querySelector('p')?.textContent).toBe(SCAN_CARD_TEXT);
     expect(scan.querySelector('.skeleton')).toBeNull();
-    expect(scan.querySelector('footer > a')?.getAttribute('href')).toBe('/scraping');
+    expect(scan.querySelector('footer > a')?.getAttribute('href')).toBe('/sources');
     expect(grid.querySelector('.cleanupmediarepair p')?.textContent).toBe(REPAIR_CARD_TEXT);
   });
   it('等数据才能执行的键保持最终变体与尺寸，用原生 disabled 挡住并标成骨架操作键', () => {

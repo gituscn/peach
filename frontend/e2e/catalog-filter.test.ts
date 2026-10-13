@@ -342,7 +342,7 @@ describe('首页筛选条', () => {
       }, FILTER);
       const [facets, tops] = [counts.facets.length, counts.tops.length];
       await page.locator(`#grid [data-media-card][data-id="${ITEM.plain}"] [data-media-title]`).first().click();
-      await pathIs(page, `/item/${ITEM.plain}`);
+      await pathIs(page, `/assets/${ITEM.plain}`);
       await page.locator(DETAIL_READY).waitFor();
       await page.locator('#closeStage').click();
       await pathIs(page, '/');

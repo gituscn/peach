@@ -130,7 +130,7 @@ async function until(ok: () => boolean, what: string): Promise<void> {
 /* 这里直接调打开管线：用例把地址落在首页或不交壳的动作，管理区的页面元素不打开（元素怎么打开见
    `pages/managed.test.tsx`）。 */
 const open = (r: Loaded, stats: Element, isCurrent = () => true) =>
-  r.openManagedRoute('/activity', {}, { container: stats, isCurrent });
+  r.openManagedRoute('/tasks', {}, { container: stats, isCurrent });
 /** 页面画出来的那一块（宿主里的第一个元素）：重挂之后就换成另一个。 */
 const painted = (stats: Element) => stats.querySelector(':scope > .peach-react > *');
 
@@ -176,7 +176,7 @@ it('冷启动深链，壳先打开、Router 后挂上：包到了才取数，骨
 });
 
 it('应用内切页：在途那一次被收起时不动容器，壳留着的同一张骨架等到下一次打开才换掉', async () => {
-  const r = await load('/activity');
+  const r = await load('/tasks');
   const { stats, skeleton } = surface();
   await mount(r);
   r.connectManagedRoutes(Promise.resolve(r.prefetchManagedRoute));
@@ -202,7 +202,7 @@ it('应用内切页：在途那一次被收起时不动容器，壳留着的同�
 });
 
 it('取数期间壳换了页就不画，骨架留给下一页', async () => {
-  const r = await load('/activity');
+  const r = await load('/tasks');
   const { stats, skeleton } = surface();
   await mount(r);
   r.connectManagedRoutes(Promise.resolve(r.prefetchManagedRoute));
@@ -219,7 +219,7 @@ it('取数期间壳换了页就不画，骨架留给下一页', async () => {
 });
 
 it('同一路径再打开一次就重取：每次打开领一个新代次，页面重挂', async () => {
-  const r = await load('/activity');
+  const r = await load('/tasks');
   const { stats } = surface();
   await mount(r);
   r.connectManagedRoutes(Promise.resolve(r.prefetchManagedRoute));
@@ -246,8 +246,8 @@ it('详情舞台压在上面时页面留着，地址回来也不重挂；壳下�
   await act(async () => { await open(r, stats) });
   const page = painted(stats);
   expect(page).not.toBeNull();
-  // 详情由壳推 `/item/:id`，不认领表面。
-  await act(async () => { r.shellNavigate('/item/7') });
+  // 详情由壳推 `/assets/:id`，不认领表面。
+  await act(async () => { r.shellNavigate('/assets/7') });
   expect(painted(stats), '舞台下面那一页不许跟着地址卸掉').toBe(page);
   // 关掉详情：壳把地址写回列表那一页。
   await act(async () => { r.shellNavigate('/') });
@@ -257,7 +257,7 @@ it('详情舞台压在上面时页面留着，地址回来也不重挂；壳下�
 });
 
 it('壳直接改写了容器再收起也不报错：页面画在自己的宿主里', async () => {
-  const r = await load('/activity');
+  const r = await load('/tasks');
   const { stats } = surface();
   await mount(r);
   r.connectManagedRoutes(Promise.resolve(r.prefetchManagedRoute));
@@ -272,7 +272,7 @@ it('壳直接改写了容器再收起也不报错：页面画在自己的宿主�
 });
 
 it('路由树没装载就打开：容器先归路由树、不取数，装载之后才取首屏、才画', async () => {
-  const r = await load('/activity');
+  const r = await load('/tasks');
   const { stats, skeleton } = surface();
   const fetch = tasksFetch(tasks(), { deferred: false });
   fetch.install();
@@ -290,7 +290,7 @@ it('路由树没装载就打开：容器先归路由树、不取数，装载之�
 });
 
 it('包取不回来时，等着的那一页跟着失败', async () => {
-  const r = await load('/activity');
+  const r = await load('/tasks');
   const { stats, skeleton } = surface();
   r.connectManagedRoutes(Promise.reject(new Error('取不回 peach-react.js')));
   await expect(open(r, stats)).rejects.toThrow('取不回 peach-react.js');
@@ -306,7 +306,7 @@ const configuration = {
 /* 壳打开返回的那一刻就按 `#peachProxy` 滚过去，所以页签条与交进来的那一组的选中态要在同一次提交里画好。
    分区自己怎么排、页签怎么走在 `configuration.test.tsx`。 */
 it('配置页打开返回的那一刻，页签条已经在容器里，选中的是交进来的那一组', async () => {
-  const r = await load('/configuration');
+  const r = await load('/settings/library');
   const { stats } = surface();
   await mount(r);
   r.connectManagedRoutes(Promise.resolve(r.prefetchManagedRoute));
@@ -319,7 +319,7 @@ it('配置页打开返回的那一刻，页签条已经在容器里，选中的�
   } })));
   await act(async () => {
     const open = { section: '网络与访问' };
-    expect(await r.openManagedRoute('/configuration', open, { container: stats, isCurrent: () => true })).toBe(true);
+    expect(await r.openManagedRoute('/settings/library', open, { container: stats, isCurrent: () => true })).toBe(true);
     const tabs = [...stats.querySelectorAll('.ui-configpage > .ui-board-local-nav[role="tablist"] > [role="tab"]')];
     expect(tabs.map((tab) => tab.textContent)).toEqual(['媒体库与入库', '来源与订阅', '网络与访问', '应用与维护']);
     expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'false', 'true', 'false']);
@@ -333,22 +333,22 @@ it('这几页之间的跳转交给 React Router，别的路径交壳', async () 
   const r = await load('/');
   const actions = shellActions();
   const navigate = vi.fn();
-  r.managedGo('/activity', actions, navigate);
-  r.managedGo('/scraping?from=cleanup#top', actions, navigate);
+  r.managedGo('/tasks', actions, navigate);
+  r.managedGo('/sources?from=cleanup#top', actions, navigate);
   r.managedGo('/', actions, navigate);
   r.managedGo('/trash', actions, navigate);
-  expect(navigate.mock.calls).toEqual([['/activity'], ['/scraping?from=cleanup#top']]);
+  expect(navigate.mock.calls).toEqual([['/tasks'], ['/sources?from=cleanup#top']]);
   expect(vi.mocked(actions.navigate).mock.calls).toEqual([['/'], ['/trash']]);
 });
 
 it('页面里的跳转：只领一个开次代次、历史只多一条', async () => {
-  const r = await load('/scraping');
+  const r = await load('/sources');
   await mount(r);
   const epoch = r.peachHistory.navigation.openEpoch;
   const before = window.history.length;
   const navigate = ((to: string) => { r.peachHistory.push(to) }) as unknown as NavigateFunction;
-  await act(async () => { r.managedGo('/activity', shellActions(), navigate) });
-  expect([r.peachHistory.navigation.openEpoch - epoch, location.pathname, window.history.length - before]).toEqual([1, '/activity', 1]);
+  await act(async () => { r.managedGo('/tasks', shellActions(), navigate) });
+  expect([r.peachHistory.navigation.openEpoch - epoch, location.pathname, window.history.length - before]).toEqual([1, '/tasks', 1]);
 });
 
 /** 一页的元素与它拿到的 props，不画。 */
@@ -366,8 +366,8 @@ it('诊断页先选配置分栏再导航，作品与任务交给共享入口', a
   const props = element<DiagnosticsProps>('/diagnostics', r, {}, actions, go);
   props.configure('网络与访问');
   props.openItem(12);
-  props.navigate('/activity');
-  expect(order).toEqual(['网络与访问', '/configuration', '/activity']);
+  props.navigate('/tasks');
+  expect(order).toEqual(['网络与访问', '/settings/network', '/tasks']);
   expect(actions.openItem).toHaveBeenCalledWith(12);
 });
 
@@ -381,7 +381,7 @@ it('统计页：点标签交壳回目录；「添加媒体文件夹」先交页�
   props.onTag('痴女');
   props.openMediaSettings();
   expect(vi.mocked(actions.openTag).mock.calls).toEqual([['痴女']]);
-  expect(order).toEqual(['section 媒体库与入库', 'go /configuration']);
+  expect(order).toEqual(['section 媒体库与入库', 'go /settings/library']);
   expect([props.configurable, props.tagLabel('JK制服')]).toEqual([false, 'JK制服']);
 });
 
@@ -389,9 +389,9 @@ it('口味页：总结里的下一步按路径走 go', async () => {
   const r = await load();
   const go = vi.fn();
   const props = element<TasteProps>('/taste', r, { onboarding: true }, shellActions(), go);
-  props.navigate('/follow-manage');
+  props.navigate('/subscriptions');
   props.navigate('/');
-  expect(go.mock.calls).toEqual([['/follow-manage'], ['/']]);
+  expect(go.mock.calls).toEqual([['/subscriptions'], ['/']]);
   expect(props.onboarding).toBe(true);
 });
 
@@ -416,7 +416,7 @@ it('复核页与关注管理页把地址写回壳，不重开', async () => {
   const review = element<ReviewProps>('/review', r,
     { category: 'name', readOnly: true, readOnlyMessage: '只读', writerUrl: '' }, actions, go);
   expect([review.route, review.category, review.readOnly]).toEqual([actions.routeReview, 'name', true]);
-  const follow = element<FollowManageProps>('/follow-manage', r, {
+  const follow = element<FollowManageProps>('/subscriptions', r, {
     tab: 'list', page: 2, sort: '', dir: '', pageSize: 20, layout: 'default', readOnly: false, readOnlyMessage: '', writerUrl: '',
   }, actions, go);
   expect([follow.route, follow.savePreference, follow.openFollow, follow.page])
@@ -438,7 +438,7 @@ it('回执、打开作品与资料页都交回壳：都走过去时回执', asyn
   duplicates.toast('已删除', { undo });
   duplicates.toast('已保留');
   duplicates.failure('删除', 'boom');
-  const configuration = element<ConfigurationProps>('/configuration', r, { section: '媒体库与入库' }, actions, vi.fn());
+  const configuration = element<ConfigurationProps>('/settings/library', r, { section: '媒体库与入库' }, actions, vi.fn());
   configuration.receipt('已保存配置');
   expect([configuration.reopenTutorial, configuration.section]).toEqual([actions.reopenTutorial, '媒体库与入库']);
   const review = element<ReviewProps>('/review', r,
@@ -446,7 +446,7 @@ it('回执、打开作品与资料页都交回壳：都走过去时回执', asyn
   review.openEntity('performer', '某人');
   review.toast('已判定');
   expect(review.revealSource).toBe(actions.revealSource);
-  element<FollowManageProps>('/follow-manage', r, {
+  element<FollowManageProps>('/subscriptions', r, {
     tab: 'list', page: 1, sort: '', dir: '', pageSize: 20, layout: 'default', readOnly: false, readOnlyMessage: '', writerUrl: '',
   }, actions, vi.fn()).toast('已添加 1 个关注来源');
   const taste = element<TasteProps>('/taste', r, { onboarding: false }, actions, vi.fn());
@@ -465,7 +465,7 @@ it('回执、打开作品与资料页都交回壳：都走过去时回执', asyn
 it('采集页的提示走全站 Toast 原样', async () => {
   const r = await load();
   const actions = shellActions();
-  element<ScrapingProps>('/scraping', r, {}, actions, vi.fn()).toast('已保存');
+  element<ScrapingProps>('/sources', r, {}, actions, vi.fn()).toast('已保存');
   expect(vi.mocked(actions.toast).mock.calls).toEqual([['已保存']]);
   expect(actions.receipt).not.toHaveBeenCalled();
 });
@@ -569,7 +569,7 @@ it('就地更新在容器里没有画着的页面时是空操作：还在取首�
 /* 资料页画进 `#index` 时管理区那一页只是被壳藏起来：两个容器各记各的，收一个不动另一个；
    一次点名两个容器就一起收。 */
 it('`#stats` 与 `#index` 各画一页，互不相收；点名两个容器时一起收', async () => {
-  const r = await load('/activity');
+  const r = await load('/tasks');
   const { stats } = surface();
   const { index } = indexSurface();
   await mount(r);
@@ -582,7 +582,7 @@ it('`#stats` 与 `#index` 各画一页，互不相收；点名两个容器时一
   const page = painted(stats);
   await act(async () => { await r.openManagedRoute('/tags', tagsOpen(), { container: index, isCurrent: () => true }) });
   expect(painted(stats), '在 `#index` 里打开一页不收 `#stats` 那一页').toBe(page);
-  expect(r.managedEntries().map((entry) => entry.path)).toEqual(['/activity', '/tags']);
+  expect(r.managedEntries().map((entry) => entry.path)).toEqual(['/tasks', '/tags']);
   act(() => { r.releaseManagedRoute(index) });
   expect(index.querySelector('.peach-react')).toBeNull();
   expect(painted(stats), '收 `#index` 不动 `#stats`').toBe(page);

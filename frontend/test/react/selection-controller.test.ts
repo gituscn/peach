@@ -61,7 +61,7 @@ describe('选择范围与批量计数', () => {
     const state = { ...emptyState(), selectMode: true, selectSurface: 'catalog', lastSelectedId: 1 };
     expect(setSelectionMode(picked, state, 'catalog', false).lastSelectedId).toBe(1);
     expect(picked.selected.size).toBe(1);
-    expect(syncSelectionSurface(picked, state, '/configuration', false)).toEqual(emptyState());
+    expect(syncSelectionSurface(picked, state, '/settings/library', false)).toEqual(emptyState());
     expect(picked.selected.size).toBe(0);
   });
 

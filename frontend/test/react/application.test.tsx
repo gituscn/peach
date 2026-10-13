@@ -64,7 +64,7 @@ it('同宿主重复挂载沿用实际 Application，一次后退只打开一次�
   roots.add(first); expect(second).toBe(first); expect(boot.initialize).toHaveBeenCalledTimes(1);
   r.shell.writeShell({ pageOpens: 1 });
   await act(async () => {
-    window.history.replaceState({ usr: { backgroundLocation: { pathname: '/nowhere', search: '' }, overlay: 'item' }, key: 'x', idx: 1 }, '', '/item/7');
+    window.history.replaceState({ usr: { backgroundLocation: { pathname: '/nowhere', search: '' }, overlay: 'item' }, key: 'x', idx: 1 }, '', '/assets/7');
     window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
   });
   await act(async () => { await new Promise(resolve => { setTimeout(resolve, 0); }); });

@@ -225,6 +225,14 @@ describe('首屏', () => {
     expect(page.props.hosts.feed.querySelector('[data-feed-id="31"]')).not.toBeNull();
   });
 
+  it('路由已经取得的实体资料直接用于首屏，作品和照片仍并行取齐', async () => {
+    const page = await open({}, { resolvedEntity: entity() });
+    expect(page.calls('/api/entity')).toHaveLength(0);
+    expect(page.calls('/api/items')).toHaveLength(1);
+    expect(page.calls('/api/photos')).toHaveLength(1);
+    expect(cards(page.props)).toEqual(['1', '2', '3']);
+  });
+
   it('作品请求的口径：每页 48，按地址上的排序与方向，随机带全站种子，这一页自己那一键不重复带', () => {
     const query = itemsParams('creator', '某创作者', { creator: '某创作者', tag: '巨乳', sort: 'seed', dir: '' },
       { jav: true, seed: '42' });
@@ -233,6 +241,12 @@ describe('首屏', () => {
     const next = itemsParams('performer', NAME, { sort: 'size', dir: 'asc' }, { jav: false, seed: '42' }, 48);
     expect(Object.fromEntries(next)).toMatchObject({ sort: 'size', dir: 'asc', offset: '48', count: '0' });
     expect(next.has('seed')).toBe(false);
+  });
+
+  it('标签资料页以本标签与追加筛选的交集聚合资产', () => {
+    const params = itemsParams('tag', '巨乳', { tag: '口交,巨乳', sort: 'new' }, { jav: true, seed: '42' });
+    expect(params.get('tag')).toBe('巨乳,口交');
+    expect(params.get('tag_match')).toBe('all');
   });
 
   it('深链落在一个图集上：整组与那一组一起取，墙画的是那一组，读数写图集名', async () => {

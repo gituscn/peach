@@ -336,7 +336,7 @@ it('快进扫过和正常看完是两回事，一行里分得出来', async () =
   const { host } = await open();
   await click(tabNamed(host, '最近看过'));
   const entry = host.querySelector('[role=tabpanel] article')!;
-  expect(entry.querySelector('a')?.getAttribute('href')).toBe('/item/42');
+  expect(entry.querySelector('a')?.getAttribute('href')).toBe('/assets/42');
   expect(entry.textContent).toContain('真实 50% · 到达 90%');
 });
 

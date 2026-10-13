@@ -9,7 +9,7 @@
  * 上面创作者、题材、标签三排露出哪些由它定。重新进入（壳的 `enterFollow`）与「换一批」
  * 才换它，从别的页面回来沿用离开时那一粒，岛重画从不重新洗牌。
  *
- * 详情（`/follow/item/:id`）是另一座岛（`../follow-detail/`），先扫这里缓存的几页找条目
+ * 详情（`/posts/:id`）是另一座岛（`../follow-detail/`），先扫这里缓存的几页找条目
  * （`findFollowItem`），扫不到才单独取。侧栏仍归壳画：岛每取到一版列表就经 `actions.loaded`
  * 交回这一视图可见条目的标签计数、全库口径的来源与时长有无。 */
 import { keepPreviousData, type InfiniteData, type QueryKey } from '@tanstack/react-query';

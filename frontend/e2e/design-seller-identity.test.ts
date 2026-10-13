@@ -44,7 +44,7 @@ describe('卖家署名与头像', () => {
     });
   }
   it('创作者已安装的实体头像使用本人图，不显示卖家角色或代表作提示', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, VIEWPORTS[0]!);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, VIEWPORTS[0]!);
     try {
       const page = opened.page;
       const item = await page.evaluate(async id => (await fetch(`/api/item?id=${id}`)).json(), ITEM.plain);

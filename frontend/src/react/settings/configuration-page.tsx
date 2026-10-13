@@ -1,4 +1,4 @@
-/* 配置页（`/configuration`）：这台运行 Peach 的电脑上那些要「保存配置」的多字段表单。
+/* 配置页（`/settings/library`）：这台运行 Peach 的电脑上那些要「保存配置」的多字段表单。
  * 五个分区各占一格页签，一次只摆一组；本机配置权限与账本写入权限由服务端分别判定。
  * 设置弹层里的「Peach 配置」入口指到这里。
  *
@@ -7,6 +7,7 @@
  * 没有内容的组连标题与页签一起省略。页签条第一帧就在，和整页同一次提交画出来。 */
 import { useQuery } from '@tanstack/react-query';
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
+import { peachHistory, shellNavigate, settingsPath } from '@peach/history';
 
 import { errorMessage } from '../../api';
 import type { ConfigurationData, ConfigurationPanel, ConfigurationProps } from '../bundle';
@@ -48,7 +49,11 @@ function ConfigurationGroups(
   { data, receipt, reopenTutorial, section }: Required<ConfigurationProps> & { data: ConfigurationData },
 ) {
   const [prefix] = useState(() => `board-tabs-${++tabSequence}`);
-  const [chosen, choose] = useState(section);
+  const [chosen, setChosen] = useState(section);
+  const choose = (title: string) => {
+    setChosen(title);
+    shellNavigate(settingsPath(title), { replace: true, state: peachHistory.navigation.location.state });
+  };
   const [narrow, setNarrow] = useState(() => matchMedia('(max-width:900px)').matches);
   useEffect(() => {
     const media = matchMedia('(max-width:900px)');

@@ -20,6 +20,13 @@ beforeAll(async () => { await import('../../../src/react/router/router') }, REAC
 async function load(path = '/') {
   vi.resetModules();
   window.history.replaceState(null, '', path);
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+    const url = new URL(String(input), 'https://peach.test');
+    const names: Record<string, string> = { '1': 'A', '2': 'B', '3': 'S1' };
+    const name = names[url.searchParams.get('id') || ''] || url.searchParams.get('name') || '';
+    const id = Number(Object.entries(names).find(([, value]) => value === name)?.[0] || 1);
+    return { ok: true, status: 200, json: async () => ({ id, kind: url.searchParams.get('kind'), canonical_name: name }) };
+  }));
   const [history, router, routes, shell, pages] = await Promise.all([
     import('../../../src/history'), import('../../../src/react/router/router'),
     import('../../../src/react/router/managed-routes'), import('../../../src/shell'),
@@ -54,6 +61,7 @@ function shellActions(refreshed = { ok: true }) {
     configurable: () => true,
     surfaceShown: vi.fn((kind: string) => { log.push(`shown ${kind}`) }),
     entity: {
+      missing: vi.fn(),
       loading: vi.fn(async (kind: string, name: string) => { log.push(`loading ${kind} ${name}`) }),
       props: vi.fn((kind: string, name: string, search: string) => {
         log.push(`props ${kind} ${name} ${search}`);
@@ -102,7 +110,7 @@ it('地址上的这一位：先整段解码再按段切，名字吃掉剩下全�
   expect(r.entityTarget('/series/x/y')).toEqual({ segment: 'series', kind: 'series', name: 'x/y' });
   expect(r.entityTarget('/agencies/%E6%9F%90%20Co')).toEqual({ segment: 'agencies', kind: 'agency', name: '某 Co' });
   expect(r.entityTarget('/performers/')).toBeNull();
-  expect(r.entityTarget('/tags/x')).toBeNull();
+  expect(r.entityTarget('/tags/x')).toEqual({ segment: 'tags', kind: 'tag', name: 'x' });
   expect(r.entityTarget('/performers/%E0')).toBeNull();
 });
 
@@ -159,7 +167,7 @@ it('索引元素：被详情压着时领了新代次也不重开，下面那一�
   const { actions } = shellActions();
   await boot(r, actions);
   await act(async () => {
-    r.peachHistory.push('/item/7', { backgroundLocation: { pathname: '/performers', search: '' }, overlay: 'item' });
+    r.peachHistory.push('/assets/7', { backgroundLocation: { pathname: '/performers', search: '' }, overlay: 'item' });
   });
   await settle();
   expect(opens(actions)).toBe(1);
@@ -171,13 +179,13 @@ it('索引元素：后退落到压在索引上的详情才挂上（中间去过�
   const { actions } = shellActions();
   await boot(r, actions);
   const overlay = { backgroundLocation: { pathname: '/performers', search: '' }, overlay: 'item' };
-  await act(async () => { r.shellNavigate('/item/7', { state: overlay }) });
+  await act(async () => { r.shellNavigate('/assets/7', { state: overlay }) });
   await settle();
   await act(async () => { r.peachHistory.push('/stats') });
   await settle();
   index.hidden = true;
   await act(async () => {
-    window.history.replaceState({ usr: overlay, key: 'x', idx: 1 }, '', '/item/7');
+    window.history.replaceState({ usr: overlay, key: 'x', idx: 1 }, '', '/assets/7');
     window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
   });
   await settle();
@@ -189,44 +197,59 @@ it('索引元素：后退落到压在索引上的详情才挂上（中间去过�
 
 it('资料元素：同一位领了新代次只就地推，推不进才整页开；换一位与壳要求重开都整页开', async () => {
   const refreshed = { ok: true };
-  const r = await load('/performers/A');
+  const r = await load('/performers/1');
   indexSurface();
   const { actions, log } = shellActions(refreshed);
   await boot(r, actions);
-  expect(log).toEqual(['surface entity /performers/A', 'loading performer A', 'props performer A ']);
+  expect(log).toEqual(['surface entity /performers/1', 'loading performer A', 'props performer A ']);
   log.length = 0;
-  await act(async () => { r.peachHistory.push('/performers/A?tag=x') });
+  await act(async () => { r.peachHistory.push('/performers/1?tag=x') });
   await settle();
   expect(log, '推进画着的那一页就够了').toEqual(['refresh performer A ?tag=x']);
   log.length = 0;
   refreshed.ok = false;
-  await act(async () => { r.peachHistory.push('/performers/A?tag=y') });
+  await act(async () => { r.peachHistory.push('/performers/1?tag=y') });
   await settle();
-  expect(log, '那一页没画着就整页开').toEqual(['refresh performer A ?tag=y', 'surface entity /performers/A',
+  expect(log, '那一页没画着就整页开').toEqual(['refresh performer A ?tag=y', 'surface entity /performers/1',
     'loading performer A', 'props performer A ?tag=y']);
   log.length = 0;
   refreshed.ok = true;
-  await act(async () => { r.shellNavigate('/performers/B', { replace: true }) });
+  await act(async () => { r.shellNavigate('/performers/2', { replace: true }) });
   await settle();
-  expect(log, '换一位按新名字重挂').toEqual(['surface entity /performers/B', 'loading performer B',
+  expect(log, '换一位按新名字重挂').toEqual(['surface entity /performers/2', 'loading performer B',
     'props performer B ']);
   log.length = 0;
   await act(async () => { reopen(r) });
   await settle();
-  expect(log, '壳要求重开时不就地推').toEqual(['surface entity /performers/B', 'loading performer B',
+  expect(log, '壳要求重开时不就地推').toEqual(['surface entity /performers/2', 'loading performer B',
     'props performer B ']);
   expect(r.shell.entityJavLayout, '每次整页打开都从非 JAV 语境起').toBe(false);
 });
 
 it('资料元素：认领的就地写地址不重开', async () => {
-  const r = await load('/studios/S1');
+  const r = await load('/studios/3');
   indexSurface();
   const { actions, log } = shellActions();
   await boot(r, actions);
   log.length = 0;
-  await act(async () => { r.shellNavigate('/studios/S1?tag=x') });
+  await act(async () => { r.shellNavigate('/studios/3?tag=x') });
   await settle();
   expect(log).toEqual([]);
+});
+
+it('重新打开实体时读取当前规范 ID，合并地址保留筛选与锚点', async () => {
+  const r = await load('/performers/2?tag=x#photos');
+  indexSurface();
+  const { actions } = shellActions();
+  await boot(r, actions);
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200,
+    json: async () => ({ id: 1, kind: 'performer', canonical_name: 'A' }) })));
+  await act(async () => { reopen(r) });
+  await settle();
+  expect(r.peachHistory.navigation.location.pathname).toBe('/performers/1');
+  expect(r.peachHistory.navigation.location.search).toBe('?tag=x');
+  expect(r.peachHistory.navigation.location.hash).toBe('#photos');
+  expect(actions.entity?.props).toHaveBeenLastCalledWith('performer', 'A', '?tag=x');
 });
 
 const TAGS = { items: [{ k: '痴女', n: 1, cat: 'role' }], has_more: false };

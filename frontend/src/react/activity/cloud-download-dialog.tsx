@@ -25,7 +25,7 @@ export interface DownloadPrefill { code?: string; title?: string; origin?: strin
   cover?: string; performers?: string; release_date?: string; duration?: number | null; studio?: string }
 
 const RECEIPTS: Partial<Record<DownloadSubmitResult['outcome'], string>> = {
-  submitted: '已提交离线下载，进度在活动页',
+  submitted: '已提交离线下载，进度在任务中心',
   adopted: '这个磁力已有任务，没有重复提交',
   adopted_remote: '远端已有同一任务，已接管',
 };
@@ -145,7 +145,7 @@ function SubmitForm({ header, snapshot, prefill, close, receipt, provider: prefe
           {provider === '115' ? <Help>每提交一次扣一条离线配额，重新提交也算。</Help> : null}
         </div>
         {!snapshot.available ? <Note tone="neutral">云下载只在账本写入端可用。</Note> : null}
-        {!configured.length ? <Note tone="neutral">尚未配置下载渠道。<a href={'/configuration?section=' + encodeURIComponent('下载渠道')}>下载渠道设置</a></Note> : null}
+        {!configured.length ? <Note tone="neutral">尚未配置下载渠道。<a href={'/settings/library?section=' + encodeURIComponent('下载渠道')}>下载渠道设置</a></Note> : null}
         <Input label="目标目录" placeholder="/云下载" autoComplete="off" maxLength={300}
           value={target} onChange={setTarget} />
         {/* 带着番号进来时它和搜索框是同一个值，选中候选也会跟着换，不再单列一格。 */}

@@ -98,7 +98,7 @@ const over = (pathname: string, overlay: 'item' | 'follow' = 'item', search = ''
 const entry = (state: unknown, key = 'x') => ({ usr: state, key, idx: 1 });
 
 it('启动覆盖元素在应用动作就绪后打开，离开详情用当前动作关闭舞台', async () => {
-  const r = await load('/item/7');
+  const r = await load('/assets/7');
   const { actions, opened } = shellActions(r);
   const root = createRoot(document.createElement('div'));
   unmounts.push(() => root.unmount());
@@ -119,13 +119,13 @@ it('后退前进落到覆盖地址上接上背景并打开；没有请求的认�
   const { seen, Probe } = probe();
   await mount(r, actions, <Probe />);
   await start(r);
-  await act(async () => { r.shellNavigate('/item/7', { state: over('/nowhere') }) });
+  await act(async () => { r.shellNavigate('/assets/7', { state: over('/nowhere') }) });
   await settle();
   expect(opened, '认领条目没有打开请求时不会重开舞台').toEqual([]);
-  await pop('/item/8', entry(over('/nowhere', 'item', '?q=1'), 'a'));
-  await pop('/mix/3/4', entry(over('/nowhere'), 'b'));
-  await pop('/follow/item/5', entry(over('/nowhere', 'follow'), 'c'));
-  await pop('/playlists/2/9', entry(over('/nowhere'), 'd'));
+  await pop('/assets/8', entry(over('/nowhere', 'item', '?q=1'), 'a'));
+  await pop('/assets/4?mix=3', entry(over('/nowhere'), 'b'));
+  await pop('/posts/5', entry(over('/nowhere', 'follow'), 'c'));
+  await pop('/assets/9?playlist=2', entry(over('/nowhere'), 'd'));
   expect(opened).toEqual([
     { target: { kind: 'item', id: 8 }, from: '/nowhere?q=1' },
     { target: { kind: 'queue', queue: 'mix', key: 3, item: 4 }, from: '/nowhere' },
@@ -145,9 +145,9 @@ it('`history.state` 为空的同一条目重放：领一个新代次，重开同
   const { actions, opened } = shellActions(r);
   await mount(r, actions);
   await start(r);
-  await act(async () => { r.shellNavigate('/item/7', { state: over('/nowhere') }) });
+  await act(async () => { r.shellNavigate('/assets/7', { state: over('/nowhere') }) });
   await settle();
-  await pop('/item/7', null);
+  await pop('/assets/7', null);
   await pop();
   expect(opened).toEqual([
     { target: { kind: 'item', id: 7 }, from: null },
@@ -163,16 +163,16 @@ it('点卡的认领导航交覆盖元素打开：同一路径再开一次也重�
   await start(r);
   const presented: OverlayTarget[] = [];
   vi.mocked(actions.openOverlay).mockImplementation((target) => { presented.push(target) });
-  await act(async () => { r.shellNavigate('/item/7', { state: over('/nowhere') }) });
+  await act(async () => { r.shellNavigate('/assets/7', { state: over('/nowhere') }) });
   await settle();
-  await act(async () => { r.shellNavigate('/item/7', { state: over('/nowhere') }) });
+  await act(async () => { r.shellNavigate('/assets/7', { state: over('/nowhere') }) });
   await settle();
   expect(presented).toEqual([{ kind: 'item', id: 7 }, { kind: 'item', id: 7 }]);
   expect([seen.mounted, seen.unmounted]).toEqual([1, 0]);
 });
 
-it('深链 `/item/:id`：壳开始路由之前只挂着，那一刻打开那一条、补画目录网格；启动那一条不读背景', async () => {
-  const r = await load('/item/7', entry(over('/stats')));
+it('深链 `/assets/:id`：壳开始路由之前只挂着，那一刻打开那一条、补画目录网格；启动那一条不读背景', async () => {
+  const r = await load('/assets/7', entry(over('/stats')));
   const { actions, opened } = shellActions(r);
   await mount(r, actions);
   expect(opened, '壳开始路由之前不开').toEqual([]);
@@ -181,13 +181,13 @@ it('深链 `/item/:id`：壳开始路由之前只挂着，那一刻打开那一�
   expect(actions.catalog!.fill).toHaveBeenCalledTimes(1);
   expect(actions.follow!.ground).not.toHaveBeenCalled();
   expect(actions.surfaceChanged, '条目里记的背景页不打开').not.toHaveBeenCalled();
-  await act(async () => { r.shellNavigate('/item/7?t=12', { replace: true }) });
+  await act(async () => { r.shellNavigate('/assets/7?t=12', { replace: true }) });
   await settle();
   expect(opened).toHaveLength(1);
 });
 
-it('深链 `/follow/item/:id`：打开那一条，只让出 `#stats`、不挂列表也不补画目录', async () => {
-  const r = await load('/follow/item/5');
+it('深链 `/posts/:id`：打开那一条，只让出 `#stats`、不挂列表也不补画目录', async () => {
+  const r = await load('/posts/5');
   const { actions, opened } = shellActions(r);
   await mount(r, actions);
   await start(r);
@@ -198,7 +198,7 @@ it('深链 `/follow/item/:id`：打开那一条，只让出 `#stats`、不挂列
 });
 
 it('路由根晚于壳开始路由才挂上：挂上就打开启动那一条，只开一次', async () => {
-  const r = await load('/parts/3/4');
+  const r = await load('/assets/4?parts=3');
   const { actions, opened } = shellActions(r);
   r.shell.writeShell({ pageOpens: 1 });
   await mount(r, actions);
@@ -206,17 +206,17 @@ it('路由根晚于壳开始路由才挂上：挂上就打开启动那一条，�
   expect(opened).toEqual([{ target: { kind: 'queue', queue: 'parts', key: 3, item: 4 }, from: null }]);
 });
 
-it('参数只认数字：`/item/abc` 什么都不开，下面也不补画', async () => {
-  const r = await load('/item/abc');
+it('参数只认数字：`/assets/abc` 什么都不开，下面也不补画', async () => {
+  const r = await load('/assets/abc');
   const { actions, opened } = shellActions(r);
   await mount(r, actions);
   await start(r);
   expect(opened).toEqual([]);
   expect(actions.catalog!.fill).not.toHaveBeenCalled();
-  expect(r.overlayTarget('/editions/1/2')).toEqual({ kind: 'queue', queue: 'editions', key: 1, item: 2 });
-  expect(r.overlayTarget('/item/7/x')).toBeNull();
-  expect(r.overlayTarget('/playlists/1/b')).toBeNull();
-  expect(r.overlayTarget('/item/')).toBeNull();
+  expect(r.overlayTarget('/assets/2?editions=1')).toEqual({ kind: 'queue', queue: 'editions', key: 1, item: 2 });
+  expect(r.overlayTarget('/assets/7/x')).toBeNull();
+  expect(r.overlayTarget('/assets/b?playlist=1')).toBeNull();
+  expect(r.overlayTarget('/assets/')).toBeNull();
 });
 
 it('打开跑在提交阶段之外：壳在里面用 flushSync 画别的岛，当场画上、不报告警', async () => {
@@ -233,8 +233,8 @@ it('打开跑在提交阶段之外：壳在里面用 flushSync 画别的岛，�
   });
   await mount(r, actions);
   await start(r);
-  await pop('/item/9', entry(over('/nowhere')));
-  expect(painted).toEqual(['/item/9']);
+  await pop('/assets/9', entry(over('/nowhere')));
+  expect(painted).toEqual(['/assets/9']);
   expect(errors).not.toHaveBeenCalled();
 });
 

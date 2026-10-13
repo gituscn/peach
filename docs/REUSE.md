@@ -493,6 +493,8 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.16.10，版�
 
 详情打开时，共用 `wireAutoScroll` 暂停底层横排，关闭后由属性观察器唤醒；播放器氛围色在任一 RGB 通道累计相差至少 6 时刷新继承色。共享 Tooltip 复用浏览器 `popover="manual"` 顶层，挂在触发器所属的模态 Dialog 内；操作键条允许按钮收缩并保持单行。无新增依赖。原生浮层契约见 [Popover API](https://developer.mozilla.org/en-US/docs/Web/API/Popover_API/Using)。
 
+规范页面地址复用同一份 React Router 历史、`resolve_entity_id`、`resolve_entity`、实体资料查询和 BoardUI 设置面。`history/canonical-path.ts` 处理产品地址，队列属于资产查询参数；`settings-route.ts` 统一设置分区与背景历史。实体 ID 解析取得规范名后复用资料、作品和照片查询。身份缺失、种类校验、实体合并与来源名称的展示属于 Peach 的领域规则；不增加路由或 slug 依赖。页面契约见 [ROUTES.md](ROUTES.md)。
+
 ## 当前替换队列
 
 下面是还开着的替换项，以及每一项已经定下的做法。

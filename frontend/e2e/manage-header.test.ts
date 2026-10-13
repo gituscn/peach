@@ -30,11 +30,11 @@ const HEADS = [
   ['/junk-files', '垃圾文件', '垃圾文件', false],
   ['/duplicates', '重复文件', '重复文件', false],
   ['/quality-goals', '高清版', '高清版', false],
-  ['/scraping', '来源和凭证', '来源和凭证', true],
+  ['/sources', '来源和凭证', '来源和凭证', true],
   ['/trash', '回收站', '回收站', false],
-  ['/follow-manage', '关注管理', '', false],
-  ['/activity', '活动', '', false],
-  ['/configuration', 'Peach 配置', '', true],
+  ['/subscriptions', '关注管理', '', false],
+  ['/tasks', '活动', '', false],
+  ['/settings/library', 'Peach 配置', '', true],
 ] as const;
 
 const BLOCKS = '[data-manage-header] > :is([data-manage-bar], [data-manage-crumb], [data-manage-title])';

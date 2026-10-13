@@ -72,7 +72,7 @@ export function FollowMatch() {
   }, {
     shown: followShown,
     onCovered: () => {
-      if (peachHistory.navigation.location.pathname.startsWith('/follow/item/')) actions?.follow?.ground();
+      if (peachHistory.navigation.location.pathname.startsWith('/posts/')) actions?.follow?.ground();
     },
   });
   return null;

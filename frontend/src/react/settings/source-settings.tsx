@@ -16,7 +16,7 @@ export function SourceSettings({ data, receipt, panel }: ConfigurationGroupProps
   const credentials = useQuery({ queryKey: FOLLOW_CREDENTIALS_KEY,
     queryFn: ({ signal }) => fetchCredentials(signal), enabled: panel?.active !== false, refetchOnMount: 'always' });
   return <div {...groupRoot(panel)}>
-    <div><ButtonLink href="/scraping" variant="secondary">采集来源与登录状态</ButtonLink></div>
+    <div><ButtonLink href="/sources" variant="secondary">采集来源与登录状态</ButtonLink></div>
     {credentials.data
       ? <Credentials data={credentials.data} readOnly={Boolean(data.ledger_read_only)} toast={receipt} />
       : credentials.error

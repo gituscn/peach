@@ -164,14 +164,14 @@ it('详情压着时什么都不做；关掉回到压着的那一份地址、筛�
   const { actions, log } = shellActions();
   await boot(r, actions);
   const overlay = { backgroundLocation: { pathname: '/', search: '?tag=a' }, overlay: 'item' };
-  await act(async () => { r.shellNavigate('/item/7', { state: overlay }) });
+  await act(async () => { r.shellNavigate('/assets/7', { state: overlay }) });
   await settle();
-  await act(async () => { r.peachHistory.push('/item/8', overlay) });
+  await act(async () => { r.peachHistory.push('/assets/8', overlay) });
   await settle();
   await act(async () => { r.shellNavigate('/?tag=a') });
   await settle();
   expect(log.slice(1), '关掉回到原处').toEqual([]);
-  await act(async () => { r.shellNavigate('/item/7', { state: overlay }) });
+  await act(async () => { r.shellNavigate('/assets/7', { state: overlay }) });
   await settle();
   r.shell.writeShell({ state: { ...filters(r), seed: '9' } });
   await act(async () => { r.shellNavigate('/?tag=a') });
@@ -181,7 +181,7 @@ it('详情压着时什么都不做；关掉回到压着的那一份地址、筛�
 });
 
 it('没有背景的作品地址（深链）：补画一次目录网格，不整页打开；关掉时壳要求重开才整页打开', async () => {
-  const r = await load('/item/7');
+  const r = await load('/assets/7');
   const { actions, log } = shellActions();
   await boot(r, actions);
   expect(log).toEqual(['fill']);
@@ -198,12 +198,12 @@ it('后退落到压在首页上的详情才挂上（中间去过别的页）：�
   const { actions, log } = shellActions();
   await boot(r, actions);
   const overlay = { backgroundLocation: { pathname: '/', search: '' }, overlay: 'item' };
-  await act(async () => { r.shellNavigate('/item/7', { state: overlay }) });
+  await act(async () => { r.shellNavigate('/assets/7', { state: overlay }) });
   await settle();
   await act(async () => { r.peachHistory.push('/stats') });
   await settle();
   expect(log.slice(1)).toEqual(['release']);
-  await pop('/item/7', { usr: overlay, key: 'x', idx: 1 });
+  await pop('/assets/7', { usr: overlay, key: 'x', idx: 1 });
   expect(log.slice(2), '压着的时候不开').toEqual([]);
   await act(async () => { r.shellNavigate('/') });
   await settle();
@@ -255,7 +255,7 @@ it('离开目录去管理区收起网格；去资料页、详情与沉浸不收'
   await settle();
   await act(async () => { r.shellNavigate('/immerse') });
   await settle();
-  await act(async () => { r.shellNavigate('/item/3') });
+  await act(async () => { r.shellNavigate('/assets/3') });
   await settle();
   expect(actions.catalog?.release).not.toHaveBeenCalled();
   await act(async () => { r.shellNavigate('/') });

@@ -74,11 +74,11 @@ export function renderInitialSurfaceLoading(){
   if(path==='/wall'){
     document.body.setAttribute('data-wall-open','');hideDiscoveryBars();return;
   }
-  if(/^\/(item\/\d+|(?:mix|parts|editions|playlists)\/\d+\/\d+)$/.test(path)){
+  if(/^\/assets\/\d+$/.test(path)){
     /* 详情的骨架归舞台岛：路由到位后 `openItem` 取回 React 包就画。下面那份列表由路由树的目录元素补发。 */
     hideDiscoveryBars();return;
   }
-  if(path.startsWith('/follow/item/')||path.startsWith('/jav/movie/')){
+  if(path==='/settings'||/^\/settings\/(appearance|playback|jav|search|content)$/.test(path)||path.startsWith('/posts/')||path.startsWith('/works/')){
     /* 关注详情同样只等舞台浮窗里那份骨架，页面里不先铺一份；列表等关掉详情才画，不补发。 */
     hideDiscoveryBars();return;
   }
@@ -95,7 +95,7 @@ export function renderInitialSurfaceLoading(){
   if(navigationState.managedPagePath(path)){
     hideDiscoveryBars();
     const stats=$('#stats');stats.hidden=false;clearCatalogGrid();
-    stats.innerHTML=path.startsWith('/follow')&&path!=='/follow-manage'
+    stats.innerHTML=path.startsWith('/follow')&&path!=='/subscriptions'
       ?followState.followSkeletonHtml('正在读取关注内容')
       :loadingState.managementPlaceholder(path);
     fitSkeleton(stats);
@@ -106,7 +106,7 @@ export function renderInitialSurfaceLoading(){
     paintIndexSkeleton($('#index'),indexParams(path.slice(1),location.search),indexState.peopleIndexLayout());
     return;
   }
-  if(/^\/(?:performers|creators|studios|agencies)\//.test(path)){
+  if(/^\/(?:performers|creators|studios|agencies|series|tags)\//.test(path)){
     hideDiscoveryBars();
     $('#index').hidden=false;clearCatalogGrid();
     // 形状名单这时刚发出去：等它一下再画，骨架第一帧就带着这一位有的那两块。

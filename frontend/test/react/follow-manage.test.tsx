@@ -647,7 +647,7 @@ it('一条来源都没有时说清这里会显示什么', async () => {
 it('一条来源都没有时空态给出添加关注的去处', async () => {
   const { host } = await open({ data: follow({ sources: [] }) });
   const empty = host.querySelector('[data-empty-state]')!;
-  const link = empty.querySelector('a[href="/follow-manage?tab=add"]');
+  const link = empty.querySelector('a[href="/subscriptions?tab=add"]');
   expect(link?.textContent).toBe('添加关注');
   // 这一屏的主动作就是它：工具条和「检查全部」只在有来源时才画。
   expect(buttonNamed('检查全部', host)).toBeNull();
