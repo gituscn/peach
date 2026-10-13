@@ -136,6 +136,7 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
     {action.error ? <Note tone="error">{action.error}</Note> : null}
     <div data-media-grid="" className={JAV_RECOMMENDATION_GRID} style={{ '--card-ratio': ratio } as CSSProperties}>
       {items.map(item => {
+        const performers = item.performer_refs?.length ? item.performer_refs.map(person => person.name).join('、') : item.performers;
         const artwork = discoveryArtwork(item, layout, settings.value.javImage);
         const recommendation = recommendationScore(item.taste_score ?? item.score);
         const scoreDetails = [recommendation.label, `口味 ${discoveryScore(item.taste_score ?? item.score)}`,
@@ -153,7 +154,7 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         <h3 data-jav-title="" title={`${item.code} · ${item.title || '标题未取得'}`}>{item.code} · {item.title || '标题未取得'}</h3>
         <div data-jav-identity="">
           <div data-jav-faces=""><DiscoveryFaces item={item} /></div>
-          <p className="min-w-0 truncate text-body-2-regular text-text-secondary" title={item.performers}>{[item.performers, item.release_date].filter(Boolean).join(' · ')}</p>
+          <p className="min-w-0 truncate text-body-2-regular text-text-secondary" title={performers}>{[performers, item.release_date].filter(Boolean).join(' · ')}</p>
         </div>
         <div data-jav-tags="" data-media-tags="">
           <button data-jav-taste-score="" type="button" title={scoreDetails} aria-label={`推荐分 ${recommendation.score}，${recommendation.label}`}

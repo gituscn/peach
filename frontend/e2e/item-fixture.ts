@@ -77,6 +77,8 @@ export const EDITIONS = { title: 'PCH-031', items: [{ ...card(31), edition_label
 export const PLAYLIST = { id: 7, name: '周末片单', items: [11, 14, 15, 16] };
 export const SAMPLE_ITEM = jav(41, 'PCH-041', { sample_images: [{ n: 1 }, { n: 3 }] });
 DETAILS.set(SAMPLE_ITEM.id, SAMPLE_ITEM);
+export const COVER_ONLY_ITEM = jav(42, 'PCH-042');
+DETAILS.set(COVER_ONLY_ITEM.id, COVER_ONLY_ITEM);
 
 const svg = (key: string, width: number, height: number) => {
   let hash = 0;
@@ -116,6 +118,7 @@ async function stub(page: Page, catalogIds: readonly number[] = CATALOG): Promis
   await json('/api/related', () => ({ items: RELATED.map(card) }));
   await json('/api/parts', () => PARTS);
   await json('/api/editions', () => EDITIONS);
+  await json('/api/library-processing', () => ({ status: 'idle' }));
   await json('/api/sources', () => ({ sources: [{ location: 'local', online: true }, { location: '115', online: false }] }));
   await json('/api/playlists', () => ({
     items: [...playlists.values()].map((row) => ({ id: row.id, name: row.name, item_count: row.ids.length })),

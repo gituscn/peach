@@ -55885,8 +55885,8 @@ function yDe({ readOnly: e, receipt: t, resource: n, query: r, navigate: i, clea
 				className: TB,
 				style: { "--card-ratio": _ },
 				children: j.map((r) => {
-					let a = ZB(r, g, h.value.javImage), o = VEe(r.taste_score ?? r.score), s = [
-						o.label,
+					let a = r.performer_refs?.length ? r.performer_refs.map((e) => e.name).join("、") : r.performers, o = ZB(r, g, h.value.javImage), s = VEe(r.taste_score ?? r.score), u = [
+						s.label,
 						`口味 ${CB(r.taste_score ?? r.score)}`,
 						w.data?.ranking_method === "mmr" && r.ranking_score != null ? `排序 ${CB(r.ranking_score)}` : "",
 						r.source_score == null ? "" : `来源评分 ${r.source_score.toFixed(1)} / 5`,
@@ -55908,10 +55908,10 @@ function yDe({ readOnly: e, receipt: t, resource: n, query: r, navigate: i, clea
 								"data-media-pic": "",
 								"data-jav-cover-box": "",
 								className: "relative inline-grid place-items-center overflow-hidden rounded-2lg bg-background-tertiary-default",
-								children: a ? /* @__PURE__ */ (0, x.jsx)(DM, {
+								children: o ? /* @__PURE__ */ (0, x.jsx)(DM, {
 									artwork: {
 										kind: "cover",
-										html: a
+										html: o
 									},
 									identity: ZB(r, "small", h.value.javImage),
 									relayout: (e) => zs(e, g)
@@ -55936,8 +55936,8 @@ function yDe({ readOnly: e, receipt: t, resource: n, query: r, navigate: i, clea
 									children: /* @__PURE__ */ (0, x.jsx)(REe, { item: r })
 								}), /* @__PURE__ */ (0, x.jsx)("p", {
 									className: "min-w-0 truncate text-body-2-regular text-text-secondary",
-									title: r.performers,
-									children: [r.performers, r.release_date].filter(Boolean).join(" · ")
+									title: a,
+									children: [a, r.release_date].filter(Boolean).join(" · ")
 								})]
 							}),
 							/* @__PURE__ */ (0, x.jsxs)("div", {
@@ -55946,12 +55946,12 @@ function yDe({ readOnly: e, receipt: t, resource: n, query: r, navigate: i, clea
 								children: [/* @__PURE__ */ (0, x.jsx)("button", {
 									"data-jav-taste-score": "",
 									type: "button",
-									title: s,
-									"aria-label": `推荐分 ${o.score}，${o.label}`,
+									title: u,
+									"aria-label": `推荐分 ${s.score}，${s.label}`,
 									className: "rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring",
 									children: /* @__PURE__ */ (0, x.jsx)(ak, {
-										color: o.color,
-										children: o.label
+										color: s.color,
+										children: s.label
 									})
 								}), (r.tags || []).slice(0, 4).map((e) => /* @__PURE__ */ (0, x.jsx)("button", {
 									type: "button",
@@ -63477,6 +63477,7 @@ function bU({ items: e, position: t, onSelect: n, below: r = !1, renderThumbnail
 		ref: a,
 		"data-media-carousel": "",
 		"data-carousel-below": r ? "" : void 0,
+		"data-carousel-video-active": e[t]?.video ? "" : void 0,
 		children: [
 			/* @__PURE__ */ (0, x.jsx)("button", {
 				type: "button",
@@ -92721,8 +92722,8 @@ async function ort(e, t, n) {
 function h5({ path: e }) {
 	let t = bR();
 	SL();
-	let n = FL(fR.navigation.location.pathname), r = (0, b.useRef)(n ? null : t);
-	return n || (r.current = t), /* @__PURE__ */ (0, x.jsx)(srt, {
+	let n = FL(fR.navigation.location.pathname), r = (0, b.useRef)(n ? null : t), i = (0, b.useRef)(n);
+	return !n && (!i.current || r.current === null) && (r.current = t), i.current = n, /* @__PURE__ */ (0, x.jsx)(srt, {
 		path: e,
 		covered: r.current === null
 	}, `${e} ${r.current ?? "covered"}`);
@@ -97763,7 +97764,7 @@ function mct() {
 		}
 		if (fct(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
 		if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-			let t = document.querySelector(`#stage[open] [data-follow-image-step="${e.key === "ArrowRight" ? 1 : -1}"]`);
+			let t = document.querySelector(`#stage[open] [data-media-carousel]:not([data-carousel-video-active]) [data-follow-image-step="${e.key === "ArrowRight" ? 1 : -1}"]`);
 			if (t) {
 				e.preventDefault(), t.click();
 				return;
@@ -97814,8 +97815,8 @@ function hct() {
 		},
 		openTasteSignal: Iat,
 		navigate: (e) => {
-			let t = /^\/jav\/movie\/([A-Za-z0-9_-]{2,64})$/.exec(e);
-			t ? S9(t[1]) : Q.navigatePath(e);
+			let t = /^\/jav\/movie\/([A-Za-z0-9_-]{2,64})$/.exec(e), n = /^\/item\/(\d+)$/.exec(e);
+			t ? S9(t[1]) : n ? x9(+n[1]) : Q.navigatePath(e);
 		},
 		openManage: B7,
 		managePath: (e) => Q.routePathOf("section", e) || "",

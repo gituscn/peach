@@ -89,7 +89,8 @@ export function MediaCarousel({ items, position, onSelect, below = false, render
     data-carousel-video={item.video ? '' : undefined} aria-current={index === position ? 'true' : 'false'}
     aria-label={item.label || `第 ${index + 1} 张，共 ${items.length} 张`} title={item.label || `第 ${index + 1} 张`}
     onClick={() => onSelect(item.index)}>{item.video ? <span dangerouslySetInnerHTML={{ __html: icon('play') }} /> : null}</button>;
-  return <div ref={root} data-media-carousel="" data-carousel-below={below ? '' : undefined}>
+  return <div ref={root} data-media-carousel="" data-carousel-below={below ? '' : undefined}
+    data-carousel-video-active={items[position]?.video ? '' : undefined}>
     <button type="button" data-follow-image-step="-1" data-follow-image-arrow="prev" aria-label={mixed ? '上一项媒体' : '上一张图片'} title="上一张"
       onClick={() => step(-1)} dangerouslySetInnerHTML={{ __html: icon('chevron-left') }} />
     <button type="button" data-follow-image-step="1" data-follow-image-arrow="next" aria-label={mixed ? '下一项媒体' : '下一张图片'} title="下一张"

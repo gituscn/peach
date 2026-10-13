@@ -39,7 +39,8 @@ compositionState.shellActions = {
   openTasteSignal,
   navigate:path=>{
     const movie=/^\/jav\/movie\/([A-Za-z0-9_-]{2,64})$/.exec(path);
-    if(movie)void openJavMovie(movie[1]);else navigationState.navigatePath(path);
+    const item=/^\/item\/(\d+)$/.exec(path);
+    if(movie)void openJavMovie(movie[1]);else if(item)void openItem(+item[1]);else navigationState.navigatePath(path);
   },
   openManage,
   managePath:section=>navigationState.routePathOf('section',section)||'',

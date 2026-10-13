@@ -489,6 +489,7 @@ def _discovery_performers(connection, contract, rows) -> dict[int, list[dict]]:
             elif not found and name.strip() in identities and not any(ref['name'] == name.strip() for ref in refs):
                 refs.append({'id': None, 'name': name.strip(), 'has_image': False})
         performers[int(row["id"])] = refs
+        row['performers'] = '、'.join(ref['name'] for ref in refs)
     return performers
 
 
