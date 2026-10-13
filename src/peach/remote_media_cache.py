@@ -89,10 +89,6 @@ class RemoteMediaCache:
             upstream = fetch()
             forwarded = {name: upstream.headers[name] for name in MEDIA_HEADERS if name in upstream.headers}
             forwarded.update({"cache-control": "private, max-age=31536000", **(headers or {})})
-            if request.method == "HEAD":
-                response = Response(status_code=upstream.status_code, headers=forwarded)
-                close()
-                return response
             kind = upstream.headers.get("content-type", "").lower()
             accepted = (upstream.status_code in (200, 206) and
                         (kind.startswith(("image/", "video/", "audio/")) or
@@ -107,6 +103,12 @@ class RemoteMediaCache:
                 byte_range = ""
             elif upstream.status_code == 206 and not byte_range:
                 accepted = False
+            if not accepted:
+                forwarded["cache-control"] = "no-store"
+            if request.method == "HEAD":
+                response = Response(status_code=upstream.status_code, headers=forwarded)
+                close()
+                return response
             slot = self._slot(key, byte_range)
             def body():
                 try:
