@@ -41,7 +41,7 @@ CREATE TABLE asset(
   duration REAL, width INTEGER, height INTEGER, ctx_length TEXT, ctx_orient TEXT,
   ctx_quality TEXT, play_count INTEGER DEFAULT 0, last_played TEXT, rating INTEGER,
   o_count INTEGER, watch_ratio REAL, stash_scene_id INTEGER, snapshot_path TEXT, first_seen TEXT,
-  feedback TEXT, disposal TEXT, leave_ratio REAL, play_seconds REAL,
+  feedback TEXT, disposal TEXT, disposal_reason TEXT, leave_ratio REAL, play_seconds REAL,
   feedback_at REAL, seek_count INTEGER, max_reached REAL,
   field_owners TEXT, mutation_revision INTEGER NOT NULL DEFAULT 0, region TEXT,
   UNIQUE(location,path));

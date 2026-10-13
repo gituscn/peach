@@ -138,6 +138,7 @@ class PurgeMissingTests(unittest.TestCase):
         self.assertEqual(self.disposals(), {1: None, 2: "vanished", 3: "trash", 4: None})
         con = sqlite3.connect(self.db_path)
         try:
+            self.assertEqual(con.execute("SELECT disposal_reason FROM asset WHERE id=3").fetchone()[0], "missing")
             # 元数据等到清空回收站才随账本行一起删。
             self.assertEqual(
                 [r[0] for r in con.execute("SELECT asset_id FROM asset_tag")], [2, 4])

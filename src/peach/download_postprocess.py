@@ -91,7 +91,7 @@ def _isolate_ads(contract, main: int, folder_ids: list[int]) -> int:
     marks = ",".join("?" * len(candidates))
     with contract.database.write_transaction() as connection:
         cursor = connection.execute(
-            f"UPDATE asset SET disposal='trash',feedback_at=? WHERE id IN ({marks}) "
+            f"UPDATE asset SET disposal='trash',disposal_reason='junk',feedback_at=? WHERE id IN ({marks}) "
             "AND disposal IS NULL", (time.time(), *candidates))
     return int(cursor.rowcount)
 

@@ -64,8 +64,8 @@ body[data-density="dense"] .peach-react [data-media-card][data-variant="short"] 
 }
 
 /* 回收站那一屏的卡是一块有边的面，封面贴边；元信息区在框里留出四周的边距，不用网格卡那套
- * 「垫 8px 再 -8px 抵消」（卡本身 overflow:hidden，垫出去的一圈也会被裁掉）。文件名多是一行，
- * 标题不预留第二行，头像与标题加署名那一块居中对齐；屏外估高跟着按一行算。 */
+ * 「垫 8px 再 -8px 抵消」（卡本身 overflow:hidden，垫出去的一圈也会被裁掉）。标题两行，
+ * 署名、标签与归入原因各一行，屏外估高和加载骨架共用这份内容预算。 */
 body[data-surface="/trash"] .peach-react [data-media-card] {
   gap: 0;
   overflow: hidden;
@@ -74,16 +74,23 @@ body[data-surface="/trash"] .peach-react [data-media-card] {
 }
 body[data-surface="/trash"] .peach-react [data-media-card] [data-media-pic] { --pic-radius: 0px; }
 body[data-surface="/trash"] .peach-react [data-media-card] [data-media-meta] {
-  --card-meta-byline: 1lh;
-  --card-meta-tags: 0px;
-  --card-meta-block: calc(var(--fs-md) * 1.35 + 3px + var(--card-meta-byline) + var(--card-meta-tags));
+  --card-meta-byline: 20px;
+  --card-meta-tags: calc(var(--fs-xs) * 1.45 + var(--tag-pad-y) * 2 + 2px + 3px);
+  --card-meta-block: calc(var(--fs-md) * 2.7 + 3px + var(--card-meta-byline) + var(--card-meta-tags) + 23px);
   min-height: 0;
   margin: 0;
   padding: 10px 12px 12px;
 }
-body[data-surface="/trash"] .peach-react [data-media-card] [data-media-title] { min-height: 0; }
+body[data-surface="/trash"] .peach-react [data-media-card] [data-media-title] { min-height: 2.7em; align-content: start; }
 body[data-surface="/trash"] .peach-react [data-media-card] [data-media-text] { gap: 3px; }
-body[data-surface="/trash"] .peach-react [data-media-text] > [data-media-tags] { margin-top: -4px; }
+body[data-surface="/trash"] .peach-react [data-media-text] > [data-media-tags] { margin-top: 0; }
+body[data-surface="/trash"] .peach-react button[data-media-title] {
+  display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
+}
+.peach-react [data-media-title-text] {
+  display: -webkit-box; max-height: 2.7em; overflow: hidden; text-decoration: inherit;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
 
 /* 整张卡的打开点击区垫在封面与元信息区下面。 */
 .peach-react [data-media-open] {
@@ -577,7 +584,6 @@ body[data-surface="/trash"] .peach-react [data-media-text] > [data-media-tags] {
 .peach-react [data-media-flags] > i { display: block; width: 6px; height: 6px; }
 .peach-react [data-flag="dislike"] { background: var(--drop); }
 .peach-react [data-flag="seen"] { background: var(--muted); }
-.peach-react [data-flag="dispose"] { background: var(--meter); }
 .peach-react [data-flag="later"] { background: var(--ink); }
 .peach-react [data-media-why] { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .peach-react [data-variant="next"] [data-media-why] { color: var(--loupe); }
@@ -663,6 +669,23 @@ body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media
 body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-card] [data-media-tag]:nth-child(n+2) { display: none; }
 
 /* ── 回收站里的资源卡 ── */
+body[data-surface="/trash"] .peach-react [data-media-text] { height: var(--card-meta-block); }
+body[data-surface="/trash"] .peach-react [data-media-byline] { flex-wrap: nowrap; height: 20px; flex: none; overflow: hidden; }
+body[data-surface="/trash"] .peach-react [data-media-size] { flex: none; white-space: nowrap; }
+body[data-surface="/trash"] .peach-react [data-media-tags] {
+  height: calc(var(--card-meta-tags) - 3px); flex: none; flex-wrap: nowrap; overflow: hidden;
+}
+.peach-react [data-media-disposal-reason] {
+  flex: none; height: 20px; overflow: hidden; color: var(--ink-2);
+  font-size: var(--fs-xs); line-height: 20px; text-overflow: ellipsis; white-space: nowrap;
+}
+.peach-react [data-pending-delete] [data-media-duration] { top: 10px; bottom: auto; }
+.peach-react [data-pending-delete] :is([data-media-preview], [data-media-later], [data-media-seek]) { display: none; }
+.peach-react [data-media-operation-error] {
+  position: absolute; z-index: 7; left: 10px; right: 10px; bottom: 48px;
+  padding: 8px; border-radius: var(--badge-radius); background: var(--ground); color: var(--drop);
+  font-size: var(--fs-xs); overflow-wrap: anywhere;
+}
 .peach-react [data-media-glyph] {
   display: grid;
   place-items: center;

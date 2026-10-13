@@ -757,7 +757,7 @@ def w_purge_missing(contract: ResourceSyncContract, body):
         stamp = time.time()
         kept = set(mark_vanished(connection, record_holders(connection, ids), stamp))
         connection.executemany(
-            "UPDATE asset SET disposal='trash',feedback_at=? WHERE id=? AND disposal IS NULL",
+            "UPDATE asset SET disposal='trash',disposal_reason='missing',feedback_at=? WHERE id=? AND disposal IS NULL",
             [(stamp, asset_id) for asset_id in ids if asset_id not in kept],
         )
         reattached = set(reattach_vanished(connection, kept))
