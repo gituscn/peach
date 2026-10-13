@@ -9,7 +9,9 @@
   width:max-content;min-width:min(400px,100%);max-width:100%;right:0;
   padding:18px 20px;gap:12px;flex-wrap:wrap;border-radius:var(--floating-radius);font:var(--board-body);
   box-shadow:var(--elevation-dropdown)}
-#toasts [data-sonner-toast][data-styled=true] [data-content]{flex:1 1 min(240px,calc(100% - 32px))}
+/* 正文按实际内容参与排布，上限留出图标、间距与 Sonner 的光学校正边距。 */
+#toasts [data-sonner-toast][data-styled=true] [data-content]{flex:1 1 auto;
+  max-width:calc(100% - 28px - var(--toast-icon-margin-start) - var(--toast-icon-margin-end))}
 #toasts [data-sonner-toast][data-styled=true] [data-button]{white-space:nowrap;margin-left:auto}
 @media(max-width:600px){
   #toasts [data-sonner-toaster]{width:calc(100% - var(--mobile-offset-left) - var(--mobile-offset-right))}
