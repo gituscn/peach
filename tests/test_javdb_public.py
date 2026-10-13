@@ -254,6 +254,40 @@ class PublicProtocolTests(unittest.TestCase):
 
 
 class DetailProjectionTests(unittest.TestCase):
+    def test_saved_identity_fetches_actor_portrait_without_code_search(self):
+        from peach.jav_discovery_metadata import discovery_metadata
+        metadata = discovery_metadata(self.contract)
+        metadata.remember('EXM-001', {'id': 'Exact', 'number': 'EXM-001', 'actors': [
+            {'id': 'Person', 'name': '甲', 'gender': 0,
+             'avatar_url': 'https://tp.spfcas.com/actor.jpg?signature=expired'}]})
+        original = io.BytesIO()
+        Image.new('RGB', (40, 60)).save(original, 'PNG')
+        requests = []
+        def transport(request, *_):
+            requests.append(request.url)
+            if '/search' in request.url:
+                raise AssertionError('已有作品身份，无需番号搜索')
+            if request.url.startswith('https://tp.spfcas.com/'):
+                body = original.getvalue()
+            elif request.url.endswith('/'):
+                body = b'<script src="/assets/index-test.js"></script>'
+            elif '/assets/' in request.url:
+                body = b'const S1="test-middle",E1="test-suffix";'
+            else:
+                body = json.dumps({'success': 1, 'data': {'movie': {'id': 'Exact', 'number': 'EXM-001',
+                    'actors': [{'id': 'Person', 'name': '甲', 'gender': 0,
+                                'avatar_url': 'https://tp.spfcas.com/actor.jpg'}]}}}).encode()
+            return HttpResponse(200, {}, body)
+        api = PublicAPI(transport, sleeper=lambda _: None)
+        with patch('peach.web_jav_detail.PUBLIC_API', api):
+            first = q_jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Person'})
+            second = q_jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Person'})
+        self.assertTrue(first['ok'])
+        self.assertTrue(first['image'].startswith('data:image/jpeg;base64,'))
+        self.assertEqual(second, first)
+        self.assertEqual(sum('/movies/Exact' in url for url in requests), 1)
+        self.assertEqual(sum(url.startswith('https://tp.spfcas.com/') for url in requests), 1)
+
     def test_saved_static_actor_portrait_does_not_fetch_movie_details(self):
         from peach.jav_discovery_metadata import discovery_metadata
         metadata = discovery_metadata(self.contract)

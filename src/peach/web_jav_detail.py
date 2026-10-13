@@ -179,6 +179,7 @@ def q_jav_image(contract, args) -> dict:
     try:
         if index.startswith('actor:'):
             stored, _ = discovery_metadata(contract).peek(code)
+            PUBLIC_API.remember_movie_identity(code, stored or {})
             actor = next((person for person in (stored or {}).get('actors', [])
                           if isinstance(person, dict) and str(person.get('id')) == index.removeprefix('actor:')), {})
             if public_image_url(actor.get('avatar_image')):
