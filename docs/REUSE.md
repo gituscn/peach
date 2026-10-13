@@ -20,11 +20,13 @@ SiteRecord 与候选结算；[外部播放](EXTERNAL_PLAYERS.md)复用既有媒�
 
 ## 二维播放墙
 
-Folia（`chthollyphile/folia-major`，AGPL-3.0，revision `9a01e788ed52d25ea01b1f0d37934e5e371ae82b`）提供矩形块模板、镜头／世界坐标、视口裁剪、循环／有限墙及视觉样式；原文保存在 [矩形块模板](reference-snapshots/upstream/folia-block-templates.ts)、[让位表](reference-snapshots/upstream/folia-block-reflows.ts)、[动效参数](reference-snapshots/upstream/folia-wall-reflow-motion.ts) 和 [墙面样式](reference-snapshots/upstream/folia-wall.css)。`frontend/src/react/video-wall/` 在独立 `/wall` 页面使用四套模板及镜像、6×6 原位展开和暗色直角拼贴，固定三列续页。封面复用 `ArtSlot`、`cardArtwork` 与人脸／正封取景；全封和正封按磁贴比例选择，只接收有封面的视频。Query、BoardUI、Motion、详情入口、舞台播放器和小窗均使用项目已有能力，不增加依赖。
+Folia（`chthollyphile/folia-major`，AGPL-3.0，revision `9a01e788ed52d25ea01b1f0d37934e5e371ae82b`）提供矩形块模板、镜头／世界坐标、视口裁剪、循环／有限墙及视觉样式；原文保存在 [矩形块模板](reference-snapshots/upstream/folia-block-templates.ts)、[让位表](reference-snapshots/upstream/folia-block-reflows.ts)、[动效参数](reference-snapshots/upstream/folia-wall-reflow-motion.ts) 和 [墙面样式](reference-snapshots/upstream/folia-wall.css)。`frontend/src/react/video-wall/` 在独立 `/wall` 页面使用四套模板及镜像、6×6 原位展开和暗色直角拼贴。封面复用 `ArtSlot`、`cardArtwork` 与人脸／正封取景；全封和正封按磁贴比例选择，只接收有封面的视频。Query、BoardUI、Motion、详情入口、舞台播放器和小窗均使用项目已有能力，不增加依赖。
 
 墙内分卷和版本使用 `item-detail` 的 `queueKey`、`fetchQueue`、`chooseItem`、`nextPart`，列表行复用 `MixQueue`；上一部、下一部和进度控制监听同一 video。换批入口复用首页 `Shuffle` 和原有等待动效。展开卡的封面铺满，标题叠在中下部，播放时封面背景模糊、标题移到上方。
 
-上游当前仓库仍在维护，技术栈为 React 19、TypeScript 7 与 Vite 8。模板与坐标算法没有 Python 或平台依赖，正式消费者是浏览器构建。Three.js、Pixi、歌词和音乐账号体系不适用于视频墙，未引入；全库一次加载会增加传输与解码成本，因此探索墙循环当前批次，筛选及实体作品墙使用现有分页。几何 POC 覆盖 80,000 项、负坐标循环及续页位置稳定，播放器测试覆盖同一实例交接、取消与来源门槛；见 [播放墙取证](reference-snapshots/folia-video-wall.md)。
+上游当前仓库仍在维护，技术栈为 React 19、TypeScript 7 与 Vite 8。模板与坐标算法没有 Python 或平台依赖，正式消费者是浏览器构建。Three.js、Pixi、歌词和音乐账号体系不适用于视频墙，未引入。探索墙复用现有 Query 分页，按进入视口的实例键分配作品，保留已看位置；未展示作品不足时自动续页，无封面页继续跳过，全范围耗尽后才循环。筛选及实体作品墙使用固定三列与手动续页。几何测试覆盖 80,000 项、负坐标、续页位置稳定和耗尽状态，播放器测试覆盖同一实例交接、取消与来源门槛；见 [播放墙取证](reference-snapshots/folia-video-wall.md)。
+
+高亮复用 Folia 当前播放标记的内侧描边与发光，Peach 同时应用于选中和播放。队列滚轮交给现有 `MixQueue` 的滚动区，墙面不接管；手动换批使用独立等待态，Query 就绪后移动到新区域并恢复墙面。全局入口与沉浸模式一样常驻，非作品页面保留来源与 JAV 语境及返回地址，馆藏和实体作品页继承当前筛选。
 
 ## 脚本目录与参数
 

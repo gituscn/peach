@@ -37,6 +37,132 @@ async function addWallCovers(page: Page) {
 }
 
 describe('播放墙的浏览与详情', () => {
+  it('选中作品具有发光描边，其余变暗；队列滚轮只滚列表；换批等待时墙面变糊', async () => {
+    const opened = await openItemPage(browser, '/', VIEWPORTS[0]!, { ready:'[data-media-card]' });
+    const { page } = opened;
+    let release = () => {};
+    let hold = false;
+    const gate = new Promise<void>(resolve => { release = resolve });
+    try {
+      await page.route(url => url.pathname === '/api/items', async route => {
+        const params = new URL(route.request().url()).searchParams;
+        if (params.has('orient')) return route.fulfill({ json:{ items:[],total:0 } });
+        const offset = Number(params.get('offset') || 0);
+        if (offset && hold) await gate;
+        await route.fulfill({ json:{ items:Array.from({ length:60 }, (_, index) => ({
+          id:1000 + offset + index,name:`作品 ${offset + index}`,medium:'video',location:'local',has_cover:true,cover_key:'NON-JAV',
+        })),total:360,has_more:offset < 300 } });
+      });
+      await page.goto(new URL('/wall', page.url()).href);
+      await page.locator('[data-wall-tile]').first().waitFor(); await pick(page);
+      await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('[data-wall-dim]')!).opacity) > .6);
+      const glow = await page.locator('[data-wall-focus]').evaluate(node => {
+        const style = getComputedStyle(node, '::before'); return { width:style.borderTopWidth, shadow:style.boxShadow };
+      });
+      assert.equal(glow.width, '2px'); assert.match(glow.shadow, /inset/);
+      await page.getByRole('button', { name:'切换视频',exact:true }).click();
+      const list = page.locator('[data-wall-queue] [data-mix-list]');
+      const box = await list.boundingBox(); assert.ok(box);
+      const position = await camera(page);
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.wheel(0, 480);
+      await page.waitForFunction(() => document.querySelector('[data-wall-queue] [data-mix-list]')!.scrollTop > 0);
+      assert.deepEqual(await camera(page), position);
+      await page.getByRole('button', { name:'收起作品',exact:true }).click();
+      await page.waitForFunction(() => document.querySelector('[data-wall-refresh] button')?.getAttribute('aria-busy') !== 'true');
+      const before = await camera(page);
+      hold = true;
+      await page.getByRole('button', { name:'换一批',exact:true }).click();
+      await page.locator('[data-video-wall][data-refreshing]').waitFor();
+      assert.match(await page.locator('[data-wall-viewport]').evaluate(node => getComputedStyle(node).filter), /blur\(8px\).*grayscale\(1\)/);
+      assert.deepEqual(await camera(page), before);
+      release(); await page.locator('[data-video-wall][data-refreshing]').waitFor({ state:'hidden' });
+      await page.waitForFunction(() => [...document.querySelectorAll<HTMLElement>('[data-wall-id]')].some(node => Number(node.dataset.wallId) >= 1060));
+      assert.equal(await page.locator('[data-wall-viewport]').evaluate(node => getComputedStyle(node).filter), 'none');
+    } finally { release(); await opened.close() }
+  });
+  it('右上角播放墙入口和沉浸模式入口在非多选页面同样常驻', async () => {
+    const opened = await openItemPage(browser, '/', VIEWPORTS[0]!, { ready:'[data-media-card]' });
+    const { page } = opened;
+    try {
+      await addWallCovers(page);
+      for (const path of ['/stats','/trash']) {
+        await page.goto(new URL(path, page.url()).href); await settle(page);
+        assert.equal(await page.getByRole('button', { name:'进入沉浸模式',exact:true }).isVisible(), true);
+        assert.equal(await page.getByRole('button', { name:'进入播放墙',exact:true }).isVisible(), true);
+        await enter(page);
+        assert.equal(new URL(page.url()).searchParams.get('state'), null);
+        await page.getByRole('button', { name:'退出播放墙',exact:true }).click();
+        await page.waitForURL(url => url.pathname === path);
+      }
+    } finally { await page.unrouteAll({ behavior:'wait' }); await opened.close() }
+  });
+  for (const viewport of VIEWPORTS) it(`${viewport.name}：四向浏览自动续页，磁贴位置稳定且优先展示未出现作品`, async () => {
+    const opened = await openItemPage(browser, '/', viewport, { ready:'[data-media-card]' });
+    const { page } = opened;
+    const offsets: number[] = [];
+    try {
+      await page.route(url => url.pathname === '/api/items', route => {
+        const params = new URL(route.request().url()).searchParams;
+        if (params.has('orient')) return route.fulfill({ json:{ items:[],total:0 } });
+        const offset = Number(params.get('offset') || 0), limit = Number(params.get('limit') || 60);
+        offsets.push(offset);
+        return route.fulfill({ json:{ items:Array.from({ length:limit }, (_, index) => ({
+          id:1000 + offset + index, name:`作品 ${offset + index}`, medium:'video', location:'local',
+          has_cover:offset !== 60, cover_key:'NON-JAV',
+        })), total:1800, has_more:offset + limit < 1800 } });
+      });
+      await page.goto(new URL('/wall', page.url()).href);
+      await page.locator('[data-wall-tile]').first().waitFor();
+      const seen = new Map<string, string>(), identities = new Map<string, string>();
+      const record = async () => {
+        await page.waitForFunction(() => document.querySelector('[data-wall-viewport]')?.getAttribute('aria-busy') !== 'true');
+        await page.waitForFunction(() => !document.querySelector('[data-wall-skeleton]'));
+        for (const [key, id] of await page.locator('[data-wall-tile]').evaluateAll(nodes => nodes.map(node => [
+          (node as HTMLElement).dataset.wallTile!, (node as HTMLElement).dataset.wallId!,
+        ]))) {
+          if (seen.has(key!)) assert.equal(id, seen.get(key!), '已有位置保持作品身份');
+          else { assert.equal(identities.has(id!), false, '新位置优先使用未出现作品'); seen.set(key!, id!); identities.set(id!, key!) }
+        }
+      };
+      await record();
+      for (const direction of ['ArrowRight','ArrowDown','ArrowLeft','ArrowUp']) {
+        await page.locator('[data-wall-viewport]').focus();
+        for (let step = 0; step < 15; step++) { await page.keyboard.press(direction); await record() }
+      }
+      assert.ok(offsets.includes(120), '无封面页继续续页');
+      assert.ok(identities.size > 60, '浏览超过首批作品');
+      assert.equal([...identities.keys()].some(id => Number(id) >= 1060 && Number(id) < 1120), false);
+      assert.deepEqual(opened.problems, []);
+    } finally { await opened.close() }
+  });
+  it('自动续页失败后停止请求，重试填入新作品并保留镜头', async () => {
+    const opened = await openItemPage(browser, '/', VIEWPORTS[0]!, { ready:'[data-media-card]' });
+    const { page } = opened;
+    let recover = false, failures = 0;
+    try {
+      await page.route(url => url.pathname === '/api/items', route => {
+        const params = new URL(route.request().url()).searchParams;
+        if (params.has('orient')) return route.fulfill({ json:{ items:[],total:0 } });
+        const offset = Number(params.get('offset') || 0);
+        if (offset && !recover) { failures++; return route.fulfill({ status:503,json:{ error:'续页暂时不可用' } }) }
+        return route.fulfill({ json:{ items:Array.from({ length:60 }, (_, index) => ({
+          id:1000 + offset + index, name:`作品 ${offset + index}`, medium:'video', location:'local', has_cover:true,cover_key:'NON-JAV',
+        })), total:120,has_more:!offset } });
+      });
+      await page.goto(new URL('/wall', page.url()).href);
+      await page.locator('[data-wall-tile]').first().waitFor();
+      await page.locator('[data-wall-viewport]').focus();
+      for (let step = 0; step < 20; step++) await page.keyboard.press('ArrowRight');
+      await page.locator('[data-wall-error]').waitFor();
+      const attempts = failures, position = await camera(page);
+      await page.waitForTimeout(400);
+      assert.equal(failures, attempts, '失败后不连续触发新请求');
+      recover = true; await page.getByRole('button', { name:'重试',exact:true }).click();
+      await page.locator('[data-wall-error]').waitFor({ state:'hidden' });
+      await page.waitForFunction(() => [...document.querySelectorAll<HTMLElement>('[data-wall-id]')].some(node => Number(node.dataset.wallId) >= 1060));
+      assert.deepEqual(await camera(page), position);
+    } finally { await opened.close() }
+  });
   for (const viewport of VIEWPORTS) it(`${viewport.name}：刷新直接进入墙面，模块和数据等待均不展示首页骨架`, async () => {
     const context = await browser.newContext({ viewport:{ width:viewport.width,height:viewport.height } });
     const page = await context.newPage();
@@ -246,7 +372,7 @@ describe('播放墙的浏览与详情', () => {
       } finally { await opened.close() }
     });
   }
-  it('搜索使用不重复的有限墙，回收站仍使用网格', async () => {
+  it('搜索使用不重复的有限墙，回收站使用网格并保留全局播放墙入口', async () => {
     const opened = await openItemPage(browser, '/?q=作品', VIEWPORTS[0]!, { ready: '[data-media-card]', catalogIds:[18,21,31] });
     const { page } = opened;
     try {
@@ -271,7 +397,7 @@ describe('播放墙的浏览与详情', () => {
       assert.equal(new URL(page.url()).searchParams.get('q'), '作品');
       await page.goto(new URL('/trash', page.url()).href);
       await settle(page);
-      assert.equal(await page.getByRole('button', { name: '进入播放墙', exact: true }).isVisible(), false);
+      assert.equal(await page.getByRole('button', { name: '进入播放墙', exact: true }).isVisible(), true);
     } finally { await opened.close() }
   });
   it('非番号作品也能切换封面与视频缩略图', async () => {
@@ -324,8 +450,10 @@ describe('播放墙的浏览与详情', () => {
       await page.getByRole('button', { name: '换一批', exact: true }).click();
       await page.waitForFunction(() => !!document.querySelector('[data-wall-id="11"]'));
       const ids = () => page.locator('[data-wall-id]').evaluateAll(nodes => [...new Set(nodes.map(node => (node as HTMLElement).dataset.wallId))].sort());
-      assert.deepEqual(await ids(), ['11','17','18']);
-      await pick(page); const position = await camera(page), visibleIds = await ids();
+      assert.ok((await ids()).includes('11'));
+      await page.locator('[data-wall-id="11"]').first().dispatchEvent('click');
+      await page.locator('[data-wall-focus][data-wall-id="11"]').waitFor();
+      const position = await camera(page), visibleIds = await ids();
       await page.getByRole('button', { name: '详情', exact: true }).click();
       await page.locator('#stage[open] [data-item-side]').waitFor();
       await page.keyboard.press('Escape'); await page.locator('#stage[open]').waitFor({ state: 'hidden' });
@@ -371,7 +499,7 @@ describe('播放墙的浏览与详情', () => {
       await page.locator('#stage video[data-wall-instance="same"]').waitFor();
       await page.keyboard.press('Escape');
       await page.locator('#stage[open]').waitFor({ state: 'hidden' });
-    } finally { await opened.close() }
+    } finally { await page.unrouteAll({ behavior:'wait' }); await opened.close() }
   });
   it('搜索无结果时保留返回和工具，清空搜索可继续浏览', async () => {
     const opened = await visit(browser, '/wall?q=不会匹配的查询', VIEWPORTS[0]!);
@@ -386,7 +514,7 @@ describe('播放墙的浏览与详情', () => {
       await page.getByRole('searchbox', { name:'搜索播放墙' }).press('Enter');
       await page.locator('[data-wall-tile]').first().waitFor();
       assert.deepEqual(opened.problems, []);
-    } finally { await opened.close() }
+    } finally { await page.unrouteAll({ behavior:'wait' }); await opened.close() }
   });
   it('读取失败留在墙内并可原地重试', async () => {
     const opened = await visit(browser, '/', VIEWPORTS[0]!);

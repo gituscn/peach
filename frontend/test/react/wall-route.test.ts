@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { wallAddress } from '../../src/react/video-wall/wall-route';
 
 describe('播放墙独立入口', () => {
+  it('全局入口保留返回地址，非作品页使用馆藏范围', () => {
+    for (const path of ['/stats?tab=creators','/trash?q=清理','/junk-files','/follow?q=动态','/performers?q=姓名']) {
+      const target = new URL(wallAddress(path, { state:'trash',q:'清理',jav:'1',loc:'local' }), location.origin);
+      expect(target.searchParams.get('state')).toBeNull();
+      expect(target.searchParams.get('q')).toBeNull();
+      expect(target.searchParams.get('tab')).toBeNull();
+      expect(target.searchParams.get('jav')).toBe('1');
+      expect(target.searchParams.get('loc')).toBe('local');
+      const source = new URL(path, location.origin);
+      expect(target.searchParams.get('returnTo')).toBe(source.pathname + source.search);
+    }
+  });
   it('继承搜索和筛选，并保留返回地址', () => {
     const target = new URL(wallAddress('/?q=测试&tag=风景&loc=local'), location.origin);
     expect(target.pathname).toBe('/wall');
