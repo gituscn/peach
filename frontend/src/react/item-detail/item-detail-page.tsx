@@ -29,6 +29,8 @@ import { IdentityCell, IdentitySeries } from '../components/identity-cell';
 import { useFoldedTitle } from '../components/folded-title';
 import { MediaCarousel, useCarouselInset } from '../components/media-carousel';
 import { CatalogPicture } from './catalog-picture';
+import { fetchJavDetail, javDetailKey } from '../jav-detail/jav-detail';
+import { busyProps } from '../settings/use-action';
 import { ExternalPlayback } from './external-playback';
 import { CoverCrop } from '../cover-crop/cover-crop-page';
 import { queryClient } from '../query';
@@ -134,9 +136,19 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
      整个实例还要搬进来，那一截 DOM 不归 React。 */
   const frameRef = useRef<HTMLDivElement>(null);
   const [image, setImage] = useState(-2);
-  useCarouselInset(frameRef, '[data-catalog-picture]', image);
+  useCarouselInset(frameRef, '[data-catalog-picture], [data-jav-picture]', image);
+  const refreshSamples = useRef(false);
+  const source = useQuery({ queryKey: javDetailKey(item.code || ''),
+    queryFn: ({ signal }) => {
+      const refresh = refreshSamples.current;
+      refreshSamples.current = false;
+      return fetchJavDetail(item.code!, signal, refresh);
+    }, staleTime: 6 * 3600_000,
+    enabled: !!item.is_jav && !!item.code && !item.sample_images?.length });
+  const samples = item.sample_images?.length ? item.sample_images.map(sample => ({ index: sample.n, source: false }))
+    : Array.from({ length: Math.min(30, Math.max(0, source.data?.preview_count || 0)) }, (_, index) => ({ index: index + 1, source: true }));
   const media = item.is_jav && item.code ? [...(item.has_cover ? [{ index: -1, label: '封面' }] : []),
-    ...(item.sample_images || []).map((sample, index) => ({ index: sample.n, label: `预览 ${index + 1}` })),
+    ...samples.map((sample, index) => ({ ...sample, label: `预览 ${index + 1}` })),
     { index: -2, label: '正片', video: true }] : [];
   const hasPictures = media.length > 1;
   const selectImage = (index: number) => {
@@ -163,10 +175,15 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
       {hasPictures ? <>
         <button type="button" data-jav-preview-toggle="" aria-pressed={image !== -2}
           onClick={() => selectImage(image === -2 ? media[0]!.index : -2)}><Glyph name={image === -2 ? 'image' : 'play'} />{image === -2 ? '查看图片' : '播放正片'}</button>
-        {image !== -2 ? <CatalogPicture key={image} item={item} image={image} /> : null}
+        {image !== -2 ? <CatalogPicture key={image} item={item} image={image} source={samples.find(sample => sample.index === image)?.source} /> : null}
         <MediaCarousel items={media} position={Math.max(0, media.findIndex(entry => entry.index === image))} onSelect={selectImage}
-            below renderThumbnail={entry => <CatalogPicture item={item} image={entry.index === -2 ? media[0]!.index : entry.index} thumbnail />} />
+            below renderThumbnail={entry => <CatalogPicture item={item} image={entry.index === -2 ? media[0]!.index : entry.index}
+              source={samples.find(sample => sample.index === (entry.index === -2 ? media[0]!.index : entry.index))?.source} thumbnail />} />
       </> : null}
+      {item.is_jav && item.code && !item.sample_images?.length && (source.isPending || source.error || source.data?.state === 'partial') ?
+        <div data-item-samples-state="">{source.isPending ? <span data-skeleton="samples" role="status" aria-label="正在读取样图" className="relative block h-12 w-20 skeleton-sheen" />
+          : <Button variant="secondary" {...busyProps(source.isFetching)} title={source.data?.message || requestErrorMessage(source.error)}
+            onClick={() => { refreshSamples.current = true; void source.refetch() }}>重试样图</Button>}</div> : null}
       {gate === 'offline' ? <OfflineGate item={item} badge={badge} helpers={helpers} actions={actions} />
         : gate === 'online' ? (
           <div id="onlineGate" role="status" data-item-gate="online">
