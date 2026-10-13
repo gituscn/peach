@@ -962,7 +962,7 @@ def jav_preview(request: Request, code: str, ref: str, args: dict[str, str] = De
                 response = open_upstream(client, "GET", ResolvedFollowMedia(url, public_hosts=True), incoming={})
                 try:
                     chunks, size = [], 0
-                    for chunk in response.iter_raw():
+                    for chunk in response.iter_bytes():
                         size += len(chunk)
                         if size > 1024 * 1024:
                             raise ValueError("预览清单过大")

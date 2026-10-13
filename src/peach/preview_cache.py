@@ -36,11 +36,11 @@ class PreviewCache:
         url = self.source(code, ref)["url"]
         def download():
             body = fetch(url)
-            if not body.lstrip().startswith(b"#EXTM3U"):
+            if not body.decode("utf-8").removeprefix(chr(0xFEFF)).lstrip().startswith("#EXTM3U"):
                 raise ValueError("预览清单未取得")
             return body
         body = self.cache.bytes(f"preview:{code}:{ref}:playlist", download)
-        playlist = m3u8.loads(body.decode("utf-8-sig"), uri=url)
+        playlist = m3u8.loads(body.decode("utf-8").removeprefix(chr(0xFEFF)), uri=url)
         nested = [*playlist.playlists, *playlist.iframe_playlists, *playlist.media]
         objects = [*playlist.segments, *nested, *playlist.keys, *playlist.session_keys, *playlist.segment_map]
         for obj in objects:

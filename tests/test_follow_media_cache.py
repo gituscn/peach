@@ -1,5 +1,6 @@
 import asyncio
 import json
+import gzip
 import os
 import tempfile
 import unittest
@@ -59,6 +60,14 @@ class RemoteMediaCacheTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.calls, 1)
         self.assertIsNone(self.cache.stored("follow:1:media:0", "bytes=6-9"))
         self.assertIsNone(self.cache.stored("follow:1:media:0"))
+
+    async def test_content_encoding_is_preserved_for_disk_replay(self):
+        self.payload = gzip.compress(b"0123456789")
+        self.headers.update({"content-encoding": "gzip", "content-length": str(len(self.payload))})
+        for _ in range(2):
+            response = await self.client.get("/media")
+            self.assertEqual(response.content, b"0123456789")
+        self.assertEqual(self.calls, 1)
 
     async def test_concurrent_cold_requests_download_once(self):
         responses = await asyncio.gather(self.client.get("/media"), self.client.get("/media"))
@@ -120,7 +129,7 @@ class PreviewCacheTests(unittest.TestCase):
             cache = RemoteMediaCache(Path(directory).resolve())
             previews = PreviewCache(cache)
             root = previews.register("ABP-123", "https://cdn.example/root.m3u8", identity="root", playlist=True)
-            fetch = mock.Mock(return_value=b'#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=10\nvideo/list\n')
+            fetch = mock.Mock(return_value=b'\xef\xbb\xbf#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=10\nvideo/list\n')
             body = previews.playlist("ABP-123", root, fetch).decode()
             self.assertNotIn("https://", body)
             child = body.splitlines()[-1].rsplit("/", 1)[-1]

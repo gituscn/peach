@@ -15,7 +15,7 @@ from .fsutil import atomic_path, atomic_write_text
 
 AVATAR_REFRESH_SECONDS = 90 * 86400
 FAVICON_REFRESH_SECONDS = 365 * 86400
-MEDIA_HEADERS = ("content-type", "content-length", "content-range", "accept-ranges")
+MEDIA_HEADERS = ("content-type", "content-length", "content-range", "accept-ranges", "content-encoding")
 
 
 class RemoteMediaUnavailable(ValueError):
@@ -110,25 +110,8 @@ class RemoteMediaCache:
             slot = self._slot(key, byte_range)
             def body():
                 try:
-                    if not accepted:
-                        yield from upstream.iter_raw()
-                        return
-                    with atomic_path(slot.with_suffix(".bin")) as temporary:
-                        size = 0
-                        with temporary.open("wb") as handle:
-                            for chunk in upstream.iter_raw():
-                                handle.write(chunk)
-                                size += len(chunk)
-                                yield chunk
-                        expected = int(forwarded.get("content-length", size))
-                        if not size or size != expected or (content_range and
-                                size != int(content_range[2]) - int(content_range[1]) + 1):
-                            raise OSError("媒体响应长度不完整")
-                    atomic_write_text(slot.with_suffix(".json"), json.dumps({
-                        "status": 200 if complete_range else upstream.status_code, "size": size, "headers": {
-                            name: value for name, value in forwarded.items() if name in MEDIA_HEADERS
-                            and not (complete_range and name == "content-range")},
-                    }), mode=0o600)
+                    yield from self._capture_response(slot, upstream, forwarded, accepted=accepted,
+                        content_range=content_range, complete_range=complete_range)
                 finally:
                     close()
             return StreamingResponse(body(), status_code=upstream.status_code, headers=forwarded,
@@ -136,6 +119,28 @@ class RemoteMediaCache:
         except BaseException:
             close()
             raise
+
+    def _capture_response(self, slot, upstream, headers, *, accepted, content_range, complete_range):
+        """安装一次完整传输的字节与范围信息，未完成的临时文件由原子写入清除。"""
+        if not accepted:
+            yield from upstream.iter_raw()
+            return
+        with atomic_path(slot.with_suffix(".bin")) as temporary:
+            size = 0
+            with temporary.open("wb") as handle:
+                for chunk in upstream.iter_raw():
+                    handle.write(chunk)
+                    size += len(chunk)
+                    yield chunk
+            expected = int(headers.get("content-length", size))
+            if not size or size != expected or (content_range and
+                    size != int(content_range[2]) - int(content_range[1]) + 1):
+                raise OSError("媒体响应长度不完整")
+        atomic_write_text(slot.with_suffix(".json"), json.dumps({
+            "status": 200 if complete_range else upstream.status_code, "size": size, "headers": {
+                name: value for name, value in headers.items() if name in MEDIA_HEADERS
+                and not (complete_range and name == "content-range")},
+        }), mode=0o600)
 
     def bytes(self, key: str, fetch, *, ttl: int | None = None) -> bytes:
         """图片与清单复用原子文件及跨进程锁；刷新失败保留可用副本。"""
