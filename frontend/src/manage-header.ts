@@ -38,12 +38,12 @@ export const MANAGE_CRUMB_PAGES: Readonly<Record<string, string>> = {
   '/review': '人工复核',
   '/trash': '回收站',
   '/quality-goals': '高清版',
-  '/scraping': '来源和凭证',
+  '/sources': '来源和凭证',
 };
 
 /* 窄屏（≤760px）上标题收一档到 22px 的页面：正文是 812px 窄列的数据管理 hub、来源和凭证与配置页。
    其余管理页跟全站页面标题走 24px。 */
-const COMPACT_TITLE_PATHS = new Set(['/data-cleanup', '/scraping']);
+const COMPACT_TITLE_PATHS = new Set(['/data-cleanup', '/sources']);
 
 /** 管理条上按下哪一项。数据管理那几张卡通往的子页从数据管理进，按下的是「数据管理」；
  *  别的页按自己的管理区，管理条上没有这一项时就没有按下项。 */

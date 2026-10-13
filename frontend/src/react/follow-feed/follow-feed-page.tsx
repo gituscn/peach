@@ -599,7 +599,7 @@ function Empty({ data, filtered }: { data: FollowPage; filtered: boolean }) {
         ? emptyStateHtml('rss', '没有符合条件的更新', '切换状态或来源筛选后再试。')
         : emptyStateHtml('rss', '还没有更新', '点「检查更新」去各个来源取一遍；来源有新内容时会集中显示在这里。')
       : emptyStateHtml('rss', '还没有关注任何来源', '添加创作者或订阅来源后，更新会集中显示在这里。',
-        { actions: '<a class="geist-button primary" href="/follow-manage?tab=add">添加关注</a>' });
+        { actions: '<a class="geist-button primary" href="/subscriptions?tab=add">添加关注</a>' });
   return <div data-follow-empty="" className="contents" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 

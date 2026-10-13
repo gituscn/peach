@@ -1117,7 +1117,7 @@ def _taste_analysis(
         next_steps.append({
             "kind": "follow", "title": "追踪常访创作者",
             "detail": "、".join(str(row["name"]) for row in creator_leads),
-            "route": "/follow-manage",
+            "route": "/subscriptions",
         })
     if int(peach["coverage"]["untagged"]) or int(peach["coverage"]["unidentified"]):
         next_steps.append({

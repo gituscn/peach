@@ -91,6 +91,11 @@ async function checkMachine(current: SettingsPanelHost): Promise<void> {
 function open(section = ''): void {
   const current = host;
   if (!current) return;
+  const requested = SECTIONS.findIndex(([title]) => title === section);
+  if (view.open && !view.closing) {
+    if (requested >= 0 && requested !== view.tab) update({ tab: requested });
+    return;
+  }
   /* 设置这一屏盖住整页，任何还开着的锚定弹层都得先收掉：设置有侧栏的设置钮、配色弹层的
      「详细设置」和快捷键几处入口，收在这里就不会漏掉哪一处。 */
   closeAnchoredMenu();
@@ -99,7 +104,6 @@ function open(section = ''): void {
   current.sound('whoosh');
   document.documentElement.style.overflow = 'hidden';
   document.body.classList.add('settings-open');
-  const requested = SECTIONS.findIndex(([title]) => title === section);
   /* 先发取数再画：第一次打开时查询还不存在，这一趟由 `fetchQuery` 建起来，组件画出来读到
      的就是在途的这一份，不会再发第二趟。 */
   const remote = refreshPanelData();
@@ -109,9 +113,10 @@ function open(section = ''): void {
   queueMicrotask(() => document.getElementById('settingsClose')?.focus());
 }
 
-function close(): void {
+function close(notify = true): void {
   if (!view.open || view.closing) return;
   const ticket = ++transition;
+  if (notify) host?.closed?.();
   update({ closing: true });
   const finish = () => {
     if (ticket !== transition || !view.closing) return;
@@ -316,7 +321,7 @@ function SettingsPanel({ host: current, view: shown }: { host: SettingsPanelHost
   useLayoutEffect(() => { resync.current?.() });
 
   const epoch = shown.epoch;
-  const select = (index: number) => { if (index !== view.tab) update({ tab: index }) };
+  const select = (index: number) => { if (index !== view.tab) { update({ tab: index }); current.selectSection?.(SECTIONS[index][0]) } };
   const save = () => current.store.save();
 
   return (
@@ -326,12 +331,12 @@ function SettingsPanel({ host: current, view: shown }: { host: SettingsPanelHost
       <div data-settings-card="" ref={card}>
         <div data-settings-head="" ref={head}>
           <h2 id="settingsTitle">{SECTIONS[shown.tab][0]}</h2>
-          <button type="button" id="settingsClose" aria-label="关闭设置" onClick={close}>
+          <button type="button" id="settingsClose" aria-label="关闭设置" onClick={() => close()}>
             <svg viewBox="0 0 24 24"><use href="#i-x" /></svg>
           </button>
         </div>
         <SettingsNav tab={shown.tab} epoch={epoch} configurable={shown.configurable} onSelect={select}
-          openConfiguration={() => { close(); current.openConfiguration() }} />
+          openConfiguration={() => { close(false); current.openConfiguration() }} />
         <div data-settings-scroll="" ref={scroll}>
           <Group index={0} tab={shown.tab}>
             <Row title="主题">
@@ -364,7 +369,7 @@ function SettingsPanel({ host: current, view: shown }: { host: SettingsPanelHost
                   onApply={(value) => { settings.relatedLimit = value; save() }} />
               </div>
             </Row>
-            <Row title="口味与记录"><div className="peach-react"><ButtonLink variant="secondary" href="/taste" onClick={close}>打开口味与记录</ButtonLink></div></Row>
+            <Row title="口味与记录"><div className="peach-react"><ButtonLink variant="secondary" href="/taste" onClick={() => close(false)}>打开口味与记录</ButtonLink></div></Row>
           </Group>
           <Group index={4} tab={shown.tab}>
             <ToggleRow id="censorSetting" title="SFW 模式" describedBy="sfwDescription" checked={current.censored()}

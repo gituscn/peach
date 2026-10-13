@@ -13,6 +13,8 @@
  * 那一段的精确路径（`/performers/`），多于一段按第一段找模式，名字是剩下各段连起来的那一串（读者交进来的是
  * 解码过的路径，名字里的斜杠吃掉剩下全部段，空尾段不算）。 */
 import { overlayMatch } from './overlay';
+import { entityLinkName } from '../core/entity-links';
+import { PREFERENCE_SECTIONS, CONFIGURATION_SECTIONS } from './settings-route';
 
 export interface RouteMeta {
   readonly title?: string;
@@ -23,6 +25,9 @@ export interface RouteMeta {
 }
 
 export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
+  '/settings': { title: '设置', refresh: 'skip' },
+  ...Object.fromEntries(Object.entries(PREFERENCE_SECTIONS).map(([key, title]) => [`/settings/${key}`, { title, refresh: 'skip' }])),
+  ...Object.fromEntries(Object.entries(CONFIGURATION_SECTIONS).map(([key, title]) => [`/settings/${key}`, { title, section: 'configuration', refresh: 'reopen' }])),
   '/jav': { nav: 'jav', title: 'JAV', refresh: 'reopen' },
   '/stats': { section: 'stats', title: '统计' },
   '/taste': { section: 'taste', title: '口味', refresh: 'reopen' },
@@ -30,10 +35,10 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
   '/data-cleanup': { section: 'cleanup', title: '数据管理' },
   '/duplicates': { section: 'cleanup', title: '重复文件', refresh: 'reopen' },
   '/quality-goals': { section: 'quality', title: '高清版', refresh: 'reopen' },
-  '/scraping': { section: 'cleanup', title: '来源和凭证', refresh: 'reopen' },
-  '/follow-manage': { section: 'follow', title: '关注管理', refresh: 'skip' },
-  '/configuration': { section: 'configuration', title: 'Peach 配置', refresh: 'reopen' },
-  '/activity': { section: 'activity', title: '活动', refresh: 'reopen' },
+  '/sources': { section: 'cleanup', title: '来源和凭证', refresh: 'reopen' },
+  '/subscriptions': { section: 'follow', title: '关注管理', refresh: 'skip' },
+  '/settings/library': { section: 'configuration', title: 'Peach 配置', refresh: 'reopen' },
+  '/tasks': { section: 'activity', title: '任务中心', refresh: 'reopen' },
   '/diagnostics': { section: 'configuration', title: '系统诊断', refresh: 'reopen' },
   // 旧直达地址，改写到数据管理页的锚点，没有自己的管理身份。
   '/resource-sync': { title: '数据管理' },
@@ -47,6 +52,7 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
   '/creators/*': { reload: 'reopen' },
   '/series/*': { reload: 'reopen' },
   '/agencies/*': { reload: 'reopen' },
+  '/tags/*': { reload: 'reopen' },
   '/playlists': { nav: 'playlists', title: '播放列表', refresh: 'reopen' },
   // 关注页重画要联网取一遍卡面，「换一批」只由页面自己的按钮触发。
   '/follow': { nav: 'follow', title: '关注', refresh: 'skip' },
@@ -58,13 +64,9 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
   '/junk-files': { nav: 'ads', title: '垃圾文件' },
   '/trash': { section: 'trash' },
   // 覆盖：详情、四种队列与关注详情。分卷与版本队列没有自己的标签。
-  '/playlists/:playlist/:item': { nav: 'playlists', title: '播放列表' },
-  '/mix/:seed/:item': { title: 'Mix' },
-  '/parts/:seed/:item': {},
-  '/editions/:seed/:item': {},
-  '/item/:id': { title: '作品' },
-  '/jav/movie/:code': { nav: 'jav', title: 'JAV 作品' },
-  '/follow/item/:id': { title: '关注' },
+  '/assets/:id': { title: '资产' },
+  '/works/:code': { nav: 'jav', title: 'JAV 作品' },
+  '/posts/:id': { title: '关注' },
   // 沉浸模式进页面组，不算覆盖。
   '/immerse': { nav: 'immerse', title: '沉浸模式' },
   '/wall': { nav: 'wall', title: '播放墙' },
@@ -79,5 +81,7 @@ export function routeMetaOf(path: string): RouteMeta | null {
   if (!segment) return null;
   if (!rest.length) return Object.hasOwn(ROUTE_META, `/${segment}`) ? ROUTE_META[`/${segment}`]! : null;
   const pattern = `/${segment}/*`;
-  return Object.hasOwn(ROUTE_META, pattern) ? { ...ROUTE_META[pattern], title: rest.join('/') } : null;
+  const kinds: Record<string, string> = { performers: 'performer', studios: 'studio', creators: 'creator', agencies: 'agency', series: 'series', tags: 'tag' };
+  const name = /^\d+$/.test(rest.join('/')) ? entityLinkName(kinds[segment] || '', Number(rest[0])) : rest.join('/');
+  return Object.hasOwn(ROUTE_META, pattern) ? { ...ROUTE_META[pattern], title: name || '资料' } : null;
 }

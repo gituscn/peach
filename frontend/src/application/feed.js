@@ -31,7 +31,7 @@ export function feedNewCardHtml(item){
     ?javTitleHtml({is_jav:true,code:item.code,name:item.code,display_title:item.title||''})
     :esc(name);
   const open=item.code
-    ?`<a class="feednewopen" href="/jav/movie/${encodeURIComponent(item.code)}" aria-label="打开 ${esc(name)} 的作品详情"></a>`:'';
+    ?`<a class="feednewopen" href="/works/${encodeURIComponent(item.code)}" aria-label="打开 ${esc(name)} 的作品详情"></a>`:'';
   return `<article class="card feednewcard${item.read?' isread':''}" data-feed-id="${item.id}">
     ${open}<div class="pic" style="--card-ratio:${COVER_FRONT_RATIO}">${cover}
       <div class="hovertools feednewtools">
@@ -67,7 +67,7 @@ export function prepareHomeFeed(host){
 export function feedNetworkNote(unreachable,items){
   if(!(unreachable>0)||!items.some(item=>!item.has_cover))return '';
   return noteHtml(`${unreachable} 部新作的封面连不上 DMM 图片主机，中国移动宽带常见。把 DMM / FANZA 的连接方式设成 Peach 代理，下一轮会自动重取。`,
-    {variant:'warning',className:'feednetwork',actionLabel:'配置连接方式',actionHref:'/scraping'});
+    {variant:'warning',className:'feednetwork',actionLabel:'配置连接方式',actionHref:'/sources'});
 }
 
 export function feedRowHtml(data){

@@ -7,7 +7,7 @@ import { cancelQueueRequest, navigationState, openRoutedPage, requestOverlay } f
 import { activeQueue, barsContext, detailOriginAbove, detailOriginAnchor, detailReturnBarsContext, detailReturnNeedsRestore, detailReturnPath, pageOpens, pendingQueueRoute, presentedItem, queueOpens, selectMode, selected, state, writeShell } from './../shell/index';
 import { scheduleStickySurfaces } from './layout.js';
 import { clearOverlayBackground, holdOverlayBackground, overlayState, takeOverlayReturn } from './../history/overlay';
-import { peachHistory, retagOverlay } from './../history/index';
+import { peachHistory, shellNavigate } from './../history/index';
 import { $, DURATION_TAGS } from '../core';
 import { apiGet } from '../api';
 import { javDisplayName, javTitleHtml } from '../core/jav-title';
@@ -19,7 +19,7 @@ import { currentBarsContext, entityState, openEntity, revealForIsland, syncForIs
 import { openAddToPlaylist, rereadPlaylists, saveMixAsPlaylist } from './playlists.js';
 import { releaseHoverPreviews } from './../card-art/hover';
 import { applicationEffects } from './effects';
-export const mediaState = { total: undefined, facets: undefined, stageHost: undefined, stageOpen: undefined, QUEUE_ROUTES: undefined, itemDetailHelpers: undefined, itemDetailActions: undefined, immerseHost: undefined, immerseOpen: undefined, requestedImmerseId: undefined };
+export const mediaState = { total: undefined, facets: undefined, stageHost: undefined, stageOpen: undefined, itemDetailHelpers: undefined, itemDetailActions: undefined, immerseHost: undefined, immerseOpen: undefined, requestedImmerseId: undefined };
 
 export function urlResume(){
   const seconds=Number(new URLSearchParams(location.search).get('t'));
@@ -78,7 +78,7 @@ export async function openItem(id,push=true,queue=null,anchor=null,queuePush=fal
   if(!queueRequest)cancelQueueRequest();
   if(push&&!queue){
     writeShell({detailReturnPath:location.pathname+location.search});
-    requestOverlay('/item/'+(+id),'item',()=>openItem(id,false,null,anchor));
+    requestOverlay('/assets/'+(+id),'item',()=>openItem(id,false,null,anchor));
     return;
   }
   releaseHoverPreviews();
@@ -103,8 +103,8 @@ export async function openItem(id,push=true,queue=null,anchor=null,queuePush=fal
   writeShell({detailReturnBarsContext:returnBars});
   writeShell({activeQueue:queue&&{kind:queue.kind,seedId:queue.seedId,playlistId:queue.playlistId}});
   writeShell({pendingQueueRoute:queue&&queuePush
-    ? `${mediaState.QUEUE_ROUTES[queue.kind]}/${queue.kind==='playlist'?queue.playlistId:queue.seedId}`:null});
-  if(push&&!queue)navigationState.route('/item/'+id,false,overlayState('item'));
+    ? `${queue.kind}=${queue.kind==='playlist'?queue.playlistId:queue.seedId}`:null});
+  if(push&&!queue)navigationState.route('/assets/'+id,false,overlayState('item'));
   const stage=await loadStage(mediaState.stageHost);
   if(queueRequest?.cancelled)return;
   const actions=queueRequest?{...mediaState.itemDetailActions,
@@ -139,7 +139,7 @@ export async function closeItemDetail(){
 export async function openJavMovie(code,push=true){
   if(push){
     writeShell({detailReturnPath:location.pathname+location.search});
-    requestOverlay('/jav/movie/'+encodeURIComponent(code),'jav',()=>openJavMovie(code,false));
+    requestOverlay('/works/'+encodeURIComponent(code),'jav',()=>openJavMovie(code,false));
     return;
   }
   const seq=peachHistory.navigation.seq;
@@ -153,6 +153,11 @@ export async function openJavMovie(code,push=true){
   if(peachHistory.navigation.seq!==seq)return;
   await stage.open({kind:'jav',code,readOnly:!!runtime.ledger_read_only,
     actions:{close:()=>void closeItemDetail(),navigate:path=>navigationState.navigatePath(path),
+      canonicalCode:canonical=>{
+        if(peachHistory.navigation.seq!==seq||!canonical||canonical===code)return;
+        shellNavigate('/works/'+encodeURIComponent(canonical)+location.search+location.hash,
+          {replace:true,state:peachHistory.navigation.location.state});
+      },
       openTag:tag=>{commitContextFilter(filters=>{filters.tag=tag});window.scrollTo({top:0,behavior:'smooth'})},
       receipt:message=>receiptsState.toast({text:message})}});
   scheduleStickySurfaces();
@@ -182,7 +187,6 @@ mediaState.stageOpen = ()=>!!stageApi()?.isOpen();
 }
 
 export function installMedia21() {
-mediaState.QUEUE_ROUTES = {mix:'/mix',parts:'/parts',editions:'/editions',playlist:'/playlists'};
 mediaState.itemDetailHelpers = {
   badgeHtml:(location,cost,cls)=>preferencesState.srcBadge(location,cost,cls),
   titleHtml:it=>javTitleHtml(it),
@@ -206,17 +210,19 @@ mediaState.itemDetailActions = {
     const returnBars=detailReturnBarsContext;
     writeShell({barsContext:{type:'item',id:item.id,filters:returnBars?.type==='entity'
       ? {...returnBars.filters}:entityState.emptyEntityFilters()}});
-    if(pendingQueueRoute){navigationState.queueOpenRequest=null;navigationState.route(`${pendingQueueRoute}/${item.id}`,false,overlayState('item'));writeShell({pendingQueueRoute:null})}
+    if(pendingQueueRoute){navigationState.queueOpenRequest=null;navigationState.route(`/assets/${item.id}?${pendingQueueRoute}`,false,overlayState('item'));writeShell({pendingQueueRoute:null})}
     buildBars();
   },
   /* 取数时发现要换去别处：保存过的在线资产转关注详情，队列取不到退回普通详情，播放列表空了
      回列表页，条目已不在就收起舞台。壳一换舞台，岛这一次挂载就作废。 */
   redirect:to=>{
     const push=!!pendingQueueRoute;
-    /* 地址照旧停在 `/item/:id`、内容换成关注详情：已推的那一条把详情种类改记成关注，背景不变。
-       队列地址还没推时当前条目是上一条或来处，不动它。 */
-    if(to.kind==='follow'&&!push)retagOverlay('follow');
-    if(to.kind==='follow'){writeShell({followDetailReturnPath:detailReturnPath||'/'});void openFollowDetail(to.id,false,null,true);return}
+    if(to.kind==='follow'){
+      navigationState.queueOpenRequest=null;
+      writeShell({pendingQueueRoute:null,followDetailReturnPath:detailReturnPath||'/'});
+      navigationState.route(`/posts/${to.id}`,!push,overlayState('follow'));
+      void openFollowDetail(to.id,false,null,true);return;
+    }
     if(to.kind==='item'){void openItem(to.id,true);return}
     // 队列地址还没推、人就停在播放列表页上：只重读那一页。
     if(to.kind==='playlists'){if(push||location.pathname!=='/playlists')openRoutedPage('/playlists');else rereadPlaylists();return}

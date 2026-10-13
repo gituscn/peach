@@ -195,7 +195,12 @@ export function IndexPage(props: IndexProps) {
 
   const pressTag = (tag: string) => {
     if (onlineTags) { props.openFollowTag(tag); return }
-    if (!props.selectMode) { props.showTags([tag], 'all'); return }
+    if (!props.selectMode) {
+      const identity = tags.find(item => item.k === tag);
+      if (identity?.entity_id) props.openEntity('tag', tag);
+      else props.showTags([tag], 'all');
+      return;
+    }
     setPicked((current) => {
       const next = new Set(current);
       if (!next.delete(tag)) next.add(tag);
@@ -309,7 +314,7 @@ function IndexEmpty(
   // 在线那一档数的是来源上的东西，名字也跟着来源的说法：艺人页在线摆的是关注来源里的创作者。
   const label = online && kind === 'performers' ? '创作者' : LABELS[kind];
   const follow = (
-    <ButtonLink variant={!configurable || online ? 'primary' : 'secondary'} href="/follow-manage?tab=add">添加关注</ButtonLink>
+    <ButtonLink variant={!configurable || online ? 'primary' : 'secondary'} href="/subscriptions?tab=add">添加关注</ButtonLink>
   );
   return (
     <EmptyState icon={spriteGlyph(kind === 'tags' ? 'tags' : 'user-round')} title={`还没有${label}`}

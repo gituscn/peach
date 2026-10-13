@@ -6,6 +6,7 @@
  * 跟着那一次打开走，不在这里。 */
 
 import type { OverlayTarget } from '@peach/history';
+import type { ConfigurationPath } from '@peach/history';
 
 import type { LibraryProcessingProps } from '../bundle';
 import type { CatalogFilterProps } from '../catalog-filter/catalog-filter';
@@ -19,6 +20,8 @@ import type { JunkQueueProps } from '../junk-queue/junk-queue';
 import type { SearchProps } from '../search/search';
 
 export interface ShellActions {
+  openSettings?(section: string): Promise<unknown>;
+  closeSettings?(): void;
   /** 打开作品详情（舞台）。 */
   openItem(id: number): void;
   /** 打开实体资料页。`kind` 是 `creator`／`performer` 等。 */
@@ -144,6 +147,7 @@ export interface CatalogShell {
 /** 资料页元素打开时回到壳的那几步。骨架里可有可无的几块按形状名单画，名单、目录卡片的比例与新作骨架都在壳里；
  *  筛选按地址解出要用壳的排序偏好；就地推要动壳的顶部三层与侧栏。 */
 export interface EntityPageShell {
+  missing(kind: string): void;
   /** 铺进页骨架：形状名单还在路上时先等它一下，`current` 回 false 就不铺了；铺完重取一遍名单，回来时补齐骨架
    *  里那几块。 */
   loading(kind: string, name: string, current: () => boolean): Promise<void>;
@@ -160,7 +164,7 @@ export type SurfaceKind = 'management' | 'index' | 'entity' | 'catalog' | 'follo
 
 /** 管理区那几页每次打开时交给页面的值，由页面元素从地址、偏好与壳的状态算（`pages/managed.tsx`），按页面分。
  *  管理区那几页画进 `#stats`。 */
-export interface ManagedOpenProps {
+export interface ManagedOpenProps extends Record<ConfigurationPath, { section?: string }> {
   '/jav': { tab: string; readOnly: boolean };
   '/stats': { configurable: boolean };
   '/taste': { onboarding: boolean };
@@ -168,12 +172,12 @@ export interface ManagedOpenProps {
   '/data-cleanup': Record<string, never>;
   '/duplicates': Record<string, never>;
   '/quality-goals': Record<string, never>;
-  '/scraping': Record<string, never>;
+  '/sources': Record<string, never>;
   /** `section`：首帧选中的那一组页签名，取走 `requestConfigurationSection` 记下的那一次（地址带 `#peachProxy` 时是「网络与访问」）。 */
-  '/configuration': { section?: string };
+  '/settings/library': { section?: string };
   '/diagnostics': Record<string, never>;
-  '/activity': Record<string, never>;
-  '/follow-manage': {
+  '/tasks': Record<string, never>;
+  '/subscriptions': {
     tab: string; page: number; sort: string; dir: string; pageSize: number; layout: string;
     readOnly: boolean; readOnlyMessage: string; writerUrl: string;
   };
@@ -222,7 +226,7 @@ export type IndexOpenPropsTable = { [Path in IndexRoutePath]: IndexOpenProps };
 
 /** 资料页画进 `#index`，每种实体一条模式（名字里可能带斜杠，吃掉剩下全部段）。种类与名字跟着打开走，
  *  名字是壳从地址解码出来的那一份。 */
-export type EntityRoutePath = '/performers/*' | '/studios/*' | '/creators/*' | '/series/*' | '/agencies/*';
+export type EntityRoutePath = '/performers/*' | '/studios/*' | '/creators/*' | '/series/*' | '/agencies/*' | '/tags/*';
 
 /** 页面里的附属面，按名字登记、各画进壳的一个容器：首页筛选条（`#catalogFilter`）、首页新作行（`#feedNew`）、
  *  目录页处理横幅（`#libraryProcessingNotice`）与顶栏搜索下拉（`#searchMenu`）。props 由壳算好、整份交进来，

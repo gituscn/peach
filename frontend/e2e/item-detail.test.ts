@@ -20,7 +20,7 @@ const PART_CARD = `#grid [data-media-card][data-variant="grid"][data-id="${ITEM.
 /** 桩里的片源没有正片，播放器拿到空响应会报一条 VIDEOJS 错误；量的不是它。 */
 const withoutPlayer = (problems: string[]) => problems.filter((line) => !line.includes('VIDEOJS'));
 const pathIs = (page: Page, path: string) => page.waitForFunction(
-  (wanted) => location.pathname === wanted, path, { timeout: 10_000 });
+  (wanted) => (wanted.includes('?') ? location.pathname + location.search : location.pathname) === wanted, path, { timeout: 10_000 });
 /** 回执栈在 body 下，舞台是模态 dialog，外面整页惰性，鼠标点不到撤销键；这里量的是撤销本身。 */
 const undo = (page: Page) => page.locator('#toasts').getByRole('button', { name: '撤销' }).last().dispatchEvent('click');
 const current = (page: Page) => page.locator('#stage [data-queue-item][aria-current="true"]').getAttribute('data-queue-item');
@@ -67,7 +67,7 @@ describe('作品详情岛', () => {
         await page.route(url => url.pathname === '/api/editions', route => route.fulfill({ json: {
           ...EDITIONS, items: Array.from({ length: count }, (_, index) => ({ ...EDITIONS.items[index % 2], id: 31 + index })),
         } }));
-        await page.goto(new URL(`/editions/${ITEM.edition}/${ITEM.edition}`, page.url()).toString());
+        await page.goto(new URL(`/assets/${ITEM.edition}?editions=${ITEM.edition}`, page.url()).toString());
         await page.locator('#stage [data-queue-row]').first().waitFor();
         await page.locator('#stage [data-item-related] [data-media-card]').first().waitFor();
         const measured = await page.locator('[data-detail-continuation]').evaluate(node => {
@@ -86,7 +86,7 @@ describe('作品详情岛', () => {
     });
   }
 
-  for (const destination of ['/activity', '/performers']) {
+  for (const destination of ['/tasks', '/performers']) {
     it(`分卷等待响应时后退到 ${destination}：舞台撤回，晚到的响应不能改变地址或历史深度`, { timeout: 60_000 }, async () => {
       const opened = await openItemPage(browser, '/', DESKTOP, { ready: PART_CARD, catalogIds: [...CATALOG, ITEM.part] });
       let release = () => {};
@@ -202,7 +202,7 @@ describe('作品详情岛', () => {
         node=>getComputedStyle(node).animationPlayState);
       const initialPlayState=await backgroundPlayState();
       await page.locator(`#grid [data-media-card][data-id="${ITEM.plain}"] [data-media-title]`).first().click();
-      await pathIs(page, `/item/${ITEM.plain}`);
+      await pathIs(page, `/assets/${ITEM.plain}`);
       await page.locator(DETAIL_READY).waitFor();
       const heights = await page.evaluate(() => (window as unknown as { coldCatalogHeights: number[] }).coldCatalogHeights);
       assert.ok(heights.length > 5 && Math.max(...heights) - Math.min(...heights) < 1, JSON.stringify(heights));
@@ -222,7 +222,7 @@ describe('作品详情岛', () => {
   });
 
   it('深链进详情：单条取这一条；关掉之后照地址补画列表', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       assert.equal(opened.stub.reads.get('/api/item'), 1);
@@ -242,7 +242,7 @@ describe('作品详情岛', () => {
       const page = opened.page;
       const openCard = async (id: number) => {
         await page.locator(`#grid [data-media-card][data-id="${id}"] [data-media-title]`).first().click();
-        await pathIs(page, `/item/${id}`);
+        await pathIs(page, `/assets/${id}`);
         await page.locator(DETAIL_READY).waitFor();
       };
       await openCard(ITEM.plain);
@@ -252,7 +252,7 @@ describe('作品详情岛', () => {
       await pathIs(page, '/');
       await page.locator(`#grid [data-media-card][data-id="${ITEM.cast}"]`).first().waitFor({ timeout: 15_000 });
       await openCard(ITEM.cast);
-      for (const path of ['/', '/trash', `/item/${ITEM.plain}`]) {
+      for (const path of ['/', '/trash', `/assets/${ITEM.plain}`]) {
         await page.goBack();
         await pathIs(page, path);
       }
@@ -273,7 +273,7 @@ describe('作品详情岛', () => {
     try {
       const page = opened.page;
       await page.locator(`#grid [data-media-card][data-id="${ITEM.plain}"] [data-media-title]`).first().click();
-      await pathIs(page, `/item/${ITEM.plain}`);
+      await pathIs(page, `/assets/${ITEM.plain}`);
       await page.locator(DETAIL_READY).waitFor();
       assert.deepEqual(await page.evaluate(() => history.state?.usr?.backgroundLocation), { pathname: '/trash', search: '' });
       await page.reload({ waitUntil: 'load' });
@@ -304,12 +304,12 @@ describe('作品详情岛', () => {
       const card = page.locator(`[data-playlist-card="${PLAYLIST.id}"]`);
       const step = async (id: number) => {
         await page.locator(`#stage [data-queue-item="${id}"]`).click();
-        await pathIs(page, `/playlists/${PLAYLIST.id}/${id}`);
+        await pathIs(page, `/assets/${id}?playlist=${PLAYLIST.id}`);
         await page.locator(`#stage [data-queue-item="${id}"][aria-current="true"]`).waitFor();
       };
       const enter = async () => {
         await card.locator('[data-mix-open]').click();
-        await pathIs(page, `/playlists/${PLAYLIST.id}/${PLAYLIST.items[0]}`);
+        await pathIs(page, `/assets/${PLAYLIST.items[0]}?playlist=${PLAYLIST.id}`);
         await page.locator(DETAIL_READY).waitFor();
         await step(PLAYLIST.items[1]!);
         await step(PLAYLIST.items[2]!);
@@ -329,7 +329,7 @@ describe('作品详情岛', () => {
       await closeToList();
       await enter();
       await page.goBack();
-      await pathIs(page, `/playlists/${PLAYLIST.id}/${PLAYLIST.items[1]}`);
+      await pathIs(page, `/assets/${PLAYLIST.items[1]}?playlist=${PLAYLIST.id}`);
       await page.locator(`#stage [data-queue-item="${PLAYLIST.items[1]}"][aria-current="true"]`).waitFor();
       await page.locator(DETAIL_READY).waitFor();
       await closeToList();
@@ -340,7 +340,7 @@ describe('作品详情岛', () => {
   });
 
   it('舞台在媒体框里挂上 Video.js，氛围光画布与统计角标跟它进同一块媒体区', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator('#stage [data-item-media="video"] > .video-js video.vjs-tech').waitFor({ state: 'attached' });
@@ -357,7 +357,7 @@ describe('作品详情岛', () => {
   });
 
   it('来源不可读取：说明块代替播放器，刷新状态后显示读取结果', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.offline}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.offline}`, DESKTOP);
     try {
       const page = opened.page;
       const gate = page.locator('#stage [data-item-gate="offline"]');
@@ -373,7 +373,7 @@ describe('作品详情岛', () => {
 
   for (const viewport of [DESKTOP, MOBILE]) {
     it(`${viewport.mobile ? '手机' : '桌面'}来源状态：权限原因可见，未取得状态不判脱盘`, { timeout: 60_000 }, async () => {
-      const opened = await openItemPage(browser, `/item/${ITEM.offline}`, viewport);
+      const opened = await openItemPage(browser, `/assets/${ITEM.offline}`, viewport);
       try {
         const page = opened.page;
         let online: boolean | null = false;
@@ -399,7 +399,7 @@ describe('作品详情岛', () => {
 
   for (const viewport of [DESKTOP, MOBILE]) {
   it(`${viewport.name}：出演超过 8 位先收起，点「还有 N 位」全部展开`, { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.cast}`, viewport);
+    const opened = await openItemPage(browser, `/assets/${ITEM.cast}`, viewport);
     try {
       const page = opened.page;
       const shown = () => page.locator('#stage [data-item-identity] [data-entity-kind="performer"]:visible').count();
@@ -437,13 +437,13 @@ describe('作品详情岛', () => {
   }
 
   it('标题折成两行，真溢出才给展开键；展开键与标题文字都能展开，再点收回', { timeout: 60_000 }, async () => {
-    const short = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const short = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       assert.equal(await short.page.locator('#stage [data-title-fold]').isHidden(), true);
     } finally {
       await short.close();
     }
-    const opened = await openItemPage(browser, `/item/${ITEM.long}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.long}`, DESKTOP);
     try {
       const page = opened.page;
       const title = page.locator('#stage [data-detail-title]');
@@ -464,7 +464,7 @@ describe('作品详情岛', () => {
   });
 
   it('评分：点当前那一颗是撤销评分；回执的撤销写回原分', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       const value = page.locator('#detailRating [data-rating-value]');
@@ -485,7 +485,7 @@ describe('作品详情岛', () => {
   });
 
   it('标签：删一枚再撤销回来；从选择器新建一枚', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       const tag = (name: string) => page.locator(`#detailTags [data-tag="${name}"]`);
@@ -513,7 +513,7 @@ describe('作品详情岛', () => {
 
   for (const viewport of [DESKTOP, MOBILE]) {
     it(`${viewport.name}详情动作保持单行，提示显示在浮窗顶层`, { timeout: 60_000 }, async () => {
-      const opened = await openItemPage(browser, `/item/${ITEM.plain}`, viewport);
+      const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, viewport);
       try {
         const page = opened.page;
         const actions = page.locator('#stage [data-item-feedback] button');
@@ -540,7 +540,7 @@ describe('作品详情岛', () => {
   }
 
   it('稍后看与反馈键：写完键态跟着服务端的回话变', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator('#stageLater').click();
@@ -588,17 +588,17 @@ describe('作品详情岛', () => {
         assert.equal(await card.count(), 1);
         assert.deepEqual(await card.locator('[data-media-group]').allTextContents(), ['2 个版本']);
         await card.locator('[data-media-title]').click();
-        await pathIs(page, '/editions/31/33');
+        await pathIs(page, '/assets/33?editions=31');
         await page.locator('#stage [data-queue-item="33"][aria-current="true"]').waitFor();
         assert.equal(await page.locator('#stage [data-queue-item]').count(), 3);
         assert.equal(await page.locator('#stage').getByText('2 个版本', { exact: true }).count(), 1);
         await page.locator('#stage [data-queue-item="32"]').click();
         await page.locator('#stage [data-queue-item="32"][aria-current="true"]').waitFor();
         await page.locator('#stage video').dispatchEvent('ended');
-        await pathIs(page, '/editions/31/33');
+        await pathIs(page, '/assets/33?editions=31');
         await page.locator('#stage [data-queue-item="33"][aria-current="true"]').waitFor();
         await page.locator('#stage video').dispatchEvent('ended');
-        assert.equal(new URL(page.url()).pathname, '/editions/31/33');
+        assert.equal(new URL(page.url()).pathname + new URL(page.url()).search, '/assets/33?editions=31');
         const bounds = await layout(page);
         assert.ok(bounds.scrollWidth <= bounds.viewportWidth + 1, JSON.stringify(bounds));
         assert.deepEqual(withoutPlayer(opened.problems), []);
@@ -609,16 +609,16 @@ describe('作品详情岛', () => {
   }
 
   for (const [kind, path, next, wanted] of [
-    ['Mix', `/mix/${ITEM.plain}/${ITEM.plain}`, 14, `/mix/${ITEM.plain}/14`],
-    ['分卷', `/parts/${ITEM.part}/22`, 23, `/parts/${ITEM.part}/23`],
-    ['版本', `/editions/${ITEM.edition}/${ITEM.edition}`, 32, `/editions/${ITEM.edition}/32`],
-    ['播放列表', `/playlists/${PLAYLIST.id}/11`, 15, `/playlists/${PLAYLIST.id}/15`],
+    ['Mix', `/assets/${ITEM.plain}?mix=${ITEM.plain}`, 14, `/assets/14?mix=${ITEM.plain}`],
+    ['分卷', `/assets/22?parts=${ITEM.part}`, 23, `/assets/23?parts=${ITEM.part}`],
+    ['版本', `/assets/${ITEM.edition}?editions=${ITEM.edition}`, 32, `/assets/32?editions=${ITEM.edition}`],
+    ['播放列表', `/assets/11?playlist=${PLAYLIST.id}`, 15, `/assets/15?playlist=${PLAYLIST.id}`],
   ] as const) {
     it(`${kind}队列：深链停在给的那一条，点另一条原地换过去且不重取队列`, { timeout: 60_000 }, async () => {
       const opened = await openItemPage(browser, path, DESKTOP);
       try {
         const page = opened.page;
-        assert.equal(await current(page), path.split('/').at(-1));
+        assert.equal(await current(page), new URL(path, page.url()).pathname.split('/').at(-1));
         const reads = new Map(opened.stub.reads);
         await watchStage(page);
         await page.locator(`#stage [data-queue-item="${next}"]`).click();
@@ -642,7 +642,7 @@ describe('作品详情岛', () => {
   }
 
   it('播放列表：拖动换顺序、移出一条，两者都能撤销', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/playlists/${PLAYLIST.id}/11`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/11?playlist=${PLAYLIST.id}`, DESKTOP);
     try {
       const page = opened.page;
       const order = () => ids(page, '#stage [data-queue-row]', 'data-queue-row');
@@ -672,13 +672,13 @@ describe('作品详情岛', () => {
   });
 
   it('保存 Mix：确认之后转去新建的那份播放列表', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/mix/${ITEM.plain}/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}?mix=${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator('#stage [data-save-mix]').click();
       await page.locator('[name="name"]').fill('我的 Mix');
       await page.locator('[data-modal-confirm]').click();
-      await page.waitForFunction(() => location.pathname.startsWith(`/playlists/${8}/`), undefined, { timeout: 10_000 });
+      await page.waitForFunction(() => location.pathname.startsWith('/assets/') && new URLSearchParams(location.search).get('playlist') === '8', undefined, { timeout: 10_000 });
       await page.locator('#stage [data-queue-row]').first().waitFor();
       assert.deepEqual(await ids(page, '#stage [data-queue-row]', 'data-queue-row'), [ITEM.plain, ...RELATED]);
       const created = opened.stub.writes.find((write) => write.body.action === 'create')!;
@@ -693,7 +693,7 @@ describe('作品详情岛', () => {
   });
 
   it('接着看：一排卡按相关作品的顺序；点一张原地换到那一条', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator('#nrow [data-media-card]').first().waitFor();
@@ -701,7 +701,7 @@ describe('作品详情岛', () => {
       const before = await page.locator('#stage [data-detail-title]').innerText();
       await watchStage(page);
       await page.locator(`#nrow [data-media-card][data-id="${RELATED[0]}"] [data-media-title]`).click();
-      await pathIs(page, `/item/${RELATED[0]}`);
+      await pathIs(page, `/assets/${RELATED[0]}`);
       await page.waitForFunction((title) => {
         const now = document.querySelector('#stage [data-detail-title]');
         return !!now && (now as HTMLElement).innerText !== title;
@@ -715,11 +715,20 @@ describe('作品详情岛', () => {
   });
 
   it('点女优进她的实体页，舞台收起', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
+      await page.route(url => url.pathname === '/api/entity', route => {
+        assert.equal(new URL(route.request().url()).searchParams.get('id'), '1');
+        return route.fulfill({ json: {
+          id: 1, kind: 'performer', canonical_name: NAMES[0], aliases: [], display_aliases: [], user_aliases: [],
+          asset_count: 1, tags: [], related_performers: [], links: [], metadata: {},
+          has_image: false, has_avatar: false, representative_asset_id: null, entry_links: [],
+        } });
+      });
       await page.locator(`#stage [data-item-identity] [data-entity-kind="performer"][data-entity-name="${NAMES[0]}"]`).click();
-      await pathIs(page, `/performers/${encodeURIComponent(NAMES[0]!)}`);
+      await pathIs(page, '/performers/1');
+      await page.locator('#index [data-entity-title] h2').filter({ hasText: NAMES[0] }).waitFor();
       await page.waitForFunction(() => !document.querySelector('#stage[open]'), undefined, { timeout: 10_000 });
       assert.equal(await page.evaluate(() => document.body.classList.contains('entity-open')), true);
     } finally {
@@ -728,11 +737,11 @@ describe('作品详情岛', () => {
   });
 
   it('取不到这一条：播放器格照 16:9 撑开，重试提示居中，不塌成一条窄条', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.route((url) => url.pathname === '/api/item', (route) => route.fulfill({ status: 500, json: { error: 'database is locked' } }));
-      await page.goto(new URL('/item/987654', page.url()).toString(), { waitUntil: 'load' });
+      await page.goto(new URL('/assets/987654', page.url()).toString(), { waitUntil: 'load' });
       await page.locator('#stage [data-item-placeholder] [data-media-error]').waitFor({ timeout: 15_000 });
       const box = await page.evaluate(() => {
         const frame = document.querySelector('#stage [data-item-placeholder]')!.getBoundingClientRect();
@@ -747,7 +756,7 @@ describe('作品详情岛', () => {
   });
 
   it('长标签单行省略，高度和别的标签一样', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, MOBILE);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, MOBILE);
     try {
       const page = opened.page;
       const heights = await page.evaluate(() => {
@@ -765,7 +774,7 @@ describe('作品详情岛', () => {
   });
 
   it('手机 390：详情不横向溢出，侧栏排在播放区下面', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, MOBILE);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, MOBILE);
     try {
       const page = opened.page;
       assert.deepEqual((await layout(page)).offenders, [], '详情里有元素越出视口右边');

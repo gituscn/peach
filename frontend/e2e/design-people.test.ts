@@ -95,7 +95,7 @@ describe('设计决定：人物与厂牌资料页', () => {
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('Enter');
         await page.waitForURL(/\/performers\//, { timeout: 5_000 });
-        assert.equal(decodeURIComponent(new URL(page.url()).pathname), '/performers/涼森れむ');
+        await page.waitForURL('**/performers/90301');
         assert.deepEqual(opened.problems, []);
       } finally {
         await opened.close();
@@ -340,7 +340,7 @@ describe('设计决定：人物与厂牌资料页', () => {
         body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#888"/></svg>' };
       await page.route(/\/entity-image\?/, (route) => route.fulfill(square));
       await page.route(/\/logo\?/, (route) => route.fulfill(square));
-      await page.goto(new URL(`/item/${requiredEnv('PEACH_E2E_ITEM')}`, page.url()).href, { waitUntil: 'load' });
+      await page.goto(new URL(`/assets/${requiredEnv('PEACH_E2E_ITEM')}`, page.url()).href, { waitUntil: 'load' });
       await page.locator('[data-item-identity] [data-id-group="studio"] [data-id-name]').waitFor({ timeout: 15_000 });
       const edges = await page.evaluate(() => Object.fromEntries(
         ['performer', 'studio'].map((kind) => {

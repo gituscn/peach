@@ -74,10 +74,10 @@ it('详情压着下面那一页时，页面组的元素不重挂，看到的是�
   const { seen, Probe } = probe();
   await mount(r, <Probe />);
   const steps: Array<[string, ReturnType<typeof over>]> = [
-    ['/follow/item/3', over('/nowhere', 'follow')], ['/item/7', over('/nowhere')], ['/parts/1/2', over('/nowhere')]];
+    ['/posts/3', over('/nowhere', 'follow')], ['/assets/7', over('/nowhere')], ['/assets/2?parts=1', over('/nowhere')]];
   for (const [path, state] of steps) await act(async () => { r.shellNavigate(path, { state }) });
-  await act(async () => { pop('/follow/item/3') });
-  await act(async () => { r.peachHistory.push('/mix/4/5', over('/nowhere')) });
+  await act(async () => { pop('/posts/3') });
+  await act(async () => { r.peachHistory.push('/assets/5?mix=4', over('/nowhere')) });
   expect([seen.mounted, seen.unmounted]).toEqual([1, 0]);
   expect(new Set(seen.paths)).toEqual(new Set(['/nowhere']));
 });
@@ -88,9 +88,9 @@ it('页面组按背景匹配：背景是管理区那一页就匹配那一条；�
     const r = await load('/nowhere');
     const { seen, Probe } = probe();
     await mount(r, <Probe />);
-    await act(async () => { r.shellNavigate('/item/7', { state: over('/stats', 'item', '?range=30') }) });
+    await act(async () => { r.shellNavigate('/assets/7', { state: over('/stats', 'item', '?range=30') }) });
     expect([seen.mounted, seen.unmounted]).toEqual([1, 1]);
-    await act(async () => { r.shellNavigate('/item/8') });
+    await act(async () => { r.shellNavigate('/assets/8') });
     expect(seen.mounted, '没有背景的作品地址不落到认不出的那一格').toBe(1);
     await act(async () => { r.shellNavigate('/no/such/page') });
     expect(seen.mounted).toBe(2);
@@ -102,7 +102,7 @@ it('页面组按背景匹配：背景是管理区那一页就匹配那一条；�
 });
 
 it('启动那一条不读背景：刷新落在带背景的详情条目上时当作没有背景；后退前进回到这一条才读', async () => {
-  const r = await load('/item/7', { usr: over('/nowhere'), key: 'boot', idx: 0 });
+  const r = await load('/assets/7', { usr: over('/nowhere'), key: 'boot', idx: 0 });
   const { seen, Probe } = probe();
   await mount(r, <Probe />);
   expect(r.navigationBackground()).toBeNull();

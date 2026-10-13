@@ -31,7 +31,7 @@ export const EMPTY_MEDIA: EntityMedia = { media: 'videos', set: 0 };
 /** `/api/entity` 里这一页读到的字段：资料卡那份，外加标签计数与名册。名字对不上时回 `{error}`。 */
 export interface EntityPageData extends EntityHeroData {
   error?: string;
-  redirect?: { kind: string; name: string };
+  redirect?: { kind: string; name: string; id?: number };
   tags?: { k: string; n: number }[];
   related_performers?: (HeroCostar & IndexPerson)[];
   labels?: IndexPerson[];
@@ -126,7 +126,8 @@ export interface EntityPageHosts { filter: Element; feed: HTMLElement; body: Ele
 
 export interface EntityPageProps extends SharedGridProps {
   kind: string;
-  /** 地址栏上的那个名字。 */
+  resolvedEntity?: EntityPageData;
+  /** 路由通过实体 ID 取得的规范名。 */
   name: string;
   filters: EntityFilters;
   media: EntityMedia;
@@ -176,6 +177,10 @@ export function itemsParams(kind: string, name: string, filters: EntityFilters, 
   offset = 0): URLSearchParams {
   const p = new URLSearchParams();
   p.set(kind, name);
+  if (kind === 'tag') {
+    p.set('tag', [...new Set([name, ...tagList(filters.tag)])].join(','));
+    p.set('tag_match', 'all');
+  }
   p.set('limit', '48');
   p.set('offset', String(offset));
   p.set('sort', filters.sort || 'new');
@@ -257,6 +262,7 @@ export async function prefetchEntityPage(props: EntityPageProps): Promise<void> 
   for (const head of ['entity', 'entity-items', 'entity-photos'] as const) {
     queryClient.removeQueries({ queryKey: [head, kind, name] });
   }
+  if (props.resolvedEntity?.id) queryClient.setQueryData(entityKey(kind, name), props.resolvedEntity);
   await Promise.all([
     queryClient.fetchQuery(entityOptions(kind, name)).then((entity) => {
       if (!entity || entity.error || !entity.id) return null;

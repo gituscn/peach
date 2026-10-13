@@ -67,7 +67,7 @@ describe('设置面板', () => {
       assert.equal(await page.locator(`${PANEL} #videoThumbnailSetting, ${PANEL} #followScheduleSetting`).count(), 0);
       const configuration = page.locator(PANEL).getByRole('button', { name: 'Peach 配置', exact: true });
       await configuration.click();
-      await page.waitForURL((url) => url.pathname === '/configuration');
+      await page.waitForURL((url) => url.pathname === '/settings/library');
       await page.locator(PANEL).waitFor({ state: 'hidden' });
       assert.deepEqual(opened.problems, []);
     } finally { await opened.close() }

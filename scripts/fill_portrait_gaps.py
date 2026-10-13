@@ -99,7 +99,7 @@ def profile_url(base_url: str, name: str) -> str:
 
 
 def item_url(base_url: str, asset_id: int) -> str:
-    return f"{base_url.rstrip('/')}/item/{int(asset_id)}"
+    return f"{base_url.rstrip('/')}/assets/{int(asset_id)}"
 
 
 def sheet_html(rows: list[dict], base_url: str) -> str:

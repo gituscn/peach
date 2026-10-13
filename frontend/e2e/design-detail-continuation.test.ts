@@ -59,7 +59,7 @@ describe('详情底部的队列与推荐', () => {
   after(async () => { await browser.close() });
 
   it('分卷队列使用详情实体头像', async () => {
-    const opened = await openItemPage(browser, `/parts/${ITEM.part}/${ITEM.part}`, VIEWPORTS[0]!);
+    const opened = await openItemPage(browser, `/assets/${ITEM.part}?parts=${ITEM.part}`, VIEWPORTS[0]!);
     try {
       const images = opened.page.locator('#stage [data-queue-item="21"] .mav img');
       assert.equal(await images.count(), 2);
@@ -72,8 +72,8 @@ describe('详情底部的队列与推荐', () => {
   for (const viewport of VIEWPORTS) for (const kind of ['local', 'follow'] as const) {
     it(`${viewport.name} ${kind}：接着看空结果显示完整说明`, { timeout: 60_000 }, async () => {
       const opened = kind === 'local'
-        ? await openItemPage(browser, `/item/${ITEM.plain}`, viewport)
-        : await openFollowFeed(browser, `/follow/item/${DETAIL.collection}`, viewport,
+        ? await openItemPage(browser, `/assets/${ITEM.plain}`, viewport)
+        : await openFollowFeed(browser, `/posts/${DETAIL.collection}`, viewport,
           { ready: '#stage [data-follow-queue]', settings: { relatedLimit: 12 } });
       try {
         const page = opened.page;
@@ -98,8 +98,8 @@ describe('详情底部的队列与推荐', () => {
 
     it(`${viewport.name} ${kind}：分集与推荐共用布局，悬停面完整`, { timeout: 60_000 }, async () => {
       const opened = kind === 'local'
-        ? await openItemPage(browser, `/parts/${ITEM.part}/${ITEM.part}`, viewport)
-        : await openFollowFeed(browser, `/follow/item/${DETAIL.collection}`, viewport,
+        ? await openItemPage(browser, `/assets/${ITEM.part}?parts=${ITEM.part}`, viewport)
+        : await openFollowFeed(browser, `/posts/${DETAIL.collection}`, viewport,
           { ready: '#stage [data-follow-queue]' });
       try {
         const page = opened.page;

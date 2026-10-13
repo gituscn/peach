@@ -406,7 +406,7 @@ describe('页面', () => {
     serve(feed([], { sources: [], facets: {} }));
     const host = await open(props());
     expect(host.textContent).toContain('还没有关注任何来源');
-    expect(host.querySelector('a[href="/follow-manage?tab=add"]')).not.toBeNull();
+    expect(host.querySelector('a[href="/subscriptions?tab=add"]')).not.toBeNull();
   });
 
   it('标记已看：请求体只带条目与目标状态，卡上立刻换状态，回执带撤销', async () => {

@@ -49,7 +49,7 @@ describe('关注与馆藏共用卡片交互', () => {
   });
 
   for (const viewport of VIEWPORTS) it(`${viewport.name}：详情动作与接着看采用共享几何`, async () => {
-    const opened = await openFollowFeed(browser, '/follow/item/1002', viewport,
+    const opened = await openFollowFeed(browser, '/posts/1002', viewport,
       { ready: '#stage[open] [data-follow-detail-side]', bindAuthors: true });
     try {
       const page = opened.page;
@@ -89,7 +89,7 @@ describe('关注与馆藏共用卡片交互', () => {
         if (url.pathname === '/api/follow' && url.searchParams.has('item')) singleRequests.push(url.searchParams.get('item')!);
       });
       await next.locator('[data-follow-open]').click();
-      await page.waitForFunction(id => location.pathname === `/follow/item/${id}`, id);
+      await page.waitForFunction(id => location.pathname === `/posts/${id}`, id);
       await page.locator('#stage [data-follow-detail-name]').filter({ hasText: `演示更新 ${id}` }).waitFor();
       assert.deepEqual(singleRequests, [], '接着看已有条目缓存却再次单条取数');
       await page.locator('#closeStage').click();

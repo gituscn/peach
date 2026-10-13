@@ -96,11 +96,11 @@ export function boardPageSkeleton(
     body = javPageSkeleton(new URLSearchParams(location.search).get('tab') === 'wants' ? 'wants' : 'discover');
   } else if (path === '/taste') {
     body = tasteSkeleton();
-  } else if (path === '/follow-manage') {
+  } else if (path === '/subscriptions') {
     body = followList(options);
-  } else if (path === '/configuration') {
+  } else if (path === '/settings/library') {
     body = configurationSkeleton();
-  } else if (path === '/activity') {
+  } else if (path === '/tasks') {
     body = `<div class="ui-activitypage">${['正在进行', '被挡下的', '最近完成'].map(title => `<section class="activitysection"><h3 class="geist-fieldset-title">${title}</h3><div class="ui-activity-runs"><article class="cleanupfieldset activity-run"><div class="geist-fieldset-content ui-skeleton-lines">${line('35%')}${lines()}</div></article></div></section>`).join('')}</div>`;
   } else if (path === '/duplicates') {
     body = duplicatesSkeleton();

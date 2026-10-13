@@ -51,7 +51,7 @@ const stageKept = (page: Page) => page.evaluate(() => {
 });
 
 const openDetail = (browser: Browser, id: number, viewport = DESKTOP) =>
-  openFollowFeed(browser, `/follow/item/${id}`, viewport, { ready: DETAIL_READY });
+  openFollowFeed(browser, `/posts/${id}`, viewport, { ready: DETAIL_READY });
 
 describe('关注详情岛', () => {
   let browser: Browser;
@@ -70,7 +70,7 @@ describe('关注详情岛', () => {
       const page = opened.page;
       const seen = watchFollowRequests(page);
       await page.locator('[data-follow-item="1002"] [data-follow-open]').click();
-      await pathIs(page, '/follow/item/1002');
+      await pathIs(page, '/posts/1002');
       await page.locator(DETAIL_READY).waitFor();
       assert.equal((await page.locator('#stage [data-follow-detail-name]').innerText()).trim(), '演示更新 1002');
       assert.deepEqual(seen.item, [], '列表缓存里有的这一条又单条取了一次');
@@ -93,12 +93,12 @@ describe('关注详情岛', () => {
       const filtered = () => page.waitForFunction(
         () => location.pathname === '/follow' && location.search === '?status=new', undefined, { timeout: 10_000 });
       await page.locator('[data-follow-item="1002"] [data-follow-open]').click();
-      await pathIs(page, '/follow/item/1002');
+      await pathIs(page, '/posts/1002');
       await page.locator(DETAIL_READY).waitFor();
       await page.locator('#closeStage').click();
       await filtered();
       await page.goBack();
-      await pathIs(page, '/follow/item/1002');
+      await pathIs(page, '/posts/1002');
       await page.locator(DETAIL_READY).waitFor();
       await page.locator('#closeStage').click();
       await filtered();
@@ -164,14 +164,14 @@ describe('关注详情岛', () => {
       await watchStage(page);
       const seen = watchFollowRequests(page);
       await page.locator('[data-follow-queue-item="5102"]').click();
-      await pathIs(page, '/follow/item/5102');
+      await pathIs(page, '/posts/5102');
       await page.locator('#stage [data-follow-queue-item="5102"][aria-current="true"]').waitFor();
       await page.locator('#stage .video-js .vjs-control-bar').waitFor({ state: 'attached' });
       assert.equal(await page.locator('#stage .video-js').count(), 1, '换一条之后旧播放器没拆');
       assert.equal(await page.locator('#stage [data-ambient-canvas]').count(), 1);
       assert.deepEqual(await stageKept(page), { same: true, skeleton: false, focused: true }, '换一条重开了浮窗');
       await page.goBack();
-      await pathIs(page, '/follow/item/5101');
+      await pathIs(page, '/posts/5101');
       await page.locator('#stage [data-follow-queue-item="5101"][aria-current="true"]').waitFor();
       await page.locator('#stage .video-js .vjs-control-bar').waitFor({ state: 'attached' });
       assert.equal(await page.locator('#stage .video-js').count(), 1, '后退之后旧播放器没拆');
@@ -207,7 +207,7 @@ describe('关注详情岛', () => {
       await page.waitForFunction(() => document.querySelector('#stage [data-follow-detail-poster]')
         ?.getAttribute('src') === '/follow-stream?id=5001&media=2');
       assert.deepEqual(await current(), ['false', 'false', 'true']);
-      assert.equal(new URL(page.url()).pathname, '/follow/item/5001');
+      assert.equal(new URL(page.url()).pathname, '/posts/5001');
       assert.deepEqual(opened.problems, []);
     } finally {
       await opened.close();
@@ -257,7 +257,7 @@ describe('关注详情岛', () => {
       await page.locator('#stage [data-follow-detail-media="image"] [data-follow-detail-poster]').waitFor();
       assert.equal(await queue.locator('[data-follow-media-item="1"]').getAttribute('aria-current'), 'true');
       assert.equal(await page.locator('#stage .video-js').count(), 0, '换成图片后播放器没拆');
-      assert.equal(new URL(page.url()).pathname, '/follow/item/5201');
+      assert.equal(new URL(page.url()).pathname, '/posts/5201');
       // 当前是图，操作条里多一枚「隐藏这张图」。
       assert.equal(await page.locator('#stage [data-follow-media-hide="1"]').count(), 1);
       assert.deepEqual(withoutPlayer(opened.problems), []);
@@ -304,7 +304,7 @@ describe('关注详情岛', () => {
         assert.equal(await poster.getAttribute('src'), `/follow-stream?id=5002&media=${index}`);
         assert.equal((await page.locator('#stage [data-follow-image-count]').innerText()).trim(), `${index + 1} / 21`);
       }
-      assert.equal(new URL(page.url()).pathname, '/follow/item/5002');
+      assert.equal(new URL(page.url()).pathname, '/posts/5002');
       assert.deepEqual(opened.problems, []);
     } finally {
       await opened.close();

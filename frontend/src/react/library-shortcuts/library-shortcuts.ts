@@ -23,6 +23,5 @@ export function isFavorite(rows: Favorite[], item: Favorite): boolean {
   return rows.some((row) => item.entity_id ? row.entity_id === item.entity_id : row.kind === item.kind && row.name === item.name);
 }
 export function favoriteHref(item: Favorite): string {
-  return item.kind === 'tag' ? '/?tag=' + encodeURIComponent(item.name)
-    : entityPath(item.kind, item.name);
+  return entityPath(item.kind, item.name, item.entity_id);
 }

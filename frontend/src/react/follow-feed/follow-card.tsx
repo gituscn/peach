@@ -12,7 +12,7 @@
  * 一叠（`isMix`）悬停时逐张翻过组里彼此不同的画面，时序与门槛同 Mix 卡（`../components/use-stack-flip.ts`）。
  * 翻的是卡片渲染时就在手上的缩略图，悬停不为动画再发请求；第一张是静止封面本身。 */
 import { memo, useCallback, useEffect, useRef, useState, type ComponentPropsWithoutRef, type MouseEvent } from 'react';
-import { esc, fmtDur, icon } from '@peach/legacy/core';
+import { esc, fmtDur, icon, entityPath } from '@peach/legacy/core';
 import { tagLabel } from '@peach/legacy/tags';
 
 import { suppressShiftTextSelection } from '../components/row-click';
@@ -32,7 +32,7 @@ const realDuration = (value: unknown) => Number(value) > 0;
 export function FollowAuthorLink({ name, actions, children, ...attrs }: {
   name: string; actions: Pick<FollowFeedActions, 'openAuthor'>;
 } & Omit<ComponentPropsWithoutRef<'a'>, 'href' | 'onClick'>) {
-  return <a {...attrs} href={`/creators/${encodeURIComponent(name)}`} onClick={(event) => {
+  return <a {...attrs} href={entityPath('creator', name)} onClick={(event) => {
     event.stopPropagation();
     if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     event.preventDefault();

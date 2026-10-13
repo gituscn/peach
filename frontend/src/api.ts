@@ -6,7 +6,7 @@
  * 迟到的响应不能再往新页面上写东西。 */
 
 /** 服务端明确回了非 2xx。`status` 留给调用方区分 401／409／404 这类需要不同处置的情况。 */
-import {requestErrorMessage} from '@peach/legacy/core';
+import {requestErrorMessage, registerResponseEntities} from '@peach/legacy/core';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -54,6 +54,7 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
   if (!response.ok) {
     throw new ApiError(reasonOf(payload) || `请求失败（${response.status}）`, response.status);
   }
+  registerResponseEntities(path, payload);
   return payload as T;
 }
 

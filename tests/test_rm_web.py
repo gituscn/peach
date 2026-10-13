@@ -444,6 +444,11 @@ class WebDataTests(unittest.TestCase):
         self.assertEqual([row["k"] for row in item["tags"]], ["足交"])
         self.assertEqual(item["stats"]["duration"], 1)
 
+        tag = rm_web.q_facets(self.contract, scope_kind="tag", scope_name="足交")
+        self.assertEqual(tag["locations"], item["locations"])
+        self.assertEqual(tag["stats"]["duration"], 1)
+        self.assertEqual([row["k"] for row in tag["tags"]], ["足交"])
+
     def test_studio_spellings_share_videos_pagination_and_facets(self):
         alias = 'CANONICAL STUDIO（カノニカル）'
         with closing(sqlite3.connect(self.db_path)) as connection, connection:

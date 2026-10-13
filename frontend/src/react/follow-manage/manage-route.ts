@@ -15,11 +15,11 @@ export function followManagePath(params: FollowManageRoute): string {
   if (params.page > 1) search.set('page', String(params.page));
   if (params.sort) search.set('sort', params.sort);
   if (params.dir) search.set('dir', params.dir);
-  return '/follow-manage' + (search.size ? `?${search}` : '');
+  return '/subscriptions' + (search.size ? `?${search}` : '');
 }
 
 export function followManageEntry(search: string, workspace?: FollowManageTab): string {
   if (!workspace && new URLSearchParams(search).get('tab') === 'wants') return '/jav?tab=wants';
-  if (!workspace && new URLSearchParams(search).get('tab') === 'source') return '/configuration?section=' + encodeURIComponent('来源与订阅');
+  if (!workspace && new URLSearchParams(search).get('tab') === 'source') return '/settings/library?section=' + encodeURIComponent('来源与订阅');
   return followManagePath({ tab: workspace || followManageParams(search).tab, page: 1, sort: '', dir: '' });
 }

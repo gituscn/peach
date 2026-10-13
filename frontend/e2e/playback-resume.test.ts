@@ -31,7 +31,7 @@ describe('视频退出续播', () => {
 
   for (const viewport of VIEWPORTS) for (const kind of ['item', 'follow'] as const) {
     it(`${viewport.name} ${kind}：关闭、重开和刷新恢复秒数，时间深链优先`, { timeout: 90_000 }, async () => {
-      const path = kind === 'item' ? `/item/${ITEM.plain}` : `/follow/item/${DETAIL.collection}`;
+      const path = kind === 'item' ? `/assets/${ITEM.plain}` : `/posts/${DETAIL.collection}`;
       const opened = kind === 'item' ? await openItemPage(browser, path, viewport)
         : await openFollowFeed(browser, path, viewport, { ready: '#stage [data-follow-detail-side]' });
       try {

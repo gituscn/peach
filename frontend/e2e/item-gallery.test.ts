@@ -13,7 +13,7 @@ describe('馆藏 JAV 官方预览', () => {
     const { page } = opened;
     try {
       await page.route('**/stream?*', route => route.continue({ url: new URL(`/stream?id=${process.env.PEACH_E2E_ITEM}`, page.url()).href }));
-      await page.goto(new URL(`/item/${COVER_ONLY_ITEM.id}`, page.url()).href);
+      await page.goto(new URL(`/assets/${COVER_ONLY_ITEM.id}`, page.url()).href);
       const frame = page.locator('[data-item-gallery]');
       const video = frame.locator('video');
       await page.waitForFunction(() => (document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.readyState || 0) >= 3);
@@ -48,7 +48,7 @@ describe('馆藏 JAV 官方预览', () => {
         samples.push(route.request().url());
         return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600"><rect width="900" height="600" fill="#777"/></svg>' });
       });
-      await page.goto(new URL(`/item/${SAMPLE_ITEM.id}`, page.url()).href);
+      await page.goto(new URL(`/assets/${SAMPLE_ITEM.id}`, page.url()).href);
       const frame = page.locator('[data-item-gallery]');
       await frame.waitFor({ state: 'visible' });
       await page.waitForFunction(() => document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.readyState === 4);
@@ -124,7 +124,7 @@ describe('馆藏 JAV 官方预览', () => {
         const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600"><rect width="900" height="600" fill="#777"/></svg>';
         return route.fulfill({ json: { ok: true, image: `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}` } });
       });
-      await page.goto(new URL(`/item/${COVER_ONLY_ITEM.id}`, page.url()).href);
+      await page.goto(new URL(`/assets/${COVER_ONLY_ITEM.id}`, page.url()).href);
       const frame = page.locator('[data-item-gallery]'), player = frame.locator('.video-js');
       await frame.getByRole('status', { name: '正在读取样图' }).waitFor();
       await page.waitForFunction(() => (document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.readyState || 0) >= 3);
@@ -167,7 +167,7 @@ describe('馆藏 JAV 官方预览', () => {
           : { code: COVER_ONLY_ITEM.code, state: 'ready', preview_count: 1 } });
       });
       await page.route('**/api/jav/image?*', route => route.fulfill({ json: { ok: false, image: '', message: '图片未取得' } }));
-      await page.goto(new URL(`/item/${COVER_ONLY_ITEM.id}`, page.url()).href);
+      await page.goto(new URL(`/assets/${COVER_ONLY_ITEM.id}`, page.url()).href);
       const frame = page.locator('[data-item-gallery]');
       const retry = frame.getByRole('button', { name: '重试样图', exact: true });
       await retry.waitFor();

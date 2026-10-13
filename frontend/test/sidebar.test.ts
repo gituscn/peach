@@ -13,9 +13,9 @@ describe('侧栏顺序', () => {
 
 describe('侧栏内容范围', () => {
   it('视频集合提供馆藏筛选，管理与索引页只提供导航', () => {
-    for (const path of ['/', '/unseen', '/trash', '/item/1', '/creators/Demo', '/parts/1/2'])
+    for (const path of ['/', '/unseen', '/trash', '/assets/1', '/creators/Demo', '/assets/2?parts=1'])
       expect(sidebarHasCatalogContent(path)).toBe(true);
-    for (const path of ['/follow-manage', '/stats', '/follow', '/tags', '/data-cleanup', '/creators'])
+    for (const path of ['/subscriptions', '/stats', '/follow', '/tags', '/data-cleanup', '/creators'])
       expect(sidebarHasCatalogContent(path)).toBe(false);
   });
 

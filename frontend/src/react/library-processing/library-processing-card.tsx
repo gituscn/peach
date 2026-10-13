@@ -226,7 +226,7 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
     <div className="flex flex-col gap-4">
       <Fieldset layout="stack" label="扫描与采集" footer={
         <>
-          <LinkButton href="/scraping" size="small" trailingIcon={RiArrowRightLine}>来源和凭证</LinkButton>
+          <LinkButton href="/sources" size="small" trailingIcon={RiArrowRightLine}>来源和凭证</LinkButton>
           {state.candidates
             ? <LinkButton href="/review" size="small" trailingIcon={RiArrowRightLine}>复核资料</LinkButton>
             : null}

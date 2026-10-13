@@ -29,12 +29,20 @@ import { TaskProgress } from '../components/task-progress';
 import { DISCOVERY_SORTS, discoveryScore, recommendationScore, type DiscoverySort } from './discovery-sorts';
 
 const SearchGlyph = spriteGlyph('search');
+import { peachHistory, shellNavigate } from '@peach/history';
+
+function writeJavQuery(patch: Record<string, string>): void {
+  const params = new URLSearchParams(location.search);
+  for (const [key, value] of Object.entries(patch)) { if (value) params.set(key, value); else params.delete(key) }
+  shellNavigate(location.pathname + (params.size ? `?${params}` : ''), { replace: true, state: peachHistory.navigation.location.state });
+}
 
 export function JavPage({ tab, readOnly, navigate, receipt }: {
   tab: string; readOnly: boolean; navigate(path: string): void; receipt(message: string): void;
 }) {
   const [download, setDownload] = useState<DownloadPrefill | null>(null);
-  const [text, setText] = useState('');
+  const [text, changeText] = useState(() => new URLSearchParams(location.search).get('q') || '');
+  const setText = (value: string) => { changeText(value); writeJavQuery({ q: value }) };
   const search = (event: FormEvent) => { event.preventDefault() };
   return <div className="flex w-full flex-col gap-6">
     <JavHeader tab={tab} navigate={navigate} find={() => setDownload({})} />
@@ -53,10 +61,16 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
   readOnly: boolean; receipt(message: string): void; resource(work: DownloadPrefill): void; query: string;
   navigate(path: string): void; clearText(): void;
 }) {
-  const [scope, setScope] = useState<DiscoveryScope>('external');
-  const [tag, setTag] = useState('');
-  const [sort, setSort] = useState<DiscoverySort>('taste');
-  const [ascending, setAscending] = useState(false);
+  const params = new URLSearchParams(location.search);
+  const [scope, changeScope] = useState<DiscoveryScope>(() => params.get('scope') === 'library' ? 'library' : 'external');
+  const [tag, changeTag] = useState(() => params.get('tag') || '');
+  const [sort, changeSort] = useState<DiscoverySort>(() => DISCOVERY_SORTS.some(([key]) => key === params.get('sort'))
+    ? params.get('sort') as DiscoverySort : 'taste');
+  const [ascending, changeAscending] = useState(() => params.get('dir') === 'asc');
+  const setScope = (value: DiscoveryScope) => { changeScope(value); writeJavQuery({ scope: value === 'external' ? '' : value }) };
+  const setTag = (value: string) => { changeTag(value); writeJavQuery({ tag: value }) };
+  const setSort = (value: DiscoverySort) => { changeSort(value); writeJavQuery({ sort: value === 'taste' ? '' : value }) };
+  const setAscending = (value: boolean) => { changeAscending(value); writeJavQuery({ dir: value ? 'asc' : '' }) };
   const section = useRef<HTMLElement>(null);
   useEffect(() => {
     const rows = section.current?.querySelectorAll('[data-catalog-scroll],[data-catalog-tags],[data-filter-row="bottom"]');
@@ -146,9 +160,9 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
           discoveries.data?.ranking_method === 'mmr' && item.ranking_score != null ? `排序 ${discoveryScore(item.ranking_score)}` : '',
           item.source_score != null ? `来源评分 ${item.source_score.toFixed(1)} / 5` : '', ...(item.reasons || [])].filter(Boolean).join(' · ');
         return <article key={item.id} data-media-card="" data-jav-card="" onClick={event => {
-        if (!(event.target as HTMLElement).closest('a,button,input')) navigate(item.asset_id ? `/item/${item.asset_id}` : `/jav/movie/${encodeURIComponent(item.code)}`);
+        if (!(event.target as HTMLElement).closest('a,button,input')) navigate(item.asset_id ? `/assets/${item.asset_id}` : `/works/${encodeURIComponent(item.code)}`);
       }}>
-        <a href={item.asset_id ? `/item/${item.asset_id}` : `/jav/movie/${encodeURIComponent(item.code)}`} aria-label={`查看 ${item.code} 详情`}
+        <a href={item.asset_id ? `/assets/${item.asset_id}` : `/works/${encodeURIComponent(item.code)}`} aria-label={`查看 ${item.code} 详情`}
           onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate(event.currentTarget.getAttribute('href')!) } }}
           data-media-pic="" data-jav-cover-box="" className="relative inline-grid place-items-center overflow-hidden rounded-2lg bg-background-tertiary-default">
           {artwork ? <ArtSlot artwork={{ kind: 'cover', html: artwork }} identity={discoveryArtwork(item, 'small', settings.value.javImage)}

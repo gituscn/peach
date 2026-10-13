@@ -22,9 +22,9 @@ describe('馆藏与资料空状态', () => {
     const html = catalogEmptyHtml({ configurable: true });
     expect(html).toContain('data-geist-empty-state');
     expect(html).toContain('data-empty-settings');
-    expect(html).toContain('href="/follow-manage?tab=add"');
+    expect(html).toContain('href="/subscriptions?tab=add"');
     expect(catalogEmptyHtml()).not.toContain('data-empty-settings');
-    expect(catalogEmptyHtml()).toContain('class="geist-button primary" href="/follow-manage?tab=add"');
+    expect(catalogEmptyHtml()).toContain('class="geist-button primary" href="/subscriptions?tab=add"');
     expect(catalogEmptyHtml({ configurable: true }).match(/class="geist-button primary"/g)).toHaveLength(1);
   });
   it('JAV 与筛选无结果可查看未筛选内容', () => {

@@ -11,6 +11,7 @@
  * 四张表的页面不走 `go`：它们在页内写地址一律由壳认领（`routeIndex`、资料页与关注页的 `actions.route`、
  * 目录的换筛选、垃圾队列的换分类），跨页也交壳，打开次数同壳自己打开。 */
 import type { ReactElement } from 'react';
+import { settingsPath, type ConfigurationPath } from '@peach/history';
 
 import { javDisplayName, javTitleHtml } from '@peach/legacy/jav-title';
 import { tagLabel } from '@peach/legacy/tags';
@@ -104,6 +105,13 @@ function openCleanupSection(section: DataCleanupSection, actions: ShellActions, 
 
 /* 第一帧在宿主放进 `#stats` 的同一个任务里同步画完（`router.tsx` 的 `ManagedSurface`）：壳画完这一页
  * 紧接着就读它画出来的结构（配置页按地址里的 `#peachProxy` 滚过去，那一刻选中的页签已经是「网络与访问」）。 */
+const configurationRoute = (path: ConfigurationPath): ManagedRoute<ManagedOpenProps['/settings/library']> => ({
+  element: <ManagedMatch path={path} />,
+  prefetch: (_open, signal) => prefetchConfiguration(signal),
+  page: (open, actions) => <ConfigurationPage receipt={message => actions.receipt(message)}
+    reopenTutorial={actions.reopenTutorial} section={open.section ?? ''} />,
+});
+
 export const MANAGED_ROUTES: ManagedRouteTable = {
   '/jav': {
     element: <ManagedMatch path="/jav" />,
@@ -116,7 +124,7 @@ export const MANAGED_ROUTES: ManagedRouteTable = {
     /* 点一个内容标签是「回目录并按它筛选」，整页换成目录仍归壳。 */
     page: (open, actions, go) => (
       <StatsPage tagLabel={tagLabel} onTag={actions.openTag} configurable={open.configurable}
-        openMediaSettings={() => { actions.requestConfigurationSection('媒体库与入库'); go('/configuration') }} />
+        openMediaSettings={() => { actions.requestConfigurationSection('媒体库与入库'); go('/settings/library') }} />
     ),
   },
   '/taste': {
@@ -164,40 +172,37 @@ export const MANAGED_ROUTES: ManagedRouteTable = {
         toast={(message) => actions.receipt(message)} srcBadge={actions.srcBadge} />
     ),
   },
-  '/scraping': {
-    element: <ManagedMatch path="/scraping" />,
+  '/sources': {
+    element: <ManagedMatch path="/sources" />,
     prefetch: (_open, signal) => prefetchScraping(signal),
     page: (_open, actions) => <ScrapingPage toast={(message) => actions.toast(message)} />,
   },
-  '/configuration': {
-    element: <ManagedMatch path="/configuration" />,
-    prefetch: (_open, signal) => prefetchConfiguration(signal),
-    page: (open, actions) => (
-      <ConfigurationPage receipt={(message) => actions.receipt(message)} reopenTutorial={actions.reopenTutorial}
-        section={open.section ?? ''} />
-    ),
-  },
+  '/settings/library': configurationRoute('/settings/library'),
+  '/settings/subscriptions': configurationRoute('/settings/subscriptions'),
+  '/settings/downloads': configurationRoute('/settings/downloads'),
+  '/settings/network': configurationRoute('/settings/network'),
+  '/settings/maintenance': configurationRoute('/settings/maintenance'),
   '/diagnostics': {
     element: <ManagedMatch path="/diagnostics" />,
     prefetch: (_open, signal) => prefetchDiagnostics(signal),
     page: (_open, actions, go) => <DiagnosticsPage navigate={go} openItem={actions.openItem}
       receipt={message => actions.receipt(message)}
-      configure={section => { actions.requestConfigurationSection(section); go('/configuration') }} />,
+      configure={section => { actions.requestConfigurationSection(section); go(settingsPath(section)) }} />,
   },
-  '/activity': {
-    element: <ManagedMatch path="/activity" />,
+  '/tasks': {
+    element: <ManagedMatch path="/tasks" />,
     prefetch: (_open, signal) => prefetchTasks(signal),
     page: () => <ActivityPage />,
   },
   /* 首屏只取来源清单与凭据状态，地址栏指着「订阅源」时连它一起取。检查更新与查找那两趟
      后台任务的快照不在首屏里：它们常年躺着上一趟的回执，等它们只会让首屏多一个往返。 */
-  '/follow-manage': {
-    element: <ManagedMatch path="/follow-manage" />,
+  '/subscriptions': {
+    element: <ManagedMatch path="/subscriptions" />,
     prefetch: (open, signal) => prefetchFollowManage(signal, open.tab),
     page: (open, actions) => (
       <FollowManagePage {...open} route={actions.routeFollowManage} savePreference={actions.saveFollowPreference}
         toast={(message) => actions.receipt(message)} openFollow={actions.openFollow}
-        openServiceConfiguration={() => actions.navigate('/configuration?section=' + encodeURIComponent('来源与订阅'))} />
+        openServiceConfiguration={() => actions.navigate('/settings/subscriptions')} />
     ),
   },
 };
@@ -266,14 +271,14 @@ const entityRoute: ManagedRoute<EntityPageProps> = {
 };
 export const ENTITY_ROUTES: EntityRouteTable = {
   '/performers/*': entityRoute, '/studios/*': entityRoute, '/creators/*': entityRoute, '/series/*': entityRoute,
-  '/agencies/*': entityRoute,
+  '/agencies/*': entityRoute, '/tags/*': entityRoute,
 };
 
 /* 画进 `#grid` 的两页。目录网格：首页、四个筛选态里除垃圾文件外的三个，和回收站，画的都是这一张网格，
    筛选是壳那一份 `state`；垃圾队列：垃圾文件那一屏，分类与视图只从地址读。表按页面分键：壳用 `/` 打开
    网格、用 `/junk-files` 打开队列，槽里记的路径说的是画着哪一页、不是地址。按地址分键会在三处出错：网格在
    `/trash` 打开之后去 `/` 是就地推，槽里的路径不跟着变；`?state=ads` 落在 `/` 上，画的是垃圾队列；冷启动
-   落在详情地址上时，网格在 `/item/:id` 底下补画。
+   落在详情地址上时，网格在 `/assets/:id` 底下补画。
    网格首屏取第一页再画；队列不在打开前等，画上就铺自己那份骨架（`junk-queue-page.tsx` 开头）。之后换
    筛选或分类、换版式、选择模式与刷新代次都由壳经 `updateManagedRoute` 推进来，页面按新键重取、自己铺
    骨架，不重挂。 */

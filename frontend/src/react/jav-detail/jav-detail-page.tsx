@@ -44,6 +44,7 @@ const Close = ({ close }: { close(): void }) => <button type="button" data-stage
   aria-label="关闭" title="关闭" onClick={close} dangerouslySetInnerHTML={{ __html: icon('x') }} />;
 
 function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps & { item: JavDetail; retry(): void; retrying: boolean }) {
+  useEffect(() => { actions.canonicalCode?.(item.code) }, [actions, item.code]);
   useEffect(() => { if (item.state === 'ready') void queryClient.invalidateQueries({ queryKey: ['jav-discoveries', 'external'] }) }, [item.code, item.state]);
   const [preview, setPreview] = useState(-1);
   const media = [{ index: -1, label: '封面' }, ...Array.from({ length: item.preview_count }, (_, index) => ({ index, label: `预览 ${index + 1}` })),

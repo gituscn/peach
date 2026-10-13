@@ -81,7 +81,7 @@ describe('我的收藏', () => {
 
   it('收藏链接使用现有实体路由和编码后的标签', () => {
     expect(favoriteHref({ kind: 'studio', name: 'A/B' })).toBe('/studios/A%2FB');
-    expect(favoriteHref({ kind: 'tag', name: 'A&B' })).toBe('/?tag=A%26B');
+    expect(favoriteHref({ kind: 'tag', name: 'A&B', entity_id: 67 })).toBe('/tags/67');
   });
 
   it('各类收藏显示可用图像并按名称筛选', async () => {
@@ -95,7 +95,7 @@ describe('我的收藏', () => {
     expect(document.querySelector('[data-shortcuts-avatar] .ini')).toBeNull();
     await type(document.querySelector('input[aria-label="搜索收藏"]'), 'studio');
     expect(document.querySelectorAll('[data-shortcuts-row]')).toHaveLength(1);
-    expect(document.querySelector('[data-shortcuts-row] a')?.getAttribute('href')).toBe('/studios/%E6%94%B6%E8%97%8F%20studio');
+    expect(document.querySelector('[data-shortcuts-row] a')?.getAttribute('href')).toBe('/studios/3');
     await type(document.querySelector('input[aria-label="搜索收藏"]'), 'missing');
     expect(document.querySelector('[data-empty-state] h3')?.textContent).toBe('没有匹配的收藏');
   });

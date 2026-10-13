@@ -183,7 +183,7 @@ describe('JAV 推荐与加载结构', () => {
       assert.notEqual(await lookup.evaluate(node => getComputedStyle(node).backgroundColor),
         await cards.first().getByRole('button', { name: '查找资源', exact: true }).evaluate(node => getComputedStyle(node).backgroundColor));
       const avatar = cards.first().getByRole('link', { name: '打开女优页：规范姓名', exact: true });
-      assert.equal(await avatar.getAttribute('href'), '/performers/' + encodeURIComponent('规范姓名'));
+      assert.equal(await avatar.getAttribute('href'), '/performers/42');
       assert.equal(await avatar.locator('.ini').textContent(), '规');
       const avatarBox = await avatar.boundingBox();
       assert.ok(avatarBox && avatarBox.width === 38 && avatarBox.height === 38, JSON.stringify(avatarBox));

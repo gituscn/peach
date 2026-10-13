@@ -6,7 +6,7 @@
  *
  * 站点图标、版本字样与另见徽章按 `data-follow-*` 认，样式在 `follow-feed.css`。创作者圆框仍挂
  * `favatar`：图坏了时回落脚本按 `data-drop-class` 换上一枚只带类名的首字母，接不住属性。 */
-import { api, esc } from '@peach/legacy/core';
+import { api, esc, registerEntityLink } from '@peach/legacy/core';
 
 import {
   authorAvatar, authorInitial, authorName, sourceIconUrl, type AliasGroup,
@@ -49,7 +49,11 @@ export const followAuthorName = (sources: readonly FollowSource[], context: Foll
 export function followAuthorEntity(sources: readonly FollowSource[]): string {
   const bound = sources.filter((source) => source.entity_id && source.entity_name);
   const ids = new Set(bound.map((source) => source.entity_id));
-  return ids.size === 1 ? text(bound[0]?.entity_name) : '';
+  if (ids.size !== 1) return '';
+  const source = bound[0]!;
+  const name = text(source.entity_name);
+  registerEntityLink('creator', name, source.entity_id);
+  return name;
 }
 
 /** 创作者圆框里那段：官方头像优先，归档站回退，都取不到时换成首字母。 */

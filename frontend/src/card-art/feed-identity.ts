@@ -10,7 +10,7 @@ export function feedIdentity(item: { performers?: string; performer_refs?: (Face
   const faces = people.slice(0, 3).map(ref => {
     const html = avatarInner(ref.name, ref, null);
     return 'id' in ref && ref.id
-      ? `<a class="mav" href="${esc(entityPath('performer', ref.name))}" aria-label="打开女优页：${esc(ref.name)}">${html}</a>`
+      ? `<a class="mav" href="${esc(entityPath('performer', ref.name, ref.id))}" aria-label="打开女优页：${esc(ref.name)}">${html}</a>`
       : `<span class="mav" title="${esc(ref.name)}">${html}</span>`;
   }).join('');
   return people.length > 1 ? `<div class="mavstack">${faces}</div>` : faces;

@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 from . import (company_profiles, entry_links, feeds, link_status, performer_header, web_feeds,
                web_follow)
 from .catalog_rules import (LENGTH_TAGS, dir_expr, photo_set_title, solo_performer_clause, tag_cat)
-from .entities import normalize_entity_name, resolve_entity, rewrite_flat_projection
+from .entities import normalize_entity_name, resolve_entity, resolve_entity_id, rewrite_flat_projection
 from .social_links import ARCHIVE_HOSTS, is_archive
 from .web_catalog import (
     COST,
@@ -35,6 +35,69 @@ from . import entity_classification
 #: 有资料页的实体种类。事务所（agency）和厂牌是两件事：厂牌出片、事务所出人，
 #: 一位女优可以在同一年里给多个厂牌拍片而只属于一家事务所。
 PROFILE_KINDS = {"performer", "studio", "creator", "series", "agency"}
+READ_ENTITY_KINDS = PROFILE_KINDS | {"tag"}
+
+
+def _query_entity_id(args) -> int | None:
+    """显式 ID 使用正整数，名称查询不占用数字名称的契约。"""
+    if "id" not in args:
+        return None
+    value = str(args["id"])
+    if not value.isascii() or not value.isdecimal() or len(value) > 19 or not 0 < int(value) < 2**63:
+        raise ValueError("invalid entity id")
+    return int(value)
+
+
+def _read_entity_query(args):
+    """资料与图集共用实体种类、名称和显式 ID 的查询契约。"""
+    kind, name = args.get("kind", ""), args.get("name", "")
+    try:
+        entity_id = _query_entity_id(args)
+    except ValueError:
+        return {"error": "invalid entity"}
+    if kind not in READ_ENTITY_KINDS or (entity_id is None and not name):
+        return {"error": "invalid entity"}
+    return kind, name, entity_id
+
+
+def _query_entity(connection, kind: str, name: str, entity_id: int | None):
+    if entity_id is None:
+        return resolve_entity(connection, kind, name)
+    target = resolve_entity_id(connection, entity_id)
+    return connection.execute("SELECT * FROM entity WHERE id=? AND kind=?",
+                              (target, kind)).fetchone() if target else None
+
+
+def entity_id_redirect(connection, kind: str, entity_id: int) -> dict | None:
+    """跨种类身份合并由墓碑来源证明原种类，现存 ID 始终使用自身身份。"""
+    row = connection.execute(
+        "SELECT e.id,e.kind,e.canonical_name FROM entity_redirect r JOIN entity e ON e.id=r.target_id "
+        "WHERE r.old_id=? AND r.source=? AND e.kind<>? "
+        "AND NOT EXISTS(SELECT 1 FROM entity live WHERE live.id=r.old_id)",
+        (entity_id, f'user:identity-merge:{kind}', kind),
+    ).fetchone()
+    if row is None or row['kind'] not in READ_ENTITY_KINDS:
+        return None
+    return {'id': row['id'], 'kind': row['kind'], 'name': row['canonical_name']}
+
+
+def _missing_entity_result(connection, kind: str, name: str, entity_id: int | None):
+    """缺失身份仅按合并来源证明返回最终资料，其余保持不存在。"""
+    if entity_id is not None:
+        redirect = entity_id_redirect(connection, kind, entity_id)
+        return {'redirect': redirect} if redirect else {"error": "not found"}
+    merged = connection.execute(
+        "SELECT DISTINCT e.id,e.kind,e.canonical_name FROM entity e "
+        "JOIN entity_alias al ON al.entity_id=e.id "
+        "JOIN entity_redirect r ON r.target_id=e.id AND r.source=al.source "
+        "WHERE al.alias=? AND al.source=? ORDER BY e.id LIMIT 2",
+        (name, f'user:identity-merge:{kind}'),
+    ).fetchall()
+    if len(merged) == 1:
+        return {'redirect': {'id': merged[0]['id'], 'kind': merged[0]['kind'],
+                             'name': merged[0]['canonical_name']}}
+    return {"error": "not found"}
+
 
 #: 资料页与索引页数作品的口径：视频，且没有标「已消失」（ADR-0087）。回收站里的照旧算；
 #: 代表作的取图不套这一条。
@@ -68,6 +131,14 @@ def scope_predicate(kind: str, column: str, subject: str = "?") -> str:
                 " UNION SELECT lm.label_id FROM label_maker lm JOIN down ON lm.maker_id=down.id)"
                 " SELECT id FROM down)")
     return f"{column}={subject}"
+
+
+def _tag_scope_visibility(kind: str, entity_column: str, asset_column: str) -> str:
+    """标签资料的资产范围遵守当前用户的隐藏选择。"""
+    if kind != "tag":
+        return ""
+    normalized = f"(SELECT normalized_name FROM entity WHERE id={entity_column})"
+    return " AND " + tag_not_hidden(asset_column, normalized)
 
 
 #: 索引页地址 → `entity.kind`。有资料页就该有索引页：只靠女优页上那个名字进事务所页的话，
@@ -151,23 +222,14 @@ def q_entity(contract: WebContract, args):
     `source_reference` 是私人馆藏来源证据：API 只返回站点名和备注，不把敏感下载
     地址变成可点击链接。官方、社交和资料库链接可直接访问。
     """
-    kind = args.get("kind", "")
-    name = args.get("name", "")
-    if kind not in PROFILE_KINDS or not name:
-        return {"error": "invalid entity"}
+    query = _read_entity_query(args)
+    if isinstance(query, dict):
+        return query
+    kind, name, entity_id = query
     with contract.read_connection() as c:
-        row = resolve_entity(c, kind, name)
+        row = _query_entity(c, kind, name, entity_id)
         if not row:
-            merged = c.execute(
-                "SELECT DISTINCT e.kind,e.canonical_name FROM entity e "
-                "JOIN entity_alias al ON al.entity_id=e.id "
-                "JOIN entity_redirect r ON r.target_id=e.id AND r.source=al.source "
-                "WHERE al.alias=? AND al.source=? ORDER BY e.id LIMIT 2",
-                (name, f'user:identity-merge:{kind}'),
-            ).fetchall()
-            if len(merged) == 1:
-                return {'redirect': {'kind': merged[0]['kind'], 'name': merged[0]['canonical_name']}}
-            return {"error": "not found"}
+            return _missing_entity_result(c, kind, name, entity_id)
         d = dict(row)
         from .web_library_shortcuts import favorite_ids
         d["favorite"] = d["id"] in favorite_ids(c)
@@ -212,11 +274,12 @@ def q_entity(contract: WebContract, args):
             d['company_profile'] = company_profiles.public_profile(metadata)
         # 创作者在关注里的那一面（ADR-0096）：绑在名下的来源和同名等确认的那几组。
         d["follow"] = web_follow.entity_follow(contract, c, d["id"]) if kind == "creator" else None
-        scope = scope_predicate(kind, "ae.entity_id")
+        scope = scope_predicate(kind, "ae.entity_id") + _tag_scope_visibility(kind, "ae.entity_id", "a.id")
         count, rep = c.execute(
             "SELECT count(DISTINCT " + video_work_key(contract, c) + "),"
             "(SELECT a2.id FROM asset_entity ae2 CROSS JOIN asset a2 ON a2.id=ae2.asset_id "
             " WHERE " + scope_predicate(kind, "ae2.entity_id") +
+            _tag_scope_visibility(kind, "ae2.entity_id", "a2.id") +
             " AND a2.medium='video' AND a2.snapshot_path IS NOT NULL " +
             (" AND " + solo_performer_clause("a2.id", "ae2.entity_id") if kind == "performer" else "") +
             " ORDER BY a2.size DESC LIMIT 1) "
@@ -233,6 +296,7 @@ def q_entity(contract: WebContract, args):
             "JOIN entity tag ON tag.id=tagged.entity_id "
             "JOIN asset a ON a.id=scope.asset_id "
             "WHERE " + scope_predicate(kind, "scope.entity_id") +
+            _tag_scope_visibility(kind, "scope.entity_id", "a.id") +
             " AND " + COUNTED_VIDEO + " AND tag.kind='tag' "
             "AND " + tag_is_not_a_performer_name("tag.normalized_name") + " "
             f"AND tag.canonical_name NOT IN ({','.join('?' for _ in LENGTH_TAGS)}) "
@@ -262,6 +326,7 @@ def q_entity(contract: WebContract, args):
                 "SELECT person.id,person.canonical_name k,count(DISTINCT " + video_work_key(contract, c) + ") n,"
                 "(SELECT a2.id FROM asset_entity ae2 JOIN asset a2 ON a2.id=ae2.asset_id "
                 " WHERE ae2.entity_id=person.id AND a2.medium='video' "
+                + _tag_scope_visibility(kind, "scope.entity_id", "a2.id") +
                 " AND a2.snapshot_path IS NOT NULL AND " + solo_performer_clause("a2.id", "person.id") +
                 " ORDER BY COALESCE(a2.play_count,0) DESC,COALESCE(a2.play_seconds,0) DESC,"
                 " COALESCE(a2.width,0)*COALESCE(a2.height,0) DESC,a2.size DESC LIMIT 1) rep "
@@ -270,6 +335,7 @@ def q_entity(contract: WebContract, args):
                 "JOIN entity person ON person.id=co.entity_id "
                 "JOIN asset a ON a.id=scope.asset_id "
                 "WHERE " + scope_predicate(kind, "scope.entity_id") +
+                _tag_scope_visibility(kind, "scope.entity_id", "a.id") +
                 " AND " + COUNTED_VIDEO + " AND person.kind='performer' "
                 "AND person.id<>? "
                 "GROUP BY person.id,person.canonical_name "
@@ -404,6 +470,7 @@ def entity_code_sets(contract: WebContract, c, kind: str, entity_id: int) -> lis
             "SELECT a.code,a.catalog_title,a.original_title,a.release_date "
             "FROM asset_entity ae CROSS JOIN asset a ON a.id=ae.asset_id "
             "WHERE " + scope_predicate(kind, "ae.entity_id") + " AND " + VISIBLE_CATALOG_ASSET +
+            _tag_scope_visibility(kind, "ae.entity_id", "a.id") +
             " AND a.code IS NOT NULL AND a.code<>'' ORDER BY a.id", (entity_id,)):
         key = sample_images.code_key(row["code"])
         if not key:
@@ -427,9 +494,10 @@ def entity_code_sets(contract: WebContract, c, kind: str, entity_id: int) -> lis
 def q_entity_photos(contract: WebContract, args):
     """实体名下的照片：本地图片分页放在 `items`；`sets` 是分组，`kind` 为 `dir` 的是本地目录图集，
     为 `code` 的是番号样张集（`entity_code_sets`）。`total` 只数本地图片，`sample_total` 数样张。"""
-    kind, name = args.get("kind", ""), args.get("name", "")
-    if kind not in PROFILE_KINDS or not name:
-        return {"error": "invalid entity"}
+    query = _read_entity_query(args)
+    if isinstance(query, dict):
+        return query
+    kind, name, entity_id = query
     try:
         limit = max(1, min(int(args.get("limit") or 120), 600))
         offset = max(0, int(args.get("offset") or 0))
@@ -439,12 +507,13 @@ def q_entity_photos(contract: WebContract, args):
     except (TypeError, ValueError):
         return {"error": "invalid pagination"}
     with contract.read_connection() as c:
-        row = resolve_entity(c, kind, name)
+        row = _query_entity(c, kind, name, entity_id)
         if not row:
             return {"error": "not found"}
         # 图集和分页数的是同一批图，`total` 由图集相加，才对得上翻到底的张数。
         scoped = ("FROM asset_entity ae CROSS JOIN asset a ON a.id=ae.asset_id "
                   "WHERE " + scope_predicate(kind, "ae.entity_id") +
+                  _tag_scope_visibility(kind, "ae.entity_id", "a.id") +
                   " AND a.medium='image' AND a.name IS NOT NULL "
                   "AND a.disposal IS NULL ")
         sets = [{

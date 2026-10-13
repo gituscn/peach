@@ -19,6 +19,7 @@ import { useContext, useEffect, useLayoutEffect, useRef, useSyncExternalStore, t
 
 import {
   adoptOverlayState, bootEntry, clearOverlayBackground, isOverlayPath, overlayTarget, peachHistory, type OverlayPath,
+  settingsBackgroundOf, isPreferencePath,
 } from '@peach/history';
 import { pageOpens, queueOpens, subscribeShell } from '@peach/shell';
 
@@ -72,7 +73,9 @@ function OverlayOpen() {
   const latestActions = useRef(actions);
   useLayoutEffect(() => { latestActions.current = actions }, [actions]);
   useRouteOpen((boot) => {
-    const target = overlayTarget(peachHistory.navigation.location.pathname);
+    const location = peachHistory.navigation.location;
+    const { pathname, search } = isPreferencePath(location.pathname) ? settingsBackgroundOf(location.state) || location : location;
+    const target = overlayTarget(pathname, search);
     if (!actions || !target) return;
     clearOverlayBackground();
     if (!boot) adoptOverlayState(peachHistory.navigation.location.state);
@@ -89,7 +92,15 @@ function OverlayOpen() {
 /** 覆盖组一条路径的元素：每次导航各挂一次，同一条目重放也能再打开。 */
 export function OverlayMatch({ path }: { path: OverlayPath }): ReactNode {
   useOpenEpoch();
-  return <OverlayOpen key={`${path} ${peachHistory.navigation.seq}`} />;
+  const { location, seq, action } = peachHistory.navigation;
+  const previous = isPreferencePath(location.pathname) ? settingsBackgroundOf(location.state) : null;
+  const identity = (previous || location).pathname + (previous || location).search;
+  const held = useRef({ identity, seq: previous?.seq ?? seq, navigationSeq: seq, settings: !!previous });
+  if (previous) { held.current.settings = true; held.current.navigationSeq = seq }
+  else if (held.current.settings && action === 'POP' && held.current.identity === identity) {
+    held.current.settings = false; held.current.navigationSeq = seq;
+  } else if (held.current.navigationSeq !== seq) held.current = { identity, seq, navigationSeq: seq, settings: false };
+  return <OverlayOpen key={`${path} ${held.current.seq}`} />;
 }
 
 /* 页面组里没有背景的关注详情（深链、刷新与没记背景的条目）：不画列表，只让出 `#stats`；列表等关掉详情才打开。 */
@@ -99,7 +110,7 @@ function FollowGroundOpen() {
   return null;
 }
 
-/** 页面组 `/follow/item/:id` 的元素，按页面开次代次挂 key。 */
+/** 页面组 `/posts/:id` 的元素，按页面开次代次挂 key。 */
 export function FollowDetailGround(): ReactNode {
   return <FollowGroundOpen key={useOpenEpoch()} />;
 }

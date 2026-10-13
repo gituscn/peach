@@ -234,6 +234,167 @@ class EntityRedirectRouteTests(unittest.TestCase):
         self.assertEqual(response.json()["id"], 10)
         self.assertEqual(response.json()["canonical_name"], "橋本ありな")
 
+    def test_entity_and_photo_queries_accept_current_and_merged_ids(self):
+        for path in ('/api/entity', '/api/photos'):
+            named = self.client.get(path, params={
+                'kind': 'performer', 'name': '橋本ありな', 't': 'secret'})
+            self.assertEqual(named.status_code, 200, named.text)
+            for entity_id in (10, 11):
+                response = self.client.get(path, params={
+                    'kind': 'performer', 'id': entity_id, 'name': 'ignored', 't': 'secret'})
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(response.json(), named.json())
+
+    def test_entity_id_queries_refuse_invalid_missing_or_other_kind_ids(self):
+        for path in ('/api/entity', '/api/photos'):
+            for entity_id in ('', '0', '-1', '1.0', 'ten', '１０', str(2**63), '9' * 50):
+                response = self.client.get(path, params={
+                    'kind': 'performer', 'id': entity_id, 't': 'secret'})
+                self.assertEqual(response.json(), {'error': 'invalid entity'}, (path, entity_id))
+            for kind, entity_id in (('studio', '10'), ('performer', '999')):
+                response = self.client.get(path, params={'kind': kind, 'id': entity_id, 't': 'secret'})
+                self.assertEqual(response.json(), {'error': 'not found'}, (path, kind, entity_id))
+
+    def test_verified_cross_kind_merge_ids_use_the_final_identity(self):
+        with sqlite3.connect(self.app.state.settings.db_path) as connection:
+            connection.execute(
+                "INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at)"
+                " VALUES(20,'creator','Old Account','old account','t','t')")
+            merge_entity(connection, target_id=10, source_id=20, source_name='Old Account',
+                         alias_source='user:identity-merge:creator')
+            add_person(connection, 12, 'Final Person')
+            merge_entity(connection, target_id=12, source_id=10, source_name='橋本ありな', alias_source='test:merge')
+        expected = {'redirect': {'id': 12, 'kind': 'performer', 'name': 'Final Person'}}
+        for identity in ({'id': 20}, {'name': 'Old Account'}):
+            response = self.client.get('/api/entity', params={'kind': 'creator', 't': 'secret', **identity})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json(), expected)
+        query = '?tag=a%2Fb&tag=second&media=photos&t=secret'
+        for method in ('GET', 'HEAD'):
+            response = self.client.request(method, '/creators/20' + query, follow_redirects=False)
+            self.assertEqual(response.status_code, 307)
+            self.assertEqual(response.headers['location'], '/performers/12' + query)
+            self.assertEqual(response.headers['cache-control'], 'no-store')
+        self.assertEqual(self.client.get('/api/photos', params={
+            'kind': 'creator', 'id': 20, 't': 'secret'}).json(), {'error': 'not found'})
+
+    def test_cross_kind_id_redirect_requires_source_kind_evidence(self):
+        with sqlite3.connect(self.app.state.settings.db_path) as connection:
+            connection.executemany(
+                "INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at)"
+                " VALUES(?,'creator',?,?,'t','t')", [(20, 'Explicit', 'explicit'), (21, 'Generic', 'generic')])
+            merge_entity(connection, target_id=10, source_id=20, source_name='Explicit',
+                         alias_source='user:identity-merge:creator')
+            merge_entity(connection, target_id=10, source_id=21, source_name='Generic', alias_source='test:merge')
+        for kind, entity_id in (('creator', 10), ('studio', 20), ('creator', 21)):
+            response = self.client.get('/api/entity', params={'kind': kind, 'id': entity_id, 't': 'secret'})
+            self.assertEqual(response.json(), {'error': 'not found'}, (kind, entity_id))
+            prefix = 'studios' if kind == 'studio' else 'creators'
+            for method in ('GET', 'HEAD'):
+                page = self.client.request(method, f'/{prefix}/{entity_id}?t=secret', follow_redirects=False)
+                self.assertEqual(page.status_code, 404, (kind, entity_id, method))
+
+    def test_a_reused_cross_kind_merge_id_keeps_its_current_identity(self):
+        with sqlite3.connect(self.app.state.settings.db_path) as connection:
+            connection.execute(
+                "INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at)"
+                " VALUES(20,'creator','Old Account','old account','t','t')")
+            merge_entity(connection, target_id=10, source_id=20, source_name='Old Account',
+                         alias_source='user:identity-merge:creator')
+            add_person(connection, 20, 'New Person')
+        self.assertEqual(self.client.get('/api/entity', params={
+            'kind': 'creator', 'id': 20, 't': 'secret'}).json(), {'error': 'not found'})
+        self.assertEqual(self.client.get('/creators/20?t=secret', follow_redirects=False).status_code, 404)
+        current = self.client.get('/api/entity', params={'kind': 'performer', 'id': 20, 't': 'secret'})
+        self.assertEqual(current.json()['id'], 20)
+        self.assertEqual(current.json()['canonical_name'], 'New Person')
+
+    def test_tag_profiles_and_photos_use_the_same_identity_by_name_and_id(self):
+        with sqlite3.connect(self.app.state.settings.db_path) as connection:
+            connection.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at)"
+                               " VALUES(20,'tag','Tag A','tag a','t','t')")
+            connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) VALUES(1,20,'tag','test',1)")
+            connection.execute("INSERT INTO asset(id,location,path,name,medium) VALUES(2,'local',?,'2.jpg','image')",
+                               (r'R:\media\2.jpg',))
+            connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) VALUES(2,20,'tag','test',1)")
+        for path in ('/api/entity', '/api/photos'):
+            named = self.client.get(path, params={'kind': 'tag', 'name': 'Tag A', 't': 'secret'})
+            by_id = self.client.get(path, params={'kind': 'tag', 'id': '20', 't': 'secret'})
+            self.assertEqual(named.status_code, 200, named.text)
+            self.assertEqual(by_id.json(), named.json())
+            if path == '/api/entity':
+                self.assertEqual(by_id.json()['asset_count'], 1)
+            else:
+                self.assertEqual(by_id.json()['total'], 1)
+                self.assertEqual(by_id.json()['items'][0]['id'], 2)
+
+    def test_tag_hidden_assets_are_excluded_from_profiles_photos_and_samples(self):
+        with sqlite3.connect(self.app.state.settings.db_path) as connection:
+            connection.executemany(
+                "INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at)"
+                " VALUES(?,'tag',?,?,'t','t')",
+                [(20, 'Tag A', 'tag a'), (21, 'Hidden only', 'hidden only'), (22, 'Visible only', 'visible only')])
+            add_person(connection, 12, 'Hidden cast')
+            connection.execute("UPDATE asset SET code='ABC-001',size=10,snapshot_path='visible.jpg' WHERE id=1")
+            connection.executemany(
+                "INSERT INTO asset(id,location,path,name,medium,size,code,snapshot_path,play_count)"
+                " VALUES(?,'local',?,?,?,?,?,?,?)",
+                [(2, r'R:\media\visible\2.jpg', '2.jpg', 'image', 10, None, None, 0),
+                 (3, r'R:\media\3.mp4', '3.mp4', 'video', 1000, 'ABC-002', 'hidden.jpg', 100),
+                 (4, r'R:\media\hidden\4.jpg', '4.jpg', 'image', 10, None, None, 0),
+                 (5, r'R:\media\5.mp4', '5.mp4', 'video', 500, 'ABC-003', 'hidden-cast.jpg', 0)])
+            connection.executemany(
+                "INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) VALUES(?,?,?,'test',1)",
+                [(asset_id, 20, 'tag') for asset_id in (1, 2, 3, 4, 5)]
+                + [(1, 22, 'tag'), (3, 21, 'tag'), (3, 10, 'performer'), (5, 12, 'performer')])
+            connection.executemany(
+                "INSERT INTO asset_tag_preference(profile_id,asset_id,normalized_tag,hidden,updated_at)"
+                " VALUES('local-default',?,'tag a',1,0)", [(3,), (4,), (5,)])
+            connection.executemany(
+                "INSERT INTO code_sample_image(code,position,url,site,source,fetched_at)"
+                " VALUES(?,1,'https://example.test/sample.jpg','dmm','test','t')",
+                [('ABC-001',), ('ABC-002',), ('ABC-003',)])
+
+        def read(path, kind='tag', entity_id=20):
+            response = self.client.get(path, params={'kind': kind, 'id': entity_id, 't': 'secret'})
+            self.assertEqual(response.status_code, 200, response.text)
+            return response.json()
+
+        profile = read('/api/entity')
+        self.assertEqual(profile['asset_count'], 1)
+        self.assertEqual(profile['representative_asset_id'], 1)
+        self.assertEqual({tag['id']: tag['n'] for tag in profile['tags']}, {20: 1, 22: 1})
+        self.assertEqual([(person['id'], person['n'], person['rep']) for person in profile['related_performers']],
+                         [(10, 1, 1)])
+        photos = read('/api/photos')
+        self.assertEqual(photos['total'], 1)
+        self.assertEqual([item['id'] for item in photos['items']], [2])
+        self.assertEqual({item['id']: item['n'] for item in photos['sets']}, {'code:ABC-001': 1, 2: 1})
+        self.assertEqual(photos['sample_total'], 1)
+        self.assertEqual(read('/api/entity', 'performer', 10)['asset_count'], 2)
+        from peach.web_catalog import _entity_asset_filter, q_facets
+        from peach.web_state import WebContract
+
+        contract = WebContract(self.app.state.settings.db_path)
+        with contract.read_connection() as connection:
+            clause, params = _entity_asset_filter(connection, 'tag', 'Tag A')
+            scoped_assets = connection.execute(f'SELECT a.id FROM asset a WHERE {clause} ORDER BY a.id', params).fetchall()
+        self.assertEqual([row[0] for row in scoped_assets], [1, 2])
+        facets = q_facets(contract, filters={'tag': 'Tag A'})
+        self.assertEqual(facets['stats']['total'], profile['asset_count'])
+        self.assertEqual({item['k']: item['n'] for item in facets['tags']}, {'Tag A': 1, 'Visible only': 1})
+        scoped_facets = q_facets(contract, scope_kind='tag', scope_name='Tag A')
+        self.assertEqual(scoped_facets['stats']['total'], profile['asset_count'])
+        self.assertEqual(scoped_facets['tags'], facets['tags'])
+
+        with sqlite3.connect(self.app.state.settings.db_path) as connection:
+            connection.execute("UPDATE asset_tag_preference SET hidden=0 WHERE normalized_tag='tag a'")
+        self.assertEqual(read('/api/entity')['asset_count'], 3)
+        restored = read('/api/photos')
+        self.assertEqual(restored['total'], 2)
+        self.assertEqual(restored['sample_total'], 3)
+        self.assertEqual(q_facets(contract, filters={'tag': 'Tag A'})['stats']['total'], 3)
+
     def test_an_old_image_address_redirects_to_the_target(self):
         body = picture("navy")
         (self.avatars / "performer-10.img").write_bytes(body)

@@ -169,7 +169,7 @@ class DiagnosticsTests(unittest.TestCase):
                                ("R:/secret/video.mp4?cookie=private-token", "2026-10-03T03:00:00Z"))
         result = diagnostics.recent_failure(self.db)
         self.assertEqual(result["status"], "warning")
-        self.assertEqual(result["target"], "/activity")
+        self.assertEqual(result["target"], "/tasks")
         text = json.dumps(result)
         for private in ("R:/secret", "cookie", "private-token", "private-host", "private-task"):
             self.assertNotIn(private, text)

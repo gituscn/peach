@@ -18,9 +18,8 @@ export function normalizeSidebarOrder(value: unknown): string[] {
 /** 侧栏筛选属于当前地址对应的内容集合；其余页面的侧栏只有导航。 */
 export function sidebarHasCatalogContent(path: string): boolean {
   return ['/', '/unseen', '/watch-later', '/flagged', '/trash', '/junk-files'].includes(path)
-    || /^\/(item|mix|parts|editions)\//.test(path)
-    || /^\/playlists\/\d+\/\d+$/.test(path)
-    || /^\/(performers|studios|creators|series|agencies)\/.+/.test(path);
+    || /^\/assets\//.test(path)
+    || /^\/(performers|studios|creators|series|agencies|tags)\/.+/.test(path);
 }
 
 /** 一条内容的同名标签只计一次。调用者传入当前实际展示的媒体。 */

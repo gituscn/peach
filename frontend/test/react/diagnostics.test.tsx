@@ -8,8 +8,8 @@ import { buttonNamed, click, fetchMock, mount, settle } from './render';
 notifyManager.setScheduler(notify => notify());
 afterEach(() => queryClient.clear());
 const data = (): DiagnosticReport => ({ version: 'test', status: 'warning', checks: {
-  media_mounts: { label: '媒体挂载', status: 'warning', reason: '来源不存在', action: '检查媒体目录', target: '/configuration', details: {} },
-  security: { label: '访问安全', status: 'warning', reason: '密码未开启', action: '开启密码', target: '/configuration', details: {} },
+  media_mounts: { label: '媒体挂载', status: 'warning', reason: '来源不存在', action: '检查媒体目录', target: '/settings/library', details: {} },
+  security: { label: '访问安全', status: 'warning', reason: '密码未开启', action: '开启密码', target: '/settings/library', details: {} },
   data_root: { label: '数据目录', status: 'failed', reason: '没有权限', action: '调整权限', target: null, details: {} },
 }, library: { issue_at: null, groups: {
   duration: { label: '缺时长', count: 2, status: 'ok', truncated: false, items: [{ id: 1, code: 'ABC-123' }, { id: 2, code: null }] },

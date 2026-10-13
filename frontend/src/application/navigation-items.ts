@@ -27,7 +27,7 @@ export const MANAGE_SECTIONS = [
   ['trash', '回收站', 'trash'],
   ['follow', '关注管理', 'rss'],
   ['quality', '高清版', 'sparkles'],
-  ['activity', '活动', 'history'],
+  ['activity', '任务中心', 'history'],
   ['configuration', 'Peach 配置', 'folder-cog'],
 ] as const satisfies readonly NavigationItem<ManagementKey>[];
 

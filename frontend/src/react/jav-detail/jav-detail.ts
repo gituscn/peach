@@ -18,7 +18,8 @@ export interface JavReview { id: string; username: string; content: string; scor
 export interface JavReviews { ok: boolean; items: JavReview[]; page: number; more: boolean; message?: string; checked_at?: string; cache_stale?: boolean }
 export interface JavDetailProps {
   code: string; readOnly: boolean;
-  actions: { close(): void; navigate(path: string): void; openTag(tag: string): void; receipt(message: string): void };
+  actions: { close(): void; navigate(path: string): void; openTag(tag: string): void; receipt(message: string): void;
+    canonicalCode?(code: string): void };
 }
 export const javDetailKey = (code: string) => ['jav-detail', code] as const;
 export const fetchJavDetail = (code: string, signal?: AbortSignal, refresh = false) =>

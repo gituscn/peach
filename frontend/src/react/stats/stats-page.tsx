@@ -126,7 +126,7 @@ function InventoryDetail({ data, configurable, openMediaSettings }: { data: Stat
           {configurable
             ? <Button size="small" onClick={openMediaSettings}>添加媒体文件夹</Button>
             : null}
-          <ButtonLink variant="secondary" href="/follow-manage?tab=add" size="small">添加关注</ButtonLink>
+          <ButtonLink variant="secondary" href="/subscriptions?tab=add" size="small">添加关注</ButtonLink>
         </>
       }>{NO_VIDEO_HINT}</EmptyState>
     );

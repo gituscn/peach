@@ -7,7 +7,7 @@ import { followScrollY } from '../shell';
 /* follow 域控制器：本域状态与动作，启动由 Application 的生命周期统一安装。 */
 import { receiptsState } from './receipts.js';
 import { managedEntry, releaseManagedRoute, updateManagedRoute } from './../history/managed';
-import { $ } from '../core';
+import { $, entityPath } from '../core';
 import { navigationState, openRoutedPage, requestOverlay } from './navigation.js';
 import { entityState, syncPhotoWalls } from './entity.js';
 import { followDetailReturnPath, followDiscoverySeed, followRevision, followSelected, pageOpens, selectMode, writeShell } from './../shell/index';
@@ -70,13 +70,13 @@ export function enterFollow(fresh=false){followState.controller.enter(fresh)}
 
 export async function openFollowDetail(id,push=true,mediaIndex=null,preserveReturn=false){
   if(push){
-    if(!location.pathname.startsWith('/follow/item/')&&!preserveReturn)writeShell({followDetailReturnPath:location.pathname+location.search});
-    requestOverlay(`/follow/item/${+id}`,'follow',()=>openFollowDetail(id,false,mediaIndex,preserveReturn));
+    if(!location.pathname.startsWith('/posts/')&&!preserveReturn)writeShell({followDetailReturnPath:location.pathname+location.search});
+    requestOverlay(`/posts/${+id}`,'follow',()=>openFollowDetail(id,false,mediaIndex,preserveReturn));
     return;
   }
   releaseHoverPreviews();
   id=+id;
-  const entering=!location.pathname.startsWith('/follow/item/');
+  const entering=!location.pathname.startsWith('/posts/');
   if(push&&entering&&!preserveReturn)writeShell({followDetailReturnPath:location.pathname+location.search});
   /* 后退前进进来按条目记的来处（带筛选的那一份列表）；冷启动与没记背景的条目回 `/follow`。 */
   if(!push&&!preserveReturn)writeShell({followDetailReturnPath:takeOverlayReturn()||'/follow'});
@@ -84,7 +84,7 @@ export async function openFollowDetail(id,push=true,mediaIndex=null,preserveRetu
   if(push)holdOverlayBackground();
   // 换详情不进小窗；小窗里放着别的条目也让位（舞台岛判），两个播放器不同时出声。关注详情开着时原地换条。
   if(stageApi()?.showing()!=='follow')disposeStage(false,false,{miniplayer:false});
-  if(push)navigationState.route(`/follow/item/${id}`,false,overlayState('follow'));
+  if(push)navigationState.route(`/posts/${id}`,false,overlayState('follow'));
   const stage=await loadStage(mediaState.stageHost);
   await stage.open({kind:'follow',id,mediaIndex,mediaView:followState.followMediaView,
     relatedLimit:preferencesState.appSettings.relatedLimit>0?+preferencesState.appSettings.relatedLimit:0,
@@ -115,7 +115,7 @@ followState.followFeedHelpers = createFollowFeedHelpers({wireDrag:row=>{if(row)w
 followState.followFeedActions = {
   loaded:drawer=>renderFollowDrawer(drawer),
   openDetail:id=>openFollowDetail(id),
-  openAuthor:name=>navigationState.navigatePath(`/creators/${encodeURIComponent(name)}`),
+  openAuthor:name=>navigationState.navigatePath(entityPath('creator',name)),
   openManage:()=>navigationState.navigatePath(followManageEntry()),
   toggleSelection:(id,range)=>toggleFollowSelection(id,range),
   setImagesOnly:on=>{preferencesState.appSettings.followImagesOnly=!!on;preferencesState.saveSettings();syncPhotoWalls()},
@@ -143,7 +143,7 @@ followState.followFeedShell = {
 followState.followDetailActions = createFollowDetailActions({view:followView,adoptView:adoptFollowView,
     rememberReturn:path=>writeShell({followDetailReturnPath:path}),close:()=>void closeFollowDetail(),
     open:(id,index,preserve)=>void openFollowDetail(id,true,index,preserve),drawer:renderFollowDrawer,
-    openAuthor:name=>navigationState.navigatePath(`/creators/${encodeURIComponent(name)}`)},
+    openAuthor:name=>navigationState.navigatePath(entityPath('creator',name))},
     {toast:(message,{undo}={})=>receiptsState.actionReceipt(message,{undo}),failure:receiptsState.actionFailure});
 }
 

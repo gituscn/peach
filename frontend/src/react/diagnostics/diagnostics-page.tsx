@@ -37,8 +37,8 @@ function Check({ name, check, navigate, configure }: Pick<DiagnosticsProps, 'nav
     </div>
     <p className="text-body-regular text-text-primary break-words">{check.reason}</p>
     {check.action ? <p className="text-body-2-regular text-text-secondary">{check.action}</p> : null}
-    {check.target ? <div><Button size="small" variant="secondary" onClick={() => check.target === '/configuration'
-      ? configure(section) : navigate(check.target!)}>{check.target === '/configuration' ? `打开${section}` : '查看任务'}</Button></div> : null}
+    {check.target ? <div><Button size="small" variant="secondary" onClick={() => check.target === '/settings/library'
+      ? configure(section) : navigate(check.target!)}>{check.target === '/settings/library' ? `打开${section}` : '查看任务'}</Button></div> : null}
   </div>;
 }
 
@@ -99,7 +99,7 @@ export function DiagnosticsPage(props: DiagnosticsProps) {
           <Fact term="冷却截止">{source.cooldown_until ? moment(source.cooldown_until) : '未在冷却'}</Fact>
         </FactList>
       </div>)}
-      <div><Button size="small" variant="secondary" onClick={() => props.navigate('/scraping')}>打开来源和凭证</Button></div>
+      <div><Button size="small" variant="secondary" onClick={() => props.navigate('/sources')}>打开来源和凭证</Button></div>
     </Stack></Section>
   </div>;
 }

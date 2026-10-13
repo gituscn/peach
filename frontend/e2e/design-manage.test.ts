@@ -577,7 +577,7 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
       await opened.close();
     }
     // 卡里那一档（活动页没有任务记录）图标直接挂在空态上，外面没有方框。
-    const activity = await visit(browser, '/activity', DESKTOP);
+    const activity = await visit(browser, '/tasks', DESKTOP);
     try {
       await activity.page.route('**/api/tasks', (route) => route.fulfill({
         status: 200, contentType: 'application/json',
@@ -603,13 +603,13 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
         prepare: (page) => page.route(/\/api\/entity\/shapes/, (route) => route.fulfill({ json: {
           ok: true, entities: [{ id: 90_001, kind: 'performer', names: [name], parts: ['costars'] }] } })) },
       { path: '/data-cleanup', ready: '[data-skeleton="cleanup"] [data-skeleton-action]',
-        targets: ['[data-skeleton] .board-plain-stat', '[data-skeleton] a[href="/scraping"]',
+        targets: ['[data-skeleton] .board-plain-stat', '[data-skeleton] a[href="/sources"]',
           '[data-skeleton] [data-skeleton-action]', '[data-skeleton] .cleanupfieldset [data-skeleton-action]'] },
       { path: '/review', ready: '[data-skeleton="review"] .reviewtabs button',
         targets: ['[data-skeleton] .reviewtabs button', '[data-skeleton] .skeletoncard'] },
       { path: '/follow', ready: '.followauthors .avskeleton',
         targets: ['.followauthors .avskeleton', '.followworks .brandskeleton', '[data-skeleton^="cards/"] > div > *'] },
-      { path: '/follow-manage', ready: '[data-skeleton="board/follow-manage"] .ui-follow-skeleton-toolbar',
+      { path: '/subscriptions', ready: '[data-skeleton="board/subscriptions"] .ui-follow-skeleton-toolbar',
         targets: ['[data-skeleton] .ui-follow-skeleton-toolbar [data-follow-toolbar-controls] > button:nth-of-type(1)',
           '[data-skeleton] .ui-follow-skeleton-toolbar > button:nth-of-type(1)'] },
     ];

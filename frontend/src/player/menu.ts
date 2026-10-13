@@ -71,7 +71,14 @@ function playerMenuItems(player: VjsPlayer): MenuItem[] {
   const item = player.peachItem;
   const kind = hooks?.kind(player) ?? 'item';
   const url = (withTime: boolean) => {
-    const link = new URL(kind === 'follow' ? `/follow/item/${item?.id}` : `/item/${item?.id}`, location.origin);
+    const link = new URL(kind === 'follow' ? `/posts/${item?.id}` : `/assets/${item?.id}`, location.origin);
+    if (kind !== 'follow' && location.pathname === link.pathname) {
+      const context = new URLSearchParams(location.search);
+      for (const key of ['mix', 'parts', 'editions', 'playlist']) {
+        const value = context.get(key);
+        if (value && /^[1-9]\d*$/.test(value)) link.searchParams.set(key, value);
+      }
+    }
     if (withTime) link.searchParams.set('t', String(Math.floor(player.currentTime() || 0)));
     return link.href;
   };

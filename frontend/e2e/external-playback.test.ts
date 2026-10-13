@@ -10,7 +10,7 @@ describe('外部播放器', () => {
   after(async () => { await browser.close() });
   for (const viewport of [VIEWPORTS.find((one) => !one.mobile)!, VIEWPORTS.find((one) => one.mobile)!]) {
     it(`${viewport.mobile ? '手机' : '桌面'}按需生成可复制的网络地址`, { timeout: 60_000 }, async () => {
-      const opened = await openItemPage(browser, `/item/${ITEM.plain}`, viewport, { ready: '#stage[open] [data-item-side]' });
+      const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, viewport, { ready: '#stage[open] [data-item-side]' });
       try {
         const page = opened.page;
         let requested = 0;

@@ -140,7 +140,7 @@ export function issueDetails(state: LibraryProcessingData): IssueDetails | null 
     items: issues.map((issue, at) => ({
       key: `${issue.asset_id ?? 'source'}-${at}`,
       label: issue.title || (issue.asset_id ? `视频 ${issue.asset_id}` : '媒体来源'),
-      href: issue.asset_id ? `/item/${issue.asset_id}` : '',
+      href: issue.asset_id ? `/assets/${issue.asset_id}` : '',
       note: issue.message,
       hint: issue.path || '',
     })),

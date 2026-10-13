@@ -1,7 +1,7 @@
 """页面全集由 React 路由注册表和覆盖组共同声明。
 
 `managed-routes.tsx` 的页面元素按真实地址注册，目录表展开到 `CATALOG_PATHS`。
-详情与队列使用 `OVERLAY_PATHS`；两类路径互不相交、共同覆盖固定页面全集。
+详情与队列使用 `OVERLAY_PATHS`；设置偏好单独登记，三组共同覆盖页面全集。
 实体资料页另按种类登记模式路径，筛选态沿用 `STATE_ROUTES` 的目录身份。
 """
 import pathlib
@@ -16,19 +16,22 @@ FRONTEND_SRC = REPO / "frontend" / "src"
 ROUTE_TABLES = FRONTEND_SRC / "react" / "router" / "managed-routes.tsx"
 OVERLAY = FRONTEND_SRC / "history" / "overlay.ts"
 CORE = FRONTEND_SRC / "core" / "index.ts"
+SETTINGS = FRONTEND_SRC / "history" / "settings-route.ts"
 
 #: 以字面量写出的页面路径；`STATE_ROUTES` 那一组筛选态（三个筛选态与垃圾文件）不在此列。资料页由路由树按模式
 #: （`TREE_PATTERNS`）登记，同样不在此列。
 FROZEN_ROUTES = frozenset({
-    "/", "/trash", "/playlists", "/playlists/:playlist/:item", "/mix/:seed/:item",
-    "/parts/:seed/:item", "/editions/:seed/:item", "/item/:id", "/follow/item/:id",
+    "/", "/trash", "/playlists", "/assets/:id", "/posts/:id",
     "/performers", "/creators", "/studios", "/agencies", "/tags", "/stats", "/taste",
     "/review", "/data-cleanup", "/duplicates", "/resource-sync", "/quality-goals",
-    "/scraping", "/follow", "/follow-manage", "/configuration", "/activity", "/immerse", "/wall",
-    "/diagnostics", "/jav", "/jav/movie/:code",
+    "/sources", "/follow", "/subscriptions", "/tasks", "/immerse", "/wall",
+    "/diagnostics", "/jav", "/works/:code", "/settings", "/settings/appearance",
+    "/settings/playback", "/settings/jav", "/settings/search", "/settings/content",
+    "/settings/library", "/settings/subscriptions", "/settings/downloads",
+    "/settings/network", "/settings/maintenance",
 })
 #: 路由树按模式登记的资料页，一个实体种类一条。
-TREE_PATTERNS = frozenset({"/performers/*", "/studios/*", "/creators/*", "/series/*", "/agencies/*"})
+TREE_PATTERNS = frozenset({"/performers/*", "/studios/*", "/creators/*", "/series/*", "/agencies/*", "/tags/*"})
 
 #: 字符串排在注释前面：`'/performers/*'` 里的 `/*` 不是注释。
 _STRING_OR_COMMENT = re.compile(r"""('(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*")|/\*.*?\*/|//[^\n]*""", re.S)
@@ -88,7 +91,9 @@ def tree_routes(source: str) -> set[str]:
     for table in re.finditer(r"export const (\w+_ROUTES)\b[^=]*=\s*\{", source):
         for path, value in top_level_entries(braced(source, table.end() - 1)).items():
             if not value.startswith("{"):
-                shared = re.search(rf"const {re.escape(value)}\b[^=]*=\s*\{{", source)
+                shared = re.search(rf"const {re.escape(value)}\b[^=]*=\s*(?:\([^)]*\)[^=]*=>\s*\()?\{{", source)
+                if shared is None:
+                    raise ValueError(f"无法读取路由声明：{path} -> {value}")
                 value = braced(source, shared.end() - 1)
             if re.search(r"\belement\s*:", value):
                 found |= quoted_list(source, "CATALOG_PATHS") if table.group(1) == "CATALOG_ROUTES" else {path}
@@ -98,6 +103,9 @@ def tree_routes(source: str) -> set[str]:
 class LegacyShellRouteTests(unittest.TestCase):
     def setUp(self):
         self.overlay = quoted_list(OVERLAY.read_text(encoding="utf-8"), "OVERLAY_PATHS")
+        settings = without_comments(SETTINGS.read_text(encoding="utf-8"))
+        start = settings.index('{', settings.index('export const PREFERENCE_SECTIONS'))
+        self.preferences = {'/settings'} | {f'/settings/{key}' for key in re.findall(r'(\w+)\s*:', braced(settings, start))}
         tree = tree_routes(ROUTE_TABLES.read_text(encoding="utf-8"))
         self.patterns = {path for path in tree if path.endswith("/*")}
         state_routes = CORE.read_text(encoding="utf-8").split("const STATE_ROUTES", 1)[1].split("};", 1)[0]
@@ -105,7 +113,7 @@ class LegacyShellRouteTests(unittest.TestCase):
 
     def test_the_route_registry_and_overlays_partition_the_frozen_pages(self):
         self.assertEqual(sorted(self.tree & self.overlay), [], "覆盖组的路径不该在页面组里再登记元素")
-        union = self.tree | self.overlay
+        union = self.tree | self.overlay | self.preferences
         added = sorted(union - FROZEN_ROUTES)
         self.assertEqual(added, [],
                          "多出了页面；新页面请做成 frontend/ 的 island 或路由树的元素，"

@@ -128,7 +128,7 @@ describe('舞台岛', () => {
   });
 
   it('深链直接进两种详情：先画骨架再揭示，内容到了焦点给关闭键', { timeout: 60_000 }, async () => {
-    const item = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const item = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       assert.deepEqual(await stageShape(item.page), { host: true, modal: true, stages: 1, hosts: 1 });
       assert.equal(await item.page.evaluate(() => document.activeElement?.id), 'closeStage');
@@ -137,7 +137,7 @@ describe('舞台岛', () => {
     } finally {
       await item.close();
     }
-    const follow = await openFollowFeed(browser, `/follow/item/${DETAIL.collection}`, DESKTOP, { ready: FOLLOW_READY });
+    const follow = await openFollowFeed(browser, `/posts/${DETAIL.collection}`, DESKTOP, { ready: FOLLOW_READY });
     try {
       assert.deepEqual(await stageShape(follow.page), { host: true, modal: true, stages: 1, hosts: 1 });
       assert.equal(await follow.page.evaluate(() => document.activeElement?.id), 'closeStage');
@@ -156,7 +156,7 @@ describe('舞台岛', () => {
       const held = new Promise<void>((resolve) => { release = resolve });
       await page.route((url) => url.pathname === '/api/item', async (route) => { await held; await route.fallback() });
       // 长标题那一条不在目录里：深链进去，骨架由舞台岛画。
-      await page.goto(new URL(`/item/${ITEM.long}`, page.url()).toString(), { waitUntil: 'load' });
+      await page.goto(new URL(`/assets/${ITEM.long}`, page.url()).toString(), { waitUntil: 'load' });
       await page.locator('#stage[open] [data-skeleton="detail"]').waitFor({ timeout: 15_000 });
       /* 揭示期间每一帧量一次标题行数，直到淡出层撤掉。 */
       const sampled = page.evaluate(() => new Promise<number[]>((resolve) => {
@@ -180,7 +180,7 @@ describe('舞台岛', () => {
   });
 
   it('Video.js 挂上：清晰度键开设置面板，统计角标与它互斥，剧场键与 T 键切换，提示带快捷键', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator(PLAYER).waitFor({ state: 'attached' });
@@ -221,7 +221,7 @@ describe('舞台岛', () => {
   });
 
   it('右键菜单逐项：Escape 只关菜单；「迷你播放器」进小窗，小窗里的菜单换成「展开」', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator('#stage #playerStatsBtn').waitFor();
@@ -252,7 +252,7 @@ describe('舞台岛', () => {
   });
 
   it('小窗展开回详情不重建播放器；拖到左上象限松手吸附到左上角', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator(PLAYER).waitFor({ state: 'attached' });
@@ -277,7 +277,7 @@ describe('舞台岛', () => {
       // 小窗上的键只在指针落在小窗上时浮出来。
       await page.locator('#miniplayerCard').hover();
       await page.locator('#miniplayerExpand').click();
-      await pathIs(page, `/item/${ITEM.plain}`);
+      await pathIs(page, `/assets/${ITEM.plain}`);
       await page.locator(ITEM_READY).waitFor();
       await page.locator('#stage [data-item-media="video"] > .video-js[data-probe="kept"]').waitFor({ state: 'attached' });
       assert.equal(await page.locator('.video-js').count(), 1, '展开之后多出一个播放器');
@@ -290,7 +290,7 @@ describe('舞台岛', () => {
   });
 
   it('队列换条：旧播放器先拆，新播放器才挂，同一时刻只有一个', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/mix/${ITEM.plain}/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}?mix=${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator(PLAYER).waitFor({ state: 'attached' });
@@ -324,7 +324,7 @@ describe('舞台岛', () => {
   });
 
   it('标签搜索框里按 Escape 只收起选择器，舞台留着；再按一下才关舞台', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator('#tagPlus').click();
@@ -333,7 +333,7 @@ describe('舞台岛', () => {
       await page.keyboard.press('Escape');
       await page.locator('#tagPicker').waitFor({ state: 'hidden' });
       assert.equal(await page.locator('#stage[open]').count(), 1, 'Escape 连舞台一起关了');
-      assert.equal(await page.evaluate(() => location.pathname), `/item/${ITEM.plain}`);
+      assert.equal(await page.evaluate(() => location.pathname), `/assets/${ITEM.plain}`);
       await page.keyboard.press('Escape');
       await pathIs(page, '/');
       assert.deepEqual(withoutPlayer(opened.problems), []);
@@ -343,7 +343,7 @@ describe('舞台岛', () => {
   });
 
   it('关注详情：/follow-qualities 挂住时视频照挂，海报挂载前后是同一张，统计键在同一个媒体框里', { timeout: 60_000 }, async () => {
-    const opened = await openFollowFeed(browser, `/follow/item/${DETAIL.collection}`, DESKTOP, { ready: FOLLOW_READY });
+    const opened = await openFollowFeed(browser, `/posts/${DETAIL.collection}`, DESKTOP, { ready: FOLLOW_READY });
     try {
       const page = opened.page;
       const frame = page.locator('#stage [data-follow-detail-media="video"]');
@@ -354,7 +354,7 @@ describe('舞台岛', () => {
 
       await page.route('**/follow-qualities**', () => {});
       await page.locator('[data-follow-queue-item="5102"]').click();
-      await pathIs(page, '/follow/item/5102');
+      await pathIs(page, '/posts/5102');
       await frame.locator('.video-js .vjs-control-bar').waitFor({ state: 'attached', timeout: 10_000 });
       assert.equal(await page.locator('#stage .video-js').count(), 1);
       assert.match(await poster() || '', /\/stub-thumb\/5102$/);
@@ -365,7 +365,7 @@ describe('舞台岛', () => {
   });
 
   it('手机 390：详情不横向溢出，播放器控件收成窄屏那一套；小窗落在视口里', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, MOBILE);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, MOBILE);
     try {
       const page = opened.page;
       await page.locator(PLAYER).waitFor({ state: 'attached' });

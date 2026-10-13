@@ -89,8 +89,8 @@ export interface EntityHeroData {
   asset_count: number;
   member_count?: number;
   labels?: unknown[];
-  maker?: { name: string } | null;
-  agency?: { canonical_name: string } | null;
+  maker?: { name: string; id?: number } | null;
+  agency?: { canonical_name: string; id?: number } | null;
   metadata?: { agency?: { name?: string } | null } | null;
   links?: HeroLink[];
   entry_links?: HeroEntryLink[];
@@ -167,8 +167,8 @@ export function nameChoices(entity: EntityHeroData): string[] {
 }
 
 /** 事务所：有实体时给去处，只有 `metadata.agency` 时只写名字（那是采到的原文，还没有对应身份）。 */
-export function agencyOf(entity: EntityHeroData): { name: string; linked: boolean } | null {
-  if (entity.agency) return { name: entity.agency.canonical_name, linked: true };
+export function agencyOf(entity: EntityHeroData): { name: string; linked: boolean; id?: number } | null {
+  if (entity.agency) return { name: entity.agency.canonical_name, linked: true, id: entity.agency.id };
   const name = entity.metadata?.agency?.name || '';
   return name ? { name, linked: false } : null;
 }

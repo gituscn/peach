@@ -29,8 +29,8 @@ export async function tokenColor(page: Page, scope: string, token: string): Prom
 /** 配置页「网络与访问」下的访问密码分区。演示库没有 access.json，分区处于系统口令状态。
  * 与冒烟同一口径：先等配置页主体，再 settle、再切分区。 */
 export async function openAccess(browser: Browser): Promise<Visit & { form: Locator }> {
-  const opened = await visit(browser, '/configuration', DESKTOP);
-  await expectBody(opened.page, '/configuration', configurationBody(opened.page));
+  const opened = await visit(browser, '/settings/library', DESKTOP);
+  await expectBody(opened.page, '/settings/library', configurationBody(opened.page));
   await settle(opened.page);
   await opened.page.getByRole('tab', { name: '网络与访问' }).click({ timeout: 5_000 });
   await settle(opened.page);
@@ -49,7 +49,7 @@ export const settledRun = (id: number, status: string, label: string) => ({
 
 /** 活动页按给定的一份 `/api/tasks` 打开：演示库里凑不齐失败、被挡下和成功三种状态。 */
 export async function openActivity(browser: Browser, runs: unknown[]): Promise<Visit> {
-  const opened = await visit(browser, '/activity', DESKTOP);
+  const opened = await visit(browser, '/tasks', DESKTOP);
   await opened.page.route('**/api/tasks', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -134,7 +134,7 @@ export const scrapingSource = (source: string, label: string, cookie: boolean) =
  * 站标走服务端的 `/site-mark`，而这几个来源是造出来的，那一趟必然取不到；那是另一条判据，
  * 这里给它一张能加载完的图，免得运行期问题名单里混进与本条无关的失败。 */
 export async function openScraping(browser: Browser): Promise<Visit> {
-  const opened = await visit(browser, '/scraping', DESKTOP);
+  const opened = await visit(browser, '/sources', DESKTOP);
   await opened.page.route('**/api/scraping', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -447,7 +447,7 @@ export const followCredential = (provider: string, requirement: string, present:
 /** 关注管理页按一份造好的来源与凭据打开：演示库没有关注来源，也凑不齐四种凭据处境。
  *  站标同 `openScraping`：造出来的来源取不到图标，给一张能加载完的图。 */
 export async function openFollowManage(browser: Browser, viewport = DESKTOP, data: FollowManageData = {}): Promise<Visit> {
-  const opened = await visit(browser, '/follow-manage', viewport);
+  const opened = await visit(browser, '/subscriptions', viewport);
   await stubFollowManage(opened.page, data);
   await opened.page.reload({ waitUntil: 'load' });
   await opened.page.locator('section[aria-label="kou 的关注来源"]').waitFor({ timeout: 15_000 });

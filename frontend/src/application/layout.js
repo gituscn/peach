@@ -28,6 +28,7 @@ import { JAV_RELEASE_SORT, SORTS } from './../sort-preferences';
 import { dropBars } from './../catalog-bars';
 import { entityState, pushEntityPage, syncPhotoWalls } from './entity.js';
 import { routeMetaOf } from './../history/route-meta';
+import { peachHistory, shellNavigate, isPreferencePath, preferenceSection, settingsPath, settingsBackgroundOf } from '../history';
 import { filterScrollState } from './filter-scroll.js';
 import { releaseHoverPreviews } from './../card-art/hover';
 export const layoutState = { sidebarProps: undefined, sidebarSurface: undefined, sidebarCatalog: undefined, sidebarContentSeq: undefined, SIDEBAR_ITEMS: undefined, MANAGE_SECTIONS: undefined, MANAGE_MENU_SECTIONS: undefined, manageMenuSections: undefined, OPTIONAL_SIDEBAR_ITEMS: undefined, NAV_CATALOG: undefined, DIRECT_MANAGE_NAV: undefined, settingsHost: undefined, lastManagePageLabel: undefined, manageHeaderSkeleton: undefined, manageHeaderRoot: undefined, scrollT: undefined, stickyFrame: undefined, mobileFilterScroll: undefined, mobileFilterHost: undefined, mobileFilterPath: undefined };
@@ -101,8 +102,21 @@ export function probeConfigurable(){
   }).catch(()=>{});
 }
 
-export function openSettings(section=''){
+export function openSettings(section='',fromRoute=false){
+  if(!fromRoute&&!isPreferencePath(location.pathname)){
+    const navigation=peachHistory.navigation;
+    peachHistory.push(settingsPath(section),{settingsBackground:{pathname:location.pathname,search:location.search,state:navigation.location.state,seq:navigation.seq}});
+  }else if(!fromRoute&&section){
+    shellNavigate(settingsPath(section),{replace:true,state:peachHistory.navigation.location.state});
+  }
+  section=section||preferenceSection(location.pathname);
   return loadSettingsPanel(layoutState.settingsHost()).then(panel=>{panel.open(section);return panel});
+}
+
+export function closeSettingsRoute(){
+  if(!isPreferencePath(location.pathname))return;
+  if(settingsBackgroundOf(peachHistory.navigation.location.state))peachHistory.go(-1);
+  else navigationState.navigatePath('/',true);
 }
 
 export function sidebarHost(){
@@ -391,6 +405,8 @@ layoutState.OPTIONAL_SIDEBAR_ITEMS = OPTIONAL_SIDEBAR_ITEMS;
 layoutState.NAV_CATALOG = NAV_CATALOG;
 layoutState.DIRECT_MANAGE_NAV = DIRECT_MANAGE_NAV;
 layoutState.settingsHost = ()=>({
+  selectSection:section=>shellNavigate(settingsPath(section),{replace:true,state:peachHistory.navigation.location.state}),
+  closed:closeSettingsRoute,
   store:preferencesState.settingsStore,
   changed:effect=>preferencesState.settingsEffects[effect]?.(),
   sound:name=>playUiSound(name),
@@ -402,7 +418,7 @@ layoutState.settingsHost = ()=>({
   receipt:message=>receiptsState.actionReceipt(message),
   failure:receiptsState.actionFailure,
   syncRemote:remote=>applySyncedSettings(remote,effect=>preferencesState.settingsEffects[effect]?.()),
-  openConfiguration:()=>navigationState.navigatePath('/configuration'),
+  openConfiguration:()=>navigationState.navigatePath('/settings/library'),
   attached:()=>preferencesState.syncGlassOptics(),
   /* 「这台电脑」那一格的判据：服务由托盘管、已完成配置、请求来自本机三条同时成立。 */
   configurable:()=>api('/healthz')

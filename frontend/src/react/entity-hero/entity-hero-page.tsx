@@ -67,8 +67,8 @@ export function EntityHeroPage({ kind, name, entity, feedNew, feedHost, actions,
           <div data-entity-identity="">
             <div data-entity-title="">
               <h2>{entity.canonical_name}</h2>
-              <NamePicker current={entity.canonical_name} choices={nameChoices(entity)}
-                onChoose={actions.chooseName} onAddAlias={actions.addAlias} />
+              {kind !== 'tag' ? <NamePicker current={entity.canonical_name} choices={nameChoices(entity)}
+                onChoose={actions.chooseName} onAddAlias={actions.addAlias} /> : null}
               {entity.id ? <FavoriteButton item={{ entity_id: Number(entity.id), kind, name: entity.canonical_name || name, favorite: entity.favorite }} /> : null}
             </div>
             <AliasLine kind={kind} entity={entity} actions={actions} />
@@ -151,7 +151,7 @@ function AliasLine({ kind, entity, actions }: { kind: string; entity: EntityHero
     actions.openEntity(target, to);
   };
   const agencyNode = agency ? (agency.linked
-    ? <a href={entityPath('agency', agency.name)} data-agency={agency.name} onClick={go('agency', agency.name)}>{agency.name}</a>
+    ? <a href={entityPath('agency', agency.name, agency.id)} data-agency={agency.name} onClick={go('agency', agency.name)}>{agency.name}</a>
     : agency.name) : null;
   const count = <><b>{entity.asset_count.toLocaleString()}</b> 个视频</>;
   if (kind === 'performer' || kind === 'creator') {
@@ -192,7 +192,7 @@ function AliasLine({ kind, entity, actions }: { kind: string; entity: EntityHero
       {kind === 'creator' ? <IdentityMeta entity={entity} /> : null}
       <span data-meta-item="" title="视频"><Glyph name="film" /><span>{count}{members}</span></span>
       {agencyNode ? <span data-meta-item="" title="事务所"><Glyph name="briefcase" /><span>{agencyNode}</span></span> : null}
-      {maker ? <span data-meta-item="" title="片商"><Glyph name="clapperboard" /><a href={entityPath('studio', maker.name)} data-studio-link={maker.name}
+      {maker ? <span data-meta-item="" title="片商"><Glyph name="clapperboard" /><a href={entityPath('studio', maker.name, maker.id)} data-studio-link={maker.name}
         onClick={go('studio', maker.name)}>{maker.name}</a></span> : null}
       {aliases.length ? <CompanyAliases aliases={aliases} /> : null}
     </div>

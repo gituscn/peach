@@ -101,7 +101,7 @@ it('三种扫描采集方式共用一颗主键加一个下拉，各自交自己�
   await click(menuItem('只采集'));
 
   expect(served.posts()).toEqual([{}, { stage: 'scan' }, { stage: 'collect' }]);
-  expect(host.querySelector('a[href="/scraping"]')?.textContent).toContain('来源和凭证');
+  expect(host.querySelector('a[href="/sources"]')?.textContent).toContain('来源和凭证');
 });
 
 it('启动只提交一次，进度用 GET 读回来，完成后给出回执与复核入口', async () => {
@@ -186,7 +186,7 @@ it('失败时把问题清单折叠进错误提示，重试只交失败的那些�
   const details = alert!.querySelector('details')!;
   expect(details.open).toBe(false);
   expect(details.querySelector('summary')?.textContent).toBe('问题清单：共 23 项，展开查看前 1 项');
-  expect(details.querySelector('li a')?.getAttribute('href')).toBe('/item/7');
+  expect(details.querySelector('li a')?.getAttribute('href')).toBe('/assets/7');
   expect(details.querySelector('li')?.textContent).toContain('样品.mp4');
   expect(details.querySelector('li code')?.textContent).toBe('R:\\Media\\样品.mp4');
   // 清单自己那条滚动条走全站那份覆盖式的，不留系统灰柱子。

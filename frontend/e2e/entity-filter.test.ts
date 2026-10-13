@@ -114,7 +114,7 @@ describe('实体页筛选浮层', () => {
         await serve(page);
         const suffix = '?sort=release&dir=asc&tag=a%2Fb&offset=48#works';
         await page.goto(new URL('/performers/OldName' + suffix, page.url()).href, { waitUntil: 'load' });
-        await page.waitForURL(url => url.pathname === PATH && url.search + url.hash === suffix);
+        await page.waitForURL(url => url.pathname === '/performers/90101' && url.search + url.hash === suffix);
         await page.locator('[data-entity-filter-glass] [data-entity-readout]').waitFor();
         await page.goBack({ waitUntil: 'load' });
         assert.equal(new URL(page.url()).pathname, '/');

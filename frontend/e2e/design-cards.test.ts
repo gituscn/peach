@@ -946,13 +946,13 @@ describe('设计决定：作品卡、管理页与复核', () => {
       /* 骨架与真页面各量一遍。版式、排序和方向是这台浏览器的偏好，骨架里就是最终那一档；
          检查全部、全部收起和行尾的移除键要等名单，骨架里是禁用态，只有尺寸与接管后一致。
          窄屏上工具行收成纯图标，两边按同一条线收，尺寸也要对得上。 */
-      const opened = await visit(browser, '/follow-manage', viewport);
+      const opened = await visit(browser, '/subscriptions', viewport);
       try {
         const page = opened.page;
         await stubFollowManage(page);
         const release = await holdApi(page);
         await page.reload({ waitUntil: 'load' });
-        await page.locator('[data-skeleton="board/follow-manage"] .ui-follow-skeleton-toolbar').waitFor({ timeout: 15_000 });
+        await page.locator('[data-skeleton="board/subscriptions"] .ui-follow-skeleton-toolbar').waitFor({ timeout: 15_000 });
         const toolbar = '[data-skeleton] .ui-follow-skeleton-toolbar';
         const skeleton = await controlFaces(page, {
           检查全部: `${toolbar} > button:nth-of-type(1)`,

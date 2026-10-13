@@ -106,5 +106,5 @@ it('路由元数据登记的就是管理区、播放列表与关注、索引、�
   expect(new Set(Object.keys(r.ROUTE_META))).toEqual(new Set([
     ...Object.keys(r.MANAGED_ROUTES), ...Object.keys(r.REDIRECT_ROUTES), ...Object.keys(r.BROWSE_ROUTES),
     ...Object.keys(r.INDEX_ROUTES), ...Object.keys(r.ENTITY_ROUTES), ...r.CATALOG_PATHS,
-    ...Object.keys(r.IMMERSE_ROUTES), ...r.OVERLAY_PATHS]));
+    ...Object.keys(r.IMMERSE_ROUTES), ...r.OVERLAY_PATHS, ...r.PREFERENCE_PATHS]));
 });

@@ -116,7 +116,7 @@ describe('关注的出处用站点图标', () => {
   });
 
   it('合集队列卡：出处是带站名的图标，与时间同一条中线', { timeout: 60_000 }, async () => {
-    const opened = await openFollow(browser, '/follow/item/1', '[data-follow-queue-item]');
+    const opened = await openFollow(browser, '/posts/1', '[data-follow-queue-item]');
     try {
       const rows = await lineGeometry(opened.page, '[data-follow-queue-item] [data-follow-queue-meta]');
       assert.equal(rows.length, 3, `队列卡数不对：${JSON.stringify(rows)}`);

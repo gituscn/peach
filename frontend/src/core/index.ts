@@ -2,6 +2,8 @@
  * Application 与 React 页面直接引用共享源码，LOC、fmtDur 等语义契约只有一份。
  * 本层不引入其他前端模块，避免被所有域引用的基础层反向依赖。
  * route() 留在应用导航域，因为它还要同步标题与界面动作。 */
+import { entityLinkId, registerEntityLink, registerResponseEntities } from './entity-links';
+export { registerEntityLink, registerResponseEntities } from './entity-links';
 const $=(s:string)=>document.querySelector(s);
 /* 方形槽位里塞不进 1.4:1 的字形：按宽度对齐它就矮一截，挨着满格的 Lucide
    图标看就是小一号。这几枚外层 viewBox 跟着 symbol 的比例走，槽位由 CSS 按高定宽。 */
@@ -41,6 +43,7 @@ const api=async(p:string,o?:RequestInit):Promise<unknown>=>{
     const detail=payload&&(payload.message||payload.detail||payload.error);
     throw new Error(requestErrorMessage(detail,response.status));
   }
+  registerResponseEntities(p,payload);
   return payload;
 };
 /* 取消不是失败。abort 只可能来自表面切换，调用点本来就有一条「已过期」分支要走，
@@ -70,10 +73,14 @@ const STATE_ROUTES:Record<string,string>={fresh:'/unseen',later:'/watch-later',f
 const ROUTE_STATES:Record<string,string>=Object.fromEntries(Object.entries(STATE_ROUTES).map(([state,path])=>[path,state]));
 const STATE_LABELS:Record<string,string>={fresh:'没看过',later:'稍后看',flagged:'已标记',ads:'垃圾文件'};
 const isCatalogPath=(path:string)=>path==='/'||path==='/wall'||Object.prototype.hasOwnProperty.call(ROUTE_STATES,path);
-const ENTITY_ROUTES:Record<string,string>={performer:'performers',studio:'studios',creator:'creators',series:'series',agency:'agencies'};
-const ROUTE_ENTITIES:Record<string,string>={performers:'performer',studios:'studio',creators:'creator',series:'series',agencies:'agency'};
-/** 实体资料页的地址：`/performers/<名字>` 这一类。 */
-const entityPath=(kind:string,name:string)=>`/${ENTITY_ROUTES[kind]||kind}/${encodeURIComponent(name)}`;
+const ENTITY_ROUTES:Record<string,string>={performer:'performers',studio:'studios',creator:'creators',series:'series',agency:'agencies',tag:'tags'};
+const ROUTE_ENTITIES:Record<string,string>={performers:'performer',studios:'studio',creators:'creator',series:'series',agencies:'agency',tags:'tag'};
+/** 实体资料页使用已取得的稳定身份。姓名地址由资料路由解析为 ID。 */
+const entityPath=(kind:string,name:string,id?:number|null)=>{
+  if(id)registerEntityLink(kind,name,id);
+  const target=id||entityLinkId(kind,name);
+  return `/${ENTITY_ROUTES[kind]||kind}/${target||encodeURIComponent(name)}`;
+};
 const esc=(s:unknown)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'} as Record<string,string>)[c] as string);
 /* 外链上写的是站点的短名：事务所和片商平时就被叫作 NAX、T-POWERS、DMM，而账本里的
    label 是采集时抄下来的全称（`New Actor eXperience`、`DMM 检索`），域名又要人先在

@@ -320,7 +320,7 @@ export interface StatsProps {
 export interface TasteProps {
   /** 点一条名次：回目录并按它筛选。`kind` 是 `tag`／`creator`／`performer`。 */
   onSignal(kind: string, name: string): void;
-  /** 去口味总结里指的那一页（`#/manage/scraping` 这类遗留路由）。 */
+  /** 打开口味总结指向的页面。 */
   navigate(route: string): void;
   /** 写操作在服务端落地之后的过去时回执。 */
   toast(message: string): void;

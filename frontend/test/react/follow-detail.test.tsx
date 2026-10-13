@@ -114,7 +114,7 @@ describe('侧栏', () => {
       { id: 1, provider: 'kemono', author_name: 'Kou', author_key: 'name:kou', entity_id: 1, entity_name: 'Kou' },
     ] });
     const avatar = host.querySelector<HTMLAnchorElement>('a[data-follow-source-avatar]')!;
-    expect(avatar.getAttribute('href')).toBe('/creators/Kou');
+    expect(avatar.getAttribute('href')).toBe('/creators/1');
     await click(avatar);
     expect(props.actions.openAuthor).toHaveBeenCalledWith('Kou');
     const event = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true });

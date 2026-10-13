@@ -492,7 +492,7 @@ class EntityClassificationTests(unittest.TestCase):
             merge_entity(self.connection,target_id=target,source_id=source,
                          source_name='Old Account Name',alias_source='user:identity-merge:creator')
         self.assertEqual(q_entity(WebContract(self.db),{'kind':'creator','name':'Old Account Name'}),
-                         {'redirect':{'kind':'performer','name':'Known Person'}})
+                         {'redirect':{'id':target,'kind':'performer','name':'Known Person'}})
         self.assertEqual(q_entity(WebContract(self.db),{'kind':'studio','name':'Known Person'}),{'error':'not found'})
         self.assertEqual(self.connection.execute('PRAGMA foreign_key_check').fetchall(),[])
 

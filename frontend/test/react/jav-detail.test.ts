@@ -6,9 +6,9 @@ const page = (n: number, ids: string[], more = true): JavReviews => ({ ok: true,
   items: ids.map(id => ({ id, username: '示例用户', content: '示例评论', created_at: '' })) });
 describe('库外作品与评论身份', () => {
   it('番号路由保持独立身份并拒绝路径片段', () => {
-    expect(overlayMatch('/jav/movie/EXM-001')?.target).toEqual({ kind: 'jav', code: 'EXM-001' });
-    expect(overlayMatch('/jav/movie/../../file')).toBeNull();
-    expect(overlayMatch('/item/3')?.target).toEqual({ kind: 'item', id: 3 });
+    expect(overlayMatch('/works/EXM-001')?.target).toEqual({ kind: 'jav', code: 'EXM-001' });
+    expect(overlayMatch('/works/../../file')).toBeNull();
+    expect(overlayMatch('/assets/3')?.target).toEqual({ kind: 'item', id: 3 });
   });
   it('重复页与终页结束翻页', () => {
     const first = page(1, ['1', '2']);

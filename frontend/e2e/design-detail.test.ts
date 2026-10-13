@@ -35,7 +35,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
       }));
     };
-    const wide = await openFollowFeed(browser, `/follow/item/${DETAIL.gallery}`, DESKTOP,
+    const wide = await openFollowFeed(browser, `/posts/${DETAIL.gallery}`, DESKTOP,
       { ready: '#stage [data-follow-image-arrow="next"]' });
     try {
       await settlePoster(wide.page);
@@ -52,7 +52,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
     } finally {
       await wide.close();
     }
-    const narrow = await openFollowFeed(browser, `/follow/item/${DETAIL.gallery}`, MOBILE,
+    const narrow = await openFollowFeed(browser, `/posts/${DETAIL.gallery}`, MOBILE,
       { ready: '#stage [data-follow-image-arrow="next"]' });
     try {
       await settlePoster(narrow.page);
@@ -67,7 +67,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   });
 
   it('关注详情：没有预览的那一格占 16:9；标签按来源记下的类型取 r34 色板，未知类型取中性灰', { timeout: 60_000 }, async () => {
-    const opened = await openFollowFeed(browser, `/follow/item/${DETAIL.bare}`, DESKTOP,
+    const opened = await openFollowFeed(browser, `/posts/${DETAIL.bare}`, DESKTOP,
       { ready: '#stage [data-follow-detail-tags]' });
     try {
       const page = opened.page;
@@ -97,7 +97,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   });
 
   it('关注详情标题：来源外链标与标题第一行同心，标题折行时仍贴第一行', { timeout: 60_000 }, async () => {
-    const opened = await openFollowFeed(browser, `/follow/item/${DETAIL.gallery}`, DESKTOP,
+    const opened = await openFollowFeed(browser, `/posts/${DETAIL.gallery}`, DESKTOP,
       { ready: '#stage [data-follow-origin]' });
     try {
       const page = opened.page;
@@ -122,7 +122,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   const withoutPlayer = (problems: string[]) => problems.filter((line) => !line.includes('VIDEOJS'));
 
   it('作品详情标题与评分：来源徽标站在标题第一行开头；整排星一种琥珀、评没评只看填不填，悬停预演到指针那一颗', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       const title = await page.evaluate(() => {
@@ -170,7 +170,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   });
 
   it('作品详情身份区：各组按内容宽并排换行，名字行框容得下下伸部；系列是整行宽的图标链接，不是标签胶囊', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       const shown = await page.evaluate(() => {
@@ -211,7 +211,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
 
   for (const viewport of VIEWPORTS) {
     it(`作品详情头像按有尺寸的圆框取景并显示（${viewport.name}）`, { timeout: 60_000 }, async () => {
-      const opened = await openItemPage(browser, `/item/${ITEM.plain}`, viewport);
+      const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, viewport);
       try {
         const page = opened.page;
         const base = await page.evaluate(() => fetch('/api/item?id=14').then((response) => response.json()));
@@ -224,7 +224,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
         await page.route((url) => url.pathname === '/api/item', (route) => route.fulfill({ json: payload }));
         await page.route('**/entity-image**', (route) => route.fulfill({ contentType: 'image/svg+xml',
           body: '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000"><rect width="1000" height="1000" fill="#ddd"/></svg>' }));
-        await page.goto(new URL('/item/14', page.url()).href, { waitUntil: 'load' });
+        await page.goto(new URL('/assets/14', page.url()).href, { waitUntil: 'load' });
         const face = page.locator('#stage [data-entity-name="取景艺人"] [data-id-face]');
         await face.scrollIntoViewIfNeeded();
         await page.waitForFunction(() => {
@@ -246,7 +246,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   }
 
   it('作品详情身份区：没实体 id 的格子不给手形，厂牌标识铺满方框', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       // 先经桩取到原样的那一条；`route.fetch()` 会绕过桩直接打到服务器。
@@ -258,7 +258,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
           studio: [{ id: 50, name: 'Peach Studio', has_image: false, has_logo: true }] },
       };
       await page.route((url) => url.pathname === '/api/item', (route) => route.fulfill({ json: payload }));
-      await page.goto(new URL('/item/14', page.url()).href, { waitUntil: 'load' });
+      await page.goto(new URL('/assets/14', page.url()).href, { waitUntil: 'load' });
       await page.locator('#stage [data-id-cell="studio"] img').waitFor({ timeout: 15_000 });
       await settle(page);
       const shown = await page.evaluate(() => {
@@ -283,7 +283,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   });
 
   it('作品详情标签与反馈键：标签和卡片同一张脸，筛选那半边悬停抬填充；反馈条每一枚悬停都换色', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       const face = await page.evaluate(() => {
@@ -326,7 +326,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   });
 
   it('作品详情喜爱理由框与「接着看」：输入框聚焦画 BoardUI 那枚 2px 内环；接着看和侧栏同底、顶上一条细线', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator('#stage [data-media-card]').first().waitFor({ timeout: 15_000 });
@@ -362,7 +362,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   });
 
   it('作品详情队列与说明块：版次徽章和标题同一行、不斜体；脱盘说明块铺满播放器格', { timeout: 60_000 }, async () => {
-    const editions = await openItemPage(browser, `/editions/${ITEM.edition}/${ITEM.edition}`, DESKTOP,
+    const editions = await openItemPage(browser, `/assets/${ITEM.edition}?editions=${ITEM.edition}`, DESKTOP,
       { ready: '#stage [data-queue-edition]' });
     try {
       const shown = await editions.page.evaluate(() => {
@@ -389,7 +389,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
     } finally {
       await editions.close();
     }
-    const offline = await openItemPage(browser, `/item/${ITEM.offline}`, DESKTOP, { ready: '#stage #offlineGate' });
+    const offline = await openItemPage(browser, `/assets/${ITEM.offline}`, DESKTOP, { ready: '#stage #offlineGate' });
     try {
       const fit = await offline.page.evaluate(() => {
         const gate = document.querySelector('#stage #offlineGate')!;
@@ -410,7 +410,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   });
 
   it('作品详情标签选择器用全站下拉面板那一对开合动效，减少动态效果时当场开合', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       const picker = page.locator('#stage [data-tag-picker]');
@@ -454,7 +454,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
     getComputedStyle(document.querySelector(target)!).getPropertyValue(name).trim(), [selector, token] as const);
 
   it('详情浮窗：遮罩同一档 --scrim、不带模糊，进出场同设置弹层；关闭键是压在画面上的 40px 黑圆；媒体格只圆左上角，剧场模式圆上面两角、排成单列', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP, { settings: { theme: 'light' } });
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP, { settings: { theme: 'light' } });
     try {
       const page = opened.page;
       const scrim = await tokenColor(page, 'body', '--scrim');
@@ -491,7 +491,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   });
 
   it('手机上详情浮窗离屏幕边 8px，滚的是里面那一层，视频格吸在它顶上', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, MOBILE);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, MOBILE);
     try {
       const page = opened.page;
       await page.locator(PLAYER_BAR).waitFor({ state: 'attached' });
@@ -513,7 +513,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
     }), selectors);
     const controls = ['#closeStage', '#likeBtn', '#stage [data-stage-action]', '#stage [data-title-fold]', '#tagPlus',
       '#stage [data-detail-tag] [data-tag]'];
-    const stage = await openItemPage(browser, `/item/${ITEM.plain}`, MOBILE);
+    const stage = await openItemPage(browser, `/assets/${ITEM.plain}`, MOBILE);
     try {
       await stage.page.locator('#stage [data-detail-tag] [data-tag]').first().waitFor({ state: 'attached' });
       assert.deepEqual(await touchOf(stage.page, controls), controls.map(() => ['manipulation', 'none']),
@@ -536,7 +536,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   });
 
   it('播放器控件：40px 黑圆播放键、同一档黑的右侧胶囊与提示、钨丝色进度、页面字体；统计键与加载速度角标压在左上；报错是一张盖在统计上面的卡', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator(PLAYER_BAR).waitFor({ state: 'attached' });
@@ -590,7 +590,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   });
 
   it('播放器的设置面板与右键菜单：同一档黑、浮层圆角、48px 的行；右键菜单悬停抬一层白', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator('#stage #playerStatsBtn').waitFor();
@@ -628,7 +628,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   });
 
   it('统计图 20px 高，缓冲那条按健康度换色；小窗照 ytd-miniplayer：固定在右下角 16px、宽 400px、层级在弹层之下，快退快进键 36px', { timeout: 60_000 }, async () => {
-    const opened = await openItemPage(browser, `/item/${ITEM.plain}`, DESKTOP);
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
       await page.locator('#stage #playerStatsBtn').click();

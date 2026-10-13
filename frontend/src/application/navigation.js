@@ -77,7 +77,7 @@ navigationState.openRoutePath = path=>{
     openRoutedPage(indexPath({kind:path.slice(1),q:'',scope:'local',view:'alphabet',category:'all'}));
     return;
   }
-  navigationState.navigatePath(path==='/follow-manage'?followManageEntry():path);
+  navigationState.navigatePath(path==='/subscriptions'?followManageEntry():path);
 };
 }
 

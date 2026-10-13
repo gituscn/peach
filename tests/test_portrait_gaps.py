@@ -171,7 +171,7 @@ class PortraitGapTests(unittest.TestCase):
         connection.close()
         self.run_script("--apply")
         page = (self.root / "sheet" / "index.html").read_text(encoding="utf-8")
-        self.assertIn("http://localhost:9999/item/41", page)
+        self.assertIn("http://localhost:9999/assets/41", page)
         self.assertIn("ABC-001", page)
 
     def test_someone_who_already_has_a_portrait_is_not_a_target(self):

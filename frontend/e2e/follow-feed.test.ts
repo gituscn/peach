@@ -63,13 +63,13 @@ describe('关注页岛', () => {
         assert.equal(await page.getByRole('searchbox', { name: '搜索创作者' }).count(), 0);
         const author = page.locator('[data-follow-authors] a[data-follow-author="name:kou"]');
         assert.equal(await author.count(), 1);
-        assert.equal(await author.getAttribute('href'), '/creators/Kou');
+        assert.equal(await author.getAttribute('href'), '/creators/90101');
         assert.equal(await author.getAttribute('aria-pressed'), null);
         const card = page.locator('[data-follow-item="1000"]');
-        assert.equal(await card.locator('a[data-follow-author]').getAttribute('href'), '/creators/Kou');
-        assert.equal(await card.locator('a[data-follow-avatar]').getAttribute('href'), '/creators/Kou');
+        assert.equal(await card.locator('a[data-follow-author]').getAttribute('href'), '/creators/90101');
+        assert.equal(await card.locator('a[data-follow-avatar]').getAttribute('href'), '/creators/90101');
         await card.locator('a[data-follow-author]').click();
-        await page.waitForURL('**/creators/Kou');
+        await page.waitForURL('**/creators/90101');
         assert.equal(await page.locator('#stage[open]').count(), 0);
         assert.deepEqual(opened.problems, []);
       } finally { await opened.close(); }
@@ -182,7 +182,7 @@ describe('关注页岛', () => {
     try {
       const page = opened.page;
       await page.locator('[data-follow-list] [data-follow-collection="5001"]').click();
-      await page.waitForURL('**/follow/item/5001');
+      await page.waitForURL('**/posts/5001');
       await page.locator('#stage[open]').waitFor();
       assert.deepEqual(withoutPlayer(opened.problems), []);
     } finally {
@@ -276,7 +276,7 @@ describe('关注页岛', () => {
       await tip.waitFor({ state: 'visible', timeout: 5_000 });
       assert.equal(await tip.textContent(), hit.title);
       await card.locator('[data-media-badge]').click();
-      await page.waitForURL(`**/follow/item/${id}`);
+      await page.waitForURL(`**/posts/${id}`);
       assert.deepEqual(withoutPlayer(opened.problems), []);
     } finally {
       await opened.close();
@@ -660,7 +660,7 @@ describe('关注页岛', () => {
       const before = await cardIds(page);
       await page.evaluate(() => { (document.querySelector('[data-follow-feed]') as HTMLElement & { mark?: number }).mark = 7 });
       await page.locator('[data-follow-item="1002"] [data-follow-open]').click();
-      await page.waitForFunction(() => location.pathname === '/follow/item/1002');
+      await page.waitForFunction(() => location.pathname === '/posts/1002');
       await page.locator('#stage[open]').waitFor();
       await page.locator('#closeStage').click();
       await searchIs(page, '?status=new');
@@ -672,7 +672,7 @@ describe('关注页岛', () => {
     } finally {
       await opened.close();
     }
-    const deep = await openFollowFeed(browser, '/follow/item/1003', DESKTOP, { ready: '#stage[open]' });
+    const deep = await openFollowFeed(browser, '/posts/1003', DESKTOP, { ready: '#stage[open]' });
     try {
       const page = deep.page;
       assert.equal(await page.locator('[data-follow-feed]').count(), 0, '深链进详情时不该挂岛');
