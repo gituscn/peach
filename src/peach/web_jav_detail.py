@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import json
+import base64
 
 from . import entities, wants, web_catalog
 from .catalog_rules import normalise_code_key, tag_cat
@@ -12,6 +13,8 @@ from .javdb_public import (MAX_REVIEW_PAGES, PAGE_SIZE, PUBLIC_API, PublicSource
                           actor_gender, preview_video_url, public_image_url)
 from .jav_discovery_metadata import discovery_metadata
 from .sources.javdb import maker_writing
+from .remote_media_cache import AVATAR_REFRESH_SECONDS, RemoteMediaUnavailable, cache_for
+from .preview_cache import PreviewCache
 
 
 def detail_code(args) -> str:
@@ -133,7 +136,7 @@ def _artwork_fields(contract, code, item, source):
             "cover_url": item.get("cover_url") or "",
             "source_image": bool(source and (source.get("cover_url") or source.get("thumb_url"))),
             "preview_count": min(len(source.get("preview_images") or []), 30),
-            "preview_video_url": preview_video_url(source),
+            "preview_video_url": _preview_url(contract, code, source),
             "source_url": "https://javdb.com/v/" + str(source["id"]) if source else item.get("link") or ""}
 
 
@@ -177,21 +180,38 @@ def q_jav_image(contract, args) -> dict:
             and (not index.isdigit() or not 0 <= int(index) < 30)):
         raise ValueError("预览图不存在")
     try:
-        if index.startswith('actor:'):
-            stored, _ = discovery_metadata(contract).peek(code)
-            PUBLIC_API.remember_movie_identity(code, stored or {})
-            actor = next((person for person in (stored or {}).get('actors', [])
-                          if isinstance(person, dict) and str(person.get('id')) == index.removeprefix('actor:')), {})
-            if public_image_url(actor.get('avatar_image')):
-                return {'ok': True, 'image': PUBLIC_API.image_from_url(actor['avatar_image'])}
-        image = PUBLIC_API.image(code, index)
-        if index.startswith('actor:'):
-            movie = PUBLIC_API.peek_movie(code)
-            if movie:
-                discovery_metadata(contract).remember(code, movie)
-    except PublicSourceUnavailable as error:
+        key = f"jav:actor:{index.removeprefix('actor:')}" if index.startswith("actor:") else f"jav:{code}:image:{index}"
+        body = cache_for(contract).bytes(key,
+            lambda: base64.b64decode(_fetch_image(contract, code, index).partition(',')[2], validate=True),
+            ttl=AVATAR_REFRESH_SECONDS if index.startswith("actor:") else None)
+        image = "data:image/jpeg;base64," + base64.b64encode(body).decode("ascii")
+    except (PublicSourceUnavailable, RemoteMediaUnavailable) as error:
         return {"ok": False, "image": "", "message": str(error)}
     return {"ok": True, "image": image}
+
+
+def _fetch_image(contract, code, index):
+    if index.startswith('actor:'):
+        stored, _ = discovery_metadata(contract).peek(code)
+        PUBLIC_API.remember_movie_identity(code, stored or {})
+        actor = next((person for person in (stored or {}).get('actors', [])
+                      if isinstance(person, dict) and str(person.get('id')) == index.removeprefix('actor:')), {})
+        if public_image_url(actor.get('avatar_image')):
+            return PUBLIC_API.image_from_url(actor['avatar_image'])
+    image = PUBLIC_API.image(code, index)
+    if index.startswith('actor:'):
+        movie = PUBLIC_API.peek_movie(code)
+        if movie:
+            discovery_metadata(contract).remember(code, movie)
+    return image
+
+
+def _preview_url(contract, code, source):
+    url = preview_video_url(source)
+    if not url:
+        return ""
+    ref = PreviewCache(cache_for(contract)).register(code, url, identity="root", playlist=True)
+    return f"/jav-preview/{code}/{ref}.m3u8"
 
 
 def q_jav_resources(contract, args) -> dict:

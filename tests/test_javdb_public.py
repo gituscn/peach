@@ -293,7 +293,7 @@ class DetailProjectionTests(unittest.TestCase):
         metadata = discovery_metadata(self.contract)
         metadata.remember('EXM-001', {'actors': [{'id': 'Actor1', 'name': '甲', 'gender': 0,
                                                'avatar_url': 'https://tp.spfcas.com/actor.jpg'}]})
-        with patch('peach.web_jav_detail.PUBLIC_API.image_from_url', return_value='data:image/jpeg;base64,example') as image, \
+        with patch('peach.web_jav_detail.PUBLIC_API.image_from_url', return_value='data:image/jpeg;base64,c2FtcGxl') as image, \
                 patch('peach.web_jav_detail.PUBLIC_API.movie') as movie:
             result = q_jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Actor1'})
         self.assertTrue(result['ok'])
@@ -303,7 +303,8 @@ class DetailProjectionTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        self.contract = WebContract(fresh_ledger(temporary.name), cover_root=Path(temporary.name) / 'covers')
+        root = Path(temporary.name).resolve()
+        self.contract = WebContract(fresh_ledger(root), cover_root=root / 'covers', candidate_root=root / 'generated')
         self.addCleanup(self.contract.stop_background_jobs)
         self.contract.followups.stop()
 
@@ -462,9 +463,18 @@ class DetailProjectionTests(unittest.TestCase):
         self.assertTrue(all(ref['source_avatar'] and ref['id'] is None for ref in result['performer_refs']))
         self.assertEqual(result['studio_refs'][0]['has_logo'], True)
         self.assertEqual(result['studio_refs'][0]['logo_version'], 'logo-version')
-        with patch('peach.web_jav_detail.PUBLIC_API.image_from_url', return_value='data:image/jpeg;base64,sample') as image:
+        with patch('peach.web_jav_detail.PUBLIC_API.image_from_url', return_value='data:image/jpeg;base64,c2FtcGxl') as image:
             self.assertTrue(q_jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Unknown'})['ok'])
         image.assert_called_once_with('https://tp.spfcas.com/b.jpg')
+
+    def test_image_bytes_are_reused_without_querying_source_again(self):
+        with patch('peach.web_jav_detail.PUBLIC_API.image', return_value='data:image/jpeg;base64,c2FtcGxl') as image:
+            first = q_jav_image(self.contract, {'code': 'EXM-001'})
+        image.assert_called_once()
+        with patch('peach.web_jav_detail.PUBLIC_API.image', side_effect=PublicSourceUnavailable('offline')) as offline:
+            replay = q_jav_image(self.contract, {'code': 'EXM-001'})
+        self.assertEqual(replay, first)
+        offline.assert_not_called()
 
     def test_local_performer_reference_keeps_canonical_identity_and_face_crop(self):
         movie = {'id': 'Exact', 'actors': [

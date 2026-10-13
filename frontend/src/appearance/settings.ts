@@ -18,7 +18,6 @@ export const SETTINGS_KEY = 'peach.settings.v1';
 export const THEME_CHOICES: readonly string[] = ['system', 'light', 'dark'];
 /** 关注首次采集往回取多少天；与账本那一份同一张表。 */
 export const FOLLOW_INITIAL_DAYS: readonly number[] = [0, 7, 30, 90];
-export const METADATA_REFRESH_DAYS: readonly number[] = [0, 7, 30, 90];
 /* 新作那一行收不收合集由服务端按账本里的设置筛（列表、未读数、补封面同一份），这里只是
    镜像：开关的真相在 `/api/settings`。默认收起大合集与切片、单人合集照列。 */
 export const FEED_COMPILATION_KEYS = ['feedHideGroupCompilations', 'feedHideSoloCompilations', 'feedHideExcerpts'] as const;
@@ -54,7 +53,6 @@ export interface AppSettings {
   feedHideSoloCompilations: boolean;
   feedHideExcerpts: boolean;
   followInitialDays: number;
-  metadataRefreshDays: number;
   sidebarOrder: string[];
   homeGlow: HomeGlow;
   accent: string;
@@ -92,6 +90,7 @@ export function normalizeAppSettings(raw: unknown): { settings: AppSettings; mig
   settings.hoverDelaySeconds = boundedPreference(+(settings.hoverDelaySeconds as number), 0, 60, 5);
   settings.seekSeconds = boundedPreference(+(settings.seekSeconds as number), 1, 300, 10);
   delete settings.loginDays;
+  delete settings.metadataRefreshDays;
   settings.ambientMode = settings.ambientMode !== false;
   settings.theaterMode = settings.theaterMode === true;
   settings.groupCollapse = settings.groupCollapse !== false;
@@ -104,7 +103,6 @@ export function normalizeAppSettings(raw: unknown): { settings: AppSettings; mig
   settings.feedHideExcerpts = settings.feedHideExcerpts !== false;
   settings.searchHistoryLimit = boundedPreference(+(settings.searchHistoryLimit as number), 0, 50, 10);
   settings.relatedLimit = boundedPreference(+(settings.relatedLimit as number), 0, 60, 20);
-  settings.metadataRefreshDays = allowedSetting(+(settings.metadataRefreshDays as number), METADATA_REFRESH_DAYS, 30);
   Object.assign(settings, normalizeJavPreferences(settings));
   settings.theme = allowedSetting(settings.theme, THEME_CHOICES, 'system');
   settings.homeGlow = normalizeHomeGlow(settings.homeGlow);
@@ -137,7 +135,6 @@ export type SyncedEffect = 'searchHistoryLimit';
 /** 搜索记录条数在 `/api/settings` 上的形状：还没定过时是 null。 */
 export interface SyncedSettings {
   followInitialDays?: unknown;
-  metadataRefreshDays?: unknown;
   feedHideGroupCompilations?: unknown;
   feedHideSoloCompilations?: unknown;
   feedHideExcerpts?: unknown;
@@ -155,10 +152,6 @@ export function applySyncedSettings(
   const settings = target.value;
   const initial = remote && remote.followInitialDays;
   if (FOLLOW_INITIAL_DAYS.includes(initial as number)) { settings.followInitialDays = initial as number; target.save() }
-  const days = remote && remote.metadataRefreshDays;
-  if (METADATA_REFRESH_DAYS.includes(days as number) && days !== settings.metadataRefreshDays) {
-    settings.metadataRefreshDays = days as number; target.save();
-  }
   for (const key of FEED_COMPILATION_KEYS) {
     if (typeof remote?.[key] !== 'boolean' || remote[key] === settings[key]) continue;
     settings[key] = remote[key] as boolean; target.save();

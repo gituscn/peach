@@ -12,7 +12,7 @@ notifyManager.setScheduler((notify) => notify());
 afterEach(() => { queryClient.clear(); localStorage.removeItem('peach.number.followScheduleSetting') });
 
 function server() {
-  const settings = { followInitialDays: 30, metadataRefreshDays: 30 };
+  const settings = { followInitialDays: 30, avatarRefreshDays: 90, faviconRefreshDays: 365 };
   const schedule = { available: true, enabled: true, interval_minutes: 180 };
   const thumbnails = { mode: 'precise', status: 'idle' };
   const posts: { url: string; body: Record<string, unknown> }[] = [];
@@ -28,22 +28,20 @@ function server() {
   return { posts, settings, schedule, thumbnails };
 }
 
-it('首次采集范围与头像刷新写入服务端，回执和本地镜像跟随成功值', async () => {
+it('首次采集范围写入服务端，头像和 favicon 使用固定刷新周期', async () => {
   const { posts } = server();
   const receipt = vi.fn();
   const host = await mount(<QueryClientProvider client={queryClient}><FollowPreferenceRows receipt={receipt} /></QueryClientProvider>);
   await settle();
   await choose(host.querySelector('#followInitialDaysSetting [aria-haspopup="listbox"]'), '最近 7 天');
   await settle();
-  await choose(host.querySelector('#metadataRefreshSetting [aria-haspopup="listbox"]'), '每周');
-  await settle();
+  expect(host.textContent).toContain('每 3 个月');
+  expect(host.textContent).toContain('每年');
   expect(posts).toEqual([
     { url: '/api/settings', body: { followInitialDays: 7 } },
-    { url: '/api/settings', body: { metadataRefreshDays: 7 } },
   ]);
   expect(appSettingsStore().value.followInitialDays).toBe(7);
-  expect(appSettingsStore().value.metadataRefreshDays).toBe(7);
-  expect(receipt.mock.calls).toEqual([['已保存首次采集范围'], ['已保存头像与图标刷新频率']]);
+  expect(receipt.mock.calls).toEqual([['已保存首次采集范围']]);
 });
 
 it('缩略图选择提交原档位，保存后的控件显示采集间隔', async () => {
@@ -83,12 +81,11 @@ it('服务设置重新进入时读取最新状态，关闭自动检查后保留�
   expect(localStorage.getItem('peach.number.followScheduleSetting')).toBe('180');
   await first.unmount();
   settings.followInitialDays = 7;
-  settings.metadataRefreshDays = 90;
   thumbnails.mode = 'coarse';
   const second = await mount(view());
   await settle();
   expect(second.querySelector('#followInitialDaysSetting [aria-haspopup="listbox"]')?.textContent).toContain('最近 7 天');
-  expect(second.querySelector('#metadataRefreshSetting [aria-haspopup="listbox"]')?.textContent).toContain('每季');
+  expect(second.textContent).toContain('每 3 个月');
   expect(second.querySelector('#videoThumbnailSetting [aria-haspopup="listbox"]')?.textContent).toContain('每 30 秒一张');
   expect(second.querySelector<HTMLInputElement>('input[role="switch"]')?.checked).toBe(false);
   await click(second.querySelector('input[role="switch"]'));

@@ -9,7 +9,7 @@ from peach import http as peach_http
 from peach.follow_stream import (
     MAX_PROXY_REDIRECTS, FollowMediaResolver, FollowMediaUnavailable,
     FollowProxyError, ResolvedFollowMedia, open_upstream, proxy_request_headers,
-    proxy_response_headers, proxyable,
+    proxyable,
 )
 from peach.follow_secrets import Credential
 from peach.http import HttpResponse
@@ -484,13 +484,3 @@ class ProxyUpstreamTests(unittest.TestCase):
         self.assertEqual(headers["Referer"], "https://kemono.cr/post/7")
         self.assertEqual(headers["Cookie"], "source_session=fixture")
         self.assertNotIn("Authorization", headers)
-        forwarded = proxy_response_headers({
-            "content-type": "video/mp4", "content-length": "10",
-            "set-cookie": "upstream=1", "server": "nginx",
-        })
-        self.assertEqual(forwarded, {"content-type": "video/mp4",
-                                     "content-length": "10",
-                                     "cache-control": "no-store"})
-        # 图片地址指向账本里固定的那一张，留在浏览器里，重进关注页不再回源。
-        image = proxy_response_headers({"content-type": "image/jpeg"})
-        self.assertEqual(image["cache-control"], "private, max-age=86400")

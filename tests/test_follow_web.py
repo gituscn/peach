@@ -706,6 +706,16 @@ class FollowContractTests(unittest.TestCase):
         self.assertEqual([item["external_id"] for item in items], ["download"])
         self.assertEqual(payload["counts"]["new"], 1)
 
+    def _assert_cached_thumb(self, item, upstream):
+        parsed = urllib.parse.urlsplit(item["thumb_url"])
+        self.assertEqual(parsed.path, "/follow-image")
+        query = urllib.parse.parse_qs(parsed.query)
+        self.assertEqual(query["id"], [str(item["id"])])
+        self.assertTrue(query["v"])
+        with self.contract.database.read_connection() as connection:
+            stored = FollowStore(lambda: connection).item(item["id"])
+            self.assertEqual(web_follow._remote_thumb_url(stored), upstream)
+
     def test_old_archive_images_get_a_thumbnail_without_rewriting_the_ledger(self):
         self._seed(candidates=(FollowCandidate(
             provider="kemono", external_id="1", title="Image release",
@@ -713,8 +723,7 @@ class FollowContractTests(unittest.TestCase):
             media_url="https://kemono.cr/ab/cd/image.jpg",
         ),), provider="kemono", ref="fanbox/1")
         item = self._get()["groups"][0]["primary"]
-        self.assertEqual(
-            item["thumb_url"], "https://img.kemono.cr/thumbnail/data/ab/cd/image.jpg")
+        self._assert_cached_thumb(item, "https://img.kemono.cr/thumbnail/data/ab/cd/image.jpg")
         self.assertEqual(item["media_kind"], "image")
         self.assertTrue(item["playable"])
 
@@ -730,8 +739,7 @@ class FollowContractTests(unittest.TestCase):
         ),), provider="rule34xxx", ref="artist")
         item = self._get()["groups"][0]["primary"]
         self.assertEqual(item["media_type"], "video/mp4")
-        self.assertEqual(
-            item["thumb_url"],
+        self._assert_cached_thumb(item,
             "https://api-cdn.rule34.xxx/images/42/"
             "0123456789abcdef0123456789abcdef.jpg")
 
@@ -767,7 +775,7 @@ class FollowContractTests(unittest.TestCase):
         items = {group["primary"]["external_id"]: group["primary"] for group in self._get()["groups"]}
         for key in ("1", "2"):
             self.assertEqual(items[key]["thumb_url"], f"/follow-cover?id={items[key]['id']}")
-        self.assertEqual(items["3"]["thumb_url"], image)
+        self._assert_cached_thumb(items["3"], image)
 
     def test_fanbox_videos_in_the_media_list_show_a_frame_not_nothing(self):
         """fanbox 站内视频不带缩略图，清单那一格给抽帧地址，不留空让页面退回站点图标。"""
@@ -788,9 +796,9 @@ class FollowContractTests(unittest.TestCase):
         ),), provider="fanbox", ref="creator")
         item = self._get()["groups"][0]["primary"]
         thumbs = {media["name"]: media["thumb_url"] for media in item["media_items"]}
+        self.assertTrue(thumbs.pop("封面").startswith(f"/follow-image?id={item['id']}&media=1&v="))
         self.assertEqual(thumbs, {
             "first": f"/follow-cover?id={item['id']}",
-            "封面": cover,
             "second": f"/follow-cover?id={item['id']}&media=2",
             # 抽帧只对 fanbox 站内视频成立；别处托管的视频没有画面就留空，由页面给中性占位。
             "elsewhere": None,
@@ -815,12 +823,12 @@ class FollowContractTests(unittest.TestCase):
                  "url": cover, "thumb_url": cover},
             ]}),), provider="fanbox", ref="lazyprocrast")
         item = self._get()["groups"][0]["primary"]
-        self.assertEqual(item["thumb_url"], cover)
+        self._assert_cached_thumb(item, cover)
 
         self._post("/api/follow/media/hide", {"item": item["id"], "media": 2, "hidden": True})
         item = self._get()["groups"][0]["primary"]
         # 封面被隐藏后卡面退回正文首图。
-        self.assertEqual(item["thumb_url"], chart)
+        self._assert_cached_thumb(item, chart)
 
     def test_poll_post_drops_the_leading_chart_for_its_author(self):
         chart = "https://downloads.fanbox.cc/images/post/1/w/1200/chart.jpeg"
@@ -844,12 +852,12 @@ class FollowContractTests(unittest.TestCase):
         item = self._get()["groups"][0]["primary"]
         # 首位图表不投影；序号保持原始下标，卡面用作者封面。
         self.assertEqual([media_["index"] for media_ in item["media_items"]], [1, 2])
-        self.assertEqual(item["thumb_url"], cover)
+        self._assert_cached_thumb(item, cover)
 
         self._post("/api/follow/media/hide", {"item": item["id"], "media": 2, "hidden": True})
         item = self._get()["groups"][0]["primary"]
         # 封面被隐藏后卡面跳过首位的图表，落在正文第二张。
-        self.assertEqual(item["thumb_url"], art)
+        self._assert_cached_thumb(item, art)
 
     def test_poll_leading_chart_stays_for_other_creators(self):
         chart = "https://downloads.fanbox.cc/images/post/1/w/1200/chart.jpeg"
@@ -965,7 +973,7 @@ class FollowContractTests(unittest.TestCase):
                  "thumb_url": art},
             ]}),), provider="fanbox", ref="lazyprocrast")
         item = self._get()["groups"][0]["primary"]
-        self.assertEqual(item["thumb_url"], chart)
+        self._assert_cached_thumb(item, chart)
 
         result = self._post("/api/follow/media/hide",
                             {"item": item["id"], "media": 0, "hidden": True})
@@ -975,7 +983,7 @@ class FollowContractTests(unittest.TestCase):
         # 序号不重排：剩下的那张仍报它在原始清单里的 1，`/follow-stream?media=1` 才不会错位。
         self.assertEqual([media["index"] for media in item["media_items"]], [1])
         self.assertEqual([media["index"] for media in item["hidden_media"]], [0])
-        self.assertEqual(item["thumb_url"], art)
+        self._assert_cached_thumb(item, art)
 
         # 两张都藏起来：卡面不再挂任何一张被隐藏的图，走无图占位。
         self._post("/api/follow/media/hide", {"item": item["id"], "media": 1, "hidden": True})
@@ -987,7 +995,7 @@ class FollowContractTests(unittest.TestCase):
         item = self._get()["groups"][0]["primary"]
         self.assertEqual([media["index"] for media in item["media_items"]], [0, 1])
         self.assertEqual(item["hidden_media"], [])
-        self.assertEqual(item["thumb_url"], chart)
+        self._assert_cached_thumb(item, chart)
 
     def test_media_hidden_state_survives_a_refetch(self):
         candidate = FollowCandidate(
@@ -1077,7 +1085,7 @@ class FollowContractTests(unittest.TestCase):
         self._seed()
         self.assertEqual(len(self._get(limit="nope")["groups"]), 1)
 
-    def test_generated_media_is_cached_for_a_month_not_a_day(self):
+    def test_generated_media_and_avatar_use_their_refresh_periods(self):
         """按 id 取的生成物内容不会变，一天太短。
 
         换了图 id 也就换了：封面重生成写的是新文件、头像换了会解析到新 URL。
@@ -1087,7 +1095,7 @@ class FollowContractTests(unittest.TestCase):
 
         self.assertEqual(api.MEDIA_CACHE_SECONDS, 365 * 24 * 3600)
         # 头像单独短一档：id 不变但人会换头像。
-        self.assertEqual(api.AVATAR_CACHE_SECONDS, 30 * 24 * 3600)
+        self.assertEqual(api.AVATAR_CACHE_SECONDS, 90 * 24 * 3600)
         self.assertLess(api.AVATAR_CACHE_SECONDS, api.MEDIA_CACHE_SECONDS)
 
     def test_archive_file_urls_get_the_data_prefix_and_the_right_host(self):
@@ -2623,7 +2631,7 @@ class FollowSourceAddTests(FollowContractTests):
         self.assertEqual(items["51632037"]["media_kind"], "image")
         self.assertTrue(items["51632038"]["playable"])
         self.assertEqual(items["51632038"]["media_kind"], "image")
-        self.assertEqual(items["51632038"]["thumb_url"], "https://jpg5.su/img/abc.md.jpg")
+        self._assert_cached_thumb(items["51632038"], "https://jpg5.su/img/abc.md.jpg")
         # 只有网盘链接的楼层不是图：不可播，链接显示成按钮。
         self.assertFalse(items["51632039"]["playable"])
         self.assertEqual(items["51632039"]["resource_urls"],

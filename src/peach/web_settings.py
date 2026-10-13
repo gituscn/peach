@@ -19,6 +19,7 @@ import time
 from typing import Protocol
 
 from .feeds import DEFAULT_HIDDEN_COMPILATIONS, EXCERPT, GROUP_COMPILATION, SOLO_COMPILATION
+from .remote_media_cache import AVATAR_REFRESH_SECONDS, FAVICON_REFRESH_SECONDS
 
 DEFAULT_PROFILE_ID = "local-default"
 
@@ -36,10 +37,6 @@ OPTIONAL_SIDEBAR_KEYS = (
 ALL_SIDEBAR_KEYS = frozenset(DEFAULT_SIDEBAR_ORDER) | frozenset(OPTIONAL_SIDEBAR_KEYS)
 SIDEBAR_KEY_ALIASES = {"ads": "data-cleanup", "dupes": "data-cleanup"}
 
-#: 头像与站点图标多久重取一次，单位天；0 是从不。这是服务端的行为参数（缓存在哪台
-#: 机器就由哪台机器取），所以它必须落在账本里让服务端读得到，浏览器本地那份只是镜像。
-METADATA_REFRESH_DAYS = (0, 7, 30, 90)
-DEFAULT_METADATA_REFRESH_DAYS = 30
 FOLLOW_INITIAL_DAYS = (0, 7, 30, 90)
 DEFAULT_FOLLOW_INITIAL_DAYS = 30
 #: 搜索框下拉里列几条最近搜索；0 是不记录。记录本身就在账本里（`/api/search-history`），
@@ -54,7 +51,7 @@ SEARCH_HISTORY_LIMIT_MAX = 50
 #: 新作那一行收不收合集（`feeds.compilation_kind`）同样是服务端行为：列表、未读数和
 #: 替哪些壳补封面都按它算，所以跟着账本走。
 SYNCED_SETTING_KEYS = frozenset({
-    "sidebarOrder", "metadataRefreshDays", "followInitialDays", "postSetupTutorialDone",
+    "sidebarOrder", "followInitialDays", "postSetupTutorialDone",
     "organizeTemplates", "feedHideGroupCompilations", "feedHideSoloCompilations",
     "feedHideExcerpts", "searchHistoryLimit",
 })
@@ -91,23 +88,6 @@ def normalise_sidebar_order(raw) -> list[str]:
             continue
         seen.append(key)
     return seen or list(DEFAULT_SIDEBAR_ORDER)
-
-
-def normalise_metadata_refresh_days(raw) -> int:
-    """不在选项里的值一律回到默认：这个数直接决定要不要出网，不能让坏载荷把它变成 1 秒。"""
-    if isinstance(raw, bool):
-        return DEFAULT_METADATA_REFRESH_DAYS
-    try:
-        days = int(raw)
-    except (TypeError, ValueError):
-        return DEFAULT_METADATA_REFRESH_DAYS
-    return days if days in METADATA_REFRESH_DAYS else DEFAULT_METADATA_REFRESH_DAYS
-
-
-def metadata_refresh_seconds(contract: SettingsContract) -> int | None:
-    """图片端点用的保鲜期，秒；None 表示从不重取。"""
-    days = normalise_metadata_refresh_days(_stored(contract).get("metadataRefreshDays"))
-    return days * 24 * 3600 or None
 
 
 def normalise_follow_initial_days(raw) -> int:
@@ -200,8 +180,8 @@ def q_settings(contract: SettingsContract, _args=None) -> dict:
     payload = _stored(contract)
     return {
         "sidebarOrder": normalise_sidebar_order(payload.get("sidebarOrder")),
-        "metadataRefreshDays": normalise_metadata_refresh_days(
-            payload.get("metadataRefreshDays")),
+        "avatarRefreshDays": AVATAR_REFRESH_SECONDS // 86400,
+        "faviconRefreshDays": FAVICON_REFRESH_SECONDS // 86400,
         "followInitialDays": normalise_follow_initial_days(payload.get("followInitialDays")),
         "postSetupTutorialDone": payload.get("postSetupTutorialDone") is True,
         "organizeTemplates": normalise_organize_templates(payload.get("organizeTemplates")),
@@ -227,9 +207,6 @@ def w_settings(contract: SettingsContract, body) -> dict:
     merged = _stored(contract)
     if "sidebarOrder" in body:
         merged["sidebarOrder"] = normalise_sidebar_order(body["sidebarOrder"])
-    if "metadataRefreshDays" in body:
-        merged["metadataRefreshDays"] = normalise_metadata_refresh_days(
-            body["metadataRefreshDays"])
     if "followInitialDays" in body:
         merged["followInitialDays"] = normalise_follow_initial_days(body["followInitialDays"])
     if "postSetupTutorialDone" in body:

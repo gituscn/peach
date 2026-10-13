@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { appSettingsStore, METADATA_REFRESH_DAYS } from '@peach/appearance';
+import { appSettingsStore } from '@peach/appearance';
 import { SettingsRow } from '@/components/application/settings/settings-rows';
 import { Select, SelectItem } from '@/components/base/select/select';
 import { Switch } from '@/components/base/switch/switch';
@@ -18,7 +18,6 @@ import {
 import { ErrorText, Help, Rows, Section, Stack } from './section';
 
 const THUMBNAIL_OPTIONS = [['off', '关闭'], ['precise', '每 10 秒一张'], ['coarse', '每 30 秒一张']] as const;
-const METADATA_OPTIONS = [['7', '每周'], ['30', '每月'], ['90', '每季'], ['0', '从不']] as const;
 
 export function VideoThumbnailRow({ epoch = 0 }: { epoch?: number }) {
   const status = useQuery({ queryKey: THUMBNAIL_JOBS_KEY, queryFn: ({ signal }) => fetchThumbnailJobs(signal), refetchOnMount: 'always' });
@@ -53,10 +52,8 @@ export function FollowPreferenceRows({ receipt }: { receipt(message: string): vo
   useSyncExternalStore(store.subscribe, store.version);
   const settings = useQuery({ queryKey: SETTINGS_KEY, queryFn: ({ signal }) => fetchSettings(signal), refetchOnMount: 'always' });
   const initial = useSaveSettings();
-  const metadata = useSaveSettings();
   const initialDays = settings.data?.followInitialDays ?? store.value.followInitialDays;
-  const refreshDays = settings.data?.metadataRefreshDays ?? store.value.metadataRefreshDays;
-  const error = initial.error || metadata.error || settings.error;
+  const error = initial.error || settings.error;
   return (
     <Section title="关注采集">
       <Rows>
@@ -77,22 +74,8 @@ export function FollowPreferenceRows({ receipt }: { receipt(message: string): vo
             </Select>
           </div>
         </SettingsRow>
-        <SettingsRow label="头像与图标刷新">
-          <div id="metadataRefreshSetting">
-            <Select aria-label="头像与图标刷新" selectedKey={String(refreshDays)}
-              isDisabled={settings.isFetching || metadata.isPending}
-              onSelectionChange={(key) => {
-                if (key === null || !METADATA_REFRESH_DAYS.includes(Number(key))) return;
-                metadata.mutate({ metadataRefreshDays: Number(key) }, { onSuccess: (saved) => {
-                  if (typeof saved.metadataRefreshDays === 'number') store.value.metadataRefreshDays = saved.metadataRefreshDays;
-                  store.save();
-                  receipt('已保存头像与图标刷新频率');
-                } });
-              }}>
-              {METADATA_OPTIONS.map(([key, label]) => <SelectItem key={key} id={key}>{label}</SelectItem>)}
-            </Select>
-          </div>
-        </SettingsRow>
+        <SettingsRow label="头像刷新">每 3 个月</SettingsRow>
+        <SettingsRow label="favicon 刷新">每年</SettingsRow>
       </Rows>
       {error ? <Stack divided><ErrorText>{errorMessage(error)}</ErrorText></Stack> : null}
     </Section>

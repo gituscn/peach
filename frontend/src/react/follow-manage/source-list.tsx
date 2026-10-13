@@ -500,6 +500,8 @@ export function SourceList(props: SourceListProps) {
   const pageState = selectionState(selected, pageIds);
   const chosen = [...selected];
   const failures = checkFailures(outcome);
+  const failedSourceIds = sources.filter((source) => source.enabled
+    && (source.last_status === 'error' || source.last_status === 'unauthorized')).map((source) => source.id);
   const evidence = checkEvidenceGap(outcome);
   const allCollapsed = groups.length > 0 && collapsed.size >= groups.length;
 
@@ -531,6 +533,8 @@ export function SourceList(props: SourceListProps) {
         <Button variant="primary" leadingIcon={RiRefreshLine} disabled={readOnly}
           aria-label="检查全部" iconOnly={compact}
           {...busyProps(rowHandlers.busy)} onClick={() => startChecking([])}>检查全部</Button>
+        {failedSourceIds.length ? <Button variant="secondary" disabled={readOnly}
+          {...busyProps(rowHandlers.busy)} onClick={() => startChecking(failedSourceIds)}>检查失败项</Button> : null}
         <span data-follow-toolbar-controls="" className="contents max-sm:flex max-sm:w-full max-sm:items-center max-sm:gap-2">
           <span data-button-group role="group" aria-label="关注列表版式">
             <Button variant="ghost" iconOnly

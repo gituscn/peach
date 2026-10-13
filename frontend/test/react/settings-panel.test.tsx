@@ -111,7 +111,7 @@ const settings = (): PanelSettings => ({
   sidebarOrder: [''], batchSize: 60, defaultSort: 'seed', defaultSortDirection: '', groupCollapse: true,
   javImage: 'cover', feedAutoScroll: true, feedHideGroupCompilations: true, feedHideSoloCompilations: false,
   feedHideExcerpts: true, hoverDelaySeconds: 5, detailAutoplay: false, miniplayer: true, seekSeconds: 10,
-  relatedLimit: 24, searchHistoryLimit: 10, followInitialDays: 30, metadataRefreshDays: 30,
+  relatedLimit: 24, searchHistoryLimit: 10, followInitialDays: 30, avatarRefreshDays: 90, faviconRefreshDays: 365,
 });
 
 /** 壳 `settingsHost()` 交进来的那一份。 */

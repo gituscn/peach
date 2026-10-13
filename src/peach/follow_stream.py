@@ -385,10 +385,6 @@ def _hop_allowed(target: ResolvedFollowMedia, url: str) -> bool:
 #: kemono → n1.、coomer → n4.），所以必须跟；但每一跳都要重新过白名单。
 MAX_PROXY_REDIRECTS = 3
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
-#: 可以原样转发给浏览器的上游响应头。范围请求要靠前四个才能拖进度条；其余一律
-#: 不转发——上游的 set-cookie、server、x-* 都不该出现在 Peach 的响应里。
-PROXY_RESPONSE_HEADERS = ("accept-ranges", "content-length", "content-range",
-                          "content-type", "etag", "last-modified")
 
 
 def proxy_request_headers(target: ResolvedFollowMedia,
@@ -407,25 +403,6 @@ def proxy_request_headers(target: ResolvedFollowMedia,
         if value:
             headers[name.title()] = value
     return headers
-
-
-#: 代理出来的图片让浏览器留多久。卡面、灯箱和翻卡预解码都按同一个 `/follow-stream`
-#: 地址取原图，地址指向账本里固定的那一张；不让浏览器缓存的话，每进一次关注页、
-#: 每开一次灯箱都要经 Peach 再从来源站拉一遍原图。
-PROXY_IMAGE_MAX_AGE = 86400
-
-
-def proxy_response_headers(upstream: Mapping[str, str]) -> dict[str, str]:
-    forwarded = {}
-    for name in PROXY_RESPONSE_HEADERS:
-        value = upstream.get(name)
-        if value:
-            forwarded[name] = value
-    # 视频照旧不缓存：rule34video 的签名地址会过期，范围请求也不该落进浏览器缓存。
-    image = str(forwarded.get("content-type", "")).lower().startswith("image/")
-    forwarded["cache-control"] = (f"private, max-age={PROXY_IMAGE_MAX_AGE}"
-                                  if image else "no-store")
-    return forwarded
 
 
 def open_upstream(client: httpx.Client, method: str, target: ResolvedFollowMedia, *,
