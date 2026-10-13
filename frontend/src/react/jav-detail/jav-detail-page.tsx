@@ -134,11 +134,10 @@ function SourceRating({ score, review = false }: { score: number; review?: boole
 }
 
 function JavIdentity({ item, navigate }: { item: JavDetail; navigate(path: string): void }) {
-  const onOpen = (kind: string, name: string) => navigate(kind === 'studio' && !item.studio_refs.find(ref => ref.name === name)?.id
-    ? `/?jav=1&studio=${encodeURIComponent(name)}` : entityPath(kind, name));
+  const onOpen = (kind: string, name: string) => navigate(entityPath(kind, name));
   const group = (kind: string, label: string, refs: JavEntityRef[], gender?: string) => refs.length ? <section data-id-group={kind} data-id-gender={gender}>
     <h5 data-id-label="">{label}</h5><div data-id-row="">{refs.map(person => <IdentityCell key={person.name} kind={kind}
-      person={{ ...person, id: person.id ?? null }} onOpen={onOpen} openByName={kind === 'studio'}
+      person={{ ...person, id: person.id ?? null }} onOpen={onOpen}
       face={kind === 'performer' && !person.has_image && !person.has_avatar && person.source_avatar && person.source_actor_id
         ? <SourceAvatar code={item.code} person={person} detail /> : undefined} />)}</div>
   </section> : null;

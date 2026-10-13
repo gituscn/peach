@@ -200,7 +200,7 @@ describe('库外 JAV 作品详情', () => {
         assert.ok(Math.abs(shared.codeY - shared.titleY) < 2, '番号与标题在同一行开始');
         assert.equal(shared.tag, '痴女'); assert.equal(shared.tagCat, 'role');
         await page.locator('[data-id-gender="female"] [data-id-face] img').waitFor({ state: 'visible' });
-        assert.equal(await page.locator('[data-id-cell="studio"]').evaluate(node => node.tagName), 'BUTTON', '来源厂牌按名称提供站内入口');
+        assert.equal(await page.locator('[data-id-cell="studio"]').evaluate(node => node.tagName), 'SPAN', '未登记厂牌只显示名称');
         assert.equal(await page.locator('[data-follow-image-dots] button').count(), 13);
         const dots = await page.locator('[data-follow-image-dots]').evaluate(el => {
           const box = el.getBoundingClientRect();
@@ -369,9 +369,25 @@ describe('库外 JAV 作品详情', () => {
         await page.keyboard.press('Escape');
         await page.waitForURL(requiredEnv('PEACH_E2E_ORIGIN') + '/');
         await card.getByRole('link', { name: '打开 EXM-001 的作品详情' }).click();
+        const detailUrl = page.url();
         await page.locator('[data-id-cell="studio"]').click();
-        await page.waitForURL(url => url.pathname === '/' && url.searchParams.get('studio') === '示例厂牌' && url.searchParams.get('jav') === '1');
-        assert.equal(await page.locator('#stage').count(), 0, '厂牌入口离开作品详情');
+        assert.equal(page.url(), detailUrl);
+        assert.ok(await page.locator('#stage').isVisible(), '未登记厂牌不跳转筛选');
+      } finally { await context.close() }
+    });
+    it(`${viewport.name}：已登记厂牌打开资料页`, { timeout: 60000 }, async () => {
+      const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: 'reduce' });
+      try {
+        const page = await context.newPage();
+        await mockJavDetail(page);
+        await page.route(/\/api\/jav\/detail\?/, route => route.fulfill({ json: { ...JAV_DETAIL,
+          preview_count: 0, source_image: false, studio_refs: [{ id: 50, name: '示例厂牌', has_logo: false }] } }));
+        await page.goto(requiredEnv('PEACH_E2E_ORIGIN') + '/jav/movie/EXM-001');
+        const studio = page.locator('button[data-id-cell="studio"]');
+        await studio.waitFor();
+        await studio.click();
+        await page.waitForURL(url => decodeURIComponent(url.pathname) === '/studios/示例厂牌');
+        assert.equal(await page.locator('#stage').count(), 0);
       } finally { await context.close() }
     });
     it(`${viewport.name} 深链刷新与来源未取得仍可关闭`, { timeout: 60000 }, async () => {
