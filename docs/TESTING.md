@@ -59,11 +59,11 @@ Python 静态检查使用开发依赖 Ruff，随每个正式测试域扫描全�
 | 场景 | 验证 |
 | --- | --- |
 | 本机修改 | 正式入口默认 `auto`，按影响域取并集；同代码、环境与范围的有效记录可复用 |
-| 普通 PR | macOS 影响域；Windows 关键系统与 Python 3.12 兼容性 |
-| 普通主线提交 | macOS 全量；Windows 关键系统与 Python 3.12 兼容性 |
-| 实际依赖、迁移、共享测试设施、未知影响面 | 两端 Python 3.14 全量，两端 Python 3.12 关键兼容性 |
+| 普通 PR | Python 3.14：macOS 影响域；Windows 关键系统 |
+| 普通主线提交 | Python 3.14：macOS 全量；Windows 关键系统 |
+| 实际依赖、迁移、共享测试设施、未知影响面 | Windows 与 macOS 的 Python 3.14 全量 |
 | 手动 CI | 完整系统矩阵 |
-| wheel | 每次独立最小安装，通常两组；完整矩阵四组 |
+| wheel | Windows 与 macOS 各一次 Python 3.14 独立最小安装 |
 | Release | 复用同 SHA 主线成功 CI；构建后执行独立 EXE 冒烟 |
 
 全量在两个独立 runner 按测试文件稳定分片；汇总任务要求所有分片和必需任务成功。分片子进程不签发记录。

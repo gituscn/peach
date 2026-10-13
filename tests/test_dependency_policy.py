@@ -350,8 +350,7 @@ class DependencyPolicyTests(unittest.TestCase):
 class AmaneBridgeManifestTests(unittest.TestCase):
     """amane 桥（`tools/amane-bridge/`，ADR-0043）是本策略的登记例外，理由与替代门槛写在这里。
 
-    它不并进主 `pyproject.toml`：amane 要求 Python 3.14、依赖全用 `>=` 下限，并进来会把
-    Peach 的下限从 3.12 抬到 3.14，并让「精确固定版本」那条对上游的一百来项传递依赖失效。
+    它不并进主 `pyproject.toml`：amane 依赖全用 `>=` 下限，需要独立锁定上游的一百来项传递依赖。
     替代门槛是：清单唯一的直接依赖是 amane 的一个 40 位 sha；`uv.lock` 在且锁的正是那个
     sha；桥脚本只 import 标准库、amane 与 structlog（amane 自己的日志库）。它不进 Dependabot：
     Dependabot 推不动一个 git sha 钉，升级是人读上游 diff 之后改清单，见 ADR-0043。

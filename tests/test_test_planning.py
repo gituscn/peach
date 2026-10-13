@@ -85,12 +85,14 @@ class TestPlanningTests(unittest.TestCase):
                 self.assertEqual(scopes, expected)
         self.assertEqual(runner.scopes_for_changes(['pyproject.toml'])[0], ('full',))
 
-    def test_matrix_keeps_full_mainline_and_platform_floor(self):
+    def test_matrix_keeps_full_mainline_and_platform_coverage(self):
         result = ci_plan.plan('push', ['web/app.js'])
         rows = result['matrix']['include']
         self.assertEqual(len([r for r in rows if r['scope'] == 'full']), 2)
         self.assertTrue(all(r['os'] == 'macos-latest' for r in rows if r['scope'] == 'full'))
-        self.assertTrue(any(r['python'] == '3.12' and r['scope'] == 'core' for r in rows))
+        self.assertEqual({r['python'] for r in rows}, {'3.14'})
+        self.assertEqual([(r['os'], r['scope']) for r in rows if r['scope'] != 'full'],
+                         [('windows-latest', 'core')])
         self.assertEqual(len(result['wheel_matrix']['include']), 2)
 
     def test_dependency_and_manual_runs_cover_both_systems(self):
@@ -100,7 +102,9 @@ class TestPlanningTests(unittest.TestCase):
             self.assertTrue(result['wide'])
             self.assertEqual({r['os'] for r in result['matrix']['include'] if r['scope'] == 'full'},
                              {'macos-latest', 'windows-latest'})
-            self.assertEqual(len(result['wheel_matrix']['include']), 4)
+            wheels = result['wheel_matrix']['include']
+            self.assertCountEqual(wheels, [{'os': 'windows-latest', 'python': '3.14'},
+                                          {'os': 'macos-latest', 'python': '3.14'}])
 
     def test_pull_request_uses_changed_domains(self):
         rows = ci_plan.plan('pull_request', ['src/peach/follow_store.py'])['matrix']['include']
