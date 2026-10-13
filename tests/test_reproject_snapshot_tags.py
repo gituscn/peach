@@ -156,6 +156,7 @@ class ReprojectTests(unittest.TestCase):
     def test_the_old_mapping_is_read_from_git(self):
         module = reproject.taxonomy_at("HEAD")
         self.assertTrue(callable(module.map_genres))
+        self.assertEqual(module.map_genres(['护士', '4小时以上作品']), (['护士'], []))
 
 
 if __name__ == "__main__":

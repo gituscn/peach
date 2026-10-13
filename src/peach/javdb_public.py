@@ -253,10 +253,13 @@ class PublicAPI:
             hit = self.cache.get("movie:" + normalise_code_key(code))
             return dict(hit[1]) if hit and hit[0] > self.clock() else None
 
-    def reviews(self, code: str, page: int) -> list[dict]:
+    def reviews(self, code: str, page: int, *, refresh=False) -> list[dict]:
         if not 1 <= page <= MAX_REVIEW_PAGES:
             raise ValueError("评论页码必须在 1 至 8 之间")
         movie = self.movie(code)
+        if refresh:
+            with self.lock:
+                self.cache.pop(f"reviews:{movie['id']}:{page}", None)
         return self._cached(f"reviews:{movie['id']}:{page}", lambda:
                             self._rows(f"/v1/movies/{movie['id']}/reviews", "reviews", {"page": page}))
 

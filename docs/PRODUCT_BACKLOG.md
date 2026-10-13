@@ -8,6 +8,7 @@
 
 - 有码内容标签按 ADR-0100 优先 JavDB；真实馆藏回填待逐资产来源归属预览与同轮授权。歧义词 `口爆/吞精`、`車站性交`、`觸摸打字` 等保留原文复核；已核对的类别身份与译名见 [来源词复核](reference-snapshots/javdb-category-translations.md)。
 - 未收录的标签来源词保留出处；「其他内容」分组的 24 个名称见 [标签词表审查](reference-snapshots/tag-vocabulary-audit.md)。
+- 新作缓存有 8 种词待复核：受孕、女检察官、性感的、恋物癖、教学、淫乱真实、礼仪小姐、美少女电影。繁简别名已全表覆盖，未知词保留来源原文；逐词表见 [JAV 发现](JAV_DISCOVERY.md)。
 - 账号身份来源待复核，当前名册见 `peach-data/review/creators-current-inventory-2.csv`；候选与查询记录见同目录 `creator-identity-findings.json`、`creator-identity-lookups.json`。「しらたま」「ひな」短名不能唯一对应艺人，保留独立身份。
 - HIP-ANGEL、Zipang、Kuchiku * Reverse Bunny 与 `gachincoppv-1009-HD` 的对应来源未取得，见 `peach-data/review/identity-simple-source-gaps.json`；JAV 资料补查缺口见同目录 `cached-minnano-identity-audit.json`。未取得来源不构成人物职业证据。
 - `FC2-PPV-1625020` 的资产 `6562`：账号「音梓」来自 `legacy:asset`，没有卖家来源证据；女优关系来自 FC2PPV-DB 和 JavDB。待取得发布账号证据或用户复核结论。

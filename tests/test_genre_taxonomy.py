@@ -16,6 +16,28 @@ from peach.genre_taxonomy import (
     unmapped_genre_warning,
 )
 from peach.taste_history import TASTE_CATEGORY_TAGS
+from opencc import OpenCC
+
+
+class SimplifiedSourceGenreTests(unittest.TestCase):
+    def test_every_registered_chinese_spelling_has_the_same_simplified_projection(self):
+        import re
+        converter = OpenCC('t2s')
+        for raw in CONTENT_GENRES:
+            if re.search(r'[ぁ-ヿ]', raw):
+                continue
+            with self.subTest(raw=raw):
+                self.assertEqual(resolve_genre(converter.convert(raw)), resolve_genre(raw))
+        for raw in NON_CONTENT_GENRES:
+            if re.search(r'[ぁ-ヿ]', raw):
+                continue
+            with self.subTest(excluded=raw):
+                self.assertIsNone(resolve_genre(converter.convert(raw)))
+
+    def test_simplified_sources_keep_user_overrides_and_unknown_words(self):
+        self.assertEqual(map_genres(['护士', '業餘', '业余', '无码破解', '4小时以上作品', '未知类别']),
+                         (['护士', '素人'], ['未知类别']))
+        self.assertEqual(resolve_genre('护士', {'护士': '职业角色'}), '职业角色')
 
 
 def _catalog_vocabulary() -> set[str]:

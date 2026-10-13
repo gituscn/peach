@@ -325,7 +325,8 @@ class DetailProjectionTests(unittest.TestCase):
                  'size': '3 GB', 'files_count': 2, 'created_at': '2026-10-12'},
                 {'hash': fingerprint}, {'hash': 'invalid'}]
         with patch('peach.web_jav_detail.PUBLIC_API.movie', return_value={'id': 'Exact'}), \
-                patch('peach.web_jav_detail.PUBLIC_API.magnets', return_value=rows) as magnets:
+                patch('peach.web_jav_detail.PUBLIC_API.magnets', return_value=rows) as magnets, \
+                patch('peach.web_jav_detail.PUBLIC_API.reviews', return_value=[]):
             result = q_jav_resources(self.contract, {'code': 'EXM-001', 'refresh': '1'})
         magnets.assert_called_once_with('EXM-001', refresh=True)
         self.assertEqual(result['state'], 'ready')
@@ -334,6 +335,50 @@ class DetailProjectionTests(unittest.TestCase):
         self.assertTrue(result['items'][0]['uri'].startswith('magnet:?'))
         self.assertEqual(result['items'][0]['attributes'], ['中字', '高清'])
         self.assertEqual(result['source_url'], 'https://javdb.com/v/Exact')
+
+    def test_resources_include_comment_ed2k_magnets_and_urls_with_origins(self):
+        digest = 'a' * 40
+        ed2k = 'ed2k://|file|www.98T.la@MIKR-096-U_1_chf3_prob4.mp4|19735225787|0936618B7ED1E5A0235FC6FBE27E104A|h=U5OZKZ4TELDTNANYLRNGQX5LCTDKAM52|/'
+        first = [{'id': n, 'content': '正文'} for n in range(9)] + [{'id': 31, 'content': '4K60:' + ed2k, 'created_at': '2026-05-15'}]
+        second = [{'id': 32, 'content': ed2k + '\nmagnet:?xt=urn:btih:' + digest + '\nhttps://example.test/download'}]
+        with patch('peach.web_jav_detail.PUBLIC_API.movie', return_value={'id': 'Exact'}), \
+                patch('peach.web_jav_detail.PUBLIC_API.magnets', return_value=[{'hash': digest, 'size': '3 GB'}]), \
+                patch('peach.web_jav_detail.PUBLIC_API.reviews', side_effect=[first, second]) as reviews:
+            result = q_jav_resources(self.contract, {'code': 'MIKR-096', 'refresh': '1'})
+        self.assertEqual([item['protocol'] for item in result['items']], ['magnet', 'ed2k', 'url'])
+        link = result['items'][1]
+        self.assertEqual(link['uri'], ed2k)
+        self.assertEqual(link['source'], 'JavDB 评论')
+        self.assertEqual(link['size'], '19,735,225,787 B')
+        self.assertEqual(link['origins'], ['https://javdb.com/v/Exact#review-item-31', 'https://javdb.com/v/Exact#review-item-32'])
+        self.assertEqual(reviews.call_count, 2)
+        self.assertEqual(result['warnings'], [])
+
+    def test_comment_failure_keeps_magnet_resources_and_reports_missing_comments(self):
+        with patch('peach.web_jav_detail.PUBLIC_API.movie', return_value={'id': 'Exact'}), \
+                patch('peach.web_jav_detail.PUBLIC_API.magnets', return_value=[{'hash': 'a' * 40}]), \
+                patch('peach.web_jav_detail.PUBLIC_API.reviews', side_effect=PublicSourceUnavailable('限流')):
+            result = q_jav_resources(self.contract, {'code': 'EXM-001'})
+        self.assertEqual(len(result['items']), 1)
+        self.assertEqual(result['warnings'], ['评论资源未取得：限流'])
+
+    def test_comment_resource_scan_has_a_page_limit(self):
+        with patch('peach.web_jav_detail.PUBLIC_API.movie', return_value={'id': 'Exact'}), \
+                patch('peach.web_jav_detail.PUBLIC_API.magnets', return_value=[]), \
+                patch('peach.web_jav_detail.PUBLIC_API.reviews', return_value=[{'content': '正文'}] * 10) as reviews:
+            result = q_jav_resources(self.contract, {'code': 'EXM-001'})
+        self.assertEqual(reviews.call_count, 8)
+        self.assertEqual(result['warnings'], ['已查询前 8 页评论资源。'])
+
+    def test_magnet_failure_keeps_comment_resources(self):
+        with patch('peach.web_jav_detail.PUBLIC_API.movie', return_value={'id': 'Exact'}), \
+                patch('peach.web_jav_detail.PUBLIC_API.magnets', side_effect=PublicSourceUnavailable('未取得')), \
+                patch('peach.web_jav_detail.PUBLIC_API.reviews', return_value=[{
+                    'id': 5, 'content': 'ed2k://|file|demo.mp4|123|' + 'b' * 32 + '|/'}]):
+            result = q_jav_resources(self.contract, {'code': 'EXM-001'})
+        self.assertEqual(result['state'], 'ready')
+        self.assertEqual([item['protocol'] for item in result['items']], ['ed2k'])
+        self.assertEqual(result['warnings'], ['磁链区资源未取得：未取得'])
 
     def test_source_avatars_and_studio_logos_preserve_each_identity(self):
         movie = {'id': 'Exact', 'actors': [

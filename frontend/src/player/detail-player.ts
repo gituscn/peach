@@ -18,12 +18,13 @@ import { playerHost } from './host';
 import { mountImmersePlayer, type ImmersePlayerOptions } from './immerse-player';
 import { wirePlayerContextMenu } from './menu';
 import { detailPlayer, setDetailPlayer } from './registry';
+import { playbackKey, playbackPosition, stopPlaybackPosition, trackPlaybackPosition } from './progress';
 import {
   averageBitrate, bufferedAhead, createBufferMeter, fmtLoadRate, fmtSpeed, PLAYER_PANEL_EVENT,
   playerSpeedBits, playerStatsOverlayHtml, playerStatsPlot, pushPlayerStat, streamEntries,
 } from './stats';
 import { detailStreamSession, detailStreamSource, directDetailSource } from './stream';
-import { wireFollowTelemetry, wireTelemetry } from './telemetry';
+import { stopTelemetry, wireFollowTelemetry, wireTelemetry } from './telemetry';
 import type { MediaFacts, PlayerItem, PlayerSource, SourceQuality, VjsPlayer } from './types';
 import { ensureVideojs } from './videojs';
 
@@ -85,7 +86,12 @@ export async function mountDetailPlayer(
   let videojs;
   try { videojs = await ensureVideojs() } catch {
     video.controls = true;
-    source().then((next) => { video.src = next.src; if (autoplay) video.play().catch(() => {}) }).catch(() => {});
+    source().then((next) => {
+      video.addEventListener('loadedmetadata', () => {
+        if (resume && resume.time > 0) video.currentTime = Math.min(resume.time, realDuration(video.duration) || resume.time);
+      }, { once: true });
+      video.src = next.src; if (autoplay) video.play().catch(() => {});
+    }).catch(() => {});
     return null;
   }
   const player = videojs(video, {
@@ -234,9 +240,13 @@ export async function mountDetailPlayer(
   source().then((next) => {
     if (!live()) return;
     segmentedSource = String(next.type || '').includes('mpegurl');
+    if (resume && resume.time > 0) player.one('loadedmetadata', () => {
+      if (player.isDisposed()) return;
+      const duration = realDuration(player.el().querySelector('video')?.duration) || realDuration(player.duration());
+      player.currentTime(Math.min(resume.time, duration || resume.time));
+    });
     player.src(next);
     enforceDuration(); setTimeout(enforceDuration, 0); setTimeout(enforceDuration, 250);
-    if (resume && resume.time > 0) player.one('loadedmetadata', () => { if (!player.isDisposed()) player.currentTime(resume.time) });
     if (autoplay) player.play()?.catch(() => {});
   }).catch(() => {});
   return player;
@@ -330,7 +340,8 @@ export function mountPlayer(video: HTMLVideoElement, options: MountPlayerOptions
   const host = playerHost();
   const frame = options.chrome === false ? null : video.parentElement;
   if (frame) preparePlayerFrame(frame, video);
-  let detail: DetailPlayerOptions = { resume: options.resume ?? null };
+  const key = playbackKey(kind, item, media?.index ?? null);
+  let detail: DetailPlayerOptions = { resume: options.resume ?? { time: playbackPosition(key, item), autoplay: false } };
   if (kind === 'follow') {
     detail = {
       ...detail,
@@ -341,15 +352,13 @@ export function mountPlayer(video: HTMLVideoElement, options: MountPlayerOptions
   } else {
     const poster = detailPosterUrl(item, host.settings().javImage);
     if (poster) video.poster = poster;
-    video.addEventListener('play', () => {
-      void (api('/api/play', { method: 'POST', body: JSON.stringify({ id: item.id }) }) as Promise<unknown>).catch(() => {});
-    }, { once: true });
-    wireTelemetry(item, video, { watched: '#watched', mark: '#mark', ratio: '#ratioTxt' });
   }
-  let player: VjsPlayer | null = null, released = false, detachChrome = () => {};
+  let player: VjsPlayer | null = null, released = false, detachChrome = () => {}, trackedVideo = video;
   const release = () => {
     detachChrome();
-    if (!player || handedOff?.(player)) return;
+    if (player && handedOff?.(player)) return;
+    stopPlaybackPosition(trackedVideo);
+    if (!player) { stopTelemetry(trackedVideo); return }
     if (detailPlayer() === player) { setDetailPlayer(null); stopPlayerPanels() }
     disposePlayer(player);
   };
@@ -357,9 +366,17 @@ export function mountPlayer(video: HTMLVideoElement, options: MountPlayerOptions
     player = mounted;
     // 挂载还没回来媒体区就换了：这一个一出来就拆掉。
     if (released) { release(); return }
+    trackedVideo = mounted?.el().querySelector('video') ?? video;
+    trackPlaybackPosition(key, trackedVideo);
+    if (kind === 'follow') wireFollowTelemetry(item, trackedVideo);
+    else {
+      trackedVideo.addEventListener('play', () => {
+        void (api('/api/play', { method: 'POST', body: JSON.stringify({ id: item.id }) }) as Promise<unknown>).catch(() => {});
+      }, { once: true });
+      wireTelemetry(item, trackedVideo, { watched: '#watched', mark: '#mark', ratio: '#ratioTxt' });
+    }
     if (!mounted) { onPlayer?.(null); return }
     if (frame) detachChrome = attachPlayerChrome(mounted, frame);
-    if (kind === 'follow') wireFollowTelemetry(item, video);
     onPlayer?.(mounted);
   });
   return () => { released = true; release() };

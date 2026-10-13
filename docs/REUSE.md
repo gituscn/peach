@@ -131,6 +131,8 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 
 JAV 默认封面（官方封面／预览图）与视频默认大小（大图／小图）独立保存，用 localStorage、共享 Switch 与既有 `/cover`、`/poster`。设置弹窗同步首页与 JAV 的版式，筛选条可单独调当前视图。`frontend/src/jav-artwork.ts` 管作品身份、偏好恢复与缺图回退，首页、接着看、实体作品、详情推荐、Mix 静止与翻图、播放队列共用封面选择。小图展示完整封套，竖版正封完整放入大图卡片；新作封面完成取景才显示，缓存图插入时重算取景。
 
+关注视频与馆藏详情的续播复用 Video.js 8.24.1（Apache-2.0）的元数据事件和 `currentTime`、浏览器 localStorage 与既有活动接口。`player/progress` 按本地资产、关注条目和媒体序号登记秒数，暂停、定位、关闭、小窗销毁、页面退出均保存；原生 video 回退也恢复，明确的时间深链优先，放完从头开始。本地既有记录可按 `leave_ratio × duration` 恢复；最远观看位置与累计观看时长不作为续播秒数。活动请求用 keepalive，销毁同步冲掉末段并清理定时器与监听。此状态属于当前浏览器，未引入账本迁移或跨设备同步，无新增依赖。
+
 详情人物头像复用 `card-art.entityFaceImg` 与 `avatarFrame`，图片直接挂在有尺寸的 `[data-id-face]` 圆框内。取景读取图片的父框几何，`display:contents` 包装层没有可用尺寸。首字与图片由同一段 HTML 承载，图片加载失败时共用回退链，浏览器回归覆盖带人脸框的桌面与手机详情。
 
 ## 复用决策门槛
@@ -333,6 +335,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
   - 图库同名多张时先按脸认人（`peach.face_match`，互证与小图作证见 ADR-0056、0057、0062、0066）；封面未匹配时仍允许不同来源、不同照片的图库多数独立互证（ADR-0104）。短边至少 300 像素的档案小图优先于封面裁片（ADR-0102），更小的图在封面落空时兜底。身份判据复用 `match_gallery`，来源标 `gallery_small`，可升级至标准图库人像。
   - 自动封面头像可换为合格档案人像或更清晰封面，人挑的不碰；候选列表按本机内容及默认裁切哈希去重，保留在用状态、具体来源与作品全部底图。展示去重不参与身份判断，不联网取图，不删除历史缓存。
 - 外部来源 genre 只在 `peach.genre_taxonomy` 投影：JavDB `類別` 与日英来源词共用词表，非内容分类排除，未收录原文回传登记；查表只有 `resolve_genre` 一处，抓取与复核折叠共用。r18dev 取 `categories[].name_ja`，日文取不到才用英文。有码标签的来源选择复用 `metadata_policy.preferred_tag_source(code)`，排序、采集与复核一致；替换走 `metadata_auto_apply` 的来源归属与人工判断保护（ADR-0100），不另写直写流程。
+- 中文来源词的有限简体别名由 `generate_genre_simplified.py` 使用已有开发依赖 OpenCC 1.4.2（Apache-2.0）生成，冲突拒绝；别名保存在 `genre_taxonomy` 的独立区块，历史词表从同一个 Git 版本读取完整规则，运行时无需 OpenCC。覆盖全部登记词的繁简投影测试保留人工决定优先级和未知词出口，无新增依赖或真实账本写入。
 - 一件事只留一个标签名：`catalog_rules.RETIRED_TAGS` 存「不该再用的写法 → 规范名」，唯一写入口是 `scripts/rename_retired_tags.py --apply --backup`，实体按 `entities.merge_entity` 并、旧名留作别名；`pixiv_tag` 是作者原话，不参与。规范名取馆藏通行写法（`合集` 来自文件名，`混合集` 全来自已关停的 Stash 导入，ADR-0021）。
 - 手动添加标签复用 `current_tags`，API 返回规范名，详情缓存、最近使用与撤销沿用该名称。`core/tags.ts` 保留 `OL制服`、`JK制服` 完整名称，制服归外观，`秘书OL` 归角色；词表审查见 [标签词表审查](reference-snapshots/tag-vocabulary-audit.md)。
 - 没有接替者的标签登记在 `catalog_rules.DROPPED_TAGS`（`乳系`、`足系` 这类粗桶）：落库时经 `current_tags` 丢掉，`rename_retired_tags.py` 连实体删掉。映射改了原词去向后，`scripts/reproject_snapshot_tags.py --since <改动前的提交>` 按 `raw_snapshot` 新旧各算一遍、只加减差值；不给 `--since` 是按现映射补缺、一个不删。加的走并集（`auto:metadata-tags@<时间>`，可整批撤回），删的只删那组来源下的行。

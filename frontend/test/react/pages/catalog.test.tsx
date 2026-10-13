@@ -9,7 +9,8 @@ import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 
 import type { ShellActions } from '../../../src/react/router/shell-actions';
 
-const REACT_IMPORT_TIMEOUT_MS = 30_000;
+// 完整路由树的冷加载单独计时，交互用例使用 Vitest 默认超时。
+const REACT_IMPORT_TIMEOUT_MS = 60_000;
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
