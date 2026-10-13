@@ -718,8 +718,17 @@ describe('作品详情岛', () => {
     const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
     try {
       const page = opened.page;
+      await page.route(url => url.pathname === '/api/entity', route => {
+        assert.equal(new URL(route.request().url()).searchParams.get('id'), '1');
+        return route.fulfill({ json: {
+          id: 1, kind: 'performer', canonical_name: NAMES[0], aliases: [], display_aliases: [], user_aliases: [],
+          asset_count: 1, tags: [], related_performers: [], links: [], metadata: {},
+          has_image: false, has_avatar: false, representative_asset_id: null, entry_links: [],
+        } });
+      });
       await page.locator(`#stage [data-item-identity] [data-entity-kind="performer"][data-entity-name="${NAMES[0]}"]`).click();
       await pathIs(page, '/performers/1');
+      await page.locator('#index [data-entity-title] h2').filter({ hasText: NAMES[0] }).waitFor();
       await page.waitForFunction(() => !document.querySelector('#stage[open]'), undefined, { timeout: 10_000 });
       assert.equal(await page.evaluate(() => document.body.classList.contains('entity-open')), true);
     } finally {
