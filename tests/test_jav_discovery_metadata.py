@@ -52,6 +52,19 @@ class DiscoveryMetadataTests(unittest.TestCase):
             self.cache.job.thread.join(5)
             self.assertEqual(movie.call_count, 101)
 
+    def test_static_portraits_survive_restart_without_signed_addresses(self):
+        self.cache.remember('EXM-001', {'actors': [
+            {'id': 'Static', 'name': '甲', 'avatar_url': 'https://tp.spfcas.com/actor.jpg'},
+            {'id': 'Signed', 'name': '乙', 'avatar_url': 'https://tp.spfcas.com/actor.jpg?signature=example'},
+            {'id': 'Private', 'name': '丙', 'avatar_url': 'http://127.0.0.1/private'}]})
+        source, _ = DiscoveryMetadata(self.path).peek('EXM-001')
+        actors = source['actors']
+        self.assertEqual(actors[0]['avatar_image'], 'https://tp.spfcas.com/actor.jpg')
+        self.assertNotIn('avatar_image', actors[1])
+        self.assertTrue(actors[1]['has_avatar'])
+        self.assertFalse(actors[2]['has_avatar'])
+        self.assertNotIn('signature', self.path.read_text(encoding='utf-8'))
+
     def test_source_cooldown_stops_batch_and_preserves_failure(self):
         def unavailable(code):
             self.api.paused_until = self.api.clock() + 900

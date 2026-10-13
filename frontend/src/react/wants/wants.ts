@@ -21,6 +21,7 @@ export type Phase = (typeof PHASES)[number][0];
 export interface Want {
   id: number;
   code: string | null;
+  has_magnets?: boolean | null;
   origin: 'code' | 'feed' | 'follow';
   title: string | null;
   link: string | null;
@@ -53,6 +54,13 @@ export interface WantsData {
 }
 
 export const fetchWants = (signal?: AbortSignal) => apiGet<WantsData>(WANTS_URL, signal);
+
+export function recordWantMagnets(id: number, available: boolean) {
+  queryClient.setQueryData<WantsData>(WANTS_KEY, current => {
+    if (!current?.items.some(want => want.id === id && want.has_magnets !== available)) return current;
+    return { ...current, items: current.items.map(want => want.id === id ? { ...want, has_magnets: available } : want) };
+  });
+}
 
 export const fetchFollowWant = (itemId: number, signal?: AbortSignal) =>
   apiGet<{ want: Want | null }>(`${WANTS_URL}?follow=${encodeURIComponent(itemId)}`, signal);

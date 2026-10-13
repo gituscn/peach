@@ -12,7 +12,7 @@ from __future__ import annotations
 import hashlib
 import random
 import time
-from . import media_libraries, sample_images, settings_file
+from . import entities, media_libraries, sample_images, settings_file
 
 from .catalog_rules import (
     LENGTH_TAGS,
@@ -414,19 +414,38 @@ def q_items(contract: WebContract, args):
 
 def con_tags(contract: WebContract, ids, qm):
     with contract.read_connection() as c:
-        return c.execute(
+        rows = c.execute(
             f"SELECT asset_id, tag FROM asset_tag WHERE asset_id IN ({qm})", ids).fetchall()
+        return visible_identity_data(c, [], rows, tag_column=1)[1]
+
+
+def visible_identity_data(connection, canonical, legacy, *, tag_column=0):
+    """身份与兼容演员标签共用展示范围，来源记录保持完整。"""
+    excluded = entities.male_performer_ids(connection)
+    if not excluded:
+        return canonical, legacy
+    marks = ','.join('?' for _ in excluded)
+    names = connection.execute(
+        f'SELECT canonical_name FROM entity WHERE id IN ({marks}) UNION ALL '
+        f'SELECT alias FROM entity_alias WHERE entity_id IN ({marks})', (*excluded, *excluded))
+    hidden = {normalize_entity_name(row[0]) for row in names}
+    canonical = [row for row in canonical if row[0] not in excluded]
+    legacy = [row for row in legacy if not row[tag_column].startswith('演员:')
+              or normalize_entity_name(row[tag_column][3:]) not in hidden]
+    return canonical, legacy
 
 
 def con_entities(contract: WebContract, ids, qm):
     with contract.read_connection() as connection:
-        return connection.execute(
+        excluded = entities.male_performer_ids(connection)
+        rows = connection.execute(
             f"SELECT DISTINCT ae.asset_id,e.id,e.kind,e.canonical_name "
             f"FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id "
             f"WHERE ae.asset_id IN ({qm}) "
             f"AND e.kind IN ('tag','performer','creator','studio','series') "
             f"ORDER BY ae.asset_id,e.kind,e.canonical_name", ids,
         ).fetchall()
+        return [row for row in rows if row[1] not in excluded]
 
 
 def entity_ref(contract: WebContract, kind: str, entity_id, name: str) -> dict:
@@ -898,6 +917,7 @@ def q_item(contract: WebContract, aid):
             + tag_not_hidden("ae.asset_id", "e.normalized_name") + ") "
             "ORDER BY e.kind,e.canonical_name", (aid,),
         ))
+        canonical, legacy_rows = visible_identity_data(c, canonical, legacy_rows)
         makers = label_makers(contract, c, aid)
     legacy = [row[0] for row in legacy_rows]
     official_tag_names = {

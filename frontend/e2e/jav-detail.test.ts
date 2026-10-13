@@ -48,6 +48,44 @@ describe('库外 JAV 作品详情', () => {
     } finally { await context.close() }
   });
   for (const viewport of VIEWPORTS) {
+    it(`${viewport.name}：加载骨架的两栏保持在详情画框内`, async () => {
+      const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: 'reduce' });
+      let release!: () => void;
+      const held = new Promise<void>(resolve => { release = resolve });
+      try {
+        await context.addInitScript(() => localStorage.setItem('peach.settings.v1', JSON.stringify({ detailAutoplay: false })));
+        const page = await context.newPage();
+        await mockJavDetail(page);
+        await page.route(/\/api\/jav\/detail\?/, async route => {
+          await held;
+          await route.fulfill({ json: { ...JAV_DETAIL, preview_count: 0 } });
+        });
+        await page.goto(requiredEnv('PEACH_E2E_ORIGIN') + '/jav/movie/EXM-001', { waitUntil: 'domcontentloaded' });
+        const skeleton = page.locator('#stage [data-skeleton="detail"]');
+        await skeleton.waitFor();
+        const bounds = await skeleton.evaluate(node => {
+          const grid = node.querySelector('[data-stage-grid]')!.getBoundingClientRect();
+          const media = node.querySelector('[data-stage-media]')!.getBoundingClientRect();
+          const side = node.querySelector('[data-stage-side]')!.getBoundingClientRect();
+          const shell = node.closest('[data-stage]')!.getBoundingClientRect();
+          const lines = [...node.querySelectorAll('[data-stage-side] .skeleton')].map(line => line.getBoundingClientRect());
+          return { grid: { width: grid.width, height: grid.height }, shellHeight: shell.height, mediaHeight: media.height,
+            mediaWithin: media.left >= grid.left - 1 && media.right <= grid.right + 1,
+            columnsSeparate: side.top >= media.bottom - 1 || media.right <= side.left + 1,
+            linesWithin: lines.every(line => line.left >= side.left - 1 && line.right <= side.right + 1) };
+        });
+        assert.ok(bounds.mediaWithin && bounds.columnsSeparate && bounds.linesWithin, JSON.stringify(bounds));
+        await page.screenshot({ path: `../build/jav-detail-pending-${viewport.name}.png` });
+        release();
+        await page.locator('#stage [data-jav-detail] h1').waitFor();
+        const ready = await page.locator('#stage [data-jav-detail][data-stage-grid]').boundingBox();
+        const shell = await page.locator('#stage').boundingBox();
+        const media = await page.locator('#stage [data-jav-detail] > [data-stage-media]').boundingBox();
+        assert.ok(ready && shell && media && Math.abs(ready.width - bounds.grid.width) <= 1
+          && Math.abs(shell.height - bounds.shellHeight) <= 1 && Math.abs(media.height - bounds.mediaHeight) <= 1,
+          JSON.stringify({ ready, bounds }));
+      } finally { release(); await context.close() }
+    });
     it(`${viewport.name} 新作在站内打开、预览切换、评论分页与关闭返回`, { timeout: 60000 }, async () => {
       const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, isMobile: viewport.mobile, hasTouch: viewport.mobile, reducedMotion: 'reduce' });
       try {

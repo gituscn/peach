@@ -93,6 +93,22 @@ class MagnetLookupTests(unittest.TestCase):
             self.assertEqual(MagnetSearch(self.root, fetcher=fetcher).query('DEMO-001')['state'], 'ready')
         self.assertEqual(fetcher.call_count, 2)
 
+    def test_expired_success_keeps_its_resources_and_uses_the_failure_cooldown(self):
+        from peach.wants_magnets import MagnetSearch
+        from unittest.mock import Mock
+        now = [100.0]
+        fetcher = Mock(side_effect=[{'items': self.items}, ValueError('source failure'), {'items': self.items}])
+        search = MagnetSearch(self.root, fetcher=fetcher, clock=lambda: now[0], sleeper=lambda seconds: None)
+        search.query('DEMO-001')
+        now[0] += 7 * 86400 + 1
+        failed = search.query('DEMO-001')
+        self.assertEqual(failed['items'], self.items)
+        self.assertEqual(search.query('DEMO-001'), failed)
+        self.assertEqual(fetcher.call_count, 2)
+        now[0] += 61
+        self.assertEqual(search.query('DEMO-001')['state'], 'ready')
+        self.assertEqual(fetcher.call_count, 3)
+
     def test_persistent_cache_keeps_the_most_recent_128_titles(self):
         from peach.wants_magnets import MagnetSearch
         from unittest.mock import Mock
@@ -168,6 +184,7 @@ class WantWebFixture(unittest.TestCase):
         self.addCleanup(self.contract.stop_background_jobs)
         self.contract.followups.stop()
         self.contract.cover_root = Path(self.temporary.name) / "covers"
+        self.contract.follow_secrets_root = Path(self.temporary.name).resolve() / 'secrets'
         # 取资料与取图都替掉：番号是假的，配额是真的。
         self.collected: list[str] = []
         self.collect_misses: set[str] = set()
@@ -197,6 +214,24 @@ class WantWebFixture(unittest.TestCase):
             self.get('/api/wants/magnets', id='-1')
         with self.assertRaises(KeyError):
             self.get('/api/wants/magnets', id='999999')
+
+    def test_want_list_reports_known_magnets_without_searching_sources(self):
+        from peach.wants_magnets import search_for
+        with self.contract.database.write_transaction() as connection:
+            wants.add_code(connection, 'DEMO-001')
+            wants.add_code(connection, 'DEMO-002')
+            wants.add_code(connection, 'DEMO-003')
+        search = search_for(self.contract.follow_secrets_root)
+        resources = {'items': [{'protocol': 'magnet', 'uri': 'magnet:?xt=urn:btih:' + 'a' * 40,
+                                'size': '4 GB', 'attributes': []}]}
+        with patch.object(search, 'fetcher', return_value=resources) as fetcher:
+            search.query('DEMO-001')
+            with patch.object(search, 'fetcher', return_value={'items': []}):
+                search.sleeper = lambda seconds: None
+                search.query('DEMO-002')
+            values = {item['code']: item['has_magnets'] for item in self.get()['items']}
+            self.assertEqual(values, {'DEMO-001': True, 'DEMO-002': False, 'DEMO-003': None})
+            self.assertEqual(fetcher.call_count, 1)
 
     def _collect(self, provider, code):
         self.collected.append(code)

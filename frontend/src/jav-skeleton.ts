@@ -15,8 +15,7 @@ export function javContentSkeleton(tab: string, layout = javLayout()): string {
     <span data-jav-skeleton-cover class="skeleton block w-full rounded-2lg" style="aspect-ratio:${ratio}"></span>
     <div class="flex h-10 flex-col">${text('85%')}${text('65%')}</div>
     <div class="flex h-10 items-center gap-2"><span data-jav-skeleton-avatar class="skeleton block shrink-0"></span>${text('55%')}</div>
-    <div class="flex h-6 items-center"><span class="skeleton block h-6 w-20 rounded-md"></span></div>
-    <div data-media-tags><span class="skeleton block h-5 w-24 rounded-md"></span></div>
+    <div data-media-tags><span class="skeleton block h-5 w-20 rounded-md"></span><span class="skeleton block h-5 w-24 rounded-md"></span></div>
     <div data-jav-skeleton-actions class="flex flex-wrap gap-2"><span data-jav-skeleton-action class="skeleton block h-9 w-20 rounded-md"></span><span data-jav-skeleton-action class="skeleton block h-9 w-12 rounded-md"></span><span data-jav-skeleton-action class="skeleton block h-9 w-26 rounded-md"></span></div>
   </div>`).join('')}</div>`;
 }

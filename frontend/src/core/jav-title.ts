@@ -15,6 +15,8 @@ export interface JavTitleSource {
   original_title?: string | null;
   display_title?: string | null;
   edition_badges?: string[] | null;
+  width?: number | null;
+  height?: number | null;
 }
 type Item = JavTitleSource | null | undefined;
 
@@ -48,6 +50,8 @@ export function javTitleParts(it:Item,value=it?.name):{code:string;title:string;
   const title=officialTitle||cleanFallback;
   const badges=Array.isArray(it?.edition_badges)?it.edition_badges.filter(
     label=>['中字','无码','无码破解'].includes(label)):[];
+  const dimensions=[Number(it?.width)||0,Number(it?.height)||0];
+  if(Math.min(...dimensions)>=2160&&Math.max(...dimensions)>=3840)badges.push('4K');
   return {code:displayCode,title,badges};
 }
 
@@ -61,6 +65,6 @@ export const javDisplayName=(it:Item,value=it?.name)=>{
 export function javTitleHtml(it:Item,value=it?.name){
   const {code,title,badges=[]}=javTitleParts(it,value);
   if(!code)return esc(title);
-  const edition=badges.map(label=>`<small class="javedition ${label==='中字'?'subtitle':label==='无码'?'uncensored':'cracked'}">${esc(label)}</small>`).join('');
+  const edition=badges.map(label=>`<small class="javedition ${label==='中字'?'subtitle':label==='无码'?'uncensored':label==='无码破解'?'cracked':'quality'}">${esc(label)}</small>`).join('');
   return `<span class="ui-javidentity"><strong class="ui-javcode">${esc(code)}</strong>${edition}</span>${title?` <span class="ui-javtitle">${esc(title)}</span>`:''}`;
 }

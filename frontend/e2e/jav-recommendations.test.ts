@@ -70,7 +70,9 @@ describe('JAV 推荐与加载结构', () => {
       assert.equal(await cards.first().locator('[data-jav-taste-score]').textContent(), '强烈推荐');
       const tierBox = await cards.first().locator('[data-jav-taste-score]').boundingBox();
       const tagsBox = await cards.first().locator('[data-jav-tags]').boundingBox();
-      assert.ok(tierBox && tagsBox && tierBox.y + tierBox.height <= tagsBox.y, '推荐档位在标签前');
+      const contentTag = await cards.first().locator('[data-media-tag]').first().boundingBox();
+      assert.ok(tierBox && tagsBox && contentTag && Math.abs(tierBox.y - contentTag.y) <= 4
+        && tierBox.x + tierBox.width <= contentTag.x, '推荐档位与内容标签同行，排在内容标签前');
       const recommendation = cards.first().getByRole('button', { name: '推荐分 100，强烈推荐', exact: true });
       await recommendation.focus();
       await page.getByRole('tooltip').filter({ hasText: '常看的女优：规范姓名' }).waitFor({ state: 'visible' });
@@ -117,6 +119,13 @@ describe('JAV 推荐与加载结构', () => {
       const avatarBox = await avatar.boundingBox();
       assert.ok(avatarBox && avatarBox.width === 38 && avatarBox.height === 38, JSON.stringify(avatarBox));
       if (!viewport.mobile) {
+        const before = await avatar.evaluate(node => getComputedStyle(node).transform);
+        await avatar.hover();
+        await page.waitForFunction(() => {
+          const face = document.querySelector('[data-jav-card] [data-media-avatar]');
+          return face && getComputedStyle(face).transform !== 'matrix(1, 0, 0, 1, 0, 0)';
+        });
+        assert.notEqual(await avatar.evaluate(node => getComputedStyle(node).transform), before);
         await cards.first().hover();
         assert.notEqual(await cards.first().evaluate(node => getComputedStyle(node).boxShadow), 'none');
       }

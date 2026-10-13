@@ -1,5 +1,6 @@
 """磁力抓取链的纯判据；不连接真实站点。"""
 import unittest
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -72,6 +73,8 @@ class MagnetChainTests(unittest.TestCase):
         from peach.magnet_chain import Fetcher, search
         from peach.wants_magnets import MagnetSearch
         now = [100.0]
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
         with patch.object(Fetcher, '__init__', return_value=None), patch.object(Fetcher, 'close'), \
                 patch.object(Fetcher, 'manko', side_effect=RuntimeError), \
                 patch.object(Fetcher, 'javdb', return_value=[]), \
@@ -80,7 +83,7 @@ class MagnetChainTests(unittest.TestCase):
             def fetcher(root, code):
                 calls.append(code)
                 return search(root, code)
-            lookup = MagnetSearch(Path('.'), fetcher=fetcher, clock=lambda: now[0], sleeper=lambda _: None)
+            lookup = MagnetSearch(Path(temporary.name).resolve(), fetcher=fetcher, clock=lambda: now[0], sleeper=lambda _: None)
             self.assertEqual(lookup.query('ABC-123')['state'], 'error')
             now[0] += 120
             self.assertEqual(lookup.query('ABC-123')['state'], 'error')

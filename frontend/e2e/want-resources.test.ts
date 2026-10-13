@@ -84,7 +84,16 @@ describe('JAV 入库作品卡', () => {
         await page.waitForFunction(() => document.querySelectorAll('[data-resource-protocol]').length === 8 &&
           !document.querySelector('details [inert=""]'));
         assert.equal(await card.locator('[data-resource-protocol]:visible').count(), 8);
-        await page.getByRole('tab', { name: '我的馆藏', exact: true }).click();
+        const phase = page.locator('[data-want-phase="searching"]');
+        await phase.locator('label:has(input[value="available"])').click();
+        assert.equal(await phase.locator('[data-want-id]').count(), 1);
+        await phase.locator('label:has(input[value="missing"])').click();
+        assert.equal(await phase.locator('[data-want-id]').count(), 0);
+        await phase.locator('label:has(input[value="available"])').click();
+        await phase.getByRole('heading', { name: '资源链接 · 8' }).waitFor();
+        assert.equal(resourceRequests, 1, '切换磁链筛选重复查询已有资源');
+        await phase.screenshot({ path: `../build/want-filter-${viewport.name}.png` });
+        await page.getByRole('tab', { name: '馆藏', exact: true }).click();
         await page.getByRole('tab', { name: '想要', exact: true }).click();
         await page.getByRole('heading', { name: '资源链接 · 8' }).waitFor();
         assert.equal(resourceRequests, 1, '返回页面重复查询资源');

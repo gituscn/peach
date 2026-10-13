@@ -815,6 +815,8 @@ def _positive_behavior_score(row: dict, *, exclude_disliked: bool) -> float:
 
 
 def _peach_dashboard_evidence(connection: sqlite3.Connection, since: str | None, *, exclude_disliked: bool = False) -> dict[str, object]:
+    from .entities import male_performer_ids
+    excluded = male_performer_ids(connection)
     since_epoch = datetime.fromisoformat(since).timestamp() if since else None
     rows = connection.execute(
         "SELECT a.id,a.creator,a.studio,a.play_count,a.play_seconds,a.o_count,a.rating,"
@@ -859,6 +861,8 @@ def _peach_dashboard_evidence(connection: sqlite3.Connection, since: str | None,
                 batch,
             )
             for entity in entity_rows:
+                if entity['entity_id'] in excluded:
+                    continue
                 aid = int(entity["asset_id"])
                 kind = str(entity["kind"])
                 normalized = str(entity["normalized_name"] or entity["canonical_name"]).casefold()
@@ -1103,6 +1107,8 @@ def _taste_analysis(
 def _linked_history_evidence(history_store, ledger_connection, since, history):
     """已登记账号的浏览计数，人物、创作者和网站分开汇总。"""
     browser_performers = Counter()
+    from .entities import male_performer_ids
+    excluded = male_performer_ids(ledger_connection)
     accounts, _ = identity_context(ledger_connection)
     cached = _history_rows(history_store) if history_store.is_file() else None
     if cached and accounts:
@@ -1111,7 +1117,9 @@ def _linked_history_evidence(history_store, ledger_connection, since, history):
                 continue
             matches = linked_identities(url, accounts)
             domain = (urlparse(url).hostname or "").removeprefix("www.")
-            for _, kind, name in matches:
+            for eid, kind, name in matches:
+                if eid in excluded:
+                    continue
                 if kind == "performer":
                     browser_performers[name] += 1
                 elif kind == "creator":

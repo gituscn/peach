@@ -8,7 +8,7 @@ from .related import rank_related
 from .taste_preferences import preference_profile, preference_score
 from .genre_decisions import load_genre_decisions
 from .jav_discovery_metadata import discovery_metadata, source_number
-from .web_jav_detail import _source_fields
+from .web_jav_detail import _source_fields, visible_actors, source_performer_refs
 
 def _identity(connection, kind, name):
     found = entities.resolve_entity(connection, kind, name)
@@ -31,6 +31,7 @@ def _external(connection, contract):
         "SELECT d.* FROM feed_discovery d WHERE d.ignored_at IS NULL AND "
         + " AND ".join(web_feeds.LISTED) + " ORDER BY d.id")]
     identities = {}
+    excluded = entities.male_performer_ids(connection)
     decisions = load_genre_decisions(connection)
     for row in rows:
         detail = _cached_movie(row["code"], contract)
@@ -44,8 +45,10 @@ def _external(connection, contract):
         series = detail.get("series_name") or ""
         if detail.get("maker_name"):
             row["studio"] = detail["maker_name"]
-        actors = [actor["name"] for actor in detail.get("actors", ()) if actor.get("name")]
-        if actors:
+        source_actors = visible_actors(connection, detail, excluded)
+        actors = [actor['name'] for actor in source_actors]
+        row['_source_actors'] = source_actors
+        if 'actors' in detail:
             row["performers"] = "、".join(actors)
         minutes = source_number(detail.get("duration"))
         row["duration"] = minutes * 60 if minutes else None
@@ -80,6 +83,7 @@ def _library(connection):
         " AND COALESCE(a.play_count,0)<=1 AND (COALESCE(a.duration,0)<=0"
         " OR COALESCE(a.max_reached,0)<a.duration*0.5) ORDER BY a.id")]
     by_id = {row["id"]: row for row in rows}
+    excluded = entities.male_performer_ids(connection)
     for row in rows:
         row.update({"entities": {}, "tags": [], "asset_id": row["id"], "cover_url": "", "link": "",
                     "source_score": None, "metadata_state": "ready", "metadata_fields": {}})
@@ -91,6 +95,8 @@ def _library(connection):
             " JOIN entity e ON e.id=ae.entity_id WHERE ae.asset_id IN (" + marks + ")"
             " AND e.kind IN ('performer','creator','tag','studio','series') AND (e.kind<>'tag' OR "
             + web_catalog.tag_not_hidden("ae.asset_id", "e.normalized_name") + ") ORDER BY e.canonical_name", ids):
+            if identity in excluded:
+                continue
             row = by_id[aid]
             row["entities"].setdefault(kind, set()).add(identity)
             if kind == "tag" and web_catalog.tag_cat(name) in (
@@ -161,6 +167,10 @@ def q_jav_discoveries(contract, args):
                               relevance_for=lambda row: row["preference_score"])
         wanted = wants.wanted_keys(connection, (web_catalog.normalise_code_key(row["code"]) for row in picked))
         refs = web_feeds._discovery_performers(connection, contract, picked) if scope == "external" else {}
+        for row in picked:
+            actors = row.pop('_source_actors', [])
+            if actors:
+                refs[row['id']] = source_performer_refs(contract, connection, actors)
         for row in picked:
             row["score"] = row.pop("related_score")
             row["taste_score"] = row["score"]

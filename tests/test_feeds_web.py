@@ -876,6 +876,19 @@ class FeedFollowByNameTest(PerformerFeedSwitchTest):
 
 
 class JavDiscoveryTest(FeedWebFixture):
+    def test_source_cast_uses_female_and_unknown_references_without_male_features(self):
+        self._add()
+        self._check()
+        result = self._discover(metadata={'actors': [
+            {'id': 'Actor1', 'name': '示例女优', 'gender': 0, 'has_avatar': True},
+            {'id': 'Actor2', 'name': '示例男优', 'gender': 1},
+            {'id': 'Actor3', 'name': '未分类人物'}]})
+        for item in result['items']:
+            self.assertEqual(item['performers'], '示例女优、未分类人物')
+            self.assertEqual([ref['name'] for ref in item['performer_refs']], ['示例女优', '未分类人物'])
+            self.assertTrue(item['performer_refs'][0]['source_avatar'])
+            self.assertFalse(any('示例男优' in reason for reason in item['reasons']))
+
     def test_persistent_metadata_supplies_canonical_filters_and_sort_values_without_detail(self):
         from peach import web_jav_discovery
         from peach.jav_discovery_metadata import discovery_metadata

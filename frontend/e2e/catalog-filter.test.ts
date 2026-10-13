@@ -249,7 +249,7 @@ describe('首页筛选条', () => {
       if (viewport.mobile) await page.locator('#filterBtn').click();
       await page.locator('button[data-nav="jav"]:visible').first().click();
       await page.waitForFunction(() => location.pathname === '/' && new URLSearchParams(location.search).get('jav') === '1');
-      await page.getByRole('tab', { name: '我的馆藏', exact: true, selected: true }).waitFor();
+      await page.getByRole('tab', { name: '馆藏', exact: true, selected: true }).waitFor();
       await page.locator('#grid [data-media-card]').first().waitFor();
       await settle(page);
       assert.ok(counts.items.slice(before).some((url) => url.searchParams.get('jav') === '1'), 'JAV 口径没有重取列表');
@@ -283,8 +283,8 @@ describe('首页筛选条', () => {
       assert.equal(await page.locator('#javLibraryHeader').isVisible(), false);
       await page.getByRole('tab', { name: '想要', exact: true }).click();
       await page.getByRole('tab', { name: '想要', exact: true, selected: true }).waitFor();
-      await page.getByRole('tab', { name: '我的馆藏', exact: true }).click();
-      await page.getByRole('tab', { name: '我的馆藏', exact: true, selected: true }).waitFor();
+      await page.getByRole('tab', { name: '馆藏', exact: true }).click();
+      await page.getByRole('tab', { name: '馆藏', exact: true, selected: true }).waitFor();
       await page.locator('#grid [data-media-card]').first().waitFor();
       assert.equal(await page.locator(`${FILTER} input[name="jav-layout"][value="big"]`).isChecked(), true);
       const box = await layout(page);

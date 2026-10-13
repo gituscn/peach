@@ -12,6 +12,7 @@ import { LoadingDots } from '../components/loading-dots';
 import { Note } from '../components/note';
 import { busyProps, useAction } from '../settings/use-action';
 import type { Want } from './wants';
+import { recordWantMagnets } from './wants';
 import { Disclosure } from '../settings/section';
 import { cachedResources, rememberResources, resourceLifetime } from './resource-cache';
 import { PROVIDER_ICONS } from '../components/source-label';
@@ -78,6 +79,10 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
   useEffect(() => {
     if (query.data?.source_url) onSource?.(query.data.source_url);
   }, [query.data?.source_url, onSource]);
+  useEffect(() => {
+    if (!queryUrl && query.data && (query.data.state === 'ready' || query.data.items.length > 0))
+      recordWantMagnets(want.id, query.data.items.some(item => item.protocol === 'magnet'));
+  }, [query.data, queryUrl, want.id]);
   const configured = downloads?.providers.find((row) => row.key === provider && row.configured);
   const add = (candidate: MagnetCandidate) => {
     if (readOnly || !downloads?.available || !configured || candidate.protocol !== 'magnet') return;

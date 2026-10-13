@@ -58,6 +58,7 @@ class MagnetSearch:
         self.lock = Lock()
         self.cache_lock = RLock()
         self.cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
+        self.failures: dict[str, tuple[float, dict]] = {}
         self.next_request = 0.0
         self._load()
 
@@ -100,19 +101,30 @@ class MagnetSearch:
             if cached and cached[0] + (cache_lifetime(released) if reusable_result(cached[1]) else 60) > self.clock():
                 self.cache.move_to_end(code)
                 return cached[1]
+            failed = self.failures.get(code)
+            if failed and failed[0] + 60 > self.clock():
+                return failed[1]
         return None
+
+    def known_magnets(self, code, released=None):
+        result = self._cached(normalise_code_key(code), released)
+        return any(item.get('protocol') == 'magnet' for item in result['items']) if result else None
 
     def _remember(self, code, result):
         with self.cache_lock:
             previous = self.cache.get(code)
             if result['state'] == 'error' and previous and reusable_result(previous[1]):
                 result['items'] = previous[1]['items']
+                self.failures[code] = (self.clock(), result)
                 return
+            self.failures.pop(code, None)
             self.cache[code] = (self.clock(), result)
             self.cache.move_to_end(code)
             while len(self.cache) > 128:
-                self.cache.popitem(last=False)
-            self._save()
+                removed, _ = self.cache.popitem(last=False)
+                self.failures.pop(removed, None)
+            if reusable_result(result):
+                self._save()
 
     def query(self, code: str, *, refresh: bool = False, released: str | None = None) -> dict:
         code = normalise_code_key(code)

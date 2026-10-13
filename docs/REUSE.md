@@ -479,6 +479,10 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.16.10，版�
 
 多维偏好复用行为计权、genre 归一和 `related.rank_related` 的 MMR；`taste_preferences` 保存规范身份、证据种类及候选强度。持久缓存复用 `fsutil.atomic_write_text`，按账本、历史库及规则源码版本失效，只读历史连接忽略没有数据帧的 WAL。名称扫描采用 [pyahocorasick 2.3.1](https://github.com/WojciechMula/pyahocorasick)（BSD-3-Clause，Unicode，Python 3.12–3.14，Windows/macOS/Linux）；已读固定版 C 实现，Windows CPython 3.14 wheel 实装通过，新增仅此直接依赖。长标题、多别名、重叠名字及 ASCII 词边界由 Peach 约束。真实只读汇总覆盖七类维度；偏好候选和私有缓存不改写 ledger。
 
+## 卡片与来源头像
+
+卡片 label 复用既有 `javTitleHtml`、`followTitleMarks` 与 `data-media-tags`，分段筛选复用 `SegmentedRadioGroup`。来源头像共用 `PublicAPI` 的已验证图片主机、三个下载槽位、Pillow 解码、单请求合并与六小时缓存；只持久保存没有查询参数的公开静态头像地址。人物使用策略在投影和口味汇总处过滤明确登记的男优，原始来源记录仍完整保留，无新增依赖或 ledger 迁移。
+
 ## 原位改字
 
 `scripts/dev/copy-editor.js` 复用官网本地预览的 `edit-client.js` 交互：文字范围提示、原位编辑、按钮文字就近输入、回车和失焦保存、Esc 取消。

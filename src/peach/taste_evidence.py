@@ -5,7 +5,7 @@ import re
 import ahocorasick
 
 from .catalog_rules import LENGTH_TAGS, TECH_TAGS
-from .entities import normalize_entity_name
+from .entities import male_performer_ids, normalize_entity_name
 from .taste_sites import account_key, host, identity_context, linked_identities, mixed_adult, MIXED_DOMAINS
 
 KINDS = ("performer", "creator", "tag", "studio", "series")
@@ -23,7 +23,9 @@ def length_band(value):
 
 class IdentityIndex:
     def __init__(self, connection):
-        self.entities = {row["id"]: dict(row) for row in connection.execute("SELECT * FROM entity")}
+        self.excluded = male_performer_ids(connection)
+        self.entities = {row["id"]: dict(row) for row in connection.execute("SELECT * FROM entity")
+                         if row['id'] not in self.excluded}
         self.canonical, self.aliases = defaultdict(set), defaultdict(set)
         self.names = defaultdict(dict)
         for row in self.entities.values():
@@ -82,7 +84,7 @@ def collection_evidence(connection, index, counters):
     linked = defaultdict(lambda: defaultdict(set))
     for aid, eid, kind, name in connection.execute(
         "SELECT ae.asset_id,e.id,e.kind,e.canonical_name FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id"):
-        if aid in rows and kind in KINDS and name not in TECH_TAGS | LENGTH_TAGS:
+        if aid in rows and eid not in index.excluded and kind in KINDS and name not in TECH_TAGS | LENGTH_TAGS:
             linked[aid][kind].add(eid)
             index.names[kind][eid] = name
     for aid, row in rows.items():
@@ -156,6 +158,8 @@ def preference_evidence(connection, store):
     accounts, followed = identity_context(connection)
     for kind, identities in followed.items():
         for (eid, name), count in identities.items():
+            if eid in index.excluded:
+                continue
             index.names[kind][eid] = name
             counters["关注"][kind][eid] = count
     browser_evidence(connection, store, index, accounts, counters)
@@ -164,6 +168,8 @@ def preference_evidence(connection, store):
         values = set().union(*(set(by_kind[kind]) for by_kind in counters.values()))
         strengths[kind] = {}
         for eid in values:
+            if eid in index.excluded:
+                continue
             raw = (2.5 * math.log2(1 + counters["观看与反馈"][kind][eid])
                    + .45 * math.log2(1 + counters["馆藏积累"][kind][eid])
                    + .7 * math.log2(1 + counters["浏览记录"][kind][eid])

@@ -548,6 +548,9 @@ body[data-surface="/trash"] .peach-react [data-media-card] [data-media-title] { 
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
+.peach-react [data-jav-item]:not([data-variant="next"]) [data-media-meta] { --card-meta-byline: calc(2lh + 2px); }
+.peach-react [data-jav-item]:not([data-variant="next"]) [data-media-byline] { height: calc(2lh + 2px); row-gap: 2px; overflow: hidden; }
+.peach-react [data-jav-item]:not([data-variant="next"]) [data-media-who] { flex-basis: 100%; }
 .peach-react [data-media-who] {
   display: inline-block;
   min-width: 0;

@@ -10,7 +10,7 @@ import { WANT_PAGE_SIZE, WantList } from '../../src/react/wants/want-list';
 import type { Want, WantsData } from '../../src/react/wants/wants';
 import { buttonNamed, click, mount, settle, type } from './render';
 
-afterEach(() => { queryClient.clear() });
+afterEach(() => { queryClient.clear(); localStorage.clear() });
 notifyManager.setScheduler((notify) => notify());
 
 const want = (id: number, extra: Partial<Want> = {}): Want => ({
@@ -96,6 +96,23 @@ it('一条都没有就是空态，不画空的分段', async () => {
   const { host } = await open();
   expect(host.textContent).toContain('还没有想要的作品');
   expect(host.querySelector('section[data-want-phase]')).toBeNull();
+});
+
+it('待找按已有磁链状态切换，切换不发查询并重置分页', async () => {
+  vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} });
+  const fetcher = serve(listed(Array.from({ length: WANT_PAGE_SIZE + 3 }, (_, index) =>
+    want(index + 1, { has_magnets: index < 2 }))));
+  const { host } = await open();
+  const calls = fetcher.mock.calls.length;
+  await click(buttonNamed('下一页', host));
+  await click(host.querySelector('input[value="available"]'));
+  await settle();
+  expect([...host.querySelectorAll('[data-want-id]')].map(node => node.getAttribute('data-want-id'))).toEqual(['1', '2']);
+  await click(host.querySelector('input[value="missing"]'));
+  await settle();
+  expect(host.querySelector('[data-want-id]')?.getAttribute('data-want-id')).toBe('3');
+  expect(host.querySelectorAll('[data-want-id]').length).toBe(WANT_PAGE_SIZE);
+  expect(fetcher.mock.calls.length).toBe(calls);
 });
 
 it('添加键是蓝色主按钮：输入框空着时是主按钮的禁用形态，填了番号就能点', async () => {
