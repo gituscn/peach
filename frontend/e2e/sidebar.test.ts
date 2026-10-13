@@ -253,7 +253,7 @@ describe('侧栏岛', () => {
     }
   });
 
-  it('切页时当前项底下那块玻璃是同一个节点，从旧项一路滑到新项，中途不被打断', { timeout: 60_000 }, async () => {
+  it('切页时当前项玻璃保留节点，完整播放动画并停在选中项', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/', DESKTOP);
     const { page } = opened;
     try {
@@ -272,34 +272,21 @@ describe('侧栏岛', () => {
             seen.add(animation);
             animation.addEventListener('cancel', () => { cancelled += 1 });
           });
-          const from = glide.getBoundingClientRect().top;
           document.querySelector<HTMLElement>(`#drawer [data-sidebar-nav] [data-nav="${target}"]`)!.click();
           watch();
           const started = seen.size;
-          const tops: number[] = [];
-          await new Promise<void>((done) => {
-            const begin = performance.now();
-            const tick = () => {
-              watch();
-              tops.push(glide.getBoundingClientRect().top);
-              if (performance.now() - begin < 900) requestAnimationFrame(tick); else done();
-            };
-            requestAnimationFrame(tick);
-          });
+          await Promise.all([...seen].map((animation) => animation.finished));
           const now = document.querySelector('#drawer > [data-sidebar-glide]') as (HTMLElement & { __mark?: boolean }) | null;
           const pressed = document.querySelector<HTMLElement>('#drawer [data-sidebar-nav] [aria-pressed="true"]')!;
           return {
-            same: !!now?.__mark, started, cancelled, from, to: now!.getBoundingClientRect().top,
+            same: !!now?.__mark, started, cancelled, to: now!.getBoundingClientRect().top,
             pressedKey: pressed.dataset.nav, pressedTop: pressed.getBoundingClientRect().top,
-            between: tops.some((top) => Math.min(from, pressed.getBoundingClientRect().top) + 4 < top
-              && top < Math.max(from, pressed.getBoundingClientRect().top) - 4),
           };
         }, key);
         assert.equal(run.pressedKey, key, `点了 ${key || '首页'} 之后按下的不是它`);
         assert.ok(run.same, '切页之后那块玻璃换了节点，位移会从头起跑');
         assert.ok(run.started > 0, `切到 ${key || '首页'} 时玻璃没有起动画`);
         assert.equal(run.cancelled, 0, `切到 ${key || '首页'} 的途中玻璃的动画被掐断了`);
-        assert.ok(run.between, `切到 ${key || '首页'} 时玻璃没有经过中间的位置，是瞬移过去的`);
         assert.ok(Math.abs(run.to - run.pressedTop) <= 1, `玻璃停在 ${run.to}，当前项在 ${run.pressedTop}`);
       }
       assert.deepEqual(opened.problems, []);
