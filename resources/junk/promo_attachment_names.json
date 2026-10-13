@@ -2,6 +2,12 @@
   "说明": "垃圾复核用的推广附件命名词库，由 peach.web_batch.promo_name_rules 读取。每条规则只按扩展名、体积上限和主名命中，命中项只进复核队列，分数低于 trash_junk.py 的自动移入回收站门槛，须看过内容再处理。names 去掉空白后不分大小写整名比较；patterns 是不分大小写的整名正则；parent_is_name 要求父目录名与主名相同；max_bytes 含边界，体积为 0 不命中。",
   "rules": [
     {
+      "reason": "游戏下载站推广视频的固定命名，须核验视频内容",
+      "suffixes": [".mp4"],
+      "max_bytes": 4194304,
+      "names": ["18+游戏大全(996gg.cc)-七龍珠H版-三國志H版-三國群淫傳等"]
+    },
+    {
       "reason": "社区推广视频的固定命名，须核验视频内容",
       "suffixes": [".mp4"],
       "max_bytes": 33554431,

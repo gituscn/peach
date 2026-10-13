@@ -153,10 +153,12 @@ function Related({ data, media, limit, context, helpers, actions }: {
     openDetail: actions.openItem, openAuthor: actions.openAuthor, canFlip: () => false,
   }), [actions]);
   const groups = followRelatedGroups(result.data?.pages || [], data, media, limit);
-  if (result.isError || (result.data && !groups.length)) return null;
   const sources = result.data?.pages.at(-1)?.sources || data.sources;
   const relatedContext = { ...context, sources, aliases: result.data?.pages.at(-1)?.author_aliases || context.aliases };
-  return <RelatedSection data-follow-related="" wireDrag={helpers.wireDrag} busy={result.isPending}>
+  return <RelatedSection data-follow-related="" wireDrag={helpers.wireDrag} busy={result.isPending}
+    empty={!!result.data && !groups.length}
+    error={result.isError ? `读取接着看失败：${requestErrorMessage(result.error)}` : undefined}
+    onRetry={() => { void result.refetch() }}>
     {result.data ? groups.map(group => <FollowCard key={group.primary.id} variant="next" group={group} media={media}
       authorSources={authorSources(group.primary, sources)} context={relatedContext} selected={false} selectMode={false}
       busy="" failure="" actions={cardActions} />)

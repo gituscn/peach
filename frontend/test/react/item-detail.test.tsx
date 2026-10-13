@@ -575,7 +575,7 @@ describe('侧栏怎么读', () => {
     ]);
   });
 
-  it('接着看没有内容就整块不出现：推荐条数为 0、Mix 队列、取回空列表', async () => {
+  it('接着看空结果显示说明，关闭推荐与 Mix 队列不显示推荐区', async () => {
     serve(undefined, { '/api/related': { items: [] } });
     const off = await show(item(1), { relatedLimit: 0 });
     expect(off.host.querySelector('[data-item-related]')).toBeNull();
@@ -584,7 +584,8 @@ describe('侧栏怎么读', () => {
     expect(queued.host.querySelector('[data-item-related]')).toBeNull();
     const empty = await show(item(3), { relatedLimit: 12 });
     await settle();
-    expect(empty.host.querySelector('[data-item-related]')).toBeNull();
+    expect(empty.host.querySelector('[data-item-related] [data-empty-state] h3')?.textContent).toBe('暂无接着看的内容');
+    expect(empty.host.querySelector('[data-item-related] [data-empty-state] p')?.textContent).toBe('可以回到列表挑选其他作品。');
   });
 
   it('标签选择器：组字过程中不筛；上下键挑、回车加；Escape 收起；点外面也收起', async () => {
