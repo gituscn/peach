@@ -198,9 +198,9 @@ class DisplayThumbUrlTests(unittest.TestCase):
                  "thumbnail_" + "a" * 32 + ".jpg")
         image = "https://api-cdn.rule34.xxx/images/1234/" + "a" * 32 + ".png"
         self.assertEqual(display_thumb_url(_Item("rule34xxx", thumb_url=thumb,
-            media_url=image, metadata={'media_kind': 'image'})), image)
+            media_url=image)), image)
         self.assertEqual(display_thumb_url(_Item("rule34xxx", thumb_url=thumb,
-            metadata={'media_kind': 'video'})), thumb)
+            media_url='https://api-cdn.rule34.xxx/images/128/' + 'c' * 32 + '.mp4')), thumb)
 
     def test_a_rule34xxx_thumb_in_another_shape_is_left_alone(self):
         """认不出的形状原样返回，不猜一个 bucket 出来。"""
