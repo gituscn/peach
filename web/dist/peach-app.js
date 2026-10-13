@@ -44976,7 +44976,7 @@ function Nxe(e, t) {
 					older: !0,
 					background: !0
 				} : { background: !0 });
-				sessionStorage.setItem("peach-follow-job", n.job_id), t = !0, e && p(!0), a((e) => e + 1);
+				sessionStorage.setItem("peach-follow-job", n.job_id), t = !0, s(!0), e && p(!0), a((e) => e + 1);
 			} catch (t) {
 				g.current.actions.checkReport({ results: [{
 					ok: !1,
