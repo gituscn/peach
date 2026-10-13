@@ -70,6 +70,7 @@
 
 ## 参考产品证据登记
 
+- 依赖与参考来源的本轮判断见 [上游复核](reference-snapshots/upstream-review.md)：原文快照按哈希与 revision 接受，人工取证笔记保留；amane 桥只消费站点与网络层。
 - BoardUI：[创作者别名表格与关注分页](BOARD_UI.md#创作者别名与扫描操作)、[Board、Link Button 与搜索动效](BOARD_UI.md)、[复核与配置灰色 Pills](reference-snapshots/board-review-layout.md#次级分类组件)；React 源码 `frontend/src/react/boardui/ORIGIN.md`。
 - [Geist 控件](reference-snapshots/vercel-geist-controls-measured.md)；[复核操作](reference-snapshots/vercel-review-actions.md)；[README 维护](README_MAINTENANCE.md)；设置：`reference-snapshots/geist-settings.md`。
 

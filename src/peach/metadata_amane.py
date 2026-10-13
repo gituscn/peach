@@ -8,6 +8,8 @@
 三档，上游原样的 reason 留在 `detail` 里给冷却与快照回溯用。链上 `LibraryMetadataProvider` 拿到的
 形状因此与自写站一致。
 
+0.20.0 的站点字段、失败分档与总时限复核见 `docs/reference-snapshots/upstream-review.md`。
+
 聚合不在这里：一站一份 payload 交给 `metadata_policy` / ADR-0038 的结算，不复制 amane 的
 `aggregate`。升级也不在这里：钉的 sha 只在 `pyproject.toml` 一处，本模块读它，不另存一份。
 """
@@ -35,7 +37,8 @@ BRIDGE_ROOT = Path(__file__).resolve().parents[2] / "tools" / "amane-bridge"
 BRIDGE_SCRIPT = BRIDGE_ROOT / "bridge.py"
 #: 桥的 venv 建在数据目录的工具区，和 FFmpeg 同一层；名字与源码目录一致。
 BRIDGE_TOOL_NAME = "amane-bridge"
-#: 一次子进程的默认超时。桥内每站并发、单请求 30 秒、每个地址最多重试一次，60 秒够一站走完。
+#: 一次子进程的总时限。单请求 30 秒，普通失败最多重试一次；403/406 可额外轮换三次指纹，
+#: 搜索与详情共用这 60 秒，超时终止子进程并报可重试失败。
 DEFAULT_TIMEOUT = 60
 
 #: 经桥开放给 Peach 来源链的站，套 `peach.sources` 同一份配置形状。每个站只有一个归属（ADR-0048）：

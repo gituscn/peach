@@ -30,10 +30,20 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
     });
     const centered = (shown: { gutter: number; size: number[] }, safe: number) =>
       shown.gutter >= shown.size[0]! + safe * 2 ? (shown.gutter - shown.size[0]!) / 2 : safe;
+    const settlePoster = async (page: Page) => {
+      await page.waitForFunction(() => {
+        const image = document.querySelector<HTMLImageElement>('#stage [data-follow-detail-poster]');
+        return image?.complete && image.naturalWidth > 0;
+      });
+      // 几何断言读取图片就绪后的布局；ResizeObserver 在渲染阶段更新箭头内距。
+      await page.evaluate(() => new Promise<void>(resolve => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }));
+    };
     const wide = await openFollowFeed(browser, `/follow/item/${DETAIL.gallery}`, DESKTOP,
       { ready: '#stage [data-follow-image-arrow="next"]' });
     try {
-      await wide.page.waitForFunction(() => (document.querySelector('#stage [data-follow-detail-poster]') as HTMLImageElement)?.complete);
+      await settlePoster(wide.page);
       const shown = await read(wide.page);
       assert.deepEqual(shown.size, [48, 48]);
       assert.equal(shown.background, 'rgba(0, 0, 0, 0.6)');
@@ -50,7 +60,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
     const narrow = await openFollowFeed(browser, `/follow/item/${DETAIL.gallery}`, MOBILE,
       { ready: '#stage [data-follow-image-arrow="next"]' });
     try {
-      await narrow.page.waitForFunction(() => (document.querySelector('#stage [data-follow-detail-poster]') as HTMLImageElement)?.complete);
+      await settlePoster(narrow.page);
       const shown = await read(narrow.page);
       assert.deepEqual(shown.size, [44, 44]);
       assert.ok(Math.abs(shown.inset - centered(shown, 10)) <= 1, `窄屏箭头内距不对：${JSON.stringify(shown)}`);

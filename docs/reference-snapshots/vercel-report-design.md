@@ -17,6 +17,15 @@ Start with the reader's job, not the document category. Identify what the reader
 
 Treat this as a brand surface even when it contains product-like interactions such as calculators. Communicate official Vercel authorship without resembling Vercel product UI, a generic SaaS landing page, or a marketing campaign.
 
+## Download logos
+
+Official Vercel logotype, with transparent backgrounds:
+
+- For light backgrounds: [Black SVG](https://vercel.com/geist/brands/assets/vercel-logotype-black.svg) · [Black PNG](https://vercel.com/geist/brands/assets/vercel-logotype-black.png).
+- For dark backgrounds: [White SVG](https://vercel.com/geist/brands/assets/vercel-logotype-white.svg) · [White PNG](https://vercel.com/geist/brands/assets/vercel-logotype-white.png).
+
+Fetch these URLs directly to save individual files. Prefer SVG for websites and scalable artwork; use PNG when an application requires a raster image. See the [complete brand asset catalog and usage requirements](https://vercel.com/geist/brands.md) for symbols, product logos, dimensions, and permitted use.
+
 ## Use this priority order
 
 When requirements compete, protect them in this order:

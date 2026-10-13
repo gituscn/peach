@@ -18,8 +18,8 @@
       "name": "Fluid Functionalism 短程弹簧参数",
       "url": "https://www.fluidfunctionalism.com/r/springs.json",
       "snapshot": "docs/reference-snapshots/upstream/fluid-springs.json",
-      "checked_on": "2026-10-08",
-      "sha256": "e8d4e6b02a35aff9d6090439fd321866716df190b84ef9b4f1e831e1acd21416",
+      "checked_on": "2026-10-13",
+      "sha256": "25dba808aba95d87fe3924ae214084013b8718fc26a102db3fee9e55b201f781",
       "role": "普通分段控件与短菜单的无回弹短程参数参考；保留 Peach 主题与无障碍行为。",
       "consumers": [
         "frontend/src/react/components/use-moving-surface.ts"
@@ -31,8 +31,8 @@
       "name": "Fluid Functionalism 分段控件行为",
       "url": "https://www.fluidfunctionalism.com/r/tabs.json",
       "snapshot": "docs/reference-snapshots/upstream/fluid-tabs.json",
-      "checked_on": "2026-10-08",
-      "sha256": "401b81b5ebce2e438ebda32e19af9d420edd3340ad4261e3a8b0b7a1da6ee884",
+      "checked_on": "2026-10-13",
+      "sha256": "db7927a4bb55bbc8b2edc48a24bf6d32364c27f1e54b938292a976aac681e33d",
       "role": "独立选中底板与即时状态更新参考；不复制组件源码、字重变化与悬停双底板。",
       "consumers": [
         "frontend/src/react/components/segmented.tsx"
@@ -44,8 +44,8 @@
       "name": "Vercel Design Report Reference",
       "url": "https://vercel.com/design.md",
       "snapshot": "docs/reference-snapshots/vercel-report-design.md",
-      "checked_on": "2026-08-28",
-      "sha256": "2b40b23712e548721ecae7d0672ae9318a83188b9fcd2fb4a7a1b7c147a39903",
+      "checked_on": "2026-10-13",
+      "sha256": "3af49d9dcb22463f0926d006ad67bbcefa32d5a2185f81c7754c26b5bba4020d",
       "role": "报告与证据型页面的版式、层级、语言和数据表达参考；Peach 仅复用可迁移原则。",
       "consumers": [
         "web/css/",
@@ -75,12 +75,12 @@
       "name": "Vercel Web Interface Guidelines",
       "url": "https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md",
       "snapshot": "docs/reference-snapshots/vercel-web-interface-guidelines.md",
-      "checked_on": "2026-08-26",
-      "sha256": "5a775e6411f790f518dbc9c1fa7c50a89e6873502d9a3530a6eb223a590bcfe8",
+      "checked_on": "2026-10-13",
+      "sha256": "d246b026f4f29b5823a9cc857f9edf3d2507002e055e32040cadeaf3b38e0234",
       "git": {
         "repository": "https://github.com/vercel-labs/web-interface-guidelines.git",
         "ref": "refs/heads/main",
-        "revision": "e3d624baaf29dc1fc645aff3e38f03e564d2d6b1"
+        "revision": "434b7f91364665f2f733b310ec54809bf8f37937"
       },
       "role": "通用 Web 可访问性、交互、状态、性能和响应式评审清单。",
       "consumers": [
@@ -367,8 +367,8 @@
       "name": "bruno README",
       "url": "https://raw.githubusercontent.com/usebruno/bruno/main/readme.md",
       "snapshot": "docs/reference-snapshots/upstream/readme-bruno.md",
-      "checked_on": "2026-09-06",
-      "sha256": "9c58f675282a73a8c7f2a0a740799743b50a654d60dafc114fdd11060ed8a039",
+      "checked_on": "2026-10-13",
+      "sha256": "fec8af393e65aae5f85c89a2e4cc787bc7ed014b94336ab8179762386c0930b2",
       "role": "小尺寸具象 Logo 配短介绍；Peach 使用自己的桃形 Logo，不复制上游品牌素材。",
       "consumers": [
         "README.md",
@@ -445,12 +445,12 @@
       "name": "amane 内容路由与站点特性",
       "url": "https://raw.githubusercontent.com/sqzw-x/amane/main/docs/dev/content-routes.md",
       "snapshot": "docs/reference-snapshots/upstream/amane-content-routes.md",
-      "checked_on": "2026-10-08",
-      "sha256": "6ce3524b553ac5b82c066eecd14e360e6144564107bf723455be93687aa032a8",
+      "checked_on": "2026-10-13",
+      "sha256": "bf2d5dbf4cebeb142e6571a9074768e2b16c31eabc0cffbf9a0db71a167614af",
       "git": {
         "repository": "https://github.com/sqzw-x/amane.git",
         "ref": "refs/heads/main",
-        "revision": "7a980aff9c503f7a5815864d62a6ef309a27808a"
+        "revision": "cc42cee6ecf290cf05af1caa347d2dc2d5aeffcd"
       },
       "role": "按内容类型给一条有序来源链的原则，以及逐站的领域判断：javdb 没有国产分区且不解析 plot、javbus 欧美目录不可用、kin8 从任意番号抽数字拼详情会误匹配、mgstage 不进有码默认表否则有码号也会去问它、单厂牌 API 对每个候选 SKU 都发请求、DMM 与厂牌官网的日期是 SKU 分层不必相等。Peach 只取可迁移的原则与站点判断，链上成员限于自己已接解析器的来源；候选与人工复核的契约、不落盘 NFO 是 Peach 自己的边界，上游没有这两条。",
       "consumers": [
@@ -487,12 +487,12 @@
       "name": "OpenAver 说明",
       "url": "https://raw.githubusercontent.com/slive777/OpenAver/main/README.md",
       "snapshot": "docs/reference-snapshots/upstream/readme-openaver.md",
-      "checked_on": "2026-10-01",
-      "sha256": "80e5994003e81daeb4f86634f50fadcbebab0a436c75e2b827e402dcadec6efc",
+      "checked_on": "2026-10-13",
+      "sha256": "3f119fffc60a479d6cc0905cf7f4a8da4aa4f1b8c85926821fe4f69230d211f7",
       "git": {
         "repository": "https://github.com/slive777/OpenAver.git",
         "ref": "refs/heads/main",
-        "revision": "8cc17e50453d9f69a81f5fee1a072df80f7aab73"
+        "revision": "502278a3e09c7520838ffb00b2ff080323a4cdcb"
       },
       "role": "同类本地影片管理器的 README 信息结构：页头几条粗体承诺、规格速览表、截图表与常见问题。Peach 只借结构，不复制文案、截图、功能承诺与免责声明条款。",
       "consumers": [
@@ -506,12 +506,12 @@
       "name": "amane 说明",
       "url": "https://raw.githubusercontent.com/sqzw-x/amane/main/README.md",
       "snapshot": "docs/reference-snapshots/upstream/readme-amane.md",
-      "checked_on": "2026-09-26",
-      "sha256": "ccb5d984e258a689389df70d117b8bddd31e1eded466f98db18f4a2d9db73cd2",
+      "checked_on": "2026-10-13",
+      "sha256": "eeb3a4313b593d38847abab0135df7b19b60dbe983daed684ede01813d589036",
       "git": {
         "repository": "https://github.com/sqzw-x/amane.git",
         "ref": "refs/heads/main",
-        "revision": "56ff8b49a014832fa49a3d6345a31da16c778bda"
+        "revision": "cc42cee6ecf290cf05af1caa347d2dc2d5aeffcd"
       },
       "role": "同类项目的极简 README：一行一个功能、安装只给入口、开发说明压到最后。Peach 只借篇幅控制，不复制文案。",
       "consumers": [
@@ -604,12 +604,12 @@
       "name": "SakuraMedia 后端说明",
       "url": "https://raw.githubusercontent.com/tinypinglite/sakuramediabe/main/README.md",
       "snapshot": "docs/reference-snapshots/upstream/readme-sakuramediabe.md",
-      "checked_on": "2026-10-01",
-      "sha256": "28a7ae73a1b718e68a8e61f367dc27ba226f7c14a8724a9468a08ff5c56655cc",
+      "checked_on": "2026-10-13",
+      "sha256": "e90948f44e8e1ba74440500023bc377bb29c5e33aae856ccba5d0d8852142756",
       "git": {
         "repository": "https://github.com/tinypinglite/sakuramediabe.git",
         "ref": "refs/heads/main",
-        "revision": "9c6a31915c9a364c9d6717798575daf9445916bd"
+        "revision": "154c3b2fce82f890414388c120604f8ba6a0097a"
       },
       "role": "SakuraMedia 后端（GPL-3.0）只作行为与算法边界证据，不引入代码：字幕同目录纯番号配对、封套左右分割点的对称判据（Peach 不采用对称判据，见 jav_poster_crop）、「想要」与关注分开、记录比文件重要、被并实体留指针，以及待办第 27、28、43、47、51、63、66 条引用的推荐权重、Torznab 客户端、自动下载判据、时刻合集、遥测与图片打包。",
       "consumers": [
@@ -625,12 +625,12 @@
       "name": "SakuraMedia 客户端说明",
       "url": "https://raw.githubusercontent.com/tinypinglite/sakuramedia/main/README.md",
       "snapshot": "docs/reference-snapshots/upstream/readme-sakuramedia.md",
-      "checked_on": "2026-10-01",
-      "sha256": "0b6732ee5d468e5f2ed658f606375a983f89c4ab8fa1048c78cae04aa7664159",
+      "checked_on": "2026-10-13",
+      "sha256": "09ddc717b3ba9e62abc0846a0cb265d02ad3bdb32b451c516e44a30b537f38fc",
       "git": {
         "repository": "https://github.com/tinypinglite/sakuramedia.git",
         "ref": "refs/heads/main",
-        "revision": "a10fcef89b247ce66dd2fe5e3612dcab6ab92519"
+        "revision": "8cfc99b7963404694ae563ef0d1f3af58254b195"
       },
       "role": "SakuraMedia 的 Flutter 客户端只作行为证据：诊断提示的「原因、修法、跳转」三元组（待办第 26 条）、先看画面再选片（第 49 条）与多端原生客户端（第 70 条）。",
       "consumers": [
@@ -665,12 +665,12 @@
       "name": "JavBoss 说明",
       "url": "https://raw.githubusercontent.com/Solr159/JavBoss/main/README.md",
       "snapshot": "docs/reference-snapshots/upstream/readme-javboss.md",
-      "checked_on": "2026-10-01",
-      "sha256": "80ec2d2adb6b9cb395c7d1b7a0d611b4c9d172ba25427f6468d0664c59449781",
+      "checked_on": "2026-10-13",
+      "sha256": "0deb93f5050709caddf8a3cbb0839e744569d0fc66c159c67cd8bacfd039869a",
       "git": {
         "repository": "https://github.com/Solr159/JavBoss.git",
         "ref": "refs/heads/main",
-        "revision": "e45775481eb8d74ae74acf7f093a2a954b2eed88"
+        "revision": "e7c5834916f1f1012d73dc901410c00d6597980b"
       },
       "role": "JavBoss（GPL-3.0）只作流程证据：CloudDrive2 gRPC 离线下载的提交、轮询与 infohash 对账（ADR-0089），NFO 里 `javboss` 类型的番号字段，以及待办第 58 条的来源缺陷台账。Peach 不复制代码，只提交到已挂载的网盘目录、不拉回本地。",
       "consumers": [
@@ -722,12 +722,12 @@
       "name": "mdcz 说明",
       "url": "https://raw.githubusercontent.com/ShotHeadman/mdcz/main/README.md",
       "snapshot": "docs/reference-snapshots/upstream/readme-mdcz.md",
-      "checked_on": "2026-10-01",
-      "sha256": "74da8d55b72b4bbe9a73fe996af91d1ae418be2cdbf2931595340964df3ff2b9",
+      "checked_on": "2026-10-13",
+      "sha256": "2b449cb8f20b4623b0032a284fa482ccadeddb9844dc5774836c265e80837f6a",
       "git": {
         "repository": "https://github.com/ShotHeadman/mdcz.git",
         "ref": "refs/heads/main",
-        "revision": "fde3d2802bc05787375a72f154bf57c2c396cf88"
+        "revision": "295f828c76158c6411b52caf6fba9e7b0ee945ba"
       },
       "role": "mdcz（GPL-3.0，可并入 AGPL）的 DMM 失败分类、来源测试录制回放、无码官方站解析与字段聚合策略，对应待办第 44、45、54、55 条。",
       "consumers": [
@@ -813,12 +813,12 @@
       "name": "Cuelume 说明",
       "url": "https://raw.githubusercontent.com/danielwh2/cuelume/main/README.md",
       "snapshot": "docs/reference-snapshots/upstream/readme-cuelume.md",
-      "checked_on": "2026-10-01",
-      "sha256": "038c6dc5d02f298a627bce3728350343b5730532642cc0c7f8e1f458d628a976",
+      "checked_on": "2026-10-13",
+      "sha256": "50e0ef00c58113238dccef231356ea480aeffea2e1bbec26f9282e409172beb8",
       "git": {
         "repository": "https://github.com/danielwh2/cuelume.git",
         "ref": "refs/heads/main",
-        "revision": "caf15480081da9432a4a982446ce44c9daf3a288"
+        "revision": "3ff42e3ea9e43c5b1ada736600875eea960d158f"
       },
       "role": "Cuelume（MIT，npm 0.2.4）的接口与音效清单，待办第 60 条的候选依赖；README 的迁移段写的是 0.3，引入时按 npm 实际版本精确钉住。",
       "consumers": [
@@ -885,12 +885,12 @@
       "name": "Atlas 说明",
       "url": "https://raw.githubusercontent.com/Zoroaaa/Atlas/v3/README.md",
       "snapshot": "docs/reference-snapshots/upstream/readme-atlas.md",
-      "checked_on": "2026-10-01",
-      "sha256": "44a599c2a576bf83d28920608f5a77caa13036a3954cae813af4b088eed3bcb7",
+      "checked_on": "2026-10-13",
+      "sha256": "2f002a235c8bd28848318bb3b55c79fe2812a504af6afc3709833ca65a7d7144",
       "git": {
         "repository": "https://github.com/Zoroaaa/Atlas.git",
         "ref": "refs/heads/v3",
-        "revision": "fc4b2ae5cb6636ee8bc0f1e762be78a2e090f3f3"
+        "revision": "b1a3b518d87edc8052502401e747f7ec276cab22"
       },
       "role": "Atlas 的 `services/jav-utils.ts` `parseMagnets` 只解析 JavBus 一家，作待办第 43 条磁力取法的第二份证据；其余「磁力搜索」只是跳转链接。",
       "consumers": [
