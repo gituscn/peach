@@ -61,13 +61,29 @@ export async function settle(page: Page, scope = 'body'): Promise<void> {
   /* 活动页和馆藏页会持续轮询任务状态，本来就不保证进入 `networkidle`。页面导航由
      `visit()` 等到 load，主体由调用方的 `expectBody()` 验证；这里只等 Peach 自己公开的
      等待态结束。 */
-  await page.waitForFunction(
-    (selector) => {
+  try {
+    await page.waitForFunction(
+      (selector) => {
+        const root = document.querySelector(selector);
+        return !!root && !root.matches('[aria-busy="true"],[data-skeleton]')
+          && !root.querySelector('[aria-busy="true"],[data-skeleton]');
+      },
+      scope, { timeout: 15_000 });
+  } catch (error) {
+    const pending = await page.evaluate((selector) => {
       const root = document.querySelector(selector);
-      return !!root && !root.matches('[aria-busy="true"],[data-skeleton]')
-        && !root.querySelector('[aria-busy="true"],[data-skeleton]');
-    },
-    scope, { timeout: 15_000 });
+      if (!root) return { missing_scope: selector };
+      const nodes = [...root.querySelectorAll('[aria-busy="true"],[data-skeleton]')];
+      if (root.matches('[aria-busy="true"],[data-skeleton]')) nodes.unshift(root);
+      return nodes.slice(0, 12).map(node => {
+        const box = node.getBoundingClientRect();
+        return { tag: node.tagName, id: node.id, skeleton: node.getAttribute('data-skeleton'),
+          label: node.getAttribute('aria-label'), scope: node.closest('dialog')?.id || 'page',
+          width: box.width, height: box.height };
+      });
+    }, scope).catch(() => '未取得');
+    throw new Error(`页面等待态未结束：${JSON.stringify(pending)}\n${(error as Error).message}`);
+  }
 }
 
 /** 等目标页面自己的主体出现：每个定位器都要可见，之后才轮到 `settle`。
