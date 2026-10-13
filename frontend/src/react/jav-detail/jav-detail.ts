@@ -15,16 +15,16 @@ export interface JavDetail {
 }
 export interface JavEntityRef extends FaceRef { name: string; gender?: 'female' | 'male' | 'unknown'; has_logo?: boolean; source_actor_id?: string; source_avatar?: boolean }
 export interface JavReview { id: string; username: string; content: string; score?: number; created_at: string }
-export interface JavReviews { ok: boolean; items: JavReview[]; page: number; more: boolean; message?: string }
+export interface JavReviews { ok: boolean; items: JavReview[]; page: number; more: boolean; message?: string; checked_at?: string; cache_stale?: boolean }
 export interface JavDetailProps {
   code: string; readOnly: boolean;
   actions: { close(): void; navigate(path: string): void; openTag(tag: string): void; receipt(message: string): void };
 }
 export const javDetailKey = (code: string) => ['jav-detail', code] as const;
-export const fetchJavDetail = (code: string, signal?: AbortSignal) =>
-  apiGet<JavDetail>(`/api/jav/detail?code=${encodeURIComponent(code)}`, signal);
-export const fetchJavReviews = (code: string, page: number, signal?: AbortSignal) =>
-  apiGet<JavReviews>(`/api/jav/reviews?code=${encodeURIComponent(code)}&page=${page}`, signal);
+export const fetchJavDetail = (code: string, signal?: AbortSignal, refresh = false) =>
+  apiGet<JavDetail>(`/api/jav/detail?code=${encodeURIComponent(code)}${refresh ? '&refresh=1' : ''}`, signal);
+export const fetchJavReviews = (code: string, page: number, signal?: AbortSignal, refresh = false) =>
+  apiGet<JavReviews>(`/api/jav/reviews?code=${encodeURIComponent(code)}&page=${page}${refresh ? '&refresh=1' : ''}`, signal);
 export const prefetchJavDetail = (props: JavDetailProps, signal: AbortSignal) =>
   queryClient.ensureQueryData({ queryKey: javDetailKey(props.code), queryFn: () => fetchJavDetail(props.code, signal),
     staleTime: 6 * 3600_000, revalidateIfStale: true });

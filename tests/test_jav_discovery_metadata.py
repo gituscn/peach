@@ -32,7 +32,7 @@ class DiscoveryMetadataTests(unittest.TestCase):
         self.assertNotIn("preview_video_url", source)
         self.assertNotIn("avatar_url", source["actors"][0])
         self.assertEqual(restarted.peek("EXM-002")[1]["metadata_fields"]["tags"], "unavailable")
-        self.now[0] += 22000
+        self.now[0] += 86400
         self.assertEqual(restarted.peek("EXM-001")[1]["metadata_state"], "stale")
         self.cache.remember("EXM-002", error="资料未取得")
         self.assertEqual(self.cache.peek("EXM-002")[1]["metadata_state"], "unavailable")

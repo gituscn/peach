@@ -128,12 +128,12 @@ it('作品详情按自身来源查询资源，想要缓存不能代替公开来�
   expect(fetcher.mock.calls[1]?.[0]).toBe('/api/jav/resources?code=DEMO-001&refresh=1');
 });
 
-it('发行三个月边界、月末与缓存有效期一致', () => {
+it('发行一个月边界、月末与缓存有效期一致', () => {
   const now = Date.parse('2026-10-03T12:00:00Z');
-  expect(resourceLifetime('2026-07-03', now)).toBe(7 * 86_400_000);
-  expect(resourceLifetime('2026-07-02', now)).toBe(365 * 86_400_000);
-  expect(resourceLifetime(null, now)).toBe(7 * 86_400_000);
-  expect(resourceLifetime('2026-02-28', Date.parse('2026-05-31T00:00:00Z'))).toBe(7 * 86_400_000);
+  expect(resourceLifetime('2026-09-03', now)).toBe(86_400_000);
+  expect(resourceLifetime('2026-09-02', now)).toBe(Infinity);
+  expect(resourceLifetime(null, now)).toBe(86_400_000);
+  expect(resourceLifetime('2026-01-31', Date.parse('2026-02-28T12:00:00Z'))).toBe(86_400_000);
 });
 
 it('资源缓存只接受可展示的字段和完整查询结果', () => {
@@ -182,7 +182,7 @@ it('过期的内存缓存随卡片进入视口重新查询', async () => {
     observe() {}
     disconnect() {}
   });
-  const want = { id: 1, code: 'DEMO-001', release_date: '2020-01-01' } as Want;
+  const want = { id: 1, code: 'DEMO-001', release_date: null } as Want;
   const result = { state: 'ready', items: [candidate], error: '', checked_at: null };
   queryClient.setQueryData(['want-magnets', want.id, want.code], result,
     { updatedAt: Date.now() - 366 * 86_400_000 });

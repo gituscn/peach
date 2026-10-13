@@ -4,13 +4,15 @@ from __future__ import annotations
 import re
 import json
 import base64
+from datetime import datetime, timezone
+from functools import wraps
 
 from . import entities, wants, web_catalog
 from .catalog_rules import normalise_code_key, tag_cat
 from .genre_decisions import load_genre_decisions
 from .genre_taxonomy import resolve_genre
 from .javdb_public import (MAX_REVIEW_PAGES, PAGE_SIZE, PUBLIC_API, PublicSourceUnavailable,
-                          actor_gender, preview_video_url, public_image_url)
+                          actor_gender, preview_video_url, public_image_url, public_cache_scope, cache_checked_at)
 from .jav_discovery_metadata import discovery_metadata
 from .sources.javdb import maker_writing
 from .remote_media_cache import AVATAR_REFRESH_SECONDS, RemoteMediaUnavailable, cache_for
@@ -42,6 +44,27 @@ def _refs(contract, connection, kind, names):
     return refs
 
 
+def _source_cache(handler):
+    @wraps(handler)
+    def read(contract, args):
+        with public_cache_scope(contract.cover_root.parent / 'jav-public') as reads:
+            payload = handler(contract, args)
+            prefix = {'q_jav_reviews': ('reviews:',), 'q_jav_resources': ('reviews:', 'magnets:')}.get(
+                handler.__name__, ('movie:',))
+            selected = [row for row in reads if row['key'].startswith(prefix)]
+            if selected:
+                payload['checked_at'] = datetime.fromtimestamp(min(row['saved'] for row in selected), timezone.utc).isoformat()
+            errors = list(dict.fromkeys(row['error'] for row in reads if row['error']))
+            if errors:
+                payload['cache_stale'] = True
+                payload['message'] = '；'.join(errors)
+                if 'warnings' in payload:
+                    payload['warnings'].extend(errors)
+            return payload
+    return read
+
+
+@_source_cache
 def q_jav_detail(contract, args) -> dict:
     code = detail_code(args)
     with contract.database.read_connection() as connection:
@@ -52,8 +75,8 @@ def q_jav_detail(contract, args) -> dict:
     try:
         stored, _ = discovery_metadata(contract).peek(code)
         PUBLIC_API.remember_movie_identity(code, stored or {})
-        source = PUBLIC_API.movie(code)
-        discovery_metadata(contract).remember(code, source)
+        source = PUBLIC_API.movie(code, refresh=True) if args.get('refresh') == '1' else PUBLIC_API.movie(code)
+        discovery_metadata(contract).remember(code, source, checked_at=cache_checked_at('movie:'))
     except PublicSourceUnavailable as error:
         message = str(error)
         discovery_metadata(contract).remember(code, error=message)
@@ -158,11 +181,12 @@ def _source_fields(source, decisions):
             "comments_count": int(source.get("comments_count") or 0)}
 
 
+@_source_cache
 def q_jav_reviews(contract, args) -> dict:
     code = detail_code(args)
     page = int(args.get("page") or 1)
     try:
-        rows = PUBLIC_API.reviews(code, page)
+        rows = PUBLIC_API.reviews(code, page, refresh=True) if args.get('refresh') == '1' else PUBLIC_API.reviews(code, page)
     except PublicSourceUnavailable as error:
         return {"ok": False, "items": [], "more": False, "message": str(error)}
     items = [{"id": str(row.get("id")), "username": str(row.get("username") or "匿名用户"),
@@ -173,6 +197,7 @@ def q_jav_reviews(contract, args) -> dict:
             "message": ""}
 
 
+@_source_cache
 def q_jav_image(contract, args) -> dict:
     code = detail_code(args)
     index = str(args.get("image") or "cover")
@@ -214,6 +239,7 @@ def _preview_url(contract, code, source):
     return f"/jav-preview/{code}/{ref}.m3u8"
 
 
+@_source_cache
 def q_jav_resources(contract, args) -> dict:
     """公开资源列表；只返回候选，下载提交由既有入口接受用户选择。"""
     import time

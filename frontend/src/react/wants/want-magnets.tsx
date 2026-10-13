@@ -14,7 +14,7 @@ import { busyProps, useAction } from '../settings/use-action';
 import type { Want } from './wants';
 import { recordWantMagnets } from './wants';
 import { Disclosure } from '../settings/section';
-import { cachedResources, rememberResources, resourceLifetime } from './resource-cache';
+import { cachedResources, rememberResources, resourcesFresh } from './resource-cache';
 import { PROVIDER_ICONS } from '../components/source-label';
 import { resourceNotice, resourceSize } from './resource-display';
 import './want-magnets.css';
@@ -28,6 +28,7 @@ export interface MagnetResult {
   state: 'ready' | 'error' | 'busy' | 'unavailable'; items: MagnetCandidate[];
   error: string; checked_at: string | null; warnings?: string[];
   source_url?: string;
+  cache_stale?: boolean;
 }
 
 function ResourceFact({ icon: Icon, children, title }: { icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>; children: ReactNode; title?: string }) {
@@ -67,12 +68,12 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
     },
     initialData: cached?.result, initialDataUpdatedAt: cached?.saved,
     enabled: visible, retry: false,
-    // 年度缓存由时间戳判定，浏览器定时器只负责一天内的内存回收。
-    staleTime: (state) => Date.now() - state.state.dataUpdatedAt <
-      (state.state.data?.state === 'error' ? 60_000 : resourceLifetime(want.release_date)) ? Infinity : 0,
+    // 发行日期与来源时间戳判定有效性，定时器只负责一天内的内存回收。
+    staleTime: (state) => resourcesFresh(state.state.data,
+      Date.parse(state.state.data?.checked_at || '') || state.state.dataUpdatedAt, want.release_date) ? Infinity : 0,
     gcTime: 86_400_000,
-    refetchOnMount: (state) => Date.now() - state.state.dataUpdatedAt >=
-      (state.state.data?.state === 'error' ? 60_000 : resourceLifetime(want.release_date)) ? 'always' : false,
+    refetchOnMount: (state) => resourcesFresh(state.state.data,
+      Date.parse(state.state.data?.checked_at || '') || state.state.dataUpdatedAt, want.release_date) ? false : 'always',
     refetchOnWindowFocus: false,
     refetchInterval: (state) => state.state.data?.state === 'busy' ? 3000 : false,
   });
