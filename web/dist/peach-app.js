@@ -65263,14 +65263,14 @@ function kU({ item: e, image: t, thumbnail: n = !1 }) {
 		alt: n ? "" : t === "cover" ? `${e.code} 封面` : `${e.code} 预览 ${Number(t) + 1}`,
 		referrerPolicy: "no-referrer"
 	}) : n ? i && a.isPending ? /* @__PURE__ */ (0, x.jsx)("span", {
-		className: "block h-24 w-full skeleton-sheen",
+		className: "relative block h-24 w-full skeleton-sheen",
 		"aria-label": "正在读取预览"
 	}) : /* @__PURE__ */ (0, x.jsx)("span", { children: "预览未取得" }) : i && a.isPending ? /* @__PURE__ */ (0, x.jsx)("div", {
 		"data-jav-picture-wait": "",
 		"data-skeleton": "image",
 		role: "status",
 		"aria-label": "正在读取图片",
-		children: /* @__PURE__ */ (0, x.jsx)("span", { className: "skeleton-sheen" })
+		children: /* @__PURE__ */ (0, x.jsx)("span", { className: "relative skeleton-sheen" })
 	}) : /* @__PURE__ */ (0, x.jsx)("div", {
 		"data-jav-picture-wait": "",
 		children: /* @__PURE__ */ (0, x.jsx)(K, {
@@ -65461,7 +65461,7 @@ function $je({ code: e, count: t }) {
 	}), a = i.data?.pages || [], o = [...new Map(a.flatMap((e) => e.items).map((e) => [e.id, e])).values()], s = i.error ? z(i.error) : a.find((e) => !e.ok)?.message;
 	return /* @__PURE__ */ (0, x.jsx)("section", {
 		"data-jav-reviews": "",
-		children: /* @__PURE__ */ (0, x.jsx)(kk, {
+		children: /* @__PURE__ */ (0, x.jsxs)(kk, {
 			trailing: !0,
 			summary: /* @__PURE__ */ (0, x.jsxs)(x.Fragment, { children: [
 				/* @__PURE__ */ (0, x.jsx)($ue, { "aria-hidden": !0 }),
@@ -65469,13 +65469,12 @@ function $je({ code: e, count: t }) {
 				t > 0 ? ` · ${t}` : ""
 			] }),
 			onOpenChange: r,
-			children: n || i.data ? /* @__PURE__ */ (0, x.jsxs)(x.Fragment, { children: [
-				i.isPending ? /* @__PURE__ */ (0, x.jsx)("div", {
-					"data-skeleton": "reviews",
-					role: "status",
-					"aria-label": "正在读取评论",
-					children: /* @__PURE__ */ (0, x.jsx)("span", { className: "inline-block h-8 w-full skeleton-sheen" })
-				}) : null,
+			children: [i.isPending ? /* @__PURE__ */ (0, x.jsx)("div", {
+				"data-skeleton": n ? "reviews" : void 0,
+				role: "status",
+				"aria-label": "正在读取评论",
+				children: /* @__PURE__ */ (0, x.jsx)("span", { className: "relative inline-block h-8 w-full skeleton-sheen" })
+			}) : null, n || i.data ? /* @__PURE__ */ (0, x.jsxs)(x.Fragment, { children: [
 				o.map((e) => /* @__PURE__ */ (0, x.jsxs)("article", {
 					"data-jav-review": "",
 					children: [/* @__PURE__ */ (0, x.jsxs)("div", {
@@ -65524,7 +65523,7 @@ function $je({ code: e, count: t }) {
 						" 条评论，其余评论可在 JavDB 查看。"
 					]
 				}) : null
-			] }) : null
+			] }) : null]
 		})
 	});
 }

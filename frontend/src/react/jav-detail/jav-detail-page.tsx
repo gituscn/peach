@@ -106,8 +106,8 @@ function JavPicture({ item, image, thumbnail = false }: { item: JavDetail; image
       `/api/jav/image?code=${encodeURIComponent(item.code)}&image=${image}`, signal) });
   const src = local ? coverUrl(item, true) : result.data?.image || (image === 'cover' && !item.source_image ? item.cover_url : '');
   if (src) return <img data-jav-picture={thumbnail ? undefined : ''} src={src} alt={thumbnail ? '' : image === 'cover' ? `${item.code} 封面` : `${item.code} 预览 ${Number(image) + 1}`} referrerPolicy="no-referrer" />;
-  if (thumbnail) return remote && result.isPending ? <span className="block h-24 w-full skeleton-sheen" aria-label="正在读取预览" /> : <span>预览未取得</span>;
-  if (remote && result.isPending) return <div data-jav-picture-wait="" data-skeleton="image" role="status" aria-label="正在读取图片"><span className="skeleton-sheen" /></div>;
+  if (thumbnail) return remote && result.isPending ? <span className="relative block h-24 w-full skeleton-sheen" aria-label="正在读取预览" /> : <span>预览未取得</span>;
+  if (remote && result.isPending) return <div data-jav-picture-wait="" data-skeleton="image" role="status" aria-label="正在读取图片"><span className="relative skeleton-sheen" /></div>;
   return <div data-jav-picture-wait=""><Note tone="neutral" action={remote ? <Button variant="secondary" {...busyProps(result.isFetching)} onClick={() => { void result.refetch() }}>重试</Button> : undefined}>{result.data?.message || (result.error ? '图片未取得' : '暂无封面')}</Note></div>;
 }
 
@@ -188,8 +188,8 @@ function Reviews({ code, count }: { code: string; count: number }) {
   return <section data-jav-reviews="">
     <Disclosure trailing summary={<><RiChat3Line aria-hidden />评论{count > 0 ? ` · ${count}` : ''}</>}
       onOpenChange={setOpened}>
+    {result.isPending ? <div data-skeleton={opened ? 'reviews' : undefined} role="status" aria-label="正在读取评论"><span className="relative inline-block h-8 w-full skeleton-sheen" /></div> : null}
     {opened || result.data ? <>
-      {result.isPending ? <div data-skeleton="reviews" role="status" aria-label="正在读取评论"><span className="inline-block h-8 w-full skeleton-sheen" /></div> : null}
       {items.map(item => <article key={item.id} data-jav-review=""><div data-jav-review-meta=""><b>{item.username}</b>
         {Number(item.score) > 0 ? <SourceRating score={Number(item.score)} review /> : null}
         <time dateTime={item.created_at} title={item.created_at}>{item.created_at.slice(0, 10)}</time></div><p>{item.content}</p></article>)}
