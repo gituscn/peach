@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { RiChat3Line, RiExternalLinkLine } from '@remixicon/react';
 import { entityPath, icon } from '@peach/legacy/core';
 import { tagLabel } from '@peach/legacy/tags';
@@ -21,7 +21,7 @@ import { WantMagnets } from '../wants/want-magnets';
 import type { DownloadsSnapshot } from '../bundle';
 import { DOWNLOADS_KEY, DOWNLOADS_URL } from '../activity/downloads-panel';
 import { queryClient } from '../query';
-import { fetchJavDetail, fetchJavReviews, javDetailKey, nextReviewPage, type JavDetail, type JavDetailProps, type JavEntityRef } from './jav-detail';
+import { fetchJavDetail, fetchJavReviews, javDetailKey, nextReviewPage, type JavDetail, type JavDetailProps, type JavEntityRef, type JavReviews } from './jav-detail';
 import { cachedReviews, rememberReviews, reviewsFresh } from './review-cache';
 
 export function JavDetailPage(props: JavDetailProps) {
@@ -180,6 +180,7 @@ function PreviewVideo({ src }: { src: string }) {
 }
 
 function Reviews({ code, count, released }: { code: string; count: number; released?: string }) {
+  const client = useQueryClient();
   const [opened, setOpened] = useState(false);
   const cached = useMemo(() => cachedReviews(code, released), [code, released]);
   const refresh = useRef(false);
@@ -191,6 +192,10 @@ function Reviews({ code, count, released }: { code: string; count: number; relea
     queryFn: async ({ signal, pageParam }) => {
       const page = await fetchJavReviews(code, pageParam, signal, refresh.current);
       rememberReviews(code, page);
+      if (!page.ok || page.cache_stale) {
+        const previous = client.getQueryData<InfiniteData<JavReviews>>(['jav-reviews', code])?.pages.find(row => row.page === pageParam);
+        if (previous?.ok) return { ...previous, cache_stale: true, message: page.message || '评论未取得，请稍后重试' };
+      }
       return page;
     }, getNextPageParam: nextReviewPage });
   useEffect(() => { if (!result.isFetching) refresh.current = false }, [result.isFetching]);
@@ -207,6 +212,8 @@ function Reviews({ code, count, released }: { code: string; count: number; relea
         <time dateTime={item.created_at} title={item.created_at}>{item.created_at.slice(0, 10)}</time></div><p>{item.content}</p></article>)}
       {failure ? <Note tone="neutral" action={<Button variant="secondary" {...busyProps(result.isFetching)} onClick={() => { refresh.current = true; void result.refetch() }}>重试</Button>}>{failure}</Note>
         : !result.isPending && !items.length ? <Note tone="neutral">暂无评论</Note> : null}
+      {!failure && pages.length ? <Button variant="secondary" {...busyProps(result.isFetching)}
+        onClick={() => { refresh.current = true; void result.refetch() }}>刷新评论</Button> : null}
       {result.hasNextPage ? <Button variant="secondary" {...busyProps(result.isFetchingNextPage)} onClick={() => { if (!result.isFetchingNextPage) void result.fetchNextPage() }}>更多评论</Button> : null}
       {!failure && pages.at(-1)?.page === 8 && count > items.length ? <Note tone="neutral">已显示 {items.length} 条评论，其余评论可在 JavDB 查看。</Note> : null}
     </> : null}

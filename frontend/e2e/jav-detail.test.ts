@@ -48,6 +48,52 @@ describe('库外 JAV 作品详情', () => {
     } finally { await context.close() }
   });
   for (const viewport of VIEWPORTS) {
+    it(`${viewport.name}：页面重建后评论与资源复用成功快照`, async () => {
+      const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: 'reduce' });
+      try {
+        const page = await context.newPage();
+        await mockJavDetail(page);
+        await page.route(/\/api\/jav\/detail\?/, route => route.fulfill({ json: { ...JAV_DETAIL,
+          release_date: '2020-01-01', preview_count: 0, source_image: false } }));
+        let reviews = 0, resources = 0;
+        const checked = new Date().toISOString();
+        await page.route(/\/api\/jav\/reviews\?/, route => {
+          reviews++;
+          return route.fulfill({ json: { ok: true, page: 1, more: false, checked_at: checked,
+            items: [{ id: 'saved', username: '示例用户', content: '已保存的评论正文', created_at: checked }] } });
+        });
+        await page.route(/\/api\/jav\/resources\?/, route => {
+          resources++;
+          return route.fulfill({ json: { state: 'ready', items: [], warnings: [], error: '', checked_at: checked } });
+        });
+        await page.goto(requiredEnv('PEACH_E2E_ORIGIN') + '/jav/movie/EXM-001');
+        for (let visit = 0; visit < 2; visit++) {
+          await page.locator('[data-jav-info] h1').waitFor();
+          await page.locator('[data-jav-reviews] summary').click();
+          await page.getByText('已保存的评论正文').waitFor();
+          await page.locator('[data-jav-resources] summary').click();
+          await page.locator('[data-want-magnets]').scrollIntoViewIfNeeded();
+          await page.getByText('暂未找到资源链接').waitFor();
+          await settle(page, '#stage');
+          assert.deepEqual({ reviews, resources }, { reviews: 1, resources: 1 });
+          assert.ok((await layout(page)).scrollWidth <= viewport.width + 1);
+          if (visit === 0) await page.reload();
+        }
+        const refreshed = page.waitForResponse(response => response.url().includes('/api/jav/reviews?') && response.url().includes('refresh=1'));
+        await page.getByRole('button', { name: '刷新评论', exact: true }).click();
+        await refreshed;
+        await settle(page, '#stage');
+        assert.deepEqual({ reviews, resources }, { reviews: 2, resources: 1 });
+        await page.route(/\/api\/jav\/reviews\?/, route => {
+          reviews++;
+          return route.fulfill({ json: { ok: false, page: 1, items: [], more: false, message: '来源暂时不可用' } });
+        });
+        await page.getByRole('button', { name: '刷新评论', exact: true }).click();
+        await page.getByText('来源暂时不可用').waitFor();
+        assert.ok(await page.getByText('已保存的评论正文').isVisible());
+        assert.equal(reviews, 3);
+      } finally { await context.close() }
+    });
     it(`${viewport.name}：加载骨架的两栏保持在详情画框内`, async () => {
       const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: 'reduce' });
       let release!: () => void;

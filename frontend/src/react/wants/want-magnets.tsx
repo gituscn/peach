@@ -29,6 +29,7 @@ export interface MagnetResult {
   error: string; checked_at: string | null; warnings?: string[];
   source_url?: string;
   cache_stale?: boolean;
+  complete?: boolean;
 }
 
 function ResourceFact({ icon: Icon, children, title }: { icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>; children: ReactNode; title?: string }) {

@@ -54,15 +54,15 @@ class MagnetLookupTests(unittest.TestCase):
         now[0] += 358 * 86400
         expired = MagnetSearch(self.root, fetcher=fetcher, clock=lambda: 3.0, wallclock=lambda: now[0])
         expired.query('OLD-001', released='2020-01-01')
-        self.assertEqual(fetcher.call_count, 2)
+        self.assertEqual(fetcher.call_count, 1)
 
-    def test_recent_titles_expire_after_one_week_across_restart(self):
+    def test_recent_titles_expire_after_one_day_across_restart(self):
         from peach.wants_magnets import MagnetSearch
         from unittest.mock import Mock
         now = [1_800_000_000.0]
         fetcher = Mock(return_value={'items': []})
         MagnetSearch(self.root, fetcher=fetcher, wallclock=lambda: now[0]).query('DEMO-001')
-        now[0] += 7 * 86400 + 1
+        now[0] += 86400 + 1
         MagnetSearch(self.root, fetcher=fetcher, wallclock=lambda: now[0]).query('DEMO-001')
         self.assertEqual(fetcher.call_count, 2)
 
@@ -140,10 +140,10 @@ class MagnetLookupTests(unittest.TestCase):
     def test_release_age_controls_cache_and_manual_refresh_bypasses_it(self):
         from peach.wants_magnets import cache_lifetime, MagnetSearch
         today = date(2026, 10, 3)
-        self.assertEqual(cache_lifetime('2026-07-03', today), 7 * 86400)
-        self.assertEqual(cache_lifetime('2026-07-02', today), 365 * 86400)
-        self.assertEqual(cache_lifetime(None, today), 7 * 86400)
-        self.assertEqual(cache_lifetime('2026-02-28', date(2026, 5, 31)), 7 * 86400)
+        self.assertEqual(cache_lifetime('2026-09-03', today), 86400)
+        self.assertIsNone(cache_lifetime('2026-09-02', today))
+        self.assertEqual(cache_lifetime(None, today), 86400)
+        self.assertEqual(cache_lifetime('2026-01-31', date(2026, 2, 28)), 86400)
         now, calls = [100.0], []
         search = MagnetSearch(self.root, fetcher=lambda root, code: calls.append(code) or {'items': []},
                               clock=lambda: now[0], sleeper=lambda seconds: None)

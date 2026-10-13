@@ -20,7 +20,7 @@ from PIL import Image
 from .catalog_rules import normalise_code_key
 from .http import HttpRequest, HttpxTransport, response_text
 from .scripting import HostLimiter
-from .jav_cache import PublicSnapshots, cache_lifetime
+from .jav_cache import DAY, PublicSnapshots, cache_lifetime
 
 WEB = "https://catembylegacy.fastcdn.dpdns.org"
 API = "https://jdforrepam.com/api"
@@ -47,6 +47,11 @@ def cache_checked_at(prefix, *, exact=False):
     matches = [read['saved'] for read in (_CACHE_READS.get() or [])
                if (read['key'] == prefix if exact else read['key'].startswith(prefix))]
     return min(matches) if matches else None
+
+
+def cache_error(key):
+    return next((read['error'] for read in reversed(_CACHE_READS.get() or [])
+                 if read['key'] == key and read['error']), '')
 
 
 def _record_read(key, snapshot, error=''):
@@ -350,8 +355,8 @@ class PublicAPI:
             self._remember(key, identity)
 
     def _rows(self, path, key, query=None):
-        rows = self._json(path, query).get(key, [])
-        if not isinstance(rows, list):
+        rows = self._json(path, query).get(key)
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
             self.paused_until = self.clock() + 60
             raise PublicSourceUnavailable("作品资料来源格式未识别")
         return [row for row in rows if isinstance(row, dict)]
@@ -375,6 +380,20 @@ class PublicAPI:
                             self._rows(f"/v1/movies/{movie['id']}/reviews", "reviews", {"page": page}),
                             released=movie.get('release_date'), refresh=refresh)
 
+    def media_movie(self, code: str) -> dict:
+        """未缓存媒体可补齐带查询参数的临时来源地址，公开编目仍按发行日期复用。"""
+        movie = self.movie(code)
+        key = 'movie:' + normalise_code_key(code)
+        snapshot = self.snapshots.get(self._cache_key(key)) or self._store().load(key)
+        urls = [movie.get(name) for name in ('cover_url', 'thumb_url', 'preview_video_url')]
+        urls.extend(actor.get('avatar_url') for actor in movie.get('actors') or [] if isinstance(actor, dict))
+        urls.extend((image.get('large_url') or image.get('url')) if isinstance(image, dict) else image
+                    for image in movie.get('preview_images') or [])
+        if snapshot and self.wallclock() - snapshot.saved >= DAY and any(
+                isinstance(url, str) and '?' in url for url in urls):
+            return self.movie(code, refresh=True)
+        return movie
+
     def magnets(self, code: str, *, refresh=False) -> list[dict]:
         movie = self.movie(code)
         return self._cached("magnets:" + movie['id'], lambda:
@@ -382,7 +401,7 @@ class PublicAPI:
                             released=movie.get('release_date'), refresh=refresh)
 
     def image(self, code: str, index: str) -> str:
-        movie = self.movie(code)
+        movie = self.media_movie(code)
         if index == "cover":
             url = movie.get("cover_url") or movie.get("thumb_url")
         elif index.startswith("actor:"):

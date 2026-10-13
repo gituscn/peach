@@ -82,6 +82,25 @@ class PublicationCacheTests(unittest.TestCase):
                 self.assertEqual(first.result(timeout=3), second.result(timeout=3))
             other.assert_not_called()
 
+    def test_uncached_media_renews_temporary_urls_and_keeps_static_metadata_fixed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            now = [stamp('2026-10-13')]
+            api = self.api(root, now)
+            movie = {'id': 'Exact', 'number': 'EXM-001', 'release_date': '2020-01-01',
+                     'cover_url': 'https://tp.spfcas.com/cover.jpg?token=temporary'}
+            api._cached('movie:EXM-001', lambda: movie)
+            api._rows = Mock(return_value=[{'id': 'Exact', 'number': 'EXM-001'}])
+            api._json = Mock(return_value={'movie': {**movie, 'cover_url': 'https://tp.spfcas.com/current.jpg'}})
+            now[0] += DAY
+            self.assertEqual(api.movie('EXM-001'), movie)
+            api._json.assert_not_called()
+            self.assertEqual(api.media_movie('EXM-001')['cover_url'], 'https://tp.spfcas.com/current.jpg')
+            self.assertEqual(api._json.call_count, 1)
+            now[0] += 10 * DAY
+            self.assertEqual(api.media_movie('EXM-001')['cover_url'], 'https://tp.spfcas.com/current.jpg')
+            self.assertEqual(api._json.call_count, 1)
+
     def test_month_end_and_leap_year_boundaries(self):
         self.assertEqual(stable_after('2024-01-31'), date(2024, 2, 29))
         self.assertEqual(stable_after('2026-01-31'), date(2026, 2, 28))

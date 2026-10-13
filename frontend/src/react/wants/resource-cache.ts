@@ -7,8 +7,11 @@ const KEY = 'peach.want-resources.v1';
 type Entry = { code: string; saved: number; result: MagnetResult };
 
 export const resourceLifetime = publicationLifetime;
+function complete(result: MagnetResult) {
+  return !result.cache_stale && (result.complete === true || !result.warnings?.length);
+}
 export function resourcesFresh(result: MagnetResult | undefined, saved: number, released?: string | null) {
-  return !!result && !result.cache_stale && (result.state === 'error' || result.warnings?.length
+  return !!result && !result.cache_stale && (result.state === 'error' || !complete(result)
     ? Date.now() - saved < 60_000 : publicationFresh(saved, released));
 }
 
@@ -17,7 +20,7 @@ function entries(): Entry[] {
     const value = JSON.parse(localStorage.getItem(KEY) || '[]');
     return Array.isArray(value) ? value.filter((row) => typeof row?.code === 'string' &&
       Number.isFinite(row.saved) && row.result?.state === 'ready' && Array.isArray(row.result.items) &&
-      !row.result.cache_stale && !row.result.warnings?.length &&
+      complete(row.result) &&
       row.result.items.every((item: Record<string, unknown>) =>
         item && ['magnet', 'ed2k', 'url'].includes(String(item.protocol)) &&
         typeof item.size === 'string' && Array.isArray(item.attributes))) : [];
@@ -35,14 +38,14 @@ export function cachedMagnetStates(wants: readonly Pick<Want, 'code' | 'release_
   for (const want of wants) {
     if (!want.code) continue;
     const row = records.get(`all-sources:${want.code}`);
-    if (row && Date.now() - row.saved < resourceLifetime(want.release_date))
+    if (row && publicationFresh(row.saved, want.release_date))
       states.set(want.code, row.result.items.some(item => item.protocol === 'magnet'));
   }
   return states;
 }
 
 export function rememberResources(code: string, result: MagnetResult) {
-  if (result.state !== 'ready' || result.cache_stale || result.warnings?.length) return;
+  if (result.state !== 'ready' || !complete(result)) return;
   try {
     const rows = entries().filter((row) => row.code !== code);
     const checked = Date.parse(result.checked_at || '');

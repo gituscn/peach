@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from .catalog_rules import normalise_code_key
 from .fsutil import atomic_write_text
 from .javdb_public import (PUBLIC_API, PublicBudgetExceeded, PublicRequestBudget, PublicSourceUnavailable,
-                          public_cache_scope, cache_checked_at)
+                          public_cache_scope, cache_checked_at, cache_error)
 from .jav_cache import cache_fresh
 from .jobs import BackgroundJob
 
@@ -115,8 +115,8 @@ class DiscoveryMetadata:
         codes = list(dict.fromkeys(normalise_code_key(code) for code in codes if code))[:MAX_ITEMS]
         with self.lock:
             pending = [code for code in codes if self.records.get(code, {}).get('retry_after', 0) <= self.clock()
-                       and not cache_fresh(self.records.get(code, {}).get('checked_at', -1),
-                                           self.records.get(code, {}).get('movie', {}).get('release_date'), self.clock())]
+                       and (refresh or not cache_fresh(self.records.get(code, {}).get('checked_at', -1),
+                                           self.records.get(code, {}).get('movie', {}).get('release_date'), self.clock()))]
         if snapshot and not pending:
             return snapshot
         budget = PublicRequestBudget()
@@ -133,8 +133,10 @@ class DiscoveryMetadata:
                     if not self.job.snapshot() or self.job.snapshot()["job_id"] != current_id:
                         return
                     try:
-                        movie = self.api.movie(code)
+                        movie = self.api.movie(code, refresh=True) if refresh else self.api.movie(code)
                         self.remember(code, movie, checked_at=cache_checked_at('movie:' + code, exact=True))
+                        if cache_error('movie:' + code):
+                            raise PublicSourceUnavailable(cache_error('movie:' + code))
                         completed += 1
                     except PublicBudgetExceeded:
                         stop_reason = budget.stop_reason

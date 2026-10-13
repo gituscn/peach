@@ -12,7 +12,7 @@ from .catalog_rules import normalise_code_key, tag_cat
 from .genre_decisions import load_genre_decisions
 from .genre_taxonomy import resolve_genre
 from .javdb_public import (MAX_REVIEW_PAGES, PAGE_SIZE, PUBLIC_API, PublicSourceUnavailable,
-                          actor_gender, preview_video_url, public_image_url, public_cache_scope, cache_checked_at)
+                          actor_gender, preview_video_url, public_image_url, public_cache_scope, cache_checked_at, cache_error)
 from .jav_discovery_metadata import discovery_metadata
 from .sources.javdb import maker_writing
 from .remote_media_cache import AVATAR_REFRESH_SECONDS, RemoteMediaUnavailable, cache_for
@@ -49,6 +49,8 @@ def _source_cache(handler):
     def read(contract, args):
         with public_cache_scope(contract.cover_root.parent / 'jav-public') as reads:
             payload = handler(contract, args)
+            if handler.__name__ == 'q_jav_image':
+                return payload
             prefix = {'q_jav_reviews': ('reviews:',), 'q_jav_resources': ('reviews:', 'magnets:')}.get(
                 handler.__name__, ('movie:',))
             selected = [row for row in reads if row['key'].startswith(prefix)]
@@ -77,6 +79,8 @@ def q_jav_detail(contract, args) -> dict:
         PUBLIC_API.remember_movie_identity(code, stored or {})
         source = PUBLIC_API.movie(code, refresh=True) if args.get('refresh') == '1' else PUBLIC_API.movie(code)
         discovery_metadata(contract).remember(code, source, checked_at=cache_checked_at('movie:'))
+        if cache_error('movie:' + code):
+            discovery_metadata(contract).remember(code, error=cache_error('movie:' + code))
     except PublicSourceUnavailable as error:
         message = str(error)
         discovery_metadata(contract).remember(code, error=message)
@@ -294,4 +298,5 @@ def q_jav_resources(contract, args) -> dict:
     failed = magnet_failed and comments_failed and not merged
     return {"state": "error" if failed else "ready", "items": merged,
             "error": "；".join(warnings) if failed else "", "source_url": source_url,
-            "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "warnings": warnings}
+            "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "warnings": warnings,
+            "cache_stale": magnet_failed or comments_failed, "complete": not (magnet_failed or comments_failed)}
