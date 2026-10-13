@@ -81,3 +81,24 @@ it('顶栏换一批的行为登记在路由元数据上：关注页与关注管�
   expect(routeMetaOf('/taste')?.refresh).toBe('reopen');
   expect(routeMetaOf('/stats')?.refresh).toBeUndefined();
 });
+
+it('对象式导航使用规范路径并保留查询片段与状态', () => {
+  const state = { from: 'react' };
+  peachHistory.push({ pathname: '/item/12', search: '?t=93', hash: '#media' }, state);
+  expect(location.pathname + location.search + location.hash).toBe('/assets/12?t=93#media');
+  expect(peachHistory.navigation.location.state).toEqual(state);
+  peachHistory.replace({ pathname: '/configuration', search: '?tab=source' }, state);
+  expect(location.pathname + location.search).toBe('/settings/library?tab=source');
+});
+
+it('后退前进的兼容地址只通知一次且保留原历史条目', () => {
+  const state = { ...window.history.state, usr: { backgroundLocation: { pathname: '/jav', search: '?scope=library' }, overlay: 'item' } };
+  const epoch = peachHistory.navigation.openEpoch;
+  window.history.replaceState(state, '', '/parts/7/12?t=93#media');
+  window.dispatchEvent(new PopStateEvent('popstate', { state }));
+  expect(location.pathname + location.search + location.hash).toBe('/assets/12?t=93&parts=7#media');
+  expect(window.history.state).toEqual(state);
+  expect(seen).toHaveLength(1);
+  expect(seen[0]!.action).toBe('POP');
+  expect(seen[0]!.openEpoch).toBe(epoch + 1);
+});

@@ -49,12 +49,27 @@ let claiming = false;
 let onBootEntry = true;
 
 browser.listen(({ action, location }) => {
+  const path = location.pathname + location.search + location.hash;
+  const canonical = canonicalPath(path);
+  if (canonical !== path) {
+    window.history.replaceState(window.history.state, '', canonical);
+    location = browser.location;
+  }
   seq += 1;
   if (!claiming) openEpoch += 1;
   if (action !== 'REPLACE') onBootEntry = false;
   current = { action, location, seq, openEpoch, claimed: claiming };
   for (const listener of [...listeners]) listener(current);
 });
+
+function canonicalTo(to: To): To {
+  if (typeof to === 'string') return canonicalPath(new URL(to, window.location.href).href);
+  const source = new URL(`${to.pathname ?? window.location.pathname}${to.search || ''}${to.hash || ''}`, window.location.href);
+  const canonical = canonicalPath(source.href);
+  if (canonical === source.pathname + source.search + source.hash) return to;
+  const target = new URL(canonical, window.location.origin);
+  return { ...to, pathname: target.pathname, search: target.search, hash: target.hash };
+}
 
 export const peachHistory: PeachHistory = {
   get navigation() { return current },
@@ -66,8 +81,8 @@ export const peachHistory: PeachHistory = {
   createURL: (to) => browser.createURL(to),
   encodeLocation: (to) => browser.encodeLocation(to),
   go: (delta) => browser.go(delta),
-  push: (to, state) => browser.push(typeof to === 'string' ? canonicalPath(new URL(to, window.location.href).href) : to, state),
-  replace: (to, state) => browser.replace(typeof to === 'string' ? canonicalPath(new URL(to, window.location.href).href) : to, state),
+  push: (to, state) => browser.push(canonicalTo(to), state),
+  replace: (to, state) => browser.replace(canonicalTo(to), state),
 };
 
 export interface ShellNavigateOptions {
