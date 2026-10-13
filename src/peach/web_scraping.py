@@ -158,8 +158,39 @@ def w_scraping_settings(contract, body):
     return {"ok": True, "saved": save(contract.follow_secrets_root, str(body.get("source", "")), body)}
 
 
+def _connection_failure(exc, label):
+    """来源连接异常对应可操作的诊断说明。"""
+    if isinstance(exc, SourcePaused):
+        detail, message = "cooldown", "来源正在冷却，请稍后重试。"
+    elif isinstance(exc, httpx.ProxyError):
+        detail, message = "proxy", "代理连接失败，请检查 Peach 代理。"
+    elif isinstance(exc, httpx.TimeoutException):
+        detail, message = "timeout", "来源连接超时，请稍后重试或检查连接方式。"
+    else:
+        detail = "network"
+        message = (f"连接未取得；{MOBILE_BROADBAND_HINT}" if label == "高清图片 CDN"
+                   else "连接未取得；此来源可能需要代理，请检查来源连接方式。")
+    return {"ok": False, "kind": "unavailable", "reason": detail,
+            "message": message, "error_type": type(exc).__name__}
+
+
+def _connection_message(detail, reason):
+    """来源响应的失败原因决定用户下一步操作。"""
+    from .metadata import reason_blames_credentials
+
+    if detail == "cloudflare_challenge":
+        return "来源返回人机验证页，请检查来源验证状态或更换出口。"
+    if detail == "rate_limited":
+        return "来源正在限流，请稍后重试。"
+    if detail == "not_found":
+        return "来源检查地址不存在，请核对站点地址。"
+    if reason_blames_credentials(reason):
+        return "来源要求登录或验证，请在官网完成登录后重试。"
+    return f"{reason}。" if reason else "来源暂不可用，请稍后重试。"
+
+
 def w_scraping_check(contract, body):
-    from .metadata import auth_wall_reason, reason_blames_credentials
+    from .metadata import auth_wall_reason
     source = str(body.get("source", ""))
     if source not in SOURCES:
         raise ValueError("未知采集来源")
@@ -205,28 +236,9 @@ def w_scraping_check(contract, body):
                     # 成因锁死在凭据上才让人去登录。只剩状态码可看的 403 直接把
                     # `auth_wall_reason` 那句原样给用户：出口 IP 被封时登录是白做，
                     # 页面上再手写一份「请去登录」等于把人引去做错事。
-                    if challenge:
-                        result["message"] = "来源返回人机验证页，请检查来源验证状态或更换出口。"
-                    elif detail == "rate_limited":
-                        result["message"] = "来源正在限流，请稍后重试。"
-                    elif detail == "not_found":
-                        result["message"] = "来源检查地址不存在，请核对站点地址。"
-                    elif reason_blames_credentials(reason):
-                        result["message"] = "来源要求登录或验证，请在官网完成登录后重试。"
-                    else:
-                        result["message"] = f"{reason}。" if reason else "来源暂不可用，请稍后重试。"
+                    result["message"] = _connection_message(detail, reason)
             except Exception as exc:
-                detail = ("cooldown" if isinstance(exc, SourcePaused)
-                          else "proxy" if isinstance(exc, httpx.ProxyError)
-                          else "timeout" if isinstance(exc, httpx.TimeoutException) else "network")
-                result.update(ok=False, kind="unavailable",
-                              reason=detail,
-                              message=("来源正在冷却，请稍后重试。" if detail == "cooldown"
-                                       else "代理连接失败，请检查 Peach 代理。" if detail == "proxy"
-                                       else "来源连接超时，请稍后重试或检查连接方式。" if detail == "timeout"
-                                       else f"连接未取得；{MOBILE_BROADBAND_HINT}" if label == "高清图片 CDN"
-                                       else "连接未取得；此来源可能需要代理，请检查来源连接方式。"),
-                              error_type=type(exc).__name__)
+                result.update(_connection_failure(exc, label))
             result.update(checked_at=time.time(), elapsed_s=round(time.monotonic() - started, 2))
             if label == "来源页面":
                 record_source_check(contract.follow_secrets_root, source, "connection", result)

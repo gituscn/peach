@@ -533,6 +533,15 @@ def _attach_index_following(connection, rows: list[dict]) -> None:
         row['following'] = row['entity_id'] in following
 
 
+def _attach_index_favorites(connection, rows: list[dict]) -> None:
+    """按规范实体身份附加名册收藏状态。"""
+    from .web_library_shortcuts import favorite_ids
+
+    favorites = favorite_ids(connection)
+    for row in rows:
+        row["favorite"] = row.get("entity_id") in favorites
+
+
 def q_index(contract: WebContract, kind, q="", limit=600, offset=0, category=""):
     """全部艺人 / 创作者 / 厂牌 / 事务所 / 标签的索引页数据。"""
     with contract.read_connection() as c:
@@ -626,10 +635,7 @@ def q_index(contract: WebContract, kind, q="", limit=600, offset=0, category="")
                 all_rows = [row for row in all_rows if row["cat"] == category]
             rows = all_rows[offset:offset + limit]
             has_more = offset + limit < len(all_rows)
-        from .web_library_shortcuts import favorite_ids
-        favorites = favorite_ids(c)
-        for row in rows:
-            row["favorite"] = row.get("entity_id") in favorites
+        _attach_index_favorites(c, rows)
     if kind in INDEX_ENTITY_KINDS:
         entity_kind = INDEX_ENTITY_KINDS[kind]
         # 索引页一屏几十个圆头像，走的是和顶栏那排同一条两级链：规范实体图优先，

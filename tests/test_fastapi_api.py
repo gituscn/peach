@@ -2924,6 +2924,10 @@ PUBLIC_ROUTES = {
     # 是独立共享密钥（ADR-0041）。这一条因此不挂 require_*，但自己有三道门：通道没开、
     # 来源不在回环与私网、密钥对不上，任意一条不成立都回 404，见 `test_push_discovery`。
     ("POST", "/api/inbox/clouddrive"),
+    # 外部播放器没有浏览器会话；两条路由各自验证进程密钥签发的限时 HMAC，
+    # 绑定单个资产与公开 Origin，验证后仍逐次检查媒体根目录。
+    ("GET,HEAD", "/external-stream/{id}"),
+    ("GET", "/external-playlist/{id}.m3u"),
 }
 
 
