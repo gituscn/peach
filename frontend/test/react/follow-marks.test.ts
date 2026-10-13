@@ -108,7 +108,7 @@ describe('标题前后的字样', () => {
     const mirror = item(2);
     const forum = item(3, { provider: 'somewhere', provider_label: '某论坛' });
     const badges = followBadges(group(primary, { duplicates: [mirror, forum] }), primary);
-    expect(badges).toBe('<span data-follow-seealso="" title="另见 Kemono、某论坛">另见 '
+    expect(badges).toBe('<span data-follow-seealso="" title="另见 Kemono、某论坛"><span data-follow-seealso-label="">另见</span> '
       + '<img data-follow-site-icon="" src="/source-icon?provider=kemono" alt="Kemono" title="Kemono" loading="lazy" data-drop="self">'
       + '<span>某论坛</span></span>');
     expect(followBadges(group(primary, { duplicates: [mirror] }), mirror)).toContain('另见 Patreon');

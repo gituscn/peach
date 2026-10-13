@@ -107,7 +107,7 @@ export function followBadges(group: FollowGroup, shown: FollowItem = group.prima
     .map((member) => [member.provider, member.provider_label || member.provider] as const));
   if (!sites.size) return '';
   const marks = [...sites].map(([provider, label]) => sourceIcon(provider, label) || `<span>${esc(label)}</span>`).join('');
-  return `<span data-follow-seealso="" title="另见 ${esc([...sites.values()].join('、'))}">另见 ${marks}</span>`;
+  return `<span data-follow-seealso="" title="另见 ${esc([...sites.values()].join('、'))}"><span data-follow-seealso-label="">另见</span> ${marks}</span>`;
 }
 
 /** 「媒体未取得」那一句，没有就是空串。 */

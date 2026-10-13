@@ -176,11 +176,12 @@ class SharedSendContractTests(unittest.TestCase):
 class _Item:
     """已入库的一行里，读取时投影用得到的那几个字段。"""
 
-    def __init__(self, provider, *, thumb_url=None, media_url=None, item_id=1):
+    def __init__(self, provider, *, thumb_url=None, media_url=None, item_id=1, metadata=None):
         self.provider = provider
         self.thumb_url = thumb_url
         self.media_url = media_url
         self.id = item_id
+        self.metadata = metadata or {}
 
 
 class DisplayThumbUrlTests(unittest.TestCase):
@@ -191,13 +192,15 @@ class DisplayThumbUrlTests(unittest.TestCase):
     `api-cdn.rule34.xxx` 这种主机名。
     """
 
-    def test_rule34xxx_history_rows_are_upgraded_to_the_sample_bucket(self):
-        """历史行存的是 250px preview；dapi 的 sample 同 bucket/hash，实测 1920x1080。"""
+    def test_rule34xxx_images_use_the_source_file_and_extension(self):
+        """图片使用来源声明的原文件，视频使用来源缩略图。"""
         thumb = ("https://api-cdn.rule34.xxx/thumbnails/1234/"
                  "thumbnail_" + "a" * 32 + ".jpg")
-        self.assertEqual(
-            display_thumb_url(_Item("rule34xxx", thumb_url=thumb)),
-            "https://api-cdn.rule34.xxx/images/1234/" + "a" * 32 + ".jpg")
+        image = "https://api-cdn.rule34.xxx/images/1234/" + "a" * 32 + ".png"
+        self.assertEqual(display_thumb_url(_Item("rule34xxx", thumb_url=thumb,
+            media_url=image, metadata={'media_kind': 'image'})), image)
+        self.assertEqual(display_thumb_url(_Item("rule34xxx", thumb_url=thumb,
+            metadata={'media_kind': 'video'})), thumb)
 
     def test_a_rule34xxx_thumb_in_another_shape_is_left_alone(self):
         """认不出的形状原样返回，不猜一个 bucket 出来。"""

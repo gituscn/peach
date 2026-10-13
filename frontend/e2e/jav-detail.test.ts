@@ -339,6 +339,12 @@ describe('库外 JAV 作品详情', () => {
           return { width: box.width, titleWidth: title.width, titleBottom: title.bottom, actionsTop: actions.top, actionsRight: actions.right, right: box.right };
         }));
         assert.ok(resources.every(row => row.titleWidth >= row.width - 1 && row.actionsTop >= row.titleBottom - 1 && row.actionsRight <= row.right + 1), JSON.stringify(resources));
+        const lines = await page.locator('[data-jav-resources] [data-resource-protocol]:visible').evaluateAll(rows => rows.map(row => {
+          const style = getComputedStyle(row);
+          return { width: style.borderBottomWidth, color: style.borderBottomColor,
+            expected: getComputedStyle(row.closest('[data-want-magnets]')!).borderTopColor };
+        }));
+        assert.ok(lines.every(line => line.width === '1px' && line.color === line.expected), JSON.stringify(lines));
         assert.ok(await page.locator('[data-jav-resources]').getByRole('button', { name: '添加下载', exact: true }).first().isDisabled());
         assert.deepEqual(await page.locator('[data-resource-actions]').first().locator('button, a').allTextContents(), ['添加下载', '复制链接', '链接来源']);
         assert.equal(await page.locator('[data-resource-facts]').first().getByText('高清', { exact: true }).count(), 0);

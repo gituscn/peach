@@ -1691,6 +1691,14 @@ class Rule34XxxConnectorTests(unittest.TestCase):
             first.extra["preview_url"],
             "https://api-cdn.rule34.xxx/thumbnails/1232/t_3df1.jpg")
 
+    def test_video_card_keeps_the_source_thumbnail_and_image_keeps_its_extension(self):
+        from types import SimpleNamespace
+        thumb = 'https://api-cdn.rule34.xxx/thumbnails/1232/thumbnail_' + 'a' * 32 + '.jpg'
+        video = SimpleNamespace(thumb_url=thumb, media_url='https://api-cdn.rule34.xxx/images/1232/hash.mp4', metadata={'media_kind': 'video'})
+        self.assertEqual(Rule34XxxConnector.display_thumb_url(video), thumb)
+        image = SimpleNamespace(thumb_url=thumb, media_url='https://api-cdn.rule34.xxx/images/1232/hash.png', metadata={'media_kind': 'image'})
+        self.assertEqual(Rule34XxxConnector.display_thumb_url(image), image.media_url)
+
     def test_a_readable_filename_is_still_preferred_and_counts_as_a_name(self):
         last = self._connector().fetch("lazyprocrastinator").candidates[3]
         self.assertEqual(last.title, "fiona paizuri nude")

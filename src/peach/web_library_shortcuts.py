@@ -7,6 +7,8 @@ import uuid
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from .entities import resolve_entity, resolve_entity_id
+from .catalog_rules import solo_performer_clause
+from .web_catalog import VISIBLE_CATALOG_ASSET, entity_ref
 from .web_settings import DEFAULT_PROFILE_ID
 
 KEY = "libraryShortcuts"
@@ -84,7 +86,38 @@ def clean_href(raw):
 
 def q_library_shortcuts(contract, _args=None):
     with contract.read_connection() as c:
-        return _snapshot(c, _profile(c))
+        data = _snapshot(c, _profile(c))
+        _attach_art(contract, c, data["favorites"])
+        return data
+
+
+def _attach_art(contract, connection, rows):
+    """收藏复用实体图、厂牌标识与可取得的代表作头像。"""
+    if not rows:
+        return
+    ids = [row["entity_id"] for row in rows]
+    marks = ','.join('?' for _ in ids)
+    representatives = {row[0]: (row[1], row[2]) for row in connection.execute(
+        "SELECT entity_id,id,snapshot_path FROM (SELECT ae.entity_id,a.id,a.snapshot_path,"
+        "ROW_NUMBER() OVER (PARTITION BY ae.entity_id ORDER BY a.size DESC,a.id) rank "
+        "FROM asset_entity ae JOIN asset a ON a.id=ae.asset_id JOIN entity e ON e.id=ae.entity_id "
+        f"WHERE ae.entity_id IN ({marks}) AND {VISIBLE_CATALOG_ASSET} "
+        "AND a.snapshot_path IS NOT NULL AND (e.kind<>'performer' OR (" +
+        solo_performer_clause('a.id', 'ae.entity_id') + ")) ) WHERE rank=1", ids)}
+    for row in rows:
+        _favorite_art(contract, row, representatives.get(row['entity_id']))
+
+
+def _favorite_art(contract, row, representative):
+    ref = entity_ref(contract, row['kind'], row['entity_id'], row['name'])
+    row['image_url'], row['image_label'] = '', row['name']
+    if row['kind'] == 'studio' and contract.has_logo(row['name']):
+        row['image_url'] = '/logo?' + urlencode({'studio': row['name'], 'variant': 'icon', 'v': contract.logo_version(row['name'])})
+    elif ref['has_image']:
+        row['image_url'] = '/entity-image?' + urlencode({'kind': row['kind'], 'id': row['entity_id'], 'thumb': 1, 'v': ref.get('image_version', '')})
+    elif row['kind'] not in {'studio', 'agency'} and representative and contract.has_avatar(*representative):
+        row['image_url'] = f'/avatar?id={representative[0]}'
+        row['image_label'] = row['name'] + ' · 代表作'
 
 
 def favorite_ids(connection):
@@ -121,4 +154,4 @@ def w_library_shortcuts(contract, body):
                             (json.dumps(settings, ensure_ascii=False), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), DEFAULT_PROFILE_ID)).rowcount
         if not updated:
             raise ValueError("当前用户设置不存在")
-    return {"ok": True, **data}
+    return {"ok": True, **q_library_shortcuts(contract)}

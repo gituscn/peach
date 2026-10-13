@@ -16,6 +16,7 @@ const WIDTH = {
   'avatar-picker': 'max-w-avatar-picker',
   'cover-crop': 'max-w-cover-crop',
   form: 'max-w-form-modal',
+  collections: 'max-w-4xl',
 } as const;
 
 export function ModalFrame({ isOpen, onOpenChange, width, label, children }: {

@@ -727,7 +727,7 @@ class FollowContractTests(unittest.TestCase):
         self.assertEqual(item["media_kind"], "image")
         self.assertTrue(item["playable"])
 
-    def test_old_rule34xxx_previews_are_upgraded_without_rewriting_the_ledger(self):
+    def test_rule34xxx_video_thumbnails_use_the_source_preview(self):
         self._seed(candidates=(FollowCandidate(
             provider="rule34xxx", external_id="1", title="Remote video",
             url="https://rule34.xxx/index.php?page=post&s=view&id=1",
@@ -740,8 +740,8 @@ class FollowContractTests(unittest.TestCase):
         item = self._get()["groups"][0]["primary"]
         self.assertEqual(item["media_type"], "video/mp4")
         self._assert_cached_thumb(item,
-            "https://api-cdn.rule34.xxx/images/42/"
-            "0123456789abcdef0123456789abcdef.jpg")
+            "https://api-cdn.rule34.xxx/thumbnails/42/"
+            "thumbnail_0123456789abcdef0123456789abcdef.jpg")
 
     def test_paheal_cards_use_same_origin_clear_cover_routes(self):
         self._seed(candidates=(

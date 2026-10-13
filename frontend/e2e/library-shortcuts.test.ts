@@ -13,7 +13,7 @@ describe('我的收藏弹层', () => {
     it(`${viewport.name} 保存、应用、删除筛选及收藏分类`, { timeout: 60_000 }, async () => {
       const opened = await openItemPage(browser, '/watch-later?loc=&tag=VR&jav=1', viewport, { ready: '[data-catalog-frame]' });
       const page = opened.page;
-      let favorites = [{ key: 'entity:7', entity_id: 7, kind: 'studio', name: '厂牌长名称'.repeat(12) }];
+      let favorites = [{ key: 'entity:7', entity_id: 7, kind: 'studio', name: '厂牌长名称'.repeat(12), image_url: '/logo?studio=test' }];
       let filters: { id: string; name: string; href: string }[] = [];
       await page.route(url => url.pathname === '/api/library-shortcuts', async route => {
         if (route.request().method() === 'POST') {
@@ -31,6 +31,8 @@ describe('我的收藏弹层', () => {
         assert.equal(await dialog.getByRole('link', { name: '稍后看', exact: true }).getAttribute('href'), '/watch-later');
         await dialog.getByRole('button', { name: '片商与厂牌', exact: true }).click();
         await dialog.getByRole('link', { name: favorites[0].name, exact: true }).waitFor();
+        await dialog.locator('[data-shortcuts-avatar] img').waitFor();
+        await page.waitForFunction(() => !!document.querySelector<HTMLImageElement>('[data-shortcuts-avatar] img')?.naturalWidth);
         const size = await layout(page);
         assert.equal(size.viewportWidth, viewport.width);
         assert(size.scrollWidth <= size.viewportWidth + 1, JSON.stringify(size));

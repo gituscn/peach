@@ -304,9 +304,20 @@
 .peach-react [data-follow-item] [data-media-meta] {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
-  gap: 3px 10px;
+  gap: 12px 10px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: start;
   --card-meta-byline: max(1lh, 21px);
-  --card-meta-tags: calc(var(--fs-xs) * 1.45 + var(--tag-pad-y) * 2 + 2px + 3px);
+  --card-meta-tags: calc(var(--fs-xs) * 1.45 + var(--tag-pad-y) * 2 + 2px + 12px);
+}
+body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-follow-item] [data-media-meta] {
+  --card-meta-block: calc(var(--fs-md) * 1.35 + 6px + var(--card-meta-byline) + var(--card-meta-tags));
+}
+body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-follow-item] [data-media-text] {
+  display: flex; flex-direction: column; height: auto; margin: 0; padding: 0; gap: 6px;
+}
+body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-follow-item] [data-follow-labels] {
+  height: calc(var(--fs-xs) * 1.45 + var(--tag-pad-y) * 2 + 2px + 8px);
 }
 .peach-react [data-follow-labels] { grid-column: 1 / -1; }
 .peach-react [data-follow-item] [data-media-meta] > [data-follow-labels] { pointer-events: none; }
@@ -496,12 +507,16 @@
   white-space: nowrap;
 }
 .peach-react [data-follow-credit] {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--muted);
   font-size: var(--fs-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding-left: 8px;
+  border-left: 1px solid var(--border-15);
+  font-style: italic;
 }
 .peach-react [data-follow-badges] { display: flex; flex: none; flex-wrap: nowrap; gap: 5px; min-width: 0; overflow: hidden; }
 /* 卡片、两排与详情共用的几处字样，HTML 由 `follow-marks.ts` 拼。站点图标在角标、来源条那几格里
@@ -521,7 +536,11 @@
 .peach-react [data-follow-edition="has-wip"] { color: var(--muted); }
 .peach-react [data-follow-edition="voiced"] { color: var(--keep); background: color-mix(in srgb, var(--keep) 16%, transparent); }
 .peach-react [data-follow-edition="silent"] { color: var(--muted); border-style: dashed; }
-/* 「另见」是状态标记，不是标签：`--badge-radius`，虚线框，站名落在图标的 alt 上。 */
+/* 来源与另见共用左上角的玻璃标记。 */
+.peach-react [data-follow-sources] { position: absolute; top: 6px; left: 6px; z-index: 2; display: flex; gap: 4px; max-width: calc(100% - 120px); }
+.peach-react [data-follow-sources] [data-media-badge] { position: static; flex: none; }
+.peach-react [data-follow-sources] > [data-follow-badges] { flex: 0 1 auto; }
+.peach-react [data-follow-sources] [data-follow-seealso-label] { display: none; }
 .peach-react [data-follow-seealso] {
   display: inline-flex;
   align-items: center;
@@ -533,6 +552,13 @@
   font-size: var(--fs-xs);
 }
 .peach-react [data-follow-seealso] [data-follow-site-icon] { margin: 0; }
+.peach-react [data-follow-sources] [data-follow-seealso] {
+  min-height: 24px; padding: 4px; border: 0; border-radius: var(--control-radius);
+  background: var(--glass-fill); box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow);
+  backdrop-filter: blur(16px) saturate(145%); color: var(--color-text-secondary); font: var(--board-caption);
+  pointer-events: auto;
+}
+.peach-react [data-follow-sources] [data-follow-site-icon] { width: 18px; height: 18px; }
 /* 卡上的标签：线与底取类型色，没记类型的按 general 那一档蓝。 */
 .peach-react [data-follow-item] [data-media-tag] {
   --tag-color: #55a7ff;

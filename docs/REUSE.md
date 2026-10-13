@@ -1,5 +1,7 @@
 # 复用清单
 
+收藏窗口复用 BoardUI `2026.10.8` 官方技能、MIT Avatar 源码与公开 `settings-modal` 分类布局，保留 React Aria 外壳、Peach 查询、viewglide 与窄屏布局。收藏图像由 `entity_ref`、厂牌标识和本地代表作头像投影提供，不写入偏好；原始源码哈希见 `docs/BOARD_UI.md`。Rule34 视频封面使用来源缩略图，图片保留原文件扩展名；失败图片在关注数据刷新时重新尝试。无新增运行时依赖或真实 ledger 写入。
+
 ## 上游应用功能
 
 amane `0.20.0 / cc42cee6ecf290cf05af1caa347d2dc2d5aeffcd`（GPL-3.0）提供实体收藏、

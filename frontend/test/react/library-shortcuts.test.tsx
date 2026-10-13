@@ -69,7 +69,7 @@ describe('我的收藏', () => {
     await settle();
     expect(document.querySelector('nav[aria-label="收藏作品清单"] a[href="/flagged"]')?.textContent).toBe('已标记');
     expect(document.querySelector('nav[aria-label="收藏作品清单"] a[href="/watch-later"]')?.textContent).toBe('稍后看');
-    await type(document.querySelector('input'), 'VR 待看');
+    await type(document.querySelector('form[aria-label="保存当前筛选"] input'), 'VR 待看');
     await submit(document.querySelector('form'));
     await settle();
     expect(writes[0]).toEqual({ action: 'save_filter', name: 'VR 待看', href: '/watch-later?loc=&tag=VR&jav=1' });
@@ -82,5 +82,21 @@ describe('我的收藏', () => {
   it('收藏链接使用现有实体路由和编码后的标签', () => {
     expect(favoriteHref({ kind: 'studio', name: 'A/B' })).toBe('/studios/A%2FB');
     expect(favoriteHref({ kind: 'tag', name: 'A&B' })).toBe('/?tag=A%26B');
+  });
+
+  it('各类收藏显示可用图像并按名称筛选', async () => {
+    const favorites = ['performer', 'creator', 'studio', 'series', 'agency', 'tag'].map((kind, index) =>
+      ({ key: `entity:${index + 1}`, entity_id: index + 1, kind, name: `收藏 ${kind}`, image_url: `/test-image/${kind}` }));
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ favorites, filters: [] }) })));
+    await mount(<QueryClientProvider client={queryClient}><LibraryShortcuts /></QueryClientProvider>);
+    await click(buttonNamed('我的收藏'));
+    await settle();
+    expect(document.querySelectorAll('[data-shortcuts-avatar] img')).toHaveLength(6);
+    expect(document.querySelector('[data-shortcuts-avatar] .ini')).toBeNull();
+    await type(document.querySelector('input[aria-label="搜索收藏"]'), 'studio');
+    expect(document.querySelectorAll('[data-shortcuts-row]')).toHaveLength(1);
+    expect(document.querySelector('[data-shortcuts-row] a')?.getAttribute('href')).toBe('/studios/%E6%94%B6%E8%97%8F%20studio');
+    await type(document.querySelector('input[aria-label="搜索收藏"]'), 'missing');
+    expect(document.querySelector('[data-empty-state] h3')?.textContent).toBe('没有匹配的收藏');
   });
 });

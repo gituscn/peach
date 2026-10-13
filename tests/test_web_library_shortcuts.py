@@ -26,6 +26,8 @@ class LibraryShortcutsTests(unittest.TestCase):
                 CREATE TABLE entity_redirect(old_id INTEGER,target_id INTEGER);
                 CREATE TABLE entity_alias(entity_id INTEGER,alias TEXT);
                 INSERT INTO entity_alias VALUES(3,'故事');
+                CREATE TABLE asset(id INTEGER PRIMARY KEY,medium TEXT,disposal TEXT,size INTEGER,snapshot_path TEXT);
+                CREATE TABLE asset_entity(asset_id INTEGER,entity_id INTEGER,role TEXT);
             """)
         self.contract = WebContract(self.path)
 
@@ -70,6 +72,22 @@ class LibraryShortcutsTests(unittest.TestCase):
         with closing(sqlite3.connect(self.path)) as c, c:
             settings = json.loads(c.execute("SELECT settings_json FROM profile").fetchone()[0])
         self.assertEqual(settings['sidebarOrder'], ['tags'])
+
+    def test_favorites_include_entity_art_logos_and_available_representatives(self):
+        with closing(sqlite3.connect(self.path)) as c, c:
+            c.execute("INSERT INTO asset VALUES(10,'video',NULL,100,'sample.jpg')")
+            c.execute("INSERT INTO asset_entity VALUES(10,3,'tag')")
+        with mock.patch.object(WebContract, 'has_logo', return_value=True), \
+                mock.patch.object(WebContract, 'logo_version', return_value='logo-v'), \
+                mock.patch.object(WebContract, 'has_avatar', return_value=True):
+            studio = self.write(action='favorite', entity_id=1, on=True)['favorites'][0]
+            tag = self.write(action='favorite', entity_id=3, on=True)['favorites'][1]
+        self.assertIn('studio=%E5%8E%82%E7%89%8C', studio['image_url'])
+        self.assertEqual(tag['image_url'], '/avatar?id=10')
+        self.assertEqual(tag['image_label'], '剧情 · 代表作')
+        with closing(sqlite3.connect(self.path)) as c:
+            stored = json.loads(c.execute('SELECT settings_json FROM profile').fetchone()[0])
+        self.assertNotIn('image_url', stored['libraryShortcuts']['favorites'][0])
 
     def test_bad_targets_are_rejected_without_writes(self):
         for href in ('https://evil.example/', '//evil.example/', '/configuration', '/?token=x', '/?seed=123'):

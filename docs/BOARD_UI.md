@@ -1,5 +1,13 @@
 # BoardUI 适配
 
+## 收藏窗口与组件目录
+
+2026-10-14 安装官方技能 `2026.10.8`，取得公开注册表的实际源码。`avatar` JSON SHA-256 为 `614f2a384e2d44c0a15df8e3fc42c1648ccd7101f1c8be98911087641ab28aec`，源码逐字复制并由 `UPSTREAM.sha256` 核验。`settings-modal` JSON SHA-256 为 `620866f68751335b9cbd7f5812850ed8f5e3ede04f88c3acb3e8a5fb36e9ecfe`：收藏窗口采用其 240px 分类栏、10px 内边距、614px 面板高度和独立滚动正文；保留 React Aria 外壳、Peach 标题分隔线与手机横滚分类栏。
+
+收藏读取实体图、厂牌标识及可取得的代表作头像；没有可用图像时显示对象图标，不发出已知必败的取图请求。入口固定 104px，位于馆藏读数旁，共用 `useViewGlide`。窄屏将排序放在独立一排。
+
+同次核对 `tabs`（`7b89651220b86041aa0db74cf6be6b9b77de24045344bd7fc9627e62f1d98857`）、`carousel`（`5a8506c353b8ace96bf51171168cf1617ca775c45e22362de07dba990e79a1a9`）与 `tree-view`（`72b06e3187ae7738bd1eabd46bc15ebe1d2d49be768e44306b266d91206eeb9c`）。收藏使用类型筛选，已有媒体轮播包含视频、缩略图与圆点；不引入页面 Tabs、树形层级或替换媒体轮播。以上组件均免费，没有 Pro 消费者；官方 Pro 源码未取得。原始 JSON 与生产封面响应证据保存在 `attic/evidence/20261014-card-collections/`。
+
 这份文档登记 Peach 界面对齐 BoardUI 的做法：每个控件取了上游哪份公开证据（注册表 SHA-256、取证日期），Peach 照抄了什么、主动偏离了什么、为什么。代码注释写「登记在 docs/BOARD_UI.md」的，证据都在这里。拿不到的证据写「未取得」，不拿猜测顶替。
 
 ## 空状态操作入口

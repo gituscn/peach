@@ -184,9 +184,8 @@ function Head({ count, refreshing, layout, sorts, actions }: CatalogFilterProps)
   };
   return (
     <>
-      <Readout count={count} />
+      <span data-catalog-summary=""><Readout count={count} /><LibraryShortcuts currentHref={actions.currentHref} glass /></span>
       <span data-entity-sorts="">
-        <LibraryShortcuts currentHref={actions.currentHref} />
         <Shuffle onPress={shuffle} busy={shuffling || refreshing} />
         {/* 按名字换键：JAV 与首页各一组，React Aria 的单选组挂上之后不改 `name`。 */}
         {layout ? <Segments key={layout.name} name={layout.name} label={layout.label} value={layout.value} options={layout.options}

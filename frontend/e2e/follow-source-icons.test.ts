@@ -153,7 +153,7 @@ describe('关注的出处用站点图标', () => {
   /* 设计决定，与谁挂哪枚字样（`test/react/follow-marks.test.ts`）分开量：另见与版本字样是状态标记，
      不是标签，圆角走 `--badge-radius`；「含 WIP」说的是同组另一条，比 WIP 本体弱一档；SFW 模式下
      站点图标和品牌标一样不糊。字样按 `follow-marks.ts` 的形状临时摆进卡片标题里量。 */
-  it('另见与版本字样是状态标记：徽章圆角、虚线框，含 WIP 弱于 WIP；SFW 模式不糊站点图标', { timeout: 60_000 }, async () => {
+  it('另见与来源图标共用封面角标，含 WIP 弱于 WIP，SFW 模式不糊站点图标', { timeout: 60_000 }, async () => {
     const opened = await openFollow(browser, '/follow', '[data-follow-item] [data-follow-seealso]');
     try {
       const look = await opened.page.evaluate(() => {
@@ -169,15 +169,21 @@ describe('关注的出处用站点图标', () => {
           + '<small class="javedition" data-follow-edition="has-wip">含 WIP</small>');
         const [wip, hasWip] = [...title.querySelectorAll('[data-follow-edition]')].map((node) => getComputedStyle(node));
         const shape = getComputedStyle(badge);
+        const source = badge.closest('[data-follow-sources]')!.querySelector('[data-media-badge]')!;
+        const sourceShape = getComputedStyle(source);
+        const sameSource = { radius: sourceShape.borderTopLeftRadius, background: sourceShape.backgroundColor, shadow: sourceShape.boxShadow };
         document.body.classList.add('censor');
         const icon = getComputedStyle(badge.querySelector('[data-follow-site-icon]')!).filter;
         document.body.classList.remove('censor');
-        return { expected, radius: shape.borderTopLeftRadius, border: shape.borderTopStyle,
+        return { expected, sameSource, radius: shape.borderTopLeftRadius, border: shape.borderTopStyle,
+          background: shape.backgroundColor, shadow: shape.boxShadow,
           editionRadius: wip!.borderTopLeftRadius, wip: wip!.color, hasWip: hasWip!.color, icon };
       });
-      assert.equal(look.radius, look.expected.radius, '另见是状态标记，圆角走 --badge-radius');
+      assert.equal(look.radius, look.sameSource.radius, '另见与来源角标同圆角');
+      assert.equal(look.background, look.sameSource.background);
+      assert.equal(look.shadow, look.sameSource.shadow);
       assert.equal(look.editionRadius, look.expected.radius, '版本字样同是状态标记');
-      assert.equal(look.border, 'dashed');
+      assert.equal(look.border, 'none');
       assert.equal(look.wip, look.expected.meter, 'WIP 本体着 --meter');
       assert.equal(look.hasWip, look.expected.muted, '「含 WIP」弱化成 --muted');
       assert.equal(look.icon, 'none', 'SFW 模式下站点图标不糊');

@@ -74,11 +74,16 @@ body[data-surface="/trash"] .peach-react [data-media-card] {
 }
 body[data-surface="/trash"] .peach-react [data-media-card] [data-media-pic] { --pic-radius: 0px; }
 body[data-surface="/trash"] .peach-react [data-media-card] [data-media-meta] {
+  --card-meta-byline: 1lh;
+  --card-meta-tags: 0px;
   --card-meta-block: calc(var(--fs-md) * 1.35 + 3px + var(--card-meta-byline) + var(--card-meta-tags));
+  min-height: 0;
   margin: 0;
   padding: 10px 12px 12px;
 }
 body[data-surface="/trash"] .peach-react [data-media-card] [data-media-title] { min-height: 0; }
+body[data-surface="/trash"] .peach-react [data-media-card] [data-media-text] { gap: 3px; }
+body[data-surface="/trash"] .peach-react [data-media-text] > [data-media-tags] { margin-top: -4px; }
 
 /* 整张卡的打开点击区垫在封面与元信息区下面。 */
 .peach-react [data-media-open] {
@@ -101,12 +106,9 @@ body[data-surface="/trash"] .peach-react [data-media-card] [data-media-title] { 
  * 四周垫 8px 再用 -8px 抵消，头像的悬停描边和焦点环不被裁；垫出来的一圈不接指针。
  * 接着看那一排只有一行、往横向排，屏外的卡不改变整页高度，不套这份估计。 */
 .peach-react [data-media-meta] {
-  --card-meta-byline: 1lh;
-  --card-meta-tags: 0px;
-  --card-meta-block: calc(var(--fs-md) * 2.7 + 3px + var(--card-meta-byline) + var(--card-meta-tags));
-}
-.peach-react [data-media-meta]:has(> [data-media-text] > [data-media-tags]) {
-  --card-meta-tags: calc(var(--fs-xs) * 1.45 + var(--tag-pad-y) * 2 + 2px + 3px);
+  --card-meta-byline: calc(2lh + 2px);
+  --card-meta-tags: calc(var(--fs-xs) * 1.45 + var(--tag-pad-y) * 2 + 2px + 12px);
+  --card-meta-block: calc(var(--fs-md) * 2.7 + 6px + var(--card-meta-byline) + var(--card-meta-tags));
 }
 .peach-react [data-media-card]:not([data-variant="next"]) :is([data-media-pic], [data-media-meta]) { content-visibility: auto; }
 .peach-react [data-media-card]:not([data-variant="next"]) [data-media-meta] {
@@ -114,6 +116,7 @@ body[data-surface="/trash"] .peach-react [data-media-card] [data-media-title] { 
   margin: -8px;
   padding: 8px;
   pointer-events: none;
+  min-height: calc(var(--card-meta-block) + 16px);
   contain-intrinsic-block-size: auto var(--card-meta-block);
 }
 .peach-react [data-media-card]:not([data-variant="next"]) [data-media-meta] > * { pointer-events: auto; }
@@ -511,13 +514,12 @@ body[data-surface="/trash"] .peach-react [data-media-card] [data-media-title] { 
 /* 接着看那一排与竖屏带的窄卡只放两个头像：第三个挤掉的正好是署名那一行的宽度。 */
 .peach-react :is([data-variant="next"], [data-variant="short"]) [data-media-avatars] > :nth-child(n+3) { display: none; }
 
-.peach-react [data-media-text] { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
-/* 标题两行，高度另用 max-height 封住：番号块是 inline-flex，WebKit 的 line-clamp 遇到非行内
- * 子元素就不截。 */
+.peach-react [data-media-text] { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 0; }
+/* 标题最多两行，署名紧随实际文本；元信息区保留统一高度。 */
 .peach-react [data-media-title] {
   display: -webkit-box;
   width: 100%;
-  min-height: 2.7em;
+  min-height: 0;
   max-height: 2.7em;
   padding: 0;
   overflow: hidden;
@@ -594,6 +596,7 @@ body[data-surface="/trash"] .peach-react [data-media-card] [data-media-title] { 
   overflow: hidden;
   pointer-events: none;
 }
+.peach-react [data-media-text] > [data-media-tags] { margin-top: 6px; }
 .peach-react [data-media-tags] > * { pointer-events: auto; }
 .peach-react [data-media-tag] {
   max-width: 100%;
@@ -651,6 +654,7 @@ body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media
 body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-card] :is([data-media-who-more], [data-media-size]) { flex: none; white-space: nowrap; }
 body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-card] :is([data-media-why], [data-media-watch-count]) { display: none; }
 body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-card] [data-media-tags] { flex-wrap: nowrap; align-items: flex-start; height: 38px; overflow: hidden; }
+body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-text] > [data-media-tags] { margin-top: -4px; }
 body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-card] [data-media-tag]:nth-child(n+2) { display: none; }
 
 /* ── 回收站里的资源卡 ── */
