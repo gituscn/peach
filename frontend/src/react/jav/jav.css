@@ -5,17 +5,5 @@
 .peach-react [data-jav-skeleton-cover] { border-radius: var(--surface-radius); }
 .peach-react [data-jav-skeleton-text] { height: 20px; }
 .peach-react [data-jav-skeleton-action] { height: 36px; border-radius: var(--control-radius); }
-.peach-react [data-jav-title] {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  min-height: 40px;
-  margin: 0;
-  font: var(--board-body-medium);
-}
-.peach-react [data-jav-identity] { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 40px; }
-.peach-react [data-jav-faces] { display: flex; align-items: center; max-width: 50%; flex-shrink: 0; }
-.peach-react [data-jav-faces] [data-media-avatars] { max-width: none; }
+.peach-react [data-jav-title] { margin: 0; font-weight: normal; }
 .peach-react [data-jav-actions] { margin-top: auto; }

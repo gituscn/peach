@@ -12,7 +12,7 @@ import { RetryNote } from '../components/grid-reveal';
 import { IdentityCell, IdentitySeries } from '../components/identity-cell';
 import { SourceAvatar } from '../components/source-avatar';
 import { SourcePicture as JavPicture } from '../components/source-picture';
-import { MediaCarousel, useCarouselInset } from '../components/media-carousel';
+import { MediaCarousel } from '../components/media-carousel';
 import { useFoldedTitle } from '../components/folded-title';
 import { busyProps, useAction } from '../settings/use-action';
 import { Disclosure } from '../settings/section';
@@ -46,8 +46,6 @@ const Close = ({ close }: { close(): void }) => <button type="button" data-stage
 function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps & { item: JavDetail; retry(): void; retrying: boolean }) {
   useEffect(() => { if (item.state === 'ready') void queryClient.invalidateQueries({ queryKey: ['jav-discoveries', 'external'] }) }, [item.code, item.state]);
   const [preview, setPreview] = useState(-1);
-  const frame = useRef<HTMLDivElement>(null);
-  useCarouselInset(frame, '[data-jav-picture]', preview);
   const media = [{ index: -1, label: '封面' }, ...Array.from({ length: item.preview_count }, (_, index) => ({ index, label: `预览 ${index + 1}` })),
     ...(item.preview_video_url ? [{ index: -2, label: '视频预览', video: true }] : [])];
   const [download, setDownload] = useState<DownloadPrefill | null>(null);
@@ -65,7 +63,7 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
     void queryClient.invalidateQueries({ queryKey: ['jav-discoveries'] });
   }) };
   return <>
-    <div ref={frame} data-stage-media="" data-jav-art="" data-jav-playing={preview === -2 ? '' : undefined}>
+    <div data-stage-media="" data-jav-art="" data-jav-playing={preview === -2 ? '' : undefined}>
       <Close close={actions.close} />
       {item.preview_video_url ? <button type="button" data-jav-preview-toggle="" aria-pressed={preview === -2}
         onClick={() => setPreview(preview === -2 ? -1 : -2)}><Glyph name={preview === -2 ? 'image' : 'play'} />{preview === -2 ? '查看图片' : '视频预览'}</button> : null}

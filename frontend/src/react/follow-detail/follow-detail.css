@@ -13,7 +13,6 @@
    媒体框不设视口高度的地板：里面的播放器高度由 16:9 和自己的宽度推出来，地板挂在 vh 上，两个量朝
    相反方向走（414×913 的视口给出 566px 的框装 208px 的画面）。播放器未初始化时 `[data-stage-media]>.video-js`
    那条 16:9 已经把高度定住了，不会塌。 */
-.peach-react [data-follow-detail] [data-follow-detail-media] { --follow-image-arrow-inset: 16px; }
 .peach-react [data-follow-detail] [data-follow-detail-media="image"] {
   background: color-mix(in srgb, var(--video-glow, #15202a) 12%, var(--surface) 88%);
 }
@@ -224,8 +223,4 @@
   border-color: color-mix(in srgb, var(--tag-color) 68%, transparent);
   background: color-mix(in srgb, var(--tag-color) 18%, transparent);
   color: var(--ink);
-}
-
-@media (max-width: 640px) {
-  .peach-react [data-follow-detail] [data-follow-detail-media] { --follow-image-arrow-inset: 10px; }
 }

@@ -89,6 +89,36 @@ class TastePreferenceTests(unittest.TestCase):
         self.db.execute("UPDATE follow_source SET enabled=0")
         self.assertLess(preference_profile(self.db, self.store)[0]["performer"][1], strengths["performer"][1])
 
+    def test_browser_preferences_read_daily_identity_visits_without_dashboard_aggregates(self):
+        self.history([(1, 'https://javdb.com/v/demo', '演示女优'),
+                      (2, 'https://javdb.com/v/demo', '演示女优')])
+        from peach.taste_evidence import browser_entities
+        with patch('peach.taste_history._read_history_rows', side_effect=AssertionError('口味看板全量统计')), \
+                patch('peach.taste_evidence.browser_entities', wraps=browser_entities) as reads:
+            strengths, names, evidence = preference_profile(self.db, self.store)
+        self.assertEqual(reads.call_count, 1)
+        self.assertGreater(strengths['performer'][1], 0)
+        self.assertEqual(names['performer'][1], '演示女优')
+        self.assertEqual(evidence['performer'][1], ['浏览记录'])
+
+    def test_browser_identity_cache_survives_watch_changes_and_tracks_aliases_and_history(self):
+        from peach.taste_evidence import browser_entities
+        self.history([(1, 'https://javdb.com/v/demo', 'demo_actor')])
+        with patch('peach.taste_evidence.browser_entities', wraps=browser_entities) as reads:
+            first = preference_profile(self.db, self.store)
+            self.asset(1, played=3)
+            watched = preference_profile(self.db, self.store)
+            self.assertEqual(reads.call_count, 1)
+            self.assertGreater(watched[0]['performer'][1], first[0]['performer'][1])
+            self.db.execute("UPDATE entity_alias SET alias='another_actor'")
+            unmatched = preference_profile(self.db, self.store)
+            self.assertEqual(reads.call_count, 2)
+            self.assertNotIn('浏览记录', unmatched[2]['performer'][1])
+            self.history([(2, 'https://javdb.com/v/demo2', 'another_actor')])
+            imported = preference_profile(self.db, self.store)
+            self.assertGreater(reads.call_count, 2)
+            self.assertIn('浏览记录', imported[2]['performer'][1])
+
     def test_adult_product_titles_and_search_aliases_map_to_existing_entities(self):
         self.history([(1, "https://www.dmm.co.jp/digital/videoa/-/detail/=/cid=demo001/", "演示女优 的作品"),
                       (2, "https://www.mgstage.com/search/cSearch.php?search_word=demo_actor", "作品搜索"),
@@ -233,6 +263,25 @@ class TastePreferenceTests(unittest.TestCase):
             sources = enabled_history_sources(self.store)
             self.assertEqual(sources[0].engine, 'firefox')
             self.assertEqual(refresh_history(sources, self.store)[0]['added'], 1)
+
+    def test_task_heartbeats_preserve_preferences_and_asset_updates_refresh_them(self):
+        from peach import taste_preferences
+        self.asset(1, played=1)
+        self.db.commit()
+        with closing(sqlite3.connect(self.root / 'ledger-revisions.sqlite')) as db:
+            self.db.backup(db)
+            db.row_factory = sqlite3.Row
+            db.executescript("CREATE TABLE ledger_revision(tbl TEXT PRIMARY KEY,n INTEGER);"
+                             "INSERT INTO ledger_revision VALUES('asset',1),('task_run',1);")
+            first = preference_profile(db, self.store)
+            db.execute("UPDATE ledger_revision SET n=n+1 WHERE tbl='task_run'")
+            db.commit()
+            with patch.object(taste_preferences, 'preference_evidence', side_effect=AssertionError('任务心跳')):
+                self.assertEqual(preference_profile(db, self.store)[0], first[0])
+            db.execute('UPDATE asset SET play_count=10,play_seconds=6000')
+            db.execute("UPDATE ledger_revision SET n=n+1 WHERE tbl='asset'")
+            db.commit()
+            self.assertGreater(preference_profile(db, self.store)[0]['performer'][1], first[0]['performer'][1])
 
     def test_a_locked_browser_does_not_prevent_other_profiles_from_importing(self):
         from peach import taste_history

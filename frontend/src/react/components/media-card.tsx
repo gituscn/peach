@@ -91,14 +91,14 @@ function identityParts(item: MediaItem): { avatar: ReactNode; who: ReactNode } {
   const who = coStarred
     ? (
       <>
-        <button type="button" data-media-who="" data-entity-kind="performer" data-entity-name={performer}>{performer}</button>
+        <button type="button" data-media-who="" data-entity-kind="performer" data-entity-name={performer}><Icon name="user-round" /><span>{performer}</span></button>
         <span data-media-who-more="">{`等 ${total} 人`}</span>
       </>
     )
     : kind
-      ? <button type="button" data-media-who="" data-entity-kind={kind} data-entity-name={name}>{name}</button>
+      ? <button type="button" data-media-who="" data-entity-kind={kind} data-entity-name={name}><Icon name="user-round" /><span>{name}</span></button>
       /* 没有署名人的那批是馆藏里的一类，点得开，和女优名、厂牌名一样。 */
-      : <button type="button" data-media-who="" data-open-unowned="">{name}</button>;
+      : <button type="button" data-media-who="" data-open-unowned=""><Icon name="user-round" /><span>{name}</span></button>;
   return { avatar, who };
 }
 
@@ -252,8 +252,8 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
           <div data-media-byline="">
             {who}
             {item.why ? <span data-media-why="">{item.why}</span> : null}
-            {item.is_jav && item.release_date ? <time data-media-release="" dateTime={item.release_date}>{item.release_date}</time> : null}
-            <span data-media-size="">{Number(shownSize) > 0 ? fmtSize(Number(shownSize)) : '大小未知'}</span>
+            {item.is_jav && item.release_date ? <time data-media-release="" dateTime={item.release_date}><Icon name="calendar" />{item.release_date}</time> : null}
+            <span data-media-size=""><Icon name="hard-drive" />{Number(shownSize) > 0 ? fmtSize(Number(shownSize)) : '大小未知'}</span>
             {item.play_count ? <span data-media-watch-count="">{`看过 ${item.play_count}`}</span> : null}
             <span data-media-flags="">{flags.map((flag) => <i key={flag} data-flag={flag} />)}</span>
           </div>

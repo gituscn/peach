@@ -552,7 +552,9 @@ body[data-surface="/trash"] .peach-react [data-media-text] > [data-media-tags] {
 }
 .peach-react [data-jav-item]:not([data-variant="next"]) [data-media-meta] { --card-meta-byline: calc(2lh + 2px); }
 .peach-react [data-media-who] {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
   max-width: 100%;
   padding: 0;
@@ -566,6 +568,9 @@ body[data-surface="/trash"] .peach-react [data-media-text] > [data-media-tags] {
   vertical-align: bottom;
 }
 .peach-react button[data-media-who] { cursor: pointer; }
+.peach-react [data-media-who] > span { overflow: hidden; text-overflow: ellipsis; }
+.peach-react :is([data-media-release], [data-media-size]) { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.peach-react [data-media-byline] svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .peach-react span[data-media-who] { cursor: default; }
 .peach-react [data-media-who-more] { color: var(--muted); }
 .peach-react [data-media-flags] { display: flex; gap: 3px; margin-left: auto; }

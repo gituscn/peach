@@ -118,12 +118,22 @@ describe('JAV 推荐与加载结构', () => {
       assert.equal(await page.locator('[data-jav-filter]').getByText('正在读取', { exact: true }).count(), 0);
       await page.screenshot({ path: `../build/jav-discover-pending-${viewport.name}.png` });
       release();
-      await page.getByRole('heading', { name: 'DEMO-777 · 演示新作', exact: true }).waitFor();
+      await page.getByRole('heading', { name: 'DEMO-777 演示新作', exact: true }).waitFor();
       const search = page.getByRole('searchbox', { name: '筛选推荐', exact: true });
       const cards = page.getByRole('region', { name: '为你推荐', exact: true }).locator('article');
       assert.equal(await cards.count(), 3);
-      assert.equal(await cards.first().locator('[data-jav-identity] p').textContent(), '规范姓名 · 2010-10-01');
-      assert.equal(await cards.first().locator('[data-jav-identity] p').getAttribute('title'), '规范姓名');
+      assert.equal(await cards.first().locator('[data-media-who]').textContent(), '规范姓名');
+      assert.equal(await cards.first().locator('[data-media-who]').getAttribute('title'), '规范姓名');
+      assert.equal(await cards.first().locator('[data-media-release]').textContent(), '2010-10-01');
+      const metadata = await cards.first().locator('[data-media-meta]').boundingBox();
+      const title = await cards.first().locator('h3').boundingBox();
+      const face = await cards.first().locator('[data-media-avatar]').boundingBox();
+      const inset = await cards.first().locator('[data-media-meta]').evaluate(node => parseFloat(getComputedStyle(node).paddingTop));
+      assert.ok(metadata && title && face && title.x >= face.x + face.width && Math.abs(title.y - metadata.y - inset) < 2, JSON.stringify({ metadata, title, face, inset }));
+      await page.screenshot({ path: `../build/jav-layout-${viewport.name}.png` });
+      const refresh = page.locator('[data-jav-filter] [data-jav-metadata-update]');
+      assert.equal(await refresh.count(), 1);
+      assert.equal(await refresh.textContent(), '');
       assert.equal(await cards.first().locator('[data-jav-taste-score]').textContent(), '强烈推荐');
       const tierBox = await cards.first().locator('[data-jav-taste-score]').boundingBox();
       const tagsBox = await cards.first().locator('[data-jav-tags]').boundingBox();
@@ -178,13 +188,13 @@ describe('JAV 推荐与加载结构', () => {
       const avatarBox = await avatar.boundingBox();
       assert.ok(avatarBox && avatarBox.width === 38 && avatarBox.height === 38, JSON.stringify(avatarBox));
       if (!viewport.mobile) {
-        const before = await avatar.evaluate(node => getComputedStyle(node).transform);
+        const before = await avatar.evaluate(node => getComputedStyle(node).boxShadow);
         await avatar.hover();
         await page.waitForFunction(() => {
           const face = document.querySelector('[data-jav-card] [data-media-avatar]');
-          return face && getComputedStyle(face).transform !== 'matrix(1, 0, 0, 1, 0, 0)';
+          return face && getComputedStyle(face).boxShadow !== 'none';
         });
-        assert.notEqual(await avatar.evaluate(node => getComputedStyle(node).transform), before);
+        assert.notEqual(await avatar.evaluate(node => getComputedStyle(node).boxShadow), before);
         await cards.first().hover();
         assert.notEqual(await cards.first().evaluate(node => getComputedStyle(node).boxShadow), 'none');
       }
@@ -218,11 +228,13 @@ describe('JAV 推荐与加载结构', () => {
       assert.equal(await page.locator('[data-jav-skeleton-cover]').count(), 0);
       await search.fill('规范姓名');
       await search.press('Enter');
-      await page.getByRole('heading', { name: 'DEMO-777 · 演示新作', exact: true }).waitFor();
+      await page.getByRole('heading', { name: 'DEMO-777 演示新作', exact: true }).waitFor();
       const geometry = await layout(page);
       assert.ok(geometry.scrollWidth <= geometry.viewportWidth + 1);
       assert.deepEqual(geometry.offenders, []);
       assert.deepEqual(opened.problems.filter(line => !line.includes('/api/links/check')), []);
+      await cards.first().locator('[data-media-meta]').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `../build/jav-card-${viewport.name}.png` });
       await page.evaluate(() => { (document.activeElement as HTMLElement)?.blur(); window.scrollTo(0, 0) });
       await page.screenshot({ path: `../build/jav-discover-${viewport.name}.png` });
     } finally { release(); await opened.close(); }

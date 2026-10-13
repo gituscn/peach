@@ -1,4 +1,4 @@
-.peach-react [data-jav-detail] [data-jav-art] { --follow-image-arrow-inset: 16px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 260px; }
+.peach-react [data-jav-detail] [data-jav-art] { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 260px; }
 .peach-react [data-jav-picture] { display: block; width: 100%; height: auto; max-height: calc(76vh - 112px); object-fit: contain; min-height: 0; }
 .peach-react [data-jav-picture-wait] { display: grid; place-items: center; min-height: 300px; padding: 24px; }
 .peach-react [data-jav-picture-wait] [class~="skeleton-sheen"] { width: 100%; min-height: 260px; }
@@ -46,5 +46,5 @@
 .peach-react [data-jav-review] p:last-child, .peach-react [data-jav-summary] { white-space: pre-wrap; }
 .peach-react [data-jav-failure] { position: relative; min-height: 260px; padding: 48px 24px; }
 @media (max-width: 640px) {
-  .peach-react [data-jav-detail] [data-jav-art] { --follow-image-arrow-inset: 10px; min-height: 220px; }
+  .peach-react [data-jav-detail] [data-jav-art] { min-height: 220px; }
 }
