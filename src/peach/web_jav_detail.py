@@ -190,6 +190,8 @@ def q_jav_reviews(contract, args) -> dict:
     code = detail_code(args)
     page = int(args.get("page") or 1)
     try:
+        if args.get('refresh') == '1':
+            PUBLIC_API.movie(code, refresh=True)
         rows = PUBLIC_API.reviews(code, page, refresh=True) if args.get('refresh') == '1' else PUBLIC_API.reviews(code, page)
     except PublicSourceUnavailable as error:
         return {"ok": False, "items": [], "more": False, "message": str(error)}
@@ -231,7 +233,7 @@ def _fetch_image(contract, code, index):
     if index.startswith('actor:'):
         movie = PUBLIC_API.peek_movie(code)
         if movie:
-            discovery_metadata(contract).remember(code, movie)
+            discovery_metadata(contract).remember(code, movie, checked_at=cache_checked_at('movie:' + code, exact=True))
     return image
 
 
@@ -239,6 +241,8 @@ def _preview_url(contract, code, source):
     url = preview_video_url(source)
     if not url:
         return ""
+    if '?' in url:
+        url = preview_video_url(PUBLIC_API.media_movie(code)) or url
     ref = PreviewCache(cache_for(contract)).register(code, url, identity="root", playlist=True)
     return f"/jav-preview/{code}/{ref}.m3u8"
 
@@ -252,7 +256,7 @@ def q_jav_resources(contract, args) -> dict:
 
     code = detail_code(args)
     try:
-        movie = PUBLIC_API.movie(code)
+        movie = PUBLIC_API.movie(code, refresh=True) if args.get('refresh') == '1' else PUBLIC_API.movie(code)
     except PublicSourceUnavailable as error:
         return {"state": "error", "items": [], "error": str(error), "checked_at": None}
     warnings = []
