@@ -484,6 +484,8 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.16.10，版�
 
 卡片 label 复用既有 `javTitleHtml`、`followTitleMarks` 与 `data-media-tags`，分段筛选复用 `SegmentedRadioGroup`。来源头像共用 `PublicAPI` 的已验证图片主机、三个下载槽位、Pillow 解码、单请求合并与六小时缓存；只持久保存没有查询参数的公开静态头像地址。人物使用策略在投影和口味汇总处过滤明确登记的男优，原始来源记录仍完整保留，无新增依赖或 ledger 迁移。
 
+公开作品资料与评论复用 `jav_cache.PublicSnapshots`、既有 `filelock` 和原子写入；`cache_fresh` 与前端 `publicationFresh` 统一日历月边界、每天补齐及满月后的固定快照。`public_cache_scope` 将快照隔离到调用者数据目录，记录实际来源时间；测试显式传临时目录，默认 `PublicAPI()` 只用内存。媒体字节复用媒体缓存，来源 JSON 不承载本地标签决定、想要状态或观看历史。
+
 ## 原位改字
 
 `scripts/dev/copy-editor.js` 复用官网本地预览的 `edit-client.js` 交互：文字范围提示、原位编辑、按钮文字就近输入、回车和失焦保存、Esc 取消。

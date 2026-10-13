@@ -9,12 +9,12 @@ from threading import RLock
 import json
 import math
 import time
-from datetime import date
-from calendar import monthrange
+from datetime import datetime, timezone
 
 from .sources import FailureReason, SourceFailure
 from .catalog_rules import normalise_code_key
 from .fsutil import atomic_write_text
+from .jav_cache import cache_fresh, cache_lifetime as cache_lifetime
 
 MAX_CACHE_BYTES = 16 * 1024 * 1024
 
@@ -37,17 +37,6 @@ def fetch(root: Path, code: str) -> dict:
     return {**result, 'items': merge_resources([*ranked, *linked])[:128]}
 
 
-def cache_lifetime(released: str | None, today: date | None = None) -> int:
-    today = today or date.today()
-    year, month = divmod(today.year * 12 + today.month - 1 - 3, 12)
-    cutoff = date(year, month + 1, min(today.day, monthrange(year, month + 1)[1]))
-    try:
-        old = date.fromisoformat(released or '') < cutoff
-    except ValueError:
-        old = False
-    return (365 if old else 7) * 86400
-
-
 class MagnetSearch:
     """一台服务同时只查一部；缓存最多 128 部，失败一分钟后可重试。"""
 
@@ -59,6 +48,7 @@ class MagnetSearch:
         self.cache_lock = RLock()
         self.cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
         self.failures: dict[str, tuple[float, dict]] = {}
+        self.saved_wall: dict[str, float] = {}
         self.next_request = 0.0
         self._load()
 
@@ -79,12 +69,13 @@ class MagnetSearch:
                     continue
                 self.cache[normalise_code_key(row['code'])] = (
                     self.clock() - (self.wallclock() - saved), row['result'])
+                self.saved_wall[normalise_code_key(row['code'])] = saved
         except (OSError, ValueError, TypeError, AttributeError):
             return
 
     def _save(self):
-        rows = [{'code': code, 'saved': self.wallclock() - max(0, self.clock() - saved), 'result': result}
-                for code, (saved, result) in reversed(self.cache.items()) if reusable_result(result)]
+        rows = [{'code': code, 'saved': self.saved_wall[code], 'result': result}
+                for code, (_, result) in reversed(self.cache.items()) if reusable_result(result)]
         encoded = json.dumps({'version': 1, 'entries': rows}, ensure_ascii=False)
         while len(encoded.encode('utf-8')) > MAX_CACHE_BYTES and rows:
             rows.pop()
@@ -98,7 +89,11 @@ class MagnetSearch:
     def _cached(self, code, released):
         with self.cache_lock:
             cached = self.cache.get(code)
-            if cached and cached[0] + (cache_lifetime(released) if reusable_result(cached[1]) else 60) > self.clock():
+            saved = self.saved_wall.get(code, 0)
+            elapsed = max(0, self.clock() - cached[0]) if cached else 0
+            complete = cached and reusable_result(cached[1]) and not cached[1].get('warnings') and not cached[1].get('cache_stale')
+            if cached and (cache_fresh(saved, released, max(self.wallclock(), saved + elapsed)) if complete
+                           else elapsed < (86400 if reusable_result(cached[1]) else 60)):
                 self.cache.move_to_end(code)
                 return cached[1]
             failed = self.failures.get(code)
@@ -113,16 +108,21 @@ class MagnetSearch:
     def _remember(self, code, result):
         with self.cache_lock:
             previous = self.cache.get(code)
-            if result['state'] == 'error' and previous and reusable_result(previous[1]):
-                result['items'] = previous[1]['items']
+            if (result['state'] == 'error' or result.get('warnings')) and previous and reusable_result(previous[1]):
+                from .sources.javdb import merge_resources
+                result['items'] = merge_resources([*previous[1]['items'], *result['items']]) if result['items'] else previous[1]['items']
+                result['checked_at'] = previous[1].get('checked_at')
+                result['cache_stale'] = True
                 self.failures[code] = (self.clock(), result)
                 return
             self.failures.pop(code, None)
             self.cache[code] = (self.clock(), result)
+            self.saved_wall[code] = self.wallclock()
             self.cache.move_to_end(code)
             while len(self.cache) > 128:
                 removed, _ = self.cache.popitem(last=False)
                 self.failures.pop(removed, None)
+                self.saved_wall.pop(removed, None)
             if reusable_result(result):
                 self._save()
 
@@ -143,7 +143,7 @@ class MagnetSearch:
             if delay > 0:
                 self.sleeper(delay)
             result = {"ok": True, "state": "ready", "items": [], "warnings": [], "error": "",
-                      "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+                      "checked_at": datetime.fromtimestamp(self.wallclock(), timezone.utc).isoformat()}
             try:
                 result.update(self.fetcher(self.root, code))
                 if result['state'] == 'ready' and not reusable_result(result):

@@ -12,6 +12,7 @@ from concurrent.futures import Future
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from contextvars import ContextVar
+from datetime import datetime
 from urllib.parse import urlencode, urlsplit
 
 from PIL import Image
@@ -19,11 +20,44 @@ from PIL import Image
 from .catalog_rules import normalise_code_key
 from .http import HttpRequest, HttpxTransport, response_text
 from .scripting import HostLimiter
+from .jav_cache import DAY, PublicSnapshots, cache_lifetime
 
 WEB = "https://catembylegacy.fastcdn.dpdns.org"
 API = "https://jdforrepam.com/api"
 PAGE_SIZE = 10
 MAX_REVIEW_PAGES = 8
+_CACHE_ROOT = ContextVar('jav_public_cache_root', default=None)
+_CACHE_READS = ContextVar('jav_public_cache_reads', default=None)
+
+
+@contextmanager
+def public_cache_scope(root):
+    """来源快照跟随调用者的数据目录，读取时间与失败状态属于本次请求。"""
+    root_token = _CACHE_ROOT.set(root)
+    reads = []
+    reads_token = _CACHE_READS.set(reads)
+    try:
+        yield reads
+    finally:
+        _CACHE_READS.reset(reads_token)
+        _CACHE_ROOT.reset(root_token)
+
+
+def cache_checked_at(prefix, *, exact=False):
+    matches = [read['saved'] for read in (_CACHE_READS.get() or [])
+               if (read['key'] == prefix if exact else read['key'].startswith(prefix))]
+    return min(matches) if matches else None
+
+
+def cache_error(key):
+    return next((read['error'] for read in reversed(_CACHE_READS.get() or [])
+                 if read['key'] == key and read['error']), '')
+
+
+def _record_read(key, snapshot, error=''):
+    reads = _CACHE_READS.get()
+    if reads is not None and snapshot is not None:
+        reads.append({'key': key, 'saved': snapshot.saved, 'error': error})
 
 
 def public_image_url(value: object) -> bool:
@@ -87,14 +121,18 @@ def actor_gender(actor: dict) -> str:
 
 
 class PublicAPI:
-    """匿名资料请求间隔 3 秒；图片最多三个并发，同键合并，缓存 6 小时。"""
+    """匿名资料按发行日期复用；来源请求限速，同键请求合并。"""
 
-    def __init__(self, transport=None, *, clock=time.monotonic, sleeper=time.sleep):
+    def __init__(self, transport=None, *, clock=time.monotonic, sleeper=time.sleep,
+                 cache_root=None, wallclock=time.time):
         self.transport = transport
         self.clock = clock
         self.limiter = HostLimiter({}, default_interval=3.0, clock=clock, sleeper=sleeper)
         self.lock = threading.RLock()
         self.cache: OrderedDict[str, tuple[float, object]] = OrderedDict()
+        self.cache_root, self.wallclock = cache_root, wallclock
+        self.snapshots = {}
+        self.failures = {}
         self.pending: dict[str, Future] = {}
         self.image_slots = threading.BoundedSemaphore(3)
         self.source_lock = threading.RLock()
@@ -188,39 +226,111 @@ class PublicAPI:
             raise PublicSourceUnavailable("作品资料来源格式未识别")
         return data
 
-    def _cached(self, key, fetch):
+    def _store(self):
+        root = self.cache_root() if callable(self.cache_root) else self.cache_root
+        return PublicSnapshots(root, clock=self.wallclock)
+
+    def _cache_key(self, key):
+        root = self._store().root
+        return f'{root.resolve()}\0{key}' if root is not None else key
+
+    def _memory(self, cache_key, *, image, refresh):
+        """持有缓存锁时读取内存命中或失败冷却，返回内容及实际来源状态。"""
+        hit = self.cache.get(cache_key)
+        snapshot = self.snapshots.get(cache_key)
+        failed = self.failures.get(cache_key)
+        cooling = failed is not None and failed[0] > self.clock()
+        error = str(failed[1]) if cooling else ''
+        if (not refresh and hit and hit[0] > self.clock()
+                and (image or (snapshot is not None and snapshot.fresh(self.wallclock())))):
+            self.cache.move_to_end(cache_key)
+            return hit[1], snapshot, error
+        if cooling:
+            if snapshot is not None:
+                return snapshot.value, snapshot, error
+            raise failed[1]
+        return None
+
+    def _cached(self, key, fetch, *, released=None, refresh=False):
+        cache_key = self._cache_key(key)
+        image = key.startswith('image:')
+        store = self._store()
         with self.lock:
-            hit = self.cache.get(key)
-            if hit and hit[0] > self.clock():
-                self.cache.move_to_end(key)
-                return hit[1]
-            future = self.pending.get(key)
+            memory = self._memory(cache_key, image=image, refresh=refresh)
+            if memory is not None:
+                result, snapshot, error = memory
+                _record_read(key, snapshot, error)
+                return result
+            snapshot = self.snapshots.get(cache_key)
+            future = self.pending.get(cache_key)
             owner = future is None
             if owner:
-                future = self.pending[key] = Future()
+                future = self.pending[cache_key] = Future()
         if not owner:
-            return future.result()
-        try:
-            with nullcontext() if key.startswith('image:') else self.source_lock:
-                result = fetch()
-            self._remember(key, result)
-            future.set_result(result)
+            result = future.result()
+            failed = self.failures.get(cache_key)
+            _record_read(key, self.snapshots.get(cache_key), str(failed[1]) if failed else '')
             return result
+        previous = snapshot if snapshot is not None else None if image else store.load(key)
+        try:
+            with nullcontext() if image else store.acquire(key):
+                disk = None if image else store.load(key)
+                if disk is not None and disk.fresh(self.wallclock()) and (
+                        not refresh or (previous is not None and disk.revision != previous.revision)):
+                    snapshot = self._remember(key, disk.value, snapshot=disk)
+                    result = disk.value
+                else:
+                    previous = disk or previous
+                    with nullcontext() if image else self.source_lock:
+                        result = fetch()
+                    snapshot = self._remember(key, result, released=released)
+            future.set_result(result)
+            _record_read(key, snapshot)
+            return result
+        except PublicSourceUnavailable as error:
+            if isinstance(error, PublicBudgetExceeded):
+                future.set_exception(error)
+                raise
+            if previous is not None:
+                self._remember(key, previous.value, snapshot=previous)
+            with self.lock:
+                self.failures[cache_key] = (self.clock() + 900, error)
+            if previous is not None:
+                future.set_result(previous.value)
+                _record_read(key, previous, str(error))
+                return previous.value
+            future.set_exception(error)
+            raise
         except BaseException as error:
             future.set_exception(error)
             raise
         finally:
             with self.lock:
-                self.pending.pop(key, None)
+                self.pending.pop(cache_key, None)
 
-    def _remember(self, key, result):
+    def _remember(self, key, result, *, released=None, snapshot=None):
+        image = key.startswith('image:')
+        cache_key = self._cache_key(key)
+        if not image and snapshot is None:
+            if isinstance(result, dict):
+                released = result.get('release_date') or released
+            released = released if isinstance(released, str) else None
+            snapshot = self._store().save(key, result, released)
+        lifetime = 6 * 3600 if image else cache_lifetime(snapshot.released, datetime.fromtimestamp(self.wallclock()).date())
+        remaining = lifetime if image else None if lifetime is None else max(0, snapshot.saved + lifetime - self.wallclock())
         with self.lock:
-            self.cache[key] = (self.clock() + 6 * 3600, result)
-            self.cache.move_to_end(key)
+            self.cache[cache_key] = (float('inf') if remaining is None else self.clock() + remaining, result)
+            if snapshot is not None:
+                self.snapshots[cache_key] = snapshot
+            self.failures.pop(cache_key, None)
+            self.cache.move_to_end(cache_key)
             while len(self.cache) > 128:
-                self.cache.popitem(last=False)
+                removed, _ = self.cache.popitem(last=False)
+                self.snapshots.pop(removed, None)
+                self.failures.pop(removed, None)
+        return snapshot
 
-    def movie(self, code: str) -> dict:
+    def movie(self, code: str, *, refresh=False) -> dict:
         canonical = normalise_code_key(code)
 
         def identify():
@@ -232,14 +342,14 @@ class PublicAPI:
             return match["id"]
 
         def fetch():
-            movie_id = self._cached("movie-id:" + canonical, identify)
+            movie_id = self._cached("movie-id:" + canonical, identify, refresh=refresh)
             movie = self._json("/v4/movies/" + movie_id).get("movie")
             if (not isinstance(movie, dict) or normalise_code_key(movie.get("number")) != canonical
                     or movie.get("id") != movie_id):
                 raise PublicSourceUnavailable("来源作品身份不匹配")
             return movie
 
-        return self._cached("movie:" + canonical, fetch)
+        return self._cached("movie:" + canonical, fetch, refresh=refresh)
 
     def remember_movie_identity(self, code: str, source: dict):
         """已取得的编目身份可复用，完整资料仍须通过来源的身份核对。"""
@@ -247,11 +357,16 @@ class PublicAPI:
         identity = source.get("id")
         if not isinstance(identity, str) or normalise_code_key(source.get("number")) != canonical or not re.fullmatch(r"[A-Za-z0-9]+", identity):
             return
-        self._remember("movie-id:" + canonical, identity)
+        key = 'movie-id:' + canonical
+        stored = self._store().load(key)
+        if stored and stored.value == identity:
+            self._remember(key, identity, snapshot=stored)
+        else:
+            self._remember(key, identity)
 
     def _rows(self, path, key, query=None):
-        rows = self._json(path, query).get(key, [])
-        if not isinstance(rows, list):
+        rows = self._json(path, query).get(key)
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
             self.paused_until = self.clock() + 60
             raise PublicSourceUnavailable("作品资料来源格式未识别")
         return [row for row in rows if isinstance(row, dict)]
@@ -259,29 +374,45 @@ class PublicAPI:
     def peek_movie(self, code: str) -> dict | None:
         """只读已取得的资料，不触发网络；供发现排序投影。"""
         with self.lock:
-            hit = self.cache.get("movie:" + normalise_code_key(code))
-            return dict(hit[1]) if hit and hit[0] > self.clock() else None
+            key = 'movie:' + normalise_code_key(code)
+            cache_key = self._cache_key(key)
+            hit = self.cache.get(cache_key)
+            snapshot = self.snapshots.get(cache_key) or self._store().load(key)
+            if snapshot and snapshot.fresh(self.wallclock()):
+                _record_read(key, snapshot)
+                return dict(snapshot.value) if isinstance(snapshot.value, dict) else None
+            return dict(hit[1]) if hit and hit[0] > self.clock() and snapshot is None else None
 
     def reviews(self, code: str, page: int, *, refresh=False) -> list[dict]:
         if not 1 <= page <= MAX_REVIEW_PAGES:
             raise ValueError("评论页码必须在 1 至 8 之间")
         movie = self.movie(code)
-        if refresh:
-            with self.lock:
-                self.cache.pop(f"reviews:{movie['id']}:{page}", None)
         return self._cached(f"reviews:{movie['id']}:{page}", lambda:
-                            self._rows(f"/v1/movies/{movie['id']}/reviews", "reviews", {"page": page}))
+                            self._rows(f"/v1/movies/{movie['id']}/reviews", "reviews", {"page": page}),
+                            released=movie.get('release_date'), refresh=refresh)
+
+    def media_movie(self, code: str) -> dict:
+        """未缓存媒体可补齐带查询参数的临时来源地址，公开编目仍按发行日期复用。"""
+        movie = self.movie(code)
+        key = 'movie:' + normalise_code_key(code)
+        snapshot = self.snapshots.get(self._cache_key(key)) or self._store().load(key)
+        urls = [movie.get(name) for name in ('cover_url', 'thumb_url', 'preview_video_url')]
+        urls.extend(actor.get('avatar_url') for actor in movie.get('actors') or [] if isinstance(actor, dict))
+        urls.extend((image.get('large_url') or image.get('url')) if isinstance(image, dict) else image
+                    for image in movie.get('preview_images') or [])
+        if snapshot and self.wallclock() - snapshot.saved >= DAY and any(
+                isinstance(url, str) and '?' in url for url in urls):
+            return self.movie(code, refresh=True)
+        return movie
 
     def magnets(self, code: str, *, refresh=False) -> list[dict]:
         movie = self.movie(code)
-        if refresh:
-            with self.lock:
-                self.cache.pop("magnets:" + movie['id'], None)
         return self._cached("magnets:" + movie['id'], lambda:
-                            self._rows(f"/v1/movies/{movie['id']}/magnets", "magnets"))
+                            self._rows(f"/v1/movies/{movie['id']}/magnets", "magnets"),
+                            released=movie.get('release_date'), refresh=refresh)
 
     def image(self, code: str, index: str) -> str:
-        movie = self.movie(code)
+        movie = self.media_movie(code)
         if index == "cover":
             url = movie.get("cover_url") or movie.get("thumb_url")
         elif index.startswith("actor:"):
@@ -337,4 +468,4 @@ def decode_image(body: bytes) -> bytes:
     raise PublicSourceUnavailable("图片未取得")
 
 
-PUBLIC_API = PublicAPI()
+PUBLIC_API = PublicAPI(cache_root=lambda: _CACHE_ROOT.get())

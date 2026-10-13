@@ -144,7 +144,11 @@ class PreviewCacheTests(unittest.TestCase):
             self.assertEqual(replay.decode(), result)
             nested.assert_called_once()
             self.assertEqual(previews.register("ABP-123", "https://cdn.example/changed.m3u8", identity="root"), root)
-            self.assertEqual(previews.source("ABP-123", root)["url"], "https://cdn.example/root.m3u8")
+            self.assertEqual(previews.source("ABP-123", root)["url"], "https://cdn.example/changed.m3u8")
+            with mock.patch.object(cache, 'bytes', wraps=cache.bytes) as saved:
+                self.assertEqual(previews.playlist('ABP-123', root, fetch).decode(), body)
+            self.assertEqual(saved.call_count, 1)
+            fetch.assert_called_once()
             with self.assertRaises(ValueError):
                 previews.source("ABP-123", "../private")
             with self.assertRaises(ValueError):

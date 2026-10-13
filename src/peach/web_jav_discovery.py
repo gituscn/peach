@@ -16,13 +16,16 @@ def _identity(connection, kind, name):
 
 
 def _cached_movie(code, contract):
-    from .javdb_public import PUBLIC_API
+    from .javdb_public import PUBLIC_API, public_cache_scope, cache_checked_at
     metadata = discovery_metadata(contract)
     stored, _ = metadata.peek(code)
-    memory = PUBLIC_API.peek_movie(code)
-    if memory and not stored:
-        metadata.remember(code, memory)
-    return stored or memory or {}
+    if stored:
+        return stored
+    with public_cache_scope(contract.cover_root.parent / 'jav-public'):
+        source = PUBLIC_API.peek_movie(code)
+        if source:
+            metadata.remember(code, source, checked_at=cache_checked_at('movie:' + code, exact=True))
+    return source or {}
 
 
 def _external(connection, contract):

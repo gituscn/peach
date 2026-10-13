@@ -20,9 +20,13 @@ class PreviewCache:
             raise ValueError("预览来源不可用")
         ref = hashlib.sha256((identity or url).encode()).hexdigest()
         path = self.cache.folder("preview:" + code) / (ref + ".source.json")
-        if not path.is_file():
-            atomic_write_text(path, json.dumps({"url": url, "playlist": playlist if playlist is not None
-                else urlsplit(url).path.lower().endswith(".m3u8")}), mode=0o600)
+        value = {"url": url, "playlist": playlist if playlist is not None else urlsplit(url).path.lower().endswith(".m3u8")}
+        try:
+            current = json.loads(path.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            current = None
+        if current != value:
+            atomic_write_text(path, json.dumps(value), mode=0o600)
         return ref
 
     def source(self, code: str, ref: str) -> dict:

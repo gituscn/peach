@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { RiChat3Line, RiExternalLinkLine } from '@remixicon/react';
 import { entityPath, icon } from '@peach/legacy/core';
 import { tagLabel } from '@peach/legacy/tags';
@@ -21,14 +21,21 @@ import { WantMagnets } from '../wants/want-magnets';
 import type { DownloadsSnapshot } from '../bundle';
 import { DOWNLOADS_KEY, DOWNLOADS_URL } from '../activity/downloads-panel';
 import { queryClient } from '../query';
-import { fetchJavDetail, fetchJavReviews, javDetailKey, nextReviewPage, type JavDetail, type JavDetailProps, type JavEntityRef } from './jav-detail';
+import { fetchJavDetail, fetchJavReviews, javDetailKey, nextReviewPage, type JavDetail, type JavDetailProps, type JavEntityRef, type JavReviews } from './jav-detail';
+import { cachedReviews, rememberReviews, reviewsFresh } from './review-cache';
 
 export function JavDetailPage(props: JavDetailProps) {
-  const result = useQuery({ queryKey: javDetailKey(props.code), queryFn: ({ signal }) => fetchJavDetail(props.code, signal), staleTime: 6 * 3600_000 });
+  const refresh = useRef(false);
+  const result = useQuery({ queryKey: javDetailKey(props.code), queryFn: ({ signal }) => {
+    const forced = refresh.current;
+    refresh.current = false;
+    return fetchJavDetail(props.code, signal, forced);
+  }, staleTime: 6 * 3600_000 });
+  const retry = () => { refresh.current = true; void result.refetch() };
   return <div data-jav-detail="" data-item-detail="" data-stage-grid="">
-    {result.data ? <Work key={props.code} {...props} item={result.data} retry={() => { void result.refetch() }} retrying={result.isFetching} /> : <div data-jav-failure="">
+    {result.data ? <Work key={props.code} {...props} item={result.data} retry={retry} retrying={result.isFetching} /> : <div data-jav-failure="">
       <Close close={props.actions.close} />
-      {result.error ? <RetryNote message={errorMessage(result.error)} onRetry={() => { void result.refetch() }} /> : null}
+      {result.error ? <RetryNote message={errorMessage(result.error)} onRetry={retry} /> : null}
     </div>}
   </div>;
 }
@@ -92,7 +99,7 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
           onClick={() => window.open(item.source_url, '_blank', 'noopener,noreferrer')}>作品来源</Button> : null}
       </div>
       {want.error ? <Note tone="error">{want.error}</Note> : null}
-      <Reviews code={item.code} count={item.comments_count} />
+      <Reviews code={item.code} count={item.comments_count} released={item.release_date} />
       <Resources item={item} actions={actions} readOnly={readOnly} />
     </div></aside>
     <CloudDownloadDialog prefill={download} close={() => setDownload(null)} receipt={actions.receipt} />
@@ -172,13 +179,29 @@ function PreviewVideo({ src }: { src: string }) {
   return <div ref={frame} data-jav-video="">{failed ? <Note tone="neutral" action={<Button variant="secondary" onClick={() => { setFailed(false); setAttempt(value => value + 1) }}>重试</Button>}>视频预览未取得</Note> : null}</div>;
 }
 
-function Reviews({ code, count }: { code: string; count: number }) {
+function Reviews({ code, count, released }: { code: string; count: number; released?: string }) {
+  const client = useQueryClient();
   const [opened, setOpened] = useState(false);
-  const result = useInfiniteQuery({ queryKey: ['jav-reviews', code], enabled: opened, initialPageParam: 1, staleTime: 60_000,
-    queryFn: ({ signal, pageParam }) => fetchJavReviews(code, pageParam, signal), getNextPageParam: nextReviewPage });
+  const cached = useMemo(() => cachedReviews(code, released), [code, released]);
+  const refresh = useRef(false);
+  const result = useInfiniteQuery({ queryKey: ['jav-reviews', code], enabled: opened, initialPageParam: 1,
+    initialData: cached ? { pages: cached.pages, pageParams: cached.pageParams } : undefined,
+    initialDataUpdatedAt: cached?.saved,
+    staleTime: state => reviewsFresh(state.state.data?.pages || [], state.state.dataUpdatedAt, released) ? Infinity : 0,
+    gcTime: 86_400_000, refetchOnWindowFocus: false,
+    queryFn: async ({ signal, pageParam }) => {
+      const page = await fetchJavReviews(code, pageParam, signal, refresh.current);
+      rememberReviews(code, page);
+      if (!page.ok || page.cache_stale) {
+        const previous = client.getQueryData<InfiniteData<JavReviews>>(['jav-reviews', code])?.pages.find(row => row.page === pageParam);
+        if (previous?.ok) return { ...previous, cache_stale: true, message: page.message || '评论未取得，请稍后重试' };
+      }
+      return page;
+    }, getNextPageParam: nextReviewPage });
+  useEffect(() => { if (!result.isFetching) refresh.current = false }, [result.isFetching]);
   const pages = result.data?.pages || [];
   const items = [...new Map(pages.flatMap(page => page.items).map(item => [item.id, item])).values()];
-  const failure = result.error ? errorMessage(result.error) : pages.find(page => !page.ok)?.message;
+  const failure = result.error ? errorMessage(result.error) : pages.find(page => !page.ok || page.cache_stale)?.message;
   return <section data-jav-reviews="">
     <Disclosure trailing summary={<><RiChat3Line aria-hidden />评论{count > 0 ? ` · ${count}` : ''}</>}
       onOpenChange={setOpened}>
@@ -187,8 +210,10 @@ function Reviews({ code, count }: { code: string; count: number }) {
       {items.map(item => <article key={item.id} data-jav-review=""><div data-jav-review-meta=""><b>{item.username}</b>
         {Number(item.score) > 0 ? <SourceRating score={Number(item.score)} review /> : null}
         <time dateTime={item.created_at} title={item.created_at}>{item.created_at.slice(0, 10)}</time></div><p>{item.content}</p></article>)}
-      {failure ? <Note tone="neutral" action={<Button variant="secondary" onClick={() => { void result.refetch() }}>重试</Button>}>{failure}</Note>
+      {failure ? <Note tone="neutral" action={<Button variant="secondary" {...busyProps(result.isFetching)} onClick={() => { refresh.current = true; void result.refetch() }}>重试</Button>}>{failure}</Note>
         : !result.isPending && !items.length ? <Note tone="neutral">暂无评论</Note> : null}
+      {!failure && pages.length ? <Button variant="secondary" {...busyProps(result.isFetching)}
+        onClick={() => { refresh.current = true; void result.refetch() }}>刷新评论</Button> : null}
       {result.hasNextPage ? <Button variant="secondary" {...busyProps(result.isFetchingNextPage)} onClick={() => { if (!result.isFetchingNextPage) void result.fetchNextPage() }}>更多评论</Button> : null}
       {!failure && pages.at(-1)?.page === 8 && count > items.length ? <Note tone="neutral">已显示 {items.length} 条评论，其余评论可在 JavDB 查看。</Note> : null}
     </> : null}
