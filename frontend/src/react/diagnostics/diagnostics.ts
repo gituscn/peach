@@ -13,7 +13,8 @@ export interface DiagnosticReport {
   version: string; status: string; checks: Record<string, DiagnosticCheck>;
   library: { groups: Record<string, LibraryGroup>; issue_at: string | null };
   sources: Array<{ source: string; label: string; status: string; reason: string;
-    last_success_at: string | null; cooldown_until: string | null }>;
+    last_success_at: string | null; cooldown_until: string | null;
+    last_check_at?: string | null; elapsed_s?: number | null }>;
 }
 export const DIAGNOSTICS_KEY = ['diagnostics'] as const;
 export const fetchDiagnostics = (signal?: AbortSignal) => apiGet<DiagnosticReport>('/api/diagnostics', signal);

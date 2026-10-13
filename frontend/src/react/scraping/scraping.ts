@@ -32,6 +32,7 @@ export interface Source {
   cookie_saved: boolean;
   /** 这台机器上这个来源的请求由本机浏览器发、验证由它自己过（ADR-0065）；为真时不需要 Cookie。 */
   browser: boolean;
+  cooldown_until?: number | null;
 }
 
 export interface ScrapingData {
@@ -46,6 +47,9 @@ export interface Check {
   message?: string;
   width?: number;
   height?: number;
+  reason?: string;
+  elapsed_s?: number;
+  checked_at?: number;
 }
 
 /** 抓封面的后台任务快照（`scraping_cover_job`）。`status` 是 `idle|running|complete|failed`。 */
@@ -100,5 +104,6 @@ export function checkText(check: Check, sourceLabel: string): string {
   return `${sourceLabel}${check.label === '来源页面' ? '' : ' 高清图片'}`
     + `：${check.ok ? '可连接' : '不能连接'}`
     + (check.width ? ` · ${check.width} × ${check.height}` : '')
+    + (check.elapsed_s !== undefined ? ` · ${check.elapsed_s.toFixed(2)} 秒` : '')
     + (check.message ? `。${check.message}` : '');
 }

@@ -203,6 +203,7 @@ class ProxyArgumentTests(unittest.TestCase):
             self.assertNotIn("NO_PROXY", env)
             args, env = metadata_amane.proxy_argument({"trust_env": True})
             self.assertEqual(args, ["--proxy", "http://env:1"])
+            self.assertNotIn("HTTPS_PROXY", env)
 
 
 class BridgeQueryTests(unittest.TestCase):
@@ -435,6 +436,16 @@ class ProviderStageTests(unittest.TestCase):
         provider.amane("FC2-PPV-1234567", route=("fc2club", "avsox"))
         self.assertEqual(len(self.calls), 1)
         self.assertEqual(self.calls[0][self.calls[0].index("--sites") + 1], "fc2club,avsox")
+
+    def test_site_network_settings_reach_the_bridge_and_parsed_state(self):
+        from peach.scraping_access import save, source_checks
+        save(self.secrets, "fc2club", {"network": "direct"})
+        provider = self.provider(report(fc2club=FOUND, avsox={"status": "not_found", "reason": "not_found"}))
+        provider.amane("FC2-PPV-1234567", route=("fc2club", "avsox"))
+        command = self.calls[0]
+        self.assertEqual(command[command.index("--direct-sites") + 1], "fc2club")
+        self.assertTrue(source_checks(self.secrets, "fc2club")["metadata"]["ok"])
+        self.assertEqual(source_checks(self.secrets, "avsox")["metadata"]["reason"], "not_found")
 
     def test_all_misses_are_not_found_and_errors_are_unavailable_with_the_reason(self):
         provider = self.provider(report(fc2club={"status": "not_found", "reason": "not_found"},

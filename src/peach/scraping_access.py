@@ -20,6 +20,7 @@ from .follow_secrets import CredentialStore
 from . import browser_transport, peach_proxy
 from .http import HttpRequest, HttpxTransport
 from .scripting import USER_AGENT, host_under, hostname_of
+from .fsutil import atomic_write_text
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +30,13 @@ SOURCES = {
     "dmm": {"label": "DMM / FANZA", "domains": ("dmm.co.jp", "dmm.com"), "login": "https://www.dmm.co.jp/"},
     "prestige": {"label": "Prestige", "domains": ("prestige-av.com",), "login": "https://www.prestige-av.com/"},
     "mgstage": {"label": "MGStage", "domains": ("mgstage.com",), "login": "https://www.mgstage.com/"},
+    "faleno": {"label": "FALENO", "domains": ("faleno.jp",), "login": "https://faleno.jp/"},
+    "dahlia": {"label": "DAHLIA", "domains": ("dahlia-av.jp",), "login": "https://dahlia-av.jp/"},
+    "makers": {"label": "片商官网", "domains": (), "login": ""},
+    "fc2club": {"label": "FC2Club", "domains": ("fc2club.top",), "login": "https://fc2club.top/"},
+    "freejavbt": {"label": "FreeJavBT", "domains": ("freejavbt.com",), "login": "https://freejavbt.com/"},
+    "airav": {"label": "AIRAV", "domains": ("airav.io",), "login": "https://airav.io/"},
+    "avsox": {"label": "AVSOX", "domains": ("avsox.click",), "login": "https://avsox.click/"},
     # FC2 的商品页、卖家页和图片存储（`storage*`、`contents-thumbnail*`）都在 fc2.com
     # 底下，一条域名就够。免登录可读，不收 Cookie。
     "fc2": {"label": "FC2", "domains": ("fc2.com",), "login": "https://adult.contents.fc2.com/"},
@@ -298,12 +306,44 @@ def fix_to_browser(root: Path, source: str) -> None:
 
 def describe(root: Path, source: str) -> dict:
     values = values_for(root, source)
+    until = paused_until(root, source)
     return {"source": source, "label": SOURCES[source]["label"],
             "login": SOURCES[source]["login"], "accepts_cookie": bool(SOURCES[source].get("cookie")),
             "network": "direct" if values.get("network") == "direct" else "peach",
             "cookie_saved": bool(values.get("cookie") or values.get("cookies_text")),
+            "cooldown_until": until or None,
             # 这台机器上这个来源是不是由本机浏览器过验证：该走浏览器（`wants_browser`）且找得到浏览器。
             "browser": wants_browser(root, source) and browser_transport.find_browser() is not None}
+
+
+def source_checks(root: Path, source: str) -> dict:
+    """逐站最近一次连接与解析结果；不包含请求地址、正文或凭据。"""
+    if source not in SOURCES:
+        return {}
+    try:
+        value = json.loads((Path(root) / f"source-check-{source}.json").read_text(encoding="utf-8"))
+        return {stage: record for stage, record in value.items()
+                if stage in {"connection", "metadata"} and isinstance(record, dict)} if isinstance(value, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def record_source_check(root: Path, source: str, stage: str, record: dict) -> None:
+    """保存脱敏状态，保留连接检查与元数据解析的独立时间戳。"""
+    if source not in SOURCES or stage not in {"connection", "metadata"}:
+        return
+    allowed = {"ok", "kind", "reason", "status", "elapsed_s", "checked_at"}
+    with _LOCK:
+        state = source_checks(root, source)
+        clean = {key: value for key, value in record.items() if key in allowed}
+        if stage == "metadata":
+            clean["last_success_at"] = record.get("checked_at") if record.get("ok") else state.get(stage, {}).get("last_success_at")
+        state[stage] = clean
+        try:
+            atomic_write_text(Path(root) / f"source-check-{source}.json",
+                              json.dumps(state, ensure_ascii=False), mode=0o600)
+        except OSError:
+            LOGGER.warning("来源 %s 的诊断记录未保存", source)
 
 
 def browser_profile(root: Path) -> Path:

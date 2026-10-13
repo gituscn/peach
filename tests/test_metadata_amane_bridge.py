@@ -69,6 +69,24 @@ def run_main(argv, runtime):
 
 
 class BridgeContractTests(unittest.TestCase):
+    def test_mixed_site_networks_use_the_requested_client(self):
+        seen = {}
+        class Crawler:
+            def __init__(self, *, client, config):
+                self.client = client
+            async def fetch(self, query, options):
+                seen[self.site] = self.client['proxy']
+                return None
+        runtime = bridge.Runtime(
+            crawler=lambda site: type(site, (Crawler,), {"site": site}),
+            make_client=lambda proxy, timeout, rate: {"proxy": proxy},
+            query=lambda number: number, options=lambda language: None,
+            source_error=FakeSourceError)
+        code, _ = run_main(["--number", "ABW-032", "--sites", "airav,freejavbt",
+                            "--proxy", "http://127.0.0.1:7890", "--direct-sites", "airav"], runtime)
+        self.assertEqual(code, bridge.EXIT_NOT_FOUND)
+        self.assertEqual(seen, {"airav": None, "freejavbt": "http://127.0.0.1:7890"})
+
     def test_the_failure_reasons_are_the_upstream_sixteen(self):
         self.assertEqual(len(bridge.FAILURE_REASONS), 17)
         self.assertEqual(len(set(bridge.FAILURE_REASONS)), 17)

@@ -304,7 +304,7 @@ class LibraryMetadataProvider:
         from . import metadata_amane, peach_proxy
         from .config import TOOLS_DIR
         from .jav_cover_fetch import Unavailable
-        from .scraping_access import SourcePaused, pause_source
+        from .scraping_access import SourcePaused, pause_source, values_for, record_source_check
         timeout = None
         if deadline is not None:
             timeout = deadline - time.monotonic()
@@ -313,11 +313,24 @@ class LibraryMetadataProvider:
         try:
             bridge = metadata_amane.AmaneBridge.create(
                 self.tools_root if self.tools_root is not None else TOOLS_DIR)
+            direct_sites = [site for site in sites if values_for(self.secrets_root, site).get('network') == 'direct']
             report = bridge.query(code, sites, timeout=timeout,
-                                  proxy_options=peach_proxy.client_options(self.secrets_root))
+                                  proxy_options={'trust_env': False} if len(direct_sites) == len(sites)
+                                  else peach_proxy.client_options(self.secrets_root), direct_sites=direct_sites)
         except Exception as error:  # noqa: BLE001 - 桥没装、venv 坏了、超时：整档未取得，原因给人看
             return Unavailable(f'amane 桥：{str(error).strip() or describe_failure(error)}')
         found, failures = metadata_amane.split_report(code, report)
+        for site, result in report.get('sites', {}).items():
+            if not isinstance(result, dict):
+                continue
+            error = failures.get(site)
+            record_source_check(self.secrets_root, site, 'metadata', {
+                'checked_at': time.time(), 'ok': result.get('status') == 'found' and error is None,
+                'kind': error.kind if error else 'ok',
+                'reason': error.detail if error else 'parsed',
+                'status': int(result.get('http_status') or 0),
+                'elapsed_s': result.get('elapsed_s', 0),
+            })
         problems, held = [], 0
         for site, error in failures.items():
             action = metadata_amane.cooldown_action(error)
