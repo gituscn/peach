@@ -92185,6 +92185,13 @@ function hnt({ kind: e, q: t, scope: n, view: r, category: i }, a) {
 	return `<div class="ihead peach-react">
       <h2 class="disp indexheading">${o}</h2>
       ${s ? "<span class=\"mono\" id=\"indexCount\"><span class=\"countskeleton\"></span></span>" : ""}${l}
+      ${EP({
+		variant: "secondary",
+		size: "small",
+		glyph: "star",
+		label: "收藏与筛选",
+		attrs: "aria-disabled=\"true\" tabindex=\"-1\""
+	})}
       <div data-index-search class="ml-auto min-w-35 max-w-80 flex-1 max-board-narrow:order-1 max-board-narrow:basis-40">${TP("", t, "过滤" + o)}</div>
     </div>
     ${e === "tags" ? r5(lnt, n, "词表") : e === "performers" || e === "creators" ? r5(unt, e === "performers" && n === "online" ? "online" : e, "人物名册") : c ? r5(cnt, e, "公司类型") : ""}

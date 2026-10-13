@@ -1,6 +1,6 @@
 /* 索引五页（艺人、卖家、厂牌、事务所、标签）的进页骨架与地址解析。
  *
- * 页头那几样此刻就能给出最终样子：标题、读数的占位、版式开关、过滤框、页面级 Tabs 和本地艺人那一排身份分类，
+ * 页头此刻就能给出最终样子：标题、读数的占位、版式开关、收藏入口、过滤框、页面级 Tabs 与本地艺人的身份分类，
  * 等的只有下面那块内容。
  * React 页取回首屏后整块换掉它，键和文字同页面那一份一致，换的那一下页头不跳。这里的控件不接线：骨架只在
  * 取数那一段露面。两处铺它：壳在冷启动落在索引页时先铺一遍（`renderInitialSurfaceLoading`），路由树的索引元素
@@ -9,7 +9,7 @@
  * 版式偏好由调用方读好交进来：这个模块壳与 React 包各带一份，设置 store 只能有一份。 */
 import { boardTabsHtml, fitSkeleton, iconSwitchHtml, indexSkeletonHtml } from '@peach/legacy/ui';
 import { identityFilterSkeletonHtml } from './identity-filter';
-import { islandSearchInput } from './island-skeleton';
+import { islandButton, islandSearchInput } from './island-skeleton';
 
 export type IndexPageKind = 'performers' | 'creators' | 'studios' | 'agencies' | 'tags';
 
@@ -67,6 +67,8 @@ export function indexPlaceholderHtml({ kind, q, scope, view, category }: IndexPa
   return `<div class="ihead peach-react">
       <h2 class="disp indexheading">${title}</h2>
       ${people ? '<span class="mono" id="indexCount"><span class="countskeleton"></span></span>' : ''}${switcher}
+      ${islandButton({ variant: 'secondary', size: 'small', glyph: 'star', label: '收藏与筛选',
+        attrs: 'aria-disabled="true" tabindex="-1"' })}
       <div data-index-search class="ml-auto min-w-35 max-w-80 flex-1 max-board-narrow:order-1 max-board-narrow:basis-40">${islandSearchInput('', q, '过滤' + title)}</div>
     </div>
     ${kind === 'tags' ? tabs(INDEX_SCOPES, scope, '词表') : kind === 'performers' || kind === 'creators'
