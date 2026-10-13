@@ -33,7 +33,7 @@ const HEADS = [
   ['/sources', '来源和凭证', '来源和凭证', true],
   ['/trash', '回收站', '回收站', false],
   ['/subscriptions', '关注管理', '', false],
-  ['/tasks', '活动', '', false],
+  ['/tasks', '任务中心', '', false],
   ['/settings/library', 'Peach 配置', '', true],
 ] as const;
 
