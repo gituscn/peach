@@ -368,16 +368,20 @@ describe('页面', () => {
 
   it(`摆满 ${FOLLOW_AUTO_LOAD_LIMIT} 组以后「加载更多」要点一下才接下一页`, async () => {
     const groups = Array.from({ length: FOLLOW_AUTO_LOAD_LIMIT }, (_, index) => group(item(index + 1)));
-    const fetcher = serve(feed(groups, { has_more: true }));
+    const page = feed(groups, { has_more: true });
+    const fetcher = serve(page);
     const host = await open(props());
     const more = host.querySelector('[data-follow-pagination] button[data-entity-more]');
     expect(more?.textContent).toBe('加载更多');
     const before = fetcher.mock.calls.filter(([url]) => String(url).startsWith('/api/follow?')).length;
+    page.groups = [group(item(FOLLOW_AUTO_LOAD_LIMIT + 1))];
+    page.has_more = false;
     await click(more);
     await settle();
     const pages = fetcher.mock.calls.filter(([url]) => String(url).startsWith('/api/follow?'));
     expect(pages).toHaveLength(before + 1);
     expect(new URL(String(pages.at(-1)![0]), 'http://peach.test').searchParams.get('offset')).toBe('100');
+    expect(host.querySelector(`[data-follow-item="${FOLLOW_AUTO_LOAD_LIMIT + 1}"]`)).not.toBeNull();
   });
 
   it('没有关注任何来源时指到添加关注', async () => {

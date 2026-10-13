@@ -9,7 +9,7 @@ notifyManager.setScheduler((notify) => notify());
 afterEach(() => { queryClient.clear() });
 const empty: Shortcuts = { favorites: [], filters: [] };
 
-describe('收藏与筛选', () => {
+describe('我的收藏', () => {
   it('资料页的规范收藏状态不受旧身份缓存影响', async () => {
     queryClient.setQueryData(SHORTCUTS_KEY, { favorites: [
       { entity_id: 2, kind: 'performer', name: '旧人物' },
@@ -37,7 +37,7 @@ describe('收藏与筛选', () => {
     const host = await mount(<QueryClientProvider client={queryClient}>
       <FavoriteButton item={{ entity_id: 1, kind: 'studio', name: '厂牌' }} />
     </QueryClientProvider>);
-    await click(buttonNamed('收藏', host));
+    await click(host.querySelector('[aria-label="收藏厂牌"]'));
     const button = host.querySelector('button')!;
     expect(button.disabled).toBe(false);
     expect(button.getAttribute('aria-busy')).toBe('true');
@@ -46,7 +46,7 @@ describe('收藏与筛选', () => {
     await answer.release({ favorites: [{ key: 'entity:1', entity_id: 1, kind: 'studio', name: '厂牌' }], filters: [] });
     await settle();
     expect(button.getAttribute('aria-pressed')).toBe('true');
-    await click(buttonNamed('已收藏', host));
+    await click(host.querySelector('[aria-label="取消收藏厂牌"]'));
     await settle();
     expect(calls[1]).toMatchObject({ action: 'favorite', entity_id: 1, on: false });
     expect(button.getAttribute('aria-pressed')).toBe('false');
@@ -65,16 +65,18 @@ describe('收藏与筛选', () => {
     await mount(<QueryClientProvider client={queryClient}>
       <LibraryShortcuts currentHref={() => '/watch-later?loc=&tag=VR&jav=1'} />
     </QueryClientProvider>);
-    await click(buttonNamed('收藏与筛选'));
+    await click(buttonNamed('我的收藏'));
     await settle();
+    expect(document.querySelector('nav[aria-label="收藏作品清单"] a[href="/flagged"]')?.textContent).toBe('已标记');
+    expect(document.querySelector('nav[aria-label="收藏作品清单"] a[href="/watch-later"]')?.textContent).toBe('稍后看');
     await type(document.querySelector('input'), 'VR 待看');
     await submit(document.querySelector('form'));
     await settle();
     expect(writes[0]).toEqual({ action: 'save_filter', name: 'VR 待看', href: '/watch-later?loc=&tag=VR&jav=1' });
-    expect(document.querySelector('a')?.getAttribute('href')).toBe('/watch-later?loc=&tag=VR&jav=1');
+    expect(document.querySelector('a[title="VR 待看"]')?.getAttribute('href')).toBe('/watch-later?loc=&tag=VR&jav=1');
     await click(document.querySelector('[aria-label="删除筛选VR 待看"]'));
     await settle();
-    expect(document.querySelector('a')).toBeNull();
+    expect(document.querySelector('a[title="VR 待看"]')).toBeNull();
   });
 
   it('收藏链接使用现有实体路由和编码后的标签', () => {

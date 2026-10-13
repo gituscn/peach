@@ -142,20 +142,6 @@
   letter-spacing: 0;
   overflow-wrap: anywhere;
 }
-.peach-react [data-namepick-toggle] {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid var(--border-10);
-  border-radius: var(--control-radius);
-  background: var(--overlay-5);
-  color: var(--muted);
-  cursor: pointer;
-}
-.peach-react [data-namepick-toggle][data-hovered] { background: var(--hover); color: var(--ink); }
 .peach-react [data-namepick-toggle] svg,
 .peach-react [data-namepick-menu] svg {
   width: 16px;
@@ -186,7 +172,6 @@
 .peach-react [data-meta-item] { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .peach-react [data-meta-item="classification"] { white-space: nowrap; flex: none; }
 .peach-react [data-meta-item="names"] { flex-wrap: wrap; }
-.peach-react [data-company-names] { flex-basis: 100%; }
 .peach-react [data-meta-item] > svg,
 .peach-react [data-entity-facts] dt svg {
   width: 16px;

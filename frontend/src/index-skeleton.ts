@@ -64,11 +64,11 @@ export function indexPlaceholderHtml({ kind, q, scope, view, category }: IndexPa
   const title = INDEX_TITLES[kind] || '标签', people = kind !== 'tags', company = kind === 'studios' || kind === 'agencies';
   const switcher = people
     ? iconSwitchHtml('people-layout', title + '索引版式', company ? COMPANY_LAYOUTS : PEOPLE_LAYOUTS, layout) : '';
-  return `<div class="ihead peach-react">
+  return `<div class="ihead peach-react" data-index-head>
       <h2 class="disp indexheading">${title}</h2>
       ${people ? '<span class="mono" id="indexCount"><span class="countskeleton"></span></span>' : ''}${switcher}
-      ${islandButton({ variant: 'secondary', size: 'small', glyph: 'star', label: '收藏与筛选',
-        attrs: 'aria-disabled="true" tabindex="-1"' })}
+      ${islandButton({ variant: 'secondary', size: 'small', label: '我的收藏',
+        attrs: 'data-shortcuts-trigger aria-disabled="true" tabindex="-1"' })}
       <div data-index-search class="ml-auto min-w-35 max-w-80 flex-1 max-board-narrow:order-1 max-board-narrow:basis-40">${islandSearchInput('', q, '过滤' + title)}</div>
     </div>
     ${kind === 'tags' ? tabs(INDEX_SCOPES, scope, '词表') : kind === 'performers' || kind === 'creators'

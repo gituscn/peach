@@ -17,7 +17,7 @@ import { Button } from '@/components/base/buttons/button';
 
 import { AvatarPicker } from '../avatar-picker/avatar-picker-page';
 import { Note } from '../components/note';
-import { FavoriteButton, LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
+import { FavoriteButton } from '../library-shortcuts/shortcut-controls';
 import { busyProps } from '../settings/busy-props';
 import { FeedNewRow } from '../feed-new/feed-new-row';
 import { Glyph } from './glyph';
@@ -69,12 +69,9 @@ export function EntityHeroPage({ kind, name, entity, feedNew, feedHost, actions,
               <h2>{entity.canonical_name}</h2>
               <NamePicker current={entity.canonical_name} choices={nameChoices(entity)}
                 onChoose={actions.chooseName} onAddAlias={actions.addAlias} />
+              {entity.id ? <FavoriteButton item={{ entity_id: Number(entity.id), kind, name: entity.canonical_name || name, favorite: entity.favorite }} /> : null}
             </div>
             <AliasLine kind={kind} entity={entity} actions={actions} />
-            {entity.id ? <div className="flex flex-wrap gap-2">
-              <FavoriteButton item={{ entity_id: Number(entity.id), kind, name: entity.canonical_name || name, favorite: entity.favorite }} />
-              <LibraryShortcuts kind={kind} />
-            </div> : null}
             {entity.related_identities?.length ? (
               <div className="flex min-w-0 flex-wrap gap-2 text-caption-1-regular text-text-secondary">
                 {/* 账号名常是一长串无空格的英文，窄屏下得能在任意处折行。 */}
@@ -197,17 +194,17 @@ function AliasLine({ kind, entity, actions }: { kind: string; entity: EntityHero
       {agencyNode ? <span data-meta-item="" title="事务所"><Glyph name="briefcase" /><span>{agencyNode}</span></span> : null}
       {maker ? <span data-meta-item="" title="片商"><Glyph name="clapperboard" /><a href={entityPath('studio', maker.name)} data-studio-link={maker.name}
         onClick={go('studio', maker.name)}>{maker.name}</a></span> : null}
-      {aliases.length ? <CompanyAliases aliases={aliases} wide={kind === 'studio' || kind === 'agency'} /> : null}
+      {aliases.length ? <CompanyAliases aliases={aliases} /> : null}
     </div>
   );
 }
 
 /** 公司别名：先列几个，余下的收进「+N」，浮层里一个名字一行。片商改过几轮名、挂过一串
  *  label 时别名能有三十多个，全摊开会占掉资料卡十几行。 */
-function CompanyAliases({ aliases, wide }: { aliases: string[]; wide: boolean }) {
+function CompanyAliases({ aliases }: { aliases: string[] }) {
   const { shown, rest } = shownTags(aliases, COMPANY_ALIASES_SHOWN);
   return (
-    <div data-meta-item="names" data-company-names={wide ? '' : undefined}>
+    <div data-meta-item="names" data-company-names="">
       <Glyph name="id-card" />
       <span data-alias-names="" title="别名">{shown.map((name, at) => <span key={at}>{name}</span>)}</span>
       {rest ? (
