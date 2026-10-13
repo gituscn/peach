@@ -57,13 +57,17 @@ export async function launch(): Promise<Browser> {
  *
  * 它只证明「没有东西在等」，证明不了页面画出来了：主体完全没渲染时同样立刻成立。
  * 所以调用方先等到目标页面自己的主体出现，再调它。 */
-export async function settle(page: Page): Promise<void> {
+export async function settle(page: Page, scope = 'body'): Promise<void> {
   /* 活动页和馆藏页会持续轮询任务状态，本来就不保证进入 `networkidle`。页面导航由
      `visit()` 等到 load，主体由调用方的 `expectBody()` 验证；这里只等 Peach 自己公开的
      等待态结束。 */
   await page.waitForFunction(
-    () => !document.querySelector('[aria-busy="true"],[data-skeleton]'),
-    undefined, { timeout: 15_000 });
+    (selector) => {
+      const root = document.querySelector(selector);
+      return !!root && !root.matches('[aria-busy="true"],[data-skeleton]')
+        && !root.querySelector('[aria-busy="true"],[data-skeleton]');
+    },
+    scope, { timeout: 15_000 });
 }
 
 /** 等目标页面自己的主体出现：每个定位器都要可见，之后才轮到 `settle`。
