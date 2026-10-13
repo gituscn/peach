@@ -46,7 +46,7 @@ FRONTEND = ROOT / "frontend"
 BROWSER_LOGS = ROOT / "build" / "agent-verification" / "browser"
 SERVER_START_SECONDS = 60
 E2E_SECONDS = 600
-SERIAL_E2E_BATCH_FILES = 12
+E2E_BATCH_FILES = 12
 
 
 def chrome_executable() -> str | None:
@@ -122,8 +122,8 @@ def e2e_command(node: str, concurrency: int, files: tuple[str, ...]) -> list[str
 def e2e_batches(frontend: Path, concurrency: int, selected: tuple[str, ...] = ()) -> tuple[tuple[tuple[str, ...], int], ...]:
     """把 `frontend/e2e` 下全部 `*.test.ts`（含子目录）分批，每批带自己的并发数，限时 600 秒。
 
-    并发时分两批：其余文件一次并发跑完，时序敏感的文件随后串行。并发为 1 时整轮是串行的，
-    按设计决定、交互回归与路由冒烟分组，每批最多 12 个文件。
+    每批最多 12 个文件。并发批之后运行时序敏感的串行批；并发为 1 时，
+    按设计决定、交互回归与路由冒烟分组。
     """
     files = tuple(sorted(path.relative_to(frontend).as_posix()
                          for path in (frontend / "e2e").rglob("*.test.ts")))
@@ -138,12 +138,14 @@ def e2e_batches(frontend: Path, concurrency: int, selected: tuple[str, ...] = ()
         design = tuple(path for path in files if path.startswith("e2e/design-"))
         routes = tuple(path for path in files if path == "e2e/smoke.test.ts")
         interactions = tuple(path for path in files if path not in design + routes)
-        return tuple((group[start:start + SERIAL_E2E_BATCH_FILES], 1)
+        return tuple((group[start:start + E2E_BATCH_FILES], 1)
                      for group in (design, interactions, routes)
-                     for start in range(0, len(group), SERIAL_E2E_BATCH_FILES))
+                     for start in range(0, len(group), E2E_BATCH_FILES))
     sensitive = tuple(path for path in files if path in TIMING_SENSITIVE_SUITES)
     shared = tuple(path for path in files if path not in sensitive)
-    return tuple(batch for batch in ((shared, concurrency), (sensitive, 1)) if batch[0])
+    return tuple((group[start:start + E2E_BATCH_FILES], lanes)
+                 for group, lanes in ((shared, concurrency), (sensitive, 1))
+                 for start in range(0, len(group), E2E_BATCH_FILES))
 
 
 @windows_ledger_roots
@@ -513,6 +515,14 @@ class MissingPrerequisiteTests(unittest.TestCase):
         self.assertCountEqual(tuple(path for files, _ in batches for path in files), paths)
         self.assertEqual([len(files) for files, _ in batches], [12, 1, 12, 12, 1, 1])
         self.assertEqual({lanes for _, lanes in batches}, {1})
+
+    def test_concurrent_batches_cover_large_groups_once_with_the_requested_concurrency(self):
+        paths = (tuple(f"e2e/feature-{index:02}.test.ts" for index in range(25))
+                 + ("e2e/smoke.test.ts", "e2e/design-cards.test.ts", "e2e/sidebar-motion.test.ts"))
+        batches = self.batches_for(4, paths=paths)
+        self.assertCountEqual(tuple(path for files, _ in batches for path in files), paths)
+        self.assertEqual([len(files) for files, _ in batches], [12, 12, 2, 2])
+        self.assertEqual([lanes for _, lanes in batches], [4, 4, 4, 1])
 
     def test_browser_batches_require_at_least_one_suite(self):
         with tempfile.TemporaryDirectory() as folder:
