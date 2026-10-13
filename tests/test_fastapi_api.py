@@ -910,10 +910,14 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         unknown = await self.client.get("/source-icon?t=secret&provider=evil.example")
         self.assertEqual(unknown.status_code, 404)
         self.assertEqual(len(hits), 2, "没登记的来源不出网")
-        self.assertEqual(
-            sorted(p.name for p in (self.candidate_root / "follow-assets" / "icons").iterdir()),
-            sorted(p.name for p in (self.candidate_root / "follow-assets" / "icons").iterdir()
-                   if p.suffix in (".img", ".failed")))
+        root = self.candidate_root / follow_assets.ROOT_NAME
+        kemono = follow_assets.cache_path(root, "icons", "kemono")
+        simpcity = follow_assets.cache_path(root, "icons", "simpcity")
+        required = {kemono.name, simpcity.with_suffix(".failed").name}
+        optional_locks = {kemono.with_suffix(".lock").name, simpcity.with_suffix(".lock").name}
+        entries = list((root / "icons").iterdir())
+        self.assertTrue(all(path.is_file() and not path.is_symlink() for path in entries))
+        self.assertEqual({path.name for path in entries} - optional_locks, required)
 
     async def test_site_marks_only_ever_resolve_a_key_the_server_already_knows(self):
         """站点圆标的地址由服务端查表得到，前端递的是键。
