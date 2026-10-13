@@ -85,12 +85,26 @@ class RemoteMediaCacheTests(unittest.IsolatedAsyncioTestCase):
     async def test_html_and_failed_status_are_not_installed(self):
         self.headers = {"content-type": "text/html", "content-length": "5"}
         self.payload = b"error"
-        await self.client.get("/media")
+        response = await self.client.get("/media")
+        self.assertEqual(response.headers['cache-control'], 'no-store')
         self.assertIsNone(self.cache.stored("follow:1:media:0"))
         self.headers["content-type"] = "video/mp4"
         self.status = 403
-        await self.client.get("/media")
+        response = await self.client.get("/media")
+        self.assertEqual(response.headers['cache-control'], 'no-store')
         self.assertIsNone(self.cache.stored("follow:1:media:0"))
+
+    async def test_invalid_media_head_is_not_cacheable_and_valid_retry_is_persistent(self):
+        self.headers['content-type'] = 'text/html'
+        response = await self.client.head('/media')
+        self.assertEqual(response.headers['cache-control'], 'no-store')
+        self.assertIsNone(self.cache.stored('follow:1:media:0'))
+        self.headers['content-type'] = 'video/mp4'
+        response = await self.client.get('/media')
+        self.assertEqual(response.content, self.payload)
+        self.assertIn('max-age=31536000', response.headers['cache-control'])
+        await self.client.get('/media')
+        self.assertEqual(self.calls, 2)
 
     async def test_truncated_response_leaves_no_cache_or_temporary_bytes(self):
         self.payload = b"short"

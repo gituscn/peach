@@ -449,15 +449,22 @@ describe('播放墙的浏览与详情', () => {
       }
       await page.getByRole('button', { name: '换一批', exact: true }).click();
       await page.waitForFunction(() => !!document.querySelector('[data-wall-id="11"]'));
+      await page.locator('[data-video-wall][data-refreshing]').waitFor({ state: 'hidden' });
       const ids = () => page.locator('[data-wall-id]').evaluateAll(nodes => [...new Set(nodes.map(node => (node as HTMLElement).dataset.wallId))].sort());
       assert.ok((await ids()).includes('11'));
       await page.locator('[data-wall-id="11"]').first().dispatchEvent('click');
       await page.locator('[data-wall-focus][data-wall-id="11"]').waitFor();
+      await page.evaluate(async () => {
+        for (let frame = 0; frame < 2; frame++) await new Promise(requestAnimationFrame);
+      });
       const position = await camera(page), visibleIds = await ids();
       await page.getByRole('button', { name: '详情', exact: true }).click();
       await page.locator('#stage[open] [data-item-side]').waitFor();
       await page.keyboard.press('Escape'); await page.locator('#stage[open]').waitFor({ state: 'hidden' });
       await page.locator('[data-wall-tile]').first().waitFor();
+      await page.evaluate(async () => {
+        for (let frame = 0; frame < 2; frame++) await new Promise(requestAnimationFrame);
+      });
       assert.deepEqual(await ids(), visibleIds);
       assert.deepEqual(await camera(page), position);
     } finally { await opened.close() }

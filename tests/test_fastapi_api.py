@@ -1684,6 +1684,30 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("ready", response.text)
 
+    async def test_playback_time_requires_a_session_and_survives_page_navigation(self):
+        denied = await self.client.get("/assets/1?t=42")
+        self.assertEqual(denied.status_code, 303)
+        self.assertTrue(denied.headers["location"].startswith("/login?"))
+        await self.client.get("/?t=secret")
+        for path in ("/assets/1", "/posts/1", "/works/ABP-968"):
+            response = await self.client.get(path + "?t=42&tag=a%20b&tag=c")
+            self.assertEqual(response.status_code, 200, path)
+            self.assertNotIn("location", response.headers)
+        legacy = await self.client.get("/item/1?t=42&mix=7")
+        self.assertEqual(legacy.headers["location"], "/assets/1?t=42&mix=7")
+        page = await self.client.get(legacy.headers["location"])
+        self.assertEqual(page.status_code, 200)
+
+    async def test_query_credentials_are_removed_without_losing_page_parameters(self):
+        response = await self.client.get(
+            "/assets/1?tag=a%20b&t=secret&t=42&tag=c&t=se%63ret&playlist=7")
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"],
+                         "/assets/1?tag=a%20b&t=42&tag=c&playlist=7")
+        self.assertIn("peach_session=", response.headers["set-cookie"])
+        page = await self.client.get(response.headers["location"])
+        self.assertEqual(page.status_code, 200)
+
     async def test_login_posts_the_token_without_putting_it_in_the_url(self):
         page = await self.client.get("/login?next=/stats")
         self.assertEqual(page.status_code, 200)

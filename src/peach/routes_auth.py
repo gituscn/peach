@@ -181,11 +181,28 @@ def require_asset_auth(request: Request) -> dict[str, str]:
     return args
 
 
+def _query_token_matches(request: Request) -> bool:
+    token = request.app.state.settings.token
+    supplied = _first_query_values(request).get("t", "")
+    return bool(token) and hmac.compare_digest(supplied.encode(), token.encode())
+
+
+def query_auth_redirect(request: Request) -> str | None:
+    """为已授权页面清除 URL 口令，保留原始编码、重复参数与播放时间。"""
+    if not _query_token_matches(request):
+        return None
+    token = request.app.state.settings.token
+    pairs = request.scope.get("query_string", b"").decode("latin-1").split("&")
+    retained = [pair for pair in pairs if parse_qs(pair).get("t") != [token]]
+    query = "&".join(retained)
+    return (request.url.path or "/") + (f"?{query}" if query else "")
+
+
 def set_auth_cookie(response: Response, request: Request, *, days: int = 30, login: bool = False) -> None:
     token = request.app.state.settings.token
     policy = _policy(request)
     response.headers["Cache-Control"] = "no-store"
-    if token and policy["mode"] in {"password", "legacy"} and (login or request.query_params.get("t") == token):
+    if token and policy["mode"] in {"password", "legacy"} and (login or _query_token_matches(request)):
         value, max_age = access.issue(policy, days)
         response.set_cookie(access.COOKIE, value, max_age=max_age, path="/", httponly=True,
                             samesite="lax", secure=request.url.scheme == "https")
