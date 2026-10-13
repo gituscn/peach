@@ -42,7 +42,7 @@ import { TaskProgress } from '../components/task-progress';
 import { SelectionDock } from '../components/selection-dock';
 import { busyProps } from '../settings/use-action';
 import {
-  authorGroups, authorName, checkedText, checkEvidenceGap, checkFailures, checkSummary,
+  authorGroups, authorName, checkedText, checkEvidenceGap, checkFailures, checkReceipt, checkSummary,
   COLUMN_SORT, dropSources, errorHeadline, fetchCheckJob, fetchPending, FOLLOW_CHECK_KEY, isBroken,
   LAYOUTS, markItem, PAGE_SIZES, pageWindow, patchSource, removeSource,
   reloadFollowManage, selectionState, setSourceEnabled, SORT_DEFAULT_DIR, SORT_OPTIONS,
@@ -268,7 +268,7 @@ export function SourceList(props: SourceListProps) {
     onError: (cause) => setProblem(errorMessage(cause)),
     onFinish: (state) => {
       void reloadFollowManage();
-      toast(state.status === 'failed' ? (state.error || '检查失败') : checkSummary(state));
+      toast(state.status === 'failed' ? (state.error || '检查失败') : checkReceipt(state));
     },
   });
 
@@ -572,6 +572,9 @@ export function SourceList(props: SourceListProps) {
           ? `${job.older ? '抓取历史' : '检查更新'}：已完成 ${job.checked || 0}/${job.total} 个来源`
           : '正在准备检查任务')} value={job?.checked} total={job?.total} /> : null}
         {problem ? <Note tone="error" title="操作未完成">{problem}</Note> : null}
+        {!running && outcome?.results?.length ? (
+          <Note tone="neutral" title="检查结果">{checkSummary(outcome)}</Note>
+        ) : null}
         {failures.length ? (
           <Note tone="error" title={`${failures.length} 个来源检查失败`}
             extra={<ul className="flex flex-col gap-0.5 text-body-2-regular">

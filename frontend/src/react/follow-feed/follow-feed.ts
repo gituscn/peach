@@ -16,7 +16,7 @@ import { keepPreviousData, type InfiniteData, type QueryKey } from '@tanstack/re
 import { seededRank } from '@peach/legacy/core';
 
 import { apiGet } from '../../api';
-import { FOLLOW_CREDENTIALS_URL } from '../follow-manage/follow-manage';
+import { FOLLOW_CREDENTIALS_URL, type CheckResult } from '../follow-manage/follow-manage';
 import { queryClient } from '../query';
 
 /* ── 地址栏那一组 ── */
@@ -451,7 +451,7 @@ export interface FollowFeedHelpers {
   jobProgress(options: FollowJobProgressOptions): void;
 }
 
-export interface FollowJobState { status?: string; job_id?: string; error?: string; [field: string]: unknown }
+export interface FollowJobState { status?: string; job_id?: string; error?: string; results?: CheckResult[]; [field: string]: unknown }
 
 export interface FollowJobProgressOptions {
   host: HTMLElement;

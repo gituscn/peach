@@ -114,7 +114,7 @@ export interface CredentialRow {
 
 export interface CredentialData { root: string; providers: CredentialRow[] }
 
-/** 检查更新那一趟的一条结果。全部成功时页内不留持久行，摘要走 Toast。 */
+/** 检查更新那一趟的一条结果。完整统计留在页内，简短回执走 Toast。 */
 export interface CheckResult {
   ok?: boolean;
   provider?: string;
@@ -606,7 +606,22 @@ export const reloadFollowManage = (): Promise<void> =>
 /** 敲字建议的防抖。这一路要打一次站点的公开补全，250ms 让连着敲的人停手之后才打一枪。 */
 export const SUGGEST_DEBOUNCE_MS = 250;
 
-/** 一次检查的结果说成一句话：新增了什么、哪些没有更新、哪些失败了。 */
+/** 检查回执只显示内容变化与失败数，完整统计由检查结果呈现。 */
+export function checkReceipt(job: Pick<CheckJob, 'results'>): string {
+  const rows = job.results || [];
+  const added = rows.reduce((total, row) => total + (row.added || 0), 0);
+  const updated = rows.reduce((total, row) => total + (row.updated || 0), 0);
+  const failed = rows.filter((row) => !row.ok).length;
+  const bits: string[] = [];
+  if (added) bits.push(`新增 ${added} 条`);
+  if (updated) bits.push(`更新 ${updated} 条`);
+  if (!bits.length && failed < rows.length) bits.push('没有更新');
+  if (failed) bits.push(`${failed} 个失败`);
+  if (!bits.length) bits.push('没有更新');
+  return `已检查 ${rows.length} 个来源：${bits.join(' · ')}`;
+}
+
+/** 一次检查的完整统计。 */
 export function checkSummary(job: CheckJob): string {
   const rows = job.results || [];
   const sum = (pick: (row: CheckResult) => number | undefined) =>
@@ -628,8 +643,7 @@ export function checkSummary(job: CheckJob): string {
   if (probed) bits.push(`回查 ${probed} 条`);
   if (quiet) bits.push(`${quiet} 个来源没有更新`);
   if (!bits.length) bits.push('没有任何更新');
-  /* 「抓到头了」和「这次没有更新」是两件事：前者以后也不会再有，后者下次还得再问一遍。
-     这句只跟着回执走，页内那条持久行只装要处理的东西。 */
+  /* 来源没有更多内容与本次没有更新分别计数。 */
   const exhausted = rows.filter((row) => row.exhausted).length;
   if (exhausted) bits.push(`${exhausted} 个没有更多内容`);
   if (failed) bits.push(`${failed} 个失败`);

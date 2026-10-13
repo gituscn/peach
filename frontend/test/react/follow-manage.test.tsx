@@ -11,7 +11,7 @@ import * as legacyUi from '@peach/legacy/ui';
 import { JOB_RUNNING_POLL_MS } from '../../src/react/background-job';
 import { queryClient } from '../../src/react/query';
 import {
-  authorAvatar, authorGroups, authorInitial, authorName, checkSummary, errorHeadline, feedIntervalText, FEEDS_CHECK_URL, FEED_SOURCE_URL,
+  authorAvatar, authorGroups, authorInitial, authorName, checkReceipt, checkSummary, errorHeadline, feedIntervalText, FEEDS_CHECK_URL, FEED_SOURCE_URL,
   FEEDS_LOOKUP_URL, FEEDS_URL, FOLLOW_CHECK_URL,
   FOLLOW_CREDENTIAL_URL, FOLLOW_CREDENTIALS_URL, FOLLOW_RESOLVE_URL, FOLLOW_SOURCE_URL,
   FOLLOW_SUGGEST_URL, FOLLOW_URL, pageWindow, prefetchFollowManage,
@@ -248,6 +248,19 @@ it('检查完的那句话把数字说出来', () => {
   expect(said).toContain('1 个失败');
 });
 
+it('检查回执保留新增、更新与失败，详细统计由完整结果承载', () => {
+  const job = { status: 'done', results: [
+    { ok: true, added: 3, updated: 2933, skipped: 301, skipped_compilations: 20,
+      history_skipped: 862, probed: 241 },
+    { ok: false },
+  ] } as CheckJob;
+  expect(checkReceipt(job)).toBe('已检查 2 个来源：新增 3 条 · 更新 2933 条 · 1 个失败');
+  expect(checkSummary(job)).toContain('跳过 281 条无资源');
+  expect(checkSummary(job)).toContain('回查 241 条');
+  expect(checkReceipt({ results: [{ ok: true }] })).toBe('已检查 1 个来源：没有更新');
+  expect(checkReceipt({ results: [{ ok: false }] })).toBe('已检查 1 个来源：1 个失败');
+});
+
 // ── 页面：视图、勾选与地址栏 ──────────────────────────────────────────────
 
 it('默认视图一位创作者一张卡', async () => {
@@ -433,6 +446,8 @@ it('起了检查就两秒一问，停了就不再问', async () => {
   await tick(JOB_RUNNING_POLL_MS);
   await settle();
   expect(props.toast).toHaveBeenCalledWith(expect.stringContaining('新增 3 条'));
+  expect(host.textContent).toContain('检查结果');
+  expect(host.textContent).toContain('检查了 1 个来源：新增 3 条');
 
   // 终态之后不再问：轮询关掉了。
   const settledAt = polls();
