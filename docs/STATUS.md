@@ -1,6 +1,6 @@
 # Peach 运行核验记录
 
-最后核验：2026-10-12
+最后核验：2026-10-13
 
 查 `/healthz`；[待办](PRODUCT_BACKLOG.md)、[复用清单](REUSE.md)、[长期约定](HANDOFF.md)。
 
@@ -27,7 +27,7 @@
 - Mac ledger 使用已授权共享副本，`in-sync`；`sources` 在内置盘，`archive`、`tools` 可在外置盘。
 - Windows doctor、诊断页通过 CA；本地目录缺失，115/PikPak 可读；密码未开、历史失败为警告。
 - Python 3.14（下限 3.12，CI 测两版）；Windows FFmpeg/ffprobe 在 `peach-data/tools/ffmpeg`，macOS 走 PATH。
-- amane 桥（ADR-0048）供番号查询；代码 `tools/amane-bridge/`，venv `peach-data/tools/amane-bridge/.venv`。
+- amane 桥 0.20.0，安装版本一致；[升级与参考复核](reference-snapshots/upstream-review.md)。
 - 发行名 `peach`、目录名 `peach-app`。macOS 按待办第 26 条处理后重启菜单栏；无口令的 `peach serve --host 0.0.0.0` 拒绝启动。
 - 扫描、采集 120 秒无进展预警；资料 90 秒、封面 240 秒超时可重试；见 `state/library-processing-<job_id>.issues.jsonl`。
 - 口味、复核、关注等聚合按账本与文件版本缓存；女优资料后继每轮存量至多 16 条。
