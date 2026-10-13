@@ -15,7 +15,7 @@ describe('关注与馆藏共用卡片交互', () => {
     try {
       opened.stub.hold = () => true;
       await opened.page.reload({ waitUntil: 'domcontentloaded' });
-      const title = opened.page.locator('[data-follow-title]');
+      const title = opened.page.locator('[data-follow-title]').last();
       await title.waitFor();
       const read = () => title.evaluate(node => {
         const style = getComputedStyle(node), box = node.getBoundingClientRect();

@@ -22,6 +22,7 @@ import { FilterGlassRows, FilterPill } from '../components/filter-glass';
 import { RetryNote, useSkeletonReveal } from '../components/grid-reveal';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { useViewGlide } from '../components/use-view-glide';
+import { useMasonryGrid } from '../components/use-masonry-grid';
 import { Segments, Shuffle } from '../entity-filter/entity-filter-page';
 import type { SegmentOption } from '../entity-filter/entity-filter';
 import { FOLLOW_CHECK_URL, FOLLOW_STATUS_URL, sourceIconUrl } from '../follow-manage/follow-manage';
@@ -550,6 +551,8 @@ function Cards({ facets, data, context, props, images }: {
   const { view, actions } = props;
   const write = useFollowWrite(props);
   const wall = images ? { 'data-size': props.photoSize, 'data-layout': props.photoLayout, 'data-images-only': String(props.imagesOnly) } : {};
+  const wallRef = useMasonryGrid(images && props.photoLayout === 'masonry',
+    `${props.photoSize}:${facets.visible.map((group) => group.primary.id).join(',')}`);
   let body: ReactNode;
   if (facets.visible.length) {
     body = facets.visible.map((group) => {
@@ -567,7 +570,7 @@ function Cards({ facets, data, context, props, images }: {
     body = <Empty data={data} filtered={!!(view.status || facets.author || facets.provider || view.work || view.tags.length)} />;
   }
   return (
-    <div data-follow-list="" data-follow-wall={images ? '' : undefined} {...wall}>
+    <div ref={wallRef} data-follow-list="" data-follow-wall={images ? '' : undefined} {...wall}>
       {body}
     </div>
   );

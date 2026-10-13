@@ -385,7 +385,7 @@ export async function openCatalogFixture(
   change: (payload: CatalogFixture, url: URL) => void,
 ): Promise<Visit> {
   const opened = await visit(browser, '/', DESKTOP);
-  let baseline: CatalogFixture | undefined;
+  const baselines = new Map<string, CatalogFixture>();
   await opened.page.route(/\/api\/items\?/, async (route) => {
     const url = new URL(route.request().url());
     /* `visit()` 返回时，首屏还可能在后台续取下一页。路由接管之后若先撞上 offset>0，
@@ -395,9 +395,12 @@ export async function openCatalogFixture(
       await route.continue();
       return;
     }
+    const key = url.searchParams.get('orient') || '';
+    let baseline = baselines.get(key);
     if (!baseline) {
       const response = await route.fetch();
       baseline = await response.json() as CatalogFixture;
+      baselines.set(key, baseline);
     }
     const payload = structuredClone(baseline);
     change(payload, url);

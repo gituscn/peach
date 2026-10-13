@@ -69,16 +69,21 @@ function Thumb({ src, fallback, width, height, provider, onLearn }: {
 }) {
   const [broken, setBroken] = useState(false);
   const [proxied, setProxied] = useState(false);
+  const [natural, setNatural] = useState<{ width: number; height: number } | null>(null);
   if (broken) return <NoThumb provider={provider} />;
   return (
-    <img src={proxied ? fallback : src} alt="" loading="lazy" referrerPolicy="no-referrer" width={width} height={height}
+    <img src={proxied ? fallback : src} alt="" loading="lazy" referrerPolicy="no-referrer"
+      width={width || natural?.width} height={height || natural?.height}
       onError={() => {
         if (fallback && fallback !== src && !proxied) setProxied(true);
         else setBroken(true);
       }}
       onLoad={onLearn ? (event) => {
         const image = event.currentTarget;
-        if (image.naturalWidth && image.naturalHeight) onLearn(image.naturalWidth, image.naturalHeight);
+        if (image.naturalWidth && image.naturalHeight) {
+          setNatural({ width: image.naturalWidth, height: image.naturalHeight });
+          onLearn(image.naturalWidth, image.naturalHeight);
+        }
       } : undefined} />
   );
 }
@@ -92,11 +97,10 @@ function FollowCardView(props: FollowCardProps) {
   const imageFallback = imageView && item.playable
     ? `/follow-stream?id=${item.id}${selectedMedia ? `&media=${selectedMedia.index}` : ''}`
     : undefined;
-  /* width/height 让浏览器在图片落地前就按固有比例占位：瀑布流按卡片高度分列，没有这两个属性时
-     未加载的图高度是零，每一张加载完都把整墙的列重新平衡一遍，卡片就在列间跳。只有图片视图摆成
-     瀑布流，视频卡片不占位也不回写。比例取卡面上这张图自己的：卡面是媒体清单里那张就落在那张上；
+  /* width/height 让浏览器在图片落地前按固有比例占位；图片视图补齐尺寸，视频卡片不回写。
+     比例取卡面上这张图自己的：卡面是媒体清单里那张就落在那张上；
      卡面就是条目自己的缩略图时落在条目上。都没有就不硬猜，走无尺寸占位那套，并在这张图加载完后
-     把固有尺寸回写给它的主人。 */
+     使用固有尺寸并回写给它的主人。 */
   const cardMedia = selectedMedia && selectedMedia.thumb_url === thumbUrl ? selectedMedia : null;
   const itemOwnsCard = !cardMedia || thumbUrl === item.thumb_url;
   const sized = imageView

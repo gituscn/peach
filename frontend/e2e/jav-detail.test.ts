@@ -271,7 +271,7 @@ describe('库外 JAV 作品详情', () => {
         await page.getByRole('button', { name: '取消想要', exact: true }).waitFor({ state: 'visible' });
         await page.getByRole('button', { name: '取消想要', exact: true }).click();
         await page.getByRole('button', { name: '想要', exact: true }).waitFor({ state: 'visible' });
-        await settle(page);
+        await settle(page, '#stage[open]');
         const geometry = await layout(page);
         assert.ok(geometry.scrollWidth <= geometry.viewportWidth + 1);
         assert.deepEqual(errors, []);

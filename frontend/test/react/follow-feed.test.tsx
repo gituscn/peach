@@ -520,6 +520,7 @@ describe('页面', () => {
     learn.mockClear();
     await load(image(3));
     expect(learn).toHaveBeenCalledWith(3, null, 300, 500);
+    expect([image(3).getAttribute('width'), image(3).getAttribute('height')]).toEqual(['300', '500']);
     await load(image(2));
     expect(learn).toHaveBeenCalledTimes(1);
     await act(async () => push({ view: view() }));

@@ -292,9 +292,9 @@
   .peach-react [data-follow-wall] { --photo-columns: 2; gap: 12px 8px; }
   .peach-react [data-follow-wall][data-size="big"] { --photo-columns: 1; }
 }
-.peach-react [data-follow-wall][data-layout="masonry"] { display: block; column-count: var(--photo-columns); column-gap: 10px; }
-.peach-react [data-follow-wall][data-layout="masonry"] > [data-follow-empty] { column-span: all; }
-.peach-react [data-follow-wall][data-layout="masonry"] > [data-media-card] { break-inside: avoid; margin: 0 0 14px; }
+.peach-react [data-follow-wall][data-layout="masonry"]:has(> [data-media-card]) {
+  row-gap: 0;
+}
 .peach-react [data-follow-wall][data-images-only="true"] [data-follow-item] :is([data-media-meta], [data-media-badge], [data-follow-collection], [data-follow-state]) { display: none; }
 
 /* ── 卡片 ──
@@ -347,12 +347,13 @@
   font: 600 11px/1 var(--board-font);
 }
 .peach-react [data-follow-image] [data-media-pic] { aspect-ratio: 4 / 3; min-height: 0; background: var(--sunk); }
-.peach-react [data-follow-image] [data-media-pic] > img { background: var(--sunk); }
+.peach-react [data-follow-image] [data-media-pic] > img { background: var(--sunk); object-fit: cover; }
 .peach-react [data-follow-image] :is([data-mix-faces], [data-mix-face] img) { background: var(--sunk); }
+.peach-react [data-follow-image] [data-mix-face] img { object-fit: cover; }
 .peach-react [data-follow-wall][data-layout="masonry"] [data-follow-image] [data-media-pic] { aspect-ratio: 1; }
-/* 只有带 width/height 属性的图才放开高度按固有比例占位：没有尺寸的保持 1:1 框，列从首帧起稳定。
+/* 带 width/height 属性的图按固有比例占位，没有尺寸的使用 1:1 框，加载后立即使用固有尺寸。
  * 图上不写 `aspect-ratio`：比例来自浏览器按这两个属性映射的 `auto w / h`，作者样式里任何一句
- * `aspect-ratio` 都会盖掉它，图落地前就退回按那一句占位，加载完再按真比例撑开，整列跟着跳。 */
+ * `aspect-ratio` 都会盖掉它。固有尺寸决定图片高度，网格只调整所在列的后续卡片。 */
 .peach-react [data-follow-wall][data-layout="masonry"] [data-follow-image] [data-media-pic]:has(> img[width][height]) { aspect-ratio: auto; }
 .peach-react [data-follow-wall][data-layout="masonry"] [data-follow-image] [data-media-pic] > img[width][height] {
   position: static;

@@ -1240,6 +1240,21 @@ class ImageDimsTests(_StoreCase):
         self.assertNotIn("width", self.store.item(item.id).metadata,
                          "媒体级尺寸不该顺手写成条目级")
 
+    def test_partial_item_and_media_dimensions_accept_a_complete_pair(self):
+        source_id = self._source(provider="kemono", ref="a")
+        item = self._record(source_id, self._image(width=800, media_items=[
+            {"id": "a", "media_kind": "image", "url": "https://kemono.cr/data/a.png", "width": 800},
+            {"id": "b", "media_kind": "image", "url": "https://kemono.cr/data/b.png", "height": 600},
+        ]))
+        self.assertTrue(self.store.set_image_dims(item.id, 800, 600))
+        for index in (0, 1):
+            self.assertTrue(self.store.set_image_dims(item.id, 800, 600, media_index=index))
+            self.assertFalse(self.store.set_image_dims(item.id, 1, 1, media_index=index))
+        metadata = self.store.item(item.id).metadata
+        self.assertEqual((metadata["width"], metadata["height"]), (800, 600))
+        self.assertEqual([(media["width"], media["height"]) for media in metadata["media_items"]],
+                         [(800, 600), (800, 600)])
+
     def test_a_full_refetch_keeps_learned_dims_until_the_source_reports_its_own(self):
         source_id = self._source(provider="kemono", ref="a")
         item = self._record(source_id, self._image(tags="a"))

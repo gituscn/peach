@@ -828,7 +828,8 @@ class FollowStore:
             "UPDATE follow_item SET metadata_json=json_set(COALESCE(metadata_json,'{}'),"
             f"'{prefix}.width',?,'{prefix}.height',?)"
             " WHERE id=? AND json_valid(COALESCE(metadata_json,'{}'))" + guard +
-            f" AND COALESCE(json_extract(metadata_json,'{prefix}.width'),0)<=0",
+            f" AND (COALESCE(json_extract(metadata_json,'{prefix}.width'),0)<=0"
+            f" OR COALESCE(json_extract(metadata_json,'{prefix}.height'),0)<=0)",
             (dims[0], dims[1], int(item_id)))
         return cursor.rowcount > 0
 
