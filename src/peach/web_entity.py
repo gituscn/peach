@@ -48,6 +48,18 @@ def _query_entity_id(args) -> int | None:
     return int(value)
 
 
+def _read_entity_query(args):
+    """资料与图集共用实体种类、名称和显式 ID 的查询契约。"""
+    kind, name = args.get("kind", ""), args.get("name", "")
+    try:
+        entity_id = _query_entity_id(args)
+    except ValueError:
+        return {"error": "invalid entity"}
+    if kind not in READ_ENTITY_KINDS or (entity_id is None and not name):
+        return {"error": "invalid entity"}
+    return kind, name, entity_id
+
+
 def _query_entity(connection, kind: str, name: str, entity_id: int | None):
     if entity_id is None:
         return resolve_entity(connection, kind, name)
@@ -67,6 +79,24 @@ def entity_id_redirect(connection, kind: str, entity_id: int) -> dict | None:
     if row is None or row['kind'] not in READ_ENTITY_KINDS:
         return None
     return {'id': row['id'], 'kind': row['kind'], 'name': row['canonical_name']}
+
+
+def _missing_entity_result(connection, kind: str, name: str, entity_id: int | None):
+    """缺失身份仅按合并来源证明返回最终资料，其余保持不存在。"""
+    if entity_id is not None:
+        redirect = entity_id_redirect(connection, kind, entity_id)
+        return {'redirect': redirect} if redirect else {"error": "not found"}
+    merged = connection.execute(
+        "SELECT DISTINCT e.id,e.kind,e.canonical_name FROM entity e "
+        "JOIN entity_alias al ON al.entity_id=e.id "
+        "JOIN entity_redirect r ON r.target_id=e.id AND r.source=al.source "
+        "WHERE al.alias=? AND al.source=? ORDER BY e.id LIMIT 2",
+        (name, f'user:identity-merge:{kind}'),
+    ).fetchall()
+    if len(merged) == 1:
+        return {'redirect': {'id': merged[0]['id'], 'kind': merged[0]['kind'],
+                             'name': merged[0]['canonical_name']}}
+    return {"error": "not found"}
 
 
 #: 资料页与索引页数作品的口径：视频，且没有标「已消失」（ADR-0087）。回收站里的照旧算；
@@ -192,33 +222,14 @@ def q_entity(contract: WebContract, args):
     `source_reference` 是私人馆藏来源证据：API 只返回站点名和备注，不把敏感下载
     地址变成可点击链接。官方、社交和资料库链接可直接访问。
     """
-    kind = args.get("kind", "")
-    name = args.get("name", "")
-    try:
-        entity_id = _query_entity_id(args)
-    except ValueError:
-        return {"error": "invalid entity"}
-    if kind not in READ_ENTITY_KINDS or (entity_id is None and not name):
-        return {"error": "invalid entity"}
+    query = _read_entity_query(args)
+    if isinstance(query, dict):
+        return query
+    kind, name, entity_id = query
     with contract.read_connection() as c:
         row = _query_entity(c, kind, name, entity_id)
         if not row:
-            if entity_id is not None:
-                redirect = entity_id_redirect(c, kind, entity_id)
-                if redirect:
-                    return {'redirect': redirect}
-                return {"error": "not found"}
-            merged = c.execute(
-                "SELECT DISTINCT e.id,e.kind,e.canonical_name FROM entity e "
-                "JOIN entity_alias al ON al.entity_id=e.id "
-                "JOIN entity_redirect r ON r.target_id=e.id AND r.source=al.source "
-                "WHERE al.alias=? AND al.source=? ORDER BY e.id LIMIT 2",
-                (name, f'user:identity-merge:{kind}'),
-            ).fetchall()
-            if len(merged) == 1:
-                return {'redirect': {'id': merged[0]['id'], 'kind': merged[0]['kind'],
-                                     'name': merged[0]['canonical_name']}}
-            return {"error": "not found"}
+            return _missing_entity_result(c, kind, name, entity_id)
         d = dict(row)
         from .web_library_shortcuts import favorite_ids
         d["favorite"] = d["id"] in favorite_ids(c)
@@ -483,13 +494,10 @@ def entity_code_sets(contract: WebContract, c, kind: str, entity_id: int) -> lis
 def q_entity_photos(contract: WebContract, args):
     """实体名下的照片：本地图片分页放在 `items`；`sets` 是分组，`kind` 为 `dir` 的是本地目录图集，
     为 `code` 的是番号样张集（`entity_code_sets`）。`total` 只数本地图片，`sample_total` 数样张。"""
-    kind, name = args.get("kind", ""), args.get("name", "")
-    try:
-        entity_id = _query_entity_id(args)
-    except ValueError:
-        return {"error": "invalid entity"}
-    if kind not in READ_ENTITY_KINDS or (entity_id is None and not name):
-        return {"error": "invalid entity"}
+    query = _read_entity_query(args)
+    if isinstance(query, dict):
+        return query
+    kind, name, entity_id = query
     try:
         limit = max(1, min(int(args.get("limit") or 120), 600))
         offset = max(0, int(args.get("offset") or 0))

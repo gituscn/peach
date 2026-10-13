@@ -44,12 +44,13 @@ interface Group { title: string; body(panel: ConfigurationPanel): ReactElement }
 let tabSequence = 0;
 
 /* 页签条是一个 tablist，方向键在整排里走、首尾相接，Home／End 到两头，挪到哪一格就选中哪一格、焦点跟过去。
-   `section` 只决定第一帧选中哪一组，之后的选中只跟用户点的走。 */
+   分区地址与选中项同步，表单保持挂载。 */
 function ConfigurationGroups(
   { data, receipt, reopenTutorial, section }: Required<ConfigurationProps> & { data: ConfigurationData },
 ) {
   const [prefix] = useState(() => `board-tabs-${++tabSequence}`);
   const [chosen, setChosen] = useState(section);
+  useEffect(() => { setChosen(section) }, [section]);
   const choose = (title: string) => {
     setChosen(title);
     shellNavigate(settingsPath(title), { replace: true, state: peachHistory.navigation.location.state });

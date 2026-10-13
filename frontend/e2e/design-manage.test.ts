@@ -609,7 +609,7 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
         targets: ['[data-skeleton] .reviewtabs button', '[data-skeleton] .skeletoncard'] },
       { path: '/follow', ready: '.followauthors .avskeleton',
         targets: ['.followauthors .avskeleton', '.followworks .brandskeleton', '[data-skeleton^="cards/"] > div > *'] },
-      { path: '/subscriptions', ready: '[data-skeleton="board/follow-manage"] .ui-follow-skeleton-toolbar',
+      { path: '/subscriptions', ready: '[data-skeleton="board/subscriptions"] .ui-follow-skeleton-toolbar',
         targets: ['[data-skeleton] .ui-follow-skeleton-toolbar [data-follow-toolbar-controls] > button:nth-of-type(1)',
           '[data-skeleton] .ui-follow-skeleton-toolbar > button:nth-of-type(1)'] },
     ];

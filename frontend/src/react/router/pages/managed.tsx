@@ -17,7 +17,7 @@ import { useLocation } from 'react-router';
 import { appSettingsStore } from '@peach/appearance';
 import {
   isOverlayPath, managedEntry, openManagedRoute, peachHistory, releaseManagedRoute, shellNavigate,
-  configurationSection,
+  configurationSection, updateManagedRoute,
 } from '@peach/history';
 import { api, isAbort } from '@peach/legacy/core';
 import {
@@ -188,13 +188,19 @@ export function ManagedMatch({ path }: { path: ManagedPath }) {
   if (!covered && (!wasCovered.current || opening.current === null)) opening.current = epoch;
   wasCovered.current = covered;
   // 路径也进 key：认领的写地址从一页换到另一页（配置页改写到数据管理页）时代次不变，页面组在同一个位置换了路由。
-  return <ManagedPage key={`${path} ${opening.current ?? 'covered'}`} path={path} covered={opening.current === null} />;
+  const group = path.startsWith('/settings/') ? '/settings/configuration' : path;
+  return <ManagedPage key={`${group} ${opening.current ?? 'covered'}`} path={path} covered={opening.current === null} />;
 }
 
 function ManagedPage({ path, covered }: { path: ManagedPath; covered: boolean }) {
   const actions = useContext(ShellActionsContext);
   const started = useRoutingStarted();
   const run = useRef<Run | null>(null);
+  useEffect(() => {
+    if (path.startsWith('/settings/')) {
+      updateManagedRoute(document.getElementById('stats'), { section: configurationSection(path) });
+    }
+  }, [path]);
   useEffect(() => {
     if (covered || !actions || !started || run.current) return;
     const current: Run = { live: true, revision: 0, controller: new AbortController() };

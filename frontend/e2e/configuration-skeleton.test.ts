@@ -95,7 +95,7 @@ describe('配置页等待态', () => {
           }, automatic_updates: { mode: 'check', interval_hours: 24, available: true, download_available: false } } });
         });
         await opened.page.reload({ waitUntil: 'load' });
-        await opened.page.locator('[data-skeleton="board/configuration"]').waitFor();
+        await opened.page.locator('[data-skeleton="board/settings/library"]').waitFor();
         const skeleton = await measure(opened.page);
         const waitingLayout = await layout(opened.page);
         release();

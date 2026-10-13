@@ -952,7 +952,7 @@ describe('设计决定：作品卡、管理页与复核', () => {
         await stubFollowManage(page);
         const release = await holdApi(page);
         await page.reload({ waitUntil: 'load' });
-        await page.locator('[data-skeleton="board/follow-manage"] .ui-follow-skeleton-toolbar').waitFor({ timeout: 15_000 });
+        await page.locator('[data-skeleton="board/subscriptions"] .ui-follow-skeleton-toolbar').waitFor({ timeout: 15_000 });
         const toolbar = '[data-skeleton] .ui-follow-skeleton-toolbar';
         const skeleton = await controlFaces(page, {
           检查全部: `${toolbar} > button:nth-of-type(1)`,
