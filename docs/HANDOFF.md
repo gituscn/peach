@@ -41,7 +41,7 @@
 - 改变运行事实的任务同时更新 [docs/STATUS.md](STATUS.md)；长期规则更新本文件、[docs/REUSE.md](REUSE.md) 或 ADR；可执行流程写成 `.claude/skills/<name>/SKILL.md`。分层判据见 ADR-0015，步骤见 `peach-context-rules`。
 - 触发是概率性的：必须每次成立的规则要由脚本、测试或 hook 强制，不能只写成技能。
 - 结论、进度、待办和证据写进共享文档或机器可读产物，不靠人转述。
-- 任务耗时与重复验证的项目记忆见 [执行效率](VERIFICATION_EFFICIENCY.md)；定向调试与记录复用见 [测试](TESTING.md)。跨对话协调只处理实际依赖，已结束对话不承担收件确认职责。
+- 用户默认授权 Peach 对话发送项目协调消息，无需重复询问；只处理实际依赖，不唤醒已结束对话收确认。执行与验证见 [执行效率](VERIFICATION_EFFICIENCY.md)、[测试](TESTING.md)。
 
 ## 并行智能体与 Git 工作树
 
@@ -69,6 +69,8 @@
   其余上游黑话词（兜底、落盘、闭环、链路）一律改写成具体机制。
 
 ## 参考产品证据登记
+
+- 收藏窗口：[BoardUI 核验](BOARD_UI.md)。
 
 - Folia 播放墙（2026-10-13）：[固定源码](https://github.com/chthollyphile/folia-major/tree/9a01e788ed52d25ea01b1f0d37934e5e371ae82b/src/components/wall)，AGPL-3.0。独立 `/wall` 页面使用其暗色、直角拼贴、标题、阴影和角落控制；12×8 单位块、每块 12 张磁贴，四套模板及镜像，6×6 原位展开与同块让位共用上游弹簧参数。
   拖动阈值 7 px、视口裁剪、探索循环与筛选有限墙。Peach 只接收有封面的视频；全封或正封按磁贴比例取景。封面铺满展开卡，标题位于中下部；播放时背景模糊、标题移到上方。固定三列续页，展开实例在屏外保持挂载。

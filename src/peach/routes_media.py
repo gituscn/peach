@@ -995,7 +995,7 @@ def follow_image(request: Request, id: int, media: int | None = None,
         return cache.stream(key, request, lambda: open_upstream(
             state.http_transport.client, request.method, target, incoming=request.headers))
     except (ValueError, FollowMediaUnavailable, FollowProxyError, OSError, httpx.HTTPError):
-        return _asset_response(request, None)
+        return Response(status_code=404, headers={"cache-control": "no-store"})
 
 
 @router.api_route("/jav-preview/{code}/{ref}", methods=["GET", "HEAD"])
@@ -1051,12 +1051,8 @@ def follow_cover(request: Request, id: int, media: int | None = None,
         else:
             path = state.follow_cover_service.cover(item, media)
     except FollowCoverUnavailable:
-        # 这里不 302 到 `item.thumb_url`：那等于把上游主机和地址交回浏览器，
-        # 而这个端点存在的全部理由就是不让它外露。FFmpeg 或网络的临时失败一律回
-        # 占位图：状态码 404，界面上是一块中性的占位，而不是碎图，也不是上游。
-        return Response(PLACEHOLDER_IMAGE, status_code=404,
-                        media_type=PLACEHOLDER_CONTENT_TYPE,
-                        headers={"cache-control": "no-store"})
+        # 失败响应不包含可解码图像，图片组件以 error 状态显示占位并允许重试。
+        return Response(status_code=404, headers={"cache-control": "no-store"})
     return _image_response(request, path, media_type="image/jpeg")
 
 

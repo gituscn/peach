@@ -2130,7 +2130,35 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             self.app.state.http_transport.client = original
             fake.close()
 
-    async def test_follow_cover_serves_cached_frame_and_degrades_to_a_placeholder(self):
+    async def test_follow_image_failure_has_no_image_body_and_can_be_retried(self):
+        from types import SimpleNamespace
+        item = SimpleNamespace(id=28, provider='simpcity', url='https://simpcity.cr/post/28',
+            thumb_url='https://cdn.example/retry.png', media_url='https://cdn.example/retry.png', metadata={}, hidden_media=())
+        calls = []
+        def upstream(request):
+            calls.append(request.url.path)
+            return httpx.Response(404 if len(calls) == 1 else 200, headers={'content-type': 'image/png'},
+                stream=httpx.ByteStream(b'' if len(calls) == 1 else b'restored-image'), request=request)
+        original = self.app.state.http_transport.client
+        fake = httpx.Client(transport=httpx.MockTransport(upstream))
+        self.app.state.http_transport.client = fake
+        try:
+            with patch('peach.routes_media.FollowStore.item', return_value=item), \
+                    patch('peach.follow_stream.resolves_publicly', return_value=True):
+                failed = await self.client.get('/follow-image?id=28&t=secret')
+                self.assertEqual(failed.status_code, 404)
+                self.assertEqual(failed.content, b'')
+                self.assertEqual(failed.headers['cache-control'], 'no-store')
+                recovered = await self.client.get('/follow-image?id=28&t=secret')
+                self.assertEqual(recovered.status_code, 200)
+                self.assertEqual(recovered.content, b'restored-image')
+                self.assertEqual((await self.client.get('/follow-image?id=28&t=secret')).content, recovered.content)
+                self.assertEqual(calls, ['/retry.png', '/retry.png'])
+        finally:
+            self.app.state.http_transport.client = original
+            fake.close()
+
+    async def test_follow_cover_serves_cached_frame_and_reports_retryable_failure(self):
         connection = sqlite3.connect(self.db)
         connection.executescript((ROOT / "migrations" / "0018_online_follow.sql").read_text(
             encoding="utf-8"))
@@ -2179,8 +2207,8 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fallback.status_code, 404)
         self.assertNotIn("location", fallback.headers)
         self.assertNotIn("paheal", fallback.text)
-        self.assertEqual(fallback.headers["content-type"],
-                         PLACEHOLDER_CONTENT_TYPE)
+        self.assertEqual(fallback.content, b"")
+        self.assertEqual(fallback.headers['cache-control'], 'no-store')
 
     async def test_rule34video_cover_uses_only_posters_from_its_work(self):
         from peach.follow_covers import FollowCoverService

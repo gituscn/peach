@@ -180,7 +180,7 @@ export function FollowFeedPage(props: FollowFeedProps) {
         <Combo conditions={conditions} onDrop={(row) => actions.route(dropCondition(view, row))}
           onClear={() => route({ author: '', provider: '', work: '', tags: [], durMin: 0, durMax: 0 })} />
         {facets.broken.length ? <BrokenNote count={facets.broken.length} onManage={actions.openManage} /> : null}
-        <List key={query.queryKey.join('\u0000')} pending={listPending} facets={facets} data={data} context={context}
+        <List key={query.queryKey.join('\u0000')} retryKey={result.dataUpdatedAt} pending={listPending} facets={facets} data={data} context={context}
           props={props} />
         {data.has_more || canBackfill ? (
           <div data-follow-pagination="">
@@ -535,8 +535,9 @@ function BrokenNote({ count, onManage }: { count: number; onManage(): void }) {
 
 /* ── 列表 ── */
 
-function List({ pending, facets, data, context, props }: {
+function List({ pending, facets, data, context, props, retryKey }: {
   pending: boolean; facets: Facets; data: FollowPage; context: FollowContext; props: FollowFeedProps;
+  retryKey: number;
 }) {
   const { view, helpers } = props;
   const images = view.media === 'images';
@@ -545,14 +546,15 @@ function List({ pending, facets, data, context, props }: {
     <div data-follow-list-body="" data-grid-reveal={reveal.fading ? '' : undefined}>
       {reveal.layer}
       {pending ? null : (
-        <Cards facets={facets} data={data} context={context} props={props} images={images} />
+        <Cards facets={facets} data={data} context={context} props={props} images={images} retryKey={retryKey} />
       )}
     </div>
   );
 }
 
-function Cards({ facets, data, context, props, images }: {
+function Cards({ facets, data, context, props, images, retryKey }: {
   facets: Facets; data: FollowPage; context: FollowContext; props: FollowFeedProps; images: boolean;
+  retryKey: number;
 }) {
   const { view, actions } = props;
   const write = useFollowWrite(props);
@@ -566,7 +568,7 @@ function Cards({ facets, data, context, props, images }: {
       const siblings = (source?.author_key && facets.authorSources.get(source.author_key)) || [];
       const id = group.primary.id;
       return (
-        <FollowCard key={`${id}:${view.media}`} group={group} authorSources={siblings} media={view.media}
+        <FollowCard key={`${id}:${view.media}`} group={group} authorSources={siblings} media={view.media} retryKey={retryKey}
           context={context} selected={props.selected.has(cardId(group, view))} selectMode={props.selectMode}
           busy={write.busy.get(cardId(group, view)) || ''} failure={write.failures.get(cardId(group, view)) || ''}
           actions={actions} onStatus={write.status} onSave={write.save} />

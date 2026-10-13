@@ -1416,9 +1416,8 @@ class Rule34XxxConnector(_BaseConnector):
     @classmethod
     def display_thumb_url(cls, item) -> str | None:
         matched = cls._PREVIEW_RE.match(str(item.thumb_url or ""))
-        if matched:
-            return ("https://api-cdn.rule34.xxx/images/"
-                    f"{matched.group(1)}/{matched.group(2)}.jpg")
+        if matched and str(item.metadata.get("media_kind") or "") == "image":
+            return str(item.media_url or item.thumb_url or "") or None
         return str(item.thumb_url or "") or None
 
     def _dapi(self, tags: str, *, limit: int, page: int = 0,

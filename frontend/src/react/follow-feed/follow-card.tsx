@@ -1,7 +1,7 @@
 /* 关注页的一张卡：一个作品，本站的 alt 与 WIP、跨站的另见都折在里面。
  *
  * 形状同馆藏作品卡（`../components/media-card.tsx`）：封面格在上，下面一行头像、两行标题、一行署名
- * 与时间，再往下是另见徽章、标签和「媒体未取得」。封面格左上是来源角标，右下是时长，右上是合并
+ * 与时间，再往下是标签和「媒体未取得」。封面格左上是来源与另见角标，右下是时长，右上是合并
  * 计数；保存、已看、忽略几枚圆键悬停或键盘聚焦时出现在计数那个位置、计数淡出，触屏上常驻并排在计数下面。
  *
  * 结构与样式钩子沿用作品卡的 `data-media-*`（几何、悬停面、选中描边、勾选圆都在
@@ -11,7 +11,7 @@
  *
  * 一叠（`isMix`）悬停时逐张翻过组里彼此不同的画面，时序与门槛同 Mix 卡（`../components/use-stack-flip.ts`）。
  * 翻的是卡片渲染时就在手上的缩略图，悬停不为动画再发请求；第一张是静止封面本身。 */
-import { memo, useCallback, useRef, useState, type ComponentPropsWithoutRef, type MouseEvent } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type ComponentPropsWithoutRef, type MouseEvent } from 'react';
 import { esc, fmtDur, icon } from '@peach/legacy/core';
 import { tagLabel } from '@peach/legacy/tags';
 
@@ -42,6 +42,7 @@ export function FollowAuthorLink({ name, actions, children, ...attrs }: {
 
 export interface FollowCardProps {
   variant?: 'grid' | 'next';
+  retryKey?: number;
   group: FollowGroup;
   /** 这张卡的创作者名下那几个来源：头像与署名读它。 */
   authorSources: readonly FollowSource[];
@@ -62,14 +63,16 @@ const NoThumb = ({ provider }: { provider: string }) => (
   <span data-follow-nothumb="" dangerouslySetInnerHTML={{ __html: sourceMark(provider) }} />
 );
 
-/** 卡面图片直连失败时尝试原图代理，每个入口只尝试一次；都取不到就换成没缩略图的那一格。 */
-function Thumb({ src, fallback, width, height, provider, onLearn }: {
+/** 卡面图片失败时尝试原图代理；数据刷新时允许失败图片重新取图。 */
+function Thumb({ src, fallback, width, height, provider, onLearn, retryKey }: {
   src: string; fallback?: string; width?: number; height?: number; provider: string;
+  retryKey?: number;
   onLearn?: (width: number, height: number) => void;
 }) {
   const [broken, setBroken] = useState(false);
   const [proxied, setProxied] = useState(false);
   const [natural, setNatural] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => { setBroken(false) }, [retryKey]);
   if (broken) return <NoThumb provider={provider} />;
   return (
     <img src={proxied ? fallback : src} alt="" loading="lazy" referrerPolicy="no-referrer"
@@ -161,7 +164,7 @@ function FollowCardView(props: FollowCardProps) {
         <div data-media-pic="">
           {thumbUrl
             ? <Thumb key={thumbUrl} src={thumbUrl} fallback={imageFallback} width={sized?.width} height={sized?.height}
-                provider={picProvider} onLearn={learn} />
+                provider={picProvider} onLearn={learn} retryKey={props.retryKey} />
             : <NoThumb provider={picProvider} />}
           {stack.faces.length > 1 ? (
             <div data-mix-faces="" hidden={!flip.faces.length}>
@@ -172,9 +175,12 @@ function FollowCardView(props: FollowCardProps) {
               ))}
             </div>
           ) : null}
-          <span data-media-badge="" title={item.provider_label || item.provider}
-            aria-label={`来源：${item.provider_label || item.provider}`}
-            dangerouslySetInnerHTML={{ __html: sourceMark(item.provider, item.provider_label) }} />
+          <div data-follow-sources="">
+            <span data-media-badge="" title={item.provider_label || item.provider}
+              aria-label={`来源：${item.provider_label || item.provider}`}
+              dangerouslySetInnerHTML={{ __html: sourceMark(item.provider, item.provider_label) }} />
+            {badges ? <span data-follow-badges="" dangerouslySetInnerHTML={{ __html: badges }} /> : null}
+          </div>
           {actions.toggleSelection ? <span data-media-check="" onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -235,7 +241,6 @@ function FollowCardView(props: FollowCardProps) {
           {issue ? <span data-follow-issue="">{issue}</span> : null}
         </div>
         <div data-media-tags="" data-follow-labels="">
-          {badges ? <span data-follow-badges="" dangerouslySetInnerHTML={{ __html: badges }} /> : null}
           {tags.map((tag) => (
             <span key={tag} data-media-tag="" data-tag-cat={`r34-${item.tag_types?.[tag] || 'unknown'}`}
               data-follow-tag={tag}>

@@ -14,6 +14,7 @@
 
 | 条目 | 注册表 JSON 的 SHA-256 | 复制的文件 |
 | --- | --- | --- |
+| `avatar`（2026-10-14） | `614f2a384e2d44c0a15df8e3fc42c1648ccd7101f1c8be98911087641ab28aec` | `components/base/avatar/avatar.tsx` |
 | `theme` | `436353b1f8466dd56adf3909cb7a871288e0d6f5b067cf03a2f860375d2a013e` | `styles/theme.css` |
 | `typography` | `5b7eca25350829755eb15cb474ab009fd1f8b929e62d54182f648b4f2e97bf8e` | `styles/typography.css` |
 | `cx` | `d118c2ace1454a92fbfb69ad0d03b2916fece06ef5102ae26dcedaa6da2e390c` | `utils/cx.ts` |

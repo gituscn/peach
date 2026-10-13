@@ -13,9 +13,10 @@ import {
   type FollowPage, type FollowSource, type FollowStackInfo, type FollowView,
 } from '../../src/react/follow-feed/follow-feed';
 import { FollowFeedPage } from '../../src/react/follow-feed/follow-feed-page';
+import { FollowCard } from '../../src/react/follow-feed/follow-card';
 import { learnFollowDims } from '../../src/react/follow-feed/follow-marks';
 import { queryClient } from '../../src/react/query';
-import { click, mount, settle } from './render';
+import { click, mount, mountRoot, settle } from './render';
 
 /* 回写尺寸那一批由 `follow-marks.test.ts` 量；这里只看卡片在什么时候报。 */
 vi.mock(import('../../src/react/follow-feed/follow-marks'), async (importOriginal) => ({
@@ -39,6 +40,23 @@ const group = (primary: FollowItem, extra: Partial<FollowGroup> = {}): FollowGro
   ({ primary, variants: [], duplicates: [], stack: null, ...extra });
 const source = (id: number, author: string, extra: Partial<FollowSource> = {}): FollowSource => ({
   id, provider: 'kemono', provider_label: 'Kemono', author_key: `name:${author}`, last_status: 'ok', ...extra,
+});
+
+it('失败封面随数据刷新重试，可用图片保持同一节点', async () => {
+  const common = { group: group(item(1)), authorSources: [], media: 'videos' as const,
+    context: { sources: [], aliases: [], credentials: new Set<string>() }, selected: false, selectMode: false,
+    busy: '', failure: '', actions: { openDetail: vi.fn(), openAuthor: vi.fn(), canFlip: () => false } };
+  const root = await mountRoot(<FollowCard {...common} retryKey={1} />);
+  const first = root.host.querySelector('[data-media-pic] > img')!;
+  await act(async () => first.dispatchEvent(new Event('error')));
+  expect(root.host.querySelector('[data-follow-nothumb]')).not.toBeNull();
+  await root.rerender(<FollowCard {...common} retryKey={1} />);
+  expect(root.host.querySelector('[data-media-pic] > img')).toBeNull();
+  await root.rerender(<FollowCard {...common} retryKey={2} />);
+  const recovered = root.host.querySelector('[data-media-pic] > img');
+  expect(recovered).not.toBeNull();
+  await root.rerender(<FollowCard {...common} retryKey={3} />);
+  expect(root.host.querySelector('[data-media-pic] > img')).toBe(recovered);
 });
 
 describe('请求地址', () => {

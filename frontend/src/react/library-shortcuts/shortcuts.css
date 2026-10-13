@@ -17,6 +17,28 @@
 .peach-react [data-favorite][aria-pressed="true"] { color: var(--color-yellow-500); }
 .peach-react [data-favorite][aria-pressed="true"] svg { fill: currentColor; }
 .peach-react [data-favorite][aria-busy="true"] { color: var(--muted); cursor: wait; }
+.peach-react [data-shortcuts-trigger] { flex: 0 0 104px; width: 104px; white-space: nowrap; }
+.peach-react [data-shortcuts-entry] { position: relative; display: inline-flex; flex: 0 0 104px; width: 104px; height: 32px; }
+.peach-react [data-shortcuts-glass] { position: relative; z-index: 1; height: 32px; padding: 0 12px; border: 0; border-radius: var(--control-radius); background: transparent; color: var(--glass-text); font: var(--board-body); cursor: pointer; }
+.peach-react [data-shortcuts-glass]:focus-visible { outline: 2px solid var(--tungsten); outline-offset: 2px; }
+.peach-react [data-shortcuts-panel] { height: 614px; max-height: calc(100dvh - 32px); }
+.peach-react [data-shortcuts-body] { display: flex; flex: 1; min-height: 0; min-width: 0; }
+.peach-react [data-shortcuts-categories] { display: flex; flex: 0 0 240px; flex-direction: column; gap: 4px; padding: 10px; overflow-y: auto; border-right: 1px solid var(--color-separator-border); background: var(--color-background-secondary-default); }
+.peach-react [data-shortcuts-categories] > button { display: flex; flex: none; align-items: center; gap: 8px; padding: 8px; border: 0; border-radius: var(--control-radius); background: transparent; color: var(--color-text-secondary); font: var(--board-body); text-align: left; cursor: pointer; }
+.peach-react [data-shortcuts-categories] > button:hover { color: var(--color-text-primary); }
+.peach-react [data-shortcuts-categories] > button[aria-pressed="true"] { background: var(--color-background-secondary-hover); color: var(--color-text-primary); }
+.peach-react [data-shortcuts-categories] > button:focus-visible { outline: 2px solid var(--tungsten); outline-offset: -2px; }
+.peach-react [data-shortcuts-count] { margin-left: auto; color: var(--muted); font: var(--board-caption); }
+.peach-react [data-shortcuts-content] { flex: 1; }
+.peach-react [data-shortcuts-content] [data-empty-state] { padding: 16px; }
+.peach-react [data-shortcuts-row] { padding-block: 12px; border-bottom: 1px solid var(--color-separator-border); }
+.peach-react [data-shortcuts-avatar] { position: relative; display: inline-flex; flex: none; }
+.peach-react [data-shortcuts-avatar] > svg { position: absolute; top: 8px; left: 8px; color: var(--color-foreground-icon-secondary); }
+@media (max-width: 760px) {
+  .peach-react [data-shortcuts-body] { flex-direction: column; }
+  .peach-react [data-shortcuts-categories] { flex: none; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--color-separator-border); }
+  .peach-react [data-shortcuts-categories] > button { white-space: nowrap; }
+}
 @media (width <= 640px) {
   :is(.peach-react[data-index-head], .peach-react [data-index-head]) [data-shortcuts-trigger] { order: 3; }
 }
