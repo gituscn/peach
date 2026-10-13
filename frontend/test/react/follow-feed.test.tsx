@@ -469,6 +469,9 @@ describe('页面', () => {
     const start = fetcher.mock.calls.find(([url, init]) => url === '/api/follow/check' && init?.method === 'POST');
     expect(JSON.parse(String(start?.[1]?.body))).toEqual({ older: true, background: true });
     const options = (given.helpers.jobProgress as ReturnType<typeof vi.fn>).mock.calls.at(-1)![0];
+    expect(host.querySelector('[data-follow-older]')?.textContent).toContain('抓取中');
+    expect(host.querySelector('[data-follow-older]')?.getAttribute('aria-busy')).toBe('true');
+    expect(host.querySelector('[data-follow-recheck]')?.getAttribute('aria-busy')).toBe('true');
     await act(async () => options.busy(true));
     expect(host.querySelector('[data-follow-older]')?.textContent).toContain('抓取中');
     expect(host.querySelector('[data-follow-backfill]')?.textContent).toBe('每个来源都抓到第 2 页');
