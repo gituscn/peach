@@ -54469,7 +54469,7 @@ function jOe(e, t) {
 //#region src/react/wants/resource-display.ts
 function MOe(e) {
 	let t = /^([\d,]+)\s*B$/i.exec(e.trim());
-	return /^[\d,.]+$/.test(e.trim()) ? "大小未标注" : t ? Ht(Number(t[1].replaceAll(",", ""))) : e || "大小未知";
+	return /^[\d,.]+$/.test(e.trim()) ? "大小未知" : t ? Ht(Number(t[1].replaceAll(",", ""))) : e || "大小未知";
 }
 function NOe(e) {
 	return /^更多评论.*(?:VIP|官方 App)/.test(e) ? "来源只返回了部分评论，资源链接可能不完整。" : e;
@@ -54606,11 +54606,13 @@ function POe({ want: e, readOnly: t, downloads: n, provider: r, toast: i, onSour
 									children: e.protocol === "magnet" ? "磁链" : e.protocol === "ed2k" ? "ED2K" : "网页链接"
 								}), /* @__PURE__ */ (0, x.jsx)("p", {
 									"data-resource-title": "",
+									title: e.name,
 									className: "min-w-0 flex-1 text-body-2-medium text-text-primary",
 									children: e.name
 								})]
 							}), /* @__PURE__ */ (0, x.jsxs)("div", {
-								className: "flex flex-wrap gap-x-3 gap-y-1 break-words text-caption-1-regular text-text-secondary",
+								"data-resource-facts": "",
+								className: "flex flex-wrap gap-x-2 gap-y-1 text-caption-1-regular text-text-secondary",
 								children: [
 									/* @__PURE__ */ (0, x.jsx)(AR, {
 										icon: Xde,
@@ -54627,9 +54629,10 @@ function POe({ want: e, readOnly: t, downloads: n, provider: r, toast: i, onSour
 									}) : null,
 									/* @__PURE__ */ (0, x.jsx)(AR, {
 										icon: Nde,
-										children: e.date ? `${e.source === "JavDB 评论" ? "评论" : "收录"} ${e.date}` : "日期未知"
+										title: e.source === "JavDB 评论" ? "评论日期" : "收录日期",
+										children: e.date ? e.date.slice(0, 10) : "日期未知"
 									}),
-									e.attributes.map((e) => /* @__PURE__ */ (0, x.jsx)(AR, {
+									e.attributes.filter((e) => e !== "高清").map((e) => /* @__PURE__ */ (0, x.jsx)(AR, {
 										icon: BD,
 										children: e
 									}, e))
@@ -54639,24 +54642,6 @@ function POe({ want: e, readOnly: t, downloads: n, provider: r, toast: i, onSour
 							"data-resource-actions": "",
 							className: "flex flex-wrap gap-2",
 							children: [
-								/* @__PURE__ */ (0, x.jsx)(gO, {
-									"data-button-link": "",
-									variant: "secondary",
-									size: "small",
-									trailingIcon: LD,
-									href: e.source_url,
-									target: "_blank",
-									rel: "noopener noreferrer",
-									children: "链接来源"
-								}),
-								/* @__PURE__ */ (0, x.jsx)(G, {
-									variant: "secondary",
-									size: "small",
-									leadingIcon: Bde,
-									...q(f.busy === `copy:${e.id}`),
-									onClick: () => S(e),
-									children: "复制链接"
-								}),
 								e.protocol === "magnet" ? /* @__PURE__ */ (0, x.jsx)(G, {
 									variant: "primary",
 									size: "small",
@@ -54666,7 +54651,25 @@ function POe({ want: e, readOnly: t, downloads: n, provider: r, toast: i, onSour
 									...q(f.busy === e.id),
 									onClick: () => y(e),
 									children: r ? "已添加" : "添加下载"
-								}) : null
+								}) : null,
+								/* @__PURE__ */ (0, x.jsx)(G, {
+									variant: e.protocol === "magnet" ? "secondary" : "primary",
+									size: "small",
+									leadingIcon: Bde,
+									...q(f.busy === `copy:${e.id}`),
+									onClick: () => S(e),
+									children: "复制链接"
+								}),
+								/* @__PURE__ */ (0, x.jsx)(gO, {
+									"data-button-link": "",
+									variant: "secondary",
+									size: "small",
+									trailingIcon: LD,
+									href: e.source_url,
+									target: "_blank",
+									rel: "noopener noreferrer",
+									children: "链接来源"
+								})
 							]
 						})]
 					}, e.id);
@@ -54777,16 +54780,6 @@ function WOe({ want: e, readOnly: t, busy: n, onReset: r, onRemove: i, onCloudDo
 					/* @__PURE__ */ (0, x.jsxs)("div", {
 						className: "mt-1 flex flex-wrap items-center gap-2",
 						children: [
-							d ? /* @__PURE__ */ (0, x.jsx)(gO, {
-								"data-button-link": "",
-								variant: "secondary",
-								size: "small",
-								trailingIcon: LD,
-								href: d,
-								target: "_blank",
-								rel: "noopener noreferrer",
-								children: "来源页"
-							}) : null,
 							e.phase === "searching" || e.phase === "given_up" ? /* @__PURE__ */ (0, x.jsx)(G, {
 								variant: "secondary",
 								size: "small",
@@ -54809,7 +54802,17 @@ function WOe({ want: e, readOnly: t, busy: n, onReset: r, onRemove: i, onCloudDo
 								...q(n === `remove:${e.id}`),
 								onClick: i,
 								children: "移除"
-							})
+							}),
+							d ? /* @__PURE__ */ (0, x.jsx)(gO, {
+								"data-button-link": "",
+								variant: "secondary",
+								size: "small",
+								trailingIcon: LD,
+								href: d,
+								target: "_blank",
+								rel: "noopener noreferrer",
+								children: "来源页"
+							}) : null
 						]
 					})
 				]
@@ -62596,9 +62599,10 @@ function dB({ children: e, wireDrag: t, busy: n, ...r }) {
 }
 //#endregion
 //#region src/react/components/detail-continuation.tsx
-function fB({ queue: e, children: t }) {
+function fB({ queue: e, children: t, editionCards: n }) {
 	return /* @__PURE__ */ (0, x.jsxs)("div", {
 		"data-detail-continuation": "",
+		"data-edition-cards": n == null ? void 0 : Math.min(3, n),
 		children: [e, t]
 	});
 }
@@ -63800,6 +63804,7 @@ function lPe(e) {
 			actions: r
 		})]
 	}), /* @__PURE__ */ (0, x.jsx)(fB, {
+		editionCards: n?.kind === "editions" ? n.items.length : void 0,
 		queue: n ? /* @__PURE__ */ (0, x.jsx)(fPe, {
 			queue: n,
 			itemId: t.id,
@@ -65063,14 +65068,6 @@ function kPe({ code: e, item: t, actions: n, readOnly: r, retry: i, retrying: a 
 						"data-jav-actions": "",
 						children: [
 							/* @__PURE__ */ (0, x.jsx)(G, {
-								variant: "secondary",
-								disabled: r,
-								"aria-pressed": !!f,
-								...q(!!m.busy),
-								onClick: h,
-								children: f ? "取消想要" : "想要"
-							}),
-							/* @__PURE__ */ (0, x.jsx)(G, {
 								variant: "primary",
 								onClick: () => d({
 									code: t.code,
@@ -65081,6 +65078,14 @@ function kPe({ code: e, item: t, actions: n, readOnly: r, retry: i, retrying: a 
 									origin: `jav:${t.code}`
 								}),
 								children: "查找资源"
+							}),
+							/* @__PURE__ */ (0, x.jsx)(G, {
+								variant: "secondary",
+								disabled: r,
+								"aria-pressed": !!f,
+								...q(!!m.busy),
+								onClick: h,
+								children: f ? "取消想要" : "想要"
 							}),
 							t.source_url ? /* @__PURE__ */ (0, x.jsx)(G, {
 								variant: "secondary",
@@ -65262,7 +65267,6 @@ function jPe({ item: e, navigate: t }) {
 			"data-identity-primary": "",
 			children: [
 				r("performer", "女优", e.performer_refs.filter((e) => e.gender === "female"), "female"),
-				r("performer", "男优", e.performer_refs.filter((e) => e.gender === "male"), "male"),
 				r("performer", "出演者", e.performer_refs.filter((e) => !e.gender || e.gender === "unknown"), "unknown"),
 				r("studio", "厂牌", e.studio_refs)
 			]

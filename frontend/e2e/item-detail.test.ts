@@ -10,7 +10,7 @@ import { after, before, describe, it } from 'node:test';
 import type { Browser, Page } from 'playwright-core';
 
 import { layout, launch, VIEWPORTS } from './harness.ts';
-import { CATALOG, ITEM, NAMES, PLAYLIST, RELATED, openItemPage } from './item-fixture.ts';
+import { CATALOG, EDITIONS, ITEM, NAMES, PLAYLIST, RELATED, openItemPage } from './item-fixture.ts';
 
 const DESKTOP = VIEWPORTS.find((viewport) => !viewport.mobile)!;
 const MOBILE = VIEWPORTS.find((viewport) => viewport.mobile)!;
@@ -58,6 +58,33 @@ describe('作品详情岛', () => {
   after(async () => {
     await browser.close();
   });
+
+  for (const count of [1, 2, 3]) {
+    it(`${count} 张版本卡按内容分配空间，推荐卡与版本卡等宽对齐`, { timeout: 60_000 }, async () => {
+      const opened = await openItemPage(browser, '/', DESKTOP, { ready: '#grid [data-media-card]' });
+      try {
+        const page = opened.page;
+        await page.route(url => url.pathname === '/api/editions', route => route.fulfill({ json: {
+          ...EDITIONS, items: Array.from({ length: count }, (_, index) => ({ ...EDITIONS.items[index % 2], id: 31 + index })),
+        } }));
+        await page.goto(new URL(`/editions/${ITEM.edition}/${ITEM.edition}`, page.url()).toString());
+        await page.locator('#stage [data-queue-row]').first().waitFor();
+        await page.locator('#stage [data-item-related] [data-media-card]').first().waitFor();
+        const measured = await page.locator('[data-detail-continuation]').evaluate(node => {
+          const queue = node.querySelector('[data-mix-queue]')!.getBoundingClientRect();
+          const cards = [...node.querySelectorAll('[data-queue-row]')].map(card => card.getBoundingClientRect());
+          const related = node.querySelector('[data-item-related] [data-media-card]')!.getBoundingClientRect();
+          return { width: queue.width, full: node.getBoundingClientRect().width, cards: cards.map(card => ({ width: card.width, y: card.y })), related: { width: related.width, y: related.y } };
+        });
+        const width = measured.cards[0]!.width;
+        if (count < 3) assert.ok(Math.abs(measured.width - (count * width + (count - 1) * 10 + 28)) < 1, JSON.stringify(measured));
+        else assert.ok(Math.abs(measured.width - measured.full / 2) < 1, JSON.stringify(measured));
+        assert.ok(measured.cards.every(card => Math.abs(card.width - measured.related.width) < 1 && Math.abs(card.y - measured.related.y) < 1), JSON.stringify(measured));
+        if (count === 2) await page.screenshot({ path: '../build/detail-two-versions.png' });
+        assert.deepEqual(withoutPlayer(opened.problems), []);
+      } finally { await opened.close() }
+    });
+  }
 
   for (const destination of ['/activity', '/performers']) {
     it(`分卷等待响应时后退到 ${destination}：舞台撤回，晚到的响应不能改变地址或历史深度`, { timeout: 60_000 }, async () => {

@@ -112,7 +112,8 @@ function Detail(props: ItemDetailProps & { item: DetailItem; queue: DetailQueue 
           autoplay={props.queue?.autoplay} onEnded={continuePart} />
         <Side item={item} queue={queue} write={write} helpers={helpers} actions={actions} />
       </div>
-      <DetailContinuation queue={queue ? <Queue queue={queue} itemId={item.id} helpers={helpers} actions={actions} /> : null}>
+      <DetailContinuation editionCards={queue?.kind === 'editions' ? queue.items.length : undefined}
+        queue={queue ? <Queue queue={queue} itemId={item.id} helpers={helpers} actions={actions} /> : null}>
         {props.relatedLimit > 0 && (!queue || queue.kind === 'parts' || queue.kind === 'editions')
           ? <Related {...props} item={queue ? { ...item, id: queue.seedId ?? item.id } : item} /> : null}
       </DetailContinuation>

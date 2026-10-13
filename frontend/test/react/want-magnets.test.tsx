@@ -35,7 +35,9 @@ async function open(items = [candidate], readOnly = false, ok = true) {
 it('自动查询，展示来源、大小、日期与属性，直接添加到选定的云下载目录', async () => {
   const { host, fetcher, toast } = await open();
   expect(fetcher.mock.calls[0]?.[0]).toBe('/api/wants/magnets?id=1');
-  for (const text of ['4 GB', '2 个文件', '2026-10-01', '字幕', '高清', 'JavDB']) expect(host.textContent).toContain(text);
+  for (const text of ['4 GB', '2 个文件', '2026-10-01', '字幕', 'JavDB']) expect(host.textContent).toContain(text);
+  expect(host.querySelector('[data-resource-facts]')?.textContent).not.toContain('高清');
+  expect([...host.querySelectorAll('[data-resource-actions] button, [data-resource-actions] a')].map(node => node.textContent)).toEqual(['添加下载', '复制链接', '链接来源']);
   await click(buttonNamed('添加下载', host));
   await settle();
   const writes = fetcher.mock.calls.filter(([, init]) => init?.method === 'POST');
@@ -104,6 +106,7 @@ it('ED2K 类型使用文字，字节容量按馆藏口径展示', async () => {
   expect(buttonNamed('添加下载', host)).toBeNull();
   expect(resourceSize('1.61 GB')).toBe('1.61 GB');
   expect(resourceSize('')).toBe('大小未知');
+  expect(resourceSize('123')).toBe('大小未知');
   expect(resourceNotice('更多评论需要 JavDB VIP 或官方 App。')).toBe('来源只返回了部分评论，资源链接可能不完整。');
 });
 

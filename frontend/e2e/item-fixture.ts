@@ -73,7 +73,7 @@ const PARTS = { title: 'PCH-021', items: [21, 22, 23].map((id, at) => ({
   performers: NAMES.slice(0, 2),
   entity_refs: { performer: NAMES.slice(0, 2).map((name, index) => ref(name, index + 1, { has_image: true })) },
 })) };
-const EDITIONS = { title: 'PCH-031', items: [{ ...card(31), edition_label: '中字' }, { ...card(32), edition_label: '无码' }] };
+export const EDITIONS = { title: 'PCH-031', items: [{ ...card(31), edition_label: '中字' }, { ...card(32), edition_label: '无码' }] };
 export const PLAYLIST = { id: 7, name: '周末片单', items: [11, 14, 15, 16] };
 export const SAMPLE_ITEM = jav(41, 'PCH-041', { sample_images: [{ n: 1 }, { n: 3 }] });
 DETAILS.set(SAMPLE_ITEM.id, SAMPLE_ITEM);

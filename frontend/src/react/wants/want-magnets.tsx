@@ -126,25 +126,25 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
                 <Chip variant="caption" color={candidate.protocol === 'magnet' ? 'blue' : candidate.protocol === 'ed2k' ? 'purple' : 'neutral'}>
                   {candidate.protocol === 'magnet' ? '磁链' : candidate.protocol === 'ed2k' ? 'ED2K' : '网页链接'}
                 </Chip>
-                <p data-resource-title="" className="min-w-0 flex-1 text-body-2-medium text-text-primary">{candidate.name}</p>
+                <p data-resource-title="" title={candidate.name} className="min-w-0 flex-1 text-body-2-medium text-text-primary">{candidate.name}</p>
               </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-1 break-words text-caption-1-regular text-text-secondary">
+              <div data-resource-facts="" className="flex flex-wrap gap-x-2 gap-y-1 text-caption-1-regular text-text-secondary">
                 <ResourceFact icon={RiLink}>{candidate.source}</ResourceFact>
                 <ResourceFact icon={RiHardDrive2Line} title={`来源大小：${candidate.size}`}>{resourceSize(candidate.size)}</ResourceFact>
                 {candidate.files ? <ResourceFact icon={RiFileList2Line}>{candidate.files.replaceAll('個', '个')}</ResourceFact> : null}
-                <ResourceFact icon={RiCalendarLine}>{candidate.date ? `${candidate.source === 'JavDB 评论' ? '评论' : '收录'} ${candidate.date}` : '日期未知'}</ResourceFact>
-                {candidate.attributes.map((value) => <ResourceFact key={value} icon={RiPriceTag3Line}>{value}</ResourceFact>)}
+                <ResourceFact icon={RiCalendarLine} title={candidate.source === 'JavDB 评论' ? '评论日期' : '收录日期'}>{candidate.date ? candidate.date.slice(0, 10) : '日期未知'}</ResourceFact>
+                {candidate.attributes.filter(value => value !== '高清').map((value) => <ResourceFact key={value} icon={RiPriceTag3Line}>{value}</ResourceFact>)}
               </div>
             </div>
             <div data-resource-actions="" className="flex flex-wrap gap-2">
-              <ButtonLink data-button-link="" variant="secondary" size="small" trailingIcon={RiExternalLinkLine} href={candidate.source_url} target="_blank" rel="noopener noreferrer">链接来源</ButtonLink>
-              <Button variant="secondary" size="small" leadingIcon={RiFileCopyLine} {...busyProps(action.busy === `copy:${candidate.id}`)}
-                onClick={() => copy(candidate)}>复制链接</Button>
               {candidate.protocol === 'magnet' ?
               <Button variant="primary" size="small" leadingIcon={configured ? PROVIDER_ICONS[configured.key] : RiCloudLine} title={configured ? `下载到 ${configured.label}` : undefined} disabled={readOnly || !downloads?.available || !configured || added}
                 {...busyProps(action.busy === candidate.id)} onClick={() => add(candidate)}>
                 {added ? '已添加' : '添加下载'}
               </Button> : null}
+              <Button variant={candidate.protocol === 'magnet' ? 'secondary' : 'primary'} size="small" leadingIcon={RiFileCopyLine} {...busyProps(action.busy === `copy:${candidate.id}`)}
+                onClick={() => copy(candidate)}>复制链接</Button>
+              <ButtonLink data-button-link="" variant="secondary" size="small" trailingIcon={RiExternalLinkLine} href={candidate.source_url} target="_blank" rel="noopener noreferrer">链接来源</ButtonLink>
             </div>
           </li>;
         });
