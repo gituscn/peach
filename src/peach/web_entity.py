@@ -169,6 +169,8 @@ def q_entity(contract: WebContract, args):
                 return {'redirect': {'kind': merged[0]['kind'], 'name': merged[0]['canonical_name']}}
             return {"error": "not found"}
         d = dict(row)
+        from .web_library_shortcuts import favorite_ids
+        d["favorite"] = d["id"] in favorite_ids(c)
         try:
             metadata = json.loads(d.pop("metadata_json") or "{}")
         except (TypeError, ValueError):
@@ -607,7 +609,7 @@ def q_index(contract: WebContract, kind, q="", limit=600, offset=0, category="")
             _attach_index_following(c, rows)
             category_counts = entity_classification.counts(c,entity_kind,q,COUNTED_VIDEO)
         else:
-            sql = ("SELECT e.canonical_name k, count(DISTINCT " + video_work_key(contract, c) + ") n "
+            sql = ("SELECT e.id entity_id,e.canonical_name k, count(DISTINCT " + video_work_key(contract, c) + ") n "
                    "FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id "
                    "JOIN asset a ON a.id=ae.asset_id WHERE " + COUNTED_VIDEO + " AND e.kind='tag' "
                    f"AND e.canonical_name NOT IN ({','.join('?' for _ in LENGTH_TAGS)}) "
@@ -624,6 +626,10 @@ def q_index(contract: WebContract, kind, q="", limit=600, offset=0, category="")
                 all_rows = [row for row in all_rows if row["cat"] == category]
             rows = all_rows[offset:offset + limit]
             has_more = offset + limit < len(all_rows)
+        from .web_library_shortcuts import favorite_ids
+        favorites = favorite_ids(c)
+        for row in rows:
+            row["favorite"] = row.get("entity_id") in favorites
     if kind in INDEX_ENTITY_KINDS:
         entity_kind = INDEX_ENTITY_KINDS[kind]
         # 索引页一屏几十个圆头像，走的是和顶栏那排同一条两级链：规范实体图优先，

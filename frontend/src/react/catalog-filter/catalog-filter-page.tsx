@@ -13,6 +13,7 @@ import { fitSkeleton, popBadges, popCount } from '@peach/legacy/ui';
 
 import { FilterGlassRows, FilterPill } from '../components/filter-glass';
 import { useViewGlide } from '../components/use-view-glide';
+import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
 import { Combo, Segments, Shuffle, SortKeys } from '../entity-filter/entity-filter-page';
 import {
   EMPTY_SLOTS, ROW_AHEAD, ROW_BATCH, ROW_FIRST, type CatalogFilterProps, type CatalogTag, type TierKind,
@@ -185,6 +186,7 @@ function Head({ count, refreshing, layout, sorts, actions }: CatalogFilterProps)
     <>
       <Readout count={count} />
       <span data-entity-sorts="">
+        <LibraryShortcuts currentHref={actions.currentHref} />
         <Shuffle onPress={shuffle} busy={shuffling || refreshing} />
         {/* 按名字换键：JAV 与首页各一组，React Aria 的单选组挂上之后不改 `name`。 */}
         {layout ? <Segments key={layout.name} name={layout.name} label={layout.label} value={layout.value} options={layout.options}

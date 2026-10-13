@@ -225,9 +225,16 @@ def w_settings(contract: SettingsContract, body) -> dict:
             merged[key] = body[key]
     stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     with contract.write_transaction() as connection:
+        row = connection.execute("SELECT settings_json FROM profile WHERE id=?", (DEFAULT_PROFILE_ID,)).fetchone()
+        try:
+            current = json.loads(row[0] or "{}") if row else {}
+        except (TypeError, ValueError):
+            current = {}
+        current = current if isinstance(current, dict) else {}
+        current.update({key: merged[key] for key in body})
         updated = connection.execute(
             "UPDATE profile SET settings_json=?, updated_at=? WHERE id=?",
-            (json.dumps(merged, ensure_ascii=False), stamp, DEFAULT_PROFILE_ID),
+            (json.dumps(current, ensure_ascii=False), stamp, DEFAULT_PROFILE_ID),
         ).rowcount
         if not updated:
             raise ValueError(f"profile {DEFAULT_PROFILE_ID} 不存在")

@@ -93,6 +93,7 @@ from .web_playlists import q_playlist, q_playlists, w_playlist
 from .web_resource_sync import w_purge_missing, w_resource_sync_apply, w_resource_sync_scan
 from .web_review import q_review, w_review_decision, w_review_genre
 from .web_settings import q_settings, w_settings
+from .web_library_shortcuts import q_library_shortcuts, w_library_shortcuts
 from .web_scraping import (
     q_scraping, q_scraping_amane_bridge, w_scraping_amane_check, w_scraping_amane_rebuild,
     w_scraping_check, w_scraping_cover, w_scraping_settings,
@@ -327,6 +328,7 @@ GET_HANDLERS = {
     "/api/scraping/cover": lambda contract, args: contract.scraping_cover_job.snapshot() or {"status": "idle"},
     "/api/scraping/amane-bridge": q_scraping_amane_bridge,
     "/api/settings": q_settings,
+    "/api/library-shortcuts": q_library_shortcuts,
     "/api/feeds": q_feeds,
     "/api/feeds/check": q_feed_check,
     "/api/feeds/discoveries": q_feed_discoveries,
@@ -427,6 +429,7 @@ POST_HANDLERS = {
     "/api/review/decision": w_review_decision,
     "/api/review/genre": w_review_genre,
     "/api/settings": w_settings,
+    "/api/library-shortcuts": w_library_shortcuts,
     "/api/entity-name": w_entity_name,
     "/api/entity-alias": w_entity_alias,
 }
