@@ -329,6 +329,9 @@ class EntityRedirectRouteTests(unittest.TestCase):
         facets = q_facets(contract, filters={'tag': 'Tag A'})
         self.assertEqual(facets['stats']['total'], profile['asset_count'])
         self.assertEqual({item['k']: item['n'] for item in facets['tags']}, {'Tag A': 1, 'Visible only': 1})
+        scoped_facets = q_facets(contract, scope_kind='tag', scope_name='Tag A')
+        self.assertEqual(scoped_facets['stats']['total'], profile['asset_count'])
+        self.assertEqual(scoped_facets['tags'], facets['tags'])
 
         with sqlite3.connect(self.app.state.settings.db_path) as connection:
             connection.execute("UPDATE asset_tag_preference SET hidden=0 WHERE normalized_tag='tag a'")

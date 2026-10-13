@@ -533,7 +533,12 @@ export function installCatalog7() {
   }
 
 export function installCatalog12() {
-applicationEffects.handler($('#wallBtn'), 'onclick', ()=>{setSelectMode(false,true);navigationState.navigatePath(wallAddress(undefined,{...entityState.activeFilterState(),jav:javActive()?'1':''}))});
+applicationEffects.handler($('#wallBtn'), 'onclick', ()=>{
+  setSelectMode(false,true);
+  const context=currentBarsContext(),filters={...entityState.activeFilterState(),jav:javActive()?'1':''};
+  if(context.type==='entity'&&context.kind!=='tag')filters[context.kind]=context.name;
+  navigationState.navigatePath(wallAddress(undefined,filters));
+});
 catalogState.mixRelatedCache = new Map();
 catalogState.reduceMotion = ()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
 catalogState.tagList = (value=state.tag)=>String(value||'').split(',').filter(Boolean);

@@ -46996,10 +46996,15 @@ function Cbe(e = `${location.pathname}${location.search}`, t = {}) {
 		performers: "performer",
 		creators: "creator",
 		studios: "studio",
-		series: "series"
+		series: "series",
+		tags: "tag"
 	}[r || ""], o = Nt(n.pathname) && n.pathname !== "/junk-files" || n.pathname === "/jav" || !!(a && i.length), s = new URLSearchParams(o ? n.search : "");
 	for (let [e, n] of Object.entries(t)) n && (o || ["jav", "loc"].includes(e)) && s.set(e, n);
-	return o && jt[n.pathname] && s.set("state", jt[n.pathname]), a && i.length && s.set(a, decodeURIComponent(i.join("/"))), s.set("returnTo", `${n.pathname}${n.search}`), `/wall?${s}`;
+	if (o && jt[n.pathname] && s.set("state", jt[n.pathname]), a && i.length) {
+		let e = decodeURIComponent(i.join("/")), t = /^[0-9]+$/.test(e) ? xt(a, Number(e)) : e;
+		t && a === "tag" ? (s.set("tag", [.../* @__PURE__ */ new Set([t, ...(s.get("tag") || "").split(",").filter(Boolean)])].join(",")), s.set("tag_match", "all")) : t && !s.has(a) && s.set(a, t);
+	}
+	return s.set("returnTo", `${n.pathname}${n.search}`), `/wall?${s}`;
 }
 function GP() {
 	let e = new URLSearchParams(FO.navigation.location.search).get("returnTo") || "/";
@@ -102756,10 +102761,12 @@ function Rlt() {
 }
 function zlt() {
 	Y5.handler(L("#wallBtn"), "onclick", () => {
-		y7(!1, !0), Q.navigatePath(Cbe(void 0, {
+		y7(!1, !0);
+		let e = l7(), t = {
 			...o7.activeFilterState(),
 			jav: V7() ? "1" : ""
-		}));
+		};
+		e.type === "entity" && e.kind !== "tag" && (t[e.kind] = e.name), Q.navigatePath(Cbe(void 0, t));
 	}), X.mixRelatedCache = /* @__PURE__ */ new Map(), X.reduceMotion = () => matchMedia("(prefers-reduced-motion:reduce)").matches, X.tagList = (e = W.tag) => String(e || "").split(",").filter(Boolean), X.tagPressed = (e, t) => X.tagList(e).includes(String(t)), X.withTagToggled = (e, t) => {
 		let n = X.tagList(e), r = n.indexOf(t);
 		return r >= 0 ? n.splice(r, 1) : n.push(t), n.join(",");

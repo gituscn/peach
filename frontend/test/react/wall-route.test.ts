@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { wallAddress } from '../../src/react/video-wall/wall-route';
+import { registerEntityLink } from '../../src/core/entity-links';
 
 describe('播放墙独立入口', () => {
   it('全局入口保留返回地址，非作品页使用馆藏范围', () => {
@@ -33,5 +34,19 @@ describe('播放墙独立入口', () => {
     expect(target.searchParams.get('state')).toBe('fresh');
     expect(target.searchParams.get('tag')).toBe('风景');
     expect(target.searchParams.get('jav')).toBe('1');
+  });
+  it('数字实体地址转换为规范名字，显式上下文保持优先', () => {
+    registerEntityLink('performer', 'Alice', 71);
+    const target = new URL(wallAddress('/performers/71?jav=1', { tag: '风景' }), location.origin);
+    expect(target.searchParams.get('performer')).toBe('Alice');
+    expect(target.searchParams.get('returnTo')).toBe('/performers/71?jav=1');
+    expect(new URL(wallAddress('/performers/71', { performer: '当前规范名' }), location.origin)
+      .searchParams.get('performer')).toBe('当前规范名');
+  });
+  it('标签资料进入播放墙时沿用标签交集', () => {
+    registerEntityLink('tag', '巨乳', 72);
+    const target = new URL(wallAddress('/tags/72?tag=口交'), location.origin);
+    expect(target.searchParams.get('tag')).toBe('巨乳,口交');
+    expect(target.searchParams.get('tag_match')).toBe('all');
   });
 });

@@ -171,7 +171,7 @@ class WebContract:
         self.revision_cache_keys: set[str] = set()
         self.aggregate_locks: dict[str, threading.RLock] = {}
         self.follow_check_lock = threading.Lock()
-        #: 任务中心。每个后台任务的开始、进度与结束都写这一张表，`/activity` 只读它。
+        #: 任务中心。每个后台任务的开始、进度与结束都写这一张表，`/tasks` 只读它。
         #: 只读端由 `api` 关掉写入：那边的账本是复制来的，写一行就是一处合不回去的分叉。
         self.task_runs = TaskRunStore(self.database)
         #: 云下载后处理复用 Web 层的垃圾评分与整理设置，但核心后继不反向依赖 Web。
