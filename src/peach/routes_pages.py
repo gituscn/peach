@@ -38,7 +38,7 @@ from fastapi.responses import (
 from . import distribution, onboarding, settings_file
 from .config import PROJECT_ROOT
 from .entities import resolve_entity, resolve_entity_id
-from .routes_auth import require_asset_auth, require_page_auth, set_auth_cookie
+from .routes_auth import query_auth_redirect, require_asset_auth, require_page_auth, set_auth_cookie
 from .web_entry import page_shell, runtime_fact_entries
 from .web_state import FAVICON
 
@@ -227,8 +227,9 @@ def stylesheet_response(request: Request, web: Path) -> Response:
 @router.api_route("/", methods=["GET", "HEAD"])
 def index(request: Request, args: dict[str, str] = Depends(require_page_auth)):
     settings = request.app.state.settings
-    if settings.token and args.get("t"):
-        response = RedirectResponse(request.url.path or "/", status_code=303)
+    auth_target = query_auth_redirect(request)
+    if auth_target is not None:
+        response = RedirectResponse(auth_target, status_code=303)
         set_auth_cookie(response, request)
         return response
     if not settings.configured:
