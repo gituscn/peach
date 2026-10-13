@@ -2223,6 +2223,47 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.get(f"/follow-cover?id={item.id}&t=secret")).status_code, 200)
         self.assertEqual(len(requests), 2)
 
+    async def test_custom_metadata_api_keeps_preview_read_only_and_requires_auth(self):
+        root = self.root.resolve() / 'custom-secrets'
+        body = {'name': '测试来源', 'endpoint': 'https://metadata.example.com/{code}',
+                'fields': {'code': 'id', 'title': 'title'}, 'content_types': ['censored'], 'enabled': False}
+        with patch.object(self.app.state.web_contract, 'follow_secrets_root', root):
+            self.assertEqual((await self.client.get('/api/custom-metadata')).status_code, 401)
+            with patch('peach.custom_metadata.fetch_json', return_value={'id': 'ABW-001', 'title': '标题'}):
+                preview = await self.client.post('/api/custom-metadata', json=dict(body, action='preview', code='ABW-001'),
+                                                 headers={'X-Token': 'secret'})
+            self.assertEqual(preview.status_code, 200, preview.text)
+            self.assertEqual(preview.json()['record']['title'], '标题')
+            self.assertFalse((root / 'custom-metadata.json').exists())
+            saved = await self.client.post('/api/custom-metadata', json=body, headers={'X-Token': 'secret'})
+            self.assertEqual(saved.status_code, 200, saved.text)
+            read = await self.client.get('/api/custom-metadata', headers={'X-Token': 'secret'})
+            self.assertEqual(read.json(), saved.json())
+            removed = await self.client.post('/api/custom-metadata', json={'action': 'delete', 'id': saved.json()['items'][0]['id']},
+                                             headers={'X-Token': 'secret'})
+            self.assertEqual(removed.json(), {'items': []})
+
+    async def test_external_player_links_authorize_only_one_asset_and_support_ranges(self):
+        denied = await self.client.post('/api/external-playback?id=1', json={})
+        self.assertEqual(denied.status_code, 401)
+        issued = await self.client.post('/api/external-playback?id=1', json={}, headers={'X-Token': 'secret'})
+        self.assertEqual(issued.status_code, 200, issued.text)
+        links = issued.json()
+        self.assertNotIn('secret', json.dumps(links))
+        self.assertNotIn(str(self.media_root), json.dumps(links))
+        media = await self.client.get(links['url'], headers={'Range': 'bytes=2-5'})
+        self.assertEqual(media.status_code, 206)
+        self.assertEqual(media.content, b'2345')
+        playlist = await self.client.get(links['playlist'])
+        self.assertEqual(playlist.status_code, 200)
+        self.assertIn('#EXTM3U', playlist.text)
+        self.assertIn(links['url'], playlist.text)
+        self.assertNotIn(str(self.media_root), playlist.text)
+        self.assertEqual((await self.client.get(links['url'].replace('/1?', '/2?'))).status_code, 401)
+        cross_site = await self.client.post('/api/external-playback?id=1', json={},
+            headers={'X-Token': 'secret', 'Origin': 'https://attacker.example'})
+        self.assertEqual(cross_site.status_code, 403)
+
     async def test_stream_session_cancel_is_authenticated_and_tombstoned(self):
         denied = await self.client.post("/api/stream-cancel?session=detail-1")
         self.assertEqual(denied.status_code, 401)

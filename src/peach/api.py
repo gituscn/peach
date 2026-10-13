@@ -391,6 +391,8 @@ def create_app(
     app.state.downloads = downloads
     app.state.mount_reachability = mount_reachability
     app.state.stream_sessions = StreamSessionRegistry()
+    import secrets
+    app.state.external_playback_key = secrets.token_bytes(32)
     app.state.sync = sync
     app.state.tunnel = tunnel_manager
 

@@ -90,6 +90,7 @@ from .web_organize import (
 )
 from .web_orphan_records import q_orphan_records, w_orphan_attach
 from .web_playlists import q_playlist, q_playlists, w_playlist
+from .web_custom_metadata import q_custom_metadata, w_custom_metadata
 from .web_resource_sync import w_purge_missing, w_resource_sync_apply, w_resource_sync_scan
 from .web_review import q_review, w_review_decision, w_review_genre
 from .web_settings import q_settings, w_settings
@@ -365,6 +366,7 @@ GET_HANDLERS = {
     "/api/tops": _get_tops,
     "/api/ads": _get_ads,
     "/api/related": _get_related,
+    "/api/custom-metadata": q_custom_metadata,
     "/api/playlists": q_playlists,
     "/api/playlist": q_playlist,
     "/api/facets": _get_facets,
@@ -406,6 +408,7 @@ POST_HANDLERS = {
     "/api/play": w_play,
     "/api/feedback": w_feedback,
     "/api/watch-later": w_watch_later,
+    "/api/custom-metadata": w_custom_metadata,
     "/api/playlist": w_playlist,
     "/api/preference": w_preference,
     "/api/quality-goal": w_quality_goal,
@@ -439,6 +442,7 @@ POST_HANDLERS = {
 #: 不该拦它们——「查找」只联网、「存凭据」只写本机 secrets 文件，都不碰账本。
 #: 追更的「查找」在只读端被拦成 409 是实测踩到的。
 READ_ONLY_POST_ROUTES = frozenset({
+    "/api/custom-metadata",
     "/api/scraping/settings", "/api/scraping/check",
     "/api/follow/resolve", "/api/follow/credential",
     "/api/taste/refresh", "/api/taste/source", "/api/resource-sync/scan",

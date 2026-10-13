@@ -180,6 +180,44 @@ def _hls_plan(state, asset_id: int, session: str = "", conversion: bool | None =
     return None if not plan else (asset, source, plan, False)
 
 
+@router.post("/api/external-playback")
+def external_playback(request: Request, id: int, args: dict[str, str] = Depends(require_auth)):
+    from .external_playback import TTL_SECONDS, issue
+    state = request.app.state
+    asset = state.media_engine.asset(id)
+    state.media_engine.filesystem.file_for(asset, thumbnail=False)
+    ticket = issue(state.external_playback_key, id)
+    path = f"/external-stream/{id}?ticket={ticket}"
+    playlist = f"/external-playlist/{id}.m3u?ticket={ticket}"
+    return JSONResponse({"url": path, "playlist": playlist, "expires_in": TTL_SECONDS},
+                        headers={"Cache-Control": "no-store"})
+
+
+def _external_asset(request: Request, asset_id: int, ticket: str):
+    from .external_playback import valid
+    from fastapi import HTTPException
+    state = request.app.state
+    if not valid(state.external_playback_key, asset_id, ticket):
+        raise HTTPException(401, "播放链接已失效，请在作品详情重新打开")
+    asset = state.media_engine.asset(asset_id)
+    return state.media_engine.filesystem.file_for(asset, thumbnail=False)
+
+
+@router.api_route("/external-stream/{id}", methods=["GET", "HEAD"])
+def external_stream(request: Request, id: int, ticket: str):
+    path = _external_asset(request, id, ticket)
+    return BufferedFileResponse(path, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
+@router.get("/external-playlist/{id}.m3u")
+def external_playlist(request: Request, id: int, ticket: str):
+    _external_asset(request, id, ticket)
+    url = str(request.base_url).rstrip('/') + f"/external-stream/{id}?ticket={ticket}"
+    return PlainTextResponse(f"#EXTM3U\n#EXTINF:-1,Peach {id}\n{url}\n", media_type="audio/x-mpegurl",
+                             headers={"Content-Disposition": f'attachment; filename="peach-{id}.m3u"',
+                                      "Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
 @router.api_route("/stream", methods=["GET", "HEAD"])
 def stream(request: Request, id: int, session: str = "", args: dict[str, str] = Depends(require_auth)):
     state = request.app.state
