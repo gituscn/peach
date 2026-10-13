@@ -22,6 +22,8 @@ PR #41、#43、#44、#45、#46、#47、#48 在隔离工作树按项目接管入�
 
 Motion 14.0.0 的大版本删除内部兼容 API。Peach 只通过 `motion` 公共入口使用，没有直接引用 `framer-motion`、`motion-dom`、`motion-utils` 或被移除的 timeline 内部 API；版本由其内部精确依赖保持一致，类型检查、组件与浏览器回归由项目完整测试入口核验。
 
+轮播箭头几何用例在图片就绪后等待渲染阶段，再读位置；`ResizeObserver` 的异步测量不能由图片 `complete` 代替。位置、尺寸、黑边中心和桌面／手机断言保持完整。
+
 ## 参考来源判断
 
 运行项目 `check_reference_updates.py check --diff`，覆盖 weekly、monthly、quarterly；manual 不在本轮范围。47 个来源中 28 个未变化，19 个报告漂移，另有 amane 运行依赖前移。14 份原文按完整 SHA-256 与 Git revision 接受；5 份人工笔记保留。
