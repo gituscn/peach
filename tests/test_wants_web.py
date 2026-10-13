@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import json
 import sys
 import tempfile
 import unittest
@@ -19,11 +20,97 @@ from support.ledger import fresh_ledger  # noqa: E402
 
 
 class MagnetLookupTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.items = [{'protocol': 'magnet', 'uri': 'magnet:?xt=urn:btih:' + 'a' * 40,
+                       'size': '4 GB', 'attributes': [], 'name': 'DEMO-001'}]
+
+    def test_saved_resources_are_read_while_another_title_owns_the_search_lock(self):
+        from peach.wants_magnets import MagnetSearch
+        from unittest.mock import Mock
+        fetcher = Mock(return_value={'items': self.items})
+        search = MagnetSearch(self.root, fetcher=fetcher)
+        found = search.query('DEMO-001')
+        with search.lock:
+            self.assertEqual(search.query('demo-001'), found)
+            refreshing = search.query('DEMO-001', refresh=True)
+            self.assertEqual(refreshing['state'], 'busy')
+            self.assertEqual(refreshing['items'], found['items'])
+        self.assertEqual(fetcher.call_count, 1)
+
+    def test_restart_keeps_resources_and_the_original_expiry(self):
+        from peach.wants_magnets import MagnetSearch
+        from unittest.mock import Mock
+        now = [1_800_000_000.0]
+        fetcher = Mock(return_value={'items': self.items})
+        first = MagnetSearch(self.root, fetcher=fetcher, wallclock=lambda: now[0])
+        result = first.query('OLD-001', released='2020-01-01')
+        now[0] += 8 * 86400
+        restarted = MagnetSearch(self.root, fetcher=fetcher, clock=lambda: 5.0, wallclock=lambda: now[0])
+        self.assertEqual(restarted.query('OLD-001', released='2020-01-01'), result)
+        self.assertEqual(fetcher.call_count, 1)
+        now[0] += 358 * 86400
+        expired = MagnetSearch(self.root, fetcher=fetcher, clock=lambda: 3.0, wallclock=lambda: now[0])
+        expired.query('OLD-001', released='2020-01-01')
+        self.assertEqual(fetcher.call_count, 2)
+
+    def test_recent_titles_expire_after_one_week_across_restart(self):
+        from peach.wants_magnets import MagnetSearch
+        from unittest.mock import Mock
+        now = [1_800_000_000.0]
+        fetcher = Mock(return_value={'items': []})
+        MagnetSearch(self.root, fetcher=fetcher, wallclock=lambda: now[0]).query('DEMO-001')
+        now[0] += 7 * 86400 + 1
+        MagnetSearch(self.root, fetcher=fetcher, wallclock=lambda: now[0]).query('DEMO-001')
+        self.assertEqual(fetcher.call_count, 2)
+
+    def test_failed_manual_refresh_preserves_successful_resources_on_disk(self):
+        from peach.wants_magnets import MagnetSearch
+        from unittest.mock import Mock
+        fetcher = Mock(side_effect=[{'items': self.items}, ValueError('source failure')])
+        search = MagnetSearch(self.root, fetcher=fetcher, sleeper=lambda seconds: None)
+        result = search.query('DEMO-001')
+        snapshot = search.path.read_bytes()
+        failed = search.query('DEMO-001', refresh=True)
+        self.assertEqual(failed['state'], 'error')
+        self.assertEqual(failed['items'], result['items'])
+        self.assertEqual(search.path.read_bytes(), snapshot)
+        self.assertEqual(search.query('DEMO-001'), result)
+        self.assertEqual(MagnetSearch(self.root, fetcher=fetcher).query('DEMO-001'), result)
+        self.assertEqual(fetcher.call_count, 2)
+
+    def test_invalid_saved_records_do_not_prevent_resource_search(self):
+        from peach.wants_magnets import MagnetSearch
+        from unittest.mock import Mock
+        fetcher = Mock(return_value={'items': []})
+        path = self.root / 'cache' / 'want-resources.json'
+        path.parent.mkdir()
+        for payload in ('{', json.dumps({'version': 1, 'entries': [{'code': 'DEMO-001',
+                        'saved': float('inf'), 'result': {'state': 'ready', 'items': []}}]})):
+            path.write_text(payload, encoding='utf-8')
+            self.assertEqual(MagnetSearch(self.root, fetcher=fetcher).query('DEMO-001')['state'], 'ready')
+        self.assertEqual(fetcher.call_count, 2)
+
+    def test_persistent_cache_keeps_the_most_recent_128_titles(self):
+        from peach.wants_magnets import MagnetSearch
+        from unittest.mock import Mock
+        fetcher = Mock(return_value={'items': []})
+        search = MagnetSearch(self.root, fetcher=fetcher, sleeper=lambda seconds: None)
+        for number in range(129):
+            search.query(f'DEMO-{number:03}')
+        restarted = MagnetSearch(self.root, fetcher=fetcher)
+        with restarted.lock:
+            self.assertEqual(restarted.query('DEMO-128')['state'], 'ready')
+            self.assertEqual(restarted.query('DEMO-000')['state'], 'busy')
+        self.assertEqual(fetcher.call_count, 129)
+
     def test_cache_serializes_and_expires_without_mutating_ledger(self):
         from peach.wants_magnets import MagnetSearch
         calls = []
         now = [100.0]
-        search = MagnetSearch(Path('.'), fetcher=lambda root, code: calls.append(code) or {"items": [], "warnings": []},
+        search = MagnetSearch(self.root, fetcher=lambda root, code: calls.append(code) or {"items": [], "warnings": []},
                               clock=lambda: now[0], sleeper=lambda seconds: None)
         self.assertEqual(search.query('DEMO-001')['state'], 'ready')
         search.query('DEMO-001')
@@ -42,7 +129,7 @@ class MagnetLookupTests(unittest.TestCase):
         self.assertEqual(cache_lifetime(None, today), 7 * 86400)
         self.assertEqual(cache_lifetime('2026-02-28', date(2026, 5, 31)), 7 * 86400)
         now, calls = [100.0], []
-        search = MagnetSearch(Path('.'), fetcher=lambda root, code: calls.append(code) or {'items': []},
+        search = MagnetSearch(self.root, fetcher=lambda root, code: calls.append(code) or {'items': []},
                               clock=lambda: now[0], sleeper=lambda seconds: None)
         search.query('OLD-001', released='2020-01-01')
         now[0] += 8 * 86400
@@ -57,7 +144,7 @@ class MagnetLookupTests(unittest.TestCase):
         def failed(root, code):
             calls.append(code)
             raise ValueError('failed')
-        search = MagnetSearch(Path('.'), fetcher=failed, clock=lambda: now[0], sleeper=lambda seconds: None)
+        search = MagnetSearch(self.root, fetcher=failed, clock=lambda: now[0], sleeper=lambda seconds: None)
         search.query('OLD-001', released='2020-01-01')
         now[0] += 61
         search.query('OLD-001', released='2020-01-01')
@@ -68,7 +155,7 @@ class MagnetLookupTests(unittest.TestCase):
         from peach.sources import SourceFailure, FailureReason
         def refused(root, code):
             raise SourceFailure(FailureReason.AUTH_REQUIRED, 'javdb 要求登录')
-        result = MagnetSearch(Path('.'), fetcher=refused).query('DEMO-001')
+        result = MagnetSearch(self.root, fetcher=refused).query('DEMO-001')
         self.assertEqual(result['state'], 'error')
         self.assertIn('登录', result['error'])
 
