@@ -99039,7 +99039,7 @@ var m5 = (e) => ({
 			savePreference: t.saveFollowPreference,
 			toast: (e) => t.receipt(e),
 			openFollow: t.openFollow,
-			openServiceConfiguration: () => t.navigate("/settings/library?section=%E6%9D%A5%E6%BA%90%E4%B8%8E%E8%AE%A2%E9%98%85")
+			openServiceConfiguration: () => t.navigate("/settings/subscriptions")
 		})
 	}
 }, g5 = (e) => Object.hasOwn(h5, e), Eat = { "/resource-sync": { element: /* @__PURE__ */ (0, x.jsx)(wat, {}) } }, Dat = { "/immerse": { element: /* @__PURE__ */ (0, x.jsx)(fat, {}) } }, _5 = {

@@ -202,7 +202,7 @@ export const MANAGED_ROUTES: ManagedRouteTable = {
     page: (open, actions) => (
       <FollowManagePage {...open} route={actions.routeFollowManage} savePreference={actions.saveFollowPreference}
         toast={(message) => actions.receipt(message)} openFollow={actions.openFollow}
-        openServiceConfiguration={() => actions.navigate('/settings/library?section=' + encodeURIComponent('来源与订阅'))} />
+        openServiceConfiguration={() => actions.navigate('/settings/subscriptions')} />
     ),
   },
 };
