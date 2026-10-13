@@ -189,13 +189,13 @@ def region_facet_rows(rows) -> list[dict]:
 
 def _entity_asset_filter(connection, kind: str, name: str) -> tuple[str, list[int]]:
     """名称按资料页身份解析，作品范围包含旗下厂牌或事务所成员。"""
-    from .web_entity import scope_predicate
+    from .web_entity import _tag_scope_visibility, scope_predicate
 
     entity = resolve_entity(connection, kind, name)
     if entity is None:
         return "0", []
-    predicate = scope_predicate(kind, "entity_id")
-    return f"a.id IN (SELECT asset_id FROM asset_entity WHERE {predicate})", [entity["id"]]
+    predicate = scope_predicate(kind, "scoped.entity_id") + _tag_scope_visibility(kind, "scoped.entity_id", "scoped.asset_id")
+    return f"a.id IN (SELECT scoped.asset_id FROM asset_entity scoped WHERE {predicate})", [entity["id"]]
 
 
 def catalog_filter(contract: WebContract, args):

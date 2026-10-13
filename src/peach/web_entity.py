@@ -90,6 +90,14 @@ def scope_predicate(kind: str, column: str, subject: str = "?") -> str:
     return f"{column}={subject}"
 
 
+def _tag_scope_visibility(kind: str, entity_column: str, asset_column: str) -> str:
+    """标签资料的资产范围遵守当前用户的隐藏选择。"""
+    if kind != "tag":
+        return ""
+    normalized = f"(SELECT normalized_name FROM entity WHERE id={entity_column})"
+    return " AND " + tag_not_hidden(asset_column, normalized)
+
+
 #: 索引页地址 → `entity.kind`。有资料页就该有索引页：只靠女优页上那个名字进事务所页的话，
 #: 名下没有关系的几十家等于只能靠猜地址。标签不在这里，它走另一条分支。
 INDEX_ENTITY_KINDS = {"performers": "performer", "creators": "creator",
@@ -239,11 +247,12 @@ def q_entity(contract: WebContract, args):
             d['company_profile'] = company_profiles.public_profile(metadata)
         # 创作者在关注里的那一面（ADR-0096）：绑在名下的来源和同名等确认的那几组。
         d["follow"] = web_follow.entity_follow(contract, c, d["id"]) if kind == "creator" else None
-        scope = scope_predicate(kind, "ae.entity_id")
+        scope = scope_predicate(kind, "ae.entity_id") + _tag_scope_visibility(kind, "ae.entity_id", "a.id")
         count, rep = c.execute(
             "SELECT count(DISTINCT " + video_work_key(contract, c) + "),"
             "(SELECT a2.id FROM asset_entity ae2 CROSS JOIN asset a2 ON a2.id=ae2.asset_id "
             " WHERE " + scope_predicate(kind, "ae2.entity_id") +
+            _tag_scope_visibility(kind, "ae2.entity_id", "a2.id") +
             " AND a2.medium='video' AND a2.snapshot_path IS NOT NULL " +
             (" AND " + solo_performer_clause("a2.id", "ae2.entity_id") if kind == "performer" else "") +
             " ORDER BY a2.size DESC LIMIT 1) "
@@ -260,6 +269,7 @@ def q_entity(contract: WebContract, args):
             "JOIN entity tag ON tag.id=tagged.entity_id "
             "JOIN asset a ON a.id=scope.asset_id "
             "WHERE " + scope_predicate(kind, "scope.entity_id") +
+            _tag_scope_visibility(kind, "scope.entity_id", "a.id") +
             " AND " + COUNTED_VIDEO + " AND tag.kind='tag' "
             "AND " + tag_is_not_a_performer_name("tag.normalized_name") + " "
             f"AND tag.canonical_name NOT IN ({','.join('?' for _ in LENGTH_TAGS)}) "
@@ -289,6 +299,7 @@ def q_entity(contract: WebContract, args):
                 "SELECT person.id,person.canonical_name k,count(DISTINCT " + video_work_key(contract, c) + ") n,"
                 "(SELECT a2.id FROM asset_entity ae2 JOIN asset a2 ON a2.id=ae2.asset_id "
                 " WHERE ae2.entity_id=person.id AND a2.medium='video' "
+                + _tag_scope_visibility(kind, "scope.entity_id", "a2.id") +
                 " AND a2.snapshot_path IS NOT NULL AND " + solo_performer_clause("a2.id", "person.id") +
                 " ORDER BY COALESCE(a2.play_count,0) DESC,COALESCE(a2.play_seconds,0) DESC,"
                 " COALESCE(a2.width,0)*COALESCE(a2.height,0) DESC,a2.size DESC LIMIT 1) rep "
@@ -297,6 +308,7 @@ def q_entity(contract: WebContract, args):
                 "JOIN entity person ON person.id=co.entity_id "
                 "JOIN asset a ON a.id=scope.asset_id "
                 "WHERE " + scope_predicate(kind, "scope.entity_id") +
+                _tag_scope_visibility(kind, "scope.entity_id", "a.id") +
                 " AND " + COUNTED_VIDEO + " AND person.kind='performer' "
                 "AND person.id<>? "
                 "GROUP BY person.id,person.canonical_name "
@@ -431,6 +443,7 @@ def entity_code_sets(contract: WebContract, c, kind: str, entity_id: int) -> lis
             "SELECT a.code,a.catalog_title,a.original_title,a.release_date "
             "FROM asset_entity ae CROSS JOIN asset a ON a.id=ae.asset_id "
             "WHERE " + scope_predicate(kind, "ae.entity_id") + " AND " + VISIBLE_CATALOG_ASSET +
+            _tag_scope_visibility(kind, "ae.entity_id", "a.id") +
             " AND a.code IS NOT NULL AND a.code<>'' ORDER BY a.id", (entity_id,)):
         key = sample_images.code_key(row["code"])
         if not key:
@@ -476,6 +489,7 @@ def q_entity_photos(contract: WebContract, args):
         # 图集和分页数的是同一批图，`total` 由图集相加，才对得上翻到底的张数。
         scoped = ("FROM asset_entity ae CROSS JOIN asset a ON a.id=ae.asset_id "
                   "WHERE " + scope_predicate(kind, "ae.entity_id") +
+                  _tag_scope_visibility(kind, "ae.entity_id", "a.id") +
                   " AND a.medium='image' AND a.name IS NOT NULL "
                   "AND a.disposal IS NULL ")
         sets = [{

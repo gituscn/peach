@@ -274,6 +274,70 @@ class EntityRedirectRouteTests(unittest.TestCase):
                 self.assertEqual(by_id.json()['total'], 1)
                 self.assertEqual(by_id.json()['items'][0]['id'], 2)
 
+    def test_tag_hidden_assets_are_excluded_from_profiles_photos_and_samples(self):
+        with sqlite3.connect(self.app.state.settings.db_path) as connection:
+            connection.executemany(
+                "INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at)"
+                " VALUES(?,'tag',?,?,'t','t')",
+                [(20, 'Tag A', 'tag a'), (21, 'Hidden only', 'hidden only'), (22, 'Visible only', 'visible only')])
+            add_person(connection, 12, 'Hidden cast')
+            connection.execute("UPDATE asset SET code='ABC-001',size=10,snapshot_path='visible.jpg' WHERE id=1")
+            connection.executemany(
+                "INSERT INTO asset(id,location,path,name,medium,size,code,snapshot_path,play_count)"
+                " VALUES(?,'local',?,?,?,?,?,?,?)",
+                [(2, r'R:\media\visible\2.jpg', '2.jpg', 'image', 10, None, None, 0),
+                 (3, r'R:\media\3.mp4', '3.mp4', 'video', 1000, 'ABC-002', 'hidden.jpg', 100),
+                 (4, r'R:\media\hidden\4.jpg', '4.jpg', 'image', 10, None, None, 0),
+                 (5, r'R:\media\5.mp4', '5.mp4', 'video', 500, 'ABC-003', 'hidden-cast.jpg', 0)])
+            connection.executemany(
+                "INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) VALUES(?,?,?,'test',1)",
+                [(asset_id, 20, 'tag') for asset_id in (1, 2, 3, 4, 5)]
+                + [(1, 22, 'tag'), (3, 21, 'tag'), (3, 10, 'performer'), (5, 12, 'performer')])
+            connection.executemany(
+                "INSERT INTO asset_tag_preference(profile_id,asset_id,normalized_tag,hidden,updated_at)"
+                " VALUES('local-default',?,'tag a',1,0)", [(3,), (4,), (5,)])
+            connection.executemany(
+                "INSERT INTO code_sample_image(code,position,url,site,source,fetched_at)"
+                " VALUES(?,1,'https://example.test/sample.jpg','dmm','test','t')",
+                [('ABC-001',), ('ABC-002',), ('ABC-003',)])
+
+        def read(path, kind='tag', entity_id=20):
+            response = self.client.get(path, params={'kind': kind, 'id': entity_id, 't': 'secret'})
+            self.assertEqual(response.status_code, 200, response.text)
+            return response.json()
+
+        profile = read('/api/entity')
+        self.assertEqual(profile['asset_count'], 1)
+        self.assertEqual(profile['representative_asset_id'], 1)
+        self.assertEqual({tag['id']: tag['n'] for tag in profile['tags']}, {20: 1, 22: 1})
+        self.assertEqual([(person['id'], person['n'], person['rep']) for person in profile['related_performers']],
+                         [(10, 1, 1)])
+        photos = read('/api/photos')
+        self.assertEqual(photos['total'], 1)
+        self.assertEqual([item['id'] for item in photos['items']], [2])
+        self.assertEqual({item['id']: item['n'] for item in photos['sets']}, {'code:ABC-001': 1, 2: 1})
+        self.assertEqual(photos['sample_total'], 1)
+        self.assertEqual(read('/api/entity', 'performer', 10)['asset_count'], 2)
+        from peach.web_catalog import _entity_asset_filter, q_facets
+        from peach.web_state import WebContract
+
+        contract = WebContract(self.app.state.settings.db_path)
+        with contract.read_connection() as connection:
+            clause, params = _entity_asset_filter(connection, 'tag', 'Tag A')
+            scoped_assets = connection.execute(f'SELECT a.id FROM asset a WHERE {clause} ORDER BY a.id', params).fetchall()
+        self.assertEqual([row[0] for row in scoped_assets], [1, 2])
+        facets = q_facets(contract, filters={'tag': 'Tag A'})
+        self.assertEqual(facets['stats']['total'], profile['asset_count'])
+        self.assertEqual({item['k']: item['n'] for item in facets['tags']}, {'Tag A': 1, 'Visible only': 1})
+
+        with sqlite3.connect(self.app.state.settings.db_path) as connection:
+            connection.execute("UPDATE asset_tag_preference SET hidden=0 WHERE normalized_tag='tag a'")
+        self.assertEqual(read('/api/entity')['asset_count'], 3)
+        restored = read('/api/photos')
+        self.assertEqual(restored['total'], 2)
+        self.assertEqual(restored['sample_total'], 3)
+        self.assertEqual(q_facets(contract, filters={'tag': 'Tag A'})['stats']['total'], 3)
+
     def test_an_old_image_address_redirects_to_the_target(self):
         body = picture("navy")
         (self.avatars / "performer-10.img").write_bytes(body)
