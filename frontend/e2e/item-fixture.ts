@@ -119,6 +119,7 @@ async function stub(page: Page, catalogIds: readonly number[] = CATALOG): Promis
   await json('/api/parts', () => PARTS);
   await json('/api/editions', () => EDITIONS);
   await json('/api/library-processing', () => ({ status: 'idle' }));
+  await json('/api/jav/detail', (url) => ({ code: url.searchParams.get('code'), state: 'ready', preview_count: 0 }));
   await json('/api/sources', () => ({ sources: [{ location: 'local', online: true }, { location: '115', online: false }] }));
   await json('/api/playlists', () => ({
     items: [...playlists.values()].map((row) => ({ id: row.id, name: row.name, item_count: row.ids.length })),
