@@ -31,10 +31,10 @@ export const mountToaster: typeof Bundle.mountToaster = (host, icons) => {
   const root = createRoot(host);
   mounted = { host, root };
   /* 底边读 `--toast-bottom`：教程卡在右下角时，遗留层把它写成卡上沿之上的位置；没写就是
-     Sonner 的默认边距。宽度和教程卡同宽，两块叠在一列里左右对齐。 */
+     Sonner 的默认边距。栈为长回执留出空间，每条回执的宽度由内容决定。 */
   root.render(
     <Toaster position="bottom-right" closeButton gap={8}
-      style={{ '--width': '400px' } as CSSProperties}
+      style={{ '--width': 'min(560px, calc(100vw - 48px))' } as CSSProperties}
       offset={{ right: 24, bottom: 'var(--toast-bottom, 24px)' }}
       mobileOffset={{ right: 16, left: 16, bottom: 'var(--toast-bottom, 16px)' }}
       toastOptions={{ closeButtonAriaLabel: '关闭提示' }} containerAriaLabel="通知"

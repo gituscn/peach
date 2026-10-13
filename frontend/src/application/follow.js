@@ -2,6 +2,7 @@ import { createFollowController } from '../react/follow-feed/follow-controller';
 import { followViewPath as pathForFollow } from '../react/follow-feed/follow-view';
 import { createFollowFeedHelpers } from '../react/follow-feed/follow-helpers';
 import { createFollowDetailActions } from '../react/follow-detail/follow-detail-actions';
+import { checkReceipt } from '../react/follow-manage/follow-manage';
 import { followScrollY } from '../shell';
 /* follow 域控制器：本域状态与动作，启动由 Application 的生命周期统一安装。 */
 import { receiptsState } from './receipts.js';
@@ -24,40 +25,12 @@ import { disposeStage, mediaState, stageExit, urlResume } from './media.js';
 import { clearOverlayBackground, holdOverlayBackground, overlayState, takeOverlayReturn } from './../history/overlay';
 export const followState = { followFilter: undefined, followAuthors: undefined, followProviders: undefined, followTags: undefined, followWorks: undefined, followMediaView: undefined, FOLLOW_FEED_SORTS: undefined, FOLLOW_RANDOM_SORT: undefined, followSort: undefined, followDir: undefined, followSeed: undefined, followDurMin: undefined, followDurMax: undefined, followContentSkeletonHtml: undefined, followSkeletonHtml: undefined, followFeedHelpers: undefined, followFeedActions: undefined, followFeedProps: undefined, followFeedShell: undefined, followDetailActions: undefined, FOLLOW_MANAGE_TABS: undefined, followSidebarFilters: undefined };
 
-export function followCheckBits(report){
-  const rows=report.results||[];
-  const added=rows.reduce((n,r)=>n+(r.added||0),0);
-  const updated=rows.reduce((n,r)=>n+(r.updated||0),0);
-  const quiet=rows.filter(r=>r.ok&&!r.added&&!r.updated).length;
-  const skipped=rows.reduce((n,r)=>n+(r.skipped||0),0);
-  const compilations=rows.reduce((n,r)=>n+(r.skipped_compilations||0),0);
-  const history=rows.reduce((n,r)=>n+(r.history_skipped||0),0);
-  const bits=[];
-  if(added)bits.push(`新增 <b>${added}</b> 条`);
-  if(updated)bits.push(`更新 <b>${updated}</b> 条`);
-  // 过滤掉多少也要说：不然用户只看到条目变少，分不清是被过滤了还是根本没抓到。
-  if(skipped-compilations)bits.push(`跳过 <b>${skipped-compilations}</b> 条无资源`);
-  if(compilations)bits.push(`排除 <b>${compilations}</b> 个超大合集`);
-  if(history)bits.push(`跳过 <b>${history}</b> 条超出首次采集范围的历史内容`);
-  // 回查是唯一会放大请求数的路径，报出来才看得出某个创作者是不是每帖都要多打一次站点。
-  const probed=rows.reduce((n,r)=>n+(r.probed||0),0);
-  if(probed)bits.push(`回查 <b>${probed}</b> 条`);
-  if(quiet)bits.push(`${quiet} 个来源没有更新`);
-  if(!bits.length)bits.push('没有任何更新');
-  return {rows,bits};
-}
-
 export function followCheckToast(report){
-  const {rows,bits}=followCheckBits(report);
+  const rows=report.results||[];
   const failed=rows.filter(r=>!r.ok).length;
-  const exhausted=rows.filter(r=>r.exhausted).length;
-  /* 这一条显式走 `html`：`bits` 由 followCheckBits 用计数拼出来、含 `<b>`，
-     里面全是本地算出来的数字和固定中文，没有账本字段能流进来。 */
-  receiptsState.toast({html:`检查了 <b>${rows.length}</b> 个来源：${bits.join(' · ')}`+
-    (exhausted?` · <b>${exhausted} 个没有更多内容</b>`:'')+
-    (failed?` · <b>${failed} 个失败</b>`:'')},
+  receiptsState.toast({text:checkReceipt(report)},
     {warn:!!failed,timeout:failed?8000:6000,sound:failed?'warning':'success',
-     action:{label:'去看更新',run:()=>enterFollow(true)}});
+     action:{label:'查看',run:()=>enterFollow(true)}});
 }
 
 export function followViewPath(){return pathForFollow(followView())}

@@ -25,7 +25,8 @@ import { useViewGlide } from '../components/use-view-glide';
 import { useMasonryGrid } from '../components/use-masonry-grid';
 import { Segments, Shuffle } from '../entity-filter/entity-filter-page';
 import type { SegmentOption } from '../entity-filter/entity-filter';
-import { FOLLOW_CHECK_URL, FOLLOW_STATUS_URL, sourceIconUrl } from '../follow-manage/follow-manage';
+import { checkSummary, FOLLOW_CHECK_URL, FOLLOW_STATUS_URL, sourceIconUrl } from '../follow-manage/follow-manage';
+import { Note } from '../components/note';
 import { sidebarTagCounts } from '../../sidebar';
 import { queryClient } from '../query';
 import { FollowAuthorLink, FollowCard } from './follow-card';
@@ -158,6 +159,7 @@ export function FollowFeedPage(props: FollowFeedProps) {
     <>
       {/* 进度那一格归 `followJobProgress`：它自己往里插面板、自己开合，React 只给一个空节点。 */}
       <div key={job.generation} ref={job.host} data-follow-progress="" />
+      {!job.busy && job.report ? <Note tone="neutral" title="检查结果">{job.report}</Note> : null}
       <div data-follow-feed="" data-select-mode={props.selectMode ? '' : undefined}>
         <Head onManage={actions.openManage}>
           {facets.sources.length ? (
@@ -251,6 +253,7 @@ function useFollowJob(props: FollowFeedProps, ready: boolean) {
   const [generation, setGeneration] = useState(0);
   const [running, setRunning] = useState(false);
   const [starting, setStarting] = useState<'' | 'check' | 'older'>('');
+  const [report, setReport] = useState('');
   /* 往回抓那枚键在它起的那一趟跑完之前一直写「抓取中」，同遗留层：检查更新那一趟只让它忙、不换字。 */
   const [olderRun, setOlderRun] = useState(false);
   const busyRef = useRef(false);
@@ -275,6 +278,7 @@ function useFollowJob(props: FollowFeedProps, ready: boolean) {
         if (!alive) return;
         const report = state.status === 'failed' ? { results: [{ ok: false, error: state.error }] } : state;
         latest.current.actions.checkReport(report);
+        setReport(checkSummary({ ...report, status: state.status || 'done' }));
         busyRef.current = false;
         setRunning(false);
         setOlderRun(false);
@@ -291,6 +295,7 @@ function useFollowJob(props: FollowFeedProps, ready: boolean) {
     if (busyRef.current) return;
     busyRef.current = true;
     setStarting(older ? 'older' : 'check');
+    setReport('');
     let started = false;
     try {
       const job = await apiSend<{ job_id: string }>(FOLLOW_CHECK_URL, older ? { older: true, background: true } : { background: true });
@@ -308,7 +313,7 @@ function useFollowJob(props: FollowFeedProps, ready: boolean) {
   }, []);
 
   return {
-    generation, host: node as RefObject<HTMLDivElement | null>, busyRef, starting, start,
+    generation, host: node as RefObject<HTMLDivElement | null>, busyRef, starting, start, report,
     busy: running || starting !== '',
     olderBusy: starting === 'older' || (olderRun && running),
   };

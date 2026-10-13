@@ -454,6 +454,8 @@ describe('页面', () => {
     await act(async () => options.complete({ status: 'done', results: [{ ok: true, added: 2 }] }));
     await settle();
     expect(given.actions.checkReport).toHaveBeenCalledWith({ status: 'done', results: [{ ok: true, added: 2 }] });
+    expect(host.textContent).toContain('检查结果');
+    expect(host.textContent).toContain('检查了 1 个来源：新增 2 条');
     expect(fetcher.mock.calls.filter(([url]) => String(url).startsWith('/api/follow?')).length).toBeGreaterThan(reads);
   });
 
