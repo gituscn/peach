@@ -20,8 +20,14 @@
 
 签发接口 `POST /api/external-playback?id=…` 使用现有登录及同源检查。流和 M3U 端点验证
 进程内密钥签发的单资产限时票据，每次读取仍经过现有媒体根目录检查。
+播放地址的 origin 一并签名：优先使用通过同源检查的页面 Origin；无 Origin 的客户端使用已配置的
+隧道入口或当前服务地址。M3U 使用该签名地址，代理转发的本机 Host 不会改写列表中的公网入口。
 
 VLC 协议参考 [VideoLAN 官方实现说明](https://mailman.videolan.org/pipermail/vlc-devel/2014-October/099830.html)，
 IINA 协议参考 [IINA 上游协议讨论](https://github.com/iina/iina/issues/3922)。播放器实现不进入 Peach，
 无新增依赖。协议打开后的实际播放取决于访问端是否安装对应播放器；自动化验证覆盖票据、Range、
 M3U 内容和页面交互，不替代真实设备的解码验收。
+
+Windows 原生验证使用现有 ffplay、临时 HTTPS 服务与专用测试证书，播放 M3U 中的签名网络地址。
+两秒 H.264 合成测试画面在关闭音频、隐藏输出时正常播放并退出，ffprobe 确认解码 20 帧；
+TLS 校验保持开启。该验证不覆盖 VLC / IINA 协议唤起或 VR 投影。

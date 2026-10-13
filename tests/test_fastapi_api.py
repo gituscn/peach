@@ -2264,6 +2264,29 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             headers={'X-Token': 'secret', 'Origin': 'https://attacker.example'})
         self.assertEqual(cross_site.status_code, 403)
 
+    async def test_external_playlist_binds_public_origin_behind_tunnel(self):
+        from types import SimpleNamespace
+        from urllib.parse import urlsplit, parse_qs, urlencode
+        self.app.state.tunnel = SimpleNamespace(snapshot=lambda: SimpleNamespace(url='https://public.example'))
+        for headers in ({'X-Token': 'secret', 'Origin': 'https://public.example'}, {'X-Token': 'secret'}):
+            issued = await self.client.post('/api/external-playback?id=1', json={}, headers=headers)
+            self.assertEqual(issued.status_code, 200, issued.text)
+            links = issued.json()
+            playlist = await self.client.get(links['playlist'], headers={'Host': 'different.example'})
+            self.assertEqual(playlist.status_code, 200)
+            self.assertEqual(playlist.text.splitlines()[-1], 'https://public.example' + links['url'])
+            parsed = urlsplit(links['playlist'])
+            query = parse_qs(parsed.query)
+            query['origin'] = ['https://attacker.example\n#EXTINF:0,injected']
+            changed = parsed.path + '?' + urlencode(query, doseq=True)
+            self.assertEqual((await self.client.get(changed)).status_code, 401)
+            changed_stream = changed.replace('/external-playlist/1.m3u', '/external-stream/1')
+            self.assertEqual((await self.client.get(changed_stream)).status_code, 401)
+        for origin in ('https://attacker.example', 'https://user:password@public.example'):
+            denied = await self.client.post('/api/external-playback?id=1', json={},
+                headers={'X-Token': 'secret', 'Origin': origin})
+            self.assertIn(denied.status_code, (400, 403))
+
     async def test_stream_session_cancel_is_authenticated_and_tombstoned(self):
         denied = await self.client.post("/api/stream-cancel?session=detail-1")
         self.assertEqual(denied.status_code, 401)

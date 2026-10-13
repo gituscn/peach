@@ -14,3 +14,9 @@ class ExternalPlaybackTests(unittest.TestCase):
         self.assertFalse(valid(key, 42, ticket, now=100 + TTL_SECONDS))
         self.assertFalse(valid(key, 42, ticket + '0', now=101))
         self.assertFalse(valid(key, 42, '../../media.mp4', now=101))
+
+    def test_ticket_binds_origin(self):
+        ticket = issue(b'key', 1, origin='https://public.example', now=100)
+        self.assertTrue(valid(b'key', 1, ticket, origin='https://public.example', now=101))
+        self.assertFalse(valid(b'key', 1, ticket, origin='https://other.example', now=101))
+        self.assertFalse(valid(b'key', 1, ticket, now=101))
