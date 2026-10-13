@@ -900,7 +900,7 @@ class FollowContractTests(unittest.TestCase):
     def test_item_level_dimensions_come_from_the_listing_and_the_browser_fills_the_gaps(self):
         """直链图片的宽高与 media_items 里那对同义；没有的条目由界面加载完回写，只补空缺。"""
         self._seed(candidates=(self._rule34_image("1", width=1280, height=720),
-                               self._rule34_image("2")),
+                               self._rule34_image("2"), self._rule34_image("3", width=900)),
                    provider="rule34xxx", ref="lazyprocrastinator")
         items = self._items_by_external_id()
         self.assertEqual((items["1"]["width"], items["1"]["height"]), (1280, 720))
@@ -909,13 +909,15 @@ class FollowContractTests(unittest.TestCase):
 
         result = self._post("/api/follow/image-dims", {"entries": [
             {"item": items["2"]["id"], "width": 900, "height": 1600},
+            {"item": items["3"]["id"], "width": 900, "height": 1600},
             {"item": items["1"]["id"], "width": 1, "height": 1},
             {"item": items["2"]["id"] + 500, "width": 10, "height": 10},
         ]})
 
-        self.assertEqual(result["learned"], 1, "已有尺寸的与不存在的条目都不算学到")
+        self.assertEqual(result["learned"], 2, "完整尺寸与不存在的条目不计数，缺任一尺寸的可以补齐")
         items = self._items_by_external_id()
         self.assertEqual((items["2"]["width"], items["2"]["height"]), (900, 1600))
+        self.assertEqual((items["3"]["width"], items["3"]["height"]), (900, 1600))
         self.assertEqual((items["1"]["width"], items["1"]["height"]), (1280, 720))
 
     def test_media_level_dimensions_are_learned_by_media_index(self):

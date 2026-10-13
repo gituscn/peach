@@ -366,7 +366,7 @@ describe('关注页岛', () => {
       assert.deepEqual(await cardIds(page), FIRST.filter((row) => row.primary.media_kind === 'image')
         .map((row) => row.primary.id));
       const columns = () => page.locator('[data-follow-wall]').evaluate((wall) => ({
-        size: (wall as HTMLElement).dataset.size, count: getComputedStyle(wall).columnCount,
+        size: (wall as HTMLElement).dataset.size, count: getComputedStyle(wall).gridTemplateColumns.split(' ').length,
       }));
       const small = await columns();
       await page.locator('#density').click();
@@ -416,6 +416,148 @@ describe('关注页岛', () => {
       await opened.close();
     }
   });
+
+  for (const viewport of [DESKTOP, MOBILE]) {
+    it(`${viewport.name} 无尺寸图片加载后按固有比例铺满瀑布流卡片`, { timeout: 60_000 }, async () => {
+      const opened = await openFollowFeed(browser, '/follow?media=images', viewport,
+        { settings: { photoLayout: 'masonry' } });
+      try {
+        const page = opened.page;
+        const payload = await page.evaluate(async () => (await fetch('/api/follow?media=images')).json());
+        payload.groups = payload.groups.filter((group: { primary: { media_kind: string } }) => group.primary.media_kind === 'image').slice(0, 1);
+        const item = payload.groups[0].primary;
+        item.width = null;
+        item.height = null;
+        item.media_items = [];
+        payload.has_more = false;
+        await page.route((url) => url.pathname === '/api/follow' && !url.searchParams.has('item'),
+          (route) => route.fulfill({ json: payload }));
+        // 只读服务拒绝尺寸回写时，当前卡片仍使用浏览器取得的尺寸。
+        await page.route('**/api/follow/image-dims', (route) => route.fulfill({ status: 409, json: { ok: false } }));
+        await page.reload({ waitUntil: 'networkidle' });
+        const image = page.locator('[data-follow-wall] [data-media-pic] > img').first();
+        await image.waitFor();
+        await image.evaluate(async (node: HTMLImageElement) => { await node.decode() });
+        const geometry = await image.evaluate((node: HTMLImageElement) => {
+          const picture = node.parentElement!.getBoundingClientRect();
+          const box = node.getBoundingClientRect();
+          return { width: box.width, height: box.height, pictureWidth: picture.width, pictureHeight: picture.height,
+            ratio: node.naturalWidth / node.naturalHeight, widthAttr: node.getAttribute('width'), heightAttr: node.getAttribute('height') };
+        });
+        assert.ok(Math.abs(geometry.width / geometry.height - geometry.ratio) < .01, JSON.stringify(geometry));
+        assert.ok(Math.abs(geometry.pictureWidth - geometry.width) < 1.5, JSON.stringify(geometry));
+        assert.ok(Math.abs(geometry.pictureHeight - geometry.height) < 1.5, JSON.stringify(geometry));
+        assert.equal(geometry.widthAttr, '60');
+        assert.equal(geometry.heightAttr, '80');
+        const viewportGeometry = await layout(page);
+        assert.ok(viewportGeometry.scrollWidth <= viewportGeometry.viewportWidth, JSON.stringify(viewportGeometry));
+      } finally { await opened.close(); }
+    });
+  }
+
+  it('瀑布流下滚续页时保留已显示卡片的位置和节点', { timeout: 60_000 }, async () => {
+    const opened = await openFollowFeed(browser, '/follow?media=images', DESKTOP,
+      { settings: { photoLayout: 'masonry', followImagesOnly: true } });
+    try {
+      const page = opened.page;
+      const payload = await page.evaluate(async () => (await fetch('/api/follow?media=images')).json());
+      const images = payload.groups.filter((group: { primary: { media_kind: string } }) => group.primary.media_kind === 'image');
+      payload.groups = images;
+      payload.has_more = true;
+      const extra = images.map((group: { primary: { id: number }; release_key: string }) => ({
+        ...group, release_key: `${group.release_key}-more`, primary: { ...group.primary, id: group.primary.id + 10000 },
+      }));
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve });
+      await page.route((url) => url.pathname === '/api/follow' && !url.searchParams.has('item'), async (route) => {
+        const more = Number(new URL(route.request().url()).searchParams.get('offset')) > 0;
+        if (more) await gate;
+        return route.fulfill({ json: { ...payload, groups: more ? extra : images, has_more: !more } });
+      });
+      await page.reload({ waitUntil: 'load' });
+      await page.locator('[data-follow-item="2005"]').waitFor();
+      await page.locator('[data-follow-wall] [data-media-pic] > img').evaluateAll(async (nodes) => {
+        await Promise.all(nodes.map((node) => (node as HTMLImageElement).decode()));
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
+      const read = () => page.locator(CARDS).evaluateAll((cards) => cards.map((node) => {
+        const box = node.getBoundingClientRect();
+        return { id: node.getAttribute('data-follow-item'), left: box.left, top: box.top + scrollY };
+      }));
+      const before = await read();
+      await page.locator(CARDS).evaluateAll((cards) => { (window as unknown as { oldCards: Element[] }).oldCards = cards });
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      release();
+      await page.locator('[data-follow-item="12005"]').waitFor();
+      const after = await read();
+      for (const old of before) {
+        const current = after.find((card) => card.id === old.id)!;
+        assert.ok(Math.abs(current.left - old.left) < 1.5 && Math.abs(current.top - old.top) < 1.5,
+          JSON.stringify({ old, current }));
+      }
+      assert.equal(await page.evaluate(() => (window as unknown as { oldCards: Element[] }).oldCards.every((node) => node.isConnected)), true);
+      assert.deepEqual(opened.problems, []);
+    } finally { await opened.close(); }
+  });
+
+  for (const viewport of [DESKTOP, MOBILE]) {
+    it(`${viewport.name} 延迟加载长图只增长所在列，卡片不换列、不重叠`, { timeout: 60_000 }, async () => {
+      const opened = await openFollowFeed(browser, '/follow?media=images', viewport,
+        { settings: { photoLayout: 'masonry', followImagesOnly: true } });
+      const held: import('playwright-core').Route[] = [];
+      try {
+        const page = opened.page;
+        const payload = await page.evaluate(async () => (await fetch('/api/follow?media=images')).json());
+        payload.groups = payload.groups.filter((group: { primary: { media_kind: string } }) => group.primary.media_kind === 'image');
+        const target = payload.groups.at(-1).primary;
+        target.width = null;
+        target.height = null;
+        target.media_items = [];
+        target.thumb_url = '/stub-thumb/delayed-tall';
+        payload.has_more = false;
+        await page.route((url) => url.pathname === '/api/follow' && !url.searchParams.has('item'),
+          (route) => route.fulfill({ json: payload }));
+        await page.route('**/stub-thumb/delayed-tall', (route) => { held.push(route) });
+        await page.reload({ waitUntil: 'load' });
+        const cards = page.locator(CARDS);
+        await cards.last().waitFor();
+        await cards.last().scrollIntoViewIfNeeded();
+        await page.waitForFunction(() => {
+          const images = document.querySelectorAll<HTMLImageElement>('[data-follow-wall] [data-media-pic] > img');
+          return [...images].slice(0, -1).every((image) => image.complete && image.naturalWidth);
+        });
+        const positions = () => cards.evaluateAll((nodes) => nodes.map((node) => {
+          const box = node.getBoundingClientRect();
+          return { left: box.left, top: box.top + scrollY, bottom: box.bottom + scrollY, width: box.width };
+        }));
+        const before = await positions();
+        for (const route of held.splice(0)) await route.fulfill({ contentType: 'image/svg+xml',
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="4000"><rect width="200" height="4000" fill="#888"/></svg>' });
+        const image = cards.last().locator('[data-media-pic] > img');
+        await page.waitForFunction(() => document.querySelector('[src="/stub-thumb/delayed-tall"]')?.getAttribute('width') === '200');
+        await image.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        const after = await positions();
+        after.forEach((box, index) => {
+          assert.ok(Math.abs(box.left - before[index]!.left) < 1.5, JSON.stringify({ before: before[index], box }));
+          for (const previous of after.slice(0, index).filter((other) => Math.abs(other.left - box.left) < 1)) {
+            assert.ok(box.top >= previous.bottom + 12, JSON.stringify({ previous, box }));
+          }
+        });
+        const picture = await image.evaluate((node) => node.parentElement!.getBoundingClientRect().toJSON());
+        assert.ok(picture.height <= picture.width * 2.5 + 1.5, JSON.stringify(picture));
+        assert.equal(await image.evaluate((node) => getComputedStyle(node).objectFit), 'cover');
+        await page.locator('[data-glass-segment]').filter({ has: page.getByRole('radio', { name: '固定比例' }) }).click();
+        await page.locator('[data-follow-wall][data-layout="fixed"]').waitFor();
+        assert.equal(await cards.last().evaluate((node) => (node as HTMLElement).style.gridRow), '');
+        const geometry = await layout(page);
+        assert.ok(geometry.scrollWidth <= geometry.viewportWidth, JSON.stringify(geometry));
+        assert.deepEqual(opened.problems, []);
+      } finally {
+        for (const route of held.splice(0)) await route.abort().catch(() => {});
+        await opened.close();
+      }
+    });
+  }
 
   it('加载更多接在原来那些卡后面', { timeout: 60_000 }, async () => {
     const opened = await openFollowFeed(browser, '/follow', DESKTOP);

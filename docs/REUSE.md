@@ -78,6 +78,10 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 
 ## Board 界面与数值设置
 
+关注图片瀑布流复用浏览器 [CSS Grid](https://www.w3.org/TR/css-grid-1/#auto-placement-algo)、`ResizeObserver` 和现有 React，不新增依赖。`use-masonry-grid.ts` 按列表顺序固定列归属，按卡片边界生成网格行；轨道数随卡片数增长，图片取得尺寸和续页只影响各自列的后续位置。卡片保留 DOM 顺序、键盘入口和选择范围。图片加载后立即使用固有宽高，固定比例卡面用 `cover`，详情完整显示。
+
+已有实现与历史 `57c42c05`、`91f2c5f0` 提供尺寸占位与学习接口。CSS 多列的 [列平衡](https://www.w3.org/TR/css-multicol-1/#filling-columns) 不满足固定列归属。外部候选 [Masonry 4.2.2](https://github.com/desandro/masonry/blob/v4.2.2/package.json)（MIT、浏览器 DOM 库，依赖 `get-size`、`outlayer`）要求维护另一套定位与图片加载后的 [layout 调用](https://masonry.desandro.com/layout)，不采用。Peach 只维护列归属和测量，定位交给原生 Grid；桌面与 390×844 用例覆盖无尺寸、只读回写拒绝、延迟长图与续页。
+
 页面控件与交互由哪些共用件承担；组件映射、Board 上游证据与许可证见 [BoardUI 适配](BOARD_UI.md)。
 
 - 页面分区复用 `BoardTabs` 与遗留导航的中性填充选中态；显示方式开关使用 `Segmented`。标题位于内容左上角、导航与筛选之前。JAV 馆藏复用目录，推荐和想要的骨架由 `jav-skeleton.ts` 与页面共享容器、列数和封面比例。网盘标识复用 `SourceMark`、`MEDIA_SOURCE_ICONS` 与 `SourceLabel`，不增加图标依赖。
