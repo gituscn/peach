@@ -1416,7 +1416,7 @@ class Rule34XxxConnector(_BaseConnector):
     @classmethod
     def display_thumb_url(cls, item) -> str | None:
         matched = cls._PREVIEW_RE.match(str(item.thumb_url or ""))
-        if matched and str(item.metadata.get("media_kind") or "") == "image":
+        if matched and _IMAGE_URL_RE.search(str(item.media_url or "")):
             return str(item.media_url or item.thumb_url or "") or None
         return str(item.thumb_url or "") or None
 

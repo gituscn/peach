@@ -29,7 +29,7 @@ from fastapi.responses import (
 from starlette.staticfiles import StaticFiles
 
 from . import (
-    avatar_face, avatar_online, avatar_picker, avatar_provider, follow_assets, images,
+    avatar_face, avatar_online, avatar_picker, avatar_provider, follow_assets, follow_providers, images,
     jav_poster_crop, link_marks, link_status, scraping_access, site_icons, social_links, subtitles,
     taste_history, timeline_sheets, web_follow,
 )
@@ -987,7 +987,8 @@ def follow_image(request: Request, id: int, media: int | None = None,
         hit = cache.response(key, request)
         if hit is not None:
             return hit
-        target = ResolvedFollowMedia(url, item.url, public_hosts=True)
+        target = ResolvedFollowMedia(url, item.url,
+            allowed_hosts=follow_providers.hosts().get(item.provider, ()), public_hosts=True)
         if media is not None:
             resolved = state.follow_media_resolver.resolve(item, media)
             if resolved.headers:

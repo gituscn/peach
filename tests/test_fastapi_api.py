@@ -2158,6 +2158,34 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             self.app.state.http_transport.client = original
             fake.close()
 
+    async def test_follow_image_uses_registered_media_hosts_and_checks_third_party_redirects(self):
+        item = SimpleNamespace(id=29, provider='rule34xxx', url='https://rule34.xxx/post/29',
+            thumb_url='https://api-cdn.rule34.xxx/poster.jpg', media_url=None, metadata={}, hidden_media=())
+        calls = []
+        def upstream(request):
+            calls.append(request.url.path)
+            headers = ({'location': 'https://cdn.example/blocked.jpg'} if request.url.path == '/redirect.jpg'
+                       else {'content-type': 'image/jpeg'})
+            return httpx.Response(302 if request.url.path == '/redirect.jpg' else 200,
+                headers=headers, stream=httpx.ByteStream(b'poster'), request=request)
+        original = self.app.state.http_transport.client
+        fake = httpx.Client(transport=httpx.MockTransport(upstream))
+        self.app.state.http_transport.client = fake
+        try:
+            with patch('peach.routes_media.FollowStore.item', return_value=item), \
+                    patch('peach.follow_stream.resolves_publicly', return_value=False):
+                known = await self.client.get('/follow-image?id=29&t=secret')
+                self.assertEqual(known.status_code, 200)
+                self.assertEqual(known.content, b'poster')
+                item.thumb_url = 'https://cdn.example/blocked.jpg'
+                self.assertEqual((await self.client.get('/follow-image?id=29&t=secret')).status_code, 404)
+                item.thumb_url = 'https://api-cdn.rule34.xxx/redirect.jpg'
+                self.assertEqual((await self.client.get('/follow-image?id=29&t=secret')).status_code, 404)
+                self.assertEqual(calls, ['/poster.jpg', '/redirect.jpg'])
+        finally:
+            self.app.state.http_transport.client = original
+            fake.close()
+
     async def test_follow_cover_serves_cached_frame_and_reports_retryable_failure(self):
         connection = sqlite3.connect(self.db)
         connection.executescript((ROOT / "migrations" / "0018_online_follow.sql").read_text(
