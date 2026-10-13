@@ -309,6 +309,7 @@
   --card-meta-tags: calc(var(--fs-xs) * 1.45 + var(--tag-pad-y) * 2 + 2px + 3px);
 }
 .peach-react [data-follow-labels] { grid-column: 1 / -1; }
+.peach-react [data-follow-item] [data-media-meta] > [data-follow-labels] { pointer-events: none; }
 .peach-react [data-follow-list]:not([data-follow-wall]) [data-follow-item] [data-media-meta] {
   min-height: calc(var(--card-meta-block) + 16px);
   contain-intrinsic-block-size: auto var(--card-meta-block);

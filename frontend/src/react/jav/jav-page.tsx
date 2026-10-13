@@ -9,7 +9,7 @@ import { coverUrl } from '@peach/card-art';
 import { relayoutCovers } from '../../card-art/framing';
 import { wireHorizontalScroller } from '../../ui-kit/scroll';
 import { DiscoveryFaces } from './discovery-faces';
-import { javContentSkeleton, JAV_RECOMMENDATION_GRID } from '../../jav-skeleton';
+import { javContentSkeleton, javTagSkeleton, JAV_RECOMMENDATION_GRID } from '../../jav-skeleton';
 import { errorMessage } from '../../api';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
 import { Note } from '../components/note';
@@ -103,8 +103,8 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         {([['external', '库外发现'], ['library', '馆藏探索']] as const).map(([key, label]) =>
           <FilterPill key={key} data-entity-tag={key} data-entity-press="" pressed={scope === key} onPress={() => { setScope(key); setTag('') }}>{label}</FilterPill>)}
         <span data-entity-sep="" aria-hidden="true" />
-      </div><div data-catalog-tags="">
-        {tags.map(name => <FilterPill key={name} data-catalog-tag={name} data-entity-press="" pressed={tag === name} onPress={() => setTag(tag === name ? '' : name)}>
+      </div><div data-catalog-tags="" dangerouslySetInnerHTML={waiting ? { __html: javTagSkeleton() } : undefined}>
+        {waiting ? null : tags.map(name => <FilterPill key={name} data-catalog-tag={name} data-entity-press="" pressed={tag === name} onPress={() => setTag(tag === name ? '' : name)}>
           {name}<span data-count-badge="">{all.filter(item => item.tags?.includes(name)).length}</span>
         </FilterPill>)}
       </div></div>} bottom={<>

@@ -50,6 +50,14 @@ describe('JAV 推荐与加载结构', () => {
       const pendingFilter = await page.locator('[data-jav-filter]').boundingBox();
       const pendingBottom = await page.locator('[data-jav-filter] [data-filter-row="bottom"]').boundingBox();
       const pendingSize = await page.locator('[data-jav-filter] [data-entity-layout]').boundingBox();
+      const tagPlaceholders = page.locator('[data-jav-filter] [data-catalog-tags] [data-skeleton="tag"]');
+      assert.equal(await tagPlaceholders.count(), 6);
+      const pendingTags = await tagPlaceholders.evaluateAll(nodes => nodes.map(node => {
+        const style = getComputedStyle(node), box = node.getBoundingClientRect();
+        return { height: box.height, y: box.y, pointer: style.pointerEvents, position: style.position, overflow: style.overflow };
+      }));
+      assert.ok(pendingTags.every(chip => chip.height === (viewport.mobile ? 36 : 30) && chip.y === pendingTags[0].y && chip.pointer === 'none'), JSON.stringify(pendingTags));
+      assert.ok(pendingTags.every(chip => chip.position === 'relative' && chip.overflow === 'hidden'), '标签光效在各自占位内定位和裁切');
       const avatarShape = await page.locator('[data-jav-skeleton-avatar]').first().evaluate(node => {
         const style = getComputedStyle(node); return { width: style.width, height: style.height, radius: style.borderRadius };
       });
@@ -105,6 +113,8 @@ describe('JAV 推荐与加载结构', () => {
       const controls = await page.locator('[data-jav-filter] [data-entity-sorts]').boundingBox();
       assert.ok(liveSize && controls && liveSize.x >= controls.x && liveSize.x + liveSize.width <= controls.x + controls.width);
       assert.equal(await page.locator('[data-jav-filter] [data-catalog-tag]').first().evaluate(node => getComputedStyle(node).borderStyle), 'dashed');
+      assert.equal(await tagPlaceholders.count(), 0);
+      assert.equal(await page.locator('[data-jav-filter] [data-catalog-tag]').first().evaluate(node => node.getBoundingClientRect().height), pendingTags[0].height);
       const heights = await cards.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height));
       if (!viewport.mobile) assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, JSON.stringify(heights));
       assert.ok(skeletonCard && Math.abs(skeletonCard.height - heights[0]!) <= 2, JSON.stringify({ skeletonCard, heights }));
