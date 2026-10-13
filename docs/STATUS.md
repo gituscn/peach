@@ -32,7 +32,7 @@
 - 发行名 `peach`、目录名 `peach-app`。macOS 按待办第 26 条处理后重启菜单栏；无口令的 `peach serve --host 0.0.0.0` 拒绝启动。
 - 扫描、采集 120 秒无进展预警；资料 90 秒、封面 240 秒超时可重试；见 `state/library-processing-<job_id>.issues.jsonl`。
 - 口味、复核、关注等聚合按账本与文件版本缓存；女优资料后继每轮存量至多 16 条。
-- 下载后处理：16 条旧失败任务保留，部分资产已移动；既有 `task_run` 外键异常 110 条，未清理。
+- 下载后处理：16 条旧失败任务保留，部分资产已移动；既有 `task_run` 外键异常 238 条，未清理。
 - [标签归一](reference-snapshots/tag-vocabulary-audit.md)
 - 实体种子（ADR-0075）由扫描结算后继 `seed-import` 导入，只填空、换旧种子行；冲突与重复身份在 `generated/seed-landing.csv`。
 - 推送发现开：本地 watch 加 CloudDrive 云端前缀 `/115open→B:`、`/Pikpak→A:`；关注每 60 分钟轮询；自动更新关闭。
