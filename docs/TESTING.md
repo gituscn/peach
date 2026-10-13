@@ -68,6 +68,8 @@ Python 静态检查使用开发依赖 Ruff，随每个正式测试域扫描全�
 
 全量在两个独立 runner 按测试文件稳定分片；汇总任务要求所有分片和必需任务成功。分片子进程不签发记录。
 
+Test 工作流的 `web-bundle` 在 Ubuntu 上统一执行 tsc、lint、Vitest、构建及产物差异检查；lint 同时检查无诊断且扫描文件数大于零。`python` 与 `web-e2e` 任务仅从 Python 测试集合中移交这三个工具用例，产物契约、系统功能和浏览器回归照常执行。任务身份由 GitHub Actions 的固定工作流与 job 名识别，未知任务和本机完整保留三个用例。承担部分 CI 职责的运行不签发本机测试记录，最终结果由必须依赖 `web-bundle` 的 `verified` 任务汇总。
+
 浏览器冒烟与设计决定断言（`tests/test_web_e2e.py`）由 `web-e2e` job 在 `windows-latest` 上执行 `web` 域。它装 Node 24、`frontend/node_modules`、ffmpeg，并经 `PEACH_E2E_CHROME` 指定 runner 自带的 Chrome。矩阵扩成全量（`plan` 输出的 `wide`）时，Windows 全量行本身就跑 `web` 域，这个 job 按条件跳过；`verified` 只在这种情况接受它的 skipped，别的 job 跳过照样算红。
 
 浏览器用例覆盖 `frontend/e2e` 下全部 `*.test.ts`，包括子目录，按文件并发、文件内串行。并发数取 `PEACH_E2E_CONCURRENCY`；未设时本机取逻辑核数的四分之一、上限 4，CI（`GITHUB_ACTIONS=true`）为 1。每批最多 12 个文件，测量动画、密度切换与等待态替换的文件（`tests/test_web_e2e.py` 的 `TIMING_SENSITIVE_SUITES`）在并发批之后串行；并发为 1 时按设计决定、交互回归和路由冒烟分组。每批限时 600 秒，任一批失败，整轮验证失败。并发的文件共用一个服务和演示库：用例触发的写请求只能落在别的用例不断言的状态上，否则用 `page.route` 拦下或归进串行批。完整 TAP 日志与服务访问日志 `serve.log` 保存在 `build/agent-verification/browser/`，CI 在测试结束后上传其中的 TAP 日志。

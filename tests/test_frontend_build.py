@@ -9,7 +9,8 @@ ADR-0022 的取舍是「构建产物进 Git」：运行时的 Python 服务、Py
   精确钉版本、共享客户端是否唯一。这些在任何机器上都跑。
 - **需要 Node 的**：tsc、lint 与 vitest。npm 或 `frontend/node_modules` 不在时本机显式
   跳过——本机可能根本没装 Node，让整个测试域红掉只会让人绕过入口，而不是去装 Node。
-  CI（`GITHUB_ACTIONS=true`）里判失败：工作流负责装齐，跳过等于这几道门槛在 CI 里从不执行。
+  CI 的 Test 工作流由 `web-bundle` 统一执行三个工具；其他任务与本机经正式入口运行。
+  CI 实际执行工具的任务缺前置条件时判失败。
 
 「产物是否由当前源码构建出来」这一条不在这里：不装 Node 就无法重建，无从比较。
 那道门槛在 CI 的 `web-bundle` job 里，`npm run build` 之后 `git diff --exit-code web/dist`。
@@ -412,10 +413,11 @@ class BrowserSuiteWorkflowTests(unittest.TestCase):
                      "PEACH_E2E_CHROME=", "& .\\scripts\\test.ps1 -Scope web"):
             self.assertIn(step, job, f"web-e2e job 缺了 {step}")
 
-    def test_the_summary_requires_the_browser_job(self):
+    def test_the_summary_requires_browser_and_frontend_jobs(self):
         needs = re.search(r"(?ms)^  verified:\n.*?^    needs: \[([^\]]*)\]", self.workflow)
         self.assertIsNotNone(needs, "verified job 没有 needs 列表")
-        self.assertIn("web-e2e", [name.strip() for name in needs.group(1).split(",")])
+        for required in ("web-e2e", "web-bundle"):
+            self.assertIn(required, [name.strip() for name in needs.group(1).split(",")])
 
     def test_the_browser_job_yields_to_a_wide_matrix_that_already_runs_the_web_scope(self):
         """全量矩阵的 Windows 行本身就跑 `web` 域，`web-e2e` 再跑就是同一批用例两遍。

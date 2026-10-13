@@ -479,6 +479,31 @@ def resolve_auto_scope() -> tuple[tuple[str, ...], str]:
     return scopes_for_changes(paths, contents=changed_contents(ROOT, "master", paths))
 
 
+CI_FRONTEND_TESTS = frozenset({
+    "test_frontend_build.VitestTests.test_the_frontend_sources_typecheck",
+    "test_frontend_build.VitestTests.test_frontend_sources_and_tests_pass_lint",
+    "test_frontend_build.VitestTests.test_the_island_suite_passes",
+})
+
+
+def ci_frontend_delegated() -> bool:
+    """Test 工作流的 Python 与浏览器任务由 web-bundle 承担前端工具检查。"""
+    return (os.environ.get("GITHUB_ACTIONS") == "true"
+            and os.environ.get("GITHUB_WORKFLOW") == "Test"
+            and os.environ.get("GITHUB_JOB") in {"python", "web-e2e"})
+
+
+def without_ci_frontend_tests(suite: unittest.TestSuite) -> unittest.TestSuite:
+    """按完整用例 ID 分配 CI 职责，保留同模块的产物与样式契约。"""
+    selected = unittest.TestSuite()
+    for test in suite:
+        if isinstance(test, unittest.TestSuite):
+            selected.addTests(without_ci_frontend_tests(test))
+        elif test.id() not in CI_FRONTEND_TESTS:
+            selected.addTest(test)
+    return selected
+
+
 def build_suite(*scopes: str, shard_index: int = 0, shard_count: int = 1) -> unittest.TestSuite:
     loader = unittest.defaultTestLoader
     suite = unittest.TestSuite()
@@ -496,7 +521,7 @@ def build_suite(*scopes: str, shard_index: int = 0, shard_count: int = 1) -> uni
                     suite.addTests(loader.loadTestsFromName(test_id))
     finally:
         del sys.path[:2]
-    return suite
+    return without_ci_frontend_tests(suite) if ci_frontend_delegated() else suite
 
 
 class TimedResult(unittest.TextTestResult):
@@ -717,6 +742,10 @@ def main(argv: list[str] | None = None) -> int:
             args.timings.write_text(json.dumps({"success": success, "count": result.testsRun,
                                                 "timings": result.timings}), encoding="utf-8")
         return 0 if success else 1
+    if ci_frontend_delegated():
+        print("CI 前端工具检查由 web-bundle 验证；本次不签发本机测试记录。", flush=True)
+        success, count, _ = run_local_suite(scopes, args.jobs)
+        return 0 if success and count > 0 else 1
     try:
         guard = test_evidence.held(test_evidence.evidence_dir(ROOT) / "full-suite.lock",
                                   wait_seconds=args.lock_timeout,

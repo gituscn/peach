@@ -48,6 +48,8 @@ class ParallelShardTests(unittest.TestCase):
 
 class VerificationTests(unittest.TestCase):
     def setUp(self):
+        # 这组用例模拟本机验收，运行它的 CI job 身份不属于临时仓库。
+        self.enterContext(mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}))
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
