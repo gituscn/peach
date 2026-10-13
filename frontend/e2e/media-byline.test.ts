@@ -18,6 +18,10 @@ describe('作品卡片署名信息行', () => {
         await opened.page.setViewportSize({ width: viewport.width, height: viewport.height });
         await settle(opened.page);
         const card = opened.page.locator('#grid [data-media-card]').first();
+        for (const [field, glyph] of [['who', 'user-round'], ['release', 'calendar'], ['size', 'hard-drive']]) {
+          assert.equal(await card.locator(`[data-media-${field}] svg use`).getAttribute('href'), `#i-${glyph}`);
+          assert.equal(await card.locator(`[data-media-${field}] svg`).evaluate(node => node.getBoundingClientRect().width), 14);
+        }
         const geometry = await card.evaluate(element => {
           const who = element.querySelector('[data-media-who]')!;
           const byline = element.querySelector('[data-media-byline]')!;

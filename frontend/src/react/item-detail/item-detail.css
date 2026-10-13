@@ -25,7 +25,7 @@
 
 /* ── 播放区：没挂载、在线与计费三种说明块 ──
    说明块铺满播放器格，不上下留黑；圆角跟着格走（格只圆左上角，右边贴着侧栏）。 */
-.peach-react [data-item-gallery] { --follow-image-arrow-inset: 16px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.peach-react [data-item-gallery] { display: flex; flex-direction: column; justify-content: center; align-items: center; }
 .peach-react [data-item-gallery] > [class~="video-js"] { order: 0; flex: none; }
 .peach-react [data-item-gallery] > [data-carousel-below] { order: 1; flex: none; }
 .peach-react [data-item-gallery]:not([data-item-picture]) > [data-jav-preview-toggle] { left: 64px; }

@@ -27,7 +27,7 @@ import { RelatedSection } from '../components/related-section';
 import { DetailContinuation } from '../components/detail-continuation';
 import { IdentityCell, IdentitySeries } from '../components/identity-cell';
 import { useFoldedTitle } from '../components/folded-title';
-import { MediaCarousel, useCarouselInset } from '../components/media-carousel';
+import { MediaCarousel } from '../components/media-carousel';
 import { CatalogPicture } from './catalog-picture';
 import { fetchJavDetail, javDetailKey } from '../jav-detail/jav-detail';
 import { busyProps } from '../settings/use-action';
@@ -136,7 +136,6 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
      整个实例还要搬进来，那一截 DOM 不归 React。 */
   const frameRef = useRef<HTMLDivElement>(null);
   const [image, setImage] = useState(-2);
-  useCarouselInset(frameRef, '[data-catalog-picture], [data-jav-picture]', image);
   const refreshSamples = useRef(false);
   const source = useQuery({ queryKey: javDetailKey(item.code || ''),
     queryFn: ({ signal }) => {

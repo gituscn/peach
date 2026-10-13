@@ -14,6 +14,8 @@ LABELS = {"performer": "出演者偏好", "creator": "创作者偏好", "tag": "
           "studio": "厂牌偏好", "series": "系列偏好", "era": "发行年代偏好", "length": "时长偏好"}
 _PROFILES = {}
 _POLICY_FINGERPRINT = None
+PROFILE_TABLES = ('asset', 'asset_entity', 'asset_preference', 'entity', 'entity_alias',
+                  'entity_link', 'entity_classification', 'follow_source', 'genre_decision')
 
 
 def _policy_fingerprint():
@@ -37,7 +39,8 @@ def preference_profile(connection, store):
     key = None
     if database:
         revision_table = connection.execute("SELECT 1 FROM sqlite_master WHERE name='ledger_revision'").fetchone()
-        revision = connection.execute("SELECT sum(n) FROM ledger_revision").fetchone()[0] if revision_table else None
+        revision = connection.execute("SELECT sum(n) FROM ledger_revision WHERE tbl IN ("
+                                      + ','.join('?' for _ in PROFILE_TABLES) + ')', PROFILE_TABLES).fetchone()[0] if revision_table else None
         key = database, revision if revision_table else store_version(Path(database)), store_version(store), _policy_fingerprint()
         if key in _PROFILES:
             return _PROFILES[key]

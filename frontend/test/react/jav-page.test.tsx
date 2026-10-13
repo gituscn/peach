@@ -3,12 +3,25 @@ import { QueryClientProvider, notifyManager } from '@tanstack/react-query';
 import { queryClient } from '../../src/react/query';
 import { JavPage } from '../../src/react/jav/jav-page';
 import { JavHeader } from '../../src/react/jav/jav-header';
-import { prefetchJav } from '../../src/react/jav/jav';
+import { discoveryKey, prefetchJav } from '../../src/react/jav/jav';
 import { WANTS_KEY } from '../../src/react/wants/wants';
 import { buttonNamed, click, mount, settle, type } from './render';
 
 notifyManager.setScheduler(notify => notify());
 afterEach(() => queryClient.clear());
+
+it('发现已有结果即时呈现，陈旧推荐在后台更新', async () => {
+  const cached = { items: [{ id: 1, code: 'ABC-001' }], candidate_total: 1, limited: false };
+  queryClient.setQueryData(discoveryKey('external'), cached, { updatedAt: Date.now() - 60_000 });
+  let finish!: (response: Response) => void;
+  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { finish = resolve })));
+  const loaded = prefetchJav('discover', new AbortController().signal);
+  const result = await Promise.race([loaded.then(() => 'ready'), new Promise(resolve => setTimeout(() => resolve('waiting'), 40))]);
+  expect(result).toBe('ready');
+  expect(queryClient.getQueryData(discoveryKey('external'))).toEqual(cached);
+  finish({ ok: true, status: 200, json: async () => cached } as Response);
+  await loaded;
+});
 
 it('想要已有清单立即返回，陈旧数据在后台更新', async () => {
   const cached = { items: [], counts: {}, scraping: false };

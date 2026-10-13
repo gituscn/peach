@@ -12,30 +12,25 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   let browser: Browser;
   installDesignBrowser((next) => { browser = next; });
 
-  it('关注详情的翻页圆钮：48px 玻璃底、窄屏 44px；落在图片黑边的视觉中心，太窄才退回 16/10 的安全内距；圆点离底 18/12', { timeout: 90_000 }, async () => {
+  it('关注详情翻页圆钮固定两侧 11px；桌面 48px、手机 44px，圆点离底 18/12', { timeout: 90_000 }, async () => {
     const read = (page: Page) => page.evaluate(() => {
       const frame = document.querySelector<HTMLElement>('#stage [data-follow-detail-media="image"]')!;
       const next = frame.querySelector('[data-follow-image-arrow="next"]')!, style = getComputedStyle(next);
       const outer = frame.getBoundingClientRect(), box = next.getBoundingClientRect();
       const dots = frame.querySelector('[data-follow-image-dots]')!.getBoundingClientRect();
-      // 桩里的图都是 600×800：object-fit:contain 之后左右各留一道黑边。
-      const rendered = Math.min(outer.width, outer.height * 600 / 800);
-      const gutter = (outer.width - rendered) / 2;
       return {
         size: [box.width, box.height], background: style.backgroundColor, blur: style.backdropFilter,
-        inset: outer.right - box.right, gutter, dotsBottom: outer.bottom - dots.bottom,
+        inset: outer.right - box.right, dotsBottom: outer.bottom - dots.bottom,
         framed: frame.hasAttribute('data-framed'),
         ratio: getComputedStyle(frame.querySelector('[data-follow-detail-poster]')!).aspectRatio,
       };
     });
-    const centered = (shown: { gutter: number; size: number[] }, safe: number) =>
-      shown.gutter >= shown.size[0]! + safe * 2 ? (shown.gutter - shown.size[0]!) / 2 : safe;
     const settlePoster = async (page: Page) => {
       await page.waitForFunction(() => {
         const image = document.querySelector<HTMLImageElement>('#stage [data-follow-detail-poster]');
         return image?.complete && image.naturalWidth > 0;
       });
-      // 几何断言读取图片就绪后的布局；ResizeObserver 在渲染阶段更新箭头内距。
+      // 图像解码与布局就绪后读取几何。
       await page.evaluate(() => new Promise<void>(resolve => {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
       }));
@@ -48,7 +43,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
       assert.deepEqual(shown.size, [48, 48]);
       assert.equal(shown.background, 'rgba(0, 0, 0, 0.6)');
       assert.equal(shown.blur, 'blur(16px)');
-      assert.ok(Math.abs(shown.inset - centered(shown, 16)) <= 1, `箭头没落在黑边中心：${JSON.stringify(shown)}`);
+      assert.ok(Math.abs(shown.inset - 11) <= 1, `箭头内距：${JSON.stringify(shown)}`);
       assert.ok(Math.abs(shown.dotsBottom - 18) <= .5, `圆点离底 ${shown.dotsBottom}px`);
       // 画框比例跟整组图走：换图时详情不忽高忽低。
       assert.equal(shown.framed, true);
@@ -63,7 +58,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
       await settlePoster(narrow.page);
       const shown = await read(narrow.page);
       assert.deepEqual(shown.size, [44, 44]);
-      assert.ok(Math.abs(shown.inset - centered(shown, 10)) <= 1, `窄屏箭头内距不对：${JSON.stringify(shown)}`);
+      assert.ok(Math.abs(shown.inset - 11) <= 1, `窄屏箭头内距：${JSON.stringify(shown)}`);
       assert.ok(Math.abs(shown.dotsBottom - 12) <= .5, `窄屏圆点离底 ${shown.dotsBottom}px`);
       assert.deepEqual(narrow.problems, []);
     } finally {

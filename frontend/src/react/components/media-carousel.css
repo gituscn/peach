@@ -1,5 +1,4 @@
-/* 左右翻页：48/24 的媒体圆钮压在图上，玻璃底；箭头落在黑边的视觉中心（`--follow-image-arrow-inset`
-   由页面按图片比例算）。 */
+/* 翻页键固定在媒体区两侧，圆形悬停面与关闭键共用。 */
 .peach-react [data-media-carousel] [data-follow-image-arrow] {
   box-sizing: border-box;
   position: absolute;
@@ -18,10 +17,14 @@
   color: #fff;
   backdrop-filter: blur(16px);
 }
-.peach-react [data-media-carousel] [data-follow-image-arrow]:hover { background: rgba(0, 0, 0, .78); }
+.peach-react [data-follow-image-arrow]::after { content: ''; position: absolute; z-index: 0; inset: 4px; border-radius: 50%; background: transparent; pointer-events: none; transition: background .2s cubic-bezier(.05,0,0,1); }
+.peach-react [data-follow-image-arrow]:is(:hover, :focus-visible)::after { background: rgba(255,255,255,.2); }
+.peach-react [data-follow-image-arrow]:active::after { background: rgba(255,255,255,.3); }
 .peach-react [data-media-carousel] [data-follow-image-arrow]:focus-visible { outline: 2px solid var(--tungsten); outline-offset: 3px; }
 .peach-react [data-media-carousel] [data-follow-image-arrow] svg {
   display: block;
+  position: relative;
+  z-index: 1;
   width: 24px;
   height: 24px;
   flex: none;
@@ -31,8 +34,8 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.peach-react [data-media-carousel] [data-follow-image-arrow="prev"] { left: var(--follow-image-arrow-inset); }
-.peach-react [data-media-carousel] [data-follow-image-arrow="next"] { right: var(--follow-image-arrow-inset); }
+.peach-react [data-media-carousel] [data-follow-image-arrow="prev"] { left: 11px; }
+.peach-react [data-media-carousel] [data-follow-image-arrow="next"] { right: 11px; }
 .peach-react [data-media-carousel] [data-follow-image-dots] {
   position: absolute;
   z-index: 4;

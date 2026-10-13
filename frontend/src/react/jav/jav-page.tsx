@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { entityPath, icon } from '@peach/legacy/core';
+import { spinnerHtml } from '@peach/legacy/ui';
 import { RiCompassLine, RiExternalLinkLine } from '@remixicon/react';
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
@@ -111,6 +113,11 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         <span data-catalog-readout="">{waiting ? <span data-skeleton="count" aria-hidden className="relative inline-block h-3.5 w-37.5 rounded-md align-middle skeleton-sheen" /> : `${items.length} 部`}</span>
         {query || tag ? <GlassPill onPress={() => { setTag(''); clearText() }}>清除筛选</GlassPill> : null}
         <span data-entity-sorts="">
+        {scope === 'external' ? <button type="button" data-entity-batch="" data-jav-metadata-update=""
+          title={metadata?.status === 'running' ? '停止读取' : '更新资料'} aria-label={metadata?.status === 'running' ? '停止读取' : '更新资料'}
+          disabled={waiting || !!metadataAction.busy} aria-busy={!!metadataAction.busy || undefined}
+          onClick={() => updateMetadata(metadata?.status === 'running' ? 'stop' : 'update')}
+          dangerouslySetInnerHTML={{ __html: metadataAction.busy ? spinnerHtml('正在更新资料') : icon(metadata?.status === 'running' ? 'x' : 'refresh-cw') }} /> : null}
         <Segments label="JAV 卡片版式" value={layout} options={JAV_LAYOUTS} onChange={storeJavLayout} />
         <SortKeys sorts={DISCOVERY_SORTS.map(([key, label, ariaLabel]) => ({ key, label, ariaLabel,
           pressed: key === sort, dir: direction }))} onSort={key => {
@@ -119,12 +126,8 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
       </>} />
     {waiting ? <div role="status" aria-label="正在读取推荐" dangerouslySetInnerHTML={{ __html: javContentSkeleton('discover', layout) }} /> : null}
     {discoveries.error ? <Note tone="error" title="推荐未取得">{errorMessage(discoveries.error)}</Note> : null}
-    {scope === 'external' ? <div data-jav-metadata="" className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-      {metadata?.status === 'running' ? <div className="min-w-0 flex-1"><TaskProgress embedded
+    {scope === 'external' && metadata?.status === 'running' ? <div data-jav-metadata="" className="min-w-0"><TaskProgress embedded
         label={`正在读取作品资料 · ${metadata.completed} / ${metadata.total} 部`} value={metadata.completed} total={metadata.total} /></div> : null}
-      <Button variant="secondary" size="small" disabled={waiting} {...busyProps(metadataAction.busy === (metadata?.status === 'running' ? 'stop' : 'update'))}
-        onClick={() => updateMetadata(metadata?.status === 'running' ? 'stop' : 'update')}>{metadata?.status === 'running' ? '停止读取' : '更新资料'}</Button>
-    </div> : null}
     {metadata && metadata.status !== 'running' && (metadata.status !== 'complete' || metadata.failed > 0)
       ? <Note tone="neutral" action={<Button variant="secondary" {...busyProps(metadataAction.busy === 'retry')}
         onClick={() => updateMetadata('retry')}>重新读取资料</Button>}>{metadata.message || `作品资料 ${metadata.completed} / ${metadata.total} 部`}</Note> : null}
@@ -151,11 +154,17 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
           {artwork ? <ArtSlot artwork={{ kind: 'cover', html: artwork }} identity={discoveryArtwork(item, 'small', settings.value.javImage)}
             relayout={root => relayoutCovers(root, layout)} /> : <span data-media-nopic="">无封面</span>}
         </a>
-        <h3 data-jav-title="" title={`${item.code} · ${item.title || '标题未取得'}`}>{item.code} · {item.title || '标题未取得'}</h3>
-        <div data-jav-identity="">
-          <div data-jav-faces=""><DiscoveryFaces item={item} /></div>
-          <p className="min-w-0 truncate text-body-2-regular text-text-secondary" title={performers}>{[performers, item.release_date].filter(Boolean).join(' · ')}</p>
-        </div>
+        <div data-media-meta="">
+          <DiscoveryFaces item={item} />
+          <div data-media-text="">
+            <h3 data-jav-title="" data-media-title="" title={`${item.code} · ${item.title || '标题未取得'}`}><b>{item.code}</b> {item.title || '标题未取得'}</h3>
+            <div data-media-byline="">
+              {item.performer_refs?.[0]?.id ? <a data-media-who="" href={entityPath('performer', item.performer_refs[0].name)} title={performers}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-user-round" /></svg><span>{item.performer_refs[0].name}</span></a>
+                : <span data-media-who="" title={performers}><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-user-round" /></svg><span>{item.performer_refs?.[0]?.name || performers}</span></span>}
+              {(item.performer_refs?.length || 0) > 1 ? <span data-media-who-more="">等 {item.performer_refs!.length} 人</span> : null}
+              {item.release_date ? <time data-media-release="" dateTime={item.release_date}><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-calendar" /></svg>{item.release_date}</time> : null}
+            </div>
         <div data-jav-tags="" data-media-tags="">
           <button data-jav-taste-score="" type="button" title={scoreDetails} aria-label={`推荐分 ${recommendation.score}，${recommendation.label}`}
             className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring">
@@ -163,6 +172,8 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
           </button>
           {(item.tags || []).slice(0, 4).map(name =>
           <button type="button" data-media-tag="" key={name} aria-pressed={tag === name} onClick={() => setTag(tag === name ? '' : name)}>{name}</button>)}</div>
+          </div>
+        </div>
         <div data-jav-actions="" className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => resource({ ...item, cover: item.has_cover ? coverUrl(item, true) : item.cover_url, origin: `${item.asset_id ? 'asset' : 'feed'}:${item.id}` })}>查找资源</Button>
           <Button variant="ghost" disabled={readOnly || item.wanted || !!item.asset_id} {...busyProps(action.busy === String(item.id))} onClick={() => {

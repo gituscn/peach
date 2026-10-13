@@ -20,7 +20,7 @@ import { RetryNote } from '../components/grid-reveal';
 import { MixGroupLabel, MixQueue, MixQueueRow } from '../components/mix-queue';
 import { RelatedSection } from '../components/related-section';
 import { DetailContinuation } from '../components/detail-continuation';
-import { MediaCarousel, MEDIA_DOTS_MAX, useCarouselInset } from '../components/media-carousel';
+import { MediaCarousel, MEDIA_DOTS_MAX } from '../components/media-carousel';
 import { FollowAuthorLink, FollowCard } from '../follow-feed/follow-card';
 import {
   FOLLOW_CREDENTIALS_KEY, fetchFollowCredentials, replaceFollowItem, setFollowItemStatus, videoItems,
@@ -182,7 +182,6 @@ function MediaFrame({ item, media, actions, onMedia, issues }: {
   const imageSrc = item.playable && kind === 'image' ? src : item.thumb_url || '';
   const fallback = item.playable && kind === 'image' && thumb && thumb !== src ? thumb : '';
   const [shown, setShown] = useState(imageSrc);
-  useCarouselInset(frame, '[data-follow-detail-poster]', shown);
 
   /* 播放器只随这一块媒体区挂一次、卸一次：写完状态换的是同一条的新对象，不能因此拆了重挂。
      这一块本身按「条目:媒体」换，换条目或换媒体时整块重建，清理就在那一刻跑。`<video>` 由舞台

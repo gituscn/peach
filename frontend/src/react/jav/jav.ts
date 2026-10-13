@@ -50,6 +50,7 @@ export async function prefetchJav(tab: string, signal: AbortSignal) {
       staleTime: 30_000, revalidateIfStale: true }); return;
   }
   if (tab === 'discover') {
-    await queryClient.fetchQuery({ queryKey: discoveryKey('external'), queryFn: () => fetchDiscoveries('external', signal) }); return;
+    await queryClient.ensureQueryData({ queryKey: discoveryKey('external'), queryFn: () => fetchDiscoveries('external', signal),
+      staleTime: 30_000, revalidateIfStale: true }); return;
   }
 }

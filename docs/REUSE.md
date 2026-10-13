@@ -72,6 +72,10 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 `entity_identity_research` 与 `apply_entity_identity_research.py` 复用规范实体写入、字段归属保护、只读预览、SQLite 备份及冻结计划。逐行撤回回执核对后续修改，新增实体有额外引用时拒绝删除；观看历史和人工判断不被回滚覆盖。资料站调研复用 `performer_alias_followup.WikiSitePages`（包着 `sources/seesaa.py` 的 `WikiPages`，加 404 记忆与按站冷却）、作品表解析 `rows()` 与 `person_profile`，以及 EUC-JP 页名直取写法，不新增依赖；`creator_identity_followup` 的后继壳照抄补厂牌、补别名两条。
 
+## 发现推荐缓存
+
+发现推荐的浏览证据复用 `taste_history` 私有历史库、规范身份和原子 JSON 写入；按日取证与同地址身份解析独立缓存。缓存只保存实体计数，历史、别名、关注、标签决定和解析规则参与失效；观看反馈不重复解析历史，任务心跳不影响偏好版本。页面预取复用 TanStack Query 的 `ensureQueryData`，无新增依赖。
+
 ## 播放器清晰度
 
 作品详情的画框几何由 `react/stage/stage.css` 管理，馆藏与库外 JAV 共用视口高度、媒体行及常驻缩略图预留。小数星星的两层 SVG 共用同一图标框。缩略图滚轮复用 `wireHorizontalScroller` 并在卸载时清理。公开图片缓存使用标准库 `Future` 合并同键请求，缓存锁只覆盖内存读写；图片下载使用三个槽位，资料取数使用独立锁与既有来源间隔，不添加依赖。

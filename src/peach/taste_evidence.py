@@ -1,5 +1,7 @@
 """规范身份、馆藏、浏览与关注证据的独立汇总。"""
 from collections import Counter, defaultdict
+import hashlib
+import json
 import math
 import re
 import ahocorasick
@@ -103,14 +105,16 @@ def collection_evidence(connection, index, counters):
                 counters["观看与反馈"][kind][eid] += behavior
 
 
-def browser_entities(url, title, index, matcher, accounts, decisions):
+def browser_entities(url, title, index, matcher, accounts, decisions, account_hosts=None):
     from .taste_history import _is_taste_domain, _url_candidates
     from .genre_taxonomy import resolve_genre
-    matched = linked_identities(url, accounts)
+    website = host(url)
+    account_host = website.partition('.')[2] if website.endswith(('.fanbox.cc', '.tumblr.com')) else website
+    matched = linked_identities(url, accounts) if account_hosts is None or account_host in account_hosts else ()
     yield from matched
     domain, tags, creators = _url_candidates(url, title)
-    social = host(url) in MIXED_DOMAINS and account_key(url) is not None
     adult = _is_taste_domain(domain or "") or mixed_adult(url, title)
+    social = not adult and website in MIXED_DOMAINS and account_key(url) is not None
     if not (adult or social):
         return
     yield from title_entities(title, matcher, index)
@@ -131,24 +135,51 @@ def browser_entities(url, title, index, matcher, accounts, decisions):
 
 
 def browser_evidence(connection, store, index, accounts, counters):
-    from .taste_history import _history_rows
+    from .taste_history import preference_history_visits, store_version
+    from .taste_preferences import _policy_fingerprint
+    from .fsutil import atomic_write_text
     from .genre_decisions import load_genre_decisions
     if not store.is_file():
         return
-    history = _history_rows(store)
-    if history is None:
-        return
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     decisions = load_genre_decisions(connection) if "genre_decision" in tables else {}
+    inputs = [store_version(store), _policy_fingerprint(), list(index.entities.values()),
+              sorted((kind, label, sorted(ids)) for (kind, label), ids in index.aliases.items()),
+              sorted((key, sorted(values)) for key, values in accounts.items()), decisions]
+    fingerprint = hashlib.sha256(json.dumps(inputs, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+    cache_path = store.parent / 'browser-preference-cache.json'
+    try:
+        cached = json.loads(cache_path.read_text(encoding='utf-8'))
+        if cached.get('version') == 1 and cached.get('fingerprint') == fingerprint:
+            for kind, rows in cached['dimensions'].items():
+                for eid, name, count in rows:
+                    index.names[kind][eid] = name
+                    counters['浏览记录'][kind][eid] = count
+            return
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    visits = preference_history_visits(store)
     matcher = index.title_matcher()
     days = defaultdict(lambda: defaultdict(set))
-    for visited_at, url, title in history.identity_visits:
-        for eid, kind, name in browser_entities(url, title, index, matcher, accounts, decisions):
+    identities = {}
+    account_hosts = {key[0] for key in accounts}
+    for visited_at, url, title in visits:
+        key = url, title
+        if key not in identities:
+            identities[key] = tuple(browser_entities(url, title, index, matcher, accounts, decisions, account_hosts))
+        for eid, kind, name in identities[key]:
             index.names[kind][eid] = name
             days[kind][eid].add(visited_at[:10])
     for kind, identities in days.items():
         for eid, dates in identities.items():
             counters["浏览记录"][kind][eid] = len(dates)
+    payload = {'version': 1, 'fingerprint': fingerprint, 'dimensions': {kind: [
+        [eid, index.names[kind][eid], len(dates)] for eid, dates in identities.items()]
+        for kind, identities in days.items()}}
+    try:
+        atomic_write_text(cache_path, json.dumps(payload, ensure_ascii=False), mode=0o600)
+    except OSError:
+        pass
 
 
 def preference_evidence(connection, store):

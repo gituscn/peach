@@ -645,6 +645,7 @@ class _HistoryRows:
 #: 按历史库文件的版本缓存解析结果。历史库只在导入与刷新时变，逐条解析网址要十几秒；
 #: 账本写入与它无关，不该连带重算。键里带 `-wal` 的版本：WAL 模式下写入先落在那里。
 _HISTORY_ROWS: dict[tuple, _HistoryRows] = {}
+_PREFERENCE_VISITS: dict[tuple, tuple[tuple[str, str, str], ...]] = {}
 
 
 def store_version(store_path: Path) -> tuple:
@@ -657,6 +658,44 @@ def store_version(store_path: Path) -> tuple:
         else:
             version.append(None if path.name.endswith("-wal") and stat.st_size <= 32 else (stat.st_mtime_ns, stat.st_size))
     return tuple(version)
+
+
+def preference_history_visits(store_path: Path) -> tuple[tuple[str, str, str], ...]:
+    """推荐按日使用身份浏览证据，缓存随历史库与 WAL 版本失效。"""
+    version = store_version(store_path)
+    cached = _PREFERENCE_VISITS.get(version)
+    if cached is not None:
+        return cached
+    visits = dict.fromkeys(_HISTORY_ROWS[version].identity_visits) if version in _HISTORY_ROWS else {}
+    if version not in _HISTORY_ROWS:
+        try:
+            with closing(sqlite3.connect(_readonly_uri(store_path), uri=True)) as store:
+                seen = set()
+                for visited_at, url, title in store.execute(
+                        "SELECT v.visited_at,v.url,v.title FROM history_visit v "
+                        "JOIN history_source s ON s.source_key=v.source_key"):
+                    try:
+                        fingerprint = (url, int(datetime.fromisoformat(visited_at).timestamp()))
+                    except ValueError:
+                        continue
+                    if fingerprint in seen:
+                        continue
+                    seen.add(fingerprint)
+                    visits.setdefault((visited_at[:10], url, title or ''), None)
+        except sqlite3.DatabaseError:
+            return ()
+    daily = dict.fromkeys((day[:10], url, title) for day, url, title in visits)
+    result = []
+    for day, url, title in daily:
+        try:
+            parsed = urlparse(url)
+            if parsed.scheme in {'http', 'https'} and parsed.hostname:
+                result.append((day, url, title))
+        except ValueError:
+            continue
+    _PREFERENCE_VISITS.clear()
+    _PREFERENCE_VISITS[version] = tuple(result)
+    return _PREFERENCE_VISITS[version]
 
 
 def _read_history_rows(store_path: Path) -> _HistoryRows | None:
