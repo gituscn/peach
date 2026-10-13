@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import type { Browser } from 'playwright-core';
-import { launch, layout, VIEWPORTS } from './harness.ts';
+import { launch, layout, settle, VIEWPORTS } from './harness.ts';
 import { openItemPage } from './item-fixture.ts';
 
 describe('我的收藏弹层', () => {
@@ -50,6 +50,7 @@ describe('我的收藏弹层', () => {
         assert.equal(address.searchParams.get('jav'), '1');
         await link.click();
         await page.waitForURL(url => url.pathname === '/watch-later' && url.searchParams.get('tag') === 'VR');
+        await settle(page, '[data-catalog-frame]');
         await page.getByRole('button', { name: '我的收藏', exact: true }).click();
         await dialog.getByRole('button', { name: '删除筛选VR 待看', exact: true }).click();
         await link.waitFor({ state: 'detached' });
@@ -58,6 +59,7 @@ describe('我的收藏弹层', () => {
         await dialog.getByRole('button', { name: '关闭', exact: true }).click();
         await dialog.waitFor({ state: 'hidden' });
         for (const [label, path] of [['已标记', '/flagged'], ['稍后看', '/watch-later']]) {
+          await settle(page, '[data-catalog-frame]');
           await page.getByRole('button', { name: '我的收藏', exact: true }).click();
           await dialog.getByRole('link', { name: label, exact: true }).click();
           await page.waitForURL(url => url.pathname === path);
