@@ -863,7 +863,7 @@ class StandaloneConfigurationTests(_Case):
     def test_the_configuration_page_is_a_screen_of_the_app_and_its_data_a_json_contract(self):
         """`/configuration` 是主站外壳里的一屏，表单由 island 画；真相只在 `/api/configuration`。"""
         from peach.routes_configuration import RELOAD_NAME
-        with self.client() as client:
+        with self.client() as client, mock.patch("peach.onboarding.check_available_port") as available:
             headers = {"X-Token": "test-token"}
             page = client.get("/configuration", headers=headers)
             self.assertEqual(page.status_code, 200)
@@ -881,6 +881,7 @@ class StandaloneConfigurationTests(_Case):
             response = client.post("/api/configuration", headers=headers, json={
                 "revision": snapshot["revision"], "media_dirs": [str(self.media)], "port": "9124"})
             self.assertEqual(response.status_code, 200, response.text)
+            available.assert_called_once_with(9124, 9123)
             self.assertEqual(response.json()["url"], "http://127.0.0.1:9124/")
             self.assertEqual(settings_file.load_config().server.port, 9124)
             self.assertTrue(self.config.path.with_suffix(".previous.toml").is_file())

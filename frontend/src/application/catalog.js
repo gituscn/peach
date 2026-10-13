@@ -14,7 +14,7 @@ import { buildManageBar, cardLayout, homeLayoutActive, javActive, layoutState, s
 import { selectionState, setSelectMode, toggleSelection } from './selection.js';
 import { javDisplayName, javTitleHtml } from '../core/jav-title';
 import { tagLabel } from '../core/tags';
-import { stageApi } from '../react/application-residents';
+import { loadStage, stageApi } from '../react/application-residents';
 import { currentBarsContext, entityState, openEntity, pushEntityPage, routeEntityPage, sortKeys } from './entity.js';
 import { applicationEffects } from './effects';
 import { managedEntry, managedTaken, openManagedRoute, releaseManagedRoute, updateManagedRoute } from './../history/managed';
@@ -30,6 +30,7 @@ import { revealRoutedPage } from './follow.js';
 import { pageSkeletonHtml } from './../management-placeholder';
 import { catalogEmptyHtml } from './../catalog-onboarding';
 import { junkRoute } from './../junk-queue';
+import { wallAddress } from '../react/video-wall/wall-route';
 export const catalogState = { homeHasFeed: undefined, barsRequestSeq: undefined, barsRendered: undefined, catalogFilterProps: undefined, catalogFilterMounting: undefined, catalogTagRows: undefined, catalogTopsPages: undefined, initialParams: undefined, resolveSort: undefined, initialCatalogUrl: undefined, initialParam: undefined, HOME_QUERY_KEYS: undefined, searchValueSnapshot: undefined, cancelSearchDissolve: undefined, rememberSearchValue: undefined, clearSearchField: undefined, mixRelatedCache: undefined, reduceMotion: undefined, tagList: undefined, tagPressed: undefined, withTagToggled: undefined, gridHelpers: undefined, gridActions: undefined, topsQueryParams: undefined, facetCountsSeq: undefined, VIEW_PILLS: undefined, catalogViews: undefined, TAGS_FIRST: undefined, catalogOnScreen: undefined, COMBO_LABELS: undefined, hideCatalogCombo: undefined, junkQueueHelpers: undefined, junkQueueActions: undefined };
 
 export function dropOfflineFromDefaultLoc(){
@@ -73,6 +74,10 @@ export function mixRelated(seedId){
 
 export function openGridCard(it,anchor){
   if(stageApi()?.miniplayerTakesCard(it)){stageApi().miniplayerPlay(it.id);return}
+  openCardDetails(it,anchor);
+}
+
+function openCardDetails(it,anchor){
   if(it.edition_group){openEditions(it.edition_group.seed_id,it.id,true,anchor);return}
   if(it.part_group){openParts(it.part_group.seed_id,it.id,true,anchor);return}
   openItem(it.id,true,null,anchor);
@@ -453,16 +458,17 @@ export function catalogGridProps(){
   const path=decodeURIComponent(location.pathname),home=isCatalogPath(path),trash=state.state==='trash';
   return {
     mode:'catalog',helpers:catalogState.gridHelpers,actions:catalogState.gridActions,layout:catalogGridLayout(),
+    wall:path==='/wall',
     selectMode,selected:new Set(selected),seekSeconds:preferencesState.appSettings.seekSeconds,revision:catalogState.controller.revision,
     wireDrag,settled:settleCatalog,
     skeletonHtml:()=>catalogSkeletonHtml(),
     filters:{...state},batchSize:preferencesState.appSettings.batchSize,groupCollapse:preferencesState.appSettings.groupCollapse,
     /* 只有首页默认列表排除竖屏——那里另有独立的竖屏带承接它们。搜索必须能搜到竖屏作品，
        否则按名字找一条竖屏视频会得到 0 结果。JAV 模式恒不含竖屏：番号发行物本身就是横版。 */
-    excludeVertical:(home&&!state.q&&!state.orient)||state.jav==='1',
-    mix:home&&!trash,
+    excludeVertical:(home&&path!=='/wall'&&!state.q&&!state.orient)||state.jav==='1',
+    mix:home&&path!=='/wall'&&!trash,
     /* JAV 模式不插竖屏带：主列表的 exclude_vertical 管不到它，它是独立请求、独立插入的。 */
-    shorts:home&&!javActive()&&state.orient!=='竖屏'&&!trash,
+    shorts:home&&path!=='/wall'&&!javActive()&&state.orient!=='竖屏'&&!trash,
     countRow:$('#count'),onCount:paintCatalogCount,onCountFailed:()=>paintCatalogFilter({count:false}),
     emptyHtml:({trash:inTrash,libraryEmpty})=>inTrash
       ?preferencesState.emptyState('trash','回收站是空的','删掉的内容会先到这里；确认不再需要后再清空。')
@@ -525,6 +531,7 @@ export function installCatalog7() {
   }
 
 export function installCatalog12() {
+applicationEffects.handler($('#wallBtn'), 'onclick', ()=>{setSelectMode(false,true);navigationState.route(wallAddress(undefined,{...entityState.activeFilterState(),jav:javActive()?'1':''}))});
 catalogState.mixRelatedCache = new Map();
 catalogState.reduceMotion = ()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
 catalogState.tagList = (value=state.tag)=>String(value||'').split(',').filter(Boolean);
@@ -538,6 +545,12 @@ catalogState.gridHelpers = {
   tagLabel:tag=>tagLabel(tag),
 };
 catalogState.gridActions = {
+  wallPlayer:async(it,frame,signal)=>{
+    const stage=await loadStage(mediaState.stageHost);
+    signal.throwIfAborted();
+    return stage.mountWallPlayer(it,frame,signal);
+  },
+  wallDetails:openCardDetails,
   open:(it,anchor)=>openGridCard(it,anchor),
   openResource:(it,anchor)=>stageApi()?.miniplayerTakesCard(it)?stageApi().miniplayerPlay(it.id):openResourceCard(it,anchor),
   openShort:it=>stageApi()?.miniplayerTakesCard(it)?stageApi().miniplayerPlay(it.id):openTok(it.id),

@@ -28,7 +28,7 @@ class ReferenceUpdateTests(unittest.TestCase):
         sources = {source["id"]: source for source in registry["sources"]}
         self.assertEqual(
             set(sources),
-            {"readme-immich", "readme-bruno", "readme-hoppscotch",
+             {"folia-wall-blocks", "folia-wall-style", "folia-wall-reflows", "folia-wall-motion", "readme-immich", "readme-bruno", "readme-hoppscotch",
              "vercel-report-design", "vercel-web-interface-guidelines",
              "fiu758-studio-logo-discovery", "rule34-follow-tags-and-collections",
              "f95-masked-gofile-media", "follow-fanbox-gofile-paheal",

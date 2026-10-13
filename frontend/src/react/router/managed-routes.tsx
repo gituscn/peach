@@ -360,7 +360,7 @@ export const RESIDENT_ROUTES: ResidentRouteTable = {
 const isResidentName = (key: string): key is ResidentName => Object.hasOwn(RESIDENT_ROUTES, key);
 /** 画着 `#grid` 那两页时地址可能落在的路径：首页、三个筛选态、回收站与垃圾文件。只进 `<Routes>` 的声明，
  *  不当槽里的键。 */
-export const CATALOG_PATHS = ['/', '/unseen', '/watch-later', '/flagged', '/trash', '/junk-files'] as const;
+export const CATALOG_PATHS = ['/', '/wall', '/unseen', '/watch-later', '/flagged', '/trash', '/junk-files'] as const;
 
 /** `<Routes>` 声明的路径：前四张表的键，加上 `#grid` 那两页画着时地址可能落在的路径。 */
 export const ROUTED_PATHS: readonly string[] = [

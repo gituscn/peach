@@ -92,6 +92,7 @@ function filtersAt(pathname: string, search: string, entering: boolean, shell: C
     ...sortFromAddress(params.get('sort'), params.get('dir'), defaultSort, defaultSortDirection),
     seed: params.get('seed') || (entering ? newSeed() : previous.seed || newSeed()),
     q: params.get('q') || '', jav: params.get('jav') || '',
+    performer: params.get('performer') || '', series: params.get('series') || '',
   };
 }
 
@@ -178,6 +179,18 @@ function CatalogOpen() {
  *  覆盖地址的参数不是数字（`/item/abc`）时什么都不挂：那不是一条详情，下面也不补画。 */
 export function CatalogMatch() {
   const { pathname, search } = useLocation();
+  useLayoutEffect(() => {
+    if (pathname !== '/wall') return;
+    document.body.setAttribute('data-wall-open', '');
+    document.documentElement.removeAttribute('data-wall-entry');
+    const chrome = Array.from(document.querySelectorAll<HTMLElement>('header.top,#drawer,#main,#catalogFilter,#count,#javLibraryHeader,#libraryProcessingNotice,#feedNew'));
+    const inert = chrome.map(node => node.inert);
+    chrome.forEach(node => { node.inert = true });
+    return () => {
+      document.body.removeAttribute('data-wall-open');
+      chrome.forEach((node, index) => { node.inert = inert[index] || false });
+    };
+  }, [pathname]);
   const actions = useContext(ShellActionsContext);
   const host = document.getElementById('javLibraryHeader');
   const jav = isCatalogPath(pathname) && new URLSearchParams(search).get('jav') === '1';

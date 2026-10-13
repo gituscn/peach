@@ -117,14 +117,75 @@ beforeEach(async () => {
   settings.seekSeconds = 10;
   stage = await import('../src/react/stage/stage-player');
   stage.configureStagePlayer({
-    player: { settings: () => settings } as never,
+    player: { settings: () => settings, loadSourceStatus: async () => ({ local: !offline }),
+      offlineReason: () => '来源未挂载' } as never,
     sourceOffline: () => offline, expand, openItem: vi.fn(),
   }, { isOpen: () => open, requestClose });
   dom = miniplayerDom();
   stage.registerMiniplayer(dom);
 });
 
-afterEach(() => { document.body.replaceChildren() });
+afterEach(() => { document.body.replaceChildren(); vi.unstubAllGlobals() });
+
+describe('播放墙的共享播放器', () => {
+  const response = (extra: Record<string, unknown> = {}) => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ id: 1, title: '作品 1', location: 'local', ...extra }) })));
+  };
+  it('收起播放墙交给小窗，打开详情认领同一实例和进度', async () => {
+    open = false; response();
+    const frame = document.body.appendChild(document.createElement('div'));
+    const release = await stage.mountWallPlayer(item(1), frame, new AbortController().signal);
+    const player = fake.mounts[0]!.player;
+    player.currentTime(43);
+    expect(stage.activeStageVideo()).toBe(player.el().querySelector('video'));
+    release(true);
+    expect(stage.miniplayerActive()).toBe(true);
+    expect(player.isDisposed()).toBe(false);
+    stage.prepareStageFor('item', 1);
+    const detail = show(1);
+    expect(detail.frame.contains(player.el())).toBe(true);
+    expect(player.currentTime()).toBe(43);
+    expect(fake.mounts).toHaveLength(1);
+  });
+  it('换片或停止释放实例，重复清理保持幂等', async () => {
+    open = false; response();
+    const release = await stage.mountWallPlayer(item(1), document.body.appendChild(document.createElement('div')), new AbortController().signal);
+    release(false); release(true);
+    expect(fake.mounts[0]!.player.isDisposed()).toBe(true);
+    expect(stage.miniplayerActive()).toBe(false);
+    expect(stage.stagePlayer()).toBeNull();
+  });
+  it('选定分卷或版本后使用共用播放器', async () => {
+    open = false; response({ part_group:{ key:'p' } });
+    const frame = document.body.appendChild(document.createElement('div'));
+    const release = await stage.mountWallPlayer({ ...item(1), part_group:{ key:'p' } }, frame, new AbortController().signal);
+    expect(fake.mounts).toHaveLength(1);
+    expect(frame.contains(fake.mounts[0]!.player.el())).toBe(true);
+    release();
+  });
+  it('计费、在线和脱盘作品不能直接拉流', async () => {
+    response();
+    const frame = document.body.appendChild(document.createElement('div'));
+    const signal = new AbortController().signal;
+    for (const extra of [{ cost: 'metered' }, { location: 'online' }]) {
+      response(extra);
+      await expect(stage.mountWallPlayer(item(1), frame, signal)).rejects.toThrow('请打开详情');
+    }
+    response(); offline = true;
+    await expect(stage.mountWallPlayer(item(1), frame, signal)).rejects.toThrow('来源未挂载');
+    expect(fake.mounts).toHaveLength(0);
+  });
+  it('离开页面后返回的作品响应不挂播放器', async () => {
+    let answer!: (response: unknown) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(resolve => { answer = resolve })));
+    const controller = new AbortController();
+    const mounting = stage.mountWallPlayer(item(1), document.body.appendChild(document.createElement('div')), controller.signal);
+    controller.abort();
+    answer({ ok: true, json: async () => ({ id: 1, location: 'local' }) });
+    await expect(mounting).rejects.toThrow();
+    expect(fake.mounts).toHaveLength(0);
+  });
+});
 
 describe('舞台与小窗之间交接播放器', () => {
   it('离开详情时正在放的那一个搬进小窗；展开回同一条认领回来，不重建', () => {

@@ -16,6 +16,14 @@ amane 的所有正式来源可选逐站直连或公共代理，桥保持一次�
 SiteRecord 与候选结算；[外部播放](EXTERNAL_PLAYERS.md)复用既有媒体根检查、HTTP Range、
 标准 M3U 与客户端协议，无新增依赖。Python 主程序和独立桥均使用 3.14，独立锁仍隔离依赖树。
 
+## 二维播放墙
+
+Folia（`chthollyphile/folia-major`，AGPL-3.0，revision `9a01e788ed52d25ea01b1f0d37934e5e371ae82b`）提供矩形块模板、镜头／世界坐标、视口裁剪、循环／有限墙及视觉样式；原文保存在 [矩形块模板](reference-snapshots/upstream/folia-block-templates.ts)、[让位表](reference-snapshots/upstream/folia-block-reflows.ts)、[动效参数](reference-snapshots/upstream/folia-wall-reflow-motion.ts) 和 [墙面样式](reference-snapshots/upstream/folia-wall.css)。`frontend/src/react/video-wall/` 在独立 `/wall` 页面使用四套模板及镜像、6×6 原位展开和暗色直角拼贴，固定三列续页。封面复用 `ArtSlot`、`cardArtwork` 与人脸／正封取景；全封和正封按磁贴比例选择，只接收有封面的视频。Query、BoardUI、Motion、详情入口、舞台播放器和小窗均使用项目已有能力，不增加依赖。
+
+墙内分卷和版本使用 `item-detail` 的 `queueKey`、`fetchQueue`、`chooseItem`、`nextPart`，列表行复用 `MixQueue`；上一部、下一部和进度控制监听同一 video。换批入口复用首页 `Shuffle` 和原有等待动效。展开卡的封面铺满，标题叠在中下部，播放时封面背景模糊、标题移到上方。
+
+上游当前仓库仍在维护，技术栈为 React 19、TypeScript 7 与 Vite 8。模板与坐标算法没有 Python 或平台依赖，正式消费者是浏览器构建。Three.js、Pixi、歌词和音乐账号体系不适用于视频墙，未引入；全库一次加载会增加传输与解码成本，因此探索墙循环当前批次，筛选及实体作品墙使用现有分页。几何 POC 覆盖 80,000 项、负坐标循环及续页位置稳定，播放器测试覆盖同一实例交接、取消与来源门槛；见 [播放墙取证](reference-snapshots/folia-video-wall.md)。
+
 ## 脚本目录与参数
 
 脚本路径读取 `settings_file` 的目录配置。`sync_sha1_115.py` 的 Cookie 默认位于 `secrets/115-cookies.txt`，复核 CSV 默认位于 `review/115-sha1重复.csv`；可通过 `--cookie-file`、`--dupes-out` 或对应的 `PEACH_115_COOKIE_FILE`、`PEACH_115_DUPES_OUT` 指定现有文件。目录排序偏好使用可重复的 `--deprioritize-dir`。TLS 两种 shell 共用 `resolve_tls_directory.py`，显式 `-OutDir`／`PEACH_TLS_DIR` 优先；`rehome_unknown_jav.py` 的目标账本根由 `--ledger-unknown-root` 明确指定。

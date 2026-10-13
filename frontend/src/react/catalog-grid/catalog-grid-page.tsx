@@ -11,17 +11,19 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { useInfiniteQuery, type InfiniteData, type QueryKey } from '@tanstack/react-query';
 import { mixFace as mixArtwork, mixLabel, relayoutCovers, type Artwork } from '@peach/card-art';
 import { requestErrorMessage } from '@peach/legacy/core';
-import { loadingDotsHtml } from '@peach/legacy/ui';
+import { emptyStateHtml, loadingDotsHtml } from '@peach/legacy/ui';
 
 import { apiGet } from '../../api';
 import { RetryNote, useSkeletonReveal } from '../components/grid-reveal';
 import { cardRatio, MediaCard, type MediaCardVariant } from '../components/media-card';
 import { MIX_FLIP_FACES, MixCard } from '../components/mix-card';
 import {
-  SHORTS_BATCH, arrangeTiles, catalogParams, catalogQuery, entityQuery, mixHasPicture,
+  SHORTS_BATCH, arrangeTiles, catalogParams, catalogQuery, entityQuery, latestCatalogPages, mixHasPicture,
   shortsBoundaries, shortsParams, splitSections, type GridPage, type ShortsCut, type Tile,
 } from './catalog-grid';
 import type { CatalogGridProps, MediaCardLayout, MediaCardHelpers, MediaItem, MediaPage } from './types';
+import { VideoWall } from '../video-wall/video-wall';
+import { finiteWallFilters, wallHasCover } from '../video-wall/wall-layout';
 
 export function CatalogGridPage(props: CatalogGridProps) {
   if (props.mode === 'items') return <ItemsGrid {...props} />;
@@ -56,15 +58,17 @@ function GridBody(props: CatalogGridProps) {
   const trash = !entity && props.filters?.state === 'trash';
   const query = entity ? entityQuery(props) : catalogQuery(props);
   /* 资料页的第一页由壳和页头一起取来：同步落进这一代的缓存，首帧就是卡片，不再发一遍。 */
-  const initialData = entity && props.initial
+  const [retained] = useState(() => props.wall ? latestCatalogPages(query.queryKey) : undefined);
+  const initialData = retained || (entity && props.initial
     ? { pages: [{ ...props.initial, items: props.initial.items || [], offset: 0 }], pageParams: [0] }
-    : undefined;
+    : undefined);
   const result = useInfiniteQuery<GridPage, Error, InfiniteData<GridPage, number>, QueryKey, number>({
     queryKey: query.queryKey,
     queryFn: ({ pageParam, signal }) => query.queryFn({ pageParam, signal }),
     initialPageParam: 0,
     getNextPageParam: query.getNextPageParam,
     initialData,
+    refetchOnMount: entity && retained ? 'always' : false,
   });
 
   /* 一次取数落定就告诉壳一次，成功、为空、失败都算：壳里 `await` 这次重读的调用方据此放行。 */
@@ -80,6 +84,12 @@ function GridBody(props: CatalogGridProps) {
   }), [result.data, props.groupCollapse, props.mix, trash, layout.javImage]);
   const shown = tiles.reduce((count, tile) => count + (tile.kind === 'card' ? 1 : 0), 0);
   const total = Number(result.data?.pages[0]?.total || 0);
+  const finiteWall = entity || finiteWallFilters(props.filters);
+  const wallAvailable = !trash && !props.selectMode && !!actions.wallPlayer && !!actions.wallDetails;
+  const wallItems = tiles.flatMap(tile => tile.kind === 'card' && wallHasCover(tile.item) ? [tile.item] : []);
+  const batchItems = tiles.slice(pageStarts.at(-1) || 0)
+    .flatMap(tile => tile.kind === 'card' && wallHasCover(tile.item) ? [tile.item] : []);
+  const wallPool = finiteWall ? wallItems : batchItems;
 
   const reveal = useSkeletonReveal(result.isPending, props.skeletonHtml);
   const body = useRef<HTMLDivElement | null>(null);
@@ -121,6 +131,17 @@ function GridBody(props: CatalogGridProps) {
     );
 
   const content = () => {
+    if (wallAvailable && props.wall) return <VideoWall
+      key={finiteWall ? 'finite' : 'explore'}
+      sessionKey={entity ? `entity:${props.entityKey || ''}` : `catalog:${catalogParams(props.filters || {}, !!props.excludeVertical)}`}
+      items={wallPool} finite={finiteWall} hasMore={!!result.hasNextPage} busy={result.isFetchingNextPage}
+      loading={result.isPending || (!result.data && result.isFetching)}
+      error={!result.data && !result.isPending ? requestErrorMessage(result.error) : ''}
+      retry={() => void result.refetch()}
+      emptyHtml={result.data && !wallPool.length ? tiles.length
+        ? emptyStateHtml('image', '这批作品没有封面', result.hasNextPage ? '载入更多作品后继续浏览。' : '换个筛选范围再试。')
+        : props.emptyHtml?.({ trash, libraryEmpty:!!result.data.pages[0]?.libraryEmpty }) : ''}
+      loadMore={loadNext} actions={actions} helpers={helpers} javImage={layout.javImage} />;
     if (result.isPending) return null;
     if (!result.data) {
       return <RetryNote message={requestErrorMessage(result.error)} onRetry={() => void result.refetch()} />;
@@ -149,7 +170,7 @@ function GridBody(props: CatalogGridProps) {
 
   return (
     <div ref={body} data-media-body="" data-grid-reveal={reveal.fading ? '' : undefined}>
-      {reveal.layer}
+      {!props.wall && reveal.layer}
       {content()}
     </div>
   );

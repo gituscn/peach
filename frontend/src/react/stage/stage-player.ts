@@ -159,6 +159,31 @@ export function attachStagePlayer(frame: HTMLElement, options: StagePlayerOption
   };
 }
 
+/** 墙面接收已选定的本地视频条目；计费与在线作品使用详情的来源门槛。 */
+export async function mountWallPlayer(summary: PlayerItem, frame: HTMLElement, signal: AbortSignal): Promise<(continuePlaying?: boolean) => void> {
+  const item = await api(`/api/item?id=${summary.id}`, { signal }) as PlayerItem & { error?: string };
+  signal.throwIfAborted();
+  if (!item || item.error) throw new Error(item?.error || '作品未取得');
+  if (item.medium && item.medium !== 'video') throw new Error('这条作品没有可播放的视频');
+  if (item.location === 'online') throw new Error('请打开详情播放在线作品');
+  if (item.cost === 'metered') throw new Error('请打开详情确认计费来源');
+  const sources = await stageHost().player.loadSourceStatus();
+  signal.throwIfAborted();
+  if (sources[String(item.location || '')] === false) throw new Error(stageHost().player.offlineReason(String(item.location || '')));
+  const metadata: StageMeta = { kind: 'item', item, title: String(item.title || item.name || ''),
+    sub: String((item.performers as string[] | undefined)?.[0] || item.creator || '未归属') };
+  setStageMeta(metadata);
+  const release = attachStagePlayer(frame, { kind: 'item', item, autoplay: true });
+  let released = false;
+  return (continuePlaying = false) => {
+    if (released) return;
+    released = true;
+    if (continuePlaying && meta === metadata) handOffStage(true);
+    release();
+    if (meta === metadata) setStageMeta(null);
+  };
+}
+
 function claimHeld(frame: HTMLElement, from: Held): () => void {
   const { player } = from;
   unbindHeld(from);
@@ -235,7 +260,7 @@ export function miniplayerVideo(): HTMLVideoElement | null {
  *  Video.js 实例：挂载后 `#vid` 是 Video.js 的 div，真正的媒体元素是 `#vid_html5_api`。 */
 export function activeStageVideo(): HTMLVideoElement | null {
   if (stageOpen()) return document.getElementById('stage')?.querySelector('video') ?? null;
-  return miniplayerVideo();
+  return stagePlayer()?.el().querySelector('video') ?? miniplayerVideo();
 }
 
 function paintMeta(next: { title: string; sub: string }): void {

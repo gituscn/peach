@@ -116,7 +116,7 @@ interface GroupPayload { error?: string; title?: string; items?: QueueItem[]; co
 
 /** 一个队列的全部条目。Mix 是种子加上它的相关作品（相关那一份每个种子只取一次，和目录里
  *  Mix 卡的悬停翻页共用）；分卷与版本是同一个番号下的几个可播条目；播放列表按它自己的顺序。 */
-export async function fetchQueue(ref: QueueRef, helpers: ItemDetailHelpers, signal?: AbortSignal): Promise<DetailQueue> {
+export async function fetchQueue(ref: QueueRef, helpers: Pick<ItemDetailHelpers, 'mixRelated' | 'tagLabel'>, signal?: AbortSignal): Promise<DetailQueue> {
   if (ref.kind === 'mix') {
     const seedId = ref.seedId!;
     const [seed, related] = await Promise.all([fetchItem(seedId, signal), helpers.mixRelated(seedId)]);

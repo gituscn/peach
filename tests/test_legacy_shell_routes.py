@@ -24,7 +24,7 @@ FROZEN_ROUTES = frozenset({
     "/parts/:seed/:item", "/editions/:seed/:item", "/item/:id", "/follow/item/:id",
     "/performers", "/creators", "/studios", "/agencies", "/tags", "/stats", "/taste",
     "/review", "/data-cleanup", "/duplicates", "/resource-sync", "/quality-goals",
-    "/scraping", "/follow", "/follow-manage", "/configuration", "/activity", "/immerse",
+    "/scraping", "/follow", "/follow-manage", "/configuration", "/activity", "/immerse", "/wall",
     "/diagnostics", "/jav", "/jav/movie/:code",
 })
 #: 路由树按模式登记的资料页，一个实体种类一条。

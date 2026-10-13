@@ -18,6 +18,7 @@ import { javTab } from '../react/jav/jav-navigation';
 export const loadingState = { setGridCards: undefined, gridCards: undefined, managementPlaceholder: undefined, wantsDiscoveryBars: undefined, entityShapesReady: undefined, ENTITY_SHAPES_WAIT: undefined, syncPageTitle: undefined };
 
 export function renderCatalogLoading(label='正在读取作品'){
+  if(location.pathname==='/wall'){$('#loadSentinel').hidden=true;return}
   const count=$('#count');
   /* 垃圾文件那一屏的计数行是自己的：一块摘要面加一条分类切换，没有排序也没有换批。
      这一版是垃圾队列等数据时那一版的静态副本，队列画上就换掉它；骨架里的
@@ -70,6 +71,9 @@ export function renderInitialSurfaceLoading(){
   /* 骨架画的就是这个表面，所以先把 `data-surface` 写上：深链冷启动时壳开始路由排在这一步后面，
      等它写的话骨架会先按默认版式铺一遍，数据到货再跳成分栏。 */
   document.body.dataset.surface=location.pathname;
+  if(path==='/wall'){
+    document.body.setAttribute('data-wall-open','');hideDiscoveryBars();return;
+  }
   if(/^\/(item\/\d+|(?:mix|parts|editions|playlists)\/\d+\/\d+)$/.test(path)){
     /* 详情的骨架归舞台岛：路由到位后 `openItem` 取回 React 包就画。下面那份列表由路由树的目录元素补发。 */
     hideDiscoveryBars();return;

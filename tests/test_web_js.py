@@ -412,10 +412,11 @@ class WebJsBehaviourTests(unittest.TestCase):
             ("core.js", "entityPath", ["新种类", "X"], "/新种类/X"),
         ])
 
-    def test_only_the_home_and_state_routes_count_as_catalog(self):
+    def test_catalog_includes_home_state_and_wall_routes(self):
         # 「这条路径算不算馆藏列表」决定了状态标题、筛选栏和高亮；管理页不算。
         self.assertJsResults([
             ("core.js", "isCatalogPath", ["/"], True),
+            ("core.js", "isCatalogPath", ["/wall"], True),
             ("core.js", "isCatalogPath", ["/unseen"], True),
             ("core.js", "isCatalogPath", ["/junk-files"], True),
             ("core.js", "isCatalogPath", ["/stats"], False),
