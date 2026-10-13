@@ -23,12 +23,21 @@ const measure = (page: Page, names = ['媒体文件夹']) => page.locator('.ui-c
 
 async function openEditableConfiguration(browser: Browser, viewport: (typeof VIEWPORTS)[number]) {
   const opened = await visit(browser, '/', viewport);
-  await opened.page.route('**/api/configuration', async route => {
-    const response = await route.fetch();
-    await route.fulfill({ response, json: { ...await response.json(), editable: true } });
-  });
-  await opened.page.goto(new URL('/configuration', opened.page.url()).href, { waitUntil: 'load' });
-  return opened;
+  try {
+    // 每例在导航前读取真实配置快照，页面等待与接管由响应门闩控制。
+    const response = await opened.page.request.get(new URL('/api/configuration', opened.page.url()).href);
+    assert.equal(response.status(), 200);
+    const configuration = await response.json();
+    await opened.page.route('**/api/configuration', async route => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await route.fulfill({ json: { ...configuration, editable: true } });
+    });
+    await opened.page.goto(new URL('/configuration', opened.page.url()).href, { waitUntil: 'load' });
+    return { ...opened, configuration };
+  } catch (error) {
+    await opened.close();
+    throw error;
+  }
 }
 
 describe('配置页等待态', () => {
@@ -79,10 +88,9 @@ describe('配置页等待态', () => {
         await settle(opened.page);
         const pending = new Promise<void>(resolve => { release = resolve });
         await opened.page.route('**/api/configuration', async route => {
-          const response = await route.fetch();
-          const data = await response.json();
+          if (route.request().method() !== 'GET') return route.continue();
           await pending;
-          await route.fulfill({ json: { ...data, editable: true, startup: {
+          await route.fulfill({ json: { ...opened.configuration, editable: true, startup: {
             available: true, enabled: true, silent: true, desktop: true, desktop_message: '', message: '',
           }, automatic_updates: { mode: 'check', interval_hours: 24, available: true, download_available: false } } });
         });

@@ -301,6 +301,7 @@ function useFollowJob(props: FollowFeedProps, ready: boolean) {
       const job = await apiSend<{ job_id: string }>(FOLLOW_CHECK_URL, older ? { older: true, background: true } : { background: true });
       sessionStorage.setItem('peach-follow-job', job.job_id);
       started = true;
+      setRunning(true);
       if (older) setOlderRun(true);
       setGeneration((value) => value + 1);
     } catch (error) {
