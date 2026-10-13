@@ -4,6 +4,28 @@ import { api, realDuration } from '@peach/legacy/core';
 
 import type { PlayerItem } from './types';
 
+const cleanup = new WeakMap<HTMLVideoElement, () => void>();
+
+export function stopTelemetry(video: HTMLVideoElement): void {
+  cleanup.get(video)?.();
+  cleanup.delete(video);
+}
+
+function lifecycle(video: HTMLVideoElement, flush: (ended: boolean) => void, stop: () => void, seeking: () => void): void {
+  const leave = () => flush(false);
+  const empty = () => { stop(); flush(false) };
+  video.addEventListener('seeking', seeking);
+  video.addEventListener('emptied', empty);
+  window.addEventListener('pagehide', leave);
+  cleanup.set(video, () => {
+    stop(); flush(false);
+    video.onplay = null; video.ontimeupdate = null; video.onpause = null; video.onended = null;
+    video.removeEventListener('seeking', seeking);
+    video.removeEventListener('emptied', empty);
+    window.removeEventListener('pagehide', leave);
+  });
+}
+
 export interface TelemetryOptions {
   /** 侧栏「离开位置」那条的三个节点（进度条、刻度与百分比）；不给就不画。 */
   watched?: string;
@@ -22,12 +44,11 @@ export interface TelemetryOptions {
  *  十秒一次的上报只有一个定时器。onplay 每次新起一个而只有 onpause 清的话，「播放→拖动→播放」
  *  这类不经过 pause 的序列会把定时器叠起来；更要紧的是离开详情时既不 pause 也不 ended，
  *  setInterval 连着已被销毁的 video 一直跑，每十秒往 /api/activity 打一发。所以 `emptied` 收尾，
- *  拆播放器时 `disposePlayer` 同步调一次 `onpause` 冲掉最后一段再整组摘掉。处理器挂在 `on*`
+ *  拆播放器时 `disposePlayer` 同步冲掉最后一段再整组摘掉。处理器挂在 `on*`
  *  属性上，播放器从舞台搬进小窗时表不停。 */
 export function wireTelemetry(item: PlayerItem, video: HTMLVideoElement | null, options: TelemetryOptions = {}): void {
   if (!video) return;
   let last = 0, acc = 0, seeks = 0, timer: ReturnType<typeof setInterval> | null = null;
-  video.addEventListener('seeking', () => { seeks++ });
   const node = (selector?: string) => (selector ? document.querySelector<HTMLElement>(selector) : null);
   const paint = () => {
     const duration = realDuration(item.duration) || realDuration(video.duration); if (!duration) return;
@@ -40,7 +61,7 @@ export function wireTelemetry(item: PlayerItem, video: HTMLVideoElement | null, 
   const flush = (ended: boolean) => {
     const duration = realDuration(item.duration) || realDuration(video.duration);
     if (!acc && !ended && !seeks) return;
-    (api('/api/activity', { method: 'POST', body: JSON.stringify(
+    (api('/api/activity', { method: 'POST', keepalive: true, body: JSON.stringify(
       { id: item.id, position: video.currentTime, duration, delta: acc, ended: !!ended, seeks }) }) as Promise<{ real_ratio?: number | null } | null>)
       .then((result) => { // 回填面板的真实观看率
         const real = document.getElementById('realTxt');
@@ -54,10 +75,10 @@ export function wireTelemetry(item: PlayerItem, video: HTMLVideoElement | null, 
   };
   const stop = () => { if (timer) { clearInterval(timer); timer = null } };
   video.onplay = () => { last = video.currentTime; stop(); timer = setInterval(() => flush(false), 10000) };
-  video.ontimeupdate = () => { const delta = video.currentTime - last; if (delta > 0 && delta < 2) acc += delta; last = video.currentTime; paint() };
+  video.ontimeupdate = () => { const delta = video.currentTime - last; if (!video.paused && !video.seeking && delta > 0 && delta < 2) acc += delta; last = video.currentTime; paint() };
   video.onpause = () => { stop(); flush(false) };
   video.onended = () => { stop(); flush(true); options.onEnded?.() };
-  video.addEventListener('emptied', () => { stop(); flush(false) }, { once: true });
+  lifecycle(video, flush, stop, () => { seeks++ });
   paint();
 }
 
@@ -67,13 +88,13 @@ export function wireFollowTelemetry(item: PlayerItem & { status?: string | undef
   const flush = (ended: boolean) => {
     const duration = realDuration(item.duration) || realDuration(video.duration);
     if (!acc && !ended) return;
-    (api('/api/follow/activity', { method: 'POST', body: JSON.stringify({
+    (api('/api/follow/activity', { method: 'POST', keepalive: true, body: JSON.stringify({
       item: item.id, position: video.currentTime, duration, delta: acc, ended: !!ended,
     }) }) as Promise<unknown>).catch(() => {});
     acc = 0;
   };
   const stop = () => { if (timer) clearInterval(timer); timer = null };
-  video.addEventListener('play', () => {
+  video.onplay = () => {
     if (!started) {
       started = true;
       (api('/api/follow/play', { method: 'POST', body: JSON.stringify({ item: item.id }) }) as Promise<{ status?: string } | null>)
@@ -81,11 +102,11 @@ export function wireFollowTelemetry(item: PlayerItem & { status?: string | undef
     }
     last = video.currentTime;
     stop(); timer = setInterval(() => flush(false), 10000);
-  });
-  video.addEventListener('timeupdate', () => {
-    const delta = video.currentTime - last; if (delta > 0 && delta < 2) acc += delta; last = video.currentTime;
-  });
-  video.addEventListener('pause', () => { stop(); flush(false) });
-  video.addEventListener('ended', () => { stop(); flush(true) });
-  video.addEventListener('emptied', () => { stop(); flush(false) }, { once: true });
+  };
+  video.ontimeupdate = () => {
+    const delta = video.currentTime - last; if (!video.paused && !video.seeking && delta > 0 && delta < 2) acc += delta; last = video.currentTime;
+  };
+  video.onpause = () => { stop(); flush(false) };
+  video.onended = () => { stop(); flush(true) };
+  lifecycle(video, flush, stop, () => {});
 }

@@ -6,7 +6,7 @@
  * 离开页面时调用方也按它取消。 */
 import { disposePlayer } from './dispose';
 import { cancelStreamSession, directStreamSource, playableStreamSource } from './stream';
-import { wireTelemetry } from './telemetry';
+import { stopTelemetry, wireTelemetry } from './telemetry';
 import type { PlayerItem, VjsPlayer } from './types';
 import { ensureVideojs } from './videojs';
 
@@ -49,6 +49,6 @@ export function mountImmersePlayer(video: HTMLVideoElement, options: ImmersePlay
     released = true;
     cancelStreamSession(session);
     if (player) disposePlayer(player);
-    else { video.pause(); video.removeAttribute('src'); video.load() }
+    else { video.pause(); stopTelemetry(video); video.removeAttribute('src'); video.load() }
   };
 }

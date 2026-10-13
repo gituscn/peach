@@ -166,13 +166,21 @@ def q_jav_resources(contract, args) -> dict:
     """公开资源列表；只返回候选，下载提交由既有入口接受用户选择。"""
     import time
     from .downloads import parse_magnet
+    from .sources.javdb import merge_resources, parse_comment_text
 
     code = detail_code(args)
     try:
         movie = PUBLIC_API.movie(code)
-        rows = PUBLIC_API.magnets(code, refresh=args.get('refresh') == '1')
     except PublicSourceUnavailable as error:
         return {"state": "error", "items": [], "error": str(error), "checked_at": None}
+    warnings = []
+    magnet_failed = False
+    try:
+        rows = PUBLIC_API.magnets(code, refresh=args.get('refresh') == '1')
+    except PublicSourceUnavailable as error:
+        rows = []
+        magnet_failed = True
+        warnings.append("磁链区资源未取得：" + str(error))
     items = {}
     source_url = "https://javdb.com/v/" + movie["id"]
     for row in rows:
@@ -188,5 +196,24 @@ def q_jav_resources(contract, args) -> dict:
             "size": str(row.get("size") or ""), "files": str(row.get("files_count") or ""),
             "date": str(row.get("created_at") or ""), "attributes": attributes,
             "source": "JavDB", "source_url": source_url, "origins": ["JavDB"]}
-    return {"state": "ready", "items": list(items.values()), "error": "", "source_url": source_url,
-            "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "warnings": []}
+    comments = []
+    comments_failed = False
+    try:
+        for page in range(1, MAX_REVIEW_PAGES + 1):
+            reviews = PUBLIC_API.reviews(code, page, refresh=args.get('refresh') == '1')
+            for review in reviews:
+                origin = source_url + "#review-item-" + str(review.get("id") or "")
+                comments.extend(parse_comment_text(str(review.get("content") or ""), origin,
+                                                   str(review.get("created_at") or "")))
+            if len(reviews) < PAGE_SIZE:
+                break
+        else:
+            warnings.append("已查询前 8 页评论资源。")
+    except PublicSourceUnavailable as error:
+        comments_failed = True
+        warnings.append("评论资源未取得：" + str(error))
+    merged = merge_resources([*items.values(), *comments])
+    failed = magnet_failed and comments_failed and not merged
+    return {"state": "error" if failed else "ready", "items": merged,
+            "error": "；".join(warnings) if failed else "", "source_url": source_url,
+            "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "warnings": warnings}

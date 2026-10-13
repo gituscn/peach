@@ -22,7 +22,8 @@ import type { ShellActions } from '../../src/react/router/shell-actions';
 import { click, pending } from './render';
 
 // 首次导入会编译路由表带进来的整棵页面子树，编译等待使用独立的有限窗口；之后每条用例重新装载只重跑模块。
-const REACT_IMPORT_TIMEOUT_MS = 30_000;
+// 完整路由树的冷加载单独计时，交互用例使用 Vitest 默认超时。
+const REACT_IMPORT_TIMEOUT_MS = 60_000;
 
 type ActFlag = { IS_REACT_ACT_ENVIRONMENT?: boolean };
 

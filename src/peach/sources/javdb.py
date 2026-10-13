@@ -201,8 +201,6 @@ _ED2K = re.compile(r"ed2k://\|file\|([^|]+)\|(\d+)\|([a-f0-9]{32})\|(?:[^\r\n]*?
 
 def parse_comment_links(page: Page) -> list[dict]:
     """只取评论正文的链接，跳过作者主页、点赞与站点推广入口。"""
-    from ..downloads import parse_magnet
-
     found = []
     soup = BeautifulSoup(page.text, "html.parser")
     for row in soup.select('.review-item'):
@@ -214,35 +212,48 @@ def parse_comment_links(page: Page) -> list[dict]:
         date = row.select_one('.time')
         # 片段引用保留评论 id；正文中的任意 URL 都不会被服务器追踪请求。
         origin = page.url + ("#" + str(row['id']) if row.get('id') else "")
-        for uri in links:
-            uri = uri.strip()
-            item = {"id": "", "protocol": "url", "info_hash": "", "uri": uri,
-                    "name": uri, "size": "", "files": "", "date": date.get_text(' ', strip=True) if date else "",
-                    "attributes": [], "source": "JavDB 评论", "source_url": origin, "origins": [origin]}
-            if uri.lower().startswith('magnet:'):
-                try:
-                    magnet = parse_magnet(uri)
-                except ValueError:
+        found.extend(comment_resources(links, origin, date.get_text(' ', strip=True) if date else ""))
+    return merge_resources(found)
+
+
+def parse_comment_text(text: str, origin: str, date: str = "") -> list[dict]:
+    """匿名评论正文与网页评论使用同一资源解析。"""
+    return comment_resources(_COMMENT_LINK.findall(text), origin, date)
+
+
+def comment_resources(links: list[str], origin: str, date: str) -> list[dict]:
+    from ..downloads import parse_magnet
+
+    found = []
+    for uri in links:
+        uri = uri.strip()
+        item = {"id": "", "protocol": "url", "info_hash": "", "uri": uri,
+                "name": uri, "size": "", "files": "", "date": date,
+                "attributes": [], "source": "JavDB 评论", "source_url": origin, "origins": [origin]}
+        if uri.lower().startswith('magnet:'):
+            try:
+                magnet = parse_magnet(uri)
+            except ValueError:
+                continue
+            item.update(id="magnet:" + magnet.info_hash, protocol="magnet", info_hash=magnet.info_hash,
+                        name=magnet.name or magnet.info_hash, uri=magnet.uri)
+        elif uri.lower().startswith('ed2k:'):
+            match = _ED2K.fullmatch(uri)
+            if not match:
+                continue
+            name, size, digest = match.groups()
+            item.update(id=f"ed2k:{digest.lower()}:{int(size)}", protocol="ed2k",
+                        name=urllib.parse.unquote(name), size=f"{int(size):,} B")
+        else:
+            try:
+                url = urllib.parse.urlsplit(uri)
+                if url.scheme.lower() not in {'http', 'https'} or not url.hostname or url.username or url.password:
                     continue
-                item.update(id="magnet:" + magnet.info_hash, protocol="magnet", info_hash=magnet.info_hash,
-                            name=magnet.name or magnet.info_hash)
-            elif uri.lower().startswith('ed2k:'):
-                match = _ED2K.fullmatch(uri)
-                if not match:
-                    continue
-                name, size, digest = match.groups()
-                item.update(id=f"ed2k:{digest.lower()}:{int(size)}", protocol="ed2k",
-                            name=urllib.parse.unquote(name), size=f"{int(size):,} B")
-            else:
-                try:
-                    url = urllib.parse.urlsplit(uri)
-                    if url.scheme.lower() not in {'http', 'https'} or not url.hostname or url.username or url.password:
-                        continue
-                    canonical = urllib.parse.urlunsplit((url.scheme.lower(), url.netloc.lower(), url.path or '/', url.query, url.fragment))
-                except ValueError:
-                    continue
-                item.update(id="url:" + canonical, uri=canonical)
-            found.append(item)
+                canonical = urllib.parse.urlunsplit((url.scheme.lower(), url.netloc.lower(), url.path or '/', url.query, url.fragment))
+            except ValueError:
+                continue
+            item.update(id="url:" + canonical, uri=canonical)
+        found.append(item)
     return merge_resources(found)
 
 
