@@ -69776,8 +69776,8 @@ function nNe(e, t, n) {
 }
 //#endregion
 //#region src/react/components/identity-cell.tsx
-function ZU({ kind: e, person: t, onOpen: n, hidden: r, overflow: i, face: a, openByName: o = !1 }) {
-	let s = e === "performer" || e === "creator" ? /* @__PURE__ */ (0, x.jsx)("span", {
+function ZU({ kind: e, person: t, onOpen: n, hidden: r, overflow: i, face: a }) {
+	let o = e === "performer" || e === "creator" ? /* @__PURE__ */ (0, x.jsx)("span", {
 		"data-id-face": "",
 		dangerouslySetInnerHTML: { __html: `<span>${R(Jt(t.name))}</span>` + na({
 			kind: e,
@@ -69796,25 +69796,25 @@ function ZU({ kind: e, person: t, onOpen: n, hidden: r, overflow: i, face: a, op
 			loading: "lazy",
 			"data-drop": "self"
 		}) : null]
-	}), c = /* @__PURE__ */ (0, x.jsxs)(x.Fragment, { children: [a ?? s, /* @__PURE__ */ (0, x.jsx)("span", {
+	}), s = /* @__PURE__ */ (0, x.jsxs)(x.Fragment, { children: [a ?? o, /* @__PURE__ */ (0, x.jsx)("span", {
 		"data-id-name": "",
 		children: t.name
-	})] }), l = {
+	})] }), c = {
 		"data-id-cell": e,
 		title: t.name,
 		hidden: r,
 		"data-castoverflow": i ? "" : void 0
 	};
-	return t.id || o ? /* @__PURE__ */ (0, x.jsx)("button", {
+	return t.id ? /* @__PURE__ */ (0, x.jsx)("button", {
 		type: "button",
-		...l,
+		...c,
 		"data-entity-kind": e,
 		"data-entity-name": t.name,
 		onClick: () => n(e, t.name),
-		children: c
+		children: s
 	}) : /* @__PURE__ */ (0, x.jsx)("span", {
-		...l,
-		children: c
+		...c,
+		children: s
 	});
 }
 function QU({ people: e, onOpen: t }) {
@@ -71717,7 +71717,7 @@ function _W({ score: e, review: t = !1 }) {
 	});
 }
 function LNe({ item: e, navigate: t }) {
-	let n = (n, r) => t(n === "studio" && !e.studio_refs.find((e) => e.name === r)?.id ? `/?jav=1&studio=${encodeURIComponent(r)}` : Ot(n, r)), r = (t, r, i, a) => i.length ? /* @__PURE__ */ (0, x.jsxs)("section", {
+	let n = (e, n) => t(Ot(e, n)), r = (t, r, i, a) => i.length ? /* @__PURE__ */ (0, x.jsxs)("section", {
 		"data-id-group": t,
 		"data-id-gender": a,
 		children: [/* @__PURE__ */ (0, x.jsx)("h5", {
@@ -71732,7 +71732,6 @@ function LNe({ item: e, navigate: t }) {
 					id: r.id ?? null
 				},
 				onOpen: n,
-				openByName: t === "studio",
 				face: t === "performer" && !r.has_image && !r.has_avatar && r.source_avatar && r.source_actor_id ? /* @__PURE__ */ (0, x.jsx)(UB, {
 					code: e.code,
 					person: r,
