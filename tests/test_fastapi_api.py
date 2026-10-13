@@ -10,7 +10,7 @@ from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 from types import SimpleNamespace
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote, urlsplit
 
 from peach import __version__
 from support.ledger import fresh_ledger
@@ -51,6 +51,7 @@ CREATE TABLE entity(
   id INTEGER PRIMARY KEY,kind TEXT,canonical_name TEXT,normalized_name TEXT,
   metadata_json TEXT DEFAULT '{}',created_at TEXT,updated_at TEXT,region TEXT,
   UNIQUE(kind,normalized_name));
+CREATE TABLE entity_redirect(old_id INTEGER PRIMARY KEY,target_id INTEGER,source TEXT,merged_at TEXT);
 CREATE TABLE entity_alias(
   entity_id INTEGER,alias TEXT,normalized_alias TEXT,source TEXT,confidence REAL DEFAULT 1.0);
 CREATE TABLE entity_external_ref(
@@ -1764,11 +1765,11 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(response.status_code, 307, (index, method))
                 self.assertEqual(response.headers['location'], f'/{index}?q=A%2FB&view=cloud')
 
-    async def test_entity_alias_urls_redirect_to_canonical_names_and_keep_query(self):
+    async def test_entity_name_urls_redirect_to_ids_and_keep_query(self):
         await self.client.post('/login', content='token=secret&next=%2F',
                                headers={'Content-Type': 'application/x-www-form-urlencoded'})
         kinds = [('performer', 'performers'), ('creator', 'creators'), ('studio', 'studios'),
-                 ('series', 'series'), ('agency', 'agencies')]
+                 ('series', 'series'), ('agency', 'agencies'), ('tag', 'tags')]
         canonical = 'Canonical / 名%? #&'
         with closing(sqlite3.connect(self.db)) as connection, connection:
             for entity_id, (kind, prefix) in enumerate(kinds, 300):
@@ -1777,9 +1778,9 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                 connection.execute("INSERT INTO entity_alias VALUES(?,?,?,'test',1)",
                                    (entity_id, f'old-{kind}', f'old-{kind}'))
         query = '?tag=a%2Fb&tag=second&media=photos&set=9&offset=48&sort=release&dir=asc'
-        for kind, prefix in kinds:
-            names = [f'old-{kind}'] + ([canonical.upper()] if kind == 'studio' else [])
-            target = f'/{prefix}/{quote(canonical, safe="")}' + query
+        for entity_id, (kind, prefix) in enumerate(kinds, 300):
+            names = [canonical, f'old-{kind}'] + ([canonical.upper()] if kind == 'studio' else [])
+            target = f'/{prefix}/{entity_id}' + query
             for name in names:
                 for method in ('GET', 'HEAD'):
                     response = await self.client.request(method, f'/{prefix}/{quote(name, safe="")}' + query,
@@ -1812,23 +1813,78 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             "/login", content="token=secret&next=%2F",
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        for path in ("/item/1", "/performers/Alice", "/studios/Prestige",
+        for path in ("/assets/1", "/performers/Alice", "/studios/Prestige",
                      "/creators/luckydog11", "/series/Example", "/performers",
                      "/creators", "/tags", "/stats", "/taste", "/immerse", "/wall", "/trash", "/review",
                      # 前端路由写好了不等于能直接打开：SPA 路径是逐条登记的，
                      # 漏登记时源码断言照样全绿，只有真的请求一次才会露出 404。
                      "/unseen", "/watch-later", "/flagged", "/junk-files",
-                     "/data-cleanup", "/duplicates", "/quality-goals", "/activity",
-                     "/mix/1/2", "/parts/1/2", "/editions/1/2", "/playlists",
+                     "/data-cleanup", "/duplicates", "/quality-goals", "/tasks",
+                     "/assets/2?mix=1", "/assets/2?parts=1", "/assets/2?editions=1", "/playlists",
                      "/resource-sync", "/diagnostics",
-                     "/playlists/1/1", "/follow", "/follow-manage",
-                     "/follow/item/190"):
+                     "/assets/1?playlist=1", "/follow", "/subscriptions",
+                     "/posts/190", "/sources", "/settings", "/works/ABC-001"):
             response = await self.client.get(path)
             self.assertEqual(response.status_code, 200, path)
             self.assertIn("Peach test", response.text)
 
         removed = await self.client.get("/entity/performer/Alice")
         self.assertEqual(removed.status_code, 404)
+
+    async def test_canonical_page_urls_require_authentication(self):
+        for path in ('/assets/1', '/posts/1', '/works/ABC-001', '/performers/1',
+                     '/tags/1', '/tasks', '/sources', '/subscriptions', '/settings/library',
+                     '/item/1', '/mix/1/2', '/jav/movie/ABC-001', '/follow/item/1'):
+            response = await self.client.get(path, follow_redirects=False)
+            self.assertEqual(response.status_code, 303, path)
+            self.assertTrue(response.headers['location'].startswith('/login?next='), path)
+
+    async def test_compatibility_page_urls_redirect_with_query_and_context(self):
+        await self.client.post('/login', content='token=secret&next=%2F',
+                               headers={'Content-Type': 'application/x-www-form-urlencoded'})
+        routes = {'/item/42': '/assets/42', '/follow/item/42': '/posts/42',
+                  '/jav/movie/abc001': '/works/ABC-001', '/works/abc001': '/works/ABC-001',
+                  '/activity': '/tasks', '/scraping': '/sources',
+                  '/configuration': '/settings/library', '/follow-manage': '/subscriptions'}
+        query = '?tag=a%2Fb&tag=second&sort=release'
+        for source, target in routes.items():
+            for method in ('GET', 'HEAD'):
+                response = await self.client.request(method, source + query, follow_redirects=False)
+                self.assertEqual(response.status_code, 307, (source, method))
+                self.assertEqual(response.headers['location'], target + query)
+        for prefix, key in (('mix', 'mix'), ('parts', 'parts'), ('editions', 'editions'),
+                            ('playlists', 'playlist')):
+            for method in ('GET', 'HEAD'):
+                response = await self.client.request(
+                    method, f'/{prefix}/7/42' + query + f'&{key}=999&{key}=888', follow_redirects=False)
+                self.assertEqual(response.status_code, 307)
+                location = urlsplit(response.headers['location'])
+                self.assertEqual(location.path, '/assets/42')
+                self.assertEqual(parse_qs(location.query),
+                                 {'tag': ['a/b', 'second'], 'sort': ['release'], key: ['7']})
+
+    async def test_settings_sections_serve_the_page_and_unknown_sections_are_missing(self):
+        await self.client.post('/login', content='token=secret&next=%2F',
+                               headers={'Content-Type': 'application/x-www-form-urlencoded'})
+        for section in ('appearance', 'playback', 'jav', 'search', 'content', 'library',
+                        'subscriptions', 'downloads', 'network', 'maintenance'):
+            for method in ('GET', 'HEAD'):
+                response = await self.client.request(method, f'/settings/{section}')
+                self.assertEqual(response.status_code, 200, (section, method))
+        self.assertEqual((await self.client.get('/settings/missing')).status_code, 404)
+
+    async def test_entity_id_pages_validate_kind_and_follow_merge_ids(self):
+        await self.client.post('/login', content='token=secret&next=%2F',
+                               headers={'Content-Type': 'application/x-www-form-urlencoded'})
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("INSERT INTO entity_redirect(old_id,target_id,source,merged_at) VALUES(399,1,'test','now')")
+        for method in ('GET', 'HEAD'):
+            response = await self.client.request(method, '/tags/399?tag=a%2Fb&tag=c', follow_redirects=False)
+            self.assertEqual(response.status_code, 307)
+            self.assertEqual(response.headers['location'], '/tags/1?tag=a%2Fb&tag=c')
+            self.assertEqual((await self.client.request(method, '/tags/1')).status_code, 200)
+            self.assertEqual((await self.client.request(method, '/performers/1')).status_code, 404)
+            self.assertEqual((await self.client.request(method, '/tags/999999')).status_code, 404)
 
     async def test_jav_section_deep_links_serve_the_authenticated_application_shell(self):
         paths = ("/jav", "/jav?tab=discover", "/jav?tab=wants")

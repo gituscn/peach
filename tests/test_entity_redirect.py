@@ -234,6 +234,46 @@ class EntityRedirectRouteTests(unittest.TestCase):
         self.assertEqual(response.json()["id"], 10)
         self.assertEqual(response.json()["canonical_name"], "橋本ありな")
 
+    def test_entity_and_photo_queries_accept_current_and_merged_ids(self):
+        for path in ('/api/entity', '/api/photos'):
+            named = self.client.get(path, params={
+                'kind': 'performer', 'name': '橋本ありな', 't': 'secret'})
+            self.assertEqual(named.status_code, 200, named.text)
+            for entity_id in (10, 11):
+                response = self.client.get(path, params={
+                    'kind': 'performer', 'id': entity_id, 'name': 'ignored', 't': 'secret'})
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(response.json(), named.json())
+
+    def test_entity_id_queries_refuse_invalid_missing_or_other_kind_ids(self):
+        for path in ('/api/entity', '/api/photos'):
+            for entity_id in ('', '0', '-1', '1.0', 'ten', '１０', str(2**63), '9' * 50):
+                response = self.client.get(path, params={
+                    'kind': 'performer', 'id': entity_id, 't': 'secret'})
+                self.assertEqual(response.json(), {'error': 'invalid entity'}, (path, entity_id))
+            for kind, entity_id in (('studio', '10'), ('performer', '999')):
+                response = self.client.get(path, params={'kind': kind, 'id': entity_id, 't': 'secret'})
+                self.assertEqual(response.json(), {'error': 'not found'}, (path, kind, entity_id))
+
+    def test_tag_profiles_and_photos_use_the_same_identity_by_name_and_id(self):
+        with sqlite3.connect(self.app.state.settings.db_path) as connection:
+            connection.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at)"
+                               " VALUES(20,'tag','Tag A','tag a','t','t')")
+            connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) VALUES(1,20,'tag','test',1)")
+            connection.execute("INSERT INTO asset(id,location,path,name,medium) VALUES(2,'local',?,'2.jpg','image')",
+                               (r'R:\media\2.jpg',))
+            connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) VALUES(2,20,'tag','test',1)")
+        for path in ('/api/entity', '/api/photos'):
+            named = self.client.get(path, params={'kind': 'tag', 'name': 'Tag A', 't': 'secret'})
+            by_id = self.client.get(path, params={'kind': 'tag', 'id': '20', 't': 'secret'})
+            self.assertEqual(named.status_code, 200, named.text)
+            self.assertEqual(by_id.json(), named.json())
+            if path == '/api/entity':
+                self.assertEqual(by_id.json()['asset_count'], 1)
+            else:
+                self.assertEqual(by_id.json()['total'], 1)
+                self.assertEqual(by_id.json()['items'][0]['id'], 2)
+
     def test_an_old_image_address_redirects_to_the_target(self):
         body = picture("navy")
         (self.avatars / "performer-10.img").write_bytes(body)

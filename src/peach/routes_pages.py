@@ -23,7 +23,7 @@ from collections.abc import Mapping, Sequence
 import re
 
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import (
@@ -37,7 +37,7 @@ from fastapi.responses import (
 
 from . import distribution, onboarding, settings_file
 from .config import PROJECT_ROOT
-from .entities import resolve_entity
+from .entities import resolve_entity, resolve_entity_id
 from .routes_auth import require_asset_auth, require_page_auth, set_auth_cookie
 from .web_entry import page_shell, runtime_fact_entries
 from .web_state import FAVICON
@@ -623,24 +623,113 @@ def index_directory_redirect(request: Request, args: dict[str, str] = Depends(re
     return RedirectResponse(request.url.path.rstrip("/") + query, status_code=307)
 
 
+def _page_redirect(request: Request, path: str, *, context: tuple[str, int] | None = None):
+    """导航使用临时重定向，重复查询参数与会话继续有效。"""
+    query = request.scope.get("query_string", b"").decode("utf-8")
+    if context:
+        key, value = context
+        pairs = [(key_, value_) for key_, value_ in request.query_params.multi_items() if key_ != key]
+        pairs.append((key, str(value)))
+        query = urlencode(pairs)
+    response = RedirectResponse(path + (f"?{query}" if query else ""), status_code=307)
+    response.headers["Cache-Control"] = "no-store"
+    set_auth_cookie(response, request)
+    return response
+
+
 @router.api_route("/item/{item_id}", methods=["GET", "HEAD"])
-@router.api_route("/mix/{seed_id}/{mix_item_id}", methods=["GET", "HEAD"])
-@router.api_route("/parts/{part_seed_id}/{part_item_id}", methods=["GET", "HEAD"])
-@router.api_route("/editions/{edition_seed_id}/{edition_item_id}", methods=["GET", "HEAD"])
-@router.api_route("/playlists", methods=["GET", "HEAD"])
-@router.api_route("/playlists/{playlist_id}/{playlist_item_id}", methods=["GET", "HEAD"])
+@router.api_route("/mix/{seed_id}/{item_id}", methods=["GET", "HEAD"])
+@router.api_route("/parts/{seed_id}/{item_id}", methods=["GET", "HEAD"])
+@router.api_route("/editions/{seed_id}/{item_id}", methods=["GET", "HEAD"])
+@router.api_route("/playlists/{seed_id}/{item_id}", methods=["GET", "HEAD"])
+def asset_route_redirect(request: Request, item_id: int, seed_id: int | None = None,
+                         args: dict[str, str] = Depends(require_page_auth)):
+    prefix = request.url.path.split("/", 2)[1]
+    context_key = "playlist" if prefix == "playlists" else prefix
+    context = (context_key, seed_id) if seed_id is not None else None
+    return _page_redirect(request, f"/assets/{item_id}", context=context)
+
+
+@router.api_route("/jav/movie/{code}", methods=["GET", "HEAD"])
+@router.api_route("/works/{code}", methods=["GET", "HEAD"])
+def work_route(request: Request, code: str, args: dict[str, str] = Depends(require_page_auth)):
+    from .sample_images import code_key
+
+    key = code_key(code)
+    if not key:
+        raise HTTPException(404, "not found")
+    path = f"/works/{quote(key, safe='')}"
+    if request.url.path != path:
+        return _page_redirect(request, path)
+    return index(request, args)
+
+
+@router.api_route("/follow/item/{item_id}", methods=["GET", "HEAD"])
+def post_route_redirect(request: Request, item_id: int,
+                        args: dict[str, str] = Depends(require_page_auth)):
+    return _page_redirect(request, f"/posts/{item_id}")
+
+
+@router.api_route("/activity", methods=["GET", "HEAD"])
+@router.api_route("/scraping", methods=["GET", "HEAD"])
+@router.api_route("/configuration", methods=["GET", "HEAD"])
+@router.api_route("/follow-manage", methods=["GET", "HEAD"])
+def management_route_redirect(request: Request, args: dict[str, str] = Depends(require_page_auth)):
+    paths = {"/activity": "/tasks", "/scraping": "/sources",
+             "/configuration": "/settings/library", "/follow-manage": "/subscriptions"}
+    return _page_redirect(request, paths[request.url.path])
+
+
+@router.api_route("/settings/{section}", methods=["GET", "HEAD"])
+def settings_section_route(request: Request, section: str,
+                           args: dict[str, str] = Depends(require_page_auth)):
+    if section not in {"appearance", "playback", "jav", "search", "content", "library",
+                       "subscriptions", "downloads", "network", "maintenance"}:
+        raise HTTPException(404, "not found")
+    return index(request, args)
+
+
 @router.api_route("/performers/{name:path}", methods=["GET", "HEAD"])
 @router.api_route("/studios/{name:path}", methods=["GET", "HEAD"])
 @router.api_route("/creators/{name:path}", methods=["GET", "HEAD"])
 @router.api_route("/series/{name:path}", methods=["GET", "HEAD"])
 @router.api_route("/agencies/{name:path}", methods=["GET", "HEAD"])
+@router.api_route("/tags/{name:path}", methods=["GET", "HEAD"])
+def entity_route(request: Request, name: str,
+                 args: dict[str, str] = Depends(require_page_auth)):
+    if not request.app.state.settings.configured:
+        return index(request, args)
+    from .web_entity import INDEX_ENTITY_KINDS
+
+    prefix = request.url.path.split("/", 2)[1]
+    kind = {**INDEX_ENTITY_KINDS, "series": "series", "tags": "tag"}[prefix]
+    with request.app.state.web_contract.read_connection() as connection:
+        if name.isascii() and name.isdecimal():
+            if len(name) > 19 or not 0 < int(name) < 2**63:
+                raise HTTPException(404, "not found")
+            entity_id = resolve_entity_id(connection, int(name))
+            entity = connection.execute("SELECT * FROM entity WHERE id=? AND kind=?",
+                                        (entity_id, kind)).fetchone() if entity_id else None
+            if entity is None:
+                raise HTTPException(404, "not found")
+        else:
+            entity = resolve_entity(connection, kind, name)
+    if entity is not None:
+        path = f"/{prefix}/{entity['id']}"
+        if request.url.path != path:
+            return _page_redirect(request, path)
+    return index(request, args)
+
+
+@router.api_route("/assets/{item_id}", methods=["GET", "HEAD"])
+@router.api_route("/posts/{item_id}", methods=["GET", "HEAD"])
+@router.api_route("/playlists", methods=["GET", "HEAD"])
 @router.api_route("/performers", methods=["GET", "HEAD"])
 @router.api_route("/creators", methods=["GET", "HEAD"])
 @router.api_route("/studios", methods=["GET", "HEAD"])
 @router.api_route("/agencies", methods=["GET", "HEAD"])
 @router.api_route("/tags", methods=["GET", "HEAD"])
 @router.api_route("/jav", methods=["GET", "HEAD"])
-@router.api_route("/jav/movie/{code}", methods=["GET", "HEAD"])
 @router.api_route("/unseen", methods=["GET", "HEAD"])
 @router.api_route("/watch-later", methods=["GET", "HEAD"])
 @router.api_route("/flagged", methods=["GET", "HEAD"])
@@ -656,37 +745,15 @@ def index_directory_redirect(request: Request, args: dict[str, str] = Depends(re
 @router.api_route("/quality-goals", methods=["GET", "HEAD"])
 # 任务中心那一屏（island），数据走 `/api/tasks`。深链要能直接打开：定时任务被挡下时
 # 留下的记录是「刚才为什么没跑」的唯一答案，从别处贴过来的地址不该是 404。
-@router.api_route("/activity", methods=["GET", "HEAD"])
-@router.api_route("/scraping", methods=["GET", "HEAD"])
+@router.api_route("/tasks", methods=["GET", "HEAD"])
+@router.api_route("/sources", methods=["GET", "HEAD"])
 @router.api_route("/resource-sync", methods=["GET", "HEAD"])
 @router.api_route("/follow", methods=["GET", "HEAD"])
-@router.api_route("/follow-manage", methods=["GET", "HEAD"])
-@router.api_route("/follow/item/{item_id}", methods=["GET", "HEAD"])
+@router.api_route("/subscriptions", methods=["GET", "HEAD"])
 # 配置页是主站里的一屏（island），数据走 `/api/configuration`。未配置时 `index()` 给的是
 # 首次运行表单，正好就是「请先完成首次设置」该长的样子。
-@router.api_route("/configuration", methods=["GET", "HEAD"])
+@router.api_route("/settings", methods=["GET", "HEAD"])
 @router.api_route("/diagnostics", methods=["GET", "HEAD"])
 def client_route(request: Request, item_id: int | None = None,
-                 seed_id: int | None = None, mix_item_id: int | None = None,
-                 part_seed_id: int | None = None, part_item_id: int | None = None,
-                 edition_seed_id: int | None = None, edition_item_id: int | None = None,
-                 playlist_id: int | None = None, playlist_item_id: int | None = None,
-                 kind: str | None = None, name: str | None = None, code: str | None = None,
                  args: dict[str, str] = Depends(require_page_auth)):
-    settings = request.app.state.settings
-    if name and "name" in request.path_params and settings.configured and not (settings.token and args.get("t")):
-        from .web_entity import INDEX_ENTITY_KINDS
-
-        prefix = request.url.path.split("/", 2)[1]
-        entity_kind = {**INDEX_ENTITY_KINDS, "series": "series"}.get(prefix)
-        if entity_kind:
-            with request.app.state.web_contract.read_connection() as connection:
-                entity = resolve_entity(connection, entity_kind, name)
-            if entity is not None and entity["canonical_name"] != name:
-                raw_query = request.scope.get("query_string", b"").decode("utf-8")
-                query = f"?{raw_query}" if raw_query else ""
-                response = RedirectResponse(
-                    f"/{prefix}/{quote(entity['canonical_name'], safe='')}" + query, status_code=307)
-                response.headers["Cache-Control"] = "no-store"
-                return response
     return index(request, args)

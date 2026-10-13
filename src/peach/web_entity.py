@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 from . import (company_profiles, entry_links, feeds, link_status, performer_header, web_feeds,
                web_follow)
 from .catalog_rules import (LENGTH_TAGS, dir_expr, photo_set_title, solo_performer_clause, tag_cat)
-from .entities import normalize_entity_name, resolve_entity, rewrite_flat_projection
+from .entities import normalize_entity_name, resolve_entity, resolve_entity_id, rewrite_flat_projection
 from .social_links import ARCHIVE_HOSTS, is_archive
 from .web_catalog import (
     COST,
@@ -35,6 +35,26 @@ from . import entity_classification
 #: 有资料页的实体种类。事务所（agency）和厂牌是两件事：厂牌出片、事务所出人，
 #: 一位女优可以在同一年里给多个厂牌拍片而只属于一家事务所。
 PROFILE_KINDS = {"performer", "studio", "creator", "series", "agency"}
+READ_ENTITY_KINDS = PROFILE_KINDS | {"tag"}
+
+
+def _query_entity_id(args) -> int | None:
+    """显式 ID 使用正整数，名称查询不占用数字名称的契约。"""
+    if "id" not in args:
+        return None
+    value = str(args["id"])
+    if not value.isascii() or not value.isdecimal() or len(value) > 19 or not 0 < int(value) < 2**63:
+        raise ValueError("invalid entity id")
+    return int(value)
+
+
+def _query_entity(connection, kind: str, name: str, entity_id: int | None):
+    if entity_id is None:
+        return resolve_entity(connection, kind, name)
+    target = resolve_entity_id(connection, entity_id)
+    return connection.execute("SELECT * FROM entity WHERE id=? AND kind=?",
+                              (target, kind)).fetchone() if target else None
+
 
 #: 资料页与索引页数作品的口径：视频，且没有标「已消失」（ADR-0087）。回收站里的照旧算；
 #: 代表作的取图不套这一条。
@@ -153,20 +173,27 @@ def q_entity(contract: WebContract, args):
     """
     kind = args.get("kind", "")
     name = args.get("name", "")
-    if kind not in PROFILE_KINDS or not name:
+    try:
+        entity_id = _query_entity_id(args)
+    except ValueError:
+        return {"error": "invalid entity"}
+    if kind not in READ_ENTITY_KINDS or (entity_id is None and not name):
         return {"error": "invalid entity"}
     with contract.read_connection() as c:
-        row = resolve_entity(c, kind, name)
+        row = _query_entity(c, kind, name, entity_id)
         if not row:
+            if entity_id is not None:
+                return {"error": "not found"}
             merged = c.execute(
-                "SELECT DISTINCT e.kind,e.canonical_name FROM entity e "
+                "SELECT DISTINCT e.id,e.kind,e.canonical_name FROM entity e "
                 "JOIN entity_alias al ON al.entity_id=e.id "
                 "JOIN entity_redirect r ON r.target_id=e.id AND r.source=al.source "
                 "WHERE al.alias=? AND al.source=? ORDER BY e.id LIMIT 2",
                 (name, f'user:identity-merge:{kind}'),
             ).fetchall()
             if len(merged) == 1:
-                return {'redirect': {'kind': merged[0]['kind'], 'name': merged[0]['canonical_name']}}
+                return {'redirect': {'id': merged[0]['id'], 'kind': merged[0]['kind'],
+                                     'name': merged[0]['canonical_name']}}
             return {"error": "not found"}
         d = dict(row)
         from .web_library_shortcuts import favorite_ids
@@ -428,7 +455,11 @@ def q_entity_photos(contract: WebContract, args):
     """实体名下的照片：本地图片分页放在 `items`；`sets` 是分组，`kind` 为 `dir` 的是本地目录图集，
     为 `code` 的是番号样张集（`entity_code_sets`）。`total` 只数本地图片，`sample_total` 数样张。"""
     kind, name = args.get("kind", ""), args.get("name", "")
-    if kind not in PROFILE_KINDS or not name:
+    try:
+        entity_id = _query_entity_id(args)
+    except ValueError:
+        return {"error": "invalid entity"}
+    if kind not in READ_ENTITY_KINDS or (entity_id is None and not name):
         return {"error": "invalid entity"}
     try:
         limit = max(1, min(int(args.get("limit") or 120), 600))
@@ -439,7 +470,7 @@ def q_entity_photos(contract: WebContract, args):
     except (TypeError, ValueError):
         return {"error": "invalid pagination"}
     with contract.read_connection() as c:
-        row = resolve_entity(c, kind, name)
+        row = _query_entity(c, kind, name, entity_id)
         if not row:
             return {"error": "not found"}
         # 图集和分页数的是同一批图，`total` 由图集相加，才对得上翻到底的张数。
