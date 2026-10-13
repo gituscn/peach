@@ -373,6 +373,7 @@ const api: StageApi = {
   isOpen: () => !!view,
   showing: () => (view && swappable(view.content.kind) ? view.content.kind : null),
   activeVideo: () => player.activeStageVideo(),
+  mountWallPlayer: player.mountWallPlayer,
   toggleTheater: () => { if (view) applyTheaterMode(!stageHost().player.settings().theaterMode) },
   toggleMiniplayer: () => player.toggleMiniplayer(),
   closeMiniplayer: () => player.closeMiniplayer(),

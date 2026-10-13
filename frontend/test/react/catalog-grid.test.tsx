@@ -5,12 +5,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { MediaCard, cardRatio, type MediaCardVariant } from '../../src/react/components/media-card';
 import {
-  MIX_SLOT, SHORTS_BATCH, arrangeTiles, catalogParams, collapseGroups, fetchCatalogPage, mixSeed, nextOffset,
+  MIX_SLOT, SHORTS_BATCH, arrangeTiles, catalogParams, collapseGroups, fetchCatalogPage, latestCatalogPages, mixSeed, nextOffset,
   shortsBoundaries, shortsParams, type GridPage,
 } from '../../src/react/catalog-grid/catalog-grid';
 import type { MediaCardActions, MediaCardHelpers, MediaCardLayout, MediaItem } from '../../src/react/catalog-grid/types';
 
 import { click, mount } from './render';
+import { queryClient } from '../../src/react/query';
 
 const SMALL: MediaCardLayout = { active: false, size: 'small', portrait: false, javImage: 'cover' };
 
@@ -18,6 +19,15 @@ const item = (id: number, extra: Partial<MediaItem> = {}): MediaItem => ({ id, n
 const page = (items: MediaItem[], offset = 0, extra: Partial<GridPage> = {}): GridPage => ({ items, offset, ...extra });
 
 describe('目录取数', () => {
+  it('刷新代次认领同一集合的完整分页，筛选不同不共用', () => {
+    const old = { pages: [page([item(801)]), page([item(802)], 60)], pageParams: [0,60] };
+    queryClient.setQueryData(['catalog-grid','catalog','q=wall-retain',1], old);
+    const retained = latestCatalogPages(['catalog-grid','catalog','q=wall-retain',2]);
+    expect(retained).toBe(old);
+    expect(retained?.pages).toHaveLength(2);
+    expect(latestCatalogPages(['catalog-grid','catalog','q=another-wall',2])).toBeUndefined();
+    queryClient.removeQueries({ queryKey: ['catalog-grid','catalog','q=wall-retain'] });
+  });
   it('查询串只带有值的筛选，排除竖屏只在壳说要排除时加', () => {
     expect(catalogParams({ sort: 'seed', q: '', tag: '苗条' }, false)).toBe('sort=seed&tag=%E8%8B%97%E6%9D%A1');
     expect(new URLSearchParams(catalogParams({ sort: 'seed' }, true)).get('exclude_vertical')).toBe('1');

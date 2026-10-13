@@ -647,6 +647,7 @@ def index_directory_redirect(request: Request, args: dict[str, str] = Depends(re
 @router.api_route("/junk-files", methods=["GET", "HEAD"])
 @router.api_route("/stats", methods=["GET", "HEAD"])
 @router.api_route("/immerse", methods=["GET", "HEAD"])
+@router.api_route("/wall", methods=["GET", "HEAD"])
 @router.api_route("/trash", methods=["GET", "HEAD"])
 @router.api_route("/review", methods=["GET", "HEAD"])
 @router.api_route("/taste", methods=["GET", "HEAD"])

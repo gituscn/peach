@@ -109,6 +109,7 @@ const lucideIcons = new Map([
   ["upload", "upload"], ["database", "database"], ["play", "play"], ["clock", "clock"],
   ["external-link", "external-link"], ["bookmark-plus", "bookmark-plus"],
   ["bookmark", "bookmark"], ["gallery-vertical-end", "gallery-vertical-end"],
+  ["gallery-thumbnails", "gallery-thumbnails"],
   ["notebook-pen", "notebook-pen"], ["search-x", "search-x"],
   ["file-archive", "file-archive"], ["file-audio", "file-audio"],
   ["file-stack", "file-stack"],

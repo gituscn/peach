@@ -28,6 +28,8 @@ export type StageRequest = StageItemRequest | StageFollowRequest | StageJavReque
 export type StagePatch = Partial<Pick<ItemDetailProps, 'layout' | 'selectMode' | 'selected' | 'seekSeconds' | 'relatedLimit'>>;
 
 export interface StageApi {
+  /** 播放墙的媒体宿主。收起后可交给小窗，详情可认领同一实例。 */
+  mountWallPlayer(item: PlayerItem, frame: HTMLElement, signal: AbortSignal): Promise<(continuePlaying?: boolean) => void>;
   /** 打开一条详情：先画骨架、`showModal()`，取完数再换成内容。小窗放着的正是这一条时，内容
    *  画出来那一刻把同一个播放器搬回来。浮窗开着同一种详情时不重开，取完数原地换内容。 */
   open(request: StageRequest): Promise<void>;

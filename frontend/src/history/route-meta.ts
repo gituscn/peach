@@ -67,6 +67,7 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
   '/follow/item/:id': { title: '关注' },
   // 沉浸模式进页面组，不算覆盖。
   '/immerse': { nav: 'immerse', title: '沉浸模式' },
+  '/wall': { nav: 'wall', title: '播放墙' },
 };
 
 /** 这条路径登记的元数据；没登记是 `null`。 */

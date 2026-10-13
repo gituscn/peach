@@ -68,6 +68,10 @@ export interface MediaCardHelpers {
 
 /** 卡片上的动作。打开与换页都归壳：详情页、沉浸模式和小窗是遗留层的整页视图。 */
 export interface MediaCardActions {
+  /** 播放墙复用舞台的单一播放器；退出时可把正在播放的实例交给小窗。 */
+  wallPlayer?(item: MediaItem, frame: HTMLElement, signal: AbortSignal): Promise<(continuePlaying?: boolean) => void>;
+  /** 打开详情，认领同一作品正在播放的实例。 */
+  wallDetails?(item: MediaItem, anchor: HTMLElement): void;
   /** 打开一张作品卡：小窗开着时在小窗里换片，分卷与版次组进各自的队列，其余打开详情。 */
   open(item: MediaItem, anchor: HTMLElement): void;
   /** 回收站里的一张：视频打开详情，本地图片在新标签页看原图，其余切换选中。 */
@@ -101,6 +105,8 @@ export interface MediaCardActions {
  *  - `items`：壳手上已有的一批（详情页的接着看），不取数。 */
 export interface CatalogGridProps {
   mode: 'catalog' | 'entity' | 'items';
+  /** 独立全屏播放墙。 */
+  wall?: boolean;
   helpers: MediaCardHelpers;
   actions: MediaCardActions;
   layout: MediaCardLayout;

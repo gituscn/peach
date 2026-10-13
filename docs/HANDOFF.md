@@ -70,6 +70,12 @@
 
 ## 参考产品证据登记
 
+- Folia 播放墙（2026-10-13）：[固定源码](https://github.com/chthollyphile/folia-major/tree/9a01e788ed52d25ea01b1f0d37934e5e371ae82b/src/components/wall)，AGPL-3.0。独立 `/wall` 页面使用其暗色、直角拼贴、标题、阴影和角落控制；12×8 单位块、每块 12 张磁贴，四套模板及镜像，6×6 原位展开与同块让位共用上游弹簧参数。
+  拖动阈值 7 px、视口裁剪、探索循环与筛选有限墙。Peach 只接收有封面的视频；全封或正封按磁贴比例取景。封面铺满展开卡，标题位于中下部；播放时背景模糊、标题移到上方。固定三列续页，展开实例在屏外保持挂载。
+  Query 分页、既有详情、Video.js 与小窗共用；分卷和版本直接使用详情队列切换。墙内控制条只监听同一 video 的暂停、进度和结束事件，统计与流源仍由共用播放器处理；换批键复用首页 `Shuffle`，与返回键并排。
+  番号按实际字宽缩小，保持一行完整显示；作品标题单行截断。墙内隐藏播放器统计与速度浮层。`/wall` 首帧在 HTML 写入入口标记，初始化跳过目录骨架；React 接管时清理入口标记，退出恢复目录。
+  上游实时交互未取得。原文见 `folia-wall-blocks`／`folia-wall-reflows`／`folia-wall-motion`／`folia-wall-style`，适配见 [播放墙取证](reference-snapshots/folia-video-wall.md)。
+
 - 依赖与参考来源的本轮判断见 [上游复核](reference-snapshots/upstream-review.md)：原文快照按哈希与 revision 接受，人工取证笔记保留；amane 桥只消费站点与网络层。
 - amane 的实体收藏与按需比较图只作产品语义参考；收藏、保存筛选复用当前 profile。自定义来源采用 OpenAver 的声明式边界，主动收窄为[单步 JSON](CUSTOM_SOURCES.md)；[外部播放](EXTERNAL_PLAYERS.md)通过客户端网络地址，媒体不改名、不移动。
 - BoardUI：[创作者别名表格与关注分页](BOARD_UI.md#创作者别名与扫描操作)、[Board、Link Button 与搜索动效](BOARD_UI.md)、[复核与配置灰色 Pills](reference-snapshots/board-review-layout.md#次级分类组件)；React 源码 `frontend/src/react/boardui/ORIGIN.md`。

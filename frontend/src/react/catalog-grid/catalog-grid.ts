@@ -97,11 +97,20 @@ export function entityQuery(props: CatalogGridProps) {
 /** 首屏取数（目录网格那条路由的 `prefetch`）。只有目录要等：资料页的作品区第一页跟着资料页递进来，
  *  网格挂上时自己落进缓存（`initialData`）。 */
 export async function prefetchCatalogGrid(props: CatalogGridProps, signal: AbortSignal): Promise<void> {
-  if (props.mode !== 'catalog') return;
+  if (props.mode !== 'catalog' || props.wall) return;
   const query = catalogQuery(props);
   await queryClient.fetchInfiniteQuery({
     ...query, queryFn: ({ pageParam }) => query.queryFn({ pageParam: pageParam as number, signal }),
   });
+}
+
+/** 同一集合的分页保存在 Query 中；刷新代次之间认领整份分页，不复制作品到界面状态。 */
+export function latestCatalogPages(key: QueryKey): InfiniteData<GridPage, number> | undefined {
+  const exact = JSON.stringify(key);
+  const cached = queryClient.getQueryCache().findAll({ queryKey: key.slice(0, -1) })
+    .filter(query => JSON.stringify(query.queryKey) !== exact && Array.isArray((query.state.data as InfiniteData<GridPage> | undefined)?.pages))
+    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt)[0];
+  return cached?.state.data as InfiniteData<GridPage, number> | undefined;
 }
 
 /** 分卷与版次各自折叠：分卷是一部片被切成几段，版次是同一部片的几个来源，两者能同时

@@ -18,12 +18,12 @@
 - Windows 托盘自动恢复，重启用 `restart_windows_tray.py --source`；代码与数据在内置盘，媒体在外置盘。
 - 托盘须普通权限启动：提权令牌看不到 CloudDrive 的 `A:`/`B:`，误报脱盘。
 - Windows：80→HTTPS、LAN:443；`peach-win`、`0.38.0`。CA、健康通过。
-- 收藏、配置、活动、续播；[JAV 缓存与浏览](JAV_DISCOVERY.md)。
+- 收藏、配置、活动、续播、播放墙；[JAV 浏览与缓存](JAV_DISCOVERY.md)。
 - `/healthz` 报 `configurable=true`；配置与选目录共用连接判据，托盘管理 HTTPS 地址、端口及重载。
 - 首启、配置页列缺失依赖（CloudDrive、挂载驱动、FFmpeg/ffprobe、OpenSSL）；Windows 识别 CloudDrive、WinFsp。
-- 访问密码未开，局域网匿名可读；首启可跳过密码，配置页可改可关，登录可记住设备。
+- 密码未开，局域网匿名可读；首启可跳过密码，配置页可改可关，登录可记住设备。
 - macOS 是 reader，代码与 `peach-data` 在内置盘；`peach.local` 经 8900/8443 和 pf 提供 80/443，GET 正常、写入回 409。
-- 两端各用本机 CA，私钥与凭据不跨机；代码用 Git、账本单写者复制、图片用 Syncthing；坐标见 `<数据根>/config.toml`。
+- 两端用本机 CA，私钥与凭据不跨机；代码用 Git、账本单写者复制、图片用 Syncthing；坐标见 `<数据根>/config.toml`。
 - Windows ledger `0045`，76,259 行；字幕 195 行（孤立 19），175 部带字幕轨；R 盘暂缓。
 - Mac ledger 使用已授权共享副本，`in-sync`；`sources` 在内置盘，`archive`、`tools` 可在外置盘。
 - Windows doctor、诊断页通过 CA；本地目录缺失，115/PikPak 可读；密码未开、历史失败为警告。

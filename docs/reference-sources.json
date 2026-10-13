@@ -13,6 +13,70 @@
   ],
   "sources": [
     {
+      "id": "folia-wall-reflows",
+      "cadence": "monthly",
+      "name": "Folia 块内让位排布",
+      "url": "https://raw.githubusercontent.com/chthollyphile/folia-major/9a01e788ed52d25ea01b1f0d37934e5e371ae82b/src/components/wall/blockReflows.ts",
+      "snapshot": "docs/reference-snapshots/upstream/folia-block-reflows.ts",
+      "checked_on": "2026-10-13",
+      "sha256": "21f28aac0061fd7e23a68d8f965e569b6865779e6712c09cdb281676b8e95af6",
+      "git": {
+        "repository": "https://github.com/chthollyphile/folia-major.git",
+        "ref": "refs/heads/main",
+        "revision": "9a01e788ed52d25ea01b1f0d37934e5e371ae82b"
+      },
+      "role": "AGPL-3.0 的原始 6×6 展开让位表，其他磁贴同步换位，收起返回原槽。",
+      "consumers": ["frontend/src/react/video-wall/folia/blockReflows.ts"]
+    },
+    {
+      "id": "folia-wall-motion",
+      "cadence": "monthly",
+      "name": "Folia 展开动效参数",
+      "url": "https://raw.githubusercontent.com/chthollyphile/folia-major/9a01e788ed52d25ea01b1f0d37934e5e371ae82b/src/components/wall/wallReflowMotion.ts",
+      "snapshot": "docs/reference-snapshots/upstream/folia-wall-reflow-motion.ts",
+      "checked_on": "2026-10-13",
+      "sha256": "f7fb80fde27b35443dd4860d45e86c93513df2f1f1a64f88b76c4adae0661d7c",
+      "git": {
+        "repository": "https://github.com/chthollyphile/folia-major.git",
+        "ref": "refs/heads/main",
+        "revision": "9a01e788ed52d25ea01b1f0d37934e5e371ae82b"
+      },
+      "role": "AGPL-3.0 的块内展开弹簧与控件淡入参数，使用项目已有 motion。",
+      "consumers": ["frontend/src/react/video-wall/wall-motion.ts"]
+    },
+    {
+      "id": "folia-wall-style",
+      "cadence": "monthly",
+      "name": "Folia 播放墙视觉样式",
+      "url": "https://raw.githubusercontent.com/chthollyphile/folia-major/9a01e788ed52d25ea01b1f0d37934e5e371ae82b/src/components/wall/wall.css",
+      "snapshot": "docs/reference-snapshots/upstream/folia-wall.css",
+      "checked_on": "2026-10-13",
+      "sha256": "2f42d1320fcbb7edb1b01d75b696b24b389f98f683922c16caf0f03523400f2f",
+      "git": {
+        "repository": "https://github.com/chthollyphile/folia-major.git",
+        "ref": "refs/heads/main",
+        "revision": "9a01e788ed52d25ea01b1f0d37934e5e371ae82b"
+      },
+      "role": "AGPL-3.0 的独立暗色封面墙样式；视频比例与播放器行为由 Peach 处理。",
+      "consumers": ["frontend/src/react/video-wall/video-wall.css"]
+    },
+    {
+      "id": "folia-wall-blocks",
+      "cadence": "monthly",
+      "name": "Folia 播放墙矩形块模板",
+      "url": "https://raw.githubusercontent.com/chthollyphile/folia-major/9a01e788ed52d25ea01b1f0d37934e5e371ae82b/src/components/wall/blockTemplates.ts",
+      "snapshot": "docs/reference-snapshots/upstream/folia-block-templates.ts",
+      "checked_on": "2026-10-13",
+      "sha256": "8630b2ba33f819a689a867f78d4d996fb2e7edd59caad7b3d798876a442029db",
+      "git": {
+        "repository": "https://github.com/chthollyphile/folia-major.git",
+        "ref": "refs/heads/main",
+        "revision": "9a01e788ed52d25ea01b1f0d37934e5e371ae82b"
+      },
+      "role": "AGPL-3.0 的矩形块模板算法参考；固定三列续页并使用 Peach 的单一视频播放器。",
+      "consumers": ["frontend/src/react/video-wall/wall-layout.ts", "frontend/src/react/video-wall/folia/blockTemplates.ts"]
+    },
+    {
       "id": "fluid-springs",
       "cadence": "weekly",
       "name": "Fluid Functionalism 短程弹簧参数",

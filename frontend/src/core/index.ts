@@ -69,7 +69,7 @@ const mapLimit=async<T,R>(items:Iterable<T>,limit:number,run:(item:T,index:numbe
 const STATE_ROUTES:Record<string,string>={fresh:'/unseen',later:'/watch-later',flagged:'/flagged',ads:'/junk-files'};
 const ROUTE_STATES:Record<string,string>=Object.fromEntries(Object.entries(STATE_ROUTES).map(([state,path])=>[path,state]));
 const STATE_LABELS:Record<string,string>={fresh:'没看过',later:'稍后看',flagged:'已标记',ads:'垃圾文件'};
-const isCatalogPath=(path:string)=>path==='/'||Object.prototype.hasOwnProperty.call(ROUTE_STATES,path);
+const isCatalogPath=(path:string)=>path==='/'||path==='/wall'||Object.prototype.hasOwnProperty.call(ROUTE_STATES,path);
 const ENTITY_ROUTES:Record<string,string>={performer:'performers',studio:'studios',creator:'creators',series:'series',agency:'agencies'};
 const ROUTE_ENTITIES:Record<string,string>={performers:'performer',studios:'studio',creators:'creator',series:'series',agencies:'agency'};
 /** 实体资料页的地址：`/performers/<名字>` 这一类。 */
