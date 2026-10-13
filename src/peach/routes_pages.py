@@ -699,7 +699,7 @@ def entity_route(request: Request, name: str,
                  args: dict[str, str] = Depends(require_page_auth)):
     if not request.app.state.settings.configured:
         return index(request, args)
-    from .web_entity import INDEX_ENTITY_KINDS
+    from .web_entity import INDEX_ENTITY_KINDS, entity_id_redirect
 
     prefix = request.url.path.split("/", 2)[1]
     kind = {**INDEX_ENTITY_KINDS, "series": "series", "tags": "tag"}[prefix]
@@ -711,6 +711,11 @@ def entity_route(request: Request, name: str,
             entity = connection.execute("SELECT * FROM entity WHERE id=? AND kind=?",
                                         (entity_id, kind)).fetchone() if entity_id else None
             if entity is None:
+                redirect = entity_id_redirect(connection, kind, int(name))
+                if redirect:
+                    prefixes = {value: key for key, value in INDEX_ENTITY_KINDS.items()}
+                    prefixes.update(series='series', tag='tags')
+                    return _page_redirect(request, f"/{prefixes[redirect['kind']]}/{redirect['id']}")
                 raise HTTPException(404, "not found")
         else:
             entity = resolve_entity(connection, kind, name)

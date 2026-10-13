@@ -255,6 +255,60 @@ class EntityRedirectRouteTests(unittest.TestCase):
                 response = self.client.get(path, params={'kind': kind, 'id': entity_id, 't': 'secret'})
                 self.assertEqual(response.json(), {'error': 'not found'}, (path, kind, entity_id))
 
+    def test_verified_cross_kind_merge_ids_use_the_final_identity(self):
+        with sqlite3.connect(self.app.state.settings.db_path) as connection:
+            connection.execute(
+                "INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at)"
+                " VALUES(20,'creator','Old Account','old account','t','t')")
+            merge_entity(connection, target_id=10, source_id=20, source_name='Old Account',
+                         alias_source='user:identity-merge:creator')
+            add_person(connection, 12, 'Final Person')
+            merge_entity(connection, target_id=12, source_id=10, source_name='橋本ありな', alias_source='test:merge')
+        expected = {'redirect': {'id': 12, 'kind': 'performer', 'name': 'Final Person'}}
+        for identity in ({'id': 20}, {'name': 'Old Account'}):
+            response = self.client.get('/api/entity', params={'kind': 'creator', 't': 'secret', **identity})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json(), expected)
+        query = '?tag=a%2Fb&tag=second&media=photos&t=secret'
+        for method in ('GET', 'HEAD'):
+            response = self.client.request(method, '/creators/20' + query, follow_redirects=False)
+            self.assertEqual(response.status_code, 307)
+            self.assertEqual(response.headers['location'], '/performers/12' + query)
+            self.assertEqual(response.headers['cache-control'], 'no-store')
+        self.assertEqual(self.client.get('/api/photos', params={
+            'kind': 'creator', 'id': 20, 't': 'secret'}).json(), {'error': 'not found'})
+
+    def test_cross_kind_id_redirect_requires_source_kind_evidence(self):
+        with sqlite3.connect(self.app.state.settings.db_path) as connection:
+            connection.executemany(
+                "INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at)"
+                " VALUES(?,'creator',?,?,'t','t')", [(20, 'Explicit', 'explicit'), (21, 'Generic', 'generic')])
+            merge_entity(connection, target_id=10, source_id=20, source_name='Explicit',
+                         alias_source='user:identity-merge:creator')
+            merge_entity(connection, target_id=10, source_id=21, source_name='Generic', alias_source='test:merge')
+        for kind, entity_id in (('creator', 10), ('studio', 20), ('creator', 21)):
+            response = self.client.get('/api/entity', params={'kind': kind, 'id': entity_id, 't': 'secret'})
+            self.assertEqual(response.json(), {'error': 'not found'}, (kind, entity_id))
+            prefix = 'studios' if kind == 'studio' else 'creators'
+            for method in ('GET', 'HEAD'):
+                page = self.client.request(method, f'/{prefix}/{entity_id}?t=secret', follow_redirects=False)
+                self.assertEqual(page.status_code, 404, (kind, entity_id, method))
+
+    def test_a_reused_cross_kind_merge_id_keeps_its_current_identity(self):
+        with sqlite3.connect(self.app.state.settings.db_path) as connection:
+            connection.execute(
+                "INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at)"
+                " VALUES(20,'creator','Old Account','old account','t','t')")
+            merge_entity(connection, target_id=10, source_id=20, source_name='Old Account',
+                         alias_source='user:identity-merge:creator')
+            add_person(connection, 20, 'New Person')
+        self.assertEqual(self.client.get('/api/entity', params={
+            'kind': 'creator', 'id': 20, 't': 'secret'}).json(), {'error': 'not found'})
+        self.assertEqual(self.client.get('/creators/20?t=secret', follow_redirects=False).status_code, 404)
+        current = self.client.get('/api/entity', params={'kind': 'performer', 'id': 20, 't': 'secret'})
+        self.assertEqual(current.json()['id'], 20)
+        self.assertEqual(current.json()['canonical_name'], 'New Person')
+
     def test_tag_profiles_and_photos_use_the_same_identity_by_name_and_id(self):
         with sqlite3.connect(self.app.state.settings.db_path) as connection:
             connection.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at)"

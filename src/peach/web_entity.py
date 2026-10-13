@@ -56,6 +56,19 @@ def _query_entity(connection, kind: str, name: str, entity_id: int | None):
                               (target, kind)).fetchone() if target else None
 
 
+def entity_id_redirect(connection, kind: str, entity_id: int) -> dict | None:
+    """跨种类身份合并由墓碑来源证明原种类，现存 ID 始终使用自身身份。"""
+    row = connection.execute(
+        "SELECT e.id,e.kind,e.canonical_name FROM entity_redirect r JOIN entity e ON e.id=r.target_id "
+        "WHERE r.old_id=? AND r.source=? AND e.kind<>? "
+        "AND NOT EXISTS(SELECT 1 FROM entity live WHERE live.id=r.old_id)",
+        (entity_id, f'user:identity-merge:{kind}', kind),
+    ).fetchone()
+    if row is None or row['kind'] not in READ_ENTITY_KINDS:
+        return None
+    return {'id': row['id'], 'kind': row['kind'], 'name': row['canonical_name']}
+
+
 #: 资料页与索引页数作品的口径：视频，且没有标「已消失」（ADR-0087）。回收站里的照旧算；
 #: 代表作的取图不套这一条。
 COUNTED_VIDEO = "a.medium='video' AND COALESCE(a.disposal,'')<>'vanished'"
@@ -191,6 +204,9 @@ def q_entity(contract: WebContract, args):
         row = _query_entity(c, kind, name, entity_id)
         if not row:
             if entity_id is not None:
+                redirect = entity_id_redirect(c, kind, entity_id)
+                if redirect:
+                    return {'redirect': redirect}
                 return {"error": "not found"}
             merged = c.execute(
                 "SELECT DISTINCT e.id,e.kind,e.canonical_name FROM entity e "
