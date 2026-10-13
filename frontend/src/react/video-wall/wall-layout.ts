@@ -1,5 +1,5 @@
 /* 矩形块拼贴参考 Folia 的 blockTemplates/layout，AGPL-3.0，固定 revision
- * 9a01e788ed52d25ea01b1f0d37934e5e371ae82b。Peach 使用固定列数续页。 */
+ * 9a01e788ed52d25ea01b1f0d37934e5e371ae82b。Peach 按浏览位置接续馆藏。 */
 import { getBlockTemplate, getBlockReflow } from './folia/blockTemplates';
 import type { MediaItem } from '../catalog-grid/types';
 export interface WallRect { x: number; y: number; width: number; height: number }
@@ -44,33 +44,21 @@ export function wallTileAt(count: number, finite: boolean, key: string): WallTil
   const localRow = finite ? row! : mod(row!, rows);
   const rank = (localRow * shape.columns + localCol) * SLOTS + slot!;
   if (finite && rank >= count) return null;
-  const rect = blockSlot(localCol, localRow, slot!);
-  return { ...rect, x:rect.x + (column! - localCol) * BLOCK_W, y:rect.y + (row! - localRow) * BLOCK_H, index:rank % count, key };
+  const rect = blockSlot(column!, row!, slot!);
+  return { ...rect, index:rank % count, key };
 }
 
-/** 找到离镜头最近的作品实例，队列切换与磁贴点击落到同一个位置。 */
-export function nearestWallTile(count: number, finite: boolean, index: number, point: { x:number; y:number }): WallTile | null {
+/** 有限墙队列选择落到作品的唯一位置。 */
+export function finiteWallTile(count: number, index: number): WallTile | null {
   if (index < 0 || index >= count) return null;
-  const shape = wallShape(count, finite), rows = shape.height / BLOCK_H;
-  let nearest: WallTile | null = null, distance = Infinity;
-  for (let rank = index; rank < (finite ? count : shape.columns * rows * SLOTS); rank += count) {
-    const block = Math.floor(rank / SLOTS), column = block % shape.columns, row = Math.floor(block / shape.columns);
-    const base = wallTileAt(count, finite, `${column}:${row}:${rank % SLOTS}`)!;
-    const x = finite ? 0 : Math.round((point.x - base.x - base.width / 2) / shape.width);
-    const y = finite ? 0 : Math.round((point.y - base.y - base.height / 2) / shape.height);
-    const tile = wallTileAt(count, finite, `${column + x * shape.columns}:${row + y * rows}:${rank % SLOTS}`)!;
-    const d = (point.x - tile.x - tile.width / 2) ** 2 + (point.y - tile.y - tile.height / 2) ** 2;
-    if (d < distance) { distance = d; nearest = tile }
-  }
-  return nearest;
+  const block = Math.floor(index / SLOTS);
+  return wallTileAt(count, true, `${block % 3}:${Math.floor(block / 3)}:${index % SLOTS}`);
 }
 
 /** Folia 原始让位表：展开成 6×6，所在块的另外十一格同步换位。 */
-export function expandedWallTiles(count: number, finite: boolean, active: WallTile): Map<string, WallRect> {
+export function expandedWallTiles(_count: number, _finite: boolean, active: WallTile): Map<string, WallRect> {
   const [column,row,slot] = active.key.split(':').map(Number);
-  const shape = wallShape(count, finite), rows = shape.height / BLOCK_H;
-  const localCol = finite ? column! : mod(column!, shape.columns), localRow = finite ? row! : mod(row!, rows);
-  const reflow = getBlockReflow(localCol, localRow, slot!);
+  const reflow = getBlockReflow(column!, row!, slot!);
   return new Map((reflow || []).map((rect, index) => [`${column}:${row}:${index}`, {
     x:column! * BLOCK_W + rect.x * PITCH, y:row! * BLOCK_H + rect.y * PITCH,
     width:rect.cols * PITCH - GAP, height:rect.rows * PITCH - GAP,
@@ -112,14 +100,67 @@ export function visibleWallTiles(count: number, finite: boolean, camera: WallCam
       for (let slot = 0; slot < SLOTS; slot += 1) {
         const rank = (localRow * shape.columns + localCol) * SLOTS + slot;
         if (finite && rank >= count) continue;
-        const local = blockSlot(localCol, localRow, slot);
-        const rect = { ...local, x: local.x + (column - localCol) * BLOCK_W,
-          y: local.y + (row - localRow) * BLOCK_H };
+        const rect = blockSlot(column, row, slot);
         if (intersects(rect, view)) result.push({ ...rect, index: rank % count, key: `${column}:${row}:${slot}` });
       }
     }
   }
   return result;
+}
+
+/** 按浏览顺序分配作品，续页不改变已分配位置；全范围耗尽才循环。 */
+export class WallExploration {
+  private readonly positions = new Map<string, number>();
+  private readonly used = new Set<number>();
+  private cursor = 0;
+  private repeat = 0;
+
+  get size(): number { return this.used.size }
+
+  prefer(index: number): void { this.cursor = index }
+
+  tile(key: string, count: number): WallTile | null {
+    const index = this.positions.get(key);
+    const tile = index === undefined ? null : wallTileAt(count, false, key);
+    return tile ? { ...tile, index:index! } : null;
+  }
+
+  assign(tiles: readonly WallTile[], count: number, hasMore: boolean): WallTile[] {
+    return tiles.flatMap(tile => {
+      let index = this.positions.get(tile.key);
+      if (index === undefined) {
+        if (this.used.size < count) {
+          while (this.used.has(this.cursor % count)) this.cursor++;
+          index = this.cursor++ % count;
+          this.used.add(index);
+        } else if (hasMore || !count) return [{ ...tile, index:-1 }];
+        else index = this.repeat++ % count;
+        this.positions.set(tile.key, index);
+      }
+      return [{ ...tile, index }];
+    });
+  }
+
+  fresh(): { x:number; y:number } {
+    let column = 0;
+    for (const key of this.positions.keys()) column = Math.max(column, Number(key.split(':')[0]));
+    return { x:(column + 2) * BLOCK_W, y:0 };
+  }
+
+  nearest(count: number, index: number, point: { x:number; y:number }): WallTile | null {
+    if (index < 0 || index >= count) return null;
+    let nearest: WallTile | null = null, distance = Infinity;
+    for (const [key, assigned] of this.positions) {
+      if (assigned !== index) continue;
+      const tile = this.tile(key, count)!;
+      const d = (point.x - tile.x - tile.width / 2) ** 2 + (point.y - tile.y - tile.height / 2) ** 2;
+      if (d < distance) { nearest = tile; distance = d }
+    }
+    if (nearest) return nearest;
+    const fresh = this.fresh(), key = `${Math.round(fresh.x / BLOCK_W)}:0:0`;
+    this.positions.set(key, index); this.used.add(index);
+    return this.tile(key, count);
+  }
 }
 
 export function finiteWallFilters(filters: Readonly<Record<string, string>> = {}): boolean {

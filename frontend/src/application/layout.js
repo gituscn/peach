@@ -333,7 +333,6 @@ export function syncHeaderActions(){
   const catalog=isCatalogPath(path)||path==='/trash';
   const canSelect=catalog||entity||path==='/tags'||path==='/follow';
   const canDensity=catalog||entity||path==='/follow';
-  if($('#wallBtn'))$('#wallBtn').hidden=(!catalog&&!entity)||path==='/trash'||path==='/junk-files';
   $('#selectMode').hidden=!canSelect;$('#density').hidden=!canDensity;
   syncPhotoWalls();
   if(!canSelect&&selectMode)setSelectMode(false,true);

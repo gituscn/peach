@@ -87,9 +87,7 @@ function GridBody(props: CatalogGridProps) {
   const finiteWall = entity || finiteWallFilters(props.filters);
   const wallAvailable = !trash && !props.selectMode && !!actions.wallPlayer && !!actions.wallDetails;
   const wallItems = tiles.flatMap(tile => tile.kind === 'card' && wallHasCover(tile.item) ? [tile.item] : []);
-  const batchItems = tiles.slice(pageStarts.at(-1) || 0)
-    .flatMap(tile => tile.kind === 'card' && wallHasCover(tile.item) ? [tile.item] : []);
-  const wallPool = finiteWall ? wallItems : batchItems;
+  const wallPool = wallItems;
 
   const reveal = useSkeletonReveal(result.isPending, props.skeletonHtml);
   const body = useRef<HTMLDivElement | null>(null);

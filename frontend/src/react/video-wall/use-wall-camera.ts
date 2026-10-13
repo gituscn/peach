@@ -118,7 +118,9 @@ export function useWallCamera(count: number, finite: boolean, initial: WallCamer
     };
     const wheel = (event: WheelEvent) => {
       if (event.ctrlKey || event.metaKey) return;
+      if (event.target instanceof Element && event.target.closest('[data-wall-queue],[data-wall-player]')) return;
       event.preventDefault();
+      if (node.closest('[data-video-wall][data-refreshing]')) return;
       if (pointer.current) return;
       const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? size.current.height : 1;
       const dx = (event.shiftKey && !event.deltaX ? event.deltaY : event.deltaX) * unit;

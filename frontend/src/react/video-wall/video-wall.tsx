@@ -14,7 +14,7 @@ import { ArtSlot } from '../components/art-slot';
 import { SEGMENT, SEGMENTED_TRACK, SegmentedRadioGroup } from '../components/segmented';
 import { busyProps } from '../settings/busy-props';
 import { useWallCamera } from './use-wall-camera';
-import { expandedWallTiles, nearestWallTile, visibleWallTiles, wallTileAt, type WallCamera, type WallTile } from './wall-layout';
+import { expandedWallTiles, finiteWallTile, visibleWallTiles, wallTileAt, WallExploration, type WallCamera, type WallTile } from './wall-layout';
 import { WALL_REFLOW_SPRING } from './wall-motion';
 import { chooseItem, fetchQueue, nextPart, partLabel, queueKey, type QueueItem, type QueueRef } from '../item-detail/item-detail';
 import { WallControls } from './wall-controls';
@@ -39,7 +39,7 @@ interface VideoWallProps {
   javImage: string;
 }
 
-interface WallSession { camera: WallCamera; selectedId: number | null; selectedKey?: string; sourceId?: number | null; image: string; pool: string }
+interface WallSession { camera: WallCamera; selectedId: number | null; selectedKey?: string; sourceId?: number | null; image: string; pool: string; exploration: WallExploration }
 // 页面刷新代次不属于集合身份。只保存界面位置，不保存 Query 中的作品副本。
 const wallSessions = new Map<string, WallSession>();
 
@@ -61,11 +61,14 @@ const WallArtwork = memo(function WallArtwork({ item, image, big = false, ratio 
 
 /** 单一播放宿主常驻在墙内，视口裁剪只影响海报磁贴。 */
 export function VideoWall({ items, finite, hasMore, busy, loading = false, error: queryError = '', retry, emptyHtml = '', loadMore, actions, helpers, javImage, sessionKey }: VideoWallProps) {
-  const pool = `${items[0]?.id}:${items.at(-1)?.id}`;
+  const pool = String(items[0]?.id);
   const [session] = useState(() => {
     const saved = wallSessions.get(sessionKey);
     return saved && (loading || finite || saved.pool === pool) ? saved : undefined;
   });
+  const [exploration] = useState(() => session?.exploration || new WallExploration());
+  const moreFlight = useRef(false);
+  const [freshFrom, setFreshFrom] = useState<number | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const playerFrame = useRef<HTMLDivElement>(null);
   const codeTitle = useRef<HTMLElement>(null);
@@ -120,12 +123,14 @@ export function VideoWall({ items, finite, hasMore, busy, loading = false, error
   const saveView = () => {
     if (!hasItems.current) return;
     wallSessions.delete(sessionKey);
-    wallSessions.set(sessionKey, { ...savedView.current, camera: camera.snapshot() });
+    wallSessions.set(sessionKey, { ...savedView.current, camera: camera.snapshot(), exploration });
     if (wallSessions.size > 8) wallSessions.delete(wallSessions.keys().next().value!);
   };
   useLayoutEffect(saveView);
-  const tiles = visibleWallTiles(items.length, finite, camera.view.camera, camera.view.size);
-  const activeTile = selected && wallTileAt(items.length, finite, selectedKey);
+  const visible = visibleWallTiles(loading ? 12 : finite ? items.length : items.length || hasMore ? 12 : 0,
+    finite && !loading, camera.view.camera, camera.view.size);
+  const tiles = loading ? visible.map(tile => ({ ...tile, index:-1 })) : finite ? visible : exploration.assign(visible, items.length, hasMore);
+  const activeTile = selected && (finite ? wallTileAt(items.length, true, selectedKey) : exploration.tile(selectedKey, items.length));
   const expanded = activeTile ? expandedWallTiles(items.length, finite, activeTile) : new Map();
   if (activeTile && !tiles.some(tile => tile.key === activeTile.key)) tiles.push(activeTile);
   const stopPlayer = (continuePlaying = false) => {
@@ -142,7 +147,7 @@ export function VideoWall({ items, finite, hasMore, busy, loading = false, error
       setPlaying(null); setStarting(false); setSelected(null); setSelectedKey(''); setError('');
       return;
     }
-    if (previousPool.current === 'undefined:undefined') {
+    if (previousPool.current === 'undefined') {
       previousPool.current = pool;
       if (session && (finite || session.pool === pool)) setSelected(items.find(item => item.id === session.selectedId) || null);
       else if (session) camera.reset();
@@ -226,15 +231,37 @@ export function VideoWall({ items, finite, hasMore, busy, loading = false, error
     }
     if (group) { setSourceId(item.id); void play(item); return }
     const view = camera.snapshot();
-    const tile = nearestWallTile(items.length, finite, items.findIndex(row => row.id === item.id), {
+    const index = items.findIndex(row => row.id === item.id);
+    const point = {
       x:(camera.view.size.width / 2 - view.x) / view.scale, y:(camera.view.size.height / 2 - view.y) / view.scale,
-    });
+    };
+    const tile = finite ? finiteWallTile(items.length, index) : exploration.nearest(items.length, index, point);
     if (tile) { choose(item, tile); setPendingPlayback(item.id) }
   };
   const more = async () => {
-    if (busy) return;
+    if (busy || moreFlight.current) return;
+    moreFlight.current = true;
     setMoreError('');
-    try { await loadMore() } catch (failure) { setMoreError(requestErrorMessage(failure)) }
+    try { await loadMore() } catch (failure) { setMoreError(requestErrorMessage(failure)); setFreshFrom(null) }
+    finally { moreFlight.current = false }
+  };
+  const pendingTiles = tiles.some(tile => tile.index < 0);
+  useEffect(() => {
+    if (loading || finite || covered || selected || busy || moreError || freshFrom !== null || !hasMore) return;
+    if (pendingTiles || items.length - exploration.size < 24) void more();
+  }, [loading, finite, covered, selected, busy, moreError, hasMore, pendingTiles, items.length, exploration.size, freshFrom]);
+  useEffect(() => {
+    if (freshFrom === null || busy || moreError) return;
+    if (items.length <= freshFrom && hasMore) { void more(); return }
+    exploration.prefer(freshFrom);
+    const next = exploration.fresh(), view = camera.snapshot();
+    close(); camera.pan(-next.x * view.scale - view.x, -next.y * view.scale - view.y);
+    setFreshFrom(null);
+  }, [freshFrom, items.length, busy, hasMore, moreError]);
+  const fresh = async () => {
+    if (busy || moreFlight.current) return;
+    setFreshFrom(items.length);
+    if (hasMore) await more();
   };
   const addLater = async () => {
     if (!activeItem || laterBusy) return;
@@ -292,6 +319,7 @@ export function VideoWall({ items, finite, hasMore, busy, loading = false, error
     {queueOpen ? <WallQueue items={tracks} activeId={current.id} kind={group?.kind || 'wall'} label={label} choose={switchTrack} close={() => setQueueOpen(false)} /> : null}
   </> : null;
   const wall = <div ref={root} data-video-wall="" data-fullscreen="" data-focused={!!selected || undefined}
+    data-refreshing={freshFrom !== null || undefined}
     hidden={covered} onKeyDown={event => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       event.preventDefault(); event.stopPropagation();
@@ -322,12 +350,13 @@ export function VideoWall({ items, finite, hasMore, busy, loading = false, error
       <span data-wall-hint="">拖动浏览 · Shift + 滚轮横移</span>
     </div> : null}
     <div ref={camera.viewport} data-wall-viewport="" tabIndex={0} role="region" aria-label="播放墙，拖动或方向键浏览"
-      aria-busy={loading || undefined} data-skeleton={loading ? 'wall' : undefined}
-      {...(loading ? {} : camera.handlers)} onClick={event => {
+      aria-busy={loading || freshFrom !== null || (busy && pendingTiles) || undefined} data-skeleton={loading ? 'wall' : undefined}
+      {...(loading || freshFrom !== null ? {} : camera.handlers)} onClick={event => {
         if (selected && event.target instanceof Element && !event.target.closest('[data-wall-tile]')) {
           if (queueOpen) setQueueOpen(false); else close();
         }
       }} onKeyDown={event => {
+        if (freshFrom !== null) return;
         if (event.target instanceof Element && event.target.closest('button,input,[role="slider"],[data-wall-player],[data-wall-queue]')) return;
         const directions: Record<string, [number, number]> = { ArrowLeft: [200,0], ArrowRight: [-200,0], ArrowUp: [0,200], ArrowDown: [0,-200] };
         const delta = directions[event.key];
@@ -335,9 +364,9 @@ export function VideoWall({ items, finite, hasMore, busy, loading = false, error
         event.preventDefault(); camera.pan(...delta);
       }}>
       <div ref={camera.world} data-wall-world="">
-        {loading ? visibleWallTiles(12, false, camera.view.camera, camera.view.size).map(tile => <span key={tile.key} data-wall-skeleton="" aria-hidden="true"
-          style={{ '--wall-left':`${tile.x}px`, '--wall-top':`${tile.y}px`, '--wall-width':`${tile.width}px`, '--wall-height':`${tile.height}px` } as CSSProperties} />) : null}
         {tiles.map(tile => {
+          if (tile.index < 0) return <span key={tile.key} data-wall-skeleton="" aria-hidden="true"
+            style={{ '--wall-left':`${tile.x}px`, '--wall-top':`${tile.y}px`, '--wall-width':`${tile.width}px`, '--wall-height':`${tile.height}px` } as CSSProperties} />;
           const item = items[tile.index]!;
           const focused = !!selected && tile.key === selectedKey;
           const rect = expanded.get(tile.key) || tile;
@@ -382,10 +411,10 @@ export function VideoWall({ items, finite, hasMore, busy, loading = false, error
     </div>
     {!loading && queryError ? <div data-wall-error=""><Note tone="error">{queryError}</Note><Button size="small" variant="ghost" onClick={retry}>重试</Button></div> : null}
     {!loading && !queryError && !items.length ? <div data-wall-empty="" dangerouslySetInnerHTML={{ __html:emptyHtml }} /> : null}
-    {hasMore && !finite ? <div data-wall-refresh=""><Shuffle busy={busy} onPress={() => void more()} /></div> : null}
+    {!finite && (hasMore || items.length > 0) ? <div data-wall-refresh=""><Shuffle busy={busy} onPress={() => void fresh()} /></div> : null}
     {hasMore && finite ? <div data-wall-footer=""><Button size="small" variant="secondary" {...busyProps(busy)} onClick={() => void more()}>
       {busy ? <span dangerouslySetInnerHTML={{ __html:spinnerHtml() }} /> : null}载入更多</Button></div> : null}
-    {moreError ? <Note tone="error">{moreError}</Note> : null}
+    {moreError ? <div data-wall-error=""><Note tone="error">{moreError}</Note><Button size="small" variant="ghost" {...busyProps(busy)} onClick={() => void more()}>重试</Button></div> : null}
     <button type="button" data-wall-tools-button="" aria-label="播放墙工具" title="播放墙工具" aria-expanded={toolsOpen} onClick={() => setToolsOpen(!toolsOpen)}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-settings" /></svg>
     </button>

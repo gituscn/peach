@@ -1,9 +1,45 @@
 import { describe, expect, it } from 'vitest';
-import { clampWall, expandedWallTiles, finiteWallFilters, nearestWallTile, visibleWallTiles, wallExtent, wallHasCover, wallShape, wallTileAt } from '../../src/react/video-wall/wall-layout';
+import { clampWall, expandedWallTiles, finiteWallFilters, finiteWallTile, visibleWallTiles, wallExtent, wallHasCover, wallTileAt, WallExploration } from '../../src/react/video-wall/wall-layout';
 
 const view = { width: 1280, height: 720 };
 const camera = { x: 16, y: 16, scale: 1 };
 describe('二维播放墙', () => {
+  it('探索作品按四向浏览顺序分配，返回已有位置和续页均保持身份与几何', () => {
+    const pool = new WallExploration(), positions = new Map<string, number>();
+    for (const point of [{ x:0,y:0 },{ x:3000,y:0 },{ x:3000,y:3000 },{ x:-3000,y:3000 },{ x:-3000,y:-3000 }]) {
+      const visible = visibleWallTiles(12, false, { ...camera,x:point.x,y:point.y }, view);
+      for (const tile of pool.assign(visible, 200, true)) {
+        if (positions.has(tile.key)) expect(tile.index).toBe(positions.get(tile.key));
+        else { expect([...positions.values()]).not.toContain(tile.index); positions.set(tile.key, tile.index) }
+        expect(pool.tile(tile.key, 400)).toEqual(tile);
+      }
+    }
+    expect(pool.size).toBeGreaterThan(60);
+    const returned = pool.assign(visibleWallTiles(12, false, camera, view), 400, true);
+    for (const tile of returned) expect(tile.index).toBe(positions.get(tile.key));
+  });
+  it('未取得下一页时保留待填磁贴，范围耗尽后才循环', () => {
+    const pool = new WallExploration(), visible = visibleWallTiles(12, false, camera, view);
+    const first = pool.assign(visible, 3, true);
+    expect(first.filter(tile => tile.index >= 0)).toHaveLength(3);
+    expect(first.some(tile => tile.index === -1)).toBe(true);
+    const next = pool.assign(visible, 40, true);
+    expect(new Set(next.map(tile => tile.index)).size).toBe(next.length);
+    expect(next.slice(0, 3)).toEqual(first.slice(0, 3));
+    const ended = new WallExploration().assign(visible, 3, false);
+    expect(ended.every(tile => tile.index >= 0 && tile.index < 3)).toBe(true);
+    expect(new WallExploration().assign(visible, 0, false).every(tile => tile.index === -1)).toBe(true);
+  });
+  it('队列可定位未展示作品，后续分配不会再次使用它；换批优先使用新增页', () => {
+    const pool = new WallExploration(), point = { x:-2500,y:1800 };
+    const chosen = pool.nearest(100, 77, point)!;
+    expect(chosen.index).toBe(77);
+    expect(pool.nearest(140, 77, point)).toEqual(chosen);
+    pool.prefer(100);
+    const tiles = pool.assign(visibleWallTiles(12, false, camera, view), 140, true);
+    expect(tiles[0]!.index).toBe(100);
+    expect(tiles.map(tile => tile.index)).not.toContain(77);
+  });
   it('只有有封面引用的视频进入墙，缩略图不能替代资格', () => {
     expect(wallHasCover({ id:1, is_jav:true, code:'PCH-001', has_cover:true })).toBe(true);
     expect(wallHasCover({ id:2, cover_key:'custom', has_cover:true })).toBe(true);
@@ -30,16 +66,9 @@ describe('二维播放墙', () => {
   it('空集合不产生磁贴', () => {
     expect(visibleWallTiles(0, false, camera, view)).toEqual([]);
   });
-  it('队列选择落到镜头附近的同一作品实例，有限墙保留唯一位置', () => {
-    expect(nearestWallTile(0, false, 0, { x:0,y:0 })).toBeNull();
-    for (const point of [{ x:-2500,y:1800 },{ x:2100,y:-3400 }]) {
-      const tile = nearestWallTile(25, false, 17, point)!;
-      expect(tile.index).toBe(17);
-      const candidates = visibleWallTiles(25, false, { x:-point.x + 1500,y:-point.y + 1500,scale:1 }, { width:3000,height:3000 }).filter(row => row.index === 17);
-      const distance = (row: typeof tile) => (row.x + row.width / 2 - point.x) ** 2 + (row.y + row.height / 2 - point.y) ** 2;
-      expect(candidates.every(row => distance(row) >= distance(tile))).toBe(true);
-      expect(nearestWallTile(25, true, 17, point)).toEqual(nearestWallTile(25, true, 17, { x:0,y:0 }));
-    }
+  it('有限墙队列选择保留唯一位置', () => {
+    expect(finiteWallTile(0, 0)).toBeNull();
+    expect(finiteWallTile(25, 17)).toEqual(wallTileAt(25, true, '1:0:5'));
   });
   it('探索墙在正负两个方向都循环，实例键唯一', () => {
     for (const position of [-100_000, -3000, 16, 3000, 100_000]) {
@@ -68,11 +97,12 @@ describe('二维播放墙', () => {
     expect(clamped.y).toBe(view.height - wallExtent(49).height - 16);
     expect(clampWall({ ...camera, x: -1e8 }, view, wallExtent(49), false).x).toBe(-1e8);
   });
-  it('循环单元经过整数圈平移后仍显示相同内容', () => {
-    const shape = wallShape(60, false);
-    const a = visibleWallTiles(60, false, camera, view);
-    const b = visibleWallTiles(60, false, { ...camera, x: camera.x - shape.width, y: camera.y + shape.height }, view);
-    expect(b.map(tile => tile.index)).toEqual(a.map(tile => tile.index));
+  it('探索磁贴几何不随取数增长改变', () => {
+    for (const key of ['-2:3:0','3:-2:4','8:6:11']) {
+      const { index:_, ...first } = wallTileAt(12, false, key)!;
+      const { index:__, ...next } = wallTileAt(1800, false, key)!;
+      expect(next).toEqual(first);
+    }
   });
   it('检索、实体条件、状态和时长使用有限墙，默认来源与 JAV 语境仍可探索', () => {
     for (const key of ['q','performer','series','creator','studio','owner','tag','state','orient','len','dur_min','dur_max','region']) {
