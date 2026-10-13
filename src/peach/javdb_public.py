@@ -234,24 +234,34 @@ class PublicAPI:
         root = self._store().root
         return f'{root.resolve()}\0{key}' if root is not None else key
 
+    def _memory(self, cache_key, *, image, refresh):
+        """持有缓存锁时读取内存命中或失败冷却，返回内容及实际来源状态。"""
+        hit = self.cache.get(cache_key)
+        snapshot = self.snapshots.get(cache_key)
+        failed = self.failures.get(cache_key)
+        cooling = failed is not None and failed[0] > self.clock()
+        error = str(failed[1]) if cooling else ''
+        if (not refresh and hit and hit[0] > self.clock()
+                and (image or (snapshot is not None and snapshot.fresh(self.wallclock())))):
+            self.cache.move_to_end(cache_key)
+            return hit[1], snapshot, error
+        if cooling:
+            if snapshot is not None:
+                return snapshot.value, snapshot, error
+            raise failed[1]
+        return None
+
     def _cached(self, key, fetch, *, released=None, refresh=False):
         cache_key = self._cache_key(key)
         image = key.startswith('image:')
         store = self._store()
         with self.lock:
-            hit = self.cache.get(cache_key)
+            memory = self._memory(cache_key, image=image, refresh=refresh)
+            if memory is not None:
+                result, snapshot, error = memory
+                _record_read(key, snapshot, error)
+                return result
             snapshot = self.snapshots.get(cache_key)
-            failed = self.failures.get(cache_key)
-            if (not refresh and hit and hit[0] > self.clock()
-                    and (image or (snapshot is not None and snapshot.fresh(self.wallclock())))):
-                self.cache.move_to_end(cache_key)
-                _record_read(key, snapshot, str(failed[1]) if failed and failed[0] > self.clock() else '')
-                return hit[1]
-            if failed and failed[0] > self.clock():
-                if snapshot is not None:
-                    _record_read(key, snapshot, str(failed[1]))
-                    return snapshot.value
-                raise failed[1]
             future = self.pending.get(cache_key)
             owner = future is None
             if owner:
@@ -369,6 +379,7 @@ class PublicAPI:
             hit = self.cache.get(cache_key)
             snapshot = self.snapshots.get(cache_key) or self._store().load(key)
             if snapshot and snapshot.fresh(self.wallclock()):
+                _record_read(key, snapshot)
                 return dict(snapshot.value) if isinstance(snapshot.value, dict) else None
             return dict(hit[1]) if hit and hit[0] > self.clock() and snapshot is None else None
 

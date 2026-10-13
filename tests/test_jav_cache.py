@@ -5,7 +5,8 @@ from pathlib import Path
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+from types import SimpleNamespace
 
 from peach.jav_cache import DAY, PublicSnapshots, cache_fresh, cache_lifetime, stable_after
 from peach.javdb_public import PublicAPI, PublicSourceUnavailable, public_cache_scope, cache_checked_at
@@ -101,6 +102,22 @@ class PublicationCacheTests(unittest.TestCase):
             self.assertEqual(api.media_movie('EXM-001')['cover_url'], 'https://tp.spfcas.com/current.jpg')
             self.assertEqual(api._json.call_count, 1)
 
+    def test_discovery_rebuilds_a_missing_projection_from_the_fixed_source_timestamp(self):
+        from peach.jav_discovery_metadata import DiscoveryMetadata
+        from peach.web_jav_discovery import _cached_movie
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            now = [stamp('2026-10-13')]
+            movie = {'number': 'EXM-001', 'release_date': '2020-01-01', 'tags': [], 'score': 4, 'duration': 120}
+            self.api(root / 'jav-public', now)._cached('movie:EXM-001', lambda: movie)
+            now[0] += 10 * DAY
+            reader = self.api(root / 'jav-public', now)
+            metadata = DiscoveryMetadata(root / 'metadata.json', api=reader, clock=lambda: now[0])
+            contract = SimpleNamespace(cover_root=root / 'covers')
+            with patch('peach.javdb_public.PUBLIC_API', reader), patch('peach.web_jav_discovery.discovery_metadata', return_value=metadata):
+                self.assertEqual(_cached_movie('EXM-001', contract), movie)
+            self.assertEqual(metadata.peek('EXM-001')[1]['metadata_checked_at'], stamp('2026-10-13'))
+
     def test_month_end_and_leap_year_boundaries(self):
         self.assertEqual(stable_after('2024-01-31'), date(2024, 2, 29))
         self.assertEqual(stable_after('2026-01-31'), date(2026, 2, 28))
@@ -140,3 +157,11 @@ class PublicationCacheTests(unittest.TestCase):
             future = PublicSnapshots(Path(directory).resolve(), clock=lambda: 200)
             future.save('movie:EXM-001', {'id': 'Exact'}, None)
             self.assertIsNone(store.load('movie:EXM-001'))
+
+    def test_unavailable_source_with_empty_message_still_obeys_failure_cooldown(self):
+        api = PublicAPI()
+        fetch = Mock(side_effect=PublicSourceUnavailable())
+        for _ in range(2):
+            with self.assertRaises(PublicSourceUnavailable):
+                api._cached('reviews:Exact:1', fetch)
+        self.assertEqual(fetch.call_count, 1)
