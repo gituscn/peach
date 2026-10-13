@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import html
+import hashlib
 import json
 import os
 import re
@@ -837,6 +838,21 @@ def item_thumbs(contract, connection, item_ids) -> dict[int, str | None]:
 
 
 def _thumb_url(item) -> str | None:
+    thumb = _remote_thumb_url(item)
+    return _cached_thumb_url(item, thumb)
+
+
+def _cached_thumb_url(item, thumb, media=None):
+    if not thumb or not thumb.startswith("https://"):
+        return thumb
+    if media is None:
+        media = next((index for index, row in enumerate(_raw_media_items(item))
+                      if (row.get("thumb_url") or row.get("url")) == thumb), None)
+    version = hashlib.sha256(thumb.encode()).hexdigest()[:16]
+    return f"/follow-image?id={item.id}{f'&media={media}' if media is not None else ''}&v={version}"
+
+
+def _remote_thumb_url(item) -> str | None:
     """卡片上用哪个缩略图。
 
     Rule34Video 经 /follow-cover 缓存静态 poster，并在作品组内寻找封面回退。
@@ -1053,8 +1069,10 @@ def _item_payload(item, credential_providers: frozenset[str] = frozenset()) -> d
         # 可直接读取的附件与仍需会话解析的外链可以同时存在。后者不能把
         # 前者整体锁死；详情继续复用同一条 /follow-stream 媒体代理路径。
         "playable": playable,
-        "media_items": media_items,
-        "hidden_media": hidden_media,
+        "media_items": [{**media, "thumb_url": _cached_thumb_url(item, media["thumb_url"], media["index"])}
+                        for media in media_items],
+        "hidden_media": [{**media, "thumb_url": _cached_thumb_url(item, media["thumb_url"], media["index"])}
+                         for media in hidden_media],
         # 只投影连接器已验证过的文件页域名；原始媒体 URL 仍不进入 feed。
         "resource_urls": safe_resource_urls,
         "tags": tags,

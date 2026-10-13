@@ -16,7 +16,7 @@ describe('启动归一化', () => {
     expect(migrated).toBe(false);
     expect(settings).toMatchObject({
       ...DEFAULT_SETTINGS, sidebarOrder: [...DEFAULT_SIDEBAR_ORDER], homeGlow: DEFAULT_HOME_GLOW, accent: DEFAULT_ACCENT,
-      followInitialDays: 30, metadataRefreshDays: 30, detailAutoplay: true, uiSounds: true, feedAutoScroll: true,
+      followInitialDays: 30, detailAutoplay: true, uiSounds: true, feedAutoScroll: true,
       feedHideGroupCompilations: true, feedHideSoloCompilations: false, feedHideExcerpts: true,
       /* JAV 版式与艺人索引默认大图；照片墙一套几十张，先看全貌所以是小图。 */
       homeLayout: 'small', javLayout: 'big', peopleLayout: 'big', photoSize: 'small',
@@ -32,13 +32,14 @@ describe('启动归一化', () => {
     });
     expect(settings).toMatchObject({
       batchSize: 60, defaultSort: 'seed', hoverDelaySeconds: 5, seekSeconds: 10, searchHistoryLimit: 10, relatedLimit: 20,
-      theme: 'system', followInitialDays: 30, metadataRefreshDays: 7, accent: 'teal', homeLayout: 'big', ambientMode: true,
+      theme: 'system', followInitialDays: 30, accent: 'teal', homeLayout: 'big', ambientMode: true,
       theaterMode: false, miniplayer: false, feedHideSoloCompilations: false,
     });
   });
 
   it('界面上已经不存在的键不留在对象上', () => {
-    const { settings } = normalizeAppSettings({ rotateMinutes: 5, loginDays: 30, followImagesOnly: true });
+    const { settings } = normalizeAppSettings({ rotateMinutes: 5, loginDays: 30, metadataRefreshDays: 7, followImagesOnly: true });
+    expect('metadataRefreshDays' in settings).toBe(false);
     expect(['rotateMinutes' in settings, 'loginDays' in settings, settings.followImagesOnly]).toEqual([false, false, true]);
   });
 
@@ -87,11 +88,11 @@ describe('账本那一份落进本地缓存', () => {
   it('合法的值落盘，认不出的不碰；搜索记录条数变了才叫壳推给搜索岛', () => {
     const { store, changed } = stage();
     applySyncedSettings({
-      followInitialDays: 7, metadataRefreshDays: 90, feedHideSoloCompilations: true, feedHideExcerpts: 'no',
+      followInitialDays: 7, feedHideSoloCompilations: true, feedHideExcerpts: 'no',
       searchHistoryLimit: 25, sidebarOrder: ['jav', ''],
     }, changed, store);
     expect(store.value).toMatchObject({
-      followInitialDays: 7, metadataRefreshDays: 90, feedHideSoloCompilations: true, feedHideExcerpts: true,
+      followInitialDays: 7, feedHideSoloCompilations: true, feedHideExcerpts: true,
       searchHistoryLimit: 25, sidebarOrder: ['jav', ''],
     });
     expect(changed.mock.calls).toEqual([['searchHistoryLimit']]);

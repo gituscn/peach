@@ -34,7 +34,8 @@ export interface PanelSettings {
   relatedLimit: number;
   searchHistoryLimit: number;
   followInitialDays: number;
-  metadataRefreshDays: number;
+  avatarRefreshDays: number;
+  faviconRefreshDays: number;
 }
 
 /** 改完一项之后壳要跟着做的事，一项一个名字；落盘已经由面板做过。 */

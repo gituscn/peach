@@ -25,14 +25,13 @@ import httpx
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import (
     FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response,
-    StreamingResponse,
 )
 from starlette.staticfiles import StaticFiles
 
 from . import (
     avatar_face, avatar_online, avatar_picker, avatar_provider, follow_assets, images,
     jav_poster_crop, link_marks, link_status, scraping_access, site_icons, social_links, subtitles,
-    taste_history, timeline_sheets, web_follow, web_settings,
+    taste_history, timeline_sheets, web_follow,
 )
 from .config import GENERATED_DIR
 from .entities import resolve_entity_id
@@ -44,11 +43,12 @@ from .follow_covers import (
 from .follow_store import FollowStore
 from .follow_stream import (
     FollowMediaUnavailable, FollowProxyError, ResolvedFollowMedia, open_upstream,
-    proxy_response_headers,
 )
 from .media import MediaUnavailable, normalized_path
 from .platform import within_root
 from .previews import ENTITY_THUMB_TYPE, PreviewUnavailable, entity_image_key
+from .remote_media_cache import AVATAR_REFRESH_SECONDS, FAVICON_REFRESH_SECONDS, cache_for
+from .preview_cache import PreviewCache
 from .routes_auth import require_auth
 from .segments import SegmentCancelled, SegmentUnavailable, build_hls_playlist
 from .streaming import BufferedFileResponse, CancellableFileResponse, SplicedMp4Response
@@ -62,12 +62,7 @@ router = APIRouter()
 MEDIA_CACHE_SECONDS = 365 * 24 * 3600
 
 #: 头像单独短一档：id 不变但人会换头像，作者换得还挺勤。
-AVATAR_CACHE_SECONDS = 30 * 24 * 3600
-
-
-def _metadata_ttl(state) -> int | None:
-    """头像、来源图标与外链圆标共用的保鲜期，来自设置「头像与站点图标刷新」。"""
-    return web_settings.metadata_refresh_seconds(state.web_contract)
+AVATAR_CACHE_SECONDS = AVATAR_REFRESH_SECONDS
 
 
 def _asset_root(state) -> Path:
@@ -653,7 +648,7 @@ def follow_avatar(request: Request, service: str = "", id: str = "",
                 return None
             return follow_assets.fetch_image(client, resolved)
     path = follow_assets.cached_image(_asset_root(state), "avatars", key,
-                                      _metadata_ttl(state), fetch)
+                                      AVATAR_REFRESH_SECONDS, fetch)
     return _asset_response(request, path)
 
 
@@ -666,7 +661,7 @@ def source_icon(request: Request, provider: str = "", args: dict[str, str] = Dep
         return _asset_response(request, None)
     client = state.http_transport.client
     path = follow_assets.cached_image(
-        _asset_root(state), "icons", provider, _metadata_ttl(state),
+        _asset_root(state), "icons", provider, FAVICON_REFRESH_SECONDS,
         lambda: follow_assets.fetch_image(client, target))
     return _asset_response(request, path)
 
@@ -813,8 +808,7 @@ def work_icon(request: Request, work: str = "",
         replaced = bool(body)
         return body
 
-    path = follow_assets.cached_image(cache_root, "works", root,
-                                      _metadata_ttl(state), fetch)
+    path = follow_assets.cached_image(cache_root, "works", root, None, fetch)
     if replaced:
         # 换了图，旧的脸记录必须一起换：留着它页面会拿上一张的脸心给这一张取景，
         # 而那在界面上和「这张图本来就该这么摆」看不出区别。
@@ -893,11 +887,19 @@ def follow_stream(request: Request, id: int, media: int | None = None,
     if item is None:
         return JSONResponse({"error": "no such follow item"}, status_code=404)
     try:
+        key = f"follow:{item.id}:media:{media}:quality:{quality}"
+        cache = cache_for(state.web_contract)
+        extra = {"content-disposition": _attachment_disposition(item.title, item.media_url or item.url)} if download else None
+        cached = cache.response(key, request, headers=extra)
+        if cached is not None:
+            return cached
         target = state.follow_media_resolver.resolve(item, media, quality)
         # 跟重定向、逐跳过白名单、非 2xx 一律不转发，都在 follow_stream 里；
         # 这里只负责把 Peach 的请求接到那个流上。
-        upstream = open_upstream(state.http_transport.client, request.method, target,
-                                 incoming=request.headers)
+        extra = {"content-disposition": _attachment_disposition(item.title, target.url)} if download else None
+        return cache.stream(key, request,
+            lambda: open_upstream(state.http_transport.client, request.method, target, incoming=request.headers),
+            headers=extra)
     except FollowMediaUnavailable as error:
         return JSONResponse({"error": str(error)}, status_code=404)
     except FollowProxyError as error:
@@ -909,26 +911,72 @@ def follow_stream(request: Request, id: int, media: int | None = None,
         LOGGER.exception("follow media proxy failed for item %s", id)
         return JSONResponse({"error": "follow media unavailable"}, status_code=502)
 
-    forwarded = proxy_response_headers(upstream.headers)
-    # 下载是显式动作，不是播放的副作用：只有带 `download=1` 才让浏览器落盘。
-    # 文件名从条目标题来，不回传上游地址——上游主机名同样是不该外露的东西。
-    if download:
-        forwarded["content-disposition"] = _attachment_disposition(
-            item.title, target.url)
-    if request.method == "HEAD":
-        status = upstream.status_code
-        upstream.close()
-        return Response(status_code=status, headers=forwarded)
+@router.api_route("/follow-image", methods=["GET", "HEAD"])
+def follow_image(request: Request, id: int, media: int | None = None,
+                 args: dict[str, str] = Depends(require_auth)):
+    state = request.app.state
+    with state.database.read_connection() as connection:
+        item = FollowStore(lambda: connection).item(id)
+    if item is None:
+        return Response(status_code=404)
+    cache = cache_for(state.web_contract)
+    try:
+        if media is None:
+            url = web_follow._remote_thumb_url(item)
+        else:
+            rows = web_follow._raw_media_items(item)
+            if media < 0 or media >= len(rows):
+                raise ValueError("媒体序号不存在")
+            url = rows[media].get("thumb_url") or rows[media].get("url")
+        from .http import public_https_url
+        if not public_https_url(url or ""):
+            raise ValueError("图片来源不可用")
+        key = f"image:{url}"
+        hit = cache.response(key, request)
+        if hit is not None:
+            return hit
+        target = ResolvedFollowMedia(url, item.url, public_hosts=True)
+        if media is not None:
+            resolved = state.follow_media_resolver.resolve(item, media)
+            if resolved.headers:
+                target = replace(resolved, url=url)
+        return cache.stream(key, request, lambda: open_upstream(
+            state.http_transport.client, request.method, target, incoming=request.headers))
+    except (ValueError, FollowMediaUnavailable, FollowProxyError, OSError, httpx.HTTPError):
+        return _asset_response(request, None)
 
-    def body():
-        try:
-            yield from upstream.iter_raw()
-        finally:
-            upstream.close()
 
-    return StreamingResponse(
-        body(), status_code=upstream.status_code, headers=forwarded,
-    )
+@router.api_route("/jav-preview/{code}/{ref}", methods=["GET", "HEAD"])
+def jav_preview(request: Request, code: str, ref: str, args: dict[str, str] = Depends(require_auth)):
+    from .web_jav_detail import detail_code
+    cache = cache_for(request.app.state.web_contract)
+    previews = PreviewCache(cache)
+    try:
+        code = detail_code({"code": code})
+        source = previews.source(code, ref)
+        url = source["url"]
+        target = ResolvedFollowMedia(url, public_hosts=True)
+        client = request.app.state.http_transport.client
+        if source["playlist"]:
+            def fetch(url):
+                response = open_upstream(client, "GET", ResolvedFollowMedia(url, public_hosts=True), incoming={})
+                try:
+                    chunks, size = [], 0
+                    for chunk in response.iter_raw():
+                        size += len(chunk)
+                        if size > 1024 * 1024:
+                            raise ValueError("预览清单过大")
+                        chunks.append(chunk)
+                    return b"".join(chunks)
+                finally:
+                    response.close()
+            body = previews.playlist(code, ref, fetch)
+            return Response(b"" if request.method == "HEAD" else body, media_type="application/vnd.apple.mpegurl",
+                            headers={"cache-control": "private, max-age=31536000", "content-length": str(len(body))})
+        return cache.stream(f"preview:{code}:{ref}", request,
+            lambda: open_upstream(client, request.method, target, incoming=request.headers))
+    except (ValueError, OSError, FollowProxyError, httpx.HTTPError):
+        return Response(status_code=404, headers={"cache-control": "no-store"})
 
 
 @router.api_route("/follow-cover", methods=["GET", "HEAD"])
@@ -986,7 +1034,7 @@ def _site_mark_response(state, url: str, root: Path):
     cached = link_marks.cached_path(root, page)
     if cached is None:
         return JSONResponse({"error": "unavailable"}, status_code=404)
-    if not link_marks.is_fresh(cached, ttl=_metadata_ttl(state)):
+    if not link_marks.is_fresh(cached, ttl=FAVICON_REFRESH_SECONDS):
         def fetch(target: str):
             try:
                 upstream = state.http_transport.client.get(

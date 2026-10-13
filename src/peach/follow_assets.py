@@ -9,8 +9,8 @@
 一个任意地址抓取的口子。取回的字节要先能按图片认出来才落盘：站点回的机器人质询页、
 错误页和整页 HTML 都不算图。
 
-保鲜期由设置里的「头像与站点图标刷新」决定（`web_settings.metadata_refresh_seconds`），
-到期后下次显示时重取；重取失败就继续用旧的，并在 `RETRY_SECONDS` 内不再反复去试。
+头像保鲜期为 90 天，favicon 为 365 天；到期后下次显示时重取。
+重取失败继续用已有图片，并在 `RETRY_SECONDS` 内不再反复去试。
 """
 from __future__ import annotations
 
@@ -22,9 +22,11 @@ from pathlib import Path
 from typing import Callable
 
 import httpx
+from filelock import FileLock
 
 from .follow_sources import KemonoConnector
 from .images import measure_image_size
+from .fsutil import atomic_path
 from .user_agent import USER_AGENT
 
 #: 落在 `generated/` 下的目录名。头像与来源图标各占一个子目录，方便按类清理。
@@ -301,21 +303,23 @@ def cached_image(root: Path, kind: str, key: str, ttl: int | None,
     path = cache_path(root, kind, key)
     if is_fresh(path, ttl, now):
         return path
-    marker = path.with_suffix(".failed")
-    if is_fresh(marker, RETRY_SECONDS, now):
-        return path if path.exists() else None
-    body = fetch()
     path.parent.mkdir(parents=True, exist_ok=True)
-    if body:
-        partial = path.with_suffix(".part")
-        partial.write_bytes(body)
-        partial.replace(path)
-        _stamp(path, now)
-        marker.unlink(missing_ok=True)
-        return path
-    marker.write_bytes(b"")
-    _stamp(marker, now)
-    return path if path.exists() else None
+    with FileLock(path.with_suffix(".lock")):
+        if is_fresh(path, ttl, now):
+            return path
+        marker = path.with_suffix(".failed")
+        if is_fresh(marker, RETRY_SECONDS, now):
+            return path if path.exists() else None
+        body = fetch()
+        if body:
+            with atomic_path(path) as partial:
+                partial.write_bytes(body)
+            _stamp(path, now)
+            marker.unlink(missing_ok=True)
+            return path
+        marker.write_bytes(b"")
+        _stamp(marker, now)
+        return path if path.exists() else None
 
 
 def _stamp(path: Path, now: float | None) -> None:

@@ -12,7 +12,7 @@ import { JOB_RUNNING_POLL_MS } from '../../src/react/background-job';
 import { queryClient } from '../../src/react/query';
 import {
   authorAvatar, authorGroups, authorInitial, authorName, checkReceipt, checkSummary, errorHeadline, feedIntervalText, FEEDS_CHECK_URL, FEED_SOURCE_URL,
-  FEEDS_LOOKUP_URL, FEEDS_URL, FOLLOW_CHECK_URL,
+  FEEDS_LOOKUP_URL, FEEDS_URL, FOLLOW_CHECK_URL, FOLLOW_MANAGE_KEY,
   FOLLOW_CREDENTIAL_URL, FOLLOW_CREDENTIALS_URL, FOLLOW_RESOLVE_URL, FOLLOW_SOURCE_URL,
   FOLLOW_SUGGEST_URL, FOLLOW_URL, pageWindow, prefetchFollowManage,
   sortLabel, SUGGEST_DEBOUNCE_MS, tableRows,
@@ -135,6 +135,18 @@ function serve(plan: Plan = {}) {
   vi.stubGlobal('fetch', fetcher);
   return fetcher;
 }
+
+it('只检查已启用的失败来源，并随清单隐藏入口', async () => {
+  const data = follow({ sources: [source({ id: 1 }), source({ id: 2, last_status: 'error' }),
+    source({ id: 3, last_status: 'unauthorized' }), source({ id: 4, enabled: false, last_status: 'error' })] });
+  const { host, fetcher } = await open({ data });
+  await click(buttonNamed('检查失败项', host)!);
+  const request = fetcher.mock.calls.find(([url, init]) => url === FOLLOW_CHECK_URL && init?.method);
+  expect(JSON.parse(String(request?.[1]?.body)).sources).toEqual([2, 3]);
+  await act(async () => { queryClient.setQueryData(FOLLOW_MANAGE_KEY, { ...data, sources: [source({ id: 1 }),
+    source({ id: 4, enabled: false, last_status: 'error' })] }) });
+  expect(buttonNamed('检查失败项', host)).toBeNull();
+});
 
 type Props = Parameters<typeof FollowManagePage>[0];
 

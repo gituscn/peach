@@ -9,6 +9,7 @@ import unittest
 from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
+from types import SimpleNamespace
 from urllib.parse import quote
 
 from peach import __version__
@@ -2034,6 +2035,9 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             denied = await self.client.get("/follow-stream?id=7")
             response = await self.client.get(
                 "/follow-stream?id=7&t=secret", headers={"Range": "bytes=2-5"})
+            with patch.object(self.app.state.follow_media_resolver, "resolve", side_effect=AssertionError("缓存命中不解析来源")):
+                replay = await self.client.get("/follow-stream?id=7&t=secret", headers={"Range": "bytes=2-5"})
+            self.assertEqual(replay.content, b"2345")
         finally:
             self.app.state.http_transport.client = original
             fake.close()
@@ -2075,7 +2079,8 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.app.state.http_transport.client = fake
         try:
             played = await self.client.get("/follow-stream?id=8&t=secret")
-            saved = await self.client.get("/follow-stream?id=8&t=secret&download=1")
+            with patch.object(self.app.state.follow_media_resolver, "resolve", side_effect=AssertionError("完整缓存无需来源")):
+                saved = await self.client.get("/follow-stream?id=8&t=secret&download=1")
         finally:
             self.app.state.http_transport.client = original
             fake.close()
@@ -2084,6 +2089,42 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("attachment;", disposition)
         self.assertIn("2B Camp [4K].webm", disposition)
         self.assertNotIn("img.kemono.cr", disposition)
+
+    async def test_follow_image_and_preview_segments_replay_from_disk(self):
+        from peach.preview_cache import PreviewCache
+        from peach.remote_media_cache import cache_for
+        item = SimpleNamespace(id=27, provider="simpcity", url="https://simpcity.cr/post/27",
+            thumb_url="https://cdn.example/image.png", media_url="https://cdn.example/image.png", metadata={}, hidden_media=())
+        cache = cache_for(self.app.state.web_contract)
+        ref = PreviewCache(cache).register("EXM-001", "https://cdn.example/root.m3u8", identity="root", playlist=True)
+        calls = []
+        def upstream(request):
+            calls.append(request.url.path)
+            body, kind = ((b"#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\npart.ts\n#EXT-X-ENDLIST\n", "application/vnd.apple.mpegurl")
+                          if request.url.path.endswith(".m3u8") else (b"media", "video/mp2t"))
+            return httpx.Response(200, headers={"content-type": kind, "content-length": str(len(body))},
+                                  stream=httpx.ByteStream(body), request=request)
+        original = self.app.state.http_transport.client
+        fake = httpx.Client(transport=httpx.MockTransport(upstream))
+        self.app.state.http_transport.client = fake
+        try:
+            with patch("peach.routes_media.FollowStore.item", return_value=item), \
+                 patch("peach.follow_stream.resolves_publicly", return_value=True):
+                image = await self.client.get("/follow-image?id=27&t=secret")
+                replay = await self.client.get("/follow-image?id=27&t=secret")
+                self.assertEqual(image.content, replay.content)
+                self.assertEqual(calls, ["/image.png"])
+                playlist = await self.client.get(f"/jav-preview/EXM-001/{ref}?t=secret")
+                self.assertEqual(playlist.status_code, 200)
+                self.assertNotIn("cdn.example", playlist.text)
+                segment = next(line for line in playlist.text.splitlines() if line.startswith("/jav-preview/"))
+                for _ in range(2):
+                    self.assertEqual((await self.client.get(segment + "?t=secret")).content, b"media")
+                await self.client.get(f"/jav-preview/EXM-001/{ref}?t=secret")
+                self.assertEqual(calls, ["/image.png", "/root.m3u8", "/part.ts"])
+        finally:
+            self.app.state.http_transport.client = original
+            fake.close()
 
     async def test_follow_cover_serves_cached_frame_and_degrades_to_a_placeholder(self):
         connection = sqlite3.connect(self.db)

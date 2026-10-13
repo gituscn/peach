@@ -73,6 +73,7 @@ class DependencyPolicyTests(unittest.TestCase):
             "grpc": "grpcio",
             "httpx": "httpx",
             "itsdangerous": "itsdangerous",
+            "m3u8": "m3u8",
             "numpy": "numpy",
             "objc": "pyobjc-framework-Cocoa",
             "opencc": "opencc",
