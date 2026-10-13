@@ -139,7 +139,12 @@ export async function visit(browser: Browser, path: string, viewport: Viewport):
     }
   });
   // 只打开到 load：等哪块主体、何时 settle 由用例决定，见 `settle` 的说明。
-  await page.goto(origin + path, { waitUntil: 'load' });
+  try {
+    await page.goto(origin + path, { waitUntil: 'load' });
+  } catch (error) {
+    await context.close();
+    throw error;
+  }
   return { page, problems, close: () => context.close() };
 }
 

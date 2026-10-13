@@ -74,6 +74,13 @@ class ScrapingAccessTests(unittest.TestCase):
             self.assertEqual(factory.call_count, 2)
             self.assertEqual(fake.close.call_count, 2)
 
+    def test_switching_networks_releases_the_previous_exit_cooldown(self):
+        from peach.scraping_access import pause_source, paused_until
+        pause_source(self.root, 'airav', refused=True)
+        self.assertGreater(paused_until(self.root, 'airav'), time.time())
+        save(self.root, 'airav', {'network': 'direct'})
+        self.assertEqual(paused_until(self.root, 'airav'), 0)
+
     def test_redirect_selects_destination_policy_and_strips_secrets(self):
         transport = SourceTransport(self.root)
         with patch.object(transport, "_request", side_effect=[
@@ -127,6 +134,30 @@ class ScrapingAccessTests(unittest.TestCase):
             transport.close()
             self.assertEqual(client.is_closed, owned)
             client.close()
+
+    def test_connection_checks_classify_failures_and_store_only_diagnostics(self):
+        from peach.scraping_access import source_checks
+        contract = SimpleNamespace(follow_secrets_root=self.root)
+        cases = [
+            (httpx.ProxyError("http://user:secret@proxy.invalid"), "proxy"),
+            (httpx.ReadTimeout("secret"), "timeout"),
+            (HttpResponse(429, {}, b"", "https://airav.io/"), "rate_limited"),
+            (HttpResponse(200, {}, b"<title>Just a moment</title>", "https://airav.io/"), "cloudflare_challenge"),
+        ]
+        for outcome, reason in cases:
+            with self.subTest(reason=reason), patch("peach.web_scraping.SourceTransport") as factory:
+                if isinstance(outcome, Exception):
+                    factory.return_value.side_effect = outcome
+                else:
+                    factory.return_value.return_value = outcome
+                result = w_scraping_check(contract, {"source": "airav"})["results"][0]
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["reason"], reason)
+            self.assertGreaterEqual(result["elapsed_s"], 0)
+            stored = source_checks(self.root, "airav")["connection"]
+            self.assertEqual(stored["reason"], reason)
+            self.assertNotIn("secret", json.dumps(stored))
+            self.assertNotIn("url", stored)
 
     def test_rate_limit_cooldown_survives_a_new_transport(self):
         from peach.scraping_access import SourcePaused
@@ -264,7 +295,7 @@ class ScrapingAccessTests(unittest.TestCase):
         """`cf_clearance` 绑着解题那台浏览器的 UA：整站 UA 与用户的 Chrome 一致，Cookie 由用户贴，卡上不另收 UA。"""
         from peach.user_agent import USER_AGENT
         shown = save(self.root, "fc2ppvdb", {"cookie": "cf_clearance=abc"})
-        self.assertEqual(set(shown), {"source", "label", "login", "accepts_cookie", "network", "cookie_saved", "browser"})
+        self.assertEqual(set(shown), {"source", "label", "login", "accepts_cookie", "network", "cookie_saved", "browser", "cooldown_until"})
         self.assertTrue(shown["cookie_saved"])
         self.assertFalse(shown["browser"], "没有浏览器的机器上这张卡照旧收 Cookie")
         for name in ("fc2ppvdb", "javten"):

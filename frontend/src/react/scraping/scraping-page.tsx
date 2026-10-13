@@ -8,7 +8,7 @@
  *   新结果。轮询跟着组件走，遗留壳换页时卸根，它自己就停了。 */
 import { useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { RiArrowRightLine } from '@remixicon/react';
+import { RiArrowRightLine, RiBuildingLine } from '@remixicon/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Radio } from 'react-aria-components';
 import { siteMarkUrl } from '@peach/legacy/core';
@@ -31,6 +31,7 @@ import {
   Disclosure, ErrorText, ExternalLink, Fact, FactList, FieldLabel, Footer, Help, Rows, Section, Stack,
 } from '../settings/section';
 import { busyProps } from '../settings/use-action';
+import { CustomSources } from './custom-sources';
 import {
   AMANE_BRIDGE_CHECK_URL, AMANE_BRIDGE_KEY, AMANE_BRIDGE_REBUILD_URL,
   checkText, COOKIE_TEXT_LIMIT, COVER_JOB_KEY, fetchAmaneBridge, fetchCoverJob,
@@ -62,6 +63,7 @@ const COOKIE_METHODS = [['paste', '粘贴 Cookie'], ['file', '导入文件']] as
    `/favicon.ico` 那一枚 16px，站点自己备好的 apple-touch-icon 和 SVG 问都不问；
    需要代理才通的来源更是常年空着。取不到时把 `<img>` 摘掉，不留破图。 */
 function SiteMark({ source }: { source: string }) {
+  if (source === 'makers') return <RiBuildingLine aria-hidden className="size-4 shrink-0" />;
   // 这几站的公开图标随静态资源提供，验证页和离线回放不影响来源身份。
   const bundled = ['javten', 'fc2ppvdb', 'avwikidb', 'minnano-av', 'github'].includes(source);
   return (
@@ -169,7 +171,7 @@ function SourceCard({ source, toast }: { source: Source } & ScrapingProps) {
     <Section title={source.label} onSubmit={submit} aside={
       <span className="flex min-w-0 items-center gap-1">
         <SiteMark source={source.source} />
-        <ExternalLink href={source.login}>{linkHost(source.login)}</ExternalLink>
+        {source.login ? <ExternalLink href={source.login}>{linkHost(source.login)}</ExternalLink> : null}
       </span>
     }>
       <Rows>
@@ -181,6 +183,9 @@ function SourceCard({ source, toast }: { source: Source } & ScrapingProps) {
           </Select>
         </SettingsRow>
       </Rows>
+      {source.cooldown_until && source.cooldown_until > Date.now() / 1000 ? (
+        <Note tone="warning">来源正在冷却，截止 {new Date(source.cooldown_until * 1000).toLocaleString('zh-CN')}</Note>
+      ) : null}
       {detailed ? <Stack divided>
         {network === 'peach'
           ? <span className="self-start">
@@ -370,6 +375,7 @@ export function ScrapingPage({ toast }: ScrapingProps) {
     <Page>
       <p className="text-body-2-regular text-text-secondary">高清图片可能要经代理才能下载，先检查连接。</p>
       <CoverCard toast={toast} />
+      <CustomSources receipt={toast} />
       {(data.sources || []).map(
         (source) => <SourceCard key={source.source} source={source} toast={toast} />)}
       <AmaneBridgeCard toast={toast} />

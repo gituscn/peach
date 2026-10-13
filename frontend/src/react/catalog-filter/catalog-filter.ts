@@ -60,6 +60,7 @@ export interface CatalogLayout {
 }
 
 export interface CatalogFilterActions {
+  currentHref?(): string;
   /** 头像条上的一格：打开那一位的资料页。 */
   openEntity(kind: 'performer' | 'studio', name: string): void;
   /** 四枚视图里的一枚。 */

@@ -15,6 +15,7 @@ import { FilterGlassRows, FilterPill } from '../components/filter-glass';
 import { SEGMENTED_GLASS_TRACK, SEGMENT_GLASS } from '../components/segmented';
 import { SelectionDock } from '../components/selection-dock';
 import { spriteGlyph } from '../components/sprite-glyph';
+import { FavoriteButton } from '../library-shortcuts/shortcut-controls';
 import { tagColorKey, type IndexTag, type TagView } from './index-data';
 
 export interface TagEntry extends IndexTag {
@@ -35,13 +36,16 @@ const Dot = () => <span aria-hidden data-tag-dot="" className="size-1.75 flex-no
 function AlphaTag({ tag, actions }: { tag: TagEntry; actions: TagActions }) {
   const pressed = actions.picked.has(tag.k);
   return (
+    <div className="flex min-w-0 items-center gap-1">
     <button type="button" data-alpha-tag="" data-k={tag.k} data-tag-cat={tagColorKey(actions.online, tag.cat)}
       aria-pressed={pressed} title={tag.label} onClick={() => actions.press(tag.k)}
-      className="flex h-9 min-w-0 cursor-pointer items-center gap-2.25 rounded-lg px-2.5 text-left text-body-regular text-text-secondary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring">
+      className="flex h-9 min-w-0 flex-1 cursor-pointer items-center gap-2.25 rounded-lg px-2.5 text-left text-body-regular text-text-secondary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring">
       <Dot />
       <span className="min-w-0 flex-1 truncate">{tag.label}</span>
       <span className="flex-none text-caption-1-regular text-text-secondary">{tag.n.toLocaleString()}</span>
     </button>
+    {!actions.online ? <FavoriteButton item={{ kind: 'tag', name: tag.k, entity_id: tag.entity_id, favorite: tag.favorite }} /> : null}
+    </div>
   );
 }
 
@@ -74,13 +78,16 @@ export function TagCloud({ tags, actions }: { tags: TagEntry[]; actions: TagActi
   return (
     <div data-tag-cloud="" className="flex flex-wrap gap-1.75">
       {tags.map((tag) => (
-        <button key={tag.k} type="button" data-tag-chip="" data-k={tag.k}
+        <span key={tag.k} className="inline-flex min-w-0 items-center gap-1">
+        <button type="button" data-tag-chip="" data-k={tag.k}
           data-tag-cat={tagColorKey(actions.online, tag.cat)} aria-pressed={actions.picked.has(tag.k)}
           onClick={() => actions.press(tag.k)}
           className="inline-flex cursor-pointer items-center rounded-lg border px-3 py-1.25 text-body-2-regular text-text-secondary outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring">
           {tag.label + NBSP}
           <span data-tag-n="" className="text-caption-1-regular opacity-60">{tag.n.toLocaleString()}</span>
         </button>
+        {!actions.online ? <FavoriteButton item={{ kind: 'tag', name: tag.k, entity_id: tag.entity_id, favorite: tag.favorite }} /> : null}
+        </span>
       ))}
     </div>
   );

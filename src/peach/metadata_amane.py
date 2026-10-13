@@ -240,15 +240,16 @@ def proxy_argument(proxy_options: Mapping[str, object]) -> tuple[list[str], dict
     """
     env = dict(os.environ)
     if proxy_options.get("proxy"):
-        return ["--proxy", str(proxy_options["proxy"])], env
-    if not proxy_options.get("trust_env", True):
-        for name in list(env):
-            if name.upper().endswith("_PROXY"):
-                env.pop(name)
-        return [], env
-    inherited = next((env[name] for name in ("HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy")
-                      if env.get(name)), "")
-    return (["--proxy", inherited] if inherited else []), env
+        address = str(proxy_options["proxy"])
+    elif proxy_options.get("trust_env", True):
+        address = next((env[name] for name in ("HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy")
+                        if env.get(name)), "")
+    else:
+        address = ""
+    for name in list(env):
+        if name.upper().endswith("_PROXY"):
+            env.pop(name)
+    return (["--proxy", address] if address else []), env
 
 
 @dataclass(frozen=True)
@@ -273,6 +274,7 @@ class AmaneBridge:
 
     def query(self, code: str, sites: Sequence[str], *, language: str = "jp",
               proxy_options: Mapping[str, object] | None = None,
+              direct_sites: Sequence[str] = (),
               timeout: float | None = None) -> dict:
         """问几站，返回桥的整份报告（`sites` 键下每站一条记录）。"""
         number = validate_provider_code(code)
@@ -280,15 +282,20 @@ class AmaneBridge:
         unknown = [site for site in names if site not in SITES]
         if not names or unknown:
             raise ValueError("未开放的 amane 站点：" + "、".join(unknown or ["（空）"]))
+        if set(direct_sites) - set(names):
+            raise ValueError("直连站点必须属于本次查询来源")
         proxy_args, env = proxy_argument(proxy_options or {"trust_env": True})
         env["PYTHONIOENCODING"] = "utf-8"
         command = [str(self.python), "-X", "utf8", str(self.script), "--number", number,
                    "--sites", ",".join(names), "--language", language, "--output", "json",
                    *proxy_args]
+        if direct_sites:
+            command.extend(["--direct-sites", ",".join(direct_sites)])
         try:
             completed = self.runner(
                 command, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                timeout=timeout or self.timeout, check=False, shell=False, env=env)
+                timeout=min(timeout, self.timeout) if timeout else self.timeout,
+                check=False, shell=False, env=env)
         except subprocess.TimeoutExpired as exc:
             raise MetadataProviderError("amane 桥查询超时", kind="unavailable",
                                         retryable=True, temporary=True) from exc
@@ -314,7 +321,7 @@ def failure_error(site: str, record: Mapping[str, object]) -> MetadataProviderEr
 def site_failure(site: str, record: Mapping[str, object]) -> SourceFailure:
     """桥记录里一站的失败 → 契约的 `SourceFailure`。分档、冷却与可否重试都由契约那张表定。"""
     reason = str(record.get("reason") or "unexpected")
-    status = int(record.get("http_status") or 0)
+    status = diagnostic_status(record.get("http_status"))
     label = SITES.get(site, site)
     translated = contract_reason(reason, status)
     kind = REASON_KINDS[translated]
@@ -329,6 +336,15 @@ def site_failure(site: str, record: Mapping[str, object]) -> SourceFailure:
         if text and reason in {"unexpected", "parse_error"}:
             message += f"：{text[:160]}"
     return SourceFailure(translated, message, status_code=status, detail=reason)
+
+
+def diagnostic_status(value: object) -> int:
+    """HTTP 状态只接受有效整数；缺失或损坏的诊断字段记为未取得。"""
+    try:
+        status = int(value) if not isinstance(value, bool) else 0
+        return status if 100 <= status <= 599 else 0
+    except (ValueError, TypeError, OverflowError):
+        return 0
 
 
 def _dates(site: str, metadata: Mapping[str, object]) -> tuple[str, dict[str, str]]:

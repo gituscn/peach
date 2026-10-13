@@ -76,6 +76,7 @@ export interface HeroFollow {
 
 /** `/api/entity` 里资料卡读到的那些字段。 */
 export interface EntityHeroData {
+  favorite?: boolean;
   company_profile?: Partial<Record<'legal_name' | 'founded' | 'launched' | 'country' | 'location' | 'operator' | 'parent' | 'group' | 'distributor', { value: string; source_url: string; evidence?: string }>>;
   identity_labels?: string[];
   external_refs?: { provider: string; external_kind: string; external_id: string }[];

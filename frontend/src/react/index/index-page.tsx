@@ -21,6 +21,7 @@ import { IDENTITY_ROW_CLASS } from '../../identity-filter';
 
 import { BoardTabs, type BoardTab } from '../components/board-tabs';
 import { EmptyState } from '../components/empty-state';
+import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
 import { LoadingDots } from '../components/loading-dots';
 import { SEGMENTED_TRACK, SEGMENT_ICON, SegmentedRadioGroup as RadioGroup } from '../components/segmented';
 import { spriteGlyph } from '../components/sprite-glyph';
@@ -237,6 +238,7 @@ export function IndexPage(props: IndexProps) {
           </span>
         ) : null}
         {isPeople(kind) ? <LayoutSwitch kind={kind} layout={layout} onChange={changeLayout} /> : null}
+        <LibraryShortcuts kind={kind === 'tags' ? 'tag' : kind === 'studios' ? 'studio' : kind === 'agencies' ? 'agency' : kind === 'creators' ? 'creator' : 'performer'} />
         {/* 窄屏一行放不下四样东西：标题与过滤框一行，开关另起一行。 */}
         <span aria-hidden className="hidden h-0 basis-full max-board-narrow:order-2 max-board-narrow:block" />
         <IndexSearch label={`过滤${title}`} value={q} onQuery={(next) => { if (next !== q) go({ q: next }, !!next) }} />

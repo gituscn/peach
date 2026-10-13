@@ -1,5 +1,21 @@
 # 复用清单
 
+## 上游应用功能
+
+amane `0.20.0 / cc42cee6ecf290cf05af1caa347d2dc2d5aeffcd`（GPL-3.0）提供实体收藏、
+元数据比较图按需请求、结构化失败等行为参考；Peach 独立实现交互，复用现有 profile、
+TanStack Query、规范实体、来源结算与复核队列，不引入上游应用数据库或任务引擎。
+实体收藏随合并身份继承，命名馆藏筛选只保存现有目录查询条件。
+
+来源连接复用 `SourceTransport`、失败原因表和冷却文件，诊断分开记录连接与解析的最近证据。
+amane 的所有正式来源可选逐站直连或公共代理，桥保持一次子进程和 60 秒总时限。
+比较图片在点击后请求，30 秒内未取得即可重试；不新增任意 URL 图片代理。
+
+[自定义来源](CUSTOM_SOURCES.md)参考 OpenAver `502278a3e09c7520838ffb00b2ff080323a4cdcb`
+（MIT）的声明式配置、番号身份核对和公网目标守卫，使用已固定的 curl_cffi、filelock、
+SiteRecord 与候选结算；[外部播放](EXTERNAL_PLAYERS.md)复用既有媒体根检查、HTTP Range、
+标准 M3U 与客户端协议，无新增依赖。Python 主程序和独立桥均使用 3.14，独立锁仍隔离依赖树。
+
 ## 脚本目录与参数
 
 脚本路径读取 `settings_file` 的目录配置。`sync_sha1_115.py` 的 Cookie 默认位于 `secrets/115-cookies.txt`，复核 CSV 默认位于 `review/115-sha1重复.csv`；可通过 `--cookie-file`、`--dupes-out` 或对应的 `PEACH_115_COOKIE_FILE`、`PEACH_115_DUPES_OUT` 指定现有文件。目录排序偏好使用可重复的 `--deprioritize-dir`。TLS 两种 shell 共用 `resolve_tls_directory.py`，显式 `-OutDir`／`PEACH_TLS_DIR` 优先；`rehome_unknown_jav.py` 的目标账本根由 `--ledger-unknown-root` 明确指定。
@@ -60,7 +76,7 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 ## 资源索引器
 
-`resource_search.py` 使用 Torznab 0.2.1（MIT，Python ≥3.10，支持项目 Python 3.12–3.14）的 `parse_capabilities` 与 `parse_torznab`。源码固定标签 v0.2.1，项目仍标为 Alpha；离线 XML POC 已覆盖 caps、GUID 磁力、体积、做种、连接数和重复标签。PyPI 包新增一项直接依赖，requests 为已有传递依赖；实际索引器验收需要用户配置端点。
+`resource_search.py` 使用 Torznab 0.2.1（MIT，Python ≥3.10，支持项目 Python 3.14）的 `parse_capabilities` 与 `parse_torznab`。源码固定标签 v0.2.1，项目仍标为 Alpha；离线 XML POC 已覆盖 caps、GUID 磁力、体积、做种、连接数和重复标签。PyPI 包新增一项直接依赖，requests 为已有传递依赖；实际索引器验收需要用户配置端点。
 
 请求复用 HTTPX 0.28.1。SDK 自带 requests 请求层没有响应大小上限，异常可能带完整 URL，故只使用其解析器。Peach 负责每源 caps 和 search 两次请求、至多六份种子、响应上限 2 MiB、每轮最多四源、45 秒预算、禁用重定向、脱敏错误、XML 实体声明拒收，以及体积、做种、黑名单、质量排序和最多五个候选。标题番号复用 `feeds.scan_code`，身份与中字、无码版次复用 `catalog_rules`。凭据复用 `CredentialStore`，不登记跨机同步字段；换端点不会沿用已保存的 API key。
 
@@ -74,7 +90,7 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 
 ## 挂载可达性
 
-`mount_reachability.py` 参考 OpenAver 的 `core/source_reachability.py`（MIT，Copyright 2026 peace；固定 revision `8cc17e50453d9f69a81f5fee1a072df80f7aab73`，2026-10-01）采用正常 600 秒、异常 60 秒的节律、两次失败确认和超时在途去重。Peach 独立实现此算法，未复制上游源码；使用 Python 标准库线程、事件与 Future，兼容项目的 Python 3.12–3.14，不新增依赖。Peach 的路径映射与首条目录读取归 `platform`，来源接口、健康摘要和托盘共用纯内存快照；最多四个目录探测在途，后台线程不阻塞服务退出。
+`mount_reachability.py` 参考 OpenAver 的 `core/source_reachability.py`（MIT，Copyright 2026 peace；固定 revision `8cc17e50453d9f69a81f5fee1a072df80f7aab73`，2026-10-01）采用正常 600 秒、异常 60 秒的节律、两次失败确认和超时在途去重。Peach 独立实现此算法，未复制上游源码；使用 Python 3.14 标准库线程、事件与 Future，不新增依赖。Peach 的路径映射与首条目录读取归 `platform`，来源接口、健康摘要和托盘共用纯内存快照；最多四个目录探测在途，后台线程不阻塞服务退出。
 
 未采用参考实现的 UNC TCP 445 探测：端口连通不能证明共享目录可读。普通文件也不能作为媒体根，`NotADirectoryError` 单列；权限拒绝、目录不存在与其他读取失败分别报告。APScheduler 已用于定时任务，但其线程执行器不能取消阻塞的文件系统调用；本功能用停止事件驱动调度，保留尚未返回的目录探测。任务中心写入 ledger，不用于此只读探测。
 

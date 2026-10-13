@@ -8,6 +8,43 @@ describe('来源链接与凭据布局', () => {
   before(async () => { browser = await launch(); });
   after(async () => { await browser?.close(); });
   for (const viewport of VIEWPORTS) {
+    it(`自定义来源可试查、保存且表单无横向溢出（${viewport.name}）`, { timeout: 60_000 }, async () => {
+      const opened = await visit(browser, '/scraping', viewport);
+      const page = opened.page;
+      const items: unknown[] = [];
+      await page.route('**/api/custom-metadata', async route => {
+        const body = route.request().method() === 'POST' ? route.request().postDataJSON() : null;
+        if (body?.action === 'preview') {
+          assert.equal(body.code, 'DEMO-001');
+          await route.fulfill({ json: { record: { code: 'DEMO-001', title: '接口试查结果' } } });
+          return;
+        }
+        if (body) items.push({ ...body, id: 'custom-demo' });
+        await route.fulfill({ json: { items } });
+      });
+      try {
+        await page.reload();
+        await page.getByRole('button', { name: '添加来源', exact: true }).click();
+        const form = page.getByRole('form', { name: '元数据来源配置', exact: true });
+        await form.getByRole('textbox', { name: '来源名称', exact: true }).fill('公开演示元数据');
+        await form.getByRole('textbox', { name: 'JSON 接口地址', exact: true }).fill('https://example.com/api/{code}');
+        const code = form.getByRole('textbox', { name: '试查番号（回车查询）', exact: true });
+        await code.fill('DEMO-001');
+        await code.press('Enter');
+        await form.locator('pre').filter({ hasText: '接口试查结果' }).waitFor();
+        const dimensions = await layout(page);
+        assert.ok(dimensions.scrollWidth <= dimensions.viewportWidth + 1, JSON.stringify(dimensions));
+        assert.deepEqual(dimensions.offenders, []);
+        await page.getByRole('region', { name: '自定义元数据来源', exact: true }).screenshot({
+          path: `../build/agent-verification/browser/custom-source-${viewport.name}.png`,
+        });
+        await form.getByRole('button', { name: '保存来源', exact: true }).click();
+        await form.waitFor({ state: 'detached' });
+        await page.getByText('公开演示元数据 · 已停用', { exact: true }).waitFor();
+        assert.equal(items.length, 1);
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close(); }
+    });
     it(`GitHub 标识、网址和外链箭头居中对齐（${viewport.name}）`, async () => {
       const opened = await visit(browser, '/scraping', viewport);
       try {

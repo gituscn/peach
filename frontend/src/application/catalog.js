@@ -203,6 +203,14 @@ export function paintCatalogFilter(patch){
 
 export function catalogFilterActions(){
   return {
+    currentHref:()=>{
+      const href=new URL(homePath(),location.origin);
+      href.searchParams.set('loc',state.loc||'');
+      href.searchParams.set('thumb',state.thumb||'0');
+      href.searchParams.set('sort',state.sort||'');
+      href.searchParams.set('dir',state.dir||'');
+      return href.pathname+href.search;
+    },
     openEntity:(kind,name)=>openEntity(kind,name),
     /* 按下去当场就推新的按下态，滑动玻璃跟着走，不等这一趟取数。 */
     setView:view=>{

@@ -2,9 +2,10 @@
  *
  * 看这几帧、然后读这一句，是同一件事的两半，所以它们合成卡片中段那一个框。候选表单和
  * 身份证据不进框：它们每一项自己就是一个框，再套一层就是框中框。 */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RiExternalLinkLine, RiPlayLine } from '@remixicon/react';
 import { VisuallyHidden } from 'react-aria-components';
+import { spinnerHtml } from '@peach/legacy/ui';
 
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { CheckboxGlyph } from '@/components/base/checkbox/checkbox-glyph';
@@ -20,13 +21,31 @@ const imageUrl = (value = '') =>
 /** 来源给的那张图。取不到时说清楚是「未取得」，不留一格空白让人以为界面坏了。 */
 export function SourceImage({ url }: { url?: string }) {
   const source = imageUrl(url || '');
-  const [failed, setFailed] = useState(false);
+  return <RequestedSourceImage key={source} source={source} />;
+}
+
+function RequestedSourceImage({ source }: { source: string }) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
+  useEffect(() => {
+    if (status !== 'loading') return;
+    const timer = setTimeout(() => setStatus('failed'), 30_000);
+    return () => clearTimeout(timer);
+  }, [status]);
   return (
-    <div className="flex h-review-image items-center justify-center overflow-hidden rounded-surface bg-background-secondary-default">
-      {source && !failed
-        ? <img src={source} alt="来源候选图片" loading="lazy" className="size-full object-contain"
-            onError={() => setFailed(true)} />
-        : <span className="text-body-2-regular text-text-secondary">未取得来源图片</span>}
+    <div className="relative flex h-review-image items-center justify-center overflow-hidden rounded-surface bg-background-secondary-default">
+      {status === 'loading' ? <span role="status" className="absolute flex items-center gap-2 text-body-2-regular text-text-secondary">
+        <span dangerouslySetInnerHTML={{ __html: spinnerHtml('正在加载图片') }} />正在加载图片
+      </span> : null}
+      {source && (status === 'loading' || status === 'ready')
+        ? <img src={source} alt="来源候选图片" referrerPolicy="no-referrer" decoding="async"
+            className={`size-full object-contain ${status === 'loading' ? 'invisible' : ''}`} onLoad={() => setStatus('ready')}
+            onError={() => setStatus('failed')} />
+        : source ? <div className="flex flex-col items-center gap-2">
+            {status === 'failed' ? <span className="text-body-2-regular text-text-secondary">未取得来源图片</span> : null}
+            <Button variant="secondary" size="small" onClick={() => setStatus('loading')}>
+              {status === 'failed' ? '重新加载图片' : '查看来源图片'}
+            </Button>
+          </div> : <span className="text-body-2-regular text-text-secondary">未取得来源图片</span>}
     </div>
   );
 }

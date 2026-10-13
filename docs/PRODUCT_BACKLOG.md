@@ -110,7 +110,7 @@
    - 真实库上还没执行过任何一批（2026-09-22 只读预览：115 会改 1484、跳过 8627，PikPak 会改 167、跳过 10436，`local` 因外置盘未挂载整批跳过）。
    - 按演员归档的模板变量：目录模板可按演员名归档（NeoAVDC v0.0.4 的演员目录命名与按演员归档开关）。
 10. 来源与默认值通用化（ADR-0023 第 5 阶段候选）：`peach init` 的问答已按本机路径只声明 `local`，非交互路径写出的 `DEFAULT_LOCATION_ROOTS`（`R:\media`、`B:/`、`A:/`）仍是维护者的示例盘符。剩两件事：来源用「本地 / 远端挂载」类型字段代替代码里按 `local`/`115`/`pikpak` 名字点名（`web_resource_sync.py` 的 SQL、`media.py` 的 HLS 规则）；复制功能支持 win↔win、mac↔mac 与任意一台当写者，目前只验证过 Windows 写者 + macOS 读者。
-11. 非 editable 安装的跨平台验收：wheel 资源与 Windows 基础依赖、仓库外 CLI 冒烟已就绪，仍需取得 macOS、Python 3.12 消费任务结果。
+11. 非 editable 安装的跨平台验收：wheel 资源与 Windows Python 3.14 源码树外独立安装已验证；Windows/macOS 的正式 3.14 消费任务结果以 CI 为准。
 12. 健康检查生产验收：`db` 区分 missing、empty、available、unavailable，`?ready=1` 检查 schema 校验和；待部署后用项目 CA 验证 HTTPS 与损坏／未初始化状态。
 13. 界面国际化：界面目前只有中文，先补英文。
 14. 制品与更新渠道：剩余 macOS 独立包、代码签名、局域网配对和更完整的配置管理。已有的部分是 Windows 独立测试包（免安装 zip 与当前用户安装包两种）、首次引导与本机配置表单、按构建身份自行重建的打包托盘、由 `release_tag.py` 在发布点独家发出的版本号与标签（每个版本号对应一份制品并在 `CHANGELOG.md` 有一节），以及退出程序后完整解压新版、数据目录保持独立的测试包更新。自动检查与自动下载已有持久设置，默认关闭；下载只准备安装，重启由用户确认。关闭判据见 ADR-0012「1.0 门槛」第 8 项。
@@ -118,8 +118,8 @@
 17. 口味导入引导：`/taste` 上传（Takeout ZIP、browserexport 兼容文件）与 `scripts/taste_history.py` 直读本机浏览器库两条路都能用，首次设置和口味页也有简短指南，但没有面向陌生人的完整文档。需要一页「各浏览器怎么导出、多台设备怎么各自刷新」教程，把脚本折进 `peach` CLI（见「把常跑批处理折进 `peach` CLI」一条），并写明定时刷新的安装方式。
 19. 局域网配对：仍需一次性配对码或 HTTPS 地址二维码，减少设备首次访问时手输口令；现有口令生成、取用与非回环无口令拒绝启动不重复实现。Windows 的 HTTP 跳转与 HTTPS 单一业务入口已有生产核验记录，见 [运行态](STATUS.md)；Mac 的入口验收并入操作 24、26。配对码参照 Javdex `docs/LAN_WEB.md`（MIT）：新设备领一个六位码，桌面端核对后批准，可记住设备、逐台撤销。
 20. 全新安装的自动门槛：CI 的 `wheel-build` 已用 `uv build --wheel` 生成制品，`wheel-smoke` 不检出源码、用 `--no-cache-dir` 安装 wheel，并离开仓库目录运行 `scripts/smoke_wheel.py`。剩余验收分三路：
-    - minimal source：全新 venv 只装默认依赖、`peach init` 连跑两次验幂等、`migrate status`、离开仓库根目录再 `peach serve`，请求 `/healthz`、`/`、`/api/items`；覆盖 3.12／3.14 × Windows／macOS 及缺 FFmpeg／OpenSSL／Node 的环境。
-    - wheel：取得第 11 条的 macOS、Python 3.12 消费结果，并核对完整系统矩阵与失败场景；消费方保持不检出源码。
+    - minimal source：全新 venv 只装默认依赖、`peach init` 连跑两次验幂等、`migrate status`、离开仓库根目录再 `peach serve`，请求 `/healthz`、`/`、`/api/items`；覆盖 Python 3.14 的 Windows/macOS 及缺 FFmpeg／OpenSSL／Node 的环境。
+    - wheel：核对第 11 条的 Windows/macOS Python 3.14 消费结果与失败场景；消费方保持不检出源码。
     - artifact-only：只下载刚构建的桌面制品、不检出源码地启动，依赖第 14 条。失败场景覆盖数据根不可写、端口被占、账本损坏、未配置媒体目录、无 FFmpeg、非回环监听但无口令、两个 writer 同时启动。
 21. `peach doctor` 与分级 `/healthz`：`doctor`（另带 `--json`）逐项报版本、数据根可写性、配置文件合法性、数据库能否打开、schema 版本与待执行迁移、FFmpeg／ffprobe／OpenSSL 路径、挂载点可达性、端口占用、是否处在「局域网暴露但无口令」状态、后台任务最近一次失败；输出脱敏，不带口令、cookie、站点凭据和完整媒体路径。`/healthz` 相应从布尔改成分项状态（`database`／`schema`／`configured`／`ffmpeg`／`media_mounts`／`security`），与「健康检查生产验收」一起做。
     - Windows 已完成正式全量、集成、源码托盘重启及项目 CA 严格 HTTPS 核验；本机 CLI 与 API 报告一致。Mac 验收待取得连接。

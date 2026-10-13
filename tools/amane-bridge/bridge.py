@@ -182,11 +182,12 @@ async def query_site(runtime: Runtime, site: str, client: Any, number: str,
 
 
 async def run(runtime: Runtime, number: str, sites: list[str], *, language: str | None,
-              proxy: str | None, timeout: float, rate: float) -> dict:
+              proxy: str | None, timeout: float, rate: float, direct_sites: tuple[str, ...] = ()) -> dict:
     """并发问每一站；限速器按主机计，不同站互不排队。"""
     client = runtime.make_client(proxy, timeout, rate)
+    direct = runtime.make_client(None, timeout, rate) if direct_sites and proxy else client
     records = await asyncio.gather(
-        *(query_site(runtime, site, client, number, language) for site in sites))
+        *(query_site(runtime, site, direct if site in direct_sites else client, number, language) for site in sites))
     return {
         "number": number,
         "language": language or "",
@@ -212,6 +213,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="amane 的 Language；空串表示不指定")
     parser.add_argument("--proxy", default=None,
                         help="代理地址；不给就不走代理（libcurl 仍会读环境变量）")
+    parser.add_argument("--direct-sites", default="", help="本次查询中强制直连的站名，逗号分隔")
     parser.add_argument("--timeout", type=float, default=30.0, help="单次请求超时（秒）")
     parser.add_argument("--rate", type=float, default=0.5, help="每主机每秒请求数上限")
     parser.add_argument("--output", default="json", choices=("json",))
@@ -228,6 +230,8 @@ def main(argv: list[str] | None = None, runtime: Runtime | None = None,
     number = str(args.number or "").strip()
     sites = [part.strip() for part in str(args.sites).split(",") if part.strip()]
     unknown = [site for site in sites if site not in SITES]
+    direct_sites = tuple(part.strip() for part in args.direct_sites.split(",") if part.strip())
+    unknown.extend(site for site in direct_sites if site not in sites)
     if not number or not sites or unknown:
         message = ("未知站名：" + "、".join(unknown)) if unknown else "番号与站名都不能为空"
         print(json.dumps({"error": message}, ensure_ascii=False), file=out, flush=True)
@@ -239,7 +243,8 @@ def main(argv: list[str] | None = None, runtime: Runtime | None = None,
                          ensure_ascii=False), file=out, flush=True)
         return EXIT_FAILED
     report = asyncio.run(run(active, number, sites, language=args.language or None,
-                             proxy=args.proxy or None, timeout=args.timeout, rate=args.rate))
+                             proxy=args.proxy or None, timeout=args.timeout, rate=args.rate,
+                             direct_sites=direct_sites))
     print(json.dumps(report, ensure_ascii=False, default=str), file=out, flush=True)
     return exit_code(report)
 

@@ -17,6 +17,7 @@ import { Button } from '@/components/base/buttons/button';
 
 import { AvatarPicker } from '../avatar-picker/avatar-picker-page';
 import { Note } from '../components/note';
+import { FavoriteButton, LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
 import { busyProps } from '../settings/busy-props';
 import { FeedNewRow } from '../feed-new/feed-new-row';
 import { Glyph } from './glyph';
@@ -70,6 +71,10 @@ export function EntityHeroPage({ kind, name, entity, feedNew, feedHost, actions,
                 onChoose={actions.chooseName} onAddAlias={actions.addAlias} />
             </div>
             <AliasLine kind={kind} entity={entity} actions={actions} />
+            {entity.id ? <div className="flex flex-wrap gap-2">
+              <FavoriteButton item={{ entity_id: Number(entity.id), kind, name: entity.canonical_name || name, favorite: entity.favorite }} />
+              <LibraryShortcuts kind={kind} />
+            </div> : null}
             {entity.related_identities?.length ? (
               <div className="flex min-w-0 flex-wrap gap-2 text-caption-1-regular text-text-secondary">
                 {/* 账号名常是一长串无空格的英文，窄屏下得能在任意处折行。 */}

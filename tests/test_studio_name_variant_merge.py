@@ -296,6 +296,7 @@ class ApplyTests(unittest.TestCase):
         self.connection.executescript(
             "CREATE TABLE entity(id INTEGER PRIMARY KEY, kind TEXT, canonical_name TEXT,"
             " normalized_name TEXT, updated_at TEXT);"
+            "CREATE TABLE profile(id INTEGER PRIMARY KEY, settings_json TEXT DEFAULT '{}', updated_at TEXT);"
             "CREATE TABLE entity_alias(entity_id INTEGER, alias TEXT,"
             " normalized_alias TEXT, source TEXT, confidence REAL,"
             " UNIQUE(entity_id, normalized_alias));"

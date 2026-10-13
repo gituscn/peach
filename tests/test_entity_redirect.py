@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import json
 import shutil
 import sqlite3
 import tempfile
@@ -104,6 +105,50 @@ class EntityRedirectTests(unittest.TestCase):
         self.con.commit()
         self.assertEqual(resolve_entity_id(self.con, 12), 12)
         self.assertEqual(self.redirects(), [])
+
+    def test_favorites_follow_merges_when_sqlite_reuses_the_highest_id(self):
+        from peach.web_contract import WebContract, dispatch_api_get, dispatch_api_post
+        contract = WebContract(self.db)
+        for entity_id in (12, 10):
+            dispatch_api_post(contract, "/api/library-shortcuts", {
+                "action": "favorite", "entity_id": entity_id, "on": True})
+        saved = dispatch_api_post(contract, "/api/library-shortcuts", {
+            "action": "save_filter", "name": "常用", "href": "/?loc="})['filters']
+        self.con.execute("UPDATE profile SET settings_json=json_set(settings_json,'$.searchHistoryLimit',25)"
+                         " WHERE id='local-default'")
+        self.con.execute("INSERT INTO profile(id,user_id,name,is_default,settings_json,created_at,updated_at)"
+                         " SELECT 'second',user_id,'另一个',0,settings_json,created_at,updated_at"
+                         " FROM profile WHERE id='local-default'")
+        self.con.execute("INSERT INTO profile(id,user_id,name,is_default,settings_json,created_at,updated_at)"
+                         " SELECT 'broken',user_id,'损坏',0,'{',created_at,updated_at"
+                         " FROM profile WHERE id='local-default'")
+        self.con.commit()
+        merge(self.con, 12, 10, "桥本有菜")
+        inserted = self.con.execute("INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at)"
+                                    " VALUES('performer','別の人','別の人','t','t')").lastrowid
+        self.con.commit()
+        self.assertEqual(inserted, 12)
+        self.assertEqual(self.redirects(), [])
+        result = dispatch_api_get(contract, "/api/library-shortcuts", {})
+        self.assertEqual([row['entity_id'] for row in result['favorites']], [10])
+        self.assertEqual(result['filters'], saved)
+        other = json.loads(self.con.execute("SELECT settings_json FROM profile WHERE id='second'").fetchone()[0])
+        self.assertEqual([row['entity_id'] for row in other['libraryShortcuts']['favorites']], [10])
+        self.assertEqual(other['libraryShortcuts']['filters'], saved)
+        self.assertEqual(other['searchHistoryLimit'], 25)
+        self.assertEqual(self.con.execute("SELECT settings_json FROM profile WHERE id='broken'").fetchone()[0], '{')
+        self.assertEqual(dispatch_api_post(contract, "/api/library-shortcuts", {
+            "action": "favorite", "entity_id": 10, "on": False})['favorites'], [])
+
+    def test_favorite_transfer_rolls_back_with_entity_merge(self):
+        original = json.dumps({'sidebarOrder': ['tags'], 'libraryShortcuts': {
+            'favorites': [{'entity_id': 12}], 'filters': []}})
+        self.con.execute("UPDATE profile SET settings_json=? WHERE id='local-default'", (original,))
+        self.con.commit()
+        merge_entity(self.con, target_id=10, source_id=12, source_name="桥本有菜", alias_source="test:merge")
+        self.con.rollback()
+        self.assertEqual(self.con.execute("SELECT settings_json FROM profile WHERE id='local-default'").fetchone()[0], original)
+        self.assertIsNotNone(self.con.execute("SELECT id FROM entity WHERE id=12").fetchone())
 
     def test_merging_into_a_missing_or_the_same_entity_is_refused(self):
         with self.assertRaises(ValueError):

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 from .catalog_rules import normalise_code_key, release_code_from_text
-from .scraping_access import cooldown_state
+from .scraping_access import SOURCES, cooldown_state, source_checks
 
 LIMIT = 500
 MAX_LOG_BYTES = 8 * 1024 * 1024
@@ -114,6 +114,29 @@ def library(settings, config):
     return {"groups": groups, "issue_at": issue_at}
 
 
+SOURCE_CHECK_REASONS = {
+    "proxy": "代理连接失败", "timeout": "来源连接超时", "network": "来源连接未取得",
+    "auth_required": "来源要求登录或拒绝当前出口", "cloudflare_challenge": "来源要求人机验证",
+    "cloudflare_blocked": "来源拦截当前出口", "ip_banned": "来源拦截当前出口",
+    "geo_restricted": "来源限制当前地区", "rate_limited": "来源正在限流",
+    "server_error": "来源服务异常", "parse_error": "资料解析失败",
+    "not_found": "上次查询未命中", "cooldown": "来源正在冷却",
+}
+
+
+def _source_health(cooling, failed, fresh, recent, connection_ok, reason_key):
+    """来源诊断优先报告冷却与失败，再报告解析和连接证据。"""
+    if cooling:
+        return "warning", "来源正在冷却"
+    if failed:
+        return "warning", SOURCE_CHECK_REASONS.get(reason_key, "来源未取得资料")
+    if fresh:
+        return "ok", "资料解析通过"
+    if recent and connection_ok:
+        return "unknown", "连接检查通过；解析状态未取得"
+    return "unknown", "当前解析状态未取得"
+
+
 def sources(settings, config, *, now=None):
     now = time.time() if now is None else now
     success = {"minnano-av": None, "javdb": None}
@@ -137,12 +160,28 @@ def sources(settings, config, *, now=None):
     except (sqlite3.Error, OSError, ValueError):
         pass
     result = []
-    for key in success:
+    for key in dict.fromkeys([*success, *SOURCES]):
+        if key == "instagram":
+            continue
         until, _ = cooldown_state(config.directory("secrets"), key)
         cooling = now < until < now + 366 * 86400
-        fresh = bool(success[key]) and 0 <= now - datetime.fromisoformat(success[key]).timestamp() <= 86400
-        result.append({"source": key, "label": key, "status": "warning" if cooling else "ok" if fresh else "unknown",
-                       "reason": "来源正在冷却" if cooling else "资料解析通过" if fresh else "当前解析状态未取得",
-                       "last_success_at": success[key],
+        checks = source_checks(config.directory("secrets"), key)
+        parsed = checks.get("metadata", {})
+        connection = checks.get("connection", {})
+        candidate = timestamp(parsed.get("last_success_at"))
+        if candidate and (not success.get(key) or candidate > success[key]):
+            success[key] = candidate
+        stamp = success.get(key)
+        fresh = bool(stamp) and 0 <= now - datetime.fromisoformat(stamp).timestamp() <= 86400
+        last = max((check for check in (parsed, connection) if timestamp(check.get("checked_at"))),
+                   key=lambda check: check["checked_at"], default={})
+        recent = 0 <= now - float(last.get("checked_at", 0)) <= 86400
+        reason_key = last.get("reason", "") if recent else ""
+        failed = recent and not last.get("ok") and reason_key != "not_found"
+        status, reason = _source_health(cooling, failed, fresh, recent, connection.get("ok"), reason_key)
+        result.append({"source": key, "label": SOURCES[key]["label"],
+                       "status": status,
+                       "reason": reason, "last_check_at": timestamp(last.get("checked_at")),
+                       "elapsed_s": last.get("elapsed_s"), "last_success_at": stamp,
                        "cooldown_until": datetime.fromtimestamp(until, timezone.utc).isoformat() if cooling else None})
     return result

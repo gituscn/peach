@@ -304,7 +304,7 @@ class LibraryMetadataProvider:
         from . import metadata_amane, peach_proxy
         from .config import TOOLS_DIR
         from .jav_cover_fetch import Unavailable
-        from .scraping_access import SourcePaused, pause_source
+        from .scraping_access import SourcePaused, pause_source, values_for, record_source_check
         timeout = None
         if deadline is not None:
             timeout = deadline - time.monotonic()
@@ -313,11 +313,27 @@ class LibraryMetadataProvider:
         try:
             bridge = metadata_amane.AmaneBridge.create(
                 self.tools_root if self.tools_root is not None else TOOLS_DIR)
+            direct_sites = [site for site in sites if values_for(self.secrets_root, site).get('network') == 'direct']
             report = bridge.query(code, sites, timeout=timeout,
-                                  proxy_options=peach_proxy.client_options(self.secrets_root))
+                                  proxy_options={'trust_env': False} if len(direct_sites) == len(sites)
+                                  else peach_proxy.client_options(self.secrets_root), direct_sites=direct_sites)
         except Exception as error:  # noqa: BLE001 - 桥没装、venv 坏了、超时：整档未取得，原因给人看
             return Unavailable(f'amane 桥：{str(error).strip() or describe_failure(error)}')
-        found, failures = metadata_amane.split_report(code, report)
+        raw_sites = report.get('sites')
+        raw_sites = raw_sites if isinstance(raw_sites, dict) else {}
+        reports = {site: raw_sites[site] if isinstance(raw_sites.get(site), dict) else {
+            'status': 'failed', 'reason': 'parse_error', 'detail': '桥未返回有效的来源记录',
+        } for site in sites}
+        found, failures = metadata_amane.split_report(code, {**report, 'sites': reports})
+        for site, result in reports.items():
+            error = failures.get(site)
+            record_source_check(self.secrets_root, site, 'metadata', {
+                'checked_at': time.time(), 'ok': result.get('status') == 'found' and error is None,
+                'kind': error.kind if error else 'ok',
+                'reason': error.detail if error else 'parsed',
+                'status': metadata_amane.diagnostic_status(result.get('http_status')),
+                'elapsed_s': result.get('elapsed_s', 0),
+            })
         problems, held = [], 0
         for site, error in failures.items():
             action = metadata_amane.cooldown_action(error)
@@ -880,7 +896,7 @@ def _merge_candidates(groups, row, code, source, document, evidence_path, genre_
         candidate = dict(candidate_key=identity, source=source, provider=PROVIDER_NAMES.get(source, source),
                          value=value['value'], display_value=value.get('display_value', str(value['value'])),
                          warnings=value.get('warnings', []),
-                         confidence=0.9 if local else 0.75 if official else 0.6,
+                         confidence=0.9 if local else 0.75 if official else 0.5 if source.startswith('custom-') else 0.6,
                          source_url=document.get('source_url', ''), raw_snapshot=str(evidence_path),
                          provider_id=str(document.get('id') or ''), content_id=str(document.get('content_id') or ''),
                          source_kind='local' if local else spec.kind if spec else 'community', official=official,
@@ -1162,7 +1178,7 @@ class _RemoteSession:
         entries, covers = [], 0
         if not _scrapes_as_jav(row, code):
             return entries, covers
-        chain = metadata_routes.route_for_code(code, *_studio_evidence(row), overrides=self._routes)
+        chain = self._chain(code, *_studio_evidence(row))
         # 链上剩下的站都给过候选或说过没有、且至少有一家给过候选：这一行不是「没取到」，
         # 只是没有新的可问，不进告知项。
         if missing and chain and (self._askable(chain, code, answered)
@@ -1232,8 +1248,19 @@ class _RemoteSession:
         if not missing or _uncandidated(groups, target_key, missing):
             return missing
         code = _provider_code(row['code'])
-        chain = metadata_routes.route_for_code(code, *_studio_evidence(row), overrides=self._routes)
+        chain = self._chain(code, *_studio_evidence(row))
         return missing if self._askable(chain, code, _answered_sources(groups, target_key, missing)) else []
+
+    def _custom_sources(self, code, *evidence):
+        from .custom_metadata import load
+        kind = metadata_routes.classify(code, *evidence)
+        return [entry for entry in load(self._config.directory('secrets'))
+                if entry['enabled'] and kind in entry['content_types']]
+
+    def _chain(self, code, *evidence):
+        from .custom_metadata import source_key
+        chain = metadata_routes.route_for_code(code, *evidence, overrides=self._routes)
+        return (*chain, *(source_key(entry) for entry in self._custom_sources(code, *evidence)))
 
     def _ask(self, source, code, members, cached, *, required, deadline, evidence):
         """问链上的一档：按档名分派到 provider 对应的入口，返回这一档答上的 `[(来源, 资料)]`。
@@ -1241,6 +1268,11 @@ class _RemoteSession:
         `members` 是这一档里这一行还该问的站（`_askable`），`cached` 是这一档缓存里已有的快照：
         FC2 那一档把它们当作已答上的几处交下去，只补问缺演员时的镜像站。
         """
+        if source.startswith('custom-'):
+            from .custom_metadata import query, source_key
+            config = next((entry for entry in self._custom_sources(code, *evidence) if source_key(entry) == source), None)
+            return [(source, query(config, code, deadline=deadline,
+                                   secrets_root=self._config.directory('secrets')).payload())] if config else []
         provider = self.provider()
         if source in ('r18dev', 'dmm'):
             return [(source, provider.query(code, source, deadline=deadline))]
@@ -1283,12 +1315,12 @@ class _RemoteSession:
         deadline = time.monotonic() + budget
         mark = _excused(self._provider)
         evidence = _studio_evidence(row)
-        chain = metadata_routes.route_for_code(code, *evidence, overrides=self._routes)
+        chain = self._chain(code, *evidence)
         required = list(metadata_routes.required_scalars(missing))
         wants_tags = 'tags' in missing
         problems, held, entries = [], [], []
         attempted = set(answered)
-        stages = _sources_for(code, *evidence, route_overrides=self._routes)
+        stages = metadata_routes.stages_for_chain(chain)
         for source, then in zip(stages, (*stages[1:], '')):
             members = self._askable(metadata_routes.stage_members(source, chain), code, answered)
             if not members:

@@ -100,3 +100,36 @@ class LibraryDiagnosticsTests(unittest.TestCase):
     def test_cover_inventory_permission_errors_are_unknown(self):
         with patch.object(diagnostics.os, 'scandir', side_effect=PermissionError):
             self.assertIsNone(diagnostics.inventory(self.root))
+
+    def test_connection_and_parsing_evidence_remain_distinct_for_all_bridge_sources(self):
+        from peach.scraping_access import record_source_check
+        root = self.config.directory('secrets')
+        record_source_check(root, 'airav', 'connection', {
+            'ok': True, 'kind': 'ok', 'reason': 'ok', 'checked_at': 1_700_000_000, 'elapsed_s': 1.2})
+        record_source_check(root, 'fc2club', 'metadata', {
+            'ok': True, 'kind': 'ok', 'reason': 'parsed', 'checked_at': 1_700_000_000, 'elapsed_s': 2.1})
+        rows = {row['source']: row for row in diagnostics.sources(self.settings, self.config, now=1_700_000_100)}
+        self.assertEqual(rows['airav']['status'], 'unknown')
+        self.assertIn('解析状态未取得', rows['airav']['reason'])
+        self.assertEqual(rows['fc2club']['status'], 'ok')
+        self.assertIsNotNone(rows['fc2club']['last_success_at'])
+        self.assertEqual(rows['airav']['elapsed_s'], 1.2)
+        record_source_check(root, 'fc2club', 'metadata', {
+            'ok': False, 'kind': 'auth', 'reason': 'geo_restricted', 'checked_at': 1_700_000_100})
+        rows = {row['source']: row for row in diagnostics.sources(self.settings, self.config, now=1_700_000_101)}
+        self.assertEqual(rows['fc2club']['status'], 'warning')
+        self.assertIn('地区', rows['fc2club']['reason'])
+        self.assertIsNotNone(rows['fc2club']['last_success_at'])
+
+    def test_source_times_are_normalized_and_corrupt_fields_are_ignored(self):
+        root = self.config.directory('secrets')
+        root.mkdir(parents=True, exist_ok=True)
+        (root / 'source-check-airav.json').write_text(json.dumps({
+            'metadata': {'ok': True, 'reason': 'parsed', 'checked_at': '2023-11-14T22:13:20Z',
+                         'last_success_at': '2023-11-14T22:13:20Z', 'elapsed_s': '1.2'},
+            'connection': {'ok': False, 'reason': {}, 'checked_at': 1_700_000_050, 'elapsed_s': 'broken'},
+        }), encoding='utf-8')
+        rows = {row['source']: row for row in diagnostics.sources(self.settings, self.config, now=1_700_000_100)}
+        self.assertEqual(rows['airav']['status'], 'warning')
+        self.assertIsNotNone(rows['airav']['last_success_at'])
+        self.assertIsNone(rows['airav']['elapsed_s'])

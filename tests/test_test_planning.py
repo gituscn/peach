@@ -15,6 +15,70 @@ from scripts import ci_plan, test_runner as runner
 from support.ledger import fresh_ledger
 
 
+class CIFrontendOwnershipTests(unittest.TestCase):
+    CI = {'GITHUB_ACTIONS': 'true', 'GITHUB_WORKFLOW': 'Test', 'GITHUB_JOB': 'python'}
+
+    @staticmethod
+    def ids(suite):
+        for test in suite:
+            if isinstance(test, unittest.TestSuite):
+                yield from CIFrontendOwnershipTests.ids(test)
+            else:
+                yield test.id()
+
+    def frontend_ids(self, environment, **shard):
+        with patch.dict(os.environ, environment, clear=True), \
+             patch.object(runner, 'selected_files', return_value=(runner.TESTS / 'test_frontend_build.py',)):
+            return list(self.ids(runner.build_suite('web', **shard)))
+
+    def test_only_known_ci_jobs_delegate_exactly_three_frontend_tools(self):
+        local = set(self.frontend_ids({}))
+        delegated = {f'test_frontend_build.VitestTests.{name}' for name in (
+            'test_the_frontend_sources_typecheck', 'test_frontend_sources_and_tests_pass_lint',
+            'test_the_island_suite_passes')}
+        self.assertLessEqual(delegated, local)
+        for job in ('python', 'web-e2e'):
+            with self.subTest(job=job):
+                selected = set(self.frontend_ids({**self.CI, 'GITHUB_JOB': job}))
+                self.assertEqual(local - selected, delegated)
+                self.assertEqual(selected - local, set())
+                self.assertIn('test_frontend_build.VitestTests.test_the_island_suite_has_a_bounded_worker_pool', selected)
+        for environment in ({}, {'GITHUB_ACTIONS': 'true'},
+                            {**self.CI, 'GITHUB_ACTIONS': 'false'},
+                            {**self.CI, 'GITHUB_WORKFLOW': 'Release'},
+                            {**self.CI, 'GITHUB_JOB': 'another-job'}):
+            with self.subTest(environment=environment):
+                self.assertEqual(set(self.frontend_ids(environment)), local)
+
+    def test_delegated_shards_cover_all_remaining_tests_once(self):
+        serial = self.frontend_ids(self.CI)
+        shards = [self.frontend_ids(self.CI, shard_index=index, shard_count=2) for index in range(2)]
+        self.assertFalse(set(shards[0]) & set(shards[1]))
+        self.assertCountEqual(serial, shards[0] + shards[1])
+        self.assertEqual(len(serial), len(set(serial)))
+
+    def test_delegated_ci_returns_results_without_local_evidence(self):
+        for scope in ('web', 'full'):
+            for success, count, expected in ((True, 3, 0), (False, 3, 1), (True, 0, 1)):
+                with self.subTest(scope=scope, success=success, count=count), \
+                     patch.dict(os.environ, self.CI, clear=True), \
+                     patch.object(runner, 'environment_preflight'), \
+                     patch.object(runner, 'run_local_suite', return_value=(success, count, [])), \
+                     patch.object(runner, 'verified_run', side_effect=AssertionError('CI 不签本机记录')), \
+                     patch.object(runner.test_evidence, 'held', side_effect=AssertionError('CI 不取本机证据锁')), \
+                     patch.object(runner.test_evidence, 'write', side_effect=AssertionError('CI 不写本机记录')), \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(runner.main(['--scope', scope]), expected)
+
+    def test_local_runs_use_the_verification_path(self):
+        with patch.dict(os.environ, {}, clear=True), \
+             patch.object(runner, 'environment_preflight'), \
+             patch.object(runner, 'verified_run', return_value=0) as verify, \
+             contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(runner.main(['--scope', 'web']), 0)
+        verify.assert_called_once()
+
+
 class TestPlanningTests(unittest.TestCase):
     def test_every_supplementary_test_id_names_a_real_test(self):
         """域的补充用例按名字装载：被引用的用例改名后，装进来的是一个必然报错的占位用例，

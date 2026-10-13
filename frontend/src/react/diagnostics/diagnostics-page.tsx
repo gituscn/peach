@@ -94,6 +94,8 @@ export function DiagnosticsPage(props: DiagnosticsProps) {
         <ErrorExcerpt text={source.reason} className="text-body-regular text-text-primary" />
         <FactList>
           <Fact term="上次解析成功">{source.last_success_at ? moment(source.last_success_at) : '未取得'}</Fact>
+          {source.last_check_at ? <Fact term="上次检查">{moment(source.last_check_at)}
+            {source.elapsed_s !== undefined && source.elapsed_s !== null ? ` · ${source.elapsed_s.toFixed(2)} 秒` : ''}</Fact> : null}
           <Fact term="冷却截止">{source.cooldown_until ? moment(source.cooldown_until) : '未在冷却'}</Fact>
         </FactList>
       </div>)}

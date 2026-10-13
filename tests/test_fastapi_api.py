@@ -2223,6 +2223,70 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.get(f"/follow-cover?id={item.id}&t=secret")).status_code, 200)
         self.assertEqual(len(requests), 2)
 
+    async def test_custom_metadata_api_keeps_preview_read_only_and_requires_auth(self):
+        root = self.root.resolve() / 'custom-secrets'
+        body = {'name': '测试来源', 'endpoint': 'https://metadata.example.com/{code}',
+                'fields': {'code': 'id', 'title': 'title'}, 'content_types': ['censored'], 'enabled': False}
+        with patch.object(self.app.state.web_contract, 'follow_secrets_root', root):
+            self.assertEqual((await self.client.get('/api/custom-metadata')).status_code, 401)
+            with patch('peach.custom_metadata.fetch_json', return_value={'id': 'ABW-001', 'title': '标题'}):
+                preview = await self.client.post('/api/custom-metadata', json=dict(body, action='preview', code='ABW-001'),
+                                                 headers={'X-Token': 'secret'})
+            self.assertEqual(preview.status_code, 200, preview.text)
+            self.assertEqual(preview.json()['record']['title'], '标题')
+            self.assertFalse((root / 'custom-metadata.json').exists())
+            saved = await self.client.post('/api/custom-metadata', json=body, headers={'X-Token': 'secret'})
+            self.assertEqual(saved.status_code, 200, saved.text)
+            read = await self.client.get('/api/custom-metadata', headers={'X-Token': 'secret'})
+            self.assertEqual(read.json(), saved.json())
+            removed = await self.client.post('/api/custom-metadata', json={'action': 'delete', 'id': saved.json()['items'][0]['id']},
+                                             headers={'X-Token': 'secret'})
+            self.assertEqual(removed.json(), {'items': []})
+
+    async def test_external_player_links_authorize_only_one_asset_and_support_ranges(self):
+        denied = await self.client.post('/api/external-playback?id=1', json={})
+        self.assertEqual(denied.status_code, 401)
+        issued = await self.client.post('/api/external-playback?id=1', json={}, headers={'X-Token': 'secret'})
+        self.assertEqual(issued.status_code, 200, issued.text)
+        links = issued.json()
+        self.assertNotIn('secret', json.dumps(links))
+        self.assertNotIn(str(self.media_root), json.dumps(links))
+        media = await self.client.get(links['url'], headers={'Range': 'bytes=2-5'})
+        self.assertEqual(media.status_code, 206)
+        self.assertEqual(media.content, b'2345')
+        playlist = await self.client.get(links['playlist'])
+        self.assertEqual(playlist.status_code, 200)
+        self.assertIn('#EXTM3U', playlist.text)
+        self.assertIn(links['url'], playlist.text)
+        self.assertNotIn(str(self.media_root), playlist.text)
+        self.assertEqual((await self.client.get(links['url'].replace('/1?', '/2?'))).status_code, 401)
+        cross_site = await self.client.post('/api/external-playback?id=1', json={},
+            headers={'X-Token': 'secret', 'Origin': 'https://attacker.example'})
+        self.assertEqual(cross_site.status_code, 403)
+
+    async def test_external_playlist_binds_public_origin_behind_tunnel(self):
+        from types import SimpleNamespace
+        from urllib.parse import urlsplit, parse_qs, urlencode
+        self.app.state.tunnel = SimpleNamespace(snapshot=lambda: SimpleNamespace(url='https://public.example'))
+        for headers in ({'X-Token': 'secret', 'Origin': 'https://public.example'}, {'X-Token': 'secret'}):
+            issued = await self.client.post('/api/external-playback?id=1', json={}, headers=headers)
+            self.assertEqual(issued.status_code, 200, issued.text)
+            links = issued.json()
+            playlist = await self.client.get(links['playlist'], headers={'Host': 'different.example'})
+            self.assertEqual(playlist.status_code, 200)
+            self.assertEqual(playlist.text.splitlines()[-1], 'https://public.example' + links['url'])
+            parsed = urlsplit(links['playlist'])
+            query = parse_qs(parsed.query)
+            query['origin'] = ['https://attacker.example\n#EXTINF:0,injected']
+            changed = parsed.path + '?' + urlencode(query, doseq=True)
+            self.assertEqual((await self.client.get(changed)).status_code, 401)
+            changed_stream = changed.replace('/external-playlist/1.m3u', '/external-stream/1')
+            self.assertEqual((await self.client.get(changed_stream)).status_code, 401)
+        for origin in ('https://attacker.example', 'https://user:password@public.example'):
+            denied = await self.client.post('/api/external-playback?id=1', json={},
+                headers={'X-Token': 'secret', 'Origin': origin})
+            self.assertIn(denied.status_code, (400, 403))
+
     async def test_stream_session_cancel_is_authenticated_and_tombstoned(self):
         denied = await self.client.post("/api/stream-cancel?session=detail-1")
         self.assertEqual(denied.status_code, 401)
@@ -2860,6 +2924,10 @@ PUBLIC_ROUTES = {
     # 是独立共享密钥（ADR-0041）。这一条因此不挂 require_*，但自己有三道门：通道没开、
     # 来源不在回环与私网、密钥对不上，任意一条不成立都回 404，见 `test_push_discovery`。
     ("POST", "/api/inbox/clouddrive"),
+    # 外部播放器没有浏览器会话；两条路由各自验证进程密钥签发的限时 HMAC，
+    # 绑定单个资产与公开 Origin，验证后仍逐次检查媒体根目录。
+    ("GET,HEAD", "/external-stream/{id}"),
+    ("GET", "/external-playlist/{id}.m3u"),
 }
 
 

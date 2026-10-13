@@ -105,6 +105,11 @@ describe('混排作品的画面框',()=>{
      card:Math.round(node.querySelector('[data-media-card]')!.getBoundingClientRect().right),
      page:document.documentElement.scrollWidth,
      view:document.documentElement.clientWidth,
+     overflow:[...document.querySelectorAll('body *')].filter(element=>{
+      const rect=element.getBoundingClientRect();
+      if(rect.right<=document.documentElement.clientWidth||rect.width===0)return false;
+      return true;
+     }).slice(0,30).map(element=>({tag:element.tagName,attrs:[...element.attributes].map(a=>`${a.name}=${a.value}`).join(' '),right:Math.round(element.getBoundingClientRect().right)})),
     }));
     assert.ok(box.right<=box.view&&box.card<=box.view&&box.page<=box.view,JSON.stringify(box));
    }finally{await context.close()}

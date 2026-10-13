@@ -6,12 +6,14 @@ import hashlib
 from http.cookies import SimpleCookie, CookieError
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import tempfile
 import threading
 import time
 from email.utils import parsedate_to_datetime
+from datetime import datetime, timezone
 from urllib.parse import urlsplit, urljoin
 
 import httpx
@@ -20,6 +22,7 @@ from .follow_secrets import CredentialStore
 from . import browser_transport, peach_proxy
 from .http import HttpRequest, HttpxTransport
 from .scripting import USER_AGENT, host_under, hostname_of
+from .fsutil import atomic_write_text
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +32,13 @@ SOURCES = {
     "dmm": {"label": "DMM / FANZA", "domains": ("dmm.co.jp", "dmm.com"), "login": "https://www.dmm.co.jp/"},
     "prestige": {"label": "Prestige", "domains": ("prestige-av.com",), "login": "https://www.prestige-av.com/"},
     "mgstage": {"label": "MGStage", "domains": ("mgstage.com",), "login": "https://www.mgstage.com/"},
+    "faleno": {"label": "FALENO", "domains": ("faleno.jp",), "login": "https://faleno.jp/"},
+    "dahlia": {"label": "DAHLIA", "domains": ("dahlia-av.jp",), "login": "https://dahlia-av.jp/"},
+    "makers": {"label": "片商官网", "domains": (), "login": ""},
+    "fc2club": {"label": "FC2Club", "domains": ("fc2club.top",), "login": "https://fc2club.top/"},
+    "freejavbt": {"label": "FreeJavBT", "domains": ("freejavbt.com",), "login": "https://freejavbt.com/"},
+    "airav": {"label": "AIRAV", "domains": ("airav.io",), "login": "https://airav.io/"},
+    "avsox": {"label": "AVSOX", "domains": ("avsox.click",), "login": "https://avsox.click/"},
     # FC2 的商品页、卖家页和图片存储（`storage*`、`contents-thumbnail*`）都在 fc2.com
     # 底下，一条域名就够。免登录可读，不收 Cookie。
     "fc2": {"label": "FC2", "domains": ("fc2.com",), "login": "https://adult.contents.fc2.com/"},
@@ -261,6 +271,7 @@ def cookie_jar(values: dict[str, str], source: str) -> http.cookiejar.CookieJar:
 def save(root: Path, source: str, body: dict) -> dict:
     with _LOCK:
         values = values_for(root, source)
+        previous_network = "direct" if values.get("network") == "direct" else "peach"
         mode = body.get("network", "direct" if values.get("network") == "direct" else "peach")
         if mode not in {"direct", "peach"}:
             raise ValueError("请选择来源连接方式")
@@ -287,6 +298,8 @@ def save(root: Path, source: str, body: dict) -> dict:
             # 新 Cookie 多半是为了解开 403 才换的；冷却记的是旧 Cookie 撞出来的账，别让它压着新的等到期。
             cooldown_path(root, source).unlink(missing_ok=True)
         _write_values(root, source, values)
+        if mode != previous_network:
+            cooldown_path(root, source).unlink(missing_ok=True)
     return describe(root, source)
 
 
@@ -298,12 +311,73 @@ def fix_to_browser(root: Path, source: str) -> None:
 
 def describe(root: Path, source: str) -> dict:
     values = values_for(root, source)
+    until = paused_until(root, source)
     return {"source": source, "label": SOURCES[source]["label"],
             "login": SOURCES[source]["login"], "accepts_cookie": bool(SOURCES[source].get("cookie")),
             "network": "direct" if values.get("network") == "direct" else "peach",
             "cookie_saved": bool(values.get("cookie") or values.get("cookies_text")),
+            "cooldown_until": until or None,
             # 这台机器上这个来源是不是由本机浏览器过验证：该走浏览器（`wants_browser`）且找得到浏览器。
             "browser": wants_browser(root, source) and browser_transport.find_browser() is not None}
+
+
+def source_checks(root: Path, source: str) -> dict:
+    """逐站最近一次连接与解析结果；不包含请求地址、正文或凭据。"""
+    if source not in SOURCES:
+        return {}
+    try:
+        path = Path(root) / f"source-check-{source}.json"
+        if path.stat().st_size > 16384:
+            return {}
+        value = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(value, dict):
+            return {}
+        result = {}
+        for stage in ("connection", "metadata"):
+            record = value.get(stage)
+            if not isinstance(record, dict):
+                continue
+            clean = {"ok": record.get("ok") is True,
+                     "kind": record.get("kind") if record.get("kind") in ("ok", "auth", "unavailable", "not_found") else "unavailable",
+                     "reason": record.get("reason") if isinstance(record.get("reason"), str) and len(record["reason"]) <= 64 else "unexpected",
+                     "status": record.get("status") if type(record.get("status")) is int and 100 <= record["status"] <= 599 else 0}
+            for key in ("checked_at", "last_success_at", "elapsed_s"):
+                raw = record.get(key)
+                if isinstance(raw, bool) or raw is None:
+                    continue
+                try:
+                    if isinstance(raw, str) and key != "elapsed_s":
+                        moment = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                        number = moment.replace(tzinfo=timezone.utc).timestamp() if moment.tzinfo is None else moment.timestamp()
+                    else:
+                        number = float(raw)
+                    if math.isfinite(number) and number >= 0:
+                        clean[key] = number
+                except (ValueError, TypeError, OverflowError, OSError):
+                    pass
+            if "checked_at" in clean:
+                result[stage] = clean
+        return result
+    except (OSError, ValueError):
+        return {}
+
+
+def record_source_check(root: Path, source: str, stage: str, record: dict) -> None:
+    """保存脱敏状态，保留连接检查与元数据解析的独立时间戳。"""
+    if source not in SOURCES or stage not in {"connection", "metadata"}:
+        return
+    allowed = {"ok", "kind", "reason", "status", "elapsed_s", "checked_at"}
+    with _LOCK:
+        state = source_checks(root, source)
+        clean = {key: value for key, value in record.items() if key in allowed}
+        if stage == "metadata":
+            clean["last_success_at"] = record.get("checked_at") if record.get("ok") else state.get(stage, {}).get("last_success_at")
+        state[stage] = clean
+        try:
+            atomic_write_text(Path(root) / f"source-check-{source}.json",
+                              json.dumps(state, ensure_ascii=False), mode=0o600)
+        except OSError:
+            LOGGER.warning("来源 %s 的诊断记录未保存", source)
 
 
 def browser_profile(root: Path) -> Path:

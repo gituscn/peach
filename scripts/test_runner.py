@@ -59,7 +59,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
                 "test_web_review.py", "test_web_settings.py"),
     # 任务中心的两个文件跟着 `test_jobs.py` 走：`jobs.py` 与 `task_runs.py` 是同一条
     # 接线的两端，改哪一端都要两边一起验。
-    "media": ("test_runtime_consistency.py", "test_endcard.py", "test_fastapi_api.py", "test_jobs.py",
+    "media": ("test_external_playback.py", "test_runtime_consistency.py", "test_endcard.py", "test_fastapi_api.py", "test_jobs.py",
               "test_task_runs.py", "test_followups.py", "test_task_center_integration.py",
               "test_frame_capture.py", "test_timeline_sheets.py",
               "test_web_timeline_thumbnails.py",
@@ -71,7 +71,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
     "sync": ("test_sync*.py", "test_platform.py", "test_mount.py", "test_tray*.py", "test_log_retention.py",
              "test_mdns.py", "test_netwatch.py", "test_certs.py",
              "test_review_mirror.py", "test_runtime_prepare.py"),
-    "metadata": ("test_scraping_access.py", "test_browser_transport.py", "test_metadata*.py", "test_genre_taxonomy.py",
+    "metadata": ("test_custom_metadata.py", "test_scraping_access.py", "test_browser_transport.py", "test_metadata*.py", "test_genre_taxonomy.py",
                  "test_fc2*.py",
                  "test_community_catalog.py",
                  "test_babepedia_match.py",
@@ -135,7 +135,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
             "test_agency_entity.py", "test_label_maker.py", "test_dependency_policy.py",
             "test_desktop_settings.py", "test_dev_copy.py",
             "test_fastapi_api.py", "test_follow_assets.py", "test_follow_web.py",
-            "test_metadata_library.py", "test_studio_icon_variants.py", "test_web_settings.py", "test_company_profiles.py"),
+            "test_metadata_library.py", "test_studio_icon_variants.py", "test_web_settings.py", "test_web_library_shortcuts.py", "test_company_profiles.py"),
     "core": ("test_access.py", "test_auth.py", "test_config.py", "test_field_owners.py",
              "test_entity_classification.py",
              "test_migrations.py", "test_ledger_revision.py",
@@ -227,6 +227,7 @@ AUTO_SCOPE_FILES: dict[str, tuple[str, ...]] = {
     "src/peach/personal_records.py": ("catalog", "tooling"),
     "src/peach/record_rehome.py": ("catalog", "tooling"),
     "src/peach/web_orphan_records.py": ("catalog", "web"),
+    "src/peach/web_library_shortcuts.py": ("catalog", "web"),
     # 入口页共用件的测试住在首启与配置来源那两份 tooling 测试里。
     "src/peach/web_entry.py": ("catalog", "tooling", "web"),
     # 这几份文档有测试在读它们的正文：改文档也要跑到那条测试。
@@ -478,6 +479,31 @@ def resolve_auto_scope() -> tuple[tuple[str, ...], str]:
     return scopes_for_changes(paths, contents=changed_contents(ROOT, "master", paths))
 
 
+CI_FRONTEND_TESTS = frozenset({
+    "test_frontend_build.VitestTests.test_the_frontend_sources_typecheck",
+    "test_frontend_build.VitestTests.test_frontend_sources_and_tests_pass_lint",
+    "test_frontend_build.VitestTests.test_the_island_suite_passes",
+})
+
+
+def ci_frontend_delegated() -> bool:
+    """Test 工作流的 Python 与浏览器任务由 web-bundle 承担前端工具检查。"""
+    return (os.environ.get("GITHUB_ACTIONS") == "true"
+            and os.environ.get("GITHUB_WORKFLOW") == "Test"
+            and os.environ.get("GITHUB_JOB") in {"python", "web-e2e"})
+
+
+def without_ci_frontend_tests(suite: unittest.TestSuite) -> unittest.TestSuite:
+    """按完整用例 ID 分配 CI 职责，保留同模块的产物与样式契约。"""
+    selected = unittest.TestSuite()
+    for test in suite:
+        if isinstance(test, unittest.TestSuite):
+            selected.addTests(without_ci_frontend_tests(test))
+        elif test.id() not in CI_FRONTEND_TESTS:
+            selected.addTest(test)
+    return selected
+
+
 def build_suite(*scopes: str, shard_index: int = 0, shard_count: int = 1) -> unittest.TestSuite:
     loader = unittest.defaultTestLoader
     suite = unittest.TestSuite()
@@ -495,7 +521,7 @@ def build_suite(*scopes: str, shard_index: int = 0, shard_count: int = 1) -> uni
                     suite.addTests(loader.loadTestsFromName(test_id))
     finally:
         del sys.path[:2]
-    return suite
+    return without_ci_frontend_tests(suite) if ci_frontend_delegated() else suite
 
 
 class TimedResult(unittest.TextTestResult):
@@ -716,6 +742,10 @@ def main(argv: list[str] | None = None) -> int:
             args.timings.write_text(json.dumps({"success": success, "count": result.testsRun,
                                                 "timings": result.timings}), encoding="utf-8")
         return 0 if success else 1
+    if ci_frontend_delegated():
+        print("CI 前端工具检查由 web-bundle 验证；本次不签发本机测试记录。", flush=True)
+        success, count, _ = run_local_suite(scopes, args.jobs)
+        return 0 if success and count > 0 else 1
     try:
         guard = test_evidence.held(test_evidence.evidence_dir(ROOT) / "full-suite.lock",
                                   wait_seconds=args.lock_timeout,

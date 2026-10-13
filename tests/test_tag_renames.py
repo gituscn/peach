@@ -18,6 +18,7 @@ _spec.loader.exec_module(_script)
 
 SCHEMA = """
 CREATE TABLE asset(id INTEGER PRIMARY KEY, location TEXT, path TEXT, name TEXT);
+CREATE TABLE profile(id INTEGER PRIMARY KEY, settings_json TEXT DEFAULT '{}', updated_at TEXT);
 CREATE TABLE asset_tag(
   asset_id INTEGER, tag TEXT, confidence REAL DEFAULT 1.0, source TEXT,
   UNIQUE(asset_id,tag));

@@ -180,6 +180,58 @@ def _hls_plan(state, asset_id: int, session: str = "", conversion: bool | None =
     return None if not plan else (asset, source, plan, False)
 
 
+@router.post("/api/external-playback")
+def external_playback(request: Request, id: int, args: dict[str, str] = Depends(require_auth)):
+    from .external_playback import TTL_SECONDS, issue
+    from .routes_auth import _named_origin, _origin_key, _tunnel_origin
+    from fastapi import HTTPException
+    state = request.app.state
+    asset = state.media_engine.asset(id)
+    state.media_engine.filesystem.file_for(asset, thumbnail=False)
+    supplied = request.headers.get('origin')
+    raw = supplied or str(request.base_url)
+    parsed = urlsplit(raw)
+    if any(ord(char) <= 32 or ord(char) == 127 for char in raw) or parsed.username or parsed.password:
+        raise HTTPException(400, '播放地址无效')
+    key = _origin_key(raw) if supplied else (_tunnel_origin(request) or _named_origin(request) or _origin_key(raw))
+    if key is None:
+        raise HTTPException(400, '播放地址无效')
+    scheme, host, port = key
+    host = f'[{host}]' if ':' in host else host
+    origin = f'{scheme}://{host}' + (f':{port}' if port is not None else '')
+    ticket = issue(state.external_playback_key, id, origin=origin)
+    query = f"ticket={ticket}&origin={quote(origin, safe='')}"
+    path = f"/external-stream/{id}?{query}"
+    playlist = f"/external-playlist/{id}.m3u?{query}"
+    return JSONResponse({"url": path, "playlist": playlist, "expires_in": TTL_SECONDS},
+                        headers={"Cache-Control": "no-store"})
+
+
+def _external_asset(request: Request, asset_id: int, ticket: str, origin: str):
+    from .external_playback import valid
+    from fastapi import HTTPException
+    state = request.app.state
+    if not origin or not valid(state.external_playback_key, asset_id, ticket, origin=origin):
+        raise HTTPException(401, "播放链接已失效，请在作品详情重新打开")
+    asset = state.media_engine.asset(asset_id)
+    return state.media_engine.filesystem.file_for(asset, thumbnail=False)
+
+
+@router.api_route("/external-stream/{id}", methods=["GET", "HEAD"])
+def external_stream(request: Request, id: int, ticket: str, origin: str = ''):
+    path = _external_asset(request, id, ticket, origin)
+    return BufferedFileResponse(path, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
+@router.get("/external-playlist/{id}.m3u")
+def external_playlist(request: Request, id: int, ticket: str, origin: str = ''):
+    _external_asset(request, id, ticket, origin)
+    url = origin + f"/external-stream/{id}?ticket={ticket}&origin={quote(origin, safe='')}"
+    return PlainTextResponse(f"#EXTM3U\n#EXTINF:-1,Peach {id}\n{url}\n", media_type="audio/x-mpegurl",
+                             headers={"Content-Disposition": f'attachment; filename="peach-{id}.m3u"',
+                                      "Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
 @router.api_route("/stream", methods=["GET", "HEAD"])
 def stream(request: Request, id: int, session: str = "", args: dict[str, str] = Depends(require_auth)):
     state = request.app.state
