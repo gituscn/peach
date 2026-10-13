@@ -2,12 +2,42 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import type { Browser } from 'playwright-core';
 import { launch, layout, settle, VIEWPORTS } from './harness.ts';
-import { openItemPage, SAMPLE_ITEM } from './item-fixture.ts';
+import { COVER_ONLY_ITEM, openItemPage, SAMPLE_ITEM } from './item-fixture.ts';
 
 describe('馆藏 JAV 官方预览', () => {
   let browser: Browser;
   before(async () => { browser = await launch() });
   after(async () => { await browser.close() });
+  for (const viewport of VIEWPORTS) it(`${viewport.name}：只有封面时视频方向键控制进度，图片方向键切换媒体`, { timeout: 60000 }, async () => {
+    const opened = await openItemPage(browser, '/', viewport, { ready: '[data-media-grid]', settings: { seekSeconds: 1 } });
+    const { page } = opened;
+    try {
+      await page.route('**/stream?*', route => route.continue({ url: new URL(`/stream?id=${process.env.PEACH_E2E_ITEM}`, page.url()).href }));
+      await page.goto(new URL(`/item/${COVER_ONLY_ITEM.id}`, page.url()).href);
+      const frame = page.locator('[data-item-gallery]');
+      const video = frame.locator('video');
+      await page.waitForFunction(() => (document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.readyState || 0) >= 3);
+      assert.equal(await frame.locator('[data-media-thumbnail]').count(), 2);
+      await video.evaluate(node => { const video = node as HTMLVideoElement; video.muted = true; video.pause(); video.currentTime = 0.5 });
+      await page.locator('#closeStage').focus();
+      await page.keyboard.press('ArrowRight');
+      assert.ok(await video.evaluate(node => Math.abs((node as HTMLVideoElement).currentTime - 1.5) < 0.1));
+      assert.ok(await frame.locator('.video-js').isVisible());
+      await page.keyboard.press('ArrowLeft');
+      assert.ok(await video.evaluate(node => Math.abs((node as HTMLVideoElement).currentTime - 0.5) < 0.1));
+      assert.ok(await frame.locator('.video-js').isVisible());
+      await frame.locator('[data-player-theater]').dispatchEvent('click');
+      await page.keyboard.press('ArrowRight');
+      assert.ok(await video.evaluate(node => Math.abs((node as HTMLVideoElement).currentTime - 1.5) < 0.1));
+      assert.ok(await frame.locator('.video-js').isVisible());
+      await frame.getByRole('button', { name: '查看图片', exact: true }).click();
+      await frame.locator('[data-catalog-picture]').waitFor();
+      await page.locator('#closeStage').focus();
+      await page.keyboard.press('ArrowRight');
+      assert.ok(await frame.locator('.video-js').isVisible());
+      assert.deepEqual(opened.problems, []);
+    } finally { await opened.close() }
+  });
   for (const viewport of VIEWPORTS) it(`${viewport.name}：图片、缩略图和正片共用媒体切换`, { timeout: 60000 }, async () => {
     const opened = await openItemPage(browser, '/', viewport, { ready: '[data-media-grid]' });
     const { page } = opened;
@@ -31,6 +61,22 @@ describe('馆藏 JAV 官方预览', () => {
       assert.equal(await dots.locator('button').count(), 4);
       const videoBox = await frame.locator('.video-js').boundingBox(), dotsBox = await dots.boundingBox();
       assert.ok(videoBox && dotsBox && dotsBox.y >= videoBox.y + videoBox.height, '馆藏 indicator 位于播放器下方');
+      const player = frame.locator('.video-js');
+      await player.evaluate(node => { (node as HTMLElement).dataset.theaterProbe = 'kept' });
+      await frame.locator('[data-player-theater]').dispatchEvent('click');
+      await page.locator('#stage[data-theater]').waitFor();
+      assert.ok(await frame.locator('[data-carousel-below]').isHidden());
+      const theaterBox = await player.boundingBox(), theaterFrame = await frame.boundingBox();
+      assert.ok(theaterBox && videoBox && theaterFrame && theaterBox.height > videoBox.height + 20);
+      if (!viewport.mobile) assert.ok(theaterBox && videoBox && theaterBox.width > videoBox.width + 20);
+      assert.ok(theaterBox && theaterFrame && Math.abs(theaterBox.height - theaterFrame.height) < 2);
+      assert.ok(theaterFrame && theaterFrame.height >= viewport.height - 36);
+      assert.equal(await player.getAttribute('data-theater-probe'), 'kept');
+      await page.screenshot({ path: `../build/item-theater-${viewport.name}.png` });
+      await frame.locator('[data-player-theater]').dispatchEvent('click');
+      assert.ok(await frame.locator('[data-carousel-below]').isVisible());
+      const restoredBox = await player.boundingBox();
+      assert.ok(restoredBox && videoBox && Math.abs(restoredBox.width - videoBox.width) < 2 && Math.abs(restoredBox.height - videoBox.height) < 2);
       await frame.locator('video').evaluate(node => { const video = node as HTMLVideoElement; video.muted = true; void video.play() });
       await page.waitForFunction(() => (document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.currentTime || 0) > 0);
       await frame.getByRole('button', { name: '预览 2', exact: true }).click();

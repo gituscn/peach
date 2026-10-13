@@ -447,7 +447,9 @@ class FeedWebTest(FeedWebFixture):
         items = dispatch_api_get(self.contract, "/api/feeds/discoveries", {})["items"]
         self.assertEqual({tuple((ref["id"], ref["name"]) for ref in item["performer_refs"])
                           for item in items}, {((1, "规范姓名"),)})
-        self.assertEqual({item["performers"] for item in items}, {"深田えいみ"})
+        self.assertEqual({item["performers"] for item in items}, {"规范姓名"})
+        with self.contract.database.read_connection() as connection:
+            self.assertEqual({row[0] for row in connection.execute("SELECT performers FROM feed_discovery")}, {"深田えいみ"})
 
     def test_discovery_avatars_share_entity_image_version_and_focus(self):
         with self.contract.database.write_transaction() as connection:
@@ -876,6 +878,29 @@ class FeedFollowByNameTest(PerformerFeedSwitchTest):
 
 
 class JavDiscoveryTest(FeedWebFixture):
+    def test_discovery_cast_projects_canonical_names_and_preserves_unknown_names(self):
+        self._add()
+        self._check()
+        with self.contract.database.write_transaction() as connection:
+            eid = connection.execute(
+                "INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at)"
+                " VALUES('performer','筱田优','筱田优',?,?)", (feeds.stamp(), feeds.stamp())).lastrowid
+            connection.execute("INSERT INTO entity_alias(entity_id,alias,normalized_alias,source) VALUES(?,?,?,'test')",
+                               (eid, '篠田ゆう', '篠田ゆう'))
+            connection.execute("UPDATE feed_discovery SET performers='篠田ゆう、筱田优、未知人物',studio='示例厂牌'")
+        rankings = {'peach_studios': [{'name': '示例厂牌', 'score': 4}]}
+        for metadata in ({}, {'actors': [{'name': '篠田ゆう'}, {'name': '筱田优'}, {'name': '未知人物'}]}):
+            with self.subTest(source=bool(metadata)):
+                rows = self._discover(rankings=rankings, metadata=metadata)['items']
+                self.assertEqual(len(rows), 2)
+                for row in rows:
+                    self.assertEqual(row['performers'], '筱田优、未知人物')
+                    self.assertEqual([ref['name'] for ref in row['performer_refs']], ['筱田优', '未知人物'])
+                    self.assertEqual(row['performer_refs'][0]['id'], eid)
+        with self.contract.database.read_connection() as connection:
+            self.assertEqual({row[0] for row in connection.execute('SELECT performers FROM feed_discovery')},
+                             {'篠田ゆう、筱田优、未知人物'})
+
     def test_source_cast_uses_female_and_unknown_references_without_male_features(self):
         self._add()
         self._check()

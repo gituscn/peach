@@ -146,7 +146,7 @@ applicationEffects.listen(document, 'keydown', e=>{
   // 输入态不抢键：搜索框、标签弹窗和任何可编辑区域里的按键归它们自己处理。
   if(isTypingTarget(e.target)||e.ctrlKey||e.metaKey||e.altKey)return;
   if(e.key==='ArrowLeft'||e.key==='ArrowRight'){
-    const imageStep=document.querySelector(`#stage[open] [data-follow-image-step="${e.key==='ArrowRight'?1:-1}"]`);
+    const imageStep=document.querySelector(`#stage[open] [data-media-carousel]:not([data-carousel-video-active]) [data-follow-image-step="${e.key==='ArrowRight'?1:-1}"]`);
     if(imageStep){e.preventDefault();imageStep.click();return}
   }
   const video=activeVideo();

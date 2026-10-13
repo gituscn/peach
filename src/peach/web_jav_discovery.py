@@ -195,6 +195,7 @@ def q_jav_discoveries(contract, args):
     else:
         for row in picked:
             row["performer_refs"] = refs[row["id"]]
+            row["performers"] = "、".join(ref["name"] for ref in row["performer_refs"])
             row["has_cover"] = contract.has_cover(row["code"])
             row["cover_frame"] = contract.cover_frame(row["code"])
             row["cover_version"] = contract.cover_version(row["code"])

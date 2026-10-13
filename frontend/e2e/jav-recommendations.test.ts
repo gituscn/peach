@@ -2,11 +2,58 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import type { Browser } from 'playwright-core';
 import { launch, layout, settle, visit, VIEWPORTS } from './harness.ts';
+import { ITEM, openItemPage } from './item-fixture.ts';
 
 describe('JAV 推荐与加载结构', () => {
   let browser: Browser;
   before(async () => { browser = await launch(); });
   after(async () => { await browser?.close(); });
+  for (const viewport of VIEWPORTS) it(`${viewport.name}：关闭馆藏详情保留探索页与筛选位置`, { timeout: 60_000 }, async () => {
+    const opened = await openItemPage(browser, '/', viewport, { ready: '[data-media-grid]' });
+    const { page } = opened;
+    const reads: string[] = [];
+    try {
+      await page.route('**/api/taste?*', route => route.fulfill({ json: { summary: {}, rankings: {} } }));
+      await page.route('**/api/jav/discoveries?*', route => {
+        reads.push(route.request().url());
+        return route.fulfill({ json: { items: Array.from({ length: 24 }, (_, index) => ({
+          id: index + 100, asset_id: ITEM.plain, code: `PCH-${index + 100}`, title: '探索作品',
+          performers: '来源原名', performer_refs: [{ id: 42, name: '规范姓名', has_image: false }],
+          has_cover: false, wanted: false, tags: ['恋足'], taste_score: 0.8, release_date: '2024-06-03',
+        })) } });
+      });
+      await page.goto(new URL('/jav?tab=discover', page.url()).href);
+      const section = page.getByRole('region', { name: '为你推荐', exact: true });
+      const search = page.getByRole('searchbox', { name: '筛选推荐', exact: true });
+      await section.locator('[data-jav-card]').first().waitFor();
+      await page.getByRole('button', { name: '馆藏探索', exact: true }).click();
+      await page.getByRole('button', { name: '按发行日期排序', exact: true }).click();
+      await section.locator('[data-catalog-tag="恋足"]').click();
+      await search.fill('PCH');
+      await section.evaluate(node => { (node as HTMLElement).dataset.returnProbe = 'kept' });
+      const count = reads.length;
+      for (const exit of ['close', 'escape', 'back']) {
+        const link = section.locator('[data-jav-card]').nth(8).locator('[data-jav-cover-box]');
+        await link.scrollIntoViewIfNeeded();
+        const top = await page.evaluate(() => window.scrollY);
+        await link.click();
+        await page.locator('#stage[open] [data-item-side]').waitFor();
+        assert.equal(await section.getAttribute('data-return-probe'), 'kept');
+        if (exit === 'close') await page.locator('#closeStage').click();
+        else if (exit === 'escape') await page.keyboard.press('Escape');
+        else await page.goBack();
+        await page.waitForFunction(() => location.pathname === '/jav' && !document.querySelector('#stage[open]'));
+        assert.equal(await search.inputValue(), 'PCH');
+        assert.equal(await section.locator('[data-entity-tag="library"]').getAttribute('aria-pressed'), 'true');
+        assert.equal(await section.locator('[data-catalog-tag="恋足"]').getAttribute('aria-pressed'), 'true');
+        assert.equal(await section.locator('[data-entity-sort="release_date"]').getAttribute('aria-pressed'), 'true');
+        assert.equal(await section.getAttribute('data-return-probe'), 'kept');
+        assert.equal(reads.length, count);
+        assert.ok(Math.abs(await page.evaluate(() => window.scrollY) - top) < 2);
+      }
+      assert.deepEqual(opened.problems.filter(line => !line.includes('VIDEOJS')), []);
+    } finally { await opened.close() }
+  });
   for (const viewport of VIEWPORTS) it(`${viewport.name}：按实体身份推荐，封面骨架占据卡片尺寸`, { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/?jav=1', viewport);
     const { page } = opened;
@@ -75,6 +122,8 @@ describe('JAV 推荐与加载结构', () => {
       const search = page.getByRole('searchbox', { name: '筛选推荐', exact: true });
       const cards = page.getByRole('region', { name: '为你推荐', exact: true }).locator('article');
       assert.equal(await cards.count(), 3);
+      assert.equal(await cards.first().locator('[data-jav-identity] p').textContent(), '规范姓名 · 2010-10-01');
+      assert.equal(await cards.first().locator('[data-jav-identity] p').getAttribute('title'), '规范姓名');
       assert.equal(await cards.first().locator('[data-jav-taste-score]').textContent(), '强烈推荐');
       const tierBox = await cards.first().locator('[data-jav-taste-score]').boundingBox();
       const tagsBox = await cards.first().locator('[data-jav-tags]').boundingBox();

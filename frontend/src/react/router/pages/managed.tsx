@@ -182,7 +182,10 @@ export function ManagedMatch({ path }: { path: ManagedPath }) {
   useLocation();
   const covered = isOverlayPath(peachHistory.navigation.location.pathname);
   const opening = useRef<number | null>(covered ? null : epoch);
-  if (!covered) opening.current = epoch;
+  const wasCovered = useRef(covered);
+  // 已打开的背景页在详情撤下时保留代次；深链下的背景等待首次打开。
+  if (!covered && (!wasCovered.current || opening.current === null)) opening.current = epoch;
+  wasCovered.current = covered;
   // 路径也进 key：认领的写地址从一页换到另一页（配置页改写到数据管理页）时代次不变，页面组在同一个位置换了路由。
   return <ManagedPage key={`${path} ${opening.current ?? 'covered'}`} path={path} covered={opening.current === null} />;
 }
