@@ -26,17 +26,8 @@ def plan(event: str, paths: list[str], contents: dict | None = None) -> dict:
         for index in range(shards):
             rows.append({"os": system, "python": "3.14", "scope": scope,
                          "shard_index": index, "shard_count": shards})
-    # Python 下限覆盖关键兼容性；依赖和基础设施变化额外跑两端。
-    rows.append({"os": "windows-latest", "python": "3.12", "scope": "core",
-                 "shard_index": 0, "shard_count": 1})
-    if wide:
-        rows.append({"os": "macos-latest", "python": "3.12", "scope": "core",
-                     "shard_index": 0, "shard_count": 1})
-    wheels = [{"os": "windows-latest", "python": "3.12"},
+    wheels = [{"os": "windows-latest", "python": "3.14"},
               {"os": "macos-latest", "python": "3.14"}]
-    if wide:
-        wheels += [{"os": "windows-latest", "python": "3.14"},
-                   {"os": "macos-latest", "python": "3.12"}]
     return {"matrix": {"include": rows}, "wheel_matrix": {"include": wheels}, "wide": wide}
 
 

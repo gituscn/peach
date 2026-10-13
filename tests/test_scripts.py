@@ -1481,21 +1481,17 @@ class OperationalScriptTests(unittest.TestCase):
                     self.assertEqual(done.returncode, 0, done.stderr)
                     self.assertEqual(json.loads(done.stdout), expected)
 
-    def test_python_floor_is_declared_once_and_ci_tests_both_ends(self):
-        """`requires-python` 是唯一真相；CI 矩阵与两份 README 都从它推出来。
-
-        下限是陌生用户按 `pip install` 装的那一端，3.14 是维护者本机运行的那一端；
-        两端都在矩阵里，README 的前置条件写的也是同一个下限，三处任一处单改都要红。
-        """
+    def test_python_floor_matches_runtime_and_ci(self):
+        """正式运行版本、CI 与 README 共同覆盖声明的 Python 下限。"""
         project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
         floor = project["requires-python"].removeprefix(">=")
-        self.assertEqual(floor, "3.12")
-        for version in (floor, "3.14"):
-            self.assertIn(f"Programming Language :: Python :: {version}", project["classifiers"])
+        self.assertEqual(floor, "3.14")
+        self.assertEqual((ROOT / ".python-version").read_text(encoding="utf-8").strip(), floor)
+        self.assertIn(f"Programming Language :: Python :: {floor}", project["classifiers"])
         workflow = (ROOT / ".github" / "workflows" / "test.yml").read_text(encoding="utf-8")
         self.assertIn("fromJSON(needs.plan.outputs.matrix)", workflow)
         from scripts.ci_plan import plan
-        self.assertEqual({row["python"] for row in plan("workflow_dispatch", [])["matrix"]["include"]}, {floor, "3.14"})
+        self.assertEqual({row["python"] for row in plan("workflow_dispatch", [])["matrix"]["include"]}, {floor})
         self.assertIn(f"Python {floor} 或更高", (ROOT / "README.md").read_text(encoding="utf-8"))
         self.assertIn(f"Python {floor} or newer", (ROOT / "README.en.md").read_text(encoding="utf-8"))
 
