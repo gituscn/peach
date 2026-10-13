@@ -27,11 +27,11 @@ describe('卡片信息与收藏入口', () => {
         }));
         const rows = await inspect();
         assert(rows[0].title >= rows[0].line * 1.9 && rows[1].title < rows[1].line * 1.5, JSON.stringify(rows));
-        assert(rows.every(row => row.gap >= 4 && row.gap <= 8 && row.labelGap >= 8), JSON.stringify(rows));
+        assert(rows.every(row => row.gap >= 4 && row.gap <= 8 && row.labelGap >= 8 && row.labelGap <= 12), JSON.stringify(rows));
         assert(Math.max(...rows.map(row => row.height)) - Math.min(...rows.map(row => row.height)) <= 1, JSON.stringify(rows));
         await opened.page.evaluate(() => { document.body.dataset.density = 'dense' });
         const dense = await inspect();
-        assert(dense.every(row => row.title < row.line * 1.5 && row.labelGap >= 8), JSON.stringify(dense));
+        assert(dense.every(row => row.title < row.line * 1.5 && row.labelGap >= 8 && row.labelGap <= 12), JSON.stringify(dense));
       } finally { await opened.close() }
     });
     it(`${viewport.name} 收藏入口在读数旁固定宽度，播放媒体没有侧箭头`, async () => {
