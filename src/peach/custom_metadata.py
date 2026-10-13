@@ -149,9 +149,19 @@ def parse(config: dict, code: str, document: object) -> SiteRecord:
                       tags=strings('tags') if 'tags' in values else None, confidence=0.5)
 
 
+def _remaining_seconds(deadline: float) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise ValueError('来源查询已超时')
+    return remaining
+
+
 def fetch_json(url: str, timeout: float, *, client_options=None):
+    expires = time.monotonic() + timeout
+    _remaining_seconds(expires)
     host = urlsplit(url).hostname or ''
     addresses = host_addresses(host)
+    _remaining_seconds(expires)
     if not addresses or any(not ipaddress.ip_address(ip).is_global for ip in addresses):
         raise ValueError('来源域名必须解析到公网地址')
     address = addresses[0]
@@ -166,7 +176,7 @@ def fetch_json(url: str, timeout: float, *, client_options=None):
         curl_options[CurlOpt.NOPROXY] = '*'
     with requests.Session(curl_options=curl_options, **options) as client:
         try:
-            with client.stream('GET', url, timeout=timeout, allow_redirects=False,
+            with client.stream('GET', url, timeout=_remaining_seconds(expires), allow_redirects=False,
                                headers={'Accept': 'application/json'}) as response:
                 if response.status_code != 200:
                     raise ValueError(f'来源响应 HTTP {response.status_code}')
@@ -184,9 +194,10 @@ def fetch_json(url: str, timeout: float, *, client_options=None):
 def query(config: dict, code: str, *, deadline=None, secrets_root=None) -> SiteRecord:
     checked = validate(config)
     code = validate_provider_code(code)
-    timeout = min(15.0, deadline - time.monotonic()) if deadline else 15.0
-    if timeout <= 0:
-        raise ValueError('来源查询已超时')
+    expires = time.monotonic() + 15.0
+    if deadline is not None:
+        expires = min(expires, deadline)
+    _remaining_seconds(expires)
     url = endpoint(checked, code)
     options = None
     if checked['network'] == 'peach_proxy':
@@ -195,7 +206,7 @@ def query(config: dict, code: str, *, deadline=None, secrets_root=None) -> SiteR
         from .peach_proxy import client_options
         options = client_options(Path(secrets_root))
     try:
-        document = fetch_json(url, timeout, client_options=options)
+        document = fetch_json(url, _remaining_seconds(expires), client_options=options)
     except (json.JSONDecodeError, UnicodeError) as error:
         raise ValueError('来源响应不是有效 JSON') from error
     return parse(config, code, document)

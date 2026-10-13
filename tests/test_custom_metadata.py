@@ -4,7 +4,7 @@ import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from peach import custom_metadata as custom
 from peach.library_processing import _RemoteSession
@@ -52,6 +52,49 @@ class CustomMetadataTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, '公网'):
                 custom.fetch_json('https://metadata.example.com/ABW-001', 2)
             session.assert_not_called()
+
+    def test_http_uses_the_budget_left_by_proxy_dns_and_session_preparation(self):
+        clock = [100.0]
+        response = Mock(status_code=200)
+        response.iter_content.return_value = [b'{"data":{"id":"ABW-001","title":"example","cast":[]}}']
+        session = MagicMock()
+        client = session.__enter__.return_value
+        client.stream.return_value.__enter__.return_value = response
+        def proxy_options(_root):
+            clock[0] += 2
+            return {'proxy': 'http://127.0.0.1:7890', 'trust_env': False}
+        def addresses(_host):
+            clock[0] += 6
+            return ('1.1.1.1',)
+        def prepare_session(**_options):
+            clock[0] += 1
+            return session
+        with patch.object(custom.time, 'monotonic', side_effect=lambda: clock[0]), \
+                patch('peach.peach_proxy.client_options', side_effect=proxy_options), \
+                patch.object(custom, 'host_addresses', side_effect=addresses), \
+                patch.object(custom.requests, 'Session', side_effect=prepare_session):
+            record = custom.query(definition(network='peach_proxy'), 'ABW-001', secrets_root=Path('.'))
+        self.assertEqual(record.title, 'example')
+        self.assertEqual(client.stream.call_args.kwargs['timeout'], 6)
+
+    def test_exhausted_dns_budget_does_not_start_http(self):
+        def exercise(dns_elapsed):
+            clock = [100.0]
+            response = Mock(status_code=200)
+            response.iter_content.return_value = [b'{"ok":true}']
+            def addresses(_host):
+                clock[0] += dns_elapsed
+                return ('1.1.1.1',)
+            with patch.object(custom.time, 'monotonic', side_effect=lambda: clock[0]), \
+                    patch.object(custom, 'host_addresses', side_effect=addresses), \
+                    patch.object(custom.requests, 'Session') as session:
+                session.return_value.__enter__.return_value.stream.return_value.__enter__.return_value = response
+                with self.assertRaisesRegex(ValueError, '超时'):
+                    custom.fetch_json('https://metadata.example.com/ABW-001', 15)
+                session.assert_not_called()
+        for dns_elapsed in (15, 16):
+            with self.subTest(dns_elapsed=dns_elapsed):
+                exercise(dns_elapsed)
 
     def test_formal_pipeline_consumes_enabled_source_after_builtin_chain(self):
         with tempfile.TemporaryDirectory() as tmp:
