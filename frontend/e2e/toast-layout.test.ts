@@ -57,7 +57,9 @@ for (const viewport of [...VIEWPORTS, { name: 'narrow', width: 320, height: 844,
         }
         if (scenario.label) {
           assert.ok(box.buttonLeft! >= box.titleRight || box.buttonTop! >= box.titleBottom, JSON.stringify(box));
-          if (viewport.mobile) assert.ok(box.buttonTop! >= box.titleBottom, JSON.stringify(box));
+          const inline = scenario.name === 'undo' || (scenario.name === 'action' && viewport.width >= 390);
+          if (inline) assert.ok(box.buttonLeft! >= box.titleRight && box.buttonTop! < box.titleBottom, JSON.stringify(box));
+          else assert.ok(box.buttonTop! >= box.titleBottom, JSON.stringify(box));
         }
         const rect = (await toast.boundingBox())!;
         await opened.page.screenshot({ path: resolve(`../build/toast-preview/${viewport.name}-${scenario.name}.png`),
