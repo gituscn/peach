@@ -324,6 +324,40 @@ def rewrite_flat_projection(connection: Connection, kind: str, entity_id: int,
     return rewritten
 
 
+def _transfer_favorites(connection: Connection, source_id: int, target_id: int, stamp: str) -> None:
+    """用户收藏随合并身份迁移，避免已删除的整数 ID 被新实体复用。"""
+    target = connection.execute("SELECT kind,canonical_name FROM entity WHERE id=?", (target_id,)).fetchone()
+    source_ids = {source_id, *(row[0] for row in connection.execute(
+        "SELECT r.old_id FROM entity_redirect r WHERE r.target_id=?"
+        " AND NOT EXISTS (SELECT 1 FROM entity e WHERE e.id=r.old_id)", (source_id,)))}
+    for profile_id, raw in connection.execute("SELECT id,settings_json FROM profile").fetchall():
+        try:
+            settings = json.loads(raw)
+        except (ValueError, TypeError):
+            continue
+        shortcuts = settings.get("libraryShortcuts") if isinstance(settings, dict) else None
+        favorites = shortcuts.get("favorites") if isinstance(shortcuts, dict) else None
+        if not isinstance(favorites, list):
+            continue
+        moved, seen, changed = [], set(), False
+        for item in favorites:
+            entity_id = item.get("entity_id") if isinstance(item, dict) else None
+            if type(entity_id) is int and entity_id in source_ids:
+                item = {**item, "entity_id": target_id, "key": f"entity:{target_id}",
+                        "kind": target[0], "name": target[1]}
+                entity_id, changed = target_id, True
+            if type(entity_id) is int:
+                if entity_id in seen:
+                    changed = True
+                    continue
+                seen.add(entity_id)
+            moved.append(item)
+        if changed:
+            shortcuts["favorites"] = moved
+            connection.execute("UPDATE profile SET settings_json=?,updated_at=? WHERE id=?",
+                               (json.dumps(settings, ensure_ascii=False), stamp, profile_id))
+
+
 def merge_entity(
     connection: Connection, *, target_id: int, source_id: int,
     source_name: str, alias_source: str, now: str | None = None,
@@ -458,6 +492,7 @@ def merge_entity(
     moved["discoveries"] = connection.execute("SELECT changes()").fetchone()[0]
     connection.execute("DELETE FROM feed_discovery_entity WHERE entity_id=?", (source_id,))
 
+    _transfer_favorites(connection, source_id, target_id, stamp)
     # 墓碑先写、先压平，再删 source：删 source 时触发器会清掉仍指向它的墓碑。
     connection.execute(
         "UPDATE entity_redirect SET target_id=? WHERE target_id=?", (target_id, source_id))
