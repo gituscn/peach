@@ -1,11 +1,11 @@
 /* 来源和凭证页的数据契约与折算。几条端点在 `frontend/src` 里都只在这里声明一次
  * （`tests/test_frontend_build.py` 盯着）。
  *
- * 这一页有两个键，因为屏幕上是两个不同节律的真相：来源列表由用户改、改完由写操作把
- * 那一条换进缓存；封面任务是后台自己推进的状态，跑起来时两秒问一次。合成一个键的话，
- * 每一轮轮询都要把整张来源列表重取一遍，用户正在填的那张卡也会跟着重画。 */
+ * 来源配置、封面任务、amane 桥和自定义来源各自缓存；后台任务按自己的节律读取状态，
+ * 不重取正在编辑的来源配置。 */
 import { apiGet } from '../../api';
 import { queryClient } from '../query';
+import { CUSTOM_SOURCES_KEY, fetchCustomSources } from './custom-source-data';
 
 export const SCRAPING_URL = '/api/scraping';
 export const SCRAPING_SETTINGS_URL = '/api/scraping/settings';
@@ -84,7 +84,7 @@ export const fetchSources = (signal?: AbortSignal) => apiGet<ScrapingData>(SCRAP
 export const fetchCoverJob = (signal?: AbortSignal) => apiGet<CoverJob>(SCRAPING_COVER_URL, signal);
 export const fetchAmaneBridge = (signal?: AbortSignal) => apiGet<AmaneBridge>(AMANE_BRIDGE_URL, signal);
 
-/** 首屏：三个键都取回来才画。
+/** 首屏来源与任务快照并发取回，同一份缓存交给页面各分区。
  *
  * 抓封面的状态也算首屏——页面一上来就得知道有没有一趟正在跑，才接得上它的进度；amane 桥
  * 那张卡同理，重建可能正在后台跑。中止时 `fetchQuery` 把 `AbortError` 抛回给挂载方，它据此
@@ -94,6 +94,7 @@ export async function prefetchScraping(signal: AbortSignal): Promise<void> {
     queryClient.fetchQuery({ queryKey: SCRAPING_KEY, queryFn: () => fetchSources(signal) }),
     queryClient.fetchQuery({ queryKey: COVER_JOB_KEY, queryFn: () => fetchCoverJob(signal) }),
     queryClient.fetchQuery({ queryKey: AMANE_BRIDGE_KEY, queryFn: () => fetchAmaneBridge(signal) }),
+    queryClient.fetchQuery({ queryKey: CUSTOM_SOURCES_KEY, queryFn: () => fetchCustomSources(signal) }),
   ]);
 }
 

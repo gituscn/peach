@@ -1,5 +1,5 @@
 import { act } from 'react';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { SourceImage } from '../../src/react/review/review-evidence';
 import { click, mountRoot } from './render';
 
@@ -20,4 +20,14 @@ it('来源图片只在点击后请求，失败可以重试，换来源要重新�
   expect(host.querySelector('img')).toBeNull();
   await rerender(<SourceImage url="javascript:alert(1)" />);
   expect(host.querySelector('button')).toBeNull();
+});
+
+it('来源图片超时结束等待并提供重试', async () => {
+  vi.useFakeTimers();
+  const { host } = await mountRoot(<SourceImage url="https://example.org/slow.jpg" />);
+  await click(host.querySelector('button'));
+  await act(async () => { vi.advanceTimersByTime(30_000) });
+  expect(host.querySelector('img')).toBeNull();
+  expect(host.querySelector('[role=status]')).toBeNull();
+  expect(host.textContent).toContain('重新加载图片');
 });

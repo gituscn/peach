@@ -74,6 +74,13 @@ class ScrapingAccessTests(unittest.TestCase):
             self.assertEqual(factory.call_count, 2)
             self.assertEqual(fake.close.call_count, 2)
 
+    def test_switching_networks_releases_the_previous_exit_cooldown(self):
+        from peach.scraping_access import pause_source, paused_until
+        pause_source(self.root, 'airav', refused=True)
+        self.assertGreater(paused_until(self.root, 'airav'), time.time())
+        save(self.root, 'airav', {'network': 'direct'})
+        self.assertEqual(paused_until(self.root, 'airav'), 0)
+
     def test_redirect_selects_destination_policy_and_strips_secrets(self):
         transport = SourceTransport(self.root)
         with patch.object(transport, "_request", side_effect=[

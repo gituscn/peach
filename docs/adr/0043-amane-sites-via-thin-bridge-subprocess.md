@@ -14,6 +14,9 @@ Python 3.14、依赖全用 `>=` 下限，并进 Peach 主 venv 会撞上「精�
 
 ## 决策
 
+Python 支持范围以主清单为准，最低与默认版本为 3.14。独立桥继续按自己的锁复现传递依赖，
+隔离上游数据库和聚合层；Python 版本一致不改变进程边界和 Peach 的来源结算归属。
+
 **一、桥是一个子进程，形状同 Javinizer-Go。** `tools/amane-bridge/bridge.py` 一次跑完：
 `--number <番号> --sites a,b --language jp --output json`，stdout 只有一行 JSON，退出码分
 「至少一站取到」「问的站都说没有」「没取到且有站出错」「参数错」四档。无端口、无状态、无常驻。

@@ -10,7 +10,8 @@ export const SHORTCUTS_KEY = ['library-shortcuts'] as const;
 const URL = '/api/library-shortcuts';
 
 export function useShortcuts(enabled = true) {
-  return useQuery({ queryKey: SHORTCUTS_KEY, queryFn: ({ signal }) => apiGet<Shortcuts>(URL, signal), enabled });
+  return useQuery({ queryKey: SHORTCUTS_KEY, queryFn: ({ signal }) => apiGet<Shortcuts>(URL, signal),
+    enabled, refetchOnMount: enabled ? 'always' : false });
 }
 export function useShortcutWrite() {
   return useMutation({ mutationKey: SHORTCUTS_KEY,

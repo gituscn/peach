@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { errorMessage } from '../../api';
@@ -13,9 +13,16 @@ const Star = spriteGlyph('star');
 const LABELS: Record<string, string> = { performer: '艺人', creator: '创作者', studio: '厂牌', series: '系列', agency: '事务所', tag: '标签' };
 
 export function FavoriteButton({ item }: { item: Favorite }) {
+  return <FavoriteChoice key={`${item.kind}:${item.entity_id}:${item.name}`} item={item} />;
+}
+
+function FavoriteChoice({ item }: { item: Favorite }) {
   const query = useShortcuts(false);
+  const initial = useRef(query.data);
   const write = useShortcutWrite();
-  const selected = query.data ? isFavorite(query.data.favorites || [], item) : !!item.favorite;
+  const selected = query.data && query.data !== initial.current
+    ? isFavorite(query.data.favorites || [], item)
+    : item.favorite ?? (query.data ? isFavorite(query.data.favorites || [], item) : false);
   return <span className="inline-flex min-w-0 flex-col gap-1">
     <Button variant="secondary" size="small" leadingIcon={Star} aria-pressed={selected}
       aria-label={`${selected ? '取消收藏' : '收藏'}${item.name}`}

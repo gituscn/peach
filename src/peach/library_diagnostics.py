@@ -145,8 +145,9 @@ def sources(settings, config, *, now=None):
         checks = source_checks(config.directory("secrets"), key)
         parsed = checks.get("metadata", {})
         connection = checks.get("connection", {})
-        if timestamp(parsed.get("last_success_at")):
-            success[key] = timestamp(parsed["last_success_at"])
+        candidate = timestamp(parsed.get("last_success_at"))
+        if candidate and (not success.get(key) or candidate > success[key]):
+            success[key] = candidate
         stamp = success.get(key)
         fresh = bool(stamp) and 0 <= now - datetime.fromisoformat(stamp).timestamp() <= 86400
         last = max((check for check in (parsed, connection) if timestamp(check.get("checked_at"))),

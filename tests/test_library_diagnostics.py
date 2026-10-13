@@ -120,3 +120,16 @@ class LibraryDiagnosticsTests(unittest.TestCase):
         self.assertEqual(rows['fc2club']['status'], 'warning')
         self.assertIn('地区', rows['fc2club']['reason'])
         self.assertIsNotNone(rows['fc2club']['last_success_at'])
+
+    def test_source_times_are_normalized_and_corrupt_fields_are_ignored(self):
+        root = self.config.directory('secrets')
+        root.mkdir(parents=True, exist_ok=True)
+        (root / 'source-check-airav.json').write_text(json.dumps({
+            'metadata': {'ok': True, 'reason': 'parsed', 'checked_at': '2023-11-14T22:13:20Z',
+                         'last_success_at': '2023-11-14T22:13:20Z', 'elapsed_s': '1.2'},
+            'connection': {'ok': False, 'reason': {}, 'checked_at': 1_700_000_050, 'elapsed_s': 'broken'},
+        }), encoding='utf-8')
+        rows = {row['source']: row for row in diagnostics.sources(self.settings, self.config, now=1_700_000_100)}
+        self.assertEqual(rows['airav']['status'], 'warning')
+        self.assertIsNotNone(rows['airav']['last_success_at'])
+        self.assertIsNone(rows['airav']['elapsed_s'])

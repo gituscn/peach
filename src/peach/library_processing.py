@@ -319,16 +319,19 @@ class LibraryMetadataProvider:
                                   else peach_proxy.client_options(self.secrets_root), direct_sites=direct_sites)
         except Exception as error:  # noqa: BLE001 - 桥没装、venv 坏了、超时：整档未取得，原因给人看
             return Unavailable(f'amane 桥：{str(error).strip() or describe_failure(error)}')
-        found, failures = metadata_amane.split_report(code, report)
-        for site, result in report.get('sites', {}).items():
-            if not isinstance(result, dict):
-                continue
+        raw_sites = report.get('sites')
+        raw_sites = raw_sites if isinstance(raw_sites, dict) else {}
+        reports = {site: raw_sites[site] if isinstance(raw_sites.get(site), dict) else {
+            'status': 'failed', 'reason': 'parse_error', 'detail': '桥未返回有效的来源记录',
+        } for site in sites}
+        found, failures = metadata_amane.split_report(code, {**report, 'sites': reports})
+        for site, result in reports.items():
             error = failures.get(site)
             record_source_check(self.secrets_root, site, 'metadata', {
                 'checked_at': time.time(), 'ok': result.get('status') == 'found' and error is None,
                 'kind': error.kind if error else 'ok',
                 'reason': error.detail if error else 'parsed',
-                'status': int(result.get('http_status') or 0),
+                'status': metadata_amane.diagnostic_status(result.get('http_status')),
                 'elapsed_s': result.get('elapsed_s', 0),
             })
         problems, held = [], 0

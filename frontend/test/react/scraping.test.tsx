@@ -93,16 +93,17 @@ const quiet = (overrides: Partial<Source> = {}) => ({
   'GET /api/scraping': () => ({ body: { sources: [source(overrides)] } }),
   'GET /api/scraping/cover': () => ({ body: { status: 'idle' } }),
   'GET /api/scraping/amane-bridge': () => ({ body: BRIDGE }),
+  'GET /api/custom-metadata': () => ({ body: { items: [] } }),
 });
-/** 首屏三份数据的请求顺序，和 `prefetchScraping` 里的一致。 */
-const FIRST_SCREEN = ['/api/scraping', '/api/scraping/cover', '/api/scraping/amane-bridge'];
+/** 首屏来源与任务数据的请求顺序，和 `prefetchScraping` 一致。 */
+const FIRST_SCREEN = ['/api/scraping', '/api/scraping/cover', '/api/scraping/amane-bridge', '/api/custom-metadata'];
 
 const password = (root: ParentNode) => root.querySelector<HTMLInputElement>('input[type=password]');
 const radio = (value: string) => document.querySelector<HTMLInputElement>(`input[type=radio][value="${value}"]`);
 /** 轮询是组件里的定时器，推进时钟会引起重画，得在 act 里推。 */
 const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) });
 
-it('首屏用 prefetch 落进缓存的三份画出来，挂载时不再请求一次', async () => {
+it('首屏用 prefetch 缓存画出来源与任务，挂载时不重复请求', async () => {
   const { calls, host } = await open(quiet());
   expect(calls.map((call) => call.path)).toEqual(FIRST_SCREEN);
   expect(section(host, 'JavBus')).not.toBeNull();

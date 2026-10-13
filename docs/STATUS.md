@@ -27,8 +27,8 @@
 - Windows ledger `0045`，76,259 行；字幕 195 行（孤立 19），175 部带字幕轨；R 盘暂缓。
 - Mac ledger 使用已授权共享副本，`in-sync`；`sources` 在内置盘，`archive`、`tools` 可在外置盘。
 - Windows doctor、诊断页通过 CA；本地目录缺失，115/PikPak 可读；密码未开、历史失败为警告。
-- Python 3.14；Windows FFmpeg/ffprobe 在 `peach-data/tools/ffmpeg`，macOS 走 PATH。
-- amane 桥 0.20.0，安装版本一致；[升级与参考复核](reference-snapshots/upstream-review.md)。
+- Python 最低与默认 3.14；Windows FFmpeg/ffprobe 在 `peach-data/tools/ffmpeg`，macOS 走 PATH。
+- amane 0.20.0，安装一致；[功能与接入](reference-snapshots/upstream-review.md)。
 - 发行名 `peach`、目录名 `peach-app`。macOS 按待办第 26 条处理后重启菜单栏；无口令的 `peach serve --host 0.0.0.0` 拒绝启动。
 - 扫描、采集 120 秒无进展预警；资料 90 秒、封面 240 秒超时可重试；见 `state/library-processing-<job_id>.issues.jsonl`。
 - 口味、复核、关注等聚合按账本与文件版本缓存；女优资料后继每轮存量至多 16 条。

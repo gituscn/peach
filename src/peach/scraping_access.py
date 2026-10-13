@@ -6,12 +6,14 @@ import hashlib
 from http.cookies import SimpleCookie, CookieError
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import tempfile
 import threading
 import time
 from email.utils import parsedate_to_datetime
+from datetime import datetime, timezone
 from urllib.parse import urlsplit, urljoin
 
 import httpx
@@ -269,6 +271,7 @@ def cookie_jar(values: dict[str, str], source: str) -> http.cookiejar.CookieJar:
 def save(root: Path, source: str, body: dict) -> dict:
     with _LOCK:
         values = values_for(root, source)
+        previous_network = "direct" if values.get("network") == "direct" else "peach"
         mode = body.get("network", "direct" if values.get("network") == "direct" else "peach")
         if mode not in {"direct", "peach"}:
             raise ValueError("请选择来源连接方式")
@@ -295,6 +298,8 @@ def save(root: Path, source: str, body: dict) -> dict:
             # 新 Cookie 多半是为了解开 403 才换的；冷却记的是旧 Cookie 撞出来的账，别让它压着新的等到期。
             cooldown_path(root, source).unlink(missing_ok=True)
         _write_values(root, source, values)
+        if mode != previous_network:
+            cooldown_path(root, source).unlink(missing_ok=True)
     return describe(root, source)
 
 
@@ -321,9 +326,38 @@ def source_checks(root: Path, source: str) -> dict:
     if source not in SOURCES:
         return {}
     try:
-        value = json.loads((Path(root) / f"source-check-{source}.json").read_text(encoding="utf-8"))
-        return {stage: record for stage, record in value.items()
-                if stage in {"connection", "metadata"} and isinstance(record, dict)} if isinstance(value, dict) else {}
+        path = Path(root) / f"source-check-{source}.json"
+        if path.stat().st_size > 16384:
+            return {}
+        value = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(value, dict):
+            return {}
+        result = {}
+        for stage in ("connection", "metadata"):
+            record = value.get(stage)
+            if not isinstance(record, dict):
+                continue
+            clean = {"ok": record.get("ok") is True,
+                     "kind": record.get("kind") if record.get("kind") in ("ok", "auth", "unavailable", "not_found") else "unavailable",
+                     "reason": record.get("reason") if isinstance(record.get("reason"), str) and len(record["reason"]) <= 64 else "unexpected",
+                     "status": record.get("status") if type(record.get("status")) is int and 100 <= record["status"] <= 599 else 0}
+            for key in ("checked_at", "last_success_at", "elapsed_s"):
+                raw = record.get(key)
+                if isinstance(raw, bool) or raw is None:
+                    continue
+                try:
+                    if isinstance(raw, str) and key != "elapsed_s":
+                        moment = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                        number = moment.replace(tzinfo=timezone.utc).timestamp() if moment.tzinfo is None else moment.timestamp()
+                    else:
+                        number = float(raw)
+                    if math.isfinite(number) and number >= 0:
+                        clean[key] = number
+                except (ValueError, TypeError, OverflowError, OSError):
+                    pass
+            if "checked_at" in clean:
+                result[stage] = clean
+        return result
     except (OSError, ValueError):
         return {}
 

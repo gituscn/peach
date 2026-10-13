@@ -459,6 +459,17 @@ class ProviderStageTests(unittest.TestCase):
         self.assertIn("FC2Club", str(caught.exception))
         self.assertIn("526", str(caught.exception))
 
+    def test_malformed_reports_are_unavailable_and_diagnostics_preserve_hits(self):
+        for value in (None, [], {}):
+            with self.subTest(value=value):
+                provider = self.provider(json.dumps({'sites': value}))
+                with self.assertRaises(Unavailable):
+                    provider.amane('FC2-PPV-1234567', route=('fc2club',))
+        hit = {**FOUND, 'http_status': 'invalid', 'elapsed_s': 'invalid'}
+        provider = self.provider(report(fc2club=hit, javdb=FOUND))
+        found = provider.amane('FC2-PPV-1234567', route=('fc2club',))
+        self.assertEqual([source for source, _ in found], ['fc2club'])
+
     def test_a_block_pauses_that_site_and_a_fully_paused_stage_is_reported_as_paused(self):
         provider = self.provider(report(avsox={"status": "failed", "reason": "cloudflare_blocked", "http_status": 403}))
         with self.assertRaises(SourcePaused):

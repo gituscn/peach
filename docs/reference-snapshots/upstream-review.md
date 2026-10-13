@@ -45,8 +45,24 @@ Motion 14.0.0 的大版本删除内部兼容 API。Peach 只通过 `motion` 公�
 
 PixivUtil2 从 `fc0f9adf44e590dde9242b3755b53528f159720a` 前移到 `22b5fdc9fc83a976d8f4f6f6acbb4d2d3d542f21`，三个提交处理 FFmpeg 8+ 动图转换、`x-userid` 登录身份和独立错误日志。`PixivBrowserFactory.py` 只增登录 ID 赋值，Peach 采用的公开 FANBOX 传输边界不变；保留既有取证 revision，不复制登录逻辑。
 
-OpenAver 从 `8cc17e50453d9f69a81f5fee1a072df80f7aab73` 前移到 `502278a3e09c7520838ffb00b2ff080323a4cdcb`，共 318 个提交；相关推荐源码未变化。DMM 改代理 session、连通探测与失败分类，GraphQL 查询取法不变；自订来源、桌面路径翻译和图片公网守卫属于上游功能，Peach 不迁移。本轮保留相关推荐人工证据及其固定 revision。
+OpenAver 从 `8cc17e50453d9f69a81f5fee1a072df80f7aab73` 前移到 `502278a3e09c7520838ffb00b2ff080323a4cdcb`，共 318 个提交；相关推荐源码未变化。DMM 采用代理 session、连通探测与失败分类，GraphQL 查询取法不变；Peach 参考声明式来源和公网目标守卫，使用受限 JSON 适配器。桌面路径继续由 `platform` 处理，相关推荐保留固定算法证据。
 
 `fiu758-studio-logo-discovery`、`rule34-follow-tags-and-collections` 的漂移是人工笔记与动态 HTML 的比较；`f95-masked-gofile-media` 返回的脚本哈希与笔记记录相同，协议未变化。这三份和 FANBOX、OpenAver 的人工笔记均不执行 `accept`，避免被网页或脚本字节覆盖。
 
-数据层、API 和页面结构未改；真实 ledger、媒体与凭据未写入。静态、组件、桌面及手机浏览器和生产运行的验收结果以项目验证记录及 [运行状态](../STATUS.md) 为准。
+## 采用的应用行为
+
+| 能力 | Peach 实现与边界 |
+| --- | --- |
+| 实体收藏与命名筛选 | 资料页、标签页和目录入口；复用 `profile.settings_json`，收藏跟随规范身份与合并事务，筛选可保存、打开和删除 |
+| 来源诊断 | 正式 amane 来源逐站选择直连或公共代理；连接结果区分代理、超时、限流、验证页与服务错误，显示耗时和冷却；诊断把连接与解析分开 |
+| 比较图按需请求 | 复核卡点击后加载，30 秒超时可重试；换来源重置请求状态 |
+| 声明式来源 | [单步 JSON 配置](../CUSTOM_SOURCES.md)，公网地址固定连接、严格 TLS、响应番号核对、低置信度候选；不复制 OpenAver 的 HTML/YAML 规则 |
+| 外部播放器与 VR | [限时网络链接与 M3U](../EXTERNAL_PLAYERS.md)，设备可使用 VLC/IINA 协议；实际投影与解码由播放器负责 |
+| 分卷与整理 | 复用同一版本分卷连播、模板预览、目标冲突跳过和整批回滚，不引入第二个规划器 |
+
+Python 最低与默认版本为 3.14；CI 保留 Windows/macOS 系统与独立 wheel 消费，前端类型、lint、
+组件验证在 `web-bundle` 集中执行，本机正式入口完整验证。amane 仍使用独立锁与子进程，
+只消费爬虫和网络层；其任务中心、数据库、整理、超分和 AI 服务没有接入 Peach。
+
+本任务未执行真实数据整理、合并或删除。静态、组件、桌面及手机浏览器和生产运行的验收结果
+以项目验证记录及 [运行状态](../STATUS.md) 为准。

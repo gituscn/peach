@@ -10,6 +10,21 @@ afterEach(() => { queryClient.clear() });
 const empty: Shortcuts = { favorites: [], filters: [] };
 
 describe('收藏与筛选', () => {
+  it('资料页的规范收藏状态不受旧身份缓存影响', async () => {
+    queryClient.setQueryData(SHORTCUTS_KEY, { favorites: [
+      { entity_id: 2, kind: 'performer', name: '旧人物' },
+    ], filters: [] });
+    const fetcher = vi.fn();
+    vi.stubGlobal('fetch', fetcher);
+    const host = await mount(<QueryClientProvider client={queryClient}>
+      <FavoriteButton item={{ entity_id: 2, kind: 'performer', name: '新人物', favorite: false }} />
+      <FavoriteButton item={{ entity_id: 1, kind: 'performer', name: '合并目标', favorite: true }} />
+    </QueryClientProvider>);
+    expect(host.querySelector('[aria-label="收藏新人物"]')?.getAttribute('aria-pressed')).toBe('false');
+    expect(host.querySelector('[aria-label="取消收藏合并目标"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it('等待收藏回执时保持可聚焦，回读后允许取消', async () => {
     queryClient.setQueryData(SHORTCUTS_KEY, empty);
     const answer = pending<unknown>();

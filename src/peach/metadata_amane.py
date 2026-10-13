@@ -321,7 +321,7 @@ def failure_error(site: str, record: Mapping[str, object]) -> MetadataProviderEr
 def site_failure(site: str, record: Mapping[str, object]) -> SourceFailure:
     """桥记录里一站的失败 → 契约的 `SourceFailure`。分档、冷却与可否重试都由契约那张表定。"""
     reason = str(record.get("reason") or "unexpected")
-    status = int(record.get("http_status") or 0)
+    status = diagnostic_status(record.get("http_status"))
     label = SITES.get(site, site)
     translated = contract_reason(reason, status)
     kind = REASON_KINDS[translated]
@@ -336,6 +336,15 @@ def site_failure(site: str, record: Mapping[str, object]) -> SourceFailure:
         if text and reason in {"unexpected", "parse_error"}:
             message += f"：{text[:160]}"
     return SourceFailure(translated, message, status_code=status, detail=reason)
+
+
+def diagnostic_status(value: object) -> int:
+    """HTTP 状态只接受有效整数；缺失或损坏的诊断字段记为未取得。"""
+    try:
+        status = int(value) if not isinstance(value, bool) else 0
+        return status if 100 <= status <= 599 else 0
+    except (ValueError, TypeError, OverflowError):
+        return 0
 
 
 def _dates(site: str, metadata: Mapping[str, object]) -> tuple[str, dict[str, str]]:

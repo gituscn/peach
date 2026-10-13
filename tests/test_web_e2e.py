@@ -214,6 +214,9 @@ class WebE2ESmokeTests(unittest.TestCase):
         mark_root.mkdir(parents=True)
         mark = (ROOT / "resources" / "peach-logo.png").read_bytes()
         for spec in scraping_access.SOURCES.values():
+            # 聚合来源没有固定站点，页面使用本地字形，不请求站标。
+            if not spec["login"]:
+                continue
             cached = link_marks.cached_path(mark_root, spec["login"])
             if cached is None:
                 raise AssertionError(f"采集来源没有可缓存的主机：{spec['login']}")
