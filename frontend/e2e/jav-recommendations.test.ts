@@ -50,6 +50,14 @@ describe('JAV 推荐与加载结构', () => {
       const pendingFilter = await page.locator('[data-jav-filter]').boundingBox();
       const pendingBottom = await page.locator('[data-jav-filter] [data-filter-row="bottom"]').boundingBox();
       const pendingSize = await page.locator('[data-jav-filter] [data-entity-layout]').boundingBox();
+      const tagPlaceholders = page.locator('[data-jav-filter] [data-catalog-tags] [data-skeleton="tag"]');
+      assert.equal(await tagPlaceholders.count(), 6);
+      const pendingTags = await tagPlaceholders.evaluateAll(nodes => nodes.map(node => {
+        const style = getComputedStyle(node), box = node.getBoundingClientRect();
+        return { height: box.height, y: box.y, pointer: style.pointerEvents, position: style.position, overflow: style.overflow };
+      }));
+      assert.ok(pendingTags.every(chip => chip.height === (viewport.mobile ? 36 : 30) && chip.y === pendingTags[0].y && chip.pointer === 'none'), JSON.stringify(pendingTags));
+      assert.ok(pendingTags.every(chip => chip.position === 'relative' && chip.overflow === 'hidden'), '标签光效在各自占位内定位和裁切');
       const avatarShape = await page.locator('[data-jav-skeleton-avatar]').first().evaluate(node => {
         const style = getComputedStyle(node); return { width: style.width, height: style.height, radius: style.borderRadius };
       });
@@ -70,7 +78,9 @@ describe('JAV 推荐与加载结构', () => {
       assert.equal(await cards.first().locator('[data-jav-taste-score]').textContent(), '强烈推荐');
       const tierBox = await cards.first().locator('[data-jav-taste-score]').boundingBox();
       const tagsBox = await cards.first().locator('[data-jav-tags]').boundingBox();
-      assert.ok(tierBox && tagsBox && tierBox.y + tierBox.height <= tagsBox.y, '推荐档位在标签前');
+      const contentTag = await cards.first().locator('[data-media-tag]').first().boundingBox();
+      assert.ok(tierBox && tagsBox && contentTag && Math.abs(tierBox.y - contentTag.y) <= 4
+        && tierBox.x + tierBox.width <= contentTag.x, '推荐档位与内容标签同行，排在内容标签前');
       const recommendation = cards.first().getByRole('button', { name: '推荐分 100，强烈推荐', exact: true });
       await recommendation.focus();
       await page.getByRole('tooltip').filter({ hasText: '常看的女优：规范姓名' }).waitFor({ state: 'visible' });
@@ -103,6 +113,8 @@ describe('JAV 推荐与加载结构', () => {
       const controls = await page.locator('[data-jav-filter] [data-entity-sorts]').boundingBox();
       assert.ok(liveSize && controls && liveSize.x >= controls.x && liveSize.x + liveSize.width <= controls.x + controls.width);
       assert.equal(await page.locator('[data-jav-filter] [data-catalog-tag]').first().evaluate(node => getComputedStyle(node).borderStyle), 'dashed');
+      assert.equal(await tagPlaceholders.count(), 0);
+      assert.equal(await page.locator('[data-jav-filter] [data-catalog-tag]').first().evaluate(node => node.getBoundingClientRect().height), pendingTags[0].height);
       const heights = await cards.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height));
       if (!viewport.mobile) assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, JSON.stringify(heights));
       assert.ok(skeletonCard && Math.abs(skeletonCard.height - heights[0]!) <= 2, JSON.stringify({ skeletonCard, heights }));
@@ -117,6 +129,13 @@ describe('JAV 推荐与加载结构', () => {
       const avatarBox = await avatar.boundingBox();
       assert.ok(avatarBox && avatarBox.width === 38 && avatarBox.height === 38, JSON.stringify(avatarBox));
       if (!viewport.mobile) {
+        const before = await avatar.evaluate(node => getComputedStyle(node).transform);
+        await avatar.hover();
+        await page.waitForFunction(() => {
+          const face = document.querySelector('[data-jav-card] [data-media-avatar]');
+          return face && getComputedStyle(face).transform !== 'matrix(1, 0, 0, 1, 0, 0)';
+        });
+        assert.notEqual(await avatar.evaluate(node => getComputedStyle(node).transform), before);
         await cards.first().hover();
         assert.notEqual(await cards.first().evaluate(node => getComputedStyle(node).boxShadow), 'none');
       }

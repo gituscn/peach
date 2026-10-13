@@ -471,16 +471,23 @@ def _discovery_performers(connection, contract, rows) -> dict[int, list[dict]]:
     names = {name.strip() for row in rows
              for name in re.split(r"[,，、;/]", row["performers"] or "") if name.strip()}
     identities = {name: entities.resolve_entity(connection, "performer", name) for name in names}
+    excluded = entities.male_performer_ids(connection)
+    identities = {name: found for name, found in identities.items()
+                  if found is None or found['id'] not in excluded}
     identity_refs = {int(found["id"]): web_catalog.entity_ref(
         contract, "performer", int(found["id"]), found["canonical_name"])
         for found in identities.values() if found}
     performers = {}
     for row in rows:
         refs = []
+        row['performers'] = '、'.join(name.strip() for name in re.split(r"[,，、;/]", row['performers'] or '')
+                                   if name.strip() in identities)
         for name in re.split(r"[,，、;/]", row["performers"] or ""):
             found = identities.get(name.strip())
             if found and found["id"] not in {ref["id"] for ref in refs}:
                 refs.append(identity_refs[int(found["id"])])
+            elif not found and name.strip() in identities and not any(ref['name'] == name.strip() for ref in refs):
+                refs.append({'id': None, 'name': name.strip(), 'has_image': False})
         performers[int(row["id"])] = refs
     return performers
 
@@ -510,12 +517,12 @@ def q_feed_discoveries(contract, args) -> dict:
     hidden = web_settings.hidden_compilations(contract.database)
     with contract.database.read_connection() as connection:
         feeds.register_functions(connection, hidden)
-        rows = connection.execute(
+        rows = [dict(row) for row in connection.execute(
             "SELECT d.*, s.name AS source_name, s.kind AS source_kind"
             " FROM feed_discovery d LEFT JOIN feed_source s ON s.id=d.source_id"
             f" WHERE {' AND '.join(where)}"
             " ORDER BY COALESCE(d.release_date,d.discovered_at) DESC, d.id DESC"
-            " LIMIT ?", (*params, limit + 1)).fetchall()
+            " LIMIT ?", (*params, limit + 1)).fetchall()]
         studios = {name: _studio_name(connection, name)
                    for name in {row["studio"] for row in rows[:limit]} if name}
         wanted = wants.wanted_keys(connection, (normalise_code_key(row["code"]) for row in rows[:limit]))

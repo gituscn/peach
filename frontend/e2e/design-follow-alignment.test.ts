@@ -25,6 +25,15 @@ describe('关注与馆藏共用卡片交互', () => {
       await opened.stub.release();
       await opened.page.locator('[data-follow-list] > [data-follow-item]').first().waitFor();
       assert.deepEqual(await read(), pending);
+      const boxes = await opened.page.locator('[data-follow-list] > [data-follow-item]').evaluateAll(nodes =>
+        nodes.slice(0, 6).map(node => {
+          const card = node.getBoundingClientRect();
+          const pic = node.querySelector('[data-media-pic]')!.getBoundingClientRect();
+          const labels = node.querySelector('[data-follow-labels]')!.getBoundingClientRect();
+          return { height: card.height, left: pic.left, labels: labels.left + 4 };
+        }));
+      assert.ok(boxes.every(box => Math.abs(box.labels - box.left) <= 1), JSON.stringify(boxes));
+      assert.ok(Math.max(...boxes.map(box => box.height)) - Math.min(...boxes.map(box => box.height)) <= 1, JSON.stringify(boxes));
     } finally { await opened.stub.release(); await opened.close() }
   });
 

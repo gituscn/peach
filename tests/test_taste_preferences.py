@@ -101,6 +101,18 @@ class TastePreferenceTests(unittest.TestCase):
         self.asset(1, played=12, feedback="dislike")
         self.assertFalse(any(preference_profile(self.db, self.store)[0].values()))
 
+    def test_known_male_performers_are_recorded_without_preference_evidence(self):
+        self.db.execute('ALTER TABLE entity ADD COLUMN metadata_json TEXT')
+        self.db.execute("UPDATE entity SET metadata_json=? WHERE id=1", (json.dumps({'gender': 'male'}),))
+        self.asset(1, played=12)
+        self.db.execute("INSERT INTO entity_link VALUES(1,'https://x.com/demo_actor')")
+        self.db.execute("INSERT INTO follow_source VALUES(1,'https://x.com/demo_actor',1)")
+        self.history([(1, 'https://x.com/demo_actor/status/123', '演示女优 的作品')])
+        strengths, _, evidence = preference_profile(self.db, self.store)
+        self.assertNotIn(1, strengths['performer'])
+        self.assertNotIn(1, evidence['performer'])
+        self.assertEqual(json.loads(self.db.execute('SELECT metadata_json FROM entity WHERE id=1').fetchone()[0]), {'gender': 'male'})
+
     def test_mmr_accepts_preference_relevance_without_changing_movie_similarity(self):
         pool = [{"id": 1, "entities": {"tag": {10}}, "taste": .9},
                 {"id": 2, "entities": {"tag": {10}}, "taste": .89},

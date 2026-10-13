@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { queryClient } from '../../src/react/query';
 import { WantMagnets, type MagnetCandidate } from '../../src/react/wants/want-magnets';
 import type { Want } from '../../src/react/wants/wants';
+import { WANTS_KEY, type WantsData } from '../../src/react/wants/wants';
 import { buttonNamed, click, mount, mountRoot, pending, settle } from './render';
 import { cachedResources, rememberResources, resourceLifetime } from '../../src/react/wants/resource-cache';
 import { resourceNotice, resourceSize } from '../../src/react/wants/resource-display';
@@ -194,4 +195,14 @@ it('过期的内存缓存随卡片进入视口重新查询', async () => {
   await act(async () => reveal!());
   await settle();
   expect(fetcher).toHaveBeenCalledOnce();
+});
+
+it('已取得磁链更新清单筛选状态，ED2K 不计作磁链', async () => {
+  queryClient.setQueryData<WantsData>(WANTS_KEY, { items: [{ id: 1 } as Want], counts: {} as WantsData['counts'], scraping: false });
+  await open();
+  expect(queryClient.getQueryData<WantsData>(WANTS_KEY)?.items[0]?.has_magnets).toBe(true);
+  queryClient.removeQueries({ queryKey: ['want-magnets'] });
+  localStorage.clear();
+  await open([{ ...candidate, protocol: 'ed2k', uri: 'ed2k://|file|demo|12|abc|/' }]);
+  expect(queryClient.getQueryData<WantsData>(WANTS_KEY)?.items[0]?.has_magnets).toBe(false);
 });

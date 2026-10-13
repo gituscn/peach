@@ -1,5 +1,6 @@
 /* JAV 想要：按状态分组的作品卡，复用资源链接查询与查找资源弹层。 */
 import { useState } from 'react';
+import { Radio } from 'react-aria-components';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { RiStarLine, RiExternalLinkLine, RiDeleteBinLine } from '@remixicon/react';
@@ -20,6 +21,8 @@ import { pageWindow } from '../follow-manage/follow-manage';
 import { ErrorLine } from '../follow-manage/source-view';
 import { Help } from '../settings/section';
 import { WantMagnets } from './want-magnets';
+import { cachedMagnetStates } from './resource-cache';
+import { SEGMENT, SEGMENTED_TRACK, SegmentedRadioGroup } from '../components/segmented';
 import { busyProps, useAction } from '../settings/use-action';
 import {
   addWant, fetchWants, invalidateWants, PHASES, removeWants, resetWants, searchNote, wantName,
@@ -29,6 +32,8 @@ import {
 const ORIGINS: Record<Want['origin'], string> = { code: '手动添加', feed: '订阅新作', follow: '关注' };
 /** 每一段一页摆多少张：一张卡二十来个节点，上千条一次摆开就是十几万像素高的一页。 */
 export const WANT_PAGE_SIZE = 20;
+const MAGNET_FILTERS = [['all', '全部'], ['available', '有磁链'], ['missing', '没磁链']] as const;
+
 
 /** 资料那一行：发行日、厂牌、女优、从哪儿加进来的。 */
 const facts = (want: Want) => [want.release_date, want.studio, want.performers, ORIGINS[want.origin]]
@@ -94,14 +99,31 @@ function WantPhase({ phase, label, rows, row }: {
   phase: string; label: string; rows: Want[]; row(want: Want): ReactNode;
 }) {
   const [page, setPage] = useState(1);
-  const win = pageWindow(rows.length, WANT_PAGE_SIZE, page);
+  const [magnetFilter, setMagnetFilter] = useState('all');
+  const cached = cachedMagnetStates(rows);
+  const hasMagnet = (want: Want) => want.has_magnets ?? cached.get(want.code || '') ?? false;
+  const available = rows.filter(hasMagnet);
+  const filtered = phase !== 'searching' || magnetFilter === 'all' ? rows
+    : rows.filter(want => hasMagnet(want) === (magnetFilter === 'available'));
+  const win = pageWindow(filtered.length, WANT_PAGE_SIZE, page);
   return (
     <section aria-label={label} data-want-phase={phase} className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
       <h3 className="flex items-baseline gap-2 text-title-2-medium text-text-primary">
         {label}
         <span className="text-body-2-regular tabular-nums text-text-secondary">{rows.length.toLocaleString()}</span>
       </h3>
-      <ul className="flex flex-col gap-4">{rows.slice(win.start, win.end).map(row)}</ul>
+      {phase === 'searching' ? <SegmentedRadioGroup name="want-magnet-filter" aria-label="待找磁链筛选"
+        orientation="horizontal" value={magnetFilter} className={SEGMENTED_TRACK} onChange={value => { setMagnetFilter(value); setPage(1) }}>
+        {MAGNET_FILTERS.map(([value, text]) => <Radio key={value} value={value} aria-label={text} className={SEGMENT}>
+          {text}<span className="text-caption-1-regular tabular-nums text-text-tertiary">{
+            (value === 'all' ? rows.length : value === 'available' ? available.length : rows.length - available.length).toLocaleString()
+          }</span>
+        </Radio>)}
+      </SegmentedRadioGroup> : null}
+      </div>
+      {!filtered.length ? <EmptyState shell="plain" icon={RiStarLine} title="暂无符合条件的作品">{null}</EmptyState> : null}
+      <ul className="flex flex-col gap-4">{filtered.slice(win.start, win.end).map(row)}</ul>
       {win.pages > 1 ? (
         <div data-want-pager="" className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-body-2-regular tabular-nums text-text-secondary">
@@ -126,6 +148,7 @@ export function WantList({ readOnly, toast, query = '' }: WantListProps) {
   const action = useAction();
   const wants = useQuery({
     queryKey: WANTS_KEY, queryFn: ({ signal }) => fetchWants(signal),
+    staleTime: 30_000,
     // 刚登记的那几条还在取资料：跑着就隔几秒再读一次，取完了就停。
     refetchInterval: (query) => (query.state.data?.scraping ? 3000 : false),
   });

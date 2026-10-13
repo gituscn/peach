@@ -147,9 +147,11 @@ def _cover(contract, row: dict, thumbs: dict) -> tuple[str | None, bool]:
 
 
 def _payload(contract, row: dict, today: date, thumbs: dict) -> dict:
+    from .wants_magnets import search_for
     cover, remote = _cover(contract, row, thumbs)
     return {
         "id": int(row["id"]), "code": row["code"], "origin": row["origin"],
+        "has_magnets": search_for(contract.follow_secrets_root).known_magnets(row['code'], row['release_date']) if row['code'] else None,
         "title": row["title"], "link": row["link"], "release_date": row["release_date"],
         "studio": row["studio"], "performers": row["performers"],
         "phase": wants.phase(row, today), "fresh": wants.is_fresh(row["release_date"], today),

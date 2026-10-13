@@ -69,32 +69,25 @@ def q_jav_detail(contract, args) -> dict:
     return payload
 
 
+def visible_actors(connection, source, excluded=None):
+    """来源演员资料保持完整，使用时排除明确登记的男优。"""
+    excluded = entities.male_performer_ids(connection) if excluded is None else excluded
+    actors = []
+    for actor in source.get('actors') or []:
+        if not isinstance(actor, dict) or not actor.get('name') or actor_gender(actor) == 'male':
+            continue
+        entity = entities.resolve_entity(connection, 'performer', actor['name'])
+        if entity is None or entity['id'] not in excluded:
+            actors.append(actor)
+    return actors
+
+
 def _identity_fields(contract, code, item, source):
-    actors = [actor for actor in source.get("actors", []) if isinstance(actor, dict) and actor.get("name")]
-    names = [actor.get("name") for actor in actors]
-    if not names:
-        names = re.split(r"[、,，]", str(item.get("performers") or ""))
     with contract.database.read_connection() as connection:
-        performer_refs = []
-        for name in dict.fromkeys(names):
-            refs = _refs(contract, connection, "performer", [name])
-            if not refs:
-                continue
-            ref = refs[0]
-            actor = next((actor for actor in actors if actor.get("name") == name), {})
-            ref["gender"] = actor_gender(actor)
-            if ref["gender"] == "unknown" and ref.get("id"):
-                local = connection.execute("SELECT metadata_json FROM entity WHERE id=?", (ref["id"],)).fetchone()
-                try:
-                    metadata = json.loads(local[0] or "{}") if local else {}
-                    ref["gender"] = actor_gender(metadata) if isinstance(metadata, dict) else "unknown"
-                except (ValueError, TypeError):
-                    pass
-            actor_id = str(actor.get("id") or "")
-            if re.fullmatch(r"[A-Za-z0-9]{1,64}", actor_id):
-                ref["source_actor_id"] = actor_id
-                ref["source_avatar"] = public_image_url(actor.get("avatar_url"))
-            performer_refs.append(ref)
+        actors = visible_actors(connection, source)
+        if 'actors' not in source:
+            actors = [{'name': name} for name in re.split(r"[、,，]", str(item.get('performers') or ''))]
+        performer_refs = source_performer_refs(contract, connection, actors)
         studio_refs = _refs(contract, connection, "studio", [item.get("studio")])
         for ref in studio_refs:
             ref["has_logo"] = contract.has_logo(ref["name"])
@@ -105,6 +98,34 @@ def _identity_fields(contract, code, item, source):
     return {"performers": "、".join(ref["name"] for ref in performer_refs),
             "performer_refs": performer_refs, "studio_refs": studio_refs, "series_refs": series_refs,
             "wanted": wanted, "want_id": int(want[0]) if want else None}
+
+
+def source_performer_refs(contract, connection, actors):
+    """详情与发现共用来源身份；头像是否可取不保存签名地址。"""
+    refs = []
+    for actor in actors:
+        matched = _refs(contract, connection, 'performer', [actor.get('name')])
+        if not matched:
+            continue
+        ref = matched[0]
+        gender = actor_gender(actor)
+        if gender == 'unknown' and ref.get('id'):
+            local = connection.execute('SELECT metadata_json FROM entity WHERE id=?', (ref['id'],)).fetchone()
+            try:
+                metadata = json.loads(local[0] or '{}') if local else {}
+                gender = actor_gender(metadata) if isinstance(metadata, dict) else 'unknown'
+            except (ValueError, TypeError):
+                pass
+        if gender == 'male' or any(person['name'] == ref['name'] for person in refs):
+            continue
+        ref['gender'] = gender
+        actor_id = str(actor.get('id') or '')
+        if re.fullmatch(r'[A-Za-z0-9]{1,64}', actor_id):
+            ref['source_actor_id'] = actor_id
+            ref['source_avatar'] = (bool(actor['has_avatar']) if 'has_avatar' in actor
+                                    else public_image_url(actor.get('avatar_url')) if 'avatar_url' in actor else True)
+        refs.append(ref)
+    return refs
 
 
 def _artwork_fields(contract, code, item, source):
@@ -156,7 +177,18 @@ def q_jav_image(contract, args) -> dict:
             and (not index.isdigit() or not 0 <= int(index) < 30)):
         raise ValueError("预览图不存在")
     try:
+        if index.startswith('actor:'):
+            stored, _ = discovery_metadata(contract).peek(code)
+            PUBLIC_API.remember_movie_identity(code, stored or {})
+            actor = next((person for person in (stored or {}).get('actors', [])
+                          if isinstance(person, dict) and str(person.get('id')) == index.removeprefix('actor:')), {})
+            if public_image_url(actor.get('avatar_image')):
+                return {'ok': True, 'image': PUBLIC_API.image_from_url(actor['avatar_image'])}
         image = PUBLIC_API.image(code, index)
+        if index.startswith('actor:'):
+            movie = PUBLIC_API.peek_movie(code)
+            if movie:
+                discovery_metadata(contract).remember(code, movie)
     except PublicSourceUnavailable as error:
         return {"ok": False, "image": "", "message": str(error)}
     return {"ok": True, "image": image}

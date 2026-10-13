@@ -11,6 +11,20 @@ def normalize_entity_name(name: str) -> str:
     return strip_zero_width(name).strip().casefold()
 
 
+def male_performer_ids(connection: Connection) -> set[int]:
+    """明确登记为男优的人物只保留资料，不参与展示和偏好。"""
+    from .javdb_public import actor_gender
+    found = set()
+    for row in connection.execute("SELECT * FROM entity WHERE kind='performer'"):
+        try:
+            metadata = json.loads(dict(row).get('metadata_json') or '{}')
+        except (ValueError, TypeError):
+            continue
+        if isinstance(metadata, dict) and actor_gender(metadata) == 'male':
+            found.add(int(row['id']))
+    return found
+
+
 # 官方标题登记的并写名：https://attackers.net/、https://premium-beauty.com/、
 # https://kawaiikawaii.jp/。只折叠已核实的品牌，不剥任意括号或标点。
 STUDIO_BRAND_NAMES = {

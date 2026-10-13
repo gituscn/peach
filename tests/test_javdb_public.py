@@ -20,6 +20,24 @@ from support.ledger import fresh_ledger
 
 
 class PublicProtocolTests(unittest.TestCase):
+    def test_api_and_image_cooldowns_have_independent_scope(self):
+        requests = []
+        def transport(request, *_):
+            requests.append(request.url)
+            return HttpResponse(429 if request.url.endswith('blocked') else 200, {}, b'pixels')
+        api = PublicAPI(transport, clock=lambda: 100, sleeper=lambda _: None)
+        with self.assertRaises(PublicSourceUnavailable):
+            api._get('https://api.example.test/blocked')
+        self.assertEqual(api._get('https://tp.spfcas.com/actor.jpg', image=True).status, 200)
+        api.paused_until = 0
+        with self.assertRaises(PublicSourceUnavailable):
+            api._get('https://tp.spfcas.com/blocked', image=True)
+        self.assertEqual(api._get('https://api.example.test/ready').status, 200)
+        count = len(requests)
+        with self.assertRaises(PublicSourceUnavailable):
+            api._get('https://tp.spfcas.com/actor.jpg', image=True)
+        self.assertEqual(len(requests), count)
+
     def test_pending_image_keeps_metadata_readable_and_merges_same_key(self):
         api = PublicAPI()
         started, release = threading.Event(), threading.Event()
@@ -236,6 +254,52 @@ class PublicProtocolTests(unittest.TestCase):
 
 
 class DetailProjectionTests(unittest.TestCase):
+    def test_saved_identity_fetches_actor_portrait_without_code_search(self):
+        from peach.jav_discovery_metadata import discovery_metadata
+        metadata = discovery_metadata(self.contract)
+        metadata.remember('EXM-001', {'id': 'Exact', 'number': 'EXM-001', 'actors': [
+            {'id': 'Person', 'name': '甲', 'gender': 0,
+             'avatar_url': 'https://tp.spfcas.com/actor.jpg?signature=expired'}]})
+        original = io.BytesIO()
+        Image.new('RGB', (40, 60)).save(original, 'PNG')
+        requests = []
+        def transport(request, *_):
+            requests.append(request.url)
+            if '/search' in request.url:
+                raise AssertionError('已有作品身份，无需番号搜索')
+            if request.url.startswith('https://tp.spfcas.com/'):
+                body = original.getvalue()
+            elif request.url.endswith('/'):
+                body = b'<script src="/assets/index-test.js"></script>'
+            elif '/assets/' in request.url:
+                body = b'const S1="test-middle",E1="test-suffix";'
+            else:
+                body = json.dumps({'success': 1, 'data': {'movie': {'id': 'Exact', 'number': 'EXM-001',
+                    'actors': [{'id': 'Person', 'name': '甲', 'gender': 0,
+                                'avatar_url': 'https://tp.spfcas.com/actor.jpg'}]}}}).encode()
+            return HttpResponse(200, {}, body)
+        api = PublicAPI(transport, sleeper=lambda _: None)
+        with patch('peach.web_jav_detail.PUBLIC_API', api):
+            first = q_jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Person'})
+            second = q_jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Person'})
+        self.assertTrue(first['ok'])
+        self.assertTrue(first['image'].startswith('data:image/jpeg;base64,'))
+        self.assertEqual(second, first)
+        self.assertEqual(sum('/movies/Exact' in url for url in requests), 1)
+        self.assertEqual(sum(url.startswith('https://tp.spfcas.com/') for url in requests), 1)
+
+    def test_saved_static_actor_portrait_does_not_fetch_movie_details(self):
+        from peach.jav_discovery_metadata import discovery_metadata
+        metadata = discovery_metadata(self.contract)
+        metadata.remember('EXM-001', {'actors': [{'id': 'Actor1', 'name': '甲', 'gender': 0,
+                                               'avatar_url': 'https://tp.spfcas.com/actor.jpg'}]})
+        with patch('peach.web_jav_detail.PUBLIC_API.image_from_url', return_value='data:image/jpeg;base64,example') as image, \
+                patch('peach.web_jav_detail.PUBLIC_API.movie') as movie:
+            result = q_jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Actor1'})
+        self.assertTrue(result['ok'])
+        movie.assert_not_called()
+        image.assert_called_once_with('https://tp.spfcas.com/actor.jpg')
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -259,12 +323,16 @@ class DetailProjectionTests(unittest.TestCase):
         with self.contract.database.read_connection() as connection:
             self.assertEqual(connection.execute('SELECT COUNT(*) FROM feed_discovery').fetchone()[0], before)
 
-    def test_performer_refs_distinguish_female_male_and_unknown(self):
+    def test_male_source_records_are_retained_without_display_references(self):
         movie = {"id": "Exact", "number": "EXM-001", "actors": [
             {"name": "甲", "gender": 0}, {"name": "乙", "gender": 1}, {"name": "丙"}]}
         with patch("peach.web_jav_detail.PUBLIC_API.movie", return_value=movie):
             rows = q_jav_detail(self.contract, {"code": "EXM-001"})["performer_refs"]
-        self.assertEqual([row["gender"] for row in rows], ["female", "male", "unknown"])
+        self.assertEqual([row["gender"] for row in rows], ["female", "unknown"])
+        from peach.jav_discovery_metadata import discovery_metadata
+        recorded, _ = discovery_metadata(self.contract).peek('EXM-001')
+        self.assertEqual([{key: value for key, value in actor.items() if key != 'has_avatar'}
+                          for actor in recorded['actors']], movie['actors'])
 
     def test_source_studio_letter_case_uses_a_unique_local_identity(self):
         with self.contract.database.write_transaction() as connection:
@@ -394,9 +462,9 @@ class DetailProjectionTests(unittest.TestCase):
         self.assertTrue(all(ref['source_avatar'] and ref['id'] is None for ref in result['performer_refs']))
         self.assertEqual(result['studio_refs'][0]['has_logo'], True)
         self.assertEqual(result['studio_refs'][0]['logo_version'], 'logo-version')
-        with patch('peach.web_jav_detail.PUBLIC_API.image', return_value='data:image/jpeg;base64,sample') as image:
+        with patch('peach.web_jav_detail.PUBLIC_API.image_from_url', return_value='data:image/jpeg;base64,sample') as image:
             self.assertTrue(q_jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Unknown'})['ok'])
-        image.assert_called_once_with('EXM-001', 'actor:Unknown')
+        image.assert_called_once_with('https://tp.spfcas.com/b.jpg')
 
     def test_local_performer_reference_keeps_canonical_identity_and_face_crop(self):
         movie = {'id': 'Exact', 'actors': [

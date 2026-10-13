@@ -254,6 +254,7 @@
 @media (pointer: coarse) {
   .peach-react [data-catalog-frame] > [data-filter-row="top"] { height: 52px; }
   .peach-react :is([data-catalog-view], [data-catalog-tag]) { height: 36px; }
+  .peach-react [data-catalog-tags] > [data-skeleton="tag"] { height: 36px; }
 }
 
 /* ── 下排 ──

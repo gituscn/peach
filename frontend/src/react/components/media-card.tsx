@@ -237,6 +237,7 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
 
   return (
     <article ref={attach} data-media-card="" data-id={item.id} data-variant={variant}
+      data-jav-item={item.is_jav ? '' : undefined}
       data-part-seed={parts ? parts.seed_id : undefined} data-stacked={stacked ? '' : undefined}
       data-pending-delete={item.disposal === 'trash' ? '' : undefined} data-selected={selected ? '' : undefined}
       onClick={click} onMouseDown={suppressShiftTextSelection}>
@@ -251,6 +252,7 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
           <div data-media-byline="">
             {who}
             {item.why ? <span data-media-why="">{item.why}</span> : null}
+            {item.is_jav && item.release_date ? <time data-media-release="" dateTime={item.release_date}>{item.release_date}</time> : null}
             <span data-media-size="">{Number(shownSize) > 0 ? fmtSize(Number(shownSize)) : '大小未知'}</span>
             {item.play_count ? <span data-media-watch-count="">{`看过 ${item.play_count}`}</span> : null}
             <span data-media-flags="">{flags.map((flag) => <i key={flag} data-flag={flag} />)}</span>

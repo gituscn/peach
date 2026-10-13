@@ -230,22 +230,18 @@ function FollowCardView(props: FollowCardProps) {
               </FollowAuthorLink>
             ) : <span data-follow-author="" title={identity.author}>{identity.author}</span>}
             <time dateTime={item.published_at || ''} title={followWhen(item)}>{followCompactWhen(item)}</time>
+            {identity.credited ? <span data-follow-credit="" title={`署名含 ${identity.credited}`}>{`署名含 ${identity.credited}`}</span> : null}
           </div>
-          {identity.credited
-            ? <div data-follow-credit="" title={`署名含 ${identity.credited}`}>{`署名含 ${identity.credited}`}</div>
-            : null}
-          {badges ? <div data-follow-badges="" dangerouslySetInnerHTML={{ __html: badges }} /> : null}
-          {tags.length ? (
-            <div data-media-tags="">
-              {tags.map((tag) => (
-                <span key={tag} data-media-tag="" data-tag-cat={`r34-${item.tag_types?.[tag] || 'unknown'}`}
-                  data-follow-tag={tag}>
-                  {tagLabel(tag)}
-                </span>
-              ))}
-            </div>
-          ) : null}
           {issue ? <span data-follow-issue="">{issue}</span> : null}
+        </div>
+        <div data-media-tags="" data-follow-labels="">
+          {badges ? <span data-follow-badges="" dangerouslySetInnerHTML={{ __html: badges }} /> : null}
+          {tags.map((tag) => (
+            <span key={tag} data-media-tag="" data-tag-cat={`r34-${item.tag_types?.[tag] || 'unknown'}`}
+              data-follow-tag={tag}>
+              {tagLabel(tag)}
+            </span>
+          ))}
         </div>
       </div>
       <span data-follow-state="" aria-live="polite">{failure}</span>

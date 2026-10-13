@@ -8,8 +8,8 @@ import { appSettingsStore, javLayout, storeJavLayout, JAV_LAYOUTS, cardRatio, gr
 import { coverUrl } from '@peach/card-art';
 import { relayoutCovers } from '../../card-art/framing';
 import { wireHorizontalScroller } from '../../ui-kit/scroll';
-import { feedIdentity } from '../../card-art/feed-identity';
-import { javContentSkeleton, JAV_RECOMMENDATION_GRID } from '../../jav-skeleton';
+import { DiscoveryFaces } from './discovery-faces';
+import { javContentSkeleton, javTagSkeleton, JAV_RECOMMENDATION_GRID } from '../../jav-skeleton';
 import { errorMessage } from '../../api';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
 import { Note } from '../components/note';
@@ -103,8 +103,8 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         {([['external', '库外发现'], ['library', '馆藏探索']] as const).map(([key, label]) =>
           <FilterPill key={key} data-entity-tag={key} data-entity-press="" pressed={scope === key} onPress={() => { setScope(key); setTag('') }}>{label}</FilterPill>)}
         <span data-entity-sep="" aria-hidden="true" />
-      </div><div data-catalog-tags="">
-        {tags.map(name => <FilterPill key={name} data-catalog-tag={name} data-entity-press="" pressed={tag === name} onPress={() => setTag(tag === name ? '' : name)}>
+      </div><div data-catalog-tags="" dangerouslySetInnerHTML={waiting ? { __html: javTagSkeleton() } : undefined}>
+        {waiting ? null : tags.map(name => <FilterPill key={name} data-catalog-tag={name} data-entity-press="" pressed={tag === name} onPress={() => setTag(tag === name ? '' : name)}>
           {name}<span data-count-badge="">{all.filter(item => item.tags?.includes(name)).length}</span>
         </FilterPill>)}
       </div></div>} bottom={<>
@@ -152,16 +152,15 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         </a>
         <h3 data-jav-title="" title={`${item.code} · ${item.title || '标题未取得'}`}>{item.code} · {item.title || '标题未取得'}</h3>
         <div data-jav-identity="">
-          <div data-jav-faces="" dangerouslySetInnerHTML={{ __html: feedIdentity(item) }} />
+          <div data-jav-faces=""><DiscoveryFaces item={item} /></div>
           <p className="min-w-0 truncate text-body-2-regular text-text-secondary" title={item.performers}>{[item.performers, item.release_date].filter(Boolean).join(' · ')}</p>
         </div>
-        <div data-jav-taste-score="" className="flex h-6 items-center">
-          <button type="button" title={scoreDetails} aria-label={`推荐分 ${recommendation.score}，${recommendation.label}`}
+        <div data-jav-tags="" data-media-tags="">
+          <button data-jav-taste-score="" type="button" title={scoreDetails} aria-label={`推荐分 ${recommendation.score}，${recommendation.label}`}
             className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring">
             <Chip color={recommendation.color}>{recommendation.label}</Chip>
           </button>
-        </div>
-        <div data-jav-tags="" data-media-tags="">{(item.tags || []).slice(0, 4).map(name =>
+          {(item.tags || []).slice(0, 4).map(name =>
           <button type="button" data-media-tag="" key={name} aria-pressed={tag === name} onClick={() => setTag(tag === name ? '' : name)}>{name}</button>)}</div>
         <div data-jav-actions="" className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => resource({ ...item, cover: item.has_cover ? coverUrl(item, true) : item.cover_url, origin: `${item.asset_id ? 'asset' : 'feed'}:${item.id}` })}>查找资源</Button>

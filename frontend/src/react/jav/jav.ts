@@ -10,7 +10,7 @@ export { JAV_TABS, javTab, javPath, javLibraryPath } from './jav-navigation';
 export interface Discovery extends CoverItem {
   id: number; code: string; title: string; performers: string; release_date: string;
   studio: string; link: string; cover_url: string; has_cover: boolean; wanted: boolean;
-  performer_refs?: (FaceRef & { id: number; name: string })[];
+  performer_refs?: (FaceRef & { name: string; source_actor_id?: string; source_avatar?: boolean })[];
   asset_id?: number | null; tags?: string[]; reasons?: string[]; score?: number;
   taste_score?: number | null; ranking_score?: number | null; rank?: number;
   source_score?: number | null; duration?: number | null;
@@ -46,7 +46,8 @@ export function discoveryArtwork(item: Discovery, layout: 'big' | 'small', javIm
 
 export async function prefetchJav(tab: string, signal: AbortSignal) {
   if (tab === 'wants') {
-    await queryClient.fetchQuery({ queryKey: WANTS_KEY, queryFn: () => fetchWants(signal) }); return;
+    await queryClient.ensureQueryData({ queryKey: WANTS_KEY, queryFn: () => fetchWants(signal),
+      staleTime: 30_000, revalidateIfStale: true }); return;
   }
   if (tab === 'discover') {
     await queryClient.fetchQuery({ queryKey: discoveryKey('external'), queryFn: () => fetchDiscoveries('external', signal) }); return;

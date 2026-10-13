@@ -101,6 +101,7 @@ class PublicAPI:
         self.signature_parts: tuple[str, str] | None = None
         self.signature_until = 0.0
         self.paused_until = 0.0
+        self.image_paused_until = 0.0
         self.request_context = ContextVar("jav_public_request_budget", default=None)
 
     @contextmanager
@@ -113,8 +114,9 @@ class PublicAPI:
             self.request_context.reset(token)
 
     def _get(self, url: str, *, signed=False, limit=2 * 1024 * 1024, image=False):
-        if self.clock() < self.paused_until:
-            raise PublicSourceUnavailable("作品资料来源暂时不可用，请稍后重试")
+        paused = self.image_paused_until if image else self.paused_until
+        if self.clock() < paused:
+            raise PublicSourceUnavailable("图片来源暂时不可用，请稍后重试" if image else "作品资料来源暂时不可用，请稍后重试")
         if not image:
             self.limiter.wait(url)
         budget = self.request_context.get()
@@ -134,12 +136,19 @@ class PublicAPI:
                 budget.requests += 1
             response = self.transport(HttpRequest("GET", url, headers), 15, limit)
         except Exception as error:
-            self.paused_until = self.clock() + 60
+            if image:
+                self.image_paused_until = self.clock() + 60
+            else:
+                self.paused_until = self.clock() + 60
             raise PublicSourceUnavailable("作品资料未取得，请稍后重试") from error
         if budget:
             budget.bytes += len(response.body)
         if response.status != 200:
-            self.paused_until = self.clock() + (900 if response.status in (403, 429) else 60)
+            delay = 900 if response.status in (403, 429) else 60
+            if image:
+                self.image_paused_until = self.clock() + delay
+            else:
+                self.paused_until = self.clock() + delay
             raise PublicSourceUnavailable("作品资料来源暂时不可用，请稍后重试")
         return response
 
@@ -290,6 +299,10 @@ class PublicAPI:
                 raise ValueError("预览图不存在") from None
             if isinstance(url, dict):
                 url = url.get("large_url") or url.get("url")
+        return self.image_from_url(url)
+
+    def image_from_url(self, url) -> str:
+        """静态头像与作品图片共用校验、并发下载、解码和请求缓存。"""
         if not public_image_url(url):
             raise PublicSourceUnavailable("图片未取得")
 
@@ -300,7 +313,7 @@ class PublicAPI:
                 decoded = decode_image(body)
             return "data:image/jpeg;base64," + base64.b64encode(decoded).decode("ascii")
 
-        return self._cached(f"image:{movie['id']}:{index}", fetch)
+        return self._cached('image:' + hashlib.sha256(str(url).encode()).hexdigest(), fetch)
 
 
 def decode_image(body: bytes) -> bytes:

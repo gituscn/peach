@@ -16,6 +16,7 @@ export interface MediaItem {
   cost?: string;
   size?: number | null;
   duration?: number | null;
+  release_date?: string | null;
   play_seconds?: number | null;
   play_count?: number | null;
   leave_ratio?: number | null;

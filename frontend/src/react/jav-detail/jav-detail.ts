@@ -26,7 +26,8 @@ export const fetchJavDetail = (code: string, signal?: AbortSignal) =>
 export const fetchJavReviews = (code: string, page: number, signal?: AbortSignal) =>
   apiGet<JavReviews>(`/api/jav/reviews?code=${encodeURIComponent(code)}&page=${page}`, signal);
 export const prefetchJavDetail = (props: JavDetailProps, signal: AbortSignal) =>
-  queryClient.fetchQuery({ queryKey: javDetailKey(props.code), queryFn: () => fetchJavDetail(props.code, signal) });
+  queryClient.ensureQueryData({ queryKey: javDetailKey(props.code), queryFn: () => fetchJavDetail(props.code, signal),
+    staleTime: 6 * 3600_000, revalidateIfStale: true });
 
 /** 同一评论身份只呈现一次；重复页结束翻页。 */
 export function nextReviewPage(last: JavReviews, pages: JavReviews[]): number | undefined {

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { RiChat3Line, RiExternalLinkLine } from '@remixicon/react';
-import { entityPath, firstGrapheme, icon } from '@peach/legacy/core';
+import { entityPath, icon } from '@peach/legacy/core';
 import { tagLabel } from '@peach/legacy/tags';
 import { coverUrl } from '@peach/card-art';
 import { mountPreviewPlayer } from '../../player';
@@ -11,6 +11,7 @@ import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-dow
 import { Note } from '../components/note';
 import { RetryNote } from '../components/grid-reveal';
 import { IdentityCell, IdentitySeries } from '../components/identity-cell';
+import { SourceAvatar } from '../components/source-avatar';
 import { MediaCarousel, useCarouselInset } from '../components/media-carousel';
 import { useFoldedTitle } from '../components/folded-title';
 import { busyProps, useAction } from '../settings/use-action';
@@ -23,7 +24,7 @@ import { queryClient } from '../query';
 import { fetchJavDetail, fetchJavReviews, javDetailKey, nextReviewPage, type JavDetail, type JavDetailProps, type JavEntityRef } from './jav-detail';
 
 export function JavDetailPage(props: JavDetailProps) {
-  const result = useQuery({ queryKey: javDetailKey(props.code), queryFn: ({ signal }) => fetchJavDetail(props.code, signal) });
+  const result = useQuery({ queryKey: javDetailKey(props.code), queryFn: ({ signal }) => fetchJavDetail(props.code, signal), staleTime: 6 * 3600_000 });
   return <div data-jav-detail="" data-item-detail="" data-stage-grid="">
     {result.data ? <Work key={props.code} {...props} item={result.data} retry={() => { void result.refetch() }} retrying={result.isFetching} /> : <div data-jav-failure="">
       <Close close={props.actions.close} />
@@ -145,20 +146,13 @@ function JavIdentity({ item, navigate }: { item: JavDetail; navigate(path: strin
     <h5 data-id-label="">{label}</h5><div data-id-row="">{refs.map(person => <IdentityCell key={person.name} kind={kind}
       person={{ ...person, id: person.id ?? null }} onOpen={onOpen} openByName={kind === 'studio'}
       face={kind === 'performer' && !person.has_image && !person.has_avatar && person.source_avatar && person.source_actor_id
-        ? <SourceAvatar code={item.code} person={person} /> : undefined} />)}</div>
+        ? <SourceAvatar code={item.code} person={person} detail /> : undefined} />)}</div>
   </section> : null;
   return <div data-item-identity=""><div data-identity-primary="">
     {group('performer', '女优', item.performer_refs.filter(person => person.gender === 'female'), 'female')}
     {group('performer', '出演者', item.performer_refs.filter(person => !person.gender || person.gender === 'unknown'), 'unknown')}
     {group('studio', '厂牌', item.studio_refs)}</div>
     <IdentitySeries people={item.series_refs.map(person => ({ ...person, id: person.id ?? null }))} onOpen={onOpen} /></div>;
-}
-
-function SourceAvatar({ code, person }: { code: string; person: JavEntityRef }) {
-  const result = useQuery({ queryKey: ['jav-actor-image', code, person.source_actor_id], queryFn: ({ signal }) =>
-    apiGet<{ ok: boolean; image: string }>(`/api/jav/image?code=${encodeURIComponent(code)}&image=${encodeURIComponent('actor:' + person.source_actor_id)}`, signal) });
-  return <span data-id-face=""><span>{firstGrapheme(person.name)}</span>{result.data?.image
-    ? <img src={result.data.image} alt="" data-drop="self" /> : null}</span>;
 }
 
 function PreviewVideo({ src }: { src: string }) {

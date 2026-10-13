@@ -1,5 +1,6 @@
 /* 资源查询按作品发行日缓存；浏览器重启后也可读取，最多保留 128 部。 */
 import type { MagnetResult } from './want-magnets';
+import type { Want } from './wants';
 
 const KEY = 'peach.want-resources.v1';
 const DAY = 86_400_000;
@@ -33,6 +34,18 @@ function entries(): Entry[] {
 export function cachedResources(code: string, released: string | null | undefined) {
   const found = entries().find((row) => row.code === code);
   return found && Date.now() - found.saved < resourceLifetime(released) ? found : undefined;
+}
+
+export function cachedMagnetStates(wants: readonly Pick<Want, 'code' | 'release_date'>[]) {
+  const records = new Map(entries().map(row => [row.code, row]));
+  const states = new Map<string, boolean>();
+  for (const want of wants) {
+    if (!want.code) continue;
+    const row = records.get(`all-sources:${want.code}`);
+    if (row && Date.now() - row.saved < resourceLifetime(want.release_date))
+      states.set(want.code, row.result.items.some(item => item.protocol === 'magnet'));
+  }
+  return states;
 }
 
 export function rememberResources(code: string, result: MagnetResult) {

@@ -7,6 +7,7 @@ import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .catalog_rules import normalise_code_key
 from .fsutil import atomic_write_text
@@ -16,6 +17,16 @@ from .jobs import BackgroundJob
 MAX_ITEMS = 100
 MAX_RECORDS = 2048
 FIELDS = ("id", "number", "title", "release_date", "maker_name", "series_name", "duration", "score", "tags", "actors")
+
+
+def actor_record(actor):
+    from .javdb_public import public_image_url
+    record = {key: actor[key] for key in ('id', 'name', 'gender') if key in actor}
+    address = str(actor.get('avatar_url') or actor.get('avatar_image') or '')
+    record['has_avatar'] = public_image_url(address)
+    if record['has_avatar'] and not urlsplit(address).query and not urlsplit(address).fragment:
+        record['avatar_image'] = address
+    return record
 
 
 def source_number(value):
@@ -63,9 +74,9 @@ class DiscoveryMetadata:
         with self.lock:
             previous = self.records.get(code, {})
             projected = {key: movie[key] for key in FIELDS if key in movie} if movie else previous.get("movie", {})
-            # 图片与播放地址只由作品详情持有，资料边车不保存签名地址。
+            # 头像仅保存公开静态地址；带签名参数的图片与播放地址不进入资料边车。
             if movie and "actors" in projected:
-                projected["actors"] = [{key: actor[key] for key in ("id", "name", "gender") if key in actor}
+                projected["actors"] = [actor_record(actor)
                                        for actor in movie.get("actors") or [] if isinstance(actor, dict)][:100]
             self.records[code] = {"movie": projected, "checked_at": self.clock(),
                                   "expires_at": self.clock() + (900 if error else 6 * 3600), "error": error}

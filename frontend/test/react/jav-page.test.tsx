@@ -3,16 +3,34 @@ import { QueryClientProvider, notifyManager } from '@tanstack/react-query';
 import { queryClient } from '../../src/react/query';
 import { JavPage } from '../../src/react/jav/jav-page';
 import { JavHeader } from '../../src/react/jav/jav-header';
+import { prefetchJav } from '../../src/react/jav/jav';
+import { WANTS_KEY } from '../../src/react/wants/wants';
 import { buttonNamed, click, mount, settle, type } from './render';
 
 notifyManager.setScheduler(notify => notify());
 afterEach(() => queryClient.clear());
 
+it('想要已有清单立即返回，陈旧数据在后台更新', async () => {
+  const cached = { items: [], counts: {}, scraping: false };
+  queryClient.setQueryData(WANTS_KEY, cached, { updatedAt: Date.now() - 60_000 });
+  let finish!: (response: Response) => void;
+  const request = new Promise<Response>(resolve => { finish = resolve });
+  const fetcher = vi.fn(() => request);
+  vi.stubGlobal('fetch', fetcher);
+  await prefetchJav('wants', new AbortController().signal);
+  expect(queryClient.getQueryData(WANTS_KEY)).toEqual(cached);
+  expect(fetcher).toHaveBeenCalledOnce();
+  finish({ ok: true, status: 200, json: async () => cached } as Response);
+  await settle();
+  await prefetchJav('wants', new AbortController().signal);
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+
 it('JAV 分区导航保留三个入口，馆藏使用目录搜索', async () => {
   const navigate = vi.fn(), find = vi.fn();
   const host = await mount(<JavHeader tab="library" navigate={navigate} find={find} />);
   const tabs = [...host.querySelectorAll('[role="tab"]')];
-  expect(tabs.map(tab => tab.textContent?.trim())).toEqual(['我的馆藏', '发现', '想要']);
+  expect(tabs.map(tab => tab.textContent?.trim())).toEqual(['馆藏', '发现', '想要']);
   expect(tabs[0]?.getAttribute('aria-selected')).toBe('true');
   expect(host.querySelector('input')).toBeNull();
   await click(tabs[1]);
