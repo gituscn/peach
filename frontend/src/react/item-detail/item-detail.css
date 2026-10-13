@@ -603,7 +603,7 @@
    是另一件事，同色的两块之间只留白读不出边界。横排竖向不滚，滑到头也不把手势交给外面那层浮窗，
    不画滚动条：拖动与滚轮靠壳的 `wireDrag`。 */
 .peach-react [data-item-related] { border-top: 1px solid var(--line-soft); padding: 11px 15px 12px; background: var(--detail-surface); }
-.peach-react [data-item-related] h3 {
+.peach-react [data-item-related] > h3 {
   margin: 0 0 8px;
   font-size: var(--fs-xs);
   letter-spacing: .1em;
@@ -621,3 +621,4 @@
   scrollbar-width: none;
 }
 .peach-react [data-item-related] [data-related-row]::-webkit-scrollbar { display: none; }
+.peach-react [data-item-related] [data-related-state] { min-width: 0; }

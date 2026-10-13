@@ -204,6 +204,21 @@ class ResourceJunkQueueTests(unittest.TestCase):
         self.assertNotIn(7, by_id)
         self.assertTrue(all("path" not in item for item in result["items"]))
 
+    def test_game_download_promo_name_enters_review_without_automatic_trash(self):
+        name = "18+游戏大全(996gg.cc)-七龍珠H版-三國志H版-三國群淫傳等.mp4"
+        self.add(80, "115", "B:\\云下载\\MNGS-071\\" + name, "video", 2001226, 11.378005)
+        self.add(81, "115", "B:\\云下载\\ROYD-358\\" + name, "video", 2001226)
+        self.add(82, "115", "B:\\游戏录像\\" + name, "video", 5 * 1024**2, 11)
+        self.add(83, "115", "B:\\游戏录像\\七龍珠H版游戏实况.mp4", "video", 2001226, 11)
+        self.add(84, "115", "B:\\完整录像\\" + name, "video", 2001226, 3600)
+        candidates = {row["id"]: row for row in q_ads(self.contract)["items"]}
+        self.assertEqual(set(candidates), {80, 81})
+        for row in candidates.values():
+            self.assertIn("游戏下载站推广视频", row["why"])
+            self.assertGreaterEqual(row["score"], web_batch.JUNK_REVIEW_SCORE)
+            self.assertLess(row["score"], web_batch.AUTO_TRASH_SCORE)
+        self.assertEqual(web_batch.automatic_junk_candidates(self.contract), [])
+
     def test_non_video_trash_items_remain_visible_and_recoverable(self):
         self.add(10, "115", r"B:\番号\广告图.jpg", "image", disposal="trash")
         self.add(11, "115", r"B:\番号\备用网址.url", "other", disposal="trash")

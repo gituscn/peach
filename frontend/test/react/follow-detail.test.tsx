@@ -338,7 +338,7 @@ describe('文案与排序', () => {
     await click(host.querySelector('[data-follow-related] [data-follow-open]'));
     expect(props.actions.openItem).toHaveBeenCalledWith(42);
     await act(async () => { setFollowItemStatus(42, 'seen') });
-    expect(host.querySelector('[data-follow-related]')).toBeNull();
+    expect(host.querySelector('[data-follow-related] [data-empty-state] h3')?.textContent).toBe('暂无接着看的内容');
     const { host: disabled } = await show(data(item(43)), { relatedLimit: 0 });
     expect(disabled.querySelector('[data-follow-related]')).toBeNull();
     expect(fetcher.mock.calls.some(([url]) => String(url).startsWith('/api/follow?limit='))).toBe(false);

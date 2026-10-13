@@ -68908,19 +68908,33 @@ function RU(e, t) {
 }
 //#endregion
 //#region src/react/components/related-section.tsx
-function zU({ children: e, wireDrag: t, busy: n, ...r }) {
-	let i = (0, b.useCallback)((e) => {
+function zU({ children: e, wireDrag: t, busy: n, empty: r, error: i, onRetry: a, ...o }) {
+	let s = (0, b.useCallback)((e) => {
 		e && (So(e), t(e));
 	}, [t]);
 	return /* @__PURE__ */ (0, x.jsxs)("div", {
-		...r,
+		...o,
 		"data-item-related": "",
 		"aria-busy": n || void 0,
 		children: [/* @__PURE__ */ (0, x.jsx)("h3", {
 			className: "font-semibold",
 			children: "接着看"
-		}), /* @__PURE__ */ (0, x.jsx)("div", {
-			ref: i,
+		}), i ? /* @__PURE__ */ (0, x.jsx)("div", {
+			"data-related-state": "",
+			children: /* @__PURE__ */ (0, x.jsx)(EM, {
+				message: i,
+				onRetry: a || (() => {})
+			})
+		}) : r && !n ? /* @__PURE__ */ (0, x.jsx)("div", {
+			"data-related-state": "",
+			children: /* @__PURE__ */ (0, x.jsx)(nk, {
+				shell: "plain",
+				icon: Nfe,
+				title: "暂无接着看的内容",
+				children: "可以回到列表挑选其他作品。"
+			})
+		}) : /* @__PURE__ */ (0, x.jsx)("div", {
+			ref: s,
 			id: "nrow",
 			"data-related-row": "",
 			children: e
@@ -69249,9 +69263,7 @@ function ZMe({ data: e, media: t, limit: n, context: r, helpers: i, actions: a }
 		openDetail: a.openItem,
 		openAuthor: a.openAuthor,
 		canFlip: () => !1
-	}), [a]), l = UU(o.data?.pages || [], e, t, n);
-	if (o.isError || o.data && !l.length) return null;
-	let u = o.data?.pages.at(-1)?.sources || e.sources, d = {
+	}), [a]), l = UU(o.data?.pages || [], e, t, n), u = o.data?.pages.at(-1)?.sources || e.sources, d = {
 		...r,
 		sources: u,
 		aliases: o.data?.pages.at(-1)?.author_aliases || r.aliases
@@ -69260,6 +69272,11 @@ function ZMe({ data: e, media: t, limit: n, context: r, helpers: i, actions: a }
 		"data-follow-related": "",
 		wireDrag: i.wireDrag,
 		busy: o.isPending,
+		empty: !!o.data && !l.length,
+		error: o.isError ? `读取接着看失败：${vt(o.error)}` : void 0,
+		onRetry: () => {
+			o.refetch();
+		},
 		children: o.data ? l.map((e) => /* @__PURE__ */ (0, x.jsx)(mR, {
 			variant: "next",
 			group: e,
@@ -71214,9 +71231,14 @@ function kNe(e) {
 		queryKey: nue(t.id, n),
 		queryFn: async ({ signal: e }) => (await B(iue(t.id, n), e)).items || []
 	}), [o] = (0, b.useState)(() => r.relatedSkeletonHtml());
-	return a.isError || a.data && !a.data.length ? null : /* @__PURE__ */ (0, x.jsx)(zU, {
+	return /* @__PURE__ */ (0, x.jsx)(zU, {
 		wireDrag: r.wireDrag,
 		busy: a.isPending,
+		empty: a.data?.length === 0,
+		error: a.isError ? `读取接着看失败：${vt(a.error)}` : void 0,
+		onRetry: () => {
+			a.refetch();
+		},
 		children: a.data ? /* @__PURE__ */ (0, x.jsx)(BP, {
 			mode: "items",
 			variant: "next",

@@ -70,6 +70,32 @@ describe('详情底部的队列与推荐', () => {
   });
 
   for (const viewport of VIEWPORTS) for (const kind of ['local', 'follow'] as const) {
+    it(`${viewport.name} ${kind}：接着看空结果显示完整说明`, { timeout: 60_000 }, async () => {
+      const opened = kind === 'local'
+        ? await openItemPage(browser, `/item/${ITEM.plain}`, viewport)
+        : await openFollowFeed(browser, `/follow/item/${DETAIL.collection}`, viewport,
+          { ready: '#stage [data-follow-queue]', settings: { relatedLimit: 12 } });
+      try {
+        const page = opened.page;
+        await page.route(kind === 'local' ? '**/api/related?*' : '**/api/follow?*', route => {
+          if (kind === 'follow' && new URL(route.request().url()).searchParams.has('item')) return route.fallback();
+          return route.fulfill({ json: kind === 'local' ? { items: [] }
+            : { groups: [], sources: [], author_aliases: [], has_more: false } });
+        });
+        await page.reload({ waitUntil: 'load' });
+        const empty = page.locator('#stage [data-item-related] [data-empty-state]');
+        await empty.waitFor({ state: 'visible' });
+        assert.equal(await empty.locator('h3').textContent(), '暂无接着看的内容');
+        assert.equal(await empty.locator('p').textContent(), '可以回到列表挑选其他作品。');
+        const box = await empty.boundingBox();
+        assert.ok(box && box.width > 0 && box.x >= 0 && box.x + box.width <= viewport.width + 1);
+        assert.equal(await page.locator('#stage [data-item-related] [aria-busy="true"]').count(), 0);
+        await empty.scrollIntoViewIfNeeded();
+        await page.locator('#stage').screenshot({ path: `../build/detail-hover-avatar/${kind}-${viewport.name}-empty.png` });
+        assert.deepEqual(opened.problems.filter(problem => !problem.includes('VIDEOJS')), []);
+      } finally { await opened.close() }
+    });
+
     it(`${viewport.name} ${kind}：分集与推荐共用布局，悬停面完整`, { timeout: 60_000 }, async () => {
       const opened = kind === 'local'
         ? await openItemPage(browser, `/parts/${ITEM.part}/${ITEM.part}`, viewport)

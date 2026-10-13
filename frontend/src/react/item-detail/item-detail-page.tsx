@@ -721,8 +721,8 @@ function Preference({ item, open, write }: { item: DetailItem; open: boolean; wr
 }
 
 /* ── 接着看 ──
-   这一排的卡是目录网格的 items 模式：取数在这里，卡只画。没有可接着看的就整块拿掉，不留一个
-   标题配空白。它没有滚动条，拖动与滚轮都靠壳的 `wireDrag`。 */
+   这一排的卡是目录网格的 items 模式：取数在这里，卡只画。空结果与失败留在推荐区，
+   拖动与滚轮都靠壳的 `wireDrag`。 */
 function Related(props: ItemDetailProps & { item: DetailItem }) {
   const { item, relatedLimit, helpers, grid } = props;
   const result = useQuery({
@@ -733,9 +733,10 @@ function Related(props: ItemDetailProps & { item: DetailItem }) {
     },
   });
   const [skeleton] = useState(() => helpers.relatedSkeletonHtml());
-  if (result.isError || (result.data && !result.data.length)) return null;
   return (
-    <RelatedSection wireDrag={helpers.wireDrag} busy={result.isPending}>
+    <RelatedSection wireDrag={helpers.wireDrag} busy={result.isPending} empty={result.data?.length === 0}
+      error={result.isError ? `读取接着看失败：${requestErrorMessage(result.error)}` : undefined}
+      onRetry={() => { void result.refetch() }}>
         {result.data ? (
           <CatalogGridPage mode="items" variant="next" items={result.data} helpers={grid.helpers} actions={grid.actions}
             layout={props.layout} selectMode={props.selectMode} selected={props.selected} seekSeconds={props.seekSeconds}
