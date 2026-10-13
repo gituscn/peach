@@ -34,7 +34,7 @@ export function registerResponseEntities(path: string, payload: unknown): void {
   if (!payload || typeof payload !== 'object') return;
   const data = payload as Record<string, any>;
   const url = new URL(path, 'https://peach.invalid');
-  if (!['/api/entity', '/api/index', '/api/entity/shapes'].includes(url.pathname)) return;
+  if (!['/api/entity', '/api/index', '/api/entity/shapes', '/api/tops', '/api/facets', '/api/suggest'].includes(url.pathname)) return;
   const requested = url.searchParams.get('kind') || url.pathname.slice(5);
   const kind = kinds[requested] || requested;
   if (data.canonical_name && data.id) {
@@ -47,5 +47,19 @@ export function registerResponseEntities(path: string, payload: unknown): void {
   }
   for (const item of Array.isArray(data.items) ? data.items : []) {
     if (kind) registerEntityLink(item.entity_kind || kind, item.k || item.name, item.entity_id);
+  }
+  if (['/api/tops', '/api/facets'].includes(url.pathname)) {
+    for (const [section, entityKind] of Object.entries(kinds)) {
+      for (const item of Array.isArray(data[section]) ? data[section] : []) {
+        registerEntityLink(entityKind, item.k || item.name, item.entity_id || item.id);
+      }
+    }
+  }
+  if (url.pathname === '/api/suggest') {
+    for (const group of Array.isArray(data.groups) ? data.groups : []) {
+      for (const item of Array.isArray(group.items) ? group.items : []) {
+        registerEntityLink(group.kind, item.value, item.entity_id);
+      }
+    }
   }
 }

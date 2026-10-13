@@ -118,7 +118,7 @@ describe('首页筛选条', () => {
       const after = counts.items.slice(before);
       assert.ok(after.length >= 1 && after.every((url) => !url.searchParams.has('studio')), '撤掉之后没有按新口径重取');
       await page.locator(`${FILTER} [data-tier-performer]`).first().click();
-      await pathIs(page, `/performers/${PERFORMERS[0]!.k}`);
+      await pathIs(page, `/performers/${PERFORMERS[0]!.id}`);
     } finally {
       await opened.close();
     }

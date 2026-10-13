@@ -42,3 +42,16 @@ it('无效与冲突队列参数使用普通资产详情', () => {
   }
   expect(overlayTarget('/assets/0')).toBeNull();
 });
+
+it('头像条、筛选与搜索补全沿用已取得的实体 ID', () => {
+  registerResponseEntities('/api/tops', { performers: [{ id: 991, k: '头像条人物' }] });
+  registerResponseEntities('/api/facets', { studios: [{ entity_id: 992, k: '筛选厂牌' }] });
+  registerResponseEntities('/api/suggest?q=test', { groups: [
+    { kind: 'creator', items: [{ entity_id: 993, value: '补全作者' }] },
+    { kind: 'asset', items: [{ id: 1, value: '示例视频' }] },
+  ] });
+  expect(entityLinkId('performer', '头像条人物')).toBe(991);
+  expect(entityLinkId('studio', '筛选厂牌')).toBe(992);
+  expect(entityLinkId('creator', '补全作者')).toBe(993);
+  expect(entityLinkId('asset', '示例视频')).toBeUndefined();
+});

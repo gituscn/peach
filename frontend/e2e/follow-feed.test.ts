@@ -63,13 +63,13 @@ describe('关注页岛', () => {
         assert.equal(await page.getByRole('searchbox', { name: '搜索创作者' }).count(), 0);
         const author = page.locator('[data-follow-authors] a[data-follow-author="name:kou"]');
         assert.equal(await author.count(), 1);
-        assert.equal(await author.getAttribute('href'), '/creators/Kou');
+        assert.equal(await author.getAttribute('href'), '/creators/90101');
         assert.equal(await author.getAttribute('aria-pressed'), null);
         const card = page.locator('[data-follow-item="1000"]');
-        assert.equal(await card.locator('a[data-follow-author]').getAttribute('href'), '/creators/Kou');
-        assert.equal(await card.locator('a[data-follow-avatar]').getAttribute('href'), '/creators/Kou');
+        assert.equal(await card.locator('a[data-follow-author]').getAttribute('href'), '/creators/90101');
+        assert.equal(await card.locator('a[data-follow-avatar]').getAttribute('href'), '/creators/90101');
         await card.locator('a[data-follow-author]').click();
-        await page.waitForURL('**/creators/Kou');
+        await page.waitForURL('**/creators/90101');
         assert.equal(await page.locator('#stage[open]').count(), 0);
         assert.deepEqual(opened.problems, []);
       } finally { await opened.close(); }

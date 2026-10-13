@@ -95,7 +95,7 @@ describe('我的收藏', () => {
     expect(document.querySelector('[data-shortcuts-avatar] .ini')).toBeNull();
     await type(document.querySelector('input[aria-label="搜索收藏"]'), 'studio');
     expect(document.querySelectorAll('[data-shortcuts-row]')).toHaveLength(1);
-    expect(document.querySelector('[data-shortcuts-row] a')?.getAttribute('href')).toBe('/studios/%E6%94%B6%E8%97%8F%20studio');
+    expect(document.querySelector('[data-shortcuts-row] a')?.getAttribute('href')).toBe('/studios/3');
     await type(document.querySelector('input[aria-label="搜索收藏"]'), 'missing');
     expect(document.querySelector('[data-empty-state] h3')?.textContent).toBe('没有匹配的收藏');
   });

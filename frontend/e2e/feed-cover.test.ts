@@ -28,7 +28,7 @@ describe('新作封面显示时机',()=>{
     await avatar.locator('img').waitFor({state:'visible'});
     assert.equal(await card.locator('.mav').count(),3);
     assert.equal(await card.locator('.mav img').count(),1);
-    assert.equal(await avatar.getAttribute('href'),'/performers/'+encodeURIComponent(name));
+    assert.equal(await avatar.getAttribute('href'),'/performers/42');
     assert.equal(await avatar.evaluate(el=>getComputedStyle(el).pointerEvents),'auto');
     const names=await card.locator('.feednewperformers').boundingBox();
     const date=await card.locator('.meta .s>span').last().boundingBox();
@@ -38,7 +38,7 @@ describe('新作封面显示时机',()=>{
     assert.ok(geometry.scrollWidth<=geometry.viewportWidth+1);
     await page.screenshot({path:`../build/feed-avatars-${viewport.name}.png`});
     await avatar.click();
-    await page.waitForURL('**/performers/'+encodeURIComponent(name));
+    await page.waitForURL('**/performers/42');
    }finally{await context.close()}
   });
  }

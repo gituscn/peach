@@ -22,7 +22,7 @@ describe('图片导航固定位置与悬停', () => {
         const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${vertical ? 400 : 1200}" height="800"><rect width="100%" height="100%" fill="#456"/></svg>`;
         return route.fulfill({ json: { ok: true, image: 'data:image/svg+xml,' + encodeURIComponent(svg) } });
       });
-      await page.goto(new URL('/jav/movie/EXM-001', page.url()).href);
+      await page.goto(new URL('/works/EXM-001', page.url()).href);
       const frame = page.locator('[data-jav-art]');
       const prev = frame.locator('[data-follow-image-arrow="prev"]');
       const next = frame.locator('[data-follow-image-arrow="next"]');

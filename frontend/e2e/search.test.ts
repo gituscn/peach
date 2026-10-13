@@ -177,7 +177,7 @@ describe('顶栏搜索', () => {
       await typeQuery(opened);
       await page.keyboard.press('ArrowDown');
       await page.keyboard.press('Enter');
-      await page.waitForFunction(() => decodeURIComponent(location.pathname) === '/performers/七海ひな');
+      await page.waitForURL('**/performers/90001');
       assert.equal(query(page), null);
       assert.deepEqual(posts, [{ query: '七海ひな' }], '记进搜索记录的应当是这个名字');
     } finally {

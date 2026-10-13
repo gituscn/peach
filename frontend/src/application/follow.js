@@ -7,7 +7,7 @@ import { followScrollY } from '../shell';
 /* follow 域控制器：本域状态与动作，启动由 Application 的生命周期统一安装。 */
 import { receiptsState } from './receipts.js';
 import { managedEntry, releaseManagedRoute, updateManagedRoute } from './../history/managed';
-import { $ } from '../core';
+import { $, entityPath } from '../core';
 import { navigationState, openRoutedPage, requestOverlay } from './navigation.js';
 import { entityState, syncPhotoWalls } from './entity.js';
 import { followDetailReturnPath, followDiscoverySeed, followRevision, followSelected, pageOpens, selectMode, writeShell } from './../shell/index';
@@ -115,7 +115,7 @@ followState.followFeedHelpers = createFollowFeedHelpers({wireDrag:row=>{if(row)w
 followState.followFeedActions = {
   loaded:drawer=>renderFollowDrawer(drawer),
   openDetail:id=>openFollowDetail(id),
-  openAuthor:name=>navigationState.navigatePath(`/creators/${encodeURIComponent(name)}`),
+  openAuthor:name=>navigationState.navigatePath(entityPath('creator',name)),
   openManage:()=>navigationState.navigatePath(followManageEntry()),
   toggleSelection:(id,range)=>toggleFollowSelection(id,range),
   setImagesOnly:on=>{preferencesState.appSettings.followImagesOnly=!!on;preferencesState.saveSettings();syncPhotoWalls()},
@@ -143,7 +143,7 @@ followState.followFeedShell = {
 followState.followDetailActions = createFollowDetailActions({view:followView,adoptView:adoptFollowView,
     rememberReturn:path=>writeShell({followDetailReturnPath:path}),close:()=>void closeFollowDetail(),
     open:(id,index,preserve)=>void openFollowDetail(id,true,index,preserve),drawer:renderFollowDrawer,
-    openAuthor:name=>navigationState.navigatePath(`/creators/${encodeURIComponent(name)}`)},
+    openAuthor:name=>navigationState.navigatePath(entityPath('creator',name))},
     {toast:(message,{undo}={})=>receiptsState.actionReceipt(message,{undo}),failure:receiptsState.actionFailure});
 }
 

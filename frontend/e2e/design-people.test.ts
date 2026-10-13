@@ -95,7 +95,7 @@ describe('设计决定：人物与厂牌资料页', () => {
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('Enter');
         await page.waitForURL(/\/performers\//, { timeout: 5_000 });
-        assert.equal(decodeURIComponent(new URL(page.url()).pathname), '/performers/涼森れむ');
+        await page.waitForURL('**/performers/90301');
         assert.deepEqual(opened.problems, []);
       } finally {
         await opened.close();
