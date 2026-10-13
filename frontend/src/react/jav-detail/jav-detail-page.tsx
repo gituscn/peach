@@ -84,9 +84,9 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
       {item.summary ? <p data-jav-summary="">{item.summary}</p> : null}
       {item.message ? <Note tone="neutral" action={<Button variant="secondary" {...busyProps(retrying)} onClick={retry}>重试</Button>}>{item.message}</Note> : null}
       <div data-jav-actions="">
-        <Button variant="secondary" disabled={readOnly} aria-pressed={!!wantId} {...busyProps(!!want.busy)} onClick={toggleWant}>{wantId ? '取消想要' : '想要'}</Button>
         <Button variant="primary" onClick={() => setDownload({ code: item.code, title: item.title, performers: item.performers,
           studio: item.studio, release_date: item.release_date, origin: `jav:${item.code}` })}>查找资源</Button>
+        <Button variant="secondary" disabled={readOnly} aria-pressed={!!wantId} {...busyProps(!!want.busy)} onClick={toggleWant}>{wantId ? '取消想要' : '想要'}</Button>
         {item.source_url ? <Button variant="secondary" trailingIcon={RiExternalLinkLine}
           onClick={() => window.open(item.source_url, '_blank', 'noopener,noreferrer')}>作品来源</Button> : null}
       </div>
@@ -149,7 +149,6 @@ function JavIdentity({ item, navigate }: { item: JavDetail; navigate(path: strin
   </section> : null;
   return <div data-item-identity=""><div data-identity-primary="">
     {group('performer', '女优', item.performer_refs.filter(person => person.gender === 'female'), 'female')}
-    {group('performer', '男优', item.performer_refs.filter(person => person.gender === 'male'), 'male')}
     {group('performer', '出演者', item.performer_refs.filter(person => !person.gender || person.gender === 'unknown'), 'unknown')}
     {group('studio', '厂牌', item.studio_refs)}</div>
     <IdentitySeries people={item.series_refs.map(person => ({ ...person, id: person.id ?? null }))} onOpen={onOpen} /></div>;

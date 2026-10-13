@@ -69,7 +69,6 @@ function WantRow({ want, readOnly, busy, onReset, onRemove, onCloudDownload, dow
           <p data-want-note="" className="text-caption-1-regular text-text-secondary">{searchNote(want)}</p> : null}
         {want.scrape_error ? <ErrorLine text={want.scrape_error} prefix="资料未取得：" tone="muted" /> : null}
         <div className="mt-1 flex flex-wrap items-center gap-2">
-          {source ? <ButtonLink data-button-link="" variant="secondary" size="small" trailingIcon={RiExternalLinkLine} href={source} target="_blank" rel="noopener noreferrer">来源页</ButtonLink> : null}
           {/* 还在找的两段才给云下载：未发售的没有资源可下，已入库的已经到手。 */}
           {want.phase === 'searching' || want.phase === 'given_up' ? (
             <Button variant="secondary" size="small" onClick={onCloudDownload}>查找资源</Button>
@@ -80,6 +79,7 @@ function WantRow({ want, readOnly, busy, onReset, onRemove, onCloudDownload, dow
           ) : null}
           <Button variant="secondary" size="small" leadingIcon={RiDeleteBinLine} disabled={readOnly} {...busyProps(busy === `remove:${want.id}`)}
             onClick={onRemove}>移除</Button>
+          {source ? <ButtonLink data-button-link="" variant="secondary" size="small" trailingIcon={RiExternalLinkLine} href={source} target="_blank" rel="noopener noreferrer">来源页</ButtonLink> : null}
         </div>
       </div>
       </div>

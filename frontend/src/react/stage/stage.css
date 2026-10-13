@@ -75,6 +75,8 @@ body[data-detail-open] [class~=glowlayer]::before{animation-play-state:paused,pa
 @media (min-width:1081px){
   /* 标题、摘要与操作键共同决定首行高度，两区封面排在共享的第二行。 */
   [data-detail-continuation]:has(>[data-mix-queue]):has(>[data-item-related]){grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto}
+  [data-detail-continuation][data-edition-cards="1"]:has(>[data-item-related]){grid-template-columns:minmax(0,calc(var(--detail-card-width) + 28px)) minmax(0,1fr)}
+  [data-detail-continuation][data-edition-cards="2"]:has(>[data-item-related]){grid-template-columns:minmax(0,calc(var(--detail-card-width) * 2 + 38px)) minmax(0,1fr)}
   [data-detail-continuation]:has(>[data-mix-queue]):has(>[data-item-related])>:is([data-mix-queue],[data-item-related]){display:grid;grid-template-rows:subgrid;grid-row:span 2;row-gap:0}
   [data-detail-continuation]:has(>[data-item-related])>[data-mix-queue]{grid-column:1}
   .peach-react [data-detail-continuation]>[data-mix-queue]+[data-item-related]{border-left:1px solid var(--line-soft);padding-top:14px}
