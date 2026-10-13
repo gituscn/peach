@@ -802,6 +802,36 @@ def _reject_ineligible_targets(operation: str, rows) -> None:
         raise ValueError("junk decisions are only allowed for active physical assets")
 
 
+def _batch_disposal_reason(body):
+    """移入回收站的原因；显式空值用于撤销未记录原因的条目。"""
+    if body.get("operation") != "dispose":
+        return None
+    reason = body.get("disposal_reason", "manual")
+    if reason not in (None, "manual", "junk", "duplicate", "missing"):
+        raise ValueError("unsupported disposal reason")
+    return reason
+
+
+def _write_batch_state(connection, rows, operation, now, disposal_reason):
+    """同一事务写入反馈或回收站状态，并保留还原操作的撤销信息。"""
+    ids = [row["id"] for row in rows]
+    marks = ",".join("?" * len(ids))
+    if operation == "restore":
+        connection.execute(
+            f"UPDATE asset SET disposal=NULL,disposal_reason=NULL,feedback_at=? WHERE id IN ({marks})",
+            [now, *ids],
+        )
+        return {"restored_reasons": {str(row["id"]): row["disposal_reason"] for row in rows}}
+    if operation == "dispose":
+        connection.execute(
+            f"UPDATE asset SET disposal='trash',disposal_reason=?,feedback_at=? WHERE id IN ({marks})",
+            [disposal_reason, now, *ids],
+        )
+    else:
+        connection.execute(f"UPDATE asset SET feedback='seen',feedback_at=? WHERE id IN ({marks})", [now, *ids])
+    return {}
+
+
 def w_batch(contract: WebContract, body):
     """Apply one explicit, reversible marker to a bounded selected set."""
     raw_ids = body.get("ids")
@@ -818,9 +848,11 @@ def w_batch(contract: WebContract, body):
         raise ValueError("unsupported batch operation")
     # 产地的取值在这里就要认出来，别等到写库那一步才发现拼错了。
     region_value = _batch_region_value(body) if operation == "region" else None
+    disposal_reason = _batch_disposal_reason(body)
     marks = ",".join("?" * len(ids))
     contract.cache_bust()
     purge_outcome = None
+    state_receipt = {}
     # 批量是一次写、几秒就完的事，但删除那一支会真的动磁盘：事后「刚才那一批到底
     # 删了多少、有没有半路失败」只有这条记录答得出。不声明互斥——两批不同的资产
     # 各改各的，互斥只会把正常的连续操作挡住。
@@ -830,19 +862,15 @@ def w_batch(contract: WebContract, body):
     try:
         with contract.write_transaction() as connection:
             found = connection.execute(
-                f"SELECT id,path,snapshot_path,disposal,location FROM asset WHERE id IN ({marks})", ids,
+                f"SELECT id,path,snapshot_path,disposal,disposal_reason,location FROM asset WHERE id IN ({marks})", ids,
             ).fetchall()
             valid_ids = [row["id"] for row in found]
             if not valid_ids:
                 raise ValueError("assets not found")
             _reject_ineligible_targets(operation, found)
             now = time.time()
-            if operation == "restore":
-                placeholders = ",".join("?" * len(valid_ids))
-                connection.execute(
-                    f"UPDATE asset SET disposal=NULL,feedback_at=? WHERE id IN ({placeholders})",
-                    [now, *valid_ids],
-                )
+            if operation in {"restore", "seen", "dispose"}:
+                state_receipt = _write_batch_state(connection, found, operation, now, disposal_reason)
             elif operation == "delete":
                 # 已消失的行文件本来就不在了，只删账本行；文件又回到盘上的那几条留着，
                 # 下一轮扫描会把它们接回在库。选中里有一条已消失的，整批都按这条口径删。
@@ -861,13 +889,6 @@ def w_batch(contract: WebContract, body):
                 connection.executemany(
                     "DELETE FROM review_decision WHERE category='junk_file' AND item_key=?",
                     [(str(asset_id),) for asset_id in valid_ids],
-                )
-            elif operation in {"seen", "dispose"}:
-                column, value = ("feedback", "seen") if operation == "seen" else ("disposal", "trash")
-                placeholders = ",".join("?" * len(valid_ids))
-                connection.execute(
-                    f"UPDATE asset SET {column}=?,feedback_at=? WHERE id IN ({placeholders})",
-                    [value, now, *valid_ids],
                 )
             elif operation == "region":
                 # 走 `write_owned_fields` 而不是直接 UPDATE：产地是真相字段，用户这一
@@ -901,7 +922,7 @@ def w_batch(contract: WebContract, body):
         return result
     handle.finish("succeeded", summary={"operation": operation,
                                         "changed": len(valid_ids)})
-    return {"ok": True, "operation": operation, "changed": len(valid_ids)}
+    return {"ok": True, "operation": operation, "changed": len(valid_ids), **state_receipt}
 
 
 def _add_large_short_copy_cluster(items: list[dict], clusters: list[list[dict]]):

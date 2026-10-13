@@ -516,6 +516,8 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.16.10，版�
 
 ## 卡片与来源头像
 
+回收站复用 `MediaCard`、`/api/batch` 与共享操作回执，视频和资源共用还原按钮及原位失败提示。`asset.disposal_reason` 保存手动、垃圾、重复和文件缺失；还原清空原因，撤销按原原因归组写回，未知原因保持为空。无新增依赖。
+
 卡片 label 复用既有 `javTitleHtml`、`followTitleMarks` 与 `data-media-tags`，分段筛选复用 `SegmentedRadioGroup`。来源头像共用 `PublicAPI` 的已验证图片主机、三个下载槽位、Pillow 解码、单请求合并与六小时缓存；只持久保存没有查询参数的公开静态头像地址。人物使用策略在投影和口味汇总处过滤明确登记的男优，原始来源记录仍完整保留，无新增依赖或 ledger 迁移。
 
 公开作品资料与评论复用 `jav_cache.PublicSnapshots`、既有 `filelock` 和原子写入；`cache_fresh` 与前端 `publicationFresh` 统一日历月边界、每天补齐及满月后的固定快照。`public_cache_scope` 将快照隔离到调用者数据目录，记录实际来源时间；测试显式传临时目录，默认 `PublicAPI()` 只用内存。媒体字节复用媒体缓存，来源 JSON 不承载本地标签决定、想要状态或观看历史。

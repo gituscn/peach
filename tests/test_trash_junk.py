@@ -81,6 +81,8 @@ class TrashJunkTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertEqual(self.disposal(1), "trash")
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            self.assertEqual(connection.execute("SELECT disposal_reason FROM asset WHERE id=1").fetchone()[0], "junk")
         self.assertIsNone(self.disposal(2))
         self.assertTrue(self.backup.is_file())
 

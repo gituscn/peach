@@ -39,6 +39,7 @@ export interface MediaItem {
   why?: string;
   feedback?: string;
   disposal?: string;
+  disposal_reason?: 'manual' | 'junk' | 'duplicate' | 'missing' | null;
   watch_later?: boolean;
   part_group?: {
     key: string; seed_id: number; count: number; title?: string; total_size?: number; total_duration?: number;

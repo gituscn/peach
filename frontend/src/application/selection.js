@@ -64,7 +64,12 @@ export async function runCatalogBatch(operation,button){
     setSelectMode(false,true);await reloadAfterWrite();
     const inverse=operation==='dispose'?'restore':operation==='restore'?'dispose':null;
     receiptsState.actionReceipt(`已${labels[operation]} ${ids.length} 项`,{undo:inverse?async()=>{
-      await api('/api/batch',{method:'POST',body:JSON.stringify({ids,operation:inverse})});
+      if(inverse==='dispose'&&r.restored_reasons){
+        for(const reason of [null,'manual','junk','duplicate','missing']){
+          const group=ids.filter(id=>r.restored_reasons[id]===reason);
+          if(group.length)await api('/api/batch',{method:'POST',body:JSON.stringify({ids:group,operation:inverse,disposal_reason:reason})});
+        }
+      }else await api('/api/batch',{method:'POST',body:JSON.stringify({ids,operation:inverse})});
       await reloadAfterWrite();
     }:null})}
   catch(error){setActionBusy(button,false);throw error}
@@ -126,7 +131,8 @@ export async function runJunkBatch(operation,button){
   return confirmModal({title:titles[operation],body:`将处理选中的 ${ids.length} 个文件。`,confirmLabel:titles[operation],danger:false,onConfirm:async()=>{
   setActionBusy(button);
   try{
-    await api('/api/batch',{method:'POST',body:JSON.stringify({ids,operation})});
+    await api('/api/batch',{method:'POST',body:JSON.stringify({ids,operation,
+      ...(operation==='dispose'?{disposal_reason:'junk'}:{})})});
     setSelectMode(false,true);await loadCatalog();
     const inverse=operation==='dispose'?'restore':operation==='dismiss-junk'?'reconsider-junk':
       operation==='reconsider-junk'?'dismiss-junk':null;

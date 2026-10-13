@@ -25,6 +25,29 @@ from support.ledger import fresh_ledger
 
 
 class WebDataTests(unittest.TestCase):
+    def test_recycle_bin_reasons_round_trip_and_restore_clears_them(self):
+        for reason in ("manual", "junk", "duplicate", "missing"):
+            rm_web.w_batch(self.contract, {"ids": [1], "operation": "dispose", "disposal_reason": reason})
+            self.assertEqual(rm_web.q_items(self.contract, {"state": "trash"})["items"][0]["disposal_reason"], reason)
+            self.assertEqual(rm_web.q_item(self.contract, 1)["disposal_reason"], reason)
+            restored = rm_web.w_batch(self.contract, {"ids": [1], "operation": "restore"})
+            self.assertEqual(restored["restored_reasons"], {"1": reason})
+            self.assertIsNone(self.row()["disposal_reason"])
+        with self.assertRaisesRegex(ValueError, "disposal reason"):
+            rm_web.w_batch(self.contract, {"ids": [1], "operation": "dispose", "disposal_reason": "guessed"})
+        self.assertIsNone(self.row()["disposal"])
+        self.assertEqual(rm_web.w_feedback(self.contract, {"id": 1, "kind": "dispose"})["disposal_reason"], "manual")
+        self.assertIsNone(rm_web.w_feedback(self.contract, {"id": 1, "kind": "dispose"})["disposal_reason"])
+
+    def test_recycle_bin_legacy_reason_is_unknown(self):
+        with self.contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET disposal='trash' WHERE id=1")
+        self.assertIsNone(rm_web.q_items(self.contract, {"state": "trash"})["items"][0]["disposal_reason"])
+        restored = rm_web.w_batch(self.contract, {"ids": [1], "operation": "restore"})
+        self.assertEqual(restored["restored_reasons"], {"1": None})
+        rm_web.w_batch(self.contract, {"ids": [1], "operation": "dispose", "disposal_reason": None})
+        self.assertIsNone(self.row()["disposal_reason"])
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.db_path = str(fresh_ledger(self.tmp.name))

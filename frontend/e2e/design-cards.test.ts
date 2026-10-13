@@ -167,19 +167,19 @@ describe('设计决定：作品卡、管理页与复核', () => {
         glyph: '[data-variant="resource"] [data-media-glyph]',
         kind: '[data-variant="resource"] [data-media-kind-glyph]',
       });
-      /* 回收站卡有边框：量实际盒子，头像、标题与最后一行都要和框、封面隔开，一行文件名不留空行。 */
+      /* 回收站卡的标题统一两行，头像对齐标题顶部，归入原因与边框保留间距。 */
       const inset = await page.locator('#grid [data-media-card][data-variant="resource"]').first().evaluate((card) => {
         const box = (selector: string) => card.querySelector(selector)!.getBoundingClientRect();
         const frame = card.getBoundingClientRect();
-        const [pic, avatar, title, byline] = ['[data-media-pic]', '[data-media-avatar]', '[data-media-title]', '[data-media-byline]'].map(box);
-        return { left: avatar.left - frame.left, top: title.top - pic.bottom, bottom: frame.bottom - byline.bottom,
+        const [pic, avatar, title, reason] = ['[data-media-pic]', '[data-media-avatar]', '[data-media-title]', '[data-media-disposal-reason]'].map(box);
+        return { left: avatar.left - frame.left, top: title.top - pic.bottom, bottom: frame.bottom - reason.bottom,
           title: title.height, lineHeight: parseFloat(getComputedStyle(card.querySelector('[data-media-title]')!).lineHeight),
-          skew: Math.abs((avatar.top + avatar.bottom) / 2 - (title.top + byline.bottom) / 2) };
+          skew: Math.abs(avatar.top - title.top) };
       });
       assert.ok(inset.left >= 10 && inset.top >= 8 && inset.bottom >= 10,
         `回收站卡的元信息区贴着边框或封面：左 ${inset.left}、上 ${inset.top}、下 ${inset.bottom}`);
-      assert.ok(inset.title < inset.lineHeight * 1.5, `一行文件名的标题仍占 ${inset.title}px，预留了第二行`);
-      assert.ok(inset.skew <= 3, `头像没有和标题加署名那一块居中对齐，偏 ${inset.skew}px`);
+      assert.ok(Math.abs(inset.title - inset.lineHeight * 2) < 1, `回收站标题未预留两行：${JSON.stringify(inset)}`);
+      assert.ok(inset.skew <= 3, `头像没有位于标题区顶部，偏 ${inset.skew}px`);
       assert.deepEqual([trash.glyph?.display, trash.glyph?.place, trash.glyph?.color], ['grid', 'center center', trash.muted.color],
         '回收站资源卡封面格里的字形没有居中或不是次要文字色');
       assert.deepEqual([trash.kind?.display, trash.kind?.place, trash.kind?.color], ['grid', 'center center', trash.text.color],
@@ -827,7 +827,7 @@ describe('设计决定：作品卡、管理页与复核', () => {
       await cards.first().locator('[data-junk-action="dispose"]').click();
       await page.waitForFunction(() => document.querySelectorAll('#grid [data-junk-card]').length === 2, null,
         { timeout: 10_000 });
-      assert.deepEqual(opened.state.batches, [{ ids: [9101], operation: 'dispose' }]);
+      assert.deepEqual(opened.state.batches, [{ ids: [9101], operation: 'dispose', disposal_reason: 'junk' }]);
       await page.getByText('已移入回收站', { exact: true }).first().waitFor({ timeout: 5_000 });
 
       // 分类是 `<a href>`，普通左键由壳改地址重读：整页重载的话，页面上记的这个标记会丢。

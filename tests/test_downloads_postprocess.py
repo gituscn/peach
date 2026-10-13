@@ -12,6 +12,13 @@ from support.ledger import fresh_ledger
 
 
 class DownloadPostprocessTests(unittest.TestCase):
+    def test_isolated_ads_record_the_junk_reason(self):
+        self.contract.download_junk_candidates = lambda: [{"id": self.asset_id}]
+        self.assertEqual(post._isolate_ads(self.contract, -1, [self.asset_id]), 1)
+        with self.database.read_connection() as connection:
+            self.assertEqual(tuple(connection.execute("SELECT disposal,disposal_reason FROM asset WHERE id=?",
+                                                      (self.asset_id,)).fetchone()), ("trash", "junk"))
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

@@ -100,7 +100,8 @@ export async function runResourceOperation(it,operation){
     await loadCatalog();
     const inverse=operation==='restore'?'dispose':'restore';
     receiptsState.actionReceipt(operation==='restore'?'已还原':'已移入回收站',{undo:async()=>{
-      await api('/api/batch',{method:'POST',body:JSON.stringify({ids:[it.id],operation:inverse})});
+      await api('/api/batch',{method:'POST',body:JSON.stringify({ids:[it.id],operation:inverse,
+        ...(inverse==='dispose'?{disposal_reason:it.disposal_reason??null}:{})})});
       await loadCatalog();
     }});
   }catch(error){receiptsState.actionFailure('操作',error);throw error}
@@ -493,7 +494,8 @@ export function loadJunk(surface){
 export async function runJunkOperation(it,operation){
   const ids=[it.id],disposed=operation==='dispose',reconsidered=operation==='reconsider-junk';
   try{
-    await api('/api/batch',{method:'POST',body:JSON.stringify({ids,operation})});
+    await api('/api/batch',{method:'POST',body:JSON.stringify({ids,operation,
+      ...(disposed?{disposal_reason:'junk'}:{})})});
     await loadCatalog();
     const inverse=disposed?'restore':reconsidered?'dismiss-junk':'reconsider-junk';
     receiptsState.actionReceipt(disposed?'已移入回收站':reconsidered?'已重新加入垃圾判断':'已标记为不是垃圾',{undo:async()=>{

@@ -73,8 +73,8 @@ def w_feedback(contract: ActivityContract, body):
             if current == VANISHED:
                 raise ValueError("vanished assets cannot be moved to the recycle bin")
             connection.execute(
-                "UPDATE asset SET disposal=?, feedback_at=? WHERE id=?",
-                (None if current == "trash" else "trash", time.time(), aid),
+                "UPDATE asset SET disposal=?, disposal_reason=?, feedback_at=? WHERE id=?",
+                (None if current == "trash" else "trash", None if current == "trash" else "manual", time.time(), aid),
             )
         elif kind == "o":
             connection.execute(
@@ -94,7 +94,7 @@ def w_feedback(contract: ActivityContract, body):
                 "UPDATE asset SET rating=? WHERE id=?", (value or None, aid),
             )
         result = dict(connection.execute(
-            "SELECT feedback,disposal,rating,o_count FROM asset WHERE id=?", (aid,),
+            "SELECT feedback,disposal,disposal_reason,rating,o_count FROM asset WHERE id=?", (aid,),
         ).fetchone())
     return {"ok": True, **result}
 

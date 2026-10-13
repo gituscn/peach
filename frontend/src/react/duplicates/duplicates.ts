@@ -146,7 +146,8 @@ export function victimBytes(groups: readonly DuplicateGroup[], ids: readonly num
 /** 批量改判。一次最多 200 条，分批串行发：并发发出去只是让服务端自己排队。 */
 export async function batchOperate(ids: readonly number[], operation: 'dispose' | 'restore'): Promise<void> {
   for (let offset = 0; offset < ids.length; offset += BATCH_LIMIT) {
-    await apiSend(BATCH_URL, { ids: ids.slice(offset, offset + BATCH_LIMIT), operation });
+    await apiSend(BATCH_URL, { ids: ids.slice(offset, offset + BATCH_LIMIT), operation,
+      ...(operation === 'dispose' ? { disposal_reason: 'duplicate' } : {}) });
   }
 }
 

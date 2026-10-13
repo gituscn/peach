@@ -167,7 +167,7 @@ def trash_assets(connection, asset_ids: list[int]) -> int:
         return 0
     marks = ",".join("?" * len(ids))
     cursor = connection.execute(
-        f"UPDATE asset SET disposal='trash', feedback_at=? WHERE id IN ({marks}) "
+        f"UPDATE asset SET disposal='trash', disposal_reason='junk', feedback_at=? WHERE id IN ({marks}) "
         "AND disposal IS NULL AND location IN ('local','115','pikpak')",
         [time.time(), *ids],
     )
