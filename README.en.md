@@ -43,7 +43,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 Want to look around before installing? The [live demo](https://demo.peach.video) is a ready-made library where you can try search, performer pages, filters and stats. The demo is read-only, so nothing you do is saved.
 
-These lossless screenshots are 3840×2160; click to view the original PNG. You can also try the video wall in the demo.
+The original screenshots are lossless 3840×2160 PNGs; click to view them. You can also try the video wall in the demo.
 
 **Home: filter by source, length and tags**
 
@@ -51,7 +51,7 @@ These lossless screenshots are 3840×2160; click to view the original PNG. You c
 
 **Video wall: drag to explore, play in place, switch versions and parts.**
 
-<a href="https://peach.video/assets/screenshots/wall-20261014.png" target="_blank" rel="noopener"><img src="https://peach.video/assets/screenshots/wall-20261014.webp" alt="Video wall: full-screen covers and browsing controls" width="1200"></a>
+<a href="https://peach.video/assets/screenshots/wall-20261014.png" target="_blank" rel="noopener"><img src="https://peach.video/assets/screenshots/wall-20261014-readme.webp" alt="Video wall: full-screen covers and browsing controls" width="1200"></a>
 
 **Performer page: profile, aliases, links and every video**
 
