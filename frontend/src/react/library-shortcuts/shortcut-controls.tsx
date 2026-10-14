@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { attachOverlayScrollbar, spinnerHtml } from '@peach/legacy/ui';
+import { attachOverlayScrollbar, revealTexts, spinnerHtml, wireHorizontalScroller } from '@peach/legacy/ui';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { errorMessage } from '../../api';
@@ -70,12 +70,22 @@ function ShortcutContents({ currentHref, kind, close }: { currentHref?: () => st
     return () => media.removeEventListener('change', changed);
   }, []);
   const navigation = useRef<HTMLDivElement>(null);
+  const head = useRef<HTMLDivElement>(null);
+  const previousScope = useRef(scope);
   const pane = useRef<HTMLSpanElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const scroll = useRef<(() => void) | null>(null);
   const glide = useViewGlide(pane, navigation, '[role="tab"][aria-selected="true"]', scope, { axis: 'y' });
   useLayoutEffect(() => { if (content.current) scroll.current = attachOverlayScrollbar(content.current) || null }, []);
+  useLayoutEffect(() => {
+    const scroller = wireHorizontalScroller(navigation.current);
+    return () => scroller?.destroy();
+  }, []);
   useLayoutEffect(() => { if (content.current) content.current.scrollTop = 0 }, [scope]);
+  useLayoutEffect(() => {
+    if (previousScope.current !== scope) revealTexts(head.current, 'h2');
+    previousScope.current = scope;
+  }, [scope]);
   useLayoutEffect(() => { scroll.current?.() });
   const label = SCOPES.find(([value]) => value === scope)?.[1] || '全部';
   const selectWithKeys = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -101,7 +111,7 @@ function ShortcutContents({ currentHref, kind, close }: { currentHref?: () => st
   const rows = (data?.favorites || []).filter((row) => (scope === 'all' || row.kind === scope)
     && row.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   return <div data-shortcuts-panel="">
-    <div data-shortcuts-head="">
+    <div ref={head} data-shortcuts-head="">
       <h2 className="text-title-2-semibold text-text-primary">{label}</h2>
       <SettingsDialogClose label="关闭我的收藏" onPress={close} />
     </div>

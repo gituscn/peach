@@ -40661,20 +40661,25 @@ function Zve({ currentHref: e, kind: t, close: n }) {
 		let e = matchMedia("(max-width: 760px)"), t = () => h(e.matches);
 		return e.addEventListener("change", t), () => e.removeEventListener("change", t);
 	}, []);
-	let g = (0, b.useRef)(null), _ = (0, b.useRef)(null), v = (0, b.useRef)(null), y = (0, b.useRef)(null), S = GA(_, g, "[role=\"tab\"][aria-selected=\"true\"]", s, { axis: "y" });
+	let g = (0, b.useRef)(null), _ = (0, b.useRef)(null), v = (0, b.useRef)(s), y = (0, b.useRef)(null), S = (0, b.useRef)(null), C = (0, b.useRef)(null), w = GA(y, g, "[role=\"tab\"][aria-selected=\"true\"]", s, { axis: "y" });
 	(0, b.useLayoutEffect)(() => {
-		v.current && (y.current = ya(v.current) || null);
+		S.current && (C.current = ya(S.current) || null);
 	}, []), (0, b.useLayoutEffect)(() => {
-		v.current && (v.current.scrollTop = 0);
+		let e = Fo(g.current);
+		return () => e?.destroy();
+	}, []), (0, b.useLayoutEffect)(() => {
+		S.current && (S.current.scrollTop = 0);
 	}, [s]), (0, b.useLayoutEffect)(() => {
-		y.current?.();
+		v.current !== s && po(_.current, "h2"), v.current = s;
+	}, [s]), (0, b.useLayoutEffect)(() => {
+		C.current?.();
 	});
-	let C = qN.find(([e]) => e === s)?.[1] || "全部", w = (e) => {
+	let T = qN.find(([e]) => e === s)?.[1] || "全部", E = (e) => {
 		let t = [...e.currentTarget.querySelectorAll("[role=\"tab\"]")], n = t.indexOf(e.target);
 		if (n < 0) return;
 		let r = e.key === "Home" ? 0 : e.key === "End" ? t.length - 1 : ["ArrowDown", "ArrowRight"].includes(e.key) ? (n + 1) % t.length : ["ArrowUp", "ArrowLeft"].includes(e.key) ? (n + t.length - 1) % t.length : -1;
 		r < 0 || (e.preventDefault(), t[r].click(), t[r].focus());
-	}, T = (t) => {
+	}, D = (t) => {
 		t.preventDefault(), e && a.trim() && !i.isPending && i.mutate({
 			action: "save_filter",
 			name: a.trim(),
@@ -40682,15 +40687,16 @@ function Zve({ currentHref: e, kind: t, close: n }) {
 		}, { onSuccess: () => {
 			o(""), f("筛选已保存");
 		} });
-	}, E = r.data, D = (E?.favorites || []).filter((e) => (s === "all" || e.kind === s) && e.name.toLocaleLowerCase().includes(l.trim().toLocaleLowerCase()));
+	}, O = r.data, k = (O?.favorites || []).filter((e) => (s === "all" || e.kind === s) && e.name.toLocaleLowerCase().includes(l.trim().toLocaleLowerCase()));
 	return /* @__PURE__ */ (0, x.jsxs)("div", {
 		"data-shortcuts-panel": "",
 		children: [
 			/* @__PURE__ */ (0, x.jsxs)("div", {
+				ref: _,
 				"data-shortcuts-head": "",
 				children: [/* @__PURE__ */ (0, x.jsx)("h2", {
 					className: "text-title-2-semibold text-text-primary",
-					children: C
+					children: T
 				}), /* @__PURE__ */ (0, x.jsx)(RN, {
 					label: "关闭我的收藏",
 					onPress: n
@@ -40706,11 +40712,11 @@ function Zve({ currentHref: e, kind: t, close: n }) {
 					"data-glass-pane": m ? "" : void 0,
 					role: "tablist",
 					"aria-label": "收藏类型",
-					onKeyDown: w,
-					onPointerLeave: S.leave,
+					onKeyDown: E,
+					onPointerLeave: w.leave,
 					children: [
 						/* @__PURE__ */ (0, x.jsx)("span", {
-							ref: _,
+							ref: y,
 							"data-view-glide": "",
 							"data-shortcuts-glide": "",
 							"aria-hidden": "true",
@@ -40722,7 +40728,7 @@ function Zve({ currentHref: e, kind: t, close: n }) {
 							children: "我的收藏"
 						}),
 						qN.map(([e, t]) => {
-							let n = KN[e] || WN, r = e === "filters" ? E?.filters.length || 0 : (E?.favorites || []).filter((t) => e === "all" || t.kind === e).length;
+							let n = KN[e] || WN, r = e === "filters" ? O?.filters.length || 0 : (O?.favorites || []).filter((t) => e === "all" || t.kind === e).length;
 							return /* @__PURE__ */ (0, x.jsxs)("button", {
 								type: "button",
 								role: "tab",
@@ -40731,7 +40737,7 @@ function Zve({ currentHref: e, kind: t, close: n }) {
 								"aria-label": t,
 								"aria-selected": s === e,
 								tabIndex: s === e ? 0 : -1,
-								onPointerEnter: S.hover,
+								onPointerEnter: w.hover,
 								onClick: () => c(e),
 								children: [
 									/* @__PURE__ */ (0, x.jsx)(n, {
@@ -40762,7 +40768,7 @@ function Zve({ currentHref: e, kind: t, close: n }) {
 				})]
 			}),
 			/* @__PURE__ */ (0, x.jsxs)("div", {
-				ref: v,
+				ref: S,
 				"data-shortcuts-content": "",
 				role: "tabpanel",
 				id: `${p}-content`,
@@ -40788,14 +40794,14 @@ function Zve({ currentHref: e, kind: t, close: n }) {
 						tone: "error",
 						children: B(i.error)
 					}) : null,
-					E ? s === "filters" ? /* @__PURE__ */ (0, x.jsxs)(x.Fragment, { children: [
-						E.filters.length ? null : /* @__PURE__ */ (0, x.jsx)(Yk, {
+					O ? s === "filters" ? /* @__PURE__ */ (0, x.jsxs)(x.Fragment, { children: [
+						O.filters.length ? null : /* @__PURE__ */ (0, x.jsx)(Yk, {
 							shell: "plain",
 							icon: LN("list-filter"),
 							title: "还没有保存的筛选",
 							children: "在馆藏页保存当前条件，随时打开。"
 						}),
-						E.filters.map((e) => /* @__PURE__ */ (0, x.jsxs)("div", {
+						O.filters.map((e) => /* @__PURE__ */ (0, x.jsxs)("div", {
 							className: "flex min-w-0 items-center justify-between gap-2",
 							children: [/* @__PURE__ */ (0, x.jsx)("a", {
 								href: e.href,
@@ -40818,7 +40824,7 @@ function Zve({ currentHref: e, kind: t, close: n }) {
 							})]
 						}, e.id)),
 						e ? /* @__PURE__ */ (0, x.jsxs)("form", {
-							onSubmit: T,
+							onSubmit: D,
 							className: "flex flex-col gap-3",
 							"aria-label": "保存当前筛选",
 							children: [
@@ -40849,15 +40855,15 @@ function Zve({ currentHref: e, kind: t, close: n }) {
 							value: l,
 							onChange: u
 						}),
-						D.length ? null : /* @__PURE__ */ (0, x.jsx)(Yk, {
+						k.length ? null : /* @__PURE__ */ (0, x.jsx)(Yk, {
 							shell: "plain",
 							icon: WN,
-							title: l ? "没有匹配的收藏" : E.favorites.length ? "还没有此类收藏" : "还没有收藏",
+							title: l ? "没有匹配的收藏" : O.favorites.length ? "还没有此类收藏" : "还没有收藏",
 							children: l ? "试试其他名称。" : "在资料页或标签页收藏常用内容。"
 						}),
 						/* @__PURE__ */ (0, x.jsx)("div", {
 							"data-shortcuts-list": "",
-							children: D.map((e) => /* @__PURE__ */ (0, x.jsxs)("div", {
+							children: k.map((e) => /* @__PURE__ */ (0, x.jsxs)("div", {
 								"data-shortcuts-row": "",
 								className: "flex min-w-0 items-center justify-between gap-3",
 								children: [/* @__PURE__ */ (0, x.jsxs)("a", {

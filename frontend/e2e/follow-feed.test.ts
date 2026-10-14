@@ -258,7 +258,7 @@ describe('关注页岛', () => {
     }
   });
 
-  it('来源角标接得住指针，悬停能读到来源名；点它照样进详情', { timeout: 60_000 }, async () => {
+  it('封面左上角可打开详情，悬停时隐藏来源角标', { timeout: 60_000 }, async () => {
     const opened = await openFollowFeed(browser, '/follow', DESKTOP);
     try {
       const page = opened.page;
@@ -271,11 +271,11 @@ describe('关注页岛', () => {
       });
       assert.equal(hit.badge, true, '角标中心命中的不是角标本身');
       assert.ok(hit.title, '角标没有来源名');
-      await card.locator('[data-media-badge]').hover();
-      const tip = page.locator('#board-control-tooltip');
-      await tip.waitFor({ state: 'visible', timeout: 5_000 });
-      assert.equal(await tip.textContent(), hit.title);
-      await card.locator('[data-media-badge]').click();
+      const corner = (await card.locator('[data-media-badge]').boundingBox())!;
+      await card.hover();
+      assert.equal(await card.locator('[data-media-badge]').isVisible(), false);
+      assert.equal(await card.locator('[data-follow-sources]').evaluate(node => getComputedStyle(node).pointerEvents), 'none');
+      await page.mouse.click(corner.x + corner.width / 2, corner.y + corner.height / 2);
       await page.waitForURL(`**/posts/${id}`);
       assert.deepEqual(withoutPlayer(opened.problems), []);
     } finally {
