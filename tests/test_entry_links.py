@@ -309,6 +309,23 @@ class MissavDirectoryTests(unittest.TestCase):
         return entry_links.directory_index({"source": entry_links.DIRECTORY_URL,
                                             "entries": rows, "complete": complete})
 
+    def test_failed_source_page_has_no_template_fallback(self):
+        address = "https://missav.ws/dm31/cn/actresses/Rina"
+        for complete in (False, True):
+            with self.subTest(complete=complete):
+                directory = self.directory([{"name": "Rina", "url": address, "verified": False}],
+                                           complete=complete)
+                rows = entry_links.build(entry_links.defaults(), "RINA", [ref("javdb", "actor")],
+                                         directory=directory)
+                self.assertNotIn("missav", [row["site"] for row in rows])
+
+    def test_conflicting_page_evidence_requires_a_verified_source(self):
+        failed = {"name": "Rina", "url": "https://missav.ws/dm31/cn/actresses/Rina", "verified": False}
+        alternate = {"name": "Rina", "url": "https://missav.ws/dm83/cn/actresses/Rina"}
+        self.assertEqual(self.directory([failed, alternate]).path("Rina", "RINA"), "")
+        restored = self.directory([{**failed, "verified": True}])
+        self.assertEqual(restored.path("Rina", "RINA"), "/dm31/cn/actresses/Rina")
+
     def test_site_glyphs_and_compound_stage_names_use_the_published_href(self):
         for canonical, jp, display, slug in (
                 ("北条麻妃", "北條麻妃", "北条麻妃", "北条麻妃"),
