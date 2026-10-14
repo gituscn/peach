@@ -329,6 +329,30 @@ class MissavDirectoryTests(unittest.TestCase):
                                  directory=directory)
         self.assertEqual([row["site"] for row in rows], ["javdb"])
 
+    def test_native_name_whitespace_preserves_the_published_url(self):
+        for written, published in (("ローレン 花恋", "ローレン花恋"),
+                                   ("日向\u3000なつ", "日向なつ")):
+            with self.subTest(name=written):
+                address = "https://missav.ws/dm193/cn/actresses/" + quote(published)
+                directory = self.directory([{"name": published, "url": address}])
+                rows = entry_links.build(entry_links.defaults(), written, [ref("javdb", "actor")],
+                                         directory=directory)
+                self.assertEqual(next(row["url"] for row in rows if row["site"] == "missav"), address)
+
+    def test_latin_name_whitespace_keeps_names_distinct(self):
+        directory = self.directory([{"name": "Rina", "url": "https://missav.ws/dm1/cn/actresses/Rina"}],
+                                   complete=True)
+        rows = entry_links.build(entry_links.defaults(), "Rin A", [ref("javdb", "actor")],
+                                 directory=directory)
+        self.assertEqual([row["site"] for row in rows], ["javdb"])
+
+    def test_distinct_published_slugs_remain_ambiguous_with_native_whitespace(self):
+        directory = self.directory([
+            {"name": "日向なつ", "url": "https://missav.ws/dm1/cn/actresses/" + quote("日向なつ")},
+            {"name": "日向 なつ", "url": "https://missav.ws/dm2/cn/actresses/" + quote("日向 なつ")},
+        ])
+        self.assertEqual(directory.path("日向なつ", "日向なつ"), "")
+
     def test_prefix_variants_of_the_same_published_slug_share_one_identity(self):
         directory = self.directory([
             {"name": "A", "url": "https://missav.ws/dm1/cn/actresses/A"},
