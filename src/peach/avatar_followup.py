@@ -154,21 +154,43 @@ def _portrait_account(connection: sqlite3.Connection, entity_id: int) -> bool:
 
 def needs_avatar(avatar_root, kind: str, entity_id: int) -> bool:
     """没有头像，或者装着的是封面截的、小图兜底的那一档（还可能换到更清楚的）。"""
+    if (avatar_picker.installed_digest(avatar_root, kind, entity_id)
+            and _installed_record(avatar_root, kind, entity_id).get("user_selected")):
+        return False
     return (not avatar_picker.installed_digest(avatar_root, kind, entity_id)
             or avatar_cover_face.installed_face_px(avatar_root, kind, entity_id) is not None
             or _installed_small(avatar_root, kind, entity_id))
 
 
-def _installed_small(avatar_root, kind: str, entity_id: int) -> bool:
-    """装着的那张是不是小图兜底那一档装的。"""
+def _installed_record(avatar_root, kind: str, entity_id: int) -> dict:
+    """已安装头像的选择来源。"""
     from .previews import entity_image_key
 
     path = Path(avatar_root) / f"{entity_image_key(kind, int(entity_id))}.img.provenance.json"
     try:
         record = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
+        return {}
+    return record if isinstance(record, dict) else {}
+
+
+def _installed_small(avatar_root, kind: str, entity_id: int) -> bool:
+    """自动小图可继续寻找高清人像；人工选择保留。"""
+    from .previews import entity_image_key
+
+    record = _installed_record(avatar_root, kind, entity_id)
+    if record.get("user_selected"):
         return False
-    return isinstance(record, dict) and record.get("source_kind") == SMALL_SOURCE_KIND
+    if record.get("source_kind") == SMALL_SOURCE_KIND:
+        return True
+    if record.get("source_kind") != "official_profile":
+        return False
+    try:
+        inspected = avatar_picker.accept_image(
+            (Path(avatar_root) / f"{entity_image_key(kind, int(entity_id))}.img").read_bytes())
+    except (OSError, avatar_picker.PickerError):
+        return False
+    return not acceptable_avatar(inspected, MIN_LONG_SIDE, MIN_SHORT_SIDE)
 
 
 #: 指纹里的量：作品数、别名数与 avwikidb 编号数。SQL 与 `stock` 那条共用。发布账号的
@@ -183,8 +205,8 @@ _OFFSITE_COUNT = ("(SELECT count(*) FROM entity_external_ref x WHERE x.entity_id
 #: 认人判据的版本，进指纹。改了判据就加一：存量里缺图的女优按新判据各重比一次。
 #: 2 是 ADR-0057 的图库互证，3 是 ADR-0062 没有封面参照时的图库自证，4 是 ADR-0066 的
 #: 小图作证与兜底，5 是 ADR-0070 的小脸裁切放大再比，6 是 ADR-0074 的馆外单人作品封面，
-#: 7 是 ADR-0102 的清晰档案小图优先，8 是封面未匹配时的图库独立互证。
-MATCH_RULE = 8
+#: 7 是 ADR-0102 的清晰档案小图优先，8 是封面未匹配时的图库独立互证，9 包含自动档案缩略图。
+MATCH_RULE = 9
 
 
 def _fingerprint(works, aliases, offsite) -> str:
@@ -264,8 +286,9 @@ def _run(contract, key: str, handle) -> dict:
     # 装着的是封面截的那一档时还要往下走：图库可能有了人像，封面可能换了更清楚的。
     cropped_px = avatar_cover_face.installed_face_px(avatar_root, kind, entity_id)
     small = _installed_small(avatar_root, kind, entity_id)
-    if (avatar_picker.installed_digest(avatar_root, kind, entity_id) and cropped_px is None
-            and not small):
+    if (avatar_picker.installed_digest(avatar_root, kind, entity_id)
+            and (_installed_record(avatar_root, kind, entity_id).get("user_selected")
+                 or (cropped_px is None and not small))):
         # 重跑、或者这中间人自己换过图。两种都不该再装一次。
         return {"outcome": "已有头像"}
     with contract.database.read_connection() as connection:
@@ -299,6 +322,8 @@ def _run(contract, key: str, handle) -> dict:
             contract, connection, providers_root, avatar_root, kind, entity_id, name, found, covers)
         if preferred is not None:
             return preferred
+        if _installed_record(avatar_root, kind, entity_id).get("source_kind") == "official_profile":
+            return {"name": name, "outcome": gallery, **extra}
         fallen = {**_install_cover_face(contract, providers_root, avatar_root, kind,
                                         entity_id, name, gallery, len(found), cropped_px,
                                         covers, probe), **extra}
