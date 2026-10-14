@@ -152,6 +152,14 @@ img.cover:not([data-frame]),img[data-facebox]:not([data-face-framed]){visibility
 :is([data-skeleton],.avskeleton,.brandskeleton),:is([data-skeleton],.avskeleton,.brandskeleton) *,.tagskeleton,.countskeleton,.skeletoncard,.skeleton{pointer-events:none}
 [data-skeleton-action]:disabled{pointer-events:auto}
 
+/* 等待态的浮层使用中性底色，骨架占位的微光独立绘制。 */
+.board-filter-frame:has([data-skeleton-tier]),
+[data-filter-glass]:has([aria-busy="true"]),
+[data-skeleton] :is(.board-filter-frame,[data-filter-glass]){
+  background-color:var(--surface)!important;background-image:none!important;
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+  box-shadow:none!important;animation:none!important}
+
 .config-skeleton-card .skeleton{display:block;height:20px;width:60%}
 .config-skeleton-card .geist-fieldset-content>.skeleton:first-child{height:24px;width:35%}
 .config-skeleton-card .geist-fieldset-content>.skeleton:last-child{height:var(--control-h);width:100%}
