@@ -55,6 +55,8 @@ describe('实体页冷启动等待态', () => {
           const root = page.locator('[data-skeleton="entity/performer"]');
           await root.waitFor();
           const first = await root.elementHandle();
+          assert.equal(await root.locator('[data-entity-portrait="round"]').evaluate(node =>
+            getComputedStyle(node).borderTopLeftRadius), '50%', '艺人头像等待态形状不准确');
           assert.equal(await root.locator('[data-entity-facts]').count() > 0, jav, '首次等待态资料栏不准确');
           assert.equal(await root.locator('[data-entity-foot]').count() > 0, jav, '首次等待态相关艺人不准确');
           assert.equal(await root.locator('[data-entity-layout]').count() > 0, jav, '首次等待态卡片版式不准确');
