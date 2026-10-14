@@ -11,7 +11,11 @@ describe('搜索图片推荐', () => {
         performer_refs: [{ id: 15, name: '女优', has_image: true }] }] };
       if (url.startsWith('/api/feeds/')) return { items: [{ id: 12, code: 'ABW-102', cover_url: '/release-cover' }] };
       if (url.startsWith('/api/follow/authors')) return { items: [{ k: '作者', key: source.author_key, entity_id: 20 }] };
-      return { sources: [source], groups: [{ primary: { id: 12, source_id: 8, title: '关注作品', thumb_url: '/post-cover' } }] };
+      return { sources: [source], groups: [{
+        primary: { id: 12, source_id: 8, title: '关注作品', thumb_url: '/post-cover', media_kind: 'video', status: 'saved' },
+        variants: [{ id: 13, source_id: 8, title: '图片作品', status: 'seen', media_kind: 'image',
+          media_items: [{ index: 2, media_kind: 'image', thumb_url: '/photo-cover' }] }], duplicates: [],
+      }] };
     });
     const groups = await searchRecommendations(request);
     const entry = (kind: string) => groups.find(group => group.kind === kind)!.items[0]!;
@@ -22,10 +26,15 @@ describe('搜索图片推荐', () => {
     expect(entry('post').href).toBe('/posts/12');
     expect(entry('post').who).toBe('作者');
     expect(entry('post').card?.thumb_url).toBe('/post-cover');
+    expect(entry('photo').href).toBe('/posts/13');
+    expect(entry('photo').mediaIndex).toBe(2);
+    expect(entry('photo').followMedia).toBe('images');
+    expect(entry('photo').card?.thumb_url).toBe('/photo-cover');
     expect(entry('author').href).toBe('/creators/20');
     expect(entry('author').avatarHtml).toContain('/avatar-fixture');
     expect(entry('performer').entity_id).toBe(15);
     expect(request.mock.calls.every(([url]) => !url.includes('scope=external'))).toBe(true);
+    expect(request.mock.calls.filter(([url]) => url.startsWith('/api/follow?')).every(([url]) => !url.includes('status='))).toBe(true);
   });
 
   it('一类读取失败不会丢失其他推荐，无实体的作者进入自己的关注筛选', async () => {

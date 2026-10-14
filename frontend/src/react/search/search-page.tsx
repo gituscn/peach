@@ -280,6 +280,11 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
   };
   /** 选中一行，点它和回车落在同一处。作品开详情，有资料页的开资料页，其余按这个词搜。 */
   const choose = (entry: SearchOption) => {
+    if (entry.type === 'suggest' && entry.item.followMedia && entry.item.id && props().actions.openFollow) {
+      input().blur();
+      props().actions.openFollow!(entry.item.id, entry.item.followMedia, entry.item.mediaIndex ?? null);
+      return;
+    }
     if (entry.type === 'suggest' && entry.item.href) { openPath(entry.item.href); return }
     if (entry.type === 'more') { runSearch(false, true); input().blur(); return }
     if (entry.type === 'suggest' && entry.kind === 'asset' && entry.item.id != null) {
@@ -410,7 +415,7 @@ function Row({ entry, active, helpers, onPick, onPeek, onRemove }: {
   }
   const { item, kind } = entry;
   const opens = SUGGEST_PROFILE_KINDS.has(kind) ? kind : undefined;
-  if (['asset', 'jav', 'post', 'release'].includes(kind)) {
+  if (['asset', 'jav', 'post', 'photo', 'release'].includes(kind)) {
     /* 作品点开是详情，不是一个搜索词：整句标题填回搜索框，下一次搜索会因为其中任何一个字符对不上
        而落空。 */
     const byline = [item.who, item.code ? item.title : ''].filter(Boolean).join(' · ');
