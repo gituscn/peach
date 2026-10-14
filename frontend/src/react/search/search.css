@@ -212,7 +212,7 @@
   .peach-react [data-search-recommendations] [data-search-results][data-split] {
     grid-template-columns: minmax(0, .32fr) minmax(0, .68fr);
   }
-  .peach-react [data-search-recommendations] [data-search-results][data-split]::before { left: calc(32% - 5px); }
+  .peach-react [data-search-recommendations] [data-search-results][data-split]::before { left: calc(32% + 2.38px); }
   .peach-react [data-search-results][data-split] {
     position: relative;
     display: grid;
