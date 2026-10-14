@@ -28,7 +28,9 @@ class ReferenceUpdateTests(unittest.TestCase):
         sources = {source["id"]: source for source in registry["sources"]}
         self.assertEqual(
             set(sources),
-             {"folia-wall-blocks", "folia-wall-style", "folia-wall-reflows", "folia-wall-motion", "readme-immich", "readme-bruno", "readme-hoppscotch",
+             {"open-claude-ui-design-manual", "open-claude-ui-rich-composer",
+             "open-claude-ui-scroll-fade", "open-claude-ui-lightbox", "open-claude-ui-license",
+             "folia-wall-blocks", "folia-wall-style", "folia-wall-reflows", "folia-wall-motion", "readme-immich", "readme-bruno", "readme-hoppscotch",
              "vercel-report-design", "vercel-web-interface-guidelines",
              "fiu758-studio-logo-discovery", "rule34-follow-tags-and-collections",
              "f95-masked-gofile-media", "follow-fanbox-gofile-paheal",

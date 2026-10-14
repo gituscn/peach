@@ -53,3 +53,30 @@ it('请求失败保留原因和重试入口', async () => {
   expect(host.textContent).toContain('请在运行 Peach 的电脑上打开系统诊断');
   expect(buttonNamed('重新检查', host)).not.toBeNull();
 });
+it('异常检查位于首区，其他检查可展开且没有重复条目', async () => {
+  const report = data();
+  report.checks.database = { label: '数据库', status: 'ok', reason: '可读取', action: '', target: null, details: {} };
+  const { host } = await open(report);
+  const priority = host.querySelector('section[aria-label="需要关注 · 3 项"]');
+  expect(host.querySelector('section')).toBe(priority);
+  expect([...priority!.querySelectorAll('h3')].map(node => node.textContent)).toEqual(['媒体挂载', '访问安全', '数据目录']);
+  for (const check of Object.values(report.checks)) {
+    expect([...host.querySelectorAll('h3')].filter(node => node.textContent === check.label)).toHaveLength(1);
+  }
+  const summary = [...host.querySelectorAll('summary')].find(node => node.textContent === '其他检查 · 1 项');
+  expect(summary?.getAttribute('aria-expanded')).toBe('false');
+  await click(summary!);
+  expect(summary?.getAttribute('aria-expanded')).toBe('true');
+  expect(summary?.parentElement?.textContent).toContain('数据库');
+});
+it('恢复动作的名称与实际目标一致', async () => {
+  const report = data();
+  report.checks.security.target = '/settings/network';
+  report.checks.ffmpeg = { label: '媒体工具', status: 'warning', reason: '缺少 FFmpeg', action: '安装工具', target: '/settings/maintenance', details: {} };
+  report.checks.tasks = { label: '后台任务', status: 'warning', reason: '有任务失败', action: '查看原因', target: '/tasks', details: {} };
+  const { host, props } = await open(report);
+  await click(buttonNamed('打开网络与访问', host));
+  await click(buttonNamed('打开维护与更新', host));
+  await click(buttonNamed('查看任务', host));
+  expect(props.navigate.mock.calls).toEqual([['/settings/network'], ['/settings/maintenance'], ['/tasks']]);
+});
