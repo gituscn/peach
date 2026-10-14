@@ -41,6 +41,7 @@
 .entityskeletontext .alias .skeleton{display:block;width:40%;height:20px}
 .entityskeletontext .entitylinks .skeleton{width:180px;height:36px}
 [data-skeleton^="entity/"] .entityportrait{height:var(--portrait-size)}
+[data-skeleton^="entity/"] .entityportrait:not(.square){border-radius:50%}
 [data-skeleton^="entity/"] .entityfacts dt .skeleton{display:block;width:56px;height:16px;margin-block:3px}
 [data-skeleton^="entity/"] .entityfacts dd .skeleton{display:block;width:70%;height:16px;margin-block:3px}
 [data-skeleton^="entity/"] .entitycollectionhead .skeleton{width:90px;height:20px}
