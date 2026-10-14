@@ -6,6 +6,10 @@
 
 收藏弹层的导航复用设置页液态玻璃、`useViewGlide`、`attachOverlayScrollbar`、入场与退场关键帧及落影，桌面和手机检查实际计算样式。官方预告复用 amane `cc42cee6ecf290cf05af1caa347d2dc2d5aeffcd` 的 Prestige SKU→UUID 协议，通过官方返回的作品身份与公开 MP4 字段取得地址；读取复用既有来源传输、限制和媒体代理，无新增依赖。
 
+## 设计准则参考
+
+Open Claude UI（MIT）只用于[设计准则](DESIGN_GUIDELINES.md)与[源码取舍](reference-snapshots/open-claude-ui.md)，原文锁定在 `reference-sources.json`。采用减少重复外框、语义排版、容器适配、输入法保护、保持阅读位置、可恢复手势、锚点缩放与真实反馈等原则；组件复用现有 BoardUI、React Aria、Motion、Swiper 和滚动入口。示例任务终态、全局样式、宿主、语音与专有协议不进入运行时。源码审阅完成，浏览器 POC 未取得；无新增依赖、生产设置或 ledger 写入。
+
 ## 上游应用功能
 
 amane `0.20.0 / cc42cee6ecf290cf05af1caa347d2dc2d5aeffcd`（GPL-3.0）提供实体收藏、

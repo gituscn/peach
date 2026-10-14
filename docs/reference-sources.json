@@ -13,6 +13,86 @@
   ],
   "sources": [
     {
+      "id": "open-claude-ui-design-manual",
+      "cadence": "monthly",
+      "name": "Open Claude UI 完整设计手册",
+      "url": "https://raw.githubusercontent.com/Caho1/open-claude-ui/501c05a587404048c6877b1358b70d4a17f20169/docs/Claude%20Design%20System%20(CDS).full.md",
+      "snapshot": "docs/reference-snapshots/upstream/open-claude-ui-design-system.md",
+      "checked_on": "2026-10-15",
+      "sha256": "98d6f3015578ecea089f5cc83acfd5fe1f5123d826d26c6f82a19da0c1d2fd70",
+      "git": {
+        "repository": "https://github.com/Caho1/open-claude-ui.git",
+        "ref": "refs/heads/main",
+        "revision": "501c05a587404048c6877b1358b70d4a17f20169"
+      },
+      "role": "MIT 的第三方设计手册，仅采用可解释 Peach 需求的原则；官方还原与参数自述不视为实测。",
+      "consumers": ["docs/DESIGN_GUIDELINES.md", "docs/reference-snapshots/open-claude-ui.md"]
+    },
+    {
+      "id": "open-claude-ui-rich-composer",
+      "cadence": "monthly",
+      "name": "Open Claude UI 输入法合成保护",
+      "url": "https://raw.githubusercontent.com/Caho1/open-claude-ui/501c05a587404048c6877b1358b70d4a17f20169/code-examples/RichComposerWithMentions.tsx",
+      "snapshot": "docs/reference-snapshots/upstream/open-claude-ui-rich-composer.tsx",
+      "checked_on": "2026-10-15",
+      "sha256": "68c412c65093950427aa379ddc21d4d427826dadc02d69ea56661caa5d28f52a",
+      "git": {
+        "repository": "https://github.com/Caho1/open-claude-ui.git",
+        "ref": "refs/heads/main",
+        "revision": "501c05a587404048c6877b1358b70d4a17f20169"
+      },
+      "role": "MIT 的输入法合成状态与键盘优先级参考；不采用指令、模拟建议源或 Token 估算。",
+      "consumers": ["docs/DESIGN_GUIDELINES.md", "docs/reference-snapshots/open-claude-ui.md"]
+    },
+    {
+      "id": "open-claude-ui-scroll-fade",
+      "cadence": "monthly",
+      "name": "Open Claude UI 滚动边缘渐隐",
+      "url": "https://raw.githubusercontent.com/Caho1/open-claude-ui/501c05a587404048c6877b1358b70d4a17f20169/code-examples/ScrollFadeContainer.tsx",
+      "snapshot": "docs/reference-snapshots/upstream/open-claude-ui-scroll-fade.tsx",
+      "checked_on": "2026-10-15",
+      "sha256": "63ba801c60c8ab2c26a9556bd1a4890a778e066e4fd07f9e2393c62b5983a906",
+      "git": {
+        "repository": "https://github.com/Caho1/open-claude-ui.git",
+        "ref": "refs/heads/main",
+        "revision": "501c05a587404048c6877b1358b70d4a17f20169"
+      },
+      "role": "MIT 的纵向多段渐隐与边缘状态参考；Peach 保留现有滚动生命周期，曲线需视觉核验。",
+      "consumers": ["docs/DESIGN_GUIDELINES.md", "docs/reference-snapshots/open-claude-ui.md"]
+    },
+    {
+      "id": "open-claude-ui-lightbox",
+      "cadence": "monthly",
+      "name": "Open Claude UI 媒体锚点缩放",
+      "url": "https://raw.githubusercontent.com/Caho1/open-claude-ui/501c05a587404048c6877b1358b70d4a17f20169/code-examples/MediaLightboxViewer.tsx",
+      "snapshot": "docs/reference-snapshots/upstream/open-claude-ui-lightbox.tsx",
+      "checked_on": "2026-10-15",
+      "sha256": "453c9ef03ae97981bdf69a966b43250ec0d7836fb0e0f44fbbbabbd1e78369c2",
+      "git": {
+        "repository": "https://github.com/Caho1/open-claude-ui.git",
+        "ref": "refs/heads/main",
+        "revision": "501c05a587404048c6877b1358b70d4a17f20169"
+      },
+      "role": "MIT 的缩放锚点与受限预载原则；不采用其焦点、拖动或缩放完整实现，不替换 Swiper。",
+      "consumers": ["docs/DESIGN_GUIDELINES.md", "docs/reference-snapshots/open-claude-ui.md"]
+    },
+    {
+      "id": "open-claude-ui-license",
+      "cadence": "monthly",
+      "name": "Open Claude UI MIT 许可证",
+      "url": "https://raw.githubusercontent.com/Caho1/open-claude-ui/501c05a587404048c6877b1358b70d4a17f20169/LICENSE",
+      "snapshot": "docs/reference-snapshots/upstream/open-claude-ui-license.txt",
+      "checked_on": "2026-10-15",
+      "sha256": "623d6fdcde280ee7294f9b8a79a22cb16eaf2b20940358aaeff787f8912cd2c9",
+      "git": {
+        "repository": "https://github.com/Caho1/open-claude-ui.git",
+        "ref": "refs/heads/main",
+        "revision": "501c05a587404048c6877b1358b70d4a17f20169"
+      },
+      "role": "保存上游原文快照的 MIT 版权与许可声明。",
+      "consumers": ["docs/reference-snapshots/open-claude-ui.md"]
+    },
+    {
       "id": "folia-wall-reflows",
       "cadence": "monthly",
       "name": "Folia 块内让位排布",
