@@ -55,6 +55,52 @@ class CoverArtworkTests(unittest.TestCase):
         self.assertEqual((face["px"], face["face"]["w"]), ([840, 472], .1))
         self.assertTrue(jav_poster_crop.is_current(poster, 840, 472))
 
+    def test_bluray_title_frames_the_front_panel_and_its_face(self):
+        detector = Detector()
+        title = '作品 ブルーレイディスク'
+        with patch.object(detector, 'detect', return_value=[
+                Face(.2, .25, .2, .2, .95), Face(.72, .22, .1, .1, .94)]):
+            cover_artwork.install_cover(self.target, 'MIDA-239', jpeg((90, 80, 70), (800, 438)),
+                (800, 438), detector=detector, evidence={'title': title})
+        poster = jav_poster_crop.read_sidecar(self.target)
+        self.assertEqual(poster['box']['x0'], round(800 - .85 * 438))
+        self.assertEqual(poster['title'], title)
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertEqual(face['face']['cx'], .72)
+
+    def test_fc2_title_keeps_the_whole_image_and_left_face(self):
+        detector = Detector()
+        with patch.object(detector, 'detect', return_value=[Face(.2, .25, .2, .2, .95)]):
+            cover_artwork.install_cover(self.target, 'FC2-PPV-12345', jpeg((90, 80, 70), (800, 438)),
+                (800, 438), detector=detector, evidence={'title': 'Blu-ray'})
+        self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertEqual(face['face']['cx'], .2)
+
+    def test_vr_mark_keeps_the_left_main_face_and_whole_artwork(self):
+        detector = Detector()
+        with patch.object(detector, 'detect', return_value=[
+                Face(.22, .25, .2, .2, .95), Face(.75, .2, .1, .1, .94)]):
+            cover_artwork.install_cover(self.target, 'MDVR-276', jpeg((90, 80, 70), (800, 600)),
+                (800, 600), detector=detector, evidence={'title': '【VR】作品'})
+        self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertEqual(face['face']['cx'], .22)
+        self.assertEqual(face['layout'], 'still')
+
+    def test_digital_collages_keep_the_whole_artwork_and_left_face(self):
+        detector = Detector()
+        with patch.object(detector, 'detect', return_value=[Face(.22, .8, .2, .2, .95)]):
+            for code in ('IENEE-93103', 'IENFE-5301', 'SDHS-039'):
+                with self.subTest(code=code):
+                    cover_artwork.install_cover(self.target, code, jpeg((90, 80, 70), (800, 540)),
+                        (800, 540), detector=detector)
+                    self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
+                    face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+                    self.assertEqual(face['face']['cx'], .22)
+                    self.assertEqual(face['face']['cy'], .8)
+                    self.assertEqual(face['layout'], 'still')
+
     def test_missing_face_model_removes_stale_focus_but_keeps_new_cover(self):
         self.target.write_bytes(jpeg((10, 10, 10), (800, 539)))
         self.target.with_suffix(".face.json").write_text('{"ratio":1,"face":{}}')

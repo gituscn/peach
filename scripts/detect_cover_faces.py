@@ -33,12 +33,13 @@ if str(SRC_DIR) not in sys.path:
 from peach.config import COVER_DIR
 from peach.cover_artwork import face_record
 from peach.face_detect import FaceDetector, FaceModelUnavailable
+from peach.jav_poster_crop import read_sidecar
 
 
 def detect(path: Path, detector: FaceDetector) -> dict | None:
     import cv2
     image = cv2.imread(str(path))
-    return face_record(image, detector, code=path.stem)
+    return face_record(image, detector, code=path.stem, title=(read_sidecar(path) or {}).get('title', ''))
 
 
 def build_parser() -> argparse.ArgumentParser:

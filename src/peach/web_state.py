@@ -420,19 +420,22 @@ class WebContract:
 
     @staticmethod
     def _cover_focus(sidecar: str) -> dict | None:
-        """sidecar 里的人脸中心。没算过、读不出或没检出都是 None，页面退回固定取景。
+        """sidecar 里的人脸中心与整幅画面标记。缺少坐标时页面退回固定取景。
 
         两个轴都给出去：哪个轴生效由容器和图片的宽高比决定，不由这里判断。
         缺哪个键就不带哪个键，前端各自回落，不要拿另一个轴的值顶替。
         """
         try:
             with open(sidecar, encoding="utf-8") as handle:
-                face = (json.load(handle) or {}).get("face")
+                record = json.load(handle) or {}
+                if not isinstance(record, dict):
+                    return None
+                face = record.get("face")
         except (OSError, ValueError):
             return None
-        if not isinstance(face, dict):
-            return None
-        focus = {axis: face[axis] for axis in ("cx", "cy") if axis in face}
+        focus = {'layout': 'still'} if record.get('layout') == 'still' else {}
+        if isinstance(face, dict):
+            focus.update({axis: face[axis] for axis in ("cx", "cy") if axis in face})
         return focus or None
 
     @staticmethod
@@ -615,11 +618,11 @@ class WebContract:
         return key in self.avatar_root_index().generated or self.has_snapshot(snapshot_path)
 
     def cover_frame(self, code: str | None) -> dict | None:
-        """封面的取景提示：人脸中心的两个轴。没算过或没检出就返回 None。
+        """封面的取景提示：人脸中心与整幅画面标记。未检出时不含人脸坐标。
 
         双页封套的横向锚点仍由版式决定（正封贴着右边缘，几何规则已经稳定），人脸
-        横向只用在 16:9 官方剧照上——那种图在大图容器里只会横向裁，写死的居中会把
-        偏在一侧的人整个切掉。取不到时前端退回固定取景，不影响显示。
+        锚点用于整幅画面被裁掉的那一轴，VR 与数字发行拼图携带 `layout=still` 标记。
+        取不到人脸时前端退回固定取景，不影响显示。
         """
         return (self._cover_entry(code) or {}).get("frame")
 

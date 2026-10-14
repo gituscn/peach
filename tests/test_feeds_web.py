@@ -569,6 +569,80 @@ class FeedWebTest(FeedWebFixture):
         self.assertEqual(items["SSIS-950"]["poster_box"]["px"], [800, 538])
         self.assertFalse(items["HMN-071"]["has_cover"])
         self.assertIsNone(items["HMN-071"]["poster_box"])
+        attempt = json.loads((covers.parent / 'feed-cover-attempts/HMN-071.json').read_text(encoding='utf-8'))
+        self.assertFalse(attempt['ok'])
+        self.assertIn('error_type', attempt)
+
+    def test_official_miss_uses_the_bound_source_image(self):
+        import base64
+        from peach.jav_cover_fetch import Unavailable
+        self._add()
+        self._check()
+        with self.contract.database.write_transaction() as connection:
+            connection.execute("UPDATE feed_discovery SET link='https://javdb.com/v/Source01' WHERE code='SSIS-950'")
+        body, size, _ = self._fake_cover(self.contract, 'SSIS-950')
+        with patch('peach.jav_cover_fetch.best_cover', side_effect=Unavailable('官方封面未取得')), \
+                patch('peach.javdb_public.PUBLIC_API.image', return_value=
+                    'data:image/jpeg;base64,' + base64.b64encode(body).decode()) as source_image, \
+                patch('peach.javdb_public.PUBLIC_API.remember_movie_identity') as identity:
+            found, actual, evidence = self._fetch_cover(self.contract, 'SSIS-950')
+        self.assertEqual((found, actual), (body, size))
+        self.assertEqual(evidence['source'], 'javdb-public')
+        identity.assert_called_once_with('SSIS-950', {'number': 'SSIS-950', 'id': 'Source01'})
+        source_image.assert_called_once_with('SSIS-950', 'cover', original=True)
+
+    def test_source_image_requires_a_bound_movie_and_full_size(self):
+        import base64
+        from peach.jav_cover_fetch import Unavailable
+        self._add()
+        self._check()
+        with self.contract.database.write_transaction() as connection:
+            connection.execute("UPDATE feed_discovery SET link='https://example.test/v/Source01' WHERE code='SSIS-950'")
+        with patch('peach.javdb_public.PUBLIC_API.image') as image:
+            with self.assertRaises(Unavailable):
+                feed_followup.source_cover(self.contract, 'SSIS-950')
+            image.assert_not_called()
+        with self.contract.database.write_transaction() as connection:
+            connection.execute("UPDATE feed_discovery SET link='https://javdb.com/v/Source01' WHERE code='SSIS-950'")
+        from PIL import Image
+        buffer = io.BytesIO()
+        Image.new('RGB', (200, 200)).save(buffer, 'JPEG')
+        with patch('peach.javdb_public.PUBLIC_API.image', return_value=
+                'data:image/jpeg;base64,' + base64.b64encode(buffer.getvalue()).decode()), \
+                patch('peach.javdb_public.PUBLIC_API.remember_movie_identity'):
+            with self.assertRaisesRegex(Unavailable, '240px'):
+                feed_followup.source_cover(self.contract, 'SSIS-950')
+
+    def test_bound_portrait_source_cover_keeps_its_native_size(self):
+        import base64
+        from PIL import Image
+        self._add()
+        self._check()
+        buffer = io.BytesIO()
+        Image.new('RGB', (560, 800)).save(buffer, 'JPEG')
+        body = buffer.getvalue()
+        with patch('peach.javdb_public.PUBLIC_API.image', return_value=
+                'data:image/jpeg;base64,' + base64.b64encode(body).decode()), \
+                patch('peach.javdb_public.PUBLIC_API.remember_movie_identity'):
+            actual, size, evidence = feed_followup.source_cover(self.contract, 'SSIS-950')
+        self.assertEqual((actual, size), (body, (560, 800)))
+        self.assertEqual(evidence['quality'], 'source-small')
+
+    def test_vr_layout_survives_without_a_detected_face(self):
+        target = self.contract.cover_root / 'MDVR-276.face.json'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps({'layout': 'still', 'face': None}), encoding='utf-8')
+        self.assertEqual(self.contract._cover_focus(str(target)), {'layout': 'still'})
+
+    def test_cover_backlog_prioritises_the_least_recent_attempt(self):
+        self._add()
+        self._check()
+        with self.contract.database.write_transaction() as connection:
+            connection.execute("UPDATE feed_discovery SET scraped_at='2026-01-01T00:00:00Z',release_date='2026-10-01' WHERE code='SSIS-950'")
+            connection.execute("UPDATE feed_discovery SET scraped_at='2025-01-01T00:00:00Z',release_date='2025-01-01' WHERE code='HMN-071'")
+        with self.contract.database.read_connection() as connection:
+            result = feed_followup.backlog(connection, self.contract.cover_root, hidden=frozenset(), limit=1)
+        self.assertEqual(result, ['HMN-071'])
 
     def test_covers_cut_off_at_the_connection_are_counted_for_the_new_release_row(self):
         """连不上图片主机的几部单独记数，列表把最近一轮的数带给页面去提示换线路；

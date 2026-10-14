@@ -12,7 +12,7 @@
 （`metadata_routes`）和发请求那一层（`library_processing.LibraryMetadataProvider`），
 不借结算。
 
-**封面走馆藏那一条。** 取图是 `jav_cover_fetch.best_cover`（和重探封面同一个），落盘是
+**封面走馆藏那一条。** 官方候选复用 `jav_cover_fetch.best_cover`，来源图复用详情的身份校验与缓存，落盘是
 `cover_artwork.install_cover`：书脊折痕的正封框与人脸位置随图一起写进边车，新作卡和
 资产卡按同一份边车取景。文件到手、建成 `asset` 之后，这张封面原样就是它的封面。
 
@@ -22,6 +22,10 @@
 from __future__ import annotations
 
 import hashlib
+import base64
+import io
+import json
+import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -100,7 +104,7 @@ def backlog(connection, cover_root: Path, *, exclude=(), now: datetime | None = 
         " AND NOT EXISTS (SELECT 1 FROM asset a WHERE a.code IS NOT NULL"
         " AND COALESCE(a.disposal,'')<>'vanished'"
         " AND normalise_code_key(a.code)=normalise_code_key(d.code))"
-        " ORDER BY COALESCE(d.release_date,d.discovered_at) DESC, d.id DESC",
+        " ORDER BY COALESCE(d.scraped_at,''), COALESCE(d.release_date,d.discovered_at) DESC, d.id DESC",
         (cutoff,)).fetchall()
     found: list[str] = []
     for row in rows:
@@ -158,25 +162,29 @@ def collect(provider, code: str) -> tuple[dict, str | None]:
 
 def fetch_cover(contract, code: str,
                 cover_url: str | None = None) -> tuple[bytes, tuple[int, int], dict]:
-    """官方渠道里这个番号最大的那张封面，连同写进 `.scraping.json` 的来路。
+    """优先官方封面，未取得时使用已绑定作品的来源封面；返回图片与来路。
 
     `cover_url` 是取资料那一步来源给的地址，它是官方图路径时一起参与择优。`DAZD-308`
     这类番号 r18 与本机快照里都没有，官方渠道一条候选也列不出来，来源给的却正是 DMM 那张
     封套；不收它，这部就只能在页面上拿远程图按固定比例切，书脊切不干净。
     取不到就抛；原因交给调用方记账，一部取不到不影响同批其余几部。
     """
-    from .jav_cover_fetch import HostLimitedTransport, best_cover, official_image_candidates
-    from .scraping_access import SourceTransport
+    from .jav_cover_fetch import HostLimitedTransport, Unavailable, best_cover, official_image_candidates
+    from .scraping_access import SourcePaused, SourceTransport
+    import httpx
 
     raw = SourceTransport(contract.follow_secrets_root, max_requests=40,
                           max_bytes=32 * 1024 * 1024, max_seconds=COVER_SECONDS)
     transport = HostLimitedTransport(raw, 1.0)
     try:
-        candidate, size, data = best_cover(
-            transport, code, 0,
-            metadata_root=contract.follow_sources_root / "metadata" / "javinizer-go",
-            prior_candidates=tuple(official_image_candidates(cover_url or "")),
-            deadline=time.monotonic() + COVER_SECONDS)
+        try:
+            candidate, size, data = best_cover(
+                transport, code, 0,
+                metadata_root=contract.follow_sources_root / "metadata" / "javinizer-go",
+                prior_candidates=tuple(official_image_candidates(cover_url or "")),
+                deadline=time.monotonic() + COVER_SECONDS)
+        except (Unavailable, SourcePaused, httpx.TransportError, OSError):
+            return source_cover(contract, code)
     finally:
         transport.close()
     digest = hashlib.sha256(data).hexdigest()
@@ -185,6 +193,54 @@ def fetch_cover(contract, code: str,
                 "raw_sha256": digest, "installed_sha256": digest,
                 "checked_at": time.time(), "resolver": "peach-jav-cover-v1"}
     return data, size, evidence
+
+
+def source_cover(contract, code: str) -> tuple[bytes, tuple[int, int], dict]:
+    """已绑定作品的来源封面，复用详情的身份校验与持久图片缓存。"""
+    from PIL import Image
+    from .jav_cover_fetch import MIN_WIDTH, SMALL_MIN_WIDTH, Unavailable
+    from .javdb_public import PUBLIC_API, public_cache_scope
+    from .remote_media_cache import cache_for
+
+    with contract.database.read_connection() as connection:
+        row = connection.execute('SELECT link,title FROM feed_discovery WHERE code=?', (code,)).fetchone()
+    if row is None:
+        raise Unavailable('未取得已绑定的来源作品')
+    link = re.fullmatch(r'https://javdb\.com/v/([A-Za-z0-9]+)/?', str(row['link'] or ''))
+    if link is None:
+        raise Unavailable('未取得已绑定的来源作品')
+    with public_cache_scope(contract.cover_root.parent / 'jav-public'):
+        PUBLIC_API.remember_movie_identity(code, {'number': code, 'id': link[1]})
+        data = cache_for(contract).bytes(f'jav:{code}:cover:original', lambda:
+            base64.b64decode(PUBLIC_API.image(code, 'cover', original=True).partition(',')[2], validate=True))
+    with Image.open(io.BytesIO(data)) as image:
+        size = image.size
+        image.verify()
+    if size[0] < SMALL_MIN_WIDTH:
+        raise Unavailable('来源封面宽度不足 240px')
+    digest = hashlib.sha256(data).hexdigest()
+    return data, size, {'code': code, 'width': size[0], 'height': size[1],
+        'source': 'javdb-public', 'source_url': row['link'], 'title': row['title'],
+        'verified_by': [], 'raw_sha256': digest, 'installed_sha256': digest,
+        'quality': 'source-small' if size[0] < MIN_WIDTH else 'source',
+        'checked_at': time.time(), 'resolver': 'peach-jav-source-cover-v1'}
+
+
+def record_cover_attempt(contract, code: str, *, ok: bool, error=None):
+    """逐番号保存封面处理结果；不记录请求凭据或来源返回正文。"""
+    from .fsutil import atomic_write_text
+    path = contract.cover_root.parent / 'feed-cover-attempts' / (normalise_code_key(code) + '.json')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    record = {'code': code, 'checked_at': time.time(), 'ok': ok}
+    if error is not None:
+        from .jav_cover_fetch import Unavailable
+        from .javdb_public import PublicSourceUnavailable
+        from .remote_media_cache import RemoteMediaUnavailable
+        import httpx
+        reason = (re.sub(r'https?://\S+', '来源地址', str(error)) if isinstance(error, (Unavailable, PublicSourceUnavailable, RemoteMediaUnavailable))
+                  else '来源连接失败' if isinstance(error, httpx.TransportError) else '封面处理未完成')
+        record.update(error_type=type(error).__name__, reason=reason[:300])
+    atomic_write_text(path, json.dumps(record, ensure_ascii=False))
 
 
 def ensure_cover(contract, code: str, cover_url: str | None = None) -> bool:
@@ -197,8 +253,17 @@ def ensure_cover(contract, code: str, cover_url: str | None = None) -> bool:
         return False
     if has_local_cover(contract.cover_root, key):
         return True
-    data, size, evidence = fetch_cover(contract, key, cover_url)
-    install_cover(Path(contract.cover_root) / f"{key}.jpg", key, data, size, evidence=evidence)
+    try:
+        data, size, evidence = fetch_cover(contract, key, cover_url)
+        with contract.database.read_connection() as connection:
+            row = connection.execute('SELECT title FROM feed_discovery WHERE code=?', (key,)).fetchone()
+        if row:
+            evidence = {**evidence, 'title': row['title']}
+        install_cover(Path(contract.cover_root) / f"{key}.jpg", key, data, size, evidence=evidence)
+    except Exception as error:
+        record_cover_attempt(contract, key, ok=False, error=error)
+        raise
+    record_cover_attempt(contract, key, ok=True)
     return True
 
 

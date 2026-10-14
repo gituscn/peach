@@ -418,7 +418,7 @@ class PublicAPI:
             return {'url': url, **({'release_date': released} if url else {})}
         return self._cached('preview:prestige:' + normalise_code_key(code), read, refresh=refresh)
 
-    def image(self, code: str, index: str) -> str:
+    def image(self, code: str, index: str, *, original=False) -> str:
         movie = self.media_movie(code)
         if index == "cover":
             url = movie.get("cover_url") or movie.get("thumb_url")
@@ -437,9 +437,9 @@ class PublicAPI:
                 raise ValueError("预览图不存在") from None
             if isinstance(url, dict):
                 url = url.get("large_url") or url.get("url")
-        return self.image_from_url(url)
+        return self.image_from_url(url, original=True) if original else self.image_from_url(url)
 
-    def image_from_url(self, url) -> str:
+    def image_from_url(self, url, *, original=False) -> str:
         """静态头像与作品图片共用校验、并发下载、解码和请求缓存。"""
         if not public_image_url(url):
             raise PublicSourceUnavailable("图片未取得")
@@ -448,13 +448,14 @@ class PublicAPI:
             import base64
             with self.image_slots:
                 body = self._get(str(url), limit=4 * 1024 * 1024, image=True).body
-                decoded = decode_image(body)
+                decoded = decode_image(body, original=True) if original else decode_image(body)
             return "data:image/jpeg;base64," + base64.b64encode(decoded).decode("ascii")
 
-        return self._cached('image:' + hashlib.sha256(str(url).encode()).hexdigest(), fetch)
+        key = ('image:original:' if original else 'image:') + hashlib.sha256(str(url).encode()).hexdigest()
+        return self._cached(key, fetch)
 
 
-def decode_image(body: bytes) -> bytes:
+def decode_image(body: bytes, *, original=False) -> bytes:
     """标准图片与公开前端 XOR 包装，只接受 Pillow 完整解码的图像。"""
     candidates = [body]
     if body:
@@ -466,9 +467,12 @@ def decode_image(body: bytes) -> bytes:
                 if image.width * image.height > 20_000_000:
                     continue
                 image.load()
-                image.thumbnail((1200, 1200))
+                if original and image.format == 'JPEG':
+                    return raw
+                if not original:
+                    image.thumbnail((1200, 1200))
                 output = io.BytesIO()
-                image.convert("RGB").save(output, "JPEG", quality=85)
+                image.convert("RGB").save(output, "JPEG", quality=95 if original else 85)
                 return output.getvalue()
         except (OSError, ValueError, Image.DecompressionBombError):
             continue

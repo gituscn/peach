@@ -224,6 +224,27 @@ class PublicProtocolTests(unittest.TestCase):
         with self.assertRaises(PublicSourceUnavailable):
             decode_image(b'<html>unavailable</html>')
 
+    def test_original_cover_keeps_jpeg_bytes_and_dimensions(self):
+        output = io.BytesIO()
+        Image.new('RGB', (2000, 1100), (40, 100, 160)).save(output, 'JPEG', quality=94)
+        raw = output.getvalue()
+        for body in (raw, bytes([31]) + bytes(value ^ 31 for value in raw)):
+            self.assertEqual(decode_image(body, original=True), raw)
+        with Image.open(io.BytesIO(decode_image(raw))) as preview:
+            self.assertEqual(preview.size, (1200, 660))
+
+    def test_original_image_cache_is_separate_from_preview(self):
+        api = self.api()
+        output = io.BytesIO()
+        Image.new('RGB', (2000, 1100), (40, 100, 160)).save(output, 'JPEG')
+        raw = output.getvalue()
+        with patch.object(api, '_get', return_value=HttpResponse(200, {}, raw)) as request:
+            preview = api.image_from_url('https://tp.spfcas.com/image.jpg')
+            original = api.image_from_url('https://tp.spfcas.com/image.jpg', original=True)
+            self.assertNotEqual(preview, original)
+            self.assertEqual(api.image_from_url('https://tp.spfcas.com/image.jpg', original=True), original)
+        self.assertEqual(request.call_count, 2)
+
     def test_preview_entry_accepts_only_the_public_hls_origin_and_path(self):
         url = 'https://jdforrepam.com/api/v1/movies/ttm3u8/preview/123/0/720p.m3u8?token=sample'
         self.assertEqual(preview_video_url({'preview_video_url': url}), url)
