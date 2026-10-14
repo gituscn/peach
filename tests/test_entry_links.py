@@ -107,6 +107,65 @@ class EntryLinkAddressTests(unittest.TestCase):
             alias("藍川みれい", "avdb-actor-mapping"), alias("坂本マリア"),
         ]), "藍川みれい")
 
+    def test_plain_hiragana_alias_is_not_a_han_stage_name(self):
+        for name, reading in (("三宅美香", "みやけみか"), ("音海里奈", "おとみりな")):
+            with self.subTest(name=name):
+                self.assertEqual(entry_links.japanese_name(name, [alias(reading)]), name)
+
+    def test_a_published_hiragana_stage_name_is_distinct_from_a_profile_reading(self):
+        aliases = [alias("なぎさ", "javdb-actor-page")]
+        self.assertEqual(entry_links.japanese_name("渚向日葵", aliases), "なぎさ")
+        self.assertEqual(entry_links.japanese_name("渚向日葵", aliases,
+                         {"source": "javdb-actor-page", "jp": "なぎさ", "zh_cn": "渚向日葵"}),
+                         "なぎさ")
+
+    def test_glyph_equivalent_chinese_alias_does_not_hide_a_published_kana_stage_name(self):
+        for name, jp, chinese in (("逢泽美优", "逢沢みゆ", "逢澤美優"),
+                                  ("优梨舞奈", "優梨まいな", "優梨舞奈"),
+                                  ("新井爱丽", "新井エリー", "新井愛麗")):
+            with self.subTest(name=name):
+                aliases = [alias(chinese, "review:performer-localization"),
+                           alias(jp, "review:performer-localization")]
+                self.assertEqual(entry_links.japanese_name(name, aliases,
+                                 {"source": "review:performer-localization", "jp": jp, "zh_cn": name}), jp)
+
+    def test_equivalent_han_name_preserves_original_glyphs_and_iteration_mark(self):
+        for name, jp in (("北条麻妃", "北條麻妃"), ("乃乃果花", "乃々果花"),
+                         ("梨梨衣", "梨々衣")):
+            with self.subTest(name=name):
+                self.assertEqual(entry_links.japanese_name(name, [alias(jp)]), jp)
+        self.assertEqual(entry_links.missav_name("北條麻妃"), "北条麻妃")
+        self.assertEqual(entry_links.missav_name("乃々果花"), "乃々果花")
+
+    def test_paired_current_han_name_wins_over_an_unreviewed_former_name(self):
+        localized = {"source": "avdb-actor-mapping", "jp": "水谷心音", "zh_cn": "水谷心音"}
+        rows = entry_links.build(entry_links.defaults(), "水谷心音", [ref("javdb", "sample")],
+                                 [alias("藤崎りお"), alias("みずたにここね")], localized)
+        self.assertEqual(next(row["url"] for row in rows if row["site"] == "missav"),
+                         "https://missav.ws/dm3/cn/actresses/"
+                         "%E6%B0%B4%E8%B0%B7%E5%BF%83%E9%9F%B3")
+
+    def test_localization_conflicts_do_not_replace_the_current_identity(self):
+        self.assertEqual(entry_links.japanese_name("霞理沙", [alias("かすみりさ")],
+                         {"source": "avdb-actor-mapping", "jp": "松冈仁美", "zh_cn": "霞理沙"}),
+                         "霞理沙")
+        self.assertEqual(entry_links.japanese_name("泽村玲子", [
+            alias("澤村レイコ", "avdb-actor-mapping")],
+            {"source": "avdb-actor-mapping", "jp": "泽村玲子", "zh_cn": "泽村玲子"}),
+                         "澤村レイコ")
+        self.assertEqual(entry_links.japanese_name("鹫尾芽衣", [
+            alias("筧ジュン", "avdb-actor-mapping"), alias("鷲尾めい", "avdb-actor-mapping")],
+            {"source": "avdb-actor-mapping", "jp": "鷲尾めい", "zh_cn": "鹫尾芽衣"}),
+                         "筧ジュン")
+
+    def test_paired_han_name_requires_the_same_current_chinese_name(self):
+        self.assertEqual(entry_links.japanese_name("宇野刊菜", [alias("あべかんな")],
+                         {"source": "avdb-actor-mapping", "jp": "宇野栞菜", "zh_cn": "宇野刊菜"}),
+                         "宇野栞菜")
+        self.assertEqual(entry_links.japanese_name("宇野刊菜", [alias("あべかんな")],
+                         {"source": "avdb-actor-mapping", "jp": "宇野栞菜", "zh_cn": "别的写法"}),
+                         "宇野刊菜")
+
     def test_a_reading_in_plain_hiragana_loses_to_the_written_stage_name(self):
         rows = entry_links.build(entry_links.defaults(), "天川空",
                                  [ref("r18dev", "1091104")], [

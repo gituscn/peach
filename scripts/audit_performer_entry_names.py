@@ -29,6 +29,14 @@ HAN = re.compile(r"[\u3400-\u9fff]")
 LATIN = re.compile(r"[A-Za-z]")
 
 
+def _name_localization(raw: str):
+    try:
+        metadata = json.loads(raw or "{}")
+    except (ValueError, TypeError):
+        return None
+    return metadata.get("name_localization") if isinstance(metadata, dict) else None
+
+
 def collect(connection: sqlite3.Connection) -> list[dict]:
     """每位 performer 一行；入口生成正确与远端页面可访问分别留证。"""
     connection.row_factory = sqlite3.Row
@@ -44,13 +52,13 @@ def collect(connection: sqlite3.Connection) -> list[dict]:
         sources[int(row["entity_id"])].add(str(row["source"]))
         assets[int(row["entity_id"])].add(int(row["asset_id"]))
     out = []
-    for entity in connection.execute("SELECT id,canonical_name FROM entity WHERE kind='performer' ORDER BY id"):
+    for entity in connection.execute("SELECT id,canonical_name,metadata_json FROM entity WHERE kind='performer' ORDER BY id"):
         entity_id = int(entity["id"])
         name = str(entity["canonical_name"])
         chain = aliases[entity_id]
         jav = entry_links.is_jav_performer(refs[entity_id])
         previous = entry_links.japanese_name("", chain) or name
-        selected = entry_links.japanese_name(name, chain)
+        selected = entry_links.japanese_name(name, chain, _name_localization(entity["metadata_json"]))
         chinese = sorted({str(row["alias"]) for row in chain
                           if HAN.search(str(row["alias"])) and not KANA.search(str(row["alias"]))
                           and not LATIN.search(str(row["alias"]))})
