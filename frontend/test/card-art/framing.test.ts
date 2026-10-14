@@ -158,6 +158,25 @@ describe('coverAnchor：封面按自己的宽高比分流', () => {
   });
 });
 
+describe('宽正封框', () => {
+  it('VR 画面在 4:3 源图上按左侧人脸取景', () => {
+    const host = mount('<div class="pic"><img class="poster cover front" src="/cover?code=MDVR-276" style="--card-ratio:.75" data-cover-layout="still" data-cx=".22" data-posterbox="380 800 600 0 800 600"></div>');
+    const img = sized(host.querySelector('img')!, 800, 600);
+    coverAnchor(img);
+    expect(img.dataset.frame).toBe('still');
+    expect(img.classList.contains('panel')).toBe(false);
+    expect(img.style.getPropertyValue('--cover-x')).toBe('0%');
+  });
+  it('来源框独立于标题保留完整宽正封', () => {
+    const host = mount('<div class="pic"><img class="poster cover front" src="/cover?code=MIDA-239" style="--card-ratio:.75" data-posterbox="428 800 438 0 800 438"></div>');
+    const img = sized(host.querySelector('img')!, 800, 438);
+    coverAnchor(img);
+    expect(img.classList.contains('panel')).toBe(true);
+    expect(parseFloat(img.style.getPropertyValue('--panel-height'))).toBeLessThan(100);
+    expect(parseFloat(img.style.getPropertyValue('--panel-top'))).toBeGreaterThan(0);
+  });
+});
+
 describe('upgradeCover：派生档不够清楚就换回原件', () => {
   it('一个源像素要占不止一个设备像素才换，模糊底仍取派生档', () => {
     const host = mount('<div class="pic"><img class="poster cover" src="/cover?code=A&thumb=1"></div>');

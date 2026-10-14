@@ -77,7 +77,7 @@ export function coverAnchor(img: HTMLImageElement): void {
   if (!r) return;
   const code = img.dataset.coverCode || new URL(img.currentSrc || img.src, location.href).searchParams.get('code') || '';
   // FC2 封面是整幅画面，横向取景跟随人脸；宽高比不代表有 DVD 正封。
-  img.dataset.frame = /^FC2(?:-PPV)?-/i.test(code) ? 'still' : wideSleeve(img) ? 'sleeve' : r >= 1.65 ? 'still' : r > 1.2 ? 'sleeve' : 'front';
+  img.dataset.frame = img.dataset.coverLayout === 'still' || /^FC2(?:-PPV)?-/i.test(code) ? 'still' : wideSleeve(img) ? 'sleeve' : r >= 1.65 ? 'still' : r > 1.2 ? 'sleeve' : 'front';
   /* `object-position` 的百分比说的是「图片上这个点对齐可见窗口的同一个百分比位置」，
      不是「这个点落到窗口正中」。所以人脸中心原样当锚点只能保证脸还在画面里：0.81
      那种偏右的脸会贴着窗口右缘，图片右边还剩一截永远露不出来。可见窗口占图片 w 时，
@@ -104,7 +104,7 @@ export function coverAnchor(img: HTMLImageElement): void {
    的 16:9 拼图才有正封可切；没有框（本机 1516 张封面里 771 张判定为不裁，永远拿不到）
    就一个字都不写，CSS 里那份贴右缘或按人脸的回退照旧生效。 */
 export function posterPanel(img: HTMLImageElement, ratio: number): void {
-  if (img.dataset.frame === 'front') return;
+  if (img.dataset.frame === 'front' || img.dataset.coverLayout === 'still') return;
   let [x0 = NaN, imgW = NaN, imgH = NaN, y0 = NaN, x1 = NaN, y1 = NaN] = String(img.dataset.posterbox || '').split(' ').map(Number);
   /* 没有框的双页封套按先验从右缘量回去，与服务端折痕找不到时的比例框一致。 */
   if (!img.dataset.posterbox && img.dataset.frame === 'sleeve') {
@@ -116,7 +116,11 @@ export function posterPanel(img: HTMLImageElement, ratio: number): void {
      这么取景」看不出区别，所以宁可退回回退值。 */
   // 卡片先取的是等比缩小的派生档，框的百分比在等比缩放下不变，所以认缩小，不认别的图。
   if (!faceSourceScale(img.naturalWidth, img.naturalHeight, imgW, imgH)) return;
-  const frame = panelFrame({ x0, y0, x1, y1, px: [imgW, imgH] }, ratio, wideSleeve(img));
+  const panelAspect = (x1 - x0) / (y1 - y0);
+  const sourceAspect = imgW / imgH;
+  const widePanel = sourceAspect >= WIDE_SLEEVE_RATIO_MIN && sourceAspect < WIDE_SLEEVE_RATIO_MAX
+    && Math.abs(panelAspect - WIDE_PANEL_ASPECT) <= .02;
+  const frame = panelFrame({ x0, y0, x1, y1, px: [imgW, imgH] }, ratio, wideSleeve(img) || widePanel);
   if (!frame) return;
   img.style.setProperty('--panel-aspect', `${img.naturalWidth} / ${img.naturalHeight}`);
   img.classList.add('panel');

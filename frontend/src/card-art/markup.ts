@@ -204,8 +204,8 @@ export interface CoverItem {
   cover_version?: string;
   has_thumb?: boolean;
   has_local_poster?: boolean;
-  cover_frame?: { cx?: number | null; cy?: number | null } | null;
-  poster_box?: { x0?: number; y0?: number; x1?: number; y1?: number; px?: number[] } | null;
+  cover_frame?: { cx?: number | null; cy?: number | null; layout?: string } | null;
+  poster_box?: { x0?: number; y0?: number; x1?: number; y1?: number; px?: number[]; method?: string } | null;
   [field: string]: unknown;
 }
 
@@ -216,16 +216,19 @@ export function coverImage(item: CoverItem, layout: 'big' | 'small', eager = fal
   const src = coverUrl(item, true);
   const wide = /ブルーレイ|blu[\s-]?ray/i.test(String(item.title || item.display_title || item.name || ''));
   const f = item.cover_frame || {};
-  // 纵向夹在 5%–60%：脸不会长在图片下半截，落在那儿是检出跑偏而不是构图。
+  const still = item.poster_box?.method !== 'manual' && (f.layout === 'still'
+    || /^(IENEE|IENFE|SDHS)-/i.test(String(item.code || ''))
+    || /(?:【|\[|\(|（)\s*(?:[48]K\s*)?VR\s*(?:】|\]|\)|）)/i.test(String(item.title || item.display_title || item.name || '')));
+  const faceY = f.cy == null ? null : still ? Math.min(1, Math.max(0, f.cy)) : Math.min(0.6, Math.max(0.05, f.cy));
   const face = [f.cx != null ? ` data-cx="${f.cx}"` : '',
-    f.cy != null ? ` data-cy="${Math.min(0.6, Math.max(0.05, f.cy))}"` : ''].join('');
+    faceY != null ? ` data-cy="${faceY}"` : ''].join('');
   /* 正封那一块的取景框，源图像素坐标加源图尺寸，由 `posterPanel` 在加载后换算成
      百分比。`map(Number)` 既是校验也是转义：进到属性里的一定是数字。 */
   const pb = item.poster_box;
   const box = pb ? ` data-posterbox="${[pb.x0, (pb.px || [])[0], (pb.px || [])[1], pb.y0, pb.x1, pb.y1].map(Number).join(' ')}"` : '';
   // 小图看整张（含剧照拼贴），大图只取右侧正封。
   return `<img class="poster cover ${layout === 'small' ? 'whole' : 'front'}" src="${src}"
-    width="640" height="360" alt="" loading="${eager ? 'eager' : 'lazy'}" data-cover-code="${esc(item.code || '')}"${wide ? ' data-wide-sleeve="1"' : ''}${face}${box} data-drop="self">`;
+    width="640" height="360" alt="" loading="${eager ? 'eager' : 'lazy'}" data-cover-code="${esc(item.code || '')}"${wide ? ' data-wide-sleeve="1"' : ''}${still ? ' data-cover-layout="still"' : ''}${face}${box} data-drop="self">`;
 }
 
 /** 封面格的两种图：官方封套（取景链接管）或预览图。空串是这一条没有可用的图。 */

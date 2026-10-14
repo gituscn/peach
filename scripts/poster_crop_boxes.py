@@ -94,7 +94,8 @@ def run(args: argparse.Namespace) -> int:
             print(f"[{index}/{len(todo)}] 读图失败 {path.name}", flush=True)
             continue
         record = jav_poster_crop.crop_record(
-            path.stem, width, height, jav_poster_crop.file_gradient(path))
+            path.stem, width, height, jav_poster_crop.file_gradient(path),
+            title=(jav_poster_crop.read_sidecar(path) or {}).get('title', ''))
         method = record["box"]["method"]
         counts[method] += 1
         bucket = samples.setdefault(method, [])

@@ -46,6 +46,7 @@ OpenCV 不在（`vision` 是可选依赖组）或图读不出来时直接走 `ra
 from __future__ import annotations
 
 import json
+import re
 import statistics
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -168,7 +169,7 @@ MANUAL = "manual"
 MANUAL_SOURCE = "user:crop"
 
 #: 算法版本号。sidecar 记着它，落后的重算。改动判据、常数或框的形状都要进位。
-ALGORITHM_VERSION = "poster-crop-v10"
+ALGORITHM_VERSION = "poster-crop-v11"
 #: sidecar 与封面同名换后缀：`ABW-232.jpg` → `ABW-232.poster.json`。人脸取景是
 #: `.face.json`，两者同目录、同命名风格，各描述一件事：一个是脸在哪，一个是正封在哪。
 SIDECAR_SUFFIX = ".poster.json"
@@ -178,7 +179,21 @@ SIDECAR_SUFFIX = ".poster.json"
 GradientSource = Sequence[float] | Callable[[], Sequence[float] | None] | None
 
 
-def crops_to_portrait(code: str | None) -> bool:
+SCENE_COVER_LABELS = frozenset({'IENEE', 'IENFE', 'SDHS'})
+
+
+def is_vr_title(title: str | None) -> bool:
+    """来源标题明确标记为 VR 作品。"""
+    return bool(re.search(r'(?:【|\[|\(|（)\s*(?:[48]K\s*)?VR\s*(?:】|\]|\)|）)', str(title or ''), re.I))
+
+
+def is_scene_cover(code: str | None, title: str = '') -> bool:
+    """VR 与数字发行厂牌的整幅宣传画面。"""
+    key = normalise_code_key(code)
+    return is_vr_title(title) or bool(key and key.split('-', 1)[0] in SCENE_COVER_LABELS)
+
+
+def crops_to_portrait(code: str | None, title: str = '') -> bool:
     """这个番号的封面是横版封套吗。
 
     判据全部走 `catalog_rules` 现有函数，不在这里另立一套番号形态：
@@ -191,19 +206,21 @@ def crops_to_portrait(code: str | None) -> bool:
     key = normalise_code_key(code)
     if not key or not is_jav_code(key):
         return False
-    if key.startswith("FC2"):
+    if key.startswith("FC2") or is_scene_cover(code, title):
         return False
     return not (is_uncensored_code(key) or is_korean_mib_code(key))
 
 
-def is_wide_sleeve_label(code: str | None) -> bool:
-    """这个番号的厂牌用的是宽封套模板吗。
+def is_wide_sleeve_label(code: str | None, title: str = '') -> bool:
+    """厂牌或来源标题是否标明宽封套版次。
 
-    只看厂牌字母段，比例那一关在 `front_panel_box`：厂牌只负责开门，同一厂牌哪一期
+    比例那一关在 `front_panel_box`：版次只负责开门，同一厂牌哪一期
     换了封面比例，仍按图本身的比例走对应的那一档。
     """
     key = normalise_code_key(code)
-    return bool(key) and key.split("-", 1)[0] in WIDE_SLEEVE_LABELS
+    return bool(key) and not key.startswith('FC2') and (
+        key.split("-", 1)[0] in WIDE_SLEEVE_LABELS
+        or bool(re.search(r'ブルーレイ|blu[\s-]?ray', str(title or ''), re.I)))
 
 
 class ColumnProfile(list):
@@ -257,7 +274,7 @@ def file_gradient(path: Path | str) -> Callable[[], ColumnProfile | None]:
 
 def front_panel_box(width: int, height: int,
                     gradient_source: GradientSource = None,
-                    code: str | None = None) -> dict:
+                    code: str | None = None, title: str = '') -> dict:
     """源图尺寸加列梯度 → 正封那一块的取景框。纯函数，不碰文件也不碰 OpenCV。
 
     返回 `{"x0", "y0", "x1", "y1", "method"}`，坐标是源图像素，右下开区间。
@@ -270,8 +287,10 @@ def front_panel_box(width: int, height: int,
     width, height = int(width or 0), int(height or 0)
     if width <= 0 or height <= 0:
         return {"x0": 0, "y0": 0, "x1": 0, "y1": 0, "method": NONE}
+    if is_scene_cover(code, title):
+        return _whole(width, height)
     ratio = width / height
-    if (is_wide_sleeve_label(code)
+    if (is_wide_sleeve_label(code, title)
             and WIDE_SLEEVE_RATIO_MIN <= ratio < WIDE_SLEEVE_RATIO_MAX):
         return _sleeve(width, height, gradient_source, WIDE_PANEL)
     if ratio >= SLEEVE_RATIO_MAX:
@@ -534,15 +553,16 @@ def _panel(width: int, height: int, start: int, method: str) -> dict:
 
 
 def crop_record(code: str | None, width: int, height: int,
-                gradient_source: GradientSource = None) -> dict:
+                gradient_source: GradientSource = None, *, title: str = '') -> dict:
     """可直接落盘的 sidecar 内容：算法版本、源图尺寸、框。
 
     番号形态先判：不该裁的图连梯度都不算，`gradient_source` 是惰性的就一次都不解码。
     """
     width, height = int(width or 0), int(height or 0)
-    box = (front_panel_box(width, height, gradient_source, code)
-           if crops_to_portrait(code) else _whole(width, height))
-    return {"version": ALGORITHM_VERSION, "px": [width, height], "box": box}
+    box = (front_panel_box(width, height, gradient_source, code, title)
+           if crops_to_portrait(code, title) else _whole(width, height))
+    return {"version": ALGORITHM_VERSION, "px": [width, height], "box": box,
+            **({'title': title} if title else {})}
 
 
 def manual_record(width: int, height: int, box: object) -> dict | None:

@@ -209,6 +209,16 @@ describe('人脸取景的换算', () => {
 });
 
 describe('coverImage：官方封面', () => {
+  it('VR 画面标记来自标题或取景记录，手工框保持其取景', () => {
+    expect(parse(coverImage({ code: 'MDVR-276', title: '【VR】作品' }, 'big'))!.dataset.coverLayout).toBe('still');
+    expect(parse(coverImage({ code: 'MDVR-276', cover_frame: { layout: 'still' } }, 'big'))!.dataset.coverLayout).toBe('still');
+    const manual = parse(coverImage({ code: 'MDVR-276', title: '【VR】作品',
+      poster_box: { x0: 0, y0: 0, x1: 300, y1: 600, px: [800, 600], method: 'manual' } }, 'big'))!;
+    expect(manual.dataset.coverLayout).toBeUndefined();
+    expect(manual.dataset.posterbox).toBeDefined();
+    expect(parse(coverImage({ code: 'IENFE-5301' }, 'big'))!.dataset.coverLayout).toBe('still');
+    expect(parse(coverImage({ code: 'IENFE-5301', cover_frame: { cy: .8 } }, 'big'))!.dataset.cy).toBe('0.8');
+  });
   it('来源封面携带作品身份和明确的 Blu-ray 版次', () => {
     const img = parse(coverImage({ code: 'MIDA-122', title: '作品（ブルーレイディスク）' }, 'big'))!;
     expect(img.dataset.coverCode).toBe('MIDA-122');

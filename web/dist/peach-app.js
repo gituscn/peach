@@ -12030,16 +12030,16 @@ function ua(e) {
 	].map(Number).join(" ")}"` : "";
 }
 function da(e, t, n = !1) {
-	let r = ta(e, !0), i = /ブルーレイ|blu[\s-]?ray/i.test(String(e.title || e.display_title || e.name || "")), a = e.cover_frame || {}, o = [a.cx == null ? "" : ` data-cx="${a.cx}"`, a.cy == null ? "" : ` data-cy="${Math.min(.6, Math.max(.05, a.cy))}"`].join(""), s = e.poster_box, c = s ? ` data-posterbox="${[
-		s.x0,
-		(s.px || [])[0],
-		(s.px || [])[1],
-		s.y0,
-		s.x1,
-		s.y1
+	let r = ta(e, !0), i = /ブルーレイ|blu[\s-]?ray/i.test(String(e.title || e.display_title || e.name || "")), a = e.cover_frame || {}, o = e.poster_box?.method !== "manual" && (a.layout === "still" || /^(IENEE|IENFE|SDHS)-/i.test(String(e.code || "")) || /(?:【|\[|\(|（)\s*(?:[48]K\s*)?VR\s*(?:】|\]|\)|）)/i.test(String(e.title || e.display_title || e.name || ""))), s = a.cy == null ? null : o ? Math.min(1, Math.max(0, a.cy)) : Math.min(.6, Math.max(.05, a.cy)), c = [a.cx == null ? "" : ` data-cx="${a.cx}"`, s == null ? "" : ` data-cy="${s}"`].join(""), l = e.poster_box, u = l ? ` data-posterbox="${[
+		l.x0,
+		(l.px || [])[0],
+		(l.px || [])[1],
+		l.y0,
+		l.x1,
+		l.y1
 	].map(Number).join(" ")}"` : "";
 	return `<img class="poster cover ${t === "small" ? "whole" : "front"}" src="${r}"
-    width="640" height="360" alt="" loading="${n ? "eager" : "lazy"}" data-cover-code="${z(e.code || "")}"${i ? " data-wide-sleeve=\"1\"" : ""}${o}${c} data-drop="self">`;
+    width="640" height="360" alt="" loading="${n ? "eager" : "lazy"}" data-cover-code="${z(e.code || "")}"${i ? " data-wide-sleeve=\"1\"" : ""}${o ? " data-cover-layout=\"still\"" : ""}${c}${u} data-drop="self">`;
 }
 var fa = {
 	kind: "",
@@ -13316,7 +13316,7 @@ function Gs(e) {
 	let t = e.naturalWidth / e.naturalHeight;
 	if (!t) return;
 	let n = e.dataset.coverCode || new URL(e.currentSrc || e.src, location.href).searchParams.get("code") || "";
-	e.dataset.frame = /^FC2(?:-PPV)?-/i.test(n) ? "still" : qs(e) ? "sleeve" : t >= 1.65 ? "still" : t > 1.2 ? "sleeve" : "front";
+	e.dataset.frame = e.dataset.coverLayout === "still" || /^FC2(?:-PPV)?-/i.test(n) ? "still" : qs(e) ? "sleeve" : t >= 1.65 ? "still" : t > 1.2 ? "sleeve" : "front";
 	let r = Xs(e), i = (t, n, r) => {
 		if (n == null || !(r > 0 && r < 1)) return;
 		let i = Math.min(1, Math.max(0, (n - r / 2) / (1 - r)));
@@ -13325,17 +13325,17 @@ function Gs(e) {
 	i("--cover-x", Zs(e, "cx"), r / t), i("--cover-y", Zs(e, "cy"), t / r), Ks(e, r), (e.classList.contains("whole") || e.dataset.frame === "front") && Math.abs(t / r - 1) > .02 && Js(e);
 }
 function Ks(e, t) {
-	if (e.dataset.frame === "front") return;
+	if (e.dataset.frame === "front" || e.dataset.coverLayout === "still") return;
 	let [n = NaN, r = NaN, i = NaN, a = NaN, o = NaN, s = NaN] = String(e.dataset.posterbox || "").split(" ").map(Number);
 	if (!e.dataset.posterbox && e.dataset.frame === "sleeve" && (r = e.naturalWidth, i = e.naturalHeight, n = Math.round(r - (qs(e) ? Yi : Ji) * i), a = 0, o = r, s = i), !Li(e.naturalWidth, e.naturalHeight, r, i)) return;
-	let c = Xi({
+	let c = (o - n) / (s - a), l = r / i, u = l >= 1.75 && l < 1.85 && Math.abs(c - .85) <= .02, d = Xi({
 		x0: n,
 		y0: a,
 		x1: o,
 		y1: s,
 		px: [r, i]
-	}, t, qs(e));
-	c && (e.style.setProperty("--panel-aspect", `${e.naturalWidth} / ${e.naturalHeight}`), e.classList.add("panel"), e.style.setProperty("--panel-clip", `${c.clip.top}% ${c.clip.right}% ${c.clip.bottom}% ${c.clip.left}%`), e.style.setProperty("--panel-left", `${c.left}%`), e.style.setProperty("--panel-top", `${c.top}%`), e.style.setProperty("--panel-height", `${c.height}%`), Js(e));
+	}, t, qs(e) || u);
+	d && (e.style.setProperty("--panel-aspect", `${e.naturalWidth} / ${e.naturalHeight}`), e.classList.add("panel"), e.style.setProperty("--panel-clip", `${d.clip.top}% ${d.clip.right}% ${d.clip.bottom}% ${d.clip.left}%`), e.style.setProperty("--panel-left", `${d.left}%`), e.style.setProperty("--panel-top", `${d.top}%`), e.style.setProperty("--panel-height", `${d.height}%`), Js(e));
 }
 function qs(e) {
 	let t = e.dataset.coverCode || new URL(e.currentSrc || e.src, location.href).searchParams.get("code") || "", n = e.naturalWidth / e.naturalHeight;
