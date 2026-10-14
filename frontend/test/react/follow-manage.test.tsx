@@ -352,6 +352,39 @@ it('表格视图把每条来源摊成一行，勾的还是来源 ID', async () =
   expect(sentBody(fetcher, FOLLOW_SOURCE_URL)).toEqual([{ action: 'enabled', id: 2, enabled: false }]);
 });
 
+it('关注表格分页和排序保留来源选择，批量操作覆盖跨页集合', async () => {
+  const many = Array.from({ length: 12 }, (_, at) => source({
+    id: at + 1, label: `来源 ${String(at + 1).padStart(2, '0')}`,
+  }));
+  const { host, fetcher } = await open({ data: follow({ sources: many }) }, {
+    layout: 'table', pageSize: 10, sort: 'source', dir: 'asc',
+  });
+  const rowIds = () => [...host.querySelectorAll('[role="row"][data-key]')]
+    .map((row) => Number(row.getAttribute('data-key')));
+  expect(rowIds()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  await click(checkboxNamed(host, '选择 来源 01'));
+  await click(buttonNamed('下一页', host));
+  expect(rowIds()).toEqual([11, 12]);
+  await click(checkboxNamed(host, '选择 来源 12'));
+
+  await click(buttonLabelled(host, sortLabel('source', 'asc')));
+  expect(rowIds()).toEqual([12, 11, 10, 9, 8, 7, 6, 5, 4, 3]);
+  expect(checkboxNamed(host, '选择 来源 12')?.checked).toBe(true);
+  await click(checkboxNamed(host, '选择 来源 12'));
+  expect(host.textContent).toContain('已选 1 个来源');
+  await click(buttonNamed('下一页', host));
+  expect(rowIds()).toEqual([2, 1]);
+  expect(checkboxNamed(host, '选择 来源 01')?.checked).toBe(true);
+  await click(checkboxNamed(host, '选择 来源 02'));
+
+  await click(buttonLabelled(host, '默认视图'));
+  expect(host.textContent).toContain('已选 2 个来源');
+  await click(buttonNamed('暂停', host));
+  await settle();
+  expect(sentBody(fetcher, FOLLOW_SOURCE_URL).map((body) => body.id).sort((a, b) => a - b))
+    .toEqual([1, 2]);
+});
+
 it('表格视图的行尾有启用开关，拨一下只写这一条，勾选和 toast 都不动', async () => {
   const { host, fetcher } = await open({}, { layout: 'table' });
   await click(checkboxNamed(host, '选择 甲 · Pawchive'));

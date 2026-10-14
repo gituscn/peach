@@ -502,7 +502,7 @@ vendor 到 `web/vendor/` 的四个包（video.js、swiper、lucide-static、heal
 | `@tanstack/react-query` | React 页面的取数与缓存：页面级 `prefetch` 与组件里的 `useQuery` 共用一份缓存，「取完数才画」不必把首屏数据当 props 串一路；轮询写成 `refetchInterval`，卸载时跟着组件一起停 |
 | `@tanstack/query-core` | `QueryClient` 本体。Application 与 React 页面直接引用同一客户端源码，运行时只有一份；版本与 `@tanstack/react-query` 同步固定 |
 | `react-router` | Declarative 客户端导航：Router、Routes 与共享浏览器历史包含在主包内，地址经唯一历史对象派发。`@remix-run/route-pattern`、`cookie-es` 是它的依赖 |
-| `@tanstack/react-table` | 表格视图的列定义、排序状态、行选择与分页。行的身份是业务 ID（`getRowId`），所以换页、换排序、换视图之后勾选的还是同一批；排序与分页跑在**全集**上，页只是最后一刀 |
+| `@tanstack/react-table` | v9 的 `useTable`、`tableFeatures` 与列 helper 驱动关注列表和 JAV 订阅源表格，只注册各表需要的分页、行选择与排序状态。行身份是业务 ID（`getRowId`），跨页跨视图共用勾选集合；排序作用在**全集**上，分页只切最后一步 |
 | `tailwind-merge` | BoardUI 的 `cx()` 合并类名时去掉互相冲突的工具类 |
 | `@remixicon/react` | BoardUI 组件内置的图标 |
 | `tailwindcss`、`@tailwindcss/vite` | 按 `src/react/` 里实际用到的类名生成 `peach-app.css` |
