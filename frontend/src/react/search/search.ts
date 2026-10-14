@@ -29,6 +29,9 @@ export interface SuggestItem {
   /** 人那一类：一行里摆得下几部近作就摆几部。 */
   works?: SuggestCard[];
   agency?: string | null;
+  href?: string;
+  avatarHtml?: string;
+  subtitle?: string;
   [key: string]: unknown;
 }
 
@@ -37,6 +40,8 @@ export interface SuggestGroup {
   label: string;
   total?: number;
   items: SuggestItem[];
+  href?: string;
+  action?: string;
 }
 
 export interface SuggestTab {
@@ -56,12 +61,14 @@ export interface SearchActions {
   search(query: string): void;
   openItem(id: number): void;
   openEntity(kind: string, name: string): void;
+  openPath?(path: string): void;
 }
 
 /** 仍由遗留层给的几样。 */
 export interface SearchHelpers {
   /** 空输入时的推荐词池：与当前目录同一组筛选，只留真搜得出东西的词（`catalogSuggestions`）。 */
   pool(): Promise<string[]>;
+  recommendations?(): Promise<SuggestGroup[]>;
   /** 小封面那一格（卡片的 `.pic`）连同里面那张图（`coverImage` 与 JAV 默认封面那套取景）；两样都没有是「无预览」。 */
   coverHtml(card: SuggestCard | null | undefined): string;
   present(menu: HTMLElement): void;
@@ -100,7 +107,7 @@ export const SUGGEST_ONE_KIND = 20;
 /** 有脸的那几类点开的是资料页；标签没有资料页，点它照旧是按这个词搜。 */
 export const SUGGEST_PROFILE_KINDS = new Set(['performer', 'creator', 'studio', 'agency', 'series']);
 /** 下拉栏按宽度分两栏：左栏是身份和词，右栏是作品封面格。 */
-export const SUGGEST_RIGHT_KINDS = new Set(['asset']);
+export const SUGGEST_RIGHT_KINDS = new Set(['asset', 'jav', 'post', 'release']);
 /** 空输入时推荐几条。 */
 export const PICKS = 5;
 
@@ -118,6 +125,8 @@ export interface MenuSection {
   label: string;
   options: SearchOption[];
   more?: SearchOption;
+  href?: string;
+  action?: string;
 }
 
 export interface MenuModel {
@@ -143,11 +152,12 @@ export interface MenuInput {
   groups: readonly SuggestGroup[];
   tabs: readonly SuggestTab[];
   kind: string;
+  recommendations?: readonly SuggestGroup[];
 }
 
 /** 从一刻的状态算出下拉栏里有什么，以及键盘上下时的次序。页签管整栏，所以排在最上面；选了一类
  *  时搜索记录让位。 */
-export function menuModel({ query, history, picks, suggestFor, groups, tabs, kind }: MenuInput): MenuModel {
+export function menuModel({ query, history, picks, suggestFor, groups, tabs, kind, recommendations = [] }: MenuInput): MenuModel {
   let index = 0;
   const options: SearchOption[] = [];
   const add = <T extends Omit<SearchOption, 'index'>>(option: T): SearchOption => {
@@ -158,6 +168,15 @@ export function menuModel({ query, history, picks, suggestFor, groups, tabs, kin
   // 有输入时历史跟着筛：这一刻用户在找一个词，不是在回顾自己搜过什么。
   const matching = history.filter((value) => !query || fold(value).includes(fold(query)));
   if (!query) {
+    if (recommendations.length) {
+      const sections = recommendations.map(group => ({ ...group,
+        options: group.items.map(item => add({ type: 'suggest', value: item.value, kind: group.kind, item })),
+      }));
+      const recent = matching.length ? { label: '搜索记录', options: matching.map(value => add({ type: 'history', value })) } : null;
+      return { tabs: null, recent,
+        left: sections.filter(group => !SUGGEST_RIGHT_KINDS.has(group.kind)),
+        right: sections.filter(group => SUGGEST_RIGHT_KINDS.has(group.kind)), empty: false, options };
+    }
     const recent = matching.length ? { label: '搜索记录', options: matching.map((value) => add({ type: 'history', value })) } : null;
     const suggested = picks.length ? { label: '推荐', options: picks.map((value) => add({ type: 'pick', value })) } : null;
     return { tabs: null, recent: null, left: recent ? [recent] : [], right: suggested ? [suggested] : [], empty: false, options };

@@ -6,7 +6,7 @@ import { describe, expect, it, vi, type Mock } from 'vitest';
 
 import { SearchPage } from '../../src/react/search/search-page';
 import {
-  PICKS, SUGGEST_DEBOUNCE, menuModel, shufflePicks, type SearchApi, type SearchProps, type SuggestResponse,
+  PICKS, SUGGEST_DEBOUNCE, menuModel, shufflePicks, type SearchApi, type SearchProps, type SuggestResponse, type SuggestGroup,
 } from '../../src/react/search/search';
 
 import { mount, pending, settle } from './render';
@@ -68,7 +68,7 @@ describe('下拉栏里摆什么', () => {
 interface Stage {
   input: HTMLInputElement;
   menu: HTMLElement;
-  actions: { [K in keyof SearchProps['actions']]: Mock<SearchProps['actions'][K]> };
+  actions: { [K in keyof SearchProps['actions']]: Mock<NonNullable<SearchProps['actions'][K]>> };
   posts: unknown[];
   api: SearchApi | null;
   key(key: string): Promise<void>;
@@ -77,6 +77,7 @@ interface Stage {
 
 /** 壳那一侧：一个静态输入框、一块带 `data-search-menu` 的面，岛挂在面里。 */
 async function stage({ pool = ['剧情'], loadPool = async () => pool,
+  recommendations = undefined as (() => Promise<SuggestGroup[]>) | undefined,
   suggest = async (q: string): Promise<SuggestResponse> => ({ q, groups: [] }) } = {}): Promise<Stage> {
   const posts: unknown[] = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
@@ -96,6 +97,7 @@ async function stage({ pool = ['剧情'], loadPool = async () => pool,
     search: vi.fn<SearchProps['actions']['search']>(),
     openItem: vi.fn<SearchProps['actions']['openItem']>(),
     openEntity: vi.fn<SearchProps['actions']['openEntity']>(),
+    openPath: vi.fn<NonNullable<SearchProps['actions']['openPath']>>(),
   };
   const out: Stage = {
     input, menu, actions, posts, api: null,
@@ -108,7 +110,7 @@ async function stage({ pool = ['剧情'], loadPool = async () => pool,
     }),
   };
   const helpers: SearchProps['helpers'] = {
-    pool: loadPool, coverHtml: () => '',
+    pool: loadPool, recommendations, coverHtml: card => `<span class="pic"><img src="/cover?code=${card?.code || ''}" alt=""></span>`,
     present: (el) => { el.hidden = false }, dismiss: (el) => { el.hidden = true },
     wireScroller: () => {}, typed: () => {}, composing: () => {}, clearField: (el) => { el.value = '' },
   };
@@ -121,6 +123,33 @@ async function stage({ pool = ['剧情'], loadPool = async () => pool,
 const debounce = () => act(async () => { vi.advanceTimersByTime(SUGGEST_DEBOUNCE) });
 
 describe('输入框上的时序', () => {
+  it('空搜索推荐显示封面，键盘选择新作打开作品详情', async () => {
+    const s = await stage({ recommendations: async () => [{ kind: 'release', label: '订阅新作',
+      items: [{ value: 'ABW-101', href: '/works/ABW-101', card: { id: 88, code: 'ABW-101' } }],
+      href: '/subscriptions?tab=feeds', action: '管理订阅',
+    }] });
+    await act(async () => s.input.focus());
+    await settle();
+    expect(s.menu.querySelector('[data-search-option="work"] img')).not.toBeNull();
+    expect(s.menu.querySelector('h3 a')?.getAttribute('href')).toBe('/subscriptions?tab=feeds');
+    await s.key('ArrowDown');
+    await s.key('Enter');
+    expect(s.actions.openPath).toHaveBeenCalledWith('/works/ABW-101');
+    expect(s.actions.openItem).not.toHaveBeenCalled();
+    expect(s.actions.search).not.toHaveBeenCalled();
+  });
+
+  it('关闭菜单后到达的图片推荐不会再打开菜单', async () => {
+    const answer = pending<SuggestGroup[]>();
+    const s = await stage({ recommendations: () => answer.answer });
+    await act(async () => s.input.focus());
+    await settle();
+    await act(async () => s.api?.close());
+    await answer.release([{ kind: 'asset', label: '作品推荐', items: [{ value: '作品', id: 11 }] }]);
+    await settle();
+    expect(s.menu.hidden).toBe(true);
+  });
+
   it('单类视频预览请求二十条，完整结果入口用当前搜索词', async () => {
     vi.useFakeTimers();
     const s = await stage({ suggest: async (q) => ({ q, groups: [{ ...asset, total: 53 }] }) });
