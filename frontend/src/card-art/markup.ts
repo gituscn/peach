@@ -25,6 +25,8 @@ export interface FaceRef {
   rep?: number | null;
   has_avatar?: boolean;
   identity_categories?: string[];
+  source_avatar_url?: string;
+  source_avatar_fallbacks?: string[];
 }
 
 /** 代表作画面替账号顶着圆框时，悬停与读屏读到的那句。 */
@@ -138,13 +140,16 @@ export function avatarInner(name: string, ref: FaceRef | null | undefined, repId
   // 这一层大多是小圆框和窄格子，厂牌标识在那里要方形图标而不是横着的字标；索引页的
   // 厂牌大格是同一个模板里的例外，由调用方点名要 `large`。
   const hint = focus === undefined ? (ref && ref.avatar_focus) || null : focus;
+  const sourceFace = !ref?.has_image && !logoName && ref?.source_avatar_url
+    ? `<img src="${esc(ref.source_avatar_url)}" width="128" height="128" alt="" loading="lazy" decoding="async" ${
+      imageFallbackAttrs({ fallbacks: ref.source_avatar_fallbacks || [] })}>` : '';
   return `<span class="ini">${esc(firstGrapheme(name))}</span>`
-    + entityFaceImg({
+    + (sourceFace || entityFaceImg({
       kind, id: ref && ref.id, hasImage: !!(ref && ref.has_image), version: ref && ref.image_version,
       rep: ref?.has_avatar && ref.rep ? ref.rep : repId, mark: markId,
       logo: logoName, logoVersion: ref && ref.logo_version, logoVariant, focus: hint, thumb,
       standIn: !!(ref && ref.avatar_stand_in),
-    });
+    }));
 }
 
 /** 卡片署名、Mix 叠放头像、沉浸作者那一格：`avatarInner` 读取引用或顶栏代表作表。`kind` 为空是

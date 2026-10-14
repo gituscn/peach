@@ -10,6 +10,8 @@ import { feedNewKey, prefetchFeedNew, type FeedDiscoveries, type FeedNewProps } 
 import { FeedNewPage } from '../../src/react/feed-new/feed-new-page';
 import { queryClient } from '../../src/react/query';
 import { click, mountRoot, settle } from './render';
+import { FeedNewRow } from '../../src/react/feed-new/feed-new-row';
+import { feedIdentity } from '../../src/card-art/feed-identity';
 
 afterEach(() => { queryClient.clear() });
 notifyManager.setScheduler((notify) => notify());
@@ -33,6 +35,26 @@ function serve(...rounds: number[][]) {
 }
 const reads = (fetcher: ReturnType<typeof serve>) =>
   fetcher.mock.calls.map(([url]) => String(url)).filter((url) => url.startsWith('/api/feeds/discoveries'));
+
+it('新作来源共演头像经详情同一查询加载并在忽略后可卸载', async () => {
+  vi.stubGlobal('IntersectionObserver', undefined);
+  const fetcher = vi.fn(async (_url: string) => ({ ok: true, status: 200, json: async () => ({ ok: true, image: 'data:image/jpeg;base64,cGl4ZWxz' }) }));
+  vi.stubGlobal('fetch', fetcher);
+  const host = document.createElement('section');
+  document.body.append(host);
+  const html = `<div class="feednewrow"><article data-feed-id="1">${feedIdentity({ code: 'EXM-001', performer_refs: [
+    { name: '甲', source_actor_id: 'A', source_avatar: true },
+    { name: '乙', source_actor_id: 'B', source_avatar: true }] })}<button data-feed-action="ignore">忽略</button></article></div>`;
+  const mounted = await mountRoot(<QueryClientProvider client={queryClient}><FeedNewRow host={host} feedNew={{ items: [{ id: 1 }], html }}
+    wire={() => {}} act={async () => {}} /></QueryClientProvider>);
+  await settle();
+  expect(mounted.host.querySelectorAll('.mav img')).toHaveLength(2);
+  expect(fetcher.mock.calls.map(([url]) => url).sort()).toEqual([
+    '/api/jav/image?code=EXM-001&image=actor%3AA', '/api/jav/image?code=EXM-001&image=actor%3AB']);
+  await click(mounted.host.querySelector('[data-feed-action]'));
+  await settle();
+  expect(mounted.host.querySelector('[data-feed-id]')).toBeNull();
+});
 
 function props(patch: Partial<FeedNewProps> = {}): FeedNewProps {
   const host = document.createElement('section');

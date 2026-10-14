@@ -1026,8 +1026,16 @@ def jav_preview(request: Request, code: str, ref: str, args: dict[str, str] = De
             body = previews.playlist(code, ref, fetch)
             return Response(b"" if request.method == "HEAD" else body, media_type="application/vnd.apple.mpegurl",
                             headers={"cache-control": "private, max-age=31536000", "content-length": str(len(body))})
-        return cache.stream(f"preview:{code}:{ref}", request,
-            lambda: open_upstream(client, request.method, target, incoming=request.headers))
+        def media():
+            response = open_upstream(client, request.method, target, incoming=request.headers)
+            if source.get('media_type') == 'video/mp4':
+                kind = response.headers.get('content-type', '').split(';')[0].lower()
+                if kind not in {'video/mp4', 'application/octet-stream', 'binary/octet-stream'}:
+                    response.close()
+                    raise FollowProxyError('视频预览响应未取得')
+                response.headers['content-type'] = 'video/mp4'
+            return response
+        return cache.stream(f"preview:{code}:{ref}", request, media)
     except (ValueError, OSError, FollowProxyError, httpx.HTTPError):
         return Response(status_code=404, headers={"cache-control": "no-store"})
 

@@ -22,6 +22,19 @@ it('没有实体图的新作留首字，不请求不存在的头像', () => {
   expect(host.querySelector('.ini')?.textContent).toBe('甲');
 });
 
+it('共演新作来源头像槽保留规范人物链接和作品身份', () => {
+  const host = render({ code: 'EXM-001', performer_refs: [
+    { id: 1, name: '甲', has_image: true },
+    { id: 2, name: '乙', has_image: false, source_avatar: true, source_actor_id: 'Actor2' },
+    { name: '未建档', source_avatar: true, source_actor_id: 'Actor3' },
+  ] });
+  const slots = [...host.querySelectorAll<HTMLElement>('[data-feed-source-avatar]')];
+  expect(slots).toHaveLength(2);
+  expect(slots[0]?.getAttribute('href')).toBe('/performers/2');
+  expect(slots.map(slot => slot.dataset.actor)).toEqual(['Actor2', 'Actor3']);
+  expect(slots.every(slot => slot.dataset.code === 'EXM-001')).toBe(true);
+});
+
 it('未建档多人署名最多叠三枚首字并转义名字', () => {
   const host = render({ performers: '<甲>、乙、丙、丁' });
   expect(host.querySelectorAll('.mav')).toHaveLength(3);
