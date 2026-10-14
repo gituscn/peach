@@ -21,6 +21,7 @@ from .entities import normalize_entity_name, resolve_entity, resolve_entity_id, 
 from .social_links import ARCHIVE_HOSTS, is_archive
 from .web_catalog import (
     COST,
+    JAV_ASSET_PREDICATE,
     VISIBLE_CATALOG_ASSET,
     attach_avatar_availability,
     seeded_order,
@@ -391,7 +392,7 @@ def agency_mark_link(links: list[dict]) -> int | None:
 
 def q_entity_shapes(contract, args) -> dict:
     """资料页上可有可无的那几块，哪些实体有：新作那一行（`feed`）、卡底的同台艺人（`costars`）、
-    页头右侧那张资料表（`facts`，ADR-0069）。
+    页头右侧那张资料表（`facts`，ADR-0069），以及作品的 JAV 版式（`jav`）。
 
     骨架在资料到达之前就要照最终形状画：不留位，那一块画出来时从中间顶进来；每页都
     留，没有的那一页又得在画出来时收掉。两块各有一半上下的页面有，猜哪一边都有一半在
@@ -410,6 +411,11 @@ def q_entity_shapes(contract, args) -> dict:
             parts.setdefault(int(row[0]), []).append("costars")
         for entity_id in performer_header.profiled(connection):
             parts.setdefault(entity_id, []).append("facts")
+        for row in connection.execute(
+                "SELECT DISTINCT scope.entity_id FROM asset_entity scope"
+                " JOIN entity e ON e.id=scope.entity_id AND e.kind IN ('performer','studio')"
+                " JOIN asset a ON a.id=scope.asset_id WHERE " + COUNTED_VIDEO + " AND " + JAV_ASSET_PREDICATE):
+            parts.setdefault(int(row[0]), []).append("jav")
         entities = {int(row["id"]): {"id": int(row["id"]), "kind": row["kind"],
                                      "names": [row["canonical_name"]], "parts": parts[int(row["id"])]}
                     for row in connection.execute("SELECT id, kind, canonical_name FROM entity ORDER BY id")

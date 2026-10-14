@@ -101169,11 +101169,7 @@ async function $st(e, t) {
 	} }) : Y5.actionReceipt(`${a?.alias} 已经是这条实体的名字`));
 }
 function ect(e, t) {
-	let n = [
-		"performer",
-		"studio",
-		"series"
-	].includes(e), r = `<div data-filter-row="bottom" class="flex min-w-0 items-center gap-3 px-3 py-2 min-h-12"><h3 data-entity-readout><span data-skeleton="count" class="relative inline-block h-3.5 w-24 rounded-md align-middle skeleton-sheen"></span></h3>${ro()}${e === "agency" ? "" : Wst(l7(W.sort, W.dir, n), n ? {
+	let n = ["performer", "studio"].includes(e) && t7.hasEntityPart(e, t, "jav"), r = `<div data-filter-row="bottom" class="flex min-w-0 items-center gap-3 px-3 py-2 min-h-12"><h3 data-entity-readout><span data-skeleton="count" class="relative inline-block h-3.5 w-24 rounded-md align-middle skeleton-sheen"></span></h3>${ro()}${e === "agency" ? "" : Wst(l7(W.sort, W.dir, n), n ? {
 		name: "jav-layout",
 		label: "JAV 卡片版式",
 		value: aE(),

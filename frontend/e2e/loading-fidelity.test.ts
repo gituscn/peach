@@ -51,7 +51,7 @@ describe('页面等待态的结构', () => {
       } finally { release(); await context.close() }
     });
 
-    it(`${viewport.name} 数字艺人地址带相关艺人占位与静态筛选`, { timeout: 60_000 }, async () => {
+    for (const jav of [false, true]) it(`${viewport.name} ${jav ? 'JAV' : '普通'}艺人等待态遵循作品语境`, { timeout: 60_000 }, async () => {
       const context = await browser.newContext({ viewport });
       let release = () => {};
       const held = new Promise<void>(resolve => { release = resolve });
@@ -62,7 +62,7 @@ describe('页面等待态的结构', () => {
           await route.fulfill({ response });
         });
         await page.route('**/api/entity/shapes', route => route.fulfill({ json: { ok: true, entities: [
-          { id: 90001, kind: 'performer', names: ['演示艺人'], parts: ['costars', 'facts'] },
+          { id: 90001, kind: 'performer', names: ['演示艺人'], parts: ['costars', 'facts', ...(jav ? ['jav'] : [])] },
         ] } }));
         await page.route(/\/api\/entity\?/, async route => { await held; await route.fulfill({ json: { error: '未取得' } }) });
         await page.goto(requiredEnv('PEACH_E2E_ORIGIN') + '/performers/90001', { waitUntil: 'load' });
@@ -72,6 +72,10 @@ describe('页面等待态的结构', () => {
         assert.ok(await root.locator('[data-entity-facts]').count(), '数字地址漏了资料表');
         assert.ok(await root.locator('[data-entity-state]').count(), '观看状态被画成了占位');
         assert.ok(await root.locator('[data-entity-sort]').count(), '排序控件被画成了占位');
+        assert.equal(await root.locator('[data-entity-layout]').count() > 0, jav, '卡片版式开关误用了艺人类型');
+        const ratio = await root.locator('[style*="--skeleton-card-ratio"]').first().evaluate(node =>
+          Number((node as HTMLElement).style.getPropertyValue('--skeleton-card-ratio')));
+        assert.equal(ratio, jav ? .75 : 16 / 9, '等待态封面比例与作品语境不一致');
       } finally { release(); await context.close() }
     });
   }
