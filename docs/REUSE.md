@@ -118,6 +118,8 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 
 ## Board 界面与数值设置
 
+全站 `title` 提示由 `board-tooltip.ts` 共用原生 Popover、Range 和既有滚动锚点判据；完整可见文字不复述，截断原文、图标名称和补充说明可查看。无自身布局盒子的元素按可见子元素定位，文字外链按实际文字定位；弹窗提示留在对应 dialog 内。播放器继续共用带快捷键的 Video.js 提示，无新增依赖。
+
 关注图片瀑布流复用浏览器 [CSS Grid](https://www.w3.org/TR/css-grid-1/#auto-placement-algo)、`ResizeObserver` 和现有 React，不新增依赖。`use-masonry-grid.ts` 按列表顺序固定列归属，按卡片边界生成网格行；轨道数随卡片数增长，图片取得尺寸和续页只影响各自列的后续位置。卡片保留 DOM 顺序、键盘入口和选择范围。图片加载后立即使用固有宽高，固定比例卡面用 `cover`，详情完整显示。
 
 已有实现与历史 `57c42c05`、`91f2c5f0` 提供尺寸占位与学习接口。CSS 多列的 [列平衡](https://www.w3.org/TR/css-multicol-1/#filling-columns) 不满足固定列归属。外部候选 [Masonry 4.2.2](https://github.com/desandro/masonry/blob/v4.2.2/package.json)（MIT、浏览器 DOM 库，依赖 `get-size`、`outlayer`）要求维护另一套定位与图片加载后的 [layout 调用](https://masonry.desandro.com/layout)，不采用。Peach 只维护列归属和测量，定位交给原生 Grid；桌面与 390×844 用例覆盖无尺寸、只读回写拒绝、延迟长图与续页。
