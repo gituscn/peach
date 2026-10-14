@@ -191,7 +191,7 @@ describe('设计决定：人物与厂牌资料页', () => {
     }
   });
 
-  it('空输入时搜索记录与推荐并排，两栏之间的分隔线从顶画到底', { timeout: 60_000 }, async () => {
+  it('空搜索的头像与封面分栏，搜索记录位于推荐之后，分隔线覆盖两栏', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/', WIDE);
     try {
       const page = opened.page;
@@ -201,18 +201,23 @@ describe('设计决定：人物与厂牌资料页', () => {
       await expectBody(page, '/', [page.locator('article[data-media-card][data-id]').first()]);
       await settle(page);
       await page.locator('#q').click();
-      await page.locator('#searchMenu [data-search-results][data-split]').waitFor({ state: 'visible', timeout: 5_000 });
+      await page.locator('#searchMenu [data-search-recommendations] [data-search-results][data-split]').waitFor({ state: 'visible', timeout: 5_000 });
       const split = await page.evaluate(() => {
         const results = document.querySelector('#searchMenu [data-search-results]')!;
         const [left, right] = [...results.querySelectorAll(':scope > [data-search-col]')].map((col) => col.getBoundingClientRect());
         const box = results.getBoundingClientRect();
         const line = getComputedStyle(results, '::before');
+        const history = document.querySelector('#searchMenu [data-search-root] > [data-search-group]')!;
         return {
-          box: box.height, left: left.height, right: right.height, line: parseFloat(line.height),
+          box: box.height, leftWidth: left.width, rightWidth: right.width, line: parseFloat(line.height),
+          historyAfter: history.getBoundingClientRect().top >= box.bottom,
+          historyCount: history.querySelectorAll('[data-search-option]').length,
           offset: parseFloat(line.left) + parseFloat(line.width) / 2 - ((left.right + right.left) / 2 - box.left),
         };
       });
-      assert.ok(split.right < split.left, `推荐一栏（${split.right}px）应比十条搜索记录（${split.left}px）短`);
+      assert.ok(split.rightWidth > split.leftWidth, '封面栏应比头像栏宽');
+      assert.equal(split.historyAfter, true, '搜索记录应在推荐之后');
+      assert.equal(split.historyCount, 10);
       assert.ok(Math.abs(split.line - split.box) <= 1, `分隔线高 ${split.line}px，两栏高 ${split.box}px`);
       assert.ok(Math.abs(split.offset) <= 1, `分隔线偏离两栏之间的缝 ${split.offset}px`);
       assert.deepEqual(opened.problems, []);
