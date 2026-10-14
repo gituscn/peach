@@ -5,13 +5,14 @@
  * 它们内部已经对文本做转义，且是 Peach 唯一那份 Geist 控件实现——在 island 里另画一遍空态或 Note
  * 就是同一语义的第二份实现，`peach-web-ui` 的门槛不允许。 */
 import { esc, icon, requestErrorMessage } from '../core';
+import { islandShortcutsEntry } from '../island-skeleton';
 
 const NOTE_VARIANTS=new Set(['secondary','warning','error','success']);
 
 /* `filterRow` 给骨架里那块两排浮层用：槽位标记跟着 HTML 一起生成，否则这一条会自己画成
    第二块浮层。 */
 export function collectionHeaderHtml({readout='',controls='',before='',className='',loading=false,filterRow=''}={}){
-  return `<div class="entitycollectionhead${className?' '+esc(className):''}"${filterRow?` data-filter-row="${esc(filterRow)}"`:''}>${before}<h3${loading?' class="skeleton"':''}>${readout}</h3>${controls}</div>`;
+  return `<div class="entitycollectionhead${className?' '+esc(className):''}"${filterRow?` data-filter-row="${esc(filterRow)}"`:''}>${before}<h3${loading?' class="skeleton"':''}>${readout}</h3>${loading && filterRow === 'bottom' ? islandShortcutsEntry() : ''}${controls}</div>`;
 }
 
 /* 逐条明细收在 Note 自己的 <details> 里，默认折叠：一句话的结论后面跟着上千行清单时，

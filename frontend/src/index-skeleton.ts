@@ -9,7 +9,7 @@
  * 版式偏好由调用方读好交进来：这个模块壳与 React 包各带一份，设置 store 只能有一份。 */
 import { boardTabsHtml, fitSkeleton, iconSwitchHtml, indexSkeletonHtml } from '@peach/legacy/ui';
 import { identityFilterSkeletonHtml } from './identity-filter';
-import { islandButton, islandSearchInput } from './island-skeleton';
+import { islandShortcutsEntry, islandSearchInput } from './island-skeleton';
 
 export type IndexPageKind = 'performers' | 'creators' | 'studios' | 'agencies' | 'tags';
 
@@ -67,8 +67,7 @@ export function indexPlaceholderHtml({ kind, q, scope, view, category }: IndexPa
   return `<div class="ihead peach-react" data-index-head>
       <h2 class="disp indexheading">${title}</h2>
       ${people ? '<span class="mono" id="indexCount"><span class="countskeleton"></span></span>' : ''}${switcher}
-      ${islandButton({ variant: 'secondary', size: 'small', label: '我的收藏',
-        attrs: 'data-shortcuts-trigger aria-disabled="true" tabindex="-1"' })}
+      ${islandShortcutsEntry()}
       <div data-index-search class="ml-auto min-w-35 max-w-80 flex-1 max-board-narrow:order-1 max-board-narrow:basis-40">${islandSearchInput('', q, '过滤' + title)}</div>
     </div>
     ${kind === 'tags' ? tabs(INDEX_SCOPES, scope, '词表') : kind === 'performers' || kind === 'creators'
