@@ -258,7 +258,7 @@ def _preview_fields(contract, code, source, *, refresh=False):
     if not url:
         return {'preview_video_url': '', 'preview_state': 'missing'}
     playlist = url.endswith('.m3u8') or '.m3u8?' in url
-    ref = PreviewCache(cache_for(contract)).register(code, url, identity="root", playlist=playlist,
+    ref = PreviewCache(cache_for(contract)).register(code, url, playlist=playlist,
                                                      media_type='' if playlist else 'video/mp4')
     return {'preview_video_url': f"/jav-preview/{code}/{ref}{'.m3u8' if playlist else ''}", 'preview_state': 'ready'}
 
