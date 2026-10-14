@@ -133,6 +133,21 @@ describe('coverAnchor：封面按自己的宽高比分流', () => {
     expect(img.parentElement!.style.getPropertyValue('--cover-blur')).toContain('/cover?code=SSIS-001&thumb=1');
   });
 
+  it('Blu-ray 与已知宽封套按宽正封取景，FC2 保留整幅画面', () => {
+    const wide = cover('https://covers.example/MIDA.jpg', 800, 438, 'data-cover-code="MIDA-122" data-wide-sleeve="1"');
+    coverAnchor(wide);
+    expect(wide.dataset.frame).toBe('sleeve');
+    expect(wide.style.getPropertyValue('--panel-clip')).toBe('0% 0% 0% 53.5%');
+    expect(parseFloat(wide.style.getPropertyValue('--panel-height'))).toBeLessThan(100);
+    const fc2 = cover('https://covers.example/fc2.jpg', 800, 438, 'data-cover-code="FC2-PPV-1" data-wide-sleeve="1"');
+    coverAnchor(fc2);
+    expect(fc2.dataset.frame).toBe('still');
+    expect(fc2.classList.contains('panel')).toBe(false);
+    const dvd = cover('/cover?code=MIDA-159', 800, 538, 'data-wide-sleeve="1"');
+    coverAnchor(dvd);
+    expect(dvd.style.getPropertyValue('--panel-height')).toBe('100%');
+  });
+
   it('框描述的是另一张图时一个字都不写；等比缩小的派生档照用', () => {
     const derived = cover('/cover?code=SSIS-001&thumb=1', 800, 538, 'data-posterbox="842 1600 1076 0 1600 1076"');
     coverAnchor(derived);

@@ -214,6 +214,7 @@ export interface CoverItem {
    把一部分作品裁掉下巴或整个切出画外；取不到人脸就退回固定取景。 */
 export function coverImage(item: CoverItem, layout: 'big' | 'small', eager = false): string {
   const src = coverUrl(item, true);
+  const wide = /ブルーレイ|blu[\s-]?ray/i.test(String(item.title || item.display_title || item.name || ''));
   const f = item.cover_frame || {};
   // 纵向夹在 5%–60%：脸不会长在图片下半截，落在那儿是检出跑偏而不是构图。
   const face = [f.cx != null ? ` data-cx="${f.cx}"` : '',
@@ -224,7 +225,7 @@ export function coverImage(item: CoverItem, layout: 'big' | 'small', eager = fal
   const box = pb ? ` data-posterbox="${[pb.x0, (pb.px || [])[0], (pb.px || [])[1], pb.y0, pb.x1, pb.y1].map(Number).join(' ')}"` : '';
   // 小图看整张（含剧照拼贴），大图只取右侧正封。
   return `<img class="poster cover ${layout === 'small' ? 'whole' : 'front'}" src="${src}"
-    width="640" height="360" alt="" loading="${eager ? 'eager' : 'lazy'}"${face}${box} data-drop="self">`;
+    width="640" height="360" alt="" loading="${eager ? 'eager' : 'lazy'}" data-cover-code="${esc(item.code || '')}"${wide ? ' data-wide-sleeve="1"' : ''}${face}${box} data-drop="self">`;
 }
 
 /** 封面格的两种图：官方封套（取景链接管）或预览图。空串是这一条没有可用的图。 */

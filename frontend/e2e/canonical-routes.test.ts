@@ -50,11 +50,12 @@ describe('规范路由与设置历史', () => {
         await page.goto(new URL(`/tags/${tag.entity_id}`, page.url()).href);
         const title = page.locator('#index [data-entity-title] h2');
         await title.waitFor();
-        assert.equal(await title.innerText(), tag.k);
         await settle(page);
+        assert.equal(await title.innerText(), tag.k);
         assert.equal(await page.locator('#index [data-namepick-toggle]').count(), 0);
         await page.reload();
         await title.waitFor();
+        await settle(page);
         assert.equal(await title.innerText(), tag.k);
         assert.equal(new URL(page.url()).pathname, `/tags/${tag.entity_id}`);
         assert.deepEqual(opened.problems, []);

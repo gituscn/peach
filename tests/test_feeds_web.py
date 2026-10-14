@@ -129,6 +129,17 @@ class FeedWebFixture(unittest.TestCase):
 
 
 class FeedWebTest(FeedWebFixture):
+    def test_known_discovery_without_cover_address_uses_source_cover_without_ledger_write(self):
+        self._add()
+        self._check()
+        with self.contract.database.write_transaction() as connection:
+            connection.execute('UPDATE feed_discovery SET cover_url=NULL')
+        rows = dispatch_api_get(self.contract, '/api/feeds/discoveries', {})['items']
+        self.assertTrue(rows)
+        self.assertTrue(all(row['cover_url'] == '/jav-cover?code=' + row['code'] for row in rows))
+        with self.contract.database.read_connection() as connection:
+            self.assertTrue(all(row[0] is None for row in connection.execute('SELECT cover_url FROM feed_discovery')))
+
     def test_newwork_cast_reads_cached_source_faces_and_local_aliases_without_fetching(self):
         from peach.jav_discovery_metadata import discovery_metadata
         self._add()

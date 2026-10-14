@@ -6,7 +6,7 @@
  * 由 Application 与 React 页面共享源码，启动时只安装一次。 */
 import { SKELETON_REVEAL_DELAY } from '@peach/legacy/ui';
 
-import { PANEL_ASPECT, panelFrame, relayoutJavImages, type JavLayout } from '../jav-artwork';
+import { PANEL_ASPECT, WIDE_PANEL_ASPECT, WIDE_SLEEVE_RATIO_MIN, WIDE_SLEEVE_RATIO_MAX, panelFrame, relayoutJavImages, type JavLayout } from '../jav-artwork';
 import { faceFrame } from './face-frame';
 import { faceSourceScale, markClamp, nativeImageFit } from './native-image';
 
@@ -75,9 +75,9 @@ export function avatarFrame(img: HTMLImageElement): void {
 export function coverAnchor(img: HTMLImageElement): void {
   const r = img.naturalWidth / img.naturalHeight;
   if (!r) return;
-  const code = new URL(img.currentSrc || img.src, location.href).searchParams.get('code') || '';
+  const code = img.dataset.coverCode || new URL(img.currentSrc || img.src, location.href).searchParams.get('code') || '';
   // FC2 封面是整幅画面，横向取景跟随人脸；宽高比不代表有 DVD 正封。
-  img.dataset.frame = /^FC2(?:-PPV)?-/i.test(code) || r >= 1.65 ? 'still' : r > 1.2 ? 'sleeve' : 'front';
+  img.dataset.frame = /^FC2(?:-PPV)?-/i.test(code) ? 'still' : wideSleeve(img) ? 'sleeve' : r >= 1.65 ? 'still' : r > 1.2 ? 'sleeve' : 'front';
   /* `object-position` 的百分比说的是「图片上这个点对齐可见窗口的同一个百分比位置」，
      不是「这个点落到窗口正中」。所以人脸中心原样当锚点只能保证脸还在画面里：0.81
      那种偏右的脸会贴着窗口右缘，图片右边还剩一截永远露不出来。可见窗口占图片 w 时，
@@ -109,14 +109,14 @@ export function posterPanel(img: HTMLImageElement, ratio: number): void {
   /* 没有框的双页封套按先验从右缘量回去，与服务端折痕找不到时的比例框一致。 */
   if (!img.dataset.posterbox && img.dataset.frame === 'sleeve') {
     imgW = img.naturalWidth; imgH = img.naturalHeight;
-    x0 = Math.round(imgW - PANEL_ASPECT * imgH); y0 = 0; x1 = imgW; y1 = imgH;
+    x0 = Math.round(imgW - (wideSleeve(img) ? WIDE_PANEL_ASPECT : PANEL_ASPECT) * imgH); y0 = 0; x1 = imgW; y1 = imgH;
   }
   /* 框是按那一版源图的像素算的，而封面会被更大的那张原子替换。尺寸对不上就说明
      框描述的是另一张图，落在这张上是一块错位的区域——而错位在页面上和「本来就该
      这么取景」看不出区别，所以宁可退回回退值。 */
   // 卡片先取的是等比缩小的派生档，框的百分比在等比缩放下不变，所以认缩小，不认别的图。
   if (!faceSourceScale(img.naturalWidth, img.naturalHeight, imgW, imgH)) return;
-  const frame = panelFrame({ x0, y0, x1, y1, px: [imgW, imgH] }, ratio);
+  const frame = panelFrame({ x0, y0, x1, y1, px: [imgW, imgH] }, ratio, wideSleeve(img));
   if (!frame) return;
   img.style.setProperty('--panel-aspect', `${img.naturalWidth} / ${img.naturalHeight}`);
   img.classList.add('panel');
@@ -128,9 +128,15 @@ export function posterPanel(img: HTMLImageElement, ratio: number): void {
   coverBackdrop(img);
 }
 
-/* 封面比卡片窄或宽时留出的那两条，垫同一张封面的模糊放大版。挂在卡片上而不是图片上：
-   正封那时已经被 `clip-path` 切成一块，铺不到留白处。糊成一片的底用不着原件的像素，
-   换回原件之后这一层仍取派生档。 */
+function wideSleeve(img: HTMLImageElement): boolean {
+  const code = img.dataset.coverCode || new URL(img.currentSrc || img.src, location.href).searchParams.get('code') || '';
+  const ratio = img.naturalWidth / img.naturalHeight;
+  return !/^FC2(?:-PPV)?-/i.test(code)
+    && (img.dataset.wideSleeve === '1' || /^(CWPBD|SMBD)-/i.test(code))
+    && ratio >= WIDE_SLEEVE_RATIO_MIN && ratio < WIDE_SLEEVE_RATIO_MAX;
+}
+
+/* 正封与卡片之间的留白由同一张封面的模糊放大版填充。背景挂在卡片上，覆盖图片裁切框外的区域。 */
 export function coverBackdrop(img: HTMLImageElement): void {
   img.closest<HTMLElement>('.pic,[data-media-pic]')?.style.setProperty('--cover-blur',
     `url("${img.dataset.thumbSrc || img.currentSrc || img.src}")`);

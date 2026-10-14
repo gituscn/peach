@@ -6,6 +6,7 @@ import json
 import base64
 from datetime import datetime, timezone
 from functools import wraps
+from urllib.parse import quote
 
 from . import entities, wants, web_catalog
 from .catalog_rules import normalise_code_key, tag_cat
@@ -24,6 +25,15 @@ def detail_code(args) -> str:
     if not re.fullmatch(r"[A-Za-z0-9_-]{2,64}", raw):
         raise ValueError("需要有效的作品番号")
     return normalise_code_key(raw)
+
+
+def discovery_cover_url(item, source) -> str:
+    """已知作品缺少封面地址时，由详情的来源缓存提供图片。"""
+    if item.get('cover_url'):
+        return item['cover_url']
+    known = source.get('id') or re.fullmatch(r'https://javdb\.com/v/[A-Za-z0-9]+/?', str(item.get('link') or ''))
+    code = normalise_code_key(item.get('code'))
+    return '/jav-cover?code=' + quote(code) if known and code else ''
 
 
 def _refs(contract, connection, kind, names):
@@ -224,9 +234,9 @@ def q_jav_image(contract, args) -> dict:
 
 
 def _fetch_image(contract, code, index):
+    stored, _ = discovery_metadata(contract).peek(code)
+    PUBLIC_API.remember_movie_identity(code, stored or {})
     if index.startswith('actor:'):
-        stored, _ = discovery_metadata(contract).peek(code)
-        PUBLIC_API.remember_movie_identity(code, stored or {})
         actor = next((person for person in (stored or {}).get('actors', [])
                       if isinstance(person, dict) and str(person.get('id')) == index.removeprefix('actor:')), {})
         if public_image_url(actor.get('avatar_image')):

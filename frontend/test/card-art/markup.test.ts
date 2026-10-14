@@ -209,6 +209,12 @@ describe('人脸取景的换算', () => {
 });
 
 describe('coverImage：官方封面', () => {
+  it('来源封面携带作品身份和明确的 Blu-ray 版次', () => {
+    const img = parse(coverImage({ code: 'MIDA-122', title: '作品（ブルーレイディスク）' }, 'big'))!;
+    expect(img.dataset.coverCode).toBe('MIDA-122');
+    expect(img.dataset.wideSleeve).toBe('1');
+    expect(parse(coverImage({ code: 'MIDA-159', title: '作品' }, 'big'))!.dataset.wideSleeve).toBeUndefined();
+  });
   it('人脸纵向夹在 5%–60%，正封框六个数按顺序送到元素上', () => {
     const img = parse(coverImage({
       code: 'SSIS-001', cover_frame: { cx: 0.81, cy: 0.9 },
