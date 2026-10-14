@@ -14,9 +14,8 @@
 日文、比看标签都硬。`stash` 不算（那是本机 Stash 的 id，库里每个人都有），
 `r18:performer_name` 也不算（那是名字映射，不是目录页上的 id）。
 
-**MISSAV 按日文艺名拼。** 它的路径就是名字，而账本里 794 位 performer 有 601 位的规范名
-是中文译名，拿译名拼出来的是一个不存在的页面（实测 `/cn/actresses/释爱丽丝` 返回 404，
-`/cn/actresses/釈アリス` 返回 200）。所以这一站从别名里挑日文艺名：
+**MISSAV 按日文艺名拼。** 入口使用 `/dm3/cn/actresses/`，汉字字形按简中站投影；当前规范名
+含假名且不是纯读音时优先使用，否则从别名里挑日文艺名。中文译名与旧艺名不能代替当前日文艺名：
 
 - 含假名才算日文写法。汉字分不出中日——`佐々木さき` 认得出，纯汉字的艺名认不出，
   那种只能退回规范名。
@@ -50,6 +49,7 @@ from urllib.parse import quote
 from filelock import FileLock
 
 from .fsutil import atomic_write_text
+from .kanji import JP_KANJI_TO_SIMPLIFIED, fold_glyphs
 
 #: 入口设置落在数据根的 state 目录下。它是本机显示偏好，不是账本真相。
 FILENAME = "entry-links.json"
@@ -100,7 +100,7 @@ SITES: tuple[EntrySite, ...] = (
               "javdb.com", "/actors/{javdb_id}",
               SLOT_MARK, "mark-javdb", jav_only=True, mirrored=True),
     EntrySite("missav", "MISSAV", "MISSAV", "name", "",
-              "missav.ws", "/cn/actresses/{name}",
+              "missav.ws", "/dm3/cn/actresses/{name}",
               SLOT_MARK, "", jav_only=True, mirrored=True),
 )
 _BY_KEY = {site.key: site for site in SITES}
@@ -111,7 +111,7 @@ _HOST_SHAPE = re.compile(r"[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?"
 #: 第二枚起的序号。用完退回括号数字，标签宁可长一点也不能两枚长得一模一样。
 _ORDINALS = "②③④⑤⑥⑦⑧⑨"
 #: 艺名类的别名来源。按子串认：来源串后面还挂着采集批次。
-_STAGE_NAME_SOURCES = ("avdb-actor-mapping", "javdb", "wiki")
+_STAGE_NAME_SOURCES = ("avdb-actor-mapping", "javdb", "wiki", "performer-localization")
 
 
 def defaults() -> dict:
@@ -236,6 +236,13 @@ def _only_hiragana(written: str) -> bool:
 def japanese_name(canonical_name: str, aliases) -> str:
     """这位的日文艺名。挑不出来时退回规范名，判据见模块开头。"""
     name = str(canonical_name or "").strip()
+    if _has_kana(name) and not _only_hiragana(name):
+        equivalents = [name]
+        for row in aliases or ():
+            written = str((row.get("alias") if isinstance(row, dict) else row) or "").strip()
+            if written and fold_glyphs(written) == fold_glyphs(name):
+                equivalents.append(written)
+        return max(equivalents, key=lambda value: sum(char in JP_KANJI_TO_SIMPLIFIED for char in value))
     chosen: tuple[tuple[int, int, int], str] | None = None
     for index, row in enumerate(aliases or ()):
         written = str((row.get("alias") if isinstance(row, dict) else row) or "").strip()
@@ -253,6 +260,11 @@ def japanese_name(canonical_name: str, aliases) -> str:
 def is_jav_performer(refs) -> bool:
     """这条实体在 JAV 目录站里有身份吗。判据与理由见模块开头。"""
     return any(provider in JAV_DIRECTORIES for provider in provider_ids(refs))
+
+
+def missav_name(japanese: str) -> str:
+    """简中入口的汉字字形，假名、叠字符号与其他艺名字符保留。"""
+    return japanese.translate(str.maketrans(JP_KANJI_TO_SIMPLIFIED))
 
 
 def _ordinal(index: int) -> str:
@@ -279,7 +291,7 @@ def build(settings: dict, canonical_name: str, refs, aliases=()) -> list[dict]:
         row = settings.get(site.key) or {}
         if site.jav_only and not jav:
             continue
-        values = ids.get(site.provider, []) if site.provider else ([written] if written else [])
+        values = ids.get(site.provider, []) if site.provider else ([missav_name(written)] if written else [])
         host = _tidy_host(row.get("host")) if site.mirrored else site.host
         if not host or _host_problem(site, host):
             host = site.host

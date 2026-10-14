@@ -76,7 +76,7 @@ class EntryLinkAddressTests(unittest.TestCase):
     def test_missav_uses_the_japanese_stage_name(self):
         """规范名是中文译名时，MISSAV 那条按别名里的日文艺名拼。
 
-        实测 `/cn/actresses/釈アリス` 返回 200，中文译名与纯平假名读音都是 404。
+        中文译名与纯平假名读音不作为混合文字艺名的入口。
         """
         rows = entry_links.build(entry_links.defaults(), "释爱丽丝",
                                  [ref("r18dev", "1096544")], [
@@ -86,7 +86,26 @@ class EntryLinkAddressTests(unittest.TestCase):
         ])
         self.assertEqual(
             rows[0]["url"],
-            "https://missav.ws/cn/actresses/%E9%87%88%E3%82%A2%E3%83%AA%E3%82%B9")
+            "https://missav.ws/dm3/cn/actresses/%E9%87%88%E3%82%A2%E3%83%AA%E3%82%B9")
+
+    def test_current_japanese_name_wins_over_a_former_name_alias(self):
+        rows = entry_links.build(entry_links.defaults(), "逢沢みゆ",
+                                 [ref("javdb", "zK98J")], [
+            alias("あいざわみゆ", "r18dev:performer-profile"),
+            alias("坂本マリア", "auto:performer-alias@2048"),
+        ])
+        self.assertEqual(next(row["url"] for row in rows if row["site"] == "missav"),
+                         "https://missav.ws/dm3/cn/actresses/"
+                         "%E9%80%A2%E6%B3%BD%E3%81%BF%E3%82%86")
+
+    def test_plain_hiragana_canonical_reading_uses_a_stage_name_alias(self):
+        self.assertEqual(entry_links.japanese_name("あいざわみゆ", [alias("逢沢みゆ")]),
+                         "逢沢みゆ")
+
+    def test_glyph_equivalent_alias_preserves_the_japanese_spelling(self):
+        self.assertEqual(entry_links.japanese_name("蓝川みれい", [
+            alias("藍川みれい", "avdb-actor-mapping"), alias("坂本マリア"),
+        ]), "藍川みれい")
 
     def test_a_reading_in_plain_hiragana_loses_to_the_written_stage_name(self):
         rows = entry_links.build(entry_links.defaults(), "天川空",
@@ -111,7 +130,7 @@ class EntryLinkAddressTests(unittest.TestCase):
                                  [alias("Karen Yuzuriha", "r18:performer")])
         self.assertEqual(
             rows[0]["url"],
-            "https://missav.ws/cn/actresses/%E6%A5%AA%20%E3%82%AB%E3%83%AC%E3%83%B3")
+            "https://missav.ws/dm3/cn/actresses/%E6%A5%AA%20%E3%82%AB%E3%83%AC%E3%83%B3")
 
     def test_ids_from_another_entity_kind_do_not_count(self):
         # 事务所那 55 条 minnano-av 引用记的是 `production`，不是这个人在站上的号；

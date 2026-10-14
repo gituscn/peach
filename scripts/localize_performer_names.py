@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 r"""用经维护的中日姓名映射本地化番号体系女优名称，并把残留的日本字形归一为简体。
 
-译名只处理带发行来源的实体，包括 Javinizer 的发行来源；账号型 performer 不翻译。
+译名只处理带发行来源或明确 JAV 目录身份的实体，包括 Javinizer 的发行来源；账号型 performer 不翻译。
 匹配按精确证据分层：既有人工复核日文名、当前日文名、既有别名，再到复核表里的旧名。
 一条名字命中多个映射时不猜。多个 ledger 实体落到同一映射条目时，按同一人的旧名合并。
 
@@ -36,6 +36,7 @@ if str(SRC_DIR) not in sys.path:
 from peach import javdb
 from peach.config import DATA_ROOT, GENERATED_DIR
 from peach.entities import merge_entity, normalize_entity_name
+from peach.entry_links import JAV_DIRECTORIES
 from peach.kanji import JP_KANJI_TO_SIMPLIFIED, simplify_kanji   # noqa: F401 - 供测试与脚本共用
 from peach.review_csv import read_rows, write_rows
 from peach.scripting import add_ledger_write_args, counts_of, open_for_write, verify_after_write
@@ -110,7 +111,7 @@ def read_mapping(path: Path) -> list[ActorMapping]:
 
 
 def read_mapping_csv(path: Path, accept: Sequence[str] = ("ok",)) -> list[ActorMapping]:
-    """读 `harvest_javdb_cn_names.py` 产出的映射，只收 `accept` 里那几种判定的行。
+    """读资料页复核映射，只收 `accept` 里那几种判定的行。
 
     默认只收 `ok`。站上已经改了名的（`改艺名`、`旧名`）要不要跟着改，是人的决定，
     所以得在命令行里点名——判定名照抄 CSV 里那一列的字面值。
@@ -177,6 +178,17 @@ def _target_name(mapping: ActorMapping) -> tuple[str, str]:
     return mapping.zh_cn or mapping.jp, "zh_cn" if mapping.zh_cn else "jp-fallback"
 
 
+def release_performer_ids(connection: sqlite3.Connection) -> set[int]:
+    """发行来源或 JAV 目录明确收录的实体编号，供译名范围判定使用。"""
+    source_marks = ",".join("?" for _ in RELEASE_SOURCES)
+    directory_marks = ",".join("?" for _ in JAV_DIRECTORIES)
+    return {int(row[0]) for row in connection.execute(
+        f"SELECT entity_id FROM asset_entity WHERE source IN ({source_marks}) UNION "
+        "SELECT entity_id FROM entity_external_ref WHERE external_kind='performer' "
+        f"AND trim(external_id)!='' AND provider IN ({directory_marks})",
+        (*RELEASE_SOURCES, *JAV_DIRECTORIES))}
+
+
 def collect(
     connection: sqlite3.Connection,
     mappings: list[ActorMapping],
@@ -218,12 +230,12 @@ def collect(
         FROM entity e WHERE e.kind='performer' ORDER BY e.id
         """
     ).fetchall()
+    release_ids = release_performer_ids(connection)
     rows: list[dict[str, object]] = []
     resolved_groups: dict[int, list[dict[str, object]]] = defaultdict(list)
     for entity in entities:
         entity_id = int(entity["id"])
         sources = str(entity["sources"] or "")
-        source_set = set(filter(None, sources.split(",")))
         base: dict[str, object] = {
             "entity_id": entity_id,
             "current_name": str(entity["canonical_name"]),
@@ -240,7 +252,7 @@ def collect(
             "_aliases": set(aliases.get(entity_id, [])),
             "_mapping_index": None,
         }
-        if not RELEASE_SOURCES.intersection(source_set):
+        if entity_id not in release_ids:
             base.update(resolution="non-release performer", action="keep-non-release")
             rows.append(base)
             continue
@@ -543,6 +555,10 @@ def build_parser() -> argparse.ArgumentParser:
     # javdb 资料页取回的映射（`harvest_javdb_cn_names.py`）。它覆盖的是假名规范名，
     # XML 那份覆盖的是已收录艺人，两份不冲突也不必同时给。
     parser.add_argument("--mapping-csv", type=Path)
+    parser.add_argument("--mapping-source", default="",
+                        help="CSV 的复核来源前缀；留空表示 javdb:performer-cn")
+    parser.add_argument("--only", type=int, action="append", default=[],
+                        help="只处理指定 entity id，可重复；同一映射合并组必须完整点名")
     # 站上已经改了名的要不要跟着改，是人的决定，所以判定要在命令行里点名。
     parser.add_argument(
         "--accept", default="ok",
@@ -564,11 +580,23 @@ def run(args: argparse.Namespace) -> int:
         mappings = read_mapping(args.mapping_xml)
     elif args.mapping_csv:
         accept = [part.strip() for part in str(args.accept).split(",") if part.strip()]
-        mappings, prefix = read_mapping_csv(args.mapping_csv, accept), JAVDB_ALIAS_SOURCE
+        mappings = read_mapping_csv(args.mapping_csv, accept)
+        prefix = args.mapping_source.strip() or JAVDB_ALIAS_SOURCE
     identity_review = read_identity_review(args.identity_review)
     connection = open_for_write(args)
     try:
         rows = collect(connection, mappings, identity_review, args.mapping_revision)
+        if args.only:
+            selected = set(args.only)
+            groups = defaultdict(set)
+            for row in rows:
+                if row["mapping_key"]:
+                    groups[str(row["mapping_key"])].add(int(row["entity_id"]))
+            rows = [row for row in rows if int(row["entity_id"]) in selected]
+            for row in rows:
+                if row["action"] in {"merge-drop", "merge-and-localize"} \
+                        and not groups[str(row["mapping_key"])].issubset(selected):
+                    row.update(action="conflict", resolution="partial-merge-group-selection")
         write_csv(args.review_csv, rows)
         print(f"已审计 performer {len(rows)} 位；复核 CSV：{args.review_csv}")
         print("  动作分布：", dict(Counter(str(row["action"]) for row in rows)))
@@ -597,6 +625,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.mapping_xml and args.mapping_csv:
         parser.error("两份映射只能给一份：混着跑的话，别名来源记的是哪一份就说不清了")
+    if args.mapping_source and not args.mapping_csv:
+        parser.error("--mapping-source 必须和 --mapping-csv 一起使用")
     if (args.mapping_xml or args.mapping_csv) and not args.mapping_revision:
         parser.error("给了映射就必须给 --mapping-revision，别名要记得住来源")
     args.mapping_revision = args.mapping_revision or KANJI_ONLY_REVISION
