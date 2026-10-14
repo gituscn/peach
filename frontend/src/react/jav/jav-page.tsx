@@ -23,6 +23,7 @@ import { discoveryArtwork, discoveryKey, fetchDiscoveries, type DiscoveryScope }
 import { JavHeader } from './jav-header';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { FilterGlassRows, FilterPill, GlassPill } from '../components/filter-glass';
+import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
 import { ArtSlot } from '../components/art-slot';
 import { Segments, SortKeys } from '../entity-filter/entity-filter-page';
 import { TaskProgress } from '../components/task-progress';
@@ -125,6 +126,7 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         </FilterPill>)}
       </div></div>} bottom={<>
         <span data-catalog-readout="">{waiting ? <span data-skeleton="count" aria-hidden className="relative inline-block h-3.5 w-37.5 rounded-md align-middle skeleton-sheen" /> : `${items.length} 部`}</span>
+        <LibraryShortcuts currentHref={() => location.pathname + location.search} />
         {query || tag ? <GlassPill onPress={() => { setTag(''); clearText() }}>清除筛选</GlassPill> : null}
         <span data-entity-sorts="">
         {scope === 'external' ? <button type="button" data-entity-batch="" data-jav-metadata-update=""

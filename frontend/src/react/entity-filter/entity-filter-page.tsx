@@ -13,6 +13,7 @@ import { icon } from '@peach/legacy/core';
 import { spinnerHtml } from '@peach/legacy/ui';
 
 import { FilterGlassRows, FilterPill } from '../components/filter-glass';
+import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
 import { SEGMENTED_GLASS_TRACK, SEGMENT_GLASS } from '../components/segmented';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { useViewGlide } from '../components/use-view-glide';
@@ -221,6 +222,7 @@ function Head(props: EntityFilterProps) {
         </button>
       ) : null}
       <Readout text={readout} busy={busy} />
+      <LibraryShortcuts currentHref={() => location.pathname + location.search} />
       {view === 'videos' && video ? <VideoControls head={video} actions={actions} /> : null}
       {view === 'photos' && photo ? <PhotoControls head={photo} actions={actions} helpers={helpers} /> : null}
       {view === 'online' && props.online ? <OnlineControls head={props.online} actions={actions} /> : null}

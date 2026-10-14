@@ -15,8 +15,10 @@ describe('库外 JAV 作品详情', () => {
       const errors: string[] = [];
       page.on('pageerror', error => errors.push(error.message));
       await mockJavDetail(page);
+      let releaseReviews!: () => void;
+      const reviewsReady = new Promise<void>(resolve => { releaseReviews = resolve });
       await page.route(/\/api\/jav\/reviews\?/, async route => {
-        await new Promise(resolve => setTimeout(resolve, 400));
+        await reviewsReady;
         await route.fulfill({ json: { ok: true, page: 1, more: false, items: Array.from({ length: 10 }, (_, i) => ({
           id: String(i), username: '来源评论者', created_at: '2026-10-12', score: 4,
           content: '评论正文及作品信息。'.repeat(40),
@@ -33,7 +35,18 @@ describe('库外 JAV 作品详情', () => {
       });
       const initial = await snapshot();
       await toggle.click();
+      const loading = page.locator('[data-skeleton="reviews"]');
+      await loading.waitFor();
+      const placeholder = await loading.evaluate(node => ({ height: node.getBoundingClientRect().height,
+        rows: node.querySelectorAll('[data-jav-review-skeleton]').length,
+        radii: [...node.querySelectorAll('.skeleton-sheen')].map(bar => parseFloat(getComputedStyle(bar).borderRadius)),
+      }));
+      releaseReviews();
+      assert.equal(placeholder.rows, 3);
+      assert.ok(placeholder.height >= 240, JSON.stringify(placeholder));
+      assert.ok(placeholder.radii.every(radius => radius > 0), JSON.stringify(placeholder));
       await page.locator('[data-jav-review]').first().waitFor();
+      await loading.waitFor({ state: 'detached' });
       const expanded = await snapshot();
       assert.ok(expanded.titleVisible && Math.abs(expanded.height - initial.height) < 1 && Math.abs(expanded.scroll - initial.scroll) < 1,
         JSON.stringify({ initial, expanded }));

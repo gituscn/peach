@@ -170,7 +170,7 @@ describe('照片与名册视图', () => {
     expect(shell.photoBack).toHaveBeenCalledTimes(1);
   });
 
-  it('名册视图下排只有读数，名册键在最左', async () => {
+  it('名册视图下排提供读数与收藏入口，名册键在最左', async () => {
     const shell = actions();
     const host = await mount(<EntityFilterPage {...props({
       kind: 'agency', view: 'people', readout: '艺人 · 3', video: null, actions: shell,
@@ -179,7 +179,8 @@ describe('照片与名册视图', () => {
     expect($$(host, '[data-media-view]').map((key) => key.dataset.mediaView)).toEqual(['people', 'videos']);
     expect($(host, '[data-media-view="people"]')?.getAttribute('aria-pressed')).toBe('true');
     expect($(host, '[data-entity-media]')?.getAttribute('aria-label')).toBe('页面视图');
-    expect($$(host, '[data-filter-row="bottom"] > *').map((node) => node.tagName)).toEqual(['H3']);
+    expect($$(host, '[data-filter-row="bottom"] > *').map((node) => node.tagName)).toEqual(['H3', 'SPAN']);
+    expect($(host, '[data-filter-row="bottom"] [aria-label="我的收藏"]')).not.toBeNull();
     await click($(host, '[data-media-view="videos"]')!);
     expect(shell.setView).toHaveBeenCalledWith('videos');
   });

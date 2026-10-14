@@ -32,6 +32,7 @@ import { NumberSetting } from './number-setting';
 import type { Choice, PanelSettings, SettingsPanelApi, SettingsPanelHost } from './settings-panel-api';
 import { refreshPanelData, useSaveSettings } from './settings-data';
 import { SidebarOrder } from './sidebar-order';
+import { SettingsDialogClose } from '../components/settings-dialog-close';
 
 /* 左栏的分区，顺序即右边各组的顺序。字形按条目自己的名字取：整列取自 Remix，一家画的笔画
    才一样粗。 */
@@ -331,9 +332,7 @@ function SettingsPanel({ host: current, view: shown }: { host: SettingsPanelHost
       <div data-settings-card="" ref={card}>
         <div data-settings-head="" ref={head}>
           <h2 id="settingsTitle">{SECTIONS[shown.tab][0]}</h2>
-          <button type="button" id="settingsClose" aria-label="关闭设置" onClick={() => close()}>
-            <svg viewBox="0 0 24 24"><use href="#i-x" /></svg>
-          </button>
+            <SettingsDialogClose id="settingsClose" label="关闭设置" onPress={() => close()} />
         </div>
         <SettingsNav tab={shown.tab} epoch={epoch} configurable={shown.configurable} onSelect={select}
           openConfiguration={() => { close(false); current.openConfiguration() }} />

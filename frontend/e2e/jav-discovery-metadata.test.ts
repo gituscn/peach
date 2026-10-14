@@ -34,6 +34,7 @@ describe('发现资料与排序', () => {
       });
       await page.goto(new URL('/jav?tab=discover', page.url()).href);
       await page.getByRole('button', { name: '停止读取', exact: true }).waitFor({ state: 'visible' });
+      assert.equal(await page.locator('[data-jav-filter]').getByRole('button', { name: '我的收藏', exact: true }).count(), 1);
       await page.locator('[data-catalog-tag="恋足"]').waitFor({ state: 'visible' });
       assert.equal(details, 0);
       assert.ok(requests.some(params => params.get('metadata_job_id') === 'fixed-batch'));

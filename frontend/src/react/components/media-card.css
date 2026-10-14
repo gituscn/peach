@@ -245,7 +245,7 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
  * 它压在倒计时圈上面，只透明的话圈接不到指针；visibility 等淡出走完再翻。关注卡的合并计数同一套
  * （`../follow-feed/follow-feed.css`）。聚焦认 `:focus-visible`，鼠标点过留下的焦点不算。 */
 @media (hover: hover) and (pointer: fine) {
-  .peach-react [data-media-card]:is(:hover, :has(:focus-visible)) :is([data-media-badge], [data-media-duration]) { opacity: 0; }
+  .peach-react [data-media-card]:is(:hover, :has(:focus-visible)) :is([data-media-badge], [data-media-duration], [data-follow-sources]) { opacity: 0; visibility: hidden; pointer-events: none; }
   .peach-react [data-media-card]:is(:hover, :has(:focus-visible)) [data-media-group] {
     opacity: 0;
     visibility: hidden;
@@ -385,7 +385,7 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
 }
 .peach-react :is([data-previewing], [data-media-card]:has(:focus-visible)) [data-media-preview] { opacity: 1; pointer-events: auto; }
 .peach-react [data-longhover] [data-media-preview] { opacity: 0; pointer-events: none; }
-.peach-react [data-media-preview]:hover { transform: scale(1.2); }
+.peach-react [data-media-preview]:hover { background: var(--hover); }
 .peach-react [data-media-preview] > svg:first-child { position: absolute; inset: 0; width: 36px; height: 36px; transform: rotate(-90deg); }
 .peach-react [data-media-preview] circle { fill: none; stroke-width: 2; }
 .peach-react [data-media-preview] circle:first-child { stroke: rgb(255 255 255 / .18); }
@@ -438,7 +438,7 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
   transition: transform .15s ease, background .15s ease;
 }
 .peach-react :is([data-longhover] [data-media-seek], [data-media-card]:is(:hover, :has(:focus-visible)) [data-media-later]) button { pointer-events: auto; }
-.peach-react :is([data-media-later], [data-media-seek]) button:hover { transform: scale(1.12); background: rgb(0 0 0 / .34); }
+.peach-react :is([data-media-later], [data-media-seek]) button:hover { background: rgb(0 0 0 / .34); }
 .peach-react [data-media-seek] svg { width: 34px; height: 34px; }
 .peach-react [data-media-later] button { width: 36px; height: 36px; padding: 0; }
 .peach-react [data-media-later] svg { width: 21px; height: 21px; }
@@ -762,15 +762,15 @@ body[data-surface="/trash"] .peach-react [data-media-tags] {
   cursor: pointer;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  transition: background .14s, translate .14s, scale calc(var(--spring-press-ms) * 1ms) var(--spring-press);
+  transition: background .14s;
 }
-.peach-react [data-shorts-enter]:hover { background: color-mix(in srgb, var(--ink) 16%, transparent); translate: 0 -1px; }
-.peach-react [data-shorts-enter]:active { scale: .96; transition: scale .06s ease-out; }
+.peach-react [data-shorts-enter]:hover { background: var(--hover); }
 .peach-react [data-shorts-enter] svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
 .peach-react [data-shorts-row] {
   display: flex;
   gap: 13px;
-  padding-bottom: 7px;
+  padding: 8px;
+  margin: -8px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -782,8 +782,8 @@ body[data-surface="/trash"] .peach-react [data-media-tags] {
     border-radius: 0 var(--floating-radius) var(--floating-radius) 0;
   }
   .peach-react [data-shorts-row] {
-    margin-left: calc(-1 * (var(--railW) + 32px));
-    padding-left: calc(var(--railW) + 32px);
+    margin-left: calc(-1 * (var(--railW) + 32px + 8px));
+    padding-left: calc(var(--railW) + 32px + 8px);
   }
 }
 

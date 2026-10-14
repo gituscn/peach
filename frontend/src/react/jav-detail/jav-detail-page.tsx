@@ -190,7 +190,12 @@ function Reviews({ code, count, released }: { code: string; count: number; relea
   return <section data-jav-reviews="">
     <Disclosure trailing summary={<><RiChat3Line aria-hidden />评论{count > 0 ? ` · ${count}` : ''}</>}
       onOpenChange={setOpened}>
-    {result.isPending ? <div data-skeleton={opened ? 'reviews' : undefined} role="status" aria-label="正在读取评论"><span className="relative inline-block h-8 w-full skeleton-sheen" /></div> : null}
+    {opened && result.isPending ? <div data-skeleton="reviews" role="status" aria-label="正在读取评论" className="flex flex-col gap-4 py-3">
+      {[0, 1, 2].map(row => <div key={row} data-jav-review-skeleton="" aria-hidden="true" className="flex flex-col gap-3 py-2">
+        <div className="flex items-center gap-3"><span className="relative block h-4 w-20 rounded-md skeleton-sheen" /><span className="relative block h-3 w-24 rounded-md skeleton-sheen" /></div>
+        <div className="flex flex-col gap-2"><span className="relative block h-3 w-full rounded-md skeleton-sheen" /><span className="relative block h-3 w-full rounded-md skeleton-sheen" /><span className="relative block h-3 w-3/4 rounded-md skeleton-sheen" /></div>
+      </div>)}
+    </div> : null}
     {opened || result.data ? <>
       {items.map(item => <article key={item.id} data-jav-review=""><div data-jav-review-meta=""><b>{item.username}</b>
         {Number(item.score) > 0 ? <SourceRating score={Number(item.score)} review /> : null}

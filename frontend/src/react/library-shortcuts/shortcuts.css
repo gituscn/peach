@@ -17,27 +17,41 @@
 .peach-react [data-favorite][aria-pressed="true"] { color: var(--color-yellow-500); }
 .peach-react [data-favorite][aria-pressed="true"] svg { fill: currentColor; }
 .peach-react [data-favorite][aria-busy="true"] { color: var(--muted); cursor: wait; }
-.peach-react [data-shortcuts-trigger] { flex: 0 0 104px; width: 104px; white-space: nowrap; }
-.peach-react [data-shortcuts-entry] { position: relative; display: inline-flex; flex: 0 0 104px; width: 104px; height: 32px; }
-.peach-react [data-shortcuts-glass] { position: relative; z-index: 1; height: 32px; padding: 0 12px; border: 0; border-radius: var(--control-radius); background: transparent; color: var(--glass-text); font: var(--board-body); cursor: pointer; }
-.peach-react [data-shortcuts-glass]:focus-visible { outline: 2px solid var(--tungsten); outline-offset: 2px; }
-.peach-react [data-shortcuts-panel] { height: 614px; max-height: calc(100dvh - 32px); }
-.peach-react [data-shortcuts-body] { display: flex; flex: 1; min-height: 0; min-width: 0; }
-.peach-react [data-shortcuts-categories] { display: flex; flex: 0 0 240px; flex-direction: column; gap: 4px; padding: 10px; overflow-y: auto; border-right: 1px solid var(--color-separator-border); background: var(--color-background-secondary-default); }
-.peach-react [data-shortcuts-categories] > button { display: flex; flex: none; align-items: center; gap: 8px; padding: 8px; border: 0; border-radius: var(--control-radius); background: transparent; color: var(--color-text-secondary); font: var(--board-body); text-align: left; cursor: pointer; }
-.peach-react [data-shortcuts-categories] > button:hover { color: var(--color-text-primary); }
-.peach-react [data-shortcuts-categories] > button[aria-pressed="true"] { background: var(--color-background-secondary-hover); color: var(--color-text-primary); }
+.peach-react [data-shortcuts-entry] { display: inline-flex; flex: none; }
+.peach-react [data-shortcuts-trigger] { display: grid; flex: none; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border-10); border-radius: var(--control-radius); background: var(--surface); color: var(--muted); cursor: pointer; }
+.peach-react [data-shortcuts-trigger]:hover { background: var(--hover); }
+.peach-react [data-shortcuts-trigger]:focus-visible { outline: 2px solid var(--tungsten); outline-offset: 2px; }
+.peach-react [data-shortcuts-trigger] svg { width: 16px; height: 16px; fill: none; stroke: currentColor; }
+.peach-react [data-modal-width="collections"] { max-width: 871px; }
+.peach-react [data-shortcuts-panel] { display: grid; grid-template-columns: 274px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); height: 614px; max-height: calc(100dvh - 32px); min-height: 0; }
+.peach-react [data-shortcuts-head] { grid-column: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 32px 32px 24px; }
+.peach-react [data-shortcuts-sidebar] { grid-column: 1; grid-row: 1 / 3; display: flex; min-height: 0; flex-direction: column; padding: 10px; border-right: 1px solid var(--border-10); background: var(--surface); }
+.peach-react [data-shortcuts-categories] { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 4px; overflow-y: auto; }
+.peach-react [data-shortcuts-categories] > button { display: flex; flex: none; align-items: center; gap: 8px; padding: 10px 12px; border: 0; border-radius: var(--control-radius); background: transparent; color: var(--muted); font: var(--board-body); text-align: left; cursor: pointer; }
+.peach-react [data-shortcuts-categories] > button:hover { background: var(--hover); }
+.peach-react [data-shortcuts-categories] > button[aria-selected="true"] { background: var(--hover); color: var(--ink); }
 .peach-react [data-shortcuts-categories] > button:focus-visible { outline: 2px solid var(--tungsten); outline-offset: -2px; }
 .peach-react [data-shortcuts-count] { margin-left: auto; color: var(--muted); font: var(--board-caption); }
-.peach-react [data-shortcuts-content] { flex: 1; }
+.peach-react [data-shortcuts-footer] { display: flex; flex-direction: column; gap: 4px; padding-top: 12px; border-top: 1px solid var(--border-10); }
+.peach-react [data-shortcuts-footer] a { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: var(--control-radius); color: var(--muted); }
+.peach-react [data-shortcuts-footer] a:hover { background: var(--hover); }
+.peach-react [data-shortcuts-footer] a:focus-visible { outline: 2px solid var(--tungsten); outline-offset: -2px; }
+.peach-react [data-shortcuts-footer] svg { width: 20px; height: 20px; fill: none; stroke: currentColor; }
+.peach-react [data-shortcuts-content] { grid-column: 2; padding: 16px 32px 32px; }
 .peach-react [data-shortcuts-content] [data-empty-state] { padding: 16px; }
 .peach-react [data-shortcuts-row] { padding-block: 12px; border-bottom: 1px solid var(--color-separator-border); }
-.peach-react [data-shortcuts-avatar] { position: relative; display: inline-flex; flex: none; }
-.peach-react [data-shortcuts-avatar] > svg { position: absolute; top: 8px; left: 8px; color: var(--color-foreground-icon-secondary); }
+.peach-react [data-shortcuts-avatar] { display: grid; flex: none; place-items: center; width: 36px; height: 36px; border-radius: 50%; overflow: hidden; background: var(--hover); color: var(--muted); }
+.peach-react [data-shortcuts-avatar] img { width: 100%; height: 100%; object-fit: cover; }
+.peach-react [data-shortcuts-avatar]:has(img) > svg { display: none; }
 @media (max-width: 760px) {
-  .peach-react [data-shortcuts-body] { flex-direction: column; }
-  .peach-react [data-shortcuts-categories] { flex: none; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--color-separator-border); }
+  .peach-react [data-shortcuts-panel] { display: flex; flex-direction: column; }
+  .peach-react [data-shortcuts-sidebar] { display: contents; }
+  .peach-react [data-shortcuts-categories] { order: 0; flex: none; flex-direction: row; overflow-x: auto; padding: 10px; border-bottom: 1px solid var(--border-10); }
   .peach-react [data-shortcuts-categories] > button { white-space: nowrap; }
+  .peach-react [data-shortcuts-categories] > button:hover:not([aria-selected="true"]) { background: transparent; color: var(--ink); }
+  .peach-react [data-shortcuts-head] { order: 1; padding: 16px 20px 12px; }
+  .peach-react [data-shortcuts-content] { order: 2; flex: 1; padding: 16px 20px 20px; }
+  .peach-react [data-shortcuts-footer] { order: 3; flex: none; flex-direction: row; padding: 10px; }
 }
 @media (width <= 640px) {
   :is(.peach-react[data-index-head], .peach-react [data-index-head]) [data-shortcuts-trigger] { order: 3; }

@@ -136,6 +136,26 @@ describe('设计决定：作品卡、管理页与复核', () => {
       /* 沉浸模式是一叠竖着翻的卡，入口用叠卡那一枚字形，不和别的动作共用。 */
       assert.equal(await page.locator('#grid [data-shorts-enter] svg use').first().getAttribute('href'), '#i-gallery-vertical-end',
         '竖屏带的「进入沉浸模式」换了字形');
+      const immerse = page.locator('#grid [data-shorts-enter]').first();
+      await immerse.scrollIntoViewIfNeeded();
+      const resting = await immerse.boundingBox();
+      await immerse.hover();
+      await page.waitForTimeout(180);
+      const hovering = await immerse.boundingBox();
+      assert.deepEqual(hovering, resting, '沉浸入口悬停保持原位与尺寸');
+      const shortCard = page.locator('#grid [data-shorts-row] [data-media-card]').first();
+      await shortCard.hover();
+      await page.waitForTimeout(180);
+      const feedback = await shortCard.evaluate(node => {
+        const card = node.getBoundingClientRect(), row = node.closest('[data-shorts-row]')!.getBoundingClientRect();
+        const style = getComputedStyle(node);
+        return { background: style.backgroundColor, shadow: style.boxShadow, top: card.top - row.top,
+          bottom: row.bottom - card.bottom };
+      });
+      assert.notEqual(feedback.background, 'rgba(0, 0, 0, 0)');
+      assert.notEqual(feedback.shadow, 'none');
+      assert.ok(feedback.top >= 8 && feedback.bottom >= 8, JSON.stringify(feedback));
+      await page.mouse.move(0, 0);
       assert.equal(catalog.progress?.background, catalog.tungsten.background, '观看进度条不是钨丝蓝');
       assert.deepEqual([catalog.mixGlyph?.background, catalog.mixGlyph?.borderWidth, catalog.mixGlyph?.borderColor],
         [catalog.overlay.background, '1px', catalog.overlay.borderColor], 'Mix 署名位那枚字形不是半透明底加细边');
