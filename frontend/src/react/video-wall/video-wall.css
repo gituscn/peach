@@ -76,6 +76,7 @@ body[data-wall-open] :is(body>header,#drawer,#main,#catalogFilter,#count,#javLib
 .peach-react :is([data-wall-back],[data-wall-tools-button],[data-wall-refresh] button):focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
 .peach-react :is([data-wall-back],[data-wall-tools-button],[data-wall-refresh] button) svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
 .peach-react [data-wall-back] { left:24px; top:calc(24px + env(safe-area-inset-top)); }
+.peach-react [data-wall-filter-notice] { position:absolute; z-index:30; left:80px; right:24px; top:calc(24px + env(safe-area-inset-top)); }
 .peach-react [data-wall-refresh] { position:absolute; left:76px; top:calc(24px + env(safe-area-inset-top)); z-index:12; }
 .peach-react [data-wall-tools-button] { right:24px; bottom:calc(24px + env(safe-area-inset-bottom)); }
 .peach-react [data-wall-toolbar] {
@@ -150,6 +151,7 @@ body[data-wall-open] :is(body>header,#drawer,#main,#catalogFilter,#count,#javLib
 .peach-react [data-wall-footer] button { background:rgba(40,40,40,.78); color:var(--ink); border-color:var(--line-soft); }
 @media (max-width:640px) {
   .peach-react [data-wall-back] { left:16px; top:calc(16px + env(safe-area-inset-top)); }
+  .peach-react [data-wall-filter-notice] { left:72px; right:16px; top:calc(16px + env(safe-area-inset-top)); padding-inline:12px; }
   .peach-react [data-wall-refresh] { left:68px; top:calc(16px + env(safe-area-inset-top)); }
   .peach-react [data-wall-tools-button] { right:16px; bottom:calc(16px + env(safe-area-inset-bottom)); }
   .peach-react [data-wall-focus-head] { left:16px; right:16px; bottom:104px; }

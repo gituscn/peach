@@ -20,7 +20,7 @@ import { chooseItem, fetchQueue, nextPart, partLabel, queueKey, type QueueItem, 
 import { WallControls } from './wall-controls';
 import { WallQueue } from './wall-queue';
 import { Shuffle } from '../entity-filter/entity-filter-page';
-import { exitWall } from './wall-route';
+import { exitWall, unfilteredWallAddress } from './wall-route';
 import './video-wall.css';
 
 interface VideoWallProps {
@@ -328,6 +328,10 @@ export function VideoWall({ items, finite, hasMore, busy, loading = false, error
     <button type="button" data-wall-back="" aria-label="退出播放墙" title="返回" onClick={exitWall}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-left" /></svg>
     </button>
+    {finite ? <aside data-wall-filter-notice="" className="ui-project-banner" role="status">
+      <div><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-info" /></svg><p>当前仅显示筛选结果</p></div>
+      <Button size="small" variant="ghost" onClick={() => peachHistory.push(unfilteredWallAddress())}>清除筛选</Button>
+    </aside> : null}
     {toolsOpen ? <div data-wall-toolbar="" aria-label="播放墙工具">
       <form onSubmit={event => {
         event.preventDefault();
