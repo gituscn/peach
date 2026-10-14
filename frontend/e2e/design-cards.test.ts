@@ -138,10 +138,16 @@ describe('设计决定：作品卡、管理页与复核', () => {
         '竖屏带的「进入沉浸模式」换了字形');
       const immerse = page.locator('#grid [data-shorts-enter]').first();
       await immerse.scrollIntoViewIfNeeded();
-      const resting = await immerse.boundingBox();
+      const measureImmerse = () => immerse.evaluate((node) => {
+        const button = node.getBoundingClientRect();
+        const strip = node.closest('[data-shorts-strip]')!.getBoundingClientRect();
+        return { x: button.x - strip.x, y: button.y - strip.y,
+          width: button.width, height: button.height, transform: getComputedStyle(node).transform };
+      });
+      const resting = await measureImmerse();
       await immerse.hover();
       await page.waitForTimeout(180);
-      const hovering = await immerse.boundingBox();
+      const hovering = await measureImmerse();
       assert.deepEqual(hovering, resting, '沉浸入口悬停保持原位与尺寸');
       const shortCard = page.locator('#grid [data-shorts-row] [data-media-card]').first();
       await shortCard.hover();
