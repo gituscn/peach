@@ -239,10 +239,17 @@ def index(request: Request, args: dict[str, str] = Depends(require_page_auth)):
         return response
     if not settings.page_path.is_file():
         return PlainTextResponse("Peach page missing", status_code=500)
-    if "edit" in request.query_params and _copy_editor_available():
+    shape = getattr(request.state, "entity_shape", None)
+    editor = "edit" in request.query_params and _copy_editor_available()
+    if shape is not None or editor:
         html = settings.page_path.read_text(encoding="utf-8")
-        html = html.replace("<body", '<body data-peach-copy-mode="source"', 1)
-        html = html.replace("</body>", '<script src="/dev/copy-editor.js" defer></script></body>')
+        if shape is not None:
+            payload = json.dumps(shape, ensure_ascii=False).replace("<", "\\u003c")
+            script = f'<script type="application/json" id="peach-entity-shape">{payload}</script>'
+            html = html.replace("</head>", script + "</head>", 1) if "</head>" in html else html + script
+        if editor:
+            html = html.replace("<body", '<body data-peach-copy-mode="source"', 1)
+            html = html.replace("</body>", '<script src="/dev/copy-editor.js" defer></script></body>')
         response = HTMLResponse(html)
     else:
         response = FileResponse(settings.page_path, media_type="text/html")
@@ -700,7 +707,7 @@ def entity_route(request: Request, name: str,
                  args: dict[str, str] = Depends(require_page_auth)):
     if not request.app.state.settings.configured:
         return index(request, args)
-    from .web_entity import INDEX_ENTITY_KINDS, entity_id_redirect
+    from .web_entity import INDEX_ENTITY_KINDS, entity_id_redirect, entity_page_shape
 
     prefix = request.url.path.split("/", 2)[1]
     kind = {**INDEX_ENTITY_KINDS, "series": "series", "tags": "tag"}[prefix]
@@ -720,6 +727,8 @@ def entity_route(request: Request, name: str,
                 raise HTTPException(404, "not found")
         else:
             entity = resolve_entity(connection, kind, name)
+        if entity is not None and request.url.path == f"/{prefix}/{entity['id']}":
+            request.state.entity_shape = entity_page_shape(request.app.state.web_contract, connection, entity)
     if entity is not None:
         path = f"/{prefix}/{entity['id']}"
         if request.url.path != path:

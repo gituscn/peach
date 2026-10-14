@@ -393,6 +393,42 @@ def agency_mark_link(links: list[dict]) -> int | None:
                  and not is_archive(link.get("url") or "")), None)
 
 
+def _entity_shape_parts(contract, connection, entity_id: int | None = None) -> dict[int, list[str]]:
+    """实体页形状的判据；深链只查询地址上的实体。"""
+    scope = (entity_id,) if entity_id is not None else ()
+    parts = {key: ["feed"] for key in web_feeds.feed_row_entity_ids(contract, connection)
+             if entity_id is None or key == entity_id}
+    for row in connection.execute(
+            "SELECT DISTINCT scope.entity_id FROM asset_entity scope"
+            " JOIN entity e ON e.id=scope.entity_id AND e.kind<>'agency'"
+            " JOIN asset a ON a.id=scope.asset_id AND " + COUNTED_VIDEO +
+            " JOIN asset_entity co ON co.asset_id=scope.asset_id AND co.entity_id<>scope.entity_id"
+            " JOIN entity person ON person.id=co.entity_id AND person.kind='performer'"
+            + (" WHERE scope.entity_id=?" if scope else ""), scope):
+        parts.setdefault(int(row[0]), []).append("costars")
+    for key in performer_header.profiled(connection):
+        if entity_id is None or key == entity_id:
+            parts.setdefault(key, []).append("facts")
+    for row in connection.execute(
+            "SELECT DISTINCT scope.entity_id FROM asset_entity scope"
+            " JOIN entity e ON e.id=scope.entity_id AND e.kind IN ('performer','studio')"
+            " JOIN asset a ON a.id=scope.asset_id WHERE " + COUNTED_VIDEO + " AND " + JAV_ASSET_PREDICATE
+            + (" AND scope.entity_id=?" if scope else ""), scope):
+        parts.setdefault(int(row[0]), []).append("jav")
+    return parts
+
+
+def entity_page_shape(contract, connection, entity) -> dict:
+    """深链 HTML 携带的首屏形状，与异步形状名单共用判据。"""
+    entity_id = int(entity["id"])
+    names = [entity["canonical_name"]]
+    names.extend(row[0] for row in connection.execute(
+        "SELECT DISTINCT alias FROM entity_alias WHERE entity_id=? ORDER BY alias", (entity_id,))
+                 if row[0] not in names)
+    return {"id": entity_id, "kind": entity["kind"], "names": names,
+            "parts": _entity_shape_parts(contract, connection, entity_id).get(entity_id, [])}
+
+
 def q_entity_shapes(contract, args) -> dict:
     """资料页上可有可无的那几块，哪些实体有：新作那一行（`feed`）、卡底的同台艺人（`costars`）、
     页头右侧那张资料表（`facts`，ADR-0069），以及作品的 JAV 版式（`jav`）。
@@ -404,21 +440,7 @@ def q_entity_shapes(contract, args) -> dict:
     """
     with contract.database.read_connection() as connection:
         home = {"feed": web_feeds.home_has_feed(contract, connection)}
-        parts = {entity_id: ["feed"] for entity_id in web_feeds.feed_row_entity_ids(contract, connection)}
-        for row in connection.execute(
-                "SELECT DISTINCT scope.entity_id FROM asset_entity scope"
-                " JOIN entity e ON e.id=scope.entity_id AND e.kind<>'agency'"
-                " JOIN asset a ON a.id=scope.asset_id AND " + COUNTED_VIDEO +
-                " JOIN asset_entity co ON co.asset_id=scope.asset_id AND co.entity_id<>scope.entity_id"
-                " JOIN entity person ON person.id=co.entity_id AND person.kind='performer'"):
-            parts.setdefault(int(row[0]), []).append("costars")
-        for entity_id in performer_header.profiled(connection):
-            parts.setdefault(entity_id, []).append("facts")
-        for row in connection.execute(
-                "SELECT DISTINCT scope.entity_id FROM asset_entity scope"
-                " JOIN entity e ON e.id=scope.entity_id AND e.kind IN ('performer','studio')"
-                " JOIN asset a ON a.id=scope.asset_id WHERE " + COUNTED_VIDEO + " AND " + JAV_ASSET_PREDICATE):
-            parts.setdefault(int(row[0]), []).append("jav")
+        parts = _entity_shape_parts(contract, connection)
         entities = {int(row["id"]): {"id": int(row["id"]), "kind": row["kind"],
                                      "names": [row["canonical_name"]], "parts": parts[int(row["id"])]}
                     for row in connection.execute("SELECT id, kind, canonical_name FROM entity ORDER BY id")

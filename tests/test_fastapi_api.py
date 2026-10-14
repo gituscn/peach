@@ -1877,6 +1877,40 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         removed = await self.client.get("/entity/performer/Alice")
         self.assertEqual(removed.status_code, 404)
 
+    async def test_entity_deep_link_carries_the_api_shape_in_its_document(self):
+        await self.client.post('/login', content='token=secret&next=%2F',
+                               headers={'Content-Type': 'application/x-www-form-urlencoded'})
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.executemany(
+                "INSERT INTO entity(id,kind,canonical_name,normalized_name) VALUES(?,'performer',?,?)",
+                [(901, '演示艺人', '演示艺人'), (902, '普通艺人', '普通艺人'), (903, '同台艺人', '同台艺人')])
+            connection.execute("UPDATE asset SET code='SSIS-950',region='jp' WHERE id=1")
+            connection.executemany(
+                "INSERT INTO asset_entity(asset_id,entity_id,role,source) VALUES(1,?,'performer','test')",
+                [(901,), (903,)])
+            connection.execute("INSERT INTO performer_profile(entity_id,source) VALUES(901,'test')")
+            connection.execute(
+                "INSERT INTO entity_alias VALUES(901,'</script><script>演示','alias','test',1)")
+        shapes = (await self.client.get('/api/entity/shapes')).json()['entities']
+        by_id = {shape['id']: shape for shape in shapes}
+        for entity_id in (901, 902):
+            for method in ('GET', 'HEAD'):
+                response = await self.client.request(method, f'/performers/{entity_id}')
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers['cache-control'], 'no-store')
+                if method == 'HEAD':
+                    self.assertEqual(response.content, b'')
+                    continue
+                marker = '<script type="application/json" id="peach-entity-shape">'
+                payload = response.text.split(marker, 1)[1].split('</script>', 1)[0]
+                shape = json.loads(payload)
+                self.assertEqual(shape['parts'], by_id.get(entity_id, {}).get('parts', []))
+                self.assertEqual(shape['id'], entity_id)
+                if entity_id == 901:
+                    self.assertEqual(shape['parts'], ['costars', 'facts', 'jav'])
+                    self.assertIn('</script><script>演示', shape['names'])
+                    self.assertNotIn('<script>', payload)
+
     async def test_canonical_page_urls_require_authentication(self):
         for path in ('/assets/1', '/posts/1', '/works/ABC-001', '/performers/1',
                      '/tags/1', '/tasks', '/sources', '/subscriptions', '/settings/library',

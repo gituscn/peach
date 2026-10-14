@@ -268,7 +268,7 @@ export function connectPhotoController(){
       releasePage:()=>releaseManagedRoute($('#index')),showMissing:showEntityMissing,dropBars,
     },
     loading:{
-      shapesReady:()=>!!feedState.entityShapes,waitShapes:waitEntityShapes,paintSkeleton:showEntityLoading,
+      shapesReady:(kind,name)=>feedState.hasEntityShape(kind,name),waitShapes:waitEntityShapes,paintSkeleton:showEntityLoading,
       resetView:()=>{writeShell({detailReturnBarsContext:null});entityState.entityPageView='';entityState.entityPageWall=false},
       loadShapes:loadEntityShapes,syncParts:syncEntitySkeletonParts,
     },
