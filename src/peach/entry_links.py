@@ -342,10 +342,18 @@ class MissavDirectory:
 
     def path(self, japanese: str, canonical: str) -> str | None:
         for name in (japanese, canonical):
-            matches = self.paths.get(_glyph_key(name).casefold(), ())
+            matches = self.paths.get(directory_name_key(name), ())
             if matches:
                 return matches[0] if len(matches) == 1 else ""
         return "" if self.complete else None
+
+
+def directory_name_key(name: str) -> str:
+    """名录匹配折叠字形及纯汉字、假名名称中的空白，路径保留来源原文。"""
+    key = _glyph_key(name).casefold()
+    if re.fullmatch(r"[\u3400-\u9fff\u3040-\u30ff\s]+", key):
+        return "".join(key.split())
+    return key
 
 
 def _published_names(name: str) -> list[str]:
@@ -378,7 +386,7 @@ def directory_index(data: object) -> MissavDirectory | None:
         names = _published_names(slug) + _published_names(str(row.get("name") or ""))
         for name in names:
             if name:
-                paths.setdefault(_glyph_key(name).casefold(), {}).setdefault(slug, target.path)
+                paths.setdefault(directory_name_key(name), {}).setdefault(slug, target.path)
     return MissavDirectory({key: tuple(sorted(values.values())) for key, values in paths.items()},
                            complete=data.get("complete") is True)
 
