@@ -283,7 +283,7 @@ describe('关注页岛', () => {
     }
   });
 
-  it('两排按种子取样：换状态推回新 view 不洗牌，换一批才换', { timeout: 60_000 }, async () => {
+  it('两排取样在筛选时保留，换一批以地址种子请求新列表', { timeout: 60_000 }, async () => {
     const opened = await openFollowFeed(browser, '/follow', DESKTOP);
     try {
       const page = opened.page;
@@ -293,10 +293,19 @@ describe('关注页岛', () => {
       await searchIs(page, '?status=new');
       await page.locator('[data-follow-filter="new"][aria-pressed="true"]').waitFor();
       assert.deepEqual(await authorOrder(page), first, '换状态之后创作者那一排重新洗了');
+      const shuffled = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return url.pathname === '/api/follow' && url.searchParams.get('sort') === 'rand';
+      });
       await page.getByRole('button', { name: '换一批', exact: true }).click();
       await page.waitForFunction(() => new URLSearchParams(location.search).get('sort') === 'rand');
-      await page.waitForFunction((before) => JSON.stringify([...document.querySelectorAll<HTMLElement>(
-        'button[data-follow-author]')].map((button) => button.dataset.followAuthor)) !== before, JSON.stringify(first));
+      const response = await shuffled;
+      assert.equal(response.status(), 200);
+      const requestSeed = new URL(response.url()).searchParams.get('seed');
+      assert.ok(Number(requestSeed) > 0);
+      assert.equal(new URL(page.url()).searchParams.get('seed'), requestSeed);
+      await page.locator('[data-follow-list] > [data-follow-item]').first().waitFor();
+      assert.deepEqual((await authorOrder(page)).sort(), [...first].sort());
       assert.deepEqual(opened.problems, []);
     } finally {
       await opened.close();
