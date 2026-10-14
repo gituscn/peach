@@ -75,10 +75,12 @@ describe('我的收藏', () => {
     await submit(document.querySelector('form'));
     await settle();
     expect(writes[0]).toEqual({ action: 'save_filter', name: 'VR 待看', href: '/watch-later?loc=&tag=VR&jav=1' });
-    expect(document.querySelector('a[title="VR 待看"]')?.getAttribute('href')).toBe('/watch-later?loc=&tag=VR&jav=1');
+    const savedLink = () => [...document.querySelectorAll('a')].find(link => link.textContent === 'VR 待看');
+    expect(savedLink()?.getAttribute('href')).toBe('/watch-later?loc=&tag=VR&jav=1');
+    expect(savedLink()?.getAttribute('title')).toBeNull();
     await click(document.querySelector('[aria-label="删除筛选VR 待看"]'));
     await settle();
-    expect(document.querySelector('a[title="VR 待看"]')).toBeNull();
+    expect(savedLink()).toBeUndefined();
   });
 
   it('收藏链接使用现有实体路由和编码后的标签', () => {
