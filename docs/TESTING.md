@@ -41,7 +41,7 @@ Dependabot 的 PR 一律在本地接管，不在网页上合：
 4. 跑 `test.ps1 full`，走 ready / integrate，推送 master 后按它印出的 `gh pr close` 逐个关 PR。PR 显示为 Closed 而不是 Merged，因为提交是在本地重做的。
 5. 同一轮跑 `scripts/check_reference_updates.py check --cadence weekly --diff`，查 Dependabot 管不到的上游：按 sha 钉住的 amane 是否前移，Peach 代码直接消费或逐字复制的参考来源是否变化。审阅与 `accept` 按 `peach-reference-evidence` 技能；amane 前移单开分支升级。
 
-单个 PR 用 `--pr <编号>`，流程相同。`.github/dependabot.yml` 把每个生态的 minor 与 patch 合成一个 PR，semver-major 照常一个包一个 PR，接管前先读变更说明。已知要改代码才能升的大版本（如 `@tanstack/react-table` v9）由 `ignore` 挡在自动 PR 之外，迁移单开分支做。
+单个 PR 用 `--pr <编号>`，流程相同。`.github/dependabot.yml` 把每个生态的 minor 与 patch 合成一个 PR，semver-major 照常一个包一个 PR，接管前先读变更说明。需要改代码的大版本在隔离工作树完成迁移和验证；TanStack Table 的大版本也由 Dependabot 检查。
 
 版本来自 `src/peach/__init__.py`，已纳入 uv 缓存键；源码版本更新后再次同步会刷新安装元数据。缓存规则采用 [uv 官方动态元数据机制](https://docs.astral.sh/uv/concepts/cache/#dynamic-metadata)。
 

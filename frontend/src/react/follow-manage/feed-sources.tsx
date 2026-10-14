@@ -10,9 +10,14 @@
  * 勾选和关注列表同一套：勾在行首，点一行的空白处也是选这一行，选中了底部浮出批量操作。 */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { createColumnHelper, flexRender, getCoreRowModel, getPaginationRowModel, useReactTable } from '@tanstack/react-table';
+import {
+  createColumnHelper, createPaginatedRowModel, flexRender, rowPaginationFeature,
+  rowSelectionFeature, tableFeatures, useTable,
+  type RowSelectionState,
+} from '@tanstack/react-table';
 import { RiDeleteBinLine, RiRefreshLine, RiRssLine } from '@remixicon/react';
 import { VisuallyHidden } from 'react-aria-components';
+
 import { avatarInner } from '@peach/card-art';
 import { mapLimit } from '@peach/legacy/core';
 import { confirmModal } from '@peach/legacy/ui';
@@ -43,6 +48,12 @@ import {
   checkFeeds, errorHeadline, FEEDS_KEY, feedIntervalText, fetchFeeds, removeFeed, setFeedEnabled,
   PAGE_SIZES, pageWindow, type FeedSource,
 } from './follow-manage';
+
+const feedTableFeatures = tableFeatures({
+  rowPaginationFeature,
+  rowSelectionFeature,
+  paginatedRowModel: createPaginatedRowModel(),
+});
 
 const COLUMN_LABELS: Record<string, string> = {
   select: '选择',
@@ -205,9 +216,9 @@ export function FeedSources({ readOnly, toast }: {
   };
 
   const columns = useMemo(() => {
-    const column = createColumnHelper<FeedSource>();
+    const column = createColumnHelper<typeof feedTableFeatures, FeedSource>();
     const label = (id: string) => () => COLUMN_LABELS[id] || id;
-    return [
+    return column.columns([
       column.display({
         id: 'select',
         header: label('select'),
@@ -296,12 +307,13 @@ export function FeedSources({ readOnly, toast }: {
           </span>
         ),
       }),
-    ];
+    ]);
   }, []);
 
-  const rowSelection = useMemo(
+  const rowSelection = useMemo<RowSelectionState>(
     () => Object.fromEntries([...selected].map((id) => [String(id), true])), [selected]);
-  const table = useReactTable({
+  const table = useTable({
+    features: feedTableFeatures,
     data: sources,
     columns,
     getRowId: (row) => String(row.id),
@@ -311,8 +323,6 @@ export function FeedSources({ readOnly, toast }: {
       const next = typeof updater === 'function' ? updater(rowSelection) : updater;
       setSelected(new Set(Object.entries(next).filter(([, on]) => on).map(([id]) => Number(id))));
     },
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
   });
 
   if (!data) {
@@ -388,7 +398,7 @@ export function FeedSources({ readOnly, toast }: {
             <TableBody>
               {table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} id={row.id} data-follow-selected={row.getIsSelected() || undefined}>
-                  {row.getVisibleCells().map((cell) => (
+                  {row.getAllCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>

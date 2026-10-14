@@ -14,10 +14,12 @@ import {
 } from '@remixicon/react';
 import { useMutation } from '@tanstack/react-query';
 import {
-  createColumnHelper, flexRender, getCoreRowModel, getPaginationRowModel, useReactTable,
+  createColumnHelper, createPaginatedRowModel, flexRender, rowPaginationFeature,
+  rowSelectionFeature, rowSortingFeature, tableFeatures, useTable,
   type RowSelectionState, type SortingState,
 } from '@tanstack/react-table';
 import { VisuallyHidden } from 'react-aria-components';
+
 import { mapLimit } from '@peach/legacy/core';
 import { confirmModal } from '@peach/legacy/ui';
 
@@ -51,6 +53,13 @@ import {
   type TableRow as SourceTableRow,
 } from './follow-manage';
 import { AuthorAvatar, ErrorLine, SourceIcon, SourceLink, StatusBadge } from './source-view';
+
+const sourceTableFeatures = tableFeatures({
+  rowPaginationFeature,
+  rowSelectionFeature,
+  rowSortingFeature,
+  paginatedRowModel: createPaginatedRowModel(),
+});
 
 const count = (value: unknown) => (Number(value) || 0).toLocaleString();
 
@@ -374,9 +383,9 @@ export function SourceList(props: SourceListProps) {
 
   /* ── 表格视图：列定义、排序、行选择与分页都交给 TanStack Table ── */
   const columns = useMemo(() => {
-    const column = createColumnHelper<SourceTableRow>();
+    const column = createColumnHelper<typeof sourceTableFeatures, SourceTableRow>();
     const label = (id: string) => () => COLUMN_LABELS[id] || id;
-    return [
+    return column.columns([
       column.display({
         id: 'select',
         header: label('select'),
@@ -447,7 +456,7 @@ export function SourceList(props: SourceListProps) {
           </span>
         ),
       }),
-    ];
+    ]);
   }, [rowHandlers]);
 
   const sorting: SortingState = useMemo(() => {
@@ -461,7 +470,8 @@ export function SourceList(props: SourceListProps) {
   // 越界的页码落到末页：地址栏里挂着的可能是上一次、来源更多时的页码。
   const win = pageWindow(asTable ? rows.length : groups.length, pageSize, page);
 
-  const table = useReactTable({
+  const table = useTable({
+    features: sourceTableFeatures,
     data: rows,
     columns,
     /* 行的身份是来源 ID，不是它在这一页里的下标：换页、换排序之后 `rowSelection` 里记着的
@@ -489,8 +499,6 @@ export function SourceList(props: SourceListProps) {
       if (next.pageSize !== pageSize) onPageSize(next.pageSize);
       else if (next.pageIndex !== now.pageIndex) onPage(next.pageIndex + 1);
     },
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
   });
 
   const pageRows = table.getRowModel().rows;
@@ -643,7 +651,7 @@ export function SourceList(props: SourceListProps) {
               {pageRows.map((row) => (
                 <TableRow key={row.id} id={row.id}
                   data-follow-selected={row.getIsSelected() || undefined}>
-                  {row.getVisibleCells().map((cell) => (
+                  {row.getAllCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
