@@ -2,8 +2,10 @@
  * 那一份模板（`feedNewCardHtml`）。忽略的那条当场消失，已看过的留在原位只是变淡，想要那颗键
  * 按下去换成填实的星；三样都直接改这一行的节点，不重画整行——重画会把横滚的位置和自动滚动
  * 一起打回起点。一条都没有就整块不出。 */
-import { useContext, useEffect, useLayoutEffect, useRef, type MouseEvent } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { ShellActionsContext } from '../router/router';
+import { SourceAvatar } from '../components/source-avatar';
 
 import type { FeedNew } from './feed-new';
 
@@ -19,6 +21,7 @@ export function FeedNewRow({ feedNew, host, wire, act, settled }: {
 }) {
   const actions = useContext(ShellActionsContext);
   const box = useRef<HTMLDivElement>(null);
+  const [sourceFaces, setSourceFaces] = useState<HTMLElement[]>([]);
   const html = feedNew?.items.length ? feedNew.html : '';
   useLayoutEffect(() => {
     host.removeAttribute('aria-busy');
@@ -27,6 +30,7 @@ export function FeedNewRow({ feedNew, host, wire, act, settled }: {
   }, [host, html, feedNew, settled]);
   useEffect(() => {
     if (html) wire(box.current?.querySelector('.feednewrow') ?? null);
+    setSourceFaces([...box.current?.querySelectorAll<HTMLElement>('[data-feed-source-avatar]') ?? []]);
   }, [wire, html]);
   const click = async (event: MouseEvent<HTMLDivElement>) => {
     const link = (event.target as Element).closest<HTMLAnchorElement>('a.feednewopen');
@@ -53,6 +57,8 @@ export function FeedNewRow({ feedNew, host, wire, act, settled }: {
       settled?.(false);
     }
   };
-  return html ? <div ref={box} className="contents" onClick={(event) => { void click(event) }}
-    dangerouslySetInnerHTML={{ __html: html }} /> : null;
+  return html ? <><div ref={box} className="contents" onClick={(event) => { void click(event) }}
+    dangerouslySetInnerHTML={{ __html: html }} />{sourceFaces.map((face, index) => createPortal(
+      <SourceAvatar code={face.dataset.code!} person={{ name: face.dataset.name!, source_actor_id: face.dataset.actor! }} />,
+      face, `${html.length}:${index}`))}</> : null;
 }

@@ -27,6 +27,17 @@ describe('西方官方封面', () => {
   });
 });
 
+it('创作者名片官方头像使用本机代理和归档回退，实体图优先', () => {
+  const ref = { id: 7, has_image: false, source_avatar_url: '/follow-avatar?service=fanbox&id=123',
+    source_avatar_fallbacks: ['/follow-avatar?provider=kemono&ref=fanbox%2F123'] };
+  const image = parse(avatarInner('创作者', ref, null, 'creator'))!;
+  expect(image.getAttribute('src')).toBe(ref.source_avatar_url);
+  expect(image.dataset.fallbacks).toBe(ref.source_avatar_fallbacks[0]);
+  expect(image.dataset.drop).toBe('self');
+  expect(parse(avatarInner('创作者', { ...ref, has_image: true }, null, 'creator'))?.getAttribute('src'))
+    .toBe('/entity-image?kind=creator&id=7');
+});
+
 describe('entityFaceImg：实体图优先，取不到退代表作头像', () => {
   it('两样都取不到就一个 <img> 都不出', () => {
     expect(entityFaceImg({ id: 3, hasImage: false })).toBe('');
