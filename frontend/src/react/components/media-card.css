@@ -385,7 +385,6 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
 }
 .peach-react :is([data-previewing], [data-media-card]:has(:focus-visible)) [data-media-preview] { opacity: 1; pointer-events: auto; }
 .peach-react [data-longhover] [data-media-preview] { opacity: 0; pointer-events: none; }
-.peach-react [data-media-preview]:hover { background: var(--hover); }
 .peach-react [data-media-preview] > svg:first-child { position: absolute; inset: 0; width: 36px; height: 36px; transform: rotate(-90deg); }
 .peach-react [data-media-preview] circle { fill: none; stroke-width: 2; }
 .peach-react [data-media-preview] circle:first-child { stroke: rgb(255 255 255 / .18); }
@@ -438,7 +437,7 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
   transition: transform .15s ease, background .15s ease;
 }
 .peach-react :is([data-longhover] [data-media-seek], [data-media-card]:is(:hover, :has(:focus-visible)) [data-media-later]) button { pointer-events: auto; }
-.peach-react :is([data-media-later], [data-media-seek]) button:hover { background: rgb(0 0 0 / .34); }
+.peach-react :is([data-media-preview], :is([data-media-later], [data-media-seek]) button):hover { background: rgb(0 0 0 / .34); }
 .peach-react [data-media-seek] svg { width: 34px; height: 34px; }
 .peach-react [data-media-later] button { width: 36px; height: 36px; padding: 0; }
 .peach-react [data-media-later] svg { width: 21px; height: 21px; }
