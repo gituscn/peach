@@ -1,5 +1,5 @@
 import { authorAvatarHtml, followIdentity, followTitle } from '../follow-feed/follow-marks';
-import type { FollowPage } from '../follow-feed/follow-feed';
+import { groupMediaKinds, itemForMedia, type FollowPage } from '../follow-feed/follow-feed';
 import type { Discovery } from '../jav/jav';
 import type { SuggestCard, SuggestGroup, SuggestItem } from './search';
 
@@ -10,7 +10,7 @@ export async function searchRecommendations(request: Request): Promise<SuggestGr
   const results = await Promise.allSettled([
     request('/api/items?sort=rand&limit=5'),
     request('/api/jav/discoveries?scope=library&limit=5'),
-    request('/api/follow?status=new&limit=5'),
+    request(`/api/follow?limit=20&sort=rand&seed=${Date.now() >>> 0}`),
     request('/api/feeds/discoveries?limit=5'),
     request('/api/follow/authors?limit=3'),
   ]);
@@ -25,15 +25,22 @@ export async function searchRecommendations(request: Request): Promise<SuggestGr
     who: String(card.performers || card.creator || ''), card, href,
   });
   const posts: SuggestItem[] = [];
+  const photos: SuggestItem[] = [];
   const context = { sources: follow?.sources || [], aliases: follow?.author_aliases || [], credentials: new Set<string>() };
   for (const group of follow?.groups || []) {
-    const item = group.primary;
-    const source = context.sources.find(source => source.id === item.source_id);
-    const sources = source?.author_key ? context.sources.filter(row => row.author_key === source.author_key) : source ? [source] : [];
-    const identity = followIdentity(item, sources, context);
-    posts.push({ value: followTitle(item), id: item.id, who: identity.author,
-      href: `/posts/${item.id}`, card: { id: item.id, thumb_url: item.thumb_url },
-    });
+    const kinds = groupMediaKinds(group);
+    for (const media of ['videos', 'images'] as const) {
+      if (media === 'images' ? !kinds.has('image') : kinds.size && !kinds.has('video')) continue;
+      const item = itemForMedia(group, media);
+      const source = context.sources.find(source => source.id === item.source_id);
+      const sources = source?.author_key ? context.sources.filter(row => row.author_key === source.author_key) : source ? [source] : [];
+      const identity = followIdentity(item, sources, context);
+      const image = media === 'images' ? item.media_items?.find(entry => entry.media_kind === 'image') : undefined;
+      (media === 'images' ? photos : posts).push({ value: followTitle(item), id: item.id, who: identity.author,
+        href: `/posts/${item.id}`, followMedia: media, mediaIndex: image?.index ?? null,
+        card: { id: item.id, thumb_url: image?.thumb_url || item.thumb_url },
+      });
+    }
   }
   const authors: SuggestItem[] = (data[4]?.items || []).map((row: { k: string; key: string; entity_id?: number }) => ({
     value: row.k, href: row.entity_id ? `/creators/${row.entity_id}` : `/follow?author=${encodeURIComponent(row.key)}`,
@@ -56,7 +63,8 @@ export async function searchRecommendations(request: Request): Promise<SuggestGr
     { kind: 'author', label: '关注作者', items: authors, href: '/subscriptions?tab=add', action: '添加关注' },
     { kind: 'asset', label: '作品推荐', items: library.map(card => work(card)), href: '/', action: '全部作品' },
     { kind: 'jav', label: 'JAV 推荐', items: jav.map(card => work(card, `/assets/${card.asset_id || card.id}`)), href: '/jav?tab=discover', action: '发现 JAV' },
-    { kind: 'post', label: '关注作品', items: posts, href: '/follow', action: '全部关注作品' },
+    { kind: 'post', label: '关注作品', items: posts.slice(0, 5), href: '/follow', action: '全部关注作品' },
+    { kind: 'photo', label: '关注图片', items: photos.slice(0, 5), href: '/follow?media=images', action: '全部关注图片' },
     { kind: 'release', label: '订阅新作', items: releases.filter(card => card.code).map(card => work({ ...card, sourceWork: true }, `/works/${encodeURIComponent(card.code)}`)), href: '/subscriptions?tab=feeds', action: '管理订阅' },
   ];
 }

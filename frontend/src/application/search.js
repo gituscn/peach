@@ -10,6 +10,7 @@ import { openEntity } from './entity.js';
 import { catalogSuggestions } from './../catalog-onboarding';
 import { searchRecommendations } from '../react/search/recommendations';
 import { feedNewCoverHtml } from './feed.js';
+import { followState, openFollowDetail } from './follow.js';
 import { $, api, esc } from '../core';
 import { dismissMenu, glideEase, presentMenu, wireHorizontalScroller } from '../ui-kit';
 import { openManagedRoute } from './../history/managed';
@@ -80,6 +81,7 @@ searchState.searchActions = {
   openItem:id=>openItem(id),
   openEntity:(kind,name)=>openEntity(kind,name),
   openPath:path=>navigationState.route(path,false),
+  openFollow:(id,media,index)=>{followState.followMediaView=media;void openFollowDetail(id,true,index)},
 };
 searchState.searchHelpers = {
   pool:()=>catalogSuggestions(state,api),

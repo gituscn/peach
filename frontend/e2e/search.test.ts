@@ -94,7 +94,9 @@ describe('顶栏搜索', () => {
         ] } }));
         await page.route(/\/api\/follow\?/, route => route.fulfill({ json: {
           sources: [{ id: 1, author_key: 'name:作者', label: '作者', ref: '作者', provider: 'pixiv', official_avatar_url: '/poster?id=11' }],
-          groups: [{ primary: { id: 901, source_id: 1, title: '关注作品', thumb_url: '/poster?id=11' } }],
+          groups: [{ primary: { id: 901, source_id: 1, title: '关注作品', thumb_url: '/poster?id=11', media_kind: 'video', status: 'saved' },
+            variants: [{ id: 902, source_id: 1, title: '图片作品', thumb_url: '/poster?id=12', media_kind: 'image', status: 'seen',
+              media_items: [{ index: 2, media_kind: 'image', thumb_url: '/poster?id=13' }] }], duplicates: [] }],
         } }));
         await page.route(/\/api\/follow\/authors\?/, route => route.fulfill({ json: {
           items: [{ k: '作者', key: 'name:作者', entity_id: 90002 }],
@@ -106,7 +108,7 @@ describe('顶栏搜索', () => {
         await page.locator('#q').click();
         await page.locator(`${MENU} [data-search-recommendations]`).waitFor();
         assert.equal(await page.locator(`${MENU} [data-kind="author"] [data-search-face] img`).count(), 1);
-        for (const kind of ['asset', 'jav', 'post', 'release']) {
+        for (const kind of ['asset', 'jav', 'post', 'photo', 'release']) {
           const cover = page.locator(`${MENU} [data-kind="${kind}"] [data-search-pic] img`).first();
           assert.ok(await cover.count(), `${kind} 没有图片`);
           const box = await cover.boundingBox();
@@ -118,6 +120,8 @@ describe('顶栏搜索', () => {
         }));
         assert.ok(overflow.scrollWidth <= overflow.width + 1);
         assert.ok(overflow.right <= overflow.viewport + 1);
+        assert.equal(await page.locator(`${MENU} [data-kind="photo"] h3 a`).getAttribute('href'), '/follow?media=images');
+        assert.ok((await page.locator(`${MENU} [data-kind="photo"] img`).getAttribute('src'))?.includes('id=13'));
         await page.screenshot({ path: `../build/agent-verification/browser/search-recommendations-${viewport.name}.png` });
         const subscription = page.locator(`${MENU} [data-kind="performer"] h3 a`);
         await subscription.focus();

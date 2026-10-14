@@ -64287,6 +64287,7 @@ var AH = /* @__PURE__ */ new Set([
 	"asset",
 	"jav",
 	"post",
+	"photo",
 	"release"
 ]), MH = (e) => String(e ?? "").normalize("NFKC").trim().toLocaleLowerCase();
 function Kke({ query: e, history: t, picks: n, suggestFor: r, groups: i, tabs: a, kind: o, recommendations: s = [] }) {
@@ -64578,7 +64579,7 @@ function Zke(e, t, n, r) {
 	}, x = (t, n) => {
 		i().blur(), l(n), e().actions.openEntity(t, n);
 	}, S = (t) => {
-		t.type === "suggest" && t.item.href ? C(t.item.href) : t.type === "more" ? (b(!1, !0), i().blur()) : t.type === "suggest" && t.kind === "asset" && t.item.id != null ? (i().blur(), e().actions.openItem(t.item.id)) : t.type === "suggest" && AH.has(t.kind) ? x(t.kind, t.value) : (i().value = t.value, b(!1, !0));
+		t.type === "suggest" && t.item.followMedia && t.item.id && e().actions.openFollow ? (i().blur(), e().actions.openFollow(t.item.id, t.item.followMedia, t.item.mediaIndex ?? null)) : t.type === "suggest" && t.item.href ? C(t.item.href) : t.type === "more" ? (b(!1, !0), i().blur()) : t.type === "suggest" && t.kind === "asset" && t.item.id != null ? (i().blur(), e().actions.openItem(t.item.id)) : t.type === "suggest" && AH.has(t.kind) ? x(t.kind, t.value) : (i().value = t.value, b(!1, !0));
 	}, C = (t) => {
 		m(), i().blur(), e().actions.openPath?.(t);
 	};
@@ -64696,6 +64697,7 @@ function $ke({ entry: e, active: t, helpers: n, onPick: r, onPeek: i, onRemove: 
 		"asset",
 		"jav",
 		"post",
+		"photo",
 		"release"
 	].includes(c)) {
 		let e = [s.who, s.code ? s.title : ""].filter(Boolean).join(" · ");
@@ -103958,7 +103960,7 @@ async function kut(e) {
 	let t = (await Promise.allSettled([
 		e("/api/items?sort=rand&limit=5"),
 		e("/api/jav/discoveries?scope=library&limit=5"),
-		e("/api/follow?status=new&limit=5"),
+		e(`/api/follow?limit=20&sort=rand&seed=${Date.now() >>> 0}`),
 		e("/api/feeds/discoveries?limit=5"),
 		e("/api/follow/authors?limit=3")
 	])).map((e) => e.status === "fulfilled" ? e.value : null), n = (t[0]?.items || []).slice(0, 5), r = (t[1]?.items || []).slice(0, 5), i = t[2], a = t[3]?.items || [], o = (e, t) => ({
@@ -103969,31 +103971,37 @@ async function kut(e) {
 		who: String(e.performers || e.creator || ""),
 		card: e,
 		href: t
-	}), s = [], c = {
+	}), s = [], c = [], l = {
 		sources: i?.sources || [],
 		aliases: i?.author_aliases || [],
 		credentials: /* @__PURE__ */ new Set()
 	};
 	for (let e of i?.groups || []) {
-		let t = e.primary, n = c.sources.find((e) => e.id === t.source_id), r = lP(t, n?.author_key ? c.sources.filter((e) => e.author_key === n.author_key) : n ? [n] : [], c);
-		s.push({
-			value: aP(t),
-			id: t.id,
-			who: r.author,
-			href: `/posts/${t.id}`,
-			card: {
-				id: t.id,
-				thumb_url: t.thumb_url
-			}
-		});
+		let t = ci(e);
+		for (let n of ["videos", "images"]) {
+			if (n === "images" ? !t.has("image") : t.size && !t.has("video")) continue;
+			let r = li(e, n), i = l.sources.find((e) => e.id === r.source_id), a = lP(r, i?.author_key ? l.sources.filter((e) => e.author_key === i.author_key) : i ? [i] : [], l), o = n === "images" ? r.media_items?.find((e) => e.media_kind === "image") : void 0;
+			(n === "images" ? c : s).push({
+				value: aP(r),
+				id: r.id,
+				who: a.author,
+				href: `/posts/${r.id}`,
+				followMedia: n,
+				mediaIndex: o?.index ?? null,
+				card: {
+					id: r.id,
+					thumb_url: o?.thumb_url || r.thumb_url
+				}
+			});
+		}
 	}
-	let l = (t[4]?.items || []).map((e) => ({
+	let u = (t[4]?.items || []).map((e) => ({
 		value: e.k,
 		href: e.entity_id ? `/creators/${e.entity_id}` : `/follow?author=${encodeURIComponent(e.key)}`,
-		avatarHtml: cP(c.sources.filter((t) => t.author_key === e.key), e.k),
+		avatarHtml: cP(l.sources.filter((t) => t.author_key === e.key), e.k),
 		subtitle: "关注中的作者"
-	})), u = /* @__PURE__ */ new Map();
-	for (let e of r) for (let t of e.performer_refs || []) t.id && !u.has(t.name) && u.set(t.name, {
+	})), d = /* @__PURE__ */ new Map();
+	for (let e of r) for (let t of e.performer_refs || []) t.id && !d.has(t.name) && d.set(t.name, {
 		value: t.name,
 		entity_id: t.id,
 		has_image: t.has_image,
@@ -104008,14 +104016,14 @@ async function kut(e) {
 		{
 			kind: "performer",
 			label: "艺人与新作",
-			items: [...u.values()].slice(0, 3),
+			items: [...d.values()].slice(0, 3),
 			href: "/subscriptions?tab=feeds",
 			action: "订阅新作"
 		},
 		{
 			kind: "author",
 			label: "关注作者",
-			items: l,
+			items: u,
 			href: "/subscriptions?tab=add",
 			action: "添加关注"
 		},
@@ -104036,9 +104044,16 @@ async function kut(e) {
 		{
 			kind: "post",
 			label: "关注作品",
-			items: s,
+			items: s.slice(0, 5),
 			href: "/follow",
 			action: "全部关注作品"
+		},
+		{
+			kind: "photo",
+			label: "关注图片",
+			items: c.slice(0, 5),
+			href: "/follow?media=images",
+			action: "全部关注图片"
 		},
 		{
 			kind: "release",
@@ -104121,7 +104136,10 @@ function Put() {
 		},
 		openItem: (e) => x9(e),
 		openEntity: (e, t) => m7(e, t),
-		openPath: (e) => Q.route(e, !1)
+		openPath: (e) => Q.route(e, !1),
+		openFollow: (e, t, n) => {
+			$.followMediaView = t, R9(e, !0, n);
+		}
 	}, B9.searchHelpers = {
 		pool: () => clt(W, Et),
 		recommendations: () => kut(Et),
