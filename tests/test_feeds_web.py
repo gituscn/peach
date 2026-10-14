@@ -241,6 +241,21 @@ class FeedWebTest(FeedWebFixture):
         listing = dispatch_api_get(self.contract, "/api/feeds/discoveries", {})
         self.assertEqual(len(listing["items"]), 2)
 
+    def test_missing_covers_follow_their_active_scrape_job(self):
+        self._add()
+        self._check()
+        deadline = time.monotonic() + 5
+        while not self.contract.task_runs.query(status="active", task_key=feed_followup.TASK_KEY):
+            self.assertLess(time.monotonic(), deadline, "取资料后继未入队")
+            time.sleep(0.01)
+        items = dispatch_api_get(self.contract, "/api/feeds/discoveries", {})["items"]
+        self.assertTrue(all(item["cover_fetching"] for item in items))
+        self.assertTrue(all(not item["has_cover"] for item in items))
+        self._drain(1)
+        items = dispatch_api_get(self.contract, "/api/feeds/discoveries", {})["items"]
+        self.assertFalse(any(item["cover_fetching"] for item in items))
+        self.assertTrue(all(item["has_cover"] for item in items))
+
     def test_a_failing_source_reports_on_its_own_row_and_stays_scheduled(self):
         self._add()
         self.transport.responses[self.url] = HttpResponse(503, {}, b"", self.url)

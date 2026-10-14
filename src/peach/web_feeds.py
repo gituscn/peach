@@ -541,6 +541,12 @@ def q_feed_discoveries(contract, args) -> dict:
     # 提示就该跟着消失，而不是让一次旧故障一直挂在页面上。
     last = contract.task_runs.query(status="succeeded", task_key=feed_followup.TASK_KEY, limit=1)
     cover_network = int(last[0].result_summary.get("cover_network") or 0) if last else 0
+    fetching = set()
+    for run in contract.task_runs.query(status="active", task_key=feed_followup.TASK_KEY, limit=500):
+        try:
+            fetching.update(normalise_code_key(code) for code in feed_followup.parse_key(run.followup_key))
+        except ValueError:
+            continue
     return {"ok": True, "more": more, "cover_network": cover_network, "items": [{
         "id": int(row["id"]),
         "code": row["code"],
@@ -549,6 +555,7 @@ def q_feed_discoveries(contract, args) -> dict:
         "cover_url": row["cover_url"],
         # 本机封面与它的两份边车，形状和资产卡的同名字段一致，页面按同一套取景。
         "has_cover": contract.has_cover(row["code"]),
+        "cover_fetching": normalise_code_key(row["code"]) in fetching,
         "cover_frame": contract.cover_frame(row["code"]),
         "cover_version": contract.cover_version(row["code"]),
         "poster_box": contract.poster_box(row["code"]),

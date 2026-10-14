@@ -20,11 +20,12 @@ import { fitSkeleton, revealTexts } from '@peach/legacy/ui';
 
 import { detailSkeletonBody } from '../../board-skeleton';
 import { applyTheaterMode, closePlayerMenu, type PlayerResume } from '../../player';
-import { prefetchFollowDetail, type FollowDetailActions, type FollowDetailProps } from '../follow-detail/follow-detail';
+import { followItemKey, prefetchFollowDetail, type FollowDetailActions, type FollowDetailProps } from '../follow-detail/follow-detail';
 import { FollowDetailPage } from '../follow-detail/follow-detail-page';
-import { prefetchItemDetail, type ItemDetailActions, type ItemDetailProps } from '../item-detail/item-detail';
+import { chooseItem, itemKey, prefetchItemDetail, queueKey, type DetailQueue, type ItemDetailActions, type ItemDetailProps } from '../item-detail/item-detail';
 import { ItemDetailPage } from '../item-detail/item-detail-page';
-import { prefetchJavDetail, type JavDetailProps } from '../jav-detail/jav-detail';
+import { javDetailKey, prefetchJavDetail, type JavDetailProps } from '../jav-detail/jav-detail';
+import { queryClient } from '../query';
 import { JavDetailPage } from '../jav-detail/jav-detail-page';
 import { Miniplayer } from './miniplayer';
 import * as player from './stage-player';
@@ -242,23 +243,28 @@ async function open(request: StageRequest): Promise<void> {
   dismissArmed = false;
   if (request.kind === 'jav') player.closeMiniplayer();
   else player.prepareStageFor(request.kind, request.id ?? Number.NaN);
-  view = { generation: mine, request, content: contentFor(request), phase: 'skeleton' };
+  const content = contentFor(request);
+  view = { generation: mine, request, content, phase: 'skeleton' };
+  const waiting = content.kind === 'item' ? prefetchItemDetail(content.props, abort.signal)
+    : content.kind === 'jav' ? prefetchJavDetail(content.props, abort.signal)
+    : prefetchFollowDetail(content.props, abort.signal);
+  if (mine !== generation || view?.request !== request) { await waiting.catch(() => {}); return }
+  const cached = cachedContent(content);
+  view = { ...view, phase: cached ? 'content' : 'skeleton' };
   paint();
   const dialog = stageDialog();
-  if (!dialog) return;
-  fitSkeleton(dialog);
+  if (!dialog) { await waiting.catch(() => {}); return }
+  if (!cached) fitSkeleton(dialog);
   document.body.setAttribute('data-detail-open', '');
   if (!dialog.open) dialog.showModal();
-  const content = view.content;
   try {
-    if (content.kind === 'item') await prefetchItemDetail(content.props, abort.signal);
-    else if (content.kind === 'jav') await prefetchJavDetail(content.props, abort.signal);
-    else await prefetchFollowDetail(content.props, abort.signal);
+    await waiting;
   } catch {
     // 中止就是用户已经走开。其余失败照画：原因和重试的节律都在详情自己手里。
     if (abort.signal.aborted) return;
   }
   if (mine !== generation || !view) return;
+  if (cached) return;
   /* 还没到显示门槛就已经取完：直接落内容，隐藏中的占位从未被人看见。 */
   const direct = !!dialog.querySelector('.skeleton-awaiting');
   view = { ...view, phase: direct ? 'content' : 'reveal' };
@@ -270,6 +276,17 @@ async function open(request: StageRequest): Promise<void> {
   /* 骨架里没有可聚焦的元素，`showModal()` 只能把焦点给 dialog 本身；内容到了交给关闭键。 */
   const active = document.activeElement;
   if (active === dialog || !dialog.contains(active)) dialog.querySelector<HTMLElement>('#closeStage')?.focus();
+}
+
+/** 可立即完整呈现的详情沿用查询缓存，刷新只更新内容。 */
+function cachedContent(content: Content): boolean {
+  if (content.kind === 'jav') return !!queryClient.getQueryData(javDetailKey(content.props.code));
+  if (content.kind === 'follow') return !!queryClient.getQueryData(followItemKey(content.props.id));
+  const { queue: ref, id } = content.props;
+  const queue = ref ? queryClient.getQueryData<DetailQueue>(queueKey(ref)) : null;
+  if (ref && !queue) return false;
+  const current = queue ? chooseItem(queue, id) : id;
+  return current != null && !!queryClient.getQueryData(itemKey(current));
 }
 
 /* 详情开着时换到同一种的另一条（队列换卷、合集换版本、相关作品、后退前进）：浮窗、遮罩与进场都不

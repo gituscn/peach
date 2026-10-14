@@ -200,7 +200,7 @@ export function paintCatalogFilter(patch){
   catalogState.catalogFilterProps={...(catalogState.catalogFilterProps||catalogFilterBase()),...patch};
   if(catalogState.catalogFilterMounting)return;
   if(managedTaken(host)){updateManagedRoute(host,patch);return}
-  if(!host.firstChild&&!offscreen){host.innerHTML=catalogFilterSkeletonHtml(catalogState.catalogViews(),catalogState.catalogFilterProps.state);fitSkeleton(host)}
+  if(!host.firstChild&&!offscreen){host.innerHTML=catalogFilterSkeletonHtml(catalogState.catalogViews(),catalogState.catalogFilterProps.state,catalogHeadProps());fitSkeleton(host)}
   /* 常驻：不随换页收，所以不判当前页。 */
   catalogState.catalogFilterMounting=openManagedRoute('catalog-filter',catalogState.catalogFilterProps,{container:host,isCurrent:()=>true})
     .then(()=>updateManagedRoute(host,catalogState.catalogFilterProps))

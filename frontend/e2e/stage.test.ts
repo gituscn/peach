@@ -275,10 +275,16 @@ describe('舞台岛', () => {
       assert.equal(await page.locator('#stage[open]').count(), 0, '拖完松手那一下被当成了「展开」');
 
       // 小窗上的键只在指针落在小窗上时浮出来。
+      let releaseRefresh = () => {};
+      const refreshed = new Promise<void>(resolve => { releaseRefresh = resolve });
+      await page.route(/\/api\/item\?id=11$/, async route => { await refreshed; await route.continue() });
       await page.locator('#miniplayerCard').hover();
       await page.locator('#miniplayerExpand').click();
       await pathIs(page, `/assets/${ITEM.plain}`);
-      await page.locator(ITEM_READY).waitFor();
+      try {
+        await page.locator(ITEM_READY).waitFor({ timeout: 3000 });
+        assert.equal(await page.locator('#stage [data-skeleton="detail"]').count(), 0, '展开已加载的详情不该退回骨架');
+      } finally { releaseRefresh() }
       await page.locator('#stage [data-item-media="video"] > .video-js[data-probe="kept"]').waitFor({ state: 'attached' });
       assert.equal(await page.locator('.video-js').count(), 1, '展开之后多出一个播放器');
       assert.equal(await page.locator('#miniplayer').isHidden(), true, '展开之后小窗还露着');

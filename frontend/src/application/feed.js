@@ -6,7 +6,7 @@ import { javTitleHtml } from '../core/jav-title';
 import { COVER_FRONT_RATIO } from './../appearance/layout';
 import { catalogState } from './catalog.js';
 import { managedTaken, openManagedRoute, releaseManagedRoute, updateManagedRoute } from './../history/managed';
-import { noteHtml, stopAutoScroll, wireAutoScroll } from '../ui-kit';
+import { loadingDotsHtml, noteHtml, stopAutoScroll, wireAutoScroll } from '../ui-kit';
 import { preferencesState, wireDrag } from './preferences.js';
 import { pushEntityPage } from './entity.js';
 import { applicationEffects } from './effects';
@@ -14,7 +14,9 @@ export const feedState = { FEED_SKELETON_CARDS: undefined, feedNewSkeletonHtml: 
 
 export function feedNewCoverHtml(item){
   if(item.has_cover)return coverImage(item,'big');
-  if(!item.cover_url)return '<span class="nopic">无封面</span>';
+  if(!item.cover_url)return item.cover_fetching
+    ?`<span class="nopic" data-feed-cover-state="fetching">${loadingDotsHtml('抓取中')}</span>`
+    :'<span class="nopic" data-feed-cover-state="missing">无封面</span>';
   return coverImage({code:item.code},'big').replace(/ src="[^"]*"/,
     ` src="${esc(item.cover_url)}" referrerpolicy="no-referrer" data-panel-prior="1"`);
 }
@@ -48,7 +50,7 @@ export async function loadEntityShapes(){
   if(!effects.isActive)return feedState.entityShapes;
   if(data&&!data.error){
     feedState.entityShapes=new Map((data.entities||[])
-      .flatMap(entity=>entity.names.map(name=>[`${entity.kind}/${foldName(name)}`,entity.parts])));
+      .flatMap(entity=>[String(entity.id),...entity.names].map(name=>[`${entity.kind}/${foldName(name)}`,entity.parts])));
     if(typeof data.home?.feed==='boolean')catalogState.homeHasFeed=data.home.feed;
     if(isFeedNewPath(location.pathname))prepareHomeFeed($('#feedNew'));
   }
@@ -129,10 +131,10 @@ feedState.entityShapes = null;
 feedState.hasEntityPart = (kind,name,part)=>!!name&&!!feedState.entityShapes?.get(`${kind}/${foldName(name)}`)?.includes(part);
 feedState.feedNewSkeletonSection = ()=>`<section class="feednew">${feedState.feedNewSkeletonHtml()}</section>`;
 feedState.COSTAR_SKELETON_PEOPLE = 12;
-feedState.costarSkeletonFoot = ()=>`<div class="entityfoot"><div class="relatedpeople">${
-  '<span class="av avskeleton"><span class="ring"></span><span class="nm">&#8203;</span></span>'
+feedState.costarSkeletonFoot = ()=>`<div class="entityfoot" data-entity-foot><div class="relatedpeople" data-related-people>${
+  '<button type="button" disabled tabindex="-1"><span class="skeleton" data-hero-ring></span><span class="skeleton" data-hero-costar-name>&#8203;</span></button>'
     .repeat(feedState.COSTAR_SKELETON_PEOPLE)}</div></div>`;
-feedState.factsSkeleton = ()=>`<dl class="entityfacts">${
+feedState.factsSkeleton = ()=>`<dl class="entityfacts" data-entity-facts>${
   '<dt><span class="skeleton"></span></dt><dd><span class="skeleton"></span></dd>'.repeat(5)}</dl>`;
 feedState.feedRevision = 0;
 feedState.feedNewHelpers = {feedRowHtml,wireFeedRow:row=>wireFeedNewRow(row)};

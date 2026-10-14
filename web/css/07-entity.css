@@ -48,9 +48,6 @@
 /* 卡底那条带：横滚的同台艺人轨道，这一排是谁由 aria-label 说，不另写一枚小标签。 */
 .entityfoot{display:flex;align-items:center;gap:16px;min-width:0;padding:12px 20px;
   border-top:1px solid var(--line-soft);background:var(--overlay-5)}
-.entitytagbar{position:sticky;top:var(--topH);z-index:61;display:flex;align-items:center;
-  height:var(--filterH);margin:0 -16px;padding:9px 16px;background:transparent;
-  border-bottom:1px solid transparent}
 /* 资料卡下面的交集条与玻璃浮层是 `entity-filter` 岛。宿主和 React 根那一层都不生成盒子：
    浮层吸顶的范围是它父元素的盒子，只裹着它自己的父元素一格都走不动；两层让开，父元素就是
    `#index`。 */

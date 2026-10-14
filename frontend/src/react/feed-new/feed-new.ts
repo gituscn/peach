@@ -9,12 +9,13 @@ import { api } from '@peach/legacy/core';
 import { queryClient } from '../query';
 
 /** `/api/feeds/discoveries` 的回话：条目与最近一轮取封面断在连接上的部数。 */
-export interface FeedDiscoveries { items?: { id: number; has_cover?: boolean }[]; cover_network?: number }
+export interface FeedDiscoveries { items?: { id: number; has_cover?: boolean; cover_fetching?: boolean }[]; cover_network?: number }
 
 /** 新作那一行取回来的样子：条目（只用来判有没有）与壳拼好的整段 HTML。 */
 export interface FeedNew {
   items: { id: number }[];
   html: string;
+  fetching?: boolean;
 }
 
 /** 壳拼的整段 HTML：连不上图片主机时的 Note 与一排卡（`feedNewCardHtml`）。 */
@@ -51,13 +52,14 @@ export async function fetchFeedNew(entityId: number | null, rowHtml: FeedRowHtml
   const items = ok?.items || [];
   const html = rowHtml(ok);
   if (preload && items.length) await preloadImages(html, FEED_SKELETON_CARDS, FEED_COVER_WAIT);
-  return { items, html };
+  return { items, html, fetching: items.some(item => item.cover_fetching && !item.has_cover) };
 }
 
 export const feedNewOptions = (entityId: number | null, rowHtml: FeedRowHtml, preload = false) => ({
   queryKey: feedNewKey(entityId),
   queryFn: () => fetchFeedNew(entityId, rowHtml, preload),
   staleTime: Infinity,
+  refetchInterval: (query: { state: { data?: FeedNew } }) => query.state.data?.fetching ? 2000 : false,
 });
 
 /** 卡上那三颗键（想要、不想看、标为已看过）。都是标记，写失败了卡片照样换样子：这一行下次取数时
