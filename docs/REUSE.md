@@ -4,6 +4,8 @@
 
 关注封面代理复用来源登记的媒体主机白名单；第三方图片地址及重定向继续执行公网 DNS 校验。
 
+收藏弹层的导航复用设置页液态玻璃、`useViewGlide`、`attachOverlayScrollbar`、入场与退场关键帧及落影，桌面和手机检查实际计算样式。官方预告复用 amane `cc42cee6ecf290cf05af1caa347d2dc2d5aeffcd` 的 Prestige SKU→UUID 协议，通过官方返回的作品身份与公开 MP4 字段取得地址；读取复用既有来源传输、限制和媒体代理，无新增依赖。
+
 ## 上游应用功能
 
 amane `0.20.0 / cc42cee6ecf290cf05af1caa347d2dc2d5aeffcd`（GPL-3.0）提供实体收藏、

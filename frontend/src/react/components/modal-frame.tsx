@@ -30,7 +30,7 @@ export function ModalFrame({ isOpen, onOpenChange, width, label, children }: {
   const { isFocusVisible } = useFocusVisible();
   return (
     <ModalOverlay isOpen={isOpen} onOpenChange={onOpenChange} isDismissable
-      data-modal-motion="" data-motion-instant={isFocusVisible || undefined}
+      data-modal-motion="" data-modal-kind={width} data-motion-instant={isFocusVisible || undefined}
       className="fixed inset-0 z-dialog flex items-center justify-center bg-scrim p-4">
       <Modal data-modal-surface="" data-modal-width={width} className={`flex max-h-full w-full ${WIDTH[width]} flex-col overflow-hidden rounded-2-5xl border border-separator-border bg-background-full shadow-dropdown`}>
         {/* 调用方自己的正文滚动区收得下时这一层不滚；矮视口里连页头加按钮都放不下，就整块滚，

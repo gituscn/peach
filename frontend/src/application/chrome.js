@@ -226,7 +226,11 @@ if(/Chrome|Chromium|Edg\//.test(navigator.userAgent)){
     document.querySelectorAll('.board-filter-frame,.top>.ib,[data-sidebar-drawer],.reviewcontrols,.reviewgroupbar,[data-glass-pane]').forEach(attach);
   };
   preferencesState.syncGlassOptics=sync;
-  effects.mutation(sync).observe(document.querySelector('#main'),{childList:true,subtree:true});sync();
+  const panes='.board-filter-frame,.top>.ib,[data-sidebar-drawer],.reviewcontrols,.reviewgroupbar,[data-glass-pane]';
+  effects.mutation(records=>{
+    if(records.some(record=>[...record.addedNodes,...record.removedNodes].some(node=>
+      node instanceof Element&&(node.matches(panes)||node.querySelector(panes)))))sync();
+  }).observe(document.body,{childList:true,subtree:true});sync();
 }
 
 })();

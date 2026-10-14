@@ -1,5 +1,5 @@
-import { useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { spinnerHtml } from '@peach/legacy/ui';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { attachOverlayScrollbar, spinnerHtml } from '@peach/legacy/ui';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { errorMessage } from '../../api';
@@ -8,6 +8,7 @@ import { Note } from '../components/note';
 import { EmptyState } from '../components/empty-state';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { SettingsDialogClose } from '../components/settings-dialog-close';
+import { useViewGlide } from '../components/use-view-glide';
 import { busyProps } from '../settings/busy-props';
 import { favoriteHref, isFavorite, useShortcuts, useShortcutWrite, type Favorite } from './library-shortcuts';
 import './shortcuts.css';
@@ -61,6 +62,21 @@ function ShortcutContents({ currentHref, kind, close }: { currentHref?: () => st
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
   const id = useId();
+  const [narrow, setNarrow] = useState(() => matchMedia('(max-width: 760px)').matches);
+  useEffect(() => {
+    const media = matchMedia('(max-width: 760px)');
+    const changed = () => setNarrow(media.matches);
+    media.addEventListener('change', changed);
+    return () => media.removeEventListener('change', changed);
+  }, []);
+  const navigation = useRef<HTMLDivElement>(null);
+  const pane = useRef<HTMLSpanElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  const scroll = useRef<(() => void) | null>(null);
+  const glide = useViewGlide(pane, navigation, '[role="tab"][aria-selected="true"]', scope, { axis: 'y' });
+  useLayoutEffect(() => { if (content.current) scroll.current = attachOverlayScrollbar(content.current) || null }, []);
+  useLayoutEffect(() => { if (content.current) content.current.scrollTop = 0 }, [scope]);
+  useLayoutEffect(() => { scroll.current?.() });
   const label = SCOPES.find(([value]) => value === scope)?.[1] || '全部';
   const selectWithKeys = (event: KeyboardEvent<HTMLDivElement>) => {
     const tabs = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
@@ -89,13 +105,15 @@ function ShortcutContents({ currentHref, kind, close }: { currentHref?: () => st
       <h2 className="text-title-2-semibold text-text-primary">{label}</h2>
       <SettingsDialogClose label="关闭我的收藏" onPress={close} />
     </div>
-      <aside data-shortcuts-sidebar="">
-      <div data-shortcuts-categories="" role="tablist" aria-label="收藏类型" onKeyDown={selectWithKeys}>
+      <aside data-shortcuts-sidebar="" data-settings-nav="" data-glass-pane={narrow ? undefined : ''}>
+      <div ref={navigation} data-shortcuts-categories="" data-glass-pane={narrow ? '' : undefined} role="tablist" aria-label="收藏类型" onKeyDown={selectWithKeys} onPointerLeave={glide.leave}>
+        <span ref={pane} data-view-glide="" data-shortcuts-glide="" aria-hidden="true" hidden />
+        <p data-shortcuts-caption="" role="presentation">我的收藏</p>
         {SCOPES.map(([value, label]) => {
           const Glyph = GLYPHS[value as keyof typeof GLYPHS] || Star;
           const count = value === 'filters' ? data?.filters.length || 0 : (data?.favorites || []).filter(row => value === 'all' || row.kind === value).length;
           return <button key={value} type="button" role="tab" id={`${id}-${value}`} aria-controls={`${id}-content`}
-            aria-label={label} aria-selected={scope === value} tabIndex={scope === value ? 0 : -1} onClick={() => setScope(value)}>
+            aria-label={label} aria-selected={scope === value} tabIndex={scope === value ? 0 : -1} onPointerEnter={glide.hover} onClick={() => setScope(value)}>
             <Glyph aria-hidden className="size-5" /><span>{label}</span><span data-shortcuts-count="">{count}</span>
           </button>;
         })}
@@ -105,7 +123,7 @@ function ShortcutContents({ currentHref, kind, close }: { currentHref?: () => st
         <a href="/watch-later" onClick={close}><Bookmark aria-hidden />稍后看</a>
       </nav>
       </aside>
-      <div data-shortcuts-content="" role="tabpanel" id={`${id}-content`} aria-labelledby={`${id}-${scope}`} tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain">
+      <div ref={content} data-shortcuts-content="" role="tabpanel" id={`${id}-content`} aria-labelledby={`${id}-${scope}`} tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain">
     {query.isPending ? <div aria-busy="true" data-skeleton="" className="h-12 animate-pulse rounded-lg bg-background-secondary-default" /> : null}
     {query.isError ? <Note tone="error" action={<Button variant="secondary" onClick={() => void query.refetch()}>重试</Button>}>{errorMessage(query.error)}</Note> : null}
     {write.isError ? <Note tone="error">{errorMessage(write.error)}</Note> : null}

@@ -45,12 +45,43 @@ describe('我的收藏弹层', () => {
         await route.fulfill({ json: { favorites, filters } });
       });
       try {
+        await page.locator('#settingsBtn').evaluate((button: HTMLElement) => button.click());
+        await page.locator('#settingsPanel:not([hidden])').waitFor();
+        const setting = await page.evaluate(() => {
+          const card = document.querySelector('[data-settings-card]')!, nav = card.querySelector('[data-settings-nav]')!, heading = card.querySelector('h2')!;
+          const surface = getComputedStyle(card), glass = getComputedStyle(nav), title = getComputedStyle(heading);
+          return { width: card.getBoundingClientRect().width, height: card.getBoundingClientRect().height,
+            radius: surface.borderRadius, background: surface.backgroundColor, shadow: surface.boxShadow,
+            image: glass.backgroundImage, backdrop: glass.backdropFilter.replace(/#peach-optic-\d+/g, '#peach-optic'), drift: glass.animationName,
+            font: title.fontSize, weight: title.fontWeight, line: title.lineHeight };
+        });
+        await page.locator('#settingsClose').click();
+        await page.locator('#settingsPanel').waitFor({ state: 'hidden' });
         await page.getByRole('button', { name: '我的收藏', exact: true }).click();
         const dialog = page.getByRole('dialog', { name: '我的收藏', exact: true });
+        await page.waitForFunction(() => {
+          const pane = document.querySelector<HTMLElement>('[data-shortcuts-glide]');
+          return pane && !pane.hidden && pane.getBoundingClientRect().width > 0
+            && !!document.querySelector('[data-shortcuts-panel] [data-glass-pane][data-optic-glass="true"]');
+        });
+        const collection = await dialog.evaluate((node, mobile) => {
+          const card = node.closest('[data-modal-surface]')!, nav = node.querySelector(mobile ? '[data-shortcuts-categories]' : '[data-shortcuts-sidebar]')!, heading = node.querySelector('h2')!;
+          const surface = getComputedStyle(card), glass = getComputedStyle(nav), title = getComputedStyle(heading);
+          return { width: card.getBoundingClientRect().width, height: card.getBoundingClientRect().height,
+            radius: surface.borderRadius, background: surface.backgroundColor, shadow: surface.boxShadow,
+            image: glass.backgroundImage, backdrop: glass.backdropFilter.replace(/#peach-optic-\d+/g, '#peach-optic'), drift: glass.animationName,
+            font: title.fontSize, weight: title.fontWeight, line: title.lineHeight };
+        }, viewport.mobile);
+        assert.deepEqual(collection, setting, '收藏弹层与设置共用尺寸、材质、落影与标题排版');
         assert.equal(await dialog.getByRole('link', { name: '已标记', exact: true }).getAttribute('href'), '/flagged');
         assert.equal(await dialog.getByRole('link', { name: '稍后看', exact: true }).getAttribute('href'), '/watch-later');
         assert.equal(await dialog.getByRole('textbox', { name: '筛选名称' }).count(), 0);
         await dialog.getByRole('tab', { name: '片商与厂牌', exact: true }).click();
+        await page.waitForFunction(() => {
+          const pane = document.querySelector('[data-shortcuts-glide]')!.getBoundingClientRect();
+          const tab = document.querySelector('[data-shortcuts-categories] [aria-selected="true"]')!.getBoundingClientRect();
+          return Math.abs(pane.left - tab.left) < 1 && Math.abs(pane.top - tab.top) < 1 && Math.abs(pane.width - tab.width) < 1 && Math.abs(pane.height - tab.height) < 1;
+        });
         await dialog.getByRole('link', { name: favorites[0].name, exact: true }).waitFor();
         await dialog.locator('[data-shortcuts-avatar] img').waitFor();
         await page.waitForFunction(() => !!document.querySelector<HTMLImageElement>('[data-shortcuts-avatar] img')?.naturalWidth);

@@ -765,9 +765,10 @@ body .peach-react :is([data-glass-pill]:hover:not([aria-busy]),:is([data-junk-vi
    主题切换拍快照的那一帧不采样背后。 */
 body [data-settings-nav]{backdrop-filter:var(--glass-optic,blur(22px)) saturate(160%) var(--glass-lume)}
 body [data-settings-nav]>[data-settings-glide]{backdrop-filter:var(--glass-pick)}
-@media(prefers-reduced-transparency:reduce),(prefers-contrast:more){body [data-settings-nav]{backdrop-filter:none}}
-html.board-high-contrast body [data-settings-nav]{backdrop-filter:none}
-html[data-theme-snapshot] body :is([data-settings-nav],[data-settings-glide]){backdrop-filter:none!important}
+@media(max-width:760px){body [data-shortcuts-categories]{backdrop-filter:var(--glass-optic,blur(22px)) saturate(160%) var(--glass-lume)}}
+@media(prefers-reduced-transparency:reduce),(prefers-contrast:more){body :is([data-settings-nav],[data-shortcuts-categories]){backdrop-filter:none}}
+html.board-high-contrast body :is([data-settings-nav],[data-shortcuts-categories]){backdrop-filter:none}
+html[data-theme-snapshot] body :is([data-settings-nav],[data-settings-glide],[data-shortcuts-categories]){backdrop-filter:none!important}
 html.board-high-contrast :is(.card .badge,[data-glass-pane]){background:var(--ground);backdrop-filter:none;-webkit-backdrop-filter:none;animation:none}
 @media(prefers-reduced-transparency:reduce){body :is(.card .badge,[data-glass-pane]){background:var(--ground);backdrop-filter:none;animation:none}}
 
