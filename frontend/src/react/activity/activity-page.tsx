@@ -72,36 +72,35 @@ function FollowupList({ rows }: { rows: TaskRunPayload[] }) {
   );
 }
 
-/** 一轮任务一张卡。失败时整张卡的框线换成 danger 色，不给结束原因那行字上色——
- *  一屏十几行里逐行读红字，比看一眼哪张卡的框是红的慢得多。 */
+/** 运行任务保留独立卡面，完成记录通过分隔线和状态徽章区分。 */
 function RunCard(
-  { run, meta, children, footer, followups }:
+  { run, meta, children, footer, followups, compact = false }:
   { run: TaskRunPayload; meta: string; children?: ReactNode; footer?: string;
-    followups?: TaskRunPayload[] },
+    followups?: TaskRunPayload[]; compact?: boolean },
 ) {
   return (
     <li data-status={run.status} data-task-key={run.task_key} data-run-id={run.id}
-      className={cardClass({
+      className={compact ? 'flex flex-col border-b border-separator-border last:border-b-0' : cardClass({
         padding: 'none',
         bordered: 'line',
         className: run.status === 'failed' ? 'flex flex-col border-border-error-default' : 'flex flex-col',
       })}>
-      <div className="flex flex-col gap-1.5 px-5 pt-5 pb-4">
+      <div className={compact ? 'flex flex-col gap-1.5 py-3' : 'flex flex-col gap-1.5 px-5 pt-5 pb-4'}>
         <div className="flex flex-wrap items-center gap-2">
-          <strong className="min-w-0 break-words text-title-1-medium text-text-primary">{run.task_label}</strong>
+          <strong className={`min-w-0 break-words text-text-primary ${compact ? 'text-body-medium' : 'text-title-1-medium'}`}>{run.task_label}</strong>
           <StatusBadge status={run.status} />
         </div>
         <p className="text-caption-1-regular text-text-secondary">{meta}</p>
         {children}
       </div>
-      {followups?.length ? <div className="border-t border-separator-border px-5 py-2.5">
+      {followups?.length ? <div className={compact ? 'pb-3' : 'border-t border-separator-border px-5 py-2.5'}>
         <Disclosure summary={`任务明细 · ${followups.length} 项`}
           defaultOpen={followups.some((row) => isActive(row) || row.status === 'failed')}>
           <FollowupList rows={followups} />
         </Disclosure>
       </div> : null}
       {footer
-        ? <div className="flex min-h-14 flex-col justify-center rounded-b-2xl border-t border-separator-border bg-card-footer px-5 py-3">
+        ? <div className={compact ? 'pb-3' : 'flex min-h-14 flex-col justify-center rounded-b-2xl border-t border-separator-border bg-card-footer px-5 py-3'}>
             <ErrorExcerpt text={footer} className="text-caption-1-regular text-text-secondary" />
           </div>
         : null}
@@ -131,7 +130,7 @@ function RunningRun({ run, followups }: { run: TaskRunPayload; followups?: TaskR
 /** 跑完的一轮。`runs` 多于一条时是折叠起来的几轮例行任务：时间写成从最早到最新那一段，
  *  摘要取最新那一轮——例行轮次的摘要本来就一样，逐条列出来只是同一行抄 N 遍。 */
 function SettledRun(
-  { run, followups, runs }: { run: TaskRunPayload; followups?: TaskRunPayload[]; runs?: TaskRunPayload[] },
+  { run, followups, runs, compact = true }: { run: TaskRunPayload; followups?: TaskRunPayload[]; runs?: TaskRunPayload[]; compact?: boolean },
 ) {
   const summary = summaryText(run.result_summary);
   const elapsed = elapsedText(run.elapsed_seconds);
@@ -142,7 +141,7 @@ function SettledRun(
     : [TRIGGER_LABELS[run.trigger] || run.trigger, momentText(run.finished_at),
        elapsed && `用时 ${elapsed}`]).filter(Boolean).join(' · ');
   return (
-    <RunCard run={run} meta={meta} footer={run.error} followups={followups}>
+    <RunCard run={run} meta={meta} footer={run.error} followups={followups} compact={compact}>
       {summary ? <p className="text-caption-1-regular text-text-secondary wrap-anywhere">{summary}</p> : null}
     </RunCard>
   );
@@ -160,7 +159,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 function RunList({ live = false, children }: { live?: boolean; children: ReactNode }) {
   return (
-    <ul aria-live={live ? 'polite' : undefined} className="flex min-w-0 flex-col gap-3">{children}</ul>
+    <ul aria-live={live ? 'polite' : undefined} className={`flex min-w-0 flex-col ${live ? 'gap-3' : ''}`}>{children}</ul>
   );
 }
 
@@ -236,7 +235,7 @@ export function ActivityPage() {
                     {running.map((run) => (
                       <RunningRun key={run.id} run={run} followups={byParent.get(run.id)} />))}
                     {working.map((run) => (
-                      <SettledRun key={run.id} run={run} followups={byParent.get(run.id)} />))}
+                      <SettledRun key={run.id} run={run} followups={byParent.get(run.id)} compact={false} />))}
                   </RunList>
                 : <Note tone="neutral">没有任务在跑。</Note>}
             </Section>

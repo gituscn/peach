@@ -12,6 +12,9 @@ import { busyProps, useAction } from '../settings/use-action';
 import { DIAGNOSTICS_KEY, fetchDiagnostics, type DiagnosticCheck, type LibraryGroup } from './diagnostics';
 
 const STATUS: Record<string, string> = { ok: '正常', warning: '需检查', failed: '需处理', unknown: '未取得', disabled: '未配置' };
+const TARGET_LABELS: Record<string, string> = {
+  '/settings/network': '打开网络与访问', '/settings/maintenance': '打开维护与更新', '/tasks': '查看任务',
+};
 const SECTIONS = [
   ['媒体库与挂载', ['media_mounts', 'data_root']],
   ['数据库与迁移', ['database', 'schema']],
@@ -38,7 +41,8 @@ function Check({ name, check, navigate, configure }: Pick<DiagnosticsProps, 'nav
     <p className="text-body-regular text-text-primary break-words">{check.reason}</p>
     {check.action ? <p className="text-body-2-regular text-text-secondary">{check.action}</p> : null}
     {check.target ? <div><Button size="small" variant="secondary" onClick={() => check.target === '/settings/library'
-      ? configure(section) : navigate(check.target!)}>{check.target === '/settings/library' ? `打开${section}` : '查看任务'}</Button></div> : null}
+      ? configure(section) : navigate(check.target!)}>{check.target === '/settings/library'
+        ? `打开${section}` : TARGET_LABELS[check.target] ?? '打开相关页面'}</Button></div> : null}
   </div>;
 }
 
@@ -77,16 +81,29 @@ export function DiagnosticsPage(props: DiagnosticsProps) {
     action={<Button variant="secondary" onClick={refresh} {...busyProps(action.busy === 'refresh')}>重新检查</Button>}>
     {query.error ? errorMessage(query.error) : '诊断报告未取得。'}
   </Note></div>;
+  const attention = Object.entries(data.checks).filter(([, check]) => ['warning', 'failed', 'unknown'].includes(check.status));
+  const other = Object.entries(data.checks).filter(([, check]) => !['warning', 'failed', 'unknown'].includes(check.status));
   return <div className="ui-configpage flex flex-col gap-6">
     <div className="flex justify-end"><Button variant="secondary" onClick={refresh} {...busyProps(action.busy === 'refresh')}>重新检查</Button></div>
     {refreshError ? <Note tone="error">{refreshError}</Note> : null}
+    {attention.length ? <Section title={`需要关注 · ${attention.length} 项`}>
+      {attention.map(([key, check]) => <Check key={key} name={key} check={check} {...props} />)}
+    </Section> : null}
     <Section title="库健康"><Stack>
       {data.library.issue_at ? <p className="text-body-2-regular text-text-secondary">处理记录 · {moment(data.library.issue_at)}</p> : null}
       {Object.entries(data.library.groups).map(([key, group]) => <HealthList key={key} group={group} {...props} />)}
     </Stack></Section>
-    {SECTIONS.map(([title, keys]) => <Section key={title} title={title}>
-      {keys.map(key => data.checks[key] ? <Check key={key} name={key} check={data.checks[key]!} {...props} /> : null)}
-    </Section>)}
+    {other.length ? <Section title="系统检查"><Stack>
+      <Disclosure summary={`其他检查 · ${other.length} 项`}>
+        {SECTIONS.map(([title, keys]) => {
+          const rows = other.filter(([key]) => keys.some(name => name === key));
+          return rows.length ? <div key={title}>
+            <p className="text-body-medium text-text-secondary">{title}</p>
+            {rows.map(([key, check]) => <Check key={key} name={key} check={check} {...props} />)}
+          </div> : null;
+        })}
+      </Disclosure>
+    </Stack></Section> : null}
     <Section title="来源会话"><Stack>
       {data.sources.map(source => <div key={source.source} className="flex flex-col gap-2">
         <h3 className="text-body-medium text-text-primary">{source.label} · {STATUS[source.status] ?? '未取得'}</h3>

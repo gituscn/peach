@@ -10,7 +10,7 @@ const lines = () => `${line('80%')}${line('48%')}`;
 const repeat = (html: string, count: number) => html.repeat(count);
 /* 关注管理整页归 React，骨架整块画在 `.peach-react` 里，容器与按键都取 React 那侧渲染出的同一串
    类名（`react/follow-manage/`、`react/components/` 与 `island-skeleton.ts`）：页面那一列、读数带、
-   分段控件、关注列表那张填充卡、创作者卡、来源行和表格外框。只有等数据的读数画占位条。
+   分段控件、来源工具栏、创作者分组、来源行和表格外框。只有等数据的读数画占位条。
    骨架整块 `inert`，焦点和点击都进不来；要等数据才能执行的键（检查、移除、全选、收起）
    另标原生 `disabled` 与 `data-skeleton-action`，外观是全站骨架共用的那副禁用面，
    视图切换、排序这类偏好控件本地就有答案，保持接管后的长相。 */
@@ -18,7 +18,7 @@ const WAITING = 'disabled data-skeleton-action';
 const text = (width: string) => `<span class="skeleton skeleton-text" style="width:${width}"></span>`;
 const block = (width: number, height: number, round = false) =>
   `<span class="skeleton" style="width:${width}px;height:${height}px;flex:none${round ? ';border-radius:50%' : ''}"></span>`;
-const STAT = 'min-w-0 bg-background-secondary-default rounded-2xl shadow-card flex flex-col gap-3 px-6 py-5 max-sm:gap-2 max-sm:p-4';
+const STAT = 'flex min-w-0 flex-col gap-2 py-2';
 const followReadings = () => `<div class="inline-grid w-full grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6">${['关注创作者', '启用来源', '检查失败', '未看更新', 'JAV 订阅', '未看新作'].map(term => `<div class="${STAT}"><span class="text-body-medium text-text-secondary">${term}</span><b class="text-title-1-medium tabular-nums text-text-primary">${text('3em')}</b></div>`).join('')}</div>`;
 /** 页签与 React `follow-manage-page.tsx` 的 `TABS` 同名同序；选中的是地址栏 `?tab=` 那一枚，认不出时是第一枚。 */
 const FOLLOW_TABS = [['list', '关注列表'], ['add', '添加关注'], ['feeds', 'JAV 订阅源']] as const;
@@ -33,14 +33,14 @@ const followCheck = (label = '') => `<span class="group inline-flex items-center
 interface FollowToolbar { table: boolean; sort: SortKey; dir: SortDir }
 const followToolbar = ({ table, sort, dir }: FollowToolbar) => {
   const name = SORT_OPTIONS.find(([key]) => key === sort)![1];
-  return `<div class="flex flex-wrap items-center gap-2 ui-follow-skeleton-toolbar"><span class="contents max-sm:flex max-sm:min-w-0 max-sm:flex-1 max-sm:flex-col"><h3 class="mr-auto text-title-2-medium text-text-primary">关注列表</h3><span class="text-body-2-regular text-text-secondary">${text('132px')}</span></span>${islandButton({ glyph: 'refresh-cw', label: '检查全部', compact: true, attrs: WAITING })}<span data-follow-toolbar-controls class="contents max-sm:flex max-sm:w-full max-sm:items-center max-sm:gap-2"><span data-button-group role="group">${islandButton({ variant: 'ghost', glyph: 'layout-grid', attrs: `aria-pressed="${!table}"` })}${islandButton({ variant: 'ghost', glyph: 'table', attrs: `aria-pressed="${table}"` })}</span>${islandSelect(name)}${islandButton({ variant: 'secondary', glyph: dir === 'asc' ? 'arrow-up' : 'arrow-down' })}${table ? '' : islandButton({ variant: 'secondary', glyph: 'chevron-up', label: '全部收起', compact: true, attrs: WAITING })}</span></div>`;
+  return `<div class="flex flex-wrap items-center gap-2 ui-follow-skeleton-toolbar"><span class="contents max-sm:flex max-sm:min-w-0 max-sm:flex-1 max-sm:flex-col"><h3 class="mr-auto text-title-2-medium text-text-primary">来源</h3><span class="text-body-2-regular text-text-secondary">${text('132px')}</span></span>${islandButton({ glyph: 'refresh-cw', label: '检查全部', compact: true, attrs: WAITING })}<span data-follow-toolbar-controls class="contents max-sm:flex max-sm:w-full max-sm:items-center max-sm:gap-2"><span data-button-group role="group">${islandButton({ variant: 'ghost', glyph: 'layout-grid', attrs: `aria-pressed="${!table}"` })}${islandButton({ variant: 'ghost', glyph: 'table', attrs: `aria-pressed="${table}"` })}</span>${islandSelect(name)}${islandButton({ variant: 'secondary', glyph: dir === 'asc' ? 'arrow-up' : 'arrow-down' })}${table ? '' : islandButton({ variant: 'secondary', glyph: 'chevron-up', label: '全部收起', compact: true, attrs: WAITING })}</span></div>`;
 };
 /** 行尾那对动作键：检查这一条的更新、移除这一条，与 React `SourceRow` 同为小号次级纯图标键。 */
 const followRowActions = () => `<span class="flex shrink-0 items-center gap-1">${islandButton({ variant: 'secondary', size: 'small', glyph: 'refresh-cw', attrs: WAITING })}${islandButton({ variant: 'secondary', size: 'small', glyph: 'trash', attrs: WAITING })}</span>`;
 /** 一条来源：勾选、名字、站点图标、状态徽章、上次检查、动作，与 React `SourceRow` 同一串类名。 */
 const followRow = () => `<div class="flex min-h-16 flex-wrap items-center gap-3 px-2 py-3 max-sm:gap-x-2 follow-skeleton-source">${followCheck()}<span class="flex min-w-0 grow basis-0 flex-col gap-0.5"><span class="text-body-medium">${text('8em')}</span></span><span class="flex shrink-0 items-center gap-1.5">${block(14, 14)}</span>${block(48, 24)}<span data-follow-source-controls class="contents max-sm:flex max-sm:w-full max-sm:flex-wrap max-sm:items-center max-sm:gap-1.5"><span class="shrink-0 text-body-2-regular whitespace-nowrap text-text-secondary max-sm:mr-auto max-sm:text-caption-1-regular">${text('113px')}</span>${followRowActions()}</span></div>`;
-/** 一位创作者一张 raised 卡：头行是头像、名字、检查、站点图标、全选、收起，底下是来源行。 */
-const followAuthor = (rows: number) => `<section class="min-w-0 bg-background-primary-default rounded-2xl shadow-card flex flex-col overflow-hidden p-2 follow-skeleton-author"><div class="flex flex-wrap items-center gap-3 px-2 py-2.5" data-follow-author-header data-open>${block(32, 32, true)}<b class="min-w-0 grow text-body-medium wrap-anywhere text-text-primary max-sm:basis-0">${text('92px')}</b>${islandButton({ variant: 'secondary', size: 'small', glyph: 'refresh-cw', attrs: WAITING })}<span data-follow-author-controls class="contents max-sm:flex max-sm:w-full max-sm:items-center max-sm:gap-2"><span class="flex shrink-0 items-center gap-1 max-sm:mr-auto">${block(14, 14)}${block(14, 14)}</span>${islandButton({ variant: 'secondary', size: 'small', glyph: 'check-check', label: '全选', attrs: WAITING })}${islandButton({ variant: 'secondary', size: 'small', glyph: 'chevron-up', label: '收起', attrs: WAITING })}</span></div><div data-source-divider>${repeat(followRow(), rows)}</div></section>`;
+/** 创作者分组的标题行与来源行使用单向分隔线。 */
+const followAuthor = (rows: number) => `<section class="flex min-w-0 flex-col border-t border-separator-border py-2 follow-skeleton-author"><div class="flex flex-wrap items-center gap-3 px-2 py-2.5" data-follow-author-header data-open>${block(32, 32, true)}<b class="min-w-0 grow text-body-medium wrap-anywhere text-text-primary max-sm:basis-0">${text('92px')}</b>${islandButton({ variant: 'secondary', size: 'small', glyph: 'refresh-cw', attrs: WAITING })}<span data-follow-author-controls class="contents max-sm:flex max-sm:w-full max-sm:items-center max-sm:gap-2"><span class="flex shrink-0 items-center gap-1 max-sm:mr-auto">${block(14, 14)}${block(14, 14)}</span>${islandButton({ variant: 'secondary', size: 'small', glyph: 'check-check', label: '全选', attrs: WAITING })}${islandButton({ variant: 'secondary', size: 'small', glyph: 'chevron-up', label: '收起', attrs: WAITING })}</span></div><div data-source-divider>${repeat(followRow(), rows)}</div></section>`;
 /** 表格骨架画多少行由每页条数决定，写死一个数会在别的页大小上多留或少留一屏。
  *  偏好存在旧层那份 `peach.settings.v1` 里，直接读它：骨架跑在 island 挂载之前，
  *  这时候页面自己的状态还不存在。 */
@@ -77,7 +77,7 @@ const followList = (options: FollowSkeletonOptions) => {
   const content = table
     ? followTable(size, order)
     : `${followCheck('全选本页')}<div class="flex flex-col gap-3">${followAuthor(3)}${followAuthor(4)}${followAuthor(3)}</div>`;
-  return `<div class="peach-react"><div class="mx-auto flex w-full max-w-board flex-col gap-8">${followReadings()}<div class="flex flex-col gap-6">${followTabs(tab)}<div class="flex flex-col gap-4"><div class="min-w-0 bg-background-secondary-default rounded-2xl shadow-card flex flex-col gap-4 px-6 py-5 max-sm:px-4 ui-follow-skeleton-surface" data-layout="${table ? 'table' : 'default'}">${followToolbar({ table, ...order })}${content}${followPager(table, size)}</div></div></div></div></div>`;
+  return `<div class="peach-react"><div class="mx-auto flex w-full max-w-board flex-col gap-8">${followReadings()}<div class="flex flex-col gap-6">${followTabs(tab)}<div class="flex flex-col gap-4"><div class="flex min-w-0 flex-col gap-4 ui-follow-skeleton-surface" data-layout="${table ? 'table' : 'default'}">${followToolbar({ table, ...order })}${content}${followPager(table, size)}</div></div></div></div></div>`;
 };
 
 /** 详情骨架外层 `[data-skeleton="detail"]` 里面那一格：舞台岛自己画外层，里面照这一份写。格子与详情栏
@@ -101,7 +101,7 @@ export function boardPageSkeleton(
   } else if (path === '/settings/library') {
     body = configurationSkeleton();
   } else if (path === '/tasks') {
-    body = `<div class="ui-activitypage">${['正在进行', '被挡下的', '最近完成'].map(title => `<section class="activitysection"><h3 class="geist-fieldset-title">${title}</h3><div class="ui-activity-runs"><article class="cleanupfieldset activity-run"><div class="geist-fieldset-content ui-skeleton-lines">${line('35%')}${lines()}</div></article></div></section>`).join('')}</div>`;
+    body = `<div class="peach-react"><div class="mx-auto flex w-full max-w-board flex-col gap-8">${['正在进行', '被挡下的', '最近完成'].map((title, at) => `<section class="flex min-w-0 flex-col gap-3"><h3 class="text-title-2-semibold text-text-primary">${title}</h3><div class="${at === 0 ? 'rounded-2xl border border-separator-border bg-background-secondary-default px-5 pt-5 pb-4' : 'border-b border-separator-border py-3'} flex flex-col gap-1.5">${line('35%')}${lines()}</div></section>`).join('')}</div></div>`;
   } else if (path === '/duplicates') {
     body = duplicatesSkeleton();
   } else if (path === '/quality-goals') {

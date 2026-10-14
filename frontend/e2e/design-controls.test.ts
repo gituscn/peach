@@ -129,17 +129,25 @@ describe('设计决定：控件、状态与首页顶部', () => {
     }
   });
 
-  it('跑失败的那一轮整张卡框线换成 danger 色，结束原因还是正文色', { timeout: 60_000 }, async () => {
+  it('完成记录使用紧凑列表与单向分隔，结束原因保留正文色', { timeout: 60_000 }, async () => {
     const opened = await openActivity(browser, [
       settledRun(1, 'failed', '扫描与采集'), settledRun(2, 'succeeded', '追更检查'),
     ]);
     try {
       const danger = await tokenColor(opened.page, '.peach-react', '--color-border-error-default');
-      const border = (status: string) => opened.page.locator(`li[data-status="${status}"]`)
-        .evaluate((element) => getComputedStyle(element).borderTopColor);
-      assert.equal(await border('failed'), danger, '失败卡的框线不是 danger 色');
-      assert.notEqual(await border('succeeded'), danger, '没失败的卡也用了 danger 框线');
-      // 一屏十几行里逐行读红字比看一眼哪张卡的框是红的慢：原因那行留正文色。
+      const rows = await opened.page.locator('li[data-run-id]').evaluateAll(elements => elements.map(element => {
+        const style = getComputedStyle(element);
+        return { sides: [style.borderTopWidth, style.borderLeftWidth, style.borderRightWidth],
+          bottom: style.borderBottomWidth, surface: style.backgroundColor,
+          title: getComputedStyle(element.querySelector('strong')!).fontSize };
+      }));
+      for (const row of rows) {
+        assert.deepEqual(row.sides, ['0px', '0px', '0px'], '完成记录出现闭合卡片边框');
+        assert.equal(row.surface, 'rgba(0, 0, 0, 0)', '完成记录出现重复卡面');
+        assert.equal(row.title, '14px', '完成记录标题没有使用列表字号');
+      }
+      assert.deepEqual(rows.map(row => row.bottom), ['1px', '0px'], '行间分隔应只出现在记录之间');
+      // 状态由徽章区分，原因保留可阅读的正文色。
       const reason = await opened.page.locator('li[data-status="failed"] p').last()
         .evaluate((element) => getComputedStyle(element).color);
       assert.notEqual(reason, danger, '结束原因那行字被涂成了 danger 色');
