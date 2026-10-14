@@ -226,8 +226,8 @@
 /* 左栏分块：一个小标题带一组条目。第一块贴着栏顶，后面每块自己往上让 12px 断开。 */
 [data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] [data-settings-nav-caption]{margin:12px 0 0;font-size:13px;color:var(--muted);padding:4px 8px 8px}
 [data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] [data-settings-nav-caption]:first-child{margin-top:0}
-[data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] button{flex:0 0 auto;justify-content:flex-start;padding:8px;border:0;border-radius:10px;font-size:14px;min-height:36px;font-weight:500}
-[data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] button{display:flex;align-items:center;gap:8px}
+:is([data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] button,.peach-react [data-shortcuts-footer] a){flex:0 0 auto;justify-content:flex-start;padding:8px;border:0;border-radius:10px;font-size:14px;min-height:36px;font-weight:500}
+:is([data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] button,.peach-react [data-shortcuts-footer] a){display:flex;align-items:center;gap:8px}
 [data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] button svg{width:20px;height:20px;fill:currentColor;stroke:none;flex:none}
 /* 这一列自己不铺底，当前那一条的填充由 `[data-settings-glide]` 那块滑过去的玻璃提供——跟筛选条上
    四枚视图、左侧抽屉那一列是同一套做法。两边都铺的话，静止态就是一块不透明的
@@ -235,12 +235,12 @@
    文字色走 `--glass-text`：这一列站在玻璃上，跟着卡片的 `--ink` 走会在玻璃的提亮
    之后偏灰。按钮抬到玻璃之上，玻璃自己是 `z-index:0`。 */
 [data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav]>:is(button,[data-settings-nav-caption]){position:relative;z-index:1}
-[data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] button{color:color-mix(in srgb,var(--glass-text) 65%,transparent)}
+:is([data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] button,.peach-react [data-shortcuts-footer] a){color:color-mix(in srgb,var(--glass-text) 65%,transparent)}
 [data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] button[aria-selected=true]{background:none;box-shadow:none;color:var(--glass-text)}
-[data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] button:hover{color:var(--glass-text)}
+:is([data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] button,.peach-react [data-shortcuts-footer] a):hover{color:var(--glass-text)}
 /* 这块玻璃扣在一条 10px 圆角的按钮上，跟着它走；下面那条通用形状里的 8px 是筛选条上那排
    药丸的圆角。 */
-[data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav]>[data-settings-glide]{border-radius:10px}
+:is([data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav]>[data-settings-glide],.peach-react [data-shortcuts-categories]>[data-shortcuts-glide]){border-radius:10px}
 /* 顶边那道高光不要：它是给浮在页面上的玻璃打边用的，而这一栏嵌在卡片里、上边贴着卡片
    自己的圆角，那道白线横在「设置」上面，读起来像卡片被切成了上下两截。其余三面的内描边
    和落影照旧。 */
@@ -283,7 +283,7 @@ html[data-theme-snapshot] [data-settings-panel] :is([data-settings-glide],[data-
    这里只管形状和材质。`left:0` 不能省：只写 `top` 的话水平方向回落到静态位置，再叠上按
    `offsetLeft` 算的位移，整块会右移一个内边距。形变走 `scale` 与 `translate` 两个独立属性，
    两段动画都交给合成线程；描边和圆角跟着缩放抻开一瞬，是要的那种「被拽着走」。 */
-[data-settings-panel] [data-settings-nav]>[data-settings-glide]{position:absolute;left:0;top:0;z-index:0;pointer-events:none;border-radius:8px;will-change:translate,scale;background:linear-gradient(180deg,var(--glass-sheen),transparent 62%),var(--glass-pick-fill);box-shadow:inset 0 0 0 1px var(--glass-rim),var(--glass-pick-shadow)}
+:is([data-settings-panel] [data-settings-nav]>[data-settings-glide],.peach-react [data-shortcuts-categories]>[data-shortcuts-glide]){position:absolute;left:0;top:0;z-index:0;pointer-events:none;border-radius:8px;will-change:translate,scale;background:linear-gradient(180deg,var(--glass-sheen),transparent 62%),var(--glass-pick-fill);box-shadow:inset 0 0 0 1px var(--glass-rim),var(--glass-pick-shadow)}
 [data-settings-panel] [data-settings-nav]>[data-settings-glide][hidden]{display:none}
 @supports not (backdrop-filter:blur(1px)){[data-settings-panel] [data-settings-card][data-settings-card][data-settings-card]>[data-settings-nav]{background:var(--ground);animation:none}}
 @media (prefers-reduced-transparency:reduce),(prefers-contrast:more){[data-settings-panel] [data-settings-card][data-settings-card][data-settings-card]>[data-settings-nav]{background:var(--ground);animation:none}}
@@ -408,7 +408,7 @@ html[class~=board-high-contrast] [data-settings-panel] [data-settings-card][data
 /* ── 分区切换与开合 ──
  * 分区切换靠 `hidden`：分组上写了 `display`，这一条要压过它们。 */
 [data-settings-panel] [data-setting-group][hidden]{display:none!important}
-[data-settings-panel] [data-settings-service]{position:relative;z-index:1;margin-top:auto;padding-top:16px;border-top:1px solid var(--line-soft)}
+:is([data-settings-panel] [data-settings-service],.peach-react [data-shortcuts-footer]){position:relative;z-index:1;margin-top:auto;padding-top:16px;border-top:1px solid var(--line-soft)}
 [data-settings-panel] [data-settings-service] button{width:100%}
 [data-settings-panel] [data-settings-service] button>svg:last-child{margin-left:auto}
 [data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] button svg:has(>use[href^="#i-"]){fill:none;stroke:currentColor;stroke-width:2}

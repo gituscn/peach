@@ -999,6 +999,11 @@ def follow_image(request: Request, id: int, media: int | None = None,
         return Response(status_code=404, headers={"cache-control": "no-store"})
 
 
+def _jav_preview_target(url: str) -> ResolvedFollowMedia:
+    """已验证的预览来源使用固定主机范围，其他 CDN 逐跳核对公网解析。"""
+    return ResolvedFollowMedia(url, allowed_hosts=("www.prestige-av.com", "jdforrepam.com"), public_hosts=True)
+
+
 @router.api_route("/jav-preview/{code}/{ref}", methods=["GET", "HEAD"])
 def jav_preview(request: Request, code: str, ref: str, args: dict[str, str] = Depends(require_auth)):
     from .web_jav_detail import detail_code
@@ -1008,11 +1013,11 @@ def jav_preview(request: Request, code: str, ref: str, args: dict[str, str] = De
         code = detail_code({"code": code})
         source = previews.source(code, ref)
         url = source["url"]
-        target = ResolvedFollowMedia(url, public_hosts=True)
+        target = _jav_preview_target(url)
         client = request.app.state.http_transport.client
         if source["playlist"]:
             def fetch(url):
-                response = open_upstream(client, "GET", ResolvedFollowMedia(url, public_hosts=True), incoming={})
+                response = open_upstream(client, "GET", _jav_preview_target(url), incoming={})
                 try:
                     chunks, size = [], 0
                     for chunk in response.iter_bytes():

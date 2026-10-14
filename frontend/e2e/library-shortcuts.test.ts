@@ -47,14 +47,18 @@ describe('我的收藏弹层', () => {
       try {
         await page.locator('#settingsBtn').evaluate((button: HTMLElement) => button.click());
         await page.locator('#settingsPanel:not([hidden])').waitFor();
-        const setting = await page.evaluate(() => {
+        const setting = await page.evaluate((mobile) => {
           const card = document.querySelector('[data-settings-card]')!, nav = card.querySelector('[data-settings-nav]')!, heading = card.querySelector('h2')!;
           const surface = getComputedStyle(card), glass = getComputedStyle(nav), title = getComputedStyle(heading);
-          return { width: card.getBoundingClientRect().width, height: card.getBoundingClientRect().height,
+          const pick = getComputedStyle(nav.querySelector('[data-settings-glide]')!);
+          const action = getComputedStyle(nav.querySelector('[data-settings-service] button')!);
+          return { pick: { radius: pick.borderRadius, image: pick.backgroundImage, shadow: pick.boxShadow, backdrop: pick.backdropFilter },
+            action: mobile ? null : { padding: action.padding, radius: action.borderRadius, font: action.fontFamily, size: action.fontSize, weight: action.fontWeight, line: action.lineHeight, color: action.color, height: action.minHeight, gap: action.gap },
+            width: card.getBoundingClientRect().width, height: card.getBoundingClientRect().height,
             radius: surface.borderRadius, background: surface.backgroundColor, shadow: surface.boxShadow,
             image: glass.backgroundImage, backdrop: glass.backdropFilter.replace(/#peach-optic-\d+/g, '#peach-optic'), drift: glass.animationName,
             font: title.fontSize, weight: title.fontWeight, line: title.lineHeight };
-        });
+        }, viewport.mobile);
         await page.locator('#settingsClose').click();
         await page.locator('#settingsPanel').waitFor({ state: 'hidden' });
         await page.getByRole('button', { name: '我的收藏', exact: true }).click();
@@ -67,12 +71,27 @@ describe('我的收藏弹层', () => {
         const collection = await dialog.evaluate((node, mobile) => {
           const card = node.closest('[data-modal-surface]')!, nav = node.querySelector(mobile ? '[data-shortcuts-categories]' : '[data-shortcuts-sidebar]')!, heading = node.querySelector('h2')!;
           const surface = getComputedStyle(card), glass = getComputedStyle(nav), title = getComputedStyle(heading);
-          return { width: card.getBoundingClientRect().width, height: card.getBoundingClientRect().height,
+          const pick = getComputedStyle(node.querySelector('[data-shortcuts-glide]')!);
+          const action = getComputedStyle(node.querySelector('[data-shortcuts-footer] a')!);
+          return { pick: { radius: pick.borderRadius, image: pick.backgroundImage, shadow: pick.boxShadow, backdrop: pick.backdropFilter },
+            action: mobile ? null : { padding: action.padding, radius: action.borderRadius, font: action.fontFamily, size: action.fontSize, weight: action.fontWeight, line: action.lineHeight, color: action.color, height: action.minHeight, gap: action.gap },
+            width: card.getBoundingClientRect().width, height: card.getBoundingClientRect().height,
             radius: surface.borderRadius, background: surface.backgroundColor, shadow: surface.boxShadow,
             image: glass.backgroundImage, backdrop: glass.backdropFilter.replace(/#peach-optic-\d+/g, '#peach-optic'), drift: glass.animationName,
             font: title.fontSize, weight: title.fontWeight, line: title.lineHeight };
         }, viewport.mobile);
         assert.deepEqual(collection, setting, '收藏弹层与设置共用尺寸、材质、落影与标题排版');
+        const iconColors = await dialog.locator('[data-shortcuts-categories] button svg, [data-shortcuts-footer] a svg').evaluateAll(icons => icons.map(icon => getComputedStyle(icon).color));
+        const selectedColor = await dialog.locator('[data-shortcuts-categories] [aria-selected="true"]').evaluate(tab => getComputedStyle(tab).color);
+        assert.ok(iconColors.every(color => color === selectedColor), JSON.stringify(iconColors));
+        if (!viewport.mobile) {
+          const clipping = await dialog.evaluate(node => {
+            const sidebar = node.querySelector('[data-shortcuts-sidebar]')!.getBoundingClientRect();
+            const categories = node.querySelector('[data-shortcuts-categories]')!.getBoundingClientRect();
+            return [categories.left - sidebar.left, sidebar.right - categories.right];
+          });
+          assert.ok(clipping.every(edge => Math.abs(edge) < 1), JSON.stringify(clipping));
+        }
         assert.equal(await dialog.getByRole('link', { name: '已标记', exact: true }).getAttribute('href'), '/flagged');
         assert.equal(await dialog.getByRole('link', { name: '稍后看', exact: true }).getAttribute('href'), '/watch-later');
         assert.equal(await dialog.getByRole('textbox', { name: '筛选名称' }).count(), 0);

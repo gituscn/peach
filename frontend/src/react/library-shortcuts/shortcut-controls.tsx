@@ -15,6 +15,7 @@ import './shortcuts.css';
 
 const Star = spriteGlyph('star');
 const Bookmark = spriteGlyph('bookmark-plus');
+const ChevronRight = spriteGlyph('chevron-right');
 const LABELS: Record<string, string> = { performer: '艺人', creator: '创作者', studio: '片商与厂牌', series: '系列', agency: '事务所', tag: '标签' };
 const GLYPHS = { all: spriteGlyph('star'), performer: spriteGlyph('user-round'), creator: spriteGlyph('user-round'), studio: spriteGlyph('clapperboard'), series: spriteGlyph('film'), agency: spriteGlyph('briefcase'), tag: spriteGlyph('tags'), filters: spriteGlyph('list-filter') };
 const SCOPES = [['all', '全部'], ...Object.entries(LABELS), ['filters', '保存的筛选']];
@@ -129,8 +130,8 @@ function ShortcutContents({ currentHref, kind, close }: { currentHref?: () => st
         })}
       </div>
       <nav data-shortcuts-footer="" aria-label="收藏作品清单">
-        <a href="/flagged" onClick={close}><Star aria-hidden />已标记</a>
-        <a href="/watch-later" onClick={close}><Bookmark aria-hidden />稍后看</a>
+        <a href="/flagged" onClick={close}><Star aria-hidden />已标记<ChevronRight aria-hidden /></a>
+        <a href="/watch-later" onClick={close}><Bookmark aria-hidden />稍后看<ChevronRight aria-hidden /></a>
       </nav>
       </aside>
       <div ref={content} data-shortcuts-content="" role="tabpanel" id={`${id}-content`} aria-labelledby={`${id}-${scope}`} tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain">
