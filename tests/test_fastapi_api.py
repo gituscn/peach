@@ -6,6 +6,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from collections import OrderedDict
 from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
@@ -197,6 +198,7 @@ class RobotsTests(unittest.IsolatedAsyncioTestCase):
 @unittest.skipUnless(HAS_DEPS, "FastAPI/httpx 尚未安装")
 class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        self.enterContext(patch.object(routes_auth, "_ATTEMPTS", OrderedDict()))
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         self.db = self.root / "ledger.db"
