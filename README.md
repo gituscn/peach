@@ -43,7 +43,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 不想先装？[在线演示](https://demo.peach.video) 里是一份现成的馆藏，搜索、女优页、筛选和统计都能直接点；演示站只读，操作不会保存。
 
-下面的截图均为 3840×2160 无损图，点击查看 PNG 原图；播放墙也能在演示站体验。
+下面的截图原图均为 3840×2160 无损 PNG，点击查看；播放墙也能在演示站体验。
 
 **首页：按来源、时长、标签筛选**
 
@@ -51,7 +51,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 **播放墙：拖动挑片，原位播放，切换版本和分卷。**
 
-<a href="https://peach.video/assets/screenshots/wall-20261014.png" target="_blank" rel="noopener"><img src="https://peach.video/assets/screenshots/wall-20261014.webp" alt="播放墙：全屏作品封面与浏览控件" width="1200"></a>
+<a href="https://peach.video/assets/screenshots/wall-20261014.png" target="_blank" rel="noopener"><img src="https://peach.video/assets/screenshots/wall-20261014-readme.webp" alt="播放墙：全屏作品封面与浏览控件" width="1200"></a>
 
 **女优页：资料、别名、外部链接和全部作品**
 
