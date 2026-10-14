@@ -1,5 +1,6 @@
 """番号体系女优中译：来源匹配、同人合并、日本字形归一与兼容标签同步。"""
 import csv
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -8,6 +9,8 @@ from pathlib import Path
 import opencc
 
 from peach.migrations import upgrade
+from peach import entry_links
+from scripts.audit_performer_entry_names import collect as audit_entries
 from scripts.localize_performer_names import (
     JP_KANJI_TO_SIMPLIFIED, KANJI_ALIAS_SOURCE, apply_rows, collect, main,
     read_identity_review, read_mapping, report_conflicts, simplify_kanji,
@@ -253,6 +256,66 @@ class PerformerLocalizationTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             main(["--db", str(self.db), "--mapping-xml", str(self.mapping),
                   "--review-csv", str(out)])
+
+    def test_review_csv_keeps_its_source_and_current_japanese_name(self):
+        root = Path(self.tmp.name).resolve()
+        mapping_csv = root / "mapping.csv"
+        with mapping_csv.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=("current_name", "adopt", "verdict"))
+            writer.writeheader()
+            writer.writerow({"current_name": "飯岡かなこ", "adopt": "饭冈加奈子", "verdict": "ok"})
+        self.con.execute("INSERT INTO entity_alias VALUES(18,'坂本マリア','坂本マリア','auto:performer-alias',1)")
+        self.con.execute("UPDATE asset_entity SET source='javinizer:avbase:performer' WHERE entity_id=18")
+        self.con.execute("INSERT INTO entity_external_ref(entity_id,provider,external_kind,external_id) "
+                         "VALUES(18,'javdb','performer','sample')")
+        self.con.commit()
+        self.assertEqual(main([
+            "--db", str(self.db), "--mapping-csv", str(mapping_csv),
+            "--mapping-source", "review:performer-localization", "--mapping-revision", "review-1",
+            "--only", "18",
+            "--identity-review", str(root / "absent.csv"), "--review-csv", str(root / "plan.csv"),
+            "--apply", "--backup", str(root / "backup.db"),
+        ]), 0)
+        name, metadata_json = self.con.execute("SELECT canonical_name,metadata_json FROM entity WHERE id=18").fetchone()
+        self.assertEqual(name, "饭冈加奈子")
+        self.assertEqual(self.con.execute("SELECT canonical_name FROM entity WHERE id=16").fetchone()[0],
+                         "斎藤満里奈")
+        self.assertEqual(json.loads(metadata_json)["name_localization"]["source"],
+                         "review:performer-localization")
+        aliases = [{"alias": row[0], "source": row[1]} for row in self.con.execute(
+            "SELECT alias,source FROM entity_alias WHERE entity_id=18")]
+        self.assertEqual(entry_links.japanese_name(name, aliases), "飯岡かなこ")
+
+    def test_mapping_source_requires_a_csv(self):
+        with self.assertRaises(SystemExit):
+            main(["--mapping-source", "review:performer-localization"])
+
+    def test_selected_member_of_a_merge_group_requires_the_whole_group(self):
+        root = Path(self.tmp.name).resolve()
+        out = root / "selected-plan.csv"
+        self.assertEqual(main([
+            "--db", str(self.db), "--mapping-xml", str(self.mapping),
+            "--mapping-revision", "r1", "--identity-review", str(self.review),
+            "--only", "11", "--review-csv", str(out),
+        ]), 1)
+        with out.open(encoding="utf-8-sig", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["action"], "conflict")
+        self.assertEqual(rows[0]["resolution"], "partial-merge-group-selection")
+
+    def test_full_entry_audit_includes_release_and_account_performers(self):
+        self.con.execute("INSERT INTO entity_alias VALUES(18,'坂本マリア','坂本マリア','auto:performer-alias',1)")
+        self.con.execute("INSERT INTO entity_external_ref(entity_id,provider,external_kind,external_id) "
+                         "VALUES(18,'javdb','performer','sample')")
+        rows = {row["entity_id"]: row for row in audit_entries(self.con)}
+        self.assertEqual(len(rows), self.con.execute("SELECT count(*) FROM entity WHERE kind='performer'").fetchone()[0])
+        self.assertEqual(rows[18]["entry_name"], "飯岡かなこ")
+        self.assertEqual(rows[18]["name_changed"], 1)
+        self.assertIn("/dm3/cn/actresses/", rows[18]["url"])
+        self.assertEqual(rows[18]["cn_status"], "假名规范名，中文来源未取得")
+        self.assertEqual(rows[14]["cn_status"], "非发行艺人，不判中译")
+        self.assertEqual(rows[14]["url"], "")
 
 
 class KanjiTableAgainstOpenCCTests(unittest.TestCase):
