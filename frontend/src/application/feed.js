@@ -10,7 +10,7 @@ import { loadingDotsHtml, noteHtml, stopAutoScroll, wireAutoScroll } from '../ui
 import { preferencesState, wireDrag } from './preferences.js';
 import { pushEntityPage } from './entity.js';
 import { applicationEffects } from './effects';
-export const feedState = { FEED_SKELETON_CARDS: undefined, feedNewSkeletonHtml: undefined, entityShapes: undefined, hasEntityPart: undefined, feedNewSkeletonSection: undefined, COSTAR_SKELETON_PEOPLE: undefined, costarSkeletonFoot: undefined, factsSkeleton: undefined, feedRevision: undefined, feedNewHelpers: undefined, feedNewActions: undefined, HERO_WIDE_PX: undefined };
+export const feedState = { FEED_SKELETON_CARDS: undefined, feedNewSkeletonHtml: undefined, entityShapes: undefined, entityShapesComplete: false, hasEntityShape: undefined, hasEntityPart: undefined, feedNewSkeletonSection: undefined, COSTAR_SKELETON_PEOPLE: undefined, costarSkeletonFoot: undefined, factsSkeleton: undefined, feedRevision: undefined, feedNewHelpers: undefined, feedNewActions: undefined, HERO_WIDE_PX: undefined };
 
 export function feedNewCoverHtml(item){
   if(item.has_cover)return coverImage(item,'big');
@@ -44,11 +44,23 @@ export function feedNewCardHtml(item){
       <div class="s mono">${label||(item.title?'':'资料还没取到')}</div></div></div></article>`;
 }
 
+export function installEntityShapeBootstrap(){
+  const script=document.getElementById('peach-entity-shape');
+  if(!script)return;
+  try{
+    const shape=JSON.parse(script.textContent||'null');
+    if(!shape?.id||typeof shape.kind!=='string'||!Array.isArray(shape.names)||!Array.isArray(shape.parts))return;
+    feedState.entityShapes=new Map([String(shape.id),...shape.names]
+      .map(name=>[`${shape.kind}/${foldName(name)}`,shape.parts]));
+  }catch{/* 无效的首屏形状由异步名单处理。 */}
+}
+
 export async function loadEntityShapes(){
   const effects=applicationEffects;
   const data=await api('/api/entity/shapes',{signal:effects.signal}).catch(()=>null);
   if(!effects.isActive)return feedState.entityShapes;
   if(data&&!data.error){
+    feedState.entityShapesComplete=true;
     feedState.entityShapes=new Map((data.entities||[])
       .flatMap(entity=>[String(entity.id),...entity.names].map(name=>[`${entity.kind}/${foldName(name)}`,entity.parts])));
     if(typeof data.home?.feed==='boolean')catalogState.homeHasFeed=data.home.feed;
@@ -128,6 +140,8 @@ feedState.feedNewSkeletonHtml = ()=>`<div class="feednewrow srow" aria-hidden="t
       <div class="s mono"><span class="skeleton">&#8203;</span></div></div></div></article>`
     .repeat(feedState.FEED_SKELETON_CARDS)}</div>`;
 feedState.entityShapes = null;
+feedState.entityShapesComplete = false;
+feedState.hasEntityShape = (kind,name)=>feedState.entityShapesComplete||!!feedState.entityShapes?.has(`${kind}/${foldName(name)}`);
 feedState.hasEntityPart = (kind,name,part)=>!!name&&!!feedState.entityShapes?.get(`${kind}/${foldName(name)}`)?.includes(part);
 feedState.feedNewSkeletonSection = ()=>`<section class="feednew">${feedState.feedNewSkeletonHtml()}</section>`;
 feedState.COSTAR_SKELETON_PEOPLE = 12;

@@ -9,7 +9,7 @@ import { state } from './../shell/index';
 import { catalogCardRatio, catalogHeadProps, catalogSkeletonHtml, clearCatalogGrid, gridTaken, paintCatalogFilter, syncCatalogFilterScreen } from './catalog.js';
 import { followListLayout, followManageParams, indexState, showIndexContainer } from './index.js';
 import { applicationEffects } from './effects';
-import { loadEntityShapes } from './feed.js';
+import { feedState, loadEntityShapes } from './feed.js';
 import { navigationState, paintNav } from './navigation.js';
 import { indexParams, paintIndexSkeleton } from './../index-skeleton';
 import { showEntityLoading } from './entity.js';
@@ -109,9 +109,9 @@ export function renderInitialSurfaceLoading(){
   if(/^\/(?:performers|creators|studios|agencies|series|tags)\//.test(path)){
     hideDiscoveryBars();
     $('#index').hidden=false;clearCatalogGrid();
-    // 形状名单这时刚发出去：等它一下再画，骨架第一帧就带着这一位有的那两块。
     const kind=ROUTE_ENTITIES[path.split('/')[1]],name=path.split('/').slice(2).join('/');
-    void waitEntityShapes().then(()=>{
+    const ready=feedState.hasEntityShape(kind,name)?Promise.resolve():waitEntityShapes();
+    void ready.then(()=>{
       if($('#index').firstElementChild||decodeURIComponent(location.pathname)!==path)return;
       showEntityLoading(kind,name);
       fitSkeleton($('#index'));
