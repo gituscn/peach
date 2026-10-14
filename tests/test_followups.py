@@ -872,7 +872,7 @@ class FaceMatchFollowupTests(FaceStubCase):
                                                    limit=10)]
 
         with self.database.read_connection() as connection:
-            self.assertEqual(fingerprint(connection, self.person), "1:0:0:r8")
+            self.assertEqual(fingerprint(connection, self.person), "1:0:0:r9")
         self.run_followup()
         self.assertEqual(planned(), [])
         with self.database.write_transaction(notify=False) as connection:
@@ -880,7 +880,7 @@ class FaceMatchFollowupTests(FaceStubCase):
                 "INSERT INTO entity_alias(entity_id,alias,normalized_alias,source)"
                 " VALUES(?,?,?,'test')", (self.person, "りな", "りな"))
         with self.database.read_connection() as connection:
-            self.assertEqual(fingerprint(connection, self.person), "1:1:0:r8")
+            self.assertEqual(fingerprint(connection, self.person), "1:1:0:r9")
         self.assertEqual(planned(), [followup_key("performer", self.person)])
 
     def test_a_small_picture_vouches_for_a_big_one_without_a_cover(self):
@@ -940,6 +940,50 @@ class FaceMatchFollowupTests(FaceStubCase):
         avatar_picker.install(self.providers, self.avatars, "performer", self.person, body,
                               {"provider": "gfriends", "source_kind": "user_cropped"})
         self.candidate("y-Minnano", (350, 350), self.HER)
+        self.assertEqual(self.run_followup()["outcome"], "已有头像")
+        self.assertEqual((self.avatars / f"performer-{self.person}.img").read_bytes(), body)
+
+    def test_an_automatic_official_thumbnail_can_use_a_verified_gallery_portrait(self):
+        from peach import avatar_picker
+        body = self.picture((125, 125), self.HER_AGAIN)
+        avatar_picker.install(self.providers, self.avatars, "performer", self.person, body,
+                              {"provider": "r18dev", "source_kind": "official_profile"})
+        self.candidate("1-S1", (400, 600), self.HER)
+        self.candidate("3-Moodyz", (400, 600), self.HER_AGAIN)
+        self.assertEqual(self.run_followup()["size"], "400×600")
+        self.assertEqual(self.provenance()["source_kind"], "gallery_face_matched")
+
+    def test_an_official_thumbnail_without_a_verified_upgrade_is_preserved(self):
+        from peach import avatar_picker
+        body = self.picture((125, 125), self.HER_AGAIN)
+        avatar_picker.install(self.providers, self.avatars, "performer", self.person, body,
+                              {"provider": "r18dev", "source_kind": "official_profile"})
+        self.candidate("1-S1", (400, 600), self.HER)
+        self.candidate("3-Moodyz", (400, 600), self.OTHER)
+        self.run_followup()
+        self.assertEqual((self.avatars / f"performer-{self.person}.img").read_bytes(), body)
+
+    def test_a_manually_selected_official_thumbnail_is_preserved(self):
+        from peach import avatar_picker
+        body = self.picture((125, 125), self.HER_AGAIN)
+        avatar_picker.install(self.providers, self.avatars, "performer", self.person, body,
+                              {"provider": "r18dev", "source_kind": "official_profile",
+                               "user_selected": True})
+        self.candidate("1-S1", (400, 600), self.HER)
+        self.candidate("3-Moodyz", (400, 600), self.HER_AGAIN)
+        self.assertEqual(self.run_followup()["outcome"], "已有头像")
+        self.assertEqual((self.avatars / f"performer-{self.person}.img").read_bytes(), body)
+
+    def test_a_manually_selected_cover_face_is_not_queued_or_replaced(self):
+        from peach import avatar_picker
+        from peach.avatar_followup import needs_avatar
+        body = self.picture((125, 125), self.HER_AGAIN)
+        avatar_picker.install(self.providers, self.avatars, "performer", self.person, body,
+                              {"provider": "cover-face", "source_kind": "cover_face_crop",
+                               "face_px": 50, "user_selected": True})
+        self.candidate("1-S1", (400, 600), self.HER)
+        self.candidate("3-Moodyz", (400, 600), self.HER_AGAIN)
+        self.assertFalse(needs_avatar(self.avatars, "performer", self.person))
         self.assertEqual(self.run_followup()["outcome"], "已有头像")
         self.assertEqual((self.avatars / f"performer-{self.person}.img").read_bytes(), body)
 
@@ -1135,11 +1179,11 @@ class OffsiteCoverFaceTests(FaceStubCase):
         self.compilation(1, "DVAJ-495")
         self.run_followup()
         with self.database.read_connection() as connection:
-            self.assertEqual(fingerprint(connection, self.person), "1:0:0:r8")
+            self.assertEqual(fingerprint(connection, self.person), "1:0:0:r9")
         self.assertEqual(planned(), [])
         self.bind()
         with self.database.read_connection() as connection:
-            self.assertEqual(fingerprint(connection, self.person), "1:0:1:r8")
+            self.assertEqual(fingerprint(connection, self.person), "1:0:1:r9")
         self.assertEqual(planned(), [key])
 
 

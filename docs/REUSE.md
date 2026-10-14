@@ -413,7 +413,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 | 搜索 | SQLite FTS5 | 索引字段、排序、profile 感知筛选 |
 | 相关推荐 | OpenAver `8cc17e50453d9f69a81f5fee1a072df80f7aab73` 的 Tag IDF + 系列／片商／出演者规则只作固定算法参考（MIT） | 独立实现规范实体评分、MMR 多样性、稳定 seed、解释原因与负反馈边界；不复制上游 UI／源码 |
 | 女优姓名对照 | `li-peifeng/Jav-Actors-Mapping` 的固定 revision，仅作私有输入（仓库未声明许可证，不随 Peach 分发） | 精确匹配、冲突复核、别名、来源与真实 ledger 写入 |
-| 女优头像候选 | Gfriends 的 GitHub raw 索引与单张媒体（只作外部 Provider，不克隆图库）；r18.dev 人物对象给出的 DMM 官方 `actjpgs` 缩略图只作精确身份绑定的首次头像 | 名字链、质量档位、格式/尺寸/SHA-256 门槛、候选缓存、provenance、健康统计和人工复核；首次头像只在人物主名精确一致、实体已连到同一资产且没有在位头像时安装，不进入高清候选排序 |
+| 女优头像候选 | Gfriends 的 GitHub raw 索引与单张媒体（只作外部 Provider，不克隆图库）；r18.dev 人物对象给出的 DMM 官方 `actjpgs` 缩略图只作精确身份绑定的首次头像 | 名字链、质量档位、格式/尺寸/SHA-256 门槛、候选缓存、provenance、健康统计和人工复核；首次头像只在人物主名精确一致、实体已连到同一资产且没有在位头像时安装。自动档案缩略图未达标准尺寸时进入图库升级核验；没有可靠图库候选则保留档案照。换头像端点记录人工选择，自动后继保留该选择 |
 | Gfriends 索引读法 | `src/peach/gfriends.py` | 页面与批处理共用：`Filetree.json` 解析、名字链匹配、`quality_key` 排序、raw 地址与本地缓存保鲜期。**目录前缀是来源优先级，不是清晰度**（上游 README 写的「质量升序」不准）：`0-` 网友投稿、`1-`～`8-` 写真机构与片商官方、往后是原图两三百像素的大型数据库，排第一的是最该先试的一张；`AI-Fix-` 是上游放大去水印版，去掉前缀取原件 |
 | 「这个地址能不能让 Peach 替人去取」 | `src/peach/http.py` 的 `public_https_url` + `resolves_publicly` | 追更图片代理与手填头像地址共用：必须 https 与公网域名，不收 IP 字面量与用户信息，解析出的每个地址都要 `is_global`；否则 Peach 就是能访问路由器、NAS 与本机端口的跳板 |
 | 头像写入 | `src/peach/avatar_provider.install_entity_avatar` | 采集脚本、复核页与换头像共用：`.img` 经临时文件原子替换，`.ct`、`.provenance.json`、`.face.json` 一起换；检不出脸要删掉旧 `.face.json`，否则页面按上一张的脸框取景且看不出错 |

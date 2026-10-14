@@ -1480,6 +1480,7 @@ async def avatar_pick(request: Request, args: dict[str, str] = Depends(require_a
         if box not in (None, ""):
             body, cropped = avatar_picker.crop(body, box)
             origin = {**origin, **cropped}
+        origin = {**origin, "user_selected": True}
         result = avatar_picker.install(providers_root, avatar_root, kind,
                                        entity_id, body, origin)
     except avatar_picker.PickerError as error:

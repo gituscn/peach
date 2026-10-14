@@ -1027,6 +1027,8 @@ class AvatarPickerRouteTests(unittest.TestCase):
             content=body, headers={"content-type": "image/jpeg"})
         self.assertEqual(response.status_code, 200)
         self.assertEqual((self.avatars / "performer-7792.img").read_bytes(), body)
+        record = json.loads((self.avatars / "performer-7792.img.provenance.json").read_text("utf-8"))
+        self.assertTrue(record["user_selected"])
 
     def test_a_file_from_this_machine_can_be_cut_before_it_is_installed(self):
         body = picture(300, 400, "olive")
