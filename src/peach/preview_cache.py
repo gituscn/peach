@@ -15,12 +15,15 @@ class PreviewCache:
     def __init__(self, cache):
         self.cache = cache
 
-    def register(self, code: str, url: str, *, identity: str = "", playlist: bool | None = None) -> str:
+    def register(self, code: str, url: str, *, identity: str = "", playlist: bool | None = None,
+                 media_type: str = "") -> str:
         if not public_https_url(url):
             raise ValueError("预览来源不可用")
         ref = hashlib.sha256((identity or url).encode()).hexdigest()
         path = self.cache.folder("preview:" + code) / (ref + ".source.json")
         value = {"url": url, "playlist": playlist if playlist is not None else urlsplit(url).path.lower().endswith(".m3u8")}
+        if media_type == 'video/mp4':
+            value['media_type'] = media_type
         try:
             current = json.loads(path.read_text(encoding='utf-8'))
         except (OSError, ValueError):

@@ -8,7 +8,10 @@ import { followSelected, notifyShell, selectMode, selected, state } from './../s
 import { navigationState } from './navigation.js';
 import { openEntity } from './entity.js';
 import { catalogSuggestions } from './../catalog-onboarding';
-import { $, api } from '../core';
+import { searchRecommendations } from '../react/search/recommendations';
+import { feedNewCoverHtml } from './feed.js';
+import { followState, openFollowDetail } from './follow.js';
+import { $, api, esc } from '../core';
 import { dismissMenu, glideEase, presentMenu, wireHorizontalScroller } from '../ui-kit';
 import { openManagedRoute } from './../history/managed';
 import { applicationEffects } from './effects';
@@ -77,11 +80,16 @@ searchState.searchActions = {
   },
   openItem:id=>openItem(id),
   openEntity:(kind,name)=>openEntity(kind,name),
+  openPath:path=>navigationState.route(path,false),
+  openFollow:(id,media,index)=>{followState.followMediaView=media;void openFollowDetail(id,true,index)},
 };
 searchState.searchHelpers = {
   pool:()=>catalogSuggestions(state,api),
+  recommendations:()=>searchRecommendations(api),
   /* `.pic` 是卡片封面那一格（比例、底色、圆角与模糊垫底都认它），和里面那张图一起由壳给。 */
-  coverHtml:card=>`<span class="pic">${searchCoverImage(card)}</span>`,
+  coverHtml:card=>`<span class="pic">${card?.thumb_url
+    ?`<img src="${esc(card.thumb_url)}" width="640" height="360" alt="" loading="lazy" referrerpolicy="no-referrer" data-drop="self">`
+    :card?.sourceWork?feedNewCoverHtml(card):searchCoverImage(card)}</span>`,
   present:menu=>presentMenu(menu),
   dismiss:menu=>dismissMenu(menu),
   wireScroller:row=>wireHorizontalScroller(row),
@@ -123,6 +131,7 @@ applicationEffects.handler($('#searchBack'), 'onclick', ()=>{
 });
 applicationEffects.listen($('#q'), 'blur', ()=>applicationEffects.delay(()=>{
   if(document.activeElement===$('#q'))return;
+  if($('#searchMenu').contains(document.activeElement))return;
   if(!$('#q').value&&!$('#searchMenu').matches(':hover'))setNarrowSearchOpen(false);
   hideSearchMenu();
 },140));

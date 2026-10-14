@@ -2210,6 +2210,43 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             self.app.state.http_transport.client = original
             fake.close()
 
+    async def test_official_mp4_preview_preserves_type_range_and_local_replay(self):
+        from peach.preview_cache import PreviewCache
+        from peach.remote_media_cache import cache_for
+        cache = cache_for(self.app.state.web_contract)
+        ref = PreviewCache(cache).register('EXM-001', 'https://www.prestige-av.com/api/media/public.mp4', playlist=False, media_type='video/mp4')
+        body = b'\0\0\0\x18ftypisom' + b'\0' * 64
+        calls = []
+        def upstream(request):
+            calls.append(request)
+            if request.url.path.endswith('failure.mp4'):
+                return httpx.Response(200, headers={'content-type': 'text/html'},
+                                      stream=httpx.ByteStream(b'<html>unavailable</html>'), request=request)
+            return httpx.Response(200, headers={'content-type': 'application/octet-stream', 'content-length': str(len(body))},
+                                  stream=httpx.ByteStream(body), request=request)
+        original = self.app.state.http_transport.client
+        fake = httpx.Client(transport=httpx.MockTransport(upstream))
+        self.app.state.http_transport.client = fake
+        try:
+            with patch('peach.follow_stream.resolves_publicly', return_value=True):
+                response = await self.client.get(f'/jav-preview/EXM-001/{ref}?t=secret')
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers['content-type'], 'video/mp4')
+                self.assertEqual(response.content, body)
+                replay = await self.client.get(f'/jav-preview/EXM-001/{ref}?t=secret', headers={'Range': 'bytes=0-7'})
+                self.assertEqual(replay.status_code, 206)
+                self.assertEqual(replay.content, body[:8])
+                self.assertEqual(replay.headers['content-range'], f'bytes 0-7/{len(body)}')
+                self.assertEqual(len(calls), 1)
+                invalid = PreviewCache(cache).register('EXM-002', 'https://www.prestige-av.com/api/media/failure.mp4',
+                    playlist=False, media_type='video/mp4')
+                failed = await self.client.get(f'/jav-preview/EXM-002/{invalid}?t=secret')
+                self.assertEqual(failed.status_code, 404)
+                self.assertEqual(failed.headers['cache-control'], 'no-store')
+        finally:
+            self.app.state.http_transport.client = original
+            fake.close()
+
     async def test_follow_image_failure_has_no_image_body_and_can_be_retried(self):
         from types import SimpleNamespace
         item = SimpleNamespace(id=28, provider='simpcity', url='https://simpcity.cr/post/28',

@@ -468,6 +468,8 @@ LISTED = (
 
 def _discovery_performers(connection, contract, rows) -> dict[int, list[dict]]:
     """新作出演名单按已有身份解析，头像契约与馆藏卡片共用。"""
+    from .web_jav_discovery import _cached_movie
+    from .web_jav_detail import source_performer_refs, visible_actors
     names = {name.strip() for row in rows
              for name in re.split(r"[,，、;/]", row["performers"] or "") if name.strip()}
     identities = {name: entities.resolve_entity(connection, "performer", name) for name in names}
@@ -479,6 +481,12 @@ def _discovery_performers(connection, contract, rows) -> dict[int, list[dict]]:
         for found in identities.values() if found}
     performers = {}
     for row in rows:
+        source = _cached_movie(row['code'], contract)
+        if 'actors' in source:
+            refs = source_performer_refs(contract, connection, visible_actors(connection, source, excluded))
+            performers[int(row['id'])] = refs
+            row['performers'] = '、'.join(ref['name'] for ref in refs)
+            continue
         refs = []
         row['performers'] = '、'.join(name.strip() for name in re.split(r"[,，、;/]", row['performers'] or '')
                                    if name.strip() in identities)

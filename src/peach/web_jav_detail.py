@@ -94,7 +94,9 @@ def q_jav_detail(contract, args) -> dict:
     with contract.database.read_connection() as connection:
         decisions = load_genre_decisions(connection)
     payload.update(_source_fields(source or {}, decisions))
-    payload.update(_artwork_fields(contract, code, item, source or {}))
+    payload.update(_artwork_fields(contract, code, item, source or {}, refresh=args.get('refresh') == '1'))
+    if payload.get('preview_message'):
+        payload['message'] = '；'.join(filter(None, (payload['message'], payload['preview_message'])))
     payload.update(_identity_fields(contract, code, item, source or {}))
     return payload
 
@@ -158,12 +160,12 @@ def source_performer_refs(contract, connection, actors):
     return refs
 
 
-def _artwork_fields(contract, code, item, source):
+def _artwork_fields(contract, code, item, source, *, refresh=False):
     return {"has_cover": contract.has_cover(code), "cover_version": contract.cover_version(code),
             "cover_url": item.get("cover_url") or "",
             "source_image": bool(source and (source.get("cover_url") or source.get("thumb_url"))),
             "preview_count": min(len(source.get("preview_images") or []), 30),
-            "preview_video_url": _preview_url(contract, code, source),
+            **_preview_fields(contract, code, source, refresh=refresh),
             "source_url": "https://javdb.com/v/" + str(source["id"]) if source else item.get("link") or ""}
 
 
@@ -237,14 +239,28 @@ def _fetch_image(contract, code, index):
     return image
 
 
-def _preview_url(contract, code, source):
+def _preview_fields(contract, code, source, *, refresh=False):
     url = preview_video_url(source)
-    if not url:
-        return ""
-    if '?' in url:
+    if url and '?' in url:
         url = preview_video_url(PUBLIC_API.media_movie(code)) or url
-    ref = PreviewCache(cache_for(contract)).register(code, url, identity="root", playlist=True)
-    return f"/jav-preview/{code}/{ref}.m3u8"
+    if not url and ('prestige' in str(source.get('maker_name') or '').casefold()
+                    or 'プレステージ' in str(source.get('maker_name') or '')):
+        from .jav_official_preview import prestige_preview
+        try:
+            result = PUBLIC_API.official_preview(code, lambda: prestige_preview(code, contract.follow_secrets_root),
+                released=source.get('release_date'), refresh=refresh)
+            url = result['url']
+            failure = cache_error('preview:prestige:' + code)
+            if failure and not url:
+                raise PublicSourceUnavailable(failure)
+        except PublicSourceUnavailable as error:
+            return {'preview_video_url': '', 'preview_state': 'unavailable', 'preview_message': str(error)}
+    if not url:
+        return {'preview_video_url': '', 'preview_state': 'missing'}
+    playlist = url.endswith('.m3u8') or '.m3u8?' in url
+    ref = PreviewCache(cache_for(contract)).register(code, url, identity="root", playlist=playlist,
+                                                     media_type='' if playlist else 'video/mp4')
+    return {'preview_video_url': f"/jav-preview/{code}/{ref}{'.m3u8' if playlist else ''}", 'preview_state': 'ready'}
 
 
 @_source_cache

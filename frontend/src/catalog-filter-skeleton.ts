@@ -8,6 +8,7 @@
  * 四枚视图由 state 决定，这一趟取数不改它们，所以现在就画成最终样子：`href` 是真地址，壳在宿主上
  * 委托接住点击。头像与标签只画占位，读数是一条宽度定死的微光。 */
 import type { CatalogView } from './react/catalog-filter/catalog-filter';
+import { islandShortcutsEntry } from './island-skeleton';
 
 /** 每排摆多少格，同岛里空馆藏占位的 `EMPTY_SLOTS`，由容器裁到可用宽度。 */
 const EMPTY_SLOTS = 64;
@@ -36,7 +37,7 @@ export function catalogFilterSkeletonHtml(views: readonly CatalogView[], state: 
     + `<div data-catalog-tags=""><span data-catalog-placeholder="tag" aria-hidden="true">`
     + '<span></span>'.repeat(EMPTY_SLOTS) + `</span></div></div></div>`
     + `<div data-filter-row="bottom" aria-busy="true" class="flex min-w-0 items-center gap-3 px-3 py-2 min-h-12">`
-    + `<span data-catalog-readout=""><span data-skeleton="count" aria-hidden="true"`
-    + ` class="relative inline-block h-3.5 w-37.5 rounded-md align-middle skeleton-sheen"></span></span>`
+    + `<span data-catalog-summary=""><span data-catalog-readout=""><span data-skeleton="count" aria-hidden="true"`
+    + ` class="relative inline-block h-3.5 w-37.5 rounded-md align-middle skeleton-sheen"></span></span>${islandShortcutsEntry()}</span>`
     + `</div></div></div></div>`;
 }

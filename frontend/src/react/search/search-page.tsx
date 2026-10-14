@@ -23,6 +23,8 @@ interface Store {
   history: string[];
   pool: string[];
   poolRequest: number;
+  recommendations: SuggestGroup[];
+  recommendationRequest: number;
   /** 画的那一刻输入框里的词与洗好的推荐。 */
   query: string;
   picks: string[];
@@ -42,13 +44,14 @@ interface Store {
 }
 
 const emptyStore = (): Store => ({
-  history: [], pool: [], poolRequest: 0, query: '', picks: [], suggestFor: '', groups: [], tabs: [],
+  history: [], pool: [], poolRequest: 0, recommendations: [], recommendationRequest: 0, query: '', picks: [], suggestFor: '', groups: [], tabs: [],
   suggestRequest: 0, asked: '', timer: 0, kind: '', active: -1, reveal: false, rewind: false,
 });
 
 const modelOf = (s: Store): MenuModel => menuModel({
   query: s.query, history: s.history, picks: s.picks, suggestFor: s.suggestFor, groups: s.groups, tabs: s.tabs,
   kind: s.kind,
+  recommendations: s.recommendations,
 });
 const hasContent = (m: MenuModel) => !!(m.tabs || m.recent || m.left.length || m.right.length || m.empty);
 
@@ -90,6 +93,7 @@ export function SearchPage(props: SearchProps) {
       input.removeEventListener('keydown', onKey);
       input.removeEventListener('focus', onFocus);
       clearTimeout(s.timer);
+      s.recommendationRequest++;
       latest.current.expose(null);
     };
   }, [op, s]);
@@ -110,7 +114,12 @@ export function SearchPage(props: SearchProps) {
   );
   const section = (group: MenuSection) => (
     <section key={group.kind ?? group.label} data-search-group="" data-kind={group.kind}>
-      <h3>{group.label}</h3>
+      <h3>{group.label}{group.href ? (
+        <a href={group.href} onMouseDown={keep} onClick={event => {
+          if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+          event.preventDefault(); op.openPath(group.href!);
+        }}>{group.action || '查看全部'}</a>
+      ) : null}</h3>
       {group.kind ? <div data-search-items="">{group.options.map(option)}</div> : group.options.map(option)}
       {group.more ? option(group.more) : null}
     </section>
@@ -122,10 +131,11 @@ export function SearchPage(props: SearchProps) {
     </div>
   ) : null);
   return (
-    <div ref={root} data-search-root="" data-history-limit={limit}>
+    <div ref={root} data-search-root="" data-search-recommendations={!s.query && s.recommendations.length ? '' : undefined} data-history-limit={limit}>
       {model.tabs ? <Tabs tabs={model.tabs} kind={s.kind} onPick={op.pickKind} wire={props.helpers.wireScroller} /> : null}
-      {model.recent ? section(model.recent) : null}
+      {s.query && model.recent ? section(model.recent) : null}
       {columns(model.left, model.right)}
+      {!s.query && model.recent ? section(model.recent) : null}
       {model.empty ? <p data-search-empty="" role="status">没有找到</p> : null}
     </div>
   );
@@ -170,6 +180,18 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
       // 推荐不可用时仍可直接输入搜索。
     }
   };
+  const loadRecommendations = async () => {
+    if (!props().helpers.recommendations) return;
+    const request = ++s.recommendationRequest;
+    try {
+      const groups = await props().helpers.recommendations!();
+      if (request !== s.recommendationRequest) return;
+      s.recommendations = groups;
+      if (focused() && !input().value.trim()) paint();
+    } catch {
+      // 推荐读取失败仍可搜索，保留手上的推荐。
+    }
+  };
   /* 分组顺序和每组的名字都由 `/api/suggest` 给出，这里照抄。慢的旧响应不许盖掉新的：连敲两个字时
      先发的那次完全可能后回来。 */
   const loadSuggestions = async (query: string, kind = '') => {
@@ -192,6 +214,7 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
 
   const isOpen = () => { const el = menu(); return !!el && !el.hidden };
   const close = () => {
+    s.recommendationRequest++;
     const el = menu();
     if (el) props().helpers.dismiss(el);
     s.active = -1;
@@ -257,6 +280,12 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
   };
   /** 选中一行，点它和回车落在同一处。作品开详情，有资料页的开资料页，其余按这个词搜。 */
   const choose = (entry: SearchOption) => {
+    if (entry.type === 'suggest' && entry.item.followMedia && entry.item.id && props().actions.openFollow) {
+      input().blur();
+      props().actions.openFollow!(entry.item.id, entry.item.followMedia, entry.item.mediaIndex ?? null);
+      return;
+    }
+    if (entry.type === 'suggest' && entry.item.href) { openPath(entry.item.href); return }
     if (entry.type === 'more') { runSearch(false, true); input().blur(); return }
     if (entry.type === 'suggest' && entry.kind === 'asset' && entry.item.id != null) {
       input().blur();
@@ -267,6 +296,7 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
     input().value = entry.value;
     runSearch(false, true);
   };
+  const openPath = (path: string) => { close(); input().blur(); props().actions.openPath?.(path) };
   const pick = (entry: SearchOption) => { close(); choose(entry) };
   const peek = (card: SuggestCard) => { close(); input().blur(); props().actions.openItem(card.id) };
   const remove = async (value: string) => {
@@ -313,6 +343,7 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
     refresh();
   };
   const focus = () => {
+    void loadRecommendations();
     void Promise.all([loadHistory(), loadPool()]).then(() => {
       if (!focused()) return;
       // 带着 `?q=` 进来再点回输入框时，框里已经有词，补全该跟着这个词给。这两份数据回来之前
@@ -321,7 +352,7 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
       if (input().value.trim() !== s.asked) refresh();
     });
   };
-  return { input: onInput, key, focus, close, pick, peek, remove, pickKind };
+  return { input: onInput, key, focus, close, pick, peek, remove, pickKind, openPath };
 }
 
 function Tabs({ tabs, kind, onPick, wire }: {
@@ -384,29 +415,29 @@ function Row({ entry, active, helpers, onPick, onPeek, onRemove }: {
   }
   const { item, kind } = entry;
   const opens = SUGGEST_PROFILE_KINDS.has(kind) ? kind : undefined;
-  if (kind === 'asset') {
+  if (['asset', 'jav', 'post', 'photo', 'release'].includes(kind)) {
     /* 作品点开是详情，不是一个搜索词：整句标题填回搜索框，下一次搜索会因为其中任何一个字符对不上
        而落空。 */
     const byline = [item.who, item.code ? item.title : ''].filter(Boolean).join(' · ');
     return (
-      <div data-search-option="work" data-open-item={item.id} {...shared}>
+      <button type="button" data-search-option="work" data-open-item={kind === 'asset' ? item.id : undefined} {...shared} onMouseDown={keep}>
         <Cover card={item.card} helpers={helpers} />
         <span data-search-meta=""><span data-search-name=""><span>{item.value}</span></span><span data-search-sub="">{byline}</span></span>
-      </div>
+      </button>
     );
   }
   const matched = item.matched ? <span data-search-matched="">{item.matched}</span> : null;
-  if (kind === 'performer' || kind === 'creator') {
+  if (kind === 'performer' || kind === 'creator' || kind === 'author') {
     // 一行里摆得下几部近作就摆几部；窄下拉整排收起，数据照给。
     const works = item.works ?? [];
-    const sub = [`${(item.n ?? 0).toLocaleString()} 个视频`, item.agency].filter(Boolean).join(' · ');
+    const sub = item.subtitle || [`${(item.n ?? 0).toLocaleString()} 个视频`, item.agency].filter(Boolean).join(' · ');
     return (
-      <div data-search-option="person" data-open-entity={opens} {...shared}>
+      <div data-search-option="person" data-open-entity={opens} {...shared} onMouseDown={keep}>
         <Face item={item} kind={kind} />
-        <span data-search-meta="">
+        <button type="button" data-search-person="" data-search-meta="" aria-label={`查看 ${item.value}`}>
           <span data-search-name=""><span>{item.value}</span>{matched}</span>
           <span data-search-sub="">{sub}</span>
-        </span>
+        </button>
         {works.length ? (
           <span data-search-peeks="">
             {works.map((card) => (
@@ -438,6 +469,7 @@ function Cover({ card, helpers }: { card: SuggestCard | null | undefined; helper
 /** 门面一律圆片，走索引页同一条兜底链：人是实体图 → 代表作头像，厂牌是标识，事务所是官网
  *  站点圆标；都取不到就是首字母。一屏几十个，取派生件。 */
 function Face({ item, kind }: { item: SuggestItem; kind: string }) {
+  if (item.avatarHtml) return <span data-search-face="" dangerouslySetInnerHTML={{ __html: item.avatarHtml }} />;
   const ref = { id: item.entity_id as number | null | undefined, has_image: item.has_image as boolean | undefined,
     image_version: item.image_version as string | undefined, avatar_focus: item.avatar_focus,
     avatar_stand_in: item.avatar_stand_in as boolean | undefined };

@@ -74,6 +74,7 @@ async function openPerformer(browser: Browser, viewport = DESKTOP, search = '', 
   await opened.page.locator('[data-entity-filter-glass] [data-entity-readout]', { hasText: /\S/ })
     .waitFor({ timeout: 15_000 });
   await settle(opened.page);
+  assert.equal(await opened.page.locator('[data-entity-filter-glass]').getByRole('button', { name: '我的收藏', exact: true }).count(), 1);
   return { ...opened, stubs };
 }
 

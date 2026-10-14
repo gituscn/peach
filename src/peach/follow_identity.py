@@ -145,6 +145,32 @@ def official_avatar_url(row) -> str | None:
         {"service": "profile", "id": profiles})
 
 
+def creator_avatar_refs(contract) -> dict:
+    """按已绑定实体汇总官方与归档头像，本机代理处理实际取图。"""
+    from .follow_assets import mirror_avatar_url
+
+    def read():
+        with contract.read_connection() as connection:
+            if not connection.execute("SELECT 1 FROM sqlite_master WHERE name='follow_source'").fetchone():
+                return {}
+            sources = connection.execute(
+                "SELECT s.* FROM follow_source s JOIN entity e ON e.id=s.entity_id "
+                "WHERE e.kind='creator' ORDER BY s.provider,s.ref").fetchall()
+        groups = {}
+        for row in sources:
+            urls = groups.setdefault(row['entity_id'], [[], []])
+            official = official_avatar_url(row)
+            if official:
+                urls[0].append(official)
+            if mirror_avatar_url(row['provider'], row['ref']):
+                urls[1].append('/follow-avatar?' + urllib.parse.urlencode(
+                    {'provider': row['provider'], 'ref': row['ref']}))
+        return {identity: list(dict.fromkeys(official + archive))
+                for identity, (official, archive) in groups.items()}
+
+    return contract.cached('creator_avatar_refs', read)
+
+
 def author_name(rows, key: str, canonical: dict[str, str]) -> str:
     """一位作者（同一作者键下的几条来源）叫什么。
 

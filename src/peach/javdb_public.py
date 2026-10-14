@@ -411,6 +411,13 @@ class PublicAPI:
                             self._rows(f"/v1/movies/{movie['id']}/magnets", "magnets"),
                             released=movie.get('release_date'), refresh=refresh)
 
+    def official_preview(self, code, fetch, *, released=None, refresh=False):
+        """预告单独补齐：已取得的视频按发行日保存，未提供的视频一天后可再检查。"""
+        def read():
+            url = fetch()
+            return {'url': url, **({'release_date': released} if url else {})}
+        return self._cached('preview:prestige:' + normalise_code_key(code), read, refresh=refresh)
+
     def image(self, code: str, index: str) -> str:
         movie = self.media_movie(code)
         if index == "cover":

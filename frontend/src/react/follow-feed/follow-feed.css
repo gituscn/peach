@@ -443,7 +443,7 @@ body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-follo
   -webkit-backdrop-filter: blur(10px);
 }
 .peach-react [data-follow-actions] button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
-.peach-react [data-follow-actions] button:hover:not(:disabled) { background: rgb(255 255 255 / .18); transform: scale(1.08); }
+.peach-react [data-follow-actions] button:hover:not(:disabled) { background: rgb(255 255 255 / .18); }
 .peach-react [data-follow-actions] button:disabled { opacity: .42; cursor: not-allowed; }
 .peach-react [data-follow-actions] button[aria-busy] { cursor: wait; opacity: .72; }
 @media (hover: hover) and (pointer: fine) {

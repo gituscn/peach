@@ -13,6 +13,7 @@ describe('卡片信息与收藏入口', () => {
     it(`${viewport.name} 标题与署名相邻，标签有间距，卡片同高`, async () => {
       const opened = await openFollowFeed(browser, '/follow', viewport);
       try {
+        assert.equal(await opened.page.locator('[data-follow-filter-glass]').getByRole('button', { name: '我的收藏', exact: true }).count(), 1);
         const payload = await opened.page.evaluate(async () => (await fetch('/api/follow')).json());
         payload.groups[0].primary.title = '这是一个很长的作品标题'.repeat(8);
         payload.groups[1].primary.title = '短标题';
@@ -34,15 +35,20 @@ describe('卡片信息与收藏入口', () => {
         assert(dense.every(row => row.title < row.line * 1.5 && row.labelGap >= 8 && row.labelGap <= 12), JSON.stringify(dense));
       } finally { await opened.close() }
     });
-    it(`${viewport.name} 收藏入口在读数旁固定宽度，播放媒体没有侧箭头`, async () => {
+    it(`${viewport.name} 收藏入口是紧凑图标按钮，播放媒体没有侧箭头`, async () => {
       const opened = await openItemPage(browser, '/', viewport, { ready: '[data-catalog-frame]' });
       try {
         const geometry = await opened.page.locator('[data-shortcuts-trigger]').evaluate(node => {
           const button = node.getBoundingClientRect(), readout = document.querySelector('[data-catalog-readout]')!.getBoundingClientRect();
-          return { width: button.width, gap: button.left - readout.right, parent: node.closest('[data-entity-sorts]') !== null };
+          return { width: button.width, height: button.height, text: node.textContent?.trim(),
+            glide: !!node.parentElement?.querySelector('[data-view-glide]'),
+            gap: button.left - readout.right, parent: node.closest('[data-entity-sorts]') !== null };
         });
         assert.equal(geometry.parent, false);
-        assert(geometry.width >= 96 && geometry.width <= 112 && geometry.gap >= 0 && geometry.gap <= 16, JSON.stringify(geometry));
+        assert(geometry.width >= 30 && geometry.width <= 40 && geometry.width === geometry.height
+          && geometry.gap >= 0 && geometry.gap <= 16, JSON.stringify(geometry));
+        assert.equal(geometry.text, '');
+        assert.equal(geometry.glide, false);
         await opened.page.goto(new URL('/item/31', opened.page.url()).href);
         await opened.page.locator('[data-carousel-video-active]').waitFor();
         assert.equal(await opened.page.locator('[data-carousel-video-active] [data-follow-image-step]:visible').count(), 0);

@@ -258,7 +258,7 @@ describe('关注页岛', () => {
     }
   });
 
-  it('来源角标接得住指针，悬停能读到来源名；点它照样进详情', { timeout: 60_000 }, async () => {
+  it('封面左上角可打开详情，悬停时隐藏来源角标', { timeout: 60_000 }, async () => {
     const opened = await openFollowFeed(browser, '/follow', DESKTOP);
     try {
       const page = opened.page;
@@ -271,11 +271,11 @@ describe('关注页岛', () => {
       });
       assert.equal(hit.badge, true, '角标中心命中的不是角标本身');
       assert.ok(hit.title, '角标没有来源名');
-      await card.locator('[data-media-badge]').hover();
-      const tip = page.locator('#board-control-tooltip');
-      await tip.waitFor({ state: 'visible', timeout: 5_000 });
-      assert.equal(await tip.textContent(), hit.title);
-      await card.locator('[data-media-badge]').click();
+      const corner = (await card.locator('[data-media-badge]').boundingBox())!;
+      await card.hover();
+      assert.equal(await card.locator('[data-media-badge]').isVisible(), false);
+      assert.equal(await card.locator('[data-follow-sources]').evaluate(node => getComputedStyle(node).pointerEvents), 'none');
+      await page.mouse.click(corner.x + corner.width / 2, corner.y + corner.height / 2);
       await page.waitForURL(`**/posts/${id}`);
       assert.deepEqual(withoutPlayer(opened.problems), []);
     } finally {
@@ -283,7 +283,7 @@ describe('关注页岛', () => {
     }
   });
 
-  it('两排按种子取样：换状态推回新 view 不洗牌，换一批才换', { timeout: 60_000 }, async () => {
+  it('两排取样在筛选时保留，换一批以地址种子请求新列表', { timeout: 60_000 }, async () => {
     const opened = await openFollowFeed(browser, '/follow', DESKTOP);
     try {
       const page = opened.page;
@@ -293,10 +293,19 @@ describe('关注页岛', () => {
       await searchIs(page, '?status=new');
       await page.locator('[data-follow-filter="new"][aria-pressed="true"]').waitFor();
       assert.deepEqual(await authorOrder(page), first, '换状态之后创作者那一排重新洗了');
+      const shuffled = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return url.pathname === '/api/follow' && url.searchParams.get('sort') === 'rand';
+      });
       await page.getByRole('button', { name: '换一批', exact: true }).click();
       await page.waitForFunction(() => new URLSearchParams(location.search).get('sort') === 'rand');
-      await page.waitForFunction((before) => JSON.stringify([...document.querySelectorAll<HTMLElement>(
-        'button[data-follow-author]')].map((button) => button.dataset.followAuthor)) !== before, JSON.stringify(first));
+      const response = await shuffled;
+      assert.equal(response.status(), 200);
+      const requestSeed = new URL(response.url()).searchParams.get('seed');
+      assert.ok(Number(requestSeed) > 0);
+      assert.equal(new URL(page.url()).searchParams.get('seed'), requestSeed);
+      await page.locator('[data-follow-list] > [data-follow-item]').first().waitFor();
+      assert.deepEqual((await authorOrder(page)).sort(), [...first].sort());
       assert.deepEqual(opened.problems, []);
     } finally {
       await opened.close();

@@ -97,6 +97,8 @@ describe('JAV 推荐与加载结构', () => {
       const pendingFilter = await page.locator('[data-jav-filter]').boundingBox();
       const pendingBottom = await page.locator('[data-jav-filter] [data-filter-row="bottom"]').boundingBox();
       const pendingSize = await page.locator('[data-jav-filter] [data-entity-layout]').boundingBox();
+      const pendingShortcut = await page.locator('[data-jav-filter] [data-shortcuts-trigger]').boundingBox();
+      assert.ok(pendingShortcut && pendingShortcut.width === 32 && pendingShortcut.height === 32);
       const tagPlaceholders = page.locator('[data-jav-filter] [data-catalog-tags] [data-skeleton="tag"]');
       assert.equal(await tagPlaceholders.count(), 6);
       const pendingTags = await tagPlaceholders.evaluateAll(nodes => nodes.map(node => {
@@ -166,8 +168,9 @@ describe('JAV 推荐与加载结构', () => {
       const liveFilter = await page.locator('[data-jav-filter]').boundingBox();
       const liveBottom = await page.locator('[data-jav-filter] [data-filter-row="bottom"]').boundingBox();
       const liveSize = await page.locator('[data-jav-filter] [data-entity-layout]').boundingBox();
-      for (const [pending, live] of [[pendingFilter, liveFilter], [pendingBottom, liveBottom], [pendingSize, liveSize]]) {
-        assert.ok(pending && live && Math.abs(pending.y - live.y) <= 1 && Math.abs(pending.height - live.height) <= 1, JSON.stringify({ pending, live, pendingBottom, liveBottom, pendingSize, liveSize }));
+      const liveShortcut = await page.locator('[data-jav-filter] [data-shortcuts-trigger]').boundingBox();
+      for (const [pending, live] of [[pendingFilter, liveFilter], [pendingBottom, liveBottom], [pendingSize, liveSize], [pendingShortcut, liveShortcut]]) {
+        assert.ok(pending && live && Math.abs(pending.y - live.y) <= 1 && Math.abs(pending.height - live.height) <= 1, JSON.stringify({ pending, live, pendingBottom, liveBottom, pendingSize, liveSize, pendingShortcut, liveShortcut }));
       }
       const controls = await page.locator('[data-jav-filter] [data-entity-sorts]').boundingBox();
       assert.ok(liveSize && controls && liveSize.x >= controls.x && liveSize.x + liveSize.width <= controls.x + controls.width);

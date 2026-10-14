@@ -1,8 +1,10 @@
 # 复用清单
 
-收藏窗口复用 BoardUI `2026.10.8` 官方技能、MIT Avatar 源码与公开 `settings-modal` 分类布局，保留 React Aria 外壳、Peach 查询、viewglide 与窄屏布局。收藏图像由 `entity_ref`、厂牌标识和本地代表作头像投影提供，不写入偏好；原始源码哈希见 `docs/BOARD_UI.md`。Rule34 视频封面使用来源缩略图，图片保留原文件扩展名；失败图片在关注数据刷新时重新尝试。无新增运行时依赖或真实 ledger 写入。
+收藏窗口复用 React Aria 外壳、Peach 设置弹层布局及共用关闭控件 `SettingsDialogClose`。入口为中性星形按钮；实体分类和保存的筛选分别显示，已标记与稍后看位于导航底部。收藏图像复用实体引用、厂牌标识、本地代表作与已绑定在线来源的本地头像代理，通过全站图片回退链逐项尝试，不写入偏好。原始 BoardUI 源码哈希见 `docs/BOARD_UI.md`。Rule34 视频封面使用来源缩略图，图片保留原文件扩展名；失败图片在关注数据刷新时重新尝试。无新增运行时依赖或真实 ledger 写入。
 
 关注封面代理复用来源登记的媒体主机白名单；第三方图片地址及重定向继续执行公网 DNS 校验。
+
+收藏弹层的导航复用设置页液态玻璃、`useViewGlide`、`attachOverlayScrollbar`、入场与退场关键帧及落影，桌面和手机检查实际计算样式。官方预告复用 amane `cc42cee6ecf290cf05af1caa347d2dc2d5aeffcd` 的 Prestige SKU→UUID 协议，通过官方返回的作品身份与公开 MP4 字段取得地址；读取复用既有来源传输、限制和媒体代理，无新增依赖。
 
 ## 上游应用功能
 
@@ -73,6 +75,8 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 `entity_identity_research` 与 `apply_entity_identity_research.py` 复用规范实体写入、字段归属保护、只读预览、SQLite 备份及冻结计划。逐行撤回回执核对后续修改，新增实体有额外引用时拒绝删除；观看历史和人工判断不被回滚覆盖。资料站调研复用 `performer_alias_followup.WikiSitePages`（包着 `sources/seesaa.py` 的 `WikiPages`，加 404 记忆与按站冷却）、作品表解析 `rows()` 与 `person_profile`，以及 EUC-JP 页名直取写法，不新增依赖；`creator_identity_followup` 的后继壳照抄补厂牌、补别名两条。
 
 ## 发现推荐缓存
+
+搜索推荐复用 `/api/items`、馆藏范围的 `/api/jav/discoveries`、`/api/follow`、`/api/follow/authors` 与 `/api/feeds/discoveries`，图片复用 `coverImage`、`feedNewCoverHtml`、`avatarInner` 和 `authorAvatarHtml`。JAV 保留 IDF/MMR 口味排序，关注取全部状态的随机作品，视频与图片复用 `groupMediaKinds`、`itemForMedia` 和附件缩略图；署名沿用 `followIdentity` 的发布者判据。搜索框不启动库外资料补齐；详情与订阅分别沿用现有作品、作者、关注管理路由。无新增依赖、迁移或 ledger 写入。
 
 发现推荐的浏览证据复用 `taste_history` 私有历史库、规范身份和原子 JSON 写入；按日取证与同地址身份解析独立缓存。缓存只保存实体计数，历史、别名、关注、标签决定和解析规则参与失效；观看反馈不重复解析历史，任务心跳不影响偏好版本。页面预取复用 TanStack Query 的 `ensureQueryData`，无新增依赖。
 

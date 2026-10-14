@@ -145,6 +145,12 @@ describe('关注的出处用站点图标', () => {
       assert.equal(badge.text, '另见');
       assert.equal(badge.alt, 'Rule34.xxx');
       assert.ok(Math.abs(badge.icon! - badge.line!) <= 1, `图标偏离徽章中线 ${Math.abs(badge.icon! - badge.line!)}px`);
+      await opened.page.locator('[data-follow-item]:has([data-follow-seealso])').first().hover();
+      const source = await opened.page.locator('[data-follow-item]:has([data-follow-seealso]) [data-follow-sources]').first().evaluate(node => {
+        const style = getComputedStyle(node);
+        return { opacity: style.opacity, visibility: style.visibility, events: style.pointerEvents };
+      });
+      assert.deepEqual(source, { opacity: '0', visibility: 'hidden', events: 'none' });
     } finally {
       await opened.close();
     }

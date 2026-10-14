@@ -129,6 +129,37 @@ class FeedWebFixture(unittest.TestCase):
 
 
 class FeedWebTest(FeedWebFixture):
+    def test_newwork_cast_reads_cached_source_faces_and_local_aliases_without_fetching(self):
+        from peach.jav_discovery_metadata import discovery_metadata
+        self._add()
+        self._check()
+        self._drain(1)
+        with self.contract.database.write_transaction() as connection:
+            connection.execute("INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at)"
+                               " VALUES('performer','规范乙','规范乙',?,?)", (feeds.stamp(), feeds.stamp()))
+            eid = connection.execute("SELECT id FROM entity WHERE canonical_name='规范乙'").fetchone()[0]
+            connection.execute("INSERT INTO entity_alias(entity_id,alias,normalized_alias,source)"
+                               " VALUES(?,'来源乙','来源乙','test')", (eid,))
+        metadata = discovery_metadata(self.contract)
+        with self.contract.database.read_connection() as connection:
+            codes = [row[0] for row in connection.execute('SELECT code FROM feed_discovery')]
+        for code in codes:
+            metadata.remember(code, {'number': code, 'actors': [
+                {'id': 'A', 'name': '深田えいみ', 'gender': 0, 'avatar_url': 'https://tp.spfcas.com/A.jpg'},
+                {'id': 'B', 'name': '来源乙', 'gender': 0, 'avatar_url': 'https://tp.spfcas.com/B.jpg'},
+                {'id': 'C', 'name': '来源男优', 'gender': 1}]})
+        with patch('peach.javdb_public.PUBLIC_API.movie') as fetch:
+            items = dispatch_api_get(self.contract, '/api/feeds/discoveries', {})['items']
+        fetch.assert_not_called()
+        self.assertTrue(items)
+        for item in items:
+            self.assertEqual(item['performers'], '深田えいみ、规范乙')
+            self.assertEqual([ref['source_actor_id'] for ref in item['performer_refs']], ['A', 'B'])
+            self.assertTrue(all(ref['source_avatar'] for ref in item['performer_refs']))
+            self.assertEqual(item['performer_refs'][1]['id'], eid)
+        with self.contract.database.read_connection() as connection:
+            self.assertEqual({row[0] for row in connection.execute('SELECT performers FROM feed_discovery')}, {'深田えいみ'})
+
     def test_home_shape_tracks_visible_discoveries_without_an_entity(self):
         def has_feed():
             return dispatch_api_get(self.contract, "/api/entity/shapes", {})["home"]["feed"]

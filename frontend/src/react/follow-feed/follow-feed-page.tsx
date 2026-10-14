@@ -19,6 +19,7 @@ import { Button } from '@/components/base/buttons/button';
 import { apiGet, apiSend } from '../../api';
 import { LoadMore } from '../catalog-grid/catalog-grid-page';
 import { FilterGlassRows, FilterPill } from '../components/filter-glass';
+import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
 import { RetryNote, useSkeletonReveal } from '../components/grid-reveal';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { useViewGlide } from '../components/use-view-glide';
@@ -462,6 +463,7 @@ function Glass({ facets, view, total, busy, props, route }: {
         <h3 data-entity-readout="" data-follow-readout="">
           {`${total.toLocaleString()} 项更新 · 显示 ${facets.visible.length.toLocaleString()}`}
         </h3>
+        <LibraryShortcuts currentHref={() => location.pathname + location.search} kind="creator" />
         <span data-entity-sorts="">
           <Shuffle onPress={actions.shuffle} />
           {images ? (

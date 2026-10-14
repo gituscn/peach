@@ -465,6 +465,12 @@ def entity_ref(contract: WebContract, kind: str, entity_id, name: str) -> dict:
     if has_image:
         ref["image_version"] = contract.entity_image_version(kind, entity_id)
         ref["avatar_focus"] = contract.avatar_focus(kind, entity_id)
+    if kind == 'creator':
+        from .follow_identity import creator_avatar_refs
+        urls = creator_avatar_refs(contract).get(entity_id, [])
+        if urls:
+            ref['source_avatar_url'] = urls[0]
+            ref['source_avatar_fallbacks'] = urls[1:]
     return ref
 
 

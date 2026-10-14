@@ -84,6 +84,57 @@ describe('顶栏搜索', () => {
   after(async () => { await browser?.close(); });
 
   for (const viewport of VIEWPORTS) {
+    it(`${viewport.name} 空搜索显示作品封面、作者头像和新作订阅入口`, { timeout: 60_000 }, async () => {
+      const opened = await openSearch(browser, { viewport, history: ['最近搜索'] });
+      try {
+        const { page } = opened;
+        await page.route(/\/api\/jav\/discoveries\?/, route => route.fulfill({ json: { items: [
+          { id: 11, asset_id: 11, code: 'ABW-101', title: 'JAV 作品', is_jav: true, has_cover: true,
+            performer_refs: [{ id: 90001, name: '七海ひな', has_image: true }] },
+        ] } }));
+        await page.route(/\/api\/follow\?/, route => route.fulfill({ json: {
+          sources: [{ id: 1, author_key: 'name:作者', label: '作者', ref: '作者', provider: 'pixiv', official_avatar_url: '/poster?id=11' }],
+          groups: [{ primary: { id: 901, source_id: 1, title: '关注作品', thumb_url: '/poster?id=11', media_kind: 'video', status: 'saved' },
+            variants: [{ id: 902, source_id: 1, title: '图片作品', thumb_url: '/poster?id=12', media_kind: 'image', status: 'seen',
+              media_items: [{ index: 2, media_kind: 'image', thumb_url: '/poster?id=13' }] }], duplicates: [] }],
+        } }));
+        await page.route(/\/api\/follow\/authors\?/, route => route.fulfill({ json: {
+          items: [{ k: '作者', key: 'name:作者', entity_id: 90002 }],
+        } }));
+        await page.route(/\/api\/feeds\/discoveries\?/, route => route.fulfill({ json: { items: [
+          { id: 91, code: 'ABW-102', title: '订阅新作', has_cover: true },
+        ] } }));
+        if (viewport.mobile) await page.locator('#searchBtn').click();
+        await page.locator('#q').click();
+        await page.locator(`${MENU} [data-search-recommendations]`).waitFor();
+        assert.equal(await page.locator(`${MENU} [data-kind="author"] [data-search-face] img`).count(), 1);
+        for (const kind of ['asset', 'jav', 'post', 'photo', 'release']) {
+          const cover = page.locator(`${MENU} [data-kind="${kind}"] [data-search-pic] img`).first();
+          assert.ok(await cover.count(), `${kind} 没有图片`);
+          const box = await cover.boundingBox();
+          assert.ok(box && box.width >= 80, `${kind} 没有以封面展示`);
+        }
+        const overflow = await page.locator(MENU).evaluate(el => ({
+          width: el.clientWidth, scrollWidth: el.scrollWidth, right: el.getBoundingClientRect().right,
+          viewport: innerWidth,
+        }));
+        assert.ok(overflow.scrollWidth <= overflow.width + 1);
+        assert.ok(overflow.right <= overflow.viewport + 1);
+        assert.equal(await page.locator(`${MENU} [data-kind="photo"] h3 a`).getAttribute('href'), '/follow?media=images');
+        assert.ok((await page.locator(`${MENU} [data-kind="photo"] img`).getAttribute('src'))?.includes('id=13'));
+        await page.screenshot({ path: `../build/agent-verification/browser/search-recommendations-${viewport.name}.png` });
+        const subscription = page.locator(`${MENU} [data-kind="performer"] h3 a`);
+        await subscription.focus();
+        await page.waitForTimeout(180);
+        assert.equal(await page.locator(MENU).isVisible(), true, '菜单内键盘焦点关闭了推荐');
+        await subscription.press('Enter');
+        await page.waitForURL('**/subscriptions?tab=feeds');
+        assert.ok(!new URL(page.url()).searchParams.has('q'));
+      } finally { await opened.close(); }
+    });
+  }
+
+  for (const viewport of VIEWPORTS) {
     it(`单类视频预览可滚动，完整结果入口可由键盘提交（${viewport.name}）`, { timeout: 60_000 }, async () => {
       const opened = await openSearch(browser, { viewport });
       try {

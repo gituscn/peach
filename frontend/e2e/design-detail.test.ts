@@ -726,15 +726,18 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
       await page.hover('[data-immerse-bar]');
       await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-immerse-bar] i')!).height === '9px');
 
-      // 动作键：悬停放大 1.05、按住缩到 .96；选中反相成浅底深字（压在画面上，抬一档的面会被画面吃掉）。
+      // 动作键以底色反馈，悬停与按住保持尺寸；选中使用浅底深字。
       await page.route('**/api/feedback', (route) => route.fulfill({ json: { feedback: 'seen', o_count: 0 } }));
       const seen = '[data-immerse-actions] button[aria-label="标为看过"]';
+      const resting = await page.locator(seen).boundingBox();
+      const background = await page.locator(seen).evaluate(node => getComputedStyle(node).backgroundColor);
       await page.hover(seen);
-      const scale = (value: string) => page.waitForFunction(([selector, want]) =>
-        getComputedStyle(document.querySelector(selector!)!).scale === want, [seen, value] as const);
-      await scale('1.05');
+      await page.waitForFunction(([selector, color]) => getComputedStyle(document.querySelector(selector!)!).backgroundColor !== color, [seen, background]);
+      assert.deepEqual(await page.locator(seen).boundingBox(), resting);
+      assert.equal(await page.locator(seen).evaluate(node => getComputedStyle(node).scale), 'none');
       await page.mouse.down();
-      await scale('0.96');
+      assert.deepEqual(await page.locator(seen).boundingBox(), resting);
+      assert.equal(await page.locator(seen).evaluate(node => getComputedStyle(node).scale), 'none');
       await page.mouse.up();
       await page.locator(`${seen}[aria-pressed="true"]`).waitFor({ timeout: 5_000 });
       await page.mouse.move(0, 0);

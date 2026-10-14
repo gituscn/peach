@@ -221,7 +221,7 @@
 [data-settings-panel] [data-number-control] input{appearance:textfield;-moz-appearance:textfield}
 /* `--settings-gap` 是标题和第一行之间那段留白，也是那道影子的门槛：它长在滚动区的上
    内边距上，所以滚掉它就等于两块重合。CSS 和 `settings-panel.tsx` 的判据都读这一个值。 */
-[data-settings-panel] [data-settings-card][data-settings-card]{--settings-gap:16px;width:871px;max-width:calc(100vw - 32px);height:614px;max-height:calc(100dvh - 32px);border-radius:24px;grid-template-columns:274px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);overflow:clip;background:var(--page)}
+:is([data-settings-panel] [data-settings-card][data-settings-card],.peach-react [data-modal-width="collections"]){--settings-gap:16px;width:871px;max-width:calc(100vw - 32px);height:614px;max-height:calc(100dvh - 32px);border-radius:24px;grid-template-columns:274px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);overflow:clip;background:var(--page)}
 [data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav]{position:relative;grid-column:1;grid-row:1/3;display:flex;flex-direction:column;align-items:stretch;padding:10px;gap:4px;background:var(--ground);border:0}
 /* 左栏分块：一个小标题带一组条目。第一块贴着栏顶，后面每块自己往上让 12px 断开。 */
 [data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] [data-settings-nav-caption]{margin:12px 0 0;font-size:13px;color:var(--muted);padding:4px 8px 8px}
@@ -269,7 +269,7 @@
 [data-settings-panel] [data-settings-card] [data-number-control]{gap:5px;font-size:12px}
 [data-settings-panel] [data-settings-card] [data-number-control] input{width:64px;height:32px;padding:6px;border-radius:8px;font-size:13px}
 [data-settings-panel] [data-settings-card] [data-number-control] button{min-height:32px;padding:4px 8px;font-size:12px}
-@media (max-width:760px){[data-settings-panel] [data-settings-card][data-settings-card]{display:flex;flex-direction:column;width:calc(100vw - 24px);max-width:calc(100vw - 24px)}}
+@media (max-width:760px){:is([data-settings-panel] [data-settings-card][data-settings-card],.peach-react [data-modal-width="collections"]){display:flex;flex-direction:column;width:calc(100vw - 24px);max-width:calc(100vw - 24px)}}
 @media (max-width:760px){[data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav]{flex-direction:row;flex-shrink:0;overflow-x:auto;border-right:0}}
 @media (max-width:760px){[data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] [data-settings-nav-caption]{margin:0;padding:0 4px 0 8px;align-self:center;white-space:nowrap}}
 @media (max-width:760px){[data-settings-panel] [data-settings-card][data-settings-card]>[data-settings-nav] [data-settings-nav-caption]:first-child{padding-left:0}}
@@ -289,9 +289,9 @@ html[data-theme-snapshot] [data-settings-panel] :is([data-settings-glide],[data-
 @media (prefers-reduced-transparency:reduce),(prefers-contrast:more){[data-settings-panel] [data-settings-card][data-settings-card][data-settings-card]>[data-settings-nav]{background:var(--ground);animation:none}}
 /* 落影随主题换浓淡。不写 `light-dark()`：构建会把它改写成依赖 `color-scheme` 声明的变量，这份样式表里
    没有那一条，落影就整条失效。主题标记是 `<html>` 上的 `.dark`。 */
-[data-settings-panel]{--settings-card-drop:#0000000d;--settings-error-drop:#0002}
-.dark [data-settings-panel]{--settings-card-drop:#00000080;--settings-error-drop:#0008}
-[data-settings-panel] [data-settings-card]{box-shadow:0 12px 40px var(--settings-card-drop)}
+:is([data-settings-panel],[data-modal-kind="collections"]){--settings-card-drop:#0000000d;--settings-error-drop:#0002}
+.dark :is([data-settings-panel],[data-modal-kind="collections"]){--settings-card-drop:#00000080;--settings-error-drop:#0008}
+:is([data-settings-panel] [data-settings-card],.peach-react [data-modal-width="collections"]){box-shadow:0 12px 40px var(--settings-card-drop)}
 [data-settings-panel] [data-settings-card]{border:1px solid var(--line)}
 [data-settings-panel] [data-settings-nav]{display:flex;gap:4px;overflow-x:auto;flex:none;border-bottom:1px solid var(--line);margin:0 0 24px;padding:0;scrollbar-width:none}
 [data-settings-panel] [data-settings-nav] button{flex:none;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:10px 12px;font-family:inherit;font-size:14px;font-weight:400;line-height:20px;color:var(--ink-2);cursor:pointer;white-space:nowrap}

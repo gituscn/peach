@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { queryClient } from '../../src/react/query';
 import { FavoriteButton, LibraryShortcuts } from '../../src/react/library-shortcuts/shortcut-controls';
 import { favoriteHref, SHORTCUTS_KEY, type Shortcuts } from '../../src/react/library-shortcuts/library-shortcuts';
-import { buttonNamed, click, mount, pending, settle, submit, type } from './render';
+import { click, mount, pending, settle, submit, type } from './render';
 
 notifyManager.setScheduler((notify) => notify());
 afterEach(() => { queryClient.clear() });
@@ -65,10 +65,12 @@ describe('我的收藏', () => {
     await mount(<QueryClientProvider client={queryClient}>
       <LibraryShortcuts currentHref={() => '/watch-later?loc=&tag=VR&jav=1'} />
     </QueryClientProvider>);
-    await click(buttonNamed('我的收藏'));
+    await click(document.querySelector('[aria-label="我的收藏"]'));
     await settle();
     expect(document.querySelector('nav[aria-label="收藏作品清单"] a[href="/flagged"]')?.textContent).toBe('已标记');
     expect(document.querySelector('nav[aria-label="收藏作品清单"] a[href="/watch-later"]')?.textContent).toBe('稍后看');
+    expect(document.querySelector('form[aria-label="保存当前筛选"]')).toBeNull();
+    await click(document.querySelector('[role="tab"][aria-label="保存的筛选"]'));
     await type(document.querySelector('form[aria-label="保存当前筛选"] input'), 'VR 待看');
     await submit(document.querySelector('form'));
     await settle();
@@ -89,7 +91,7 @@ describe('我的收藏', () => {
       ({ key: `entity:${index + 1}`, entity_id: index + 1, kind, name: `收藏 ${kind}`, image_url: `/test-image/${kind}` }));
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ favorites, filters: [] }) })));
     await mount(<QueryClientProvider client={queryClient}><LibraryShortcuts /></QueryClientProvider>);
-    await click(buttonNamed('我的收藏'));
+    await click(document.querySelector('[aria-label="我的收藏"]'));
     await settle();
     expect(document.querySelectorAll('[data-shortcuts-avatar] img')).toHaveLength(6);
     expect(document.querySelector('[data-shortcuts-avatar] .ini')).toBeNull();
