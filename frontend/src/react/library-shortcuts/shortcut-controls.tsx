@@ -155,7 +155,7 @@ function ShortcutContents({ currentHref, kind, close }: { currentHref?: () => st
     </> : <>
       {!data.filters.length ? <EmptyState shell="plain" icon={spriteGlyph('list-filter')} title="还没有保存的筛选">在馆藏页保存当前条件，随时打开。</EmptyState> : null}
       {data.filters.map((row) => <div key={row.id} className="flex min-w-0 items-center justify-between gap-2">
-        <a href={row.href} title={row.name} onClick={close} className="min-w-0 flex-1 break-all text-body-regular text-text-primary underline">{row.name}</a>
+        <a href={row.href} onClick={close} className="min-w-0 flex-1 break-all text-body-regular text-text-primary underline">{row.name}</a>
         <Button variant="secondary" size="small" aria-label={`删除筛选${row.name}`} {...busyProps(write.isPending)}
           onClick={() => { if (!write.isPending) write.mutate({ action: 'delete_filter', id: row.id }) }}>删除</Button>
       </div>)}
