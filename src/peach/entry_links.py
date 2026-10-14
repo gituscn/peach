@@ -17,10 +17,10 @@
 **MISSAV 按日文艺名拼。** 入口使用 `/dm3/cn/actresses/`，汉字字形按简中站投影；当前规范名
 含假名且不是纯读音时优先使用，否则从别名里挑日文艺名。中文译名与旧艺名不能代替当前日文艺名：
 
-- 含假名才算日文写法。汉字分不出中日——`佐々木さき` 认得出，纯汉字的艺名认不出，
-  那种只能退回规范名。
-- 纯平假名的那条是读音不是艺名。`r18:performer` 每位都带一条（`しゃくありす`），
-  而站上的页面挂在混着汉字或片假名的艺名下（`釈アリス`），实测纯平假名同样 404。
+- 日文艺名可含假名或纯汉字。汉字现名采用同名字形或已有成对译名的来源证据；
+  对应的中文名必须仍是当前规范名，不同姓氏与可信假名艺名的冲突保留给复核。
+- 别名里的纯平假名读音不作为入口。`r18:performer` 每位都带一条（`しゃくありす`），
+  选择艺名时需要区分它与人物的正式写法（`釈アリス`）。可信艺名来源标明的纯平假名正式艺名照用。
 - 同样形态的有多条时，优先 `avdb-actor-mapping`、`javdb`、`wiki` 这几类艺名来源。
 - 一条都挑不出时才用规范名：拼错的地址和没有地址相比，前者更难发现。
 
@@ -112,6 +112,7 @@ _HOST_SHAPE = re.compile(r"[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?"
 _ORDINALS = "②③④⑤⑥⑦⑧⑨"
 #: 艺名类的别名来源。按子串认：来源串后面还挂着采集批次。
 _STAGE_NAME_SOURCES = ("avdb-actor-mapping", "javdb", "wiki", "performer-localization")
+_MISSAV_GLYPHS = {**JP_KANJI_TO_SIMPLIFIED, "條": "条"}
 
 
 def defaults() -> dict:
@@ -233,24 +234,88 @@ def _only_hiragana(written: str) -> bool:
                for char in written)
 
 
-def japanese_name(canonical_name: str, aliases) -> str:
+def _glyph_key(written: str) -> str:
+    return fold_glyphs(written).translate(str.maketrans(_MISSAV_GLYPHS))
+
+
+def _han_name(written: str) -> bool:
+    return bool(re.fullmatch(r"[\u3400-\u9fff々\s]+", written))
+
+
+def _glyph_equivalents(name: str, aliases) -> list[str]:
+    """与当前艺名仅有汉字字形或叠字符号差异的写法。"""
+    matches = []
+    for row in aliases or ():
+        written = str((row.get("alias") if isinstance(row, dict) else row) or "").strip()
+        if written and _glyph_key(written) == _glyph_key(name):
+            matches.append(written)
+    return matches
+
+
+def _published_kana_alias(aliases) -> bool:
+    """别名中是否有区别于纯平假名读音的艺名。"""
+    for row in aliases or ():
+        written = str((row.get("alias") if isinstance(row, dict) else row) or "")
+        if _has_kana(written) and not _only_hiragana(written):
+            return True
+    return False
+
+
+def _paired_hiragana_name(jp: str, aliases) -> bool:
+    """成对来源中的纯平假名艺名必须同时出现在可信艺名别名中。"""
+    if not _only_hiragana(jp) or not _has_kana(jp):
+        return False
+    return any(isinstance(row, dict) and row.get("alias") == jp
+               and any(mark in str(row.get("source") or "") for mark in _STAGE_NAME_SOURCES)
+               for row in aliases or ())
+
+
+def _localized_han_name(name: str, aliases, localization) -> str:
+    """来源成对记录的当前汉字艺名；不同姓氏或可信假名艺名冲突时不采用。"""
+    if not isinstance(localization, dict) or not _han_name(name):
+        return ""
+    jp = str(localization.get("jp") or "").strip()
+    chinese = str(localization.get("zh_cn") or "").strip()
+    source = str(localization.get("source") or "")
+    trusted = any(mark in source for mark in (*_STAGE_NAME_SOURCES, "kanji-simplification"))
+    if not trusted or _glyph_key(chinese) != _glyph_key(name):
+        return ""
+    if _paired_hiragana_name(jp, aliases):
+        return jp
+    if not _han_name(jp):
+        return ""
+    if _glyph_key(jp) != _glyph_key(name) and _glyph_key(jp)[:2] != _glyph_key(name)[:2]:
+        return ""
+    for row in aliases or ():
+        if not isinstance(row, dict):
+            continue
+        written = str(row.get("alias") or "")
+        alias_source = str(row.get("source") or "")
+        if _has_kana(written) and not _only_hiragana(written) \
+                and any(mark in alias_source for mark in _STAGE_NAME_SOURCES):
+            return ""
+    return jp
+
+
+def japanese_name(canonical_name: str, aliases, localization=None) -> str:
     """这位的日文艺名。挑不出来时退回规范名，判据见模块开头。"""
     name = str(canonical_name or "").strip()
-    if _has_kana(name) and not _only_hiragana(name):
-        equivalents = [name]
-        for row in aliases or ():
-            written = str((row.get("alias") if isinstance(row, dict) else row) or "").strip()
-            if written and fold_glyphs(written) == fold_glyphs(name):
-                equivalents.append(written)
-        return max(equivalents, key=lambda value: sum(char in JP_KANJI_TO_SIMPLIFIED for char in value))
+    localized = _localized_han_name(name, aliases, localization)
+    current = localized or name
+    equivalents = _glyph_equivalents(current, aliases)
+    if localized or (equivalents and not _published_kana_alias(aliases)) \
+            or (_has_kana(name) and not _only_hiragana(name)):
+        return max([current, *equivalents],
+                   key=lambda value: sum(char in _MISSAV_GLYPHS or char == "々" for char in value))
     chosen: tuple[tuple[int, int, int], str] | None = None
     for index, row in enumerate(aliases or ()):
         written = str((row.get("alias") if isinstance(row, dict) else row) or "").strip()
-        if not written or not _has_kana(written):
-            continue
         source = str((row.get("source") if isinstance(row, dict) else "") or "")
+        trusted = any(mark in source for mark in _STAGE_NAME_SOURCES)
+        if not written or not _has_kana(written) or (_only_hiragana(written) and not trusted):
+            continue
         rank = (1 if _only_hiragana(written) else 0,
-                0 if any(mark in source for mark in _STAGE_NAME_SOURCES) else 1,
+                0 if trusted else 1,
                 index)
         if chosen is None or rank < chosen[0]:
             chosen = (rank, written)
@@ -264,7 +329,7 @@ def is_jav_performer(refs) -> bool:
 
 def missav_name(japanese: str) -> str:
     """简中入口的汉字字形，假名、叠字符号与其他艺名字符保留。"""
-    return japanese.translate(str.maketrans(JP_KANJI_TO_SIMPLIFIED))
+    return japanese.translate(str.maketrans(_MISSAV_GLYPHS))
 
 
 def _ordinal(index: int) -> str:
@@ -281,11 +346,11 @@ def _ordinal(index: int) -> str:
     return f"({index + 1})"
 
 
-def build(settings: dict, canonical_name: str, refs, aliases=()) -> list[dict]:
+def build(settings: dict, canonical_name: str, refs, aliases=(), localization=None) -> list[dict]:
     """这条人物实体能直达的地址，按 SITES 的先后排好。缺 id 的站点不出现在结果里。"""
     ids = provider_ids(refs)
     jav = is_jav_performer(refs)
-    written = japanese_name(canonical_name, aliases)
+    written = japanese_name(canonical_name, aliases, localization)
     out: list[dict] = []
     for site in SITES:
         row = settings.get(site.key) or {}
@@ -305,9 +370,9 @@ def build(settings: dict, canonical_name: str, refs, aliases=()) -> list[dict]:
     return out
 
 
-def entry_links(root: Path, canonical_name: str, refs, aliases=()) -> list[dict]:
+def entry_links(root: Path, canonical_name: str, refs, aliases=(), localization=None) -> list[dict]:
     """读设置并拼出入口。资料页只调这一个。"""
-    return build(read(root), canonical_name, refs, aliases)
+    return build(read(root), canonical_name, refs, aliases, localization)
 
 
 def javdb_actor_pages(canonical_name: str, refs) -> list[str]:

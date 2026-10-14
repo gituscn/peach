@@ -1248,6 +1248,26 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(entries[0]["url"], "https://javdb.com/actors/NPD3")
         self.assertTrue(entries[1]["url"].startswith("https://missav.ws/dm3/cn/actresses/%"))
 
+    async def test_entity_entries_use_paired_current_han_stage_name(self):
+        connection = sqlite3.connect(self.db)
+        metadata = {"name_localization": {"source": "avdb-actor-mapping",
+                                          "jp": "水谷心音", "zh_cn": "水谷心音"}}
+        connection.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,metadata_json) "
+                           "VALUES(3,'performer','水谷心音','水谷心音',?)",
+                           (json.dumps(metadata, ensure_ascii=False),))
+        connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) "
+                           "VALUES(1,3,'performer','test',1)")
+        connection.execute("INSERT INTO entity_external_ref(entity_id,provider,external_kind,external_id) "
+                           "VALUES(3,'javdb','performer','sample')")
+        connection.execute("INSERT INTO entity_alias(entity_id,alias,normalized_alias,source,confidence) "
+                           "VALUES(3,'藤崎りお','藤崎りお','r18:performer',1)")
+        connection.commit()
+        connection.close()
+        response = await self.client.get("/api/entity?t=secret&kind=performer&name=" + quote("水谷心音"))
+        self.assertEqual(response.status_code, 200, response.text)
+        missav = next(row for row in response.json()["entry_links"] if row["site"] == "missav")
+        self.assertEqual(missav["url"], "https://missav.ws/dm3/cn/actresses/" + quote("水谷心音"))
+
     async def test_review_queue_is_readable_and_decisions_are_persisted(self):
         response = await self.client.get("/api/review?t=secret")
         self.assertEqual(response.status_code, 200)

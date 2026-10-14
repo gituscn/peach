@@ -155,8 +155,11 @@ def _performer_entries(contract: WebContract, c, d: dict, alias_rows) -> dict:
     前端再拼一遍就会有两份规则。缺 id 的站点不出现在这个列表里。开关只在她有
     JavDB 演员页时出现，订阅地址同样由服务端拼，页面只管开和关。
     """
+    metadata = d.get("metadata") or {}
+    localization = metadata.get("name_localization") if isinstance(metadata, dict) else None
     out = {"entry_links": entry_links.entry_links(
-        contract.entry_links_root, d["canonical_name"], d["external_refs"], alias_rows)}
+        contract.entry_links_root, d["canonical_name"], d["external_refs"], alias_rows,
+        localization)}
     if entry_links.javdb_actor_pages(d["canonical_name"], d["external_refs"]):
         out["feed"] = {"following": feeds.entity_following(c, d["id"])}
     return out
