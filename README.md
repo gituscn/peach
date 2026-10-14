@@ -34,7 +34,6 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 - **网盘和本地一起看**：115、PikPak 用 CloudDrive2 挂载成本地磁盘后，和硬盘里的片子进同一个馆藏。
 - **挂载状态**：定期检查媒体目录；读取失败会复查，确认后在托盘和作品页说明来源及原因。扫描跳过 NAS 回收站与系统目录。
 - **播放墙挑片**：拖动全屏封面墙浏览，点开作品就在墙内播放；同一番号的版本和分卷可以直接切换。
-- **收藏与保存筛选**：收藏常看的艺人、厂牌、系列和标签，也能给一组筛选起名字，下次直接打开。
 - **跨站关注与追新作**：把同一创作者在多个站点的更新汇到一起；按女优名订阅新作，尚未入库也能追。
 - **数据留在自己电脑上**：观看记录、收藏和设置都存在本机；补资料时只向来源站点发送番号或女优名；用云下载时，磁力只交给你选的网盘。
 - **公司资料**：厂牌和事务所可显示公司名称、成立日期、品牌启动日期、所在地及运营归属；只显示有来源的资料。
@@ -53,10 +52,6 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 **播放墙：拖动挑片，原位播放，切换版本和分卷。**
 
 <a href="https://peach.video/assets/screenshots/wall-20261014.png" target="_blank" rel="noopener"><img src="https://peach.video/assets/screenshots/wall-20261014.webp" alt="播放墙：全屏作品封面与浏览控件" width="1200"></a>
-
-**我的收藏：人物、厂牌、系列、标签和保存的筛选集中打开。**
-
-<a href="https://peach.video/assets/screenshots/favorites-20261014.png" target="_blank" rel="noopener"><img src="https://peach.video/assets/screenshots/favorites-20261014.webp" alt="我的收藏：分类导航与收藏条目" width="1200"></a>
 
 **女优页：资料、别名、外部链接和全部作品**
 

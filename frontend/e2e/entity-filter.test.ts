@@ -133,6 +133,13 @@ describe('实体页筛选浮层', () => {
       await page.route(/\/api\/entity\?/, async (route) => { await held; await route.fallback(); });
       await page.goto(new URL(PATH, page.url()).href, { waitUntil: 'load' });
       await page.locator('#index [data-skeleton="entity/performer"] .board-filter-frame').waitFor({ timeout: 15_000 });
+      const material = await page.locator('#index [data-skeleton] .board-filter-frame').evaluate(node => {
+        const style = getComputedStyle(node);
+        return { image: style.backgroundImage, backdrop: style.backdropFilter, background: style.backgroundColor };
+      });
+      assert.equal(material.image, 'none');
+      assert.equal(material.backdrop, 'none');
+      assert.notEqual(material.background, 'rgb(0, 0, 0)');
       /* 资料卡是另一座岛，骨架与真卡的高度差不归这一块管：浮层的位置按它离资料卡下沿的距离量。 */
       const measure = (hero: string, glass: string, grid: string) => page.evaluate(([heroSelector, glassSelector, gridSelector]) => {
         const heroBox = document.querySelector(heroSelector)!.getBoundingClientRect();

@@ -34,7 +34,6 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 - **Cloud and local together**: once 115 or PikPak is mounted as a local drive with CloudDrive2, its videos join the same library as your hard drives.
 - **Mount status**: media directories are checked periodically. A failed read is checked again before the tray and video page show the affected source and reason. Scans skip NAS recycle bins and system folders.
 - **Pick from the video wall**: drag through a full-screen cover wall, expand a work and play in place, with versions and parts available directly.
-- **Favorites and saved filters**: favorite performers, studios, series and tags, or name a filter combination to open it again later.
 - **Cross-site following and new releases**: bring a creator's updates from multiple sites into one feed. Subscribe by performer name, including performers outside your library.
 - **Your data stays on your computer**: watch history, favorites and settings are stored locally. When filling in details, Peach only sends the video code or performer name to source sites. With cloud download, a magnet link goes only to the cloud drive you pick.
 - **Company profiles**: studio and agency pages can show company names, foundation dates, brand launch dates, locations and operating relationships when sourced information is available.
@@ -53,10 +52,6 @@ These lossless screenshots are 3840×2160; click to view the original PNG. You c
 **Video wall: drag to explore, play in place, switch versions and parts.**
 
 <a href="https://peach.video/assets/screenshots/wall-20261014.png" target="_blank" rel="noopener"><img src="https://peach.video/assets/screenshots/wall-20261014.webp" alt="Video wall: full-screen covers and browsing controls" width="1200"></a>
-
-**My Favorites: people, studios, series, tags and saved filters in one place.**
-
-<a href="https://peach.video/assets/screenshots/favorites-20261014.png" target="_blank" rel="noopener"><img src="https://peach.video/assets/screenshots/favorites-20261014.webp" alt="My Favorites: category navigation and saved entries" width="1200"></a>
 
 **Performer page: profile, aliases, links and every video**
 
