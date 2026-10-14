@@ -472,7 +472,7 @@ body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-follo
   outline: 2px solid var(--tungsten);
   outline-offset: 2px;
 }
-.peach-react a[data-follow-author]:hover { text-decoration: underline; }
+.peach-react [data-follow-byline] a[data-follow-author]:hover { text-decoration: underline; }
 /* 作品卡的首字母用 Bahnschrift，关注卡同遗留层 `.fsourceavatar .favatar.none` 走正文字体。 */
 .peach-react [data-follow-avatar] > span:first-child {
   display: grid;
