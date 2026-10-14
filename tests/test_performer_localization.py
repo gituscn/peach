@@ -317,6 +317,21 @@ class PerformerLocalizationTests(unittest.TestCase):
         self.assertEqual(rows[14]["cn_status"], "非发行艺人，不判中译")
         self.assertEqual(rows[14]["url"], "")
 
+    def test_entry_audit_uses_the_source_glyphs_for_missav(self):
+        self.con.execute("UPDATE entity SET canonical_name='七泽美亚',metadata_json='{}' WHERE id=18")
+        self.con.execute("DELETE FROM entity_alias WHERE entity_id=18")
+        self.con.execute("INSERT INTO entity_alias VALUES(18,'七沢みあ','七沢みあ','javdb-actor-page',1)")
+        self.con.execute("INSERT INTO entity_external_ref(entity_id,provider,external_kind,external_id) "
+                         "VALUES(18,'javdb','performer','sample')")
+        directory = entry_links.directory_index({"source": entry_links.DIRECTORY_URL,
+            "entries": [{"name": "七泽美亚", "url": "https://missav.ws/dm3/cn/actresses/"
+                         "%E4%B8%83%E6%B2%A2%E3%81%BF%E3%81%82"}]})
+        rows = {row["entity_id"]: row for row in audit_entries(self.con, directory)}
+        self.assertEqual(rows[18]["entry_name"], "七沢みあ")
+        self.assertEqual(rows[18]["directory_status"], "已匹配")
+        self.assertEqual(rows[18]["url"], "https://missav.ws/dm3/cn/actresses/"
+                         "%E4%B8%83%E6%B2%A2%E3%81%BF%E3%81%82")
+
 
 class KanjiTableAgainstOpenCCTests(unittest.TestCase):
     """字形表逐字对 opencc 复核，手写的对应关系不作数。

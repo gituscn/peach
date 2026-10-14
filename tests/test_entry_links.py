@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from urllib.parse import quote
 
 from peach import entry_links
 
@@ -134,8 +135,20 @@ class EntryLinkAddressTests(unittest.TestCase):
                          ("梨梨衣", "梨々衣")):
             with self.subTest(name=name):
                 self.assertEqual(entry_links.japanese_name(name, [alias(jp)]), jp)
-        self.assertEqual(entry_links.missav_name("北條麻妃"), "北条麻妃")
-        self.assertEqual(entry_links.missav_name("乃々果花"), "乃々果花")
+
+    def test_missav_preserves_source_stage_name_glyphs(self):
+        from urllib.parse import unquote, urlsplit
+
+        for name, jp in (("七泽美亚", "七沢みあ"), ("逢泽美优", "逢沢みゆ"),
+                         ("北条麻妃", "北條麻妃"), ("乃乃果花", "乃々果花"),
+                         ("优梨舞奈", "優梨まいな")):
+            with self.subTest(name=name):
+                directory = entry_links.directory_index({"source": entry_links.DIRECTORY_URL,
+                    "entries": [{"name": name, "url": "https://missav.ws/dm3/cn/actresses/" + quote(jp)}]})
+                rows = entry_links.build(entry_links.defaults(), name,
+                                         [ref("javdb", "sample")], [alias(jp)], directory=directory)
+                address = next(row["url"] for row in rows if row["site"] == "missav")
+                self.assertEqual(unquote(urlsplit(address).path), f"/dm3/cn/actresses/{jp}")
 
     def test_paired_current_han_name_wins_over_an_unreviewed_former_name(self):
         localized = {"source": "avdb-actor-mapping", "jp": "水谷心音", "zh_cn": "水谷心音"}
@@ -253,6 +266,22 @@ class EntryLinkSettingsFileTests(unittest.TestCase):
         self.assertEqual(rows["missav"]["host"], "")
         self.assertEqual(rows["missav"]["default_host"], "missav.ws")
 
+    def test_directory_file_supplies_the_published_missav_path(self):
+        path = self.root / entry_links.DIRECTORY_FILENAME
+        first = "https://missav.ws/dm102/cn/actresses/" + quote("七沢みあ")
+        path.write_text(json.dumps({"source": entry_links.DIRECTORY_URL,
+                                  "entries": [{"name": "七泽美亚", "url": first}]}), encoding="utf-8")
+        rows = entry_links.entry_links(self.root, "七泽美亚", [ref("javdb", "NPD3")],
+                                       [alias("七沢みあ")])
+        self.assertEqual(next(row["url"] for row in rows if row["site"] == "missav"), first)
+        second = first.replace("dm102", "dm1002")
+        path.write_text(json.dumps({"source": entry_links.DIRECTORY_URL,
+                                  "entries": [{"name": "七泽美亚", "url": second}]}), encoding="utf-8")
+        rows = entry_links.entry_links(self.root, "七泽美亚", [ref("javdb", "NPD3")],
+                                       [alias("七沢みあ")])
+        self.assertEqual(next(row["url"] for row in rows if row["site"] == "missav"), second)
+
+
     def test_a_pasted_address_is_trimmed_down_to_its_domain(self):
         """镜像地址多半是整条复制过来的，前缀与末尾的斜杠不值得弹一条错误。"""
         entry_links.save(self.root, self.body(missav={"host": "https://missav.ai/"}))
@@ -274,6 +303,65 @@ class EntryLinkSettingsFileTests(unittest.TestCase):
             json.dumps({"sites": {"javdb": {"host": "not a domain"}}}), encoding="utf-8")
         self.assertEqual(entry_links.read(self.root)["javdb"]["host"], "")
 
+
+class MissavDirectoryTests(unittest.TestCase):
+    def directory(self, rows, *, complete=False):
+        return entry_links.directory_index({"source": entry_links.DIRECTORY_URL,
+                                            "entries": rows, "complete": complete})
+
+    def test_site_glyphs_and_compound_stage_names_use_the_published_href(self):
+        for canonical, jp, display, slug in (
+                ("北条麻妃", "北條麻妃", "北条麻妃", "北条麻妃"),
+                ("森泽佳奈", "飯岡かなこ", "森泽佳奈 (饭冈佳奈子)", "森沢かな（飯岡かなこ）")):
+            with self.subTest(canonical=canonical):
+                address = "https://missav.ws/dm193/cn/actresses/" + quote(slug)
+                directory = self.directory([{"name": display, "url": address}])
+                rows = entry_links.build(entry_links.defaults(), canonical, [ref("javdb", "actor")],
+                                         [alias(jp)], directory=directory)
+                self.assertEqual(next(row["url"] for row in rows if row["site"] == "missav"), address)
+
+    def test_ambiguous_directory_names_have_no_missav_entry(self):
+        directory = self.directory([
+            {"name": "同名艺人", "url": "https://missav.ws/dm1/cn/actresses/A"},
+            {"name": "同名艺人", "url": "https://missav.ws/dm2/cn/actresses/B"},
+        ])
+        rows = entry_links.build(entry_links.defaults(), "同名艺人", [ref("javdb", "actor")],
+                                 directory=directory)
+        self.assertEqual([row["site"] for row in rows], ["javdb"])
+
+    def test_prefix_variants_of_the_same_published_slug_share_one_identity(self):
+        directory = self.directory([
+            {"name": "A", "url": "https://missav.ws/dm1/cn/actresses/A"},
+            {"name": "A", "url": "https://missav.ws/dm2/cn/actresses/A"},
+        ])
+        self.assertEqual(directory.path("A", "A"), "/dm1/cn/actresses/A")
+
+    def test_an_incomplete_directory_does_not_assert_an_unlisted_name_is_absent(self):
+        directory = self.directory([])
+        self.assertIsNone(directory.path("七沢みあ", "七泽美亚"))
+        rows = entry_links.build(entry_links.defaults(), "七泽美亚", [ref("javdb", "actor")],
+                                 [alias("七沢みあ")], directory=directory)
+        self.assertTrue(any(row["site"] == "missav" for row in rows))
+
+    def test_a_complete_directory_has_no_entry_for_an_unmatched_name(self):
+        rows = entry_links.build(entry_links.defaults(), "同名艺人", [ref("javdb", "actor")],
+                                 directory=self.directory([], complete=True))
+        self.assertEqual([row["site"] for row in rows], ["javdb"])
+
+    def test_directory_entries_are_scoped_to_the_public_actress_origin(self):
+        invalid = ("http://missav.ws/cn/actresses/A", "https://missav.ws.evil.test/cn/actresses/A",
+                   "https://name@missav.ws/cn/actresses/A", "https://missav.ws/cn/videos/A",
+                   "https://missav.ws/cn/actresses/A/extra")
+        directory = self.directory([{"name": "A", "url": value} for value in invalid])
+        self.assertEqual(directory.paths, {})
+
+    def test_a_mirror_preserves_the_directory_path(self):
+        settings = entry_links.defaults()
+        settings["missav"]["host"] = "missav.ai"
+        directory = self.directory([{"name": "A", "url": "https://missav.ws/dm102/cn/actresses/A"}])
+        rows = entry_links.build(settings, "A", [ref("javdb", "actor")], directory=directory)
+        self.assertEqual(next(row["url"] for row in rows if row["site"] == "missav"),
+                         "https://missav.ai/dm102/cn/actresses/A")
 
 if __name__ == "__main__":
     unittest.main()

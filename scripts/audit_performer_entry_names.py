@@ -16,14 +16,14 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from peach import entry_links  # noqa: E402
-from peach.config import DATABASE_PATH, DATA_ROOT  # noqa: E402
+from peach.config import DATABASE_PATH, DATA_ROOT, STATE_DIR  # noqa: E402
 from peach.review_csv import write_rows  # noqa: E402
 from peach.scripting import open_readonly  # noqa: E402
 from localize_performer_names import RELEASE_SOURCES  # noqa: E402
 
 FIELDS = ("entity_id", "current_name", "assets", "jav_directory", "previous_name",
           "entry_name", "previous_url", "url", "name_changed", "cn_status", "cn_aliases",
-          "aliases", "link_evidence")
+          "aliases", "directory_status", "link_evidence")
 KANA = re.compile(r"[\u3040-\u30ff]")
 HAN = re.compile(r"[\u3400-\u9fff]")
 LATIN = re.compile(r"[A-Za-z]")
@@ -37,7 +37,19 @@ def _name_localization(raw: str):
     return metadata.get("name_localization") if isinstance(metadata, dict) else None
 
 
-def collect(connection: sqlite3.Connection) -> list[dict]:
+def _directory_evidence(jav: bool, directory, selected: str, name: str) -> tuple[str, str]:
+    """名录匹配与目标页面请求是两个独立的证据状态。"""
+    if not jav:
+        return "不适用", "不适用"
+    path = directory.path(selected, name) if directory else None
+    if path is None:
+        return "未取得", "未取得：未取得名录条目，目标未逐页请求"
+    if not path:
+        return "需复核", "未取得：名录无唯一匹配"
+    return "已匹配", "已取得：名录 href，目标未逐页请求"
+
+
+def collect(connection: sqlite3.Connection, directory=None) -> list[dict]:
     """每位 performer 一行；入口生成正确与远端页面可访问分别留证。"""
     connection.row_factory = sqlite3.Row
     aliases: dict[int, list[dict]] = defaultdict(list)
@@ -59,6 +71,7 @@ def collect(connection: sqlite3.Connection) -> list[dict]:
         jav = entry_links.is_jav_performer(refs[entity_id])
         previous = entry_links.japanese_name("", chain) or name
         selected = entry_links.japanese_name(name, chain, _name_localization(entity["metadata_json"]))
+        directory_status, link_evidence = _directory_evidence(jav, directory, selected, name)
         chinese = sorted({str(row["alias"]) for row in chain
                           if HAN.search(str(row["alias"])) and not KANA.search(str(row["alias"]))
                           and not LATIN.search(str(row["alias"]))})
@@ -72,10 +85,13 @@ def collect(connection: sqlite3.Connection) -> list[dict]:
                     "assets": len(assets[entity_id]), "jav_directory": int(jav),
                     "previous_name": previous if jav else "", "entry_name": selected if jav else "",
                     "previous_url": f"https://missav.ws/cn/actresses/{quote(previous, safe='')}" if jav else "",
-                    "url": f"https://missav.ws/dm3/cn/actresses/{quote(entry_links.missav_name(selected), safe='')}" if jav else "",
+                    "url": next((row["url"] for row in entry_links.build(
+                        entry_links.defaults(), name, refs[entity_id], chain,
+                        _name_localization(entity["metadata_json"]), directory) if row["site"] == "missav"), ""),
                     "name_changed": int(jav and previous != selected), "cn_status": status,
                     "cn_aliases": "|".join(chinese), "aliases": "|".join(row["alias"] for row in chain),
-                    "link_evidence": "未取得：本轮只读本地库，未逐页请求" if jav else "不适用"})
+                    "directory_status": directory_status,
+                    "link_evidence": link_evidence})
     return out
 
 
@@ -83,12 +99,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", type=Path, default=DATABASE_PATH)
     parser.add_argument("--out", type=Path, default=DATA_ROOT / "review" / "performer-entry-name-audit.csv")
+    parser.add_argument("--missav-directory", type=Path, default=STATE_DIR / entry_links.DIRECTORY_FILENAME)
     args = parser.parse_args(argv)
+    directory = None
+    if args.missav_directory.is_file():
+        directory = entry_links.directory_index(json.loads(
+            args.missav_directory.read_text(encoding="utf-8")))
     with open_readonly(args.db) as connection:
-        rows = collect(connection)
+        rows = collect(connection, directory)
     write_rows(args.out, FIELDS, rows)
     print(json.dumps({"performers": len(rows), "missav_entries": sum(row["jav_directory"] for row in rows),
                       "entry_names_changed": sum(row["name_changed"] for row in rows),
+                      "directory_status": dict(Counter(row["directory_status"] for row in rows)),
                       "cn_status": dict(Counter(row["cn_status"] for row in rows)),
                       "review_csv": str(args.out)}, ensure_ascii=False))
     return 0

@@ -14,8 +14,11 @@
 日文、比看标签都硬。`stash` 不算（那是本机 Stash 的 id，库里每个人都有），
 `r18:performer_name` 也不算（那是名字映射，不是目录页上的 id）。
 
-**MISSAV 按日文艺名拼。** 入口使用 `/dm3/cn/actresses/`，汉字字形按简中站投影；当前规范名
+**MISSAV 采用名录中的实际 href。** 名录按当前艺名与规范名匹配，路径保留站点原文。
+未取得对应名录条目时，候选入口使用 `/dm3/cn/actresses/` 与来源艺名；当前规范名
 含假名且不是纯读音时优先使用，否则从别名里挑日文艺名。中文译名与旧艺名不能代替当前日文艺名：
+
+页面语言不决定路径字形；站点 canonical 中的艺名与数字前缀由站点处理。
 
 - 日文艺名可含假名或纯汉字。汉字现名采用同名字形或已有成对译名的来源证据；
   对应的中文名必须仍是当前规范名，不同姓氏与可信假名艺名的冲突保留给复核。
@@ -43,8 +46,9 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlsplit
 
 from filelock import FileLock
 
@@ -53,6 +57,8 @@ from .kanji import JP_KANJI_TO_SIMPLIFIED, fold_glyphs
 
 #: 入口设置落在数据根的 state 目录下。它是本机显示偏好，不是账本真相。
 FILENAME = "entry-links.json"
+DIRECTORY_FILENAME = "missav-actresses.json"
+DIRECTORY_URL = "https://missav.ws/cn/actresses"
 #: `entity_external_ref.external_kind`：人物那一档。
 EXTERNAL_KIND = "performer"
 
@@ -112,7 +118,7 @@ _HOST_SHAPE = re.compile(r"[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?"
 _ORDINALS = "②③④⑤⑥⑦⑧⑨"
 #: 艺名类的别名来源。按子串认：来源串后面还挂着采集批次。
 _STAGE_NAME_SOURCES = ("avdb-actor-mapping", "javdb", "wiki", "performer-localization")
-_MISSAV_GLYPHS = {**JP_KANJI_TO_SIMPLIFIED, "條": "条"}
+_NAME_GLYPHS = {**JP_KANJI_TO_SIMPLIFIED, "條": "条"}
 
 
 def defaults() -> dict:
@@ -235,7 +241,7 @@ def _only_hiragana(written: str) -> bool:
 
 
 def _glyph_key(written: str) -> str:
-    return fold_glyphs(written).translate(str.maketrans(_MISSAV_GLYPHS))
+    return fold_glyphs(written).translate(str.maketrans(_NAME_GLYPHS))
 
 
 def _han_name(written: str) -> bool:
@@ -306,7 +312,7 @@ def japanese_name(canonical_name: str, aliases, localization=None) -> str:
     if localized or (equivalents and not _published_kana_alias(aliases)) \
             or (_has_kana(name) and not _only_hiragana(name)):
         return max([current, *equivalents],
-                   key=lambda value: sum(char in _MISSAV_GLYPHS or char == "々" for char in value))
+                   key=lambda value: sum(char in _NAME_GLYPHS or char == "々" for char in value))
     chosen: tuple[tuple[int, int, int], str] | None = None
     for index, row in enumerate(aliases or ()):
         written = str((row.get("alias") if isinstance(row, dict) else row) or "").strip()
@@ -327,9 +333,77 @@ def is_jav_performer(refs) -> bool:
     return any(provider in JAV_DIRECTORIES for provider in provider_ids(refs))
 
 
+@dataclass(frozen=True)
+class MissavDirectory:
+    """目录实际 href 的只读索引；名称折叠只用于匹配，地址保持站点原文。"""
+
+    paths: dict[str, tuple[str, ...]]
+    complete: bool = False
+
+    def path(self, japanese: str, canonical: str) -> str | None:
+        for name in (japanese, canonical):
+            matches = self.paths.get(_glyph_key(name).casefold(), ())
+            if matches:
+                return matches[0] if len(matches) == 1 else ""
+        return "" if self.complete else None
+
+
+def _published_names(name: str) -> list[str]:
+    names = [name.strip()]
+    combined = re.fullmatch(r"([^()（）]+)[(（]([^()（）]+)[)）]", name)
+    if combined:
+        names.extend(part.strip() for part in combined.groups())
+    return names
+
+
+def directory_index(data: object) -> MissavDirectory | None:
+    """目录快照的公开名字与实际 href；非法域名、空名与非人物路径不入索引。"""
+    if not isinstance(data, dict) or data.get("source") != DIRECTORY_URL:
+        return None
+    entries = data.get("entries")
+    if not isinstance(entries, list):
+        return None
+    paths: dict[str, dict[str, str]] = {}
+    for row in entries:
+        if not isinstance(row, dict):
+            continue
+        try:
+            target = urlsplit(str(row.get("url") or ""))
+        except ValueError:
+            continue
+        if target.scheme != "https" or target.netloc != "missav.ws" \
+                or not re.fullmatch(r"/(?:dm\d+/)?cn/actresses/[^/?#]+", target.path):
+            continue
+        slug = unquote(target.path.rsplit("/", 1)[-1])
+        names = _published_names(slug) + _published_names(str(row.get("name") or ""))
+        for name in names:
+            if name:
+                paths.setdefault(_glyph_key(name).casefold(), {}).setdefault(slug, target.path)
+    return MissavDirectory({key: tuple(sorted(values.values())) for key, values in paths.items()},
+                           complete=data.get("complete") is True)
+
+
+@lru_cache(maxsize=4)
+def _directory_file(path: str, modified: int, size: int) -> MissavDirectory | None:
+    try:
+        return directory_index(json.loads(Path(path).read_text(encoding="utf-8")))
+    except (OSError, ValueError):
+        return None
+
+
+def read_directory(root: Path) -> MissavDirectory | None:
+    """按文件版本读取名录快照；不发网络请求，不写账本。"""
+    path = Path(root) / DIRECTORY_FILENAME
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return _directory_file(str(path.resolve()), stat.st_mtime_ns, stat.st_size)
+
+
 def missav_name(japanese: str) -> str:
-    """简中入口的汉字字形，假名、叠字符号与其他艺名字符保留。"""
-    return japanese.translate(str.maketrans(_MISSAV_GLYPHS))
+    """未取得名录条目时使用的简中候选艺名。"""
+    return japanese.translate(str.maketrans(_NAME_GLYPHS))
 
 
 def _ordinal(index: int) -> str:
@@ -346,15 +420,19 @@ def _ordinal(index: int) -> str:
     return f"({index + 1})"
 
 
-def build(settings: dict, canonical_name: str, refs, aliases=(), localization=None) -> list[dict]:
+def build(settings: dict, canonical_name: str, refs, aliases=(), localization=None,
+          directory: MissavDirectory | None = None) -> list[dict]:
     """这条人物实体能直达的地址，按 SITES 的先后排好。缺 id 的站点不出现在结果里。"""
     ids = provider_ids(refs)
     jav = is_jav_performer(refs)
     written = japanese_name(canonical_name, aliases, localization)
+    missav_path = directory.path(written, canonical_name) if directory else None
     out: list[dict] = []
     for site in SITES:
         row = settings.get(site.key) or {}
         if site.jav_only and not jav:
+            continue
+        if site.key == "missav" and missav_path == "":
             continue
         values = ids.get(site.provider, []) if site.provider else ([missav_name(written)] if written else [])
         host = _tidy_host(row.get("host")) if site.mirrored else site.host
@@ -363,6 +441,8 @@ def build(settings: dict, canonical_name: str, refs, aliases=(), localization=No
         for index, value in enumerate(values):
             ordinal = _ordinal(index)
             path = site.path.replace("{" + site.placeholder + "}", quote(value, safe=""))
+            if site.key == "missav" and missav_path:
+                path = missav_path
             out.append({"site": site.key,
                         "label": f"{site.label} {ordinal}".strip(),
                         "ordinal": ordinal, "slot": site.slot, "mark": site.mark,
@@ -372,7 +452,7 @@ def build(settings: dict, canonical_name: str, refs, aliases=(), localization=No
 
 def entry_links(root: Path, canonical_name: str, refs, aliases=(), localization=None) -> list[dict]:
     """读设置并拼出入口。资料页只调这一个。"""
-    return build(read(root), canonical_name, refs, aliases, localization)
+    return build(read(root), canonical_name, refs, aliases, localization, read_directory(root))
 
 
 def javdb_actor_pages(canonical_name: str, refs) -> list[str]:

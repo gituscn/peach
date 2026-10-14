@@ -10,7 +10,7 @@
 - 公司资料、FC2 卖家按来源补空；厂牌去重 6 组。回执 `peach-data/review/`。
 - 核查：`peach-data/review/creator-boundary-delivery.md`；StraplessDildo 归厂牌。
 - 关注作者 25 位、来源 111 条、身份关联 71 条、别名 30 条（ADR-0096）。
-- 验收：`peach-data/review/portrait-loading-production-verification.json`。
+- 验收：`peach-data/review/entity-cold-missav-verification.json`。
 - 身份合并 18 组；版本核查：`peach-data/review/version-evidence-review.md`。
 - JAV 头像 817，水印待复核 38；档案 17、候选 253、官方封面 2；[选图规则](adr/0102-profile-avatar-priority.md)。
 - 「整理」（ADR-0039）支持预览、执行、回滚；英文视频名分词 169 条。
