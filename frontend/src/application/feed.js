@@ -17,8 +17,9 @@ export function feedNewCoverHtml(item){
   if(!item.cover_url)return item.cover_fetching
     ?`<span class="nopic" data-feed-cover-state="fetching">${loadingDotsHtml('抓取中')}</span>`
     :'<span class="nopic" data-feed-cover-state="missing">无封面</span>';
-  return coverImage({code:item.code},'big').replace(/ src="[^"]*"/,
-    ` src="${esc(item.cover_url)}" referrerpolicy="no-referrer" data-panel-prior="1"`);
+  return coverImage(item,'big').replace(/ src="[^"]*"/,
+    ` src="${esc(item.cover_url)}" referrerpolicy="no-referrer" data-panel-prior="1"`)
+    .replace('data-drop="self"', 'data-drop="initial" data-initial="无封面" data-drop-class="nopic"');
 }
 
 export function feedNewCardHtml(item){

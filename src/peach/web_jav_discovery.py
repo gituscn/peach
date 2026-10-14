@@ -8,7 +8,7 @@ from .related import rank_related
 from .taste_preferences import preference_profile, preference_score
 from .genre_decisions import load_genre_decisions
 from .jav_discovery_metadata import discovery_metadata, source_number
-from .web_jav_detail import _source_fields, visible_actors, source_performer_refs
+from .web_jav_detail import _source_fields, discovery_cover_url, visible_actors, source_performer_refs
 
 def _identity(connection, kind, name):
     found = entities.resolve_entity(connection, kind, name)
@@ -38,6 +38,7 @@ def _external(connection, contract):
     decisions = load_genre_decisions(connection)
     for row in rows:
         detail = _cached_movie(row["code"], contract)
+        row['cover_url'] = discovery_cover_url(row, detail)
         projection = _source_fields(detail, decisions)
         tags = [tag["name"] for tag in projection["tag_refs"]]
         row["source_tags"] = projection["tags"]

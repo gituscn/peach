@@ -254,6 +254,40 @@ class PublicProtocolTests(unittest.TestCase):
 
 
 class DetailProjectionTests(unittest.TestCase):
+    def test_source_cover_route_reuses_detail_image_bytes_and_checks_code(self):
+        import base64
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from peach.routes_auth import require_auth
+        from peach.routes_media import jav_cover
+        app = FastAPI()
+        app.state.web_contract = self.contract
+        app.dependency_overrides[require_auth] = lambda: {}
+        app.add_api_route('/jav-cover', jav_cover, methods=['GET', 'HEAD'])
+        original = io.BytesIO()
+        Image.new('RGB', (800, 438), '#777').save(original, 'JPEG')
+        data_url = 'data:image/jpeg;base64,' + base64.b64encode(original.getvalue()).decode('ascii')
+        with patch('peach.web_jav_detail.PUBLIC_API.image', return_value=data_url) as fetch:
+            detail = q_jav_image(self.contract, {'code': 'MIDA-085'})
+        with TestClient(app) as client, patch('peach.web_jav_detail.PUBLIC_API.image', side_effect=AssertionError('缓存命中不请求来源')):
+            response = client.get('/jav-cover?code=MIDA-085')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.content, original.getvalue())
+            self.assertEqual(response.headers['content-type'], 'image/jpeg')
+            self.assertEqual(client.head('/jav-cover?code=MIDA-085').content, b'')
+            self.assertEqual(client.get('/jav-cover?code=../secret').status_code, 400)
+        self.assertTrue(detail['ok'])
+        fetch.assert_called_once()
+
+    def test_source_cover_url_projects_known_work_without_changing_source_fields(self):
+        from peach.web_jav_detail import discovery_cover_url
+        item = {'code': 'MIDA-085', 'cover_url': None, 'link': 'https://javdb.com/v/Exact'}
+        self.assertEqual(discovery_cover_url(item, {}), '/jav-cover?code=MIDA-085')
+        self.assertIsNone(item['cover_url'])
+        self.assertEqual(discovery_cover_url({**item, 'cover_url': 'https://c0.jdbstatic.com/a.jpg'}, {}), 'https://c0.jdbstatic.com/a.jpg')
+        self.assertEqual(discovery_cover_url({**item, 'link': ''}, {'id': 'Exact'}), '/jav-cover?code=MIDA-085')
+        self.assertEqual(discovery_cover_url({**item, 'link': 'https://private.invalid/'}, {}), '')
+
     def test_saved_identity_fetches_actor_portrait_without_code_search(self):
         from peach.jav_discovery_metadata import discovery_metadata
         metadata = discovery_metadata(self.contract)

@@ -26,6 +26,10 @@ export function javImageKind(item: { is_jav?: boolean; code?: string; has_cover?
  *  本机 637 张实测中位数也是它。封面框选按它锁比例；没有边车的双页封套按它从右缘量回正封
  *  宽度，贴右缘时 0.75 的卡片比正封宽，不量就会带进一条书脊。 */
 export const PANEL_ASPECT = 0.704;
+// 与 jav_poster_crop 的宽封套模板共用尺寸；明确的 Blu-ray 版次才启用。
+export const WIDE_PANEL_ASPECT = 0.85;
+export const WIDE_SLEEVE_RATIO_MIN = 1.75;
+export const WIDE_SLEEVE_RATIO_MAX = 1.85;
 
 /** 接口 `poster_box` 的形状：`x0/y0/x1/y1` 是源图像素坐标，`px` 是源图尺寸，
  *  `method` 记着这个框是沿折痕（`fold`）、按正封宽高比的先验（`ratio`），还是人在
@@ -51,7 +55,7 @@ export interface PosterBox {
  *  横向：框占卡片宽的 `框宽 / 框高 / 容器比例`。装得下就居中，两侧各留一条交给模糊
  *  背景；装不下就让框的右缘贴住卡片右缘再从左边切，因为标题、女优名和角标都压在
  *  正封右侧。 */
-export function panelFrame(box: Partial<PosterBox> | null | undefined, ratio: number): {
+export function panelFrame(box: Partial<PosterBox> | null | undefined, ratio: number, contain = false): {
   clip: { top: number; right: number; bottom: number; left: number };
   left: number; top: number; height: number;
 } | null {
@@ -72,7 +76,8 @@ export function panelFrame(box: Partial<PosterBox> | null | undefined, ratio: nu
   if (!(boxWidth > 0 && boxHeight > 0)) return null;
   const visible = boxWidth / boxHeight / ratio;
   if (!(visible > 0)) return null;
-  const offset = visible <= 1
+  const scale = contain ? Math.min(1, 1 / visible) : 1;
+  const offset = contain ? (1 - visible * scale) / 2 - left0 / boxHeight / ratio * scale : visible <= 1
     ? (1 - visible) / 2 - left0 / boxHeight / ratio
     : 1 - right / boxHeight / ratio;
   // `|| 0` 是为了把 -0 收成 0：写进 CSS 两者一样，读出来比对时不一样。
@@ -83,8 +88,8 @@ export function panelFrame(box: Partial<PosterBox> | null | undefined, ratio: nu
       bottom: percent(1 - bottom / height), left: percent(left0 / width),
     },
     left: percent(offset),
-    top: percent(-top0 / boxHeight),
-    height: percent(height / boxHeight),
+    top: percent((1 - scale) / 2 - top0 / boxHeight * scale),
+    height: percent(height / boxHeight * scale),
   };
 }
 
