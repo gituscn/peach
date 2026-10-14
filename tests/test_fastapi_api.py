@@ -2228,7 +2228,7 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         fake = httpx.Client(transport=httpx.MockTransport(upstream))
         self.app.state.http_transport.client = fake
         try:
-            with patch('peach.follow_stream.resolves_publicly', return_value=True):
+            with patch('peach.follow_stream.resolves_publicly', return_value=False):
                 response = await self.client.get(f'/jav-preview/EXM-001/{ref}?t=secret')
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.headers['content-type'], 'video/mp4')
@@ -2243,6 +2243,44 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                 failed = await self.client.get(f'/jav-preview/EXM-002/{invalid}?t=secret')
                 self.assertEqual(failed.status_code, 404)
                 self.assertEqual(failed.headers['cache-control'], 'no-store')
+        finally:
+            self.app.state.http_transport.client = original
+            fake.close()
+
+    async def test_preview_fixed_sources_and_hls_keep_unknown_hosts_guarded(self):
+        from peach.preview_cache import PreviewCache
+        from peach.remote_media_cache import cache_for
+        cache = cache_for(self.app.state.web_contract)
+        previews = PreviewCache(cache)
+        calls = []
+        def upstream(request):
+            calls.append(str(request.url))
+            if request.url.path.endswith('redirect.mp4'):
+                return httpx.Response(302, headers={'location': 'https://private.example/video.mp4'}, request=request)
+            body = b'#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\npart.ts\n#EXT-X-ENDLIST\n' if request.url.path.endswith('.m3u8') else b'media'
+            kind = 'application/vnd.apple.mpegurl' if request.url.path.endswith('.m3u8') else 'video/mp2t'
+            return httpx.Response(200, headers={'content-type': kind, 'content-length': str(len(body))},
+                                  stream=httpx.ByteStream(body), request=request)
+        original = self.app.state.http_transport.client
+        fake = httpx.Client(transport=httpx.MockTransport(upstream))
+        self.app.state.http_transport.client = fake
+        try:
+            with patch('peach.follow_stream.resolves_publicly', return_value=False):
+                ref = previews.register('EXM-010', 'https://jdforrepam.com/api/preview/root.m3u8', playlist=True)
+                playlist = await self.client.get(f'/jav-preview/EXM-010/{ref}?t=secret')
+                self.assertEqual(playlist.status_code, 200)
+                segment = next(line for line in playlist.text.splitlines() if line.startswith('/jav-preview/'))
+                self.assertEqual((await self.client.get(segment + '?t=secret')).content, b'media')
+                self.assertEqual(len(calls), 2)
+                for index, url in enumerate(('https://private.example/video.mp4',
+                                             'https://www.prestige-av.com/api/media/redirect.mp4')):
+                    code = f'EXM-{20 + index:03d}'
+                    ref = previews.register(code, url, playlist=False)
+                    failed = await self.client.get(f'/jav-preview/{code}/{ref}?t=secret')
+                    self.assertEqual(failed.status_code, 404)
+                    self.assertEqual(failed.headers['cache-control'], 'no-store')
+                self.assertEqual(len(calls), 3)
+                self.assertTrue(all('private.example' not in url for url in calls))
         finally:
             self.app.state.http_transport.client = original
             fake.close()
