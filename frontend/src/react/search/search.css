@@ -10,6 +10,7 @@
 /* 两组之间一道细线，同一组的行紧挨着。 */
 .peach-react [data-search-group] + [data-search-group],
 .peach-react [data-search-group] + [data-search-results],
+.peach-react [data-search-results] + [data-search-group],
 .peach-react [data-search-col] + [data-search-col] {
   border-top: 1px solid var(--line-soft);
   margin-top: 7px;
@@ -19,9 +20,16 @@
   margin: 6px 10px;
   color: var(--muted);
   font-size: var(--fs-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: .14em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
+.peach-react [data-search-group] > h3 > a { flex: none; font-weight: 400; letter-spacing: normal; }
+.peach-react [data-search-person] { padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.peach-react [data-search-person]:focus-visible { outline: 2px solid var(--tungsten); outline-offset: 2px; }
 
 /* 这个词一条补全都没有时的那一行，排在搜索记录下面，字色同组标题。 */
 .peach-react [data-search-empty] { margin: 0; padding: 9px 10px; color: var(--muted); font-size: var(--fs-sm); }
@@ -146,6 +154,19 @@
 .peach-react [data-search-pic] { --card-ratio: .75; display: block; flex: none; border-radius: var(--badge-radius); }
 .peach-react [data-search-pic] > span > span { font-size: 10px; letter-spacing: 0; }
 .peach-react [data-search-option="work"] > [data-search-pic] { width: 36px; }
+.peach-react [data-search-recommendations] [data-search-option="work"] {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px;
+}
+.peach-react [data-search-recommendations] [data-search-option="work"] > [data-search-pic] { width: 100%; }
+.peach-react [data-search-recommendations] [data-search-col] > [data-search-group] [data-search-items]:has([data-search-option="work"]) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(96px, calc(20% - 4px), 200px), 1fr));
+  gap: 4px;
+}
+.peach-react [data-search-option="work"]:focus-visible { outline: 2px solid var(--tungsten); outline-offset: -2px; }
 /* 行里的 span 一律截断裁切，这一排要让出焦点环。 */
 .peach-react [data-search-option] [data-search-peeks] {
   display: none;
@@ -188,6 +209,10 @@
 /* 右栏钉在顶上：左栏人名一长串往下翻时，视频那一格不跟着滚走。钉住要求右栏不拉伸，它自己只有内容
  * 那么高，所以两栏的分隔线画在两栏之间的缝上，从顶到底，不论哪一栏更长。 */
 @container searchmenu (min-width: 720px) {
+  .peach-react [data-search-recommendations] [data-search-results][data-split] {
+    grid-template-columns: minmax(0, .32fr) minmax(0, .68fr);
+  }
+  .peach-react [data-search-recommendations] [data-search-results][data-split]::before { left: calc(32% - 5px); }
   .peach-react [data-search-results][data-split] {
     position: relative;
     display: grid;
