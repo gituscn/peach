@@ -137,8 +137,7 @@ describe('实体页筛选浮层', () => {
         const style = getComputedStyle(node);
         return { image: style.backgroundImage, backdrop: style.backdropFilter, background: style.backgroundColor };
       });
-      assert.equal(material.image, 'none');
-      assert.equal(material.backdrop, 'none');
+      assert.notEqual(material.backdrop, 'none');
       assert.notEqual(material.background, 'rgb(0, 0, 0)');
       /* 资料卡是另一座岛，骨架与真卡的高度差不归这一块管：浮层的位置按它离资料卡下沿的距离量。 */
       const measure = (hero: string, glass: string, grid: string) => page.evaluate(([heroSelector, glassSelector, gridSelector]) => {

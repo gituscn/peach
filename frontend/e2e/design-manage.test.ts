@@ -598,8 +598,8 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
   it('骨架里的占位和按键悬停不给任何反馈，也点不中', { timeout: 120_000 }, async () => {
     const name = '七沢みあ';
     const pages: { path: string; ready: string; targets: string[]; prepare?: (page: Page) => Promise<void> }[] = [
-      { path: `/performers/${encodeURIComponent(name)}`, ready: '[data-skeleton="entity/performer"] .entityfoot .avskeleton',
-        targets: ['[data-skeleton] .entityfoot .avskeleton'],
+      { path: `/performers/${encodeURIComponent(name)}`, ready: '[data-skeleton="entity/performer"] [data-entity-foot] [data-hero-ring]',
+        targets: ['[data-skeleton] [data-entity-foot] [data-hero-ring]'],
         prepare: (page) => page.route(/\/api\/entity\/shapes/, (route) => route.fulfill({ json: {
           ok: true, entities: [{ id: 90_001, kind: 'performer', names: [name], parts: ['costars'] }] } })) },
       { path: '/data-cleanup', ready: '[data-skeleton="cleanup"] [data-skeleton-action]',

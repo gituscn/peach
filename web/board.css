@@ -90,7 +90,7 @@
   87.5%{background-position-y:7.6%,92.4%,0}
   100%{background-position-y:-10%,50%,0}
 }
-.board-filter-frame.board-filter-frame.board-filter-frame,.entitytagbar.entitytagbar.entitytagbar,.entitycollectionhead.entitycollectionhead.entitycollectionhead,.top .search.search,.top.top>.ib{
+.board-filter-frame.board-filter-frame.board-filter-frame,.entitycollectionhead.entitycollectionhead.entitycollectionhead,.top .search.search,.top.top>.ib{
   background:var(--glass-drift-a),var(--glass-drift-b),linear-gradient(125deg,var(--glass-sheen),transparent 42%,var(--glass-low)),var(--glass-fill);
   background-size:200% 200%,200% 200%,auto;background-repeat:no-repeat,no-repeat,repeat;
   background-position:50% 20%,80% 70%,0 0;
@@ -102,22 +102,19 @@
 /* 搜索框使用浏览器原生模糊，尺寸变化不依赖异步 SVG 位移贴图。 */
 .top .search.search.search{--glass-optic:blur(22px)}
 /* 快照里的玻璃使用实底承接光晕；实时页面恢复后再采样背景。 */
-html[data-theme-snapshot] :is(.board-filter-frame,.entitytagbar,.entitycollectionhead,.search,.top>.ib,.board-library-menu,.board-glow-menu,.viewglide,[data-view-glide],[data-glass-pane]){backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background-color:var(--ground)!important;transition:none!important}
+html[data-theme-snapshot] :is(.board-filter-frame,.entitycollectionhead,.search,.top>.ib,.board-library-menu,.board-glow-menu,.viewglide,[data-view-glide],[data-glass-pane]){backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background-color:var(--ground)!important;transition:none!important}
 /* 快照撤掉那一下，材质要淡回来：揭示动画刚停，浮层从实底「啪」地跳成毛玻璃，读起来
    像主题又切了第二次。过渡只写在常态上——进快照那一下正在拍旧状态的快照，拍到一半
    路上的颜色就会闪，所以上面那条规则自己把过渡关掉。 */
-.board-filter-frame.board-filter-frame,.entitytagbar.entitytagbar,.entitycollectionhead.entitycollectionhead,.board-library-menu.board-library-menu,.board-glow-menu.board-glow-menu{
+.board-filter-frame.board-filter-frame,.entitycollectionhead.entitycollectionhead,.board-library-menu.board-library-menu,.board-glow-menu.board-glow-menu{
   transition:background-color .28s ease,backdrop-filter .28s ease,-webkit-backdrop-filter .28s ease}
 .board-filter-frame.board-filter-frame{border-radius:22px;isolation:isolate;color:var(--glass-text);overflow:visible}
-.entitytagbar.entitytagbar.entitytagbar,
 .entitycollectionhead.entitycollectionhead.entitycollectionhead{border-radius:22px;color:var(--glass-text)}
 /* 浮层材质与吸顶归外框，槽位只负责排列内容。 */
 .board-filter-frame.board-filter-frame.board-filter-frame.board-filter-frame>[data-filter-row]{position:relative;top:auto;left:auto;
   width:auto;margin:0;min-width:0;z-index:auto;border:0;box-shadow:none;background:none;
   backdrop-filter:none;-webkit-backdrop-filter:none;animation:none}
 .board-filter-frame>[data-filter-row]::before,.board-filter-frame>[data-filter-row]::after{display:none}
-/* 资料页骨架那块浮层的上排：微光药丸之间的间距同真浮层上排。 */
-.board-filter-frame .entitytagbar .filterscroll{gap:6px}
 /* 版式、大小这类分段开关问的也是「你在哪儿」。滑块的位置和几何归分段器自己管，这里
    只换材质与配色：那一套是给 flat 面配的，一块灰底衬一枚不透明的白滑块，摆到浮层上
    就是整条里唯一一块实心的面，读起来像贴上去的另一个控件；字色取的也是 flat 面的
@@ -181,14 +178,14 @@ html[data-theme-snapshot] :is(.board-filter-frame,.entitytagbar,.entitycollectio
    在动。字碎归字碎，那几块玻璃自己压得住它们各自身后那一片。 */
 .top .search.search{border-radius:999px;padding-left:16px}
 .top.top>.ib{border-radius:50%}
-@supports not (backdrop-filter:blur(1px)){.board-filter-frame.board-filter-frame.board-filter-frame,.entitytagbar.entitytagbar.entitytagbar,.entitycollectionhead.entitycollectionhead.entitycollectionhead,.top .search.search{background:var(--ground);animation:none}}
-@media(prefers-reduced-transparency:reduce),(prefers-contrast:more){.board-filter-frame.board-filter-frame.board-filter-frame,.entitytagbar.entitytagbar.entitytagbar,.entitycollectionhead.entitycollectionhead.entitycollectionhead,.top .search.search,.top.top>.ib{background:var(--ground);backdrop-filter:none;-webkit-backdrop-filter:none;animation:none}}
+@supports not (backdrop-filter:blur(1px)){.board-filter-frame.board-filter-frame.board-filter-frame,.entitycollectionhead.entitycollectionhead.entitycollectionhead,.top .search.search{background:var(--ground);animation:none}}
+@media(prefers-reduced-transparency:reduce),(prefers-contrast:more){.board-filter-frame.board-filter-frame.board-filter-frame,.entitycollectionhead.entitycollectionhead.entitycollectionhead,.top .search.search,.top.top>.ib{background:var(--ground);backdrop-filter:none;-webkit-backdrop-filter:none;animation:none}}
 /* 面上那两团光停在 `background-position` 给的那一处，不再挪：它讲的是光在动，而这
    台机器上「减少动态效果」说的就是别让不由我操作的东西自己动。停住之后它还是两团
    高光，玻璃仍有厚度，只是这屋里的光不再走了。 */
-@media(prefers-reduced-motion:reduce){.board-filter-frame.board-filter-frame.board-filter-frame,.entitytagbar.entitytagbar.entitytagbar,.entitycollectionhead.entitycollectionhead.entitycollectionhead,.top .search.search,.top.top>.ib{animation:none}}
+@media(prefers-reduced-motion:reduce){.board-filter-frame.board-filter-frame.board-filter-frame,.entitycollectionhead.entitycollectionhead.entitycollectionhead,.top .search.search,.top.top>.ib{animation:none}}
 /* Peach-owned media and analytics layouts. */
-html.board-high-contrast .board-filter-frame.board-filter-frame.board-filter-frame,html.board-high-contrast .entitytagbar.entitytagbar.entitytagbar,html.board-high-contrast .entitycollectionhead.entitycollectionhead.entitycollectionhead,html.board-high-contrast .top .search.search,html.board-high-contrast .top.top>.ib{background:var(--ground);backdrop-filter:none;-webkit-backdrop-filter:none;animation:none}
+html.board-high-contrast .board-filter-frame.board-filter-frame.board-filter-frame,html.board-high-contrast .entitycollectionhead.entitycollectionhead.entitycollectionhead,html.board-high-contrast .top .search.search,html.board-high-contrast .top.top>.ib{background:var(--ground);backdrop-filter:none;-webkit-backdrop-filter:none;animation:none}
 :root{--board-card-foot:color-mix(in srgb,var(--ground) 92%,var(--ink))}
 
 .configfieldset.configfieldset:not([data-fieldset-type])>.geist-fieldset-footer,.cleanupfieldset.cleanupfieldset>.geist-fieldset-footer{background:var(--board-card-foot)}
@@ -327,7 +324,6 @@ body>.board-filter-frame{margin-inline:16px}
    算下半的吸顶位置，另起一个只归这块浮层的高度。下半的吸顶位置是上半的下沿，上半没有时
    它自己就是整块，回到顶栏下 8px。 */
 :root{--board-filterH:48px}
-.entitytagbar{position:sticky;top:calc(var(--topH) + 8px);margin:0;height:var(--board-filterH);gap:6px;padding:8px 12px}
 /* 资料页骨架里那块浮层的下排：读数一格，几何同真浮层下排。 */
 .entitycollectionhead{position:sticky;top:calc(var(--topH) + 8px);margin:0 0 22px;padding:8px 12px;min-height:var(--board-filterH);gap:12px}
 /* 读数照首页那条 `10,471 个符合` 写：12px、常规字重、不加字距，颜色比标签低一档。 */

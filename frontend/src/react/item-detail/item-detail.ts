@@ -210,10 +210,11 @@ export async function prefetchItemDetail(props: ItemDetailProps, signal: AbortSi
     item = cachedItem
       || await queryClient.fetchQuery({ queryKey: itemKey(id), queryFn: () => fetchItem(id, signal), staleTime: 0 });
   } catch (error) {
+    if (signal.aborted) throw error;
     if (error instanceof ItemGone) { actions.redirect({ kind: 'gone' }); return }
     throw error;
   }
-  if (item.location === 'online' && item.follow_item_id) actions.redirect({ kind: 'follow', id: Number(item.follow_item_id) });
+  if (!signal.aborted && item.location === 'online' && item.follow_item_id) actions.redirect({ kind: 'follow', id: Number(item.follow_item_id) });
 }
 
 /* ── 壳递进来的那几样 ── */

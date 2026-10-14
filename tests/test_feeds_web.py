@@ -187,6 +187,30 @@ class FeedWebTest(FeedWebFixture):
         dispatch_api_post(self.contract, "/api/settings", {"feedHideGroupCompilations": False})
         self.assertTrue(shape())
 
+    def test_entity_shapes_use_the_real_jav_work_predicate(self):
+        people = []
+        with self.contract.database.write_transaction() as connection:
+            for index, region in enumerate(("jp", "kr")):
+                name = f"演示艺人{index}"
+                entity_id = connection.execute(
+                    "INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at)"
+                    " VALUES('performer',?,peach_normalize(?),?,?)",
+                    (name, name, feeds.stamp(), feeds.stamp())).lastrowid
+                asset_id = connection.execute(
+                    "INSERT INTO asset(location,path,name,medium,code,region,studio)"
+                    " VALUES('local',?,?,'video','SSIS-950',?,'S1')",
+                    (f"R:\\media\\shape{index}.mp4", f"shape{index}.mp4", region)).lastrowid
+                connection.execute(
+                    "INSERT INTO asset_entity(asset_id,entity_id,role,source)"
+                    " VALUES(?,?,'performer','test')", (asset_id, entity_id))
+                people.append((entity_id, name, region == "jp"))
+        shapes = {item["id"]: item["parts"] for item in dispatch_api_get(
+            self.contract, "/api/entity/shapes", {})["entities"]}
+        for entity_id, name, jav in people:
+            items = dispatch_api_get(self.contract, "/api/items", {"performer": name})["items"]
+            self.assertEqual(items[0]["is_jav"], jav)
+            self.assertEqual("jav" in shapes.get(entity_id, []), jav)
+
     def test_settings_snapshot_lists_the_source(self):
         self._add()
         snapshot = dispatch_api_get(self.contract, "/api/feeds", {})
@@ -240,6 +264,21 @@ class FeedWebTest(FeedWebFixture):
         self.assertEqual(self.transport.requests[-1].headers["If-None-Match"], 'W/"abc"')
         listing = dispatch_api_get(self.contract, "/api/feeds/discoveries", {})
         self.assertEqual(len(listing["items"]), 2)
+
+    def test_missing_covers_follow_their_active_scrape_job(self):
+        self._add()
+        self._check()
+        deadline = time.monotonic() + 5
+        while not self.contract.task_runs.query(status="active", task_key=feed_followup.TASK_KEY):
+            self.assertLess(time.monotonic(), deadline, "取资料后继未入队")
+            time.sleep(0.01)
+        items = dispatch_api_get(self.contract, "/api/feeds/discoveries", {})["items"]
+        self.assertTrue(all(item["cover_fetching"] for item in items))
+        self.assertTrue(all(not item["has_cover"] for item in items))
+        self._drain(1)
+        items = dispatch_api_get(self.contract, "/api/feeds/discoveries", {})["items"]
+        self.assertFalse(any(item["cover_fetching"] for item in items))
+        self.assertTrue(all(item["has_cover"] for item in items))
 
     def test_a_failing_source_reports_on_its_own_row_and_stays_scheduled(self):
         self._add()

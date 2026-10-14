@@ -9,7 +9,7 @@ describe('实体资料骨架', () => {
     expect(html).toContain('data-skeleton="entity/agency"');
     expect(html).toContain('entityportrait square skeleton');
     expect(html).toContain('entityhero');
-    expect(html).toContain('entitytagbar');
+    expect(html).toContain('data-entity-filter-glass');
     expect(html).toContain('<div class="entitysection"><div class="igrid">');
   });
   it('人物资料使用圆形头像', () => {

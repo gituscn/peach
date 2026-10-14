@@ -2,24 +2,6 @@
 .tagbar{position:sticky;top:var(--topH);z-index:61;height:var(--filterH);padding:9px 16px;
   border-bottom:1px solid transparent;background:transparent;
   display:flex;gap:7px;overflow:hidden;align-items:center}
-/* 横滚只发生在右半截。左边那四枚是视图，四选一、恒有一枚生效，读的是「这一屏现在
-   在看什么」；右边的标签才是可加可不加的筛选。读数跟着筛选一起滚走的话，滚到一半
-   这条上就没有任何东西说明现在看的是哪一档了。
-   这三格是同一个控件，哪一页用到都是这一份：最左端是页面自己的那一档（资料页的媒体
-   类型），住在 `.filterscroll` 外，任何宽度下都不滚。
-   这一层定位不为自己，是给那块滑动玻璃当落脚点：窄屏时它是横滚的那一层，玻璃住进来
-   才会跟着内容走、越界跟着被裁。 */
-.filterscroll{display:flex;gap:7px;flex:1;min-width:0;align-items:center;position:relative}
-/* 窄到这个宽度，钉住的东西得让位。四枚视图在 375 上要占掉两百多像素，钉住它们等于把
-   标签挤到屏幕外——那一条看着满，其实一枚可点的筛选都露不出来。所以换成整段一起滚：
-   滚动从标签那一格上提到外面这层，视图跟着标签走，只有最左端那一档还钉着。
-   它才是离开就没有上下文的那个——四枚视图和标签问的都是「这一批里挑哪些」，滑走了
-   滑回来就是；媒体类型定的是这一页现在摆的是视频还是照片，两枚圆键一共六十来像素，
-   钉住它的代价是窄屏上唯一付得起的。 */
-@media(max-width:760px){
-  .filterscroll{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-inline:contain}
-  .filterscroll::-webkit-scrollbar{display:none}
-}
 /* 选中药丸和生效筛选共用高亮填充。 */
 .pill{flex:none;height:var(--filterItemH);padding:0 20px;border:1px solid var(--field-ring);
   border-radius:var(--pill-radius);background:transparent;display:inline-flex;align-items:center;justify-content:center;

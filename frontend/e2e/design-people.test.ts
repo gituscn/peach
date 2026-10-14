@@ -738,7 +738,7 @@ describe('设计决定：人物与厂牌资料页', () => {
         probe.remove();
         return { height: row.getBoundingClientRect().height,
           footHeight: foot?.getBoundingClientRect().height ?? 0,
-          between: !!row.previousElementSibling?.matches('[data-filter-frame]')
+          between: !!(row.previousElementSibling?.matches('[data-filter-frame]') || row.previousElementSibling?.querySelector('[data-filter-frame]'))
             && !!row.nextElementSibling?.matches('.entitysection'),
           sheen: getComputedStyle(row.querySelector('.pic.imgwait')!, '::after').backgroundImage, plain,
           first: (window as unknown as { skeletonFirst: { feed: boolean; foot: boolean; sheen: string } }).skeletonFirst };

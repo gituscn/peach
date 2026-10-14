@@ -241,6 +241,37 @@ describe('常驻面', () => {
     expect([...container.children].map((el) => el.id)).toEqual(['stage', 'miniplayer']);
   });
 
+  it('重进已读取的作品立即显示缓存，后台刷新不遮住内容', async () => {
+    serve();
+    (globalThis as ActFlag).IS_REACT_ACT_ENVIRONMENT = false;
+    await api.open(request(1));
+    api.dispose({ miniplayer: true });
+    let finish!: (value: unknown) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(resolve => { finish = resolve })));
+    const opening = api.open(request(1));
+    const dialog = q<HTMLDialogElement>('#stage')!;
+    expect(dialog.querySelector('[data-skeleton="detail"]')).toBeNull();
+    expect(dialog.querySelector('[data-item-side]')).not.toBeNull();
+    finish({ ok: true, status: 200, json: async () => detail(1) });
+    await opening;
+    expect(dialog.querySelector('[data-skeleton="detail"]')).toBeNull();
+  });
+
+  it('缓存里的空队列退出详情时不留舞台和等待态', async () => {
+    serve();
+    const { queryClient } = await import('../../src/react/query');
+    const { queueKey } = await import('../../src/react/item-detail/item-detail');
+    const queue = { kind: 'parts' as const, seedId: 1 };
+    queryClient.setQueryData(queueKey(queue), { ...queue, title: '示例卷组', items: [] });
+    const props = request(1, { id: null, queue });
+    vi.mocked(props.actions.redirect).mockImplementation(() => api.dispose({ miniplayer: false }));
+    (globalThis as ActFlag).IS_REACT_ACT_ENVIRONMENT = false;
+    await api.open(props);
+    expect(props.actions.redirect).toHaveBeenCalledWith({ kind: 'gone' });
+    expect(api.isOpen()).toBe(false);
+    expect(q('#stage')).toBeNull();
+  });
+
   it('抛错只卸组件、宿主还在，body 上的打开标记留着，批量条照画；之后句柄各成员照调不抛', async () => {
     const reported = watchReports();
     const dockRoot = document.createElement('div');

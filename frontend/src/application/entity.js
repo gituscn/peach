@@ -13,7 +13,7 @@ import { javActive, scheduleStickySurfaces, setJavLayout, sortOptions } from './
 import { navigationState, openRoutedPage } from './navigation.js';
 import { releaseHoverPreviews } from './../card-art/hover';
 import { preferencesState, wireDrag } from './preferences.js';
-import { collectionHeaderHtml, fitSkeleton, formModal, indexSkeletonHtml, wireHorizontalScroller } from '../ui-kit';
+import { fitSkeleton, formModal, indexSkeletonHtml, wireHorizontalScroller } from '../ui-kit';
 import { feedRowHtml, feedState, loadEntityShapes, wireFeedNewRow } from './feed.js';
 import { receiptsState } from './receipts.js';
 import { JAV_LAYOUTS, PHOTO_LAYOUTS, javLayout, photoLayout, photoSize, storePhotoLayout, storePhotoSize } from './../appearance/layout';
@@ -24,6 +24,10 @@ import { applyDensity, paintPhotoSizeButton } from './../appearance/density';
 import { applicationEffects } from './effects';
 import { entitySkeletonHtml } from './../entity-skeleton';
 import { INDEX_TITLES } from './../index-skeleton';
+import { filterControlsSkeletonHtml } from './../filter-controls-skeleton';
+import { cardRatio, gridLayout } from './../appearance/layout';
+import { pageSkeletonHtml } from './../management-placeholder';
+import { islandShortcutsEntry } from './../island-skeleton';
 export const entityState = { ENTITY_FILTER_KEYS: undefined, emptyEntityFilters: undefined, parseEntityFilters: undefined, entityFilterSearch: undefined, cloneBarsContext: undefined, activeFilterState: undefined, entityPageView: undefined, entityPageWall: undefined, entityPageRevision: undefined, entityPageCurrent: undefined, entityPageLive: undefined, EMPTY_ENTITY_MEDIA: undefined, parseMediaView: undefined, entityViewSearch: undefined, entityBodyCanLoadMore: undefined, entityBodySkeleton: undefined, entityPageHelpers: undefined, entityFollowActions: undefined, SOURCE_HINTS: undefined, sourceHint: undefined, syncedText: undefined, sourceToolButtons: undefined, application: undefined };
 
 export function entityPageEntry(){
@@ -148,11 +152,13 @@ export async function entityAliasForm(mine,write){
 }
 
 export function showEntityLoading(kind,name){
-  const head=collectionHeaderHtml({readout:'&nbsp;',loading:true,filterRow:'bottom'});
+  const jav=['performer','studio'].includes(kind)&&feedState.hasEntityPart(kind,name,'jav');
+  const head=`<div data-filter-row="bottom" class="flex min-w-0 items-center gap-3 px-3 py-2 min-h-12"><h3 data-entity-readout><span data-skeleton="count" class="relative inline-block h-3.5 w-24 rounded-md align-middle skeleton-sheen"></span></h3>${islandShortcutsEntry()}${kind==='agency'?'':filterControlsSkeletonHtml(sortKeys(state.sort,state.dir,jav),jav?{name:'jav-layout',label:'JAV 卡片版式',value:javLayout(),options:JAV_LAYOUTS}:null)}</div>`;
+  const top=kind==='agency'?'':`<div data-entity-media><button type="button" data-media-view="videos" aria-label="视频" aria-pressed="true" disabled data-skeleton-action>${icon('play')}</button><button type="button" data-media-view="photos" aria-label="照片" disabled data-skeleton-action>${icon('pics')}</button></div><span data-entity-sep></span><div data-entity-scroll><div data-entity-states>${catalogState.catalogViews().map(view=>`<button type="button" data-entity-state="${esc(view.k)}" aria-pressed="${state.state===view.k}" disabled data-skeleton-action>${esc(view.label)}</button>`).join('')}</div>`;
   const body=kind==='agency'
     ?indexSkeletonHtml({kind:'performers',layout:indexState.peopleIndexLayout()})
-    :catalogSkeletonHtml();
-  const placeholder=entitySkeletonHtml(kind,head,body);
+    :pageSkeletonHtml('正在读取作品',{cards:true,className:'catalog-skeleton postercard-skeleton',cardRatio:cardRatio(gridLayout({active:jav,home:false,portrait:false}))});
+  const placeholder=entitySkeletonHtml(kind,head,body,top);
   if($('#index').firstElementChild?.dataset.skeleton!==`entity/${kind}`){
     $('#index').innerHTML=placeholder;
     syncEntitySkeletonParts(kind,name);

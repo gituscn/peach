@@ -3,9 +3,8 @@
  * 取值与首页那块浮层同一套：`web/board.css` 里 `.board-filter-frame` 的几排覆盖层，
  * `web/css/03-filterbar.css` 的 `.pill`、`.sep`、`.combo`，`web/css/12-cards.css` 的 `.sorts`。
  * 浮层的料与吸顶在 `../styles.css` 的 `[data-filter-glass]`，滑动玻璃的形状与材质在 `web/board.css`
- * 的 `[data-view-glide]`。骨架（`entitySkeletonHtml`）用遗留类名 `.entitytagbar`、`.entitycollectionhead`
- * 画，几何在 `web/board.css` 与 `web/css/07-entity.css`；这里的行高、内边距都要和它对得上，骨架换成
- * 真浮层时高度才不跳。
+ * 的 `[data-view-glide]`。骨架（`entitySkeletonHtml`）与页面共用 `data-*` 容器和控件几何，
+ * 行高、内边距和横滚由这一份样式提供。
  *
  * 选择器全用 `data-*`：遗留样式表不分层、排在后面，写遗留类名会被接管。颜色读遗留层的 `--glass-text`、
  * `--glass-low`、`--ink-2` 这组：它们在 `:root` 上算好再继承进来，和页面其余部分同一档。
