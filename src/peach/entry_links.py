@@ -342,8 +342,9 @@ class MissavDirectory:
 
     def path(self, japanese: str, canonical: str) -> str | None:
         for name in (japanese, canonical):
-            matches = self.paths.get(directory_name_key(name), ())
-            if matches:
+            key = directory_name_key(name)
+            if key in self.paths:
+                matches = self.paths[key]
                 return matches[0] if len(matches) == 1 else ""
         return "" if self.complete else None
 
@@ -372,6 +373,7 @@ def directory_index(data: object) -> MissavDirectory | None:
     if not isinstance(entries, list):
         return None
     paths: dict[str, dict[str, str]] = {}
+    blocked: set[str] = set()
     for row in entries:
         if not isinstance(row, dict):
             continue
@@ -386,8 +388,14 @@ def directory_index(data: object) -> MissavDirectory | None:
         names = _published_names(slug) + _published_names(str(row.get("name") or ""))
         for name in names:
             if name:
-                paths.setdefault(directory_name_key(name), {}).setdefault(slug, target.path)
-    return MissavDirectory({key: tuple(sorted(values.values())) for key, values in paths.items()},
+                key = directory_name_key(name)
+                bucket = paths.setdefault(key, {})
+                if row.get("verified") is False:
+                    blocked.add(key)
+                else:
+                    bucket.setdefault(slug, target.path)
+    return MissavDirectory({key: () if key in blocked else tuple(sorted(values.values()))
+                            for key, values in paths.items()},
                            complete=data.get("complete") is True)
 
 
