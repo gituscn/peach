@@ -162,10 +162,28 @@ class PreviewCacheTests(unittest.TestCase):
             with mock.patch.object(cache, 'bytes', wraps=cache.bytes) as saved:
                 self.assertEqual(previews.playlist('ABP-123', root, fetch).decode(), body)
             self.assertEqual(saved.call_count, 1)
-            fetch.assert_called_once()
+            self.assertEqual(fetch.call_count, 2)
             with self.assertRaises(ValueError):
                 previews.source("ABP-123", "../private")
             with self.assertRaises(ValueError):
                 previews.register("ABP-123", "https://127.0.0.1/a")
             for path in cache.root.rglob("*.source.json"):
                 self.assertIn("url", json.loads(path.read_text()))
+
+    def test_signed_playlist_refreshes_and_registers_current_segment_addresses(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache = RemoteMediaCache(Path(directory).resolve())
+            previews = PreviewCache(cache)
+            root = previews.register('EXM-001', 'https://cdn.example/root.m3u8', identity='root')
+            def playlist(signature):
+                return f'#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\npart.ts?sign={signature}\n#EXT-X-ENDLIST\n'.encode()
+            fetch = mock.Mock(side_effect=[playlist('first'), playlist('current')])
+            first = previews.playlist('EXM-001', root, fetch)
+            for path in cache.root.rglob('*.data'):
+                os.utime(path, (0, 0))
+            current = previews.playlist('EXM-001', root, fetch)
+            self.assertNotEqual(first, current)
+            segment = next(line for line in current.decode().splitlines() if line.startswith('/jav-preview/'))
+            self.assertTrue(previews.source('EXM-001', segment.rsplit('/', 1)[-1])['url'].endswith('sign=current'))
+            self.assertEqual(previews.playlist('EXM-001', root, fetch), current)
+            self.assertEqual(fetch.call_count, 2)

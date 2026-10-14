@@ -10,6 +10,7 @@ import m3u8
 from .fsutil import atomic_write_text
 from .http import public_https_url
 
+PLAYLIST_REFRESH_SECONDS = 300
 
 class PreviewCache:
     def __init__(self, cache):
@@ -46,7 +47,9 @@ class PreviewCache:
             if not body.decode("utf-8").removeprefix(chr(0xFEFF)).lstrip().startswith("#EXTM3U"):
                 raise ValueError("预览清单未取得")
             return body
-        body = self.cache.bytes(f"preview:{code}:{ref}:playlist", download)
+        generation = hashlib.sha256(url.encode()).hexdigest()
+        body = self.cache.bytes(f"preview:{code}:{ref}:playlist:{generation}", download,
+                                ttl=PLAYLIST_REFRESH_SECONDS)
         playlist = m3u8.loads(body.decode("utf-8").removeprefix(chr(0xFEFF)), uri=url)
         nested = [*playlist.playlists, *playlist.iframe_playlists, *playlist.media]
         objects = [*playlist.segments, *nested, *playlist.keys, *playlist.session_keys, *playlist.segment_map]

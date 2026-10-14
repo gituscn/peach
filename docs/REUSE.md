@@ -528,6 +528,8 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.16.10，版�
 
 公开作品资料与评论复用 `jav_cache.PublicSnapshots`、既有 `filelock` 和原子写入；`cache_fresh` 与前端 `publicationFresh` 统一日历月边界、每天补齐及满月后的固定快照。`public_cache_scope` 将快照隔离到调用者数据目录，记录实际来源时间；测试显式传临时目录，默认 `PublicAPI()` 只用内存。媒体字节复用媒体缓存，来源 JSON 不承载本地标签决定、想要状态或观看历史。
 
+公开预览复用 HTTPX 0.28.1 的流式响应与已安装的 `curl_cffi` 0.16.3（MIT）浏览器传输。`preview_transport` 只适配响应生命周期与 TLS 连接失败，逐跳主机判据仍复用 `open_upstream`；HTTP 拒绝状态不切换传输。已读取固定版本 SDK 的 `Session.request`、`Response.iter_content` 和 `close`，实际公开 MP4 范围请求取得 206，无新增依赖。HLS 根与嵌套清单使用来源地址作为代际，5 分钟后按需刷新，浏览器核对本机清单；分片、密钥与初始化段继续复用持久缓存。MIKR-122 的来源新清单包含可用的当前签名；作品资料及评论的发行日期缓存独立保存。缓存与协议证据沿用 [媒体缓存](MEDIA_CACHE.md) 中现有 `m3u8` 和 Hishel 评估。
+
 ## 原位改字
 
 `scripts/dev/copy-editor.js` 复用官网本地预览的 `edit-client.js` 交互：文字范围提示、原位编辑、按钮文字就近输入、回车和失焦保存、Esc 取消。

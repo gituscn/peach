@@ -1007,6 +1007,7 @@ def _jav_preview_target(url: str) -> ResolvedFollowMedia:
 @router.api_route("/jav-preview/{code}/{ref}", methods=["GET", "HEAD"])
 def jav_preview(request: Request, code: str, ref: str, args: dict[str, str] = Depends(require_auth)):
     from .web_jav_detail import detail_code
+    from .preview_transport import open_preview_upstream
     cache = cache_for(request.app.state.web_contract)
     previews = PreviewCache(cache)
     try:
@@ -1015,9 +1016,12 @@ def jav_preview(request: Request, code: str, ref: str, args: dict[str, str] = De
         url = source["url"]
         target = _jav_preview_target(url)
         client = request.app.state.http_transport.client
+        def upstream(method, target, incoming):
+            return open_preview_upstream(client, method, target, incoming=incoming,
+                secrets_root=request.app.state.web_contract.follow_secrets_root)
         if source["playlist"]:
             def fetch(url):
-                response = open_upstream(client, "GET", _jav_preview_target(url), incoming={})
+                response = upstream("GET", _jav_preview_target(url), {})
                 try:
                     chunks, size = [], 0
                     for chunk in response.iter_bytes():
@@ -1030,9 +1034,9 @@ def jav_preview(request: Request, code: str, ref: str, args: dict[str, str] = De
                     response.close()
             body = previews.playlist(code, ref, fetch)
             return Response(b"" if request.method == "HEAD" else body, media_type="application/vnd.apple.mpegurl",
-                            headers={"cache-control": "private, max-age=31536000", "content-length": str(len(body))})
+                            headers={"cache-control": "private, no-cache", "content-length": str(len(body))})
         def media():
-            response = open_upstream(client, request.method, target, incoming=request.headers)
+            response = upstream(request.method, target, request.headers)
             if source.get('media_type') == 'video/mp4':
                 kind = response.headers.get('content-type', '').split(';')[0].lower()
                 if kind not in {'video/mp4', 'application/octet-stream', 'binary/octet-stream'}:
