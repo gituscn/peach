@@ -37,6 +37,46 @@ async function addWallCovers(page: Page) {
 }
 
 describe('播放墙的浏览与详情', () => {
+  for (const viewport of VIEWPORTS) it(`${viewport.name}：受限范围提示可清除条件并恢复探索，保留返回位置`, async () => {
+    const params = new URLSearchParams({ q:'作品', performer:'Alice', tag:'风景', tag_match:'all', state:'fresh',
+      jav:'1', loc:'local', returnTo:'/?q=原来的搜索' });
+    const opened = await openItemPage(browser, `/wall?${params}`, viewport, { ready:'[data-wall-tile]', catalogIds:[18,21] });
+    const { page } = opened;
+    const requests: URL[] = [];
+    page.on('request', request => { const url = new URL(request.url()); if (url.pathname === '/api/items') requests.push(url) });
+    try {
+      const notice = page.locator('[data-wall-filter-notice]');
+      assert.equal(await notice.isVisible(), true);
+      assert.match(await notice.innerText(), /当前仅显示筛选结果/);
+      assert.equal(await page.locator('[data-wall-refresh]').count(), 0);
+      const geometry = await notice.evaluate(node => {
+        const box = node.getBoundingClientRect(), back = document.querySelector('[data-wall-back]')!.getBoundingClientRect();
+        const text = node.querySelector('p')!.getBoundingClientRect(), action = node.querySelector('button')!.getBoundingClientRect();
+        return { left:box.left, right:box.right, backRight:back.right, width:innerWidth,
+          overlap:action.left < text.right && action.right > text.left && action.top < text.bottom && action.bottom > text.top };
+      });
+      assert(geometry.left >= geometry.backRight + 8 && geometry.right <= geometry.width, JSON.stringify(geometry));
+      assert.equal(geometry.overlap, false);
+      await notice.getByRole('button', { name:'清除筛选', exact:true }).click();
+      await notice.waitFor({ state:'detached' });
+      await page.getByRole('button', { name:'换一批', exact:true }).waitFor();
+      await page.locator('[data-wall-tile]').first().waitFor();
+      const current = new URL(page.url());
+      assert.equal(current.searchParams.get('jav'), '1');
+      assert.equal(current.searchParams.get('loc'), 'local');
+      assert.equal(current.searchParams.get('returnTo'), '/?q=原来的搜索');
+      for (const key of ['q','performer','tag','tag_match','state']) assert.equal(current.searchParams.has(key), false);
+      assert(requests.some(url => !url.searchParams.has('q') && !url.searchParams.has('performer')
+        && !url.searchParams.has('tag') && !url.searchParams.has('state')), requests.map(String).join('\n'));
+      const look = await layout(page);
+      assert(look.scrollWidth <= look.viewportWidth, JSON.stringify(look));
+      await page.reload(); await page.locator('[data-wall-tile]').first().waitFor();
+      assert.equal(await notice.count(), 0);
+      await page.getByRole('button', { name:'退出播放墙', exact:true }).click();
+      await page.waitForURL(url => url.pathname === '/' && url.searchParams.get('q') === '原来的搜索');
+      assert.deepEqual(opened.problems, []);
+    } finally { await opened.close() }
+  });
   it('选中作品具有发光描边，其余变暗；队列滚轮只滚列表；换批等待时墙面变糊', async () => {
     const opened = await openItemPage(browser, '/', VIEWPORTS[0]!, { ready:'[data-media-card]' });
     const { page } = opened;
@@ -516,6 +556,7 @@ describe('播放墙的浏览与详情', () => {
       await addWallCovers(page);
       assert.equal(await page.locator('[data-wall-tile]').count(), 0);
       assert.equal(await page.getByRole('button', { name:'退出播放墙' }).isVisible(), true);
+      assert.equal(await page.getByRole('button', { name:'清除筛选', exact:true }).isVisible(), true);
       await page.getByRole('button', { name:'播放墙工具', exact:true }).click();
       await page.getByRole('searchbox', { name:'搜索播放墙' }).fill('');
       await page.getByRole('searchbox', { name:'搜索播放墙' }).press('Enter');
