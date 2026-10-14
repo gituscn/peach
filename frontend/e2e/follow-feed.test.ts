@@ -65,6 +65,10 @@ describe('关注页岛', () => {
         assert.equal(await author.count(), 1);
         assert.equal(await author.getAttribute('href'), '/creators/90101');
         assert.equal(await author.getAttribute('aria-pressed'), null);
+        await author.hover();
+        assert.equal(await author.evaluate((node) => getComputedStyle(node).textDecorationLine), 'none');
+        await author.focus();
+        assert.equal(await author.evaluate((node) => document.activeElement === node), true);
         const card = page.locator('[data-follow-item="1000"]');
         assert.equal(await card.locator('a[data-follow-author]').getAttribute('href'), '/creators/90101');
         assert.equal(await card.locator('a[data-follow-avatar]').getAttribute('href'), '/creators/90101');
