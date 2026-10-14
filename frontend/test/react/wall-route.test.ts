@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { wallAddress } from '../../src/react/video-wall/wall-route';
+import { unfilteredWallAddress, wallAddress } from '../../src/react/video-wall/wall-route';
 import { registerEntityLink } from '../../src/core/entity-links';
 
 describe('播放墙独立入口', () => {
+  it('清除作品条件，保留浏览语境、排序和返回地址', () => {
+    const filters = new URLSearchParams({ q:'Alice', performer:'Alice', studio:'Studio', tag:'风景', tag_match:'all',
+      state:'fresh', orient:'vertical', dur_min:'600', region:'jp', jav:'1', loc:'local,115', sort:'new', returnTo:'/performers/71?tag=风景' });
+    const target = new URL(unfilteredWallAddress(`/wall?${filters}`), location.origin);
+    expect(Object.fromEntries(target.searchParams)).toEqual({ jav:'1', loc:'local,115', sort:'new', returnTo:'/performers/71?tag=风景' });
+    expect(unfilteredWallAddress('/wall?q=测试')).toBe('/wall');
+  });
   it('全局入口保留返回地址，非作品页使用馆藏范围', () => {
     for (const path of ['/stats?tab=creators','/trash?q=清理','/junk-files','/follow?q=动态','/performers?q=姓名']) {
       const target = new URL(wallAddress(path, { state:'trash',q:'清理',jav:'1',loc:'local' }), location.origin);

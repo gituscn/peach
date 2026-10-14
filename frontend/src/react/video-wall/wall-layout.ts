@@ -163,7 +163,8 @@ export class WallExploration {
   }
 }
 
+export const WALL_FILTER_KEYS = ['q','performer','series','creator','studio','owner','tag','state','orient','len','dur_min','dur_max','region'] as const;
+
 export function finiteWallFilters(filters: Readonly<Record<string, string>> = {}): boolean {
-  return ['q','performer','series','creator','studio','owner','tag','state','orient','len','dur_min','dur_max','region']
-    .some(key => !!filters[key]);
+  return WALL_FILTER_KEYS.some(key => !!filters[key]);
 }

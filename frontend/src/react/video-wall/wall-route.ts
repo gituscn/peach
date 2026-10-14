@@ -1,6 +1,7 @@
 import { peachHistory } from '@peach/history';
 import { isCatalogPath, ROUTE_STATES } from '@peach/legacy/core';
 import { entityLinkName } from '../../core/entity-links';
+import { WALL_FILTER_KEYS } from './wall-layout';
 
 export function wallAddress(from = `${location.pathname}${location.search}`, filters: Readonly<Record<string, string>> = {}): string {
   const source = new URL(from, location.origin);
@@ -20,6 +21,13 @@ export function wallAddress(from = `${location.pathname}${location.search}`, fil
   }
   params.set('returnTo', `${source.pathname}${source.search}`);
   return `/wall?${params}`;
+}
+
+export function unfilteredWallAddress(from = `${location.pathname}${location.search}`): string {
+  const params = new URL(from, location.origin).searchParams;
+  for (const key of WALL_FILTER_KEYS) params.delete(key);
+  params.delete('tag_match');
+  return `/wall${params.size ? `?${params}` : ''}`;
 }
 
 export function exitWall(): void {
