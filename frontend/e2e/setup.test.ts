@@ -5,6 +5,7 @@
  * PEACH_E2E_SETUP_DATA（临时数据根）和 PEACH_E2E_SETUP_MEDIA（一个已建好的空媒体目录）传进来。
  * 路由冒烟那几批没有这几个变量，本文件整组跳过。 */
 import assert from 'node:assert/strict';
+import { readFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
@@ -19,7 +20,8 @@ const ledgerRoot = process.env.PEACH_E2E_SETUP_LEDGER_ROOT ?? '';
 
 /** 填错那一轮的 400 是预期内的：Chrome 会把它同时记成一条控制台错误和一条 4xx 响应。 */
 const expectedRejection = (problem: string) =>
-  problem === '400 /api/setup' || problem.startsWith('console Failed to load resource: the server responded with a status of 400');
+  problem === '400 /api/setup' || problem === '400 /api/setup/restore'
+  || problem.startsWith('console Failed to load resource: the server responded with a status of 400');
 
 describe('首次运行页', { skip: origin && media && dataRoot ? false : '只在 SetupE2ETests 起的首启服务上跑' }, () => {
   let browser: Browser;
@@ -114,6 +116,29 @@ describe('首次运行页', { skip: origin && media && dataRoot ? false : '只�
       await page.getByText(selectedData, { exact: true }).waitFor({ state: 'visible' });
       const mobile = VIEWPORTS.find((candidate) => candidate.name === 'mobile')!;
       await page.setViewportSize({ width: mobile.width, height: mobile.height });
+      assert.deepEqual((await layout(page)).offenders, []);
+
+      // 已有数据目录的入口在首启页可操作，找不到配置时保留路径并说明原因。
+      const originalConfig = await readFile(join(selectedData, 'config.toml'));
+      await unlink(join(dataRoot, 'state', 'data-root.txt'));
+      await page.reload({ waitUntil: 'load' });
+      await page.getByRole('button', { name: '使用已有数据目录', exact: true }).click();
+      const existing = page.getByRole('textbox', { name: '已有数据目录' });
+      await existing.fill(join(dataRoot, 'missing'));
+      const restoreRejected = page.waitForResponse((response) => response.url().endsWith('/api/setup/restore'));
+      await page.getByRole('button', { name: '使用此目录', exact: true }).click();
+      assert.equal((await restoreRejected).status(), 400);
+      await page.getByRole('alert').filter({ hasText: 'config.toml' }).waitFor({ state: 'visible' });
+      assert.deepEqual((await layout(page)).offenders, []);
+      await existing.fill(selectedData);
+      const restoreAccepted = page.waitForResponse((response) => response.url().endsWith('/api/setup/restore'));
+      await page.getByRole('button', { name: '使用此目录', exact: true }).click();
+      assert.equal((await restoreAccepted).status(), 200);
+      await page.getByText('已连接已有数据目录。', { exact: true }).waitFor({ state: 'visible' });
+      assert.equal(await readFile(join(dataRoot, 'state', 'data-root.txt'), 'utf8'), selectedData);
+      assert.deepEqual(await readFile(join(selectedData, 'config.toml')), originalConfig);
+      assert.deepEqual((await layout(page)).offenders, []);
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
       assert.deepEqual((await layout(page)).offenders, []);
 
       assert.deepEqual(problems.filter((problem) => !expectedRejection(problem)), []);

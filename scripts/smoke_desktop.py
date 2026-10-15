@@ -109,6 +109,7 @@ def wait_for(check, description: str, *, timeout: float = 60):
 
 def smoke_environment(data: Path) -> dict[str, str]:
     environment = dict(os.environ, PEACH_DATA_ROOT=str(data), PYTHONIOENCODING="utf-8")
+    environment["LOCALAPPDATA"] = str(data.parent / "local-app-data")
     environment.pop("PYTHONPATH", None)
     environment["PATH"] = os.environ.get("SystemRoot", "/usr") + ("/System32" if os.name == "nt" else "/bin")
     return environment
@@ -163,12 +164,14 @@ def smoke_tray(executable: Path, evidence_dir: Path) -> None:
                     return pids and tray_window_ready(pids)
                 wait_for(tray_started, "托盘窗口、消息循环与监视器就绪")
                 wait_health(opener, "http://127.0.0.1:8900", None, root / "runtime.log")
+                selected = root / "selected-data"
                 complete_first_run(opener, "http://127.0.0.1:8900", media, port,
-                                   "standalone-tray-smoke-password")
+                                   "standalone-tray-smoke-password", data_root=selected)
                 health = wait_health(opener, f"http://127.0.0.1:{port}", None, root / "runtime.log")
                 assert health["ok"]
-                assert (data / "database/ledger.db").is_file()
-                wait_for(lambda: not (data / "state/configuration-reload.request").exists(),
+                assert (selected / "database/ledger.db").is_file()
+                assert (data / "state/data-root.txt").read_text(encoding="utf-8") == str(selected)
+                wait_for(lambda: not (selected / "state/configuration-reload.request").exists(),
                          "托盘消费设置重载请求")
                 assert_requires_login(opener, f"http://127.0.0.1:{port}")
             finally:
@@ -181,8 +184,33 @@ def smoke_tray(executable: Path, evidence_dir: Path) -> None:
                            for row in rows), "托盘发生异常退出或恢复"
             assert not list((data / "state/tray-watchdogs").glob("*.json")), "监视器记录仍在"
             assert not list((data / "state/tray-watchdogs").glob("*.ready")), "监视器握手仍在"
+            # 原配置保存在自选目录、启动落点没有位置记录：恢复后再次普通启动也应进入馆藏。
+            original = (selected / "config.toml").read_bytes()
+            (data / "state/data-root.txt").unlink()
+            launcher = subprocess.Popen([str(executable), "--silent"], cwd=root,
+                env=environment, stdout=log, stderr=log)
+            try:
+                setup = "http://127.0.0.1:8900"
+                assert wait_health(opener, setup, None, root / "runtime.log")["configured"] is False
+                request = urllib.request.Request(setup + "/api/setup/restore",
+                    data=json.dumps({"data_root": str(selected)}).encode(),
+                    headers={"Origin": setup, "Content-Type": "application/json"})
+                with opener.open(request, timeout=10) as response:
+                    assert json.load(response)["restored"]
+                assert wait_health(opener, f"http://127.0.0.1:{port}", None, root / "runtime.log")["configured"]
+                assert (selected / "config.toml").read_bytes() == original
+            finally:
+                stop_tray(executable, root, environment, log, launcher)
+            launcher = subprocess.Popen([str(executable), "--silent"], cwd=root,
+                env=environment, stdout=log, stderr=log)
+            try:
+                assert wait_health(opener, f"http://127.0.0.1:{port}", None, root / "runtime.log")["configured"]
+                assert_requires_login(opener, f"http://127.0.0.1:{port}")
+            finally:
+                stop_tray(executable, root, environment, log, launcher)
             print(json.dumps({"ok": True, "checks": ["tray-first-run", "tray-window",
-                "tray-watchdog", "tray-service-handoff", "tray-graceful-stop", "tray-no-residue"]}))
+                "tray-watchdog", "tray-service-handoff", "tray-graceful-stop", "tray-no-residue",
+                "existing-data-recovery", "selected-data-relaunch"]}))
 
 
 def wait_health(opener, base: str, process: subprocess.Popen | None, log_path: Path) -> dict:
@@ -225,7 +253,7 @@ def assert_standalone_tunnel(configuration: dict) -> None:
     assert tunnel['available'] is True
 
 
-def complete_first_run(opener, base: str, media: Path, port: int, password: str) -> None:
+def complete_first_run(opener, base: str, media: Path, port: int, password: str, *, data_root: Path | None = None) -> None:
     """首启服务的薄壳与页面包都取得到，再按页面包的提交形态完成一次设置。"""
     with opener.open(base + "/", timeout=5) as response:
         assert 'data-page="setup"' in response.read().decode("utf-8")
@@ -235,6 +263,8 @@ def complete_first_run(opener, base: str, media: Path, port: int, password: str)
     answers = {"media_dir": [{"path": str(media), "location": "115"}], "host": "2",
                "port": str(port), "mdns_name": "peach", "access_enabled": True,
                "access_password": password, "access_confirm": password}
+    if data_root is not None:
+        answers["data_root"] = str(data_root)
     request = urllib.request.Request(base + "/api/setup", data=json.dumps(answers).encode(),
         headers={"Origin": base, "Content-Type": "application/json"})
     with opener.open(request, timeout=60) as response:

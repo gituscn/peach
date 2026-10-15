@@ -10,6 +10,7 @@ import { AuthCard } from '../auth-card';
 import { describeFailure, fetchQuestions, SetupRequestError, type SetupDone, type SetupQuestions } from './setup-api';
 import { SetupDoneView } from './setup-done';
 import { SetupForm } from './setup-form';
+import { SetupRestore } from './setup-restore';
 
 type View =
   | { kind: 'loading' }
@@ -21,6 +22,7 @@ type View =
 export function SetupPage() {
   const [view, setView] = useState<View>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  const [restoring, setRestoring] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -46,7 +48,14 @@ export function SetupPage() {
       {view.kind === 'failed'
         ? <Note tone="error" action={<Button variant="secondary" onClick={retry}>重试</Button>}>{view.message}</Note>
         : null}
-      {view.kind === 'form' ? <SetupForm setup={view.setup} onDone={(done) => setView({ kind: 'done', done })} /> : null}
+      {view.kind === 'form' ? <>
+        <Button variant="secondary" className="self-start" onClick={() => setRestoring((current) => !current)}>
+          {restoring ? '返回首次设置' : '使用已有数据目录'}
+        </Button>
+        {restoring
+          ? <SetupRestore onDone={(done) => setView({ kind: 'done', done })} />
+          : <SetupForm setup={view.setup} onDone={(done) => setView({ kind: 'done', done })} />}
+      </> : null}
     </AuthCard>
   );
 }

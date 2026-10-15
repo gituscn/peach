@@ -1721,6 +1721,11 @@ def _main(argv: list[str] | None = None) -> int:
         except Exception:
             logging.getLogger(__name__).warning("日志整理失败", exc_info=True)
         log_to_file(config.directory("logs") / "tray.log")
+        try:
+            from .standalone_update import remember_installation_data_root
+            remember_installation_data_root(config)
+        except (OSError, RuntimeError):
+            logging.getLogger(__name__).warning("更新后的数据目录位置未能保存", exc_info=True)
         if sys.platform == "win32":
             lifecycle = Lifecycle(config.directory("state"), config.directory("logs"),
                                   config.data_root, PROJECT_ROOT)

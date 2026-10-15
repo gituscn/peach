@@ -18,8 +18,7 @@ import zipfile
 import httpx
 from filelock import FileLock, Timeout
 
-from . import desktop_installer, distribution, release_updates
-from .config import STATE_DIR, DATABASE_PATH
+from . import __version__, desktop_installer, distribution, release_updates, settings_file
 from .fsutil import atomic_write_text
 from .windows_update import replace_with_retry
 
@@ -29,7 +28,27 @@ MAX_EXPANDED = 2 * 1024 * 1024 * 1024
 
 
 def state_path() -> Path:
-    return STATE_DIR / "standalone-update.json"
+    return settings_file.load_config().directory("state") / "standalone-update.json"
+
+
+def remember_installation_data_root(config) -> bool:
+    """在线安装启动时，将已知的数据目录记入空的默认启动落点。"""
+    if not distribution.standalone() or not config.present:
+        return False
+    data = read()
+    target = data.get("target")
+    if (data.get("state") != "installing" or data.get("version") != __version__
+            or not isinstance(target, str) or not Path(target).is_absolute()
+            or Path(target).resolve() != Path(sys.executable).resolve().parent):
+        return False
+    bootstrap = distribution.user_data_root(os.environ)
+    if (bootstrap.resolve() == config.data_root.resolve()
+            or any((bootstrap / name).exists() for name in (
+                settings_file.SETTINGS_FILENAME, "state/data-root.txt", "database/ledger.db"))):
+        return False
+    settings_file.remember_data_root(settings_file.load_config(
+        environ=dict(os.environ, PEACH_DATA_ROOT=str(bootstrap))), config)
+    return True
 
 
 def read() -> dict:
@@ -91,7 +110,7 @@ def prepare(data: dict, lock: FileLock) -> None:
         if not isinstance(total, int) or not 0 < total <= MAX_ARCHIVE:
             raise ValueError("更新包大小无效")
         target = Path(sys.executable).resolve().parent
-        if STATE_DIR.resolve().is_relative_to(target):
+        if state_path().resolve().is_relative_to(target):
             raise ValueError("数据目录位于程序目录内，不能自动替换")
         transaction = target.parent / f".{target.name}-update-{data['id']}"
         transaction.mkdir()
@@ -168,6 +187,7 @@ def poll(tray) -> None:
         helper = Path(data["helper"]) / "Peach.exe"
         environment = os.environ.copy()
         environment["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+        environment[settings_file.DATA_ROOT_ENV] = str(settings_file.load_config().data_root.resolve())
         subprocess.Popen([str(helper), "--apply-standalone-update", str(state_path()), str(os.getpid())],
                          cwd=str(helper.parent), env=environment, creationflags=subprocess.CREATE_NO_WINDOW)
         tray.exit(reason="standalone-update")
@@ -179,17 +199,19 @@ def poll(tray) -> None:
 
 def migrate_database(stage: Path, data: dict) -> Path | None:
     from .migrations import plan, sqlite_backup
-    if not DATABASE_PATH.is_file():
+    config = settings_file.load_config()
+    database = config.directory("database") / "ledger.db"
+    if not database.is_file():
         return None
-    _, pending = plan(DATABASE_PATH, stage / "_internal" / "migrations")
+    _, pending = plan(database, stage / "_internal" / "migrations")
     if not pending:
         return None
-    backup = STATE_DIR / "update-backups" / data["id"] / "ledger.db"
-    sqlite_backup(DATABASE_PATH, backup)
+    backup = config.directory("state") / "update-backups" / data["id"] / "ledger.db"
+    sqlite_backup(database, backup)
     write(data, database_backup=str(backup), state="installing", progress=10, message="正在更新本地数据库")
-    environment = dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT="1")
+    environment = dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT="1", PEACH_DATA_ROOT=str(config.data_root.resolve()))
     with (backup.parent / "migration.log").open("wb") as log:
-        result = subprocess.run([str(stage / "Peach.exe"), "migrate", "upgrade", "--yes", "--db", str(DATABASE_PATH)],
+        result = subprocess.run([str(stage / "Peach.exe"), "migrate", "upgrade", "--yes", "--db", str(database)],
                                 cwd=str(stage), env=environment, stdout=log, stderr=log, stdin=subprocess.DEVNULL,
                                 timeout=180, check=False, creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
     if result.returncode:
@@ -198,10 +220,12 @@ def migrate_database(stage: Path, data: dict) -> Path | None:
 
 
 def restore_database(data: dict) -> None:
-    backup = STATE_DIR / "update-backups" / data["id"] / "ledger.db"
+    config = settings_file.load_config()
+    database = config.directory("database") / "ledger.db"
+    backup = config.directory("state") / "update-backups" / data["id"] / "ledger.db"
     if not backup.is_file():
         return
-    with closing(sqlite3.connect(backup.as_uri() + "?mode=ro", uri=True)) as source, closing(sqlite3.connect(DATABASE_PATH)) as destination:
+    with closing(sqlite3.connect(backup.as_uri() + "?mode=ro", uri=True)) as source, closing(sqlite3.connect(database)) as destination:
         source.backup(destination)
         if destination.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise RuntimeError("数据库恢复检查失败")
@@ -219,7 +243,7 @@ def apply(manifest: Path, wait_pid: int) -> int:
     transaction = Path(data["transaction"]).resolve()
     stage = Path(data["stage"]).resolve()
     if (transaction.parent != target.parent or transaction.name != f".{target.name}-update-{data['id']}"
-            or stage != transaction / "stage" / "Peach" or STATE_DIR.resolve().is_relative_to(target)
+            or stage != transaction / "stage" / "Peach" or state_path().resolve().is_relative_to(target)
             or not (target / "_internal" / "standalone.txt").is_file()):
         return 2
     backup = transaction / "backup"

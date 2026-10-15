@@ -42,6 +42,7 @@ export interface SetupQuestions {
 export interface SetupFact { term: string; value: string; download_url?: string; download_label?: string }
 
 export interface SetupDone {
+  restored?: boolean;
   url: string;
   scan_requested: boolean;
   history_guide: boolean;
@@ -91,6 +92,9 @@ export const fetchQuestions = (signal?: AbortSignal) =>
 
 export const submitSetup = (submission: SetupSubmission) =>
   request<SetupDone>(SETUP_URL, { method: 'POST', body: JSON.stringify(submission) }, '没能完成设置');
+
+export const restoreSetup = (dataRoot: string) =>
+  request<SetupDone>(`${SETUP_URL}/restore`, { method: 'POST', body: JSON.stringify({ data_root: dataRoot }) }, '没能使用此数据目录');
 
 export const pickFolder = async (initial: string) =>
   (await request<{ path: string | null }>(PICK_FOLDER_URL,
