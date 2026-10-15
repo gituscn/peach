@@ -99,7 +99,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 ### Windows
 
 1. 从 [Releases](https://github.com/peach-mitao/peach/releases) 下载其中一种：
-   - 安装包 `Peach-<版本>-windows-x64-setup.exe`：双击安装，不需要管理员权限，开始菜单里有 Peach，可以在系统设置里卸载。
+   - 安装包 `Peach-<版本>-windows-x64-setup.exe`：双击安装，可选择安装目录，不需要管理员权限，开始菜单里有 Peach，可以在系统设置里卸载。
    - 免安装包 `Peach-<版本>-windows-x64.zip`：右键「全部解压」，双击里面的 `Peach.exe`。
 2. 浏览器会打开首次设置页。
 3. 选好媒体文件夹和谁能访问，开始扫描。

@@ -100,7 +100,7 @@ The original screenshots are lossless 3840×2160 PNGs; click to view them. You c
 ### Windows
 
 1. Download one of the two packages from [Releases](https://github.com/peach-mitao/peach/releases):
-   - Installer `Peach-<version>-windows-x64-setup.exe`: double-click to install. No administrator rights needed; Peach appears in the Start menu and can be uninstalled from Windows Settings.
+   - Installer `Peach-<version>-windows-x64-setup.exe`: double-click to install and choose an installation folder. No administrator rights needed; Peach appears in the Start menu and can be uninstalled from Windows Settings.
    - Portable `Peach-<version>-windows-x64.zip`: right-click it, choose "Extract All", then double-click `Peach.exe` inside.
 2. Your browser opens the first-run setup page.
 3. Pick your media folders and who may access Peach, then start the scan.

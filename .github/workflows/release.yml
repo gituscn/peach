@@ -65,6 +65,9 @@ jobs:
             choco install innosetup --version 6.7.3 --yes --no-progress
             if ($LASTEXITCODE -ne 0) { throw 'Inno Setup 安装失败' }
           }
+      - name: 验证安装目录选择与保护
+        shell: pwsh
+        run: '& ./scripts/test.ps1 -Scope packaging -Focus test_desktop_installer'
       - name: 构建独立目录包与安装包
         shell: pwsh
         run: '& ./scripts/build_windows.ps1 -Installer -CloudflaredPath "$env:RUNNER_TEMP/cloudflared.exe"'
@@ -102,10 +105,10 @@ jobs:
       - name: 静默安装、验收并卸载安装包
         shell: pwsh
         run: |
+          $Installed = Join-Path $env:RUNNER_TEMP 'Peach 安装验收\自定义目录'
           $Setup = Start-Process -FilePath './Peach-${{ needs.windows.outputs.version }}-windows-x64-setup.exe' `
-            -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
+            -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$Installed`"" -Wait -PassThru
           if ($Setup.ExitCode -ne 0) { throw "安装包退出码 $($Setup.ExitCode)" }
-          $Installed = Join-Path $env:LOCALAPPDATA 'Programs\Peach'
           $Key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{02D9748A-78F6-4866-AC75-918177194DAB}_is1'
           $Menu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Peach.lnk'
           if (-not (Test-Path -LiteralPath $Key) -or -not (Test-Path -LiteralPath $Menu)) { throw '安装包没有登记卸载项或开始菜单项' }
