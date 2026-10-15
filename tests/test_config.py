@@ -58,6 +58,27 @@ class ProjectRootTests(unittest.TestCase):
 
 
 class DataRootDiscoveryTests(unittest.TestCase):
+    def test_saved_data_root_locations_reject_invalid_and_cyclic_paths(self):
+        with TempTree() as tree:
+            state = tree.data_root / "state"
+            state.mkdir()
+            locator = state / settings_file.DATA_ROOT_LOCATION
+            for destination in ("", "relative", str(tree.data_root)):
+                with self.subTest(destination=destination):
+                    locator.write_text(destination, encoding="utf-8")
+                    with self.assertRaises(SettingsFileError):
+                        tree.load()
+
+    def test_a_missing_selected_root_stays_selected(self):
+        with TempTree() as tree:
+            selected = tree.root / "custom-data"
+            state = tree.data_root / "state"
+            state.mkdir()
+            (state / settings_file.DATA_ROOT_LOCATION).write_text(str(selected), encoding="utf-8")
+            loaded = tree.load()
+            self.assertEqual(loaded.data_root, selected)
+            self.assertFalse(loaded.present)
+
     def test_environment_variable_wins_over_the_sibling_directory(self):
         with TempTree() as tree:
             elsewhere = tree.root / "elsewhere"

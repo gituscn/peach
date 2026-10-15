@@ -98,7 +98,7 @@ _POSIX_MEDIA_NOTE = "本机文件夹是这台电脑读取媒体的位置；Windo
 
 
 #: 有一行媒体来源选了云盘时，媒体库底下出现的那句提示和它的帮助链接。
-_CLOUD_HELP = "先在 CloudDrive 登录网盘并完成挂载。"
+_CLOUD_HELP = "CloudDrive 可运行在本机或 NAS。请先挂载网盘；Windows 读取 NAS 共享时，请先映射为盘符，再选择对应文件夹。本机安装提示仅适用于在本机运行 CloudDrive。"
 _CLOUD_HELP_URL = "https://www.clouddrive2.com/help.html"
 _CLOUD_HELP_LABEL = "挂载帮助"
 
@@ -436,6 +436,7 @@ async def setup_submit_json(request: Request):
             raise HTTPException(status_code=409, detail="settings file already exists")
         try:
             applied = onboarding.apply(resolved, answers, windows=windows, access_password=password)
+            settings_file.remember_data_root(settings_file.active(), applied.config)
         except (OSError, RuntimeError) as exc:
             errors = {"data_root": str(exc)}
     if errors:

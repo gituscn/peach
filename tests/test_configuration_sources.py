@@ -52,6 +52,21 @@ class MediaConfigurationTests(unittest.TestCase):
         self.assertEqual(roots["115"], ("B:\\Movies", "B:\\Photos"))
         self.assertEqual(mounts["115"], ("/Volumes/115/Movies", "/Volumes/115/Photos"))
 
+    def test_windows_network_shares_require_a_mapped_drive(self):
+        roots, mounts, errors = media_config.validate([
+            {"location": "115", "path": r"\\nas\media\115"},
+        ], windows=True)
+        self.assertEqual(roots, {})
+        self.assertEqual(mounts, {})
+        self.assertIn("映射为 Windows 盘符", errors[0])
+        with patch.object(media_config, "mount_dependencies", return_value=[]):
+            roots, mounts, errors = media_config.validate([
+                {"location": "115", "path": r"Z:\视频"},
+            ], windows=True)
+        self.assertFalse(errors)
+        self.assertEqual(roots, {"115": ("Z:\\视频",)})
+        self.assertEqual(mounts, {})
+
     def test_invalid_and_overlapping_roots_return_row_errors(self):
         for rows in ([{"location": "bad", "path": "B:/"}],
                      [{"location": [], "path": "B:/"}],

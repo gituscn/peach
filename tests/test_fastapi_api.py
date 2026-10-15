@@ -3141,6 +3141,16 @@ class UnconfiguredMachineTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(body["configured"])
         self.assertEqual(body["db"], "missing")
 
+    async def test_setup_lifespan_keeps_ledger_workers_stopped(self):
+        async with self.app.router.lifespan_context(self.app):
+            self.assertIsNone(self.app.state.web_contract.downloads._thread)
+            self.assertFalse(self.app.state.follow_scheduler._started)
+            self.assertFalse(self.app.state.web_contract.feed_scheduler._started)
+            response = await self.client.get("/healthz")
+            self.assertEqual(response.status_code, 200)
+            self.assertFalse(response.json()["configured"])
+            self.assertFalse(self.settings.db_path.exists())
+
     async def test_the_page_serves_the_first_run_shell(self):
         response = await self.client.get("/")
         self.assertEqual(response.status_code, 200)

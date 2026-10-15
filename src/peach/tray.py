@@ -213,6 +213,16 @@ class SingleInstance:
         self._handle.close()
         self._handle = None
 
+    def relocate(self, path: Path) -> None:
+        """先取得目标目录的锁，再释放当前目录的锁。"""
+        if self.path == path:
+            return
+        replacement = SingleInstance(path)
+        replacement.acquire()
+        self.close()
+        self.path, self._handle = replacement.path, replacement._handle
+        replacement._handle = None
+
 
 class ServiceManager:
     def __init__(
@@ -835,6 +845,7 @@ class SetupGate:
         config,
         *,
         waiting: bool,
+        instance: SingleInstance | None = None,
         load: Callable[[], object] = settings_file.load_config,
         popen: Callable[..., subprocess.Popen] = subprocess.Popen,
         open_browser: Callable[[str], object] = webbrowser.open,
@@ -842,6 +853,7 @@ class SetupGate:
         self.manager = manager
         self.config = config
         self._waiting = waiting
+        self._instance = instance
         self._load = load
         self._popen = popen
         self._open_browser = open_browser
@@ -883,6 +895,8 @@ class SetupGate:
             specs = configured_service_specs(config)
         except FileNotFoundError:
             return False        # CA 还没生成完（或没有 openssl），下一轮再看
+        if self._instance is not None:
+            self._instance.relocate(config.directory("state") / "peach-tray.lock")
         self._waiting = False
         self.config = config
         self.manager.replace_specs(
@@ -1163,11 +1177,12 @@ class PeachTray:
         threading.Thread(target=work, name="PeachLedgerAction", daemon=True).start()
 
     def open_logs(self, _icon=None, _item=None) -> None:
-        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        log_dir = self.gate.config.directory("logs")
+        log_dir.mkdir(parents=True, exist_ok=True)
         if os.name == "nt":
-            os.startfile(LOG_DIR)  # type: ignore[attr-defined]
+            os.startfile(log_dir)  # type: ignore[attr-defined]
         elif sys.platform == "darwin":
-            subprocess.run(["open", str(LOG_DIR)], check=False)
+            subprocess.run(["open", str(log_dir)], check=False)
 
     def export_diagnostics(self, _icon=None, _item=None) -> None:
         from .support_bundle import save_bundle
@@ -1316,7 +1331,8 @@ class PeachTray:
             if self._stop_event.is_set():
                 return
             # 先看首次设置有没有完成：切换会换掉 `manager.specs`，采样必须落在换完之后。
-            self.gate.poll()
+            if self.gate.poll() and self.preparation is not None:
+                self.preparation = tray_preparation(self.gate.config, self.manager)
             down = [spec for spec in self.manager.specs if not self.manager.healthy(spec)]
             if down:
                 self.revive_services()
@@ -1716,7 +1732,7 @@ def _main(argv: list[str] | None = None) -> int:
                 lifecycle = None
         specs = build_setup_service_specs(config) if waiting else configured_service_specs(config)
         manager = ServiceManager(specs, log_dir=config.directory("logs"))
-        gate = SetupGate(manager, config, waiting=waiting)
+        gate = SetupGate(manager, config, waiting=waiting, instance=instance)
         if sys.platform == "darwin":
             manager.start_missing()
             run_macos_menu_bar(manager, gate, silent=args.silent, show_browser=args.show)
