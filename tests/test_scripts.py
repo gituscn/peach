@@ -53,6 +53,109 @@ def load_script(name: str):
     return module
 
 
+class DesktopSmokeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.script = load_script("smoke_desktop")
+
+    def test_failure_preserves_logs_without_database_or_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory).resolve() / "evidence"
+            with self.assertRaisesRegex(RuntimeError, "startup failed"), redirect_stderr(io.StringIO()):
+                with self.script.smoke_directory(evidence) as root:
+                    (root / "data/logs").mkdir(parents=True)
+                    (root / "data/logs/tray.log").write_text("启动堆栈", encoding="utf-8")
+                    (root / "data/config.toml").write_text("private config", encoding="utf-8")
+                    (root / "data/ledger.db").write_bytes(b"private database")
+                    raise RuntimeError("startup failed")
+            files = [path.relative_to(evidence).parts[1:] for path in evidence.rglob("*") if path.is_file()]
+            self.assertCountEqual(files, [("data", "logs", "tray.log"), ("failure.txt",)])
+            self.assertFalse(root.exists())
+
+    def test_success_removes_temporary_data_without_creating_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory).resolve() / "evidence"
+            with self.script.smoke_directory(evidence) as root:
+                (root / "runtime.log").write_text("ok", encoding="utf-8")
+            self.assertFalse(root.exists())
+            self.assertFalse(evidence.exists())
+
+    def test_lifecycle_reader_tolerates_a_record_being_written(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data = Path(directory).resolve()
+            self.assertEqual(self.script.lifecycle_events(data), [])
+            (data / "logs").mkdir()
+            (data / "logs/tray-lifecycle.log").write_text(
+                '{"event":"watchdog_ready","tray_pid":42}\n{"event":', encoding="utf-8")
+            self.assertEqual(self.script.lifecycle_events(data), [{"event": "watchdog_ready", "tray_pid": 42}])
+
+    def test_process_inventory_filters_by_exact_artifact_and_handles_single_pid(self):
+        with mock.patch.dict(os.environ, {"SystemRoot": "C:/Windows"}), \
+                mock.patch.object(self.script.subprocess, "run",
+                                  return_value=SimpleNamespace(stdout="42")) as run:
+            executable = Path("C:/isolated/Peach.exe")
+            self.assertEqual(self.script.artifact_processes(executable), [42])
+        self.assertEqual(run.call_args.kwargs["env"]["PEACH_SMOKE_EXECUTABLE"], str(executable))
+        self.assertIn("-NonInteractive", run.call_args.args[0])
+
+    def test_health_wait_accepts_a_detached_launcher(self):
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"ok":true}'
+        opener = mock.Mock()
+        opener.open.return_value = response
+        self.assertEqual(self.script.wait_health(opener, "http://127.0.0.1:1", None,
+                                                Path("unused.log")), {"ok": True})
+
+    def test_failed_normal_stop_disarms_watchdogs_and_reaps_only_artifact_pids(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            watchdogs = root / "data/state/tray-watchdogs"
+            watchdogs.mkdir(parents=True)
+            (watchdogs / "session.json").write_text("{}", encoding="utf-8")
+            (watchdogs / "session.ready").write_text("43", encoding="utf-8")
+            executable = root / "Peach.exe"
+            launcher = mock.Mock()
+            with mock.patch.dict(os.environ, {"SystemRoot": "C:/Windows"}), \
+                    mock.patch.object(self.script, "artifact_processes", side_effect=[[42, 43], []]), \
+                    mock.patch.object(self.script, "wait_for", side_effect=lambda check, *_args, **_kwargs: check()), \
+                    mock.patch.object(self.script.subprocess, "run", side_effect=[
+                        SimpleNamespace(returncode=1), SimpleNamespace(returncode=0), SimpleNamespace(returncode=0)]) as run:
+                with self.assertRaisesRegex(AssertionError, "托盘退出失败"):
+                    self.script.stop_tray(executable, root, {}, io.BytesIO(), launcher)
+            commands = [call.args[0] for call in run.call_args_list]
+            self.assertEqual(commands[0], [str(executable), "--installer-stop"])
+            self.assertEqual([command[2] for command in commands[1:]], ["43", "42"])
+            self.assertEqual((watchdogs / "session.stop").read_text(encoding="utf-8"), "smoke-cleanup")
+
+    @unittest.skipUnless(os.name == "nt", "Windows 托盘验收")
+    def test_setup_failure_still_stops_tray_and_checks_all_artifact_processes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            executable = root / "Peach.exe"
+            process = mock.Mock()
+
+            def wait_for(check, description, **_kwargs):
+                if "全部退出" in description:
+                    self.assertTrue(check())
+                return True
+
+            with mock.patch.object(self.script, "artifact_processes", return_value=[]) as inventory, \
+                    mock.patch.object(self.script, "wait_for", side_effect=wait_for), \
+                    mock.patch.object(self.script, "wait_health", return_value={"ok": True}), \
+                    mock.patch.object(self.script, "complete_first_run", side_effect=RuntimeError("setup failed")), \
+                    mock.patch.object(self.script.subprocess, "Popen", return_value=process) as popen, \
+                    mock.patch.object(self.script.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as stop, \
+                    mock.patch.object(self.script.socket, "socket"), redirect_stderr(io.StringIO()):
+                with self.assertRaisesRegex(RuntimeError, "setup failed"):
+                    self.script.smoke_tray(executable, root / "evidence")
+            self.assertEqual(popen.call_args.args[0], [str(executable), "--silent"])
+            self.assertEqual(stop.call_args.args[0], [str(executable), "--installer-stop"])
+            self.assertEqual(inventory.call_count, 2)
+            process.wait.assert_called_once_with(timeout=15)
+            failure = next((root / "evidence").rglob("failure.txt")).read_text(encoding="utf-8")
+            self.assertIn("setup failed", failure)
+
+
 class Sha1SyncOptionsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
