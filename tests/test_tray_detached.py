@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import json
 import os
 import subprocess
@@ -7,6 +8,7 @@ import sys
 import tempfile
 import time
 import unittest
+from ctypes import wintypes
 from pathlib import Path
 from unittest import mock
 
@@ -14,6 +16,24 @@ from peach import tray_detached, windows_restart
 from peach.process_job import assign_to_job, close_job, create_kill_on_close_job
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class _JobBasicLimits(ctypes.Structure):
+    _fields_ = [("times", ctypes.c_longlong * 2), ("flags", wintypes.DWORD),
+                ("working_set", ctypes.c_size_t * 2), ("active_limit", wintypes.DWORD),
+                ("affinity", ctypes.c_size_t), ("priority", wintypes.DWORD),
+                ("scheduling", wintypes.DWORD)]
+
+
+class _JobLimits(ctypes.Structure):
+    _fields_ = [("basic", _JobBasicLimits), ("io", ctypes.c_ulonglong * 6),
+                ("memory", ctypes.c_size_t * 4)]
+
+
+class _JobAccounting(ctypes.Structure):
+    _fields_ = [("times", ctypes.c_longlong * 4), ("page_faults", wintypes.DWORD),
+                ("total", wintypes.DWORD), ("active", wintypes.DWORD),
+                ("terminated", wintypes.DWORD)]
 
 
 class DetachedLaunchTests(unittest.TestCase):
@@ -144,6 +164,89 @@ time.sleep(60)
                         process.terminate()
                         process.wait(timeout=10)
                     process.close()
+
+    @unittest.skipUnless(os.name == "nt", "Windows 桌面 Job 的实际继承与脱离")
+    def test_child_escapes_desktop_jobs_that_allow_automatic_or_explicit_breakaway(self):
+        for flags in (0x1000, 0x0800):
+            with self.subTest(flags=hex(flags)):
+                self._desktop_job_launch(flags, allowed=True)
+
+    @unittest.skipUnless(os.name == "nt", "Windows 桌面 Job 的实际继承与脱离")
+    def test_restricted_desktop_job_never_executes_the_child(self):
+        self._desktop_job_launch(0, allowed=False)
+
+    def _desktop_job_launch(self, flags, *, allowed):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            job = create_kill_on_close_job()
+            self.assertIsNotNone(job)
+            kernel = tray_detached._kernel()
+            kernel.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int,
+                                                       wintypes.LPVOID, wintypes.DWORD]
+            limits = _JobLimits()
+            limits.basic.flags = 0x2000 | flags
+            self.assertTrue(kernel.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits)))
+            desktop = child = None
+            try:
+                desktop = tray_detached.launch_detached(
+                    [sys._base_executable, "-c", "import time; time.sleep(60)"], cwd=root)
+                assign_to_job(job, desktop)
+                self.assertTrue(tray_detached._in_job(kernel, desktop._handle))
+                user = mock.Mock()
+                user.GetShellWindow.return_value = 1
+
+                def desktop_pid(_window, output):
+                    ctypes.cast(output, ctypes.POINTER(wintypes.DWORD)).contents.value = desktop.pid
+                    return 1
+
+                user.GetWindowThreadProcessId.side_effect = desktop_pid
+                native_dll = ctypes.WinDLL
+
+                def load_dll(name, *args, **kwargs):
+                    return user if name == "user32" else native_dll(name, *args, **kwargs)
+
+                marker = root / "executed"
+                code = "from pathlib import Path; import sys, time; Path(sys.argv[1]).touch(); time.sleep(60)"
+                with mock.patch.object(ctypes, "WinDLL", side_effect=load_dll):
+                    if allowed:
+                        child = tray_detached.launch_detached(
+                            [sys._base_executable, "-c", code, str(marker)], cwd=root)
+                    else:
+                        with self.assertRaises(OSError):
+                            tray_detached.launch_detached([sys._base_executable, "-c", code, str(marker)], cwd=root)
+                if allowed:
+                    deadline = time.monotonic() + 10
+                    while not marker.exists() and time.monotonic() < deadline:
+                        self.assertIsNone(child.poll())
+                        time.sleep(.05)
+                    self.assertTrue(marker.exists(), "通过独立性检查后应执行子进程")
+                    self.assertFalse(tray_detached._in_job(kernel, child._handle))
+                    close_job(job)
+                    job = None
+                    desktop.wait(timeout=10)
+                    self.assertIsNone(child.poll(), "关闭桌面 Job 后独立子进程必须存活")
+                else:
+                    self.assertFalse(marker.exists(), "受限子进程必须在执行代码前停止")
+                    kernel.QueryInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int,
+                        wintypes.LPVOID, wintypes.DWORD, wintypes.LPVOID]
+                    accounting = _JobAccounting()
+                    self.assertTrue(kernel.QueryInformationJobObject(
+                        job, 1, ctypes.byref(accounting), ctypes.sizeof(accounting), None))
+                    self.assertGreaterEqual(accounting.total, 2, "必须按实际子进程结果判断独立性")
+                    self.assertEqual(accounting.active, 1, "拒绝的子进程必须完整回收")
+            finally:
+                close_job(job)
+                for process in (child, desktop):
+                    if process is not None:
+                        if process is desktop and job is not None:
+                            try:
+                                process.wait(timeout=10)
+                            except subprocess.TimeoutExpired:
+                                pass
+                        if process.poll() is None:
+                            process.terminate()
+                        process.wait(timeout=10)
+                        process.close()
 
 
 

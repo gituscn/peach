@@ -8,6 +8,8 @@ import sys
 from ctypes import wintypes
 from pathlib import Path
 
+_CREATE_SUSPENDED = 0x00000004
+
 
 class _StartupInfo(ctypes.Structure):
     _fields_ = [
@@ -48,6 +50,7 @@ def _kernel():
             wintypes.LPVOID, wintypes.LPVOID, wintypes.BOOL, wintypes.DWORD,
             wintypes.LPVOID, wintypes.LPCWSTR, ctypes.POINTER(_StartupInfoEx),
             ctypes.POINTER(_ProcessInfo)]),
+        "ResumeThread": (wintypes.DWORD, [wintypes.HANDLE]),
     }
     for name, (result, arguments) in signatures.items():
         function = getattr(kernel, name)
@@ -124,6 +127,34 @@ class DetachedProcess:
         self.close()
 
 
+def _create_verified(kernel, executable, argv, cwd, block, startup, flags):
+    """挂起创建，在用户代码执行前验收 Job 归属，再恢复主线程。"""
+    child = _ProcessInfo()
+    command = ctypes.create_unicode_buffer(subprocess.list2cmdline([os.fspath(a) for a in argv]))
+    if not kernel.CreateProcessW(str(executable), command, None, None, False,
+            flags | _CREATE_SUSPENDED, block, os.fspath(cwd),
+            ctypes.byref(startup), ctypes.byref(child)):
+        operation = "CreateProcessW(breakaway)" if flags & subprocess.CREATE_BREAKAWAY_FROM_JOB else "CreateProcessW"
+        raise _windows_error(operation)
+    process = DetachedProcess(child.hProcess, child.dwProcessId)
+    verified = False
+    try:
+        if _in_job(kernel, child.hProcess):
+            return None
+        if kernel.ResumeThread(child.hThread) == 0xFFFFFFFF:
+            raise _windows_error("ResumeThread")
+        verified = True
+        return process
+    finally:
+        kernel.CloseHandle(child.hThread)
+        if not verified:
+            try:
+                process.terminate()
+                process.wait(timeout=5)
+            finally:
+                process.close()
+
+
 def launch_detached(argv, *, cwd, env=None) -> DetachedProcess:
     """由当前会话桌面进程承接父身份；失败明确报错，不回退到启动器 Job。"""
     if os.name != "nt":
@@ -153,10 +184,7 @@ def launch_detached(argv, *, cwd, env=None) -> DetachedProcess:
     if not parent:
         raise _windows_error("OpenProcess(desktop)")
     initialized = False
-    child = _ProcessInfo()
     try:
-        if _in_job(kernel, parent):
-            raise OSError("Windows 桌面进程属于 Job，无法保证托盘独立运行")
         size = ctypes.c_size_t()
         kernel.InitializeProcThreadAttributeList(None, 1, 0, ctypes.byref(size))
         attributes = ctypes.create_string_buffer(size.value)
@@ -174,21 +202,18 @@ def launch_detached(argv, *, cwd, env=None) -> DetachedProcess:
         block = ctypes.create_unicode_buffer("\0".join(
             f"{key}={value}" for key, value in sorted(environment.items(), key=lambda row: row[0].upper())
         ) + "\0\0")
-        command = ctypes.create_unicode_buffer(subprocess.list2cmdline([os.fspath(a) for a in argv]))
         flags = 0x00080000 | 0x00000400 | subprocess.DETACHED_PROCESS
-        if not kernel.CreateProcessW(str(executable), command, None, None, False,
-                flags, block, os.fspath(cwd), ctypes.byref(startup), ctypes.byref(child)):
-            raise _windows_error("CreateProcessW")
-        kernel.CloseHandle(child.hThread)
-        process = DetachedProcess(child.hProcess, child.dwProcessId)
         try:
-            if _in_job(kernel, child.hProcess):
-                raise OSError("托盘进程仍属于 Job，独立启动未成立")
-        except OSError:
-            process.terminate()
-            process.wait(timeout=5)
-            process.close()
-            raise
+            process = _create_verified(kernel, executable, argv, cwd, block, startup, flags)
+        except OSError as error:
+            if getattr(error, "winerror", None) != 5 or getattr(error, "peach_operation", "") != "CreateProcessW":
+                raise
+            process = None
+        if process is None:
+            process = _create_verified(kernel, executable, argv, cwd, block, startup,
+                                       flags | subprocess.CREATE_BREAKAWAY_FROM_JOB)
+        if process is None:
+            raise OSError(f"托盘进程仍受 Windows Job 约束，独立启动未成立（桌面 PID：{pid.value}）")
         return process
     finally:
         if initialized:
