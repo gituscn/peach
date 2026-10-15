@@ -6,12 +6,12 @@ import { afterEach, expect, it, vi } from 'vitest';
 import * as legacyUi from '@peach/legacy/ui';
 
 import { queryClient } from '../../src/react/query';
-import { AliasManager } from '../../src/react/follow-manage/alias-manager';
+import { AliasManager, type AliasManagerProps } from '../../src/react/follow-manage/alias-manager';
 import {
   FOLLOW_ALIAS_URL, type AliasGroup, type AliasSuggestion,
 } from '../../src/react/follow-manage/follow-manage';
 
-import { buttonNamed, click, mountRoot, settle } from './render';
+import { buttonNamed, click, mountRoot, settle, type } from './render';
 
 afterEach(() => queryClient.clear());
 notifyManager.setScheduler((notify) => notify());
@@ -40,15 +40,17 @@ function stubConfirm() {
   return asked;
 }
 
-async function open(fetcher: ReturnType<typeof vi.fn>) {
+async function open(fetcher: ReturnType<typeof vi.fn>, over: Partial<AliasManagerProps> = {}) {
   vi.stubGlobal('fetch', fetcher);
   const toast = vi.fn();
-  const mounted = await mountRoot(
+  const render = (props = over) => (
     <QueryClientProvider client={queryClient}>
-      <AliasManager groups={GROUPS} suggestions={SUGGESTIONS} readOnly={false} toast={toast} />
+      <AliasManager groups={GROUPS} suggestions={SUGGESTIONS} readOnly={false} toast={toast} {...props} />
     </QueryClientProvider>);
+  const mounted = await mountRoot(render());
   await settle();
-  return { toast, ...mounted };
+  return { toast, ...mounted, renderProps: (props: Partial<AliasManagerProps>) =>
+    mounted.rerender(render({ ...over, ...props })) };
 }
 
 const okFetch = () => vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }));
@@ -82,8 +84,83 @@ it('勾选决定合并范围，表头全选能一并取消', async () => {
 
   await click(box(host, '全选待合并别名'));
   expect(buttonNamed('合并所选（2）', host)).not.toBeNull();
+  expect(box(host, '全选待合并别名')?.checked).toBe(true);
+  expect(box(host, '全选待合并别名')?.indeterminate).toBe(false);
   await click(box(host, '全选待合并别名'));
   expect(buttonNamed('合并所选（0）', host)?.disabled).toBe(true);
+});
+
+it('待合并清单换序和补充后按别名保留勾选，合并使用当前规范名', async () => {
+  const asked = stubConfirm();
+  const fetcher = okFetch();
+  const { host, renderProps } = await open(fetcher);
+  await click(box(host, '选择别名 别名 B，归入 作者 B'));
+  await renderProps({ suggestions: [
+    { ...SUGGESTIONS[1]!, canonical: '作者 B 的规范名' },
+    { canonical: '作者 C', alias: '别名 C', evidence: '来源 C' },
+    SUGGESTIONS[0]!,
+  ] });
+  expect(box(host, '选择别名 别名 B，归入 作者 B 的规范名')?.checked).toBe(true);
+  expect(box(host, '选择别名 别名 C，归入 作者 C')?.checked).toBe(false);
+  expect(box(host, '全选待合并别名')?.indeterminate).toBe(true);
+  await click(buttonNamed('合并所选（1）', host));
+  await asked[0]!.onConfirm();
+  await settle();
+  expect(aliasWrites(fetcher)).toEqual([
+    { action: 'add', canonical: '作者 B 的规范名', alias: '别名 B' },
+  ]);
+  expect(buttonNamed('合并所选（0）', host)?.disabled).toBe(true);
+});
+
+it('消失的候选不计入合并范围，重新全选只处理当前清单', async () => {
+  const asked = stubConfirm();
+  const fetcher = okFetch();
+  const { host, renderProps } = await open(fetcher);
+  await click(box(host, '选择别名 别名 B，归入 作者 B'));
+  await renderProps({ suggestions: [SUGGESTIONS[0]!] });
+  expect(buttonNamed('合并所选（0）', host)?.disabled).toBe(true);
+  expect(box(host, '全选待合并别名')?.indeterminate).toBe(false);
+  await click(box(host, '全选待合并别名'));
+  expect(box(host, '全选待合并别名')?.checked).toBe(true);
+  await click(buttonNamed('合并所选（1）', host));
+  await asked[0]!.onConfirm();
+  await settle();
+  expect(aliasWrites(fetcher).map((sent) => sent.alias)).toEqual(['别名 A']);
+});
+
+it('已保存别名清单刷新和只读状态都更新到单元格操作', async () => {
+  const asked = stubConfirm();
+  const fetcher = okFetch();
+  const { host, renderProps } = await open(fetcher);
+  const groups = [{ ...GROUPS[0]!, canonical_name: '作者 A 的规范名',
+    aliases: [{ key: 'name:新别名', name: '新别名' }] }];
+  await renderProps({ groups, readOnly: true });
+  const remove = () => host.querySelector<HTMLButtonElement>('button[aria-label="移除别名 新别名"]');
+  expect(host.querySelector('button[aria-label="移除别名 已存别名"]')).toBeNull();
+  expect(host.textContent).toContain('作者 A 的规范名');
+  expect(remove()?.disabled).toBe(true);
+  await renderProps({ groups, readOnly: false });
+  expect(remove()?.disabled).toBe(false);
+  await click(remove());
+  expect(asked[0]!.body).toContain('「新别名」');
+  await asked[0]!.onConfirm();
+  await settle();
+  expect(aliasWrites(fetcher)).toEqual([{ action: 'remove', alias: '新别名' }]);
+});
+
+it('手动保存别名提交输入并在成功后清空', async () => {
+  const fetcher = okFetch();
+  const { host, toast } = await open(fetcher);
+  const canonical = () => host.querySelector<HTMLInputElement>('input[aria-label="规范创作者名"]');
+  const alias = () => host.querySelector<HTMLInputElement>('input[aria-label="平台别名"]');
+  await type(canonical(), '规范名');
+  await type(alias(), '平台上的名字');
+  await click(buttonNamed('保存别名', host));
+  await settle();
+  expect(aliasWrites(fetcher)).toEqual([{ action: 'add', canonical: '规范名', alias: '平台上的名字' }]);
+  expect(canonical()?.value).toBe('');
+  expect(alias()?.value).toBe('');
+  expect(toast).toHaveBeenCalledWith('已保存创作者别名');
 });
 
 it('全部合并一条一条发，顺序照着待合并列表', async () => {
