@@ -3179,6 +3179,8 @@ PUBLIC_ROUTES = {
     # 平台、打包形态与挂载软件这些运行事实不外露。
     ("GET", "/api/setup/questions"),
     ("POST", "/api/setup"),
+    # 首启与登录页的浏览器尚无会话；此接口仅向本机同源开放，限流、限长后只写脱敏错误日志。
+    ("POST", "/api/diagnostics/client-error"),
     # 登录页在拿到会话之前就要出图，书签与历史记录也从这三个固定路径取图标。
     # 它们发的是随仓库分发的品牌资源，不读账本。
     ("GET,HEAD", "/favicon.ico"),

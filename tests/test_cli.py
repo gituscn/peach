@@ -622,6 +622,11 @@ class PackagedEntryTests(unittest.TestCase):
     def setUpClass(cls):
         cls.entry = load_script("build_app_entry")
 
+    def setUp(self):
+        self.enterContext(mock.patch("peach.error_reporting.install"))
+        self.enterContext(mock.patch("peach.error_reporting.event"))
+        self.enterContext(mock.patch("peach.error_reporting.console_ready"))
+
     def test_every_cli_subcommand_is_reachable_from_the_packaged_entry(self):
         subcommands = set()
         for action in cli.build_parser()._subparsers._group_actions:

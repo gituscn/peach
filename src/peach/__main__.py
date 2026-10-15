@@ -1,4 +1,4 @@
-from .cli import main
+from .error_reporting import cli_main
 
 
-raise SystemExit(main())
+raise SystemExit(cli_main())

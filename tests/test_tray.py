@@ -38,6 +38,7 @@ from peach.tray import (
     restart_tray_process, tray_restart_required,
 )
 from peach.tray import main as tray_main
+from unittest import mock
 from peach.sync import SyncPlan
 from peach.versioning import UpdateResult, VersionSnapshot
 from peach.windows_update import PendingWindowsUpdate, WindowsUpdatePreparation
@@ -639,10 +640,34 @@ class LogRetentionAtStartupTests(unittest.TestCase):
     def test_the_log_sweep_runs_before_any_child_process_can_open_a_log(self):
         """子进程以追加方式握着 `tray-*.log` 的句柄；先起服务再改名，Windows 上改名会失败，
         POSIX 上则是段文件继续被写。所以整理必须排在 ServiceManager 之前，且失败只记警告。"""
-        source = inspect.getsource(tray_main)
-        sweep = source.index("log_retention.sweep(config.directory(\"logs\"))")
-        self.assertLess(sweep, source.index("ServiceManager(specs, log_dir="))
-        self.assertIn('warning("日志整理失败", exc_info=True)', source)
+        from peach import tray, settings_file
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            config = settings_file.PeachConfig(root, root / "config.toml")
+            events = []
+            def sweep(_):
+                events.append("sweep")
+                raise OSError("log busy")
+            def manager(*args, **kwargs):
+                events.append("manager")
+                return mock.Mock()
+            icon = mock.Mock()
+            icon.run.side_effect = lambda: events.append("run")
+            with mock.patch.object(tray, "handoff_tray", return_value=False), \
+                    mock.patch.object(tray.settings_file, "load_config", return_value=config), \
+                    mock.patch.object(tray.error_reporting, "install"), \
+                    mock.patch.object(tray, "SingleInstance"), \
+                    mock.patch.object(tray, "Lifecycle"), \
+                    mock.patch.object(tray.log_retention, "sweep", side_effect=sweep), \
+                    mock.patch.object(tray, "log_to_file"), \
+                    mock.patch.object(tray, "build_setup_service_specs", return_value=()), \
+                    mock.patch.object(tray, "ServiceManager", side_effect=manager), \
+                    mock.patch.object(tray, "PeachTray", return_value=icon), \
+                    mock.patch.object(tray, "tray_preparation"), \
+                    mock.patch.object(tray, "show_message"), \
+                    self.assertLogs(level="WARNING"):
+                self.assertEqual(tray_main(["--silent"]), 0)
+            self.assertEqual(events, ["sweep", "manager", "run"])
 
 
 class SourceSyncTests(unittest.TestCase):

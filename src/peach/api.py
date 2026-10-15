@@ -317,6 +317,10 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        from .error_reporting import asyncio_handler
+        loop = asyncio.get_running_loop()
+        previous_error_handler = loop.get_exception_handler()
+        loop.set_exception_handler(asyncio_handler)
         _restore_task_center(contract)
         # 启动握手要等 cloudflared 连上边缘，可以占到几十秒；和 mDNS 一样交给线程，
         # 不要在事件循环里卡住整条服务的启动。
@@ -339,6 +343,7 @@ def create_app(
         try:
             yield
         finally:
+            loop.set_exception_handler(previous_error_handler)
             warmup.cancel()
             aggregate_warmup.cancel()
             follow_scheduler.stop()

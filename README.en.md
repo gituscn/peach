@@ -109,6 +109,8 @@ The test package is not code-signed yet. If Windows says "Windows protected your
 
 On Windows, the tray runs independently. Closing the Codex, Claude, or terminal session that started it keeps Peach running. Peach attempts to recover after an unexpected tray exit, up to three times within five minutes. Choosing “Quit Peach” keeps it closed. Exit reasons and recovery results are recorded in `tray-lifecycle.log` in the logs folder.
 
+Startup error dialogs show where a diagnostic report was saved. While Peach is running, choose “Export diagnostic report” in the tray menu or “Download diagnostic report” on the diagnostics page to collect a redacted ZIP for feedback.
+
 ### Run from source (Windows, macOS)
 
 You need Git, [uv](https://docs.astral.sh/uv/getting-started/installation/) and Python 3.14 or newer (`.python-version` selects Python 3.14 for production; uv downloads a missing interpreter for you):

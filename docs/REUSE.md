@@ -96,6 +96,8 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 ## 分级诊断
 
+启动取证复用 Python 3.14 标准库的 `sys.excepthook`、`threading.excepthook`、`sys.unraisablehook`、`logging.Handler`、`faulthandler` 和 `zipfile`（PSF 许可，无额外安装体积）。`error_reporting` 在配置与第三方依赖之前加载，`support_bundle` 仅收集选定日志和系统字段；Peach 保留脱敏、备用目录、本机权限与报告内容策略。已有诊断报告继续用于页面和运行期导出。已用临时目录与独立子进程核对无控制台、导入失败、线程异常、备用目录、配置损坏和脱敏。Sentry 等远程 SDK 不符合本机取证范围，且增加运行依赖与打包体积，因此不引入。没有新增依赖或 ledger 写入。
+
 `src/peach/diagnostics.py` 统一生成 CLI 与本机 API 报告；复用 `settings_file`、`health` 的只读迁移校验、`FFmpegResolver`、访问策略和挂载快照。数据库用 SQLite `mode=ro`；写入与端口检查用标准库短暂探针，不新增运行依赖。
 
 已核对 sakuramedia `a10fcef8`（GPL-3.0）的诊断字段与提示组织，仅作产品参考，不复制源码。OpenAver `8cc17e50`（MIT）的 HTTP 健康探针不足以表达分项状态。[fastapi-health 0.4.0](https://pypi.org/project/fastapi-health/)（MIT）在本机 Python 3.14.7 的离线试验中将状态字典视为真值；CLI、分级规则和脱敏仍需本项目处理，因此未引入。
