@@ -30,36 +30,139 @@ class _JobLimits(ctypes.Structure):
                 ("memory", ctypes.c_size_t * 4)]
 
 
-class _JobAccounting(ctypes.Structure):
-    _fields_ = [("times", ctypes.c_longlong * 4), ("page_faults", wintypes.DWORD),
-                ("total", wintypes.DWORD), ("active", wintypes.DWORD),
-                ("terminated", wintypes.DWORD)]
-
-
 class DetachedLaunchTests(unittest.TestCase):
+    def setUp(self):
+        events = mock.patch("peach.error_reporting.event")
+        self.events = events.start()
+        self.addCleanup(events.stop)
+
     def test_source_sync_restarts_for_detachment_and_lifecycle_changes(self):
         from peach.tray import tray_restart_required
         for path in ("src/peach/tray_detached.py", "src/peach/tray_lifecycle.py"):
             with self.subTest(path=path):
                 self.assertTrue(tray_restart_required((path,)))
 
-    def test_tray_handoff_precedes_the_single_instance_lock(self):
+    def test_tray_handoff_leaves_the_single_instance_lock_for_the_child(self):
         from peach.tray import main
         with mock.patch("peach.tray.handoff_tray", return_value=True) as handoff, \
-                mock.patch("peach.tray.SingleInstance") as instance:
+                mock.patch("peach.tray.SingleInstance") as instance, \
+                mock.patch("peach.tray.settings_file.load_config"), \
+                mock.patch("peach.tray.error_reporting.install"), \
+                mock.patch("peach.tray.needs_setup", return_value=False):
+            instance.return_value.is_running.return_value = False
             self.assertEqual(main(["--silent"]), 0)
         self.assertEqual(handoff.call_args.args[0], ["--silent"])
-        instance.assert_not_called()
+        instance.return_value.acquire.assert_not_called()
+
+    def test_existing_tray_opens_its_page_without_attempting_handoff(self):
+        from peach.tray import main
+        for waiting, silent in ((False, False), (True, False), (False, True)):
+            with self.subTest(waiting=waiting, silent=silent), \
+                    mock.patch("peach.tray.handoff_tray", side_effect=OSError("desktop denied")) as handoff, \
+                    mock.patch("peach.tray.SingleInstance") as instance, \
+                    mock.patch("peach.tray.settings_file.load_config") as config, \
+                    mock.patch("peach.tray.error_reporting.install"), \
+                    mock.patch("peach.tray.error_reporting.failure_details", return_value="desktop denied"), \
+                    mock.patch("peach.tray.show_message"), \
+                    mock.patch("peach.tray.needs_setup", return_value=waiting), \
+                    mock.patch("peach.tray.normal_url", return_value="https://peach.invalid") as normal, \
+                    mock.patch("peach.tray.setup_url", return_value="http://peach.invalid/setup") as setup, \
+                    mock.patch("peach.tray.webbrowser.open") as browser:
+                instance.return_value.is_running.return_value = True
+                self.assertEqual(main(["--silent"] if silent else ["--show"]), 0)
+            handoff.assert_not_called()
+            instance.return_value.acquire.assert_not_called()
+            if silent:
+                browser.assert_not_called()
+            else:
+                browser.assert_called_once_with("http://peach.invalid/setup" if waiting else "https://peach.invalid")
+                (setup if waiting else normal).assert_called_once_with(config.return_value)
 
     def test_failed_handoff_stops_before_services_or_state_are_created(self):
         from peach.tray import main
         with mock.patch("peach.tray.handoff_tray", side_effect=OSError("desktop unavailable")), \
                 mock.patch("peach.tray.error_reporting.failure_details", return_value="desktop unavailable"), \
                 mock.patch("peach.tray.show_message") as message, \
-                mock.patch("peach.tray.SingleInstance") as instance:
+                mock.patch("peach.tray.SingleInstance") as instance, \
+                mock.patch("peach.tray.settings_file.load_config"), \
+                mock.patch("peach.tray.error_reporting.install"), \
+                mock.patch("peach.tray.needs_setup", return_value=False):
+            instance.return_value.is_running.return_value = False
             self.assertEqual(main(["--silent"]), 1)
         self.assertIn("desktop unavailable", message.call_args.args[1])
-        instance.assert_not_called()
+        instance.return_value.acquire.assert_not_called()
+
+    def test_handoff_marker_is_consumed_once_even_in_a_system_job(self):
+        with mock.patch.dict(os.environ, {"PEACH_TRAY_DESKTOP_HANDOFF": "1"}), \
+                mock.patch.object(tray_detached, "in_job", return_value=True), \
+                mock.patch.object(tray_detached, "launch_detached") as launch:
+            self.assertFalse(tray_detached.handoff_tray([], ROOT))
+            self.assertNotIn("PEACH_TRAY_DESKTOP_HANDOFF", os.environ)
+            launch.assert_not_called()
+            self.assertTrue(tray_detached.handoff_tray([], ROOT))
+            launch.assert_called_once()
+
+    def test_instance_probe_is_read_only_and_does_not_hold_the_lock(self):
+        from peach.tray import SingleInstance
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory).resolve() / "state" / "tray.lock"
+            first, second = SingleInstance(path), SingleInstance(path)
+            self.assertFalse(second.is_running())
+            self.assertFalse(path.parent.exists())
+            first.acquire()
+            try:
+                self.assertTrue(second.is_running())
+            finally:
+                first.close()
+            content = path.read_bytes()
+            self.assertFalse(second.is_running())
+            self.assertEqual(path.read_bytes(), content)
+            second.acquire()
+            second.close()
+
+    def test_job_flag_names_follow_windows_limit_values(self):
+        kernel = mock.Mock()
+
+        def query(_job, _kind, output, _size, _returned):
+            ctypes.cast(output, ctypes.POINTER(tray_detached._JobBasicLimits)).contents.flags = 0x3800
+            return 1
+
+        kernel.QueryInformationJobObject.side_effect = query
+        with mock.patch.object(tray_detached, "_in_job", return_value=True):
+            facts = tray_detached._job_facts(kernel, -1, current=True)
+        self.assertEqual(facts["immediate_limit_flags"], "0x3800")
+        self.assertEqual(facts["immediate_limit_names"],
+                         ["BREAKAWAY_OK", "SILENT_BREAKAWAY_OK", "KILL_ON_JOB_CLOSE"])
+
+    @unittest.skipUnless(os.name == "nt", "Windows 挂起创建与线程恢复")
+    def test_resume_failure_reaps_the_child_and_keeps_diagnostic_context(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            marker = root / "executed"
+            kernel = tray_detached._kernel()
+            failing = mock.Mock(wraps=kernel)
+
+            def resume(_thread):
+                ctypes.set_last_error(31)
+                return 0xFFFFFFFF
+
+            failing.ResumeThread.side_effect = resume
+            with mock.patch.object(tray_detached, "_kernel", return_value=failing):
+                with self.assertRaises(OSError) as raised:
+                    tray_detached.launch_detached([sys._base_executable, '-c',
+                        'from pathlib import Path; import sys; Path(sys.argv[1]).touch()', str(marker)], cwd=root)
+            self.assertEqual(raised.exception.peach_operation, "ResumeThread")
+            self.assertEqual(raised.exception.winerror, 31)
+            self.assertIn("desktop", raised.exception.peach_context)
+            self.assertFalse(marker.exists())
+            pid = raised.exception.peach_context["child"]["pid"]
+            handle = kernel.OpenProcess(0x00100000 | 0x1000, False, pid)
+            if handle:
+                process = tray_detached.DetachedProcess(handle, pid)
+                try:
+                    self.assertEqual(process.wait(timeout=5), 1)
+                finally:
+                    process.close()
 
     def test_source_handoff_preserves_arguments_and_environment(self):
         child = mock.Mock()
@@ -139,6 +242,8 @@ time.sleep(60)
                     self.assertTrue(handle)
                     handles.append(tray_detached.DetachedProcess(handle, pid))
                 control, child = handles
+                self.assertTrue(tray_detached._in_job(kernel, control._handle, job))
+                self.assertFalse(tray_detached._in_job(kernel, child._handle, job))
                 with self.assertRaises(subprocess.TimeoutExpired):
                     child.wait(timeout=.01)
                 close_job(job)
@@ -146,12 +251,10 @@ time.sleep(60)
                 worker.wait(timeout=10)
                 control.wait(timeout=10)
                 self.assertIsNone(child.poll(), "独立托盘子进程必须存活")
-                self.assertFalse(tray_detached._in_job(kernel, child._handle))
                 payload = json.loads((root / "child.json").read_text(encoding="utf-8"))
                 self.assertEqual(payload[:2], [str(root), "测试 env"])
                 self.assertEqual(payload[2], '引号 " 和 \\ 路径')
                 self.assertEqual(payload[3:5], [sys.executable, sys.prefix])
-                self.assertFalse(payload[5], "实际解释器必须独立于 venv 启动器的 Job")
                 child.terminate()
                 self.assertEqual(child.wait(timeout=10), 1)
             finally:
@@ -166,74 +269,64 @@ time.sleep(60)
                     process.close()
 
     @unittest.skipUnless(os.name == "nt", "Windows 桌面 Job 的实际继承与脱离")
-    def test_child_escapes_desktop_jobs_that_allow_automatic_or_explicit_breakaway(self):
-        for flags in (0x1000, 0x0800):
+    def test_children_can_share_desktop_jobs_with_various_breakaway_policies(self):
+        for flags in (0, 0x1000, 0x0800):
             with self.subTest(flags=hex(flags)):
-                self._desktop_job_launch(flags, allowed=True)
+                self._desktop_job_launch(flags)
 
-    @unittest.skipUnless(os.name == "nt", "Windows 桌面 Job 的实际继承与脱离")
-    def test_restricted_desktop_job_never_executes_the_child(self):
-        self._desktop_job_launch(0, allowed=False)
+    def _job(self, flags):
+        job = create_kill_on_close_job()
+        self.assertIsNotNone(job)
+        kernel = tray_detached._kernel()
+        kernel.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int,
+                                                   wintypes.LPVOID, wintypes.DWORD]
+        limits = _JobLimits()
+        limits.basic.flags = flags
+        self.assertTrue(kernel.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits)))
+        return job
 
-    def _desktop_job_launch(self, flags, *, allowed):
+    @staticmethod
+    def _desktop_dll(desktop):
+        user = mock.Mock()
+        user.GetShellWindow.return_value = 1
+
+        def desktop_pid(_window, output):
+            ctypes.cast(output, ctypes.POINTER(wintypes.DWORD)).contents.value = desktop.pid
+            return 1
+
+        user.GetWindowThreadProcessId.side_effect = desktop_pid
+        native_dll = ctypes.WinDLL
+        return lambda name, *args, **kwargs: user if name == "user32" else native_dll(name, *args, **kwargs)
+
+    def _desktop_job_launch(self, flags):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
-            job = create_kill_on_close_job()
-            self.assertIsNotNone(job)
+            job = self._job(0x2000 | flags)
             kernel = tray_detached._kernel()
-            kernel.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int,
-                                                       wintypes.LPVOID, wintypes.DWORD]
-            limits = _JobLimits()
-            limits.basic.flags = 0x2000 | flags
-            self.assertTrue(kernel.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits)))
             desktop = child = None
             try:
                 desktop = tray_detached.launch_detached(
                     [sys._base_executable, "-c", "import time; time.sleep(60)"], cwd=root)
                 assign_to_job(job, desktop)
                 self.assertTrue(tray_detached._in_job(kernel, desktop._handle))
-                user = mock.Mock()
-                user.GetShellWindow.return_value = 1
-
-                def desktop_pid(_window, output):
-                    ctypes.cast(output, ctypes.POINTER(wintypes.DWORD)).contents.value = desktop.pid
-                    return 1
-
-                user.GetWindowThreadProcessId.side_effect = desktop_pid
-                native_dll = ctypes.WinDLL
-
-                def load_dll(name, *args, **kwargs):
-                    return user if name == "user32" else native_dll(name, *args, **kwargs)
-
                 marker = root / "executed"
                 code = "from pathlib import Path; import sys, time; Path(sys.argv[1]).touch(); time.sleep(60)"
-                with mock.patch.object(ctypes, "WinDLL", side_effect=load_dll):
-                    if allowed:
-                        child = tray_detached.launch_detached(
-                            [sys._base_executable, "-c", code, str(marker)], cwd=root)
-                    else:
-                        with self.assertRaises(OSError):
-                            tray_detached.launch_detached([sys._base_executable, "-c", code, str(marker)], cwd=root)
-                if allowed:
-                    deadline = time.monotonic() + 10
-                    while not marker.exists() and time.monotonic() < deadline:
-                        self.assertIsNone(child.poll())
-                        time.sleep(.05)
-                    self.assertTrue(marker.exists(), "通过独立性检查后应执行子进程")
-                    self.assertFalse(tray_detached._in_job(kernel, child._handle))
-                    close_job(job)
-                    job = None
-                    desktop.wait(timeout=10)
-                    self.assertIsNone(child.poll(), "关闭桌面 Job 后独立子进程必须存活")
+                with mock.patch.object(ctypes, "WinDLL", side_effect=self._desktop_dll(desktop)):
+                    child = tray_detached.launch_detached(
+                        [sys._base_executable, "-c", code, str(marker)], cwd=root)
+                deadline = time.monotonic() + 10
+                while not marker.exists() and time.monotonic() < deadline:
+                    self.assertIsNone(child.poll())
+                    time.sleep(.05)
+                self.assertTrue(marker.exists(), "桌面 Job 内的子进程应执行")
+                self.assertEqual(tray_detached._in_job(kernel, child._handle, job), not bool(flags & 0x1000))
+                close_job(job)
+                job = None
+                desktop.wait(timeout=10)
+                if flags & 0x1000:
+                    self.assertIsNone(child.poll())
                 else:
-                    self.assertFalse(marker.exists(), "受限子进程必须在执行代码前停止")
-                    kernel.QueryInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int,
-                        wintypes.LPVOID, wintypes.DWORD, wintypes.LPVOID]
-                    accounting = _JobAccounting()
-                    self.assertTrue(kernel.QueryInformationJobObject(
-                        job, 1, ctypes.byref(accounting), ctypes.sizeof(accounting), None))
-                    self.assertGreaterEqual(accounting.total, 2, "必须按实际子进程结果判断独立性")
-                    self.assertEqual(accounting.active, 1, "拒绝的子进程必须完整回收")
+                    child.wait(timeout=10)
             finally:
                 close_job(job)
                 for process in (child, desktop):
@@ -247,6 +340,118 @@ time.sleep(60)
                             process.terminate()
                         process.wait(timeout=10)
                         process.close()
+
+
+NESTED_WORKER = """
+import ctypes, json, os, subprocess, sys, time
+from ctypes import wintypes
+from pathlib import Path
+from unittest.mock import Mock, patch
+from peach.tray_detached import launch_detached
+root = Path(sys.argv[1])
+os.environ.pop('PEACH_TRAY_DESKTOP_HANDOFF', None)
+deadline = time.monotonic() + 20
+while not (root / 'go').exists():
+    if time.monotonic() > deadline:
+        raise TimeoutError('gate')
+    time.sleep(.05)
+control = subprocess.Popen([sys._base_executable, '-c', 'import time; time.sleep(60)'],
+    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    creationflags=subprocess.CREATE_NO_WINDOW)
+user = Mock()
+user.GetShellWindow.return_value = 1
+def desktop_pid(window, output):
+    ctypes.cast(output, ctypes.POINTER(wintypes.DWORD)).contents.value = int(sys.argv[2])
+    return 1
+user.GetWindowThreadProcessId.side_effect = desktop_pid
+native_dll = ctypes.WinDLL
+def dll(name, *args, **kwargs):
+    return user if name == 'user32' else native_dll(name, *args, **kwargs)
+with patch.object(ctypes, 'WinDLL', side_effect=dll):
+    child = launch_detached([sys.executable, '-c', sys.argv[3], str(root)], cwd=root)
+(root / 'pids.json').write_text(json.dumps([control.pid, child.pid]))
+time.sleep(60)
+"""
+
+NESTED_CHILD = """
+import json, os, sys, time
+from pathlib import Path
+from unittest.mock import patch
+from peach.tray_detached import handoff_tray, in_job
+root = Path(sys.argv[1])
+with patch('peach.tray_detached.launch_detached', side_effect=RuntimeError('repeated handoff')):
+    handed_off = handoff_tray([], root)
+(root / 'child.json').write_text(json.dumps(dict(in_job=in_job(), handed_off=handed_off,
+    marker_consumed='PEACH_TRAY_DESKTOP_HANDOFF' not in os.environ)))
+time.sleep(60)
+"""
+
+
+@unittest.skipUnless(os.name == "nt", "Windows 多层 Job 的实际继承与关闭")
+class NestedJobTests(unittest.TestCase):
+    _job = DetachedLaunchTests._job
+    setUp = DetachedLaunchTests.setUp
+
+    def test_child_shares_system_jobs_and_survives_its_launcher_job_closing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            jobs = [self._job(flags) for flags in (0x2000, 0x2000, 0x3800, 0x2000)]
+            processes = []
+            try:
+                desktop = tray_detached.launch_detached(
+                    [sys._base_executable, '-c', 'import time; time.sleep(60)'], cwd=root)
+                processes.append(desktop)
+                for job in jobs[:3]:
+                    assign_to_job(job, desktop)
+                worker = tray_detached.launch_detached(
+                    [sys._base_executable, '-c', NESTED_WORKER, str(root), str(desktop.pid), NESTED_CHILD],
+                    cwd=root, env={**os.environ, "PYTHONPATH": str(ROOT / "src"), "PEACH_DATA_ROOT": str(root)})
+                processes.append(worker)
+                for job in (jobs[0], jobs[1], jobs[3]):
+                    assign_to_job(job, worker)
+                kernel = tray_detached._kernel()
+                self.assertTrue(tray_detached._in_job(kernel, worker._handle, jobs[3]))
+                (root / 'go').touch()
+                self._wait_for_nested_child(root, worker)
+                for pid in json.loads((root / 'pids.json').read_text()):
+                    handle = kernel.OpenProcess(0x00100000 | 0x1000 | 0x0001, False, pid)
+                    self.assertTrue(handle)
+                    processes.append(tray_detached.DetachedProcess(handle, pid))
+                control, child = processes[-2:]
+                self.assertTrue(tray_detached._in_job(kernel, child._handle, jobs[1]))
+                self.assertTrue(tray_detached._in_job(kernel, control._handle, jobs[3]))
+                self.assertFalse(tray_detached._in_job(kernel, child._handle, jobs[3]))
+                close_job(jobs.pop())
+                worker.wait(timeout=10)
+                control.wait(timeout=10)
+                self.assertIsNone(child.poll(), "退出启动器的私有 Job 后托盘必须存活")
+                self.assertEqual(json.loads((root / 'child.json').read_text()),
+                                 dict(in_job=True, handed_off=False, marker_consumed=True))
+                records = [json.loads(line) for path in (root / 'logs').glob('errors-*.log')
+                           for line in path.read_text(encoding='utf-8').splitlines()]
+                context = next(row['context'] for row in records if row['stage'] == 'tray-detached')
+                self.assertEqual(context['caller']['immediate_limit_flags'], '0x2000')
+                self.assertEqual(context['caller']['immediate_limit_names'], ['KILL_ON_JOB_CLOSE'])
+                self.assertTrue(context['desktop']['in_job'])
+                self.assertTrue(context['child']['in_job'])
+            finally:
+                for job in reversed(jobs):
+                    close_job(job)
+                for process in processes:
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.terminate()
+                        process.wait(timeout=10)
+                    finally:
+                        process.close()
+
+    def _wait_for_nested_child(self, root, worker):
+        deadline = time.monotonic() + 20
+        while not (root / 'child.json').exists() or not (root / 'pids.json').exists():
+            self.assertIsNone(worker.poll(), "多层 Job 启动器失败")
+            self.assertLess(time.monotonic(), deadline, "多层 Job 托盘未就绪")
+            time.sleep(.05)
 
 
 

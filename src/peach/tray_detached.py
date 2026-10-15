@@ -1,4 +1,4 @@
-"""Windows 桌面进程启动常驻托盘，不继承终端或智能体的 Job。"""
+"""通过 Windows 桌面父身份启动常驻托盘，独立于启动器的私有 Job。"""
 from __future__ import annotations
 
 import ctypes
@@ -9,6 +9,14 @@ from ctypes import wintypes
 from pathlib import Path
 
 _CREATE_SUSPENDED = 0x00000004
+_HANDOFF_ENV = "PEACH_TRAY_DESKTOP_HANDOFF"
+
+
+class _JobBasicLimits(ctypes.Structure):
+    _fields_ = [("times", ctypes.c_longlong * 2), ("flags", wintypes.DWORD),
+                ("working_set", ctypes.c_size_t * 2), ("active_limit", wintypes.DWORD),
+                ("affinity", ctypes.c_size_t), ("priority", wintypes.DWORD),
+                ("scheduling", wintypes.DWORD)]
 
 
 class _StartupInfo(ctypes.Structure):
@@ -51,6 +59,8 @@ def _kernel():
             wintypes.LPVOID, wintypes.LPCWSTR, ctypes.POINTER(_StartupInfoEx),
             ctypes.POINTER(_ProcessInfo)]),
         "ResumeThread": (wintypes.DWORD, [wintypes.HANDLE]),
+        "QueryInformationJobObject": (wintypes.BOOL, [wintypes.HANDLE, ctypes.c_int,
+            wintypes.LPVOID, wintypes.DWORD, wintypes.LPVOID]),
     }
     for name, (result, arguments) in signatures.items():
         function = getattr(kernel, name)
@@ -58,9 +68,9 @@ def _kernel():
     return kernel
 
 
-def _in_job(kernel, handle) -> bool:
+def _in_job(kernel, handle, job=None) -> bool:
     result = wintypes.BOOL()
-    if not kernel.IsProcessInJob(handle, None, ctypes.byref(result)):
+    if not kernel.IsProcessInJob(handle, job, ctypes.byref(result)):
         raise _windows_error("IsProcessInJob")
     return bool(result.value)
 
@@ -79,7 +89,8 @@ def in_job() -> bool:
 
 def handoff_tray(arguments, root) -> bool:
     """托盘取得单实例锁前完成独立启动；保留参数、数据根与源码路径。"""
-    if not in_job():
+    handed_off = os.environ.pop(_HANDOFF_ENV, None) == "1"
+    if handed_off or not in_job():
         return False
     environment = os.environ.copy()
     environment["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
@@ -127,8 +138,29 @@ class DetachedProcess:
         self.close()
 
 
-def _create_verified(kernel, executable, argv, cwd, block, startup, flags):
-    """挂起创建，在用户代码执行前验收 Job 归属，再恢复主线程。"""
+def _job_facts(kernel, handle, *, current=False):
+    """记录已知进程的 Job 归属；限制查询只适用于调用进程的直接 Job。"""
+    facts = {}
+    try:
+        member = _in_job(kernel, handle)
+        facts = {"in_job": member}
+        if current and member:
+            limits = _JobBasicLimits()
+            if not kernel.QueryInformationJobObject(None, 2, ctypes.byref(limits), ctypes.sizeof(limits), None):
+                raise _windows_error("QueryInformationJobObject(current)")
+            facts["immediate_limit_flags"] = hex(limits.flags)
+            facts["immediate_limit_names"] = [name for flag, name in (
+                (0x0400, "DIE_ON_UNHANDLED_EXCEPTION"), (0x0800, "BREAKAWAY_OK"),
+                (0x1000, "SILENT_BREAKAWAY_OK"), (0x2000, "KILL_ON_JOB_CLOSE"),
+                (0x4000, "SUBSET_AFFINITY")) if limits.flags & flag]
+        return facts
+    except OSError as error:
+        return {**facts, "status": "unavailable", "winerror": getattr(error, "winerror", None),
+                "operation": getattr(error, "peach_operation", None)}
+
+
+def _create_child(kernel, executable, argv, cwd, block, startup, flags, context):
+    """按桌面父身份挂起创建，记录归属后恢复主线程。"""
     child = _ProcessInfo()
     command = ctypes.create_unicode_buffer(subprocess.list2cmdline([os.fspath(a) for a in argv]))
     if not kernel.CreateProcessW(str(executable), command, None, None, False,
@@ -139,8 +171,7 @@ def _create_verified(kernel, executable, argv, cwd, block, startup, flags):
     process = DetachedProcess(child.hProcess, child.dwProcessId)
     verified = False
     try:
-        if _in_job(kernel, child.hProcess):
-            return None
+        context["child"] = {"pid": process.pid, **_job_facts(kernel, child.hProcess)}
         if kernel.ResumeThread(child.hThread) == 0xFFFFFFFF:
             raise _windows_error("ResumeThread")
         verified = True
@@ -173,16 +204,28 @@ def launch_detached(argv, *, cwd, env=None) -> DetachedProcess:
         environment["__PYVENV_LAUNCHER__"] = str(executable.resolve())
         executable = Path(home) / executable.name
     kernel = _kernel()
+    context = {"caller": {"pid": os.getpid(), **_job_facts(kernel, wintypes.HANDLE(-1), current=True)},
+               "parent_source": "Windows desktop",
+               "job_chain": {"status": "unavailable", "reason": "未取得各层 Job 句柄与归属；仅记录已知进程和直接 Job"}}
     user = ctypes.WinDLL("user32", use_last_error=True)
     user.GetShellWindow.restype = wintypes.HWND
     user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
     shell = user.GetShellWindow()
     pid = wintypes.DWORD()
     if not shell or not user.GetWindowThreadProcessId(shell, ctypes.byref(pid)):
-        raise OSError("未取得当前会话的 Windows 桌面进程")
+        error = OSError("未取得当前会话的 Windows 桌面进程，请确认已登录 Windows 桌面")
+        error.peach_context = context
+        raise error
+    context["desktop"] = {"pid": pid.value}
     parent = kernel.OpenProcess(0x0080 | 0x1000, False, pid.value)
     if not parent:
-        raise _windows_error("OpenProcess(desktop)")
+        error = _windows_error("OpenProcess(desktop)")
+        error.peach_context = context
+        raise error
+    context["desktop"].update(_job_facts(kernel, parent))
+    # 标记由桌面父身份创建的这一跳；托盘入口消费后不向普通子服务传播。
+    # PyInstaller onefile 的引导进程会把环境传给实际应用进程。
+    environment[_HANDOFF_ENV] = "1"
     initialized = False
     try:
         size = ctypes.c_size_t()
@@ -204,17 +247,22 @@ def launch_detached(argv, *, cwd, env=None) -> DetachedProcess:
         ) + "\0\0")
         flags = 0x00080000 | 0x00000400 | subprocess.DETACHED_PROCESS
         try:
-            process = _create_verified(kernel, executable, argv, cwd, block, startup, flags)
+            process = _create_child(kernel, executable, argv, cwd, block, startup, flags, context)
         except OSError as error:
             if getattr(error, "winerror", None) != 5 or getattr(error, "peach_operation", "") != "CreateProcessW":
                 raise
-            process = None
-        if process is None:
-            process = _create_verified(kernel, executable, argv, cwd, block, startup,
-                                       flags | subprocess.CREATE_BREAKAWAY_FROM_JOB)
-        if process is None:
-            raise OSError(f"托盘进程仍受 Windows Job 约束，独立启动未成立（桌面 PID：{pid.value}）")
+            context["retry"] = "CREATE_BREAKAWAY_FROM_JOB"
+            process = _create_child(kernel, executable, argv, cwd, block, startup,
+                                    flags | subprocess.CREATE_BREAKAWAY_FROM_JOB, context)
+        try:
+            from .error_reporting import event
+            event("tray-detached", context=context)
+        except Exception:
+            pass
         return process
+    except OSError as error:
+        error.peach_context = context
+        raise
     finally:
         if initialized:
             kernel.DeleteProcThreadAttributeList(attributes)
