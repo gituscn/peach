@@ -6,7 +6,7 @@
  * `tests/test_dependency_policy.py` 核它与 `package.json` 一致。 */
 import type { VideojsFactory } from './types';
 
-const VIDEOJS = '/vendor/videojs/8.24.1/';
+const VIDEOJS = '/vendor/videojs/8.24.2/';
 const STYLESHEET = `${VIDEOJS}video-js.min.css`;
 
 const loadScript = (src: string): Promise<void> => new Promise((resolve, reject) => {

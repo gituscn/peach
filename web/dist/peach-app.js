@@ -29933,7 +29933,7 @@ function IE() {
 }
 //#endregion
 //#region src/player/videojs.ts
-var LE = "/vendor/videojs/8.24.1/", Eue = `${LE}video-js.min.css`, Due = (e) => new Promise((t, n) => {
+var LE = "/vendor/videojs/8.24.2/", Eue = `${LE}video-js.min.css`, Due = (e) => new Promise((t, n) => {
 	let r = document.head.querySelector(`script[src="${e}"]`);
 	if (r?.dataset.loaded) {
 		t();
