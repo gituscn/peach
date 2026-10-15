@@ -656,7 +656,7 @@ class LogRetentionAtStartupTests(unittest.TestCase):
             with mock.patch.object(tray, "handoff_tray", return_value=False), \
                     mock.patch.object(tray.settings_file, "load_config", return_value=config), \
                     mock.patch.object(tray.error_reporting, "install"), \
-                    mock.patch.object(tray, "SingleInstance"), \
+                    mock.patch.object(tray, "SingleInstance") as instance, \
                     mock.patch.object(tray, "Lifecycle"), \
                     mock.patch.object(tray.log_retention, "sweep", side_effect=sweep), \
                     mock.patch.object(tray, "log_to_file"), \
@@ -666,6 +666,7 @@ class LogRetentionAtStartupTests(unittest.TestCase):
                     mock.patch.object(tray, "tray_preparation"), \
                     mock.patch.object(tray, "show_message"), \
                     self.assertLogs(level="WARNING"):
+                instance.return_value.is_running.return_value = False
                 self.assertEqual(tray_main(["--silent"]), 0)
             self.assertEqual(events, ["sweep", "manager", "run"])
 

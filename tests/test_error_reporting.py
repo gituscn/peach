@@ -76,6 +76,24 @@ class ErrorReportingTests(unittest.TestCase):
         self.assertEqual(path.parent, fallback)
         self.assertTrue(path.is_file())
 
+    def test_shared_job_failure_context_is_preserved_in_the_redacted_report(self):
+        error = OSError("desktop process creation denied")
+        error.peach_operation = "CreateProcessW(breakaway)"
+        error.peach_context = {
+            "caller": {"pid": 123, "in_job": True, "immediate_limit_flags": "0x2000",
+                       "immediate_limit_names": ["KILL_ON_JOB_CLOSE"]},
+            "desktop": {"pid": 456, "in_job": True},
+            "job_chain": {"status": "unavailable"}, "token": "private-job-token"}
+        error_reporting.event("tray-handoff", error)
+        with zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes())) as archive:
+            name = next(name for name in archive.namelist() if 'errors-' in name)
+            payload = archive.read(name).decode()
+        context = json.loads(payload)["exception"][0]["context"]
+        self.assertEqual(context["caller"], error.peach_context["caller"])
+        self.assertEqual(context["desktop"], {"pid": 456, "in_job": True})
+        self.assertEqual(context["job_chain"]["status"], "unavailable")
+        self.assertNotIn("private-job-token", payload)
+
     def test_bundle_is_available_with_corrupt_configuration_and_excludes_private_files(self):
         (self.root / "config.toml").write_text('secret = "unclosed-private-config', encoding="utf-8")
         (self.root / "ledger.db").write_text("private-database", encoding="utf-8")

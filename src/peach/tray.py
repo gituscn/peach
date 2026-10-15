@@ -6,6 +6,7 @@ if __name__ == "__main__":
 
 import argparse
 import ctypes
+import errno
 import json
 import logging
 import os
@@ -170,6 +171,28 @@ class SingleInstance:
             self._acquire_windows()
         else:
             self._acquire_posix()
+
+    def is_running(self) -> bool:
+        """只读探测现有锁；探测结束即释放，不创建文件或接管实例。"""
+        try:
+            handle = self.path.open("rb")
+        except FileNotFoundError:
+            return False
+        with handle:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBRLCK, 1)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            except OSError as error:
+                if error.errno in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+                    return True
+                raise
+        return False
 
     def _acquire_posix(self) -> None:
         import fcntl
@@ -1687,6 +1710,14 @@ def _main(argv: list[str] | None = None) -> int:
     # 单实例锁和目录创建之前退出，否则一条试探命令就会在磁盘上凭空造出一个数据根，
     # 让之后的安装探测把这台机器误判成已配置。
     args = build_parser().parse_args(argv)
+    config = settings_file.load_config()
+    error_reporting.install(config.directory("logs"))
+    waiting = needs_setup(config)
+    instance = SingleInstance(config.directory("state") / "peach-tray.lock")
+    if instance.is_running():
+        if not args.silent:
+            webbrowser.open(setup_url(config) if waiting else normal_url(config))
+        return 0
     try:
         if handoff_tray(sys.argv[1:] if argv is None else argv, PROJECT_ROOT):
             return 0
@@ -1697,12 +1728,6 @@ def _main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     logging.getLogger().setLevel(logging.INFO)
     enable_hidpi()
-    # 设置文件新鲜读一次。`config.py` 的常量是 import 期算的，而首次设置正要改变它们
-    # 指向的数据根；这里只用它判断该起哪一组服务，之后由 `SetupGate` 接手。
-    config = settings_file.load_config()
-    error_reporting.install(config.directory("logs"))
-    waiting = needs_setup(config)
-    instance = SingleInstance(config.directory("state") / "peach-tray.lock")
     manager = None
     lifecycle = None
     exit_code = 1

@@ -103,7 +103,8 @@ def exception_facts(error: BaseException) -> dict:
         seen.add(id(current))
         chain.append({"type": type(current).__name__, "message": redact(str(current))[:4000],
                       "winerror": getattr(current, "winerror", None), "errno": getattr(current, "errno", None),
-                      "operation": getattr(current, "peach_operation", None)})
+                      "operation": getattr(current, "peach_operation", None),
+                      "context": getattr(current, "peach_context", None)})
         for frame in traceback.extract_tb(current.__traceback__)[-40:]:
             frames.append({"file": Path(frame.filename).name, "line": frame.lineno, "function": frame.name})
         current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
