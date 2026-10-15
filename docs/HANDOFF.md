@@ -2,6 +2,8 @@
 
 接手时先读这份：跨任务长期成立的判据与约定。运行态见 `STATUS.md`，部署与设置见 `OPERATIONS.md`。
 
+首次设置服务只负责配置，不启动账本任务恢复、关注和订阅轮询、推送发现、云下载对账或挂载检查。`tray-setup.err.log` 中的 `sqlite3.OperationalError: unable to open database file` 可由尚无账本时启动下载对账触发，不能据此判断媒体目录不可读。设置完成后仍回到首启页时，核对实际数据目录：启动落点通过 `state/data-root.txt` 定位自选目录，托盘切换服务时同时迁移单实例锁，并更新迁移检查与查看日志的路径。CloudDrive2 可部署在 NAS，Windows 通过映射盘符读取共享目录，本机软件安装检测只作提示。
+
 ## 界面、媒体与复核的既定判据
 
 界面门槛见 `.claude/skills/peach-web-ui/SKILL.md`，这里只留代码外的判据。

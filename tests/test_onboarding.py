@@ -489,6 +489,62 @@ class SetupJsonContractTests(_SetupHttpCase):
         self.assertEqual((loaded.server.host, loaded.server.port), ("127.0.0.1", 8900))
         self.assertFalse(loaded.replication.enabled)
 
+    def test_a_custom_data_root_is_loaded_by_the_tray_and_a_fresh_launch(self):
+        import json
+        import socket
+        import subprocess
+        import sys
+        from urllib.request import ProxyHandler, build_opener
+        from peach.tray import AlreadyRunning, ServiceManager, SetupGate, SingleInstance, _peach_executable
+
+        selected = self.root / "自选数据目录"
+        executable = _peach_executable()
+        environment = {"PEACH_DATA_ROOT": str(self.config.data_root)}
+
+        def launch_service(command, **kwargs):
+            python = sys.executable
+            if os.name == "nt":
+                python = sys._base_executable
+                kwargs["env"]["__PYVENV_LAUNCHER__"] = sys.executable
+            return subprocess.Popen([python, "-m", "peach", *command[1:]], **kwargs)
+
+        manager = ServiceManager((), log_dir=self.config.directory("logs"), popen=launch_service)
+        self.addCleanup(manager.stop_owned)
+        instance = SingleInstance(self.config.directory("state") / "peach-tray.lock")
+        instance.acquire()
+        self.addCleanup(instance.close)
+        gate = SetupGate(manager, self.config, waiting=True,
+                         instance=instance,
+                         load=lambda: settings_file.load_config(environ=environment))
+        with socket.socket() as holder:
+            holder.bind(("127.0.0.1", 0))
+            port = holder.getsockname()[1]
+        with mock.patch.object(distribution, "standalone", return_value=True), \
+                mock.patch("peach.tray._peach_executable", return_value=executable):
+            response = self._send("POST", self.SUBMIT,
+                                  json=self._body(data_root=str(selected), port=str(port), scan_now=False),
+                                  base_url="http://127.0.0.1:8900")
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertTrue(gate.poll())
+            self.assertFalse(gate.waiting)
+            self.assertEqual(gate.config.data_root, selected)
+            self.assertTrue(manager.wait_until_ready(), "切换后的服务必须能访问")
+            opener = build_opener(ProxyHandler({}))
+            with opener.open(f"http://127.0.0.1:{port}/healthz", timeout=5) as ready:
+                self.assertTrue(json.load(ready)["configured"])
+            with opener.open(f"http://127.0.0.1:{port}/", timeout=5) as page:
+                self.assertNotIn('data-page="setup"', page.read().decode("utf-8"))
+            with mock.patch.object(distribution, "user_data_root", return_value=self.config.data_root):
+                fresh = settings_file.load_config(environ={})
+            self.assertTrue(fresh.present)
+            self.assertEqual(fresh.data_root, selected)
+            self.assertEqual(instance.path.parent, fresh.directory("state"))
+            with self.assertRaises(AlreadyRunning):
+                SingleInstance(instance.path).acquire()
+        self.assertTrue((selected / "database" / "ledger.db").is_file())
+        self.assertFalse((self.config.data_root / "database" / "ledger.db").exists())
+        self.assertEqual(manager.child_environment()["PEACH_DATA_ROOT"], str(selected))
+
     def test_two_directories_are_declared_together(self):
         second = self.root / "more"
         second.mkdir()

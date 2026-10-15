@@ -93,6 +93,8 @@ describe('首次运行页', { skip: origin && media && dataRoot ? false : '只�
       // 改对：已有目录、默认端口，不扫描。
       await folder.fill(media);
       await port.fill(defaultPort);
+      const selectedData = join(dataRoot, 'custom-data');
+      await page.locator('#f-data_root').fill(selectedData);
       const accepted = page.waitForResponse((response) => response.url().endsWith('/api/setup')
         && response.request().method() === 'POST');
       await page.getByRole('button', { name: '完成设置' }).click();
@@ -107,6 +109,11 @@ describe('首次运行页', { skip: origin && media && dataRoot ? false : '只�
       assert.match((await entry.getAttribute('href')) ?? '', /^https?:\/\//);
       await page.getByText('稍后在配置页开始扫描媒体库。').waitFor({ state: 'visible' });
       assert.equal(await page.title(), 'Peach · 设置完成');
+      assert.deepEqual((await layout(page)).offenders, []);
+      await page.getByText('运行信息', { exact: true }).click();
+      await page.getByText(selectedData, { exact: true }).waitFor({ state: 'visible' });
+      const mobile = VIEWPORTS.find((candidate) => candidate.name === 'mobile')!;
+      await page.setViewportSize({ width: mobile.width, height: mobile.height });
       assert.deepEqual((await layout(page)).offenders, []);
 
       assert.deepEqual(problems.filter((problem) => !expectedRejection(problem)), []);

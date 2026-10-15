@@ -51,7 +51,7 @@
 2. 项目目录旁边的 `peach-data/`（最多向上找四层，所以主检出、工作树和打包出的 `dist/Peach` 都能找到同一个）。
 3. 都没有，就是「未配置」。
 
-Windows 测试包的数据根是 `%LOCALAPPDATA%\Peach\peach-data`。
+Windows 测试包默认使用 `%LOCALAPPDATA%\Peach\peach-data`。首次设置选择其他数据目录时，启动落点的 `state/data-root.txt` 会记录所选绝对路径；托盘、子服务和再次启动均沿此记录读取设置。该文件只保存本机路径，账本和媒体留在各自目录。记录不可读、路径无效或循环时会报错。
 
 同一个设置项的优先级：环境变量 > 设置文件 > 内置默认值。
 

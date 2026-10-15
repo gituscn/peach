@@ -144,6 +144,7 @@ Open System diagnostics under Peach configuration → Application and maintenanc
   - Existing titles, performers, studios and posters show up right away.
 - **Which cloud drives are supported?**
   - 115 and PikPak, mounted as local drives with CloudDrive2.
+  - CloudDrive2 can also run on a NAS such as Synology. Map the shared folder to a Windows drive letter, then select that folder in Peach; this setup does not require CloudDrive2 or WinFsp on Windows.
   - For playback, Peach reads them like ordinary folders and does not store your cloud account.
   - For cloud download, the CloudDrive2 API token and the PikPak sign-in token are kept in this computer's credential file.
   - For PikPak, "Sign in with browser" is the recommended way: you sign in inside the window it opens, and Peach never sees your password. Signing in with your account and password also works; the password is saved only if you tick "Save password".

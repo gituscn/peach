@@ -321,16 +321,16 @@ def create_app(
         loop = asyncio.get_running_loop()
         previous_error_handler = loop.get_exception_handler()
         loop.set_exception_handler(asyncio_handler)
-        _restore_task_center(contract)
         # 启动握手要等 cloudflared 连上边缘，可以占到几十秒；和 mDNS 一样交给线程，
         # 不要在事件循环里卡住整条服务的启动。
         await asyncio.to_thread(_start_tunnel, settings, tunnel_manager)
-        follow_scheduler.start()
-        feed_scheduler.start()
-        automatic_updates.start()
-        push_discovery.start()
-        downloads.start()
         if settings.configured:
+            _restore_task_center(contract)
+            follow_scheduler.start()
+            feed_scheduler.start()
+            automatic_updates.start()
+            push_discovery.start()
+            downloads.start()
             mount_reachability.start()
         warmup = asyncio.create_task(warm_startup_entries())
         aggregate_warmup = asyncio.create_task(_warm_ledger_aggregates(settings, contract))

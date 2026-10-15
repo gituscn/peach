@@ -33,6 +33,7 @@ from . import distribution
 #: 设置文件名。位置固定为数据根下，不做多候选路径搜索。
 SETTINGS_FILENAME = "config.toml"
 DATA_ROOT_ENV = "PEACH_DATA_ROOT"
+DATA_ROOT_LOCATION = "data-root.txt"
 #: ADR-0017 的顶层布局里这两个目录名是固定的，不随机器变化。
 DATA_ROOT_DIRNAME = "peach-data"
 SHARED_ROOT_DIRNAME = "peach-sync"
@@ -102,7 +103,7 @@ SEARCH_ANCHOR = _search_anchor()
 _SEARCH_DEPTH = 4
 
 
-def discover_data_root(
+def _bootstrap_data_root(
     project_root: Path = SEARCH_ANCHOR, environ: dict[str, str] | None = None,
 ) -> tuple[Path, bool]:
     """返回 (数据根, 是否真的找到了)。找不到时第一项是 `peach init` 的默认落点。
@@ -121,6 +122,43 @@ def discover_data_root(
         if candidate.is_dir():
             return candidate, True
     return project_root.parent / DATA_ROOT_DIRNAME, False
+
+
+def _selected_data_root(root: Path) -> Path:
+    """读取本机首次设置保存的位置；最多跟随八次，并拒绝循环与相对路径。"""
+    visited = {root}
+    for _ in range(9):
+        locator = root / "state" / DATA_ROOT_LOCATION
+        try:
+            text = locator.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            return root
+        except (OSError, UnicodeError) as exc:
+            raise SettingsFileError(f"无法读取数据目录位置：{locator}：{exc}") from exc
+        selected = Path(text)
+        if not text or not selected.is_absolute() or selected in visited:
+            raise SettingsFileError(f"数据目录位置无效或循环：{locator}")
+        visited.add(selected)
+        root = selected
+    raise SettingsFileError("数据目录位置的跳转次数超过八次")
+
+
+def discover_data_root(
+    project_root: Path = SEARCH_ANCHOR, environ: dict[str, str] | None = None,
+) -> tuple[Path, bool]:
+    """从启动落点读取已保存的数据目录位置，返回实际数据根及发现状态。"""
+    root, found = _bootstrap_data_root(project_root, environ)
+    selected = _selected_data_root(root)
+    return selected, found or (selected / SETTINGS_FILENAME).is_file()
+
+
+def remember_data_root(bootstrap: PeachConfig, selected: PeachConfig) -> None:
+    """将首次设置选定的位置原子记录在启动落点，不复制账本或其他数据。"""
+    if bootstrap.data_root.resolve() == selected.data_root.resolve():
+        return
+    from .fsutil import atomic_write_text
+    atomic_write_text(bootstrap.data_root / "state" / DATA_ROOT_LOCATION,
+                      str(selected.data_root.resolve()))
 
 
 @dataclass(frozen=True)

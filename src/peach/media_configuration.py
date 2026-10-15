@@ -85,7 +85,7 @@ def validate(raws: object, *, windows: bool) -> tuple[dict, dict, list[str]]:
             if any(ord(char) < 32 for char in text + root):
                 raise ValueError("路径不能包含控制字符")
             if not platform.is_windows_path(root) or ".." in PureWindowsPath(root).parts:
-                raise ValueError("Windows 中的对应路径必须包含盘符，例如 B:\\")
+                raise ValueError("Windows 中的对应路径必须包含盘符，例如 B:\\；网络共享请先映射为 Windows 盘符")
             path = PureWindowsPath(text) if windows else PurePosixPath(text)
             if not text or not (platform.is_windows_path(text) if windows else text.startswith("/")):
                 raise ValueError("请填写本机挂载点的绝对路径")

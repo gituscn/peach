@@ -21,7 +21,7 @@
 - 封面2001，v11。
 - 收藏、续播、播放墙续页；[路由](ROUTES.md)、[JAV](JAV_DISCOVERY.md)。
 - `/healthz` 报 `configurable=true`；配置、选目录共用连接判据；托盘管理 HTTPS 地址、端口及重载。
-- 首启、配置页列缺失依赖（CloudDrive、挂载驱动、FFmpeg/ffprobe、OpenSSL）；Windows 识别 CloudDrive、WinFsp。
+- 首启目录持久化，配置后启动后台任务；依赖提示见 [运行与配置](OPERATIONS.md)。
 - 密码未开，局域网匿名可读；首启可跳过密码，配置页可改可关，登录可记住设备。
 - macOS 是 reader，代码与 `peach-data` 在内置盘；`peach.local` 经 8900/8443 和 pf 提供 80/443，GET 正常、写入回 409。
 - 两端用本机 CA，私钥、凭据不跨机；代码 Git、账本单写者复制、图片 Syncthing；坐标 `<数据根>/config.toml`。

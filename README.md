@@ -143,6 +143,7 @@ macOS 把后两条换成 `uv sync --locked --python 3.14 --extra macos` 和 `./.
   - 已有的标题、女优、厂牌和海报会直接显示。
 - **支持哪些网盘？**
   - 支持通过 CloudDrive2 挂载的 115 和 PikPak。
+  - CloudDrive2 也可运行在群晖等 NAS 上。Windows 先把共享目录映射为盘符，再在 Peach 中选择对应文件夹；这种方式无需在 Windows 安装 CloudDrive2 或 WinFsp。
   - 看片时 Peach 只把它当普通文件夹读，不保存网盘账号。
   - 用云下载时，CloudDrive2 的 API 令牌和 PikPak 的登录令牌存在这台电脑的凭据文件里。
   - PikPak 推荐点「用浏览器登录」，在弹出的窗口里登录，Peach 不经手密码；也可以用账号密码登录，密码只在你勾选「保存密码」时保存。
