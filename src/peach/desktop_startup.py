@@ -65,6 +65,9 @@ try {
 #: 读到的快捷方式状态，键是路径，值是 `(指纹, 结论)`。指纹见 `_fingerprint`。
 _READ_CACHE: dict[str, tuple[tuple, dict]] = {}
 
+#: PowerShell 冷启动与快捷方式操作的总等待时限。
+_SHORTCUT_TIMEOUT = 60
+
 
 def _fingerprint(path: Path) -> tuple:
     """这个 `.lnk` 的当前身份。文件不在就是 `()`，内容变了指纹一定跟着变。"""
@@ -95,11 +98,14 @@ def shortcut(action: str, path: Path, *, target: str = "", arguments: str = "", 
     encoded = base64.b64encode(_SHORTCUT_SCRIPT.encode("utf-16-le")).decode("ascii")
     # 和 folder_picker 相同：发行包使用 Windows 自带的 PowerShell，不要求用户安装 pwsh。
     shell = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32/WindowsPowerShell/v1.0/powershell.exe"
-    result = subprocess.run([str(shell), "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
-                            input=json.dumps(dict(action=action, path=str(path), target=target, arguments=arguments,
-                                                  directory=directory, expected=expected)),
-                            capture_output=True, text=True, encoding="utf-8", timeout=15,
-                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), check=False)
+    try:
+        result = subprocess.run([str(shell), "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+                                input=json.dumps(dict(action=action, path=str(path), target=target, arguments=arguments,
+                                                      directory=directory, expected=expected)),
+                                capture_output=True, text=True, encoding="utf-8", timeout=_SHORTCUT_TIMEOUT,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), check=False)
+    except subprocess.TimeoutExpired as exc:
+        raise OSError(f"Windows 快捷方式操作超时（等待 {_SHORTCUT_TIMEOUT} 秒），请稍后重试。") from exc
     try:
         payload = json.loads(result.stdout.lstrip("﻿"))
     except ValueError:

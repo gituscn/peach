@@ -34,6 +34,14 @@ class DesktopSettingsTests(unittest.TestCase):
         desktop_startup._READ_CACHE.clear()
         self.addCleanup(desktop_startup._READ_CACHE.clear)
 
+    def test_shortcut_timeout_has_an_actionable_error_and_original_cause(self):
+        failure = subprocess.TimeoutExpired(['powershell.exe'], 60)
+        with patch('peach.desktop_startup.subprocess.run', side_effect=failure):
+            with self.assertRaisesRegex(OSError, '快捷方式操作超时.*60 秒') as raised:
+                desktop_startup.shortcut('write', self.root / 'Peach.lnk',
+                                         target=str(self.program / 'Peach.exe'))
+        self.assertIs(raised.exception.__cause__, failure)
+
     def test_uninstall_plan_keeps_media_and_can_preserve_all_data(self):
         keep = desktop_uninstall.plan(self.config, delete_data=False, program=self.program)
         self.assertEqual(keep['directories'], [])
