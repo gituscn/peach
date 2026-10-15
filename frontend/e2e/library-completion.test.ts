@@ -60,7 +60,9 @@ describe('缺预览时的统一补全入口', () => {
         const box = await menu.boundingBox();
         assert.ok(box && box.x >= 0 && box.x + box.width <= viewport.width);
         await page.keyboard.press('Escape');
-        assert.equal(await more.evaluate(element => element === document.activeElement), true);
+        await menu.waitFor({ state: 'hidden' });
+        await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label')
+          === '更多资料与预览补全方式', null, { timeout: 5_000 });
         for (const dark of [false, true]) {
           await page.evaluate(value => {
             document.documentElement.dataset.theme = value ? 'dark' : 'light';
@@ -75,6 +77,7 @@ describe('缺预览时的统一补全入口', () => {
           await mkdir(artifacts, { recursive: true });
           await page.screenshot({ path: path.join(artifacts, `${viewport.name}-${dark ? 'dark' : 'light'}.png`) });
           await page.keyboard.press('Escape');
+          await menu.waitFor({ state: 'hidden' });
         }
         await more.click();
         await menu.getByRole('button', { name: '只生成本地预览' }).click();
