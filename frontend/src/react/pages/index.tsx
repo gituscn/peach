@@ -7,6 +7,7 @@
  *
  * 这个包不要会话就能取（ADR-0094）：不得 import 别的产物，不得内嵌账本、配置或凭据派生的数据。 */
 import './pages.css';
+import { installErrorReporting } from '../../error-reporting';
 
 import type { ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -22,6 +23,7 @@ const PAGES: Readonly<Record<string, ComponentType<{ data: PageData }>>> = {
   error: ErrorPage,
 };
 
+installErrorReporting();
 const mount = document.getElementById('peach-page');
 const Page = mount ? PAGES[mount.dataset.page ?? ''] : undefined;
 if (mount && Page) createRoot(mount).render(<Page data={{ ...mount.dataset }} />);

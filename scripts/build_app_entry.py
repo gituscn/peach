@@ -14,14 +14,6 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-# 数据根必须在 Peach 模块读取配置之前确定。
-if "--data-root" in sys.argv:
-    _root_index = sys.argv.index("--data-root")
-    if _root_index + 1 >= len(sys.argv):
-        raise SystemExit(2)
-    os.environ["PEACH_DATA_ROOT"] = sys.argv[_root_index + 1]
-    del sys.argv[_root_index:_root_index + 2]
-
 def cli_main(argv):
     from peach.cli import main
     return main(argv)
@@ -33,8 +25,8 @@ def subcommands():
 
 
 def tray_main():
-    from peach.tray import main
-    return main()
+    from peach.error_reporting import tray_main as run
+    return run()
 
 _ATTACH_PARENT_PROCESS = -1
 _STD_OUTPUT_HANDLE = -11
@@ -62,6 +54,8 @@ def _prepare_console() -> None:
         if reconfigure is not None:
             reconfigure(encoding="utf-8", errors="backslashreplace")
     if sys.stdout is not None and sys.stderr is not None:
+        from peach.error_reporting import console_ready
+        console_ready()
         return
     try:
         ctypes.windll.kernel32.AttachConsole(_ATTACH_PARENT_PROCESS)
@@ -70,6 +64,8 @@ def _prepare_console() -> None:
     devnull = open(os.devnull, "w", encoding="utf-8")
     sys.stdout = _open_std_handle(_STD_OUTPUT_HANDLE) or devnull
     sys.stderr = _open_std_handle(_STD_ERROR_HANDLE) or devnull
+    from peach.error_reporting import console_ready
+    console_ready()
 
 
 def cli_commands() -> frozenset[str]:
@@ -82,6 +78,23 @@ def wants_cli(argv: list[str]) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
+    if "--data-root" in argv:
+        index = argv.index("--data-root")
+        if index + 1 >= len(argv):
+            raise ValueError("--data-root 缺少目录")
+        os.environ["PEACH_DATA_ROOT"] = argv[index + 1]
+        del argv[index:index + 2]
+        sys.argv = argv
+    from peach import error_reporting
+    error_reporting.install()
+    if len(argv) in (2, 3) and argv[1] == "--diagnostic-report":
+        from peach.support_bundle import save_bundle
+        path = save_bundle(Path(argv[2]) if len(argv) == 3 else None)
+        if len(argv) == 2 and os.name == "nt":
+            ctypes.windll.user32.MessageBoxW(None, f"诊断报告已保存：\n{path}", "Peach 诊断报告", 0x40)
+        elif sys.stdout is not None:
+            print(path)
+        return 0
     if len(argv) == 3 and argv[1] == "--tray-watchdog":
         from peach.tray_lifecycle import main as watchdog_main
         return watchdog_main(argv[2:])
@@ -95,7 +108,8 @@ def main(argv: list[str] | None = None) -> int:
         _prepare_console()
         try:
             return cli_main(argv[1:])
-        except Exception:
+        except Exception as error:
+            error_reporting.event("packaged-cli", error)
             import traceback
             traceback.print_exc()
             return 1
@@ -105,4 +119,13 @@ def main(argv: list[str] | None = None) -> int:
 if __name__ == "__main__":
     import multiprocessing
     multiprocessing.freeze_support()
-    raise SystemExit(main())
+    from peach import error_reporting
+    try:
+        raise SystemExit(main())
+    except Exception as error:
+        message = error_reporting.failure_details("desktop-entry", error)
+        if os.name == "nt":
+            ctypes.windll.user32.MessageBoxW(None, message, "Peach 启动失败", 0x10)
+        elif sys.stderr is not None:
+            print(message, file=sys.stderr)
+        raise SystemExit(1)

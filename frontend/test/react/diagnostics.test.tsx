@@ -80,3 +80,24 @@ it('恢复动作的名称与实际目标一致', async () => {
   await click(buttonNamed('查看任务', host));
   expect(props.navigate.mock.calls).toEqual([['/settings/network'], ['/settings/maintenance'], ['/tasks']]);
 });
+
+it('诊断报告下载成功生成文件；失败原因保留在入口旁', async () => {
+  const create = vi.fn(() => 'blob:report');
+  const revoke = vi.fn();
+  vi.stubGlobal('URL', { createObjectURL: create, revokeObjectURL: revoke });
+  const clickFile = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  const fetch = vi.fn().mockResolvedValue(new Response(new Blob(['zip']), { status: 200 }));
+  vi.stubGlobal('fetch', fetch);
+  const { host } = await open();
+  await click(buttonNamed('下载诊断报告', host));
+  await settle();
+  expect(fetch).toHaveBeenCalledWith('/api/diagnostics/bundle', { credentials: 'same-origin' });
+  expect(create).toHaveBeenCalledTimes(1);
+  expect(clickFile).toHaveBeenCalledTimes(1);
+  expect(document.querySelector('a[download]')).toBeNull();
+  fetch.mockResolvedValueOnce(new Response('', { status: 503 }));
+  await click(buttonNamed('下载诊断报告', host));
+  await settle();
+  expect(host.textContent).toContain('诊断报告下载失败（HTTP 503）');
+  expect(buttonNamed('下载诊断报告', host)).not.toBeNull();
+});

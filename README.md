@@ -108,6 +108,8 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 Windows 托盘独立运行，关闭启动它的 Codex、Claude 或终端不会退出 Peach。托盘异常退出后会自动尝试恢复；5 分钟内最多恢复 3 次。主动选择「退出 Peach」会保持关闭。退出原因和恢复结果可在日志目录的 `tray-lifecycle.log` 中查看。
 
+启动失败弹窗会给出诊断报告位置。程序能运行时，可从托盘「导出诊断报告」或系统诊断页「下载诊断报告」取得脱敏 ZIP，用于问题反馈。
+
 ### 从源码运行（Windows、macOS）
 
 需要 Git、[uv](https://docs.astral.sh/uv/getting-started/installation/) 和 Python 3.14 或更高（正式运行版本由 `.python-version` 固定为 3.14，uv 会自动下载缺的解释器）：

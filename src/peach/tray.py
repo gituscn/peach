@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+if __name__ == "__main__":
+    from . import error_reporting
+    error_reporting.install()
+
 import argparse
 import ctypes
 import json
@@ -19,7 +23,7 @@ import httpx
 import pystray
 from PIL import Image
 
-from . import ledger_backups, log_retention, onboarding, runtime_prepare, settings_file
+from . import error_reporting, ledger_backups, log_retention, onboarding, runtime_prepare, settings_file
 from .appid import MACOS_LAUNCH_AGENT_LABEL
 from .certs import ensure_certificate
 from .distribution import standalone
@@ -1021,6 +1025,7 @@ class PeachTray:
                     pystray.MenuItem, self.sync_ledger, self.take_ownership),
                 pystray.MenuItem("重启服务", self.restart),
                 pystray.MenuItem("查看日志", self.open_logs),
+                pystray.MenuItem("导出诊断报告", self.export_diagnostics),
                 pystray.MenuItem("版本与更新", version_menu),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("退出 Peach", self.exit),
@@ -1163,6 +1168,14 @@ class PeachTray:
             os.startfile(LOG_DIR)  # type: ignore[attr-defined]
         elif sys.platform == "darwin":
             subprocess.run(["open", str(LOG_DIR)], check=False)
+
+    def export_diagnostics(self, _icon=None, _item=None) -> None:
+        from .support_bundle import save_bundle
+        try:
+            path = save_bundle()
+            show_message("Peach 诊断报告", f"诊断报告已保存：\n{path}")
+        except Exception as error:
+            show_message("Peach 诊断报告", error_reporting.failure_details("report-export", error), error=True)
 
     def check_updates(self, icon=None, _item=None) -> None:
         if not self._action_lock.acquire(blocking=False):
@@ -1646,6 +1659,14 @@ def log_to_file(path: Path) -> logging.Handler | None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    except Exception as exc:
+        show_message("Peach 启动失败", error_reporting.failure_details("tray-startup", exc), error=True)
+        return 1
+
+
+def _main(argv: list[str] | None = None) -> int:
     # 参数解析必须排在任何进程级副作用之前：`--help` 和拼错的参数都要在 HiDPI 设置、
     # 单实例锁和目录创建之前退出，否则一条试探命令就会在磁盘上凭空造出一个数据根，
     # 让之后的安装探测把这台机器误判成已配置。
@@ -1654,13 +1675,16 @@ def main(argv: list[str] | None = None) -> int:
         if handoff_tray(sys.argv[1:] if argv is None else argv, PROJECT_ROOT):
             return 0
     except OSError as exc:
-        show_message("Peach 启动失败", f"无法独立启动托盘：{exc}", error=True)
+        details = error_reporting.failure_details("tray-handoff", exc)
+        show_message("Peach 启动失败", f"无法独立启动托盘：{details}", error=True)
         return 1
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.getLogger().setLevel(logging.INFO)
     enable_hidpi()
     # 设置文件新鲜读一次。`config.py` 的常量是 import 期算的，而首次设置正要改变它们
     # 指向的数据根；这里只用它判断该起哪一组服务，之后由 `SetupGate` 接手。
     config = settings_file.load_config()
+    error_reporting.install(config.directory("logs"))
     waiting = needs_setup(config)
     instance = SingleInstance(config.directory("state") / "peach-tray.lock")
     manager = None
@@ -1707,7 +1731,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         LOGGER.exception("托盘运行失败")
         if not os.environ.get("PEACH_TRAY_RECOVERIES"):
-            show_message("Peach 启动失败", str(exc), error=True)
+            show_message("Peach 启动失败", error_reporting.failure_details("tray-runtime", exc), error=True)
         return 1
     finally:
         if lifecycle is not None:

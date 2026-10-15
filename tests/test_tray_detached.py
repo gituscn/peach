@@ -34,6 +34,7 @@ class DetachedLaunchTests(unittest.TestCase):
     def test_failed_handoff_stops_before_services_or_state_are_created(self):
         from peach.tray import main
         with mock.patch("peach.tray.handoff_tray", side_effect=OSError("desktop unavailable")), \
+                mock.patch("peach.tray.error_reporting.failure_details", return_value="desktop unavailable"), \
                 mock.patch("peach.tray.show_message") as message, \
                 mock.patch("peach.tray.SingleInstance") as instance:
             self.assertEqual(main(["--silent"]), 1)

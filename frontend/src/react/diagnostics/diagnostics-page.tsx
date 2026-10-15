@@ -29,6 +29,26 @@ export interface DiagnosticsProps {
   receipt(message: string): void;
 }
 
+function DownloadReport() {
+  const action = useAction();
+  const download = () => void action.run('download', async () => {
+    const response = await fetch('/api/diagnostics/bundle', { credentials: 'same-origin' });
+    if (!response.ok) throw new Error(`诊断报告下载失败（HTTP ${response.status}）`);
+    const url = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement('a');
+    anchor.href = url; anchor.download = 'peach-support.zip';
+    document.body.append(anchor);
+    try { anchor.click() } finally {
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  }, () => {});
+  return <div className="flex flex-col items-end gap-2">
+    <Button variant="secondary" onClick={download} {...busyProps(action.busy === 'download')}>下载诊断报告</Button>
+    {action.error ? <Note tone="error">{action.error}</Note> : null}
+  </div>;
+}
+
 function Check({ name, check, navigate, configure }: Pick<DiagnosticsProps, 'navigate' | 'configure'> & {
   name: string; check: DiagnosticCheck;
 }) {
@@ -77,14 +97,15 @@ export function DiagnosticsPage(props: DiagnosticsProps) {
     return response.data;
   }, () => setRefreshError(''), cause => setRefreshError(errorMessage(cause)));
   const data = query.data;
-  if (!data) return <div className="ui-configpage"><Note tone="error" title="诊断读取失败"
+  if (!data) return <div className="ui-configpage"><DownloadReport /><Note tone="error" title="诊断读取失败"
     action={<Button variant="secondary" onClick={refresh} {...busyProps(action.busy === 'refresh')}>重新检查</Button>}>
     {query.error ? errorMessage(query.error) : '诊断报告未取得。'}
   </Note></div>;
   const attention = Object.entries(data.checks).filter(([, check]) => ['warning', 'failed', 'unknown'].includes(check.status));
   const other = Object.entries(data.checks).filter(([, check]) => !['warning', 'failed', 'unknown'].includes(check.status));
   return <div className="ui-configpage flex flex-col gap-6">
-    <div className="flex justify-end"><Button variant="secondary" onClick={refresh} {...busyProps(action.busy === 'refresh')}>重新检查</Button></div>
+    <div className="flex flex-wrap justify-end gap-2"><DownloadReport />
+      <Button variant="secondary" onClick={refresh} {...busyProps(action.busy === 'refresh')}>重新检查</Button></div>
     {refreshError ? <Note tone="error">{refreshError}</Note> : null}
     {attention.length ? <Section title={`需要关注 · ${attention.length} 项`}>
       {attention.map(([key, check]) => <Check key={key} name={key} check={check} {...props} />)}

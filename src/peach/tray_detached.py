@@ -58,8 +58,14 @@ def _kernel():
 def _in_job(kernel, handle) -> bool:
     result = wintypes.BOOL()
     if not kernel.IsProcessInJob(handle, None, ctypes.byref(result)):
-        raise ctypes.WinError(ctypes.get_last_error())
+        raise _windows_error("IsProcessInJob")
     return bool(result.value)
+
+
+def _windows_error(operation: str) -> OSError:
+    error = ctypes.WinError(ctypes.get_last_error())
+    error.peach_operation = operation
+    return error
 
 
 def in_job() -> bool:
@@ -145,7 +151,7 @@ def launch_detached(argv, *, cwd, env=None) -> DetachedProcess:
         raise OSError("未取得当前会话的 Windows 桌面进程")
     parent = kernel.OpenProcess(0x0080 | 0x1000, False, pid.value)
     if not parent:
-        raise ctypes.WinError(ctypes.get_last_error())
+        raise _windows_error("OpenProcess(desktop)")
     initialized = False
     child = _ProcessInfo()
     try:
@@ -155,12 +161,12 @@ def launch_detached(argv, *, cwd, env=None) -> DetachedProcess:
         kernel.InitializeProcThreadAttributeList(None, 1, 0, ctypes.byref(size))
         attributes = ctypes.create_string_buffer(size.value)
         if not kernel.InitializeProcThreadAttributeList(attributes, 1, 0, ctypes.byref(size)):
-            raise ctypes.WinError(ctypes.get_last_error())
+            raise _windows_error("InitializeProcThreadAttributeList")
         initialized = True
         parent_value = wintypes.HANDLE(parent)
         if not kernel.UpdateProcThreadAttribute(attributes, 0, 0x00020000,
                 ctypes.byref(parent_value), ctypes.sizeof(parent_value), None, None):
-            raise ctypes.WinError(ctypes.get_last_error())
+            raise _windows_error("UpdateProcThreadAttribute(parent)")
         startup = _StartupInfoEx()
         startup.StartupInfo.cb = ctypes.sizeof(startup)
         startup.StartupInfo.lpDesktop = "winsta0\\default"
@@ -172,7 +178,7 @@ def launch_detached(argv, *, cwd, env=None) -> DetachedProcess:
         flags = 0x00080000 | 0x00000400 | subprocess.DETACHED_PROCESS
         if not kernel.CreateProcessW(str(executable), command, None, None, False,
                 flags, block, os.fspath(cwd), ctypes.byref(startup), ctypes.byref(child)):
-            raise ctypes.WinError(ctypes.get_last_error())
+            raise _windows_error("CreateProcessW")
         kernel.CloseHandle(child.hThread)
         process = DetachedProcess(child.hProcess, child.dwProcessId)
         try:

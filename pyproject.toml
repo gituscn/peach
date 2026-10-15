@@ -60,8 +60,8 @@ Repository = "https://github.com/peach-mitao/peach"
 Issues = "https://github.com/peach-mitao/peach/issues"
 
 [project.scripts]
-peach = "peach.cli:main"
-peach-tray = "peach.tray:main"
+peach = "peach.error_reporting:cli_main"
+peach-tray = "peach.error_reporting:tray_main"
 
 [project.optional-dependencies]
 # psutil 给 `scripts/agent_worktree.py` 查工作树里的残留进程：当前目录、父进程、CPU 与内存。

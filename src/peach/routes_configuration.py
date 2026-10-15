@@ -8,15 +8,18 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from collections import deque
 import hashlib
 import ipaddress
 import os
 import shutil
 import threading
+import json
+import time
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from filelock import FileLock, Timeout
 
 from . import (access, distribution, entry_links, folder_picker, media_libraries, onboarding,
@@ -99,6 +102,57 @@ def system_diagnostics(request: Request, args: dict[str, str] = Depends(require_
     if not local_client(request):
         raise HTTPException(403, "请在运行 Peach 的电脑上打开系统诊断")
     return diagnostics.report(request.app.state.settings, request.app.state.mount_reachability.summary())
+
+
+@router.get("/api/diagnostics/bundle")
+def diagnostic_bundle(request: Request, args: dict[str, str] = Depends(require_auth)):
+    from . import diagnostics, support_bundle
+    local_only(request)
+    try:
+        report = diagnostics.report(request.app.state.settings, request.app.state.mount_reachability.summary())
+    except Exception as error:
+        from .error_reporting import event
+        event("diagnostics-report", error)
+        report = None
+    return Response(support_bundle.bundle_bytes(report=report), media_type="application/zip",
+                    headers={"Content-Disposition": 'attachment; filename="peach-support.zip"',
+                             "Cache-Control": "no-store"})
+
+
+_CLIENT_ERROR_LOCK = threading.Lock()
+
+
+@router.post("/api/diagnostics/client-error")
+async def client_error(request: Request):
+    """本机浏览器错误取证；首启与登录页也可调用。"""
+    from . import error_reporting
+    same_origin(request)
+    local_only(request)
+    with _CLIENT_ERROR_LOCK:
+        recent = getattr(request.app.state, "client_error_times", deque(maxlen=20))
+        request.app.state.client_error_times = recent
+        now = time.monotonic()
+        while recent and now - recent[0] >= 60:
+            recent.popleft()
+        if len(recent) >= 20:
+            raise HTTPException(429, "错误记录过于频繁")
+        recent.append(now)
+    body = bytearray()
+    async for part in request.stream():
+        body.extend(part)
+        if len(body) > 16 * 1024:
+            raise HTTPException(413, "错误记录过长")
+    try:
+        data = json.loads(body)
+    except (ValueError, UnicodeError):
+        raise HTTPException(400, "错误记录格式无效") from None
+    if not isinstance(data, dict) or not isinstance(data.get("message"), str):
+        raise HTTPException(400, "错误记录缺少原因")
+    fields = {key: value[:6000] for key in ("message", "stack", "kind")
+              if isinstance(value := data.get(key), str)}
+    if error_reporting.event("browser", **fields) is None:
+        raise HTTPException(503, "错误日志无法写入")
+    return {"recorded": True}
 
 
 def configurable(request: Request) -> bool:
