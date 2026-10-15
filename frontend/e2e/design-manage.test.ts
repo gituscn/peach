@@ -62,7 +62,7 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
     }
   });
 
-  it('数据管理卡外的分区标题是 20px 的 Title 2，链接读数照旧版字号与行高', { timeout: 60_000 }, async () => {
+  it('数据管理面板内标题采用 medium，链接读数使用既定字号与行高', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/data-cleanup', DESKTOP);
     try {
       const page = opened.page;
@@ -82,12 +82,15 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
           sync: style('#resource-sync-title'),
           label: style('#link-manager .link-stat-grid span'),
           figure: style('#link-manager .link-stat-grid b'),
+          outsideTitles: document.querySelectorAll('#link-manager > h2, #link-manager > h3, #resource-sync > h2, #resource-sync > h3').length,
         };
       });
-      /* 这一页挂在 `#stats` 里，遗留样式表给那里的二级标题定了 24px 与 4px 底距。 */
+      assert.equal(faces.outsideTitles, 0, '单面板分区出现了框外标题');
       for (const [name, heading] of [['链接管理', faces.links], ['资源同步', faces.sync]] as const) {
         assert.equal(heading.size, '20px', `${name}标题字号不是 Title 2`);
-        assert.equal(heading.bottom, '0px', `${name}标题带着遗留那 4px 底距`);
+        assert.equal(heading.weight, '500', `${name}标题不是 medium 字重`);
+        assert.equal(heading.line, '26px', `${name}标题行高不是 Title 2`);
+        assert.equal(heading.bottom, '8px', `${name}标题与面板正文间距不一致`);
       }
       assert.deepEqual([faces.label.size, faces.label.line], ['12px', '20px'], '链接读数的标签不是 12/20');
       assert.deepEqual([faces.figure.size, faces.figure.weight, faces.figure.line], ['20px', '700', '20px'],
