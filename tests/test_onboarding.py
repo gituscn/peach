@@ -667,6 +667,37 @@ class SetupJsonContractTests(_SetupHttpCase):
         self.assertEqual((again.status_code, again.json()), (409, {"error": "settings file already exists"}))
         self.assertEqual(self._loaded().server.port, 8900)
 
+    def test_restore_adopts_the_selected_existing_configuration_without_rewriting_data(self):
+        selected = self.root / "existing-data"
+        self._submit(data_root=str(selected), scan_now=False)
+        locator = self.config.data_root / "state" / settings_file.DATA_ROOT_LOCATION
+        locator.unlink()
+        before = {path: path.read_bytes() for path in selected.rglob("*") if path.is_file()}
+        response = self._send("POST", "/api/setup/restore", json={"data_root": str(selected)})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["restored"])
+        self.assertFalse(response.json()["scan_requested"])
+        self.assertEqual(self._loaded().data_root, selected)
+        self.assertEqual(before, {path: path.read_bytes() for path in selected.rglob("*") if path.is_file()})
+
+    def test_restore_requires_an_existing_configuration_and_ledger_and_keeps_guards(self):
+        for value in (None, "relative", str(self.root / "missing")):
+            with self.subTest(value=value):
+                response = self._send("POST", "/api/setup/restore", json={"data_root": value})
+                self.assertEqual(response.status_code, 400, response.text)
+                self.assertIn("data_root", response.json()["errors"])
+        self.assertFalse((self.config.data_root / "state" / settings_file.DATA_ROOT_LOCATION).exists())
+        for kwargs, status in (({"configured": True}, 404), ({"client": ("198.51.100.7", 1)}, 403),
+                               ({"headers": {"Origin": "http://elsewhere.example"}}, 403)):
+            with self.subTest(kwargs=kwargs):
+                self.assertEqual(self._send("POST", "/api/setup/restore", json={}, **kwargs).status_code, status)
+        selected = self.root / "existing-data"
+        self._submit(data_root=str(selected), scan_now=False)
+        (self.config.data_root / "state" / settings_file.DATA_ROOT_LOCATION).unlink()
+        (selected / "database" / "ledger.db").unlink()
+        response = self._send("POST", "/api/setup/restore", json={"data_root": str(selected)})
+        self.assertEqual(response.status_code, 400, response.text)
+
     def test_each_wrong_answer_comes_back_under_its_own_key(self):
         a_file = self.root / "not-a-folder"
         a_file.write_text("x", encoding="utf-8")

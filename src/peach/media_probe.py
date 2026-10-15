@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import subprocess
 from collections.abc import Callable, Sequence
@@ -60,6 +61,7 @@ def probe_file(ffprobe: str, path: str, timeout: float = TIMEOUT_SECONDS) -> tup
         ],
         capture_output=True,
         timeout=timeout,
+        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )
     payload = json.loads(result.stdout or b"{}")
     duration = float((payload.get("format") or {}).get("duration") or 0)

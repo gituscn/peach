@@ -76,7 +76,7 @@ FC2 卖家名册复用 `sources/fc2.py` 的 `label`、`seller_url` 来源契约�
 
 JAV 发现卡复用馆藏的 `data-media-card` 网格与悬停面、`coverImage` 封面取景、`cardRatio` 大小图比例和 `feedIdentity` 身份头像；筛选复用 `FilterGlassRows`、`FilterPill`、`Segments` 与 `SortKeys`。出演者引用由 `web_catalog.entity_ref` 提供图片版本与取景；标题保留两行，操作区贴底。发现查询复用口味汇总与 `related.rank_related` 的 IDF/MMR，输出相关度和实际选择分，支持口味、发行日期、来源评分、时长、番号排序。来源资料复用 `PublicAPI`、`BackgroundJob(runs=None)`、`fsutil.atomic_write_text` 与标准库 `ContextVar`；固定至多 100 部，真实 HTTP 预算 202 次、16 MiB、900 秒，3 秒串行间隔。资料边车有效期 6 小时、最多 2,048 条、失败冷却 15 分钟，完成或停止后由显式刷新续跑。`WantMagnets` 以 `queryUrl` 共用作品详情和想要清单的资源布局，按资源区容器宽度排列操作，缓存按来源分开，容量复用 `fmtSize`。JAV 与名册的静态搜索框复用 `islandSearchInput`。资料扩展见 [JAV 发现](JAV_DISCOVERY.md)，无新增依赖。
 
-JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字回退，标题折叠复用 `useFoldedTitle`。厂牌大小写唯一匹配与 `sources.javdb.maker_writing` 的日英组合解析只用于来源身份投影，标识按规范名读取。评论、资源复用 `Disclosure` 和 `setCollapseOpen`；来源与评论评分共用按小数裁切填充的星星。桌面右栏以 `contain:size` 排除正文的固有高度贡献，媒体区决定框体高度，正文在右栏内滚动。写操作取 `/healthz` 的账本只读状态，与运行配置权限分别处理。图片切换由 `MediaCarousel` 同时服务关注、库外 JAV 与馆藏详情，提供环形翻页及限宽圆点条。圆点溢出采用浏览器原生 `overflow-x:auto`（[MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/overflow-x)），滚轮与鼠标拖动复用 `wireHorizontalScroller`；选中点在切图、循环和容器缩窄时保持可见。沿用既有依赖与滚动交互，Swiper 14.3.0 留给灯箱；圆点导航不额外加载预览图片。馆藏样张复用 `sample_images.detail_refs` 和 `/sample-image`，`/api/item` 只读本地序号、最多 30 项；查看图片暂停正片，返回保留位置。推荐分标签复用 BoardUI `Chip` 与共享 Tooltip。视频预览的 `mountPreviewPlayer` 复用已固定的 Video.js 8.24.1（Apache-2.0）、VHS、`mountPlayerQualityControl`、`mountPlayerSeekPreview` 和 `mountPlayerSpinner`，安装共用控制条、设置、时间、音量与窄宽度折叠。来源给定的 HLS 直接由播放器请求；不添加依赖、片源代理、馆藏 ID 或观看上报。播放器生命周期由当前详情管理，异步加载完成前离开会取消挂载，切换与关闭会停止并销毁实例。
+JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字回退，标题折叠复用 `useFoldedTitle`。厂牌大小写唯一匹配与 `sources.javdb.maker_writing` 的日英组合解析只用于来源身份投影，标识按规范名读取。评论、资源复用 `Disclosure` 和 `setCollapseOpen`；来源与评论评分共用按小数裁切填充的星星。桌面右栏以 `contain:size` 排除正文的固有高度贡献，媒体区决定框体高度，正文在右栏内滚动。写操作取 `/healthz` 的账本只读状态，与运行配置权限分别处理。图片切换由 `MediaCarousel` 同时服务关注、库外 JAV 与馆藏详情，提供环形翻页及限宽圆点条。圆点溢出采用浏览器原生 `overflow-x:auto`（[MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/overflow-x)），滚轮与鼠标拖动复用 `wireHorizontalScroller`；选中点在切图、循环和容器缩窄时保持可见。沿用既有依赖与滚动交互，Swiper 14.3.0 留给灯箱；圆点导航不额外加载预览图片。馆藏样张复用 `sample_images.detail_refs` 和 `/sample-image`，`/api/item` 只读本地序号、最多 30 项；查看图片暂停正片，返回保留位置。推荐分标签复用 BoardUI `Chip` 与共享 Tooltip。视频预览的 `mountPreviewPlayer` 复用已固定的 Video.js 8.24.2（Apache-2.0）、VHS、`mountPlayerQualityControl`、`mountPlayerSeekPreview` 和 `mountPlayerSpinner`，安装共用控制条、设置、时间、音量与窄宽度折叠。来源给定的 HLS 直接由播放器请求；不添加依赖、片源代理、馆藏 ID 或观看上报。播放器生命周期由当前详情管理，异步加载完成前离开会取消挂载，切换与关闭会停止并销毁实例。
 
 账号归属复用 `review_decision`、`creator_collection_base`、`write_owned_fields` 和全库归属审计。明确拒绝的资产与账号组合在自动摄取时跳过；用户写入保留复核入口。网黄博主只命中可信个人、内容创作者或发布账号断言，未分类账号保留全部名册入口。`attach_avatar_availability` 集中处理资料页、索引、搜索与统计的作品头像：发布账号缺少本人或出演职业证据时作品帧照常兜底，另标 `avatar_stand_in`，已安装图片独立保留。个人博主的补头像复用 `avatar_cover_face.face_square`、`readable_cut` 与 ADR-0074 的 `agreeing` 两部互证，画面取自接触印相九格（ADR-0099）。来源核查清单、逐关系回执和备份存于 `peach-data/review/`。
 
@@ -94,7 +94,7 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 待找资源复用 `MagnetSearch` 的来源链、发行时间策略与串行限速，服务端结果使用 `atomic_write_text` 原子保存为私有 JSON 边车。读缓存和网络查询分锁；重启时将原始墙钟时间转换为当前进程的单调时钟。边车最多 128 部、16 MiB，不保存错误，主动刷新失败保留成功结果。浏览器沿用 TanStack Query 和 localStorage，不新增缓存服务或依赖。
 
-清晰度控件复用已内置 VHS 的 Video.js 8.24.1（Apache-2.0）及其 [QualityLevelList](https://github.com/videojs/videojs-contrib-quality-levels)。多档自动播放通过 `selectedIndex`、`change` 事件取得当前轨道；单档 HLS 缺少尺寸时读取视频元素的实际尺寸，并响应 `loadedmetadata`、`resize`。尺寸未取得时显示「当前画质」，轨道 ID 不作界面名称；无需新增依赖。
+清晰度控件复用已内置 VHS 的 Video.js 8.24.2（Apache-2.0）及其 [QualityLevelList](https://github.com/videojs/videojs-contrib-quality-levels)。多档自动播放通过 `selectedIndex`、`change` 事件取得当前轨道；单档 HLS 缺少尺寸时读取视频元素的实际尺寸，并响应 `loadedmetadata`、`resize`。尺寸未取得时显示「当前画质」，轨道 ID 不作界面名称；无需新增依赖。
 
 ## 分级诊断
 
@@ -188,10 +188,11 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 - 不用 [Velopack](https://docs.velopack.io/packaging/operating-systems/windows)（要求其安装目录与包格式）与 [WinSparkle](https://winsparkle.org/)（要求 appcast 与原生更新界面）：产物是 PyInstaller ZIP、进度在 Web 显示，沿用托盘进程与目录替换协议。
 - Web 复用 Fieldset、Progress、confirmModal；状态由 `standalone-update.json` 保存。下载按字节计量，解压按文件数计量，替换使用阶段进度；服务重启期间保留等待状态，恢复连接后核对版本。
 - 新版有待应用迁移时，重启安装复用 `migrate upgrade --yes`，先保存 SQLite 备份；迁移或启动失败时恢复数据库与程序。数据库备份位于用户数据根的 `state/update-backups/`。
+- 更新事务按当前配置读取 state 与账本路径，助手显式继承所选数据根。已有数据目录恢复复用严格配置解析与位置记录，只接受含配置和账本的目录。`scripts/smoke_desktop.py` 验证恢复及再次启动；`scripts/smoke_online_update.py` 使用真实 Release 包和临时馆藏验证在线更新，可注入无法启动的暂存 EXE 验证回滚。
 
 JAV 默认封面（官方封面／预览图）与视频默认大小（大图／小图）独立保存，用 localStorage、共享 Switch 与既有 `/cover`、`/poster`。设置弹窗同步首页与 JAV 的版式，筛选条可单独调当前视图。`frontend/src/jav-artwork.ts` 管作品身份、偏好恢复与缺图回退，首页、接着看、实体作品、详情推荐、Mix 静止与翻图、播放队列共用封面选择。小图展示完整封套，竖版正封完整放入大图卡片；新作封面完成取景才显示，缓存图插入时重算取景。
 
-关注视频与馆藏详情的续播复用 Video.js 8.24.1（Apache-2.0）的元数据事件和 `currentTime`、浏览器 localStorage 与既有活动接口。`player/progress` 按本地资产、关注条目和媒体序号登记秒数，暂停、定位、关闭、小窗销毁、页面退出均保存；原生 video 回退也恢复，明确的时间深链优先，放完从头开始。本地既有记录可按 `leave_ratio × duration` 恢复；最远观看位置与累计观看时长不作为续播秒数。活动请求用 keepalive，销毁同步冲掉末段并清理定时器与监听。此状态属于当前浏览器，未引入账本迁移或跨设备同步，无新增依赖。
+关注视频与馆藏详情的续播复用 Video.js 8.24.2（Apache-2.0）的元数据事件和 `currentTime`、浏览器 localStorage 与既有活动接口。`player/progress` 按本地资产、关注条目和媒体序号登记秒数，暂停、定位、关闭、小窗销毁、页面退出均保存；原生 video 回退也恢复，明确的时间深链优先，放完从头开始。本地既有记录可按 `leave_ratio × duration` 恢复；最远观看位置与累计观看时长不作为续播秒数。活动请求用 keepalive，销毁同步冲掉末段并清理定时器与监听。此状态属于当前浏览器，未引入账本迁移或跨设备同步，无新增依赖。
 
 详情人物头像复用 `card-art.entityFaceImg` 与 `avatarFrame`，图片直接挂在有尺寸的 `[data-id-face]` 圆框内。取景读取图片的父框几何，`display:contents` 包装层没有可用尺寸。首字与图片由同一段 HTML 承载，图片加载失败时共用回退链，浏览器回归覆盖带人脸框的桌面与手机详情。
 
@@ -448,8 +449,8 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 | FC2 目录元数据与跨号证据 | 已缓存的 fc2cmadb Inertia `article`／评论；Javinizer-Go v1.5.2 的 FC2 解析器（MIT）只作商品页字段边界参考 | 旧文章仍有标题、原始标签、日期、时长、卖家、FC2 CDN 封面与 `comments`（2026-08-31 登录态实测）；无歧义标签译成现有词表，标题／标签进 `/review`，`w1200` 封面过尺寸与解码门槛落生成产物；pair、合集/分片保护、hash/时长/尺寸佐证、库外 evidence、健康统计与复核归 Peach，不依赖 FC2-Leak-Detector/JavSP，镜像候选不直写 ledger |
 | 缺索引 MP4 重建 | untrunc（anthwlock，GPL-2.0，用户自行解压到 `<数据根>/tools/untrunc/`，也认 `PEACH_UNTRUNC` 与 PATH），`-n -s -dst` 借一部同编码器的完整片子当参照切 `mdat`；不随 Peach 分发，「运行信息」给下载入口 | `src/peach/mp4recover.py` 挑参照（同目录文件名最近的先试，最多 4 部）、验收（解码错误 ≤3 行、音视频时长差 ≤5%）、换回原路径并把坏原件改名成同目录的 `.文件名.peach-original`；缺整个 `moov` 的片子哪里都打不开，所以结果替换原文件，不像缺 `ctts` 那样另存头。实测见 [取证](SOURCING.md#媒体与关注实测) |
 | 媒体探测/转码 | Peach 管理的 FFmpeg/ffprobe（Windows 实测 9.0.1 full build 的 CUDA/NVDEC、`scale_cuda` 与 NVENC，二进制启用 GPL/version3）；CI 用 `FedericoCarboni/setup-ffmpeg@v3`（MIT）固定 9.0.1，从 GyanD/codexffmpeg 的精确 release 资产下载，不走访问 Gyan 易失端点的默认 `release`（[取证](SOURCING.md#依赖与工具实测)） | 容器与编码分别检查：MP4/M4V 的 H.264 8-bit 加兼容音轨直出，其余容器里的 H.264 8-bit 只换 MP4 封装；其余 Windows 输入依次 CUDA→NVENC、软件解码→NVENC、`libx264`，macOS 封装复制或软件转码 |
-| HTML5/HLS/DASH 播放 | Video.js 8.24.1 + 内置 VHS（Apache-2.0，本地固定版本） | 流方案、授权、稳定时长、回退顺序和统计面板；详情不兼容片源复用 HlsSegmentService 与 FFmpeg 按六秒编码 H.264/AAC，独立缓存、绝对时间轴及会话取消，无整片预转码 |
-| 播放器设置与影院布局 | Video.js 8.24.1 的 `playbackRate`、既有 QualityLevel、原生 tooltip 与控制栏插槽；YouTube `e937390a` 实际 DOM／CSS／JS 给几何、状态、动画和图形证据 | 在现有 DOM 上组合氛围模式、倍速、真实清晰度和影院模式：59 px 两排控制栏、40→111 px 横向音量、4→6 px 进度、右侧共享胶囊、整行悬停的 274 px 设置菜单、视口级全屏；普通视图 `contain`，全屏 `cover`（接受非等比片源的边缘裁切）。全屏判定同时看 Video.js／原生类、`isFullscreen()` 同步的 `data-peach-fullscreen` 与 `body.vjs-full-window`；浏览器专用伪类放进 forgiving `:is(...)` 或拆开写，免得未知伪类废掉整组。设置项、选中勾、菜单箭头、中央 bezel 与 loading 只 vendoring 锁定版本的 SVG path／spinner，音量 hover 与滑轨中心沿用上游外层伪元素与 50% 几何，tooltip 只补层级与越界可见；不复制控制逻辑、不迁 Video.js 10 Menu、不引重复质量选择的插件 |
+| HTML5/HLS/DASH 播放 | Video.js 8.24.2 + 内置 VHS（Apache-2.0，本地固定版本） | 流方案、授权、稳定时长、回退顺序和统计面板；详情不兼容片源复用 HlsSegmentService 与 FFmpeg 按六秒编码 H.264/AAC，独立缓存、绝对时间轴及会话取消，无整片预转码 |
+| 播放器设置与影院布局 | Video.js 8.24.2 的 `playbackRate`、既有 QualityLevel、原生 tooltip 与控制栏插槽；YouTube `e937390a` 实际 DOM／CSS／JS 给几何、状态、动画和图形证据 | 在现有 DOM 上组合氛围模式、倍速、真实清晰度和影院模式：59 px 两排控制栏、40→111 px 横向音量、4→6 px 进度、右侧共享胶囊、整行悬停的 274 px 设置菜单、视口级全屏；普通视图 `contain`，全屏 `cover`（接受非等比片源的边缘裁切）。全屏判定同时看 Video.js／原生类、`isFullscreen()` 同步的 `data-peach-fullscreen` 与 `body.vjs-full-window`；浏览器专用伪类放进 forgiving `:is(...)` 或拆开写，免得未知伪类废掉整组。设置项、选中勾、菜单箭头、中央 bezel 与 loading 只 vendoring 锁定版本的 SVG path／spinner，音量 hover 与滑轨中心沿用上游外层伪元素与 50% 几何，tooltip 只补层级与越界可见；不复制控制逻辑、不迁 Video.js 10 Menu、不引重复质量选择的插件 |
 | 播放器时刻预览 | Video.js 原生进度控件 + Peach 的 `/timeline?id=&s=`（10×10 接触印相），取不到时退到 `/poster?id=&c=0…8` 九宫格切片 | `peach.timeline_sheets` 按每 10 或 30 秒一帧预铺，只覆盖 `location='local'`（网盘每抽一帧都回源，[流量实测](SOURCING.md#媒体与关注实测)）；其余退回只给近似时刻的九宫格。抽帧与拼图共用 `peach.frame_capture`。`videojs-vtt-thumbnails`／`videojs-sprite-thumbnails` 要另建 sprite/VTT 契约与运行时依赖，格子换算在 Peach 是一行整除，不引入 |
 | 外挂字幕 sidecar | 浏览器原生 `TextTrack` 与 [WebVTT 规范](https://www.w3.org/TR/webvtt1/)；配对复用 `catalog_rules` 的 `VERSION_TAIL_TOKENS` 与 `release_code_from_filename`。行为证据：sakuramediabe `import_service.py`／`movie_numbers.py` 的 `subtitle_matches_movie_number`（同目录、纯番号、不回退同名），NeoAVDC `organizeMedia.ts`／`parseNumber.ts` 的 `isSubtitleFile`（`.srt .ass .sub .vtt .ssa`，按视频主名前缀）；Peach 的判据是两者的并集加顺序 | `subtitles.py` 只做同目录配对（exact／suffix／code／orphan）、`asset_subtitle` 幂等登记、srt/ass/ssa → WebVTT。不用 `pysubs2`（为几十行加运行时依赖）和 FFmpeg（每次起子进程、报不出「编码认不出来」），编码要认 GBK／Big5／Shift_JIS，不用几乎吞下任何字节的 `gb18030`。内封字幕轨不在此列，`media_probe.py` 只取 `v:0`，流信息不落库 |
 | 分卷文件命名 | [Plex 官方命名](https://support.plex.tv/articles/naming-and-organizing-your-movie-media-files/)的 `cd/disc/disk/dvd/part/pt + 数字` 与 [Kodi 官方 File Stacking](https://kodi.wiki/view/File_stacking)只作行为证据；运行时复用当前树的 `part_marker`，不新增扫描器依赖 | 兼容裸数字、紧接番号的 A–H 与 cd 序号、fhd 序号及圈号标题，共有版次尾缀先剥离再取卷标。FC2 的明确数字合集允许缺集和零起始；本篇与唯一 SP、gift、特典可合卡，完整版与数字分卷混合、重复标签不自动合并。每个 asset 与播放会话保留，不拼接或改写媒体 |
@@ -488,7 +489,9 @@ Python、npm 与 GitHub Actions 的版本由 `.github/dependabot.yml` 每周检�
 
 ## 静态检查
 
-Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.16.10，版本由开发依赖和 `uv.lock` 固定。规则配置在 `pyproject.toml`；正式入口通过 `tests/test_python_lint.py` 扫描全仓自有 Python 文件，检查 Pyflakes、Ruff 支持的 Pylint 错误规则与四项常见行为隐患。Ruff 的 Pylint 规则覆盖是部分覆盖；需要跨模块推断的问题仍由对应行为回归验证。
+Windows 媒体子进程复用 Python 标准库 `subprocess.CREATE_NO_WINDOW`：入库探测、抽帧、拼图、预览、关注封面与媒体修复均显式设置，输出捕获、超时和取消按各入口原有契约处理。该标记由 Windows 原生支持，不引入依赖；见 [Python 文档](https://docs.python.org/3/library/subprocess.html#subprocess.CREATE_NO_WINDOW) 与 [Windows 创建标记](https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags)。
+
+Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.17.0，版本由开发依赖和 `uv.lock` 固定。规则配置在 `pyproject.toml`；正式入口通过 `tests/test_python_lint.py` 扫描全仓自有 Python 文件，检查 Pyflakes、Ruff 支持的 Pylint 错误规则与四项常见行为隐患。Ruff 的 Pylint 规则覆盖是部分覆盖；需要跨模块推断的问题仍由对应行为回归验证。
 
 复用现有 Oxlint 1.85.0 的 correctness、`eqeqeq` 与 `oxc/no-accumulating-spread`，不新增依赖。源码和测试共用基础规则；shadcn 设计规则仅作用于自有 React 源码。
 

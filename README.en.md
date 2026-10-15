@@ -106,6 +106,10 @@ The original screenshots are lossless 3840×2160 PNGs; click to view them. You c
 2. Your browser opens the first-run setup page.
 3. Pick your media folders and who may access Peach, then start the scan.
 
+If you already have a library but see first-run setup, choose **使用已有数据目录** and enter its `peach-data` folder. Peach keeps the existing settings, ledger and access password, and remembers the folder.
+
+Windows standalone builds can check for and download updates under **应用与维护** in Configuration. Confirm a restart to install a downloaded update. Automatic checks and downloads are off by default and can be enabled there.
+
 The test package is not code-signed yet. If Windows says "Windows protected your PC", make sure the file came from this project's Releases, then choose "More info → Run anyway". Transcoding and thumbnails need FFmpeg; without it you can still browse and play MP4 and WebM. See [Windows test build](docs/TESTING_DESKTOP.md) for how to install it.
 
 On Windows, the tray runs independently. Closing the Codex, Claude, or terminal session that started it keeps Peach running. Peach attempts to recover after an unexpected tray exit, up to three times within five minutes. Choosing “Quit Peach” keeps it closed. Exit reasons and recovery results are recorded in `tray-lifecycle.log` in the logs folder.

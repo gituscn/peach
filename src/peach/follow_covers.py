@@ -170,7 +170,8 @@ class FollowCoverService:
         try:
             with self._slots:
                 result = subprocess.run(
-                    command, capture_output=True, timeout=self.timeout, check=False)
+                    command, capture_output=True, timeout=self.timeout, check=False,
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
             if (result.returncode != 0 or not temporary.is_file()
                     or temporary.stat().st_size == 0):
                 self._remember_miss(destination.name)

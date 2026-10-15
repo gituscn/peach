@@ -18,11 +18,11 @@
 - 产地是独立维度、JAV 是其投影：`region` 空时按厂牌、创作者、番号逐层推断，不落库；韩国 MIB 不算 JAV。
 - Windows 托盘自动恢复；重启 `restart_windows_tray.py --source`；代码、数据在内置盘，媒体在外置盘。
 - 托盘用普通权限：提权看不到 CloudDrive 的 `A:`/`B:`，误报脱盘。
-- Windows：80→HTTPS、LAN:443；`peach-win`、`0.39.0`。重启、CA、桌面/手机通过。
+- Windows：80→HTTPS、LAN:443；`peach-win`。重启、CA、桌面/手机通过。
 - 封面2001，v11。
 - 收藏、续播、播放墙续页；[路由](ROUTES.md)、[JAV](JAV_DISCOVERY.md)。
 - `/healthz` 报 `configurable=true`；配置、选目录共用连接判据；托盘管理 HTTPS 地址、端口及重载。
-- 首启目录持久化，配置后启动后台任务；依赖提示见 [运行与配置](OPERATIONS.md)。
+- 首启记住目录，支持接回已有配置；更新沿用数据根；见 [运行与配置](OPERATIONS.md)。
 - 密码未开，局域网匿名可读；首启可跳过密码，配置页可改可关，登录可记住设备。
 - macOS 是 reader，代码与 `peach-data` 在内置盘；`peach.local` 经 8900/8443 和 pf 提供 80/443，GET 正常、写入回 409。
 - 两端用本机 CA，私钥、凭据不跨机；代码 Git、账本单写者复制、图片 Syncthing；坐标 `<数据根>/config.toml`。

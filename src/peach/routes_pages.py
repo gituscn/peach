@@ -443,16 +443,45 @@ async def setup_submit_json(request: Request):
         raise HTTPException(status_code=400, detail={"message": "有几项需要修改", "errors": errors})
     if scan_now:
         onboarding.request_first_scan(applied.config, "configured" if answers.media_sources is not None else "local")
-    destination = _setup_destination(applied.config, history_guide=history_guide)
+    return _setup_done(applied.config, scan_now=scan_now, history_guide=history_guide)
+
+
+def _setup_done(config, *, scan_now: bool = False, history_guide: bool = False, restored: bool = False):
+    destination = _setup_destination(config, history_guide=history_guide)
     return JSONResponse({
         "url": destination,
         "scan_requested": scan_now,
         "history_guide": history_guide,
-        "standalone": standalone,
+        "restored": restored,
+        "standalone": distribution.standalone(),
         # 独立包的完成页过一会儿自己跳到入口；时长由前端定，与配置页保存后的跳转同一个数。
-        "redirect": destination if standalone else None,
-        "facts": runtime_fact_entries(applied.config),
+        "redirect": destination if distribution.standalone() else None,
+        "facts": runtime_fact_entries(config),
     })
+
+
+@router.post("/api/setup/restore")
+async def setup_restore(request: Request):
+    """接回用户指定的已有数据目录；只记录位置，沿用其中的配置、账本和访问密码。"""
+    _setup_guard(request, submit=True)
+    try:
+        body = await request.json()
+        raw = body.get("data_root") if isinstance(body, dict) else None
+        if not isinstance(raw, str) or not raw.strip() or not Path(raw).is_absolute():
+            raise ValueError("请选择已有数据目录的绝对路径")
+        config, broken = onboarding.resolve_config(Path(raw))
+        if broken:
+            raise broken
+        if not config.present:
+            raise ValueError("此目录中没有有效的 config.toml")
+        if not (config.directory("database") / "ledger.db").is_file():
+            raise ValueError("此目录中没有账本，请选择保存原配置和账本的数据目录")
+        if distribution.standalone():
+            onboarding.check_available_port(config.server.port, request.url.port or 80)
+        settings_file.remember_data_root(settings_file.active(), config)
+    except (ValueError, OSError, RuntimeError) as exc:
+        raise HTTPException(400, {"message": "无法使用此数据目录", "errors": {"data_root": str(exc)}}) from exc
+    return _setup_done(config, restored=True)
 
 
 def _setup_media_source_errors(dirs: Sequence[str], kinds: object,

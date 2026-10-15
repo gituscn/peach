@@ -29,7 +29,7 @@ export function SetupDoneView({ done }: { done: SetupDone }) {
   return (
     <AuthCard title="设置完成" lede="正在启动馆藏。">
       <p className="text-body-regular text-text-primary">
-        {done.scan_requested
+        {done.restored ? '已连接已有数据目录。' : done.scan_requested
           ? '首次扫描已排队，在后台整理媒体库，期间可以照常使用 Peach。'
           : '稍后在配置页开始扫描媒体库。'}
       </p>

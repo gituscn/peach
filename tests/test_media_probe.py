@@ -98,6 +98,21 @@ class ProbeUnmeasuredTests(unittest.TestCase):
         self.assertIsNone(self.row(other)[0])
 
 
+class ProbeProcessTests(unittest.TestCase):
+    def test_probe_reads_metadata_with_a_hidden_windows_process(self):
+        payload = b'{"format":{"duration":"12.5"},"streams":[{"width":320,"height":240,' \
+                  b'"codec_name":"h264","avg_frame_rate":"25/1"}]}'
+        with mock.patch.object(media_probe.subprocess, "run",
+                               return_value=SimpleNamespace(stdout=payload)) as run:
+            result = media_probe.probe_file("ffprobe", "sample.mp4", timeout=3)
+        self.assertEqual(result, (12.5, 320, 240, "h264", 25.0, None))
+        options = run.call_args.kwargs
+        self.assertEqual(options["creationflags"],
+                         subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+        self.assertTrue(options["capture_output"])
+        self.assertEqual(options["timeout"], 3)
+
+
 class PushDiscoveryProbeTests(unittest.TestCase):
     def test_a_pushed_video_lands_with_its_duration(self):
         with tempfile.TemporaryDirectory() as tmp:

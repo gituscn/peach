@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import struct
 import subprocess
 import threading
@@ -151,7 +152,8 @@ def _display_order(ffprobe: Path, source: Path, decode_times: list[int]) -> list
         "-show_entries", "frame=pts", "-of", "csv=p=0", str(source),
     )
     try:
-        completed = subprocess.run(command, capture_output=True, timeout=PROBE_TIMEOUT_SECONDS)
+        completed = subprocess.run(command, capture_output=True, timeout=PROBE_TIMEOUT_SECONDS,
+                                   creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise RepairUnavailable(f"ffprobe 没跑完：{exc}") from exc
     if completed.returncode:

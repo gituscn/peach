@@ -1,6 +1,7 @@
 """独立包更新使用临时目录验证路径、进度、重启确认及回滚。"""
 import json
 import hashlib
+import os
 from contextlib import nullcontext
 from pathlib import Path
 import tempfile
@@ -9,7 +10,7 @@ import unittest
 from unittest.mock import Mock, patch
 import zipfile
 
-from peach import standalone_update as update
+from peach import settings_file, standalone_update as update
 
 
 class StandaloneUpdateTests(unittest.TestCase):
@@ -17,12 +18,54 @@ class StandaloneUpdateTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name).resolve()
-        self.state = self.root / "state"
+        self.config = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(self.root)})
+        self.load_config = settings_file.load_config
+        self.database = self.config.directory("database") / "ledger.db"
+        self.database.parent.mkdir()
+        self.state = self.config.directory("state")
         self.state.mkdir()
-        patcher = patch.object(update, "STATE_DIR", self.state)
+        patcher = patch.object(update.settings_file, "load_config", return_value=self.config)
         patcher.start(); self.addCleanup(patcher.stop)
-        patcher = patch.object(update, "DATABASE_PATH", self.root / "ledger.db")
-        patcher.start(); self.addCleanup(patcher.stop)
+
+    def test_online_install_remembers_a_known_root_only_for_an_empty_default_location(self):
+        settings_file.write(self.config)
+        config = self.load_config(environ={"PEACH_DATA_ROOT": str(self.root)})
+        target = self.root / "app"
+        bootstrap = self.root / "default-data"
+        with patch.object(update.distribution, "standalone", return_value=True), patch.object(
+                update.distribution, "user_data_root", return_value=bootstrap), patch.object(
+                update.settings_file, "load_config", side_effect=self.load_config), patch.dict(
+                os.environ, {"PEACH_DATA_ROOT": str(self.root)}), patch.object(
+                update.sys, "executable", str(target / "Peach.exe")):
+            update.write({"target": str(target), "version": update.__version__}, state="ready")
+            self.assertFalse(update.remember_installation_data_root(config))
+            update.write({"target": str(self.root / "other-app"), "version": update.__version__}, state="installing")
+            self.assertFalse(update.remember_installation_data_root(config))
+            update.write({"target": str(target), "version": update.__version__}, state="installing")
+            self.assertTrue(update.remember_installation_data_root(config))
+            self.assertEqual(self.load_config(environ={"PEACH_DATA_ROOT": str(bootstrap)}).data_root, self.root)
+            self.assertFalse(update.remember_installation_data_root(config))
+            (bootstrap / "state/data-root.txt").unlink()
+            settings = bootstrap / "config.toml"
+            settings.write_text("[server]\nport = 9123\n", encoding="utf-8")
+            self.assertFalse(update.remember_installation_data_root(config))
+            self.assertEqual(settings.read_text(encoding="utf-8"), "[server]\nport = 9123\n")
+
+    @unittest.skipUnless(os.name == "nt", "Windows 更新助手")
+    def test_tray_reads_update_intent_from_the_selected_data_root_and_passes_it_to_helper(self):
+        import threading
+        from types import SimpleNamespace
+        from dataclasses import replace
+        selected = replace(self.config, data_root=self.root / "selected")
+        tray = SimpleNamespace(_action_lock=threading.Lock(), exit=Mock())
+        with patch.object(update.settings_file, "load_config", return_value=selected), patch.object(
+                update.distribution, "standalone", return_value=True), patch.object(update.subprocess, "Popen") as launch:
+            update.write({"helper": str(self.root / "helper")}, state="restarting")
+            update.poll(tray)
+            self.assertEqual(launch.call_args.args[0][2], str(selected.directory("state") / "standalone-update.json"))
+            self.assertEqual(launch.call_args.kwargs["env"]["PEACH_DATA_ROOT"], str(selected.data_root))
+            tray.exit.assert_called_once_with(reason="standalone-update")
+        self.assertEqual(update.read()["state"], "idle")
 
     def archive(self, names):
         archive = self.root / "package.zip"
@@ -116,12 +159,12 @@ class StandaloneUpdateTests(unittest.TestCase):
         self.assertTrue(self.state.is_dir())
 
     def test_migration_failure_can_restore_the_sqlite_backup(self):
-        with update.closing(sqlite3.connect(update.DATABASE_PATH)) as connection, connection:
+        with update.closing(sqlite3.connect(self.database)) as connection, connection:
             connection.execute("CREATE TABLE fixture(value TEXT)")
             connection.execute("INSERT INTO fixture VALUES ('original')")
         data = {"id":"migration-fixture"}
         def failed_migration(*args, **kwargs):
-            with update.closing(sqlite3.connect(update.DATABASE_PATH)) as connection, connection:
+            with update.closing(sqlite3.connect(self.database)) as connection, connection:
                 connection.execute("UPDATE fixture SET value='changed'")
             return Mock(returncode=1)
         with patch("peach.migrations.plan",return_value=([],[object()])), patch.object(
@@ -129,5 +172,5 @@ class StandaloneUpdateTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 update.migrate_database(self.root,data)
         update.restore_database(data)
-        with update.closing(sqlite3.connect(update.DATABASE_PATH)) as connection:
+        with update.closing(sqlite3.connect(self.database)) as connection:
             self.assertEqual(connection.execute("SELECT value FROM fixture").fetchone()[0],"original")
