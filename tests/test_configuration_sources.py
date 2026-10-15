@@ -1,5 +1,6 @@
 """CloudDrive 表单、来源映射与离线状态的隔离回归。"""
 from dataclasses import replace
+import ntpath
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,6 +10,25 @@ from peach import media_configuration as media_config, onboarding, settings_file
 
 
 class MediaConfigurationTests(unittest.TestCase):
+    def test_setup_local_source_accepts_a_mapped_nas_drive(self):
+        from peach.routes_pages import _read_answers
+
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory).resolve()
+            config = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(base)})
+            mapped = r"Z:\CloudDrive2\115open\云下载"
+            submitted = {"data_root": str(base), "media_dir": [mapped],
+                         "media_location": ["local"], "host": "1"}
+            windows_abspath = ntpath.abspath
+            with patch.object(Path, "is_dir", return_value=True), \
+                    patch.object(Path, "resolve", return_value=Path(r"\\NAS\媒体库")), \
+                    patch("peach.onboarding.os.path.abspath", side_effect=windows_abspath):
+                answers, errors = _read_answers(config, submitted, windows=True)
+            self.assertEqual(errors, {})
+            prepared = onboarding.configure(config, answers, windows=True)
+            self.assertEqual(prepared.locations, {"local": (mapped,)})
+            self.assertEqual(prepared.mounts, {})
+
     def test_runtime_facts_name_the_operating_system_and_settings_file(self):
         from peach import web_entry
         with tempfile.TemporaryDirectory() as directory:
