@@ -1,7 +1,7 @@
 """本机配置的 JSON 契约：读取、校验、原子保存与托盘重启请求。
 
 页面整个是 `frontend/src/react/settings/` 下的 React 子树（入口 `configuration-page.tsx`），
-挂在主站的 `/configuration` 路由里（ADR-0031）；这里只回数据。两道门都在服务端：只放行本机连接，只在托盘管理的服务里可写。
+挂在主站的 `/configuration` 路由里（ADR-0031）；这里只回数据。桌面由托盘管理，无桌面服务由专用入口管理；调用方范围与配置写入都在服务端校验。
 手机上的管理菜单不列这一页，靠的是 `/healthz` 的 `configurable`，但那只是入口的显隐，
 拒绝写入的判定在这里。
 """
@@ -36,8 +36,9 @@ FILE_MANAGED_NOTICE = "这个部署由配置文件管理服务；在本机编辑
 
 
 def managed_configuration() -> bool:
-    """托盘负责消费配置保存后的重载标记。"""
-    return distribution.standalone() or os.environ.get("PEACH_TRAY_MANAGED") == "1"
+    """托盘或无桌面入口负责消费配置保存后的重载标记。"""
+    return (distribution.standalone() or os.environ.get("PEACH_TRAY_MANAGED") == "1"
+            or os.environ.get("PEACH_HEADLESS_MANAGED") == "1")
 
 
 def dev_environment() -> bool:
@@ -78,6 +79,13 @@ def local_client(request: Request) -> bool:
             peer = ipaddress.ip_address(request.client.host)
         except ValueError:
             return False
+    if os.environ.get("PEACH_HEADLESS_MANAGED") == "1":
+        if any(header.startswith("x-forwarded-") or header in {"forwarded", "cf-connecting-ip"}
+               for header in request.headers):
+            return False
+        return peer.is_loopback or (peer.is_private and not any((
+            peer.is_link_local, peer.is_reserved, peer.is_unspecified, peer.is_multicast,
+        )))
     if not peer.is_loopback and (peer != bound or peer.is_unspecified):
         return False
     if managed_configuration():

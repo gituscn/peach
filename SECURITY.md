@@ -6,6 +6,8 @@ Peach is a single-user, self-hosted application: one deployment serves one perso
 
 Peach 是单人自托管应用：一个部署只服务一个人，没有账号体系、没有权限分级，也没有多租户隔离。
 
+Linux 无桌面部署的配置管理接受经过鉴权的回环与私有网络连接，拒绝公网、链路本地、保留地址和携带转发头的管理请求。地址分类使用 Python 标准库。容器端口默认发布到宿主机回环，部署方式见 [Docker 部署](docs/DOCKER.md)。
+
 能打开 Peach 的人，就能看到整个馆藏，也能做任何修改。Peach 只防一件事：同一局域网里的其他设备被无意放进来。多人共用和云端托管不在考虑范围内。
 
 ## 访问密码

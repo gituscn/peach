@@ -129,6 +129,10 @@ LAN access, access passwords, updates and uninstalling are covered in [Operation
 
 Open System diagnostics under Peach configuration → Application and maintenance to view library health lists, source parsing and cooldowns. `peach doctor` provides the same report; `--json` returns redacted JSON. See [Local diagnostics](docs/OPERATIONS.md#本机诊断) for status and actions.
 
+### Docker (VPS / NAS)
+
+The headless Linux image runs alongside CloudDrive2, with separate mounts for media and application data. See [Docker deployment](docs/DOCKER.md) for setup, access boundaries and validation status.
+
 ## FAQ
 
 - **Will it change my files?**

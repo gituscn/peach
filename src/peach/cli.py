@@ -90,7 +90,7 @@ def _serve(args: argparse.Namespace) -> int:
     # 有人重启这条引导服务，读到新口令的它会把还没看到口令的用户关在门外。
     # 安全边界由绑定地址给：这条服务只监听回环（`build_setup_service_specs`）。
     tunnel_lan_address = None
-    if not distribution.standalone() and not _is_loopback(args.host):
+    if not distribution.standalone() and not _is_loopback(args.host) and (publish_mdns or TUNNEL_ENABLED):
         from .mdns import lan_ipv4
         tunnel_lan_address = args.mdns_address or lan_ipv4()
     settings = PeachSettings(
