@@ -12,6 +12,11 @@
 .reviewsection{margin-bottom:20px}
 .reviewlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;align-items:start}
 .reviewbulkbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+/* 活动页骨架的分区与卡内那一列；窄列与列表在 frontend/src/board-skeleton.css，
+   卡片框体沿用 `.cleanupfieldset`。 */
+.activitysection{display:grid;gap:12px;min-width:0}
+.activitysection .geist-fieldset-title{margin:0}
+.activity-run>.geist-fieldset-content{display:grid;gap:6px}
 .cleanupgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
 /* Geist Fieldset：全框只有一条线，在底部操作条上方。标题是正文区的第一行，
    底下不划线（证据：vercel.com/geist/fieldset 的 Multiple Fieldsets 示例）。

@@ -84,6 +84,7 @@ interface Plan {
   check?: CheckJob[] | (() => CheckJob | Promise<CheckJob>);
   /** 查找任务此刻的快照，每次现问：用例在点「查找」之前把它推到想要的那一步。 */
   resolve?: () => ResolveJob | Promise<ResolveJob>;
+  resolveStart?: () => ReturnType<typeof ok> | ReturnType<typeof refuse>;
   /** 敲字建议。回一个不落地的 Promise 就能停在「正在查找建议」那一刻。 */
   suggest?: (q: string) => SuggestData | Promise<SuggestData>;
   /** 登记一条来源。回 `refuse(...)` 就是这一条被服务端挡回来。 */
@@ -122,7 +123,7 @@ function serve(plan: Plan = {}) {
       return ok({ ok: true, source: 9 });
     }
     if (url === FOLLOW_RESOLVE_URL) {
-      if (init?.method) return ok({ status: 'running' });
+      if (init?.method) return plan.resolveStart ? plan.resolveStart() : ok({ status: 'running' });
       return ok(plan.resolve ? await plan.resolve() : IDLE);
     }
     if (url.startsWith(`${FOLLOW_SUGGEST_URL}?`)) {
@@ -1116,6 +1117,32 @@ it('一趟查找没跑完时不起第二趟，按钮进忙态', async () => {
   expect(lookups(fetcher)).toHaveLength(1);
 });
 
+it('查找启动失败保留输入，回车可直接重试', async () => {
+  const { host, fetcher } = await open({ resolveStart: () => refuse('来源暂时不可用') }, { tab: 'add' });
+  await lookUp(host, 'kou');
+  expect(host.textContent).toContain('来源暂时不可用');
+  expect(lookupField(host).value).toBe('kou');
+  await press(lookupField(host), 'Enter');
+  await settle();
+  expect(lookups(fetcher)).toHaveLength(2);
+});
+
+it('后台查找失败保留输入和原因，回车可直接重试', async () => {
+  vi.useFakeTimers();
+  const job = lookupJob();
+  const { host, fetcher } = await open({ resolve: job.resolve }, { tab: 'add' });
+  job.set(RUNNING);
+  await lookUp(host, 'kou');
+  job.set({ status: 'failed', error: '来源连接中断' } as ResolveJob);
+  await tick(JOB_RUNNING_POLL_MS);
+  await settle();
+  expect(host.textContent).toContain('来源连接中断');
+  expect(lookupField(host).value).toBe('kou');
+  await press(lookupField(host), 'Enter');
+  await settle();
+  expect(lookups(fetcher)).toHaveLength(2);
+});
+
 it('等待时说的话跟着这一趟查的是名字还是链接走', async () => {
   const hint = async (text: string) => {
     const job = lookupJob();
@@ -1334,6 +1361,28 @@ it('输入法选字时的回车归输入法，不拿半截拼音去查', async (
   });
   await settle();
   expect(lookups(fetcher)).toEqual([]);
+});
+
+it('中文和日文合成期间不请求建议或查找，定字后只请求完整词', async () => {
+  vi.useFakeTimers();
+  const { host, fetcher } = await open({}, { tab: 'add' });
+  const input = lookupField(host);
+  await focus(input);
+  for (const [draft, word] of [['chuangzuozhe', '创作者'], ['さくら', '桜']]) {
+    await act(async () => { input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })) });
+    await type(input, draft!);
+    await tick(SUGGEST_DEBOUNCE_MS);
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 229, bubbles: true, cancelable: true }));
+    });
+    expect(lookups(fetcher)).toEqual([]);
+    expect(suggestCalls(fetcher).some(url => new URL(url, 'http://peach.test').searchParams.get('q') === draft)).toBe(false);
+    await type(input, word!);
+    await act(async () => { input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: word })) });
+    await tick(SUGGEST_DEBOUNCE_MS);
+    await settle();
+  }
+  expect(suggestCalls(fetcher).map(url => new URL(url, 'http://peach.test').searchParams.get('q'))).toEqual(['创作者', '桜']);
 });
 
 it('站点还没回话时下拉里是一行等待，回车查的是框里敲的字', async () => {
