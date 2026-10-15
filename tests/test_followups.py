@@ -1378,10 +1378,11 @@ class ProcessLibraryTests(LedgerTestCase):
     def test_a_scrape_declares_dispatches_and_runs_its_avatar_followups(self):
         _media, config = self.sample()
         self.seed()
-        result = process_library(config, self.db, self.root / 'generated',
-                                 self.root / 'covers',
-                                 provider_factory=mock.Mock(return_value=self.provider()),
-                                 database=self.database)
+        with mock.patch('peach.library_processing._generate_previews', return_value=0):
+            result = process_library(config, self.db, self.root / 'generated',
+                                     self.root / 'covers',
+                                     provider_factory=mock.Mock(return_value=self.provider()),
+                                     database=self.database)
         self.assertEqual(result['status'], 'complete')
         with self.database.read_connection() as connection:
             entity_id = connection.execute(
