@@ -103,7 +103,7 @@ TIMING_SENSITIVE_SUITES = frozenset({
 def e2e_concurrency(override: str = "") -> int:
     """浏览器用例文件的并发数：`PEACH_E2E_CONCURRENCY` 优先，CI 为 1，本机按 CPU 数推导、上限 4。
 
-    每个文件起一个 Chrome，只给一个渲染进程（`e2e/harness.ts`），一路并发约占四个逻辑核；
+    每个文件启动独立的 Chrome，使用 Playwright 的默认浏览器参数；
     上限 4 与 vitest 的 `maxWorkers` 同一份进程预算。
     """
     if override:

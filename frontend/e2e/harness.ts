@@ -46,8 +46,6 @@ export async function launch(): Promise<Browser> {
   return chromium.launch({
     headless: true,
     executablePath: requiredEnv('PEACH_E2E_CHROME'),
-    // 串行页面共用一个渲染进程，GPU 与音频服务留在浏览器进程内。
-    args: ['--renderer-process-limit=1', '--in-process-gpu', '--disable-features=AudioServiceOutOfProcess', '--disable-audio-output'],
     timeout: 30_000,
   });
 }
@@ -89,13 +87,14 @@ export async function settle(page: Page, scope = 'body'): Promise<void> {
 /** 等目标页面自己的主体出现：每个定位器都要可见，之后才轮到 `settle`。
  * 等不到就带上此刻 `#main` 的无障碍树失败：CI 上只有这段输出，看得出停在骨架、
  * 空态换了文案还是整块没画。 */
-export async function expectBody(page: Page, where: string, body: readonly Locator[]): Promise<void> {
+export async function expectBody(page: Page, where: string, body: readonly Locator[], problems: readonly string[] = []): Promise<void> {
   for (const locator of body) {
     try {
       await locator.waitFor({ state: 'visible', timeout: 15_000 });
     } catch (error) {
       const snapshot = await page.locator('#main').ariaSnapshot({ timeout: 5_000 }).catch(() => '未取得');
       assert.fail(`${where}：页面主体没有出现，等不到 ${locator}\n${(error as Error).message}\n`
+        + `页面：${page.url()}；已关闭：${page.isClosed()}；运行期问题：${JSON.stringify(problems)}\n`
         + `#main 当时的无障碍树：\n${snapshot.slice(0, 3000)}`);
     }
   }
@@ -109,7 +108,8 @@ export function configurationBody(page: Page): Locator[] {
   ];
 }
 
-export async function visit(browser: Browser, path: string, viewport: Viewport): Promise<Visit> {
+export async function visit(browser: Browser, path: string, viewport: Viewport,
+  prepare?: (page: Page) => Promise<void>): Promise<Visit> {
   const origin = requiredEnv('PEACH_E2E_ORIGIN');
   const context: BrowserContext = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
@@ -140,6 +140,7 @@ export async function visit(browser: Browser, path: string, viewport: Viewport):
   });
   // 只打开到 load：等哪块主体、何时 settle 由用例决定，见 `settle` 的说明。
   try {
+    await prepare?.(page);
     await page.goto(origin + path, { waitUntil: 'load' });
   } catch (error) {
     await context.close();
