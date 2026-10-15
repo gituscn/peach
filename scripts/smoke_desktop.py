@@ -2,28 +2,198 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+import ctypes
+from ctypes import wintypes
 import json
 import http.cookiejar
 import os
 from pathlib import Path
+import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import time
+import traceback
 import urllib.error
 import urllib.request
 import urllib.parse
+import uuid
 
 
-def wait_health(opener, base: str, process: subprocess.Popen, log_path: Path) -> dict:
+@contextmanager
+def smoke_directory(evidence_dir: Path):
+    """失败时只保留本次临时运行的日志，不打包账本与配置。"""
+    with tempfile.TemporaryDirectory(prefix="peach-desktop-") as directory:
+        root = Path(directory).resolve()
+        try:
+            yield root
+        except BaseException:
+            destination = evidence_dir / uuid.uuid4().hex
+            destination.mkdir(parents=True)
+            for path in root.rglob("*.log"):
+                target = destination / path.relative_to(root)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, target)
+            (destination / "failure.txt").write_text(traceback.format_exc(), encoding="utf-8")
+            print(f"制品验收失败，日志：{destination}", file=sys.stderr, flush=True)
+            raise
+
+
+def artifact_processes(executable: Path) -> list[int]:
+    """仅核对本次制品的精确映像路径，包含脱离启动器的托盘与监视器。"""
+    powershell = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    environment = dict(os.environ, PEACH_SMOKE_EXECUTABLE=str(executable))
+    result = subprocess.run([str(powershell), "-NoProfile", "-NonInteractive", "-Command",
+        "@(Get-Process | Where-Object { $_.Path -eq $env:PEACH_SMOKE_EXECUTABLE } | "
+        "ForEach-Object { $_.Id }) | ConvertTo-Json -Compress"],
+        env=environment, capture_output=True, text=True, encoding="utf-8", timeout=15, check=True)
+    value = json.loads(result.stdout.strip() or "[]")
+    return value if isinstance(value, list) else [value]
+
+
+def tray_window_ready(process_ids: list[int]) -> bool:
+    """验到 pystray 的真实 Windows 消息窗口，且消息循环可以应答。"""
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    user32.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
+    user32.EnumWindows.restype = wintypes.BOOL
+    user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    user32.SendMessageTimeoutW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM,
+        wintypes.LPARAM, wintypes.UINT, wintypes.UINT, ctypes.POINTER(ctypes.c_size_t)]
+    user32.SendMessageTimeoutW.restype = ctypes.c_ssize_t
+    found = []
+
+    @callback_type
+    def visit(window, _extra):
+        process_id = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(window, ctypes.byref(process_id))
+        if process_id.value in process_ids:
+            name = ctypes.create_unicode_buffer(512)
+            user32.GetClassNameW(window, name, len(name))
+            if name.value.startswith("Peach") and name.value.endswith("SystemTrayIcon"):
+                result = ctypes.c_size_t()
+                if user32.SendMessageTimeoutW(window, 0, 0, 0, 2, 1000, ctypes.byref(result)):
+                    found.append(int(window))
+        return True
+
+    if not user32.EnumWindows(visit, 0):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return bool(found)
+
+
+def lifecycle_events(data: Path) -> list[dict]:
+    path = data / "logs/tray-lifecycle.log"
+    if not path.exists():
+        return []
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            pass  # 写入中的末行留给下一轮读取。
+    return rows
+
+
+def wait_for(check, description: str, *, timeout: float = 60):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        result = check()
+        if result:
+            return result
+        time.sleep(.25)
+    raise RuntimeError(f"等待超时：{description}")
+
+
+def smoke_environment(data: Path) -> dict[str, str]:
+    environment = dict(os.environ, PEACH_DATA_ROOT=str(data), PYTHONIOENCODING="utf-8")
+    environment.pop("PYTHONPATH", None)
+    environment["PATH"] = os.environ.get("SystemRoot", "/usr") + ("/System32" if os.name == "nt" else "/bin")
+    return environment
+
+
+def stop_tray(executable: Path, root: Path, environment: dict, log, launcher) -> None:
+    try:
+        stopped = subprocess.run([str(executable), "--installer-stop"], cwd=root,
+            env=environment, stdout=log, stderr=log, timeout=90)
+        assert stopped.returncode == 0, f"托盘退出失败：{stopped.returncode}"
+        launcher.wait(timeout=15)
+        wait_for(lambda: not artifact_processes(executable), "托盘、服务与监视器全部退出", timeout=20)
+    except BaseException:
+        # 正常退出契约失败也要回收本次实例；强制回收会保留失败结果和日志。
+        watchdogs = root / "data/state/tray-watchdogs"
+        for path in watchdogs.glob("*.json"):
+            path.with_suffix(".stop").write_text("smoke-cleanup", encoding="utf-8")
+        process_ids = artifact_processes(executable)
+        guards = {int(path.read_text(encoding="utf-8")) for path in watchdogs.glob("*.ready")}
+        taskkill = Path(os.environ["SystemRoot"]) / "System32/taskkill.exe"
+        for pid in sorted(process_ids, key=lambda pid: pid not in guards):
+            subprocess.run([str(taskkill), "/PID", str(pid), "/T", "/F"],
+                           stdout=log, stderr=log, timeout=15, check=False)
+        launcher.wait(timeout=15)
+        wait_for(lambda: not artifact_processes(executable), "失败实例全部退出", timeout=20)
+        raise
+
+
+def smoke_tray(executable: Path, evidence_dir: Path) -> None:
+    """真实首启托盘、完成设置、接管服务并通过安装器契约正常退出。"""
+    assert os.name == "nt", "托盘制品验收需要 Windows"
+    assert not artifact_processes(executable), "此制品已有进程运行，不能接管它"
+    with smoke_directory(evidence_dir) as root:
+        data, media = root / "data", root / "media"
+        media.mkdir()
+        # 全新数据根的默认端口必须空闲，避免把其他部署当作首启服务。
+        with socket.socket() as reservation:
+            reservation.bind(("127.0.0.1", 8900))
+        with socket.socket() as reservation:
+            reservation.bind(("127.0.0.1", 0))
+            port = reservation.getsockname()[1]
+        environment = smoke_environment(data)
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}),
+            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        with (root / "runtime.log").open("wb") as log:
+            launcher = subprocess.Popen([str(executable), "--silent"], cwd=root,
+                env=environment, stdout=log, stderr=log)
+            try:
+                def tray_started():
+                    rows = lifecycle_events(data)
+                    pids = [row["tray_pid"] for row in rows if row["event"] == "watchdog_ready"]
+                    return pids and tray_window_ready(pids)
+                wait_for(tray_started, "托盘窗口、消息循环与监视器就绪")
+                wait_health(opener, "http://127.0.0.1:8900", None, root / "runtime.log")
+                complete_first_run(opener, "http://127.0.0.1:8900", media, port,
+                                   "standalone-tray-smoke-password")
+                health = wait_health(opener, f"http://127.0.0.1:{port}", None, root / "runtime.log")
+                assert health["ok"]
+                assert (data / "database/ledger.db").is_file()
+                wait_for(lambda: not (data / "state/configuration-reload.request").exists(),
+                         "托盘消费设置重载请求")
+                assert_requires_login(opener, f"http://127.0.0.1:{port}")
+            finally:
+                stop_tray(executable, root, environment, log, launcher)
+            rows = lifecycle_events(data)
+            assert any(row["event"] == "stop_requested" and row.get("reason") == "external-stop"
+                       for row in rows), "未取得托盘正常退出意图"
+            assert any(row["event"] == "exited" and row.get("exit_code") == 0 for row in rows), "未取得托盘正常退出记录"
+            assert not any(row["event"] in {"unexpected_exit", "watchdog_error", "recovery_started"}
+                           for row in rows), "托盘发生异常退出或恢复"
+            assert not list((data / "state/tray-watchdogs").glob("*.json")), "监视器记录仍在"
+            assert not list((data / "state/tray-watchdogs").glob("*.ready")), "监视器握手仍在"
+            print(json.dumps({"ok": True, "checks": ["tray-first-run", "tray-window",
+                "tray-watchdog", "tray-service-handoff", "tray-graceful-stop", "tray-no-residue"]}))
+
+
+def wait_health(opener, base: str, process: subprocess.Popen | None, log_path: Path) -> dict:
     deadline = time.monotonic() + 40
     while True:
         try:
             with opener.open(base + "/healthz", timeout=1) as response:
                 return json.load(response)
         except (OSError, urllib.error.URLError):
-            if process.poll() is not None or time.monotonic() > deadline:
-                raise RuntimeError(log_path.read_text(errors="replace"))
+            if (process is not None and process.poll() is not None) or time.monotonic() > deadline:
+                raise RuntimeError(f"服务未就绪：{base}/healthz\n" + log_path.read_text(encoding="utf-8", errors="replace"))
             time.sleep(.25)
 
 
@@ -74,17 +244,17 @@ def complete_first_run(opener, base: str, media: Path, port: int, password: str)
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("executable", type=Path)
+    parser.add_argument("--evidence-dir", type=Path, default=Path("smoke-evidence"))
     args = parser.parse_args()
     executable = args.executable.resolve(strict=True)
-    with tempfile.TemporaryDirectory(prefix="peach-desktop-") as directory:
-        root = Path(directory).resolve()
+    evidence_dir = args.evidence_dir.resolve()
+    smoke_tray(executable, evidence_dir)
+    with smoke_directory(evidence_dir) as root:
         data = root / "data"
         media = root / "media"
         media.mkdir()
-        environment = dict(os.environ, PEACH_DATA_ROOT=str(data), PYTHONIOENCODING="utf-8")
-        environment.pop("PYTHONPATH", None)
         # 制品不得借助用户安装的 Python、Git、Node、FFmpeg 或 OpenSSL。
-        environment["PATH"] = os.environ.get("SystemRoot", "/usr") + ("/System32" if os.name == "nt" else "/bin")
+        environment = smoke_environment(data)
         with (root / "runtime.log").open("wb") as log:
             with socket.socket() as reservation:
                 reservation.bind(("127.0.0.1", 0))
