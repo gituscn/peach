@@ -1,9 +1,13 @@
 /* 创作者别名：同一个人在几个站上用几个名字，合并之后按一位创作者归组。
  *
  * 待合并是带依据的候选，合并永远由人点：服务端不自行升级，页面也不替他勾。 */
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { RiCloseLine, RiUserLine } from '@remixicon/react';
 import { useMutation } from '@tanstack/react-query';
+import {
+  createColumnHelper, flexRender, rowSelectionFeature, tableFeatures, useTable,
+  type RowSelectionState,
+} from '@tanstack/react-table';
 import { confirmModal } from '@peach/legacy/ui';
 
 import { Button } from '@/components/base/buttons/button';
@@ -26,6 +30,8 @@ import {
 import { AuthorAvatar } from './source-view';
 
 const REMOVE_BODY = (alias: string) => `将移除别名「${alias}」，对应来源恢复为独立创作者组。`;
+const suggestionFeatures = tableFeatures({ rowSelectionFeature });
+const savedFeatures = tableFeatures({});
 
 export interface AliasManagerProps {
   groups: AliasGroup[];
@@ -58,7 +64,7 @@ function AuthorIdentity({ sources, name, canonicalKey }: {
 }
 
 export function AliasManager({ groups, suggestions, sources = [], readOnly, toast }: AliasManagerProps) {
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set<string>());
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [problem, setProblem] = useState('');
   const [canonical, setCanonical] = useState('');
   const [alias, setAlias] = useState('');
@@ -82,7 +88,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
     },
     onSuccess: (result) => {
       setProblem('');
-      setSelected(new Set());
+      setRowSelection({});
       void reloadFollowManage();
       toast(`已合并 ${result.done} 组创作者别名`);
     },
@@ -118,8 +124,97 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
     });
   };
 
-  const chosen = suggestions.filter((item) => selected.has(suggestionKey(item)));
-  const allChosen = suggestions.length > 0 && chosen.length === suggestions.length;
+  const removeSome = (name: string) => void confirmModal({
+    title: '移除创作者别名', body: REMOVE_BODY(name),
+    confirmLabel: '移除创作者别名',
+    onConfirm: () => drop.mutateAsync(name),
+  });
+  const handlers = useRef({ sources, readOnly, merging: merge.isPending,
+    removing: drop.isPending, merge: mergeSome, remove: removeSome });
+  handlers.current = { sources, readOnly, merging: merge.isPending,
+    removing: drop.isPending, merge: mergeSome, remove: removeSome };
+
+  const suggestionColumns = useMemo(() => {
+    const column = createColumnHelper<typeof suggestionFeatures, AliasSuggestion>();
+    return column.columns([
+      column.display({
+        id: 'select',
+        header: (context) => (
+          <Checkbox slot={null} isSelected={context.table.getIsAllRowsSelected()}
+            isIndeterminate={context.table.getSelectedRowModel().rows.length > 0 && !context.table.getIsAllRowsSelected()}
+            aria-label="全选待合并别名"
+            onChange={(on) => context.table.toggleAllRowsSelected(on)} />
+        ),
+        cell: (context) => (
+          <Checkbox slot={null} isSelected={context.row.getIsSelected()}
+            aria-label={`选择别名 ${context.row.original.alias}，归入 ${context.row.original.canonical}`}
+            onChange={(on) => context.row.toggleSelected(on)} />
+        ),
+      }),
+      column.accessor('canonical', {
+        header: '规范创作者',
+        cell: (context) => <AuthorIdentity sources={handlers.current.sources} name={context.getValue()} />,
+      }),
+      column.accessor('alias', { header: '平台别名', cell: (context) => context.getValue() }),
+      column.accessor('evidence', {
+        header: '依据',
+        cell: (context) => <span className="text-body-2-regular text-text-secondary">{context.getValue()}</span>,
+      }),
+      column.display({
+        id: 'actions', header: '操作',
+        cell: (context) => (
+          <Button variant="secondary" size="small" disabled={handlers.current.readOnly}
+            {...busyProps(handlers.current.merging)}
+            onClick={() => handlers.current.merge([context.row.original], false)}>合并</Button>
+        ),
+      }),
+    ]);
+  }, []);
+  const savedColumns = useMemo(() => {
+    const column = createColumnHelper<typeof savedFeatures, AliasGroup>();
+    return column.columns([
+      column.accessor('canonical_name', {
+        id: 'canonical', header: '规范创作者',
+        cell: (context) => (
+          <AuthorIdentity sources={handlers.current.sources} name={context.getValue()}
+            canonicalKey={context.row.original.canonical_key} />
+        ),
+      }),
+      column.accessor('aliases', {
+        header: '平台别名',
+        cell: (context) => (
+          <span className="flex flex-wrap items-center gap-1.5">
+            {context.getValue().map((item) => (
+              <span key={item.key}
+                className="inline-flex items-center gap-1 rounded-md bg-background-secondary-default px-1.5 py-1 text-caption-1-medium text-text-secondary">
+                {item.name}
+                <Button variant="ghost" size="xs" iconOnly leadingIcon={RiCloseLine}
+                  aria-label={`移除别名 ${item.name}`} disabled={handlers.current.readOnly}
+                  {...busyProps(handlers.current.removing)}
+                  onClick={() => handlers.current.remove(item.name)} />
+              </span>
+            ))}
+          </span>
+        ),
+      }),
+    ]);
+  }, []);
+  const suggestionTable = useTable({
+    features: suggestionFeatures,
+    data: suggestions,
+    columns: suggestionColumns,
+    getRowId: suggestionKey,
+    state: { rowSelection },
+    onRowSelectionChange: setRowSelection,
+    enableRowSelection: true,
+  });
+  const savedTable = useTable({
+    features: savedFeatures,
+    data: groups,
+    columns: savedColumns,
+    getRowId: (group) => group.canonical_key,
+  });
+  const chosen = suggestionTable.getSelectedRowModel().rows.map((row) => row.original);
   const busy = busyProps(merge.isPending);
 
   return (
@@ -158,49 +253,20 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
           <DataTableFrame>
             <Table aria-label="待合并创作者别名" size="sm">
             <TableHeader>
-              <TableColumn id="select">
-                {/* `slot={null}`：表格自带一个叫 selection 的插槽，摆进去的勾不声明归属就
-                    会被它拦下报错。合并范围是这一屏自己的状态，不走 Table 的行选择。 */}
-                <Checkbox slot={null} isSelected={allChosen} isIndeterminate={chosen.length > 0 && !allChosen}
-                  aria-label="全选待合并别名"
-                  onChange={(on) => setSelected(on
-                    ? new Set(suggestions.map(suggestionKey))
-                    : new Set<string>())} />
-              </TableColumn>
-              <TableColumn id="canonical">规范创作者</TableColumn>
-              <TableColumn id="alias" isRowHeader>平台别名</TableColumn>
-              <TableColumn id="evidence">依据</TableColumn>
-              <TableColumn id="actions">操作</TableColumn>
+              {suggestionTable.getHeaderGroups()[0]!.headers.map((header) => (
+                <TableColumn key={header.id} id={header.id} isRowHeader={header.column.id === 'alias'}>
+                  {flexRender(header.column.columnDef.header, header.getContext())}
+                </TableColumn>
+              ))}
             </TableHeader>
             <TableBody>
-              {suggestions.map((item) => {
-                const key = suggestionKey(item);
-                return (
-                  <TableRow key={key} id={key}
-                    data-board-selected={selected.has(key) || undefined}>
-                    <TableCell>
-                      <Checkbox slot={null} isSelected={selected.has(key)}
-                        aria-label={`选择别名 ${item.alias}，归入 ${item.canonical}`}
-                        onChange={(on) => {
-                          const next = new Set(selected);
-                          if (on) next.add(key); else next.delete(key);
-                          setSelected(next);
-                        }} />
-                    </TableCell>
-                    <TableCell>
-                      <AuthorIdentity sources={sources} name={item.canonical} />
-                    </TableCell>
-                    <TableCell>{item.alias}</TableCell>
-                    <TableCell>
-                      <span className="text-body-2-regular text-text-secondary">{item.evidence}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="secondary" size="small" disabled={readOnly} {...busy}
-                        onClick={() => mergeSome([item], false)}>合并</Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {suggestionTable.getRowModel().rows.map((row) => (
+                <TableRow key={row.id} id={row.id} data-board-selected={row.getIsSelected() || undefined}>
+                  {row.getAllCells().map((cell) => (
+                    <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                  ))}
+                </TableRow>
+              ))}
             </TableBody>
             </Table>
           </DataTableFrame>
@@ -216,34 +282,18 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
           <DataTableFrame>
             <Table aria-label="已保存创作者别名" size="sm">
             <TableHeader>
-              <TableColumn id="canonical" isRowHeader>规范创作者</TableColumn>
-              <TableColumn id="aliases">平台别名</TableColumn>
+              {savedTable.getHeaderGroups()[0]!.headers.map((header) => (
+                <TableColumn key={header.id} id={header.id} isRowHeader={header.column.id === 'canonical'}>
+                  {flexRender(header.column.columnDef.header, header.getContext())}
+                </TableColumn>
+              ))}
             </TableHeader>
             <TableBody>
-              {groups.map((group) => (
-                <TableRow key={group.canonical_key} id={group.canonical_key}>
-                  <TableCell>
-                    <AuthorIdentity sources={sources} name={group.canonical_name}
-                      canonicalKey={group.canonical_key} />
-                  </TableCell>
-                  <TableCell>
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      {group.aliases.map((item) => (
-                        <span key={item.key}
-                          className="inline-flex items-center gap-1 rounded-md bg-background-secondary-default px-1.5 py-1 text-caption-1-medium text-text-secondary">
-                          {item.name}
-                          <Button variant="ghost" size="xs" iconOnly leadingIcon={RiCloseLine}
-                            aria-label={`移除别名 ${item.name}`} disabled={readOnly}
-                            {...busyProps(drop.isPending)}
-                            onClick={() => void confirmModal({
-                              title: '移除创作者别名', body: REMOVE_BODY(item.name),
-                              confirmLabel: '移除创作者别名',
-                              onConfirm: () => drop.mutateAsync(item.name),
-                            })} />
-                        </span>
-                      ))}
-                    </span>
-                  </TableCell>
+              {savedTable.getRowModel().rows.map((row) => (
+                <TableRow key={row.id} id={row.id}>
+                  {row.getAllCells().map((cell) => (
+                    <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                  ))}
                 </TableRow>
               ))}
             </TableBody>
