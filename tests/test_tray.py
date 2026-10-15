@@ -641,34 +641,48 @@ class LogRetentionAtStartupTests(unittest.TestCase):
         """子进程以追加方式握着 `tray-*.log` 的句柄；先起服务再改名，Windows 上改名会失败，
         POSIX 上则是段文件继续被写。所以整理必须排在 ServiceManager 之前，且失败只记警告。"""
         from peach import tray, settings_file
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory).resolve()
-            config = settings_file.PeachConfig(root, root / "config.toml")
-            events = []
-            def sweep(_):
-                events.append("sweep")
-                raise OSError("log busy")
-            def manager(*args, **kwargs):
-                events.append("manager")
-                return mock.Mock()
-            icon = mock.Mock()
-            icon.run.side_effect = lambda: events.append("run")
-            with mock.patch.object(tray, "handoff_tray", return_value=False), \
-                    mock.patch.object(tray.settings_file, "load_config", return_value=config), \
-                    mock.patch.object(tray.error_reporting, "install"), \
-                    mock.patch.object(tray, "SingleInstance") as instance, \
-                    mock.patch.object(tray, "Lifecycle"), \
-                    mock.patch.object(tray.log_retention, "sweep", side_effect=sweep), \
-                    mock.patch.object(tray, "log_to_file"), \
-                    mock.patch.object(tray, "build_setup_service_specs", return_value=()), \
-                    mock.patch.object(tray, "ServiceManager", side_effect=manager), \
-                    mock.patch.object(tray, "PeachTray", return_value=icon), \
-                    mock.patch.object(tray, "tray_preparation"), \
-                    mock.patch.object(tray, "show_message"), \
-                    self.assertLogs(level="WARNING"):
-                instance.return_value.is_running.return_value = False
-                self.assertEqual(tray_main(["--silent"]), 0)
-            self.assertEqual(events, ["sweep", "manager", "run"])
+        for platform in ("win32", "darwin", "linux"):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as directory:
+                self.check_log_sweep(Path(directory).resolve(), platform, tray, settings_file)
+
+    def check_log_sweep(self, root, platform, tray, settings_file):
+        config = settings_file.PeachConfig(root, root / "config.toml")
+        events = []
+        def sweep(_):
+            events.append("sweep")
+            raise OSError("log busy")
+        def manager(*args, **kwargs):
+            events.append("manager")
+            return mock.Mock()
+        icon = mock.Mock()
+        icon.run.side_effect = lambda: events.append("run")
+        with mock.patch.object(tray.sys, "platform", platform), \
+                mock.patch.object(tray, "run_macos_menu_bar", side_effect=lambda *args, **kwargs: events.append("run")) as macos_menu, \
+                mock.patch.object(tray, "handoff_tray", return_value=False), \
+                mock.patch.object(tray.settings_file, "load_config", return_value=config), \
+                mock.patch.object(tray.error_reporting, "install"), \
+                mock.patch.object(tray, "SingleInstance") as instance, \
+                mock.patch.object(tray, "Lifecycle"), \
+                mock.patch.object(tray.log_retention, "sweep", side_effect=sweep), \
+                mock.patch.object(tray, "log_to_file"), \
+                mock.patch.object(tray, "build_setup_service_specs", return_value=()), \
+                mock.patch.object(tray, "ServiceManager", side_effect=manager), \
+                mock.patch.object(tray, "PeachTray", return_value=icon) as windows_tray, \
+                mock.patch.object(tray, "tray_preparation"), \
+                mock.patch.object(tray, "show_message"), \
+                self.assertLogs(level="WARNING"):
+            instance.return_value.is_running.return_value = False
+            self.assertEqual(tray_main(["--silent"]), 0)
+            instance.return_value.close.assert_called_once_with()
+        self.assertEqual(events, ["sweep", "manager", "run"])
+        if platform == "darwin":
+            macos_menu.assert_called_once()
+            windows_tray.assert_not_called()
+            icon.run.assert_not_called()
+        else:
+            macos_menu.assert_not_called()
+            windows_tray.assert_called_once()
+            icon.run.assert_called_once_with()
 
 
 class SourceSyncTests(unittest.TestCase):
