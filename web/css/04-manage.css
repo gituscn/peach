@@ -15,7 +15,7 @@
 /* 活动页骨架的分区与卡内那一列；窄列与列表在 frontend/src/board-skeleton.css，
    卡片框体沿用 `.cleanupfieldset`。 */
 .activitysection{display:grid;gap:12px;min-width:0}
-.activitysection .geist-fieldset-title{margin:0}
+.activitysection .geist-fieldset-title{margin:0;font:var(--board-heading);font-family:var(--font-sans);letter-spacing:0}
 .activity-run>.geist-fieldset-content{display:grid;gap:6px}
 .cleanupgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
 /* Geist Fieldset：全框只有一条线，在底部操作条上方。标题是正文区的第一行，

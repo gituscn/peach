@@ -21,7 +21,9 @@ import {
 import { errorMessage } from '../../api';
 import { cardClass } from '../components/card';
 import { DataTableFrame } from '../components/data-table-frame';
-import { DataTableFooter } from '../components/data-table';
+import { DataTableFooter, DataTableSort } from '../components/table-controls';
+import { SelectionDock } from '../components/selection-dock';
+import { useTableSelection } from '../components/use-table-selection';
 import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 import { EmptyState } from '../components/empty-state';
 import { ErrorText, FieldLabel } from '../settings/section';
@@ -70,10 +72,12 @@ function AuthorIdentity({ sources, name, canonicalKey }: {
 export function AliasManager({ groups, suggestions, sources = [], readOnly, toast }: AliasManagerProps) {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [savedSelection, setSavedSelection] = useState<RowSelectionState>({});
+  const activateSuggestion = useTableSelection(() => setRowSelection({}));
+  const activateSaved = useTableSelection(() => setSavedSelection({}));
   const [sorting, setSorting] = useState<SortingState>([]);
   const [savedSorting, setSavedSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
-  const [savedPagination, setSavedPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
+  const [savedPagination, setSavedPagination] = useState({ pageIndex: 0, pageSize: 20 });
   const suggestionPage = { ...pagination, pageIndex: Math.min(pagination.pageIndex, Math.max(0, Math.ceil(suggestions.length / pagination.pageSize) - 1)) };
   const savedPage = { ...savedPagination, pageIndex: Math.min(savedPagination.pageIndex, Math.max(0, Math.ceil(groups.length / savedPagination.pageSize) - 1)) };
   const [problem, setProblem] = useState('');
@@ -232,7 +236,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
     columns: suggestionColumns,
     getRowId: suggestionKey,
     state: { rowSelection, sorting, pagination: suggestionPage },
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: (next) => { activateSuggestion(); setRowSelection(next); },
     onSortingChange: (next) => { setSorting(next); setPagination((now) => ({ ...now, pageIndex: 0 })); },
     onPaginationChange: setPagination,
     enableRowSelection: true,
@@ -243,7 +247,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
     columns: savedColumns,
     getRowId: (group) => group.canonical_key,
     state: { rowSelection: savedSelection, sorting: savedSorting, pagination: savedPage },
-    onRowSelectionChange: setSavedSelection, enableRowSelection: true,
+    onRowSelectionChange: (next) => { activateSaved(); setSavedSelection(next); }, enableRowSelection: true,
     onSortingChange: (next) => { setSavedSorting(next); setSavedPagination((now) => ({ ...now, pageIndex: 0 })); },
     onPaginationChange: setSavedPagination,
   });
@@ -279,11 +283,17 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
             <span className="mr-auto text-body-2-regular text-text-secondary">
               {`${suggestions.length} 组`}
             </span>
-            <Button variant="secondary" size="small" disabled={readOnly || !chosen.length} {...busy}
-              onClick={() => mergeSome(chosen, false)}>{`合并所选（${chosen.length}）`}</Button>
             <Button variant="primary" size="small" disabled={readOnly} {...busy}
               onClick={() => mergeSome(suggestions, true)}>{`全部合并（${suggestions.length}）`}</Button>
+            <DataTableSort label="待合并创作者别名" sorting={sorting}
+              options={[{ id: 'canonical', label: '规范创作者' }, { id: 'alias', label: '平台别名' }, { id: 'evidence', label: '依据' }]}
+              onChange={(next) => { setSorting(next); setPagination((now) => ({ ...now, pageIndex: 0 })); }} />
           </div>
+          <SelectionDock label="待合并别名批量操作" visible={chosen.length > 0} count={`已选 ${chosen.length} 组`}>
+            <Button variant="secondary" size="small" disabled={readOnly} {...busy}
+              onClick={() => mergeSome(chosen, false)}>{`合并所选（${chosen.length}）`}</Button>
+            <Button variant="ghost" size="small" onClick={() => setRowSelection({})}>取消选择</Button>
+          </SelectionDock>
           <DataTableFrame follow>
             <Table aria-label="待合并创作者别名" size="sm"
               sortDescriptor={sorting[0] ? { column: sorting[0].id, direction: sorting[0].desc ? 'descending' : 'ascending' } : undefined}
@@ -309,21 +319,27 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
             </TableBody>
             </Table>
           </DataTableFrame>
-          <DataTableFooter label="待合并创作者别名" total={suggestions.length} pagination={suggestionPage} onChange={setPagination} />
+          <DataTableFooter label="待合并创作者别名" unit="组" total={suggestions.length} pagination={suggestionPage} onChange={setPagination} />
         </div>
       ) : null}
 
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <FieldLabel>已保存别名</FieldLabel>
-          <span className="text-body-2-regular text-text-secondary">{`${groups.length} 组`}</span>
-          <Button variant="secondary" size="small" disabled={readOnly || !savedNames.length} {...busyProps(drop.isPending)}
+          <span className="mr-auto text-body-2-regular text-text-secondary">{`${groups.length} 组`}</span>
+          <DataTableSort label="已保存创作者别名" sorting={savedSorting}
+            options={[{ id: 'canonical', label: '规范创作者' }, { id: 'aliases', label: '平台别名' }]}
+            onChange={(next) => { setSavedSorting(next); setSavedPagination((now) => ({ ...now, pageIndex: 0 })); }} />
+        </div>
+        <SelectionDock label="已保存别名批量操作" visible={savedNames.length > 0} count={`已选 ${savedNames.length} 个别名`}>
+          <Button variant="secondary" size="small" disabled={readOnly} {...busyProps(drop.isPending)}
             onClick={() => void confirmModal({ title: '移除所选创作者别名',
               body: `将移除以下 ${savedNames.length} 个别名：${savedNames.map((name) => `「${name}」`).join('、')}，对应来源恢复为独立创作者组。`,
               confirmLabel: '移除所选别名', onConfirm: () => drop.mutateAsync(savedNames) })}>
             {`移除所选别名（${savedNames.length}）`}
           </Button>
-        </div>
+          <Button variant="ghost" size="small" onClick={() => setSavedSelection({})}>取消选择</Button>
+        </SelectionDock>
         {groups.length ? (
           <>
           <DataTableFrame follow>
@@ -351,7 +367,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
             </TableBody>
             </Table>
           </DataTableFrame>
-          <DataTableFooter label="已保存创作者别名" total={groups.length} pagination={savedPage} onChange={setSavedPagination} />
+          <DataTableFooter label="已保存创作者别名" unit="组" total={groups.length} pagination={savedPage} onChange={setSavedPagination} />
           </>
         ) : (
           <EmptyState shell="plain" icon={RiUserLine} title="还没有保存创作者别名">

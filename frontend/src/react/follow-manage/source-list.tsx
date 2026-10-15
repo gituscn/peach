@@ -33,7 +33,7 @@ import {
 import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 
 import { errorMessage } from '../../api';
-import { Pagination } from '../components/table-pagination';
+import { DataTableFooter } from '../components/table-controls';
 import { useBackgroundJob } from '../background-job';
 import { cardClass } from '../components/card';
 import { DataTableFrame } from '../components/data-table-frame';
@@ -46,7 +46,7 @@ import { busyProps } from '../settings/use-action';
 import {
   authorGroups, authorName, checkedText, checkEvidenceGap, checkFailures, checkReceipt, checkSummary,
   COLUMN_SORT, dropSources, errorHeadline, fetchCheckJob, fetchPending, FOLLOW_CHECK_KEY, isBroken,
-  LAYOUTS, markItem, PAGE_SIZES, pageWindow, patchSource, removeSource,
+  LAYOUTS, markItem, pageWindow, patchSource, removeSource,
   reloadFollowManage, selectionState, setSourceEnabled, SORT_DEFAULT_DIR, SORT_OPTIONS,
   sortLabel, startCheck, tableRows, toggleGroup,
   type CheckJob, type FollowData, type FollowSource, type Layout, type SortDir, type SortKey,
@@ -661,21 +661,9 @@ export function SourceList(props: SourceListProps) {
         </>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-body-2-regular text-text-secondary">
-          {`${count(win.start + 1)}–${count(win.end)} / ${count(win.total)} ${asTable ? '个来源' : '位创作者'}`}
-        </span>
-        <Select aria-label="每页显示数量" size="sm" selectedKey={String(pageSize)}
-          onSelectionChange={(key) => { if (key !== null) table.setPageSize(Number(key)) }}>
-          {PAGE_SIZES.map((size) => (
-            <SelectItem key={size} id={String(size)}>
-              {`每页 ${size} ${asTable ? '条' : '位'}`}
-            </SelectItem>
-          ))}
-        </Select>
-        <Pagination page={win.page} pages={win.pages}
-          onPage={(next) => table.setPageIndex(next - 1)} />
-      </div>
+      <DataTableFooter label="关注列表" total={win.total} pagination={{ pageIndex: win.page - 1, pageSize }}
+        unit={asTable ? '个来源' : '位创作者'} pageUnit={asTable ? '条' : '位'}
+        onChange={(next) => { if (next.pageSize !== pageSize) table.setPageSize(next.pageSize); else table.setPageIndex(next.pageIndex); }} />
 
       {counts.new ? (
         /* 旧 `.fsecfoot`：汇总与它的动作是卡底那一条带，比卡面暗一点点，通到卡片左右两沿。 */

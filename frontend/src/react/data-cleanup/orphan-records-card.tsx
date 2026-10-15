@@ -13,7 +13,7 @@ import { Select, SelectItem } from '@/components/base/select/select';
 
 import { errorMessage } from '../../api';
 import { DataTable, type DataColumn } from '../components/data-table';
-import { SectionHeading } from '../components/fieldset';
+import { Fieldset, FieldsetTitle } from '../components/fieldset';
 import { Note } from '../components/note';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { queryClient } from '../query';
@@ -124,13 +124,14 @@ export function OrphanRecordsCard({ toast }: { toast(message: string): void }) {
   if (!query.isError && !items.length) return null;
   return (
     <section id="orphan-records" aria-labelledby="orphan-records-title" className="flex scroll-mt-20 flex-col gap-4">
-      <SectionHeading id="orphan-records-title">孤儿记录</SectionHeading>
-        <p className="text-body-regular text-text-secondary">
-          这些作品的文件已不在盘上，喜欢、稍后看、播放列表与观看历史都还留着。接到新文件后记录跟过去，旧的这一条删掉。
-        </p>
         {query.isError
-          ? <Note tone="error" title="孤儿记录读取失败">{errorMessage(query.error)}</Note>
+          ? <Fieldset layout="stack" labelledBy="orphan-records-title">
+              <FieldsetTitle id="orphan-records-title">孤儿记录</FieldsetTitle>
+              <Note tone="error" title="孤儿记录读取失败">{errorMessage(query.error)}</Note>
+            </Fieldset>
           : <DataTable label="文件已消失的作品" items={items} columns={columns}
+              title="孤儿记录" titleId="orphan-records-title" unit="条作品"
+              description="这些作品的文件已不在盘上，喜欢、稍后看、播放列表与观看历史都还留着。接到新文件后记录跟过去，旧的这一条删掉。"
               rowId={(item) => String(item.id)} rowLabel={(item) => item.name}
               selected={selected} onSelected={setSelected}
               actions={(chosen) => <Button variant="danger" size="small" disabled={!chosen.length}

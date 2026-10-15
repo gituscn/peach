@@ -8,12 +8,12 @@ describe('孤儿记录数据表', () => {
   let browser: Browser;
   before(async () => { browser = await launch(); await mkdir('../build/table-evidence', { recursive: true }); });
   after(async () => { await browser.close(); });
-  for (const viewport of VIEWPORTS) it(`${viewport.name}：单层表框、全集排序、跨页勾选与取消删除`, async () => {
+  for (const viewport of VIEWPORTS) it(`${viewport.name}：面板内标题、共用分页与选中后的批量操作`, async () => {
     const opened = await visit(browser, '/data-cleanup', viewport);
     const { page } = opened;
     try {
-      const items = Array.from({ length: 13 }, (_, index) => ({
-        id: index + 1, name: `作品 ${13 - index}・很长的作品名称用于复核截断和操作区域`,
+      const items = Array.from({ length: 23 }, (_, index) => ({
+        id: index + 1, name: `作品 ${23 - index}・很长的作品名称用于复核截断和操作区域`,
         code: '', location: 'pikpak', duration: 600, size: 10, vanished_at: 100,
         has_thumb: false, records: { watch_queue: 1, last_played: 1 }, candidates: [],
       }));
@@ -30,23 +30,25 @@ describe('孤儿记录数据表', () => {
       const table = page.getByRole('grid', { name: '文件已消失的作品', exact: true });
       await table.waitFor();
       await settle(page);
-      assert.equal(await table.locator('tbody tr').count(), 10);
-      const frame = section.locator('[data-board-data-table]');
-      const borders = await frame.evaluate(node => {
-        const widths: number[] = [];
-        for (let parent = node.parentElement; parent; parent = parent.parentElement) {
-          widths.push(parseFloat(getComputedStyle(parent).borderTopWidth));
-          if (parent.id === 'orphan-records') break;
-        }
-        return widths;
-      });
-      assert.ok(borders.every(width => width === 0), JSON.stringify(borders));
+      assert.equal(await section.locator('[data-data-table-panel] #orphan-records-title').count(), 1);
+      assert.equal(await table.locator('tbody tr').count(), 20);
+      assert.equal(await section.getByRole('button', { name: '彻底删除所选（0）', exact: true }).count(), 0);
+      const pagination = section.locator('[data-table-pagination]');
+      assert.ok((await pagination.textContent())?.includes('1–20 / 23 条作品'));
+      await pagination.getByRole('button', { name: /每页显示数量/ }).waitFor();
+      await section.getByRole('button', { name: /文件已消失的作品排序/ }).waitFor();
+      await page.setViewportSize({ width: viewport.width, height: 2400 });
+      await section.evaluate((element) => window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY - 100));
       await section.screenshot({ path: `../build/table-evidence/orphan-${viewport.name}.png` });
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await table.locator('tbody tr').first().locator('label:has(input[type="checkbox"])').click();
+      await section.locator('[data-selection-dock]').waitFor();
       await section.getByRole('button', { name: '下一页', exact: true }).click();
       await table.locator('tbody tr').first().locator('label:has(input[type="checkbox"])').click();
       await table.getByRole('columnheader', { name: '作品', exact: true }).click();
       assert.ok((await table.locator('tbody tr').first().textContent())?.includes('作品 1・'));
+      await pagination.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `../build/table-evidence/orphan-selected-${viewport.name}.png` });
       await section.getByRole('button', { name: '彻底删除所选（2）', exact: true }).click();
       await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
       assert.deepEqual(writes, []);
