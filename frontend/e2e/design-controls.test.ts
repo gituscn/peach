@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Browser } from 'playwright-core';
-import { settle } from './harness.ts';
+import { expectBody, settle } from './harness.ts';
 import { ITEM, openItemPage } from './item-fixture.ts';
 import {
   DESKTOP, MOBILE, tokenColor, openAccess, settledRun, openActivity, qualityGoal, openQualityGoals,
@@ -369,7 +369,7 @@ describe('设计决定：控件、状态与首页顶部', () => {
     const opened = await openProcessing(browser, '/data-cleanup', FAILED_JOB);
     try {
       const alert = opened.page.locator('#libraryProcessing [role="alert"]');
-      await alert.waitFor({ state: 'visible', timeout: 15_000 });
+      await expectBody(opened.page, '/data-cleanup 处理失败提示', [alert]);
       await alert.locator('summary').click();
       const list = alert.locator('ul');
       await list.waitFor({ state: 'visible', timeout: 5_000 });
