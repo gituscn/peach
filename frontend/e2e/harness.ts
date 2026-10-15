@@ -46,7 +46,8 @@ export async function launch(): Promise<Browser> {
   return chromium.launch({
     headless: true,
     executablePath: requiredEnv('PEACH_E2E_CHROME'),
-    timeout: 30_000,
+    // Windows 首次加载浏览器与系统组件使用独立的启动预算，页面等待由各用例限定。
+    timeout: 60_000,
   });
 }
 
