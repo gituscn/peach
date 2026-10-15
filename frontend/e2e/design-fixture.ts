@@ -194,12 +194,10 @@ export function lightness([red, green, blue]: number[]): number {
 export async function openProcessing(
   browser: Browser, path: string, job: Record<string, unknown>,
 ): Promise<Visit> {
-  const opened = await visit(browser, path, DESKTOP);
-  await opened.page.route('**/api/library-processing', (route) => route.fulfill({
-    status: 200, contentType: 'application/json', body: JSON.stringify(job),
-  }));
-  await opened.page.reload({ waitUntil: 'load' });
-  return opened;
+  return visit(browser, path, DESKTOP, (page) =>
+    page.route('**/api/library-processing', (route) => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify(job),
+    })));
 }
 
 /** 1280 的桌面视口比 `--board-content` 还窄，量不出「网格铺满、标题居中」这类差别。 */
