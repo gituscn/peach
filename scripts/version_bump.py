@@ -20,8 +20,8 @@ VERSION_PATTERN = re.compile(r'(__version__\s*=\s*")(\d+)\.(\d+)\.(\d+)(")')
 #: 版本标签的形状。`--match` 用它排除别的标签，免得把某个临时标签当成上一个发布点。
 TAG_GLOB = "v[0-9]*.[0-9]*.[0-9]*"
 
-#: 进入运行时产物的输入。一批改动完全落在这个清单之外时，发布出去的东西和上一个标签
-#: 逐字节相同，没有可发布的内容。清单与 `WINDOWS_TRAY_INPUTS` 各自服务不同的问题：
+#: 决定运行时代码、依赖与发布构建的输入。清单之外的开发过程文件不触发版本发布。
+#: 清单与 `WINDOWS_TRAY_INPUTS` 各自服务不同的问题：
 #: 那份决定要不要重建 EXE，这份决定这批改动够不够格成为一个新版本。
 RUNTIME_INPUTS = (
     "src/peach/",
@@ -32,6 +32,8 @@ RUNTIME_INPUTS = (
     "scripts/build_app_entry.py",
     "scripts/build_windows.ps1",
     "pyproject.toml",
+    "uv.lock",
+    ".github/workflows/release.yml",
 )
 
 #: Conventional Commits 的功能类型；`!` 是破坏性标记。pre-1.0 阶段两者都只推 minor。

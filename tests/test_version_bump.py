@@ -41,6 +41,8 @@ class BumpPartTests(unittest.TestCase):
         self.assertTrue(runtime_inputs_changed(["scripts/build_windows.ps1"]))
         self.assertTrue(runtime_inputs_changed(["scripts/build_app_entry.py"]))
         self.assertTrue(runtime_inputs_changed(["pyproject.toml"]))
+        self.assertTrue(runtime_inputs_changed(["uv.lock"]))
+        self.assertTrue(runtime_inputs_changed([".github/workflows/release.yml"]))
         self.assertTrue(runtime_inputs_changed([r"src\peach\tray.py"]))
 
         self.assertFalse(runtime_inputs_changed([]))
@@ -130,6 +132,16 @@ class ReleasePlanTests(unittest.TestCase):
         self.commit("fix: 一处小修", self.write("src/peach/tray.py"))
         self.assertEqual(plan_bump(self.root, "major")["version"], "1.0.0")
         self.assertEqual(plan_bump(self.root, "minor")["version"], "0.8.0")
+
+    def test_release_workflow_changes_plan_a_patch(self):
+        self.tag()
+        self.commit("fix(desktop): 发布构建使用完整依赖", self.write(".github/workflows/release.yml"))
+        self.assertEqual(plan_bump(self.root)["version"], "0.7.15")
+
+    def test_locked_dependency_changes_plan_a_patch(self):
+        self.tag()
+        self.commit("fix(desktop): 固定构建依赖", self.write("uv.lock"))
+        self.assertEqual(plan_bump(self.root)["version"], "0.7.15")
 
     def test_planning_writes_nothing(self):
         self.tag()
