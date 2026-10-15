@@ -21,6 +21,25 @@ Removed / Fixed / Security。
 
 ## [未发布]
 
+## [0.40.1] - 2026-10-16
+
+本版是 0.40 系列首个 Windows 测试包，包含 0.40.0 记录的全部应用改动。
+
+### 修复
+
+- **桌面**：Windows 安装包与免安装包使用完整的锁定依赖构建；安装包支持选择程序目录。
+- **桌面**：Windows 桌面处于共享 Job 时可独立启动托盘，终端或智能体退出后保持运行。
+- **配置**：首次设置可接回已有数据目录；升级沿用配置、账本和访问密码，并记住数据目录。
+
+### 新增
+
+- **桌面**：启动失败可查看错误日志，并从托盘或系统诊断页导出脱敏诊断包。
+- **播放**：资料补全入口统一处理在线资料与本地抽帧预览，可通过菜单单独选择补全方式。
+
+### 变更
+
+- **界面**：数据表支持排序、分页和浮动批量操作。
+
 ## [0.40.0] - 2026-10-15
 
 ### 新增
@@ -506,7 +525,8 @@ Removed / Fixed / Security。
 - **桌面**：独立包使用 UTF-8 启动日志。
 - **配置**：首次设置后的跳转目标取新鲜读到的 mDNS 名。
 
-[未发布]: https://github.com/peach-mitao/peach/compare/v0.40.0...HEAD
+[未发布]: https://github.com/peach-mitao/peach/compare/v0.40.1...HEAD
+[0.40.1]: https://github.com/peach-mitao/peach/compare/v0.40.0...v0.40.1
 [0.40.0]: https://github.com/peach-mitao/peach/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/peach-mitao/peach/compare/v0.38.0...v0.39.0
 [0.38.0]: https://github.com/peach-mitao/peach/compare/v0.37.0...v0.38.0
