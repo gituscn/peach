@@ -356,6 +356,10 @@ class DetailProjectionTests(unittest.TestCase):
         image.assert_called_once_with('https://tp.spfcas.com/actor.jpg')
 
     def setUp(self):
+        for name in ('dmm_preview', 'javdb_preview'):
+            patcher = patch('peach.jav_official_preview.' + name, return_value='')
+            patcher.start()
+            self.addCleanup(patcher.stop)
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name).resolve()

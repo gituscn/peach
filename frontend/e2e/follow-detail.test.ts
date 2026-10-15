@@ -299,9 +299,22 @@ describe('关注详情岛', () => {
       const dots = page.locator('#stage [data-follow-image-dots]');
       assert.equal(await dots.locator('button').count(), 21);
       assert.ok(await dots.evaluate(node => node.scrollWidth > node.clientWidth), '圆点超出时在条内滚动');
+      assert.ok(await dots.evaluate(node => {
+        const frame = node.closest('[data-media-indicator]');
+        if (!frame) return false;
+        const style = getComputedStyle(frame);
+        return style.borderTopWidth === '1px' && !['rgba(0, 0, 0, 0)', 'rgb(0, 0, 0)'].includes(style.backgroundColor);
+      }), 'indicator 具有可见灰色框体');
+      assert.equal(await dots.getAttribute('data-overflow-left'), 'false');
+      assert.equal(await dots.getAttribute('data-overflow-right'), 'true');
+      assert.ok(await dots.evaluate(node => getComputedStyle(node).maskImage.includes('linear-gradient')), '溢出端复用横向渐隐');
       await dots.hover();
       await page.mouse.wheel(0, 100);
-      await page.waitForFunction(() => (document.querySelector('[data-follow-image-dots]')?.scrollLeft || 0) > 0);
+      await page.waitForFunction(() => {
+        const strip = document.querySelector('[data-follow-image-dots]');
+        return (strip?.scrollLeft || 0) > 1 && strip?.getAttribute('data-overflow-left') === 'true';
+      });
+      assert.equal(await dots.getAttribute('data-overflow-left'), 'true');
       for (const [key, index] of [['ArrowRight', 1], ['ArrowLeft', 0], ['ArrowLeft', 20]] as const) {
         await page.keyboard.press(key);
         await page.waitForFunction((wanted) => document.querySelector('#stage [data-follow-detail-poster]')
@@ -313,6 +326,7 @@ describe('关注详情岛', () => {
           const item = node.getBoundingClientRect(), strip = node.parentElement!.getBoundingClientRect();
           return item.left >= strip.left && item.right <= strip.right;
         }), '当前圆点完整可见');
+        if (index === 20) assert.equal(await dots.getAttribute('data-overflow-right'), 'false');
       }
       await page.keyboard.press('ArrowRight');
       await dots.locator('[data-follow-image-item="0"][aria-current="true"]').waitFor();
