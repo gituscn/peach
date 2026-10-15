@@ -71,7 +71,7 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
       {preview === -2 && item.preview_video_url ? <PreviewVideo key={item.preview_video_url} src={item.preview_video_url} />
         : <JavPicture key={preview} item={item} image={preview === -1 ? 'cover' : String(preview)} />}
       <MediaCarousel items={media} position={Math.max(0, media.findIndex(entry => entry.index === preview))} onSelect={setPreview}
-        below renderThumbnail={entry => <JavPicture item={item} image={entry.index < 0 ? 'cover' : String(entry.index)} thumbnail />} />
+        below />
     </div>
     <aside data-stage-side=""><div data-stage-side-content="" data-jav-info="">
       <JavTitle item={item} />

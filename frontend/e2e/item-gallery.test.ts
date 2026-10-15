@@ -17,7 +17,7 @@ describe('馆藏 JAV 官方预览', () => {
       const frame = page.locator('[data-item-gallery]');
       const video = frame.locator('video');
       await page.waitForFunction(() => (document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.readyState || 0) >= 3);
-      assert.equal(await frame.locator('[data-media-thumbnail]').count(), 2);
+      assert.equal(await frame.locator('[data-follow-image-dots] button').count(), 2);
       await video.evaluate(node => { const video = node as HTMLVideoElement; video.muted = true; video.pause(); video.currentTime = 0.5 });
       await page.locator('#closeStage').focus();
       await page.keyboard.press('ArrowRight');
@@ -38,7 +38,7 @@ describe('馆藏 JAV 官方预览', () => {
       assert.deepEqual(opened.problems, []);
     } finally { await opened.close() }
   });
-  for (const viewport of [...VIEWPORTS, { name: 'wide', width: 1920, height: 1080, mobile: false }]) it(`${viewport.name}：图片、缩略图和正片共用媒体切换`, { timeout: 60000 }, async () => {
+  for (const viewport of [...VIEWPORTS, { name: 'wide', width: 1920, height: 1080, mobile: false }]) it(`${viewport.name}：图片和正片共用圆点切换`, { timeout: 60000 }, async () => {
     const opened = await openItemPage(browser, '/', viewport, { ready: '[data-media-grid]' });
     const { page } = opened;
     const samples: string[] = [];
@@ -52,7 +52,7 @@ describe('馆藏 JAV 官方预览', () => {
       const frame = page.locator('[data-item-gallery]');
       await frame.waitFor({ state: 'visible' });
       await page.waitForFunction(() => document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.readyState === 4);
-      assert.ok(samples.every(url => new URL(url).pathname === '/sample-thumb'), '常驻缩略图条只读取小图');
+      assert.equal(samples.length, 0, '播放正片时只按需读取样图');
       const stats = frame.getByRole('button', { name: '播放统计', exact: true });
       await stats.waitFor({ state: 'visible' });
       const statsBox = await stats.boundingBox(), toggleBox = await frame.getByRole('button', { name: '查看图片', exact: true }).boundingBox();
@@ -89,12 +89,11 @@ describe('馆藏 JAV 官方预览', () => {
       assert.ok(await frame.locator('.video-js').isHidden());
       await page.keyboard.press('Tab');
       await frame.getByRole('button', { name: '预览 1', exact: true }).focus();
-      const thumbnails = frame.locator('[data-media-thumbnails]');
-      await thumbnails.getByRole('button', { name: '切换到预览 1', exact: true }).locator('img').waitFor({ state: 'visible' });
-      const stripBox = await thumbnails.boundingBox(), imageBox = await frame.locator('[data-catalog-picture]').boundingBox();
+      assert.equal(await frame.locator('[data-media-thumbnails]').count(), 0);
+      const stripBox = await dots.boundingBox(), imageBox = await frame.locator('[data-catalog-picture]').boundingBox();
       assert.ok(stripBox && imageBox && stripBox.y >= imageBox.y + imageBox.height);
       assert.equal(await page.locator('[data-media-preview-tip]').count(), 0);
-      await thumbnails.getByRole('button', { name: '切换到预览 1', exact: true }).click();
+      await frame.getByRole('button', { name: '预览 1', exact: true }).click();
       await page.waitForFunction(() => document.querySelector('[data-catalog-picture]')?.getAttribute('src')?.endsWith('n=1'));
       await frame.getByRole('button', { name: '播放正片', exact: true }).click();
       await frame.locator('.video-js').waitFor({ state: 'visible' });
@@ -132,8 +131,8 @@ describe('馆藏 JAV 官方预览', () => {
       await frame.locator('video').evaluate(node => { const video = node as HTMLVideoElement; video.pause(); video.currentTime = 0.5 });
       const normalFrame = await frame.boundingBox();
       release();
-      await frame.getByRole('button', { name: '切换到预览 11', exact: true }).waitFor();
-      assert.equal(await frame.locator('[data-media-thumbnail]').count(), 13);
+      await frame.getByRole('button', { name: '预览 11', exact: true }).waitFor();
+      assert.equal(await frame.locator('[data-follow-image-dots] button').count(), 13);
       assert.equal(await player.getAttribute('data-gallery-probe'), 'kept');
       const loadedFrame = await frame.boundingBox();
       assert.ok(normalFrame && loadedFrame && Math.abs(loadedFrame.height - normalFrame.height) < 2);
@@ -148,7 +147,7 @@ describe('馆藏 JAV 官方预览', () => {
       const imageReads = images;
       await frame.getByRole('button', { name: '预览 1', exact: true }).click();
       await frame.locator('[data-jav-picture]').waitFor();
-      assert.equal(images, imageReads, '样图缩略图和原图共用查询缓存');
+      assert.equal(images, imageReads, '重复查看样图复用查询缓存');
       assert.equal(details, 1);
       assert.deepEqual(opened.problems, []);
       await page.screenshot({ path: `../build/item-source-gallery-${viewport.name}.png` });

@@ -20,7 +20,7 @@ import { RetryNote } from '../components/grid-reveal';
 import { MixGroupLabel, MixQueue, MixQueueRow } from '../components/mix-queue';
 import { RelatedSection } from '../components/related-section';
 import { DetailContinuation } from '../components/detail-continuation';
-import { MediaCarousel, MEDIA_DOTS_MAX } from '../components/media-carousel';
+import { MediaCarousel } from '../components/media-carousel';
 import { FollowAuthorLink, FollowCard } from '../follow-feed/follow-card';
 import {
   FOLLOW_CREDENTIALS_KEY, fetchFollowCredentials, replaceFollowItem, setFollowItemStatus, videoItems,
@@ -42,8 +42,6 @@ import {
 import { fetchFollowRelated, followRelatedGroups, followRelatedKey } from './follow-related';
 
 const realDuration = (value: unknown) => Number(value) > 0;
-/** 轮播张数多于它时，圆点条换成「当前 / 总数」：1280 宽下四十来个点就碰到画框边了。 */
-export const FOLLOW_DOTS_MAX = MEDIA_DOTS_MAX;
 
 /** 字形原样取壳那一份 `icon()`：骨架与遗留详情画的就是它，换成别的字形接管那一拍会跳。 */
 const Glyph = ({ name }: { name: string }) => (

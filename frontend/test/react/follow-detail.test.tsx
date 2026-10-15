@@ -10,7 +10,7 @@ import {
   collectionCopy, detailTags, followItemKey, tagCategory,
   type FollowDetailActions, type FollowDetailData, type FollowDetailItem, type FollowDetailProps,
 } from '../../src/react/follow-detail/follow-detail';
-import { FOLLOW_DOTS_MAX, FollowDetailPage } from '../../src/react/follow-detail/follow-detail-page';
+import { FollowDetailPage } from '../../src/react/follow-detail/follow-detail-page';
 import { followRelatedKey } from '../../src/react/follow-detail/follow-related';
 import { FOLLOW_CREDENTIALS_KEY, setFollowItemStatus, type FollowFeedHelpers, type FollowGroup } from '../../src/react/follow-feed/follow-feed';
 import { openPhotoLightbox } from '../../src/react/photo-lightbox/photo-lightbox-dialog';
@@ -282,11 +282,11 @@ describe('媒体', () => {
     expect(host.querySelector('[data-media-thumb-fallback]')?.hasAttribute('hidden')).toBe(false);
   });
 
-  it(`轮播多于 ${FOLLOW_DOTS_MAX} 张时圆点条换成「当前 / 总数」`, async () => {
-    const many = Array.from({ length: FOLLOW_DOTS_MAX + 100 }, (_, index) => image(index));
+  it('一百二十张图共用圆点条并标出当前图片', async () => {
+    const many = Array.from({ length: 120 }, (_, index) => image(index));
     const { host } = await show(data(item(14, { media_kind: 'image', media_items: many })), { mediaIndex: 99 });
-    expect(host.querySelector('[data-follow-image-dots]')).toBeNull();
-    expect(host.querySelector('[data-follow-image-count]')?.textContent).toBe('100 / 120');
+    expect(host.querySelectorAll('[data-follow-image-dots] button')).toHaveLength(120);
+    expect(host.querySelector('[data-follow-image-dots] [aria-current="true"]')?.getAttribute('data-follow-image-item')).toBe('99');
     queryClient.clear();
     const { host: few } = await show(data(item(15, { media_kind: 'image', media_items: [image(0), image(1), image(2)] })));
     expect(few.querySelectorAll('[data-follow-image-dots] [data-follow-image-item]')).toHaveLength(3);

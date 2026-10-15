@@ -291,19 +291,34 @@ describe('关注详情岛', () => {
     }
   });
 
-  it('二十一张图使用计数条时，键盘左右仍切图并循环，地址保持当前帖子', { timeout: 60_000 }, async () => {
-    const opened = await openDetail(browser, DETAIL.largeGallery);
+  for (const viewport of VIEWPORTS) it(`${viewport.name}：二十一张图的圆点可滚动并跟随当前图片，地址保持当前帖子`, { timeout: 60_000 }, async () => {
+    const opened = await openDetail(browser, DETAIL.largeGallery, viewport);
     try {
       const page = opened.page;
       const poster = page.locator('#stage [data-follow-detail-poster]');
-      assert.equal(await page.locator('#stage [data-follow-image-dots]').count(), 0);
+      const dots = page.locator('#stage [data-follow-image-dots]');
+      assert.equal(await dots.locator('button').count(), 21);
+      assert.ok(await dots.evaluate(node => node.scrollWidth > node.clientWidth), '圆点超出时在条内滚动');
+      await dots.hover();
+      await page.mouse.wheel(0, 100);
+      await page.waitForFunction(() => (document.querySelector('[data-follow-image-dots]')?.scrollLeft || 0) > 0);
       for (const [key, index] of [['ArrowRight', 1], ['ArrowLeft', 0], ['ArrowLeft', 20]] as const) {
         await page.keyboard.press(key);
         await page.waitForFunction((wanted) => document.querySelector('#stage [data-follow-detail-poster]')
           ?.getAttribute('src') === wanted, `/follow-stream?id=5002&media=${index}`);
         assert.equal(await poster.getAttribute('src'), `/follow-stream?id=5002&media=${index}`);
-        assert.equal((await page.locator('#stage [data-follow-image-count]').innerText()).trim(), `${index + 1} / 21`);
+        const selected = dots.locator('[aria-current="true"]');
+        assert.equal(await selected.getAttribute('data-follow-image-item'), String(index));
+        assert.ok(await selected.evaluate(node => {
+          const item = node.getBoundingClientRect(), strip = node.parentElement!.getBoundingClientRect();
+          return item.left >= strip.left && item.right <= strip.right;
+        }), '当前圆点完整可见');
       }
+      await page.keyboard.press('ArrowRight');
+      await dots.locator('[data-follow-image-item="0"][aria-current="true"]').waitFor();
+      assert.ok(await dots.evaluate(node => node.scrollLeft < 1), '循环回第一张时圆点回到起点');
+      const geometry = await layout(page);
+      assert.ok(geometry.scrollWidth <= geometry.viewportWidth + 1);
       assert.equal(new URL(page.url()).pathname, '/posts/5002');
       assert.deepEqual(opened.problems, []);
     } finally {

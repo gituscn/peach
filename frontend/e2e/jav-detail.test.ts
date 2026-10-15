@@ -217,19 +217,18 @@ describe('库外 JAV 作品详情', () => {
         assert.equal(await page.locator('[data-follow-image-dots] button').count(), 13);
         const dots = await page.locator('[data-follow-image-dots]').evaluate(el => {
           const box = el.getBoundingClientRect();
-          return [...el.children].every(child => { const rect = child.getBoundingClientRect(); return rect.left >= box.left && rect.right <= box.right });
+          const rect = el.querySelector('[aria-current="true"]')!.getBoundingClientRect();
+          return el.scrollWidth > el.clientWidth && rect.left >= box.left && rect.right <= box.right;
         });
-        assert.ok(dots, '每个媒体入口都在圆点条内');
+        assert.ok(dots, '圆点条可滚动且当前项完整可见');
         assert.equal(await page.locator('[data-carousel-video]').evaluate(el => el.getBoundingClientRect().width), 20);
-        const thumbnails = page.locator('[data-media-thumbnails]');
-        await thumbnails.locator('img').first().waitFor({ state: 'visible' });
-        assert.equal(await thumbnails.locator('button').count(), 13);
-        const stripBox = await thumbnails.boundingBox(), mainBox = await page.locator('[data-jav-picture]').boundingBox();
-        assert.ok(stripBox && mainBox && stripBox.y >= mainBox.y + mainBox.height, `缩略图常驻主图下方：${JSON.stringify({ stripBox, mainBox })}`);
-        await thumbnails.evaluate(node => { node.scrollLeft = 0 });
-        await thumbnails.hover();
+        assert.equal(await page.locator('[data-media-thumbnails]').count(), 0);
+        const indicator = page.locator('[data-follow-image-dots]');
+        const stripBox = await indicator.boundingBox(), mainBox = await page.locator('[data-jav-picture]').boundingBox();
+        assert.ok(stripBox && mainBox && stripBox.y >= mainBox.y + mainBox.height);
+        await indicator.hover();
         await page.mouse.wheel(0, 180);
-        await page.waitForFunction(() => (document.querySelector('[data-media-thumbnails]')?.scrollLeft || 0) > 0);
+        await page.waitForFunction(() => (document.querySelector('[data-follow-image-dots]')?.scrollLeft || 0) > 0);
         await page.evaluate(() => {
           const frames: { width: number; height: number }[] = [];
           Object.assign(window, { detailHeightFrames: frames });
@@ -243,13 +242,13 @@ describe('库外 JAV 作品详情', () => {
         await imageDot.focus();
         assert.equal(await page.locator('[data-media-preview-tip]').count(), 0);
         assert.equal(await page.locator('[data-follow-image-item][aria-current="true"]').getAttribute('data-follow-image-item'), '-1', '聚焦预览保持当前图片');
-        await page.getByRole('button', { name: '切换到预览 2', exact: true }).click();
+        await imageDot.click();
         await page.getByRole('img', { name: 'EXM-001 预览 2', exact: true }).waitFor();
         await page.getByRole('button', { name: '封面', exact: true }).click();
         if (viewport.mobile) {
           await page.setViewportSize({ width: 350, height: viewport.height });
-          await page.locator('[data-follow-image-count]').waitFor({ state: 'visible' });
-          assert.equal(await page.locator('[data-follow-image-count]').textContent(), '1 / 13');
+          assert.equal(await page.locator('[data-follow-image-dots] button').count(), 13);
+          assert.equal(await page.locator('[data-follow-image-count]').count(), 0);
           await page.setViewportSize({ width: viewport.width, height: viewport.height });
           await page.locator('[data-follow-image-dots]').waitFor({ state: 'visible' });
         }
