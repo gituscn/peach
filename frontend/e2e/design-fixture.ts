@@ -192,12 +192,22 @@ export function lightness([red, green, blue]: number[]): number {
 /** 按给定的一份 `/api/library-processing` 打开某一页：演示库里那趟任务早就跑完了，
  *  而运行态和失败态正是这两条要看的东西。字段以 `src/peach/web_library_processing.py` 为准。 */
 export async function openProcessing(
-  browser: Browser, path: string, job: Record<string, unknown>,
+  browser: Browser, path: '/' | '/data-cleanup', job: Record<string, unknown>,
 ): Promise<Visit> {
-  return visit(browser, path, DESKTOP, (page) =>
+  const opened = await visit(browser, path, DESKTOP, (page) =>
     page.route('**/api/library-processing', (route) => route.fulfill({
       status: 200, contentType: 'application/json', body: JSON.stringify(job),
     })));
+  try {
+    const body = opened.page.locator(path === '/data-cleanup'
+      ? '#libraryProcessing section[aria-label="扫描与采集"]'
+      : '[data-catalog-filter] [data-count-readout]');
+    await expectBody(opened.page, path, [body], opened.problems);
+    return opened;
+  } catch (error) {
+    await opened.close();
+    throw error;
+  }
 }
 
 /** 1280 的桌面视口比 `--board-content` 还窄，量不出「网格铺满、标题居中」这类差别。 */
