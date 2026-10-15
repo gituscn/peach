@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -40,7 +41,8 @@ def capture_frame(ffmpeg: str, path: str, timestamp: float, destination: Path, *
         "-vf", f"scale={int(width)}:-1", "-q:v", "4", str(destination),
     ]
     try:
-        completed = subprocess.run(command, capture_output=True, timeout=timeout)
+        completed = subprocess.run(command, capture_output=True, timeout=timeout,
+                                   creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
     except subprocess.TimeoutExpired:
         return False, "ffmpeg timeout"
     ok = destination.is_file() and destination.stat().st_size > 1024
@@ -70,5 +72,6 @@ def tile_frames(ffmpeg: str, pattern: str, columns: int, rows: int, destination:
         [ffmpeg, "-y", "-v", "error", "-i", pattern,
          "-filter_complex", f"tile={int(columns)}x{int(rows)}", "-q:v", "4", str(destination)],
         capture_output=True, timeout=timeout,
+        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )
     return destination.is_file() and destination.stat().st_size > 4096

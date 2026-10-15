@@ -50,8 +50,13 @@ RECIPES = {
     "web": {
         "label": "根 package.json（手工 vendor 的四个 web 包）",
         "manifests": ("package.json", "package-lock.json"),
-        "derived": ("web/vendor/", "web/index.html"),
-        "commands": (("npm", "ci", "--ignore-scripts"), ("npm", "run", "vendor:web")),
+        "derived": ("web/vendor/", "web/index.html", "web/dist/", "docs/REUSE.md",
+                    "frontend/src/player/videojs.ts", "tests/test_web_ui.py",
+                    "frontend/src/react/photo-lightbox/photo-lightbox.ts",
+                    "frontend/test/react/photo-lightbox.test.tsx"),
+        "commands": (("npm", "ci", "--ignore-scripts"), ("npm", "run", "vendor:web"),
+                     ("npm", "--prefix", "frontend", "ci"),
+                     ("npm", "--prefix", "frontend", "run", "build")),
         "checks": (),
     },
     "frontend": {
@@ -202,8 +207,9 @@ def bring_over(branch: str, manifests: tuple[str, ...], *, root: Path = ROOT,
 
 
 def working_changes(*, root: Path = ROOT) -> list[str]:
-    return [line for line in run(("git", "diff", "--name-only", "HEAD"), root=root).splitlines()
-            if line]
+    tracked = run(("git", "diff", "--name-only", "HEAD"), root=root).splitlines()
+    added = run(("git", "ls-files", "--others", "--exclude-standard"), root=root).splitlines()
+    return sorted({line for line in (*tracked, *added) if line})
 
 
 def commit_message(key: str, versions: list[str], pr: str | None,

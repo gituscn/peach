@@ -204,9 +204,10 @@ class DependencyPolicyTests(unittest.TestCase):
         """
         key, recipe = adopt.recipe_for(["package-lock.json"])
         self.assertEqual(key, "web")
-        for path in ("package.json", "web/index.html", "web/vendor/lucide/1.40.0/ORIGIN.md"):
+        for path in ("package.json", "web/index.html", "web/vendor/lucide/1.40.0/ORIGIN.md",
+                     "web/dist/peach-app.js", "frontend/src/player/videojs.ts", "docs/REUSE.md"):
             self.assertTrue(adopt.owned_by(recipe, path), path)
-        for path in ("web/index.html.bak", "web/dist/peach-ui.js", "src/peach/api.py"):
+        for path in ("web/index.html.bak", "frontend/src/player/types.ts", "src/peach/api.py"):
             self.assertFalse(adopt.owned_by(recipe, path), path)
         self.assertEqual(adopt.recipe_for(["frontend/package.json"])[0], "frontend")
         self.assertEqual(adopt.recipe_for(["pyproject.toml", "uv.lock"])[0], "uv")
@@ -219,6 +220,19 @@ class DependencyPolicyTests(unittest.TestCase):
             adopt.recipe_for(["uv.lock", "src/peach/api.py"])
         with self.assertRaisesRegex(RuntimeError, "认得的清单"):
             adopt.recipe_for(["README.md"])
+
+    def test_takeover_lists_each_new_vendor_file_and_excludes_ignored_builds(self):
+        with tempfile.TemporaryDirectory() as holder:
+            repo = seed_repository(Path(holder).resolve() / "repo",
+                                   {"package.json": b"{}", ".gitignore": b"build/\n"}, "base")
+            (repo / "package.json").write_bytes(b'{"private":true}')
+            vendor = repo / "web/vendor/videojs/1.2.3/video.min.js"
+            vendor.parent.mkdir(parents=True)
+            vendor.write_bytes(b"player")
+            (repo / "build").mkdir()
+            (repo / "build/log.txt").write_text("ignored", encoding="utf-8")
+            self.assertEqual(adopt.working_changes(root=repo),
+                             ["package.json", "web/vendor/videojs/1.2.3/video.min.js"])
 
     def test_the_takeover_keeps_what_master_added_to_the_manifest_after_the_fork(self):
         """接管套的是分支自己的改动，分叉后 master 往清单里加的依赖原样留着。

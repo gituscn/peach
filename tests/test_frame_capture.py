@@ -1,6 +1,7 @@
 """按时间点抽单帧、把若干帧拼成一张接触印相。九宫格与时间轴预览共用这一份。"""
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -24,7 +25,9 @@ class CaptureFrameTests(unittest.TestCase):
         self.commands: list[list[str]] = []
 
     def _run(self, produce: bool = True, stderr: bytes = b""):
-        def fake(command, **_kwargs):
+        def fake(command, **options):
+            self.assertEqual(options["creationflags"],
+                             subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
             self.commands.append(list(command))
             if produce:
                 Path(command[-1]).write_bytes(b"x" * 2048)
@@ -88,7 +91,9 @@ class TileFramesTests(unittest.TestCase):
     def test_the_grid_size_reaches_the_filter(self):
         seen: list[list[str]] = []
 
-        def fake(command, **_kwargs):
+        def fake(command, **options):
+            self.assertEqual(options["creationflags"],
+                             subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
             seen.append(list(command))
             Path(command[-1]).write_bytes(b"x" * 8192)
             return _Completed()

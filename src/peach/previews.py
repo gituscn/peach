@@ -184,6 +184,7 @@ class PreviewService:
                             [str(ffmpeg), "-v", "error", "-i", str(temporary), "-vf", "scale=1:1",
                              "-f", "rawvideo", "-pix_fmt", "gray", "-"],
                             capture_output=True, timeout=20, check=False,
+                            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
                         ).stdout
                     except (OSError, subprocess.TimeoutExpired):
                         raw = b""
@@ -342,7 +343,8 @@ class PreviewService:
     @staticmethod
     def _run(command: list[str]) -> None:
         try:
-            result = subprocess.run(command, capture_output=True, timeout=30, check=False)
+            result = subprocess.run(command, capture_output=True, timeout=30, check=False,
+                                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
         except (OSError, subprocess.TimeoutExpired) as exc:
             Path(command[-1]).unlink(missing_ok=True)
             raise PreviewUnavailable("ffmpeg generation failed") from exc
