@@ -128,6 +128,10 @@ macOS 把后两条换成 `uv sync --locked --python 3.14 --extra macos` 和 `./.
 
 在Peach 配置「应用与维护」打开系统诊断，可查看库健康清单、来源解析与冷却状态。运行 `peach doctor` 可取得同一份报告；`--json` 输出脱敏 JSON。状态与处理方式见 [本机诊断](docs/OPERATIONS.md#本机诊断)。
 
+### Docker（VPS / NAS）
+
+Linux 无桌面镜像与 CloudDrive2 分别部署，媒体目录与运行数据独立挂载。部署方式、访问范围和验收状态见 [Docker 部署](docs/DOCKER.md)。
+
 ## 常见问题
 
 - **会改我的文件吗？**

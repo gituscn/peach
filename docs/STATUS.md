@@ -6,6 +6,7 @@
 
 ## 运行态
 
+- [Docker](DOCKER.md)
 - 名册：艺人（含动画作者）｜卖家｜在线；素人须有非职业出演证据，FC2 仅筛作品。
 - 公司资料、FC2 卖家按来源补空；厂牌去重 6 组。回执 `peach-data/review/`。
 - 核查：`peach-data/review/creator-boundary-delivery.md`；StraplessDildo 归厂牌。

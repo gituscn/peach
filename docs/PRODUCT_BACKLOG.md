@@ -78,7 +78,7 @@
   统一配置、会话有效性验证与完整批量 GUI，清单导入导出与标准模式待实施。
   Instagram 成熟解析器须有独立用户会话 POC；交付条件是 Windows/macOS 干净安装能跑、二次运行命中缓存。
 - 后续结构：显式 API 模型、前端构建与高频页面迁移、候选分页、任务持久化按垂直功能实施；不为 AppContext 或文件尺寸单独做全仓搬迁。
-- Linux 首版候选为 headless、预挂载媒体与独立 wheel。外部容器用了替身依赖，其结果不能证明锁定依赖可用，也不算 Linux 正式支持；优先级低于 Windows/macOS。
+- Linux 无桌面容器使用正式锁定依赖，部署边界见 [Docker 部署](DOCKER.md) 与 ADR-0105；ARM、NAS 实机与真实 CloudDrive2 挂载仍需分别验收。
 
 真实 ledger 迁移、双机复制取消和系统级安装另有明确授权边界。
 

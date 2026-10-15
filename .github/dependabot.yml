@@ -3,6 +3,14 @@
 # semver-major 不进组，照常一个包一个 PR，接管前单独看变更说明。
 version: 2
 updates:
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:45"
+      timezone: Asia/Taipei
+
   - package-ecosystem: uv
     directory: /
     schedule:
