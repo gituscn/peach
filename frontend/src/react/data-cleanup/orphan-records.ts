@@ -61,8 +61,8 @@ export const attachOrphan = (id: number, target: number) =>
 
 /** 彻底删除这一条和它带的记录。不可撤销，调用方必须先过危险档的确认弹层。
  *  文件又回到盘上的那一条落在 `blocked` 里、不删，下一轮扫描会把它接回在库。 */
-export const purgeOrphan = (id: number) =>
-  apiSend<{ ok: boolean; purged: number; blocked: unknown[] }>(BATCH_URL, { ids: [id], operation: 'delete' });
+export const purgeOrphan = (id: number | number[]) =>
+  apiSend<{ ok: boolean; purged: number; blocked: unknown[] }>(BATCH_URL, { ids: Array.isArray(id) ? id : [id], operation: 'delete' });
 
 /** 行上四列的写法：分值与次数照写；只记过最近播放、没有播放次数时写「播放过」。 */
 const rowRecordsText = (records: OrphanRecord['records']) => [

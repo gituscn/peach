@@ -901,6 +901,22 @@ it('JAV 订阅分页保留跨页选择', FULL_PAGE, async () => {
   expect(host.textContent).toContain('已选 2 条订阅源');
 });
 
+it('JAV 订阅频率按分钟数对全集排序并回到首页', FULL_PAGE, async () => {
+  const feeds = twoPagesOfFeeds();
+  feeds.sources = feeds.sources.map((source, index) => ({ ...source, interval_minutes: (21 - index) * 15 }));
+  const { host } = await open({ feeds }, { tab: 'feeds' });
+  await click(checkboxNamed(host, '选择 来源 1'));
+  await click(buttonNamed('下一页', host));
+  await click(host.querySelector('th[data-key="interval"]'));
+  const table = host.querySelector('[aria-label="JAV 订阅源"]')!;
+  const rows = table.querySelectorAll('tbody tr');
+  expect(rows).toHaveLength(20);
+  expect(rows[0]!.textContent).toContain('来源 21');
+  expect(rows[19]!.textContent).toContain('来源 2');
+  expect(host.textContent).toContain('1–20 / 21 个订阅源');
+  expect(host.textContent).toContain('已选 1 条订阅源');
+});
+
 it('JAV 订阅换页容量回到首页，状态栏照全集计数', FULL_PAGE, async () => {
   const { host } = await open({ feeds: twoPagesOfFeeds(81) }, { tab: 'feeds' });
   await click(buttonNamed('下一页', host));

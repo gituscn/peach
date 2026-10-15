@@ -475,6 +475,27 @@ describe('孤儿记录', () => {
   it('取消确认就不发删除', async () => {
     expect((await purgeSecond(false)).posts).toEqual([]);
   });
+
+  it('批量删除覆盖跨页选择，取消确认不发请求，文件恢复时显示保留数量', async () => {
+    const items = Array.from({ length: 13 }, (_, index) => ({ ...orphans.items[1]!, id: index + 30, name: `作品 ${index}` }));
+    const server = serve({ '/api/orphan-records': { total: items.length, items },
+      '/api/batch': { ok: true, purged: 1, blocked: [40] } });
+    const toast = vi.fn();
+    const host = await wrap(<OrphanRecordsCard toast={toast} />);
+    await settle();
+    await click(host.querySelector('input[aria-label="选择 作品 0"]'));
+    await click(buttonNamed('下一页', host));
+    await click(host.querySelector('input[aria-label="选择 作品 10"]'));
+    confirmWith(false);
+    await click(buttonNamed('彻底删除所选（2）', host));
+    expect(server.posts('/api/batch')).toEqual([]);
+    const seen = confirmWith(true);
+    await click(buttonNamed('彻底删除所选（2）', host));
+    await settle();
+    expect(seen[0]!.body).toContain('「作品 0」、「作品 10」');
+    expect(server.posts('/api/batch')).toEqual([{ ids: [30, 40], operation: 'delete' }]);
+    expect(toast).toHaveBeenCalledWith('已彻底删除 1 条记录，1 条文件已恢复，未删除');
+  });
 });
 
 describe('整理', () => {
