@@ -1,8 +1,7 @@
 /* 扫描与采集的数据契约、轮询节律与纯折算。
  *
- * 这一趟后台任务有两个读者：数据管理页那张卡片（`#libraryProcessing`）和目录页顶上那条
- * 横幅（`#libraryProcessingNotice`）。两边读同一个 `queryKey`，所以它们看到的是同一份快照，
- * 轮询也由 Query 合成一份——各存一份状态的话，卡片说「已完成」、横幅还挂着进度。
+ * 数据管理页卡片、目录横幅与缺预览提示读同一个 `queryKey`，使用同一份任务快照。
+ * 轮询也由 Query 合成一份，进度、失败与完成状态由服务端统一提供。
  * 端点在 `frontend/src` 里只在这里声明一次（`tests/test_frontend_build.py` 盯着）。 */
 import { apiGet } from '../../api';
 import { elapsedText } from '../activity/tasks';
@@ -62,7 +61,7 @@ export interface LibraryProcessingData {
   completed_at?: number;
 }
 
-/** 一次写操作的请求体：全跑、只扫描、只采集，或者按任务号重试失败项。 */
+/** 一次写操作的请求体：指定处理阶段与影片，或者按任务号重试失败项。 */
 export type LibraryProcessingCommand =
   | Record<string, never>
   | { stage: 'scan' | 'collect' | 'previews' | 'metadata'; asset_ids?: number[] }
