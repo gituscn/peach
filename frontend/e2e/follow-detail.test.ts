@@ -303,8 +303,9 @@ describe('关注详情岛', () => {
         const frame = node.closest('[data-media-indicator]');
         if (!frame) return false;
         const style = getComputedStyle(frame);
-        return style.borderTopWidth === '1px' && !['rgba(0, 0, 0, 0)', 'rgb(0, 0, 0)'].includes(style.backgroundColor);
-      }), 'indicator 具有可见灰色框体');
+        return style.borderTopWidth === '0px' && style.backgroundColor === 'rgba(0, 0, 0, 0.5)'
+          && style.borderRadius === getComputedStyle(document.documentElement).getPropertyValue('--pill-radius').trim();
+      }), 'indicator 使用关注详情的半透明胶囊底衬');
       assert.equal(await dots.getAttribute('data-overflow-left'), 'false');
       assert.equal(await dots.getAttribute('data-overflow-right'), 'true');
       assert.ok(await dots.evaluate(node => getComputedStyle(node).maskImage.includes('linear-gradient')), '溢出端复用横向渐隐');

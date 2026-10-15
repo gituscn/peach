@@ -45,9 +45,9 @@
   box-sizing: border-box;
   width: max-content;
   max-width: min(180px, calc(100% - var(--media-dot-room)));
-  border: 1px solid color-mix(in srgb, var(--on-media) 20%, transparent);
+  border: 0;
   border-radius: var(--pill-radius);
-  background: color-mix(in srgb, var(--on-media) 14%, var(--on-media-ink));
+  background: rgba(0, 0, 0, .5);
   overflow: hidden;
 }
 .peach-react [data-media-carousel] [data-follow-image-dots] {
