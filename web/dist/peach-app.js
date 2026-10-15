@@ -47990,11 +47990,11 @@ function sxe({ assetIds: e, onComplete: t }) {
 		"aria-label": "补全预览",
 		"aria-live": "polite",
 		"data-library-completion": "",
-		className: "mb-4",
+		className: "@container mb-4",
 		children: /* @__PURE__ */ (0, C.jsx)(q, {
 			tone: d ? "warning" : "neutral",
 			action: /* @__PURE__ */ (0, C.jsx)("div", {
-				className: "flex w-full justify-end sm:w-auto",
+				className: "flex w-full justify-end @sm:w-auto",
 				children: /* @__PURE__ */ (0, C.jsx)(uF, {
 					busy: u,
 					onRun: (e) => {

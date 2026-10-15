@@ -43,6 +43,10 @@ describe('缺预览时的统一补全入口', () => {
         const prompt = page.locator('[data-library-completion]');
         await prompt.waitFor();
         assert.match(await prompt.innerText(), /1 部暂无预览/);
+        await prompt.evaluate(element => { element.style.width = '320px' });
+        const narrowText = await prompt.locator('p').boundingBox();
+        assert.ok(narrowText && narrowText.width >= 280, '窄容器中的提示正文应独占一行宽度');
+        await prompt.evaluate(element => { element.style.width = '' });
         if (viewport.mobile) {
           const text = await prompt.locator('p').boundingBox();
           assert.ok(text && text.width >= viewport.width - 80, '手机提示正文应独占一行宽度');

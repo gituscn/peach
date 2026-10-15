@@ -60,8 +60,8 @@ function Completion({ assetIds, onComplete }: { assetIds: number[]; onComplete?(
     : started && state?.job_id === started && state.status === 'failed' ? state.error || '补全未完成' : '';
   const message = problem || (busy ? start.isPending ? '正在启动补全…' : currentLine(state!)
     : outcome || `这批影片中有 ${assetIds.length.toLocaleString()} 部暂无预览，可补全封面与视频画面。`);
-  return <section aria-label="补全预览" aria-live="polite" data-library-completion="" className="mb-4">
-    <Note tone={problem ? 'warning' : 'neutral'} action={<div className="flex w-full justify-end sm:w-auto"><ProcessingActions busy={busy} onRun={command => {
+  return <section aria-label="补全预览" aria-live="polite" data-library-completion="" className="@container mb-4">
+    <Note tone={problem ? 'warning' : 'neutral'} action={<div className="flex w-full justify-end @sm:w-auto"><ProcessingActions busy={busy} onRun={command => {
       if (busy) return;
       setOutcome('');
       start.mutate(command);
