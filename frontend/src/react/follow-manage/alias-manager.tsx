@@ -5,8 +5,9 @@ import { useMemo, useRef, useState } from 'react';
 import { RiCloseLine, RiUserLine } from '@remixicon/react';
 import { useMutation } from '@tanstack/react-query';
 import {
-  createColumnHelper, flexRender, rowSelectionFeature, tableFeatures, useTable,
-  type RowSelectionState,
+  createColumnHelper, createPaginatedRowModel, createSortedRowModel, flexRender,
+  rowPaginationFeature, rowSelectionFeature, rowSortingFeature, tableFeatures, useTable,
+  type RowSelectionState, type SortingState,
 } from '@tanstack/react-table';
 import { confirmModal } from '@peach/legacy/ui';
 
@@ -20,6 +21,8 @@ import {
 import { errorMessage } from '../../api';
 import { cardClass } from '../components/card';
 import { DataTableFrame } from '../components/data-table-frame';
+import { DataTableFooter } from '../components/data-table';
+import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 import { EmptyState } from '../components/empty-state';
 import { ErrorText, FieldLabel } from '../settings/section';
 import { busyProps } from '../settings/use-action';
@@ -30,8 +33,9 @@ import {
 import { AuthorAvatar } from './source-view';
 
 const REMOVE_BODY = (alias: string) => `将移除别名「${alias}」，对应来源恢复为独立创作者组。`;
-const suggestionFeatures = tableFeatures({ rowSelectionFeature });
-const savedFeatures = tableFeatures({});
+const suggestionFeatures = tableFeatures({ rowSelectionFeature, rowSortingFeature, rowPaginationFeature,
+  sortedRowModel: createSortedRowModel(), paginatedRowModel: createPaginatedRowModel() });
+const savedFeatures = suggestionFeatures;
 
 export interface AliasManagerProps {
   groups: AliasGroup[];
@@ -65,6 +69,13 @@ function AuthorIdentity({ sources, name, canonicalKey }: {
 
 export function AliasManager({ groups, suggestions, sources = [], readOnly, toast }: AliasManagerProps) {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [savedSelection, setSavedSelection] = useState<RowSelectionState>({});
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [savedSorting, setSavedSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [savedPagination, setSavedPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const suggestionPage = { ...pagination, pageIndex: Math.min(pagination.pageIndex, Math.max(0, Math.ceil(suggestions.length / pagination.pageSize) - 1)) };
+  const savedPage = { ...savedPagination, pageIndex: Math.min(savedPagination.pageIndex, Math.max(0, Math.ceil(groups.length / savedPagination.pageSize) - 1)) };
   const [problem, setProblem] = useState('');
   const [canonical, setCanonical] = useState('');
   const [alias, setAlias] = useState('');
@@ -108,8 +119,16 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
   });
 
   const drop = useMutation({
-    mutationFn: (name: string) => removeAlias(name),
-    onSuccess: () => { setProblem(''); void reloadFollowManage(); toast('已移除创作者别名') },
+    mutationFn: async (names: string | string[]) => {
+      const pending = typeof names === 'string' ? [names] : names;
+      let done = 0;
+      try {
+        for (const name of pending) { await removeAlias(name); done += 1; }
+      } catch (cause) {
+        throw new Error(`${errorMessage(cause)}（已移除 ${done} 个别名，还有 ${pending.length - done} 个未移除）`);
+      } finally { void reloadFollowManage(); }
+    },
+    onSuccess: () => { setProblem(''); setSavedSelection({}); toast('已移除创作者别名') },
     onError: (cause) => setProblem(errorMessage(cause)),
   });
 
@@ -173,6 +192,13 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
   const savedColumns = useMemo(() => {
     const column = createColumnHelper<typeof savedFeatures, AliasGroup>();
     return column.columns([
+      column.display({ id: 'select', header: ({ table }) => (
+        <Checkbox slot={null} aria-label="全选已保存别名" isSelected={table.getIsAllRowsSelected()}
+          isIndeterminate={table.getIsSomeRowsSelected()} onChange={(on) => table.toggleAllRowsSelected(on)} />
+      ), cell: ({ row }) => (
+        <Checkbox slot={null} aria-label={`选择已保存别名 ${row.original.canonical_name}`}
+          isSelected={row.getIsSelected()} onChange={(on) => row.toggleSelected(on)} />
+      ) }),
       column.accessor('canonical_name', {
         id: 'canonical', header: '规范创作者',
         cell: (context) => (
@@ -182,6 +208,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
       }),
       column.accessor('aliases', {
         header: '平台别名',
+        sortFn: (a, b) => a.original.aliases.map((item) => item.name).join(' ').localeCompare(b.original.aliases.map((item) => item.name).join(' '), 'zh-CN'),
         cell: (context) => (
           <span className="flex flex-wrap items-center gap-1.5">
             {context.getValue().map((item) => (
@@ -204,8 +231,10 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
     data: suggestions,
     columns: suggestionColumns,
     getRowId: suggestionKey,
-    state: { rowSelection },
+    state: { rowSelection, sorting, pagination: suggestionPage },
     onRowSelectionChange: setRowSelection,
+    onSortingChange: (next) => { setSorting(next); setPagination((now) => ({ ...now, pageIndex: 0 })); },
+    onPaginationChange: setPagination,
     enableRowSelection: true,
   });
   const savedTable = useTable({
@@ -213,8 +242,13 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
     data: groups,
     columns: savedColumns,
     getRowId: (group) => group.canonical_key,
+    state: { rowSelection: savedSelection, sorting: savedSorting, pagination: savedPage },
+    onRowSelectionChange: setSavedSelection, enableRowSelection: true,
+    onSortingChange: (next) => { setSavedSorting(next); setSavedPagination((now) => ({ ...now, pageIndex: 0 })); },
+    onPaginationChange: setSavedPagination,
   });
   const chosen = suggestionTable.getSelectedRowModel().rows.map((row) => row.original);
+  const savedNames = savedTable.getSelectedRowModel().rows.flatMap((row) => row.original.aliases.map((item) => item.name));
   const busy = busyProps(merge.isPending);
 
   return (
@@ -250,12 +284,17 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
             <Button variant="primary" size="small" disabled={readOnly} {...busy}
               onClick={() => mergeSome(suggestions, true)}>{`全部合并（${suggestions.length}）`}</Button>
           </div>
-          <DataTableFrame>
-            <Table aria-label="待合并创作者别名" size="sm">
+          <DataTableFrame follow>
+            <Table aria-label="待合并创作者别名" size="sm"
+              sortDescriptor={sorting[0] ? { column: sorting[0].id, direction: sorting[0].desc ? 'descending' : 'ascending' } : undefined}
+              onSortChange={(sort) => suggestionTable.getColumn(String(sort.column))?.toggleSorting(sort.direction === 'descending')}>
             <TableHeader>
               {suggestionTable.getHeaderGroups()[0]!.headers.map((header) => (
-                <TableColumn key={header.id} id={header.id} isRowHeader={header.column.id === 'alias'}>
-                  {flexRender(header.column.columnDef.header, header.getContext())}
+                <TableColumn key={header.id} id={header.id} isRowHeader={header.column.id === 'alias'} allowsSorting={header.column.getCanSort()}>
+                  {({ sortDirection }) => <span className="flex items-center gap-0.5">
+                    {flexRender(header.column.columnDef.header, header.getContext())}
+                    {header.column.getCanSort() ? <span data-sort-indicator data-direction={sortDirection || undefined}><ChevronSortDown /></span> : null}
+                  </span>}
                 </TableColumn>
               ))}
             </TableHeader>
@@ -270,6 +309,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
             </TableBody>
             </Table>
           </DataTableFrame>
+          <DataTableFooter label="待合并创作者别名" total={suggestions.length} pagination={suggestionPage} onChange={setPagination} />
         </div>
       ) : null}
 
@@ -277,20 +317,32 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
         <div className="flex flex-wrap items-center gap-2">
           <FieldLabel>已保存别名</FieldLabel>
           <span className="text-body-2-regular text-text-secondary">{`${groups.length} 组`}</span>
+          <Button variant="secondary" size="small" disabled={readOnly || !savedNames.length} {...busyProps(drop.isPending)}
+            onClick={() => void confirmModal({ title: '移除所选创作者别名',
+              body: `将移除以下 ${savedNames.length} 个别名：${savedNames.map((name) => `「${name}」`).join('、')}，对应来源恢复为独立创作者组。`,
+              confirmLabel: '移除所选别名', onConfirm: () => drop.mutateAsync(savedNames) })}>
+            {`移除所选别名（${savedNames.length}）`}
+          </Button>
         </div>
         {groups.length ? (
-          <DataTableFrame>
-            <Table aria-label="已保存创作者别名" size="sm">
+          <>
+          <DataTableFrame follow>
+            <Table aria-label="已保存创作者别名" size="sm"
+              sortDescriptor={savedSorting[0] ? { column: savedSorting[0].id, direction: savedSorting[0].desc ? 'descending' : 'ascending' } : undefined}
+              onSortChange={(sort) => savedTable.getColumn(String(sort.column))?.toggleSorting(sort.direction === 'descending')}>
             <TableHeader>
               {savedTable.getHeaderGroups()[0]!.headers.map((header) => (
-                <TableColumn key={header.id} id={header.id} isRowHeader={header.column.id === 'canonical'}>
-                  {flexRender(header.column.columnDef.header, header.getContext())}
+                <TableColumn key={header.id} id={header.id} isRowHeader={header.column.id === 'canonical'} allowsSorting={header.column.getCanSort()}>
+                  {({ sortDirection }) => <span className="flex items-center gap-0.5">
+                    {flexRender(header.column.columnDef.header, header.getContext())}
+                    {header.column.getCanSort() ? <span data-sort-indicator data-direction={sortDirection || undefined}><ChevronSortDown /></span> : null}
+                  </span>}
                 </TableColumn>
               ))}
             </TableHeader>
             <TableBody>
               {savedTable.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} id={row.id}>
+                <TableRow key={row.id} id={row.id} data-board-selected={row.getIsSelected() || undefined}>
                   {row.getAllCells().map((cell) => (
                     <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
                   ))}
@@ -299,6 +351,8 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
             </TableBody>
             </Table>
           </DataTableFrame>
+          <DataTableFooter label="已保存创作者别名" total={groups.length} pagination={savedPage} onChange={setSavedPagination} />
+          </>
         ) : (
           <EmptyState shell="plain" icon={RiUserLine} title="还没有保存创作者别名">
             填写规范创作者名和平台别名以添加。

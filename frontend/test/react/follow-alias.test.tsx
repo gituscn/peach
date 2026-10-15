@@ -213,3 +213,30 @@ it('移除已保存的别名也要先问一句', async () => {
   expect(aliasWrites(fetcher)).toEqual([{ action: 'remove', alias: '已存别名' }]);
   expect(toast).toHaveBeenCalledWith('已移除创作者别名');
 });
+
+it('别名分页保留跨页选择，已保存别名批量移除只处理所选组', async () => {
+  const asked = stubConfirm();
+  const fetcher = okFetch();
+  const { host, renderProps } = await open(fetcher);
+  const groups = Array.from({ length: 12 }, (_, index) => ({
+    canonical_key: `name:${index}`, canonical_name: `创作者 ${index}`,
+    aliases: [{ key: `alias:${index}`, name: `别名 ${index}` }],
+  }));
+  await renderProps({ groups });
+  const saved = () => host.querySelector('[aria-label="已保存创作者别名"]')!;
+  expect(saved().querySelectorAll('tbody tr')).toHaveLength(10);
+  await click(box(host, '选择已保存别名 创作者 0'));
+  await click(buttonNamed('下一页', host));
+  await click(box(host, '选择已保存别名 创作者 10'));
+  await click(buttonNamed('移除所选别名（2）', host));
+  expect(aliasWrites(fetcher)).toEqual([]);
+  expect(asked[0]!.body).toContain('「别名 0」、「别名 10」');
+  await asked[0]!.onConfirm();
+  await settle();
+  expect(aliasWrites(fetcher)).toEqual([
+    { action: 'remove', alias: '别名 0' }, { action: 'remove', alias: '别名 10' },
+  ]);
+  await renderProps({ groups: groups.slice(0, 2) });
+  expect(saved().querySelectorAll('tbody tr')).toHaveLength(2);
+  expect(host.textContent).toContain('第 1 / 1 页');
+});

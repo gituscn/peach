@@ -11,9 +11,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
-  createColumnHelper, createPaginatedRowModel, flexRender, rowPaginationFeature,
-  rowSelectionFeature, tableFeatures, useTable,
-  type RowSelectionState,
+  createColumnHelper, createPaginatedRowModel, createSortedRowModel, flexRender, rowPaginationFeature,
+  rowSelectionFeature, rowSortingFeature, tableFeatures, useTable,
+  type RowSelectionState, type SortingState,
 } from '@tanstack/react-table';
 import { RiDeleteBinLine, RiRefreshLine, RiRssLine } from '@remixicon/react';
 import { VisuallyHidden } from 'react-aria-components';
@@ -30,6 +30,7 @@ import { Switch } from '@/components/base/switch/switch';
 import {
   Table, TableBody, TableCell, TableColumn, TableHeader, TableRow,
 } from '@/components/base/table/table';
+import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 
 import { errorMessage } from '../../api';
 import { DataTableFrame } from '../components/data-table-frame';
@@ -52,6 +53,8 @@ import {
 const feedTableFeatures = tableFeatures({
   rowPaginationFeature,
   rowSelectionFeature,
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
   paginatedRowModel: createPaginatedRowModel(),
 });
 
@@ -160,6 +163,7 @@ export function FeedSources({ readOnly, toast }: {
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set<number>());
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [sorting, setSorting] = useState<SortingState>([]);
   const win = pageWindow(sources.length, pageSize, page);
   useEffect(() => { setPage((current) => Math.min(current, win.pages)) }, [win.pages]);
 
@@ -265,20 +269,20 @@ export function FeedSources({ readOnly, toast }: {
           </a>
         ),
       }),
-      column.display({
+      column.accessor((source) => source.last_error ? '拉取失败' : source.enabled ? '已启用' : '已暂停', {
         id: 'status',
         header: label('status'),
         cell: (context) => <StatusChip source={context.row.original} />,
       }),
-      column.accessor((row) => feedIntervalText(row.interval_minutes), {
+      column.accessor((row) => row.interval_minutes, {
         id: 'interval',
         header: label('interval'),
-        cell: (context) => <span className="whitespace-nowrap">{context.getValue()}</span>,
+        cell: (context) => <span className="whitespace-nowrap">{feedIntervalText(context.getValue())}</span>,
       }),
-      column.accessor((row) => (row.last_fetched_at ? localTime(row.last_fetched_at) : '还没拉过'), {
+      column.accessor((row) => row.last_fetched_at ? Date.parse(row.last_fetched_at) || 0 : 0, {
         id: 'fetched',
         header: label('fetched'),
-        cell: (context) => <span className="whitespace-nowrap tabular-nums">{context.getValue()}</span>,
+        cell: (context) => <span className="whitespace-nowrap tabular-nums">{context.row.original.last_fetched_at ? localTime(context.row.original.last_fetched_at) : '还没拉过'}</span>,
       }),
       column.accessor((row) => row.last_new_count, {
         id: 'fresh',
@@ -317,7 +321,8 @@ export function FeedSources({ readOnly, toast }: {
     data: sources,
     columns,
     getRowId: (row) => String(row.id),
-    state: { rowSelection, pagination: { pageIndex: win.page - 1, pageSize } },
+    state: { rowSelection, sorting, pagination: { pageIndex: win.page - 1, pageSize } },
+    onSortingChange: (next) => { setSorting(next); setPage(1); },
     enableRowSelection: true,
     onRowSelectionChange: (updater) => {
       const next = typeof updater === 'function' ? updater(rowSelection) : updater;
@@ -383,14 +388,19 @@ export function FeedSources({ readOnly, toast }: {
         </SelectionDock>
 
       {sources.length ? (
-        <DataTableFrame onRowClick={(key) => toggleRow(Number(key))}>
-          <Table aria-label="JAV 订阅源" size="sm">
+        <DataTableFrame follow onRowClick={(key) => toggleRow(Number(key))}>
+          <Table aria-label="JAV 订阅源" size="sm"
+            sortDescriptor={sorting[0] ? { column: sorting[0].id, direction: sorting[0].desc ? 'descending' : 'ascending' } : undefined}
+            onSortChange={(sort) => table.getColumn(String(sort.column))?.toggleSorting(sort.direction === 'descending')}>
             <TableHeader>
               {table.getHeaderGroups()[0]!.headers.map((header) => {
                 const text = flexRender(header.column.columnDef.header, header.getContext());
                 return (
-                  <TableColumn key={header.id} id={header.id} isRowHeader={header.column.id === 'name'}>
-                    {SILENT_COLUMNS.has(header.column.id) ? <VisuallyHidden>{text}</VisuallyHidden> : text}
+                  <TableColumn key={header.id} id={header.id} isRowHeader={header.column.id === 'name'} allowsSorting={header.column.getCanSort()}>
+                    {({ sortDirection }) => SILENT_COLUMNS.has(header.column.id) ? <VisuallyHidden>{text}</VisuallyHidden>
+                      : <span className="flex items-center gap-0.5">{text}
+                        {header.column.getCanSort() ? <span data-sort-indicator data-direction={sortDirection || undefined}><ChevronSortDown /></span> : null}
+                      </span>}
                   </TableColumn>
                 );
               })}
