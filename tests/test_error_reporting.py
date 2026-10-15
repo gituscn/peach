@@ -86,7 +86,7 @@ class ErrorReportingTests(unittest.TestCase):
             'password=private-password\n'
             'https://private.example/download?key=private-key\n'
             'C:\\Users\\private-user\\private.mp4\n'
-            '/Users/private-user/movie.mp4\n192.168.1.20\n'
+            '/example/private-user/movie.mp4\n203.0.113.20\n'
             'user@private.example\n', encoding="utf-8")
         (self.logs / "unapproved.log").write_text("private-unapproved", encoding="utf-8")
         error_reporting.event("entry")
@@ -97,7 +97,7 @@ class ErrorReportingTests(unittest.TestCase):
             self.assertTrue(all(name == "report.json" or name.startswith("logs/") for name in archive.namelist()))
             self.assertNotIn("unapproved.log", " ".join(archive.namelist()))
         for secret in ("private-session", "private-cookie", "private-auth", "private-password", "private-key",
-                       "private.example", "private-user", "192.168.1.20", "private-database", "unclosed-private-config"):
+                       "private.example", "private-user", "203.0.113.20", "private-database", "unclosed-private-config"):
             self.assertNotIn(secret, contents)
 
     def test_report_tail_is_bounded_and_records_the_truncation(self):
