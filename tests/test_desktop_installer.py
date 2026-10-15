@@ -1,6 +1,11 @@
 """安装包与 Peach 自身更新、卸载机制之间的约定。"""
 from pathlib import Path
+import ctypes
+import os
 import re
+import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -25,6 +30,130 @@ class InstallerContractTests(unittest.TestCase):
     def test_start_menu_entry_is_the_shortcut_peach_removes(self):
         name = iss_value(r'^Name: "\{userprograms\}\\([^"]+)"; Filename: "\{app\}\\Peach\.exe"')
         self.assertEqual(name + ".lnk", desktop_installer.MENU_SHORTCUT)
+
+    def test_directory_page_and_upgrade_directory_are_enabled(self):
+        self.assertEqual(iss_value(r"^DisableDirPage=(.+)$"), "no")
+        self.assertEqual(iss_value(r"^UsePreviousAppDir=(.+)$"), "yes")
+
+
+@unittest.skipUnless(sys.platform == "win32", "安装器目录回归需要 Windows")
+class InstallerDirectoryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        candidates = [os.environ.get("PEACH_ISCC"), shutil.which("ISCC.exe")]
+        for base in (os.environ.get("ProgramFiles(x86)"),
+                     str(Path(os.environ.get("LOCALAPPDATA", "")) / "Programs")):
+            if base:
+                candidates.append(str(Path(base) / "Inno Setup 6/ISCC.exe"))
+        cls.compiler = next((p for p in candidates if p and Path(p).is_file()), None)
+        if not cls.compiler:
+            raise unittest.SkipTest("未取得 Inno Setup 编译器")
+        temporary = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(temporary.cleanup)
+        cls.build = Path(temporary.name).resolve()
+        fixture = ISS.parent / "directory-contract-test.iss"
+        cls.compile(fixture, f"/O{cls.build}")
+
+    @classmethod
+    def compile(cls, script, *options):
+        compiled = subprocess.run([cls.compiler, "/Q", *options, str(script)],
+                                  capture_output=True, timeout=120)
+        if compiled.returncode:
+            raise AssertionError(compiled.stdout.decode(errors="replace") +
+                                 compiled.stderr.decode(errors="replace"))
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.data = self.root / "data"
+        self.data.mkdir()
+
+    def check_directory(self, program, expected, *, previous="", data=None):
+        result = self.root / "result.txt"
+        result.unlink(missing_ok=True)
+        subprocess.run([str(self.build / "directory-contract.exe"), "/VERYSILENT",
+                        "/SUPPRESSMSGBOXES", "/NORESTART", f"/program={program}",
+                        f"/data={data or self.data}", f"/previous={previous}",
+                        f"/result={result}"], capture_output=True, timeout=30)
+        self.assertEqual(result.read_text(), expected)
+
+    def test_custom_directory_with_spaces_and_unicode(self):
+        program = self.root / "自选 目录/Peach"
+        self.check_directory(program, "ok")
+        self.assertFalse(program.exists())
+
+    def test_empty_existing_directory(self):
+        program = self.root / "Peach"
+        program.mkdir()
+        self.check_directory(program, "ok")
+        self.assertEqual(list(program.iterdir()), [])
+
+    def test_data_directory_and_ancestors_and_children_are_rejected(self):
+        for program in (self.data, self.root, self.data / "Peach",
+                        self.data / "child/../Peach", str(self.data).upper()):
+            with self.subTest(program=program):
+                self.check_directory(program, "DirectoryOverlapsData")
+
+    def test_sibling_with_the_same_prefix_is_independent(self):
+        self.check_directory(self.root / "data-program", "ok")
+
+    def test_short_path_alias_of_data_is_rejected(self):
+        data = self.root / "Peach data directory"
+        data.mkdir()
+        buffer = ctypes.create_unicode_buffer(32768)
+        size = ctypes.windll.kernel32.GetShortPathNameW(str(data), buffer, len(buffer))
+        self.assertGreater(size, 0)
+        self.check_directory(Path(buffer.value) / "Peach", "DirectoryOverlapsData", data=data)
+
+    def test_directory_and_update_parent_must_be_writable(self):
+        parent = self.root / "programs"
+        program = parent / "Peach"
+        program.mkdir(parents=True)
+        for denied in (program, parent):
+            with self.subTest(denied=denied):
+                changed = subprocess.run(["icacls", str(denied), "/deny", "*S-1-1-0:(W)"],
+                                         capture_output=True, timeout=10)
+                try:
+                    self.assertEqual(changed.returncode, 0, changed.stderr)
+                    self.check_directory(program, "DirectoryNotWritable")
+                finally:
+                    restored = subprocess.run(["icacls", str(denied), "/remove:d", "*S-1-1-0"],
+                                              capture_output=True, timeout=10)
+                    self.assertEqual(restored.returncode, 0, restored.stderr)
+
+    def test_unrelated_nonempty_directory_is_rejected(self):
+        program = self.root / "media"
+        program.mkdir()
+        original = program / "personal.txt"
+        original.write_text("keep")
+        self.check_directory(program, "DirectoryNotDedicated")
+        self.assertEqual(original.read_text(), "keep")
+
+    def test_existing_installation_can_be_upgraded_in_place(self):
+        program = self.root / "Peach"
+        program.mkdir()
+        for name in ("Peach.exe", "unins000.exe"):
+            (program / name).touch()
+        self.check_directory(program, "ok", previous=program)
+        self.check_directory(self.root / "elsewhere", "DirectoryMove", previous=program)
+
+    def test_directory_junction_is_rejected(self):
+        alias = self.root / "alias"
+        made = subprocess.run(["cmd", "/c", "mklink", "/J", str(alias), str(self.data)],
+                              capture_output=True, timeout=10)
+        self.assertEqual(made.returncode, 0, made.stderr)
+        self.addCleanup(alias.rmdir)
+        self.check_directory(alias / "Peach", "DirectoryLink")
+        self.check_directory(self.root / "Peach", "DirectoryLink", data=alias)
+
+    def test_production_installer_compiles_with_directory_validation(self):
+        payload = self.root / "payload"
+        payload.mkdir()
+        (payload / "Peach.exe").write_bytes(b"compile fixture")
+        self.compile(ISS, "/DAppVersion=0.0.0", f"/DSourceDir={payload}",
+                     f"/DOutputDir={self.root}")
+        self.assertTrue((self.root / "Peach-0.0.0-windows-x64-setup.exe").is_file())
 
 
 class InstallerHandoffTests(unittest.TestCase):
