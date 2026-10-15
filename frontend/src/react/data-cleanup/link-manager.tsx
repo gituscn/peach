@@ -13,15 +13,11 @@ import { useQuery } from '@tanstack/react-query';
 import { confirmModal } from '@peach/legacy/ui';
 
 import { Button } from '@/components/base/buttons/button';
-import { Checkbox } from '@/components/base/checkbox/checkbox';
-import {
-  Table, TableBody, TableCell, TableColumn, TableHeader, TableRow,
-} from '@/components/base/table/table';
 
 import { errorMessage } from '../../api';
 import { ErrorExcerpt } from '../activity/error-excerpt';
 import { useBackgroundJob } from '../background-job';
-import { DataTableFrame } from '../components/data-table-frame';
+import { DataTable, type DataColumn } from '../components/data-table';
 import {
   Fieldset, FieldsetTitle, PanelFooter, RESULT_PANEL, RESULT_SECTION, SectionHeading,
 } from '../components/fieldset';
@@ -47,9 +43,6 @@ const DISCONNECTED = '暂时无法读取进度，正在重新连接…';
 
 const count = (value: number | undefined) => Number(value || 0).toLocaleString();
 
-/** 一张结果表先露的行数：一趟检查能判出上百条，全铺开这一节就有几屏长。 */
-export const LINK_TABLE_PREVIEW = 10;
-
 /** 一格读数：名目、数字、可选的一句注。每一类各占一格：挤成一行时标签和数字之间只剩
  *  间隔点，数字归谁全靠猜。 */
 function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
@@ -66,82 +59,36 @@ function LinkTable(
   { title, items, hint, picked, onPick, children }:
   {
     title: string; items: LinkRow[]; hint: string;
-    picked?: readonly number[]; onPick?(next: number[]): void; children?: ReactNode;
+    picked: readonly number[]; onPick(next: number[]): void; children?: ReactNode;
   },
 ) {
-  const [expanded, setExpanded] = useState(false);
   if (!items.length) return null;
-  const chosen = picked ?? [];
-  const all = chosen.length > 0 && chosen.length === items.length;
-  // 收起时只露前几行；全选、重试与删除照旧作用于整张表，表头的计数也是全部。
-  const shown = expanded ? items : items.slice(0, LINK_TABLE_PREVIEW);
-  const folded = items.length > LINK_TABLE_PREVIEW;
+  const columns: DataColumn<LinkRow>[] = [
+    { id: 'entity', label: '所属', value: (item) => item.entity,
+      render: (item) => <span className="block min-w-24 wrap-anywhere">{item.entity}</span> },
+    { id: 'kind', label: '类型', value: (item) => LINK_KINDS[item.link_kind] || item.link_kind,
+      render: (item) => LINK_KINDS[item.link_kind] || item.link_kind },
+    { id: 'label', label: '标签', value: (item) => item.label || '',
+      render: (item) => <span className="block min-w-24 wrap-anywhere">{item.label || ''}</span> },
+    { id: 'note', label: '结果', value: (item) => item.note,
+      render: (item) => <div className="min-w-40 max-w-80"><ErrorExcerpt text={item.note} className="tabular-nums text-text-error-primary" /></div> },
+    { id: 'url', label: '地址', value: (item) => item.url,
+      render: (item) => <a href={item.url} target="_blank" rel="noreferrer" title={item.url}
+        className="flex max-w-90 min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary">
+        <span data-middle-truncate className="min-w-0 truncate">{item.url}</span>
+        <RiExternalLinkLine aria-hidden className="size-3.5 shrink-0" />
+      </a> },
+  ];
   return (
     <div className={RESULT_SECTION}>
       <h4 className="mb-1 text-body-semibold text-text-primary">
         {title}<b className="ml-1.5 font-semibold tabular-nums text-text-secondary">{items.length.toLocaleString()}</b>
       </h4>
       <p className="mb-3 text-caption-1-regular text-text-secondary">{hint}</p>
-      <DataTableFrame>
-        <Table aria-label={title} size="sm">
-          <TableHeader>
-            {onPick ? (
-              <TableColumn id="pick">
-                <Checkbox slot={null} aria-label="全选本次未访问成功的链接"
-                  isSelected={all} isIndeterminate={chosen.length > 0 && !all}
-                  onChange={(on) => onPick(on ? items.map((item) => item.id) : [])} />
-              </TableColumn>
-            ) : null}
-            <TableColumn id="entity" isRowHeader>所属</TableColumn>
-            <TableColumn id="kind">类型</TableColumn>
-            <TableColumn id="label">标签</TableColumn>
-            <TableColumn id="note">结果</TableColumn>
-            <TableColumn id="url">地址</TableColumn>
-          </TableHeader>
-          <TableBody>
-            {shown.map((item) => (
-              <TableRow key={item.id} id={item.id}>
-                {onPick ? (
-                  <TableCell>
-                    <Checkbox slot={null} aria-label={`选择 ${item.entity} 的${item.label || item.url}`}
-                      isSelected={chosen.includes(item.id)}
-                      onChange={(on) => onPick(on
-                        ? [...chosen, item.id]
-                        : chosen.filter((id) => id !== item.id))} />
-                  </TableCell>
-                ) : null}
-                {/* 结果常是整段报错：收成一行、宽度封顶，所属和标签留出能读的宽度。 */}
-                <TableCell><span className="block min-w-24 wrap-anywhere">{item.entity}</span></TableCell>
-                <TableCell>{LINK_KINDS[item.link_kind] || item.link_kind}</TableCell>
-                <TableCell><span className="block min-w-24 wrap-anywhere">{item.label || ''}</span></TableCell>
-                <TableCell>
-                  <div className="min-w-40 max-w-80">
-                    <ErrorExcerpt text={item.note} className="tabular-nums text-text-error-primary" />
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {/* 地址保留首尾：`/official/talent/X` 与 `/talent/X` 的差别就在尾部，尾部省略
-                      正好把这张表要回答的东西切掉。中缩改写的是那个 span 的 textContent，
-                      外链标留在它外面才不会被一起抹掉。 */}
-                  <a href={item.url} target="_blank" rel="noreferrer" title={item.url}
-                    className="flex max-w-90 min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary">
-                    <span data-middle-truncate className="min-w-0 truncate">{item.url}</span>
-                    <RiExternalLinkLine aria-hidden className="size-3.5 shrink-0" />
-                  </a>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </DataTableFrame>
-      {folded
-        ? <div className="mt-2">
-            <Button variant="secondary" size="small" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
-              {expanded ? '收起' : `显示全部 ${items.length.toLocaleString()} 条`}
-            </Button>
-          </div>
-        : null}
-      {children}
+      <DataTable label={title} items={items} columns={columns} rowId={(item) => String(item.id)}
+        rowLabel={(item) => `${item.entity} 的${item.label || item.url}`}
+        selected={picked.map(String)} onSelected={(ids) => onPick(ids.map(Number))}
+        actions={() => children} />
     </div>
   );
 }
@@ -149,7 +96,8 @@ function LinkTable(
 export function LinkManager() {
   const stats = useQuery({ queryKey: LINKS_KEY, queryFn: ({ signal }) => fetchLinkStats(signal) });
   const [picked, setPicked] = useState<number[]>([]);
-  const prune = useBackgroundJob<LinkPruneState, string>({
+  const [gonePicked, setGonePicked] = useState<number[]>([]);
+  const prune = useBackgroundJob<LinkPruneState, { checkId: string; ids?: number[] }>({
     queryKey: LINK_PRUNE_KEY,
     queryFn: ({ signal }) => fetchLinkPrune(signal),
     start: startLinkPrune,
@@ -164,12 +112,12 @@ export function LinkManager() {
     queryFn: ({ signal }) => fetchLinkCheck(signal),
     start: startLinkCheck,
     /* 又起了一趟检查：上一趟删除的回执说的是旧清单，勾选的行号也不再指向任何东西。 */
-    onStarted: () => { prune.dismiss(); setPicked([]) },
+    onStarted: () => { prune.dismiss(); setPicked([]); setGonePicked([]) },
   });
 
   const state = check.job;
   const checkId = state?.check_id ?? '';
-  useEffect(() => { setPicked([]) }, [checkId]);
+  useEffect(() => { setPicked([]); setGonePicked([]) }, [checkId]);
 
   const running = check.running || check.start.isPending;
   const removing = prune.running || prune.start.isPending;
@@ -177,6 +125,8 @@ export function LinkManager() {
   const gone = state?.gone ?? [];
   const unclear = state?.unclear ?? [];
   const retryable = done ? unclear : [];
+  const selectedGone = gone.filter((item) => gonePicked.includes(item.id)).map((item) => item.id);
+  const selectedRetryable = retryable.filter((item) => picked.includes(item.id)).map((item) => item.id);
   const info = stats.data;
   const hosts = (info?.top_hosts ?? []).slice(0, 3).map(([host, n]) => `${host} ${count(n)}`).join(' · ');
 
@@ -184,14 +134,14 @@ export function LinkManager() {
     if (running || (retry && !retry.length)) return;
     check.start.mutate(retry ? { retry, checkId } : {});
   };
-  const removeGone = () => {
+  const removeGone = (ids?: number[]) => {
     if (removing || !gone.length) return;
     void confirmModal({
       title: '删除失效链接',
-      body: `将删除 ${gone.length} 条失效链接。删除前会再次检查，删除后无法恢复。`,
+      body: `将删除 ${ids?.length ?? gone.length} 条失效链接。删除前会再次检查，删除后无法恢复。`,
       confirmLabel: '删除失效链接',
       danger: true,
-      onConfirm: () => prune.start.mutateAsync(checkId),
+      onConfirm: () => prune.start.mutateAsync({ checkId, ids }),
     });
   };
 
@@ -202,7 +152,7 @@ export function LinkManager() {
   let result: ReactNode = null;
   if (pruned?.status === 'failed') {
     result = <Note tone="error" title="链接清理未完成">{pruned.error || '请查看任务记录，核对已处理的链接。'}</Note>;
-  } else if (pruned) {
+  } else if (pruned && !gone.length && !unclear.length) {
     result = <Note tone="success" title="完成">{pruneText(pruned)}</Note>;
   } else if (startError) {
     result = <Note tone="error" title="检查失败">{errorMessage(startError)}</Note>;
@@ -220,26 +170,30 @@ export function LinkManager() {
             value={Math.min(prune.job?.checked || 0, prune.job?.total || 0)} total={prune.job?.total} />
         : null}
     </>;
-    const pickedLabel = picked.length ? `重试选中的 ${picked.length} 条` : '重试选中的链接';
+    const pickedLabel = selectedRetryable.length ? `重试选中的 ${selectedRetryable.length} 条` : '重试选中的链接';
     result = done || gone.length || unclear.length ? (
       <div className={RESULT_PANEL}>
-        <LinkTable title="地址已失效" items={gone} hint={GONE_HINT} />
+        {pruned?.status === 'complete' ? <Note tone="success" title="完成">{pruneText(pruned)}</Note> : null}
+        <LinkTable title="地址已失效" items={gone} hint={GONE_HINT} picked={gonePicked} onPick={setGonePicked}>
+          <Button variant="danger" size="small" disabled={!done || !selectedGone.length}
+            {...busyProps(removing)} onClick={() => removeGone(selectedGone)}>
+            {`删除所选（${selectedGone.length}）`}
+          </Button>
+        </LinkTable>
         <LinkTable title="本次未访问成功" items={unclear} hint={UNCLEAR_HINT}
-          picked={retryable.length ? picked : undefined} onPick={retryable.length ? setPicked : undefined}>
+          picked={picked} onPick={setPicked}>
           {retryable.length
-            ? <div className="-mx-4 mt-3 -mb-4">
-                <PanelFooter>
-                  <Button leadingIcon={RETRY} disabled={!picked.length} {...busyProps(running)}
-                    onClick={() => run(picked)}>{pickedLabel}</Button>
+            ? <>
+                  <Button leadingIcon={RETRY} disabled={!selectedRetryable.length} {...busyProps(running)}
+                    onClick={() => run(selectedRetryable)}>{pickedLabel}</Button>
                   <Button leadingIcon={RETRY} {...busyProps(running)}
                     onClick={() => run(retryable.map((item) => item.id))}>{`全部重试（${retryable.length}）`}</Button>
-                </PanelFooter>
-              </div>
+              </>
             : null}
         </LinkTable>
         {done && gone.length
           ? <PanelFooter tone="error" status={PRUNE_HINT}>
-              <Button variant="danger" {...busyProps(removing)} onClick={removeGone}>
+              <Button variant="danger" {...busyProps(removing)} onClick={() => removeGone()}>
                 {`删除 ${gone.length} 条失效链接`}
               </Button>
             </PanelFooter>

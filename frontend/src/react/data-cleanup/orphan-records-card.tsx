@@ -10,13 +10,10 @@ import { LOC } from '@peach/legacy/core';
 
 import { Button } from '@/components/base/buttons/button';
 import { Select, SelectItem } from '@/components/base/select/select';
-import {
-  Table, TableBody, TableCell, TableColumn, TableHeader, TableRow,
-} from '@/components/base/table/table';
 
 import { errorMessage } from '../../api';
-import { DataTableFrame } from '../components/data-table-frame';
-import { Fieldset, FieldsetTitle, SectionHeading } from '../components/fieldset';
+import { DataTable, type DataColumn } from '../components/data-table';
+import { SectionHeading } from '../components/fieldset';
 import { Note } from '../components/note';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { queryClient } from '../query';
@@ -30,7 +27,7 @@ const PLAY = spriteGlyph('play');
 
 const refresh = () => queryClient.invalidateQueries({ queryKey: ORPHAN_RECORDS_KEY, exact: true });
 
-function OrphanRow({ item, toast }: { item: OrphanRecord; toast(message: string): void }) {
+function OrphanActions({ item, toast }: { item: OrphanRecord; toast(message: string): void }) {
   const [target, setTarget] = useState<number | null>(item.candidates[0]?.id ?? null);
   const attach = useMutation({
     mutationFn: () => attachOrphan(item.id, Number(target)),
@@ -57,8 +54,28 @@ function OrphanRow({ item, toast }: { item: OrphanRecord; toast(message: string)
   };
   const busy = attach.isPending || purge.isPending;
   return (
-    <TableRow id={item.id}>
-      <TableCell>
+    <span className="flex min-w-48 flex-wrap items-center gap-2">
+        {item.candidates.length
+          ? <Select aria-label={`把 ${item.name} 的记录接到哪个文件`} className="w-52" selectedKey={target}
+              onSelectionChange={(key) => { if (key !== null) setTarget(Number(key)) }}>
+              {item.candidates.map((candidate) => (
+                <SelectItem key={candidate.id} id={candidate.id} textValue={candidateText(candidate)}>
+                  {candidateText(candidate)}
+                </SelectItem>
+              ))}
+            </Select>
+          : <span className="text-text-secondary">没有番号或文件名对得上的文件</span>}
+        {item.candidates.length
+          ? <Button size="small" disabled={target === null} {...busyProps(busy)}
+              onClick={() => attach.mutate()}>接到这个文件</Button>
+          : null}
+        <Button variant="danger" size="small" {...busyProps(busy)} onClick={remove}>彻底删除</Button>
+    </span>
+  );
+}
+
+function OrphanIdentity({ item }: { item: OrphanRecord }) {
+  return (
         <span className="flex min-w-0 items-center gap-3">
           {/* 快照图供认片；没有图或取不到时留一格带描边的占位，和重复文件页的封面格同一个样子。
               窄屏收起，把宽度让给名字与记录。 */}
@@ -77,68 +94,49 @@ function OrphanRow({ item, toast }: { item: OrphanRecord; toast(message: string)
             </small>
           </span>
         </span>
-      </TableCell>
-      <TableCell><span className="block min-w-28">{recordsText(item.records)}</span></TableCell>
-      <TableCell>
-        {item.candidates.length
-          ? <Select aria-label={`把 ${item.name} 的记录接到哪个文件`} className="w-52" selectedKey={target}
-              onSelectionChange={(key) => { if (key !== null) setTarget(Number(key)) }}>
-              {item.candidates.map((candidate) => (
-                <SelectItem key={candidate.id} id={candidate.id} textValue={candidateText(candidate)}>
-                  {candidateText(candidate)}
-                </SelectItem>
-              ))}
-            </Select>
-          : <span className="text-text-secondary">没有番号或文件名对得上的文件</span>}
-      </TableCell>
-      <TableCell>
-        <span className="flex flex-wrap gap-2">
-          {item.candidates.length
-            ? <Button size="small" disabled={busy || target === null}
-                {...busyProps(attach.isPending)} onClick={() => attach.mutate()}>接到这个文件</Button>
-            : null}
-          <Button variant="danger" size="small" disabled={busy} {...busyProps(purge.isPending)}
-            onClick={remove}>彻底删除</Button>
-        </span>
-      </TableCell>
-    </TableRow>
   );
 }
 
 export function OrphanRecordsCard({ toast }: { toast(message: string): void }) {
+  const [selected, setSelected] = useState<string[]>([]);
   const query = useQuery({ queryKey: ORPHAN_RECORDS_KEY, queryFn: ({ signal }) => fetchOrphanRecords(signal) });
   const items = query.data?.items ?? [];
-  const total = query.data?.total ?? items.length;
+  const purge = useMutation({
+    mutationFn: (ids: number[]) => purgeOrphan(ids),
+    onSuccess: (data) => {
+      toast(`已彻底删除 ${data.purged} 条记录${data.blocked.length ? `，${data.blocked.length} 条文件已恢复，未删除` : ''}`);
+      setSelected([]); void refresh();
+    },
+  });
+  const removeSelected = (chosen: OrphanRecord[]) => void confirmModal({
+    title: '彻底删除所选记录',
+    body: `将删除以下 ${chosen.length} 条作品和它们带的全部记录：${chosen.map((item) => `「${item.name}」`).join('、')}。此操作不可撤销。`,
+    confirmLabel: '彻底删除所选记录', danger: true,
+    onConfirm: () => purge.mutateAsync(chosen.map((item) => item.id)),
+  });
+  const columns: DataColumn<OrphanRecord>[] = [
+    { id: 'item', label: '作品', value: (item) => item.name, render: (item) => <OrphanIdentity item={item} /> },
+    { id: 'records', label: '带的记录', value: (item) => recordsText(item.records),
+      render: (item) => <span className="block min-w-28">{recordsText(item.records) || '无个人记录'}</span> },
+    { id: 'target', label: '接到与操作', value: (item) => item.candidates.length,
+      render: (item) => <OrphanActions item={item} toast={toast} /> },
+  ];
   if (!query.isError && !items.length) return null;
   return (
     <section id="orphan-records" aria-labelledby="orphan-records-title" className="flex scroll-mt-20 flex-col gap-4">
       <SectionHeading id="orphan-records-title">孤儿记录</SectionHeading>
-      <Fieldset layout="stack" labelledBy="orphan-records-box">
-        <FieldsetTitle id="orphan-records-box" gap="small">文件已消失的作品</FieldsetTitle>
-        <p className="mb-3 text-body-regular text-text-secondary">
+        <p className="text-body-regular text-text-secondary">
           这些作品的文件已不在盘上，喜欢、稍后看、播放列表与观看历史都还留着。接到新文件后记录跟过去，旧的这一条删掉。
         </p>
         {query.isError
           ? <Note tone="error" title="孤儿记录读取失败">{errorMessage(query.error)}</Note>
-          : <DataTableFrame>
-              <Table aria-label="文件已消失的作品" size="sm">
-                <TableHeader>
-                  <TableColumn id="item" isRowHeader>作品</TableColumn>
-                  <TableColumn id="records">带的记录</TableColumn>
-                  <TableColumn id="target">接到</TableColumn>
-                  <TableColumn id="actions">操作</TableColumn>
-                </TableHeader>
-                <TableBody>
-                  {items.map((item) => <OrphanRow key={item.id} item={item} toast={toast} />)}
-                </TableBody>
-              </Table>
-            </DataTableFrame>}
-        {!query.isError && total > items.length
-          ? <p className="mt-3 text-caption-1-regular text-text-secondary">
-              {`显示前 ${items.length.toLocaleString()} 条，共 ${total.toLocaleString()} 条。`}
-            </p>
-          : null}
-      </Fieldset>
+          : <DataTable label="文件已消失的作品" items={items} columns={columns}
+              rowId={(item) => String(item.id)} rowLabel={(item) => item.name}
+              selected={selected} onSelected={setSelected}
+              actions={(chosen) => <Button variant="danger" size="small" disabled={!chosen.length}
+                {...busyProps(purge.isPending)} onClick={() => removeSelected(chosen)}>
+                {`彻底删除所选（${chosen.length}）`}
+              </Button>} />}
     </section>
   );
 }

@@ -171,6 +171,31 @@ class SummaryTests(unittest.TestCase):
         """不可逆动作不接受默认参数。"""
         self.assertFalse(web_links.w_links_prune(self.contract, {})["ok"])
 
+    def test_prune_selected_ids_only_reverifies_and_removes_the_chosen_links(self):
+        self._finished_check()
+        state = self.contract.link_check.state
+        state["gone"].append({"id": 3, "entity": "MOODYZ", "link_kind": "official",
+                              "label": "官方网站", "url": "https://moodyz.com/", "note": "HTTP 404"})
+        probed = []
+        original = web_links._probe
+        self.addCleanup(setattr, web_links, "_probe", original)
+        web_links._probe = lambda url, timeout=0: probed.append(url) or (404, "")
+        out = web_links.w_links_prune(self.contract, {"confirm": True, "check_id": "fresh", "ids": [3]})
+        self.assertEqual(out["removed"], 1)
+        self.assertEqual(probed, ["https://moodyz.com/"])
+        self.assertEqual([item["id"] for item in self.contract.link_check.snapshot()["gone"]], [1])
+        with self.contract.read_connection() as connection:
+            self.assertEqual([row[0] for row in connection.execute("SELECT id FROM entity_link ORDER BY id")], [1, 2])
+
+    def test_prune_selected_ids_rejects_empty_invalid_and_outside_selection(self):
+        self._finished_check()
+        for ids in ([], [2], [999], [True], ["1"], None):
+            with self.subTest(ids=ids):
+                out = web_links.w_links_prune(self.contract, {"confirm": True, "check_id": "fresh", "ids": ids})
+                self.assertFalse(out["ok"])
+        with self.contract.read_connection() as connection:
+            self.assertEqual(connection.execute("SELECT count(*) FROM entity_link").fetchone()[0], 3)
+
     def _finished_check(self):
         self.contract.link_check.state = {
             "check_id": "fresh", "status": "complete", "checked": 3, "total": 3,

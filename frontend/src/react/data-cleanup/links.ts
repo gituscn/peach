@@ -92,8 +92,8 @@ export const fetchLinkPrune = (signal?: AbortSignal) => apiGet<LinkPruneState>(L
 
 /** 删除判定为失效的链接。服务端删前逐条重验一次，所以这一趟走后台任务；不可撤销，
  *  调用方必须先过确认弹层。 */
-export const startLinkPrune = (checkId: string) =>
-  accepted(apiSend<LinkPruneState>(LINK_PRUNE_URL, { confirm: true, check_id: checkId, background: true }));
+export const startLinkPrune = ({ checkId, ids }: { checkId: string; ids?: number[] }) =>
+  accepted(apiSend<LinkPruneState>(LINK_PRUNE_URL, { confirm: true, check_id: checkId, background: true, ...(ids ? { ids } : {}) }));
 
 const count = (value: number | undefined) => Number(value || 0).toLocaleString();
 

@@ -226,6 +226,19 @@ def w_links_check(contract: LinkContract, body=None):
     ))
 
 
+def _prune_selection(planned: list[dict], body: dict) -> list[dict]:
+    """选择只能覆盖本次已确认失效的链接。"""
+    if "ids" not in body:
+        return planned
+    ids = body["ids"]
+    if not isinstance(ids, list) or not ids or any(type(item) is not int for item in ids):
+        raise ValueError("请选择失效链接")
+    requested = set(ids)
+    if not requested.issubset({item["id"] for item in planned}):
+        raise ValueError("所选链接不在本次失效清单中")
+    return [item for item in planned if item["id"] in requested]
+
+
 def w_links_prune(contract: LinkContract, body, *, progress=None):
     """删掉上一次检查判定为 gone 的链接。
 
@@ -247,7 +260,10 @@ def w_links_prune(contract: LinkContract, body, *, progress=None):
         return {"ok": False, "error": "没有已完成的检查结果"}
     if body.get("check_id") != state["check_id"]:
         return {"ok": False, "error": "检查结果已过期，请重新检查"}
-    planned = [dict(item) for item in state["gone"]]
+    try:
+        planned = _prune_selection([dict(item) for item in state["gone"]], body)
+    except ValueError as error:
+        return {"ok": False, "error": str(error)}
 
     confirmed, recovered = [], []
     for index, item in enumerate(planned):
@@ -269,6 +285,7 @@ def w_links_prune(contract: LinkContract, body, *, progress=None):
             removed, marked = link_status.settle_gone(connection, confirmed)
     with contract.link_check.editing(body.get("check_id")) as state:
         if state is not None:
-            state["gone"] = []
+            processed = {item["id"] for item in planned}
+            state["gone"] = [item for item in state["gone"] if item["id"] not in processed]
     return {"ok": True, "removed": removed, "marked": marked, "recovered": len(recovered),
             "entities": len({item["entity"] for item in confirmed})}

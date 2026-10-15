@@ -45,6 +45,7 @@ description: 在新增、修改或复核 Peach 页面、控件、提示、错误
 ## 实现门槛
 
 - 优先扩展 `frontend/src/ui-kit/`，不要为同一语义复制一次性 class 和模板。
+- 数据表统一使用 TanStack Table 驱动 BoardUI `Table`，具备全集排序、分页、跨页选择和业务批量操作；复用 `react/components/data-table.tsx`、`DataTableFrame` 与 `DataTableFooter`，独立表格分区只保留表框。
 - 颜色、字号、圆角、浮层层级只用 `:root` 已有 token；新 token 必须证明现有词汇无法表达。
 - 字重只有 400／500／600 三档，标题也是 600；圆角只用 `--badge-radius`／`--control-radius`／`--surface-radius`／`--floating-radius`／`--pill-radius` 加 `50%` 与 `0`，带边框容器里的头尾条用 `calc(… - 1px)` 保持同心。两者的字面值由 `tests/test_web_ui.py` 拒绝，归属判据见 `:root` 注释。
 - 单色优先：`--tungsten` 只给焦点环、链接、进度／数据与 Toggle 开态。主动作用 `--ink` 底 `--ground` 字且每屏最多一个。标题悬停下划线不变蓝，计数徽章中性灰。其它选择器引用 `--tungsten` 由 `tests/test_web_ui.py` 拒绝；实测见 `vercel-geist-semantics-measured.md`「选中态与开关色」「Button 全变体与状态」。
