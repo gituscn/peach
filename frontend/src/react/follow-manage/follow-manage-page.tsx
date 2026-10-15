@@ -20,6 +20,7 @@ import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 
 import { resolveFollowSort } from '../../follow-sort';
 import type { FollowManageProps } from '../bundle';
+import { cardClass } from '../components/card';
 import { Note } from '../components/note';
 import { Page } from '../components/page';
 import { STAT_STRIP_SIX } from '../components/stat-card';
@@ -41,12 +42,12 @@ type TabKey = (typeof TABS)[number][0];
 
 const isTab = (value: unknown): value is TabKey => TABS.some(([key]) => key === value);
 
-/** 概览中的一格读数，名称、数量和单位保持完整。 */
+/** 一格读数：一个名字、一个大数、一句它的量词。旧 `.fmanageoverview>div` 的填充卡。 */
 function Reading({ term, figure, unit }: { term: string; figure: number; unit: string }) {
   return (
-    <div className="flex min-w-0 flex-col gap-2 py-2">
+    <div className={cardClass({ padding: 'none', className: 'flex flex-col gap-3 px-6 py-5 max-sm:gap-2 max-sm:p-4' })}>
       <span className="text-body-medium text-text-secondary">{term}</span>
-      {/* 六位数起小一号字、七位数起再小一号；更长时单位落到下一行，读数保持完整。 */}
+      {/* 六位数起小一号字、七位数起再小一号，六卡并排时读数和单位仍在一行；更长时单位落到下一行，不顶出卡片。 */}
       <b data-follow-reading="" className={`flex min-w-0 flex-wrap items-baseline gap-x-1 tabular-nums text-text-primary ${
         figure >= 1000000 ? 'text-headline-medium' : figure >= 100000 ? 'text-title-3-medium' : 'text-title-1-medium'}`}>
         <span className="min-w-0 wrap-anywhere">{figure.toLocaleString()}</span>
@@ -125,7 +126,7 @@ export function FollowManagePage(props: FollowManageProps) {
         </Note>
       ) : null}
 
-      {/* 前四项是关注，后两项是 JAV 订阅源。 */}
+      {/* 前四张是关注，后两张是 JAV 订阅源：订了几位、拉回来的新作还有几条没看。 */}
       <div className={STAT_STRIP_SIX} aria-label="关注概览">
         <Reading term="关注创作者" figure={groups.length} unit="位" />
         <Reading term="启用来源" figure={enabled} unit={`/ ${sources.length}`} />

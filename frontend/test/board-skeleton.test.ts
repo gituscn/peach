@@ -26,7 +26,7 @@ describe('Board 页面骨架', () => {
   });
   it.each([
     ['/stats', '[data-stats-chart]', 2],
-    ['/tasks', '.peach-react section', 3],
+    ['/tasks', '.activitysection', 3],
     ['/duplicates', '[data-duplicate-group] .duplicate-row', 4],
     ['/quality-goals', '.peach-react .card-grid-cover > li', 6],
     ['/subscriptions', '.peach-react .ui-follow-skeleton-surface .follow-skeleton-author', 3],

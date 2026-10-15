@@ -35,6 +35,7 @@ import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 import { errorMessage } from '../../api';
 import { DOTS, paginationRange } from '../../pagination';
 import { useBackgroundJob } from '../background-job';
+import { cardClass } from '../components/card';
 import { DataTableFrame } from '../components/data-table-frame';
 import { EmptyState } from '../components/empty-state';
 import { clickedBlank } from '../components/row-click';
@@ -213,7 +214,9 @@ function AuthorCard(
   const state = selectionState(selected, ids);
   return (
     <section aria-label={`${name} 的关注来源`}
-      className="flex min-w-0 flex-col border-t border-separator-border py-2">
+      className={cardClass({
+        variant: 'raised', padding: 'none', className: 'flex flex-col overflow-hidden p-2',
+      })}>
       <div data-follow-author-header data-open={open || undefined}
         className="flex flex-wrap items-center gap-3 px-2 py-2.5">
         <AuthorAvatar group={group} name={name} />
@@ -520,12 +523,17 @@ export function SourceList(props: SourceListProps) {
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    /* 旧 `.followmanage .fmain>.fsec`：整块关注列表是一张填充卡，标题、工具条、创作者分组
+       和底下那条汇总都在同一张卡里，不是一个描边容器套着几行。 */
+    <div className={cardClass({
+      padding: 'none',
+      className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4',
+    })}>
       {/* 放不下时带字的按钮先收成图标，再让整行换行。收起后名字由 `aria-label` 接着说。
           窄屏固定两行：上一行标题、读数与检查全部，下一行版式、排序与全部收起。 */}
       <div ref={toolbar} data-follow-toolbar="" className="flex flex-wrap items-center gap-2">
         <span className="contents max-sm:flex max-sm:min-w-0 max-sm:flex-1 max-sm:flex-col">
-          <h3 className="mr-auto text-title-2-medium text-text-primary">来源</h3>
+          <h3 className="mr-auto text-title-2-medium text-text-primary">关注列表</h3>
           <span className="text-body-2-regular text-text-secondary">
             {`${sources.length.toLocaleString()} 个来源${counts.new ? ` · ${count(counts.new)} 条未看` : ''}`}
           </span>
@@ -693,7 +701,8 @@ export function SourceList(props: SourceListProps) {
       </div>
 
       {counts.new ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-separator-border py-4">
+        /* 旧 `.fsecfoot`：汇总与它的动作是卡底那一条带，比卡面暗一点点，通到卡片左右两沿。 */
+        <div className="-mx-6 -mb-5 flex flex-wrap items-center gap-2 border-t border-separator-border rounded-b-2xl bg-card-footer px-6 py-4 max-sm:-mx-4 max-sm:px-4">
           <span className="mr-auto text-body-2-regular text-text-secondary">
             {`未看 ${count(counts.new)} · 已看 ${count(counts.seen)} · 已保存 ${count(counts.saved)} · 已忽略 ${count(counts.ignored)}`}
           </span>

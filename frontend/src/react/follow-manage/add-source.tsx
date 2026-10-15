@@ -221,7 +221,8 @@ function PickRow(
 
 export function AddSource({ data, credentials, readOnly, toast, openCredentials }: AddSourceProps) {
   const [line, setLine] = useState('');
-  /** 这一趟查的是什么。输入框在发出查找时就清空了，等待态的那句提示按它判断。 */
+  const [composing, setComposing] = useState(false);
+  /** 这一趟查的是什么。等待提示使用已提交的词，输入框可继续编辑并保留重试内容。 */
   const [asked, setAsked] = useState('');
   const [term, setTerm] = useState('');
   const [focused, setFocused] = useState(false);
@@ -239,15 +240,15 @@ export function AddSource({ data, credentials, readOnly, toast, openCredentials 
      地址不进这条路——服务端认得出里面的 `/`，那时该做的是解析链接。 */
   useEffect(() => {
     const text = line.trim();
-    if (!text || text.includes('/')) { setTerm(''); return }
+    if (composing || !text || text.includes('/')) { setTerm(''); return }
     const timer = setTimeout(() => setTerm(text), SUGGEST_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [line]);
+  }, [line, composing]);
 
   const suggest = useQuery({
     queryKey: followSuggestKey(term),
     queryFn: ({ signal }) => fetchSuggestions(term, signal),
-    enabled: term.length > 0 && focused,
+    enabled: term.length > 0 && focused && !composing && closedAt !== line,
   });
 
   const options = useMemo<SuggestOption[]>(() => (suggest.data?.groups || []).flatMap((group) => (
@@ -269,22 +270,23 @@ export function AddSource({ data, credentials, readOnly, toast, openCredentials 
 
   const search = (text: string) => {
     const query = text.trim();
-    if (!query || running || resolve.isPending) return;
+    if (!query || readOnly || composing || running || resolve.isPending) return;
     setProblem('');
     setActive(-1);
     setAsked(query);
-    setLine('');
+    setLine(query);
     setTerm('');
+    setClosedAt(query);
     resolve.mutate(query);
   };
 
   const suggesting = suggest.isFetching;
-  const menuOpen = focused && closedAt !== line && (options.length > 0 || suggesting);
+  const menuOpen = focused && !composing && closedAt !== line && (options.length > 0 || suggesting);
   // 收起的同时放掉选中：看不见的那一行不该被回车选去查。
   const closeMenu = () => { setActive(-1); setClosedAt(line) };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.nativeEvent.isComposing) return;
+    if (composing || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
     if (event.key === 'Escape' && menuOpen) { closeMenu(); return }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       if (!options.length) return;
@@ -361,6 +363,8 @@ export function AddSource({ data, credentials, readOnly, toast, openCredentials 
           }}>
           <Input aria-label="来源链接、名字或 id" placeholder={PLACEHOLDER} value={line}
             leadingIcon={RiSearchLine} enterKeyHint="search" isDisabled={readOnly} onChange={setLine}
+            onCompositionStart={() => { setComposing(true); setActive(-1) }}
+            onCompositionEnd={(event) => { setComposing(false); setLine(event.currentTarget.value) }}
             onKeyDown={onKeyDown} />
           {menuOpen ? (
             <SuggestMenu field={field} menu={menu} options={options} active={active}
