@@ -52,7 +52,7 @@ describe('卡片信息与收藏入口', () => {
         await opened.page.goto(new URL('/item/31', opened.page.url()).href);
         await opened.page.locator('[data-carousel-video-active]').waitFor();
         assert.equal(await opened.page.locator('[data-carousel-video-active] [data-follow-image-step]:visible').count(), 0);
-        await opened.page.locator('[data-media-thumbnail="-1"]').click();
+        await opened.page.locator('[data-follow-image-item="-1"]').click();
         assert.equal(await opened.page.locator('[data-follow-image-step]:visible').count(), 2);
       } finally { await opened.close() }
     });
