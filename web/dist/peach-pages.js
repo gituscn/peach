@@ -11795,7 +11795,7 @@ function Rr() {
 	return {
 		width: e * n,
 		height: t * n,
-		angle: window.screen.orientation.angle
+		angle: window.screen.orientation?.angle ?? 0
 	};
 }
 function zr(e) {
