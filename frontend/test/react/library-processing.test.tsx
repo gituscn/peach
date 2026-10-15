@@ -89,7 +89,7 @@ it('来源说没有只报一个数，不算问题也不提供失败重试', asyn
   expect(host.querySelector('details')).toBeNull();
 });
 
-it('三种扫描采集方式共用一颗主键加一个下拉，各自交自己的阶段', async () => {
+it('扫描与补全方式共用一颗主键加一个下拉，各自交自己的阶段', async () => {
   const served = await open({ status: 'idle' }, () => ({ status: 'complete' }));
   const host = await mount(card({ toast: vi.fn() }));
 
@@ -98,9 +98,13 @@ it('三种扫描采集方式共用一颗主键加一个下拉，各自交自己�
   expect(menuItem('扫描并补全资料')).not.toBeNull();
   await click(menuItem('只扫描'));
   await click(host.querySelector('[aria-haspopup="dialog"]'));
-  await click(menuItem('只采集'));
+  await click(menuItem('补全资料与预览'));
+  await click(host.querySelector('[aria-haspopup="dialog"]'));
+  await click(menuItem('只生成本地预览'));
+  await click(host.querySelector('[aria-haspopup="dialog"]'));
+  await click(menuItem('只采集在线资料'));
 
-  expect(served.posts()).toEqual([{}, { stage: 'scan' }, { stage: 'collect' }]);
+  expect(served.posts()).toEqual([{}, { stage: 'scan' }, { stage: 'collect' }, { stage: 'previews' }, { stage: 'metadata' }]);
   expect(host.querySelector('a[href="/sources"]')?.textContent).toContain('来源和凭证');
 });
 

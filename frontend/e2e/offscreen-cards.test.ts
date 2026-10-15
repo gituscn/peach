@@ -277,6 +277,11 @@ describe('视口外的卡片', () => {
       const opened = await open(browser);
       try {
         const { page } = opened;
+        await page.locator(selector).first().evaluate(async (card) => {
+          card.scrollIntoView({ block: 'center' });
+          await new Promise(requestAnimationFrame);
+          await new Promise(requestAnimationFrame);
+        });
         /* 元信息区四周垫内边距再用负外边距抵消，裁切边（padding box）往外扩，内容盒原地不动。
            内容盒要贴着卡片左右缘、封面下方隔一道卡片行距，外边距盒的下沿就是内容盒下沿；
            同一行里最高的那张卡，内容盒下面到卡片下缘（关注卡是到 `[data-follow-state]`）不留空，卡高

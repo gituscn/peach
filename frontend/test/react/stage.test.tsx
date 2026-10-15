@@ -247,7 +247,9 @@ describe('常驻面', () => {
     await api.open(request(1));
     api.dispose({ miniplayer: true });
     let finish!: (value: unknown) => void;
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(resolve => { finish = resolve })));
+    vi.stubGlobal('fetch', vi.fn((url: string) => url === '/api/library-processing'
+      ? Promise.resolve({ ok: true, status: 200, json: async () => ({ status: 'idle' }) })
+      : new Promise(resolve => { finish = resolve })));
     const opening = api.open(request(1));
     const dialog = q<HTMLDialogElement>('#stage')!;
     expect(dialog.querySelector('[data-skeleton="detail"]')).toBeNull();

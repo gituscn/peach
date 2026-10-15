@@ -4,8 +4,7 @@ import { islandButton, islandGlyph, islandSelect } from './island-skeleton';
 
 /* 「扫描与采集」「媒体修复」两张卡的正文。卡片本体由 React 画，骨架与遗留层的取数占位
    画的是同一段话：写两份的话，骨架上的那句会比真卡短一截，接管时整张卡跳一次。 */
-export const SCAN_CARD_TEXT = '扫描媒体文件夹，导入已有资料，采集缺失信息。两段也可以分开跑：新盘刚接上时先只扫描，'
-  + '几万个文件登记完就能用；采集被网络拖住时只重跑采集，不必再扫一遍磁盘。';
+export const SCAN_CARD_TEXT = '扫描媒体文件夹，补全资料、封面与视频预览。下拉菜单可选择只扫描、只生成本地预览或只采集在线资料。';
 export const REPAIR_CARD_TEXT = '修缺时间戳表（播放卡顿）和缺索引（打不开）的 MP4。常看的片子先修。';
 
 const bar = '<span class="skeleton skeleton-text" aria-hidden="true"></span>';

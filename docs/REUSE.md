@@ -174,7 +174,9 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 - 独立包卸载用正常托盘退出和 Windows PowerShell 助手；计划限于程序标记、数据直属目录、媒体不重叠，助手拒绝目录链接，会退出仍从程序目录运行的进程并重试删除。完全卸载只把 `config.toml.<说明>-<日期>-<时刻>` 当 Peach 写的设置备份，手工的 `config.toml.bak` 保留；混入被占用文件、数据、媒体与无关文件的真实输入验证只删计划内容与整个解压目录。源码树只给手动卸载说明。
 - 扫描与采集统一挂在数据管理；首页进度 Banner 跳转同一入口。默认排序与方向使用浏览偏好，显式 URL 优先。
 
-目录页进度横幅与数据管理卡片共读 `LIBRARY_PROCESSING_KEY`（[共享状态](FRONTEND.md#共享状态怎么写)）；启动只提交一次，状态查询接续托盘首次处理。首页在完成后收起，失败跳转数据管理；数据管理持续读取阶段与真实计数。Geist Banner 取证与 Peach 差异见 [docs/reference-snapshots/vercel-geist-library-banner.md](reference-snapshots/vercel-geist-library-banner.md)。
+目录页进度横幅、缺预览提示与数据管理卡片共读 `LIBRARY_PROCESSING_KEY`（[共享状态](FRONTEND.md#共享状态怎么写)）；启动只提交一次，状态查询接续托盘首次处理。首页进度在完成后收起，失败跳转数据管理；数据管理持续读取阶段与真实计数。Geist Banner 取证与 Peach 差异见 [docs/reference-snapshots/vercel-geist-library-banner.md](reference-snapshots/vercel-geist-library-banner.md)。
+
+缺预览提示复用 `cardArtwork` 的可用性判据，目录、实体作品区与详情共用 `LibraryCompletionPrompt` 和 `ProcessingActions`。`/api/library-processing` 的 `collect` 阶段补资料与本地预览，`previews` 仅生成本地九宫格，`metadata` 仅采集资料；可选 `asset_ids` 限定已存在影片，空数组拒绝，全库扫描不用于定向处理。九宫格复用 `frame_capture`、FFmpegResolver 和 `/poster`，本地阶段先于外部查询执行，沿用任务日志和失败重试；不增加依赖。浏览器回归使用临时演示库和拦截响应验证默认动作、下拉、焦点归还及完成后的卡面更新。
 
 ## 独立测试包在线更新
 
@@ -358,7 +360,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 - 账本路径在 Windows 只做 `abspath`，不 `resolve()`：PikPak 的 A: 是 WinFsp 网络驱动器，`resolve()` 得到 UNC 形态，之后每个经 `file_for()` 的播放请求都慢几个数量级；115 的 B: 不受影响。
 - 不兼容片源（HEVC、mp3 以外的音轨、非 MP4 容器）按 6 秒片重编码给 HLS，账本没记时长或为负时用 ffprobe 的时长切，探测也拿不到才回 Range。分片重编码链与整片转码相同（CUDA 解码加 NVENC、软件解码加 NVENC、libx264），同一分片只起一个 FFmpeg。Range 响应按 1 MiB 读文件，`BufferedFileResponse` 自己盯 `http.disconnect`（uvicorn 断开后 `send()` 静默返回，Starlette `FileResponse` 不监听），否则拖一次进度条就留下一个把整部片拉完的幽灵读者。
 - 有 B 帧却没有 `ctts` 的 MP4 是时间戳错乱，浏览器丢掉倒着走的帧。这类片源不重编码：`mp4repair.py` 重建一份 `moov`（游程编码的 `ctts`、编辑列表补整体平移、`stco`/`co64` 按头长差平移）存成 `transcode_root` 里的 `.mp4hdr` 边车，`/stream` 用「边车的头 + 原文件那段 mdat」按 Range 发。显示顺序取自 `ffprobe -ignore_editlist 1 -show_entries frame=pts`，`pkt_dts` 不能用。边车算出来前走 HLS 转码，同一部片后台只算一次，算不出就跳过。
-- 「只采集」对齐全的行（番号已落库、字段有着落或已在候选表、封面在位）不碰磁盘；文件在不在看目录列表、同目录只列一次，扫描用目录列表自带的大小与时间、不逐个 stat；候选 CSV 每 5 秒写盘一次，被打断也在收尾写全。
+- 「只采集在线资料」对齐全的行（番号已落库、字段有着落或已在候选表、封面在位）不碰磁盘；文件在不在看目录列表、同目录只列一次，扫描用目录列表自带的大小与时间、不逐个 stat；候选 CSV 每 5 秒写盘一次，被打断也在收尾写全。
 - 一个控件在两页出现时，选中态也归它：首页、资料页与关注页的「全部／没看过／稍后看／已标记」共用 `use-view-glide.ts` 那块滑动玻璃与 `[data-view-glide]`，填充只由玻璃给，各排自己不铺底。
 - 本地详情与关注详情的「接着看」共用 `RelatedSection`、横滚接线与卡片 `next` 版式，数量读同一设置。空结果复用 `EmptyState`，读取失败复用 `RetryNote`，可原位重试；关闭推荐时不取数。关注推荐复用 `/api/follow` 分页及 TanStack Query 缓存，最多读取三页；优先同创作者和共同标签，排除当前合集、已看、忽略与不同媒体类型。创作者头像链接复用卡片的 hover，下载链接复用舞台操作键几何；未新增依赖，推荐读取不写 ledger。
 - 详情底部共用 `DetailContinuation`：分集队列在左、接着看在右，手机上下排列，两区独立横滚并共用底色。封面共用宽度与 16:9 比例；宽屏标题区通过 CSS subgrid 共用行高，摘要与操作键参与排版。`RelatedSection` 给卡片的 8px 悬停面留出滚动内距；分卷与版本的推荐按队列种子缓存。队列头像共用 `cardIdentity`、`avatarInner`，同时读取列表投影与详情 `entity_refs`，保留图片版本及人脸取景。
