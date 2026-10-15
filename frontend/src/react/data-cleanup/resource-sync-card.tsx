@@ -13,7 +13,7 @@ import { Button } from '@/components/base/buttons/button';
 
 import { errorMessage } from '../../api';
 import { useBackgroundJob } from '../background-job';
-import { Fieldset, FieldsetTitle, SectionHeading } from '../components/fieldset';
+import { Fieldset, FieldsetTitle } from '../components/fieldset';
 import { Note } from '../components/note';
 import { TaskProgress } from '../components/task-progress';
 import { spriteGlyph } from '../components/sprite-glyph';
@@ -173,12 +173,11 @@ export function ResourceSyncCard(
 
   return (
     <section id="resource-sync" aria-labelledby="resource-sync-title" className="flex scroll-mt-20 flex-col gap-4">
-      <SectionHeading id="resource-sync-title">资源同步</SectionHeading>
-      <Fieldset layout="split" labelledBy="resource-sync-box" footer={
+      <Fieldset layout="split" labelledBy="resource-sync-title" footer={
         <Button data-resource-scan leadingIcon={scanned && !scanning ? AGAIN : COMPARE} {...busyProps(scanning)}
           onClick={() => { if (!scanning) scan.start.mutate() }}>{label}</Button>
       }>
-        <FieldsetTitle id="resource-sync-box" gap="small">文件与记录核对</FieldsetTitle>
+        <FieldsetTitle id="resource-sync-title" gap="small">资源同步</FieldsetTitle>
         <p className="max-w-190 text-body-2-regular leading-5 text-text-secondary">
           按馆藏记录逐条查找本地磁盘与网盘上的文件，列出文件已不存在的记录、空文件夹，以及不再被引用的缓存。
         </p>

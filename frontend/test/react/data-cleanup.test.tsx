@@ -127,6 +127,17 @@ const entry = (host: ParentNode, section: DataCleanupSection) =>
   host.querySelector<HTMLButtonElement>(`[data-cleanup-go="${section}"]`);
 
 describe('读数卡', () => {
+  it('单面板分区的标题只在面板内显示', async () => {
+    const { host } = await openPage();
+    for (const id of ['link-manager', 'resource-sync']) {
+      const section = host.querySelector(`#${id}`)!;
+      const title = section.querySelector(`#${id}-title`)!;
+      expect(title.tagName).toBe('H3');
+      expect(title.parentElement).not.toBe(section);
+      expect(section.querySelector(':scope > h2, :scope > h3')).toBeNull();
+    }
+  });
+
   it('复核列前三类、其余合成一项；垃圾分项只列有东西的类别', () => {
     expect(reviewSummary({ counts: { metadata_fields: 12, performer_avatars: 3, studio_logos: 2, creator_tags: 1 } }))
       .toEqual({ figure: '18 条待复核', meta: '元数据字段 12 · 女优头像 3 · 厂牌 Logo 2 · 其余 1' });
@@ -477,23 +488,23 @@ describe('孤儿记录', () => {
   });
 
   it('批量删除覆盖跨页选择，取消确认不发请求，文件恢复时显示保留数量', async () => {
-    const items = Array.from({ length: 13 }, (_, index) => ({ ...orphans.items[1]!, id: index + 30, name: `作品 ${index}` }));
+    const items = Array.from({ length: 23 }, (_, index) => ({ ...orphans.items[1]!, id: index + 30, name: `作品 ${index}` }));
     const server = serve({ '/api/orphan-records': { total: items.length, items },
-      '/api/batch': { ok: true, purged: 1, blocked: [40] } });
+      '/api/batch': { ok: true, purged: 1, blocked: [50] } });
     const toast = vi.fn();
     const host = await wrap(<OrphanRecordsCard toast={toast} />);
     await settle();
     await click(host.querySelector('input[aria-label="选择 作品 0"]'));
     await click(buttonNamed('下一页', host));
-    await click(host.querySelector('input[aria-label="选择 作品 10"]'));
+    await click(host.querySelector('input[aria-label="选择 作品 20"]'));
     confirmWith(false);
     await click(buttonNamed('彻底删除所选（2）', host));
     expect(server.posts('/api/batch')).toEqual([]);
     const seen = confirmWith(true);
     await click(buttonNamed('彻底删除所选（2）', host));
     await settle();
-    expect(seen[0]!.body).toContain('「作品 0」、「作品 10」');
-    expect(server.posts('/api/batch')).toEqual([{ ids: [30, 40], operation: 'delete' }]);
+    expect(seen[0]!.body).toContain('「作品 0」、「作品 20」');
+    expect(server.posts('/api/batch')).toEqual([{ ids: [30, 50], operation: 'delete' }]);
     expect(toast).toHaveBeenCalledWith('已彻底删除 1 条记录，1 条文件已恢复，未删除');
   });
 });

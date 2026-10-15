@@ -37,7 +37,7 @@ describe('管理页面容器与骨架', () => {
       const opened = await visit(browser, '/data-cleanup', viewport);
       try {
         await settle(opened.page);
-        for (const name of ['扫描与采集', '站外链接']) {
+        for (const name of ['扫描与采集', '链接管理']) {
           const card = opened.page.locator('section').filter({ has: opened.page.getByRole('heading', { name, exact: true }) }).last();
           const geometry = await card.evaluate(node => {
             const children = Array.from(node.children);

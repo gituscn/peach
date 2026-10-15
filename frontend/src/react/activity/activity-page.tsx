@@ -152,7 +152,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   const id = useId();
   return (
     <section aria-labelledby={id} className="flex min-w-0 flex-col gap-3">
-      <h3 id={id} className="text-title-2-semibold text-text-primary">{title}</h3>
+      <h3 id={id} className="text-title-2-medium text-text-primary">{title}</h3>
       {children}
     </section>
   );

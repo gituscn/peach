@@ -49,7 +49,7 @@ describe('创作者别名表', () => {
       await all.focus();
       await all.press('Space');
       assert.equal(await one.isChecked(), false);
-      assert.equal(await page.getByRole('button', { name: '合并所选（0）', exact: true }).isDisabled(), true);
+      assert.equal(await page.getByRole('button', { name: '合并所选（0）', exact: true }).count(), 0);
       const geometry = await layout(page);
       assert.ok(geometry.scrollWidth <= geometry.viewportWidth + 1, JSON.stringify(geometry));
       assert.deepEqual(geometry.offenders, []);

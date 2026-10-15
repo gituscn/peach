@@ -6,11 +6,13 @@ import {
 } from '@tanstack/react-table';
 import { Button } from '@/components/base/buttons/button';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
-import { Select, SelectItem } from '@/components/base/select/select';
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@/components/base/table/table';
 import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 import { DataTableFrame } from './data-table-frame';
-import { Pagination } from './table-pagination';
+import { DataTableFooter, DataTableSort } from './table-controls';
+import { SelectionDock } from './selection-dock';
+import { cardClass } from './card';
+import { useTableSelection } from './use-table-selection';
 
 const features = tableFeatures({
   rowSortingFeature, rowSelectionFeature, rowPaginationFeature,
@@ -33,12 +35,20 @@ interface DataTableProps<T> {
   selected: string[];
   onSelected(ids: string[]): void;
   actions(items: T[], clear: () => void): ReactNode;
+  title?: string;
+  titleId?: string;
+  description?: ReactNode;
+  footerActions?: ReactNode;
+  panel?: boolean;
+  unit?: string;
 }
 
 /** 数据表共用排序、跨页选择与分页；业务动作只接收仍在清单里的所选行。 */
-export function DataTable<T extends RowData>({ label, items, columns, rowId, rowLabel, selected, onSelected, actions }: DataTableProps<T>) {
+export function DataTable<T extends RowData>({ label, items, columns, rowId, rowLabel, selected, onSelected, actions,
+  title = label, titleId, description, footerActions, panel = true, unit = '条记录' }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
+  const activateSelection = useTableSelection(() => onSelected([]));
   const pages = Math.max(1, Math.ceil(items.length / pagination.pageSize));
   const pageIndex = Math.min(pagination.pageIndex, pages - 1);
   const rowSelection: RowSelectionState = Object.fromEntries(selected.map((id) => [id, true]));
@@ -70,19 +80,28 @@ export function DataTable<T extends RowData>({ label, items, columns, rowId, row
     onPaginationChange: setPagination, enableRowSelection: true,
     onRowSelectionChange: (updater) => {
       const next = typeof updater === 'function' ? updater(rowSelection) : updater;
+      if (Object.values(next).some(Boolean)) activateSelection();
       onSelected(items.filter((item) => next[rowId(item)]).map(rowId));
     },
   });
   const chosen = table.getSelectedRowModel().rows.map((row) => row.original);
   return (
-    <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label={`${label}批量操作`}>
-        <span className="mr-auto text-body-2-regular tabular-nums text-text-secondary">
-          {`${items.length.toLocaleString()} 项 · 已选 ${chosen.length.toLocaleString()} 项`}
+    <div data-data-table-panel={panel || undefined} className={panel
+      ? cardClass({ padding: 'none', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })
+      : 'flex min-w-0 flex-col gap-4'}>
+      <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label={`${label}工具栏`}>
+        <h3 id={titleId} className="mr-auto text-title-2-medium text-text-primary">{title}</h3>
+        <span className="text-body-2-regular tabular-nums text-text-secondary">
+          {`${items.length.toLocaleString()} ${unit}`}
         </span>
-        {actions(chosen, () => onSelected([]))}
-        {chosen.length ? <Button variant="secondary" size="small" onClick={() => onSelected([])}>取消选择</Button> : null}
+        <DataTableSort label={label} options={columns.filter((column) => column.value).map((column) => ({ id: column.id, label: column.label }))}
+          sorting={sorting} onChange={(next) => { setSorting(next); setPagination((now) => ({ ...now, pageIndex: 0 })); }} />
       </div>
+      {description ? <p className="text-body-2-regular text-text-secondary">{description}</p> : null}
+      <SelectionDock label={`${label}批量操作`} visible={chosen.length > 0} count={`已选 ${chosen.length.toLocaleString()} ${unit}`}>
+        {actions(chosen, () => onSelected([]))}
+        <Button variant="ghost" size="small" onClick={() => onSelected([])}>取消选择</Button>
+      </SelectionDock>
       <DataTableFrame follow onRowClick={(id) => table.getRow(id)?.toggleSelected()}>
         <Table aria-label={label} size="sm"
           sortDescriptor={sorting[0] ? { column: sorting[0].id, direction: sorting[0].desc ? 'descending' : 'ascending' } : undefined}
@@ -106,26 +125,8 @@ export function DataTable<T extends RowData>({ label, items, columns, rowId, row
           </TableBody>
         </Table>
       </DataTableFrame>
-      <DataTableFooter label={label} total={items.length} pagination={{ ...pagination, pageIndex }} onChange={setPagination} />
+      <DataTableFooter label={label} total={items.length} pagination={{ ...pagination, pageIndex }} onChange={setPagination} unit={unit} />
+      {footerActions ? <div className="flex flex-wrap items-center justify-end gap-2 border-t border-separator-border pt-4">{footerActions}</div> : null}
     </div>
-  );
-}
-
-export function DataTableFooter({ label, total, pagination, onChange }: {
-  label: string; total: number; pagination: { pageIndex: number; pageSize: number };
-  onChange(next: { pageIndex: number; pageSize: number }): void;
-}) {
-  const pages = Math.max(1, Math.ceil(total / pagination.pageSize));
-  const pageIndex = Math.min(pagination.pageIndex, pages - 1);
-  return (
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Select aria-label={`${label}每页条数`} className="w-32" selectedKey={pagination.pageSize}
-          onSelectionChange={(key) => { if (key) onChange({ pageIndex: 0, pageSize: Number(key) }); }}>
-          {[10, 20, 50, 100].map((size) => <SelectItem key={size} id={size}>{`${size} 项 / 页`}</SelectItem>)}
-        </Select>
-        <span className="text-caption-1-regular tabular-nums text-text-secondary">{`第 ${pageIndex + 1} / ${pages} 页`}</span>
-        <Pagination label={`${label}分页`} page={pageIndex + 1} pages={pages}
-          onPage={(page) => onChange({ ...pagination, pageIndex: page - 1 })} />
-      </div>
   );
 }

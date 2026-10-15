@@ -67,7 +67,7 @@ it('勾选决定合并范围，表头全选能一并取消', async () => {
   const fetcher = okFetch();
   const { host } = await open(fetcher);
 
-  expect(buttonNamed('合并所选（0）', host)?.disabled).toBe(true);
+  expect(buttonNamed('合并所选（0）', host)).toBeNull();
 
   await click(box(host, '选择别名 别名 B，归入 作者 B'));
   expect(box(host, '全选待合并别名')?.indeterminate).toBe(true);
@@ -87,7 +87,7 @@ it('勾选决定合并范围，表头全选能一并取消', async () => {
   expect(box(host, '全选待合并别名')?.checked).toBe(true);
   expect(box(host, '全选待合并别名')?.indeterminate).toBe(false);
   await click(box(host, '全选待合并别名'));
-  expect(buttonNamed('合并所选（0）', host)?.disabled).toBe(true);
+  expect(buttonNamed('合并所选（0）', host)).toBeNull();
 });
 
 it('待合并清单换序和补充后按别名保留勾选，合并使用当前规范名', async () => {
@@ -109,7 +109,7 @@ it('待合并清单换序和补充后按别名保留勾选，合并使用当前�
   expect(aliasWrites(fetcher)).toEqual([
     { action: 'add', canonical: '作者 B 的规范名', alias: '别名 B' },
   ]);
-  expect(buttonNamed('合并所选（0）', host)?.disabled).toBe(true);
+  expect(buttonNamed('合并所选（0）', host)).toBeNull();
 });
 
 it('消失的候选不计入合并范围，重新全选只处理当前清单', async () => {
@@ -118,7 +118,7 @@ it('消失的候选不计入合并范围，重新全选只处理当前清单', a
   const { host, renderProps } = await open(fetcher);
   await click(box(host, '选择别名 别名 B，归入 作者 B'));
   await renderProps({ suggestions: [SUGGESTIONS[0]!] });
-  expect(buttonNamed('合并所选（0）', host)?.disabled).toBe(true);
+  expect(buttonNamed('合并所选（0）', host)).toBeNull();
   expect(box(host, '全选待合并别名')?.indeterminate).toBe(false);
   await click(box(host, '全选待合并别名'));
   expect(box(host, '全选待合并别名')?.checked).toBe(true);
@@ -218,25 +218,25 @@ it('别名分页保留跨页选择，已保存别名批量移除只处理所选�
   const asked = stubConfirm();
   const fetcher = okFetch();
   const { host, renderProps } = await open(fetcher);
-  const groups = Array.from({ length: 12 }, (_, index) => ({
+  const groups = Array.from({ length: 22 }, (_, index) => ({
     canonical_key: `name:${index}`, canonical_name: `创作者 ${index}`,
     aliases: [{ key: `alias:${index}`, name: `别名 ${index}` }],
   }));
   await renderProps({ groups });
   const saved = () => host.querySelector('[aria-label="已保存创作者别名"]')!;
-  expect(saved().querySelectorAll('tbody tr')).toHaveLength(10);
+  expect(saved().querySelectorAll('tbody tr')).toHaveLength(20);
   await click(box(host, '选择已保存别名 创作者 0'));
   await click(buttonNamed('下一页', host));
-  await click(box(host, '选择已保存别名 创作者 10'));
+  await click(box(host, '选择已保存别名 创作者 20'));
   await click(buttonNamed('移除所选别名（2）', host));
   expect(aliasWrites(fetcher)).toEqual([]);
-  expect(asked[0]!.body).toContain('「别名 0」、「别名 10」');
+  expect(asked[0]!.body).toContain('「别名 0」、「别名 20」');
   await asked[0]!.onConfirm();
   await settle();
   expect(aliasWrites(fetcher)).toEqual([
-    { action: 'remove', alias: '别名 0' }, { action: 'remove', alias: '别名 10' },
+    { action: 'remove', alias: '别名 0' }, { action: 'remove', alias: '别名 20' },
   ]);
   await renderProps({ groups: groups.slice(0, 2) });
   expect(saved().querySelectorAll('tbody tr')).toHaveLength(2);
-  expect(host.textContent).toContain('第 1 / 1 页');
+  expect(host.textContent).toContain('1–2 / 2 组');
 });

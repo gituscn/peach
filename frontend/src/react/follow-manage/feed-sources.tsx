@@ -25,7 +25,6 @@ import { confirmModal } from '@peach/legacy/ui';
 import { Chip } from '@/components/base/badges/chip';
 import { Button } from '@/components/base/buttons/button';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
-import { Select, SelectItem } from '@/components/base/select/select';
 import { Switch } from '@/components/base/switch/switch';
 import {
   Table, TableBody, TableCell, TableColumn, TableHeader, TableRow,
@@ -34,6 +33,7 @@ import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 
 import { errorMessage } from '../../api';
 import { DataTableFrame } from '../components/data-table-frame';
+import { DataTableFooter, DataTableSort } from '../components/table-controls';
 import { cardClass } from '../components/card';
 import { EmptyState } from '../components/empty-state';
 import { LEGACY_AVATAR_IMG } from '../components/legacy-avatar';
@@ -44,10 +44,9 @@ import { ErrorText, Help } from '../settings/section';
 import { busyProps, useAction } from '../settings/use-action';
 import { localTime } from '../time';
 import { AddFeed } from './add-feed';
-import { Pagination } from './source-list';
 import {
   checkFeeds, errorHeadline, FEEDS_KEY, feedIntervalText, fetchFeeds, removeFeed, setFeedEnabled,
-  PAGE_SIZES, pageWindow, type FeedSource,
+  pageWindow, type FeedSource,
 } from './follow-manage';
 
 const feedTableFeatures = tableFeatures({
@@ -354,6 +353,8 @@ export function FeedSources({ readOnly, toast }: {
         <h3 className="mr-auto text-title-2-medium text-text-primary">JAV 订阅源</h3>
         <span className="text-body-2-regular text-text-secondary">{`${sources.length.toLocaleString()} 个订阅源 · ${(Number(data.unread) || 0).toLocaleString()} 条未看`}</span>
         <Button onClick={check} disabled={readOnly} {...busyProps(action.busy === 'check')}>立即拉取</Button>
+        <DataTableSort label="JAV 订阅源" sorting={sorting} onChange={(next) => { setSorting(next); setPage(1); }}
+          options={['name', 'kind', 'origin', 'status', 'interval', 'fetched', 'fresh'].map((id) => ({ id, label: COLUMN_LABELS[id]! }))} />
       </div>
 
       {failing.length || action.error ? (
@@ -424,14 +425,9 @@ export function FeedSources({ readOnly, toast }: {
         </EmptyState>
       )}
       {sources.length ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-body-2-regular text-text-secondary">{`${(win.start + 1).toLocaleString()}–${win.end.toLocaleString()} / ${win.total.toLocaleString()} 个订阅源`}</span>
-          <Select aria-label="每页显示数量" size="sm" selectedKey={String(pageSize)}
-            onSelectionChange={(key) => { if (key !== null) { setPageSize(Number(key)); setPage(1) } }}>
-            {PAGE_SIZES.map((size) => <SelectItem key={size} id={String(size)}>{`每页 ${size} 条`}</SelectItem>)}
-          </Select>
-          <Pagination label="JAV 订阅分页" page={win.page} pages={win.pages} onPage={setPage} />
-        </div>
+        <DataTableFooter label="JAV 订阅" total={win.total} unit="个订阅源"
+          pagination={{ pageIndex: win.page - 1, pageSize }}
+          onChange={(next) => { setPageSize(next.pageSize); setPage(next.pageIndex + 1); }} />
       ) : null}
       <footer className="-mx-6 -mb-5 flex flex-wrap items-center gap-2 border-t border-separator-border rounded-b-2xl bg-card-footer px-6 py-4 max-sm:-mx-4 max-sm:px-4">
         <span role="status" className="mr-auto text-body-2-regular text-text-secondary">

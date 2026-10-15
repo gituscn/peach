@@ -19,7 +19,7 @@ import { ErrorExcerpt } from '../activity/error-excerpt';
 import { useBackgroundJob } from '../background-job';
 import { DataTable, type DataColumn } from '../components/data-table';
 import {
-  Fieldset, FieldsetTitle, PanelFooter, RESULT_PANEL, RESULT_SECTION, SectionHeading,
+  Fieldset, FieldsetTitle, PanelFooter, RESULT_PANEL, RESULT_SECTION,
 } from '../components/fieldset';
 import { Note } from '../components/note';
 import { TaskProgress } from '../components/task-progress';
@@ -56,10 +56,10 @@ function Stat({ label, value, note }: { label: string; value: string; note?: str
 }
 
 function LinkTable(
-  { title, items, hint, picked, onPick, children }:
+  { title, items, hint, picked, onPick, children, footer }:
   {
     title: string; items: LinkRow[]; hint: string;
-    picked: readonly number[]; onPick(next: number[]): void; children?: ReactNode;
+    picked: readonly number[]; onPick(next: number[]): void; children?: ReactNode; footer?: ReactNode;
   },
 ) {
   if (!items.length) return null;
@@ -81,11 +81,8 @@ function LinkTable(
   ];
   return (
     <div className={RESULT_SECTION}>
-      <h4 className="mb-1 text-body-semibold text-text-primary">
-        {title}<b className="ml-1.5 font-semibold tabular-nums text-text-secondary">{items.length.toLocaleString()}</b>
-      </h4>
-      <p className="mb-3 text-caption-1-regular text-text-secondary">{hint}</p>
       <DataTable label={title} items={items} columns={columns} rowId={(item) => String(item.id)}
+        description={hint} unit="条链接" panel={false} footerActions={footer}
         rowLabel={(item) => `${item.entity} 的${item.label || item.url}`}
         selected={picked.map(String)} onSelected={(ids) => onPick(ids.map(Number))}
         actions={() => children} />
@@ -181,13 +178,14 @@ export function LinkManager() {
           </Button>
         </LinkTable>
         <LinkTable title="本次未访问成功" items={unclear} hint={UNCLEAR_HINT}
-          picked={picked} onPick={setPicked}>
+          picked={picked} onPick={setPicked} footer={retryable.length
+            ? <Button leadingIcon={RETRY} {...busyProps(running)}
+                onClick={() => run(retryable.map((item) => item.id))}>{`全部重试（${retryable.length}）`}</Button>
+            : null}>
           {retryable.length
             ? <>
                   <Button leadingIcon={RETRY} disabled={!selectedRetryable.length} {...busyProps(running)}
                     onClick={() => run(selectedRetryable)}>{pickedLabel}</Button>
-                  <Button leadingIcon={RETRY} {...busyProps(running)}
-                    onClick={() => run(retryable.map((item) => item.id))}>{`全部重试（${retryable.length}）`}</Button>
               </>
             : null}
         </LinkTable>
@@ -207,13 +205,12 @@ export function LinkManager() {
 
   return (
     <section id="link-manager" aria-labelledby="link-manager-title" className="flex scroll-mt-20 flex-col gap-4">
-      <SectionHeading id="link-manager-title">链接管理</SectionHeading>
-      <Fieldset layout="stack" labelledBy="link-manager-box" footer={
+      <Fieldset layout="stack" labelledBy="link-manager-title" footer={
         <Button leadingIcon={UNLINK} {...busyProps(running)} onClick={() => run()}>
           {running ? '检查中' : done ? '重新检查' : '检查死链'}
         </Button>
       }>
-        <FieldsetTitle id="link-manager-box" gap="small">站外链接</FieldsetTitle>
+        <FieldsetTitle id="link-manager-title" gap="small">链接管理</FieldsetTitle>
         {stats.isError
           ? <Note tone="error" title="链接统计读取失败">{errorMessage(stats.error)}</Note>
           : info
