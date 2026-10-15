@@ -114,7 +114,8 @@ def media_dir_validator(*, windows: bool) -> Callable[[str], Path]:
         path = Path(text).expanduser()
         if not path.is_dir():
             raise ValueError(f"目录不存在，或者不是目录：{path}。先建好再填。")
-        resolved = path.resolve()
+        # Windows 媒体目录保留盘符；挂载盘的最终路径可能是 UNC。
+        resolved = Path(os.path.abspath(path)) if windows else path.resolve()
         if windows and not is_windows_path(str(resolved)):
             raise ValueError(f"{resolved} 不是盘符路径；网络位置先映射成盘符再来")
         return resolved

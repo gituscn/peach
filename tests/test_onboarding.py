@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import ntpath
 import os
 import sqlite3
 import tempfile
@@ -72,6 +73,31 @@ class QuestionTests(_Case):
 
 
 class ValidatorTests(_Case):
+    def test_windows_mapped_directory_keeps_its_drive_path(self):
+        mapped = r"Z:\CloudDrive2\115open\云下载"
+        redirected = Path(r"\\NAS\CloudDrive2\115open\云下载")
+        windows_abspath = ntpath.abspath
+        with mock.patch.object(Path, "is_dir", return_value=True), \
+                mock.patch.object(Path, "resolve", return_value=redirected), \
+                mock.patch("peach.onboarding.os.path.abspath", side_effect=windows_abspath):
+            validate = onboarding.media_dir_validator(windows=True)
+            for raw in (mapped, mapped + r"\子目录\.."):
+                with self.subTest(raw=raw):
+                    self.assertEqual(validate(raw), Path(mapped))
+
+    def test_windows_unc_directory_requires_a_drive_mapping(self):
+        shared = r"\\NAS\媒体库"
+        windows_abspath = ntpath.abspath
+        with mock.patch.object(Path, "is_dir", return_value=True), \
+                mock.patch.object(Path, "resolve", return_value=Path(shared)), \
+                mock.patch("peach.onboarding.os.path.abspath", side_effect=windows_abspath):
+            with self.assertRaisesRegex(ValueError, "不是盘符路径"):
+                onboarding.media_dir_validator(windows=True)(shared)
+
+    def test_posix_media_directory_uses_its_filesystem_target(self):
+        with mock.patch.object(Path, "resolve", return_value=self.media):
+            self.assertEqual(onboarding.media_dir_validator(windows=False)(str(self.home)), self.media)
+
     def test_media_dir_must_already_exist_and_is_never_created(self):
         validate = onboarding.media_dir_validator(windows=False)
         missing = self.root / "nope"
