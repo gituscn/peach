@@ -6,20 +6,12 @@
  * 写操作是 `useMutation`：服务端回的就是这一趟的新快照，用 `setQueryData` 换进缓存，
  * 再让这个键立刻重读一次接上轮询的节律。首屏读到的旧终态不冒充新结果——任务关掉页面
  * 照样在跑，状态里常年躺着上一趟的回执，判据在 `use-library-processing.ts`。 */
-import { useEffect, useRef, useState } from 'react';
-import {
-  RiArrowDownSLine, RiArrowRightLine, RiDatabase2Line, RiGlobalLine, RiHardDrive2Line,
-} from '@remixicon/react';
+import { useEffect } from 'react';
+import { RiArrowRightLine } from '@remixicon/react';
 import { useMutation } from '@tanstack/react-query';
-import { Popover } from 'react-aria-components';
-import { MenuDialog as Dialog } from '../components/menu-dialog';
 
 import { Button } from '@/components/base/buttons/button';
 import { LinkButton } from '@/components/base/buttons/link-button';
-import {
-  MENU_ITEM, MENU_ITEM_INTERACTIVE, MENU_POPOVER_SURFACE,
-} from '@/components/base/dropdown/menu-styles';
-import { cx } from '@/utils/cx';
 
 import { apiSend, errorMessage } from '../../api';
 import { SCAN_CARD_TEXT } from '../../management';
@@ -30,22 +22,13 @@ import { useOverlayScrollbar } from '../components/overlay-scrollbar';
 import { PathLine } from '../components/path-line';
 import { TaskProgress } from '../components/task-progress';
 import { Disclosure } from '../settings/section';
-import { busyProps } from '../settings/use-action';
 import { queryClient } from '../query';
 import {
   currentLine, DISCONNECTED_TEXT, issueDetails, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL,
   notesLine, type LibraryProcessingCommand, type LibraryProcessingData,
 } from './library-processing';
 import { useLibraryProcessingJob } from './use-library-processing';
-
-/** 菜单里那两种只跑一半的方式。主键「扫描并补全资料」两段都跑，交的是空请求体。 */
-const PARTIAL_RUNS = [
-  { label: '扫描并补全资料', icon: RiDatabase2Line, command: {} },
-  { label: '只扫描', icon: RiHardDrive2Line, command: { stage: 'scan' } },
-  { label: '只采集', icon: RiGlobalLine, command: { stage: 'collect' } },
-] as const;
-
-const MENU_ROW = cx(MENU_ITEM, MENU_ITEM_INTERACTIVE, 'text-body-2-medium');
+import { ProcessingActions } from './processing-actions';
 
 /* 中文正文写成常量：JSX 里换行的文字会在接缝处多出一个空格，中文句子里看得见。
    卡片正文与首屏骨架共用 `SCAN_CARD_TEXT`（`management.ts`）。 */
@@ -65,47 +48,11 @@ const profileText = (state: LibraryProcessingData) => {
 };
 
 const receiptText = (state: LibraryProcessingData) =>
-  `已扫描 ${state.scanned || 0} 个文件，识别 ${state.identified || 0} 个番号，`
+  state.requested_stage === 'previews' ? `已生成 ${state.previews || 0} 部视频预览。`
+  : `已扫描 ${state.scanned || 0} 个文件，识别 ${state.identified || 0} 个番号，`
   + `整理 ${state.candidates || 0} 组资料候选，自动落库 ${state.auto_applied || 0} 条。`
+  + (state.previews ? `已生成 ${state.previews} 部视频预览。` : '')
   + profileText(state);
-
-/** 主键加一个下拉：三种方式改的是同一件事，摊成三颗按钮读不出哪个是常用的那一个。
- *
- *  注册表 `dropdown` 条目的 `DropdownTrigger` 自己就是那颗按钮、外观全由 className 给，
- *  套不进 BoardUI `Button` 的档位，所以触发键用 `Button`、面板用 React Aria 的
- *  `Popover` + `Dialog` 组合，行的外观仍取 `menu-styles.ts`（登记在 `boardui/ORIGIN.md`）。 */
-function ScanActions({ busy, onRun }: { busy: boolean; onRun(command: LibraryProcessingCommand): void }) {
-  const trigger = useRef<HTMLButtonElement>(null);
-  const [open, setOpen] = useState(false);
-  const run = (command: LibraryProcessingCommand) => {
-    if (busy) return;
-    setOpen(false);
-    onRun(command);
-  };
-  return (
-    <>
-      <span data-button-group data-split-button data-variant="primary">
-        <Button leadingIcon={RiDatabase2Line} onClick={() => run({})} {...busyProps(busy)}>
-          扫描并补全资料
-        </Button>
-        <Button ref={trigger} iconOnly leadingIcon={RiArrowDownSLine}
-          aria-label="更多扫描与采集方式" aria-haspopup="dialog" aria-expanded={open}
-          {...busyProps(busy)} onClick={() => { if (!busy) setOpen(true) }} />
-      </span>
-      <Popover triggerRef={trigger} isOpen={open} onOpenChange={setOpen}
-        placement="bottom end" offset={4} className={MENU_POPOVER_SURFACE}>
-        <Dialog aria-label="更多扫描与采集方式" className="flex w-52 flex-col gap-1 outline-none">
-          {PARTIAL_RUNS.map(({ label, icon: Glyph, command }) => (
-            <button key={label} type="button" className={MENU_ROW} onClick={() => run(command)}>
-              <Glyph aria-hidden className="size-4 shrink-0" />
-              {label}
-            </button>
-          ))}
-        </Dialog>
-      </Popover>
-    </>
-  );
-}
 
 /** 卡片外面那一块：这一趟怎么了。逐条明细要展开才读，完整清单在状态给出的日志文件里。 */
 function Outcome(
@@ -233,7 +180,7 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
           {/* 两个入口并存，各自答的不是一个问题：这里是「重新跑一整批」，下面那条错误提示里
               的「重试未完成项」只补上一趟没做完的那些。采集里网络超时几乎每趟都留下几项可
               重试的，页脚要是让位给重试键，新入库的片子就再也没有入口被扫到。 */}
-          <ScanActions busy={busy} onRun={run} />
+          <ProcessingActions scan busy={busy} onRun={run} />
         </>
       }>
         <div className="flex flex-col gap-2">

@@ -452,7 +452,7 @@ describe('写完之后', () => {
     expect(save.getAttribute('aria-busy')).toBeNull();
     expect(save.textContent).toBe('提交');
     expect(done.toast.mock.calls[0]![0]).toBe('已保存喜欢偏好');
-    expect(JSON.parse(String(fetcher.mock.calls[0]![1]!.body))).toEqual({ id: 1, liked: true, reason: '镜头好' });
+    expect(posts(fetcher)).toEqual([['/api/preference', { id: 1, liked: true, reason: '镜头好' }]]);
     await click(toggle);
     expect(panel.hidden).toBe(true);
   });

@@ -29,6 +29,7 @@ export interface LibraryProcessingData {
   status: string;
   job_id?: string;
   stage?: string;
+  requested_stage?: string;
   checked?: number;
   total?: number;
   scanned?: number;
@@ -36,6 +37,7 @@ export interface LibraryProcessingData {
   candidates?: number;
   auto_applied?: number;
   covers?: number;
+  previews?: number;
   /* 落库之后补齐女优资料那一步的四个读数：别名、头像、交回人工的冲突、没取到的头像。 */
   performer_aliases?: number;
   performer_avatars?: number;
@@ -63,7 +65,7 @@ export interface LibraryProcessingData {
 /** 一次写操作的请求体：全跑、只扫描、只采集，或者按任务号重试失败项。 */
 export type LibraryProcessingCommand =
   | Record<string, never>
-  | { stage: 'scan' | 'collect' }
+  | { stage: 'scan' | 'collect' | 'previews' | 'metadata'; asset_ids?: number[] }
   | { job_id: string; retry: number[] };
 
 export const fetchLibraryProcessing = (signal?: AbortSignal) =>
@@ -96,6 +98,7 @@ const ACTION_LABELS: Record<string, string> = {
   reading_local: '读取本地资料',
   querying_metadata: '查询外部资料',
   fetching_cover: '采集缺失封面',
+  generating_preview: '生成视频预览',
   writing_candidates: '保存资料候选',
 };
 
@@ -165,6 +168,11 @@ export function announceCompletion(
     if (state.job_id && localStorage.getItem(ANNOUNCED_KEY) === state.job_id) return;
     if (state.job_id) localStorage.setItem(ANNOUNCED_KEY, state.job_id);
   } catch { /* 存储不可用时照常提示，最多重复一次 */ }
+  if (state.requested_stage === 'previews') {
+    toast(`视频预览已生成：${state.previews || 0} 部`);
+    return;
+  }
   toast(`扫描与资料采集已完成：识别 ${state.identified || 0} 个番号，`
-    + `整理 ${state.candidates || 0} 组资料候选，自动落库 ${state.auto_applied || 0} 条`);
+    + `整理 ${state.candidates || 0} 组资料候选，自动落库 ${state.auto_applied || 0} 条`
+    + (state.previews ? `，生成 ${state.previews} 部视频预览` : ''));
 }

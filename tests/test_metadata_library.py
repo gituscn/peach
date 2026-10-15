@@ -373,7 +373,8 @@ class LibraryNfoTests(unittest.TestCase):
         }
         provider.cover.return_value = False
 
-        with patch('peach.avatar_provider.FaceProbe') as face:
+        with patch('peach.avatar_provider.FaceProbe') as face, \
+                patch('peach.library_processing._generate_previews', return_value=0):
             face.return_value.return_value = None
             result = process_library(
                 config, db, self.root / 'generated', self.root / 'covers',
@@ -2230,3 +2231,205 @@ class LibraryWatchdogTests(unittest.TestCase):
         timeout = transport.call_args.args[1]
         self.assertGreater(timeout, 4)
         self.assertLessEqual(timeout, 5)
+
+
+class LibraryPreviewCompletionTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.media = self.root / 'media'
+        self.media.mkdir()
+        self.config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                                  locations={'local': (str(self.media),),
+                                             'pikpak': (str(self.root / 'unmounted-cloud'),)})
+        directory = self.root / 'database'
+        directory.mkdir()
+        self.db = fresh_ledger(directory)
+        self.database = LedgerDatabase(self.db)
+        self.resolver = Mock()
+        self.resolver.ffmpeg.return_value = SimpleNamespace(path=Path('test-ffmpeg'))
+        with self.database.write_transaction() as connection:
+            for aid, location, medium, disposal in ((1, 'local', 'video', None),
+                                                    (2, 'pikpak', 'video', None),
+                                                    (3, 'local', 'photo', None),
+                                                    (4, 'local', 'video', 'trash')):
+                video = self.media / f'clip-{aid}.mp4'
+                video.write_bytes(b'video')
+                connection.execute(
+                    'INSERT INTO asset(id,location,path,name,medium,duration,disposal) VALUES(?,?,?,?,?,?,?)',
+                    (aid, location, str(video), video.name, medium, 30, disposal))
+
+    def run_processing(self, **options):
+        return process_library(self.config, self.db, self.root / 'candidates', self.root / 'covers',
+                               database=self.database, **options)
+
+    @staticmethod
+    def make_tile(_ffmpeg, _pattern, _columns, _rows, destination):
+        Image.new('RGB', (1440, 810), 'green').save(destination, format='JPEG')
+        return True
+
+    def test_selected_completion_generates_a_snapshot_without_scanning_or_cloud_reads(self):
+        reports = []
+        with patch('peach.library_processing.scan_location') as scan, \
+                patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
+                patch('peach.frame_capture.capture_with_retry', return_value=True) as capture, \
+                patch('peach.frame_capture.tile_frames', side_effect=self.make_tile), \
+                patch('peach.library_processing._finish_collection', return_value={}), \
+                patch('peach.library_processing.root_online', return_value=True) as online:
+            result = self.run_processing(asset_ids=[1], report=reports.append)
+        scan.assert_not_called()
+        self.assertEqual(capture.call_count, 9)
+        online.assert_called_once_with(self.media)
+        self.assertEqual(result['status'], 'complete')
+        self.assertEqual(result['previews'], 1)
+        self.assertEqual(result['requested_stage'], 'all')
+        self.assertEqual(result['asset_ids'], [1])
+        self.assertTrue(any(row.get('current_action') == 'generating_preview' for row in reports))
+        with self.database.read_connection() as connection:
+            snapshot = connection.execute('SELECT snapshot_path FROM asset WHERE id=1').fetchone()[0]
+            self.assertIsNone(connection.execute('SELECT snapshot_path FROM asset WHERE id=2').fetchone()[0])
+        self.assertTrue(Path(snapshot).is_relative_to(self.root / 'generated' / 'snapshots'))
+        self.assertTrue(Path(snapshot).is_file())
+        with patch('peach.frame_capture.capture_with_retry') as capture:
+            second = self.run_processing(stage='previews')
+        self.assertEqual(second['previews'], 0)
+        self.assertEqual(second['status'], 'complete')
+        capture.assert_not_called()
+
+    def test_preview_only_leaves_candidates_and_sources_untouched(self):
+        factory = Mock(side_effect=AssertionError('外部资料不属于预览任务'))
+        with patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
+                patch('peach.frame_capture.capture_with_retry', return_value=True), \
+                patch('peach.frame_capture.tile_frames', side_effect=self.make_tile), \
+                patch('peach.library_processing._finish_collection') as finish:
+            result = self.run_processing(stage='previews', provider_factory=factory)
+        self.assertEqual(result['total'], 1)
+        self.assertEqual(result['previews'], 1)
+        self.assertFalse((self.root / 'candidates').exists())
+        finish.assert_not_called()
+        factory.assert_not_called()
+
+    def test_missing_ffmpeg_is_retryable_and_collection_can_finish_its_work(self):
+        self.resolver.ffmpeg.return_value = None
+        with patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
+                patch('peach.library_processing._finish_collection', return_value={'auto_applied': 2}) as finish:
+            result = self.run_processing(stage='collect', asset_ids=[1])
+        finish.assert_called_once()
+        self.assertEqual(result['auto_applied'], 2)
+        self.assertEqual(result['status'], 'failed')
+        self.assertEqual(result['retryable_asset_ids'], [1])
+        issue = json.loads(Path(result['issues_log']).read_text(encoding='utf-8').splitlines()[0])
+        self.assertEqual(issue['failed_action'], 'generating_preview')
+        self.assertIn('FFmpeg', result['issue_preview'][0]['message'])
+
+    def test_metadata_only_never_extracts_frames(self):
+        with patch('peach.library_processing._generate_previews') as generate, \
+                patch('peach.library_processing._finish_collection', return_value={}):
+            result = self.run_processing(stage='metadata', asset_ids=[1])
+        generate.assert_not_called()
+        self.assertEqual(result['previews'], 0)
+        self.assertEqual(result['status'], 'complete')
+
+    def test_local_preview_is_available_when_online_collection_starts(self):
+        with self.database.write_transaction() as connection:
+            connection.execute("UPDATE asset SET code='ABW-358' WHERE id=1")
+        def collect(*_args, **_kwargs):
+            with self.database.read_connection() as connection:
+                path = connection.execute('SELECT snapshot_path FROM asset WHERE id=1').fetchone()[0]
+            self.assertTrue(Path(path).is_file())
+            return [], 0
+        with patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
+                patch('peach.frame_capture.capture_with_retry', return_value=True), \
+                patch('peach.frame_capture.tile_frames', side_effect=self.make_tile), \
+                patch('peach.library_processing._RemoteSession.collect', side_effect=collect) as online, \
+                patch('peach.library_processing._finish_collection', return_value={}):
+            result = self.run_processing(stage='collect', asset_ids=[1])
+        online.assert_called_once()
+        self.assertEqual(result['previews'], 1)
+
+    def test_failed_tiling_leaves_no_registered_or_partial_snapshot(self):
+        import subprocess
+        with patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
+                patch('peach.frame_capture.capture_with_retry', return_value=True), \
+                patch('peach.frame_capture.tile_frames', side_effect=subprocess.TimeoutExpired('ffmpeg', 60)):
+            result = self.run_processing(stage='previews')
+        self.assertEqual(result['status'], 'failed')
+        self.assertEqual(result['retryable_asset_ids'], [1])
+        self.assertIn('超时', result['issue_preview'][0]['message'])
+        self.assertFalse(list((self.root / 'generated').rglob('*.jpg')))
+        with self.database.read_connection() as connection:
+            self.assertIsNone(connection.execute('SELECT snapshot_path FROM asset WHERE id=1').fetchone()[0])
+
+    def test_selected_assets_require_active_videos(self):
+        for selection in ([], [True], [0], [-1], ['1'], '1', [99], [3], [4]):
+            with self.subTest(selection=selection), self.assertRaises(ValueError), \
+                    patch('peach.library_processing.scan_location') as scan:
+                self.run_processing(asset_ids=selection)
+            scan.assert_not_called()
+        with self.assertRaises(ValueError):
+            self.run_processing(asset_ids=[1], retry_ids=[1])
+
+    def test_stop_during_extraction_registers_no_snapshot(self):
+        alive = [True]
+        def capture(*_args, **_kwargs):
+            alive[0] = False
+            return True
+        with patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
+                patch('peach.frame_capture.capture_with_retry', side_effect=capture), \
+                self.assertRaises(InterruptedError):
+            self.run_processing(stage='previews', active=lambda: alive[0])
+        with self.database.read_connection() as connection:
+            self.assertIsNone(connection.execute('SELECT snapshot_path FROM asset WHERE id=1').fetchone()[0])
+        self.assertFalse(list((self.root / 'generated').rglob('*.jpg')))
+
+    def test_web_request_preserves_preview_scope_when_retrying(self):
+        from peach.web_library_processing import w_library_processing
+        previous = {'job_id': 'old', 'status': 'failed', 'requested_stage': 'previews',
+                    'retryable_asset_ids': [1]}
+        job = SimpleNamespace(snapshot=lambda: None, update=lambda *_args, **_kwargs: None,
+                              start=lambda work, restart, initial: (work('new'), initial)[1])
+        contract = SimpleNamespace(db_path=self.db, database=self.database,
+                                   candidate_root=self.root / 'candidates', cover_root=self.root / 'covers',
+                                   library_processing_job=job, cache_bust=lambda: None)
+        with patch('peach.web_library_processing.settings_file.active', return_value=self.config), \
+                patch('peach.web_library_processing.snapshot', return_value=previous), \
+                patch('peach.web_library_processing.process_library', return_value={'status': 'complete'}) as run:
+            result = w_library_processing(contract, {'job_id': 'old', 'retry': []})
+            self.assertEqual(result['requested_stage'], 'previews')
+            self.assertEqual(run.call_args.kwargs['stage'], 'previews')
+            self.assertEqual(run.call_args.kwargs['retry_ids'], [1])
+            w_library_processing(contract, {'stage': 'collect', 'asset_ids': [1, 1]})
+            self.assertEqual(run.call_args.kwargs['asset_ids'], [1])
+            for selection in ([], None, [99], [True]):
+                with self.subTest(selection=selection), self.assertRaises(ValueError):
+                    w_library_processing(contract, {'asset_ids': selection})
+
+    def test_real_local_video_produces_a_snapshot_and_card_poster(self):
+        import subprocess
+        from peach.ffmpeg import FFmpegResolver
+        from peach.previews import PreviewService
+        from peach.repository import LedgerRepository
+        resolver = FFmpegResolver(self.config.directory('tools') / 'ffmpeg')
+        choice = resolver.ffmpeg()
+        if choice is None or resolver.ffprobe() is None:
+            self.skipTest('需要 FFmpeg 和 ffprobe')
+        video = self.media / 'clip-1.mp4'
+        subprocess.run([str(choice.path), '-y', '-v', 'error', '-f', 'lavfi',
+                        '-i', 'testsrc2=size=320x180:rate=10', '-t', '3', '-an',
+                        '-c:v', 'mpeg4', str(video)], capture_output=True, check=True, timeout=30)
+        with self.database.write_transaction() as connection:
+            connection.execute('UPDATE asset SET duration=NULL WHERE id=1')
+        result = self.run_processing(stage='previews')
+        self.assertEqual(result['status'], 'complete')
+        self.assertEqual(result['previews'], 1)
+        with self.database.read_connection() as connection:
+            row = connection.execute('SELECT snapshot_path,duration FROM asset WHERE id=1').fetchone()
+        self.assertGreater(row['duration'], 0)
+        with Image.open(row['snapshot_path']) as image:
+            self.assertEqual(image.size, (1440, 810))
+        generated = self.root / 'generated'
+        service = PreviewService(LedgerRepository(self.database), resolver, generated / 'snapshots',
+                                 generated / 'posters', generated / 'avatars', generated / 'logos')
+        with Image.open(service.poster(1)) as image:
+            self.assertEqual(image.size, (480, 270))
