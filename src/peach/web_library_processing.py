@@ -3,6 +3,7 @@ import json
 
 from . import settings_file
 from .library_processing import (ALL_STAGES, COLLECT_STAGE, SCAN_STAGE, STAGES,
+                                METADATA_STAGE, PREVIEWS_STAGE, _asset_selection,
                                 decorate, issues_path, process_library, snapshot)
 
 
@@ -76,7 +77,13 @@ def w_library_processing(contract, body):
     if previous.get('status') == 'running':
         return previous
     retry_ids = _retry_ids(previous, body)
-    stage = str((body or {}).get('stage') or ALL_STAGES)
+    if 'asset_ids' in (body or {}) and body['asset_ids'] is None:
+        raise ValueError('请选择有效的视频项目')
+    asset_ids = _asset_selection(contract.db_path, (body or {}).get('asset_ids'))
+    if asset_ids is not None and retry_ids is not None:
+        raise ValueError('选择项目与失败重试不能同时使用')
+    stage = str((body or {}).get('stage') or
+                (previous.get('requested_stage') if retry_ids is not None else None) or ALL_STAGES)
     if stage not in STAGES:
         raise ValueError('处理阶段无效')
     if retry_ids is not None and not retry_ids:
@@ -84,7 +91,7 @@ def w_library_processing(contract, body):
     def work(job_id):
         try:
             result = process_library(config, contract.db_path, contract.candidate_root, contract.cover_root,
-                job_id=job_id, retry_ids=retry_ids, stage=stage,
+                job_id=job_id, retry_ids=retry_ids, stage=stage, asset_ids=asset_ids,
                 # 自动落库与页面写的是同一个 `LedgerDatabase`：进程内写锁在实例上，
                 # 另建一个就是在同一个进程里开第二条写入路径。
                 database=contract.database,
@@ -96,6 +103,7 @@ def w_library_processing(contract, body):
             contract.cache_bust()
     # 起步那行字按这一趟真正要做的事写：点了「只扫描」却看到「读取本地资料」，
     # 人会以为点错了。
-    labels = {ALL_STAGES: '准备处理', SCAN_STAGE: '准备扫描文件', COLLECT_STAGE: '准备采集资料'}
+    labels = {ALL_STAGES: '准备处理', SCAN_STAGE: '准备扫描文件', COLLECT_STAGE: '准备采集资料',
+              METADATA_STAGE: '准备采集资料', PREVIEWS_STAGE: '准备生成预览图'}
     return contract.library_processing_job.start(
         work, restart=True, initial={'stage': labels[stage], 'requested_stage': stage})
