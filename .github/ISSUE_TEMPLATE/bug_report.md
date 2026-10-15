@@ -1,42 +1,40 @@
 ---
-name: 缺陷报告
-about: 功能行为与预期不符
-title: ''
+name: 缺陷报告 / Bug report
+about: 报告错误或异常行为 / Report an error or unexpected behavior
 labels: bug
-assignees: ''
 ---
 
-## 现象
+<!--
+请先搜索已有 issue。安全漏洞请使用私有报告：https://github.com/peach-mitao/peach/security/advisories/new
+Search existing issues first. Report security vulnerabilities privately at the link above.
+可以用中文或英文填写。/ Write in Chinese or English.
+-->
 
-一句话说清哪里不对。
+## 问题描述 / What happened
 
-## 复现步骤
+<!-- 实际发生了什么，期望发生什么？/ What happened, and what did you expect? -->
+
+## 复现步骤 / Steps to reproduce
+
+<!-- 从哪个入口开始，做了什么？无法稳定复现也请说明。/ Where did you start, and what did you do? Mention if it happens intermittently. -->
 
 1.
-2.
-3.
 
-## 期望与实际
+## 运行环境 / Environment
 
-- 期望：
-- 实际：
+- Peach 版本或构建 / Peach version or build:
+- 系统版本及架构 / OS version and architecture:
+- 安装方式 / Installation: <!-- 安装包、免安装包、Docker 或源码 / Installer, portable, Docker, or source -->
+- Python 版本（源码部署，可选）/ Python version (source installs, optional):
+- `/healthz` 返回（可选）/ `/healthz` response (optional):
 
-## 运行环境
+<!-- 服务无法启动时写“无法访问”即可。/ If the service cannot start, write "unreachable". -->
 
-- 平台与版本：Windows / macOS / Linux，具体版本
-- Python 版本：
-- Peach 提交或版本：
-- `/healthz` 返回：
+## 日志与截图（可选）/ Logs and screenshots (optional)
 
-## 日志与截图
-
-相关片段贴在下面。请先去掉本机路径、局域网地址、账号名与凭据。
-
-```text
-
-```
-
-## 已确认
-
-- [ ] 这不是安全漏洞（安全问题走 SECURITY.md 的私有报告渠道）
-- [ ] 已搜索过既有 issue
+<!--
+粘贴完整报错，或附截图、相关日志、诊断报告。不需要自行判断根因。
+上传前检查并遮盖本机路径、网络地址、账号及凭据等隐私信息。
+Paste the full error or attach screenshots, relevant logs, or a diagnostic report. No root-cause analysis is required.
+Review attachments and redact private information such as local paths, network addresses, accounts, and credentials.
+-->
