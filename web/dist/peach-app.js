@@ -70399,10 +70399,7 @@ function nG({ items: e, position: t, onSelect: n, below: r = !1 }) {
 	if ((0, b.useLayoutEffect)(() => {
 		let e = i.current, t = e?.querySelector("[data-follow-image-dots]"), n = e?.closest("[data-stage-media]");
 		if (!e || !t) return;
-		let a = es(t, {
-			drag: !0,
-			fade: !1
-		}), o = () => {
+		let a = es(t, { drag: !0 }), o = () => {
 			let i = t.querySelector("[aria-current=\"true\"]");
 			if (i && t.clientWidth) {
 				let e = i.getBoundingClientRect(), n = t.getBoundingClientRect(), r = parseFloat(getComputedStyle(t).paddingLeft);
@@ -70412,6 +70409,7 @@ function nG({ items: e, position: t, onSelect: n, below: r = !1 }) {
 				let t = [...n.querySelectorAll("[data-jav-picture], [data-catalog-picture], .video-js")].find((e) => e.offsetWidth > 0), r = n.getBoundingClientRect(), i = t?.getBoundingClientRect(), a = i ? i.y - r.y + i.height / 2 : (e.getBoundingClientRect().y - r.y) / 2;
 				e.style.setProperty("--media-arrow-top", `${Math.max(0, a)}px`);
 			}
+			a?.update();
 		}, s = new ResizeObserver(o);
 		return s.observe(t), n && s.observe(n), o(), () => {
 			s.disconnect(), a?.destroy();
@@ -70453,10 +70451,13 @@ function nG({ items: e, position: t, onSelect: n, below: r = !1 }) {
 			onClick: () => o(1),
 			dangerouslySetInnerHTML: { __html: R("chevron-right") }
 		})] }), /* @__PURE__ */ (0, x.jsx)("div", {
-			"data-follow-image-dots": "",
-			role: "group",
-			"aria-label": `${e.length} ${s}`,
-			children: e.map((e, t) => c(e, t))
+			"data-media-indicator": "",
+			children: /* @__PURE__ */ (0, x.jsx)("div", {
+				"data-follow-image-dots": "",
+				role: "group",
+				"aria-label": `${e.length} ${s}`,
+				children: e.map((e, t) => c(e, t))
+			})
 		})]
 	});
 }

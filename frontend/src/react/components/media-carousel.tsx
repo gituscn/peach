@@ -17,7 +17,7 @@ export function MediaCarousel({ items, position, onSelect, below = false }: {
     const strip = wrapper?.querySelector<HTMLElement>('[data-follow-image-dots]');
     const frame = wrapper?.closest<HTMLElement>('[data-stage-media]');
     if (!wrapper || !strip) return;
-    const scroller = wireHorizontalScroller(strip, { drag: true, fade: false });
+    const scroller = wireHorizontalScroller(strip, { drag: true });
     const measure = () => {
       const selected = strip.querySelector<HTMLElement>('[aria-current="true"]');
       if (selected && strip.clientWidth) {
@@ -32,6 +32,7 @@ export function MediaCarousel({ items, position, onSelect, below = false }: {
         const center = picture ? picture.y - bounds.y + picture.height / 2 : (wrapper.getBoundingClientRect().y - bounds.y) / 2;
         wrapper.style.setProperty('--media-arrow-top', `${Math.max(0, center)}px`);
       }
+      scroller?.update();
     };
     const observer = new ResizeObserver(measure);
     observer.observe(strip);
@@ -52,8 +53,8 @@ export function MediaCarousel({ items, position, onSelect, below = false }: {
       onClick={() => step(-1)} dangerouslySetInnerHTML={{ __html: icon('chevron-left') }} />
     <button type="button" data-follow-image-step="1" data-follow-image-arrow="next" aria-label={mixed ? '下一项媒体' : '下一张图片'} title="下一张"
       onClick={() => step(1)} dangerouslySetInnerHTML={{ __html: icon('chevron-right') }} /></> : null}
-    <div data-follow-image-dots="" role="group" aria-label={`${items.length} ${unit}`}>
+    <div data-media-indicator=""><div data-follow-image-dots="" role="group" aria-label={`${items.length} ${unit}`}>
       {items.map((item, index) => indicator(item, index))}
-    </div>
+    </div></div>
   </div>;
 }

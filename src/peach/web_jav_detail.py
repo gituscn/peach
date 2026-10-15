@@ -250,23 +250,37 @@ def _fetch_image(contract, code, index):
 
 
 def _preview_fields(contract, code, source, *, refresh=False):
-    url = preview_video_url(source)
-    if url and '?' in url:
-        url = preview_video_url(PUBLIC_API.media_movie(code)) or url
-    if not url and ('prestige' in str(source.get('maker_name') or '').casefold()
-                    or 'プレステージ' in str(source.get('maker_name') or '')):
-        from .jav_official_preview import prestige_preview
+    from .jav_official_preview import dmm_preview, javdb_preview, prestige_preview
+
+    prestige = ('prestige' in str(source.get('maker_name') or '').casefold()
+                or 'プレステージ' in str(source.get('maker_name') or ''))
+    provider = 'prestige' if prestige else 'dmm'
+    fetch = (lambda: prestige_preview(code, contract.follow_secrets_root)) if prestige else (
+        lambda: dmm_preview(code, contract.follow_secrets_root))
+    sources = [(provider, fetch), ('javdb', lambda: javdb_preview(code, source.get('id'), contract.follow_secrets_root))]
+    url, errors = '', []
+    for provider, fetch in sources:
         try:
-            result = PUBLIC_API.official_preview(code, lambda: prestige_preview(code, contract.follow_secrets_root),
-                released=source.get('release_date'), refresh=refresh)
+            result = PUBLIC_API.official_preview(code, fetch, released=source.get('release_date'),
+                                                 refresh=refresh, provider=provider)
             url = result['url']
-            failure = cache_error('preview:prestige:' + code)
+            failure = cache_error(f'preview:{provider}:' + code)
             if failure and not url:
                 raise PublicSourceUnavailable(failure)
         except PublicSourceUnavailable as error:
-            return {'preview_video_url': '', 'preview_state': 'unavailable', 'preview_message': str(error)}
+            errors.append(str(error))
+        if url:
+            break
     if not url:
-        return {'preview_video_url': '', 'preview_state': 'missing'}
+        url = preview_video_url(source)
+        if url and '?' in url:
+            try:
+                url = preview_video_url(PUBLIC_API.media_movie(code)) or url
+            except PublicSourceUnavailable as error:
+                errors.append(str(error))
+    if not url:
+        return {'preview_video_url': '', 'preview_state': 'unavailable' if errors else 'missing',
+                **({'preview_message': '；'.join(dict.fromkeys(errors))} if errors else {})}
     playlist = url.endswith('.m3u8') or '.m3u8?' in url
     ref = PreviewCache(cache_for(contract)).register(code, url, playlist=playlist,
                                                      media_type='' if playlist else 'video/mp4')

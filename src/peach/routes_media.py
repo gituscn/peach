@@ -1017,7 +1017,7 @@ def follow_image(request: Request, id: int, media: int | None = None,
 
 def _jav_preview_target(url: str) -> ResolvedFollowMedia:
     """已验证的预览来源使用固定主机范围，其他 CDN 逐跳核对公网解析。"""
-    return ResolvedFollowMedia(url, allowed_hosts=("www.prestige-av.com", "jdforrepam.com"), public_hosts=True)
+    return ResolvedFollowMedia(url, allowed_hosts=("www.prestige-av.com", "jdforrepam.com", "cc3001.dmm.co.jp"), public_hosts=True)
 
 
 @router.api_route("/jav-preview/{code}/{ref}", methods=["GET", "HEAD"])
