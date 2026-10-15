@@ -39,7 +39,7 @@ export function ProcessingActions({ busy, scan = false, onRun }: {
       </Button>
       <Button ref={trigger} iconOnly leadingIcon={RiArrowDownSLine}
         aria-label={scan ? '更多扫描与采集方式' : '更多资料与预览补全方式'}
-        aria-haspopup="dialog" aria-expanded={open} {...busyProps(busy)} onClick={() => setOpen(!open)} />
+        aria-haspopup="dialog" aria-expanded={open} {...busyProps(busy)} onClick={() => { if (!busy) setOpen(!open) }} />
     </span>
     <Popover triggerRef={trigger} isOpen={open} onOpenChange={setOpen} placement="bottom end" offset={4}
       className={MENU_POPOVER_SURFACE}>

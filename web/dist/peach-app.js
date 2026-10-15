@@ -47929,7 +47929,9 @@ function wF({ busy: e, scan: t = !1, onRun: n }) {
 			"aria-haspopup": "dialog",
 			"aria-expanded": i,
 			...J(e),
-			onClick: () => a(!i)
+			onClick: () => {
+				e || a(!i);
+			}
 		})]
 	}), /* @__PURE__ */ (0, C.jsx)(wM, {
 		triggerRef: r,
