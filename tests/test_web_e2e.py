@@ -47,6 +47,7 @@ BROWSER_LOGS = ROOT / "build" / "agent-verification" / "browser"
 SERVER_START_SECONDS = 60
 E2E_SECONDS = 600
 E2E_BATCH_FILES = 12
+SETUP_SUITE = "e2e/setup.test.ts"
 
 
 def chrome_executable() -> str | None:
@@ -120,10 +121,10 @@ def e2e_command(node: str, concurrency: int, files: tuple[str, ...]) -> list[str
 
 
 def e2e_batches(frontend: Path, concurrency: int, selected: tuple[str, ...] = ()) -> tuple[tuple[tuple[str, ...], int], ...]:
-    """把 `frontend/e2e` 下全部 `*.test.ts`（含子目录）分批，每批带自己的并发数，限时 600 秒。
+    """把已配置服务的 `*.test.ts`（含子目录）分批，每批带自己的并发数，限时 600 秒。
 
     并发批最多 12 个文件，串行批每批一个文件。并发批之后运行时序敏感的串行批；并发为 1 时，
-    按设计决定、交互回归与路由冒烟分组。
+    按设计决定、交互回归与路由冒烟分组。首启用例由 `SetupE2ETests` 在专用服务执行。
     """
     files = tuple(sorted(path.relative_to(frontend).as_posix()
                          for path in (frontend / "e2e").rglob("*.test.ts")))
@@ -134,6 +135,7 @@ def e2e_batches(frontend: Path, concurrency: int, selected: tuple[str, ...] = ()
         if missing:
             raise AssertionError(f"浏览器用例不存在：{sorted(missing)}")
         files = tuple(path for path in files if path in selected)
+    files = tuple(path for path in files if path != SETUP_SUITE)
     if concurrency == 1:
         design = tuple(path for path in files if path.startswith("e2e/design-"))
         routes = tuple(path for path in files if path == "e2e/smoke.test.ts")
@@ -317,7 +319,9 @@ class WebE2ESmokeTests(unittest.TestCase):
             stale.unlink()
         concurrency = e2e_concurrency(os.environ.get("PEACH_E2E_CONCURRENCY", "").strip())
         selected = tuple(json.loads(os.environ.get("PEACH_E2E_FILES", "[]")))
-        for index, (batch, lanes) in enumerate(e2e_batches(FRONTEND, concurrency, selected), 1):
+        batches = e2e_batches(FRONTEND, concurrency, selected)
+        for index, (batch, lanes) in enumerate(batches, 1):
+            print(f"浏览器批次 {index}/{len(batches)}：{', '.join(batch)}", flush=True)
             log_path = BROWSER_LOGS / f"batch-{index}.tap"
             try:
                 completed = subprocess.run(
@@ -341,7 +345,7 @@ class SetupE2ETests(unittest.TestCase):
     """首次运行页跑在 `serve --setup` 上：临时数据根里还没有设置文件，提交成功后才有。
 
     托盘拉起引导服务用的就是这组参数（`tray.build_setup_service_specs`）。页面那一侧是
-    `frontend/e2e/setup.test.ts`，路由冒烟的几批里它因为缺变量整组跳过。
+    `frontend/e2e/setup.test.ts`，只由本组在首启服务执行。
     """
 
     @classmethod
@@ -417,7 +421,7 @@ class SetupE2ETests(unittest.TestCase):
         log_path = BROWSER_LOGS / "setup.tap"
         try:
             completed = subprocess.run(
-                e2e_command(self.node, 1, ("e2e/setup.test.ts",)),
+                e2e_command(self.node, 1, (SETUP_SUITE,)),
                 capture_output=True, text=True, encoding="utf-8", errors="replace",
                 cwd=str(FRONTEND), env=env, timeout=E2E_SECONDS, check=False)
         except subprocess.TimeoutExpired as expired:
@@ -534,6 +538,21 @@ class MissingPrerequisiteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaisesRegex(AssertionError, "没有浏览器用例"):
                 e2e_batches(Path(folder).resolve(), 4)
+
+    def test_setup_suite_is_owned_by_the_first_run_service(self):
+        paths = (*self.PATHS, SETUP_SUITE)
+        for concurrency in (1, 4):
+            with self.subTest(concurrency=concurrency):
+                self.assertEveryFileOnce(self.batches_for(concurrency, paths=paths))
+        with tempfile.TemporaryDirectory() as folder:
+            frontend = Path(folder).resolve()
+            for name in paths:
+                path = frontend / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.touch()
+            self.assertEqual(e2e_batches(frontend, 1, (SETUP_SUITE,)), ())
+            self.assertEqual(e2e_batches(frontend, 1, (SETUP_SUITE, self.PATHS[0])),
+                             (((self.PATHS[0],), 1),))
 
     def test_focused_batches_only_collect_named_browser_files(self):
         with tempfile.TemporaryDirectory() as folder:
