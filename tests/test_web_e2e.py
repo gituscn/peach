@@ -122,7 +122,7 @@ def e2e_command(node: str, concurrency: int, files: tuple[str, ...]) -> list[str
 def e2e_batches(frontend: Path, concurrency: int, selected: tuple[str, ...] = ()) -> tuple[tuple[tuple[str, ...], int], ...]:
     """把 `frontend/e2e` 下全部 `*.test.ts`（含子目录）分批，每批带自己的并发数，限时 600 秒。
 
-    每批最多 12 个文件。并发批之后运行时序敏感的串行批；并发为 1 时，
+    并发批最多 12 个文件，串行批每批一个文件。并发批之后运行时序敏感的串行批；并发为 1 时，
     按设计决定、交互回归与路由冒烟分组。
     """
     files = tuple(sorted(path.relative_to(frontend).as_posix()
@@ -138,14 +138,17 @@ def e2e_batches(frontend: Path, concurrency: int, selected: tuple[str, ...] = ()
         design = tuple(path for path in files if path.startswith("e2e/design-"))
         routes = tuple(path for path in files if path == "e2e/smoke.test.ts")
         interactions = tuple(path for path in files if path not in design + routes)
-        return tuple((group[start:start + E2E_BATCH_FILES], 1)
-                     for group in (design, interactions, routes)
-                     for start in range(0, len(group), E2E_BATCH_FILES))
-    sensitive = tuple(path for path in files if path in TIMING_SENSITIVE_SUITES)
-    shared = tuple(path for path in files if path not in sensitive)
-    return tuple((group[start:start + E2E_BATCH_FILES], lanes)
-                 for group, lanes in ((shared, concurrency), (sensitive, 1))
-                 for start in range(0, len(group), E2E_BATCH_FILES))
+        groups = ((design, 1), (interactions, 1), (routes, 1))
+    else:
+        sensitive = tuple(path for path in files if path in TIMING_SENSITIVE_SUITES)
+        shared = tuple(path for path in files if path not in sensitive)
+        groups = ((shared, concurrency), (sensitive, 1))
+    batches = []
+    for group, lanes in groups:
+        size = E2E_BATCH_FILES if lanes > 1 else 1
+        batches.extend((group[start:start + size], lanes)
+                       for start in range(0, len(group), size))
+    return tuple(batches)
 
 
 @windows_ledger_roots
@@ -494,18 +497,18 @@ class MissingPrerequisiteTests(unittest.TestCase):
     def test_concurrent_run_puts_timing_sensitive_suites_in_a_trailing_serial_batch(self):
         batches = self.batches_for(4)
         self.assertEveryFileOnce(batches)
-        (shared, lanes), (serial, serial_lanes) = batches
+        (shared, lanes), *serial = batches
         self.assertEqual(lanes, 4)
-        self.assertEqual(serial, ("e2e/design-cards.test.ts", "e2e/sidebar-motion.test.ts"))
-        self.assertEqual(serial_lanes, 1)
+        self.assertEqual(serial, [(("e2e/design-cards.test.ts",), 1),
+                                  (("e2e/sidebar-motion.test.ts",), 1)])
         self.assertIn("e2e/nested/feature.test.ts", shared)
 
     def test_serial_run_splits_design_interactions_and_routes_to_stay_within_the_time_limit(self):
         batches = self.batches_for(1)
         self.assertEveryFileOnce(batches)
         self.assertEqual([files for files, _ in batches], [
-            ("e2e/design-cards.test.ts", "e2e/design-detail.test.ts"),
-            ("e2e/nested/feature.test.ts", "e2e/sidebar-motion.test.ts"),
+            ("e2e/design-cards.test.ts",), ("e2e/design-detail.test.ts",),
+            ("e2e/nested/feature.test.ts",), ("e2e/sidebar-motion.test.ts",),
             ("e2e/smoke.test.ts",),
         ])
         self.assertEqual({lanes for _, lanes in batches}, {1})
@@ -516,7 +519,7 @@ class MissingPrerequisiteTests(unittest.TestCase):
                  + ("e2e/smoke.test.ts",))
         batches = self.batches_for(1, paths=paths)
         self.assertCountEqual(tuple(path for files, _ in batches for path in files), paths)
-        self.assertEqual([len(files) for files, _ in batches], [12, 1, 12, 12, 1, 1])
+        self.assertEqual([len(files) for files, _ in batches], [1] * len(paths))
         self.assertEqual({lanes for _, lanes in batches}, {1})
 
     def test_concurrent_batches_cover_large_groups_once_with_the_requested_concurrency(self):
@@ -524,8 +527,8 @@ class MissingPrerequisiteTests(unittest.TestCase):
                  + ("e2e/smoke.test.ts", "e2e/design-cards.test.ts", "e2e/sidebar-motion.test.ts"))
         batches = self.batches_for(4, paths=paths)
         self.assertCountEqual(tuple(path for files, _ in batches for path in files), paths)
-        self.assertEqual([len(files) for files, _ in batches], [12, 12, 2, 2])
-        self.assertEqual([lanes for _, lanes in batches], [4, 4, 4, 1])
+        self.assertEqual([len(files) for files, _ in batches], [12, 12, 2, 1, 1])
+        self.assertEqual([lanes for _, lanes in batches], [4, 4, 4, 1, 1])
 
     def test_browser_batches_require_at_least_one_suite(self):
         with tempfile.TemporaryDirectory() as folder:
