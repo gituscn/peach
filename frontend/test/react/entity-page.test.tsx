@@ -8,7 +8,7 @@ import { notifyManager, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as legacyUi from '@peach/legacy/ui';
 
-import { itemsParams, prefetchEntityPage, type EntityPageProps } from '../../src/react/entity-page/entity-page';
+import { fetchItems, itemsParams, prefetchEntityPage, type EntityPageProps } from '../../src/react/entity-page/entity-page';
 import { EntityPage } from '../../src/react/entity-page/entity-page-view';
 import { queryClient } from '../../src/react/query';
 import { buttonNamed, click, mountRoot, settle } from './render';
@@ -186,6 +186,15 @@ const pressedView = (props: EntityPageProps) =>
 const readout = (props: EntityPageProps) => props.hosts.filter.querySelector('[data-entity-readout]')?.textContent;
 
 describe('首屏', () => {
+  it('资料页表格按页取数、全集排序并保留人物与标签筛选', async () => {
+    const served = serve();
+    await fetchItems('performer', NAME, { tag: '演示标签', state: 'fresh' }, { jav: true, seed: '42' },
+      20, new AbortController().signal, { limit: 20, sort: 'name', dir: 'asc' });
+    const params = served.calls('/api/items')[0]!.searchParams;
+    expect(Object.fromEntries(params)).toMatchObject({ performer: NAME, tag: '演示标签', state: 'fresh',
+      jav: '1', offset: '20', limit: '20', sort: 'name', dir: 'asc' });
+    expect(params.has('count')).toBe(false);
+  });
   it('FC2 合集读数按作品展示，文件总数留给分页', async () => {
     const page=await open({ entity:entity({asset_count:1}),items:()=>({...items([1,2,3]),total:19,work_total:1}) });
     expect(readout(page.props)).toBe('视频 · 1');

@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { cardArtwork } from '@peach/card-art';
 
 import { LinkButton } from '@/components/base/buttons/link-button';
+import { RiArrowRightLine } from '@remixicon/react';
 
 import { apiSend, errorMessage } from '../../api';
 import type { MediaItem } from '../catalog-grid/types';
@@ -61,12 +62,12 @@ function Completion({ assetIds, onComplete }: { assetIds: number[]; onComplete?(
   const message = problem || (busy ? start.isPending ? '正在启动补全…' : currentLine(state!)
     : outcome || `这批影片中有 ${assetIds.length.toLocaleString()} 部暂无预览，可补全封面与视频画面。`);
   return <section aria-label="补全预览" aria-live="polite" data-library-completion="" className="@container mb-4">
-    <Note tone={problem ? 'warning' : 'neutral'} action={<div className="flex w-full justify-end @sm:w-auto"><ProcessingActions busy={busy} onRun={command => {
+    <Note tone={problem ? 'warning' : 'neutral'} actionLayout="below" action={<ProcessingActions busy={busy} onRun={command => {
       if (busy) return;
       setOutcome('');
       start.mutate(command);
-    }} /></div>} extra={<div className="flex"><LinkButton href="/data-cleanup#libraryProcessing" size="small">
+    }} />}>{message}{' '}<LinkButton href="/data-cleanup#libraryProcessing" size="small" trailingIcon={RiArrowRightLine}>
       {problem ? '查看并处理' : '查看处理详情'}
-    </LinkButton></div>}>{message}</Note>
+    </LinkButton></Note>
   </section>;
 }

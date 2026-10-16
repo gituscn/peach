@@ -1,5 +1,21 @@
 # BoardUI 适配
 
+## 目录浏览
+
+2026-10-17 取得公开 [Tree View](https://www.boardui.com/components/tree-view)、[Breadcrumb](https://www.boardui.com/components/breadcrumb) 与 Direction 注册表源码。三个条目的 SHA-256 与逐文件校验登记在 `frontend/src/react/boardui/ORIGIN.md` 和 `UPSTREAM.sha256`；原始 JSON 保存在本次工作树 `build/boardui-registry/`。来源为 MIT，无新增运行依赖。
+
+Tree View 直接使用上游的目录图标、层级线、32px 紧凑行、键盘导航及受控展开；Breadcrumb 使用上游的祖先按钮与当前项。Peach 保留首页顶部人物与厂牌、玻璃筛选、排序、卡片和详情，在正文左侧放置 224px 目录栏；1100px 以下收为按需打开的目录弹层。面包屑、子文件夹入口及用途设置位于作品区上方。用途表单使用已有 Select、Input、Checkbox、ModalFrame 与共用确认框；移除确认期间卸载用途弹层，取消后恢复表单，避免两套焦点管理重叠。目录浏览采用最近一层明确规则及来源撤回，范围见[目录浏览](DIRECTORY_BROWSING.md)。
+
+官方组件文档与注册表源码已取得；官方实时浏览器示例打开超时，交互视觉实测未取得。Peach 的桌面和手机行为使用临时合成馆藏验收。
+
+目录栏吸顶边界按筛选浮层的实际高度与顶部位置计算，并随窗口和筛选内容变化更新；树内滚动高度保留筛选栏与底部间距。密集模式的 Mix 与作品卡共用顶部 7px 叠层留白，封面下沿对齐。
+
+文件夹模式使用上游 IconButton，在右侧排序控件组中适配关注页的 30px 透明按钮和玻璃选中面；Remix 图标保留填充路径。卡片与列表使用共用分段控件，当前浏览器保留所选显示方式。列表由 TanStack Table 驱动现有 BoardUI Table，复用 DataTableFrame、排序与分页控件，行间使用直线；选择接入馆藏现有批量栏。默认每页 20 部，服务端对完整筛选结果排序分页，跨页保留选择。实现依据 [TanStack 服务端分页](https://tanstack.com/table/latest/docs/framework/react/guide/pagination) 与 [排序](https://tanstack.com/table/latest/docs/framework/react/guide/sorting)，2026-10-17 核对。
+
+窄屏的首页、资料页与关注页筛选栏按整行横滚；作品与关注卡片按实际文字和标签定高，空标签区不占行。Note 按容器宽度排列正文和操作，补全提示使用两层结构：说明及带右箭头的详情链接、下一行补全按钮。玻璃材质沿用既有实现。
+
+筛选栏按钮统一为 viewglide 分段控件的 30px 高度，纯图标键为 30×30px。收藏入口、换一批与探索页资料更新复用同一个 BoardUI IconButton 包装件，采用蓝色动作表面、16px 图标与相同的悬停和忙态。
+
 ## 任务记录、诊断与关注概览
 
 任务中心的一轮任务使用独立卡面，失败时卡框使用错误色，结束原因保留正文色。运行进度、后继任务明细、例行任务折叠、历史分页和轮询共用现有数据状态。

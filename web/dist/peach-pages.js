@@ -19237,11 +19237,12 @@ function Hp({ data: e }) {
 }
 //#endregion
 //#region src/react/components/note.tsx
-function Up({ tone: e, title: t, action: n, extra: r, children: i }) {
-	let a = /* @__PURE__ */ (0, R.jsxs)(R.Fragment, { children: [/* @__PURE__ */ (0, R.jsxs)("div", {
-		className: "flex flex-wrap items-center justify-between gap-3",
+function Up({ tone: e, title: t, action: n, extra: r, children: i, actionLayout: a = "inline" }) {
+	let o = /* @__PURE__ */ (0, R.jsxs)(R.Fragment, { children: [/* @__PURE__ */ (0, R.jsxs)("div", {
+		"data-note-layout": "",
+		className: yt("flex flex-col items-start gap-3", a === "inline" && "@xl:flex-row @xl:items-center @xl:justify-between"),
 		children: [/* @__PURE__ */ (0, R.jsxs)("div", {
-			className: "flex min-w-0 flex-1 flex-col gap-0.5",
+			className: "flex min-w-0 flex-1 flex-col gap-0.5 self-stretch",
 			children: [t ? /* @__PURE__ */ (0, R.jsx)("p", {
 				className: "text-body-medium wrap-anywhere",
 				children: t
@@ -19249,33 +19250,37 @@ function Up({ tone: e, title: t, action: n, extra: r, children: i }) {
 				className: "whitespace-pre-line text-body-2-regular wrap-anywhere",
 				children: i
 			})]
-		}), n]
+		}), n ? /* @__PURE__ */ (0, R.jsx)("div", {
+			"data-note-action": "",
+			className: "max-w-full",
+			children: n
+		}) : null]
 	}), r] });
 	switch (e) {
 		case "info": return /* @__PURE__ */ (0, R.jsx)("div", {
 			role: "status",
-			className: "flex flex-col gap-0.5 rounded-2lg bg-notification-information-background px-3 py-2 text-notification-information-foreground",
-			children: a
+			className: "@container flex flex-col gap-2 rounded-2lg bg-notification-information-background px-3 py-2 text-notification-information-foreground",
+			children: o
 		});
 		case "success": return /* @__PURE__ */ (0, R.jsx)("div", {
 			role: "status",
-			className: "flex flex-col gap-0.5 rounded-2lg bg-notification-success-background px-3 py-2 text-notification-success-foreground",
-			children: a
+			className: "@container flex flex-col gap-2 rounded-2lg bg-notification-success-background px-3 py-2 text-notification-success-foreground",
+			children: o
 		});
 		case "warning": return /* @__PURE__ */ (0, R.jsx)("div", {
 			role: "note",
-			className: "flex flex-col gap-0.5 rounded-2lg bg-status-yellow-background px-3 py-2 text-status-yellow-text",
-			children: a
+			className: "@container flex flex-col gap-2 rounded-2lg bg-status-yellow-background px-3 py-2 text-status-yellow-text",
+			children: o
 		});
 		case "error": return /* @__PURE__ */ (0, R.jsx)("div", {
 			role: "alert",
-			className: "flex flex-col gap-0.5 rounded-2lg bg-background-tertiary-error px-3 py-2 text-text-error-primary",
-			children: a
+			className: "@container flex flex-col gap-2 rounded-2lg bg-background-tertiary-error px-3 py-2 text-text-error-primary",
+			children: o
 		});
 		default: return /* @__PURE__ */ (0, R.jsx)("div", {
 			role: "note",
-			className: "flex flex-col gap-0.5 rounded-2lg bg-background-tertiary-default px-3 py-2 text-text-secondary",
-			children: a
+			className: "@container flex flex-col gap-2 rounded-2lg bg-background-tertiary-default px-3 py-2 text-text-secondary",
+			children: o
 		});
 	}
 }

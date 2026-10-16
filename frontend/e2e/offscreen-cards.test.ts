@@ -8,7 +8,7 @@ import { after, before, describe, it } from 'node:test';
 
 import type { Browser, Page } from 'playwright-core';
 
-import { launch, settle, visit, VIEWPORTS, type Visit } from './harness.ts';
+import { launch, layout, settle, visit, VIEWPORTS, type Visit } from './harness.ts';
 
 const DESKTOP = VIEWPORTS.find((viewport) => !viewport.mobile)!;
 const CLONES = 150;
@@ -172,6 +172,25 @@ describe('视口外的卡片', () => {
 
   after(async () => {
     await browser.close();
+  });
+
+  it('手机关注卡片按文字和标签定高，空标签区不占行', { timeout: 60_000 }, async () => {
+    const opened = await openLongFollow(browser);
+    try {
+      await opened.page.setViewportSize({ width: 390, height: 844 });
+      for (const density of ['roomy', 'dense']) {
+        await opened.page.evaluate(value => { document.body.dataset.density = value }, density);
+        const cards = await opened.page.locator(FOLLOW_CARDS).evaluateAll(nodes => nodes.slice(0, 3).map(node => {
+          const meta = node.querySelector('[data-media-meta]')!;
+          const children = [...meta.children].filter(child => getComputedStyle(child).display !== 'none')
+            .map(child => child.getBoundingClientRect());
+          const content = Math.max(...children.map(child => child.bottom)) - Math.min(...children.map(child => child.top));
+          return { height: meta.getBoundingClientRect().height, content };
+        }));
+        for (const card of cards) assert.ok(card.height <= card.content + 17, JSON.stringify({ density, ...card }));
+      }
+      assert.deepEqual((await layout(opened.page)).offenders, []);
+    } finally { await opened.close() }
   });
 
   for (const [where, open, selector] of [

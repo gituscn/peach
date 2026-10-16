@@ -33,6 +33,7 @@ import { ShellActionsContext, useOpenEpoch } from '../router';
 import type { CatalogShell, ShellActions } from '../shell-actions';
 import { entityTarget } from './index-entity';
 import { JavLibraryHeader } from '../../jav/jav-header';
+import { CatalogFolders } from '../../catalog-folders/catalog-folders-page';
 
 const readOpens = () => pageOpens;
 
@@ -93,6 +94,8 @@ function filtersAt(pathname: string, search: string, entering: boolean, shell: C
     seed: params.get('seed') || (entering ? newSeed() : previous.seed || newSeed()),
     q: params.get('q') || '', jav: params.get('jav') || '',
     performer: params.get('performer') || '', series: params.get('series') || '',
+    browse: params.get('browse') === 'folders' || params.get('folder') ? 'folders' : '',
+    folder: params.get('folder') || '', folder_recursive: params.get('folder_recursive') === '0' ? '0' : '',
   };
 }
 
@@ -202,6 +205,7 @@ export function CatalogMatch() {
   if (isOverlayPath(pathname) && !overlayTarget(pathname)) return null;
   return <>
     <CatalogOpen key={pathname === '/junk-files' ? '/junk-files' : '/'} />
+    {isCatalogPath(pathname) ? <CatalogFolders /> : null}
     {jav && host && actions ? createPortal(<JavLibraryHeader navigate={actions.navigate}
       receipt={message => actions.receipt(message)} />, host) : null}
   </>;

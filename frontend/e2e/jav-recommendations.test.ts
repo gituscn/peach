@@ -98,14 +98,14 @@ describe('JAV 推荐与加载结构', () => {
       const pendingBottom = await page.locator('[data-jav-filter] [data-filter-row="bottom"]').boundingBox();
       const pendingSize = await page.locator('[data-jav-filter] [data-entity-layout]').boundingBox();
       const pendingShortcut = await page.locator('[data-jav-filter] [data-shortcuts-trigger]').boundingBox();
-      assert.ok(pendingShortcut && pendingShortcut.width === 32 && pendingShortcut.height === 32);
+      assert.ok(pendingShortcut && pendingShortcut.width === 30 && pendingShortcut.height === 30, JSON.stringify(pendingShortcut));
       const tagPlaceholders = page.locator('[data-jav-filter] [data-catalog-tags] [data-skeleton="tag"]');
       assert.equal(await tagPlaceholders.count(), 6);
       const pendingTags = await tagPlaceholders.evaluateAll(nodes => nodes.map(node => {
         const style = getComputedStyle(node), box = node.getBoundingClientRect();
         return { height: box.height, y: box.y, pointer: style.pointerEvents, position: style.position, overflow: style.overflow };
       }));
-      assert.ok(pendingTags.every(chip => chip.height === (viewport.mobile ? 36 : 30) && chip.y === pendingTags[0].y && chip.pointer === 'none'), JSON.stringify(pendingTags));
+      assert.ok(pendingTags.every(chip => chip.height === 30 && chip.y === pendingTags[0].y && chip.pointer === 'none'), JSON.stringify(pendingTags));
       assert.ok(pendingTags.every(chip => chip.position === 'relative' && chip.overflow === 'hidden'), '标签光效在各自占位内定位和裁切');
       const avatarShape = await page.locator('[data-jav-skeleton-avatar]').first().evaluate(node => {
         const style = getComputedStyle(node); return { width: style.width, height: style.height, radius: style.borderRadius };
@@ -179,7 +179,12 @@ describe('JAV 推荐与加载结构', () => {
       assert.equal(await page.locator('[data-jav-filter] [data-catalog-tag]').first().evaluate(node => node.getBoundingClientRect().height), pendingTags[0].height);
       const heights = await cards.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height));
       if (!viewport.mobile) assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, JSON.stringify(heights));
-      assert.ok(skeletonCard && Math.abs(skeletonCard.height - heights[0]!) <= 2, JSON.stringify({ skeletonCard, heights }));
+      if (viewport.mobile) {
+        assert.ok(skeletonCard && skeletonCard.height >= Math.min(...heights) - 2
+          && skeletonCard.height <= Math.max(...heights) + 2, JSON.stringify({ skeletonCard, heights }));
+      } else {
+        assert.ok(skeletonCard && Math.abs(skeletonCard.height - heights[0]!) <= 2, JSON.stringify({ skeletonCard, heights }));
+      }
       assert.deepEqual(await search.locator('xpath=../../..').boundingBox(), searchBox);
       assert.equal(await cards.nth(1).locator('h3').evaluate(node => getComputedStyle(node).webkitLineClamp), '2');
       const lookup = page.getByRole('button', { name: '查找资源', exact: true }).first();

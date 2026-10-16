@@ -97,6 +97,24 @@ describe('首页筛选条', () => {
     it(`${viewport.name} 筛选条件与作品卡片悬停面保持间距`, { timeout: 60_000 }, async () => {
       const opened = await openHome(browser, '/?studio=Peach%20Studio', viewport);
       try {
+        await opened.page.mouse.move(0, 0);
+        const controls = await opened.page.locator(`${FILTER} [data-filter-glass]`).evaluate(frame => {
+          const candidates = [...frame.querySelectorAll('button,a[aria-pressed],[data-glass-segment]')]
+            .filter(node => node.getBoundingClientRect().width > 0 && node.getBoundingClientRect().height > 0);
+          const actions = ['[data-shortcuts-trigger]', '[data-entity-batch]'].map(selector => {
+            const node = frame.querySelector(selector)!;
+            const style = getComputedStyle(node), rect = node.getBoundingClientRect();
+            return { width: rect.width, height: rect.height, background: style.backgroundImage,
+              color: style.color, border: style.border, shadow: style.boxShadow, radius: style.borderRadius };
+          });
+          return { heights: candidates.map(node => ({ label: node.getAttribute('aria-label') || node.textContent,
+            height: node.getBoundingClientRect().height })), actions };
+        });
+        for (const control of controls.heights) assert.equal(control.height, 30, JSON.stringify(control));
+        assert.deepEqual(controls.actions[0], controls.actions[1]);
+        assert.equal(controls.actions[0].width, 30);
+        assert.equal(controls.actions[0].color, 'rgb(255, 255, 255)');
+        assert.match(controls.actions[0].background, /^linear-gradient\(/);
         const gap = await opened.page.evaluate(() => document.querySelector('#grid [data-media-card]')!.getBoundingClientRect().top
           - document.querySelector('#combo [data-entity-combo]')!.getBoundingClientRect().bottom - 8);
         assert.ok(gap >= 16, `筛选条件距卡片悬停面只有 ${gap}px`);
@@ -411,6 +429,28 @@ describe('首页筛选条', () => {
       }));
       assert.ok(moved.left > 0, '外层滚不动');
       assert.ok(moved.view < before.view - 100, '四枚视图没有跟着标签一起滚走');
+      const controls = page.locator(`${FILTER} [data-filter-row="bottom"]`);
+      const bottom = await controls.evaluate(element => {
+        const summary = element.querySelector('[data-catalog-summary]')!.getBoundingClientRect();
+        const sorts = element.querySelector('[data-entity-sorts]')!.getBoundingClientRect();
+        return { height: element.getBoundingClientRect().height, summary: summary.y + summary.height / 2,
+          sorts: sorts.y + sorts.height / 2, room: element.scrollWidth - element.clientWidth,
+          overflow: getComputedStyle(element).overflowX };
+      });
+      assert.ok(Math.abs(bottom.summary - bottom.sorts) < 2, JSON.stringify(bottom));
+      assert.ok(bottom.height <= 56 && bottom.room > 100 && bottom.overflow === 'auto', JSON.stringify(bottom));
+      await controls.evaluate(element => { element.scrollLeft = 300 });
+      assert.ok(await controls.evaluate(element => element.scrollLeft > 100));
+      for (const width of [430, 390, 760, 761, 390]) {
+        await page.setViewportSize({ width, height: 844 });
+        const glass = await page.locator(`${FILTER} [data-filter-glass]`).evaluate(async element => {
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          const style = getComputedStyle(element);
+          return { filter: style.backdropFilter, width: element.getBoundingClientRect().width,
+            viewport: document.documentElement.clientWidth };
+        });
+        assert.ok(glass.filter.includes('blur(') && glass.width < glass.viewport, JSON.stringify(glass));
+      }
       const measured = await layout(page);
       assert.deepEqual(measured.offenders, [], `筛选条把页面撑宽了：${measured.offenders.join('、')}`);
       assert.deepEqual(withoutPlayer(opened.problems), []);

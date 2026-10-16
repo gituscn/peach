@@ -16,11 +16,13 @@ export interface CatalogState extends CatalogFilters {
   tag: string; tag_match: string; len: string; dur_min: string; dur_max: string;
   orient: string; region: string; state: string; sort: string; dir: string;
   seed: string; q: string; jav: string; thumb: string;
+  browse: string; folder: string; folder_recursive: string;
 }
 
 const HOME_QUERY_KEYS = [
   'loc', 'creator', 'studio', 'owner', 'tag', 'tag_match', 'len', 'dur_min', 'dur_max',
   'orient', 'region', 'sort', 'dir', 'q', 'jav',
+  'browse', 'folder', 'folder_recursive',
 ] as const;
 
 export function resolveSort(rawSort: string | null, rawDir: string | null,
@@ -43,6 +45,8 @@ export function initialCatalogFilters(address: CatalogAddress, preferences: Cata
     region: read('region') || '', state: ROUTE_STATES[pathname] || read('state') || '',
     ...resolveSort(read('sort'), read('dir'), preferences), seed: read('seed') || seed(),
     q: read('q') || '', jav: read('jav') || '', thumb: read('thumb') || '0',
+    browse: read('browse') === 'folders' || read('folder') ? 'folders' : '',
+    folder: read('folder') || '', folder_recursive: read('folder_recursive') === '0' ? '0' : '',
   };
 }
 
@@ -78,6 +82,7 @@ export function resetCatalogFilters(previous: Readonly<CatalogFilters>, preferen
     sort: preferences.defaultSort,
     dir: preferredDirection(preferences.defaultSort, preferences.defaultSort, preferences.defaultSortDirection),
     seed: seed(), q: '', jav: '', thumb: '0',
+    browse: '', folder: '', folder_recursive: '',
   };
 }
 

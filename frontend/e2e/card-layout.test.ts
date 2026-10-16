@@ -55,6 +55,27 @@ describe('混排作品的画面框',()=>{
      assert.equal(frame.fit,'contain');
      assert.equal(frame.background,'rgb(0, 0, 0)');
     }
+    if(viewport.mobile)for(const density of ['roomy','dense']){
+     await page.evaluate(value=>{document.body.dataset.density=value},density);
+     const meta=await page.locator('#grid [data-media-card] [data-media-meta]').first().evaluate(node=>{
+      const box=node.getBoundingClientRect();
+      const content=Math.max(...[...node.children].map(child=>child.getBoundingClientRect().height));
+      return {height:box.height,content};
+     });
+     assert.ok(meta.height<=meta.content+17,JSON.stringify({density,...meta}));
+    }
+    if(size==='small')for(const density of ['roomy','dense']){
+     await page.evaluate(value=>{document.body.dataset.density=value},density);
+     const row=await page.locator('#grid [data-mix-card]').evaluate(mix=>{
+      const mixCover=mix.querySelector('[data-mix-cover]')!.getBoundingClientRect();
+      const peer=mix.parentElement!.querySelector(':scope > [data-media-card]')!;
+      const peerCover=peer.querySelector('[data-media-pic]')!.getBoundingClientRect();
+      return {mixBottom:mixCover.bottom-mix.getBoundingClientRect().top,peerBottom:peerCover.bottom-peer.getBoundingClientRect().top,
+       mixTop:mixCover.top-mix.getBoundingClientRect().top,peerTop:peerCover.top-peer.getBoundingClientRect().top};
+     });
+     assert.ok(Math.abs(row.mixBottom-row.peerBottom)<1,JSON.stringify(row));
+     assert.ok(Math.abs(row.mixTop-row.peerTop)<1,JSON.stringify(row));
+    }
    }finally{await context.close()}
   });
  }

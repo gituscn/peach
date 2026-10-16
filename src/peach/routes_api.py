@@ -27,6 +27,7 @@ from fastapi.responses import JSONResponse
 
 from . import push_discovery, web_contract, web_tasks
 from .field_owners import RevisionConflict
+from .folder_rules import FolderRuleConflict
 from .interaction import reveal_path
 from .jobs import TaskRunConflict
 from .update_tasks import UpdateBusy
@@ -303,6 +304,8 @@ def api_get(request: Request, route: str, args: dict[str, str] = Depends(require
         return _conflict(exc)
     except UpdateBusy as exc:
         return JSONResponse({'error': 'update in progress', 'message': str(exc)}, status_code=409)
+    except FolderRuleConflict as exc:
+        return JSONResponse({'error': 'folder rule conflict', 'message': str(exc)}, status_code=409)
     except KeyError:
         return JSONResponse({"error": "not found"}, status_code=404)
     except (TypeError, ValueError) as exc:

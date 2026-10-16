@@ -120,7 +120,7 @@ export async function getBarsData(context){
   if(context.type==='home'&&state.state)facetParams.set('state',state.state);
   if(context.type!=='item'){
     const filters=entityState.activeFilterState();
-    ['loc','creator','studio','tag','tag_match','len','dur_min','dur_max','orient','region','q','thumb'].forEach(key=>{
+    ['loc','creator','studio','tag','tag_match','len','dur_min','dur_max','orient','region','q','thumb','folder','folder_recursive'].forEach(key=>{
       if(filters[key])facetParams.set(key,filters[key]);
     });
   }
@@ -387,7 +387,7 @@ export async function loadCatalog(){
   if(catalogState.controller.page==='/junk-files')clearCatalogGrid();
   renderCatalogLoading();
   showHomeSurfaces();
-  if(isFeedNewPath(location.pathname)){
+  if(isFeedNewPath(location.pathname)&&state.browse!=='folders'){
     await loadingState.entityShapesReady;
     if(!navigationState.surfaceCurrent(surface))return;
     renderHomeFeed();
@@ -466,10 +466,10 @@ export function catalogGridProps(){
     filters:{...state},batchSize:preferencesState.appSettings.batchSize,groupCollapse:preferencesState.appSettings.groupCollapse,
     /* 只有首页默认列表排除竖屏——那里另有独立的竖屏带承接它们。搜索必须能搜到竖屏作品，
        否则按名字找一条竖屏视频会得到 0 结果。JAV 模式恒不含竖屏：番号发行物本身就是横版。 */
-    excludeVertical:(home&&path!=='/wall'&&!state.q&&!state.orient)||state.jav==='1',
-    mix:home&&path!=='/wall'&&!trash,
+    excludeVertical:(home&&path!=='/wall'&&!state.q&&!state.orient&&state.browse!=='folders')||state.jav==='1',
+    mix:home&&path!=='/wall'&&!trash&&state.browse!=='folders',
     /* JAV 模式不插竖屏带：主列表的 exclude_vertical 管不到它，它是独立请求、独立插入的。 */
-    shorts:home&&path!=='/wall'&&!javActive()&&state.orient!=='竖屏'&&!trash,
+    shorts:home&&path!=='/wall'&&!javActive()&&state.orient!=='竖屏'&&!trash&&state.browse!=='folders',
     countRow:$('#count'),onCount:paintCatalogCount,onCountFailed:()=>paintCatalogFilter({count:false}),
     emptyHtml:({trash:inTrash,libraryEmpty})=>inTrash
       ?preferencesState.emptyState('trash','回收站是空的','删掉的内容会先到这里；确认不再需要后再清空。')
@@ -581,6 +581,7 @@ catalogState.topsQueryParams = (context,page=0)=>{
   if(page)params.set('page',String(page));
   if(javActive())params.set('jav','1');
   if(context.type==='home'&&state.state)params.set('state',state.state);
+  if(context.type==='home'&&state.folder){params.set('folder',state.folder);if(state.folder_recursive)params.set('folder_recursive',state.folder_recursive)}
   return params;
 };
 catalogState.facetCountsSeq = 0;

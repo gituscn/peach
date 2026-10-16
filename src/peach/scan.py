@@ -38,7 +38,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 
-from . import record_rehome, subtitles, wants
+from . import folder_rules, record_rehome, subtitles, wants
 from .platform import is_windows_path, resolve_location, resolve_root
 
 VIDEO = {".mp4", ".m4v", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".rmvb", ".mpg",
@@ -299,6 +299,7 @@ def ingest_path(
         new = first_seen == now
         reattached = len(record_rehome.reattach(connection, [asset_id] if new else [], now=now))
         acquired = len(wants.reconcile(connection, [asset_id] if new else []))
+        folder_rules.apply_new(connection, [asset_id] if new else [])
         connection.commit()
     finally:
         connection.close()
@@ -442,6 +443,7 @@ def scan_location(
             "SELECT id FROM asset WHERE location=? AND first_seen=? ORDER BY id", (location, now)))
         reattached = len(record_rehome.reattach(connection, new_ids, now=now))
         acquired = len(wants.reconcile(connection, new_ids))
+        folder_rules.apply_new(connection, new_ids)
         connection.commit()
         gone =connection.execute(
             "SELECT COUNT(*) FROM asset WHERE location=? AND last_seen<?",

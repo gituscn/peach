@@ -25,6 +25,7 @@
 | 地址 | 用途 |
 | --- | --- |
 | `/` | 全部馆藏，含本地硬盘与已挂载网盘；新作行使用作品详情地址 |
+| `/?browse=folders` | 按原目录浏览；`folder` 指定目录，`folder_recursive=0` 只看当前层 |
 | `/?jav=1` | JAV 馆藏 |
 | `/jav?tab=discover` | JAV 探索；`scope=library` 看馆藏，`scope=external` 看外部发现 |
 | `/jav?tab=wants` | 想要的作品 |

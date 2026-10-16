@@ -195,8 +195,15 @@ export function itemsParams(kind: string, name: string, filters: EntityFilters, 
 }
 
 export async function fetchItems(kind: string, name: string, filters: EntityFilters, opts: { jav: boolean; seed: string },
-  offset: number, signal?: AbortSignal): Promise<MediaPage> {
-  return await api(`/api/items?${itemsParams(kind, name, filters, opts, offset)}`, signal ? { signal } : {}) as MediaPage;
+  offset: number, signal?: AbortSignal, options?: { limit: number; sort?: string; dir?: string }): Promise<MediaPage> {
+  const params = itemsParams(kind, name, filters, opts, offset);
+  if (options) {
+    params.set('limit', String(options.limit));
+    params.delete('count');
+    if (options.sort) params.set('sort', options.sort);
+    if (options.dir) params.set('dir', options.dir);
+  }
+  return await api(`/api/items?${params}`, signal ? { signal } : {}) as MediaPage;
 }
 
 /** 同一页里换回看过的那一份筛选不再请求：每次进页先把这一位名下的缓存清掉（`prefetch`），页内

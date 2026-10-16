@@ -14,6 +14,9 @@ import { fitSkeleton, popBadges, popCount } from '@peach/legacy/ui';
 import { FilterGlassRows, FilterPill } from '../components/filter-glass';
 import { useViewGlide } from '../components/use-view-glide';
 import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
+import { FolderBrowseToggle } from '../catalog-folders/catalog-folders-page';
+import { useCatalogView } from '../catalog-grid/catalog-view';
+import { CatalogViewToggle } from '../catalog-grid/catalog-view-toggle';
 import { Combo, Segments, Shuffle, SortKeys } from '../entity-filter/entity-filter-page';
 import {
   EMPTY_SLOTS, ROW_AHEAD, ROW_BATCH, ROW_FIRST, type CatalogFilterProps, type CatalogTag, type TierKind,
@@ -177,6 +180,7 @@ function Placeholders({ kind }: { kind: 'performer' | 'studio' | 'tag' }) {
 
 /** 下排：读数、换一批、版式与排序。回收站不出这一排。 */
 function Head({ count, refreshing, layout, sorts, actions }: CatalogFilterProps) {
+  const view = useCatalogView();
   const [shuffling, setShuffling] = useState(false);
   const shuffle = () => {
     setShuffling(true);
@@ -188,13 +192,16 @@ function Head({ count, refreshing, layout, sorts, actions }: CatalogFilterProps)
       <span data-entity-sorts="">
         <Shuffle onPress={shuffle} busy={shuffling || refreshing} />
         {/* 按名字换键：JAV 与首页各一组，React Aria 的单选组挂上之后不改 `name`。 */}
-        {layout ? <Segments key={layout.name} name={layout.name} label={layout.label} value={layout.value} options={layout.options}
+        {layout && view === 'cards' ? <Segments key={layout.name} name={layout.name} label={layout.label} value={layout.value} options={layout.options}
           onChange={actions.setLayout} /> : null}
-        <SortKeys sorts={sorts} onSort={actions.setSort} />
+        <CatalogViewToggle />
+        <FolderBrowseToggle />
+        {view === 'cards' ? <SortKeys sorts={sorts} onSort={actions.setSort} /> : null}
       </span>
     </>
   );
 }
+
 
 /** 读数：`1,234 个符合 · 显示 24`。等这一趟取数时换成一条宽度定死的微光，180ms 内就到手的一帧都不露。 */
 function Readout({ count }: { count: CatalogFilterProps['count'] }) {

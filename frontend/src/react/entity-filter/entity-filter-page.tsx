@@ -10,13 +10,14 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Radio, RadioGroup } from 'react-aria-components';
 import { icon } from '@peach/legacy/core';
-import { spinnerHtml } from '@peach/legacy/ui';
 
-import { FilterGlassRows, FilterPill } from '../components/filter-glass';
+import { FilterGlassRows, FilterIconButton, FilterPill } from '../components/filter-glass';
 import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
 import { SEGMENTED_GLASS_TRACK, SEGMENT_GLASS } from '../components/segmented';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { useViewGlide } from '../components/use-view-glide';
+import { useCatalogView } from '../catalog-grid/catalog-view';
+import { CatalogViewToggle } from '../catalog-grid/catalog-view-toggle';
 import { sourceIcon } from '../follow-feed/follow-marks';
 import {
   videoOnly, type EntityComboItem, type EntityFilterActions, type EntityFilterHelpers, type EntityFilterProps, type EntityOnlineHead,
@@ -263,21 +264,21 @@ export function Segments({ name, label, value, options, onChange }: {
 
 export function Shuffle({ onPress, busy = false }: { onPress(): void; busy?: boolean }) {
   return (
-    <button type="button" data-entity-batch="" title="换一批" aria-label="换一批" aria-busy={busy || undefined}
-      aria-disabled={busy || undefined} onClick={() => { if (!busy) onPress() }}
-      dangerouslySetInnerHTML={{ __html: busy ? spinnerHtml('正在换一批') : icon('shuffle') }} />
+    <FilterIconButton data-entity-batch="" label="换一批" busy={busy} icon={spriteGlyph('shuffle')} onPress={onPress} />
   );
 }
 
 /** 作品视图：换一批、JAV 语境下的卡片版式，排序键一律排在最末，挨着它说明的那批内容。 */
 function VideoControls({ head, actions }: { head: EntityVideoHead; actions: EntityFilterActions }) {
+  const view = useCatalogView();
   return (
     <span data-entity-sorts="">
       <Shuffle onPress={() => void actions.reshuffle()} />
-      {head.jav ? (
+      {head.jav && view === 'cards' ? (
         <Segments label="JAV 卡片版式" value={head.jav.layout} options={head.jav.options} onChange={actions.setJavLayout} />
       ) : null}
-      <SortKeys sorts={head.sorts} onSort={actions.setSort} />
+      <CatalogViewToggle />
+      {view === 'cards' ? <SortKeys sorts={head.sorts} onSort={actions.setSort} /> : null}
     </span>
   );
 }

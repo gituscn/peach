@@ -75,8 +75,8 @@
 }
 .peach-react [data-media-view] svg {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -243,39 +243,6 @@
   margin-left: 5px;
 }
 
-.peach-react [data-entity-batch] {
-  display: inline-grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 36px;
-  height: 30px;
-  min-height: 30px;
-  border-radius: 7px;
-  background: var(--board-blue);
-  box-shadow: var(--elevation-xs);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.peach-react [data-entity-batch]:hover {
-  background: var(--board-blue-hover);
-  color: #fff;
-}
-.peach-react [data-entity-batch] svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-}
-.peach-react [data-entity-batch][aria-busy="true"] { cursor: wait; }
-/* 等新的一批时换批键自己画那两条交叉箭头，动效写在 `#i-shuffle` 的两条线上（`12-cards.css`），
-   忙态只负责把两个自定义属性传下去。 */
-.peach-react [data-filter-row="bottom"][aria-busy="true"] [data-entity-batch] svg {
-  --strand-dash: 100;
-  --strand-cycle: 2.2s;
-}
 
 /* 分段器两侧各让 6px，跟换一批和排序键分开：它答的是「这批东西怎么摆」，不是同一排里的又一枚键。 */
 .peach-react [data-entity-layout] { flex: none; gap: 2px; margin: 0 6px; }
@@ -284,10 +251,6 @@
   backdrop-filter: var(--glass-pick);
 }
 
-/* 触屏上这一排的键放到 36px 高，下排跟着长到 52px，同首页浮层那条。 */
-@media (pointer: coarse) {
-  .peach-react :is([data-entity-sort], [data-entity-batch]) { height: 36px; }
-}
 
 /* 图集里的「全部照片」：高度跟同一排的排序键对齐，那圈线和字色跟着玻璃取。 */
 .peach-react [data-photo-back] {

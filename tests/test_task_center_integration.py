@@ -182,8 +182,9 @@ class BackgroundJobTaskRunTests(unittest.TestCase):
     def test_shutdown_marks_the_round_cancelled_not_failed(self):
         job = self.job()
         release = threading.Event()
-        self.addCleanup(release.set)
         job.start(lambda job_id: release.wait(5))
+        self.addCleanup(job.thread.join, 5)
+        self.addCleanup(release.set)
         run_id = job.snapshot()["run_id"]
         job.stop(timeout=0.1)
         run = self.store.get(run_id)

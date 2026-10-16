@@ -95,6 +95,7 @@ from .web_resource_sync import w_purge_missing, w_resource_sync_apply, w_resourc
 from .web_review import q_review, w_review_decision, w_review_genre
 from .web_settings import q_settings, w_settings
 from .web_library_shortcuts import q_library_shortcuts, w_library_shortcuts
+from .web_folders import q_folders, w_folder_preview, w_folder_rule
 from .web_scraping import (
     q_scraping, q_scraping_amane_bridge, w_scraping_amane_check, w_scraping_amane_rebuild,
     w_scraping_check, w_scraping_cover, w_scraping_settings,
@@ -145,9 +146,10 @@ def _get_tops(contract, args):
     state = str(args.get("state", ""))
     # 横滚续接一页一页地要，页号必须进缓存键：不进的话第二页拿回的是第一页的答案。
     page = max(int(args.get("page", "0")), 0)
+    folders = {key: args[key] for key in ('folder', 'folder_recursive') if args.get(key)}
     return contract.cached(
-        f"tops{n}p{page}{'-jav' if jav else ''}:{seed}:{state}",
-        lambda: q_tops(contract, n, jav=jav, seed=seed, state=state, page=page),
+        f"tops{n}p{page}{'-jav' if jav else ''}:{seed}:{state}:{sorted(folders.items())}",
+        lambda: q_tops(contract, n, jav=jav, seed=seed, state=state, page=page, filters=folders),
     )
 
 
@@ -185,7 +187,7 @@ def _get_facets(contract, args):
     filters = {key: args[key] for key in (
         'loc', 'creator', 'performer', 'studio', 'series', 'agency', 'tag', 'tag_match',
         'len', 'dur_min', 'dur_max', 'orient', 'region', 'exclude_vertical', 'q', 'thumb',
-        'library',
+        'library', 'folder', 'folder_recursive',
     ) if args.get(key)}
     scope_key += repr(sorted(filters.items()))
     return contract.cached(
@@ -313,6 +315,7 @@ def _post_empty_trash(contract, _body):
 
 
 GET_HANDLERS = {
+    "/api/folders": q_folders,
     "/api/tasks": q_tasks,
     "/api/downloads": q_downloads,
     "/api/resources/search": q_resource_search,
@@ -378,6 +381,8 @@ GET_HANDLERS = {
 }
 
 POST_HANDLERS = {
+    "/api/folders/preview": w_folder_preview,
+    "/api/folders/rule": w_folder_rule,
     "/api/downloads": w_download_submit,
     "/api/downloads/cancel": w_download_cancel,
     "/api/downloads/postprocess": w_download_postprocess,
@@ -442,6 +447,7 @@ POST_HANDLERS = {
 #: 不该拦它们——「查找」只联网、「存凭据」只写本机 secrets 文件，都不碰账本。
 #: 追更的「查找」在只读端被拦成 409 是实测踩到的。
 READ_ONLY_POST_ROUTES = frozenset({
+    "/api/folders/preview",
     "/api/custom-metadata",
     "/api/scraping/settings", "/api/scraping/check",
     "/api/follow/resolve", "/api/follow/credential",

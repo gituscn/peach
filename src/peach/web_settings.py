@@ -21,7 +21,7 @@ from typing import Protocol
 from .feeds import DEFAULT_HIDDEN_COMPILATIONS, EXCERPT, GROUP_COMPILATION, SOLO_COMPILATION
 from .remote_media_cache import AVATAR_REFRESH_SECONDS, FAVICON_REFRESH_SECONDS
 
-DEFAULT_PROFILE_ID = "local-default"
+from .profiles import DEFAULT_PROFILE_ID
 
 #: 默认就在侧栏里的入口，顺序即默认顺序。首页之后是关注（每天有新东西的那一屏），
 #: 再是主库最常用的浏览模式 JAV，然后三个索引，回头找的已标记，管理垫底。

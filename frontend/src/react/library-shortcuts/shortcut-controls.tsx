@@ -5,6 +5,7 @@ import { Input } from '@/components/base/input/input';
 import { errorMessage } from '../../api';
 import { ModalFrame } from '../components/modal-frame';
 import { Note } from '../components/note';
+import { FilterIconButton } from '../components/filter-glass';
 import { EmptyState } from '../components/empty-state';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { SettingsDialogClose } from '../components/settings-dialog-close';
@@ -47,8 +48,8 @@ function FavoriteChoice({ item }: { item: Favorite }) {
 export function LibraryShortcuts({ currentHref, kind }: { currentHref?: () => string; kind?: string }) {
   const [open, setOpen] = useState(false);
   return <>
-    <span data-shortcuts-entry=""><button type="button" data-shortcuts-trigger="" aria-label="我的收藏" title="我的收藏"
-      aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}><Star aria-hidden /></button></span>
+    <span data-shortcuts-entry=""><FilterIconButton data-shortcuts-trigger="" label="我的收藏" icon={Star}
+      aria-haspopup="dialog" aria-expanded={open} onPress={() => setOpen(true)} /></span>
     <ModalFrame isOpen={open} onOpenChange={setOpen} width="collections" label="我的收藏">
       {open ? <ShortcutContents currentHref={currentHref} kind={kind} close={() => setOpen(false)} /> : null}
     </ModalFrame>

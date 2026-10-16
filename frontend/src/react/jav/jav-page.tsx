@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { entityPath, icon } from '@peach/legacy/core';
-import { spinnerHtml } from '@peach/legacy/ui';
+import { entityPath } from '@peach/legacy/core';
 import { RiCompassLine, RiExternalLinkLine } from '@remixicon/react';
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
@@ -22,7 +21,7 @@ import { busyProps, useAction } from '../settings/use-action';
 import { discoveryArtwork, discoveryKey, fetchDiscoveries, type DiscoveryScope } from './jav';
 import { JavHeader } from './jav-header';
 import { spriteGlyph } from '../components/sprite-glyph';
-import { FilterGlassRows, FilterPill, GlassPill } from '../components/filter-glass';
+import { FilterGlassRows, FilterIconButton, FilterPill, GlassPill } from '../components/filter-glass';
 import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
 import { ArtSlot } from '../components/art-slot';
 import { Segments, SortKeys } from '../entity-filter/entity-filter-page';
@@ -30,6 +29,8 @@ import { TaskProgress } from '../components/task-progress';
 import { DISCOVERY_SORTS, discoveryScore, recommendationScore, type DiscoverySort } from './discovery-sorts';
 
 const SearchGlyph = spriteGlyph('search');
+const MetadataStopGlyph = spriteGlyph('x');
+const MetadataRefreshGlyph = spriteGlyph('refresh-cw');
 import { peachHistory, shellNavigate } from '@peach/history';
 
 function writeJavQuery(patch: Record<string, string>): void {
@@ -129,11 +130,11 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         <LibraryShortcuts currentHref={() => location.pathname + location.search} />
         {query || tag ? <GlassPill onPress={() => { setTag(''); clearText() }}>清除筛选</GlassPill> : null}
         <span data-entity-sorts="">
-        {scope === 'external' ? <button type="button" data-entity-batch="" data-jav-metadata-update=""
-          title={metadata?.status === 'running' ? '停止读取' : '更新资料'} aria-label={metadata?.status === 'running' ? '停止读取' : '更新资料'}
-          disabled={waiting || !!metadataAction.busy} aria-busy={!!metadataAction.busy || undefined}
-          onClick={() => updateMetadata(metadata?.status === 'running' ? 'stop' : 'update')}
-          dangerouslySetInnerHTML={{ __html: metadataAction.busy ? spinnerHtml('正在更新资料') : icon(metadata?.status === 'running' ? 'x' : 'refresh-cw') }} /> : null}
+        {scope === 'external' ? <FilterIconButton data-entity-batch="" data-jav-metadata-update=""
+          label={metadata?.status === 'running' ? '停止读取' : '更新资料'}
+          disabled={waiting} data-skeleton-action={waiting ? '' : undefined} busy={!!metadataAction.busy}
+          icon={metadata?.status === 'running' ? MetadataStopGlyph : MetadataRefreshGlyph}
+          onPress={() => updateMetadata(metadata?.status === 'running' ? 'stop' : 'update')} /> : null}
         <Segments label="JAV 卡片版式" value={layout} options={JAV_LAYOUTS} onChange={storeJavLayout} />
         <SortKeys sorts={DISCOVERY_SORTS.map(([key, label, ariaLabel]) => ({ key, label, ariaLabel,
           pressed: key === sort, dir: direction }))} onSort={key => {

@@ -72,6 +72,8 @@
 
 ## 参考产品证据登记
 
+- 目录树与面包屑：2026-10-17 取得 BoardUI registry 源码，版本、SHA-256 与适配见 [BoardUI 适配](BOARD_UI.md#目录浏览)。保留首页结构，目录用途由用户确认。官方实时示例未取得。
+
 - Open Claude UI：[设计准则](DESIGN_GUIDELINES.md)与[取舍证据](reference-snapshots/open-claude-ui.md)。
 
 - 收藏窗口：[BoardUI 核验](BOARD_UI.md)。

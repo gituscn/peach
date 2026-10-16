@@ -62,14 +62,15 @@ def attach_artwork_fields(contract: WebContract, item: dict) -> None:
 #: 每个方向都显式 `NULLS LAST`——升序时 SQLite 默认把 NULL 排在最前，
 #: 「时长最短」会先给出一整屏没有时长的条目。
 SORT_COLUMNS = {
+    "name": "a.name COLLATE NOCASE {d} NULLS LAST, a.id {d}",
     "new": "a.first_seen {d} NULLS LAST, a.id {d}",
     "release": "a.release_date {d} NULLS LAST, a.first_seen {d} NULLS LAST, a.id {d}",
-    "size": "a.size {d} NULLS LAST",
-    "dur": "a.duration {d} NULLS LAST",
-    "played": "a.last_played {d} NULLS LAST",
-    "rating": "a.rating {d} NULLS LAST, a.o_count {d} NULLS LAST",
-    "plays": "a.play_count {d} NULLS LAST, a.last_played {d} NULLS LAST",
-    "o": "a.o_count {d} NULLS LAST",
+    "size": "a.size {d} NULLS LAST, a.id {d}",
+    "dur": "a.duration {d} NULLS LAST, a.id {d}",
+    "played": "a.last_played {d} NULLS LAST, a.id {d}",
+    "rating": "a.rating {d} NULLS LAST, a.o_count {d} NULLS LAST, a.id {d}",
+    "plays": "a.play_count {d} NULLS LAST, a.last_played {d} NULLS LAST, a.id {d}",
+    "o": "a.o_count {d} NULLS LAST, a.id {d}",
 }
 
 #: 旧键沿用：地址栏和书签里存着把方向写进键名的值，认不出来它们会落到
@@ -204,6 +205,10 @@ def catalog_filter(contract: WebContract, args):
     # 普通馆藏仍是视频表面；回收站必须展示所有文件类型，否则从垃圾复核移入的
     # 图片、网址快捷方式等会变成不可见、不可恢复，只能被「清空回收站」直接删掉。
     where, par = ([] if trash else [VISIBLE_CATALOG_ASSET]), []
+    from .web_folders import folder_filter
+    folder_where, folder_params = folder_filter(contract, args)
+    where.extend(folder_where)
+    par.extend(folder_params)
     if args.get("library"):
         clause, values = media_libraries.predicate(settings_file.active(), args["library"])
         where.append(clause)
@@ -1174,7 +1179,7 @@ def state_clause(state: str) -> str:
 TOPS_POOL_FACTOR = 4
 
 
-def q_tops(contract: WebContract, n=28, jav=False, seed="", state="", page=0):
+def q_tops(contract: WebContract, n=28, jav=False, seed="", state="", page=0, filters=None):
     """顶部三层用的数据：女优圆头像 / 厂牌 / 内容标签。
 
     缓存的人物肖像由前端优先使用；缺失时才回退到代表作接触印相裁切。
@@ -1187,6 +1192,10 @@ def q_tops(contract: WebContract, n=28, jav=False, seed="", state="", page=0):
     末尾往后按数量数下去。库里六百多位女优，一排给到头才是「滚到底还能接着滚」。"""
     with contract.read_connection() as c:
         scope = PRESENT_ASSET_CLAUSE + (JAV_ASSET_CLAUSE if jav else "") + state_clause(state)
+        folder_params = []
+        if filters and filters.get('folder'):
+            conditions, folder_params = catalog_filter(contract, filters)
+            scope += ' AND ' + ' AND '.join(conditions)
         base = (
             "SELECT e.id,e.canonical_name,count(DISTINCT ae.asset_id) n,"
             "(SELECT a2.id FROM asset_entity ae2 JOIN asset a2 ON a2.id=ae2.asset_id "
@@ -1203,7 +1212,7 @@ def q_tops(contract: WebContract, n=28, jav=False, seed="", state="", page=0):
         def read(kind, limit, skip):
             return [{"id": entity_id, "k": k, "n": cnt, "rep": representative}
                     for entity_id, k, cnt, representative
-                    in c.execute(base, (kind, limit, skip))]
+                    in c.execute(base, (kind, *folder_params, limit, skip))]
 
         def pick(kind):
             """按数量取候选池，再按种子确定性抽样。种子为空时退回严格前 N。"""

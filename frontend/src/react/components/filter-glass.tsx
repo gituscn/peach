@@ -7,8 +7,21 @@
  * 悬停换成 `--glass-rim` 边加 `--glass-pick-fill` 底——玻璃上的键不是 BoardUI 那种实心按钮。 */
 import { useRef, type ReactNode, type Ref } from 'react';
 import { cx } from '@/utils/cx';
+import { IconButton, type IconButtonProps } from '@/components/base/buttons/icon-button';
+import { spinnerHtml } from '@peach/legacy/ui';
 
 import { useStuck } from './use-stuck';
+
+const BusyIcon = ({ className }: { className?: string }) => <span aria-hidden className={className}
+  dangerouslySetInnerHTML={{ __html: spinnerHtml('正在处理') }} />;
+
+/** 筛选栏动作使用 30px 尺寸和蓝色动作表面。 */
+export function FilterIconButton({ label, icon, busy = false, onPress, ...props }:
+  Omit<IconButtonProps, 'aria-label' | 'size' | 'onClick'> & { label: string; busy?: boolean; onPress(): void }) {
+  return <IconButton {...props} data-filter-action="" size="small" icon={busy ? BusyIcon : icon}
+    aria-label={label} title={props.title || label} aria-busy={busy || undefined} aria-disabled={busy || undefined}
+    onClick={() => { if (!busy) onPress() }} />;
+}
 
 export function FilterGlass({ title, children }: { title: string; children: ReactNode }) {
   const glass = useRef<HTMLDivElement>(null);
