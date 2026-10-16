@@ -9,9 +9,9 @@
 别名或站上编号对得上）时才补，补的每一格都是空格（ADR-0052 第三条），归属串 `auto:seed`、
 批次 `auto:seed@<版本>`，`scripts/revert_auto_landing.py --source auto:seed` 整批撤回。
 
-会变的事实（所属事务所、label 的片商、资料表）里由种子自己写下的行，新版种子可以整行换掉
-（ADR-0075）；人或本机后继写的行不动，包里说的不一样就记进 `conflicts` 等人看。一条对上本机
-两位实体的记进 `duplicates`：那是本机账本里的重复身份信号，合并不可逆，不由种子动手。
+会变的事实（所属事务所、label 的片商、资料表）里由种子自己写下的行，新版种子可以整行换掉。
+格式 2 通过独立身份锚点、累计显式撤销和持久版本历史传递精确纠错；人或本机后继写的行不动。
+一条对上本机两位实体的记进 `duplicates`：合并不可逆，不由种子动手。
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 from . import link_status
+from . import seed_corrections, seed_validation
 from .entities import _ref_is_free, normalize_entity_name
 from .minnano_av import PROFILE_COLUMNS
 from .performer_profiles import read_profile, write_profile
@@ -74,21 +75,26 @@ def _name(connection: sqlite3.Connection, entity_id: int) -> str:
 # -- 导出 ----------------------------------------------------------------------
 
 
-def _aliases(connection: sqlite3.Connection, entity_id: int, kind: str) -> list[dict]:
+def _aliases(connection: sqlite3.Connection, entity_id: int, kind: str, *, source_confidence: bool = False) -> list[dict]:
     """名下的别名写法，同一写法只留排在前面的那个来源；种子自己写的不再导出。
 
     女优的写法先过 ADR-0055 的判据：罗马字与短单名导入时本来就判「不收」，留在包里只会让
     匹配认出别人（`绫乃梓` 的 `Nozomi` 与另一位 `NOZOMI` 同键，两位都对上就整条跳过）。"""
     from .performer_alias_followup import rejection
     found: dict[str, dict] = {}
-    for alias, source in connection.execute(
-            "SELECT alias,source FROM entity_alias WHERE entity_id=? ORDER BY normalized_alias,source",
+    for alias, source, confidence in connection.execute(
+            "SELECT alias,source,confidence FROM entity_alias WHERE entity_id=? ORDER BY normalized_alias,source",
             (entity_id,)):
         if _ours(source) or not str(alias or "").strip():
             continue
         if kind == "performer" and rejection(str(alias)):
             continue
-        found.setdefault(normalize_entity_name(str(alias)), {"alias": str(alias), "source": str(source)})
+        if source_confidence and str(source).casefold().split(":", 1)[0] == "stash":
+            continue
+        fact = {"alias": str(alias), "source": str(source)}
+        if source_confidence:
+            fact["confidence"] = float(confidence)
+        found.setdefault(normalize_entity_name(str(alias)), fact)
     return list(found.values())
 
 
@@ -141,14 +147,15 @@ def _pointer(connection: sqlite3.Connection, entity_id: int, field: str) -> dict
     return {"name": str(row[0]), "source": str(row[1])}
 
 
-def export_pack(connection: sqlite3.Connection, *, version: str) -> dict:
+def export_pack(connection: sqlite3.Connection, *, version: str, revision: int | None = None,
+                withdrawals: list[dict] | None = None, previous: dict | None = None) -> dict:
     """账本里三类实体的公开事实。只有名字、没有任何可补事实的实体不进包：导入不造实体，
     光一个名字对别的账本没有用处。输出按种类与归一名排序，同一账本两次导出逐字节一致。"""
     entities, counts = [], dict.fromkeys(COUNT_KEYS, 0)
     for entity_id, kind, name in connection.execute(
             f"SELECT id,kind,canonical_name FROM entity WHERE kind IN ({','.join('?' * len(KINDS))})"
             " ORDER BY kind,normalized_name,id", KINDS):
-        item = {"kind": str(kind), "name": str(name), "aliases": _aliases(connection, entity_id, str(kind)),
+        item = {"kind": str(kind), "name": str(name), "aliases": _aliases(connection, entity_id, str(kind), source_confidence=revision is not None),
                 "refs": _refs(connection, entity_id), "links": _links(connection, entity_id)}
         if kind == "performer":
             item.update({key: value for key, value in (("profile", _profile(connection, entity_id)),
@@ -167,7 +174,26 @@ def export_pack(connection: sqlite3.Connection, *, version: str) -> dict:
         counts["profiles"] += "profile" in item
         counts["memberships"] += "agency" in item
         counts["makers"] += "maker" in item
-    return {"format": FORMAT, "version": version, "source": SOURCE, "counts": counts, "entities": entities}
+    pack = {"format": FORMAT, "version": version, "source": SOURCE, "counts": counts, "entities": entities}
+    if revision is not None:
+        inherited = list((previous or {}).get("withdrawals", []))
+        if previous is not None:
+            seed_validation.validate(previous)
+            if revision <= previous.get("revision", 0) or version <= previous["version"]:
+                raise ValueError("导出需要更新的 version 与 revision")
+        by_id = {item["id"]: item for item in inherited}
+        for item in withdrawals or []:
+            if item["id"] in by_id and item != by_id[item["id"]]:
+                raise ValueError("累计撤销 id 不得改写")
+            by_id[item["id"]] = item
+        for item in entities:
+            item["identity"] = {"kind": item["kind"], "name": item["name"], "refs": item["refs"]}
+        pack.update(format=2, revision=revision, withdrawals=[by_id[key] for key in sorted(by_id)])
+        pack["content_sha256"] = seed_validation.digest(pack)
+        seed_validation.validate(pack)
+    elif withdrawals or previous:
+        raise ValueError("累计撤销需要格式 2 的 revision")
+    return pack
 
 
 def dump(pack: dict) -> str:
@@ -176,10 +202,16 @@ def dump(pack: dict) -> str:
 
 
 def load(path) -> dict:
-    pack = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(pack, dict) or pack.get("format") != FORMAT or not pack.get("version"):
-        raise ValueError(f"{path} 不是格式 {FORMAT} 的种子包")
-    return pack
+    def unique_fields(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"种子 JSON 字段重复：{key}")
+            result[key] = value
+        return result
+
+    pack = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_fields)
+    return seed_validation.validate(pack)
 
 
 # -- 导入 ----------------------------------------------------------------------
@@ -214,7 +246,7 @@ def match_entity(connection: sqlite3.Connection, item: dict) -> int | None:
     return found.pop() if len(found) == 1 else None
 
 
-def _land_aliases(connection, entity_id: int, item: dict, version: str, batch: str) -> int:
+def _land_aliases(connection, entity_id: int, item: dict, version: str, batch: str, report: dict) -> int:
     """女优别名走补别名后继的判据（ADR-0055：不收的写法、已有、被占用）；厂牌与事务所
     只查同类实体里有没有人用着这个写法。"""
     names = [item["name"], *(alias["alias"] for alias in item.get("aliases") or [])]
@@ -222,8 +254,10 @@ def _land_aliases(connection, entity_id: int, item: dict, version: str, batch: s
         from .performer_alias_followup import WRITE, land
         canonical = connection.execute("SELECT canonical_name FROM entity WHERE id=?", (entity_id,)).fetchone()
         rows = land(connection, entity_id, str(canonical[0]), "seed", f"{SOURCE}:{version}", names, batch)
+        _preserve_alias_confidence(connection, entity_id, item, batch, report,
+                                   {row["alias"] for row in rows if row["action"] == WRITE})
         return sum(row["action"] == WRITE for row in rows)
-    written = 0
+    written, created = 0, set()
     for name in dict.fromkeys(names):
         key = normalize_entity_name(name)
         taken = connection.execute(
@@ -234,8 +268,29 @@ def _land_aliases(connection, entity_id: int, item: dict, version: str, batch: s
             connection.execute(
                 "INSERT OR IGNORE INTO entity_alias(entity_id,alias,normalized_alias,source,confidence)"
                 " VALUES(?,?,?,?,1.0)", (entity_id, name, key, batch))
-            written += connection.execute("SELECT changes()").fetchone()[0]
+            changed = connection.execute("SELECT changes()").fetchone()[0]
+            written += changed
+            if changed:
+                created.add(name)
+    _preserve_alias_confidence(connection, entity_id, item, batch, report, created)
     return written
+
+
+def _preserve_alias_confidence(connection, entity_id: int, item: dict, batch: str, report: dict,
+                               created: set[str]) -> None:
+    """来源置信度与用户复核状态独立，只维护种子自己拥有的行。"""
+    for alias in item.get("aliases", []):
+        if alias.get("confidence") is None:
+            continue
+        rows = connection.execute("SELECT alias,source,confidence FROM entity_alias WHERE entity_id=? AND normalized_alias=?",
+                                  (entity_id, normalize_entity_name(alias["alias"]))).fetchall()
+        for spelling, source, current in rows:
+            if not _ours(source) or current == alias["confidence"]:
+                continue
+            connection.execute("UPDATE entity_alias SET confidence=?,source=? WHERE entity_id=? AND alias=? AND source=?",
+                               (alias["confidence"], batch, entity_id, spelling, source))
+            if spelling not in created:
+                report["refreshed"] += connection.execute("SELECT changes()").fetchone()[0]
 
 
 def _land_refs(connection, entity_id: int, item: dict, batch: str, stamp: str) -> int:
@@ -280,16 +335,22 @@ def _land_links(connection, entity_id: int, item: dict, batch: str, stamp: str) 
     return written
 
 
-def _land_profile(connection, entity_id: int, item: dict, batch: str, report: dict) -> None:
-    """资料只给没有资料行的写；种子自己写的那一行，包里取回时间更晚才整行换掉。本机后继刮的
-    资料比种子新，也由它自己按期刷新，`write_profile` 对自动来源的整行替换在这里不碰它。"""
+def _land_profile(connection, entity_id: int, item: dict, batch: str, report: dict, *, revision: bool = False) -> None:
+    """资料只补空行与种子自己的行。格式 1 按取回时间换新，格式 2 由包修订与内容决定纠错；
+    本机后继与人工资料由自己的写入者维护。"""
     profile = item.get("profile")
     if not profile or item["kind"] != "performer":
         return
     current = read_profile(connection, entity_id)
-    if current is not None and not (_ours(current.get("source"))
-                                    and str(profile.get("fetched_at") or "") > str(current.get("fetched_at") or "")):
-        return
+    if current is not None:
+        if not _ours(current.get("source")):
+            return
+        same = (all(current.get(key) == profile["fields"].get(key) for key in PROFILE_COLUMNS)
+                and current.get("tags") == profile["fields"].get("tags", [])
+                and current.get("source_url") == profile.get("source_url")
+                and current.get("fetched_at") == profile.get("fetched_at"))
+        if same or (not revision and str(profile.get("fetched_at") or "") <= str(current.get("fetched_at") or "")):
+            return
     fields = dict(profile.get("fields") or {})
     fields["raw"] = {}
     write_profile(connection, entity_id, fields, source=batch,
@@ -338,28 +399,49 @@ def _land_pointer(connection, entity_id: int, item: dict, field: str, batch: str
                                     "ours": str(row[2]), "source": str(row[1]), "theirs": str(fact["name"])})
 
 
-def _land_one(connection, entity_id: int, item: dict, version: str, batch: str, stamp: str, report: dict) -> None:
-    report["aliases"] += _land_aliases(connection, entity_id, item, version, batch)
+def _land_one(connection, entity_id: int, item: dict, version: str, batch: str, stamp: str, report: dict, *, revision: bool = False) -> None:
+    report["aliases"] += _land_aliases(connection, entity_id, item, version, batch, report)
     report["refs"] += _land_refs(connection, entity_id, item, batch, stamp)
     report["links"] += _land_links(connection, entity_id, item, batch, stamp)
-    _land_profile(connection, entity_id, item, batch, report)
+    _land_profile(connection, entity_id, item, batch, report, revision=revision)
     for field in POINTERS:
         _land_pointer(connection, entity_id, item, field, batch, stamp, report)
 
 
 def written(report: dict) -> int:
     """这次导入动了多少行：补上的加换掉的。"""
-    return sum(int(report.get(key, 0)) for key in (*COUNT_KEYS[1:], "refreshed"))
+    return sum(int(report.get(key, 0)) for key in (*COUNT_KEYS[1:], "refreshed", "withdrawn"))
 
 
 def land(connection: sqlite3.Connection, pack: dict) -> dict:
     """把包里的事实补进这本账，返回逐类计数与两张明细（`conflicts`、`duplicates`）。
     调用方负责事务与备份；dry-run 走 `plan`。同一包再跑一遍不会再动任何一行。"""
+    seed_validation.validate(pack)
+    if not connection.in_transaction:
+        connection.execute("BEGIN")
+    connection.execute("SAVEPOINT seed_landing")
+    try:
+        seed_corrections.check_history(connection, pack)
+        report = _land_pack(connection, pack)
+        seed_corrections.remember(connection, pack, _now())
+        connection.execute("RELEASE seed_landing")
+        return report
+    except BaseException:
+        connection.execute("ROLLBACK TO seed_landing")
+        connection.execute("RELEASE seed_landing")
+        raise
+
+
+def _land_pack(connection: sqlite3.Connection, pack: dict) -> dict:
     version, batch, stamp = str(pack["version"]), batch_of(str(pack["version"])), _now()
     report = {"version": version, "batch": batch, "matched": 0, "unmatched": 0,
               **dict.fromkeys(COUNT_KEYS[1:], 0), "refreshed": 0, "conflicts": [], "duplicates": []}
+    revision = pack["format"] == 2
+    if revision:
+        report.update(withdrawn=0, withdrawal_conflicts=[])
+        seed_corrections.withdraw(connection, pack, report)
     for item in pack.get("entities") or []:
-        found = matches(connection, item)
+        found = matches(connection, item["identity"] if revision else item)
         if len(found) > 1:
             report["duplicates"].append({"kind": item["kind"], "name": item["name"],
                                          "entities": sorted(_name(connection, entity_id) for entity_id in found)})
@@ -368,7 +450,7 @@ def land(connection: sqlite3.Connection, pack: dict) -> dict:
             report["unmatched"] += 1
             continue
         report["matched"] += 1
-        _land_one(connection, found.pop(), item, version, batch, stamp, report)
+        _land_one(connection, found.pop(), item, version, batch, stamp, report, revision=revision)
     return report
 
 

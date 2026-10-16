@@ -13,31 +13,28 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from . import seed_pack
+from . import seed_pack, seed_corrections, seed_validation
 from .followups import Followup, FollowupType, register
 
 TASK_KEY = "seed-import"
 TASK_LABEL = "导入实体种子"
 REVIEW_FILE = "seed-landing.csv"
-FIELDS = ("kind", "entity", "field", "ours", "source", "theirs", "detail", "batch")
+FIELDS = ("kind", "entity", "field", "ours", "source", "theirs", "detail", "batch", "withdrawal_id", "evidence")
 #: 活动页摘要里的计数键与它们的中文名，按这个顺序拼结论。
 SUMMARY_LABELS = (("aliases", "别名"), ("refs", "编号"), ("links", "链接"), ("profiles", "资料"),
-                  ("memberships", "归属"), ("makers", "片商"), ("refreshed", "换新"))
+                  ("memberships", "归属"), ("makers", "片商"), ("refreshed", "换新"), ("withdrawn", "撤销"))
 
 
-def followup_key(version: str) -> str:
-    return f"{TASK_KEY}:{version}"
+def followup_key(version: str, content_hash: str = "") -> str:
+    return f"{TASK_KEY}:{version}" + (f":{content_hash}" if content_hash else "")
 
 
 def pack_version(path: Path | None = None) -> str | None:
-    """随仓库走的那份包的版本；没有包或包读不出来就当没有。"""
+    """随仓库走的包版本；缺包时返回 None，包损坏时报告校验错误。"""
     path = Path(path) if path is not None else seed_pack.DEFAULT_PACK
     if not path.is_file():
         return None
-    try:
-        return str(seed_pack.load(path)["version"])
-    except (OSError, ValueError):
-        return None
+    return str(seed_pack.load(path)["version"])
 
 
 def landed(connection: sqlite3.Connection, key: str) -> bool:
@@ -55,10 +52,13 @@ def _new_entities(connection: sqlite3.Connection, since_entity_id: int) -> bool:
 
 def plan(connection: sqlite3.Connection, *, since_entity_id: int, pack_path: Path | None = None) -> list[Followup]:
     """这一轮该不该派：包的版本没成功导过，或这一轮登记了包里那三类的新实体。"""
-    version = pack_version(pack_path)
-    if version is None:
+    path = Path(pack_path) if pack_path is not None else seed_pack.DEFAULT_PACK
+    if not path.is_file():
         return []
-    key = followup_key(version)
+    pack = seed_pack.load(path)
+    seed_corrections.check_history(connection, pack)
+    version = pack["version"]
+    key = followup_key(version, seed_validation.digest(pack))
     if landed(connection, key) and not _new_entities(connection, since_entity_id):
         return []
     return [Followup(key=key, task_key=TASK_KEY, label=f"{TASK_LABEL}：{version}")]
@@ -73,6 +73,10 @@ def _rows(report: dict) -> list[dict]:
               "source": "", "theirs": item["name"], "batch": report["batch"],
               "detail": "包里一条对上本机两位，可能是重复身份；合并不可逆，由人决定"}
              for item in report["duplicates"]]
+    rows += [{"kind": item["kind"], "entity": item["entity"], "field": item["field"], "source": item["source"],
+              "detail": item["detail"] + "；" + item["reason"], "withdrawal_id": item["id"],
+              "evidence": item["evidence"], "batch": report["batch"]}
+             for item in report.get("withdrawal_conflicts", [])]
     return rows
 
 
@@ -90,6 +94,8 @@ def outcome(report: dict) -> str:
         parts.append(f"不一致 {len(report['conflicts'])}")
     if report["duplicates"]:
         parts.append(f"重复身份 {len(report['duplicates'])}")
+    if report.get("withdrawal_conflicts"):
+        parts.append(f"撤销待复核 {len(report['withdrawal_conflicts'])}")
     return "、".join(parts) if parts else f"没有可补的（对上 {report['matched']} 位）"
 
 
@@ -100,6 +106,8 @@ def run(contract, key: str, handle) -> dict:
     会给测试账本里的真人名补上站上编号，后面的后继就真的去联网了。
     """
     pack = seed_pack.load(seed_pack.DEFAULT_PACK)
+    if key != followup_key(pack["version"], seed_validation.digest(pack)):
+        raise ValueError("种子内容与排队任务的摘要不一致，请重新派发")
     if handle is not None:
         handle.progress(label=f"{TASK_LABEL}：{pack['version']}", throttle=0)
     with contract.database.write_transaction() as connection:
@@ -108,8 +116,9 @@ def run(contract, key: str, handle) -> dict:
         contract.cache_bust()
     record_review(contract.candidate_root, report)
     return {"outcome": outcome(report), "version": report["version"], "matched": report["matched"],
-            "unmatched": report["unmatched"], **{key: report[key] for key, _label in SUMMARY_LABELS},
-            "conflicts": len(report["conflicts"]), "duplicates": len(report["duplicates"])}
+            "unmatched": report["unmatched"], **{key: report.get(key, 0) for key, _label in SUMMARY_LABELS},
+            "conflicts": len(report["conflicts"]), "duplicates": len(report["duplicates"]),
+            "withdrawal_conflicts": len(report.get("withdrawal_conflicts", []))}
 
 
 #: 写账本：别名、编号、链接、资料、归属与片商都进账本，走写账本那一条串行通道（ADR-0040 第三条）。

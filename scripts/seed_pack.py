@@ -1,13 +1,13 @@
 """实体事实种子包的导出与导入（ADR-0073）。
 
     seed_pack.py export --version 2026-09-25
+    seed_pack.py validate --pack resources/seed/entities.json
     seed_pack.py import
     seed_pack.py import --apply --backup peach-data/database/ledger.pre-seed-<时间戳>.db
 
 `export` 只读账本，把女优、厂牌与事务所的公开事实写成 `resources/seed/entities.json`；
-同一账本、同一版本号两次导出逐字节一致。内容变了就必须换版本串：`seed-import:<版本>` 是导入
-的幂等键，导过旧内容的机器会把同版本的新包当作已导过而跳过，所以版本串不比现有文件新的导出被
-拒绝、不动文件、退出码 2。`import` 默认 dry-run，只报会补多少；
+格式 2 保留来源置信度、继承累计显式撤销，用内容摘要绑定版本与导入任务。内容变化须推进版本与修订，
+同一版本的不同内容或回退修订被拒绝。`validate` 只校验包，不打开账本。`import` 默认 dry-run，只报会补多少；
 `--apply` 必须同时给 `--backup`。撤回：`revert_auto_landing.py --source auto:seed`。
 """
 from __future__ import annotations
@@ -33,9 +33,14 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument("--version", default=date.today().isoformat(),
                         help="包版本号，也是批次号的后半段；默认当天日期")
     export.add_argument("--out", type=Path, default=seed_pack.DEFAULT_PACK, help="落盘路径")
+    export.add_argument("--previous", type=Path, help="继承累计撤销的上一份包；缺省读取现有输出文件")
+    export.add_argument("--revision", type=int, help="格式 2 的单调修订号；缺省由上一包递增")
+    export.add_argument("--withdrawals", type=Path, help="已复核的显式撤销 JSON 数组，原样继承历史撤销")
     landing = commands.add_parser("import", help="把种子包补进本机账本")
     add_ledger_write_args(landing)
     landing.add_argument("--pack", type=Path, default=seed_pack.DEFAULT_PACK, help="种子包路径")
+    validation = commands.add_parser("validate", help="只校验种子包，不打开账本")
+    validation.add_argument("--pack", type=Path, default=seed_pack.DEFAULT_PACK, help="种子包路径")
     return parser
 
 
@@ -48,9 +53,20 @@ def _version_in(text: str) -> str | None:
 
 
 def export(args: argparse.Namespace) -> int:
+    previous_path = args.previous or args.out
+    previous = seed_pack.load(previous_path) if previous_path.is_file() else None
+    inherited = list((previous or {}).get("withdrawals", []))
+    withdrawals = json.loads(args.withdrawals.read_text(encoding="utf-8")) if args.withdrawals else []
+    if not isinstance(withdrawals, list):
+        raise ValueError("撤销输入必须是 JSON 数组")
+    same_version = previous is not None and previous["version"] == args.version
+    revision = args.revision if args.revision is not None else (
+        max(1, previous.get("revision", 0)) if same_version else (previous or {}).get("revision", 0) + 1)
     connection = open_readonly(args.db)
     try:
-        pack = seed_pack.export_pack(connection, version=args.version)
+        pack = seed_pack.export_pack(connection, version=args.version, revision=revision,
+                                     withdrawals=[*inherited, *withdrawals],
+                                     previous=None if same_version else previous)
     finally:
         connection.close()
     text = seed_pack.dump(pack)
@@ -69,6 +85,14 @@ def export(args: argparse.Namespace) -> int:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(text, encoding="utf-8", newline="\n")
     print(json.dumps(summary, ensure_ascii=False))
+    return 0
+
+
+def validate(args: argparse.Namespace) -> int:
+    pack = seed_pack.load(args.pack)
+    print(json.dumps({"valid": True, "format": pack["format"], "version": pack["version"],
+                      "revision": pack.get("revision", 0), "content_sha256": seed_pack.seed_validation.digest(pack),
+                      "counts": pack["counts"], "withdrawals": len(pack.get("withdrawals", []))}, ensure_ascii=False))
     return 0
 
 
@@ -93,7 +117,13 @@ def land(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    return export(args) if args.command == "export" else land(args)
+    try:
+        if args.command == "validate":
+            return validate(args)
+        return export(args) if args.command == "export" else land(args)
+    except (ValueError, OSError) as exc:
+        print(json.dumps({"written": False, "error": str(exc)}, ensure_ascii=False))
+        return 2
 
 
 if __name__ == "__main__":
