@@ -39,6 +39,17 @@ class TaskRunStoreTests(unittest.TestCase):
         self.assertEqual(run.pid, os.getpid())
         self.assertEqual(self.store.get(run.id).progress_label, "准备")
 
+    def test_missing_empty_or_corrupt_ledgers_have_no_available_task_center(self):
+        self.assertTrue(self.store.available())
+        for state, content in (("missing", None), ("empty", b""), ("corrupt", b"not a sqlite database")):
+            with self.subTest(state=state):
+                path = self.db.parent / f"{state}.db"
+                if content is not None:
+                    path.write_bytes(content)
+                store = TaskRunStore(LedgerDatabase(path), host="test-host")
+                self.assertFalse(store.available())
+                self.assertEqual(path.read_bytes() if path.exists() else None, content)
+
     def test_scheduled_conflict_is_skipped_and_says_who_blocked_it(self):
         first = self.store.start("demo", trigger="manual", mutex_key="demo")
         self.assertIsNone(self.store.start(

@@ -13,6 +13,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest import mock
 
@@ -891,6 +892,7 @@ class StandaloneConfigurationTests(_Case):
             self.config.data_root, self.config.path, True, True,
             settings_file._read_document(self.config.path), {})).start()
 
+    @contextmanager
     def client(self, *, token="test-token", address="127.0.0.1", base_url="http://localhost", server=None):
         from fastapi.testclient import TestClient
         from peach.api import create_app
@@ -903,7 +905,9 @@ class StandaloneConfigurationTests(_Case):
             async def connection_address(request, call_next):
                 request.scope["server"] = (server, 443)
                 return await call_next(request)
-        return TestClient(app, client=(address, 12345), base_url=base_url)
+        with self.assertNoLogs("peach", level="ERROR"), \
+                TestClient(app, client=(address, 12345), base_url=base_url) as client:
+            yield client
 
     def test_local_mdns_connection_shares_configuration_access_for_read_save_and_picker(self):
         headers = {"X-Token": "test-token"}

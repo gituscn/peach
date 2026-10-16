@@ -58,9 +58,11 @@ def database_status(path) -> str:
     return inspect_database(path)["database"]
 
 
-def readiness(settings: PeachSettings) -> dict:
+def readiness(settings: PeachSettings, *, background_ready: bool | None = None) -> dict:
     checks = {"configured": bool(settings.configured),
               "web": settings.page_path.is_file(), "database": False, "schema": False}
     inspected = inspect_database(settings.db_path)
     checks.update(database=inspected["readable"], schema=inspected["schema"] == "current")
+    if background_ready is not None:
+        checks["background"] = background_ready
     return {"ready": all(checks.values()), "checks": checks}

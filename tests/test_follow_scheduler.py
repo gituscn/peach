@@ -103,7 +103,9 @@ class FollowUpdateSchedulerTests(unittest.TestCase):
                                  MAX_INTERVAL_MINUTES))
             scheduler._run()
             self.assertEqual(scheduler.status()["consecutive_failures"], 1)
-            scheduler._run()
+            with self.assertLogs("peach.follow_scheduler", level="ERROR") as captured:
+                scheduler._run()
+            self.assertIn("上游断了", "\n".join(captured.output))
             status = scheduler.status()
             self.assertEqual(status["consecutive_failures"], 2)
             self.assertEqual(status["last_error"], "上游断了")

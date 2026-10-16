@@ -894,7 +894,8 @@ class TunnelStartupTests(unittest.TestCase):
             db_path=self.root / "peach.db", configured=True, token="",
             tunnel_state_root=self.root / "state", tunnel_log_root=self.root / "logs",
         )
-        with TestClient(api.create_app(settings, tunnel_manager=manager)) as client:
+        with self.assertNoLogs("peach", level="ERROR"), \
+                TestClient(api.create_app(settings, tunnel_manager=manager)) as client:
             client.get("/healthz")
         manager.start.assert_not_called()
 

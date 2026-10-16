@@ -266,7 +266,9 @@ class QueueTests(unittest.TestCase):
                                     debounce=0.0, settle=0.0)
         queue.submit("local", "p", 0.0)
         queue.tick(0.0)
-        queue.tick(0.0)
+        with self.assertLogs("peach.push_discovery", level="ERROR") as captured:
+            queue.tick(0.0)
+        self.assertIn("账本忙", "\n".join(captured.output))
         self.assertEqual(queue.snapshot()["failed"], 1)
         self.assertIn("账本忙", queue.snapshot()["last_error"])
 

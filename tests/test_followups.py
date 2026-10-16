@@ -223,7 +223,9 @@ class RunnerTests(LedgerTestCase):
             queued = self.store.enqueue_followups(
                 parent.id, [("entity-avatar:performer:1", AVATAR_TASK_KEY, "甲")])["queued"]
             self.store.finish(parent.id, "succeeded", summary={"followups": 1})
-            FollowupRunner(self.contract()).drain()
+            with self.assertLogs("peach.followups", level="WARNING") as captured:
+                FollowupRunner(self.contract()).drain()
+            self.assertIn("取不到这张图", "\n".join(captured.output))
         child = self.store.get(queued[0])
         self.assertEqual(child.status, "failed")
         self.assertIn("取不到这张图", child.error)
