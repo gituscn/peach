@@ -57,7 +57,7 @@ from peach.scripting import USER_AGENT, open_readonly
 from peach.config import COVER_DIR, DATABASE_PATH, GENERATED_DIR, SOURCES_DIR
 from peach.http import HttpRequest, HttpTransport, HttpxTransport
 from peach.scripting import HostLimiter
-from peach.scraping_access import SOURCES, SourceTransport, source_for
+from peach.scraping_access import SOURCES, SourcePaused, SourceTransport, source_for
 from peach.config import SECRETS_DIR
 from peach.jobs import DiskGuard, JobPolicyError
 from peach.task_runs import TaskRunHandle, cli_run, inert_handle
@@ -67,6 +67,7 @@ from peach.catalog_rules import (
     is_amateur_code,
     is_jav_code,
     is_korean_mib_code,
+    is_uncensored_code,
     normalise_code_key,
 )
 from peach.metadata_policy import SOURCE_SPECS
@@ -555,7 +556,7 @@ def _is_prestige(evidence: MetadataEvidence) -> bool:
 
 
 def r18_evidence(transport: HttpTransport, code: str, *,
-                 deadline: float | None = None) -> MetadataEvidence:
+                 deadline: float | None = None, record=lambda key: None) -> MetadataEvidence:
     """读取 r18 返回的官方封套，并保留旧数字版高清 URL 探测。
 
     `content_id` 不是稳定的数字版路径。Prestige 的 ABW 系列会返回
@@ -570,7 +571,13 @@ def r18_evidence(transport: HttpTransport, code: str, *,
                 referer="https://r18.dev/", limit=2 * 1024 * 1024,
                 deadline=deadline,
             ).decode("utf-8", "ignore"))
+        except NotFound:
+            continue
         except (Unavailable, ValueError, httpx.TransportError):
+            record('source_unanswered')
+            continue
+        if not isinstance(payload, dict):
+            record('source_unanswered')
             continue
         return r18_payload_evidence(payload)
     return MetadataEvidence()
@@ -594,6 +601,23 @@ def r18_payload_evidence(payload: dict) -> MetadataEvidence:
     makers = frozenset(str(payload.get(key, {}).get("name", "")).casefold()
                        for key in ("maker", "label") if isinstance(payload.get(key), dict))
     return MetadataEvidence(tuple(_unique_candidates(found)), makers, frozenset({"r18dev"}))
+
+
+def dmm_evidence(transport: HttpTransport, code: str, *, deadline=None) -> MetadataEvidence:
+    """复用已核对番号的 DMM 官方目录，取得图片与数字版候选。"""
+    from peach.sources import Session
+    from peach.sources.base import SourceFailure
+    from peach.sources.dmm import DmmSource
+    try:
+        payload = DmmSource().query(code, session=Session(transport, deadline)).payload()
+    except SourceFailure as error:
+        if error.kind == 'not_found':
+            return MetadataEvidence()
+        raise Unavailable('DMM：' + str(error)) from error
+    found = [candidate for url in payload.get('cover_urls') or () for candidate in dmm_cdn_images(url)]
+    found += content_id_images(str(payload.get('content_id') or ''))
+    makers = frozenset(str(payload.get(field) or '').strip().casefold() for field in ('maker', 'label'))
+    return MetadataEvidence(tuple(_unique_candidates(found)), makers, frozenset({'dmm'}))
 
 
 def mgstage_images(transport: HttpTransport, code: str, *,
@@ -721,15 +745,23 @@ def _usable_candidates(code: str, candidates, known_sizes: dict[str, tuple[int, 
 
 
 def _site_candidates(transport: HttpTransport, code: str, evidence: MetadataEvidence, *,
-                     delay: float, deadline: float | None) -> list[Candidate]:
-    """现问官方站拿到的封面候选：r18.dev，再按厂牌证据问 Prestige 或按番号形状问 MGS。FC2 一处都不问。"""
+                     delay: float, deadline: float | None, record=lambda key: None) -> list[Candidate]:
+    """复用官方目录并按发行面查询图片；FC2 由调用方提供商品图候选。"""
     if code.upper().startswith("FC2-PPV-"):
         return []
     candidates: list[Candidate] = []
     live_evidence = MetadataEvidence()
+    if (not evidence.candidates and 'dmm' not in evidence.sources
+            and not is_amateur_code(code) and not is_uncensored_code(code)):
+        try:
+            live_evidence = dmm_evidence(transport, code, deadline=deadline)
+            candidates += list(live_evidence.candidates)
+        except (Unavailable, SourcePaused):
+            record('source_unanswered')
     # 有成功快照时不重复打 r18；失败快照不算证据，仍允许联网刷新。
-    if "r18dev" not in evidence.sources:
-        live_evidence = r18_evidence(transport, code, deadline=deadline)
+    if ('r18dev' not in evidence.sources and not live_evidence.candidates
+            and not ('dmm' in evidence.sources and evidence.candidates)):
+        live_evidence = r18_evidence(transport, code, deadline=deadline, record=record)
         candidates += list(live_evidence.candidates)
         _sleep_within(delay, deadline)
     # MGS 与 Prestige 都是 Prestige 集团的官方供给面。只在本地厂牌证据命中时
@@ -777,9 +809,25 @@ def best_cover(transport: HttpTransport, code: str, delay: float, *,
     def usable(found):
         return _usable_candidates(code, found, known_sizes or {}, minimum_quality, minimum_pixels)
 
+    def source_transport(request, timeout, limit):
+        try:
+            response = transport(request, timeout, limit)
+        except (httpx.TransportError, SourcePaused):
+            record('source_unanswered')
+            raise
+        if response.status not in (200, 206, 404):
+            record('source_unanswered')
+            record('source_http_' + str(response.status))
+        return response
+
+    source_transport.inner = transport
+
     first = usable([*prior_candidates, *evidence.candidates])
-    asked = usable([*first, *_site_candidates(transport, code, evidence, delay=delay, deadline=deadline)])
+    asked = usable([*first, *_site_candidates(source_transport, code, evidence, delay=delay,
+                                            deadline=deadline, record=record)])
     if not asked:
+        if diagnostics.get('source_unanswered'):
+            raise Unavailable('官方目录查询未完成，尚未取得封面候选')
         raise NotFound("所有渠道都没有候选")
     measured = _measure(transport, asked, record, minimum_width=minimum_width,
                         delay=delay, deadline=deadline)

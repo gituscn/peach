@@ -98,8 +98,9 @@ def main():
                 result = upgrade(path, known, transport, args.report, live=args.live,
                                  metadata_root=args.data_root / 'sources/metadata/javinizer-go')
             except Exception as error:
-                from peach.library_processing import describe_failure
-                result = dict(code=path.stem, status='failed', error=describe_failure(error))
+                from peach.library_processing import describe_failure, is_missing
+                result = dict(code=path.stem, status='failed', error=describe_failure(error),
+                              error_type=type(error).__name__, retryable=not is_missing(error))
             results.append(result)
             atomic_write_text(checkpoint, json.dumps(result, ensure_ascii=False, indent=2))
             print(json.dumps({'index': index, **result}, ensure_ascii=False), flush=True)

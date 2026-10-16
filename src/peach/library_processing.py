@@ -157,6 +157,14 @@ def _official_evidence(snapshots, absent=()):
             found += content_id_images(str(payload.get('content_id') or ''))
             makers |= {str(payload[field]).strip().casefold() for field in ('maker', 'studio', 'label')
                        if isinstance(payload.get(field), str) and payload[field].strip()}
+        elif name in metadata_routes.FC2_STAGE:
+            from .jav_cover_fetch import candidate_for
+            from .scripting import host_under, hostname_of
+            from .sources.fc2 import storage_original
+            found += [candidate_for(original) for url in payload.get('cover_urls') or ()
+                      if isinstance(url, str) and (original := storage_original(url)) and IMAGE_URL.fullmatch(original)
+                      and (host_under(hostname_of(original), ('contents.fc2.com',))
+                           or re.fullmatch(r'contents-thumbnail\d*\.fc2\.com', hostname_of(original)))]
         else:
             continue
         sources.add(name)

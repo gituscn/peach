@@ -32,6 +32,38 @@ class _Response:
 
 
 class FetchRetryTests(unittest.TestCase):
+    def test_empty_snapshots_use_the_identified_dmm_catalog_and_largest_image(self):
+        COVER = 'https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ssis00057/ssis00057pl.jpg'
+        ENDPOINT = 'https://api.video.dmm.co.jp/graphql'
+        item = {'id': 'ssis00057', 'title': '作品', 'makerContentId': 'SSIS-057',
+                'packageImage': {'largeUrl': COVER}}
+        modern = COVER.replace('awsimgsrc.dmm.co.jp/pics_dig/', 'awsimgsrc.dmm.com/dig/')
+        transport = transport_for({
+            ENDPOINT: (200, json.dumps({'data': {'ppvContent': item}}).encode()),
+            COVER: (200, jpeg(800, 540)), modern: (200, jpeg(2184, 1468)),
+        })
+        with patch.object(covers, 'r18_evidence') as mirror:
+            winner, size, _ = covers.best_cover(transport, 'SSIS-057', 0)
+        self.assertEqual(winner.url, modern)
+        self.assertEqual(size, (2184, 1468))
+        mirror.assert_not_called()
+
+    def test_catalog_connection_failure_is_not_a_definitive_missing_cover(self):
+        diagnostics = {}
+        with patch.object(covers, 'dmm_evidence', return_value=covers.MetadataEvidence()):
+            with self.assertRaises(covers.Unavailable) as raised:
+                covers.best_cover(lambda *args: _Response(503, b''), 'MIDA-085', 0, diagnostics=diagnostics)
+        self.assertNotIsInstance(raised.exception, covers.NotFound)
+        self.assertGreater(diagnostics.get('source_http_503', 0), 0)
+
+    def test_official_catalog_probe_preserves_source_cooldown_writes(self):
+        from unittest.mock import Mock
+        transport = Mock(return_value=_Response(429, b''))
+        transport.hold = Mock()
+        with self.assertRaises(covers.Unavailable):
+            covers.best_cover(transport, 'MIDA-085', 0)
+        self.assertTrue(any(call.args[0] == 'dmm' for call in transport.hold.call_args_list))
+
     def test_cover_rejections_report_measured_sizes_and_decode_failures(self):
         candidate = covers.Candidate("test", "https://example.test/cover.jpg")
         for size, expected in [((600, 400), "too_small"), ((1600, 1000), "invalid_image")]:

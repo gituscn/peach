@@ -1618,6 +1618,14 @@ class LibraryNfoTests(unittest.TestCase):
         self.assertIsNotNone(evidence)
         self.assertEqual([candidate.url for candidate in evidence.candidates], [url])
 
+    def test_fc2_snapshots_supply_only_product_storage_originals(self):
+        from peach.library_processing import _official_evidence
+        original = 'https://storage12000.contents.fc2.com/file/342/34141418/1554539118.7.jpg'
+        evidence = _official_evidence([('javten', {'cover_urls': [original]}),
+            ('javarchive', {'cover_urls': ['https://img.javstore.net/a.jpg']}),
+            ('javdb', {'cover_urls': ['https://c0.jdbstatic.com/a.jpg']})])
+        self.assertEqual([candidate.url for candidate in evidence.candidates], [original])
+
     def test_community_cover_is_eligible_for_official_replacement(self):
         from peach.library_processing import cover_settled
         target = self.root / 'MIDV-377.jpg'

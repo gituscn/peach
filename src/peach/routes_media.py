@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import logging
 import re
 import time
@@ -611,8 +612,20 @@ async def cover_crop(request: Request, args: dict[str, str] = Depends(require_au
     if payload.get("box") is None:
         # 恢复默认是当场按折痕判据重算一遍，不是删掉 sidecar：删掉之后没有人会
         # 再来算，页面拿到的是「这张图不该裁」，正封从此再也回不来。
+        def read_evidence(suffix):
+            try:
+                value = json.loads(path.with_suffix(suffix).read_text(encoding='utf-8'))
+                return value if isinstance(value, dict) else {}
+            except (OSError, ValueError):
+                return {}
+        face = read_evidence('.face.json')
+        current_face = face.get('px') == list(size)
+        title = (jav_poster_crop.read_sidecar(path) or {}).get('title') or read_evidence('.scraping.json').get('title', '')
         record = jav_poster_crop.crop_record(
-            code, size[0], size[1], jav_poster_crop.file_gradient(path))
+            code, size[0], size[1], jav_poster_crop.file_gradient(path), title=title,
+            face=face.get('face') if current_face else None)
+        if current_face and face.get('layout') == 'still':
+            record['box'] = dict(x0=0, y0=0, x1=size[0], y1=size[1], method=jav_poster_crop.NONE)
     else:
         record = jav_poster_crop.manual_record(size[0], size[1], payload.get("box"))
     if record is None:

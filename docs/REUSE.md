@@ -215,6 +215,8 @@ JAV 默认封面（官方封面／预览图）与视频默认大小（大图／�
 
 新作封面复用 `best_cover` 的官方候选与 `cover_artwork.install_cover`，保存本地封面、正封框、人脸坐标与来源证据。JavDB 图片仅作来源复核证据，不进入安装、封面索引、详情封面投影或缺图兜底；`scripts/quarantine_javdb_covers.py` 将有来源证据的历史图片及边车移入可恢复归档。未取得合格来源时显示未取得状态，详见 ADR-0107。
 
+无快照的有码作品由封面入口复用现有 `DmmSource` 的 GraphQL 查询与精确身份核验；成功快照直接展开 DMM 图片候选，r18.dev 与 DMM 使用同一份目录证据。FC2 来源快照通过 `storage_original` 提取发行方存储原件，排除社区图床。目录查询沿用来源冷却，HTTP、网络与解析失败分别保留未取得状态。
+
 取景由 `poster-crop-v12` 管理。Blu-ray 来源标题、明确的版次标签与图片比例共同决定 0.85 正封比例，标题随正封框保留，重算人脸与正封框均读取同一版次；有效宽正封框在没有版次标题的卡片上也完整显示。VR 标记、IENEE、IENFE、SDHS 数字发行拼图，以及可信主脸跨过 DVD 正封先验边界的大封保留整幅画面，由 `cover_frame.layout=still` 传给卡片。大封在竖版大图按主脸居中填满，横版小图完整显示，均不使用模糊补边；JPEG 软边的书脊识别结合突出度、左忙右静的方向与正封侧基线。手工框保持用户取景。重试队列按最早尝试时间轮转，收起的合集沿用设置跳过；逐番号结果保存在 `feed-cover-attempts/`。复用现有 HTTP、Pillow、OpenCV 与文件锁，无新增依赖。
 
 馆藏与新作取图共用 `cover_artwork.metadata_snapshots` 和 `best_cover`，片商官网、发行方、R18 与 DMM 的官方候选均参与尺寸比较。馆藏采集将长边 1600px 作为高清重探界限，社区转存图可由官方封面替换；同类官方图按像素面积升级，FC2 保留商品图的来源保护。`scripts/audit_cover_artwork.py` 逐张核对尺寸、来源、版次与取景框，输出 CSV；`scripts/upgrade_audited_covers.py` 按已有官方快照逐番号重探，`--live` 经同一官方链在线补查，保存原件备份与结果检查点。两者只处理可重建图片和边车，不写 ledger。
