@@ -37,6 +37,7 @@ from .mdns import lan_ipv4
 from .netwatch import NetworkChangeWatcher
 from .mount import mount_share as mount_smb_share
 from .process_job import assign_to_job, create_kill_on_close_job
+from .tray_diagnostics import show_report as show_diagnostic_report
 from .tray_lifecycle import Lifecycle
 from .tray_detached import handoff_tray
 from .sync import COPY_ACTIONS, SyncPlan, device_id, resolve
@@ -88,6 +89,7 @@ TRAY_SOURCES = (
     "src/peach/tray.py",
     "src/peach/tray_detached.py",
     "src/peach/tray_lifecycle.py",
+    "src/peach/tray_diagnostics.py",
     "src/peach/menubar.py",
     "src/peach/versioning.py",
     "src/peach/sync.py",
@@ -1037,6 +1039,7 @@ class PeachTray:
         self.version = self.versions.inspect()
         self._stop_event = threading.Event()
         self._action_lock = threading.Lock()
+        self._diagnostics_lock = threading.Lock()
         self._build_checked_at = time.monotonic()
         self._build_attempted_head: str | None = None
         version_menu = pystray.Menu(
@@ -1209,11 +1212,23 @@ class PeachTray:
 
     def export_diagnostics(self, _icon=None, _item=None) -> None:
         from .support_bundle import save_bundle
-        try:
-            path = save_bundle()
-            show_message("Peach 诊断报告", f"诊断报告已保存：\n{path}")
-        except Exception as error:
-            show_message("Peach 诊断报告", error_reporting.failure_details("report-export", error), error=True)
+        if not self._diagnostics_lock.acquire(blocking=False):
+            return
+
+        def work() -> None:
+            try:
+                path = save_bundle()
+                try:
+                    show_diagnostic_report(path)
+                except OSError as error:
+                    show_message("Peach 诊断报告", f"诊断报告已保存：\n{path}\n\n窗口或打开操作未完成：{error}", error=True)
+            except Exception as error:
+                show_message("Peach 诊断报告", error_reporting.failure_details("report-export", error), error=True)
+            finally:
+                self._diagnostics_lock.release()
+
+        # 菜单回调及时返回；报告窗口在独立线程上使用系统自己的消息循环。
+        threading.Thread(target=work, name="PeachDiagnostics", daemon=True).start()
 
     def check_updates(self, icon=None, _item=None) -> None:
         if not self._action_lock.acquire(blocking=False):
