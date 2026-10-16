@@ -55,9 +55,11 @@ def inspect(path, metadata, *, detector=None):
     face_record = current_face(path, (width, height), title, detector)
     face = face_record.get('face') if face_record.get('px') == [width, height] else None
     full = crop.face_crosses_spine(width, height, face)
-    layout = 'still' if full or crop.is_scene_cover(path.stem, title) or face_record.get('layout') == 'still' else ''
+    layout = 'still' if crop.is_scene_cover(path.stem, title) or face_record.get('layout') == 'still' else ''
     proposed = saved if crop.is_manual(saved) and crop.is_current(saved, width, height) else crop.crop_record(
         path.stem, width, height, crop.file_gradient(path), title=title, face=face, layout=layout)
+    if full and proposed['box']['method'] == crop.NONE:
+        layout = 'still'
     if layout == 'still' and not crop.is_manual(proposed):
         proposed['box'] = {'x0': 0, 'y0': 0, 'x1': width, 'y1': height, 'method': crop.NONE}
     origin = origin_of(str(evidence.get('source_url') or ''))

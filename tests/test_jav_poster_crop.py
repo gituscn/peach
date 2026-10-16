@@ -814,6 +814,21 @@ class BatchScriptTests(unittest.TestCase):
         self.assertEqual((proposed['box']['method'], layout), (NONE, 'still'))
         self.assertEqual(row['x0'], 0)
 
+    def test_offline_reframing_preserves_a_centered_front_with_padding(self):
+        from peach.cover_artwork import FACE_ALGORITHM_VERSION
+        target = self.root / 'HHL-018.jpg'
+        Image.new('RGB', (840, 563), 'gray').save(target)
+        target.with_suffix('.face.json').write_text(json.dumps({
+            'version': FACE_ALGORITHM_VERSION, 'px': [840, 563],
+            'face': {'cx': .487, 'cy': .231, 'w': .135, 'h': .242, 'score': .93},
+        }), encoding='utf-8')
+        profile = jav_poster_crop.ColumnProfile([.02] * 224 + [.2] * 394 + [.02] * 222, [0.] * 840)
+        profile.seams[224] = profile.seams[618] = .95
+        with patch.object(jav_poster_crop, 'file_gradient', return_value=profile):
+            row, proposed, _, layout = batch_script('audit_cover_artwork').inspect(target, self.root / 'metadata')
+        self.assertEqual((proposed['box']['method'], layout), (CENTER, ''))
+        self.assertEqual((row['x0'], proposed['box']['x1']), (225, 618))
+
     def test_audit_refreshes_legacy_front_only_faces_before_classifying_the_cover(self):
         from peach.face_detect import Face
         from peach.cover_artwork import FACE_ALGORITHM_VERSION
