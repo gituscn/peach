@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from peach import seed_followup, seed_pack
+from peach import seed_followup, seed_pack, seed_validation
 from peach.entities import normalize_entity_name
 from peach.repository import LedgerDatabase
 from peach.review_csv import read_rows
@@ -21,6 +21,7 @@ PACK = {"format": 1, "version": VERSION, "source": "auto:seed", "counts": {}, "e
     {"kind": "studio", "name": "PRESTIGE PREMIUM", "aliases": [], "refs": [], "links": [],
      "maker": {"name": "Prestige", "source": "review:label-maker-20260923.csv"}},
 ]}
+KEY = seed_followup.followup_key(VERSION, seed_validation.digest(PACK))
 
 
 class Case(unittest.TestCase):
@@ -65,6 +66,15 @@ class Case(unittest.TestCase):
 
 
 class PlanTests(Case):
+    def test_content_hash_changes_the_followup_key(self):
+        first = self.plan(since_entity_id=10 ** 9)[0].key
+        self.finished_run(first)
+        modified = seed_pack.load(self.pack)
+        modified["entities"][0]["links"][0]["url"] = "https://x.com/verified_handle"
+        self.pack.write_text(seed_pack.dump(modified), encoding="utf-8")
+        second = self.plan(since_entity_id=10 ** 9)[0].key
+        self.assertNotEqual(first, second)
+
     def test_without_a_pack_nothing_is_planned(self):
         with self.database.read_connection() as connection:
             self.assertEqual(seed_followup.plan(connection, since_entity_id=0,
@@ -73,10 +83,10 @@ class PlanTests(Case):
     def test_a_version_never_landed_is_planned_even_without_new_entities(self):
         found = self.plan(since_entity_id=10 ** 9)
         self.assertEqual([(item.key, item.task_key, item.label) for item in found],
-                         [(f"seed-import:{VERSION}", "seed-import", f"导入实体种子：{VERSION}")])
+                         [(KEY, "seed-import", f"导入实体种子：{VERSION}")])
 
     def test_a_landed_version_is_planned_again_only_when_new_entities_appear(self):
-        self.finished_run(seed_followup.followup_key(VERSION))
+        self.finished_run(KEY)
         self.assertEqual(self.plan(since_entity_id=10 ** 9), [], "导过、又没有新实体，不再派")
         her = self.add("performer", "天川そら")
         self.assertEqual(len(self.plan(since_entity_id=her - 1)), 1, "这一轮登记了新女优，再派一次给她补")
@@ -85,6 +95,17 @@ class PlanTests(Case):
 
 
 class RunTests(Case):
+    def test_queued_content_change_is_rejected_without_writing(self):
+        self.add("performer", "天川そら")
+        modified = seed_pack.load(self.pack)
+        modified["entities"][0]["links"][0]["url"] = "https://x.com/verified_handle"
+        self.pack.write_text(seed_pack.dump(modified), encoding="utf-8")
+        with self.assertRaises(ValueError):
+            seed_followup.run(self.contract, KEY, None)
+        with self.database.read_connection() as connection:
+            self.assertEqual(connection.execute("SELECT count(*) FROM entity_alias").fetchone()[0], 0)
+            self.assertEqual(connection.execute("SELECT count(*) FROM seed_pack_history").fetchone()[0], 0)
+
     def test_run_lands_the_pack_and_writes_the_review_file(self):
         her, kmp = self.add("performer", "天川そら"), self.add("studio", "K M Produce")
         self.add("agency", "STARTUP")
@@ -93,7 +114,7 @@ class RunTests(Case):
         with self.database.write_transaction() as connection:
             connection.execute("INSERT INTO label_maker(label_id,maker_id,source,confidence,checked_at)"
                                " VALUES(?,?,?,1.0,?)", (label, kmp, "review:user", STAMP))
-        summary = seed_followup.run(self.contract, seed_followup.followup_key(VERSION), None)
+        summary = seed_followup.run(self.contract, KEY, None)
         self.assertEqual((summary["matched"], summary["aliases"], summary["links"], summary["memberships"],
                           summary["makers"], summary["conflicts"], summary["duplicates"]), (2, 1, 1, 1, 0, 1, 0))
         self.assertEqual(summary["outcome"], "别名 1、链接 1、归属 1、不一致 1")
@@ -106,7 +127,7 @@ class RunTests(Case):
         rows = read_rows(self.candidates / seed_followup.REVIEW_FILE)
         self.assertEqual([(row["entity"], row["field"], row["ours"], row["theirs"]) for row in rows],
                          [("PRESTIGE PREMIUM", "maker", "K M Produce", "Prestige")])
-        again = seed_followup.run(self.contract, seed_followup.followup_key(VERSION), None)
+        again = seed_followup.run(self.contract, KEY, None)
         self.assertEqual((again["aliases"], again["links"], again["memberships"], again["refreshed"]), (0, 0, 0, 0),
                          "同一包再跑一遍没有东西可补")
         self.assertEqual(self.busts, 1, "没动账本就不清缓存")
@@ -115,7 +136,7 @@ class RunTests(Case):
     def test_two_local_entities_for_one_pack_item_become_a_duplicate_row(self):
         self.add("performer", "天川そら")
         self.add("performer", "春山心愛")
-        summary = seed_followup.run(self.contract, seed_followup.followup_key(VERSION), None)
+        summary = seed_followup.run(self.contract, KEY, None)
         self.assertEqual((summary["matched"], summary["duplicates"]), (0, 1))
         rows = read_rows(self.candidates / seed_followup.REVIEW_FILE)
         self.assertEqual([(row["field"], row["entity"], row["theirs"]) for row in rows],

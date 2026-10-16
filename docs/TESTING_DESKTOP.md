@@ -50,11 +50,15 @@ Windows 第一次询问防火墙权限时，只勾选「专用网络」。
 
 ## 播放与 FFmpeg
 
-浏览器能直接播放的格式（例如常见的 MP4）不需要额外软件。转码、抽帧和缩略图需要 FFmpeg 与 ffprobe，测试包不附带，需要自己安装：
+安装包和免安装 ZIP 均包含 FFmpeg 与 ffprobe，位于程序目录的 `tools\ffmpeg\bin`。转码、媒体信息探测与缩略图可直接使用，无需安装系统工具或设置 PATH。应用更新同时更新随包工具。
 
-1. 下载 FFmpeg（配置页「运行信息」缺少它时会给出下载入口）。
-2. 把 `ffmpeg.exe` 和 `ffprobe.exe` 加入 PATH，或放进数据目录下的 `tools\ffmpeg\bin`。
-3. 从托盘退出 Peach，再重新打开。
+缺索引 MP4 修复使用随包的 `tools\untrunc\untrunc.exe`，需要同编码参数的完整片作为参照。该工具与其兼容的 FFmpeg 库独立构建，按 GPL-2.0-or-later 分发；完整对应源码制品为同一 Release 中的 `untrunc-corresponding-source.zip`。显式 `PEACH_UNTRUNC` 优先于随包工具，其后查数据目录与 PATH。
+
+工具以独立进程调用，按 GPL-3.0-or-later 分发；工具目录包含许可证、构建配置、来源清单和 SHA-256。完整对应源码制品 `ffmpeg-corresponding-source.zip` 与应用放在同一个 Release，包含 FFmpeg、x264、nv-codec-headers 的固定源码和构建脚本。发行构建会校验工具及对应源码，任何一项缺失或哈希不符都停止打包。
+
+源码运行可将 FFmpeg、ffprobe 加入 PATH，或放在数据目录的 `tools\ffmpeg\bin`。显式指定的 `PEACH_FFMPEG`、`PEACH_FFPROBE` 优先；独立包随后使用随包工具，再查数据目录和 PATH。
+
+已在系统安装媒体工具时，可运行 [`import_windows_media_tools.cmd`](../scripts/import_windows_media_tools.cmd)，它调用同目录 PowerShell 脚本检测 WinGet、Scoop、Chocolatey、PATH 和下载目录，将工具及同目录 DLL 放入 Peach 的数据目录，替换文件时保留备份。没有检测到已解压工具时，可识别下载目录中的 Gyan `ffmpeg-9.0.2-essentials_build.zip`，校验固定 SHA-256 后解压接入。脚本不修改系统 PATH 或馆藏账本；完成后刷新配置页。
 
 ## 从外网临时访问
 

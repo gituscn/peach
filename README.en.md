@@ -112,11 +112,11 @@ Windows standalone builds can check for and download updates under **应用与�
 
 Downloading an update leaves tasks running. Installing an update saves progress and pauses scraping and preview generation; collection requests made during installation wait for it to finish. After installation finishes or is cancelled, a running Peach service resumes the tasks automatically. If Peach has exited, it resumes unfinished library metadata, local previews, timeline thumbnails and cover tasks on the next launch, reusing completed results. Turning thumbnail collection off explicitly keeps it stopped.
 
-The test package is not code-signed yet. If Windows says "Windows protected your PC", make sure the file came from this project's Releases, then choose "More info → Run anyway". Transcoding and thumbnails need FFmpeg; without it you can still browse and play MP4 and WebM. See [Windows test build](docs/TESTING_DESKTOP.md) for how to install it.
+Both the Windows installer and portable ZIP include FFmpeg, ffprobe and untrunc for transcoding, thumbnails and MP4 index recovery. Corresponding source is available in the same Release; the tools directory contains licenses and build notes. See [Windows test build](docs/TESTING_DESKTOP.md). The test package is not code-signed yet. If Windows says "Windows protected your PC", make sure the file came from this project's Releases, then choose "More info → Run anyway".
 
 On Windows, the tray runs independently. Closing the Codex, Claude, or terminal session that started it keeps Peach running. Peach attempts to recover after an unexpected tray exit, up to three times within five minutes. Choosing “Quit Peach” keeps it closed. Exit reasons and recovery results are recorded in `tray-lifecycle.log` in the logs folder.
 
-Startup error dialogs show where a diagnostic report was saved. While Peach is running, choose “Export diagnostic report” in the tray menu or “Download diagnostic report” on the diagnostics page to collect a redacted ZIP for feedback.
+Startup error dialogs show where a diagnostic report was saved. While Peach is running, choose “Export diagnostic report” in the tray menu or “Download diagnostic report” on the diagnostics page to collect a redacted ZIP for feedback. The tray export dialog can open the report folder, open the file, or close.
 
 ### Run from source (Windows, macOS)
 

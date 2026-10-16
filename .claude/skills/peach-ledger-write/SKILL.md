@@ -5,8 +5,8 @@ description: 在用户说迁移、migrate、--apply、合并实体、merge_entit
 
 # 真实 ledger 写入流程
 
-最后复核：2026-10-02
-证据来源：`docs/HANDOFF.md`「数据安全」「身份、来源与标识采集」、ADR-0005、ADR-0015、ADR-0017、ADR-0052、ADR-0091。
+最后复核：2026-10-17
+证据来源：`docs/HANDOFF.md`「数据安全」「身份、来源与标识采集」、ADR-0005、ADR-0015、ADR-0017、ADR-0052、ADR-0091、ADR-0106。
 
 真实库：当前写入者本机 `PEACH_DATA_ROOT/database/ledger.db`（WAL）。绝不能把共享传输副本或
 另一台机器的副本当当前真实库；测试只用临时 SQLite 与临时媒体。
@@ -42,10 +42,9 @@ Windows 写者的托盘在启动与「重启服务」时、子服务停着的间
   只产候选，人复核后才 `approved`；撤不回的（合并、改规范名）判据再确定也要授权。
 - 运维脚本默认 dry-run：`scrape_codes.py` 默认只写复核 CSV，`clean_names.py` 默认只生成
   改名计划且 `--apply` 前备份 SQLite 并在数据库更新失败时回滚文件名。
-- 种子包（ADR-0073、0075）：导入只给已有实体填空、不造实体，只换 `auto:seed@…` 自己写过的归属、
-  片商与资料行，与人写的不一致记 `seed-landing.csv`；归属 `auto:seed@<版本>`。`export` 只读，
-  内容变了必须换更新的版本串（版本串是导入的幂等键，不比现有文件新的会被脚本拒绝），数据包单独提交，
-  推不推公开仓库由用户看字段决定。
+- 种子包按 ADR-0073、0075、[0106](../../../docs/adr/0106-seed-correction-history-and-explicit-withdrawals.md) 校验；只匹配已有实体，保留源置信度与非种子归属，冲突记 `seed-landing.csv`。
+  只精确撤销 `auto:seed` 拥有的旧断言，不依据缺席撤销。`export` 只读；更新须递增版本与修订号、继承累计撤销，
+  经差异复核后独立提交数据包。内容摘要与永久历史校验由导入入口执行；公开推送由用户看字段决定。
 
 ## 实体合并
 

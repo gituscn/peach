@@ -24,7 +24,7 @@ class MigrationTests(unittest.TestCase):
             connection.execute("INSERT INTO asset(id,location,path,medium,disposal) VALUES(1,'local','sample.mp4','video','trash')")
             connection.execute("INSERT INTO asset_tag(asset_id,tag,source) VALUES(1,'示例','user')")
             connection.commit()
-            self.assertEqual([migration.version for migration in upgrade(self.db, MIGRATIONS)], ['0046'])
+            self.assertEqual([migration.version for migration in upgrade(self.db, MIGRATIONS)], ['0046', '0047'])
             self.assertEqual(connection.execute("SELECT disposal,disposal_reason FROM asset WHERE id=1").fetchone(), ('trash', None))
             self.assertEqual(connection.execute("SELECT tag,source FROM asset_tag WHERE asset_id=1").fetchall(), [('示例', 'user')])
             self.assertEqual(connection.execute("SELECT count(*) FROM asset").fetchone()[0], 1)
@@ -43,7 +43,7 @@ class MigrationTests(unittest.TestCase):
         sqlite3.connect(self.db).close()
         backup = self.root / "before.db"
         done = upgrade(self.db, MIGRATIONS, backup)
-        self.assertEqual([m.version for m in done], [f'{number:04d}' for number in range(47)])
+        self.assertEqual([m.version for m in done], [f'{number:04d}' for number in range(48)])
         self.assertTrue(backup.exists())
         con = sqlite3.connect(self.db)
         tables = {row[0] for row in con.execute(
@@ -60,8 +60,8 @@ class MigrationTests(unittest.TestCase):
                          "playlist", "playlist_item",
                          "asset_tag_preference", "asset_search", "follow_playback",
                          "genre_decision", "asset_subtitle", "task_run", "performer_profile", "code_sample_image",
-                         "entity_classification", "entity_identity_link", "schema_migration"} <= tables)
-        self.assertEqual(versions, [f'{number:04d}' for number in range(47)])
+                         "entity_classification", "entity_identity_link", "seed_pack_history", "schema_migration"} <= tables)
+        self.assertEqual(versions, [f'{number:04d}' for number in range(48)])
         self.assertEqual(upgrade(self.db, MIGRATIONS), [])
         self.assertEqual(plan(self.db, MIGRATIONS)[1], [])
 
@@ -341,12 +341,9 @@ class MigrationTests(unittest.TestCase):
         base_migrations = self.root / "base-migrations"
         base_migrations.mkdir()
         for path in sorted(MIGRATIONS.glob("*.sql")):
-            # 0024 重建 follow_playback，必须与建表的 0022 一起排除；0038 给每张表挂
-            # 版本号触发器、0039 清 follow_playback 的孤儿行、0040 给墓碑表登记版本号、0041 给新表挂
-            # 版本号触发器、0042 的想要清单、0043 的下载任务和 0044 的身份表挂版本号触发器，
-            # 被排除的迁移建的表这时还不存在，它们也要等到后面一起应用。
-            if not path.name.startswith(("0020_", "0021_", "0022_", "0024_", "0038_", "0039_", "0040_",
-                                         "0041_", "0042_", "0043_", "0044_", "0045_")):
+            # 历史基线停在 0037，follow_playback 建表与重建随 0020/0021 统一应用。
+            # 0038 起的版本号触发器依赖这些表，留在后续的完整迁移链中。
+            if path.name < "0038_" and not path.name.startswith(("0020_", "0021_", "0022_", "0024_")):
                 shutil.copyfile(path, base_migrations / path.name)
         sqlite3.connect(self.db).close()
         upgrade(self.db, base_migrations)

@@ -11,6 +11,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from peach import seed_pack
 from peach.entities import normalize_entity_name
@@ -328,6 +329,19 @@ class ImportTests(SeedPackCase):
 
 
 class ScriptTests(SeedPackCase):
+    def test_validate_checks_package_without_opening_a_database(self):
+        pack = self.root / "package.json"
+        pack.write_text(seed_pack.dump(self.seeded_source()), encoding="utf-8")
+        script = load_script("seed_pack")
+        with mock.patch.object(script, "open_readonly", side_effect=AssertionError("database must remain closed")):
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(script.main(["validate", "--pack", str(pack)]), 0)
+            self.assertTrue(json.loads(output.getvalue())["valid"])
+            pack.write_text('{"format":true}', encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()) as rejected:
+                self.assertEqual(script.main(["validate", "--pack", str(pack)]), 2)
+            self.assertFalse(json.loads(rejected.getvalue())["written"])
+
     def test_export_is_idempotent_and_import_is_dry_run_by_default(self):
         self.seeded_source()
         self.source.close()
@@ -359,7 +373,7 @@ class ScriptTests(SeedPackCase):
         self.assertTrue((self.root / "pre-seed.db").exists())
 
     def test_a_changed_export_that_keeps_the_version_is_refused(self):
-        """`seed-import:<版本>` 是导入的幂等键：同版本装新内容，导过旧内容的机器会当作已导过而跳过。"""
+        """版本与内容绑定，导出内容变化须推进版本。"""
         self.seeded_source()
         script = load_script("seed_pack")
         out, db = self.root / "seed" / "entities.json", str(self.root / "source.db")
@@ -388,7 +402,7 @@ class ScriptTests(SeedPackCase):
         source.close()
         with contextlib.redirect_stdout(io.StringIO()) as older:
             self.assertEqual(script.main(["export", "--db", db, "--version", VERSION, "--out", str(out)]), 2)
-        self.assertIn(f"不比文件里的 {VERSION}.1 新", json.loads(older.getvalue())["error"])
+        self.assertIn("需要更新的 version 与 revision", json.loads(older.getvalue())["error"])
         self.assertEqual(seed_pack.load(out)["version"], f"{VERSION}.1")
 
 

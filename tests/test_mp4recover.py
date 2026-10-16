@@ -142,6 +142,45 @@ class ReplaceOriginalTests(unittest.TestCase):
 
 
 class ToolLookupTests(unittest.TestCase):
+    def test_the_frozen_bundle_precedes_the_data_tools_and_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            executable = root / 'Peach.exe'
+            bundled = root / 'tools/untrunc' / f"untrunc{'.exe' if os.name == 'nt' else ''}"
+            bundled.parent.mkdir(parents=True)
+            bundled.touch()
+            tools = root / 'data/tools'
+            managed = tools / 'untrunc' / bundled.name
+            managed.parent.mkdir(parents=True)
+            managed.touch()
+            with mock.patch.dict(os.environ, {mp4recover.UNTRUNC_ENV: ''}), \
+                    mock.patch.object(mp4recover.sys, 'frozen', True, create=True), \
+                    mock.patch.object(mp4recover.sys, 'executable', str(executable)), \
+                    mock.patch.object(mp4recover.shutil, 'which', return_value=None) as which:
+                self.assertEqual(mp4recover.untrunc_path(tools), bundled)
+            which.assert_not_called()
+
+    def test_an_explicit_binary_precedes_the_frozen_bundle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            custom = root / 'custom-untrunc.exe'
+            custom.touch()
+            with mock.patch.dict(os.environ, {mp4recover.UNTRUNC_ENV: str(custom)}), \
+                    mock.patch.object(mp4recover.sys, 'frozen', True, create=True):
+                self.assertEqual(mp4recover.untrunc_path(root / 'data/tools'), custom)
+
+    def test_a_missing_bundled_binary_uses_data_tools(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            tools = root / 'data/tools'
+            managed = tools / 'untrunc' / f"untrunc{'.exe' if os.name == 'nt' else ''}"
+            managed.parent.mkdir(parents=True)
+            managed.touch()
+            with mock.patch.dict(os.environ, {mp4recover.UNTRUNC_ENV: ''}), \
+                    mock.patch.object(mp4recover.sys, 'frozen', True, create=True), \
+                    mock.patch.object(mp4recover.sys, 'executable', str(root / 'Peach.exe')):
+                self.assertEqual(mp4recover.untrunc_path(tools), managed)
+
     def test_the_managed_copy_under_tools_is_found(self):
         with tempfile.TemporaryDirectory() as directory:
             tools = Path(directory)

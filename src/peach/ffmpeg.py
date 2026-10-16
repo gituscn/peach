@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,7 +14,7 @@ class BinaryChoice:
 
 
 class FFmpegResolver:
-    """Resolve explicit, Peach-managed, or PATH binaries without backend coupling."""
+    """按显式配置、随包工具、数据目录与 PATH 查找媒体工具。"""
 
     def __init__(self, managed_root: Path):
         self.managed_root = managed_root
@@ -31,6 +32,11 @@ class FFmpegResolver:
             path = Path(configured).expanduser()
             if path.is_file():
                 return BinaryChoice(path.resolve(), "environment")
+
+        if getattr(sys, "frozen", False):
+            bundled = Path(sys.executable).parent / "tools" / "ffmpeg" / "bin" / f"{executable}{suffix}"
+            if bundled.is_file():
+                return BinaryChoice(bundled.resolve(), "peach-bundled")
 
         managed = self.managed_root / "bin" / f"{executable}{suffix}"
         if managed.is_file():

@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from peach import followups as followups_module
-from peach import seed_followup, seed_pack
+from peach import seed_followup, seed_pack, seed_validation
 from peach import task_runs as task_runs_module
 from peach.avatar_followup import TASK_KEY as AVATAR_TASK_KEY
 from peach.avatar_followup import followup_key, parse_key, plan
@@ -1379,7 +1379,7 @@ class ProcessLibraryTests(LedgerTestCase):
     @windows_ledger_roots
     def test_a_scrape_declares_dispatches_and_runs_its_avatar_followups(self):
         _media, config = self.sample()
-        self.seed()
+        seed = seed_pack.load(self.seed())
         with mock.patch('peach.library_processing._generate_previews', return_value=0):
             result = process_library(config, self.db, self.root / 'generated',
                                      self.root / 'covers',
@@ -1394,7 +1394,7 @@ class ProcessLibraryTests(LedgerTestCase):
         # 补头像、补别名、补女优资料各一条，实体身份就在 key 里。
         from peach import performer_alias_followup, performer_profile_followup
         self.assertEqual([item['key'] for item in result['followups']],
-                         [seed_followup.followup_key('2026-09-25'),
+                         [seed_followup.followup_key(seed['version'], seed_validation.digest(seed)),
                           followup_key('performer', entity_id),
                           performer_alias_followup.followup_key(entity_id),
                           performer_profile_followup.followup_key(entity_id)])

@@ -5,6 +5,7 @@ import argparse
 from contextlib import contextmanager
 import ctypes
 from ctypes import wintypes
+import hashlib
 import json
 import http.cookiejar
 import os
@@ -20,6 +21,62 @@ import urllib.error
 import urllib.request
 import urllib.parse
 import uuid
+
+
+def assert_bundled_media_tools(application: Path) -> None:
+    """在没有系统媒体工具的机器上验证随包转码、探测和抽帧。"""
+    tools = application / "tools" / "ffmpeg"
+    manifest = json.loads((tools / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["license"] == "GPL-3.0-or-later"
+    for name, expected in manifest["files"].items():
+        path = tools / name
+        assert path.resolve().is_relative_to(tools.resolve()), name
+        with path.open("rb") as stream:
+            assert hashlib.file_digest(stream, "sha256").hexdigest() == expected, name
+    untrunc_root = application / "tools/untrunc"
+    repair_manifest = json.loads((untrunc_root / "manifest.json").read_text(encoding="utf-8"))
+    assert repair_manifest["license"] == "GPL-2.0-or-later"
+    for name, expected in repair_manifest["files"].items():
+        path = untrunc_root / name
+        assert path.resolve().is_relative_to(untrunc_root.resolve()), name
+        with path.open("rb") as stream:
+            assert hashlib.file_digest(stream, "sha256").hexdigest() == expected, name
+    # resources 是冻结资源的一部分，首次扫描可读到随版本附带的种子。
+    seed = json.loads((application / "_internal/resources/seed/entities.json").read_text(encoding="utf-8"))
+    assert seed["version"] and seed["entities"], "随包种子缺失"
+    ffmpeg, ffprobe = tools / "bin/ffmpeg.exe", tools / "bin/ffprobe.exe"
+    with tempfile.TemporaryDirectory(prefix="peach-media-smoke-") as directory:
+        root = Path(directory).resolve()
+        video, image = root / "sample.mp4", root / "frame.jpg"
+        for command in (
+            [str(ffmpeg), "-v", "error", "-f", "lavfi", "-i", "testsrc2=s=64x64:r=5",
+             "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video)],
+            [str(ffmpeg), "-v", "error", "-i", str(video), "-frames:v", "1", str(image)],
+        ):
+            result = subprocess.run(command, capture_output=True, timeout=30)
+            assert result.returncode == 0, result.stderr.decode("utf-8", errors="replace")
+        result = subprocess.run([str(ffprobe), "-v", "error", "-show_streams", "-of", "json", str(video)],
+                                capture_output=True, text=True, encoding="utf-8", timeout=15, check=True)
+        assert json.loads(result.stdout)["streams"][0]["codec_name"] == "h264"
+        assert image.stat().st_size > 0
+        # 合成片的 moov 位于 mdat 之后；移掉索引后用同编码参数的完整片重建。
+        payload = video.read_bytes()
+        offset = 0
+        while offset + 8 <= len(payload):
+            size = int.from_bytes(payload[offset:offset + 4], "big")
+            assert size >= 8, "合成 MP4 盒子长度无效"
+            if payload[offset + 4:offset + 8] == b"moov":
+                break
+            offset += size
+        assert offset < len(payload), "合成 MP4 缺少 moov"
+        broken, repaired = root / "broken.mp4", root / "repaired.mp4"
+        broken.write_bytes(payload[:offset])
+        result = subprocess.run([str(untrunc_root / "untrunc.exe"), "-n", "-s", "-dst", str(repaired),
+                                 str(video), str(broken)], capture_output=True, timeout=30)
+        assert repaired.is_file(), result.stderr.decode("utf-8", errors="replace")
+        result = subprocess.run([str(ffprobe), "-v", "error", "-show_streams", "-of", "json", str(repaired)],
+                                capture_output=True, text=True, encoding="utf-8", timeout=15, check=True)
+        assert json.loads(result.stdout)["streams"][0]["codec_name"] == "h264"
 
 
 @contextmanager
@@ -293,6 +350,7 @@ def main() -> int:
     parser.add_argument("--evidence-dir", type=Path, default=Path("smoke-evidence"))
     args = parser.parse_args()
     executable = args.executable.resolve(strict=True)
+    assert_bundled_media_tools(executable.parent)
     evidence_dir = args.evidence_dir.resolve()
     smoke_tray(executable, evidence_dir)
     with smoke_directory(evidence_dir) as root:
@@ -340,6 +398,7 @@ def main() -> int:
                         assert response.status == 200, path
                 with opener.open(base + "/api/configuration", timeout=5) as response:
                     configuration = json.load(response)
+                assert not any(row["term"] in ("FFmpeg", "untrunc") for row in configuration["facts"]), configuration["facts"]
                 assert configuration['media_sources'][0]['location'] == '115'
                 assert_standalone_tunnel(configuration)
                 second = root / 'pikpak'
@@ -357,7 +416,7 @@ def main() -> int:
                 assert (data / "config.previous.toml").is_file()
                 assert (data / "state" / "configuration-reload.request").is_file()
                 print(json.dumps({"ok": True, "version": health.get("version"),
-                                  "checks": ["oobe", "migrations", "lan-bind", "mdns", "password-login", "unauthenticated-api", "pages", "island", "items", "clouddrive-configuration", "cloudflared-sidecar"]}))
+                                  "checks": ["oobe", "migrations", "lan-bind", "mdns", "password-login", "unauthenticated-api", "pages", "island", "items", "clouddrive-configuration", "cloudflared-sidecar", "bundled-media-tools", "seed-pack"]}))
             finally:
                 process.terminate()
                 process.wait(timeout=15)
