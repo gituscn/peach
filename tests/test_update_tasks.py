@@ -101,9 +101,10 @@ class UpdateTaskTests(unittest.TestCase):
             job.update(job_id, status='complete')
         state = job.start(work, recovery={'stage': 'previews'})
         thread = job.thread
-        token = update_tasks.reserve(self.db)
+        token = None
         try:
             self.assertTrue(entered.wait(5))
+            token = update_tasks.reserve(self.db)
             job.stop(timeout=0)
             self.assertEqual(self.store.get(state['run_id']).status, 'pending')
             update_tasks.release(self.db, token)
@@ -112,7 +113,8 @@ class UpdateTaskTests(unittest.TestCase):
         finally:
             release.set()
             thread.join(5)
-            update_tasks.release(self.db, token)
+            if token is not None:
+                update_tasks.release(self.db, token)
         self.assertFalse(thread.is_alive())
         self.assertEqual(job_recovery.resume(self.db, handler), ['library-processing'])
         job.thread.join(5)
