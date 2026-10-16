@@ -16,6 +16,7 @@ from .jav_cover_fetch import Unavailable, is_javdb_image
 
 FRONT_START = 0.468
 MIN_FACE_Y, MAX_FACE_Y = 0.05, 0.60
+FACE_ALGORITHM_VERSION = 'cover-face-v2'
 _INSTALL_LOCK = threading.RLock()
 
 
@@ -46,6 +47,20 @@ def metadata_snapshots(root: Path, code: str) -> list[tuple[str, dict]]:
     return found
 
 
+def _dominant_left_face(image, largest, faces, *, code, title):
+    """没有可辨书脊、左侧主脸明显大于右侧拼图时，保留整幅宣传画面。"""
+    height, width = image.shape[:2]
+    if not (jav_poster_crop.SLEEVE_RATIO_MIN <= width / height < jav_poster_crop.SLEEVE_RATIO_MAX):
+        return False
+    if largest is None or largest.cx >= FRONT_START or largest.score < .8 or largest.width < .075 or largest.height < .12:
+        return False
+    front = main_face([face for face in faces if face.cx >= FRONT_START])
+    if front and largest.width * largest.height < 2 * front.width * front.height:
+        return False
+    box = jav_poster_crop.front_panel_box(width, height, lambda: jav_poster_crop.column_gradient(image), code, title)
+    return box['method'] == jav_poster_crop.RATIO
+
+
 def face_record(image, detector, *, code: str, title: str = '') -> dict | None:
     """已解码的封面 → 页面取景记录；无法解码时不生成记录。
 
@@ -58,10 +73,12 @@ def face_record(image, detector, *, code: str, title: str = '') -> dict | None:
     height, width = image.shape[:2]
     ratio = width / height if height else 0
     faces = detector.detect(image)
-    largest = main_face([face for face in faces if MIN_FACE_Y <= face.cy <= MAX_FACE_Y])
+    portraits = [face for face in faces if MIN_FACE_Y <= face.cy <= MAX_FACE_Y]
+    largest = main_face(portraits)
     full_cover = jav_poster_crop.face_crosses_spine(width, height, {
         'cx': largest.cx, 'w': largest.width, 'h': largest.height,
-        'score': largest.score} if largest else None)
+        'score': largest.score} if largest else None) or _dominant_left_face(
+            image, largest, portraits, code=code, title=title)
     if (not full_cover and jav_poster_crop.crops_to_portrait(code, title)
             and (jav_poster_crop.SLEEVE_RATIO_MIN <= ratio < jav_poster_crop.SLEEVE_RATIO_MAX
                  or (jav_poster_crop.is_wide_sleeve_label(code, title)
@@ -70,7 +87,7 @@ def face_record(image, detector, *, code: str, title: str = '') -> dict | None:
     low, high = (0.0, 1.0) if jav_poster_crop.is_scene_cover(code, title) else (MIN_FACE_Y, MAX_FACE_Y)
     faces = [face for face in faces if low <= face.cy <= high]
     best = main_face(faces)
-    return {"ratio": round(ratio, 3), "px": [int(width), int(height)],
+    return {"version": FACE_ALGORITHM_VERSION, "ratio": round(ratio, 3), "px": [int(width), int(height)],
             **({'layout': 'still'} if full_cover or jav_poster_crop.is_scene_cover(code, title) else {}), "face": (
         {"cx": best.cx, "cy": best.cy, "w": best.width, "h": best.height,
          "score": best.score} if best else None)}
@@ -91,7 +108,7 @@ def _sidecars(code: str, payload: bytes, size: tuple[int, int], detector=None, e
     poster = jav_poster_crop.crop_record(
         code, size[0], size[1],
         (lambda: jav_poster_crop.column_gradient(image)) if image is not None else None,
-        title=title, face=(face or {}).get('face'),
+        title=title, face=(face or {}).get('face'), layout=(face or {}).get('layout', ''),
     )
     records = {jav_poster_crop.SIDECAR_SUFFIX: poster}
     if face is not None:

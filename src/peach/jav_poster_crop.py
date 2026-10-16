@@ -566,14 +566,15 @@ def _panel(width: int, height: int, start: int, method: str) -> dict:
 
 
 def crop_record(code: str | None, width: int, height: int,
-                gradient_source: GradientSource = None, *, title: str = '', face: dict | None = None) -> dict:
+                gradient_source: GradientSource = None, *, title: str = '', face: dict | None = None,
+                layout: str = '') -> dict:
     """可直接落盘的 sidecar 内容：算法版本、源图尺寸、框。
 
     番号形态先判：不该裁的图连梯度都不算，`gradient_source` 是惰性的就一次都不解码。
     """
     width, height = int(width or 0), int(height or 0)
     box = (front_panel_box(width, height, gradient_source, code, title)
-           if crops_to_portrait(code, title) and not face_crosses_spine(width, height, face)
+           if layout != 'still' and crops_to_portrait(code, title) and not face_crosses_spine(width, height, face)
            else _whole(width, height))
     return {"version": ALGORITHM_VERSION, "px": [width, height], "box": box,
             **({'title': title} if title else {})}

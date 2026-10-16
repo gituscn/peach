@@ -782,6 +782,31 @@ class BatchScriptTests(unittest.TestCase):
         self.assertEqual((proposed['box']['method'], layout), (NONE, 'still'))
         self.assertEqual(row['x0'], 0)
 
+    def test_audit_refreshes_legacy_front_only_faces_before_classifying_the_cover(self):
+        from peach.face_detect import Face
+        from peach.cover_artwork import FACE_ALGORITHM_VERSION
+        from unittest.mock import Mock
+        target = self.root / 'SPONE-001.jpg'
+        Image.new('RGB', (800, 600), 'gray').save(target)
+        target.with_suffix('.face.json').write_text(json.dumps({
+            'px': [800, 600], 'face': {'cx': .8, 'cy': .3, 'w': .06, 'h': .1, 'score': .9},
+        }), encoding='utf-8')
+        detector = Mock()
+        detector.detect.return_value = [Face(.555, .331, .257, .422, .918), Face(.8, .3, .06, .1, .9)]
+        row, proposed, face, layout = batch_script('audit_cover_artwork').inspect(target, self.root / 'metadata', detector=detector)
+        self.assertEqual((proposed['box']['method'], layout), (NONE, 'still'))
+        self.assertEqual((face['version'], face['face']['cx']), (FACE_ALGORITHM_VERSION, .555))
+        self.assertNotIn('stale_face', row['reasons'])
+
+    def test_face_cache_requires_current_algorithm_and_image_dimensions(self):
+        from peach.cover_artwork import FACE_ALGORITHM_VERSION
+        script = batch_script('detect_cover_faces')
+        target = self.cover.with_suffix('.face.json')
+        for version, size, expected in (('old', [800, 540], False),
+                (FACE_ALGORITHM_VERSION, [1, 1], False), (FACE_ALGORITHM_VERSION, [800, 540], True)):
+            target.write_text(json.dumps({'version': version, 'px': size}), encoding='utf-8')
+            self.assertEqual(script.current_face(self.cover), expected)
+
     def test_apply_writes_the_sidecar_and_leaves_the_image_untouched(self):
         self.assertEqual(self.run_script("--apply"), 0)
         record = json.loads(

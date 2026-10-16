@@ -60,6 +60,27 @@ class CoverArtworkTests(unittest.TestCase):
         self.assertEqual(face['layout'], 'still')
         self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
 
+    def test_dominant_left_portrait_without_a_spine_keeps_the_whole_picture(self):
+        detector = Detector()
+        with patch.object(detector, 'detect', return_value=[Face(.22, .3, .3, .4, .95), Face(.8, .3, .06, .1, .9)]):
+            cover_artwork.install_cover(self.target, 'MIDV-865', jpeg((80, 90, 100), (800, 600)),
+                                        (800, 600), detector=detector)
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertEqual((face['version'], face['layout'], face['face']['cx']),
+                         (cover_artwork.FACE_ALGORITHM_VERSION, 'still', .22))
+        self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
+
+    def test_a_clear_spine_keeps_the_front_portrait_despite_a_larger_back_portrait(self):
+        detector = Detector()
+        with patch.object(detector, 'detect', return_value=[Face(.22, .3, .3, .4, .95), Face(.8, .3, .06, .1, .9)]):
+            with patch.object(jav_poster_crop, 'front_panel_box', return_value={
+                    'x0': 420, 'y0': 0, 'x1': 800, 'y1': 600, 'method': 'fold'}):
+                cover_artwork.install_cover(self.target, 'ABW-232', jpeg((80, 90, 100), (800, 600)),
+                                            (800, 600), detector=detector)
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertNotIn('layout', face)
+        self.assertEqual(face['face']['cx'], .8)
+
     def test_full_photo_keeps_faces_on_the_left_but_sleeves_use_the_front(self):
         detector = Detector()
         with patch.object(detector, "detect", return_value=[Face(.22, .3, .1, .1, .95)]):

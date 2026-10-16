@@ -101,7 +101,8 @@ def run(args: argparse.Namespace) -> int:
         record = jav_poster_crop.crop_record(
             path.stem, width, height, jav_poster_crop.file_gradient(path),
             title=(jav_poster_crop.read_sidecar(path) or {}).get('title', ''),
-            face=face.get('face') if face.get('px') == [width, height] else None)
+            face=face.get('face') if face.get('px') == [width, height] else None,
+            layout=face.get('layout', '') if face.get('px') == [width, height] else '')
         method = record["box"]["method"]
         counts[method] += 1
         bucket = samples.setdefault(method, [])

@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 
 from PIL import Image
 from peach import jav_poster_crop as crop
-from peach.cover_artwork import metadata_snapshots
+from peach.cover_artwork import FACE_ALGORITHM_VERSION, metadata_snapshots, face_record as detect_face
 from peach.community_catalog import origin_of
 from peach.fsutil import atomic_write_text
 from peach.library_processing import _official_evidence
@@ -31,13 +31,20 @@ def snapshots(root, code):
     return metadata_snapshots(root, code)
 
 
-def inspect(path, metadata):
+def current_face(path, size, title, detector):
+    """按算法版本与源图尺寸核对缓存，需要时从整图重新检测。"""
+    record = read(path.with_suffix('.face.json'))
+    if detector is not None and (record.get('version') != FACE_ALGORITHM_VERSION or record.get('px') != list(size)):
+        from peach.face_detect import decode
+        return detect_face(decode(path.read_bytes()), detector, code=path.stem, title=title) or {}
+    return record
+
+
+def inspect(path, metadata, *, detector=None):
     from peach.library_processing import artwork_title
     with Image.open(path) as image:
         width, height = image.size
         image.verify()
-    face_record = read(path.with_suffix('.face.json'))
-    face = face_record.get('face') if face_record.get('px') == [width, height] else None
     saved = crop.read_sidecar(path) or {}
     evidence = read(path.with_suffix('.scraping.json'))
     known = snapshots(metadata, path.stem)
@@ -45,10 +52,12 @@ def inspect(path, metadata):
     title = artwork_title([*known, ('installed', {'title': previous_title, 'genres': [previous_title]})])
     if crop.is_vr_title(previous_title):
         title = previous_title
+    face_record = current_face(path, (width, height), title, detector)
+    face = face_record.get('face') if face_record.get('px') == [width, height] else None
     full = crop.face_crosses_spine(width, height, face)
     layout = 'still' if full or crop.is_scene_cover(path.stem, title) or face_record.get('layout') == 'still' else ''
     proposed = saved if crop.is_manual(saved) and crop.is_current(saved, width, height) else crop.crop_record(
-        path.stem, width, height, crop.file_gradient(path), title=title, face=face)
+        path.stem, width, height, crop.file_gradient(path), title=title, face=face, layout=layout)
     if layout == 'still' and not crop.is_manual(proposed):
         proposed['box'] = {'x0': 0, 'y0': 0, 'x1': width, 'y1': height, 'method': crop.NONE}
     origin = origin_of(str(evidence.get('source_url') or ''))
@@ -61,6 +70,8 @@ def inspect(path, metadata):
         reasons.append('low_resolution')
     if not crop.is_current(saved, width, height):
         reasons.append('stale_frame')
+    if face_record.get('version') != FACE_ALGORITHM_VERSION:
+        reasons.append('stale_face')
     if saved.get('box') != proposed.get('box'):
         reasons.append('crop_changed')
     if proposed['box']['method'] == crop.RATIO:
@@ -80,13 +91,18 @@ def main():
     parser.add_argument('--data-root', type=Path, required=True)
     parser.add_argument('--report', type=Path, required=True)
     parser.add_argument('--apply', action='store_true', help='备份并更新可重建的取景边车')
+    parser.add_argument('--refresh-faces', action='store_true', help='按当前人脸算法重算过期缓存')
     args = parser.parse_args()
     args.report.mkdir(parents=True, exist_ok=True)
     rows, errors = [], []
     covers = sorted((args.data_root / 'generated/covers').glob('*.jpg'))
+    detector = None
+    if args.refresh_faces:
+        from peach.face_detect import FaceDetector
+        detector = FaceDetector(allow_download=False)
     for index, path in enumerate(covers, 1):
         try:
-            row, poster, face, layout = inspect(path, args.data_root / 'sources/library-metadata')
+            row, poster, face, layout = inspect(path, args.data_root / 'sources/library-metadata', detector=detector)
             rows.append(row)
             if args.apply:
                 changes = {path.with_suffix('.poster.json'): poster}
