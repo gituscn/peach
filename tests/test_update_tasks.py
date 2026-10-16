@@ -92,6 +92,34 @@ class UpdateTaskTests(unittest.TestCase):
         self.assertEqual(self.store.recover_interrupted(), [])
         update_tasks.release(self.db, token)
 
+    def test_service_shutdown_during_installation_preserves_the_run_until_its_worker_exits(self):
+        entered, release = threading.Event(), threading.Event()
+        job = BackgroundJob('test', runs=self.store, task_key='library-processing')
+        def work(job_id):
+            entered.set()
+            release.wait(10)
+            job.update(job_id, status='complete')
+        state = job.start(work, recovery={'stage': 'previews'})
+        thread = job.thread
+        token = update_tasks.reserve(self.db)
+        try:
+            self.assertTrue(entered.wait(5))
+            job.stop(timeout=0)
+            self.assertEqual(self.store.get(state['run_id']).status, 'pending')
+            update_tasks.release(self.db, token)
+            handler = {'library-processing': lambda body: job.start(work, restart=True, recovery=body)}
+            self.assertEqual(job_recovery.resume(self.db, handler), [])
+        finally:
+            release.set()
+            thread.join(5)
+            update_tasks.release(self.db, token)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(job_recovery.resume(self.db, handler), ['library-processing'])
+        job.thread.join(5)
+        self.assertEqual(job.snapshot()['job_id'], state['job_id'])
+        self.assertEqual(job.snapshot()['run_id'], state['run_id'])
+        self.assertEqual(self.store.get(state['run_id']).status, 'succeeded')
+
     def test_another_service_cannot_replace_the_scope_already_waiting_for_installation(self):
         token = update_tasks.reserve(self.db)
         first = BackgroundJob('one', runs=self.store, task_key='library-processing')

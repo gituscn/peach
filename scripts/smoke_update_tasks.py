@@ -47,7 +47,6 @@ def main():
     with smoke_directory(args.evidence_dir.resolve()) as root:
         application = root / '中文 程序目录/Peach'
         old = (args.old_executable or executable).resolve(strict=True)
-        shutil.copytree(old.parent, application)
         target = application / 'Peach.exe'
         data, media = root / 'data', root / 'media'
         media.mkdir()
@@ -62,6 +61,14 @@ def main():
         process = None
         with log_path.open('wb') as log:
             try:
+                installer_command = None
+                if args.installer:
+                    installer_command = [str(args.installer.resolve()), '/VERYSILENT', '/SUPPRESSMSGBOXES',
+                        '/NORESTART', f'/DIR={application}']
+                    subprocess.run([*installer_command, f'/LOG={root / "initial-install.log"}'],
+                                   env=environment, timeout=240, check=True)
+                else:
+                    shutil.copytree(old.parent, application)
                 process = subprocess.Popen([*command, '--setup'], cwd=root, env=environment, stdout=log, stderr=log)
                 wait_health(opener, base, process, log_path)
                 complete_first_run(opener, base, media, port, 'update-task-smoke-password')
@@ -81,11 +88,9 @@ def main():
                 state = data / 'state/library-processing.json'
                 state.write_text(json.dumps({'job_id': 'interrupted-fixture', 'status': 'running',
                     'requested_stage': 'scan', 'last_progress_at': 1}), encoding='utf-8')
-                installer_command = None
-                if args.installer:
-                    installer_command = [str(args.installer.resolve()), '/VERYSILENT', '/SUPPRESSMSGBOXES',
-                        '/NORESTART', f'/DIR={application}', f'/LOG={root / "install.log"}']
-                    subprocess.run(installer_command, env=environment, timeout=240, check=True)
+                if installer_command:
+                    subprocess.run([*installer_command, f'/LOG={root / "install.log"}'],
+                                   env=environment, timeout=240, check=True)
                 else:
                     error = root / 'preflight-error.txt'
                     helper = subprocess.run([str(executable), '--installer-prepare', str(application),
