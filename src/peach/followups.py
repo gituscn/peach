@@ -146,6 +146,7 @@ class FollowupRunner:
         self._lock = threading.Lock()
         self._threads: dict[str, threading.Thread] = {}
         self._stopping = False
+        self._paused_for_update = False
 
     # -- 对外 --------------------------------------------------------------
 
@@ -184,6 +185,11 @@ class FollowupRunner:
             if thread.is_alive():
                 thread.join(timeout)
 
+    def resume_after_update(self) -> None:
+        if self._paused_for_update:
+            self._paused_for_update = False
+            self.wake()
+
     def drain(self) -> int:
         """在当前线程里把所有通道排着的后继跑完，返回跑了几条。
 
@@ -205,6 +211,10 @@ class FollowupRunner:
         while not self._stopping:
             run = self.store.claim_followup(keys)
             if run is None:
+                from .update_tasks import is_pausing
+                db = getattr(getattr(self.store, 'database', None), 'db_path', None)
+                if isinstance(db, Path) and is_pausing(db):
+                    self._paused_for_update = True
                 return
             self._execute(run)
 

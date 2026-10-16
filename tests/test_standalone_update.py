@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 import zipfile
 
 from peach import settings_file, standalone_update as update
+from support.ledger import fresh_ledger
 
 
 class StandaloneUpdateTests(unittest.TestCase):
@@ -61,6 +62,7 @@ class StandaloneUpdateTests(unittest.TestCase):
         with patch.object(update.settings_file, "load_config", return_value=selected), patch.object(
                 update.distribution, "standalone", return_value=True), patch.object(update.subprocess, "Popen") as launch:
             update.write({"helper": str(self.root / "helper")}, state="restarting")
+            launch.return_value.pid = os.getpid()
             update.poll(tray)
             self.assertEqual(launch.call_args.args[0][2], str(selected.directory("state") / "standalone-update.json"))
             self.assertEqual(launch.call_args.kwargs["env"]["PEACH_DATA_ROOT"], str(selected.data_root))
@@ -107,6 +109,19 @@ class StandaloneUpdateTests(unittest.TestCase):
         with patch.object(update.distribution, "standalone", return_value=False):
             with self.assertRaises(ValueError):
                 update.start()
+
+    def test_restart_accepts_running_tasks_and_requests_their_pause(self):
+        from peach.task_runs import TaskRunStore
+        fresh_ledger(self.database.parent)
+        store = TaskRunStore(self.database)
+        store.start('library-processing', trigger='scheduled')
+        update.write({}, state='ready', version='1.0.0')
+        with patch.object(update.distribution, 'standalone', return_value=True), patch.object(update.sys, 'platform', 'win32'):
+            self.assertEqual(update.request_restart()['state'], 'restarting')
+            self.assertTrue(update.update_tasks.is_pausing(self.database))
+            with self.assertRaisesRegex(ValueError, '安装更新'):
+                store.start('timeline-thumbnails', trigger='manual')
+            update.update_tasks.release(self.database, update.read()['task_token'])
 
     def test_download_prepares_verified_package_without_stopping_the_app(self):
         target = self.root / "installed"; target.mkdir()

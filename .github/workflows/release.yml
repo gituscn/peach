@@ -78,6 +78,7 @@ jobs:
           Compress-Archive -Path dist/Peach -DestinationPath 'release/Peach-${{ steps.version.outputs.version }}-windows-x64.zip'
           Copy-Item 'dist/Peach-${{ steps.version.outputs.version }}-windows-x64-setup.exe' release/
           Copy-Item scripts/smoke_desktop.py release/smoke_desktop.py
+          Copy-Item scripts/smoke_update_tasks.py release/smoke_update_tasks.py
           python scripts/changelog.py --notes '${{ steps.version.outputs.version }}' --to release/RELEASE_NOTES.md
           if ($LASTEXITCODE -ne 0) { throw 'CHANGELOG.md 缺这一版的一节，不发没有说明的版本' }
       - uses: actions/upload-artifact@v7
@@ -120,6 +121,11 @@ jobs:
           while ((Test-Path -LiteralPath $Installed) -and (Get-Date) -lt $Deadline) { Start-Sleep -Seconds 1 }
           if (Test-Path -LiteralPath $Installed) { throw '卸载后程序目录仍在' }
           if ((Test-Path -LiteralPath $Key) -or (Test-Path -LiteralPath $Menu)) { throw '卸载后仍留有登记项或开始菜单项' }
+      - name: 验证在途任务保护与覆盖安装后的恢复
+        shell: pwsh
+        run: |
+          python smoke_update_tasks.py candidate/Peach/Peach.exe --installer './Peach-${{ needs.windows.outputs.version }}-windows-x64-setup.exe' --apply
+          if ($LASTEXITCODE -ne 0) { throw '任务保护与恢复验收失败' }
       - name: 保留制品验收失败日志
         if: failure()
         uses: actions/upload-artifact@v7

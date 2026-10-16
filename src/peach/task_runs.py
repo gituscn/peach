@@ -267,6 +267,38 @@ class TaskRunStore:
     def start(self, task_key: str, *, trigger: str, mutex_key: str | None = None,
               conflict: str = "skip", total: int | None = None,
               label: str = "", pid: int | None = None) -> TaskRun | None:
+        from .update_tasks import admission
+        with admission(self.database.db_path):
+            from .job_recovery import current_run
+            resumed = self._resume(current_run.get(), task_key)
+            if resumed is not None:
+                return resumed
+            return self._start(task_key, trigger=trigger, mutex_key=mutex_key,
+                               conflict=conflict, total=total, label=label, pid=pid)
+
+    def suspend(self, run_id: int) -> None:
+        if not self.enabled:
+            return
+        with self.database.write_transaction(notify=False) as connection:
+            connection.execute(
+                "UPDATE task_run SET status='pending',pid=0,progress_label=?,result_summary=? "
+                "WHERE id=? AND status='running'",
+                ('等待安装完成后继续', json.dumps({'paused_for_update': True}), run_id))
+
+    def _resume(self, run_id, task_key):
+        if run_id is None or not self.enabled:
+            return None
+        with self.database.write_transaction(notify=False) as connection:
+            cursor = connection.execute(
+                "UPDATE task_run SET status='running',pid=?,host=?,heartbeat_at=?,result_summary='{}' "
+                "WHERE id=? AND task_key=? AND status='pending' "
+                "AND json_extract(result_summary,'$.paused_for_update')=1",
+                (os.getpid(), self.host, stamp(), run_id, task_key))
+        return self.get(run_id) if cursor.rowcount else None
+
+    def _start(self, task_key: str, *, trigger: str, mutex_key: str | None = None,
+               conflict: str = "skip", total: int | None = None,
+               label: str = "", pid: int | None = None) -> TaskRun | None:
         """开一轮。互斥冲突时按 `conflict` 处理，返回 None 或抛 `TaskRunConflict`。
 
         `conflict="skip"` 是定时触发的语义：本轮不跑，但要留下一条记录说明被谁挡了。
@@ -487,6 +519,14 @@ class TaskRunStore:
         return int(cursor.lastrowid)
 
     def claim_followup(self, task_keys) -> TaskRun | None:
+        from .update_tasks import admission, UpdateBusy
+        try:
+            with admission(self.database.db_path):
+                return self._claim_followup(task_keys)
+        except UpdateBusy:
+            return None
+
+    def _claim_followup(self, task_keys) -> TaskRun | None:
         """领走这几类里最早的一条待跑后继并标 `running`；没有就返回 None。
 
         `task_keys` 是调用方这条通道负责的任务种类。按 id 升序领：后继之间没有优先级
@@ -583,6 +623,11 @@ class TaskRunStore:
         for run in self.query(status="active", limit=1000):
             if run.followup:
                 continue
+            if run.status == 'pending' and run.result_summary.get('paused_for_update'):
+                from .job_recovery import read
+                recovery = read(self.database.db_path, run.task_key)
+                if recovery.get('status') == 'active' and recovery.get('run_id') == run.id:
+                    continue
             local = run.host == self.host
             alive = (local and run.pid is not None and run.pid != os.getpid()
                      and process_alive(run.pid))

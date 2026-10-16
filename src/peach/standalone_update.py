@@ -21,6 +21,7 @@ from filelock import FileLock, Timeout
 from . import __version__, desktop_installer, distribution, release_updates, settings_file
 from .fsutil import atomic_write_text
 from .windows_update import replace_with_retry
+from . import update_tasks
 
 ACTIVE = {"downloading", "verifying", "extracting", "preparing", "restarting", "installing"}
 MAX_ARCHIVE = 512 * 1024 * 1024
@@ -173,7 +174,13 @@ def request_restart() -> dict:
         data = read()
         if data.get("state") != "ready":
             raise ValueError("更新尚未准备完成")
-        write(data, state="restarting", progress=0, message="正在重启安装")
+        db = settings_file.load_config().directory("database") / "ledger.db"
+        token = update_tasks.reserve(db)
+        try:
+            write(data, state="restarting", task_token=token, progress=0, message="正在保存任务进度，随后重启安装")
+        except Exception:
+            update_tasks.release(db, token)
+            raise
     return public()
 
 
@@ -184,14 +191,22 @@ def poll(tray) -> None:
         return
     try:
         data = read()
+        db = settings_file.load_config().directory("database") / "ledger.db"
+        token = data.get("task_token") or update_tasks.reserve(db)
+        if not data.get("task_token"):
+            write(data, task_token=token)
+        update_tasks.wait_quiescent(db)
         helper = Path(data["helper"]) / "Peach.exe"
         environment = os.environ.copy()
         environment["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
         environment[settings_file.DATA_ROOT_ENV] = str(settings_file.load_config().data_root.resolve())
-        subprocess.Popen([str(helper), "--apply-standalone-update", str(state_path()), str(os.getpid())],
+        process = subprocess.Popen([str(helper), "--apply-standalone-update", str(state_path()), str(os.getpid())],
                          cwd=str(helper.parent), env=environment, creationflags=subprocess.CREATE_NO_WINDOW)
+        update_tasks.transfer(db, token, process.pid)
         tray.exit(reason="standalone-update")
     except Exception as exc:
+        if 'token' in locals():
+            update_tasks.release(db, token)
         write(read(), state="error", message=f"未能重启：{exc}")
     finally:
         tray._action_lock.release()
@@ -231,13 +246,10 @@ def restore_database(data: dict) -> None:
             raise RuntimeError("数据库恢复检查失败")
 
 
-def apply(manifest: Path, wait_pid: int) -> int:
-    """复制出来的助手等待原托盘正常退出，再在同一卷上切换两个目录。"""
-    from .windows_restart import process_alive, start_tray, find_tray_windows, post_stop
-    from .tray import configured_service_specs
-    from .settings_file import load_config
+def _transaction_paths(manifest: Path):
+    """只接受本机状态文件与同卷暂存目录，安装目标须为完整独立包。"""
     if manifest.resolve() != state_path().resolve():
-        return 2
+        raise ValueError('更新状态文件不匹配')
     data = read()
     target = Path(data["target"]).resolve()
     transaction = Path(data["transaction"]).resolve()
@@ -245,16 +257,41 @@ def apply(manifest: Path, wait_pid: int) -> int:
     if (transaction.parent != target.parent or transaction.name != f".{target.name}-update-{data['id']}"
             or stage != transaction / "stage" / "Peach" or state_path().resolve().is_relative_to(target)
             or not (target / "_internal" / "standalone.txt").is_file()):
+        raise ValueError('更新目录无效')
+    return data, target, transaction, stage
+
+
+def apply(manifest: Path, wait_pid: int) -> int:
+    """复制出来的助手等待原托盘正常退出，再在同一卷上切换两个目录。"""
+    from .windows_restart import process_alive, start_tray, find_tray_windows, post_stop
+    from .tray import configured_service_specs
+    from .settings_file import load_config
+    from . import job_recovery
+    try:
+        data, target, transaction, stage = _transaction_paths(manifest)
+    except ValueError:
         return 2
     backup = transaction / "backup"
     moved = False
     installed = False
+    db = load_config().directory("database") / "ledger.db"
+    token = data.get("task_token")
+    previous = job_recovery.legacy_library_request(db)
+    try:
+        if token:
+            update_tasks.transfer(db, token, os.getpid())
+        else:
+            token = update_tasks.reserve(db)
+    except Exception as exc:
+        write(data, state="error", progress=0, message=f"安装预检未通过，程序与数据库未更改：{exc}")
+        return 1
     try:
         deadline = time.monotonic() + 90
         while process_alive(wait_pid):
             if time.monotonic() > deadline:
                 raise TimeoutError("托盘尚未退出，安装已取消")
             time.sleep(.25)
+        job_recovery.import_legacy_library(db, previous)
         migrate_database(stage, data)
         write(data, state="installing", progress=20, message="正在保留旧版本")
         replace_with_retry(target, backup)
@@ -263,6 +300,7 @@ def apply(manifest: Path, wait_pid: int) -> int:
         replace_with_retry(stage, target)
         installed = True
         write(data, progress=80, message="正在启动新版本")
+        update_tasks.release(db, token)
         start_tray(target / "Peach.exe")
         deadline = time.monotonic() + 90
         specs = configured_service_specs(load_config())
@@ -293,6 +331,7 @@ def apply(manifest: Path, wait_pid: int) -> int:
                     replace_with_retry(target, transaction / "failed")
                 replace_with_retry(backup, target)
                 restore_database(data)
+                update_tasks.release(db, token)
                 start_tray(target / "Peach.exe")
                 message = f"更新失败，已恢复旧版本：{exc}"
             except Exception as rollback:
@@ -301,9 +340,14 @@ def apply(manifest: Path, wait_pid: int) -> int:
             message = f"更新未安装：{exc}"
             try:
                 restore_database(data)
+                if token:
+                    update_tasks.release(db, token)
                 if not process_alive(wait_pid):
                     start_tray(target / "Peach.exe")
             except Exception as rollback:
                 message = f"更新失败，数据库恢复未完成：{rollback}"
         write(data, state="error", progress=0, message=message)
         return 1
+    finally:
+        if token:
+            update_tasks.release(db, token)

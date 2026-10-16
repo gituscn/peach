@@ -500,11 +500,6 @@ def download_update(request: Request, _args=Depends(require_auth)):
 @router.post("/api/configuration/update-restart")
 def restart_update(request: Request, _args=Depends(require_auth)):
     local_only(request)
-    contract = request.app.state.web_contract
-    from .jobs import BackgroundJob
-    if any(isinstance(job, BackgroundJob) and (job.snapshot() or {}).get("status") == "running"
-           for job in vars(contract).values()):
-        raise HTTPException(409, "后台任务正在运行，请完成后重启安装。")
     try:
         return standalone_update.request_restart()
     except (ValueError, Timeout) as exc:

@@ -14,6 +14,10 @@ def _current(contract):
 
 def q_library_processing(contract, _args):
     state = decorate(_current(contract))
+    from .job_recovery import read
+    recovery = read(contract.db_path, 'library-processing')
+    if state.get('status') != 'running' and recovery.get('status') == 'blocked':
+        state.update(status='failed', error=f"任务未能自动恢复：{recovery.get('error') or '请重新发起任务'}")
     # 上一趟任务的状态文件里没有这个字段，而它那份完整清单还在磁盘上：按 job_id
     # 推出地址补回去，界面才有得可给。
     if state.get('issue_count') and state.get('job_id') and not state.get('issues_log'):
@@ -67,7 +71,7 @@ def _retry_ids(previous, body):
     return chosen
 
 
-def w_library_processing(contract, body):
+def w_library_processing(contract, body, *, resume=False):
     config = settings_file.active()
     if not config.configured or not config.locations:
         raise ValueError('请先添加媒体文件夹')
@@ -95,6 +99,7 @@ def w_library_processing(contract, body):
                 # 自动落库与页面写的是同一个 `LedgerDatabase`：进程内写锁在实例上，
                 # 另建一个就是在同一个进程里开第二条写入路径。
                 database=contract.database,
+                resume_state=previous if resume else None,
                 active=lambda: (contract.library_processing_job.snapshot() or {}).get('job_id') == job_id,
                 report=lambda state: contract.library_processing_job.update(job_id, **{
                     key: value for key, value in state.items() if key != 'job_id'}))
@@ -106,4 +111,6 @@ def w_library_processing(contract, body):
     labels = {ALL_STAGES: '准备处理', SCAN_STAGE: '准备扫描文件', COLLECT_STAGE: '准备采集资料',
               METADATA_STAGE: '准备采集资料', PREVIEWS_STAGE: '准备生成预览图'}
     return contract.library_processing_job.start(
-        work, restart=True, initial={'stage': labels[stage], 'requested_stage': stage})
+        work, restart=True, initial={'stage': labels[stage], 'requested_stage': stage},
+        recovery={'stage': stage, **({'asset_ids': asset_ids or retry_ids}
+                                    if asset_ids is not None or retry_ids is not None else {})})

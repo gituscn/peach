@@ -128,7 +128,7 @@ def start_scrape(contract, *, trigger: str = "manual") -> dict | None:
         contract.want_job.update(job_id, **result, status="complete", current=None,
                                  completed_at=time.time())
     try:
-        return contract.want_job.start(work, restart=True, trigger=trigger,
+        return contract.want_job.start(work, restart=True, trigger=trigger, recovery={},
                                        initial={"ok": True, "checked": 0, "total": 0, "current": None})
     except TaskRunConflict:
         # 另一个进程占着这把互斥键：登记已经落库，资料留给下一轮。

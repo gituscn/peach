@@ -164,7 +164,7 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 - React 设置分区用 `frontend/src/react/settings/section.tsx`：`Section` 给标题、卡片与表单外壳，`Footer`、`Note`、`ErrorText`、`FactList`、`Progress`、`Disclosure` 补齐 BoardUI 注册表没有的部分。`service-preferences.tsx` 组合缩略图与订阅采集参数，继续使用已有设置、关注计划和缩略图 API。`use-action.ts` 的 `useAction` 管提交互斥、卸载取消与原位错误，`busy-props.ts` 的 `busyProps` 写忙态；媒体文件夹行（`folder-rows.tsx`）与密码加确认两格（`password-pair.tsx`）由配置页与首启页共用；密码校验与服务端回执归各分区，不自动重试写入。口味读取、封面采集、amane 桥重建、关注检查与查找共用 `frontend/src/react/background-job.ts` 的 `useBackgroundJob`。
 - 增量列表用 `catalog-grid/catalog-grid-page.tsx` 的 `LoadMore`：请求互斥、失败留原位重试、卸载即停；目录、资料页照片墙与关注页注入读取和可用条件。首页页码在读取成功后推进，照片沿用随机种子，关注合并分组；显式页码用 `pagination.ts`。
 - 在图上框一块由 `frontend/src/crop-geometry.ts`（纯算术）加 `react/crop/crop-frame.tsx`（四块压暗、一个可拖可缩的框）承担，换头像与裁封面共用；坐标一律是源图像素、右下开区间。不引 `react-image-crop`：换到的只有把手样式，代价是一条依赖和它自己的坐标约定。裁封面通过 Application 的媒体域动作连接 React 裁剪组件（ADR-0031）。
-- 后台任务用 `watchJob`、`followJobProgress` 默认面板与 `jobActivityHtml` 的真实计数／未知总量显示，关注、来源扫描、链接检查和扫描采集共用；业务保留启动、终态回执和结果面板，不新增轮询循环。任务本体是 `jobs.BackgroundJob`，不加队列或调度依赖；状态在服务进程，浏览器由 `frontend/src/jobs.ts` 跟进、刷新后经读接口恢复，服务重启不重放；`BackgroundJob.update(job_id)` 报阶段与计数，查询不重新执行任务。
+- 后台任务用 `watchJob`、`followJobProgress` 默认面板与 `jobActivityHtml` 的真实计数／未知总量显示，关注、来源扫描、链接检查和扫描采集共用；业务保留启动、终态回执和结果面板，不新增轮询循环。任务本体是 `jobs.BackgroundJob`，不加队列或调度依赖；浏览器由 `frontend/src/jobs.ts` 跟进，刷新后经读接口恢复。可恢复的采集任务由本机恢复记录重放，其他任务只保留终态；`BackgroundJob.update(job_id)` 报阶段与计数，查询不重新执行任务。
 - 遗留层反馈控件 `noteHtml`、`progressHtml`、`gaugeHtml`、`projectBannerHtml` 与 `wireContextCard` 集中在共享 UI 模块；信息卡片用原生 Popover 与现有锚定菜单定位，不加浮层依赖。证据见 `reference-snapshots/vercel-geist-note-progress-switch-analytics.md`。
 - 资源核对复用 `web_resource_sync` 的目录枚举、离线跳过、写前逐条复验与 BackgroundJob，覆盖 local、115、PikPak；失效记录的永久删除复用 `web_batch.purge_assets`，文件仍在盘上的行进 `blocked`。确认弹层复用 Fieldset、Note、Toast 与 confirmModal：失败留在弹层，危险动作初始聚焦取消，忙态阻止重入与关闭；不引入另一套对话框库。
 - 新界面走 BoardUI／React（ADR-0031），遗留层共用的 Geist 控件随页面迁走，不引入 Geist React 运行时。覆盖式滚动条 `attachOverlayScrollbar`（滑块不占宽度）、Collapse 的 `wireCollapse`／`setCollapseOpen`、Geist Select 的 `selectFieldHtml`／`wireSelectField`、来源站标 `MEDIA_SOURCE_ICONS`，以及模板、骨架、确认框等其余共用控件的唯一实现在 `frontend/src/ui-kit/`，Application 与 React 页面直接引用共享源码，随 `/dist/peach-app.js` 发出一份；独立页面包只打入用到的控件；覆盖式滚动条与 `.ui-geist-scroller`（只给两端渐隐）可叠加；整页异步重绘复用导航代际隔离。
@@ -187,6 +187,10 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 缺预览提示复用 `cardArtwork` 的可用性判据，目录、实体作品区与详情共用 `LibraryCompletionPrompt` 和 `ProcessingActions`。`/api/library-processing` 的 `collect` 阶段补资料与本地预览，`previews` 仅生成本地九宫格，`metadata` 仅采集资料；可选 `asset_ids` 限定已存在影片，空数组拒绝，全库扫描不用于定向处理。九宫格复用 `frame_capture`、FFmpegResolver 和 `/poster`，本地阶段先于外部查询执行，沿用任务日志和失败重试；不增加依赖。浏览器回归使用临时演示库和拦截响应验证默认动作、下拉、焦点归还及完成后的卡面更新。
 
 ## 独立测试包在线更新
+
+- 任务起跑与安装预约复用已固定的 filelock 4.1.1（MIT，Windows/macOS/Linux，无额外依赖）和原子 JSON。`update_tasks` 在同一数据目录内串行登记任务和预约安装，覆盖各服务进程、任务中心、后继领取和 `job_main` 批处理。安装请求触发采集任务在检查点保存并暂停，任务中心保留 `pending` 行；新采集请求进入等待。安装入口等在途步骤保存进度，随后停止自己的服务，不要求用户等待整轮任务结束。源码批处理保留 PID 锁，写完在途批次后等待安装，结束后由原进程继续。
+- 安装器在临时目录展开随包运行时，以 `--installer-prepare` 承接馆藏处理状态并暂停任务；预约归安装器持有，完成或取消时释放。在线更新将预约交给更新助手，切换目录和迁移完成后释放，失败回滚也释放。恢复轮询复用 APScheduler，安装取消时现有服务也会接回任务。不采用新任务队列或更新框架：任务语义、PyInstaller 目录切换和 Inno Setup 生命周期继续由已有实现承担。
+- `job_recovery` 保存馆藏处理范围、阶段、指定影片、时间轴密度、单部封面、关注、订阅和想要资料的请求；服务启动或安装结束后只领取未完成记录。暂停任务复用任务中心的同一行，已完成、失败和主动停止的任务不循环重试。馆藏预览在产物登记后保存影片检查点，元数据检查点跟随候选 CSV 成功落盘；未取得结果的项目不记完成。时间轴复用已有索引判定。恢复领取和新任务起跑共用安装闸门，数据仍留在本机 state 目录，不引入 ledger 迁移。
 
 - 自动更新设置用 APScheduler（见「必须复用」表的定时轮询）、共享 HTTPX 发行查询、filelock 与原子 JSON 写入，安装走 `standalone_update`。按 [interval trigger](https://apscheduler.readthedocs.io/en/3.x/modules/triggers/interval.html) 每分钟查是否到期，本机持久时间与文件锁协调多个服务；关闭、6/24/168 小时间隔与源码下载限制归 Peach。默认关闭，下载只准备安装，重启仍需确认；设置存 state 目录的 `automatic-updates.json`。
 - 版本与资产信息用 GitHub Releases REST API（测试通道含预发布），查询与流式下载用项目 HTTPX，ZIP 解压用标准库，互斥用 FileLock。真实 Release 只读验过：只有已上传完整独立包的发布才进更新，查询不下载也不安装。

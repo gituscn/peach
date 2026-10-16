@@ -654,7 +654,7 @@ def decorate(state, *, now=None):
                                        path=str(row.get('path') or ''), message=str(row.get('message') or ''))
                                   for row in legacy[:ISSUE_PREVIEW_LIMIT]]
         state['issues_truncated'] = len(legacy) > ISSUE_PREVIEW_LIMIT
-    if state.get('status') != 'running':
+    if state.get('status') != 'running' or state.get('waiting_for_update'):
         return state
     now = time.time() if now is None else now
     started = state.get('current_started_at') or state.get('last_progress_at') or state.get('started_at')
@@ -1753,7 +1753,8 @@ def _generate_preview(config, row, database, resolver, *, progress):
     return bool(result.rowcount)
 
 
-def _generate_previews(config, rows, database, *, update, issue, guard):
+def _generate_previews(config, rows, database, *, update, issue, guard,
+                       completed=(), checkpoint=lambda row: None):
     """只读本机视频；来源失败与抽帧失败各自保留可重试项目。"""
     if database is None:
         return 0
@@ -1761,6 +1762,8 @@ def _generate_previews(config, rows, database, *, update, issue, guard):
     resolver = FFmpegResolver(config.directory('tools') / 'ffmpeg')
     made = 0
     for index, row in enumerate(rows):
+        if _checkpoint_key(row) in completed:
+            continue
         def progress(row=row, index=index, made=made):
             guard.check()
             update(stage='生成预览图', checked=index, total=len(rows), previews=made,
@@ -1770,6 +1773,7 @@ def _generate_previews(config, rows, database, *, update, issue, guard):
         progress()
         try:
             made += int(_generate_preview(config, row, database, resolver, progress=progress))
+            checkpoint(row)
         except InterruptedError:
             raise
         except (OSError, ValueError, subprocess.SubprocessError) as error:
@@ -1782,10 +1786,51 @@ def _generate_previews(config, rows, database, *, update, issue, guard):
     return made
 
 
+def _checkpoint_key(row):
+    return f"{row['id']}:{row['path']}"
+
+
+class _LibraryCheckpoints:
+    """只有预览登记或候选落盘成功才提交影片检查点。"""
+
+    def __init__(self, state, previous, database):
+        previous = previous or {}
+        self.state = state
+        self.completed = {phase: set(previous.get(phase) or [])
+                          for phase in ('completed_previews', 'completed_metadata')}
+        self.pending_metadata = set()
+        self.entity_watermark = previous.get('entity_watermark')
+        if self.entity_watermark is None:
+            self.entity_watermark = _entity_watermark(database)
+        state['entity_watermark'] = self.entity_watermark
+        for phase, keys in self.completed.items():
+            state[phase] = sorted(keys)
+
+    def mark(self, phase, row, flush):
+        self.completed[phase].add(_checkpoint_key(row))
+        self.state[phase] = sorted(self.completed[phase])
+        flush(force=True)
+
+    def queue_metadata(self, row, entries, issues_before):
+        if entries and self.state['issue_count'] == issues_before:
+            self.pending_metadata.add(_checkpoint_key(row))
+
+    def commit_metadata(self, flush):
+        self.completed['completed_metadata'].update(self.pending_metadata)
+        self.pending_metadata.clear()
+        self.state['completed_metadata'] = sorted(self.completed['completed_metadata'])
+        flush(force=True)
+
+    def remaining_metadata(self, rows):
+        return ((index, row) for index, row in enumerate(rows)
+                if _checkpoint_key(row) not in self.completed['completed_metadata'])
+
+
 def process_library(config, db_path, candidate_root, cover_root, *, location='configured',
                     report=lambda state: None, provider_factory=None, job_id=None,
                     retry_ids=None, active=lambda: True, stage=ALL_STAGES,
-                    database=None, route_overrides=None, state_file=None, asset_ids=None):
+                    database=None, route_overrides=None, state_file=None, asset_ids=None,
+                    resume_state=None):
     """登记文件与确定的番号，外部资料保留为可复核候选。
 
     `retry_ids` 为 `None` 时处理整个馆藏；给定时只处理这些项目（上一任务记录的
@@ -1817,7 +1862,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
     targeted = retrying or selected_ids is not None
     chosen_ids = selected_ids if selected_ids is not None else list(dict.fromkeys(map(int, retry_ids or [])))
     scope_ids = chosen_ids if targeted else None
-    with FileLock(str(state_path(config)) + '.lock', timeout=0):
+    from .update_tasks import activity
+    with activity(Path(db_path), 'library-processing'), FileLock(str(state_path(config)) + '.lock', timeout=0):
         state = dict(job_id=job_id or uuid.uuid4().hex, status='running',
                      stage='读取本地资料' if retrying else '扫描文件',
                      checked=0, total=0, scanned=0, probed=0, identified=0, candidates=0, covers=0, previews=0,
@@ -1830,7 +1876,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                      followups=[],
                      started_at=time.time(), error='')
         # 实体表的水位在开工前记一次：比它大的实体就是这一轮建出来的（`_entity_followups`）。
-        entity_watermark = _entity_watermark(database)
+        checkpoints = _LibraryCheckpoints(state, resume_state, database)
+        entity_watermark = checkpoints.entity_watermark
         # 每行这一轮换上了几张封面，`(asset_id, 张数)`：换上了的作品，女优可能截得出更清楚的脸。
         covered = []
         log_path = _processing_issue_log(config, path, state['job_id'], state_file is not None)
@@ -1896,7 +1943,9 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             rows, genre_decisions = _collection_rows(
                 db_path, locations=locations, online_roots=sources.online_roots, asset_ids=scope_ids)
             if stage in (ALL_STAGES, COLLECT_STAGE, PREVIEWS_STAGE):
-                _generate_previews(config, rows, database, update=update, issue=issue, guard=guard)
+                _generate_previews(config, rows, database, update=update, issue=issue, guard=guard,
+                                   completed=checkpoints.completed['completed_previews'],
+                                   checkpoint=lambda row: checkpoints.mark('completed_previews', row, flush_state))
             if stage == PREVIEWS_STAGE:
                 update(status='failed' if state['issue_count'] else 'complete', stage='处理结束',
                        completed_at=time.time(), error=issue_summary(state['issue_count'], state['paused_count']))
@@ -1914,9 +1963,11 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                     write_rows(output, FIELDS, groups.values(), atomic=True)
                     csv_dirty = False
                     csv_written_at = time.monotonic()
+                    checkpoints.commit_metadata(flush_state)
 
-            for index, row in enumerate(rows):
+            for index, row in checkpoints.remaining_metadata(rows):
                 guard.check()
+                issues_before = state['issue_count']
                 update(stage='读取本地资料', checked=index, total=len(rows),
                        current_asset_id=row['id'], current_asset_name=Path(str(row['name'] or '')).name,
                        current_action='reading_local', current_started_at=time.time(),
@@ -1931,6 +1982,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                     update(checked=index + 1, candidates=len(scoped_groups()),
                            current_asset_id=None, current_asset_name='', current_action='',
                            current_started_at=None, current_deadline_at=None)
+                    checkpoints.mark('completed_metadata', row, flush_state)
                     continue
                 video = translate_ledger_path(row['path'])
                 # 文件在不在看目录列表，不单独 stat：一部片一个文件夹的网盘上，那是每行一半的往返。
@@ -1998,6 +2050,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                                       local_fields)
                 if entries:
                     csv_dirty = True
+                checkpoints.queue_metadata(row, entries, issues_before)
                 flush_candidates()
                 update(checked=index + 1, candidates=len(scoped_groups()),
                        current_asset_id=None, current_asset_name='', current_action='',

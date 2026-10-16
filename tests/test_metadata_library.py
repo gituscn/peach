@@ -237,6 +237,7 @@ class LibraryNfoTests(unittest.TestCase):
         from peach.web_library_processing import q_library_processing
         from unittest.mock import patch
         contract = Mock()
+        contract.db_path = self.root / 'database/ledger.db'
         contract.library_processing_job.snapshot.return_value = {'status': 'running', 'job_id': 'one'}
         with patch('peach.web_library_processing.process_library') as worker:
             self.assertEqual(q_library_processing(contract, {})['job_id'], 'one')
@@ -1893,6 +1894,7 @@ class LibraryWatchdogTests(unittest.TestCase):
         state_path(config).write_text(json.dumps({'status': 'failed', 'job_id': 'old', 'issue_count': 1}),
                                       encoding='utf-8')
         contract = Mock()
+        contract.db_path = self.root / 'database/ledger.db'
         contract.library_processing_job.snapshot.return_value = None
         with patch('peach.web_library_processing.settings_file.active', return_value=config):
             self.assertEqual(q_library_processing(contract, {})['issues_log'], str(log))
@@ -2182,7 +2184,7 @@ class LibraryWatchdogTests(unittest.TestCase):
             cache_bust=lambda: None, database=Mock(),
             library_processing_job=SimpleNamespace(
                 snapshot=lambda: None,
-                start=lambda work, restart, initial: (work('job'), initial)[1],
+                start=lambda work, restart, initial, recovery: (work('job'), initial)[1],
                 update=lambda job_id, **values: None))
         media = self.root / 'media'
         media.mkdir()
@@ -2388,7 +2390,7 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
         previous = {'job_id': 'old', 'status': 'failed', 'requested_stage': 'previews',
                     'retryable_asset_ids': [1]}
         job = SimpleNamespace(snapshot=lambda: None, update=lambda *_args, **_kwargs: None,
-                              start=lambda work, restart, initial: (work('new'), initial)[1])
+                              start=lambda work, restart, initial, recovery: (work('new'), initial)[1])
         contract = SimpleNamespace(db_path=self.db, database=self.database,
                                    candidate_root=self.root / 'candidates', cover_root=self.root / 'covers',
                                    library_processing_job=job, cache_bust=lambda: None)
@@ -2404,6 +2406,33 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
             for selection in ([], None, [99], [True]):
                 with self.subTest(selection=selection), self.assertRaises(ValueError):
                     w_library_processing(contract, {'asset_ids': selection})
+
+    def test_preview_checkpoint_restarts_only_unfinished_movies(self):
+        from peach import library_processing
+        with self.database.write_transaction() as connection:
+            video = self.media / 'clip-5.mp4'
+            video.write_bytes(b'video')
+            connection.execute(
+                "INSERT INTO asset(id,location,path,name,medium,duration) VALUES(5,'local',?,?, 'video',30)",
+                (str(video), video.name))
+        seen = []
+        def capture(_config, row, _database, _resolver, *, progress):
+            seen.append(row['id'])
+            progress()
+            if row['id'] == 5:
+                raise InterruptedError('模拟服务退出')
+            return True
+        with patch.object(library_processing, '_generate_preview', side_effect=capture):
+            with self.assertRaises(InterruptedError):
+                self.run_processing(stage='previews', asset_ids=[1, 5])
+        saved = snapshot(self.config)
+        self.assertEqual(saved['completed_previews'], [f'1:{self.media / "clip-1.mp4"}'])
+        seen.clear()
+        with patch.object(library_processing, '_generate_preview',
+                          side_effect=lambda _c, row, *_a, **_k: seen.append(row['id']) or True):
+            result = self.run_processing(stage='previews', asset_ids=[1, 5], resume_state=saved)
+        self.assertEqual(seen, [5])
+        self.assertEqual(result['status'], 'complete')
 
     def test_real_local_video_produces_a_snapshot_and_card_poster(self):
         import subprocess

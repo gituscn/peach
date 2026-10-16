@@ -8,7 +8,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,6 +22,11 @@ class MeteredSourceDenied(JobPolicyError):
 
 
 class DiskSpaceDenied(JobPolicyError):
+    exit_code = 3
+
+
+class JobPaused(JobPolicyError):
+    """安装期间在任务检查点暂停，原参数保留用于恢复。"""
     exit_code = 3
 
 
@@ -112,12 +117,16 @@ class DiskGuard:
         self.minimum_gb = float(minimum_gb)
         self.interval_secs = float(interval_secs)
         self._next_check = 0.0
+        from .update_tasks import current_db
+        self._pause_db = current_db.get()
 
     def free_gb(self) -> float:
         return shutil.disk_usage(self.path).free / 1024**3
 
     def check(self, force: bool = False) -> float | None:
         """到期就复查；返回本次读到的可用 GiB，未到期返回 None。触线抛 DiskSpaceDenied。"""
+        from .update_tasks import check_pause
+        check_pause(self._pause_db)
         now = time.monotonic()
         if not force and now < self._next_check:
             return None
@@ -286,6 +295,9 @@ class BackgroundJob:
         #: job_id → task_run id。结算读这一份而不是读状态：状态可能已经被下一轮顶掉，
         #: 而被顶掉的那一轮同样要有人给它收尾。
         self._run_ids: dict[str, int] = {}
+        self._activity_files: dict[str, Path] = {}
+        self._recoverable: set[str] = set()
+        self._paused_stops: set[str] = set()
         #: 摘 run id 与把那一行写成结束是同一件事：只摘不写完就放手的话，另一个线程
         #: 看见 id 没了以为已经收过尾，紧接着开的下一轮会撞上那一行还没释放的互斥键。
         self._close_lock = threading.Lock()
@@ -294,6 +306,10 @@ class BackgroundJob:
         """当前状态的深拷贝；一次都没跑过返回 None。"""
         with self.lock:
             return copy.deepcopy(self.state) if self.state is not None else None
+
+    def _database_path(self) -> Path | None:
+        value = getattr(getattr(self.runs, 'database', None), 'db_path', None)
+        return Path(value) if isinstance(value, (str, Path)) else None
 
     def update(self, job_id: str, **fields: object) -> bool:
         """状态仍属于 `job_id` 时改字段；已经被顶掉就什么都不做并返回 False。"""
@@ -313,6 +329,9 @@ class BackgroundJob:
         退出时把进度同步进 `task_run`，写库在锁外：那一步要拿数据库的写锁，套在本类
         的锁里面就多了一组取锁顺序，而进度本来不需要和状态原子。节流由 store 做。
         """
+        if job_id in self._recoverable:
+            from .update_tasks import check_pause
+            check_pause(self._database_path())
         with self.lock:
             state = self.state
             current = state if state is not None and state[self.id_key] == job_id else None
@@ -369,7 +388,36 @@ class BackgroundJob:
         return summary
 
     def start(self, fn: Callable[[str], None], *, initial: dict | None = None,
-              restart: bool = False, trigger: str = "manual") -> dict:
+              restart: bool = False, trigger: str = "manual", recovery: dict | None = None) -> dict:
+        from .update_tasks import admission, UpdateBusy
+        db = self._database_path()
+        try:
+            with admission(db) if db is not None else nullcontext():
+                return self._start(fn, initial=initial, restart=restart, trigger=trigger, recovery=recovery)
+        except UpdateBusy:
+            if db is None or recovery is None:
+                raise
+            return self._queue(recovery, initial)
+
+    def _queue(self, recovery, initial):
+        from .job_recovery import save, read
+        from .update_tasks import _mutex, state_for
+        db = self._database_path()
+        with _mutex(state_for(db)), self.lock:
+            if self.state is not None and self.state.get('status') == 'running':
+                return copy.deepcopy(self.state)
+            existing = read(db, self.task_key)
+            job_id = existing.get('job_id') if existing.get('status') == 'active' else uuid.uuid4().hex
+            if existing.get('status') != 'active':
+                save(db, self.task_key, job_id, recovery, waiting=True)
+            self.state = {self.id_key: job_id, 'status': 'running', 'run_id': None,
+                          **(initial or {}), 'waiting_for_update': True,
+                          'stage': '等待安装完成后继续', 'error': '',
+                          'message': '任务将在安装完成后自动继续。'}
+            return copy.deepcopy(self.state)
+
+    def _start(self, fn: Callable[[str], None], *, initial: dict | None = None,
+               restart: bool = False, trigger: str = "manual", recovery: dict | None = None) -> dict:
         """跑一轮，返回启动后（或原有）状态的深拷贝。
 
         已经在跑，或者已经有结果而调用方没要求 `restart`，都原样返回现状——重复点击
@@ -384,9 +432,12 @@ class BackgroundJob:
         job_id = ""
         with self.lock:
             state = self.state
+            if state is not None and state.get('waiting_for_update'):
+                state = None
             previous = state
             if state is None or (restart and state["status"] != "running"):
-                job_id = uuid.uuid4().hex
+                from .job_recovery import current_job_id
+                job_id = current_job_id.get() or uuid.uuid4().hex
                 state = {self.id_key: job_id, "status": "running", "run_id": None,
                          "started_at": time.time(), "error": "", **(initial or {})}
                 self.state = state
@@ -409,7 +460,18 @@ class BackgroundJob:
             self._settle_from(previous[self.id_key], previous, superseded=True)
         try:
             self._open_run(job_id, trigger, snapshot)
-        except TaskRunConflict:
+            if (db := self._database_path()) is not None:
+                from .update_tasks import register
+                self._activity_files[job_id] = register(db, self.task_key)
+                if recovery is not None:
+                    from .job_recovery import save
+                    save(db, self.task_key, job_id, recovery, run_id=self._run_ids.get(job_id))
+                    self._recoverable.add(job_id)
+        except Exception:
+            self._close_run(job_id, 'failed', error='任务未能启动')
+            activity = self._activity_files.pop(job_id, None)
+            if activity is not None:
+                activity.unlink(missing_ok=True)
             # 线程还没起，这一轮什么都没做过，撤干净再把冲突交出去。
             with self.lock:
                 if self.state is not None and self.state[self.id_key] == job_id:
@@ -442,7 +504,7 @@ class BackgroundJob:
             self.runs.finish(run_id, status, summary=summary, error=error)
         self.runs.prune(self.task_key)
 
-    def stop(self, timeout: float | None = 2.0) -> None:
+    def stop(self, timeout: float | None = 2.0, *, resume: bool = True) -> None:
         """丢掉状态并等线程收工，用于服务关停。
 
         线程是 daemon，本来也挡不住进程退出；清状态的意义是让在途的 worker 下一次
@@ -450,39 +512,96 @@ class BackgroundJob:
         往一个没人读的状态里写进度。等不到就不等——一次外部 HTTP 探测可以是十几秒，
         关停不该被它拖住。
 
-        在途那一轮在表里记成 `cancelled`：进程是有序退出的，不是被打断，下次启动的
-        租约恢复也就不该再把它算成一次故障。
+        安装暂停期间保留可恢复任务与原运行记录，线程退出后交回恢复入口。
+        普通关停的在途任务记成 `cancelled`，租约恢复不把有序退出计为故障。
         """
-        with self.lock:
-            state = self.state
-            job_id = state[self.id_key] if state is not None else ""
-            self.state = None
-            thread = self.thread
-            self.thread = None
-        if job_id and state is not None and state["status"] == "running":
-            self._close_run(job_id, "cancelled", error="服务关停，这一轮没有跑完")
+        from .update_tasks import _mutex, state_for
+        db = self._database_path()
+        with _mutex(state_for(db)) if db is not None else nullcontext():
+            if not resume and db is not None:
+                from .job_recovery import cancel
+                cancel(db, self.task_key)
+            with self.lock:
+                state = self.state
+                job_id = state[self.id_key] if state is not None else ""
+                self.state = None
+                thread = self.thread
+                self.thread = None
+            if job_id and state is not None and state["status"] == "running":
+                self._stop_run(job_id, resume=resume)
         if thread is not None and thread.is_alive():
             thread.join(timeout)
 
-    def start_result(self, fn: Callable[[], dict]) -> dict:
+    def _stop_run(self, job_id, *, resume):
+        if resume and job_id in self._recoverable:
+            from .job_recovery import read
+            if read(self._database_path(), self.task_key).get('pause_requested'):
+                self._paused_stops.add(job_id)
+                run_id = self._run_ids.pop(job_id, None)
+                if self.runs is not None and run_id is not None:
+                    self.runs.suspend(run_id)
+                return
+        self._close_run(job_id, 'cancelled', error='服务关停，这一轮没有跑完')
+
+    def start_result(self, fn: Callable[[], dict], *, recovery: dict | None = None) -> dict:
         """执行一次操作并保存终态回执；重复提交只返回进行中的同一任务。"""
         def work(job_id):
             result = fn()
             self.update(job_id, **result, status=(
                 "complete" if result.get("ok", True) else "failed"),
                 completed_at=time.time())
-        return self.start(work, restart=True)
+        return self.start(work, restart=True, recovery=recovery)
 
     def _run(self, fn: Callable[[str], None], job_id: str) -> None:
+        from .update_tasks import current_db
+        from .job_recovery import current_run, current_job_id
+        parent_run = current_run.set(None)
+        parent_job = current_job_id.set(None)
+        context = current_db.set(self._database_path() if job_id in self._recoverable else None)
         try:
+            from .update_tasks import check_pause
+            check_pause(current_db.get())
             fn(job_id)
+        except JobPaused:
+            with self.lock:
+                if self.state is not None and self.state.get(self.id_key) == job_id:
+                    self.state.update(waiting_for_update=True, stage='等待安装完成后继续', error='',
+                                      message='任务已暂停，安装完成后自动继续。')
         except Exception as error:   # 后台失败必须变成可轮询的状态，不能只留在日志里
             # 抛出来就是没跑完：途中声明过的后继作废，结算时一条都不派。
-            self.update(job_id, status="failed",
-                        error=f"{type(error).__name__}: {error}",
-                        followups=[], completed_at=time.time())
+            with self.lock:
+                if self.state is not None and self.state.get(self.id_key) == job_id:
+                    self.state.update(status='failed', error=f'{type(error).__name__}: {error}',
+                                      followups=[], completed_at=time.time())
         finally:
-            self._settle(job_id)
+            try:
+                self._finish_execution(job_id)
+            finally:
+                current_db.reset(context)
+                current_run.reset(parent_run)
+                current_job_id.reset(parent_job)
+
+    def _finish_execution(self, job_id):
+        from .update_tasks import _mutex, state_for
+        db = self._database_path()
+        with _mutex(state_for(db)) if db is not None else nullcontext():
+            try:
+                self._settle(job_id)
+                if job_id in self._paused_stops:
+                    from .job_recovery import waiting
+                    waiting(db, self.task_key, job_id)
+                state = self.snapshot() or {}
+                if (db is not None and job_id in self._recoverable
+                        and state.get(self.id_key) == job_id and not state.get('waiting_for_update')):
+                    from .job_recovery import finish
+                    finish(db, self.task_key, job_id,
+                           'failed' if state.get('status') == 'failed' else 'complete')
+            finally:
+                activity = self._activity_files.pop(job_id, None)
+                if activity is not None:
+                    activity.unlink(missing_ok=True)
+                self._recoverable.discard(job_id)
+                self._paused_stops.discard(job_id)
 
     def _settle(self, job_id: str) -> None:
         """按域自己落下的终态结算 `task_run`。
@@ -492,6 +611,13 @@ class BackgroundJob:
         把互斥键一起堵死到下次服务重启。
         """
         state = self.snapshot() or {}
+        if state.get(self.id_key) == job_id and state.get('waiting_for_update'):
+            from .job_recovery import waiting
+            run_id = self._run_ids.pop(job_id, None)
+            if self.runs is not None and run_id is not None:
+                self.runs.suspend(run_id)
+            waiting(self._database_path(), self.task_key, job_id)
+            return
         if state.get(self.id_key) != job_id:
             # 已经被 `start` 在顶替的那一刻收过尾了，这里再收一次是空操作。
             self._close_run(job_id, "cancelled", error="这一轮已被新的任务顶替")
@@ -561,9 +687,28 @@ def job_main(build_parser, run, argv: list[str] | None = None) -> int:
     约定；散成三份，下一个脚本照抄时漏掉锁或吞掉退出码都不会有人发现。
     """
     args = build_parser().parse_args(argv)
+    from .update_tasks import UpdateBusy
     try:
+        db = Path(getattr(args, 'db', Path(args.lock).resolve().parent / 'ledger.db'))
         with PidFileLock(args.lock):
-            return run(args)
+            return _run_batch_with_updates(db, Path(args.lock).stem, run, args)
     except JobPolicyError as exc:
         print(f"[stop] {exc}")
         return exc.exit_code
+    except UpdateBusy as exc:
+        print(f"[stop] {exc}")
+        return 3
+
+
+def _run_batch_with_updates(db, label, run, args):
+    from .update_tasks import activity, is_pausing, wait_for_installation, UpdateBusy
+    while True:
+        try:
+            with activity(db, label):
+                result = run(args)
+            if result == 0 or not is_pausing(db):
+                return result
+        except (JobPaused, UpdateBusy):
+            pass
+        print('[pause] 任务进度已保留，安装完成后自动继续。')
+        wait_for_installation(db)

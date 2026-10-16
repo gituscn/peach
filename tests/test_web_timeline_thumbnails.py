@@ -56,7 +56,7 @@ class ThumbnailJobEndpointTests(unittest.TestCase):
         made.parent.mkdir(parents=True)
         made.write_bytes(b"sheet")
         state = web_timeline_thumbnails.w_thumbnail_jobs(self.contract, {"mode": "off"})
-        self.contract.thumbnail_job.stop.assert_called_once_with()
+        self.contract.thumbnail_job.stop.assert_called_once_with(resume=False)
         self.assertEqual(state["mode"], "off")
         self.assertTrue(made.is_file())
 

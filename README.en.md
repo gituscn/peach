@@ -110,6 +110,8 @@ If you already have a library but see first-run setup, choose **使用已有数�
 
 Windows standalone builds can check for and download updates under **应用与维护** in Configuration. Confirm a restart to install a downloaded update. Automatic checks and downloads are off by default and can be enabled there.
 
+Downloading an update leaves tasks running. Installing an update saves progress and pauses scraping and preview generation; collection requests made during installation wait for it to finish. After installation finishes or is cancelled, a running Peach service resumes the tasks automatically. If Peach has exited, it resumes unfinished library metadata, local previews, timeline thumbnails and cover tasks on the next launch, reusing completed results. Turning thumbnail collection off explicitly keeps it stopped.
+
 The test package is not code-signed yet. If Windows says "Windows protected your PC", make sure the file came from this project's Releases, then choose "More info → Run anyway". Transcoding and thumbnails need FFmpeg; without it you can still browse and play MP4 and WebM. See [Windows test build](docs/TESTING_DESKTOP.md) for how to install it.
 
 On Windows, the tray runs independently. Closing the Codex, Claude, or terminal session that started it keeps Peach running. Peach attempts to recover after an unexpected tray exit, up to three times within five minutes. Choosing “Quit Peach” keeps it closed. Exit reasons and recovery results are recorded in `tray-lifecycle.log` in the logs folder.
