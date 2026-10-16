@@ -57,7 +57,8 @@ class NetworkChangeWatcherTests(unittest.TestCase):
 
         watcher = NetworkChangeWatcher(boom)
         self.addCleanup(watcher.stop)
-        with patch("peach.netwatch._libsystem", return_value=FakeLibSystem()):
+        with patch("peach.netwatch._libsystem", return_value=FakeLibSystem()), \
+                self.assertLogs("peach.netwatch", level="ERROR") as captured:
             watcher.start()
             os.write(notify_write, b"ping")
             for _ in range(20):
@@ -66,6 +67,8 @@ class NetworkChangeWatcherTests(unittest.TestCase):
                 time.sleep(0.01)
             self.assertEqual(calls, [1])
             self.assertTrue(watcher._thread.is_alive())
+            watcher.stop()
+        self.assertIn("RuntimeError: boom", "\n".join(captured.output))
 
     @unittest.skipIf(sys.platform == "darwin", "非 macOS 才走这条")
     def test_unsupported_platform_reports_itself(self):
