@@ -232,12 +232,17 @@ time.sleep(60)
                 assign_to_job(job, worker)
                 (root / "go").touch()
                 deadline = time.monotonic() + 15
-                while not (root / "child.json").exists() or not (root / "pids.json").exists():
-                    self.assertIsNone(worker.poll(), "worker 启动失败")
-                    self.assertLess(time.monotonic(), deadline, "独立启动未就绪")
-                    time.sleep(.05)
+                while True:
+                    try:
+                        pids = json.loads((root / "pids.json").read_text())
+                        payload = json.loads((root / "child.json").read_text(encoding="utf-8"))
+                        break
+                    except (FileNotFoundError, json.JSONDecodeError):
+                        self.assertIsNone(worker.poll(), "worker 启动失败")
+                        self.assertLess(time.monotonic(), deadline, "独立启动未就绪")
+                        time.sleep(.05)
                 kernel = tray_detached._kernel()
-                for pid in json.loads((root / "pids.json").read_text()):
+                for pid in pids:
                     handle = kernel.OpenProcess(0x00100000 | 0x1000 | 0x0001, False, pid)
                     self.assertTrue(handle)
                     handles.append(tray_detached.DetachedProcess(handle, pid))
@@ -251,7 +256,6 @@ time.sleep(60)
                 worker.wait(timeout=10)
                 control.wait(timeout=10)
                 self.assertIsNone(child.poll(), "独立托盘子进程必须存活")
-                payload = json.loads((root / "child.json").read_text(encoding="utf-8"))
                 self.assertEqual(payload[:2], [str(root), "测试 env"])
                 self.assertEqual(payload[2], '引号 " 和 \\ 路径')
                 self.assertEqual(payload[3:5], [sys.executable, sys.prefix])
