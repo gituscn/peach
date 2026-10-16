@@ -77,8 +77,9 @@ describe('首页文件夹浏览', () => {
         await page.getByRole('button', { name: '设置目录用途', exact: true }).click();
         await page.getByRole('dialog', { name: '设置目录用途', exact: true }).getByRole('button', { name: '移除规则', exact: true }).click();
         await page.getByRole('button', { name: '移除目录规则', exact: true }).click();
+        await page.getByRole('dialog', { name: '移除目录规则', exact: true }).waitFor({ state: 'hidden' });
         await page.getByRole('dialog', { name: '设置目录用途', exact: true }).waitFor({ state: 'hidden' });
-        await page.getByRole('button', { name: '退出文件夹浏览', exact: true }).click();
+        await page.getByRole('button', { name: '文件夹模式', exact: true }).click();
         await page.waitForFunction(() => !new URLSearchParams(location.search).has('browse'));
         assert.equal(await page.locator('#catalogFolderHeader').isVisible(), false);
         await page.goBack();

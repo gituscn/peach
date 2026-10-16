@@ -25,12 +25,16 @@ import type { CatalogGridProps, MediaCardLayout, MediaCardHelpers, MediaItem, Me
 import { VideoWall } from '../video-wall/video-wall';
 import { finiteWallFilters, wallHasCover } from '../video-wall/wall-layout';
 import { LibraryCompletionPrompt, missingPreviewIds } from '../library-processing/library-completion';
+import { useCatalogView } from './catalog-view';
+import { CatalogListPage } from './catalog-list-page';
 
 export function CatalogGridPage(props: CatalogGridProps) {
+  const view = useCatalogView();
   if (props.mode === 'items') return <ItemsGrid {...props} />;
   const key = props.mode === 'entity'
     ? `entity:${props.entityKey || ''}:${props.revision}`
     : `catalog:${catalogParams(props.filters || {}, !!props.excludeVertical)}:${props.batchSize || 60}:${props.revision}`;
+  if (view === 'list' && !props.wall) return <CatalogListPage key={key} {...props} />;
   return <GridBody key={key} {...props} />;
 }
 
@@ -156,7 +160,7 @@ function GridBody(props: CatalogGridProps) {
         <div data-media-sections="" data-select-mode={props.selectMode ? '' : undefined}>
           {splitSections(tiles, cuts).map((section) => (
             <Fragment key={section.start}>
-              <div data-media-grid="">{section.tiles.map(card)}</div>
+              <div data-media-grid="" data-catalog-view-mode="cards">{section.tiles.map(card)}</div>
               {section.strip ? <ShortsStrip cut={section.strip} props={props} onOpen={openShort} /> : null}
             </Fragment>
           ))}

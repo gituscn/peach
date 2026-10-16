@@ -521,7 +521,7 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
 .peach-react :is([data-variant="next"], [data-variant="short"]) [data-media-avatars] > :nth-child(n+3) { display: none; }
 
 .peach-react [data-media-text] { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 0; }
-/* 标题最多两行，署名紧随实际文本；元信息区保留统一高度。 */
+/* 标题最多两行，署名紧随实际文本；桌面元信息区保留统一高度。 */
 .peach-react [data-media-title] {
   display: -webkit-box;
   width: 100%;
@@ -815,6 +815,28 @@ body[data-surface="/trash"] .peach-react [data-media-tags] {
   border-radius: var(--surface-radius);
   background: var(--hover);
   box-shadow: 0 0 0 8px var(--hover);
+}
+
+/* 窄屏卡片按实际文字定高；图片继续按视口跳过绘制。 */
+@media (max-width: 760px) {
+  body .peach-react [data-media-card]:not([data-variant="next"]) [data-media-meta] {
+    min-height: 0;
+    content-visibility: visible;
+    contain-intrinsic-block-size: none;
+  }
+  body[data-density] .peach-react [data-media-card]:not([data-variant="next"]) [data-media-text],
+  body[data-surface="/trash"] .peach-react [data-media-text] {
+    display: flex; flex-direction: column; height: auto;
+  }
+  body[data-density] .peach-react [data-media-card]:not([data-variant="next"]) [data-media-title] {
+    display: -webkit-box; min-height: 0; white-space: normal; -webkit-line-clamp: 2;
+  }
+  body[data-density] .peach-react [data-media-card]:not([data-variant="next"]) [data-media-byline] {
+    flex-wrap: wrap; height: auto;
+  }
+  body[data-density] .peach-react [data-media-card]:not([data-variant="next"]) [data-media-tags] {
+    flex-wrap: wrap; height: auto;
+  }
 }
 .peach-react [data-load-more] {
   min-height: 42px;

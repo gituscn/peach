@@ -411,6 +411,28 @@ describe('首页筛选条', () => {
       }));
       assert.ok(moved.left > 0, '外层滚不动');
       assert.ok(moved.view < before.view - 100, '四枚视图没有跟着标签一起滚走');
+      const controls = page.locator(`${FILTER} [data-filter-row="bottom"]`);
+      const bottom = await controls.evaluate(element => {
+        const summary = element.querySelector('[data-catalog-summary]')!.getBoundingClientRect();
+        const sorts = element.querySelector('[data-entity-sorts]')!.getBoundingClientRect();
+        return { height: element.getBoundingClientRect().height, summary: summary.y + summary.height / 2,
+          sorts: sorts.y + sorts.height / 2, room: element.scrollWidth - element.clientWidth,
+          overflow: getComputedStyle(element).overflowX };
+      });
+      assert.ok(Math.abs(bottom.summary - bottom.sorts) < 2, JSON.stringify(bottom));
+      assert.ok(bottom.height <= 56 && bottom.room > 100 && bottom.overflow === 'auto', JSON.stringify(bottom));
+      await controls.evaluate(element => { element.scrollLeft = 300 });
+      assert.ok(await controls.evaluate(element => element.scrollLeft > 100));
+      for (const width of [430, 390, 760, 761, 390]) {
+        await page.setViewportSize({ width, height: 844 });
+        const glass = await page.locator(`${FILTER} [data-filter-glass]`).evaluate(async element => {
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          const style = getComputedStyle(element);
+          return { filter: style.backdropFilter, width: element.getBoundingClientRect().width,
+            viewport: document.documentElement.clientWidth };
+        });
+        assert.ok(glass.filter.includes('blur(') && glass.width < glass.viewport, JSON.stringify(glass));
+      }
       const measured = await layout(page);
       assert.deepEqual(measured.offenders, [], `筛选条把页面撑宽了：${measured.offenders.join('、')}`);
       assert.deepEqual(withoutPlayer(opened.problems), []);

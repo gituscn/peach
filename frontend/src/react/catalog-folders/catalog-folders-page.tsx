@@ -32,8 +32,9 @@ function FolderBrowseControl() {
   if (!isCatalogPath(address.pathname)) return null;
   const params = new URLSearchParams(address.search);
   const active = params.get('browse') === 'folders' || !!params.get('folder');
-  return <IconButton aria-label={active ? '退出文件夹浏览' : '按文件夹浏览'} aria-pressed={active}
-    size="small" icon={RiFolder3Line} onClick={() => actions?.navigate(folderHref(address,
+  return <IconButton size="small" data-folder-mode-toggle="" aria-label="文件夹模式" title="文件夹模式" aria-pressed={active}
+    icon={RiFolder3Line}
+    onClick={() => actions?.navigate(folderHref(address,
       active ? { browse: null, folder: null, folder_recursive: null } : { browse: 'folders' }))} />;
 }
 

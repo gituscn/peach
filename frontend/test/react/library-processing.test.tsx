@@ -211,12 +211,11 @@ it('失败时把问题清单折叠进错误提示，重试只交失败的那些�
   // 补上没做完的那些是这一趟的事，重新跑一整批是下一趟的事：页脚那颗留着，各答各的问题。
   expect(buttonNamed('扫描并补全资料', host)?.textContent).toBe('扫描并补全资料');
 
-  // 重试键是这条提示的主动作：和卡片一样摆在右边，不是正文底下一颗次级键。
+  // 重试键属于错误提示，问题清单收起时仍可操作。
   const retry = buttonNamed('重试未完成项')!;
   expect(retry.className).toContain('bg-button-primary');
-  const headline = alert!.firstElementChild!;
-  expect(headline.className).toContain('justify-between');
-  expect(headline.lastElementChild).toBe(retry);
+  expect(alert!.contains(retry)).toBe(true);
+  expect(details.contains(retry)).toBe(false);
 
   await click(retry);
   expect(served.posts()).toEqual([{ job_id: 'one', retry: [7, 8] }]);

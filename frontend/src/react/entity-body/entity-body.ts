@@ -75,7 +75,7 @@ export interface EntityBodyActions extends MediaCardActions {
 /** 从卡片网格原样递进去的那几样：版式、选择状态、缓存与骨架都是壳里同一份。 */
 type SharedGridProps = Pick<CatalogGridProps,
   'layout' | 'selectMode' | 'selected' | 'seekSeconds' | 'wireDrag' | 'skeletonHtml'
-  | 'groupCollapse' | 'canLoadMore'>;
+  | 'groupCollapse' | 'canLoadMore' | 'listScope'>;
 
 export interface EntityBodyProps extends SharedGridProps {
   kind: string;
@@ -89,7 +89,7 @@ export interface EntityBodyProps extends SharedGridProps {
   /** 作品列表的代次。壳每发起一次新的作品请求就加一，网格按它换键，骨架与续页都从头开始。 */
   revision: number;
   /** 续页。筛选与排序由壳在闭包里带着，和第一页同一套口径。 */
-  fetchPage(offset: number, signal: AbortSignal): Promise<MediaPage>;
+  fetchPage: NonNullable<CatalogGridProps['fetchPage']>;
   /** 照片视图这一屏；还没进过照片视图时是 `null`。 */
   photos: EntityPhotos | null;
   /** 照片墙的大小档与版式。开关画在筛选浮层与顶栏里，这里只读，标在墙的 `data-size`/`data-layout` 上。 */

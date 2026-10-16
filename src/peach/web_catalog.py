@@ -62,14 +62,15 @@ def attach_artwork_fields(contract: WebContract, item: dict) -> None:
 #: 每个方向都显式 `NULLS LAST`——升序时 SQLite 默认把 NULL 排在最前，
 #: 「时长最短」会先给出一整屏没有时长的条目。
 SORT_COLUMNS = {
+    "name": "a.name COLLATE NOCASE {d} NULLS LAST, a.id {d}",
     "new": "a.first_seen {d} NULLS LAST, a.id {d}",
     "release": "a.release_date {d} NULLS LAST, a.first_seen {d} NULLS LAST, a.id {d}",
-    "size": "a.size {d} NULLS LAST",
-    "dur": "a.duration {d} NULLS LAST",
-    "played": "a.last_played {d} NULLS LAST",
-    "rating": "a.rating {d} NULLS LAST, a.o_count {d} NULLS LAST",
-    "plays": "a.play_count {d} NULLS LAST, a.last_played {d} NULLS LAST",
-    "o": "a.o_count {d} NULLS LAST",
+    "size": "a.size {d} NULLS LAST, a.id {d}",
+    "dur": "a.duration {d} NULLS LAST, a.id {d}",
+    "played": "a.last_played {d} NULLS LAST, a.id {d}",
+    "rating": "a.rating {d} NULLS LAST, a.o_count {d} NULLS LAST, a.id {d}",
+    "plays": "a.play_count {d} NULLS LAST, a.last_played {d} NULLS LAST, a.id {d}",
+    "o": "a.o_count {d} NULLS LAST, a.id {d}",
 }
 
 #: 旧键沿用：地址栏和书签里存着把方向写进键名的值，认不出来它们会落到

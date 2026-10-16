@@ -55,6 +55,15 @@ describe('混排作品的画面框',()=>{
      assert.equal(frame.fit,'contain');
      assert.equal(frame.background,'rgb(0, 0, 0)');
     }
+    if(viewport.mobile)for(const density of ['roomy','dense']){
+     await page.evaluate(value=>{document.body.dataset.density=value},density);
+     const meta=await page.locator('#grid [data-media-card] [data-media-meta]').first().evaluate(node=>{
+      const box=node.getBoundingClientRect();
+      const content=Math.max(...[...node.children].map(child=>child.getBoundingClientRect().height));
+      return {height:box.height,content};
+     });
+     assert.ok(meta.height<=meta.content+17,JSON.stringify({density,...meta}));
+    }
     if(size==='small')for(const density of ['roomy','dense']){
      await page.evaluate(value=>{document.body.dataset.density=value},density);
      const row=await page.locator('#grid [data-mix-card]').evaluate(mix=>{

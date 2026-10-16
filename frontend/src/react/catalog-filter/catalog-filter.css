@@ -270,12 +270,6 @@
   white-space: nowrap;
 }
 .peach-react [data-catalog-summary] { display: flex; flex: none; align-items: center; gap: 12px; }
-@media (max-width: 760px) {
-  .peach-react [data-catalog-frame] > [data-filter-row="bottom"] { flex-wrap: wrap; }
-  .peach-react [data-catalog-frame] [data-entity-sorts] { width: 100%; margin-left: 0; }
-  .peach-react [data-catalog-summary] { max-width: 100%; }
-  .peach-react [data-catalog-summary] [data-catalog-readout] { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-}
 
 /* ── 空馆藏占位 ──
  * 说的是「这里将来会有东西」：形状同真头像与真标签，只铺 `--hover` 的面，不接指针，由容器裁到可用宽度。 */

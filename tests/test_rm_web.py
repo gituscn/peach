@@ -2038,6 +2038,28 @@ class WebDataTests(unittest.TestCase):
         bounded = rm_web.q_items(self.contract, {"limit": "-1", "offset": "-2", "seed": "1"})
         self.assertEqual([item["id"] for item in bounded["items"]], [1])
 
+    def test_named_items_sort_over_the_complete_filtered_result_with_stable_pages(self):
+        with self.contract.write_transaction() as connection:
+            connection.executemany(
+                "INSERT INTO asset(id,location,path,name,medium,duration) VALUES(?,'local',?,?,'video',10)",
+                [(400 + index, f"sort-{index}.mp4", name)
+                 for index, name in enumerate(["zebra.mp4", "Alpha.mp4", "alpha.mp4", "middle.mp4"])],
+            )
+        args = {"q": "mp4", "loc": "local", "sort": "name", "dir": "asc", "limit": "1"}
+        complete = rm_web.q_items(self.contract, {**args, "limit": "100"})
+        pages = [rm_web.q_items(self.contract, {**args, "offset": str(index)})
+                 for index in range(complete["total"])]
+        self.assertEqual([page["items"][0]["id"] for page in pages],
+                         [item["id"] for item in complete["items"]])
+        self.assertEqual([item["id"] for item in complete["items"] if item["id"] >= 400],
+                         [401, 402, 403, 400])
+        reverse = rm_web.q_items(self.contract, {**args, "limit": "100", "dir": "desc"})
+        self.assertEqual([item["id"] for item in reverse["items"]],
+                         list(reversed([item["id"] for item in complete["items"]])))
+        tied = rm_web.q_items(self.contract, {"q": "Alpha", "sort": "dur", "dir": "asc", "limit": "1"})
+        next_tied = rm_web.q_items(self.contract, {"q": "Alpha", "sort": "dur", "dir": "asc", "limit": "1", "offset": "1"})
+        self.assertEqual([tied["items"][0]["id"], next_tied["items"][0]["id"]], [401, 402])
+
     def test_sort_takes_a_direction_and_puts_missing_values_last_either_way(self):
         """方向是独立参数，升序也把空值排在最后。
 

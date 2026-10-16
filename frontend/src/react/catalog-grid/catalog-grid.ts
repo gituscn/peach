@@ -14,6 +14,7 @@ import { apiGet } from '../../api';
 import { javImageKind } from '../../jav-artwork';
 import type { CatalogGridProps, MediaItem, MediaPage } from './types';
 import { queryClient } from '../query';
+import { catalogView } from './catalog-view';
 
 /** 竖屏带一条放几张。 */
 export const SHORTS_BATCH = 18;
@@ -97,7 +98,7 @@ export function entityQuery(props: CatalogGridProps) {
 /** 首屏取数（目录网格那条路由的 `prefetch`）。只有目录要等：资料页的作品区第一页跟着资料页递进来，
  *  网格挂上时自己落进缓存（`initialData`）。 */
 export async function prefetchCatalogGrid(props: CatalogGridProps, signal: AbortSignal): Promise<void> {
-  if (props.mode !== 'catalog' || props.wall) return;
+  if (props.mode !== 'catalog' || props.wall || catalogView() === 'list') return;
   const query = catalogQuery(props);
   await queryClient.fetchInfiniteQuery({
     ...query, queryFn: ({ pageParam }) => query.queryFn({ pageParam: pageParam as number, signal }),
@@ -225,6 +226,10 @@ export function replaceCatalogItem(id: number, patch: Partial<MediaItem>): void 
 
 /** 同上，换的是 `match` 认出来的每一张：一个番号的几段、几个版本共用同一张封面。 */
 export function patchCatalogItems(match: (item: MediaItem) => boolean, patch: Partial<MediaItem>): void {
+  queryClient.setQueriesData<MediaPage>({ queryKey: ['catalog-grid', 'table'] }, data => {
+    if (!data?.items.some(match)) return data;
+    return { ...data, items: data.items.map(item => match(item) ? { ...item, ...patch } : item) };
+  });
   queryClient.setQueriesData<InfiniteData<GridPage>>({
     queryKey: ['catalog-grid'], predicate: (query) => Array.isArray((query.state.data as InfiniteData<GridPage>)?.pages),
   }, (data) => {

@@ -43,6 +43,16 @@ describe('缺预览时的统一补全入口', () => {
         const prompt = page.locator('[data-library-completion]');
         await prompt.waitFor();
         assert.match(await prompt.innerText(), /1 部暂无预览/);
+        const placement = await prompt.evaluate(element => {
+          const text = element.querySelector('p')!;
+          const link = text.querySelector('a')!;
+          const action = element.querySelector('[data-note-action]')!;
+          return { inline: link.parentElement === text, arrow: !!link.querySelector('svg'),
+            text: text.getBoundingClientRect().toJSON(), action: action.getBoundingClientRect().toJSON() };
+        });
+        assert.ok(placement.inline && placement.arrow, JSON.stringify(placement));
+        assert.ok(placement.action.top >= placement.text.bottom + 8, JSON.stringify(placement));
+        assert.ok(Math.abs(placement.action.left - placement.text.left) < 1, JSON.stringify(placement));
         await prompt.evaluate(element => { element.style.width = '320px' });
         const narrowText = await prompt.locator('p').boundingBox();
         assert.ok(narrowText && narrowText.width >= 280, '窄容器中的提示正文应独占一行宽度');

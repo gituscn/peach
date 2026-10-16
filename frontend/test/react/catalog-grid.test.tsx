@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MediaCard, cardRatio, type MediaCardVariant } from '../../src/react/components/media-card';
 import {
   MIX_SLOT, SHORTS_BATCH, arrangeTiles, catalogParams, collapseGroups, fetchCatalogPage, latestCatalogPages, mixSeed, nextOffset,
-  shortsBoundaries, shortsParams, type GridPage,
+  shortsBoundaries, shortsParams, replaceCatalogItem, type GridPage,
 } from '../../src/react/catalog-grid/catalog-grid';
 import type { MediaCardActions, MediaCardHelpers, MediaCardLayout, MediaItem } from '../../src/react/catalog-grid/types';
 
@@ -19,6 +19,21 @@ const item = (id: number, extra: Partial<MediaItem> = {}): MediaItem => ({ id, n
 const page = (items: MediaItem[], offset = 0, extra: Partial<GridPage> = {}): GridPage => ({ items, offset, ...extra });
 
 describe('目录取数', () => {
+  it('详情修改同步到卡片分页和表格页，同页其它作品保持原值', () => {
+    const cardKey = ['catalog-grid', 'catalog', 'cache-test', 0];
+    const tableKey = ['catalog-grid', 'table', 'cache-test', 0];
+    queryClient.setQueryData(cardKey, { pages: [page([item(100), item(101)], 0)], pageParams: [0] });
+    queryClient.setQueryData(tableKey, { items: [item(100), item(101)], total: 2 });
+    replaceCatalogItem(100, { feedback: 'seen', watch_later: true });
+    const cards = queryClient.getQueryData<{ pages: GridPage[] }>(cardKey)!.pages[0]!.items;
+    const rows = queryClient.getQueryData<{ items: MediaItem[] }>(tableKey)!.items;
+    for (const items of [cards, rows]) {
+      expect(items[0]).toMatchObject({ id: 100, feedback: 'seen', watch_later: true });
+      expect(items[1]!.feedback).toBeUndefined();
+    }
+    queryClient.removeQueries({ queryKey: cardKey });
+    queryClient.removeQueries({ queryKey: tableKey });
+  });
   it('刷新代次认领同一集合的完整分页，筛选不同不共用', () => {
     const old = { pages: [page([item(801)]), page([item(802)], 60)], pageParams: [0,60] };
     queryClient.setQueryData(['catalog-grid','catalog','q=wall-retain',1], old);

@@ -142,7 +142,7 @@ followState.followSkeletonHtml = (label='正在读取关注内容')=>`<div class
 $('#loadSentinel').innerHTML=loadingDotsHtml('继续载入中…');
 loadingState.setGridCards = html=>revealSkeleton($('#grid'),()=>{$('#grid').innerHTML=`<div class="grid">${html}</div>`});
 loadingState.gridCards = ()=>document.querySelectorAll(
-  ':is(#grid,#index [data-entity-grid]) [data-media-grid] > [data-media-card][data-id]');
+    ':is(#grid,#index [data-entity-grid]) :is([data-media-grid] > [data-media-card][data-id],[data-catalog-row][data-id])');
 loadingState.managementPlaceholder = path=>managementSkeletonHtml(path,{followLayout:followListLayout(),
   ...(({sort,dir,tab})=>({followSort:sort,followDir:dir,followTab:tab}))(followManageParams())});
 loadingState.wantsDiscoveryBars = ()=>$('#catalogFilter').style.display!=='none';

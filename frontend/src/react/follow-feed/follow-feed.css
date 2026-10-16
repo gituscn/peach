@@ -573,3 +573,10 @@ body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-follo
 .peach-react [data-follow-item] [data-media-tag][data-tag-cat="r34-metadata"] { --tag-color: #f5a24a; }
 .peach-react [data-follow-issue] { display: block; margin: 18px 0 8px; color: var(--drop); font-size: var(--fs-sm); line-height: 1.7; overflow-wrap: anywhere; }
 .peach-react [data-follow-state] { flex: 1 1 100%; color: var(--drop); font-size: var(--fs-xs); }
+@media (max-width: 760px) {
+  .peach-react [data-follow-list]:not([data-follow-wall]) [data-follow-item] [data-media-meta] {
+    min-height: 0; content-visibility: visible; contain-intrinsic-block-size: none;
+  }
+  body[data-density] .peach-react [data-follow-item] [data-follow-labels] { height: auto; }
+  .peach-react [data-follow-item] [data-follow-labels]:empty { display: none; }
+}

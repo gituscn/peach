@@ -133,7 +133,8 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
     : { ...props.layout, active: javPage }), [props.layout, javPage]);
   const opts = { jav: props.jav, seed: props.seed };
   const fetchPage = useCallback(
-    (offset: number, signal: AbortSignal) => fetchItems(kind, name, filters, opts, offset, signal),
+    (offset: number, signal: AbortSignal, options?: Parameters<typeof fetchItems>[6]) =>
+      fetchItems(kind, name, filters, opts, offset, signal, options),
     // 续页的口径就是第一页那一份：代次随键变，键里已经带着筛选、种子与 JAV 开关。
     [itemsRevision]);
 
@@ -403,7 +404,8 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
           : worksEmpty ? <WorksEmpty filtered={filtered} onShowAll={showAll} />
           : (
             <EntityBodyPage kind={kind} name={name} view={view} roster={rosterProps} items={items.data ?? null}
-              revision={itemsRevision} fetchPage={fetchPage} photos={photos} photoSize={props.photoSize}
+              revision={itemsRevision} fetchPage={fetchPage} listScope={JSON.stringify(itemsQuery.queryKey.slice(0, -1))}
+              photos={photos} photoSize={props.photoSize}
               photoLayout={props.photoLayout} helpers={props.card.helpers} actions={bodyActions} layout={layout}
               selectMode={props.selectMode} selected={props.selected} seekSeconds={props.seekSeconds}
               wireDrag={props.wireDrag} skeletonHtml={props.skeletonHtml} groupCollapse={props.groupCollapse}
