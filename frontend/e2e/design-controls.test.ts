@@ -726,9 +726,9 @@ describe('设计决定：控件、状态与首页顶部', () => {
     }
   });
 
-  it('首页标签：没加上去是 --field-ring-hover 的虚线，加上去是玻璃上那圈实线，视图不画虚线；触屏上排 52、视图与标签 36', { timeout: 60_000 }, async () => {
+  it('首页标签：没加上去是 --field-ring-hover 的虚线，加上去是玻璃上那圈实线，视图不画虚线；触屏上排 48、视图与标签 30', { timeout: 60_000 }, async () => {
     /* 虚线只说「这条筛选可加、此刻没加」，取 Vercel 筛选令牌未生效那一档；四枚视图恒有一枚生效，不画。
-       圆角同卡片、详情与交集条那一颗（`--tag-radius`）。触屏上 30px 不够一枚指尖。 */
+       圆角同卡片、详情与交集条那一颗（`--tag-radius`）。触屏控件共用 30px 高度。 */
     const opened = await openCatalogBars(browser);
     try {
       const { page } = opened;
@@ -765,7 +765,7 @@ describe('设计决定：控件、状态与首页顶部', () => {
         return { coarse: matchMedia('(pointer: coarse)').matches, row: height('[data-filter-row="top"]'),
           view: height('[data-catalog-view]'), tag: height('[data-catalog-tag]') };
       });
-      assert.deepEqual(heights, { coarse: true, row: 52, view: 36, tag: 36 }, '触屏上筛选条上排没有放大到指尖尺寸');
+      assert.deepEqual(heights, { coarse: true, row: 48, view: 30, tag: 30 }, '触屏筛选按钮高度不一致');
     } finally {
       await phone.close();
     }

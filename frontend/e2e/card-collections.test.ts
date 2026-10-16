@@ -10,7 +10,7 @@ describe('卡片信息与收藏入口', () => {
   before(async () => { browser = await launch() });
   after(async () => { await browser.close() });
   for (const viewport of VIEWPORTS) {
-    it(`${viewport.name} 标题与署名相邻，标签有间距，卡片同高`, async () => {
+    it(`${viewport.name} 标题与署名相邻，标签有间距，${viewport.mobile ? '卡片按内容定高' : '同排卡片等高'}`, async () => {
       const opened = await openFollowFeed(browser, '/follow', viewport);
       try {
         assert.equal(await opened.page.locator('[data-follow-filter-glass]').getByRole('button', { name: '我的收藏', exact: true }).count(), 1);
@@ -29,10 +29,19 @@ describe('卡片信息与收藏入口', () => {
         const rows = await inspect();
         assert(rows[0].title >= rows[0].line * 1.9 && rows[1].title < rows[1].line * 1.5, JSON.stringify(rows));
         assert(rows.every(row => row.gap >= 4 && row.gap <= 8 && row.labelGap >= 8 && row.labelGap <= 12), JSON.stringify(rows));
-        assert(Math.max(...rows.map(row => row.height)) - Math.min(...rows.map(row => row.height)) <= 1, JSON.stringify(rows));
+        if (viewport.mobile) {
+          assert(Math.abs((rows[0].height - rows[1].height) - (rows[0].title - rows[1].title)) <= 1, JSON.stringify(rows));
+        } else {
+          assert(Math.max(...rows.map(row => row.height)) - Math.min(...rows.map(row => row.height)) <= 1, JSON.stringify(rows));
+        }
         await opened.page.evaluate(() => { document.body.dataset.density = 'dense' });
         const dense = await inspect();
-        assert(dense.every(row => row.title < row.line * 1.5 && row.labelGap >= 8 && row.labelGap <= 12), JSON.stringify(dense));
+        assert(dense.every(row => row.title < row.line * (viewport.mobile ? 2.1 : 1.5)
+          && row.labelGap >= 8 && row.labelGap <= 12), JSON.stringify(dense));
+        if (viewport.mobile) {
+          assert(dense[0].title >= dense[0].line * 1.9, JSON.stringify(dense));
+          assert(Math.abs((dense[0].height - dense[1].height) - (dense[0].title - dense[1].title)) <= 1, JSON.stringify(dense));
+        }
       } finally { await opened.close() }
     });
     it(`${viewport.name} 收藏入口是紧凑图标按钮，播放媒体没有侧箭头`, async () => {
