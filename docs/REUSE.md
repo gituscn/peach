@@ -102,6 +102,10 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 `src/peach/diagnostics.py` 统一生成 CLI 与本机 API 报告；复用 `settings_file`、`health` 的只读迁移校验、`FFmpegResolver`、访问策略和挂载快照。数据库用 SQLite `mode=ro`；写入与端口检查用标准库短暂探针，不新增运行依赖。
 
+应用生命周期复用 `health.inspect_database` 的只读账本与迁移检查；账本可读且结构为 `current` 时才恢复任务、启动追更、订阅、推送发现、下载对账和馆藏聚合预热。账本缺失、空白、损坏或迁移未就绪时保留健康与配置入口，只记录不含路径和 SQL 的状态提示，不创建或迁移账本；账本准备完成后重启服务。`/healthz?ready=1` 的 `checks.background` 反映本次生命周期是否启动了账本后台任务；暂缓启动的实例在重启前保持未就绪。配置与隧道测试复用标准库 `unittest.assertNoLogs` 检查非预期的后台错误，故障注入用 `assertLogs` 核对预期原因，生命周期回归使用 `support.ledger.fresh_ledger` 的真实迁移模板。没有新增依赖或真实 ledger 写入。
+
+浏览器网络失败取证复用 Chromium（BSD）的 NetLog 与现有 Playwright 启动入口；`PEACH_E2E_NET_LOG_DIR` 启用 `--log-net-log`，捕获模式固定为 [`HeavilyRedacted`](https://chromium.googlesource.com/chromium/src/net/+/master/log/net_log_capture_mode.h)，保留允许公开的网络事件字段，不采集 URL、主机、IP 或请求头。日志随浏览器正常关闭完成写入，由 CI 与 TAP 一起保存；失败请求仍使测试失败，不重试或过滤 `ERR_NO_BUFFER_SPACE`。番号样张夹具在首次导航前安装响应，直接打开目标页，并在主体等待失败时关闭 context。没有新增依赖或机器资源限额。
+
 已核对 sakuramedia `a10fcef8`（GPL-3.0）的诊断字段与提示组织，仅作产品参考，不复制源码。OpenAver `8cc17e50`（MIT）的 HTTP 健康探针不足以表达分项状态。[fastapi-health 0.4.0](https://pypi.org/project/fastapi-health/)（MIT）在本机 Python 3.14.7 的离线试验中将状态字典视为真值；CLI、分级规则和脱敏仍需本项目处理，因此未引入。
 
 诊断页复用同一报告、TanStack Query、BoardUI 设置组合件及覆盖式滚动条。库健康参照 javm `dd0e6b62`（MIT）的计数→清单入口，采用 Peach 的资产、封面键与处理日志。来源证据复用 `performer_profile_followup` 成功落库来源与 `scraping_access.cooldown_state`，不复用 HTTP 200 作为内容健康。无新增依赖；本机只读试验已核对现有日志与成功记录。

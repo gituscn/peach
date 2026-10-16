@@ -136,10 +136,12 @@ class ImportedPerformerProfileTests(unittest.TestCase):
             raise OSError("connection reset")
 
         issues = []
-        result = enrich_performer_profiles(
-            self.database, [self.group()], self.root / "avatars", self.root / "providers",
-            transport_factory=lambda: refuse,
-            issue=lambda asset_id, message: issues.append((asset_id, message)))
+        with self.assertLogs("peach.metadata_performer_profiles", level="WARNING") as captured:
+            result = enrich_performer_profiles(
+                self.database, [self.group()], self.root / "avatars", self.root / "providers",
+                transport_factory=lambda: refuse,
+                issue=lambda asset_id, message: issues.append((asset_id, message)))
+        self.assertIn("connection reset", "\n".join(captured.output))
         self.assertEqual(result["failed"], 1)
         self.assertEqual(result["avatars"], 0)
         self.assertEqual([asset_id for asset_id, _message in issues], [1])

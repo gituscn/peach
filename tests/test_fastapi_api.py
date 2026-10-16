@@ -7,7 +7,8 @@ import sqlite3
 import tempfile
 import unittest
 from collections import OrderedDict
-from contextlib import closing
+from contextlib import asynccontextmanager, closing
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 from types import SimpleNamespace
@@ -3150,6 +3151,88 @@ class UnconfiguredMachineTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(response.status_code, 200)
             self.assertFalse(response.json()["configured"])
             self.assertFalse(self.settings.db_path.exists())
+
+    @asynccontextmanager
+    async def ledger_client(self, database):
+        from peach import settings_file
+        config = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(database.parent.parent)})
+        config = replace(config, locations={}, mounts={})
+        settings = replace(self.settings, configured=True, db_path=database,
+                           page_path=ROOT / "web/index.html", secrets_root=database.parent / "secrets",
+                           tunnel_state_root=database.parent / "tunnel-state",
+                           tunnel_log_root=database.parent / "logs")
+        with patch("peach.settings_file.load_config", return_value=config), \
+                patch("peach.routes_configuration.managed_configuration", return_value=False), \
+                self.assertNoLogs("peach", level="ERROR"):
+            app = create_app(settings)
+            async with app.router.lifespan_context(app), httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app), base_url="http://test",
+            ) as client:
+                yield app, client
+
+    async def test_unready_ledgers_keep_background_workers_stopped_without_creating_or_migrating_data(self):
+        parent = self.settings.db_path.parent
+        parent.mkdir(parents=True)
+        for state in ("missing", "empty", "corrupt", "pending", "mismatch"):
+            with self.subTest(state=state):
+                database = parent / f"{state}.db"
+                if state == "empty":
+                    with closing(sqlite3.connect(database)):
+                        pass
+                elif state == "corrupt":
+                    database.write_bytes(b"not a sqlite database")
+                elif state in {"pending", "mismatch"}:
+                    fresh_ledger(parent, database.name)
+                    with closing(sqlite3.connect(database)) as connection, connection:
+                        if state == "pending":
+                            connection.execute("DELETE FROM schema_migration WHERE version=(SELECT MAX(version) FROM schema_migration)")
+                        else:
+                            connection.execute("UPDATE schema_migration SET checksum='wrong' WHERE version=(SELECT MAX(version) FROM schema_migration)")
+                original = database.read_bytes() if database.exists() else None
+                with self.assertLogs("peach.api", level="WARNING") as captured:
+                    async with self.ledger_client(database) as (app, client):
+                        self.assertIsNone(app.state.web_contract.downloads._thread)
+                        self.assertFalse(app.state.follow_scheduler._started)
+                        self.assertFalse(app.state.web_contract.feed_scheduler._started)
+                        self.assertEqual((await client.get("/healthz")).status_code, 200)
+                        ready = await client.get("/healthz?ready=1")
+                        self.assertEqual(ready.status_code, 503)
+                        self.assertFalse(ready.json()["ready"])
+                self.assertEqual([record.levelname for record in captured.records], ["WARNING"])
+                self.assertIn("账本准备完成后重启服务", captured.output[0])
+                self.assertNotIn(str(database), captured.output[0])
+                self.assertEqual(database.read_bytes() if database.exists() else None, original)
+
+    async def test_current_ledger_starts_background_workers_and_stops_them_with_the_service(self):
+        parent = self.settings.db_path.parent
+        parent.mkdir(parents=True)
+        database = fresh_ledger(parent)
+        async with self.ledger_client(database) as (app, client):
+            self.assertIsNotNone(app.state.web_contract.downloads._thread)
+            self.assertTrue(app.state.follow_scheduler._started)
+            self.assertTrue(app.state.web_contract.feed_scheduler._started)
+            ready = await client.get("/healthz?ready=1")
+            self.assertEqual(ready.status_code, 200)
+            self.assertTrue(ready.json()["ready"])
+        self.assertIsNone(app.state.web_contract.downloads._thread)
+        self.assertFalse(app.state.follow_scheduler._started)
+        self.assertFalse(app.state.web_contract.feed_scheduler._started)
+
+    async def test_preparing_the_ledger_requires_a_service_restart_to_resume_background_work(self):
+        parent = self.settings.db_path.parent
+        parent.mkdir(parents=True)
+        database = parent / "ledger.db"
+        async with self.ledger_client(database) as (app, client):
+            self.assertIsNone(app.state.web_contract.downloads._thread)
+            fresh_ledger(parent)
+            response = await client.get("/healthz?ready=1")
+            self.assertEqual(response.status_code, 503)
+            self.assertFalse(response.json()["checks"]["background"])
+        async with self.ledger_client(database) as (app, client):
+            response = await client.get("/healthz?ready=1")
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.json()["checks"]["background"])
+            self.assertIsNotNone(app.state.web_contract.downloads._thread)
 
     async def test_the_page_serves_the_first_run_shell(self):
         response = await self.client.get("/")

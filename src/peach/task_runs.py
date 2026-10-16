@@ -259,7 +259,7 @@ class TaskRunStore:
         try:
             self.query(limit=1)
             return True
-        except sqlite3.OperationalError:
+        except sqlite3.DatabaseError:
             return False
 
     # -- 写入 --------------------------------------------------------------

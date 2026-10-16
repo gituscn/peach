@@ -55,15 +55,24 @@ async function serveProfile(page: Page, local?: Local): Promise<number[]> {
   return offsets;
 }
 
-async function openPhotos(browser: Browser, search: string, local?: Local): Promise<Visit & { offsets: number[] }> {
-  const opened = await visit(browser, '/', DESKTOP);
-  const offsets = await serveProfile(opened.page, local);
-  await opened.page.goto(new URL(`/performers/${encodeURIComponent(NAME)}?${search}`, opened.page.url()).href,
-    { waitUntil: 'load' });
-  await opened.page.locator('#index [data-entity-readout]', { hasText: '照片' })
-    .waitFor({ state: 'visible', timeout: 15_000 });
-  await settle(opened.page);
-  return { ...opened, offsets };
+async function openPhotos(browser: Browser, search: string, local?: Local): Promise<Visit & { offsets: number[]; documents: string[] }> {
+  let offsets: number[] = [];
+  const documents: string[] = [];
+  const opened = await visit(browser, `/performers/${encodeURIComponent(NAME)}?${search}`, DESKTOP, async page => {
+    page.on('request', request => {
+      if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documents.push(request.url());
+    });
+    offsets = await serveProfile(page, local);
+  });
+  try {
+    await opened.page.locator('#index [data-entity-readout]', { hasText: '照片' })
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    await settle(opened.page);
+    return { ...opened, offsets, documents };
+  } catch (error) {
+    await opened.close();
+    throw error;
+  }
 }
 
 /** 故意回 404 的那一张不算运行期问题，浏览器为它各记一条的控制台 404 也按条数扣掉；
@@ -93,6 +102,8 @@ describe('番号样张', () => {
     const opened = await openPhotos(browser, 'media=photos');
     const { page } = opened;
     try {
+      assert.equal(opened.documents.length, 1, '夹具直接打开目标资料页，页面只导航一次');
+      assert.equal(new URL(opened.documents[0]).pathname, `/performers/${encodeURIComponent(NAME)}`);
       assert.equal(await page.locator('[data-entity-media] [data-media-view="photos"]').getAttribute('aria-pressed'),
         'true');
       assert.deepEqual(await groups(page), [['SSIS-057', 3], ['SSIS-001', 2]]);

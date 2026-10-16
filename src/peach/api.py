@@ -41,6 +41,7 @@ from .follow_covers import FollowCoverService
 from .follow_faces import FollowFaceIndex
 from .follow_stream import FollowMediaResolver
 from .http import HttpxTransport
+from .health import inspect_database
 from .media import (
     FilesystemBackend,
     MediaEngine,
@@ -154,9 +155,22 @@ WARM_AGGREGATES = (("/api/taste", {"window": "all"}), ("/api/review", {}), ("/ap
                    ("/api/follow", {}))
 
 
-async def _warm_ledger_aggregates(settings: PeachSettings, contract) -> None:
+def _start_ledger_services(settings: PeachSettings, contract, services) -> bool:
+    """只读核对当前账本后，恢复任务并启动依赖账本的后台服务。"""
+    status = inspect_database(settings.db_path)
+    if not status["readable"] or status["schema"] != "current":
+        LOGGER.warning("账本未就绪，依赖账本的后台任务保持停止（数据库：%s；结构：%s）；账本准备完成后重启服务。",
+                       status["database"], status["schema"])
+        return False
+    _restore_task_center(contract)
+    for service in services:
+        service.start()
+    return True
+
+
+async def _warm_ledger_aggregates(ledger_ready: bool, contract) -> None:
     """走和真实请求同一条分派，缓存键一致，页面第一次打开就是现成的。"""
-    if not settings.configured:
+    if not ledger_ready:
         return
     for path, args in WARM_AGGREGATES:
         try:
@@ -324,16 +338,15 @@ def create_app(
         # 启动握手要等 cloudflared 连上边缘，可以占到几十秒；和 mDNS 一样交给线程，
         # 不要在事件循环里卡住整条服务的启动。
         await asyncio.to_thread(_start_tunnel, settings, tunnel_manager)
+        ledger_ready = False
         if settings.configured:
-            _restore_task_center(contract)
-            follow_scheduler.start()
-            feed_scheduler.start()
+            ledger_ready = _start_ledger_services(settings, contract,
+                (follow_scheduler, feed_scheduler, push_discovery, downloads))
             automatic_updates.start()
-            push_discovery.start()
-            downloads.start()
             mount_reachability.start()
+        _app.state.ledger_background_ready = ledger_ready
         warmup = asyncio.create_task(warm_startup_entries())
-        aggregate_warmup = asyncio.create_task(_warm_ledger_aggregates(settings, contract))
+        aggregate_warmup = asyncio.create_task(_warm_ledger_aggregates(ledger_ready, contract))
         if mdns is not None:
             try:
                 await asyncio.to_thread(mdns.start)
@@ -484,7 +497,7 @@ def create_app(
     def healthz(request: Request, ready: bool = False):
         from .health import database_status, readiness
         if ready:
-            result = readiness(settings)
+            result = readiness(settings, background_ready=getattr(request.app.state, "ledger_background_ready", None))
             return JSONResponse(result, status_code=200 if result["ready"] else 503,
                                 headers={"Cache-Control": "no-store"})
         # 不探测共享目录或迁移数据库；健康检查必须无副作用。

@@ -313,7 +313,7 @@ class WebE2ESmokeTests(unittest.TestCase):
 
     def test_every_route_holds_the_layout_and_runtime_invariants(self):
         env = dict(os.environ, PEACH_E2E_ORIGIN=self.origin, PEACH_E2E_ITEM=str(self.item),
-                   PEACH_E2E_CHROME=self.chrome)
+                   PEACH_E2E_CHROME=self.chrome, PEACH_E2E_NET_LOG_DIR=str(BROWSER_LOGS / "network"))
         BROWSER_LOGS.mkdir(parents=True, exist_ok=True)
         for stale in BROWSER_LOGS.glob("batch-*.tap"):
             stale.unlink()
@@ -416,7 +416,7 @@ class SetupE2ETests(unittest.TestCase):
         self.assertFalse((self.data / settings_file.SETTINGS_FILENAME).exists())
         env = dict(os.environ, PEACH_E2E_SETUP_ORIGIN=self.origin, PEACH_E2E_SETUP_MEDIA=str(self.media),
                    PEACH_E2E_SETUP_DATA=str(self.data), PEACH_E2E_SETUP_LEDGER_ROOT=self.ledger_root,
-                   PEACH_E2E_CHROME=self.chrome)
+                   PEACH_E2E_CHROME=self.chrome, PEACH_E2E_NET_LOG_DIR=str(BROWSER_LOGS / "network"))
         BROWSER_LOGS.mkdir(parents=True, exist_ok=True)
         log_path = BROWSER_LOGS / "setup.tap"
         try:

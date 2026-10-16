@@ -7,6 +7,9 @@
  * 用例只写语义断言（没有横向溢出、等待态会结束、控制台无错误），不做截图比对：
  * 单人部署里维护基线图的成本高于它能拦住的问题。 */
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { chromium, type Browser, type BrowserContext, type Locator, type Page } from 'playwright-core';
 
@@ -43,9 +46,18 @@ export function requiredEnv(name: string): string {
 }
 
 export async function launch(): Promise<Browser> {
+  const args: string[] = [];
+  const networkLogs = process.env.PEACH_E2E_NET_LOG_DIR;
+  if (networkLogs) {
+    mkdirSync(networkLogs, { recursive: true });
+    const filename = `network-${process.pid}-${randomUUID()}.json`;
+    args.push(`--log-net-log=${join(networkLogs, filename)}`, '--net-log-capture-mode=HeavilyRedacted');
+    console.info(`浏览器网络事件日志：${filename}`);
+  }
   return chromium.launch({
     headless: true,
     executablePath: requiredEnv('PEACH_E2E_CHROME'),
+    args,
     // Windows 首次加载浏览器与系统组件使用独立的启动预算，页面等待由各用例限定。
     timeout: 60_000,
   });
