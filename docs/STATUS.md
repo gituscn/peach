@@ -19,7 +19,7 @@
 - Windows 托盘自动恢复；重启 `restart_windows_tray.py --source`；代码、数据在内置盘，媒体在外置盘。
 - 托盘用普通权限：提权看不到 CloudDrive 的 `A:`/`B:`，误报脱盘。
 - Windows：80→HTTPS、LAN:443；`peach-win`。重启、CA、桌面/手机通过。
-- 封面2001，v11。
+- 封面2144，v13、人脸v4；JavDB 0。
 - 收藏、续播、播放墙续页；[目录浏览](DIRECTORY_BROWSING.md)。
 - `/healthz` 报 `configurable=true`；配置、选目录共用连接判据；托盘管理 HTTPS 地址、端口及重载。
 - 首启恢复配置；更新保留数据，安装暂停采集，运行后续跑；见 [运行与配置](OPERATIONS.md)。
