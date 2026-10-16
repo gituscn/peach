@@ -19,6 +19,16 @@ from peach import images, jav_poster_crop
 from peach.jav_poster_crop import CENTER, FOLD, MANUAL, MANUAL_SOURCE, NONE, RATIO
 
 
+class CompressedSpineTests(unittest.TestCase):
+    def test_soft_spine_edge_is_separated_from_the_lettering(self):
+        record = json.loads((Path(__file__).parent / 'fixtures/cover-profiles/ipzz-477.json').read_text(encoding='utf-8'))
+        profile = jav_poster_crop.ColumnProfile(record['gradient'], record['seams'])
+        box = jav_poster_crop.front_panel_box(*record['px'], profile, code='IPZZ-477')
+        self.assertEqual(box['method'], FOLD)
+        self.assertGreaterEqual(box['x0'], 422)
+        self.assertLessEqual(box['x0'], 423)
+
+
 def sleeve(width: int, height: int, fold: int | None) -> Image.Image:
     """一张封套：左边是背面，右边是正面，中间可选一条书脊折痕。"""
     image = Image.new("RGB", (width, height), (200, 200, 200))
@@ -68,14 +78,14 @@ def opencv_available() -> bool:
     return True
 
 
-@functools.lru_cache(maxsize=1)
-def batch_script():
-    """把 `scripts/poster_crop_boxes.py` 当模块载入，按文件路径而不是包名。"""
+@functools.lru_cache(maxsize=3)
+def batch_script(name='poster_crop_boxes'):
+    """按文件路径载入封面维护脚本。"""
     import importlib.util
 
     root = Path(__file__).resolve().parents[1]
     spec = importlib.util.spec_from_file_location(
-        "poster_crop_boxes", root / "scripts" / "poster_crop_boxes.py")
+        name, root / 'scripts' / (name + '.py'))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -696,6 +706,26 @@ class BatchScriptTests(unittest.TestCase):
     def test_a_dry_run_writes_nothing(self):
         self.assertEqual(self.run_script(), 0)
         self.assertFalse(jav_poster_crop.sidecar_path(self.cover).exists())
+
+    def test_audit_keeps_manual_frames_and_reports_unknown_provenance(self):
+        manual = jav_poster_crop.manual_record(800, 540, {'x0': 420, 'y0': 0, 'x1': 800, 'y1': 540})
+        jav_poster_crop.write_sidecar(self.cover, manual)
+        script = batch_script('audit_cover_artwork')
+        row, proposed, _, _ = script.inspect(self.cover, self.root / 'metadata')
+        self.assertEqual(proposed, manual)
+        self.assertEqual(row['method'], MANUAL)
+        self.assertTrue('missing_provenance' in row['reasons'])
+        self.assertEqual(self.cover.read_bytes(), self.before)
+
+    def test_face_crossing_the_spine_is_preserved_by_offline_reframing(self):
+        target = self.root / 'SPONE-001.jpg'
+        Image.new('RGB', (800, 600), 'gray').save(target)
+        target.with_suffix('.face.json').write_text(json.dumps({
+            'px': [800, 600], 'face': {'cx': .555, 'cy': .331, 'w': .257, 'h': .422, 'score': .918},
+        }), encoding='utf-8')
+        row, proposed, _, layout = batch_script('audit_cover_artwork').inspect(target, self.root / 'metadata')
+        self.assertEqual((proposed['box']['method'], layout), (NONE, 'still'))
+        self.assertEqual(row['x0'], 0)
 
     def test_apply_writes_the_sidecar_and_leaves_the_image_untouched(self):
         self.assertEqual(self.run_script("--apply"), 0)

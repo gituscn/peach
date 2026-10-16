@@ -133,6 +133,18 @@ describe('coverAnchor：封面按自己的宽高比分流', () => {
     expect(img.parentElement!.style.getPropertyValue('--cover-blur')).toContain('/cover?code=SSIS-001&thumb=1');
   });
 
+  it('整幅大封按主体人脸居中，重取景会清掉正封框样式', () => {
+    const img = cover('/cover?code=SPONE-001', 2184, 1638, 'data-cx=".555" data-cy=".331"');
+    coverAnchor(img);
+    expect(img.classList.contains('panel')).toBe(true);
+    img.dataset.coverLayout = 'still';
+    coverAnchor(img);
+    expect(img.dataset.frame).toBe('still');
+    expect(img.classList.contains('panel')).toBe(false);
+    expect(img.style.getPropertyValue('--panel-clip')).toBe('');
+    expect(img.style.getPropertyValue('--cover-x')).toBe('63%');
+  });
+
   it('Blu-ray 与已知宽封套按宽正封取景，FC2 保留整幅画面', () => {
     const wide = cover('https://covers.example/MIDA.jpg', 800, 438, 'data-cover-code="MIDA-122" data-wide-sleeve="1"');
     coverAnchor(wide);

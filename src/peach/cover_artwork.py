@@ -23,6 +23,19 @@ def _default_detector() -> FaceDetector:
     return FaceDetector(allow_download=False)
 
 
+def metadata_snapshots(root: Path, code: str) -> list[tuple[str, dict]]:
+    """当前番号已保存的来源快照；字段仍由各自的来源契约解释。"""
+    found = []
+    for path in sorted(Path(root).glob(code + '-*.json')):
+        try:
+            payload = json.loads(path.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            continue
+        if isinstance(payload, dict):
+            found.append((payload.get('source') or path.stem[len(code) + 1:], payload))
+    return found
+
+
 def face_record(image, detector, *, code: str, title: str = '') -> dict | None:
     """已解码的封面 → 页面取景记录；无法解码时不生成记录。
 
@@ -35,7 +48,11 @@ def face_record(image, detector, *, code: str, title: str = '') -> dict | None:
     height, width = image.shape[:2]
     ratio = width / height if height else 0
     faces = detector.detect(image)
-    if (jav_poster_crop.crops_to_portrait(code, title)
+    largest = main_face([face for face in faces if MIN_FACE_Y <= face.cy <= MAX_FACE_Y])
+    full_cover = jav_poster_crop.face_crosses_spine(width, height, {
+        'cx': largest.cx, 'w': largest.width, 'h': largest.height,
+        'score': largest.score} if largest else None)
+    if (not full_cover and jav_poster_crop.crops_to_portrait(code, title)
             and (jav_poster_crop.SLEEVE_RATIO_MIN <= ratio < jav_poster_crop.SLEEVE_RATIO_MAX
                  or (jav_poster_crop.is_wide_sleeve_label(code, title)
                      and jav_poster_crop.WIDE_SLEEVE_RATIO_MIN <= ratio < jav_poster_crop.WIDE_SLEEVE_RATIO_MAX))):
@@ -44,7 +61,7 @@ def face_record(image, detector, *, code: str, title: str = '') -> dict | None:
     faces = [face for face in faces if low <= face.cy <= high]
     best = main_face(faces)
     return {"ratio": round(ratio, 3), "px": [int(width), int(height)],
-            **({'layout': 'still'} if jav_poster_crop.is_scene_cover(code, title) else {}), "face": (
+            **({'layout': 'still'} if full_cover or jav_poster_crop.is_scene_cover(code, title) else {}), "face": (
         {"cx": best.cx, "cy": best.cy, "w": best.width, "h": best.height,
          "score": best.score} if best else None)}
 
@@ -56,17 +73,17 @@ def _sidecars(code: str, payload: bytes, size: tuple[int, int], detector=None, e
         image = decode(payload)
     except ImportError:
         pass
-    poster = jav_poster_crop.crop_record(
-        code, size[0], size[1],
-        (lambda: jav_poster_crop.column_gradient(image)) if image is not None else None,
-        title=title,
-    )
-    records = {jav_poster_crop.SIDECAR_SUFFIX: poster}
     try:
         active = detector if detector is not None else _default_detector()
         face = face_record(image, active, code=code, title=title)
     except (FaceModelUnavailable, ImportError):
         face = None
+    poster = jav_poster_crop.crop_record(
+        code, size[0], size[1],
+        (lambda: jav_poster_crop.column_gradient(image)) if image is not None else None,
+        title=title, face=(face or {}).get('face'),
+    )
+    records = {jav_poster_crop.SIDECAR_SUFFIX: poster}
     if face is not None:
         records[".face.json"] = face
     return {suffix: json.dumps(record, ensure_ascii=False).encode("utf-8")

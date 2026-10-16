@@ -101,8 +101,8 @@ FOLD_SHARP_MIN_COVERAGE = 0.6
 #: EBOD-531、GUN-851、IPX-150、PGD-526、CLUB-622、IPZZ-477 各留 7～19 列。这七张的
 #: 折痕是周围中位数的 3.7～9.2 倍；正封里紧挨折痕的大字周围还有别的笔画，MIMK-009
 #: 的 423 列只有 2.2 倍、IDBD-610 的 433 列 2.0 倍。ABP-627 的折痕 441 列挨着正封的
-#: 金色花纹，2.6 倍，救不回来（正封左缘留 8 列书脊），是这个数的已知代价。
-FOLD_ISOLATION = 3.0
+#: JPEG 软边也要达到 2.5 倍，并满足左忙右静的方向约束。
+FOLD_ISOLATION = 2.5
 #: 候选按相邻归并成边：一道边在梯度上响应好几列，相距不超过源图宽这个比例的算一条。
 FOLD_EDGE_SPAN = 0.005
 #: 折痕是一道有宽度的斜坡，梯度的峰落在斜坡最陡处，也就是斜坡当中；书脊的最后一两
@@ -169,7 +169,7 @@ MANUAL = "manual"
 MANUAL_SOURCE = "user:crop"
 
 #: 算法版本号。sidecar 记着它，落后的重算。改动判据、常数或框的形状都要进位。
-ALGORITHM_VERSION = "poster-crop-v11"
+ALGORITHM_VERSION = "poster-crop-v12"
 #: sidecar 与封面同名换后缀：`ABW-232.jpg` → `ABW-232.poster.json`。人脸取景是
 #: `.face.json`，两者同目录、同命名风格，各描述一件事：一个是脸在哪，一个是正封在哪。
 SIDECAR_SUFFIX = ".poster.json"
@@ -191,6 +191,16 @@ def is_scene_cover(code: str | None, title: str = '') -> bool:
     """VR 与数字发行厂牌的整幅宣传画面。"""
     key = normalise_code_key(code)
     return is_vr_title(title) or bool(key and key.split('-', 1)[0] in SCENE_COVER_LABELS)
+
+
+def face_crosses_spine(width: int, height: int, face: dict | None) -> bool:
+    """占据主体的大脸跨过 DVD 正封先验边界时，整张图按宣传大封取景。"""
+    if not face or not height or not SLEEVE_RATIO_MIN <= width / height < SLEEVE_RATIO_MAX:
+        return False
+    cx, fw, fh = (float(face.get(key) or 0) for key in ('cx', 'w', 'h'))
+    spine = 1 - PANEL_ASPECT * height / width
+    return (float(face.get('score') or 0) >= .8 and fw >= .075 and fh >= .12
+            and cx - fw / 2 < spine < cx)
 
 
 def crops_to_portrait(code: str | None, title: str = '') -> bool:
@@ -366,7 +376,10 @@ def fold_column(width: int, height: int,
     if seam is not None:
         return seam + 1
     sharp = _sharp_beyond(profile, seams, found, cut, window, reach, span)
-    return cut if sharp is None else _settled(profile, sharp, baseline, limit, span)
+    if sharp is None:
+        return cut
+    right_baseline = statistics.median(profile[sharp + span + 1:sharp + reach + 1] or [baseline])
+    return _settled(profile, sharp, min(baseline, right_baseline), limit, span)
 
 
 def _sharp_beyond(profile: list[float], seams: Sequence[float] | None, found: int,
@@ -553,14 +566,15 @@ def _panel(width: int, height: int, start: int, method: str) -> dict:
 
 
 def crop_record(code: str | None, width: int, height: int,
-                gradient_source: GradientSource = None, *, title: str = '') -> dict:
+                gradient_source: GradientSource = None, *, title: str = '', face: dict | None = None) -> dict:
     """可直接落盘的 sidecar 内容：算法版本、源图尺寸、框。
 
     番号形态先判：不该裁的图连梯度都不算，`gradient_source` 是惰性的就一次都不解码。
     """
     width, height = int(width or 0), int(height or 0)
     box = (front_panel_box(width, height, gradient_source, code, title)
-           if crops_to_portrait(code, title) else _whole(width, height))
+           if crops_to_portrait(code, title) and not face_crosses_spine(width, height, face)
+           else _whole(width, height))
     return {"version": ALGORITHM_VERSION, "px": [width, height], "box": box,
             **({'title': title} if title else {})}
 

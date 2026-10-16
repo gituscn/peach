@@ -215,7 +215,9 @@ JAV 默认封面（官方封面／预览图）与视频默认大小（大图／�
 
 新作封面优先复用 `best_cover` 的官方候选，未取得时复用 `javdb_public` 的作品身份校验与 `RemoteMediaCache` 的持久字节缓存、失败冷却；来源图片沿用 ADR-0030、0032 的 240px 小图下限，按实际尺寸保存，证据区分小图，再经 `cover_artwork.install_cover` 安装本地封面、正封框、人脸坐标与来源证据。原图缓存与详情预览分键，JPEG 解包后保留原字节、原尺寸；其他格式按原尺寸转为 JPEG。缺图时 `/jav-cover` 提供同源显示回退。
 
-取景由 `poster-crop-v11` 管理。Blu-ray 来源标题与图片比例共同决定 0.85 正封比例，标题随正封框保留，重算人脸与正封框均读取同一版次；有效宽正封框在没有版次标题的卡片上也完整显示。VR 标记与 IENEE、IENFE、SDHS 数字发行拼图保留整幅画面，由 `cover_frame.layout=still` 传给卡片，人脸检测包含左侧主图；FC2 与普通横版画面保持人脸取景。手工框保持用户取景。重试队列按最早尝试时间轮转，收起的合集沿用设置跳过；逐番号结果保存在 `feed-cover-attempts/`。复用现有 HTTP、Pillow、OpenCV 与文件锁，无新增依赖。
+取景由 `poster-crop-v12` 管理。Blu-ray 来源标题、明确的版次标签与图片比例共同决定 0.85 正封比例，标题随正封框保留，重算人脸与正封框均读取同一版次；有效宽正封框在没有版次标题的卡片上也完整显示。VR 标记、IENEE、IENFE、SDHS 数字发行拼图，以及可信主脸跨过 DVD 正封先验边界的大封保留整幅画面，由 `cover_frame.layout=still` 传给卡片。大封按主脸居中并铺满卡片，大小图均不使用模糊补边；JPEG 软边的书脊识别结合突出度、左忙右静的方向与正封侧基线。手工框保持用户取景。重试队列按最早尝试时间轮转，收起的合集沿用设置跳过；逐番号结果保存在 `feed-cover-attempts/`。复用现有 HTTP、Pillow、OpenCV 与文件锁，无新增依赖。
+
+馆藏与新作取图共用 `cover_artwork.metadata_snapshots` 和 `best_cover`，片商官网、发行方、R18 与 DMM 的官方候选均参与尺寸比较。馆藏采集将长边 1600px 作为高清重探界限，社区转存图可由官方封面替换；同类官方图按像素面积升级，FC2 保留商品图的来源保护。`scripts/audit_cover_artwork.py` 逐张核对尺寸、来源、版次与取景框，输出 CSV；`scripts/upgrade_audited_covers.py` 按已有官方快照逐番号重探，保存原件备份与结果检查点。两者只处理可重建图片和边车，不写 ledger。
 
 ## 复用决策门槛
 

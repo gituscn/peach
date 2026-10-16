@@ -29,6 +29,26 @@ class CoverArtworkTests(unittest.TestCase):
         self.root = Path(tempfile.mkdtemp())
         self.target = self.root / "259LUXU-1537.jpg"
 
+    def test_large_face_crossing_the_assumed_spine_uses_the_whole_cover(self):
+        detector = Detector()
+        with patch.object(detector, 'detect', return_value=[
+                Face(.555, .331, .257, .422, .918), Face(.81, .3, .06, .1, .95)]):
+            cover_artwork.install_cover(self.target, 'SPONE-001', jpeg((80, 90, 100), (800, 600)),
+                                        (800, 600), detector=detector)
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertEqual(face['layout'], 'still')
+        self.assertEqual(face['face']['cx'], .555)
+        self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
+
+    def test_central_portrait_in_a_full_collage_keeps_its_face(self):
+        detector = Detector()
+        with patch.object(detector, 'detect', return_value=[Face(.508, .2, .09, .155, .917)]):
+            cover_artwork.install_cover(self.target, 'MIDV-377', jpeg((80, 90, 100), (800, 600)),
+                                        (800, 600), detector=detector)
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertEqual(face['layout'], 'still')
+        self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
+
     def test_full_photo_keeps_faces_on_the_left_but_sleeves_use_the_front(self):
         detector = Detector()
         with patch.object(detector, "detect", return_value=[Face(.22, .3, .1, .1, .95)]):

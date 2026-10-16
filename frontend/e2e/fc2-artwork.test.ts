@@ -30,19 +30,23 @@ describe('FC2 合集与封面取景', () => {
       } finally { await opened.close(); }
     });
 
-    for (const cx of [.519, .22]) {
-    it(`${viewport.name}: 缺集归为一张卡，横图人脸 ${cx} 尽量居中`, async () => {
+    for (const art of [
+      { code: 'FC2-PPV-3312576', cx: .519, width: 1548, height: 948, layout: undefined },
+      { code: 'FC2-PPV-3312576', cx: .22, width: 1548, height: 948, layout: undefined },
+      { code: 'SPONE-001', cx: .555, width: 2184, height: 1638, layout: 'still' },
+    ]) {
+    it(`${viewport.name}: ${art.code} 缺集归为一张卡，横图人脸 ${art.cx} 尽量居中`, async () => {
       const opened = await openItemPage(browser, '/', viewport, {
         ready: '[data-media-card]', settings: { javLayout: 'big', homeLayout: 'big', javImage: 'cover' },
       });
       try {
-        const code = 'FC2-PPV-3312576';
+        const { code, cx } = art;
         const ids = [8001, 8008, 8010, 8021];
         const base = await opened.page.evaluate(async (id) =>
           (await fetch(`/api/item?id=${id}`)).json(), ITEM.plain);
         const items = ids.map((id) => ({ ...base, id, code, is_jav: true, tags: [],
           name: `${code}-${id - 8000}.mp4`, has_cover: true,
-          cover_frame: { cx, cy: .294 }, poster_box: null,
+          cover_frame: { cx, cy: .294, layout: art.layout }, poster_box: null,
           part_group: { key: code, title: code, count: ids.length, seed_id: ids[0],
             item_ids: ids, total_duration: 9000, total_size: 9000000000 },
         }));
@@ -50,13 +54,13 @@ describe('FC2 合集与封面取景', () => {
           items, total: items.length, has_more: false,
         } }));
         await opened.page.route('**/cover?*', (route) => route.fulfill({
-          contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="1548" height="948"><rect width="1548" height="948" fill="#ddd"/></svg>',
+          contentType: 'image/svg+xml', body: `<svg xmlns="http://www.w3.org/2000/svg" width="${art.width}" height="${art.height}"><rect width="${art.width}" height="${art.height}" fill="#ddd"/></svg>`,
         }));
         await opened.page.reload({ waitUntil: 'load' });
         const covers = opened.page.locator('[data-media-card] img.cover');
         await covers.first().waitFor();
-        await opened.page.waitForFunction(() =>
-          document.querySelector<HTMLImageElement>('[data-media-card] img.cover')?.naturalWidth === 1548);
+        await opened.page.waitForFunction((width) =>
+          document.querySelector<HTMLImageElement>('[data-media-card] img.cover')?.naturalWidth === width, art.width);
         await settle(opened.page);
         assert.equal(await covers.count(), 1);
         const frame = await covers.first().evaluate((img: HTMLImageElement, faceCenter: number) => {
@@ -75,6 +79,24 @@ describe('FC2 合集与封面取景', () => {
         assert.ok(frame.croppedWidth > 0, JSON.stringify(frame));
         assert.ok(frame.x >= 0 && frame.x <= 1, JSON.stringify(frame));
         assert.ok(Math.abs(frame.faceX - frame.closestCenter) < 5, JSON.stringify(frame));
+        if (art.layout === 'still') {
+          for (const shape of ['front', 'whole']) {
+            const fill = await covers.first().evaluate((img: HTMLImageElement, mode) => {
+              img.classList.toggle('front', mode === 'front');
+              img.classList.toggle('whole', mode === 'whole');
+              const pic = img.closest<HTMLElement>('[data-media-pic],.pic')!;
+              pic.style.setProperty('--card-ratio', mode === 'whole' ? '16/9' : '.75');
+              img.dispatchEvent(new Event('load'));
+              const box = pic.getBoundingClientRect();
+              const image = img.getBoundingClientRect();
+              return { fit: getComputedStyle(img).objectFit, blur: pic.style.getPropertyValue('--cover-blur'),
+                widthGap: Math.abs(box.width - image.width), heightGap: Math.abs(box.height - image.height) };
+            }, shape);
+            assert.equal(fill.fit, 'cover', JSON.stringify(fill));
+            assert.equal(fill.blur, '', JSON.stringify(fill));
+            assert.ok(fill.widthGap < 1 && fill.heightGap < 1, JSON.stringify(fill));
+          }
+        }
         const bounds = await layout(opened.page);
         assert.ok(bounds.scrollWidth <= bounds.viewportWidth + 1, JSON.stringify(bounds));
         assert.deepEqual(opened.problems, []);
