@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 
@@ -44,11 +45,16 @@ class Recovery:
 
 
 def untrunc_path(tools_root: Path) -> Path | None:
-    """环境变量指定的、Peach 托管目录里的、PATH 上的，依次找。"""
+    """依次查环境变量、随包工具、数据根托管目录与 PATH。"""
     configured = os.environ.get(UNTRUNC_ENV)
     if configured and Path(configured).expanduser().is_file():
         return Path(configured).expanduser().resolve()
-    managed = Path(tools_root) / "untrunc" / f"untrunc{'.exe' if os.name == 'nt' else ''}"
+    name = f"untrunc{'.exe' if os.name == 'nt' else ''}"
+    if getattr(sys, 'frozen', False):
+        bundled = Path(sys.executable).resolve().parent / 'tools' / 'untrunc' / name
+        if bundled.is_file():
+            return bundled.resolve()
+    managed = Path(tools_root) / "untrunc" / name
     if managed.is_file():
         return managed.resolve()
     found = shutil.which("untrunc")
