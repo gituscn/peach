@@ -5,6 +5,7 @@ import io
 import json
 import sqlite3
 import tempfile
+import threading
 import unittest
 from collections import OrderedDict
 from contextlib import asynccontextmanager, closing
@@ -3233,6 +3234,43 @@ class UnconfiguredMachineTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(response.status_code, 200)
             self.assertTrue(response.json()["checks"]["background"])
             self.assertIsNotNone(app.state.web_contract.downloads._thread)
+
+    async def test_shutdown_joins_the_active_aggregate_before_releasing_the_ledger(self):
+        parent = self.settings.db_path.parent
+        parent.mkdir(parents=True)
+        database = fresh_ledger(parent)
+        opened, release, closed = threading.Event(), threading.Event(), threading.Event()
+        calls = []
+
+        def query(contract, path, args):
+            calls.append(path)
+            with closing(sqlite3.connect(database)) as connection:
+                connection.execute("SELECT id FROM asset LIMIT 1").fetchone()
+                opened.set()
+                release.wait(5)
+            closed.set()
+
+        context = self.ledger_client(database)
+        shutdown = None
+        with patch("peach.api.web_contract.dispatch_api_get", side_effect=query):
+            try:
+                app, _client = await context.__aenter__()
+                self.assertTrue(await asyncio.to_thread(opened.wait, 5))
+                shutdown = asyncio.create_task(context.__aexit__(None, None, None))
+                while app.state.ledger_background_ready and not shutdown.done():
+                    await asyncio.sleep(0)
+                self.assertFalse(shutdown.done(), "服务退出须等待预热查询释放账本")
+                release.set()
+                await shutdown
+                self.assertTrue(closed.is_set())
+                self.assertEqual(calls, ["/api/taste"])
+            finally:
+                release.set()
+                if shutdown is not None:
+                    await shutdown
+                else:
+                    await context.__aexit__(None, None, None)
+                await asyncio.to_thread(closed.wait, 5)
 
     async def test_the_page_serves_the_first_run_shell(self):
         response = await self.client.get("/")
