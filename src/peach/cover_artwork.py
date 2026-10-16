@@ -16,7 +16,7 @@ from .jav_cover_fetch import Unavailable, is_javdb_image
 
 FRONT_START = 0.468
 MIN_FACE_Y, MAX_FACE_Y = 0.05, 0.60
-FACE_ALGORITHM_VERSION = 'cover-face-v3'
+FACE_ALGORITHM_VERSION = 'cover-face-v4'
 _INSTALL_LOCK = threading.RLock()
 
 
@@ -52,9 +52,10 @@ def _dominant_left_face(image, largest, faces, *, code, title):
     height, width = image.shape[:2]
     if not (jav_poster_crop.SLEEVE_RATIO_MIN <= width / height < jav_poster_crop.SLEEVE_RATIO_MAX):
         return False
-    if largest is None or largest.cx >= FRONT_START or largest.score < .8 or largest.width < .075 or largest.height < .12:
+    spine = 1 - jav_poster_crop.PANEL_ASPECT * height / width
+    if largest is None or largest.cx >= spine or largest.score < .8 or largest.width < .075 or largest.height < .12:
         return False
-    front = main_face([face for face in faces if face.cx >= FRONT_START])
+    front = main_face([face for face in faces if face.cx >= spine])
     if front and largest.width * largest.height < 2 * front.width * front.height:
         return False
     box = jav_poster_crop.front_panel_box(width, height, lambda: jav_poster_crop.column_gradient(image), code, title)
@@ -62,9 +63,10 @@ def _dominant_left_face(image, largest, faces, *, code, title):
 
 
 def _promotional_canvas(image, *, code, title):
-    """4:3 画布没有可辨书脊时保留整幅，版式识别不依赖人脸是否检出。"""
+    """4:3 与纸张比例的画布没有可辨书脊时保留整幅。"""
     height, width = image.shape[:2]
-    if abs(width / height - 4 / 3) >= .015 or not jav_poster_crop.crops_to_portrait(code, title):
+    if (min(abs(width / height - ratio) for ratio in (4 / 3, 2 ** .5)) >= .015
+            or not jav_poster_crop.crops_to_portrait(code, title)):
         return False
     box = jav_poster_crop.front_panel_box(width, height, lambda: jav_poster_crop.column_gradient(image), code, title)
     return box['method'] == jav_poster_crop.RATIO
@@ -97,6 +99,9 @@ def face_record(image, detector, *, code: str, title: str = '') -> dict | None:
         'cx': largest.cx, 'w': largest.width, 'h': largest.height,
         'score': largest.score} if largest else None) or _dominant_left_face(
             image, largest, portraits, code=code, title=title) or _promotional_canvas(image, code=code, title=title)
+    if full_cover:
+        panel = jav_poster_crop.front_panel_box(width, height, lambda: jav_poster_crop.column_gradient(image), code, title)
+        full_cover = panel['method'] != jav_poster_crop.CENTER
     if (not full_cover and jav_poster_crop.crops_to_portrait(code, title)
             and (jav_poster_crop.SLEEVE_RATIO_MIN <= ratio < jav_poster_crop.SLEEVE_RATIO_MAX
                  or (jav_poster_crop.is_wide_sleeve_label(code, title)

@@ -33,12 +33,49 @@ class CoverArtworkTests(unittest.TestCase):
         from peach.jav_cover_fetch import Unavailable
         data = jpeg((80, 90, 100))
         self.target.write_bytes(data)
-        for evidence in ({'source_url': 'https://c0.jdbstatic.com/covers/x.jpg'},
-                         {'source': 'javdb-public'}):
+        from peach.sources.javdb import JAVDB
+        evidence_list = [{'source_url': 'https://c0.' + domain + '/covers/x.jpg'}
+                         for domain in (*JAVDB.domains, 'tp.spfcas.com')]
+        for evidence in [*evidence_list, {'source': 'javdb-public'}]:
             with self.subTest(evidence=evidence), self.assertRaisesRegex(Unavailable, '无 JavDB 水印'):
                 cover_artwork.install_cover(self.target, 'FC2-PPV-12345', data, (840, 472), evidence=evidence)
         self.assertEqual(self.target.read_bytes(), data)
         self.assertFalse(self.target.with_suffix('.face.json').exists())
+
+    def test_a_paper_canvas_keeps_a_face_left_of_the_expected_spine(self):
+        detector = Detector()
+        with patch.object(detector, 'detect', return_value=[Face(.478, .094, .085, .155, .838)]):
+            cover_artwork.install_cover(self.target, 'STARS-350', jpeg((80, 90, 100), (840, 594)),
+                                        (840, 594), detector=detector)
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertEqual(face['layout'], 'still')
+        self.assertEqual(face['face']['cx'], .478)
+        self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
+
+    def test_a_paper_canvas_without_faces_preserves_the_complete_picture(self):
+        detector = Detector()
+        with patch.object(detector, 'detect', return_value=[]):
+            cover_artwork.install_cover(self.target, 'SDDE-640', jpeg((80, 90, 100), (840, 594)),
+                                        (840, 594), detector=detector)
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertEqual(face['layout'], 'still')
+        self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
+
+    def test_centered_front_with_padding_keeps_its_panel(self):
+        import numpy
+        image = numpy.full((563, 840, 3), 40, numpy.uint8)
+        image[:, 225:618] = numpy.random.default_rng(42).integers(100, 255, (563, 393, 3), dtype=numpy.uint8)
+        output = io.BytesIO()
+        Image.fromarray(image).save(output, 'PNG')
+        detector = Detector()
+        with patch.object(detector, 'detect', return_value=[Face(.487, .231, .135, .242, .93)]):
+            cover_artwork.install_cover(self.target, 'HHL-018', output.getvalue(), (840, 563), detector=detector)
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertNotIn('layout', face)
+        box = jav_poster_crop.read_sidecar(self.target)['box']
+        self.assertEqual(box['method'], jav_poster_crop.CENTER)
+        self.assertLessEqual(abs(box['x0'] - 225), 1)
+        self.assertLessEqual(abs(box['x1'] - 618), 1)
 
     def test_large_face_crossing_the_assumed_spine_uses_the_whole_cover(self):
         detector = Detector()

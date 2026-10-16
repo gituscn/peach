@@ -21,6 +21,28 @@ from peach.jav_poster_crop import CENTER, FOLD, MANUAL, MANUAL_SOURCE, NONE, RAT
 
 
 class CompressedSpineTests(unittest.TestCase):
+    def test_a_face_left_of_the_cut_keeps_its_right_side(self):
+        face = {'cx': .5, 'cy': .2, 'w': .1, 'h': .2, 'score': .9}
+        box = jav_poster_crop.crop_record('STARS-350', 840, 563, [0.] * 840, face=face)['box']
+        self.assertEqual(box, {'x0': 0, 'y0': 0, 'x1': 840, 'y1': 563, 'method': NONE})
+
+    def test_blurred_padding_around_a_centered_front_is_excluded(self):
+        profile = jav_poster_crop.ColumnProfile([.02] * 224 + [.2] * 394 + [.02] * 222, [0.] * 840)
+        profile.seams[224] = profile.seams[618] = .95
+        face = {'cx': .487, 'cy': .231, 'w': .135, 'h': .242, 'score': .93}
+        box = jav_poster_crop.crop_record('HHL-018', 840, 563, profile, face=face)['box']
+        self.assertEqual(box, {'x0': 225, 'y0': 0, 'x1': 618, 'y1': 563, 'method': CENTER})
+
+    def test_busy_side_pictures_do_not_form_blurred_padding(self):
+        profile = jav_poster_crop.ColumnProfile([.2] * 840, [0.] * 840)
+        profile.seams[224] = profile.seams[618] = .95
+        self.assertIsNone(jav_poster_crop.padded_center_panel(840, 563, profile))
+
+    def test_both_boundaries_are_required_for_blurred_padding(self):
+        profile = jav_poster_crop.ColumnProfile([.02] * 224 + [.2] * 394 + [.02] * 222, [0.] * 840)
+        profile.seams[224] = .95
+        self.assertIsNone(jav_poster_crop.padded_center_panel(840, 563, profile))
+
     def test_soft_spine_edge_is_separated_from_the_lettering(self):
         record = json.loads((Path(__file__).parent / 'fixtures/cover-profiles/ipzz-477.json').read_text(encoding='utf-8'))
         profile = jav_poster_crop.ColumnProfile(record['gradient'], record['seams'])

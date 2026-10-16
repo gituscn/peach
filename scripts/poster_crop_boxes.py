@@ -117,7 +117,7 @@ def run(args: argparse.Namespace) -> int:
                   + "，".join(f"{key} {value}" for key, value in counts.items()),
                   flush=True)
 
-    print("\n折痕 {fold}，右半居中 {ratio}，16:9 居中正封 {center}，不裁 {none}，"
+    print("\n折痕 {fold}，右半居中 {ratio}，居中正封 {center}，不裁 {none}，"
           "读图失败 {unreadable}".format(
               fold=counts[jav_poster_crop.FOLD], ratio=counts[jav_poster_crop.RATIO],
               center=counts[jav_poster_crop.CENTER], none=counts[jav_poster_crop.NONE],

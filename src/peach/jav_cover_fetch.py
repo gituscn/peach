@@ -114,13 +114,15 @@ IMAGE_URL = re.compile(r"https?://[^\"'\\ )]+?\.(?:jpg|jpeg|png|webp)")
 
 def is_javdb_image(url: str = '', source: str = '') -> bool:
     """JavDB 转存图片仅参与来源印证，不作为正式封面。"""
+    from .sources.javdb import JAVDB
+    domains = (*JAVDB.domains, 'tp.spfcas.com')
     for value in (url, source):
         value = str(value or '').strip().lower()
         if value in {'javdb', 'javdb-public', 'javdb_public'}:
             return True
         host = urlparse(value).hostname if '://' in value else value
         if host and any(host == domain or host.endswith('.' + domain)
-                        for domain in ('jdbstatic.com', 'javdb.com', 'tp.spfcas.com')):
+                        for domain in domains):
             return True
     return False
 
