@@ -384,6 +384,18 @@
   box-shadow: inset 0 0 0 1px var(--glass-rim), var(--glass-pick-shadow);
 }
 
+.peach-react [data-filter-glass] :is(button, a[aria-pressed], [data-glass-segment]) { height: 30px; min-height: 30px; }
+.peach-react button[data-filter-action] {
+  width: 30px; min-width: 30px; height: 30px; min-height: 30px; padding: 0; border: 0;
+  border-radius: var(--control-radius);
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 62%), var(--glass-pick-fill);
+  box-shadow: inset 0 0 0 1px var(--glass-rim), var(--glass-pick-shadow);
+  color: var(--glass-text);
+}
+.peach-react button[data-filter-action]:hover { background: linear-gradient(180deg, var(--glass-sheen), transparent 62%), color-mix(in srgb, var(--glass-text) 8%, var(--glass-pick-fill)); color: var(--glass-text); }
+.peach-react button[data-filter-action] svg { width: 16px; height: 16px; }
+.peach-react button[data-filter-action][aria-busy="true"] { cursor: wait; }
+
 /* 浮层上动作键（`components/filter-glass.tsx` 的 `GlassPill`）指上去的那一下：同一副料，
  * 细线让给整圈 rim，落影把它从浮层上托起来，跟首页筛选条上滑到指针下的那块一样。那一档
  * `backdrop-filter` 提亮写在 `web/board.css`：构建会把标准属性折成 Chromium 不认的前缀写法。 */

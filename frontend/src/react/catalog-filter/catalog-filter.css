@@ -250,12 +250,6 @@
   color: color-mix(in srgb, var(--glass-text) 80%, transparent);
 }
 
-/* 触屏上 30px 不够一枚指尖：视图与标签放到 36px，这一排跟着长到 52px。下排的排序键归资料页那一条。 */
-@media (pointer: coarse) {
-  .peach-react [data-catalog-frame] > [data-filter-row="top"] { height: 52px; }
-  .peach-react :is([data-catalog-view], [data-catalog-tag]) { height: 36px; }
-  .peach-react [data-catalog-tags] > [data-skeleton="tag"] { height: 36px; }
-}
 
 /* ── 下排 ──
  * 读数照 `10,471 个符合` 写：12px 等宽、常规字重，颜色比标签低一档。其余控件同资料页那一排。 */

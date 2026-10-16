@@ -157,13 +157,13 @@
 }
 /* 关注页这块浮层的药丸间距同首页（`03-filterbar.css` 的 `.viewpills`、`.tagscroll`）是 7px，资料页收到 6px。 */
 .peach-react [data-follow-filter-glass] :is([data-entity-scroll], [data-entity-states], [data-entity-tags]) { gap: 7px; }
-/* 来源键只有站点图标，是一枚 34px 宽的药丸。 */
+/* 来源键与视图控件使用同一尺寸。 */
 .peach-react button[data-follow-provider] {
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 34px;
+  width: 30px;
   height: 30px;
   padding: 0;
   border: 1px dashed var(--glass-low);

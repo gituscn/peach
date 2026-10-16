@@ -10,9 +10,8 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Radio, RadioGroup } from 'react-aria-components';
 import { icon } from '@peach/legacy/core';
-import { spinnerHtml } from '@peach/legacy/ui';
 
-import { FilterGlassRows, FilterPill } from '../components/filter-glass';
+import { FilterGlassRows, FilterIconButton, FilterPill } from '../components/filter-glass';
 import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
 import { SEGMENTED_GLASS_TRACK, SEGMENT_GLASS } from '../components/segmented';
 import { spriteGlyph } from '../components/sprite-glyph';
@@ -265,9 +264,7 @@ export function Segments({ name, label, value, options, onChange }: {
 
 export function Shuffle({ onPress, busy = false }: { onPress(): void; busy?: boolean }) {
   return (
-    <button type="button" data-entity-batch="" title="换一批" aria-label="换一批" aria-busy={busy || undefined}
-      aria-disabled={busy || undefined} onClick={() => { if (!busy) onPress() }}
-      dangerouslySetInnerHTML={{ __html: busy ? spinnerHtml('正在换一批') : icon('shuffle') }} />
+    <FilterIconButton data-entity-batch="" label="换一批" busy={busy} icon={spriteGlyph('shuffle')} onPress={onPress} />
   );
 }
 

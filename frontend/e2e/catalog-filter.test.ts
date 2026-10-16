@@ -97,6 +97,22 @@ describe('首页筛选条', () => {
     it(`${viewport.name} 筛选条件与作品卡片悬停面保持间距`, { timeout: 60_000 }, async () => {
       const opened = await openHome(browser, '/?studio=Peach%20Studio', viewport);
       try {
+        await opened.page.mouse.move(0, 0);
+        const controls = await opened.page.locator(`${FILTER} [data-filter-glass]`).evaluate(frame => {
+          const candidates = [...frame.querySelectorAll('button,a[aria-pressed],[data-glass-segment]')]
+            .filter(node => node.getBoundingClientRect().width > 0 && node.getBoundingClientRect().height > 0);
+          const actions = ['[data-shortcuts-trigger]', '[data-entity-batch]'].map(selector => {
+            const node = frame.querySelector(selector)!;
+            const style = getComputedStyle(node), rect = node.getBoundingClientRect();
+            return { width: rect.width, height: rect.height, background: style.backgroundImage,
+              color: style.color, border: style.border, shadow: style.boxShadow, radius: style.borderRadius };
+          });
+          return { heights: candidates.map(node => ({ label: node.getAttribute('aria-label') || node.textContent,
+            height: node.getBoundingClientRect().height })), actions };
+        });
+        for (const control of controls.heights) assert.equal(control.height, 30, JSON.stringify(control));
+        assert.deepEqual(controls.actions[0], controls.actions[1]);
+        assert.equal(controls.actions[0].width, 30);
         const gap = await opened.page.evaluate(() => document.querySelector('#grid [data-media-card]')!.getBoundingClientRect().top
           - document.querySelector('#combo [data-entity-combo]')!.getBoundingClientRect().bottom - 8);
         assert.ok(gap >= 16, `筛选条件距卡片悬停面只有 ${gap}px`);
