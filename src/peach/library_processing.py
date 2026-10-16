@@ -127,6 +127,24 @@ def _unreached(problems):
     return kind('；'.join(text for text, _ in problems))
 
 
+def _fc2_official_images(payload):
+    """FC2 来源快照只提取发行方存储原件，并附发行方 Referer。"""
+    from .jav_cover_fetch import Candidate, IMAGE_URL
+    from .scripting import host_under, hostname_of
+    from .sources.fc2 import FC2, storage_original
+    found = []
+    for raw in payload.get('cover_urls') or ():
+        if not isinstance(raw, str):
+            continue
+        original = storage_original(raw)
+        if not IMAGE_URL.fullmatch(original):
+            continue
+        host = hostname_of(original)
+        if host_under(host, ('contents.fc2.com',)) or re.fullmatch(r'contents-thumbnail\d*\.fc2\.com', host):
+            found.append(Candidate(host, original, FC2.referer))
+    return found
+
+
 def _official_evidence(snapshots, absent=()):
     """片商、发行方与官方镜像快照里的封面候选，交给 `best_cover` 的 `known`。
 
@@ -158,13 +176,7 @@ def _official_evidence(snapshots, absent=()):
             makers |= {str(payload[field]).strip().casefold() for field in ('maker', 'studio', 'label')
                        if isinstance(payload.get(field), str) and payload[field].strip()}
         elif name in metadata_routes.FC2_STAGE:
-            from .jav_cover_fetch import candidate_for
-            from .scripting import host_under, hostname_of
-            from .sources.fc2 import storage_original
-            found += [candidate_for(original) for url in payload.get('cover_urls') or ()
-                      if isinstance(url, str) and (original := storage_original(url)) and IMAGE_URL.fullmatch(original)
-                      and (host_under(hostname_of(original), ('contents.fc2.com',))
-                           or re.fullmatch(r'contents-thumbnail\d*\.fc2\.com', hostname_of(original)))]
+            found += _fc2_official_images(payload)
         else:
             continue
         sources.add(name)
