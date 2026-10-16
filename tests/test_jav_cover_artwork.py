@@ -127,13 +127,15 @@ class CoverArtworkTests(unittest.TestCase):
         self.assertEqual(face['face']['cy'], .262)
 
     def test_full_canvas_layout_is_available_without_a_face_model(self):
-        with patch('peach.cover_artwork._default_detector', side_effect=FaceModelUnavailable('未取得')):
-            cover_artwork.install_cover(self.target, 'CAWD-186', jpeg((80, 90, 100), (800, 600)), (800, 600))
-        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
-        self.assertEqual(face['layout'], 'still')
-        self.assertIsNone(face['face'])
-        self.assertNotIn('version', face)
-        self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
+        for size in ((800, 600), (840, 594)):
+            with self.subTest(size=size), patch('peach.cover_artwork._default_detector',
+                                                side_effect=FaceModelUnavailable('未取得')):
+                cover_artwork.install_cover(self.target, 'CAWD-186', jpeg((80, 90, 100), size), size)
+            face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+            self.assertEqual(face['layout'], 'still')
+            self.assertIsNone(face['face'])
+            self.assertNotIn('version', face)
+            self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
 
     def test_a_clear_spine_keeps_the_front_portrait_despite_a_larger_back_portrait(self):
         detector = Detector()

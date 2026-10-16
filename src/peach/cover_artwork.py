@@ -17,6 +17,7 @@ from .jav_cover_fetch import Unavailable, is_javdb_image
 FRONT_START = 0.468
 MIN_FACE_Y, MAX_FACE_Y = 0.05, 0.60
 FACE_ALGORITHM_VERSION = 'cover-face-v4'
+PROMOTIONAL_ASPECTS = (4 / 3, 2 ** .5)
 _INSTALL_LOCK = threading.RLock()
 
 
@@ -65,7 +66,7 @@ def _dominant_left_face(image, largest, faces, *, code, title):
 def _promotional_canvas(image, *, code, title):
     """4:3 与纸张比例的画布没有可辨书脊时保留整幅。"""
     height, width = image.shape[:2]
-    if (min(abs(width / height - ratio) for ratio in (4 / 3, 2 ** .5)) >= .015
+    if (min(abs(width / height - ratio) for ratio in PROMOTIONAL_ASPECTS) >= .015
             or not jav_poster_crop.crops_to_portrait(code, title)):
         return False
     box = jav_poster_crop.front_panel_box(width, height, lambda: jav_poster_crop.column_gradient(image), code, title)
@@ -133,7 +134,7 @@ def _sidecars(code: str, payload: bytes, size: tuple[int, int], detector=None, e
         (lambda: jav_poster_crop.column_gradient(image)) if image is not None else None,
         title=title, face=(face or {}).get('face'), layout=(face or {}).get('layout', ''),
     )
-    if (face is None and abs(size[0] / size[1] - 4 / 3) < .015
+    if (face is None and min(abs(size[0] / size[1] - ratio) for ratio in PROMOTIONAL_ASPECTS) < .015
             and poster['box']['method'] == jav_poster_crop.RATIO):
         face = {'px': list(size), 'layout': 'still', 'face': None}
         poster = jav_poster_crop.crop_record(code, *size, title=title, layout='still')
