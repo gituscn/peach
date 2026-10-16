@@ -168,83 +168,120 @@ def _validate_withdrawal(value: dict) -> None:
         raise ValueError("撤销字段与实体类型不符")
 
 
-def validate(pack: dict, *, verify_hash: bool = True) -> dict:
-    """只校验，不修补、丢弃或自动批准输入。"""
+def _validate_header(pack: dict, *, verify_hash: bool) -> None:
+    """校验原始对象与版本头，保证后续检查可按已声明格式读取字段。"""
     if type(pack) is not dict or type(pack.get("format")) is not int:
         raise ValueError("种子包必须是带整数 format 的对象")
+    parsed = Pack.model_validate(pack)
+    if pack["format"] == 1 and {"revision", "content_sha256", "withdrawals"} & pack.keys():
+        raise ValueError("格式 1 不接受格式 2 字段")
+    if pack["format"] == 2:
+        if parsed.revision is None or type(parsed.content_sha256) is not str or "withdrawals" not in pack:
+            raise ValueError("格式 2 需要 revision、content_sha256 与累计 withdrawals")
+        if verify_hash and pack["content_sha256"] != digest(pack):
+            raise ValueError("种子内容摘要不符")
+
+
+def _validate_counts(pack: dict) -> None:
+    """对结构已通过校验的格式 2 包，核对各类声明计数。"""
+    if pack["format"] != 2:
+        return
+    counts = {"entities": len(pack["entities"]), "aliases": 0, "refs": 0, "links": 0,
+              "profiles": 0, "memberships": 0, "makers": 0}
+    for item in pack["entities"]:
+        for field in ("aliases", "refs", "links"):
+            counts[field] += len(item[field])
+        for field, counter in (("profile", "profiles"), ("agency", "memberships"), ("maker", "makers")):
+            counts[counter] += bool(item.get(field))
+    if counts != pack["counts"]:
+        raise ValueError("种子计数与包内容不一致")
+
+
+def _validate_item(item: dict, *, index: int, format_number: int, names: dict, refs: dict) -> None:
+    """校验单项身份和事实，并把名称、编号登记到共享占用表。"""
+    kind, identity = item["kind"], item.get("identity")
+    if format_number == 2 and identity is None:
+        raise ValueError("格式 2 的实体必须声明独立身份锚点")
+    if identity and (identity["kind"] != kind or normalize_entity_name(identity["name"]) != normalize_entity_name(item["name"])):
+        raise ValueError("实体与身份锚点不一致")
+    for name in [item["name"], *(alias["alias"] for alias in item["aliases"])]:
+        key = kind, normalize_entity_name(name)
+        if not key[1] or names.setdefault(key, index) != index:
+            raise ValueError(f"种子内身份名称冲突：{name}")
+    for ref in [*item["refs"], *((identity or {}).get("refs", []))]:
+        if ref["provider"] == "stash" or refs.setdefault(ref_key(ref), index) != index:
+            raise ValueError("种子内来源编号身份冲突或使用本机编号")
+    for link in item["links"]:
+        url_key(link["url"])
+    if item.get("profile"):
+        _profile(item["profile"])
+    if (item.get("profile") or item.get("agency")) and kind != "performer":
+        raise ValueError("资料与事务所归属只适用于女优")
+    if item.get("maker") and kind != "studio":
+        raise ValueError("片商归属只适用于厂牌")
+
+
+def _validate_items(pack: dict) -> None:
+    """全包共享占用表，拒绝跨实体的名称或编号冲突。"""
+    names, refs = {}, {}
+    for index, item in enumerate(pack["entities"]):
+        _validate_item(item, index=index, format_number=pack["format"], names=names, refs=refs)
+
+
+def _item_identity(item: dict) -> dict:
+    return item.get("identity") or {"kind": item["kind"], "name": item["name"], "refs": item["refs"]}
+
+
+def _asserted_values(item: dict, field: str) -> list:
+    """取得已通过结构校验的单项在指定字段上的正向断言。"""
+    if field == "alias":
+        return [item["name"], *(alias["alias"] for alias in item["aliases"])]
+    if field in {"ref", "link"}:
+        return item[{"ref": "refs", "link": "links"}[field]]
+    return [item[field]] if item.get(field) else []
+
+
+def _validate_withdrawal_conflicts(pack: dict) -> None:
+    """校验撤销值、唯一 id 和身份锚点，拒绝与同包正向断言矛盾。"""
+    identifiers = set()
+    anchors = [identity_keys(_item_identity(item)) for item in pack["entities"]]
+    for withdrawal in pack.get("withdrawals", []):
+        _validate_withdrawal(withdrawal)
+        if withdrawal["id"] in identifiers:
+            raise ValueError("撤销 id 重复")
+        identifiers.add(withdrawal["id"])
+        keys = identity_keys(withdrawal["identity"])
+        if sum(bool(keys & anchor) for anchor in anchors) > 1:
+            raise ValueError("撤销身份锚点在包内指向多个实体")
+        field = withdrawal["field"]
+        old = fact_key(field, withdrawal["value"])
+        for item, anchor in zip(pack["entities"], anchors):
+            if not keys & anchor:
+                continue
+            if any(fact_key(field, value) == old for value in _asserted_values(item, field)):
+                raise ValueError("同一包同时断言与撤销同一事实")
+
+
+def _validate_maker_graph(pack: dict) -> None:
+    """按规范名遍历已校验的片商归属图，拒绝循环指向。"""
+    studios = {normalize_entity_name(item["name"]): item for item in pack["entities"] if item["kind"] == "studio"}
+    for start in studios:
+        current, visited = start, set()
+        while current in studios and studios[current].get("maker"):
+            if current in visited:
+                raise ValueError("种子片商归属成环")
+            visited.add(current)
+            current = normalize_entity_name(studios[current]["maker"]["name"])
+
+
+def validate(pack: dict, *, verify_hash: bool = True) -> dict:
+    """只校验，不修补、丢弃或自动批准输入。"""
     try:
-        parsed = Pack.model_validate(pack)
-        if pack["format"] == 1 and {"revision", "content_sha256", "withdrawals"} & pack.keys():
-            raise ValueError("格式 1 不接受格式 2 字段")
-        if pack["format"] == 2:
-            if parsed.revision is None or type(parsed.content_sha256) is not str or "withdrawals" not in pack:
-                raise ValueError("格式 2 需要 revision、content_sha256 与累计 withdrawals")
-            if verify_hash and pack["content_sha256"] != digest(pack):
-                raise ValueError("种子内容摘要不符")
-            counts = {"entities": len(pack["entities"]), "aliases": 0, "refs": 0, "links": 0,
-                      "profiles": 0, "memberships": 0, "makers": 0}
-            for item in pack["entities"]:
-                for field in ("aliases", "refs", "links"):
-                    counts[field] += len(item[field])
-                for field, counter in (("profile", "profiles"), ("agency", "memberships"), ("maker", "makers")):
-                    counts[counter] += bool(item.get(field))
-            if counts != pack["counts"]:
-                raise ValueError("种子计数与包内容不一致")
-        names, refs = {}, {}
-        for index, item in enumerate(pack["entities"]):
-            kind = item["kind"]
-            identity = item.get("identity")
-            if pack["format"] == 2 and identity is None:
-                raise ValueError("格式 2 的实体必须声明独立身份锚点")
-            if identity and (identity["kind"] != kind or normalize_entity_name(identity["name"]) != normalize_entity_name(item["name"])):
-                raise ValueError("实体与身份锚点不一致")
-            for name in [item["name"], *(alias["alias"] for alias in item["aliases"])]:
-                key = kind, normalize_entity_name(name)
-                if not key[1] or names.setdefault(key, index) != index:
-                    raise ValueError(f"种子内身份名称冲突：{name}")
-            for ref in [*item["refs"], *((identity or {}).get("refs", []))]:
-                if ref["provider"] == "stash" or refs.setdefault(ref_key(ref), index) != index:
-                    raise ValueError("种子内来源编号身份冲突或使用本机编号")
-            for link in item["links"]:
-                url_key(link["url"])
-            if item.get("profile"):
-                _profile(item["profile"])
-            if item.get("profile") or item.get("agency"):
-                if kind != "performer":
-                    raise ValueError("资料与事务所归属只适用于女优")
-            if item.get("maker") and kind != "studio":
-                raise ValueError("片商归属只适用于厂牌")
-        identifiers = set()
-        anchors = [identity_keys(item.get("identity") or {"kind": item["kind"], "name": item["name"], "refs": item["refs"]})
-                   for item in pack["entities"]]
-        for withdrawal in pack.get("withdrawals", []):
-            _validate_withdrawal(withdrawal)
-            if withdrawal["id"] in identifiers:
-                raise ValueError("撤销 id 重复")
-            identifiers.add(withdrawal["id"])
-            identity = withdrawal["identity"]
-            if sum(bool(identity_keys(identity) & keys) for keys in anchors) > 1:
-                raise ValueError("撤销身份锚点在包内指向多个实体")
-            for item in pack["entities"]:
-                anchor = item.get("identity", {"kind": item["kind"], "name": item["name"], "refs": item["refs"]})
-                if not identity_keys(identity) & identity_keys(anchor):
-                    continue
-                field, old = withdrawal["field"], fact_key(withdrawal["field"], withdrawal["value"])
-                values = {"alias": [item["name"], *(a["alias"] for a in item["aliases"])],
-                          "ref": item["refs"], "link": item["links"],
-                          "profile": [item["profile"]] if item.get("profile") else [],
-                          "agency": [item["agency"]] if item.get("agency") else [],
-                          "maker": [item["maker"]] if item.get("maker") else []}[field]
-                if any(fact_key(field, value) == old for value in values):
-                    raise ValueError("同一包同时断言与撤销同一事实")
-        studios = {normalize_entity_name(item["name"]): item for item in pack["entities"] if item["kind"] == "studio"}
-        for start in studios:
-            current, visited = start, set()
-            while current in studios and studios[current].get("maker"):
-                if current in visited:
-                    raise ValueError("种子片商归属成环")
-                visited.add(current)
-                current = normalize_entity_name(studios[current]["maker"]["name"])
+        _validate_header(pack, verify_hash=verify_hash)
+        _validate_counts(pack)
+        _validate_items(pack)
+        _validate_withdrawal_conflicts(pack)
+        _validate_maker_graph(pack)
         canonical(pack)
     except (ValidationError, TypeError, KeyError, OverflowError) as exc:
         raise ValueError(f"种子包结构无效：{exc}") from exc

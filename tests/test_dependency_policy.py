@@ -79,6 +79,7 @@ class DependencyPolicyTests(unittest.TestCase):
             "opencc": "opencc",
             "p115client": "p115client",
             "psutil": "psutil",
+            "pydantic": "pydantic",
             "pystray": "pystray",
             "resvg_py": "resvg-py",
             "starlette": "starlette",
