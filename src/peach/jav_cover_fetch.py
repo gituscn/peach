@@ -749,10 +749,19 @@ def _site_candidates(transport: HttpTransport, code: str, evidence: MetadataEvid
     """复用官方目录并按发行面查询图片；FC2 由调用方提供商品图候选。"""
     if code.upper().startswith("FC2-PPV-"):
         return []
+    from peach.metadata_routes import maker_sites
     candidates: list[Candidate] = []
     live_evidence = MetadataEvidence()
+    prestige = _is_prestige(evidence) or 'prestige' in maker_sites(code)
+    amateur = is_amateur_code(code) or 'mgstage' in evidence.sources
+    if prestige:
+        candidates += prestige_group_images(transport, code, deadline=deadline)
+    elif amateur:
+        candidates += mgstage_images(transport, code, deadline=deadline)
+    if candidates or ((prestige or amateur) and evidence.candidates):
+        return candidates
     if (not evidence.candidates and 'dmm' not in evidence.sources
-            and not is_amateur_code(code) and not is_uncensored_code(code)):
+            and not prestige and not amateur and not is_uncensored_code(code)):
         try:
             live_evidence = dmm_evidence(transport, code, deadline=deadline)
             candidates += list(live_evidence.candidates)
@@ -764,15 +773,9 @@ def _site_candidates(transport: HttpTransport, code: str, evidence: MetadataEvid
         live_evidence = r18_evidence(transport, code, deadline=deadline, record=record)
         candidates += list(live_evidence.candidates)
         _sleep_within(delay, deadline)
-    # MGS 与 Prestige 都是 Prestige 集团的官方供给面。只在本地厂牌证据命中时
-    # 查询，避免把全库 960 个番号无差别打到两个站点。
-    if _is_prestige(evidence) or _is_prestige(live_evidence):
+    # 目录新识别出 Prestige 时补问集团自营渠道。
+    if not prestige and _is_prestige(live_evidence):
         candidates += prestige_group_images(transport, code, deadline=deadline)
-        _sleep_within(delay, deadline)
-    # 素人系番号按形状就能确定发行面是 MGS，不必先有元数据。等元数据的旧写法让
-    # 259LUXU / 300MIUM / 428SUKE 这批番号一次也没问过 MGS——而 MGS 一直有图。
-    elif is_amateur_code(code) or "mgstage" in evidence.sources:
-        candidates += mgstage_images(transport, code, deadline=deadline)
         _sleep_within(delay, deadline)
     return candidates
 
@@ -889,7 +892,7 @@ def _measure(transport: HttpTransport, candidates, record, *, minimum_width: int
 def _download_best(transport: HttpTransport, measured, record, *, minimum_width: int,
                    minimum_quality: int, minimum_pixels: int,
                    deadline: float | None) -> tuple[Candidate, tuple[int, int], bytes]:
-    """按来源档次与像素从高到低完整下载，第一张尺寸对得上、是静态图、确实更好的就是它。
+    """封面按像素面积择优，同尺寸优先商品图；预览图仅作末档候选。
 
     动图只有下完整张才认得出：FC2 链末档 JavArchive 的图床存的常是 GIF 预览动画，
     只读头部量尺寸时它和一张静态图没有区别，落进 `.jpg` 之后卡片就一直在动。候选全是
@@ -897,7 +900,7 @@ def _download_best(transport: HttpTransport, measured, record, *, minimum_width:
     """
     animated = 0
     for _pixels, winner, size in sorted(
-            measured, key=lambda item: (candidate_quality(item[1]), item[0]), reverse=True):
+            measured, key=lambda item: (candidate_quality(item[1]) > 0, item[0], candidate_quality(item[1])), reverse=True):
         try:
             data = _fetch(transport, winner.url, referer=winner.referer,
                           limit=16 * 1024 * 1024, deadline=deadline)
