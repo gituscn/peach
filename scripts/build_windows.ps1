@@ -3,7 +3,9 @@
     [switch]$Standalone,
     # 在独立目录包之上再编一个 Inno Setup 安装包，放在输出目录的上一层。
     [switch]$Installer,
-    [string]$CloudflaredPath = ''
+    [string]$CloudflaredPath = '',
+    [string]$FFmpegPath = '',
+    [string]$UntruncPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -87,6 +89,18 @@ $CloudflaredSource = $null
 $CloudflaredManifest = $null
 $CloudflaredHash = $null
 if ($Standalone) {
+    if (-not $FFmpegPath) { $FFmpegPath = $env:PEACH_FFMPEG_BUILD }
+    if (-not $FFmpegPath) { $FFmpegPath = Join-Path $ProjectRoot 'build\ffmpeg-windows\ffmpeg' }
+    & $Python -X utf8 (Join-Path $PSScriptRoot 'media_tool_bundle.py') --source $FFmpegPath --validate-only
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Standalone build requires verified FFmpeg tools and corresponding source. Run scripts/build_ffmpeg_windows.sh first or pass -FFmpegPath.'
+    }
+    if (-not $UntruncPath) { $UntruncPath = $env:PEACH_UNTRUNC_BUILD }
+    if (-not $UntruncPath) { $UntruncPath = Join-Path $ProjectRoot 'build\untrunc-windows\untrunc' }
+    & $Python -X utf8 (Join-Path $PSScriptRoot 'media_tool_bundle.py') --tool untrunc --source $UntruncPath --validate-only
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Standalone build requires verified untrunc and corresponding source. Run scripts/build_untrunc_windows.sh first or pass -UntruncPath.'
+    }
     $CloudflaredCandidates = @()
     if ($CloudflaredPath) { $CloudflaredCandidates += $CloudflaredPath }
     if ($env:PEACH_CLOUDFLARED_BUILD) { $CloudflaredCandidates += $env:PEACH_CLOUDFLARED_BUILD }
@@ -126,6 +140,20 @@ if ($Standalone) {
     Copy-Item -LiteralPath $CloudflaredSource -Destination (Join-Path $OutputPath 'cloudflared.exe') -Force
     $CloudflaredManifest | Add-Member -NotePropertyName packaged_sha256 -NotePropertyValue $CloudflaredHash -Force
     $CloudflaredManifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutputPath 'cloudflared-manifest.json') -Encoding utf8
+    $PackagedFFmpeg = [IO.Path]::GetFullPath((Join-Path $OutputPath 'tools\ffmpeg'))
+    if (-not $PackagedFFmpeg.StartsWith($OutputPath.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'FFmpeg packaging destination must stay inside the application output directory.'
+    }
+    if (Test-Path -LiteralPath $PackagedFFmpeg) { Remove-Item -LiteralPath $PackagedFFmpeg -Recurse -Force }
+    & $Python -X utf8 (Join-Path $PSScriptRoot 'media_tool_bundle.py') --source $FFmpegPath --destination $PackagedFFmpeg
+    if ($LASTEXITCODE -ne 0) { throw 'FFmpeg packaging failed.' }
+    $PackagedUntrunc = [IO.Path]::GetFullPath((Join-Path $OutputPath 'tools\untrunc'))
+    if (-not $PackagedUntrunc.StartsWith($OutputPath.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'untrunc packaging destination must stay inside the application output directory.'
+    }
+    if (Test-Path -LiteralPath $PackagedUntrunc) { Remove-Item -LiteralPath $PackagedUntrunc -Recurse -Force }
+    & $Python -X utf8 (Join-Path $PSScriptRoot 'media_tool_bundle.py') --tool untrunc --source $UntruncPath --destination $PackagedUntrunc
+    if ($LASTEXITCODE -ne 0) { throw 'untrunc packaging failed.' }
 }
 
 # 工作目录只服务这一次构建：`--clean` 已让下一次不复用它，留着只是几十 MB 的中间产物。

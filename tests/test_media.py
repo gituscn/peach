@@ -1,5 +1,6 @@
 import os
 import tempfile
+import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -79,6 +80,35 @@ class MediaEngineTests(unittest.TestCase):
                     patch("peach.ffmpeg.shutil.which", return_value=None):
                 choice = FFmpegResolver(root).ffmpeg()
         self.assertEqual(choice.source, "peach-managed")
+
+    def test_frozen_application_uses_both_bundled_tools_without_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            bundle = root / "app" / "tools" / "ffmpeg" / "bin"
+            bundle.mkdir(parents=True)
+            suffix = ".exe" if os.name == "nt" else ""
+            for name in ("ffmpeg", "ffprobe"):
+                (bundle / (name + suffix)).write_bytes(b"tool")
+            with patch.object(sys, "frozen", True, create=True), \
+                    patch.object(sys, "executable", str(root / "app" / "Peach.exe")), \
+                    patch.dict(os.environ, {"PEACH_FFMPEG": "", "PEACH_FFPROBE": ""}), \
+                    patch("peach.ffmpeg.shutil.which", return_value=None):
+                resolver = FFmpegResolver(root / "data")
+                for choice in (resolver.ffmpeg(), resolver.ffprobe()):
+                    self.assertEqual(choice.source, "peach-bundled")
+                    self.assertEqual(choice.path.parent, bundle)
+
+    def test_source_environment_does_not_use_tools_beside_python(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            tool = root / "tools" / "ffmpeg" / "bin" / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+            tool.parent.mkdir(parents=True)
+            tool.write_bytes(b"tool")
+            with patch.object(sys, "frozen", False, create=True), \
+                    patch.object(sys, "executable", str(root / "python.exe")), \
+                    patch.dict(os.environ, {"PEACH_FFMPEG": ""}), \
+                    patch("peach.ffmpeg.shutil.which", return_value=None):
+                self.assertIsNone(FFmpegResolver(root / "data").ffmpeg())
 
     def test_offline_windows_root_does_not_block_startup(self):
         with patch.object(Path, "resolve", side_effect=OSError("offline")):
