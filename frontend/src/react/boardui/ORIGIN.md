@@ -14,6 +14,9 @@
 
 | 条目 | 注册表 JSON 的 SHA-256 | 复制的文件 |
 | --- | --- | --- |
+| `tree-view`（2026-10-17） | `72b06e3187ae7738bd1eabd46bc15ebe1d2d49be768e44306b266d91206eeb9c` | `components/base/tree-view/tree-view.tsx` |
+| `breadcrumb`（2026-10-17） | `15ec77574bb50fd5e37bf6d157905ffe7eb03226585cc77983c0beea92abd811` | `components/base/breadcrumb/breadcrumb.tsx` |
+| `direction`（2026-10-17） | `94ff665ff5060ffbbbda89f395882c0236646db74f6b080ab987518fb5fa4592` | `components/foundations/direction/direction.tsx` |
 | `avatar`（2026-10-14） | `614f2a384e2d44c0a15df8e3fc42c1648ccd7101f1c8be98911087641ab28aec` | `components/base/avatar/avatar.tsx` |
 | `theme` | `436353b1f8466dd56adf3909cb7a871288e0d6f5b067cf03a2f860375d2a013e` | `styles/theme.css` |
 | `typography` | `5b7eca25350829755eb15cb474ab009fd1f8b929e62d54182f648b4f2e97bf8e` | `styles/typography.css` |
@@ -32,6 +35,8 @@
 | `table` | `fc12a8f2f4012d9e983e0b9bbb10f9fe3288d74046566d2623d60e7056c50d88` | `components/base/table/table.tsx` |
 
 ## 没有逐字复制的部分
+
+目录浏览保留首页筛选、排序、卡片和详情结构。树采用 `small` 档和受控展开、选中状态，子目录按需从账本读取。面包屑按钮由 Peach 导航；上游 `next/link` 导入通过构建别名连接 `../components/board-navigation-link.tsx`，只承担原生链接槽，不引入 Next.js。上游目录树需要的 `menu-styles.ts` 继续使用已登记副本。全部依赖已由当前 React、React Aria、Motion 和 Remix Icon 清单覆盖。
 
 | 上游 | 处理 | 原因 |
 | --- | --- | --- |

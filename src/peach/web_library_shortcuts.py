@@ -14,7 +14,8 @@ from .web_settings import DEFAULT_PROFILE_ID
 KEY = "libraryShortcuts"
 KINDS = frozenset({"performer", "creator", "studio", "series", "agency", "tag"})
 QUERY_KEYS = frozenset({"loc", "creator", "studio", "owner", "tag", "tag_match", "len",
-                        "dur_min", "dur_max", "orient", "region", "sort", "dir", "q", "jav", "thumb", "state"})
+                        "dur_min", "dur_max", "orient", "region", "sort", "dir", "q", "jav", "thumb", "state",
+                        "browse", "folder", "folder_recursive"})
 PATHS = frozenset({"/", "/unseen", "/watch-later", "/flagged"})
 
 

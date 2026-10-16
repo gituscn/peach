@@ -67,6 +67,8 @@ The original screenshots are lossless 3840×2160 PNGs; click to view them. You c
 
 ## What it does
 
+- **Browse folders**: the folder button in the library filter bar opens your directory tree and breadcrumbs, alongside the existing search, filters, sorting, cards, and details. Keep personal categories or confirm a folder as a person, creator account, seller, or studio. Preview the affected items before saving, optionally apply the rule to future files, and remove the rule when needed. Conflicting assignments stay in place. See [folder browsing](docs/DIRECTORY_BROWSING.md).
+
 - **Search**: focus the search field to browse library works, JAV releases, followed videos and images, and subscribed releases by cover; enter performer and followed creator pages through their avatars. Follow and new release subscriptions are also available from the menu. Type a few characters to search performers, codes and videos together.
 - **My Favorites**: use the star beside a profile name to favorite people, makers, labels, series and tags; a solid yellow star shows a favorite. The star button in library, discovery, follow and profile filters opens My Favorites, with type and name search and profile images, label logos or creator avatars. The dialog shares the settings glass navigation, keeps saved filters in their own tab, and links to Marked and Watch Later at the bottom of navigation. On library pages, name the current filter to open or delete it later.
 - **Source checks**: choose direct access or the Peach proxy per source, and inspect failure reasons, elapsed time and cooldowns. Configure, preview and enable public JSON metadata APIs on the sources page; see [custom sources](docs/CUSTOM_SOURCES.md). Review images load when requested and can be retried.

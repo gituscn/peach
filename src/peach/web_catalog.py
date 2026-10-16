@@ -204,6 +204,10 @@ def catalog_filter(contract: WebContract, args):
     # 普通馆藏仍是视频表面；回收站必须展示所有文件类型，否则从垃圾复核移入的
     # 图片、网址快捷方式等会变成不可见、不可恢复，只能被「清空回收站」直接删掉。
     where, par = ([] if trash else [VISIBLE_CATALOG_ASSET]), []
+    from .web_folders import folder_filter
+    folder_where, folder_params = folder_filter(contract, args)
+    where.extend(folder_where)
+    par.extend(folder_params)
     if args.get("library"):
         clause, values = media_libraries.predicate(settings_file.active(), args["library"])
         where.append(clause)
@@ -1174,7 +1178,7 @@ def state_clause(state: str) -> str:
 TOPS_POOL_FACTOR = 4
 
 
-def q_tops(contract: WebContract, n=28, jav=False, seed="", state="", page=0):
+def q_tops(contract: WebContract, n=28, jav=False, seed="", state="", page=0, filters=None):
     """顶部三层用的数据：女优圆头像 / 厂牌 / 内容标签。
 
     缓存的人物肖像由前端优先使用；缺失时才回退到代表作接触印相裁切。
@@ -1187,6 +1191,10 @@ def q_tops(contract: WebContract, n=28, jav=False, seed="", state="", page=0):
     末尾往后按数量数下去。库里六百多位女优，一排给到头才是「滚到底还能接着滚」。"""
     with contract.read_connection() as c:
         scope = PRESENT_ASSET_CLAUSE + (JAV_ASSET_CLAUSE if jav else "") + state_clause(state)
+        folder_params = []
+        if filters and filters.get('folder'):
+            conditions, folder_params = catalog_filter(contract, filters)
+            scope += ' AND ' + ' AND '.join(conditions)
         base = (
             "SELECT e.id,e.canonical_name,count(DISTINCT ae.asset_id) n,"
             "(SELECT a2.id FROM asset_entity ae2 JOIN asset a2 ON a2.id=ae2.asset_id "
@@ -1203,7 +1211,7 @@ def q_tops(contract: WebContract, n=28, jav=False, seed="", state="", page=0):
         def read(kind, limit, skip):
             return [{"id": entity_id, "k": k, "n": cnt, "rep": representative}
                     for entity_id, k, cnt, representative
-                    in c.execute(base, (kind, limit, skip))]
+                    in c.execute(base, (kind, *folder_params, limit, skip))]
 
         def pick(kind):
             """按数量取候选池，再按种子确定性抽样。种子为空时退回严格前 N。"""
