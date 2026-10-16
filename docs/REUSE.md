@@ -189,6 +189,7 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 - Web 复用 Fieldset、Progress、confirmModal；状态由 `standalone-update.json` 保存。下载按字节计量，解压按文件数计量，替换使用阶段进度；服务重启期间保留等待状态，恢复连接后核对版本。
 - 新版有待应用迁移时，重启安装复用 `migrate upgrade --yes`，先保存 SQLite 备份；迁移或启动失败时恢复数据库与程序。数据库备份位于用户数据根的 `state/update-backups/`。
 - 更新事务按当前配置读取 state 与账本路径，助手显式继承所选数据根。已有数据目录恢复复用严格配置解析与位置记录，只接受含配置和账本的目录。`scripts/smoke_desktop.py` 验证恢复及再次启动；`scripts/smoke_online_update.py` 使用真实 Release 包和临时馆藏验证在线更新，可注入无法启动的暂存 EXE 验证回滚。
+- 覆盖升级验收复用 `smoke_desktop` 的首启配置、临时数据根、登录和进程退出；`scripts/smoke_overlay_upgrade.py` 使用标准库下载并校验已发布制品，分别走 ZIP 原位解压和 Inno Setup 原位安装。安装包只在没有 Peach 安装登记的 Actions runner 上验收，覆盖安装器停止旧进程、目录记忆、配置与密码保留、账本哨兵、普通启动及卸载保留数据；不新增依赖。
 
 JAV 默认封面（官方封面／预览图）与视频默认大小（大图／小图）独立保存，用 localStorage、共享 Switch 与既有 `/cover`、`/poster`。设置弹窗同步首页与 JAV 的版式，筛选条可单独调当前视图。`frontend/src/jav-artwork.ts` 管作品身份、偏好恢复与缺图回退，首页、接着看、实体作品、详情推荐、Mix 静止与翻图、播放队列共用封面选择。小图展示完整封套，竖版正封完整放入大图卡片；新作封面完成取景才显示，缓存图插入时重算取景。
 
