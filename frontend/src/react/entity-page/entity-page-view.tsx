@@ -404,7 +404,8 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
           : worksEmpty ? <WorksEmpty filtered={filtered} onShowAll={showAll} />
           : (
             <EntityBodyPage kind={kind} name={name} view={view} roster={rosterProps} items={items.data ?? null}
-              revision={itemsRevision} fetchPage={fetchPage} listScope={JSON.stringify(itemsQuery.queryKey.slice(0, -1))}
+              revision={itemsRevision} fetchPage={fetchPage}
+              listScope={JSON.stringify([kind, name, filters, props.jav, filters.sort === 'seed' ? props.seed : ''])}
               photos={photos} photoSize={props.photoSize}
               photoLayout={props.photoLayout} helpers={props.card.helpers} actions={bodyActions} layout={layout}
               selectMode={props.selectMode} selected={props.selected} seekSeconds={props.seekSeconds}

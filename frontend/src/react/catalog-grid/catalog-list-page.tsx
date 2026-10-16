@@ -35,7 +35,11 @@ const positions = new Map<string, ListState>();
 /** 服务端对完整筛选结果排序、分页；选择集及批量栏归现有馆藏控制器。 */
 export function CatalogListPage(props: CatalogGridProps) {
   const params = catalogParams(props.filters || {}, false);
-  const scope = `${props.mode}:${props.listScope || props.entityKey || ''}:${params}`;
+  const [scope] = useState(() => {
+    const position = new URLSearchParams(params);
+    if (!new URLSearchParams(location.search).has('seed')) position.delete('seed');
+    return `${props.mode}:${props.listScope || props.entityKey || ''}:${position}`;
+  });
   const [state, setState] = useState<ListState>(() => positions.get(scope) || {
     sorting: [], pagination: { pageIndex: 0, pageSize: 20 },
   });
@@ -44,7 +48,7 @@ export function CatalogListPage(props: CatalogGridProps) {
   const offset = pagination.pageIndex * pagination.pageSize;
   const sort = sorting[0];
   const result = useQuery({
-    queryKey: ['catalog-grid', 'table', scope, props.revision, pagination, sorting],
+    queryKey: ['catalog-grid', 'table', scope, params, props.revision, pagination, sorting],
     placeholderData: keepPreviousData,
     queryFn: async ({ signal }): Promise<MediaPage> => {
       const options = { limit: pagination.pageSize, sort: sort?.id, dir: sort ? sort.desc ? 'desc' : 'asc' : undefined };

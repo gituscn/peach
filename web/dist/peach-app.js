@@ -52899,7 +52899,10 @@ var qwe = _L({
 	}
 ], gR = /* @__PURE__ */ new Map();
 function Ywe(e) {
-	let t = lD(e.filters || {}, !1), n = `${e.mode}:${e.listScope || e.entityKey || ""}:${t}`, [r, i] = (0, S.useState)(() => gR.get(n) || {
+	let t = lD(e.filters || {}, !1), [n] = (0, S.useState)(() => {
+		let n = new URLSearchParams(t);
+		return new URLSearchParams(location.search).has("seed") || n.delete("seed"), `${e.mode}:${e.listScope || e.entityKey || ""}:${n}`;
+	}), [r, i] = (0, S.useState)(() => gR.get(n) || {
 		sorting: [],
 		pagination: {
 			pageIndex: 0,
@@ -52914,6 +52917,7 @@ function Ywe(e) {
 			"catalog-grid",
 			"table",
 			n,
+			t,
 			e.revision,
 			o,
 			a
@@ -60174,7 +60178,13 @@ function Qke(e) {
 			items: M.data ?? null,
 			revision: N,
 			fetchPage: ee,
-			listScope: JSON.stringify(j.queryKey.slice(0, -1)),
+			listScope: JSON.stringify([
+				t,
+				n,
+				i,
+				e.jav,
+				i.sort === "seed" ? e.seed : ""
+			]),
 			photos: se,
 			photoSize: e.photoSize,
 			photoLayout: e.photoLayout,
