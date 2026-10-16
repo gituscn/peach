@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 import zipfile
 
 from peach import settings_file, standalone_update as update
+from support.ledger import fresh_ledger
 
 
 class StandaloneUpdateTests(unittest.TestCase):
@@ -111,7 +112,6 @@ class StandaloneUpdateTests(unittest.TestCase):
 
     def test_restart_accepts_running_tasks_and_requests_their_pause(self):
         from peach.task_runs import TaskRunStore
-        from support.ledger import fresh_ledger
         fresh_ledger(self.database.parent)
         store = TaskRunStore(self.database)
         store.start('library-processing', trigger='scheduled')
