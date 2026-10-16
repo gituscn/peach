@@ -1,6 +1,6 @@
 """建一个 master 上已有首个提交的临时 git 仓库，供测试按模板复制。
 
-`git init`、两条 config、add、commit 一套下来五六次子进程，Windows 上每次约 0.05 秒；
+`git init`、仓库配置、add、commit 一套需要多次子进程，Windows 上每次约 0.05 秒；
 三份工作树与发布脚本的测试每个 `setUp` 都来一遍，一百多个用例就是半分钟。同样内容的
 种子仓库只真的建一次，之后 `copytree` 一份，几毫秒。
 
@@ -47,6 +47,9 @@ def seed_repository(destination: Path, files: dict[str, str | bytes], message: s
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         _git(template, "config", "user.email", "test@example.invalid")
         _git(template, "config", "user.name", "Peach Test")
+        # 命令返回前完成自动维护，副本回收时没有后台 Git 继续写入。
+        _git(template, "config", "maintenance.autoDetach", "false")
+        _git(template, "config", "gc.autoDetach", "false")
         for name, body in files.items():
             path = template / name
             path.parent.mkdir(parents=True, exist_ok=True)

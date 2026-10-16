@@ -168,11 +168,13 @@ def _start_ledger_services(settings: PeachSettings, contract, services) -> bool:
     return True
 
 
-async def _warm_ledger_aggregates(ledger_ready: bool, contract) -> None:
+async def _warm_ledger_aggregates(ledger_ready: bool, contract, stopping: asyncio.Event) -> None:
     """走和真实请求同一条分派，缓存键一致，页面第一次打开就是现成的。"""
     if not ledger_ready:
         return
     for path, args in WARM_AGGREGATES:
+        if stopping.is_set():
+            return
         try:
             await asyncio.to_thread(web_contract.dispatch_api_get, contract, path, args)
         except Exception:
@@ -346,7 +348,8 @@ def create_app(
             mount_reachability.start()
         _app.state.ledger_background_ready = ledger_ready
         warmup = asyncio.create_task(warm_startup_entries())
-        aggregate_warmup = asyncio.create_task(_warm_ledger_aggregates(ledger_ready, contract))
+        aggregate_stop = asyncio.Event()
+        aggregate_warmup = asyncio.create_task(_warm_ledger_aggregates(ledger_ready, contract, aggregate_stop))
         if mdns is not None:
             try:
                 await asyncio.to_thread(mdns.start)
@@ -356,15 +359,18 @@ def create_app(
         try:
             yield
         finally:
+            _app.state.ledger_background_ready = False
+            aggregate_stop.set()
             loop.set_exception_handler(previous_error_handler)
             warmup.cancel()
-            aggregate_warmup.cancel()
             follow_scheduler.stop()
             feed_scheduler.stop()
             automatic_updates.stop()
             push_discovery.stop()
             downloads.stop()
             mount_reachability.stop()
+            # to_thread 的查询在线程内释放连接后才算结束。
+            await aggregate_warmup
             # 死链检查和资源对账的后台线程是 daemon，本来挡不住进程退出；这里显式收
             # 一下，免得在途的那一轮在解释器拆卸期间还继续查库、往没人读的状态里写。
             contract.stop_background_jobs()
