@@ -3,8 +3,8 @@ name: peach-jav-cover-workflow
 description: 在用户说 JAV 封面、高清封面、缺封面、封面刮削、重探、来源比较或继续抓取时使用。
 ---
 
-最后复核：2026-09-27
-证据来源：`scripts/fetch_jav_covers.py`、`scripts/detect_cover_faces.py`、`tests/test_jav_covers.py`、`tests/test_jav_poster_crop.py`、`docs/REUSE.md` 与 ABW-232 官方来源实测。
+最后复核：2026-10-17
+证据来源：`scripts/fetch_jav_covers.py`、`scripts/audit_cover_artwork.py`、`tests/test_jav_covers.py`、`tests/test_jav_poster_crop.py` 与 ADR-0107。
 
 # JAV 封面获取流程
 
@@ -43,7 +43,7 @@ description: 在用户说 JAV 封面、高清封面、缺封面、封面刮削�
 
 - 宽度低于 700、无法解码、缩略图、剧照、关联作品图都拒绝。
 - Range 最多先取 64 KiB 量尺寸，胜出后才下载完整图片。
-- 已有封面只有候选像素面积更大时才写同目录临时文件并原子替换。
+- 正式封面按实际像素面积择优，同尺寸优先商品图；JavDB 图片只作核验，不安装或显示兜底。
 - 单条网络异常写失败并换连接池，任务继续；确认无候选与瞬时失败分开记录。
 - `DiskGuard` 运行期守住系统盘；每条完成后重写可续跑日志。
 
@@ -55,7 +55,7 @@ description: 在用户说 JAV 封面、高清封面、缺封面、封面刮削�
 & .\.venv\Scripts\python.exe .\scripts\detect_cover_faces.py
 ```
 
-- 已算过的默认跳过，`--redo` 才重算；954 张实测检出 885 张，未检出的页面居中。
+- 算法版本与尺寸匹配的记录默认跳过，过期记录自动重算；`--redo` 全量重算，未检出时页面居中。
 - sidecar 的 `cx` 和 `cy` 都要留着。用哪个轴由容器比例决定：`object-fit:cover`
   一次只裁一个轴，16:9 官方剧照在大图版式里裁的是横向，纵向锚点在那里不生效。
 - 版式判据（1.2 / 1.65 两个分界）的真相在 `peach.jav_poster_crop`，`web/app.js` 的 `coverAnchor`
@@ -90,9 +90,8 @@ description: 在用户说 JAV 封面、高清封面、缺封面、封面刮削�
   改了判据要进 `ALGORITHM_VERSION`，重算完再重启服务，否则旧服务整批拒收新边车、全站框消失。
 - 页面只用框里的 `x0`：`web/app.js` 的 `posterPanel` 把它换算成 `--panel-clip` 与
   `--panel-left`，图片按卡片高度铺满、`clip-path` 切掉折痕以左的封底，正封居中摆。
-- **容器比例定在 0.75，别按单张封面调**：一行卡片必须等高，比例只能是全局一个数。切出来的
-  正封比全在 0.667～0.749，一张都不用从左边切；两侧留白由 `--cover-blur` 模糊背景垫，每边
-  中位 3.1%、最大 5.6%（取 0.72 会有 10 张被切掉最多 3.8%）。
+- **正封容器比例定在 0.75**：一行卡片等高，正封完整居中，比例差异处保留卡片纯色底。
+  整幅大封在竖版按主脸填满、横版完整显示，均不使用模糊补边（ADR-0107）。
 - 找不到折痕的（本机 46 张）按 `PANEL_ASPECT` 从右缘量回去，记 `ratio`；形状仍是正封的物理比例。
 - **宽封套由厂牌开门、比例决定走不走**（`WIDE_SLEEVE_LABELS`：CWPBD、SMBD）。Blu-ray 模板
   750×419 与 mgstage 16:9 剧照只差 1%，比例与满高缝都分不开（143 张剧照里 52 张同窗有缝）；

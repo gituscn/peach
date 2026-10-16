@@ -70,6 +70,18 @@ class FetchRetryTests(unittest.TestCase):
         self.assertEqual(size, (2184, 1468))
         mirror.assert_not_called()
 
+    def test_maker_small_image_and_a_missing_mirror_do_not_suppress_dmm_lookup(self):
+        factory = 'https://cdn.up-timely.com/image/32/cover.jpg'
+        original = 'https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/cawd00447/cawd00447pl.jpg'
+        modern = original.replace('awsimgsrc.dmm.co.jp/pics_dig/', 'awsimgsrc.dmm.com/dig/')
+        item = {'id': 'cawd00447', 'title': '作品', 'makerContentId': 'CAWD-447',
+                'packageImage': {'largeUrl': original}}
+        evidence = covers.MetadataEvidence((covers.candidate_for(factory),), sources=frozenset({'makers', 'r18dev'}))
+        winner, size, _ = covers.best_cover(transport_for({factory: (200, jpeg(800, 538)),
+            'https://api.video.dmm.co.jp/graphql': (200, json.dumps({'data': {'ppvContent': item}}).encode()),
+            modern: (200, jpeg(2184, 1468))}), 'CAWD-447', 0, known=evidence)
+        self.assertEqual((winner.url, size), (modern, (2184, 1468)))
+
     def test_catalog_connection_failure_is_not_a_definitive_missing_cover(self):
         diagnostics = {}
         with patch.object(covers, 'dmm_evidence', return_value=covers.MetadataEvidence()):

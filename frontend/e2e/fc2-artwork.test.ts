@@ -30,6 +30,41 @@ describe('FC2 合集与封面取景', () => {
       } finally { await opened.close(); }
     });
 
+    it(`${viewport.name}: 正封完整居中，卡片边缘使用纯色底`, async () => {
+      const opened = await openItemPage(browser, '/', viewport, {
+        ready: '[data-media-card]', settings: { javLayout: 'big', homeLayout: 'big', javImage: 'cover' },
+      });
+      try {
+        const base = await opened.page.evaluate(async (id) => (await fetch(`/api/item?id=${id}`)).json(), ITEM.plain);
+        const item = { ...base, code: 'IPZZ-477', is_jav: true, has_cover: true, tags: [], part_group: null,
+          cover_frame: { cx: .75, cy: .25 },
+          poster_box: { x0: 1153, y0: 0, x1: 2184, y1: 1468, px: [2184, 1468], method: 'fold' } };
+        await opened.page.route('**/api/items?*', (route) => route.fulfill({ json: { items: [item], total: 1, has_more: false } }));
+        await opened.page.route('**/cover?*', (route) => route.fulfill({ contentType: 'image/svg+xml',
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="2184" height="1468"><rect width="1153" height="1468" fill="brown"/><rect x="1153" width="1031" height="1468" fill="black"/></svg>' }));
+        await opened.page.reload({ waitUntil: 'load' });
+        await opened.page.waitForFunction(() => document.querySelector<HTMLImageElement>('[data-media-card] img.cover')?.naturalWidth === 2184);
+        await settle(opened.page);
+        const framed = await opened.page.locator('[data-media-card] img.cover').first().evaluate((img: HTMLImageElement) => {
+          const pic = img.closest<HTMLElement>('.pic,[data-media-pic]')!;
+          pic.style.setProperty('--cover-blur', `url("${img.currentSrc}")`);
+          img.dispatchEvent(new Event('load'));
+          const card = pic.getBoundingClientRect(), image = img.getBoundingClientRect();
+          const left = image.left + image.width * 1153 / 2184 - card.left;
+          const right = card.right - image.right;
+          return { panel: img.classList.contains('panel'), blur: pic.style.getPropertyValue('--cover-blur'),
+            background: getComputedStyle(pic, '::before').backgroundImage, left, right,
+            heightGap: Math.abs(card.height - image.height) };
+        });
+        assert.equal(framed.panel, true);
+        assert.equal(framed.blur, '');
+        assert.equal(framed.background, 'none');
+        assert.ok(framed.left >= -.5 && framed.right >= -.5 && Math.abs(framed.left - framed.right) < 1, JSON.stringify(framed));
+        assert.ok(framed.heightGap < 1, JSON.stringify(framed));
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close(); }
+    });
+
     for (const art of [
       { code: 'FC2-PPV-3312576', cx: .519, width: 1548, height: 948, layout: undefined },
       { code: 'FC2-PPV-3312576', cx: .22, width: 1548, height: 948, layout: undefined },

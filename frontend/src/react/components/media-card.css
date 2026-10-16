@@ -147,16 +147,6 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
   aspect-ratio: var(--card-ratio, 16 / 9);
   background: #000;
 }
-/* 正封窄于卡片时两侧的留白，垫的是同一张封面的模糊放大版；`--cover-blur` 由壳在图片加载完
- * 写进来，没写就什么都不画。伪元素排在子元素之前，不用 z-index 就压在封面底下。 */
-.peach-react [data-media-pic]::before {
-  content: "";
-  position: absolute;
-  inset: -8%;
-  pointer-events: none;
-  background: var(--cover-blur, none) center / cover no-repeat;
-  filter: blur(26px) brightness(.5);
-}
 .peach-react [data-media-card][data-selected] [data-media-pic]::after {
   content: "";
   position: absolute;
@@ -343,8 +333,6 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
   filter: grayscale(.9) brightness(.54);
   opacity: .68;
 }
-/* 模糊层要跟着一起暗下去，否则待删卡片上只有两条留白还是亮的。 */
-.peach-react [data-pending-delete] [data-media-pic]::before { filter: blur(26px) grayscale(.9) brightness(.27); opacity: .68; }
 .peach-react [data-pending-delete] [data-media-meta] { opacity: .58; }
 .peach-react [data-pending-delete]:hover [data-media-meta] { opacity: .76; }
 

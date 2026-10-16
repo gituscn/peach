@@ -124,13 +124,14 @@ describe('coverAnchor：封面按自己的宽高比分流', () => {
     expect(edge.style.getPropertyValue('--cover-y')).toBe('');
   });
 
-  it('没有框的封套按正封比例从右缘量回去，切出正封并垫模糊底', () => {
+  it('没有框的封套按正封比例从右缘量回去，正封边缘保持纯色底', () => {
     const img = cover('/cover?code=SSIS-001&thumb=1', 800, 538);
+    img.parentElement!.style.setProperty('--cover-blur', 'url("/cover?code=SSIS-001&thumb=1")');
     coverAnchor(img);
     expect(img.classList.contains('panel')).toBe(true);
     expect(img.style.getPropertyValue('--panel-clip')).toMatch(/^0% 0% 0% \d/);
     expect(img.style.getPropertyValue('--panel-height')).toBe('100%');
-    expect(img.parentElement!.style.getPropertyValue('--cover-blur')).toContain('/cover?code=SSIS-001&thumb=1');
+    expect(img.parentElement!.style.getPropertyValue('--cover-blur')).toBe('');
   });
 
   it('整幅大封按主体人脸居中，重取景会清掉正封框样式', () => {
