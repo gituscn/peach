@@ -70,6 +70,34 @@ class CoverArtworkTests(unittest.TestCase):
                          (cover_artwork.FACE_ALGORITHM_VERSION, 'still', .22))
         self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
 
+    def test_four_three_collage_without_a_spine_keeps_the_largest_closed_eye_face(self):
+        detector = Detector()
+        with patch.object(detector, 'detect', return_value=[
+                Face(.511, .435, .419, .717, .751), Face(.115, .128, .173, .227, .909)]):
+            cover_artwork.install_cover(self.target, 'SONE-694', jpeg((80, 90, 100), (800, 600)),
+                                        (800, 600), detector=detector)
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertEqual((face['layout'], face['face']['cx']), ('still', .511))
+        self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
+
+    def test_a_large_weak_body_box_does_not_displace_the_portrait_on_a_full_canvas(self):
+        detector = Detector()
+        with patch.object(detector, 'detect', return_value=[
+                Face(.389, .482, .427, .313, .798), Face(.389, .262, .202, .170, .928)]):
+            cover_artwork.install_cover(self.target, 'SONE-694', jpeg((80, 90, 100), (800, 600)),
+                                        (800, 600), detector=detector)
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertEqual(face['face']['cy'], .262)
+
+    def test_full_canvas_layout_is_available_without_a_face_model(self):
+        with patch('peach.cover_artwork._default_detector', side_effect=FaceModelUnavailable('未取得')):
+            cover_artwork.install_cover(self.target, 'CAWD-186', jpeg((80, 90, 100), (800, 600)), (800, 600))
+        face = json.loads(self.target.with_suffix('.face.json').read_text(encoding='utf-8'))
+        self.assertEqual(face['layout'], 'still')
+        self.assertIsNone(face['face'])
+        self.assertNotIn('version', face)
+        self.assertIsNone(jav_poster_crop.projection(jav_poster_crop.read_sidecar(self.target)))
+
     def test_a_clear_spine_keeps_the_front_portrait_despite_a_larger_back_portrait(self):
         detector = Detector()
         with patch.object(detector, 'detect', return_value=[Face(.22, .3, .3, .4, .95), Face(.8, .3, .06, .1, .9)]):
