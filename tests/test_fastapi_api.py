@@ -3219,6 +3219,73 @@ class UnconfiguredMachineTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(app.state.follow_scheduler._started)
         self.assertFalse(app.state.web_contract.feed_scheduler._started)
 
+    async def test_service_startup_replays_an_interrupted_library_request_with_its_scope(self):
+        from peach import job_recovery, settings_file
+        parent = self.settings.db_path.parent
+        parent.mkdir(parents=True)
+        database = fresh_ledger(parent)
+        job_recovery.save(database, 'library-processing', 'interrupted', {'stage': 'previews'})
+        path = parent.parent / 'state/job-recovery/library-processing.json'
+        record = json.loads(path.read_text(encoding='utf-8'))
+        record['pid'] = -1
+        path.write_text(json.dumps(record), encoding='utf-8')
+        media = parent.parent / 'media'
+        media.mkdir()
+        config = replace(settings_file.load_config(environ={'PEACH_DATA_ROOT': str(parent.parent)}),
+                         present=True, locations={'local': (str(media),)})
+        invoked = threading.Event()
+        def process(*_args, **kwargs):
+            self.assertEqual(kwargs['stage'], 'previews')
+            invoked.set()
+            return {'status': 'complete'}
+        with patch('peach.settings_file.active', return_value=config), patch(
+                'peach.web_library_processing.process_library', side_effect=process):
+            async with self.ledger_client(database) as (app, _client):
+                self.assertTrue(await asyncio.to_thread(invoked.wait, 5))
+                thread = app.state.web_contract.library_processing_job.thread
+                await asyncio.to_thread(thread.join, 5)
+                self.assertEqual(job_recovery.read(database, 'library-processing')['status'], 'complete')
+
+    async def test_cancelled_installation_resumes_the_paused_task_in_the_existing_service(self):
+        from peach import job_recovery, settings_file, update_tasks
+        parent = self.settings.db_path.parent
+        parent.mkdir(parents=True)
+        database = fresh_ledger(parent)
+        media = parent.parent / 'media'
+        media.mkdir()
+        config = replace(settings_file.load_config(environ={'PEACH_DATA_ROOT': str(parent.parent)}),
+                         present=True, locations={'local': (str(media),)})
+        entered, checkpoint, completed = threading.Event(), threading.Event(), threading.Event()
+        calls = []
+        def process(*_args, **kwargs):
+            calls.append(kwargs['stage'])
+            entered.set()
+            checkpoint.wait(5)
+            kwargs['report']({'stage': '生成预览图'})
+            completed.set()
+            return {'status': 'complete'}
+        with patch('peach.settings_file.active', return_value=config), patch(
+                'peach.web_library_processing.process_library', side_effect=process):
+            async with self.ledger_client(database) as (app, _client):
+                from peach.web_library_processing import w_library_processing
+                job = app.state.web_contract.library_processing_job
+                w_library_processing(app.state.web_contract, {'stage': 'previews'})
+                self.assertTrue(await asyncio.to_thread(entered.wait, 5))
+                run_id = job.snapshot()['run_id']
+                token = update_tasks.reserve(database)
+                try:
+                    checkpoint.set()
+                    await asyncio.to_thread(job.thread.join, 5)
+                    self.assertTrue(job.snapshot()['waiting_for_update'])
+                    self.assertEqual(app.state.web_contract.task_runs.get(run_id).status, 'pending')
+                finally:
+                    update_tasks.release(database, token)
+                    checkpoint.set()
+                self.assertTrue(await asyncio.to_thread(completed.wait, 5))
+                await asyncio.to_thread(job.thread.join, 5)
+                self.assertEqual(calls, ['previews', 'previews'])
+                self.assertEqual(job.snapshot()['run_id'], run_id)
+
     async def test_preparing_the_ledger_requires_a_service_restart_to_resume_background_work(self):
         parent = self.settings.db_path.parent
         parent.mkdir(parents=True)

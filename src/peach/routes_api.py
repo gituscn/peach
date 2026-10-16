@@ -29,6 +29,7 @@ from . import push_discovery, web_contract, web_tasks
 from .field_owners import RevisionConflict
 from .interaction import reveal_path
 from .jobs import TaskRunConflict
+from .update_tasks import UpdateBusy
 from .platform import is_unmapped, translate_ledger_path
 from .providers import ProviderUnavailable
 from .routes_auth import require_auth
@@ -300,6 +301,8 @@ def api_get(request: Request, route: str, args: dict[str, str] = Depends(require
         return payload
     except TaskRunConflict as exc:
         return _conflict(exc)
+    except UpdateBusy as exc:
+        return JSONResponse({'error': 'update in progress', 'message': str(exc)}, status_code=409)
     except KeyError:
         return JSONResponse({"error": "not found"}, status_code=404)
     except (TypeError, ValueError) as exc:
@@ -336,6 +339,8 @@ def api_post(
             request.app.state.web_contract, route_path, body)
     except TaskRunConflict as exc:
         return _conflict(exc)
+    except UpdateBusy as exc:
+        return JSONResponse({'error': 'update in progress', 'message': str(exc)}, status_code=409)
     except KeyError:
         return JSONResponse({"error": "not found"}, status_code=404)
     except RevisionConflict as exc:

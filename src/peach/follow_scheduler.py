@@ -12,6 +12,7 @@ from typing import Callable
 
 from apscheduler.jobstores.base import JobLookupError
 from apscheduler.schedulers.background import BackgroundScheduler
+from .update_tasks import UpdateBusy
 
 
 LOGGER = logging.getLogger(__name__)
@@ -170,7 +171,10 @@ class FollowUpdateScheduler:
             # （`w_follow_check` 按 `automatic` 传 `trigger="scheduled"`），开始、进度、
             # 结束三样都在里面。这里不再记第二条：轮询和手动检查是同一件事的两种发起
             # 方式，各记一条在活动页上就成了两轮。
-            result = self.run_check()
+            try:
+                result = self.run_check()
+            except UpdateBusy:
+                result = {'busy': True}
             if result.get("busy"):
                 # 锁被另一次检查占着是互斥的正常结果，不是故障：手动检查正在跑的
                 # 时候自动这一轮什么也没做。这里不抛异常：抛了界面就把它显示成

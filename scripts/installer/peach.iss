@@ -46,6 +46,7 @@ Name: "chs"; MessagesFile: "ChineseSimplified.isl"
 
 [CustomMessages]
 chs.StillRunning=Peach 仍在运行，未能自动退出。请从托盘菜单退出 Peach 后重试。
+chs.TaskCheckFailed=无法确认后台任务状态，安装已取消。请等待任务结束后重试。
 chs.MigrationFailed=本地数据库未能更新到新版本，Peach 启动后可能出错。升级前的备份在数据目录的 database 文件夹里，文件名以 ledger.pre-migrate- 开头。
 chs.DataKept=Peach 已卸载。设置、本地数据库和观看记录保留在 %1，需要时可手动删除；媒体文件不受影响。
 chs.DirectoryOverlapsData=程序目录不能与 Peach 数据目录重叠。请选择独立的程序文件夹。
@@ -63,6 +64,7 @@ Type: filesandordirs; Name: "{app}\_internal"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\*"; DestDir: "{tmp}\Peach-preflight"; Flags: dontcopy recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{userprograms}\Peach"; Filename: "{app}\Peach.exe"; Parameters: "--show"
@@ -76,6 +78,30 @@ Filename: "{app}\Peach.exe"; Parameters: "--show"; Description: "{cm:LaunchProgr
 Type: filesandordirs; Name: "{app}"
 
 [Code]
+var
+  GuardPrepared: Boolean;
+
+function GetCurrentProcessId(): LongWord;
+  external 'GetCurrentProcessId@kernel32.dll stdcall';
+
+procedure FinishTaskGuard();
+var
+  ResultCode: Integer;
+begin
+  if GuardPrepared then
+  begin
+    if Exec(ExpandConstant('{tmp}\Peach-preflight\Peach.exe'),
+      '--installer-finish "' + ExpandConstant('{app}') + '" ' + IntToStr(GetCurrentProcessId()),
+      ExpandConstant('{tmp}\Peach-preflight'), SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0) then
+      GuardPrepared := False;
+  end;
+end;
+
+procedure DeinitializeSetup();
+begin
+  FinishTaskGuard();
+end;
+
 function DataRoot(): String;
 begin
   Result := GetEnv('PEACH_DATA_ROOT');
@@ -117,15 +143,26 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
+  ErrorText: AnsiString;
 begin
   Result := InstallationDirectoryError();
   if Result <> '' then
     Exit;
-  { 退出码 1 是托盘没能退出；2 是不认这个参数的旧版本，交给 CloseApplications 处理。 }
-  if FileExists(ExpandConstant('{app}\Peach.exe')) then
-    if Exec(ExpandConstant('{app}\Peach.exe'), '--installer-stop', ExpandConstant('{app}'),
-            SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 1) then
-      Result := CustomMessage('StillRunning');
+  if GuardPrepared then
+    Exit;
+  ExtractTemporaryFiles('{tmp}\Peach-preflight\*');
+  if not Exec(ExpandConstant('{tmp}\Peach-preflight\Peach.exe'),
+      '--installer-prepare "' + ExpandConstant('{app}') + '" ' + IntToStr(GetCurrentProcessId()) +
+      ' "' + ExpandConstant('{tmp}\Peach-preflight\prepare-error.txt') + '"',
+      ExpandConstant('{tmp}\Peach-preflight'), SW_HIDE, ewWaitUntilTerminated, ResultCode) or
+      (ResultCode <> 0) then
+  begin
+    Result := CustomMessage('TaskCheckFailed');
+    if LoadStringFromFile(ExpandConstant('{tmp}\Peach-preflight\prepare-error.txt'), ErrorText) then
+      Result := UTF8Decode(ErrorText);
+  end
+  else
+    GuardPrepared := True;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -134,10 +171,13 @@ var
 begin
   { 服务启动时不迁移账本；覆盖安装换了程序，要在这里补上。没有账本的新机器不跑，
     否则会凭空建出账本，首次设置页就再也不出现。migrate 自己会先备份。 }
-  if (CurStep = ssPostInstall) and FileExists(DataRoot() + '\database\ledger.db') then
-    if not Exec(ExpandConstant('{app}\Peach.exe'), 'migrate upgrade --yes', ExpandConstant('{app}'),
+  if CurStep = ssPostInstall then
+    if not Exec(ExpandConstant('{tmp}\Peach-preflight\Peach.exe'),
+                '--installer-migrate "' + ExpandConstant('{app}') + '"', ExpandConstant('{tmp}\Peach-preflight'),
                 SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
       SuppressibleMsgBox(CustomMessage('MigrationFailed'), mbError, MB_OK, IDOK);
+  if CurStep = ssPostInstall then
+    FinishTaskGuard();
 end;
 
 function InitializeUninstall(): Boolean;

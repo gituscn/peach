@@ -104,6 +104,15 @@ def main(argv: list[str] | None = None) -> int:
     if len(argv) == 2 and argv[1] in {"--installer-stop", "--installer-uninstall"}:
         from peach.desktop_installer import main as installer_main
         return installer_main(argv[1])
+    if len(argv) == 5 and argv[1] == "--installer-prepare":
+        from peach.desktop_installer import prepare
+        return prepare(Path(argv[2]), int(argv[3]), Path(argv[4]))
+    if len(argv) == 4 and argv[1] == "--installer-finish":
+        from peach.desktop_installer import finish_install
+        return finish_install(Path(argv[2]), int(argv[3]))
+    if len(argv) == 3 and argv[1] == "--installer-migrate":
+        from peach.desktop_installer import migrate_install
+        return migrate_install(Path(argv[2]))
     if wants_cli(argv):
         _prepare_console()
         try:

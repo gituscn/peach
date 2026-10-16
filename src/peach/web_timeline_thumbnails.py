@@ -58,6 +58,9 @@ def q_thumbnail_jobs(contract, _args):
     return {'mode': read_mode(), 'modes': list(timeline_sheets.MODES),
             'intervals': dict(timeline_sheets.INTERVALS),
             'status': state.get('status') or 'idle',
+            'stage': state.get('stage') or '',
+            'message': state.get('message') or '',
+            'waiting_for_update': bool(state.get('waiting_for_update')),
             'job_id': state.get('job_id') or '',
             'total': state.get('total') or 0, 'done': state.get('done') or 0,
             'made': state.get('made') or 0, 'skipped': state.get('skipped') or 0,
@@ -77,7 +80,7 @@ def w_thumbnail_jobs(contract, body):
         raise ValueError('采集密度无效')
     write_mode(mode)
     if mode == timeline_sheets.OFF:
-        contract.thumbnail_job.stop()
+        contract.thumbnail_job.stop(resume=False)
         return q_thumbnail_jobs(contract, {})
     choice = FFmpegResolver(FFMPEG_DIR).ffmpeg()
     if choice is None:
@@ -101,7 +104,7 @@ def w_thumbnail_jobs(contract, body):
             status='failed' if failed else 'complete',
             error=stopped if failed else '')
 
-    contract.thumbnail_job.start(work, restart=True,
+    contract.thumbnail_job.start(work, restart=True, recovery={'mode': mode},
                                  initial={'mode': mode, 'interval': interval,
                                           'stage': '采集缩略图', 'checked': 0,
                                           'total': 0, 'done': 0, 'made': 0,

@@ -112,7 +112,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
                 "test_buildinfo.py", "test_versioning.py",
                 "test_windows_update.py", "test_release_updates.py", "test_automatic_updates.py", "test_standalone_update.py", "test_certs.py", "test_config.py",
                 "test_fsutil.py", "test_desktop_settings.py", "test_desktop_installer.py",
-                "test_job_status.py", "test_jobs.py", "test_task_runs.py", "test_followups.py",
+                "test_job_status.py", "test_jobs.py", "test_task_runs.py", "test_followups.py", "test_update_tasks.py",
                 "test_task_center_integration.py", "test_reference_updates.py",
                 "test_repo_hygiene.py", "test_seed_pack.py", "test_seed_followup.py",
                 "test_review_csv.py", "test_jav_code_domain.py", "test_organize.py",

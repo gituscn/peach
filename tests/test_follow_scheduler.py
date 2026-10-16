@@ -31,6 +31,19 @@ class FollowScheduleStoreTests(unittest.TestCase):
 
 
 class FollowUpdateSchedulerTests(unittest.TestCase):
+    def test_installation_reservation_skips_the_tick_without_recording_a_failure(self):
+        from peach.update_tasks import UpdateBusy
+        def blocked():
+            raise UpdateBusy('正在安装')
+        with tempfile.TemporaryDirectory() as temporary:
+            scheduler = FollowUpdateScheduler(Path(temporary), blocked, available=True)
+            with self.assertNoLogs('peach', level='ERROR'):
+                scheduler._run()
+            status = scheduler.status()
+            self.assertEqual(status['consecutive_failures'], 0)
+            self.assertIsNone(status['last_error'])
+            self.assertIsNotNone(status['last_skipped_at'])
+
     def test_interval_job_waits_one_interval_and_can_be_disabled(self):
         with tempfile.TemporaryDirectory() as temporary:
             scheduler = FollowUpdateScheduler(Path(temporary), lambda: {"ok": True}, available=True)

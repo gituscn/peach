@@ -2041,9 +2041,11 @@ def w_follow_check(contract, body) -> dict:
     # 轮询撞上在跑的那一轮记成跳过，手动撞上外部占用则由 API 回 409。
     started = contract.follow_job.start(work, restart=True,
         trigger="scheduled" if body.get("automatic") else "manual",
+        recovery={**{key: body[key] for key in ('source', 'sources', 'older', 'backfill_all', 'automatic') if key in body},
+                  'background': True},
         initial={"ok": True, "checked": 0, "total": 0, "results": [],
                  "request_id": request_id, "older": bool(body.get("older")), "current": None})
-    if body.get("background"):
+    if body.get("background") or started.get('waiting_for_update'):
         return started
     if started["request_id"] != request_id:
         return {"ok": False, "busy": True, "checked": 0, "results": []}
@@ -2055,6 +2057,9 @@ def w_follow_check(contract, body) -> dict:
     if worker is not None and worker is not threading.current_thread():
         worker.join(5)
     if "error" in outcome:
+        from .jobs import JobPaused
+        if isinstance(outcome['error'], JobPaused):
+            return contract.follow_job.snapshot() or started
         raise outcome["error"]
     return outcome["result"]
 

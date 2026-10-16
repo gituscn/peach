@@ -140,6 +140,9 @@ def _restore_task_center(contract) -> None:
     后继是例外：它重新排队而不判 `interrupted`，冻在终态就再也没有重试的机会
     （ADR-0040 第六条）。排着的那些也在这一步被叫醒，接着跑完。
     """
+    from .job_recovery import reconcile_paused
+    if contract.task_runs.enabled:
+        reconcile_paused(contract.db_path)
     recovered = contract.task_runs.recover_interrupted()
     if recovered:
         LOGGER.info("task center recovered %s interrupted run(s)", len(recovered))
@@ -163,6 +166,9 @@ def _start_ledger_services(settings: PeachSettings, contract, services) -> bool:
                        status["database"], status["schema"])
         return False
     _restore_task_center(contract)
+    from .web_job_recovery import restore
+    if contract.task_runs.enabled:
+        restore(contract)
     for service in services:
         service.start()
     return True
@@ -302,6 +308,8 @@ def create_app(
         unavailable_message="订阅源拉取只在写入端可用",
     )
     contract.feed_scheduler = feed_scheduler
+    from .web_job_recovery import RecoveryService
+    recovery_service = RecoveryService(contract, available=_writer(sync))
     contract.header_repairs = header_repairs
     contract.transcode_service = transcode_service
     # 只读端不写任务中心：`task_run` 也在账本里，reader 往里写会造成无法自动合并的
@@ -343,7 +351,7 @@ def create_app(
         ledger_ready = False
         if settings.configured:
             ledger_ready = _start_ledger_services(settings, contract,
-                (follow_scheduler, feed_scheduler, push_discovery, downloads))
+                (follow_scheduler, feed_scheduler, push_discovery, downloads, recovery_service))
             automatic_updates.start()
             mount_reachability.start()
         _app.state.ledger_background_ready = ledger_ready
@@ -363,6 +371,7 @@ def create_app(
             aggregate_stop.set()
             loop.set_exception_handler(previous_error_handler)
             warmup.cancel()
+            recovery_service.stop()
             follow_scheduler.stop()
             feed_scheduler.stop()
             automatic_updates.stop()

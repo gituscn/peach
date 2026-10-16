@@ -116,3 +116,43 @@ def main(action: str) -> int:
     if action == "--installer-uninstall":
         remove_shortcuts(program)
     return 0
+
+
+def prepare(program: Path, owner: int, error_file: Path) -> int:
+    """安装器使用随包携带的运行时预检，程序目录里的旧版本无需支持此协议。"""
+    from . import settings_file, update_tasks, job_recovery
+    from .fsutil import atomic_write_text
+    config = settings_file.load_config(project_root=program)
+    db = config.directory('database') / 'ledger.db'
+    token = None
+    try:
+        token = update_tasks.reserve(db, owner=owner)
+        previous = job_recovery.legacy_library_request(db)
+        update_tasks.wait_quiescent(db)
+        if not stop(program):
+            raise update_tasks.UpdateBusy('Peach 尚未退出，安装未完成。请稍后重试。')
+        job_recovery.import_legacy_library(db, previous)
+        return 0
+    except Exception as exc:
+        if token:
+            update_tasks.release(db, token)
+        atomic_write_text(error_file, str(exc))
+        return 1
+
+
+def finish_install(program: Path, owner: int) -> int:
+    """安装完成或取消后撤销属于这个安装器的预约。"""
+    from . import settings_file, update_tasks
+    db = settings_file.load_config(project_root=program).directory('database') / 'ledger.db'
+    update_tasks.release_owner(db, owner)
+    return 0
+
+
+def migrate_install(program: Path) -> int:
+    """按实际数据目录迁移已有账本，空白安装不创建数据库。"""
+    from . import settings_file
+    from .cli import main as cli_main
+    db = settings_file.load_config(project_root=program).directory('database') / 'ledger.db'
+    if not db.is_file():
+        return 0
+    return cli_main(['migrate', 'upgrade', '--yes', '--db', str(db)])
