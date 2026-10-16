@@ -11,9 +11,47 @@ Peach 是单人自托管应用，由一个人维护。欢迎提 Issue 和 PR。
 
 ## 开 Issue
 
-- **报缺陷**：写清运行平台（Windows / macOS / Linux）、Python 版本、复现步骤、期望结果和实际结果，并附上 `/healthz` 的返回。贴日志前先去掉路径、局域网地址和凭据。
+- **报缺陷**：写清 Peach 版本或构建、系统版本及架构、安装方式、复现步骤、期望结果和实际结果，附上完整报错。无法稳定复现时说明发生条件，不要求自行判断根因。Python 版本仅用于源码部署，可选；`/healthz` 返回也可选，服务无法启动时写「无法访问」即可。贴日志或诊断报告前先遮盖本机路径、网络地址、账号及凭据。
 - **提需求**：写清问题和使用场景。开放需求见 [待办](docs/PRODUCT_BACKLOG.md)，设计边界见 [总体架构](docs/ARCHITECTURE.md#明确不做)。涉及多用户、云托管、微服务或 PostgreSQL 的提案，先讨论是否需要新增 ADR。
 - **安全问题**：不要开公开 issue，按 [`SECURITY.md`](SECURITY.md) 私下报告。
+
+## Issue 处理规范
+
+维护者和协助维护的智能体按本节处理 issue。回复跟随报告者的语言；提交模板及标签说明提供中英文。未经明确授权，不修改他人 issue 的标题、正文或评论；需要归纳时另写维护者摘要。已有 issue 的分类、关联、负责人和开关操作按当前任务授权执行，不因整理规范批量修改。
+
+### 回复、提及与格式
+
+- 首次回复简短确认问题，说明已确认的事实或尚待验证的判断，再给出下一步。需要补充信息时一次列出必要项目，不要求用户完成与问题无关的环境自查。
+- 修复回复说明原因、修复内容、可下载的版本链接及验证范围。代码通过测试与原用户环境复测分别说明，不把推测写成已确认原因。
+- 只有需要指定的人补资料、复测或处理时才 `@mention`，并说明具体动作；普通回复不重复提及，避免无关人员和团队通知。
+- 标题简短描述现象，不堆叠类型、状态或版本前缀。正文用短段落和必要列表；日志用代码块，长日志用 `<details>` 折叠。截图、日志和诊断报告都先检查隐私信息。
+- 链接使用明确文字，例如「0.40.1 下载」「修复 PR #123」；关联其他 issue 时说明关系。
+
+### 右侧字段
+
+| 字段 | 约定 |
+| --- | --- |
+| Type | `Bug`：异常行为；`Feature`：功能建议；`Task`：明确的维护任务。缺陷和需求模板分别设置 `Bug`、`Feature`，维护者创建的维护任务使用 `Task`。 |
+| Labels | 按需补充 `platform:*` 平台、`area:*` 模块及 `status:*` 处理条件。多个受影响平台或模块可并列；不要猜测未确认的影响面。标签定义见 [标签清单](.github/labels.json)。 |
+| Assignees | 指定实际认领并处理的人；未认领时留空，不把报告者当作负责人。 |
+| Milestone | 只关联已确定的目标版本或阶段；没有发布承诺时留空。修复已发布版本同时在回复中给出链接。 |
+| Projects / Priority | 仅在实际使用项目排期时维护；状态和优先级各选一个记录位置，不同时用项目字段和 label 重复表达。 |
+| Relationships | 仅记录明确的父子任务和阻塞关系，不能根据相似标题推断依赖。 |
+| Development | 关联实际修复该问题的 PR，不关联仅供参考或比较的 PR。 |
+
+`status:needs-info` 表示缺少定位所需的信息，回复中应列明具体缺口；`status:needs-verification` 表示修复已有可下载版本，等待目标环境验证。两者互斥，条件消失时移除。未处理、处理中、已关闭不另设状态标签。没有明确影响的平台或模块可以留空。
+
+`bug`、`enhancement` 保留给 PR 和未设置 Type 的 issue；使用 Type 的新 issue 不重复添加同义标签。`dependencies`、`javascript`、`github_actions`、`python:uv` 用于对应依赖更新，`documentation`、`accessibility` 等按实际内容使用。标签名称保持稳定，颜色和双语说明以清单为准；修改清单时同步 GitHub 并回读核对，不批量删除或重命名已有标签。
+
+### 关闭、重开与关联
+
+- 修复已发布且有相应验证依据后，回复解决版本和验证结果，再以 Completed 关闭。原用户环境仍待确认时保持 Open，并使用 `status:needs-verification`；仅合并 PR 不作为已解决的依据。
+- 同一问题在修复版本仍可复现时重开，补充版本与复现证据；不同问题另开 issue 并相互引用。
+- 重复问题先链接到继续跟踪的 issue，说明重复依据，再以 Not planned 关闭；明确不在项目范围或不计划处理时说明原因，也以 Not planned 关闭，不把这些情况标成已修复。
+- 等待信息时保持 Open，不因暂时没有回复自动关闭；不设置自动过期或批量关单流程。
+- 修复 PR 和提交用普通编号引用，例如 `Refs #123`。本项目按发布与验证结果手动关闭 issue，不使用会在合入默认分支时触发自动关闭的 `Fixes #123`、`Closes #123` 或 `Resolves #123`。
+
+GitHub 的字段与模板机制见 [Issue types](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/managing-issue-types-in-an-organization)、[Issue 模板配置](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository) 和 [PR 与 issue 关联](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue)。
 
 ## 提 PR 之前
 

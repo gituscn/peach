@@ -4,7 +4,8 @@
 
 ## 关联 issue
 
-Closes #
+<!-- 无关联 issue 时删除此行。issue 由维护者在发布并验证后关闭。 / Remove if unrelated. Maintainers close the issue after release and verification. -->
+Refs #
 
 ## 检查项
 
