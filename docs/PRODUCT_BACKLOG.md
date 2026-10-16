@@ -266,3 +266,4 @@
 42. 合并转址回填：2026-10-01 只读盘点出 127 对 ADR-0088 之前的旧合并，126 对可按 ADR-0088 补 `entity_redirect`，1 对目标已不在、链条也接不上；孤立实体图 47 张，其中 19 张可按回填对跳到活实体。盘点脚本在仓库外 `attic/tools/20261001-entity-redirect-backfill/inventory_merge_redirects.py`（`mode=ro`、只打标准输出）。写账本需另行授权，按 `peach-ledger-write` 先备份。
 43. PikPak 用浏览器登录的真实账号验收（ADR-0093）：用户在设置页点「用浏览器登录」并在窗口里登录，确认窗口自动关闭、卡片显示「浏览器登录，由 Peach 续期」；再提交一条磁力，确认签名通过、任务落到 PikPak。隔两小时以上、access token 过期后再提交一次，确认服务端接受不带 secret 的网页 client 刷新。任一步被拒时按报错区分「登录失效」还是「网页端常量已更新」，后者重新取证并更新 `ClientProfile`。
 44. 磁力抓取链的完整验收：直连实现是 manko.fun、JavDB、Sukebei，其余来源由已配置索引器兜底，尚未保证 JavBus、16mag、OneJAV、Free JAV Torrent 的固定次序。`watermark_check` 只保存 `pending`／`bypassed`，下载后的实际水印检验未接入；Manko 绕过按用户指定偏好保留。来源可用性、版本质量与到盘后检查须分别取证。
+45. 种子来源与身份复核：本轮 13 项撤销已有历史证据并进入 v2；另有 5 项去重事项保留在 `attic/reviews/20261017-seed-corrections/withdrawal-review.csv`。其中 2 项规范名更正不由种子自动改名，1 项身份未取得，2 项仅有本机 Stash 别名来源并已从新导出排除。来源置信度与差异见同目录 `candidate-risks.csv` 和 `entity-diff.csv`；结构校验不代替事实复核，不依据缺席撤销旧断言。资料上传暂不实施。

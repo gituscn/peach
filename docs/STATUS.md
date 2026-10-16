@@ -26,7 +26,7 @@
 - 密码未开，局域网匿名可读；首启可跳过密码，配置页可改可关，登录可记住设备。
 - macOS 是 reader，代码与 `peach-data` 在内置盘；`peach.local` 经 8900/8443 和 pf 提供 80/443，GET 正常、写入回 409。
 - 两端用本机 CA，私钥、凭据不跨机；代码 Git、账本单写者复制、图片 Syncthing；坐标 `<数据根>/config.toml`。
-- Windows ledger `0046`，78,103 行；字幕 195 行（孤立 19），175 部带字幕轨；R 盘暂缓。
+- Windows ledger `0046`，78,520 行；字幕 195 行（孤立 19），175 部带字幕轨；R 盘暂缓。
 - Mac ledger 使用已授权共享副本，`in-sync`；`sources` 在内置盘，`archive`、`tools` 可在外置盘。
 - Windows doctor、诊断页通过 CA；本地目录缺失，115/PikPak 可读；密码未开、历史失败为警告。
 - Python 最低与默认 3.14；Windows FFmpeg/ffprobe 在 `peach-data/tools/ffmpeg`，macOS 走 PATH。
@@ -38,7 +38,7 @@
 - [标签归一](reference-snapshots/tag-vocabulary-audit.md)
 - 实体种子 `2026-10-17.1`：1,199 实体、723 份资料，13 项有证据的精确撤销；v2 保留源置信度，永久历史与累计撤销防旧包回放（ADR-0106）。只读导出，真实账本未应用 `0047`；冲突与重复身份在 `generated/seed-landing.csv`。
 - 诊断报告弹窗提供打开目录、打开文件与关闭；原生 6 种操作通过，源码托盘已重启，HTTPS 就绪使用项目 CA 严格校验通过。
-- Windows 制品接入 FFmpeg 9.0.2、ffprobe、untrunc `9d86ec9` 及完整对应源码；软件/GPU 转码、抽帧、损坏 MP4 恢复通过。发行制品验收进行中。
+- Windows 安装包与目录包携带 FFmpeg 9.0.2、ffprobe、untrunc `9d86ec9` 及完整对应源码；构建与独立 EXE 冒烟通过，配置页没有工具缺失项，软件/GPU 转码、抽帧、损坏 MP4 恢复通过。候选未发布，安装包本机仅编译，真实安装留给干净 CI 验收。
 - 推送发现开：本地 watch 加 CloudDrive 云端前缀 `/115open→B:`、`/Pikpak→A:`；关注每 60 分钟轮询；自动更新关闭。
 - Cloudflare 公网入口默认关，配置页启停前须设密码；临时链接写状态文件，命名隧道限源码部署、令牌存设置文件；整站 `noindex` 与 `/robots.txt`。
 - FC2PPV-DB、JAVten 与被拦时的 minnano-av 经本机 Chrome 取页（ADR-0065），profile 在 `secrets/browser/`，免贴 Cookie。

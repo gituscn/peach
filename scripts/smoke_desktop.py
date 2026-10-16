@@ -416,7 +416,7 @@ def main() -> int:
                 assert (data / "config.previous.toml").is_file()
                 assert (data / "state" / "configuration-reload.request").is_file()
                 print(json.dumps({"ok": True, "version": health.get("version"),
-                                  "checks": ["oobe", "migrations", "lan-bind", "mdns", "password-login", "unauthenticated-api", "pages", "island", "items", "clouddrive-configuration", "cloudflared-sidecar"]}))
+                                  "checks": ["oobe", "migrations", "lan-bind", "mdns", "password-login", "unauthenticated-api", "pages", "island", "items", "clouddrive-configuration", "cloudflared-sidecar", "bundled-media-tools", "seed-pack"]}))
             finally:
                 process.terminate()
                 process.wait(timeout=15)
