@@ -113,6 +113,8 @@ describe('首页筛选条', () => {
         for (const control of controls.heights) assert.equal(control.height, 30, JSON.stringify(control));
         assert.deepEqual(controls.actions[0], controls.actions[1]);
         assert.equal(controls.actions[0].width, 30);
+        assert.equal(controls.actions[0].color, 'rgb(255, 255, 255)');
+        assert.match(controls.actions[0].background, /^linear-gradient\(/);
         const gap = await opened.page.evaluate(() => document.querySelector('#grid [data-media-card]')!.getBoundingClientRect().top
           - document.querySelector('#combo [data-entity-combo]')!.getBoundingClientRect().bottom - 8);
         assert.ok(gap >= 16, `筛选条件距卡片悬停面只有 ${gap}px`);

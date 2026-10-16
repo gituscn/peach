@@ -15,7 +15,7 @@ import { useStuck } from './use-stuck';
 const BusyIcon = ({ className }: { className?: string }) => <span aria-hidden className={className}
   dangerouslySetInnerHTML={{ __html: spinnerHtml('正在处理') }} />;
 
-/** 筛选栏动作使用与分段视图相同的尺寸和中性玻璃表面。 */
+/** 筛选栏动作使用 30px 尺寸和蓝色动作表面。 */
 export function FilterIconButton({ label, icon, busy = false, onPress, ...props }:
   Omit<IconButtonProps, 'aria-label' | 'size' | 'onClick'> & { label: string; busy?: boolean; onPress(): void }) {
   return <IconButton {...props} data-filter-action="" size="small" icon={busy ? BusyIcon : icon}

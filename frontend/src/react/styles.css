@@ -388,11 +388,11 @@
 .peach-react button[data-filter-action] {
   width: 30px; min-width: 30px; height: 30px; min-height: 30px; padding: 0; border: 0;
   border-radius: var(--control-radius);
-  background: linear-gradient(180deg, var(--glass-sheen), transparent 62%), var(--glass-pick-fill);
-  box-shadow: inset 0 0 0 1px var(--glass-rim), var(--glass-pick-shadow);
-  color: var(--glass-text);
+  background: var(--board-blue);
+  box-shadow: var(--elevation-xs);
+  color: #fff;
 }
-.peach-react button[data-filter-action]:hover { background: linear-gradient(180deg, var(--glass-sheen), transparent 62%), color-mix(in srgb, var(--glass-text) 8%, var(--glass-pick-fill)); color: var(--glass-text); }
+.peach-react button[data-filter-action]:hover { background: var(--board-blue-hover); color: #fff; }
 .peach-react button[data-filter-action] svg { width: 16px; height: 16px; }
 .peach-react button[data-filter-action][aria-busy="true"] { cursor: wait; }
 

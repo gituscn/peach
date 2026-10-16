@@ -20,7 +20,7 @@
 - 托盘用普通权限：提权看不到 CloudDrive 的 `A:`/`B:`，误报脱盘。
 - Windows：80→HTTPS、LAN:443；`peach-win`。重启、CA、桌面/手机通过。
 - 封面2001，v11。
-- 收藏、续播、播放墙续页；[目录预览](DIRECTORY_BROWSING.md)。
+- 收藏、续播、播放墙续页；[目录浏览](DIRECTORY_BROWSING.md)。
 - `/healthz` 报 `configurable=true`；配置、选目录共用连接判据；托盘管理 HTTPS 地址、端口及重载。
 - 首启恢复配置；更新保留数据，安装暂停采集，运行后续跑；见 [运行与配置](OPERATIONS.md)。
 - 密码未开，局域网匿名可读；首启可跳过密码，配置页可改可关，登录可记住设备。
