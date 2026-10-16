@@ -9,3 +9,14 @@ CREATE TABLE seed_pack_history(
 
 CREATE UNIQUE INDEX idx_seed_pack_history_revision
 ON seed_pack_history(revision) WHERE revision > 0;
+
+INSERT INTO ledger_revision(tbl) VALUES('seed_pack_history');
+CREATE TRIGGER rev_seed_pack_history_insert AFTER INSERT ON seed_pack_history BEGIN
+    UPDATE ledger_revision SET n=n+1 WHERE tbl='seed_pack_history';
+END;
+CREATE TRIGGER rev_seed_pack_history_update AFTER UPDATE ON seed_pack_history BEGIN
+    UPDATE ledger_revision SET n=n+1 WHERE tbl='seed_pack_history';
+END;
+CREATE TRIGGER rev_seed_pack_history_delete AFTER DELETE ON seed_pack_history BEGIN
+    UPDATE ledger_revision SET n=n+1 WHERE tbl='seed_pack_history';
+END;

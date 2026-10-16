@@ -30,7 +30,7 @@ class MediaToolImportTests(unittest.TestCase):
             result = subprocess.run([PWSH, "-NoProfile", "-File",
                 str(ROOT / "scripts/import_windows_media_tools.ps1"),
                 "-DataRoot", str(data), "-SearchRoots", str(root / "WinGet")],
-                capture_output=True, text=True, timeout=30)
+                capture_output=True, text=True, encoding="utf-8", timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             for name in ("ffmpeg.exe", "ffprobe.exe", "avcodec.dll"):
                 self.assertEqual((target / name).read_bytes(), (installed / name).read_bytes())
@@ -46,7 +46,7 @@ class MediaToolImportTests(unittest.TestCase):
             result = subprocess.run([PWSH, "-NoProfile", "-File",
                 str(ROOT / "scripts/import_windows_media_tools.ps1"),
                 "-DataRoot", str(root), "-SearchRoots", str(root)],
-                capture_output=True, text=True, timeout=30)
+                capture_output=True, text=True, encoding="utf-8", timeout=30)
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("NOT FOUND", result.stdout)
             self.assertEqual((root / "ledger.db").read_bytes(), b"kept")

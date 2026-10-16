@@ -77,8 +77,8 @@ def export(args: argparse.Namespace) -> int:
     # 版本串按字典序比：ISO 日期加 `.n` 后缀在同一天十次以内单调；缺省的当天日期退不回已发过的 `.1`。
     if changed and current is not None and pack["version"] <= current:
         print(json.dumps({**summary, "written": False,
-                          "error": f"内容变了而版本串 {pack['version']} 不比文件里的 {current} 新：导入以"
-                                   " seed-import:<版本> 判有没有导过，导过旧内容的机器会跳过这份新内容；换一个新版本串再导"},
+                          "error": f"种子版本 {pack['version']} 必须比现有文件的 {current} 新：永久导入历史"
+                                   "拒绝同版本的不同内容；换一个新版本串再导"},
                          ensure_ascii=False))
         return 2
     if changed:

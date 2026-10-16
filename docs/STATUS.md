@@ -31,17 +31,17 @@
 - Windows doctor、诊断页通过 CA；本地目录缺失，115/PikPak 可读；密码未开、历史失败为警告。
 - Python 最低与默认 3.14；Windows FFmpeg/ffprobe 在 `peach-data/tools/ffmpeg`，macOS 走 PATH。
 - amane 0.20.0，安装一致；[功能与接入](reference-snapshots/upstream-review.md)。
-- 发行名 `peach`、目录名 `peach-app`。macOS 按待办第 26 条处理后重启菜单栏；无口令的 `peach serve --host 0.0.0.0` 拒绝启动。
+- 发行名 `peach`、目录名 `peach-app`；Mac 维护与重启见待办 26。
 - 扫描、采集 120 秒无进展预警；资料 90 秒、封面 240 秒超时可重试；见 `state/library-processing-<job_id>.issues.jsonl`。
 - 口味、复核、关注按账本、文件版本缓存；女优资料后继每轮存量至多 16 条。
 - 下载后处理：16 条旧失败任务保留，部分资产已移动；`task_run` 外键异常 242 条未清理。
 - [标签归一](reference-snapshots/tag-vocabulary-audit.md)
-- 实体种子 `2026-10-17.1`：1,199 实体、723 份资料，13 项有证据的精确撤销；v2 保留源置信度，永久历史与累计撤销防旧包回放（ADR-0106）。只读导出，真实账本未应用 `0047`；冲突与重复身份在 `generated/seed-landing.csv`。
-- 诊断报告弹窗提供打开目录、打开文件与关闭；原生 6 种操作通过，源码托盘已重启，HTTPS 就绪使用项目 CA 严格校验通过。
-- Windows 安装包与目录包携带 FFmpeg 9.0.2、ffprobe、untrunc `9d86ec9` 及完整对应源码；构建与独立 EXE 冒烟通过，配置页没有工具缺失项，软件/GPU 转码、抽帧、损坏 MP4 恢复通过。候选未发布，安装包本机仅编译，真实安装留给干净 CI 验收。
+- 种子 `2026-10-17.1`：1,199 实体、13 撤销（ADR-0106）；`0047` 未应用。
+- 诊断报告操作、托盘重启与严格 CA HTTPS 通过。
+- Windows 工具候选构建与 EXE 冒烟通过；未发布，安装/卸载未验证。
 - 推送发现开：本地 watch 加 CloudDrive 云端前缀 `/115open→B:`、`/Pikpak→A:`；关注每 60 分钟轮询；自动更新关闭。
 - Cloudflare 公网入口默认关，配置页启停前须设密码；临时链接写状态文件，命名隧道限源码部署、令牌存设置文件；整站 `noindex` 与 `/robots.txt`。
-- FC2PPV-DB、JAVten 与被拦时的 minnano-av 经本机 Chrome 取页（ADR-0065），profile 在 `secrets/browser/`，免贴 Cookie。
+- FC2PPV-DB、JAVten、被拦的 minnano-av 经本机 Chrome 取页（ADR-0065），profile 在 `secrets/browser/`。
 
 ## 批处理进度
 

@@ -54,7 +54,7 @@ if ($Roots.Count -eq 0) {
         "$env:ProgramData\scoop\apps\ffmpeg\current",
         "$env:ProgramData\chocolatey\lib\ffmpeg",
         "$env:ProgramData\chocolatey\lib\ffmpeg-full",
-        "$env:ProgramFiles\ffmpeg", "$env:LOCALAPPDATA\Programs\ffmpeg", 'C:\ffmpeg',
+        "$env:ProgramFiles\ffmpeg", "$env:LOCALAPPDATA\Programs\ffmpeg", 'C:\ffmpeg', 'C:\FF',
         "$env:USERPROFILE\Downloads"
     )
     foreach ($ToolName in @('ffmpeg.exe', 'ffprobe.exe', 'untrunc.exe')) {

@@ -108,7 +108,7 @@ class UntruncNativeRecoveryTests(unittest.TestCase):
         archive = bundle.parent / manifest['source_archive']['name']
         self.assertEqual(build.digest(archive), manifest['source_archive']['sha256'])
         version = subprocess.run([str(executable), '-V'], check=True, capture_output=True,
-                                 text=True, timeout=15).stdout
+                                 text=True, encoding='utf-8', timeout=15).stdout
         self.assertIn(manifest['version'], version)
         self.assertIn("ffmpeg '8.1.3'", version)
 
