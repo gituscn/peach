@@ -723,6 +723,16 @@ class BatchScriptTests(unittest.TestCase):
         self.assertEqual(install.call_args.kwargs['evidence']['resolver'], 'official-live-upgrade-v1')
         self.assertEqual((report / 'originals/ABW-232.jpg').read_bytes(), self.before)
 
+    def test_upgrade_resets_connections_only_for_retryable_source_failures(self):
+        from peach.jav_cover_fetch import NotFound, Unavailable
+        from unittest.mock import Mock
+        script = batch_script('upgrade_audited_covers')
+        for error, expected in ((NotFound('HTTP 404'), False), (Unavailable('HTTP 503'), True)):
+            transport = Mock()
+            result = script.failure_result('ABW-232', error, transport)
+            self.assertEqual(result['retryable'], expected)
+            self.assertEqual(transport.renew.call_count, int(expected))
+
     def test_javdb_quarantine_preserves_bytes_and_resumes_without_duplicates(self):
         covers = self.root / 'generated/covers'
         covers.mkdir(parents=True)

@@ -76,7 +76,8 @@ class FetchRetryTests(unittest.TestCase):
         modern = original.replace('awsimgsrc.dmm.co.jp/pics_dig/', 'awsimgsrc.dmm.com/dig/')
         item = {'id': 'cawd00447', 'title': '作品', 'makerContentId': 'CAWD-447',
                 'packageImage': {'largeUrl': original}}
-        evidence = covers.MetadataEvidence((covers.candidate_for(factory),), sources=frozenset({'makers', 'r18dev'}))
+        guessed = covers.candidate_for('https://awsimgsrc.dmm.com/dig/digital/video/1cawd00447/1cawd00447pl.jpg')
+        evidence = covers.MetadataEvidence((covers.candidate_for(factory), guessed), sources=frozenset({'makers', 'r18dev'}))
         winner, size, _ = covers.best_cover(transport_for({factory: (200, jpeg(800, 538)),
             'https://api.video.dmm.co.jp/graphql': (200, json.dumps({'data': {'ppvContent': item}}).encode()),
             modern: (200, jpeg(2184, 1468))}), 'CAWD-447', 0, known=evidence)

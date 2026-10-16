@@ -744,17 +744,6 @@ def _usable_candidates(code: str, candidates, known_sizes: dict[str, tuple[int, 
     ]
 
 
-def _has_dmm_catalog_image(code: str, evidence: MetadataEvidence) -> bool:
-    """候选是否已有属于当前番号的 DMM 目录图片，厂牌小图不构成这份证据。"""
-    for candidate in evidence.candidates:
-        parsed = urlparse(candidate.url)
-        host = parsed.hostname or ''
-        if (host.endswith(('.dmm.com', '.dmm.co.jp')) and _DMM_CID.search(parsed.path)
-                and not is_cross_product_cover(code, candidate.url)):
-            return True
-    return False
-
-
 def _site_candidates(transport: HttpTransport, code: str, evidence: MetadataEvidence, *,
                      delay: float, deadline: float | None, record=lambda key: None) -> list[Candidate]:
     """复用官方目录并按发行面查询图片；FC2 由调用方提供商品图候选。"""
@@ -771,7 +760,7 @@ def _site_candidates(transport: HttpTransport, code: str, evidence: MetadataEvid
         candidates += mgstage_images(transport, code, deadline=deadline)
     if candidates or ((prestige or amateur) and evidence.candidates):
         return candidates
-    if (not _has_dmm_catalog_image(code, evidence)
+    if ('dmm' not in evidence.sources
             and not prestige and not amateur and not is_uncensored_code(code)):
         try:
             live_evidence = dmm_evidence(transport, code, deadline=deadline)

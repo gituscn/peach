@@ -64,6 +64,16 @@ def upgrade(path, known, transport, report, *, live=False, metadata_root=None):
     return {**result, 'status': 'installed'}
 
 
+def failure_result(code, error, transport):
+    """暂时故障重建连接池，来源明确缺失保留原有连接；逐番号记录可重试性。"""
+    from peach.library_processing import describe_failure, is_missing
+    retryable = not is_missing(error)
+    if retryable:
+        transport.renew()
+    return dict(code=code, status='failed', error=describe_failure(error),
+                error_type=type(error).__name__, retryable=retryable)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data-root', type=Path, required=True)
@@ -98,9 +108,7 @@ def main():
                 result = upgrade(path, known, transport, args.report, live=args.live,
                                  metadata_root=args.data_root / 'sources/metadata/javinizer-go')
             except Exception as error:
-                from peach.library_processing import describe_failure, is_missing
-                result = dict(code=path.stem, status='failed', error=describe_failure(error),
-                              error_type=type(error).__name__, retryable=not is_missing(error))
+                result = failure_result(path.stem, error, transport)
             results.append(result)
             atomic_write_text(checkpoint, json.dumps(result, ensure_ascii=False, indent=2))
             print(json.dumps({'index': index, **result}, ensure_ascii=False), flush=True)
