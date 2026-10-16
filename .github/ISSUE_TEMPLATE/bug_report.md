@@ -1,7 +1,7 @@
 ---
 name: 缺陷报告 / Bug report
 about: 报告错误或异常行为 / Report an error or unexpected behavior
-labels: bug
+type: Bug
 ---
 
 <!--

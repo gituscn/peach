@@ -1,7 +1,7 @@
 ---
 name: 功能建议 / Feature request
 about: 建议新功能或改善使用体验 / Suggest a feature or improve the experience
-labels: enhancement
+type: Feature
 ---
 
 <!-- 请先搜索已有 issue。可以用中文或英文填写。/ Search existing issues first. Write in Chinese or English. -->
