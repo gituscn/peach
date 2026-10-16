@@ -26,7 +26,7 @@
 - 密码未开，局域网匿名可读；首启可跳过密码，配置页可改可关，登录可记住设备。
 - macOS 是 reader，代码与 `peach-data` 在内置盘；`peach.local` 经 8900/8443 和 pf 提供 80/443，GET 正常、写入回 409。
 - 两端用本机 CA，私钥、凭据不跨机；代码 Git、账本单写者复制、图片 Syncthing；坐标 `<数据根>/config.toml`。
-- Windows ledger `0046`，78,520 行；字幕 195 行（孤立 19），175 部带字幕轨；R 盘暂缓。
+- Windows ledger `0047`，78,520 行；字幕 195 行（孤立 19），175 部带字幕轨；R 盘暂缓。
 - Mac ledger 使用已授权共享副本，`in-sync`；`sources` 在内置盘，`archive`、`tools` 可在外置盘。
 - Windows doctor、诊断页通过 CA；本地目录缺失，115/PikPak 可读；密码未开、历史失败为警告。
 - Python 最低与默认 3.14；Windows FFmpeg/ffprobe 在 `peach-data/tools/ffmpeg`，macOS 走 PATH。
@@ -36,7 +36,7 @@
 - 口味、复核、关注按账本、文件版本缓存；女优资料后继每轮存量至多 16 条。
 - 下载后处理：16 条旧失败任务保留，部分资产已移动；`task_run` 外键异常 242 条未清理。
 - [标签归一](reference-snapshots/tag-vocabulary-audit.md)
-- 种子 `2026-10-17.1`：1,199 实体、13 撤销（ADR-0106）；`0047` 未应用。
+- 种子 `2026-10-17.1`：1,199 实体、13 撤销（ADR-0106）；`0047` 已应用。
 - 诊断报告操作、托盘重启与严格 CA HTTPS 通过。
 - Windows 工具候选构建与 EXE 冒烟通过；未发布，安装/卸载未验证。
 - 推送发现开：本地 watch 加 CloudDrive 云端前缀 `/115open→B:`、`/Pikpak→A:`；关注每 60 分钟轮询；自动更新关闭。
