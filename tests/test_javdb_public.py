@@ -277,12 +277,13 @@ class PublicProtocolTests(unittest.TestCase):
 class DetailProjectionTests(unittest.TestCase):
     def test_official_thumbnail_does_not_enable_a_javdb_cover(self):
         from peach.web_jav_detail import _artwork_fields
-        source = {'id': 'Exact', 'cover_url': 'https://c0.jdbstatic.com/a.jpg',
-                  'thumb_url': 'https://pics.dmm.co.jp/a.jpg'}
-        with patch('peach.web_jav_detail._preview_fields', return_value={}):
-            result = _artwork_fields(self.contract, 'MIDA-085', {}, source)
-        self.assertFalse(result['source_image'])
-        self.assertEqual(result['cover_url'], '')
+        for url in ('https://c0.jdbstatic.com/a.jpg', 'https://tp.spfcas.com/a.jpg?expires=100'):
+            with self.subTest(url=url):
+                source = {'id': 'Exact', 'cover_url': url, 'thumb_url': 'https://pics.dmm.co.jp/a.jpg'}
+                with patch('peach.web_jav_detail._preview_fields', return_value={}):
+                    result = _artwork_fields(self.contract, 'MIDA-085', {}, source)
+                self.assertFalse(result['source_image'])
+                self.assertEqual(result['cover_url'], '')
 
     def test_explicit_source_evidence_reuses_detail_image_bytes(self):
         import base64

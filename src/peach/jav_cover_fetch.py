@@ -120,7 +120,7 @@ def is_javdb_image(url: str = '', source: str = '') -> bool:
             return True
         host = urlparse(value).hostname if '://' in value else value
         if host and any(host == domain or host.endswith('.' + domain)
-                        for domain in ('jdbstatic.com', 'javdb.com')):
+                        for domain in ('jdbstatic.com', 'javdb.com', 'tp.spfcas.com')):
             return True
     return False
 
