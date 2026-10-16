@@ -3247,7 +3247,7 @@ class UnconfiguredMachineTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(job_recovery.read(database, 'library-processing')['status'], 'complete')
 
     async def test_cancelled_installation_resumes_the_paused_task_in_the_existing_service(self):
-        from peach import job_recovery, settings_file, update_tasks
+        from peach import settings_file, update_tasks
         parent = self.settings.db_path.parent
         parent.mkdir(parents=True)
         database = fresh_ledger(parent)

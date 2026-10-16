@@ -53,10 +53,40 @@ def load_script(name: str):
     return module
 
 
+class UpdateTaskSmokeTests(unittest.TestCase):
+    def test_dry_run_does_not_open_artifacts_or_create_installation_data(self):
+        with mock.patch.dict(sys.modules, {'smoke_desktop': load_script('smoke_desktop')}):
+            script = load_script('smoke_update_tasks')
+        with mock.patch.object(sys, 'argv', ['smoke_update_tasks.py', 'missing/Peach.exe']), \
+                mock.patch.object(script, 'smoke_directory') as directory, redirect_stdout(io.StringIO()):
+            self.assertEqual(script.main(), 0)
+        directory.assert_not_called()
+
+
 class DesktopSmokeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.script = load_script("smoke_desktop")
+
+    def test_cleanup_waits_for_a_released_windows_directory(self):
+        error = PermissionError('目录仍被占用')
+        error.winerror = 32
+        directory = mock.Mock()
+        directory.cleanup.side_effect = [error, None]
+        with mock.patch.object(self.script.time, 'sleep'):
+            self.script.cleanup_smoke_directory(directory)
+        self.assertEqual(directory.cleanup.call_count, 2)
+
+    def test_cleanup_preserves_persistent_or_unrelated_failures(self):
+        for winerror in (32, 5):
+            with self.subTest(winerror=winerror):
+                error = PermissionError('无法清理')
+                error.winerror = winerror
+                directory = mock.Mock()
+                directory.cleanup.side_effect = error
+                with mock.patch.object(self.script.time, 'monotonic', side_effect=[0, 16]), \
+                        self.assertRaises(PermissionError):
+                    self.script.cleanup_smoke_directory(directory)
 
     def test_failure_preserves_logs_without_database_or_configuration(self):
         with tempfile.TemporaryDirectory() as directory:

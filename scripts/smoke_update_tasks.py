@@ -34,7 +34,11 @@ def main():
     parser.add_argument('--old-executable', type=Path)
     parser.add_argument('--installer', type=Path)
     parser.add_argument('--evidence-dir', type=Path, default=Path('smoke-evidence'))
+    parser.add_argument('--apply', action='store_true', help='执行临时安装与任务恢复验收')
     args = parser.parse_args()
+    if not args.apply:
+        print('预演：在临时目录完成首启、模拟运行任务、覆盖安装并核验续跑；加 --apply 执行。')
+        return 0
     executable = args.executable.resolve(strict=True)
     if args.installer:
         validate_installer_host()
@@ -117,6 +121,8 @@ def main():
                 if process is not None and process.poll() is None:
                     process.terminate()
                     process.wait(timeout=20)
+                # Windows 在 Popen 释放前仍保留已退出进程的内核句柄。
+                process = None
                 if args.installer and (application / 'unins000.exe').exists():
                     subprocess.run([str(application / 'unins000.exe'), '/VERYSILENT', '/SUPPRESSMSGBOXES',
                                     '/NORESTART'], env=environment, timeout=120, check=True)

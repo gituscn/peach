@@ -180,7 +180,7 @@ class UpdateTaskTests(unittest.TestCase):
 
     def test_installer_accepts_a_running_task_and_holds_the_pause_until_completion(self):
         config = settings_file.load_config(environ={'PEACH_DATA_ROOT': str(self.root)})
-        run = self.store.start('library-processing', trigger='manual')
+        self.store.start('library-processing', trigger='manual')
         error = self.root / 'prepare-error.txt'
         with patch.object(settings_file, 'load_config', return_value=config), patch.object(
                 desktop_installer, 'stop', return_value=True) as stop, patch.object(

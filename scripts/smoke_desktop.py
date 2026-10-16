@@ -25,8 +25,9 @@ import uuid
 @contextmanager
 def smoke_directory(evidence_dir: Path):
     """失败时只保留本次临时运行的日志，不打包账本与配置。"""
-    with tempfile.TemporaryDirectory(prefix="peach-desktop-") as directory:
-        root = Path(directory).resolve()
+    directory = tempfile.TemporaryDirectory(prefix="peach-desktop-")
+    try:
+        root = Path(directory.name).resolve()
         try:
             yield root
         except BaseException:
@@ -39,6 +40,21 @@ def smoke_directory(evidence_dir: Path):
             (destination / "failure.txt").write_text(traceback.format_exc(), encoding="utf-8")
             print(f"制品验收失败，日志：{destination}", file=sys.stderr, flush=True)
             raise
+    finally:
+        cleanup_smoke_directory(directory)
+
+
+def cleanup_smoke_directory(directory):
+    """等待 Windows 释放原生缓存目录，持续占用仍判验收失败。"""
+    deadline = time.monotonic() + 15
+    while True:
+        try:
+            directory.cleanup()
+            return
+        except OSError as error:
+            if getattr(error, 'winerror', None) not in (32, 145) or time.monotonic() >= deadline:
+                raise
+            time.sleep(.25)
 
 
 def artifact_processes(executable: Path) -> list[int]:

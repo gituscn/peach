@@ -1,6 +1,6 @@
 # Peach 运行核验
 
-最后核验：2026-10-15
+最后核验：2026-10-16
 
 查 `/healthz`；[待办](PRODUCT_BACKLOG.md)、[复用清单](REUSE.md)、[长期约定](HANDOFF.md)。
 
@@ -23,6 +23,7 @@
 - 收藏、续播、播放墙续页；[路由](ROUTES.md)、[JAV](JAV_DISCOVERY.md)。
 - `/healthz` 报 `configurable=true`；配置、选目录共用连接判据；托盘管理 HTTPS 地址、端口及重载。
 - 首启记住目录，支持接回已有配置；更新沿用数据根；见 [运行与配置](OPERATIONS.md)。
+- 安装与更新会暂停刮削、抽帧等后台任务，完成或取消后由运行中的 Peach 续跑，已退出则下次启动时恢复；期间新发起的采集等待安装结束，已完成的馆藏处理步骤保留进度。
 - 密码未开，局域网匿名可读；首启可跳过密码，配置页可改可关，登录可记住设备。
 - macOS 是 reader，代码与 `peach-data` 在内置盘；`peach.local` 经 8900/8443 和 pf 提供 80/443，GET 正常、写入回 409。
 - 两端用本机 CA，私钥、凭据不跨机；代码 Git、账本单写者复制、图片 Syncthing；坐标 `<数据根>/config.toml`。

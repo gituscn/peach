@@ -124,7 +124,7 @@ jobs:
       - name: 验证在途任务保护与覆盖安装后的恢复
         shell: pwsh
         run: |
-          python smoke_update_tasks.py candidate/Peach/Peach.exe --installer './Peach-${{ needs.windows.outputs.version }}-windows-x64-setup.exe'
+          python smoke_update_tasks.py candidate/Peach/Peach.exe --installer './Peach-${{ needs.windows.outputs.version }}-windows-x64-setup.exe' --apply
           if ($LASTEXITCODE -ne 0) { throw '任务保护与恢复验收失败' }
       - name: 保留制品验收失败日志
         if: failure()

@@ -114,7 +114,7 @@ class StandaloneUpdateTests(unittest.TestCase):
         from support.ledger import fresh_ledger
         fresh_ledger(self.database.parent)
         store = TaskRunStore(self.database)
-        run = store.start('library-processing', trigger='scheduled')
+        store.start('library-processing', trigger='scheduled')
         update.write({}, state='ready', version='1.0.0')
         with patch.object(update.distribution, 'standalone', return_value=True), patch.object(update.sys, 'platform', 'win32'):
             self.assertEqual(update.request_restart()['state'], 'restarting')

@@ -670,7 +670,6 @@ def job_main(build_parser, run, argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     from .update_tasks import UpdateBusy
     try:
-        from .update_tasks import activity
         db = Path(getattr(args, 'db', Path(args.lock).resolve().parent / 'ledger.db'))
         with PidFileLock(args.lock):
             return _run_batch_with_updates(db, Path(args.lock).stem, run, args)
