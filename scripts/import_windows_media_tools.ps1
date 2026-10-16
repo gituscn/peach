@@ -34,6 +34,7 @@ function Find-PeachBinary([string]$Name, [string[]]$Roots) {
                 if (-not [IO.Path]::IsPathRooted($RealPath)) { $RealPath = Join-Path $Match.DirectoryName $RealPath }
             }
             if (-not (Test-Path -LiteralPath $RealPath -PathType Leaf)) { continue }
+            if ($Name -eq 'ffmpeg.exe' -and -not (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $RealPath) 'ffprobe.exe') -PathType Leaf)) { continue }
             $Stream = [IO.File]::OpenRead($RealPath)
             try { $IsExecutable = ($Stream.ReadByte() -eq 77 -and $Stream.ReadByte() -eq 90) }
             finally { $Stream.Dispose() }
@@ -96,7 +97,9 @@ try {
     $FFmpeg = Find-PeachBinary 'ffmpeg.exe' $Roots
     if (-not $FFmpeg) {
         if (-not $ArchivePath) {
-            foreach ($Folder in @("$env:USERPROFILE\Downloads", $PSScriptRoot, (Split-Path -Parent $PSScriptRoot))) {
+            $ArchiveFolders = @($SearchRoots)
+            if ($ArchiveFolders.Count -eq 0) { $ArchiveFolders = @("$env:USERPROFILE\Downloads", $PSScriptRoot, (Split-Path -Parent $PSScriptRoot)) }
+            foreach ($Folder in $ArchiveFolders) {
                 $CandidateArchive = Join-Path $Folder 'ffmpeg-9.0.2-essentials_build.zip'
                 if (Test-Path -LiteralPath $CandidateArchive -PathType Leaf) { $ArchivePath = $CandidateArchive; break }
             }

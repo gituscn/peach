@@ -1,6 +1,6 @@
 # Peach 运行核验
 
-最后核验：2026-10-16
+最后核验：2026-10-17
 
 查 `/healthz`；[待办](PRODUCT_BACKLOG.md)、[复用清单](REUSE.md)、[长期约定](HANDOFF.md)。
 
@@ -36,7 +36,9 @@
 - 口味、复核、关注按账本、文件版本缓存；女优资料后继每轮存量至多 16 条。
 - 下载后处理：16 条旧失败任务保留，部分资产已移动；`task_run` 外键异常 242 条未清理。
 - [标签归一](reference-snapshots/tag-vocabulary-audit.md)
-- 实体种子（ADR-0075）由扫描结算后继 `seed-import` 导入，只填空、换旧种子行；冲突与重复身份在 `generated/seed-landing.csv`。
+- 实体种子 `2026-10-17.1`：1,199 实体、723 份资料，13 项有证据的精确撤销；v2 保留源置信度，永久历史与累计撤销防旧包回放（ADR-0106）。只读导出，真实账本未应用 `0047`；冲突与重复身份在 `generated/seed-landing.csv`。
+- 诊断报告弹窗提供打开目录、打开文件与关闭；原生 6 种操作通过，源码托盘已重启，HTTPS 就绪使用项目 CA 严格校验通过。
+- Windows 制品接入 FFmpeg 9.0.2、ffprobe、untrunc `9d86ec9` 及完整对应源码；软件/GPU 转码、抽帧、损坏 MP4 恢复通过。发行制品验收进行中。
 - 推送发现开：本地 watch 加 CloudDrive 云端前缀 `/115open→B:`、`/Pikpak→A:`；关注每 60 分钟轮询；自动更新关闭。
 - Cloudflare 公网入口默认关，配置页启停前须设密码；临时链接写状态文件，命名隧道限源码部署、令牌存设置文件；整站 `noindex` 与 `/robots.txt`。
 - FC2PPV-DB、JAVten 与被拦时的 minnano-av 经本机 Chrome 取页（ADR-0065），profile 在 `secrets/browser/`，免贴 Cookie。

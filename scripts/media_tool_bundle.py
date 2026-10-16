@@ -56,6 +56,8 @@ def validate(root: Path, tool: str = "ffmpeg") -> tuple[dict, Path]:
                 or not re.fullmatch(r"[0-9a-f]{64}", source.get("sha256", ""))):
             raise ValueError("FFmpeg 源码来源缺少固定版本或哈希")
     archive = manifest["source_archive"]
+    if archive["name"] != f"{tool}-corresponding-source.zip":
+        raise ValueError("媒体工具对应源码归档名称不符")
     source_path = checked_file(root.parent, archive["name"], archive["sha256"])
     return manifest, source_path
 

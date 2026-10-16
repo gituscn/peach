@@ -22,7 +22,7 @@ jobs:
       - name: 安装交叉编译工具
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential gcc-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config python3 clang ca-certificates curl xz-utils
+          sudo apt-get install -y build-essential gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config python3 clang ca-certificates curl xz-utils
       - name: 构建固定版本媒体工具
         run: bash scripts/build_ffmpeg_windows.sh build/ffmpeg-windows
       - name: 构建固定版本索引修复工具
@@ -30,11 +30,15 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-windows
-          path: build/ffmpeg-windows/
+          path: |
+            build/ffmpeg-windows/ffmpeg/
+            build/ffmpeg-windows/ffmpeg-corresponding-source.zip
       - uses: actions/upload-artifact@v7
         with:
           name: untrunc-windows
-          path: build/untrunc-windows/
+          path: |
+            build/untrunc-windows/untrunc/
+            build/untrunc-windows/untrunc-corresponding-source.zip
 
   windows:
     name: Windows x64 独立测试包

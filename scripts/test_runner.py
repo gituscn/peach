@@ -103,7 +103,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
                  "test_link_repair.py",
                  "test_resource_identification.py",
                  "test_agency_entity.py", "test_agency_reject.py", "test_label_maker.py",
-                 "test_seed_pack.py", "test_seed_followup.py"),
+                 "test_seed_pack.py", "test_seed_followup.py", "test_seed_corrections.py"),
     "tooling": ("test_scripts.py", "test_trash_junk.py", "test_auth.py", "test_access.py", "test_cli.py", "test_server.py", "test_diagnostics.py", "test_error_reporting.py", "test_library_diagnostics.py", "test_script_policy.py",
                 "test_scan.py", "test_record_rehome.py", "test_wants.py", "test_push_discovery.py", "test_media_probe.py", "test_subtitles.py", "test_onboarding.py", "test_configuration_sources.py", "test_folder_picker.py", "test_ledger_backups.py", "test_clear_camera_filename_codes.py",
                 "test_agent_worktree.py", "test_test_evidence.py", "test_test_environment.py", "test_dependency_policy.py",
@@ -119,7 +119,9 @@ SCOPES: dict[str, tuple[str, ...]] = {
                 "test_link_repair.py",
                 "test_subprocess_encoding.py", "test_module_layering.py",
                 "test_copy_final_state.py", "test_demo_dataset.py",
-                "test_cloudflared_packaging.py", "test_tunnel.py", "test_process_job.py"),
+                "test_cloudflared_packaging.py", "test_tunnel.py", "test_process_job.py",
+                "test_ffmpeg_build.py", "test_ffmpeg_bundle.py", "test_untrunc_build.py",
+                "test_media_tool_import.py", "test_seed_corrections.py"),
     # 前端 island 层（ADR-0022）。产物与源码的断言不需要 Node；vitest 那部分在没有
     # npm 时自己跳过，所以这个域在任何机器上都能跑，`full` 也就自动包含它。
     # `test_web_perf.py` 两个域都登记：压缩与 ETag 是 API 交付（catalog），
@@ -144,7 +146,8 @@ SCOPES: dict[str, tuple[str, ...]] = {
              "test_subprocess_encoding.py", "test_windows_update.py", "test_buildinfo.py"),
     "packaging": ("test_dependency_policy.py", "test_buildinfo.py", "test_onboarding.py",
                   "test_cli.py", "test_server.py", "test_versioning.py", "test_frontend_build.py",
-                  "test_cloudflared_packaging.py", "test_desktop_installer.py"),
+                  "test_cloudflared_packaging.py", "test_desktop_installer.py",
+                  "test_ffmpeg_build.py", "test_ffmpeg_bundle.py", "test_untrunc_build.py"),
 }
 
 SCOPE_TEST_IDS: dict[str, tuple[str, ...]] = {
@@ -163,6 +166,15 @@ SCOPE_TEST_IDS: dict[str, tuple[str, ...]] = {
 # 一个文件可以落到多个域：读它的测试登记在哪个域，改它就得跑到哪个域。
 # `tests/test_test_planning.py` 按测试源码里真实读到的路径反查这两张表，漏一条本地就红。
 AUTO_SCOPE_FILES: dict[str, tuple[str, ...]] = {
+    "scripts/fetch_ffmpeg_sources.py": ("tooling", "packaging"),
+    "scripts/ffmpeg-sources.json": ("tooling", "packaging"),
+    "scripts/build_ffmpeg_windows.sh": ("tooling", "packaging"),
+    "scripts/fetch_untrunc_sources.py": ("tooling", "packaging"),
+    "scripts/untrunc-sources.json": ("tooling", "packaging"),
+    "scripts/build_untrunc_windows.sh": ("tooling", "packaging"),
+    "scripts/media_tool_bundle.py": ("tooling", "packaging"),
+    "src/peach/seed_corrections.py": ("metadata", "tooling"),
+    "src/peach/seed_validation.py": ("metadata", "tooling"),
     "src/peach/preview_cache.py": ("follow", "catalog", "media", "web"),
     "src/peach/preview_transport.py": ("catalog", "media", "web"),
     "src/peach/dev_copy.py": ("web",),

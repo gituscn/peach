@@ -70,7 +70,7 @@ class FFmpegBundleTests(unittest.TestCase):
         outside.write_bytes(b"source fixture")
         self.manifest["source_archive"]["name"] = "../outside.zip"
         self.write_manifest()
-        with self.assertRaisesRegex(ValueError, "路径无效"):
+        with self.assertRaises(ValueError):
             ffmpeg_bundle.validate(self.source)
 
     def test_rejects_stale_destination(self):
@@ -88,6 +88,9 @@ class FFmpegBundleTests(unittest.TestCase):
         self.manifest["files"]["untrunc.exe"] = ffmpeg_bundle.digest(self.source / "untrunc.exe")
         self.manifest["sources"] = [s for s in self.manifest["sources"] if s["name"] != "x264"]
         self.manifest["sources"][1]["name"] = "untrunc"
+        archive = self.source.parent / "ffmpeg-corresponding-source.zip"
+        archive.rename(self.source.parent / "untrunc-corresponding-source.zip")
+        self.manifest["source_archive"]["name"] = "untrunc-corresponding-source.zip"
         self.write_manifest()
         result = ffmpeg_bundle.package(self.source, self.destination, "untrunc")
         self.assertEqual(result["license"], "GPL-2.0-or-later")

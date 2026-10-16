@@ -35,6 +35,9 @@ if (-not (Test-Path -LiteralPath (Join-Path $ProjectRoot 'resources\peach.ico') 
     throw 'Brand assets are missing. Run scripts/generate_brand_assets.py first.'
 }
 
+& $Python -X utf8 (Join-Path $PSScriptRoot 'seed_pack.py') validate --pack (Join-Path $ProjectRoot 'resources\seed\entities.json')
+if ($LASTEXITCODE -ne 0) { throw 'The bundled entity seed did not pass validation.' }
+
 # Frontend bundles ship inside `--add-data web;web` and the runtime has no Node, so they
 # must be rebuilt here: web/dist is committed to Git, but packaging reads the working tree,
 # and a stale bundle would be shipped without any signal. See ADR-0022.
