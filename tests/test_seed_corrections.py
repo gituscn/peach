@@ -280,3 +280,22 @@ class CorrectionTests(SeedPackCase):
         self.assertEqual(pack["entities"][0]["aliases"], [])
         self.assertEqual(pack["withdrawals"], [])
 
+    def test_local_import_only_people_remain_local(self):
+        local_people = (("古河君", "古河X沐沐", "61"),
+                        ("小芽芽不乖", "91社区21442644", "63"))
+        with self.source:
+            for name, other_name, external_id in local_people:
+                person = entity(self.source, "performer", name)
+                alias(self.source, person, other_name, "stash:performer")
+                ref(self.source, person, "stash", external_id)
+        snapshot = {
+            table: [tuple(row) for row in self.source.execute(f"SELECT * FROM {table} ORDER BY 1")]
+            for table in ("entity", "entity_alias", "entity_external_ref")}
+        pack = self.pack(1)
+        self.assertEqual([item["name"] for item in pack["entities"]], ["天川そら"])
+        self.assertEqual(pack["counts"]["entities"], 1)
+        self.assertEqual(pack["withdrawals"], [])
+        self.assertEqual(snapshot, {
+            table: [tuple(row) for row in self.source.execute(f"SELECT * FROM {table} ORDER BY 1")]
+            for table in snapshot})
+
