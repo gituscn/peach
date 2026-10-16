@@ -11,12 +11,45 @@ import io
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from PIL import Image
 
 from peach import images, jav_poster_crop
 from peach.jav_poster_crop import CENTER, FOLD, MANUAL, MANUAL_SOURCE, NONE, RATIO
+
+
+class CompressedSpineTests(unittest.TestCase):
+    def test_a_face_left_of_the_cut_keeps_its_right_side(self):
+        face = {'cx': .5, 'cy': .2, 'w': .1, 'h': .2, 'score': .9}
+        box = jav_poster_crop.crop_record('STARS-350', 840, 563, [0.] * 840, face=face)['box']
+        self.assertEqual(box, {'x0': 0, 'y0': 0, 'x1': 840, 'y1': 563, 'method': NONE})
+
+    def test_blurred_padding_around_a_centered_front_is_excluded(self):
+        profile = jav_poster_crop.ColumnProfile([.02] * 224 + [.2] * 394 + [.02] * 222, [0.] * 840)
+        profile.seams[224] = profile.seams[618] = .95
+        face = {'cx': .487, 'cy': .231, 'w': .135, 'h': .242, 'score': .93}
+        box = jav_poster_crop.crop_record('HHL-018', 840, 563, profile, face=face)['box']
+        self.assertEqual(box, {'x0': 225, 'y0': 0, 'x1': 618, 'y1': 563, 'method': CENTER})
+
+    def test_busy_side_pictures_do_not_form_blurred_padding(self):
+        profile = jav_poster_crop.ColumnProfile([.2] * 840, [0.] * 840)
+        profile.seams[224] = profile.seams[618] = .95
+        self.assertIsNone(jav_poster_crop.padded_center_panel(840, 563, profile))
+
+    def test_both_boundaries_are_required_for_blurred_padding(self):
+        profile = jav_poster_crop.ColumnProfile([.02] * 224 + [.2] * 394 + [.02] * 222, [0.] * 840)
+        profile.seams[224] = .95
+        self.assertIsNone(jav_poster_crop.padded_center_panel(840, 563, profile))
+
+    def test_soft_spine_edge_is_separated_from_the_lettering(self):
+        record = json.loads((Path(__file__).parent / 'fixtures/cover-profiles/ipzz-477.json').read_text(encoding='utf-8'))
+        profile = jav_poster_crop.ColumnProfile(record['gradient'], record['seams'])
+        box = jav_poster_crop.front_panel_box(*record['px'], profile, code='IPZZ-477')
+        self.assertEqual(box['method'], FOLD)
+        self.assertGreaterEqual(box['x0'], 422)
+        self.assertLessEqual(box['x0'], 423)
 
 
 def sleeve(width: int, height: int, fold: int | None) -> Image.Image:
@@ -68,14 +101,14 @@ def opencv_available() -> bool:
     return True
 
 
-@functools.lru_cache(maxsize=1)
-def batch_script():
-    """把 `scripts/poster_crop_boxes.py` 当模块载入，按文件路径而不是包名。"""
+@functools.lru_cache(maxsize=3)
+def batch_script(name='poster_crop_boxes'):
+    """按文件路径载入封面维护脚本。"""
     import importlib.util
 
     root = Path(__file__).resolve().parents[1]
     spec = importlib.util.spec_from_file_location(
-        "poster_crop_boxes", root / "scripts" / "poster_crop_boxes.py")
+        name, root / 'scripts' / (name + '.py'))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -696,6 +729,130 @@ class BatchScriptTests(unittest.TestCase):
     def test_a_dry_run_writes_nothing(self):
         self.assertEqual(self.run_script(), 0)
         self.assertFalse(jav_poster_crop.sidecar_path(self.cover).exists())
+
+    def test_online_upgrade_checks_official_sources_without_local_snapshots(self):
+        from peach.jav_cover_fetch import Candidate
+        script = batch_script('upgrade_audited_covers')
+        candidate = Candidate('pics.dmm.co.jp', 'https://pics.dmm.co.jp/a.jpg', '')
+        report = self.root / 'report'
+        with patch.object(script, 'best_cover', return_value=(candidate, (2184, 1468), self.before)) as fetch:
+            with patch.object(script, 'install_cover') as install:
+                result = script.upgrade(self.cover, [], object(), report, live=True,
+                                        metadata_root=self.root / 'metadata')
+        self.assertEqual(result['status'], 'installed')
+        self.assertEqual(fetch.call_args.args[1], 'ABW-232')
+        self.assertEqual(fetch.call_args.kwargs['metadata_root'], self.root / 'metadata')
+        self.assertEqual(install.call_args.kwargs['evidence']['resolver'], 'official-live-upgrade-v1')
+        self.assertEqual((report / 'originals/ABW-232.jpg').read_bytes(), self.before)
+
+    def test_upgrade_resets_connections_only_for_retryable_source_failures(self):
+        from peach.jav_cover_fetch import NotFound, Unavailable
+        from unittest.mock import Mock
+        script = batch_script('upgrade_audited_covers')
+        for error, expected in ((NotFound('HTTP 404'), False), (Unavailable('HTTP 503'), True)):
+            transport = Mock()
+            result = script.failure_result('ABW-232', error, transport)
+            self.assertEqual(result['retryable'], expected)
+            self.assertEqual(transport.renew.call_count, int(expected))
+
+    def test_javdb_quarantine_preserves_bytes_and_resumes_without_duplicates(self):
+        covers = self.root / 'generated/covers'
+        covers.mkdir(parents=True)
+        target = covers / 'MIDV-377.jpg'
+        target.write_bytes(self.before)
+        evidence = target.with_suffix('.scraping.json')
+        evidence.write_text(json.dumps({'source': 'javdb', 'source_url': 'https://c0.jdbstatic.com/a.jpg'}), encoding='utf-8')
+        official = covers / 'SPONE-001.jpg'
+        official.write_bytes(self.before)
+        report = self.root / 'review/quarantine'
+        args = ['--data-root', str(self.root), '--report', str(report)]
+        script = batch_script('quarantine_javdb_covers')
+        self.assertEqual(script.main(args), 0)
+        self.assertTrue(target.exists())
+        self.assertEqual(script.main([*args, '--apply']), 0)
+        self.assertFalse(target.exists())
+        self.assertFalse(evidence.exists())
+        self.assertEqual((report / 'originals/MIDV-377.jpg').read_bytes(), self.before)
+        self.assertEqual(official.read_bytes(), self.before)
+        self.assertEqual(script.main([*args, '--apply']), 0)
+        result = json.loads((report / 'manifest.json').read_text(encoding='utf-8'))
+        self.assertEqual((result['matched'], result['quarantined']), (0, 1))
+
+    def test_quarantine_collision_does_not_partially_move_an_item(self):
+        covers = self.root / 'generated/covers'
+        covers.mkdir(parents=True)
+        target = covers / 'MIDV-377.jpg'
+        target.write_bytes(self.before)
+        evidence = target.with_suffix('.scraping.json')
+        evidence.write_text(json.dumps({'source': 'javdb'}), encoding='utf-8')
+        report = self.root / 'review/quarantine'
+        (report / 'originals').mkdir(parents=True)
+        (report / 'originals/MIDV-377.scraping.json').write_text('{}', encoding='utf-8')
+        with self.assertRaises(FileExistsError):
+            batch_script('quarantine_javdb_covers').main([
+                '--data-root', str(self.root), '--report', str(report), '--apply'])
+        self.assertEqual(target.read_bytes(), self.before)
+        self.assertTrue(evidence.exists())
+
+    def test_audit_keeps_manual_frames_and_reports_unknown_provenance(self):
+        manual = jav_poster_crop.manual_record(800, 540, {'x0': 420, 'y0': 0, 'x1': 800, 'y1': 540})
+        jav_poster_crop.write_sidecar(self.cover, manual)
+        script = batch_script('audit_cover_artwork')
+        row, proposed, _, _ = script.inspect(self.cover, self.root / 'metadata')
+        self.assertEqual(proposed, manual)
+        self.assertEqual(row['method'], MANUAL)
+        self.assertTrue('missing_provenance' in row['reasons'])
+        self.assertEqual(self.cover.read_bytes(), self.before)
+
+    def test_face_crossing_the_spine_is_preserved_by_offline_reframing(self):
+        target = self.root / 'SPONE-001.jpg'
+        Image.new('RGB', (800, 600), 'gray').save(target)
+        target.with_suffix('.face.json').write_text(json.dumps({
+            'px': [800, 600], 'face': {'cx': .555, 'cy': .331, 'w': .257, 'h': .422, 'score': .918},
+        }), encoding='utf-8')
+        row, proposed, _, layout = batch_script('audit_cover_artwork').inspect(target, self.root / 'metadata')
+        self.assertEqual((proposed['box']['method'], layout), (NONE, 'still'))
+        self.assertEqual(row['x0'], 0)
+
+    def test_offline_reframing_preserves_a_centered_front_with_padding(self):
+        from peach.cover_artwork import FACE_ALGORITHM_VERSION
+        target = self.root / 'HHL-018.jpg'
+        Image.new('RGB', (840, 563), 'gray').save(target)
+        target.with_suffix('.face.json').write_text(json.dumps({
+            'version': FACE_ALGORITHM_VERSION, 'px': [840, 563],
+            'face': {'cx': .487, 'cy': .231, 'w': .135, 'h': .242, 'score': .93},
+        }), encoding='utf-8')
+        profile = jav_poster_crop.ColumnProfile([.02] * 224 + [.2] * 394 + [.02] * 222, [0.] * 840)
+        profile.seams[224] = profile.seams[618] = .95
+        with patch.object(jav_poster_crop, 'file_gradient', return_value=profile):
+            row, proposed, _, layout = batch_script('audit_cover_artwork').inspect(target, self.root / 'metadata')
+        self.assertEqual((proposed['box']['method'], layout), (CENTER, ''))
+        self.assertEqual((row['x0'], proposed['box']['x1']), (225, 618))
+
+    def test_audit_refreshes_legacy_front_only_faces_before_classifying_the_cover(self):
+        from peach.face_detect import Face
+        from peach.cover_artwork import FACE_ALGORITHM_VERSION
+        from unittest.mock import Mock
+        target = self.root / 'SPONE-001.jpg'
+        Image.new('RGB', (800, 600), 'gray').save(target)
+        target.with_suffix('.face.json').write_text(json.dumps({
+            'px': [800, 600], 'face': {'cx': .8, 'cy': .3, 'w': .06, 'h': .1, 'score': .9},
+        }), encoding='utf-8')
+        detector = Mock()
+        detector.detect.return_value = [Face(.555, .331, .257, .422, .918), Face(.8, .3, .06, .1, .9)]
+        row, proposed, face, layout = batch_script('audit_cover_artwork').inspect(target, self.root / 'metadata', detector=detector)
+        self.assertEqual((proposed['box']['method'], layout), (NONE, 'still'))
+        self.assertEqual((face['version'], face['face']['cx']), (FACE_ALGORITHM_VERSION, .555))
+        self.assertNotIn('stale_face', row['reasons'])
+
+    def test_face_cache_requires_current_algorithm_and_image_dimensions(self):
+        from peach.cover_artwork import FACE_ALGORITHM_VERSION
+        script = batch_script('detect_cover_faces')
+        target = self.cover.with_suffix('.face.json')
+        for version, size, expected in (('old', [800, 540], False),
+                (FACE_ALGORITHM_VERSION, [1, 1], False), (FACE_ALGORITHM_VERSION, [800, 540], True)):
+            target.write_text(json.dumps({'version': version, 'px': size}), encoding='utf-8')
+            self.assertEqual(script.current_face(self.cover), expected)
 
     def test_apply_writes_the_sidecar_and_leaves_the_image_untouched(self):
         self.assertEqual(self.run_script("--apply"), 0)

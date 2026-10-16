@@ -24,6 +24,7 @@ r"""给已落盘的封面算正封的取景框，写进边车。
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -93,9 +94,15 @@ def run(args: argparse.Namespace) -> int:
             counts["unreadable"] += 1
             print(f"[{index}/{len(todo)}] 读图失败 {path.name}", flush=True)
             continue
+        try:
+            face = json.loads(path.with_suffix('.face.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            face = {}
         record = jav_poster_crop.crop_record(
             path.stem, width, height, jav_poster_crop.file_gradient(path),
-            title=(jav_poster_crop.read_sidecar(path) or {}).get('title', ''))
+            title=(jav_poster_crop.read_sidecar(path) or {}).get('title', ''),
+            face=face.get('face') if face.get('px') == [width, height] else None,
+            layout=face.get('layout', '') if face.get('px') == [width, height] else '')
         method = record["box"]["method"]
         counts[method] += 1
         bucket = samples.setdefault(method, [])
@@ -110,7 +117,7 @@ def run(args: argparse.Namespace) -> int:
                   + "，".join(f"{key} {value}" for key, value in counts.items()),
                   flush=True)
 
-    print("\n折痕 {fold}，右半居中 {ratio}，16:9 居中正封 {center}，不裁 {none}，"
+    print("\n折痕 {fold}，右半居中 {ratio}，居中正封 {center}，不裁 {none}，"
           "读图失败 {unreadable}".format(
               fold=counts[jav_poster_crop.FOLD], ratio=counts[jav_poster_crop.RATIO],
               center=counts[jav_poster_crop.CENTER], none=counts[jav_poster_crop.NONE],

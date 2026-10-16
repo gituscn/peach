@@ -22,7 +22,7 @@ import httpx
 from PIL import Image
 
 from .jav_cover_fetch import (SMALL_MIN_WIDTH, Candidate, NotFound, Unavailable, _fetch, candidate_for,
-                              is_cross_product_cover)
+                              is_cross_product_cover, is_javdb_image)
 from .scraping_access import SourcePaused
 from .scripting import host_under, hostname_of
 from .sources import AVBASE, JAVBUS, JAVDB
@@ -216,7 +216,10 @@ def _unverified(pool: list[Picture], usable: int,
     if len(origins) > 1:
         # 几家都答了、图都下到了，只是互相对不上：再问还是这几张，交 `NotFound` 让采集任务记住。
         raise NotFound(f"{'、'.join(origins)} 给的封面不是同一张图，无法互相印证")
-    largest = max(pool, key=lambda one: one.pixels)
+    allowed = [one for one in pool if not is_javdb_image(one.candidate.url)]
+    if not allowed:
+        raise NotFound('未取得无 JavDB 水印的封面')
+    largest = max(allowed, key=lambda one: one.pixels)
     return largest.candidate, largest.size, largest.data, ()
 
 
@@ -241,6 +244,8 @@ def verified_cover(transport, code: str, works: list[tuple[str, dict]], *,
     pool, fetched, usable = _pictures(transport, urls, reference, siblings, deadline=deadline)
     best = None
     for one in pool:
+        if is_javdb_image(one.candidate.url):
+            continue
         origins = {other.origin for other in pool if same_picture(one, other)}
         if len(origins) >= 2 and (best is None or one.pixels > best[0].pixels):
             best = (one, tuple(sorted(origins)))

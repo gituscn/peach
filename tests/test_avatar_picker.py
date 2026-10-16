@@ -1215,6 +1215,19 @@ class CoverCropRouteTests(unittest.TestCase):
         response = self.client.post("/api/cover-crop", json={"code": "ABW-232"})
         self.assertEqual(response.status_code, 401)
 
+    def test_default_crop_uses_current_main_face_and_edition_evidence(self):
+        self.cover.with_suffix('.face.json').write_text(json.dumps({
+            'px': [800, 540], 'layout': 'still',
+            'face': {'cx': .555, 'cy': .331, 'w': .257, 'h': .422, 'score': .918},
+        }), encoding='utf-8')
+        self.cover.with_suffix('.scraping.json').write_text(json.dumps({'title': 'VR 作品'}), encoding='utf-8')
+        response = self.client.post('/api/cover-crop?t=secret', json={'code': 'ABW-232', 'box': None})
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()['poster_box'])
+        self.assertEqual(self.sidecar()['box'], {'x0': 0, 'y0': 0, 'x1': 800, 'y1': 540, 'method': 'none'})
+        self.assertEqual(self.sidecar()['title'], 'VR 作品')
+        self.assertEqual(self.cover.read_bytes(), self.before)
+
     def test_a_missing_cover_or_an_impossible_box_says_which(self):
         missing = self.client.post("/api/cover-crop?t=secret",
                                    json={"code": "NOPE-001", "box": None})

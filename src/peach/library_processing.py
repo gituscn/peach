@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 import sqlite3
 import subprocess
 import tempfile
@@ -126,8 +127,26 @@ def _unreached(problems):
     return kind('；'.join(text for text, _ in problems))
 
 
+def _fc2_official_images(payload):
+    """FC2 来源快照只提取发行方存储原件，并附发行方 Referer。"""
+    from .jav_cover_fetch import Candidate, IMAGE_URL
+    from .scripting import host_under, hostname_of
+    from .sources.fc2 import FC2, storage_original
+    found = []
+    for raw in payload.get('cover_urls') or ():
+        if not isinstance(raw, str):
+            continue
+        original = storage_original(raw)
+        if not IMAGE_URL.fullmatch(original):
+            continue
+        host = hostname_of(original)
+        if host_under(host, ('contents.fc2.com',)) or re.fullmatch(r'contents-thumbnail\d*\.fc2\.com', host):
+            found.append(Candidate(host, original, FC2.referer))
+    return found
+
+
 def _official_evidence(snapshots, absent=()):
-    """资料那一步取到的 r18.dev 与 DMM 快照里的官方封面证据，交给 `best_cover` 的 `known`。
+    """片商、发行方与官方镜像快照里的封面候选，交给 `best_cover` 的 `known`。
 
     r18.dev 那份原样带着作品 JSON（`raw`），按 `r18_payload_evidence` 读；DMM 那份给的是
     `cover_urls` 与 `content_id`。r18.dev 在 `absent` 里（一周内说过没有、或不在这个番号的链上）
@@ -149,11 +168,32 @@ def _official_evidence(snapshots, absent=()):
             if not images:
                 continue
             found += images
+        elif name in metadata_routes.AMANE_OFFICIAL_STAGE:
+            from .jav_cover_fetch import candidate_for
+            found += [candidate_for(url) for url in payload.get('cover_urls') or ()
+                      if isinstance(url, str) and IMAGE_URL.fullmatch(url)]
+            found += content_id_images(str(payload.get('content_id') or ''))
+            makers |= {str(payload[field]).strip().casefold() for field in ('maker', 'studio', 'label')
+                       if isinstance(payload.get(field), str) and payload[field].strip()}
+        elif name in metadata_routes.FC2_STAGE:
+            found += _fc2_official_images(payload)
         else:
             continue
         sources.add(name)
     sources |= {'r18dev'} & set(absent)
     return MetadataEvidence(tuple(found), frozenset(makers), frozenset(sources)) if sources else None
+
+
+def artwork_title(snapshots):
+    """封面版次使用来源标题与明确的 Blu-ray 标签。"""
+    from .jav_poster_crop import is_vr_title
+    titles = [str(payload.get('title') or '') for _, payload in snapshots if payload.get('title')]
+    title = next((value for value in titles if is_vr_title(value)), next(iter(titles), ''))
+    edition = any(re.search(r'ブルーレイ|blu[\s-]?ray', str(payload.get('genres') or ''), re.I)
+                  for _, payload in snapshots)
+    if edition and not re.search(r'ブルーレイ|blu[\s-]?ray', title, re.I):
+        title += ' Blu-ray'
+    return title
 
 
 def _said_no(message, sites):
@@ -208,17 +248,20 @@ class CoverKept(NotFound):
 
 
 def cover_settled(path):
-    """本机那张封面够不够大，大到这一轮不必再问来源。
-
-    长边到 `jav_cover_fetch.MIN_WIDTH`（700）就算定了，再往上换是
-    `fetch_jav_covers.py --upgrade-existing` 那条批处理的事。不到这个尺寸的多半是缩略图，
-    发行方那里常常还留着原图：2026-09-23 实测梨奈名下 6 部 276×154 的 FC2，官方存储上
-    都有 1180×2100 到 3360×1890 的原图。所以缩略图不算有了封面，采集照样去问，问来的
-    更宽才换（`CoverKept`）；同目录的本地海报也一样，够大的才算定。量长边不量宽：
-    600×900 的竖版海报是一张清楚的正封，按宽度算会被当成缩略图再去问一遍来源。
-    """
+    """网络封面按 1600px 判断高清；用户提供的本地图片和 FC2 商品图保留尺寸门槛。"""
     size = measure_image_file(path)
-    return size is not None and max(size) >= MIN_WIDTH
+    if size is None:
+        return False
+    try:
+        evidence = json.loads(Path(path).with_suffix('.scraping.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        evidence = {}
+    from .community_catalog import origin_of
+    if origin_of(str(evidence.get('source_url') or '')) in ('javdb', 'javbus'):
+        return False
+    if not evidence.get('source_url') or str(Path(path).stem).upper().startswith('FC2'):
+        return max(size) >= MIN_WIDTH
+    return max(size) >= 1600
 
 
 def _corrects_kept_cover(target, candidate, data, verified_by):
@@ -560,8 +603,8 @@ class LibraryMetadataProvider:
 
         `snapshots` 是资料那一步这一趟已经取到、或磁盘缓存里还新鲜的快照 `[(来源, 资料)]`，
         `absent` 是一周内说过没有、或不在这个番号链上的站：两者都不再问。r18.dev 与 DMM 的快照
-        给出官方候选（`_official_evidence`），手上的候选里有够宽的就不再问 r18.dev 与 MGS
-        （`best_cover` 的 `sites_when_needed`）；社区那几家的快照直接交给图源印证。
+        给出官方候选（`_official_evidence`），并与 `best_cover` 在线官方候选一起比较尺寸；
+        社区那几家的快照直接交给图源印证，JavDB 图片仅用作比对证据。
         几处没问成且全是冷却时报 `SourcePaused`（本趟没轮到），否则报 `Unavailable`。
         """
         from .community_catalog import verified_cover
@@ -577,7 +620,7 @@ class LibraryMetadataProvider:
             siblings = self._official_candidates(code, evidence, deadline=deadline, known=snapshots, absent=absent)
             official = best_cover(self.transport, code, 0, deadline=_extended(deadline, self.excused - mark),
                                   prior_candidates=siblings, minimum_width=SMALL_MIN_WIDTH,
-                                  known=_official_evidence(snapshots, absent), sites_when_needed=True)
+                                  known=_official_evidence(snapshots, absent))
         except NotFound:
             pass
         except (Unavailable, SourcePaused) as error:
@@ -599,15 +642,26 @@ class LibraryMetadataProvider:
         if chosen is None:
             raise _unreached(problems) if problems else NotFound('官方与社区来源都没有这部片的封面')
         candidate, size, data = chosen
-        # 比宽度，不比面积：同一张缩略图各处转存常差一行像素（276×154 与 276×155），
-        # 按面积判就会拿一张一样糊的图换掉另一张。
-        if kept and size[0] <= kept[0] and not _corrects_kept_cover(target, candidate, data, verified_by):
+        # 官方图可替换社区转存图；同类来源按像素面积升级。
+        from .community_catalog import origin_of
+        official_replacement = False
+        if official is not None and chosen is official:
+            try:
+                prior = json.loads(target.with_suffix('.scraping.json').read_text(encoding='utf-8'))
+                official_replacement = origin_of(str(prior.get('source_url') or '')) in ('javdb', 'javbus')
+            except (OSError, ValueError):
+                pass
+        improves = kept is None or (size[0] > kept[0] if code.upper().startswith('FC2')
+                                    else size[0] * size[1] > kept[0] * kept[1] * 1.01)
+        if (not improves and not official_replacement
+                and not _corrects_kept_cover(target, candidate, data, verified_by)):
             if problems:
                 # 有来源这一趟没问成（冷却、配额、超时），它那里可能有原图：不能记成一周不问。
                 raise _unreached(problems)
-            raise CoverKept(f'来源给的封面 {size[0]}×{size[1]} 不比本机那张宽')
+            raise CoverKept(f'来源给的封面 {size[0]}×{size[1]} 未提高本机封面质量')
         from .cover_artwork import install_cover
-        install_cover(target, code, data, size, evidence=dict(source=candidate.source,
+        title = artwork_title(snapshots)
+        install_cover(target, code, data, size, evidence=dict(source=candidate.source, title=title,
             source_url=candidate.url, width=size[0], height=size[1], verified_by=list(verified_by),
             raw_sha256=hashlib.sha256(data).hexdigest(), checked_at=time.time()))
         return True

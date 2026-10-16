@@ -13,7 +13,7 @@ JAV 的官方封套是「背面 | 书脊 | 正面」拼成的一整张横图，�
 
 - `fold`：Sobel 找到了书脊折痕那道竖直峭壁，正面从折痕右侧开始。
 - `ratio`：没找到折痕，按正封宽高比的先验从右缘量回去。
-- `center`：16:9 拼图正中的正封，左右两侧是剧照，框在两条拼接缝之间。
+- `center`：拼图或模糊补边正中的正封，框在两条拼接缝之间。
 - `none`：这张图不该裁。整图框原样返回，页面维持现有的封面取景。
 - `manual`：人在详情页自己框的。它压过上面四条，也不受算法版本号管辖——
   框后面没有算法，改判据不构成重算它的理由。作废的唯一条件是封面换了张图
@@ -101,8 +101,8 @@ FOLD_SHARP_MIN_COVERAGE = 0.6
 #: EBOD-531、GUN-851、IPX-150、PGD-526、CLUB-622、IPZZ-477 各留 7～19 列。这七张的
 #: 折痕是周围中位数的 3.7～9.2 倍；正封里紧挨折痕的大字周围还有别的笔画，MIMK-009
 #: 的 423 列只有 2.2 倍、IDBD-610 的 433 列 2.0 倍。ABP-627 的折痕 441 列挨着正封的
-#: 金色花纹，2.6 倍，救不回来（正封左缘留 8 列书脊），是这个数的已知代价。
-FOLD_ISOLATION = 3.0
+#: JPEG 软边也要达到 2.5 倍，并满足左忙右静的方向约束。
+FOLD_ISOLATION = 2.5
 #: 候选按相邻归并成边：一道边在梯度上响应好几列，相距不超过源图宽这个比例的算一条。
 FOLD_EDGE_SPAN = 0.005
 #: 折痕是一道有宽度的斜坡，梯度的峰落在斜坡最陡处，也就是斜坡当中；书脊的最后一两
@@ -169,7 +169,7 @@ MANUAL = "manual"
 MANUAL_SOURCE = "user:crop"
 
 #: 算法版本号。sidecar 记着它，落后的重算。改动判据、常数或框的形状都要进位。
-ALGORITHM_VERSION = "poster-crop-v11"
+ALGORITHM_VERSION = "poster-crop-v13"
 #: sidecar 与封面同名换后缀：`ABW-232.jpg` → `ABW-232.poster.json`。人脸取景是
 #: `.face.json`，两者同目录、同命名风格，各描述一件事：一个是脸在哪，一个是正封在哪。
 SIDECAR_SUFFIX = ".poster.json"
@@ -191,6 +191,16 @@ def is_scene_cover(code: str | None, title: str = '') -> bool:
     """VR 与数字发行厂牌的整幅宣传画面。"""
     key = normalise_code_key(code)
     return is_vr_title(title) or bool(key and key.split('-', 1)[0] in SCENE_COVER_LABELS)
+
+
+def face_crosses_spine(width: int, height: int, face: dict | None) -> bool:
+    """占据主体的大脸跨过 DVD 正封先验边界时，整张图按宣传大封取景。"""
+    if not face or not height or not SLEEVE_RATIO_MIN <= width / height < SLEEVE_RATIO_MAX:
+        return False
+    cx, fw, fh = (float(face.get(key) or 0) for key in ('cx', 'w', 'h'))
+    spine = 1 - PANEL_ASPECT * height / width
+    return (float(face.get('score') or 0) >= .8 and fw >= .075 and fh >= .12
+            and cx - fw / 2 < spine < cx + fw / 2)
 
 
 def crops_to_portrait(code: str | None, title: str = '') -> bool:
@@ -279,7 +289,7 @@ def front_panel_box(width: int, height: int,
 
     返回 `{"x0", "y0", "x1", "y1", "method"}`，坐标是源图像素，右下开区间。
     封套的框右下角就是源图的右下角，`x0` 就是折痕所在的列——正封是「折痕右边的全部」，
-    不是它里面某个形状的子区域。16:9 的居中正封左右两条缝之间就是框。`method` 为
+    不是它里面某个形状的子区域。居中正封左右两条缝之间就是框。`method` 为
     `none` 时框是整张图：没有可裁的形状，调用方照原图处理。
 
     `code` 只用来认宽封套的厂牌：不给就没有这一档，别的判据全由尺寸和梯度决定。
@@ -299,7 +309,24 @@ def front_panel_box(width: int, height: int,
                 or _whole(width, height))
     if ratio < SLEEVE_RATIO_MIN:
         return _whole(width, height)
-    return _sleeve(width, height, gradient_source, DVD_PANEL)
+    profile = gradient_source() if callable(gradient_source) else gradient_source
+    return padded_center_panel(width, height, profile) or _sleeve(width, height, profile, DVD_PANEL)
+
+
+def padded_center_panel(width: int, height: int, profile) -> dict | None:
+    """两侧均为低纹理补边、两条满高接缝夹出的居中正封。"""
+    seams = getattr(profile, 'seams', None)
+    panel = center_panel(width, height, seams)
+    if panel is None:
+        return None
+    left, right = panel['x0'], panel['x1']
+    if min(seams[left - 1], seams[right]) < SEAM_MIN_COVERAGE:
+        return None
+    middle = statistics.median(profile[left:right])
+    if middle <= 0 or any(statistics.median(side) >= middle * .25
+                          for side in (profile[:left], profile[right:])):
+        return None
+    return panel
 
 
 def _sleeve(width: int, height: int, gradient_source: GradientSource,
@@ -366,7 +393,10 @@ def fold_column(width: int, height: int,
     if seam is not None:
         return seam + 1
     sharp = _sharp_beyond(profile, seams, found, cut, window, reach, span)
-    return cut if sharp is None else _settled(profile, sharp, baseline, limit, span)
+    if sharp is None:
+        return cut
+    right_baseline = statistics.median(profile[sharp + span + 1:sharp + reach + 1] or [baseline])
+    return _settled(profile, sharp, min(baseline, right_baseline), limit, span)
 
 
 def _sharp_beyond(profile: list[float], seams: Sequence[float] | None, found: int,
@@ -451,7 +481,7 @@ def _seam_beyond(profile: list[float], seams: Sequence[float] | None, found: int
 
 
 def center_panel(width: int, height: int, seams: Sequence[float] | None) -> dict | None:
-    """16:9 拼图正中那块正封的框；不是这种版式返回 None。
+    """画布正中那块正封的框；不是这种版式返回 None。
 
     缝只在「宽 `PANEL_ASPECT` 倍高、正好居中」的两个边位附近找，一侧够满高就成立，
     另一侧按居中对称补上。缝那一列本身是过渡带，留在框外。
@@ -553,14 +583,17 @@ def _panel(width: int, height: int, start: int, method: str) -> dict:
 
 
 def crop_record(code: str | None, width: int, height: int,
-                gradient_source: GradientSource = None, *, title: str = '') -> dict:
+                gradient_source: GradientSource = None, *, title: str = '', face: dict | None = None,
+                layout: str = '') -> dict:
     """可直接落盘的 sidecar 内容：算法版本、源图尺寸、框。
 
     番号形态先判：不该裁的图连梯度都不算，`gradient_source` 是惰性的就一次都不解码。
     """
     width, height = int(width or 0), int(height or 0)
     box = (front_panel_box(width, height, gradient_source, code, title)
-           if crops_to_portrait(code, title) else _whole(width, height))
+           if layout != 'still' and crops_to_portrait(code, title) else _whole(width, height))
+    if box['method'] != CENTER and face_crosses_spine(width, height, face):
+        box = _whole(width, height)
     return {"version": ALGORITHM_VERSION, "px": [width, height], "box": box,
             **({'title': title} if title else {})}
 

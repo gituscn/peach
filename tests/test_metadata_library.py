@@ -435,7 +435,7 @@ class LibraryNfoTests(unittest.TestCase):
         video.write_bytes(b'video')
         (media / 'ABW-358.nfo').write_text('<movie><title>Local title</title><sorttitle>ABW-358</sorttitle>'
             '<premiered>2023-05-26</premiered><actor><name>涼森れむ</name></actor><tag>自定义标签</tag></movie>', encoding='utf-8')
-        # 竖版海报量长边：600×900 是一张清楚的正封，不必再去问来源。
+        # 本地海报按长边判断可用尺寸。
         Image.new('RGB', (600, 900), 'blue').save(media / 'ABW-358-poster.jpg')
         db = fresh_ledger(self.root)
         config = PeachConfig(self.root, self.root / 'config.toml', present=True, locations={'local': (str(media),)})
@@ -937,7 +937,7 @@ class LibraryNfoTests(unittest.TestCase):
         provider.transport = Mock()
         provider.community = Mock(return_value=[('javdb', {'cover_urls': ['https://c0.jdbstatic.com/covers/x.jpg']})])
         small = (Candidate('image.mgstage.com', 'https://image.mgstage.com/pf_o1.jpg'), (300, 200), b'small')
-        large = (Candidate('c0.jdbstatic.com', 'https://c0.jdbstatic.com/covers/x.jpg'), (1200, 800), b'large',
+        large = (Candidate('img.javbus.com', 'https://img.javbus.com/covers/x.jpg'), (1200, 800), b'large',
                  ('javdb', 'mgstage'))
         covers = self.root / 'covers'
         with patch('peach.jav_cover_fetch.best_cover', return_value=small) as official, \
@@ -954,7 +954,7 @@ class LibraryNfoTests(unittest.TestCase):
             self.assertTrue(provider.cover('ORETD-616', covers))
         self.assertEqual((covers / 'ORETD-616.jpg').read_bytes(), b'small')
 
-        lone = (Candidate('c0.jdbstatic.com', 'https://c0.jdbstatic.com/covers/y.jpg'), (800, 538), b'lone', ())
+        lone = (Candidate('img.javbus.com', 'https://img.javbus.com/covers/y.jpg'), (800, 538), b'lone', ())
         with patch('peach.jav_cover_fetch.best_cover', side_effect=NotFound('所有渠道都没有候选')), \
                 patch('peach.community_catalog.verified_cover', return_value=lone):
             self.assertTrue(provider.cover('IPX-060', covers))
@@ -1607,6 +1607,58 @@ class LibraryNfoTests(unittest.TestCase):
         self.assertIsNone(_official_evidence([]))
         self.assertEqual(_official_evidence([], {'r18dev'}).sources, frozenset({'r18dev'}))
         self.assertIsNone(_official_evidence([('r18dev', {'id': 'X-1'})]), '没有作品 JSON 也没有图址的快照不算证据')
+
+    def test_maker_snapshot_supplies_its_own_cover_candidate(self):
+        from peach.library_processing import _official_evidence
+        url = 'https://cdn.up-timely.com/image/30/content/68732/cover.jpg'
+        evidence = _official_evidence([('makers', {
+            'source_url': 'https://moodyz.com/works/detail/midv377',
+            'cover_urls': [url], 'title': '作品', 'genres': ['Blu-ray（ブルーレイ）'],
+        }), ('javdb', {'cover_urls': ['https://c0.jdbstatic.com/covers/x.jpg']})])
+        self.assertIsNotNone(evidence)
+        self.assertEqual([candidate.url for candidate in evidence.candidates], [url])
+
+    def test_fc2_snapshots_supply_only_product_storage_originals(self):
+        from peach.library_processing import _official_evidence
+        original = 'https://storage12000.contents.fc2.com/file/342/34141418/1554539118.7.jpg'
+        evidence = _official_evidence([('javten', {'cover_urls': [original]}),
+            ('javarchive', {'cover_urls': ['https://img.javstore.net/a.jpg']}),
+            ('javdb', {'cover_urls': ['https://c0.jdbstatic.com/a.jpg']})])
+        self.assertEqual([candidate.url for candidate in evidence.candidates], [original])
+
+    def test_community_cover_is_eligible_for_official_replacement(self):
+        from peach.library_processing import cover_settled
+        target = self.root / 'MIDV-377.jpg'
+        Image.new('RGB', (800, 438)).save(target)
+        target.with_suffix('.scraping.json').write_text(json.dumps({
+            'source': 'c0.jdbstatic.com', 'source_url': 'https://c0.jdbstatic.com/covers/x.jpg',
+        }), encoding='utf-8')
+        self.assertFalse(cover_settled(target))
+
+    def test_official_cover_can_replace_a_larger_community_copy(self):
+        from peach.jav_cover_fetch import Candidate
+        from peach.library_processing import LibraryMetadataProvider
+        provider = LibraryMetadataProvider.__new__(LibraryMetadataProvider)
+        provider.transport = Mock()
+        provider._official_candidates = Mock(return_value=())
+        covers = self.root / 'covers'
+        covers.mkdir()
+        target = covers / 'MIDV-377.jpg'
+        Image.new('RGB', (2000, 1100), 'gray').save(target)
+        target.with_suffix('.scraping.json').write_text(json.dumps({
+            'source_url': 'https://c0.jdbstatic.com/covers/x.jpg',
+        }), encoding='utf-8')
+        data = io.BytesIO()
+        Image.new('RGB', (1600, 1200), 'blue').save(data, 'JPEG')
+        official = (Candidate('awsimgsrc.dmm.com', 'https://awsimgsrc.dmm.com/dig/cover.jpg'),
+                    (1600, 1200), data.getvalue())
+        with patch('peach.jav_cover_fetch.best_cover', return_value=official):
+            self.assertTrue(provider.cover('MIDV-377', covers, snapshots=[('makers', {
+                'title': '作品', 'genres': ['Blu-ray（ブルーレイ）'],
+            })]))
+        installed = json.loads(target.with_suffix('.scraping.json').read_text(encoding='utf-8'))
+        self.assertEqual(installed['source'], 'awsimgsrc.dmm.com')
+        self.assertEqual(installed['title'], '作品 Blu-ray')
 
     def test_a_source_held_by_its_cooldown_is_reported_as_not_yet_reached(self):
         """冷却里的来源说的是「本趟没轮到」，不是「没取到」：社区那一档与封面那一步都按它分档。

@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 import asyncio
-import base64
+import json
 import logging
 import re
 import time
@@ -588,21 +588,6 @@ def cover(request: Request, code: str = "", thumb: int = 0,
     return _image_response(request, path, media_type="image/jpeg")
 
 
-@router.api_route("/jav-cover", methods=["GET", "HEAD"])
-def jav_cover(request: Request, code: str = "", args: dict[str, str] = Depends(require_auth)):
-    """来源封面与详情共用图片缓存、身份校验和失败冷却。"""
-    from .web_jav_detail import q_jav_image
-    try:
-        result = q_jav_image(request.app.state.web_contract, {'code': code, 'image': 'cover'})
-    except ValueError as error:
-        return JSONResponse({'error': str(error)}, status_code=400)
-    if not result.get('image'):
-        return _asset_response(request, None)
-    body = base64.b64decode(result['image'].partition(',')[2], validate=True)
-    return Response(b'' if request.method == 'HEAD' else body, media_type='image/jpeg',
-                    headers={'Cache-Control': 'private, max-age=3600', 'Content-Length': str(len(body))})
-
-
 @router.post("/api/cover-crop")
 async def cover_crop(request: Request, args: dict[str, str] = Depends(require_auth)):
     """人自己框的正封那一块，或者把它撤掉换回算出来的那个。
@@ -626,8 +611,20 @@ async def cover_crop(request: Request, args: dict[str, str] = Depends(require_au
     if payload.get("box") is None:
         # 恢复默认是当场按折痕判据重算一遍，不是删掉 sidecar：删掉之后没有人会
         # 再来算，页面拿到的是「这张图不该裁」，正封从此再也回不来。
+        def read_evidence(suffix):
+            try:
+                value = json.loads(path.with_suffix(suffix).read_text(encoding='utf-8'))
+                return value if isinstance(value, dict) else {}
+            except (OSError, ValueError):
+                return {}
+        face = read_evidence('.face.json')
+        current_face = face.get('px') == list(size)
+        title = (jav_poster_crop.read_sidecar(path) or {}).get('title') or read_evidence('.scraping.json').get('title', '')
         record = jav_poster_crop.crop_record(
-            code, size[0], size[1], jav_poster_crop.file_gradient(path))
+            code, size[0], size[1], jav_poster_crop.file_gradient(path), title=title,
+            face=face.get('face') if current_face else None)
+        if current_face and face.get('layout') == 'still':
+            record['box'] = dict(x0=0, y0=0, x1=size[0], y1=size[1], method=jav_poster_crop.NONE)
     else:
         record = jav_poster_crop.manual_record(size[0], size[1], payload.get("box"))
     if record is None:

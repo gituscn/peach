@@ -73,8 +73,12 @@ export function avatarFrame(img: HTMLImageElement): void {
    剧照必须自成一档：把 1.78 归进 front 就会按写死的 50% 取横向中段，人偏在一侧
    就整个被切掉，而大图容器比所有封面都竖、纵向锚点在那里根本不生效。 */
 export function coverAnchor(img: HTMLImageElement): void {
+  img.closest<HTMLElement>('.pic,[data-media-pic]')?.style.removeProperty('--cover-blur');
   const r = img.naturalWidth / img.naturalHeight;
   if (!r) return;
+  img.classList.remove('panel');
+  ['--panel-aspect', '--panel-clip', '--panel-left', '--panel-top', '--panel-height', '--cover-x', '--cover-y']
+    .forEach(name => img.style.removeProperty(name));
   const code = img.dataset.coverCode || new URL(img.currentSrc || img.src, location.href).searchParams.get('code') || '';
   // FC2 封面是整幅画面，横向取景跟随人脸；宽高比不代表有 DVD 正封。
   img.dataset.frame = img.dataset.coverLayout === 'still' || /^FC2(?:-PPV)?-/i.test(code) ? 'still' : wideSleeve(img) ? 'sleeve' : r >= 1.65 ? 'still' : r > 1.2 ? 'sleeve' : 'front';
@@ -94,9 +98,6 @@ export function coverAnchor(img: HTMLImageElement): void {
   center('--cover-x', coverFace(img, 'cx'), car / r);
   center('--cover-y', coverFace(img, 'cy'), r / car);
   posterPanel(img, car);
-  /* 小图版式整张放进卡片（`.whole`）：FC2 那种方图、竖版正封放进横卡片，两侧同样留出
-     两条，垫模糊底而不是黑边。比例差不到 2% 的那一丝留白看不出来，不必多解一张图。 */
-  if ((img.classList.contains('whole') || img.dataset.frame === 'front') && Math.abs(r / car - 1) > .02) coverBackdrop(img);
 }
 
 /* 只把折痕右边那块正封摆进卡片，封底一个像素都不露。折痕位置在 `data-posterbox` 里，
@@ -129,7 +130,6 @@ export function posterPanel(img: HTMLImageElement, ratio: number): void {
   img.style.setProperty('--panel-left', `${frame.left}%`);
   img.style.setProperty('--panel-top', `${frame.top}%`);
   img.style.setProperty('--panel-height', `${frame.height}%`);
-  coverBackdrop(img);
 }
 
 function wideSleeve(img: HTMLImageElement): boolean {
@@ -138,12 +138,6 @@ function wideSleeve(img: HTMLImageElement): boolean {
   return !/^FC2(?:-PPV)?-/i.test(code)
     && (img.dataset.wideSleeve === '1' || /^(CWPBD|SMBD)-/i.test(code))
     && ratio >= WIDE_SLEEVE_RATIO_MIN && ratio < WIDE_SLEEVE_RATIO_MAX;
-}
-
-/* 正封与卡片之间的留白由同一张封面的模糊放大版填充。背景挂在卡片上，覆盖图片裁切框外的区域。 */
-export function coverBackdrop(img: HTMLImageElement): void {
-  img.closest<HTMLElement>('.pic,[data-media-pic]')?.style.setProperty('--cover-blur',
-    `url("${img.dataset.thumbSrc || img.currentSrc || img.src}")`);
 }
 
 /* 卡片先取封面的派生档（`/cover?thumb=1`）：高清原件一张解码 38 MB，一页几十张挤爆

@@ -6,7 +6,6 @@ import json
 import base64
 from datetime import datetime, timezone
 from functools import wraps
-from urllib.parse import quote
 
 from . import entities, wants, web_catalog
 from .catalog_rules import normalise_code_key, tag_cat
@@ -28,12 +27,12 @@ def detail_code(args) -> str:
 
 
 def discovery_cover_url(item, source) -> str:
-    """已知作品缺少封面地址时，由详情的来源缓存提供图片。"""
-    if item.get('cover_url'):
-        return item['cover_url']
-    known = source.get('id') or re.fullmatch(r'https://javdb\.com/v/[A-Za-z0-9]+/?', str(item.get('link') or ''))
-    code = normalise_code_key(item.get('code'))
-    return '/jav-cover?code=' + quote(code) if known and code else ''
+    """卡片只显示合格图源的封面地址。"""
+    from .jav_cover_fetch import is_javdb_image
+    for value in (item.get('cover_url'), source.get('cover_url')):
+        if value and not is_javdb_image(value):
+            return value
+    return ''
 
 
 def _refs(contract, connection, kind, names):
@@ -171,9 +170,11 @@ def source_performer_refs(contract, connection, actors):
 
 
 def _artwork_fields(contract, code, item, source, *, refresh=False):
+    from .jav_cover_fetch import is_javdb_image
+    source_cover = (source or {}).get('cover_url') or (source or {}).get('thumb_url')
     return {"has_cover": contract.has_cover(code), "cover_version": contract.cover_version(code),
-            "cover_url": item.get("cover_url") or "",
-            "source_image": bool(source and (source.get("cover_url") or source.get("thumb_url"))),
+            "cover_url": discovery_cover_url(item, source or {}),
+            "source_image": bool(source_cover and not is_javdb_image(source_cover)),
             "preview_count": min(len(source.get("preview_images") or []), 30),
             **_preview_fields(contract, code, source, refresh=refresh),
             "source_url": "https://javdb.com/v/" + str(source["id"]) if source else item.get("link") or ""}

@@ -213,9 +213,23 @@ JAV 默认封面（官方封面／预览图）与视频默认大小（大图／�
 
 详情人物头像复用 `card-art.entityFaceImg` 与 `avatarFrame`，图片直接挂在有尺寸的 `[data-id-face]` 圆框内。取景读取图片的父框几何，`display:contents` 包装层没有可用尺寸。首字与图片由同一段 HTML 承载，图片加载失败时共用回退链，浏览器回归覆盖带人脸框的桌面与手机详情。
 
-新作封面优先复用 `best_cover` 的官方候选，未取得时复用 `javdb_public` 的作品身份校验与 `RemoteMediaCache` 的持久字节缓存、失败冷却；来源图片沿用 ADR-0030、0032 的 240px 小图下限，按实际尺寸保存，证据区分小图，再经 `cover_artwork.install_cover` 安装本地封面、正封框、人脸坐标与来源证据。原图缓存与详情预览分键，JPEG 解包后保留原字节、原尺寸；其他格式按原尺寸转为 JPEG。缺图时 `/jav-cover` 提供同源显示回退。
+新作封面复用 `best_cover` 的官方候选与 `cover_artwork.install_cover`，保存本地封面、正封框、人脸坐标与来源证据。JavDB 图片仅作来源复核证据，不进入安装、封面索引、详情封面投影或缺图兜底；`scripts/quarantine_javdb_covers.py` 将有来源证据的历史图片及边车移入可恢复归档。未取得合格来源时显示未取得状态，详见 ADR-0107。
 
-取景由 `poster-crop-v11` 管理。Blu-ray 来源标题与图片比例共同决定 0.85 正封比例，标题随正封框保留，重算人脸与正封框均读取同一版次；有效宽正封框在没有版次标题的卡片上也完整显示。VR 标记与 IENEE、IENFE、SDHS 数字发行拼图保留整幅画面，由 `cover_frame.layout=still` 传给卡片，人脸检测包含左侧主图；FC2 与普通横版画面保持人脸取景。手工框保持用户取景。重试队列按最早尝试时间轮转，收起的合集沿用设置跳过；逐番号结果保存在 `feed-cover-attempts/`。复用现有 HTTP、Pillow、OpenCV 与文件锁，无新增依赖。
+无快照的有码作品由封面入口复用现有 `DmmSource` 的 GraphQL 查询与精确身份核验；成功快照直接展开 DMM 图片候选，r18.dev 与 DMM 使用同一份目录证据。FC2 来源快照通过 `storage_original` 提取发行方存储原件，排除社区图床。目录查询沿用来源冷却，HTTP、网络与解析失败分别保留未取得状态。
+
+MGS 专属发行先查自营商品目录，Prestige 番号复用 `metadata_routes.maker_sites` 路由后汇总集团官网与 MGS 图片；手上已有候选仍一起比较实际尺寸。专属目录未取得候选时才查综合目录，避免无关目录故障消耗整项预算。
+
+正式封面和商品图以像素面积择优，同尺寸优先商品图，剧照预览保留末档；图片角色不让低清商品图覆盖更大的官方封面。
+
+只有厂牌图片的快照继续补查 DMM 目录；成功的 DMM 来源快照才省略目录查询，按厂牌编号构造的 CDN 地址和 r18.dev 的缺失记忆都不替代 DMM 查询。
+
+人脸缓存使用 `cover-face-v4` 与源图尺寸校验。`detect_cover_faces.py` 自动重算过期记录，逐图核查加 `--refresh-faces` 可在重算整图主脸后再决定版式；无可信书脊的 4:3、√2:1 画布或左侧主脸明显占优的大封按整幅画面取景。安装、批次重算与恢复默认取景读取同一版式标记。
+
+正封与整幅封面均使用卡片纯色底。传统正封完整居中，竖版大封按主脸填满，横版完整放入容器；图片切换时清理残留背景属性。
+
+取景由 `poster-crop-v13` 管理。Blu-ray 来源标题、明确的版次标签与图片比例共同决定 0.85 正封比例，标题随正封框保留，重算人脸与正封框均读取同一版次；有效宽正封框在没有版次标题的卡片上也完整显示。VR 标记、IENEE、IENFE、SDHS 数字发行拼图，以及可信主脸跨过 DVD 正封先验边界的大封保留整幅画面，由 `cover_frame.layout=still` 传给卡片。两条满高接缝夹出居中正封且两侧纹理均低于正封四分之一时，只显示中间正封。大封在竖版大图按主脸居中填满，横版小图完整显示，均不使用模糊补边；JPEG 软边的书脊识别结合突出度、左忙右静的方向与正封侧基线。手工框保持用户取景。重试队列按最早尝试时间轮转，收起的合集沿用设置跳过；逐番号结果保存在 `feed-cover-attempts/`。复用现有 HTTP、Pillow、OpenCV 与文件锁，无新增依赖。
+
+馆藏与新作取图共用 `cover_artwork.metadata_snapshots` 和 `best_cover`，片商官网、发行方、R18 与 DMM 的官方候选均参与尺寸比较。馆藏采集将长边 1600px 作为高清重探界限，社区转存图可由官方封面替换；同类官方图按像素面积升级，FC2 保留商品图的来源保护。`scripts/audit_cover_artwork.py` 逐张核对尺寸、来源、版次与取景框，输出 CSV；`scripts/upgrade_audited_covers.py` 按已有官方快照逐番号重探，`--live` 经同一官方链在线补查，保存原件备份与结果检查点。两者只处理可重建图片和边车，不写 ledger。
 
 ## 复用决策门槛
 
@@ -497,7 +511,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 | FANBOX 正文解析 | PixivUtil2 `v20251112` / `e537e96` 的公开正文模型（BSD-2-Clause，只复用数据模型，不引入整套下载器） | Peach 的独立规范化 DTO 覆盖 image/text/file/article/video/entry、`fileMap`、`embedMap`、`urlEmbedMap` 和旧 HTML 正文，保留正文顺序、稳定去重、可播放媒体与文件页边界；许可证依据写在实现头部，传输固定 `curl_cffi` |
 | 云下载传输 | `grpcio==1.84.0` 与 `protobuf==7.36.2`（消息代码由 grpcio-tools 1.84.0 生成后提交），首个消费者 `downloads_clouddrive` | CloudDrive2 官方 proto 的七个方法子集、令牌存 CredentialStore、任务表与失败分类（`downloads.py`，ADR-0089） |
 | 本地 NFO 导入 | Kodi／Jellyfin NFO 协议（2026-09-06 核对 [Kodi](https://kodi.wiki/view/NFO_files/Movies)、[Jellyfin](https://jellyfin.org/docs/general/server/metadata/nfo/)），标准库 ElementTree，图片走项目固定版 Pillow；实现在 `library_nfo.py` | 只适配影片、单集与音乐视频（整剧、专辑、播放记录与远端图片引用不套用），拒绝 DTD、超大输入与越目录图片引用。同名边车优先，`movie.nfo` 与通用海报只用于单影片目录；正片和图片同属一组连号（`(1).mp4` 配 `(1).jpg`…）时同名图是图集的一张。已知内容词投影为中文标签，画质、促销、发行属性与演员编成丢弃，未收录的自定义标签保留；远端补厂牌、导演、发行商、时长与图片出处，人物主名精确一致时补 DMM id、假名、罗马字与首次头像，不替换演员真值。网络复用 R18 JSON 入口、SourceTransport、头像缓存与封面解析器。候选按资产 ID 与路径定位，批准时复核目标，时长证据不覆盖探测时长（ADR-0029） |
-| JAV 高清封面 | Javinizer-Go `dd56998328d078c9baf68ff4fde2e6fcaa2a691a`（MIT）的 DMM modern `awsimgsrc.dmm.com/dig/...` 映射与尺寸门槛；Prestige 公开 API 的查询模型参考 MDCX `58e3f930f2e864fceb8a53ceef818716e2a6413d`（GPL-3.0，只作协议证据） | 候选、Range 量尺寸、面积最大者胜出与仅更大才原子升级见 `peach-jav-cover-workflow`。批量流程不请求社区来源，历史快照里的社区站只借厂牌；既有库采集在官方落空时经 `peach.community_catalog` 查 AVBase（取商品号认得出这个番号的店铺条目，名寄せ的标题可能来自合集）、JavBus 与 javdb，两个图源先按 dHash 求一致，取景不同时用 OpenCV ORB（相似变换内点 ≥60 算同一张），单一图源照用并留空 `verified_by`，遇验证页不绕过（ADR-0030、0032）。MDC-NG 只证明 Amazon 日本渠道存在，只留 POC 候选。不写 ledger |
+| JAV 高清封面 | Javinizer-Go `dd56998328d078c9baf68ff4fde2e6fcaa2a691a`（MIT）的 DMM modern `awsimgsrc.dmm.com/dig/...` 映射与尺寸门槛；Prestige 公开 API 的查询模型参考 MDCX `58e3f930f2e864fceb8a53ceef818716e2a6413d`（GPL-3.0，只作协议证据） | 候选、Range 量尺寸、面积最大者胜出与仅更大才原子升级见 `peach-jav-cover-workflow`。批量流程不请求社区来源，历史快照里的社区站只借厂牌；既有库采集在官方落空时经 `peach.community_catalog` 查 AVBase（取商品号认得出这个番号的店铺条目，名寄せ的标题可能来自合集）、JavBus 与 JavDB，两个图源先按 dHash 求一致，取景不同时用 OpenCV ORB（相似变换内点 ≥60 算同一张）。JavDB 只参与复核，不作为安装候选；其他单一图源留空 `verified_by`，遇验证页不绕过（ADR-0107）。MDC-NG 只证明 Amazon 日本渠道存在，只留 POC 候选。不写 ledger |
 
 依赖的第一个消费者及其隔离测试必须在同一改动落地，否则不引入依赖。
 表里没有单列的 Python 依赖及首个消费者：`numpy`（vision 组，`face_detect.decode` 直接 import）、`socksio`（PikPak 的 SOCKS 代理）、

@@ -14,7 +14,7 @@ export {
 } from './markup';
 export type { Artwork, ArtworkKind, CoverItem, FaceFocus, FaceRef, IdentityItem } from './markup';
 export {
-  avatarFrame, coverAnchor, coverBackdrop, coverFace, coverRatio, fitNativeImage, frameCachedImages, installCardArt,
+  avatarFrame, coverAnchor, coverFace, coverRatio, fitNativeImage, frameCachedImages, installCardArt,
   posterPanel, refitNativeImages, relayoutCovers, settleImage, upgradeCover, watchPendingImages,
 } from './framing';
 export { configureHoverPreview, releaseHover, releaseHoverPreviews, setHoverState, wireHover } from './hover';

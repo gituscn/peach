@@ -32,6 +32,73 @@ class _Response:
 
 
 class FetchRetryTests(unittest.TestCase):
+    def test_larger_official_cover_beats_a_smaller_product_image(self):
+        large = covers.candidate_for('https://official.example/full.jpg')
+        small = covers.candidate_for('https://image.mgstage.com/pb_e_product.jpg')
+        winner, size, _ = covers.best_cover(transport_for({large.url: (200, jpeg(2184, 1468)),
+            small.url: (200, jpeg(840, 563))}), 'FC2-PPV-123456', 0, prior_candidates=(small, large))
+        self.assertEqual((winner, size), (large, (2184, 1468)))
+
+    def test_mgs_releases_use_their_own_catalog_without_waiting_for_an_unrelated_mirror(self):
+        url = 'https://image.mgstage.com/images/nanpatv/200gana/1995/pb_e_200gana-1995.jpg'
+        with patch.object(covers, 'mgstage_images', return_value=[covers.candidate_for(url)]):
+            with patch.object(covers, 'r18_evidence', side_effect=AssertionError('专属目录已取得')):
+                with patch.object(covers, 'dmm_evidence', side_effect=AssertionError('MGS 不在 DMM 目录')):
+                    _, size, _ = covers.best_cover(transport_for({url: (200, jpeg(840, 472))}), '200GANA-1995', 0)
+        self.assertEqual(size, (840, 472))
+
+    def test_prestige_code_routing_uses_the_official_group_without_a_snapshot(self):
+        url = 'https://www.prestige-av.com/api/media/package.jpg'
+        with patch.object(covers, 'prestige_group_images', return_value=[covers.candidate_for(url)]) as group:
+            with patch.object(covers, 'r18_evidence', side_effect=AssertionError('片商目录已取得')):
+                _, size, _ = covers.best_cover(transport_for({url: (200, jpeg(1600, 1000))}), 'ABW-192', 0)
+        self.assertEqual(size, (1600, 1000))
+        group.assert_called_once()
+    def test_empty_snapshots_use_the_identified_dmm_catalog_and_largest_image(self):
+        COVER = 'https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ssis00057/ssis00057pl.jpg'
+        ENDPOINT = 'https://api.video.dmm.co.jp/graphql'
+        item = {'id': 'ssis00057', 'title': '作品', 'makerContentId': 'SSIS-057',
+                'packageImage': {'largeUrl': COVER}}
+        modern = COVER.replace('awsimgsrc.dmm.co.jp/pics_dig/', 'awsimgsrc.dmm.com/dig/')
+        transport = transport_for({
+            ENDPOINT: (200, json.dumps({'data': {'ppvContent': item}}).encode()),
+            COVER: (200, jpeg(800, 540)), modern: (200, jpeg(2184, 1468)),
+        })
+        with patch.object(covers, 'r18_evidence') as mirror:
+            winner, size, _ = covers.best_cover(transport, 'SSIS-057', 0)
+        self.assertEqual(winner.url, modern)
+        self.assertEqual(size, (2184, 1468))
+        mirror.assert_not_called()
+
+    def test_maker_small_image_and_a_missing_mirror_do_not_suppress_dmm_lookup(self):
+        factory = 'https://cdn.up-timely.com/image/32/cover.jpg'
+        original = 'https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/cawd00447/cawd00447pl.jpg'
+        modern = original.replace('awsimgsrc.dmm.co.jp/pics_dig/', 'awsimgsrc.dmm.com/dig/')
+        item = {'id': 'cawd00447', 'title': '作品', 'makerContentId': 'CAWD-447',
+                'packageImage': {'largeUrl': original}}
+        guessed = covers.candidate_for('https://awsimgsrc.dmm.com/dig/digital/video/1cawd00447/1cawd00447pl.jpg')
+        evidence = covers.MetadataEvidence((covers.candidate_for(factory), guessed), sources=frozenset({'makers', 'r18dev'}))
+        winner, size, _ = covers.best_cover(transport_for({factory: (200, jpeg(800, 538)),
+            'https://api.video.dmm.co.jp/graphql': (200, json.dumps({'data': {'ppvContent': item}}).encode()),
+            modern: (200, jpeg(2184, 1468))}), 'CAWD-447', 0, known=evidence)
+        self.assertEqual((winner.url, size), (modern, (2184, 1468)))
+
+    def test_catalog_connection_failure_is_not_a_definitive_missing_cover(self):
+        diagnostics = {}
+        with patch.object(covers, 'dmm_evidence', return_value=covers.MetadataEvidence()):
+            with self.assertRaises(covers.Unavailable) as raised:
+                covers.best_cover(lambda *args: _Response(503, b''), 'MIDA-085', 0, diagnostics=diagnostics)
+        self.assertNotIsInstance(raised.exception, covers.NotFound)
+        self.assertGreater(diagnostics.get('source_http_503', 0), 0)
+
+    def test_official_catalog_probe_preserves_source_cooldown_writes(self):
+        from unittest.mock import Mock
+        transport = Mock(return_value=_Response(429, b''))
+        transport.hold = Mock()
+        with self.assertRaises(covers.Unavailable):
+            covers.best_cover(transport, 'MIDA-085', 0)
+        self.assertTrue(any(call.args[0] == 'dmm' for call in transport.hold.call_args_list))
+
     def test_cover_rejections_report_measured_sizes_and_decode_failures(self):
         candidate = covers.Candidate("test", "https://example.test/cover.jpg")
         for size, expected in [((600, 400), "too_small"), ((1600, 1000), "invalid_image")]:

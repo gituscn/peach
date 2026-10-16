@@ -23,7 +23,7 @@ r"""按番号抓官方封套：把所有候选量一遍，留像素最多的那�
 - 上轮成功日志里的原 URL，保住已经发现但当前无法重新检索的 DUGA 等官方图。
 
 批量流程不请求社区来源；采集任务在官方渠道落空时经 `peach.community_catalog` 去问
-AVBase、JavBus 与 javdb，封面先求两个图源比对一致（ADR-0030、ADR-0032）。DUGA 批量搜索 API
+AVBase、JavBus 与 JavDB，封面先求两个图源比对一致；JavDB 只作比对证据（ADR-0107）。DUGA 批量搜索 API
 需要代理店应用 ID，未配置前只复用成功日志中已经取得的精确图片 URL。
 
 两条番号改写规则，都由实测得出：
@@ -57,7 +57,7 @@ from peach.scripting import USER_AGENT, open_readonly
 from peach.config import COVER_DIR, DATABASE_PATH, GENERATED_DIR, SOURCES_DIR
 from peach.http import HttpRequest, HttpTransport, HttpxTransport
 from peach.scripting import HostLimiter
-from peach.scraping_access import SOURCES, SourceTransport, source_for
+from peach.scraping_access import SOURCES, SourcePaused, SourceTransport, source_for
 from peach.config import SECRETS_DIR
 from peach.jobs import DiskGuard, JobPolicyError
 from peach.task_runs import TaskRunHandle, cli_run, inert_handle
@@ -67,6 +67,7 @@ from peach.catalog_rules import (
     is_amateur_code,
     is_jav_code,
     is_korean_mib_code,
+    is_uncensored_code,
     normalise_code_key,
 )
 from peach.metadata_policy import SOURCE_SPECS
@@ -109,6 +110,21 @@ NETWORK_RETRY_DELAYS = (2, 4, 6, 8)
 THUMBNAIL = re.compile(r"(thumb|small|icon|/ts/|-s\d|_s\.)", re.I)
 FC2_HIRES = re.compile(r"https://contents-thumbnail\d*\.fc2\.com/w(?:7\d\d|[89]\d\d|\d{4,})/", re.I)
 IMAGE_URL = re.compile(r"https?://[^\"'\\ )]+?\.(?:jpg|jpeg|png|webp)")
+
+
+def is_javdb_image(url: str = '', source: str = '') -> bool:
+    """JavDB 转存图片仅参与来源印证，不作为正式封面。"""
+    from .sources.javdb import JAVDB
+    domains = (*JAVDB.domains, 'tp.spfcas.com')
+    for value in (url, source):
+        value = str(value or '').strip().lower()
+        if value in {'javdb', 'javdb-public', 'javdb_public'}:
+            return True
+        host = urlparse(value).hostname if '://' in value else value
+        if host and any(host == domain or host.endswith('.' + domain)
+                        for domain in domains):
+            return True
+    return False
 
 
 @dataclass(frozen=True)
@@ -542,7 +558,7 @@ def _is_prestige(evidence: MetadataEvidence) -> bool:
 
 
 def r18_evidence(transport: HttpTransport, code: str, *,
-                 deadline: float | None = None) -> MetadataEvidence:
+                 deadline: float | None = None, record=lambda key: None) -> MetadataEvidence:
     """读取 r18 返回的官方封套，并保留旧数字版高清 URL 探测。
 
     `content_id` 不是稳定的数字版路径。Prestige 的 ABW 系列会返回
@@ -557,7 +573,13 @@ def r18_evidence(transport: HttpTransport, code: str, *,
                 referer="https://r18.dev/", limit=2 * 1024 * 1024,
                 deadline=deadline,
             ).decode("utf-8", "ignore"))
+        except NotFound:
+            continue
         except (Unavailable, ValueError, httpx.TransportError):
+            record('source_unanswered')
+            continue
+        if not isinstance(payload, dict):
+            record('source_unanswered')
             continue
         return r18_payload_evidence(payload)
     return MetadataEvidence()
@@ -581,6 +603,23 @@ def r18_payload_evidence(payload: dict) -> MetadataEvidence:
     makers = frozenset(str(payload.get(key, {}).get("name", "")).casefold()
                        for key in ("maker", "label") if isinstance(payload.get(key), dict))
     return MetadataEvidence(tuple(_unique_candidates(found)), makers, frozenset({"r18dev"}))
+
+
+def dmm_evidence(transport: HttpTransport, code: str, *, deadline=None) -> MetadataEvidence:
+    """复用已核对番号的 DMM 官方目录，取得图片与数字版候选。"""
+    from peach.sources import Session
+    from peach.sources.base import SourceFailure
+    from peach.sources.dmm import DmmSource
+    try:
+        payload = DmmSource().query(code, session=Session(transport, deadline)).payload()
+    except SourceFailure as error:
+        if error.kind == 'not_found':
+            return MetadataEvidence()
+        raise Unavailable('DMM：' + str(error)) from error
+    found = [candidate for url in payload.get('cover_urls') or () for candidate in dmm_cdn_images(url)]
+    found += content_id_images(str(payload.get('content_id') or ''))
+    makers = frozenset(str(payload.get(field) or '').strip().casefold() for field in ('maker', 'label'))
+    return MetadataEvidence(tuple(_unique_candidates(found)), makers, frozenset({'dmm'}))
 
 
 def mgstage_images(transport: HttpTransport, code: str, *,
@@ -708,26 +747,37 @@ def _usable_candidates(code: str, candidates, known_sizes: dict[str, tuple[int, 
 
 
 def _site_candidates(transport: HttpTransport, code: str, evidence: MetadataEvidence, *,
-                     delay: float, deadline: float | None) -> list[Candidate]:
-    """现问官方站拿到的封面候选：r18.dev，再按厂牌证据问 Prestige 或按番号形状问 MGS。FC2 一处都不问。"""
+                     delay: float, deadline: float | None, record=lambda key: None) -> list[Candidate]:
+    """复用官方目录并按发行面查询图片；FC2 由调用方提供商品图候选。"""
     if code.upper().startswith("FC2-PPV-"):
         return []
+    from peach.metadata_routes import maker_sites
     candidates: list[Candidate] = []
     live_evidence = MetadataEvidence()
+    prestige = _is_prestige(evidence) or 'prestige' in maker_sites(code)
+    amateur = is_amateur_code(code) or 'mgstage' in evidence.sources
+    if prestige:
+        candidates += prestige_group_images(transport, code, deadline=deadline)
+    elif amateur:
+        candidates += mgstage_images(transport, code, deadline=deadline)
+    if candidates or ((prestige or amateur) and evidence.candidates):
+        return candidates
+    if ('dmm' not in evidence.sources
+            and not prestige and not amateur and not is_uncensored_code(code)):
+        try:
+            live_evidence = dmm_evidence(transport, code, deadline=deadline)
+            candidates += list(live_evidence.candidates)
+        except (Unavailable, SourcePaused):
+            record('source_unanswered')
     # 有成功快照时不重复打 r18；失败快照不算证据，仍允许联网刷新。
-    if "r18dev" not in evidence.sources:
-        live_evidence = r18_evidence(transport, code, deadline=deadline)
+    if ('r18dev' not in evidence.sources and not live_evidence.candidates
+            and not ('dmm' in evidence.sources and evidence.candidates)):
+        live_evidence = r18_evidence(transport, code, deadline=deadline, record=record)
         candidates += list(live_evidence.candidates)
         _sleep_within(delay, deadline)
-    # MGS 与 Prestige 都是 Prestige 集团的官方供给面。只在本地厂牌证据命中时
-    # 查询，避免把全库 960 个番号无差别打到两个站点。
-    if _is_prestige(evidence) or _is_prestige(live_evidence):
+    # 目录新识别出 Prestige 时补问集团自营渠道。
+    if not prestige and _is_prestige(live_evidence):
         candidates += prestige_group_images(transport, code, deadline=deadline)
-        _sleep_within(delay, deadline)
-    # 素人系番号按形状就能确定发行面是 MGS，不必先有元数据。等元数据的旧写法让
-    # 259LUXU / 300MIUM / 428SUKE 这批番号一次也没问过 MGS——而 MGS 一直有图。
-    elif is_amateur_code(code) or "mgstage" in evidence.sources:
-        candidates += mgstage_images(transport, code, deadline=deadline)
         _sleep_within(delay, deadline)
     return candidates
 
@@ -742,14 +792,12 @@ def best_cover(transport: HttpTransport, code: str, delay: float, *,
                deadline: float | None = None,
                diagnostics: dict[str, int] | None = None,
                known: MetadataEvidence | None = None,
-               sites_when_needed: bool = False,
                ) -> tuple[Candidate, tuple[int, int], bytes]:
     """官方封面择优：手上的候选、缓存快照里的候选，加上 r18.dev、MGS 或 Prestige 现问来的候选。
 
     `known` 是调用方这一趟已经取到的官方快照证据（例如 `r18_payload_evidence`），与 `metadata_root`
-    那份缓存同等对待：`sources` 里有 `r18dev` 就不再问 r18.dev。`sites_when_needed` 时先量手上的候选，
-    其中有一张宽到 `MIN_WIDTH` 就直接用它，量不出这么宽的才去问站——资料那一步刚取回的快照
-    多半已经带着原图地址，再问一遍 r18.dev 只是白等一次主机间隔。
+    那份缓存同等对待：`sources` 里有 `r18dev` 就不再问 r18.dev。所有可用官方候选一起量尺寸，
+    并按像素面积选择。
     """
     # 韩国 MIB 的编号在 JAV 目录站上要么不存在、要么撞上番号相同的日本作品：
     # `HA-101`、`MY-102` 取回的都是那部日本片的封套，番号核验拦不住，因为番号本来
@@ -766,23 +814,28 @@ def best_cover(transport: HttpTransport, code: str, delay: float, *,
     def usable(found):
         return _usable_candidates(code, found, known_sizes or {}, minimum_quality, minimum_pixels)
 
+    def source_transport(request, timeout, limit):
+        try:
+            response = transport(request, timeout, limit)
+        except (httpx.TransportError, SourcePaused):
+            record('source_unanswered')
+            raise
+        if response.status not in (200, 206, 404):
+            record('source_unanswered')
+            record('source_http_' + str(response.status))
+        return response
+
+    source_transport.inner = transport
+
     first = usable([*prior_candidates, *evidence.candidates])
-    tried, measured = [], []
-    if sites_when_needed and first:
-        tried = first
-        measured = _measure(transport, first, record, minimum_width=minimum_width,
-                            delay=delay, deadline=deadline)
-        if any(size[0] >= MIN_WIDTH for _, _, size in measured):
-            return _download_best(transport, measured, record, minimum_width=minimum_width,
-                                  minimum_quality=minimum_quality, minimum_pixels=minimum_pixels,
-                                  deadline=deadline)
-    asked = usable([*first, *_site_candidates(transport, code, evidence, delay=delay, deadline=deadline)])
-    candidates = [candidate for candidate in asked if candidate not in tried]
-    if not candidates and not tried:
+    asked = usable([*first, *_site_candidates(source_transport, code, evidence, delay=delay,
+                                            deadline=deadline, record=record)])
+    if not asked:
+        if diagnostics.get('source_unanswered'):
+            raise Unavailable('官方目录查询未完成，尚未取得封面候选')
         raise NotFound("所有渠道都没有候选")
-    if candidates:
-        measured += _measure(transport, candidates, record, minimum_width=minimum_width,
-                             delay=delay, deadline=deadline)
+    measured = _measure(transport, asked, record, minimum_width=minimum_width,
+                        delay=delay, deadline=deadline)
     if not measured:
         # 每张候选都回过话（404、太小、占位图、解不开）就是来源的确定答复，下次再问还是这几张：
         # 交 `NotFound`，采集任务记下一周不问。有一张断在连接、5xx 或拒绝访问上才可能是这趟没问成。
@@ -841,7 +894,7 @@ def _measure(transport: HttpTransport, candidates, record, *, minimum_width: int
 def _download_best(transport: HttpTransport, measured, record, *, minimum_width: int,
                    minimum_quality: int, minimum_pixels: int,
                    deadline: float | None) -> tuple[Candidate, tuple[int, int], bytes]:
-    """按来源档次与像素从高到低完整下载，第一张尺寸对得上、是静态图、确实更好的就是它。
+    """封面按像素面积择优，同尺寸优先商品图；预览图仅作末档候选。
 
     动图只有下完整张才认得出：FC2 链末档 JavArchive 的图床存的常是 GIF 预览动画，
     只读头部量尺寸时它和一张静态图没有区别，落进 `.jpg` 之后卡片就一直在动。候选全是
@@ -849,7 +902,7 @@ def _download_best(transport: HttpTransport, measured, record, *, minimum_width:
     """
     animated = 0
     for _pixels, winner, size in sorted(
-            measured, key=lambda item: (candidate_quality(item[1]), item[0]), reverse=True):
+            measured, key=lambda item: (candidate_quality(item[1]) > 0, item[0], candidate_quality(item[1])), reverse=True):
         try:
             data = _fetch(transport, winner.url, referer=winner.referer,
                           limit=16 * 1024 * 1024, deadline=deadline)
