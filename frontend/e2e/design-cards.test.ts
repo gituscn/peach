@@ -6,7 +6,7 @@ import { expectBody, settle, visit } from './harness.ts';
 import {
   DESKTOP, MOBILE, tokenColor, openReview, lightness, WIDE, JUNK_COUNT, openJunk, junkItem, openJunkWith,
   openCatalog, openCatalogFixture, openFollowManage, stubFollowManage, holdApi, controlFaces, disabledTokens,
-  waitingActionFaces, assertDisabledFace, installDesignBrowser,
+  waitingActionFaces, assertDisabledFace, installDesignBrowser, PIXEL,
 } from './design-fixture.ts';
 
 describe('设计决定：作品卡、管理页与复核', () => {
@@ -75,9 +75,12 @@ describe('设计决定：作品卡、管理页与复核', () => {
       const item = payload.items[1];
       if (!item) throw new Error('演示目录不够两条');
       Object.assign(item, { medium: 'archive', name: '演示资料.zip', disposal: 'trash' });
-      payload.items[0].disposal = 'trash';
+      Object.assign(payload.items[0], { disposal: 'trash', is_jav: false, has_cover: false, has_thumb: true });
     });
     const { page } = opened;
+    await page.route('**/poster**', (route) => route.fulfill({
+      status: 200, contentType: 'image/png', body: Buffer.from(PIXEL, 'base64'),
+    }));
     /* 岛根是 `line-height:1.5`，卡里没写行高的格子会继承它；旧卡读的是页面正文 14px/20px。
        取值用同一个岛根下的空元素量 token，不在断言里抄像素。 */
     const readStyles = (selectors: Record<string, string>) => page.evaluate((wanted) => {
