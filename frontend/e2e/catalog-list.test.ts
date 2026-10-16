@@ -123,6 +123,16 @@ describe('馆藏卡片与列表', () => {
         await page.getByRole('option', { name: '每页 10 部', exact: true }).click();
         await page.waitForFunction(() => document.querySelectorAll('[data-catalog-row]').length === 10);
         assert.equal(requests.at(-1)!.get('limit'), '10');
+        if (!viewport.mobile) {
+          const namedResponse = page.waitForResponse(response => {
+            const url = new URL(response.url());
+            return url.pathname === '/api/items' && url.searchParams.get('sort') === 'name';
+          });
+          await page.getByRole('columnheader', { name: /名称/ }).click();
+          await namedResponse;
+          await page.waitForFunction(() => document.querySelector('[data-catalog-row]')?.getAttribute('data-id') === '9000');
+          assert.equal(requests.at(-1)!.get('dir'), 'asc');
+        }
         const measured = await layout(page);
         assert.ok(measured.scrollWidth <= measured.viewportWidth + 1, JSON.stringify(measured));
         assert.deepEqual(opened.problems.filter(line => !line.includes('VIDEOJS')), []);
