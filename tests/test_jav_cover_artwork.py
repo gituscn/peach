@@ -29,6 +29,17 @@ class CoverArtworkTests(unittest.TestCase):
         self.root = Path(tempfile.mkdtemp())
         self.target = self.root / "259LUXU-1537.jpg"
 
+    def test_javdb_images_are_rejected_before_replacing_any_file(self):
+        from peach.jav_cover_fetch import Unavailable
+        data = jpeg((80, 90, 100))
+        self.target.write_bytes(data)
+        for evidence in ({'source_url': 'https://c0.jdbstatic.com/covers/x.jpg'},
+                         {'source': 'javdb-public'}):
+            with self.subTest(evidence=evidence), self.assertRaisesRegex(Unavailable, '无 JavDB 水印'):
+                cover_artwork.install_cover(self.target, 'FC2-PPV-12345', data, (840, 472), evidence=evidence)
+        self.assertEqual(self.target.read_bytes(), data)
+        self.assertFalse(self.target.with_suffix('.face.json').exists())
+
     def test_large_face_crossing_the_assumed_spine_uses_the_whole_cover(self):
         detector = Detector()
         with patch.object(detector, 'detect', return_value=[

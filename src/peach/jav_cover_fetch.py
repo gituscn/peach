@@ -23,7 +23,7 @@ r"""按番号抓官方封套：把所有候选量一遍，留像素最多的那�
 - 上轮成功日志里的原 URL，保住已经发现但当前无法重新检索的 DUGA 等官方图。
 
 批量流程不请求社区来源；采集任务在官方渠道落空时经 `peach.community_catalog` 去问
-AVBase、JavBus 与 javdb，封面先求两个图源比对一致（ADR-0030、ADR-0032）。DUGA 批量搜索 API
+AVBase、JavBus 与 JavDB，封面先求两个图源比对一致；JavDB 只作比对证据（ADR-0107）。DUGA 批量搜索 API
 需要代理店应用 ID，未配置前只复用成功日志中已经取得的精确图片 URL。
 
 两条番号改写规则，都由实测得出：
@@ -109,6 +109,19 @@ NETWORK_RETRY_DELAYS = (2, 4, 6, 8)
 THUMBNAIL = re.compile(r"(thumb|small|icon|/ts/|-s\d|_s\.)", re.I)
 FC2_HIRES = re.compile(r"https://contents-thumbnail\d*\.fc2\.com/w(?:7\d\d|[89]\d\d|\d{4,})/", re.I)
 IMAGE_URL = re.compile(r"https?://[^\"'\\ )]+?\.(?:jpg|jpeg|png|webp)")
+
+
+def is_javdb_image(url: str = '', source: str = '') -> bool:
+    """JavDB 转存图片仅参与来源印证，不作为正式封面。"""
+    for value in (url, source):
+        value = str(value or '').strip().lower()
+        if value in {'javdb', 'javdb-public', 'javdb_public'}:
+            return True
+        host = urlparse(value).hostname if '://' in value else value
+        if host and any(host == domain or host.endswith('.' + domain)
+                        for domain in ('jdbstatic.com', 'javdb.com')):
+            return True
+    return False
 
 
 @dataclass(frozen=True)
@@ -742,14 +755,12 @@ def best_cover(transport: HttpTransport, code: str, delay: float, *,
                deadline: float | None = None,
                diagnostics: dict[str, int] | None = None,
                known: MetadataEvidence | None = None,
-               sites_when_needed: bool = False,
                ) -> tuple[Candidate, tuple[int, int], bytes]:
     """官方封面择优：手上的候选、缓存快照里的候选，加上 r18.dev、MGS 或 Prestige 现问来的候选。
 
     `known` 是调用方这一趟已经取到的官方快照证据（例如 `r18_payload_evidence`），与 `metadata_root`
-    那份缓存同等对待：`sources` 里有 `r18dev` 就不再问 r18.dev。`sites_when_needed` 时先量手上的候选，
-    其中有一张宽到 `MIN_WIDTH` 就直接用它，量不出这么宽的才去问站——资料那一步刚取回的快照
-    多半已经带着原图地址，再问一遍 r18.dev 只是白等一次主机间隔。
+    那份缓存同等对待：`sources` 里有 `r18dev` 就不再问 r18.dev。所有可用官方候选一起量尺寸，
+    并按像素面积选择。
     """
     # 韩国 MIB 的编号在 JAV 目录站上要么不存在、要么撞上番号相同的日本作品：
     # `HA-101`、`MY-102` 取回的都是那部日本片的封套，番号核验拦不住，因为番号本来
@@ -767,22 +778,11 @@ def best_cover(transport: HttpTransport, code: str, delay: float, *,
         return _usable_candidates(code, found, known_sizes or {}, minimum_quality, minimum_pixels)
 
     first = usable([*prior_candidates, *evidence.candidates])
-    tried, measured = [], []
-    if sites_when_needed and first:
-        tried = first
-        measured = _measure(transport, first, record, minimum_width=minimum_width,
-                            delay=delay, deadline=deadline)
-        if any(size[0] >= MIN_WIDTH for _, _, size in measured):
-            return _download_best(transport, measured, record, minimum_width=minimum_width,
-                                  minimum_quality=minimum_quality, minimum_pixels=minimum_pixels,
-                                  deadline=deadline)
     asked = usable([*first, *_site_candidates(transport, code, evidence, delay=delay, deadline=deadline)])
-    candidates = [candidate for candidate in asked if candidate not in tried]
-    if not candidates and not tried:
+    if not asked:
         raise NotFound("所有渠道都没有候选")
-    if candidates:
-        measured += _measure(transport, candidates, record, minimum_width=minimum_width,
-                             delay=delay, deadline=deadline)
+    measured = _measure(transport, asked, record, minimum_width=minimum_width,
+                        delay=delay, deadline=deadline)
     if not measured:
         # 每张候选都回过话（404、太小、占位图、解不开）就是来源的确定答复，下次再问还是这几张：
         # 交 `NotFound`，采集任务记下一周不问。有一张断在连接、5xx 或拒绝访问上才可能是这趟没问成。

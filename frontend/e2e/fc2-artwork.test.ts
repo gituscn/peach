@@ -92,7 +92,7 @@ describe('FC2 合集与封面取景', () => {
               return { fit: getComputedStyle(img).objectFit, blur: pic.style.getPropertyValue('--cover-blur'),
                 widthGap: Math.abs(box.width - image.width), heightGap: Math.abs(box.height - image.height) };
             }, shape);
-            assert.equal(fill.fit, 'cover', JSON.stringify(fill));
+            assert.equal(fill.fit, shape === 'front' ? 'cover' : 'contain', JSON.stringify(fill));
             assert.equal(fill.blur, '', JSON.stringify(fill));
             assert.ok(fill.widthGap < 1 && fill.heightGap < 1, JSON.stringify(fill));
           }

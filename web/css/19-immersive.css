@@ -112,5 +112,5 @@
 /* 整张放进卡片：两侧留白透出 `.pic::before` 那层模糊底。 */
 .poster.cover.whole{object-fit:contain;object-position:50% 50%}
 /* 整幅画面按人脸取景并铺满卡片。 */
-.poster.cover.front[data-frame="still"],.poster.cover.whole[data-frame="still"]{
+.poster.cover.front[data-frame="still"]{
   object-fit:cover;object-position:var(--cover-x,50%) var(--cover-y,50%)}

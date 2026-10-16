@@ -74424,7 +74424,7 @@ function gK({ item: e, image: t }) {
 				},
 				children: "重试"
 			}) : void 0,
-			children: i.data?.message || (i.error ? "图片未取得" : "暂无封面")
+			children: i.data?.message || (i.error ? "图片未取得" : "封面未取得")
 		})
 	});
 }

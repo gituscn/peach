@@ -583,8 +583,8 @@ class LibraryMetadataProvider:
 
         `snapshots` 是资料那一步这一趟已经取到、或磁盘缓存里还新鲜的快照 `[(来源, 资料)]`，
         `absent` 是一周内说过没有、或不在这个番号链上的站：两者都不再问。r18.dev 与 DMM 的快照
-        给出官方候选（`_official_evidence`），手上的候选里有够宽的就不再问 r18.dev 与 MGS
-        （`best_cover` 的 `sites_when_needed`）；社区那几家的快照直接交给图源印证。
+        给出官方候选（`_official_evidence`），并与 `best_cover` 在线官方候选一起比较尺寸；
+        社区那几家的快照直接交给图源印证，JavDB 图片仅用作比对证据。
         几处没问成且全是冷却时报 `SourcePaused`（本趟没轮到），否则报 `Unavailable`。
         """
         from .community_catalog import verified_cover

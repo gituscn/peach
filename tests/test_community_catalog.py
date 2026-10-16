@@ -294,8 +294,8 @@ class VerifiedCoverTests(unittest.TestCase):
         works = [("avbase", {"cover_urls": [DMM_COVER]}), ("javdb", {"cover_urls": [JAVDB_COVER]})]
         pages = {JAVDB_COVER: gradient(800, 534), DMM_COVER: gradient(400, 267)}
         candidate, size, _data, origins = verified_cover(serve(pages), "ABW-358", works)
-        self.assertEqual((candidate.url, size, origins), (JAVDB_COVER, (800, 534), ("dmm", "javdb")))
-        self.assertEqual(candidate.referer, "https://javdb.com/")
+        self.assertEqual((candidate.url, size, origins), (DMM_COVER, (400, 267), ("dmm", "javdb")))
+        self.assertEqual(candidate.referer, "https://www.dmm.co.jp/")
         pages[DMM_COVER] = gradient(400, 267, rising=False)
         with self.assertRaisesRegex(NotFound, "^dmm、javdb 给的封面不是同一张图"):
             verified_cover(serve(pages), "ABW-358", works)
@@ -307,11 +307,10 @@ class VerifiedCoverTests(unittest.TestCase):
         self.assertEqual((candidate.url, candidate.referer, origins),
                          (JAVBUS_COVER, "https://www.javbus.com/", ("javbus", "javdb")))
 
-    def test_a_cover_only_one_origin_has_is_used_without_verification(self):
-        """没有第二个图源可比时照样用最大那张，印证图源留空（ADR-0032）：卡着没有封面更糟。"""
+    def test_a_javdb_only_cover_waits_for_an_eligible_image(self):
         works = [("avbase", {"cover_urls": []}), ("javdb", {"cover_urls": [JAVDB_COVER]})]
-        candidate, size, _data, origins = verified_cover(serve({JAVDB_COVER: gradient(800, 534)}), "IPX-060", works)
-        self.assertEqual((candidate.url, size, origins), (JAVDB_COVER, (800, 534), ()))
+        with self.assertRaisesRegex(NotFound, '无 JavDB 水印'):
+            verified_cover(serve({JAVDB_COVER: gradient(800, 534)}), "IPX-060", works)
 
     def test_a_small_official_cover_counts_as_the_second_origin(self):
         works = [("javdb", {"cover_urls": [JAVDB_COVER]})]
@@ -319,7 +318,7 @@ class VerifiedCoverTests(unittest.TestCase):
         reference = (small, (300, 200), gradient(300, 200))
         candidate, _size, _data, origins = verified_cover(serve({JAVDB_COVER: gradient(900, 600)}), "ORETD-615",
                                                           works, reference=reference)
-        self.assertEqual((candidate.url, origins), (JAVDB_COVER, ("javdb", "mgstage")))
+        self.assertEqual((candidate.url, origins), (small.url, ("javdb", "mgstage")))
         with self.assertRaisesRegex(Unavailable, "下载失败"):
             verified_cover(serve({}), "ORETD-615", works, reference=reference)
         with self.assertRaisesRegex(NotFound, "^javdb、mgstage 给的封面不是同一张图"):

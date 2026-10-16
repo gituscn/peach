@@ -588,21 +588,6 @@ def cover(request: Request, code: str = "", thumb: int = 0,
     return _image_response(request, path, media_type="image/jpeg")
 
 
-@router.api_route("/jav-cover", methods=["GET", "HEAD"])
-def jav_cover(request: Request, code: str = "", args: dict[str, str] = Depends(require_auth)):
-    """来源封面与详情共用图片缓存、身份校验和失败冷却。"""
-    from .web_jav_detail import q_jav_image
-    try:
-        result = q_jav_image(request.app.state.web_contract, {'code': code, 'image': 'cover'})
-    except ValueError as error:
-        return JSONResponse({'error': str(error)}, status_code=400)
-    if not result.get('image'):
-        return _asset_response(request, None)
-    body = base64.b64decode(result['image'].partition(',')[2], validate=True)
-    return Response(b'' if request.method == 'HEAD' else body, media_type='image/jpeg',
-                    headers={'Cache-Control': 'private, max-age=3600', 'Content-Length': str(len(body))})
-
-
 @router.post("/api/cover-crop")
 async def cover_crop(request: Request, args: dict[str, str] = Depends(require_auth)):
     """人自己框的正封那一块，或者把它撤掉换回算出来的那个。

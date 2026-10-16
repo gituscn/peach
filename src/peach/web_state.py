@@ -380,7 +380,8 @@ class WebContract:
         if not key:
             return None
         path = self.cover_root / f"{key}.jpg"
-        return path if path.is_file() else None
+        from .cover_artwork import has_javdb_source
+        return path if path.is_file() and not has_javdb_source(path) else None
 
     def cover_index(self) -> dict[str, dict]:
         """封面目录扫一遍的索引：casefold(归一番号) → 两份取景提示加封面版本。
@@ -406,6 +407,9 @@ class WebContract:
             with os.scandir(self.cover_root) as entries:
                 for entry in entries:
                     if not entry.name.endswith(".jpg"):
+                        continue
+                    from .cover_artwork import has_javdb_source
+                    if has_javdb_source(Path(entry.path)):
                         continue
                     stem = entry.path[:-len(".jpg")]
                     scanned[entry.name[:-len(".jpg")].casefold()] = {

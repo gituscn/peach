@@ -11,6 +11,7 @@ import io
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from PIL import Image
@@ -706,6 +707,60 @@ class BatchScriptTests(unittest.TestCase):
     def test_a_dry_run_writes_nothing(self):
         self.assertEqual(self.run_script(), 0)
         self.assertFalse(jav_poster_crop.sidecar_path(self.cover).exists())
+
+    def test_online_upgrade_checks_official_sources_without_local_snapshots(self):
+        from peach.jav_cover_fetch import Candidate
+        script = batch_script('upgrade_audited_covers')
+        candidate = Candidate('pics.dmm.co.jp', 'https://pics.dmm.co.jp/a.jpg', '')
+        report = self.root / 'report'
+        with patch.object(script, 'best_cover', return_value=(candidate, (2184, 1468), self.before)) as fetch:
+            with patch.object(script, 'install_cover') as install:
+                result = script.upgrade(self.cover, [], object(), report, live=True,
+                                        metadata_root=self.root / 'metadata')
+        self.assertEqual(result['status'], 'installed')
+        self.assertEqual(fetch.call_args.args[1], 'ABW-232')
+        self.assertEqual(fetch.call_args.kwargs['metadata_root'], self.root / 'metadata')
+        self.assertEqual(install.call_args.kwargs['evidence']['resolver'], 'official-live-upgrade-v1')
+        self.assertEqual((report / 'originals/ABW-232.jpg').read_bytes(), self.before)
+
+    def test_javdb_quarantine_preserves_bytes_and_resumes_without_duplicates(self):
+        covers = self.root / 'generated/covers'
+        covers.mkdir(parents=True)
+        target = covers / 'MIDV-377.jpg'
+        target.write_bytes(self.before)
+        evidence = target.with_suffix('.scraping.json')
+        evidence.write_text(json.dumps({'source': 'javdb', 'source_url': 'https://c0.jdbstatic.com/a.jpg'}), encoding='utf-8')
+        official = covers / 'SPONE-001.jpg'
+        official.write_bytes(self.before)
+        report = self.root / 'review/quarantine'
+        args = ['--data-root', str(self.root), '--report', str(report)]
+        script = batch_script('quarantine_javdb_covers')
+        self.assertEqual(script.main(args), 0)
+        self.assertTrue(target.exists())
+        self.assertEqual(script.main([*args, '--apply']), 0)
+        self.assertFalse(target.exists())
+        self.assertFalse(evidence.exists())
+        self.assertEqual((report / 'originals/MIDV-377.jpg').read_bytes(), self.before)
+        self.assertEqual(official.read_bytes(), self.before)
+        self.assertEqual(script.main([*args, '--apply']), 0)
+        result = json.loads((report / 'manifest.json').read_text(encoding='utf-8'))
+        self.assertEqual((result['matched'], result['quarantined']), (0, 1))
+
+    def test_quarantine_collision_does_not_partially_move_an_item(self):
+        covers = self.root / 'generated/covers'
+        covers.mkdir(parents=True)
+        target = covers / 'MIDV-377.jpg'
+        target.write_bytes(self.before)
+        evidence = target.with_suffix('.scraping.json')
+        evidence.write_text(json.dumps({'source': 'javdb'}), encoding='utf-8')
+        report = self.root / 'review/quarantine'
+        (report / 'originals').mkdir(parents=True)
+        (report / 'originals/MIDV-377.scraping.json').write_text('{}', encoding='utf-8')
+        with self.assertRaises(FileExistsError):
+            batch_script('quarantine_javdb_covers').main([
+                '--data-root', str(self.root), '--report', str(report), '--apply'])
+        self.assertEqual(target.read_bytes(), self.before)
+        self.assertTrue(evidence.exists())
 
     def test_audit_keeps_manual_frames_and_reports_unknown_provenance(self):
         manual = jav_poster_crop.manual_record(800, 540, {'x0': 420, 'y0': 0, 'x1': 800, 'y1': 540})

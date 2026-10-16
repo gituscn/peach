@@ -937,7 +937,7 @@ class LibraryNfoTests(unittest.TestCase):
         provider.transport = Mock()
         provider.community = Mock(return_value=[('javdb', {'cover_urls': ['https://c0.jdbstatic.com/covers/x.jpg']})])
         small = (Candidate('image.mgstage.com', 'https://image.mgstage.com/pf_o1.jpg'), (300, 200), b'small')
-        large = (Candidate('c0.jdbstatic.com', 'https://c0.jdbstatic.com/covers/x.jpg'), (1200, 800), b'large',
+        large = (Candidate('img.javbus.com', 'https://img.javbus.com/covers/x.jpg'), (1200, 800), b'large',
                  ('javdb', 'mgstage'))
         covers = self.root / 'covers'
         with patch('peach.jav_cover_fetch.best_cover', return_value=small) as official, \
@@ -954,7 +954,7 @@ class LibraryNfoTests(unittest.TestCase):
             self.assertTrue(provider.cover('ORETD-616', covers))
         self.assertEqual((covers / 'ORETD-616.jpg').read_bytes(), b'small')
 
-        lone = (Candidate('c0.jdbstatic.com', 'https://c0.jdbstatic.com/covers/y.jpg'), (800, 538), b'lone', ())
+        lone = (Candidate('img.javbus.com', 'https://img.javbus.com/covers/y.jpg'), (800, 538), b'lone', ())
         with patch('peach.jav_cover_fetch.best_cover', side_effect=NotFound('所有渠道都没有候选')), \
                 patch('peach.community_catalog.verified_cover', return_value=lone):
             self.assertTrue(provider.cover('IPX-060', covers))

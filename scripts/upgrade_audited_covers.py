@@ -16,28 +16,32 @@ from peach.cover_artwork import install_cover
 from peach.fsutil import atomic_write_text
 from peach.images import measure_image_file
 from peach.jav_cover_fetch import (HostLimitedTransport, NotFound, Unavailable, _download_best,
-                                   _measure, _no_usable_official, _usable_candidates)
+                                   _measure, _no_usable_official, _usable_candidates, best_cover)
 from peach.library_processing import _official_evidence, artwork_title
 from peach.scraping_access import SourceTransport
 from peach.community_catalog import origin_of
 
 
-def upgrade(path, known, transport, report):
+def upgrade(path, known, transport, report, *, live=False, metadata_root=None):
     evidence = _official_evidence(known)
-    if not evidence or not evidence.candidates:
+    if not live and (not evidence or not evidence.candidates):
         return {'code': path.stem, 'status': 'no_official_snapshot'}
     diagnostics = {}
     def record(key):
         diagnostics[key] = diagnostics.get(key, 0) + 1
     deadline = time.monotonic() + 90
-    candidates = _usable_candidates(path.stem, evidence.candidates, {}, 0, 0)
-    measured = _measure(transport, candidates, record,
-                        minimum_width=240, delay=0, deadline=deadline)
-    if not measured:
-        kind = Unavailable if diagnostics.get('unanswered') else NotFound
-        raise kind(_no_usable_official(diagnostics))
-    candidate, size, data = _download_best(transport, measured, record,
-        minimum_width=240, minimum_quality=0, minimum_pixels=0, deadline=deadline)
+    if live:
+        candidate, size, data = best_cover(transport, path.stem, 0, known=evidence,
+            metadata_root=metadata_root, minimum_width=240, deadline=deadline, diagnostics=diagnostics)
+    else:
+        candidates = _usable_candidates(path.stem, evidence.candidates, {}, 0, 0)
+        measured = _measure(transport, candidates, record,
+                            minimum_width=240, delay=0, deadline=deadline)
+        if not measured:
+            kind = Unavailable if diagnostics.get('unanswered') else NotFound
+            raise kind(_no_usable_official(diagnostics))
+        candidate, size, data = _download_best(transport, measured, record,
+            minimum_width=240, minimum_quality=0, minimum_pixels=0, deadline=deadline)
     previous = read(path.with_suffix('.scraping.json'))
     old_size = measure_image_file(path)
     community = origin_of(str(previous.get('source_url') or '')) in ('javdb', 'javbus')
@@ -54,9 +58,9 @@ def upgrade(path, known, transport, report):
             shutil.copy2(original, saved)
     digest = hashlib.sha256(data).hexdigest()
     install_cover(path, path.stem, data, size, evidence=dict(source=candidate.source,
-        source_url=candidate.url, title=artwork_title(known), width=size[0], height=size[1],
+        source_url=candidate.url, title=artwork_title(known) or previous.get('title', ''), width=size[0], height=size[1],
         raw_sha256=digest, installed_sha256=digest, checked_at=time.time(),
-        resolver='official-snapshot-upgrade-v1', verified_by=[]))
+        resolver='official-live-upgrade-v1' if live else 'official-snapshot-upgrade-v1', verified_by=[]))
     return {**result, 'status': 'installed'}
 
 
@@ -67,6 +71,7 @@ def main():
     parser.add_argument('--code', action='append', default=[])
     parser.add_argument('--apply', action='store_true')
     parser.add_argument('--retry-failures', action='store_true')
+    parser.add_argument('--live', action='store_true', help='通过现有官方链在线补查，无需已有快照')
     args = parser.parse_args()
     root = args.data_root / 'generated/covers'
     paths = [root / (code + '.jpg') for code in args.code] if args.code else sorted(root.glob('*.jpg'))
@@ -84,13 +89,14 @@ def main():
             evidence = read(path.with_suffix('.scraping.json'))
             eligible = bool(args.code) or (size and (max(size) < 1600 or origin_of(
                 str(evidence.get('source_url') or '')) in ('javdb', 'javbus')))
-            if not eligible or not _official_evidence(known):
+            if not eligible or (not args.live and not _official_evidence(known)):
                 continue
             if not args.apply:
                 print(json.dumps({'code': path.stem, 'size': size, 'eligible': True}), flush=True)
                 continue
             try:
-                result = upgrade(path, known, transport, args.report)
+                result = upgrade(path, known, transport, args.report, live=args.live,
+                                 metadata_root=args.data_root / 'sources/metadata/javinizer-go')
             except Exception as error:
                 from peach.library_processing import describe_failure
                 result = dict(code=path.stem, status='failed', error=describe_failure(error))

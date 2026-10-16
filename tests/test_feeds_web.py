@@ -129,14 +129,29 @@ class FeedWebFixture(unittest.TestCase):
 
 
 class FeedWebTest(FeedWebFixture):
-    def test_known_discovery_without_cover_address_uses_source_cover_without_ledger_write(self):
+    def test_javdb_provenance_is_unavailable_to_cover_readers(self):
+        from PIL import Image
+        target = self.contract.cover_root / 'SSIS-950.jpg'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        Image.new('RGB', (800, 538)).save(target)
+        evidence = target.with_suffix('.scraping.json')
+        evidence.write_text(json.dumps({'source_url': 'https://c0.jdbstatic.com/covers/a.jpg'}), encoding='utf-8')
+        self.contract.cache_bust()
+        self.assertFalse(self.contract.has_cover('SSIS-950'))
+        self.assertIsNone(self.contract.cover_path('SSIS-950'))
+        evidence.write_text(json.dumps({'source_url': 'https://pics.dmm.co.jp/a.jpg'}), encoding='utf-8')
+        self.contract.cache_bust()
+        self.assertTrue(self.contract.has_cover('SSIS-950'))
+        self.assertEqual(self.contract.cover_path('SSIS-950'), target)
+
+    def test_known_discovery_without_cover_address_has_no_javdb_image_fallback(self):
         self._add()
         self._check()
         with self.contract.database.write_transaction() as connection:
             connection.execute('UPDATE feed_discovery SET cover_url=NULL')
         rows = dispatch_api_get(self.contract, '/api/feeds/discoveries', {})['items']
         self.assertTrue(rows)
-        self.assertTrue(all(row['cover_url'] == '/jav-cover?code=' + row['code'] for row in rows))
+        self.assertTrue(all('jdbstatic.com' not in row['cover_url'] and not row['cover_url'].startswith('/jav-cover') for row in rows))
         with self.contract.database.read_connection() as connection:
             self.assertTrue(all(row[0] is None for row in connection.execute('SELECT cover_url FROM feed_discovery')))
 
@@ -573,60 +588,19 @@ class FeedWebTest(FeedWebFixture):
         self.assertFalse(attempt['ok'])
         self.assertIn('error_type', attempt)
 
-    def test_official_miss_uses_the_bound_source_image(self):
-        import base64
+    def test_official_miss_does_not_install_a_bound_javdb_image(self):
         from peach.jav_cover_fetch import Unavailable
         self._add()
         self._check()
         with self.contract.database.write_transaction() as connection:
             connection.execute("UPDATE feed_discovery SET link='https://javdb.com/v/Source01' WHERE code='SSIS-950'")
-        body, size, _ = self._fake_cover(self.contract, 'SSIS-950')
         with patch('peach.jav_cover_fetch.best_cover', side_effect=Unavailable('官方封面未取得')), \
-                patch('peach.javdb_public.PUBLIC_API.image', return_value=
-                    'data:image/jpeg;base64,' + base64.b64encode(body).decode()) as source_image, \
+                patch('peach.javdb_public.PUBLIC_API.image') as source_image, \
                 patch('peach.javdb_public.PUBLIC_API.remember_movie_identity') as identity:
-            found, actual, evidence = self._fetch_cover(self.contract, 'SSIS-950')
-        self.assertEqual((found, actual), (body, size))
-        self.assertEqual(evidence['source'], 'javdb-public')
-        identity.assert_called_once_with('SSIS-950', {'number': 'SSIS-950', 'id': 'Source01'})
-        source_image.assert_called_once_with('SSIS-950', 'cover', original=True)
-
-    def test_source_image_requires_a_bound_movie_and_full_size(self):
-        import base64
-        from peach.jav_cover_fetch import Unavailable
-        self._add()
-        self._check()
-        with self.contract.database.write_transaction() as connection:
-            connection.execute("UPDATE feed_discovery SET link='https://example.test/v/Source01' WHERE code='SSIS-950'")
-        with patch('peach.javdb_public.PUBLIC_API.image') as image:
-            with self.assertRaises(Unavailable):
-                feed_followup.source_cover(self.contract, 'SSIS-950')
-            image.assert_not_called()
-        with self.contract.database.write_transaction() as connection:
-            connection.execute("UPDATE feed_discovery SET link='https://javdb.com/v/Source01' WHERE code='SSIS-950'")
-        from PIL import Image
-        buffer = io.BytesIO()
-        Image.new('RGB', (200, 200)).save(buffer, 'JPEG')
-        with patch('peach.javdb_public.PUBLIC_API.image', return_value=
-                'data:image/jpeg;base64,' + base64.b64encode(buffer.getvalue()).decode()), \
-                patch('peach.javdb_public.PUBLIC_API.remember_movie_identity'):
-            with self.assertRaisesRegex(Unavailable, '240px'):
-                feed_followup.source_cover(self.contract, 'SSIS-950')
-
-    def test_bound_portrait_source_cover_keeps_its_native_size(self):
-        import base64
-        from PIL import Image
-        self._add()
-        self._check()
-        buffer = io.BytesIO()
-        Image.new('RGB', (560, 800)).save(buffer, 'JPEG')
-        body = buffer.getvalue()
-        with patch('peach.javdb_public.PUBLIC_API.image', return_value=
-                'data:image/jpeg;base64,' + base64.b64encode(body).decode()), \
-                patch('peach.javdb_public.PUBLIC_API.remember_movie_identity'):
-            actual, size, evidence = feed_followup.source_cover(self.contract, 'SSIS-950')
-        self.assertEqual((actual, size), (body, (560, 800)))
-        self.assertEqual(evidence['quality'], 'source-small')
+            with self.assertRaisesRegex(Unavailable, '官方封面未取得'):
+                self._fetch_cover(self.contract, 'SSIS-950')
+        identity.assert_not_called()
+        source_image.assert_not_called()
 
     def test_vr_layout_survives_without_a_detected_face(self):
         target = self.contract.cover_root / 'MDVR-276.face.json'

@@ -12,10 +12,20 @@ from filelock import FileLock
 
 from . import jav_poster_crop
 from .face_detect import FaceDetector, FaceModelUnavailable, decode, main_face
+from .jav_cover_fetch import Unavailable, is_javdb_image
 
 FRONT_START = 0.468
 MIN_FACE_Y, MAX_FACE_Y = 0.05, 0.60
 _INSTALL_LOCK = threading.RLock()
+
+
+def has_javdb_source(path: Path) -> bool:
+    """封面旁的来源证据是否指向 JavDB 转存图。"""
+    try:
+        evidence = json.loads(Path(path).with_suffix('.scraping.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return False
+    return isinstance(evidence, dict) and is_javdb_image(evidence.get('source_url'), evidence.get('source'))
 
 
 @lru_cache(maxsize=1)
@@ -93,6 +103,8 @@ def _sidecars(code: str, payload: bytes, size: tuple[int, int], detector=None, e
 def install_cover(target: Path, code: str, payload: bytes, size: tuple[int, int], *,
                   evidence: dict | None = None, detector=None) -> None:
     """准备完成后安装整组文件；失败时还原旧组，避免图片与取景跨版本。"""
+    if evidence and is_javdb_image(evidence.get('source_url'), evidence.get('source')):
+        raise Unavailable('未取得无 JavDB 水印的封面')
     target = Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
     prepared = _sidecars(code, payload, size, detector, evidence)
