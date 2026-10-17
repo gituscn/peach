@@ -144,13 +144,16 @@ jobs:
       - name: 安装前端依赖
         if: matrix.scope != 'core'
         run: npm --prefix frontend ci
-      # 浏览器冒烟只在 Windows 上执行（声明根是盘符），只有那里要 ffmpeg 与 Chrome。
+      # 抽帧与 AV1 软件解码回归在两端执行；浏览器冒烟的 Chrome 仅在 Windows 装配。
       - name: 安装固定版本 FFmpeg
         uses: FedericoCarboni/setup-ffmpeg@v3
         if: runner.os == 'Windows' && matrix.scope != 'core'
         with:
           ffmpeg-version: "9.0.1"
           github-token: ${{ github.token }}
+      - name: 安装 macOS FFmpeg
+        if: runner.os == 'macOS' && matrix.scope != 'core'
+        run: brew install ffmpeg
       - name: 指定 e2e 用的 Chrome
         if: runner.os == 'Windows' && matrix.scope != 'core'
         shell: pwsh
