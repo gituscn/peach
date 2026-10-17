@@ -71178,7 +71178,10 @@ function wPe({ initial: e, receipt: t }) {
 			status: /* @__PURE__ */ (0, C.jsxs)("span", {
 				role: "status",
 				className: "inline-flex items-center gap-1.5",
-				children: [/* @__PURE__ */ (0, C.jsx)(mG, { color: n.enabled ? "green" : "yellow" }), n.enabled ? "已启用" : "未启用"]
+				children: [/* @__PURE__ */ (0, C.jsx)(mG, {
+					color: "green",
+					className: n.enabled ? void 0 : "bg-background-primary-hover [&>span]:bg-text-tertiary"
+				}), n.enabled ? "已启用" : "未启用"]
 			}),
 			children: [n.enabled ? /* @__PURE__ */ (0, C.jsx)(q, {
 				variant: "secondary",

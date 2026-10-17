@@ -60,7 +60,8 @@ function BrowserForm({ initial, receipt }: { initial: State; receipt(message: st
       {action.error ? <ErrorText>{action.error}</ErrorText> : null}
     </Stack>
     <Footer status={<span role="status" className="inline-flex items-center gap-1.5">
-      <StatusDot color={state.enabled ? 'green' : 'yellow'} />{state.enabled ? '已启用' : '未启用'}
+      <StatusDot color="green" className={state.enabled ? undefined
+        : 'bg-background-primary-hover [&>span]:bg-text-tertiary'} />{state.enabled ? '已启用' : '未启用'}
     </span>}>
       {state.enabled ? <Button variant="secondary" type="button" disabled={Boolean(action.busy)}
         onClick={() => save('disable')}>关闭浏览器添加</Button> : null}

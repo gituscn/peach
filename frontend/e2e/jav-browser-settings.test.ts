@@ -44,6 +44,18 @@ describe('浏览器添加 JAV 设置', () => {
         const status = region.getByRole('status');
         assert.equal(await status.innerText(), '未启用');
         assert.equal(await status.locator('span[aria-hidden="true"]').count(), 1);
+        const statusColor = () => status.locator('span[aria-hidden="true"] > span')
+          .evaluate(node => getComputedStyle(node).backgroundColor);
+        const disabledColor = await statusColor();
+        const neutralColor = await page.evaluate(() => {
+          const sample = document.createElement('span');
+          sample.style.backgroundColor = 'var(--color-text-tertiary)';
+          document.body.append(sample);
+          const color = getComputedStyle(sample).backgroundColor;
+          sample.remove();
+          return color;
+        });
+        assert.equal(disabledColor, neutralColor);
         await channel.scrollIntoViewIfNeeded();
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         await channel.click();
@@ -58,6 +70,7 @@ describe('浏览器添加 JAV 设置', () => {
         await token.waitFor();
         assert.equal(await status.innerText(), '已启用');
         assert.equal(await status.locator('span[aria-hidden="true"]').count(), 1);
+        assert.notEqual(await statusColor(), disabledColor);
         assert.equal(await token.inputValue(), 'test-issued-token-1');
         assert.equal(await token.getAttribute('type'), 'password');
         assert.equal(await region.getByRole('link', { name: '安装 Peach 用户脚本' }).getAttribute('href'),
@@ -70,6 +83,7 @@ describe('浏览器添加 JAV 设置', () => {
         await token.waitFor({ state: 'detached' });
         assert.equal(await status.innerText(), '未启用');
         assert.equal(await status.locator('span[aria-hidden="true"]').count(), 1);
+        assert.equal(await statusColor(), disabledColor);
         assert.deepEqual(posted.map(body => body.action), ['enable', 'rotate', 'disable']);
         assert.ok(posted.every(body => body.provider === '115'));
         await settle(page);
