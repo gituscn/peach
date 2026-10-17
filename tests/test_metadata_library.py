@@ -2768,6 +2768,49 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
         with self.database.read_connection() as connection:
             self.assertIsNone(connection.execute('SELECT snapshot_path FROM asset WHERE id=1').fetchone()[0])
 
+    def test_frame_failure_evidence_is_saved_and_included_in_the_support_zip(self):
+        import io
+        import zipfile
+        from peach import support_bundle
+
+        def fail(_ffmpeg, video, _timestamp, _destination, *, diagnostics):
+            diagnostics.update(reason='ffmpeg_error', returncode=69, timestamp_seconds=2.4667,
+                               timeout_seconds=45, attempts=[],
+                               stderr=f'Error decoding {video}\nInvalid data token=private-token')
+            return False
+
+        with patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
+                patch('peach.frame_capture.capture_with_retry', side_effect=fail):
+            result = self.run_processing(stage='previews', asset_ids=[1])
+        self.assertEqual(result['status'], 'failed')
+        self.assertEqual(result['retryable_asset_ids'], [1])
+        issue = json.loads(Path(result['issues_log']).read_text(encoding='utf-8').splitlines()[0])
+        detail = issue['diagnostics']
+        self.assertEqual(detail['returncode'], 69)
+        self.assertEqual(detail['frame_index'], 0)
+        self.assertEqual(detail['duration_seconds'], 30)
+        self.assertIn('Invalid data', detail['stderr'])
+        self.assertNotIn(str(self.media), detail['stderr'])
+        self.assertNotIn('private-token', detail['stderr'])
+        self.assertIn('导出诊断报告', issue['message'])
+        with patch.object(support_bundle.error_reporting, 'log_directories', return_value=[]):
+            payload = support_bundle.bundle_bytes(config=self.config)
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            evidence = json.loads(archive.read('processing/' + Path(result['issues_log']).name))
+            state = json.loads(archive.read('processing/library-processing.json'))
+        self.assertEqual(evidence['diagnostics'], detail)
+        self.assertEqual(evidence['asset_id'], 1)
+        self.assertEqual(evidence['title'], '<media>')
+        self.assertNotIn(str(self.media), evidence['path'])
+        self.assertEqual(state['retryable_asset_ids'], [1])
+        with patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
+                patch('peach.frame_capture.capture_with_retry', return_value=True), \
+                patch('peach.frame_capture.tile_frames', side_effect=self.make_tile):
+            retried = self.run_processing(stage='previews', asset_ids=[1])
+        self.assertEqual(retried['status'], 'complete')
+        self.assertEqual(retried['issue_count'], 0)
+        self.assertEqual(retried['retryable_asset_ids'], [])
+
     def test_selected_assets_require_active_videos(self):
         for selection in ([], [True], [0], [-1], ['1'], '1', [99], [3], [4]):
             with self.subTest(selection=selection), self.assertRaises(ValueError), \

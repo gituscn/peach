@@ -47,7 +47,7 @@ jobs:
         id: media-cache
         uses: actions/cache@v6.1.0
         with:
-          key: windows-media-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build_ffmpeg_windows.sh', 'scripts/build_untrunc_windows.sh', 'scripts/fetch_ffmpeg_sources.py', 'scripts/fetch_untrunc_sources.py', 'scripts/ffmpeg-sources.json', 'scripts/untrunc-sources.json') }}
+          key: windows-media-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build_ffmpeg_windows.sh', 'scripts/dav1d-mingw64.ini', 'scripts/build_untrunc_windows.sh', 'scripts/fetch_ffmpeg_sources.py', 'scripts/fetch_untrunc_sources.py', 'scripts/ffmpeg-sources.json', 'scripts/untrunc-sources.json') }}
           path: |
             build/ffmpeg-windows/ffmpeg
             build/ffmpeg-windows/ffmpeg-corresponding-source.zip
@@ -57,7 +57,7 @@ jobs:
         if: steps.media-cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config python3 clang ca-certificates curl xz-utils
+          sudo apt-get install -y build-essential gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config python3 clang meson ninja-build ca-certificates curl xz-utils
       - name: 构建固定版本媒体工具
         if: steps.media-cache.outputs.cache-hit != 'true'
         run: bash scripts/build_ffmpeg_windows.sh build/ffmpeg-windows

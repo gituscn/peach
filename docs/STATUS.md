@@ -33,7 +33,7 @@
 - Python 最低与默认 3.14；Windows FFmpeg/ffprobe 在 `peach-data/tools/ffmpeg`，macOS 走 PATH。
 - amane 0.20.0，安装一致；[功能与接入](reference-snapshots/upstream-review.md)。
 - 发行名 `peach`、目录名 `peach-app`；Mac 维护与重启见待办 26。
-- 扫描任务卡支持暂停、三档速度、估时与步骤勾选；无进展预警 120 秒，资料/封面超时 90/240 秒。
+- 扫描卡：暂停、三档速度、估时、步骤；120 秒无进展预警，资料/封面超时 90/240 秒；[诊断](DIAGNOSTICS_AUDIT.md)。
 - 资料逐项提交，页面按结果版本刷新；女优资料后继每轮存量至多 16 条。
 - 下载后处理：16 条旧失败任务保留，部分资产已移动；`task_run` 外键异常 242 条未清理。
 - [标签归一](reference-snapshots/tag-vocabulary-audit.md)

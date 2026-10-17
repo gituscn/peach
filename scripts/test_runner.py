@@ -854,4 +854,8 @@ def verified_run(args, requested, scopes, files) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # 故障注入的默认错误日志属于当前测试进程，不能写进真实数据目录。
+    from peach import error_reporting
+    with tempfile.TemporaryDirectory(prefix='peach-test-errors-') as error_logs:
+        error_reporting._log_dir = Path(error_logs)
+        raise SystemExit(main())

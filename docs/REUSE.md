@@ -547,6 +547,10 @@ Python、npm 与 GitHub Actions 的版本由 `.github/dependabot.yml` 每周检�
 
 Windows 媒体子进程复用 Python 标准库 `subprocess.CREATE_NO_WINDOW`：入库探测、抽帧、拼图、预览、关注封面与媒体修复均显式设置，输出捕获、超时和取消按各入口原有契约处理。该标记由 Windows 原生支持，不引入依赖；见 [Python 文档](https://docs.python.org/3/library/subprocess.html#subprocess.CREATE_NO_WINDOW) 与 [Windows 创建标记](https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags)。
 
+抽帧与拼图通过现有 Pillow 12.3.0（HPND）完整解码输出图像，不按压缩文件大小推断有效性。复用既有 FFmpeg、色彩元数据重试与 `support_bundle`：失败记录包含采样秒数、时长、退出码、超时、工具来源和各次尝试的错误输出，错误原文截断并脱敏。诊断 ZIP 收集处理状态、最近 8 份问题清单及启动、更新、隧道证据，每文件最多读取尾部 96 KiB，媒体名称留在本机。有效的不足 1 KiB JPEG、中文路径、失败重试和诊断导出均有回归；FFmpeg 参数依据[官方文档](https://ffmpeg.org/ffmpeg.html)，不引入 ffmpeg-python 等命令包装层，不写真实 ledger。核验范围见 [日志与诊断核验](DIAGNOSTICS_AUDIT.md)。
+
+Windows FFmpeg 9.0.2 静态链接 VideoLAN dav1d 1.5.4（BSD-2-Clause，官方源码 1,038,852 字节，Meson + NASM，支持 Windows x64 与 8/10-bit AV1）。版本、HTTPS 来源与 SHA256 固定在 `scripts/ffmpeg-sources.json`，源码和许可证随对应源码归档分发；完整工具的 FFmpeg 二进制增加约 3 MiB，不新增 Python 运行依赖。原生 `av1` 包装器依赖硬件解码，浏览器可播放不能作为 FFmpeg 软件解码证据；CPU 解码直接采用维护中的 dav1d，不为当前仅需解码的链路引入 libaom 编码库。对照样本为 585.153855 秒的 AV1 视频，带 dav1d 的自构建工具已完成 9 帧与 1440×789 拼图；其余 52 项媒体未取得。构建参数依据 [FFmpeg libdav1d 文档](https://ffmpeg.org/ffmpeg-codecs.html#libdav1d) 和 [VideoLAN 固定发行源码](https://download.videolan.org/pub/videolan/dav1d/1.5.4/)。
+
 Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.17.0，版本由开发依赖和 `uv.lock` 固定。规则配置在 `pyproject.toml`；正式入口通过 `tests/test_python_lint.py` 扫描全仓自有 Python 文件，检查 Pyflakes、Ruff 支持的 Pylint 错误规则与四项常见行为隐患。Ruff 的 Pylint 规则覆盖是部分覆盖；需要跨模块推断的问题仍由对应行为回归验证。
 
 复用现有 Oxlint 1.85.0 的 correctness、`eqeqeq` 与 `oxc/no-accumulating-spread`，不新增依赖。源码和测试共用基础规则；shadcn 设计规则仅作用于自有 React 源码。

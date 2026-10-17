@@ -13,7 +13,7 @@ import time
 from contextlib import closing
 
 from . import __version__, access, distribution, settings_file
-from .ffmpeg import FFmpegResolver
+from .ffmpeg import FFmpegResolver, binary_diagnostics
 from .health import inspect_database
 from .mount_reachability import MountReachability, PROBE_TIMEOUT
 
@@ -70,19 +70,25 @@ def database_checks(settings):
     return database, schema
 
 
-def tools(settings):
+def tools(settings, *, inspect=True):
     resolver = FFmpegResolver(settings.ffmpeg_root)
     found = {}
     for name, choice in (("ffmpeg", resolver.ffmpeg()), ("ffprobe", resolver.ffprobe())):
-        found[name] = {"available": choice is not None, "source": choice.source if choice else None,
-                       "path": str(choice.path) if choice else None}
+        found[name] = (binary_diagnostics(choice, decoders=name == 'ffmpeg') if inspect else
+                       {'available': choice is not None, 'source': choice.source if choice else None,
+                        'path': str(choice.path) if choice else None})
     openssl = shutil.which("openssl")
     found["openssl"] = {"available": openssl is not None, "source": "path" if openssl else None,
                         "path": openssl}
     missing = [name for name, value in found.items() if not value["available"]]
-    return item("FFmpeg／OpenSSL", "warning" if missing else "ok",
-                "未找到：" + "、".join(missing) if missing else "工具路径已找到",
-                action="安装缺失工具" if missing else "", target="/settings/maintenance" if missing else None, details=found)
+    unavailable = [name for name in ('ffmpeg', 'ffprobe') if found[name]['available'] and not found[name].get('usable', True)]
+    incomplete = found['ffmpeg'].get('usable') and not found['ffmpeg'].get('av1_software')
+    problems = (["未找到：" + "、".join(missing)] if missing else [])
+    problems += (["无法执行：" + "、".join(unavailable)] if unavailable else [])
+    problems += ['FFmpeg 缺少 AV1 软件解码器'] if incomplete else []
+    return item("FFmpeg／OpenSSL", 'warning' if problems else 'ok',
+                '；'.join(problems) or ('媒体工具可执行，AV1 软件解码器可用' if inspect else '工具路径已找到'),
+                action='更新媒体工具' if problems else '', target='/settings/maintenance' if problems else None, details=found)
 
 
 def security(settings):
@@ -112,12 +118,12 @@ def media_mounts(snapshot):
                 details=snapshot)
 
 
-def component_checks(settings, snapshot, *, config=None, validate_config=True):
+def component_checks(settings, snapshot, *, config=None, validate_config=True, inspect_tools=True):
     config = config or settings_file.active()
     database, schema = database_checks(settings)
     checks = {"database": database, "schema": schema, "configured": configuration(config, settings.configured, validate=validate_config),
               "media_mounts": media_mounts(snapshot), "security": security(settings)}
-    checks["ffmpeg"] = tools(settings)
+    checks["ffmpeg"] = tools(settings, inspect=inspect_tools)
     return checks
 
 
@@ -198,6 +204,6 @@ def report(settings, snapshot, *, config=None):
 
 
 def health_components(settings, snapshot):
-    checks = component_checks(settings, snapshot, validate_config=False)
+    checks = component_checks(settings, snapshot, validate_config=False, inspect_tools=False)
     # 公开健康检查只保留分项原因；工具路径与详细修法由本机诊断提供。
     return {key: {name: value[name] for name in ("status", "reason")} for key, value in checks.items()}

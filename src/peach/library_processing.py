@@ -774,12 +774,14 @@ def _issue_classification(message, retryable, paused):
     return ('info' if note else 'paused' if paused else 'error'), retryable and not note
 
 
-def _record_issue(state, log_path, record):
+def _record_issue(state, log_path, record, *, diagnostics=None):
     """把一条记录写进日志，并按类型计进状态。
 
     告知项只按类型各记一个数：它们占着那 20 条预览的话，一条真问题就被几百条
     「来源没有这部片」挤出屏幕，而全库有大量片子任何目录站都收不到。
     """
+    if diagnostics is not None:
+        record['diagnostics'] = diagnostics
     with open(log_path, 'a', encoding='utf-8') as handle:
         handle.write(json.dumps(record, ensure_ascii=False) + '\n')
     note = NOTE_KEYS.get(record['message'])
@@ -1813,6 +1815,20 @@ def _asset_selection(db_path, asset_ids):
     return chosen
 
 
+class _PreviewCaptureError(ValueError):
+    """预览失败的操作提示及脱敏工具证据。"""
+
+    def __init__(self, diagnostics):
+        from .error_reporting import scrub
+        self.diagnostics = scrub(diagnostics)
+        message = {
+            'timeout': '视频抽帧超时，可重试；反馈问题请导出诊断报告',
+            'ffmpeg_error': 'FFmpeg 抽帧失败，反馈问题请导出诊断报告',
+            'no_frame': '采样位置未取得画面，反馈问题请导出诊断报告',
+        }.get(diagnostics.get('reason'), '视频抽帧未取得，反馈问题请导出诊断报告')
+        super().__init__(message)
+
+
 def _generate_preview(config, row, database, resolver, *, progress):
     """复用九宫格抽帧原语，产物可用后在共享写锁内登记。"""
     from . import frame_capture, media_probe
@@ -1852,9 +1868,17 @@ def _generate_preview(config, row, database, resolver, *, progress):
                     return False
                 progress()
                 timestamp = duration * (0.03 + 0.94 * (index + 0.5) / 9)
+                diagnostic = {}
                 if not frame_capture.capture_with_retry(
-                        str(choice.path), str(video), timestamp, frames / f's{index:02d}.jpg'):
-                    raise ValueError('视频抽帧未取得，请检查媒体文件后重试')
+                        str(choice.path), str(video), timestamp, frames / f's{index:02d}.jpg',
+                        diagnostics=diagnostic):
+                    for attempt in diagnostic.get('attempts', []):
+                        attempt['stderr'] = attempt.get('stderr', '').replace(str(video), '<media>')[-4096:]
+                    diagnostic['stderr'] = diagnostic.get('stderr', '').replace(str(video), '<media>')[-4096:]
+                    diagnostic.update(frame_index=index, duration_seconds=duration,
+                                      tool_source=choice.source if hasattr(choice, 'source') else 'unknown',
+                                      tool_name=Path(choice.path).name)
+                    raise _PreviewCaptureError(diagnostic)
             progress()
             with atomic_path(destination) as output:
                 if not frame_capture.tile_frames(str(choice.path), str(frames / 's%02d.jpg'), 3, 3, output):
@@ -1895,10 +1919,13 @@ def _generate_previews(config, rows, database, *, update, issue, guard,
         except InterruptedError:
             raise
         except (OSError, ValueError, subprocess.SubprocessError) as error:
+            from .error_reporting import event
+            event('library-preview', error, asset_id=row['id'])
             message = (str(error) if isinstance(error, ValueError) else
                        '生成预览图超时，请重试' if isinstance(error, subprocess.SubprocessError) else
                        '生成预览图失败，请检查 FFmpeg 与目录权限后重试')
-            issue(row, message, action='generating_preview', retryable=True)
+            details = {'diagnostics': error.diagnostics} if isinstance(error, _PreviewCaptureError) else {}
+            issue(row, message, action='generating_preview', retryable=True, **details)
         update(checked=index + 1, previews=made, current_asset_id=None, current_asset_name='',
                current_action='', current_started_at=None, current_deadline_at=None)
     return made
@@ -2130,7 +2157,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             flush_state(force='status' in values)
             report(dict(state))
 
-        def issue(asset, message, *, action='', retryable=False, paused=False):
+        def issue(asset, message, *, action='', retryable=False, paused=False, diagnostics=None):
             """`asset` 是这一项的馆藏行，来源离线一类与具体项目无关的问题给 `None`。
 
             每条问题都带上标题与路径：光有「NFO 无法解析」和一个链接，人得逐个点开
@@ -2144,7 +2171,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             _record_issue(state, log_path, {
                 'asset_id': asset_id, 'title': title, 'path': asset_path, 'message': message,
                 'severity': severity, 'failed_action': action, 'retryable': retryable,
-                'last_failed_at': time.time()})
+                'last_failed_at': time.time()}, diagnostics=diagnostics)
             state['last_progress_at'] = time.time()
             flush_state()
             report(dict(state))

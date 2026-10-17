@@ -3,6 +3,13 @@
   "license": "GPL-3.0-or-later",
   "sources": [
     {
+      "name": "dav1d",
+      "revision": "1.5.4",
+      "url": "https://download.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz",
+      "sha256": "686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5",
+      "archive": "dav1d-1.5.4.tar.xz"
+    },
+    {
       "name": "ffmpeg",
       "revision": "n9.0.2",
       "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",

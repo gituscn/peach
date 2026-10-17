@@ -68,6 +68,8 @@ def probe_file(ffprobe: str, path: str, timeout: float = TIMEOUT_SECONDS) -> tup
         timeout=timeout,
         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )
+    if result.returncode:
+        raise subprocess.CalledProcessError(result.returncode, 'ffprobe', stderr=result.stderr)
     payload = json.loads(result.stdout or b"{}")
     duration = float((payload.get("format") or {}).get("duration") or 0)
     if duration <= 0:
@@ -94,8 +96,14 @@ def measure(ffprobe: str, asset_id: int, path: str, timeout: float = TIMEOUT_SEC
     try:
         duration, width, height, codec, fps, audio = probe_file(
             ffprobe, resolve_case_insensitive(path), timeout)
-    except Exception:  # 超时、文件读不到、输出不是 JSON：对这一行都是「没拿到」
+    except Exception as error:  # 超时、文件读不到、输出不是 JSON：对这一行都是「没拿到」
+        from .error_reporting import subprocess_failure
+        subprocess_failure('media-probe', tool=ffprobe, error=error, asset_id=asset_id,
+                           returncode=getattr(error, 'returncode', None), timeout_seconds=timeout)
         return (-1, 0, 0, None, 0, 0, None, None, None, asset_id)
+    if duration <= 0:
+        from .error_reporting import event
+        event('media-probe', asset_id=asset_id, reason='duration_unavailable')
     return (duration, width, height, codec, fps, audio,
             *context_fields(width, height, duration), asset_id)
 

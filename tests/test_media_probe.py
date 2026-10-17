@@ -114,7 +114,7 @@ class ProbeProcessTests(unittest.TestCase):
         payload = b'{"format":{"duration":"12.5"},"streams":[{"width":320,"height":240,' \
                   b'"codec_name":"h264","avg_frame_rate":"25/1"}]}'
         with mock.patch.object(media_probe.subprocess, "run",
-                               return_value=SimpleNamespace(stdout=payload)) as run:
+                               return_value=SimpleNamespace(stdout=payload, returncode=0, stderr=b'')) as run:
             result = media_probe.probe_file("ffprobe", "sample.mp4", timeout=3)
         self.assertEqual(result, (12.5, 320, 240, "h264", 25.0, None))
         options = run.call_args.kwargs

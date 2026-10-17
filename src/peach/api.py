@@ -20,6 +20,7 @@
 """
 import asyncio
 import logging
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from urllib.parse import quote
@@ -186,6 +187,17 @@ async def _warm_ledger_aggregates(ledger_ready: bool, contract, stopping: asynci
         except Exception:
             # 预热失败不影响服务启动，这一页照旧在第一次打开时自己算。
             LOGGER.debug("aggregate warmup failed: %s", path, exc_info=True)
+
+
+def _server_error_headers(request: Request, error: Exception, status_code=500):
+    """服务错误按路由模板关联；请求参数、正文与鉴权头留在请求中。"""
+    if status_code < 500:
+        return {}
+    from .error_reporting import event
+    error_id = uuid.uuid4().hex
+    event('http-request', error, error_id=error_id, method=request.method,
+          route=getattr(request.scope.get('route'), 'path', '<unmatched>').lstrip('/'), status_code=status_code)
+    return {'X-Peach-Error-ID': error_id, 'Cache-Control': 'no-store'}
 
 
 def create_app(
@@ -461,6 +473,7 @@ def create_app(
     # 只挂子类的话地址栏敲错一个字母仍会看到一行 JSON。
     @app.exception_handler(StarletteHTTPException)
     def _http_exception_handler(request: Request, exc: StarletteHTTPException):
+        headers = _server_error_headers(request, exc, exc.status_code)
         detail = exc.detail
         if isinstance(detail, dict):
             # 表单校验那种带字段明细的 4xx：`message` 是总话，其余键原样带给页面。
@@ -473,8 +486,14 @@ def create_app(
                       and "text/html" in request.headers.get("accept", ""))
         if navigation:
             return HTMLResponse(routes_pages.error_page(exc.status_code, body["error"]),
-                                status_code=exc.status_code)
-        return JSONResponse(body, status_code=exc.status_code)
+                                status_code=exc.status_code, headers=headers)
+        return JSONResponse(body, status_code=exc.status_code, headers=headers)
+
+    @app.exception_handler(Exception)
+    def _server_exception_handler(request: Request, exc: Exception):
+        headers = _server_error_headers(request, exc)
+        return JSONResponse({'error': '服务处理失败，请导出诊断报告',
+                             'error_id': headers['X-Peach-Error-ID']}, status_code=500, headers=headers)
 
     # 第三方前端依赖固定版本并随 Peach 自托管；局域网断网时仍可播放。
     app.mount(

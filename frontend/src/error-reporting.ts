@@ -7,7 +7,7 @@ export function installErrorReporting(): void {
   let start = Date.now();
   let count = 0;
   const seen = new Set<string>();
-  const send = (kind: string, cause: unknown, fallback = '') => {
+  const send = (kind: string, cause: unknown, fallback = '', source?: ErrorEvent) => {
     if (Date.now() - start >= 60_000) {
       start = Date.now(); count = 0; seen.clear();
     }
@@ -20,9 +20,11 @@ export function installErrorReporting(): void {
     seen.add(key); count += 1;
     void fetch('/api/diagnostics/client-error', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind, message, stack }), credentials: 'same-origin', keepalive: true,
+      body: JSON.stringify({ kind, message, stack, page: window.location.pathname,
+        source_file: source?.filename?.split('/').pop()?.split('?')[0],
+        line: source?.lineno, column: source?.colno }), credentials: 'same-origin', keepalive: true,
     }).catch(() => {});
   };
-  window.addEventListener('error', event => send('error', event.error, event.message));
+  window.addEventListener('error', event => send('error', event.error, event.message, event));
   window.addEventListener('unhandledrejection', event => send('unhandledrejection', event.reason, 'Promise 未处理的异常'));
 }

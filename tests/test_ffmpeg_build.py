@@ -23,7 +23,8 @@ class FFmpegSourceBuildTests(unittest.TestCase):
         lock = builder.load_sources()
         self.assertEqual(lock["version"], "9.0.2")
         self.assertEqual(lock["license"], "GPL-3.0-or-later")
-        self.assertEqual(len(lock["sources"]), 3)
+        self.assertEqual(len(lock["sources"]), 4)
+        self.assertIn('dav1d', {source['name'] for source in lock['sources']})
 
     def make_sources(self, output):
         lock = builder.load_sources()
@@ -64,7 +65,7 @@ class FFmpegSourceBuildTests(unittest.TestCase):
             lock = self.make_sources(output)
             builder.prepare(output, lock)
             for path in ("ffmpeg/COPYING.GPLv3", "ffmpeg/COPYING.LGPLv2.1",
-                         "ffmpeg/COPYING.LGPLv3", "x264/COPYING"):
+                         "ffmpeg/COPYING.LGPLv3", "x264/COPYING", "dav1d/COPYING"):
                 (output / "work" / path).write_text("license", encoding="utf-8")
             headers = output / "work/nv-codec-headers/include/ffnvcodec"
             headers.mkdir(parents=True)
