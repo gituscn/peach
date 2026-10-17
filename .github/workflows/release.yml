@@ -31,7 +31,10 @@ jobs:
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python scripts/release_tag.py --repo "$GITHUB_REPOSITORY" --verify-sha "$GITHUB_SHA"
+        run: |
+          python scripts/release_tag.py --repo "$GITHUB_REPOSITORY" --verify-sha "$GITHUB_SHA"
+          python -c 'import os; from pathlib import Path; from scripts.version_bump import read_version; assert os.environ["GITHUB_REF_NAME"] == "v" + read_version(Path.cwd()), "Tag 与版本不一致"'
+          python scripts/changelog.py --notes "${GITHUB_REF_NAME#v}" --to "$RUNNER_TEMP/release-notes.md"
 
   ffmpeg:
     name: Windows FFmpeg 与对应源码
@@ -228,5 +231,5 @@ jobs:
           VERSION: ${{ needs.windows.outputs.version }}
         run: |
           cd release
-          sha256sum *.zip *-setup.exe > SHA256SUMS.txt
-          gh release create "$GITHUB_REF_NAME" *.zip *-setup.exe SHA256SUMS.txt --verify-tag --prerelease --title "Peach $VERSION · Windows 测试版" --notes-file RELEASE_NOTES.md
+          sha256sum ./*.zip ./*-setup.exe > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" ./*.zip ./*-setup.exe SHA256SUMS.txt --verify-tag --prerelease --title "Peach $VERSION · Windows 测试版" --notes-file RELEASE_NOTES.md
