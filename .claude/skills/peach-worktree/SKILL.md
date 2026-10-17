@@ -5,7 +5,7 @@ description: 在用户说并行、工作树、暂存、提交、ready、集成�
 
 # 并行 worktree 与提交边界
 
-最后复核：2026-10-13
+最后复核：2026-10-18
 证据来源：`docs/HANDOFF.md`「并行智能体与 Git 工作树」、`README.md`、ADR-0015、ADR-0017、本机工作树与沙箱工具记录。
 
 ## 是否委派与何时使用
@@ -66,7 +66,7 @@ description: 在用户说并行、工作树、暂存、提交、ready、集成�
   代码差别比换工具本身还大。工具与地址的名单在 `scripts/co_author.py` 的 `VENDORS`，
   `ready` / `integrate` 逐个提交判，拒收缺失、形态不对、工具未登记和地址与工具不配四种；
   合进来的 merge 与已在 `origin/master` 上的提交（网页上直接改的那种，签不了名）不算。
-  一个提交由两个智能体接力写成时，两条并列署名都写上。
+  智能体接力写成时并列署名；人类共同作者使用「姓名 <邮箱>」，与智能体署名同块保留。
 
 - 禁止 `git add .`、`git add -A`、目录路径或 glob。只暂存任务明确拥有的文件。
 - 提交前用 `git diff --cached --name-status` 与任务边界逐条对照。干净的 `git status`

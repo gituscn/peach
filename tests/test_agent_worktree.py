@@ -216,6 +216,13 @@ class CommitMessageGuardTests(_WorktreeCase):
         self.assertEqual(amended.returncode, 0, amended.stderr)
         self.assertEqual(_git(self.worker, "show", "-s", "--format=%B").stdout.strip(), message.strip())
 
+    def test_human_and_agent_trailers_are_preserved_in_the_commit(self):
+        message = ("test: 共同作者署名\n\n" + AUTHOR
+                   + "\nCo-Authored-By: Contributor <contributor@example.invalid>\n")
+        result = self.attempt(message)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(_git(self.worker, "show", "-s", "--format=%B").stdout.strip(), message.strip())
+
     def test_intermediate_commit_can_leave_readme_scope_for_delivery_check(self):
         result = self.attempt("test: intermediate\n\n" + AUTHOR)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -681,6 +688,29 @@ class CoAuthorTests(unittest.TestCase):
         self.assertEqual(
             self.signed("Co-Authored-By: Claude Code (Opus 5) <noreply@anthropic.com>",
                         "Co-Authored-By: Codex (GPT-5.5) <noreply@openai.com>"), [])
+
+    def test_human_and_agent_coauthors_share_one_commit(self):
+        human = "Co-Authored-By: Contributor <contributor@example.invalid>"
+        agent = "Co-Authored-By: Codex (GPT-6) <noreply@openai.com>"
+        for signatures in ((human, agent), (agent, human)):
+            with self.subTest(signatures=signatures):
+                self.assertEqual(self.signed(*signatures), [])
+
+    def test_human_coauthor_requires_an_agent_signature(self):
+        self.assertTrue(self.signed("Co-Authored-By: Contributor <contributor@example.invalid>"))
+
+    def test_human_coauthor_requires_a_name_and_email(self):
+        agent = "Co-Authored-By: Codex (GPT-6) <noreply@openai.com>"
+        for human in ("Contributor", "Contributor <invalid>", "<contributor@example.invalid>"):
+            with self.subTest(human=human):
+                self.assertTrue(co_author.problems("测试", [agent, human]))
+
+    def test_registered_agent_and_vendor_addresses_require_model_metadata(self):
+        agent = "Codex (GPT-6) <noreply@openai.com>"
+        for signature in ("Codex <someone@example.invalid>",
+                          "Contributor <noreply@openai.com>"):
+            with self.subTest(signature=signature):
+                self.assertTrue(co_author.problems("测试", [agent, signature]))
 
     def test_every_commit_on_the_branch_is_checked_not_only_head(self):
         """一次交付常常是好几个提交。只判尖端等于只判收尾那一次签得对不对，
