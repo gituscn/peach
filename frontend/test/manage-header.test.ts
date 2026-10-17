@@ -51,6 +51,13 @@ describe('页头判据', () => {
 });
 
 describe('启动骨架', () => {
+  it('管理导航、面包屑和页面标题按层级排列', () => {
+    const node = document.createElement('div');
+    node.innerHTML = manageHeaderSkeletonHtml(props('cleanup', '/review'));
+    expect([...node.children].map(child => child.tagName)).toEqual(['NAV', 'NAV', 'H2']);
+    expect(node.firstElementChild?.hasAttribute('data-manage-bar')).toBe(true);
+    expect(node.children[1]?.hasAttribute('data-manage-crumb')).toBe(true);
+  });
   it('管理条标出当前项，回收站读数到之前铺两格占位', () => {
     const node = document.createElement('div');
     node.innerHTML = manageHeaderSkeletonHtml(props('trash', '/trash'));

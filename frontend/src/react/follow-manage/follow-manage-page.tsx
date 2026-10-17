@@ -23,6 +23,7 @@ import type { FollowManageProps } from '../bundle';
 import { cardClass } from '../components/card';
 import { Note } from '../components/note';
 import { Page } from '../components/page';
+import { useHorizontalScroller } from '../components/use-horizontal-scroller';
 import { STAT_STRIP_SIX } from '../components/stat-card';
 import { AddSource } from './add-source';
 import { AliasManager } from './alias-manager';
@@ -58,6 +59,7 @@ function Reading({ term, figure, unit }: { term: string; figure: number; unit: s
 }
 
 export function FollowManagePage(props: FollowManageProps) {
+  const sectionScroll = useHorizontalScroller<HTMLDivElement>();
   const {
     route, savePreference, toast, openFollow, openServiceConfiguration, readOnly, readOnlyMessage, writerUrl,
   } = props;
@@ -142,7 +144,7 @@ export function FollowManagePage(props: FollowManageProps) {
         setTab(next);
         go({ tab: next });
       }} className="flex flex-col gap-6">
-        <TabList aria-label="关注管理区域" data-section-nav data-section-items
+        <TabList ref={sectionScroll} aria-label="关注管理区域" data-section-nav data-section-items
           className="flex max-w-full flex-nowrap overflow-x-auto">
           {TABS.map(([key, name]) => (
             <Tab key={key} id={key} className="cursor-pointer whitespace-nowrap">{name}</Tab>

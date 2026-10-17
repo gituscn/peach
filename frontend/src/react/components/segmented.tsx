@@ -1,14 +1,15 @@
 /* 分段控件的选中面独立移动，文字、焦点与业务状态即时更新。 */
 import { RadioGroup, TabList, type RadioGroupProps, type TabListProps } from 'react-aria-components';
 import { useMovingSurface } from './use-moving-surface';
+import { useHorizontalScroller } from './use-horizontal-scroller';
 
 export function SegmentedTabList<T extends object>(props: TabListProps<T>) {
-  const ref = useMovingSurface('selection');
+  const ref = useHorizontalScroller(useMovingSurface('selection'));
   return <TabList {...props} ref={ref} />;
 }
 
 export function SegmentedRadioGroup(props: RadioGroupProps) {
-  const ref = useMovingSurface('selection');
+  const ref = useHorizontalScroller(useMovingSurface('selection'));
   return <RadioGroup {...props} ref={ref} />;
 }
 

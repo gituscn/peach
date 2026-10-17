@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { wireHorizontalScroller, rubberBand } from '../src/ui-kit';
 
 afterEach(async () => {document.body.replaceChildren();await new Promise(resolve=>setTimeout(resolve,0));vi.unstubAllGlobals()});
-function button(){const node=document.createElement('button');document.body.append(node);return node}
+function button(){const node=document.createElement('button');node.style.overflowX='auto';document.body.append(node);return node}
 
 it('在横排上开头的滚轮手势整段归这一排，鼠标一格逐帧走完、半路接着加，拦不住的留给页面，重复绑定与移除都释放资源', async () => {
   const node=button();let left=0,now=1000;const disconnect=vi.fn();
@@ -19,6 +19,11 @@ it('在横排上开头的滚轮手势整段归这一排，鼠标一格逐帧走�
   const control=wireHorizontalScroller(node,{drag:true});
   expect(wireHorizontalScroller(node)).toBe(control);
   const wheel=(deltaY=100,cancelable=true)=>new WheelEvent('wheel',{deltaY,cancelable});
+  // 内容可直接显示的布局不拦页面滚动，也不画横向提示。
+  node.style.overflowX='visible';control.update();
+  const pageWheel=wheel(60);node.dispatchEvent(pageWheel);
+  expect(pageWheel.defaultPrevented).toBe(false);expect(node.dataset.overflowRight).toBe('false');
+  node.style.overflowX='auto';control.update();
   // 鼠标一格逐帧走，不是一下跳过去。
   const moving=wheel(60);node.dispatchEvent(moving);
   expect(moving.defaultPrevented).toBe(true);expect(left).toBe(0);

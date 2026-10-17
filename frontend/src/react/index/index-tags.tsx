@@ -15,6 +15,7 @@ import { FilterGlassRows, FilterPill } from '../components/filter-glass';
 import { SEGMENTED_GLASS_TRACK, SEGMENT_GLASS } from '../components/segmented';
 import { SelectionDock } from '../components/selection-dock';
 import { spriteGlyph } from '../components/sprite-glyph';
+import { useHorizontalScroller } from '../components/use-horizontal-scroller';
 import { FavoriteButton } from '../library-shortcuts/shortcut-controls';
 import { tagColorKey, type IndexTag, type TagView } from './index-data';
 
@@ -111,6 +112,7 @@ export function TagFilters(
     onView(view: TagView): void;
   },
 ) {
+  const alphaScroll = useHorizontalScroller<HTMLElement>();
   return (
     <FilterGlassRows label="标签筛选" topLabel="标签类型"
       top={categories.map(([key, label]) => (
@@ -124,7 +126,7 @@ export function TagFilters(
           {readout}
         </span>
         {letters.length > 1 ? (
-          <nav aria-label="按首字跳转" data-alpha-jump=""
+          <nav ref={alphaScroll} aria-label="按首字跳转" data-alpha-jump=""
             className="flex min-w-0 gap-0.5 overflow-x-auto overscroll-x-contain">
             {letters.map((letter, at) => (
               <button key={letter} type="button" onClick={() => onJump(at)}

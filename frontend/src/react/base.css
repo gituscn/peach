@@ -209,15 +209,15 @@
  * 底下，只会让那一块看着比实际矮一截。遗留层的 `.tier`、`.tagbar`、`.srow` 就是这个
  * 做法（`web/css/01-base.css`），这里只是把同一条搬进岛内。
  *
- * 按 `overflow-x-auto` 认，不逐处挂钩子：横滚的块以后还会加，而漏挂和「这块本来就该
- * 露系统条」在屏幕上看不出区别。
+ * `overflow-x-auto` 与横向导航的 `data-horizontal-scroll` 共用隐藏规则；导航的边缘提示
+ * 由共用横滚 hook 绑定，表格和代码块使用覆盖式滑块。
  *
  * 竖着滚的块不走这条：藏掉原生的却不给别的指示，就没人知道那一块还有下文。那些块挂
  * 全站那条覆盖式滑块，接法在 `components/overlay-scrollbar.ts`。 */
-.peach-react [class~="overflow-x-auto"] {
+.peach-react :is([class~="overflow-x-auto"], [data-horizontal-scroll]) {
   scrollbar-width: none;
 }
 
-.peach-react [class~="overflow-x-auto"]::-webkit-scrollbar {
+.peach-react :is([class~="overflow-x-auto"], [data-horizontal-scroll])::-webkit-scrollbar {
   display: none;
 }
