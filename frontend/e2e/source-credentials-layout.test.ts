@@ -24,9 +24,28 @@ describe('来源链接与凭据布局', () => {
       });
       try {
         await page.reload();
+        const region = page.getByRole('region', { name: '自定义元数据来源', exact: true });
+        const add = region.getByRole('button', { name: '添加来源', exact: true });
+        const assertClosedCard = async () => {
+          await add.waitFor(); await settle(page);
+          const geometry = await add.evaluate(button => {
+            const row = button.parentElement!;
+            const card = button.closest('section')!.lastElementChild!;
+            return { divider: parseFloat(getComputedStyle(row).borderTopWidth),
+              radius: parseFloat(getComputedStyle(card).borderTopLeftRadius),
+              top: button.getBoundingClientRect().top - card.getBoundingClientRect().top };
+          });
+          assert.equal(geometry.divider, 0, JSON.stringify(geometry));
+          assert.ok(geometry.radius > 0 && geometry.top >= 12 && geometry.top <= 18, JSON.stringify(geometry));
+        };
+        await assertClosedCard();
         await page.getByRole('button', { name: '添加来源', exact: true }).click();
         const form = page.getByRole('form', { name: '元数据来源配置', exact: true });
-        const region = page.getByRole('region', { name: '自定义元数据来源', exact: true });
+        await form.getByRole('button', { name: '取消', exact: true }).click();
+        await form.waitFor({ state: 'detached' });
+        await assertClosedCard();
+        await region.screenshot({ path: `../build/agent-verification/browser/custom-source-closed-${viewport.name}.png` });
+        await add.click();
         const editorGeometry = await region.evaluate(node => {
           const card = node.lastElementChild!.getBoundingClientRect();
           const input = node.querySelector('form label')!.getBoundingClientRect();
@@ -52,6 +71,7 @@ describe('来源链接与凭据布局', () => {
         await form.waitFor({ state: 'detached' });
         await page.getByText('公开演示元数据 · 已停用', { exact: true }).waitFor();
         assert.equal(items.length, 1);
+        assert.equal(await add.evaluate(button => parseFloat(getComputedStyle(button.parentElement!).borderTopWidth)), 1);
         assert.deepEqual(opened.problems, []);
       } finally { await opened.close(); }
     });

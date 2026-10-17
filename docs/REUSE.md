@@ -88,7 +88,7 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 卡片多选由 `MediaCard`、`FollowCard` 的 `selectMode` 统一控制：保留选择入口，单项保存、已看、忽略、稍后看、预览跳转和回收站操作不挂载；退出多选恢复单项操作。首页、实体页、关注与回收站沿用同一组组件。
 
-配置页中的来源凭据复用 `Section`、`Stack` 与 `SettingsSectionLabel`；独立凭据页面保留自己的面板层级。自定义来源表单和卸载开关只使用一层正文间距，操作区复用 `Footer`。PikPak 直接显示账号表单，两种登录动作同排。在线、离线等连接状态复用 BoardUI `StatusDot`；权限、任务和凭据结果复用 `Chip`。作品资料站点标识经 `/site-mark` 读取本地缓存，资源搜索帮助直达 [详细配置说明](RESOURCE_SEARCH.md)。不新增运行时依赖，不修改凭据内容或 ledger。
+配置页中的来源凭据复用 `Section`、`Stack` 与 `SettingsSectionLabel`；独立凭据页面保留自己的面板层级。自定义来源表单和卸载开关只使用一层正文间距，列表与表单操作区复用 `Footer`；空来源列表的添加入口放在 `Stack` 正文中。PikPak 直接显示账号表单，两种登录动作同排。在线、离线等连接状态复用 BoardUI `StatusDot`；权限、任务和凭据结果复用 `Chip`。作品资料站点标识经 `/site-mark` 读取本地缓存，资源搜索帮助直达 [详细配置说明](RESOURCE_SEARCH.md)。不新增运行时依赖，不修改凭据内容或 ledger。
 
 账号归属复用 `review_decision`、`creator_collection_base`、`write_owned_fields` 和全库归属审计。明确拒绝的资产与账号组合在自动摄取时跳过；用户写入保留复核入口。网黄博主只命中可信个人、内容创作者或发布账号断言，未分类账号保留全部名册入口。`attach_avatar_availability` 集中处理资料页、索引、搜索与统计的作品头像：发布账号缺少本人或出演职业证据时作品帧照常兜底，另标 `avatar_stand_in`，已安装图片独立保留。个人博主的补头像复用 `avatar_cover_face.face_square`、`readable_cut` 与 ADR-0074 的 `agreeing` 两部互证，画面取自接触印相九格（ADR-0099）。来源核查清单、逐关系回执和备份存于 `peach-data/review/`。
 
