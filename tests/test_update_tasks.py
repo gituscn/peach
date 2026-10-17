@@ -1,5 +1,6 @@
 """升级预检以真实临时账本、进程与文件锁验证任务保护和恢复。"""
 import json
+from contextlib import contextmanager
 import os
 from pathlib import Path
 import subprocess
@@ -164,6 +165,52 @@ class UpdateTaskTests(unittest.TestCase):
             thread.join(10)
         self.assertEqual(results, [0])
         self.assertEqual(attempts, [os.getpid(), os.getpid()])
+
+    def test_activity_registration_remains_readable_until_the_protected_scan_finishes(self):
+        entered, finish, withdrawing = (threading.Event() for _ in range(3))
+        errors = []
+        mutex, read = update_tasks._mutex, update_tasks._read
+
+        def work():
+            try:
+                with update_tasks.activity(self.db, '受保护任务'):
+                    entered.set()
+                    if not finish.wait(5):
+                        raise TimeoutError('任务结束信号未取得')
+            except Exception as error:
+                errors.append(error)
+            finally:
+                withdrawing.set()
+
+        worker = threading.Thread(target=work)
+
+        @contextmanager
+        def observed_mutex(root):
+            lock = mutex(root)
+            if threading.current_thread() is worker and finish.is_set():
+                withdrawing.set()
+            with lock:
+                yield
+
+        def protected_read(path):
+            if path.parent.name == 'active':
+                finish.set()
+                self.assertTrue(withdrawing.wait(5))
+                self.assertTrue(path.is_file(), '受保护扫描期间任务登记必须保留')
+            return read(path)
+
+        with patch.object(update_tasks, '_mutex', observed_mutex), patch.object(
+                update_tasks, '_read', protected_read):
+            worker.start()
+            try:
+                self.assertTrue(entered.wait(5))
+                self.assertEqual(update_tasks._running(self.db), ['受保护任务'])
+            finally:
+                finish.set()
+                worker.join(5)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(errors, [])
+        self.assertTrue(update_tasks.wait_quiescent(self.db, timeout=0))
 
     def test_a_live_thread_remains_protected_after_its_record_is_cancelled(self):
         entered, release = threading.Event(), threading.Event()

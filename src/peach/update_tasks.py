@@ -95,7 +95,8 @@ def activity(db: Path, label: str):
         yield
     finally:
         current_db.reset(context)
-        path.unlink(missing_ok=True)
+        with _mutex(path.parent.parent):
+            path.unlink(missing_ok=True)
 
 
 def reserve(db: Path, *, owner: int | None = None) -> str:
