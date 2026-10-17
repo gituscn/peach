@@ -1,5 +1,6 @@
 /* 常驻任务面：状态、计数与控件共用服务端快照。位置由全站通知栈管理。 */
 import { useEffect, useRef, useState } from 'react';
+import { VisuallyHidden } from 'react-aria';
 import { RiArrowRightLine, RiArrowDownSLine, RiArrowUpSLine, RiCheckLine, RiCheckboxBlankCircleLine, RiErrorWarningLine, RiInformationLine } from '@remixicon/react';
 import { Button } from '@/components/base/buttons/button';
 import { LinkButton } from '@/components/base/buttons/link-button';
@@ -83,7 +84,7 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
             step.status === 'current' ? 'text-text-primary' : 'text-text-tertiary')}>
           {step.status === 'complete' ? <RiCheckLine aria-hidden className="size-4 shrink-0" />
             : <RiCheckboxBlankCircleLine aria-hidden className={cx('size-4 shrink-0', step.status === 'current' && 'text-border-focus-ring')} />}
-          <span className="sr-only">{step.status === 'complete' ? '已完成：' : step.status === 'current' ? '当前：' : '待处理：'}</span>
+          <VisuallyHidden>{step.status === 'complete' ? '已完成：' : step.status === 'current' ? '当前：' : '待处理：'}</VisuallyHidden>
           {step.status === 'complete' ? <s className="wrap-anywhere">{step.label}</s> : <span className="wrap-anywhere">{step.label}</span>}
         </li>)}
       </ol> : null}

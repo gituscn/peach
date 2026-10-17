@@ -135,9 +135,16 @@ describe('扫描与采集控制', () => {
         });
         const receipt = page.locator('#toasts [data-sonner-toast]').filter({ hasText: '设置已保存' });
         await receipt.waitFor();
+        await page.waitForFunction(() => {
+          const task = document.querySelector('#toasts [data-processing-dock]');
+          const notice = [...document.querySelectorAll('#toasts [data-sonner-toast]')]
+            .find(node => node.textContent?.includes('设置已保存'));
+          return task && notice && notice.getBoundingClientRect().bottom <= task.getBoundingClientRect().top - 7;
+        });
         const dockBox = await dock.boundingBox(), receiptBox = await receipt.boundingBox();
         assert.ok(dockBox && receiptBox && receiptBox.y + receiptBox.height <= dockBox.y - 7,
-          '普通回执位于任务卡上方');
+          JSON.stringify({ message: '普通回执位于任务卡上方', dockBox, receiptBox,
+            space: await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--processing-toast-space')) }));
         const homeLayout = await layout(page);
         assert.ok(homeLayout.scrollWidth <= homeLayout.viewportWidth, JSON.stringify(homeLayout));
         assert.deepEqual(homeLayout.offenders, []);

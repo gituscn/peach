@@ -45064,10 +45064,7 @@ function EP({ state: e, problem: t = "", measure: n = !1 }) {
 									"aria-hidden": !0,
 									className: dk("size-4 shrink-0", e.status === "current" && "text-border-focus-ring")
 								}),
-								/* @__PURE__ */ (0, C.jsx)("span", {
-									className: "sr-only",
-									children: e.status === "complete" ? "已完成：" : e.status === "current" ? "当前：" : "待处理："
-								}),
+								/* @__PURE__ */ (0, C.jsx)(Ux, { children: e.status === "complete" ? "已完成：" : e.status === "current" ? "当前：" : "待处理：" }),
 								e.status === "complete" ? /* @__PURE__ */ (0, C.jsx)("s", {
 									className: "wrap-anywhere",
 									children: e.label
