@@ -1887,6 +1887,11 @@ class OperationalScriptTests(unittest.TestCase):
             "/tmp/peach/ABW-234.mp4",
         )
 
+    def test_filename_cleanup_ignores_read_only_mounts(self):
+        self.assertEqual(self.clean_names.build_plan([
+            (1, 'guangya', r'G:\media\abw-0234.mp4', 'abw-0234.mp4', 'ABW-234'),
+        ]), [])
+
     def test_filename_cleanup_apply_renames_files_updates_ledger_and_validates_backup(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
