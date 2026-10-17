@@ -39,16 +39,21 @@ describe('Video.js 10 播放链', () => {
       payload.groups[0].primary.media_type = 'application/dash+xml'; payload.groups[0].primary.duration = 3;
       await page.route(url => url.pathname === '/api/follow' && url.searchParams.has('item'), route => route.fulfill({ json: payload }));
       await page.route('**/api/follow/play', route => route.fulfill({ json: { ok: true } }));
+      await page.route('**/api/follow/activity', route => {
+        assert.equal(route.request().postDataJSON().item, DETAIL.collection);
+        return route.fulfill({ json: { ok: true, item: DETAIL.collection } });
+      });
       await page.route('**/follow-stream**', route => route.fulfill({ body: files.get('video.mpd')!, contentType: 'application/dash+xml' }));
       await page.route(/\/(?:init|chunk)-stream\d+(?:-\d+)?\.m4s(?:\?|$)/, route =>
         route.fulfill({ body: files.get(basename(new URL(route.request().url()).pathname))!, contentType: 'video/mp4' }));
       await page.reload();
       await page.locator('#stage dash-video > video.vjs-tech').waitFor();
       await page.locator('#stage video.vjs-tech').evaluate((node: HTMLVideoElement) => { node.muted = true });
+      const activity = page.waitForResponse(reply => new URL(reply.url()).pathname === '/api/follow/activity');
       await page.locator('#stage media-play-button').click();
       await page.waitForFunction(() => {
         const video = document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')!;
-        return video.currentTime > .2 && video.videoWidth === 160;
+        return video.currentTime > .8 && video.videoWidth === 160;
       }, undefined, { timeout: 15_000 }).catch(async error => {
         const state = await page.locator('#stage video.vjs-tech').evaluate((node: HTMLVideoElement) => ({
           paused: node.paused, time: node.currentTime, width: node.videoWidth, ready: node.readyState, src: node.currentSrc,
@@ -57,6 +62,7 @@ describe('Video.js 10 播放链', () => {
         throw new Error(`${String(error)} ${JSON.stringify({ state, problems })}`);
       });
       await page.locator('#stage video.vjs-tech').evaluate((node: HTMLVideoElement) => node.pause());
+      assert.equal((await activity).status(), 200);
       await page.locator('#closeStage').click();
       await page.locator('.video-js').waitFor({ state: 'detached' });
       assert.deepEqual(problems, []);
