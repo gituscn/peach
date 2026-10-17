@@ -270,7 +270,8 @@ class ProcessingControlTests(unittest.TestCase):
         from peach.frame_capture import capture_frame
         control = control_for(self.config)
         with control.bind('one', publish=lambda **_: None, active=lambda: True, db_path=self.db, mode='low'), \
-                patch('peach.frame_capture.subprocess.run', return_value=SimpleNamespace(stderr=b'')) as run:
+                patch('peach.frame_capture._readable_image', return_value=True), \
+                patch('peach.frame_capture.subprocess.run', return_value=SimpleNamespace(returncode=0, stderr=b'')) as run:
             capture_frame('ffmpeg', 'video.mp4', 1, self.root / 'frame.jpg')
         command = run.call_args.args[0]
         self.assertEqual(command.count('-threads'), 2)
@@ -351,7 +352,8 @@ class ProcessingControlTests(unittest.TestCase):
             with self.subTest(mode=mode), \
                     control.bind(mode, publish=lambda **_: None, active=lambda: True, db_path=self.db, mode=mode), \
                     patch('peach.frame_capture.checkpoint'), \
-                    patch('peach.frame_capture.subprocess.run', return_value=SimpleNamespace(stderr=b'')) as run:
+                    patch('peach.frame_capture._readable_image', return_value=True), \
+                    patch('peach.frame_capture.subprocess.run', return_value=SimpleNamespace(returncode=0, stderr=b'')) as run:
                 capture_frame('ffmpeg', 'video.mp4', 1, self.root / 'frame.jpg')
                 tile_frames('ffmpeg', 'frame%02d.jpg', 3, 3, self.root / 'tile.jpg')
                 for call, filter_option in zip(run.call_args_list, ('-filter_threads', '-filter_complex_threads')):
