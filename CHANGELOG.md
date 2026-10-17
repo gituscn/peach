@@ -21,6 +21,28 @@ Removed / Fixed / Security。
 
 ## [未发布]
 
+## [0.42.0] - 2026-10-17
+
+### 新增
+
+- **更新**：提供完整安装包、完整免安装包和应用更新包。自动更新校验并复用已安装工具，仅在工具缺失、损坏或版本变化时下载对应工具包；旧版更新器首次升级仍下载完整包。
+- **馆藏**：支持 STRM 文件按需播放；支持登记已挂载的光鸭、OneDrive 和其他网盘目录，按只读方式管理。
+- **配置**：网盘目录可分别选择「正常读取」或「代理流量保护」，包括 PikPak；实际代理由挂载工具配置。
+- **配置**：「生成视频预览」统一控制九宫格与时间轴抽帧；关闭后仍按来源规则探测时长与分辨率。时间轴预览默认关闭。
+
+### 变更
+
+- **播放**：播放器采用 Video.js 10，统一播放会话与续播处理。
+
+### 修复
+
+- **播放**：播放前等待媒体来源挂载就绪；媒体读取与命令行抽帧遵循目录读取策略和视频预览设置。
+- **馆藏**：只读挂载目录禁用文件改名与索引修复等写入操作。
+- **采集**：浏览器采集遵循 Peach 的显式直连设置。
+- **界面**：详情页显示视频缩略图；数据表支持横向覆盖式滑块，横向导航、管理页层级、配置页与来源空列表使用一致的布局。
+
+首次安装请选择 `Peach-0.42.0-windows-x64-setup.exe`，免安装使用请选择完整 ZIP。`ffmpeg-corresponding-source.zip` 和 `untrunc-corresponding-source.zip` 是第三方工具的对应源码，普通使用无需下载；`tools-*.zip` 由更新器按需下载，无需手动选择。
+
 ## [0.41.0] - 2026-10-17
 
 ### 新增
@@ -547,7 +569,8 @@ Removed / Fixed / Security。
 - **桌面**：独立包使用 UTF-8 启动日志。
 - **配置**：首次设置后的跳转目标取新鲜读到的 mDNS 名。
 
-[未发布]: https://github.com/peach-mitao/peach/compare/v0.41.0...HEAD
+[未发布]: https://github.com/peach-mitao/peach/compare/v0.42.0...HEAD
+[0.42.0]: https://github.com/peach-mitao/peach/compare/v0.41.0...v0.42.0
 [0.41.0]: https://github.com/peach-mitao/peach/compare/v0.40.1...v0.41.0
 [0.40.1]: https://github.com/peach-mitao/peach/compare/v0.40.0...v0.40.1
 [0.40.0]: https://github.com/peach-mitao/peach/compare/v0.39.0...v0.40.0
