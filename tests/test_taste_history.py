@@ -175,17 +175,21 @@ class TasteHistoryTests(unittest.TestCase):
             self.assertTrue(all(source.engine == "chrome" for source in enabled))
             self.assertIn(user_data / "Default" / "HistoryEx", [source.path for source in enabled])
 
-    def test_historyex_directory_and_file_use_verified_browsing_schema(self):
-        from peach.taste_browsers import configure_browser, enabled_history_sources
-        path = self.root / "115Chrome/User Data/Default/HistoryEx"
-        self._chrome_db(path)
-        for selected in (path, path.parent, path.parent.parent):
-            with self.subTest(selected=selected), mock.patch("peach.taste_history.discover_history_sources", return_value=[]):
-                store = self.root / f"store-{len(selected.parts)}.sqlite"
-                configure_browser(store, "add", {"name": "115", "path": str(selected)})
-                sources = enabled_history_sources(store)
-                self.assertEqual([source.path for source in sources], [path])
-                self.assertEqual(refresh_history(sources, store)[0]["added"], 1)
+    def test_registers_115_historyex_from_user_data_profile_or_file(self):
+        user_data = self.root.resolve() / "115Chrome" / "User Data"
+        history = user_data / "Default" / "HistoryEx"
+        self._chrome_db(history)
+        for index, path in enumerate((user_data, history.parent, history)):
+            with self.subTest(path=path), mock.patch.object(taste_history, "discover_history_sources", return_value=[]):
+                store = self.root.resolve() / f"115-history-{index}.sqlite"
+                taste_browsers.configure_browser(store, "add", {"name": "115", "path": str(path)})
+                browser = taste_browsers.browser_sources(store)[0]
+                self.assertTrue(browser["available"])
+                self.assertEqual(browser["profiles"], 1)
+                sources = taste_browsers.enabled_history_sources(store)
+                self.assertEqual(sources, [HistorySource("115", "Default", history, engine="chrome")])
+                self.assertEqual(refresh_history(sources, store, host="test")[0]["added"], 1)
+                self.assertEqual(refresh_history(sources, store, host="test")[0]["added"], 0)
 
     def test_historyex_download_database_has_actionable_error(self):
         from peach.taste_browsers import configure_browser

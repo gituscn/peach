@@ -17,6 +17,7 @@ VENDORS = {
 #: 署名形态：`工具 (模型 版本) <厂商 noreply>`。括号里那一段是重点——同一个工具换代
 #: 模型，写出来的代码差别比换工具本身还大，事后翻这一行是要知道哪个模型写的。
 FORM = re.compile(r"(?P<tool>[^()<>]+) \((?P<model>[^()]+)\) <(?P<mail>[^<>\s]+)>")
+HUMAN_FORM = re.compile(r"(?P<name>[^()<>\r\n]+) <(?P<mail>[^<>\s@]+@[^<>\s@]+)>")
 
 EXAMPLE = "Co-Authored-By: Claude Code (Opus 5) <noreply@anthropic.com>"
 
@@ -38,8 +39,14 @@ def problems(label: str, found: list[str]) -> list[str]:
     if not found:
         return [f"提交「{label}」须有 Co-Authored-By 写明工具与模型，如 {EXAMPLE}"]
     problems = []
+    has_agent = False
     for value in found:
         parsed = FORM.fullmatch(value)
+        human = HUMAN_FORM.fullmatch(value)
+        if (parsed is None and human is not None and human["name"].strip()
+                and human["name"].strip().casefold() not in {tool.casefold() for tool in VENDORS}
+                and human["mail"].casefold() not in VENDORS.values()):
+            continue
         if parsed is None:
             problems.append(f"提交「{label}」的署名「{value}」形态不对，须为 工具 (模型 版本) "
                             f"<厂商 noreply>，如 {EXAMPLE}")
@@ -49,6 +56,10 @@ def problems(label: str, found: list[str]) -> list[str]:
         elif parsed["mail"] != VENDORS[parsed["tool"]]:
             problems.append(f"提交「{label}」里 {parsed['tool']} 的署名地址须是 "
                             f"{VENDORS[parsed['tool']]}，不是 {parsed['mail']}")
+        else:
+            has_agent = True
+    if not problems and not has_agent:
+        problems.append(f"提交「{label}」须有 Co-Authored-By 写明工具与模型，如 {EXAMPLE}")
     return problems
 
 
@@ -56,8 +67,8 @@ def check(repo: Path, base: str, head: str = "HEAD") -> list[str]:
     """分支上每个非 merge 提交都要有署名，且每一条都合规。
 
     署名是事后追责唯一的入手处：出问题的那一行是哪个工具的哪个模型写的，只能从这里看。
-    所以缺了、形态不对、工具没登记、地址与工具不配，四种都拒收。多条并列是允许的，
-    一个提交确实可能由两个智能体接力写成。
+    每个提交须有合规的智能体署名。人类共同作者使用「姓名 <邮箱>」，可以与智能体并列；
+    智能体的模型、工具登记和厂商地址仍逐条检查。
 
     判据落在每个提交上，不是落在分支尖端：一次交付常常是好几个提交，只看最后一个
     等于只要收尾那次签对了，前面写代码的几次签成谁都放行——而要追的恰恰是写出那
