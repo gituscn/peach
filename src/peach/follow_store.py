@@ -420,7 +420,8 @@ class FollowStore:
 
     def record(self, source_id: int, fetch: SourceFetch, *,
                creator_aliases: tuple[str, ...] = (),
-               moment: datetime | None = None, page: int = 0) -> RecordOutcome:
+               moment: datetime | None = None, page: int = 0,
+               complete: bool = True) -> RecordOutcome:
         stamp = _now_text(moment)
         connection = self._connect()
         if fetch.not_modified:
@@ -429,8 +430,9 @@ class FollowStore:
                 " last_error=NULL, updated_at=? WHERE id=?", (stamp, stamp, source_id))
             return RecordOutcome(source_id, not_modified=True)
 
-        evidence, evidence_error = self._persist_evidence(fetch, moment)
-        self._replace_candidate_profile_links(source_id, fetch, moment=moment, page=page)
+        evidence, evidence_error = self._persist_evidence(fetch, moment) if complete else (None, None)
+        if complete:
+            self._replace_candidate_profile_links(source_id, fetch, moment=moment, page=page)
         added = updated = 0
         for candidate in fetch.candidates:
             verdict = classify(candidate.title, creator_aliases=creator_aliases,
@@ -478,13 +480,16 @@ class FollowStore:
                 " ON CONFLICT(source_id,external_id) DO UPDATE SET"
                 # status、asset_id 与 first_seen_at 刻意不在两个 SET 里：用户处理过的
                 # 条目不因为再次抓到就退回 new，首见时间也不该被重写。
-                + (_PARTIAL_UPDATE if candidate.partial else _FULL_UPDATE),
+                + (_PARTIAL_UPDATE if candidate.partial else _FULL_UPDATE)
+                + ", evidence_path=COALESCE(follow_item.evidence_path, excluded.evidence_path)",
                 values,
             )
             if existed:
                 updated += 1
             else:
                 added += 1
+        if not complete:
+            return RecordOutcome(source_id, len(fetch.candidates), added, updated)
         if page:
             # 往回抓：**不动 etag/last_modified**。那两个值是第一页的条件请求凭据，
             # 拿第 3 页的 etag 覆盖掉，下次常规检查就会拿它去问第一页，
