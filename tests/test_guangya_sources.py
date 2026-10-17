@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 
 from peach import media_configuration, onboarding, organize, resource_identification, settings_file
 from peach import web_batch, web_catalog, web_organize, web_resource_sync
-from peach.media_sources import READ_ONLY_LOCATIONS, SCANNABLE_LOCATIONS
+from peach.media_sources import READ_ONLY_LOCATIONS, SCANNABLE_LOCATIONS, cost_for
 from support.ledger import fresh_ledger
 
 
@@ -45,10 +45,10 @@ class GuangyaSourceTests(unittest.TestCase):
         self.assertEqual(answers.media_sources[0]["location"], "guangya")
         self.assertIn("只读", dict(media_configuration.SOURCE_OPTIONS)["guangya"])
 
-    def test_guangya_is_scannable_metered_and_read_only(self):
+    def test_guangya_is_scannable_free_and_read_only(self):
         self.assertIn("guangya", SCANNABLE_LOCATIONS)
         self.assertIn("guangya", READ_ONLY_LOCATIONS)
-        self.assertEqual(web_catalog.COST["guangya"], "metered")
+        self.assertEqual(cost_for("guangya"), "free")
         with patch.object(web_resource_sync, "LOCATION_ROOT_DECLARATIONS", {"guangya": ("G:/",)}):
             self.assertEqual(web_resource_sync.configured_resource_locations(), ("guangya",))
 

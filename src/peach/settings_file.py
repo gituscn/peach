@@ -229,6 +229,7 @@ class PeachConfig:
     mounts: dict[str, tuple[str, ...]] = field(default_factory=dict)
     library_names: dict[str, str] = field(default_factory=dict)
     library_icons: dict[str, str] = field(default_factory=dict)
+    media_costs: dict[str, str] = field(default_factory=dict)
     #: `asset.location` -> 账本口径的声明根，至少一个。
     locations: dict[str, tuple[str, ...]] = field(
         default_factory=lambda: dict(DEFAULT_LOCATION_ROOTS))
@@ -355,7 +356,7 @@ def _merge(
         raise _fail(path, "`directories` 里有不认识的键：" + "、".join(unknown))
 
     media = _table(document, "media", path)
-    stray = sorted(set(media) - {_LOCATIONS_KEY, _MOUNTS_KEY, "libraries", "library_icons"})
+    stray = sorted(set(media) - {_LOCATIONS_KEY, _MOUNTS_KEY, "libraries", "library_icons", "costs"})
     if stray:
         # 第一阶段的 `[media] R = '/Volumes/RESOURCES'`。键空间从盘符换成了 location ID，
         # 把它当未知键忽略等于「所有来源都没挂」——整台机器安静地进脱盘模式。
@@ -438,11 +439,15 @@ def _merge(
             tunnel_table, "hostname", tunnel_defaults.hostname, path, "tunnel."),
     )
 
+    media_costs = _string_map(_table(media, "costs", path), path, "media.costs.")
+    if any(cost not in {"free", "metered"} for cost in media_costs.values()):
+        raise _fail(path, "`[media.costs]` 只接受 free 或 metered")
     config = PeachConfig(
         data_root=data_root, path=path, present=present, data_root_found=found,
         directories=directories, mounts=mounts, locations=locations,
         library_names=_string_map(_table(media, "libraries", path), path, "media.libraries."),
         library_icons=_string_map(_table(media, "library_icons", path), path, "media.library_icons."),
+        media_costs=media_costs,
         server=server, replication=replication, tunnel=tunnel,
     )
     return _apply_environment(config, environ)
@@ -610,6 +615,8 @@ def render(config: PeachConfig) -> str:
         "# 不认识的值忽略：只含一个来源的馆藏回落到该来源的图标，跨来源的用 database。",
     ]
     lines += [f"{_render_value(root)} = {_render_value(icon)}" for root, icon in config.library_icons.items()]
+    lines += ["", "[media.costs]", "# 声明根 -> 代理流量保护。free 关闭，metered 开启。"]
+    lines += [f"{_render_value(root)} = {_render_value(cost)}" for root, cost in config.media_costs.items()]
     lines += [
         "",
         "[media.mounts]",

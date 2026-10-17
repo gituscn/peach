@@ -7,9 +7,7 @@ import sys
 from typing import Any
 
 from . import platform
-
-SOURCE_OPTIONS = (("local", "本地磁盘"), ("115", "CloudDrive · 115"),
-                  ("pikpak", "CloudDrive · PikPak"), ("guangya", "CloudDrive · 光鸭云盘（只读）"))
+from .media_sources import SOURCE_OPTIONS, cost_for
 
 
 def _windows_installed_names() -> list[str]:
@@ -61,6 +59,7 @@ def rows(config, *, windows: bool, probe: bool = False) -> list[dict[str, Any]]:
             result.append({"location": location, "root": root, "path": mount,
                            "library": config.library_names.get(root) or PureWindowsPath(root).name or root,
                            "library_icon": config.library_icons.get(root, ""),
+                           "cost": cost_for(location, root, config),
                            "online": platform.root_online(Path(mount)) if probe and mount else False})
     return result
 
@@ -79,7 +78,9 @@ def validate(raws: object, *, windows: bool) -> tuple[dict, dict, list[str]]:
                 raise ValueError("媒体来源格式不正确")
             location = row.get("location")
             if not isinstance(location, str) or location not in dict(SOURCE_OPTIONS):
-                raise ValueError("请选择本地磁盘、115、PikPak 或光鸭云盘")
+                raise ValueError("请选择列表中的媒体来源")
+            if "cost" in row and row["cost"] not in ("free", "metered"):
+                raise ValueError("请选择代理流量保护设置")
             text = str(row.get("path", "")).strip()
             root = text if windows else str(row.get("root", "")).strip()
             if any(ord(char) < 32 for char in text + root):
@@ -107,3 +108,15 @@ def validate(raws: object, *, windows: bool) -> tuple[dict, dict, list[str]]:
     return ({key: tuple(value) for key, value in locations.items()},
             {key: tuple(value) for key, value in mounts.items()},
             errors if any(errors) else [])
+
+
+def costs(raws: list[dict], config, *, windows: bool) -> dict[str, str]:
+    """为已校验的媒体行保存声明根保护设置。"""
+    result = dict(config.media_costs)
+    for row in raws:
+        root = str(PureWindowsPath(row["path"] if windows else row["root"]))
+        for previous in tuple(result):
+            if PureWindowsPath(previous) == PureWindowsPath(root):
+                del result[previous]
+        result[root] = row.get("cost", cost_for(row["location"], root, config))
+    return result
