@@ -17,6 +17,8 @@ from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from html.parser import HTMLParser
+from itertools import chain
+from functools import lru_cache
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -26,10 +28,11 @@ from browserexport.browsers.firefox import Firefox
 from browserexport.browsers.safari import Safari
 from browserexport.browsers.common import Schema
 from browserexport.common import BrowserexportError
+import ahocorasick
 
 from .catalog_rules import LENGTH_TAGS, TECH_TAGS
 from .review_csv import read_rows, write_rows
-from .taste_sites import ADULT_DOMAINS, MIXED_DOMAINS, account_key, identity_context, linked_identities, mixed_adult
+from .taste_sites import ADULT_DOMAINS, MIXED_DOMAINS, account_key, identity_context, mixed_adult
 
 
 @dataclass(frozen=True)
@@ -119,6 +122,7 @@ def discover_history_sources(
     appdata: Path | None = None,
     localappdata: Path | None = None,
     platform_name: str | None = None,
+    include_bookmarks: bool = False,
 ) -> list[HistorySource]:
     from .taste_browsers import _paths
 
@@ -190,7 +194,10 @@ def discover_history_sources(
     for browser, root in candidates:
         if not root.is_dir():
             continue
-        for path in _paths(root, browsing_only=True):
+        paths = _paths(root, browsing_only=True)
+        if include_bookmarks:
+            paths = sorted(set(paths + _paths(root, bookmarks=True)))
+        for path in paths:
             if path.is_file():
                 found.append(HistorySource(browser, path.parent.name, path, root,
                                            "firefox" if browser in {"firefox", "zen"} else "chrome"))
@@ -323,6 +330,17 @@ def _prepare_store(db: sqlite3.Connection) -> None:
             PRIMARY KEY (source_key, visit_key)
         );
         CREATE INDEX IF NOT EXISTS history_visit_time_idx ON history_visit(visited_at);
+        CREATE TABLE IF NOT EXISTS history_bookmark (
+            source_key TEXT NOT NULL REFERENCES history_source(source_key),
+            url TEXT NOT NULL,
+            title TEXT NOT NULL,
+            added_at TEXT NOT NULL,
+            PRIMARY KEY (source_key, url)
+        );
+        CREATE TABLE IF NOT EXISTS browser_snapshot (
+            source_key TEXT PRIMARY KEY,
+            browser_id TEXT NOT NULL
+        );
         """
     )
 
@@ -375,12 +393,17 @@ def refresh_history(
                                 "added": 0, "status": "failed", "error": message})
                 continue
             source_key = _source_key(source, host)
+            from .taste_browsers import browser_snapshot_allowed
+            if not browser_snapshot_allowed(store, source):
+                continue
             path_hash = hashlib.sha256(str(source.path.resolve()).encode("utf-8")).hexdigest()
             store.execute(
                 "INSERT INTO history_source VALUES (?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(source_key) DO UPDATE SET last_seen_at=excluded.last_seen_at",
                 (source_key, source.browser, source.profile, host, path_hash, now, now),
             )
+            from .taste_browsers import bind_browser_snapshot
+            bind_browser_snapshot(store, source_key, source)
             before = store.total_changes
             store.executemany(
                 "INSERT OR IGNORE INTO history_visit(source_key, visit_key, visited_at, url, title) "
@@ -388,10 +411,10 @@ def refresh_history(
                 ((source_key, visit.visit_key, visit.visited_at, visit.url, visit.title) for visit in visits),
             )
             added = store.total_changes - before
+            store.commit()
             results.append(
                 {"browser": source.browser, "profile": source.profile, "visits": len(visits), "added": added}
             )
-        store.commit()
     return results
 
 
@@ -644,7 +667,12 @@ def import_history_exports(
 ) -> list[dict[str, object]]:
     """Route Google Takeout archives and browserexport-compatible files."""
     results: list[dict[str, object]] = []
+    from .taste_bookmarks import is_bookmark_export, refresh_bookmarks
     for export_path in exports:
+        if is_bookmark_export(export_path):
+            results.extend(refresh_bookmarks(
+                [HistorySource("bookmarks", export_path.name, export_path)], store_path, host=host, strict=True))
+            continue
         is_takeout = False
         if zipfile.is_zipfile(export_path):
             with zipfile.ZipFile(export_path) as archive:
@@ -669,7 +697,10 @@ def remove_history_source(store_path: Path, source_key: str) -> int:
             "SELECT count(*) FROM history_visit WHERE source_key=?", (source_key,),
         ).fetchone()
         removed = int(row[0]) if row else 0
+        removed += store.execute("SELECT count(*) FROM history_bookmark WHERE source_key=?", (source_key,)).fetchone()[0]
+        store.execute("DELETE FROM history_bookmark WHERE source_key=?", (source_key,))
         store.execute("DELETE FROM history_visit WHERE source_key=?", (source_key,))
+        store.execute("DELETE FROM browser_snapshot WHERE source_key=?", (source_key,))
         store.execute("DELETE FROM history_source WHERE source_key=?", (source_key,))
         store.commit()
     return removed
@@ -698,6 +729,7 @@ class _TasteVisit:
     tags: tuple[str, ...]
     creators: tuple[str, ...]
     categories: tuple[str, ...]
+    bookmark: bool = False
 
 
 @dataclass(frozen=True)
@@ -708,6 +740,7 @@ class _HistoryRows:
     visited: tuple[str, ...]
     taste: tuple[_TasteVisit, ...]
     identity_visits: tuple[tuple[str, str, str], ...] = ()
+    bookmarks: tuple[tuple[str, str, str], ...] = ()
 
 
 #: 按历史库文件的版本缓存解析结果。历史库只在导入与刷新时变，逐条解析网址要十几秒；
@@ -766,7 +799,27 @@ def preference_history_visits(store_path: Path) -> tuple[tuple[str, str, str], .
     return _PREFERENCE_VISITS[version]
 
 
+def _taste_visit(visited_at, url, title, moment, bookmark):
+    """解析一条浏览器信号的域名、题材和本地时间维度。"""
+    domain, row_tags, row_creators = _url_candidates(url, title)
+    if not domain or not (_is_taste_domain(domain) or mixed_adult(url, title)):
+        return domain, None
+    if moment is not None:
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=UTC)
+        moment = moment.astimezone(HONG_KONG_TIMEZONE)
+    categories = set()
+    for tag in row_tags:
+        compact = tag.replace(" ", "").replace("_", "")
+        categories.update(category for category, terms in CATEGORY_TERMS.items()
+                          if compact in terms or tag in terms or tag in TASTE_CATEGORY_TAGS.get(category, ()))
+    return domain, _TasteVisit(
+        visited_at, domain, moment.date().isoformat() if moment else "", (moment.weekday(), moment.hour) if moment else (0, 0),
+        tuple(row_tags), tuple(row_creators), tuple(categories), bookmark)
+
+
 def _read_history_rows(store_path: Path) -> _HistoryRows | None:
+    from .taste_bookmarks import bookmark_rows
     with closing(sqlite3.connect(_readonly_uri(store_path), uri=True)) as store:
         store.row_factory = sqlite3.Row
         store.execute("BEGIN")
@@ -777,45 +830,45 @@ def _read_history_rows(store_path: Path) -> _HistoryRows | None:
                 "FROM history_source s LEFT JOIN history_visit v ON v.source_key=s.source_key "
                 "GROUP BY s.source_key ORDER BY s.last_seen_at DESC,s.browser,s.profile"
             ))
+            bookmarks = bookmark_rows(store)
+            counts = Counter(row[0] for row in bookmarks)
+            for source in source_rows:
+                source["bookmarks"] = counts[source["source_key"]]
             rows = store.execute(
                 "SELECT v.visited_at,v.url,v.title FROM history_visit v "
                 "JOIN history_source s ON s.source_key=v.source_key"
             )
-            seen: set[tuple[str, int]] = set()
+            seen: set[tuple[str, int | str]] = set()
             visited: list[str] = []
             taste: list[_TasteVisit] = []
             identity_visits: list[tuple[str, str, str]] = []
-            for row in rows:
-                visited_at, url = str(row["visited_at"]), str(row["url"])
+            # 同一 URL 在不同设备或文件夹的书签只贡献一份证据。
+            unique_bookmarks = {}
+            for _, added_at, url, title in bookmarks:
+                unique_bookmarks.setdefault(url, (added_at, url, title))
+            combined = chain(((str(row["visited_at"]), str(row["url"]), str(row["title"] or ""), False) for row in rows),
+                             ((*row, True) for row in unique_bookmarks.values()))
+            for visited_at, url, title, bookmark in combined:
+                if not visited_at and not bookmark:
+                    continue
                 try:
-                    moment = datetime.fromisoformat(visited_at)
-                    fingerprint = (url, int(moment.timestamp()))
+                    moment = datetime.fromisoformat(visited_at) if visited_at else None
+                    fingerprint = (url, "bookmark" if bookmark else int(moment.timestamp()))
                 except ValueError:
                     continue
                 if fingerprint in seen:
                     continue
                 seen.add(fingerprint)
-                visited.append(visited_at)
-                domain, row_tags, row_creators = _url_candidates(url, str(row["title"] or ""))
-                if domain:
-                    identity_visits.append((visited_at, url, str(row["title"] or "")))
-                if not domain or not (_is_taste_domain(domain) or mixed_adult(url, str(row["title"] or ""))):
-                    # 不在口味站上的访问只计入访问数与时间范围：网址候选只从口味站取。
-                    continue
-                if moment.tzinfo is None:
-                    moment = moment.replace(tzinfo=UTC)
-                moment = moment.astimezone(HONG_KONG_TIMEZONE)
-                categories = []
-                for tag in row_tags:
-                    compact = tag.replace(" ", "").replace("_", "")
-                    categories.extend(category for category, terms in CATEGORY_TERMS.items()
-                                      if compact in terms or tag in terms)
-                taste.append(_TasteVisit(
-                    visited_at, domain, moment.date().isoformat(), (moment.weekday(), moment.hour),
-                    tuple(row_tags), tuple(row_creators), tuple(categories)))
+                if not bookmark:
+                    visited.append(visited_at)
+                domain, candidate = _taste_visit(visited_at, url, title, moment, bookmark)
+                if domain and not bookmark:
+                    identity_visits.append((visited_at, url, title))
+                if candidate:
+                    taste.append(candidate)
         except sqlite3.DatabaseError:
             return None
-    return _HistoryRows(source_rows, tuple(visited), tuple(taste), tuple(identity_visits))
+    return _HistoryRows(source_rows, tuple(visited), tuple(taste), tuple(identity_visits), tuple(unique_bookmarks.values()))
 
 
 def _history_rows(store_path: Path) -> _HistoryRows | None:
@@ -833,8 +886,9 @@ def _history_rows(store_path: Path) -> _HistoryRows | None:
 
 def _history_dashboard_evidence(store_path: Path, since: str | None) -> dict[str, object]:
     empty = {
-        "visits": 0, "sources": [], "range_start": None, "range_end": None,
+        "visits": 0, "bookmarks": 0, "sources": [], "range_start": None, "range_end": None,
         "tags": Counter(), "creators": Counter(), "categories": Counter(),
+        "bookmark_tags": Counter(), "bookmark_creators": Counter(), "bookmark_domains": Counter(),
         "domains": Counter(), "creator_domains": {}, "activity": {"days": [], "hours": []},
     }
     if not store_path.is_file():
@@ -853,10 +907,16 @@ def _history_dashboard_evidence(store_path: Path, since: str | None) -> dict[str
     domains: Counter[str] = Counter()
     activity_days: Counter[str] = Counter()
     activity_hours: Counter[tuple[int, int]] = Counter()
+    bookmark_tags, bookmark_creators, bookmark_domains = Counter(), Counter(), Counter()
     for visit in taste:
         domains[visit.domain] += 1
-        activity_days[visit.day] += 1
-        activity_hours[visit.hour] += 1
+        if visit.bookmark:
+            bookmark_tags.update(visit.tags)
+            bookmark_creators.update(visit.creators)
+            bookmark_domains[visit.domain] += 1
+        if not visit.bookmark:
+            activity_days[visit.day] += 1
+            activity_hours[visit.hour] += 1
         tags.update(visit.tags)
         creators.update(visit.creators)
         for creator in visit.creators:
@@ -864,10 +924,14 @@ def _history_dashboard_evidence(store_path: Path, since: str | None) -> dict[str
         categories.update(visit.categories)
     return {
         "visits": len(visited),
+        "bookmarks": sum(not since or added >= since for added, _, _ in history.bookmarks),
         "sources": [dict(row) for row in history.sources],
         "range_start": min(visited) if visited else None,
         "range_end": max(visited) if visited else None,
         "tags": tags,
+        "bookmark_tags": bookmark_tags,
+        "bookmark_creators": bookmark_creators,
+        "bookmark_domains": bookmark_domains,
         "creators": creators,
         "creator_domains": creator_domains,
         "categories": categories,
@@ -1198,7 +1262,7 @@ def _taste_analysis(
         })
     if explicit < 10:
         next_steps.append({
-            "kind": "feedback", "title": "增加明确反馈",
+            "kind": "feedback", "title": "去馆藏评价作品",
             "detail": f"当前喜欢 {int(peach['liked'])} · 不合口味 {int(peach['disliked'])}",
             "route": "/",
         })
@@ -1212,29 +1276,56 @@ def _taste_analysis(
 
 
 def _linked_history_evidence(history_store, ledger_connection, since, history):
-    """已登记账号的浏览计数，人物、创作者和网站分开汇总。"""
+    """账号与标题的规范身份按浏览器信号汇总。"""
+    from .taste_evidence import IdentityIndex, browser_entities
     browser_performers = Counter()
+    history["bookmark_performers"] = Counter()
     from .entities import male_performer_ids
     excluded = male_performer_ids(ledger_connection)
     accounts, _ = identity_context(ledger_connection)
     cached = _history_rows(history_store) if history_store.is_file() else None
-    if cached and accounts:
-        for visited_at, url, title in cached.identity_visits:
+    if cached:
+        index = IdentityIndex(ledger_connection)
+        matcher = index.title_matcher()
+        rows = [(*row, False) for row in cached.identity_visits]
+        rows.extend((*row, True) for row in cached.bookmarks)
+        for visited_at, url, title, bookmark in rows:
             if since and visited_at < since:
                 continue
-            matches = linked_identities(url, accounts)
+            matches = set(browser_entities(url, title, index, matcher, accounts, {}))
+            raw_creators = _url_candidates(url, title)[2]
             domain = (urlparse(url).hostname or "").removeprefix("www.")
             for eid, kind, name in matches:
                 if eid in excluded:
                     continue
                 if kind == "performer":
                     browser_performers[name] += 1
+                    if bookmark:
+                        history["bookmark_performers"][name] += 1
                 elif kind == "creator":
+                    if name.casefold() in raw_creators:
+                        continue
                     history["creators"][name] += 1
+                    if bookmark:
+                        history["bookmark_creators"][name] += 1
                     history["creator_domains"].setdefault(name.casefold(), Counter())[domain] += 1
             if matches and not (_is_taste_domain(domain) or mixed_adult(url, title)):
                 history["domains"][domain] += 1
+                if bookmark:
+                    history["bookmark_domains"][domain] += 1
     return browser_performers
+
+
+def _attach_bookmark_counts(rows, counts):
+    """榜单保留浏览器信号总数，分别标注访问与书签证据。"""
+    normalized = Counter()
+    for label, count in counts.items():
+        normalized[label.casefold().strip()] += count
+    for row in rows:
+        row["web_bookmarks"] = normalized[row["name"].casefold().strip()]
+        row["evidence"] = [source for source, present in (
+            ("浏览记录", row["web_visits"] > row["web_bookmarks"]),
+            ("浏览器书签", row["web_bookmarks"] > 0), ("Peach", row["peach_score"] > 0)) if present]
 
 
 def build_taste_dashboard(
@@ -1255,6 +1346,9 @@ def build_taste_dashboard(
         source_counts = history["creator_domains"].get(str(row["name"]).casefold().strip(), Counter())
         row["source_domain"] = source_counts.most_common(1)[0][0] if source_counts else None
     all_performers = _rank_combined("performer", browser_performers, peach, limit=1000)
+    for rows, counts in ((all_tags, history["bookmark_tags"]), (all_creators, history["bookmark_creators"]),
+                         (all_performers, history["bookmark_performers"])):
+        _attach_bookmark_counts(rows, counts)
     all_studios = _rank_combined("studio", Counter(), peach, limit=1000)
     all_series = _rank_combined("series", Counter(), peach, limit=1000)
     tags, creators, performers = all_tags[:30], all_creators[:30], all_performers[:30]
@@ -1286,6 +1380,7 @@ def build_taste_dashboard(
     return {
         "summary": {
             "history_visits": history["visits"],
+            "bookmarks": history["bookmarks"],
             "history_sources": len(history["sources"]),
             "peach_items": peach["assets"],
             "peach_seconds": round(float(peach["seconds"])),
@@ -1314,7 +1409,7 @@ def build_taste_dashboard(
             "peach_performers": _rank_for_source(all_performers, "peach"),
             "peach_studios": _rank_for_source(all_studios, "peach"),
             "peach_series": _rank_for_source(all_series, "peach"),
-            "domains": [{"name": name, "visits": count}
+            "domains": [{"name": name, "visits": count, "web_bookmarks": history["bookmark_domains"][name]}
                         for name, count in history["domains"].most_common(20)],
         },
         "coverage": peach["coverage"],
@@ -1416,6 +1511,34 @@ def _query_candidates(parsed):
     return tags, query_creators
 
 
+@lru_cache(maxsize=1)
+def _title_genre_matcher():
+    """标题复用内容词表，排除依赖来源语境的省写与单字。"""
+    from .genre_taxonomy import CONTENT_GENRES, CONTENT_ALIASES, normalise_genre, resolve_genre
+    matcher = ahocorasick.Automaton()
+    ambiguous = {"お掃除", "掃除", "仁王立ち", "ノーハンド", "swallow", "oral", "private", "生"}
+    for raw in CONTENT_GENRES.keys() | CONTENT_ALIASES.keys() | set(CONTENT_GENRES.values()):
+        term = normalise_genre(raw)
+        label = resolve_genre(term)
+        if label and term not in ambiguous and len(term) >= (4 if term.isascii() else 2):
+            matcher.add_word(term, (term, label))
+    matcher.make_automaton()
+    return matcher
+
+
+def _title_tags(title):
+    from .genre_taxonomy import normalise_genre
+    text = NEGATIVE_QUERY_TERM.sub(" ", normalise_genre(title))
+    tags = set()
+    for end, (term, label) in _title_genre_matcher().iter_long(text):
+        start = end - len(term) + 1
+        edges = text[max(0, start - 1):start] + text[end + 1:end + 2]
+        if term.isascii() and any(char.isascii() and (char.isalnum() or char == "_") for char in edges):
+            continue
+        tags.add(label)
+    return tags
+
+
 def _url_candidates(url: str, title: str = "") -> tuple[str | None, set[str], set[str]]:
     try:
         parsed = urlparse(url)
@@ -1447,22 +1570,28 @@ def _url_candidates(url: str, title: str = "") -> tuple[str | None, set[str], se
         account = account_key(url)
         if account:
             creators.add(account[1])
+    from .genre_taxonomy import resolve_genre
+    unique = {}
+    for tag in sorted(tags, key=lambda value: (len(value), value)):
+        label = resolve_genre(tag.replace("_", " "))
+        unique.setdefault(label or tag, tag)
+    tags = set(unique.values())
+    represented = set(unique)
+    tags.update(_title_tags(title) - represented)
     return domain or None, tags, creators
 
 
 def analyze_history(store_path: Path, output_dir: Path, *, since: str | None = None, progress=None) -> dict[str, object]:
     output_dir.mkdir(parents=True, exist_ok=True)
     query = (
-        "SELECT v.source_key, v.visited_at, v.url, s.browser, s.profile "
+        "SELECT v.source_key, v.visited_at, v.url, s.browser, s.profile,v.title,0 bookmark "
         "FROM history_visit v JOIN history_source s ON s.source_key = v.source_key"
     )
-    params: tuple[str, ...] = ()
-    if since:
-        query += " WHERE v.visited_at >= ?"
-        params = (since,)
+    params: tuple[str, ...] = (since,) if since else ()
     domains: Counter[str] = Counter()
     tag_visits: Counter[str] = Counter()
     creator_visits: Counter[str] = Counter()
+    tag_bookmarks, creator_bookmarks = Counter(), Counter()
     tag_urls: dict[str, set[str]] = defaultdict(set)
     creator_urls: dict[str, set[str]] = defaultdict(set)
     tag_sources: dict[str, set[str]] = defaultdict(set)
@@ -1471,7 +1600,13 @@ def analyze_history(store_path: Path, output_dir: Path, *, since: str | None = N
     min_time: str | None = None
     max_time: str | None = None
     total = 0
+    bookmarks_count = 0
     with closing(sqlite3.connect(_readonly_uri(store_path), uri=True)) as db:
+        if db.execute("SELECT 1 FROM sqlite_master WHERE name='history_bookmark'").fetchone():
+            query += (" UNION ALL SELECT b.source_key,b.added_at,b.url,s.browser,s.profile,b.title,1 bookmark "
+                      "FROM history_bookmark b JOIN history_source s ON s.source_key=b.source_key")
+        if since:
+            query = "SELECT * FROM (" + query + ") WHERE visited_at>=?"
         source_count = db.execute("SELECT COUNT(*) FROM history_source").fetchone()[0]
         ceiling = db.execute("SELECT COUNT(*) FROM (" + query + ")", params).fetchone()[0]
         def report_analysis():
@@ -1479,17 +1614,20 @@ def analyze_history(store_path: Path, output_dir: Path, *, since: str | None = N
                 progress(stage="analyzing", checked=total, total=ceiling,
                          message=f"分析浏览记录：已处理 {total:,} / {ceiling:,} 条")
         report_analysis()
-        for source_key, visited_at, url, browser, profile in db.execute(query, params):
+        for source_key, visited_at, url, browser, profile, title, bookmark in db.execute(query, params):
             total += 1
-            min_time = visited_at if min_time is None or visited_at < min_time else min_time
-            max_time = visited_at if max_time is None or visited_at > max_time else max_time
-            domain, tags, creators = _url_candidates(url)
+            bookmarks_count += bookmark
+            if visited_at and not bookmark:
+                min_time = visited_at if min_time is None or visited_at < min_time else min_time
+                max_time = visited_at if max_time is None or visited_at > max_time else max_time
+            domain, tags, creators = _url_candidates(url, title or "")
             if domain:
                 domains[domain] += 1
             url_hash = hashlib.sha256(url.encode("utf-8")).hexdigest()
             source_label = f"{browser}:{profile}"
             for tag in tags:
                 tag_visits[tag] += 1
+                tag_bookmarks[tag] += bookmark
                 tag_urls[tag].add(url_hash)
                 tag_sources[tag].add(source_label)
                 compact = tag.replace(" ", "").replace("_", "")
@@ -1498,6 +1636,7 @@ def analyze_history(store_path: Path, output_dir: Path, *, since: str | None = N
                         category_visits[category] += 1
             for creator in creators:
                 creator_visits[creator] += 1
+                creator_bookmarks[creator] += bookmark
                 creator_urls[creator].add(url_hash)
                 creator_sources[creator].add(source_label)
             if total % 1000 == 0:
@@ -1511,15 +1650,16 @@ def analyze_history(store_path: Path, output_dir: Path, *, since: str | None = N
     tag_path = output_dir / f"taste-tag-candidates-{stamp}.csv"
     creator_path = output_dir / f"taste-creator-candidates-{stamp}.csv"
     report_path = output_dir / f"taste-report-{stamp}.md"
-    _write_candidates(tag_path, "tag", tag_visits, tag_urls, tag_sources)
-    _write_candidates(creator_path, "creator", creator_visits, creator_urls, creator_sources)
+    _write_candidates(tag_path, "tag", tag_visits, tag_urls, tag_sources, tag_bookmarks)
+    _write_candidates(creator_path, "creator", creator_visits, creator_urls, creator_sources, creator_bookmarks)
 
     lines = [
         "# 浏览记录口味分析",
         "",
         f"- 生成时间：{datetime.now().astimezone().isoformat(timespec='seconds')}",
         f"- 范围：{min_time or '无'} 至 {max_time or '无'}",
-        f"- 访问记录：{total:,}",
+        f"- 访问记录：{total - bookmarks_count:,}",
+        f"- 浏览器书签：{bookmarks_count:,}",
         f"- 数据源：{source_count}",
         "- 隐私：报告不含完整 URL、页面标题或原始搜索记录；所有结论均为 candidate。",
         "",
@@ -1530,7 +1670,8 @@ def analyze_history(store_path: Path, output_dir: Path, *, since: str | None = N
     _append_ranking(lines, "高频域名", domains)
     report_path.write_text("\n".join(lines), encoding="utf-8")
     return {
-        "visits": total,
+        "visits": total - bookmarks_count,
+        "bookmarks": bookmarks_count,
         "sources": source_count,
         "range_start": min_time,
         "range_end": max_time,
@@ -1546,15 +1687,18 @@ def _write_candidates(
     visits: Counter[str],
     urls: dict[str, set[str]],
     sources: dict[str, set[str]],
+    bookmarks: Counter[str],
 ) -> None:
     write_rows(
         path,
-        ["candidate", "kind", "visits", "distinct_urls", "source_count", "sources", "status"],
+        ["candidate", "kind", "visits", "bookmarks", "signals", "distinct_urls", "source_count", "sources", "status"],
         (
             {
                 "candidate": candidate,
                 "kind": kind,
-                "visits": count,
+                "visits": count - bookmarks[candidate],
+                "bookmarks": bookmarks[candidate],
+                "signals": count,
                 "distinct_urls": len(urls[candidate]),
                 "source_count": len(sources[candidate]),
                 "sources": " | ".join(sorted(sources[candidate])),
@@ -1566,7 +1710,7 @@ def _write_candidates(
 
 
 def _append_ranking(lines: list[str], title: str, values: Counter[str], limit: int = 30) -> None:
-    lines.extend([f"## {title}", "", "| 候选 | 访问次数 |", "| --- | ---: |"])
+    lines.extend([f"## {title}", "", "| 候选 | 信号数 |", "| --- | ---: |"])
     if values:
         lines.extend(f"| {name.replace('|', '\\|')} | {count:,} |" for name, count in values.most_common(limit))
     else:

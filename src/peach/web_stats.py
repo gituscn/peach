@@ -32,7 +32,8 @@ from .web_activity import DEFAULT_PROFILE_ID
 from .web_catalog import attach_avatar_availability, tag_is_not_a_performer_name
 from .media_sources import cost_for
 from .web_state import WebContract, path_version
-from .taste_browsers import browser_sources, configure_browser, enabled_history_sources
+from .taste_browsers import browser_sources, configure_browser, enabled_history_sources, enabled_bookmark_sources
+from .taste_bookmarks import refresh_bookmarks
 
 
 def q_search_history(contract: WebContract, limit: int = 10):
@@ -146,6 +147,8 @@ def w_taste_refresh(contract: WebContract, body, *, progress=None):
     window = str(body.get("window") or "all")
     sources = enabled_history_sources(contract.taste_history_store)
     results = refresh_history(sources, contract.taste_history_store, progress=progress) if sources else []
+    results.extend(refresh_bookmarks(enabled_bookmark_sources(contract.taste_history_store),
+                                     contract.taste_history_store, progress=progress))
     if contract.taste_history_store.is_file():
         analysis = analyze_history(contract.taste_history_store, contract.taste_history_root, progress=progress)
         write_manifest(contract.taste_history_manifest, results, analysis)
@@ -157,8 +160,11 @@ def w_taste_refresh(contract: WebContract, body, *, progress=None):
 
 
 def w_taste_source(contract: WebContract, body):
-    if body.get("operation") in ("add", "disable", "enable"):
+    if body.get("operation") in ("add", "disable", "enable", "delete_browser"):
         configure_browser(contract.taste_history_store, body["operation"], body)
+        if body["operation"] == "delete_browser":
+            analysis = analyze_history(contract.taste_history_store, contract.taste_history_root)
+            write_manifest(contract.taste_history_manifest, [], analysis)
         contract.cache_bust()
         return {"dashboard": q_taste(contract, {"window": str(body.get("window") or "all")})}
     if body.get("operation") != "remove":

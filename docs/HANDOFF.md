@@ -147,7 +147,7 @@ CloudDrive 见 [docs/CLOUDDRIVE.md](CLOUDDRIVE.md)；部署、托盘重启、双
 - FastAPI 与前端保持单体部署，在线来源和 AI 只通过显式适配器进入；AI runtime 与推理 API 的协议边界见 ADR-0003。
 - 前端按 ADR-0031 走 strangler 迁移：新页面进 `frontend/src/react/`（React + Tailwind + BoardUI 源码），逐页替换，不做整站重写；分发阶段见 ADR-0023。
 - 页面与交互的已定型行为写 [docs/REUSE.md](REUSE.md)，由 API 与测试守住；版本号、像素值、批量大小与性能测量是实现快照，留在测试或参考快照，本文件不抄。
-- `/taste` 只读合并 Peach 行为与本机私有浏览历史，明确以浏览器记录为主要画像、Peach 内部为辅助证据，分别排序，不把「不合口味」自动归因或降权到 Tag。
+- `/taste` 只读合并 Peach 行为与私有浏览历史、书签，明确以浏览器记录为主要画像、Peach 内部为辅助证据，分别排序，不把「不合口味」自动归因或降权到 Tag。
 - 查询词里的负号项整体排除，下划线是组合词边界的一部分，不得把 `-ai_generated` 拆成正向 `generated`；模糊时长旧 Tag 只作兼容识别，不进入口味、索引、详情和筛选状态。
 - 原始 URL 与标题不进入页面或 ledger；上传原件存 `sources/taste-history/imports`，移除数据源只清理规范化分析库，不删原件。浏览器数据库解析固定复用 `browserexport==0.4.4`，运行中浏览器先由 SQLite backup API 取一致快照。本机发现不等于跨机同步，跨机数据要显式导出、传输并按来源去重合并。
 - 追更连接器、凭据、变体和跨站归组以 ADR-0019 为准；关注页顶部标签筛选与卡片只用来源明确标记为 `general` 的内容标签，详情页与在线索引保留全部来源标签并按类型着色，未知类型不猜成 `general`。

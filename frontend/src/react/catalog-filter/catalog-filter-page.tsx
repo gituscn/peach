@@ -50,6 +50,7 @@ function Glass(props: CatalogFilterProps) {
   const scroll = useRef<HTMLDivElement>(null);
   const tagRow = useRef<HTMLDivElement>(null);
   const bottomRow = useRef<HTMLDivElement>(null);
+  const [singleRow, setSingleRow] = useState(false);
   const glide = useViewGlide(pane, viewRow, '[data-catalog-view][aria-pressed="true"]', props.state);
 
   /* 标签那一格是 `overflow-x:auto` 加隐藏滚动条，鼠标够不着，所以登记全站横向行那套拖动加滚轮。
@@ -62,12 +63,28 @@ function Glass(props: CatalogFilterProps) {
 
   const loading = !props.tiers;
   const tags = usePaged(tagRow, props.tags, props.tiers?.key ?? '', props.tagFirst);
+  useLayoutEffect(() => {
+    const frame = scroll.current?.closest<HTMLElement>('[data-catalog-frame]');
+    if (!frame) return;
+    const width = (element: HTMLElement | null) => {
+      if (!element) return 0;
+      const style = getComputedStyle(element);
+      return [...element.children].reduce((total, child) => total + child.getBoundingClientRect().width, 0)
+        + Math.max(0, element.children.length - 1) * (parseFloat(style.columnGap) || 0);
+    };
+    const measure = () => setSingleRow(frame.clientWidth >= width(viewRow.current) + width(tagRow.current)
+      + width(bottomRow.current) + 64);
+    const observer = new ResizeObserver(measure);
+    observer.observe(frame);
+    measure();
+    return () => observer.disconnect();
+  }, [tags, props.count, props.layout, props.sorts]);
   /* 计数徽标变了值的那几枚弹一下（遗留层 `popBadges`，按上一次的值判断，不按节点新不新）。 */
   useLayoutEffect(() => { popBadges(tagRow.current, 'tagbar') }, [tags]);
 
   return (
     <FilterGlassRows label="筛选与排序" topLabel="视图与标签"
-      attrs={{ 'data-filter-frame': '', 'data-catalog-frame': '' }}
+      attrs={{ 'data-filter-frame': '', 'data-catalog-frame': '', ...(singleRow ? { 'data-single-row': '' } : {}) }}
       className="mx-4" topClassName="gap-1.5 overflow-visible" bottomClassName={props.trash ? 'hidden' : 'min-h-12'}
       bottomRef={bottomRow} busy={props.count === null || props.refreshing}
       panes={<span ref={pane} data-view-glide="" aria-hidden="true" />}

@@ -42,6 +42,7 @@ export interface RankRow {
   score?: number;
   visits?: number;
   web_visits?: number;
+  web_bookmarks?: number;
   peach_score?: number;
   peach_items?: number;
   entity_id?: number | null;
@@ -70,6 +71,7 @@ export interface TasteRankings {
 
 export interface TasteSummary {
   history_visits?: number;
+  bookmarks?: number;
   history_sources?: number;
   peach_items?: number;
   peach_seconds?: number;
@@ -85,7 +87,7 @@ export interface TasteCoverage {
 
 /** 一台设备的一份浏览记录。`source_key` 是 64 位十六进制，移除时交回去的就是它。 */
 export interface TasteSource {
-  source_key: string; browser: string; profile: string; host: string; visits?: number;
+  source_key: string; browser: string; profile: string; host: string; visits?: number; bookmarks?: number;
 }
 
 export interface TasteAnalysis {
@@ -121,9 +123,10 @@ export interface BrowserSource {
   enabled: boolean;
   available: boolean;
   profiles: number;
+  source_keys?: string[];
 }
 
-export const configureTasteBrowser = (body: { operation: 'add' | 'disable' | 'enable'; name?: string; path?: string; id?: string }, window: string) =>
+export const configureTasteBrowser = (body: { operation: 'add' | 'disable' | 'enable' | 'delete_browser'; name?: string; path?: string; id?: string }, window: string) =>
   apiSend<{ dashboard: TasteData }>(TASTE_SOURCE_URL, { ...body, window });
 
 /** 读取浏览记录那一趟的快照。`status` 一次都没跑过是 `idle`。 */
@@ -195,7 +198,10 @@ export const tasteDate = (value: string | null | undefined): string =>
 export function historySpan(summary: TasteSummary): string {
   const sources = `${Number(summary.history_sources || 0).toLocaleString()} 个数据源`;
   if (!summary.range_start && !summary.range_end) return sources;
-  return `${sources} · ${tasteDate(summary.range_start)}—${tasteDate(summary.range_end)}`;
+  const sameYear = summary.range_start?.slice(0, 4) === summary.range_end?.slice(0, 4);
+  const date = (value: string | null | undefined) => value && sameYear
+    ? new Date(value).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : tasteDate(value);
+  return `${sources} · ${date(summary.range_start)}–${date(summary.range_end)}`;
 }
 
 /** 累计时长。与统计页同一套口径。 */
@@ -212,9 +218,12 @@ export const rankStrength = (row: RankRow): number =>
 
 /** 一行名次底下那句补充。两侧都有证据时并排显示，只有一侧就读那一侧的数。 */
 export function rankDetail(row: RankRow): string {
-  if (row.web_visits == null) return Number(row.score || row.visits || 0).toLocaleString();
+  if (row.web_visits == null && !row.web_bookmarks) return Number(row.score || row.visits || 0).toLocaleString();
   const parts: string[] = [];
-  if (row.web_visits) parts.push(`浏览 ${Number(row.web_visits).toLocaleString()}`);
+  const bookmarks = Number(row.web_bookmarks || 0);
+  const visits = Number(row.web_visits ?? row.visits ?? 0) - bookmarks;
+  if (visits > 0) parts.push(`浏览 ${visits.toLocaleString()}`);
+  if (bookmarks) parts.push(`书签 ${bookmarks.toLocaleString()}`);
   if (row.peach_items) parts.push(`Peach ${Number(row.peach_items).toLocaleString()}`);
   return parts.join(' · ');
 }

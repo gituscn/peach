@@ -1166,6 +1166,50 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         removed = await self.client.post("/api/search-history?t=secret", json={"operation": "remove", "query": "ABW"})
         self.assertEqual(removed.status_code, 200)
 
+    async def test_taste_bookmark_upload_count_reimport_and_source_removal(self):
+        payload = b'<!DOCTYPE NETSCAPE-Bookmark-file-1><DL><DT><A HREF="https://rule34.xxx/?tags=feet">private bookmark</A></DL>'
+        for _ in range(2):
+            imported = await self.client.post("/api/taste/import?t=secret", content=payload,
+                headers={"Content-Type": "application/octet-stream", "X-Peach-Filename": "bookmarks.html"})
+            self.assertEqual(imported.status_code, 200, imported.text)
+            dashboard = imported.json()["dashboard"]
+            self.assertEqual(dashboard["summary"]["history_visits"], 0)
+            self.assertEqual(dashboard["summary"]["bookmarks"], 1)
+            self.assertNotIn("private bookmark", imported.text)
+            self.assertNotIn("rule34.xxx/?tags", imported.text)
+        listed = await self.client.get("/api/taste?t=secret&window=all")
+        self.assertEqual(listed.json()["summary"]["bookmarks"], 1)
+        removed = await self.client.post("/api/taste/source?t=secret", json={
+            "operation": "remove", "source_key": dashboard["sources"][0]["source_key"], "window": "all"})
+        self.assertEqual(removed.status_code, 200, removed.text)
+        self.assertEqual(removed.json()["removed"], 1)
+        self.assertEqual(removed.json()["dashboard"]["summary"]["bookmarks"], 0)
+        self.assertEqual(len(list(self.taste_import_root.iterdir())), 1)
+
+    async def test_taste_refresh_reads_enabled_local_bookmarks(self):
+        profile = self.root / "browser" / "Default"
+        profile.mkdir(parents=True)
+        (profile / "Bookmarks").write_text(json.dumps({"roots": {"bookmark_bar": {"children": [
+            {"type": "url", "url": "https://rule34.xxx/?tags=feet", "name": "private local bookmark"}]}}}), encoding="utf-8")
+        with patch("peach.taste_history.discover_history_sources", return_value=[]):
+            configured = await self.client.post("/api/taste/source?t=secret", json={
+                "operation": "add", "name": "测试 Chrome", "path": str(profile)})
+            self.assertEqual(configured.status_code, 200, configured.text)
+            refreshed = await self.client.post("/api/taste/refresh?t=secret", json={"window": "all"})
+        self.assertEqual(refreshed.status_code, 200, refreshed.text)
+        self.assertEqual(refreshed.json()["dashboard"]["summary"]["bookmarks"], 1)
+        self.assertEqual(refreshed.json()["dashboard"]["summary"]["history_visits"], 0)
+        self.assertEqual(refreshed.json()["warnings"], [])
+        self.assertNotIn("private local bookmark", refreshed.text)
+        with patch("peach.taste_history.discover_history_sources", return_value=[]):
+            browser = refreshed.json()["dashboard"]["browsers"][0]
+            self.assertEqual(len(browser["source_keys"]), 1)
+            removed = await self.client.post("/api/taste/source?t=secret", json={"operation": "delete_browser", "id": browser["id"]})
+        self.assertEqual(removed.status_code, 200, removed.text)
+        self.assertEqual(removed.json()["dashboard"]["summary"]["bookmarks"], 0)
+        self.assertEqual(removed.json()["dashboard"]["browsers"], [])
+        self.assertTrue((profile / "Bookmarks").is_file())
+
     async def test_taste_import_combines_private_history_with_peach_behavior(self):
         with closing(sqlite3.connect(self.db)) as connection:
             connection.execute(
