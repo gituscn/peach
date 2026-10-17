@@ -31,6 +31,7 @@ import {
   ErrorText, ExternalLink, Fact, FactList, FieldLabel, Footer, Help, Section, Stack,
 } from './section';
 import { busyProps, useAction } from './use-action';
+import { JavBrowserSettings } from './jav-browser-settings';
 
 export const DOWNLOADS_URL = '/api/configuration/downloads';
 const CHECK_URL = '/api/configuration/downloads/check';
@@ -65,6 +66,9 @@ export function DownloadSettings({ initial, receipt }: {
     <>
       <DownloadForm state={state} settle={setState} receipt={receipt} pikpakAccount={pikpakAccount} />
       <PikPakAccount state={state} settle={setState} receipt={receipt} username={username} setUsername={setUsername} />
+      <JavBrowserSettings receipt={receipt} refreshKey={JSON.stringify([
+        state.config, state.token_set, state.pikpak.logged_in,
+      ])} />
     </>
   );
 }

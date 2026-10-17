@@ -1,5 +1,13 @@
 # 复用清单
 
+## JAV 用户脚本添加
+
+用户脚本模板 `web/integrations/peach-jav.user.js`（0.2.0）使用 [Tampermonkey 官方 GM API](https://www.tampermonkey.net/documentation.php) 的本机存储、菜单与 `GM_xmlhttpRequest`；SPA 通知依据 `window.onurlchange` 契约。`jav-sites.json` 集中登记站点、域名、详情规则、明确字段和作品参数，安装端点生成 `@match` 与脚本运行规则，设置页读取同一份清单。脚本独立编写，不复制第三方源码、不新增依赖。宿主扩展由用户安装，兼容性以实际浏览器及脚本管理器授权为准；本轮通过模拟 GM API 的真实 Chromium 页面验证，真实扩展安装及源站页面验收未取得。
+
+Peach 保留页面粗提取与身份冲突提示，服务端复用 `catalog_rules` 的唯一番号规则、`feeds.scan_code`、`web_resource_search.q_resource_search` 的来源顺序与质量排序、`submit_offline_download` 的 infohash 幂等、现有云下载落地与后处理。浏览器添加在共享提交锁内按番号接管已有任务，覆盖其他入口同时提交不同磁力的情况。专用令牌经 `CredentialStore` 仅保存 SHA-256 摘要，不声明跨机同步字段。队列用已有 `atomic_write_text` 保存本机运行状态，关闭功能会撤销令牌并停止尚未提交的添加。
+
+书签不能执行云下载链路；完整浏览器扩展增加发布与权限管理面；现有外部下载器不承接 Peach 的网盘目标、入库和后处理，因此未引入。临时账本与模拟 115／PikPak 的 API 回归验证搜索、重复点击、重启恢复、失败重试和凭据隔离；用户脚本及配置页通过桌面与 390×844 浏览器回归。无新增 ledger 表或迁移。
+
 ## 长跑任务的结果显示
 
 资料采集与关注检查复用已有字段判据、事务和候选复核。全部本地 NFO 先读取并按影片提交；在线资料按来源返回时提交，候选 CSV 仍按时间合并落盘。关注列表的安全 partial 行与逐项详情分别保存，历史边界和整页游标沿用连接器规则。中断保留已提交结果，停止后不再落库。

@@ -1,12 +1,14 @@
 """应用组装点：把依赖建好挂到 `app.state`，再按顺序把各 router include 进来。
 
-路由不在这里。它们按类分到四个模块，各自 import 需要的东西，运行期依赖一律从
+路由按用途拆分，各自 import 需要的东西，运行期依赖一律从
 `request.app.state` 取：
 
 | 模块 | 管什么 |
 | --- | --- |
 | `routes_auth` | 口令闸门与登录页，三个 `require_*` 依赖 |
 | `routes_pages` | 单页界面、静态资产与全部前端路由落点 |
+| `routes_configuration` | 本机配置与账号设置 |
+| `routes_jav_browser` | JAV 用户脚本的专用权限、添加与状态查询 |
 | `routes_media` | 播放、分片、缩图、封面、头像、外链圆标 |
 | `routes_api` | JSON 契约出口，含两条 `/api/{route:path}` catch-all |
 
@@ -33,7 +35,7 @@ from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES, GZipMiddle
 
 from . import (__version__, browser_transport, feeds, tunnel, web_batch, web_contract,
                web_feeds, web_follow, web_settings)
-from . import routes_api, routes_auth, routes_configuration, routes_media, routes_pages
+from . import routes_api, routes_auth, routes_configuration, routes_jav_browser, routes_media, routes_pages
 from .buildinfo import frozen_build
 from .config import LOCATION_ROOT_DECLARATIONS, PeachSettings
 from .ffmpeg import FFmpegResolver
@@ -305,6 +307,8 @@ def create_app(
         push_discovery=push_discovery, available=_writer(sync),
         after_ingest=lambda task: enqueue_download_postprocess(contract, task))
     contract.downloads = downloads
+    from .jav_browser import JavBrowser
+    jav_browser = JavBrowser(contract)
     contract.follow_scheduler = follow_scheduler
     # 订阅源拉取（ADR-0042）用同一个调度实现，只换 job id、状态文件与默认间隔。
     # 默认 6 小时：一位女优的 JavDB 演员页一天更新几条，比这更密只是把 JavDB 的配额
@@ -363,7 +367,7 @@ def create_app(
         ledger_ready = False
         if settings.configured:
             ledger_ready = _start_ledger_services(settings, contract,
-                (follow_scheduler, feed_scheduler, push_discovery, downloads, recovery_service))
+                (follow_scheduler, feed_scheduler, push_discovery, downloads, recovery_service, jav_browser))
             automatic_updates.start()
             mount_reachability.start()
         _app.state.ledger_background_ready = ledger_ready
@@ -388,6 +392,7 @@ def create_app(
             feed_scheduler.stop()
             automatic_updates.stop()
             push_discovery.stop()
+            await asyncio.to_thread(jav_browser.stop)
             downloads.stop()
             mount_reachability.stop()
             # to_thread 的查询在线程内释放连接后才算结束。
@@ -434,6 +439,7 @@ def create_app(
     app.state.automatic_updates = automatic_updates
     app.state.push_discovery = push_discovery
     app.state.downloads = downloads
+    app.state.jav_browser = jav_browser
     app.state.mount_reachability = mount_reachability
     app.state.stream_sessions = StreamSessionRegistry()
     from .strm_stream import StrmResources
@@ -575,6 +581,7 @@ def create_app(
     app.include_router(routes_auth.router)
     app.include_router(routes_pages.router)
     app.include_router(routes_configuration.router)
+    app.include_router(routes_jav_browser.router)
     app.include_router(routes_media.router)
     app.include_router(routes_api.router)
     return app

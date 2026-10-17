@@ -346,6 +346,16 @@ class DownloadStore:
                 "SELECT * FROM download_task WHERE info_hash=?", (info_hash,)).fetchone()
         return DownloadTask.from_row(row) if row else None
 
+    def active_by_code(self, code: str) -> DownloadTask | None:
+        states = tuple(sorted(RESUBMITTABLE_STATES))
+        marks = ",".join("?" for _ in states)
+        with self.database.read_connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM download_task WHERE normalise_code_key(code)=normalise_code_key(?) "
+                f"AND state NOT IN ({marks}) AND blocked_at IS NULL ORDER BY id DESC LIMIT 1",
+                (code, *states)).fetchone()
+        return DownloadTask.from_row(row) if row else None
+
     def recent(self, limit: int = 100) -> list[DownloadTask]:
         with self.database.read_connection() as connection:
             rows = connection.execute(
@@ -597,7 +607,7 @@ class DownloadService:
 
     def submit(self, *, source: str, provider: str, target: str | None = None,
                code: str | None = None, title: str | None = None,
-               origin: str | None = None) -> SubmitResult:
+               origin: str | None = None, dedupe_code: bool = False) -> SubmitResult:
         if not self.available:
             raise ValueError("云下载只在账本写入端可用")
         magnet = parse_magnet(source)
@@ -606,6 +616,9 @@ class DownloadService:
         folder = normalise_target(target or self.config.targets.get(provider, ""))
         with self._submit_lock:
             now = self.clock()
+            if dedupe_code and code and (existing := self.store.active_by_code(code)) is not None:
+                self.store.record_submission(task=existing, outcome="adopted", now=now)
+                return SubmitResult("adopted", existing)
             task = self.store.by_hash(magnet.info_hash)
             if task is not None and task.blocked_at:
                 self.store.record_submission(task=task, outcome="refused", now=now,
@@ -949,11 +962,13 @@ class Landing:
 def submit_offline_download(
     service: DownloadService, *, magnet: str, provider: str, target: str | None = None,
     code: str | None = None, title: str | None = None, origin: str | None = None,
+    dedupe_code: bool = False,
 ) -> dict:
-    """把一个磁力交给云下载。三处入口（粘贴、作品页与关注条目、「想要」清单）都走这里。
+    """把一个磁力交给云下载，各入口共用这条提交路径。
 
     `origin` 说这次提交从哪儿来，例如 `paste`、`asset:12`、`follow:34`、`wishlist:56`。
     同一 infohash 已有任务就接管，返回的 `outcome` 是 `adopted`，不会重复提交。
+    浏览器添加启用 `dedupe_code`，在提交锁内接管同番号的进行中或已入库任务。
     """
     return service.submit(source=magnet, provider=provider, target=target, code=code,
-                          title=title, origin=origin).payload()
+                          title=title, origin=origin, dedupe_code=dedupe_code).payload()
