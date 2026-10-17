@@ -4502,18 +4502,32 @@ class ReleaseTagTests(unittest.TestCase):
     def test_applying_a_bump_writes_the_version_and_the_changelog_but_commits_nothing(self):
         """措辞要人过一遍，所以脚本只落盘；提交与标签是后面两步。"""
         with self._shell() as command, mock.patch.object(self.release, "api", return_value=[]), \
+                mock.patch("scripts.release_review.review", return_value={"complete": True}) as review, \
                 mock.patch.object(self.release.version_bump, "plan_bump",
                                   return_value=self._planned_bump()), \
                 mock.patch.object(self.release.version_bump, "write_version") as write, \
                 mock.patch.object(self.release.changelog, "release") as promote:
             result = self.release.prepare("owner/repo", "auto", apply=True)
         write.assert_called_once_with(self.release.ROOT, "minor")
+        review.assert_called_once_with(self.release.ROOT, "owner/repo")
         self.assertEqual(promote.call_args.args, (self.release.ROOT, "0.8.0"))
         self.assertEqual(promote.call_args.kwargs["spec"], "v0.7.14..HEAD")
         self.assertTrue(result["next"], "落盘之后必须告诉人下一步做什么")
         issued = [args for args, _ in command.call_args_list]
         self.assertFalse([args for args in issued
                           if {"commit", "tag", "push"} & set(args)], issued)
+
+    def test_incomplete_upstream_review_keeps_version_files_untouched(self):
+        with self._shell(), mock.patch.object(self.release, "api", return_value=[]), \
+                mock.patch.object(self.release.version_bump, "plan_bump",
+                                  return_value=self._planned_bump()), \
+                mock.patch("scripts.release_review.review", side_effect=ValueError("未取得")), \
+                mock.patch.object(self.release.version_bump, "write_version") as write, \
+                mock.patch.object(self.release.changelog, "release") as promote, \
+                self.assertRaisesRegex(ValueError, "未取得"):
+            self.release.prepare("owner/repo", "auto", apply=True)
+        write.assert_not_called()
+        promote.assert_not_called()
 
     def test_a_bump_stops_when_the_target_tag_already_exists(self):
         with self._shell(), \

@@ -37,6 +37,7 @@ description: 在用户说并行、工作树、暂存、提交、ready、集成�
 5. 协调者统一运行 `integrate`：锁内复查、合并固定提交。取得成功退出状态并核对主线提交后才重启；锁忙交给入口等待，禁止直接 merge；提示带持锁方的 pid、开始时间与范围，不反复数进程。同一批任务由协调者整理 `STATUS`，工作者按文件分工；共享文件安排顺序。
    版本号不在这里动，`integrate` 只报当前值：推进与打标签都走 `scripts/release_tag.py`，
    它是唯一入口。`--bump auto --apply` 推版本、定版变更日志并把那一节带在输出里给人确认，
+   落盘前自动检查上游、依赖与非 manual 参考来源；审阅 `build/release-review.json`，采用范围见 `docs/TESTING.md`。
    确认后 `--ship --apply` 一次做完提交、推送、等 Test 转绿、打标签（ADR-0012 修订）。
    人只判断措辞，不记流程；停在半路就再跑一次同一条命令。
    「该发一版了」由 `release_due.py` 的 Stop 钩子一家说，收尾那段不要跟着说第二遍：
