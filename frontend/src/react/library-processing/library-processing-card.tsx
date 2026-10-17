@@ -75,7 +75,7 @@ function Outcome(
         ? <Note tone="warning" title="处理较慢">{STALLED_TEXT}</Note>
         : null}
       {problem || state.status === 'failed'
-        ? <Note tone="error"
+        ? <Note tone="error" className="gap-0 p-3"
             action={retryable
               ? <Button variant="primary" size="small" onClick={onRetry}>重试未完成项</Button>
               : null}
@@ -83,8 +83,8 @@ function Outcome(
               /* 三层东西叠在同一块红底上：一句结论、一份清单、一条日志地址。各自之间
                  横一条自己颜色的发丝线，读的人才看得出哪一段结束了——只靠间距的话，
                  几十条同样长短的明细会连成一片。 */
-              ? <div className="mt-1.5 border-t border-current/20 pt-1.5">
-                  <Disclosure summary={details.label}>
+              ? <div className="mt-3 border-t border-current/20 pt-3">
+                  <Disclosure summary={details.label} contentClassName="gap-0">
                     {/* 轨道是滚动容器的兄弟，得有一层只裹着清单的定位祖先给它落脚。 */}
                     <div className="relative">
                       {/* 条间线画在每条自己身上，不用 `divide-y`：那一族的选择器裹在
@@ -93,7 +93,7 @@ function Outcome(
                       <ul ref={list} className="max-h-96 overflow-y-auto pr-3">
                         {details.items.map((item) => (
                           <li key={item.key}
-                            className="flex flex-col gap-0.5 border-b border-current/15 py-2 wrap-anywhere first:pt-1 last:border-b-0 last:pb-1">
+                            className="flex flex-col gap-1 border-b border-current/15 py-2 wrap-anywhere first:pt-0 last:border-b-0 last:pb-0">
                             {item.href
                               ? <a href={item.href} className="text-body-2-medium underline-offset-4 hover:underline">{item.label}</a>
                               : <span className="text-body-2-medium">{item.label}</span>}
@@ -104,10 +104,8 @@ function Outcome(
                       </ul>
                     </div>
                     {details.log
-                      /* 完整记录不是这条提示在说的事，它是出事之后自己去翻的东西：留在
-                         红底上但退回灰字。那条线取这行字自己的颜色（`border-current`），
-                         中性的 `separator` 在有色底上是另一种灰，跟这行字对不上。 */
-                      ? <div className="mt-2 border-t border-current/20 pt-2 text-text-secondary">
+                      /* 日志地址使用次级文字色，分隔线沿用错误提示的红色。 */
+                      ? <div className="mt-3 border-t border-border-error-default/20 pt-3 text-text-secondary">
                           <PathLine path={details.log} prefix="完整记录：" className="text-caption-1-regular"
                             onRevealed={toast} />
                         </div>
@@ -124,7 +122,7 @@ function Outcome(
       {!processingActive(state) && notes
         ? <Note tone="neutral"
             extra={state.issues_log
-              /* 同上：线跟着这行灰字走，两块提示里的那一条才是同一条。 */
+              /* 中性提示的分隔线跟随次级文字色。 */
               ? <div className="mt-1.5 border-t border-current/20 pt-1.5 text-text-secondary">
                   <PathLine path={state.issues_log} prefix="完整记录：" className="text-caption-1-regular"
                     onRevealed={toast} />

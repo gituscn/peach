@@ -2699,6 +2699,8 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
         self.assertFalse((self.root / 'candidates').exists())
         finish.assert_not_called()
         factory.assert_not_called()
+        self.assertEqual([(step['id'], step['status']) for step in result['steps']],
+                         [('sources', 'complete'), ('media', 'complete')])
 
     def test_missing_ffmpeg_is_retryable_and_collection_can_finish_its_work(self):
         self.resolver.ffmpeg.return_value = None

@@ -12,6 +12,8 @@ describe('扫描与采集控制', () => {
   for (const viewport of VIEWPORTS) {
     it(`${viewport.name}：资源提示、粗估、模式切换与暂停继续`, async () => {
       let state = { status: 'idle', job_id: '', checked: 0, total: 100, speed_mode: 'standard',
+        steps: [{ id: 'sources', label: '扫描文件', status: 'complete' },
+          { id: 'collect', label: '采集外部资料与封面', status: 'current' }],
         current_asset_name: '', current_action: '', stage: '',
         eta_kind: 'historical', eta_initial: true, eta_seconds_min: 1200, eta_seconds_max: 2400 };
       const writes: Record<string, unknown>[] = [];
@@ -86,6 +88,18 @@ describe('扫描与采集控制', () => {
         assert.equal(await page.locator('[data-library-completion]').count(), 0, '运行期间首页由常驻任务卡承接进度');
         await dock.getByRole('button', { name: '暂停', exact: true }).waitFor();
         await dock.getByRole('button', { name: '收起任务详情' }).click();
+        const fixed = await dock.boundingBox();
+        await dock.hover();
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await page.waitForTimeout(500);
+        const hovered = await dock.boundingBox();
+        await page.mouse.move(1, 1);
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.waitForTimeout(500);
+        const unhovered = await dock.boundingBox();
+        assert.ok(fixed && hovered && unhovered);
+        assert.ok(Math.abs(fixed.y - hovered.y) < 1 && Math.abs(fixed.y - unhovered.y) < 1,
+          '收起详情后滚动与悬停保持任务卡位置');
         await dock.getByRole('button', { name: '处理速度：标准' }).click();
         const speed = page.getByRole('dialog', { name: '处理速度', exact: true });
         await speed.getByRole('slider').press('End');
@@ -112,6 +126,8 @@ describe('扫描与采集控制', () => {
         await dock.getByRole('button', { name: '展开任务详情' }).waitFor();
         assert.equal(await dock.count(), 1, '换页保留同一张任务卡');
         await dock.getByRole('button', { name: '展开任务详情' }).click();
+        assert.equal(await dock.locator('[data-processing-step="complete"] s').innerText(), '扫描文件');
+        assert.equal(await dock.locator('[aria-current="step"] s').count(), 0);
         await page.evaluate(async () => {
           const entry = '/dist/peach-app.js', ui = await import(entry);
           ui.showToast(document.getElementById('toasts'), { success: '', error: '' }, 'processing-proof',

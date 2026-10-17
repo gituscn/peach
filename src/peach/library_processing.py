@@ -2069,6 +2069,17 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                      followups=[],
                      started_at=time.time(), error='')
         state.update(initial_estimate(config, db_path, stage, scope_ids, speed_mode))
+        steps = [('sources', '扫描文件' if scope_ids is None and stage in (ALL_STAGES, SCAN_STAGE) else '检查媒体目录')]
+        if stage not in (SCAN_STAGE, PREVIEWS_STAGE):
+            steps.append(('local', '读取本地资料'))
+        if stage == PREVIEWS_STAGE or stage in (ALL_STAGES, COLLECT_STAGE):
+            media_label = ('生成视频预览' if stage == PREVIEWS_STAGE else
+                           '读取媒体属性' if metadata_only(config.directory('state')) else '读取媒体属性与生成预览')
+            steps.append(('media', media_label))
+        if stage not in (SCAN_STAGE, PREVIEWS_STAGE):
+            steps.append(('collect', '采集外部资料与封面'))
+        state['steps'] = [dict(id=key, label=label, status='current' if index == 0 else 'pending')
+                          for index, (key, label) in enumerate(steps)]
         estimate = ProcessingEstimate(config, state, control)
         # 实体表的水位在开工前记一次：比它大的实体就是这一轮建出来的（`_entity_followups`）。
         checkpoints = _LibraryCheckpoints(state, resume_state, database)
@@ -2119,6 +2130,17 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             flush_state()
             report(dict(state))
 
+        def finish_step(key):
+            """阶段成功返回后发布完成状态；异常退出的阶段保留当前状态。"""
+            progress = [dict(item) for item in state['steps']]
+            for index, item in enumerate(progress):
+                if item['id'] == key:
+                    item['status'] = 'complete'
+                    if index + 1 < len(progress):
+                        progress[index + 1]['status'] = 'current'
+                    break
+            update(steps=progress)
+
         update()
         remote = _RemoteSession(config, provider_factory, _MissCache(misses_path(config)),
                                 retrying=retrying, routes=routes)
@@ -2131,6 +2153,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             sources = _scan_sources(config, db_path, locations=locations, asset_ids=scope_ids,
                                     stage=stage, guard=guard, update=update, issue=issue)
             state.update(scanned=sources.scanned, scanned_bytes=sources.scanned_bytes, probed=sources.probed)
+            finish_step('sources')
             if stage == SCAN_STAGE:
                 # `checked`／`total` 在探时长时借给进度条用过；只扫描这一段没有采集，读数归零。
                 update(status='failed' if state['issue_count'] else 'complete',
@@ -2143,6 +2166,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 _generate_previews(config, rows, database, update=update, issue=issue, guard=guard,
                                    completed=checkpoints.completed['completed_previews'],
                                    checkpoint=lambda row: checkpoints.mark('completed_previews', row, flush_state))
+                finish_step('media')
             if stage == PREVIEWS_STAGE:
                 update(status='failed' if state['issue_count'] else 'complete', stage='处理结束',
                        completed_at=time.time(), error=issue_summary(state['issue_count'], state['paused_count']))
@@ -2200,12 +2224,14 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                                      state['issue_count'] == issues_before))
                 update(checked=index + 1)
             flush_candidates(force=True)
+            finish_step('local')
             if stage in (ALL_STAGES, COLLECT_STAGE):
                 _probe_sources(config, db_path, locations, sources.online_roots, scope_ids, update)
                 if not metadata_only(config.directory('state')):
                     _generate_previews(config, rows, database, update=update, issue=issue, guard=guard,
                         completed=checkpoints.completed['completed_previews'],
                         checkpoint=lambda row: checkpoints.mark('completed_previews', row, flush_state))
+                finish_step('media')
             for index, row, code, verify_existing, local_fields, local_entries, local_ok in prepared:
                 guard.check()
                 issues_before = state['issue_count']
@@ -2234,6 +2260,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 active=active, update=update, issue=issue, watermark=entity_watermark, covered=covered)
             summary['auto_applied'] = summary.get('auto_applied', 0) + state['auto_applied']
             summary['auto_rejected'] = summary.get('auto_rejected', 0) + state['auto_rejected']
+            finish_step('collect')
             update(status='failed' if state['issue_count'] else 'complete', stage='处理结束',
                    checked=len(rows),
                    **summary,

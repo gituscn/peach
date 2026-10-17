@@ -1,6 +1,6 @@
 /* 常驻任务面：状态、计数与控件共用服务端快照。位置由全站通知栈管理。 */
 import { useEffect, useRef, useState } from 'react';
-import { RiArrowRightLine, RiArrowDownSLine, RiArrowUpSLine, RiErrorWarningLine, RiInformationLine } from '@remixicon/react';
+import { RiArrowRightLine, RiArrowDownSLine, RiArrowUpSLine, RiCheckLine, RiCheckboxBlankCircleLine, RiErrorWarningLine, RiInformationLine } from '@remixicon/react';
 import { Button } from '@/components/base/buttons/button';
 import { LinkButton } from '@/components/base/buttons/link-button';
 import { cx } from '@/utils/cx';
@@ -57,11 +57,12 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
   if (!problem && !active && !failed) return null;
   const warning = !!problem || !!state?.stalled;
   const title = failed ? '扫描与资料采集未完成' : state?.status === 'paused' ? '扫描与采集已暂停' : '扫描与采集';
-  return <aside ref={panel} data-processing-dock="" aria-label="扫描任务" role={failed ? 'alert' : 'status'}
-    className={cx('flex min-w-0 flex-col gap-3 border p-4',
-      failed ? 'border-current/35 bg-background-tertiary-error text-text-error-primary'
-        : warning ? 'border-current/35 bg-status-yellow-background text-status-yellow-text'
-          : 'border-border-button-default bg-background-primary-default text-text-primary')}>
+  return <aside ref={panel} data-processing-dock="" data-processing-tone={failed ? 'error' : warning ? 'warning' : 'neutral'}
+    aria-label="扫描任务" role={failed ? 'alert' : 'status'}
+    className={cx('flex min-w-0 flex-col gap-3 border bg-background-primary-default p-4',
+      failed ? 'border-current/35 text-text-error-primary'
+        : warning ? 'border-current/35 text-status-yellow-text'
+          : 'border-border-button-default text-text-primary')}>
     <div className="flex min-w-0 items-center gap-3">
       {active && state?.total ? <Gauge value={state.checked || 0} max={state.total} />
         : failed || warning ? <RiErrorWarningLine aria-hidden className="size-5 shrink-0" />
@@ -73,9 +74,21 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
       <Button size="small" variant="ghost" iconOnly leadingIcon={expanded ? RiArrowDownSLine : RiArrowUpSLine}
         aria-label={expanded ? '收起任务详情' : '展开任务详情'} aria-expanded={expanded} onClick={toggle} />
     </div>
-    {expanded ? <div className="flex min-w-0 flex-col gap-2 border-t border-separator-border pt-3">
+    {expanded ? <div className={cx('flex min-w-0 flex-col gap-2 border-t pt-3',
+      failed ? 'border-border-error-default/20' : warning ? 'border-current/20' : 'border-separator-border')}>
+      {state?.steps?.length ? <ol aria-label="处理步骤" className="flex min-w-0 flex-col gap-1.5">
+        {state.steps.map(step => <li key={step.id} data-processing-step={step.status}
+          aria-current={step.status === 'current' ? 'step' : undefined}
+          className={cx('flex min-h-8 items-center gap-2 text-body-2-regular',
+            step.status === 'current' ? 'text-text-primary' : 'text-text-tertiary')}>
+          {step.status === 'complete' ? <RiCheckLine aria-hidden className="size-4 shrink-0" />
+            : <RiCheckboxBlankCircleLine aria-hidden className={cx('size-4 shrink-0', step.status === 'current' && 'text-border-focus-ring')} />}
+          <span className="sr-only">{step.status === 'complete' ? '已完成：' : step.status === 'current' ? '当前：' : '待处理：'}</span>
+          {step.status === 'complete' ? <s className="wrap-anywhere">{step.label}</s> : <span className="wrap-anywhere">{step.label}</span>}
+        </li>)}
+      </ol> : null}
       <p className="text-body-2-regular wrap-anywhere">{problem || (failed ? state?.error || '请查看并处理未完成项' : processingLine(state!))}</p>
-      {active && state?.stage ? <p className="text-caption-1-regular text-text-tertiary">当前阶段 · {state.stage}</p> : null}
+      {active && state?.stage && !state.steps?.length ? <p className="text-caption-1-regular text-text-tertiary">当前阶段 · {state.stage}</p> : null}
       {state?.stalled && !problem ? <p className="text-caption-1-regular">当前步骤耗时较长，正在等待进展</p> : null}
     </div> : null}
     <div className="flex flex-wrap items-center justify-between gap-2">

@@ -36,6 +36,7 @@ export interface LibraryProcessingData {
   job_id?: string;
   stage?: string;
   requested_stage?: string;
+  steps?: { id: string; label: string; status: 'pending' | 'current' | 'complete' }[];
   checked?: number;
   total?: number;
   scanned?: number;

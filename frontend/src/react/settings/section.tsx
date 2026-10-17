@@ -10,6 +10,7 @@ import { setCollapseOpen } from '@peach/legacy/ui';
 
 import { SettingsCard, SettingsSectionLabel } from '@/components/application/settings/settings-rows';
 import { LinkButton } from '@/components/base/buttons/link-button';
+import { cx } from '@/utils/cx';
 
 interface SectionProps {
   title: string;
@@ -115,8 +116,8 @@ export function Fact({ term, children }: { term: ReactNode; children: ReactNode 
 /** 展开正文。原生 `details` 给键盘与无障碍语义；开合交给共用 Collapse 的 `setCollapseOpen`，
  *  它给正文外层挂上 `ui-kit/collapse.css` 的 `.ui-fcollapse` 让高度过渡。内边距放在里层，高度才能收到 0。 */
 export function Disclosure(
-  { summary, defaultOpen = false, children, trailing = false, onOpenChange }:
-  { summary: ReactNode; defaultOpen?: boolean; children: ReactNode; trailing?: boolean; onOpenChange?(open: boolean): void },
+  { summary, defaultOpen = false, children, trailing = false, onOpenChange, contentClassName }:
+  { summary: ReactNode; defaultOpen?: boolean; children: ReactNode; trailing?: boolean; onOpenChange?(open: boolean): void; contentClassName?: string },
 ) {
   const id = useId();
   const details = useRef<HTMLDetailsElement>(null);
@@ -148,7 +149,7 @@ export function Disclosure(
         {trailing ? <RiArrowRightSLine aria-hidden className={open ? 'ml-auto size-4 shrink-0 -rotate-90 transition-transform' : 'ml-auto size-4 shrink-0 rotate-90 transition-transform'} /> : null}
       </summary>
       <div ref={body} id={id} inert={!open}>
-        <div className="flex flex-col gap-2 pt-3">{children}</div>
+        <div className={cx('flex flex-col gap-2 pt-3', contentClassName)}>{children}</div>
       </div>
     </details>
   );

@@ -42,7 +42,7 @@ export const mountToaster: typeof Bundle.mountToaster = (host, icons) => {
       mobileOffset={{ right: 16, left: 16, bottom: 'calc(var(--toast-bottom, 16px) + var(--processing-toast-space, 0px))' }}
       toastOptions={{ closeButtonAriaLabel: '关闭提示' }} containerAriaLabel="通知"
       icons={{ success: glyph(icons.success, true), error: glyph(icons.error, false) }} />
-      <Toaster id="processing" position="bottom-right" gap={8}
+      <Toaster id="processing" position="bottom-right" gap={8} expand
         style={{ ...FRAME, '--width': 'min(400px, calc(100vw - 32px))' } as CSSProperties}
         offset={{ right: 24, bottom: 'var(--toast-bottom, 24px)' }}
         mobileOffset={{ right: 16, left: 16, bottom: 'var(--toast-bottom, 16px)' }}
