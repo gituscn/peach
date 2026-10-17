@@ -19677,14 +19677,15 @@ function Nm(e, t = 50, n = Mm, r) {
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/generators/utils/create-generator-easing.mjs
 function Pm(e, t = 100, n) {
-	let r = n({
+	let { keyframes: r, velocity: i } = e, a = r && r[r.length - 1] - r[0], o = n({
 		...e,
+		velocity: i && a ? i * t / a : i,
 		keyframes: [0, t]
-	}), i = Math.min(Nm(r), Mm);
+	}), s = Math.min(Nm(o), Mm);
 	return {
 		type: "keyframes",
-		ease: (e) => r.next(i * e).value / t,
-		duration: /* @__PURE__ */ Tm(i)
+		ease: (e) => o.next(s * e).value / t,
+		duration: /* @__PURE__ */ Tm(s)
 	};
 }
 //#endregion
