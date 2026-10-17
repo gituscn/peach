@@ -11,7 +11,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from .processing_control import checkpoint, low_mode
+from .processing_control import checkpoint, ffmpeg_options
 
 #: 部分网盘视频把色彩原色写成 reserved（非法值），swscale 会拒绝缩放；声明为 bt709
 #: 只是覆盖坏的元数据，不改动像素。
@@ -36,14 +36,13 @@ def capture_frame(ffmpeg: str, path: str, timestamp: float, destination: Path, *
     """
     command = [ffmpeg, "-y", "-v", "error", "-rw_timeout", "8000000"]
     checkpoint('frame')
-    if low_mode():
-        command += ['-threads', '1', '-filter_threads', '1']
+    command += ffmpeg_options(filter_option='-filter_threads')
     if color_override:
         command += COLOR_OVERRIDE
     command += [
         "-ss", f"{timestamp:.2f}", "-i", path, "-frames:v", "1",
         "-vf", f"scale={int(width)}:-1", "-q:v", "4",
-        *(['-threads', '1'] if low_mode() else []), str(destination),
+        *ffmpeg_options(), str(destination),
     ]
     try:
         completed = subprocess.run(command, capture_output=True, timeout=timeout,
@@ -74,11 +73,11 @@ def tile_frames(ffmpeg: str, pattern: str, columns: int, rows: int, destination:
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
     checkpoint('frame')
-    options = ['-threads', '1', '-filter_complex_threads', '1'] if low_mode() else []
+    options = ffmpeg_options(filter_option='-filter_complex_threads')
     subprocess.run(
         [ffmpeg, "-y", "-v", "error", *options, "-i", pattern,
          "-filter_complex", f"tile={int(columns)}x{int(rows)}", "-q:v", "4",
-         *(['-threads', '1'] if low_mode() else []), str(destination)],
+         *ffmpeg_options(), str(destination)],
         capture_output=True, timeout=timeout,
         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )

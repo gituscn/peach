@@ -5,7 +5,7 @@ from . import settings_file
 from .library_processing import (ALL_STAGES, COLLECT_STAGE, SCAN_STAGE, STAGES,
                                 METADATA_STAGE, PREVIEWS_STAGE, _asset_selection,
                                 decorate, issues_path, process_library, snapshot)
-from .processing_control import control_for, initial_estimate, valid_mode
+from .processing_control import control_for, initial_estimate, valid_mode, mode_ratio
 
 ACTIVE = ('running', 'pausing', 'paused')
 
@@ -55,7 +55,7 @@ def _control_action(contract, config, body):
         mode = valid_mode(body.get('speed_mode'))
         control.request(action, mode=mode)
         if previous.get('status') in ACTIVE:
-            ratio = 1.8 if mode == 'low' else 1 / 1.8
+            ratio = mode_ratio(mode, previous.get('speed_mode') or 'standard')
             fields = dict(speed_mode=mode, eta_initial=True)
             if previous.get('speed_mode') != mode:
                 for key in ('eta_seconds_min', 'eta_seconds_max'):

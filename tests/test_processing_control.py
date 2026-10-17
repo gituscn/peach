@@ -37,11 +37,13 @@ class ProcessingControlTests(unittest.TestCase):
         estimate = initial_estimate(self.config, self.db, 'all')
         chosen = initial_estimate(self.config, self.db, 'all', [1, 2])
         low = initial_estimate(self.config, self.db, 'all', mode='low')
+        high = initial_estimate(self.config, self.db, 'all', mode='high')
         self.assertEqual(estimate['estimate_file_count'], 10)
         self.assertEqual(estimate['estimate_bytes'], 10 * 1024**3)
         self.assertGreater(estimate['eta_seconds_max'], estimate['eta_seconds_min'])
         self.assertLess(chosen['eta_seconds_max'], estimate['eta_seconds_max'])
         self.assertGreater(low['eta_seconds_max'], estimate['eta_seconds_max'])
+        self.assertLess(high['eta_seconds_max'], estimate['eta_seconds_max'])
         self.assertTrue(estimate['eta_initial'])
         self.assertIn('未含未知新增', estimate['eta_scope'])
 
@@ -80,7 +82,7 @@ class ProcessingControlTests(unittest.TestCase):
                 paused.set()
         def worker():
             try:
-                with control.bind('one', publish=publish, active=lambda: True, db_path=self.db):
+                with control.bind('one', publish=publish, active=lambda: True, db_path=self.db, mode='high'):
                     entered.set()
                     control.request('pause', 'one')
                     checkpoint('probe')
@@ -104,10 +106,11 @@ class ProcessingControlTests(unittest.TestCase):
 
     def test_saved_pause_intent_prevents_automatic_restart(self):
         control = control_for(self.config)
-        with control.bind('one', publish=lambda **_: None, active=lambda: True, db_path=self.db):
+        with control.bind('one', publish=lambda **_: None, active=lambda: True, db_path=self.db, mode='high'):
             control.request('pause', 'one')
         restored = ProcessingControl(control.path)
         self.assertTrue(restored.paused)
+        self.assertEqual(restored.mode, 'high')
         job_recovery.save(self.db, 'library-processing', 'one', {'stage': 'scan'}, waiting=True)
         handler = Mock()
         self.assertEqual(job_recovery.resume(self.db, {'library-processing': handler}), [])
@@ -197,8 +200,9 @@ class ProcessingControlTests(unittest.TestCase):
                 raise
         with patch('peach.web_library_processing.settings_file.active', return_value=self.config), \
                 patch('peach.web_library_processing.process_library', side_effect=process):
-            initial = w_library_processing(contract, {'stage': 'metadata'})
+            initial = w_library_processing(contract, {'stage': 'metadata', 'speed_mode': 'high'})
             self.assertIn('eta_seconds_max', initial)
+            self.assertEqual(initial['speed_mode'], 'high')
             self.assertTrue(entered.wait(2))
             run_id = initial['run_id']
             identity = initial['job_id']
@@ -263,7 +267,7 @@ class ProcessingControlTests(unittest.TestCase):
                 return {'status': 'complete'}
         with patch('peach.web_library_processing.settings_file.active', return_value=self.config), \
                 patch('peach.web_library_processing.process_library', side_effect=process):
-            initial = w_library_processing(contract, {'stage': 'metadata'})
+            initial = w_library_processing(contract, {'stage': 'metadata', 'speed_mode': 'high'})
             self.assertTrue(entered.wait(2))
             w_library_processing(contract, {'action': 'pause', 'job_id': initial['job_id']})
             advance.set()
@@ -279,7 +283,126 @@ class ProcessingControlTests(unittest.TestCase):
             self.assertEqual(resumes[1]['completed_metadata'], ['1:R:\\a.mp4'])
             self.assertEqual(second.snapshot()['status'], 'complete')
             self.assertEqual(second.snapshot()['run_id'], initial['run_id'])
+            self.assertEqual(control_for(self.config).mode, 'high')
             self.assertEqual(runs.get(initial['run_id']).status, 'succeeded')
+
+    def test_three_intensities_set_distinct_io_start_intervals(self):
+        control = control_for(self.config)
+        intervals = {}
+        for mode in ('low', 'standard', 'high'):
+            with self.subTest(mode=mode), \
+                    control.bind(mode, publish=lambda **_: None, active=lambda: True, db_path=self.db, mode=mode), \
+                    patch('peach.processing_control.time.monotonic', return_value=10):
+                checkpoint('network')
+                intervals[mode] = control.next_work['network'] - 10
+        self.assertGreater(intervals['low'], intervals['standard'])
+        self.assertGreater(intervals['standard'], intervals['high'])
+        self.assertEqual(intervals['high'], 0)
+
+    def test_three_intensities_set_decode_filter_and_encode_threads(self):
+        from peach.frame_capture import capture_frame, tile_frames
+        control = control_for(self.config)
+        for mode, threads in (('low', '1'), ('standard', '2'), ('high', None)):
+            with self.subTest(mode=mode), \
+                    control.bind(mode, publish=lambda **_: None, active=lambda: True, db_path=self.db, mode=mode), \
+                    patch('peach.frame_capture.checkpoint'), \
+                    patch('peach.frame_capture.subprocess.run', return_value=SimpleNamespace(stderr=b'')) as run:
+                capture_frame('ffmpeg', 'video.mp4', 1, self.root / 'frame.jpg')
+                tile_frames('ffmpeg', 'frame%02d.jpg', 3, 3, self.root / 'tile.jpg')
+                for call, filter_option in zip(run.call_args_list, ('-filter_threads', '-filter_complex_threads')):
+                    command = call.args[0]
+                    if threads is None:
+                        self.assertNotIn('-threads', command)
+                        self.assertNotIn(filter_option, command)
+                    else:
+                        self.assertEqual(command.count('-threads'), 2)
+                        self.assertEqual(command[command.index(filter_option) + 1], threads)
+                        self.assertEqual([command[index + 1] for index, value in enumerate(command)
+                                          if value == '-threads'], [threads, threads])
+
+    def test_intensity_switch_recalibrates_estimate_in_every_direction(self):
+        self.seed()
+        control = control_for(self.config)
+        for initial, target in (('low', 'standard'), ('standard', 'high'), ('high', 'low')):
+            with self.subTest(initial=initial, target=target), \
+                    control.bind(initial, publish=lambda **_: None, active=lambda: True,
+                                 db_path=self.db, mode=initial):
+                state = dict(initial_estimate(self.config, self.db, 'metadata', mode=initial),
+                             status='paused', requested_stage='metadata')
+                estimate = ProcessingEstimate(self.config, state, control)
+                old = state['eta_seconds_max']
+                control.request('set_speed', mode=target)
+                estimate.update(state)
+                self.assertEqual(state['speed_mode'], target)
+                if target == 'low':
+                    self.assertGreater(state['eta_seconds_max'], old)
+                else:
+                    self.assertLess(state['eta_seconds_max'], old)
+
+    def test_high_intensity_honors_installation_pause(self):
+        from peach.jobs import JobPaused
+        from peach import update_tasks
+        control = control_for(self.config)
+        with control.bind('one', publish=lambda **_: None, active=lambda: True, db_path=self.db, mode='high'):
+            token = update_tasks.reserve(self.db)
+            try:
+                with self.assertRaises(JobPaused):
+                    checkpoint('frame')
+            finally:
+                update_tasks.release(self.db, token)
+            checkpoint('frame')
+            self.assertEqual(control.mode, 'high')
+
+    def test_high_history_is_normalized_for_every_initial_intensity(self):
+        self.seed()
+        control = control_for(self.config)
+        with control.bind('one', publish=lambda **_: None, active=lambda: True, db_path=self.db, mode='high'):
+            state = dict(initial_estimate(self.config, self.db, 'metadata', mode='high'),
+                         requested_stage='metadata', status='running')
+            with patch('peach.processing_control.time.monotonic', return_value=100):
+                estimate = ProcessingEstimate(self.config, state, control)
+            state['status'] = 'complete'
+            with patch('peach.processing_control.time.monotonic', return_value=175):
+                estimate.update(state)
+        history = json.loads((self.config.directory('state') / 'library-processing-timing.json').read_text())
+        self.assertEqual(history['metadata'], 10.0)
+        low, standard, high = [initial_estimate(self.config, self.db, 'metadata', mode=mode)
+                               for mode in ('low', 'standard', 'high')]
+        self.assertEqual(high['eta_kind'], 'historical')
+        self.assertGreater(low['eta_seconds_max'], standard['eta_seconds_max'])
+        self.assertGreater(standard['eta_seconds_max'], high['eta_seconds_max'])
+
+    def test_high_intensity_and_pause_intent_are_shared_between_control_instances(self):
+        control = control_for(self.config)
+        with control.bind('one', publish=lambda **_: None, active=lambda: True, db_path=self.db, mode='standard'):
+            external = ProcessingControl(control.path)
+            external.request('set_speed', 'one', mode='high')
+            external.request('pause', 'one')
+            control.refresh(force=True)
+            self.assertEqual(control.mode, 'high')
+            self.assertTrue(control.paused)
+            external.request('resume', 'one')
+            control.refresh(force=True)
+            self.assertFalse(control.paused)
+            self.assertEqual(control.mode, 'high')
+
+    def test_api_switches_between_all_intensities_with_proportional_paused_estimates(self):
+        from peach.jobs import BackgroundJob
+        control = control_for(self.config)
+        job = BackgroundJob('library-processing')
+        job.state = dict(job_id='one', status='paused', speed_mode='low', eta_seconds_min=180, eta_seconds_max=360)
+        contract = SimpleNamespace(db_path=self.db, library_processing_job=job)
+        with control.bind('one', publish=lambda **_: None, active=lambda: True, db_path=self.db, mode='low'), \
+                patch('peach.web_library_processing.settings_file.active', return_value=self.config):
+            control.request('pause', 'one')
+            high = w_library_processing(contract, {'action': 'set_speed', 'job_id': 'one', 'speed_mode': 'high'})
+            self.assertEqual((high['speed_mode'], high['status']), ('high', 'paused'))
+            self.assertEqual((high['eta_seconds_min'], high['eta_seconds_max']), (75, 150))
+            standard = w_library_processing(contract, {'action': 'set_speed', 'job_id': 'one', 'speed_mode': 'standard'})
+            self.assertEqual((standard['eta_seconds_min'], standard['eta_seconds_max']), (100, 200))
+            low = w_library_processing(contract, {'action': 'set_speed', 'job_id': 'one', 'speed_mode': 'low'})
+            self.assertEqual((low['eta_seconds_min'], low['eta_seconds_max']), (180, 360))
+            self.assertTrue(control.paused)
 
     def test_scan_progress_accumulates_discovered_counts_across_roots(self):
         from peach.library_processing import _scan_sources

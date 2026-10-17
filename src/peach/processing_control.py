@@ -14,12 +14,18 @@ from .fsutil import atomic_write_text
 CURRENT = ContextVar('peach_library_processing_control', default=None)
 _CONTROLS = {}
 _LOCK = threading.Lock()
-MODES = ('standard', 'low')
+MODES = ('low', 'standard', 'high')
+MODE_FACTORS = {'low': 1.8, 'standard': 1.0, 'high': 0.75}
+IO_INTERVALS = {
+    'low': {'scan': 0.008, 'probe': 0.75, 'network': 1.5, 'frame': 0.75, 'work': 0.15},
+    'standard': {'scan': 0.002, 'probe': 0.2, 'network': 0.25, 'frame': 0.2, 'work': 0.03},
+    'high': {},
+}
 
 
 def valid_mode(value):
     if value not in MODES:
-        raise ValueError('请选择标准或低占用模式')
+        raise ValueError('请选择低占用、标准或高强度模式')
     return value
 
 
@@ -76,6 +82,20 @@ def checkpoint(kind='work'):
 def low_mode():
     control = CURRENT.get()
     return control is not None and control.mode == 'low'
+
+
+def mode_ratio(target, previous='standard'):
+    return MODE_FACTORS[valid_mode(target)] / MODE_FACTORS[valid_mode(previous)]
+
+
+def ffmpeg_options(*, filter_option=None):
+    """当前馆藏任务的 FFmpeg 线程选项；高强度与独立调用使用工具默认值。"""
+    control = CURRENT.get()
+    threads = {'low': 1, 'standard': 2}.get(control.mode) if control is not None else None
+    if threads is None:
+        return []
+    value = str(threads)
+    return ['-threads', value, *([filter_option, value] if filter_option else [])]
 
 
 class ActiveDeadline(float):
@@ -211,8 +231,7 @@ class ProcessingControl:
                 self.publish(status='running', speed_mode=mode, resumed_after=spent)
                 started = None
             # 控制只作用于当前馆藏任务；在单项 I/O 之间留出空档。
-            delay = {'scan': 0.008, 'probe': 0.75, 'network': 1.5, 'frame': 0.75,
-                     'work': 0.15}.get(kind, 0.15) if mode == 'low' else 0
+            delay = IO_INTERVALS[mode].get(kind, 0)
             remaining = self.next_work.get(kind, 0) - time.monotonic()
             if remaining > 0:
                 self.event.wait(min(0.25, remaining))
@@ -251,7 +270,7 @@ def initial_estimate(config, db_path, stage, asset_ids=None, mode=None):
     historical = isinstance(sample, (int, float)) and math.isfinite(sample) and sample > 0
     if historical:
         seconds = sample
-    factor = 1.8 if mode == 'low' else 1.0
+    factor = MODE_FACTORS[valid_mode(mode)]
     known = bool(count) or asset_ids is not None or stage not in ('scan', 'all')
     estimate = count * seconds * factor
     return dict(speed_mode=mode,
@@ -281,7 +300,7 @@ class ProcessingEstimate:
     def update(self, state):
         mode = self.control.mode if self.control is not None else self.mode
         if mode != self.mode:
-            ratio = 1.8 if mode == 'low' else 1 / 1.8
+            ratio = mode_ratio(mode, self.mode)
             for key in ('eta_seconds_min', 'eta_seconds_max'):
                 if isinstance(state.get(key), (int, float)):
                     state[key] = math.ceil(state[key] * ratio)
@@ -294,7 +313,7 @@ class ProcessingEstimate:
                 elapsed = max(0.01, time.monotonic() - self.started - self.paused_elapsed())
                 path = self.config.directory('state') / 'library-processing-timing.json'
                 history = _read(path)
-                history[state['requested_stage']] = elapsed / state['estimate_file_count'] / (1.8 if mode == 'low' else 1)
+                history[state['requested_stage']] = elapsed / state['estimate_file_count'] / MODE_FACTORS[mode]
                 atomic_write_text(path, json.dumps(history) + '\n')
             return
         if state.get('status') != 'running':
