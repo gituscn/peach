@@ -16,6 +16,23 @@
 
 桥锁文件同时覆盖 PR #40、#42 的传递依赖要求：Mako 1.4.3、pydantic-ai-slim / pydantic-graph 2.55.0。没有新增直接依赖；传递更新包括 anthropic、openai、genai-prices，桥不调用它们的模型服务。
 
+## amane 0.21.0 采用范围
+
+2026-10-17 复核稳定版 [v0.21.0](https://github.com/sqzw-x/amane/releases/tag/v0.21.0)，
+提交 `a2d45880e83df7047d461452965919692701e8c9`；桥清单仍固定 0.20.0，未执行运行依赖升级。
+从固定提交到该版本的源码差异覆盖 DMM 图片路径、CID、数字前缀与 MGStage 搜索；
+版本检查与实际接入必须分开判断。
+
+| 能力 | 上游修复与 Peach 消费者 | 判断 |
+| --- | --- | --- |
+| 高清图片 | amane 生成 legacy 高清候选；Peach `jav_cover_fetch` 同时测 modern、legacy 与原始图的真实像素面积，保留最大官方图 | 保留 Peach 选图策略；上游补充的 mono/movie 分类目录与剧照路径可单独补回归 |
+| DMM CID | amane 区分通贩与配信 CID，剥离门店前缀；Peach 正式 DMM 来源独立使用 GraphQL 与 `makerContentId` 核对 | 升级桥不会替换 Peach DMM；不直接套用全局去数字规则 |
+| MGStage 搜索 | amane 生成搜索变体，精确命中优先，只有一个候选时才允许单边数字前缀差异；Peach 正式来源通过桥调用 MGStage | 桥升级的有效收益，须在独立升级中验证字段与错误契约 |
+| 聚合与产品功能 | Peach 经桥使用 4 个社区站、5 个官方来源入口，不调用 amane 聚合、任务中心或前端 | 沿用固定上游版本加 Peach 领域策略，无需维护完整 fork |
+
+pnpm 管理 amane 的前端依赖，Justfile 编排 uv、前端、测试与打包；它们不是桥运行依赖。
+Peach 继续使用现有 npm 清单与项目命令入口。pnpm 的多工作树安装收益需实测，just 暂无独立消费者。
+
 ## Dependabot PR
 
 PR #41、#43、#44、#45、#46、#47、#48 在隔离工作树按项目接管入口处理，保持一 PR 一提交。PR #43 的锁冲突保留主线 `pyahocorasick` 并采用 Pydantic 2.14.0，`uv lock --check` 通过。npm vendor、主界面与独立页面包按清单重建。

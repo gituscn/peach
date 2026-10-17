@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="https://github.com/peach-mitao/peach/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/peach-mitao/peach/test.yml?branch=master&amp;label=tests&amp;logo=githubactions&amp;logoColor=white" alt="tests"></a>
-  <a href="https://github.com/peach-mitao/peach/releases"><img src="https://img.shields.io/github/v/release/peach-mitao/peach?include_prereleases&amp;label=release&amp;logo=github&amp;logoColor=white" alt="release"></a>
+  <a href="https://github.com/peach-mitao/peach/releases"><img src="https://img.shields.io/github/v/release/peach-mitao/peach?include_prereleases&amp;filter=v*&amp;sort=semver&amp;label=release" alt="release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue?logo=gnu&amp;logoColor=white" alt="license"></a>
   <img src="https://img.shields.io/badge/python-3.14%2B-3776AB?logo=python&logoColor=white" alt="Python 3.14+">
   <img src="https://img.shields.io/badge/platform-Windows-0078D4?logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xIDFoMTB2MTBIMXptMTIgMGgxMHYxMEgxM3pNMSAxM2gxMHYxMEgxem0xMiAwaDEwdjEwSDEzeiIvPjwvc3ZnPg%3D%3D" alt="Windows">
@@ -186,6 +186,16 @@ Contributing: [Development guide](AGENTS.md) · [Architecture](docs/ARCHITECTURE
 - [OpenAver](https://github.com/slive777/OpenAver), [Javinizer-Go](https://github.com/javinizer/javinizer-go), [MetaTube](https://github.com/metatube-community/metatube-sdk-go), [MDCx](https://github.com/sqzw-x/mdcx): Peach learned from their source parsing and recommendation approaches.
 
 The full reuse and credits list is in the [reuse inventory](docs/REUSE.md).
+
+## Star history
+
+<a href="https://www.star-history.com/?repos=peach-mitao%2Fpeach&amp;type=date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=peach-mitao/peach&amp;type=date&amp;theme=dark">
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=peach-mitao/peach&amp;type=date">
+    <img alt="Peach Star history" src="https://api.star-history.com/chart?repos=peach-mitao/peach&amp;type=date">
+  </picture>
+</a>
 
 ## License
 

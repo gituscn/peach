@@ -133,6 +133,8 @@ def prepare(repo: str, part: str, *, apply: bool) -> dict:
     result = {**planned, "tag": tag, "repo": repo, "applied": apply}
     if not apply:
         return result
+    from .release_review import review
+    result["upstream_review"] = review(ROOT, repo)
     version_bump.write_version(ROOT, str(planned["bump"]))
     changelog.release(ROOT, version, repo=repo, spec=str(planned["range"]))
     # 那一节原样带在输出里：确认措辞的人不该再去翻文件才知道自己在确认什么。

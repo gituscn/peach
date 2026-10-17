@@ -2,6 +2,7 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -15,6 +16,54 @@ def load_checker():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+class ReleaseReviewTests(unittest.TestCase):
+    def test_network_failure_keeps_later_checks_and_records_missing_evidence(self):
+        from scripts import release_review as review
+        registry = {"pins": [], "sources": [
+            {"id": "first", "cadence": "weekly"},
+            {"id": "second", "cadence": "quarterly"},
+            {"id": "manual", "cadence": "manual"},
+        ]}
+
+        def run(args, root, **kwargs):
+            if args[0] == "git":
+                return "head"
+            if args[0] == "gh":
+                return '[[{"number": 3, "title": "更新", "html_url": "url", "user": {"login": "dependabot[bot]"}}]]'
+            if args[0] == "npm":
+                self.assertEqual(kwargs["allowed"], (0, 1))
+                return "{}"
+            return "locked tree"
+
+        with mock.patch.object(review.references, "load_registry", return_value=registry), \
+                mock.patch.object(review.references, "validate_registry", return_value=[]), \
+                mock.patch.object(review, "run", side_effect=run), \
+                mock.patch.object(review.references, "inspect_source", side_effect=[
+                    OSError("network unavailable"), {"changed": True, "live": b"evidence"}
+                ]) as inspect:
+            report = review.collect(ROOT, "owner/repo")
+        self.assertFalse(report["complete"])
+        self.assertEqual(inspect.call_count, 2)
+        by_id = {item["id"]: item for item in report["checks"]}
+        self.assertEqual(by_id["first"]["status"], "未取得")
+        self.assertIn("network unavailable", by_id["first"]["error"])
+        self.assertEqual(by_id["second"]["result"], {"changed": True})
+        self.assertNotIn("manual", by_id)
+        self.assertEqual(by_id["dependabot"]["result"][0]["number"], 3)
+
+    def test_report_is_saved_before_incomplete_review_is_rejected(self):
+        import json
+        from scripts import release_review as review
+        report = {"complete": False, "checks": [{"id": "example", "status": "未取得"}]}
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            with mock.patch.object(review, "collect", return_value=report), \
+                    self.assertRaisesRegex(ValueError, "example"):
+                review.review(root, "owner/repo")
+            self.assertEqual(json.loads((root / "build/release-review.json").read_text(
+                encoding="utf-8")), report)
 
 
 class ReferenceUpdateTests(unittest.TestCase):

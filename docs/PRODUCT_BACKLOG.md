@@ -4,6 +4,8 @@
 
 ## 待复核的元数据
 
+- amane 0.21.0 桥升级待在独立工作树验证 MGStage 数字前缀搜索、站点字段与失败契约；Peach 独立 DMM 链路的目录与 CID 规则另测，采用范围见 [上游复核](reference-snapshots/upstream-review.md)。
+
 - JAV 发现的历史目录候选、年代与时长偏好、质量参考、近期偏好衰减及可撤回的负向探索反馈待取得并验证，范围与有界采集方案见 [JAV 发现](JAV_DISCOVERY.md)。
 
 - 有码内容标签按 ADR-0100 优先 JavDB；真实馆藏回填待逐资产来源归属预览与同轮授权。歧义词 `口爆/吞精`、`車站性交`、`觸摸打字` 等保留原文复核；已核对的类别身份与译名见 [来源词复核](reference-snapshots/javdb-category-translations.md)。

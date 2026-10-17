@@ -49,6 +49,12 @@ Dependabot 的 PR 一律在本地接管，不在网页上合：
 
 版本来自 `src/peach/__init__.py`，已纳入 uv 缓存键；源码版本更新后再次同步会刷新安装元数据。缓存规则采用 [uv 官方动态元数据机制](https://docs.astral.sh/uv/concepts/cache/#dynamic-metadata)。
 
+### 每次发版检查
+
+`release_tag.py --bump auto --apply` 在写版本前调用 `release_review.py`，检查两份 Python 锁、两份 npm 清单的可用更新、Dependabot 待处理 PR、sha 固定的运行依赖及其最新稳定发布，以及登记表中全部非 manual 参考来源。独立检查入口为 `scripts/release_review.py`；报告存于 `build/release-review.json`，含提交、时间、差异与逐项错误。Docker 与 GitHub Actions 的更新以 Dependabot PR 为线索，不据空 PR 列表断言全部最新。
+
+网络失败记为「未取得」，其余检查继续；检查不全时版本文件保持原样。发现更新只报告，由智能体对照真实消费者、字段语义与许可证判断采用范围；升级依赖沿用隔离工作树与完整验证。原文证据按 `peach-reference-evidence` 审阅后接受，人工笔记不被网页覆盖。
+
 ## 验证频率
 
 测试直接使用项目入口，不设置机器级资源槽位、CPU、内存或进程数限额。每轮并发由 `-Jobs` / `--jobs` 选择，默认按本机核数取最多四路，显式正整数不设机器级上限。取消时只按已创建的 PID 清理本轮子进程树；全量测试与集成仍按代码一致性要求互斥。
