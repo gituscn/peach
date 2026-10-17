@@ -2015,6 +2015,34 @@ def _read_local_metadata(config, db_path, row, cover_root, listing, state, updat
     return code, nfo is not None, payload, entries
 
 
+def _processing_steps(stage, asset_ids, *, metadata_only_enabled):
+    """按本趟真实处理范围构造有序阶段清单。"""
+    scanning = asset_ids is None and stage in (ALL_STAGES, SCAN_STAGE)
+    steps = [('sources', '扫描文件' if scanning else '检查媒体目录')]
+    if stage not in (SCAN_STAGE, PREVIEWS_STAGE):
+        steps.append(('local', '读取本地资料'))
+    if stage == PREVIEWS_STAGE or stage in (ALL_STAGES, COLLECT_STAGE):
+        media_label = ('生成视频预览' if stage == PREVIEWS_STAGE else
+                       '读取媒体属性' if metadata_only_enabled else '读取媒体属性与生成预览')
+        steps.append(('media', media_label))
+    if stage not in (SCAN_STAGE, PREVIEWS_STAGE):
+        steps.append(('collect', '采集外部资料与封面'))
+    return [dict(id=key, label=label, status='current' if index == 0 else 'pending')
+            for index, (key, label) in enumerate(steps)]
+
+
+def _complete_processing_step(steps, key):
+    """返回完成当前阶段并激活下一阶段的独立快照。"""
+    progress = [dict(item) for item in steps]
+    for index, item in enumerate(progress):
+        if item['id'] == key:
+            item['status'] = 'complete'
+            if index + 1 < len(progress):
+                progress[index + 1]['status'] = 'current'
+            break
+    return progress
+
+
 def process_library(config, db_path, candidate_root, cover_root, *, location='configured',
                     report=lambda state: None, provider_factory=None, job_id=None,
                     retry_ids=None, active=lambda: True, stage=ALL_STAGES,
@@ -2069,17 +2097,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                      followups=[],
                      started_at=time.time(), error='')
         state.update(initial_estimate(config, db_path, stage, scope_ids, speed_mode))
-        steps = [('sources', '扫描文件' if scope_ids is None and stage in (ALL_STAGES, SCAN_STAGE) else '检查媒体目录')]
-        if stage not in (SCAN_STAGE, PREVIEWS_STAGE):
-            steps.append(('local', '读取本地资料'))
-        if stage == PREVIEWS_STAGE or stage in (ALL_STAGES, COLLECT_STAGE):
-            media_label = ('生成视频预览' if stage == PREVIEWS_STAGE else
-                           '读取媒体属性' if metadata_only(config.directory('state')) else '读取媒体属性与生成预览')
-            steps.append(('media', media_label))
-        if stage not in (SCAN_STAGE, PREVIEWS_STAGE):
-            steps.append(('collect', '采集外部资料与封面'))
-        state['steps'] = [dict(id=key, label=label, status='current' if index == 0 else 'pending')
-                          for index, (key, label) in enumerate(steps)]
+        state['steps'] = _processing_steps(stage, scope_ids,
+            metadata_only_enabled=metadata_only(config.directory('state')))
         estimate = ProcessingEstimate(config, state, control)
         # 实体表的水位在开工前记一次：比它大的实体就是这一轮建出来的（`_entity_followups`）。
         checkpoints = _LibraryCheckpoints(state, resume_state, database)
@@ -2132,14 +2151,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
 
         def finish_step(key):
             """阶段成功返回后发布完成状态；异常退出的阶段保留当前状态。"""
-            progress = [dict(item) for item in state['steps']]
-            for index, item in enumerate(progress):
-                if item['id'] == key:
-                    item['status'] = 'complete'
-                    if index + 1 < len(progress):
-                        progress[index + 1]['status'] = 'current'
-                    break
-            update(steps=progress)
+            update(steps=_complete_processing_step(state['steps'], key))
 
         update()
         remote = _RemoteSession(config, provider_factory, _MissCache(misses_path(config)),

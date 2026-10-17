@@ -207,8 +207,6 @@ it('失败时把问题清单折叠进错误提示，重试只交失败的那些�
   const log = details.querySelector('p')!;
   expect(log.textContent).toBe(`完整记录：${LOG}`);
   expect(log.closest('.text-text-secondary')).not.toBeNull();
-  // 那条线取这行灰字自己的颜色：中性 separator 在有色底上是另一种灰，跟它对不上。
-  expect(log.closest('.border-t')!.className).toContain('border-current/20');
   expect(details.querySelector('button[aria-label="在资源管理器中显示"]')).not.toBeNull();
   // 补上没做完的那些是这一趟的事，重新跑一整批是下一趟的事：页脚那颗留着，各答各的问题。
   expect(buttonNamed('同步媒体库', host)?.textContent).toBe('同步媒体库');

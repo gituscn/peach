@@ -45037,7 +45037,7 @@ function EP({ state: e, problem: t = "", measure: n = !1 }) {
 					}),
 					/* @__PURE__ */ (0, C.jsx)(K, {
 						size: "small",
-						variant: "ghost",
+						variant: "secondary",
 						iconOnly: !0,
 						leadingIcon: r ? OO : jO,
 						"aria-label": r ? "收起任务详情" : "展开任务详情",
@@ -45096,6 +45096,7 @@ function EP({ state: e, problem: t = "", measure: n = !1 }) {
 					disabled: !!t
 				}) : null, /* @__PURE__ */ (0, C.jsx)(Ok, {
 					href: "/data-cleanup#libraryProcessing",
+					variant: "secondary",
 					size: "small",
 					trailingIcon: kO,
 					children: t || o ? "查看并处理" : "任务详情"

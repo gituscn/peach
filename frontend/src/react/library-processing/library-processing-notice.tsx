@@ -72,7 +72,7 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
         <p className="text-body-medium">{title}</p>
         {active ? <p data-processing-eta="" className="text-caption-1-regular text-text-secondary tabular-nums wrap-anywhere">{remainingTime(state!)}</p> : null}
       </div>
-      <Button size="small" variant="ghost" iconOnly leadingIcon={expanded ? RiArrowDownSLine : RiArrowUpSLine}
+      <Button size="small" variant="secondary" iconOnly leadingIcon={expanded ? RiArrowDownSLine : RiArrowUpSLine}
         aria-label={expanded ? '收起任务详情' : '展开任务详情'} aria-expanded={expanded} onClick={toggle} />
     </div>
     {expanded ? <div className={cx('flex min-w-0 flex-col gap-2 border-t pt-3',
@@ -94,7 +94,7 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
     </div> : null}
     <div className="flex flex-wrap items-center justify-between gap-2">
       {active ? <ProcessingControls state={state!} disabled={!!problem} /> : null}
-      <LinkButton href="/data-cleanup#libraryProcessing" size="small" trailingIcon={RiArrowRightLine}>
+      <LinkButton href="/data-cleanup#libraryProcessing" variant="secondary" size="small" trailingIcon={RiArrowRightLine}>
         {problem || failed ? '查看并处理' : '任务详情'}
       </LinkButton>
     </div>
