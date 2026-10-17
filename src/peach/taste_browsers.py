@@ -12,30 +12,57 @@ def _key(path: Path) -> str:
     return hashlib.sha256(f"{socket.gethostname()}\0{str(path.resolve()).casefold()}".encode()).hexdigest()
 
 
-def _paths(path: Path) -> list[Path]:
+def _paths(path: Path, *, browsing_only: bool = False) -> list[Path]:
     if path.is_file():
         return [path]
     if not path.is_dir():
         return []
-    return sorted({item for name in ("History", "places.sqlite", "History.db")
-                   for pattern in (name, f"*/{name}") for item in path.glob(pattern)
-                   if item.is_file()})[:200]
+    paths = sorted({item for name in ("History", "HistoryEx", "places.sqlite", "History.db")
+                    for pattern in (name, f"*/{name}") for item in path.glob(pattern)
+                    if item.is_file()})[:200]
+    if not browsing_only:
+        return paths
+    found = []
+    for item in paths:
+        if item.name == "HistoryEx":
+            try:
+                _validate(item)
+            except ValueError:
+                continue
+        found.append(item)
+    return found
+
+
+def history_engine(db: sqlite3.Connection) -> str:
+    """根据访问记录的必需列识别格式，附加元数据由解析器处理。"""
+    schemas = {
+        "chrome": {"urls": {"id", "url", "title"}, "visits": {"url", "visit_time"}},
+        "firefox": {"moz_places": {"id", "url", "title"},
+                    "moz_historyvisits": {"place_id", "visit_date"}},
+        "safari": {"history_items": {"id", "url"},
+                   "history_visits": {"history_item", "visit_time", "title"}},
+    }
+    for engine, required in schemas.items():
+        if all(columns <= {row[1] for row in db.execute(f'PRAGMA table_info("{table}")')}
+               for table, columns in required.items()):
+            return engine
+    raise ValueError("浏览器历史格式不受支持，请选择包含网页访问记录的历史文件")
 
 
 def _validate(path: Path) -> str:
     from .taste_history import _readonly_uri
     try:
         with closing(sqlite3.connect(_readonly_uri(path), uri=True)) as db:
-            tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    except sqlite3.OperationalError as error:
+            try:
+                return history_engine(db)
+            except ValueError as error:
+                if path.name == "HistoryEx":
+                    raise ValueError("HistoryEx 未包含可识别的网页访问记录；115 下载记录不能用于浏览历史，请选择 History 文件") from error
+                raise
+    except sqlite3.DatabaseError as error:
         if "locked" in str(error).casefold():
             raise ValueError("历史文件正在使用，请退出该浏览器后添加") from error
         raise ValueError("浏览器历史文件未取得，请检查资料目录") from error
-    for engine, required in (("chrome", {"urls", "visits"}), ("firefox", {"moz_places", "moz_historyvisits"}),
-                             ("safari", {"history_items", "history_visits"})):
-        if required <= tables:
-            return engine
-    raise ValueError("请选择浏览器历史文件或包含浏览器资料的目录")
 
 
 def _registered_browsers(store_path):
@@ -62,7 +89,7 @@ def browser_sources(store_path: Path) -> list[dict]:
         entries[key] = {"id": key, "name": name, "path": path, "enabled": bool(enabled),
                         "automatic": key in entries, "engine": engine}
     for entry in entries.values():
-        paths = _paths(Path(entry["path"]))
+        paths = _paths(Path(entry["path"]), browsing_only=True)
         entry["profiles"] = len(paths)
         entry["available"] = bool(paths)
     return sorted(entries.values(), key=lambda row: (row["name"].casefold(), row["id"]))
@@ -80,7 +107,9 @@ def configure_browser(store_path: Path, operation: str, body: dict) -> None:
         paths = _paths(path)
         if not paths:
             raise ValueError("目录中未找到浏览器历史文件")
-        engines = [_validate(history) for history in paths]
+        # 同一资料目录可以同时包含网页历史与下载历史。
+        browsing = _paths(path, browsing_only=True)
+        engines = [_validate(history) for history in browsing or paths]
         entry = {"id": _key(path), "name": name, "path": str(path), "enabled": True,
                  "engine": engines[0] if len(set(engines)) == 1 else "auto"}
     elif operation in ("disable", "enable"):
@@ -106,8 +135,7 @@ def enabled_history_sources(store_path: Path):
     unique = {}
     for browser in browser_sources(store_path):
         if browser["enabled"]:
-            for path in _paths(Path(browser["path"])):
-                engine = {"History": "chrome", "places.sqlite": "firefox", "History.db": "safari"}.get(path.name, browser["engine"])
+            for path in _paths(Path(browser["path"]), browsing_only=True):
                 unique.setdefault(str(path.resolve()).casefold(), HistorySource(
-                    browser["name"].casefold(), path.parent.name, path, engine=engine))
+                    browser["name"].casefold(), path.parent.name, path, engine=browser["engine"]))
     return list(unique.values())

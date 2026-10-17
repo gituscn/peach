@@ -6,6 +6,8 @@
 
 ## 功能验收与范围
 
+- [#65 115 历史导入](https://github.com/peach-mitao/peach/issues/65)：目录与格式识别有合成 SQLite 回归；报告者的 `HistoryEx` 表结构和实机导入结果未取得。官方将其描述为下载历史，支持范围见[浏览器历史导入](BROWSER_HISTORY.md)。
+
 - #61 的 OneDrive、光鸭与通用挂载来源待真实账号验收；#62 的真实 STRM 上游兼容性待补，合成 HTTP Range 与 HLS 回归在隔离环境验证。
 - [#63 Emby／Jellyfin 兼容](https://github.com/peach-mitao/peach/issues/63)待明确目标客户端、认证、媒体库查询、播放与进度接口范围。
 
