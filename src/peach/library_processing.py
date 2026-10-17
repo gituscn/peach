@@ -1890,6 +1890,21 @@ class _LibraryCheckpoints:
                 if _checkpoint_key(row) not in self.completed['completed_metadata'])
 
 
+def _validate_processing_request(config, db_path, stage, asset_ids, retry_ids, database):
+    """校验处理范围、选择与预览生成所需条件，返回规范的所选影片。"""
+    _require_writer(config, db_path)
+    if stage not in STAGES:
+        raise ValueError('处理阶段无效')
+    if stage == PREVIEWS_STAGE and metadata_only(config.directory('state')):
+        raise ValueError('视频预览生成已关闭，请先在媒体库设置中开启')
+    if asset_ids is not None and retry_ids is not None:
+        raise ValueError('选择项目与失败重试不能同时使用')
+    selected_ids = _asset_selection(db_path, asset_ids)
+    if stage == PREVIEWS_STAGE and database is None:
+        raise ValueError('生成预览图需要共享馆藏写入连接')
+    return selected_ids
+
+
 def process_library(config, db_path, candidate_root, cover_root, *, location='configured',
                     report=lambda state: None, provider_factory=None, job_id=None,
                     retry_ids=None, active=lambda: True, stage=ALL_STAGES,
@@ -1911,16 +1926,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
     `metadata_routes.parse_route_overrides`；不给就用内建那张表。
     `state_file` 给后台定向任务保存独立进度，共享候选写入仍使用全库处理锁。
     """
-    _require_writer(config, db_path)
-    if stage not in STAGES:
-        raise ValueError('处理阶段无效')
-    if stage == PREVIEWS_STAGE and metadata_only(config.directory('state')):
-        raise ValueError('视频预览生成已关闭，请先在媒体库设置中开启')
-    if asset_ids is not None and retry_ids is not None:
-        raise ValueError('选择项目与失败重试不能同时使用')
-    selected_ids = _asset_selection(db_path, asset_ids)
-    if stage == PREVIEWS_STAGE and database is None:
-        raise ValueError('生成预览图需要共享馆藏写入连接')
+    selected_ids = _validate_processing_request(config, db_path, stage, asset_ids, retry_ids, database)
     routes = metadata_routes.parse_route_overrides(route_overrides)
     path = Path(state_file) if state_file is not None else state_path(config)
     path.parent.mkdir(parents=True, exist_ok=True)

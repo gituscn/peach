@@ -1083,6 +1083,11 @@ class LibraryDirectoryTests(unittest.TestCase):
 
 
 class OperationalScriptTests(unittest.TestCase):
+    def setUp(self):
+        policy = mock.patch.object(self.sheets, "metadata_only", return_value=False)
+        policy.start()
+        self.addCleanup(policy.stop)
+
     @classmethod
     def setUpClass(cls):
         cls.clean_names = load_script("clean_names")
@@ -2843,6 +2848,26 @@ class OperationalScriptTests(unittest.TestCase):
         self.assertIn("one.mp4", shot[0])
         self.assertEqual(rewritten[:1], b"y", "陈旧产物必须被真正覆盖")
         self.assertIsNone(snapshots[1], "没点名的待抽项不该被这一趟带走")
+
+    def test_sheets_obeys_preview_mode_and_never_extracts_pointer_or_disc_frames(self):
+        with mock.patch.object(self.sheets, "metadata_only", return_value=True), \
+                mock.patch.object(self.sheets.FFmpegResolver, "ffmpeg") as resolver:
+            with self.assertRaisesRegex(self.sheets.JobPolicyError, "视频预览生成已关闭"):
+                self.sheets.run(self.sheets.build_parser().parse_args([]))
+            resolver.assert_not_called()
+        with mock.patch.object(self.sheets, "_capture_frame") as capture:
+            for source in ("movie.strm", "movie.ISO"):
+                self.assertEqual(self.sheets.make_sheet("ffmpeg", source, 60, Path("unused.jpg"), 9),
+                                 (False, "unsupported_source"))
+            capture.assert_not_called()
+
+    def test_sheets_stops_extracting_frames_when_preview_mode_is_disabled(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                mock.patch.object(self.sheets, "metadata_only", side_effect=[False, True]), \
+                mock.patch.object(self.sheets, "_capture_frame", return_value=(False, "")) as capture:
+            result = self.sheets.make_sheet("ffmpeg", "movie.mp4", 60, Path(temporary) / "sheet.jpg", 9)
+        self.assertEqual(result, (False, "previews_disabled"))
+        self.assertEqual(capture.call_count, 1)
 
     def test_sheets_leaves_the_recycle_bin_alone_unless_a_row_is_named(self):
         """回收站里的行不领，点名的除外。

@@ -130,7 +130,8 @@ def run(args: argparse.Namespace) -> int:
         if args.limit:
             sql += " LIMIT ?"
             parameters += (args.limit,)
-        tasks = connection.execute(sql, parameters).fetchall()
+        from peach.strm import background_rows
+        tasks = background_rows(connection.execute(sql, parameters).fetchall(), 1)
         connection.close()
         total = len(tasks)
         log(f"待处理 {total:,} 个视频 workers={args.workers} interval={args.interval}s 日志={log_path}")

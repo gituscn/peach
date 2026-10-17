@@ -17,6 +17,11 @@ def skip_background_read(path: str | Path) -> bool:
     return Path(path).suffix.lower() in DISC_SUFFIXES | {POINTER_SUFFIX}
 
 
+def background_rows(rows, path_index: int):
+    """批处理只领取可读取的视频文件，保留调用方的行形状。"""
+    return [row for row in rows if not skip_background_read(row[path_index])]
+
+
 def validate_url(url: str) -> str:
     try:
         parts = urlsplit(url)

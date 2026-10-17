@@ -33,6 +33,8 @@ from peach.jobs import (
 )
 from peach.platform import system_volume
 from peach.media import resolve_case_insensitive
+from peach.media_processing_policy import metadata_only
+from peach.strm import background_rows, skip_background_read
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -93,12 +95,16 @@ def make_sheet(ffmpeg: str, path: str, duration: float, destination: Path,
     失败时返回可区分的原因，不能只返回「失败」：asset 12510 与 18349 都失败了一整天，
     一个是片源头损坏、一个是账本时长记错，光看计数分不出来，也就没法决定该修哪一边。
     """
+    if skip_background_read(path):
+        return False, "unsupported_source"
     if not duration or duration < 2:
         return False, "no_duration"
     temporary = Path(tempfile.mkdtemp(prefix="sheet_"))
     try:
         captured: list[Path] = []
         for index in range(frames):
+            if metadata_only():
+                return False, "previews_disabled"
             timestamp = duration * (0.03 + 0.94 * (index + 0.5) / frames)
             frame = temporary / f"{index:02d}.jpg"
             ok, stderr = _capture_frame(ffmpeg, path, timestamp, frame, color_override=False)
@@ -123,7 +129,23 @@ def make_sheet(ffmpeg: str, path: str, duration: float, destination: Path,
         shutil.rmtree(temporary, ignore_errors=True)
 
 
+def _require_previews_enabled() -> None:
+    if metadata_only():
+        raise JobPolicyError("视频预览生成已关闭，请先在媒体库设置中开启")
+
+
+def _preview_active(stop, reasons) -> bool:
+    if stop.is_set():
+        return False
+    if metadata_only():
+        reasons.append("视频预览生成已关闭")
+        stop.set()
+        return False
+    return True
+
+
 def run(args: argparse.Namespace) -> int:
+    _require_previews_enabled()
     if args.workers < 1 or args.frames < 2 or args.limit < 0:
         raise SystemExit("workers 必须大于 0，frames 至少为 2，limit 不能为负数")
     resolver = FFmpegResolver(FFMPEG_DIR)
@@ -170,7 +192,7 @@ def run(args: argparse.Namespace) -> int:
         if args.limit:
             sql += " LIMIT ?"
             parameters += (args.limit,)
-        tasks = connection.execute(sql, parameters).fetchall()
+        tasks = background_rows(connection.execute(sql, parameters).fetchall(), 2)
         connection.close()
         total = len(tasks)
         log(f"待处理 {total:,} 个视频 workers={args.workers} frames={args.frames} 日志={log_path}")
@@ -191,7 +213,7 @@ def run(args: argparse.Namespace) -> int:
         stop_reason: list[str] = []
 
         def worker() -> None:
-            while not stop.is_set():
+            while _preview_active(stop, stop_reason):
                 try:
                     asset_id, location, path, duration = pending.get_nowait()
                 except queue.Empty:
@@ -264,7 +286,7 @@ def run(args: argparse.Namespace) -> int:
         connection.close()
         if stop_reason:
             # 已完成的部分都已入库；磁盘闸门中止不能报成正常完成，否则续跑决策会被误导。
-            log(f"磁盘闸门中止：{stop_reason[0]}")
+            log(f"任务中止：{stop_reason[0]}")
             return DiskSpaceDenied.exit_code
     return 0
 
