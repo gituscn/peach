@@ -146,7 +146,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path release | Out-Null
-          python scripts/package_windows_release.py --source dist/Peach --output release --version '${{ steps.version.outputs.version }}'
+          python scripts/package_windows_release.py --source dist/Peach --output release --version '${{ steps.version.outputs.version }}' --lite-installer
           if ($LASTEXITCODE -ne 0) { throw '发行包拆分失败' }
           Copy-Item 'dist/Peach-${{ steps.version.outputs.version }}-windows-x64-setup.exe' release/
           Copy-Item dist/ffmpeg-corresponding-source.zip release/
@@ -185,7 +185,7 @@ jobs:
       - name: 从应用更新包与独立工具包重建并验证运行
         shell: pwsh
         run: |
-          python smoke_split_update.py --version '${{ needs.windows.outputs.version }}' --destination split-candidate
+          python smoke_split_update.py --version '${{ needs.windows.outputs.version }}' --destination split-candidate --prepare-with-app
           if ($LASTEXITCODE -ne 0) { throw '拆分制品与完整包不一致' }
           python smoke_desktop.py split-candidate/Peach/Peach.exe
           if ($LASTEXITCODE -ne 0) { throw '拆分制品运行验收失败' }
@@ -207,6 +207,19 @@ jobs:
           while ((Test-Path -LiteralPath $Installed) -and (Get-Date) -lt $Deadline) { Start-Sleep -Seconds 1 }
           if (Test-Path -LiteralPath $Installed) { throw '卸载后程序目录仍在' }
           if ((Test-Path -LiteralPath $Key) -or (Test-Path -LiteralPath $Menu)) { throw '卸载后仍留有登记项或开始菜单项' }
+      - name: 安装并验收轻量安装包
+        shell: pwsh
+        run: |
+          $Installed = Join-Path $env:RUNNER_TEMP 'Peach 轻量安装验收\自定义目录'
+          $Setup = Start-Process -FilePath './Peach-${{ needs.windows.outputs.version }}-windows-x64-lite-setup.exe' `
+            -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$Installed`"" -WindowStyle Hidden -Wait -PassThru
+          if ($Setup.ExitCode -ne 0) { throw "轻量安装包退出码 $($Setup.ExitCode)" }
+          python smoke_desktop.py (Join-Path $Installed 'Peach.exe')
+          if ($LASTEXITCODE -ne 0) { throw '轻量安装包运行验收失败' }
+          Start-Process -FilePath (Join-Path $Installed 'unins000.exe') -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -WindowStyle Hidden -Wait
+          $Deadline = (Get-Date).AddSeconds(120)
+          while ((Test-Path -LiteralPath $Installed) -and (Get-Date) -lt $Deadline) { Start-Sleep -Seconds 1 }
+          if (Test-Path -LiteralPath $Installed) { throw '轻量安装包卸载后程序目录仍在' }
       - name: 验证在途任务保护与覆盖安装后的恢复
         shell: pwsh
         run: |

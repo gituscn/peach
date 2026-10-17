@@ -1566,7 +1566,7 @@ class OperationalScriptTests(unittest.TestCase):
         self.assertIn("full|auto|follow|catalog|media|sync|metadata|tooling|web|checks|core|packaging)", posix)
         # 文档里可以「提到」裸命令来说明它为什么不可信，但绝不能让它单独出现成为一条可照抄的指令。
         # 判据因此不是黑名单，而是：凡出现该命令的行，必须在同一行指向某个正式入口。
-        for relative in ("AGENTS.md", "README.md", "docs/HANDOFF.md"):
+        for relative in ("AGENTS.md", "docs/TESTING.md", "docs/HANDOFF.md"):
             instructions = (ROOT / relative).read_text(encoding="utf-8")
             self.assertIn("scripts\\test.ps1", instructions)
             self.assertIn("scripts/test.sh", instructions)

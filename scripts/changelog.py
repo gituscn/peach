@@ -39,10 +39,9 @@ UNRELEASED = "未发布"
 
 #: Release 页正文里跟在变更日志后面的安装提示。每一版都一样，所以只写在这里一处，
 #: 工作流不再自己抄一份。
-INSTALL_NOTE = ("Windows x64 独立测试包。完整解压后双击 Peach.exe，选择媒体文件夹即可开始。"
-                "也可运行安装包，选择程序目录。本机使用；无需 Python、Git 或 Node。"
-                "安装版和免安装版均携带 FFmpeg、ffprobe 与 untrunc，支持转码、缩略图与损坏 MP4 索引修复。"
-                "配置和日志入口见程序内「配置 Peach」。macOS 请按 README 使用源码安装。")
+INSTALL_NOTE = ("Windows x64，支持本机和局域网浏览器访问；无需另装 Python 或媒体工具。"
+                "安装与使用见 [Windows 使用说明](https://github.com/peach-mitao/peach/blob/master/docs/TESTING_DESKTOP.md)，"
+                "macOS 见 [源码运行](https://github.com/peach-mitao/peach/blob/master/docs/OPERATIONS.md#从源码运行windowsmacos)。")
 
 #: Conventional Commits 的主题形状：`type(scope)!: 描述`。
 SUBJECT = re.compile(r"^(?P<type>[a-z]+)(?:\((?P<scope>[^)]*)\))?(?P<bang>!)?:\s*(?P<text>.+)$")

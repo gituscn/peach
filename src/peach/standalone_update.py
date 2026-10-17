@@ -118,10 +118,14 @@ def download(url: str, archive: Path, size: int, digest: str, progress) -> None:
         raise ValueError("更新包校验失败，请重新下载")
 
 
-def prepare_tools(stage: Path, target: Path, transaction: Path, release: dict, data: dict) -> None:
+def prepare_tools(stage: Path, target: Path, transaction: Path, release: dict, data: dict,
+                  *, report=None, fetch=None) -> None:
+    report, fetch = report or write, fetch or download
     manifest = update_packages.read_manifest(stage, release["latest_version"])
     missing = []
     for tool, bundle in manifest["tools"].items():
+        if update_packages.matches(stage, bundle["files"]):
+            continue
         if update_packages.matches(target, bundle["files"]):
             for name in bundle["files"]:
                 destination = update_packages.checked_path(stage, name)
@@ -130,17 +134,17 @@ def prepare_tools(stage: Path, target: Path, transaction: Path, release: dict, d
         else:
             missing.append((tool, bundle))
     total = data["total"] + sum(bundle["asset"]["size"] for _, bundle in missing)
-    write(data, total=total)
+    report(data, total=total)
     for index, (tool, bundle) in enumerate(missing):
         asset = bundle["asset"]
         archive = transaction / f"tools-{tool}.zip"
         received = data["downloaded"]
-        write(data, state="downloading", message=f"正在下载 {tool} 工具包")
-        download(release["asset_url"].rsplit("/", 1)[0] + "/" + asset["name"], archive,
+        report(data, state="downloading", message=f"正在下载 {tool} 工具包")
+        fetch(release["asset_url"].rsplit("/", 1)[0] + "/" + asset["name"], archive,
                  asset["size"], asset["sha256"],
-                 lambda count, start=received, step=index, size=asset["size"]: write(
+                 lambda count, start=received, step=index, size=asset["size"]: report(
                      data, downloaded=start + count, progress=75 + round((step + count / size) / len(missing) * 13)))
-        write(data, state="verifying", message=f"正在校验 {tool} 工具包")
+        report(data, state="verifying", message=f"正在校验 {tool} 工具包")
         extracted = extract(archive, transaction / f"tool-{tool}", lambda *_: None, tool_files=set(bundle["files"]))
         if not update_packages.matches(extracted, bundle["files"]):
             raise ValueError(f"{tool} 工具包文件校验失败")

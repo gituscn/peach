@@ -3,8 +3,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
 import sys
+import tempfile
 import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -19,6 +23,50 @@ def archive(destination: Path, root: Path, files: list[Path], manifest: dict | N
             package.write(path, "Peach/" + path.relative_to(root).as_posix())
         if manifest is not None:
             package.writestr("Peach/" + MANIFEST, json.dumps(manifest, ensure_ascii=False, sort_keys=True))
+
+
+def download_notes(version: str, *, lite_installer: bool = False) -> str:
+    """发布页的下载入口与包类型说明。"""
+    base = f"https://github.com/peach-mitao/peach/releases/download/v{version}/Peach-{version}-windows-x64"
+    lite = (f"| [轻量安装包（lite-setup.exe）]({base}-lite-setup.exe) | 不含工具，安装时复用已有工具或按需联网下载 |\n"
+            if lite_installer else "")
+    return (
+        "\n## 下载选择\n\n"
+        "| 下载 | 用途 |\n| --- | --- |\n"
+        f"| [安装包（setup.exe）]({base}-setup.exe) | 包含全部工具，首次安装推荐 |\n"
+        + lite +
+        f"| [完整免安装包（ZIP）]({base}.zip) | 包含全部工具，解压后运行 `Peach.exe` |\n"
+        f"| [应用更新包（update.zip）]({base}-update.zip) | 不含工具，由 Peach 更新器安装，不能单独用于首次安装 |\n"
+        f"| 工具包（tools-*.zip）：[FFmpeg]({base}-tools-ffmpeg.zip) / "
+        f"[untrunc]({base}-tools-untrunc.zip) / [cloudflared]({base}-tools-cloudflared.zip) "
+        "| 更新器按需下载，普通使用无需手动选择 |\n"
+        "| `*-corresponding-source.zip` | 第三方工具源码，普通使用无需下载 |\n\n"
+        "已有 Peach：在「配置 → 应用与维护」检查更新，下载完成后确认重启安装。"
+        "手动更新可运行安装包，或使用完整免安装包。\n"
+    )
+
+
+def build_lite_installer(output: Path, version: str, compiler: Path | None = None) -> Path:
+    """将应用更新包及其工具清单编入按需下载工具的安装器。"""
+    from peach.standalone_update import extract
+    output = output.resolve()
+    if compiler is None:
+        candidates = [os.environ.get('PEACH_ISCC'), shutil.which('ISCC.exe'),
+                      str(Path(os.environ.get('ProgramFiles(x86)', 'C:/Program Files (x86)')) / 'Inno Setup 6/ISCC.exe'),
+                      str(Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs/Inno Setup 6/ISCC.exe')]
+        compiler = next((Path(item) for item in candidates if item and Path(item).is_file()), None)
+    if compiler is None:
+        raise ValueError('未取得 Inno Setup 编译器，请设置 PEACH_ISCC。')
+    with tempfile.TemporaryDirectory(prefix='peach-lite-installer-') as folder:
+        source = extract(output / f'Peach-{version}-windows-x64-update.zip', Path(folder).resolve(), lambda *_: None)
+        read_manifest(source, version)
+        subprocess.run([str(compiler), '/Q', f'/DAppVersion={version}',
+                        f'/DSourceDir={source}', f'/DOutputDir={output}', '/DLiteInstaller=1',
+                        str(Path(__file__).resolve().parent / 'installer/peach.iss')], check=True)
+    target = output / f'Peach-{version}-windows-x64-lite-setup.exe'
+    if not target.is_file():
+        raise ValueError('轻量安装包未生成。')
+    return target
 
 
 def package(root: Path, output: Path, version: str) -> dict:
@@ -50,7 +98,6 @@ def package(root: Path, output: Path, version: str) -> dict:
         tool_files.update(selected)
     manifest = {"format": 1, "version": version, "tools": tools}
     # 用运行时的同一判据验证生成结果，不在完整包内留下更新专用文件。
-    import tempfile
     with tempfile.TemporaryDirectory() as temp:
         check = Path(temp).resolve()
         (check / MANIFEST).write_text(json.dumps(manifest), encoding="utf-8")
@@ -59,16 +106,7 @@ def package(root: Path, output: Path, version: str) -> dict:
     archive(output / f"Peach-{version}-windows-x64-update.zip", root,
             [path for path in files if path not in tool_files], manifest)
     (output / "DOWNLOADS.md").write_text(
-        "\n## 下载选择\n\n"
-        "| 文件 | 用途 | 媒体工具 |\n| --- | --- | --- |\n"
-        f"| `Peach-{version}-windows-x64-setup.exe` | 首次安装，推荐 | 包含 FFmpeg、ffprobe、untrunc |\n"
-        f"| `Peach-{version}-windows-x64.zip` | 完整免安装包，解压后运行 | 包含 FFmpeg、ffprobe、untrunc |\n"
-        f"| `Peach-{version}-windows-x64-update.zip` | 已安装用户的应用更新包，由 Peach 更新器使用 | 复用本机工具 |\n"
-        f"| `Peach-{version}-windows-x64-tools-*.zip` | 更新器按需下载的工具包 | 按工具分别打包 |\n\n"
-        "已有 Peach 请在「配置 → 应用与维护」检查更新。更新器校验并复用已安装工具，"
-        "仅在工具缺失、损坏或版本变化时下载相应工具包。应用更新包不能单独用于首次安装。"
-        "旧版更新器首次升级仍下载完整包，之后支持工具复用。\n",
-        encoding="utf-8")
+        download_notes(version), encoding="utf-8")
     return manifest
 
 
@@ -77,8 +115,13 @@ def main() -> int:
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--version", required=True)
+    parser.add_argument("--lite-installer", action="store_true", help="同时编译按需下载工具的轻量安装包")
+    parser.add_argument("--iscc", type=Path, help="Inno Setup 编译器路径")
     args = parser.parse_args()
     manifest = package(args.source, args.output, args.version)
+    if args.lite_installer:
+        build_lite_installer(args.output, args.version, args.iscc)
+        (args.output / 'DOWNLOADS.md').write_text(download_notes(args.version, lite_installer=True), encoding='utf-8')
     print(json.dumps({"version": manifest["version"], "tools": list(manifest["tools"])}))
     return 0
 

@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
+import subprocess
 import zipfile
 
 
@@ -24,7 +25,7 @@ def inventory(package: zipfile.ZipFile) -> dict[str, str]:
     return result
 
 
-def verify(root: Path, version: str, destination: Path) -> dict:
+def verify(root: Path, version: str, destination: Path, *, prepare_with_app: bool = False) -> dict:
     prefix = f"Peach-{version}-windows-x64"
     if destination.exists():
         raise ValueError("制品验收目录须不存在")
@@ -53,9 +54,21 @@ def verify(root: Path, version: str, destination: Path) -> dict:
         if actual != expected:
             raise ValueError("应用更新包与工具包不能重建完整程序")
         thin.extractall(destination)
-    for path in tools:
-        with zipfile.ZipFile(path) as package:
-            package.extractall(destination)
+    if prepare_with_app:
+        error = destination / 'tools-error.txt'
+        process = subprocess.run([str(destination / 'Peach/Peach.exe'), '--data-root', str(destination / 'setup-data'), '--installer-tools',
+                                  str(destination / 'empty-install'), str(root), str(error)],
+                                 capture_output=True, timeout=120)
+        if process.returncode:
+            raise ValueError(error.read_text(encoding='utf-8') if error.exists() else '轻量安装工具准备失败')
+        for name, checksum in expected.items():
+            with (destination / name).open('rb') as source:
+                if hashlib.file_digest(source, 'sha256').hexdigest() != checksum:
+                    raise ValueError(f'轻量安装文件不符：{name}')
+    else:
+        for path in tools:
+            with zipfile.ZipFile(path) as package:
+                package.extractall(destination)
     return {"files": len(expected), "tools": len(tools), "application": str(destination / "Peach/Peach.exe")}
 
 
@@ -64,5 +77,7 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--version", required=True)
     parser.add_argument("--destination", type=Path, required=True)
+    parser.add_argument("--prepare-with-app", action="store_true", help="由实际应用准备轻量安装所需工具")
     args = parser.parse_args()
-    print(json.dumps(verify(args.root.resolve(), args.version, args.destination.resolve()), ensure_ascii=False))
+    print(json.dumps(verify(args.root.resolve(), args.version, args.destination.resolve(),
+                            prepare_with_app=args.prepare_with_app), ensure_ascii=False))
