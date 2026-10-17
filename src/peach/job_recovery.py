@@ -94,6 +94,10 @@ def resume(db: Path, handlers: dict) -> list[str]:
             with admission(db):
                 data = read(db, key)
                 pid = data.get("pid")
+                if key == 'library-processing':
+                    from .processing_control import user_paused
+                    if user_paused(db, data.get('job_id')):
+                        continue
                 if (data.get("status") != "active" or not isinstance(data.get("request"), dict)
                         or (isinstance(pid, int) and pid != os.getpid() and process_alive(pid))):
                     continue

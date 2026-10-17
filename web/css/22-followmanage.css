@@ -7,9 +7,9 @@
    瞬时回执用 toast，销毁确认用 dialog/confirm。整页范围的失败也是这个盒子，只是多
    一个关闭键（见下面的 .fwarn），不另立一套横幅。 */
 /* Note 默认无填充，filled 使用不透明浅色面；状态含义由文字和图标共同表达。 */
-:root{--feedback-success:oklch(53.18% .2399 256.99)}
-:root[data-theme="dark"]{--feedback-success:oklch(71.7% .1648 250.794)}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--feedback-success:oklch(71.7% .1648 250.794)}}
+:root{--feedback-success:var(--color-accent-600)}
+:root[data-theme="dark"]{--feedback-success:var(--color-accent-400)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--feedback-success:var(--color-accent-400)}}
 .geist-note{--feedback-color:var(--muted);display:grid;grid-template-columns:16px minmax(0,1fr);align-items:center;gap:12px;margin:0;padding:6px 12px;min-height:40px;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--control-radius);background:color-mix(in srgb,var(--feedback-color) 8%,var(--ground));color:var(--feedback-color);font-size:var(--fs-md);line-height:24px;overflow-wrap:anywhere}
 .geist-note>svg{width:16px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .geist-note.geist-note>p{margin:0;color:inherit;font:inherit;align-self:center}.geist-note>p b{margin-right:8px;color:inherit}

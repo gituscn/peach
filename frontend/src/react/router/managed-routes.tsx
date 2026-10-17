@@ -296,7 +296,7 @@ export const CATALOG_ROUTES: CatalogRouteTable = {
 };
 const isCatalogPage = (path: string): path is CatalogPagePath => Object.hasOwn(CATALOG_ROUTES, path);
 
-/* 扫描与采集一个名字两种形态：数据管理页那张卡片，和目录页顶上那条横幅。两边读同一个
+/* 扫描与采集提供数据管理卡片和紧凑任务面。两边读同一个
  * `queryKey`，所以同时挂着时它们看的是同一份快照，Query 也只发一份轮询。 */
 const LibraryProcessing = (props: LibraryProcessingProps) => (
   props.mode === 'notice' ? <LibraryProcessingNotice {...props} /> : <LibraryProcessingCard {...props} />
@@ -304,7 +304,7 @@ const LibraryProcessing = (props: LibraryProcessingProps) => (
 
 /* 页面里的附属面，按名字登记：壳每次打开交进来整份 props，之后经 `updateManagedRoute` 推补丁，页面就地
    重渲染。首页筛选条与搜索下拉不在打开前等数据（筛选条的读数与头像由壳推进来，搜索下拉的记录与推荐聚焦
-   时才取）；首页新作行连头几张封面一起等，再一次换掉骨架；处理横幅先取一份进度快照。 */
+   时才取）；首页新作行连头几张封面一起等，再一次换掉骨架；任务面先取一份进度快照。 */
 export const SURFACE_ROUTES: SurfaceRouteTable = {
   'catalog-filter': {
     prefetch: async () => {},

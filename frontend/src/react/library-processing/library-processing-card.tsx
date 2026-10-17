@@ -24,11 +24,12 @@ import { TaskProgress } from '../components/task-progress';
 import { Disclosure } from '../settings/section';
 import { queryClient } from '../query';
 import {
-  currentLine, DISCONNECTED_TEXT, issueDetails, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL,
-  notesLine, type LibraryProcessingCommand, type LibraryProcessingData,
+  processingLine, DISCONNECTED_TEXT, issueDetails, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL,
+  notesLine, processingActive, remainingTime, type LibraryProcessingCommand, type LibraryProcessingData,
 } from './library-processing';
 import { useLibraryProcessingJob } from './use-library-processing';
 import { ProcessingActions } from './processing-actions';
+import { ProcessingControls } from './processing-controls';
 
 /* 中文正文写成常量：JSX 里换行的文字会在接缝处多出一个空格，中文句子里看得见。
    卡片正文与首屏骨架共用 `SCAN_CARD_TEXT`（`management.ts`）。 */
@@ -74,7 +75,7 @@ function Outcome(
         ? <Note tone="warning" title="处理较慢">{STALLED_TEXT}</Note>
         : null}
       {problem || state.status === 'failed'
-        ? <Note tone="error"
+        ? <Note tone="error" className="gap-0 p-3"
             action={retryable
               ? <Button variant="primary" size="small" onClick={onRetry}>重试未完成项</Button>
               : null}
@@ -82,8 +83,8 @@ function Outcome(
               /* 三层东西叠在同一块红底上：一句结论、一份清单、一条日志地址。各自之间
                  横一条自己颜色的发丝线，读的人才看得出哪一段结束了——只靠间距的话，
                  几十条同样长短的明细会连成一片。 */
-              ? <div className="mt-1.5 border-t border-current/20 pt-1.5">
-                  <Disclosure summary={details.label}>
+              ? <div className="mt-3 border-t border-current/20 pt-3">
+                  <Disclosure summary={details.label} contentClassName="gap-0">
                     {/* 轨道是滚动容器的兄弟，得有一层只裹着清单的定位祖先给它落脚。 */}
                     <div className="relative">
                       {/* 条间线画在每条自己身上，不用 `divide-y`：那一族的选择器裹在
@@ -92,7 +93,7 @@ function Outcome(
                       <ul ref={list} className="max-h-96 overflow-y-auto pr-3">
                         {details.items.map((item) => (
                           <li key={item.key}
-                            className="flex flex-col gap-0.5 border-b border-current/15 py-2 wrap-anywhere first:pt-1 last:border-b-0 last:pb-1">
+                            className="flex flex-col gap-1 border-b border-current/15 py-2 wrap-anywhere first:pt-0 last:border-b-0 last:pb-0">
                             {item.href
                               ? <a href={item.href} className="text-body-2-medium underline-offset-4 hover:underline">{item.label}</a>
                               : <span className="text-body-2-medium">{item.label}</span>}
@@ -103,10 +104,8 @@ function Outcome(
                       </ul>
                     </div>
                     {details.log
-                      /* 完整记录不是这条提示在说的事，它是出事之后自己去翻的东西：留在
-                         红底上但退回灰字。那条线取这行字自己的颜色（`border-current`），
-                         中性的 `separator` 在有色底上是另一种灰，跟这行字对不上。 */
-                      ? <div className="mt-2 border-t border-current/20 pt-2 text-text-secondary">
+                      /* 日志地址使用次级文字色，分隔线沿用错误提示的红色。 */
+                      ? <div className="mt-3 border-t border-border-error-default/20 pt-3 text-text-secondary">
                           <PathLine path={details.log} prefix="完整记录：" className="text-caption-1-regular"
                             onRevealed={toast} />
                         </div>
@@ -120,10 +119,10 @@ function Outcome(
       {settled?.status === 'complete'
         ? <Note tone="success" title="处理完成">{receiptText(settled)}</Note>
         : null}
-      {state.status !== 'running' && notes
+      {!processingActive(state) && notes
         ? <Note tone="neutral"
             extra={state.issues_log
-              /* 同上：线跟着这行灰字走，两块提示里的那一条才是同一条。 */
+              /* 中性提示的分隔线跟随次级文字色。 */
               ? <div className="mt-1.5 border-t border-current/20 pt-1.5 text-text-secondary">
                   <PathLine path={state.issues_log} prefix="完整记录：" className="text-caption-1-regular"
                     onRevealed={toast} />
@@ -156,17 +155,17 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
   const problem = start.error ? errorMessage(start.error)
     : job.isError ? (job.data ? DISCONNECTED_TEXT : errorMessage(job.error))
     : '';
-  const busy = start.isPending || state.status === 'running';
-  const line = currentLine(state);
+  const busy = start.isPending || processingActive(state);
+  const line = processingLine(state);
 
-  const run = (command: LibraryProcessingCommand) => {
+  const run = async (command: LibraryProcessingCommand) => {
     if (busy) return;
     start.reset();
-    start.mutate(command);
+    await start.mutateAsync(command);
   };
   const retry = () => {
     if (!state.job_id || !state.retryable_asset_ids?.length) return;
-    run({ job_id: state.job_id, retry: state.retryable_asset_ids });
+    void run({ job_id: state.job_id, retry: state.retryable_asset_ids }).catch(() => {});
   };
 
   return (
@@ -180,15 +179,21 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
           {/* 两个入口并存，各自答的不是一个问题：这里是「重新跑一整批」，下面那条错误提示里
               的「重试未完成项」只补上一趟没做完的那些。采集里网络超时几乎每趟都留下几项可
               重试的，页脚要是让位给重试键，新入库的片子就再也没有入口被扫到。 */}
-          <ProcessingActions scan busy={busy} metadataOnly={state?.metadata_only} onRun={run} />
+          <ProcessingActions scan busy={busy} metadataOnly={state?.metadata_only} speedMode={state.speed_mode} onRun={run} />
         </>
       }>
         <div className="flex flex-col gap-2">
           <FieldsetTitle>扫描与采集</FieldsetTitle>
           <p className="text-body-2-regular text-text-secondary">{SCAN_CARD_TEXT}</p>
-          {state.status === 'running'
+          {state.status === 'paused' && !state.total
+            ? <p className="text-caption-1-regular text-text-secondary">已暂停</p>
+            : processingActive(state)
             ? <TaskProgress embedded label={line} value={Math.min(state.checked || 0, state.total || 0)} total={state.total} />
             : null}
+          {processingActive(state) ? <p className="text-body-2-regular text-text-secondary tabular-nums" data-processing-eta="">
+            {remainingTime(state)}
+          </p> : null}
+          <ProcessingControls state={state} disabled={start.isPending || job.isError} />
         </div>
       </Fieldset>
       <Outcome state={state} problem={problem} settled={settled} onRetry={retry} toast={toast} />

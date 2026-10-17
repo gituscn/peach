@@ -1,6 +1,6 @@
 /* 客户端导航（ADR-0031「React Router 外壳阶段接管」）：React Router 的 Declarative 模式接管 history。
  * 管理区那几页、播放列表页与关注页、索引页与资料页、目录网格与垃圾队列，以及页面里的附属面（首页筛选条、
- * 首页新作行、目录页处理横幅、顶栏搜索下拉）与常驻面（底部批量条、侧栏配色卡、管理区页头、沉浸模式、设置面板、
+ * 首页新作行、顶栏搜索下拉）与常驻面（后台任务、底部批量条、侧栏配色卡、管理区页头、沉浸模式、设置面板、
  * 侧栏、详情舞台）（`managed-routes.tsx`）由这棵树画。每一页、沉浸模式与详情覆盖都由路由按匹配打开
  * （`pages/` 下各元素），壳不接派发：它只订阅历史同步标题与侧栏，换页时写地址。
  *
@@ -34,6 +34,7 @@ import {
 } from '@peach/history';
 
 import { Providers } from '../providers';
+import { LibraryProcessingDock } from '../library-processing/library-processing-dock';
 import { SettingsMatch } from './pages/settings';
 import {
   BROWSE_ROUTES, CATALOG_PATHS, CATALOG_ROUTES, ENTITY_ROUTES, IMMERSE_ROUTES, INDEX_ROUTES, MANAGED_ROUTES, REDIRECT_ROUTES,
@@ -215,8 +216,8 @@ function RouteGroups({ children }: { children?: ReactNode }) {
 }
 
 /** 整棵路由树。`children` 画在页面组 `path="*"` 的元素里面，只给测试用：跟着它挂一次就说明元素没被重挂。 */
-export function RouterRoot({ children, actions = null, background }:
-  { children?: ReactNode; actions?: ShellActions | null; background?: ReactNode }) {
+export function RouterRoot({ children, actions = null, background, processing = false }:
+  { children?: ReactNode; actions?: ShellActions | null; background?: ReactNode; processing?: boolean }) {
   return (
     <Providers>
       {background}
@@ -224,6 +225,7 @@ export function RouterRoot({ children, actions = null, background }:
         <PeachRouter>
           <ManagedSurface />
           <QueueRequests />
+          {processing && actions ? <LibraryProcessingDock toast={actions.toast} /> : null}
           <RouteGroups>{children}</RouteGroups>
         </PeachRouter>
       </ShellActionsContext.Provider>

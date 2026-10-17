@@ -386,6 +386,8 @@ class BackgroundJob:
     @staticmethod
     def _progress_label(state: dict) -> str:
         """一行「此刻在做什么」。域各有各的字段名，这里按可读性从具体到笼统取第一个。"""
+        if state.get('status') in ('paused', 'pausing'):
+            return ('已暂停' if state['status'] == 'paused' else '正在暂停') + ' · ' + str(state.get('stage') or '')
         current = state.get("current")
         if isinstance(current, dict):
             for key in ("label", "provider"):
@@ -548,7 +550,7 @@ class BackgroundJob:
                 self.state = None
                 thread = self.thread
                 self.thread = None
-            if job_id and state is not None and state["status"] == "running":
+            if job_id and state is not None and state["status"] in ('running', 'pausing', 'paused'):
                 self._stop_run(job_id, resume=resume)
         if thread is not None and thread.is_alive():
             thread.join(timeout)
@@ -556,13 +558,22 @@ class BackgroundJob:
     def _stop_run(self, job_id, *, resume):
         if resume and job_id in self._recoverable:
             from .job_recovery import read
-            if read(self._database_path(), self.task_key).get('pause_requested'):
+            from .processing_control import user_paused
+            if (read(self._database_path(), self.task_key).get('pause_requested') or
+                    self.task_key == 'library-processing' and user_paused(self._database_path(), job_id)):
                 self._paused_stops.add(job_id)
                 run_id = self._run_ids.pop(job_id, None)
                 if self.runs is not None and run_id is not None:
-                    self.runs.suspend(run_id)
+                    self._suspend_run(job_id, run_id)
                 return
         self._close_run(job_id, 'cancelled', error='服务关停，这一轮没有跑完')
+
+    def _suspend_run(self, job_id, run_id):
+        from .processing_control import user_paused
+        if self.task_key == 'library-processing' and user_paused(self._database_path(), job_id):
+            self.runs.suspend(run_id, label='已暂停，等待继续')
+        else:
+            self.runs.suspend(run_id)
 
     def start_result(self, fn: Callable[[], dict], *, recovery: dict | None = None) -> dict:
         """执行一次操作并保存终态回执；重复提交只返回进行中的同一任务。"""
@@ -643,7 +654,7 @@ class BackgroundJob:
             from .job_recovery import waiting
             run_id = self._run_ids.pop(job_id, None)
             if self.runs is not None and run_id is not None:
-                self.runs.suspend(run_id)
+                self._suspend_run(job_id, run_id)
             waiting(self._database_path(), self.task_key, job_id)
             return
         if state.get(self.id_key) != job_id:

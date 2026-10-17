@@ -10,8 +10,8 @@ import type { MediaItem } from '../catalog-grid/types';
 import { Note } from '../components/note';
 import { queryClient } from '../query';
 import {
-  currentLine, DISCONNECTED_TEXT, fetchLibraryProcessing, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL,
-  pollInterval, type LibraryProcessingCommand, type LibraryProcessingData,
+  DISCONNECTED_TEXT, fetchLibraryProcessing, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL,
+  pollInterval, processingActive, type LibraryProcessingCommand, type LibraryProcessingData,
 } from './library-processing';
 import { ProcessingActions } from './processing-actions';
 
@@ -48,7 +48,7 @@ function Completion({ assetIds, onComplete }: { assetIds: number[]; onComplete?(
   });
   const state = job.data;
   useEffect(() => {
-    if (!state || !started || state.job_id !== started || state.status === 'running'
+    if (!state || !started || state.job_id !== started || processingActive(state)
       || completed.current === started) return;
     completed.current = started;
     if (state.status === 'complete') {
@@ -57,17 +57,20 @@ function Completion({ assetIds, onComplete }: { assetIds: number[]; onComplete?(
     void queryClient.invalidateQueries({ queryKey: ['catalog-grid'] });
     onComplete?.();
   }, [state, started, onComplete]);
-  const busy = start.isPending || state?.status === 'running';
+  // 运行中的进度与控制由常驻任务卡承接，缺图提示只在可发起补全时呈现。
+  if (processingActive(state)) return null;
+  const busy = start.isPending || processingActive(state);
   const problem = start.error ? errorMessage(start.error) : job.error ? DISCONNECTED_TEXT
     : started && state?.job_id === started && state.status === 'failed' ? state.error || '补全未完成' : '';
-  const message = problem || (busy ? start.isPending ? '正在启动补全…' : currentLine(state!)
+  const message = problem || (start.isPending ? '正在启动补全…'
     : outcome || `这批影片中有 ${assetIds.length.toLocaleString()} 部暂无预览，可补全资料与图片。`);
   return <section aria-label="补全预览" aria-live="polite" data-library-completion="" className="@container mb-4">
-    <Note tone={problem ? 'warning' : 'neutral'} actionLayout="below" action={<ProcessingActions busy={busy} metadataOnly={state?.metadata_only} onRun={command => {
+    <Note tone={problem ? 'warning' : 'neutral'} actionLayout="below" action={<div className="flex flex-wrap items-center gap-2"><ProcessingActions busy={busy} metadataOnly={state?.metadata_only} onRun={command => {
       if (busy) return;
       setOutcome('');
       start.mutate(command);
-    }} />}>{message}{' '}<LinkButton href="/data-cleanup#libraryProcessing" size="small" trailingIcon={RiArrowRightLine}>
+    }} /></div>}>
+      {message}{' '}<LinkButton href="/data-cleanup#libraryProcessing" size="small" trailingIcon={RiArrowRightLine}>
       {problem ? '查看并处理' : '查看处理详情'}
     </LinkButton></Note>
   </section>;

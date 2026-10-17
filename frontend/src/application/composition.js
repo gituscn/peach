@@ -18,7 +18,6 @@ import { releaseHoverPreviews } from './../card-art/hover';
 import { bootEntry, peachHistory } from './../history/index';
 import { $ } from '../core';
 import { dropBars } from './../catalog-bars';
-import { releaseManagedRoute } from './../history/managed';
 import { isOverlayPath } from './../history/overlay';
 import { loadRouter, settingsPanelApi } from '../react/application-residents';
 import { applicationEffects } from './effects';
@@ -163,8 +162,8 @@ compositionState.shellActions = {
       const count=$('#count');count.removeAttribute('aria-busy');count.removeAttribute('aria-label');
       void paintCatalogGrid(navigationState.surfaceToken(navigationState.surfacePath()));
     },
-    /* 离开目录：收起网格、首页新作行与处理横幅。 */
-    release:()=>{clearCatalogGrid();clearHomeFeed();releaseManagedRoute($('#libraryProcessingNotice'))},
+    /* 离开目录：收起网格与首页新作行。 */
+    release:()=>{clearCatalogGrid();clearHomeFeed()},
   },
 };
 compositionState.routing = false;

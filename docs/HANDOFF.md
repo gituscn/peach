@@ -84,7 +84,7 @@
 
 - 依赖与参考来源的本轮判断见 [上游复核](reference-snapshots/upstream-review.md)：原文快照按哈希与 revision 接受，人工取证笔记保留；amane 桥只消费站点与网络层。
 - amane 的实体收藏与按需比较图只作产品语义参考；收藏、保存筛选复用当前 profile。自定义来源采用 OpenAver 的声明式边界，主动收窄为[单步 JSON](CUSTOM_SOURCES.md)；[外部播放](EXTERNAL_PLAYERS.md)通过客户端网络地址，媒体不改名、不移动。
-- BoardUI：[创作者别名表格与关注分页](BOARD_UI.md#创作者别名与扫描操作)、[Board、Link Button 与搜索动效](BOARD_UI.md)、[复核与配置灰色 Pills](reference-snapshots/board-review-layout.md#次级分类组件)；React 源码 `frontend/src/react/boardui/ORIGIN.md`。
+- BoardUI：[组件适配](BOARD_UI.md)、[扫描任务控件](reference-snapshots/processing-task-controls.md)、[灰色 Pills](reference-snapshots/board-review-layout.md#次级分类组件)；源码 `frontend/src/react/boardui/ORIGIN.md`。
 - [Geist 控件](reference-snapshots/vercel-geist-controls-measured.md)；[复核操作](reference-snapshots/vercel-review-actions.md)；[README 维护](README_MAINTENANCE.md)；设置：`reference-snapshots/geist-settings.md`。
 
 版本与差异见 `docs/reference-sources.json`、`docs/reference-snapshots/`，流程见

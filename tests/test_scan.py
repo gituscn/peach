@@ -104,6 +104,15 @@ class WindowsShapeTests(_ScanCase):
 class PosixShapeTests(_ScanCase):
     """macOS：账本里写 `R:\\media\\...`，遍历的是挂载点，读取侧按挂载表翻回去。"""
 
+    def test_structured_progress_reports_discovered_files_and_bytes(self):
+        progress = []
+        result, _ = self._scan('R:\\media', declared_roots={'local': ('R:\\media',)},
+                               mounts={'local': (str(self.media),)}, windows=False,
+                               progress=lambda files, size: progress.append((files, size)))
+        self.assertEqual(progress[0][0], 1)
+        self.assertEqual(progress[-1], (3, 14))
+        self.assertEqual(progress[-1], (result.files, result.total_bytes))
+
     DECLARED = {"local": (r"R:\media",)}
 
     def test_rows_keep_the_ledger_shape_and_translate_back_to_real_files(self):

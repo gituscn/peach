@@ -78,7 +78,7 @@ export interface ShellActions {
   /** 此刻能不能悬停翻页：壳的多选、遮挡、减少动效与滚动中都回 false。 */
   canFlip(): boolean;
   /** 页面组换了一页：路由树里的页面元素挂上、开始取数之前报一次。壳收起上一页留下的面（悬停预览、在途读请求、
-   *  首页新作行、处理横幅、别的容器里那一页），再按种类铺开：管理区、关注页与播放列表页铺 `#stats`，索引页、
+   *  首页新作行、别的容器里那一页），再按种类铺开：管理区、关注页与播放列表页铺 `#stats`，索引页、
    *  资料页与目录铺首页那一侧。 */
   surfaceChanged(kind: SurfaceKind, path: string): void;
   /** 清空顶栏搜索框（带散开的残影）。 */
@@ -140,7 +140,7 @@ export interface CatalogShell {
   /** 没有背景的作品详情与队列地址（深链、刷新）下面补画目录网格：网格没被占着、又是启动那一条或还铺着目录骨架时，
    *  按当前地址取一次（不是首页口径，不写筛选）。 */
   fill(): void;
-  /** 离开目录：收起 `#grid` 那一页、首页新作行与处理横幅。 */
+  /** 离开目录：收起 `#grid` 那一页与首页新作行。 */
   release(): void;
 }
 
@@ -229,7 +229,7 @@ export type IndexOpenPropsTable = { [Path in IndexRoutePath]: IndexOpenProps };
 export type EntityRoutePath = '/performers/*' | '/studios/*' | '/creators/*' | '/series/*' | '/agencies/*' | '/tags/*';
 
 /** 页面里的附属面，按名字登记、各画进壳的一个容器：首页筛选条（`#catalogFilter`）、首页新作行（`#feedNew`）、
- *  目录页处理横幅（`#libraryProcessingNotice`）与顶栏搜索下拉（`#searchMenu`）。props 由壳算好、整份交进来，
+ *  顶栏搜索下拉（`#searchMenu`）。props 由壳算好、整份交进来，
  *  之后经 `updateManagedRoute` 推补丁。 */
 export interface SurfaceOpenProps {
   'catalog-filter': CatalogFilterProps;

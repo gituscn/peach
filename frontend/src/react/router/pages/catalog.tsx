@@ -16,7 +16,7 @@
  * 壳开始路由才装上时，挂上那一刻算第一种。
  *
  * `?state=ads` 落在首页上时不打开，改写成垃圾文件的地址（不加条目），由垃圾文件那一页的元素接着打开。卸载时去处
- * 不是目录、详情、沉浸或资料页，就收起 `#grid`、首页新作行与处理横幅：那三处离开目录也留着它们。判断、改写与收起
+ * 不是目录、详情、沉浸或资料页，就收起 `#grid` 与首页新作行：这些页面离开目录也留着它们。判断、改写与收起
  * 都排进微任务：路由根在历史变化的同一次调用里同步提交，壳订阅历史早于路由根，它写标题与侧栏的那一轮排在前面。 */
 import { useContext, useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
@@ -186,7 +186,7 @@ export function CatalogMatch() {
     if (pathname !== '/wall') return;
     document.body.setAttribute('data-wall-open', '');
     document.documentElement.removeAttribute('data-wall-entry');
-    const chrome = Array.from(document.querySelectorAll<HTMLElement>('header.top,#drawer,#main,#catalogFilter,#count,#javLibraryHeader,#libraryProcessingNotice,#feedNew'));
+    const chrome = Array.from(document.querySelectorAll<HTMLElement>('header.top,#drawer,#main,#catalogFilter,#count,#javLibraryHeader,#feedNew'));
     const inert = chrome.map(node => node.inert);
     chrome.forEach(node => { node.inert = true });
     return () => {

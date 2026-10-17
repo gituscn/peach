@@ -99,7 +99,6 @@ export function wireFeedNewRow(row){
 
 export function isFeedNewPath(path){return isCatalogPath(path)&&path!=='/junk-files'}
 
-export function isProcessingNoticePath(path){return isCatalogPath(path)&&path!=='/junk-files'}
 
 export function renderHomeFeed(){
   const host=$('#feedNew');
