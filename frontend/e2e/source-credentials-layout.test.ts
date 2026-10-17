@@ -26,6 +26,16 @@ describe('来源链接与凭据布局', () => {
         await page.reload();
         await page.getByRole('button', { name: '添加来源', exact: true }).click();
         const form = page.getByRole('form', { name: '元数据来源配置', exact: true });
+        const region = page.getByRole('region', { name: '自定义元数据来源', exact: true });
+        const editorGeometry = await region.evaluate(node => {
+          const card = node.lastElementChild!.getBoundingClientRect();
+          const input = node.querySelector('form label')!.getBoundingClientRect();
+          const form = node.querySelector('form')!.getBoundingClientRect();
+          const footer = node.querySelector('form button[type="submit"]')!.parentElement!.getBoundingClientRect();
+          return { top: input.top - card.top, left: footer.left - card.left, right: card.right - footer.right, bottom: form.bottom - footer.bottom };
+        });
+        assert.ok(editorGeometry.top >= 14 && editorGeometry.top <= 18, JSON.stringify(editorGeometry));
+        assert.ok(Math.abs(editorGeometry.left) <= 1 && Math.abs(editorGeometry.right) <= 1 && Math.abs(editorGeometry.bottom) <= 1, JSON.stringify(editorGeometry));
         await form.getByRole('textbox', { name: '来源名称', exact: true }).fill('公开演示元数据');
         await form.getByRole('textbox', { name: 'JSON 接口地址', exact: true }).fill('https://example.com/api/{code}');
         const code = form.getByRole('textbox', { name: '试查番号（回车查询）', exact: true });
@@ -78,6 +88,12 @@ describe('来源链接与凭据布局', () => {
         await opened.page.reload();
         const field = opened.page.getByLabel('cookie', { exact: true });
         await field.waitFor(); await settle(opened.page);
+        const labels = await opened.page.evaluate(() => ['来源凭据', '作品资料站点'].map(name => {
+          const section = document.querySelector(`[aria-label="${name}"]`)!;
+          const label = section.querySelector('p')!;
+          return { x: label.getBoundingClientRect().x, size: getComputedStyle(label).fontSize, weight: getComputedStyle(label).fontWeight };
+        }));
+        assert.deepEqual(labels[0], labels[1], '配置分区标题对齐且使用相同排版');
         for (const name of ['cookie', 'user_agent']) {
           const geometry = await opened.page.getByLabel(name, { exact: true }).evaluate(node => {
             const wrapper = node.closest('[data-input-size]')!;

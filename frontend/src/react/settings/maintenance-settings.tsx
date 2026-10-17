@@ -131,11 +131,13 @@ export function UninstallSettings(
   const paths = [...new Set([uninstall.data_root, ...uninstall.directories])];
   return (
     <Section id="uninstallPeach" title="卸载 Peach">
-      <Stack>
-        {uninstall.available ? <Help>卸载移除 Peach 程序本身，原始媒体文件保留。</Help> : null}
+      {uninstall.available ? <Stack><Help>卸载移除 Peach 程序本身，原始媒体文件保留。</Help></Stack> : null}
+      <Rows>
         <SettingsRow label="完全卸载" description="同时删除设置、本地数据库、观看记录、凭据和缓存">
           <Switch aria-label="完全卸载" isSelected={removeData} isDisabled={!uninstall.full_available || Boolean(accepted)} onChange={setRemoveData} />
         </SettingsRow>
+      </Rows>
+      <Stack divided>
         <Disclosure summary="数据目录">
           {paths.map((path) => (
             <PathLine key={path} path={path} className="text-body-2-regular text-text-secondary" onRevealed={receipt} />

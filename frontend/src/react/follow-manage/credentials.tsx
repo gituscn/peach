@@ -17,7 +17,7 @@ import { Note } from '../components/note';
 import { PathLine } from '../components/path-line';
 import { queryClient } from '../query';
 import { busyProps } from '../settings/use-action';
-import { Disclosure, ErrorText, ExternalLink, Help } from '../settings/section';
+import { Disclosure, ErrorText, ExternalLink, Help, Section, Stack } from '../settings/section';
 import {
   CREDENTIAL_STATE, credentialDone, FOLLOW_CREDENTIALS_KEY, saveCredential,
   type CredentialData, type CredentialRow,
@@ -142,23 +142,16 @@ function CredentialSection({ row, readOnly, toast }:
 }
 
 export function Credentials(
-  { data, readOnly, toast }:
-  { data: CredentialData; readOnly: boolean; toast(message: string): void },
+  { data, readOnly, toast, embedded = false }:
+  { data: CredentialData; readOnly: boolean; toast(message: string): void; embedded?: boolean },
 ) {
   const rows = data.providers || [];
   const pending = rows.filter((row) => row.requirement === 'required' && !credentialDone(row));
   if (!rows.length) {
     return <EmptyState shell="plain" icon={RiKey2Line} title="没有可配置的来源">已接入的站点及其凭据状态会显示在这里。</EmptyState>;
   }
-  return (
-    <div className={cardClass({ padding: 'none', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })}>
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="mr-auto text-title-2-medium text-text-primary">来源凭据</h3>
-        {pending.length
-          ? <span className="text-body-2-regular text-text-error-primary">{`${pending.length} 个待配置`}</span>
-          : null}
-      </div>
-      {[
+  const pendingLabel = pending.length ? <span className="text-body-2-regular text-text-error-primary">{`${pending.length} 个待配置`}</span> : null;
+  const groups = <>{[
         { title: '可配置凭据', rows: rows.filter((row) => row.requirement !== 'none' && row.requirement !== 'blocked') },
         { title: '不需要凭据', rows: rows.filter((row) => row.requirement === 'none') },
         { title: '暂不支持', rows: rows.filter((row) => row.requirement === 'blocked') },
@@ -171,7 +164,10 @@ export function Credentials(
             ))}
           </div>
         </section>
-      ))}
-    </div>
-  );
+      ))}</>;
+  return embedded ? <Section title="来源凭据" aside={pendingLabel || undefined}><Stack>{groups}</Stack></Section> :
+    <div className={cardClass({ padding: 'none', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })}>
+      <div className="flex flex-wrap items-center gap-2"><h3 className="mr-auto text-title-2-medium text-text-primary">来源凭据</h3>{pendingLabel}</div>
+      {groups}
+    </div>;
 }

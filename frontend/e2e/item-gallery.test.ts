@@ -52,7 +52,8 @@ describe('馆藏 JAV 官方预览', () => {
       const frame = page.locator('[data-item-gallery]');
       await frame.waitFor({ state: 'visible' });
       await page.waitForFunction(() => document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.readyState === 4);
-      assert.equal(samples.length, 0, '播放正片时只按需读取样图');
+      await frame.locator('[data-media-thumbnail] img').first().waitFor({ state: 'visible' });
+      assert.ok(samples.some(url => new URL(url).pathname === '/sample-thumb'), '小图使用样图缩略图入口');
       const stats = frame.getByRole('button', { name: '播放统计', exact: true });
       await stats.waitFor({ state: 'visible' });
       const statsBox = await stats.boundingBox(), toggleBox = await frame.getByRole('button', { name: '查看图片', exact: true }).boundingBox();
@@ -89,7 +90,9 @@ describe('馆藏 JAV 官方预览', () => {
       assert.ok(await frame.locator('.video-js').isHidden());
       await page.keyboard.press('Tab');
       await frame.getByRole('button', { name: '预览 1', exact: true }).focus();
-      assert.equal(await frame.locator('[data-media-thumbnails]').count(), 0);
+      assert.equal(await frame.locator('[data-media-thumbnails]').count(), 1);
+      await frame.locator('[data-media-thumbnail="1"]').click();
+      await page.waitForFunction(() => document.querySelector('[data-catalog-picture]')?.getAttribute('src')?.endsWith('n=1'));
       const stripBox = await dots.boundingBox(), imageBox = await frame.locator('[data-catalog-picture]').boundingBox();
       assert.ok(stripBox && imageBox && stripBox.y >= imageBox.y + imageBox.height);
       assert.equal(await page.locator('[data-media-preview-tip]').count(), 0);

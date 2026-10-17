@@ -297,6 +297,11 @@ describe('关注详情岛', () => {
       const page = opened.page;
       const poster = page.locator('#stage [data-follow-detail-poster]');
       const dots = page.locator('#stage [data-follow-image-dots]');
+      const thumbnails = page.locator('#stage [data-media-thumbnails]');
+      assert.equal(await thumbnails.locator('button').count(), 21);
+      await thumbnails.locator('img').first().waitFor({ state: 'visible' });
+      const thumbnailBox = await thumbnails.boundingBox(), posterBox = await poster.boundingBox();
+      assert.ok(thumbnailBox && posterBox && thumbnailBox.y >= posterBox.y + posterBox.height, '小图位于主图下方');
       assert.equal(await dots.locator('button').count(), 21);
       assert.ok(await dots.evaluate(node => node.scrollWidth > node.clientWidth), '圆点超出时在条内滚动');
       assert.ok(await dots.evaluate(node => {
@@ -327,6 +332,10 @@ describe('关注详情岛', () => {
           const item = node.getBoundingClientRect(), strip = node.parentElement!.getBoundingClientRect();
           return item.left >= strip.left && item.right <= strip.right;
         }), '当前圆点完整可见');
+        assert.ok(await thumbnails.locator('[aria-current="true"]').evaluate(node => {
+          const item = node.getBoundingClientRect(), strip = node.parentElement!.getBoundingClientRect();
+          return item.left >= strip.left && item.right <= strip.right;
+        }), '当前小图完整可见');
         if (index === 20) assert.equal(await dots.getAttribute('data-overflow-right'), 'false');
       }
       await page.keyboard.press('ArrowRight');

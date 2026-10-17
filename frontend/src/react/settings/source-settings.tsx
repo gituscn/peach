@@ -18,7 +18,7 @@ export function SourceSettings({ data, receipt, panel }: ConfigurationGroupProps
   return <div {...groupRoot(panel)}>
     <div><ButtonLink href="/sources" variant="secondary">采集来源与登录状态</ButtonLink></div>
     {credentials.data
-      ? <Credentials data={credentials.data} readOnly={Boolean(data.ledger_read_only)} toast={receipt} />
+      ? <Credentials data={credentials.data} readOnly={Boolean(data.ledger_read_only)} toast={receipt} embedded />
       : credentials.error
         ? <Note tone="error" title="来源凭据未取得">{errorMessage(credentials.error)}</Note>
         : panel?.active !== false ? <LoadingDots label="正在读取来源凭据" /> : null}

@@ -16,6 +16,7 @@ import { ENTRY_LINKS_HELP, ENTRY_LINKS_HINT } from '../../configuration-copy';
 import type { EntryLinkSite, EntryLinksState } from '../bundle';
 import { ErrorText, Footer, Help, Section, Stack } from './section';
 import { busyProps, useAction } from './use-action';
+import { SiteLabel } from '../components/source-label';
 
 export function EntryLinksForm({ initial, receipt }: {
   initial: EntryLinksState;
@@ -43,7 +44,7 @@ export function EntryLinksForm({ initial, receipt }: {
       <Stack>
         <Help>{ENTRY_LINKS_HELP}</Help>
         {sites.map((site) => (
-          <Input key={site.key} id={`entry-link-${site.key}`} label={`${site.label} 地址`}
+          <Input key={site.key} id={`entry-link-${site.key}`} label={<SiteLabel site={site.key} label={`${site.label} 地址`} />}
             autoComplete="off" maxLength={100} value={site.host}
             placeholder={site.default_host}
             onChange={(host) => change(site.key, host)}

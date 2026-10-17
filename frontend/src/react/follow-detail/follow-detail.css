@@ -28,6 +28,9 @@
   background: transparent;
 }
 .peach-react [data-follow-detail] [data-follow-detail-poster][data-zoomable] { cursor: zoom-in; }
+.peach-react [data-follow-detail] [data-follow-detail-media]:has(>[data-carousel-below]) { flex-direction: column; }
+.peach-react [data-follow-detail] [data-follow-detail-media]:has(>[data-carousel-below]) [data-follow-detail-poster] { min-height: 0; max-height: calc(76dvh - 116px); }
+.peach-react [data-follow-detail] [data-carousel-below] { flex: none; }
 .peach-react [data-follow-detail] [data-framed] [data-follow-detail-poster] {
   width: 100%;
   aspect-ratio: var(--follow-frame-ratio);

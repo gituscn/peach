@@ -6,8 +6,7 @@
  * 「保存配置」的响应里也带着一份，「检查」键按此刻填的值重查。115 目标目录留空保存时，服务端按
  * 推送发现推一个目录，已经存在就直接存上。地址、还没存的目标目录与 PikPak 根留空时，检查把
  * 探测到的、按推送发现推出的值填回表单，点「保存配置」才落盘；推出的目录不存在时给一颗
- * 「新建这个目录」，只有点了才在 CloudDrive2 里建。第二张是 PikPak 账号：主路径是用浏览器登录，
- * 账号密码登录收在折叠里。
+ * 「新建这个目录」，只有点了才在 CloudDrive2 里建。第二张是 PikPak 账号，提供账号密码与浏览器登录。
  *
  * 令牌与密码只往本机凭据文件写，读接口只回「存没存过」，所以令牌框保存后清空、提示改成
  * 「已保存，留空不改」。PikPak 要人机验证时服务端回一个验证页地址，这里给出链接让用户在浏览器
@@ -15,6 +14,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
 import { Button } from '@/components/base/buttons/button';
+import { Chip } from '@/components/base/badges/chip';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
 import { Select, SelectItem } from '@/components/base/select/select';
@@ -28,7 +28,7 @@ import { Note } from '../components/note';
 import { SourceLabel, PROVIDER_ICONS } from '../components/source-label';
 import { groupRoot } from './configuration-panel';
 import {
-  Disclosure, ErrorText, ExternalLink, Fact, FactList, FieldLabel, Footer, Help, Section, Stack,
+  ErrorText, ExternalLink, Fact, FactList, FieldLabel, Footer, Help, Section, Stack,
 } from './section';
 import { busyProps, useAction } from './use-action';
 
@@ -263,7 +263,9 @@ function CheckReport({ report, detected, suggested, create, creating }: {
         {suggested.root ? <Fact term={<SourceLabel source="pikpak" label="PikPak 根目录" />}>{`按推送发现填入 ${suggested.root}，保存配置后生效`}</Fact> : null}
         {report.permissions.length ? (
           <Fact term="离线权限">
-            {report.missing.length ? `缺少：${report.missing.join('、')}` : '齐全'}
+            <Chip variant="caption" color={report.missing.length ? 'yellow' : 'lime'}>
+              {report.missing.length ? `缺少：${report.missing.join('、')}` : '齐全'}
+            </Chip>
           </Fact>
         ) : null}
         {report.folder ? (
@@ -280,8 +282,7 @@ function CheckReport({ report, detected, suggested, create, creating }: {
 
 /** PikPak 账号卡。主路径是「用浏览器登录」（ADR-0093）：服务端拉起一个 Peach 专用的浏览器窗口，
  *  用户在里面登录，Peach 取走网页端会话后关窗，之后只由 Peach 续期。这里拉起后每两秒读一次状态，
- *  直到登好、取消、超时或失败。账号密码登录收在下面的折叠里；这台电脑没有 Chrome 或 Edge 时
- *  只剩它，直接摊开。 */
+ *  直到登好、取消、超时或失败。账号密码表单直接显示，登录方式在底栏选择。 */
 function PikPakAccount({ state, settle, receipt, username, setUsername }: CardProps & {
   username: string;
   setUsername(value: string): void;
@@ -388,18 +389,9 @@ function PikPakAccount({ state, settle, receipt, username, setUsername }: CardPr
             <Fact term="密码">{account.remember ? '已保存，登录过期时自动重新登录' : '未保存，登录过期后需要回到这里重新登录'}</Fact>
           )}
         </FactList>
-      ) : browser.available ? (
-        <Stack>
-          {outcome ? (outcomeFailed ? <ErrorText>{outcome}</ErrorText> : <Help role="status">{outcome}</Help>) : null}
-          <Disclosure summary="用账号密码登录">
-            <div className="flex flex-col gap-4">
-              {passwordForm}
-              <div className="flex justify-end">{passwordLogin}</div>
-            </div>
-          </Disclosure>
-        </Stack>
       ) : (
         <Stack>
+          {outcome ? (outcomeFailed ? <ErrorText>{outcome}</ErrorText> : <Help role="status">{outcome}</Help>) : null}
           {passwordForm}
         </Stack>
       )}
@@ -408,12 +400,12 @@ function PikPakAccount({ state, settle, receipt, username, setUsername }: CardPr
         ? <LoadingDots label={browser.message || '等你在浏览器窗口里登录 PikPak'} /> : null}>
         {account.logged_in ? (
           <Button variant="secondary" onClick={logout} disabled={!state.available} {...busyProps(action.busy === 'logout')}>登出</Button>
-        ) : !browser.available ? passwordLogin : waiting ? (
+        ) : <>{passwordLogin}{!browser.available ? null : waiting ? (
           <Button variant="secondary" type="button" onClick={cancelBrowser} {...busyProps(action.busy === 'cancel')}>取消</Button>
         ) : (
           <Button type="button" onClick={openBrowser} disabled={!state.available}
             {...busyProps(action.busy === 'browser')}>用浏览器登录</Button>
-        )}
+        )}</>}
       </Footer>
     </Section>
   );

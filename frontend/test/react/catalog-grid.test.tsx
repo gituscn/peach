@@ -189,6 +189,10 @@ describe('作品卡', () => {
     await act(async () => { title.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true })) });
     expect(plain.actions.toggleSelection).toHaveBeenCalledWith(9, true);
     const selecting = await render(item(10), { selectMode: true });
+    expect(selecting.card.querySelector('[data-media-later]')).toBeNull();
+    expect(selecting.card.querySelector('[data-media-seek]')).toBeNull();
+    expect(selecting.card.querySelector('[data-media-check]')).not.toBeNull();
+    expect(plain.card.querySelector('[data-media-later]')).not.toBeNull();
     await click(selecting.host.querySelector('[data-media-title]'));
     expect(selecting.actions.toggleSelection).toHaveBeenCalledWith(10, false);
     expect([plain.onOpen, selecting.onOpen].every((fn) => fn.mock.calls.length === 0)).toBe(true);

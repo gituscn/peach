@@ -9,6 +9,20 @@ describe('馆藏卡片与列表', () => {
   let browser: Browser;
   before(async () => { browser = await launch() });
   after(async () => { await browser?.close() });
+  for (const viewport of VIEWPORTS) it(`${viewport.name}：多选隐藏卡片悬浮操作，退出后恢复`, { timeout: 60000 }, async () => {
+    const opened = await visit(browser, '/', viewport);
+    const { page } = opened;
+    try {
+      await page.locator('#grid [data-media-card] [data-media-later]').first().waitFor({ state: 'attached' });
+      await page.locator('#selectMode').click();
+      await page.waitForFunction(() => document.querySelectorAll('#grid [data-media-card] [data-media-later]').length === 0);
+      assert.equal(await page.locator('#grid [data-media-card] [data-media-seek]').count(), 0);
+      assert.ok(await page.locator('#grid [data-media-check]').count() > 0);
+      await page.locator('#selectMode').click();
+      await page.locator('#grid [data-media-card] [data-media-later]').first().waitFor({ state: 'attached' });
+      assert.deepEqual(opened.problems, []);
+    } finally { await opened.close() }
+  });
   for (const viewport of VIEWPORTS) {
     it(`${viewport.name} 显示切换、文件夹开关、详情与刷新保留列表`, { timeout: 90_000 }, async () => {
       const opened = await visit(browser, '/?browse=folders&loc=local', viewport);

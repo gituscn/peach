@@ -653,6 +653,7 @@ describe('关注页岛', () => {
       const ids = await cardIds(page);
       await page.locator('#selectMode').click();
       await page.locator('[data-follow-feed][data-select-mode]').waitFor();
+      assert.equal(await page.locator('[data-follow-actions]').count(), 0);
       await page.locator(`[data-follow-item="${ids[1]}"]`).click();
       await page.locator(`[data-follow-item="${ids[4]}"]`).click({ modifiers: ['Shift'] });
       await page.locator(`[data-follow-item="${ids[4]}"][data-selected]`).waitFor();
@@ -660,6 +661,8 @@ describe('关注页岛', () => {
         cards.map((card) => Number((card as HTMLElement).dataset.followItem)));
       assert.deepEqual(picked, ids.slice(1, 5));
       assert.equal(new URL(page.url()).pathname, '/follow', '多选里点卡不该进详情');
+      await page.locator('#selectMode').click();
+      await page.locator('[data-follow-actions]').first().waitFor();
       assert.deepEqual(opened.problems, []);
     } finally {
       await opened.close();
