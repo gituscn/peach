@@ -404,11 +404,14 @@ class SourceTransport:
         self.root = secrets_root
         self.transports: dict[str | None, HttpxTransport] = {}
         self.max_requests, self.max_bytes = max_requests, max_bytes
-        self.deadline = time.monotonic() + max_seconds if max_seconds else 0
+        from .processing_control import deadline_after
+        self.deadline = deadline_after(max_seconds) if max_seconds else 0
         self.requests = self.bytes = 0
 
     def __call__(self, request: HttpRequest, timeout: float, max_bytes: int):
         for _ in range(6):
+            from .processing_control import checkpoint
+            checkpoint('network')
             response = self._request(request, timeout, max_bytes)
             if response.status not in {301, 302, 303, 307, 308} or not response.headers.get("location"):
                 return response

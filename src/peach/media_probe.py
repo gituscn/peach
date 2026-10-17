@@ -25,6 +25,7 @@ from .jobs import ACTIVE_ASSET_SQL
 from .media import resolve_case_insensitive
 from .media_sources import cost_for
 from .strm import skip_background_read
+from .processing_control import CURRENT, checkpoint
 
 #: 一次探测最多等多久。ffprobe 只读文件头，网盘上实测一两秒。
 TIMEOUT_SECONDS = 20.0
@@ -142,6 +143,18 @@ def _record(db_path, ffprobe: str, rows: Sequence, report: Callable[[int, int], 
     if not rows:
         return 0
     done = 0
+    if CURRENT.get() is not None:
+        # 馆藏任务逐项领取探测，不预先提交整库，安全停点没有仍在读盘的排队任务。
+        with closing(sqlite3.connect(db_path, timeout=120)) as connection:
+            report(0, len(rows))
+            for row in rows:
+                checkpoint('probe')
+                measured = measure(ffprobe, row[0], row[1])
+                connection.execute(UPDATE, measured)
+                connection.commit()
+                done += 1
+                report(done, len(rows))
+        return done
     executor = ThreadPoolExecutor(max_workers=min(WORKERS, len(rows)), thread_name_prefix="PeachProbe")
     try:
         with closing(sqlite3.connect(db_path, timeout=120)) as connection:

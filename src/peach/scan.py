@@ -40,6 +40,7 @@ from pathlib import Path, PureWindowsPath
 
 from . import folder_rules, record_rehome, subtitles, wants
 from .platform import is_windows_path, resolve_location, resolve_root
+from .processing_control import checkpoint
 
 VIDEO = {".mp4", ".m4v", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".rmvb", ".mpg",
          ".m2ts", ".strm", ".iso"}
@@ -344,6 +345,7 @@ def _walk(top: Path):
     """
     stack = [os.fspath(top)]
     while stack:
+        checkpoint('scan')
         directory = stack.pop()
         try:
             with os.scandir(directory) as scanner:
@@ -400,6 +402,7 @@ def scan_location(
     try:
         connection.execute("PRAGMA journal_mode=WAL")
         for directory, entries in _walk(walk_root):
+            checkpoint('scan')
             relative = Path(directory).relative_to(walk_root).parts
             here: dict[str, tuple[int, str]] = {}
             videos = video_stems(entry.name for entry in entries)
@@ -409,6 +412,7 @@ def scan_location(
             artwork_dir = (os.path.basename(directory).casefold() in ARTWORK_DIRS
                            and os.path.dirname(directory) in video_dirs)
             for entry in entries:
+                checkpoint('scan')
                 name = entry.name
                 if is_sidecar(name, videos, artwork_dir=artwork_dir):
                     skipped += 1

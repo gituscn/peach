@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
+from .processing_control import checkpoint, low_mode
 
 #: 部分网盘视频把色彩原色写成 reserved（非法值），swscale 会拒绝缩放；声明为 bt709
 #: 只是覆盖坏的元数据，不改动像素。
@@ -34,11 +35,15 @@ def capture_frame(ffmpeg: str, path: str, timestamp: float, destination: Path, *
     那个时间点，两小时的片子抽最后一帧要几分钟。
     """
     command = [ffmpeg, "-y", "-v", "error", "-rw_timeout", "8000000"]
+    checkpoint('frame')
+    if low_mode():
+        command += ['-threads', '1', '-filter_threads', '1']
     if color_override:
         command += COLOR_OVERRIDE
     command += [
         "-ss", f"{timestamp:.2f}", "-i", path, "-frames:v", "1",
-        "-vf", f"scale={int(width)}:-1", "-q:v", "4", str(destination),
+        "-vf", f"scale={int(width)}:-1", "-q:v", "4",
+        *(['-threads', '1'] if low_mode() else []), str(destination),
     ]
     try:
         completed = subprocess.run(command, capture_output=True, timeout=timeout,
@@ -68,9 +73,12 @@ def tile_frames(ffmpeg: str, pattern: str, columns: int, rows: int, destination:
     于是拼出来的图少了后半段，而命令本身照样退出 0。
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint('frame')
+    options = ['-threads', '1', '-filter_complex_threads', '1'] if low_mode() else []
     subprocess.run(
-        [ffmpeg, "-y", "-v", "error", "-i", pattern,
-         "-filter_complex", f"tile={int(columns)}x{int(rows)}", "-q:v", "4", str(destination)],
+        [ffmpeg, "-y", "-v", "error", *options, "-i", pattern,
+         "-filter_complex", f"tile={int(columns)}x{int(rows)}", "-q:v", "4",
+         *(['-threads', '1'] if low_mode() else []), str(destination)],
         capture_output=True, timeout=timeout,
         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )

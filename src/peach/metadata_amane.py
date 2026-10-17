@@ -20,6 +20,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -284,6 +285,11 @@ class AmaneBridge:
             raise ValueError("未开放的 amane 站点：" + "、".join(unknown or ["（空）"]))
         if set(direct_sites) - set(names):
             raise ValueError("直连站点必须属于本次查询来源")
+        from .processing_control import low_mode, checkpoint
+        if low_mode() and len(names) > 1:
+            return self._serial_query(code, names, language=language, proxy_options=proxy_options,
+                                      direct_sites=direct_sites, timeout=timeout)
+        checkpoint('network')
         proxy_args, env = proxy_argument(proxy_options or {"trust_env": True})
         env["PYTHONIOENCODING"] = "utf-8"
         command = [str(self.python), "-X", "utf8", str(self.script), "--number", number,
@@ -311,6 +317,21 @@ class AmaneBridge:
             message = report.get("error") if isinstance(report, dict) else ""
             raise MetadataProviderError(str(message or f"amane 桥查询失败（exit {completed.returncode}）"))
         return report
+
+    def _serial_query(self, code, sites, *, language, proxy_options, direct_sites, timeout):
+        """低占用逐站启动桥查询，保留统一的整档时间预算。"""
+        from .processing_control import checkpoint, deadline_after
+        deadline = deadline_after(timeout) if timeout else None
+        records = {}
+        for site in sites:
+            checkpoint('network')
+            remaining = deadline - time.monotonic() if deadline is not None else None
+            if remaining is not None and remaining <= 1:
+                raise MetadataProviderError('amane 桥查询超时', kind='unavailable', retryable=True, temporary=True)
+            report = self.query(code, [site], language=language, proxy_options=proxy_options,
+                                direct_sites=[site] if site in direct_sites else [], timeout=remaining)
+            records.update(report.get('sites') or {})
+        return {'number': code, 'sites': records}
 
 
 def failure_error(site: str, record: Mapping[str, object]) -> MetadataProviderError:
