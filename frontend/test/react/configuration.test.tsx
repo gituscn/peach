@@ -31,6 +31,8 @@ function serve(config: ConfigurationData, credentials: CredentialData = { root: 
   const fetcher = vi.fn(async (url: string) => ({ ok: true, status: 200, json: async () => {
     if (url === CONFIGURATION_URL) return config;
     if (url === '/api/configuration/indexers') return { indexers: [], max_indexers: 4 };
+    if (url === '/api/configuration/jav-browser') return { enabled: false, provider: '115', available: true,
+      providers: [{ key: '115', label: '115', configured: true, target: '/115/Movies' }] };
     if (url === '/api/follow/credentials') return credentials;
     if (url === '/api/settings') return { followInitialDays: 30, metadataRefreshDays: 30 };
     if (url === '/api/follow/schedule') return { enabled: false, available: true, interval_minutes: 60 };

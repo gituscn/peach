@@ -1,8 +1,8 @@
 /* JAV 用户脚本的默认下载渠道与专用令牌。 */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { RiCheckboxBlankCircleFill } from '@remixicon/react';
 import { Button } from '@/components/base/buttons/button';
-import { StatusDot } from '@/components/base/badges/status-dot';
 import { Input } from '@/components/base/input/input';
 import { Select, SelectItem } from '@/components/base/select/select';
 import { apiGet, apiSend, errorMessage } from '../../api';
@@ -60,8 +60,9 @@ function BrowserForm({ initial, receipt }: { initial: State; receipt(message: st
       {action.error ? <ErrorText>{action.error}</ErrorText> : null}
     </Stack>
     <Footer status={<span role="status" className="inline-flex items-center gap-1.5">
-      <StatusDot color="green" className={state.enabled ? undefined
-        : 'bg-background-primary-hover [&>span]:bg-text-tertiary'} />{state.enabled ? '已启用' : '未启用'}
+      <span aria-hidden="true" className="inline-flex size-3 items-center justify-center">
+        <RiCheckboxBlankCircleFill className={state.enabled ? 'size-2 text-notification-success-foreground' : 'size-2 text-text-tertiary'} />
+      </span>{state.enabled ? '已启用' : '未启用'}
     </span>}>
       {state.enabled ? <Button variant="secondary" type="button" disabled={Boolean(action.busy)}
         onClick={() => save('disable')}>关闭浏览器添加</Button> : null}

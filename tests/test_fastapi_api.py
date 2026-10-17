@@ -30,6 +30,7 @@ if HAS_DEPS:
     from starlette.routing import Mount
     from peach import api as api_module
     from peach import routes_auth
+    from peach import routes_jav_browser
     from peach.api import create_app
     from peach.follow_covers import PLACEHOLDER_CONTENT_TYPE
     from peach.follow_secrets import credential_store_for
@@ -3390,6 +3391,8 @@ PUBLIC_ROUTES = {
     # 变化，也不 import 别的产物；其余 `/dist/*` 仍走要会话的 `/dist/{name}`。
     ("GET,HEAD", "/dist/peach-pages.js"),
     ("GET,HEAD", "/dist/peach-pages.css"),
+    # 用户脚本安装产物只含随仓库分发的代码与站点规则，不含配对令牌、网盘账号或账本内容。
+    ("GET", "/integrations/peach-jav.user.js"),
     # 拒绝收录的声明。爬虫没有会话，被 401 挡住等于这份声明根本没被读到。
     ("GET,HEAD", "/robots.txt"),
     # CloudDrive2 的文件通知。推送方是另一个进程，没有也不该有 Peach 的会话，所以它带的
@@ -3441,6 +3444,10 @@ class RouteAuthContractTests(unittest.TestCase):
             configured=True, db_path=root / "ledger.db",
             follow_state_root=root / "state"))
         cls.guards = {getattr(routes_auth, name) for name in cls.GUARD_NAMES}
+        cls.special_guards = {
+            ("GET", "/api/jav-browser"): routes_jav_browser.browser_client,
+            ("POST", "/api/jav-browser"): routes_jav_browser.browser_client,
+        }
         cls.routes = {(",".join(sorted(route.methods)), route.path):
                       {dependency.call for dependency in route.dependant.dependencies}
                       for route in _api_routes(cls.app.routes)}
@@ -3457,10 +3464,16 @@ class RouteAuthContractTests(unittest.TestCase):
 
     def test_every_route_is_gated_unless_it_is_on_the_public_list(self):
         unguarded = sorted(key for key, dependencies in self.routes.items()
-                           if not dependencies & self.guards and key not in PUBLIC_ROUTES)
+                           if not dependencies & self.guards and key not in PUBLIC_ROUTES
+                           and self.special_guards.get(key) not in dependencies)
         self.assertEqual(unguarded, [],
                          "新路由没挂 routes_auth 的 require_* 依赖；确实该公开就写进 "
                          "PUBLIC_ROUTES 并注明理由")
+
+    def test_browser_addition_requires_its_scoped_bearer_dependency(self):
+        for key, guard in self.special_guards.items():
+            with self.subTest(route=key):
+                self.assertIn(guard, self.routes[key])
 
     def test_the_public_list_has_no_entry_that_stopped_existing(self):
         """路径改名或删掉时白名单要跟着收，否则它会一直替一条不存在的路由背书。"""

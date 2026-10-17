@@ -5,6 +5,8 @@ import { DownloadSettings } from '../../src/react/settings/download-settings';
 import type { DownloadCheckReport, DownloadSettingsState } from '../../src/react/bundle';
 import { buttonNamed, click, fetchMock, mount, pending, section, sentBody, settle, submit, type } from './render';
 
+vi.mock('../../src/react/settings/jav-browser-settings', () => ({ JavBrowserSettings: () => null }));
+
 const state = (patch: Partial<DownloadSettingsState> = {}): DownloadSettingsState => ({
   available: true,
   config: { clouddrive_address: 'http://127.0.0.1:19798', targets: { '115': '/115/云下载' },

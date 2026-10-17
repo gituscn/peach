@@ -44,18 +44,18 @@ describe('浏览器添加 JAV 设置', () => {
         const status = region.getByRole('status');
         assert.equal(await status.innerText(), '未启用');
         assert.equal(await status.locator('span[aria-hidden="true"]').count(), 1);
-        const statusColor = () => status.locator('span[aria-hidden="true"] > span')
-          .evaluate(node => getComputedStyle(node).backgroundColor);
+        const statusColor = () => status.locator('svg')
+          .evaluate(node => getComputedStyle(node).color);
         const disabledColor = await statusColor();
-        const neutralColor = await page.evaluate(() => {
+        const themeColor = (token: string) => page.evaluate(token => {
           const sample = document.createElement('span');
-          sample.style.backgroundColor = 'var(--color-text-tertiary)';
+          sample.style.color = `var(${token})`;
           document.body.append(sample);
-          const color = getComputedStyle(sample).backgroundColor;
+          const color = getComputedStyle(sample).color;
           sample.remove();
           return color;
-        });
-        assert.equal(disabledColor, neutralColor);
+        }, token);
+        assert.equal(disabledColor, await themeColor('--color-text-tertiary'));
         await channel.scrollIntoViewIfNeeded();
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         await channel.click();
@@ -71,6 +71,7 @@ describe('浏览器添加 JAV 设置', () => {
         assert.equal(await status.innerText(), '已启用');
         assert.equal(await status.locator('span[aria-hidden="true"]').count(), 1);
         assert.notEqual(await statusColor(), disabledColor);
+        assert.equal(await statusColor(), await themeColor('--color-notification-success-foreground'));
         const channelLabelBox = await region.getByText('浏览器添加的下载渠道', { exact: true }).boundingBox();
         const channelFieldBox = await channel.boundingBox();
         assert.ok(channelLabelBox && channelFieldBox);
