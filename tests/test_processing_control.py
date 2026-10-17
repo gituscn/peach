@@ -280,3 +280,26 @@ class ProcessingControlTests(unittest.TestCase):
             self.assertEqual(second.snapshot()['status'], 'complete')
             self.assertEqual(second.snapshot()['run_id'], initial['run_id'])
             self.assertEqual(runs.get(initial['run_id']).status, 'succeeded')
+
+    def test_scan_progress_accumulates_discovered_counts_across_roots(self):
+        from peach.library_processing import _scan_sources
+        reports = []
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': ('R:\\Media', 'R:\\Other')})
+        def scan(*_args, **kwargs):
+            kwargs['progress'](1, 10)
+            kwargs['progress'](2, 30)
+            return SimpleNamespace(files=2, total_bytes=30, new_ids=[])
+        with patch('peach.library_processing.scan_location', side_effect=scan), \
+                patch('peach.library_processing._online_source_root', return_value=self.root), \
+                patch('peach.library_processing._ffprobe_path', return_value=None), \
+                patch('peach.library_processing.probe_unmeasured', return_value=0), \
+                patch('peach.library_processing.reattach_in'):
+            result = _scan_sources(config, self.db, locations=config.locations, asset_ids=None,
+                                   stage='scan', guard=Mock(), update=lambda **values: reports.append(values),
+                                   issue=lambda *_args, **_kwargs: None)
+        discovering = [row for row in reports if row.get('current_action') == 'scanning_files']
+        self.assertEqual([row['scanned'] for row in discovering], [1, 2, 3, 4])
+        self.assertEqual([row['scanned_bytes'] for row in discovering], [10, 30, 40, 60])
+        self.assertTrue(all(row['total'] == 0 for row in discovering))
+        self.assertEqual((result.scanned, result.scanned_bytes), (4, 60))

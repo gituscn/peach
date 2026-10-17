@@ -1651,6 +1651,7 @@ class _SourceScan:
     online_roots: list[Path]
     scanned: int = 0
     probed: int = 0
+    scanned_bytes: int = 0
 
 
 def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update, issue):
@@ -1672,8 +1673,13 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
             result.online_roots.append(translated_root)
             if scan:
                 registered = scan_location(db_path, source, root, declared_roots=config.locations,
-                                           mounts=mounts, report=lambda line: update(stage='扫描文件'))
+                                           mounts=mounts, report=lambda line: None,
+                                           progress=lambda files, size: update(
+                                               stage='扫描文件', scanned=result.scanned + files,
+                                               scanned_bytes=result.scanned_bytes + size,
+                                               checked=0, total=0, current_action='scanning_files'))
                 result.scanned += registered.files
+                result.scanned_bytes += registered.total_bytes
                 result.probed += probe_unmeasured(
                     db_path, ffprobe, source, root, config=config,
                     report=lambda done, total: update(stage='读取时长与分辨率', checked=done, total=total))
@@ -1949,7 +1955,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                        mode=speed_mode)):
         state = dict(job_id=identity, status='running',
                      stage='读取本地资料' if retrying else '扫描文件',
-                     checked=0, total=0, scanned=0, probed=0, identified=0, candidates=0, covers=0, previews=0,
+                     checked=0, total=0, scanned=0, scanned_bytes=0, probed=0, identified=0, candidates=0, covers=0, previews=0,
                      requested_stage=stage, asset_ids=scope_ids,
                      issue_count=0, paused_count=0, issue_preview=[], issues_truncated=False,
                      notes={}, retryable_asset_ids=[],
@@ -2020,7 +2026,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             locations = config.locations if location == 'configured' else {location: config.locations[location]}
             sources = _scan_sources(config, db_path, locations=locations, asset_ids=scope_ids,
                                     stage=stage, guard=guard, update=update, issue=issue)
-            state.update(scanned=sources.scanned, probed=sources.probed)
+            state.update(scanned=sources.scanned, scanned_bytes=sources.scanned_bytes, probed=sources.probed)
             if stage == SCAN_STAGE:
                 # `checked`／`total` 在探时长时借给进度条用过；只扫描这一段没有采集，读数归零。
                 update(status='failed' if state['issue_count'] else 'complete',

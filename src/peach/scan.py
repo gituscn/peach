@@ -372,10 +372,24 @@ def _walk(top: Path):
         yield directory, sorted(files, key=lambda entry: entry.name)
 
 
+class _ScanProgress:
+    """结构化扫描进度按时间节流，首项与最终汇总始终报告。"""
+    def __init__(self, callback):
+        self.callback = callback
+        self.reported_at = 0.0
+
+    def __call__(self, files, total_bytes, *, force=False):
+        now = time.monotonic()
+        if force or files == 1 or now - self.reported_at >= 0.5:
+            self.callback(files, total_bytes)
+            self.reported_at = now
+
+
 def scan_location(
     db_path: str | os.PathLike[str], location: str, root: str, *,
     declared_roots: Mapping[str, str], mounts: Mapping[str, str | Path] | None = None,
     report: Callable[[str], None] = print, windows: bool | None = None,
+    progress: Callable[[int, int], None] = lambda files, total_bytes: None,
 ) -> ScanResult:
     """遍历 `root`（账本口径）对应的本机目录，把文件元数据 upsert 进 `asset`。
 
@@ -388,6 +402,7 @@ def scan_location(
     ledger_root = PureWindowsPath(root)
     now = time.strftime("%Y-%m-%d %H:%M:%S")
     started = time.time()
+    progress = _ScanProgress(progress)
     files = 0
     total = 0
     skipped = 0
@@ -428,6 +443,7 @@ def scan_location(
                               stat.st_size, mtime, now, now))
                 files += 1
                 total += stat.st_size
+                progress(files, total)
                 if len(batch) >= BATCH_SIZE:
                     connection.executemany(_UPSERT, batch)
                     connection.commit()
@@ -456,5 +472,6 @@ def scan_location(
         connection.close()
     result = ScanResult(location, root, files, total, time.time() - started, gone,
                         tracks, orphans, skipped, new_ids, reattached, acquired)
+    progress(files, total, force=True)
     report(result.summary())
     return result
