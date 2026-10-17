@@ -142,18 +142,21 @@ jobs:
       - name: 构建独立目录包与安装包
         shell: pwsh
         run: '& ./scripts/build_windows.ps1 -Installer -CloudflaredPath "$env:RUNNER_TEMP/cloudflared.exe" -FFmpegPath "$env:RUNNER_TEMP/ffmpeg-build/ffmpeg" -UntruncPath "$env:RUNNER_TEMP/untrunc-build/untrunc"'
-      - name: 压缩完整程序目录
+      - name: 生成完整包、应用更新包与工具包
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path release | Out-Null
-          Compress-Archive -Path dist/Peach -DestinationPath 'release/Peach-${{ steps.version.outputs.version }}-windows-x64.zip'
+          python scripts/package_windows_release.py --source dist/Peach --output release --version '${{ steps.version.outputs.version }}'
+          if ($LASTEXITCODE -ne 0) { throw '发行包拆分失败' }
           Copy-Item 'dist/Peach-${{ steps.version.outputs.version }}-windows-x64-setup.exe' release/
           Copy-Item dist/ffmpeg-corresponding-source.zip release/
           Copy-Item dist/untrunc-corresponding-source.zip release/
           Copy-Item scripts/smoke_desktop.py release/smoke_desktop.py
           Copy-Item scripts/smoke_update_tasks.py release/smoke_update_tasks.py
+          Copy-Item scripts/smoke_split_update.py release/smoke_split_update.py
           python scripts/changelog.py --notes '${{ steps.version.outputs.version }}' --to release/RELEASE_NOTES.md
           if ($LASTEXITCODE -ne 0) { throw 'CHANGELOG.md 缺这一版的一节，不发没有说明的版本' }
+          Add-Content -LiteralPath release/RELEASE_NOTES.md -Value (Get-Content -Raw -Encoding utf8 release/DOWNLOADS.md) -Encoding utf8
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-candidate
@@ -179,6 +182,13 @@ jobs:
           Expand-Archive -Path 'Peach-${{ needs.windows.outputs.version }}-windows-x64.zip' -DestinationPath candidate
           python smoke_desktop.py candidate/Peach/Peach.exe
           if ($LASTEXITCODE -ne 0) { throw '制品验收失败' }
+      - name: 从应用更新包与独立工具包重建并验证运行
+        shell: pwsh
+        run: |
+          python smoke_split_update.py --version '${{ needs.windows.outputs.version }}' --destination split-candidate
+          if ($LASTEXITCODE -ne 0) { throw '拆分制品与完整包不一致' }
+          python smoke_desktop.py split-candidate/Peach/Peach.exe
+          if ($LASTEXITCODE -ne 0) { throw '拆分制品运行验收失败' }
       - name: 静默安装、验收并卸载安装包
         shell: pwsh
         run: |

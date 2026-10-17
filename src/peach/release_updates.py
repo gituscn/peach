@@ -7,6 +7,7 @@ import httpx
 
 from . import __version__, distribution
 from .http import HttpRequest, HttpxTransport
+from .update_packages import TOOL_PATHS
 
 RELEASES_URL = "https://github.com/peach-mitao/peach/releases"
 API_URL = "https://api.github.com/repos/peach-mitao/peach/releases?per_page=100"
@@ -45,14 +46,17 @@ def check(*, transport=None) -> dict:
                 continue
             tag = row["tag_name"]
             assets = row.get("assets") or []
-            expected = f"Peach-{tag.removeprefix('v')}-windows-x64.zip"
-            if not any(isinstance(a, dict) and a.get("name") == expected and a.get("state") == "uploaded" for a in assets):
+            prefix = f"Peach-{tag.removeprefix('v')}-windows-x64"
+            uploaded = {a.get("name"): a for a in assets if isinstance(a, dict) and a.get("state") == "uploaded"}
+            full = uploaded.get(prefix + ".zip")
+            if full is None:
                 continue
-            asset = next(a for a in assets if a.get("name") == expected and a.get("state") == "uploaded")
-            releases.append((version, tag, asset))
+            complete_tools = all(prefix + f"-tools-{tool}.zip" in uploaded for tool in TOOL_PATHS)
+            asset = uploaded.get(prefix + "-update.zip", full) if complete_tools else full
+            releases.append((version, tag, asset, full))
         if not releases:
             return dict(result, state="empty", message="暂未找到可下载的测试版。")
-        version, tag, asset = max(releases, key=lambda item: item[0])
+        version, tag, asset, full = max(releases, key=lambda item: item[0])
         current = _version(result["current_version"])
         if current is None:
             raise ValueError("current version required")
@@ -61,6 +65,7 @@ def check(*, transport=None) -> dict:
         return dict(result, latest_version=tag.removeprefix("v"), state=state, message=message,
                     asset_url=f"{RELEASES_URL}/download/{tag}/{asset['name']}",
                     asset_size=asset.get("size", 0), asset_digest=asset.get("digest"),
+                    package_kind="update" if asset is not full else "full",
                     release_url=f"{RELEASES_URL}/tag/{tag}")
     except (OSError, ValueError, TypeError, TimeoutError, httpx.HTTPError):
         return dict(result, state="error", message="未能取得版本信息，请重试。")

@@ -18,7 +18,7 @@ import zipfile
 import httpx
 from filelock import FileLock, Timeout
 
-from . import __version__, desktop_installer, distribution, release_updates, settings_file
+from . import __version__, desktop_installer, distribution, release_updates, settings_file, update_packages
 from .fsutil import atomic_write_text
 from .windows_update import replace_with_retry
 from . import update_tasks
@@ -73,7 +73,7 @@ def public() -> dict:
         "state", "progress", "message", "downloaded", "total", "version", "updated_at"}}
 
 
-def extract(archive: Path, destination: Path, progress) -> Path:
+def extract(archive: Path, destination: Path, progress, *, tool_files: set[str] | None = None) -> Path:
     destination = destination.resolve()
     with zipfile.ZipFile(archive) as package:
         entries = package.infolist()
@@ -86,6 +86,8 @@ def extract(archive: Path, destination: Path, progress) -> Path:
             if (not parts or parts[0] != "Peach" or "\\" in name or ":" in name
                     or ".." in parts or name.startswith("/") or (item.external_attr >> 16) & 0o170000 == 0o120000):
                 raise ValueError("更新包含无效路径")
+            if tool_files is not None and (item.is_dir() or "/".join(parts[1:]) not in tool_files):
+                raise ValueError("工具包包含清单外的文件")
             target = destination.joinpath(*parts).resolve()
             key = str(target).casefold()
             if not target.is_relative_to(destination) or key in seen:
@@ -94,9 +96,61 @@ def extract(archive: Path, destination: Path, progress) -> Path:
             package.extract(item, destination)
             progress(index + 1, len(entries))
     root = destination / "Peach"
-    if not (root / "Peach.exe").is_file() or not (root / "_internal" / "standalone.txt").is_file():
+    if tool_files is None and (not (root / "Peach.exe").is_file() or not (root / "_internal" / "standalone.txt").is_file()):
         raise ValueError("更新包不是独立 Windows 版本")
     return root
+
+
+def download(url: str, archive: Path, size: int, digest: str, progress) -> None:
+    checksum = hashlib.sha256()
+    received = 0
+    with httpx.Client(follow_redirects=True, timeout=30) as client, client.stream("GET", url) as response:
+        response.raise_for_status()
+        with archive.open("wb") as output:
+            for chunk in response.iter_bytes(256 * 1024):
+                received += len(chunk)
+                if received > size:
+                    raise ValueError("下载体积与发布记录不符")
+                output.write(chunk)
+                checksum.update(chunk)
+                progress(received)
+    if received != size or checksum.hexdigest() != digest:
+        raise ValueError("更新包校验失败，请重新下载")
+
+
+def prepare_tools(stage: Path, target: Path, transaction: Path, release: dict, data: dict) -> None:
+    manifest = update_packages.read_manifest(stage, release["latest_version"])
+    missing = []
+    for tool, bundle in manifest["tools"].items():
+        if update_packages.matches(target, bundle["files"]):
+            for name in bundle["files"]:
+                destination = update_packages.checked_path(stage, name)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(update_packages.checked_path(target, name), destination)
+        else:
+            missing.append((tool, bundle))
+    total = data["total"] + sum(bundle["asset"]["size"] for _, bundle in missing)
+    write(data, total=total)
+    for index, (tool, bundle) in enumerate(missing):
+        asset = bundle["asset"]
+        archive = transaction / f"tools-{tool}.zip"
+        received = data["downloaded"]
+        write(data, state="downloading", message=f"正在下载 {tool} 工具包")
+        download(release["asset_url"].rsplit("/", 1)[0] + "/" + asset["name"], archive,
+                 asset["size"], asset["sha256"],
+                 lambda count, start=received, step=index, size=asset["size"]: write(
+                     data, downloaded=start + count, progress=75 + round((step + count / size) / len(missing) * 13)))
+        write(data, state="verifying", message=f"正在校验 {tool} 工具包")
+        extracted = extract(archive, transaction / f"tool-{tool}", lambda *_: None, tool_files=set(bundle["files"]))
+        if not update_packages.matches(extracted, bundle["files"]):
+            raise ValueError(f"{tool} 工具包文件校验失败")
+        for name in bundle["files"]:
+            destination = update_packages.checked_path(stage, name)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(update_packages.checked_path(extracted, name), destination)
+    for tool, bundle in manifest["tools"].items():
+        if not update_packages.matches(stage, bundle["files"]):
+            raise ValueError(f"{tool} 工具复用校验失败")
 
 
 def prepare(data: dict, lock: FileLock) -> None:
@@ -118,26 +172,18 @@ def prepare(data: dict, lock: FileLock) -> None:
         write(data, transaction=str(transaction), target=str(target), version=release["latest_version"],
               total=total, downloaded=0, message="正在下载", state="downloading")
         archive = transaction / "package.zip"
-        checksum = hashlib.sha256()
-        received = 0
-        with httpx.Client(follow_redirects=True, timeout=30) as client, client.stream("GET", release["asset_url"]) as response:
-            response.raise_for_status()
-            with archive.open("wb") as output:
-                for chunk in response.iter_bytes(256 * 1024):
-                    received += len(chunk)
-                    if received > total:
-                        raise ValueError("下载体积与发布记录不符")
-                    output.write(chunk); checksum.update(chunk)
-                    write(data, downloaded=received, progress=round(received / total * 65, 1))
+        download(release["asset_url"], archive, total, digest[7:],
+                 lambda count: write(data, downloaded=count, progress=round(count / total * 65, 1)))
         write(data, state="verifying", progress=66, message="正在校验")
-        if received != total or checksum.hexdigest() != digest[7:]:
-            raise ValueError("更新包校验失败，请重新下载")
         write(data, state="extracting", message="正在解压")
-        stage = extract(archive, transaction / "stage", lambda done, count: write(data, progress=67 + round(done / count * 20)))
+        stage = extract(archive, transaction / "stage", lambda done, count: write(data, progress=67 + round(done / count * 8)))
         from .buildinfo import read_build_info
         info = read_build_info(stage / "_internal")
         if not info or info.version != release["latest_version"]:
             raise ValueError("包内版本与发布版本不符")
+        if release.get("package_kind") == "update":
+            write(data, state="preparing", message="正在复用和校验已安装工具")
+            prepare_tools(stage, target, transaction, release, data)
         write(data, state="preparing", progress=90, message="正在准备安装")
         desktop_installer.carry_uninstaller(target, stage)
         # 助手从自己的目录运行，正式目录与暂存目录都不会被它的 DLL 句柄占用。

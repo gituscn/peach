@@ -219,6 +219,8 @@ export interface ReleaseState {
   message: string;
   release_url: string;
   checked_at?: number;
+  package_kind?: 'update' | 'full';
+  asset_size?: number;
 }
 
 export interface UpdateJob {

@@ -215,7 +215,7 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 - `job_recovery` 保存馆藏处理范围、阶段、指定影片、时间轴密度、单部封面、关注、订阅和想要资料的请求；服务启动或安装结束后只领取未完成记录。暂停任务复用任务中心的同一行，已完成、失败和主动停止的任务不循环重试。馆藏预览在产物登记后保存影片检查点，元数据检查点跟随候选 CSV 成功落盘；未取得结果的项目不记完成。时间轴复用已有索引判定。恢复领取和新任务起跑共用安装闸门，数据仍留在本机 state 目录，不引入 ledger 迁移。
 
 - 自动更新设置用 APScheduler（见「必须复用」表的定时轮询）、共享 HTTPX 发行查询、filelock 与原子 JSON 写入，安装走 `standalone_update`。按 [interval trigger](https://apscheduler.readthedocs.io/en/3.x/modules/triggers/interval.html) 每分钟查是否到期，本机持久时间与文件锁协调多个服务；关闭、6/24/168 小时间隔与源码下载限制归 Peach。默认关闭，下载只准备安装，重启仍需确认；设置存 state 目录的 `automatic-updates.json`。
-- 版本与资产信息用 GitHub Releases REST API（测试通道含预发布），查询与流式下载用项目 HTTPX，ZIP 解压用标准库，互斥用 FileLock。真实 Release 只读验过：只有已上传完整独立包的发布才进更新，查询不下载也不安装。
+- 版本与资产信息用 [GitHub Releases REST API](https://docs.github.com/en/rest/releases/assets)（测试通道含预发布），查询与流式下载用项目 HTTPX，ZIP 解压用标准库，互斥用 FileLock。只有已上传完整独立包的发布才进更新，优先选择 `*-update.zip`，历史完整 ZIP 保留原名供旧客户端更新。`package_windows_release.py` 从同一构建目录生成完整包、应用更新包与 FFmpeg、untrunc、cloudflared 工具包；更新包内清单固定工具文件哈希、工具包大小与 SHA-256，运行时只复用校验相符的文件，按需下载不符的工具。工具包路径限于对应工具目录，补齐后再次校验并沿用同卷暂存与目录回滚。复用已有 HTTPX、hashlib、zipfile、copy2，无新增依赖；不引入 Velopack 的包格式或二进制差分机制。隔离回归用实际生成的 ZIP 验证工具复用、独立补下载与失败保留现有安装，不使用真实 ledger。
 - 安装策略与进度归 Peach：下载校验后在程序同卷暂存，用户确认重启，复制出来的包内助手等原托盘退出再切换完整目录；失败保留或恢复旧目录。配置、数据库与媒体不进更新包。
 - 不用 [Velopack](https://docs.velopack.io/packaging/operating-systems/windows)（要求其安装目录与包格式）与 [WinSparkle](https://winsparkle.org/)（要求 appcast 与原生更新界面）：产物是 PyInstaller ZIP、进度在 Web 显示，沿用托盘进程与目录替换协议。
 - Web 复用 Fieldset、Progress、confirmModal；状态由 `standalone-update.json` 保存。下载按字节计量，解压按文件数计量，替换使用阶段进度；服务重启期间保留等待状态，恢复连接后核对版本。

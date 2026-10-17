@@ -70014,7 +70014,7 @@ var GW = /* @__PURE__ */ new Set([
 	"installing"
 ]), GNe = [
 	65,
-	67,
+	75,
 	90
 ], KW = 120;
 function KNe({ initial: e, initialJob: t }) {
@@ -70086,8 +70086,13 @@ function KNe({ initial: e, initialJob: t }) {
 				/* @__PURE__ */ (0, C.jsx)(RA, {
 					term: "最新版本",
 					children: n.latest_version || (n.state === "unchecked" ? "尚未检查" : "未取得")
-				})
+				}),
+				n.package_kind ? /* @__PURE__ */ (0, C.jsxs)(RA, {
+					term: "下载内容",
+					children: [n.package_kind === "update" ? "应用更新包" : "应用与工具", n.asset_size ? ` · ${(n.asset_size / 1048576).toFixed(1)} MB` : ""]
+				}) : null
 			] }),
+			n.package_kind === "update" ? /* @__PURE__ */ (0, C.jsx)(NA, { children: "应用更新包复用已安装工具；工具缺失、损坏或版本变化时会另行下载所需工具包。" }) : n.package_kind === "full" ? /* @__PURE__ */ (0, C.jsx)(NA, { children: "本次更新包含媒体工具。" }) : null,
 			n.state === "unchecked" && !n.checked_at && !g && i.state === "idle" ? null : /* @__PURE__ */ (0, C.jsxs)(jA, {
 				divided: !0,
 				children: [

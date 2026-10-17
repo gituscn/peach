@@ -73,6 +73,15 @@ describe('自动更新', () => {
 });
 
 describe('检查更新', () => {
+  it('标明应用更新包体积和工具补下载条件', async () => {
+    const host = await mount(<ReleaseUpdates initial={{ ...release, state: 'available', latest_version: '1.0.0',
+      package_kind: 'update', asset_size: 12 * 1048576 }} />);
+    expect(host.textContent).toContain('应用更新包 · 12.0 MB');
+    expect(host.textContent).toContain('工具缺失、损坏或版本变化时会另行下载所需工具包');
+    expect(host.textContent).not.toContain('首次安装');
+    expect([...host.querySelectorAll('a')].some((a) => a.textContent === '完整安装包')).toBe(false);
+  });
+
   it('还没检查过时「尚未检查」只在最新版本那一行出现一次', async () => {
     vi.stubGlobal('fetch', fetchMock(200, { state: 'idle', progress: 0 }));
     const host = await mount(<ReleaseUpdates initial={release} />);

@@ -105,14 +105,16 @@ The original screenshots are lossless 3840×2160 PNGs; click to view them. You c
 ### Windows
 
 1. Download one of the two packages from [Releases](https://github.com/peach-mitao/peach/releases):
-   - Installer `Peach-<version>-windows-x64-setup.exe`: double-click to install and choose an installation folder. No administrator rights needed; Peach appears in the Start menu and can be uninstalled from Windows Settings.
-   - Portable `Peach-<version>-windows-x64.zip`: right-click it, choose "Extract All", then double-click `Peach.exe` inside.
+   - Full installer `Peach-<version>-windows-x64-setup.exe`: recommended for first-time installation. Double-click to install and choose an installation folder. No administrator rights needed; Peach appears in the Start menu and can be uninstalled from Windows Settings.
+   - Full portable package `Peach-<version>-windows-x64.zip`: right-click it, choose "Extract All", then double-click `Peach.exe` inside.
 2. Your browser opens the first-run setup page.
 3. Pick your media folders and who may access Peach, then start the scan.
 
 If you already have a library but see first-run setup, choose **使用已有数据目录** and enter its `peach-data` folder. Peach keeps the existing settings, ledger and access password, and remembers the folder.
 
 Windows standalone builds can check for and download updates under **应用与维护** in Configuration. Confirm a restart to install a downloaded update. Automatic checks and downloads are off by default and can be enabled there.
+
+Routine updates use `Peach-<version>-windows-x64-update.zip` and reuse verified installed tools. The updater downloads separate `tools-*.zip` bundles only when tools are missing, damaged or changed. The application update ZIP is for Peach's updater; use a full package for first-time installation. Older updaters download a full package on their first upgrade, then support tool reuse. Older releases that only provide a full package remain supported by the updater.
 
 Downloading an update leaves tasks running. Installing an update saves progress and pauses scraping and preview generation; collection requests made during installation wait for it to finish. After installation finishes or is cancelled, a running Peach service resumes the tasks automatically. If Peach has exited, it resumes unfinished library metadata, local previews, timeline thumbnails and cover tasks on the next launch, reusing completed results. Turning thumbnail collection off explicitly keeps it stopped.
 
