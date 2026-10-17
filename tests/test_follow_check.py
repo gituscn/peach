@@ -8,6 +8,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from peach.follow import FollowHistoryEnd, FollowSourceError, FollowSourceRateLi
 from peach.follow_check import plan_check, run_check
 from peach.follow_stream import FollowMediaResolver
 from peach.follow_secrets import CredentialError
-from peach.follow_sources import FollowCandidate, SourceFetch
+from peach.follow_sources import FollowCandidate, SourceFetch, _BaseConnector
 from peach.follow_store import FollowStore
 from support.ledger import fresh_ledger
 
@@ -84,6 +85,117 @@ class _CheckCase(unittest.TestCase):
                          writer=self.writer,
                          connector_factory=lambda provider, **kw: connector,
                          moment=MOMENT, **kwargs)
+
+
+class IncrementalCheckTests(_CheckCase):
+    @contextlib.contextmanager
+    def writer(self):
+        with self.connection:
+            yield self.store
+
+    def _reader(self):
+        database = self.connection.execute('PRAGMA database_list').fetchone()[2]
+        connection = sqlite3.connect(database)
+        connection.row_factory = sqlite3.Row
+        self.addCleanup(connection.close)
+        return connection
+
+    def _connector(self, enrich_one):
+        class Connector(_BaseConnector):
+            def fetch(self, ref, **kwargs):
+                candidates, probed = self.enrich(tuple(
+                    FollowCandidate(provider='fanbox', external_id=str(index),
+                                    title=f'作品 {index}', partial=True)
+                    for index in (1, 2)))
+                return _fetch(candidates=candidates, probed=probed, etag='finished', raw_body=b'page')
+
+            def _enrich_one(self, candidate):
+                return enrich_one(candidate)
+
+        return Connector(enrich_budget=2)
+
+    def test_a_completed_item_is_visible_while_the_next_item_is_being_enriched(self):
+        source = self._register()
+        self.connection.commit()
+        reader = self._reader()
+
+        def enrich(candidate):
+            if candidate.external_id == '1':
+                saved = reader.execute('SELECT * FROM follow_item ORDER BY external_id').fetchall()
+                self.assertEqual([row['external_id'] for row in saved], ['1', '2'])
+                self.assertTrue(all('post_type' not in json.loads(row['metadata_json']) for row in saved))
+            if candidate.external_id == '2':
+                saved = reader.execute('SELECT * FROM follow_item ORDER BY external_id').fetchall()
+                self.assertEqual([row['external_id'] for row in saved], ['1', '2'])
+                self.assertEqual(json.loads(saved[0]['metadata_json'])['post_type'], 'image')
+                self.assertNotIn('post_type', json.loads(saved[1]['metadata_json']))
+                self.assertIsNone(saved[0]['evidence_path'])
+                pending = reader.execute('SELECT * FROM follow_source WHERE id=?', (source,)).fetchone()
+                self.assertIsNone(pending['last_checked_at'])
+                self.assertIsNone(pending['etag'])
+                self.assertEqual(pending['backfill_page'], 0)
+            return replace(candidate, partial=False, extra={'post_type': 'image'})
+
+        result = self._run(source, self._connector(enrich))
+        self.assertEqual((result.outcome.discovered, result.outcome.added, result.outcome.updated),
+                         (2, 2, 0))
+        self.assertEqual(self._row(source)['etag'], 'finished')
+        self.assertTrue(all(row[0] for row in reader.execute('SELECT evidence_path FROM follow_item')))
+        again = self._run(source, self._connector(lambda candidate: candidate))
+        self.assertEqual((again.outcome.added, again.outcome.updated), (0, 2))
+
+    def test_a_rate_limit_keeps_completed_items_and_the_page_can_be_retried(self):
+        source = self._register()
+        self.connection.commit()
+
+        def enrich(candidate):
+            if candidate.external_id == '2':
+                raise FollowSourceRateLimited('稍后再试', 120)
+            return replace(candidate, partial=False, extra={'post_type': 'image'})
+
+        result = self._run(source, self._connector(enrich))
+        self.assertFalse(result.ok)
+        reader = self._reader()
+        saved = reader.execute('SELECT * FROM follow_item ORDER BY external_id').fetchall()
+        self.assertEqual([row['external_id'] for row in saved], ['1', '2'])
+        self.assertEqual(json.loads(saved[0]['metadata_json'])['post_type'], 'image')
+        self.assertNotIn('post_type', json.loads(saved[1]['metadata_json']))
+        row = self._row(source)
+        self.assertEqual(row['last_status'], 'error')
+        self.assertIsNone(row['etag'])
+        self.assertEqual(row['backfill_page'], 0)
+        retry = self._run(source, self._connector(lambda candidate: candidate))
+        self.assertEqual((retry.outcome.added, retry.outcome.updated), (0, 2))
+        self.assertEqual(len(self.store.items(source_id=source)), 2)
+
+    def test_an_interrupted_history_page_keeps_items_without_advancing_its_cursor(self):
+        source = self._register()
+        self.connection.commit()
+
+        def enrich(candidate):
+            if candidate.external_id == '2':
+                raise InterruptedError('任务中断')
+            return candidate
+
+        with self.assertRaises(InterruptedError):
+            self._run(source, self._connector(enrich), older=True)
+        self.assertEqual(len(self.store.items(source_id=source)), 2)
+        self.assertEqual(self._row(source)['backfill_page'], 0)
+        self.assertIsNone(self._row(source)['last_checked_at'])
+
+    def test_detail_dates_enforce_the_persisted_history_boundary(self):
+        source = self._register()
+        self.store.merge_source_metadata(source, {
+            'initial_history_after': '2026-08-04T00:00:00Z', 'initial_history_floor': 0}, MOMENT)
+        self.connection.commit()
+
+        def enrich(candidate):
+            self.assertEqual(len(self.store.items(source_id=source)), 0)
+            return replace(candidate, partial=False, published_at='2025-01-01T00:00:00Z')
+
+        result = self._run(source, self._connector(enrich))
+        self.assertEqual(result.outcome.discovered, 0)
+        self.assertEqual(len(self.store.items(source_id=source)), 0)
 
 
 class SecondPhaseHandoffTests(_CheckCase):

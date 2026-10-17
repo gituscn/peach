@@ -474,6 +474,7 @@ class _BaseConnector:
         #: 可断言又不真的把测试拖成几十秒。
         self.sleeper = sleeper
         self.progress = None
+        self.candidate_ready = None
         self.history_after = None
         self.history_skipped = 0
         #: 首次采集的条数下限。边界之外最多放行这么多条，精确裁剪由 `run_check`
@@ -682,17 +683,23 @@ class _BaseConnector:
         limit = self.enrich_budget
         skipped = self.enrich_skip
         candidates = tuple(candidate for candidate in candidates if self.within_history(candidate))
-        if not limit:
-            return tuple(candidates), 0
+        for candidate in candidates:
+            self.publish_candidate(candidate)
         spent = 0
         result: list[FollowCandidate] = []
         for candidate in candidates:
             if spent >= limit or str(candidate.external_id) in skipped:
                 result.append(candidate)
-                continue
-            spent += 1
-            result.append(self._enrich_one(candidate))
+            else:
+                spent += 1
+                result.append(self._enrich_one(candidate))
+                self.publish_candidate(result[-1])
         return tuple(result), spent
+
+    def publish_candidate(self, candidate: FollowCandidate) -> None:
+        """把已通过当前条目判据的结果交回调用方，分页完成由 fetch 回执声明。"""
+        if self.candidate_ready is not None:
+            self.candidate_ready(candidate)
 
     def _enrich_one(self, candidate: FollowCandidate) -> FollowCandidate:
         """补全一条候选。取不到就原样返回（仍是 `partial`），不猜、不写死。"""
@@ -904,6 +911,7 @@ class KemonoConnector(_BaseConnector):
                 skipped += 1
                 continue
             kept.append(self._candidate(post, service, user))
+            self.publish_candidate(kept[-1])
         return SourceFetch(candidates=tuple(kept), skipped=skipped, probed=probed,
                            raw_body=response.body, **common)
 
@@ -1233,6 +1241,7 @@ class Rule34VideoConnector(_BaseConnector):
                 skipped_compilations += 1
                 continue
             candidates.append(enriched)
+            self.publish_candidate(enriched)
         return SourceFetch(
             candidates=tuple(candidates), skipped=skipped_compilations,
             skipped_compilations=skipped_compilations, probed=probed,
@@ -2194,6 +2203,7 @@ class F95ZoneConnector(_BaseConnector):
                        "gofile_video_count": sum(
                            item.get("media_kind") == "video" for item in media_items)},
             ))
+            self.publish_candidate(enriched[-1])
         return SourceFetch(candidates=tuple(enriched), skipped=skipped,
                            raw_body=response.body, **common)
 

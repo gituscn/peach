@@ -4,8 +4,8 @@ Web 与命令行共用这一份。各写一遍必然分岔：其中一份漏掉�
 之后的强制重取、不学官方渠道的作者别名，于是同一句「检查更新」在网页上做的事比
 在终端里多，而没有任何地方说明这一点。
 
-网络与落库都在这里，事务边界由调用方传进来的 `writer` 决定：Web 每条来源一个写
-事务，命令行是一条连接加显式 commit。展示不在这里，`CheckResult` 交回给调用方。
+网络与落库都在这里，已确认条目各自交给调用方传入的 `writer` 提交；整页完成后
+才推进来源游标。展示不在这里，`CheckResult` 交回给调用方。
 """
 from __future__ import annotations
 
@@ -125,6 +125,7 @@ def run_check(row: Mapping, *, credentials, writer, connector_factory,
     force = bool(row.get("force_media_reparse")) or replay_first
     cutoff, floor = _history_limits(row, metadata, writer, moment,
                                     older=older, initial_days=initial_days)
+    recorder = _PageRecorder(row, writer, moment, cutoff)
     try:
         connector = build_connector_for(
             provider, credentials, connector_factory,
@@ -132,6 +133,7 @@ def run_check(row: Mapping, *, credentials, writer, connector_factory,
         connector.history_after = cutoff
         connector.history_skipped = 0
         connector.history_floor = floor
+        connector.candidate_ready = recorder.publish
         if progress is not None:
             connector.progress = progress
         fetch = connector.fetch(
@@ -158,12 +160,11 @@ def run_check(row: Mapping, *, credentials, writer, connector_factory,
                 store.merge_source_metadata(source_id, {'initial_history_first_page_pending': False}, moment)
             elif history_skipped and page == 0 and 'initial_history_first_page_pending' not in metadata:
                 store.merge_source_metadata(source_id, {'initial_history_first_page_pending': True}, moment)
-        outcome = store.record(
-            source_id, fetch,
-            creator_aliases=store.creator_aliases(row["entity_id"]),
-            moment=moment, page=page)
+        outcome = recorder.record_in(store, fetch, page)
     if floor and not fetch.not_modified:
-        fetch, outcome = _fill_floor(row, connector, writer, fetch, outcome, cutoff, floor, moment)
+        recorder.cutoff = None
+        fetch, outcome = _fill_floor(row, connector, writer, fetch, outcome, cutoff, floor, moment,
+                                     recorder=recorder)
     with writer() as store:
         learned = store.learn_official_author_alias(provider, ref, fetch.candidates)
     return CheckResult(**base, fetch=fetch, outcome=outcome,
@@ -196,7 +197,7 @@ def _history_limits(row, metadata: dict, writer, moment: datetime, *,
     return datetime.fromisoformat(history_after), floor
 
 
-def _fill_floor(row, connector, writer, fetch, outcome, cutoff, floor, moment):
+def _fill_floor(row, connector, writer, fetch, outcome, cutoff, floor, moment, *, recorder):
     """首次采集不足下限时往前翻页补足，再把边界挪到实际收下的最早一条。
 
     往前翻的页整页收下，回填游标因此和「已经抓到第几页」一致，之后手动加载更早
@@ -219,10 +220,7 @@ def _fill_floor(row, connector, writer, fetch, outcome, cutoff, floor, moment):
         except (CredentialError, FollowSourceError):
             # 首页已经落库，补页失败只是这次补得少，之后手动加载更早还能接着翻。
             break
-        with writer() as store:
-            extra = store.record(source_id, more,
-                                 creator_aliases=store.creator_aliases(row["entity_id"]),
-                                 moment=moment, page=page)
+        extra = recorder.record(more, page)
         kept.extend(more.candidates)
         for key in totals:
             totals[key] += getattr(extra, key)
@@ -243,3 +241,39 @@ def _record_failure(writer, base: dict, error: Exception, moment: datetime,
     with writer() as store:
         store.record_error(base["source_id"], str(error), moment, status=status)
     return CheckResult(**base, ok=False, status=status, error=str(error))
+
+
+class _PageRecorder:
+    """逐项提交可展示的结果，整页完成后才保存来源游标与完成状态。"""
+
+    def __init__(self, row, writer, moment, cutoff):
+        self.row, self.writer, self.moment, self.cutoff = row, writer, moment, cutoff
+        self.added_ids: set[str] = set()
+
+    def publish(self, candidate):
+        # 有历史边界时，详情可能给出更早的日期；列表行由整页最终筛选接纳。
+        if self.cutoff is not None and candidate.partial:
+            return
+        if not history_window((candidate,), self.cutoff):
+            return
+        fetch = SourceFetch(provider=str(self.row['provider']), ref=str(self.row['ref']),
+                            request_url=str(self.row['url']), semantics=str(self.row['semantics']),
+                            candidates=(candidate,))
+        with self.writer() as store:
+            outcome = store.record(int(self.row['id']), fetch,
+                                   creator_aliases=store.creator_aliases(self.row['entity_id']),
+                                   moment=self.moment, complete=False)
+        if outcome.added:
+            self.added_ids.add(str(candidate.external_id))
+
+    def record(self, fetch, page):
+        with self.writer() as store:
+            return self.record_in(store, fetch, page)
+
+    def record_in(self, store, fetch, page):
+        outcome = store.record(int(self.row['id']), fetch,
+                               creator_aliases=store.creator_aliases(self.row['entity_id']),
+                               moment=self.moment, page=page)
+        added = len(self.added_ids.intersection(str(c.external_id) for c in fetch.candidates))
+        self.added_ids.clear()
+        return replace(outcome, added=outcome.added + added, updated=outcome.updated - added)

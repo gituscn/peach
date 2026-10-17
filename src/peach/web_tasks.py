@@ -17,6 +17,7 @@ import sqlite3
 from datetime import datetime
 
 from .task_runs import ACTIVE_STATUSES, TERMINAL_STATUSES
+from .web_result_versions import result_versions
 
 #: 不带筛选时「最近完成」那一段每页的默认条数。一屏看得完，更早的往前翻。
 RECENT_LIMIT = 20
@@ -62,6 +63,7 @@ def _tasks(contract, args):
         "ok": True,
         "filtered": False,
         "available": True,
+        "result_versions": result_versions(contract),
         "running": [row.payload() for row in running],
         # 被挡掉的那些也在 `finished` 里（它们是 `cancelled`），这里单独再挑一份：
         # 「为什么没跑」是用户来这一页的主要问题，不该让他在完成列表里自己找。

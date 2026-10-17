@@ -34,7 +34,8 @@ def _approved_key(connection, group: dict) -> str:
     if row is None:
         return ""
     try:
-        return str(json.loads(row[0]).get("candidate_key") or "")
+        note = json.loads(row[0])
+        return str(note.get("refreshed_candidate_key") or note.get("candidate_key") or "")
     except (AttributeError, TypeError, ValueError):
         return ""
 

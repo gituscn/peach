@@ -73,6 +73,51 @@ class ProcessingControlTests(unittest.TestCase):
             estimate.update(state)
         self.assertEqual((state['eta_seconds_min'], state['eta_seconds_max']), frozen)
 
+    def test_metadata_passes_use_independent_measured_samples(self):
+        self.seed()
+        state = dict(initial_estimate(self.config, self.db, 'metadata'),
+                     requested_stage='metadata', status='running', stage='读取本地资料', checked=0, total=10)
+        with patch('peach.processing_control.time.monotonic', return_value=100):
+            estimate = ProcessingEstimate(self.config, state, None)
+            estimate.update(state)
+        state['checked'] = 3
+        with patch('peach.processing_control.time.monotonic', return_value=103):
+            estimate.update(state)
+        self.assertEqual(state['eta_kind'], 'measured')
+        state.update(stage='采集缺失资料', checked=0)
+        with patch('peach.processing_control.time.monotonic', return_value=200):
+            estimate.update(state)
+        self.assertTrue(state['eta_initial'])
+        self.assertEqual(state['eta_kind'], 'estimating')
+        self.assertEqual(state['eta_scope'], '当前阶段：采集缺失资料')
+        state['checked'] = 2
+        with patch('peach.processing_control.time.monotonic', return_value=204):
+            estimate.update(state)
+        self.assertLessEqual(state['eta_seconds_min'], 16)
+        self.assertGreaterEqual(state['eta_seconds_max'], 16)
+        self.assertLess(state['eta_seconds_max'], 40)
+
+    def test_progress_count_rewind_starts_a_new_sample_for_same_stage(self):
+        self.seed()
+        state = dict(initial_estimate(self.config, self.db, 'metadata'),
+                     requested_stage='metadata', status='running', stage='读取时长与分辨率', checked=0, total=10)
+        with patch('peach.processing_control.time.monotonic', return_value=100):
+            estimate = ProcessingEstimate(self.config, state, None)
+            estimate.update(state)
+        state['checked'] = 5
+        with patch('peach.processing_control.time.monotonic', return_value=150):
+            estimate.update(state)
+        state['checked'] = 0
+        with patch('peach.processing_control.time.monotonic', return_value=200):
+            estimate.update(state)
+        self.assertEqual(state['eta_kind'], 'estimating')
+        state['checked'] = 2
+        with patch('peach.processing_control.time.monotonic', return_value=202):
+            estimate.update(state)
+        self.assertLessEqual(state['eta_seconds_min'], 8)
+        self.assertGreaterEqual(state['eta_seconds_max'], 8)
+        self.assertLess(state['eta_seconds_max'], 20)
+
     def test_pause_waits_at_checkpoint_and_resume_releases_same_job(self):
         control = control_for(self.config)
         entered, paused, finished = threading.Event(), threading.Event(), threading.Event()

@@ -1,5 +1,11 @@
 # 复用清单
 
+## 长跑任务的结果显示
+
+资料采集与关注检查复用已有字段判据、事务和候选复核。全部本地 NFO 先读取并按影片提交；在线资料按来源返回时提交，候选 CSV 仍按时间合并落盘。关注列表的安全 partial 行与逐项详情分别保存，历史边界和整页游标沿用连接器规则。中断保留已提交结果，停止后不再落库。
+
+显示层复用 SQLite `ledger_revision` 触发器、候选与图片目录版本，以及 TanStack Query 5.104.2（MIT）查询失效和任务轮询；不新增推送服务或依赖。应用根按结果版本刷新相关读缓存，任务心跳不使资料失效；慢请求期间的新版本排队，保留当前内容。资源同步扫描同时显示已完成来源，清理仍需完整扫描和确认。隔离账本、暂停的来源调用与手动放行的 Promise 验证中间结果可见及中断保留；无真实抓取或真实 ledger 写入。
+
 ## STRM 与挂载来源
 
 STRM 采用文本指针、播放时解析的通用行为，参考 SmartStrm 文档、OpenList 的 `drivers/strm` 与 Jellyfin 的 STRM 探测入口；固定 revision、许可证与实际读取位置见 [取证记录](reference-snapshots/strm-source-evidence.md)。SmartStrm 核心闭源，源码未取得。Peach 独立实现受限 HTTP(S) 指针，复用 HTTPX、现有 Range 传输、`m3u8` 解析与播放器计划；无新增运行依赖，也不复制上游应用代码。
@@ -619,3 +625,5 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.17.0，版本
 任务卡复用 Sonner 2.0.8（MIT）的 `toast.custom`、稳定任务 id 与无限停留时间；`processing` 和 `receipts` 两个栈按 `toasterId` 分流，普通回执按任务面板实测高度避让。任务卡在路由根观察共享 Query 缓存，收起只隐藏正文，暂停、速度与估时仍可见。React Aria 1.22.1 的 Slider、Popover 与现有 BoardUI Button 承担键盘、焦点与浮层行为，三档对应 `low/standard/high`；最高档流光使用 SVG 与 CSS，浮层关闭后卸载，暂停与后台页面停止运动。界面重建依据与差异见 [控件取证](reference-snapshots/processing-task-controls.md)。无新增依赖。问题明细沿用 `state/library-processing-<job_id>.issues.jsonl`。
 
 站点强调色检查覆盖进度、焦点、选中态、操作按钮与流光：旧 `--feedback-success` 引用既有强调色色阶；RSS 订阅保留橙色，信息、成功、警告、错误、品牌与图表分类保留语义色。
+
+普通 Toast 与扫描任务卡共用 Agent Progress 外框，16px 半径由通知栈内的既有 token 解析，细边框与接触阴影分别复用 `border-button-default`、`elevation-xs`，不改变内容排版。浏览器回归核对桌面、手机和明暗主题下的外框一致性，并以同一任务、同一内容回放外框基线生成对比图。

@@ -405,7 +405,7 @@ class LibraryMetadataProvider:
             return SourcePaused('；'.join(problems))
         return Unavailable('；'.join(problems))
 
-    def community(self, code, *, deadline=None, route=None, known=(), absent=()):
+    def community(self, code, *, deadline=None, route=None, known=(), absent=(), received=lambda found: None):
         """官方渠道落空时问综合索引那一档，返回 `[(来源, 资料)]`。
 
         问哪几家按 `community_catalog.community_sources_for`，它转手问
@@ -424,22 +424,24 @@ class LibraryMetadataProvider:
         if code not in cache:
             asked = [source for source in community_sources_for(code, route=route)
                      if source not in have and source not in absent]
-            cache[code] = self._ask_community(code, asked, deadline)
+            cache[code] = self._ask_community(code, asked, deadline, received)
         if isinstance(cache[code], Exception):
             if have:
                 return list(have.items())
             raise _again(cache[code])
         return [*have.items(), *((source, payload) for source, payload in cache[code] if source not in have)]
 
-    def _ask_community(self, code, sources, deadline):
+    def _ask_community(self, code, sources, deadline, received):
         """逐家问 `sources`，交出答上的 `[(来源, 资料)]`，或一个待缓存再抛的异常（见 `community`）。"""
         from .jav_cover_fetch import Unavailable
         from .scraping_access import SourcePaused
         found, problems, said_no, held = [], [], [], 0
         for source in sources:
             try:
-                found.append((source, self.site(source, code, deadline=deadline)))
+                payload = self.site(source, code, deadline=deadline)
             except DeadlineExceeded:
+                if found:
+                    return found
                 raise
             except Exception as error:
                 if is_missing(error):
@@ -448,11 +450,14 @@ class LibraryMetadataProvider:
                 held += source_paused(error)
                 text = describe_failure(error)
                 problems.append(text if text.startswith(SOURCE_LABELS[source]) else f'{SOURCE_LABELS[source]}：{text}')
+                continue
+            found.append((source, payload))
+            received([(source, payload)])
         if found or not problems:
             return found or _said_no('社区来源都没有这个番号', said_no)
         return (SourcePaused if held == len(problems) else Unavailable)('；'.join(problems))
 
-    def fc2(self, code, *, deadline=None, route=None, covers=False, required=(), known=()):
+    def fc2(self, code, *, deadline=None, route=None, covers=False, required=(), known=(), received=lambda found: None):
         """FC2 自己那一页，下架了就依次问几个存档站；返回沿路答上的每一档 `[(来源, 资料)]`。
 
         五站各是契约下的一站（`sources/fc2.py`、`sources/fc2cmadb.py`、`sources/fc2ppvdb.py`、
@@ -498,10 +503,12 @@ class LibraryMetadataProvider:
                 break
             state['asked'].add(name)
             started = time.monotonic()
+            additions = []
             try:
                 session = Session(self.transport, _extended(deadline, self.excused - mark))
-                state['found'] += [(name, record.payload())
-                                   for record in SITE_SOURCES[name]().records(code, session=session)]
+                additions = [(name, record.payload())
+                             for record in SITE_SOURCES[name]().records(code, session=session)]
+                state['found'] += additions
             except DeadlineExceeded:
                 # 前面已经答上时预算用尽只是「没再往下问」，不是这个番号没取到。
                 if not state['found']:
@@ -512,6 +519,7 @@ class LibraryMetadataProvider:
                     state['problems'].append(error)
             finally:
                 self._excuse(name, started)
+            received(additions)
         if state['found'] or known:
             return state['found']
         # 一处报错、另一处说没有时报错误：那个番号在报错那处有没有，还没问出来。
@@ -1213,6 +1221,30 @@ class _MissCache:
                        for name, codes in self._entries.items()}})
 
 
+class _MetadataResults:
+    """单站确认后发布证据，同一档的聚合回执只接纳新增取值。"""
+
+    def __init__(self, remote, code, received):
+        self.remote, self.code, self.received = remote, code, received
+        self.entries = []
+        self.known = {}
+
+    def cached(self, entries):
+        fresh = []
+        for name, payload, path in entries:
+            if self.known.get(name) != payload:
+                self.known[name] = payload
+                fresh.append((name, payload, path))
+        self.entries.extend(fresh)
+        if fresh:
+            self.received(fresh)
+
+    def save(self, found):
+        entries = [self.remote._evidence(name, self.code, payload) for name, payload in found
+                   if self.known.get(name) != payload]
+        self.cached(entries)
+
+
 class _RemoteSession:
     """一个任务共用的外部来源连接，加上来源说过「没有」的记忆。"""
 
@@ -1241,7 +1273,7 @@ class _RemoteSession:
         if self._provider is not None and hasattr(self._provider, 'close'):
             self._provider.close()
 
-    def collect(self, row, code, missing, cover_root, *, update, issue, answered=()):
+    def collect(self, row, code, missing, cover_root, *, update, issue, answered=(), received=lambda entries: None):
         """给这一行补外部资料与封面；返回 (证据条目, 新落盘的封面数)。
 
         文件名被读成番号的创作者作品一家都不问，判据见 `catalog_rules.scrapes_as_jav`；
@@ -1256,7 +1288,8 @@ class _RemoteSession:
         # 只是没有新的可问，不进告知项。
         if missing and chain and (self._askable(chain, code, answered)
                                   or not set(answered).intersection(chain)):
-            entries = self._metadata(row, code, missing, update=update, issue=issue, answered=answered)
+            entries = self._metadata(row, code, missing, update=update, issue=issue, answered=answered,
+                                     received=received)
         if _asks_cover(code, *_studio_evidence(row)) and not cover_settled(cover_root / (code + '.jpg')):
             snapshots, absent = self._cover_inputs(code, chain, entries)
             covers = self._cover(row, code, cover_root, update=update, issue=issue,
@@ -1322,7 +1355,7 @@ class _RemoteSession:
         chain = metadata_routes.route_for_code(code, *evidence, overrides=self._routes)
         return (*chain, *(source_key(entry) for entry in self._custom_sources(code, *evidence)))
 
-    def _ask(self, source, code, members, cached, *, required, deadline, evidence):
+    def _ask(self, source, code, members, cached, *, required, deadline, evidence, received=lambda found: None):
         """问链上的一档：按档名分派到 provider 对应的入口，返回这一档答上的 `[(来源, 资料)]`。
 
         `members` 是这一档里这一行还该问的站（`_askable`），`cached` 是这一档缓存里已有的快照：
@@ -1340,16 +1373,16 @@ class _RemoteSession:
             answered = {name for name, _, _ in cached}
             return provider.fc2(code, deadline=deadline, required=required,
                                 route=tuple(name for name in members if name not in answered),
-                                known=[payload for _, payload, _ in cached])
+                                known=[payload for _, payload, _ in cached], received=received)
         if source == '1pondo':
             return provider.one_pondo(code, deadline=deadline)
         if source in ('amane', 'amane_official'):
             return provider.amane(code, deadline=deadline, route=members)
         route = metadata_routes.community_route(code, *evidence, overrides=self._routes)
         return provider.community(code, deadline=deadline,
-                                  route=tuple(name for name in route if name in members))
+                                  route=tuple(name for name in route if name in members), received=received)
 
-    def _metadata(self, row, code, missing, *, update, issue, answered=()):
+    def _metadata(self, row, code, missing, *, update, issue, answered=(), received=lambda entries: None):
         """按内容类型的来源链逐档问，必填标量字段够了就不问下一档。
 
         链在 `metadata_routes`：有码先问片商官网、素人先问 MGStage（经 amane 桥，ADR-0048），
@@ -1378,7 +1411,8 @@ class _RemoteSession:
         chain = self._chain(code, *evidence)
         required = list(metadata_routes.required_scalars(missing))
         wants_tags = 'tags' in missing
-        problems, held, entries = [], [], []
+        results = _MetadataResults(self, code, received)
+        problems, held, entries = [], [], results.entries
         attempted = set(answered)
         stages = metadata_routes.stages_for_chain(chain)
         for source, then in zip(stages, (*stages[1:], '')):
@@ -1388,7 +1422,7 @@ class _RemoteSession:
             attempted.update(members)
             cached = self._cached_evidence(members, code) if self._consult else []
             if cached:
-                entries.extend(cached)
+                results.cached(cached)
                 if metadata_routes.settles(required, _given_fields(entries),
                                            wants_tags=wants_tags, then=then):
                     break
@@ -1398,7 +1432,8 @@ class _RemoteSession:
             try:
                 # 浏览器来源等人点验证的那段不算进这部片的预算（`LibraryMetadataProvider.excused`）。
                 found = self._ask(source, code, members, cached, required=required, evidence=evidence,
-                                  deadline=_extended(deadline, _excused(self._provider) - mark))
+                                  deadline=_extended(deadline, _excused(self._provider) - mark),
+                                  received=results.save)
             except DeadlineExceeded:
                 self.reset()
                 if entries:
@@ -1418,12 +1453,13 @@ class _RemoteSession:
                 held.append(source_paused(error))
                 continue
             update(stage='保存资料候选')
-            entries.extend(self._evidence(name, code, payload) for name, payload in found)
+            results.save(found)
             if metadata_routes.settles(required, _given_fields(entries),
                                        wants_tags=wants_tags, then=then):
                 break
-        entries.extend(self._preferred_tags(row, code, missing, chain, entries, attempted,
-            update=update, issue=issue, deadline=_extended(deadline, _excused(self._provider) - mark)))
+        tag_entries = self._preferred_tags(row, code, missing, chain, entries, attempted,
+            update=update, issue=issue, deadline=_extended(deadline, _excused(self._provider) - mark))
+        results.cached(tag_entries)
         if entries:
             return entries
         # 链上任何一档还在正常作答，这一行就是真没取到；全被限住时才算没轮到。
@@ -1489,7 +1525,7 @@ class _RemoteSession:
         return 0
 
 
-def _apply_finished_candidates(database, candidate_root, active, asset_ids=None):
+def _apply_finished_candidates(database, candidate_root, active, asset_ids=None, candidate_rows=None):
     """候选落盘后立即执行窄规则自动落库；没有账本实例时只采集候选。
 
     停止后一条都不再写：任务已经不属于这次运行，用户按下停止之后账本还在变，
@@ -1502,7 +1538,8 @@ def _apply_finished_candidates(database, candidate_root, active, asset_ids=None)
     # 快照目录是企划名义解析的证据来源（ADR-0038）。路径只有 `DEFAULT_METADATA_ROOT`
     # 一份定义，这里传它而不是再拼一次：两处各拼一份，改数据根时会有一处留在原地。
     return auto_apply_metadata(database, Path(candidate_root), active=active,
-                               snapshot_root=DEFAULT_METADATA_ROOT, asset_ids=asset_ids)
+                               snapshot_root=DEFAULT_METADATA_ROOT, asset_ids=asset_ids,
+                               candidate_rows=candidate_rows)
 
 
 def _enrich_finished_performers(database, groups, config, candidate_root, remote, active,
@@ -1660,7 +1697,7 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
     chosen_paths = _chosen_asset_paths(db_path, asset_ids)
     scan = asset_ids is None and stage in (ALL_STAGES, SCAN_STAGE)
     mounts = {key: tuple(str(value) for value in values) for key, values in config.mounts.items()}
-    ffprobe = _ffprobe_path(config) if scan or stage == COLLECT_STAGE else None
+    ffprobe = _ffprobe_path(config) if stage == SCAN_STAGE else None
     for source, roots in locations.items():
         if stage == PREVIEWS_STAGE and source != 'local':
             continue
@@ -1680,16 +1717,27 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
                                                checked=0, total=0, current_action='scanning_files'))
                 result.scanned += registered.files
                 result.scanned_bytes += registered.total_bytes
-                result.probed += probe_unmeasured(
-                    db_path, ffprobe, source, root, config=config,
-                    report=lambda done, total: update(stage='读取时长与分辨率', checked=done, total=total))
+                if stage == SCAN_STAGE:
+                    result.probed += probe_unmeasured(
+                        db_path, ffprobe, source, root, config=config,
+                        report=lambda done, total: update(stage='读取时长与分辨率', checked=done, total=total))
                 reattach_in(db_path, registered.new_ids)
                 update(scanned=result.scanned, probed=result.probed)
-            elif stage == COLLECT_STAGE:
-                result.probed += probe_unmeasured(
+    return result
+
+
+def _probe_sources(config, db_path, locations, online_roots, asset_ids, update):
+    """已登记视频按可访问来源逐项读取媒体属性。"""
+    probed = 0
+    ffprobe = _ffprobe_path(config)
+    for source, roots in locations.items():
+        for root in roots:
+            if translate_ledger_path(root) in online_roots:
+                probed += probe_unmeasured(
                     db_path, ffprobe, source, root, asset_ids=asset_ids, config=config,
                     report=lambda done, total: update(stage='读取时长与分辨率', checked=done, total=total))
-    return result
+    update(probed=probed)
+    return probed
 
 
 def _collection_rows(db_path, *, locations, online_roots, asset_ids):
@@ -1886,6 +1934,8 @@ class _LibraryCheckpoints:
             self.pending_metadata.add(_checkpoint_key(row))
 
     def commit_metadata(self, flush):
+        if not self.pending_metadata:
+            return
         self.completed['completed_metadata'].update(self.pending_metadata)
         self.pending_metadata.clear()
         self.state['completed_metadata'] = sorted(self.completed['completed_metadata'])
@@ -1909,6 +1959,60 @@ def _validate_processing_request(config, db_path, stage, asset_ids, retry_ids, d
     if stage == PREVIEWS_STAGE and database is None:
         raise ValueError('生成预览图需要共享馆藏写入连接')
     return selected_ids
+
+
+def _candidate_baseline(database, row, code, verify_existing):
+    """用已提交的字段判定补空与覆盖，包括演员、标签关系。"""
+    if database is None or not verify_existing:
+        return row
+    from .metadata_auto_apply import refresh_current_values
+    values = [dict(asset_id=row['id'], asset_path=row['path'], code=code or '',
+                   field=field, current_value=row.get(COLUMN_OF.get(field, field)) or '') for field in LABELS]
+    with database.read_connection() as connection:
+        refresh_current_values(connection, values)
+    return {**row, **{COLUMN_OF.get(value['field'], value['field']): value['current_value'] for value in values}}
+
+
+def _read_local_metadata(config, db_path, row, cover_root, listing, state, update, issue):
+    """读取一部影片的本地证据，返回可独立发布的资料与在线核查范围。"""
+    video = translate_ledger_path(row['path'])
+    try:
+        files = listing.files(video.parent)
+    except OSError:
+        files = {}
+    if video.name.casefold() not in files:
+        issue(row, '媒体文件不可访问', action='reading_local', retryable=True)
+        return None
+    code = _provider_code(row['code']) or release_code_from_filename(row['name'])
+    payload = None
+    entries = []
+    nfo, posters = sidecars(video, files)
+    if nfo:
+        try:
+            payload, raw = read_nfo(nfo)
+            if payload['id'] and code and not same_release_code(code, payload['id']):
+                raise ValueError('文件名与 NFO 番号冲突，请复核')
+            code = code or _provider_code(payload['id'])
+        except (OSError, ValueError, ET.ParseError) as error:
+            issue(row, str(error), action='reading_local')
+            payload = None
+    if code and not row['code']:
+        with closing(sqlite3.connect(db_path, timeout=30)) as connection, connection:
+            write_owned_fields(connection, [row['id']], {'code': code}, SCAN_FILENAME, require_empty=True)
+        state['identified'] += 1
+    try:
+        poster_root = cover_root if code else config.directory('generated') / 'posters'
+        state['covers'] += int(_local_poster(video, code or f"{row['id']}_4", poster_root,
+                                           payload, posters=posters))
+    except (OSError, ValueError):
+        issue(row, '本地封面无法读取', action='reading_local', retryable=True)
+    if payload:
+        evidence_path = config.directory('sources') / 'library-metadata' / (hashlib.sha256(raw).hexdigest() + '.nfo')
+        evidence_path.parent.mkdir(parents=True, exist_ok=True)
+        evidence_path.write_bytes(raw)
+        entries.append(('local_nfo', payload, evidence_path))
+    update(identified=state['identified'], covers=state['covers'])
+    return code, nfo is not None, payload, entries
 
 
 def process_library(config, db_path, candidate_root, cover_root, *, location='configured',
@@ -2035,8 +2139,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 return state
             rows, genre_decisions = _collection_rows(
                 db_path, locations=locations, online_roots=sources.online_roots, asset_ids=scope_ids)
-            if (stage in (ALL_STAGES, COLLECT_STAGE, PREVIEWS_STAGE)
-                    and not metadata_only(config.directory('state'))):
+            if stage == PREVIEWS_STAGE:
                 _generate_previews(config, rows, database, update=update, issue=issue, guard=guard,
                                    completed=checkpoints.completed['completed_previews'],
                                    checkpoint=lambda row: checkpoints.mark('completed_previews', row, flush_state))
@@ -2050,6 +2153,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             listing = _DirectoryIndex()
             csv_dirty = False
             csv_written_at = time.monotonic()
+            state.update(auto_applied=0, auto_rejected=0)
 
             def flush_candidates(force=False):
                 nonlocal csv_dirty, csv_written_at
@@ -2057,8 +2161,27 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                     write_rows(output, FIELDS, groups.values(), atomic=True)
                     csv_dirty = False
                     csv_written_at = time.monotonic()
+                if not csv_dirty:
                     checkpoints.commit_metadata(flush_state)
 
+            def publish(row, code, local_fields, verify_existing, entries):
+                nonlocal csv_dirty
+                if not entries:
+                    return
+                row = _candidate_baseline(database, row, code, verify_existing)
+                for source, document, evidence_path in entries:
+                    _merge_candidates(groups, row, code, source, document, evidence_path, genre_decisions,
+                                      local_fields, verify_existing=verify_existing)
+                csv_dirty = True
+                selected = [groups[key] for field in LABELS
+                            if (key := f"asset:{row['id']}:{field}") in groups]
+                landed = _apply_finished_candidates(database, candidate_root, active, [row['id']], selected)
+                state['auto_applied'] += landed['applied']
+                state['auto_rejected'] += landed['auto_rejected']
+                flush_candidates()
+                update(candidates=len(scoped_groups()), auto_applied=state['auto_applied'])
+
+            prepared = []
             for index, row in checkpoints.remaining_metadata(rows):
                 guard.check()
                 issues_before = state['issue_count']
@@ -2066,74 +2189,39 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                        current_asset_id=row['id'], current_asset_name=Path(str(row['name'] or '')).name,
                        current_action='reading_local', current_started_at=time.time(),
                        current_deadline_at=None)
-                target_key = f"asset:{row['id']}"
-                video = translate_ledger_path(row['path'])
-                # 文件在不在看目录列表，不单独 stat：一部片一个文件夹的网盘上，那是每行一半的往返。
-                try:
-                    files = listing.files(video.parent)
-                except OSError:
-                    files = {}
-                if video.name.casefold() not in files:
-                    issue(row, '媒体文件不可访问', action='reading_local', retryable=True)
+                local = _read_local_metadata(config, db_path, row, cover_root, listing, state, update, issue)
+                if local is None:
                     continue
-                code = _provider_code(row['code']) or release_code_from_filename(row['name'])
-                payload = None
-                nfo, posters = sidecars(video, files)
-                if nfo:
-                    try:
-                        payload, raw = read_nfo(nfo)
-                        if payload['id'] and code and not same_release_code(code, payload['id']):
-                            raise ValueError('文件名与 NFO 番号冲突，请复核')
-                        code = code or _provider_code(payload['id'])
-                    except (OSError, ValueError, ET.ParseError) as error:
-                        issue(row, str(error), action='reading_local')
-                        payload = None
-                if not code and not payload:
-                    # 没有番号不是问题项：账本里两万多行是创作者作品，本来就没有番号，
-                    # 逐行报「未识别到番号」只会把真正要处理的几十条淹掉。它们只登记本地海报：
-                    # 正片旁边的同名 PNG／JPG 落在 `{id}_4.jpg` 后卡片和详情直接用这一张。
-                    try:
-                        state['covers'] += int(_local_poster(
-                            video, f"{row['id']}_4",
-                            config.directory('generated') / 'posters', posters=posters))
-                    except (OSError, ValueError):
-                        issue(row, '本地封面无法读取', action='reading_local', retryable=True)
-                    update(checked=index + 1, candidates=len(scoped_groups()),
-                           current_asset_id=None, current_asset_name='', current_action='',
-                           current_started_at=None, current_deadline_at=None)
-                    continue
-                if code and not row['code']:
-                    with closing(sqlite3.connect(db_path, timeout=30)) as connection, connection:
-                        write_owned_fields(connection, [row['id']], {'code': code},
-                                           SCAN_FILENAME, require_empty=True)
-                    state['identified'] += 1
-                try:
-                    poster_root = cover_root if code else config.directory('generated') / 'posters'
-                    state['covers'] += int(_local_poster(video, code or f"{row['id']}_4", poster_root, payload,
-                                                         posters=posters))
-                except (OSError, ValueError):
-                    issue(row, '本地封面无法读取', action='reading_local', retryable=True)
-                entries = []
-                if payload:
-                    evidence_path = config.directory('sources') / 'library-metadata' / (hashlib.sha256(raw).hexdigest() + '.nfo')
-                    evidence_path.parent.mkdir(parents=True, exist_ok=True)
-                    evidence_path.write_bytes(raw)
-                    entries.append(('local_nfo', payload, evidence_path))
+                code, verify_existing, payload, entries = local
                 local_fields = _fields(payload, genre_decisions) if payload else {}
-                missing = list(COLLECTED_FIELDS) if nfo else _missing_fields(row, local_fields)
+                publish(row, code, local_fields, verify_existing, entries)
+                if code or payload:
+                    prepared.append((index, row, code, verify_existing, local_fields, entries,
+                                     state['issue_count'] == issues_before))
+                update(checked=index + 1)
+            flush_candidates(force=True)
+            if stage in (ALL_STAGES, COLLECT_STAGE):
+                _probe_sources(config, db_path, locations, sources.online_roots, scope_ids, update)
+                if not metadata_only(config.directory('state')):
+                    _generate_previews(config, rows, database, update=update, issue=issue, guard=guard,
+                        completed=checkpoints.completed['completed_previews'],
+                        checkpoint=lambda row: checkpoints.mark('completed_previews', row, flush_state))
+            for index, row, code, verify_existing, local_fields, local_entries, local_ok in prepared:
+                guard.check()
+                issues_before = state['issue_count']
+                update(stage='采集缺失资料', checked=index, total=len(rows), current_asset_id=row['id'],
+                       current_asset_name=Path(str(row['name'] or '')).name)
+                target_key = f"asset:{row['id']}"
+                missing = list(COLLECTED_FIELDS) if verify_existing else _missing_fields(row, local_fields)
                 found, covers = remote.collect(row, code, missing, cover_root, update=update, issue=issue,
-                                               answered=() if nfo else _answered_sources(groups, target_key, missing))
-                entries.extend(found)
+                    answered=() if verify_existing else _answered_sources(groups, target_key, missing),
+                    received=lambda entries, row=row, code=code, fields=local_fields, verify=verify_existing:
+                        publish(row, code, fields, verify, entries))
                 state['covers'] += covers
                 covered.append((row['id'], covers))
                 update(stage='保存资料候选', current_action='writing_candidates',
                        current_started_at=time.time(), current_deadline_at=None)
-                for source, document, evidence_path in entries:
-                    _merge_candidates(groups, row, code, source, document, evidence_path, genre_decisions,
-                                      local_fields, verify_existing=nfo is not None)
-                if entries:
-                    csv_dirty = True
-                checkpoints.queue_metadata(row, entries, issues_before)
+                checkpoints.queue_metadata(row, local_entries + found if local_ok else [], issues_before)
                 flush_candidates()
                 update(checked=index + 1, candidates=len(scoped_groups()),
                        current_asset_id=None, current_asset_name='', current_action='',
@@ -2144,6 +2232,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             summary = _finish_collection(
                 config, database, candidate_root, cover_root, groups, remote, asset_ids=scope_ids,
                 active=active, update=update, issue=issue, watermark=entity_watermark, covered=covered)
+            summary['auto_applied'] = summary.get('auto_applied', 0) + state['auto_applied']
+            summary['auto_rejected'] = summary.get('auto_rejected', 0) + state['auto_rejected']
             update(status='failed' if state['issue_count'] else 'complete', stage='处理结束',
                    checked=len(rows),
                    **summary,

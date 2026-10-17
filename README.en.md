@@ -30,6 +30,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 > **18+** For adults managing their own adult-content collections. The repository contains no media or site data. When Peach connects to outside sites it uses your own accounts and access rights.
 
 - **Already-organized videos just work**: Peach reads local NFO files and posters, then checks online metadata. Missing fields are filled automatically; replacing existing values requires review. Parts and versions with the same release code can share a `<code>.nfo`; a folder containing one release can also use `movie.nfo`. Unreadable NFO files are reported while online collection continues.
+- **See results as they arrive**: Local metadata appears first. Online collection, follow checks and history fetches show confirmed results during the run. Interrupted tasks retain committed results; conflicting metadata stays in review.
 - **Your files stay put**: scanning is read-only and files stay where they are. Renaming or moving only happens when you start it, with a preview first and an undo afterwards.
 - **Cloud and local together**: mount 115, PikPak, Guangya or OneDrive as a local drive with CloudDrive2 or another tool, and its videos join the same library as your hard drives. Register other mounted providers under **其他已挂载网盘**.
 - **Mount status**: media directories are checked periodically. A failed read is checked again before the tray and video page show the affected source and reason. Scans skip NAS recycle bins and system folders.

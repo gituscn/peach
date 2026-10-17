@@ -1046,7 +1046,7 @@ class Rule34VideoConnectorTests(unittest.TestCase):
         self.assertTrue(first.thumb_url.endswith("/preview.jpg"))
         self.assertIn("4542721_360.mp4", first.media_url)
 
-    def _detail_with_credits(self, names):
+    def _detail_with_credits(self, names, *, ready=None):
         credits = "".join(
             f'<a class="item btn_link video_meta_pill"'
             f' href="https://rule34video.com/models/m{n}/">{name}</a>'
@@ -1058,12 +1058,16 @@ class Rule34VideoConnectorTests(unittest.TestCase):
             return HttpResponse(200, {},
                                 RULE34VIDEO_HTML if "/models/" in request.url else detail)
 
-        return Rule34VideoConnector(transport=transport).fetch("lazyprocrastinator")
+        connector = Rule34VideoConnector(transport=transport)
+        connector.candidate_ready = ready
+        return connector.fetch("lazyprocrastinator")
 
     def test_detail_with_many_credited_models_is_not_collected(self):
         # 样本自带 LazyProcrastinator 一位，这里再添三位就是四位画面作者。
-        result = self._detail_with_credits(["M1", "M2", "M3"])
+        ready = []
+        result = self._detail_with_credits(["M1", "M2", "M3"], ready=ready.append)
         self.assertEqual(result.candidates, ())
+        self.assertEqual(ready, [])
         self.assertEqual(result.skipped, 2)
         self.assertEqual(result.skipped_compilations, 2)
 
@@ -2213,6 +2217,21 @@ class EnrichPhaseTests(unittest.TestCase):
         self.assertEqual(seen, [url for url in seen if "s=view" not in url])
         self.assertEqual(result.probed, 0)
         self.assertTrue(all(item.partial for item in result.candidates))
+
+    def test_each_enriched_item_is_published_before_the_next_detail_request(self):
+        seen, ready = [], []
+        connector = self._rule34xxx(seen, enrich_budget=2)
+
+        def publish(candidate):
+            ready.append(candidate)
+            enriched = sum(not item.partial for item in ready)
+            self.assertEqual(sum('s=view' in url for url in seen), enriched)
+
+        connector.candidate_ready = publish
+        result = connector.fetch('lazyprocrastinator')
+        self.assertEqual([item.external_id for item in ready[:4]],
+                         [item.external_id for item in result.candidates])
+        self.assertEqual([item.partial for item in ready], [True, True, True, True, False, False])
 
     def test_the_skip_set_is_spent_on_the_condition_not_on_the_budget(self):
         """跳过的条目不占额度：额度是为「还没补齐的那几条」留的。"""

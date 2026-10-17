@@ -291,11 +291,22 @@ class ProcessingEstimate:
         self.phase = None
         self.phase_started = self.started
         self.base_done = 0
+        self.last_done = 0
         self.paused_at_start = control.paused_seconds if control is not None else 0
         self.mode = state['speed_mode']
 
     def paused_elapsed(self):
         return self.control.paused_seconds - self.paused_at_start if self.control is not None else 0
+
+    def _phase_estimate(self, state, phase, done, total):
+        """阶段切换时用该阶段保守范围起算，采样只消费当前阶段的增量。"""
+        rates = {'local': 0.2, 'metadata': 8.0, 'previews': 12.0, 'probe': 1.0}
+        seconds = max(0, total - done) * rates.get(phase, 0) * MODE_FACTORS[self.mode]
+        known = phase in rates and total > 0
+        state.update(eta_seconds_min=math.ceil(seconds * 0.4) if known else None,
+                     eta_seconds_max=math.ceil(seconds * 2.5) if known else None,
+                     eta_kind='estimating', eta_initial=True, eta_scope=f"当前阶段：{state.get('stage') or '准备处理'}",
+                     eta_basis='根据当前阶段待处理数量粗估，运行后校准')
 
     def update(self, state):
         mode = self.control.mode if self.control is not None else self.mode
@@ -320,12 +331,16 @@ class ProcessingEstimate:
             return
         stage = state.get('stage')
         phase = ('previews' if stage == '生成预览图' else
-                 'metadata' if stage in ('读取本地资料', '采集缺失资料', '采集缺失封面', '保存资料候选') else
+                 'local' if stage == '读取本地资料' else
+                 'metadata' if stage in ('采集缺失资料', '采集缺失封面', '保存资料候选') else
                  'probe' if stage == '读取时长与分辨率' else None)
         done, total = state.get('checked', 0), state.get('total', 0)
         now = time.monotonic() - self.paused_elapsed()
-        if phase != self.phase:
+        if phase != self.phase or done < self.last_done:
+            if self.phase is not None:
+                self._phase_estimate(state, phase, done, total)
             self.phase, self.phase_started, self.base_done = phase, now, done
+        self.last_done = done
         completed = done - self.base_done
         if phase is None or completed < 2 or total <= done:
             return

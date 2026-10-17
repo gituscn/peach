@@ -216,9 +216,11 @@ function RouteGroups({ children }: { children?: ReactNode }) {
 }
 
 /** 整棵路由树。`children` 画在页面组 `path="*"` 的元素里面，只给测试用：跟着它挂一次就说明元素没被重挂。 */
-export function RouterRoot({ children, actions = null, processing = false }: { children?: ReactNode; actions?: ShellActions | null; processing?: boolean }) {
+export function RouterRoot({ children, actions = null, background, processing = false }:
+  { children?: ReactNode; actions?: ShellActions | null; background?: ReactNode; processing?: boolean }) {
   return (
     <Providers>
+      {background}
       <ShellActionsContext.Provider value={actions}>
         <PeachRouter>
           <ManagedSurface />

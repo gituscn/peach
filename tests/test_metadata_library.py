@@ -87,6 +87,223 @@ def _archive_pages(url):
 
 class LibraryNfoTests(unittest.TestCase):
     @windows_ledger_roots
+    def test_a_later_source_requires_review_to_replace_a_field_filled_during_the_run(self):
+        media = self.root / 'media'
+        media.mkdir()
+        (media / 'SSIS-057.mp4').write_bytes(b'video')
+        (media / 'SSIS-057.nfo').write_text(
+            '<movie><id>SSIS-057</id><title>本地标题</title></movie>', encoding='utf-8')
+        db = fresh_ledger(self.root)
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        database = LedgerDatabase(db)
+        provider = stub_provider()
+        provider.cover.return_value = False
+
+        def tags():
+            with database.read_connection() as connection:
+                return {row[0] for row in connection.execute(
+                    "SELECT tag FROM asset_tag WHERE asset_id=1 AND tag NOT LIKE '演员:%'")}
+
+        def query(code, source='r18dev', **kwargs):
+            if source == 'javdb':
+                self.assertIn('巨乳', tags())
+                return {'id': code, 'genres': ['高跟鞋', '絲襪']}
+            if source == 'dmm':
+                raise NotFound('没有')
+            return {'id': code, 'title': '本地标题', 'maker': 'Prestige', 'release_date': '2023-05-26',
+                    'actresses': [{'japanese_name': '涼森れむ'}], 'genres': ['巨乳']}
+
+        provider.query.side_effect = query
+        with patch('peach.library_processing._enrich_finished_performers',
+                   return_value={'aliases': 0, 'avatars': 0, 'conflicts': 0, 'failed': 0}):
+            process_library(config, db, self.root / 'generated', self.root / 'covers',
+                            provider_factory=lambda: provider, database=database,
+                            route_overrides='censored=r18dev,javdb')
+        self.assertEqual(tags(), {'巨乳'})
+        group = next(row for row in read_rows(self.root / 'generated/library-metadata-field-candidates.csv')
+                     if row['field'] == 'tags')
+        choice = next(item for item in json.loads(group['candidates_json']) if item['source'] == 'javdb')
+        self.assertTrue(choice['requires_review'])
+        from peach.web_contract import WebContract
+        from peach.web_review import q_review, w_review_decision
+        contract = WebContract(db, candidate_root=self.root / 'generated', database=database)
+        pending = q_review(contract)['sections']['metadata_fields']
+        decision = next(item for item in pending if item['field'] == 'tags')
+        w_review_decision(contract, {'category': 'metadata_fields', 'item_key': decision['item_key'],
+            'status': 'approved', 'candidate_key': choice['candidate_key'],
+            'expected_revision': decision['asset_mutation_revision']})
+        self.assertEqual(tags(), {'高跟', '丝袜'})
+
+    @windows_ledger_roots
+    def test_a_confirmed_site_is_visible_before_another_site_reaches_its_deadline(self):
+        from peach.library_processing import LibraryMetadataProvider
+        from peach.jav_cover_fetch import DeadlineExceeded
+        media = self.root / 'media'
+        media.mkdir()
+        (media / 'ABW-358.mp4').write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        with closing(sqlite3.connect(db)) as connection, connection:
+            connection.execute("INSERT INTO asset(path,name,location,medium,code) VALUES(?,?,'local','video','ABW-358')",
+                               (str(media / 'ABW-358.mp4'), 'ABW-358.mp4'))
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        provider = LibraryMetadataProvider.__new__(LibraryMetadataProvider)
+        provider.cover = Mock(return_value=False)
+        provider.transport = Mock()
+        seen = []
+
+        def site(source, code, **kwargs):
+            if source == 'avbase':
+                return {'id': code, 'title': '已确认来源标题'}
+            if source == 'javbus':
+                with closing(sqlite3.connect(db)) as connection:
+                    seen.extend(connection.execute('SELECT catalog_title FROM asset').fetchone())
+                self.assertTrue((config.directory('sources') / 'library-metadata/ABW-358-avbase.json').is_file())
+                raise DeadlineExceeded('等待另一站超时')
+            raise NotFound('没有')
+
+        provider.site = site
+        with patch('peach.library_processing._enrich_finished_performers',
+                   return_value={'aliases': 0, 'avatars': 0, 'conflicts': 0, 'failed': 0}):
+            process_library(config, db, self.root / 'generated', self.root / 'covers', stage='metadata',
+                            provider_factory=lambda: provider, database=LedgerDatabase(db),
+                            route_overrides='censored=avbase,javbus,javdb')
+        self.assertEqual(seen, ['已确认来源标题'])
+        candidates = read_rows(self.root / 'generated/library-metadata-field-candidates.csv')
+        self.assertEqual(json.loads(candidates[0]['candidates_json'])[0]['source'], 'avbase')
+
+    @windows_ledger_roots
+    def test_metadata_checkpoint_is_saved_when_evidence_was_flushed_before_cover_finished(self):
+        media = self.root / 'media'
+        media.mkdir()
+        (media / 'ABW-358.mp4').write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        with closing(sqlite3.connect(db)) as connection, connection:
+            connection.execute("INSERT INTO asset(path,name,location,medium,code) VALUES(?,?,'local','video','ABW-358')",
+                               (str(media / 'ABW-358.mp4'), 'ABW-358.mp4'))
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        provider = stub_provider()
+        provider.query.return_value = {'id': 'ABW-358', 'title': '已保存资料'}
+        provider.cover.return_value = False
+        with patch('peach.library_processing.CANDIDATE_FLUSH_SECONDS', 0):
+            result = process_library(config, db, self.root / 'generated', self.root / 'covers',
+                                     stage='metadata', provider_factory=lambda: provider)
+        self.assertEqual(len(result['completed_metadata']), 1)
+        provider.query.reset_mock()
+        process_library(config, db, self.root / 'generated', self.root / 'covers', stage='metadata',
+                        provider_factory=lambda: provider, resume_state=result)
+        provider.query.assert_not_called()
+
+    @windows_ledger_roots
+    def test_user_pause_keeps_published_fields_and_resumes_the_same_collection(self):
+        import threading
+        from peach.processing_control import control_for
+        media = self.root / 'media'
+        media.mkdir()
+        video = media / 'ABW-358.mp4'
+        video.write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        with closing(sqlite3.connect(db)) as connection, connection:
+            connection.execute("INSERT INTO asset(path,name,location,medium,code) VALUES(?,?,'local','video','ABW-358')",
+                               (str(video), video.name))
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        provider = stub_provider()
+        provider.query.return_value = {'id': 'ABW-358', 'title': '已确认资料'}
+        provider.cover.return_value = False
+        control = control_for(config)
+        paused, requested = threading.Event(), threading.Event()
+        results, errors = [], []
+        def report(state):
+            if state['status'] == 'paused':
+                paused.set()
+            elif state.get('auto_applied', 0) and not requested.is_set():
+                requested.set()
+                control.request('pause', state['job_id'])
+        def run():
+            try:
+                results.append(process_library(config, db, self.root / 'generated', self.root / 'covers',
+                    stage='metadata', speed_mode='high', job_id='one', report=report,
+                    provider_factory=lambda: provider, database=LedgerDatabase(db)))
+            except BaseException as exc:
+                errors.append(exc)
+        with patch('peach.library_processing.CANDIDATE_FLUSH_SECONDS', 0), \
+                patch('peach.library_processing._enrich_finished_performers',
+                      return_value={'aliases': 0, 'avatars': 0, 'conflicts': 0, 'failed': 0}):
+            thread = threading.Thread(target=run)
+            thread.start()
+            try:
+                self.assertTrue(paused.wait(5), errors)
+                with closing(sqlite3.connect(db)) as connection:
+                    self.assertEqual(connection.execute('SELECT catalog_title FROM asset').fetchone()[0], '已确认资料')
+                self.assertTrue(read_rows(self.root / 'generated/library-metadata-field-candidates.csv'))
+                self.assertEqual(snapshot(config)['status'], 'paused')
+            finally:
+                control.request('resume', 'one')
+                thread.join(5)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual((results[0]['job_id'], results[0]['status']), ('one', 'complete'))
+        self.assertGreater(results[0]['auto_applied'], 0)
+
+    @windows_ledger_roots
+    def test_all_local_titles_are_committed_before_the_first_online_request(self):
+        media = self.root / 'media'
+        media.mkdir()
+        db = fresh_ledger(self.root)
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        for code in ('ABW-358', 'ABW-359'):
+            (media / f'{code}.mp4').write_bytes(b'video')
+            (media / f'{code}.nfo').write_text(
+                f'<movie><id>{code}</id><title>本地 {code}</title></movie>', encoding='utf-8')
+        seen = []
+
+        def query(*args, **kwargs):
+            with closing(sqlite3.connect(db)) as connection:
+                seen.append(connection.execute('SELECT catalog_title FROM asset ORDER BY id').fetchall())
+            raise KeyboardInterrupt()
+
+        provider = stub_provider()
+        provider.query.side_effect = query
+        def previews(*args, **kwargs):
+            with closing(sqlite3.connect(db)) as connection:
+                self.assertEqual(connection.execute('SELECT catalog_title FROM asset ORDER BY id').fetchall(),
+                                 [('本地 ABW-358',), ('本地 ABW-359',)])
+
+        with self.assertRaises(KeyboardInterrupt), patch('peach.library_processing._generate_previews', side_effect=previews):
+            process_library(config, db, self.root / 'generated', self.root / 'covers',
+                            provider_factory=lambda: provider, database=LedgerDatabase(db))
+        self.assertEqual(seen, [[('本地 ABW-358',), ('本地 ABW-359',)]])
+        self.assertTrue(read_rows(self.root / 'generated/library-metadata-field-candidates.csv'))
+
+    @windows_ledger_roots
+    def test_confirmed_online_fields_are_committed_while_cover_fetch_is_pending(self):
+        media = self.root / 'media'
+        media.mkdir()
+        (media / 'ABW-358.mp4').write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        provider = stub_provider()
+        provider.query.return_value = {'id': 'ABW-358', 'title': '已确认标题', 'maker': 'Prestige',
+            'release_date': '2023-05-26', 'actresses': [{'japanese_name': '涼森れむ'}]}
+        visible = []
+
+        def cover(*args, **kwargs):
+            with closing(sqlite3.connect(db)) as connection:
+                visible.extend(connection.execute('SELECT catalog_title FROM asset').fetchone())
+            raise KeyboardInterrupt()
+
+        provider.cover.side_effect = cover
+        with self.assertRaises(KeyboardInterrupt):
+            process_library(config, db, self.root / 'generated', self.root / 'covers',
+                            provider_factory=lambda: provider, database=LedgerDatabase(db))
+        self.assertEqual(visible, ['已确认标题'])
+
+    @windows_ledger_roots
     def test_targeted_collection_keeps_global_progress_and_unrelated_candidates(self):
         media = self.root / 'media'
         media.mkdir()
@@ -398,12 +615,8 @@ class LibraryNfoTests(unittest.TestCase):
         self.assertEqual(json.loads(decision[1])['rule'], 'adr-0029-empty-field-local-nfo')
 
     @windows_ledger_roots
-    def test_a_stopped_job_lands_nothing_and_fetches_nothing(self):
-        """停止之后收尾那两步一个都不做：候选不落库，头像不下载。
-
-        采集本身停在哪一行都无所谓，而收尾这两步是在全部候选写完之后才跑的——
-        停止键按下去，界面上任务已经结束，账本却还在变，是最难解释的一种表现。
-        """
+    def test_stop_preserves_committed_fields_and_prevents_followup_writes(self):
+        """停止保留已提交资料，禁止后续写入与头像下载。"""
         media = self.root / 'media'
         media.mkdir()
         (media / 'ABW-358.mp4').write_bytes(b'video')
@@ -419,6 +632,9 @@ class LibraryNfoTests(unittest.TestCase):
         provider.query.return_value = {'id': 'ABW-358'}
         # 采集跑完、收尾还没开始的那一刻按下停止。
         alive = {'value': True}
+        commits = []
+        database = LedgerDatabase(db)
+        database.after_commit = lambda: commits.append(alive['value'])
 
         def report(state):
             if state.get('stage') == '保存资料候选':
@@ -427,7 +643,7 @@ class LibraryNfoTests(unittest.TestCase):
         with self.assertRaises(InterruptedError):
             process_library(config, db, self.root / 'generated', self.root / 'covers',
                             provider_factory=Mock(return_value=provider),
-                            database=LedgerDatabase(db), report=report,
+                            database=database, report=report,
                             active=lambda: alive['value'])
 
         with closing(sqlite3.connect(db)) as connection:
@@ -435,8 +651,10 @@ class LibraryNfoTests(unittest.TestCase):
                 "SELECT count(*) FROM review_decision").fetchone()[0]
             title = connection.execute(
                 "SELECT catalog_title FROM asset WHERE code='ABW-358'").fetchone()[0]
-        self.assertEqual(decisions, 0)
-        self.assertIsNone(title)
+        self.assertEqual(decisions, 2)
+        self.assertEqual(title, '涼森れむ流')
+        self.assertTrue(commits)
+        self.assertTrue(all(commits))
         transport.assert_not_called()
         self.assertFalse((self.root / 'generated' / 'avatars').exists())
 
@@ -1978,7 +2196,6 @@ class LibraryNfoTests(unittest.TestCase):
 
     def test_management_controls_keep_credentials_and_empty_sections_visible(self):
         root = Path(__file__).resolve().parents[1]
-        source = (root / 'frontend/src/application/catalog.js').read_text(encoding='utf-8')
         # 关注管理那一屏在 React 里：能加来源的站才进候选，缺必填凭据的那一行默认展开，
         # 一个站都没配也照样把整块列出来（空清单不等于这块不存在）。
         follow = root / 'frontend/src/react/follow-manage'
@@ -1987,7 +2204,6 @@ class LibraryNfoTests(unittest.TestCase):
         self.assertIn('const rows = (credentials.providers || []).filter((row) => row.followable);', add)
         self.assertIn("defaultOpen={row.requirement === 'required' && !credentialDone(row)}>", creds)
         self.assertIn('const rows = data.providers || [];', creds)
-        self.assertIn("mode:'notice'", source)
         configuration = (root / 'frontend/src/react/settings/configuration-page.tsx').read_text(encoding='utf-8')
         self.assertNotIn("'/api/library-processing'", configuration)
         page = (root / 'frontend/src/react/data-cleanup/data-cleanup-page.tsx').read_text(encoding='utf-8')
@@ -2533,6 +2749,9 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
             result = self.run_processing(stage='collect', asset_ids=[1])
         online.assert_called_once()
         self.assertEqual(result['previews'], 1)
+        with self.database.read_connection() as connection:
+            path = connection.execute('SELECT snapshot_path FROM asset WHERE id=1').fetchone()[0]
+        self.assertTrue(Path(path).is_file())
 
     def test_failed_tiling_leaves_no_registered_or_partial_snapshot(self):
         import subprocess

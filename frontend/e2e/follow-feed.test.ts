@@ -36,6 +36,37 @@ describe('关注页岛', () => {
   });
 
   for (const viewport of [DESKTOP, MOBILE]) {
+    it(`${viewport.name} 关注任务仍在运行时显示已确认资料`, { timeout: 60_000 }, async () => {
+      const opened = await openFollowFeed(browser, '/follow', viewport);
+      try {
+        const page = opened.page;
+        const payload = await page.evaluate(async () => (await fetch('/api/follow')).json());
+        let revision = 1;
+        await page.route((url) => url.pathname === '/api/tasks', route => route.fulfill({ json: {
+          available: true, running: [{ id: 1, status: 'running', task_key: 'follow-check' }],
+          finished: [], skipped: [], result_versions: { follow: String(revision) },
+        } }));
+        await page.route((url) => url.pathname === '/api/follow' && !url.searchParams.has('item'), route =>
+          route.fulfill({ json: { ...payload, groups: payload.groups.map((group: typeof FIRST[number]) =>
+            group.primary.id === 1000 && revision > 1 ? { ...group, primary: { ...group.primary,
+              title: '任务运行中已确认的标题' } } : group) } }));
+        const baseline = page.waitForResponse(url => new URL(url.url()).pathname === '/api/tasks');
+        await page.reload({ waitUntil: 'load' });
+        await baseline;
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        await page.locator(CARDS).first().waitFor();
+        await page.waitForFunction(() => document.querySelector('[data-follow-list]')?.textContent?.includes('演示更新 1000'));
+        revision = 2;
+        await page.getByText('任务运行中已确认的标题', { exact: true }).waitFor({ timeout: 15_000 });
+        const measured = await layout(page);
+        assert.ok(measured.scrollWidth <= measured.viewportWidth + 1, JSON.stringify(measured));
+        assert.deepEqual(measured.offenders, []);
+        assert.deepEqual(withoutPlayer(opened.problems), []);
+      } finally {
+        await opened.close();
+      }
+    });
+
     it(`${viewport.name} 已建档作者的头像与署名进入作者页，多位作者保持一排`, { timeout: 60_000 }, async () => {
       const opened = await openFollowFeed(browser, '/follow', viewport);
       try {
