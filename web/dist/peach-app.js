@@ -53362,7 +53362,11 @@ function xR({ size: e = "md", className: t, containerClassName: n, ref: r, ...i 
 //#endregion
 //#region src/react/components/data-table-frame.tsx
 function SR({ children: e, follow: t = !1, onRowClick: n }) {
-	return /* @__PURE__ */ (0, C.jsx)("div", {
+	let r = (0, S.useRef)(null);
+	return (0, S.useEffect)(() => {
+		Na(r.current?.querySelector(":scope > .overflow-x-auto") ?? null);
+	}), /* @__PURE__ */ (0, C.jsx)("div", {
+		ref: r,
 		"data-board-data-table": !0,
 		"data-follow-table": t || void 0,
 		onClick: n ? (e) => {

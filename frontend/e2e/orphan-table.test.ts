@@ -30,6 +30,22 @@ describe('孤儿记录数据表', () => {
       const table = page.getByRole('grid', { name: '文件已消失的作品', exact: true });
       await table.waitFor();
       await settle(page);
+      const scroller = table.locator('..');
+      assert.equal(await scroller.getAttribute('data-overlay-scrollbar'), 'true');
+      if (viewport.mobile) {
+        const track = section.locator('[data-board-data-table] > .ov-x');
+        await track.waitFor({ state: 'visible' });
+        const before = await track.locator('.ovthumb').evaluate(node => getComputedStyle(node).transform);
+        await scroller.evaluate(node => { node.scrollLeft = node.scrollWidth });
+        await page.waitForFunction(() => {
+          const node = document.querySelector('#orphan-records [data-overlay-scrollbar]')!;
+          return node.scrollLeft > 0;
+        });
+        await settle(page);
+        const after = await track.locator('.ovthumb').evaluate(node => getComputedStyle(node).transform);
+        assert.notEqual(after, before, '横向滑块没有跟随表格滚动');
+        await scroller.evaluate(node => { node.scrollLeft = 0 });
+      }
       assert.equal(await section.locator('[data-data-table-panel] #orphan-records-title').count(), 1);
       assert.equal(await table.locator('tbody tr').count(), 20);
       assert.equal(await section.getByRole('button', { name: '彻底删除所选（0）', exact: true }).count(), 0);

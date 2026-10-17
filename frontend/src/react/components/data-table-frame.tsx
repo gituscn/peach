@@ -1,4 +1,5 @@
-import type { MouseEvent, PropsWithChildren } from 'react';
+import { useEffect, useRef, type MouseEvent, type PropsWithChildren } from 'react';
+import { attachOverlayScrollbar } from '@peach/legacy/ui';
 
 import { clickedBlank } from './row-click';
 
@@ -12,6 +13,10 @@ export interface DataTableFrameProps extends PropsWithChildren {
 
 /** BoardUI Table 的 Data Table 外框：主表面、完整边线、圆角与选中行反馈。 */
 export function DataTableFrame({ children, follow = false, onRowClick }: DataTableFrameProps) {
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    attachOverlayScrollbar(host.current?.querySelector<HTMLElement>(':scope > .overflow-x-auto') ?? null);
+  });
   const click = onRowClick ? (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
@@ -19,7 +24,7 @@ export function DataTableFrame({ children, follow = false, onRowClick }: DataTab
     if (row && clickedBlank(event, row)) onRowClick(row.dataset.key!);
   } : undefined;
   return (
-    <div data-board-data-table data-follow-table={follow || undefined} onClick={click}>
+    <div ref={host} data-board-data-table data-follow-table={follow || undefined} onClick={click}>
       {children}
     </div>
   );
