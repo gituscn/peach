@@ -1,6 +1,7 @@
 // ==UserScript==
 // @name         Peach · JAV 入库
 // @namespace    https://github.com/peach-mitao/peach
+// @license      AGPL-3.0-or-later
 // @version      0.2.0
 // @description  在 JAV 作品详情页识别或选中番号，交给 Peach 下载入库。
 // __PEACH_JAV_MATCHES__

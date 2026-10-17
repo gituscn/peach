@@ -33,10 +33,6 @@ describe('浏览器添加 JAV 设置', () => {
         });
         await page.reload();
         const region = page.getByRole('region', { name: '浏览器添加 JAV', exact: true });
-        await region.getByText('支持的站点', { exact: true }).click();
-        await region.getByText(/^数据库：自动识别：JavDB、JavBus、JavLibrary/).waitFor();
-        await region.getByText(/^发行平台：选中番号：FANZA \/ DMM/).waitFor();
-        await region.getByText(/Tokyo-Hot/).waitFor();
         await region.getByRole('button', { name: '启用并生成令牌', exact: true }).click();
         const token = region.getByLabel('浏览器添加专用令牌', { exact: true });
         await token.waitFor();

@@ -71105,25 +71105,13 @@ function wPe({ initial: e, receipt: t }) {
 			let { token: i = "", ...a } = n;
 			r(a), s(i), t(e === "disable" ? "已关闭浏览器添加" : "已生成专用令牌");
 		});
-	}, u = n.providers.some((e) => e.key === i && e.configured && e.target), d = [...new Set((n.sites || []).map((e) => e.kind))];
+	}, u = n.providers.some((e) => e.key === i && e.configured && e.target);
 	return /* @__PURE__ */ (0, C.jsxs)(OA, {
 		title: "浏览器添加 JAV",
 		children: [/* @__PURE__ */ (0, C.jsxs)(AA, { children: [
-			/* @__PURE__ */ (0, C.jsx)(MA, { children: "在 JAV 作品页点击「加入 Peach」，自动搜索磁力并交给所选网盘下载入库。" }),
 			/* @__PURE__ */ (0, C.jsx)(FA, {
 				href: "/integrations/peach-jav.user.js",
 				children: "安装 Peach 用户脚本"
-			}),
-			/* @__PURE__ */ (0, C.jsxs)(RA, {
-				summary: "支持的站点",
-				children: [d.map((e) => {
-					let t = n.sites?.filter((t) => t.kind === e) || [], r = t.filter((e) => e.mode === "automatic").map((e) => e.label), i = t.filter((e) => e.mode === "selection").map((e) => e.label);
-					return /* @__PURE__ */ (0, C.jsxs)(MA, { children: [
-						e,
-						"：",
-						[r.length ? `自动识别：${r.join("、")}` : "", i.length ? `选中番号：${i.join("、")}` : ""].filter(Boolean).join("；")
-					] }, e);
-				}), /* @__PURE__ */ (0, C.jsx)(MA, { children: "未自动识别时，选中一个番号，在脚本菜单选择「选中番号加入 Peach」，再点击添加按钮。" })]
 			}),
 			/* @__PURE__ */ (0, C.jsxs)("div", { children: [/* @__PURE__ */ (0, C.jsx)(PA, { children: "浏览器添加的下载渠道" }), /* @__PURE__ */ (0, C.jsx)(NF, {
 				"aria-label": "浏览器添加的下载渠道",
@@ -71142,25 +71130,21 @@ function wPe({ initial: e, receipt: t }) {
 				isReadOnly: !0,
 				autoComplete: "off"
 			}),
-			o ? /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [
-				/* @__PURE__ */ (0, C.jsx)(bP, {
-					label: "浏览器添加专用令牌",
-					type: "password",
-					value: o,
-					isReadOnly: !0,
-					autoComplete: "new-password"
-				}),
-				/* @__PURE__ */ (0, C.jsx)(MA, { children: "在用户脚本菜单「配置 Peach」中填写 Peach 地址与专用令牌。" }),
-				/* @__PURE__ */ (0, C.jsx)("div", { children: /* @__PURE__ */ (0, C.jsx)(q, {
-					variant: "secondary",
-					type: "button",
-					onClick: () => {
-						c.run("copy", async () => navigator.clipboard.writeText(o), () => t("已复制专用令牌"));
-					},
-					...Y(c.busy === "copy"),
-					children: "复制专用令牌"
-				}) })
-			] }) : null,
+			o ? /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [/* @__PURE__ */ (0, C.jsx)(bP, {
+				label: "浏览器添加专用令牌",
+				type: "password",
+				value: o,
+				isReadOnly: !0,
+				autoComplete: "new-password"
+			}), /* @__PURE__ */ (0, C.jsx)("div", { children: /* @__PURE__ */ (0, C.jsx)(q, {
+				variant: "secondary",
+				type: "button",
+				onClick: () => {
+					c.run("copy", async () => navigator.clipboard.writeText(o), () => t("已复制专用令牌"));
+				},
+				...Y(c.busy === "copy"),
+				children: "复制专用令牌"
+			}) })] }) : null,
 			c.error ? /* @__PURE__ */ (0, C.jsx)(NA, { children: c.error }) : null
 		] }), /* @__PURE__ */ (0, C.jsxs)(jA, {
 			status: n.enabled ? "已启用" : "未启用",
