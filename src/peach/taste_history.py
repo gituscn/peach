@@ -9,6 +9,8 @@ import sqlite3
 import tempfile
 import zipfile
 import math
+import os
+import sys
 import time
 from collections import Counter, defaultdict
 from contextlib import closing, contextmanager
@@ -22,6 +24,8 @@ from browserexport.parse import read_visits as read_browser_visits
 from browserexport.browsers.chrome import Chrome
 from browserexport.browsers.firefox import Firefox
 from browserexport.browsers.safari import Safari
+from browserexport.browsers.common import Schema
+from browserexport.common import BrowserexportError
 
 from .catalog_rules import LENGTH_TAGS, TECH_TAGS
 from .review_csv import read_rows, write_rows
@@ -116,12 +120,17 @@ def discover_history_sources(
     localappdata: Path | None = None,
     platform_name: str | None = None,
 ) -> list[HistorySource]:
-    platform_name = platform_name or ("windows" if __import__("os").name == "nt" else "macos")
+    from .taste_browsers import _paths
+
+    platform_name = platform_name or {"win32": "windows", "darwin": "macos"}.get(sys.platform, "linux")
+    use_environment = home is None
     home = home or Path.home()
     candidates: list[tuple[str, Path]] = []
     if platform_name == "windows":
-        appdata = appdata or home / "AppData" / "Roaming"
-        localappdata = localappdata or home / "AppData" / "Local"
+        appdata = appdata or (Path(os.environ.get("APPDATA") or home / "AppData" / "Roaming")
+                              if use_environment else home / "AppData" / "Roaming")
+        localappdata = localappdata or (Path(os.environ.get("LOCALAPPDATA") or home / "AppData" / "Local")
+                                       if use_environment else home / "AppData" / "Local")
         candidates.extend(
             [
                 ("firefox", appdata / "Mozilla" / "Firefox" / "Profiles"),
@@ -132,9 +141,22 @@ def discover_history_sources(
                 ("brave", localappdata / "BraveSoftware" / "Brave-Browser" / "User Data"),
                 ("vivaldi", localappdata / "Vivaldi" / "User Data"),
                 ("opera", appdata / "Opera Software" / "Opera Stable"),
+                ("opera_gx", appdata / "Opera Software" / "Opera GX Stable"),
+                ("115", localappdata / "115Chrome" / "User Data"),
+                ("qq", localappdata / "Tencent" / "QQBrowser" / "User Data"),
+                ("360chrome", localappdata / "360chrome" / "Chrome" / "User Data"),
+                ("360chromex", localappdata / "360ChromeX" / "Chrome" / "User Data"),
+                ("360se", appdata / "360se6" / "User Data"),
+                ("360se", localappdata / "360se6" / "User Data"),
+                ("360se", localappdata / "secoresdk" / "360se6" / "User Data"),
+                ("sogou", localappdata / "Sogou" / "SogouExplorer" / "User Data"),
+                ("2345", localappdata / "2345Explorer" / "User Data"),
+                ("maxthon", localappdata / "Maxthon" / "Application" / "User Data"),
+                ("maxthon", localappdata / "Maxthon" / "User Data"),
+                ("chromium", localappdata / "Chromium" / "User Data"),
             ]
         )
-    else:
+    elif platform_name == "macos":
         candidates.extend(
             [
                 ("firefox", home / "Library" / "Application Support" / "Firefox" / "Profiles"),
@@ -144,15 +166,31 @@ def discover_history_sources(
                 ("edge", home / "Library" / "Application Support" / "Microsoft Edge"),
                 ("brave", home / "Library" / "Application Support" / "BraveSoftware" / "Brave-Browser"),
                 ("vivaldi", home / "Library" / "Application Support" / "Vivaldi"),
+                ("opera", home / "Library" / "Application Support" / "com.operasoftware.Opera"),
+                ("opera_gx", home / "Library" / "Application Support" / "com.operasoftware.OperaGX"),
             ]
         )
+    elif platform_name == "linux":
+        config = (Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
+                  if use_environment else home / ".config")
+        candidates.extend([
+            ("firefox", home / ".mozilla/firefox"),
+            ("firefox", home / ".var/app/org.mozilla.firefox/.mozilla/firefox"),
+            ("firefox", home / "snap/firefox/common/.mozilla/firefox"),
+            ("chrome", config / "google-chrome"),
+            ("chrome", home / ".var/app/com.google.Chrome/config/google-chrome"),
+            ("chromium", config / "chromium"),
+            ("edge", config / "microsoft-edge"),
+            ("brave", config / "BraveSoftware/Brave-Browser"),
+            ("vivaldi", config / "vivaldi"),
+            ("opera", config / "opera"),
+        ])
 
     found: list[HistorySource] = []
     for browser, root in candidates:
         if not root.is_dir():
             continue
-        filename = "places.sqlite" if browser in {"firefox", "zen"} else "History"
-        for path in [root / filename, *root.glob(f"*/{filename}")]:
+        for path in _paths(root, browsing_only=True):
             if path.is_file():
                 found.append(HistorySource(browser, path.parent.name, path, root,
                                            "firefox" if browser in {"firefox", "zen"} else "chrome"))
@@ -164,7 +202,7 @@ def discover_history_sources(
 
 
 def _readonly_uri(path: Path) -> str:
-    return f"file:{path.resolve().as_posix()}?mode=ro"
+    return f"{path.resolve().as_uri()}?mode=ro"
 
 
 def _consistent_copy(source: Path, destination: Path) -> None:
@@ -193,7 +231,37 @@ def _read_visits(snapshot: Path, _browser: str | None = None, *, progress=None) 
 
     def consume(source, browser: str | None = None) -> None:
         known = {"chrome": Chrome, "firefox": Firefox, "zen": Firefox, "safari": Safari}
-        iterator = known[browser].extract_visits(source) if browser in known else read_browser_visits(source)
+        if isinstance(source, sqlite3.Connection):
+            from .taste_browsers import history_engine
+            try:
+                browser = history_engine(source)
+            except ValueError:
+                # 其它格式仍交给 browserexport 自带的格式探测器。
+                iterator = read_browser_visits(source)
+                return consume_visits(iterator)
+            adapter = known[browser]
+            # 保留 browserexport 的时间与 DTO 转换，仅补可选元数据列。
+            optional = ({"V.visit_duration": ("visits", "visit_duration", "0")}
+                        if browser == "chrome" else {
+                            "P.description": ("moz_places", "description", "NULL"),
+                            "P.preview_image_url": ("moz_places", "preview_image_url", "NULL"),
+                        } if browser == "firefox" else {})
+            columns = list(adapter.schema.cols)
+            for expression, (table, column, fallback) in optional.items():
+                available = {row[1] for row in source.execute(f'PRAGMA table_info("{table}")')}
+                replacement = (f"COALESCE({expression}, {fallback})" if column in available
+                               else fallback)
+                columns = [f"{replacement} AS {column}" if item == expression else item
+                           for item in columns]
+            adapted = type("HistoryAdapter", (adapter,), {
+                "schema": Schema(cols=columns, where=adapter.schema.where, order_by=adapter.schema.order_by),
+            })
+            iterator = adapted.extract_visits(source)
+        else:
+            iterator = read_browser_visits(source)
+        consume_visits(iterator)
+
+    def consume_visits(iterator) -> None:
         for visit in iterator:
             visited = visit.dt
             if visited.tzinfo is None:
@@ -300,7 +368,7 @@ def refresh_history(
                     report()
                     visits = _read_visits(snapshot, source.engine or source.browser, progress=report)
                     report(len(visits))
-            except (sqlite3.DatabaseError, OSError) as error:
+            except (sqlite3.DatabaseError, OSError, ValueError, TypeError, OverflowError, BrowserexportError) as error:
                 message = ("历史文件正在使用，请退出该浏览器后重新读取" if "locked" in str(error).casefold()
                            else "浏览器历史未取得，请检查资料目录或退出浏览器后重试")
                 results.append({"browser": source.browser, "profile": source.profile, "visits": 0,
