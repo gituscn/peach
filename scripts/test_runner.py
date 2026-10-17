@@ -504,6 +504,11 @@ CI_FRONTEND_TESTS = frozenset({
     "test_frontend_build.VitestTests.test_the_island_suite_passes",
 })
 
+CI_BROWSER_TESTS = frozenset({
+    "test_web_e2e.WebE2ESmokeTests.test_every_route_holds_the_layout_and_runtime_invariants",
+    "test_web_e2e.SetupE2ETests.test_the_first_run_page_writes_errors_back_and_finishes",
+})
+
 
 def ci_frontend_delegated() -> bool:
     """Test 工作流的 Python 与浏览器任务由 web-bundle 承担前端工具检查。"""
@@ -518,7 +523,8 @@ def without_ci_frontend_tests(suite: unittest.TestSuite) -> unittest.TestSuite:
     for test in suite:
         if isinstance(test, unittest.TestSuite):
             selected.addTests(without_ci_frontend_tests(test))
-        elif test.id() not in CI_FRONTEND_TESTS:
+        elif test.id() not in CI_FRONTEND_TESTS and not (
+                os.environ.get("GITHUB_JOB") == "python" and test.id() in CI_BROWSER_TESTS):
             selected.addTest(test)
     return selected
 

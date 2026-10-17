@@ -69,18 +69,24 @@ Python 静态检查使用开发依赖 Ruff，随每个正式测试域扫描全�
 | 场景 | 验证 |
 | --- | --- |
 | 本机修改 | 正式入口默认 `auto`，按影响域取并集；同代码、环境与范围的有效记录可复用 |
-| 普通 PR | Python 3.14：macOS 影响域；Windows 关键系统 |
-| 普通主线提交 | Python 3.14：macOS 全量；Windows 关键系统 |
+| 普通 PR | Python 3.14：macOS 与 Windows 均按影响域验证 |
+| 普通主线提交 | Python 3.14：macOS 与 Windows 全量 Python 回归；前端与浏览器按影响选择 |
 | 实际依赖、迁移、共享测试设施、未知影响面 | Windows 与 macOS 的 Python 3.14 全量 |
 | 手动 CI | 完整系统矩阵 |
 | wheel | Windows 与 macOS 各一次 Python 3.14 独立最小安装 |
 | Release | 复用同 SHA 主线成功 CI；构建后执行独立 EXE 冒烟 |
 
-全量在两个独立 runner 按测试文件稳定分片；汇总任务要求所有分片和必需任务成功。分片子进程不签发记录。
+Python 全量按文件稳定分片，Windows 四片、macOS 两片，每片使用独立 runner；汇总任务要求所有分片和计划选择的任务成功。分片子进程不签发记录。
 
-Test 工作流的 `web-bundle` 在 Ubuntu 上统一执行 tsc、lint、Vitest、构建及产物差异检查；lint 同时检查无诊断且扫描文件数大于零。`python` 与 `web-e2e` 任务仅从 Python 测试集合中移交这三个工具用例，产物契约、系统功能和浏览器回归照常执行。任务身份由 GitHub Actions 的固定工作流与 job 名识别，未知任务和本机完整保留三个用例。承担部分 CI 职责的运行不签发本机测试记录，最终结果由必须依赖 `web-bundle` 的 `verified` 任务汇总。
+Test 工作流的 `web-bundle` 在 Ubuntu 上统一执行 tsc、lint、Vitest、构建及产物差异检查；lint 同时检查无诊断且扫描文件数大于零。CI 的 Python 任务把这三个工具用例交给前端任务，把两个真实浏览器用例交给浏览器矩阵；同模块的契约测试仍执行。任务身份由固定工作流与 job 名识别，未知任务和本机保留完整测试。承担部分 CI 职责的运行不签发本机测试记录。
 
-浏览器冒烟与设计决定断言（`tests/test_web_e2e.py`）由 `web-e2e` job 在 `windows-latest` 上执行 `web` 域。它装 Node 24、`frontend/node_modules`、ffmpeg，并经 `PEACH_E2E_CHROME` 指定 runner 自带的 Chrome。矩阵扩成全量（`plan` 输出的 `wide`）时，Windows 全量行本身就跑 `web` 域，这个 job 按条件跳过；`verified` 只在这种情况接受它的 skipped，别的 job 跳过照样算红。
+浏览器用例由 `web-e2e` 的六个 Windows runner 分担，每片有自己的服务、演示库与日志。`ci_plan.py` 按 `ci-browser-timings.json` 的实测秒数分配文件，新文件使用默认权重；每个文件恰好执行一次。每片经项目入口的 `-Focus` 运行分配的浏览器文件，首启文件始终归首次设置服务。它装 Node 24、前端依赖、ffmpeg，并经 `PEACH_E2E_CHROME` 指定 Chrome。本机浏览器入口与并发语义保持完整。
+
+计划按改动选择前端、vendor、wheel 与浏览器任务，文档 PR 只执行适用检查；依赖、未知影响与手动验证包含全部任务。`verified` 根据计划核对必需任务，缺失、失败、取消及必需任务跳过均判失败。Actions 工作流本身由固定版 actionlint 检查语法、表达式、依赖与脚本。PR 更新取消同 PR 的过期运行，主线 Test 按提交各自保留结果。
+
+Python 分片上传完整测试输出；浏览器分片上传 TAP、服务日志及已脱敏网络日志，保留 14 天。npm 审计遇到 high 或 critical 漏洞直接失败；只有临时网络错误最多请求三次，在前两次失败后分别等待 15 与 30 秒，未知响应不当成通过。
+
+Release 在媒体工具编译前核对同 SHA 主线 CI，缓存键绑定媒体工具源码清单与构建脚本，缓存内容同时含二进制和对应源码包；制品与独立开箱验收仍是发布前置。Docker 只在镜像相关主线改动、匹配 PR、版本标签或手动请求时运行，验收后推送同一个本地镜像。版本发布与覆盖升级验收不取消进行中的同目标运行；覆盖升级需明确选择目标版本及完整构建提交。
 
 浏览器用例覆盖 `frontend/e2e` 下全部 `*.test.ts`，包括子目录。`setup.test.ts` 由 `SetupE2ETests` 在首次设置服务上执行，其余文件在已配置的演示库服务上按文件并发、文件内串行。并发数取 `PEACH_E2E_CONCURRENCY`；未设时本机取逻辑核数的四分之一、上限 4，CI（`GITHUB_ACTIONS=true`）为 1。并发批最多 12 个文件，串行批每批一个文件，各自取得完整 TAP 结果。测量动画、密度切换与等待态替换的文件（`tests/test_web_e2e.py` 的 `TIMING_SENSITIVE_SUITES`）在并发批之后串行；并发为 1 时按设计决定、交互回归和路由冒烟排序。每批限时 600 秒，任一批失败，整轮验证失败。并发的文件共用一个服务和演示库：用例触发的写请求只能落在别的用例不断言的状态上，否则用 `page.route` 拦下或归进串行批。控制台逐批输出文件名；完整 TAP 日志与服务访问日志 `serve.log` 保存在 `build/agent-verification/browser/`，CI 在测试结束后上传其中的 TAP 日志。
 
@@ -93,6 +99,8 @@ Windows 的路径、挂载、托盘、证书、进程编码、更新、认证及
 人名对照等业务测试保留：修改相关域时执行，主线全量也执行。测试数据库从真实迁移生成模板，各用例复制独立临时库；迁移测试直接执行迁移。重试测试注入 sleeper 并断言退避序列。重复继承的测试只保留一份。
 
 ## 写什么测试
+
+纯 HTTP 请求契约可使用 `tests/support/web.py` 的 `route_client`：请求经过真实路由、中间件和依赖，不启动后台服务；调用方仍须准备完整临时账本。服务启动、恢复与关闭语义使用正常 lifespan，由集成测试覆盖。
 
 浏览器入口通过 `PEACH_E2E_NET_LOG_DIR` 保存 Chromium 网络事件日志；模式为 `HeavilyRedacted`，文件位于 `build/agent-verification/browser/network/`，CI 与 TAP 一起上传。网络请求失败仍使测试失败；排查 `ERR_NO_BUFFER_SPACE` 时同时核对 TAP 与该次浏览器的网络事件，不根据错误字样推断机器资源状态，也不添加放行重试。
 

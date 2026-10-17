@@ -9,11 +9,47 @@ import sys
 import tempfile
 import tomllib
 import unittest
+from unittest import mock
 
 from scripts import adopt_dependency_bump as adopt
 from tests.support.gitrepo import seed_repository
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class NpmAuditTests(unittest.TestCase):
+    def test_docker_dependency_updates_have_a_takeover_recipe(self):
+        for manifest in ('Dockerfile', '.github/actions/actionlint/Dockerfile'):
+            self.assertEqual(adopt.recipe_for([manifest])[0], 'docker')
+
+    def test_high_and_critical_vulnerabilities_fail_without_network_retries(self):
+        from scripts import npm_audit
+        for severity in ('high', 'critical'):
+            counts = {'high': 0, 'critical': 0, severity: 1}
+            with self.subTest(severity=severity):
+                response = subprocess.CompletedProcess([], 1, json.dumps(
+                    {'metadata': {'vulnerabilities': counts}}), '')
+                run, sleep = mock.Mock(return_value=response), mock.Mock()
+                self.assertEqual(npm_audit.audit(ROOT, runner=run, sleep=sleep), 1)
+                self.assertEqual(run.call_count, 1)
+                sleep.assert_not_called()
+
+    def test_temporary_registry_failures_retry_and_clean_results_pass(self):
+        from scripts import npm_audit
+        transient = subprocess.CompletedProcess([], 1, '{"error":{"code":"E503"}}', '')
+        clean = subprocess.CompletedProcess([], 0, '{"metadata":{"vulnerabilities":{"high":0,"critical":0}}}', '')
+        run, sleep = mock.Mock(side_effect=[transient, transient, clean]), mock.Mock()
+        self.assertEqual(npm_audit.audit(ROOT, runner=run, sleep=sleep), 0)
+        self.assertEqual(run.call_count, 3)
+        self.assertEqual(sleep.call_args_list, [mock.call(15), mock.call(30)])
+
+    def test_network_exhaustion_and_malformed_results_never_pass(self):
+        from scripts import npm_audit
+        for body, attempts in (('{"error":{"code":"E503"}}', 3), ('not json', 1), ('{}', 1)):
+            with self.subTest(body=body):
+                run = mock.Mock(return_value=subprocess.CompletedProcess([], 1, body, ''))
+                self.assertEqual(npm_audit.audit(ROOT, runner=run, sleep=mock.Mock()), 1)
+                self.assertEqual(run.call_count, attempts)
 
 
 def git(repo: Path, *args: str) -> str:

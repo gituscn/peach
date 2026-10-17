@@ -47,6 +47,13 @@ ROOT = Path(__file__).resolve().parents[1]
 #: 可能变的路径，`commands` 是重算命令，`checks` 只核对不产出文件。以 `/` 结尾的条目按
 #: 目录算，其余按整条路径比。
 RECIPES = {
+    "docker": {
+        "label": "应用与工作流 Docker 镜像",
+        "manifests": ("Dockerfile", ".github/actions/actionlint/Dockerfile"),
+        "derived": (),
+        "commands": (),
+        "checks": (),
+    },
     "web": {
         "label": "根 package.json（手工 vendor 的四个 web 包）",
         "manifests": ("package.json", "package-lock.json"),

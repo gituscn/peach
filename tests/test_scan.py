@@ -72,11 +72,11 @@ class WindowsShapeTests(_ScanCase):
             self.assertTrue(Path(path).is_file(), path)
 
     def test_scanned_video_is_visible_without_a_thumbnail_filter(self):
-        from fastapi.testclient import TestClient
+        from support.web import route_client
         from peach.api import create_app
         from peach.config import PeachSettings
         self._scan(str(self.media), declared_roots={"local": (str(self.media),)}, windows=True)
-        with TestClient(create_app(PeachSettings(db_path=self.db, configured=True, token=""))) as client:
+        with route_client(create_app(PeachSettings(db_path=self.db, configured=True, token=""))) as client:
             self.assertEqual(client.get('/api/items').json()['total'], 1)
             self.assertEqual(client.get('/api/items?thumb=0').json()['total'], 1)
             self.assertEqual(client.get('/api/items?thumb=1').json()['total'], 0)

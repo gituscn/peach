@@ -333,10 +333,10 @@ class SubtitleApiTests(unittest.TestCase):
         connection.close()
 
     def _client(self):
-        from fastapi.testclient import TestClient
+        from support.web import route_client
         from peach.api import create_app
         from peach.config import PeachSettings
-        return TestClient(create_app(PeachSettings(
+        return route_client(create_app(PeachSettings(
             db_path=self.db, configured=True, token="",
             allowed_media_roots=(self.media,))))
 
@@ -378,13 +378,13 @@ class SubtitleApiTests(unittest.TestCase):
             self.assertEqual(client.get("/api/assets/404/subtitles").status_code, 404)
 
     def test_the_endpoints_require_the_same_token_as_the_rest(self):
-        from fastapi.testclient import TestClient
+        from support.web import route_client
         from peach.api import create_app
         from peach.config import PeachSettings
         app = create_app(PeachSettings(
             db_path=self.db, configured=True, token="secret",
             allowed_media_roots=(self.media,)))
-        with TestClient(app) as client:
+        with route_client(app) as client:
             self.assertEqual(client.get("/api/assets/1/subtitles").status_code, 401)
             self.assertEqual(
                 client.get("/api/assets/1/subtitles/0?t=secret").status_code, 200)
