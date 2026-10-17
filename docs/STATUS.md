@@ -2,12 +2,11 @@
 
 最后核验：2026-10-17
 
-查 `/healthz`；[待办](PRODUCT_BACKLOG.md)、[复用清单](REUSE.md)、[长期约定](HANDOFF.md)。
+`/healthz`；[待办](PRODUCT_BACKLOG.md)、[复用](REUSE.md)、[约定](HANDOFF.md)
 
 ## 运行态
 
-- 浏览器历史：本机 115 `HistoryEx` 在临时私有库读取、重复导入与源文件不变性已验收；目录与实机覆盖见[浏览器历史导入](BROWSER_HISTORY.md)。
-
+- [115](BROWSER_HISTORY.md)
 - [Docker](DOCKER.md)
 - 名册：艺人（含动画作者）｜卖家｜在线；素人须有非职业出演证据，FC2 仅筛作品。
 - 公司资料、FC2 卖家按来源补空；厂牌去重 6 组。回执 `peach-data/review/`。
