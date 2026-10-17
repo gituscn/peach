@@ -14,7 +14,7 @@ import { ErrorText, ExternalLink, Fact, FactList, Footer, Help, Section, Stack }
 import { busyProps, useAction } from './use-action';
 
 const ACTIVE = new Set(['downloading', 'verifying', 'extracting', 'preparing', 'restarting', 'installing']);
-const STOPS = [65, 67, 90];
+const STOPS = [65, 75, 90];
 const MAX_FAILURES = 120;
 
 export function ReleaseUpdates({ initial, initialJob }: { initial: ReleaseState; initialJob?: UpdateJob | undefined }) {
@@ -92,7 +92,14 @@ export function ReleaseUpdates({ initial, initialJob }: { initial: ReleaseState;
         <Fact term="安装方式">{data.installation}</Fact>
         <Fact term="更新通道">{data.channel}</Fact>
         <Fact term="最新版本">{data.latest_version || (data.state === 'unchecked' ? '尚未检查' : '未取得')}</Fact>
+        {data.package_kind ? <Fact term="下载内容">
+          {data.package_kind === 'update' ? '应用更新包' : '应用与工具'}
+          {data.asset_size ? ` · ${(data.asset_size / 1048576).toFixed(1)} MB` : ''}
+        </Fact> : null}
       </FactList>
+      {data.package_kind === 'update'
+        ? <Help>应用更新包复用已安装工具；工具缺失、损坏或版本变化时会另行下载所需工具包。</Help>
+        : data.package_kind === 'full' ? <Help>本次更新包含媒体工具。</Help> : null}
       {/* 还没检查过时「最新版本」那一行已经写着「尚未检查」，下面不再说一遍。 */}
       {data.state === 'unchecked' && !data.checked_at && !error && job.state === 'idle' ? null : <Stack divided>
         {data.checked_at ? <Help>检查于 {new Date(data.checked_at * 1000).toLocaleString()}</Help> : null}

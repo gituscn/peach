@@ -2,6 +2,7 @@
 import json
 import hashlib
 import os
+import shutil
 from contextlib import nullcontext
 from pathlib import Path
 import tempfile
@@ -10,7 +11,12 @@ import unittest
 from unittest.mock import Mock, patch
 import zipfile
 
+import httpx
+
 from peach import settings_file, standalone_update as update
+from peach import update_packages
+from scripts.package_windows_release import package as package_release
+from scripts.smoke_split_update import verify as verify_split
 from support.ledger import fresh_ledger
 
 
@@ -150,6 +156,111 @@ class StandaloneUpdateTests(unittest.TestCase):
         self.assertEqual((target/"Peach.exe").read_text(),"old")
         launch.assert_not_called()
         lock.release.assert_called_once()
+
+    def release_fixture(self):
+        source = self.root / "dist/Peach"
+        (source / "_internal").mkdir(parents=True)
+        (source / "Peach.exe").write_bytes(b"new application")
+        (source / "_internal/standalone.txt").touch()
+        (source / "_internal/build-info.json").write_text(
+            json.dumps({"version": "1.0.0", "commit": None, "built_at": "fixture"}), encoding="utf-8")
+        for prefix, required in update_packages.TOOL_PATHS.values():
+            for name in required | ({"bin/codec.dll"} if prefix == "tools/ffmpeg" else set()):
+                path = source / prefix / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes((prefix + name).encode())
+        output = self.root / "release"
+        manifest = package_release(source, output, "1.0.0")
+        target = self.root / "installed"
+        shutil.copytree(source, target)
+        (target / "Peach.exe").write_bytes(b"old application")
+        (target / "unins000.exe").write_bytes(b"uninstaller")
+        archive = output / "Peach-1.0.0-windows-x64-update.zip"
+        release = dict(state="available", latest_version="1.0.0", asset_size=archive.stat().st_size,
+                       asset_digest="sha256:" + update_packages.digest(archive),
+                       asset_url="https://github.com/peach-mitao/peach/releases/download/v1.0.0/" + archive.name,
+                       package_kind="update")
+        return source, output, manifest, target, archive, release
+
+    def prepare_fixture(self, target, output, release, *, corrupt=None):
+        requests = []
+        def response(request):
+            name = request.url.path.rsplit("/", 1)[1]
+            requests.append(name)
+            content = (output / name).read_bytes()
+            return httpx.Response(200, content=b"corrupt" if name == corrupt else content)
+        client_type = update.httpx.Client
+        lock = Mock()
+        with patch.object(update.sys, "executable", str(target / "Peach.exe")), patch.object(
+                update.release_updates, "check", return_value=release), patch.object(
+                update.httpx, "Client", side_effect=lambda **kwargs: client_type(
+                    **kwargs, transport=update.httpx.MockTransport(response))):
+            update.prepare({"id": "split-fixture"}, lock)
+        lock.release.assert_called_once()
+        return update.read(), requests
+
+    def test_split_package_preserves_complete_install_and_reuses_verified_tools_without_download(self):
+        source, output, manifest, target, archive, release = self.release_fixture()
+        rebuilt = self.root / "rebuilt"
+        report = verify_split(output, "1.0.0", rebuilt)
+        self.assertEqual(report["tools"], 3)
+        self.assertEqual((rebuilt / "Peach/Peach.exe").read_bytes(), (source / "Peach.exe").read_bytes())
+        with zipfile.ZipFile(archive) as thin, zipfile.ZipFile(output / "Peach-1.0.0-windows-x64.zip") as full:
+            self.assertNotIn("Peach/tools/ffmpeg/bin/ffmpeg.exe", thin.namelist())
+            self.assertNotIn("Peach/cloudflared.exe", thin.namelist())
+            self.assertIn("Peach/tools/ffmpeg/bin/ffmpeg.exe", full.namelist())
+            self.assertNotIn("Peach/" + update_packages.MANIFEST, full.namelist())
+        state, requests = self.prepare_fixture(target, output, release)
+        self.assertEqual(state["state"], "ready", state)
+        self.assertEqual(requests, [archive.name])
+        self.assertEqual(state["downloaded"], state["total"])
+        for bundle in manifest["tools"].values():
+            self.assertTrue(update_packages.matches(Path(state["stage"]), bundle["files"]))
+        self.assertEqual((Path(state["stage"]) / "unins000.exe").read_bytes(), b"uninstaller")
+        self.assertEqual((target / "Peach.exe").read_bytes(), b"old application")
+
+    def test_only_missing_or_different_tools_are_downloaded_and_verified(self):
+        source, output, manifest, target, archive, release = self.release_fixture()
+        (target / "tools/ffmpeg/bin/codec.dll").write_bytes(b"different version")
+        (target / "cloudflared.exe").unlink()
+        state, requests = self.prepare_fixture(target, output, release)
+        self.assertEqual(state["state"], "ready", state)
+        self.assertEqual(set(requests), {archive.name, manifest["tools"]["ffmpeg"]["asset"]["name"],
+                                       manifest["tools"]["cloudflared"]["asset"]["name"]})
+        self.assertEqual(state["downloaded"], state["total"])
+        for bundle in manifest["tools"].values():
+            self.assertTrue(update_packages.matches(Path(state["stage"]), bundle["files"]))
+        self.assertEqual((target / "tools/ffmpeg/bin/codec.dll").read_bytes(), b"different version")
+
+    def test_corrupt_tool_download_leaves_the_installed_program_and_tools_untouched(self):
+        source, output, manifest, target, archive, release = self.release_fixture()
+        binary = target / "tools/ffmpeg/bin/ffmpeg.exe"
+        binary.write_bytes(b"old version")
+        state, _ = self.prepare_fixture(target, output, release, corrupt=manifest["tools"]["ffmpeg"]["asset"]["name"])
+        self.assertEqual(state["state"], "error")
+        self.assertIn("校验失败", state["message"])
+        self.assertEqual(binary.read_bytes(), b"old version")
+        self.assertEqual((target / "Peach.exe").read_bytes(), b"old application")
+
+    def test_manifest_rejects_path_escape_tool_scope_collision_and_incomplete_tools(self):
+        source, output, manifest, target, archive, release = self.release_fixture()
+        for name in ("../escape.exe", "tools/ffmpeg/../../Peach.exe", "Peach.exe", "tools/untrunc/untrunc.exe",
+                     "tools/ffmpeg/bin/FFMPEG.exe"):
+            with self.subTest(name=name):
+                invalid = json.loads(json.dumps(manifest))
+                invalid["tools"]["ffmpeg"]["files"][name] = "a" * 64
+                (source / update_packages.MANIFEST).write_text(json.dumps(invalid), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    update_packages.read_manifest(source, "1.0.0")
+        del manifest["tools"]["untrunc"]
+        (source / update_packages.MANIFEST).write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaises(ValueError):
+            update_packages.read_manifest(source, "1.0.0")
+
+    def test_tool_archive_cannot_replace_application_files(self):
+        archive = self.archive(["Peach/tools/ffmpeg/bin/ffmpeg.exe", "Peach/Peach.exe"])
+        with self.assertRaisesRegex(ValueError, "清单外"):
+            update.extract(archive, self.root / "tool-stage", Mock(), tool_files={"tools/ffmpeg/bin/ffmpeg.exe"})
 
     def test_install_failure_restores_program_directory_and_preserves_data(self):
         target = self.root / "app"; target.mkdir()

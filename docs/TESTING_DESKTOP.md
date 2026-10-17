@@ -50,7 +50,7 @@ Windows 第一次询问防火墙权限时，只勾选「专用网络」。
 
 ## 播放与 FFmpeg
 
-安装包和免安装 ZIP 均包含 FFmpeg 与 ffprobe，位于程序目录的 `tools\ffmpeg\bin`。转码、媒体信息探测与缩略图可直接使用，无需安装系统工具或设置 PATH。应用更新同时更新随包工具。
+完整安装包和完整免安装 ZIP 均包含 FFmpeg 与 ffprobe，位于程序目录的 `tools\ffmpeg\bin`。转码、媒体信息探测与缩略图可直接使用，无需安装系统工具或设置 PATH。应用更新包 `*-update.zip` 由 Peach 更新器使用，按文件 SHA-256 校验并复用已安装工具，仅下载缺失、损坏或版本变化的工具包。首次安装须使用完整包；`tools-*.zip` 由更新器按需处理。
 
 缺索引 MP4 修复使用随包的 `tools\untrunc\untrunc.exe`，需要同编码参数的完整片作为参照。该工具与其兼容的 FFmpeg 库独立构建，按 GPL-2.0-or-later 分发；完整对应源码制品为同一 Release 中的 `untrunc-corresponding-source.zip`。显式 `PEACH_UNTRUNC` 优先于随包工具，其后查数据目录与 PATH。
 

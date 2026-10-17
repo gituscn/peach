@@ -34,6 +34,24 @@ class ReleaseUpdateTests(unittest.TestCase):
         self.assertEqual(self.check([release("0.8.0")])["state"], "ahead")
         self.assertEqual(self.check([])["state"], "empty")
 
+    def test_prefers_app_update_when_all_tool_assets_are_uploaded(self):
+        row = release("1.0.0")
+        row["assets"] += [
+            {"name": "Peach-1.0.0-windows-x64-update.zip", "state": "uploaded", "size": 123, "digest": "sha256:" + "a" * 64},
+            {"name": "Peach-1.0.0-windows-x64-setup.exe", "state": "uploaded"},
+        ]
+        self.assertEqual(self.check([row])["package_kind"], "full")
+        row["assets"] += [{"name": f"Peach-1.0.0-windows-x64-tools-{tool}.zip", "state": "uploaded"}
+                          for tool in ("ffmpeg", "untrunc", "cloudflared")]
+        result = self.check([row])
+        self.assertEqual(result["package_kind"], "update")
+        self.assertTrue(result["asset_url"].endswith("-update.zip"))
+        self.assertEqual(result["asset_size"], 123)
+        row["assets"][1]["state"] = "new"
+        self.assertEqual(self.check([row])["package_kind"], "full")
+        row["assets"].pop(0)
+        self.assertEqual(self.check([row])["state"], "empty")
+
     def test_failures_do_not_claim_current_or_keep_a_latest_version(self):
         self.assertEqual(self.check({}, status=429)["state"], "error")
         self.assertEqual(self.check({})["state"], "error")

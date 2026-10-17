@@ -8,6 +8,28 @@ describe('配置表单与行间距', () => {
   before(async () => { browser = await launch() });
   after(async () => { await browser?.close() });
   for (const viewport of VIEWPORTS) {
+    it(`${viewport.name}：应用更新包说明和体积不越出视口`, async () => {
+      const opened = await visit(browser, '/settings/library?section=' + encodeURIComponent('应用与维护'), viewport);
+      const { page } = opened;
+      try {
+        await page.route('**/api/configuration', async route => {
+          const data = await (await route.fetch()).json();
+          await route.fulfill({ json: { ...data, updates: { ...data.updates, installation: '独立测试包',
+            state: 'available', latest_version: '1.0.0', message: '有新版本可下载。', package_kind: 'update',
+            asset_size: 12 * 1048576, release_url: 'https://github.com/peach-mitao/peach/releases/tag/v1.0.0' },
+            update_job: { state: 'idle', progress: 0 } } });
+        });
+        await page.reload();
+        const region = page.getByRole('region', { name: '检查更新', exact: true });
+        await region.getByText('应用更新包 · 12.0 MB', { exact: true }).waitFor();
+        assert.ok((await region.innerText()).includes('工具缺失、损坏或版本变化时会另行下载'));
+        assert.equal(await region.getByRole('link', { name: '完整安装包', exact: true }).count(), 0);
+        await settle(page);
+        assert.ok((await layout(page)).scrollWidth <= viewport.width + 1);
+        await region.screenshot({ path: `../build/update-download-${viewport.name}.png` });
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close() }
+    });
     it(`${viewport.name}：挂载目录的代理流量保护可切换且不越出视口`, async () => {
       const opened = await visit(browser, '/settings/library?section=' + encodeURIComponent('这台电脑'), viewport);
       const { page } = opened;
