@@ -23,6 +23,32 @@ function mounted() {
 }
 
 describe('Video.js 10 播放会话', () => {
+  it('片源交给异步 adapter 后立即播放，原生 play 使用已挂载的片源', async () => {
+    const { video, player, media } = mounted();
+    Object.defineProperty(media, 'source', { set: (value: { src: string }) => {
+      queueMicrotask(() => { video.src = value.src });
+    } });
+    const play = vi.spyOn(video, 'play').mockImplementation(() => video.getAttribute('src')
+      ? Promise.resolve() : Promise.reject(new DOMException('没有可播放的片源', 'NotSupportedError')));
+    player.src({ src: '/example.mp4', type: 'video/mp4' });
+    await expect(player.play()).resolves.toBeUndefined();
+    expect(play).toHaveBeenCalledOnce();
+    expect(video.src).toContain('/example.mp4');
+    player.dispose();
+  });
+
+  it.each(['pause', 'source', 'dispose'] as const)('排队播放期间 %s 会取消该请求', async action => {
+    const { video, player } = mounted();
+    const play = vi.spyOn(video, 'play').mockResolvedValue(undefined);
+    const pending = player.play();
+    if (action === 'pause') player.pause();
+    else if (action === 'source') player.src({ src: '/next.mp4', type: 'video/mp4' });
+    else player.dispose();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(play).not.toHaveBeenCalled();
+    player.dispose();
+  });
+
   it('媒体错误可补充来源状态文案，展示错误不会再次触发错误处理', () => {
     const { player, media } = mounted();
     const callback = vi.fn(() => player.error({ code: 2, message: '脱盘模式' }));

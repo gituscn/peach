@@ -56,7 +56,7 @@ export const createV10Player: VideojsFactory = (video, options) => {
   const events = new EventTarget();
   const cleanup = new AbortController();
   const signal = cleanup.signal;
-  let disposed = false, sourceGeneration = 0, expectedDuration = 0, source: PlayerSource = { src: '', type: '' }, failure: unknown = null;
+  let disposed = false, sourceGeneration = 0, playGeneration = 0, expectedDuration = 0, source: PlayerSource = { src: '', type: '' }, failure: unknown = null;
   let idle: ReturnType<typeof setTimeout> | undefined;
   const subtitleControl = root.querySelector<HTMLElement>('.vjs-subtitles-control');
   const subtitleMenu = subtitleControl?.querySelector<HTMLElement>('[role="menu"]');
@@ -183,7 +183,14 @@ export const createV10Player: VideojsFactory = (video, options) => {
     trigger: emit,
     paused: () => video.paused, ended: () => video.ended,
     error: (value?: { code: number; message: string }) => value ? showError(value, false) : failure || video.error,
-    play: () => video.play(), pause: () => video.pause(),
+    play: async () => {
+      const generation = ++playGeneration;
+      // 官方 HLS adapter 在微任务里挂载片源；原生 play 必须使用已经挂载的片源。
+      await Promise.resolve();
+      if (disposed || generation !== playGeneration) throw new DOMException('播放请求已取消', 'AbortError');
+      return video.play();
+    },
+    pause: () => { playGeneration++; video.pause() },
     currentTime: (value?: number) => value === undefined ? video.currentTime : (video.currentTime = value),
     duration: (value?: number) => value === undefined ? expectedDuration || video.duration : (expectedDuration = value),
     playbackRate: (value?: number) => value === undefined ? video.playbackRate : (video.playbackRate = value),
@@ -193,7 +200,7 @@ export const createV10Player: VideojsFactory = (video, options) => {
     poster: (url: string) => { video.poster = url },
     src: (next: PlayerSource) => {
       source = next; failure = null; root.classList.remove('vjs-error');
-      sourceGeneration++; selectionQueued = false; enabledLevels = []; levels.length = 0;
+      sourceGeneration++; playGeneration++; selectionQueued = false; enabledLevels = []; levels.length = 0;
       const tag = next.type.toLowerCase().includes('dash') ? 'dash-video' : 'hlsjs-video';
       if (media.localName !== tag) {
         const previous = media;
