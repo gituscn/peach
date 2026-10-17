@@ -14,7 +14,7 @@
 - 验收：`peach-data/review/entity-cold-missav-verification.json`。
 - 身份合并 18 组；版本核查：`peach-data/review/version-evidence-review.md`。
 - JAV 头像 817，水印待复核 38；档案 17、候选 253、官方封面 2；[选图规则](adr/0102-profile-avatar-priority.md)。
-- 「整理」（ADR-0039）支持预览、执行、回滚；英文视频名分词 169 条。
+- 挂载读写、整理回滚；光鸭/OneDrive 图标；真实账号待验；英文分词 169 条。
 - 产地是独立维度、JAV 是其投影：`region` 空时按厂牌、创作者、番号逐层推断，不落库；韩国 MIB 不算 JAV。
 - Windows 托盘自动恢复；重启 `restart_windows_tray.py --source`；代码、数据在内置盘，媒体在外置盘。
 - 托盘用普通权限，提权看不到 CloudDrive 挂载盘。

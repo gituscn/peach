@@ -159,7 +159,7 @@ The headless Linux image runs alongside CloudDrive2, with separate mounts for me
     - posters such as `<title>-poster.jpg`.
   - Existing titles, performers, studios and posters show up right away.
 - **Which cloud drives are supported?**
-  - Mounted 115, PikPak, Guangya and OneDrive directories are supported; register other providers under **其他已挂载网盘**. Guangya, OneDrive and generic mounted sources are managed read-only. Every new cloud directory, including PikPak, requires a choice between normal reads and proxy traffic protection. Configure the actual proxy in the mount tool; see [mount configuration](docs/CLOUDDRIVE.md).
+  - Mounted 115, PikPak, Guangya and OneDrive directories are supported; register other providers under **其他已挂载网盘**. All mounted sources support reading and writing, subject to the mount tool's capabilities and the cloud account's permissions. Every new cloud directory, including PikPak, requires a choice between normal reads and proxy traffic protection. Configure the actual proxy in the mount tool; see [mount configuration](docs/CLOUDDRIVE.md).
   - CloudDrive2 can also run on a NAS such as Synology. Map the shared folder to a Windows drive letter, then select that folder in Peach; this setup does not require CloudDrive2 or WinFsp on Windows.
   - For playback, Peach reads them like ordinary folders and does not store your cloud account.
   - For cloud download, the CloudDrive2 API token and the PikPak sign-in token are kept in this computer's credential file.

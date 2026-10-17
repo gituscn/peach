@@ -138,7 +138,7 @@ describe('访问密码', () => {
 describe('媒体库', () => {
   it('首次设置网盘时必须明确选择读取策略', async () => {
     const { host, sent } = await open({}, { [SETUP_URL]: { status: 200, body: done() } });
-    await choose(rows(host)[0]!.querySelector('[aria-haspopup="listbox"]'), 'OneDrive（只读）');
+    await choose(rows(host)[0]!.querySelector('[aria-haspopup="listbox"]'), 'OneDrive');
     const policy = rows(host)[0]!.querySelector('[data-media-read-policy] [aria-haspopup="listbox"]');
     expect(policy?.textContent).toContain('选择读取策略');
     await submitForm(host);

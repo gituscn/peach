@@ -4,10 +4,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { CONFIGURATION_URL, PICK_FOLDER_URL } from '../../src/configuration-endpoints';
 import type { ConfigurationData } from '../../src/react/bundle';
 import { CloudDriveGuide } from '../../src/react/settings/clouddrive-guide';
+import { MEDIA_SOURCE_ICONS } from '../../src/ui-kit/media-source-icons';
 import { MediaSettings } from '../../src/react/settings/media-settings';
 import { buttonNamed, choose, click, fetchMock, mount, section, sentBody, settle, submit } from './render';
 
 vi.mock('../../src/react/settings/service-preferences', () => ({ VideoThumbnailRow: () => null }));
+vi.mock('@peach/legacy/ui', async (original) => ({
+  ...await original<Record<string, unknown>>(),
+  MEDIA_SOURCE_ICONS: (await import('../../src/ui-kit/media-source-icons')).MEDIA_SOURCE_ICONS,
+}));
 
 const data = (over: Partial<ConfigurationData> = {}): ConfigurationData => ({
   editable: true, notice: '', revision: 'rev-1', media_dirs: ['D:\\Media'], library_count: 1, port: 9123, facts: [], ...over,
@@ -46,19 +51,23 @@ it('不能编辑时只说原因，不画表单', async () => {
 });
 
 describe('媒体文件夹', () => {
-  it('光鸭来源回填只读名称、挂载帮助和现有图标，保存带上来源', async () => {
+  it.each([['guangya', '光鸭云盘'], ['onedrive', 'OneDrive'], ['mounted', '其他已挂载网盘']])(
+    '%s 来源回填名称、挂载帮助和现有图标，保存带上来源', async (location, label) => {
     const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
     vi.stubGlobal('fetch', fetcher);
     const host = await open({ windows: true, media_sources: [
-      { location: 'guangya', root: 'G:\\Movies', path: 'G:\\Movies', online: true },
+      { location, root: 'G:\\Movies', path: 'G:\\Movies', online: true },
     ] });
     expect(paths(host)[0]?.value).toBe('G:\\Movies');
-    expect(host.textContent).toContain('光鸭云盘（只读）');
-    expect(host.querySelector('use[href="#i-database"]')).not.toBeNull();
-    expect(host.textContent).toContain('光鸭云盘需要 CloudDrive2 v1.0.11');
+    expect(host.textContent).toContain(label);
+    expect(host.textContent).not.toContain('（只读）');
+    if (location === 'mounted') expect(host.querySelector('use[href="#i-database"]')).not.toBeNull();
+    else expect(host.querySelector('img')?.getAttribute('src')).toBe(MEDIA_SOURCE_ICONS[location]);
+    expect(host.textContent).toContain('CloudDrive2 v1.1.0');
     await submit(host.querySelector('form'));
     expect(sentBody(fetcher).media_sources).toEqual([
-      { location: 'guangya', root: 'G:\\Movies', path: 'G:\\Movies', library: '', library_icon: '', cost: 'free' },
+      { location, root: 'G:\\Movies', path: 'G:\\Movies', library: '', library_icon: '',
+        cost: location === 'guangya' ? 'free' : 'metered' },
     ]);
   });
 

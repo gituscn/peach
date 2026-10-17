@@ -72,7 +72,7 @@
 
 ## 参考产品证据登记
 
-- STRM 与挂载来源（2026-10-17）：[固定源码、差异与验收](reference-snapshots/strm-source-evidence.md)。
+- 2026-10-17：[STRM](reference-snapshots/strm-source-evidence.md)、[图标](reference-snapshots/media-source-icons.md)。
 
 - 目录树与面包屑：2026-10-17 取得 BoardUI registry 源码，版本、SHA-256 与适配见 [BoardUI 适配](BOARD_UI.md#目录浏览)。保留首页结构，目录用途由用户确认。官方实时示例未取得。
 

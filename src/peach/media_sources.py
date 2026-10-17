@@ -14,19 +14,16 @@ class MediaSource:
     label: str
     default_cost: str
     cloud: bool
-    read_only: bool
     icon: str
 
 
 SOURCE_REGISTRY = tuple(MediaSource(**row) for row in json.loads(
     (PROJECT_ROOT / "resources" / "media-sources.json").read_text(encoding="utf-8")))
 SOURCES = {source.id: source for source in SOURCE_REGISTRY}
-SOURCE_OPTIONS = tuple((source.id, source.label + ("（只读）" if source.read_only else ""))
-                       for source in SOURCE_REGISTRY)
+SOURCE_OPTIONS = tuple((source.id, source.label) for source in SOURCE_REGISTRY)
 SOURCE_COSTS = {source.id: source.default_cost for source in SOURCE_REGISTRY}
 SCANNABLE_LOCATIONS = tuple(SOURCES)
 CLOUD_LOCATIONS = frozenset(source.id for source in SOURCE_REGISTRY if source.cloud)
-READ_ONLY_LOCATIONS = frozenset(source.id for source in SOURCE_REGISTRY if source.read_only)
 
 
 def _config(config):
@@ -83,9 +80,3 @@ def cost_sql(location_column: str = "location", path_column: str = "path", *, co
         clauses.append(f"WHEN {location_column}=? THEN ?")
         parameters.extend((location, cost))
     return "CASE " + " ".join(clauses) + " ELSE 'metered' END", tuple(parameters)
-
-
-def require_writable_location(location: str | None) -> None:
-    """只读挂载在任何文件系统写入之前拒绝。"""
-    if location in READ_ONLY_LOCATIONS:
-        raise ValueError(f"{SOURCES[location].name}为只读来源，请在网盘客户端管理文件")
