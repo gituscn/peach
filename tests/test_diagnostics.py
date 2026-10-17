@@ -178,8 +178,10 @@ class DiagnosticsTests(unittest.TestCase):
         binary = BinaryChoice(self.root / "tools/ffmpeg", "peach-managed")
         with patch.object(diagnostics.FFmpegResolver, "ffmpeg", return_value=binary), \
              patch.object(diagnostics.FFmpegResolver, "ffprobe", return_value=binary), \
-             patch.object(diagnostics.settings_file, "active", return_value=self.config):
+             patch.object(diagnostics.settings_file, "active", return_value=self.config), \
+             patch.object(diagnostics, 'binary_diagnostics') as inspect:
             result = diagnostics.health_components(self.settings, EMPTY_MOUNTS)
+        inspect.assert_not_called()
         self.assertEqual(set(result), {"database", "schema", "configured", "ffmpeg", "media_mounts", "security"})
         self.assertTrue(all(set(value) == {"status", "reason"} for value in result.values()))
         self.assertNotIn(str(self.root), json.dumps(result))

@@ -21,7 +21,7 @@ class FFmpegBundleTests(unittest.TestCase):
             self.manifest["files"][name] = ffmpeg_bundle.digest(path)
         self.manifest["sources"] = [
             {"name": name, "revision": "fixed", "url": f"https://example.org/{name}.tar.gz", "sha256": "1" * 64}
-            for name in ("ffmpeg", "x264", "nv-codec-headers")]
+            for name in ("ffmpeg", "x264", "nv-codec-headers", "dav1d")]
         archive = self.source.parent / "ffmpeg-corresponding-source.zip"
         archive.write_bytes(b"source fixture")
         self.manifest["source_archive"] = {"name": archive.name, "sha256": ffmpeg_bundle.digest(archive)}
@@ -86,7 +86,7 @@ class FFmpegBundleTests(unittest.TestCase):
         self.manifest["files"].pop("bin/ffprobe.exe")
         (self.source / "untrunc.exe").write_bytes(b"untrunc")
         self.manifest["files"]["untrunc.exe"] = ffmpeg_bundle.digest(self.source / "untrunc.exe")
-        self.manifest["sources"] = [s for s in self.manifest["sources"] if s["name"] != "x264"]
+        self.manifest["sources"] = [s for s in self.manifest["sources"] if s["name"] in ('ffmpeg', 'nv-codec-headers')]
         self.manifest["sources"][1]["name"] = "untrunc"
         archive = self.source.parent / "ffmpeg-corresponding-source.zip"
         archive.rename(self.source.parent / "untrunc-corresponding-source.zip")

@@ -30,6 +30,94 @@ class ErrorReportingTests(unittest.TestCase):
                               env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
                               capture_output=True, text=True, encoding="utf-8", timeout=30)
 
+    def test_processing_export_keeps_recent_bounded_evidence_and_hides_media_names(self):
+        from peach.settings_file import PeachConfig
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True)
+        state = config.directory('state')
+        state.mkdir(parents=True)
+        row = {'asset_id': 23, 'title': 'private-movie.mp4', 'path': r'D:\private\movie.mp4',
+               'diagnostics': {'reason': 'timeout', 'stderr': 'token=private-token',
+                               'timestamp_seconds': 12, 'timeout_seconds': 45}}
+        for index in range(10):
+            path = state / f'library-processing-{index}.issues.jsonl'
+            path.write_text(json.dumps(row) + '\n', encoding='utf-8')
+            os.utime(path, (100 + index, 100 + index))
+        (state / 'private-credentials.json').write_text('private-credentials', encoding='utf-8')
+        (state / 'library-processing.json').write_text(json.dumps({
+            'status': 'failed', 'issue_preview': [row], 'current_asset_name': 'private-movie.mp4'}),
+            encoding='utf-8')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes(config=config))) as archive:
+            names = [name for name in archive.namelist() if name.startswith('processing/')]
+            self.assertEqual(len(names), 9)
+            self.assertNotIn('processing/library-processing-0.issues.jsonl', names)
+            exported = json.loads(archive.read('processing/library-processing-9.issues.jsonl'))
+            self.assertEqual(exported['asset_id'], 23)
+            self.assertEqual(exported['diagnostics']['timestamp_seconds'], 12)
+            contents = '\n'.join(archive.read(name).decode() for name in archive.namelist())
+        for private in ('private-movie', 'private-token', 'private-credentials', r'D:\private'):
+            self.assertNotIn(private, contents)
+
+    def test_processing_export_omits_partial_rows_and_limits_large_files(self):
+        from peach.settings_file import PeachConfig
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True)
+        state = config.directory('state')
+        state.mkdir(parents=True)
+        path = state / 'library-processing-large.issues.jsonl'
+        row = json.dumps({'asset_id': 23, 'message': 'error' * 100}) + '\n'
+        path.write_text(row * 400 + '{"partial":', encoding='utf-8')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes(config=config))) as archive:
+            text = archive.read('processing/' + path.name).decode()
+            report = json.loads(archive.read('report.json'))
+        self.assertLessEqual(len(text.encode()), support_bundle.TAIL_BYTES)
+        self.assertTrue(text.splitlines())
+        self.assertTrue(all(json.loads(line)['asset_id'] == 23 for line in text.splitlines()))
+        self.assertTrue(next(row for row in report['logs'] if row['name'] == path.name)['truncated'])
+
+    def test_bundle_contains_update_tunnel_rotated_and_startup_evidence_with_invalid_config(self):
+        from peach import settings_file
+        self.logs.mkdir()
+        for name in ('tray-restart.out.log', 'tray-scan.out.log', 'windows-source-sync.log',
+                     'cloudflare-tunnel.log', 'tray.until-20261001.log'):
+            (self.logs / name).write_text('failure --token private-cli-token\n', encoding='utf-8')
+        state = self.root / 'state'
+        state.mkdir()
+        (state / 'runtime-prepare.json').write_text(json.dumps({
+            'ok': False, 'steps': [{'name': 'dependencies', 'message': 'failed --password private-password'}]},
+            indent=2), encoding='utf-8')
+        migration = state / 'update-backups' / 'fixture' / 'migration.log'
+        migration.parent.mkdir(parents=True)
+        migration.write_text('migration failed\n', encoding='utf-8')
+        with mock.patch.object(settings_file, 'load_config', side_effect=ValueError('invalid config')), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes())) as archive:
+            names = archive.namelist()
+            self.assertTrue(any('tray.until-' in name for name in names))
+            for name in ('tray-restart.out.log', 'tray-scan.out.log', 'windows-source-sync.log', 'cloudflare-tunnel.log'):
+                self.assertTrue(any(item.endswith('/' + name) for item in names), name)
+            startup = json.loads(archive.read('processing/runtime-prepare.json'))
+            self.assertFalse(startup['ok'])
+            self.assertIn('updates/update-backups/fixture/migration.log', names)
+            contents = '\n'.join(archive.read(name).decode() for name in names)
+        for private in ('private-cli-token', 'private-password'):
+            self.assertNotIn(private, contents)
+
+    def test_one_unreadable_error_log_does_not_hide_other_logs(self):
+        self.logs.mkdir()
+        (self.logs / 'tray.log').write_text('service failed\n', encoding='utf-8')
+        (self.logs / 'errors-unreadable.log').write_text('error', encoding='utf-8')
+        original = Path.stat
+        def stat(path, *args, **kwargs):
+            if path.name == 'errors-unreadable.log':
+                raise PermissionError('not readable')
+            return original(path, *args, **kwargs)
+        with mock.patch.object(Path, 'stat', stat), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes())) as archive:
+            self.assertTrue(any(name.endswith('/tray.log') for name in archive.namelist()))
+            report = json.loads(archive.read('report.json'))
+        self.assertTrue(any(row['name'] == 'errors-unreadable.log' and row['status'] == 'PermissionError'
+                            for row in report['logs']))
+
     def records(self):
         return [json.loads(line) for path in self.logs.glob("errors-*.log")
                 for line in path.read_text(encoding="utf-8").splitlines()]
@@ -178,7 +266,7 @@ class ErrorReportingTests(unittest.TestCase):
         again = self.probe(f"from peach.support_bundle import main; raise SystemExit(main([{str(destination)!r}]))")
         self.assertNotEqual(again.returncode, 0)
 
-    def test_browser_errors_and_bundle_require_local_same_origin_access(self):
+    def test_browser_errors_require_same_origin_and_remote_login_while_export_is_local(self):
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
         from types import SimpleNamespace
@@ -187,7 +275,7 @@ class ErrorReportingTests(unittest.TestCase):
         app = FastAPI()
         app.include_router(routes_configuration.router)
         app.dependency_overrides[require_auth] = lambda: {}
-        app.state.settings = SimpleNamespace(mdns_name="peach")
+        app.state.settings = SimpleNamespace(mdns_name="peach", token='', access_path=self.root / 'access.json')
         app.state.mount_reachability = SimpleNamespace(summary=lambda: {})
         client = TestClient(app, base_url="http://127.0.0.1", client=("127.0.0.1", 1234))
         path = "/api/diagnostics/client-error"
@@ -195,21 +283,109 @@ class ErrorReportingTests(unittest.TestCase):
                                      headers={"Origin": "https://other.example"}).status_code, 403)
         self.assertEqual(client.post(path, content=b"x" * 20_000).status_code, 413)
         self.assertEqual(client.post(path, json={"message": 5}).status_code, 400)
-        self.assertEqual(client.post(path, json={"message": "secret=private-browser", "stack": "at render"}).status_code, 200)
+        self.assertEqual(client.post(path, json={"message": "secret=private-browser", "stack": "at render",
+                                               'source_file': 'app-abcd.js', 'line': 21, 'column': 8}).status_code, 200)
         browser = next(row for row in self.records() if row["stage"] == "browser")
         self.assertNotIn("private-browser", str(browser))
         self.assertEqual(browser["stack"], "at render")
+        self.assertEqual(browser['line'], 21)
+        self.assertEqual(browser['source_file'], 'app-abcd.js')
         with mock.patch("peach.diagnostics.report", side_effect=RuntimeError("diagnostics unavailable")):
             response = client.get("/api/diagnostics/bundle")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["cache-control"], "no-store")
         self.assertTrue(zipfile.is_zipfile(io.BytesIO(response.content)))
         remote = TestClient(app, base_url="http://127.0.0.1", client=("192.0.2.55", 1234))
-        self.assertEqual(remote.post(path, json={"message": "example"}).status_code, 403)
+        self.assertEqual(remote.post(path, json={"message": "example"}).status_code, 401)
+        from peach import access
+        empty_policy = access.load(app.state.settings.access_path)
+        empty_policy['key'] = ''
+        remote.cookies.set(access.COOKIE, access.issue(empty_policy, 1)[0])
+        self.assertEqual(remote.post(path, json={'message': 'anonymous'}).status_code, 401)
+        policy = access.save(app.state.settings.access_path, 'valid-private-password')
+        remote.cookies.set(access.COOKIE, access.issue(policy, 1)[0])
+        self.assertEqual(remote.post(path, json={'message': 'phone failed'}).status_code, 200)
+        self.assertEqual(remote.post(path, json={'message': 'phone failed'},
+                                     headers={'Origin': 'https://other.example'}).status_code, 403)
+        remote.cookies.clear()
+        self.assertEqual(remote.post(path, json={'message': 'anonymous'}).status_code, 401)
         self.assertEqual(remote.get("/api/diagnostics/bundle").status_code, 403)
         for _ in range(20):
             response = client.post(path, json={"message": "example"})
         self.assertEqual(response.status_code, 429)
+
+    def test_background_failure_has_a_persistent_traceback_and_job_identifier(self):
+        from peach.jobs import BackgroundJob
+        job = BackgroundJob('test-diagnostic-job')
+        def fail(_job_id):
+            raise ValueError('failed --token private-cli-token')
+        state = job.start(fail)
+        job.thread.join(3)
+        self.assertFalse(job.thread.is_alive())
+        event = next(row for row in self.records() if row['stage'] == 'background-job')
+        self.assertEqual(event['job_id'], state['job_id'])
+        self.assertEqual(event['exception'][0]['type'], 'ValueError')
+        self.assertTrue(event['frames'])
+        self.assertNotIn('private-cli-token', str(event))
+        job.start_result(lambda: {'ok': False, 'error': 'expired --token private-result-token'})
+        job.thread.join(3)
+        result = next(row for row in self.records() if row['stage'] == 'background-result')
+        self.assertIn('expired', result['message'])
+        self.assertNotIn('private-result-token', str(result))
+
+    def test_export_keeps_safe_source_health_without_source_response_content(self):
+        source = {'source': 'javdb', 'status': 'warning', 'reason': '来源正在冷却',
+                  'cooldown_until': '2026-10-18T01:00:00Z', 'raw': 'private-source-response',
+                  'url': 'https://private.example/?token=private-token'}
+        with zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes(report={'sources': [source]}))) as archive:
+            report = json.loads(archive.read('report.json'))
+        self.assertEqual(report['sources'][0]['status'], 'warning')
+        self.assertEqual(report['sources'][0]['cooldown_until'], source['cooldown_until'])
+        self.assertNotIn('private-source-response', str(report))
+
+    def test_probe_error_preserves_exit_code_and_stderr(self):
+        from peach import media_probe
+        result = subprocess.CompletedProcess(['ffprobe'], 69, b'{}', b'AV1 decoder unavailable')
+        with mock.patch.object(media_probe.subprocess, 'run', return_value=result), \
+                mock.patch.object(media_probe, 'resolve_case_insensitive', str):
+            measured = media_probe.measure('ffprobe', 23, 'private.mp4')
+        self.assertEqual(measured[0], -1)
+        event = next(row for row in self.records() if row['stage'] == 'media-probe')
+        self.assertEqual(event['asset_id'], 23)
+        self.assertEqual(event['returncode'], 69)
+        self.assertIn('AV1 decoder unavailable', event['stderr'])
+
+    def test_command_line_credentials_are_redacted(self):
+        for flag in ('--token', '--tunnel-token', '--api-key', '--access-key', '--password'):
+            self.assertNotIn('private-value', error_reporting.redact(f'{flag} "private-value"'))
+
+    def test_http_server_errors_are_correlated_without_request_contents(self):
+        from fastapi import HTTPException
+        from fastapi.testclient import TestClient
+        from peach.api import create_app
+        from peach.config import PeachSettings
+        app = create_app(PeachSettings(db_path=self.root / 'database/ledger.db'))
+        @app.get('/diagnostic-test/{identifier}')
+        def fail(identifier: str):
+            raise RuntimeError('request failed')
+        @app.get('/diagnostic-handled-test')
+        def handled():
+            raise HTTPException(503, 'service unavailable')
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get('/diagnostic-test/private-identifier?token=private-query',
+                              headers={'Authorization': 'Bearer private-auth'})
+        self.assertEqual(response.status_code, 500)
+        record = next(row for row in self.records() if row['stage'] == 'http-request')
+        self.assertEqual(record['route'], 'diagnostic-test/{identifier}')
+        self.assertEqual(record['error_id'], response.json()['error_id'])
+        self.assertEqual(response.headers['x-peach-error-id'], record['error_id'])
+        self.assertTrue(record['frames'])
+        for value in ('private-identifier', 'private-query', 'private-auth'):
+            self.assertNotIn(value, str(record))
+        self.assertEqual(client.get('/diagnostic-handled-test').status_code, 503)
+        self.assertEqual(len([row for row in self.records() if row['stage'] == 'http-request']), 2)
+        client.get('/diagnostic-missing')
+        self.assertEqual(len([row for row in self.records() if row['stage'] == 'http-request']), 2)
 
     def test_asyncio_exceptions_are_recorded_and_keep_the_default_handler(self):
         loop = mock.Mock()

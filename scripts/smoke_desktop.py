@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 from contextlib import contextmanager
 import ctypes
 from ctypes import wintypes
@@ -21,6 +22,35 @@ import urllib.error
 import urllib.request
 import urllib.parse
 import uuid
+
+
+# 合成 64×64 testsrc2 的两帧 AV1；不依赖发行工具包含 AV1 编码器。
+_AV1_SAMPLE = (
+    'REtJRgAAIABBVjAxQABAAAIAAAABAAAAAgAAAAAAAAAQAgAAAAAAAAAAAAASAAoKAAAAAq//m18gCDL/AxQAMoAY'
+    'YQeKAgrbccEajCcFwrWZWZAcjk7HsQkwz6bl6C/RIMrhL7TGShgVqQJwYehp8Dk3NGsPnZpd9H/kMuUNCln4V/8Q'
+    'sNsk8IXFEYPBxm3hH5FrNUGl0JHoXb5So71sC0w8QV8tnCFJTJAa+GuYX8XXKJuJpyg/HBFtHqiEEkLALQ/XUqV1'
+    'LrdrAMGJ49bvAgoNjl5FDPy+4wDlFJYlV4y1RiocKER6pIiZK2g+N/lGJorkKg0vsmoI3olvguuTNs0+xIxZfToS'
+    '7Y0UK7UCr7w5NzJEkZ0kpLbVot5PtEax3tOtvGE6FBU1kZfmKMQcB8OYl18JooM7zn1mYiNVVmYSOVeICjSlAXFj'
+    'M4M8NDeILhqcheLaAJ1q53QozK7pAYwIKBS4AF8DjvvAVnxT9VLa2a+5RGqL2XT1aJ2Pfyh6kvsGhib/5pYSn4Xk'
+    'OrP/XNtfE0Pdli4ram0vyYdaMWWmkqgxDMMLEqnWXdWn/+2RVPAdGZV//gWLaIS/BVQ92TcmFE0jZfAu6lFZa9kr'
+    'ejynNQpdnX6BtyCsXsCXFuFjWviueEYWX9kN3KxKcmYIqae/8rioTK/koM1WIkuN7wIr0/+YE4v9eqfwkRqGKG7u'
+    'GF3ydM6SqhvPoE2YvyUjw7lkOwzOzma5AOOux53IQlzAEigiskKcks4nv4AOAQAAAQAAAAAAAAASADKJAjIB4EAA'
+    'AANoADDEExRddQDdOU0PJApEvWVmn/OPmFU6GzRhHf19xENKaaOLsjU3y6xIX+RghuEbLRK9wN2yvwikcZaOrZTr'
+    'eEt5qhzR3F4YxcfTJakEEe4U6a9FIaWXxEAwrn4RU+3r7JnNsIifqcHcrsC4HVxAe8KcHtW+fmENmZgnhfwLdXp+'
+    'LhgOZVki5u57z8TbVswnUJYINlRS2IMU9Tua7xL8EFwM+rxDyvaP0X3Rht73L1z0NvyYzeUaigPsLRrLvEwWp+BE'
+    'UijJPuANY7UCckwZAo2GKlk3pY+wW5Zgw6aLcZpBzsDk8oZjBW13QxHQHremUttJSFHH4bQZ+D8cmQFv8BA='
+)
+
+
+def assert_av1_decoder(ffmpeg: Path, root: Path) -> None:
+    """在 CPU 上验证随包 AV1 解码与缩图，不依赖显卡。"""
+    source, image = root / 'av1.ivf', root / 'av1-frame.jpg'
+    source.write_bytes(base64.b64decode(_AV1_SAMPLE))
+    result = subprocess.run([str(ffmpeg), '-v', 'error', '-c:v', 'libdav1d', '-i', str(source),
+                             '-vf', 'scale=480:-1', '-frames:v', '1', str(image)],
+                            capture_output=True, timeout=30)
+    assert result.returncode == 0, result.stderr.decode('utf-8', 'replace')[-4000:]
+    assert image.is_file() and image.stat().st_size > 0, 'AV1 抽帧未取得'
 
 
 def assert_bundled_media_tools(application: Path) -> None:
@@ -59,6 +89,7 @@ def assert_bundled_media_tools(application: Path) -> None:
                                 capture_output=True, text=True, encoding="utf-8", timeout=15, check=True)
         assert json.loads(result.stdout)["streams"][0]["codec_name"] == "h264"
         assert image.stat().st_size > 0
+        assert_av1_decoder(ffmpeg, root)
         # 合成片的 moov 位于 mdat 之后；移掉索引后用同编码参数的完整片重建。
         payload = video.read_bytes()
         offset = 0

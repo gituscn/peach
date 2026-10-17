@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,33 @@ from pathlib import Path
 class BinaryChoice:
     path: Path
     source: str
+
+
+def binary_diagnostics(choice: BinaryChoice | None, *, decoders=False) -> dict:
+    """检查实际工具版本与 AV1 软件解码器；路径存在和可执行分别报告。"""
+    facts = {'available': choice is not None, 'source': choice.source if choice else None,
+             'path': str(choice.path) if choice else None, 'usable': False}
+    if choice is None:
+        return facts
+    try:
+        for option in ('-version', '-decoders') if decoders else ('-version',):
+            result = subprocess.run([str(choice.path), '-hide_banner', option], capture_output=True,
+                                    timeout=5, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            if result.returncode:
+                facts.update(returncode=result.returncode, error=(result.stderr or b'').decode('utf-8', 'replace')[-2000:])
+                return facts
+            output = result.stdout.decode('utf-8', 'replace')
+            if option == '-version':
+                facts['version'] = output.splitlines()[0][:300] if output.splitlines() else ''
+            else:
+                names = {parts[1] for line in output.splitlines()
+                         if len(parts := line.split()) >= 2 and parts[0].startswith('V')}
+                facts['av1_software'] = bool(names & {'libdav1d', 'libaom-av1'})
+        facts['usable'] = bool(facts.get('version'))
+    except (OSError, subprocess.TimeoutExpired) as error:
+        facts.update(error=type(error).__name__, errno=getattr(error, 'errno', None),
+                     winerror=getattr(error, 'winerror', None), timeout_seconds=5)
+    return facts
 
 
 class FFmpegResolver:

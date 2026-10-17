@@ -3036,6 +3036,8 @@ class OperationalScriptTests(unittest.TestCase):
         from peach import media_probe as module
 
         class _Empty:
+            returncode = 0
+            stderr = b""
             stdout = b'{"format":{},"streams":[{"width":0,"height":0}]}'
 
         original = module.subprocess.run
@@ -3112,6 +3114,8 @@ class OperationalScriptTests(unittest.TestCase):
 
         符玄12.mp4 实测：`scale=480:-1` 报 Error -129，覆盖色彩声明后正常。
         """
+        from PIL import Image
+
         sheets = self.sheets
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "sheet.jpg"
@@ -3120,11 +3124,11 @@ class OperationalScriptTests(unittest.TestCase):
             def fake_run(command, **kwargs):
                 calls.append(list(command))
                 if "-filter_complex" in command:
-                    dest.write_bytes(b"x" * 8192)
+                    Image.new("RGB", (1440, 810), "black").save(dest, "JPEG")
                     return type("R", (), {"returncode": 0})()
                 target = Path(command[-1])
                 if "bt709" in command:
-                    target.write_bytes(b"y" * 2048)
+                    Image.new("RGB", (480, 270), "black").save(target, "JPEG")
                     return type("R", (), {"returncode": 0, "stderr": b""})()
                 return type("R", (), {
                     "returncode": 1,

@@ -174,6 +174,19 @@ def require_page_auth(request: Request) -> dict[str, str]:
     return args
 
 
+def require_authenticated_client(request: Request) -> None:
+    """错误上报须有有效登录凭据，开放访问模式不提供匿名上报。"""
+    same_origin(request)
+    policy = _policy(request)
+    if policy['mode'] not in {'password', 'legacy'} or not policy.get('key'):
+        raise HTTPException(401, 'unauthorized')
+    authenticated = access.valid_session(policy, request.cookies.get(access.COOKIE, ''))
+    if policy['mode'] == 'legacy':
+        authenticated = _authorized(request, policy['key'], _first_query_values(request))
+    if not authenticated:
+        raise HTTPException(401, 'unauthorized')
+
+
 def require_asset_auth(request: Request) -> dict[str, str]:
     args = _first_query_values(request)
     if not _authorized(request, request.app.state.settings.token, args):

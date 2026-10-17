@@ -346,9 +346,14 @@ class PreviewService:
             result = subprocess.run(command, capture_output=True, timeout=30, check=False,
                                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
         except (OSError, subprocess.TimeoutExpired) as exc:
+            from .error_reporting import subprocess_failure
+            subprocess_failure('preview', tool=command[0], error=exc, timeout_seconds=30)
             Path(command[-1]).unlink(missing_ok=True)
             raise PreviewUnavailable("ffmpeg generation failed") from exc
         if result.returncode != 0 or not Path(command[-1]).is_file():
+            from .error_reporting import subprocess_failure
+            subprocess_failure('preview', tool=command[0], returncode=result.returncode,
+                               stderr=result.stderr, reason='generation_failed')
             Path(command[-1]).unlink(missing_ok=True)
             raise PreviewUnavailable("ffmpeg generation failed")
 
