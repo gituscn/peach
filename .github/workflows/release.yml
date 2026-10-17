@@ -146,7 +146,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path release | Out-Null
-          python scripts/package_windows_release.py --source dist/Peach --output release --version '${{ steps.version.outputs.version }}' --lite-installer
+          & ./.venv/Scripts/python.exe scripts/package_windows_release.py --source dist/Peach --output release --version '${{ steps.version.outputs.version }}' --lite-installer
           if ($LASTEXITCODE -ne 0) { throw '发行包拆分失败' }
           Copy-Item 'dist/Peach-${{ steps.version.outputs.version }}-windows-x64-setup.exe' release/
           Copy-Item dist/ffmpeg-corresponding-source.zip release/
