@@ -21,6 +21,24 @@ Removed / Fixed / Security。
 
 ## [未发布]
 
+## [0.43.0] - 2026-10-18
+
+### 新增
+
+- **馆藏**：扫描与采集任务提供常驻任务卡、三档处理强度、暂停控制和预估耗时；扫描过程中持续显示已发现的文件数与大小。
+- **播放**：统一开放挂载网盘读写并补齐品牌图标
+
+### 修复
+
+- **馆藏**：口味导入支持 115 浏览器的 `HistoryEx` 历史文件，按实际表结构读取访问记录，兼容多个资料目录并保留手动指定的资料根。
+- **界面**：任务控件使用统一的中性样式，完善深浅色浮层、扫描步骤与任务状态显示。
+- **播放**：补齐 AV1 软件解码与全链路诊断
+- **界面**：通知使用共享读屏提示，定位稳定后显示。
+- **更新**：更新保护任务按顺序撤下登记。
+- **馆藏**：长跑任务持续显示已确认的结果。
+- **关注**：逐项保存关注采集结果并保留中断进度
+- **采集**：核查本地 NFO 资料并修复连续复核版本冲突
+
 ## [0.42.0] - 2026-10-17
 
 ### 新增
@@ -569,7 +587,8 @@ Removed / Fixed / Security。
 - **桌面**：独立包使用 UTF-8 启动日志。
 - **配置**：首次设置后的跳转目标取新鲜读到的 mDNS 名。
 
-[未发布]: https://github.com/peach-mitao/peach/compare/v0.42.0...HEAD
+[未发布]: https://github.com/peach-mitao/peach/compare/v0.43.0...HEAD
+[0.43.0]: https://github.com/peach-mitao/peach/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/peach-mitao/peach/compare/v0.41.0...v0.42.0
 [0.41.0]: https://github.com/peach-mitao/peach/compare/v0.40.1...v0.41.0
 [0.40.1]: https://github.com/peach-mitao/peach/compare/v0.40.0...v0.40.1
