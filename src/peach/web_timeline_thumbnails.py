@@ -12,7 +12,7 @@ from .config import FFMPEG_DIR, STATE_DIR
 from .ffmpeg import FFmpegResolver
 from .fsutil import atomic_path
 from .jobs import DiskGuard
-from .media_processing_policy import metadata_only
+from .media_processing_policy import metadata_only, save as save_processing_policy
 from .platform import system_volume
 
 #: 采集期间系统盘至少留这么多 GiB。数字和抽帧脚本的默认值同一个：真正会把系统盘写满的
@@ -40,6 +40,19 @@ def write_mode(mode: str, path: Path | None = None) -> None:
     with atomic_path(_mode_file(path)) as destination:
         destination.write_text(json.dumps({'mode': mode, 'saved_at': time.time()}),
                                encoding='utf-8')
+
+
+def q_media_processing(contract, _args):
+    return {'metadata_only': metadata_only(contract.follow_state_root)}
+
+
+def w_media_processing(contract, body):
+    value = (body or {}).get('metadata_only')
+    save_processing_policy(contract.follow_state_root, value)
+    if value:
+        write_mode('off', Path(contract.follow_state_root) / 'timeline-thumbnails.json')
+        contract.thumbnail_job.stop(resume=False)
+    return q_media_processing(contract, {})
 
 
 def q_timeline(contract, args):

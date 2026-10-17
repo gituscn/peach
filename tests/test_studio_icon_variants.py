@@ -378,17 +378,8 @@ class PageSourceTests(unittest.TestCase):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, source)
 
-    def test_one_disk_has_one_mark_wherever_it_shows_up(self):
-        """网盘的图形只有一份，不因为取图入口不同而长成两枚。
-
-        来源角标、侧栏的来源筛选、媒体库切换器和配置页问的是同一件事「这是哪个网盘」。
-        其中一处改走 `/logo?studio=115`，同一块屏上就会同时出现站标和官方字标两枚 115，
-        读出来像两个来源；而厂牌那条取图链本来就不认网盘，115 能从那里取到只是名字
-        碰巧撞上了一个厂牌文件名。
-        """
-        source = (self.application / 'preferences.js').read_text(encoding='utf-8')
-        self.assertIn('\'115\':`<img class="source-icon" src="${MEDIA_SOURCE_ICONS[\'115\']}" alt="">`,', source)
-        self.assertIn('pikpak:`<img class="source-icon" src="${MEDIA_SOURCE_ICONS.pikpak}" alt="">`,', source)
+    def test_media_sources_do_not_request_studio_logos(self):
+        """网盘使用来源标识，实际图形由前端渲染回归核对；厂牌字标链不接收网盘名称。"""
         for path in sorted((ROOT / 'frontend/src').rglob('*')):
             if path.suffix in {'.js', '.ts', '.tsx'}:
                 self.assertNotIn("studio=115", path.read_text(encoding='utf-8'))

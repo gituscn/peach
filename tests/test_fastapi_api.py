@@ -3400,6 +3400,9 @@ PUBLIC_ROUTES = {
     # 绑定单个资产与公开 Origin，验证后仍逐次检查媒体根目录。
     ("GET,HEAD", "/external-stream/{id}"),
     ("GET", "/external-playlist/{id}.m3u"),
+    # STRM 的 HLS 子资源供浏览器和外部播放器共用：处理函数验证浏览器会话，
+    # 或绑定资产与 Origin 的限时 HMAC；两条分支都检查媒体根目录及资源归属。
+    ("GET,HEAD", "/strm-resource/{id}/{key}"),
 }
 
 

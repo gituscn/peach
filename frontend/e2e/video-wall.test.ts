@@ -269,7 +269,7 @@ describe('播放墙的浏览与详情', () => {
         const requested = page.waitForRequest(request => new URL(request.url()).pathname === '/api/item' && new URL(request.url()).searchParams.get('id') === String(target));
         await page.locator(`[data-wall-source="${target}"]`).click();
         await requested;
-        await page.locator('[data-wall-player] video').waitFor();
+        await page.locator('[data-wall-player] video.vjs-tech').waitFor();
         assert.equal(new URL(page.url()).pathname, '/wall');
         assert.equal(await page.getByText('请打开详情选择分卷或版本', { exact:true }).count(), 0);
         await page.getByRole('button', { name:'切换分卷或版本', exact:true }).click();
@@ -288,8 +288,8 @@ describe('播放墙的浏览与详情', () => {
       const requested = page.waitForRequest(request => new URL(request.url()).pathname === '/api/item' && new URL(request.url()).searchParams.get('id') === '41');
       await page.locator('[data-wall-source="41"]').click();
       await requested;
-      await page.locator('[data-wall-focus][data-wall-id="41"] [data-wall-player] video').waitFor();
-      assert.equal(await page.locator('[data-wall-player] video').count(), 1);
+      await page.locator('[data-wall-focus][data-wall-id="41"] [data-wall-player] video.vjs-tech').waitFor();
+      assert.equal(await page.locator('[data-wall-player] video.vjs-tech').count(), 1);
       assert.equal(new URL(page.url()).pathname, '/wall');
     } finally { await opened.close() }
   });

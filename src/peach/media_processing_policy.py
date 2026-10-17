@@ -27,17 +27,3 @@ def save(state_root: Path, value: bool) -> None:
         raise ValueError('请选择视频预览生成状态')
     atomic_write_text(Path(state_root) / FILENAME,
                       json.dumps({'metadata_only': value}) + '\n')
-
-
-def q_media_processing(contract, _args):
-    return {'metadata_only': metadata_only(contract.follow_state_root)}
-
-
-def w_media_processing(contract, body):
-    value = (body or {}).get('metadata_only')
-    save(contract.follow_state_root, value)
-    if value:
-        from .web_timeline_thumbnails import write_mode
-        write_mode('off', Path(contract.follow_state_root) / 'timeline-thumbnails.json')
-        contract.thumbnail_job.stop(resume=False)
-    return q_media_processing(contract, {})

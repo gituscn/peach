@@ -106,7 +106,7 @@ describe('规范路由与设置历史', () => {
       const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, viewport);
       const { page } = opened;
       try {
-        await page.locator('#stage video').waitFor({ state: 'attached' });
+        await page.locator('#stage video.vjs-tech').waitFor({ state: 'attached' });
         await page.evaluate(() => {
           Object.assign(window, { routeVideo: document.querySelector('#stage video') });
           document.querySelector<HTMLElement>('#settingsBtn')!.click();

@@ -47,7 +47,7 @@ BASELINE: dict[str, int] = {
     "test_repo_hygiene.py": 2,
     "test_scripts.py": 13,
     "test_social_avatar_harvest.py": 2,
-    "test_studio_icon_variants.py": 4,
+    "test_studio_icon_variants.py": 2,
     "test_studio_site_harvest.py": 1,
     "test_subprocess_encoding.py": 2,
     "test_tray.py": 3,

@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from peach import media_configuration, onboarding, organize, resource_identification, settings_file
-from peach import web_batch, web_catalog, web_organize, web_resource_sync
+from peach import web_batch, web_organize, web_resource_sync
 from peach.media_sources import READ_ONLY_LOCATIONS, SCANNABLE_LOCATIONS, cost_for
 from support.ledger import fresh_ledger
 

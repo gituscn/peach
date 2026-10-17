@@ -15,7 +15,7 @@ describe('馆藏 JAV 官方预览', () => {
       await page.route('**/stream?*', route => route.continue({ url: new URL(`/stream?id=${process.env.PEACH_E2E_ITEM}`, page.url()).href }));
       await page.goto(new URL(`/assets/${COVER_ONLY_ITEM.id}`, page.url()).href);
       const frame = page.locator('[data-item-gallery]');
-      const video = frame.locator('video');
+      const video = frame.locator('video.vjs-tech');
       await page.waitForFunction(() => (document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.readyState || 0) >= 3);
       assert.equal(await frame.locator('[data-follow-image-dots] button').count(), 2);
       await video.evaluate(node => { const video = node as HTMLVideoElement; video.muted = true; video.pause(); video.currentTime = 0.5 });
@@ -81,12 +81,12 @@ describe('馆藏 JAV 官方预览', () => {
       assert.ok(await frame.locator('[data-carousel-below]').isVisible());
       const restoredBox = await player.boundingBox();
       assert.ok(restoredBox && videoBox && Math.abs(restoredBox.width - videoBox.width) < 2 && Math.abs(restoredBox.height - videoBox.height) < 2);
-      await frame.locator('video').evaluate(node => { const video = node as HTMLVideoElement; video.muted = true; void video.play() });
+      await frame.locator('video.vjs-tech').evaluate(node => { const video = node as HTMLVideoElement; video.muted = true; void video.play() });
       await page.waitForFunction(() => (document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.currentTime || 0) > 0);
       await frame.getByRole('button', { name: '预览 2', exact: true }).click();
       await frame.locator('[data-catalog-picture]').waitFor({ state: 'visible' });
       assert.match(await frame.locator('[data-catalog-picture]').getAttribute('src') || '', /n=3$/);
-      assert.ok(await frame.locator('video').evaluate(node => (node as HTMLVideoElement).paused), '查看图片暂停正片');
+      assert.ok(await frame.locator('video.vjs-tech').evaluate(node => (node as HTMLVideoElement).paused), '查看图片暂停正片');
       assert.ok(await frame.locator('.video-js').isHidden());
       await page.keyboard.press('Tab');
       await frame.getByRole('button', { name: '预览 1', exact: true }).focus();
@@ -100,7 +100,7 @@ describe('馆藏 JAV 官方预览', () => {
       await page.waitForFunction(() => document.querySelector('[data-catalog-picture]')?.getAttribute('src')?.endsWith('n=1'));
       await frame.getByRole('button', { name: '播放正片', exact: true }).click();
       await frame.locator('.video-js').waitFor({ state: 'visible' });
-      assert.ok(await frame.locator('video').evaluate(node => (node as HTMLVideoElement).currentTime > 0), '切回正片保留位置');
+      assert.ok(await frame.locator('video.vjs-tech').evaluate(node => (node as HTMLVideoElement).currentTime > 0), '切回正片保留位置');
       await settle(page);
       const geometry = await layout(page);
       assert.ok(geometry.scrollWidth <= geometry.viewportWidth + 1);
@@ -131,7 +131,7 @@ describe('馆藏 JAV 官方预览', () => {
       await frame.getByRole('status', { name: '正在读取样图' }).waitFor();
       await page.waitForFunction(() => (document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.readyState || 0) >= 3);
       await player.evaluate(node => { (node as HTMLElement).dataset.galleryProbe = 'kept' });
-      await frame.locator('video').evaluate(node => { const video = node as HTMLVideoElement; video.pause(); video.currentTime = 0.5 });
+      await frame.locator('video.vjs-tech').evaluate(node => { const video = node as HTMLVideoElement; video.pause(); video.currentTime = 0.5 });
       const normalFrame = await frame.boundingBox();
       release();
       await frame.getByRole('button', { name: '预览 11', exact: true }).waitFor();
@@ -146,7 +146,7 @@ describe('馆藏 JAV 官方预览', () => {
       assert.ok(await player.isHidden());
       await frame.getByRole('button', { name: '播放正片', exact: true }).click();
       assert.equal(await player.getAttribute('data-gallery-probe'), 'kept');
-      assert.ok(await frame.locator('video').evaluate(node => Math.abs((node as HTMLVideoElement).currentTime - 0.5) < 0.1));
+      assert.ok(await frame.locator('video.vjs-tech').evaluate(node => Math.abs((node as HTMLVideoElement).currentTime - 0.5) < 0.1));
       const imageReads = images;
       await frame.getByRole('button', { name: '预览 1', exact: true }).click();
       await frame.locator('[data-jav-picture]').waitFor();

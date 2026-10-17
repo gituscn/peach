@@ -258,7 +258,7 @@ describe('库外 JAV 作品详情', () => {
         await page.getByRole('button', { name: '上一项媒体', exact: true }).click();
         await page.getByRole('button', { name: '视频预览', exact: true }).first().click();
         await page.waitForFunction(() => { const video = document.querySelector<HTMLVideoElement>('[data-jav-video] video'); return video && video.readyState >= 1 && Number.isFinite(video.duration) && video.duration > 0 });
-        assert.ok(await page.locator('[data-jav-video] video').evaluate(video => (video as HTMLVideoElement).paused), '预览等待用户播放');
+        assert.ok(await page.locator('[data-jav-video] video.vjs-tech').evaluate(video => (video as HTMLVideoElement).paused), '预览等待用户播放');
         const preview = page.locator('[data-jav-video]');
         const playerBox = await preview.locator('.video-js').boundingBox();
         assert.ok(playerBox && Math.abs(playerBox.width / playerBox.height - 16 / 9) < 0.02, JSON.stringify(playerBox));
@@ -266,16 +266,16 @@ describe('库外 JAV 作品详情', () => {
         assert.ok(playerBox && indicatorBox && indicatorBox.y >= playerBox.y + playerBox.height, '视频 indicator 位于播放器下方');
         await preview.getByRole('button', { name: '播放', exact: true }).waitFor({ state: 'visible' });
         assert.equal(await preview.locator('.vjs-control-bar').evaluate(el => getComputedStyle(el).visibility), 'visible');
-        await preview.locator('video').evaluate(node => { (node as HTMLVideoElement).muted = true });
+        await preview.locator('video.vjs-tech').evaluate(node => { (node as HTMLVideoElement).muted = true });
         await preview.getByRole('button', { name: '播放', exact: true }).click();
         await page.waitForFunction(() => (document.querySelector<HTMLVideoElement>('[data-jav-video] video')?.currentTime || 0) > 0);
         await preview.getByRole('button', { name: '暂停', exact: true }).click();
-        assert.ok(await preview.locator('video').evaluate(node => (node as HTMLVideoElement).paused));
+        assert.ok(await preview.locator('video.vjs-tech').evaluate(node => (node as HTMLVideoElement).paused));
         await preview.getByRole('button', { name: '设置', exact: true }).click();
         await preview.getByRole('menuitem', { name: /播放速度/ }).waitFor({ state: 'visible' });
         await preview.getByRole('button', { name: '设置', exact: true }).click();
         await page.getByRole('button', { name: '查看图片', exact: true }).click();
-        assert.equal(await page.locator('[data-jav-video] video').count(), 0, '切回图片卸下预览播放器');
+        assert.equal(await page.locator('[data-jav-video] video.vjs-tech').count(), 0, '切回图片卸下预览播放器');
         const frames = await page.evaluate(() => (window as unknown as { detailHeightFrames: { width: number; height: number }[] }).detailHeightFrames);
         assert.ok(frames.length > 3);
         for (const width of new Set(frames.map(frame => frame.width))) {

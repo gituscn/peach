@@ -160,7 +160,7 @@ describe('关注详情岛', () => {
       // 控制条在用户一段时间不动后会隐去（Video.js 的 userActive），只等它挂上，不等可见。
       await frame.locator('.video-js .vjs-control-bar').waitFor({ state: 'attached' });
       assert.equal(await frame.locator('[data-ambient-canvas]').count(), 1);
-      assert.equal(await frame.locator('.video-js video').count(), 1, '媒体框里的 video 不止一个');
+      assert.equal(await frame.locator('.video-js video.vjs-tech').count(), 1, '媒体框里的活动 video 不止一个');
       await watchStage(page);
       const seen = watchFollowRequests(page);
       await page.locator('[data-follow-queue-item="5102"]').click();

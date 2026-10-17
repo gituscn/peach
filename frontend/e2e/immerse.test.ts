@@ -83,7 +83,7 @@ describe('沉浸模式', () => {
           .observe(document, { childList: true, subtree: true });
       });
       await page.goto(new URL(`/immerse?id=${wide.id}`, page.url()).href, { waitUntil: 'domcontentloaded' });
-      await page.locator('[data-immerse-track] [data-immerse-slide] video').waitFor({ state: 'attached' });
+      await page.locator('[data-immerse-track] [data-immerse-slide] video.vjs-tech').waitFor({ state: 'attached' });
 
       // 首条出画前：框、动作列、作者标题一样都不露，出画时一次摆成横屏。
       const loaderHidden = () => page.evaluate(() => document.querySelector<HTMLElement>('[data-immerse-loader]')!.hidden);

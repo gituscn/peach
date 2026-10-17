@@ -94,7 +94,6 @@ from .web_custom_metadata import q_custom_metadata, w_custom_metadata
 from .web_resource_sync import w_purge_missing, w_resource_sync_apply, w_resource_sync_scan
 from .web_review import q_review, w_review_decision, w_review_genre
 from .web_settings import q_settings, w_settings
-from .media_processing_policy import q_media_processing, w_media_processing
 from .web_library_shortcuts import q_library_shortcuts, w_library_shortcuts
 from .web_folders import q_folders, w_folder_preview, w_folder_rule
 from .web_scraping import (
@@ -103,7 +102,9 @@ from .web_scraping import (
 )
 from .web_state import WebContract, path_version
 from .web_tasks import q_tasks
-from .web_timeline_thumbnails import q_thumbnail_jobs, q_timeline, w_thumbnail_jobs
+from .web_timeline_thumbnails import (
+    q_media_processing, q_thumbnail_jobs, q_timeline, w_media_processing, w_thumbnail_jobs,
+)
 from .web_wants import q_wants, q_want_magnets, w_wants
 from .web_stats import (
     q_quality_goals,

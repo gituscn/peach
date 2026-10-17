@@ -594,10 +594,10 @@ describe('作品详情岛', () => {
         assert.equal(await page.locator('#stage').getByText('2 个版本', { exact: true }).count(), 1);
         await page.locator('#stage [data-queue-item="32"]').click();
         await page.locator('#stage [data-queue-item="32"][aria-current="true"]').waitFor();
-        await page.locator('#stage video').dispatchEvent('ended');
+        await page.locator('#stage video.vjs-tech').dispatchEvent('ended');
         await pathIs(page, '/assets/33?editions=31');
         await page.locator('#stage [data-queue-item="33"][aria-current="true"]').waitFor();
-        await page.locator('#stage video').dispatchEvent('ended');
+        await page.locator('#stage video.vjs-tech').dispatchEvent('ended');
         assert.equal(new URL(page.url()).pathname + new URL(page.url()).search, '/assets/33?editions=31');
         const bounds = await layout(page);
         assert.ok(bounds.scrollWidth <= bounds.viewportWidth + 1, JSON.stringify(bounds));
