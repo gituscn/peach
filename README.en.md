@@ -123,7 +123,7 @@ Both the Windows installer and portable ZIP include FFmpeg, ffprobe and untrunc 
 
 On Windows, the tray runs independently. Closing the Codex, Claude, or terminal session that started it keeps Peach running. Peach attempts to recover after an unexpected tray exit, up to three times within five minutes. Choosing “Quit Peach” keeps it closed. Exit reasons and recovery results are recorded in `tray-lifecycle.log` in the logs folder.
 
-Startup error dialogs show where a diagnostic report was saved. While Peach is running, choose “Export diagnostic report” in the tray menu or “Download diagnostic report” on the diagnostics page to collect a redacted ZIP for feedback. The tray export dialog can open the report folder, open the file, or close.
+Startup error dialogs show where a diagnostic report was saved. While Peach is running, choose “Export diagnostic report” in the tray menu or “Download diagnostic report” on the diagnostics page to collect a redacted ZIP for feedback. For library processing failures, retry the failed items and export this ZIP; there is no need to select individual logs. It includes tool versions and decoding capabilities, processing issues, startup preparation, update and tunnel records, and same-origin browser errors from signed-in devices. Diagnostic downloads are limited to the computer running Peach. The tray export dialog can open the report folder, open the file, or close.
 
 ### Run from source (Windows, macOS)
 
