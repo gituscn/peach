@@ -70,7 +70,7 @@ Python 静态检查使用开发依赖 Ruff，随每个正式测试域扫描全�
 | --- | --- |
 | 本机修改 | 正式入口默认 `auto`，按影响域取并集；同代码、环境与范围的有效记录可复用 |
 | 普通 PR | Python 3.14：macOS 与 Windows 均按影响域验证 |
-| 普通主线提交 | Python 3.14：macOS 与 Windows 全量 Python 回归；前端与浏览器按影响选择 |
+| 普通主线提交 | Python 3.14：macOS、Windows、前端、浏览器与 wheel 完整回归 |
 | 实际依赖、迁移、共享测试设施、未知影响面 | Windows 与 macOS 的 Python 3.14 全量 |
 | 手动 CI | 完整系统矩阵 |
 | wheel | Windows 与 macOS 各一次 Python 3.14 独立最小安装 |
@@ -82,7 +82,7 @@ Test 工作流的 `web-bundle` 在 Ubuntu 上统一执行 tsc、lint、Vitest、
 
 浏览器用例由 `web-e2e` 的六个 Windows runner 分担，每片有自己的服务、演示库与日志。`ci_plan.py` 按 `ci-browser-timings.json` 的实测秒数分配文件，新文件使用默认权重；每个文件恰好执行一次。每片经项目入口的 `-Focus` 运行分配的浏览器文件，首启文件始终归首次设置服务。它装 Node 24、前端依赖、ffmpeg，并经 `PEACH_E2E_CHROME` 指定 Chrome。本机浏览器入口与并发语义保持完整。
 
-计划按改动选择前端、vendor、wheel 与浏览器任务，文档 PR 只执行适用检查；依赖、未知影响与手动验证包含全部任务。`verified` 根据计划核对必需任务，缺失、失败、取消及必需任务跳过均判失败。Actions 工作流本身由固定版 actionlint 检查语法、表达式、依赖与脚本。PR 更新取消同 PR 的过期运行，主线 Test 按提交各自保留结果。
+PR 计划按改动选择前端、vendor、wheel 与浏览器任务，文档 PR 只执行适用检查；主线、依赖、未知影响与手动验证包含全部任务。`verified` 根据计划核对必需任务，缺失、失败、取消及必需任务跳过均判失败。Actions 工作流本身由固定版 actionlint 检查语法、表达式、依赖与脚本。PR 更新取消同 PR 的过期运行，主线 Test 按提交各自保留结果。
 
 Python 分片上传完整测试输出；浏览器分片上传 TAP、服务日志及已脱敏网络日志，保留 14 天。npm 审计遇到 high 或 critical 漏洞直接失败；只有临时网络错误最多请求三次，在前两次失败后分别等待 15 与 30 秒，未知响应不当成通过。
 

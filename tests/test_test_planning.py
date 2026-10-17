@@ -192,6 +192,10 @@ class TestPlanningTests(unittest.TestCase):
         unknown = ci_plan.plan('pull_request', ['unknown.file'])
         self.assertLessEqual({'web-e2e', 'web-bundle', 'web-vendor', 'wheel-smoke'},
                              set(unknown['required_jobs']))
+        mainline = ci_plan.plan('push', ['docs/TESTING.md'])
+        self.assertTrue(mainline['wide'])
+        self.assertLessEqual({'web-e2e', 'web-bundle', 'web-vendor', 'wheel-build', 'wheel-smoke'},
+                             set(mainline['required_jobs']))
 
     def test_result_gate_rejects_missing_failed_cancelled_or_required_skipped_jobs(self):
         required = ['plan', 'python', 'workflow-lint', 'web-e2e']

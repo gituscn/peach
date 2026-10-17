@@ -47,10 +47,10 @@ def validate_results(results: dict, required: list[str]) -> None:
 def plan(event: str, paths: list[str], contents: dict | None = None) -> dict:
     from . import test_runner as runner
     scopes, _ = runner.scopes_for_changes(paths, contents=contents)
-    wide = event == "workflow_dispatch" or "full" in scopes
+    wide = event in {"push", "workflow_dispatch"} or "full" in scopes
     rows = []
     for system in ("macos-latest", "windows-latest"):
-        scope = "full" if wide or event == "push" else "auto"
+        scope = "full" if wide else "auto"
         # 独立 runner 承担分片，避免共享文件、端口和全量证据锁。
         shards = (4 if system == "windows-latest" else 2) if scope == "full" else 1
         for index in range(shards):
@@ -58,7 +58,7 @@ def plan(event: str, paths: list[str], contents: dict | None = None) -> dict:
                          "shard_index": index, "shard_count": shards})
     wheels = [{"os": "windows-latest", "python": "3.14"},
               {"os": "macos-latest", "python": "3.14"}]
-    shared = event == "workflow_dispatch" or "full" in scopes
+    shared = wide
     browser = shared or any(path.startswith(("src/", "web/", "frontend/", "migrations/", "resources/",
                                              "tests/", ".github/workflows/test.yml"))
                             or path in {"pyproject.toml", "uv.lock"} for path in paths)
