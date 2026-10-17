@@ -7,6 +7,7 @@ import type { VjsPlayer } from '../src/player/types';
 import { mountDetailPlayer } from '../src/player/detail-player';
 import { configurePlayer } from '../src/player/host';
 import { setDetailPlayer } from '../src/player/registry';
+import * as videojsLoader from '../src/player/videojs';
 
 const item = { id: 12, duration: 300, leave_ratio: .4 };
 const key = playbackKey('item', item);
@@ -35,7 +36,7 @@ describe('视频续播位置', () => {
       currentTime: (seconds?: number) => { if (seconds !== undefined) time = seconds; return time },
       src: () => listeners.get('loadedmetadata')?.forEach((callback) => callback()),
     } as unknown as VjsPlayer;
-    vi.stubGlobal('videojs', () => player);
+    vi.spyOn(videojsLoader, 'ensureVideojs').mockResolvedValue(() => player);
     try {
       await mountDetailPlayer({ id: 12, duration: 30 }, video, false,
         { source: { src: '/follow-stream?id=12&media=2', type: 'video/mp4' }, resume: { time: 97, autoplay: false } });

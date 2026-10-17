@@ -123,7 +123,7 @@ export function streamSpeedBits(id: number, session = ''): number {
 
 export function playerSpeedBits(player: VjsPlayer | null, id: number, session = '', meter: BufferMeter | null = null): number {
   let bandwidth = 0;
-  try { bandwidth = Number(player?.tech({ IWillNotUseThisInPlugins: true })?.vhs?.stats?.bandwidth) || 0 } catch { /* 没有 VHS */ }
+  try { bandwidth = Number(player?.bandwidth?.()) || 0 } catch { /* 播放引擎没有带宽读数 */ }
   if (bandwidth > 0) return bandwidth;
   /* 传了 meter 就是渐进源：它的 resource timing 本来就量不到，不能拿别的条目顶上。 */
   return meter ? Number(meter.bits) || 0 : streamSpeedBits(id, session);

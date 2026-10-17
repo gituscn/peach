@@ -312,7 +312,7 @@ class WebE2ESmokeTests(unittest.TestCase):
                 raise AssertionError(f"演示短片取消失败：{error}") from error
 
     def test_every_route_holds_the_layout_and_runtime_invariants(self):
-        env = dict(os.environ, PEACH_E2E_ORIGIN=self.origin, PEACH_E2E_ITEM=str(self.item),
+        env = dict(os.environ, PEACH_E2E_ORIGIN=self.origin, PEACH_E2E_ITEM=str(self.item), PEACH_E2E_FFMPEG=self.ffmpeg,
                    PEACH_E2E_CHROME=self.chrome, PEACH_E2E_NET_LOG_DIR=str(BROWSER_LOGS / "network"))
         BROWSER_LOGS.mkdir(parents=True, exist_ok=True)
         for stale in BROWSER_LOGS.glob("batch-*.tap"):

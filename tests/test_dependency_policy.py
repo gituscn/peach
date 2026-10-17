@@ -155,14 +155,14 @@ class DependencyPolicyTests(unittest.TestCase):
         self.assertTrue(manifest["private"])
         versions = manifest["devDependencies"]
         self.assertEqual(set(versions), {"@phosphor-icons/core", "healthicons",
-                                         "lucide-static", "swiper", "video.js", "remixicon", "@fontsource-variable/inter"})
+                                         "lucide-static", "swiper", "@videojs/cdn", "remixicon", "@fontsource-variable/inter"})
         for version in versions.values():
             self.assertRegex(version, r"^\d+\.\d+\.\d+$")
 
         index = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
         loader = (ROOT / "frontend" / "src" / "player" / "videojs.ts").read_text(encoding="utf-8")
-        # video.js 的脚本与样式表都按需加载，版本只钉在播放器模块的加载器里。
-        self.assertIn(f"'/vendor/videojs/{versions['video.js']}/'", loader)
+        # Video.js 10 的本地 ESM 模块按需加载，版本与官方 CDN 包一致。
+        self.assertIn(f"'/vendor/videojs/{versions['@videojs/cdn']}/'", loader)
         self.assertIn(f"Lucide static {versions['lucide-static']}", index)
         self.assertIn(f"Health Icons {versions['healthicons']}", index)
         self.assertIn(f"Phosphor {versions['@phosphor-icons/core']} regular", index)

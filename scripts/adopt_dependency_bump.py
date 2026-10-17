@@ -55,7 +55,7 @@ RECIPES = {
         "checks": (),
     },
     "web": {
-        "label": "根 package.json（手工 vendor 的四个 web 包）",
+        "label": "根 package.json（本地固定 web 依赖）",
         "manifests": ("package.json", "package-lock.json"),
         "derived": ("web/vendor/", "web/index.html", "web/dist/", "docs/REUSE.md",
                     "frontend/src/player/videojs.ts", "tests/test_web_ui.py",

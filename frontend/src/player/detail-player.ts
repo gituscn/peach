@@ -96,8 +96,7 @@ export async function mountDetailPlayer(
   }
   const player = videojs(video, {
     controls: true, preload: 'metadata', language: 'zh-CN', responsive: true,
-    /* video.js 只认 options 里的海报，不读 video 元素上的 poster 属性；不传，开播前那层本地
-       封面就在挂载那一刻被丢掉。 */
+    /* 海报与作品当前封面偏好一致，交给原生视频显示。 */
     poster: options.poster || detailPosterUrl(item, host.settings().javImage),
     controlBar: {
       pictureInPictureToggle: true, currentTimeDisplay: false, timeDivider: false,
@@ -114,7 +113,7 @@ export async function mountDetailPlayer(
     const tech = player.el()?.querySelector('video');
     if (tech?.videoWidth && tech.videoHeight) player.el().style.setProperty('--peach-video-ratio', `${tech.videoWidth}/${tech.videoHeight}`);
   });
-  // 非正时长一律当未知：强行 player.duration(-1) 会被 Video.js 转成 Infinity 并标成直播。
+  // 非正时长一律当未知。
   const expected = realDuration(item.duration);
   const statsHistory = { speed: [] as number[], activity: [] as number[], buffer: [] as number[] };
   /* 关注条目的字节数要回源 HEAD 才知道，跟清晰度表同一趟回来，比挂载晚。码率是速度读数的
