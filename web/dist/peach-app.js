@@ -67681,11 +67681,15 @@ function rNe({ receipt: e }) {
 	let [t, n] = (0, S.useState)(null), r = pt({
 		queryKey: sW,
 		queryFn: ({ signal: e }) => cW(e)
-	}), i = hA(), a = (e) => W.setQueryData(sW, e);
+	}), i = hA(), a = (e) => W.setQueryData(sW, e), o = !!(r.isPending || r.error || r.data?.items.length || i.error), s = /* @__PURE__ */ (0, C.jsx)(K, {
+		variant: "secondary",
+		onClick: () => n(nNe()),
+		children: "添加来源"
+	});
 	return /* @__PURE__ */ (0, C.jsxs)(xA, {
 		title: "自定义元数据来源",
 		children: [
-			r.isPending || r.error || r.data?.items.length || i.error ? /* @__PURE__ */ (0, C.jsxs)(CA, { children: [
+			o ? /* @__PURE__ */ (0, C.jsxs)(CA, { children: [
 				r.isPending ? /* @__PURE__ */ (0, C.jsx)("div", {
 					"aria-busy": "true",
 					"data-skeleton": "",
@@ -67738,10 +67742,9 @@ function rNe({ receipt: e }) {
 				}, t.id)),
 				i.error ? /* @__PURE__ */ (0, C.jsx)(EA, { children: i.error }) : null
 			] }) : null,
-			t ? null : /* @__PURE__ */ (0, C.jsx)(wA, { children: /* @__PURE__ */ (0, C.jsx)(K, {
-				variant: "secondary",
-				onClick: () => n(nNe()),
-				children: "添加来源"
+			t ? null : o ? /* @__PURE__ */ (0, C.jsx)(wA, { children: s }) : /* @__PURE__ */ (0, C.jsx)(CA, { children: /* @__PURE__ */ (0, C.jsx)("div", {
+				className: "flex justify-end",
+				children: s
 			}) }),
 			t ? /* @__PURE__ */ (0, C.jsx)(iNe, {
 				initial: t,

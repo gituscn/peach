@@ -24,8 +24,10 @@ export function CustomSources({ receipt }: { receipt(message: string): void }) {
   const query = useQuery({ queryKey: KEY, queryFn: ({ signal }) => fetchCustomSources(signal) });
   const action = useAction();
   const changed = (result: { items: Source[] }) => queryClient.setQueryData(KEY, result);
+  const hasContent = Boolean(query.isPending || query.error || query.data?.items.length || action.error);
+  const add = <Button variant="secondary" onClick={() => setEditing(blank())}>添加来源</Button>;
   return <Section title="自定义元数据来源">
-    {query.isPending || query.error || query.data?.items.length || action.error ? <Stack>
+    {hasContent ? <Stack>
       {query.isPending ? <div aria-busy="true" data-skeleton="" aria-label="读取自定义来源" /> : null}
       {query.error ? <ErrorText>{errorMessage(query.error)}</ErrorText> : null}
       {query.data?.items.map((source) => <div key={source.id} className="flex flex-wrap items-center gap-3">
@@ -42,7 +44,7 @@ export function CustomSources({ receipt }: { receipt(message: string): void }) {
       </div>)}
       {action.error ? <ErrorText>{action.error}</ErrorText> : null}
     </Stack> : null}
-    {!editing ? <Footer><Button variant="secondary" onClick={() => setEditing(blank())}>添加来源</Button></Footer> : null}
+    {!editing ? hasContent ? <Footer>{add}</Footer> : <Stack><div className="flex justify-end">{add}</div></Stack> : null}
     {editing ? <SourceForm key={editing.id || 'new'} initial={editing} cancel={() => setEditing(null)}
       saved={(result) => { changed(result); setEditing(null); receipt('已保存来源') }} /> : null}
   </Section>;
