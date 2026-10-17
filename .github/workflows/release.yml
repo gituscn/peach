@@ -9,43 +9,19 @@ permissions:
   contents: read
   actions: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"
 
 jobs:
-  ffmpeg:
-    name: Windows FFmpeg 与对应源码
+  validate:
+    name: 核对发布提交与版本
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: 安装交叉编译工具
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config python3 clang ca-certificates curl xz-utils
-      - name: 构建固定版本媒体工具
-        run: bash scripts/build_ffmpeg_windows.sh build/ffmpeg-windows
-      - name: 构建固定版本索引修复工具
-        run: bash scripts/build_untrunc_windows.sh build/untrunc-windows
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ffmpeg-windows
-          path: |
-            build/ffmpeg-windows/ffmpeg/
-            build/ffmpeg-windows/ffmpeg-corresponding-source.zip
-      - uses: actions/upload-artifact@v7
-        with:
-          name: untrunc-windows
-          path: |
-            build/untrunc-windows/untrunc/
-            build/untrunc-windows/untrunc-corresponding-source.zip
-
-  windows:
-    name: Windows x64 独立测试包
-    runs-on: windows-latest
-    needs: ffmpeg
-    outputs:
-      version: ${{ steps.version.outputs.version }}
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -55,13 +31,73 @@ jobs:
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: pwsh
         run: |
-          python scripts/release_tag.py --repo "$env:GITHUB_REPOSITORY" --verify-sha "$env:GITHUB_SHA"
-          if ($LASTEXITCODE -ne 0) { throw '发布提交未通过主线 CI' }
+          python scripts/release_tag.py --repo "$GITHUB_REPOSITORY" --verify-sha "$GITHUB_SHA"
+          python -c 'import os; from pathlib import Path; from scripts.version_bump import read_version; assert os.environ["GITHUB_REF_NAME"] == "v" + read_version(Path.cwd()), "Tag 与版本不一致"'
+          python scripts/changelog.py --notes "${GITHUB_REF_NAME#v}" --to "$RUNNER_TEMP/release-notes.md"
+
+  ffmpeg:
+    name: Windows FFmpeg 与对应源码
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - name: 复用固定源码的媒体工具与对应源码包
+        id: media-cache
+        uses: actions/cache@v6.1.0
+        with:
+          key: windows-media-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build_ffmpeg_windows.sh', 'scripts/build_untrunc_windows.sh', 'scripts/fetch_ffmpeg_sources.py', 'scripts/fetch_untrunc_sources.py', 'scripts/ffmpeg-sources.json', 'scripts/untrunc-sources.json') }}
+          path: |
+            build/ffmpeg-windows/ffmpeg
+            build/ffmpeg-windows/ffmpeg-corresponding-source.zip
+            build/untrunc-windows/untrunc
+            build/untrunc-windows/untrunc-corresponding-source.zip
+      - name: 安装交叉编译工具
+        if: steps.media-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config python3 clang ca-certificates curl xz-utils
+      - name: 构建固定版本媒体工具
+        if: steps.media-cache.outputs.cache-hit != 'true'
+        run: bash scripts/build_ffmpeg_windows.sh build/ffmpeg-windows
+      - name: 构建固定版本索引修复工具
+        if: steps.media-cache.outputs.cache-hit != 'true'
+        run: bash scripts/build_untrunc_windows.sh build/untrunc-windows
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ffmpeg-windows
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            build/ffmpeg-windows/ffmpeg/
+            build/ffmpeg-windows/ffmpeg-corresponding-source.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: untrunc-windows
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            build/untrunc-windows/untrunc/
+            build/untrunc-windows/untrunc-corresponding-source.zip
+
+  windows:
+    name: Windows x64 独立测试包
+    runs-on: windows-latest
+    needs: ffmpeg
+    timeout-minutes: 40
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: 核对发布版本
         id: version
         shell: pwsh
@@ -122,11 +158,14 @@ jobs:
         with:
           name: desktop-candidate
           path: release/*
+          if-no-files-found: error
+          retention-days: 7
 
   desktop-smoke:
     name: 仅下载制品验收
     needs: windows
     runs-on: windows-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -170,12 +209,14 @@ jobs:
           name: desktop-smoke-failure
           path: smoke-evidence/
           if-no-files-found: ignore
+          retention-days: 14
 
   release:
     name: GitHub 预发布
     if: github.ref_type == 'tag'
     needs: [windows, desktop-smoke]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
@@ -190,5 +231,5 @@ jobs:
           VERSION: ${{ needs.windows.outputs.version }}
         run: |
           cd release
-          sha256sum *.zip *-setup.exe > SHA256SUMS.txt
-          gh release create "$GITHUB_REF_NAME" *.zip *-setup.exe SHA256SUMS.txt --verify-tag --prerelease --title "Peach $VERSION · Windows 测试版" --notes-file RELEASE_NOTES.md
+          sha256sum ./*.zip ./*-setup.exe > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" ./*.zip ./*-setup.exe SHA256SUMS.txt --verify-tag --prerelease --title "Peach $VERSION · Windows 测试版" --notes-file RELEASE_NOTES.md

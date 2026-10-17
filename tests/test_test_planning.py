@@ -57,6 +57,22 @@ class CIFrontendOwnershipTests(unittest.TestCase):
         self.assertCountEqual(serial, shards[0] + shards[1])
         self.assertEqual(len(serial), len(set(serial)))
 
+    def test_python_jobs_delegate_browser_cases_and_keep_their_contract_tests(self):
+        def collect(environment):
+            with patch.dict(os.environ, environment, clear=True), patch.object(
+                    runner, 'selected_files', return_value=(runner.TESTS / 'test_web_e2e.py',)):
+                return set(self.ids(runner.build_suite('web')))
+        local = collect({})
+        selected = collect(self.CI)
+        self.assertEqual(local - selected, {
+            'test_web_e2e.WebE2ESmokeTests.test_every_route_holds_the_layout_and_runtime_invariants',
+            'test_web_e2e.SetupE2ETests.test_the_first_run_page_writes_errors_back_and_finishes',
+        })
+        self.assertTrue(any('.MissingPrerequisiteTests.' in name for name in selected))
+        for environment in ({**self.CI, 'GITHUB_JOB': 'web-e2e'},
+                            {**self.CI, 'GITHUB_WORKFLOW': 'Release'}):
+            self.assertEqual(collect(environment), local)
+
     def test_delegated_ci_returns_results_without_local_evidence(self):
         for scope in ('web', 'full'):
             for success, count, expected in ((True, 3, 0), (False, 3, 1), (True, 0, 1)):
@@ -152,12 +168,46 @@ class TestPlanningTests(unittest.TestCase):
     def test_matrix_keeps_full_mainline_and_platform_coverage(self):
         result = ci_plan.plan('push', ['web/app.js'])
         rows = result['matrix']['include']
-        self.assertEqual(len([r for r in rows if r['scope'] == 'full']), 2)
-        self.assertTrue(all(r['os'] == 'macos-latest' for r in rows if r['scope'] == 'full'))
+        self.assertEqual(len([r for r in rows if r['scope'] == 'full']), 6)
+        self.assertEqual({r['os'] for r in rows}, {'windows-latest', 'macos-latest'})
         self.assertEqual({r['python'] for r in rows}, {'3.14'})
-        self.assertEqual([(r['os'], r['scope']) for r in rows if r['scope'] != 'full'],
-                         [('windows-latest', 'core')])
+        self.assertTrue(all(r['scope'] == 'full' for r in rows))
         self.assertEqual(len(result['wheel_matrix']['include']), 2)
+
+    def test_browser_partitions_cover_every_file_once_and_balance_recorded_duration(self):
+        matrix = ci_plan.browser_matrix()['include']
+        groups = [json.loads(row['files']) for row in matrix]
+        expected = {path.relative_to(runner.ROOT).as_posix()
+                    for path in (runner.ROOT / 'frontend/e2e').rglob('*.test.ts')}
+        collected = [name for group in groups for name in group]
+        self.assertEqual(set(collected), expected)
+        self.assertEqual(len(collected), len(set(collected)))
+        self.assertTrue(all(groups))
+        costs = [row['estimated_seconds'] for row in matrix]
+        self.assertLess(max(costs) - min(costs), 60)
+
+    def test_document_changes_avoid_optional_jobs_and_unknown_changes_require_them(self):
+        documents = ci_plan.plan('pull_request', ['docs/TESTING.md'])
+        self.assertEqual(documents['required_jobs'], ['plan', 'python', 'workflow-lint'])
+        unknown = ci_plan.plan('pull_request', ['unknown.file'])
+        self.assertLessEqual({'web-e2e', 'web-bundle', 'web-vendor', 'wheel-smoke'},
+                             set(unknown['required_jobs']))
+        mainline = ci_plan.plan('push', ['docs/TESTING.md'])
+        self.assertTrue(mainline['wide'])
+        self.assertLessEqual({'web-e2e', 'web-bundle', 'web-vendor', 'wheel-build', 'wheel-smoke'},
+                             set(mainline['required_jobs']))
+
+    def test_result_gate_rejects_missing_failed_cancelled_or_required_skipped_jobs(self):
+        required = ['plan', 'python', 'workflow-lint', 'web-e2e']
+        passed = {name: {'result': 'success'} for name in required}
+        ci_plan.validate_results({**passed, 'web-vendor': {'result': 'skipped'}}, required)
+        for result in ('failure', 'cancelled', 'skipped'):
+            with self.subTest(result=result), self.assertRaises(ValueError):
+                ci_plan.validate_results({**passed, 'web-e2e': {'result': result}}, required)
+        with self.assertRaises(ValueError):
+            ci_plan.validate_results({name: value for name, value in passed.items() if name != 'python'}, required)
+        with self.assertRaises(ValueError):
+            ci_plan.validate_results(passed, [])
 
     def test_dependency_and_manual_runs_cover_both_systems(self):
         for event, paths in [('push', ['uv.lock']), ('pull_request', ['migrations/0025.sql']),

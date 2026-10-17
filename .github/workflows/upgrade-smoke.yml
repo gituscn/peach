@@ -10,19 +10,22 @@ on:
       to_version:
         description: 已发布的目标版本
         required: true
-        default: '0.40.1'
       to_commit:
         description: 目标制品的完整构建提交
         required: true
-        default: '6e5e8b48d0bfe5203c9af998792ce9c31c02542b'
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.from_version }}-${{ inputs.to_version }}-${{ inputs.to_commit }}
+  cancel-in-progress: false
 
 jobs:
   overlay:
     name: ${{ matrix.kind }} / ${{ matrix.data_location }} 原位覆盖
     runs-on: windows-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -56,3 +59,5 @@ jobs:
           path: |
             overlay.log
             smoke-evidence/
+          if-no-files-found: error
+          retention-days: 14
