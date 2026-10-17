@@ -5,6 +5,7 @@ import { PICK_FOLDER_URL } from '../../src/configuration-endpoints';
 import { SetupPage } from '../../src/react/pages/setup/setup-page';
 import { SETUP_QUESTIONS_URL, SETUP_URL, type SetupDone, type SetupQuestions } from '../../src/react/pages/setup/setup-api';
 import { RESTART_REDIRECT_MS } from '../../src/react/restart-redirect';
+import { MEDIA_SOURCE_OPTIONS } from '../../src/core/media-sources';
 import { buttonNamed, choose, click, mount, settle, switches, type } from './render';
 
 const questions = (over: Partial<SetupQuestions> = {}): SetupQuestions => ({
@@ -22,8 +23,7 @@ const questions = (over: Partial<SetupQuestions> = {}): SetupQuestions => ({
     { key: 'mdns_name', label: '局域网访问地址', help: [], default: 'peach', required: true, advanced: true,
       input: 'text', prefix: 'https://', suffix: '.local', visible_when: { host: '2' } },
   ],
-  media_sources: [{ value: 'local', label: '本地磁盘' }, { value: '115', label: 'CloudDrive · 115' },
-    { value: 'pikpak', label: 'CloudDrive · PikPak' }],
+  media_sources: MEDIA_SOURCE_OPTIONS.map(([value, label]) => ({ value, label })),
   media_source_default: 'local',
   media_root: null,
   cloud: { help: '先在 CloudDrive 登录网盘并完成挂载。', link: { url: 'https://www.clouddrive2.com/help.html', label: '挂载帮助' },
@@ -136,6 +136,20 @@ describe('访问密码', () => {
 });
 
 describe('媒体库', () => {
+  it('首次设置网盘时必须明确选择读取策略', async () => {
+    const { host, sent } = await open({}, { [SETUP_URL]: { status: 200, body: done() } });
+    await choose(rows(host)[0]!.querySelector('[aria-haspopup="listbox"]'), 'OneDrive（只读）');
+    const policy = rows(host)[0]!.querySelector('[data-media-read-policy] [aria-haspopup="listbox"]');
+    expect(policy?.textContent).toContain('选择读取策略');
+    await submitForm(host);
+    expect(host.textContent).toContain('请选择媒体读取策略');
+    await choose(policy, '正常读取');
+    await submitForm(host);
+    expect(sent(SETUP_URL).media_dir).toEqual([
+      { path: 'D:\\Videos', location: 'onedrive', root: '', cost: 'free' },
+    ]);
+  });
+
   it('加一行、删一行，扫描说明跟着行数走，提交按行带上来源', async () => {
     const { host, sent } = await open({}, { [SETUP_URL]: { status: 200, body: done() } });
     await click(buttonNamed('添加媒体库', host));
@@ -147,7 +161,7 @@ describe('媒体库', () => {
     expect(paths(host).map((input) => input.value)).toEqual(['E:\\More']);
     expect(rows(host)[0]!.querySelector('button[aria-label="移除这个文件夹"]')).toBeNull();
     await submitForm(host);
-    expect(sent(SETUP_URL).media_dir).toEqual([{ path: 'E:\\More', location: 'local', root: '' }]);
+    expect(sent(SETUP_URL).media_dir).toEqual([{ path: 'E:\\More', location: 'local', root: '', cost: 'free' }]);
   });
 
   it('选择文件夹让这台电脑弹对话框，选中的路径填回这一行', async () => {

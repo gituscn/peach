@@ -240,13 +240,14 @@ def _promo_directory(parts) -> bool:
 
 def _junk_rows(connection):
     """读取能进入垃圾复核的物理文件；字幕、NFO 与大视频在最外层排除。"""
+    marks = ",".join("?" for _ in SCANNABLE_LOCATIONS)
     rows = connection.execute(
         "SELECT id,location,name,medium,creator,code,size,duration,width,height,snapshot_path,"
         "feedback,disposal,play_count,leave_ratio,o_count,studio,ctx_orient,path "
-        "FROM asset WHERE location IN ('local','115','pikpak','guangya') AND disposal IS NULL "
+        f"FROM asset WHERE location IN ({marks}) AND disposal IS NULL "
         "AND (COALESCE(medium,'other')<>'video' OR (size < ? "
         "AND (duration IS NULL OR duration <= 1200)))",
-        (JUNK_VIDEO_MAX_BYTES,)).fetchall()
+        (*SCANNABLE_LOCATIONS, JUNK_VIDEO_MAX_BYTES)).fetchall()
     # NFO 是媒体资料边车，不是等待清理的物理内容；即使名字或所在目录带推广词，
     # 也应由资料读取报告解析问题，不能进入会把文件移入回收站的垃圾队列。
     return [row for row in rows if PureWindowsPath(
@@ -712,7 +713,7 @@ def purge_assets(connection, rows, *, missing_only: bool = False):
             location = stored[0] if stored else None
         if media and not missing_only and location in READ_ONLY_LOCATIONS:
             blocked.append({"id": row["id"], "path": media,
-                            "reason": "光鸭云盘为只读来源，请在光鸭云盘客户端管理文件"})
+                            "reason": "该挂载来源为只读，请在网盘客户端管理文件"})
             continue
         if media and missing_only:
             try:

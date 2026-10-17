@@ -53,7 +53,7 @@ export interface SetupDone {
 
 export type SetupErrors = Partial<Record<string, string | string[]>>;
 
-export interface SetupFolder { path: string; location: string; root: string }
+export interface SetupFolder { path: string; location: string; root: string; cost?: 'free' | 'metered' | '' }
 
 export interface SetupSubmission {
   media_dir: SetupFolder[];

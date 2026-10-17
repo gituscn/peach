@@ -16,7 +16,7 @@ import { Switch } from '@/components/base/switch/switch';
 
 import { SEGMENT, SEGMENTED_TRACK, SegmentedRadioGroup } from '../../components/segmented';
 import { busyProps } from '../../settings/busy-props';
-import { FolderRow, isCloudSource, SourceSelect, useFolderRows, WindowsRootInput } from '../../settings/folder-rows';
+import { FolderRow, isCloudSource, MediaReadPolicy, MediaReadPolicyHelp, SourceSelect, useFolderRows, WindowsRootInput } from '../../settings/folder-rows';
 import { PasswordPair } from '../../settings/password-pair';
 import { Disclosure, ErrorText, ExternalLink, Help } from '../../settings/section';
 import { CardGroup, GroupTitle } from '../auth-card';
@@ -48,7 +48,7 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
   const media = setup.questions.find((question) => question.input === 'folders');
   const others = setup.questions.filter((question) => question.input !== 'folders');
   const sources = setup.media_sources.map(({ value, label }) => [value, label] as const);
-  const blank = (path = ''): SetupFolder => ({ path, location: setup.media_source_default, root: '' });
+  const blank = (path = ''): SetupFolder => ({ path, location: setup.media_source_default, root: '', cost: setup.media_source_default === 'local' ? 'free' : '' });
   const folders = useFolderRows<SetupFolder>({
     initial: () => [blank(media?.default ?? '')], blank: () => blank(), pickFolder, describe: describeFailure,
     focusAfterPick: true,
@@ -64,6 +64,7 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
   const [tableError, setTableError] = useState('');
   const [failure, setFailure] = useState('');
   const [busy, setBusy] = useState(false);
+  const [requireReadPolicy, setRequireReadPolicy] = useState(false);
   // 每次因为错误要展开就换一个 key：折叠按初始状态展开，已填的值都在这一层的 state 里。
   const [advancedOpenings, setAdvancedOpenings] = useState(0);
   const form = useRef<HTMLFormElement>(null);
@@ -87,6 +88,12 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busy) return;
+    const missing = folders.rows.findIndex((row) => !row.cost);
+    if (missing >= 0) {
+      setRequireReadPolicy(true);
+      requestAnimationFrame(() => form.current?.querySelector<HTMLButtonElement>(`[data-media-read-policy="${missing}"] button`)?.focus());
+      return;
+    }
     setBusy(true);
     setFailure('');
     const submission: SetupSubmission = {
@@ -166,7 +173,10 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
                 onPick={() => void folders.pick(index)}
                 onRemove={folders.rows.length > 1 ? () => { folders.remove(index); addButton.current?.focus(); } : undefined}>
                 <SourceSelect index={index} value={row.location} options={sources}
-                  onChange={(location) => folders.edit(index, { location })} />
+                  onChange={(location) => folders.edit(index, { location, cost: location === 'local' ? 'free' : '' })} />
+                <MediaReadPolicy index={index} cost={row.cost ?? ''}
+                  error={requireReadPolicy && !row.cost ? '请选择媒体读取策略' : undefined}
+                  onChange={(cost) => folders.edit(index, { cost })} />
                 {setup.media_root
                   ? <WindowsRootInput label={setup.media_root.label} placeholder={setup.media_root.placeholder}
                       value={row.root} onChange={(root) => folders.edit(index, { root })} />
@@ -179,6 +189,7 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
           </Button>
           {cloud ? (
             <>
+              <MediaReadPolicyHelp />
               <Help>{setup.cloud.help}<ExternalLink href={setup.cloud.link.url}>{setup.cloud.link.label}</ExternalLink></Help>
               {setup.cloud.dependencies.map((dependency) => (
                 <Help key={dependency.name}>

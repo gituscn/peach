@@ -8,6 +8,32 @@ describe('配置表单与行间距', () => {
   before(async () => { browser = await launch() });
   after(async () => { await browser?.close() });
   for (const viewport of VIEWPORTS) {
+    it(`${viewport.name}：挂载目录的代理流量保护可切换且不越出视口`, async () => {
+      const opened = await visit(browser, '/settings/library?section=' + encodeURIComponent('这台电脑'), viewport);
+      const { page } = opened;
+      try {
+        await page.route('**/api/configuration', async route => {
+          const data = await (await route.fetch()).json();
+          await route.fulfill({ json: { ...data, editable: true, windows: true, media_sources: [
+            { location: 'onedrive', root: 'O:\\Movies', path: 'O:\\Movies', cost: 'metered' },
+            { location: 'mounted', root: 'M:\\Movies', path: 'M:\\Movies', cost: 'free' },
+          ] } });
+        });
+        await page.reload();
+        const form = page.getByRole('form', { name: '媒体文件夹', exact: true });
+        const protectedFolder = form.locator('[data-media-read-policy="0"] [aria-haspopup="listbox"]');
+        await protectedFolder.waitFor();
+        assert.ok((await protectedFolder.textContent())?.includes('代理流量保护'));
+        assert.ok((await form.locator('[data-media-read-policy="1"]').textContent())?.includes('正常读取'));
+        await protectedFolder.click();
+        await page.getByRole('option', { name: '正常读取', exact: true }).click();
+        await settle(page);
+        assert.ok((await protectedFolder.textContent())?.includes('正常读取'));
+        assert.deepEqual((await layout(page)).offenders, []);
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close() }
+    });
+
     it(`${viewport.name}：PikPak 表单直接显示，登录按钮同排`, async () => {
       const opened = await visit(browser, '/settings/library?section=' + encodeURIComponent('下载渠道'), viewport);
       const { page } = opened;

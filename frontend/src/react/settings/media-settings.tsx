@@ -22,7 +22,8 @@ import { RESTART_REDIRECT_MS } from '../restart-redirect';
 import { CloudDriveGuide } from './clouddrive-guide';
 import { CONFIGURATION_KEY, fetchConfiguration } from './configuration';
 import { groupRoot } from './configuration-panel';
-import { FolderRow, isCloudSource, MEDIA_SOURCES, SourceSelect, sourceMark, useFolderRows, WindowsRootInput } from './folder-rows';
+import { FolderRow, isCloudSource, MEDIA_SOURCES, MediaReadPolicy, MediaReadPolicyHelp, SourceSelect, sourceMark, useFolderRows, WindowsRootInput } from './folder-rows';
+import { sourceDefaultCost, type SourceCost } from '../../core/media-sources';
 import { LibraryIconPicker } from './library-icon-picker';
 import { PushDiscoveryForm } from './push-discovery-settings';
 import {
@@ -34,17 +35,18 @@ const sourceName = (location: string) => MEDIA_SOURCES.find(([kind]) => kind ===
 const pickFolder = async (initial: string) =>
   (await apiSend<{ path: string | null }>(PICK_FOLDER_URL, { initial })).path;
 
-interface MediaRow { path: string; location: string; root: string; library: string; library_icon: string }
+interface MediaRow { path: string; location: string; root: string; library: string; library_icon: string; cost: SourceCost | '' }
 interface FieldErrors { media_dirs?: string[]; port?: string }
 interface SaveResult { saved: boolean; url: string; revision: string }
 
-const blankRow = (path = ''): MediaRow => ({ path, location: 'local', root: '', library: '', library_icon: '' });
+const blankRow = (path = ''): MediaRow => ({ path, location: 'local', root: '', library: '', library_icon: '', cost: 'free' });
 
 function initialRows(data: ConfigurationData): MediaRow[] {
   const known = data.media_sources?.filter((row) => MEDIA_SOURCES.some(([kind]) => kind === row.location));
   if (known?.length) {
     return known.map((row) => ({
       path: row.path, location: row.location, root: row.root, library: row.library || '', library_icon: row.library_icon || '',
+      cost: row.cost ?? sourceDefaultCost(row.location),
     }));
   }
   return (data.media_dirs.length ? data.media_dirs : ['']).map((path) => blankRow(path));
@@ -73,6 +75,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
     initial: () => initialRows(data), blank: () => blankRow(), pickFolder, describe: errorMessage,
   });
   const [scanNow, setScanNow] = useState(false);
+  const [requireReadPolicy, setRequireReadPolicy] = useState(false);
   const [failure, setFailure] = useState('');
   const [saved, setSaved] = useState<SaveResult | null>(null);
   const revision = useRef(data.revision);
@@ -86,6 +89,13 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const missing = rows.findIndex((row) => !row.cost);
+    if (missing >= 0) {
+      setRequireReadPolicy(true);
+      const form = event.currentTarget;
+      requestAnimationFrame(() => form.querySelector<HTMLButtonElement>(`[data-media-read-policy="${missing}"] button`)?.focus());
+      return;
+    }
     setFailure('');
     void action.run('save', (signal) => apiSend<SaveResult>(CONFIGURATION_URL, {
       revision: revision.current,
@@ -133,7 +143,10 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                 picking={picking === index} onPick={() => void pick(index)}
                 onRemove={rows.length > 1 ? () => remove(index) : undefined}
                 status={mountOf(row.path) ? <MountBadge online={mountOf(row.path)?.online} /> : null}>
-                <SourceSelect index={index} value={row.location} onChange={(location) => edit(index, { location })} />
+                <SourceSelect index={index} value={row.location}
+                  onChange={(location) => edit(index, { location, cost: location === 'local' ? 'free' : '' })} />
+                <MediaReadPolicy index={index} cost={row.cost} onChange={(cost) => edit(index, { cost })}
+                  error={requireReadPolicy && !row.cost ? '请选择媒体读取策略' : undefined} />
                 <Input className="min-w-40 flex-1" aria-label={`媒体库名称 ${index + 1}`} maxLength={80}
                   placeholder="媒体库名称"
                   value={row.library} onChange={(library) => edit(index, { library })} />
@@ -147,7 +160,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
           </div>
           <Button variant="secondary" className="self-start" onClick={add}>添加文件夹</Button>
         </div>
-        {cloud ? <CloudDriveGuide /> : null}
+        {cloud ? <><MediaReadPolicyHelp /><CloudDriveGuide /></> : null}
         {missing.map((dependency) => (
           <Help key={dependency.name}>
             未检测到 {dependency.name}。<ExternalLink href={dependency.download_url}>下载 {dependency.name}</ExternalLink>

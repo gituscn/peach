@@ -3,6 +3,7 @@ from dataclasses import replace
 from pathlib import Path
 import sqlite3
 import tempfile
+from types import SimpleNamespace
 import unittest
 
 from peach import media_configuration, media_sources, settings_file
@@ -32,6 +33,15 @@ class MediaSourceCostTests(unittest.TestCase):
         for location in ("onedrive", "mounted"):
             with self.assertRaisesRegex(ValueError, "只读"):
                 media_sources.require_writable_location(location)
+
+    def test_minimal_configuration_objects_use_source_defaults(self):
+        for config in (SimpleNamespace(locations={"115": ("B:/",)}), SimpleNamespace()):
+            self.assertEqual(media_sources.cost_for("115", "B:\\film.mp4", config), "free")
+            expression, params = media_sources.cost_sql(config=config)
+            with sqlite3.connect(":memory:") as connection:
+                value = connection.execute(
+                    f"SELECT {expression} FROM (SELECT '115' AS location,'B:\\film.mp4' AS path)", params).fetchone()[0]
+            self.assertEqual(value, "free")
 
     def test_longest_root_directory_boundary_and_unknown_paths(self):
         cases = [

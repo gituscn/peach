@@ -19346,13 +19346,74 @@ function im(e, t, n = () => !0) {
 	});
 }
 //#endregion
+//#region ../resources/media-sources.json
+var am = [
+	{
+		id: "local",
+		name: "本地磁盘",
+		label: "本地磁盘",
+		default_cost: "free",
+		cloud: !1,
+		read_only: !1,
+		icon: "hard-drive"
+	},
+	{
+		id: "115",
+		name: "115",
+		label: "CloudDrive · 115",
+		default_cost: "free",
+		cloud: !0,
+		read_only: !1,
+		icon: "database"
+	},
+	{
+		id: "pikpak",
+		name: "PikPak",
+		label: "CloudDrive · PikPak",
+		default_cost: "metered",
+		cloud: !0,
+		read_only: !1,
+		icon: "database"
+	},
+	{
+		id: "guangya",
+		name: "光鸭云盘",
+		label: "光鸭云盘",
+		default_cost: "free",
+		cloud: !0,
+		read_only: !0,
+		icon: "database"
+	},
+	{
+		id: "onedrive",
+		name: "OneDrive",
+		label: "OneDrive",
+		default_cost: "metered",
+		cloud: !0,
+		read_only: !0,
+		icon: "database"
+	},
+	{
+		id: "mounted",
+		name: "其他已挂载网盘",
+		label: "其他已挂载网盘",
+		default_cost: "metered",
+		cloud: !0,
+		read_only: !0,
+		icon: "database"
+	}
+], om = am, sm = am.map((e) => [e.id, e.label + (e.read_only ? "（只读）" : "")]);
+am.map((e) => e.id);
+var cm = am.filter((e) => e.cloud).map((e) => e.id);
+Object.fromEntries(am.map((e) => [e.id, e.name]));
+//#endregion
 //#region src/ui-kit/media-source-icons.ts
-var am = {
+var lm = {
 	local: "hard-drive",
 	guangya: "database",
 	115: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAHB0lEQVR4nO2bbUwURxjH/zN38qIcb4JWoIoHFYumWhDbRquNiSlYC4ZGjVYrotHWD1VTLdY00X7zbA22Na21KWqsUMHYSiygJjaRQDW+VK2YioBarVZBQA9QDm6nedajCuxxHrfH7dX+kiXcvszM8+zO7DPP/JfBzcQmfx4O1jpJEmKUgBTHwUYIIAyAwbYRZtoYUCdBVDLwi5yxCgjfo1Uly2vd2T7mjkJj3vgsUVitcwWkqQxstAv1CAFxnoEfZjpdbvXPq05p1gFxqSZDexuWCIhMCMTDHTBcYGA5+n7YdrEwy6xOkS4yJi07uMliWSGEeB9ACPqGBsbYFwE+PpvP7l/Z6BEHCCFYzDRTBgATBMLhCRhofMiqLsrawRgTvSuiFxinbxjK2pErgAnQAAwoE3rMrTmw5s9eXOscxpSNE5iQ9glgEDQEA24LxtNrij8sc+Y67szJscmmTAjpiNaMJ+Q2CemI3Ea1n4CZM/N1p5pqPoXASngDDNmJAcbVBQWzrI5PfRLjzTX7AKTCuyhMNBjTHTmBOypFvvPeZzyRamt775+A2GRTpgTxHbwYDraoqiQrx2kHGFM2TqBBBYAPvBsLGJ9i7+3AenjPn9DiaN/rV6QeSUpxgl4pwotNMeWqbXw/PceYuAiEBvk7dZ2/Xz8MCQvE2JERGB4ZgteXOt8jyRY5cBPi1a4Ro77rybbwVtUIzzDAF7mmOYiPGexSOZt2Hu31tRS12mzbbvctMCYtO1iO7VVmUXqSy8bX323Bjp9OutoUk81GZQc0WSwr1J7YBAb4IiNtnMvlbCs4jpYHba4VIhAu26jkgLhUk8E2pVWVRenj5S7QWyxtVhQcOoecH0+o0h6ykWztNga0t2GJ2vP5oAA/ZKQldtv/1Q+/Yv8vFWg0P3BYhrm5Fa2WdjWbFWKzdVMnB8iZHJVZ/NZ4BPTvfPfzis64NJipgc1W2QG8I4endhor2OCHd1ITOu27/6AN2btK4XEE4mWbYXMAJTD74u5/f+A07jS2QAt02MzlH5Cmqn/3u/d9vV6HyeOM8nFP02Ezo7y9hPu31MwQr86YjHdnv9zjOTXX7+D4uWsoKv0D5WeuwgMIDv/Belq0gFDP+JBAf8zv0veVMEYNlLc508bir1t3sffw78g/eA5/16mS7X4SGNnOacVG7b4/wN+5CWTk4CAsnzcRh79djPlvOnaeWkhCjOK0XKVmoXWNzdhTchalpy7Ld9YZ+vv5YP2yqfK8YfDAALgbASmOxSRvoGmv67GqHcJCBuDFkRHybC5pdBQSno8EY457XPW1O5i9ajca7t13V9Oo359kxuQNlwFEo494JsyAGVNGYeGMcbJzeuLcxZt4e02e63MA+1yh1+C/cXFfQIPc1vxjmJSxFZt3lcJqleye+0LcEKyYP9GdzTH0uQM6oPj+y9xyzM3Kw83ae3bPmzc9ARGDAt3qAI9ysuI6Zn2wG7X1TYrHfX30WDb7FbfVz23iBI9yo/YeFq/bK88VlJicZHRX1WZNOIA4X3ULuw6cVjwWER6I6Ai3rLybOclSoBFy9p2wO/ePHTpQ9foYUMdJkwONUNvQjIuXlSVBOp36w5UEUclJkAQNcdPOXIDTs6oyjMRYshpLQ1gl5big5nq96nVxxio4SdEeps21QVx0uGJesPKK6mo5QbZz0uGRFA0agMLk4ZGh3faX/XaF9HKqQjZXlSyvlUcW0uFBA9BUWKmvUxZZbTps5vIPnS4XHoZecwsU0mgHyypRUU0JK3XpsJnTH1mByXABHoKySFvWzpAXQrtOiT/aXKx+hQwXOlSn/NE+ZldE4E6GDQlGwaZ5eG4YyYcfcbu+CRkf5+Nuk+PFE2d53Fbe8Q/JT0mBiT6CJjlLZ76Eoq8zMTyq88B36WodFqzdgxu37c8SXaDBZqtMpxEnJsW0XgixDm6CNAKUGaLU+OzkMQgN6t/peLtVwjf5x7Alr1xeE3QHjLFPqouz1ivqAwJ8fDabLa3LXF0hHjEsDBMSoqHjHH4+egwM7g9jVCgS46O69XOC0l6Hyiuxs/CU3VBYFRhqycbOu7pgTNmwEAI5aiyMvjbeiEkJRhifDUXkoCB5qbyt3YrmFguu3mxE5dVaHCq7hPIzV2CV+iAWY8isKV6zvUcHiIcSmVKt6IDV1BNXFWd1k8jwbicyJkh4TMIi/EewiaTmKinKudIFpKYi4bEsMfN+LLKI2o6SnNu7inR1HOw9eDlkQ08Kct7TxbLCkiEb3gpDdk8qUcJhmoVU1yQ8hvdRaGs7XHJAQcEsK6muvepJILn8EyjFCafyTDbx9Nca1g9bqM87euwfhzlbw1P9yQxBFZDwmAILaATbR1NJzhpP/P/ZHFzkqf1wsitP7aezSjyVH0/DDlr/fP4fOwTeE5lpP+gAAAAASUVORK5CYII=",
 	pikpak: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACY0lEQVR4nNWXy2tTQRSHv7m5RUWttqlNW1OairhKNbrU+lhE/AOkdCOIIO7arty0QhSxCIIQ7VJwIfgfCIJdFB+rgC32AVIflD5CbFUsoohJRiZzb5Ne05p4kxv94HCTc+bO+c0MM3eOoICD/TJswAAQBdoBH5UhA8wDo1mIv7ojpuyAsH9EBuQgkmuASXVJI4lN3BXDawIifXIQwQ28RDA0ERfDwpr2cQ9G7iSdhcOGteZeJ1eYKreB5DS1I2oiCJba2hDQVA9tjdDaCHMfICuhMwDJz5D8BMtftK9E2s2NttrJMOxvzSdT1rIb6goW69KIXsjr5/K+nxlIWWKWrOebJIxNFhXgK7r20QjcPL+59PllGH8LarDvU3oWFHU+CDZpK+TKA3j88vd+zGKd93av/y8lrKxao7Ls6bROrrj6EE6E9WzZppZKrJ0y0Hu8RAGhZuhohqk5nShp2Y/0+nZqxPaoFQsr2my2mNDSkBe01w/7AvAu9QcB/nrYs0vboU4qSsNOwCHAoMYY/5WAsckNt1NJ8WKY5TS+fF8/E7f/Lu5aQDrjLu5agOlzF3ct4NYFd3HXAk51uYv/k9vQLPeFr9/h4gh0dcCBNu17vaiP7nt9sGNblQVs3wo9x+DZNCRm9aUyFICebh0rF9PpWP22+QvqC3f2qLZyKda34XTMLsGLGSrO8xndtxMR6ZfqQ+tz7uczRyDor0zyxY/6LlDkoMqYVsUSKvSqho8SVB/JglqCUWqF4ImharVcueQ96j4bN3KFoiDmeXpJTOXO7QJVoyEZ8mgm0rm6sLA4talFef4LaurBZfZxNPMAAAAASUVORK5CYII="
-}, om = bt({
+}, um = Object.fromEntries(om.map((e) => [e.id, lm[e.id] || e.icon])), dm = bt({
 	base: [
 		"inline-flex items-center justify-center gap-1 whitespace-nowrap",
 		"font-sans select-none cursor-pointer rounded-sm",
@@ -19376,15 +19437,15 @@ var am = {
 		secondary: ["text-text-secondary active:text-text-primary", "disabled:text-text-tertiary aria-disabled:text-text-tertiary"].join(" ")
 	}
 });
-function sm({ variant: e = "primary", size: t = "medium", leadingIcon: n, trailingIcon: r, children: i, className: a, disabled: o = !1, ...s }) {
-	let c = yt(om.base, om.size[t], om.variant[e], a), l = /* @__PURE__ */ (0, R.jsxs)(R.Fragment, { children: [
+function fm({ variant: e = "primary", size: t = "medium", leadingIcon: n, trailingIcon: r, children: i, className: a, disabled: o = !1, ...s }) {
+	let c = yt(dm.base, dm.size[t], dm.variant[e], a), l = /* @__PURE__ */ (0, R.jsxs)(R.Fragment, { children: [
 		n ? /* @__PURE__ */ (0, R.jsx)(n, {
-			className: om.icon[t],
+			className: dm.icon[t],
 			"aria-hidden": !0
 		}) : null,
 		i != null && /* @__PURE__ */ (0, R.jsx)("span", { children: i }),
 		r ? /* @__PURE__ */ (0, R.jsx)(r, {
-			className: om.icon[t],
+			className: dm.icon[t],
 			"aria-hidden": !0
 		}) : null
 	] });
@@ -19411,22 +19472,22 @@ function sm({ variant: e = "primary", size: t = "medium", leadingIcon: n, traili
 }
 //#endregion
 //#region src/react/settings/section.tsx
-function cm({ role: e, children: t }) {
+function pm({ role: e, children: t }) {
 	return /* @__PURE__ */ (0, R.jsx)("p", {
 		role: e,
 		className: "text-body-2-regular text-text-secondary",
 		children: t
 	});
 }
-function lm({ children: e }) {
+function mm({ children: e }) {
 	return /* @__PURE__ */ (0, R.jsx)("p", {
 		role: "alert",
 		className: "text-body-2-regular text-text-error-primary",
 		children: e
 	});
 }
-function um({ href: e, children: t, leadingIcon: n }) {
-	return /* @__PURE__ */ (0, R.jsx)(sm, {
+function hm({ href: e, children: t, leadingIcon: n }) {
+	return /* @__PURE__ */ (0, R.jsx)(fm, {
 		href: e,
 		target: "_blank",
 		rel: "noopener noreferrer",
@@ -19440,13 +19501,13 @@ function um({ href: e, children: t, leadingIcon: n }) {
 		})
 	});
 }
-function dm({ children: e }) {
+function gm({ children: e }) {
 	return /* @__PURE__ */ (0, R.jsx)("dl", {
 		className: "flex flex-col",
 		children: e
 	});
 }
-function fm({ term: e, children: t }) {
+function _m({ term: e, children: t }) {
 	return /* @__PURE__ */ (0, R.jsxs)("div", {
 		className: "flex min-h-11 items-center justify-between gap-4 border-b border-separator-border py-2.5 pr-3 last:border-b-0",
 		children: [/* @__PURE__ */ (0, R.jsx)("dt", {
@@ -19458,7 +19519,7 @@ function fm({ term: e, children: t }) {
 		})]
 	});
 }
-function pm({ summary: e, defaultOpen: t = !1, children: n, trailing: r = !1, onOpenChange: i }) {
+function vm({ summary: e, defaultOpen: t = !1, children: n, trailing: r = !1, onOpenChange: i }) {
 	let a = (0, y.useId)(), o = (0, y.useRef)(null), s = (0, y.useRef)(null), c = (0, y.useRef)(!1), [l, u] = (0, y.useState)(t);
 	return /* @__PURE__ */ (0, R.jsxs)("details", {
 		ref: (e) => {
@@ -19493,7 +19554,7 @@ function pm({ summary: e, defaultOpen: t = !1, children: n, trailing: r = !1, on
 		})]
 	});
 }
-function mm({ name: e }) {
+function ym({ name: e }) {
 	return /* @__PURE__ */ (0, R.jsx)("svg", {
 		"aria-hidden": !0,
 		viewBox: "0 0 24 24",
@@ -19502,18 +19563,18 @@ function mm({ name: e }) {
 		children: /* @__PURE__ */ (0, R.jsx)("use", { href: `#i-${e}` })
 	});
 }
-function hm({ mark: e }) {
+function bm({ mark: e }) {
 	return e.startsWith("data:image/png;base64,") ? /* @__PURE__ */ (0, R.jsx)("img", {
 		src: e,
 		alt: "",
 		width: 16,
 		height: 16,
 		className: "size-4 shrink-0"
-	}) : /* @__PURE__ */ (0, R.jsx)(mm, { name: e });
+	}) : /* @__PURE__ */ (0, R.jsx)(ym, { name: e });
 }
 //#endregion
 //#region src/react/pages/setup/setup-done.tsx
-function gm({ done: e }) {
+function xm({ done: e }) {
 	let t = (0, y.useRef)(null);
 	return (0, y.useEffect)(() => {
 		document.title = "Peach · 设置完成", t.current?.focus();
@@ -19536,11 +19597,11 @@ function gm({ done: e }) {
 				className: "self-start",
 				children: e.history_guide ? "导入浏览器历史记录" : "进入 Peach"
 			}),
-			/* @__PURE__ */ (0, R.jsx)(pm, {
+			/* @__PURE__ */ (0, R.jsx)(vm, {
 				summary: "运行信息",
-				children: /* @__PURE__ */ (0, R.jsx)(dm, { children: e.facts.map((e) => /* @__PURE__ */ (0, R.jsxs)(fm, {
+				children: /* @__PURE__ */ (0, R.jsx)(gm, { children: e.facts.map((e) => /* @__PURE__ */ (0, R.jsxs)(_m, {
 					term: e.term,
-					children: [e.value, e.download_url ? /* @__PURE__ */ (0, R.jsx)(um, {
+					children: [e.value, e.download_url ? /* @__PURE__ */ (0, R.jsx)(hm, {
 						href: e.download_url,
 						children: e.download_label ?? e.download_url
 					}) : null]
@@ -19551,7 +19612,7 @@ function gm({ done: e }) {
 }
 //#endregion
 //#region src/react/boardui/components/base/switch/switch.tsx
-var _m = bt({
+var Sm = bt({
 	sm: {
 		track: "h-4 w-7",
 		trackRadius: {
@@ -19613,8 +19674,8 @@ var _m = bt({
 		}
 	}
 });
-function vm({ state: e, size: t = "md", shape: n = "pill" }) {
-	let r = _m[t];
+function Cm({ state: e, size: t = "md", shape: n = "pill" }) {
+	let r = Sm[t];
 	return /* @__PURE__ */ (0, R.jsx)("span", {
 		"aria-hidden": !0,
 		className: yt("relative shrink-0 transition-colors duration-200 ease", r.track, r.trackRadius[n], e.isSelected ? yt("bg-linear-to-b from-accent-500 to-accent-600", r.onShadow) : "bg-background-tertiary-default", e.isDisabled && "opacity-50", e.isFocusVisible && "ring-2 ring-border-focus-ring ring-offset-2"),
@@ -19624,12 +19685,12 @@ function vm({ state: e, size: t = "md", shape: n = "pill" }) {
 		})
 	});
 }
-function ym({ className: e, children: t, size: n = "md", shape: r = "pill", ref: i, ...a }) {
+function wm({ className: e, children: t, size: n = "md", shape: r = "pill", ref: i, ...a }) {
 	return /* @__PURE__ */ (0, R.jsx)(xp, {
 		ref: i,
 		...a,
 		className: (t) => yt("group inline-flex items-center gap-2 select-none", t.isDisabled ? "cursor-not-allowed" : "cursor-pointer", typeof e == "function" ? e(t) : e),
-		children: (e) => /* @__PURE__ */ (0, R.jsxs)(R.Fragment, { children: [/* @__PURE__ */ (0, R.jsx)(vm, {
+		children: (e) => /* @__PURE__ */ (0, R.jsxs)(R.Fragment, { children: [/* @__PURE__ */ (0, R.jsx)(Cm, {
 			state: e,
 			size: n,
 			shape: r
@@ -19641,56 +19702,56 @@ function ym({ className: e, children: t, size: n = "md", shape: r = "pill", ref:
 }
 //#endregion
 //#region node_modules/motion-utils/dist/es/clamp.mjs
-var bm = (e, t, n) => n > t ? t : n < e ? e : n, xm = {};
+var Tm = (e, t, n) => n > t ? t : n < e ? e : n, Em = {};
 //#endregion
 //#region node_modules/motion-utils/dist/es/memo.mjs
 /*#__NO_SIDE_EFFECTS__*/
-function Sm(e) {
+function Dm(e) {
 	let t;
 	return () => (t === void 0 && (t = e()), t);
 }
 //#endregion
 //#region node_modules/motion-utils/dist/es/noop.mjs
-var Cm = /* @__NO_SIDE_EFFECTS__ */ (e) => e, wm = /* @__NO_SIDE_EFFECTS__ */ (e) => e * 1e3, Tm = /* @__NO_SIDE_EFFECTS__ */ (e) => e / 1e3, Em = /* @__NO_SIDE_EFFECTS__ */ (e) => Array.isArray(e) && typeof e[0] == "number", Dm = {
+var Om = /* @__NO_SIDE_EFFECTS__ */ (e) => e, km = /* @__NO_SIDE_EFFECTS__ */ (e) => e * 1e3, Am = /* @__NO_SIDE_EFFECTS__ */ (e) => e / 1e3, jm = /* @__NO_SIDE_EFFECTS__ */ (e) => Array.isArray(e) && typeof e[0] == "number", Mm = {
 	delta: 0,
 	timestamp: 0,
 	isProcessing: !1
-}, Om;
-function km() {
-	Om = void 0;
+}, Nm;
+function Pm() {
+	Nm = void 0;
 }
-var Am = {
-	now: () => (Om === void 0 && Am.set(Dm.isProcessing || xm.useManualTiming ? Dm.timestamp : performance.now()), Om),
+var Fm = {
+	now: () => (Nm === void 0 && Fm.set(Mm.isProcessing || Em.useManualTiming ? Mm.timestamp : performance.now()), Nm),
 	set: (e) => {
-		Om = e, queueMicrotask(km);
+		Nm = e, queueMicrotask(Pm);
 	}
-}, jm = (e, t, n = 10) => {
+}, Im = (e, t, n = 10) => {
 	let r = "", i = Math.max(Math.round(t / n), 2);
 	for (let t = 0; t < i; t++) r += Math.round(e(t / (i - 1)) * 1e4) / 1e4 + ", ";
 	return `linear(${r.substring(0, r.length - 2)})`;
-}, Mm = 2e4;
-function Nm(e, t = 50, n = Mm, r) {
+}, Lm = 2e4;
+function Rm(e, t = 50, n = Lm, r) {
 	let i = 0, a = e.next(i);
 	for (r?.push(a.value); !a.done && i < n;) i += t, a = e.next(i), r?.push(a.value);
 	return i >= n ? Infinity : i;
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/generators/utils/create-generator-easing.mjs
-function Pm(e, t = 100, n) {
+function zm(e, t = 100, n) {
 	let { keyframes: r, velocity: i } = e, a = r && r[r.length - 1] - r[0], o = n({
 		...e,
 		velocity: i && a ? i * t / a : i,
 		keyframes: [0, t]
-	}), s = Math.min(Nm(o), Mm);
+	}), s = Math.min(Rm(o), Lm);
 	return {
 		type: "keyframes",
 		ease: (e) => o.next(s * e).value / t,
-		duration: /* @__PURE__ */ Tm(s)
+		duration: /* @__PURE__ */ Am(s)
 	};
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/generators/spring.mjs
-var Fm = {
+var Bm = {
 	stiffness: 100,
 	damping: 10,
 	mass: 1,
@@ -19708,63 +19769,63 @@ var Fm = {
 	minDuration: .01,
 	maxDuration: 10,
 	minDamping: .05
-}, Im = (e) => e < 0 ? 1 / Math.max(1 + e, Fm.minDamping) : Math.max(1 - e, Fm.minDamping);
-function Lm(e, t) {
+}, Vm = (e) => e < 0 ? 1 / Math.max(1 + e, Bm.minDamping) : Math.max(1 - e, Bm.minDamping);
+function Hm(e, t) {
 	if (!(e > 1)) return 1;
 	let n = Math.sqrt(e * e - 1), r = e - n, i = e + n, a = 2 * n * Math.exp(-t) * (1 + t);
-	return Bm((e) => i * Math.exp(-r * e) - r * Math.exp(-i * e) - a, (e) => Math.exp(-i * e) - Math.exp(-r * e), t) / t;
+	return Gm((e) => i * Math.exp(-r * e) - r * Math.exp(-i * e) - a, (e) => Math.exp(-i * e) - Math.exp(-r * e), t) / t;
 }
-function Rm(e, t) {
+function Um(e, t) {
 	return e * Math.sqrt(1 - t * t);
 }
-var zm = 12;
-function Bm(e, t, n) {
+var Wm = 12;
+function Gm(e, t, n) {
 	let r = n;
-	for (let n = 1; n < zm; n++) r -= e(r) / t(r);
+	for (let n = 1; n < Wm; n++) r -= e(r) / t(r);
 	return r;
 }
-var Vm = .001;
-function Hm({ duration: e = Fm.duration, bounce: t = Fm.bounce }) {
+var Km = .001;
+function qm({ duration: e = Bm.duration, bounce: t = Bm.bounce }) {
 	let n, r;
-	Fm.maxDuration;
-	let i = Im(t);
-	e = bm(Fm.minDuration, Fm.maxDuration, /* @__PURE__ */ Tm(e)), i < 1 ? (n = (t) => {
-		let n = t * i, r = n * e, a = Rm(t, i), o = Math.exp(-r);
-		return Vm - n / a * o;
+	Bm.maxDuration;
+	let i = Vm(t);
+	e = Tm(Bm.minDuration, Bm.maxDuration, /* @__PURE__ */ Am(e)), i < 1 ? (n = (t) => {
+		let n = t * i, r = n * e, a = Um(t, i), o = Math.exp(-r);
+		return Km - n / a * o;
 	}, r = (t) => {
-		let r = t * i * e, a = i * i * t * t * e, o = Math.exp(-r), s = Rm(t * t, i);
-		return (-n(t) + Vm > 0 ? -1 : 1) * -a * o / s;
+		let r = t * i * e, a = i * i * t * t * e, o = Math.exp(-r), s = Um(t * t, i);
+		return (-n(t) + Km > 0 ? -1 : 1) * -a * o / s;
 	}) : (n = (t) => -.001 + Math.exp(-t * e) * (t * e + 1), r = (t) => Math.exp(-t * e) * (-t * (e * e)));
-	let a = 5 / e, o = Bm(n, r, a), s = o * Lm(i, o * e), c = s * s;
+	let a = 5 / e, o = Gm(n, r, a), s = o * Hm(i, o * e), c = s * s;
 	return {
 		stiffness: c,
 		damping: i * 2 * Math.sqrt(c),
-		duration: /* @__PURE__ */ wm(e)
+		duration: /* @__PURE__ */ km(e)
 	};
 }
-var Um = (e, t) => (t ? e >= 0 : e > 0) && e < Infinity;
-function Wm(e, t) {
-	if (Um(e, t)) return e;
+var Jm = (e, t) => (t ? e >= 0 : e > 0) && e < Infinity;
+function Ym(e, t) {
+	if (Jm(e, t)) return e;
 }
-function Gm(e) {
-	let t = Wm(e.stiffness), n = Wm(e.damping, !0), r = Wm(e.mass), i = {
+function Xm(e) {
+	let t = Ym(e.stiffness), n = Ym(e.damping, !0), r = Ym(e.mass), i = {
 		...e,
-		stiffness: t ?? Fm.stiffness,
-		damping: n ?? Fm.damping,
-		mass: r ?? Fm.mass,
+		stiffness: t ?? Bm.stiffness,
+		damping: n ?? Bm.damping,
+		mass: r ?? Bm.mass,
 		isResolvedFromDuration: !1,
 		isTimeDefined: (t ?? n ?? r) === void 0 && (e.duration !== void 0 || e.bounce !== void 0)
 	};
 	if (i.isTimeDefined) {
 		if (e.visualDuration) {
-			let t = Im(e.bounce || 0), n = 2 * Math.PI / (e.visualDuration * 1.2) * Lm(t, 2 * Math.PI / 1.2);
+			let t = Vm(e.bounce || 0), n = 2 * Math.PI / (e.visualDuration * 1.2) * Hm(t, 2 * Math.PI / 1.2);
 			i.stiffness = n * n, i.damping = 2 * t * Math.sqrt(i.stiffness);
-		} else Object.assign(i, Hm(i)), i.isResolvedFromDuration = !0;
-		(!Um(i.stiffness) || !Um(i.damping, !0)) && (i.stiffness = Fm.stiffness, i.damping = Fm.damping);
+		} else Object.assign(i, qm(i)), i.isResolvedFromDuration = !0;
+		(!Jm(i.stiffness) || !Jm(i.damping, !0)) && (i.stiffness = Bm.stiffness, i.damping = Bm.damping);
 	}
 	return i;
 }
-function Km(e = Fm.visualDuration, t = Fm.bounce) {
+function Zm(e = Bm.visualDuration, t = Bm.bounce) {
 	let n = typeof e == "object" ? e : {
 		visualDuration: e,
 		keyframes: [0, 1],
@@ -19772,7 +19833,7 @@ function Km(e = Fm.visualDuration, t = Fm.bounce) {
 	}, r = n.keyframes[0], i = n.keyframes[n.keyframes.length - 1], a = {
 		done: !1,
 		value: r
-	}, { stiffness: o, damping: s, mass: c, duration: l, isResolvedFromDuration: u, isTimeDefined: d } = Gm({ ...n }), f = (e) => d ? 0 : -/* @__PURE__ */ Tm(e), p = s / (2 * Math.sqrt(o * c)), m = /* @__PURE__ */ Tm(Math.sqrt(o / c)), h = p * m, g = {
+	}, { stiffness: o, damping: s, mass: c, duration: l, isResolvedFromDuration: u, isTimeDefined: d } = Xm({ ...n }), f = (e) => d ? 0 : -/* @__PURE__ */ Am(e), p = s / (2 * Math.sqrt(o * c)), m = /* @__PURE__ */ Am(Math.sqrt(o / c)), h = p * m, g = {
 		target: i,
 		delta: i - r,
 		velocity: f(n.velocity || 0) || 0,
@@ -19780,12 +19841,12 @@ function Km(e = Fm.visualDuration, t = Fm.bounce) {
 		restDelta: 0
 	}, _ = () => {
 		let e = Math.abs(g.delta) < 5;
-		g.restSpeed = n.restSpeed || (e ? Fm.restSpeed.granular : Fm.restSpeed.default), g.restDelta = n.restDelta || (e ? Fm.restDelta.granular : Fm.restDelta.default);
+		g.restSpeed = n.restSpeed || (e ? Bm.restSpeed.granular : Bm.restSpeed.default), g.restDelta = n.restDelta || (e ? Bm.restDelta.granular : Bm.restDelta.default);
 	};
 	_();
 	let v, y, b;
 	if (p < 1) {
-		let e = Rm(m, p), t = {
+		let e = Um(m, p), t = {
 			A: 0,
 			sinC: 0,
 			cosC: 0,
@@ -19823,51 +19884,51 @@ function Km(e = Fm.visualDuration, t = Fm.bounce) {
 		retarget: (e, t) => {
 			g.target = e[e.length - 1], g.delta = g.target - e[0], g.velocity = f(t), n.restSpeed && n.restDelta || _(), S.calculatedDuration = x, a.done = !1, b();
 		},
-		velocity: (e) => /* @__PURE__ */ wm(y(e)),
+		velocity: (e) => /* @__PURE__ */ km(y(e)),
 		next: (e) => {
 			let t = v(e);
 			if (u) a.done = e >= l;
 			else {
-				let n = /* @__PURE__ */ wm(y(e));
+				let n = /* @__PURE__ */ km(y(e));
 				a.done = Math.abs(n) <= g.restSpeed && Math.abs(g.target - t) <= g.restDelta;
 			}
 			return a.value = a.done ? g.target : t, a;
 		},
 		toString: () => {
-			let e = Math.min(Nm(S), Mm), t = jm((t) => S.next(e * t).value, e, 30);
+			let e = Math.min(Rm(S), Lm), t = Im((t) => S.next(e * t).value, e, 30);
 			return e + "ms " + t;
 		},
 		toTransition: () => {}
 	};
 	return S;
 }
-Km.applyToOptions = (e) => {
-	let t = Pm(e, 100, Km);
-	return e.ease = t.ease, e.duration = /* @__PURE__ */ wm(t.duration), e.type = "keyframes", e;
+Zm.applyToOptions = (e) => {
+	let t = zm(e, 100, Zm);
+	return e.ease = t.ease, e.duration = /* @__PURE__ */ km(t.duration), e.type = "keyframes", e;
 };
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/keyframes/get-final.mjs
-var qm = (e) => e !== null;
-function Jm(e, { repeat: t, repeatType: n = "loop" }, r, i = 1) {
-	let a = e.filter(qm), o = i < 0 || t && n !== "loop" && t % 2 == 1 ? 0 : a.length - 1;
+var Qm = (e) => e !== null;
+function $m(e, { repeat: t, repeatType: n = "loop" }, r, i = 1) {
+	let a = e.filter(Qm), o = i < 0 || t && n !== "loop" && t % 2 == 1 ? 0 : a.length - 1;
 	return !o || r === void 0 ? a[o] : r;
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/utils/notify-inspector.mjs
-function Ym(e, t) {
+function eh(e, t) {
 	return {
 		kind: e,
 		animation: t,
-		timestamp: Am.now(),
-		frameTimestamp: Dm.timestamp,
-		frameIsProcessing: Dm.isProcessing
+		timestamp: Fm.now(),
+		frameTimestamp: Mm.timestamp,
+		frameIsProcessing: Mm.isProcessing
 	};
 }
-function Xm(e, t, n) {
+function th(e, t, n) {
 	let r = globalThis.__MOTION_INSPECT__;
 	if (r) try {
 		r({
-			...Ym("animation-start", e),
+			...eh("animation-start", e),
 			options: n ? {
 				...t,
 				...n
@@ -19877,7 +19938,7 @@ function Xm(e, t, n) {
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/utils/WithPromise.mjs
-var Zm = class {
+var nh = class {
 	constructor() {
 		this.isResolved = !1;
 	}
@@ -19898,60 +19959,60 @@ var Zm = class {
 };
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/keyframes/utils/fill-wildcards.mjs
-function Qm(e) {
+function rh(e) {
 	for (let t = 1; t < e.length; t++) e[t] ?? (e[t] = e[t - 1]);
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/render/dom/is-css-var.mjs
-var $m = (e) => e.startsWith("--");
+var ih = (e) => e.startsWith("--");
 //#endregion
 //#region node_modules/motion-dom/dist/es/render/dom/style-set.mjs
-function eh(e, t, n) {
-	$m(t) ? e.style.setProperty(t, n) : e.style[t] = n;
+function ah(e, t, n) {
+	ih(t) ? e.style.setProperty(t, n) : e.style[t] = n;
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/utils/supports/flags.mjs
-var th = {};
+var oh = {};
 //#endregion
 //#region node_modules/motion-dom/dist/es/utils/supports/memo.mjs
-function nh(e, t) {
-	let n = /* @__PURE__ */ Sm(e);
-	return () => th[t] ?? n();
+function sh(e, t) {
+	let n = /* @__PURE__ */ Dm(e);
+	return () => oh[t] ?? n();
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/utils/supports/scroll-timeline.mjs
-var rh = /* @__PURE__ */ nh(() => window.ScrollTimeline !== void 0, "scrollTimeline"), ih = /*@__PURE__*/ nh(() => {
+var ch = /* @__PURE__ */ sh(() => window.ScrollTimeline !== void 0, "scrollTimeline"), lh = /*@__PURE__*/ sh(() => {
 	try {
 		document.createElement("div").animate({ opacity: 0 }, { easing: "linear(0, 1)" });
 	} catch {
 		return !1;
 	}
 	return !0;
-}, "linearEasing"), ah = ([e, t, n, r]) => `cubic-bezier(${e}, ${t}, ${n}, ${r})`, oh = {
+}, "linearEasing"), uh = ([e, t, n, r]) => `cubic-bezier(${e}, ${t}, ${n}, ${r})`, dh = {
 	linear: "linear",
 	ease: "ease",
 	easeIn: "ease-in",
 	easeOut: "ease-out",
 	easeInOut: "ease-in-out",
-	circIn: /*@__PURE__*/ ah([
+	circIn: /*@__PURE__*/ uh([
 		0,
 		.65,
 		.55,
 		1
 	]),
-	circOut: /*@__PURE__*/ ah([
+	circOut: /*@__PURE__*/ uh([
 		.55,
 		0,
 		1,
 		.45
 	]),
-	backIn: /*@__PURE__*/ ah([
+	backIn: /*@__PURE__*/ uh([
 		.31,
 		.01,
 		.66,
 		-.59
 	]),
-	backOut: /*@__PURE__*/ ah([
+	backOut: /*@__PURE__*/ uh([
 		.33,
 		1.53,
 		.69,
@@ -19960,15 +20021,15 @@ var rh = /* @__PURE__ */ nh(() => window.ScrollTimeline !== void 0, "scrollTimel
 };
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/waapi/easing/map-easing.mjs
-function sh(e, t) {
-	if (e) return typeof e == "function" ? ih() ? jm(e, t) : "ease-out" : /* @__PURE__ */ Em(e) ? ah(e) : Array.isArray(e) ? e.map((e) => sh(e, t) || oh.easeOut) : oh[e];
+function fh(e, t) {
+	if (e) return typeof e == "function" ? lh() ? Im(e, t) : "ease-out" : /* @__PURE__ */ jm(e) ? uh(e) : Array.isArray(e) ? e.map((e) => fh(e, t) || dh.easeOut) : dh[e];
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/waapi/start-waapi-animation.mjs
-function ch(e, t, n, { delay: r = 0, duration: i = 300, repeat: a = 0, repeatType: o = "loop", ease: s = "easeOut", times: c } = {}, l = void 0) {
+function ph(e, t, n, { delay: r = 0, duration: i = 300, repeat: a = 0, repeatType: o = "loop", ease: s = "easeOut", times: c } = {}, l = void 0) {
 	let u = { [t]: n };
 	c && (u.offset = c);
-	let d = sh(s, i);
+	let d = fh(s, i);
 	Array.isArray(d) && (u.easing = d);
 	let f = {
 		delay: r,
@@ -19982,29 +20043,29 @@ function ch(e, t, n, { delay: r = 0, duration: i = 300, repeat: a = 0, repeatTyp
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/generators/utils/is-generator.mjs
-function lh(e) {
+function mh(e) {
 	return typeof e == "function" && "applyToOptions" in e;
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/waapi/utils/apply-generator.mjs
-function uh({ type: e, ...t }) {
-	return lh(e) && ih() ? e.applyToOptions(t) : (t.duration ??= 300, t.ease ??= "easeOut", t);
+function hh({ type: e, ...t }) {
+	return mh(e) && lh() ? e.applyToOptions(t) : (t.duration ??= 300, t.ease ??= "easeOut", t);
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/NativeAnimation.mjs
-var dh = class extends Zm {
+var gh = class extends nh {
 	constructor(e) {
 		if (super(), this.finishedTime = null, this.isStopped = !1, this.manualStartTime = null, !e) return;
 		let { element: t, name: n, keyframes: r, pseudoElement: i, allowFlatten: a = !1, finalKeyframe: o, onComplete: s } = e;
 		this.isPseudoElement = !!i, this.allowFlatten = a, this.options = e, e.type;
-		let c = uh(e);
-		this.animation = ch(t, n, r, c, i), c.autoplay === !1 && this.animation.pause(), this.animation.onfinish = () => {
+		let c = hh(e);
+		this.animation = ph(t, n, r, c, i), c.autoplay === !1 && this.animation.pause(), this.animation.onfinish = () => {
 			if (this.finishedTime = this.time, !i) {
-				let e = Jm(r, this.options, o, this.speed);
-				this.updateMotionValue && this.updateMotionValue(e), eh(t, n, e), this.animation.cancel();
+				let e = $m(r, this.options, o, this.speed);
+				this.updateMotionValue && this.updateMotionValue(e), ah(t, n, e), this.animation.cancel();
 			}
 			s?.(), this.notifyFinished();
-		}, Xm(this, e, c);
+		}, th(this, e, c);
 	}
 	play() {
 		this.isStopped || (this.manualStartTime = null, this.animation.play(), this.state === "finished" && this.updateFinished());
@@ -20032,18 +20093,18 @@ var dh = class extends Zm {
 	}
 	get duration() {
 		let e = this.animation.effect?.getComputedTiming?.().duration || 0;
-		return /* @__PURE__ */ Tm(Number(e));
+		return /* @__PURE__ */ Am(Number(e));
 	}
 	get iterationDuration() {
 		let { delay: e = 0 } = this.options || {};
-		return this.duration + /* @__PURE__ */ Tm(e);
+		return this.duration + /* @__PURE__ */ Am(e);
 	}
 	get time() {
-		return /* @__PURE__ */ Tm(Number(this.animation.currentTime) || 0);
+		return /* @__PURE__ */ Am(Number(this.animation.currentTime) || 0);
 	}
 	set time(e) {
 		let t = this.finishedTime !== null;
-		this.manualStartTime = null, this.finishedTime = null, this.animation.currentTime = /* @__PURE__ */ wm(e), t && this.animation.pause();
+		this.manualStartTime = null, this.finishedTime = null, this.animation.currentTime = /* @__PURE__ */ km(e), t && this.animation.pause();
 	}
 	get speed() {
 		return this.animation.playbackRate;
@@ -20061,9 +20122,9 @@ var dh = class extends Zm {
 		this.manualStartTime = this.animation.startTime = e;
 	}
 	attachTimeline({ timeline: e, onAttach: t, observe: n }) {
-		return this.allowFlatten && this.animation.effect?.updateTiming({ easing: "linear" }), this.animation.onfinish = null, e && rh() ? (this.animation.timeline = e, t?.(this.animation), Cm) : n(this);
+		return this.allowFlatten && this.animation.effect?.updateTiming({ easing: "linear" }), this.animation.onfinish = null, e && ch() ? (this.animation.timeline = e, t?.(this.animation), Om) : n(this);
 	}
-}, fh = class {
+}, _h = class {
 	constructor(e) {
 		this.stop = () => this.runAll("stop"), this.animations = e.filter(Boolean);
 	}
@@ -20103,10 +20164,10 @@ var dh = class extends Zm {
 		return this.getAll("startTime");
 	}
 	get duration() {
-		return ph(this.animations, "duration");
+		return vh(this.animations, "duration");
 	}
 	get iterationDuration() {
-		return ph(this.animations, "iterationDuration");
+		return vh(this.animations, "iterationDuration");
 	}
 	runAll(e) {
 		this.animations.forEach((t) => t[e]());
@@ -20124,7 +20185,7 @@ var dh = class extends Zm {
 		this.runAll("complete");
 	}
 };
-function ph(e, t) {
+function vh(e, t) {
 	let n = 0;
 	for (let r = 0; r < e.length; r++) {
 		let i = e[r][t];
@@ -20134,18 +20195,18 @@ function ph(e, t) {
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/GroupAnimationWithThen.mjs
-var mh = class extends fh {
+var yh = class extends _h {
 	then(e, t) {
 		return this.finished.finally(e).then(() => {});
 	}
-}, hh = /* @__PURE__ */ new WeakMap(), gh = (e, t = "") => `${e}:${t}`;
-function _h(e) {
-	let t = hh.get(e);
-	return t || (t = /* @__PURE__ */ new Map(), hh.set(e, t)), t;
+}, bh = /* @__PURE__ */ new WeakMap(), xh = (e, t = "") => `${e}:${t}`;
+function Sh(e) {
+	let t = bh.get(e);
+	return t || (t = /* @__PURE__ */ new Map(), bh.set(e, t)), t;
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/utils/resolve-transition.mjs
-function vh(e, t) {
+function Ch(e, t) {
 	if (e?.inherit && t) {
 		let { inherit: n, ...r } = e;
 		return {
@@ -20157,21 +20218,21 @@ function vh(e, t) {
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/utils/get-value-transition.mjs
-function yh(e, t) {
+function wh(e, t) {
 	let n = e?.[t] ?? e?.default ?? e;
-	return n === e ? n : vh(n, e);
+	return n === e ? n : Ch(n, e);
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/waapi/utils/px-values.mjs
-var bh = /* @__PURE__ */ new Set(/* @__PURE__ */ "borderWidth.borderTopWidth.borderRightWidth.borderBottomWidth.borderLeftWidth.borderRadius.borderTopLeftRadius.borderTopRightRadius.borderBottomRightRadius.borderBottomLeftRadius.width.maxWidth.height.maxHeight.top.right.bottom.left.inset.insetBlock.insetBlockStart.insetBlockEnd.insetInline.insetInlineStart.insetInlineEnd.padding.paddingTop.paddingRight.paddingBottom.paddingLeft.paddingBlock.paddingBlockStart.paddingBlockEnd.paddingInline.paddingInlineStart.paddingInlineEnd.margin.marginTop.marginRight.marginBottom.marginLeft.marginBlock.marginBlockStart.marginBlockEnd.marginInline.marginInlineStart.marginInlineEnd.fontSize.backgroundPositionX.backgroundPositionY".split("."));
+var Th = /* @__PURE__ */ new Set(/* @__PURE__ */ "borderWidth.borderTopWidth.borderRightWidth.borderBottomWidth.borderLeftWidth.borderRadius.borderTopLeftRadius.borderTopRightRadius.borderBottomRightRadius.borderBottomLeftRadius.width.maxWidth.height.maxHeight.top.right.bottom.left.inset.insetBlock.insetBlockStart.insetBlockEnd.insetInline.insetInlineStart.insetInlineEnd.padding.paddingTop.paddingRight.paddingBottom.paddingLeft.paddingBlock.paddingBlockStart.paddingBlockEnd.paddingInline.paddingInlineStart.paddingInlineEnd.margin.marginTop.marginRight.marginBottom.marginLeft.marginBlock.marginBlockStart.marginBlockEnd.marginInline.marginInlineStart.marginInlineEnd.fontSize.backgroundPositionX.backgroundPositionY".split("."));
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/keyframes/utils/apply-px-defaults.mjs
-function xh(e, t) {
-	for (let n = 0; n < e.length; n++) typeof e[n] == "number" && bh.has(t) && (e[n] = e[n] + "px");
+function Eh(e, t) {
+	for (let n = 0; n < e.length; n++) typeof e[n] == "number" && Th.has(t) && (e[n] = e[n] + "px");
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/utils/resolve-elements.mjs
-function Sh(e, t, n) {
+function Dh(e, t, n) {
 	if (e == null) return [];
 	if (e instanceof EventTarget) return [e];
 	if (typeof e == "string") {
@@ -20184,24 +20245,24 @@ function Sh(e, t, n) {
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/render/dom/style-computed.mjs
-function Ch(e, t) {
+function Oh(e, t) {
 	let n = window.getComputedStyle(e);
-	return $m(t) ? n.getPropertyValue(t) : n[t];
+	return ih(t) ? n.getPropertyValue(t) : n[t];
 }
 //#endregion
 //#region node_modules/framer-motion/dist/es/animation/animators/waapi/animate-elements.mjs
-function wh(e, t, n, r) {
+function kh(e, t, n, r) {
 	if (e == null) return [];
-	let i = Sh(e, r), a = i.length, o = [];
+	let i = Dh(e, r), a = i.length, o = [];
 	for (let e = 0; e < a; e++) {
 		let r = i[e], s = { ...n };
 		typeof s.delay == "function" && (s.delay = s.delay(e, a));
 		for (let e in t) {
 			let n = t[e];
 			Array.isArray(n) || (n = [n]);
-			let i = { ...yh(s, e) };
-			i.duration &&= /* @__PURE__ */ wm(i.duration), i.delay &&= /* @__PURE__ */ wm(i.delay);
-			let a = _h(r), c = gh(e, i.pseudoElement || ""), l = a.get(c);
+			let i = { ...wh(s, e) };
+			i.duration &&= /* @__PURE__ */ km(i.duration), i.delay &&= /* @__PURE__ */ km(i.delay);
+			let a = Sh(r), c = xh(e, i.pseudoElement || ""), l = a.get(c);
 			l && l.stop(), o.push({
 				map: a,
 				key: c,
@@ -20217,33 +20278,33 @@ function wh(e, t, n, r) {
 	}
 	for (let e = 0; e < o.length; e++) {
 		let { unresolvedKeyframes: t, options: n } = o[e], { element: r, name: i, pseudoElement: a } = n;
-		!a && t[0] === null && (t[0] = Ch(r, i)), Qm(t), xh(t, i), !a && t.length < 2 && t.unshift(Ch(r, i)), n.keyframes = t;
+		!a && t[0] === null && (t[0] = Oh(r, i)), rh(t), Eh(t, i), !a && t.length < 2 && t.unshift(Oh(r, i)), n.keyframes = t;
 	}
 	let s = [];
 	for (let e = 0; e < o.length; e++) {
-		let { map: t, key: n, options: r } = o[e], i = new dh(r);
+		let { map: t, key: n, options: r } = o[e], i = new gh(r);
 		t.set(n, i), i.finished.finally(() => t.delete(n)), s.push(i);
 	}
 	return s;
 }
-var Th = /*@__PURE__*/ ((e) => {
+var Ah = /*@__PURE__*/ ((e) => {
 	function t(t, n, r) {
-		return new mh(wh(t, n, r, e));
+		return new yh(kh(t, n, r, e));
 	}
 	return t;
-})(), Eh = {
+})(), jh = {
 	selection: {
-		type: Km,
+		type: Zm,
 		duration: .16,
 		bounce: 0
 	},
 	hover: {
-		type: Km,
+		type: Zm,
 		duration: .08,
 		bounce: 0
 	}
 };
-function Dh(e) {
+function Mh(e) {
 	let [t, n] = (0, y.useState)(null);
 	return (0, y.useLayoutEffect)(() => {
 		if (!t) return;
@@ -20264,7 +20325,7 @@ function Dh(e) {
 			let ee = `translate(${b}px, ${x}px) scale(1, 1)`;
 			if (u && a && !r.matches && T && s !== h) {
 				let r = `translate(${(T.left - _.left) / v + t.scrollLeft - t.clientLeft}px, ${(T.top - _.top) / y + t.scrollTop - t.clientTop}px) scale(${T.width / v / S}, ${T.height / y / C})`;
-				l = Th(n, { transform: [r, ee] }, Eh[e]);
+				l = Ah(n, { transform: [r, ee] }, jh[e]);
 			} else n.style.transform = ee;
 			s = h, c = w, t.dataset.surfaceReady = "";
 		}, m = (t) => {
@@ -20301,17 +20362,17 @@ function Dh(e) {
 }
 //#endregion
 //#region src/react/components/segmented.tsx
-function Oh(e) {
-	let t = Dh("selection");
+function Nh(e) {
+	let t = Mh("selection");
 	return /* @__PURE__ */ (0, R.jsx)(ep, {
 		...e,
 		ref: t
 	});
 }
-var kh = "inline-flex w-max max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-2lg bg-background-tertiary-default p-1", Ah = "flex min-h-7 flex-none cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 max-sm:px-2 text-body-medium whitespace-nowrap text-text-secondary outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring data-focus-visible:ring-2 data-focus-visible:ring-border-focus-ring data-selected:bg-background-primary-default data-selected:text-text-primary data-selected:shadow-card dark:data-selected:bg-background-primary-hover";
+var Ph = "inline-flex w-max max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-2lg bg-background-tertiary-default p-1", Fh = "flex min-h-7 flex-none cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 max-sm:px-2 text-body-medium whitespace-nowrap text-text-secondary outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring data-focus-visible:ring-2 data-focus-visible:ring-border-focus-ring data-selected:bg-background-primary-default data-selected:text-text-primary data-selected:shadow-card dark:data-selected:bg-background-primary-hover";
 //#endregion
 //#region src/react/settings/busy-props.ts
-function jh(e) {
+function Ih(e) {
 	return e ? {
 		"aria-busy": !0,
 		"aria-disabled": !0
@@ -20319,7 +20380,7 @@ function jh(e) {
 }
 //#endregion
 //#region src/react/boardui/components/base/buttons/icon-button.tsx
-var Mh = bt({
+var Lh = bt({
 	base: [
 		"relative inline-flex shrink-0 items-center justify-center overflow-visible rounded-2lg",
 		"bg-background-primary-default text-foreground-icon-primary",
@@ -20340,21 +20401,21 @@ var Mh = bt({
 		small: "size-4 shrink-0"
 	}
 });
-function Nh({ icon: e, size: t = "medium", className: n, type: r = "button", ref: i, ...a }) {
+function Rh({ icon: e, size: t = "medium", className: n, type: r = "button", ref: i, ...a }) {
 	return /* @__PURE__ */ (0, R.jsx)("button", {
 		ref: i,
 		type: r,
-		className: yt(Mh.base, Mh.size[t], n),
+		className: yt(Lh.base, Lh.size[t], n),
 		...a,
 		children: /* @__PURE__ */ (0, R.jsx)(e, {
-			className: Mh.icon[t],
+			className: Lh.icon[t],
 			"aria-hidden": !0
 		})
 	});
 }
 //#endregion
 //#region src/react/boardui/components/base/dropdown/menu-styles.ts
-var Ph = [
+var zh = [
 	"max-w-[calc(100vw-32px)] overflow-y-auto",
 	"rounded-2xl border border-border-button-default bg-background-primary-default p-2.5 shadow-dropdown",
 	"transition duration-150 ease-out",
@@ -20362,10 +20423,10 @@ var Ph = [
 	"data-[exiting]:opacity-0 data-[exiting]:scale-95 data-[exiting]:blur-[2px]",
 	"data-[placement=bottom]:origin-top-left data-[placement=top]:origin-bottom-left",
 	"data-[placement=left]:origin-right data-[placement=right]:origin-left"
-].join(" "), Fh = "w-[266px]", Ih = "flex w-full flex-col gap-1 outline-none", Lh = ["flex w-full cursor-pointer items-center gap-2 rounded-2lg p-2 text-left", "text-text-primary outline-none transition-colors"].join(" ");
+].join(" "), Bh = "w-[266px]", Vh = "flex w-full flex-col gap-1 outline-none", Hh = ["flex w-full cursor-pointer items-center gap-2 rounded-2lg p-2 text-left", "text-text-primary outline-none transition-colors"].join(" ");
 //#endregion
 //#region src/react/boardui/components/foundations/icons/chevrons.tsx
-function Rh(e) {
+function Uh(e) {
 	return /* @__PURE__ */ (0, R.jsx)("svg", {
 		viewBox: "0 0 16 16",
 		fill: "none",
@@ -20381,7 +20442,7 @@ function Rh(e) {
 }
 //#endregion
 //#region src/react/boardui/utils/use-dismiss-on-outside-press.ts
-function zh(e, t, n) {
+function Wh(e, t, n) {
 	(0, y.useEffect)(() => {
 		if (!e) return;
 		let r = (e) => {
@@ -20395,7 +20456,7 @@ function zh(e, t, n) {
 		n
 	]);
 }
-function Bh(e, t) {
+function Gh(e, t) {
 	let n = (0, y.useRef)(!1);
 	return (0, y.useEffect)(() => {
 		if (!e) return;
@@ -20409,11 +20470,11 @@ function Bh(e, t) {
 }
 //#endregion
 //#region src/react/boardui/components/base/select/select.tsx
-var Vh = (0, y.createContext)("md");
-function Hh({ className: e, triggerClassName: t, popoverClassName: n, size: r = "md", children: i, items: a, renderValue: o, ref: s, ...c }) {
+var Kh = (0, y.createContext)("md");
+function qh({ className: e, triggerClassName: t, popoverClassName: n, size: r = "md", children: i, items: a, renderValue: o, ref: s, ...c }) {
 	let l = (0, y.useRef)(null), u = (0, y.useRef)(null), [d, f] = (0, y.useState)(!1);
-	zh(d, () => f(!1), [l, u]);
-	let p = Bh(d, l);
+	Wh(d, () => f(!1), [l, u]);
+	let p = Gh(d, l);
 	return /* @__PURE__ */ (0, R.jsx)(pp, {
 		ref: s,
 		...c,
@@ -20426,16 +20487,16 @@ function Hh({ className: e, triggerClassName: t, popoverClassName: n, size: r = 
 			children: [/* @__PURE__ */ (0, R.jsx)(_p, {
 				className: yt("flex min-w-0 items-center truncate", r === "sm" ? "gap-1" : "gap-[5px]"),
 				children: o
-			}), /* @__PURE__ */ (0, R.jsx)(Rh, { className: yt("shrink-0 text-text-secondary transition-transform duration-200 ease", r === "sm" ? "size-3.5" : "size-4", e && "rotate-180") })]
+			}), /* @__PURE__ */ (0, R.jsx)(Uh, { className: yt("shrink-0 text-text-secondary transition-transform duration-200 ease", r === "sm" ? "size-3.5" : "size-4", e && "rotate-180") })]
 		}), /* @__PURE__ */ (0, R.jsx)(nf, {
 			ref: u,
 			isNonModal: !0,
 			offset: 4,
-			className: yt(Fh, Ph, "p-2", n),
+			className: yt(Bh, zh, "p-2", n),
 			children: /* @__PURE__ */ (0, R.jsx)(Xl, {
 				items: a,
-				className: yt(Ih, "max-h-[240px] overflow-auto"),
-				children: /* @__PURE__ */ (0, R.jsx)(Vh.Provider, {
+				className: yt(Vh, "max-h-[240px] overflow-auto"),
+				children: /* @__PURE__ */ (0, R.jsx)(Kh.Provider, {
 					value: r,
 					children: i
 				})
@@ -20443,17 +20504,17 @@ function Hh({ className: e, triggerClassName: t, popoverClassName: n, size: r = 
 		})] })
 	});
 }
-function Uh({ className: e, children: t, ...n }) {
-	let r = (0, y.useContext)(Vh);
+function Jh({ className: e, children: t, ...n }) {
+	let r = (0, y.useContext)(Kh);
 	return /* @__PURE__ */ (0, R.jsx)(eu, {
 		...n,
-		className: (t) => yt(Lh, r === "sm" ? "px-2 py-1.5 text-body-2-medium" : "text-body-medium", (t.isFocused || t.isSelected) && "bg-dropdown-item-hover-background", t.isDisabled && "cursor-not-allowed text-text-disabled", typeof e == "function" ? e(t) : e),
+		className: (t) => yt(Hh, r === "sm" ? "px-2 py-1.5 text-body-2-medium" : "text-body-medium", (t.isFocused || t.isSelected) && "bg-dropdown-item-hover-background", t.isDisabled && "cursor-not-allowed text-text-disabled", typeof e == "function" ? e(t) : e),
 		children: t
 	});
 }
 //#endregion
 //#region src/react/settings/folder-rows.tsx
-function Wh({ className: e }) {
+function Yh({ className: e }) {
 	return /* @__PURE__ */ (0, R.jsx)("svg", {
 		"aria-hidden": !0,
 		viewBox: "0 0 24 24",
@@ -20466,17 +20527,35 @@ function Wh({ className: e }) {
 		children: /* @__PURE__ */ (0, R.jsx)("use", { href: "#i-folder-search" })
 	});
 }
-var Gh = [
-	["local", "本地磁盘"],
-	["115", "CloudDrive · 115"],
-	["pikpak", "CloudDrive · PikPak"],
-	["guangya", "CloudDrive · 光鸭云盘（只读）"]
-], Kh = (e) => am[e] || "database", qh = (e) => [
-	"115",
-	"pikpak",
-	"guangya"
-].includes(e);
-function Jh({ initial: e, blank: t, pickFolder: n, describe: r, focusAfterPick: i = !1 }) {
+var Xh = sm, Zh = (e) => um[e] || "database", Qh = (e) => cm.includes(e);
+function $h({ index: e, cost: t, error: n, onChange: r }) {
+	return /* @__PURE__ */ (0, R.jsxs)("div", {
+		"data-media-read-policy": e,
+		className: "flex w-full flex-col gap-1.5 @lg:w-48",
+		children: [/* @__PURE__ */ (0, R.jsxs)(qh, {
+			"aria-label": `媒体读取策略 ${e + 1}`,
+			placeholder: "选择读取策略",
+			isRequired: !0,
+			validationBehavior: "aria",
+			isInvalid: !!n,
+			selectedKey: t || null,
+			onSelectionChange: (e) => {
+				(e === "free" || e === "metered") && r(e);
+			},
+			children: [/* @__PURE__ */ (0, R.jsx)(Jh, {
+				id: "free",
+				children: "正常读取"
+			}), /* @__PURE__ */ (0, R.jsx)(Jh, {
+				id: "metered",
+				children: "代理流量保护"
+			})]
+		}), n ? /* @__PURE__ */ (0, R.jsx)(mm, { children: n }) : null]
+	});
+}
+function eg() {
+	return /* @__PURE__ */ (0, R.jsx)(pm, { children: "按挂载工具实际配置选择；代理流量保护会限制自动媒体读取。" });
+}
+function tg({ initial: e, blank: t, pickFolder: n, describe: r, focusAfterPick: i = !1 }) {
 	let [a, o] = (0, y.useState)(e), [s, c] = (0, y.useState)([]), [l, u] = (0, y.useState)(null), [d, f] = (0, y.useState)(null), p = (0, y.useRef)(!1), m = (0, y.useRef)([]);
 	(0, y.useLayoutEffect)(() => {
 		l !== null && (m.current[l]?.focus(), u(null));
@@ -20519,7 +20598,7 @@ function Jh({ initial: e, blank: t, pickFolder: n, describe: r, focusAfterPick: 
 		}
 	};
 }
-function Yh({ label: e, path: t, onPath: n, error: r, inputRef: i, picking: a, onPick: o, onRemove: s, status: c, children: l }) {
+function ng({ label: e, path: t, onPath: n, error: r, inputRef: i, picking: a, onPick: o, onRemove: s, status: c, children: l }) {
 	let u = (0, y.useRef)(null), d = () => {
 		let e = u.current;
 		e && e.ownerDocument.activeElement !== e && (e.scrollLeft = e.scrollWidth);
@@ -20550,11 +20629,11 @@ function Yh({ label: e, path: t, onPath: n, error: r, inputRef: i, picking: a, o
 					className: "flex h-9 shrink-0 items-center",
 					children: c
 				}) : null,
-				/* @__PURE__ */ (0, R.jsx)(Nh, {
-					icon: Wh,
+				/* @__PURE__ */ (0, R.jsx)(Rh, {
+					icon: Yh,
 					"aria-label": "选择文件夹",
 					onClick: o,
-					...jh(a)
+					...Ih(a)
 				}),
 				s ? /* @__PURE__ */ (0, R.jsx)(Ct, {
 					variant: "danger",
@@ -20570,22 +20649,22 @@ function Yh({ label: e, path: t, onPath: n, error: r, inputRef: i, picking: a, o
 		})]
 	});
 }
-function Xh({ index: e, value: t, onChange: n, options: r = Gh }) {
-	return /* @__PURE__ */ (0, R.jsx)(Hh, {
+function rg({ index: e, value: t, onChange: n, options: r = Xh }) {
+	return /* @__PURE__ */ (0, R.jsx)(qh, {
 		className: "w-full @lg:w-60",
 		"aria-label": `媒体来源 ${e + 1}`,
 		selectedKey: t,
 		onSelectionChange: (e) => {
 			e !== null && n(String(e));
 		},
-		children: r.map(([e, t]) => /* @__PURE__ */ (0, R.jsxs)(Uh, {
+		children: r.map(([e, t]) => /* @__PURE__ */ (0, R.jsxs)(Jh, {
 			id: e,
 			textValue: t,
-			children: [/* @__PURE__ */ (0, R.jsx)(hm, { mark: Kh(e) }), t]
+			children: [/* @__PURE__ */ (0, R.jsx)(bm, { mark: Zh(e) }), t]
 		}, e))
 	});
 }
-function Zh({ value: e, onChange: t, label: n = "Windows 中的对应路径", placeholder: r = "例如 B:\\" }) {
+function ig({ value: e, onChange: t, label: n = "Windows 中的对应路径", placeholder: r = "例如 B:\\" }) {
 	return /* @__PURE__ */ (0, R.jsx)(Vp, {
 		label: n,
 		placeholder: r,
@@ -20595,7 +20674,7 @@ function Zh({ value: e, onChange: t, label: n = "Windows 中的对应路径", pl
 }
 //#endregion
 //#region src/react/settings/password-pair.tsx
-function Qh({ label: e, password: t, confirmation: n, onPassword: r, onConfirmation: i, disabled: a = !1, passwordError: o, passwordHint: s, confirmationError: c, confirmationInvalid: l = !1 }) {
+function ag({ label: e, password: t, confirmation: n, onPassword: r, onConfirmation: i, disabled: a = !1, passwordError: o, passwordHint: s, confirmationError: c, confirmationInvalid: l = !1 }) {
 	return /* @__PURE__ */ (0, R.jsxs)(R.Fragment, { children: [/* @__PURE__ */ (0, R.jsx)(Vp, {
 		id: "access-password",
 		type: "password",
@@ -20626,13 +20705,13 @@ function Qh({ label: e, password: t, confirmation: n, onPassword: r, onConfirmat
 }
 //#endregion
 //#region src/react/pages/setup/setup-form.tsx
-var $h = [
+var og = [
 	"data_root",
 	"host",
 	"port",
 	"mdns_name"
 ];
-function eg(e, t) {
+function sg(e, t) {
 	return Array.isArray(e) ? e.length === t ? {
 		rows: e,
 		table: ""
@@ -20644,57 +20723,63 @@ function eg(e, t) {
 		table: e ?? ""
 	};
 }
-function tg(e) {
+function cg(e) {
 	return e.length ? e.length === 1 ? `完成设置后扫描并补全资料：${e[0]}` : `完成设置后扫描这 ${e.length} 个文件夹并补全资料` : "完成设置后扫描并补全资料";
 }
-var ng = (e) => Array.isArray(e) ? e.filter(Boolean).join(" ") : e ?? "";
-function rg({ setup: e, onDone: t }) {
+var lg = (e) => Array.isArray(e) ? e.filter(Boolean).join(" ") : e ?? "";
+function ug({ setup: e, onDone: t }) {
 	let n = e.questions.find((e) => e.input === "folders"), r = e.questions.filter((e) => e.input !== "folders"), i = e.media_sources.map(({ value: e, label: t }) => [e, t]), a = (t = "") => ({
 		path: t,
 		location: e.media_source_default,
-		root: ""
-	}), o = Jh({
+		root: "",
+		cost: e.media_source_default === "local" ? "free" : ""
+	}), o = tg({
 		initial: () => [a(n?.default ?? "")],
 		blank: () => a(),
 		pickFolder: Qp,
 		describe: $p,
 		focusAfterPick: !0
-	}), [s, c] = (0, y.useState)(() => Object.fromEntries(r.map((e) => [e.key, e.default]))), [l, u] = (0, y.useState)(e.access_enabled), [d, f] = (0, y.useState)(""), [p, m] = (0, y.useState)(""), [h, g] = (0, y.useState)(e.scan_now), [_, v] = (0, y.useState)(e.history_guide), [b, x] = (0, y.useState)({}), [S, C] = (0, y.useState)(""), [w, T] = (0, y.useState)(""), [ee, E] = (0, y.useState)(!1), [D, O] = (0, y.useState)(0), k = (0, y.useRef)(null), A = (0, y.useRef)(null), [j, te] = (0, y.useState)(0);
+	}), [s, c] = (0, y.useState)(() => Object.fromEntries(r.map((e) => [e.key, e.default]))), [l, u] = (0, y.useState)(e.access_enabled), [d, f] = (0, y.useState)(""), [p, m] = (0, y.useState)(""), [h, g] = (0, y.useState)(e.scan_now), [_, v] = (0, y.useState)(e.history_guide), [b, x] = (0, y.useState)({}), [S, C] = (0, y.useState)(""), [w, T] = (0, y.useState)(""), [ee, E] = (0, y.useState)(!1), [D, O] = (0, y.useState)(!1), [k, A] = (0, y.useState)(0), j = (0, y.useRef)(null), te = (0, y.useRef)(null), [ne, re] = (0, y.useState)(0);
 	(0, y.useEffect)(() => {
-		j && k.current?.querySelector("input[aria-invalid=\"true\"]")?.focus();
-	}, [j]);
-	let ne = (e) => e ? /* @__PURE__ */ (0, R.jsx)("span", {
+		ne && j.current?.querySelector("input[aria-invalid=\"true\"]")?.focus();
+	}, [ne]);
+	let M = (e) => e ? /* @__PURE__ */ (0, R.jsx)("span", {
 		role: "alert",
 		children: e
-	}, j) : void 0, re = (e) => !e.visible_when || Object.entries(e.visible_when).every(([e, t]) => s[e] === t), M = (e, t) => c((n) => ({
+	}, ne) : void 0, ie = (e) => !e.visible_when || Object.entries(e.visible_when).every(([e, t]) => s[e] === t), ae = (e, t) => c((n) => ({
 		...n,
 		[e]: t
-	})), ie = async (e) => {
+	})), oe = async (e) => {
 		if (e.preventDefault(), ee) return;
+		let n = o.rows.findIndex((e) => !e.cost);
+		if (n >= 0) {
+			O(!0), requestAnimationFrame(() => j.current?.querySelector(`[data-media-read-policy="${n}"] button`)?.focus());
+			return;
+		}
 		E(!0), T("");
-		let n = {
+		let i = {
 			media_dir: o.rows,
 			access_enabled: l,
 			scan_now: h,
 			history_guide: _
 		};
-		for (let e of r) re(e) && (n[e.key] = s[e.key] ?? "");
-		l && Object.assign(n, {
+		for (let e of r) ie(e) && (i[e.key] = s[e.key] ?? "");
+		l && Object.assign(i, {
 			access_password: d,
 			access_confirm: p
 		});
 		try {
-			t(await Xp(n));
+			t(await Xp(i));
 		} catch (e) {
 			if (e instanceof qp && e.status === 400 && e.errors) {
-				let t = e.errors, { rows: n, table: r } = eg(t.media_dir, o.rows.length);
-				o.setErrors(n), C(r), x(t), $h.some((e) => t[e]) && O((e) => e + 1), t.access_password && u(!0), te((e) => e + 1);
+				let t = e.errors, { rows: n, table: r } = sg(t.media_dir, o.rows.length);
+				o.setErrors(n), C(r), x(t), og.some((e) => t[e]) && A((e) => e + 1), t.access_password && u(!0), re((e) => e + 1);
 			} else T($p(e));
 		} finally {
 			E(!1);
 		}
-	}, ae = (e) => {
-		let t = ng(b[e.key]), n = e.help.join("");
+	}, se = (e) => {
+		let t = lg(b[e.key]), n = e.help.join("");
 		if (e.input === "choice") {
 			let r = `setup-${e.key}-label`;
 			return /* @__PURE__ */ (0, R.jsxs)("div", {
@@ -20705,20 +20790,20 @@ function rg({ setup: e, onDone: t }) {
 						elementType: "span",
 						children: e.label
 					}),
-					/* @__PURE__ */ (0, R.jsx)(Oh, {
+					/* @__PURE__ */ (0, R.jsx)(Nh, {
 						"aria-labelledby": r,
 						orientation: "horizontal",
-						className: kh,
+						className: Ph,
 						value: s[e.key] ?? e.default,
-						onChange: (t) => M(e.key, t),
+						onChange: (t) => ae(e.key, t),
 						children: (e.options ?? []).map((e) => /* @__PURE__ */ (0, R.jsx)(tp, {
 							value: e.value,
-							className: Ah,
+							className: Fh,
 							children: e.label
 						}, e.value))
 					}),
-					n ? /* @__PURE__ */ (0, R.jsx)(cm, { children: n }) : null,
-					t ? /* @__PURE__ */ (0, R.jsx)(lm, { children: t }, j) : null
+					n ? /* @__PURE__ */ (0, R.jsx)(pm, { children: n }) : null,
+					t ? /* @__PURE__ */ (0, R.jsx)(mm, { children: t }, ne) : null
 				]
 			}, e.key);
 		}
@@ -20730,7 +20815,7 @@ function rg({ setup: e, onDone: t }) {
 			autoComplete: "off",
 			spellCheck: "false",
 			value: s[e.key] ?? "",
-			onChange: (t) => M(e.key, t),
+			onChange: (t) => ae(e.key, t),
 			leadingAddon: e.prefix ? /* @__PURE__ */ (0, R.jsx)("span", {
 				className: "shrink-0 pl-1 text-body-regular text-text-secondary",
 				children: e.prefix
@@ -20741,13 +20826,13 @@ function rg({ setup: e, onDone: t }) {
 			}) : void 0,
 			validationBehavior: "aria",
 			isInvalid: !!t,
-			hint: ne(t) ?? (n || void 0)
+			hint: M(t) ?? (n || void 0)
 		}, e.key);
-	}, oe = o.rows.map((e) => e.path.trim()).filter(Boolean), se = o.rows.some((e) => qh(e.location));
+	}, ce = o.rows.map((e) => e.path.trim()).filter(Boolean), le = o.rows.some((e) => Qh(e.location));
 	return /* @__PURE__ */ (0, R.jsxs)("form", {
-		ref: k,
+		ref: j,
 		noValidate: !0,
-		onSubmit: (e) => void ie(e),
+		onSubmit: (e) => void oe(e),
 		"aria-labelledby": "auth-card-title",
 		className: "flex flex-col gap-6",
 		children: [
@@ -20763,51 +20848,67 @@ function rg({ setup: e, onDone: t }) {
 							children: "*"
 						})]
 					}),
-					S ? /* @__PURE__ */ (0, R.jsx)(lm, { children: S }, j) : null,
+					S ? /* @__PURE__ */ (0, R.jsx)(mm, { children: S }, ne) : null,
 					/* @__PURE__ */ (0, R.jsx)("div", {
 						role: "group",
 						"aria-labelledby": "setup-media-title",
 						className: "flex flex-col gap-3",
-						children: o.rows.map((t, r) => /* @__PURE__ */ (0, R.jsxs)(Yh, {
+						children: o.rows.map((t, r) => /* @__PURE__ */ (0, R.jsxs)(ng, {
 							label: `${n.label} ${r + 1}`,
 							path: t.path,
 							onPath: (e) => o.edit(r, { path: e }),
-							error: ne(o.errors[r]),
+							error: M(o.errors[r]),
 							inputRef: o.inputRef(r),
 							picking: o.picking === r,
 							onPick: () => void o.pick(r),
 							onRemove: o.rows.length > 1 ? () => {
-								o.remove(r), A.current?.focus();
+								o.remove(r), te.current?.focus();
 							} : void 0,
-							children: [/* @__PURE__ */ (0, R.jsx)(Xh, {
-								index: r,
-								value: t.location,
-								options: i,
-								onChange: (e) => o.edit(r, { location: e })
-							}), e.media_root ? /* @__PURE__ */ (0, R.jsx)(Zh, {
-								label: e.media_root.label,
-								placeholder: e.media_root.placeholder,
-								value: t.root,
-								onChange: (e) => o.edit(r, { root: e })
-							}) : null]
+							children: [
+								/* @__PURE__ */ (0, R.jsx)(rg, {
+									index: r,
+									value: t.location,
+									options: i,
+									onChange: (e) => o.edit(r, {
+										location: e,
+										cost: e === "local" ? "free" : ""
+									})
+								}),
+								/* @__PURE__ */ (0, R.jsx)($h, {
+									index: r,
+									cost: t.cost ?? "",
+									error: D && !t.cost ? "请选择媒体读取策略" : void 0,
+									onChange: (e) => o.edit(r, { cost: e })
+								}),
+								e.media_root ? /* @__PURE__ */ (0, R.jsx)(ig, {
+									label: e.media_root.label,
+									placeholder: e.media_root.placeholder,
+									value: t.root,
+									onChange: (e) => o.edit(r, { root: e })
+								}) : null
+							]
 						}, r))
 					}),
 					/* @__PURE__ */ (0, R.jsx)(Ct, {
-						ref: A,
+						ref: te,
 						variant: "secondary",
 						leadingIcon: Ap,
 						className: "self-start",
 						onClick: o.add,
 						children: "添加媒体库"
 					}),
-					se ? /* @__PURE__ */ (0, R.jsxs)(R.Fragment, { children: [/* @__PURE__ */ (0, R.jsxs)(cm, { children: [e.cloud.help, /* @__PURE__ */ (0, R.jsx)(um, {
-						href: e.cloud.link.url,
-						children: e.cloud.link.label
-					})] }), e.cloud.dependencies.map((e) => /* @__PURE__ */ (0, R.jsxs)(cm, { children: [e.message, /* @__PURE__ */ (0, R.jsx)(um, {
-						href: e.download_url,
-						children: e.download_label
-					})] }, e.name))] }) : null,
-					n.help.map((e) => /* @__PURE__ */ (0, R.jsx)(cm, { children: e }, e))
+					le ? /* @__PURE__ */ (0, R.jsxs)(R.Fragment, { children: [
+						/* @__PURE__ */ (0, R.jsx)(eg, {}),
+						/* @__PURE__ */ (0, R.jsxs)(pm, { children: [e.cloud.help, /* @__PURE__ */ (0, R.jsx)(hm, {
+							href: e.cloud.link.url,
+							children: e.cloud.link.label
+						})] }),
+						e.cloud.dependencies.map((e) => /* @__PURE__ */ (0, R.jsxs)(pm, { children: [e.message, /* @__PURE__ */ (0, R.jsx)(hm, {
+							href: e.download_url,
+							children: e.download_label
+						})] }, e.name))
+					] }) : null,
+					n.help.map((e) => /* @__PURE__ */ (0, R.jsx)(pm, { children: e }, e))
 				]
 			}) : null,
 			/* @__PURE__ */ (0, R.jsxs)(Et, {
@@ -20825,34 +20926,34 @@ function rg({ setup: e, onDone: t }) {
 								className: "text-body-2-regular text-text-secondary",
 								children: "开启后，访问 Peach 需要先登录。"
 							})]
-						}), /* @__PURE__ */ (0, R.jsx)(ym, {
+						}), /* @__PURE__ */ (0, R.jsx)(wm, {
 							"aria-labelledby": "setup-access-title",
 							"aria-describedby": "setup-access-description",
 							isSelected: l,
 							onChange: u
 						})]
 					}),
-					/* @__PURE__ */ (0, R.jsx)(cm, { children: "未设置密码时，能连接到 Peach 的设备可直接进入。" }),
-					l ? /* @__PURE__ */ (0, R.jsx)(Qh, {
+					/* @__PURE__ */ (0, R.jsx)(pm, { children: "未设置密码时，能连接到 Peach 的设备可直接进入。" }),
+					l ? /* @__PURE__ */ (0, R.jsx)(ag, {
 						label: "访问密码",
 						password: d,
 						confirmation: p,
 						onPassword: f,
 						onConfirmation: m,
-						passwordError: ne(ng(b.access_password)),
+						passwordError: M(lg(b.access_password)),
 						passwordHint: "请输入 8–256 个字符。",
 						confirmationInvalid: !!b.access_password
 					}) : null
 				]
 			}),
-			/* @__PURE__ */ (0, R.jsx)(Et, { children: /* @__PURE__ */ (0, R.jsx)(pm, {
+			/* @__PURE__ */ (0, R.jsx)(Et, { children: /* @__PURE__ */ (0, R.jsx)(vm, {
 				summary: "高级设置",
-				defaultOpen: D > 0,
+				defaultOpen: k > 0,
 				children: /* @__PURE__ */ (0, R.jsx)("div", {
 					className: "flex flex-col gap-4",
-					children: r.filter(re).map(ae)
+					children: r.filter(ie).map(se)
 				})
-			}, D) }),
+			}, k) }),
 			/* @__PURE__ */ (0, R.jsxs)(Et, {
 				labelledBy: "setup-options-title",
 				children: [
@@ -20865,8 +20966,8 @@ function rg({ setup: e, onDone: t }) {
 						children: [/* @__PURE__ */ (0, R.jsx)(kp, {
 							isSelected: h,
 							onChange: g,
-							children: tg(oe)
-						}), /* @__PURE__ */ (0, R.jsx)(cm, { children: "读取已有 NFO 和封面，采集缺失资料。符合自动规则的资料会在处理完成后落库，其余候选留在复核。" })]
+							children: cg(ce)
+						}), /* @__PURE__ */ (0, R.jsx)(pm, { children: "读取已有 NFO 和封面，采集缺失资料。符合自动规则的资料会在处理完成后落库，其余候选留在复核。" })]
 					}),
 					/* @__PURE__ */ (0, R.jsxs)("section", {
 						"aria-labelledby": "setup-history-title",
@@ -20885,16 +20986,16 @@ function rg({ setup: e, onDone: t }) {
 								onChange: v,
 								children: "接下来导入浏览器历史记录"
 							}),
-							/* @__PURE__ */ (0, R.jsx)(cm, { children: "用于生成口味分析。完成设置后选择读取这台电脑，或导入其他设备的记录；也可稍后从「口味」进入。" })
+							/* @__PURE__ */ (0, R.jsx)(pm, { children: "用于生成口味分析。完成设置后选择读取这台电脑，或导入其他设备的记录；也可稍后从「口味」进入。" })
 						]
 					})
 				]
 			}),
-			w ? /* @__PURE__ */ (0, R.jsx)(lm, { children: w }) : null,
+			w ? /* @__PURE__ */ (0, R.jsx)(mm, { children: w }) : null,
 			/* @__PURE__ */ (0, R.jsx)(Ct, {
 				type: "submit",
 				className: "self-start",
-				...jh(ee),
+				...Ih(ee),
 				children: "完成设置"
 			})
 		]
@@ -20902,7 +21003,7 @@ function rg({ setup: e, onDone: t }) {
 }
 //#endregion
 //#region src/react/pages/setup/setup-restore.tsx
-function ig({ onDone: e }) {
+function dg({ onDone: e }) {
 	let [t, n] = (0, y.useState)(""), [r, i] = (0, y.useState)(""), [a, o] = (0, y.useState)(!1);
 	return /* @__PURE__ */ (0, R.jsxs)("form", {
 		className: "flex flex-col gap-4",
@@ -20936,14 +21037,14 @@ function ig({ onDone: e }) {
 		}), /* @__PURE__ */ (0, R.jsx)(Ct, {
 			type: "submit",
 			className: "self-start",
-			...jh(a),
+			...Ih(a),
 			children: a ? "正在连接数据目录…" : "使用此目录"
 		})]
 	});
 }
 //#endregion
 //#region src/react/pages/setup/setup-page.tsx
-function ag() {
+function fg() {
 	let [e, t] = (0, y.useState)({ kind: "loading" }), [n, r] = (0, y.useState)(0), [i, a] = (0, y.useState)(!1);
 	return (0, y.useEffect)(() => {
 		let e = new AbortController();
@@ -20956,7 +21057,7 @@ function ag() {
 				message: $p(n)
 			});
 		}), () => e.abort();
-	}, [n]), e.kind === "done" ? /* @__PURE__ */ (0, R.jsx)(gm, { done: e.done }) : /* @__PURE__ */ (0, R.jsxs)(Tt, {
+	}, [n]), e.kind === "done" ? /* @__PURE__ */ (0, R.jsx)(xm, { done: e.done }) : /* @__PURE__ */ (0, R.jsxs)(Tt, {
 		title: "欢迎使用 Peach",
 		lede: "添加媒体库，开始整理馆藏。",
 		busy: e.kind === "loading",
@@ -20981,10 +21082,10 @@ function ag() {
 				className: "self-start",
 				onClick: () => a((e) => !e),
 				children: i ? "返回首次设置" : "使用已有数据目录"
-			}), i ? /* @__PURE__ */ (0, R.jsx)(ig, { onDone: (e) => t({
+			}), i ? /* @__PURE__ */ (0, R.jsx)(dg, { onDone: (e) => t({
 				kind: "done",
 				done: e
-			}) }) : /* @__PURE__ */ (0, R.jsx)(rg, {
+			}) }) : /* @__PURE__ */ (0, R.jsx)(ug, {
 				setup: e.setup,
 				onDone: (e) => t({
 					kind: "done",
@@ -20996,12 +21097,12 @@ function ag() {
 }
 //#endregion
 //#region src/react/pages/index.tsx
-var og = {
-	setup: ag,
+var pg = {
+	setup: fg,
 	login: Hp,
 	error: At
 };
 u();
-var sg = document.getElementById("peach-page"), cg = sg ? og[sg.dataset.page ?? ""] : void 0;
-sg && cg && (0, b.createRoot)(sg).render(/* @__PURE__ */ (0, R.jsx)(cg, { data: { ...sg.dataset } }));
+var mg = document.getElementById("peach-page"), hg = mg ? pg[mg.dataset.page ?? ""] : void 0;
+mg && hg && (0, b.createRoot)(mg).render(/* @__PURE__ */ (0, R.jsx)(hg, { data: { ...mg.dataset } }));
 //#endregion

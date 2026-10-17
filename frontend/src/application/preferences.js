@@ -50,8 +50,8 @@ export function replaceCatalogAddress(){
 export function sidebarDot(loc){
   if(loc==='local')return {kind:'glyph',name:'hard-drive'};
   if(loc==='online')return {kind:'glyph',name:'rss'};
-  if(loc==='guangya')return {kind:'glyph',name:MEDIA_SOURCE_ICONS.guangya};
-  if(preferencesState.SRCICON[loc]&&MEDIA_SOURCE_ICONS[loc])return {kind:'image',src:MEDIA_SOURCE_ICONS[loc]};
+  const mark=MEDIA_SOURCE_ICONS[loc];
+  if(mark)return mark.startsWith('data:')?{kind:'image',src:mark}:{kind:'glyph',name:mark};
   // 已登记的计费来源使用自己的标识。
   return {kind:'cost',cost:'free'};
 }
@@ -195,10 +195,8 @@ preferencesState.settingsEffects = {
 preferencesState.syncGlassOptics = ()=>{};
 preferencesState.placeSidebarHead = ()=>{};
 preferencesState.SRCICON = {
-  local:icon('hard-drive'),
-  '115':`<img class="source-icon" src="${MEDIA_SOURCE_ICONS['115']}" alt="">`,
-  pikpak:`<img class="source-icon" src="${MEDIA_SOURCE_ICONS.pikpak}" alt="">`,
-  guangya:icon(MEDIA_SOURCE_ICONS.guangya),
+  ...Object.fromEntries(Object.entries(MEDIA_SOURCE_ICONS).map(([location,mark])=>
+    [location,mark.startsWith('data:')?`<img class="source-icon" src="${mark}" alt="">`:icon(mark)])),
   online:icon('rss'),
 };
 preferencesState.srcBadge = (loc,cost,cls)=>{const label=`${LOC[loc]||loc}${cost==='metered'?' · 计费':''}`;

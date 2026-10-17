@@ -112,7 +112,7 @@ def validate(raws: object, *, windows: bool) -> tuple[dict, dict, list[str]]:
 
 def costs(raws: list[dict], config, *, windows: bool) -> dict[str, str]:
     """为已校验的媒体行保存声明根保护设置。"""
-    result = dict(config.media_costs)
+    result = dict(getattr(config, "media_costs", {}))
     for row in raws:
         root = str(PureWindowsPath(row["path"] if windows else row["root"]))
         for previous in tuple(result):

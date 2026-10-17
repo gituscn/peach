@@ -347,7 +347,9 @@ def configure(config: PeachConfig, answers: Answers, *, windows: bool) -> PeachC
                    "mdns_name": answers.mdns_name},
         mounts=mounts,
     )
-    return replace(prepared, locations=locations)
+    return replace(prepared, locations=locations,
+                   media_costs=(media_configuration.costs(answers.media_sources, config, windows=windows)
+                                if answers.media_sources is not None else dict(config.media_costs)))
 
 
 @dataclass(frozen=True)

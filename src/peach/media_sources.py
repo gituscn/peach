@@ -43,10 +43,10 @@ def _root_key(path: str) -> str:
 
 
 def _root_costs(config):
-    overrides = {_root_key(root): cost for root, cost in config.media_costs.items()}
+    overrides = {_root_key(root): cost for root, cost in getattr(config, "media_costs", {}).items()}
     return sorted(((location, str(PureWindowsPath(root)),
                     overrides.get(_root_key(root), SOURCE_COSTS.get(location, "metered")))
-                   for location, roots in config.locations.items() for root in roots),
+                   for location, roots in getattr(config, "locations", {}).items() for root in roots),
                   key=lambda row: len(_root_key(row[1])), reverse=True)
 
 
@@ -70,7 +70,7 @@ def cost_sql(location_column: str = "location", path_column: str = "path", *, co
             raise ValueError("成本查询列名不正确")
     config = _config(config)
     clauses, parameters = [], []
-    for location in config.locations:
+    for location in getattr(config, "locations", {}):
         clauses.append(f"WHEN {location_column}=? AND COALESCE({path_column},'')='' THEN ?")
         parameters.extend((location, cost_for(location, config=config)))
     for location, root, cost in _root_costs(config):
