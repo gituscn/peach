@@ -25,7 +25,7 @@ from peach import web_review as rm_review
 from peach.entities import upsert_asset_entity
 from peach.genre_taxonomy import map_genres
 from peach.metadata_alias_resolve import stage_name
-from peach.metadata_auto_apply import _fc2_seller_as_label, auto_apply_metadata
+from peach.metadata_auto_apply import _fc2_seller_as_label, _refresh_auto_batch, auto_apply_metadata
 from peach.field_owners import (
     EXPECTED_REVISION_FIELD,
     USER_MANUAL,
@@ -151,6 +151,24 @@ class ReviewQueueTests(unittest.TestCase):
 
     def _auto(self):
         return auto_apply_metadata(self.contract.database, self.candidates)
+
+    def test_auto_batch_reads_only_its_metadata_decisions_across_query_chunks(self):
+        keys = [f"batch-{index}" for index in range(205)]
+        with self.contract.database.write_transaction() as connection:
+            connection.executemany(
+                "INSERT INTO review_decision(category,item_key,status,note,updated_at) "
+                "VALUES(?,?,'approved',?,'2026-10-17')",
+                [(category, key, json.dumps({"key": key}))
+                 for category, key in [*(('metadata_fields', key) for key in keys),
+                                       ('metadata_fields', 'outside'), ('studio_logo', keys[0])]])
+            batch = [{"item_key": f" {key} "} for key in keys]
+            batch.extend([{"item_key": keys[0]}, {"item_key": " "}, {}])
+            decided, _genres = _refresh_auto_batch(connection, batch)
+            self.assertEqual(set(decided), set(keys))
+            for key in keys:
+                self.assertEqual(decided[key]["status"], "approved")
+                self.assertEqual(json.loads(decided[key]["note"]), {"key": key})
+            self.assertEqual(_refresh_auto_batch(connection, [{}, {"item_key": " "}])[0], {})
 
     def test_a_new_candidate_file_shows_up_without_waiting_for_the_cache(self):
         """候选文件由进程外的脚本写，没有 `cache_bust`；目录一变，复核页就要重算。"""

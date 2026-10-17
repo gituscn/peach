@@ -244,6 +244,22 @@ class ContractWiringTests(unittest.TestCase):
 
 
 class TasksEndpointTests(unittest.TestCase):
+    def test_result_versions_track_committed_fields_and_candidates_without_task_heartbeats(self):
+        from pathlib import Path
+        self.contract.candidate_root = Path(self.tmp.name) / 'candidates'
+        self.contract.candidate_root.mkdir()
+        before = web_tasks.q_tasks(self.contract, {})['result_versions']
+        run = self.store.start('library-processing', trigger='manual')
+        self.store.progress(run.id, current=1, label='读取资料')
+        self.assertEqual(web_tasks.q_tasks(self.contract, {})['result_versions'], before)
+        with self.contract.write_transaction() as connection:
+            connection.execute("INSERT INTO asset(path,name,location,medium) VALUES('A:/one.mp4','one.mp4','local','video')")
+        committed = web_tasks.q_tasks(self.contract, {})['result_versions']
+        self.assertNotEqual(committed['catalog'], before['catalog'])
+        self.assertEqual(committed['follow'], before['follow'])
+        (self.contract.candidate_root / 'sample.csv').write_text('item_key\nasset:1:title\n', encoding='utf-8')
+        self.assertNotEqual(web_tasks.q_tasks(self.contract, {})['result_versions']['review'], committed['review'])
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

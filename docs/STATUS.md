@@ -33,7 +33,7 @@
 - amane 0.20.0，安装一致；[功能与接入](reference-snapshots/upstream-review.md)。
 - 发行名 `peach`、目录名 `peach-app`；Mac 维护与重启见待办 26。
 - 扫描、采集 120 秒无进展预警；资料 90 秒、封面 240 秒超时可重试；见 `state/library-processing-<job_id>.issues.jsonl`。
-- 口味、复核、关注按账本、文件版本缓存；女优资料后继每轮存量至多 16 条。
+- 资料逐项提交，页面按结果版本刷新；女优资料后继每轮存量至多 16 条。
 - 下载后处理：16 条旧失败任务保留，部分资产已移动；`task_run` 外键异常 242 条未清理。
 - [标签归一](reference-snapshots/tag-vocabulary-audit.md)
 - 种子 `2026-10-17.1`：1,199 实体、13 撤销（ADR-0106）；`0047` 已应用。

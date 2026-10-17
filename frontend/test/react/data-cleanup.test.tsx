@@ -4,7 +4,7 @@
  * 与回滚）都必须先过确认弹层：这里既量「确认了才发」，也量「取消了一个字节都不发」。
  * 外观由 `frontend/e2e/design-*.test.ts` 读 `getComputedStyle` 断言；这里只看结构、文字与请求。 */
 import { notifyManager, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactElement } from 'react';
+import { act, type ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as legacyUi from '@peach/legacy/ui';
 
@@ -18,7 +18,7 @@ import type { OrganizeData } from '../../src/react/data-cleanup/organize';
 import { OrphanRecordsCard } from '../../src/react/data-cleanup/orphan-records-card';
 import type { OrphanRecordsData } from '../../src/react/data-cleanup/orphan-records';
 import { ResourceSyncCard } from '../../src/react/data-cleanup/resource-sync-card';
-import { hasResourceRoots, type ResourceScanState } from '../../src/react/data-cleanup/resource-sync';
+import { hasResourceRoots, RESOURCE_SCAN_KEY, type ResourceScanState } from '../../src/react/data-cleanup/resource-sync';
 import { IDLE_REPAIR } from '../../src/react/media-repair/media-repair';
 import type { MediaSourcesData } from '../../src/react/media-sources';
 import { queryClient } from '../../src/react/query';
@@ -243,6 +243,23 @@ describe('资源同步', () => {
     await settle();
     expect(toast).toHaveBeenCalledWith('已清理失效条目');
     expect(host.textContent).toContain('已永久删除 4 条失效记录和 3 个空文件夹，清理 2 个缓存，释放 5 MB。');
+  });
+
+  it('其余来源仍在扫描时显示已确认来源，任务失败也保留这些结果', async () => {
+    const state = { status: 'running', scan_id: 'scan-partial', completed_sources: 1, total_sources: 2,
+      sources: [scanned.sources![0]!] };
+    serve({ '/api/resource-sync/scan': state, '/api/resource-sync/apply': { status: 'idle' } });
+    const host = await wrap(<ResourceSyncCard toast={vi.fn()} />);
+    await settle();
+    expect(host.textContent).toContain('本地磁盘');
+    expect(host.textContent).toContain('空文件夹 3 个');
+    expect(buttonNamed('清理失效条目', host)).toBeNull();
+    expect(host.textContent).not.toContain('可清理的缓存');
+    await act(async () => { queryClient.setQueryData(RESOURCE_SCAN_KEY, {
+      ...state, status: 'failed', error: '第二个来源无法读取',
+    }); });
+    expect(host.textContent).toContain('本地磁盘');
+    expect(host.textContent).toContain('第二个来源无法读取');
   });
 
   it('带个人记录的单列一档：读数卡与确认框分开报删除和标为已消失的条数，结果单报接回的', async () => {
