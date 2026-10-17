@@ -78,6 +78,19 @@ class ImportedPerformerProfileTests(unittest.TestCase):
         self.assertTrue((self.root / "avatars" / "performer-7.img").is_file())
         transport.assert_called_once()
 
+    def test_refreshed_approval_selects_the_confirmed_profile_evidence(self):
+        with self.database.write_transaction() as connection:
+            connection.execute(
+                "UPDATE review_decision SET note=? WHERE category='metadata_fields' AND item_key='asset:1:performers'",
+                (json.dumps({'candidate_key': 'earlier-evidence', 'refreshed_candidate_key': 'profile'}),))
+        transport = Mock()
+        result = enrich_performer_profiles(
+            self.database, [self.group(url='')], self.root / 'avatars', self.root / 'providers',
+            transport_factory=lambda: transport)
+        self.assertEqual(result['aliases'], 2)
+        self.assertEqual(result['avatars'], 0)
+        transport.assert_not_called()
+
     def test_a_javdb_actor_id_lands_as_a_performer_external_ref(self):
         """javdb 的演员 id 落进账本，人物页的 JavDB 入口就是靠它拼出来的。
 

@@ -14,8 +14,8 @@ type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'error';
  *  同一件事，摆到 Note 外面就成了一句话加一块不知道属于谁的内容。
  *  正文是段落，塞不进这些块级内容。 */
 export function Note(
-  { tone, title, action, extra, children, actionLayout = 'inline' }:
-  { tone: Tone; title?: string; action?: ReactNode; extra?: ReactNode; children: ReactNode; actionLayout?: 'inline' | 'below' },
+  { tone, title, action, extra, children, actionLayout = 'inline', className }:
+  { tone: Tone; title?: string; action?: ReactNode; extra?: ReactNode; children: ReactNode; actionLayout?: 'inline' | 'below'; className?: string },
 ) {
   const content = (
     <>
@@ -34,14 +34,14 @@ export function Note(
   );
   switch (tone) {
     case 'info':
-      return <div role="status" className="@container flex flex-col gap-2 rounded-2lg bg-notification-information-background px-3 py-2 text-notification-information-foreground">{content}</div>;
+      return <div role="status" className={cx('@container flex flex-col gap-2 rounded-2lg bg-notification-information-background px-3 py-2 text-notification-information-foreground', className)}>{content}</div>;
     case 'success':
-      return <div role="status" className="@container flex flex-col gap-2 rounded-2lg bg-notification-success-background px-3 py-2 text-notification-success-foreground">{content}</div>;
+      return <div role="status" className={cx('@container flex flex-col gap-2 rounded-2lg bg-notification-success-background px-3 py-2 text-notification-success-foreground', className)}>{content}</div>;
     case 'warning':
-      return <div role="note" className="@container flex flex-col gap-2 rounded-2lg bg-status-yellow-background px-3 py-2 text-status-yellow-text">{content}</div>;
+      return <div role="note" className={cx('@container flex flex-col gap-2 rounded-2lg bg-status-yellow-background px-3 py-2 text-status-yellow-text', className)}>{content}</div>;
     case 'error':
-      return <div role="alert" className="@container flex flex-col gap-2 rounded-2lg bg-background-tertiary-error px-3 py-2 text-text-error-primary">{content}</div>;
+      return <div role="alert" className={cx('@container flex flex-col gap-2 rounded-2lg bg-background-tertiary-error px-3 py-2 text-text-error-primary', className)}>{content}</div>;
     default:
-      return <div role="note" className="@container flex flex-col gap-2 rounded-2lg bg-background-tertiary-default px-3 py-2 text-text-secondary">{content}</div>;
+      return <div role="note" className={cx('@container flex flex-col gap-2 rounded-2lg bg-background-tertiary-default px-3 py-2 text-text-secondary', className)}>{content}</div>;
   }
 }

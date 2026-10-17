@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
+from .processing_control import checkpoint, ffmpeg_options
 
 from PIL import Image
 
@@ -47,11 +48,14 @@ def capture_frame(ffmpeg: str, path: str, timestamp: float, destination: Path, *
     """
     destination.unlink(missing_ok=True)
     command = [ffmpeg, "-y", "-v", "error", "-rw_timeout", "8000000"]
+    checkpoint('frame')
+    command += ffmpeg_options(filter_option='-filter_threads')
     if color_override:
         command += COLOR_OVERRIDE
     command += [
         "-ss", f"{timestamp:.2f}", "-i", path, "-frames:v", "1",
-        "-vf", f"scale={int(width)}:-1", "-q:v", "4", str(destination),
+        "-vf", f"scale={int(width)}:-1", "-q:v", "4",
+        *ffmpeg_options(), str(destination),
     ]
     try:
         completed = subprocess.run(command, capture_output=True, timeout=timeout,
@@ -107,12 +111,15 @@ def tile_frames(ffmpeg: str, pattern: str, columns: int, rows: int, destination:
     于是拼出来的图少了后半段，而命令本身照样退出 0。
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint('frame')
+    options = ffmpeg_options(filter_option='-filter_complex_threads')
     destination.unlink(missing_ok=True)
     from .error_reporting import subprocess_failure
     try:
         completed = subprocess.run(
-            [ffmpeg, "-y", "-v", "error", "-i", pattern,
-             "-filter_complex", f"tile={int(columns)}x{int(rows)}", "-q:v", "4", str(destination)],
+            [ffmpeg, "-y", "-v", "error", *options, "-i", pattern,
+             "-filter_complex", f"tile={int(columns)}x{int(rows)}", "-q:v", "4",
+             *ffmpeg_options(), str(destination)],
             capture_output=True, timeout=timeout,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )

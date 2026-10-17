@@ -398,7 +398,7 @@ export interface LibraryProcessingProps {
   toast(message: string): void;
   /** 这一趟从运行走到终态：让遗留层重画数据管理页那几个计数。 */
   onComplete?(): void;
-  /** 画成目录页顶上那条横幅，而不是数据管理页那张卡片。 */
+    /** 紧凑任务面持续观察后台状态。 */
   mode?: 'notice';
   /** 卡片闲着时也接着问：任务由后台自己起，页面要认出「现在跑起来了」。 */
   monitor?: boolean;

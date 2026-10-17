@@ -220,10 +220,10 @@ describe('设计决定：控件、状态与首页顶部', () => {
     }
   });
 
-  it('目录页那条处理横幅在跑的时候不占语气色，失败了才换成状态红并报警', { timeout: 60_000 }, async () => {
+  it('常驻任务面在运行时使用中性色，失败时使用状态红并跨页保留', { timeout: 60_000 }, async () => {
     const running = await openProcessing(browser, '/', RUNNING_JOB);
     try {
-      const banner = running.page.locator('#libraryProcessingNotice [role="status"]');
+      const banner = running.page.locator('#toasts [data-processing-dock][role="status"]');
       await banner.waitFor({ state: 'visible', timeout: 15_000 });
       assert.match(await banner.innerText(), /采集缺失资料 · 38 \/ 100/);
       // 一圈长度钉成 100，画出来的那一段就是百分比本身。
@@ -240,11 +240,11 @@ describe('设计决定：控件、状态与首页顶部', () => {
 
     const failed = await openProcessing(browser, '/', { status: 'failed', error: '来源离线' });
     try {
-      const banner = failed.page.locator('#libraryProcessingNotice [role="alert"]');
+      const banner = failed.page.locator('#toasts [data-processing-dock][role="alert"]');
       await banner.waitFor({ state: 'visible', timeout: 15_000 });
       /* 计算值现在是 `oklab()`／`oklch()`，两种记法之间没法直接比字符串，所以统一在
          canvas 上取回 RGBA 再比。 */
-      const surface = await banner.evaluate((element) => {
+      const readSurface = () => banner.evaluate((element) => {
         const style = getComputedStyle(element);
         const context = document.createElement('canvas').getContext('2d')!;
         const paint = (color: string) => {
@@ -253,23 +253,34 @@ describe('设计决定：控件、状态与首页顶部', () => {
           context.fillRect(0, 0, 1, 1);
           return [...context.getImageData(0, 0, 1, 1).data];
         };
-        return { tint: style.backgroundColor, line: paint(style.borderTopColor), ink: paint(style.color) };
+        return { base: paint(style.backgroundColor), tint: style.backgroundImage,
+          line: paint(style.borderTopColor), ink: paint(style.color),
+          button: getComputedStyle(element.querySelector('button[aria-expanded]')!).backgroundColor,
+          link: getComputedStyle(element.querySelector('a')!).color };
       });
-      assert.equal(surface.tint,
-        await tokenColor(failed.page, '.peach-react', '--color-background-tertiary-error'));
-      // 上下两条线取自己的文字色：红底上横一条中性灰线，读起来是把这一条切成了两半。
-      for (const at of [0, 1, 2]) {
-        assert.ok(Math.abs(surface.line[at]! - surface.ink[at]!) <= 2,
-          `横幅的线没跟着语气走：线 ${surface.line} 与字 ${surface.ink} 不是同一个色`);
+      for (const theme of ['light', 'dark']) {
+        await failed.page.evaluate(value => {
+          document.documentElement.dataset.theme = value;
+          document.documentElement.classList.toggle('dark', value === 'dark');
+        }, theme);
+        const surface = await readSurface();
+        const errorTint = await tokenColor(failed.page, '.peach-react', '--color-background-tertiary-error');
+        assert.equal(surface.base[3], 255, '任务卡的底层不透明');
+        assert.equal(surface.tint, `linear-gradient(${errorTint}, ${errorTint})`);
+        assert.equal(surface.button, await tokenColor(failed.page, '.peach-react', '--color-background-primary-default'));
+        assert.equal(surface.link, await tokenColor(failed.page, '.peach-react', '--color-text-secondary'));
+        for (const at of [0, 1, 2]) {
+          assert.ok(Math.abs(surface.line[at]! - surface.ink[at]!) <= 2,
+            `横幅的线没跟着语气走：线 ${surface.line} 与字 ${surface.ink} 不是同一个色`);
+        }
+        assert.ok(surface.line[3]! < surface.ink[3]!, '状态分隔线比正文更淡');
       }
-      assert.ok(surface.line[3]! < surface.ink[3]!,
-        '线和字一样实，整条读起来像三行字');
-      // 垃圾文件也是目录路径，但它是数据管理底下的一页：同一趟失败的任务，横幅不跟进去。
+      // 数据管理子页继续保留同一趟尚未处理的失败提示。
       await failed.page.goto(new URL('/junk-files', failed.page.url()).href, { waitUntil: 'load' });
       await failed.page.locator('[data-junk-filters]').waitFor({ state: 'visible', timeout: 15_000 });
       await failed.page.waitForTimeout(1_000);
-      assert.equal(await failed.page.locator('#libraryProcessingNotice [role="alert"]').count(), 0,
-        '垃圾文件页顶上挂了目录页的处理横幅');
+      assert.equal(await failed.page.locator('#toasts [data-processing-dock][role="alert"]').count(), 1,
+        '未处理的失败在换页后仍可找到');
     } finally {
       await failed.close();
     }

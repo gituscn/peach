@@ -87,7 +87,7 @@ it('启动等待期间不重复提交，结束后刷新馆藏并给出封面与�
   await click(primary);
   expect(posts).toHaveLength(1);
   await response.release({ status: 'running', job_id: 'complete-one' });
-  expect(host.textContent).toContain('生成视频预览');
+  expect(host.textContent).toBe('');
   await click(more);
   expect(more.getAttribute('aria-expanded')).toBe('false');
   await act(async () => queryClient.setQueryData(LIBRARY_PROCESSING_KEY,
@@ -95,8 +95,9 @@ it('启动等待期间不重复提交，结束后刷新馆藏并给出封面与�
   expect(host.textContent).toContain('取得 1 张封面，生成 2 部视频预览');
   expect(queryClient.getQueryState(['catalog-grid', 'catalog', 'sample', 1])?.isInvalidated).toBe(true);
   expect(onComplete).toHaveBeenCalledTimes(1);
-  await click(more);
-  expect(more.getAttribute('aria-expanded')).toBe('true');
+  const nextMore = host.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]')!;
+  await click(nextMore);
+  expect(nextMore.getAttribute('aria-expanded')).toBe('true');
 });
 
 it('启动失败保留入口与处理详情，不显示完成回执', async () => {

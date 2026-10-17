@@ -23,7 +23,7 @@ import { JAV_LAYOUTS, cardRatio, gridLayout, javLayout } from './../appearance/l
 import { entityFaceImg, facePos, logoUrl } from './../card-art/markup';
 import { sidebarHasCatalogContent } from './../sidebar';
 import { rememberRepresentatives } from './../card-art/representatives';
-import { clearHomeFeed, isFeedNewPath, isProcessingNoticePath, renderHomeFeed } from './feed.js';
+import { clearHomeFeed, isFeedNewPath, renderHomeFeed } from './feed.js';
 import { loadingState, renderCatalogLoading } from './loading.js';
 import { releaseHoverPreviews } from './../card-art/hover';
 import { revealRoutedPage } from './follow.js';
@@ -375,9 +375,6 @@ export function renderCombo(){
 
 export async function loadCatalog(){
   const surface=navigationState.claimSurface(navigationState.surfacePath());
-  // 已经画着或首屏在取就让它接着跑：重开要先收起再重取，而它这一刻要说的话跟上一刻是同一句。
-  if(isProcessingNoticePath(location.pathname)&&!managedTaken($('#libraryProcessingNotice')))
-    void openManagedRoute('library-processing',{toast: receiptsState.toast,mode:'notice'},{container:$('#libraryProcessingNotice'),isCurrent:()=>navigationState.surfaceCurrent(surface)});
   /* 新作那一行只在目录路径上出现：管理页、回收站这些页面回答的是别的问题，一行「外面出了
      什么」摆在那里只是噪音。离开目录时要显式收起——它是 `#main` 的固定子节点，没人收就
      一直挂在那儿。 */

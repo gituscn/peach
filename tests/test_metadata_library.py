@@ -197,6 +197,58 @@ class LibraryNfoTests(unittest.TestCase):
         provider.query.assert_not_called()
 
     @windows_ledger_roots
+    def test_user_pause_keeps_published_fields_and_resumes_the_same_collection(self):
+        import threading
+        from peach.processing_control import control_for
+        media = self.root / 'media'
+        media.mkdir()
+        video = media / 'ABW-358.mp4'
+        video.write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        with closing(sqlite3.connect(db)) as connection, connection:
+            connection.execute("INSERT INTO asset(path,name,location,medium,code) VALUES(?,?,'local','video','ABW-358')",
+                               (str(video), video.name))
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        provider = stub_provider()
+        provider.query.return_value = {'id': 'ABW-358', 'title': '已确认资料'}
+        provider.cover.return_value = False
+        control = control_for(config)
+        paused, requested = threading.Event(), threading.Event()
+        results, errors = [], []
+        def report(state):
+            if state['status'] == 'paused':
+                paused.set()
+            elif state.get('auto_applied', 0) and not requested.is_set():
+                requested.set()
+                control.request('pause', state['job_id'])
+        def run():
+            try:
+                results.append(process_library(config, db, self.root / 'generated', self.root / 'covers',
+                    stage='metadata', speed_mode='high', job_id='one', report=report,
+                    provider_factory=lambda: provider, database=LedgerDatabase(db)))
+            except BaseException as exc:
+                errors.append(exc)
+        with patch('peach.library_processing.CANDIDATE_FLUSH_SECONDS', 0), \
+                patch('peach.library_processing._enrich_finished_performers',
+                      return_value={'aliases': 0, 'avatars': 0, 'conflicts': 0, 'failed': 0}):
+            thread = threading.Thread(target=run)
+            thread.start()
+            try:
+                self.assertTrue(paused.wait(5), errors)
+                with closing(sqlite3.connect(db)) as connection:
+                    self.assertEqual(connection.execute('SELECT catalog_title FROM asset').fetchone()[0], '已确认资料')
+                self.assertTrue(read_rows(self.root / 'generated/library-metadata-field-candidates.csv'))
+                self.assertEqual(snapshot(config)['status'], 'paused')
+            finally:
+                control.request('resume', 'one')
+                thread.join(5)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual((results[0]['job_id'], results[0]['status']), ('one', 'complete'))
+        self.assertGreater(results[0]['auto_applied'], 0)
+
+    @windows_ledger_roots
     def test_all_local_titles_are_committed_before_the_first_online_request(self):
         media = self.root / 'media'
         media.mkdir()
@@ -2144,7 +2196,6 @@ class LibraryNfoTests(unittest.TestCase):
 
     def test_management_controls_keep_credentials_and_empty_sections_visible(self):
         root = Path(__file__).resolve().parents[1]
-        source = (root / 'frontend/src/application/catalog.js').read_text(encoding='utf-8')
         # 关注管理那一屏在 React 里：能加来源的站才进候选，缺必填凭据的那一行默认展开，
         # 一个站都没配也照样把整块列出来（空清单不等于这块不存在）。
         follow = root / 'frontend/src/react/follow-manage'
@@ -2153,7 +2204,6 @@ class LibraryNfoTests(unittest.TestCase):
         self.assertIn('const rows = (credentials.providers || []).filter((row) => row.followable);', add)
         self.assertIn("defaultOpen={row.requirement === 'required' && !credentialDone(row)}>", creds)
         self.assertIn('const rows = data.providers || [];', creds)
-        self.assertIn("mode:'notice'", source)
         configuration = (root / 'frontend/src/react/settings/configuration-page.tsx').read_text(encoding='utf-8')
         self.assertNotIn("'/api/library-processing'", configuration)
         page = (root / 'frontend/src/react/data-cleanup/data-cleanup-page.tsx').read_text(encoding='utf-8')
@@ -2649,6 +2699,8 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
         self.assertFalse((self.root / 'candidates').exists())
         finish.assert_not_called()
         factory.assert_not_called()
+        self.assertEqual([(step['id'], step['status']) for step in result['steps']],
+                         [('sources', 'complete'), ('media', 'complete')])
 
     def test_missing_ffmpeg_is_retryable_and_collection_can_finish_its_work(self):
         self.resolver.ffmpeg.return_value = None

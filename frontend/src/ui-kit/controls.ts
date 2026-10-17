@@ -43,7 +43,7 @@ export function iconSwitchHtml(name:string,legend:string,options:readonly (reado
   const items=options.map(([value,label,symbol])=>
     `<label title="${esc(label)}"><input type="radio" name="${esc(name)}" value="${esc(value)}" ${attr}
       ${value===current?'checked':''}><span aria-hidden="true">${text?(symbol?icon(symbol):'')+esc(label):icon(symbol)}</span><span class="sr-only">${esc(label)}</span></label>`).join('');
-  return `<fieldset class="iconswitch${className?` ${esc(className)}`:''}"><legend class="sr-only">${esc(legend)}</legend>${items}</fieldset>`;
+  return `<fieldset class="iconswitch${text?' iconswitch-text':''}${className?` ${esc(className)}`:''}"><legend class="sr-only">${esc(legend)}</legend>${items}</fieldset>`;
 }
 
 /** 把一组 iconSwitchHtml 画出来的 radio 接到 apply(value) 上。 */

@@ -40,6 +40,9 @@ from .media_probe import probe_unmeasured
 from .media_processing_policy import metadata_only
 from .strm import skip_background_read
 from .record_rehome import reattach_in
+from .processing_control import (task_control, bind_control, checkpoint_values,
+                                 initial_estimate, ProcessingEstimate, interrupted_state,
+                                 deadline_after, resume_fields)
 
 FIELDS = ('item_key', 'code', 'query', 'asset_id', 'asset_path', 'field', 'field_label', 'current_value',
           'candidates_json', 'source_count', 'source_profile', 'policy_version', 'status',
@@ -354,6 +357,8 @@ class LibraryMetadataProvider:
         from .config import TOOLS_DIR
         from .jav_cover_fetch import Unavailable
         from .scraping_access import SourcePaused, pause_source, values_for, record_source_check
+        from .processing_control import checkpoint
+        checkpoint('network')
         timeout = None
         if deadline is not None:
             timeout = deadline - time.monotonic()
@@ -1402,7 +1407,7 @@ class _RemoteSession:
         budget = ACTION_BUDGETS[action]
         update(stage='采集缺失资料', current_action=action,
                current_started_at=time.time(), current_deadline_at=time.time() + budget)
-        deadline = time.monotonic() + budget
+        deadline = deadline_after(budget)
         mark = _excused(self._provider)
         evidence = _studio_evidence(row)
         chain = self._chain(code, *evidence)
@@ -1504,7 +1509,7 @@ class _RemoteSession:
         update(stage='采集缺失封面', current_action=action,
                current_started_at=time.time(), current_deadline_at=time.time() + budget)
         try:
-            return int(self.provider().cover(code, cover_root, deadline=time.monotonic() + budget,
+            return int(self.provider().cover(code, cover_root, deadline=deadline_after(budget),
                                              evidence=_studio_evidence(row), snapshots=snapshots,
                                              absent=absent))
         except DeadlineExceeded:
@@ -1685,6 +1690,7 @@ class _SourceScan:
     online_roots: list[Path]
     scanned: int = 0
     probed: int = 0
+    scanned_bytes: int = 0
 
 
 def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update, issue):
@@ -1706,8 +1712,13 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
             result.online_roots.append(translated_root)
             if scan:
                 registered = scan_location(db_path, source, root, declared_roots=config.locations,
-                                           mounts=mounts, report=lambda line: update(stage='扫描文件'))
+                                           mounts=mounts, report=lambda line: None,
+                                           progress=lambda files, size: update(
+                                               stage='扫描文件', scanned=result.scanned + files,
+                                               scanned_bytes=result.scanned_bytes + size,
+                                               checked=0, total=0, current_action='scanning_files'))
                 result.scanned += registered.files
+                result.scanned_bytes += registered.total_bytes
                 if stage == SCAN_STAGE:
                     result.probed += probe_unmeasured(
                         db_path, ffprobe, source, root, config=config,
@@ -2031,11 +2042,39 @@ def _read_local_metadata(config, db_path, row, cover_root, listing, state, updat
     return code, nfo is not None, payload, entries
 
 
+def _processing_steps(stage, asset_ids, *, metadata_only_enabled):
+    """按本趟真实处理范围构造有序阶段清单。"""
+    scanning = asset_ids is None and stage in (ALL_STAGES, SCAN_STAGE)
+    steps = [('sources', '扫描文件' if scanning else '检查媒体目录')]
+    if stage not in (SCAN_STAGE, PREVIEWS_STAGE):
+        steps.append(('local', '读取本地资料'))
+    if stage == PREVIEWS_STAGE or stage in (ALL_STAGES, COLLECT_STAGE):
+        media_label = ('生成视频预览' if stage == PREVIEWS_STAGE else
+                       '读取媒体属性' if metadata_only_enabled else '读取媒体属性与生成预览')
+        steps.append(('media', media_label))
+    if stage not in (SCAN_STAGE, PREVIEWS_STAGE):
+        steps.append(('collect', '采集外部资料与封面'))
+    return [dict(id=key, label=label, status='current' if index == 0 else 'pending')
+            for index, (key, label) in enumerate(steps)]
+
+
+def _complete_processing_step(steps, key):
+    """返回完成当前阶段并激活下一阶段的独立快照。"""
+    progress = [dict(item) for item in steps]
+    for index, item in enumerate(progress):
+        if item['id'] == key:
+            item['status'] = 'complete'
+            if index + 1 < len(progress):
+                progress[index + 1]['status'] = 'current'
+            break
+    return progress
+
+
 def process_library(config, db_path, candidate_root, cover_root, *, location='configured',
                     report=lambda state: None, provider_factory=None, job_id=None,
                     retry_ids=None, active=lambda: True, stage=ALL_STAGES,
                     database=None, route_overrides=None, state_file=None, asset_ids=None,
-                    resume_state=None):
+                    resume_state=None, speed_mode=None):
     """登记文件与确定的番号，外部资料保留为可复核候选。
 
     `retry_ids` 为 `None` 时处理整个馆藏；给定时只处理这些项目（上一任务记录的
@@ -2060,11 +2099,22 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
     targeted = retrying or selected_ids is not None
     chosen_ids = selected_ids if selected_ids is not None else list(dict.fromkeys(map(int, retry_ids or [])))
     scope_ids = chosen_ids if targeted else None
+    control = task_control(config, state_file)
+    identity = job_id or uuid.uuid4().hex
+    def control_report(**values):
+        resume_fields(state, values)
+        state.update(values)
+        estimate.update(state)
+        flush_state(force=True)
+        report(dict(state))
     from .update_tasks import activity
-    with activity(Path(db_path), 'library-processing'), FileLock(str(state_path(config)) + '.lock', timeout=0):
-        state = dict(job_id=job_id or uuid.uuid4().hex, status='running',
+    with (activity(Path(db_path), 'library-processing'),
+          FileLock(str(state_path(config)) + '.lock', timeout=0),
+          bind_control(control, identity, publish=control_report, active=active, db_path=Path(db_path),
+                       mode=speed_mode)):
+        state = dict(job_id=identity, status='running',
                      stage='读取本地资料' if retrying else '扫描文件',
-                     checked=0, total=0, scanned=0, probed=0, identified=0, candidates=0, covers=0, previews=0,
+                     checked=0, total=0, scanned=0, scanned_bytes=0, probed=0, identified=0, candidates=0, covers=0, previews=0,
                      requested_stage=stage, asset_ids=scope_ids,
                      issue_count=0, paused_count=0, issue_preview=[], issues_truncated=False,
                      notes={}, retryable_asset_ids=[],
@@ -2073,6 +2123,10 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                      current_started_at=None, current_deadline_at=None,
                      followups=[],
                      started_at=time.time(), error='')
+        state.update(initial_estimate(config, db_path, stage, scope_ids, speed_mode))
+        state['steps'] = _processing_steps(stage, scope_ids,
+            metadata_only_enabled=metadata_only(config.directory('state')))
+        estimate = ProcessingEstimate(config, state, control)
         # 实体表的水位在开工前记一次：比它大的实体就是这一轮建出来的（`_entity_followups`）。
         checkpoints = _LibraryCheckpoints(state, resume_state, database)
         entity_watermark = checkpoints.entity_watermark
@@ -2095,7 +2149,9 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             _require_writer(config, db_path)
             if not active():
                 raise InterruptedError('处理任务已停止')
+            checkpoint_values(values)
             state.update(values)
+            estimate.update(state)
             state['last_progress_at'] = time.time()
             state['progress_seq'] += 1
             flush_state(force='status' in values)
@@ -2120,6 +2176,10 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             flush_state()
             report(dict(state))
 
+        def finish_step(key):
+            """阶段成功返回后发布完成状态；异常退出的阶段保留当前状态。"""
+            update(steps=_complete_processing_step(state['steps'], key))
+
         update()
         remote = _RemoteSession(config, provider_factory, _MissCache(misses_path(config)),
                                 retrying=retrying, routes=routes)
@@ -2131,7 +2191,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             locations = config.locations if location == 'configured' else {location: config.locations[location]}
             sources = _scan_sources(config, db_path, locations=locations, asset_ids=scope_ids,
                                     stage=stage, guard=guard, update=update, issue=issue)
-            state.update(scanned=sources.scanned, probed=sources.probed)
+            state.update(scanned=sources.scanned, scanned_bytes=sources.scanned_bytes, probed=sources.probed)
+            finish_step('sources')
             if stage == SCAN_STAGE:
                 # `checked`／`total` 在探时长时借给进度条用过；只扫描这一段没有采集，读数归零。
                 update(status='failed' if state['issue_count'] else 'complete',
@@ -2144,6 +2205,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 _generate_previews(config, rows, database, update=update, issue=issue, guard=guard,
                                    completed=checkpoints.completed['completed_previews'],
                                    checkpoint=lambda row: checkpoints.mark('completed_previews', row, flush_state))
+                finish_step('media')
             if stage == PREVIEWS_STAGE:
                 update(status='failed' if state['issue_count'] else 'complete', stage='处理结束',
                        completed_at=time.time(), error=issue_summary(state['issue_count'], state['paused_count']))
@@ -2201,16 +2263,18 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                                      state['issue_count'] == issues_before))
                 update(checked=index + 1)
             flush_candidates(force=True)
+            finish_step('local')
             if stage in (ALL_STAGES, COLLECT_STAGE):
                 _probe_sources(config, db_path, locations, sources.online_roots, scope_ids, update)
                 if not metadata_only(config.directory('state')):
                     _generate_previews(config, rows, database, update=update, issue=issue, guard=guard,
                         completed=checkpoints.completed['completed_previews'],
                         checkpoint=lambda row: checkpoints.mark('completed_previews', row, flush_state))
+                finish_step('media')
             for index, row, code, verify_existing, local_fields, local_entries, local_ok in prepared:
                 guard.check()
                 issues_before = state['issue_count']
-                update(checked=index, total=len(rows), current_asset_id=row['id'],
+                update(stage='采集缺失资料', checked=index, total=len(rows), current_asset_id=row['id'],
                        current_asset_name=Path(str(row['name'] or '')).name)
                 target_key = f"asset:{row['id']}"
                 missing = list(COLLECTED_FIELDS) if verify_existing else _missing_fields(row, local_fields)
@@ -2235,6 +2299,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 active=active, update=update, issue=issue, watermark=entity_watermark, covered=covered)
             summary['auto_applied'] = summary.get('auto_applied', 0) + state['auto_applied']
             summary['auto_rejected'] = summary.get('auto_rejected', 0) + state['auto_rejected']
+            finish_step('collect')
             update(status='failed' if state['issue_count'] else 'complete', stage='处理结束',
                    checked=len(rows),
                    **summary,
@@ -2243,6 +2308,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                    current_action='', current_started_at=None, current_deadline_at=None)
         except Exception:
             state.update(status='failed', error='处理被中断。核对媒体目录后重试。', completed_at=time.time())
+            state.update(interrupted_state(control))
             _save(path, state)
             raise
         finally:

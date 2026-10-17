@@ -1,7 +1,7 @@
 /* Folia wall.css 与用户截图的独立暗色表面；数值与差异见 folia-video-wall.md。 */
 html[data-wall-entry] body, body[data-wall-open] { overflow:hidden; background:#070707; }
-html[data-wall-entry] :is(body>header,#drawer,#main,#catalogFilter,#count,#javLibraryHeader,#libraryProcessingNotice,#feedNew),
-body[data-wall-open] :is(body>header,#drawer,#main,#catalogFilter,#count,#javLibraryHeader,#libraryProcessingNotice,#feedNew) { visibility:hidden; pointer-events:none; }
+html[data-wall-entry] :is(body>header,#drawer,#main,#catalogFilter,#count,#javLibraryHeader,#feedNew),
+body[data-wall-open] :is(body>header,#drawer,#main,#catalogFilter,#count,#javLibraryHeader,#feedNew) { visibility:hidden; pointer-events:none; }
 .peach-react [data-video-wall] {
   --ground:#070707; --surface:#161419; --ink:#f7f4ee; --ink-2:#f7f4ee; --muted:#aaa7a2;
   --hover:rgba(255,255,255,.08); --line-soft:rgba(255,255,255,.22);
