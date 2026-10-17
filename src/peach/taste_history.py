@@ -123,11 +123,14 @@ def discover_history_sources(
     from .taste_browsers import _paths
 
     platform_name = platform_name or {"win32": "windows", "darwin": "macos"}.get(sys.platform, "linux")
+    use_environment = home is None
     home = home or Path.home()
     candidates: list[tuple[str, Path]] = []
     if platform_name == "windows":
-        appdata = appdata or Path(os.environ.get("APPDATA", home / "AppData" / "Roaming"))
-        localappdata = localappdata or Path(os.environ.get("LOCALAPPDATA", home / "AppData" / "Local"))
+        appdata = appdata or (Path(os.environ.get("APPDATA") or home / "AppData" / "Roaming")
+                              if use_environment else home / "AppData" / "Roaming")
+        localappdata = localappdata or (Path(os.environ.get("LOCALAPPDATA") or home / "AppData" / "Local")
+                                       if use_environment else home / "AppData" / "Local")
         candidates.extend(
             [
                 ("firefox", appdata / "Mozilla" / "Firefox" / "Profiles"),
@@ -168,7 +171,8 @@ def discover_history_sources(
             ]
         )
     elif platform_name == "linux":
-        config = Path(os.environ.get("XDG_CONFIG_HOME", home / ".config"))
+        config = (Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
+                  if use_environment else home / ".config")
         candidates.extend([
             ("firefox", home / ".mozilla/firefox"),
             ("firefox", home / ".var/app/org.mozilla.firefox/.mozilla/firefox"),

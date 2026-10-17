@@ -11,7 +11,7 @@ import pathlib
 from urllib.parse import quote
 from unittest import mock
 
-from peach import taste_history
+from peach import taste_browsers, taste_history
 from peach.taste_history import (
     HistorySource,
     analyze_history,
@@ -152,6 +152,29 @@ class TasteHistoryTests(unittest.TestCase):
             results = refresh_history(enabled_history_sources(store), store)
         self.assertEqual([row["added"] for row in results], [1] * len(layouts))
 
+    def test_discovers_windows_115_historyex_profiles(self):
+        home = self.root.resolve()
+        user_data = home / "AppData" / "Local" / "115Chrome" / "User Data"
+        for profile in ("Default", "Profile 1"):
+            self._chrome_db(user_data / profile / "HistoryEx")
+        sources = discover_history_sources(home=home, platform_name="windows")
+        self.assertEqual(
+            sources,
+            [HistorySource("115", profile, user_data / profile / "HistoryEx", user_data, "chrome")
+             for profile in ("Default", "Profile 1")],
+        )
+        store = home / "115-history.sqlite"
+        with mock.patch.object(taste_history, "discover_history_sources", return_value=sources):
+            browsers = taste_browsers.browser_sources(store)
+            self.assertEqual(len(browsers), 1)
+            self.assertTrue(browsers[0]["automatic"])
+            self.assertTrue(browsers[0]["available"])
+            self.assertEqual(browsers[0]["path"], str(user_data))
+            self.assertEqual(browsers[0]["profiles"], 2)
+            enabled = taste_browsers.enabled_history_sources(store)
+            self.assertTrue(all(source.engine == "chrome" for source in enabled))
+            self.assertIn(user_data / "Default" / "HistoryEx", [source.path for source in enabled])
+
     def test_historyex_directory_and_file_use_verified_browsing_schema(self):
         from peach.taste_browsers import configure_browser, enabled_history_sources
         path = self.root / "115Chrome/User Data/Default/HistoryEx"
@@ -227,8 +250,9 @@ class TasteHistoryTests(unittest.TestCase):
         local, roaming = self.root / "RedirectedLocal", self.root / "RedirectedRoaming"
         self._chrome_db(local / "Google/Chrome/User Data/Profile 2/History")
         self._firefox_db(roaming / "Mozilla/Firefox/Profiles/custom/places.sqlite")
-        with mock.patch.dict("os.environ", {"APPDATA": str(roaming), "LOCALAPPDATA": str(local)}):
-            sources = discover_history_sources(home=self.root, platform_name="windows")
+        with mock.patch.dict("os.environ", {"APPDATA": str(roaming), "LOCALAPPDATA": str(local)}), \
+                mock.patch("pathlib.Path.home", return_value=self.root):
+            sources = discover_history_sources(platform_name="windows")
         self.assertEqual([source.browser for source in sources], ["chrome", "firefox"])
 
     def test_linux_uses_native_and_sandboxed_browser_profiles(self):
@@ -238,8 +262,9 @@ class TasteHistoryTests(unittest.TestCase):
                  self.root / "snap/firefox/common/.mozilla/firefox/snap/places.sqlite"]
         for path in paths:
             (self._firefox_db if path.name == "places.sqlite" else self._chrome_db)(path)
-        with mock.patch.dict("os.environ", {"XDG_CONFIG_HOME": str(config)}):
-            sources = discover_history_sources(home=self.root, platform_name="linux")
+        with mock.patch.dict("os.environ", {"XDG_CONFIG_HOME": str(config)}), \
+                mock.patch("pathlib.Path.home", return_value=self.root):
+            sources = discover_history_sources(platform_name="linux")
         self.assertEqual({source.path for source in sources}, set(paths))
 
     def test_the_history_store_has_one_entry_point(self):
