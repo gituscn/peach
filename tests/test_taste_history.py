@@ -11,7 +11,7 @@ import pathlib
 from urllib.parse import quote
 from unittest import mock
 
-from peach import taste_history
+from peach import taste_browsers, taste_history
 from peach.taste_history import (
     HistorySource,
     analyze_history,
@@ -123,6 +123,45 @@ class TasteHistoryTests(unittest.TestCase):
             path.touch()
         sources = discover_history_sources(home=self.root, platform_name="macos")
         self.assertEqual([source.browser for source in sources], ["chrome", "firefox", "safari", "zen"])
+
+    def test_discovers_windows_115_historyex_profiles(self):
+        home = self.root.resolve()
+        user_data = home / "AppData" / "Local" / "115Chrome" / "User Data"
+        for profile in ("Default", "Profile 1"):
+            self._chrome_db(user_data / profile / "HistoryEx")
+        sources = discover_history_sources(home=home, platform_name="windows")
+        self.assertEqual(
+            sources,
+            [HistorySource("115", profile, user_data / profile / "HistoryEx", user_data, "chrome")
+             for profile in ("Default", "Profile 1")],
+        )
+        store = home / "115-history.sqlite"
+        with mock.patch.object(taste_history, "discover_history_sources", return_value=sources):
+            browsers = taste_browsers.browser_sources(store)
+            self.assertEqual(len(browsers), 1)
+            self.assertTrue(browsers[0]["automatic"])
+            self.assertTrue(browsers[0]["available"])
+            self.assertEqual(browsers[0]["path"], str(user_data))
+            self.assertEqual(browsers[0]["profiles"], 2)
+            enabled = taste_browsers.enabled_history_sources(store)
+            self.assertTrue(all(source.engine == "chrome" for source in enabled))
+            self.assertIn(user_data / "Default" / "HistoryEx", [source.path for source in enabled])
+
+    def test_registers_115_historyex_from_user_data_profile_or_file(self):
+        user_data = self.root.resolve() / "115Chrome" / "User Data"
+        history = user_data / "Default" / "HistoryEx"
+        self._chrome_db(history)
+        for index, path in enumerate((user_data, history.parent, history)):
+            with self.subTest(path=path), mock.patch.object(taste_history, "discover_history_sources", return_value=[]):
+                store = self.root.resolve() / f"115-history-{index}.sqlite"
+                taste_browsers.configure_browser(store, "add", {"name": "115", "path": str(path)})
+                browser = taste_browsers.browser_sources(store)[0]
+                self.assertTrue(browser["available"])
+                self.assertEqual(browser["profiles"], 1)
+                sources = taste_browsers.enabled_history_sources(store)
+                self.assertEqual(sources, [HistorySource("115", "Default", history, engine="chrome")])
+                self.assertEqual(refresh_history(sources, store, host="test")[0]["added"], 1)
+                self.assertEqual(refresh_history(sources, store, host="test")[0]["added"], 0)
 
     def test_the_history_store_has_one_entry_point(self):
         """打开私有历史库的前导只许有一份。

@@ -17,7 +17,7 @@ def _paths(path: Path) -> list[Path]:
         return [path]
     if not path.is_dir():
         return []
-    return sorted({item for name in ("History", "places.sqlite", "History.db")
+    return sorted({item for name in ("History", "HistoryEx", "places.sqlite", "History.db")
                    for pattern in (name, f"*/{name}") for item in path.glob(pattern)
                    if item.is_file()})[:200]
 
@@ -107,7 +107,8 @@ def enabled_history_sources(store_path: Path):
     for browser in browser_sources(store_path):
         if browser["enabled"]:
             for path in _paths(Path(browser["path"])):
-                engine = {"History": "chrome", "places.sqlite": "firefox", "History.db": "safari"}.get(path.name, browser["engine"])
+                engine = {"History": "chrome", "HistoryEx": "chrome", "places.sqlite": "firefox",
+                          "History.db": "safari"}.get(path.name, browser["engine"])
                 unique.setdefault(str(path.resolve()).casefold(), HistorySource(
                     browser["name"].casefold(), path.parent.name, path, engine=engine))
     return list(unique.values())
