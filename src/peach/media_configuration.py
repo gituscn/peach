@@ -64,6 +64,22 @@ def rows(config, *, windows: bool, probe: bool = False) -> list[dict[str, Any]]:
     return result
 
 
+def _validated_paths(row: dict, *, windows: bool) -> tuple[PureWindowsPath, PurePath]:
+    """将表单路径转换为可比较的声明根与本机绝对路径。"""
+    text = str(row.get("path", "")).strip()
+    root = text if windows else str(row.get("root", "")).strip()
+    if any(ord(char) < 32 for char in text + root):
+        raise ValueError("路径不能包含控制字符")
+    if not platform.is_windows_path(root) or ".." in PureWindowsPath(root).parts:
+        raise ValueError("Windows 中的对应路径必须包含盘符，例如 B:\\；网络共享请先映射为 Windows 盘符")
+    path = PureWindowsPath(text) if windows else PurePosixPath(text)
+    if not text or not (platform.is_windows_path(text) if windows else text.startswith("/")):
+        raise ValueError("请填写本机挂载点的绝对路径")
+    if ".." in path.parts:
+        raise ValueError("挂载点不能包含上级目录 ..")
+    return PureWindowsPath(root), path
+
+
 def validate(raws: object, *, windows: bool) -> tuple[dict, dict, list[str]]:
     """离线来源允许保存；绝对路径、盘符根与来源间重叠在保存前校验。"""
     if not isinstance(raws, list) or not raws or len(raws) > 100:
@@ -81,18 +97,7 @@ def validate(raws: object, *, windows: bool) -> tuple[dict, dict, list[str]]:
                 raise ValueError("请选择列表中的媒体来源")
             if "cost" in row and row["cost"] not in ("free", "metered"):
                 raise ValueError("请选择代理流量保护设置")
-            text = str(row.get("path", "")).strip()
-            root = text if windows else str(row.get("root", "")).strip()
-            if any(ord(char) < 32 for char in text + root):
-                raise ValueError("路径不能包含控制字符")
-            if not platform.is_windows_path(root) or ".." in PureWindowsPath(root).parts:
-                raise ValueError("Windows 中的对应路径必须包含盘符，例如 B:\\；网络共享请先映射为 Windows 盘符")
-            path = PureWindowsPath(text) if windows else PurePosixPath(text)
-            if not text or not (platform.is_windows_path(text) if windows else text.startswith("/")):
-                raise ValueError("请填写本机挂载点的绝对路径")
-            if ".." in path.parts:
-                raise ValueError("挂载点不能包含上级目录 ..")
-            declared = PureWindowsPath(root)
+            declared, path = _validated_paths(row, windows=windows)
             for other_root, other_path in seen:
                 if (declared == other_root or declared.is_relative_to(other_root)
                         or other_root.is_relative_to(declared)):

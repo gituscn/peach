@@ -50,7 +50,7 @@ def _root_costs(config):
                   key=lambda row: len(_root_key(row[1])), reverse=True)
 
 
-def cost_for(location: str, path: str = "", config=None) -> str:
+def cost_for(location: str, path: str | None = "", config=None) -> str:
     """实际路径按最长声明根取保护设置；空路径聚合同来源的已配置根。"""
     roots = [row for row in _root_costs(_config(config)) if row[0] == location]
     if not path and roots:

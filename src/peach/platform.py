@@ -4,7 +4,7 @@
 `A:\\...`（PikPak）、`B:\\...`（115）。这是不变量，不随平台改写。
 
 真正会变的是「同一个来源在这台机器上落在哪」。`asset.location` 本来就是挂载点 ID
-（`local` / `115` / `pikpak`），设置文件用 `[media.locations]` 声明每个 ID 的账本口径根
+（来源 ID 见 `media_sources.SOURCE_REGISTRY`），设置文件用 `[media.locations]` 声明每个 ID 的账本口径根
 （一个来源可以有几个根：两块硬盘都算 `local`），用 `[media.mounts]` 按同样的顺序声明每个
 根在本机的落点，翻译按「声明根前缀 → 本机挂载点」进行（ADR-0023 第 2 阶段勘误）。
 Windows 上盘符本身就是挂载点，路径原样返回。

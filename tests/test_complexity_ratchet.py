@@ -62,7 +62,6 @@ BASELINE: dict[str, int] = {
     "src/peach/studio_icons.py:icon_row": 32,
     "scripts/find_ads.py:find_candidates": 31,
     "scripts/rehome_unknown_jav.py:build_plan": 31,
-    "src/peach/media_configuration.py:validate": 30,
     "src/peach/resource_identification.py:ingest_results": 30,
 }
 

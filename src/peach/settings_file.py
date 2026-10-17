@@ -53,7 +53,7 @@ DEFAULT_LOCATION_ROOTS: dict[str, tuple[str, ...]] = {
     "pikpak": ("A:/",),
 }
 
-#: `[media]` 下只有这两个子表，没有任何标量键。第一阶段的 `[media] R = '...'` 是盘符键，
+#: `[media]` 下按子表保存路径、媒体库与读取策略，没有标量键。第一阶段的 `[media] R = '...'` 是盘符键，
 #: 键空间和 location ID 不同，静默接受只会让整台机器脱盘，所以要显式报升级提示。
 _LOCATIONS_KEY = "locations"
 _MOUNTS_KEY = "mounts"

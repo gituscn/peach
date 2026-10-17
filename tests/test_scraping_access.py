@@ -74,6 +74,19 @@ class ScrapingAccessTests(unittest.TestCase):
             self.assertEqual(factory.call_count, 2)
             self.assertEqual(fake.close.call_count, 2)
 
+    def test_browser_obeys_global_direct_proxy_and_environment_modes(self):
+        transport = SourceTransport(self.root)
+        self.addCleanup(transport.close)
+        for mode, direct, proxy in (("direct", True, ""),
+                                    ("proxy", False, "http://127.0.0.1:7890"),
+                                    ("environment", False, "")):
+            with self.subTest(mode=mode):
+                peach_proxy.save(self.root, {"mode": mode, "proxy": "http://127.0.0.1:7890"})
+                with patch("peach.browser_transport.shared") as shared:
+                    transport._browser_for("javten")
+                self.assertEqual(shared.call_args.kwargs["direct"], direct)
+                self.assertEqual(shared.call_args.kwargs["proxy"], proxy)
+
     def test_switching_networks_releases_the_previous_exit_cooldown(self):
         from peach.scraping_access import pause_source, paused_until
         pause_source(self.root, 'airav', refused=True)
