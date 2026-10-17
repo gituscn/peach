@@ -49,6 +49,10 @@ CARD_PERFORMERS = 6
 
 def attach_artwork_fields(contract: WebContract, item: dict) -> None:
     """列表、详情与推荐共用本地官方封面和版本投影。"""
+    from .strm import is_pointer
+    if is_pointer(item.get('path') or item.get('name') or ''):
+        item['size'] = None
+        item['is_strm'] = True
     key = artwork_key(item['id'], item.get('code'))
     item['has_cover'] = contract.has_cover(key)
     item['cover_key'] = key if item['has_cover'] else ''

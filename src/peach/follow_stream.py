@@ -406,7 +406,8 @@ def proxy_request_headers(target: ResolvedFollowMedia,
 
 
 def open_upstream(client: httpx.Client, method: str, target: ResolvedFollowMedia, *,
-                  incoming: Mapping[str, str]) -> httpx.Response:
+                  incoming: Mapping[str, str], allowed=None, accepted_statuses=(),
+                  strip_credentials=False) -> httpx.Response:
     """打开上游媒体流；只在拿到可转发的 2xx 时返回。
 
     这里自己跟重定向而不是交给 client 的 `follow_redirects`：`target.headers` 可能
@@ -417,16 +418,19 @@ def open_upstream(client: httpx.Client, method: str, target: ResolvedFollowMedia
     非 2xx 同样在这里终止：上游的 403 页面、限流提示或错误 JSON 转发给播放器毫无
     用处，只会把上游的状态与正文（可能含主机名、提示语）原样交给浏览器。
     """
-    if not target.allowed_hosts and not target.public_hosts:
+    if allowed is None and not target.allowed_hosts and not target.public_hosts:
         raise FollowProxyError("这条媒体没有可代理的主机白名单")
     url = target.url
     headers = proxy_request_headers(target, incoming)
     response: httpx.Response | None = None
     for _ in range(MAX_PROXY_REDIRECTS + 1):
-        if not _hop_allowed(target, url):
+        if not (allowed(url) if allowed is not None else _hop_allowed(target, url)):
             raise FollowProxyError("媒体地址不在可代理的主机范围内" if url == target.url
                                    else "上游把媒体重定向到了不受信任的地址")
         request = client.build_request(method, url, headers=headers)
+        if strip_credentials:
+            for name in ('cookie', 'authorization', 'proxy-authorization'):
+                request.headers.pop(name, None)
         response = client.send(request, stream=True, follow_redirects=False)
         if response.status_code not in _REDIRECT_STATUSES:
             break
@@ -436,7 +440,7 @@ def open_upstream(client: httpx.Client, method: str, target: ResolvedFollowMedia
         url = urllib.parse.urljoin(url, location)
     if response is None:
         raise FollowProxyError("上游重定向次数过多")
-    if not 200 <= response.status_code < 300:
+    if not 200 <= response.status_code < 300 and response.status_code not in accepted_statuses:
         status = response.status_code
         response.close()
         raise FollowProxyError(f"上游返回 HTTP {status}")

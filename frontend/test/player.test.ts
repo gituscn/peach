@@ -68,6 +68,12 @@ describe('片源判据', () => {
     await flush(); await flush();
     expect(JSON.parse(document.documentElement.dataset.peachStreamCancel || 'null')).toEqual({ cancelled: 1 });
   });
+
+  it('STRM 的文件类型使用服务端播放计划', async () => {
+    stubFetch(() => ({ protocol: 'range', src: '/stream?id=6', mime_type: 'video/webm' }));
+    expect(await playableStreamSource({ id: 6, name: 'ABC-123.strm' }, 'strm'))
+      .toEqual({ src: '/stream?id=6', type: 'video/webm' });
+  });
 });
 
 describe('观看上报', () => {

@@ -12,6 +12,7 @@ from .config import FFMPEG_DIR, STATE_DIR
 from .ffmpeg import FFmpegResolver
 from .fsutil import atomic_path
 from .jobs import DiskGuard
+from .media_processing_policy import metadata_only
 from .platform import system_volume
 
 #: 采集期间系统盘至少留这么多 GiB。数字和抽帧脚本的默认值同一个：真正会把系统盘写满的
@@ -78,6 +79,8 @@ def w_thumbnail_jobs(contract, body):
     mode = str((body or {}).get('mode') or timeline_sheets.OFF)
     if mode not in timeline_sheets.MODES:
         raise ValueError('采集密度无效')
+    if mode != timeline_sheets.OFF and metadata_only(contract.follow_state_root):
+        raise ValueError('视频预览生成已关闭，请先在媒体库设置中开启')
     write_mode(mode)
     if mode == timeline_sheets.OFF:
         contract.thumbnail_job.stop(resume=False)
@@ -92,7 +95,8 @@ def w_thumbnail_jobs(contract, body):
         guard = DiskGuard(system_volume(), MIN_FREE_GB)
         result = timeline_sheets.generate_library(
             contract.db_path, root, interval, ffmpeg=str(choice.path),
-            active=lambda: (contract.thumbnail_job.snapshot() or {}).get('job_id') == job_id,
+            active=lambda: ((contract.thumbnail_job.snapshot() or {}).get('job_id') == job_id
+                            and not metadata_only(contract.follow_state_root)),
             report=lambda **fields: contract.thumbnail_job.update(job_id, **_with_progress(fields)),
             guard=guard)
         # 磁盘触线停下来的那一轮不能记成完成：队列后面还剩几千部，而页面上「完成」

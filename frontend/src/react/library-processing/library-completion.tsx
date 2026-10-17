@@ -16,11 +16,12 @@ import {
 import { ProcessingActions } from './processing-actions';
 
 /** 缺图判据与卡面一致；本机影片可抽帧，有番号的挂载影片可补发行封面。 */
-type PreviewItem = Pick<MediaItem, 'id' | 'medium' | 'disposal' | 'location' | 'code' | 'is_jav'
+type PreviewItem = Pick<MediaItem, 'id' | 'name' | 'medium' | 'disposal' | 'location' | 'code' | 'is_jav'
   | 'has_cover' | 'cover_key' | 'has_thumb' | 'has_local_poster' | 'follow_thumb_url'>;
 
 export function missingPreviewIds(items: PreviewItem[], javImage: string): number[] {
   return [...new Set(items.filter(item => (!item.medium || item.medium === 'video')
+    && (!/\.(strm|iso)$/i.test(item.name || '') || !!item.code)
     && !item.disposal && item.location !== 'online' && (item.location === 'local' || !!item.code)
     && !cardArtwork(item, 'small', false, javImage).html).map(item => item.id))];
 }
@@ -60,9 +61,9 @@ function Completion({ assetIds, onComplete }: { assetIds: number[]; onComplete?(
   const problem = start.error ? errorMessage(start.error) : job.error ? DISCONNECTED_TEXT
     : started && state?.job_id === started && state.status === 'failed' ? state.error || '补全未完成' : '';
   const message = problem || (busy ? start.isPending ? '正在启动补全…' : currentLine(state!)
-    : outcome || `这批影片中有 ${assetIds.length.toLocaleString()} 部暂无预览，可补全封面与视频画面。`);
+    : outcome || `这批影片中有 ${assetIds.length.toLocaleString()} 部暂无预览，可补全资料与图片。`);
   return <section aria-label="补全预览" aria-live="polite" data-library-completion="" className="@container mb-4">
-    <Note tone={problem ? 'warning' : 'neutral'} actionLayout="below" action={<ProcessingActions busy={busy} onRun={command => {
+    <Note tone={problem ? 'warning' : 'neutral'} actionLayout="below" action={<ProcessingActions busy={busy} metadataOnly={state?.metadata_only} onRun={command => {
       if (busy) return;
       setOutcome('');
       start.mutate(command);

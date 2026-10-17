@@ -424,6 +424,8 @@ def create_app(
     app.state.downloads = downloads
     app.state.mount_reachability = mount_reachability
     app.state.stream_sessions = StreamSessionRegistry()
+    from .strm_stream import StrmResources
+    app.state.strm_resources = StrmResources()
     import secrets
     app.state.external_playback_key = secrets.token_bytes(32)
     app.state.sync = sync

@@ -362,7 +362,7 @@ def _merge(
         raise _fail(path, (
             "`[media]` 下不再接受盘符键：" + "、".join(stray)
             + "。改写成 `[media.mounts] <location-id> = <本机路径>`，"
-            "ID 取 `[media.locations]` 里的键（local / 115 / pikpak），"
+            "ID 取 `[media.locations]` 中已配置的来源键，"
             "路径填该来源的声明根在本机的落点，例如 "
             "`local = '/mnt/media'`"
         ))

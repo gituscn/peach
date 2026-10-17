@@ -61,18 +61,18 @@ describe('缺预览时的统一补全入口', () => {
           const text = await prompt.locator('p').boundingBox();
           assert.ok(text && text.width >= viewport.width - 80, '手机提示正文应独占一行宽度');
         }
-        const more = prompt.getByRole('button', { name: '更多资料与预览补全方式' });
+        const more = prompt.getByRole('button', { name: '更多同步方式' });
         await more.focus();
         await page.keyboard.press('Enter');
-        const menu = page.getByRole('dialog', { name: '资料与预览补全方式' });
+        const menu = page.getByRole('dialog', { name: '同步方式' });
         await menu.waitFor();
-        assert.deepEqual(await menu.getByRole('button').allTextContents(), ['补全资料与预览', '只生成本地预览', '只采集在线资料']);
+        assert.deepEqual(await menu.getByRole('button').allTextContents(), ['同步这些影片', '仅生成视频预览', '仅补全资料']);
         const box = await menu.boundingBox();
         assert.ok(box && box.x >= 0 && box.x + box.width <= viewport.width);
         await page.keyboard.press('Escape');
         await menu.waitFor({ state: 'hidden' });
         await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label')
-          === '更多资料与预览补全方式', null, { timeout: 5_000 });
+          === '更多同步方式', null, { timeout: 5_000 });
         for (const dark of [false, true]) {
           await page.evaluate(value => {
             document.documentElement.dataset.theme = value ? 'dark' : 'light';
@@ -90,7 +90,7 @@ describe('缺预览时的统一补全入口', () => {
           await menu.waitFor({ state: 'hidden' });
         }
         await more.click();
-        await menu.getByRole('button', { name: '只生成本地预览' }).click();
+        await menu.getByRole('button', { name: '仅生成视频预览' }).click();
         await prompt.waitFor({ state: 'hidden' });
         await page.locator('[data-media-card] img.poster').waitFor();
         assert.deepEqual(posts, [{ stage: 'previews', asset_ids: [11] }]);

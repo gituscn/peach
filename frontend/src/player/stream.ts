@@ -32,7 +32,7 @@ export async function playableStreamSource(item: PlayerItem, session: string): P
   try {
     const plan = await api(`/api/stream-plan?id=${item.id}&session=${encodeURIComponent(session)}`) as
       { protocol?: string; src?: string; mime_type?: string } | null;
-    if (plan?.protocol === 'hls' && plan.src) return { src: plan.src, type: plan.mime_type || 'application/vnd.apple.mpegurl' };
+    if (plan?.src) return { src: plan.src, type: plan.mime_type || (plan.protocol === 'hls' ? 'application/vnd.apple.mpegurl' : 'video/mp4') };
   } catch { /* 取不到计划就直读 */ }
   return directStreamSource(item, session);
 }

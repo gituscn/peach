@@ -42,7 +42,7 @@ from . import folder_rules, record_rehome, subtitles, wants
 from .platform import is_windows_path, resolve_location, resolve_root
 
 VIDEO = {".mp4", ".m4v", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".rmvb", ".mpg",
-         ".m2ts"}
+         ".m2ts", ".strm", ".iso"}
 IMAGE = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
 AUDIO = {".mp3", ".flac", ".wav", ".m4a", ".ogg", ".opus"}
 ARCHIVE = {".zip", ".rar", ".7z", ".tar", ".gz"}
@@ -70,7 +70,7 @@ _DERIVED_THUMB = re.compile(
 _UPSERT = """INSERT INTO asset(location,path,name,medium,size,mtime,first_seen,last_seen)
              VALUES(?,?,?,?,?,?,?,?)
              ON CONFLICT(location,path) DO UPDATE SET
-               size=excluded.size, mtime=excluded.mtime, last_seen=excluded.last_seen,
+               medium=excluded.medium, size=excluded.size, mtime=excluded.mtime, last_seen=excluded.last_seen,
                disposal=CASE WHEN asset.disposal='vanished' THEN NULL ELSE asset.disposal END"""
 
 

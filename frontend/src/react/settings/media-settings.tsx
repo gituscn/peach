@@ -25,7 +25,6 @@ import { groupRoot } from './configuration-panel';
 import { FolderRow, isCloudSource, MEDIA_SOURCES, SourceSelect, sourceMark, useFolderRows, WindowsRootInput } from './folder-rows';
 import { LibraryIconPicker } from './library-icon-picker';
 import { PushDiscoveryForm } from './push-discovery-settings';
-import { VideoThumbnailRow } from './service-preferences';
 import {
   ErrorText, ExternalLink, Fact, FactList, FieldLabel, Footer, Help, Section, SourceMark, Stack,
 } from './section';
@@ -65,7 +64,6 @@ export function MediaSettings({ data, receipt, panel }: ConfigurationGroupProps)
       {data.push_discovery
         ? <PushDiscoveryForm initial={data.push_discovery} receipt={receipt} />
         : null}
-      <VideoThumbnailRow />
     </div>
   );
 }

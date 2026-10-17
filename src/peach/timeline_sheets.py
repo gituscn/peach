@@ -221,6 +221,12 @@ def generate_library(db_path: Path | str, root: Path, interval: int, *, ffmpeg: 
              "failed": 0, "stopped": ""}
     report(**state)
     for asset_id, path, duration in tasks:
+        from .strm import skip_background_read
+        if skip_background_read(path):
+            state['done'] += 1
+            state['skipped'] += 1
+            report(**state)
+            continue
         if not active():
             state["stopped"] = STOPPED_BY_USER
             break

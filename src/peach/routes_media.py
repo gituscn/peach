@@ -221,6 +221,9 @@ def _external_asset(request: Request, asset_id: int, ticket: str, origin: str):
 @router.api_route("/external-stream/{id}", methods=["GET", "HEAD"])
 def external_stream(request: Request, id: int, ticket: str, origin: str = ''):
     path = _external_asset(request, id, ticket, origin)
+    from . import strm, strm_stream
+    if strm.is_pointer(path):
+        return strm_stream.proxy(request, id, path)
     return BufferedFileResponse(path, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
@@ -238,6 +241,11 @@ def stream(request: Request, id: int, session: str = "", args: dict[str, str] = 
     state = request.app.state
     asset = state.media_engine.asset(id)
     path = state.media_engine.filesystem.file_for(asset, thumbnail=False)
+    from . import strm, strm_stream
+    if strm.is_pointer(path):
+        return strm_stream.proxy(request, id, path, session)
+    if path.suffix.lower() in strm.DISC_SUFFIXES:
+        return JSONResponse({'error': 'ISO 原盘请使用作品详情中的外部播放器打开'}, status_code=415)
     header = _repaired_header(state, id, path)
     if header is not None:
         return SplicedMp4Response(
@@ -276,6 +284,18 @@ def stream_plan(request: Request, id: int, session: str = "", mode: str = "", ar
     plan = state.media_engine.stream_plan(id, mode=mode or "auto")
     # 只有真的能读出关键帧才宣告 HLS，否则客户端会拿到一个必然 404 的播放列表。
     source_path = state.media_engine.filesystem.file_for(asset, thumbnail=False)
+    from . import strm, strm_stream
+    if strm.is_pointer(source_path):
+        try:
+            target = strm.read_target(source_path)
+        except ValueError as error:
+            return JSONResponse({'error': str(error)}, status_code=400)
+        mime = strm_stream.mime_type(target)
+        return {'id': id, 'protocol': 'hls' if mime in strm_stream.PLAYLIST_TYPES else 'range',
+                'mime_type': mime, 'duration': asset.duration,
+                'src': f'/stream?id={id}&session={quote(session, safe="")}', 'reason': 'strm-pointer'}
+    if source_path.suffix.lower() in strm.DISC_SUFFIXES:
+        return JSONResponse({'error': 'ISO 原盘请使用作品详情中的外部播放器打开'}, status_code=415)
     conversion = _needs_conversion(state, id, source_path, session)
     resolved = (_hls_plan(state, id, session, conversion)
                 if conversion or plan.protocol == "hls" else None)
@@ -301,6 +321,20 @@ def stream_plan(request: Request, id: int, session: str = "", mode: str = "", ar
         "src": source,
         "reason": plan.reason,
     }
+
+
+@router.api_route('/strm-resource/{id}/{key}', methods=['GET', 'HEAD'])
+def strm_resource(request: Request, id: int, key: str, session: str = '',
+                  ticket: str = '', origin: str = ''):
+    from . import strm, strm_stream
+    if ticket:
+        path = _external_asset(request, id, ticket, origin)
+    else:
+        require_auth(request)
+        path = request.app.state.media_engine.file_for(id)
+    if not strm.is_pointer(path):
+        return Response(status_code=404)
+    return strm_stream.proxy(request, id, path, session, key)
 
 
 @router.get("/stream/hls/{id}/index.m3u8")

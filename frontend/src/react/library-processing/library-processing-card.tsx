@@ -180,7 +180,7 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
           {/* 两个入口并存，各自答的不是一个问题：这里是「重新跑一整批」，下面那条错误提示里
               的「重试未完成项」只补上一趟没做完的那些。采集里网络超时几乎每趟都留下几项可
               重试的，页脚要是让位给重试键，新入库的片子就再也没有入口被扫到。 */}
-          <ProcessingActions scan busy={busy} onRun={run} />
+          <ProcessingActions scan busy={busy} metadataOnly={state?.metadata_only} onRun={run} />
         </>
       }>
         <div className="flex flex-col gap-2">
