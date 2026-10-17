@@ -127,6 +127,7 @@ def discover_history_sources(
                 ("firefox", appdata / "Mozilla" / "Firefox" / "Profiles"),
                 ("zen", appdata / "zen" / "Profiles"),
                 ("chrome", localappdata / "Google" / "Chrome" / "User Data"),
+                ("115", localappdata / "115Chrome" / "User Data"),
                 ("aside", localappdata / "Aside" / "User Data"),
                 ("edge", localappdata / "Microsoft" / "Edge" / "User Data"),
                 ("brave", localappdata / "BraveSoftware" / "Brave-Browser" / "User Data"),
@@ -151,7 +152,8 @@ def discover_history_sources(
     for browser, root in candidates:
         if not root.is_dir():
             continue
-        filename = "places.sqlite" if browser in {"firefox", "zen"} else "History"
+        filename = ("places.sqlite" if browser in {"firefox", "zen"}
+                    else "HistoryEx" if browser == "115" else "History")
         for path in [root / filename, *root.glob(f"*/{filename}")]:
             if path.is_file():
                 found.append(HistorySource(browser, path.parent.name, path, root,
