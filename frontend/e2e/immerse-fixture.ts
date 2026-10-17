@@ -42,4 +42,4 @@ export async function openImmerse(page: Page, id: number): Promise<void> {
 }
 
 /** 当前出画那一格的 video。 */
-export const currentVideo = '[data-immerse-track] [data-immerse-slide] video';
+export const currentVideo = '[data-immerse-track] [data-immerse-slide] video.vjs-tech';

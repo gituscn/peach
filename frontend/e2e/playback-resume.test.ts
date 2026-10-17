@@ -8,7 +8,7 @@ import { DETAIL, openFollowFeed } from './follow-fixture.ts';
 import { launch, VIEWPORTS } from './harness.ts';
 import { ITEM, openItemPage } from './item-fixture.ts';
 
-const VIDEO = '#stage video';
+const VIDEO = '#stage video.vjs-tech';
 
 async function metadata(page: Page): Promise<void> {
   await page.waitForFunction(() => {

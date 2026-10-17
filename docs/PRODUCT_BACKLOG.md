@@ -4,10 +4,12 @@
 
 当前开发与版本范围见 [Peach 开发进度](https://github.com/orgs/peach-mitao/projects/6)；本文件保留资料复核、运维等待条件与长期待办。
 
-## 待复核的元数据
+## 功能验收与范围
 
 - #61 的 OneDrive、光鸭与通用挂载来源待真实账号验收；#62 的真实 STRM 上游兼容性待补，合成 HTTP Range 与 HLS 回归在隔离环境验证。
 - [#63 Emby／Jellyfin 兼容](https://github.com/peach-mitao/peach/issues/63)待明确目标客户端、认证、媒体库查询、播放与进度接口范围。
+
+## 待复核的元数据
 
 - amane 0.21.0 桥升级待在独立工作树验证 MGStage 数字前缀搜索、站点字段与失败契约；Peach 独立 DMM 链路的目录与 CID 规则另测，采用范围见 [上游复核](reference-snapshots/upstream-review.md)。
 
