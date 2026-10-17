@@ -46,6 +46,22 @@ it('不能编辑时只说原因，不画表单', async () => {
 });
 
 describe('媒体文件夹', () => {
+  it('光鸭来源回填只读名称、挂载帮助和现有图标，保存带上来源', async () => {
+    const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
+    vi.stubGlobal('fetch', fetcher);
+    const host = await open({ windows: true, media_sources: [
+      { location: 'guangya', root: 'G:\\Movies', path: 'G:\\Movies', online: true },
+    ] });
+    expect(paths(host)[0]?.value).toBe('G:\\Movies');
+    expect(host.textContent).toContain('CloudDrive · 光鸭云盘（只读）');
+    expect(host.querySelector('use[href="#i-database"]')).not.toBeNull();
+    expect(host.textContent).toContain('光鸭云盘需要 CloudDrive2 v1.0.11');
+    await submit(host.querySelector('form'));
+    expect(sentBody(fetcher).media_sources).toEqual([
+      { location: 'guangya', root: 'G:\\Movies', path: 'G:\\Movies', library: '', library_icon: '' },
+    ]);
+  });
+
   it('Windows 只填本机路径，选了网盘才出 CloudDrive 帮助', async () => {
     const host = await open({ windows: true, media_sources: [{ location: 'local', root: 'D:/', path: 'D:/' }] });
     expect(host.textContent).not.toContain('Windows 中的对应路径');

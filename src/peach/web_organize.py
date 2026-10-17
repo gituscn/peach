@@ -14,6 +14,7 @@ from pathlib import Path
 
 from . import organize
 from .migrations import sqlite_backup
+from .media_sources import require_writable_location
 from .organize_templates import PLACEHOLDERS, TemplateError, validate_template
 from .platform import location_roots
 from .scripting import verify_after_write
@@ -26,6 +27,7 @@ ORGANIZE_LOCATIONS = ("local", "115", "pikpak")
 def _templates(contract, body) -> tuple[str, str, str]:
     """取出这一次要用的来源与两份模板；模板缺省时用账本里存着的那一份。"""
     location = str(body.get("location") or "").strip()
+    require_writable_location(location)
     if location not in ORGANIZE_LOCATIONS:
         raise ValueError(f"不认识的来源：{location or '(空)'}")
     stored = organize_templates(contract).get(location, {})

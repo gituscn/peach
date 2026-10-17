@@ -38,7 +38,7 @@ from .web_state import WebContract
 from .western_artwork import artwork_key
 
 
-COST = {"local": "free", "115": "free", "pikpak": "metered", "online": "metered"}
+COST = {"local": "free", "115": "free", "pikpak": "metered", "guangya": "metered", "online": "metered"}
 GROUP_TABLES = ('asset', 'asset_entity', 'entity')
 
 #: 卡片随每条记录返回的女优上限。共演作品必须带上全部出镜者，而不是只留第一位；

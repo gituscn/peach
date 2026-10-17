@@ -9,7 +9,7 @@ from typing import Any
 from . import platform
 
 SOURCE_OPTIONS = (("local", "本地磁盘"), ("115", "CloudDrive · 115"),
-                  ("pikpak", "CloudDrive · PikPak"))
+                  ("pikpak", "CloudDrive · PikPak"), ("guangya", "CloudDrive · 光鸭云盘（只读）"))
 
 
 def _windows_installed_names() -> list[str]:
@@ -79,7 +79,7 @@ def validate(raws: object, *, windows: bool) -> tuple[dict, dict, list[str]]:
                 raise ValueError("媒体来源格式不正确")
             location = row.get("location")
             if not isinstance(location, str) or location not in dict(SOURCE_OPTIONS):
-                raise ValueError("请选择本地磁盘、115 或 PikPak")
+                raise ValueError("请选择本地磁盘、115、PikPak 或光鸭云盘")
             text = str(row.get("path", "")).strip()
             root = text if windows else str(row.get("root", "")).strip()
             if any(ord(char) < 32 for char in text + root):

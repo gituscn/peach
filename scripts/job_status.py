@@ -34,6 +34,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from peach.config import DATABASE_PATH, GENERATED_DIR, STATE_DIR
+from peach.media_sources import SCANNABLE_LOCATIONS
 from peach.review_csv import read_rows
 
 # 两个路径都从 peach.config 推出来：2026 年上半年数据根从 `R:\peach-data` 搬到内置盘，
@@ -100,7 +101,7 @@ def collect(db_path: Path, generated: Path, state_path: Path | None = None) -> l
     # 矛盾，其实一个是可执行量、一个是原始量，都对。
     # 没有时长就算不出 seek 点，抽帧脚本处理不了，那些要先补 probe。
     lines.append("- 待抽帧（可抽 / 缺时长待 probe / 合计）：")
-    for loc in ("local", "115", "pikpak"):
+    for loc in SCANNABLE_LOCATIONS:
         ready = one("SELECT count(*) FROM asset WHERE medium='video' AND location=? "
                     "AND (snapshot_path IS NULL OR snapshot_path='') AND duration>0", loc)
         blocked = one("SELECT count(*) FROM asset WHERE medium='video' AND location=? "

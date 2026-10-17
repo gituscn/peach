@@ -98,7 +98,7 @@ _POSIX_MEDIA_NOTE = "本机文件夹是这台电脑读取媒体的位置；Windo
 
 
 #: 有一行媒体来源选了云盘时，媒体库底下出现的那句提示和它的帮助链接。
-_CLOUD_HELP = "CloudDrive 可运行在本机或 NAS。请先挂载网盘；Windows 读取 NAS 共享时，请先映射为盘符，再选择对应文件夹。本机安装提示仅适用于在本机运行 CloudDrive。"
+_CLOUD_HELP = "CloudDrive 可运行在本机或 NAS。请先挂载网盘；Windows 读取 NAS 共享时，请先映射为盘符，再选择对应文件夹。本机安装提示仅适用于在本机运行 CloudDrive。光鸭云盘需要 CloudDrive2 v1.0.11 或更高版本，文件管理请使用光鸭云盘客户端。"
 _CLOUD_HELP_URL = "https://www.clouddrive2.com/help.html"
 _CLOUD_HELP_LABEL = "挂载帮助"
 

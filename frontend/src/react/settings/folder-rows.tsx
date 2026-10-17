@@ -31,10 +31,11 @@ export type SourceOption = readonly [kind: string, name: string];
 
 export const MEDIA_SOURCES: readonly SourceOption[] = [
   ['local', '本地磁盘'], ['115', 'CloudDrive · 115'], ['pikpak', 'CloudDrive · PikPak'],
+  ['guangya', 'CloudDrive · 光鸭云盘（只读）'],
 ];
 
 export const sourceMark = (location: string) => MEDIA_SOURCE_ICONS[location] || 'database';
-export const isCloudSource = (location: string) => location === '115' || location === 'pikpak';
+export const isCloudSource = (location: string) => ['115', 'pikpak', 'guangya'].includes(location);
 
 export interface FolderRowValue { path: string; location: string }
 

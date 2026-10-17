@@ -19,6 +19,7 @@ from .catalog_rules import is_jav_code, strip_promo_markers
 from .entities import canonicalize_entity_name, collapse_repeated_entity_name
 from .library_processing import FIELDS, LABELS
 from .review_csv import read_rows, write_rows
+from .media_sources import SCANNABLE_LOCATIONS
 
 SOURCE = "websearch"
 POLICY_VERSION = "websearch-v1"
@@ -104,7 +105,7 @@ def _sibling_images(connection) -> dict[str, dict[str, str]]:
 
 
 def build_worklist(
-    connection: sqlite3.Connection, *, locations: tuple[str, ...] = ("local", "115", "pikpak"),
+    connection: sqlite3.Connection, *, locations: tuple[str, ...] = SCANNABLE_LOCATIONS,
     prefix: str | None = None, ids: tuple[int, ...] | None = None,
     paired_only: bool = False, sparse_only: bool = False, limit: int = 0,
 ) -> list[dict[str, object]]:

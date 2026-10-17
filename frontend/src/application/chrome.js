@@ -73,7 +73,7 @@ api('/api/libraries',{signal:effects.signal}).then(data=>{
   if(!choices.some(row=>row[0]===selected)){sessionStorage.removeItem('peach.library');location.reload();return}
   const current=sessionStorage.getItem('peach.library')||'';
   boardBrand.querySelector('h1').textContent=current||'全部媒体库';
-  const libraryMark=glyph=>MEDIA_SOURCE_ICONS[glyph]?.startsWith('data:')?`<img src="${MEDIA_SOURCE_ICONS[glyph]}" alt="">`:icon(glyph==='local'?'hard-drive':glyph);
+  const libraryMark=glyph=>MEDIA_SOURCE_ICONS[glyph]?.startsWith('data:')?`<img src="${MEDIA_SOURCE_ICONS[glyph]}" alt="">`:icon(MEDIA_SOURCE_ICONS[glyph]||glyph);
   const mark=document.createElement('span');mark.className='mark';mark.setAttribute('aria-hidden','true');
   mark.innerHTML=libraryMark(choices.find(row=>row[0]===current)?.[2]||'database');boardBrand.querySelector('.mark').replaceWith(mark);
   libraryPicker.innerHTML=`<p>媒体库</p><div class="board-library-rows">${choices.map(([id,name,glyph])=>`<button type="button" data-library="${esc(id)}" aria-pressed="${id===current}"><span class="board-library-avatar">${libraryMark(glyph)}</span><span>${esc(name)}</span></button>`).join('')}</div><footer><button type="button" class="geist-button primary" data-library-manage>管理媒体库</button></footer>`;
