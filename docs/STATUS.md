@@ -17,7 +17,7 @@
 - 「整理」（ADR-0039）支持预览、执行、回滚；英文视频名分词 169 条。
 - 产地是独立维度、JAV 是其投影：`region` 空时按厂牌、创作者、番号逐层推断，不落库；韩国 MIB 不算 JAV。
 - Windows 托盘自动恢复；重启 `restart_windows_tray.py --source`；代码、数据在内置盘，媒体在外置盘。
-- 托盘用普通权限：提权看不到 CloudDrive 的 `A:`/`B:`，误报脱盘。
+- 托盘用普通权限，提权看不到 CloudDrive 挂载盘。
 - Windows：80→HTTPS、LAN:443；`peach-win`。重启、CA、桌面/手机通过。
 - 封面2144，v13、人脸v4；JavDB 0。
 - 收藏、续播、播放墙续页；[目录浏览](DIRECTORY_BROWSING.md)。
@@ -37,7 +37,7 @@
 - 下载后处理：16 条旧失败任务保留，部分资产已移动；`task_run` 外键异常 242 条未清理。
 - [标签归一](reference-snapshots/tag-vocabulary-audit.md)
 - 种子 `2026-10-17.1`：1,199 实体、13 撤销（ADR-0106）；`0047` 已应用。
-- 诊断报告操作、托盘重启与严格 CA HTTPS 通过。
+- STRM/ISO、目录读取策略、预览开关与 Video.js 10 已部署。
 - Windows 工具候选构建与 EXE 冒烟通过；未发布，安装/卸载未验证。
 - 推送发现开：本地 watch 加 CloudDrive 云端前缀 `/115open→B:`、`/Pikpak→A:`；关注每 60 分钟轮询；自动更新关闭。
 - Cloudflare 公网入口默认关，配置页启停前须设密码；临时链接写状态文件，命名隧道限源码部署、令牌存设置文件；整站 `noindex` 与 `/robots.txt`。
