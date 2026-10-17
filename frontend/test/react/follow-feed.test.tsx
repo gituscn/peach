@@ -447,6 +447,8 @@ describe('页面', () => {
     const given = props({ selectMode: true });
     const host = await open(given);
     const card = host.querySelector<HTMLElement>('[data-follow-item="2"]')!;
+    expect(card.querySelector('[data-follow-actions]')).toBeNull();
+    expect(card.querySelector('[data-media-check]')).not.toBeNull();
     await act(async () => { card.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true })) });
     expect(given.actions.toggleSelection).toHaveBeenCalledWith(2, true);
     expect(given.actions.openDetail).not.toHaveBeenCalled();
@@ -454,6 +456,7 @@ describe('页面', () => {
     expect(card.hasAttribute('data-selected')).toBe(true);
     expect(host.querySelector('[data-follow-feed]')?.hasAttribute('data-select-mode')).toBe(true);
     await act(async () => push({ selectMode: false }));
+    expect(card.querySelector('[data-follow-actions]')).not.toBeNull();
     await click(host.querySelector('[data-follow-item="1"]'));
     expect(given.actions.openDetail).toHaveBeenCalledWith(1);
   });

@@ -324,13 +324,11 @@ const replies = (...bodies: unknown[]) => {
 };
 const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) });
 
-it('有浏览器时账号密码登录收在折叠里，主路径是用浏览器登录', async () => {
+it('账号密码表单直接显示，两种登录方式共用底栏', async () => {
   const host = await mount(<DownloadSettings initial={state()} receipt={vi.fn()} />);
-  const folded = host.querySelector('details');
-  expect(folded?.querySelector('summary')?.textContent).toBe('用账号密码登录');
-  expect(folded?.open).toBe(false);
-  expect(folded?.contains(field(host, '账号'))).toBe(true);
-  expect(folded?.contains(buttonNamed('登录', host))).toBe(true);
+  expect(host.querySelector('details')).toBeNull();
+  expect(field(host, '账号')).not.toBeNull();
+  expect(buttonNamed('登录', host)?.parentElement).toBe(buttonNamed('用浏览器登录', host)?.parentElement);
   expect(buttonNamed('用浏览器登录', host)?.type).toBe('button');
 });
 

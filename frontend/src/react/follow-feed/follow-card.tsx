@@ -187,7 +187,7 @@ function FollowCardView(props: FollowCardProps) {
             actions.toggleSelection?.(item.id, event.shiftKey);
           }} dangerouslySetInnerHTML={{ __html: icon('check') }} /> : null}
           {realDuration(item.duration) ? <span data-media-duration="">{fmtDur(item.duration)}</span> : null}
-          <div data-follow-corner="">
+          {!selectMode ? <div data-follow-corner="">
             {stack.isMix ? (
               <button type="button" data-follow-collection={mixTarget}
                 onClick={(event) => act(event, () => actions.openDetail(mixTarget))}>
@@ -217,7 +217,7 @@ function FollowCardView(props: FollowCardProps) {
                   dangerouslySetInnerHTML={{ __html: icon('rotate-ccw') }} />
               ) : null}
             </div> : null}
-          </div>
+          </div> : null}
         </div>
       </div>
       <div data-media-meta="">

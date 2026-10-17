@@ -203,6 +203,9 @@ def host_key(url: str) -> str:
 #: 每加一行都要写清为什么发现流程不够，否则这张表会长成一份手工 favicon 清单，
 #: 而站点改版时没有人会来更新它。
 HOST_OVERRIDES: dict[str, tuple[str, ...]] = {
+    # 首页受验证页保护；用户确认的 180×180 成品图标位于 /img/，根路径约定无法发现。
+    "missav.com": ("https://missav.ws/img/favicon.png",),
+    "missav.ws": ("https://missav.ws/img/favicon.png",),
     # 首页只声明了 favicon.ico（16×16 的相机图标，缩到 32 px 认不出）。这张吉祥物图
     # 只出现在年龄确认页的正文里，`<link>` 里没有，发现流程按设计不会去正文里翻图。
     "av-event.jp": (

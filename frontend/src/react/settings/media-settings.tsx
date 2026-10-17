@@ -11,6 +11,7 @@ import { Button } from '@/components/base/buttons/button';
 import { LinkButton } from '@/components/base/buttons/link-button';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
+import { ConnectionStatus } from '../components/connection-status';
 
 import { ApiError, apiSend, errorMessage } from '../../api';
 import { CONFIGURATION_URL, PICK_FOLDER_URL } from '../../configuration-endpoints';
@@ -168,13 +169,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
 }
 
 function MountBadge({ online }: { online: boolean | undefined }) {
-  if (online === true) {
-    return <span data-mount="online" className="inline-flex items-center gap-1.5 text-body-2-medium text-notification-success-foreground"><span aria-hidden className="size-1.5 rounded-full bg-current" />在线</span>;
-  }
-  if (online === false) {
-    return <span data-mount="offline" className="inline-flex items-center gap-1.5 text-body-2-medium text-text-error-primary"><span aria-hidden className="size-1.5 rounded-full bg-current" />离线</span>;
-  }
-  return <span data-mount="unknown" className="inline-flex items-center gap-1.5 text-body-2-medium text-text-secondary"><span aria-hidden className="size-1.5 rounded-full bg-current" />未检测</span>;
+  return <ConnectionStatus online={online} />;
 }
 
 /* 重取回来的是整份配置，换进整页那一个键：屏幕上只有一份真相，页面上别处读到的

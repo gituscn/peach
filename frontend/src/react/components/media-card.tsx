@@ -242,7 +242,7 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
         ? <span data-media-group="" title={editions.editions.join(' · ')}>{`${Number(editions.count).toLocaleString()} 个版本`}</span>
         : null}
       <span data-media-duration="">{fmtDur(shownDuration)}</span>
-      {item.disposal === 'trash' ? <ResourceAction item={item} actions={actions} /> : null}
+      {!selectMode && item.disposal === 'trash' ? <ResourceAction item={item} actions={actions} /> : null}
       {watched > 0
         ? (
           <div data-media-progress="" role="progressbar" aria-label="观看进度" aria-valuemin={0} aria-valuemax={100}
@@ -258,14 +258,14 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
           )
           : null}
       <PreviewCounter />
-      <LaterButton item={item} actions={actions} />
-      <div data-media-seek="">
+      {!selectMode ? <LaterButton item={item} actions={actions} /> : null}
+      {!selectMode ? <div data-media-seek="">
         <button type="button" onClick={(event) => { event.stopPropagation(); seekPreview(card.current, -seekSeconds) }}
           title={`后退 ${seekSeconds} 秒`} aria-label={`后退 ${seekSeconds} 秒`}><Icon name="rotate-ccw" /></button>
         <button type="button" onClick={(event) => { event.stopPropagation(); seekPreview(card.current, seekSeconds) }}
           title={`前进 ${seekSeconds} 秒`} aria-label={`前进 ${seekSeconds} 秒`}><Icon name="rotate-cw" /></button>
         <button type="button" data-open="" title="打开详情" aria-label="打开详情"><Icon name="expand" /></button>
-      </div>
+      </div> : null}
     </div>
   );
 
@@ -341,7 +341,7 @@ function ResourceCard({ item, selected, selectMode, helpers, actions, onOpen }: 
         <div data-media-badge="" dangerouslySetInnerHTML={{ __html: helpers.badgeHtml(item.location || '', item.cost || '') }} />
         <span data-media-check=""><Icon name="check" /></span>
         <span data-media-trash-mark=""><Icon name="trash" /><b>回收站</b></span>
-        <ResourceAction item={item} actions={actions} />
+        {!selectMode ? <ResourceAction item={item} actions={actions} /> : null}
       </div>
       <div data-media-meta="">
         <span data-media-avatar="" data-media-kind-glyph="" aria-hidden="true"><Icon name={glyph} /></span>

@@ -32,6 +32,7 @@
 | `link-button` | `05eb37b3cf1334c153e0702de05fe4989e4359c9c74d5ba55cc552a58e4629bd` | `components/base/buttons/link-button.tsx` |
 | `icon-button` | `1441e8301efc6e16e0693194f876ce285ca5fe8d440156a060a9266e012d2c90` | `components/base/buttons/icon-button.tsx` |
 | `chip` | `d2b0dd38146325acada58fbc241d13fcd633bb5407ce1ef457e752023fe282de` | `components/base/badges/chip.tsx` |
+| `status-dot`（2026-10-17） | `f39a5df3e93d6e58884fa823c787bf9b94d048de9e2c5884d1e4a6346391fa54` | `components/base/badges/status-dot.tsx` |
 | `table` | `fc12a8f2f4012d9e983e0b9bbb10f9fe3288d74046566d2623d60e7056c50d88` | `components/base/table/table.tsx` |
 
 ## 没有逐字复制的部分

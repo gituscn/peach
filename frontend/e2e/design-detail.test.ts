@@ -12,7 +12,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
   let browser: Browser;
   installDesignBrowser((next) => { browser = next; });
 
-  it('关注详情翻页圆钮固定两侧 11px；桌面 48px、手机 44px，indicator 外框离底 18/12', { timeout: 90_000 }, async () => {
+  it('关注详情翻页圆钮固定两侧 11px；桌面 48px、手机 44px，导航条位于画面下方', { timeout: 90_000 }, async () => {
     const read = (page: Page) => page.evaluate(() => {
       const frame = document.querySelector<HTMLElement>('#stage [data-follow-detail-media="image"]')!;
       const next = frame.querySelector('[data-follow-image-arrow="next"]')!, style = getComputedStyle(next);
@@ -44,7 +44,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
       assert.equal(shown.background, 'rgba(0, 0, 0, 0.6)');
       assert.equal(shown.blur, 'blur(16px)');
       assert.ok(Math.abs(shown.inset - 11) <= 1, `箭头内距：${JSON.stringify(shown)}`);
-      assert.ok(Math.abs(shown.indicatorBottom - 18) <= .5, `indicator 外框离底 ${shown.indicatorBottom}px`);
+      assert.ok(Math.abs(shown.indicatorBottom - 8) <= .5, `导航条底部留白 ${shown.indicatorBottom}px`);
       // 画框比例跟整组图走：换图时详情不忽高忽低。
       assert.equal(shown.framed, true);
       assert.match(shown.ratio, /^0\.75\b/);
@@ -59,7 +59,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
       const shown = await read(narrow.page);
       assert.deepEqual(shown.size, [44, 44]);
       assert.ok(Math.abs(shown.inset - 11) <= 1, `窄屏箭头内距：${JSON.stringify(shown)}`);
-      assert.ok(Math.abs(shown.indicatorBottom - 12) <= .5, `窄屏 indicator 外框离底 ${shown.indicatorBottom}px`);
+      assert.ok(Math.abs(shown.indicatorBottom - 8) <= .5, `窄屏导航条底部留白 ${shown.indicatorBottom}px`);
       assert.deepEqual(narrow.problems, []);
     } finally {
       await narrow.close();

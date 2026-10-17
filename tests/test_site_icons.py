@@ -339,6 +339,22 @@ class SharedHostGuardTests(unittest.TestCase):
 
 
 class BestMarkTests(unittest.TestCase):
+    def test_missav_uses_the_confirmed_icon_when_the_homepage_is_unavailable(self):
+        icon = "https://missav.ws/img/favicon.png"
+        for host in ("missav.com", "missav.ws"):
+            with self.subTest(host=host):
+                fetched = []
+
+                def fetch(url, fetched=fetched):
+                    fetched.append(url)
+                    return (b"MISSAV-ICON", "image/png") if url == icon else None
+
+                made = site_icons.best_mark(
+                    f"https://{host}/", fetch,
+                    lambda data, content_type="": data if content_type == "image/png" else None)
+                self.assertEqual(made, b"MISSAV-ICON")
+                self.assertIn(icon, fetched)
+
     def test_the_first_candidate_that_renders_wins(self):
         pages = {"https://e.com": b'<link rel="icon" sizes="256x256" href="/a.png">',
                  "https://e.com/a.png": b"A",

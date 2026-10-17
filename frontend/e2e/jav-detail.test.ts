@@ -222,7 +222,8 @@ describe('库外 JAV 作品详情', () => {
         });
         assert.ok(dots, '圆点条可滚动且当前项完整可见');
         assert.equal(await page.locator('[data-carousel-video]').evaluate(el => el.getBoundingClientRect().width), 20);
-        assert.equal(await page.locator('[data-media-thumbnails]').count(), 0);
+        assert.equal(await page.locator('[data-media-thumbnails]').count(), 1);
+        await page.locator('[data-media-thumbnail="1"] img').waitFor({ state: 'visible' });
         const indicator = page.locator('[data-follow-image-dots]');
         const stripBox = await indicator.boundingBox(), mainBox = await page.locator('[data-jav-picture]').boundingBox();
         assert.ok(stripBox && mainBox && stripBox.y >= mainBox.y + mainBox.height);

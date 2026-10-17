@@ -25,7 +25,7 @@ export function CustomSources({ receipt }: { receipt(message: string): void }) {
   const action = useAction();
   const changed = (result: { items: Source[] }) => queryClient.setQueryData(KEY, result);
   return <Section title="自定义元数据来源">
-    <Stack>
+    {query.isPending || query.error || query.data?.items.length || action.error ? <Stack>
       {query.isPending ? <div aria-busy="true" data-skeleton="" aria-label="读取自定义来源" /> : null}
       {query.error ? <ErrorText>{errorMessage(query.error)}</ErrorText> : null}
       {query.data?.items.map((source) => <div key={source.id} className="flex flex-wrap items-center gap-3">
@@ -41,10 +41,10 @@ export function CustomSources({ receipt }: { receipt(message: string): void }) {
             setEditing(null); receipt('已删除来源') } })}>删除</Button>
       </div>)}
       {action.error ? <ErrorText>{action.error}</ErrorText> : null}
-      {!editing ? <Button variant="secondary" onClick={() => setEditing(blank())}>添加来源</Button> : null}
-      {editing ? <SourceForm key={editing.id || 'new'} initial={editing} cancel={() => setEditing(null)}
-        saved={(result) => { changed(result); setEditing(null); receipt('已保存来源') }} /> : null}
-    </Stack>
+    </Stack> : null}
+    {!editing ? <Footer><Button variant="secondary" onClick={() => setEditing(blank())}>添加来源</Button></Footer> : null}
+    {editing ? <SourceForm key={editing.id || 'new'} initial={editing} cancel={() => setEditing(null)}
+      saved={(result) => { changed(result); setEditing(null); receipt('已保存来源') }} /> : null}
   </Section>;
 }
 

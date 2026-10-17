@@ -212,7 +212,11 @@ function MediaFrame({ item, media, actions, onMedia, issues }: {
           <span>没有可用预览</span>
         </div>
       )}
-      {carousel ? <MediaCarousel items={images} position={position} onSelect={onMedia} /> : null}
+      {carousel ? <MediaCarousel items={images} position={position} onSelect={onMedia} below renderThumbnail={entry => {
+        const image = images.find(image => image.index === entry.index)!;
+        const thumbnail = image.thumb_url || (item.playable ? `/follow-stream?id=${item.id}&media=${entry.index}` : item.thumb_url);
+        return thumbnail ? <img src={thumbnail} alt="" referrerPolicy="no-referrer" /> : <span>预览未取得</span>;
+      }} /> : null}
     </div>
   );
 }
