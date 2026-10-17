@@ -220,10 +220,10 @@ describe('设计决定：控件、状态与首页顶部', () => {
     }
   });
 
-  it('目录页那条处理横幅在跑的时候不占语气色，失败了才换成状态红并报警', { timeout: 60_000 }, async () => {
+  it('常驻任务面在运行时使用中性色，失败时使用状态红并跨页保留', { timeout: 60_000 }, async () => {
     const running = await openProcessing(browser, '/', RUNNING_JOB);
     try {
-      const banner = running.page.locator('#libraryProcessingNotice [role="status"]');
+      const banner = running.page.locator('#toasts [data-processing-dock][role="status"]');
       await banner.waitFor({ state: 'visible', timeout: 15_000 });
       assert.match(await banner.innerText(), /采集缺失资料 · 38 \/ 100/);
       // 一圈长度钉成 100，画出来的那一段就是百分比本身。
@@ -240,7 +240,7 @@ describe('设计决定：控件、状态与首页顶部', () => {
 
     const failed = await openProcessing(browser, '/', { status: 'failed', error: '来源离线' });
     try {
-      const banner = failed.page.locator('#libraryProcessingNotice [role="alert"]');
+      const banner = failed.page.locator('#toasts [data-processing-dock][role="alert"]');
       await banner.waitFor({ state: 'visible', timeout: 15_000 });
       /* 计算值现在是 `oklab()`／`oklch()`，两种记法之间没法直接比字符串，所以统一在
          canvas 上取回 RGBA 再比。 */
@@ -268,8 +268,8 @@ describe('设计决定：控件、状态与首页顶部', () => {
       await failed.page.goto(new URL('/junk-files', failed.page.url()).href, { waitUntil: 'load' });
       await failed.page.locator('[data-junk-filters]').waitFor({ state: 'visible', timeout: 15_000 });
       await failed.page.waitForTimeout(1_000);
-      assert.equal(await failed.page.locator('#libraryProcessingNotice [role="alert"]').count(), 0,
-        '垃圾文件页顶上挂了目录页的处理横幅');
+      assert.equal(await failed.page.locator('#toasts [data-processing-dock][role="alert"]').count(), 1,
+        '未处理的失败在换页后仍可找到');
     } finally {
       await failed.close();
     }

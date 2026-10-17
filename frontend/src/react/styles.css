@@ -54,6 +54,7 @@
 @import "../configuration-skeleton.css";
 @import "../board-controls.css";
 @import "./settings/configuration-page.css";
+@import "./library-processing/processing-effort.css";
 @import "../jobs.css";
 @import "../pagination.css";
 

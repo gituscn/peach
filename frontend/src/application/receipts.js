@@ -1,7 +1,7 @@
 /* receipts 域控制器：本域状态与动作，启动由 Application 的生命周期统一安装。 */
 import { $, esc, icon, newSeed, seededRank } from '../core';
 import { playUiSound } from '../ui-kit/sounds';
-import { showToast } from '../react/application-residents';
+import { mountToaster, showToast } from '../react/application-residents';
 import { setActionBusy } from '../ui-kit';
 import { applicationEffects } from './effects';
 export const receiptsState = { toastBody: undefined, toastSeq: undefined, toast: undefined, liftToastsOverTutorial: undefined, actionReceipt: undefined, actionFailure: undefined, rollSeed: undefined, seededSample: undefined };
@@ -9,6 +9,7 @@ export const receiptsState = { toastBody: undefined, toastSeq: undefined, toast:
 
 
 export function installReceipts6() {
+mountToaster($('#toasts'),{success:icon('check'),error:icon('circle-alert')});
 receiptsState.toastBody = message=>message&&typeof message==='object'&&'html' in message
   ? String(message.html)
   : esc(message&&typeof message==='object'?(message.text??''):message??'');

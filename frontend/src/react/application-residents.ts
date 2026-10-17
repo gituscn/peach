@@ -3,6 +3,7 @@ import { configureBatchDock, configureGlowPicker, configureImmerse, configureMan
   configureSettingsPanel, configureSidebar, configureStage } from '../react/entry';
 import { prefetchManagedRoute } from '../react/router/managed-routes';
 import { mountToaster, showToast as emitToast, unmountToaster } from '../react/toaster';
+export { mountToaster } from '../react/toaster';
 import { connectManagedRoutes, openManagedRoute } from '../history';
 import type * as Bundle from '../react/bundle';
 import type { ShellActions } from '../react/router/shell-actions';

@@ -1,6 +1,6 @@
 /* 扫描与采集的数据契约、轮询节律与纯折算。
  *
- * 数据管理页卡片、目录横幅与缺预览提示读同一个 `queryKey`，使用同一份任务快照。
+ * 数据管理页卡片、常驻任务面与缺预览提示读同一个 `queryKey`，使用同一份任务快照。
  * 轮询也由 Query 合成一份，进度、失败与完成状态由服务端统一提供。
  * 端点在 `frontend/src` 里只在这里声明一次（`tests/test_frontend_build.py` 盯着）。 */
 import { apiGet } from '../../api';
@@ -9,7 +9,7 @@ import { queryClient } from '../query';
 
 export const LIBRARY_PROCESSING_URL = '/api/library-processing';
 
-/** 卡片与横幅共用这一个键。 */
+/** 卡片与常驻任务面共用这一个键。 */
 export const LIBRARY_PROCESSING_KEY = ['library-processing'] as const;
 
 /** 处理过程中记下的一条问题。`asset_id` 为空时说的是媒体来源本身。 */
@@ -70,7 +70,7 @@ export interface LibraryProcessingData {
 }
 
 /** 一次写操作的请求体：指定处理阶段与影片，或者按任务号重试失败项。 */
-export type ProcessingSpeed = 'standard' | 'low';
+export type ProcessingSpeed = 'low' | 'standard' | 'high';
 export interface LibraryProcessingCommand {
   stage?: 'scan' | 'collect' | 'previews' | 'metadata';
   asset_ids?: number[];
@@ -199,9 +199,9 @@ export function issueDetails(state: LibraryProcessingData): IssueDetails | null 
   };
 }
 
-/* 完成用通知报一次。目录页的横幅和数据管理页的卡片看的是同一个任务，谁先看到结束谁报，
+/* 完成用通知报一次。常驻任务面和数据管理页的卡片看的是同一个任务，谁先看到结束谁报，
    另一处按任务号认出来就不再报。首次引导添加文件夹后那一趟常在跳到目录页之前就跑完
-   （一个文件一秒），横幅从没见过「运行中」，所以刚结束的任务第一次读到时也报。 */
+   （一个文件一秒），任务面从没见过「运行中」，所以刚结束的任务第一次读到时也报。 */
 const ANNOUNCED_KEY = 'peach.library-processing.announced';
 const FRESH_COMPLETION_SECONDS = 120;
 

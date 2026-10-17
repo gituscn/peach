@@ -4,6 +4,8 @@
    自己身上，压过 Sonner 按浅色主题挂在栈上的那一组，两档主题都跟着 Board token 走。
    层级回到站内的 popover 档：Sonner 自带的九位数会连 tooltip 一起盖住。 */
 #toasts [data-sonner-toaster]{z-index:var(--layer-popover);font:var(--board-body)}
+#toasts .processing-task-toast{width:100%;right:0}
+[data-processing-dock]{border-radius:var(--floating-radius);box-shadow:var(--elevation-dropdown);width:100%}
 #toasts [data-sonner-toast][data-styled=true]{--normal-bg:var(--color-background-primary-default);
   --normal-border:var(--color-border-button-default);--normal-text:var(--color-text-primary);
   width:max-content;min-width:min(400px,100%);max-width:100%;right:0;

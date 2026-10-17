@@ -1,25 +1,13 @@
-import { Radio } from 'react-aria-components';
 import { Button } from '@/components/base/buttons/button';
 
 import { apiSend } from '../../api';
-import { SEGMENT, SEGMENTED_TRACK, SegmentedRadioGroup } from '../components/segmented';
+import { ProcessingMode } from './processing-effort';
 import { queryClient } from '../query';
 import { busyProps, useAction } from '../settings/use-action';
 import {
   LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL, processingActive,
-  type LibraryProcessingData, type ProcessingControlCommand, type ProcessingSpeed,
+  type LibraryProcessingData, type ProcessingControlCommand,
 } from './library-processing';
-
-/** 两档处理模式在任务开始前和运行中使用同一组选择。 */
-export function ProcessingMode({ value, busy, onChange }: {
-  value: ProcessingSpeed; busy: boolean; onChange(value: ProcessingSpeed): void;
-}) {
-  return <SegmentedRadioGroup aria-label="处理模式" orientation="horizontal" value={value}
-    isDisabled={busy} onChange={value => onChange(value as ProcessingSpeed)} className={SEGMENTED_TRACK}>
-    <Radio value="standard" className={SEGMENT}>标准</Radio>
-    <Radio value="low" className={SEGMENT}>低占用</Radio>
-  </SegmentedRadioGroup>;
-}
 
 /** 控制只作用于快照里的任务号；状态由服务端确认后交给所有入口。 */
 export function ProcessingControls({ state, disabled = false }: {
@@ -38,6 +26,7 @@ export function ProcessingControls({ state, disabled = false }: {
   return <div className="flex min-w-0 flex-col gap-2" data-processing-controls="">
     <div className="flex flex-wrap items-center gap-2">
       <ProcessingMode value={state.speed_mode || 'standard'} busy={disabled || !!action.busy}
+        animate={state.status !== 'paused' && state.status !== 'pausing'}
         onChange={speed_mode => change({ action: 'set_speed', speed_mode, ...(active ? { job_id: state.job_id } : {}) })} />
       {active ? <Button size="small" variant="secondary" disabled={disabled || !state.job_id || state.status === 'pausing'}
         {...busyProps(action.busy === 'pause' || action.busy === 'resume')}

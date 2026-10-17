@@ -96,14 +96,14 @@ it('扫描与补全方式共用一颗主键加一个下拉，各自交自己的�
   const host = await mount(card({ toast: vi.fn() }));
 
   await click(buttonNamed('同步媒体库', host));
-  await click(host.querySelector('[aria-haspopup="dialog"]'));
+  await click(host.querySelector('[data-split-button] [aria-haspopup="dialog"]'));
   expect(menuItem('同步媒体库')).not.toBeNull();
   await click(menuItem('仅扫描文件'));
-  await click(host.querySelector('[aria-haspopup="dialog"]'));
+  await click(host.querySelector('[data-split-button] [aria-haspopup="dialog"]'));
   await click(menuItem('仅同步已入库影片'));
-  await click(host.querySelector('[aria-haspopup="dialog"]'));
+  await click(host.querySelector('[data-split-button] [aria-haspopup="dialog"]'));
   await click(menuItem('仅生成视频预览'));
-  await click(host.querySelector('[aria-haspopup="dialog"]'));
+  await click(host.querySelector('[data-split-button] [aria-haspopup="dialog"]'));
   await click(menuItem('仅补全资料'));
 
   expect(served.posts()).toEqual([{}, { stage: 'scan' }, { stage: 'collect' }, { stage: 'previews' }, { stage: 'metadata' }]);
@@ -404,7 +404,7 @@ it('首屏暂停状态在卡片和横幅中保留进度与继续入口', async (
   expect(banner.textContent).toContain('已暂停');
   expect(buttonNamed('继续', host)).not.toBeNull();
   expect(buttonNamed('继续', banner)).not.toBeNull();
-  expect(banner.querySelector('input[value="low"]')).not.toBeNull();
+  expect(buttonNamed('速度 · 标准', banner)).not.toBeNull();
   expect(host.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('2');
 });
 
@@ -414,10 +414,16 @@ it('模式切换失败保留服务端选中值和原位错误，可重试', asyn
     ? { ok: false, status: 409, json: async () => ({ error: '任务已变化，请刷新后重试' }) }
     : { ok: true, status: 200, json: async () => ({ status: 'running', job_id: 'one', speed_mode: 'standard' }) }));
   const host = await mount(card({ toast: vi.fn() }));
-  await click(host.querySelector('input[value="low"]'));
+  await click(buttonNamed('速度 · 标准', host));
+  const slider = document.querySelector<HTMLInputElement>('input[type="range"]')!;
+  await act(async () => {
+    slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    slider.dispatchEvent(new KeyboardEvent('keyup', { key: 'Home', bubbles: true }));
+  });
   expect(host.textContent).toContain('任务已变化，请刷新后重试');
-  expect(host.querySelector<HTMLInputElement>('input[value="standard"]')?.checked).toBe(true);
-  expect(host.querySelector<HTMLInputElement>('input[value="low"]')?.disabled).toBe(false);
+  expect(buttonNamed('速度 · 标准', host)).not.toBeNull();
+  expect(slider.value).toBe('1');
+  expect(slider.disabled).toBe(false);
 });
 
 it('预估按粗估与实测速率显示区间，缺少有效范围时等待估算', () => {

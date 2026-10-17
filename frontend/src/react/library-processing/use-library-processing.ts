@@ -1,4 +1,4 @@
-/* 卡片与横幅共用的那一份读取与状态迁移判断。
+/* 卡片与任务面共用的那一份读取与状态迁移判断。
  *
  * 两处读同一个 `queryKey`，轮询由 Query 合成一份；这里额外盯住「这一趟是不是在本次
  * 眼前跑完的」。任务关掉页面照样在跑，状态里常年躺着上一趟的回执：首屏读到的终态没有
@@ -38,7 +38,7 @@ export function useLibraryProcessingJob(
     previous.current = state.status;
     const witnessed = !!was && ['running', 'pausing', 'paused'].includes(was) && !processingActive(state);
     if (witnessed) setSettled(state);
-    /* 横幅那一侧还要认「刚结束」：首次引导那一趟常在跳到目录页之前就跑完，它从没见过
+    /* 任务面还要认「刚结束」：首次引导那一趟常在跳到目录页之前就跑完，它从没见过
        「运行中」。卡片只认自己看着跑完的那一趟。 */
     if (witnessed || mode === 'notice') announceCompletion(state, toast, witnessed);
   }, [state, mode, toast]);

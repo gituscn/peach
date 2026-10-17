@@ -1,6 +1,6 @@
 /* 文字档按内容收宽，选项保持单行。 */
-.iconswitch.iconswitch-text{display:inline-flex;justify-self:start}
-.iconswitch.iconswitch-text label{width:auto;min-width:52px;padding-inline:10px;white-space:nowrap}
+fieldset.iconswitch-text{display:inline-flex;justify-self:start}
+fieldset.iconswitch-text label{width:auto;min-width:52px;padding-inline:10px;white-space:nowrap}
 
 /* 自绘单值拉条（`dialSliderHtml` / `wireDialSlider`）。几何取自 feralui.dev/gradients 的
    `.dial-slider`，实测记在 docs/reference-snapshots/feralui-studio-boardui-accent-measured.md：

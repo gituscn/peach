@@ -45,11 +45,11 @@ export function ProcessingActions({ busy, scan = false, metadataOnly = false, sp
       description: previews
         ? '生成视频预览会读取视频并占用处理器，可能让电脑变慢。需要同时使用电脑时，可选择低占用模式。'
         : `处理会读取媒体文件${command.stage === 'scan' ? '' : metadataOnly ? '并下载资料' : '、下载资料并生成视频预览'}，可能让电脑变慢。需要同时使用电脑时，可选择低占用模式。`,
-      body: iconSwitchHtml('processing-speed', '处理模式', [['standard', '标准'], ['low', '低占用']], speedMode, { text: true }),
+      body: iconSwitchHtml('processing-speed', '处理模式', [['low', '低占用'], ['standard', '标准'], ['high', '全速']], speedMode, { text: true }),
       confirmLabel: title,
       onConfirm: async () => {
         const selected = dialog.dialog.querySelector<HTMLInputElement>('input[name="processing-speed"]:checked')?.value;
-        await onRun({ ...command, speed_mode: selected === 'low' ? 'low' : 'standard' });
+        await onRun({ ...command, speed_mode: selected === 'low' ? 'low' : selected === 'high' ? 'high' : 'standard' });
         try { localStorage.setItem(RESOURCE_NOTICE_KEY, 'seen') } catch { /* 本次启动照常完成 */ }
       },
     });
