@@ -155,6 +155,24 @@ class InstallerDirectoryTests(unittest.TestCase):
                      f"/DOutputDir={self.root}")
         self.assertTrue((self.root / "Peach-0.0.0-windows-x64-setup.exe").is_file())
 
+    def test_lite_installer_compiles_from_the_application_update_package(self):
+        from peach.update_packages import TOOL_PATHS
+        from scripts.package_windows_release import package, build_lite_installer
+        payload = self.root / 'payload'
+        (payload / '_internal').mkdir(parents=True)
+        (payload / 'Peach.exe').write_bytes(b'compile fixture')
+        (payload / '_internal/standalone.txt').touch()
+        for prefix, required in TOOL_PATHS.values():
+            for name in required:
+                target = payload / prefix / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(b'fixture')
+        output = self.root / 'release'
+        package(payload, output, '0.0.0')
+        installer = build_lite_installer(output, '0.0.0', Path(self.compiler))
+        self.assertTrue(installer.is_file())
+        self.assertEqual(installer.name, 'Peach-0.0.0-windows-x64-lite-setup.exe')
+
 
 class InstallerHandoffTests(unittest.TestCase):
     def setUp(self):

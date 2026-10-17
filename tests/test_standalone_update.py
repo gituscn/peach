@@ -232,6 +232,82 @@ class StandaloneUpdateTests(unittest.TestCase):
             self.assertTrue(update_packages.matches(Path(state["stage"]), bundle["files"]))
         self.assertEqual((target / "tools/ffmpeg/bin/codec.dll").read_bytes(), b"different version")
 
+    def lite_fixture(self):
+        source, output, manifest, target, archive, release = self.release_fixture()
+        stage = update.extract(archive, self.root / 'preflight', lambda *_: None)
+        return output, manifest, target, stage, self.root / 'tools-error.txt'
+
+    def test_lite_installer_reuses_matching_tools_without_settings_or_network(self):
+        from peach.desktop_installer import prepare_install_tools
+        output, manifest, target, stage, error = self.lite_fixture()
+        with patch('peach.__version__', '1.0.0'), patch.object(update, 'download') as download, \
+                patch.object(settings_file, 'load_config') as configuration:
+            self.assertEqual(prepare_install_tools(target, output, error, stage=stage), 0)
+        download.assert_not_called()
+        configuration.assert_not_called()
+        for bundle in manifest['tools'].values():
+            self.assertTrue(update_packages.matches(stage, bundle['files']))
+        self.assertEqual((target / 'Peach.exe').read_bytes(), b'old application')
+
+    def test_lite_installer_can_prepare_a_fresh_install_from_verified_sidecar_archives(self):
+        from peach.desktop_installer import prepare_install_tools
+        output, manifest, _, stage, error = self.lite_fixture()
+        target = self.root / 'fresh-install'
+        with patch('peach.__version__', '1.0.0'), patch.object(update, 'download') as download:
+            self.assertEqual(prepare_install_tools(target, output, error, stage=stage), 0)
+        download.assert_not_called()
+        self.assertFalse(target.exists())
+        for bundle in manifest['tools'].values():
+            self.assertTrue(update_packages.matches(stage, bundle['files']))
+
+    def test_lite_installer_downloads_only_a_tool_that_fails_file_verification(self):
+        from peach.desktop_installer import prepare_install_tools
+        output, manifest, target, stage, error = self.lite_fixture()
+        (target / 'tools/ffmpeg/bin/ffmpeg.exe').write_bytes(b'damaged tool')
+        requests = []
+        original_client = httpx.Client
+
+        def respond(request):
+            name = request.url.path.rsplit('/', 1)[-1]
+            requests.append(name)
+            return httpx.Response(200, content=(output / name).read_bytes())
+
+        def client(*args, **kwargs):
+            return original_client(*args, **kwargs, transport=httpx.MockTransport(respond), trust_env=False)
+
+        with patch('peach.__version__', '1.0.0'), patch.object(update.httpx, 'Client', side_effect=client):
+            self.assertEqual(prepare_install_tools(target, self.root / 'empty-cache', error, stage=stage), 0)
+        self.assertEqual(requests, [manifest['tools']['ffmpeg']['asset']['name']])
+        self.assertEqual((target / 'tools/ffmpeg/bin/ffmpeg.exe').read_bytes(), b'damaged tool')
+        for bundle in manifest['tools'].values():
+            self.assertTrue(update_packages.matches(stage, bundle['files']))
+
+    def test_lite_installer_rejects_a_corrupt_archive_and_can_retry_without_touching_the_install(self):
+        from peach.desktop_installer import prepare_install_tools
+        output, manifest, _, stage, error = self.lite_fixture()
+        target = self.root / 'existing-without-tools'
+        target.mkdir()
+        (target / 'Peach.exe').write_bytes(b'keep existing application')
+        bad = output / manifest['tools']['ffmpeg']['asset']['name']
+        valid = bad.read_bytes()
+        bad.write_bytes(b'corrupt archive')
+        with patch('peach.__version__', '1.0.0'), patch.object(update, 'download') as download, \
+                patch('peach.desktop_installer.stop') as stop:
+            self.assertEqual(prepare_install_tools(target, output, error, stage=stage), 1)
+            self.assertIn('校验失败', error.read_text(encoding='utf-8'))
+            bad.write_bytes(valid)
+            self.assertEqual(prepare_install_tools(target, output, error, stage=stage), 0)
+        download.assert_not_called()
+        stop.assert_not_called()
+        self.assertEqual(list(target.iterdir()), [target / 'Peach.exe'])
+        self.assertEqual((target / 'Peach.exe').read_bytes(), b'keep existing application')
+
+    def test_packaged_entry_dispatches_lite_tool_preparation(self):
+        from scripts.build_app_entry import main
+        with patch('peach.error_reporting.install'), patch('peach.desktop_installer.prepare_install_tools', return_value=0) as prepare:
+            self.assertEqual(main(['Peach.exe', '--installer-tools', 'target', 'cache', 'error.txt']), 0)
+        prepare.assert_called_once_with(Path('target'), Path('cache'), Path('error.txt'))
+
     def test_corrupt_tool_download_leaves_the_installed_program_and_tools_untouched(self):
         source, output, manifest, target, archive, release = self.release_fixture()
         binary = target / "tools/ffmpeg/bin/ffmpeg.exe"

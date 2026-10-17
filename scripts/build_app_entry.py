@@ -107,6 +107,9 @@ def main(argv: list[str] | None = None) -> int:
     if len(argv) == 5 and argv[1] == "--installer-prepare":
         from peach.desktop_installer import prepare
         return prepare(Path(argv[2]), int(argv[3]), Path(argv[4]))
+    if len(argv) == 5 and argv[1] == "--installer-tools":
+        from peach.desktop_installer import prepare_install_tools
+        return prepare_install_tools(Path(argv[2]), Path(argv[3]), Path(argv[4]))
     if len(argv) == 4 and argv[1] == "--installer-finish":
         from peach.desktop_installer import finish_install
         return finish_install(Path(argv[2]), int(argv[3]))

@@ -110,3 +110,6 @@ SHA-256 对不上是硬错误，不降级放行。
   使用条款，Peach 的边界以 AGPL 与 `SECURITY.md` 为准。
 - **演示素材**：README 里任何截图或视频都按上面「演示数据集」一节的边界取图，换素材时重新核对
   那几条边界。
+- **篇幅取舍（2026-10-17）**：复读已登记的 amane、Stash 与 OpenAver 原文，并核对线上 README。采用 amane 的短功能列表与安装入口，保留 Peach 的演示、全部五张截图、六条特色和必要安全说明；源码安装步骤集中在 [运行与配置](OPERATIONS.md#从源码运行windowsmacos)。路由、字段判据、缓存周期、更新包机制与开发流程由专题文档承载。
+- **截图与 Star 历史（2026-10-17）**：截图沿用 `a5f979d6^` 的双列表格，播放墙独占一行，五张 WebP 均链接 PNG 原图。Star History 依据官方 [`EmbedMarkdownSection.tsx`](https://github.com/star-history/star-history/blob/608d0e39be441665c01cd6ac1fd01ca5ec1eaf39/frontend/components/EmbedMarkdownSection.tsx) 使用 `/svg`，保留深浅主题并链接用户指定的交互页。实测 `/chart` 与 `/svg` 均返回 HTTP 200、SVG 类型及 `Cache-Control: public, s-maxage=86400, max-age=86400`；同版本 [`cache.ts`](https://github.com/star-history/star-history/blob/608d0e39be441665c01cd6ac1fd01ca5ec1eaf39/backend/cache.ts) 将数据与 SVG 缓存各设为 24 小时。交互页 URL 仅改变点击去向，不能保证嵌入图片即时刷新；README 不显示实时性承诺。
+- **交互图与嵌入图（2026-10-17）**：用户截图显示纵轴为 0、10、100；嵌入接口使用 `logscale` 得到相同刻度。官方同版本 [`StarChartViewer.tsx`](https://github.com/star-history/star-history/blob/608d0e39be441665c01cd6ac1fd01ca5ec1eaf39/frontend/components/StarChartViewer.tsx) 在浏览器调用 GitHub，并在页面内存中复用结果；24 小时服务端缓存针对嵌入图片接口，不能据此判断官网交互图的数据新鲜度。官网 `https://peach.video` 位于中英文 README 顶部导航。

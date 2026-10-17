@@ -1,14 +1,18 @@
 # Windows 测试版
 
-Windows 测试版有安装包和免安装包两种，程序文件相同，都不需要安装 Python、Git、Node 或 OpenSSL。macOS 暂无独立包，请按 [README](https://github.com/peach-mitao/peach) 从源码运行。
+Windows 版提供完整安装包、轻量安装包和免安装包，均无需另装 Python、Git、Node 或 OpenSSL。macOS 请按[源码运行](OPERATIONS.md#从源码运行windowsmacos)安装。
 
-| | 安装包 | 免安装包 |
-| --- | --- | --- |
-| 文件 | `Peach-<版本>-windows-x64-setup.exe` | `Peach-<版本>-windows-x64.zip` |
-| 程序位置 | 可选择，默认 `%LOCALAPPDATA%\Programs\Peach`，不需要管理员权限 | 解压到哪里就在哪里 |
-| 开始菜单与系统设置里的卸载项 | 有 | 没有 |
+| 文件 | 用途 |
+| --- | --- |
+| `Peach-<版本>-windows-x64-setup.exe` | 完整安装包，包含全部工具，可离线安装 |
+| `Peach-<版本>-windows-x64-lite-setup.exe` | 轻量安装包，校验并复用已有工具，缺失或版本不符时自动下载 |
+| `Peach-<版本>-windows-x64.zip` | 完整免安装包，解压后运行 `Peach.exe` |
 
-两种的数据都在 `%LOCALAPPDATA%\Peach\peach-data`，换用另一种时设置和数据库照常沿用。
+安装包默认装在 `%LOCALAPPDATA%\Programs\Peach`，可选择目录，无需管理员权限；两种安装包都提供开始菜单与系统设置里的卸载项。免安装包解压到哪里就在哪里。
+
+三种包的数据都在 `%LOCALAPPDATA%\Peach\peach-data`，换用另一种时设置和数据库照常沿用。
+
+轻量安装包先在临时目录备齐并校验工具，再停止旧程序并安装；下载失败可重试，现有安装会保留。安装包旁边已有对应的 `tools-*.zip` 时，可校验后直接使用。
 
 安装目录须为当前用户可写的独立文件夹，上级目录也须可写，以便自动更新。可选择空文件夹或已有的 Peach 安装目录；程序目录不能与数据目录重叠，也不能经过目录链接。升级默认沿用已有安装目录。需要换位置时，先卸载并保留数据，再安装到新目录。
 
@@ -50,7 +54,7 @@ Windows 第一次询问防火墙权限时，只勾选「专用网络」。
 
 ## 播放与 FFmpeg
 
-完整安装包和完整免安装 ZIP 均包含 FFmpeg 与 ffprobe，位于程序目录的 `tools\ffmpeg\bin`。转码、媒体信息探测与缩略图可直接使用，无需安装系统工具或设置 PATH。应用更新包 `*-update.zip` 由 Peach 更新器使用，按文件 SHA-256 校验并复用已安装工具，仅下载缺失、损坏或版本变化的工具包。首次安装须使用完整包；`tools-*.zip` 由更新器按需处理。
+完整安装包和完整免安装 ZIP 均包含 FFmpeg 与 ffprobe，位于程序目录的 `tools\ffmpeg\bin`；轻量安装包会在安装时备齐工具。转码、媒体信息探测与缩略图无需额外配置。`*-update.zip` 由 Peach 更新器校验和安装，不提供手动导入入口；首次安装使用任一安装包或完整免安装包。`tools-*.zip` 由更新器或轻量安装包按需处理。
 
 缺索引 MP4 修复使用随包的 `tools\untrunc\untrunc.exe`，需要同编码参数的完整片作为参照。该工具与其兼容的 FFmpeg 库独立构建，按 GPL-2.0-or-later 分发；完整对应源码制品为同一 Release 中的 `untrunc-corresponding-source.zip`。显式 `PEACH_UNTRUNC` 优先于随包工具，其后查数据目录与 PATH。
 

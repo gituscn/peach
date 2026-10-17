@@ -2,7 +2,22 @@
 
 本文讲在自己电脑上运行 Peach 时要知道的事：第一次怎么设置、配置页在哪、怎么从其他设备访问、怎么装 FFmpeg、哪些操作会真的删除文件。
 
-用 Windows 测试包的，先看 [Windows 测试版](TESTING_DESKTOP.md)；从源码运行的，安装命令见 [README](../README.md)。文末「维护者参考」是给在源码上开发、打包和发布的人看的，普通使用可以跳过。
+用 Windows 测试包的，先看 [Windows 测试版](TESTING_DESKTOP.md)；从源码运行的，按下面的步骤安装。文末「维护者参考」是给在源码上开发、打包和发布的人看的，普通使用可以跳过。
+
+## 从源码运行（Windows、macOS）
+
+需要 Git 和 [uv](https://docs.astral.sh/uv/getting-started/installation/)。Python 下限为 3.14，项目由 `.python-version` 固定运行版本，uv 会自动下载缺少的解释器。
+
+在 PowerShell 7（Windows）或 zsh（macOS）中依次执行：
+
+1. 克隆仓库：`git clone https://github.com/peach-mitao/peach.git peach-app`。
+2. 进入项目目录：`cd peach-app`。后续命令均在此目录执行。
+
+Windows 安装依赖：`uv sync --locked --python 3.14`。完成后启动托盘：`& .\.venv\Scripts\peach-tray.exe`。
+
+macOS 安装依赖：`uv sync --locked --python 3.14 --extra macos`。完成后启动托盘：`./.venv/bin/peach-tray`。
+
+托盘会打开浏览器中的首次设置页。源码运行不需要下载 Windows 安装包。
 
 ## 首次运行与设置文件
 

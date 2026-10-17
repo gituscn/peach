@@ -140,6 +140,34 @@ def prepare(program: Path, owner: int, error_file: Path) -> int:
         return 1
 
 
+def prepare_install_tools(program: Path, cache: Path, error_file: Path, *, stage: Path | None = None) -> int:
+    """在安装器临时目录备齐工具，不读取馆藏设置或修改现有安装。"""
+    from . import __version__, standalone_update, update_packages
+    from .fsutil import atomic_write_text
+    import tempfile
+    stage = (stage or Path(sys.executable).resolve().parent).resolve()
+    try:
+        def fetch(url, archive, size, checksum, progress):
+            cached = cache / url.rsplit('/', 1)[-1]
+            if cached.is_file():
+                if cached.stat().st_size != size or update_packages.digest(cached) != checksum:
+                    raise ValueError(f'本地工具包校验失败：{cached.name}。请重新下载或移走此文件后重试。')
+                shutil.copy2(cached, archive)
+                progress(size)
+            else:
+                standalone_update.download(url, archive, size, checksum, progress)
+
+        release = {'latest_version': __version__,
+                   'asset_url': f'https://github.com/peach-mitao/peach/releases/download/v{__version__}/package.zip'}
+        with tempfile.TemporaryDirectory(prefix='peach-installer-tools-', dir=stage.parent) as folder:
+            standalone_update.prepare_tools(stage, program, Path(folder).resolve(), release, {'total': 0, 'downloaded': 0},
+                                            report=lambda data, **changes: data.update(changes), fetch=fetch)
+        return 0
+    except Exception as exc:
+        atomic_write_text(error_file, f'媒体工具准备失败：{exc}')
+        return 1
+
+
 def finish_install(program: Path, owner: int) -> int:
     """安装完成或取消后撤销属于这个安装器的预约。"""
     from . import settings_file, update_tasks

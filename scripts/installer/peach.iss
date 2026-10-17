@@ -31,7 +31,11 @@ DisableProgramGroupPage=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputDir}
+#ifdef LiteInstaller
+OutputBaseFilename=Peach-{#AppVersion}-windows-x64-lite-setup
+#else
 OutputBaseFilename=Peach-{#AppVersion}-windows-x64-setup
+#endif
 SetupIconFile=..\..\resources\peach.ico
 UninstallDisplayIcon={app}\Peach.exe
 UninstallDisplayName=Peach
@@ -65,6 +69,11 @@ Type: filesandordirs; Name: "{app}\_internal"
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#SourceDir}\*"; DestDir: "{tmp}\Peach-preflight"; Flags: dontcopy recursesubdirs createallsubdirs
+#ifdef LiteInstaller
+Source: "{tmp}\Peach-preflight\tools\*"; DestDir: "{app}\tools"; ExternalSize: 0; Flags: external ignoreversion recursesubdirs createallsubdirs
+Source: "{tmp}\Peach-preflight\cloudflared.exe"; DestDir: "{app}"; ExternalSize: 0; Flags: external ignoreversion
+Source: "{tmp}\Peach-preflight\cloudflared-manifest.json"; DestDir: "{app}"; ExternalSize: 0; Flags: external ignoreversion
+#endif
 
 [Icons]
 Name: "{userprograms}\Peach"; Filename: "{app}\Peach.exe"; Parameters: "--show"
@@ -80,6 +89,10 @@ Type: filesandordirs; Name: "{app}"
 [Code]
 var
   GuardPrepared: Boolean;
+#ifdef LiteInstaller
+  ToolsPrepared: Boolean;
+  ToolsPage: TOutputMarqueeProgressWizardPage;
+#endif
 
 function GetCurrentProcessId(): LongWord;
   external 'GetCurrentProcessId@kernel32.dll stdcall';
@@ -151,6 +164,31 @@ begin
   if GuardPrepared then
     Exit;
   ExtractTemporaryFiles('{tmp}\Peach-preflight\*');
+#ifdef LiteInstaller
+  if not ToolsPrepared then
+  begin
+    if ToolsPage = nil then
+      ToolsPage := CreateOutputMarqueeProgressPage('准备媒体工具', '已有工具会校验后复用，缺少时自动下载。');
+    ToolsPage.SetText('正在检查、下载并校验媒体工具，请稍候。', '下载失败可重试，现有安装会保留。');
+    ToolsPage.Show;
+    ToolsPage.Animate;
+    try
+      ToolsPrepared := Exec(ExpandConstant('{tmp}\Peach-preflight\Peach.exe'),
+        '--installer-tools "' + ExpandConstant('{app}') + '" "' + ExpandConstant('{src}\.') +
+        '" "' + ExpandConstant('{tmp}\Peach-preflight\tools-error.txt') + '"',
+        ExpandConstant('{tmp}\Peach-preflight'), SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+    finally
+      ToolsPage.Hide;
+    end;
+    if not ToolsPrepared then
+    begin
+      Result := '媒体工具未能准备完成，请检查网络后重试。';
+      if LoadStringFromFile(ExpandConstant('{tmp}\Peach-preflight\tools-error.txt'), ErrorText) then
+        Result := UTF8Decode(ErrorText);
+      Exit;
+    end;
+  end;
+#endif
   if not Exec(ExpandConstant('{tmp}\Peach-preflight\Peach.exe'),
       '--installer-prepare "' + ExpandConstant('{app}') + '" ' + IntToStr(GetCurrentProcessId()) +
       ' "' + ExpandConstant('{tmp}\Peach-preflight\prepare-error.txt') + '"',
