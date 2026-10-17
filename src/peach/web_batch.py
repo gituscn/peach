@@ -33,7 +33,8 @@ from .regions import normalize_region
 from .settings_file import PROJECT_ROOT
 from .task_runs import TaskRunHandle
 from .web_activity import DEFAULT_PROFILE_ID
-from .web_catalog import COST, attach_card_performers
+from .web_catalog import attach_card_performers
+from .media_sources import cost_for
 from .web_resource_sync import clean_resource_orphans
 from .web_state import WebContract
 
@@ -523,7 +524,7 @@ def _scored_junk(contract: WebContract) -> tuple[list[dict], frozenset[int]]:
             s = min(s, AUTO_TRASH_SCORE - 1)
         if s >= JUNK_REVIEW_SCORE:
             d["score"] = s; d["why"] = " · ".join(why)
-            d["cost"] = COST.get(d["location"], "metered")
+            d["cost"] = cost_for(d['location'], d.get('path'))
             d["has_thumb"] = contract.has_snapshot(d["snapshot_path"])
             d.pop("snapshot_path", None)
             d.pop("path", None)

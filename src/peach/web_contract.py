@@ -79,7 +79,6 @@ from .web_batch import (
 )
 from .web_catalog import (
     CARD_PERFORMERS,
-    COST,
     EDITION_ORDER,
     EFFECTIVE_REGION_SQL,
     JAV_ASSET_CLAUSE,
@@ -139,7 +138,7 @@ __all__ = [
     "AD_DIRPACK", "AD_DOMAIN", "ASSET_REFERENCE_TABLES", "BUNDLE_DIR_ASSETS", "CACHE_TTL",
     "EXPECTED_REVISION_FIELD", "OWNED_FIELDS", "RevisionConflict", "parse_owners",
     "write_owned_fields",
-    "CARD_PERFORMERS", "CONTENT_BYTES", "COST", "ContractRouteNotFound", "EDITION_ORDER",
+    "CARD_PERFORMERS", "CONTENT_BYTES", "ContractRouteNotFound", "EDITION_ORDER",
     "EFFECTIVE_REGION_SQL", "effective_region_sql",
     "FAVICON",
     "GET_HANDLERS", "INTERNET_SHORTCUT_SUFFIXES", "JAV_ASSET_CLAUSE",

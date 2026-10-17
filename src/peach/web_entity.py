@@ -19,8 +19,8 @@ from . import (company_profiles, entry_links, feeds, link_status, performer_head
 from .catalog_rules import (LENGTH_TAGS, dir_expr, photo_set_title, solo_performer_clause, tag_cat)
 from .entities import normalize_entity_name, resolve_entity, resolve_entity_id, rewrite_flat_projection
 from .social_links import ARCHIVE_HOSTS, is_archive
+from .media_sources import cost_for
 from .web_catalog import (
-    COST,
     JAV_ASSET_PREDICATE,
     VISIBLE_CATALOG_ASSET,
     attach_avatar_availability,
@@ -554,7 +554,7 @@ def q_entity_photos(contract: WebContract, args):
             "n": item["n"],
             "bytes": item["bytes"] or 0,
             "location": item["location"],
-            "cost": COST.get(item["location"], "metered"),
+            "cost": cost_for(item['location'], item['dir']),
         } for item in c.execute(
             # 一张图在范围里可能挂好几行（两位成员、片商连同旗下 label、同一位的不同 role 或
             # source）。先只按 id 去重，再回 `asset` 取路径分组，`n` 和 `bytes` 数的才是图；
@@ -618,7 +618,7 @@ def q_photo_set(contract: WebContract, args):
                  )]
         return {
             "id": anchor["id"], "title": photo_set_title(directory),
-            "location": anchor["location"], "cost": COST.get(anchor["location"], "metered"),
+            "location": anchor["location"], "cost": cost_for(anchor['location'], anchor['path']),
             "total": total, "items": items, "seed": seed, "has_more": offset + len(items) < total,
         }
 

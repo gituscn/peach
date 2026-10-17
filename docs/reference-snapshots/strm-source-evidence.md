@@ -24,11 +24,11 @@ STRM 与 ISO 不参与后台探测、九宫格或时间轴抽帧。ISO 只登记
 
 「生成视频预览」控制九宫格与时间轴抽帧，保留普通媒体按来源策略执行的 ffprobe 探测。关闭后停止时间轴任务，重新开启总开关不自动开启时间轴采集。时间轴间隔仍由用户选择。
 
-挂载目录通过「代理流量保护」选择读取成本，文件写入能力独立判断。光鸭默认正常读取；OneDrive 与通用挂载入口默认保护，可按实际路径关闭。通用「其他已挂载网盘」只承诺文件系统读取，不承诺每家平台的原生 API、上传、分享或回收站功能。
+新增网盘目录由用户明确选择「正常读取」或「代理流量保护」，不按网盘品牌预选，PikPak 同样适用。既有配置保留当前读取策略，文件写入能力独立判断。通用「其他已挂载网盘」只承诺文件系统读取，不承诺每家平台的原生 API、上传、分享或回收站功能。
 
 ## 代理与成本证据
 
-[光鸭官网](https://www.guangyapan.com/)面向大陆提供第三方应用直连能力，支持默认正常读取的产品判断，真实账号下载路径未取得。[微软网络说明](https://learn.microsoft.com/en-us/microsoft-365/enterprise/microsoft-365-networking-china?view=o365-worldwide)区分国际租户跨境拥塞与世纪互联环境；[OpenList 驱动](https://doc.oplist.org/guide/drivers/onedrive)按账号类型选择应用端点，并提供独立的下载反代设置。登录可达不等于文件下载直连；不能仅凭网盘名称推断代理费用。
+[光鸭官网](https://www.guangyapan.com/)面向大陆提供第三方应用直连能力，真实账号下载路径未取得。[微软网络说明](https://learn.microsoft.com/en-us/microsoft-365/enterprise/microsoft-365-networking-china?view=o365-worldwide)区分国际租户跨境拥塞与世纪互联环境；[OpenList 驱动](https://doc.oplist.org/guide/drivers/onedrive)按账号类型选择应用端点，并提供独立的下载反代设置。登录可达不等于文件下载直连；不能仅凭网盘名称推断代理费用。曾按品牌为新增网盘选择默认成本的判断不成立，最终使用用户明确选择的目录策略。
 
 本机匿名 HEAD 核验中，显式绕过客户端代理的光鸭官网返回 200，`login.live.com` 返回 404，`graph.microsoft.com` 返回 405，OneDrive 个人网页版连接超时。404、405 只证明公共端点可达，不代表认证或业务成功。FlowLens 快照未观测到这些短连接，不能用它证明系统隧道路径、零代理流量或全大陆可用性。无网盘登录、真实媒体读取或路由配置改动。
 

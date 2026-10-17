@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import httpx
 
-from peach import media_processing_policy as policy, strm
+from peach import media_processing_policy as policy, settings_file, strm
 from peach.api import create_app
 from peach.config import PeachSettings
 from peach.media_probe import probe_unmeasured
@@ -137,6 +137,30 @@ class StrmPlaybackTests(unittest.TestCase):
         self.assertNotIn('private', json.dumps(result))
         self.assertIsNone(item['size'])
         self.assertTrue(item['is_strm'])
+        self.assertEqual(self.requests, [])
+
+    def test_mount_choice_matches_catalog_detail_playlist_and_library_without_exposing_paths(self):
+        root = str(self.root)
+        config = replace(settings_file.PeachConfig(self.root, self.root / 'config.toml'),
+                         locations={'local': (root,)}, library_names={root: '指针测试'},
+                         media_costs={root: 'metered'})
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("INSERT INTO playlist(id,profile_id,name,source_kind,created_at,updated_at) "
+                               "VALUES(1,'local-default','测试','manual','now','now')")
+            connection.execute("INSERT INTO playlist_item(playlist_id,asset_id,position,added_at) VALUES(1,1,0,'now')")
+        with patch('peach.settings_file.active', return_value=config), route_client(self.app) as client:
+            catalog = client.get('/api/items?thumb=0').json()['items']
+            detail = client.get('/api/item?id=1').json()
+            playlist = client.get('/api/playlist?id=1').json()['items']
+            library = client.get('/api/libraries').json()['libraries'][0]
+        for row in (catalog[0], detail, playlist[0]):
+            self.assertEqual(row['cost'], 'metered')
+            self.assertNotIn('path', row)
+        self.assertTrue(library['metered'])
+        config = replace(config, media_costs={root: 'free'})
+        with patch('peach.settings_file.active', return_value=config), route_client(self.app) as client:
+            self.assertEqual(client.get('/api/item?id=1').json()['cost'], 'free')
+            self.assertFalse(client.get('/api/libraries').json()['libraries'][0]['metered'])
         self.assertEqual(self.requests, [])
 
     def test_range_is_forwarded_without_browser_credentials_or_upstream_address(self):

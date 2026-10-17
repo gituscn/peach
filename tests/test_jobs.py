@@ -1,10 +1,12 @@
 import os
+import sqlite3
 import signal
 import tempfile
 import threading
 import time
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from peach.jobs import (
@@ -28,8 +30,32 @@ class JobPolicyTests(unittest.TestCase):
 
     def test_unmetered_query_uses_parameters_and_excludes_metered_sources(self):
         sql, parameters = SourceAccessPolicy().sql_filter("115", allow_metered=False)
-        self.assertEqual(sql, " AND location=? AND location NOT IN (?,?)")
-        self.assertEqual(parameters, ("115", "online", "pikpak"))
+        with sqlite3.connect(':memory:') as connection:
+            connection.execute('CREATE TABLE asset(location TEXT,path TEXT)')
+            connection.executemany('INSERT INTO asset VALUES(?,?)',
+                                   [('115', r'B:\movie.mp4'), ('online', ''), ('pikpak', r'A:\movie.mp4')])
+            self.assertEqual(connection.execute('SELECT location FROM asset WHERE 1=1' + sql,
+                                                parameters).fetchall(), [('115',)])
+
+    def test_root_choices_allow_pikpak_and_protect_a_different_root_of_the_same_source(self):
+        config = SimpleNamespace(locations={'pikpak': (r'A:\Normal', r'A:\Proxy', r'A:\Proxy\Free')},
+                                 media_costs={r'A:\Normal': 'free', r'A:\Proxy': 'metered',
+                                              r'A:\Proxy\Free': 'free'})
+        with patch('peach.settings_file.active', return_value=config):
+            sql, parameters = SourceAccessPolicy().sql_filter('pikpak', False, 'a.location')
+        with sqlite3.connect(':memory:') as connection:
+            connection.execute('CREATE TABLE asset(location TEXT,path TEXT)')
+            connection.executemany('INSERT INTO asset VALUES(?,?)', [('pikpak', path) for path in
+                (r'A:\Normal\one.mp4', r'A:\Proxy\two.mp4', r'A:\Proxy\Free\three.mp4', r'A:\NormalExtra\four.mp4')])
+            self.assertEqual(connection.execute('SELECT path FROM asset a WHERE 1=1' + sql,
+                                                parameters).fetchall(),
+                             [(r'A:\Normal\one.mp4',), (r'A:\Proxy\Free\three.mp4',)])
+
+    def test_normal_source_can_require_budget_when_its_root_is_protected(self):
+        config = SimpleNamespace(locations={'115': (r'B:\Media',)}, media_costs={r'B:\Media': 'metered'})
+        with patch('peach.settings_file.active', return_value=config):
+            with self.assertRaises(MeteredSourceDenied):
+                SourceAccessPolicy().sql_filter('115', False)
 
     def test_authorized_metered_query_is_scoped_to_requested_source(self):
         sql, parameters = SourceAccessPolicy().sql_filter("pikpak", allow_metered=True)

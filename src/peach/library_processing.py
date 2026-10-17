@@ -1675,13 +1675,13 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
                                            mounts=mounts, report=lambda line: update(stage='扫描文件'))
                 result.scanned += registered.files
                 result.probed += probe_unmeasured(
-                    db_path, ffprobe, source, root,
+                    db_path, ffprobe, source, root, config=config,
                     report=lambda done, total: update(stage='读取时长与分辨率', checked=done, total=total))
                 reattach_in(db_path, registered.new_ids)
                 update(scanned=result.scanned, probed=result.probed)
             elif stage == COLLECT_STAGE:
                 result.probed += probe_unmeasured(
-                    db_path, ffprobe, source, root, asset_ids=asset_ids,
+                    db_path, ffprobe, source, root, asset_ids=asset_ids, config=config,
                     report=lambda done, total: update(stage='读取时长与分辨率', checked=done, total=total))
     return result
 

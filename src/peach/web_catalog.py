@@ -32,13 +32,13 @@ from .entities import normalize_entity_name, resolve_entity, upsert_asset_entity
 from .catalog_versions import foldable_versions, partition_versions, version_labels
 from .field_owners import parse_owners
 from .metadata_policy import SOURCE_SPECS
+from .media_sources import cost_for
 from .regions import infer_region, normalize_region, region_label
 from .web_activity import DEFAULT_PROFILE_ID
 from .web_state import WebContract
 from .western_artwork import artwork_key
 
 
-COST = {"local": "free", "115": "free", "pikpak": "metered", "guangya": "metered", "online": "metered"}
 GROUP_TABLES = ('asset', 'asset_entity', 'entity')
 
 #: 卡片随每条记录返回的女优上限。共演作品必须带上全部出镜者，而不是只留第一位；
@@ -408,7 +408,7 @@ def q_items(contract: WebContract, args):
             r["performer_total"] = len(refs) or len(all_performers)
             r["_entity_kinds"] = tuple(canonical)
     for r in rows:
-        r["cost"] = COST.get(r["location"], "metered")
+        r["cost"] = cost_for(r['location'], r.get('path'))
         r["has_thumb"] = contract.has_snapshot(r["snapshot_path"])
         r['has_local_poster'] = (contract.poster_root / f"{r['id']}_4.jpg").is_file()
         attach_artwork_fields(contract, r)
@@ -981,7 +981,7 @@ def q_item(contract: WebContract, aid):
         d["creator"] = d["entities"]["creator"][0]
     if d["entities"]["studio"]:
         d["studio"] = d["entities"]["studio"][0]
-    d["cost"] = COST.get(d["location"], "metered")
+    d["cost"] = cost_for(d['location'], d.get('path'))
     d["has_thumb"] = contract.has_snapshot(d["snapshot_path"])
     d['has_local_poster'] = (contract.poster_root / f"{d['id']}_4.jpg").is_file()
     attach_artwork_fields(contract, d)
@@ -1047,7 +1047,7 @@ def q_related(contract: WebContract, aid, limit=24):
         ))
         if not source_entities:
             return {"items": []}
-        COLS = ("id,location,name,catalog_title,original_title,creator,studio,code,size,duration,width,height,"
+        COLS = ("id,location,path,name,catalog_title,original_title,creator,studio,code,size,duration,width,height,"
                 "ctx_orient,snapshot_path,play_count,leave_ratio,feedback,disposal,o_count")
         source_entity_ids = [row[0] for row in source_entities]
         source_marks = ",".join("?" * len(source_entity_ids))
@@ -1100,7 +1100,7 @@ def q_related(contract: WebContract, aid, limit=24):
         for asset_id, tag in con_tags(contract, related_ids, marks):
             related_tags.setdefault(asset_id, []).append(tag)
     for d in picked:
-        d["cost"] = COST.get(d["location"], "metered")
+        d["cost"] = cost_for(d['location'], d.get('path'))
         d["has_thumb"] = contract.has_snapshot(d["snapshot_path"])
         d['has_local_poster'] = (contract.poster_root / f"{d['id']}_4.jpg").is_file()
         attach_artwork_fields(contract, d)
@@ -1109,6 +1109,7 @@ def q_related(contract: WebContract, aid, limit=24):
         )
         d.pop("release_date", None)
         d.pop("snapshot_path", None)
+        d.pop("path", None)
     return {"items": picked[:limit]}
 
 #: 一条资产实际算哪个产地，按三层依次取第一个有值的：资产自己判定的
