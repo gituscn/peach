@@ -24,11 +24,12 @@ import { TaskProgress } from '../components/task-progress';
 import { Disclosure } from '../settings/section';
 import { queryClient } from '../query';
 import {
-  currentLine, DISCONNECTED_TEXT, issueDetails, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL,
-  notesLine, type LibraryProcessingCommand, type LibraryProcessingData,
+  processingLine, DISCONNECTED_TEXT, issueDetails, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL,
+  notesLine, processingActive, remainingTime, type LibraryProcessingCommand, type LibraryProcessingData,
 } from './library-processing';
 import { useLibraryProcessingJob } from './use-library-processing';
 import { ProcessingActions } from './processing-actions';
+import { ProcessingControls } from './processing-controls';
 
 /* 中文正文写成常量：JSX 里换行的文字会在接缝处多出一个空格，中文句子里看得见。
    卡片正文与首屏骨架共用 `SCAN_CARD_TEXT`（`management.ts`）。 */
@@ -120,7 +121,7 @@ function Outcome(
       {settled?.status === 'complete'
         ? <Note tone="success" title="处理完成">{receiptText(settled)}</Note>
         : null}
-      {state.status !== 'running' && notes
+      {!processingActive(state) && notes
         ? <Note tone="neutral"
             extra={state.issues_log
               /* 同上：线跟着这行灰字走，两块提示里的那一条才是同一条。 */
@@ -156,17 +157,17 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
   const problem = start.error ? errorMessage(start.error)
     : job.isError ? (job.data ? DISCONNECTED_TEXT : errorMessage(job.error))
     : '';
-  const busy = start.isPending || state.status === 'running';
-  const line = currentLine(state);
+  const busy = start.isPending || processingActive(state);
+  const line = processingLine(state);
 
-  const run = (command: LibraryProcessingCommand) => {
+  const run = async (command: LibraryProcessingCommand) => {
     if (busy) return;
     start.reset();
-    start.mutate(command);
+    await start.mutateAsync(command);
   };
   const retry = () => {
     if (!state.job_id || !state.retryable_asset_ids?.length) return;
-    run({ job_id: state.job_id, retry: state.retryable_asset_ids });
+    void run({ job_id: state.job_id, retry: state.retryable_asset_ids }).catch(() => {});
   };
 
   return (
@@ -180,15 +181,21 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
           {/* 两个入口并存，各自答的不是一个问题：这里是「重新跑一整批」，下面那条错误提示里
               的「重试未完成项」只补上一趟没做完的那些。采集里网络超时几乎每趟都留下几项可
               重试的，页脚要是让位给重试键，新入库的片子就再也没有入口被扫到。 */}
-          <ProcessingActions scan busy={busy} metadataOnly={state?.metadata_only} onRun={run} />
+          <ProcessingActions scan busy={busy} metadataOnly={state?.metadata_only} speedMode={state.speed_mode} onRun={run} />
         </>
       }>
         <div className="flex flex-col gap-2">
           <FieldsetTitle>扫描与采集</FieldsetTitle>
           <p className="text-body-2-regular text-text-secondary">{SCAN_CARD_TEXT}</p>
-          {state.status === 'running'
+          {state.status === 'paused' && !state.total
+            ? <p className="text-caption-1-regular text-text-secondary">已暂停</p>
+            : processingActive(state)
             ? <TaskProgress embedded label={line} value={Math.min(state.checked || 0, state.total || 0)} total={state.total} />
             : null}
+          {processingActive(state) ? <p className="text-body-2-regular text-text-secondary tabular-nums" data-processing-eta="">
+            {remainingTime(state)}
+          </p> : null}
+          <ProcessingControls state={state} disabled={start.isPending || job.isError} />
         </div>
       </Fieldset>
       <Outcome state={state} problem={problem} settled={settled} onRetry={retry} toast={toast} />

@@ -10,10 +10,11 @@ import type { MediaItem } from '../catalog-grid/types';
 import { Note } from '../components/note';
 import { queryClient } from '../query';
 import {
-  currentLine, DISCONNECTED_TEXT, fetchLibraryProcessing, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL,
-  pollInterval, type LibraryProcessingCommand, type LibraryProcessingData,
+  processingLine, DISCONNECTED_TEXT, fetchLibraryProcessing, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL,
+  pollInterval, processingActive, remainingTime, type LibraryProcessingCommand, type LibraryProcessingData,
 } from './library-processing';
 import { ProcessingActions } from './processing-actions';
+import { ProcessingControls } from './processing-controls';
 
 /** 缺图判据与卡面一致；本机影片可抽帧，有番号的挂载影片可补发行封面。 */
 type PreviewItem = Pick<MediaItem, 'id' | 'name' | 'medium' | 'disposal' | 'location' | 'code' | 'is_jav'
@@ -48,7 +49,7 @@ function Completion({ assetIds, onComplete }: { assetIds: number[]; onComplete?(
   });
   const state = job.data;
   useEffect(() => {
-    if (!state || !started || state.job_id !== started || state.status === 'running'
+    if (!state || !started || state.job_id !== started || processingActive(state)
       || completed.current === started) return;
     completed.current = started;
     if (state.status === 'complete') {
@@ -57,17 +58,18 @@ function Completion({ assetIds, onComplete }: { assetIds: number[]; onComplete?(
     void queryClient.invalidateQueries({ queryKey: ['catalog-grid'] });
     onComplete?.();
   }, [state, started, onComplete]);
-  const busy = start.isPending || state?.status === 'running';
+  const busy = start.isPending || processingActive(state);
   const problem = start.error ? errorMessage(start.error) : job.error ? DISCONNECTED_TEXT
     : started && state?.job_id === started && state.status === 'failed' ? state.error || '补全未完成' : '';
-  const message = problem || (busy ? start.isPending ? '正在启动补全…' : currentLine(state!)
+  const message = problem || (busy ? start.isPending ? '正在启动补全…' : processingLine(state!)
     : outcome || `这批影片中有 ${assetIds.length.toLocaleString()} 部暂无预览，可补全资料与图片。`);
   return <section aria-label="补全预览" aria-live="polite" data-library-completion="" className="@container mb-4">
-    <Note tone={problem ? 'warning' : 'neutral'} actionLayout="below" action={<ProcessingActions busy={busy} metadataOnly={state?.metadata_only} onRun={command => {
+    <Note tone={problem ? 'warning' : 'neutral'} actionLayout="below" action={<div className="flex flex-wrap items-center gap-2"><ProcessingActions busy={busy} metadataOnly={state?.metadata_only} onRun={command => {
       if (busy) return;
       setOutcome('');
       start.mutate(command);
-    }} />}>{message}{' '}<LinkButton href="/data-cleanup#libraryProcessing" size="small" trailingIcon={RiArrowRightLine}>
+    }} />{state && processingActive(state) ? <ProcessingControls state={state} disabled={job.isError} /> : null}</div>}>
+      {message}{state && processingActive(state) ? <span className="block tabular-nums" data-processing-eta="">{remainingTime(state)}</span> : null}{' '}<LinkButton href="/data-cleanup#libraryProcessing" size="small" trailingIcon={RiArrowRightLine}>
       {problem ? '查看并处理' : '查看处理详情'}
     </LinkButton></Note>
   </section>;

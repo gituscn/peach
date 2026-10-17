@@ -11,9 +11,9 @@ import { RiArrowRightLine, RiErrorWarningLine, RiInformationLine } from '@remixi
 import { LinkButton } from '@/components/base/buttons/link-button';
 
 import { errorMessage } from '../../api';
-import { progressText } from '../activity/tasks';
 import type { LibraryProcessingProps } from '../bundle';
-import { currentLine, DISCONNECTED_TEXT } from './library-processing';
+import { processingLine, DISCONNECTED_TEXT, processingActive, remainingTime } from './library-processing';
+import { ProcessingControls } from './processing-controls';
 import { useLibraryProcessingJob } from './use-library-processing';
 
 type Tone = 'gray' | 'warning' | 'error';
@@ -52,7 +52,7 @@ export function LibraryProcessingNotice(props: LibraryProcessingProps) {
   const problem = job.isError ? (state ? DISCONNECTED_TEXT : errorMessage(job.error)) : '';
   const status = state?.status ?? 'idle';
   const failed = status === 'failed';
-  const running = status === 'running';
+  const running = processingActive(state);
   /* 任务不在跑、也没出事时这条不该占地方：目录页顶上常年挂一句「没有任务」比没有还吵。 */
   if (!problem && !running && !failed) return null;
 
@@ -61,7 +61,7 @@ export function LibraryProcessingNotice(props: LibraryProcessingProps) {
   const checked = Math.min(state?.checked || 0, total);
   const message = problem
     || (failed ? '扫描与资料采集未完成'
-      : currentLine(state!) + (total ? ` · ${progressText(checked, total)}` : ''));
+      : processingLine(state!));
   const Glyph = tone === 'gray' ? RiInformationLine : RiErrorWarningLine;
   return (
     <aside role={failed ? 'alert' : 'status'} className={SURFACE[tone]}>
@@ -69,8 +69,12 @@ export function LibraryProcessingNotice(props: LibraryProcessingProps) {
         {running && total
           ? <Gauge value={checked} max={total} />
           : <Glyph aria-hidden className="size-4 shrink-0" />}
-        <p className="min-w-0 text-body-2-regular">{message}</p>
+        <div className="min-w-0 text-body-2-regular wrap-anywhere">
+          <p>{message}</p>
+          {running ? <p className="text-caption-1-regular tabular-nums" data-processing-eta="">{remainingTime(state!)}</p> : null}
+        </div>
       </div>
+      {running ? <ProcessingControls state={state!} disabled={job.isError} /> : null}
       <LinkButton href="/data-cleanup#libraryProcessing" size="small" trailingIcon={RiArrowRightLine}>
         {problem || failed ? '查看并处理' : '查看进度'}
       </LinkButton>
