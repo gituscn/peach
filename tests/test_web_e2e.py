@@ -312,7 +312,7 @@ class WebE2ESmokeTests(unittest.TestCase):
                 raise AssertionError(f"演示短片取消失败：{error}") from error
 
     def test_every_route_holds_the_layout_and_runtime_invariants(self):
-        env = dict(os.environ, PEACH_E2E_ORIGIN=self.origin, PEACH_E2E_ITEM=str(self.item),
+        env = dict(os.environ, PEACH_E2E_ORIGIN=self.origin, PEACH_E2E_ITEM=str(self.item), PEACH_E2E_FFMPEG=self.ffmpeg,
                    PEACH_E2E_CHROME=self.chrome, PEACH_E2E_NET_LOG_DIR=str(BROWSER_LOGS / "network"))
         BROWSER_LOGS.mkdir(parents=True, exist_ok=True)
         for stale in BROWSER_LOGS.glob("batch-*.tap"):
@@ -571,6 +571,7 @@ class MissingPrerequisiteTests(unittest.TestCase):
             log_root = Path(folder).resolve()
             case = WebE2ESmokeTests("test_every_route_holds_the_layout_and_runtime_invariants")
             case.origin, case.item, case.chrome, case.node = "http://fixture", 1, "chrome", "node"
+            case.ffmpeg = "ffmpeg"
             failed = subprocess.CompletedProcess([], 1, "# pass 1\n# fail 1\n", "failure")
             batches = ((("e2e/first.test.ts",), 1), (("e2e/second.test.ts",), 1))
             with mock.patch.dict(os.environ, {"PEACH_E2E_FILES": "[]"}), \

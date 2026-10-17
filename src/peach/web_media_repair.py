@@ -26,6 +26,7 @@ from pathlib import Path, PureWindowsPath
 
 from . import media_libraries, media_probe, mp4recover, settings_file
 from .mp4repair import RepairUnavailable
+from .media_sources import READ_ONLY_LOCATIONS
 from .platform import translate_ledger_path
 
 #: 判定结论的落盘位置，放在边车自己的目录里：它们同生同灭，清缓存时一起走。
@@ -167,6 +168,10 @@ def _record_replacement(contract, asset_id: int, source: Path, ffprobe: Path) ->
 
 
 def _recover(contract, asset_id: int, raw: str, tools: tuple[Path, Path, Path]) -> bool:
+    with contract.read_connection() as connection:
+        row = connection.execute("SELECT location FROM asset WHERE id=?", (asset_id,)).fetchone()
+    if row is None or row['location'] in READ_ONLY_LOCATIONS:
+        return False
     untrunc, ffmpeg, ffprobe = tools
     source = translate_ledger_path(raw)
     references = [translate_ledger_path(path) for path in

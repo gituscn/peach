@@ -136,7 +136,7 @@ const ROUTES: readonly Route[] = [
     path: `/assets/${requiredEnv('PEACH_E2E_ITEM')}`,
     body: (page) => {
       const stage = page.getByRole('dialog', { name: '作品详情' });
-      return [stage, stage.locator('video')];
+      return [stage, stage.locator('video.vjs-tech')];
     },
   },
 ];

@@ -355,7 +355,7 @@ describe('舞台岛', () => {
       const frame = page.locator('#stage [data-follow-detail-media="video"]');
       await frame.locator('.video-js .vjs-control-bar').waitFor({ state: 'attached' });
       await frame.locator(':scope > #playerStatsBtn').waitFor();
-      const poster = () => frame.locator('.vjs-poster img').getAttribute('src');
+      const poster = () => frame.locator('video.vjs-tech').getAttribute('poster');
       assert.match(await poster() || '', /\/stub-thumb\/5101$/, 'Video.js 挂上之后海报丢了');
 
       await page.route('**/follow-qualities**', () => {});

@@ -1,7 +1,4 @@
-/* 播放器模块用到的那一截 Video.js 接口与条目形状。
- *
- * Video.js 走 vendored 脚本与全局 `videojs`（`/vendor/videojs/8.24.1/`），不装 npm 包，也就没有
- * 上游的类型声明；这里只声明真正调用到的方法，参数形状按 8.24 的实际行为写。 */
+/* Peach 播放会话接口与条目形状；Video.js 10 通过本地 ESM 模块提供媒体与控件。 */
 
 export type PlayerEvents = string | string[];
 
@@ -24,7 +21,6 @@ export interface VjsPlayer {
   one(events: PlayerEvents, handler: (...args: unknown[]) => void): void;
   ready(handler: () => void): void;
   el(): HTMLElement;
-  getChild(name: string): { el(): HTMLElement } | undefined;
   isDisposed(): boolean;
   dispose(): void;
   trigger(event: string): void;
@@ -50,7 +46,7 @@ export interface VjsPlayer {
   currentSrc(): string;
   currentSource(): { type?: string } | undefined;
   qualityLevels?(): QualityLevelList;
-  tech(options: { IWillNotUseThisInPlugins: true }): { vhs?: { stats?: { bandwidth?: number } } } | undefined;
+  bandwidth?(): number;
   addRemoteTextTrack(track: Record<string, unknown>, manualCleanup: boolean): void;
 }
 

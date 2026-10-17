@@ -29,6 +29,7 @@ from .catalog_rules import dir_expr, normalise_code_key, photo_set_title
 from .config import LOCATION_ROOT_DECLARATIONS
 from .jobs import BackgroundJob
 from .media import normalized_path
+from .media_sources import READ_ONLY_LOCATIONS, SCANNABLE_LOCATIONS
 from .personal_records import VANISHED, mark_vanished, record_holders
 from .platform import is_unmapped, root_online, translate_ledger_path, within_root
 from .record_rehome import reattach_vanished
@@ -77,7 +78,7 @@ RESOURCE_SCAN_WORKERS = 8
 def configured_resource_locations() -> tuple[str, ...]:
     """核对已声明的媒体来源，离线状态由扫描阶段报告。"""
     return tuple(location for location, roots in LOCATION_ROOT_DECLARATIONS.items()
-                 if location in ("local", "115", "pikpak") and roots)
+                 if location in SCANNABLE_LOCATIONS and roots)
 
 
 def _scan_resource_directory(
@@ -287,7 +288,8 @@ def _scan_sources(
         if online:
             unreadable: set[str] = set()
             gone = vanished_asset_rows(contract, location, unreadable_dirs=unreadable)
-            empties = _empty_directories(_source_roots(location), unreadable)
+            empties = ([] if location in READ_ONLY_LOCATIONS
+                       else _empty_directories(_source_roots(location), unreadable))
             vanished_ids.extend(int(row["id"]) for row in gone)
             keep = _keeps_records(contract, gone)
             keep_ids.update(keep)
@@ -676,7 +678,8 @@ def w_resource_sync_apply(contract: ResourceSyncContract, body, *, progress=None
     report(checked=0, total=None, message="正在删除空文件夹")
     dirs_removed, dir_errors = 0, 0
     for location, paths in state["empty_dirs"].items():
-        if location not in configured_resource_locations() or not source_is_online(location):
+        if (location in READ_ONLY_LOCATIONS or location not in configured_resource_locations()
+                or not source_is_online(location)):
             continue
         removed, errors = _remove_empty_directories([Path(path) for path in paths],
                                                     _source_roots(location))

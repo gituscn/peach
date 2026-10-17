@@ -2,7 +2,7 @@
  *
  * 这些节点由命令式模块画，不进 React 渲染，也不在 `.peach-react` 里：画面框在两座详情岛的
  * 媒体格里（`[data-stage-media]`），右键菜单建在 body 上、舞台开着时挪进舞台。选择器全用
- * `data-*`；Video.js 自己的 `video-js` 与 `vjs-*` 类照旧按类名写，那是它的组件契约
+ * `data-*`；播放器皮肤的 `video-js` 与 `vjs-*` 类用于 Peach 控件和布局
  * （`test/legacy-class-names.test.ts` 按前缀放行）。
  *
  * 引入顺序排在各岛样式之后、舞台样式之前（`src/react/styles.css`）。舞台里压过播放器的几条
@@ -12,10 +12,40 @@
  * `backdrop-filter` 只写标准属性：带前缀那条由构建按目标补上。两条都手写的话，产物里只剩带前缀
  * 那条，当前 Chromium 不认，模糊整条丢掉。 */
 
+/* Video.js 10 控件使用 light DOM，几何归 Peach 皮肤。 */
+.video-js{display:block;position:relative;box-sizing:border-box;color:#fff;background:#000;font-size:10px;line-height:1;font-family:inherit}
+.video-js>video-player{display:contents}
+.video-js>video-player>media-container{display:block;width:100%;height:100%;position:absolute;inset:0}
+.video-js :is(hlsjs-video,dash-video){display:contents}
+.video-js .vjs-tech{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.video-js .vjs-control-bar{display:flex;position:absolute;bottom:0;left:0;width:100%;height:3em;z-index:2}
+.video-js .vjs-control{position:relative;flex:none;box-sizing:border-box;width:4em;height:3em;color:inherit}
+.video-js .vjs-button{display:block;cursor:pointer;background:none;border:0;padding:0;color:inherit;font:inherit;outline-offset:2px;touch-action:manipulation;user-select:none}
+.video-js .vjs-button:focus-visible,.video-js media-slider-thumb:focus-visible{outline:2px solid var(--tungsten)}
+.video-js .vjs-slider{display:block;position:relative;cursor:pointer;touch-action:none}
+.video-js media-slider-track{display:block;position:absolute;inset:0}
+.video-js .vjs-play-progress,.video-js .vjs-load-progress,.video-js .vjs-volume-level{display:block;position:absolute;left:0;top:0;height:100%}
+.video-js .vjs-play-progress,.video-js .vjs-volume-level{width:var(--media-slider-fill,0%);background:#fff}
+.video-js .vjs-load-progress{width:var(--media-slider-buffer,0%);background:rgba(255,255,255,.35)}
+.video-js media-slider-thumb{display:block;position:absolute;left:var(--media-slider-fill,0%);top:50%;width:12px;height:12px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);z-index:2}
+.video-js .vjs-progress-thumb{opacity:0}.video-js .vjs-progress-control:hover .vjs-progress-thumb,.video-js .vjs-progress-control:focus-within .vjs-progress-thumb{opacity:1}
+.video-js .vjs-loading-spinner{display:none;position:absolute}
+.video-js.vjs-waiting:not(.vjs-paused) .vjs-loading-spinner{display:block}
+.video-js .vjs-error-display{display:none;position:absolute;inset:0;pointer-events:none}
+.video-js.vjs-error .vjs-error-display{display:flex;align-items:center;justify-content:center}
+.video-js.vjs-user-inactive.vjs-playing .vjs-control-bar{opacity:0;pointer-events:none}
+.video-js.vjs-fullscreen{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;max-height:none!important}
+.video-js media-container:fullscreen{width:100vw;height:100vh;background:#000}
+.video-js .vjs-subtitles-control{position:relative;z-index:4;align-self:flex-end;width:40px;height:40px;margin-bottom:8px;cursor:pointer}
+.video-js .vjs-subtitles-menu{position:absolute;right:0;bottom:100%;min-width:140px;max-height:50vh;overflow:auto;background:rgba(0,0,0,.9);border-radius:var(--floating-radius);padding:6px}
+.video-js .vjs-subtitles-menu button{display:block;width:100%;color:inherit;background:none;border:0;padding:8px;text-align:left;font:inherit;cursor:pointer}
+.video-js .vjs-subtitles-menu button[aria-checked=true]{background:rgba(255,255,255,.15)}
+.video-js .vjs-subtitles-menu[hidden],.video-js .vjs-subtitles-control[hidden]{display:none}
+.video-js .vjs-modal-dialog-content{position:absolute}
+.video-js media-slider-value{position:absolute;visibility:hidden}
+.video-js .vjs-volume-panel:hover media-slider-value,.video-js .vjs-volume-panel:focus-within media-slider-value{visibility:visible}
 /* ── 画面框与 Video.js 外观 ── */
-/* Video.js 的样式表随播放器一起装（`videojs.ts`），画面框先挂上的那几帧里裸 `<video class="video-js">`
-   还没有它。这一条照抄样式表 `.video-js` 里决定盒子位置的四项，样式表到场前后画面框不跳；初始化后
-   Video.js 把这个元素的类换成 `vjs-tech`，这条就不再命中。 */
+/* 挂载前的原生 video 与播放器皮肤共用尺寸和字形。 */
 video.video-js{vertical-align:top;font-size:10px;line-height:1;font-family:Arial,Helvetica,sans-serif}
 [data-stage-media]{background:#000;position:relative;display:flex;align-items:center;justify-content:center;isolation:isolate}
 [data-ambient-canvas]{position:absolute;z-index:0;inset:-34px;width:calc(100% + 68px);height:calc(100% + 68px);
@@ -162,6 +192,7 @@ video.video-js{vertical-align:top;font-size:10px;line-height:1;font-family:Arial
 [data-stage-media] .video-js .vjs-peach-right-controls>.vjs-control:focus-visible,
 [data-stage-media] .video-js .vjs-peach-right-controls>.vjs-control>button:focus,
 [data-stage-media] .video-js .vjs-peach-right-controls>.vjs-control>button:focus-visible{outline:0;box-shadow:none}
+[data-stage-media] .video-js .vjs-peach-right-controls>.vjs-button:focus-visible{outline:2px solid var(--tungsten);outline-offset:2px}
 /* 命中区比看得见的那条粗得多：彩条只有 6px，要在 6px 里对准才能拖动进度。上游
    YouTube 的 `.ytp-progress-bar-container` 同样把可点高度留得比彩条高，而多出来的那
    一截全在条上方——往下扩会盖住按钮那一排的顶边，读起来就是按钮时灵时不灵。Video.js

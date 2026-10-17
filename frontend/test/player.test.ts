@@ -11,6 +11,7 @@ import {
 import { mountPlayer } from '../src/player/detail-player';
 import { wireTelemetry } from '../src/player/telemetry';
 import type { QualityLevel, QualityLevelList, VjsPlayer } from '../src/player/types';
+import * as videojsLoader from '../src/player/videojs';
 
 type FetchCall = { url: string; init: RequestInit | undefined };
 
@@ -68,6 +69,12 @@ describe('片源判据', () => {
     await flush(); await flush();
     expect(JSON.parse(document.documentElement.dataset.peachStreamCancel || 'null')).toEqual({ cancelled: 1 });
   });
+
+  it('STRM 的文件类型使用服务端播放计划', async () => {
+    stubFetch(() => ({ protocol: 'range', src: '/stream?id=6', mime_type: 'video/webm' }));
+    expect(await playableStreamSource({ id: 6, name: 'ABC-123.strm' }, 'strm'))
+      .toEqual({ src: '/stream?id=6', type: 'video/webm' });
+  });
 });
 
 describe('观看上报', () => {
@@ -122,7 +129,7 @@ describe('沉浸模式的每一格', () => {
         dispose: () => { record.disposed = true },
       } as unknown as VjsPlayer;
     });
-    vi.stubGlobal('videojs', factory);
+    vi.spyOn(videojsLoader, 'ensureVideojs').mockResolvedValue(factory);
     return { factory, made };
   }
 
@@ -208,13 +215,14 @@ describe('播放器清晰度', () => {
   function menu(entries: QualityLevel[], selectedIndex = 0) {
     configurePlayer(host());
     const root = document.createElement('div'), bar = document.createElement('div'), video = document.createElement('video');
+    bar.className = 'vjs-control-bar';
     root.append(video, bar); document.body.append(root);
     const { player, fire } = fakePlayer({ time: 0, duration: 100 });
     const events = new Map<string, () => void>();
     const levels = Object.assign(entries, { selectedIndex, on: (names: string | string[], fn: () => void) => {
       for (const name of [names].flat()) events.set(name, fn);
     } }) as QualityLevelList;
-    Object.assign(player, { el: () => root, getChild: () => ({ el: () => bar }), qualityLevels: () => levels,
+    Object.assign(player, { el: () => root, qualityLevels: () => levels,
       paused: () => true, ended: () => false, isFullscreen: () => false, muted: () => false, volume: () => 1, trigger: () => {} });
     mountPlayerQualityControl(player, video, 2160);
     const open = () => {

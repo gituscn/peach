@@ -12,6 +12,29 @@ from .http import public_https_url
 
 PLAYLIST_REFRESH_SECONDS = 300
 
+
+def rewrite_hls(body: bytes, url: str, register) -> bytes:
+    """用已声明的 m3u8 模型投影全部媒体引用，地址登记策略由消费者提供。"""
+    text = body.decode('utf-8-sig')
+    if not text.lstrip().startswith('#EXTM3U'):
+        raise ValueError('播放列表未取得')
+    playlist = m3u8.loads(text, uri=url)
+    if playlist.content_steering:
+        raise ValueError('暂不支持 Content Steering 播放列表')
+    nested = [*playlist.playlists, *playlist.iframe_playlists, *playlist.image_playlists, *playlist.media]
+    objects = [*playlist.segments, *nested, *playlist.keys, *playlist.session_keys,
+               *playlist.session_data, *playlist.segment_map, *playlist.rendition_reports,
+               playlist.preload_hint]
+    objects += [segment.init_section for segment in playlist.segments if segment.init_section]
+    objects += [part for segment in playlist.segments for part in segment.parts]
+    seen = set()
+    for obj in objects:
+        if obj is not None and id(obj) not in seen and getattr(obj, 'uri', None):
+            seen.add(id(obj))
+            obj.uri = register(urljoin(url, obj.uri), any(obj is row for row in nested))
+    return playlist.dumps().encode('utf-8')
+
+
 class PreviewCache:
     def __init__(self, cache):
         self.cache = cache
@@ -50,18 +73,7 @@ class PreviewCache:
         generation = hashlib.sha256(url.encode()).hexdigest()
         body = self.cache.bytes(f"preview:{code}:{ref}:playlist:{generation}", download,
                                 ttl=PLAYLIST_REFRESH_SECONDS)
-        playlist = m3u8.loads(body.decode("utf-8").removeprefix(chr(0xFEFF)), uri=url)
-        nested = [*playlist.playlists, *playlist.iframe_playlists, *playlist.media]
-        objects = [*playlist.segments, *nested, *playlist.keys, *playlist.session_keys, *playlist.segment_map]
-        for obj in objects:
-            if obj is None or not getattr(obj, "uri", None):
-                continue
-            source = urljoin(url, obj.uri)
-            item = self.register(code, source, playlist=any(obj is row for row in nested))
-            obj.uri = f"/jav-preview/{code}/{item}{'.m3u8' if any(obj is row for row in nested) else ''}"
-        # 每个段的 init_section 是同一格式的独立对象，必须一同投影。
-        for segment in playlist.segments:
-            obj = segment.init_section
-            if obj and obj.uri and not obj.uri.startswith("/jav-preview/"):
-                obj.uri = f"/jav-preview/{code}/{self.register(code, urljoin(url, obj.uri))}"
-        return playlist.dumps().encode("utf-8")
+        def register(source, nested):
+            item = self.register(code, source, playlist=nested)
+            return f"/jav-preview/{code}/{item}{'.m3u8' if nested else ''}"
+        return rewrite_hls(body, url, register)

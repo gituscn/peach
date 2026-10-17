@@ -104,9 +104,7 @@ export const hasChanges = (scan: ResourceScanState | undefined) =>
   Boolean(scan?.missing || scan?.empty || scan?.cache?.files);
 
 /** 来源代号在这一块里的名字。认不出的来源统称「媒体来源」。 */
-export const SOURCE_LABELS: Record<string, string> = {
-  local: '本地磁盘', '115': '115', pikpak: 'PikPak',
-};
+export { SOURCE_LABELS } from '../../core/media-sources';
 
 const count = (value: number | undefined) => Number(value || 0).toLocaleString();
 

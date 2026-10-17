@@ -1150,6 +1150,7 @@ class WebDataTests(unittest.TestCase):
             "/api/tasks",
             "/api/library-processing",
             "/api/library-processing/issues",
+            "/api/media-processing",
             "/api/thumbnail-jobs", "/api/timeline", "/api/media-repair",
             "/api/scraping", "/api/scraping/cover", "/api/scraping/amane-bridge",
             "/api/items", "/api/item", "/api/entity", "/api/entity/shapes", "/api/photos", "/api/photo-set",
@@ -1174,6 +1175,7 @@ class WebDataTests(unittest.TestCase):
         self.assertEqual(set(rm_web.POST_HANDLERS), {
             "/api/downloads", "/api/downloads/cancel", "/api/downloads/postprocess",
             "/api/library-processing", "/api/thumbnail-jobs", "/api/media-repair",
+            "/api/media-processing",
             "/api/scraping/settings", "/api/scraping/check", "/api/scraping/cover",
             "/api/scraping/amane-bridge/check", "/api/scraping/amane-bridge/rebuild",
             "/api/activity", "/api/play", "/api/feedback", "/api/watch-later",

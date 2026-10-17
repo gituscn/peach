@@ -623,7 +623,8 @@ class SetupJsonContractTests(_SetupHttpCase):
         self.assertEqual(by_key["media_dir"]["input"], "folders")
         self.assertEqual(data["windows"], NATIVE_WINDOWS)
         self.assertFalse(data["standalone"])
-        self.assertEqual([row["value"] for row in data["media_sources"]], ["local", "115", "pikpak"])
+        self.assertEqual([row["value"] for row in data["media_sources"]],
+                         ["local", "115", "pikpak", "guangya", "onedrive", "mounted"])
         self.assertEqual(data["media_source_default"], "local")
         if NATIVE_WINDOWS:
             self.assertIsNone(data["media_root"])
@@ -634,6 +635,15 @@ class SetupJsonContractTests(_SetupHttpCase):
         self.assertEqual(data["cloud"]["link"]["url"], "https://www.clouddrive2.com/help.html")
         # 默认对局域网开放，所以访问密码开关第一次出现就开着；扫描默认勾上，导入历史默认不勾。
         self.assertEqual((data["access_enabled"], data["scan_now"], data["history_guide"]), (True, True, False))
+
+    def test_setup_preserves_explicit_proxy_protection_for_a_mounted_source(self):
+        rows = self._rows(self.media, location="onedrive")
+        rows[0]["cost"] = "free"
+        self._submit(media_dir=rows, scan_now=False)
+        loaded = self._loaded()
+        self.assertEqual(set(loaded.locations), {"onedrive"})
+        self.assertEqual(set(loaded.media_costs.values()), {"free"})
+        self.assertEqual(loaded.media_costs[next(iter(loaded.locations["onedrive"]))], "free")
 
     def test_the_questions_list_missing_mount_software_with_download_links(self):
         rows = [{"name": "CloudDrive", "available": True, "download_url": "https://www.clouddrive2.com/download.html"},
@@ -1059,6 +1069,21 @@ class StandaloneConfigurationTests(_Case):
             self.assertEqual(snapshot['media_sources'][0]['location'], '115')
             self.assertTrue(snapshot['media_sources'][0]['online'])
             self.assertFalse((saved.directory('database') / 'ledger.db').exists())
+
+    def test_cloud_configuration_roundtrips_per_root_proxy_protection(self):
+        from peach.routes_configuration import revision
+        with self.client() as client:
+            for location, cost in (("onedrive", "free"), ("mounted", "metered"), ("guangya", "free")):
+                current = settings_file.load_config()
+                response = client.post('/api/configuration', headers={'X-Token': 'test-token'}, json={
+                    'revision': revision(current), 'port': 9123,
+                    'media_sources': [{'location': location, 'path': str(self.media), 'root': 'O:/', 'cost': cost}]})
+                self.assertEqual(response.status_code, 200, response.text)
+                saved = settings_file.load_config()
+                self.assertIn(cost, saved.media_costs.values())
+                snapshot = client.get('/api/configuration', headers={'X-Token': 'test-token'}).json()
+                self.assertEqual(snapshot['media_sources'][0]['cost'], cost)
+                self.assertFalse((saved.directory('database') / 'ledger.db').exists())
 
     def test_settings_reject_unauthenticated_remote_cross_origin_and_stale_forms(self):
         from peach.routes_configuration import revision

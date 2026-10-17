@@ -1,5 +1,11 @@
 # 复用清单
 
+## STRM 与挂载来源
+
+STRM 采用文本指针、播放时解析的通用行为，参考 SmartStrm 文档、OpenList 的 `drivers/strm` 与 Jellyfin 的 STRM 探测入口；固定 revision、许可证与实际读取位置见 [取证记录](reference-snapshots/strm-source-evidence.md)。SmartStrm 核心闭源，源码未取得。Peach 独立实现受限 HTTP(S) 指针，复用 HTTPX、现有 Range 传输、`m3u8` 解析与播放器计划；无新增运行依赖，也不复制上游应用代码。
+
+光鸭、OneDrive 与其他网盘复用声明挂载根、路径翻译、扫描和只读保护；网盘登录与平台 API 由 CloudDrive2 或 OpenList 等挂载工具提供。挂载目录可单独设置代理流量保护，成本投影与批处理使用同一规则。STRM、ISO 跳过后台媒体读取，普通媒体保留按来源策略执行的探测；九宫格和时间轴共用本机视频预览开关。
+
 Actions 工作流静态检查复用 actionlint 1.7.12（MIT，`rhysd/actionlint:1.7.12` 官方 Docker 镜像），由本地 Docker action 使用，独立 Docker 目录纳入 Dependabot 与接管入口。GitHub Actions 生态不更新 `docker://` 镜像引用。Windows 官方二进制按发布校验和完成本地 POC；CI 在 Linux 容器检查语法、表达式、任务依赖与脚本。Python 与浏览器回归继续使用现有统一入口及 Playwright；六片浏览器权重来自 [已通过的 CI](https://github.com/peach-mitao/peach/actions/runs/38981261189) 的 69 份 TAP，记录在 `scripts/ci-browser-timings.json`，没有新增应用运行依赖。
 
 目录浏览的 `media_folders` 复用 `PureWindowsPath`、媒体库声明根和账本路径，不访问媒体挂载。`folder_rules` 复用 profile 偏好、规范实体、字段归属、身份断言、逐件归属否定和扫描登记入口；规则以 `user:directory-<目录标识>` 保存独立来源，预览摘要绑定资产版本与关系，撤回只处理本来源。已有明确归属保持独立。
@@ -84,7 +90,7 @@ FC2 卖家名册复用 `sources/fc2.py` 的 `label`、`seller_url` 来源契约�
 
 JAV 发现卡复用馆藏的 `data-media-card` 网格与悬停面、`coverImage` 封面取景、`cardRatio` 大小图比例和 `feedIdentity` 身份头像；筛选复用 `FilterGlassRows`、`FilterPill`、`Segments` 与 `SortKeys`。出演者引用由 `web_catalog.entity_ref` 提供图片版本与取景；标题保留两行，操作区贴底。发现查询复用口味汇总与 `related.rank_related` 的 IDF/MMR，输出相关度和实际选择分，支持口味、发行日期、来源评分、时长、番号排序。来源资料复用 `PublicAPI`、`BackgroundJob(runs=None)`、`fsutil.atomic_write_text` 与标准库 `ContextVar`；固定至多 100 部，真实 HTTP 预算 202 次、16 MiB、900 秒，3 秒串行间隔。资料边车有效期 6 小时、最多 2,048 条、失败冷却 15 分钟，完成或停止后由显式刷新续跑。`WantMagnets` 以 `queryUrl` 共用作品详情和想要清单的资源布局，按资源区容器宽度排列操作，缓存按来源分开，容量复用 `fmtSize`。JAV 与名册的静态搜索框复用 `islandSearchInput`。资料扩展见 [JAV 发现](JAV_DISCOVERY.md)，无新增依赖。
 
-JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字回退，标题折叠复用 `useFoldedTitle`。厂牌大小写唯一匹配与 `sources.javdb.maker_writing` 的日英组合解析只用于来源身份投影，标识按规范名读取。评论、资源复用 `Disclosure` 和 `setCollapseOpen`；来源与评论评分共用按小数裁切填充的星星。桌面右栏以 `contain:size` 排除正文的固有高度贡献，媒体区决定框体高度，正文在右栏内滚动。写操作取 `/healthz` 的账本只读状态，与运行配置权限分别处理。图片切换由 `MediaCarousel` 同时服务关注、库外 JAV 与馆藏详情，提供环形翻页、横向缩略图和位置圆点。缩略图与圆点复用浏览器原生 `overflow-x:auto`、`wireHorizontalScroller`，选中项在切图、循环和容器缩窄时保持可见。缩略图使用 `IntersectionObserver` 按可见范围挂载，馆藏经 `/sample-thumb`，来源图片共享查询缓存，关注优先取附件小图；Swiper 14.3.0 留给灯箱。馆藏样张复用 `sample_images.detail_refs` 和 `/sample-image`，`/api/item` 只读本地序号、最多 30 项；查看图片暂停正片，返回保留位置。推荐分标签复用 BoardUI `Chip` 与共享 Tooltip。视频预览的 `mountPreviewPlayer` 复用已固定的 Video.js 8.24.2（Apache-2.0）、VHS、`mountPlayerQualityControl`、`mountPlayerSeekPreview` 和 `mountPlayerSpinner`，安装共用控制条、设置、时间、音量与窄宽度折叠。来源给定的 HLS 直接由播放器请求；不添加依赖、片源代理、馆藏 ID 或观看上报。播放器生命周期由当前详情管理，异步加载完成前离开会取消挂载，切换与关闭会停止并销毁实例。
+JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字回退，标题折叠复用 `useFoldedTitle`。厂牌大小写唯一匹配与 `sources.javdb.maker_writing` 的日英组合解析只用于来源身份投影，标识按规范名读取。评论、资源复用 `Disclosure` 和 `setCollapseOpen`；来源与评论评分共用按小数裁切填充的星星。桌面右栏以 `contain:size` 排除正文的固有高度贡献，媒体区决定框体高度，正文在右栏内滚动。写操作取 `/healthz` 的账本只读状态，与运行配置权限分别处理。图片切换由 `MediaCarousel` 同时服务关注、库外 JAV 与馆藏详情，提供环形翻页、横向缩略图和位置圆点。缩略图与圆点复用浏览器原生 `overflow-x:auto`、`wireHorizontalScroller`，选中项在切图、循环和容器缩窄时保持可见。缩略图使用 `IntersectionObserver` 按可见范围挂载，馆藏经 `/sample-thumb`，来源图片共享查询缓存，关注优先取附件小图；Swiper 14.3.0 留给灯箱。馆藏样张复用 `sample_images.detail_refs` 和 `/sample-image`，`/api/item` 只读本地序号、最多 30 项；查看图片暂停正片，返回保留位置。推荐分标签复用 BoardUI `Chip` 与共享 Tooltip。视频预览的 `mountPreviewPlayer` 复用已固定的 Video.js 10.1.0（Apache-2.0）、官方 HLS 媒体组件、`mountPlayerQualityControl`、`mountPlayerSeekPreview` 和 `mountPlayerSpinner`，安装共用控制条、设置、时间、音量与窄宽度折叠。来源给定的 HLS 直接由播放器请求；片源代理、馆藏 ID 和观看上报沿用各自入口。播放器生命周期由当前详情管理，异步加载完成前离开会取消挂载，切换与关闭会停止并销毁实例。
 
 卡片多选由 `MediaCard`、`FollowCard` 的 `selectMode` 统一控制：保留选择入口，单项保存、已看、忽略、稍后看、预览跳转和回收站操作不挂载；退出多选恢复单项操作。首页、实体页、关注与回收站沿用同一组组件。
 
@@ -106,7 +112,9 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 待找资源复用 `MagnetSearch` 的来源链、发行时间策略与串行限速，服务端结果使用 `atomic_write_text` 原子保存为私有 JSON 边车。读缓存和网络查询分锁；重启时将原始墙钟时间转换为当前进程的单调时钟。边车最多 128 部、16 MiB，不保存错误，主动刷新失败保留成功结果。浏览器沿用 TanStack Query 和 localStorage，不新增缓存服务或依赖。
 
-清晰度控件复用已内置 VHS 的 Video.js 8.24.2（Apache-2.0）及其 [QualityLevelList](https://github.com/videojs/videojs-contrib-quality-levels)。多档自动播放通过 `selectedIndex`、`change` 事件取得当前轨道；单档 HLS 缺少尺寸时读取视频元素的实际尺寸，并响应 `loadedmetadata`、`resize`。尺寸未取得时显示「当前画质」，轨道 ID 不作界面名称；无需新增依赖。
+清晰度控件复用 Video.js 10.1.0 官方 `@videojs/hlsjs-video` 的 hls.js 引擎。多档播放从实际轨道读取分辨率，自动码率和固定轨道通过引擎选择；单档 HLS 缺少尺寸时读取原生视频元素的实际尺寸，并响应 `loadedmetadata`、`resize`。尺寸未取得时显示「当前画质」，轨道 ID 不作界面名称。来源各自独立的 MP4 档位由 Peach 保留播放位置后切换片源。
+
+播放器按 [Video.js 10 官方迁移指南](https://videojs.org/docs/framework/html/guides/migrate-from-video-js-8) 和 [10.1.0 源码](https://github.com/videojs/video.js/tree/919ad955a9baf2433c68aba8151654dde0e58b5d/packages)接入 `video-player`、`media-container`、官方按钮／滑条与 HLS／DASH 媒体组件。`@videojs/cdn` 10.1.0（Apache-2.0）提供固定 ESM 模块，构建脚本按静态与字面量动态导入闭包分发并登记哈希；浏览器支持沿用项目目标。Peach 保留片源授权、时长口径、统计、字幕菜单和舞台生命周期，原生视频经 `media` 插槽携带字幕与观看上报。`video.js` 10.1.0 包的旧入口只有带错误码的 shim，不作为运行依赖；v8 的组件和 VHS 不进入产物。真实短片回归覆盖 MP4、HLS 和 DASH 解码，质量档位选择按 HLS 引擎验证，DASH 不声明手动档位能力。生产切换与 ledger 不属于依赖接管工作树。
 
 ## 分级诊断
 
@@ -215,7 +223,7 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 
 JAV 默认封面（官方封面／预览图）与视频默认大小（大图／小图）独立保存，用 localStorage、共享 Switch 与既有 `/cover`、`/poster`。设置弹窗同步首页与 JAV 的版式，筛选条可单独调当前视图。`frontend/src/jav-artwork.ts` 管作品身份、偏好恢复与缺图回退，首页、接着看、实体作品、详情推荐、Mix 静止与翻图、播放队列共用封面选择。小图展示完整封套，竖版正封完整放入大图卡片；新作封面完成取景才显示，缓存图插入时重算取景。
 
-关注视频与馆藏详情的续播复用 Video.js 8.24.2（Apache-2.0）的元数据事件和 `currentTime`、浏览器 localStorage 与既有活动接口。`player/progress` 按本地资产、关注条目和媒体序号登记秒数，暂停、定位、关闭、小窗销毁、页面退出均保存；原生 video 回退也恢复，明确的时间深链优先，放完从头开始。本地既有记录可按 `leave_ratio × duration` 恢复；最远观看位置与累计观看时长不作为续播秒数。活动请求用 keepalive，销毁同步冲掉末段并清理定时器与监听。此状态属于当前浏览器，未引入账本迁移或跨设备同步，无新增依赖。
+关注视频与馆藏详情的续播复用 Video.js 10.1.0（Apache-2.0）的元数据事件和 `currentTime`、浏览器 localStorage 与既有活动接口。`player/progress` 按本地资产、关注条目和媒体序号登记秒数，暂停、定位、关闭、小窗销毁、页面退出均保存；原生 video 回退也恢复，明确的时间深链优先，放完从头开始。本地既有记录可按 `leave_ratio × duration` 恢复；最远观看位置与累计观看时长不作为续播秒数。活动请求用 keepalive，销毁同步冲掉末段并清理定时器与监听。此状态属于当前浏览器，未引入账本迁移或跨设备同步，无新增依赖。
 
 详情人物头像复用 `card-art.entityFaceImg` 与 `avatarFrame`，图片直接挂在有尺寸的 `[data-id-face]` 圆框内。取景读取图片的父框几何，`display:contents` 包装层没有可用尺寸。首字与图片由同一段 HTML 承载，图片加载失败时共用回退链，浏览器回归覆盖带人脸框的桌面与手机详情。
 
@@ -487,8 +495,8 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 | FC2 目录元数据与跨号证据 | 已缓存的 fc2cmadb Inertia `article`／评论；Javinizer-Go v1.5.2 的 FC2 解析器（MIT）只作商品页字段边界参考 | 旧文章仍有标题、原始标签、日期、时长、卖家、FC2 CDN 封面与 `comments`（2026-08-31 登录态实测）；无歧义标签译成现有词表，标题／标签进 `/review`，`w1200` 封面过尺寸与解码门槛落生成产物；pair、合集/分片保护、hash/时长/尺寸佐证、库外 evidence、健康统计与复核归 Peach，不依赖 FC2-Leak-Detector/JavSP，镜像候选不直写 ledger |
 | 缺索引 MP4 重建 | untrunc（anthwlock `9d86ec9`，GPL-2.0-or-later）与兼容的 FFmpeg 8.1.3 静态构建，固定来源及哈希见 `scripts/untrunc-sources.json`。Windows 安装包与免安装包携带 `tools/untrunc`，同一 Release 提供完整对应源码；原生样片实测覆盖尾部 `moov` 缺失后的 H.264/AAC 恢复、时长与全片解码。显式 `PEACH_UNTRUNC` 优先，其后依次查随包目录、数据工具与 PATH | `src/peach/mp4recover.py` 挑参照（同目录文件名最近的先试，最多 4 部）、验收（解码错误 ≤3 行、音视频时长差 ≤5%）、换回原路径并把坏原件改名成同目录的 `.文件名.peach-original`；缺整个 `moov` 的片子哪里都打不开，所以结果替换原文件，不像缺 `ctts` 那样另存头。实测见 [取证](SOURCING.md#媒体与关注实测) |
 | 媒体探测/转码 | Windows 独立包从固定源码交叉编译 FFmpeg 9.0.2、x264 与 nv-codec-headers，按 GPL-3.0-or-later 分发；版本、来源和哈希见 `scripts/ffmpeg-sources.json`。工具与完整对应源码一起构建，安装包和免安装 ZIP 共用经校验的 `tools/ffmpeg`。源码与 CI 媒体测试仍可使用 PATH 工具（[取证](SOURCING.md#依赖与工具实测)） | 容器与编码分别检查：MP4/M4V 的 H.264 8-bit 加兼容音轨直出，其余容器里的 H.264 8-bit 只换 MP4 封装；其余 Windows 输入依次 CUDA→NVENC、软件解码→NVENC、`libx264`，macOS 封装复制或软件转码 |
-| HTML5/HLS/DASH 播放 | Video.js 8.24.2 + 内置 VHS（Apache-2.0，本地固定版本） | 流方案、授权、稳定时长、回退顺序和统计面板；详情不兼容片源复用 HlsSegmentService 与 FFmpeg 按六秒编码 H.264/AAC，独立缓存、绝对时间轴及会话取消，无整片预转码 |
-| 播放器设置与影院布局 | Video.js 8.24.2 的 `playbackRate`、既有 QualityLevel、原生 tooltip 与控制栏插槽；YouTube `e937390a` 实际 DOM／CSS／JS 给几何、状态、动画和图形证据 | 在现有 DOM 上组合氛围模式、倍速、真实清晰度和影院模式：59 px 两排控制栏、40→111 px 横向音量、4→6 px 进度、右侧共享胶囊、整行悬停的 274 px 设置菜单、视口级全屏；普通视图 `contain`，全屏 `cover`（接受非等比片源的边缘裁切）。全屏判定同时看 Video.js／原生类、`isFullscreen()` 同步的 `data-peach-fullscreen` 与 `body.vjs-full-window`；浏览器专用伪类放进 forgiving `:is(...)` 或拆开写，免得未知伪类废掉整组。设置项、选中勾、菜单箭头、中央 bezel 与 loading 只 vendoring 锁定版本的 SVG path／spinner，音量 hover 与滑轨中心沿用上游外层伪元素与 50% 几何，tooltip 只补层级与越界可见；不复制控制逻辑、不迁 Video.js 10 Menu、不引重复质量选择的插件 |
+| HTML5/HLS/DASH 播放 | Video.js 10.1.0 的 `@videojs/html`、`@videojs/hlsjs-video` 与 `@videojs/dash-video`，通过官方 `@videojs/cdn` 本地固定模块分发（Apache-2.0） | 流方案、授权、稳定时长、回退顺序和统计面板；详情不兼容片源复用 HlsSegmentService 与 FFmpeg 按六秒编码 H.264/AAC，独立缓存、绝对时间轴及会话取消，无整片预转码 |
+| 播放器设置与影院布局 | Video.js 10.1.0 的播放器状态、原生媒体事件、播放／静音／全屏／画中画按钮与进度／音量滑条；YouTube `e937390a` 实际 DOM／CSS／JS 给几何、状态、动画和图形证据 | Peach 皮肤组合氛围模式、倍速、真实清晰度和影院模式：59 px 两排控制栏、40→111 px 横向音量、4→6 px 进度、右侧共享胶囊、整行悬停的 274 px 设置菜单、视口级全屏；普通视图 `contain`，全屏 `cover`。播放会话与同一枚原生视频经过舞台和小窗整体搬移，状态、字幕与上报保留；设置、时间、预览、统计、字幕菜单、中央提示和错误反馈属于 Peach。皮肤沿用本地 SVG 与 spinner，不复制上游按钮、滑条或媒体引擎的控制逻辑 |
 | 播放器时刻预览 | Video.js 原生进度控件 + Peach 的 `/timeline?id=&s=`（10×10 接触印相），取不到时退到 `/poster?id=&c=0…8` 九宫格切片 | `peach.timeline_sheets` 按每 10 或 30 秒一帧预铺，只覆盖 `location='local'`（网盘每抽一帧都回源，[流量实测](SOURCING.md#媒体与关注实测)）；其余退回只给近似时刻的九宫格。抽帧与拼图共用 `peach.frame_capture`。`videojs-vtt-thumbnails`／`videojs-sprite-thumbnails` 要另建 sprite/VTT 契约与运行时依赖，格子换算在 Peach 是一行整除，不引入 |
 | 外挂字幕 sidecar | 浏览器原生 `TextTrack` 与 [WebVTT 规范](https://www.w3.org/TR/webvtt1/)；配对复用 `catalog_rules` 的 `VERSION_TAIL_TOKENS` 与 `release_code_from_filename`。行为证据：sakuramediabe `import_service.py`／`movie_numbers.py` 的 `subtitle_matches_movie_number`（同目录、纯番号、不回退同名），NeoAVDC `organizeMedia.ts`／`parseNumber.ts` 的 `isSubtitleFile`（`.srt .ass .sub .vtt .ssa`，按视频主名前缀）；Peach 的判据是两者的并集加顺序 | `subtitles.py` 只做同目录配对（exact／suffix／code／orphan）、`asset_subtitle` 幂等登记、srt/ass/ssa → WebVTT。不用 `pysubs2`（为几十行加运行时依赖）和 FFmpeg（每次起子进程、报不出「编码认不出来」），编码要认 GBK／Big5／Shift_JIS，不用几乎吞下任何字节的 `gb18030`。内封字幕轨不在此列，`media_probe.py` 只取 `v:0`，流信息不落库 |
 | 分卷文件命名 | [Plex 官方命名](https://support.plex.tv/articles/naming-and-organizing-your-movie-media-files/)的 `cd/disc/disk/dvd/part/pt + 数字` 与 [Kodi 官方 File Stacking](https://kodi.wiki/view/File_stacking)只作行为证据；运行时复用当前树的 `part_marker`，不新增扫描器依赖 | 兼容裸数字、紧接番号的 A–H 与 cd 序号、fhd 序号及圈号标题，共有版次尾缀先剥离再取卷标。FC2 的明确数字合集允许缺集和零起始；本篇与唯一 SP、gift、特典可合卡，完整版与数字分卷混合、重复标签不自动合并。每个 asset 与播放会话保留，不拼接或改写媒体 |

@@ -185,7 +185,13 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
           : <Button variant="secondary" {...busyProps(source.isFetching)} title={source.data?.message || requestErrorMessage(source.error)}
             onClick={() => { refreshSamples.current = true; void source.refetch() }}>重试样图</Button>}</div> : null}
       {gate === 'offline' ? <OfflineGate item={item} badge={badge} helpers={helpers} actions={actions} />
-        : gate === 'online' ? (
+        : gate === 'disc' ? (
+          <div role="status" data-item-gate="disc">
+            <b>ISO 原盘</b>
+            <span>请使用支持原盘的外部播放器打开。</span>
+            <ExternalPlayback id={item.id} />
+          </div>
+        ) : gate === 'online' ? (
           <div id="onlineGate" role="status" data-item-gate="online">
             <Html html={badge} />
             <b>在线资产</b>

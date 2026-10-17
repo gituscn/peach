@@ -17,6 +17,7 @@ import { DownloadGroup } from './download-settings';
 import { GeneralSettings } from './general-settings';
 import { MaintenanceSettings } from './maintenance-settings';
 import { MediaSettings } from './media-settings';
+import { MediaProcessingSettings } from './media-processing-settings';
 import { NetworkSettings } from './network-settings';
 import { SourceSettings } from './source-settings';
 import { groupRoot } from './configuration-panel';
@@ -67,7 +68,9 @@ function ConfigurationGroups(
   const network = Boolean(data.peach_proxy || data.access || data.tunnel || (data.editable && data.port_editable !== false));
   const downloads = data.downloads;
   const groups: Group[] = [
-    { title: '媒体库与入库', body: (panel) => <MediaSettings {...group} panel={panel} /> },
+    { title: '媒体库与入库', body: (panel) => <div {...groupRoot(panel)}>
+      <MediaSettings {...group} /><MediaProcessingSettings receipt={receipt} />
+    </div> },
     { title: '来源与订阅', body: (panel) => <SourceSettings {...group} panel={panel} /> },
     ...(downloads ? [{
       title: '下载渠道',

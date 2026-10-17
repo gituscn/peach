@@ -6,6 +6,7 @@
 import { fetchMediaSources, MEDIA_SOURCES_KEY, type MediaSourcesData, type MediaSourceStatus } from '@peach/query';
 
 import { queryClient } from './query';
+import { CLOUD_LOCATIONS, SCANNABLE_LOCATIONS } from '../core/media-sources';
 
 export { fetchMediaSources, MEDIA_SOURCES_KEY } from '@peach/query';
 export type { MediaSourcesData, MediaSourceStatus } from '@peach/query';
@@ -14,13 +15,13 @@ export async function prefetchMediaSources(signal: AbortSignal): Promise<void> {
   await queryClient.fetchQuery({ queryKey: MEDIA_SOURCES_KEY, queryFn: () => fetchMediaSources(signal) });
 }
 
-/** 落盘的三种存储来源。`online` 这类在线来源不落盘，不参与扫描与对账。 */
-export const SCANNABLE_LOCATIONS = ['local', '115', 'pikpak'];
+/** 挂载存储来源。`online` 这类在线来源不落盘，不参与扫描与对账。 */
+export { SCANNABLE_LOCATIONS } from '../core/media-sources';
 
 export const scannableSources = (data: MediaSourcesData | undefined): MediaSourceStatus[] =>
   (data?.sources ?? []).filter((source) => SCANNABLE_LOCATIONS.includes(source.location));
 
 /** 配了根目录的网盘。离线的网盘仍然属于已配置来源：它上面的重复副本照样能挑着留。 */
 export const cloudLocations = (data: MediaSourcesData | undefined): string[] =>
-  (data?.sources ?? []).filter((source) => ['115', 'pikpak'].includes(source.location)
+  (data?.sources ?? []).filter((source) => CLOUD_LOCATIONS.includes(source.location)
     && (source.roots === undefined || source.roots.length > 0)).map((source) => source.location);

@@ -141,6 +141,16 @@ class MediaRepairRunTests(unittest.TestCase):
 
         self.assertEqual(self.store.repaired[0], 2, "放得最多的那部没排在最前面")
 
+    def test_read_only_mount_never_replaces_the_source_file(self):
+        with self.contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET location='guangya' WHERE id=6")
+        with mock.patch.object(rm_repair.mp4recover, 'recover') as recover, \
+                mock.patch.object(rm_repair.mp4recover, 'replace_original') as replace:
+            self.assertFalse(rm_repair._recover(self.contract, 6, 'G:\\media\\cut.mp4',
+                                               (Path('untrunc'), Path('ffmpeg'), Path('ffprobe'))))
+        recover.assert_not_called()
+        replace.assert_not_called()
+
     def test_a_library_has_to_be_named(self):
         with self.assertRaisesRegex(ValueError, "先选一个媒体库"):
             rm_repair.w_media_repair(self.contract, {})

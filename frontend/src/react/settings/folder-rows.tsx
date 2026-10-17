@@ -13,8 +13,9 @@ import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { Select, SelectItem } from '@/components/base/select/select';
 
-import { SourceMark } from './section';
+import { ErrorText, Help, SourceMark } from './section';
 import { busyProps } from './busy-props';
+import { CLOUD_LOCATIONS, MEDIA_SOURCE_OPTIONS, type SourceCost } from '../../core/media-sources';
 
 /** 「选择文件夹」弹系统对话框去挑，全站用雪碧图的 `folder-search`；`folder-open` 归「打开位置」，
  * Remix Icon 里没有这一枚。 */
@@ -29,12 +30,28 @@ export function FolderSearchIcon({ className }: { className?: string }) {
 
 export type SourceOption = readonly [kind: string, name: string];
 
-export const MEDIA_SOURCES: readonly SourceOption[] = [
-  ['local', '本地磁盘'], ['115', 'CloudDrive · 115'], ['pikpak', 'CloudDrive · PikPak'],
-];
+export const MEDIA_SOURCES: readonly SourceOption[] = MEDIA_SOURCE_OPTIONS;
 
 export const sourceMark = (location: string) => MEDIA_SOURCE_ICONS[location] || 'database';
-export const isCloudSource = (location: string) => location === '115' || location === 'pikpak';
+export const isCloudSource = (location: string) => CLOUD_LOCATIONS.includes(location);
+
+export function MediaReadPolicy({ index, cost, error, onChange }: {
+  index: number; cost: SourceCost | ''; error?: string; onChange(cost: SourceCost): void;
+}) {
+  return <div data-media-read-policy={index} className="flex w-full flex-col gap-1.5 @lg:w-48">
+    <Select aria-label={`媒体读取策略 ${index + 1}`} placeholder="选择读取策略" isRequired
+      validationBehavior="aria" isInvalid={Boolean(error)} selectedKey={cost || null}
+      onSelectionChange={(key) => { if (key === 'free' || key === 'metered') onChange(key); }}>
+      <SelectItem id="free">正常读取</SelectItem>
+      <SelectItem id="metered">代理流量保护</SelectItem>
+    </Select>
+    {error ? <ErrorText>{error}</ErrorText> : null}
+  </div>;
+}
+
+export function MediaReadPolicyHelp() {
+  return <Help>按挂载工具实际配置选择；代理流量保护会限制自动媒体读取。</Help>;
+}
 
 export interface FolderRowValue { path: string; location: string }
 

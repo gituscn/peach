@@ -536,7 +536,9 @@ class SourceTransport:
         """这个来源用的本机浏览器（进程共用）；本机没有可驱动的浏览器或代理带凭据时 None。"""
         values = values_for(self.root, source)
         direct = values.get("network") == "direct"
-        proxy = "" if direct else peach_proxy.client_options(self.root).get("proxy", "")
+        options = {"trust_env": False} if direct else peach_proxy.client_options(self.root)
+        proxy = options.get("proxy", "")
+        direct = not options.get("trust_env", True) and not proxy
         gate = SOURCES[source].get("browser_gate")
         gates = {domain: gate for domain in SOURCES[source]["domains"]} if gate else {}
         return browser_transport.shared(browser_profile(self.root), direct=direct, proxy=proxy, gates=gates)

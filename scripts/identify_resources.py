@@ -24,6 +24,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from peach.config import DATABASE_PATH, GENERATED_DIR
+from peach.media_sources import SCANNABLE_LOCATIONS
 from peach.resource_identification import (
     CANDIDATE_FILENAME,
     build_worklist,
@@ -45,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     worklist = sub.add_parser("worklist", help="生成联网识别清单")
-    worklist.add_argument("--location", action="append", choices=("local", "115", "pikpak"))
+    worklist.add_argument("--location", action="append", choices=SCANNABLE_LOCATIONS)
     worklist.add_argument("--root", help="账本口径的目录前缀，例如 B:\\xxr\\0208 (23)")
     worklist.add_argument("--paired-only", action="store_true", help="只列有同目录配套图片的")
     worklist.add_argument("--sparse-only", action="store_true",
@@ -65,7 +66,7 @@ def cmd_worklist(args: argparse.Namespace) -> int:
     try:
         rows = build_worklist(
             connection,
-            locations=tuple(args.location or ("local", "115", "pikpak")),
+            locations=tuple(args.location or SCANNABLE_LOCATIONS),
             prefix=args.root, paired_only=args.paired_only,
             sparse_only=args.sparse_only, limit=args.limit,
         )

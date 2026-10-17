@@ -226,7 +226,7 @@ export interface UpdateJob {
 }
 
 export interface MediaSource {
-  location: string; root: string; path: string; online?: boolean; library?: string; library_icon?: string;
+  location: string; root: string; path: string; online?: boolean; library?: string; library_icon?: string; cost?: 'free' | 'metered';
 }
 
 export interface ConfigurationFact {

@@ -93,16 +93,16 @@ it('扫描与补全方式共用一颗主键加一个下拉，各自交自己的�
   const served = await open({ status: 'idle' }, () => ({ status: 'complete' }));
   const host = await mount(card({ toast: vi.fn() }));
 
-  await click(buttonNamed('扫描并补全资料', host));
+  await click(buttonNamed('同步媒体库', host));
   await click(host.querySelector('[aria-haspopup="dialog"]'));
-  expect(menuItem('扫描并补全资料')).not.toBeNull();
-  await click(menuItem('只扫描'));
+  expect(menuItem('同步媒体库')).not.toBeNull();
+  await click(menuItem('仅扫描文件'));
   await click(host.querySelector('[aria-haspopup="dialog"]'));
-  await click(menuItem('补全资料与预览'));
+  await click(menuItem('仅同步已入库影片'));
   await click(host.querySelector('[aria-haspopup="dialog"]'));
-  await click(menuItem('只生成本地预览'));
+  await click(menuItem('仅生成视频预览'));
   await click(host.querySelector('[aria-haspopup="dialog"]'));
-  await click(menuItem('只采集在线资料'));
+  await click(menuItem('仅补全资料'));
 
   expect(served.posts()).toEqual([{}, { stage: 'scan' }, { stage: 'collect' }, { stage: 'previews' }, { stage: 'metadata' }]);
   expect(host.querySelector('a[href="/sources"]')?.textContent).toContain('来源和凭证');
@@ -117,7 +117,7 @@ it('启动只提交一次，进度用 GET 读回来，完成后给出回执与�
       : { status: 'complete', job_id: 'one', scanned: 9, identified: 4, candidates: 2 },
   );
   const host = await mount(card({ toast }));
-  await click(buttonNamed('扫描并补全资料', host));
+  await click(buttonNamed('同步媒体库', host));
 
   expect(served.calls.map((call) => call.method)).toEqual(['POST', 'GET']);
   expect(host.querySelector('a[href="/review"]')).not.toBeNull();
@@ -142,7 +142,7 @@ it('补齐女优资料的读数进回执，冲突和未取得各自点名', asyn
         },
   );
   const host = await mount(card({ toast: vi.fn() }));
-  await click(buttonNamed('扫描并补全资料', host));
+  await click(buttonNamed('同步媒体库', host));
 
   expect(served.posts()).toEqual([{}]);
   expect(host.querySelector('[role="status"]')?.textContent).toContain(
@@ -173,7 +173,7 @@ it('运行态说清当前项目、动作与等待时长，处理慢只提示不�
   expect(host.querySelectorAll('[role="progressbar"]')).toHaveLength(1);
   expect(host.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('2');
 
-  await click(buttonNamed('扫描并补全资料', host));
+  await click(buttonNamed('同步媒体库', host));
   expect(served.posts()).toEqual([]);
 });
 
@@ -209,7 +209,7 @@ it('失败时把问题清单折叠进错误提示，重试只交失败的那些�
   expect(log.closest('.border-t')!.className).toContain('border-current/20');
   expect(details.querySelector('button[aria-label="在资源管理器中显示"]')).not.toBeNull();
   // 补上没做完的那些是这一趟的事，重新跑一整批是下一趟的事：页脚那颗留着，各答各的问题。
-  expect(buttonNamed('扫描并补全资料', host)?.textContent).toBe('扫描并补全资料');
+  expect(buttonNamed('同步媒体库', host)?.textContent).toBe('同步媒体库');
 
   // 重试键属于错误提示，问题清单收起时仍可操作。
   const retry = buttonNamed('重试未完成项')!;
@@ -230,7 +230,7 @@ it('有可重试项时页脚那颗发的仍是整批，不夹带上一趟的失�
   }, () => ({ status: 'running', job_id: 'two' }));
   const host = await mount(card({ toast: vi.fn() }));
 
-  await click(buttonNamed('扫描并补全资料', host));
+  await click(buttonNamed('同步媒体库', host));
   expect(served.posts()).toEqual([{}]);
 });
 
@@ -241,7 +241,7 @@ it('失败项都不可重试时仍能重新发起整批任务', async () => {
   });
   const host = await mount(card({ toast: vi.fn() }));
   expect(buttonNamed('重试未完成项')).toBeNull();
-  expect(buttonNamed('扫描并补全资料', host)?.textContent).toBe('扫描并补全资料');
+  expect(buttonNamed('同步媒体库', host)?.textContent).toBe('同步媒体库');
 });
 
 it('读不回来时留住已有进度，只在旁边说一句连接中断', async () => {

@@ -46,6 +46,22 @@ it('不能编辑时只说原因，不画表单', async () => {
 });
 
 describe('媒体文件夹', () => {
+  it('光鸭来源回填只读名称、挂载帮助和现有图标，保存带上来源', async () => {
+    const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
+    vi.stubGlobal('fetch', fetcher);
+    const host = await open({ windows: true, media_sources: [
+      { location: 'guangya', root: 'G:\\Movies', path: 'G:\\Movies', online: true },
+    ] });
+    expect(paths(host)[0]?.value).toBe('G:\\Movies');
+    expect(host.textContent).toContain('光鸭云盘（只读）');
+    expect(host.querySelector('use[href="#i-database"]')).not.toBeNull();
+    expect(host.textContent).toContain('光鸭云盘需要 CloudDrive2 v1.0.11');
+    await submit(host.querySelector('form'));
+    expect(sentBody(fetcher).media_sources).toEqual([
+      { location: 'guangya', root: 'G:\\Movies', path: 'G:\\Movies', library: '', library_icon: '', cost: 'free' },
+    ]);
+  });
+
   it('Windows 只填本机路径，选了网盘才出 CloudDrive 帮助', async () => {
     const host = await open({ windows: true, media_sources: [{ location: 'local', root: 'D:/', path: 'D:/' }] });
     expect(host.textContent).not.toContain('Windows 中的对应路径');
@@ -81,9 +97,41 @@ describe('媒体文件夹', () => {
     await submit(host.querySelector('form'));
     await settle();
     expect(sentBody(fetcher).media_sources).toEqual([
-      { location: '115', root: 'B:\\', path: '/Volumes/115', library: '收藏', library_icon: 'heart' },
-      { location: 'pikpak', root: 'A:\\', path: '/Volumes/PikPak', library: '', library_icon: '' },
+      { location: '115', root: 'B:\\', path: '/Volumes/115', library: '收藏', library_icon: 'heart', cost: 'free' },
+      { location: 'pikpak', root: 'A:\\', path: '/Volumes/PikPak', library: '', library_icon: '', cost: 'metered' },
     ]);
+  });
+
+  it('已保存的目录回填代理保护，用户可改为正常读取', async () => {
+    const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
+    vi.stubGlobal('fetch', fetcher);
+    const host = await open({ windows: true, media_sources: [
+      { location: 'onedrive', root: 'O:\\Movies', path: 'O:\\Movies', cost: 'metered' },
+    ] });
+    const policy = rows(host)[0]?.querySelector('[data-media-read-policy] [aria-haspopup="listbox"]');
+    expect(policy?.textContent).toContain('代理流量保护');
+    await choose(policy, '正常读取');
+    await submit(host.querySelector('form'));
+    expect(sentBody(fetcher).media_sources).toEqual([
+      { location: 'onedrive', root: 'O:\\Movies', path: 'O:\\Movies', library: '', library_icon: '', cost: 'free' },
+    ]);
+  });
+
+  it('切换到网盘来源后必须明确选择读取策略才能保存', async () => {
+    const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
+    vi.stubGlobal('fetch', fetcher);
+    const host = await open({ windows: true, media_sources: [
+      { location: 'local', root: 'O:\\Movies', path: 'O:\\Movies', cost: 'free' },
+    ] });
+    await choose(rows(host)[0]?.querySelector('[aria-haspopup="listbox"]'), 'CloudDrive · PikPak');
+    const policy = rows(host)[0]?.querySelector('[data-media-read-policy] [aria-haspopup="listbox"]');
+    expect(policy?.textContent).toContain('选择读取策略');
+    await submit(host.querySelector('form'));
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('请选择媒体读取策略');
+    await choose(policy, '正常读取');
+    await submit(host.querySelector('form'));
+    expect(sentBody(fetcher).media_sources[0]).toMatchObject({ location: 'pikpak', cost: 'free' });
   });
 
   it('一行一个文件夹，只有一行时没有移除键', async () => {

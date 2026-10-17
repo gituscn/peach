@@ -20,6 +20,10 @@ import { ErrorText, Help, Rows, Section, Stack } from './section';
 const THUMBNAIL_OPTIONS = [['off', '关闭'], ['precise', '每 10 秒一张'], ['coarse', '每 30 秒一张']] as const;
 
 export function VideoThumbnailRow({ epoch = 0 }: { epoch?: number }) {
+  return <Section title="时间轴缩略图"><VideoThumbnailControls epoch={epoch} /></Section>;
+}
+
+export function VideoThumbnailControls({ epoch = 0, disabled = false }: { epoch?: number; disabled?: boolean }) {
   const status = useQuery({ queryKey: THUMBNAIL_JOBS_KEY, queryFn: ({ signal }) => fetchThumbnailJobs(signal), refetchOnMount: 'always' });
   const save = useSaveThumbnailMode();
   const reset = save.reset;
@@ -27,12 +31,12 @@ export function VideoThumbnailRow({ epoch = 0 }: { epoch?: number }) {
   const data = status.data;
   const error = save.error || status.error;
   return (
-    <Section title="时间轴缩略图">
+    <>
       <Rows>
-        <SettingsRow label="采集间隔" description="仅采集本机磁盘上的视频。">
+        <SettingsRow label="时间轴预览" description="按所选间隔抽帧，仅处理本机磁盘上的视频。">
           <div id="videoThumbnailSetting">
             <Select aria-label="缩略图采集间隔" selectedKey={data?.mode || 'off'}
-              isDisabled={!data || status.isFetching || save.isPending}
+              isDisabled={disabled || !data || status.isFetching || save.isPending}
               onSelectionChange={(key) => { if (key !== null) save.mutate(String(key)) }}>
               {THUMBNAIL_OPTIONS.map(([key, label]) => <SelectItem key={key} id={key}>{label}</SelectItem>)}
             </Select>
@@ -43,7 +47,7 @@ export function VideoThumbnailRow({ epoch = 0 }: { epoch?: number }) {
         ? <Stack divided><Help role="status">{save.isPending ? '正在保存…' : '正在采集，进度在活动页查看。'}</Help></Stack>
         : null}
       {error ? <Stack divided><ErrorText>{errorMessage(error)}</ErrorText></Stack> : null}
-    </Section>
+    </>
   );
 }
 

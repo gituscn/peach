@@ -12,6 +12,11 @@ from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 
+from .media_sources import SOURCE_COSTS, cost_for, cost_sql
+
+DEFAULT_METERED_LOCATIONS = frozenset(location for location, cost in SOURCE_COSTS.items()
+                                    if cost == 'metered') | {'online'}
+
 
 class JobPolicyError(RuntimeError):
     exit_code = 1
@@ -61,7 +66,17 @@ ACTIVE_ASSET_SQL = "disposal IS NULL"
 
 @dataclass(frozen=True)
 class SourceAccessPolicy:
-    metered_locations: frozenset[str] = frozenset({"pikpak", "online"})
+    metered_locations: frozenset[str] = DEFAULT_METERED_LOCATIONS
+
+    def requires_budget(self, location: str) -> bool:
+        """有正常读取目录的来源可筛选执行，全部受保护时需明确授权。"""
+        if self.metered_locations != DEFAULT_METERED_LOCATIONS:
+            return location in self.metered_locations
+        from .settings_file import active
+        config = active()
+        roots = config.locations.get(location, ())
+        return (all(cost_for(location, root, config) == 'metered' for root in roots)
+                if roots else cost_for(location, config=config) == 'metered')
 
     def sql_filter(
         self,
@@ -70,9 +85,9 @@ class SourceAccessPolicy:
         column: str = "location",
     ) -> tuple[str, tuple[str, ...]]:
         """返回参数化 location 条件；显式计费授权是唯一放行入口。"""
-        if location in self.metered_locations and not allow_metered:
+        if location and not allow_metered and self.requires_budget(location):
             raise MeteredSourceDenied(
-                f"{location} 是计费来源；确认预算后显式加 --allow-metered"
+                f"{location} 的目录已开启代理流量保护；确认预算后显式加 --allow-metered"
             )
 
         clauses: list[str] = []
@@ -81,10 +96,16 @@ class SourceAccessPolicy:
             clauses.append(f"{column}=?")
             parameters.append(location)
         if not allow_metered:
-            metered = tuple(sorted(self.metered_locations))
-            placeholders = ",".join("?" for _ in metered)
-            clauses.append(f"{column} NOT IN ({placeholders})")
-            parameters.extend(metered)
+            if self.metered_locations == DEFAULT_METERED_LOCATIONS:
+                path_column = column.rsplit('.', 1)[0] + '.path' if '.' in column else 'path'
+                expression, values = cost_sql(column, path_column)
+                clauses.append(expression + "='free'")
+                parameters.extend(values)
+            else:
+                metered = tuple(sorted(self.metered_locations))
+                placeholders = ",".join("?" for _ in metered)
+                clauses.append(f"{column} NOT IN ({placeholders})")
+                parameters.extend(metered)
         if not clauses:
             return "", ()
         return " AND " + " AND ".join(clauses), tuple(parameters)

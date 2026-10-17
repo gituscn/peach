@@ -52,6 +52,17 @@ class ProbeUnmeasuredTests(unittest.TestCase):
                 mock.patch.object(media_probe, "resolve_case_insensitive", str):
             return media_probe.probe_unmeasured(self.db, ffprobe, location, root)
 
+    def test_probe_uses_each_mount_root_choice_including_pikpak(self):
+        self.add(r'A:\Media\normal.mp4', location='pikpak')
+        self.add(r'A:\Media\Proxy\protected.mp4', location='pikpak')
+        config = SimpleNamespace(locations={'pikpak': (r'A:\Media', r'A:\Media\Proxy')},
+                                 media_costs={r'A:\Media': 'free', r'A:\Media\Proxy': 'metered'})
+        with mock.patch.object(media_probe, 'probe_file', self.fake_probe), \
+                mock.patch.object(media_probe, 'resolve_case_insensitive', str):
+            count = media_probe.probe_unmeasured(self.db, 'ffprobe', 'pikpak', r'A:\Media', config=config)
+        self.assertEqual(count, 1)
+        self.assertEqual(self.probed, ['normal.mp4'])
+
     def test_only_unmeasured_active_videos_under_the_scanned_root_are_probed(self):
         fresh = self.add(ROOT + r"\新片\a.mp4")
         measured = self.add(ROOT + r"\b.mp4", duration=10.0)

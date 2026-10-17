@@ -12,8 +12,7 @@ import type { PlayerItem, SourceQuality, VjsPlayer } from './types';
 type TooltipSync = (label?: string, aria?: string) => void;
 
 /** 控制条上每个按钮的悬停提示都从这里出：文案 + 快捷键徽标，样式取自 YouTube delhi-modern。
- *  同时抹掉浏览器原生 title——两层提示会一前一后弹出来叠在一起。Video.js 每次改 controlText
- *  都会把 title 写回去，所以按钮状态同步的地方必须重新调一次返回的 sync。 */
+ *  原生 title 与状态提示共用同一个同步入口。 */
 export function playerControlTooltip(button: Element | null | undefined, label: string, shortcut = ''): TooltipSync {
   if (!button) return () => {};
   let tip = button.querySelector<HTMLElement>(':scope>.vjs-peach-tooltip');
@@ -124,7 +123,7 @@ export function mountPlayerAmbient(video: HTMLVideoElement): () => void {
 export function mountPlayerQualityControl(
   player: VjsPlayer, video: HTMLVideoElement, fallbackHeight: unknown = 0, initialSourceQualities: SourceQuality[] | null = null,
 ): ((next: SourceQuality[] | null) => void) | undefined {
-  const controlBar = player.getChild('controlBar')?.el();
+  const controlBar = player.el().querySelector<HTMLElement>('.vjs-control-bar');
   if (!controlBar || controlBar.querySelector('[data-player-quality]')) return undefined;
   const root = document.createElement('div');
   root.className = 'vjs-peach-settings vjs-control'; root.dataset.playerQuality = '';
@@ -326,7 +325,7 @@ export function mountPlayerQualityControl(
 }
 
 function mountPlayerTheaterControl(player: VjsPlayer, settingsRoot: Element): void {
-  const controlBar = player.getChild('controlBar')?.el();
+  const controlBar = player.el().querySelector<HTMLElement>('.vjs-control-bar');
   if (!controlBar || controlBar.querySelector('[data-player-theater]')) return;
   const theater = playerHost().settings().theaterMode;
   const root = document.createElement('div'); root.className = 'vjs-peach-theater vjs-control';
@@ -339,7 +338,7 @@ function mountPlayerTheaterControl(player: VjsPlayer, settingsRoot: Element): vo
 }
 
 function mountPlayerChromeLayout(player: VjsPlayer): void {
-  const controlBar = player.getChild('controlBar')?.el();
+  const controlBar = player.el().querySelector<HTMLElement>('.vjs-control-bar');
   if (!controlBar || controlBar.querySelector('.vjs-peach-right-controls')) return;
   const play = controlBar.querySelector<HTMLElement>(':scope>.vjs-play-control');
   if (play && !play.querySelector(':scope>.vjs-peach-hover')) play.insertAdjacentHTML('beforeend', '<span class="vjs-peach-hover" aria-hidden="true"></span>');
@@ -410,7 +409,7 @@ function mountPlayerChromeLayout(player: VjsPlayer): void {
     if (bezelTimer) clearTimeout(bezelTimer);
     bezelTimer = setTimeout(() => { bezel.hidden = true; bezel.classList.remove('vjs-peach-bezel-run') }, 1000);
   };
-  player.el().insertBefore(bezel, controlBar);
+  controlBar.parentElement!.insertBefore(bezel, controlBar);
   player.el().addEventListener('click', (event) => {
     const target = event.target as Element;
     if (target.closest('.vjs-mute-control')) {
@@ -510,7 +509,7 @@ interface TimelineSheets { frames: number; interval: number; columns?: number; r
  *  取不到退回九宫格那九格——那是全片九等分，两小时的片子格与格之间隔着十几分钟，指的位置和
  *  看到的画面对不上，但比没有画面强。关注条目没有本地图，只报时间。 */
 export function mountPlayerSeekPreview(player: VjsPlayer, item: PlayerItem | null, options: { thumbnail?: boolean } = {}): void {
-  const progress = player.getChild('controlBar')?.el()?.querySelector<HTMLElement>('.vjs-progress-control');
+  const progress = player.el().querySelector<HTMLElement>('.vjs-control-bar .vjs-progress-control');
   if (!progress || progress.querySelector('[data-player-seek-preview]')) return;
   const hasThumbnail = !!item && options.thumbnail !== false;
   const preview = document.createElement('div');
@@ -607,8 +606,7 @@ export function mountPlayerMediaSession(player: VjsPlayer, item: PlayerItem): vo
   });
 }
 
-/** Video.js 自带的转圈是 `:before`／`:after` 画的两条弧，换不掉曲线；YouTube e937390a 的 `FsY`
- *  是四段嵌套元素配四段动画。转圈的 DOM 只能整块替换，样式表接不上手。 */
+/** 加载提示复用 YouTube e937390a 的 `FsY`：四段嵌套元素与四段动画。 */
 export function mountPlayerSpinner(player: VjsPlayer): void {
   const spinner = player.el().querySelector('.vjs-loading-spinner');
   if (!spinner || spinner.querySelector('.vjs-peach-spinner-container')) return;
@@ -617,8 +615,7 @@ export function mountPlayerSpinner(player: VjsPlayer): void {
 
 /** 本机资产的外挂字幕。服务端已经把 srt/ass/ssa 换成 WebVTT，这里只把它挂成 text track。
  *  一律不设 default：自动打开某一条等于替用户选了语言，而同一部片常有简体、繁体、日语三条。
- *  要看就从 Video.js 自己的字幕菜单里点，菜单只在有轨的时候才出现。manualCleanup 传 true：
- *  播放出错回退到直连片源时会重新 src()，自动清理会把字幕一起带走。 */
+ *  Peach 字幕菜单只在有轨的时候出现；轨道挂在原生 video 上，随同一枚元素保留。 */
 export function mountPlayerSubtitles(player: VjsPlayer, assetId: number): void {
   (api(`/api/assets/${assetId}/subtitles`) as Promise<{ subtitles?: { playable?: boolean; src: string; language?: string; label: string }[] } | null>)
     .then((payload) => {

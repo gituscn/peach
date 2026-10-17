@@ -24,6 +24,7 @@ export interface LibraryProcessingIssue {
 
 /** 一趟扫描与采集的快照。字段以 `q_library_processing`（`src/peach/web_library_processing.py`）为准。 */
 export interface LibraryProcessingData {
+  metadata_only?: boolean;
   /** `idle` | `running` | `complete` | `failed`。 */
   status: string;
   job_id?: string;

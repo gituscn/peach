@@ -26,13 +26,15 @@ from typing import Sequence
 from .catalog_rules import duration_clusters, is_jav_code, normalise_code_key
 from .config import GENERATED_DIR, LOCATION_ROOT_DECLARATIONS
 from .field_owners import USER_MANUAL, write_owned_fields
+from .media_sources import READ_ONLY_LOCATIONS, SCANNABLE_LOCATIONS
 from .personal_records import ASSET_REFERENCE_TABLES, VANISHED
 from .platform import is_unmapped, root_online, translate_ledger_path, within_root
 from .regions import normalize_region
 from .settings_file import PROJECT_ROOT
 from .task_runs import TaskRunHandle
 from .web_activity import DEFAULT_PROFILE_ID
-from .web_catalog import COST, attach_card_performers
+from .web_catalog import attach_card_performers
+from .media_sources import cost_for
 from .web_resource_sync import clean_resource_orphans
 from .web_state import WebContract
 
@@ -238,13 +240,14 @@ def _promo_directory(parts) -> bool:
 
 def _junk_rows(connection):
     """读取能进入垃圾复核的物理文件；字幕、NFO 与大视频在最外层排除。"""
+    marks = ",".join("?" for _ in SCANNABLE_LOCATIONS)
     rows = connection.execute(
         "SELECT id,location,name,medium,creator,code,size,duration,width,height,snapshot_path,"
         "feedback,disposal,play_count,leave_ratio,o_count,studio,ctx_orient,path "
-        "FROM asset WHERE location IN ('local','115','pikpak') AND disposal IS NULL "
+        f"FROM asset WHERE location IN ({marks}) AND disposal IS NULL "
         "AND (COALESCE(medium,'other')<>'video' OR (size < ? "
         "AND (duration IS NULL OR duration <= 1200)))",
-        (JUNK_VIDEO_MAX_BYTES,)).fetchall()
+        (*SCANNABLE_LOCATIONS, JUNK_VIDEO_MAX_BYTES)).fetchall()
     # NFO 是媒体资料边车，不是等待清理的物理内容；即使名字或所在目录带推广词，
     # 也应由资料读取报告解析问题，不能进入会把文件移入回收站的垃圾队列。
     return [row for row in rows if PureWindowsPath(
@@ -522,7 +525,7 @@ def _scored_junk(contract: WebContract) -> tuple[list[dict], frozenset[int]]:
             s = min(s, AUTO_TRASH_SCORE - 1)
         if s >= JUNK_REVIEW_SCORE:
             d["score"] = s; d["why"] = " · ".join(why)
-            d["cost"] = COST.get(d["location"], "metered")
+            d["cost"] = cost_for(d['location'], d.get('path'))
             d["has_thumb"] = contract.has_snapshot(d["snapshot_path"])
             d.pop("snapshot_path", None)
             d.pop("path", None)
@@ -602,6 +605,8 @@ def _online_source_roots() -> dict[str, tuple[Path, ...]]:
     """Return only declared physical roots that can be enumerated now, per source."""
     roots: dict[str, tuple[Path, ...]] = {}
     for location, declarations in LOCATION_ROOT_DECLARATIONS.items():
+        if location in READ_ONLY_LOCATIONS:
+            continue
         online = []
         for declaration in declarations:
             root = translate_ledger_path(declaration)
@@ -702,6 +707,14 @@ def purge_assets(connection, rows, *, missing_only: bool = False):
     purged, blocked, staged, snapshots, parents = [], [], [], [], []
     for row in rows:
         media = row["path"]
+        location = row["location"] if "location" in row.keys() else None
+        if location is None:
+            stored = connection.execute("SELECT location FROM asset WHERE id=?", (row["id"],)).fetchone()
+            location = stored[0] if stored else None
+        if media and not missing_only and location in READ_ONLY_LOCATIONS:
+            blocked.append({"id": row["id"], "path": media,
+                            "reason": "该挂载来源为只读，请在网盘客户端管理文件"})
+            continue
         if media and missing_only:
             try:
                 present = translate_ledger_path(media).exists()
@@ -726,7 +739,7 @@ def purge_assets(connection, rows, *, missing_only: bool = False):
         snapshot = row["snapshot_path"]
         if snapshot:
             snapshots.append(Path(snapshot))
-        if media:
+        if media and location not in READ_ONLY_LOCATIONS:
             parents.append(Path(media).parent)
         purged.append(row["id"])
     try:
@@ -759,7 +772,7 @@ def w_empty_trash(contract: WebContract):
     try:
         with contract.write_transaction() as connection:
             rows = connection.execute(
-                "SELECT id,path,snapshot_path FROM asset WHERE disposal='trash'",
+                "SELECT id,location,path,snapshot_path FROM asset WHERE disposal='trash'",
             ).fetchall()
             outcome = purge_assets(connection, rows)
     except BaseException:
@@ -797,7 +810,7 @@ def _reject_ineligible_targets(operation: str, rows) -> None:
     if operation == "dispose" and any(row["disposal"] == VANISHED for row in rows):
         raise ValueError("vanished assets cannot be moved to the recycle bin")
     if operation in {"dismiss-junk", "reconsider-junk"} and any(
-            row["location"] not in {"local", "115", "pikpak"}
+            row["location"] not in SCANNABLE_LOCATIONS
             or row["disposal"] is not None for row in rows):
         raise ValueError("junk decisions are only allowed for active physical assets")
 

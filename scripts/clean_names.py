@@ -36,6 +36,7 @@ if str(SRC_DIR) not in sys.path:
 from peach.review_csv import write_rows
 from peach.catalog_rules import is_jav_code, normalise_code_key
 from peach.config import DATABASE_PATH, GENERATED_DIR, LOG_DIR
+from peach.media_sources import READ_ONLY_LOCATIONS, SCANNABLE_LOCATIONS, require_writable_location
 from peach.scripting import (
     add_ledger_write_args, open_for_write, open_readonly, verify_after_write,
 )
@@ -176,7 +177,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_ledger_write_args(parser, db_default=DEFAULT_DB)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--log-dir", type=Path, default=DEFAULT_LOG_DIR)
-    parser.add_argument("--location", choices=("local", "115", "pikpak"))
+    parser.add_argument("--location", choices=SCANNABLE_LOCATIONS)
     return parser
 
 
@@ -235,6 +236,8 @@ def build_plan(rows: list[tuple]) -> list[dict]:
 
     plan: list[dict] = []
     for aid, location, path, name, code, *evidence in rows:
+        if location in READ_ONLY_LOCATIONS:
+            continue
         allow_compact = bool(evidence and evidence[0])
         normalized = normalise_code_key(code)
         canonical = (
@@ -333,6 +336,7 @@ def run(args_ns: argparse.Namespace) -> int:
                 fail += 1
                 continue
             try:
+                require_writable_location(item["location"])
                 if rename_needed:
                     _rename_path(src, dst)
             except Exception as exc:

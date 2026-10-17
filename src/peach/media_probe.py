@@ -21,8 +21,10 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from pathlib import PureWindowsPath
 
-from .jobs import ACTIVE_ASSET_SQL, SourceAccessPolicy
+from .jobs import ACTIVE_ASSET_SQL
 from .media import resolve_case_insensitive
+from .media_sources import cost_for
+from .strm import skip_background_read
 
 #: 一次探测最多等多久。ffprobe 只读文件头，网盘上实测一两秒。
 TIMEOUT_SECONDS = 20.0
@@ -52,6 +54,8 @@ def context_fields(width: int, height: int, duration: float) -> tuple[str | None
 
 
 def probe_file(ffprobe: str, path: str, timeout: float = TIMEOUT_SECONDS) -> tuple:
+    if skip_background_read(path):
+        raise ValueError('STRM 和 ISO 不执行视频探测')
     result = subprocess.run(
         [
             ffprobe, "-v", "error", "-rw_timeout", "8000000",
@@ -98,21 +102,32 @@ def measure(ffprobe: str, asset_id: int, path: str, timeout: float = TIMEOUT_SEC
 def probe_unmeasured(
     db_path, ffprobe: str | None, location: str, root: str, *,
     report: Callable[[int, int], None] = lambda done, total: None,
+    asset_ids: Sequence[int] | None = None,
+    config=None,
 ) -> int:
     """`root`（账本口径）下还没探过的视频逐个探一遍，返回探了几个。"""
-    if not ffprobe or location in SourceAccessPolicy().metered_locations:
+    if not ffprobe:
         return 0
     prefix = str(PureWindowsPath(root)).rstrip("\\") + "\\"
+    selected = ''
+    parameters = (location, len(prefix), prefix)
+    if asset_ids is not None:
+        if not asset_ids:
+            return 0
+        selected = ' AND id IN (' + ','.join('?' * len(asset_ids)) + ')'
+        parameters += tuple(asset_ids)
     with closing(sqlite3.connect(db_path, timeout=30)) as connection:
         rows = connection.execute(
-            f"SELECT id,path FROM asset WHERE {_UNMEASURED} AND substr(path,1,?)=? ORDER BY id",
-            (location, len(prefix), prefix)).fetchall()
+            f"SELECT id,path FROM asset WHERE {_UNMEASURED} AND substr(path,1,?)=?{selected} ORDER BY id",
+            parameters).fetchall()
+    rows = [row for row in rows if cost_for(location, row[1], config) == 'free']
     return _record(db_path, ffprobe, rows, report)
 
 
-def probe_path(db_path, ffprobe: str | None, location: str, path: str) -> int:
+def probe_path(db_path, ffprobe: str | None, location: str, path: str, *, config=None) -> int:
     """推送发现刚登记的这一个文件；不是视频、已经探过或来源计费都回 0。"""
-    if not ffprobe or location in SourceAccessPolicy().metered_locations:
+    if (not ffprobe or cost_for(location, path, config) == 'metered'
+            or skip_background_read(path)):
         return 0
     with closing(sqlite3.connect(db_path, timeout=30)) as connection:
         rows = connection.execute(
@@ -123,6 +138,7 @@ def probe_path(db_path, ffprobe: str | None, location: str, path: str) -> int:
 
 def _record(db_path, ffprobe: str, rows: Sequence, report: Callable[[int, int], None]) -> int:
     """探完一条写一条。`report` 抛出来（任务被停）时，还没开始的那些不再探。"""
+    rows = [row for row in rows if not skip_background_read(row[1])]
     if not rows:
         return 0
     done = 0

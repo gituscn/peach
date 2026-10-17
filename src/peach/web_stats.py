@@ -29,7 +29,8 @@ from .taste_history import (
     write_manifest,
 )
 from .web_activity import DEFAULT_PROFILE_ID
-from .web_catalog import COST, attach_avatar_availability, tag_is_not_a_performer_name
+from .web_catalog import attach_avatar_availability, tag_is_not_a_performer_name
+from .media_sources import cost_for
 from .web_state import WebContract, path_version
 from .taste_browsers import browser_sources, configure_browser, enabled_history_sources
 
@@ -450,7 +451,7 @@ def q_quality_goals(contract: WebContract, args):
             (DEFAULT_PROFILE_ID,),
         ).fetchone()[0]
         rows = [dict(row) for row in connection.execute(
-            "SELECT a.id,a.name,a.code,a.location,a.size,a.duration,a.snapshot_path,"
+            "SELECT a.id,a.name,a.code,a.location,a.path,a.size,a.duration,a.snapshot_path,"
             "g.reason,g.updated_at FROM asset_quality_goal g "
             "JOIN asset a ON a.id=g.asset_id "
             "WHERE g.profile_id=? AND g.wanted=1 "
@@ -458,7 +459,7 @@ def q_quality_goals(contract: WebContract, args):
             (DEFAULT_PROFILE_ID, limit, offset),
         )]
     for row in rows:
-        row["cost"] = COST.get(row["location"], "metered")
+        row["cost"] = cost_for(row['location'], row.pop('path', None))
         row["has_thumb"] = contract.has_snapshot(row["snapshot_path"])
         row["has_cover"] = contract.has_cover(row.get("code"))
         row["cover_version"] = contract.cover_version(row.get("code"))

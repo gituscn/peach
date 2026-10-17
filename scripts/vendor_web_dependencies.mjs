@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -46,17 +46,38 @@ copyPackageFiles({
   note: "Board 界面使用 Inter 可变字体；中文由系统中文字体补齐。",
 });
 
+// 官方 CDN 包只分发播放器消费的 ESM 静态导入闭包。
+const videoPackage = "@videojs/cdn";
+const videoRoot = join(root, "node_modules", videoPackage);
+const videoEntries = [
+  "video-player.js", "media/hlsjs-video.js", "media/dash-video.js", "ui/container.js", "ui/play-button.js",
+  "ui/mute-button.js", "ui/fullscreen-button.js", "ui/pip-button.js", "ui/time-slider.js",
+  "ui/volume-slider.js", "ui/slider-track.js", "ui/slider-fill.js", "ui/slider-buffer.js",
+  "ui/slider-thumb.js", "ui/slider-value.js", "i18n.js", "locales/zh-CN.js",
+];
+const videoFiles = new Set();
+const visitVideoModule = (name) => {
+  if (videoFiles.has(name)) return;
+  if (name.startsWith("../") || !name.endsWith(".js")) throw new Error(`播放器模块越界：${name}`);
+  videoFiles.add(name);
+  const contents = text("node_modules", videoPackage, name);
+  for (const match of contents.matchAll(/(?:from\s*|import\s*\(?)["'`](\.[^"'`]+)["'`]/g)) {
+    visitVideoModule(relative(videoRoot, resolve(videoRoot, dirname(name), match[1])).replaceAll("\\", "/"));
+  }
+};
+videoEntries.forEach(visitVideoModule);
 copyPackageFiles({
-  packageName: "video.js",
+  packageName: videoPackage,
   vendorName: "videojs",
-  files: [
-    ["dist/video.min.js", "video.min.js"],
-    ["dist/video-js.min.css", "video-js.min.css"],
-    ["dist/font/VideoJS.woff", "font/VideoJS.woff"],
-    ["dist/lang/zh-CN.js", "lang/zh-CN.js"],
-  ],
-  note: "Peach 自托管固定版本，不依赖 CDN。直接 MP4 使用 Range，远端原生 MP4 可使用服务端 HLS 短片段；两者共用 Video.js 内置 VHS。",
+  files: [...videoFiles].sort().map(name => [name, name]),
+  note: "Peach 自托管 Video.js 10 官方 ESM 模块及其导入闭包。控制器复用 @videojs/html，媒体复用 @videojs/hlsjs-video 与 @videojs/dash-video；原生 video 经 media 插槽承载 MP4、HLS、DASH 与字幕。\n\n"
+    + `- hls.js 1.6.19（Apache-2.0）：\`hls.js.LICENSE.txt\` SHA-256：\`${sha256(lfText("resources", "licenses", "hlsjs-1.6.19-LICENSE.txt"))}\`\n`
+    + `- dash.js 5.2.0（BSD-3-Clause）：\`media/dash.all.min.js.LICENSE.txt\` SHA-256：\`${sha256(lfText("resources", "licenses", "dashjs-5.2.0-LICENSE.txt"))}\``,
 });
+stage(`web/vendor/videojs/${versions[videoPackage]}/media/dash.all.min.js.LICENSE.txt`,
+  lfText("resources", "licenses", "dashjs-5.2.0-LICENSE.txt"));
+stage(`web/vendor/videojs/${versions[videoPackage]}/hls.js.LICENSE.txt`,
+  lfText("resources", "licenses", "hlsjs-1.6.19-LICENSE.txt"));
 
 copyPackageFiles({
   packageName: "swiper",
@@ -251,7 +272,7 @@ index = index.replace(/Health Icons sperm outline-24px, CC0\/public domain/,
   `Health Icons ${versions.healthicons} sperm outline-24px, CC0/public domain`);
 index = index.replace(/Phosphor [0-9.]+ regular, MIT/,
   `Phosphor ${versions["@phosphor-icons/core"]} regular, MIT`);
-index = index.replaceAll(/\/vendor\/videojs\/[0-9.]+\//g, `/vendor/videojs/${versions["video.js"]}/`);
+index = index.replaceAll(/\/vendor\/videojs\/[0-9.]+\//g, `/vendor/videojs/${versions[videoPackage]}/`);
 // `palette-line` 有两个使用者，它们说的是同一件事：设置分区的「界面」页签，和侧栏底部
 // 那枚配色钮——那枚钮的弹层底部「详细设置」开的正是「界面」页。一枚字形一个意思，同一个
 // 意思也只有一枚字形，所以这里不给配色钮另备一枚。
@@ -272,7 +293,7 @@ stage("web/index.html", index);
 
 let player = text("frontend", "src", "player", "videojs.ts");
 // 播放器版本由按需加载器固定，随前端清单重算；依赖检查同时核对 HTML 与加载器。
-player = player.replaceAll(/\/vendor\/videojs\/[0-9.]+\//g, `/vendor/videojs/${versions["video.js"]}/`);
+player = player.replaceAll(/\/vendor\/videojs\/[0-9.]+\//g, `/vendor/videojs/${versions[videoPackage]}/`);
 stage("frontend/src/player/videojs.ts", player);
 
 // 灯箱的 Swiper 同理按需加载，版本钉在 React 灯箱的加载器里。改了之后要在 frontend/
@@ -283,13 +304,13 @@ for (const path of ["frontend/src/react/photo-lightbox/photo-lightbox.ts", "fron
 }
 
 let webTests = text("tests", "test_web_ui.py");
-webTests = webTests.replaceAll(/\/vendor\/videojs\/[0-9.]+\//g, `/vendor/videojs/${versions["video.js"]}/`);
+webTests = webTests.replaceAll(/\/vendor\/videojs\/[0-9.]+\//g, `/vendor/videojs/${versions[videoPackage]}/`);
 stage("tests/test_web_ui.py", webTests);
 
 let reuse = text("docs", "REUSE.md");
 // 版本号在这份文档里不止出现一次，换第一处会留下一行对不上的旧版本。只认完整
 // 三段版本号：正文里还有「Video.js 10 Menu」那样指某个大版本的说法，它不是固定版本。
-reuse = reuse.replaceAll(/Video\.js \d+\.\d+\.\d+/g, `Video.js ${versions["video.js"]}`);
+reuse = reuse.replaceAll(/Video\.js \d+\.\d+\.\d+/g, `Video.js ${versions[videoPackage]}`);
 reuse = reuse.replaceAll(/Swiper \d+\.\d+\.\d+/g, `Swiper ${versions.swiper}`);
 stage("docs/REUSE.md", reuse);
 
@@ -333,7 +354,7 @@ if (orphans.length) {
 }
 
 const versionRoots = [
-  ["web/vendor/videojs", versions["video.js"]],
+  ["web/vendor/videojs", versions[videoPackage]],
   ["web/vendor/swiper", versions.swiper],
 ];
 const problems = [];
@@ -357,7 +378,7 @@ if (checkOnly) {
       + "Dependabot 的清单升级用：scripts/adopt_dependency_bump.py --pr <编号>");
     process.exit(1);
   }
-  console.log(`前端固定依赖已同步：Video.js ${versions["video.js"]}、Swiper ${versions.swiper}、Lucide ${versions["lucide-static"]}、Phosphor ${versions["@phosphor-icons/core"]}、Health Icons ${versions.healthicons}`);
+  console.log(`前端固定依赖已同步：Video.js ${versions[videoPackage]}、Swiper ${versions.swiper}、Lucide ${versions["lucide-static"]}、Phosphor ${versions["@phosphor-icons/core"]}、Health Icons ${versions.healthicons}`);
   process.exit(0);
 }
 

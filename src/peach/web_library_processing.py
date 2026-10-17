@@ -14,6 +14,8 @@ def _current(contract):
 
 def q_library_processing(contract, _args):
     state = decorate(_current(contract))
+    from .media_processing_policy import metadata_only
+    state['metadata_only'] = metadata_only(settings_file.active().directory('state'))
     from .job_recovery import read
     recovery = read(contract.db_path, 'library-processing')
     if state.get('status') != 'running' and recovery.get('status') == 'blocked':
@@ -90,6 +92,9 @@ def w_library_processing(contract, body, *, resume=False):
                 (previous.get('requested_stage') if retry_ids is not None else None) or ALL_STAGES)
     if stage not in STAGES:
         raise ValueError('处理阶段无效')
+    from .media_processing_policy import metadata_only
+    if stage == PREVIEWS_STAGE and metadata_only(config.directory('state')):
+        raise ValueError('视频预览生成已关闭，请先在媒体库设置中开启')
     if retry_ids is not None and not retry_ids:
         return previous
     def work(job_id):

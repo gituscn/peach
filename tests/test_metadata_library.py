@@ -2385,6 +2385,18 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
         self.assertEqual(result['previews'], 0)
         self.assertEqual(result['status'], 'complete')
 
+    def test_management_mode_keeps_collection_and_suppresses_automatic_previews(self):
+        from peach.media_processing_policy import save
+        save(self.config.directory('state'), True)
+        with patch('peach.library_processing._generate_previews', side_effect=AssertionError('不应抽帧')), \
+                patch('peach.library_processing._finish_collection', return_value={}) as finish:
+            result = self.run_processing(stage='collect', asset_ids=[1])
+        self.assertEqual(result['status'], 'complete')
+        self.assertEqual(result['previews'], 0)
+        finish.assert_called_once()
+        with self.assertRaisesRegex(ValueError, '视频预览生成已关闭'):
+            self.run_processing(stage='previews', asset_ids=[1])
+
     def test_local_preview_is_available_when_online_collection_starts(self):
         with self.database.write_transaction() as connection:
             connection.execute("UPDATE asset SET code='ABW-358' WHERE id=1")

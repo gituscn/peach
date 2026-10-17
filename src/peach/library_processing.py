@@ -37,6 +37,8 @@ from .scan import scan_location
 from .ffmpeg import FFmpegResolver
 from .jobs import DiskGuard
 from .media_probe import probe_unmeasured
+from .media_processing_policy import metadata_only
+from .strm import skip_background_read
 from .record_rehome import reattach_in
 
 FIELDS = ('item_key', 'code', 'query', 'asset_id', 'asset_path', 'field', 'field_label', 'current_value',
@@ -1657,7 +1659,7 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
     chosen_paths = _chosen_asset_paths(db_path, asset_ids)
     scan = asset_ids is None and stage in (ALL_STAGES, SCAN_STAGE)
     mounts = {key: tuple(str(value) for value in values) for key, values in config.mounts.items()}
-    ffprobe = _ffprobe_path(config) if scan else None
+    ffprobe = _ffprobe_path(config) if scan or stage == COLLECT_STAGE else None
     for source, roots in locations.items():
         if stage == PREVIEWS_STAGE and source != 'local':
             continue
@@ -1673,10 +1675,14 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
                                            mounts=mounts, report=lambda line: update(stage='扫描文件'))
                 result.scanned += registered.files
                 result.probed += probe_unmeasured(
-                    db_path, ffprobe, source, root,
+                    db_path, ffprobe, source, root, config=config,
                     report=lambda done, total: update(stage='读取时长与分辨率', checked=done, total=total))
                 reattach_in(db_path, registered.new_ids)
                 update(scanned=result.scanned, probed=result.probed)
+            elif stage == COLLECT_STAGE:
+                result.probed += probe_unmeasured(
+                    db_path, ffprobe, source, root, asset_ids=asset_ids, config=config,
+                    report=lambda done, total: update(stage='读取时长与分辨率', checked=done, total=total))
     return result
 
 
@@ -1788,6 +1794,8 @@ def _generate_preview(config, row, database, resolver, *, progress):
         with tempfile.TemporaryDirectory(prefix='peach-preview-') as temporary:
             frames = Path(temporary)
             for index in range(9):
+                if metadata_only(config.directory('state')):
+                    return False
                 progress()
                 timestamp = duration * (0.03 + 0.94 * (index + 0.5) / 9)
                 if not frame_capture.capture_with_retry(
@@ -1812,10 +1820,12 @@ def _generate_previews(config, rows, database, *, update, issue, guard,
     """只读本机视频；来源失败与抽帧失败各自保留可重试项目。"""
     if database is None:
         return 0
-    rows = [row for row in rows if row['location'] == 'local']
+    rows = [row for row in rows if row['location'] == 'local' and not skip_background_read(row['path'])]
     resolver = FFmpegResolver(config.directory('tools') / 'ffmpeg')
     made = 0
     for index, row in enumerate(rows):
+        if metadata_only(config.directory('state')):
+            break
         if _checkpoint_key(row) in completed:
             continue
         def progress(row=row, index=index, made=made):
@@ -1880,6 +1890,21 @@ class _LibraryCheckpoints:
                 if _checkpoint_key(row) not in self.completed['completed_metadata'])
 
 
+def _validate_processing_request(config, db_path, stage, asset_ids, retry_ids, database):
+    """校验处理范围、选择与预览生成所需条件，返回规范的所选影片。"""
+    _require_writer(config, db_path)
+    if stage not in STAGES:
+        raise ValueError('处理阶段无效')
+    if stage == PREVIEWS_STAGE and metadata_only(config.directory('state')):
+        raise ValueError('视频预览生成已关闭，请先在媒体库设置中开启')
+    if asset_ids is not None and retry_ids is not None:
+        raise ValueError('选择项目与失败重试不能同时使用')
+    selected_ids = _asset_selection(db_path, asset_ids)
+    if stage == PREVIEWS_STAGE and database is None:
+        raise ValueError('生成预览图需要共享馆藏写入连接')
+    return selected_ids
+
+
 def process_library(config, db_path, candidate_root, cover_root, *, location='configured',
                     report=lambda state: None, provider_factory=None, job_id=None,
                     retry_ids=None, active=lambda: True, stage=ALL_STAGES,
@@ -1901,14 +1926,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
     `metadata_routes.parse_route_overrides`；不给就用内建那张表。
     `state_file` 给后台定向任务保存独立进度，共享候选写入仍使用全库处理锁。
     """
-    _require_writer(config, db_path)
-    if stage not in STAGES:
-        raise ValueError('处理阶段无效')
-    if asset_ids is not None and retry_ids is not None:
-        raise ValueError('选择项目与失败重试不能同时使用')
-    selected_ids = _asset_selection(db_path, asset_ids)
-    if stage == PREVIEWS_STAGE and database is None:
-        raise ValueError('生成预览图需要共享馆藏写入连接')
+    selected_ids = _validate_processing_request(config, db_path, stage, asset_ids, retry_ids, database)
     routes = metadata_routes.parse_route_overrides(route_overrides)
     path = Path(state_file) if state_file is not None else state_path(config)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1996,7 +2014,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 return state
             rows, genre_decisions = _collection_rows(
                 db_path, locations=locations, online_roots=sources.online_roots, asset_ids=scope_ids)
-            if stage in (ALL_STAGES, COLLECT_STAGE, PREVIEWS_STAGE):
+            if (stage in (ALL_STAGES, COLLECT_STAGE, PREVIEWS_STAGE)
+                    and not metadata_only(config.directory('state'))):
                 _generate_previews(config, rows, database, update=update, issue=issue, guard=guard,
                                    completed=checkpoints.completed['completed_previews'],
                                    checkpoint=lambda row: checkpoints.mark('completed_previews', row, flush_state))

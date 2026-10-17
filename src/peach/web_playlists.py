@@ -5,7 +5,8 @@ from typing import Protocol
 
 from .personal_records import VANISHED
 from .web_activity import DEFAULT_PROFILE_ID
-from .web_catalog import COST, con_entities, entity_ref
+from .web_catalog import con_entities, entity_ref
+from .media_sources import cost_for
 
 
 MAX_PLAYLIST_ITEMS = 200
@@ -169,7 +170,7 @@ def q_playlist(contract: PlaylistContract, args):
     with contract.read_connection() as connection:
         playlist = dict(_playlist(connection, playlist_id))
         items = [dict(row) for row in connection.execute(
-            "SELECT a.id,a.location,a.name,a.creator,a.studio,a.code,a.size,a.duration,"
+            "SELECT a.id,a.location,a.path,a.name,a.creator,a.studio,a.code,a.size,a.duration,"
             "a.width,a.height,a.ctx_orient,a.snapshot_path,a.play_count,a.leave_ratio,"
             "a.feedback,a.disposal,a.o_count,pi.position "
             "FROM playlist_item pi JOIN asset a ON a.id=pi.asset_id "
@@ -177,7 +178,7 @@ def q_playlist(contract: PlaylistContract, args):
             (playlist_id,),
         )]
     for item in items:
-        item["cost"] = COST.get(item["location"], "metered")
+        item["cost"] = cost_for(item['location'], item.pop('path', None))
         item["has_thumb"] = contract.has_snapshot(item.pop("snapshot_path", None))
     playlist["items"] = items
     playlist["item_count"] = len(items)
