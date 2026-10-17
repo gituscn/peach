@@ -12,24 +12,28 @@ var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescr
 function u() {
 	if (l || typeof window > "u") return;
 	l = !0;
-	let e = Date.now(), t = 0, n = /* @__PURE__ */ new Set(), r = (r, i, a = "") => {
+	let e = Date.now(), t = 0, n = /* @__PURE__ */ new Set(), r = (r, i, a = "", o) => {
 		if (Date.now() - e >= 6e4 && (e = Date.now(), t = 0, n.clear()), t >= 10) return;
-		let o = (i instanceof Error ? i.message : typeof i == "string" ? i : a).slice(0, 2e3);
-		if (!o) return;
-		let s = i instanceof Error ? (i.stack ?? "").slice(0, 6e3) : "", c = `${r}:${o}:${s}`;
-		n.has(c) || (n.add(c), t += 1, fetch("/api/diagnostics/client-error", {
+		let s = (i instanceof Error ? i.message : typeof i == "string" ? i : a).slice(0, 2e3);
+		if (!s) return;
+		let c = i instanceof Error ? (i.stack ?? "").slice(0, 6e3) : "", l = `${r}:${s}:${c}`;
+		n.has(l) || (n.add(l), t += 1, fetch("/api/diagnostics/client-error", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				kind: r,
-				message: o,
-				stack: s
+				message: s,
+				stack: c,
+				page: window.location.pathname,
+				source_file: o?.filename?.split("/").pop()?.split("?")[0],
+				line: o?.lineno,
+				column: o?.colno
 			}),
 			credentials: "same-origin",
 			keepalive: !0
 		}).catch(() => {}));
 	};
-	window.addEventListener("error", (e) => r("error", e.error, e.message)), window.addEventListener("unhandledrejection", (e) => r("unhandledrejection", e.reason, "Promise 未处理的异常"));
+	window.addEventListener("error", (e) => r("error", e.error, e.message, e)), window.addEventListener("unhandledrejection", (e) => r("unhandledrejection", e.reason, "Promise 未处理的异常"));
 }
 //#endregion
 //#region node_modules/scheduler/cjs/scheduler.production.js

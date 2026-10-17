@@ -28,6 +28,10 @@ def redact(value: str) -> str:
     text = str(value).encode("utf-8", errors="backslashreplace").decode("utf-8")
     text = re.sub(r"(?i)\b(?:https?|ftp|file)://[^\s<>\"']+", "<url>", text)
     text = re.sub(r"(?i)\b(?:bearer|basic)\s+[\w+/=.-]+", "<credential>", text)
+    text = re.sub(
+        r"(?i)(--(?:[a-z0-9_]+-)*(?:password|passwd|token|api[_-]?key|secret|cookie|authorization|access[_-]?key)\s+)"
+        r"(?:\"[^\"]*\"|'[^']*'|[^\s,;}]+)", r"\1<redacted>", text,
+    )
     text = re.sub(r"(?im)(\b(?:cookie|set-cookie|authorization)[\"']?\s*:\s*)[^\r\n]*", r"\1<redacted>", text)
     text = re.sub(
         r"(?i)([\"']?(?:password|passwd|token|api[_-]?key|secret|cookie|authorization|access[_-]?key)"
@@ -113,7 +117,7 @@ def exception_facts(error: BaseException) -> dict:
 
 def event(stage: str, error: BaseException | None = None, **fields) -> Path | None:
     record = {"at": datetime.now(timezone.utc).isoformat(), "stage": stage,
-              **system_facts(), **fields}
+              **system_facts(), 'thread': threading.current_thread().name, **fields}
     if error is not None:
         record.update(exception_facts(error))
     payload = json.dumps(scrub(record), ensure_ascii=False, default=str) + "\n"
@@ -128,6 +132,15 @@ def event(stage: str, error: BaseException | None = None, **fields) -> Path | No
             except OSError:
                 continue
     return None
+
+
+def subprocess_failure(stage: str, *, tool: str, error: BaseException | None = None,
+                       returncode=None, stderr=b'', **fields) -> Path | None:
+    """媒体子进程仅保留工具名、错误码和有界错误输出，不记录完整命令。"""
+    raw = stderr or getattr(error, 'stderr', b'') or b''
+    text = raw.decode('utf-8', 'replace') if isinstance(raw, bytes) else str(raw)
+    return event(stage, error, tool=Path(tool).name, returncode=returncode,
+                 stderr=text[-4000:], **fields)
 
 
 class ErrorHandler(logging.Handler):

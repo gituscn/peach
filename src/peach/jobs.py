@@ -568,6 +568,10 @@ class BackgroundJob:
         """执行一次操作并保存终态回执；重复提交只返回进行中的同一任务。"""
         def work(job_id):
             result = fn()
+            if not result.get('ok', True):
+                from .error_reporting import event
+                event('background-result', job_id=job_id, task_key=self.task_key,
+                      message=result.get('error') or result.get('message') or '任务失败')
             self.update(job_id, **result, status=(
                 "complete" if result.get("ok", True) else "failed"),
                 completed_at=time.time())
@@ -589,6 +593,9 @@ class BackgroundJob:
                     self.state.update(waiting_for_update=True, stage='等待安装完成后继续', error='',
                                       message='任务已暂停，安装完成后自动继续。')
         except Exception as error:   # 后台失败必须变成可轮询的状态，不能只留在日志里
+            from .error_reporting import event
+            event('background-job', error, job_id=job_id, task_key=self.task_key,
+                  run_id=self._run_ids.get(job_id))
             # 抛出来就是没跑完：途中声明过的后继作废，结算时一条都不派。
             with self.lock:
                 if self.state is not None and self.state.get(self.id_key) == job_id:

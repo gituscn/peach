@@ -370,6 +370,8 @@ def apply(manifest: Path, wait_pid: int) -> int:
         raise TimeoutError("新版本未能就绪")
     except Exception as exc:
         if moved:
+            from .error_reporting import event
+            event('standalone-update-install', exc)
             try:
                 if installed:
                     for window in find_tray_windows(target / "Peach.exe"):
@@ -381,8 +383,11 @@ def apply(manifest: Path, wait_pid: int) -> int:
                 start_tray(target / "Peach.exe")
                 message = f"更新失败，已恢复旧版本：{exc}"
             except Exception as rollback:
+                event('standalone-update-rollback', rollback)
                 message = f"更新失败，回滚未完成：{rollback}"
         else:
+            from .error_reporting import event
+            event('standalone-update-install', exc)
             message = f"更新未安装：{exc}"
             try:
                 restore_database(data)
@@ -391,6 +396,7 @@ def apply(manifest: Path, wait_pid: int) -> int:
                 if not process_alive(wait_pid):
                     start_tray(target / "Peach.exe")
             except Exception as rollback:
+                event('standalone-update-rollback', rollback)
                 message = f"更新失败，数据库恢复未完成：{rollback}"
         write(data, state="error", progress=0, message=message)
         return 1

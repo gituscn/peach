@@ -1,4 +1,5 @@
 import os
+import subprocess
 import tempfile
 import sys
 import unittest
@@ -6,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import peach.media as media_module
-from peach.ffmpeg import FFmpegResolver
+from peach.ffmpeg import BinaryChoice, FFmpegResolver, binary_diagnostics
 from peach.media import (
     FilesystemBackend, MediaEngine, MediaUnavailable, normalized_path,
     resolve_case_insensitive,
@@ -15,6 +16,22 @@ from peach.repository import MediaAsset
 
 
 class MediaEngineTests(unittest.TestCase):
+    def test_tool_diagnostics_distinguishes_software_av1_and_hardware_only(self):
+        for decoder, available in (('av1', False), ('libdav1d', True)):
+            results = [subprocess.CompletedProcess([], 0, b'ffmpeg version test\n', b''),
+                       subprocess.CompletedProcess([], 0, f' V..... {decoder} AV1 decoder\n'.encode(), b'')]
+            with patch('peach.ffmpeg.subprocess.run', side_effect=results):
+                result = binary_diagnostics(BinaryChoice(Path('ffmpeg'), 'test'), decoders=True)
+            self.assertTrue(result['usable'])
+            self.assertEqual(result['av1_software'], available)
+
+    def test_tool_diagnostics_reports_execution_failure(self):
+        with patch('peach.ffmpeg.subprocess.run', side_effect=subprocess.TimeoutExpired('ffmpeg', 5)):
+            result = binary_diagnostics(BinaryChoice(Path('ffmpeg'), 'test'), decoders=True)
+        self.assertTrue(result['available'])
+        self.assertFalse(result['usable'])
+        self.assertEqual(result['error'], 'TimeoutExpired')
+
     # 临时目录一律先 resolve 再喂给被测代码。媒体解析本身就以 resolve 后的真实路径
     # 判断是否越过根目录，而 CI runner 的临时目录都是别名：macOS 的 /var 是
     # /private/var 的软链，Windows runner 的 %TEMP% 是 C:\Users\RUNNER~1 这种 8.3

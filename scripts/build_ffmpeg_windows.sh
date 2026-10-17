@@ -3,7 +3,7 @@
 set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 output="$(realpath -m -- "${1:?用法: build_ffmpeg_windows.sh <输出目录>}")"
-for tool in python3 make nasm pkg-config clang x86_64-w64-mingw32-gcc x86_64-w64-mingw32-strip; do
+for tool in python3 make nasm pkg-config clang meson ninja x86_64-w64-mingw32-gcc x86_64-w64-mingw32-strip; do
     command -v "$tool" >/dev/null || { echo "缺少构建工具: $tool" >&2; exit 1; }
 done
 python3 "$script_dir/fetch_ffmpeg_sources.py" prepare "$output"
@@ -14,12 +14,19 @@ prefix="$work/prefix"
     nasm -v
     clang --version
     make --version
+    meson --version
+    ninja --version
     python3 --version
     uname -a
 } > "$output/build-environment.txt"
 export PKG_CONFIG_PATH=
 export PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
 mkdir -p "$prefix" "$output/ffmpeg/bin"
+meson setup "$work/dav1d-build" "$work/dav1d" --cross-file "$script_dir/dav1d-mingw64.ini" \
+    --prefix "$prefix" --libdir lib --buildtype release --default-library static \
+    -Denable_tools=false -Denable_tests=false
+meson compile -C "$work/dav1d-build"
+meson install -C "$work/dav1d-build"
 cd "$work/x264"
 ./configure --host=x86_64-w64-mingw32 --cross-prefix=x86_64-w64-mingw32- \
     --prefix="$prefix" --enable-static --disable-cli --disable-opencl \
@@ -33,7 +40,7 @@ cd "$work/ffmpeg"
     --cross-prefix=x86_64-w64-mingw32- --enable-cross-compile \
     --disable-autodetect --disable-shared --enable-static --disable-debug \
     --disable-doc --disable-ffplay --disable-pthreads --enable-w32threads \
-    --enable-gpl --enable-version3 --disable-nonfree --enable-libx264 \
+    --enable-gpl --enable-version3 --disable-nonfree --enable-libx264 --enable-libdav1d \
     --enable-cuda-llvm \
     --enable-ffnvcodec --enable-cuda --enable-cuvid --enable-nvenc --enable-nvdec \
     --enable-d3d11va --enable-dxva2 --enable-schannel \

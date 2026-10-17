@@ -24,7 +24,7 @@ from filelock import FileLock, Timeout
 
 from . import (access, distribution, entry_links, folder_picker, media_libraries, onboarding,
                push_discovery, settings_file, media_configuration, tunnel, web_downloads)
-from .routes_auth import require_auth, same_origin
+from .routes_auth import require_auth, require_authenticated_client, same_origin
 from .web_entry import runtime_fact_entries
 from . import release_updates, standalone_update, peach_proxy, desktop_startup, desktop_uninstall
 
@@ -132,10 +132,11 @@ _CLIENT_ERROR_LOCK = threading.Lock()
 
 @router.post("/api/diagnostics/client-error")
 async def client_error(request: Request):
-    """本机浏览器错误取证；首启与登录页也可调用。"""
+    """浏览器错误取证；本机首启与登录页允许上报，远程须登录。"""
     from . import error_reporting
     same_origin(request)
-    local_only(request)
+    if not local_client(request):
+        require_authenticated_client(request)
     with _CLIENT_ERROR_LOCK:
         recent = getattr(request.app.state, "client_error_times", deque(maxlen=20))
         request.app.state.client_error_times = recent
@@ -156,8 +157,11 @@ async def client_error(request: Request):
         raise HTTPException(400, "错误记录格式无效") from None
     if not isinstance(data, dict) or not isinstance(data.get("message"), str):
         raise HTTPException(400, "错误记录缺少原因")
-    fields = {key: value[:6000] for key in ("message", "stack", "kind")
+    fields = {key: value[:6000] for key in ("message", "stack", "kind", "page", "source_file")
               if isinstance(value := data.get(key), str)}
+    fields.update({key: value for key in ('line', 'column')
+                   if type(value := data.get(key)) is int and value >= 0})
+    fields['user_agent'] = request.headers.get('user-agent', '')[:512]
     if error_reporting.event("browser", **fields) is None:
         raise HTTPException(503, "错误日志无法写入")
     return {"recorded": True}
