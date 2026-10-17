@@ -18,7 +18,6 @@ from .downloads import INGESTED, RESUBMITTABLE_STATES, submit_offline_download, 
 from .follow_secrets import CredentialError
 from .feeds import scan_code
 from .fsutil import atomic_write_text
-from .web_resource_search import q_resource_search
 
 LOGGER = logging.getLogger(__name__)
 CREDENTIAL = "jav-browser"
@@ -82,12 +81,12 @@ def source_page(value: object) -> str:
 class JavBrowser:
     """本机持久队列；搜索完成前退出时，下一次启动继续处理。"""
 
-    def __init__(self, contract, *, search=None):
+    def __init__(self, contract, *, search):
         self.contract = contract
         self.downloads = contract.downloads
         self.credentials = self.downloads.credentials
         self.path = Path(contract.follow_state_root) / "jav-browser-queue.json"
-        self.search = search or q_resource_search
+        self.search = search
         self._lock = threading.RLock()
         self._wake = threading.Event()
         self._stop = threading.Event()

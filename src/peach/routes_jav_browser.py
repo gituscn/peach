@@ -5,9 +5,6 @@ from fastapi.responses import JSONResponse, Response
 from .config import PROJECT_ROOT
 from .jav_browser import source_sites
 from .routes_auth import require_auth
-from .routes_configuration import local_only
-
-router = APIRouter()
 
 
 def browser_client(request: Request):
@@ -21,7 +18,6 @@ def browser_client(request: Request):
     return service
 
 
-@router.get("/integrations/peach-jav.user.js")
 def userscript():
     import json
     sites = source_sites()
@@ -34,7 +30,6 @@ def userscript():
     return Response(script, media_type="application/javascript", headers={"Cache-Control": "no-cache"})
 
 
-@router.get("/api/jav-browser")
 def status(code: str, service=Depends(browser_client)):
     try:
         return JSONResponse(service.status(code), headers={"Cache-Control": "no-store"})
@@ -42,7 +37,6 @@ def status(code: str, service=Depends(browser_client)):
         raise HTTPException(400, str(error)) from None
 
 
-@router.post("/api/jav-browser")
 def add(body: dict = Body(...), service=Depends(browser_client)):
     try:
         return JSONResponse(service.add(body), headers={"Cache-Control": "no-store"})
@@ -50,16 +44,23 @@ def add(body: dict = Body(...), service=Depends(browser_client)):
         raise HTTPException(400, str(error)) from None
 
 
-@router.get("/api/configuration/jav-browser")
-def settings(request: Request, _args=Depends(require_auth)):
-    local_only(request)
+def settings(request: Request):
     return JSONResponse(request.app.state.jav_browser.settings(), headers={"Cache-Control": "no-store"})
 
 
-@router.post("/api/configuration/jav-browser")
-def configure(request: Request, body: dict = Body(...), _args=Depends(require_auth)):
-    local_only(request)
+def configure(request: Request, body: dict = Body(...)):
     try:
         return JSONResponse(request.app.state.jav_browser.configure(body), headers={"Cache-Control": "no-store"})
     except ValueError as error:
         raise HTTPException(400, str(error)) from None
+
+
+def create_router(local_only) -> APIRouter:
+    router = APIRouter()
+    router.add_api_route("/integrations/peach-jav.user.js", userscript, methods=["GET"])
+    router.add_api_route("/api/jav-browser", status, methods=["GET"])
+    router.add_api_route("/api/jav-browser", add, methods=["POST"])
+    permissions = [Depends(require_auth), Depends(local_only)]
+    router.add_api_route("/api/configuration/jav-browser", settings, methods=["GET"], dependencies=permissions)
+    router.add_api_route("/api/configuration/jav-browser", configure, methods=["POST"], dependencies=permissions)
+    return router

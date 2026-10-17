@@ -88,7 +88,7 @@ class BrowserTests(unittest.TestCase):
         self.add()
         self.service.rows["ABC-123"]["state"] = "searching"
         self.service._save()
-        restored = JavBrowser(self.app.state.web_contract)
+        restored = JavBrowser(self.app.state.web_contract, search=self.service.search)
         self.assertEqual(restored.status("ABC-123")["state"], "queued")
 
     def test_owned_video_is_not_queued_or_searched(self):

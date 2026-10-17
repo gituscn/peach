@@ -33,9 +33,31 @@ describe('浏览器添加 JAV 设置', () => {
         });
         await page.reload();
         const region = page.getByRole('region', { name: '浏览器添加 JAV', exact: true });
+        const install = region.getByRole('link', { name: '安装 Peach 用户脚本' });
+        await install.waitFor();
+        const channel = region.locator('button[aria-haspopup="listbox"]');
+        const installBox = await install.locator('span').first().boundingBox();
+        const channelBox = await channel.boundingBox();
+        assert.ok(installBox && channelBox && Math.abs(installBox.x - channelBox.x) <= 1,
+          JSON.stringify({ installBox, channelBox }));
+        assert.equal(await channel.locator('img').count(), 1);
+        const status = region.getByRole('status');
+        assert.equal(await status.innerText(), '未启用');
+        assert.equal(await status.locator('span[aria-hidden="true"]').count(), 1);
+        await channel.scrollIntoViewIfNeeded();
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        await channel.click();
+        const pikpak = page.getByRole('option', { name: 'PikPak', exact: true });
+        await pikpak.waitFor();
+        assert.equal(await pikpak.locator('img').count(), 1);
+        const cloud115 = page.getByRole('option', { name: '115', exact: true });
+        assert.equal(await cloud115.locator('img').count(), 1);
+        await cloud115.click();
         await region.getByRole('button', { name: '启用并生成令牌', exact: true }).click();
         const token = region.getByLabel('浏览器添加专用令牌', { exact: true });
         await token.waitFor();
+        assert.equal(await status.innerText(), '已启用');
+        assert.equal(await status.locator('span[aria-hidden="true"]').count(), 1);
         assert.equal(await token.inputValue(), 'test-issued-token-1');
         assert.equal(await token.getAttribute('type'), 'password');
         assert.equal(await region.getByRole('link', { name: '安装 Peach 用户脚本' }).getAttribute('href'),
@@ -46,6 +68,8 @@ describe('浏览器添加 JAV 设置', () => {
           'input[type="password"][value="test-issued-token-2"]') !== null);
         await region.getByRole('button', { name: '关闭浏览器添加', exact: true }).click();
         await token.waitFor({ state: 'detached' });
+        assert.equal(await status.innerText(), '未启用');
+        assert.equal(await status.locator('span[aria-hidden="true"]').count(), 1);
         assert.deepEqual(posted.map(body => body.action), ['enable', 'rotate', 'disable']);
         assert.ok(posted.every(body => body.provider === '115'));
         await settle(page);

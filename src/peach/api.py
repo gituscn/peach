@@ -308,7 +308,8 @@ def create_app(
         after_ingest=lambda task: enqueue_download_postprocess(contract, task))
     contract.downloads = downloads
     from .jav_browser import JavBrowser
-    jav_browser = JavBrowser(contract)
+    from .web_resource_search import q_resource_search
+    jav_browser = JavBrowser(contract, search=q_resource_search)
     contract.follow_scheduler = follow_scheduler
     # 订阅源拉取（ADR-0042）用同一个调度实现，只换 job id、状态文件与默认间隔。
     # 默认 6 小时：一位女优的 JavDB 演员页一天更新几条，比这更密只是把 JavDB 的配额
@@ -581,7 +582,7 @@ def create_app(
     app.include_router(routes_auth.router)
     app.include_router(routes_pages.router)
     app.include_router(routes_configuration.router)
-    app.include_router(routes_jav_browser.router)
+    app.include_router(routes_jav_browser.create_router(routes_configuration.local_only))
     app.include_router(routes_media.router)
     app.include_router(routes_api.router)
     return app
