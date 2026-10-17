@@ -6,7 +6,7 @@
 
 | 平台 | 自动发现 |
 | --- | --- |
-| Windows | Chrome、Edge、Firefox、Zen、Aside、Brave、Vivaldi、Opera、Opera GX、115、QQ、360 安全、360 极速、360 极速 X、搜狗新版 |
+| Windows | Chrome、Chromium、Edge、Firefox、Zen、Aside、Brave、Vivaldi、Opera、Opera GX、115、QQ、360 安全、360 极速、360 极速 X、搜狗新版、2345、Maxthon |
 | macOS | Chrome、Edge、Firefox、Zen、Aside、Brave、Vivaldi、Opera、Opera GX、Safari |
 | Linux | Chrome、Chromium、Edge、Firefox、Brave、Vivaldi、Opera；另含 Chrome Flatpak、Firefox Flatpak 与 Snap 默认目录 |
 
@@ -14,15 +14,21 @@ Windows 使用当前设备的 `APPDATA`、`LOCALAPPDATA`，Linux 使用 `XDG_CON
 
 ## 115 与国产浏览器
 
-- **115**：默认资料目录为 `%LOCALAPPDATA%\115Chrome\User Data`。优先使用包含网页访问记录的 `History`。`HistoryEx` 只有包含受支持的网页访问表结构时才可读取；[115 官方将其称为下载历史](https://115.com/115115/T344887.html)，只有下载记录的文件会提示选择 `History`，不计入口味。目录中同时有两种文件时，下载记录不妨碍网页历史读取。
+- **115**：默认资料目录为 `%LOCALAPPDATA%\115Chrome\User Data`，网页历史可存于 `HistoryEx`。本机实际文件同时含 `urls`、`visits` 与下载表，自动发现、选择文件、选择 `Default` 或 `User Data` 目录均已验收。[115 官方下载故障说明](https://115.com/115115/T344887.html)也引用此文件，但不能据此将整个文件视为仅有下载记录。只有不含可识别网页访问表的文件才会被拒绝；下载表本身不计入口味。
 - **QQ、360 极速、360 极速 X、搜狗新版**：按 Chromium 网页历史读取。默认目录依据维护项目 [HackBrowserData 的 Windows 浏览器目录](https://github.com/moonD4rk/HackBrowserData/blob/master/browser/browser_windows.go)；360 安全目录另有[官方社区说明](https://bbs.360.cn/archiver/tid-15857311.html)。自定义安装路径需手动添加。
 - **搜狗旧版**：`HistoryUrl3.db` 的专有格式未支持，不能按 Chromium 格式读取。[取证研究](https://www.huorong.cn/document/tech/vir_report/805)记录的表结构与标准网页访问表不同；完整时间字段语义未取得。
+- **2345**：`%LOCALAPPDATA%\2345Explorer\User Data`，依据[官方帮助](https://ie.2345.cc/help/v7/help_scj.htm)确认资料目录；历史文件仍需满足受支持的 SQLite 表结构。
+- **Maxthon**：同时查找 `%LOCALAPPDATA%\Maxthon\User Data` 与 `%LOCALAPPDATA%\Maxthon\Application\User Data`。前者见 [Winapp2 维护源码](https://github.com/MoscaDotTo/Winapp2/blob/master/Non-CCleaner/Winapp2.ini)，后者见[官方社区实际目录](https://forum.maxthon.com/d/6744-aimax--cant-turn-off/5)；[官方答复](https://forum.maxthon.com/d/3314-restore-last-visit-page-after-update-)确认 `History` 为资料中的历史文件。旧版专有 `.dat` 不在标准 SQLite 解析范围内。
 - **Opera**：具体资料目录可从 `opera:about/` 查看，见[官方帮助](https://help.opera.com/en/latest/crashes-and-issues/)。
+
+Chrome、Chromium 的资料路径以[官方说明](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md)和 `chrome://version` 的 `Profile Path` 为准；`--user-data-dir` 指定的任意位置需手动添加。
+
+Firefox 自定义资料可以从 `about:profiles` 找到根目录后手动添加。官方源码中，[`profiles.ini`](https://github.com/mozilla-firefox/firefox/blob/main/toolkit/profile/nsToolkitProfileService.cpp) 的相对路径基于 Firefox 根目录；新版 [Profile Groups](https://github.com/mozilla-firefox/firefox/blob/main/toolkit/profile/ProfilesDatastoreService.sys.mjs) 记录在独立 SQLite 配置里。Peach 自动查找默认资料位置，不解析这两类配置中的外置位置。UC 的 [Autopsy 目录规则](https://github.com/sleuthkit/autopsy/blob/develop/RecentActivity/src/org/sleuthkit/autopsy/recentactivity/Chromium.java)包含 `UCBrowser/User Data%`，存在资料目录与文件名后缀差异，未列入自动发现承诺；可手动选择历史文件，按实际格式校验。
 
 ## 验证与限制
 
 浏览器数据库先经 SQLite backup 取得一致快照，再由固定的 `browserexport==0.4.4` 转换访问时间与记录。Chrome 的可选停留时长、Firefox 的可选描述与预览图缺失时仍可读取；一份资料损坏不阻断其他资料。原始 URL 与标题只保存在私有历史库，不进入 ledger。
 
-临时 SQLite 回归覆盖目录发现、手动添加、停止与恢复、增量去重、可选列、错误格式、特殊路径字符及单份失败隔离。这里的目录支持不表示已对每款浏览器当前版本完成实机验收。issue [#65](https://github.com/peach-mitao/peach/issues/65) 报告者的 `HistoryEx` 表结构与实际导入结果未取得；无需上传含私人历史的完整数据库，可先提供表名与列名确认格式。
+临时 SQLite 回归覆盖目录发现、手动添加、停止与恢复、增量去重、可选列、错误格式、特殊路径字符及本机单份失败隔离。本机 115 的真实文件已在临时私有库完成读取与重复导入验收，源文件哈希保持一致；记录仅保留计数和通过状态，没有 URL 或标题。其他浏览器的目录支持不表示已对其当前版本完成实机验收。issue [#65](https://github.com/peach-mitao/peach/issues/65) 报告者环境仍待修复版本发布后复测。
 
 桌面与手机页面沿用现有浏览器来源管理，本次没有布局或交互改动。

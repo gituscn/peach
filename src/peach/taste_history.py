@@ -147,6 +147,10 @@ def discover_history_sources(
                 ("360se", localappdata / "360se6" / "User Data"),
                 ("360se", localappdata / "secoresdk" / "360se6" / "User Data"),
                 ("sogou", localappdata / "Sogou" / "SogouExplorer" / "User Data"),
+                ("2345", localappdata / "2345Explorer" / "User Data"),
+                ("maxthon", localappdata / "Maxthon" / "Application" / "User Data"),
+                ("maxthon", localappdata / "Maxthon" / "User Data"),
+                ("chromium", localappdata / "Chromium" / "User Data"),
             ]
         )
     elif platform_name == "macos":

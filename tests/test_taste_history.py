@@ -136,6 +136,9 @@ class TasteHistoryTests(unittest.TestCase):
             "360chromex": local / "360ChromeX/Chrome/User Data/Default/History",
             "360se": roaming / "360se6/User Data/Default/History",
             "sogou": local / "Sogou/SogouExplorer/User Data/Default/History",
+            "2345": local / "2345Explorer/User Data/Default/History",
+            "maxthon": local / "Maxthon/Application/User Data/Default/History",
+            "chromium": local / "Chromium/User Data/Default/History",
             "opera_gx": roaming / "Opera Software/Opera GX Stable/Default/History",
         }
         for path in layouts.values():
