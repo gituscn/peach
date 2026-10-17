@@ -32,6 +32,7 @@ from peach.settings_file import PeachConfig
 from peach.metadata_auto_apply import _apply_metadata_candidate
 from support.conditions import windows_ledger_roots
 from support.ledger import fresh_ledger
+from support.demo import seed_metadata_cache
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -129,6 +130,7 @@ class DemoDatasetTests(unittest.TestCase):
         db = fresh_ledger(self.root)
         config = PeachConfig(self.root, self.root / "config.toml", present=True,
                              locations={"local": (str(media),)})
+        seed_metadata_cache(media, config.directory('sources'))
         factory = Mock()
         result = process_library(config, db, self.root / "generated", self.root / "covers",
                                  provider_factory=factory)

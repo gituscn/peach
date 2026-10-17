@@ -44,7 +44,7 @@ BASELINE: dict[str, int] = {
     "src/peach/web_follow.py:q_follow": 35,
     "scripts/merge_duplicate_identities.py:collect": 50,
     "src/peach/web_review.py:_attach_review_asset_context": 46,
-    "src/peach/web_review.py:w_review_decision": 46,
+    "src/peach/web_review.py:w_review_decision": 44,
     "scripts/harvest_social_avatars.py:run": 45,
     "scripts/fetch_studio_avatar_candidates.py:main": 44,
     "src/peach/web_catalog.py:q_item": 44,
@@ -71,7 +71,7 @@ ACCEPTED: dict[str, tuple[int, str]] = {
         41, "应用工厂：按启动顺序构造账本、各项后台服务与路由并接成一个 app，每个可注入的"
             "依赖各带一个缺省；挂载探测按配置状态启动。拆开会把同一条构造顺序分散到几处"),
     "src/peach/library_processing.py:process_library": (
-        58, "顺序流水线：本地预览、读本地资料、联网采集、写候选、收尾共用一份进度状态"
+        56, "顺序流水线：本地预览、读本地资料、联网采集、写候选、收尾共用一份进度状态"
             "与问题记录；来源扫描、资产查询与外部会话分别归 `_scan_sources`、"
             "`_collection_rows`、`_RemoteSession`，剩下的是任务编排与逐项目资料处理"),
     "src/peach/jav_cover_fetch.py:run": (

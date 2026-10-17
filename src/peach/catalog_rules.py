@@ -783,7 +783,8 @@ def release_code_from_filename(name: str | None) -> str | None:
     stem = _ASSET_EXTENSION.sub("", str(name or "").strip())
     if western_release_identity(stem):
         return None
-    stripped = _FILE_NOISE.sub("", strip_promo_markers(stem))
+    partless = _ASSET_EXTENSION.sub("", _PART_MARKER.sub("", str(name or "").strip()))
+    stripped = _FILE_NOISE.sub("", strip_promo_markers(partless))
     code = release_code_from_text(stem) or (
         release_code_from_text(stripped) if _STANDS_ALONE.search(stripped) else None)
     if code:

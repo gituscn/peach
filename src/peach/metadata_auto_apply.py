@@ -500,6 +500,13 @@ def metadata_decision_is_stale(decision: dict, candidates: list[dict], *, code: 
         return False
     status = str(decision.get("status") or "").strip()
     if status == "approved":
+        reviewed = set(note.get("reviewed_candidate_keys") or [])
+        reviewed.update(str(note.get(key) or "") for key in ("candidate_key", "refreshed_candidate_key"))
+        if any(candidate.get("requires_review") and candidate.get("candidate_key") not in reviewed
+               for candidate in candidates):
+            return True
+        if note.get("reviewed_candidate_keys") and keys <= reviewed:
+            return False
         if _preferred_tags_changed(decision, candidates, code=code):
             return True
         approved_key = str(note.get("candidate_key") or "").strip()
@@ -896,6 +903,15 @@ def pending_genres(candidates: list[dict]) -> list[str]:
         for genre in candidate.get("unmapped_genres") or [] if str(genre).strip()))
 
 
+def overwrite_requires_review(connection, row: dict) -> bool:
+    """NFO 核查中的已有值差异必须由用户批准。"""
+    current = str(row.get("current_value") or "").strip()
+    return bool(current) and any(
+        candidate.get("requires_review") and not _same_as_current(
+            connection, str(row.get("field") or ""), candidate, current)
+        for candidate in row.get("candidates") or _parsed_candidates(row))
+
+
 def _may_replace_current(candidates: list[dict], *, field: str = "", code: str = "") -> bool:
     """这批候选能不能改掉账本已有的值：只有链上第一档可以。
 
@@ -912,6 +928,18 @@ def _may_replace_current(candidates: list[dict], *, field: str = "", code: str =
         return True
     return bool(sources) and all(
         source_tier(source) <= CHAIN_OFFICIAL for source in sources)
+
+
+def _auto_apply_targets(connection, row: dict, code: str, field: str):
+    """核对番号组的文件身份与字段归属，返回可供自动补全的资产。"""
+    query = str(row.get("query") or code).strip()
+    targets = _codes_matching(connection, [code, query], "code,name,path,field_owners")
+    if not targets or not _group_identifies_code(code, targets):
+        return []
+    column = METADATA_FIELD_COLUMNS.get(field)
+    if column and any(is_protected(owner_of(target["field_owners"], column)) for target in targets):
+        return []
+    return targets
 
 
 def metadata_auto_apply_candidate(connection, row: dict, *,
@@ -956,10 +984,13 @@ def metadata_auto_apply_candidate(connection, row: dict, *,
     快照，实测 r18dev 在 CSV 里写着 False，而现行 policy 认它是 official_mirror。
 
     本地 NFO 不在登记表里，却同样构成证据（ADR-0029）：采集时它的番号已经和文件名
-    对过，第 3 条照样再核一遍。
+    对过，第 3 条照样再核一遍。NFO 核查的覆盖候选带 `requires_review`，非空字段必须
+    复核后才可改值（ADR-0108）；来源链只决定补空采用哪一份。
     """
     field = str(row.get("field") or "").strip()
     if field not in AUTO_APPLY_FIELDS:
+        return None
+    if overwrite_requires_review(connection, row):
         return None
     code = str(row.get("code") or "").strip()
     if not code:
@@ -977,24 +1008,16 @@ def metadata_auto_apply_candidate(connection, row: dict, *,
     if replaces_current and not _may_replace_current(candidates, field=field, code=code):
         return None
     candidate = _preferred_candidate(field, candidates, code=code)
-    query = str(row.get("query") or code).strip()
     # 韩国 MIB 的番号问 JAV 目录站必错，这类候选一条都不该走自动批准。第 3 条对它们
     # 全部成立——文件名就叫 `AR-101 Ari....mp4`——但它保证的是「候选属于这个文件」，
     # 保证不了「来源返回的是这个番号」，而 MIB 恰恰错在后者。只有候选全部来自 MIB
     # 官网时才放行：官网按番号列出的就是这部片本身。
     if is_korean_mib_code(code) and not _only_mib_official(row):
         return None
-    targets = _codes_matching(connection, [code, query], "code,name,path,field_owners")
-    if not targets:
-        return None
-    if not _group_identifies_code(code, targets):
-        return None
     # 归属是用户判断的字段不走自动落库。ADR-0018 第 1 条只看取值空不空，而用户可以
     # 把一个字段判成空——那也是判断。没有这一道，「清空再等自动补回来」就成了
     # 用户无法表达的意思。
-    column = METADATA_FIELD_COLUMNS.get(field)
-    if column and any(is_protected(owner_of(target["field_owners"], column))
-                      for target in targets):
+    if not _auto_apply_targets(connection, row, code, field):
         return None
     return {**_normalised_candidate(field, candidate, resolve),
             **({"tag_policy": "censored-javdb"}
@@ -1392,6 +1415,15 @@ def _performer_external_provider(performer: dict, source: str,
     return str(performer.get("profile_source") or source)
 
 
+def _refresh_auto_batch(connection, batch):
+    """在同一事务中取得决定、标签规则和候选的账本现值。"""
+    decided = {row["item_key"]: dict(row) for row in connection.execute(
+        "SELECT item_key,status,note FROM review_decision WHERE category='metadata_fields'")}
+    genres = load_genre_decisions(connection)
+    refresh_current_values(connection, batch)
+    return decided, genres
+
+
 def auto_apply_metadata(database, candidate_root, *, batch_size=AUTO_APPLY_BATCH,
                         active=lambda: True, snapshot_root=None, asset_ids=None):
     """把确定的那部分直接落库，不占人工队列。
@@ -1432,13 +1464,9 @@ def auto_apply_metadata(database, candidate_root, *, batch_size=AUTO_APPLY_BATCH
         # 写入都要等它跑完；被停止或中途失败时，回滚的也只是当前这一批。
         batch = [dict(row) for row in rows[start:start + step]]
         with database.write_transaction() as connection:
-            decided = {row["item_key"]: dict(row) for row in connection.execute(
-                "SELECT item_key,status,note FROM review_decision "
-                "WHERE category='metadata_fields'")}
-            genres = load_genre_decisions(connection)
             # 第 1 条判据是「这个字段现在是空的」，问的必须是账本此刻，不是候选件那一刻。
             # 候选落盘之后落过库、合并过实体的，快照还写着空，照它落库就是拿来源覆盖已有值。
-            refresh_current_values(connection, batch)
+            decided, genres = _refresh_auto_batch(connection, batch)
             now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             for row in batch:
                 item_key = str(row.get("item_key") or "").strip()
@@ -1448,6 +1476,9 @@ def auto_apply_metadata(database, candidate_root, *, batch_size=AUTO_APPLY_BATCH
                     continue
                 row["candidates"] = _row_candidates(row, genres)
                 prior = decided.get(item_key)
+                if overwrite_requires_review(connection, row):
+                    skipped += 1
+                    continue
                 landed = _land_union_tags(
                     connection, item_key, prior, row, genres, batch=union_batch, now=now)
                 if landed:

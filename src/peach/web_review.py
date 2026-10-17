@@ -37,6 +37,7 @@ from .metadata_auto_apply import (
     _apply_metadata_candidate,
     _entity_identity_key,
     _fold_genre_decisions,
+    _landing_scope,
     _offers_another_stage_name,
     _only_mib_official,
     _parsed_candidates,
@@ -45,6 +46,7 @@ from .metadata_auto_apply import (
     _split_multi,
     genres_still_pending,
     metadata_decision_is_stale,
+    overwrite_requires_review,
     refresh_current_values,
 )
 from .metadata_policy import FALLBACK_SOURCES, SOURCE_SPECS, preferred_tag_source
@@ -337,9 +339,11 @@ def _metadata_queue_rows(connection, rows: list[dict],
     # MIB 官网（kmib）的候选是例外：那是这批番号自己的发行方。
     rows = [row for row in rows
             if not is_korean_mib_code(str(row.get("code") or "")) or _only_mib_official(row)]
-    rows = _drop_community_challenges_to_official(connection, rows)
-    rows = _drop_shop_side_dissent(rows)
-    return _drop_fallback_challenges(rows), genre_decisions
+    overrides = {row['item_key'] for row in rows if overwrite_requires_review(connection, row)}
+    filtered = _drop_community_challenges_to_official(connection, rows)
+    filtered = _drop_fallback_challenges(_drop_shop_side_dissent(filtered))
+    kept = {row['item_key'] for row in filtered} | overrides
+    return [row for row in rows if row['item_key'] in kept], genre_decisions
 
 
 def _review_rows(contract: ReviewContract, category: str) -> tuple[list[dict], str | None, int]:
@@ -841,6 +845,32 @@ def _install_studio_logo(contract: ReviewContract, studio: str) -> int:
     return 1
 
 
+def _approve_metadata_with_receipt(connection, group, candidate, now, note, expected_revision):
+    """批准一个来源值，保存已展示的候选，并取得同一事务中的实际版本回执。"""
+    candidate = _fold_genre_decisions(str(group.get("field") or ""), candidate,
+                                      load_genre_decisions(connection))
+    asset_ids, *_ = _landing_scope(connection, group, candidate, expected_revision)
+    marks = ",".join("?" * len(asset_ids))
+    before = {str(row["id"]): int(row["mutation_revision"]) for row in connection.execute(
+        f"SELECT id,mutation_revision FROM asset WHERE id IN ({marks})", asset_ids)}
+    applied = _apply_metadata_candidate(
+        connection, group, candidate, now, review_owner(str(candidate.get("source") or "")),
+        expected_revision=expected_revision)
+    revisions = {
+        str(row["id"]): {"before": before[str(row["id"])], "after": int(row["mutation_revision"])}
+        for row in connection.execute(
+            f"SELECT id,mutation_revision FROM asset WHERE id IN ({marks})", asset_ids)}
+    provenance = json.dumps({
+        "candidate_key": candidate['candidate_key'], "source": candidate.get("source"),
+        "reviewed_candidate_keys": [item.get("candidate_key") for item in _parsed_candidates(group)],
+        "user_note": note,
+    }, ensure_ascii=False, separators=(",", ":"))
+    connection.execute(
+        "UPDATE review_decision SET note=? WHERE category='metadata_fields' AND item_key=?",
+        (provenance, group['item_key']))
+    return applied, revisions
+
+
 def w_review_decision(contract: ReviewContract, body):
     category = str(body.get("category", "")).strip()
     item_key = str(body.get("item_key", "")).strip()
@@ -864,6 +894,7 @@ def w_review_decision(contract: ReviewContract, body):
         expected_revision = None if raw_revision in (None, "") else int(raw_revision)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{EXPECTED_REVISION_FIELD} 必须是整数") from exc
+    asset_revisions = {}
     with contract.write_transaction() as connection:
         connection.execute(
             "INSERT INTO review_decision(category,item_key,status,note,updated_at) VALUES(?,?,?,?,?) "
@@ -876,21 +907,8 @@ def w_review_decision(contract: ReviewContract, body):
             if not candidate_key:
                 raise ValueError("批准字段候选时必须选择一个来源值")
             group, candidate = _selected_metadata_candidate(contract, item_key, candidate_key)
-            # 页面上显示的是折过收录决定的那份值，写下去的也必须是它。
-            candidate = _fold_genre_decisions(str(group.get("field") or ""), candidate,
-                                              load_genre_decisions(connection))
-            applied = _apply_metadata_candidate(
-                connection, group, candidate, now,
-                review_owner(str(candidate.get("source") or "")),
-                expected_revision=expected_revision)
-            provenance_note = json.dumps({
-                "candidate_key": candidate_key, "source": candidate.get("source"),
-                "user_note": note,
-            }, ensure_ascii=False, separators=(",", ":"))
-            connection.execute(
-                "UPDATE review_decision SET note=? WHERE category=? AND item_key=?",
-                (provenance_note, category, item_key),
-            )
+            applied, asset_revisions = _approve_metadata_with_receipt(
+                connection, group, candidate, now, note, expected_revision)
         elif category == "creator_tags" and status == "approved":
             # 权威值只能来自候选文件本身。直接采信请求体的话，「批准候选 X」
             # 可以写入与 X 无关的创作者和标签，而 review_decision 里留痕仍写着 X 通过。
@@ -967,7 +985,8 @@ def w_review_decision(contract: ReviewContract, body):
         elif category == "performer_avatars" and status == "approved":
             applied = _install_performer_avatar(contract, item_key)
     contract.cache_bust()   # 标签写完，聚合缓存必须失效，否则 facets 最多 90 秒还是旧数
-    return {"ok": True, "category": category, "item_key": item_key, "status": status, "applied_assets": applied}
+    return {"ok": True, "category": category, "item_key": item_key, "status": status,
+            "applied_assets": applied, "asset_revisions": asset_revisions}
 
 
 def w_review_genre(contract: ReviewContract, body):

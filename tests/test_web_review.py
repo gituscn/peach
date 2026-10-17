@@ -1704,6 +1704,42 @@ class ReviewQueueTests(unittest.TestCase):
         self.assertEqual(
             rm_review.w_review_decision(self.contract, body)["applied_assets"], 1)
 
+    def test_approval_receipt_tracks_actual_asset_revisions(self):
+        self._asset(199, "HHH-8", "HHH-8.mp4")
+        self.write_metadata_rows([
+            {"item_key": "HHH-8:studio", "field": "studio", "current": "",
+             "candidates": ["片商"], "code": "HHH-8", "source": "javdb"},
+            {"item_key": "HHH-8:release_date", "field": "release_date", "current": "",
+             "candidates": ["2015-02-20"], "code": "HHH-8", "source": "javdb"},
+        ])
+        for field, expected in (("studio", 0), ("release_date", 1)):
+            key = f"HHH-8:{field}"
+            result = rm_review.w_review_decision(self.contract, {
+                "category": "metadata_fields", "item_key": key,
+                "status": "approved", "candidate_key": key + ":0",
+                EXPECTED_REVISION_FIELD: expected})
+            self.assertEqual(result["asset_revisions"], {
+                "199": {"before": expected, "after": expected + 1}})
+
+    def test_fc2_local_nfo_cast_is_the_initial_value_with_remote_difference_pending(self):
+        code = 'FC2-PPV-4927200'
+        self._asset(201, code, code + '.mp4')
+        self.write_metadata_rows([{
+            'item_key': code + ':performers', 'field': 'performers', 'current': '', 'code': code,
+            'candidates': [
+                {'source': 'local_nfo', 'value': [{'name': '桐谷まつり'}], 'display': '桐谷まつり'},
+                {'source': 'fc2cmadb', 'value': [{'name': '川北すずね'}], 'display': '川北すずね',
+                 'requires_review': True},
+            ],
+        }])
+        self.assertEqual(self._auto()['applied'], 1)
+        with contextlib.closing(sqlite3.connect(self.db_path)) as connection:
+            names = [row[0] for row in connection.execute(
+                "SELECT e.canonical_name FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id "
+                "WHERE ae.asset_id=201 AND ae.role='performer'")]
+        self.assertEqual(names, ['桐谷まつり'])
+        self.assertEqual(self.queue_keys('metadata_fields'), [code + ':performers'])
+
     def test_the_card_says_who_owns_the_value_it_is_asking_about(self):
         self._asset(100, "III-9", "III-9.mp4")
         con = sqlite3.connect(self.db_path)

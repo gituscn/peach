@@ -153,6 +153,11 @@ class ScrapeGateTests(unittest.TestCase):
 
 
 class ExtractionTests(unittest.TestCase):
+    def test_named_volume_suffix_preserves_the_release_code(self):
+        for suffix in ('CD1', 'disc02', 'Part-3', 'DVD4', 'Vol_5'):
+            with self.subTest(suffix=suffix):
+                self.assertEqual(release_code_from_filename(f'ABW-358-{suffix}.mp4'), 'ABW-358')
+
     def test_watermark_chain_yields_the_real_code(self):
         self.assertEqual(release_code_from_filename("ABW-132.mp4"), "ABW-132")
         self.assertEqual(release_code_from_filename("IPX219C.mp4"), "IPX-219")

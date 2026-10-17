@@ -165,9 +165,9 @@ def chain_rank(field: str, source: str, *, code: str | None = None) -> tuple[int
     保证同分时顺序是确定的——不确定的顺序会让同一批候选在两次运行里落不同的值。
     """
     name = str(source or "").strip()
+    if name == LOCAL_NFO_SOURCE:
+        return (-2, 0, name)
     if field == "tags" and preferred_tag_source(code):
-        if name == LOCAL_NFO_SOURCE:
-            return (-2, 0, name)
         if name == preferred_tag_source(code):
             return (-1, 0, name)
     priority = FIELD_SOURCE_PRIORITY.get(field, ())

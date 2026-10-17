@@ -927,29 +927,40 @@ def _candidate_identity(source, value):
                                      sort_keys=True).encode()).hexdigest()
 
 
-def _merge_candidates(groups, row, code, source, document, evidence_path, genre_decisions, local_fields=()):
+def _candidate_review_mode(groups, row, field, source, value, local_fields, verify_existing):
+    """判定字段是补空、覆盖复核还是同值，并清除该来源失效的差异。"""
+    local = source == 'local_nfo'
+    current = _text(row.get(COLUMN_OF.get(field, field)))
+    if not verify_existing and not local and (field in local_fields or current):
+        return None
+    baseline = current or (_text(local_fields[field].get('display_value', local_fields[field]['value']))
+                           if field in local_fields else '')
+    if (baseline and (not local or current) and not (verify_existing and local)
+            and baseline == _text(value.get('display_value', value['value']))):
+        key = f"asset:{row['id']}:{field}"
+        if verify_existing and key in groups:
+            group = groups[key]
+            choices = [entry for entry in json.loads(group['candidates_json']) if entry['source'] != source]
+            group.update(candidates_json=json.dumps(choices, ensure_ascii=False), source_count=len(choices))
+        return None
+    return 'review' if verify_existing and baseline and (not local or current) else 'fill'
+
+
+def _merge_candidates(groups, row, code, source, document, evidence_path, genre_decisions, local_fields=(),
+                      *, verify_existing=False):
     """把 `document` 里认得出的字段并进 `groups`：同来源的旧候选换掉，别的来源保留。
 
-    本地 NFO 已给出的字段只收 NFO 这一条（ADR-0029）。NFO 的番号已经和文件名对过，
-    是用户自己刮削留下的；在线来源再给一条同字段候选，唯一的效果是把「英文机翻标题
-    对日文原题」这种写法差异变成一道人工复核题。
-
-    账本已经有值的字段，联网来源同样不给候选，取值与现值相同的谁给都不要（ADR-0033）。
-    一次抓取回来的是整份资料，缺 tags 也会顺带带回标题、厂牌、发行日期；不拦住就是
-    每部片多出几道「英文机翻对日文原题」和「同一个值对同一个值」。
+    NFO 核查保留不同来源的取值；已有值的差异标记为覆盖复核。相同取值不重复生成候选。
     """
     local = source == 'local_nfo'
     spec = SOURCE_SPECS.get(source)
     official = bool(spec and spec.official)
     for field, value in _fields(document, genre_decisions).items():
-        current = _text(row.get(COLUMN_OF.get(field, field)))
         key = f"asset:{row['id']}:{field}"
         if not local and field == 'performers' and field in local_fields:
             _merge_local_performer_profiles(groups, key, value, source)
-            continue
-        if not local and (field in local_fields or current):
-            continue
-        if current and current == _text(value.get('display_value', value['value'])):
+        mode = _candidate_review_mode(groups, row, field, source, value, local_fields, verify_existing)
+        if mode is None:
             continue
         identity = _candidate_identity(source, value['value'])
         # 来源自报的番号跟着候选走：落库前要再核一次身份，javdb 的详情页地址里没有番号。
@@ -961,6 +972,8 @@ def _merge_candidates(groups, row, code, source, document, evidence_path, genre_
                          provider_id=str(document.get('id') or ''), content_id=str(document.get('content_id') or ''),
                          source_kind='local' if local else spec.kind if spec else 'community', official=official,
                          catalog_evidence=extract_catalog_evidence(document))
+        if mode == 'review':
+            candidate['requires_review'] = True
         # 只有 tags 字段有未收录原文；别的字段挂一个空列表只是让每条候选都胖一圈。
         if value.get('unmapped_genres'):
             candidate['unmapped_genres'] = value['unmapped_genres']
@@ -970,7 +983,8 @@ def _merge_candidates(groups, row, code, source, document, evidence_path, genre_
             candidates_json='[]', source_count=0, source_profile='library', policy_version='library-v1',
             status='candidate', size_gb=round((row['size'] or 0)/1024**3, 2), videos=1, fetched_at=''))
         choices = [entry for entry in json.loads(group['candidates_json'])
-                   if entry['source'] != source and not (local and entry['source'] != 'local_nfo')]
+                   if entry['source'] != source and not (local and not verify_existing
+                                                         and entry['source'] != 'local_nfo')]
         choices.append(candidate)
         group.update(candidates_json=json.dumps(choices, ensure_ascii=False), source_count=len(choices),
                      fetched_at=time.strftime('%Y-%m-%d %H:%M:%S'))
@@ -978,11 +992,10 @@ def _merge_candidates(groups, row, code, source, document, evidence_path, genre_
 
 
 def _merge_local_performer_profiles(groups, key, remote, source):
-    """NFO 的演员值不让在线来源替换，但收下同名人物的资料页证据。
+    """同名人物的资料页证据并入本地 NFO 演员候选。
 
-    r18 combined 页同一个人物对象里带 DMM id、假名、罗马字和官方头像；此前因为
-    NFO 已给演员，整条在线候选被跳过，这些不改变演员真值的资料也一起丢了。只在
-    规范化主名逐字匹配时合并，来源给了另一个人时仍按 ADR-0029 保留 NFO 一条。
+    r18 combined 页的人物对象提供 DMM id、假名、罗马字和官方头像。只在规范化主名
+    逐字匹配时合并；不同人物作为独立候选保留，改变演员值须复核（ADR-0108）。
     """
     from .entities import normalize_entity_name
 
@@ -1097,11 +1110,6 @@ def _answered_sources(groups, target_key, fields):
         if group:
             answered.update(entry.get('source') for entry in json.loads(group.get('candidates_json') or '[]'))
     return answered
-
-
-def _uncandidated(groups, target_key, fields):
-    """`fields` 里候选表上一条候选都还没有的那几个。"""
-    return [field for field in fields if f'{target_key}:{field}' not in groups]
 
 
 class _DirectoryIndex:
@@ -1297,19 +1305,6 @@ class _RemoteSession:
         """
         return tuple(name for name in members if name not in answered
                      and not (self._consult and self.misses.fresh(name, code)))
-
-    def open_fields(self, row, target_key, groups):
-        """这一行还值得去问的字段；空列表表示整行没有可采集的东西。
-
-        账本空着的字段里，候选表上一条候选都没有的必问；都有候选时，链上还剩没给过候选、
-        也没说过「没有」的站才问。每家来源对一行最多问出一次候选，之后这一行就在这里停下。
-        """
-        missing = _missing_fields(row)
-        if not missing or _uncandidated(groups, target_key, missing):
-            return missing
-        code = _provider_code(row['code'])
-        chain = self._chain(code, *_studio_evidence(row))
-        return missing if self._askable(chain, code, _answered_sources(groups, target_key, missing)) else []
 
     def _custom_sources(self, code, *evidence):
         from .custom_metadata import load
@@ -2046,17 +2041,6 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                        current_action='reading_local', current_started_at=time.time(),
                        current_deadline_at=None)
                 target_key = f"asset:{row['id']}"
-                # 番号早已落库、没有可问的字段、封面够大（或这种号不问封面）的行没有可采集的东西，
-                # 连网盘都不碰。重跑「只采集」时这是绝大多数行，每行省下的是网盘上的一次 stat
-                # 和一次列目录；量封面只读本机那张的图片头。
-                if row['code'] and not remote.open_fields(row, target_key, groups) and (
-                        not _asks_cover(row['code'], *_studio_evidence(row))
-                        or cover_settled(cover_root / (row['code'] + '.jpg'))):
-                    update(checked=index + 1, candidates=len(scoped_groups()),
-                           current_asset_id=None, current_asset_name='', current_action='',
-                           current_started_at=None, current_deadline_at=None)
-                    checkpoints.mark('completed_metadata', row, flush_state)
-                    continue
                 video = translate_ledger_path(row['path'])
                 # 文件在不在看目录列表，不单独 stat：一部片一个文件夹的网盘上，那是每行一半的往返。
                 try:
@@ -2077,7 +2061,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                         code = code or _provider_code(payload['id'])
                     except (OSError, ValueError, ET.ParseError) as error:
                         issue(row, str(error), action='reading_local')
-                        continue
+                        payload = None
                 if not code and not payload:
                     # 没有番号不是问题项：账本里两万多行是创作者作品，本来就没有番号，
                     # 逐行报「未识别到番号」只会把真正要处理的几十条淹掉。它们只登记本地海报：
@@ -2110,9 +2094,9 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                     evidence_path.write_bytes(raw)
                     entries.append(('local_nfo', payload, evidence_path))
                 local_fields = _fields(payload, genre_decisions) if payload else {}
-                missing = _missing_fields(row, local_fields)
+                missing = list(COLLECTED_FIELDS) if nfo else _missing_fields(row, local_fields)
                 found, covers = remote.collect(row, code, missing, cover_root, update=update, issue=issue,
-                                               answered=_answered_sources(groups, target_key, missing))
+                                               answered=() if nfo else _answered_sources(groups, target_key, missing))
                 entries.extend(found)
                 state['covers'] += covers
                 covered.append((row['id'], covers))
@@ -2120,7 +2104,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                        current_started_at=time.time(), current_deadline_at=None)
                 for source, document, evidence_path in entries:
                     _merge_candidates(groups, row, code, source, document, evidence_path, genre_decisions,
-                                      local_fields)
+                                      local_fields, verify_existing=nfo is not None)
                 if entries:
                     csv_dirty = True
                 checkpoints.queue_metadata(row, entries, issues_before)

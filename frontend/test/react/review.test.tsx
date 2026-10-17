@@ -12,6 +12,7 @@ import {
   commonReviewSources, filterReviewRows, groupReviewRows, prefetchReview, REVIEW_DECISION_URL,
   REVIEW_KEY, REVIEW_PAGE_SIZE, REVIEW_URL, reviewGroupingOptions,
   reviewWindow, type ReviewCandidate, type ReviewData, type ReviewRow,
+  type DecisionResult,
 } from '../../src/react/review/review';
 import { ReviewPage } from '../../src/react/review/review-page';
 
@@ -54,12 +55,12 @@ const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body }
 interface Plan {
   data?: ReviewData;
   /** 判定的回答：给一串就按顺序一条一条回（最后一条之后一直回它）。 */
-  decisions?: { ok: boolean; error?: string }[];
+  decisions?: DecisionResult[];
 }
 
 function serve(plan: Plan = {}) {
   const decisions = [...(plan.decisions ?? [{ ok: true }])];
-  const fetcher = vi.fn(async (input: string) => {
+  const fetcher = vi.fn(async (input: string, _init?: RequestInit) => {
     const url = String(input);
     if (url === REVIEW_DECISION_URL) {
       return ok(decisions.length > 1 ? decisions.shift()! : decisions[0]!);
@@ -211,6 +212,42 @@ it('批量判定把成功的摘掉，没写成的留下来等重试', async () =
   expect(queueOf().sections.metadata_fields).toHaveLength(QUEUE.length - 2);
   expect(keys(host)).toEqual(['row-101']);
   expect(cards(host)[0]?.textContent).toContain('来源已失效');
+});
+
+const sameAssetRows = (): ReviewRow[] => [0, 1, 2].map((at) => ({
+  ...row(at, ['javdb']), asset_id: 6, asset_path: '/media/ABC-123.mp4',
+  asset_mutation_revision: at === 2 ? 0 : 1,
+}));
+const receipt = (before: number, after: number): DecisionResult =>
+  ({ ok: true, asset_revisions: { '6': { before, after } } });
+const sentDecisions = (fetcher: ReturnType<typeof serve>) => fetcher.mock.calls
+  .filter(([url]) => url === REVIEW_DECISION_URL)
+  .map((call) => JSON.parse((call[1] as RequestInit).body as string));
+
+it('逐项通过使用同资产最近一次批准的版本，已过期的候选保持原版本', async () => {
+  const { host, fetcher } = await open({
+    data: review({ sections: { metadata_fields: sameAssetRows() } }),
+    decisions: [receipt(1, 4), receipt(4, 5)],
+  });
+  await click(buttonIn(cards(host)[0]!, '通过'));
+  await settle();
+  expect(queueOf().sections.metadata_fields?.map((item) => item.asset_mutation_revision)).toEqual([4, 0]);
+  await click(buttonIn(cards(host)[0]!, '通过'));
+  await settle();
+  expect(sentDecisions(fetcher).map((body) => body.expected_revision)).toEqual([1, 4]);
+});
+
+it('批量通过逐条沿用服务端版本回执，并保留其他写入造成的冲突', async () => {
+  const { host, fetcher } = await open({
+    data: review({ sections: { metadata_fields: sameAssetRows() } }),
+    decisions: [receipt(1, 4), receipt(4, 5), { ok: false, error: '资产资料已更改' }],
+  });
+  await click(buttonIn(host, '全选本页'));
+  await click(buttonIn(host, '通过所选'));
+  await settle();
+  expect(sentDecisions(fetcher).map((body) => body.expected_revision)).toEqual([1, 4, 0]);
+  expect(keys(host)).toEqual(['row-2']);
+  expect(cards(host)[0]?.textContent).toContain('资产资料已更改');
 });
 
 it('多来源候选没选来源就批量通过时先说清楚，不替人按下判断', async () => {
