@@ -23,7 +23,6 @@ from pathlib import Path
 
 from .catalog_rules import is_jav_code, is_uncensored_release, normalise_code_key, part_marker
 from .jobs import ACTIVE_ASSET_SQL
-from .media_sources import require_writable_location
 from .organize_templates import MAX_PATH, TemplateError, render, validate_template
 from .platform import (is_windows_path, location_mounts, location_roots, resolve_root, root_online,
                        translate_ledger_path, within_root)
@@ -65,7 +64,6 @@ class UnverifiedRename(OSError):
 @contextmanager
 def verified_renames(location: str, rename: Callable[[str, str], None]):
     """在这段上下文里，`location` 的改名交给 `rename`（它自己确认云端结果）。"""
-    require_writable_location(location)
     if location in _verified_renames:
         raise RuntimeError(f"来源 {location} 已注入核验改名")
     _verified_renames[location] = rename
@@ -94,8 +92,6 @@ def unverified_location(location: str | None) -> bool:
 def refuse_unverified(paths: Iterable[str]) -> None:
     """整批动盘之前的门槛：涉及须核验来源而没有核验通道时整批拒绝，一个文件都不动。"""
     locations = [_location_of(str(path)) for path in paths]
-    for location in locations:
-        require_writable_location(location)
     blocked = sorted({location for location in locations
                       if unverified_location(location)})
     if blocked:
@@ -310,8 +306,6 @@ def _rename(source: str, target: str) -> None:
     须核验来源（`VERIFIED_RENAME_LOCATIONS`）交给注入的官方改名；没有注入时拒绝。
     """
     location = _location_of(str(source))
-    require_writable_location(location)
-    require_writable_location(_location_of(str(target)))
     if location in VERIFIED_RENAME_LOCATIONS:
         verified = _verified_renames.get(location)
         if verified is None:
@@ -377,8 +371,6 @@ def apply_plan(connection: sqlite3.Connection, rows: Sequence[dict], *,
     `web_organize` 都是这么做的）。这里只负责动盘、写账本和留下批次日志。
     """
     movable = [row for row in rows if row.get("action") in {"rename", "move"}]
-    for row in movable:
-        require_writable_location(row.get("location"))
     refuse_unverified(path for row in movable for path in (row["current_path"], row["target_path"]))
     entries: list[dict] = []
     failures: list[dict] = []

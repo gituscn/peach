@@ -23,6 +23,7 @@ from peach.classification import is_structural_creator
 from peach.config import DATABASE_PATH, GENERATED_DIR
 from peach.entity_classification import category_predicates
 from peach.jobs import PidFileLock
+from peach.media_sources import SCANNABLE_LOCATIONS
 from peach.migrations import sqlite_backup
 from peach.organize_clouddrive import UnconfirmedMove
 from peach.organize_templates import MAX_PATH, sanitise_component
@@ -455,7 +456,11 @@ def build_plan(stage, batch=None):
         else:
             creators, categories, unverified = classification_inputs(db)
             db.create_function('infer_region',2,infer_region,deterministic=True)
-            all_rows = [dict(r) for r in db.execute("SELECT a.*,"+effective_region_sql()+" AS effective_region FROM asset a WHERE a.location IN ('115','pikpak','local') AND a.path IS NOT NULL AND trim(a.path)<>'' ORDER BY a.id")]
+            marks = ','.join('?' for _ in SCANNABLE_LOCATIONS)
+            all_rows = [dict(r) for r in db.execute(
+                "SELECT a.*," + effective_region_sql() + " AS effective_region FROM asset a "
+                f"WHERE a.location IN ({marks}) AND a.path IS NOT NULL AND trim(a.path)<>'' ORDER BY a.id",
+                SCANNABLE_LOCATIONS)]
             by_id = {row['id']:row for row in all_rows}
             by_path = {row['path'].casefold():row for row in all_rows}
             mounts = {root:root_online(translate_ledger_path(root)) for values in roots.values() for root in values}
@@ -1130,7 +1135,7 @@ if __name__ == '__main__':
     parser.add_argument('--limit', type=int, default=1000)
     parser.add_argument('--seconds', type=int, default=1200)
     parser.add_argument('--self-check', action='store_true')
-    parser.add_argument('--location', choices=('115','pikpak','local'))
+    parser.add_argument('--location', choices=SCANNABLE_LOCATIONS)
     parser.add_argument('--retry-failed', action='store_true')
     parser.add_argument('--skip-collapses', action='store_true')
     parser.add_argument('--pikpak-webdav', action='store_true',

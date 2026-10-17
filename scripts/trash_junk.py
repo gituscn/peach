@@ -33,6 +33,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from peach.config import DATABASE_PATH, GENERATED_DIR, LOCATION_ROOT_DECLARATIONS
+from peach.media_sources import SCANNABLE_LOCATIONS
 from peach.personal_records import record_holders
 from peach.platform import root_online, translate_ledger_path, within_root
 from peach.review_csv import read_rows, write_rows
@@ -46,7 +47,7 @@ from peach.web_batch import (
 from peach.web_contract import WebContract
 
 FIELDS = ["id", "score", "location", "medium", "size_mb", "name", "why", "path"]
-TRASHABLE_LOCATIONS = ("local", "115", "pikpak")
+TRASHABLE_LOCATIONS = SCANNABLE_LOCATIONS
 
 
 def load_review(path: Path) -> list[dict]:
@@ -166,10 +167,11 @@ def trash_assets(connection, asset_ids: list[int]) -> int:
     if not ids:
         return 0
     marks = ",".join("?" * len(ids))
+    sources = ",".join("?" * len(TRASHABLE_LOCATIONS))
     cursor = connection.execute(
         f"UPDATE asset SET disposal='trash', disposal_reason='junk', feedback_at=? WHERE id IN ({marks}) "
-        "AND disposal IS NULL AND location IN ('local','115','pikpak')",
-        [time.time(), *ids],
+        f"AND disposal IS NULL AND location IN ({sources})",
+        [time.time(), *ids, *TRASHABLE_LOCATIONS],
     )
     connection.commit()
     return cursor.rowcount

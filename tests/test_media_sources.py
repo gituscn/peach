@@ -19,8 +19,8 @@ class MediaSourceCostTests(unittest.TestCase):
                        "onedrive": ("O:/Public", "O:/Private"), "mounted": ("M:/",)},
             media_costs={"g:/movies": "metered", "G:/Movies/Direct": "free", "O:/Public": "free"})
 
-    def test_registry_has_mount_only_read_only_sources_and_proxy_defaults(self):
-        self.assertTrue({"onedrive", "guangya", "mounted"}.issubset(media_sources.READ_ONLY_LOCATIONS))
+    def test_registry_has_mount_sources_and_proxy_defaults(self):
+        self.assertTrue({"onedrive", "guangya", "mounted"}.issubset(media_sources.SCANNABLE_LOCATIONS))
         self.assertEqual(media_sources.SOURCE_COSTS["guangya"], "free")
         self.assertEqual(media_sources.SOURCE_COSTS["115"], "free")
         self.assertEqual(media_sources.SOURCE_COSTS["pikpak"], "metered")
@@ -30,9 +30,6 @@ class MediaSourceCostTests(unittest.TestCase):
             {"location": "mounted", "path": "M:/", "cost": "metered"}], windows=True)
         self.assertEqual(errors, [])
         self.assertEqual(set(roots), {"onedrive", "mounted"})
-        for location in ("onedrive", "mounted"):
-            with self.assertRaisesRegex(ValueError, "只读"):
-                media_sources.require_writable_location(location)
 
     def test_minimal_configuration_objects_use_source_defaults(self):
         for config in (SimpleNamespace(locations={"115": ("B:/",)}), SimpleNamespace()):

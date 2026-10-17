@@ -39,12 +39,26 @@ describe('配置表单与行间距', () => {
           await route.fulfill({ json: { ...data, editable: true, windows: true, media_sources: [
             { location: 'onedrive', root: 'O:\\Movies', path: 'O:\\Movies', cost: 'metered' },
             { location: 'mounted', root: 'M:\\Movies', path: 'M:\\Movies', cost: 'free' },
+            { location: 'guangya', root: 'G:\\Movies', path: 'G:\\Movies', cost: 'free' },
+            { location: '115', root: 'B:\\Movies', path: 'B:\\Movies', cost: 'free' },
+            { location: 'pikpak', root: 'A:\\Movies', path: 'A:\\Movies', cost: 'metered' },
           ] } });
         });
         await page.reload();
         const form = page.getByRole('form', { name: '媒体文件夹', exact: true });
         const protectedFolder = form.locator('[data-media-read-policy="0"] [aria-haspopup="listbox"]');
         await protectedFolder.waitFor();
+        await page.waitForFunction(() => {
+          const marks = [...document.querySelectorAll<HTMLImageElement>('[data-folder-row] img')];
+          return marks.length === 8 && marks.every(image => image.complete && image.naturalWidth > 0);
+        });
+        const marks = await form.locator('[data-folder-row] img').evaluateAll(images => images.map(image => {
+          const box = image.getBoundingClientRect();
+          return { inline: image.getAttribute('src')?.startsWith('data:image/png;base64,'),
+            width: box.width, height: box.height };
+        }));
+        assert.deepEqual(marks, Array.from({ length: 8 }, () => ({ inline: true, width: 16, height: 16 })));
+        assert.ok(!(await form.innerText()).includes('（只读）'));
         assert.ok((await protectedFolder.textContent())?.includes('代理流量保护'));
         assert.ok((await form.locator('[data-media-read-policy="1"]').textContent())?.includes('正常读取'));
         await protectedFolder.click();
@@ -52,6 +66,7 @@ describe('配置表单与行间距', () => {
         await settle(page);
         assert.ok((await protectedFolder.textContent())?.includes('正常读取'));
         assert.deepEqual((await layout(page)).offenders, []);
+        await form.screenshot({ path: `../build/cloud-source-icons-${viewport.name}.png` });
         assert.deepEqual(opened.problems, []);
       } finally { await opened.close() }
     });

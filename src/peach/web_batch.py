@@ -26,7 +26,7 @@ from typing import Sequence
 from .catalog_rules import duration_clusters, is_jav_code, normalise_code_key
 from .config import GENERATED_DIR, LOCATION_ROOT_DECLARATIONS
 from .field_owners import USER_MANUAL, write_owned_fields
-from .media_sources import READ_ONLY_LOCATIONS, SCANNABLE_LOCATIONS
+from .media_sources import SCANNABLE_LOCATIONS
 from .personal_records import ASSET_REFERENCE_TABLES, VANISHED
 from .platform import is_unmapped, root_online, translate_ledger_path, within_root
 from .regions import normalize_region
@@ -605,8 +605,6 @@ def _online_source_roots() -> dict[str, tuple[Path, ...]]:
     """Return only declared physical roots that can be enumerated now, per source."""
     roots: dict[str, tuple[Path, ...]] = {}
     for location, declarations in LOCATION_ROOT_DECLARATIONS.items():
-        if location in READ_ONLY_LOCATIONS:
-            continue
         online = []
         for declaration in declarations:
             root = translate_ledger_path(declaration)
@@ -707,14 +705,6 @@ def purge_assets(connection, rows, *, missing_only: bool = False):
     purged, blocked, staged, snapshots, parents = [], [], [], [], []
     for row in rows:
         media = row["path"]
-        location = row["location"] if "location" in row.keys() else None
-        if location is None:
-            stored = connection.execute("SELECT location FROM asset WHERE id=?", (row["id"],)).fetchone()
-            location = stored[0] if stored else None
-        if media and not missing_only and location in READ_ONLY_LOCATIONS:
-            blocked.append({"id": row["id"], "path": media,
-                            "reason": "该挂载来源为只读，请在网盘客户端管理文件"})
-            continue
         if media and missing_only:
             try:
                 present = translate_ledger_path(media).exists()
@@ -739,7 +729,7 @@ def purge_assets(connection, rows, *, missing_only: bool = False):
         snapshot = row["snapshot_path"]
         if snapshot:
             snapshots.append(Path(snapshot))
-        if media and location not in READ_ONLY_LOCATIONS:
+        if media:
             parents.append(Path(media).parent)
         purged.append(row["id"])
     try:

@@ -21,7 +21,7 @@ export function CloudDriveGuide() {
           <ExternalLink href="https://www.clouddrive2.com/help.html">挂载帮助</ExternalLink>
         </Help>
         <Help>缓存按所在硬盘和可用内存选起步值，再根据播放表现调整。</Help>
-        <Help>光鸭云盘需要 CloudDrive2 v1.0.11 或更高版本，文件管理请使用光鸭云盘客户端。</Help>
+        <Help>文件操作需要挂载工具和网盘账号授予写入权限。光鸭云盘的上传、建文件夹、改名和移动需要 CloudDrive2 v1.1.0 或更高版本，删除和复制暂不支持。</Help>
         {/* 三档同形、跨档比较：窄处每档一块纵排，宽处三项读数排成三列对齐。 */}
         <ul aria-label="按缓存所在硬盘分档" className="flex flex-col gap-2">
           {CLOUDDRIVE_PROFILES.map((profile) => (

@@ -141,15 +141,19 @@ class MediaRepairRunTests(unittest.TestCase):
 
         self.assertEqual(self.store.repaired[0], 2, "放得最多的那部没排在最前面")
 
-    def test_read_only_mount_never_replaces_the_source_file(self):
-        with self.contract.write_transaction() as connection:
-            connection.execute("UPDATE asset SET location='guangya' WHERE id=6")
-        with mock.patch.object(rm_repair.mp4recover, 'recover') as recover, \
-                mock.patch.object(rm_repair.mp4recover, 'replace_original') as replace:
-            self.assertFalse(rm_repair._recover(self.contract, 6, 'G:\\media\\cut.mp4',
-                                               (Path('untrunc'), Path('ffmpeg'), Path('ffprobe'))))
-        recover.assert_not_called()
-        replace.assert_not_called()
+    def test_mounted_cloud_sources_replace_recovered_files(self):
+        for location in ('guangya', 'onedrive', 'mounted'):
+            with self.subTest(location=location):
+                source = self.media / f'{location}.mp4'
+                source.write_bytes(CUT_SHORT)
+                raw = f'B:\\{source.name}'
+                with self.contract.write_transaction() as connection:
+                    connection.execute("UPDATE asset SET location=? WHERE id IN (1,2,3,6)", (location,))
+                    connection.execute("UPDATE asset SET path=?,name=? WHERE id=6", (raw, source.name))
+                with mock.patch.object(rm_repair.mp4recover, 'recover', self.recover):
+                    self.assertTrue(rm_repair._recover(self.contract, 6, raw,
+                        (Path('untrunc'), Path('ffmpeg'), Path('ffprobe'))))
+                self.assertEqual(source.read_bytes(), b'repaired')
 
     def test_a_library_has_to_be_named(self):
         with self.assertRaisesRegex(ValueError, "先选一个媒体库"):

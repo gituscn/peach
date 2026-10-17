@@ -14,20 +14,19 @@ from pathlib import Path
 
 from . import organize
 from .migrations import sqlite_backup
-from .media_sources import require_writable_location
+from .media_sources import SCANNABLE_LOCATIONS
 from .organize_templates import PLACEHOLDERS, TemplateError, validate_template
 from .platform import location_roots
 from .scripting import verify_after_write
 from .web_settings import organize_templates
 
 #: 界面上能整理的来源。`online` 是追更抓来的东西，不在任何一个媒体根下面。
-ORGANIZE_LOCATIONS = ("local", "115", "pikpak")
+ORGANIZE_LOCATIONS = SCANNABLE_LOCATIONS
 
 
 def _templates(contract, body) -> tuple[str, str, str]:
     """取出这一次要用的来源与两份模板；模板缺省时用账本里存着的那一份。"""
     location = str(body.get("location") or "").strip()
-    require_writable_location(location)
     if location not in ORGANIZE_LOCATIONS:
         raise ValueError(f"不认识的来源：{location or '(空)'}")
     stored = organize_templates(contract).get(location, {})
@@ -80,7 +79,7 @@ def _run_write(contract, job_id: str, work) -> dict:
     并发的普通写入照常进行。
     """
     backup = Path(contract.candidate_root) / "organize-backups" / (
-        f"ledger.pre-organize-{time.strftime('%Y%m%d-%H%M%S')}.db")
+        f"ledger.pre-organize-{time.strftime('%Y%m%d-%H%M%S')}-{job_id}.db")
     backup.parent.mkdir(parents=True, exist_ok=True)
     sqlite_backup(Path(contract.db_path), backup)
     connection = sqlite3.connect(str(contract.db_path), timeout=30)

@@ -12,6 +12,9 @@ vi.mock('@peach/legacy/ui', async (original) => ({
 
 it.each(MEDIA_SOURCE_REGISTRY)('$label 的选择项与状态使用同一来源标识', async (source) => {
   const mark = MEDIA_SOURCE_ICONS[source.id]!;
+  if (['115', 'pikpak', 'guangya', 'onedrive'].includes(source.id)) {
+    expect(mark).toMatch(/^data:image\/png;base64,/);
+  }
   const host = await mount(<>
     <SourceSelect index={0} value={source.id} onChange={() => undefined} />
     <SourceMark mark={mark} />

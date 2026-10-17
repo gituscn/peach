@@ -86,6 +86,16 @@ class TrashJunkTests(unittest.TestCase):
         self.assertIsNone(self.disposal(2))
         self.assertTrue(self.backup.is_file())
 
+    def test_mounted_sources_can_be_selected_and_trashed(self):
+        locations = ('guangya', 'onedrive', 'mounted')
+        for asset_id, location in enumerate((*locations, 'online'), 1):
+            self.add(asset_id, location, rf'G:\{location}\tuu26.com.mp4', 'video', 10 * 1024**2, 60)
+        candidates = self.trash_junk.select_candidates(self.db_path, min_score=40)
+        self.assertEqual({row['id'] for row in candidates}, {1, 2, 3})
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            self.assertEqual(self.trash_junk.trash_assets(connection, [1, 2, 3, 4]), 3)
+        self.assertEqual([self.disposal(aid) for aid in (1, 2, 3, 4)], ['trash', 'trash', 'trash', None])
+
     def test_apply_without_backup_is_rejected(self):
         self.add(1, "115", r"B:\广告\tuu26.com.mp4", "video", 10 * 1024**2, 60)
 

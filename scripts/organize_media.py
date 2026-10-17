@@ -26,6 +26,7 @@ if str(SRC_DIR) not in sys.path:
 
 from peach import organize
 from peach.config import DATABASE_PATH, GENERATED_DIR
+from peach.media_sources import SCANNABLE_LOCATIONS
 from peach.organize_templates import PLACEHOLDERS, TemplateError
 from peach.scripting import add_ledger_write_args, open_for_write, verify_after_write
 
@@ -35,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="按模板整理文件名与目录；默认只出计划",
         epilog="占位符：" + "、".join(f"{{{key}}}={label}" for key, label in PLACEHOLDERS.items()))
     add_ledger_write_args(parser, db_default=DATABASE_PATH)
-    parser.add_argument("--location", choices=("local", "115", "pikpak"), default="local")
+    parser.add_argument("--location", choices=SCANNABLE_LOCATIONS, default="local")
     parser.add_argument("--file-template", default="", help="文件名模板，不含扩展名")
     parser.add_argument("--dir-template", default="",
                         help="目录模板，相对来源根；留空表示原地改名")

@@ -19,6 +19,7 @@ import time
 from typing import Protocol
 
 from .feeds import DEFAULT_HIDDEN_COMPILATIONS, EXCERPT, GROUP_COMPILATION, SOLO_COMPILATION
+from .media_sources import SCANNABLE_LOCATIONS
 from .remote_media_cache import AVATAR_REFRESH_SECONDS, FAVICON_REFRESH_SECONDS
 
 from .profiles import DEFAULT_PROFILE_ID
@@ -132,7 +133,7 @@ def normalise_organize_templates(raw) -> dict:
         return {}
     clean: dict[str, dict[str, str]] = {}
     for location, entry in raw.items():
-        if location not in {"local", "115", "pikpak"} or not isinstance(entry, dict):
+        if location not in SCANNABLE_LOCATIONS or not isinstance(entry, dict):
             continue
         # 模板不合法时 `TemplateError` 原样抛给调用方：它是 `ValueError`，API 翻成 400
         # 并把那句中文交给用户，而不是把这一份悄悄丢掉。

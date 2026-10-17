@@ -531,6 +531,33 @@ class LibraryDirectoryTests(unittest.TestCase):
     def setUpClass(cls):
         cls.script = load_script('organize_library_dirs')
 
+    def test_directory_plan_includes_mounted_cloud_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            ledger = fresh_ledger(root)
+            locations = ('guangya', 'onedrive', 'mounted')
+            roots = {location: [rf'G:\{location}'] for location in locations}
+            sources = {location: rf'G:\{location}\1pon_092415_001-fhd' for location in locations}
+            with closing(sqlite3.connect(ledger)) as db:
+                for asset_id, location in enumerate(locations, 1):
+                    db.execute('INSERT INTO asset(id,location,path,name,medium,code,studio) VALUES(?,?,?,?,?,?,?)',
+                        (asset_id, location, sources[location] + r'\film.mp4', 'film.mp4',
+                         'video', '092415-001', '一本道'))
+                db.commit()
+            with mock.patch.object(self.script, 'DATABASE_PATH', ledger), \
+                    mock.patch.object(self.script, 'OUT', root), \
+                    mock.patch.object(self.script, 'location_roots', return_value=roots), \
+                    mock.patch.object(self.script, 'root_online', return_value=True), redirect_stdout(io.StringIO()):
+                self.script.build_plan('rehome', 'mounted')
+            plan = json.loads((root / 'rehome-mounted-manifest.json').read_text(encoding='utf-8'))
+            self.assertEqual({op['source'] for op in plan['operations']}, set(sources.values()))
+
+    def test_template_cli_accepts_mounted_cloud_sources(self):
+        script = load_script('organize_media')
+        for location in ('guangya', 'onedrive', 'mounted'):
+            with self.subTest(location=location):
+                self.assertEqual(script.build_parser().parse_args(['--location', location]).location, location)
+
     def test_release_pack_with_unattributed_images(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -1887,10 +1914,14 @@ class OperationalScriptTests(unittest.TestCase):
             "/tmp/peach/ABW-234.mp4",
         )
 
-    def test_filename_cleanup_ignores_read_only_mounts(self):
-        self.assertEqual(self.clean_names.build_plan([
-            (1, 'guangya', r'G:\media\abw-0234.mp4', 'abw-0234.mp4', 'ABW-234'),
-        ]), [])
+    def test_filename_cleanup_supports_mounted_cloud_sources(self):
+        for location in ('guangya', 'onedrive', 'mounted'):
+            with self.subTest(location=location):
+                plan = self.clean_names.build_plan([
+                    (1, location, r'G:\media\abw-0234.mp4', 'abw-0234.mp4', 'ABW-234'),
+                ])
+                self.assertEqual([(row['location'], row['new']) for row in plan],
+                                 [(location, 'ABW-234.mp4')])
 
     def test_filename_cleanup_apply_renames_files_updates_ledger_and_validates_backup(self):
         with tempfile.TemporaryDirectory() as tmp:
