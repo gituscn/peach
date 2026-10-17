@@ -302,10 +302,36 @@ export const decisionReceipt = (status: DecisionStatus): string =>
 
 export const fetchReview = (signal?: AbortSignal) => apiGet<ReviewData>(REVIEW_URL, signal);
 
-export interface DecisionResult { ok: boolean; error?: string }
+export interface DecisionResult {
+  ok: boolean;
+  error?: string;
+  asset_revisions?: Record<string, { before: number; after: number }>;
+}
 
-export const submitDecision = (payload: Record<string, unknown>) =>
-  apiSend<DecisionResult>(REVIEW_DECISION_URL, payload);
+export async function submitDecision(payload: Record<string, unknown>): Promise<DecisionResult> {
+  const result = await apiSend<DecisionResult>(REVIEW_DECISION_URL, payload);
+  if (result.ok && result.asset_revisions) {
+    const revisions = result.asset_revisions;
+    queryClient.setQueryData<ReviewData>(REVIEW_KEY, (data) => data && ({
+      ...data,
+      sections: {
+        ...data.sections,
+        metadata_fields: data.sections.metadata_fields?.map((row) => {
+          const change = revisions[String(row.asset_id)];
+          return row.asset_path && change && row.asset_mutation_revision === change.before
+            ? { ...row, asset_mutation_revision: change.after } : row;
+        }),
+      },
+    }));
+  }
+  return result;
+}
+
+/** 批量队列保留行身份；并发凭据来自共享缓存里的最新回执。 */
+export function currentReviewRow(category: ReviewCategory, row: ReviewRow): ReviewRow {
+  return queryClient.getQueryData<ReviewData>(REVIEW_KEY)?.sections[category]
+    ?.find((item) => item.item_key === row.item_key) || row;
+}
 
 /** 收录一个 genre（给中文名）或把它判成非内容（`tag` 留空）。 */
 export const recordGenre = (genre: string, tag: string) =>

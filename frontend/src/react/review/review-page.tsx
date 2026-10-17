@@ -27,7 +27,7 @@ import { GenreTagList } from './candidate-form';
 import { ReviewCard } from './review-card';
 import type { DecisionStatus, ReviewCategory, ReviewData, ReviewGrouping, ReviewRow, RowChoice } from './review';
 import {
-  canApprove, DEFAULT_CATEGORY, decisionPayload, decisionReceipt, defaultChoice,
+  canApprove, currentReviewRow, DEFAULT_CATEGORY, decisionPayload, decisionReceipt, defaultChoice,
   dropReviewRows, fetchReview, filterReviewRows, groupReviewRows, isReviewCategory, mirrorText,
   REVIEW_CATEGORIES, REVIEW_KEY, REVIEW_LABELS, reviewGroupingOptions,
   reviewWindow, selectReviewRange, submitDecision,
@@ -142,7 +142,7 @@ export function ReviewPage(props: ReviewProps) {
 
   const decide = useMutation({
     mutationFn: ({ row, status }: { row: ReviewRow; status: DecisionStatus }) =>
-      submitDecision(decisionPayload(category, row, status, choiceOf(row))),
+      submitDecision(decisionPayload(category, currentReviewRow(category, row), status, choiceOf(row))),
     onSuccess: (result, { row, status }) => {
       if (!result.ok) { fail(row.item_key, result.error || '服务端拒绝了这次判定'); return }
       // 判过的直接移出本批并同步计数，下一条立刻顶上来；留在队列里就像没生效。
@@ -164,7 +164,7 @@ export function ReviewPage(props: ReviewProps) {
         if (!alive.current) break;
         setFeedback(`正在处理 ${at} / ${rows.length}`);
         try {
-          const result = await submitDecision(decisionPayload(category, row, status, choiceOf(row)));
+          const result = await submitDecision(decisionPayload(category, currentReviewRow(category, row), status, choiceOf(row)));
           if (!result.ok) throw new Error(result.error || '服务端未采用该项');
           done.push(row.item_key);
         } catch (cause) {

@@ -195,7 +195,9 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 - 统计页与口味页的柱状、径向、雷达图复用 EvilCharts Recharts 分支（MIT，源码逐字复制进 `frontend/src/react/evilcharts/`，依赖 `recharts`、`motion`、`clsx`），单系列柱状图统一走 `frontend/src/react/charts/bar-card.tsx` 的 `BarCard`，悬停浮层统一走 `charts/chart-tip.tsx` 的 `ChartTip`。星期 × 小时与每日热力图是 `charts/heat-card.tsx` 的 `ActivityHeat`，统计页播放时间与口味页浏览活跃共用；EvilCharts 没有这类图（ADR-0076）。
 - `frontend/src/react/taste/taste.ts` 使用 d3-sankey（BSD-3-Clause）及其类型包计算来源网站到创作者线索的流向。布局依赖不读取浏览历史；Peach 提供去重聚合值并负责隐私边界。分发许可随 `web/vendor/d3-LICENSE.txt` 保留。
 
-复核用 Checkbox、Button、Badge、Select 与 `/api/review/decision`，默认勾选、沿用馆藏页 Shift 连选；支持跨组通过／拒绝与无歧义的共同来源选择。按候选数量、来源组合或字段分组，每项只出现一次，切组保留选择；成功移出、失败保留，离开页面即停。整页在 `frontend/src/react/review/`，一条队列一个 `queryKey`，判定后改缓存不重取。身份候选用创作者页、作品详情与 revealSource 核对样本；来源图与缺图占位共用 220px 预览区，样本支持无缩略图作品，回收站不参与。
+复核用 Checkbox、Button、Badge、Select 与 `/api/review/decision`，默认勾选、沿用馆藏页 Shift 连选；支持跨组通过／拒绝与无歧义的共同来源选择。按候选数量、来源组合或字段分组，每项只出现一次，切组保留选择；成功移出、失败保留，离开页面即停。整页在 `frontend/src/react/review/`，一条队列一个 `queryKey`，判定后改缓存不重取。批准回执在同一事务中读取实际资产版本，缓存只推进仍持有该次写入前版本的候选；逐项与批量提交共用缓存中的并发凭据。身份候选用创作者页、作品详情与 revealSource 核对样本；来源图与缺图占位共用 220px 预览区，样本支持无缩略图作品，回收站不参与。
+
+本地 NFO 配对复用 `library_nfo`、`catalog_rules` 的番号与分卷识别、标准库 ElementTree 及现有资料补空流程。[Kodi NFO 文档](https://kodi.wiki/view/NFO_files/Movies)的同名文件与 `movie.nfo` 约定于 2026-10-17 核对；只参照公开格式，没有复制外部源码。Peach 保留同番号分卷共享、同名文件优先、多份匹配拒绝、内容番号冲突检查和输入安全限制。Kodi 整套媒体中心没有作为依赖引入；标准库随 Python 3.14 运行，无额外体积或许可证。NFO 读取后复用来源缓存与缺失缓存核查在线字段；`requires_review` 跟随候选保留覆盖复核要求，人工决定保存已展示的候选身份，见 ADR-0108。隔离媒体与账本回归覆盖共用 NFO、不同作品混放、错误 NFO 继续在线补全、补空与覆盖分流，以及连续批准的版本回执；真实反馈的 NFO 样本尚未取得，无新增依赖。
 
 ## 本机设置与卸载
 

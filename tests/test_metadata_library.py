@@ -165,6 +165,129 @@ class LibraryNfoTests(unittest.TestCase):
         (gallery / 'cover.jpg').touch()
         self.assertEqual(sidecars(video)[1], [gallery / 'cover.jpg'])
 
+    def test_release_sidecar_is_shared_by_parts_and_versions(self):
+        video = self.root / 'ABC-123-CD1.mp4'
+        for name in (video.name, 'ABC-123-CD2.mp4', 'ABC-123-4K.mkv', 'ABC-124.mp4'):
+            (self.root / name).touch()
+        shared = self.root / 'ABC-123.nfo'
+        shared.write_text('<movie><id>ABC-123</id><title>本地标题</title></movie>', encoding='utf-8')
+        for name in (video.name, 'ABC-123-CD2.mp4', 'ABC-123-4K.mkv'):
+            self.assertEqual(sidecars(self.root / name)[0], shared)
+        self.assertIsNone(sidecars(self.root / 'ABC-124.mp4')[0])
+        named = video.with_suffix('.nfo')
+        named.touch()
+        self.assertEqual(sidecars(video)[0], named)
+        (self.root / 'ABC-123-4K.nfo').touch()
+        self.assertIsNone(sidecars(self.root / 'ABC-123-CD2.mp4')[0])
+
+    def test_movie_sidecar_is_shared_only_by_one_release(self):
+        video = self.root / 'ABC-123-CD1.mp4'
+        for name in (video.name, 'ABC-123-CD2.mp4'):
+            (self.root / name).touch()
+        common = self.root / 'movie.nfo'
+        common.touch()
+        self.assertEqual(sidecars(video)[0], common)
+        (self.root / 'ABC-124.mp4').touch()
+        self.assertIsNone(sidecars(video)[0])
+
+    @windows_ledger_roots
+    def test_shared_nfo_fills_parts_and_verifies_cached_remote_metadata(self):
+        media = self.root / 'media'
+        media.mkdir()
+        for part in (1, 2):
+            (media / f'ABW-358-CD{part}.mp4').write_bytes(b'video')
+        (media / 'ABW-358.nfo').write_text(
+            '<movie><id>ABW-358</id><title>本地标题</title><studio>本地厂牌</studio>'
+            '<premiered>2023-05-26</premiered><actor><name>本地演员</name></actor>'
+            '<tag>主观视角</tag></movie>', encoding='utf-8')
+        db = fresh_ledger(self.root)
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        provider = stub_provider()
+        provider.query.return_value = {
+            'id': 'ABW-358', 'title': '本地标题', 'maker': '本地厂牌',
+            'release_date': '2023-05-26', 'actresses': [{'japanese_name': '本地演员'}],
+            'genres': ['主觀視角'],
+        }
+        factory = Mock(return_value=provider)
+        with patch('peach.library_processing._asks_cover', return_value=False), \
+                patch('peach.library_processing._generate_previews', return_value=0), \
+                patch('peach.library_processing._enrich_finished_performers',
+                      return_value={'aliases': 0, 'avatars': 0, 'conflicts': 0, 'failed': 0}):
+            result = process_library(config, db, self.root / 'generated', self.root / 'covers',
+                                     provider_factory=factory, database=LedgerDatabase(db),
+                                     route_overrides='censored=r18dev')
+        self.assertEqual(result['status'], 'complete')
+        provider.query.assert_called_once()
+        with closing(sqlite3.connect(db)) as connection:
+            self.assertEqual(connection.execute(
+                'SELECT code,catalog_title,studio FROM asset ORDER BY name').fetchall(),
+                [('ABW-358', '本地标题', '本地厂牌')] * 2)
+            self.assertEqual(connection.execute(
+                "SELECT count(*) FROM review_decision WHERE status='approved'").fetchone()[0], 10)
+
+    @windows_ledger_roots
+    def test_nfo_errors_allow_remote_fill_and_existing_values_require_review(self):
+        from peach.web_contract import WebContract
+        from peach.web_review import q_review, w_review_decision
+        documents = (
+            '<movie><title>未闭合',
+            '<metadata><title>其他格式</title></metadata>',
+            '<movie><id>ABW-359</id><title>其他作品</title></movie>',
+            '<movie><id>ABW-358</id><title>本地标题</title><premiered>2023-99-99</premiered></movie>',
+        )
+        for index, document in enumerate(documents):
+            with self.subTest(document=index):
+                root = self.root / str(index)
+                root.mkdir()
+                media = root / 'media'
+                media.mkdir()
+                (media / 'ABW-358.mp4').write_bytes(b'video')
+                (media / 'ABW-358.nfo').write_text(document, encoding='utf-8')
+                db = fresh_ledger(root)
+                config = PeachConfig(root, root / 'config.toml', present=True,
+                                     locations={'local': (str(media),)})
+                provider = stub_provider()
+                provider.query.return_value = {
+                    'id': 'ABW-358', 'title': '在线标题', 'maker': '片商', 'release_date': '2023-05-26',
+                    'actresses': [{'japanese_name': '测试演员'}], 'genres': ['主觀視角'],
+                }
+                generated = root / 'generated'
+                covers = root / 'covers'
+                with patch('peach.library_processing._asks_cover', return_value=False), \
+                        patch('peach.library_processing._generate_previews', return_value=0), \
+                        patch('peach.library_processing._enrich_finished_performers',
+                              return_value={'aliases': 0, 'avatars': 0, 'conflicts': 0, 'failed': 0}):
+                    for _ in range(2):
+                        process_library(config, db, generated, covers, provider_factory=Mock(return_value=provider),
+                                        database=LedgerDatabase(db), route_overrides='censored=r18dev')
+                provider.query.assert_called_once()
+                with closing(sqlite3.connect(db)) as connection:
+                    title, date = connection.execute('SELECT catalog_title,release_date FROM asset').fetchone()
+                self.assertEqual(date, '2023-05-26')
+                self.assertEqual(title, '本地标题' if index == 3 else '在线标题')
+                contract = WebContract(db, candidate_root=generated, cover_root=covers)
+                queue = q_review(contract)['sections']['metadata_fields']
+                self.assertEqual([row['field'] for row in queue], ['title'] if index == 3 else [])
+                if queue:
+                    row = queue[0]
+                    choice = next(candidate for candidate in row['candidates'] if candidate['source'] == 'r18dev')
+                    w_review_decision(contract, {
+                        'category': 'metadata_fields', 'item_key': row['item_key'], 'status': 'approved',
+                        'candidate_key': choice['candidate_key'],
+                        'expected_revision': row['asset_mutation_revision'],
+                    })
+                    self.assertEqual(q_review(contract)['sections']['metadata_fields'], [])
+                    with closing(sqlite3.connect(db)) as connection:
+                        self.assertEqual(connection.execute('SELECT catalog_title FROM asset').fetchone()[0], '在线标题')
+                    with patch('peach.library_processing._asks_cover', return_value=False), \
+                            patch('peach.library_processing._generate_previews', return_value=0), \
+                            patch('peach.library_processing._enrich_finished_performers',
+                                  return_value={'aliases': 0, 'avatars': 0, 'conflicts': 0, 'failed': 0}):
+                        process_library(config, db, generated, covers, provider_factory=Mock(return_value=provider),
+                                        database=LedgerDatabase(db), route_overrides='censored=r18dev')
+                    self.assertEqual(q_review(contract)['sections']['metadata_fields'], [])
+
     def test_releases_sharing_a_folder_keep_their_same_name_posters(self):
         for code in ('ABC-123', 'ABC-124'):
             (self.root / f'{code}.mp4').touch()
@@ -447,14 +570,13 @@ class LibraryNfoTests(unittest.TestCase):
         self.assertEqual(result['identified'], 1)
         self.assertEqual(result['covers'], 1)
         provider.cover.assert_not_called()
-        provider.query.assert_called_once()
-        self.assertEqual(provider.query.call_args.args, ('ABW-358', 'r18dev'))
+        self.assertEqual([call.args for call in provider.query.call_args_list],
+                         [('ABW-358', 'r18dev'), ('ABW-358', 'dmm')])
         self.assertIn('deadline', provider.query.call_args.kwargs)
         groups = read_rows(self.root / 'generated/library-metadata-field-candidates.csv')
         studio = next(row for row in groups if row['field'] == 'studio')
         self.assertEqual(json.loads(studio['candidates_json'])[0]['catalog_evidence']['runtime']['value'], 210)
-        # 厂牌只有 r18.dev 一家的待批候选：重跑时 r18.dev 不再问，链上下一家接着问；
-        # 几家都给过或说过没有之后，再跑一遍就一问都不发。
+        # 成功快照和未取得记录均在有效期内，重复核查直接复用。
         second = process_library(config, db, self.root / 'generated', self.root / 'covers', provider_factory=factory)
         self.assertEqual(second['status'], 'complete')
         self.assertEqual(second['candidates'], result['candidates'])
@@ -466,8 +588,8 @@ class LibraryNfoTests(unittest.TestCase):
                          asked)
 
     @windows_ledger_roots
-    def test_fields_the_local_nfo_gives_take_no_remote_candidate(self):
-        """NFO 给了日文原题，r18 再给一条英文机翻只会变成一道复核题。"""
+    def test_local_nfo_fields_keep_remote_differences_for_review(self):
+        """本地字段优先补空，在线不同值保留为覆盖复核候选。"""
         from PIL import Image
         media = self.root / 'media'
         media.mkdir()
@@ -484,8 +606,8 @@ class LibraryNfoTests(unittest.TestCase):
                         provider_factory=Mock(return_value=provider))
         groups = {row['field']: [entry['source'] for entry in json.loads(row['candidates_json'])]
                   for row in read_rows(self.root / 'generated/library-metadata-field-candidates.csv')}
-        self.assertEqual(groups['title'], ['local_nfo'])
-        self.assertEqual(groups['performers'], ['local_nfo'])
+        self.assertEqual(groups['title'], ['local_nfo', 'r18dev'])
+        self.assertEqual(groups['performers'], ['local_nfo', 'r18dev'])
         self.assertEqual(groups['studio'], ['r18dev'])
 
     @windows_ledger_roots
@@ -644,7 +766,10 @@ class LibraryNfoTests(unittest.TestCase):
             connection.execute("UPDATE asset SET catalog_title=? WHERE code='ABW-358'", ('涼森れむ流',))
         candidates.unlink()
         process_library(config, db, self.root / 'generated', self.root / 'covers', provider_factory=factory)
-        self.assertNotIn('title', {row['field'] for row in read_rows(candidates)})
+        from peach.web_contract import WebContract
+        from peach.web_review import q_review
+        queue = q_review(WebContract(db, candidate_root=candidates.parent))['sections']['metadata_fields']
+        self.assertNotIn('title', {row['field'] for row in queue})
 
     def test_r18_metadata_takes_japanese_title_series_and_names(self):
         from peach.library_processing import LibraryMetadataProvider
@@ -2152,13 +2277,8 @@ class LibraryWatchdogTests(unittest.TestCase):
         self.assertEqual(state['checked'], 1)
 
     @windows_ledger_roots
-    def test_a_row_with_nothing_left_to_collect_never_touches_the_disk(self):
-        """番号已落库、缺的字段都有候选且链上每一站都给过候选或说过没有、封面在位的行，
-        采集连 stat 都不做。
-
-        重跑「只采集」时这是绝大多数行；网盘上每行一次 stat 加一次列目录就是两趟往返。
-        文件在扫描后被删掉，任务仍然一条问题都不报，就是没碰磁盘的证据。
-        """
+    def test_media_is_checked_for_local_metadata_when_sources_are_settled(self):
+        """目录列表用于核对媒体与 NFO；媒体消失时记录问题，在线来源缓存仍然有效。"""
         from peach import metadata_routes
         from peach.library_processing import FIELDS, _MissCache, misses_path
         from peach.review_csv import write_rows
@@ -2187,7 +2307,7 @@ class LibraryWatchdogTests(unittest.TestCase):
                                     stage='collect', provider_factory=lambda: provider)
         listing.assert_not_called()
         provider.query.assert_not_called()
-        self.assertEqual((state['status'], state['checked'], state['issue_count']), ('complete', 1, 0))
+        self.assertEqual((state['status'], state['checked'], state['issue_count']), ('failed', 1, 1))
 
     @windows_ledger_roots
     def test_one_directory_is_listed_once_for_all_the_videos_in_it(self):

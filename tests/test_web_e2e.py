@@ -40,6 +40,7 @@ from peach.ffmpeg import FFmpegResolver
 from peach.library_processing import process_library
 from support.conditions import missing_prerequisite, windows_ledger_roots
 from support.ledger import fresh_ledger
+from support.demo import seed_metadata_cache
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
@@ -231,6 +232,7 @@ class WebE2ESmokeTests(unittest.TestCase):
             cached = follow_assets.cache_path(icon_root, "icons", provider)
             cached.parent.mkdir(parents=True, exist_ok=True)
             cached.write_bytes(mark)
+        seed_metadata_cache(media, config.directory('sources'))
         result = process_library(config, cls.db, generated, generated / "covers",
                                  provider_factory=refuse_network)
         if result["status"] != "complete":

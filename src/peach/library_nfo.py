@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
 
-from .catalog_rules import release_code_from_text
+from .catalog_rules import release_code_from_filename, release_code_from_text, same_release_code
 from .scan import VIDEO
 
 
@@ -47,8 +47,16 @@ def sidecars(video: Path, files: dict[str, Path] | None = None):
     files = directory_files(video.parent) if files is None else files
     single = sum(path.suffix.lower() in VIDEO for path in files.values()) == 1
     nfo = files.get((video.stem + '.nfo').casefold())
-    if nfo is None and single:
-        nfo = files.get('movie.nfo')
+    if nfo is None:
+        code = release_code_from_filename(video.name)
+        matching = [path for path in files.values() if path.suffix.lower() == '.nfo'
+                    and code and same_release_code(code, release_code_from_filename(path.stem))]
+        if len(matching) == 1:
+            nfo = matching[0]
+        elif not matching and (single or (code and all(
+                same_release_code(code, release_code_from_filename(path.name))
+                for path in files.values() if path.suffix.lower() in VIDEO))):
+            nfo = files.get('movie.nfo')
     names = [video.stem + '-poster']
     if not _numbered_image_set(video.stem, files):
         names.append(video.stem)
