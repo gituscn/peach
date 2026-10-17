@@ -40,7 +40,7 @@ const RESULT_ROW = 'inline-grid w-full grid-flow-col auto-cols-fr gap-4 max-plai
 const count = (value: number | undefined) => Number(value || 0).toLocaleString();
 
 /** 一趟扫描的结论：来源一行，每个来源一张读数卡；要清的三样一行。 */
-function ScanResult({ scan }: { scan: ResourceScanState }) {
+function ScanResult({ scan, partial = false }: { scan: ResourceScanState; partial?: boolean }) {
   const cache = scan.cache ?? { files: 0, bytes: 0 };
   return (
     <>
@@ -57,7 +57,7 @@ function ScanResult({ scan }: { scan: ResourceScanState }) {
           </article>
         ))}
       </div>
-      <div className={RESULT_ROW}>
+      {!partial && <div className={RESULT_ROW}>
         <article className={plainStatClass()}>
           <PlainStat label="待永久删除" figure={`${count(purgeCount(scan))} 项`} meta="文件已不在盘上，含回收站" />
         </article>
@@ -71,7 +71,7 @@ function ScanResult({ scan }: { scan: ResourceScanState }) {
           <PlainStat label="可清理的缓存" figure={`${count(cache.files)} 个`}
             meta={cache.files ? fmtSize(cache.bytes) : ''} />
         </article>
-      </div>
+      </div>}
     </>
   );
 }
@@ -143,8 +143,12 @@ export function ResourceSyncCard(
     progress = (
       <TaskProgress embedded label={line} value={state.completed_sources} total={state.total_sources} />
     );
+    if (state.sources?.length) result = <ScanResult scan={state} partial />;
   } else if (state?.status === 'failed') {
-    result = <Note tone="error" title="扫描失败">{state.error || '后台扫描失败'}</Note>;
+    result = <>
+      {state.sources?.length ? <ScanResult scan={state} partial /> : null}
+      <Note tone="error" title="扫描失败">{state.error || '后台扫描失败'}</Note>
+    </>;
   } else if (state?.status === 'complete' && state.applied) {
     result = apply.job?.status === 'complete'
       ? receipt(apply.job)

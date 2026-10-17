@@ -34,6 +34,7 @@ export interface TaskRunPayload {
 
 export interface ActivityData {
   available: boolean;
+  result_versions?: Record<string, string>;
   message?: string;
   running: TaskRunPayload[];
   skipped: TaskRunPayload[];
@@ -71,7 +72,7 @@ export function mergeFinished(...batches: TaskRunPayload[][]): TaskRunPayload[] 
 export const RUNNING_POLL_MS = 2000;
 export const SETTLED_POLL_MS = 10000;
 export const pollInterval = (data: ActivityData | undefined): number =>
-  data?.running.length ? RUNNING_POLL_MS : SETTLED_POLL_MS;
+  data?.running?.length ? RUNNING_POLL_MS : SETTLED_POLL_MS;
 
 export const fetchTasks = (signal?: AbortSignal) => apiGet<ActivityData>(TASKS_URL, signal);
 
