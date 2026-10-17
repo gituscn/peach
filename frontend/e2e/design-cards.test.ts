@@ -376,7 +376,7 @@ describe('设计决定：作品卡、管理页与复核', () => {
     }
   });
 
-  it('管理区标题位于导航上方，面包屑使用身份层级，导航选中态使用中性填充', { timeout: 60_000 }, async () => {
+  it('管理导航、面包屑与标题按层级排列，导航选中态使用中性填充', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/duplicates', DESKTOP);
     try {
       const { page } = opened;
@@ -392,7 +392,8 @@ describe('设计决定：作品卡、管理页与复核', () => {
           gap: getComputedStyle(document.querySelector('[data-manage-crumb] ol')!).columnGap,
           tab: getComputedStyle(pressed).color,
           fill: getComputedStyle(pressed).backgroundColor,
-          titleBeforeNav: document.querySelector('[data-manage-title]')!.getBoundingClientRect().bottom <= document.querySelector('[data-manage-bar]')!.getBoundingClientRect().top,
+          navBeforeCrumb: document.querySelector('[data-manage-bar]')!.getBoundingClientRect().bottom <= document.querySelector('[data-manage-crumb]')!.getBoundingClientRect().top,
+          crumbBeforeTitle: document.querySelector('[data-manage-crumb]')!.getBoundingClientRect().bottom <= document.querySelector('[data-manage-title]')!.getBoundingClientRect().top,
           titleLeft: Math.round(document.querySelector('[data-manage-title]')!.getBoundingClientRect().left - document.querySelector('#grid')!.getBoundingClientRect().left),
         };
       });
@@ -400,7 +401,8 @@ describe('设计决定：作品卡、管理页与复核', () => {
       assert.deepEqual(read.separators, [muted, null], '分隔符跟着当前项提亮了，或最后一项也带了分隔符');
       assert.equal(read.gap, '6px');
       assert.deepEqual([read.tab, read.fill], [ink, fill]);
-      assert.equal(read.titleBeforeNav, true);
+      assert.equal(read.navBeforeCrumb, true);
+      assert.equal(read.crumbBeforeTitle, true);
       assert.equal(read.titleLeft, 0);
       assert.deepEqual(opened.problems.filter((line) => !line.includes('/api/links/check')), []);
     } finally {

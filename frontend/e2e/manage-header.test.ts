@@ -53,7 +53,9 @@ async function readHead(page: Page) {
         const rect = node.getBoundingClientRect();
         return [Math.round(rect.left), Math.round(rect.width)];
       }),
-      titleFirst: document.querySelector('[data-manage-header]')!.firstElementChild === title,
+      order: [...document.querySelector('[data-manage-header]')!.children].map(node =>
+        node.hasAttribute('data-manage-bar') ? 'bar' : node.hasAttribute('data-manage-crumb') ? 'crumb'
+          : node.hasAttribute('data-manage-title') ? 'title' : 'lede'),
       lede: (() => {
         const rect = document.querySelector('[data-manage-lede]')?.getBoundingClientRect();
         return rect ? [rect.left, rect.width] : null;
@@ -83,7 +85,8 @@ describe('管理区页头', () => {
         for (const column of head.columns) assert.deepEqual(column, head.columns[0], `${path} 页头几块没落在同一列：${JSON.stringify(head.columns)}`);
         const [left, width] = head.columns[0]!;
         const [start, end] = head.main;
-        assert.ok(head.titleFirst, `${path} 标题没有位于导航之前`);
+        assert.deepEqual(head.order.slice(0, crumb ? 3 : 2), crumb ? ['bar', 'crumb', 'title'] : ['bar', 'title'],
+          `${path} 页头没有按管理导航、面包屑、标题排列`);
         assert.equal(width, Math.min(1120, Math.round(end - start)), `${path} 页头没有使用正文宽度`);
         assert.ok(Math.abs((left - start) - (end - left - width)) <= 1, `${path} 页头没有与正文居中对齐`);
         if (head.lede) {

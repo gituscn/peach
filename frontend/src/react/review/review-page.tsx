@@ -21,6 +21,7 @@ import { DOTS, paginationRange } from '../../pagination';
 import { EmptyState } from '../components/empty-state';
 import { Note } from '../components/note';
 import { Page } from '../components/page';
+import { useHorizontalScroller } from '../components/use-horizontal-scroller';
 import { BulkToolbar } from './bulk-toolbar';
 import { GenreTagList } from './candidate-form';
 import { ReviewCard } from './review-card';
@@ -63,6 +64,7 @@ function Pagination(
 
 export function ReviewPage(props: ReviewProps) {
   const [narrow, setNarrow] = useState(() => matchMedia('(max-width:900px)').matches);
+  const categoryScroll = useHorizontalScroller<HTMLDivElement>(undefined, narrow);
   useEffect(() => {
     const query = matchMedia('(max-width:900px)');
     const update = () => setNarrow(query.matches);
@@ -246,7 +248,7 @@ export function ReviewPage(props: ReviewProps) {
       }} className="flex flex-col gap-5 review-split:flex-row review-split:items-start review-split:gap-6">
         <div data-section-nav className="w-full min-w-0 review-split:sticky review-split:top-topbar review-split:w-review-tabs review-split:shrink-0">
           <h2 id="reviewcategories">复核分类</h2>
-          <TabList aria-labelledby="reviewcategories" data-section-items
+          <TabList ref={categoryScroll} aria-labelledby="reviewcategories" data-section-items
             className="flex review-split:flex-col review-split:items-stretch">
             {REVIEW_CATEGORIES.map((key) => {
               const count = Number(data.counts[key] || 0);

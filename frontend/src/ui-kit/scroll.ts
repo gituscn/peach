@@ -79,7 +79,8 @@ export function wireHorizontalScroller(el:any,{drag=false,fade=true}={}):any{
   let start:{x:number;left:number}|null=null,moved=0,heldUntil=0,target=0,kicked=false,glide=0,glideAt=0,pos=0,pending=0;
   /* 值没变就不写：自动滚动每一帧都触发一次 `scroll`，同值重写属性照样让样式重算一遍。 */
   const mark=(key:string,value:string)=>{if(el.dataset[key]!==value)el.dataset[key]=value};
-  const update=()=>{if(options.fade){mark('overflowLeft',String(el.scrollLeft>1));mark('overflowRight',String(el.scrollLeft+el.clientWidth<el.scrollWidth-1))}};
+  const scrollable=()=>['auto','scroll','hidden'].includes(getComputedStyle(el).overflowX);
+  const update=()=>{if(options.fade){const active=scrollable();mark('overflowLeft',String(active&&el.scrollLeft>1));mark('overflowRight',String(active&&el.scrollLeft+el.clientWidth<el.scrollWidth-1))}};
   const listen=(target:EventTarget,event:string,handler:(event:any)=>void,extra={})=>target.addEventListener(event,handler,{...extra,signal:abort.signal});
   listen(el,'scroll',update,{passive:true});
   const kick=(delta:number)=>{if(!kicked){kicked=true;bounce.kick(delta)}};
@@ -102,7 +103,7 @@ export function wireHorizontalScroller(el:any,{drag=false,fade=true}={}):any{
      尾巴一格一格地撞在边上，每格都弹就是一串抖动。 */
   listen(el,'wheel',event=>{
     const max=el.scrollWidth-el.clientWidth;
-    if(event.defaultPrevented||!event.cancelable||Math.abs(event.deltaY)<=Math.abs(event.deltaX)||max<=0)return;
+    if(event.defaultPrevented||!event.cancelable||Math.abs(event.deltaY)<=Math.abs(event.deltaX)||max<=0||!scrollable())return;
     event.preventDefault();
     const now=performance.now(),step=Math.abs(event.deltaY);
     if(now>heldUntil)kicked=false;
@@ -129,8 +130,11 @@ export function wireHorizontalScroller(el:any,{drag=false,fade=true}={}):any{
   });
   listen(window,'mouseup',()=>{if(start)bounce.release();start=null;el.style.cursor=''});
   listen(el,'click',event=>{if(moved>6){event.stopPropagation();event.preventDefault();moved=0}},{capture:true});
-  const resize=new ResizeObserver(update);resize.observe(el);
-  const control={options,update,destroy(){abort.abort();stopGlide();resize.disconnect();horizontalControls.delete(el);el.style.cursor='';if(!horizontalControls.size){horizontalCleanup?.disconnect();horizontalCleanup=null}}};
+  const resize=new ResizeObserver(update);
+  const observe=()=>{resize.observe(el);for(const child of el.children)resize.observe(child);update()};
+  const contents=new MutationObserver(()=>{resize.disconnect();observe()});
+  contents.observe(el,{childList:true,characterData:true,subtree:true});observe();
+  const control={options,update,destroy(){abort.abort();stopGlide();resize.disconnect();contents.disconnect();horizontalControls.delete(el);el.style.cursor='';if(!horizontalControls.size){horizontalCleanup?.disconnect();horizontalCleanup=null}}};
   horizontalControls.set(el,control);
   if(!horizontalCleanup){horizontalCleanup=new MutationObserver(()=>{for(const [node,item] of horizontalControls)if(!node.isConnected)item.destroy()});horizontalCleanup.observe(document.body,{childList:true,subtree:true})}
   update();return control;

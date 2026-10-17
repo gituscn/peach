@@ -57,9 +57,9 @@ function ManageHeader({ host: at, props: current }: { host: ManageHeaderHost; pr
   if (!view) return null;
   return (
     <>
-      <h2 data-manage-title="" data-compact={view.compact ? '' : undefined}>{view.title}</h2>
-      {view.crumb ? <Crumb host={at} label={view.crumb} /> : null}
       <ManageBar host={at} pressed={view.pressed} menu={current.menu} />
+      {view.crumb ? <Crumb host={at} label={view.crumb} /> : null}
+      <h2 data-manage-title="" data-compact={view.compact ? '' : undefined}>{view.title}</h2>
       {view.lede.kind === 'none' ? null : <TrashLede host={at} lede={view.lede} />}
     </>
   );

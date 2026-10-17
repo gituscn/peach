@@ -2,6 +2,7 @@
 import { useLayoutEffect, useRef, type KeyboardEvent } from 'react';
 
 import { spriteGlyph } from './sprite-glyph';
+import { useHorizontalScroller } from './use-horizontal-scroller';
 
 export interface BoardTab<V extends string> {
   value: V;
@@ -32,6 +33,7 @@ export function BoardTabs<V extends string>(
   { tabs: readonly BoardTab<V>[]; value: V; label: string; onChange(value: V): void; className?: string },
 ) {
   const list = useRef<HTMLDivElement>(null);
+  const scrollRef = useHorizontalScroller(list);
 
   useLayoutEffect(() => {
     const host = list.current;
@@ -61,7 +63,7 @@ export function BoardTabs<V extends string>(
   };
 
   return (
-    <div ref={list} role="tablist" aria-label={label} data-board-tab-list="" onKeyDown={onKeyDown}
+    <div ref={scrollRef} role="tablist" aria-label={label} data-board-tab-list="" onKeyDown={onKeyDown}
       className={`relative flex flex-none gap-1 overflow-x-auto max-board-narrow:gap-0 ${className}`}>
       {tabs.map((tab) => {
         const Glyph = tab.symbol ? spriteGlyph(tab.symbol) : null;

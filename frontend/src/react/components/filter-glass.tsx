@@ -5,12 +5,13 @@
  * 也在那一条上。吸到顶栏下沿那一刻由 `use-stuck.ts` 标 `data-stuck`，影换成抬起来那一档。
  * 胶囊键 30px 高、透明底、一圈 `--glass-low`，
  * 悬停换成 `--glass-rim` 边加 `--glass-pick-fill` 底——玻璃上的键不是 BoardUI 那种实心按钮。 */
-import { useRef, type ReactNode, type Ref } from 'react';
+import { useRef, type ReactNode, type RefObject } from 'react';
 import { cx } from '@/utils/cx';
 import { IconButton, type IconButtonProps } from '@/components/base/buttons/icon-button';
 import { spinnerHtml } from '@peach/legacy/ui';
 
 import { useStuck } from './use-stuck';
+import { useHorizontalScroller } from './use-horizontal-scroller';
 
 const BusyIcon = ({ className }: { className?: string }) => <span aria-hidden className={className}
   dangerouslySetInnerHTML={{ __html: spinnerHtml('正在处理') }} />;
@@ -57,23 +58,25 @@ export function FilterGlassRows(
     panes?: ReactNode;
     attrs?: Record<`data-${string}`, string>;
     busy?: boolean;
-    bottomRef?: Ref<HTMLDivElement>;
+    bottomRef?: RefObject<HTMLDivElement | null>;
   },
 ) {
   const glass = useRef<HTMLDivElement>(null);
+  const topScroll = useHorizontalScroller<HTMLDivElement>();
+  const bottomScroll = useHorizontalScroller<HTMLDivElement>(bottomRef);
   useStuck(glass);
   return (
     <div ref={glass} role="group" aria-label={label} data-filter-glass data-glass-pane="" {...attrs}
       className={cx('sticky top-topbar z-10 mb-5.5 flex flex-col', className)}>
       {panes}
       {top === null ? null : (
-        <div role="group" aria-label={topLabel} data-filter-row="top"
+        <div ref={topScroll} role="group" aria-label={topLabel} data-filter-row="top"
           className={cx('flex h-12 min-w-0 items-center gap-1.75 overflow-x-auto overscroll-x-contain px-3 py-2',
             topClassName)}>
           {top}
         </div>
       )}
-      <div ref={bottomRef} data-filter-row="bottom" aria-busy={busy || undefined}
+      <div ref={bottomScroll} data-filter-row="bottom" aria-busy={busy || undefined}
         className={cx('flex min-h-11.5 min-w-0 items-center gap-3 px-3 py-2', bottomClassName)}>
         {bottom}
       </div>
