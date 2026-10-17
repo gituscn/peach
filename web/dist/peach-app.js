@@ -71137,20 +71137,23 @@ function wPe({ initial: e, receipt: t }) {
 				href: "/integrations/peach-jav.user.js",
 				children: "安装 Peach 用户脚本"
 			}) }),
-			/* @__PURE__ */ (0, C.jsxs)("div", { children: [/* @__PURE__ */ (0, C.jsx)(PA, { children: "浏览器添加的下载渠道" }), /* @__PURE__ */ (0, C.jsx)(NF, {
-				"aria-label": "浏览器添加的下载渠道",
-				selectedKey: i,
-				onSelectionChange: (e) => a(String(e)),
-				isDisabled: !!c.busy,
-				children: n.providers.map((e) => /* @__PURE__ */ (0, C.jsx)(PF, {
-					id: e.key,
-					textValue: e.label,
-					children: /* @__PURE__ */ (0, C.jsx)($A, {
-						source: e.key,
-						label: e.label
-					})
-				}, e.key))
-			})] }),
+			/* @__PURE__ */ (0, C.jsxs)("div", {
+				className: "flex flex-col gap-1",
+				children: [/* @__PURE__ */ (0, C.jsx)(PA, { children: "浏览器添加的下载渠道" }), /* @__PURE__ */ (0, C.jsx)(NF, {
+					"aria-label": "浏览器添加的下载渠道",
+					selectedKey: i,
+					onSelectionChange: (e) => a(String(e)),
+					isDisabled: !!c.busy,
+					children: n.providers.map((e) => /* @__PURE__ */ (0, C.jsx)(PF, {
+						id: e.key,
+						textValue: e.label,
+						children: /* @__PURE__ */ (0, C.jsx)($A, {
+							source: e.key,
+							label: e.label
+						})
+					}, e.key))
+				})]
+			}),
 			u ? null : /* @__PURE__ */ (0, C.jsx)(MA, { children: "请先保存所选网盘的账号和目标目录。" }),
 			/* @__PURE__ */ (0, C.jsx)(bP, {
 				label: "Peach 地址",

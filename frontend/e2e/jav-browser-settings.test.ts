@@ -71,6 +71,18 @@ describe('浏览器添加 JAV 设置', () => {
         assert.equal(await status.innerText(), '已启用');
         assert.equal(await status.locator('span[aria-hidden="true"]').count(), 1);
         assert.notEqual(await statusColor(), disabledColor);
+        const channelLabelBox = await region.getByText('浏览器添加的下载渠道', { exact: true }).boundingBox();
+        const channelFieldBox = await channel.boundingBox();
+        assert.ok(channelLabelBox && channelFieldBox);
+        const channelGap = channelFieldBox.y - channelLabelBox.y - channelLabelBox.height;
+        const inputGaps = await region.locator('[data-input-size]').evaluateAll(fields => fields.map(field => {
+          const label = field.querySelector('label')!;
+          const control = label.nextElementSibling!;
+          return control.getBoundingClientRect().top - label.getBoundingClientRect().bottom;
+        }));
+        assert.equal(inputGaps.length, 2);
+        assert.ok(inputGaps.every(gap => Math.abs(gap - channelGap) <= 0.5),
+          JSON.stringify({ channelGap, inputGaps }));
         assert.equal(await token.inputValue(), 'test-issued-token-1');
         assert.equal(await token.getAttribute('type'), 'password');
         assert.equal(await region.getByRole('link', { name: '安装 Peach 用户脚本' }).getAttribute('href'),
