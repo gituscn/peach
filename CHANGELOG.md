@@ -21,7 +21,7 @@ Removed / Fixed / Security。
 
 ## [未发布]
 
-## [0.46.0] - 2026-10-19
+## [0.46.1] - 2026-10-19
 
 ### 新增
 
@@ -39,6 +39,7 @@ Removed / Fixed / Security。
 
 ### 修复
 
+- **桌面**：构建与验收仅使用公开发行资源，安装包不包含本机实体导出。
 - **配置**：筛选取消、正常断连和标准库资源清理等预期状态，保留本机诊断证据，并聚合需要开发处理的故障次数；安装辅助进程仅保存本机选项。
 - **界面**：完善系统诊断中的作品表格、状态标识、滚动导航和来源站图标；统一确认清单滚动、任务图标与数据表面板。
 - **界面**：封面补底与大封取景保持一致；输入法收起后保留搜索建议与预览画框；独立页面隔离请求错误依赖。
@@ -616,8 +617,8 @@ Removed / Fixed / Security。
 - **桌面**：独立包使用 UTF-8 启动日志。
 - **配置**：首次设置后的跳转目标取新鲜读到的 mDNS 名。
 
-[未发布]: https://github.com/peach-mitao/peach/compare/v0.46.0...HEAD
-[0.46.0]: https://github.com/peach-mitao/peach/compare/v0.45.0...v0.46.0
+[未发布]: https://github.com/peach-mitao/peach/compare/v0.46.1...HEAD
+[0.46.1]: https://github.com/peach-mitao/peach/compare/v0.45.0...v0.46.1
 [0.45.0]: https://github.com/peach-mitao/peach/compare/v0.43.0...v0.45.0
 [0.43.0]: https://github.com/peach-mitao/peach/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/peach-mitao/peach/compare/v0.41.0...v0.42.0
