@@ -232,6 +232,10 @@ def _actionable(stage, error, fields):
     """仅允许技术故障入口；预期领域状态和 SDK 自身日志留在本机。"""
     if str(fields.get("logger", "")).startswith(("sentry_sdk", "urllib3")):
         return False
+    if stage == "unhandled-asyncio":
+        from .error_reporting import is_asyncio_connection_cleanup
+        if is_asyncio_connection_cleanup(error, fields):
+            return False
     stages = {"browser", "http-request", "unhandled-main", "unhandled-thread", "unraisable",
               "unhandled-asyncio", "cli", "packaged-cli", "desktop-entry", "tray-import",
               "background-job", "library-preview", "frame-capture", "frame-tile", "media-probe",

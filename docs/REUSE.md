@@ -150,6 +150,8 @@ Peach 播放器皮肤直接装饰 Video.js 10 的 light DOM：右侧控制组用
 
 可选远程诊断复用官方 [sentry-sdk 2.72.0](https://github.com/getsentry/sentry-python/tree/2.72.0)（MIT，维护中，支持 Python 3.14）；固定版源码通过 `opensrc path pypi:sentry-sdk` 核对。SDK 负责后台 HTTP、TLS、Sentry 信封和服务端限流；Peach 负责本机选择、技术字段投影、同类错误去重与每机每日上限。版本统计与错误诊断共用默认勾选的开关，关闭时不构造 SDK；SDK 全局自动集成、追踪、回放、日志、会话与指标采集均关闭。`HttpTransport._send_envelope` 的窄覆盖在真正发送前复查本机选择版本并移除本机传输元数据；它是固定版本的内部接口，升级必须通过真实 SDK 信封回归。无真实外发的内存接收端检查最终字节、停用后队列失效与断网不影响本机取证。新增依赖仅 `sentry-sdk`，复用已声明的 urllib3 / certifi；体积以发行构建为准。未采用自写 Sentry 协议或 Workers 收集后台，避免另行维护传输、去重和查看界面。没有真实 ledger 写入。
 
+Windows 连接清理诊断复用 CPython 3.14.7 的 `asyncio` 回调与异常栈（PSF 许可，无新增依赖）。只将纯标准库 `_call_connection_lost` 回调中的 `WinError 10054` 分类为本机连接清理证据，保留其他网络故障。核对本机 `proactor_events.py` 源码与重启前后日志；33 次回环实验未复现原始竞争时序，不据此认定客户端来源。合成异常通过真实 `asyncio.Handle` 分派验证筛选与默认处理器，协议类别只写本机日志。没有修改或复制传输实现、全局替换事件循环，或引入另一套日志 SDK。
+
 馆藏与口味群体研究复用 `LedgerDatabase.read_connection`、`taste_preferences.preference_profile`、`error_reporting.redact` 与同一固定版 Sentry 的内存附件 API；偏好权重与身份口径不另写一份。研究使用独立项目、独立同意文件和字段版本；默认关闭，预览只在用户点击时读取，后台读取要求有效同意与接收端。没有复制浏览器资料、原始历史或媒体，没有真实 ledger 写入。SDK 本机安装目录含缓存约 3.1 MB，Windows 构建复制 MIT 许可证元数据；压缩后的发行增量未单独测量。
 
 `src/peach/diagnostics.py` 统一生成 CLI 与本机 API 报告；复用 `settings_file`、`health` 的只读迁移校验、`FFmpegResolver`、访问策略和挂载快照。数据库用 SQLite `mode=ro`；写入与端口检查用标准库短暂探针，不新增运行依赖。

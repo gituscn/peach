@@ -1,4 +1,5 @@
 """异常取证与分享报告只使用临时目录；进程级钩子在子进程里验证。"""
+import asyncio
 import io
 import json
 import os
@@ -392,6 +393,88 @@ class ErrorReportingTests(unittest.TestCase):
         error_reporting.asyncio_handler(loop, {"exception": ValueError("async failure"), "message": "task"})
         self.assertEqual(self.records()[0]["stage"], "unhandled-asyncio")
         loop.default_exception_handler.assert_called_once()
+
+    def asyncio_callback(self, error, *, module='asyncio.proactor_events',
+                         name='_call_connection_lost', business=False):
+        namespace = {'__name__': module, 'failure': error}
+        if business:
+            exec(compile('def fail():\n    raise failure\n', 'peach/network_fixture.py', 'exec'), namespace)
+        operation = 'fail()' if business else 'raise failure'
+        exec(compile(f'class _ProactorBasePipeTransport:\n    def {name}(self):\n        {operation}\n',
+                     'asyncio/proactor_events.py', 'exec'), namespace)
+        transport = namespace['_ProactorBasePipeTransport']()
+        protocol_type = type('H11Protocol', (), {'__module__': 'uvicorn.protocols.http.h11_impl'})
+        ssl_type = type('SSLProtocol', (), {'__module__': 'asyncio.sslproto'})
+        transport._protocol = ssl_type()
+        transport._protocol._app_protocol = protocol_type()
+        transport.private_url = 'https://private.example/?token=private-token'
+        transport.private_path = 'D:/private/movie.mp4'
+        loop = mock.Mock()
+        loop.get_debug.return_value = False
+        loop.call_exception_handler.side_effect = lambda context: error_reporting.asyncio_handler(loop, context)
+        asyncio.Handle(getattr(transport, name), (), loop)._run()
+        return loop
+
+    def test_windows_asyncio_connection_cleanup_stays_local_with_safe_context(self):
+        from peach import remote_reporting
+        error = ConnectionResetError(10054, 'connection reset')
+        error.winerror = 10054
+        with mock.patch.object(remote_reporting, 'send') as send:
+            loop = self.asyncio_callback(error)
+        send.assert_not_called()
+        record = self.records()[0]
+        self.assertEqual(record['classification'], 'connection-cleanup')
+        self.assertEqual(record['asyncio_callback'],
+                         'asyncio.proactor_events._ProactorBasePipeTransport._call_connection_lost')
+        self.assertEqual(record['asyncio_protocol'], 'uvicorn.protocols.http.h11_impl.H11Protocol')
+        self.assertEqual(record['asyncio_connection_role'], 'http-server')
+        self.assertTrue(record['asyncio_tls'])
+        self.assertEqual(record['exception'][0]['winerror'], 10054)
+        self.assertEqual(record['frames'][-1]['function'], '_call_connection_lost')
+        for value in ('private.example', 'private-token', 'movie.mp4', 'private_url', 'private_path'):
+            self.assertNotIn(value, json.dumps(record))
+        loop.default_exception_handler.assert_called_once()
+
+    def test_asyncio_connection_faults_require_the_exact_cleanup_signature(self):
+        from peach import remote_reporting
+        cases = [
+            ({}, 10053, ConnectionResetError),
+            ({}, 10054, RuntimeError),
+            ({'name': '_read_ready'}, 10054, ConnectionResetError),
+            ({'module': 'peach.network_fixture'}, 10054, ConnectionResetError),
+            ({'business': True}, 10054, ConnectionResetError),
+        ]
+        for options, code, error_type in cases:
+            with self.subTest(options=options, code=code, error_type=error_type):
+                error = error_type(code, 'network failure')
+                error.winerror = code
+                with mock.patch.object(remote_reporting, 'send') as send:
+                    loop = self.asyncio_callback(error, **options)
+                send.assert_called_once()
+                self.assertNotIn('classification', self.records()[-1])
+                loop.default_exception_handler.assert_called_once()
+
+    def test_asyncio_cleanup_with_linked_failure_keeps_remote_evidence(self):
+        from peach import remote_reporting
+        for attribute in ('__cause__', '__context__'):
+            with self.subTest(attribute=attribute):
+                error = ConnectionResetError(10054, 'connection reset')
+                error.winerror = 10054
+                setattr(error, attribute, ValueError('linked failure'))
+                with mock.patch.object(remote_reporting, 'send') as send:
+                    self.asyncio_callback(error)
+                send.assert_called_once()
+                self.assertNotIn('classification', self.records()[-1])
+                self.assertNotIn('asyncio_protocol', json.dumps(send.call_args.args[1]))
+
+    def test_connection_reset_in_business_stage_is_reported_without_asyncio_metadata(self):
+        from peach import remote_reporting
+        error = ConnectionResetError(10054, 'business network failure')
+        error.winerror = 10054
+        with mock.patch.object(remote_reporting, 'send') as send:
+            error_reporting.event('background-job', error)
+        send.assert_called_once()
+        self.assertEqual(send.call_args.args[1]['tags']['winerror'], '10054')
 
     def test_unraisable_errors_and_logging_exceptions_have_persistent_records(self):
         code = """

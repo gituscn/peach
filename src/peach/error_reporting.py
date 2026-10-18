@@ -251,6 +251,52 @@ def cli_main() -> int:
         return 1
 
 
+def _code_name(value) -> str:
+    name = f"{getattr(value, '__module__', '')}.{getattr(value, '__qualname__', '')}"
+    return name if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]{0,180}", name) else ""
+
+
+def _asyncio_fields(context) -> dict:
+    """仅保留代码类别，不访问连接地址、实例文本或请求内容。"""
+    callback = getattr(context.get("handle"), "_callback", None)
+    transport = context.get("transport") or getattr(callback, "__self__", None)
+    protocol = context.get("protocol") or getattr(transport, "_protocol", None)
+    fields = {}
+    if name := _code_name(callback):
+        fields["asyncio_callback"] = name
+    tls = _code_name(type(protocol)) == "asyncio.sslproto.SSLProtocol"
+    if tls:
+        protocol = getattr(protocol, "_app_protocol", None)
+    if protocol is not None and (name := _code_name(type(protocol))):
+        fields["asyncio_protocol"] = name
+        if name.startswith("uvicorn.protocols.http."):
+            fields["asyncio_connection_role"] = "http-server"
+    if tls:
+        fields["asyncio_tls"] = True
+    return fields
+
+
+def is_asyncio_connection_cleanup(error, fields) -> bool:
+    """识别 Winsock 重置连接时、纯标准库清理回调中的异常。"""
+    callback = "asyncio.proactor_events._ProactorBasePipeTransport._call_connection_lost"
+    if (not isinstance(error, ConnectionResetError) or getattr(error, "winerror", None) != 10054
+            or fields.get("asyncio_callback") != callback
+            or error.__cause__ is not None or error.__context__ is not None):
+        return False
+    frame = error.__traceback__
+    last = None
+    while frame is not None:
+        last = (frame.tb_frame.f_globals.get("__name__"), frame.tb_frame.f_code.co_name)
+        if last not in {("asyncio.events", "_run"), ("asyncio.proactor_events", "_call_connection_lost")}:
+            return False
+        frame = frame.tb_next
+    return last == ("asyncio.proactor_events", "_call_connection_lost")
+
+
 def asyncio_handler(loop, context) -> None:
-    event("unhandled-asyncio", context.get("exception"), message=context.get("message", ""))
+    error = context.get("exception")
+    fields = _asyncio_fields(context)
+    if is_asyncio_connection_cleanup(error, fields):
+        fields["classification"] = "connection-cleanup"
+    event("unhandled-asyncio", error, message=context.get("message", ""), **fields)
     loop.default_exception_handler(context)
