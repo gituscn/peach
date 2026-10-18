@@ -60,10 +60,12 @@ chs.DirectoryNotWritable=当前用户无法写入程序目录或其上级目录�
 chs.DirectoryLink=程序目录和数据目录不能经过目录链接。请选择普通文件夹。
 chs.DirectoryMove=请先卸载现有 Peach（保留数据），再选择新的安装目录。
 chs.ReportingFailed=版本统计与错误诊断选项未能保存。首次设置或设置页可再次选择；未保存的同意不会启用上传。
+chs.LibrarySharingFailed=馆藏与口味上传选项未能保存。可在设置页重新选择。
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "reporting"; Description: "发送版本统计与错误诊断（推荐；发送至 Sentry：版本与系统每天最多一次，Python、CPU 架构、异常类型及代码位置等诊断每天最多 20 条；不含安装标识、错误原文、日志正文或媒体信息；服务端可见连接 IP）"; GroupDescription: "可选版本统计与错误诊断（可取消勾选，设置页可关闭）："
+Name: "reporting"; Description: "发送版本统计与错误诊断（推荐）：版本、系统信息、故障类型、代码位置与发生次数"; GroupDescription: "数据上传（可在设置页关闭）："
+Name: "librarysharing"; Description: "每周上传馆藏与口味明细用于 Peach 群体研究：作品编号、副本数量、标签、出演者、创作者、厂牌、系列、媒体类型、时长、评分、喜欢状态、播放汇总、各类偏好名称及强度、证据类别、版本与自然周。不上传账号、设备或安装标识；存在关联与再识别风险，接收服务可见 IP。"; GroupDescription: "数据上传（可在设置页关闭）："; Flags: unchecked
 
 [InstallDelete]
 ; PyInstaller 的依赖都在 _internal 里；覆盖安装留下上一版多出来的库会被新版误加载。
@@ -84,6 +86,7 @@ Name: "{userdesktop}\Peach"; Filename: "{app}\Peach.exe"; Parameters: "--show"; 
 
 [Run]
 Filename: "{app}\Peach.exe"; Parameters: "--show"; Description: "{cm:LaunchProgram,Peach}"; Flags: nowait postinstall skipifsilent
+Filename: "https://github.com/peach-mitao/peach"; Description: "打开 Peach 仓库，给项目加星"; Flags: shellexec postinstall skipifsilent unchecked
 
 [UninstallDelete]
 ; 自更新整目录换过之后，卸载记录里的文件清单不再完整，按目录整个移除。
@@ -210,6 +213,7 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
   ReportingConsent: String;
+  LibraryConsent: String;
 begin
   if (CurStep = ssPostInstall) and not WizardSilent() then
   begin
@@ -219,6 +223,12 @@ begin
       '--installer-reporting ' + ReportingConsent + ' ' + ReportingConsent,
       ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
       SuppressibleMsgBox(CustomMessage('ReportingFailed'), mbError, MB_OK, IDOK);
+    LibraryConsent := '0';
+    if WizardIsTaskSelected('librarysharing') then LibraryConsent := '1';
+    if not Exec(ExpandConstant('{app}\Peach.exe'),
+      '--installer-library-sharing ' + LibraryConsent,
+      ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
+      SuppressibleMsgBox(CustomMessage('LibrarySharingFailed'), mbError, MB_OK, IDOK);
   end;
   { 服务启动时不迁移账本；覆盖安装换了程序，要在这里补上。没有账本的新机器不跑，
     否则会凭空建出账本，首次设置页就再也不出现。migrate 自己会先备份。 }

@@ -136,7 +136,7 @@ def browser_entities(url, title, index, matcher, accounts, decisions, account_ho
                 yield entity["id"], kind, entity["canonical_name"]
 
 
-def browser_evidence(connection, store, index, accounts, counters):
+def browser_evidence(connection, store, index, accounts, counters, *, cache=True):
     from .taste_history import preference_history_visits, store_version
     from .taste_preferences import _policy_fingerprint
     from .fsutil import atomic_write_text
@@ -151,7 +151,7 @@ def browser_evidence(connection, store, index, accounts, counters):
     fingerprint = hashlib.sha256(json.dumps(inputs, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     cache_path = store.parent / 'browser-preference-cache.json'
     try:
-        cached = json.loads(cache_path.read_text(encoding='utf-8'))
+        cached = json.loads(cache_path.read_text(encoding='utf-8')) if cache else {}
         if cached.get('version') == 1 and cached.get('fingerprint') == fingerprint:
             for kind, rows in cached['dimensions'].items():
                 for eid, name, count in rows:
@@ -179,12 +179,13 @@ def browser_evidence(connection, store, index, accounts, counters):
         [eid, index.names[kind][eid], len(dates)] for eid, dates in identities.items()]
         for kind, identities in days.items()}}
     try:
-        atomic_write_text(cache_path, json.dumps(payload, ensure_ascii=False), mode=0o600)
+        if cache:
+            atomic_write_text(cache_path, json.dumps(payload, ensure_ascii=False), mode=0o600)
     except OSError:
         pass
 
 
-def preference_evidence(connection, store):
+def preference_evidence(connection, store, *, cache=True):
     index = IdentityIndex(connection)
     counters = {source: defaultdict(Counter) for source in ("观看与反馈", "馆藏积累", "浏览记录", "浏览器书签", "关注")}
     collection_evidence(connection, index, counters)
@@ -195,7 +196,7 @@ def preference_evidence(connection, store):
                 continue
             index.names[kind][eid] = name
             counters["关注"][kind][eid] = count
-    browser_evidence(connection, store, index, accounts, counters)
+    browser_evidence(connection, store, index, accounts, counters, cache=cache)
     if store.is_file():
         from .taste_history import _readonly_uri
         from .taste_bookmarks import bookmark_rows

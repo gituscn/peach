@@ -248,7 +248,7 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
       {reporting ? <CardGroup>
         <GroupTitle>版本统计与错误诊断</GroupTitle>
         <ReportingChoices value={reporting} onChange={setReporting} />
-        <Help>馆藏与口味分享默认关闭。完成设置后，可在「应用与维护」查看明细预览并明确同意。</Help>
+        <Help>馆藏与口味明细上传默认关闭，可在「应用与维护」查看并选择。</Help>
       </CardGroup> : null}
       <Button type="submit" className="self-start" {...busyProps(busy)}>完成设置</Button>
     </form>

@@ -32,7 +32,9 @@ def _policy_fingerprint():
     return _POLICY_FINGERPRINT
 
 
-def preference_profile(connection, store):
+def preference_profile(connection, store, *, cache=True):
+    if not cache:
+        return preference_evidence(connection, store, cache=False)
     from .taste_history import store_version
     from .fsutil import atomic_write_text
     database = next((row[2] for row in connection.execute("PRAGMA database_list") if row[1] == "main"), "")
