@@ -440,7 +440,7 @@ it('首屏暂停状态在卡片和横幅中保留进度与继续入口', async (
   expect(banner.textContent).toContain('已暂停');
   expect(buttonNamed('继续', host)).not.toBeNull();
   expect(buttonNamed('继续', banner)).not.toBeNull();
-  expect(buttonNamed('速度 · 标准', banner)).not.toBeNull();
+  expect(buttonNamed('标准', banner)).not.toBeNull();
   expect(host.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('2');
 });
 
@@ -450,14 +450,14 @@ it('模式切换失败保留服务端选中值和原位错误，可重试', asyn
     ? { ok: false, status: 409, json: async () => ({ error: '任务已变化，请刷新后重试' }) }
     : { ok: true, status: 200, json: async () => ({ status: 'running', job_id: 'one', speed_mode: 'standard' }) }));
   const host = await mount(card({ toast: vi.fn() }));
-  await click(buttonNamed('速度 · 标准', host));
+  await click(buttonNamed('标准', host));
   const slider = document.querySelector<HTMLInputElement>('input[type="range"]')!;
   await act(async () => {
     slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
     slider.dispatchEvent(new KeyboardEvent('keyup', { key: 'Home', bubbles: true }));
   });
   expect(host.textContent).toContain('任务已变化，请刷新后重试');
-  expect(buttonNamed('速度 · 标准', host)).not.toBeNull();
+  expect(buttonNamed('标准', host)).not.toBeNull();
   expect(slider.value).toBe('1');
   expect(slider.disabled).toBe(false);
 });

@@ -1,4 +1,15 @@
 .processing-effort-panel{width:256px;max-width:calc(100vw - 64px)}
+.processing-effort-scale{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:center}
+.processing-effort-scale>span{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.processing-effort-scale>span[data-selected]{color:var(--color-text-primary)}
+.processing-effort-trigger{display:inline-flex}
+.processing-effort-scale>span:last-child[data-selected],.processing-effort-trigger[data-speed=high]>button:not([aria-disabled=true]){color:var(--color-accent-600)}
+.processing-effort-scale>span:nth-child(2){justify-self:center}
+.processing-effort-scale>span:last-child{justify-self:end}
+.processing-effort-double{flex-shrink:0;width:22px;height:16px}
+@media(hover:hover){.processing-effort-trigger:hover{--processing-effort-icon-background:var(--color-background-primary-hover)}}
+.processing-effort-trigger:active{--processing-effort-icon-background:var(--color-background-primary-active)}
+.processing-effort-trigger>button:is([aria-disabled=true],:disabled){--processing-effort-icon-background:var(--color-background-primary-disabled)}
 .processing-effort-label{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}
 .processing-effort-track{position:relative;height:27px;overflow:hidden;border-radius:var(--control-radius);background:var(--color-background-secondary-default)}
 .processing-effort-fill{width:var(--effort-fill);height:100%;border-radius:inherit;background:var(--color-background-tertiary-hover)}

@@ -17,6 +17,7 @@ DSN = 'https://public@o123.ingest.us.sentry.io/789'
 
 class LibrarySharingTests(unittest.TestCase):
     def setUp(self):
+        self.enterContext(mock.patch('peach.remote_reporting._disabled', False))
         holder = tempfile.TemporaryDirectory()
         self.addCleanup(holder.cleanup)
         self.root = Path(holder.name).resolve()

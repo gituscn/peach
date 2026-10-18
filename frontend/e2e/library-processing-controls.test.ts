@@ -73,10 +73,40 @@ describe('扫描与采集控制', () => {
         assert.equal(await card.getByRole('button', { name: '同步媒体库', exact: true }).getAttribute('aria-disabled'), 'true');
         await page.reload();
         await resume.waitFor();
+        const lowSpeed = dock.getByRole('button', { name: '处理速度：低占用' });
+        assert.equal(await lowSpeed.innerText(), '低占用');
+        assert.equal(await lowSpeed.locator('use[href="#i-snail"]').count(), 1);
         await dock.getByRole('button', { name: '处理速度：低占用' }).click();
         const effort = page.getByRole('dialog', { name: '处理速度', exact: true });
+        const scale = effort.locator('.processing-effort-scale');
+        const assertSelectedSpeed = async (expected: number) => {
+          const marks = await scale.locator(':scope > span').evaluateAll(elements => elements.map(el => ({
+            selected: el.hasAttribute('data-selected'), color: getComputedStyle(el).color,
+            iconColor: getComputedStyle(el.querySelector('svg')!).color,
+          })));
+          assert.deepEqual(marks.map(mark => mark.selected), [0, 1, 2].map(index => index === expected));
+          assert.ok(marks.every(mark => mark.iconColor === mark.color));
+          assert.ok(marks.every((mark, index) => index === expected || mark.color !== marks[expected]!.color));
+        };
+        await assertSelectedSpeed(0);
+        assert.deepEqual(await scale.locator(':scope > span').allTextContents(), ['最慢', '标准', '最快']);
+        assert.deepEqual(await scale.locator(':scope > span').evaluateAll(marks => marks.map(mark => mark.querySelectorAll('svg > use').length)), [1, 1, 2]);
+        const scaleLayout = await scale.evaluate(el => {
+          const marks = [...el.children].map(mark => mark.getBoundingClientRect());
+          const track = el.parentElement!.querySelector('.processing-effort-track')!.getBoundingClientRect();
+          return { above: marks.every(mark => mark.bottom <= track.top),
+            centered: Math.abs((marks[1]!.left + marks[1]!.right) / 2 - (track.left + track.right) / 2) < 1 };
+        });
+        assert.deepEqual(scaleLayout, { above: true, centered: true });
+        assert.equal((await effort.innerText()).match(/低占用/g)?.length, 1);
+        await effort.screenshot({ path: path.join(artifacts, `${viewport.name}-effort-low.png`) });
         await effort.getByRole('slider').press('ArrowRight');
         await dock.getByRole('button', { name: '处理速度：标准' }).waitFor();
+        const standardSpeed = dock.getByRole('button', { name: '处理速度：标准' });
+        assert.equal(await standardSpeed.innerText(), '标准');
+        assert.equal(await standardSpeed.locator('use[href="#i-zap"]').count(), 1);
+        await assertSelectedSpeed(1);
+        await effort.screenshot({ path: path.join(artifacts, `${viewport.name}-effort-standard.png`) });
         await effort.press('Escape');
         await resume.click();
         await card.getByText('预计剩余约 10–15 分钟', { exact: true }).waitFor();
@@ -110,16 +140,48 @@ describe('扫描与采集控制', () => {
         const speed = page.getByRole('dialog', { name: '处理速度', exact: true });
         await speed.getByRole('slider').press('End');
         await dock.getByRole('button', { name: '处理速度：全速' }).waitFor();
+        const highSpeed = dock.getByRole('button', { name: '处理速度：全速' });
+        assert.equal(await highSpeed.innerText(), '全速');
+        assert.equal(await highSpeed.locator('svg > use[href="#i-zap"]').count(), 2);
+        await assertSelectedSpeed(2);
+        const theme = await page.evaluate(() => ({ value: document.documentElement.dataset.theme,
+          dark: document.documentElement.classList.contains('dark') }));
+        for (const dark of [false, true]) {
+          await page.evaluate(dark => { document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+            document.documentElement.classList.toggle('dark', dark) }, dark);
+          for (const hovered of [false, true]) {
+            if (hovered) await highSpeed.hover();
+            else await page.mouse.move(1, 1);
+            await page.waitForFunction(() => {
+              const button = document.querySelector('.processing-effort-trigger[data-speed="high"] > button')!;
+              return getComputedStyle(button.querySelector('.processing-effort-double > use:last-child')!).fill === getComputedStyle(button).backgroundColor;
+            });
+            const paint = await highSpeed.evaluate(el => ({ background: getComputedStyle(el).backgroundColor,
+              foreground: getComputedStyle(el.querySelector('.processing-effort-double > use:last-child')!).fill }));
+            assert.equal(paint.foreground, paint.background, '前方闪电用控件背景遮住后方轮廓');
+          }
+        }
+        await page.mouse.move(1, 1);
+        await page.evaluate(theme => {
+          if (theme.value) document.documentElement.dataset.theme = theme.value;
+          else delete document.documentElement.dataset.theme;
+          document.documentElement.classList.toggle('dark', theme.dark);
+        }, theme);
         assert.ok(writes.some(body => body.action === 'set_speed' && body.speed_mode === 'high'));
         assert.match(await speed.innerText(), /最慢[\s\S]*最快[\s\S]*占用少[\s\S]*占用多/);
         await page.locator('[data-effort-flow]').waitFor();
         const flow = page.locator('.processing-flow-outer');
         const blue = await flow.evaluate(el => getComputedStyle(el).fill);
+        const highColor = await highSpeed.evaluate(el => getComputedStyle(el).color);
+        assert.equal(await scale.locator(':scope > span[data-selected]').evaluate(el => getComputedStyle(el).color), highColor);
         const readFeedback = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--feedback-success').trim());
         const feedbackBlue = await readFeedback();
         await page.evaluate(() => { document.documentElement.dataset.accent = 'emerald' });
         const emerald = await flow.evaluate(el => getComputedStyle(el).fill);
         assert.notEqual(emerald, blue, '最高档流光跟随站点强调色');
+        assert.notEqual(await highSpeed.evaluate(el => getComputedStyle(el).color), highColor, '全速入口跟随站点强调色');
+        assert.equal(await scale.locator(':scope > span[data-selected]').evaluate(el => getComputedStyle(el).color),
+          await highSpeed.evaluate(el => getComputedStyle(el).color), '全速刻度和入口共用强调色');
         assert.notEqual(await readFeedback(), feedbackBlue, '旧进度反馈色跟随站点强调色');
         assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--feed-mark').trim()), '#F78422', 'RSS 语义色保持橙色');
         await page.screenshot({ path: path.join(artifacts, `${viewport.name}-effort.png`) });
