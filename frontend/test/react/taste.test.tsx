@@ -174,9 +174,10 @@ it('「口味维度」读数只数分数为正的维度，和雷达、排行条�
 it('数据源与名次底下的数加千分位，没有起止日期时只读数据源数', () => {
   expect(historySpan({ history_sources: 12345 })).toBe(`${(12345).toLocaleString()} 个数据源`);
   expect(historySpan({ history_sources: 2, range_start: '2026-01-01', range_end: '2026-09-01' }))
-    .toMatch(/^2 个数据源 · .+—.+$/);
+    .toMatch(/^2 个数据源 · .+–.+$/);
   expect(rankDetail({ name: '甲', web_visits: 12345, peach_items: 6789 }))
     .toBe(`浏览 ${(12345).toLocaleString()} · Peach ${(6789).toLocaleString()}`);
+  expect(rankDetail({ name: '乙', web_visits: 5, web_bookmarks: 3 })).toBe('浏览 2 · 书签 3');
 });
 
 it('流向图一侧超过十二个节点时并掉尾部，画布跟着节点数加高，节点不挤在一起', () => {
@@ -309,6 +310,19 @@ it('导入按 octet-stream 发原文件，文件名走请求头，回来的那�
   // 换进缓存就够了，不为一次导入再问一遍 `/api/taste`。
   expect(host.textContent).toContain('4,321');
   expect(tasteGets(fetcher)).toHaveLength(1);
+});
+
+it('书签文件上传后显示独立计数与来源', async () => {
+  const { host, fetcher } = await open({ imported: { dashboard: payload({
+    summary: { history_visits: 0, bookmarks: 27 },
+    sources: [{ source_key: 'b2', browser: 'bookmarks', profile: '书签.html', host: 'desktop', bookmarks: 27 }],
+  }) } });
+  await choosePeachFile(host.querySelector<HTMLInputElement>('[data-bookmark-import]')!,
+    new File(['<!DOCTYPE NETSCAPE-Bookmark-file-1>'], '书签.html'));
+  await settle();
+  expect(callTo(fetcher, TASTE_IMPORT_URL)).toHaveLength(1);
+  expect(host.textContent).toContain('浏览器书签');
+  expect(host.textContent).toContain('27 枚书签');
 });
 
 it('导入之后回到导入前看过的范围，读的是导入后的数', async () => {

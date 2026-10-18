@@ -616,6 +616,12 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.17.0，版本
 
 ## 口味来源与偏好
 
+书签复用 `beautifulsoup4==4.15.0`（MIT，现有依赖）解析 Netscape HTML，JSON 和时间戳使用 Python 3.14 标准库；Firefox 复用现有 SQLite 一致快照，私有来源、停止读取、上传及删除入口沿用历史模块。浏览器格式依据 Chromium `BookmarkCodec` 的 `roots/children/type/url/date_added` 与 Mozilla Places 的 `moz_bookmarks/moz_places`，不复制外部实现代码。隔离样本覆盖 HTML 实体、日期缺失、重复 URL、非 HTTP(S) 过滤、Chromium 书签独立资料、Firefox 快照及失败保留；接口与偏好测试使用临时数据库，无新增依赖或 ledger 迁移。
+
+标题题材复用 `genre_taxonomy` 的中英日内容词表、`pyahocorasick==2.3.1` 的最长匹配和现有规范身份别名索引；Peach 保留标题省写过滤、英文词边界、成人上下文及 URL 与标题的同义去重。隔离样本覆盖仅 ID 的详情 URL、标题名称及别名、Rule34 标签交叉证据、全半角、负向条件与普通页面误匹配；不请求原页面，不新增分词或模型依赖。
+
+候选复核（2026-10-17）：[browser-history](https://github.com/browser-history/browser-history) 为 Apache-2.0、纯 Python、跨平台且无依赖，但书签能力明确标为实验性且未受测试覆盖，通用读取先复制文件，无法直接取代 Peach 的一致快照和失败保留策略；[bookmarks-converter](https://github.com/radam9/bookmarks-converter) 为 MIT，声明 Windows/macOS/Linux 与 Python 3.14 支持，HTML 依赖 BeautifulSoup，转换模型还引入 SQLAlchemy。Peach 仅需平面 URL、标题和可缺失日期，采用现有 BeautifulSoup 与标准库承接通用解析，保留最小格式适配和私有证据策略。原始输入只在本机读取，无采集网络流量。
+
 历史快照与导入复用 SQLite backup API 和 `browserexport==0.4.4` 的 Chromium、Firefox、Safari 适配器。`taste_browsers` 管理本机资料目录及启停，配置在私有历史库内，停用保留已导入数据；一份资料未取得不阻塞其他资料。来源规则与账号关联见[口味来源](TASTE_SOURCES.md)，仅复用既有实体链接和启用的关注，不自行确认新身份。
 
 多维偏好复用行为计权、genre 归一和 `related.rank_related` 的 MMR；`taste_preferences` 保存规范身份、证据种类及候选强度。持久缓存复用 `fsutil.atomic_write_text`，按账本、历史库及规则源码版本失效，只读历史连接忽略没有数据帧的 WAL。名称扫描采用 [pyahocorasick 2.3.1](https://github.com/WojciechMula/pyahocorasick)（BSD-3-Clause，Unicode，Python 3.12–3.14，Windows/macOS/Linux）；已读固定版 C 实现，Windows CPython 3.14 wheel 实装通过，新增仅此直接依赖。长标题、多别名、重叠名字及 ASCII 词边界由 Peach 约束。真实只读汇总覆盖七类维度；偏好候选和私有缓存不改写 ledger。

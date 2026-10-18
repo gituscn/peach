@@ -4,6 +4,8 @@ import hashlib
 import json
 import math
 import re
+import sqlite3
+from contextlib import closing
 import ahocorasick
 
 from .catalog_rules import LENGTH_TAGS, TECH_TAGS
@@ -184,7 +186,7 @@ def browser_evidence(connection, store, index, accounts, counters):
 
 def preference_evidence(connection, store):
     index = IdentityIndex(connection)
-    counters = {source: defaultdict(Counter) for source in ("观看与反馈", "馆藏积累", "浏览记录", "关注")}
+    counters = {source: defaultdict(Counter) for source in ("观看与反馈", "馆藏积累", "浏览记录", "浏览器书签", "关注")}
     collection_evidence(connection, index, counters)
     accounts, followed = identity_context(connection)
     for kind, identities in followed.items():
@@ -194,6 +196,22 @@ def preference_evidence(connection, store):
             index.names[kind][eid] = name
             counters["关注"][kind][eid] = count
     browser_evidence(connection, store, index, accounts, counters)
+    if store.is_file():
+        from .taste_history import _readonly_uri
+        from .taste_bookmarks import bookmark_rows
+        from .genre_decisions import load_genre_decisions
+        try:
+            with closing(sqlite3.connect(_readonly_uri(store), uri=True)) as private:
+                rows = {row[2]: row[3] for row in bookmark_rows(private)}
+        except sqlite3.DatabaseError:
+            rows = {}
+        matcher = index.title_matcher()
+        tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        decisions = load_genre_decisions(connection) if "genre_decision" in tables else {}
+        for url, title in rows.items():
+            for eid, kind, name in set(browser_entities(url, title, index, matcher, accounts, decisions)):
+                index.names[kind][eid] = name
+                counters["浏览器书签"][kind][eid] += 1
     strengths, evidence = {}, defaultdict(dict)
     for kind in (*KINDS, "era", "length"):
         values = set().union(*(set(by_kind[kind]) for by_kind in counters.values()))
@@ -204,6 +222,7 @@ def preference_evidence(connection, store):
             raw = (2.5 * math.log2(1 + counters["观看与反馈"][kind][eid])
                    + .45 * math.log2(1 + counters["馆藏积累"][kind][eid])
                    + .7 * math.log2(1 + counters["浏览记录"][kind][eid])
+                   + 1.2 * math.log2(1 + counters["浏览器书签"][kind][eid])
                    + 2 * counters["关注"][kind][eid])
             if raw > 0:
                 strengths[kind][eid] = 1 - math.exp(-raw / 6)

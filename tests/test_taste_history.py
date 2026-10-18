@@ -31,6 +31,57 @@ class TasteHistoryTests(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
+    def test_bookmark_html_entities_dates_duplicates_and_non_web_links(self):
+        from peach.taste_bookmarks import read_bookmarks
+        path = self.root / "书签.html"
+        path.write_text('<!DOCTYPE NETSCAPE-Bookmark-file-1><META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">'
+                        '<DL><DT><H3>文件夹</H3><DL><DT><A HREF="https://rule34.xxx/?tags=feet&amp;page=1" ADD_DATE="1700000000">足 &amp; 测试</A>'
+                        '<DT><A HREF="https://rule34.xxx/?tags=feet&amp;page=1">重复</A>'
+                        '<DT><A HREF="javascript:alert(1)">脚本</A><DT><A HREF="file:///private">本机</A>'
+                        '<DT><A HREF="https://[invalid">无效</A><DT><A HREF="https://fansly.com/demo" ADD_DATE="bad">无日期</A>'
+                        '</DL></DL>', encoding="utf-8")
+        rows = read_bookmarks(path)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0], ("https://rule34.xxx/?tags=feet&page=1", "足 & 测试", "2023-11-14T22:13:20+00:00"))
+        self.assertEqual(rows[1][2], "")
+        results = import_history_exports([path], self.root / "history.db")
+        self.assertEqual(results[0]["bookmarks"], 2)
+        analysis = analyze_history(self.root / "history.db", self.root / "reports")
+        self.assertEqual((analysis["visits"], analysis["bookmarks"]), (0, 2))
+        self.assertIn("feet", Path(analysis["tags"]).read_text(encoding="utf-8"))
+        self.assertNotIn("足 & 测试", Path(analysis["report"]).read_text(encoding="utf-8"))
+
+    def test_firefox_bookmarks_use_snapshot_and_failed_sources_preserve_private_data(self):
+        from peach.taste_bookmarks import refresh_bookmarks
+        path = self.root / "places.sqlite"
+        with closing(sqlite3.connect(path)) as db:
+            db.executescript("CREATE TABLE moz_places(id INTEGER PRIMARY KEY,url TEXT);"
+                             "CREATE TABLE moz_bookmarks(id INTEGER PRIMARY KEY,fk INTEGER,type INTEGER,title TEXT,dateAdded INTEGER);")
+            db.execute("INSERT INTO moz_places VALUES(1,'https://fansly.com/demo')")
+            db.execute("INSERT INTO moz_bookmarks VALUES(1,1,1,'私有标题',1700000000000000)")
+            db.execute("INSERT INTO moz_bookmarks VALUES(2,NULL,2,'文件夹',1700000000000000)")
+            db.commit()
+        source = HistorySource("firefox", "default", path, engine="firefox")
+        store = self.root / "history.sqlite"
+        self.assertEqual(refresh_bookmarks([source], store)[0]["added"], 1)
+        with mock.patch.object(taste_history, "_consistent_copy", side_effect=TimeoutError):
+            failed = refresh_bookmarks([source], store)
+        self.assertEqual(failed[0]["status"], "failed")
+        self.assertNotIn("私有标题", str(failed))
+        with closing(sqlite3.connect(store)) as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM history_bookmark").fetchone()[0], 1)
+
+    def test_chromium_bookmark_json_import_and_invalid_file_rejection(self):
+        path = self.root / "digest-Bookmarks"
+        path.write_text(json.dumps({"roots": {"bookmark_bar": {"children": [
+            {"type": "url", "url": "https://fansly.com/demo", "name": "演示", "date_added": "13344473600000000"}]}}}), encoding="utf-8")
+        self.assertEqual(import_history_exports([path], self.root / "store.sqlite")[0]["bookmarks"], 1)
+        html = self.root / "普通页面.html"
+        html.write_text('<a href="https://example.com">普通页面</a>', encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "书签文件未取得"):
+            import_history_exports([html], self.root / "invalid.sqlite")
+        self.assertFalse((self.root / "invalid.sqlite").exists())
+
     def _firefox_db(self, path: Path) -> None:
         path.parent.mkdir(parents=True)
         with closing(sqlite3.connect(path)) as db:
@@ -187,9 +238,10 @@ class TasteHistoryTests(unittest.TestCase):
                 self.assertTrue(browser["available"])
                 self.assertEqual(browser["profiles"], 1)
                 sources = taste_browsers.enabled_history_sources(store)
-                self.assertEqual(sources, [HistorySource("115", "Default", history, engine="chrome")])
+                self.assertEqual(sources, [HistorySource("115", "Default", history, root=path, engine="chrome")])
                 self.assertEqual(refresh_history(sources, store, host="test")[0]["added"], 1)
                 self.assertEqual(refresh_history(sources, store, host="test")[0]["added"], 0)
+                self.assertEqual(len(taste_browsers.browser_sources(store)[0]["source_keys"]), 1)
 
     def test_historyex_download_database_has_actionable_error(self):
         from peach.taste_browsers import configure_browser
@@ -383,6 +435,7 @@ class TasteHistoryTests(unittest.TestCase):
                 "play_seconds REAL,o_count INTEGER,rating INTEGER,feedback TEXT,last_played REAL);"
                 "CREATE TABLE asset_preference(profile_id TEXT,asset_id INTEGER,liked INTEGER);"
                 "CREATE TABLE entity(id INTEGER PRIMARY KEY,kind TEXT,canonical_name TEXT,normalized_name TEXT);"
+                "CREATE TABLE entity_alias(entity_id INTEGER,alias TEXT);"
                 "CREATE TABLE asset_entity(asset_id INTEGER,entity_id INTEGER);"
             )
             db.execute("INSERT INTO asset VALUES(1,'Alice','Studio',2,600,1,80,NULL,1700000200)")

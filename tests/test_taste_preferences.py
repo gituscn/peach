@@ -20,7 +20,7 @@ class TastePreferenceTests(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
-        self.root = Path(directory.name)
+        self.root = Path(directory.name).resolve()
         self.store = self.root / "history.sqlite"
         self.db = sqlite3.connect(":memory:")
         self.db.row_factory = sqlite3.Row
@@ -51,6 +51,89 @@ class TastePreferenceTests(unittest.TestCase):
         path.write_text(json.dumps([{"url": url, "metadata": {"title": title}, "dt": datetime.fromisoformat(f"2026-10-{day:02d}T00:00:00+00:00").timestamp()}
                                     for day, url, title in visits]), encoding="utf-8")
         import_history_exports([path], self.store, host="test")
+
+    def test_bookmarks_feed_preferences_without_creating_visits_and_removal_clears_evidence(self):
+        from peach.taste_history import build_taste_dashboard, remove_history_source
+        path = self.root / "bookmarks.html"
+        path.write_text('<!DOCTYPE NETSCAPE-Bookmark-file-1><DL><DT><A '
+                        'HREF="https://rule34.xxx/?tags=feet">私有书签标题</A></DL>', encoding="utf-8")
+        first = import_history_exports([path], self.store, host="test")
+        second = import_history_exports([path], self.store, host="test")
+        self.assertEqual((first[0]["added"], second[0]["added"]), (1, 0))
+        strengths, _, evidence = preference_profile(self.db, self.store)
+        self.assertGreater(strengths["tag"][2], 0)
+        self.assertEqual(evidence["tag"][2], ["浏览器书签"])
+        dashboard = build_taste_dashboard(self.store, self.db)
+        self.assertEqual(dashboard["summary"]["history_visits"], 0)
+        self.assertEqual(dashboard["summary"]["bookmarks"], 1)
+        self.assertEqual(dashboard["activity"]["days"], [])
+        self.assertEqual(dashboard["rankings"]["browser_tags"][0]["name"], "feet")
+        self.assertEqual(dashboard["rankings"]["browser_tags"][0]["web_bookmarks"], 1)
+        self.assertEqual(dashboard["rankings"]["browser_tags"][0]["evidence"], ["浏览器书签"])
+        self.assertNotIn("私有书签标题", json.dumps(dashboard, ensure_ascii=False))
+        self.assertNotIn("rule34.xxx/?tags", json.dumps(dashboard))
+        self.assertEqual(build_taste_dashboard(self.store, self.db, since="2026-10-01")["summary"]["bookmarks"], 0)
+        self.assertEqual(remove_history_source(self.store, dashboard["sources"][0]["source_key"]), 1)
+        self.assertFalse(preference_profile(self.db, self.store)[0]["tag"])
+
+    def test_local_bookmark_only_profile_supports_stop_resume_and_snapshot_deletion(self):
+        from peach.taste_browsers import enabled_bookmark_sources
+        from peach.taste_bookmarks import refresh_bookmarks
+        path = self.root / "Chrome" / "Default" / "Bookmarks"
+        path.parent.mkdir(parents=True)
+        def save(children):
+            path.write_text(json.dumps({"roots": {"bookmark_bar": {"children": children}}}), encoding="utf-8")
+        save([{"type": "url", "url": "https://rule34.xxx/?tags=feet", "name": "演示书签", "date_added": "13344473600000000"}])
+        with patch("peach.taste_history.discover_history_sources", return_value=[]):
+            configure_browser(self.store, "add", {"name": "Chrome", "path": str(path.parent.parent)})
+            self.assertEqual(enabled_history_sources(self.store), [])
+            sources = enabled_bookmark_sources(self.store)
+            self.assertEqual(len(sources), 1)
+            self.assertEqual(refresh_bookmarks(sources, self.store)[0]["added"], 1)
+            key = browser_sources(self.store)[0]["id"]
+            self.assertEqual(browser_sources(self.store)[0]["profiles"], 1)
+            configure_browser(self.store, "disable", {"id": key})
+            self.assertEqual(enabled_bookmark_sources(self.store), [])
+            self.assertGreater(preference_profile(self.db, self.store)[0]["tag"][2], 0)
+            configure_browser(self.store, "enable", {"id": key})
+            save([])
+            refresh_bookmarks(enabled_bookmark_sources(self.store), self.store)
+            self.assertFalse(preference_profile(self.db, self.store)[0]["tag"])
+
+    def test_browser_deletion_clears_both_snapshots_and_can_be_added_again(self):
+        from peach.taste_browsers import enabled_bookmark_sources
+        from peach.taste_bookmarks import refresh_bookmarks
+        path = self.root / "Chrome/Default/Bookmarks"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({"roots": {"bar": {"children": [
+            {"type": "url", "url": "https://rule34.xxx/?tags=feet", "name": "恋足"}]}}}), encoding="utf-8")
+        history = path.with_name("History")
+        with closing(sqlite3.connect(history)) as db:
+            db.executescript("CREATE TABLE urls(id INTEGER PRIMARY KEY,url TEXT,title TEXT);"
+                             "CREATE TABLE visits(id INTEGER PRIMARY KEY,url INTEGER,visit_time INTEGER,visit_duration INTEGER);"
+                             "INSERT INTO urls VALUES(1,'https://javdb.com/v/demo','恋足');"
+                             "INSERT INTO visits VALUES(1,1,13344473600000000,0);")
+            db.commit()
+        discovered = [HistorySource("chrome", "Default", history, root=path.parent.parent, engine="chrome")]
+        with patch("peach.taste_history.discover_history_sources", return_value=discovered):
+            key = browser_sources(self.store)[0]["id"]
+            refresh_history(enabled_history_sources(self.store), self.store)
+            refresh_bookmarks(enabled_bookmark_sources(self.store), self.store)
+            self.assertEqual(len(browser_sources(self.store)[0]["source_keys"]), 2)
+            stale_history = enabled_history_sources(self.store)
+            stale_bookmarks = enabled_bookmark_sources(self.store)
+            with patch("peach.taste_browsers.browser_snapshot_keys", return_value=[]):
+                configure_browser(self.store, "delete_browser", {"id": key})
+            refresh_history(stale_history, self.store)
+            refresh_bookmarks(stale_bookmarks, self.store)
+            self.assertEqual(browser_sources(self.store), [])
+            self.assertFalse(preference_profile(self.db, self.store)[0]["tag"])
+            with closing(sqlite3.connect(self.store)) as db:
+                self.assertEqual(db.execute("SELECT count(*) FROM history_source").fetchone()[0], 0)
+            self.assertTrue(history.is_file() and path.is_file())
+            configure_browser(self.store, "add", {"name": "Chrome", "path": str(path.parent.parent)})
+            self.assertEqual(len(enabled_history_sources(self.store)), 1)
+            self.assertEqual(len(enabled_bookmark_sources(self.store)), 1)
 
     def test_collection_accumulates_weak_evidence_and_explicit_watches_are_stronger(self):
         for aid in range(1, 41):
@@ -126,6 +209,41 @@ class TastePreferenceTests(unittest.TestCase):
         strengths, _, evidence = preference_profile(self.db, self.store)
         self.assertIn(1, strengths["performer"])
         self.assertEqual(evidence["performer"][1], ["浏览记录"])
+
+    def test_titles_and_urls_share_content_and_identity_evidence(self):
+        from peach.taste_history import build_taste_dashboard
+        self.history([(1, "https://javdb.com/v/abc123", "演示女优 演示厂牌 演示系列 足フェチ"),
+                      (2, "https://rule34.xxx/?tags=feet+foot_fetish", "Foot Fetish 恋足")])
+        bookmark = self.root / "bookmarks.html"
+        bookmark.write_text('<!DOCTYPE NETSCAPE-Bookmark-file-1><DL><DT><A '
+                            'HREF="https://javbus.com/ABC-123">演示女优 demo_actor 演示厂牌 演示系列 足フェチ 制服</A></DL>', encoding="utf-8")
+        import_history_exports([bookmark], self.store)
+        strengths, _, evidence = preference_profile(self.db, self.store)
+        for kind, eid in (("performer", 1), ("tag", 2), ("studio", 3), ("series", 4)):
+            self.assertGreater(strengths[kind][eid], 0)
+            self.assertEqual(evidence[kind][eid], ["浏览记录", "浏览器书签"])
+        dashboard = build_taste_dashboard(self.store, self.db)
+        self.assertEqual(dashboard["summary"]["history_visits"], 2)
+        self.assertEqual(dashboard["summary"]["bookmarks"], 1)
+        self.assertEqual(sum(row["web_visits"] for row in dashboard["rankings"]["browser_tags"]), 4)
+        row = dashboard["rankings"]["performers"][0]
+        self.assertEqual((row["web_visits"], row["web_bookmarks"]), (2, 1))
+
+    def test_title_genres_use_boundaries_context_and_longest_terms(self):
+        adult = "https://javdb.com/v/abc123"
+        self.assertEqual(_url_candidates(adult, "生放送会場 Metro Platform Oral History")[1], set())
+        self.assertEqual(_url_candidates(adult, "ANAL SEX 足フェチ 中出し 制服")[1],
+                         {"肛交", "恋足", "中出内射", "制服"})
+        self.assertEqual(_url_candidates(adult, "ＡＳＭＲ 深喉")[1], {"ASMR", "深喉"})
+        self.assertEqual(_url_candidates("https://unknown.example/1", "Foot Fetish")[1], set())
+        self.assertEqual(_url_candidates("https://x.com/demo/status/1", "Foot Fetish")[1], set())
+        self.assertEqual(_url_candidates("https://x.com/demo/status/1", "NSFW Foot Fetish")[1], {"恋足"})
+        self.assertEqual(_url_candidates("https://rule34.xxx/?tags=feet+foot_fetish", "恋足 Foot Fetish")[1], {"feet"})
+        self.assertEqual(_url_candidates("https://rule34.xxx/?tags=feet+-cosplay", "feet -cosplay")[1], {"feet"})
+
+    def test_unreadable_private_history_does_not_supply_browser_preferences(self):
+        self.store.write_bytes(b"not a SQLite database")
+        self.assertFalse(any(preference_profile(self.db, self.store)[0].values()))
 
     def test_disliked_assets_do_not_provide_collection_or_watch_evidence(self):
         self.asset(1, played=12, feedback="dislike")

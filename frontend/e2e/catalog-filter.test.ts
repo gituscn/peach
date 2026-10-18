@@ -93,6 +93,31 @@ describe('首页筛选条', () => {
   before(async () => { browser = await launch(); });
   after(async () => { await browser?.close(); });
 
+  it('少量筛选项与右侧操作按容器宽度同行或分行', { timeout: 60_000 }, async () => {
+    const opened = await openHome(browser);
+    const { page } = opened;
+    try {
+      await page.route((url) => url.pathname === '/api/facets', async route => {
+        const response = await route.fetch();
+        await route.fulfill({ json: { ...await response.json(), tags: TAGS.slice(0, 1) } });
+      });
+      await page.setViewportSize({ width: 1920, height: 900 });
+      await page.reload(); await settle(page);
+      const frame = page.locator(`${FILTER} [data-catalog-frame]`);
+      await frame.locator('[data-catalog-tag]').first().waitFor();
+      await page.locator(`${FILTER} [data-catalog-frame][data-single-row]`).waitFor();
+      const wide = await frame.evaluate(element => {
+        const top = element.querySelector('[data-filter-row="top"]')!.getBoundingClientRect();
+        const bottom = element.querySelector('[data-filter-row="bottom"]')!.getBoundingClientRect();
+        return { same: Math.abs(top.y - bottom.y) < 2, after: bottom.x >= top.right - 2 };
+      });
+      assert.deepEqual(wide, { same: true, after: true });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.locator(`${FILTER} [data-catalog-frame]:not([data-single-row])`).waitFor();
+      assert.ok((await layout(page)).scrollWidth <= 390);
+    } finally { await opened.close(); }
+  });
+
   for (const viewport of [DESKTOP, PHONE]) {
     it(`${viewport.name} 筛选条件与作品卡片悬停面保持间距`, { timeout: 60_000 }, async () => {
       const opened = await openHome(browser, '/?studio=Peach%20Studio', viewport);

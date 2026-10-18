@@ -153,11 +153,14 @@ class BackgroundJobTaskRunTests(unittest.TestCase):
         job = self.job()
         release = threading.Event()
         job.start(lambda job_id: release.wait(5))
+        first_thread = job.thread
         first_id = job.snapshot()["run_id"]
         job.update(job.snapshot()["job_id"], status="complete")
         job.start(lambda job_id: job.update(job_id, status="complete"), restart=True)
         release.set()
+        first_thread.join(5)
         job.thread.join(5)
+        self.assertFalse(first_thread.is_alive())
         self.assertEqual(self.store.get(first_id).status, "succeeded")
         self.assertEqual(len(self.store.query(status="active")), 0)
 

@@ -17,7 +17,7 @@ import type { ChangeEvent } from 'react';
 import {
   RiArrowDownSLine, RiArrowRightSLine, RiCompassLine, RiDatabase2Line, RiDeleteBinLine,
   RiEyeLine, RiHistoryLine, RiPriceTag3Line, RiSearchLine, RiThumbDownLine,
-  RiThumbUpLine, RiUploadLine,
+  RiThumbUpLine, RiUploadLine, RiBookmarkLine,
 } from '@remixicon/react';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { Popover, Tab, TabPanel, Tabs } from 'react-aria-components';
@@ -52,7 +52,7 @@ import { Disclosure } from '../settings/section';
 import { busyProps } from '../settings/use-action';
 import { ActivityHeat } from '../charts/heat-card';
 import { CreatorSankey, RankedBars, TasteRadar } from './charts';
-import { BrowserSources } from './browser-sources';
+import { BrowserSources, SOURCE_TILE } from './browser-sources';
 import {
   DEFAULT_WINDOW, fetchTaste, fetchTasteJob, historySpan, IDLE_POLL_MS, importTasteExport, radarRows,
   rankDetail, rankShares, removeTasteSource, startTasteRefresh, tasteDate, tasteDimensions, tasteHours,
@@ -68,7 +68,7 @@ const CARD = `${cardClass()} flex flex-col gap-4`;
 const TILE = 'rounded-xl bg-background-primary-default p-3';
 
 /* 中文正文写成常量：JSX 里换行的文字会在接缝处多出一个空格，中文句子里看得见。 */
-const REFRESH_TITLE = '读取运行 Peach 的这台电脑上的浏览记录';
+const REFRESH_TITLE = '读取运行 Peach 的这台电脑上的浏览历史与书签';
 const NO_SOURCE_HINT = '导入或读取浏览记录后，这里会列出已采集设备。';
 const NO_LEAD_HINT = '馆藏里暂时没有对得上浏览信号的标签。';
 const NO_CATEGORY_HINT = '采集浏览记录后，这里会显示聚合后的口味证据。';
@@ -79,8 +79,8 @@ const NO_DOMAIN_HINT = '采集浏览记录后，这里会列出常访问的网�
 const NO_PEACH_TAG_HINT = '在 Peach 里播放或评价作品后，这里会列出对应的标签。';
 const NO_PEACH_CREATOR_HINT = '在 Peach 里播放或评价作品后，这里会列出对应的创作者。';
 const NO_PEACH_PERFORMER_HINT = '在 Peach 里播放或评价作品后，这里会列出对应的女优。';
-const GUIDE_LOCAL = '在运行 Peach 的电脑上使用浏览器：点上面的「读取浏览器历史」。';
-const GUIDE_REMOTE = '记录在其他设备上：导出文件后，点上面的「导入历史文件」。多台设备的文件分别导入。';
+const GUIDE_LOCAL = '在运行 Peach 的电脑上使用浏览器：点上面的「读取浏览器记录」。';
+const GUIDE_REMOTE = '记录在其他设备上：导出文件后，选择「导入历史文件」或「导入书签文件」。书签支持浏览器导出的 HTML 文件和 Chromium Bookmarks JSON 文件。';
 const GUIDE_REFRESH = '需要刷新时再次读取或导入；数据源可在页面底部移除。';
 const REMOVE_BODY = '删除这个来源的已导入记录，原始文件保留。若浏览器仍启用，下次读取会再次导入。';
 
@@ -90,11 +90,12 @@ export const TASTE_GUIDE_KEY = 'peach-taste-guide-dismissed';
 type Glyph = typeof RiEyeLine;
 
 /** 一格读数：一个名字、一个大数、一句它的来历。和统计页的读数卡是同一张卡。 */
-function SummaryCard({ icon: Icon, term, figure, detail, accent }:
-{ icon: Glyph; term: string; figure: string; detail?: string; accent: number }) {
+function SummaryCard({ icon: Icon, term, figure, detail, detailTitle, accent }:
+{ icon: Glyph; term: string; figure: string; detail?: string; detailTitle?: string; accent: number }) {
   return (
     <div className={statCardClass()}>
-      <StatCard label={term} icon={Icon} accent={accent} figure={figure} footer={detail ?? ''} />
+      <StatCard label={term} icon={Icon} accent={accent} figure={figure}
+        footer={<span className="block min-w-0 truncate" title={detailTitle || detail}>{detail ?? ''}</span>} />
     </div>
   );
 }
@@ -312,8 +313,8 @@ function HistoryGuide({ onboarding, done }: { onboarding: boolean; done: boolean
  *
  *  菜单第一项和左边那颗同名同事——键盘和读屏用户只走菜单这一条路，少列一项就是少一个动作。 */
 function HistoryActions(
-  { busy, onRefresh, onImport }:
-  { busy: boolean; onRefresh(): void; onImport(): void },
+  { busy, onRefresh, onImport, onImportBookmarks }:
+  { busy: boolean; onRefresh(): void; onImport(): void; onImportBookmarks(): void },
 ) {
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -322,7 +323,7 @@ function HistoryActions(
     <>
       <span data-button-group data-split-button data-variant="primary">
         <Button leadingIcon={RiCompassLine} title={REFRESH_TITLE} onClick={onRefresh} {...busyProps(busy)}>
-          读取浏览器历史
+          读取浏览器记录
         </Button>
         <Button ref={trigger} iconOnly leadingIcon={RiArrowDownSLine}
           aria-label="更多取得浏览记录的方式" aria-haspopup="dialog" aria-expanded={open}
@@ -332,10 +333,13 @@ function HistoryActions(
         placement="bottom end" offset={4} className={MENU_POPOVER_SURFACE}>
         <Dialog aria-label="更多取得浏览记录的方式" className="flex w-52 flex-col gap-1 outline-none">
           <button type="button" className={MENU_ROW} onClick={() => pick(onRefresh)}>
-            <RiCompassLine aria-hidden className="size-4 shrink-0" />读取浏览器历史
+            <RiCompassLine aria-hidden className="size-4 shrink-0" />读取浏览器记录
           </button>
           <button type="button" className={MENU_ROW} onClick={() => pick(onImport)}>
             <RiUploadLine aria-hidden className="size-4 shrink-0" />导入历史文件
+          </button>
+          <button type="button" className={MENU_ROW} onClick={() => pick(onImportBookmarks)}>
+            <RiBookmarkLine aria-hidden className="size-4 shrink-0" />导入书签文件
           </button>
         </Dialog>
       </Popover>
@@ -345,8 +349,8 @@ function HistoryActions(
 
 /** 已采集设备。移除只影响分析，原始导出文件仍在本机。 */
 function SourceList(
-  { sources, window: range, toast }:
-  { sources: NonNullable<TasteData['sources']>; window: string } & Pick<TasteProps, 'toast'>,
+  { sources, browsers, window: range, toast }:
+  { sources: NonNullable<TasteData['sources']>; browsers: NonNullable<TasteData['browsers']>; window: string } & Pick<TasteProps, 'toast'>,
 ) {
   const remove = useMutation({
     mutationFn: (sourceKey: string) => removeTasteSource(sourceKey, range),
@@ -357,14 +361,13 @@ function SourceList(
     },
   });
   return (
-    <section className={CARD} aria-label="数据源">
-      <h3 className="text-title-2-medium text-text-primary">数据源</h3>
-      {remove.error ? <Note tone="error">{errorMessage(remove.error)}</Note> : null}
+    <BrowserSources browsers={browsers} sources={sources} range={range}>
+      {remove.error ? <div className="sm:col-span-2"><Note tone="error">{errorMessage(remove.error)}</Note></div> : null}
       {sources.length ? (
-        <div className="inline-grid w-full gap-2 sm:grid-cols-2">
-          {sources.map((source) => (
-            <div key={source.source_key}
-              className={`flex min-w-0 items-center gap-3 ${TILE}`}>
+        <>
+          {sources.filter(source => !browsers.some(browser => browser.source_keys?.includes(source.source_key))).map((source) => (
+            <div key={source.source_key} data-taste-source="import"
+              className={SOURCE_TILE}>
               <span className="inline-grid size-8 shrink-0 place-items-center rounded-lg text-text-secondary">
                 {source.browser === 'browserexport'
                   ? <RiUploadLine aria-hidden className="size-4" />
@@ -373,7 +376,7 @@ function SourceList(
               <span className="flex min-w-0 grow flex-col gap-0.5">
                 <b className="min-w-0 text-body-2-medium break-words text-text-primary">{source.profile}</b>
                 <small className="min-w-0 text-caption-1-regular break-words text-text-secondary">
-                  {`${source.browser} · ${source.host} · ${Number(source.visits || 0).toLocaleString()} 条`}
+                  {`导入文件 · ${source.host} · ${Number(source.visits || source.bookmarks || 0).toLocaleString()} ${source.bookmarks ? '枚书签' : '条历史'}`}
                 </small>
               </span>
               <Button variant="secondary" size="small" aria-label={`移除 ${source.profile}`} className="shrink-0"
@@ -387,9 +390,9 @@ function SourceList(
                 }} />
             </div>
           ))}
-        </div>
-      ) : <EmptyState shell="plain" icon={RiDatabase2Line} title="还没有数据源">{NO_SOURCE_HINT}</EmptyState>}
-    </section>
+        </>
+      ) : !browsers.length ? <EmptyState shell="plain" icon={RiDatabase2Line} title="还没有数据源">{NO_SOURCE_HINT}</EmptyState> : null}
+    </BrowserSources>
   );
 }
 
@@ -398,6 +401,7 @@ export function TastePage(props: TasteProps) {
   const [range, setRange] = useState(DEFAULT_WINDOW);
   const [evidence, setEvidence] = useState('browser');
   const file = useRef<HTMLInputElement>(null);
+  const bookmarkFile = useRef<HTMLInputElement>(null);
 
   const taste = useQuery({
     queryKey: tasteKey(range),
@@ -484,10 +488,13 @@ export function TastePage(props: TasteProps) {
               {TASTE_WINDOWS.map(([key, name]) => <SelectItem key={key} id={key}>{name}</SelectItem>)}
             </Select>
             <HistoryActions busy={running || refresh.isPending || load.isPending}
-              onRefresh={startRefresh} onImport={() => file.current?.click()} />
+              onRefresh={startRefresh} onImport={() => file.current?.click()}
+              onImportBookmarks={() => bookmarkFile.current?.click()} />
             {/* 原生文件选择器长相不可控，按钮归 BoardUI，输入框只留着接文件。 */}
             <input ref={file} type="file" tabIndex={-1} aria-hidden className="hidden"
               onChange={pickFile} />
+            <input ref={bookmarkFile} type="file" tabIndex={-1} aria-hidden className="hidden"
+              data-bookmark-import onChange={pickFile} />
           </div>
         </div>
         <HistoryGuide onboarding={onboarding}
@@ -496,7 +503,7 @@ export function TastePage(props: TasteProps) {
         <div aria-live="polite" className="flex flex-col gap-3 empty:hidden">
           {running ? <TaskProgress label={job?.message || '正在读取浏览记录并更新口味分析'}
             value={job?.checked} total={job?.total} /> : null}
-          {load.isPending ? <TaskProgress label="正在导入历史文件" /> : null}
+          {load.isPending ? <TaskProgress label="正在导入口味数据" /> : null}
           {problem ? <Note tone="error">{problem}</Note> : null}
           {outcome?.warnings?.length ? <Note tone="warning">{outcome.warnings.join('；')}</Note> : null}
         </div>
@@ -504,12 +511,13 @@ export function TastePage(props: TasteProps) {
           <div className={STAT_STRIP}>
             <SummaryCard accent={0} icon={RiHistoryLine} term="浏览记录"
               figure={Number(summary.history_visits || 0).toLocaleString()}
-              detail={historySpan(summary)} />
+              detail={historySpan(summary)} detailTitle={`${tasteDate(summary.range_start)}—${tasteDate(summary.range_end)}`} />
             <SummaryCard accent={1} icon={RiPriceTag3Line} term="口味维度"
               figure={categories.length.toLocaleString()} detail={categories[0]?.name || '尚无主维度'} />
             <SummaryCard accent={2} icon={RiSearchLine} term="浏览候选" figure={gaps.length.toLocaleString()} />
-            <SummaryCard accent={3} icon={RiDatabase2Line} term="私有导出"
-              figure={Number(storage.exports || 0).toLocaleString()} detail={fmtSize(storage.bytes || 0)} />
+            <SummaryCard accent={3} icon={RiBookmarkLine} term="浏览器书签"
+              figure={Number(summary.bookmarks || 0).toLocaleString()}
+              detail={`${Number(storage.exports || 0).toLocaleString()} 份私有导出 · ${fmtSize(storage.bytes || 0)}`} />
           </div>
           {/* 维度不足三个画不成雷达：左栏只留标题与更新时间，排行条占满整张卡。 */}
           <section className={radar ? `${CARD} md:flex-row md:gap-6` : CARD} aria-label="浏览器画像">
@@ -573,8 +581,7 @@ export function TastePage(props: TasteProps) {
         </TabPanel>
       </Tabs>
       <AnalysisCard data={data} onSignal={onSignal} navigate={navigate} />
-      <SourceList sources={data.sources || []} window={range} toast={toast} />
-      <BrowserSources browsers={data.browsers || []} range={range} />
+      <SourceList sources={data.sources || []} browsers={data.browsers || []} window={range} toast={toast} />
     </Page>
   );
 }
