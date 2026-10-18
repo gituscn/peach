@@ -19,13 +19,15 @@ from . import __version__
 
 FIELDS = {
     "usage": "Peach 版本、操作系统类型；每天最多一次，不含安装标识。",
-    "errors": "Peach 版本、系统类型、Python 版本、CPU 架构、故障环节、异常链、Peach 代码文件名/函数名/行号、结构化错误码、媒体工具故障类别、HTTP 方法/路由模板/关联错误编号；每天最多 20 条，同类错误每天一次。",
+    "errors": "Peach 版本、系统类型、Python 版本、CPU 架构、故障环节、异常链、Peach 代码文件名/函数名/行号、结构化错误码、媒体工具故障类别、HTTP 方法/路由模板/关联错误编号、同类故障次数与统计日期；首次立即上传，重复次数每小时或退出时合并，每天最多 20 批。",
 }
 NOTICE = "发送至 Sentry。不上报错误原文、完整日志、诊断 ZIP、媒体名称、路径、网址、观看记录或凭据。接收服务会接触连接 IP；关闭后停止新发送，已发送的信息无法撤回。"
 _lock = threading.RLock()
 _client = None
 _client_dsn = ""
 _disabled = False
+_frequency_timer = None
+_frequency_configs = {}
 MEDIA_STAGES = frozenset({"frame-capture", "frame-tile", "media-probe", "preview", "library-preview"})
 LOCAL_EXCEPTION_TYPES = frozenset({
     ("asyncio.exceptions", "CancelledError"), ("concurrent.futures._base", "CancelledError"),
@@ -109,6 +111,8 @@ def save(body, config=None):
     config = _config(config)
     payload["revision"] = uuid.uuid4().hex
     atomic_write_text(config.directory("state") / "remote-reporting.json", json.dumps(payload))
+    from . import diagnostic_frequency
+    diagnostic_frequency.clear(config)
     return snapshot(config)
 
 
@@ -177,9 +181,55 @@ def _new_client(target, *, envelope_gate=None):
                   before_send=final_event)
 
 
-def send(kind, event, config=None):
-    """发送失败不影响应用；关闭时不初始化 SDK，也不生成补传文件。"""
+def _submit(kind, event, config, current, target):
     global _client, _client_dsn
+    with _lock:
+        if _client is None or _client_dsn != target:
+            if _client is not None:
+                _client.close(timeout=0)
+            _client, _client_dsn = _new_client(target), target
+        return _client.capture_event({**event, "platform": "python",
+            "extra": {"consent": str(config.directory("state") / "remote-reporting.json"),
+                      "kind": kind, "revision": current["revision"]}})
+
+
+def _schedule_frequency(config):
+    global _frequency_timer
+    with _lock:
+        _frequency_configs[str(config.directory("state"))] = config
+        if _frequency_timer is None:
+            _frequency_timer = threading.Timer(60, _frequency_tick)
+            _frequency_timer.daemon = True
+            _frequency_timer.start()
+
+
+def _frequency_tick():
+    global _frequency_timer
+    with _lock:
+        _frequency_timer = None
+        configs = list(_frequency_configs.values())
+    for config in configs:
+        flush_counts(config)
+    with _lock:
+        if _frequency_configs and not _disabled:
+            _schedule_frequency(next(iter(_frequency_configs.values())))
+
+
+def flush_counts(config=None, *, force=False):
+    try:
+        from . import diagnostic_frequency
+        config = _config(config)
+        current, target = consent(config), dsn()
+        if _disabled or not current["errors"] or not target:
+            return
+        diagnostic_frequency.flush(config, current["revision"],
+            lambda event: _submit("errors", event, config, current, target), force=force)
+    except Exception:
+        pass
+
+
+def send(kind, event, config=None):
+    """发送失败不影响应用；技术诊断按同意版本聚合，关闭时不初始化 SDK。"""
     if _disabled:
         return
     try:
@@ -188,16 +238,14 @@ def send(kind, event, config=None):
         target = dsn()
         if kind not in FIELDS or not current[kind] or not target:
             return
-        if not _reserve(config, kind, {**event, "release": __version__}):
-            return
-        with _lock:
-            if _client is None or _client_dsn != target:
-                if _client is not None:
-                    _client.close(timeout=0)
-                _client, _client_dsn = _new_client(target), target
-            _client.capture_event({**event, "release": __version__, "platform": "python",
-                "extra": {"consent": str(config.directory("state") / "remote-reporting.json"),
-                          "kind": kind, "revision": current["revision"]}})
+        event = {**event, "release": __version__}
+        if kind == "errors":
+            from . import diagnostic_frequency
+            diagnostic_frequency.record(config, current["revision"], event,
+                lambda batch: _submit(kind, batch, config, current, target))
+            _schedule_frequency(config)
+        elif _reserve(config, kind, event):
+            _submit(kind, event, config, current, target)
     except Exception:
         # 不能把遥测自身故障写回错误钩子而递归发送。
         pass
@@ -205,6 +253,12 @@ def send(kind, event, config=None):
 
 def usage(config=None):
     send("usage", {"message": "Peach started", "level": "info", "tags": {"os": platform.system()}}, config)
+    flush_counts(config)
+    try:
+        if not _disabled and consent(config)["errors"] and dsn():
+            _schedule_frequency(_config(config))
+    except Exception:
+        pass
 
 
 def _http_status(error):
@@ -374,8 +428,12 @@ def disable_for_process():
 
 
 def close():
-    global _client, _client_dsn
+    global _client, _client_dsn, _frequency_timer
     with _lock:
+        if _frequency_timer is not None:
+            _frequency_timer.cancel()
+        _frequency_timer = None
+        _frequency_configs.clear()
         if _client is not None:
             _client.close(timeout=0)
         _client, _client_dsn = None, ""
@@ -383,6 +441,10 @@ def close():
 
 def _shutdown():
     try:
+        with _lock:
+            configs = list(_frequency_configs.values())
+        for config in configs:
+            flush_counts(config, force=True)
         with _lock:
             if _client is not None:
                 _client.flush(timeout=1)
