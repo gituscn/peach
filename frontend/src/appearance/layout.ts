@@ -18,9 +18,7 @@ export const PHOTO_SIZES: readonly [big: Choice, small: Choice] = [
 export const PHOTO_LAYOUTS: readonly (readonly [value: string, label: string, icon: string])[] = [
   ['fixed', '固定比例', 'layout-grid'], ['masonry', '瀑布流', 'columns-2'],
 ];
-/* 大图卡片的容器比例。0.75 比
-   最宽的那张还宽：683 张一张都不用从左边切，全部居中摆，两侧保持卡片纯色底，每边
-   中位 3.1%、最大 5.6%。取 0.72 会让 10 张被切掉最多 3.8%，取 0.76 同样一张不切但留白到每边中位 3.7%。 */
+/* 大图卡片固定为 3:4；传统正封完整居中，比例留白使用同图模糊补底，整幅大封按主体取景。 */
 export const COVER_FRONT_RATIO = 0.75;
 
 type LayoutSettings = Pick<AppSettings, 'javLayout' | 'homeLayout' | 'photoSize' | 'photoLayout' | 'javImage'>;

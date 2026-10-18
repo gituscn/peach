@@ -90,7 +90,7 @@
 /* 取景：正封模式下，整张封套要把镜头推到右半边；本身就是竖版正封的则整张用；
    16:9 官方剧照没有「正封那一块」，只能按人脸取。
    判据是图片自己的宽高比，由 onload 写进 data-frame。
-   封面本身不垫底色，比例差异处由 `.pic` 的纯色底承接，圆角边缘保持同一底色。 */
+   封面本身不垫底色，传统正封的比例留白由容器的同图模糊底承接，整幅大封使用纯色底。 */
 .poster.cover{width:100%;height:100%;object-fit:cover;display:block;background:none}
 /* --cover-x / --cover-y 都由人脸检出写入。哪个轴生效取决于容器和图片谁更竖：
    `object-fit:cover` 只裁一个轴，另一个轴的锚点是死值。 */
@@ -108,7 +108,7 @@
 .poster.cover.front[data-frame="front"]{object-fit:contain;object-position:50% 50%}
 /* 剧照比大图容器宽得多，裁的是横向，所以横向锚点必须跟着人走。没检出时回落
    居中：那是取不到人脸时唯一站得住的猜测。 */
-/* 整张放进卡片，比例不同处保留卡片纯色底。 */
+/* 整张放进卡片，传统封面的比例留白由容器补底。 */
 .poster.cover.whole{object-fit:contain;object-position:50% 50%}
 /* 整幅画面按人脸取景并铺满卡片。 */
 .poster.cover.front[data-frame="still"]{
