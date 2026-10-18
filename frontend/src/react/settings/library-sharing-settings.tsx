@@ -50,12 +50,12 @@ export function LibrarySharingSettings({ initial, receipt }: {
     </SettingsRow></Rows>
     {!value.available ? <Stack divided><Help>上传服务未配置。</Help></Stack> : null}
     {value.enabled && value.last_attempt?.status === 'failed'
-      ? <Stack divided><ErrorText>馆藏与口味上传失败，下周自动重试。</ErrorText></Stack> : null}
+      ? <Stack divided><ErrorText>馆藏与口味上传失败，自动重试。</ErrorText></Stack> : null}
     {reviewing ? <Stack divided>
       <ul className="list-disc space-y-2 pl-5 text-body-2-regular text-text-secondary">
         {value.fields.map((field) => <li key={field}>{field}</li>)}
       </ul>
-      <Help>不含账号、设备或安装标识、文件路径、媒体、网址和逐条浏览记录；明细仍可能关联或被再识别。关闭可停止后续发送，已发送的数据无法通过本机开关撤回。</Help>
+      <Help>不含账号、设备、文件路径和浏览器历史记录等个人数据。</Help>
     </Stack> : null}
     {preview ? <Stack divided>
       <Help>当前预览包含 {preview.data.library.length} 部作品，约 {(preview.bytes / 1024).toFixed(1)} KiB。</Help>
@@ -69,7 +69,7 @@ export function LibrarySharingSettings({ initial, receipt }: {
       </Disclosure>
       {previewText.length > 24000 ? <Help>屏幕显示前 24,000 个字符，下载可查看完整内容。</Help> : null}
       <Button variant="secondary" onClick={downloadPreview}>下载完整预览</Button>
-      {!value.enabled ? <Checkbox isSelected={accepted} onChange={setAccepted}>我已查看字段与预览，接受关联风险，同意每周上传馆藏与口味明细</Checkbox> : null}
+      {!value.enabled ? <Checkbox isSelected={accepted} onChange={setAccepted}>我已查看字段与预览，同意上传馆藏与口味明细</Checkbox> : null}
     </Stack> : null}
     {action.error ? <Stack divided><ErrorText>{action.error}</ErrorText></Stack> : null}
     <Footer>

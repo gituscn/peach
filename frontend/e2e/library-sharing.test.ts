@@ -48,7 +48,7 @@ describe('馆藏与口味分享', () => {
       const posts: Record<string, unknown>[] = [];
       const state = { enabled: false, available: true, schema: 3,
         fields: ['作品编号、标签、人物、评分与全部偏好维度'],
-        notice: '每周上传馆藏与各类偏好明细，用于群体研究；移除直接标识，仍可能关联，接收服务可见 IP。' };
+        notice: '匿名处理后上传馆藏与各类偏好明细。' };
       const opened = await visit(browser, '/settings/library?section=' + encodeURIComponent('应用与维护'), viewport,
         async page => {
           await page.route('**/api/configuration', async route => {
@@ -92,6 +92,14 @@ describe('馆藏与口味分享', () => {
         await region.getByRole('button', { name: '同意并开启上传', exact: true }).click();
         await settle(page);
         assert.deepEqual(posts[0], { enabled: true, schema: 3, consent: true, preview_token: 'preview-token' });
+        assert.equal(await preview.count(), 0, '同意后收起数据预览');
+        assert.equal(await region.getByRole('checkbox').count(), 0, '同意后收起同意框');
+        assert.equal(await region.getByText(state.fields[0], { exact: true }).count(), 0, '同意后收起字段明细');
+        assert.equal(await toggle.isChecked(), true);
+        await region.getByRole('button', { name: '预览上传内容', exact: true }).click();
+        await preview.waitFor();
+        assert.equal(posts.length, 1, '查看预览不重复保存同意');
+        assert.equal(await region.getByRole('checkbox').count(), 0, '已开启时查看预览不重复要求同意');
         await toggle.focus();
         await toggle.press('Space');
         await settle(page);
