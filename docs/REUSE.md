@@ -1,5 +1,9 @@
 # 复用清单
 
+## GitHub 项目看板
+
+看板同步复用 GitHub CLI 的已登录认证、GraphQL Projects API 和 Git 的提交祖先校验；不新增 Python 依赖。官方 [Projects Actions 自动化](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/automating-projects-using-actions)支持独立项目凭据，仓库默认令牌不能写组织 Project。项目原生状态工作流没有发布标签与制品归属判定；通用自动加卡 Action 也不覆盖验收和发布的分别记录，因此由 `scripts/project_board.py` 保留 Peach 的状态规则，传输与认证交给系统已安装的 `gh`。运行依赖是官方维护、MIT 许可的 GitHub CLI 和 GPL-2.0 Git，使用 GitHub 托管 runner 内置版本；本机只读 GraphQL 与标签祖先验证后再应用。无生产服务、ledger 或媒体写入。
+
 ## JAV 用户脚本添加
 
 用户脚本模板 `web/integrations/peach-jav.user.js`（0.2.0）使用 [Tampermonkey 官方 GM API](https://www.tampermonkey.net/documentation.php) 的本机存储、菜单与 `GM_xmlhttpRequest`；SPA 通知依据 `window.onurlchange` 契约。`jav-sites.json` 集中登记站点、域名、详情规则、明确字段和作品参数，安装端点生成 `@match` 与脚本运行规则，设置页读取同一份清单。脚本独立编写，不复制第三方源码、不新增依赖。宿主扩展由用户安装，兼容性以实际浏览器及脚本管理器授权为准；本轮通过模拟 GM API 的真实 Chromium 页面验证，真实扩展安装及源站页面验收未取得。

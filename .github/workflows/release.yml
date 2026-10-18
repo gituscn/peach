@@ -256,3 +256,18 @@ jobs:
           cd release
           sha256sum ./*.zip ./*-setup.exe > SHA256SUMS.txt
           gh release create "$GITHUB_REF_NAME" ./*.zip ./*-setup.exe SHA256SUMS.txt --verify-tag --prerelease --title "Peach $VERSION · Windows 测试版" --notes-file RELEASE_NOTES.md
+
+  project-board:
+    name: 同步已发布版本到看板
+    if: github.ref_type == 'tag'
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: 请求项目看板同步
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run project-board.yml --ref master

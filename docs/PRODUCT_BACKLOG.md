@@ -2,11 +2,11 @@
 
 最后核验：2026-10-07。这里只记还没做完的需求和待执行的操作；做完就删，历史去 Git 查。运行数字以 `peach-data/state/job-status.md` 的自动区块为准。
 
-当前开发与版本范围见 [Peach 开发进度](https://github.com/orgs/peach-mitao/projects/6)；本文件保留资料复核、运维等待条件与长期待办。
+当前开发与版本范围见 [Peach 项目看板](https://github.com/orgs/peach-mitao/projects/6)，关联与自动同步方式见[项目看板与交付关联](PROJECT_BOARD.md)；本文件保留资料复核、运维等待条件与长期待办。
 
 ## 功能验收与范围
 
-- [#65 115 历史导入](https://github.com/peach-mitao/peach/issues/65)：本机真实 `HistoryEx` 的发现、读取与去重已验收；待修复版本发布后由报告者复测。目录与格式范围见[浏览器历史导入](BROWSER_HISTORY.md)。
+- [#65 115 历史导入](https://github.com/peach-mitao/peach/issues/65)：本机真实 `HistoryEx` 的发现、读取与去重已验收，修复已随 v0.43.0 发布，等待报告者复测。目录与格式范围见[浏览器历史导入](BROWSER_HISTORY.md)。
 
 - #61 的 OneDrive、光鸭与通用挂载来源待真实账号验收；#62 的真实 STRM 上游兼容性待补，合成 HTTP Range 与 HLS 回归在隔离环境验证。
 - [#63 Emby／Jellyfin 兼容](https://github.com/peach-mitao/peach/issues/63)待明确目标客户端、认证、媒体库查询、播放与进度接口范围。
