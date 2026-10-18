@@ -49,6 +49,21 @@ class DiscoveryMetadata:
         self.last_job = None
         self.records = OrderedDict()
         self._load()
+        self.job_path = self.path.with_suffix('.job.json')
+        try:
+            saved = json.loads(self.job_path.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            saved = {}
+        if saved.get('status') == 'running':
+            self.ensure(saved.get('codes') or [], _resume=saved)
+        elif saved.get('job_id'):
+            self.last_job = saved
+
+    def _save_job(self):
+        with self.lock:
+            state = self.job.snapshot()
+            if state:
+                atomic_write_text(self.job_path, json.dumps(state, ensure_ascii=False))
 
     def _load(self):
         try:
@@ -104,8 +119,13 @@ class DiscoveryMetadata:
             return movie, {"metadata_state": state, "metadata_fields": fields,
                            "metadata_message": record.get("error", ""), "metadata_checked_at": record.get("checked_at")}
 
-    def ensure(self, codes, *, refresh=False, job_id=None):
-        snapshot = self.job.snapshot() or self.last_job
+    def ensure(self, codes, *, refresh=False, job_id=None, _resume=None):
+        snapshot = None if _resume else self.job.snapshot() or self.last_job
+        if _resume:
+            refresh = bool(_resume.get('refresh'))
+        successful = set((_resume or {}).get('completed_codes') or [])
+        attempted = set((_resume or {}).get('attempted_codes') or [])
+        failures = set((_resume or {}).get('failed_codes') or [])
         # 同一页的轮询只观察固定集合，完成后不会自行领下一批。
         if snapshot and (snapshot["status"] == "running" or
                          (not refresh and snapshot.get('status') != 'complete')):
@@ -114,19 +134,25 @@ class DiscoveryMetadata:
             codes = snapshot['codes']
         codes = list(dict.fromkeys(normalise_code_key(code) for code in codes if code))[:MAX_ITEMS]
         with self.lock:
-            pending = [code for code in codes if self.records.get(code, {}).get('retry_after', 0) <= self.clock()
+            pending = [code for code in codes if code not in successful and self.records.get(code, {}).get('retry_after', 0) <= self.clock()
                        and (refresh or not cache_fresh(self.records.get(code, {}).get('checked_at', -1),
                                            self.records.get(code, {}).get('movie', {}).get('release_date'), self.clock()))]
         if snapshot and not pending:
             return snapshot
         budget = PublicRequestBudget()
-        initial = {"total": len(codes), "completed": len(codes) - len(pending), "failed": 0,
-                   "requests": 0, "bytes": 0, "stop_reason": "", "codes": codes,
+        budget.requests = (_resume or {}).get('requests', 0)
+        budget.bytes = (_resume or {}).get('bytes', 0)
+        previous_elapsed = (_resume or {}).get('active_seconds', 0)
+        budget.max_seconds = max(0, budget.max_seconds - previous_elapsed)
+        started = time.monotonic()
+        initial = {"total": len(codes), "completed": (_resume or {}).get('completed', len(codes) - len(pending)),
+                   "failed": len(failures), 'refresh': refresh,
+                   "requests": budget.requests, "bytes": budget.bytes, "stop_reason": "", "codes": codes,
                    "budget": {"max_items": MAX_ITEMS, "max_requests": budget.max_requests,
                               "max_bytes": budget.max_bytes, "max_seconds": budget.max_seconds}}
 
         def work(current_id):
-            completed, failed = initial["completed"], 0
+            completed = initial['completed']
             stop_reason = ""
             with public_cache_scope(self.path.parent / 'jav-public'), self.api.request_budget(budget):
                 for code in pending:
@@ -137,27 +163,43 @@ class DiscoveryMetadata:
                         self.remember(code, movie, checked_at=cache_checked_at('movie:' + code, exact=True))
                         if cache_error('movie:' + code):
                             raise PublicSourceUnavailable(cache_error('movie:' + code))
-                        completed += 1
+                        successful.add(code)
+                        failures.discard(code)
                     except PublicBudgetExceeded:
                         stop_reason = budget.stop_reason
                         break
                     except PublicSourceUnavailable as error:
                         self.remember(code, error=str(error))
-                        failed += 1
-                        completed += 1
+                        failures.add(code)
                         if self.api.paused_until > self.api.clock():
                             stop_reason = "source_cooldown"
-                    if not self.job.update(current_id, completed=completed, failed=failed,
-                                           requests=budget.requests, bytes=budget.bytes, batch=(completed + 9) // 10):
+                    if code not in attempted:
+                        completed += 1
+                        attempted.add(code)
+                    if not self.job.update(current_id, completed=completed, failed=len(failures),
+                            completed_codes=sorted(successful), attempted_codes=sorted(attempted), failed_codes=sorted(failures),
+                            active_seconds=previous_elapsed + time.monotonic() - started,
+                            requests=budget.requests, bytes=budget.bytes, batch=(completed + 9) // 10):
                         return
+                    self._save_job()
                     if stop_reason:
                         break
             self.job.update(current_id, status="stopped" if stop_reason else "complete", stop_reason=stop_reason,
-                            completed=completed, failed=failed, requests=budget.requests, bytes=budget.bytes)
+                            completed=completed, failed=len(failures), requests=budget.requests, bytes=budget.bytes)
+            self._save_job()
 
-        return self.job.start(work, initial=initial, restart=bool(snapshot))
+        from .job_recovery import current_job_id
+        token = current_job_id.set(_resume.get('job_id')) if _resume else None
+        try:
+            result = self.job.start(work, initial=initial, restart=bool(snapshot))
+            self._save_job()
+            return result
+        finally:
+            if token is not None:
+                current_job_id.reset(token)
 
     def stop(self):
+        self._save_job()
         self.job.stop()
 
     def cancel(self, job_id=None):
@@ -167,6 +209,8 @@ class DiscoveryMetadata:
         self.job.stop()
         snapshot.update(status="stopped", stop_reason="cancelled")
         self.last_job = snapshot
+        with self.lock:
+            atomic_write_text(self.job_path, json.dumps(snapshot, ensure_ascii=False))
         return snapshot
 
 

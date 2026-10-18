@@ -32,9 +32,21 @@ def read(db: Path, key: str) -> dict:
 
 
 def save(db: Path, key: str, job_id: str, request: dict, *, run_id=None, waiting=False) -> None:
+    previous = read(db, key)
     atomic_write_text(_path(db, key), json.dumps({
         "job_id": job_id, "pid": -1 if waiting else os.getpid(), "status": "active",
-        "request": request, 'run_id': run_id}, ensure_ascii=False))
+        "request": request, 'run_id': run_id,
+        'checkpoint': previous.get('checkpoint', {}) if previous.get('job_id') == job_id else {},
+    }, ensure_ascii=False))
+
+
+def checkpoint(db: Path, key: str, job_id: str, fields: dict) -> None:
+    """结果落盘后保存进度；只更新同一任务的恢复记录。"""
+    with _mutex(state_for(db)):
+        data = read(db, key)
+        if data.get('job_id') == job_id and data.get('status') == 'active':
+            data['checkpoint'] = {**data.get('checkpoint', {}), **fields}
+            atomic_write_text(_path(db, key), json.dumps(data, ensure_ascii=False))
 
 
 def finish(db: Path, key: str, job_id: str, status: str) -> None:

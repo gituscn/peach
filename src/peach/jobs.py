@@ -321,6 +321,12 @@ class BackgroundJob:
         #: 摘 run id 与把那一行写成结束是同一件事：只摘不写完就放手的话，另一个线程
         #: 看见 id 没了以为已经收过尾，紧接着开的下一轮会撞上那一行还没释放的互斥键。
         self._close_lock = threading.Lock()
+        if (db := self._database_path()) is not None:
+            from .job_recovery import read
+            previous = read(db, self.task_key)
+            saved = previous.get('checkpoint') or {}
+            if previous.get('status') in ('complete', 'failed') and saved.get(self.id_key):
+                self.state = copy.deepcopy(saved)
 
     def snapshot(self) -> dict | None:
         """当前状态的深拷贝；一次都没跑过返回 None。"""
@@ -338,6 +344,15 @@ class BackgroundJob:
                 return False
             state.update(fields)
             return True
+
+    def checkpoint(self, job_id: str, **fields: object) -> bool:
+        """领域结果已保存后，原子登记可跨进程恢复的完成集合与计数。"""
+        if not self.update(job_id, **fields):
+            return False
+        if job_id in self._recoverable and (db := self._database_path()) is not None:
+            from .job_recovery import checkpoint
+            checkpoint(db, self.task_key, job_id, fields)
+        return True
 
     @contextmanager
     def editing(self, job_id: str) -> Iterator[dict | None]:
@@ -462,6 +477,7 @@ class BackgroundJob:
                 job_id = current_job_id.get() or uuid.uuid4().hex
                 state = {self.id_key: job_id, "status": "running", "run_id": None,
                          "started_at": time.time(), "error": "", **(initial or {})}
+                state.update(self._resuming_fields(job_id, initial))
                 self.state = state
                 thread = threading.Thread(target=self._run, args=(fn, job_id),
                                           daemon=True, name=self.name)
@@ -489,6 +505,8 @@ class BackgroundJob:
                     from .job_recovery import save
                     save(db, self.task_key, job_id, recovery, run_id=self._run_ids.get(job_id))
                     self._recoverable.add(job_id)
+                    from .job_recovery import checkpoint
+                    checkpoint(db, self.task_key, job_id, self.snapshot() or snapshot)
         except Exception:
             self._close_run(job_id, 'failed', error='任务未能启动')
             activity = self._activity_files.pop(job_id, None)
@@ -502,6 +520,20 @@ class BackgroundJob:
             raise
         thread.start()
         return self.snapshot() or snapshot
+
+    def _resuming_fields(self, job_id, initial):
+        """恢复原任务的持久进度，当前请求仍使用自己的同步回执标识。"""
+        from .job_recovery import current_job_id, read
+        db = self._database_path()
+        if not current_job_id.get() or db is None:
+            return {}
+        saved = read(db, self.task_key)
+        if saved.get('job_id') != job_id:
+            return {}
+        fields = {**(saved.get('checkpoint') or {}), 'status': 'running', 'error': ''}
+        if initial and 'request_id' in initial:
+            fields['request_id'] = initial['request_id']
+        return fields
 
     def _open_run(self, job_id: str, trigger: str, state: dict) -> None:
         if self.runs is None:
@@ -534,8 +566,8 @@ class BackgroundJob:
         往一个没人读的状态里写进度。等不到就不等——一次外部 HTTP 探测可以是十几秒，
         关停不该被它拖住。
 
-        安装暂停期间保留可恢复任务与原运行记录，线程退出后交回恢复入口。
-        普通关停的在途任务记成 `cancelled`，租约恢复不把有序退出计为故障。
+        `resume=True` 保留可恢复任务与原运行记录，线程退出后交回恢复入口。
+        `resume=False` 取消任务并删除恢复记录。
         """
         from .update_tasks import _mutex, state_for
         db = self._database_path()
@@ -556,15 +588,11 @@ class BackgroundJob:
 
     def _stop_run(self, job_id, *, resume):
         if resume and job_id in self._recoverable:
-            from .job_recovery import read
-            from .processing_control import user_paused
-            if (read(self._database_path(), self.task_key).get('pause_requested') or
-                    self.task_key == 'library-processing' and user_paused(self._database_path(), job_id)):
-                self._paused_stops.add(job_id)
-                run_id = self._run_ids.pop(job_id, None)
-                if self.runs is not None and run_id is not None:
-                    self._suspend_run(job_id, run_id)
-                return
+            self._paused_stops.add(job_id)
+            run_id = self._run_ids.pop(job_id, None)
+            if self.runs is not None and run_id is not None:
+                self._suspend_run(job_id, run_id)
+            return
         self._close_run(job_id, 'cancelled', error='服务关停，这一轮没有跑完')
 
     def _suspend_run(self, job_id, run_id):
@@ -631,7 +659,8 @@ class BackgroundJob:
                 state = self.snapshot() or {}
                 if (db is not None and job_id in self._recoverable
                         and state.get(self.id_key) == job_id and not state.get('waiting_for_update')):
-                    from .job_recovery import finish
+                    from .job_recovery import checkpoint, finish
+                    checkpoint(db, self.task_key, job_id, state)
                     finish(db, self.task_key, job_id,
                            'failed' if state.get('status') == 'failed' else 'complete')
             finally:

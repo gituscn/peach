@@ -2040,7 +2040,7 @@ def w_follow_check(contract, body) -> dict:
     # 轮询撞上在跑的那一轮记成跳过，手动撞上外部占用则由 API 回 409。
     started = contract.follow_job.start(work, restart=True,
         trigger="scheduled" if body.get("automatic") else "manual",
-        recovery={**{key: body[key] for key in ('source', 'sources', 'older', 'backfill_all', 'automatic') if key in body},
+        recovery={**{key: body[key] for key in ('source', 'sources', 'older', 'backfill_all', 'rewind', 'automatic') if key in body},
                   'background': True},
         initial={"ok": True, "checked": 0, "total": 0, "results": [],
                  "request_id": request_id, "older": bool(body.get("older")), "current": None})
@@ -2143,6 +2143,7 @@ def _check_payload(result) -> dict:
 
 
 def _run_follow_check(contract, body, job_id=None) -> dict:
+    previous = (contract.follow_job.snapshot() or {}) if job_id else {}
     requested = body.get("source")
     source_id = requested if isinstance(requested, int) else None
     # 往回抓一页。这是**显式的、一次一页**的动作：常规检查永远只看第一页，
@@ -2161,15 +2162,23 @@ def _run_follow_check(contract, body, job_id=None) -> dict:
                           backfill_providers=_BACKFILL_PROVIDERS)
     if "sources" in body:
         rows = [row for row in rows if row["id"] in body["sources"]]
+    if 'source_ids' in previous:
+        rows = [row for row in rows if row['id'] in previous['source_ids']]
+    results = list(previous.get('results') or [])
+    completed = {row['source'] for row in results if row.get('ok')}
+    pages = dict(previous.get('backfill_pages') or {})
     if rewind and older:
         for row in rows:
-            row["backfill_page"] = 0
+            row["backfill_page"] = pages.get(str(row['id']), 0)
     writer = _check_writer(contract)
     cooldown = getattr(contract, "follow_media_resolver", None)
-    results = []
+    if job_id and not contract.follow_job.checkpoint(job_id, source_ids=[row['id'] for row in rows]):
+        raise InterruptedError('关注检查已停止')
     for row in rows:
+        if row['id'] in completed:
+            continue
         if job_id and contract.follow_job.snapshot() is None:
-            break
+            raise InterruptedError('关注检查已停止')
         current = {"source": row["id"], "label": author_display_name(row),
                    "provider": PROVIDER_LABELS.get(row["provider"], row["provider"])}
         def progress(*, current=current, **fields):
@@ -2182,6 +2191,12 @@ def _run_follow_check(contract, body, job_id=None) -> dict:
             row, credentials=credentials, writer=writer,
             connector_factory=build_connector, older=older, progress=progress,
             initial_days=initial_days, cooldown=cooldown))
+        def remember_page():
+            if result.get('ok') and isinstance(result.get('page'), int):
+                pages[str(row['id'])] = result['page']
+                if job_id and not contract.follow_job.checkpoint(job_id, backfill_pages=dict(pages)):
+                    raise InterruptedError('关注检查已停止')
+        remember_page()
         if older and body.get("backfill_all"):
             # 全量回抓：一页记完接着抓下一页，直到站点说没有更多、某一页失败，
             # 或满 500 轮。每轮把结果页写回工作行，`run_check` 从它加一起算，页码
@@ -2190,7 +2205,7 @@ def _run_follow_check(contract, body, job_id=None) -> dict:
             while (result.get("ok") and not result.get("exhausted")
                    and isinstance(result.get("page"), int) and rounds < 500):
                 if job_id and contract.follow_job.snapshot() is None:
-                    break
+                    raise InterruptedError('关注检查已停止')
                 row["backfill_page"] = result["page"]
                 # 首页重放只该有一次：`run_check` 已把标记写回 ledger，工作行里的旧
                 # metadata 还带着它，不摘掉的话每一轮都判成重放，第 0 页连抓到轮数上限。
@@ -2202,8 +2217,12 @@ def _run_follow_check(contract, body, job_id=None) -> dict:
                     connector_factory=build_connector, older=True, progress=progress,
                     initial_days=initial_days, cooldown=cooldown))
                 rounds += 1
+                remember_page()
         result["author"] = author_display_name(row)
+        results = [item for item in results if item['source'] != row['id']]
         results.append(result)
+        if job_id and not contract.follow_job.checkpoint(job_id, results=results.copy(), checked=len(results), total=len(rows)):
+            raise InterruptedError('关注检查已停止')
         progress()
     # 还没建档的关注作者交给建档后继（ADR-0096）。后继由结果声明、调度端统一派
     # （ADR-0040）；这里判不出来只是这一轮不派，检查本身的结论不受影响。
@@ -2464,7 +2483,7 @@ def _external_search_payload(search) -> dict:
             "url": search.url, "evidence": search.evidence}
 
 
-def w_follow_resolve(contract, body, *, progress=None) -> dict:
+def w_follow_resolve(contract, body, *, progress=None, checkpoint=None, resume_state=None) -> dict:
     """把粘进来的每一行解析成「可以添加什么」，但**不添加**。
 
     一行是链接就直接认；不是链接就当成名字或 id 拿去各来源查一遍。两种都只返回结果，
@@ -2475,9 +2494,11 @@ def w_follow_resolve(contract, body, *, progress=None) -> dict:
         job = contract.follow_resolve_job
         def work(job_id):
             result = w_follow_resolve(contract, {**body, "background": False},
-                progress=lambda **fields: job.update(job_id, **fields))
+                progress=lambda **fields: job.update(job_id, **fields),
+                checkpoint=lambda **fields: job.checkpoint(job_id, **fields), resume_state=job.snapshot())
             job.update(job_id, **result, status="complete", completed_at=time.time())
-        return job.start(work, restart=True, initial={"message": "正在准备查找关注来源"})
+        return job.start(work, restart=True, initial={"message": "正在准备查找关注来源"},
+                         recovery={'lines': body.get('lines'), 'background': True})
     raw = body.get("lines")
     if isinstance(raw, str):
         raw = raw.splitlines()
@@ -2547,11 +2568,17 @@ def w_follow_resolve(contract, body, *, progress=None) -> dict:
                                 "known": (parsed.provider, canonical_source_ref(
                                     parsed.provider, parsed.ref)) in known}]}
 
-    results = []
+    results = list((resume_state or {}).get('results') or [])
+    completed = {row['line'] for row in results if row.get('kind') != 'error' and not row.get('failures')}
     for index, line in enumerate(lines):
         # 分母是 plan_units 算出来的，分子就照同一把尺子加：一行查失败也占掉了它那
         # 几个来源，不加进去的话后面每一行都低这么多，环最后停在半路。
-        results.append(resolve_line(index, line))
+        if line not in completed:
+            result = resolve_line(index, line)
+            results = [row for row in results if row['line'] != line]
+            results.append(result)
+            if checkpoint and not checkpoint(results=results.copy(), checked=done_units + plan_units(line), total=total_units):
+                raise InterruptedError('关注来源查找已停止')
         done_units += plan_units(line)
     if progress is not None and total_units:
         # 每个来源是开查前报一次自己的序号，最后一个报的是 total-1；收尾这一下才走满。

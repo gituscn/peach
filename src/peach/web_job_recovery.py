@@ -1,11 +1,16 @@
 """Web 组合入口为可恢复任务装配领域处理器。"""
 from .job_recovery import resume
 from .web_library_processing import w_library_processing
-from .web_scraping import w_scraping_cover
+from .web_scraping import w_scraping_cover, w_scraping_amane_rebuild
 from .web_timeline_thumbnails import w_thumbnail_jobs
-from .web_follow import w_follow_check
+from .web_follow import w_follow_check, w_follow_resolve
 from .web_feeds import w_feed_check
 from .web_wants import start_scrape
+from .web_links import w_links_check, w_links_prune
+from .web_resource_sync import w_resource_sync_scan, w_resource_sync_apply
+from .web_stats import w_taste_refresh
+from .web_media_repair import w_media_repair
+from .web_organize import w_organize_apply, w_organize_rollback
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -17,6 +22,16 @@ def restore(contract):
         "follow-check": lambda body: w_follow_check(contract, body),
         "feed-check": lambda body: w_feed_check(contract, body),
         "want-scrape": lambda _body: start_scrape(contract),
+        "link-check": lambda body: w_links_check(contract, {**body, 'restart': True}),
+        "resource-scan": lambda body: w_resource_sync_scan(contract, {**body, 'background': True}),
+        "resource-apply": lambda body: w_resource_sync_apply(contract, body),
+        "link-prune": lambda body: w_links_prune(contract, body),
+        "follow-resolve": lambda body: w_follow_resolve(contract, body),
+        "taste-refresh": lambda body: w_taste_refresh(contract, body),
+        "media-repair": lambda body: w_media_repair(contract, body),
+        "amane-bridge": lambda body: w_scraping_amane_rebuild(contract, body),
+        "organize": lambda body: (w_organize_rollback(contract, body) if body.get('action') == 'rollback'
+                                    else w_organize_apply(contract, body)),
     })
 
 

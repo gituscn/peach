@@ -1,5 +1,6 @@
 """发现资料边车、固定批次、预算和失败状态的行为契约。"""
 import tempfile
+import json
 import unittest
 import threading
 from pathlib import Path
@@ -11,6 +12,20 @@ from peach.web_jav_discovery import _metadata_response
 
 
 class DiscoveryMetadataTests(unittest.TestCase):
+    def test_restart_retains_batch_identity_budget_and_completed_codes(self):
+        self.cache.remember('EXM-001', {'number': 'EXM-001', 'tags': [], 'score': 4, 'duration': 120})
+        self.path.with_suffix('.job.json').write_text(json.dumps(dict(
+            job_id='original', status='running', codes=['EXM-001', 'EXM-002'], refresh=True,
+            completed=1, completed_codes=['EXM-001'], attempted_codes=['EXM-001'], requests=3, bytes=120,
+            active_seconds=10)), encoding='utf-8')
+        with patch.object(self.api, 'movie', return_value={'number': 'EXM-002', 'tags': [], 'score': 4, 'duration': 120}) as movie:
+            restarted = DiscoveryMetadata(self.path, api=self.api, clock=lambda: self.now[0])
+            self.addCleanup(restarted.stop)
+            restarted.job.thread.join(5)
+        final = restarted.job.snapshot()
+        movie.assert_called_once_with('EXM-002', refresh=True)
+        self.assertEqual((final['job_id'], final['completed'], final['requests'], final['bytes']), ('original', 2, 3, 120))
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

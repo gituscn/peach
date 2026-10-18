@@ -34,6 +34,7 @@ from .metadata_policy import SOURCE_SPECS, preferred_tag_source
 from .platform import root_online, translate_ledger_path
 from .review_csv import read_rows, write_rows
 from .scan import scan_location
+from .fsutil import atomic_write_text
 from .ffmpeg import FFmpegResolver
 from .jobs import DiskGuard
 from .media_probe import probe_unmeasured
@@ -1742,9 +1743,11 @@ class _SourceScan:
     scanned_bytes: int = 0
 
 
-def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update, issue):
+def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update, issue,
+                  scan_checkpoints=None, save_checkpoint=lambda: None, initial_probed=0):
     """发现本趟可访问的来源根，按阶段登记文件并探测新视频。"""
-    result = _SourceScan([])
+    result = _SourceScan([], probed=initial_probed)
+    scan_checkpoints = scan_checkpoints if scan_checkpoints is not None else {}
     chosen_paths = _chosen_asset_paths(db_path, asset_ids)
     scan = asset_ids is None and stage in (ALL_STAGES, SCAN_STAGE)
     mounts = {key: tuple(str(value) for value in values) for key, values in config.mounts.items()}
@@ -1760,8 +1763,13 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
                 continue
             result.online_roots.append(translated_root)
             if scan:
+                key = f'{source}:{root}'
+                def remember(value, key=key):
+                    scan_checkpoints[key] = value
+                    save_checkpoint()
                 registered = scan_location(db_path, source, root, declared_roots=config.locations,
                                            mounts=mounts, report=lambda line: None,
+                                           resume_state=scan_checkpoints.get(key), save_checkpoint=remember,
                                            progress=lambda files, size: update(
                                                stage='扫描文件', scanned=result.scanned + files,
                                                scanned_bytes=result.scanned_bytes + size,
@@ -1771,19 +1779,21 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
                 if stage == SCAN_STAGE:
                     result.probed += probe_unmeasured(
                         db_path, ffprobe, source, root, config=config,
-                        report=lambda done, total: update(stage='读取时长与分辨率', checked=done, total=total))
+                        report=lambda done, total: update(stage='读取时长与分辨率',
+                            checked=result.probed + done, total=result.probed + total, probed=result.probed + done))
                 reattach_in(db_path, registered.new_ids)
                 update(scanned=result.scanned, probed=result.probed)
     return result
 
 
-def _probe_sources(config, db_path, locations, online_roots, asset_ids, update, *, total_pending=0):
+def _probe_sources(config, db_path, locations, online_roots, asset_ids, update, *, total_pending=0, initial_probed=0):
     """已登记视频按可访问来源逐项读取媒体属性。"""
-    probed = 0
-    checked = 0
+    probed = initial_probed
+    checked = initial_probed
     ffprobe = _ffprobe_path(config)
     def report(done, total):
-        update(stage='读取时长与分辨率', checked=checked + done, total=max(total_pending, checked + total))
+        update(stage='读取时长与分辨率', checked=checked + done, probed=checked + done,
+               total=max(initial_probed + total_pending, checked + total))
     for source, roots in locations.items():
         for root in roots:
             if translate_ledger_path(root) in online_roots:
@@ -1818,10 +1828,11 @@ def _collection_rows(db_path, *, locations, online_roots, asset_ids):
     return rows, genre_decisions
 
 
-def _processing_issue_log(config, path, job_id, isolated):
+def _processing_issue_log(config, path, job_id, isolated, *, resume=False):
     """每趟任务保留独立问题清单，仅初始化本趟文件。"""
     log_path = path.with_suffix('.issues.jsonl') if isolated else issues_path(config, job_id)
-    log_path.unlink(missing_ok=True)
+    if not resume:
+        log_path.unlink(missing_ok=True)
     return log_path
 
 
@@ -1945,27 +1956,29 @@ def _generate_preview(config, row, database, resolver, *, progress):
 
 
 def _generate_previews(config, rows, database, *, update, issue, guard,
-                       completed=(), checkpoint=lambda row: None):
+                       completed=(), checkpoint=lambda row: None, initial_made=0):
     """只读本机视频；来源失败与抽帧失败各自保留可重试项目。"""
     from .previews import PreviewUnavailable
     if database is None:
         return 0
-    rows = [row for row in rows if row['location'] == 'local' and not skip_background_read(row['path'])
-            and _checkpoint_key(row) not in completed]
+    rows = [row for row in rows if row['location'] == 'local' and not skip_background_read(row['path'])]
+    base_done = sum(_checkpoint_key(row) in completed for row in rows)
+    rows = [row for row in rows if _checkpoint_key(row) not in completed]
     resolver = FFmpegResolver(config.directory('tools') / 'ffmpeg')
-    made = 0
+    made = initial_made
     for index, row in enumerate(rows):
         if metadata_only(config.directory('state')):
             break
         def progress(row=row, index=index, made=made):
             guard.check()
-            update(stage='生成预览图', checked=index, total=len(rows), previews=made,
+            update(stage='生成预览图', checked=base_done + index, total=base_done + len(rows), previews=made,
                    current_asset_id=row['id'], current_asset_name=Path(str(row['name'] or '')).name,
                    current_action='generating_preview', current_started_at=time.time(),
                    current_deadline_at=time.time() + 90)
         progress()
         try:
             made += int(_generate_preview(config, row, database, resolver, progress=progress))
+            update(previews=made)
             checkpoint(row)
         except InterruptedError:
             raise
@@ -1977,7 +1990,7 @@ def _generate_previews(config, rows, database, *, update, issue, guard,
                        '生成预览图失败，请检查 FFmpeg 与目录权限后重试')
             details = {'diagnostics': error.diagnostics} if isinstance(error, _PreviewCaptureError) else {}
             issue(row, message, action='generating_preview', retryable=True, **details)
-        update(checked=index + 1, previews=made, current_asset_id=None, current_asset_name='',
+        update(checked=base_done + index + 1, previews=made, current_asset_id=None, current_asset_name='',
                current_action='', current_started_at=None, current_deadline_at=None)
     return made
 
@@ -2138,6 +2151,54 @@ def _processing_workload(config, rows, stage, database, completed_previews):
     return pending
 
 
+def _restore_processing_counts(state, previous):
+    """同一处理任务沿用累计数、问题清单和已保存证据索引。"""
+    previous = previous or {}
+    for key in ('started_at', 'identified', 'covers', 'previews', 'probed', 'issue_count', 'paused_count',
+                'issue_preview', 'issues_truncated', 'notes', 'retryable_asset_ids'):
+        if key in previous:
+            state[key] = previous[key]
+    for key in ('scan_checkpoints', 'local_metadata'):
+        state[key] = dict(previous.get(key) or {})
+    for key in ('auto_applied', 'auto_rejected'):
+        state[key] = previous.get(key, 0)
+
+
+class _LocalEvidenceCache:
+    """保存已经读出的本地证据与待处理图片，供同一影片的后续阶段复用。"""
+
+    def __init__(self, config, db_path, cover_root, listing, state, path):
+        self.config, self.db_path, self.cover_root = config, db_path, cover_root
+        self.listing, self.state, self.path = listing, state, path
+
+    def read(self, row, update, issue, poster_jobs):
+        key = _checkpoint_key(row)
+        cached_path = self.state['local_metadata'].get(key)
+        try:
+            cached = json.loads(Path(cached_path).read_text(encoding='utf-8')) if cached_path else None
+        except (OSError, ValueError):
+            cached = None
+        if cached is not None:
+            code, verify, payload, entries = cached['local']
+            poster_jobs.extend((row, Path(source), name, Path(target))
+                               for source, name, target in cached['posters'])
+            return code, verify, payload, [(source, document, Path(path)) for source, document, path in entries]
+        offset, issues_before = len(poster_jobs), self.state['issue_count']
+        local = _read_local_metadata(self.config, self.db_path, row, self.cover_root, self.listing,
+                                     self.state, update, issue, poster_jobs)
+        if local is not None and self.state['issue_count'] == issues_before:
+            code, verify, payload, entries = local
+            record = dict(local=[code, verify, payload, [(source, document, str(path)) for source, document, path in entries]],
+                          posters=[(str(source), name, str(target)) for _, source, name, target in poster_jobs[offset:]])
+            encoded = json.dumps(record, ensure_ascii=False)
+            digest = hashlib.sha256(encoded.encode()).hexdigest()
+            item_path = self.path.parent / (self.path.stem + '-items') / f"{row['id']}-{digest}.json"
+            if not item_path.is_file():
+                atomic_write_text(item_path, encoded)
+            self.state['local_metadata'][key] = str(item_path)
+        return local
+
+
 def process_library(config, db_path, candidate_root, cover_root, *, location='configured',
                     report=lambda state: None, provider_factory=None, job_id=None,
                     retry_ids=None, active=lambda: True, stage=ALL_STAGES,
@@ -2194,13 +2255,15 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
         state.update(initial_estimate(config, db_path, stage, scope_ids, speed_mode))
         state['steps'] = _processing_steps(stage, scope_ids,
             metadata_only_enabled=metadata_only(config.directory('state')))
+        _restore_processing_counts(state, resume_state)
         estimate = ProcessingEstimate(config, state, control)
         # 实体表的水位在开工前记一次：比它大的实体就是这一轮建出来的（`_entity_followups`）。
         checkpoints = _LibraryCheckpoints(state, resume_state, database)
         entity_watermark = checkpoints.entity_watermark
         # 每行这一轮换上了几张封面，`(asset_id, 张数)`：换上了的作品，女优可能截得出更清楚的脸。
         covered = []
-        log_path = _processing_issue_log(config, path, state['job_id'], state_file is not None)
+        log_path = _processing_issue_log(config, path, state['job_id'], state_file is not None,
+                                         resume=bool(resume_state))
         # 界面只展示前 20 条，完整清单在这个文件里；地址跟着状态一起给出，
         # 不让人按 job_id 自己去拼路径。
         state['issues_log'] = str(log_path)
@@ -2258,7 +2321,9 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             guard.check(force=True)
             locations = config.locations if location == 'configured' else {location: config.locations[location]}
             sources = _scan_sources(config, db_path, locations=locations, asset_ids=scope_ids,
-                                    stage=stage, guard=guard, update=update, issue=issue)
+                                    stage=stage, guard=guard, update=update, issue=issue,
+                                    scan_checkpoints=state['scan_checkpoints'],
+                                    save_checkpoint=lambda: flush_state(force=True), initial_probed=state['probed'])
             state.update(scanned=sources.scanned, scanned_bytes=sources.scanned_bytes, probed=sources.probed)
             finish_step('sources')
             if stage == SCAN_STAGE:
@@ -2274,6 +2339,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             if stage == PREVIEWS_STAGE:
                 _generate_previews(config, rows, database, update=update, issue=issue, guard=guard,
                                    completed=checkpoints.completed['completed_previews'],
+                                   initial_made=state['previews'],
                                    checkpoint=lambda row: checkpoints.mark('completed_previews', row, flush_state))
                 finish_step('media')
                 update(status='failed' if state['issue_count'] else 'complete', stage='处理结束',
@@ -2283,9 +2349,9 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             groups = {row['item_key']: row for row in read_rows(output, missing_ok=True)}
             scoped_groups = lambda: _candidate_scope(groups, scope_ids)
             listing = _DirectoryIndex()
+            local_evidence = _LocalEvidenceCache(config, db_path, cover_root, listing, state, path)
             csv_dirty = False
             csv_written_at = time.monotonic()
-            state.update(auto_applied=0, auto_rejected=0)
 
             def flush_candidates(force=False):
                 nonlocal csv_dirty, csv_written_at
@@ -2316,14 +2382,15 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             prepared = []
             poster_jobs = []
             local_rows = list(checkpoints.remaining_metadata(rows))
+            completed_count = len(rows) - len(local_rows)
             for index, (_, row) in enumerate(local_rows):
                 guard.check()
                 issues_before = state['issue_count']
-                update(stage='检查配套文件', checked=index, total=len(local_rows),
+                update(stage='检查配套文件', checked=completed_count + index, total=len(rows),
                        current_asset_id=row['id'], current_asset_name=Path(str(row['name'] or '')).name,
                        current_action='reading_local', current_started_at=time.time(),
                        current_deadline_at=None)
-                local = _read_local_metadata(config, db_path, row, cover_root, listing, state, update, issue, poster_jobs)
+                local = local_evidence.read(row, update, issue, poster_jobs)
                 if local is None:
                     continue
                 code, verify_existing, payload, entries = local
@@ -2332,7 +2399,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 if code or payload:
                     prepared.append((row, code, verify_existing, local_fields, entries,
                                      state['issue_count'] == issues_before))
-                update(checked=index + 1)
+                update(checked=completed_count + index + 1)
             flush_candidates(force=True)
             pending.pop('local')
             pending['metadata'] = len(prepared)
@@ -2348,12 +2415,13 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             finish_step('local')
             if stage in (ALL_STAGES, COLLECT_STAGE):
                 _probe_sources(config, db_path, locations, sources.online_roots, scope_ids, update,
-                               total_pending=pending.get('probe', 0))
+                               total_pending=pending.get('probe', 0), initial_probed=state['probed'])
                 pending.pop('probe', None)
                 update(estimate_pending=dict(pending), stage='准备生成预览', checked=0, total=0)
                 if not metadata_only(config.directory('state')):
                     _generate_previews(config, rows, database, update=update, issue=issue, guard=guard,
                         completed=checkpoints.completed['completed_previews'],
+                        initial_made=state['previews'],
                         checkpoint=lambda row: checkpoints.mark('completed_previews', row, flush_state))
                 pending.pop('previews', None)
                 update(estimate_pending=dict(pending), stage='准备采集外部资料', checked=0, total=0)
@@ -2362,7 +2430,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 local_ok = local_ok and row['id'] not in poster_failed
                 guard.check()
                 issues_before = state['issue_count']
-                update(stage='采集缺失资料', checked=position, total=len(prepared), current_asset_id=row['id'],
+                update(stage='采集缺失资料', checked=completed_count + position,
+                       total=completed_count + len(prepared), current_asset_id=row['id'],
                        current_asset_name=Path(str(row['name'] or '')).name)
                 target_key = f"asset:{row['id']}"
                 missing = list(COLLECTED_FIELDS) if verify_existing else _missing_fields(row, local_fields)
@@ -2376,7 +2445,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                        current_started_at=time.time(), current_deadline_at=None)
                 checkpoints.queue_metadata(row, local_entries + found if local_ok else [], issues_before)
                 flush_candidates()
-                update(checked=position + 1, candidates=len(scoped_groups()),
+                update(checked=completed_count + position + 1, candidates=len(scoped_groups()),
                        current_asset_id=None, current_asset_name='', current_action='',
                        current_started_at=None, current_deadline_at=None)
             flush_candidates(force=True)

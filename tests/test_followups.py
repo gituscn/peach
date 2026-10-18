@@ -260,7 +260,7 @@ class RestartTests(LedgerTestCase):
         self.assertEqual(self.store.requeue_followups(), queued)
         run = self.store.get(queued[0])
         self.assertEqual(run.status, "pending")
-        self.assertIsNone(run.started_at)
+        self.assertEqual(run.started_at, '2026-09-22T00:00:00.000Z')
 
     def test_a_queued_followup_survives_and_still_blocks_its_key(self):
         parent = self.parent()

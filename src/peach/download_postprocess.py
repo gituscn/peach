@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+import json
 from pathlib import Path
 
 from . import organize, settings_file
@@ -101,10 +102,15 @@ def _collect(contract, main: int, handle) -> dict:
     if not config.configured or Path(contract.db_path).resolve() != (
             config.directory("database") / "ledger.db").resolve():
         raise ValueError("当前馆藏与媒体配置不一致，不能采集下载资料")
+    state_file = config.directory('state') / 'download-processing' / f'{main}.json'
+    try:
+        previous = json.loads(state_file.read_text(encoding='utf-8'))
+    except FileNotFoundError:
+        previous = None
     state = process_library(
         config, contract.db_path, contract.candidate_root, contract.cover_root,
         retry_ids=[main], stage=COLLECT_STAGE, database=contract.database,
-        state_file=config.directory('state') / 'download-processing' / f'{main}.json',
+        state_file=state_file, resume_state=previous,
         report=lambda state: handle.progress(
             current=int(state.get("checked") or 0), total=int(state.get("total") or 0),
             label=str(state.get("stage") or TASK_LABEL)))

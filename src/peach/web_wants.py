@@ -97,8 +97,10 @@ def _provider(contract):
 
 def scrape(contract, job_id: str | None = None) -> dict:
     """把积压的想要取一遍。一轮里新登记的也会接着取到：每取完一批再读一次积压。"""
-    done: set[int] = set()
-    fetched = covers = 0
+    previous = (contract.want_job.snapshot() or {}) if job_id else {}
+    done = set(previous.get('completed_wants') or [])
+    completed = set(done)
+    fetched, covers = previous.get('fetched', 0), previous.get('covers', 0)
     provider = _provider(contract)
     while len(done) < MAX_PER_RUN:
         with contract.database.read_connection() as connection:
@@ -107,12 +109,20 @@ def scrape(contract, job_id: str | None = None) -> dict:
             break
         for want_id in batch:
             if job_id:
-                contract.want_job.update(job_id, checked=len(done), total=len(done) + len(batch),
-                                         current=want_id)
+                if not contract.want_job.update(job_id, checked=len(done), total=len(done) + len(batch),
+                                                current=want_id):
+                    raise InterruptedError('想要资料任务已停止')
             got, covered = _scrape_one(contract, provider, want_id)
             fetched += got
             covers += covered
             done.add(want_id)
+            with contract.database.read_connection() as connection:
+                saved = wants.get(connection, want_id)
+            if covered and saved and saved['scraped_at'] is not None and saved['scrape_error'] is None:
+                completed.add(want_id)
+            if job_id and not contract.want_job.checkpoint(job_id, completed_wants=sorted(completed),
+                    checked=len(done), fetched=fetched, covers=covers):
+                raise InterruptedError('想要资料任务已停止')
     contract.cache_bust()
     return {"ok": True, "total": len(done), "fetched": fetched, "covers": covers}
 
@@ -120,7 +130,8 @@ def scrape(contract, job_id: str | None = None) -> dict:
 def start_scrape(contract, *, trigger: str = "manual") -> dict | None:
     """有积压就起一轮 `want_job`；没有就不起，任务中心里不留空跑的一行。"""
     with contract.database.read_connection() as connection:
-        if not backlog(connection, contract.cover_root):
+        from .job_recovery import current_job_id
+        if not current_job_id.get() and not backlog(connection, contract.cover_root):
             return None
 
     def work(job_id):

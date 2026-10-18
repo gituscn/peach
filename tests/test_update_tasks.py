@@ -26,6 +26,69 @@ class UpdateTaskTests(unittest.TestCase):
         fresh_ledger(self.db.parent)
         self.store = TaskRunStore(self.db)
 
+    def test_restart_keeps_the_run_identity_and_committed_progress(self):
+        entered, release = threading.Event(), threading.Event()
+        first = BackgroundJob('resume-test', runs=self.store, task_key='feed-check')
+        def initial(job_id):
+            first.checkpoint(job_id, completed_sources=[1], checked=1, total=3, added=7)
+            entered.set()
+            release.wait(5)
+        original = first.start(initial, recovery={'all': True}, initial={'checked': 0, 'total': 3})
+        worker = first.thread
+        self.assertTrue(entered.wait(5))
+        first.stop(timeout=0)
+        release.set()
+        worker.join(5)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(self.store.get(original['run_id']).status, 'pending')
+        second = BackgroundJob('resume-test', runs=self.store, task_key='feed-check')
+        observed, processed = [], []
+        def resumed(job_id):
+            observed.append(second.snapshot())
+            for source in (1, 2, 3):
+                if source not in observed[0]['completed_sources']:
+                    processed.append(source)
+            second.update(job_id, checked=3, status='complete')
+        result = job_recovery.resume(self.db, {'feed-check': lambda body: second.start(
+            resumed, restart=True, recovery=body, initial={'checked': 0, 'total': 0})})
+        second.thread.join(5)
+        self.assertEqual(result, ['feed-check'])
+        self.assertEqual(processed, [2, 3])
+        self.assertEqual((observed[0]['job_id'], observed[0]['run_id']),
+                         (original['job_id'], original['run_id']))
+        self.assertEqual((observed[0]['checked'], observed[0]['total'], observed[0]['added']), (1, 3, 7))
+
+    def test_dead_process_keeps_a_recoverable_run_pending(self):
+        run = self.store.start('follow-check', trigger='manual', total=5)
+        self.store.progress(run.id, current=3, total=5, throttle=0)
+        job_recovery.save(self.db, 'follow-check', 'original', {'older': True}, run_id=run.id, waiting=True)
+        self.assertNotIn(run.id, self.store.recover_interrupted())
+        pending = self.store.get(run.id)
+        self.assertEqual((pending.status, pending.progress_current, pending.progress_total), ('pending', 3, 5))
+
+    def test_terminal_checkpoint_is_readable_by_a_new_job_instance(self):
+        first = BackgroundJob('resume-test', runs=self.store, task_key='link-check')
+        original = first.start(lambda identity: first.update(identity, status='complete', checked=2, total=2), recovery={})
+        first.thread.join(5)
+        second = BackgroundJob('resume-test', runs=self.store, task_key='link-check')
+        self.assertEqual((second.snapshot()['job_id'], second.snapshot()['checked']), (original['job_id'], 2))
+
+    def test_explicit_stop_removes_the_resume_record(self):
+        entered, release = threading.Event(), threading.Event()
+        job = BackgroundJob('resume-test', runs=self.store, task_key='feed-check')
+        def work(identity):
+            job.checkpoint(identity, checked=1)
+            entered.set()
+            release.wait(5)
+        original = job.start(work, recovery={})
+        worker = job.thread
+        self.assertTrue(entered.wait(5))
+        job.stop(timeout=0, resume=False)
+        release.set()
+        worker.join(5)
+        self.assertEqual(job_recovery.read(self.db, 'feed-check'), {})
+        self.assertEqual(self.store.get(original['run_id']).status, 'cancelled')
+
     def test_running_tasks_receive_a_pause_request_when_installation_is_accepted(self):
         for trigger in ('manual', 'scheduled'):
             with self.subTest(trigger=trigger):

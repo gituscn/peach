@@ -1268,6 +1268,39 @@ class LibraryDirectoryTests(unittest.TestCase):
 
 
 class OperationalScriptTests(unittest.TestCase):
+    def test_scrape_codes_resumes_committed_codes_and_retains_candidate_rows(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            db = self._chain_ledger(root, ['AAA-001', 'BBB-002'])
+            output = root / 'candidates.csv'
+            arguments = ['--db', str(db), '--out', str(output), '--raw-dir', str(root / 'raw'),
+                         '--log-dir', str(root / 'logs'), '--sources', 'r18dev', '--delay', '0', '--min-free', '0']
+            class Provider:
+                calls = []
+                interrupt = True
+                def query(instance, code, source):
+                    instance.calls.append(code)
+                    if code == 'BBB-002' and instance.interrupt:
+                        raise KeyboardInterrupt('模拟进程退出')
+                    return OperationalScriptTests._full_payload(code, source)
+            provider = Provider()
+            with redirect_stdout(io.StringIO()), self.assertRaises(KeyboardInterrupt):
+                self.scrape_codes.main(arguments, provider=provider)
+            saved = json.loads(output.with_suffix('.resume.json').read_text(encoding='utf-8'))
+            self.assertEqual(saved['completed'], ['AAA-001'])
+            provider.calls.clear()
+            provider.interrupt = False
+            try:
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(self.scrape_codes.main(arguments, provider=provider), 0)
+            finally:
+                self.scrape_codes.close_log()
+            self.assertEqual(provider.calls, ['BBB-002'])
+            with output.open(encoding='utf-8-sig', newline='') as file:
+                rows = list(csv.DictReader(file))
+            self.assertEqual({row['query'] for row in rows}, {'AAA-001', 'BBB-002'})
+            self.assertEqual(len(rows), len({row['item_key'] for row in rows}))
+
     def setUp(self):
         policy = mock.patch.object(self.sheets, "metadata_only", return_value=False)
         policy.start()

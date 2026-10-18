@@ -153,6 +153,16 @@ class QueueTests(unittest.TestCase):
 
 
 class GenerateLibraryTests(unittest.TestCase):
+    def test_resume_keeps_counters_and_does_not_build_committed_assets(self):
+        saved = dict(completed_assets=[1], done=1, made=1, skipped=0, failed=0)
+        built = []
+        with patch.object(timeline_sheets, 'is_current', side_effect=lambda root, asset_id, interval: asset_id == 1), \
+                patch.object(timeline_sheets, 'build', side_effect=lambda ffmpeg, path, duration, root, asset_id, interval, **kwargs:
+                             built.append(asset_id) or True):
+            state = self._run(resume_state=saved)
+        self.assertEqual(built, [2])
+        self.assertEqual((state['made'], state['done'], state['total']), (2, 3, 3))
+
     def setUp(self):
         self.root = Path(tempfile.mkdtemp(prefix="timeline-run-"))
         self.addCleanup(lambda: shutil.rmtree(self.root, ignore_errors=True))

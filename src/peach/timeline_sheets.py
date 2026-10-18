@@ -209,7 +209,7 @@ def pending(db_path: Path | str, interval: int, *, limit: int = 0) -> list[tuple
 
 def generate_library(db_path: Path | str, root: Path, interval: int, *, ffmpeg: str,
                      report=lambda **fields: None, active=lambda: True,
-                     guard=None, limit: int = 0) -> dict:
+                     guard=None, limit: int = 0, resume_state=None, checkpoint=lambda **fields: None) -> dict:
     """按队列逐部生成，返回这一趟的计数。
 
     失败不中断：一部片子解不出来（源坏了、时长记错、编码器不认）是它自己的事，
@@ -219,8 +219,16 @@ def generate_library(db_path: Path | str, root: Path, interval: int, *, ffmpeg: 
     tasks = pending(db_path, interval, limit=limit)
     state = {"total": len(tasks), "done": 0, "made": 0, "skipped": 0,
              "failed": 0, "stopped": ""}
+    completed = set((resume_state or {}).get('completed_assets') or [])
+    for key in ('done', 'made', 'skipped', 'failed'):
+        state[key] = (resume_state or {}).get(key, 0)
+    def save(asset_id):
+        completed.add(asset_id)
+        checkpoint(completed_assets=sorted(completed), **state)
     report(**state)
     for asset_id, path, duration in tasks:
+        if asset_id in completed and is_current(root, asset_id, interval):
+            continue
         from .strm import skip_background_read
         if skip_background_read(path):
             state['done'] += 1
@@ -239,6 +247,7 @@ def generate_library(db_path: Path | str, root: Path, interval: int, *, ffmpeg: 
         state["done"] += 1
         if is_current(root, asset_id, interval):
             state["skipped"] += 1
+            save(asset_id)
             report(**state)
             continue
         # 账本路径是 Windows 形态，而挂载层可能是大小写敏感的：这一步同时管翻译和
@@ -251,6 +260,7 @@ def generate_library(db_path: Path | str, root: Path, interval: int, *, ffmpeg: 
         if build(ffmpeg, str(source), float(duration or 0), root, int(asset_id),
                  interval, active=active):
             state["made"] += 1
+            save(asset_id)
         else:
             state["failed"] += 1
         report(**state)

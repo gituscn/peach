@@ -268,33 +268,44 @@ def _keeps_records(contract: ResourceSyncContract, rows: Sequence) -> set[int]:
 def _scan_sources(
     contract: ResourceSyncContract,
     progress: Callable[[dict], None] | None = None,
+    *, resume_state=None, checkpoint=None,
 ) -> dict:
     """只读核对每个在线来源：文件已不在盘上的行（分删除与标已消失两档）、空文件夹、读不了的目录。"""
     with contract.read_connection() as connection:
         totals = {row[0]: int(row[1]) for row in connection.execute(
             "SELECT location,count(*) FROM asset WHERE path IS NOT NULL "
             "AND COALESCE(disposal,'')<>? GROUP BY location", (VANISHED,))}
-    vanished_ids: list[int] = []
-    keep_ids: set[int] = set()
-    empty_dirs: dict[str, list[str]] = {}
-    sources = []
+    previous = (resume_state or {}).get('scan_checkpoint') or {}
+    parts = dict(previous.get('parts') or {})
+    sources = [part['source'] for part in parts.values()]
+    completed = {row['location'] for row in sources if row['online'] and not row['unreadable']}
     for location in configured_resource_locations():
+        if location in completed:
+            continue
         online = source_is_online(location)
         source = {"location": location, "online": online, "total": totals.get(location, 0),
                   "missing": 0, "vanish": 0, "empty": 0, "unreadable": 0}
+        part = dict(source=source, vanished_ids=[], keep_ids=[], empty_dirs=[])
         if online:
             unreadable: set[str] = set()
             gone = vanished_asset_rows(contract, location, unreadable_dirs=unreadable)
             empties = _empty_directories(_source_roots(location), unreadable)
-            vanished_ids.extend(int(row["id"]) for row in gone)
+            part['vanished_ids'] = [int(row['id']) for row in gone]
             keep = _keeps_records(contract, gone)
-            keep_ids.update(keep)
-            empty_dirs[location] = [os.fspath(path) for path in empties]
+            part['keep_ids'] = sorted(keep)
+            part['empty_dirs'] = [os.fspath(path) for path in empties]
             source.update(missing=len(gone), vanish=len(keep), empty=len(empties),
                           unreadable=len(unreadable))
-        sources.append(source)
+        sources = [row for row in sources if row['location'] != location] + [source]
+        parts[location] = part
         if progress is not None:
             progress(source)
+        if checkpoint and not checkpoint(scan_checkpoint={'parts': parts}, sources=sources):
+            raise InterruptedError('资源检查已停止')
+    sources = [part['source'] for part in parts.values()]
+    vanished_ids = sorted({value for part in parts.values() for value in part['vanished_ids']})
+    keep_ids = {value for part in parts.values() for value in part['keep_ids']}
+    empty_dirs = {location: part['empty_dirs'] for location, part in parts.items() if part['source']['online']}
     return {"sources": sources, "vanished_ids": vanished_ids, "keep_ids": keep_ids,
             "empty_dirs": empty_dirs}
 
@@ -451,13 +462,14 @@ def _resource_orphan_plan(
     }
 
 
-def clean_resource_orphans(contract: ResourceSyncContract, *, progress=None) -> dict:
+def clean_resource_orphans(contract: ResourceSyncContract, *, progress=None, checkpoint=None, resume_state=None) -> dict:
     if progress:
         progress(checked=0, total=None, message="正在核对可重建缓存清单")
     plan = _resource_orphan_plan(contract)
-    removed = 0
-    reclaimed = 0
-    blocked = []
+    previous = (resume_state or {}).get('cache_checkpoint') or {}
+    removed = previous.get('cache_removed', 0)
+    reclaimed = previous.get('bytes_reclaimed', 0)
+    blocked = list(previous.get('cache_blocked') or [])
     for index, (kind, path, size) in enumerate(plan["files"]):
         if progress:
             progress(checked=index, total=len(plan["files"]), message=f"清理缓存：已处理 {index} / {len(plan['files'])} 个")
@@ -468,6 +480,9 @@ def clean_resource_orphans(contract: ResourceSyncContract, *, progress=None) -> 
         except OSError as error:
             blocked.append({"kind": kind, "name": path.name,
                             "reason": error.strerror or str(error)})
+        if checkpoint and not checkpoint(cache_checkpoint=dict(cache_removed=removed, bytes_reclaimed=reclaimed,
+                                                                cache_blocked=blocked)):
+            raise InterruptedError('缓存清理已停止')
     if progress:
         progress(checked=0, total=None, message="正在整理缓存目录并汇总释放空间")
     for directory in sorted(plan["dirs"], key=lambda item: len(item.parts), reverse=True):
@@ -505,9 +520,11 @@ def _run_resource_scan(contract: ResourceSyncContract, scan_id: str) -> None:
     def progress(source: dict) -> None:
         with job.editing(scan_id) as state:
             if state is not None:
+                state['sources'] = [row for row in state['sources'] if row['location'] != source['location']]
                 state["sources"].append(dict(source))
 
-    scan = _scan_sources(contract, progress)
+    scan = _scan_sources(contract, progress, resume_state=job.snapshot(),
+                         checkpoint=lambda **fields: job.checkpoint(scan_id, **fields))
     # 候选名单和空目录路径只留在任务状态里，不进 `result`：公开投影整个下发 `result`，
     # 物理路径不出服务端。
     job.update(scan_id, status="complete", result=_scan_result(contract, scan),
@@ -538,6 +555,7 @@ def _background_resource_scan(contract: ResourceSyncContract, restart: bool = Fa
         lambda scan_id: _run_resource_scan(contract, scan_id),
         initial={"sources": [], "result": None, "vanished_ids": [], "empty_dirs": {}},
         restart=restart,
+        recovery={'restart': True},
     ))
 
 
@@ -640,7 +658,7 @@ def _mark_record_holders(contract: ResourceSyncContract,
     return marked, reattached, [row for row in rows if int(row["id"]) not in kept]
 
 
-def w_resource_sync_apply(contract: ResourceSyncContract, body, *, progress=None):
+def w_resource_sync_apply(contract: ResourceSyncContract, body, *, progress=None, checkpoint=None, resume_state=None):
     """处理这一轮检查报出的失效记录与空文件夹，再清孤儿缓存。
 
     文件已不在盘上的行不进回收站：在库且带个人记录的标「已消失」，记录留着等接回
@@ -653,24 +671,44 @@ def w_resource_sync_apply(contract: ResourceSyncContract, body, *, progress=None
     if body.get("confirm") is not True:
         raise ValueError("resource sync requires confirmation")
     scan_id = str(body.get("scan_id") or "")
-    _completed_scan(contract, scan_id)
+    from .job_recovery import current_job_id, read
+    recovering = (read(contract.db_path, 'resource-apply').get('checkpoint') or {}) if current_job_id.get() else {}
+    if not recovering.get('apply_receipt'):
+        _completed_scan(contract, scan_id)
     if body.get("background"):
         job = contract.resource_apply_job
         def work(job_id):
             result = w_resource_sync_apply(contract, {**body, "background": False},
-                progress=lambda **fields: job.update(job_id, **fields))
+                progress=lambda **fields: job.update(job_id, **fields),
+                checkpoint=lambda **fields: job.checkpoint(job_id, **fields), resume_state=job.snapshot())
             job.update(job_id, **result, status="complete", completed_at=time.time())
-        return job.start(work, restart=True, initial={"message": "正在逐条复核失效记录"})
+        return job.start(work, restart=True, initial={"message": "正在逐条复核失效记录"}, recovery=body)
+    if (resume_state or {}).get('apply_receipt'):
+        return resume_state['apply_receipt']
     state = _completed_scan(contract, scan_id)
     report = progress or (lambda **_fields: None)
-    report(checked=0, total=None, message="正在逐条复核失效记录")
-    marked, reattached, confirmed = _mark_record_holders(
-        contract, _recheck_vanished(contract, state["vanished_ids"]))
-    purge = {"purged": 0, "blocked": [], "empty_dirs_removed": 0}
-    if confirmed:
-        report(checked=0, total=None, message=f"正在永久删除 {len(confirmed)} 条失效记录")
-        from .web_batch import purge_vanished_rows  # web_batch 在模块顶部 import 本模块
-        purge = purge_vanished_rows(contract, confirmed)
+    saved = (resume_state or {}).get('apply_checkpoint') or {}
+    processed = set(saved.get('processed') or [])
+    report(checked=len(processed), total=len(state['vanished_ids']), message="正在逐条复核失效记录")
+    marked, reattached = list(saved.get('marked') or []), list(saved.get('reattached') or [])
+    purge = dict(saved.get('purge') or {'purged': 0, 'blocked': [], 'empty_dirs_removed': 0})
+    pending = [value for value in state['vanished_ids'] if value not in processed]
+    for offset in range(0, len(pending), 100):
+        selected = pending[offset:offset + 100]
+        added, attached, confirmed = _mark_record_holders(contract, _recheck_vanished(contract, selected))
+        marked.extend(added)
+        reattached.extend(attached)
+        if confirmed:
+            from .web_batch import purge_vanished_rows
+            result = purge_vanished_rows(contract, confirmed)
+            for field in ('purged', 'empty_dirs_removed'):
+                purge[field] += int(result.get(field) or 0)
+            purge['blocked'].extend(result.get('blocked') or [])
+        processed.update(selected)
+        report(checked=len(processed), total=len(state['vanished_ids']), message='正在处理失效记录')
+        if checkpoint and not checkpoint(apply_checkpoint=dict(processed=sorted(processed), marked=marked,
+                                                                reattached=reattached, purge=purge)):
+            raise InterruptedError('资源清理已停止')
     report(checked=0, total=None, message="正在删除空文件夹")
     dirs_removed, dir_errors = 0, 0
     for location, paths in state["empty_dirs"].items():
@@ -681,14 +719,14 @@ def w_resource_sync_apply(contract: ResourceSyncContract, body, *, progress=None
         dirs_removed += removed
         dir_errors += errors
     contract.cache_bust()
-    cleanup = clean_resource_orphans(contract, progress=progress) if body.get("clean_cache", True) else {
+    cleanup = clean_resource_orphans(contract, progress=progress, checkpoint=checkpoint,
+                                    resume_state=resume_state) if body.get("clean_cache", True) else {
         "cache_removed": 0, "bytes_reclaimed": 0, "cache_blocked": [],
     }
     blocked = [{"id": item["id"], "name": PureWindowsPath(item["path"]).name,
                 "reason": item["reason"]} for item in purge["blocked"]]
     # 这一轮的清单已经照着清过：读数不再是盘上的现状，结果区换成清理回执。
-    contract.resource_scan.update(scan_id, applied_at=time.time())
-    return {
+    receipt = {
         "ok": True, "sources": state["result"]["sources"],
         "purged": int(purge["purged"]), "vanished": len(marked) - len(reattached),
         "reattached": len(reattached),
@@ -697,6 +735,10 @@ def w_resource_sync_apply(contract: ResourceSyncContract, body, *, progress=None
         "dir_errors": dir_errors, "unreadable": int(state["result"].get("unreadable") or 0),
         **cleanup,
     }
+    if checkpoint:
+        checkpoint(apply_receipt=receipt)
+    contract.resource_scan.update(scan_id, applied_at=time.time())
+    return receipt
 
 
 def w_purge_missing(contract: ResourceSyncContract, body):

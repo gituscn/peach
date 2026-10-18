@@ -135,20 +135,45 @@ def q_taste(contract: WebContract, args=None):
     return payload
 
 
-def w_taste_refresh(contract: WebContract, body, *, progress=None):
+def w_taste_refresh(contract: WebContract, body, *, progress=None, checkpoint=None, resume_state=None):
     if body.get("background"):
         job = contract.taste_refresh_job
         def work(job_id):
             result = w_taste_refresh(contract, {**body, "background": False},
-                progress=lambda **fields: job.update(job_id, **fields))
+                progress=lambda **fields: job.update(job_id, **fields),
+                checkpoint=lambda **fields: job.checkpoint(job_id, **fields), resume_state=job.snapshot())
             job.update(job_id, **result, status="complete", message="部分浏览记录未取得" if result["warnings"] else "口味分析已更新", completed_at=time.time())
         return job.start(work, restart=True, initial={
-            "stage": "discovering", "message": "正在查找 Peach 主机上的浏览器资料"})
+            "stage": "discovering", "message": "正在查找 Peach 主机上的浏览器资料"},
+            recovery={'background': True, 'window': body.get('window') or 'all'})
     window = str(body.get("window") or "all")
     sources = enabled_history_sources(contract.taste_history_store)
-    results = refresh_history(sources, contract.taste_history_store, progress=progress) if sources else []
-    results.extend(refresh_bookmarks(enabled_bookmark_sources(contract.taste_history_store),
-                                     contract.taste_history_store, progress=progress))
+    results = list((resume_state or {}).get('refresh_results') or [])
+    completed = set((resume_state or {}).get('completed_profiles') or [])
+    plans = (
+            ('history', sources, refresh_history),
+            ('bookmarks', enabled_bookmark_sources(contract.taste_history_store), refresh_bookmarks))
+    profile_keys = (resume_state or {}).get('profile_keys')
+    if profile_keys is None:
+        profile_keys = [f'{kind}:{source.browser}:{source.profile}:{source.path}'
+                        for kind, selected, _refresh in plans for source in selected]
+        if checkpoint and not checkpoint(profile_keys=profile_keys):
+            raise InterruptedError('口味读取已停止')
+    def profile_progress(**fields):
+        if progress:
+            progress(**{**fields, 'checked': len(completed), 'total': len(profile_keys)})
+    for kind, selected, refresh in plans:
+        for source in selected:
+            key = f'{kind}:{source.browser}:{source.profile}:{source.path}'
+            if key in completed or key not in profile_keys:
+                continue
+            rows = refresh([source], contract.taste_history_store, progress=profile_progress)
+            results.extend(rows)
+            if rows and all(row.get('status') != 'failed' for row in rows):
+                completed.add(key)
+            if checkpoint and not checkpoint(refresh_results=results.copy(), completed_profiles=sorted(completed),
+                                              checked=len(completed), total=len(profile_keys)):
+                raise InterruptedError('口味读取已停止')
     if contract.taste_history_store.is_file():
         analysis = analyze_history(contract.taste_history_store, contract.taste_history_root, progress=progress)
         write_manifest(contract.taste_history_manifest, results, analysis)
