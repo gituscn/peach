@@ -42,7 +42,8 @@ def _read(path):
 
 def consent(config=None):
     value = _read(_config(config).directory("state") / "remote-reporting.json")
-    return {"usage": value.get("usage") is True, "errors": value.get("errors") is True,
+    enabled = all(value.get(key) is True for key in FIELDS)
+    return {"usage": enabled, "errors": enabled,
             "revision": str(value.get("revision", ""))}
 
 
@@ -76,6 +77,8 @@ def parse_choices(body, *, partial=False):
     choices = {key: body.get(key, False) if partial else body.get(key) for key in FIELDS}
     if any(type(value) is not bool for value in choices.values()):
         raise ValueError("遥测和自动错误诊断必须是布尔值")
+    if choices["usage"] != choices["errors"]:
+        raise ValueError("版本统计与错误诊断须同时开启或关闭")
     return choices
 
 
@@ -130,7 +133,7 @@ def _new_client(target, *, envelope_gate=None):
                 permit = event.pop("extra", {})
                 try:
                     current = _read(Path(permit["consent"]))
-                    if current.get(permit["kind"]) is not True or current["revision"] != permit["revision"]:
+                    if not all(current.get(key) is True for key in FIELDS) or current["revision"] != permit["revision"]:
                         return
                 except Exception:
                     return

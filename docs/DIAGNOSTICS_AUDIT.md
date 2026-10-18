@@ -25,7 +25,7 @@
 
 ## 可选远程诊断
 
-安装器、首次设置和设置页「应用与维护」提供「发送版本与平台统计」「自动发送错误诊断」两个独立选项。交互安装的两项均默认关闭；静默安装保留已有选择。选项保存在本机 `state/remote-reporting.json`，不写 ledger。缺少接收端时页面明确提示不会发送，仍可保存选择。
+安装器、首次设置和设置页「应用与维护」提供「发送版本统计与错误诊断」单个选项，默认关闭，同时控制版本统计与错误诊断；静默安装保留已有选择。选项保存在本机 `state/remote-reporting.json`，`usage` 与 `errors` 必须同时为 `true` 才生效；仅同意一项的记录不发送，须明确选择完整范围。不写 ledger。缺少接收端时页面明确提示不会发送，仍可保存选择。
 
 | 类别 | 发送内容与筛选 |
 | --- | --- |
@@ -41,7 +41,7 @@
 
 接收端由维护者配置：源码与 Docker 使用 `PEACH_SENTRY_DSN`；Windows 发行构建从同名环境变量写入包内 `sentry.json`，GitHub Release 使用仓库变量 `PEACH_SENTRY_DSN`。只接受 Sentry 的公开 HTTPS DSN（含 US / DE 区域），不需要 API token。没有 DSN 时不会创建 SDK 客户端。SDK 自动框架集成、日志、性能追踪和指标均关闭；版本统计作为普通事件计入 Sentry 错误事件额度。账号套餐和总量以 [Sentry 订阅页](https://sentry.io/settings/) 为准。
 
-验收使用临时数据根和 SDK 内存接收端，不发送真实用户数据。真实 Sentry 接收、发行 EXE 和原生安装器的端到端验收需配置接收端与发行制品后执行。
+回归验收使用临时数据根和 SDK 内存接收端。本机已配置独立的 `peach-errors` 与 `peach-library-research` 接收项目，合成错误 `PEACH-ERRORS-1` 已在 Sentry 核对代码位置；没有发送真实馆藏，所有本机上传开关关闭。发布包的 CI 接收地址尚未配置。
 
 ### 馆藏与口味群体研究
 

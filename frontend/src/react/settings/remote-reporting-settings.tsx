@@ -18,11 +18,9 @@ export function ReportingChoices({ value, onChange }: {
 }) {
   return <>
     <Rows>
-      <SettingsRow label="发送版本与平台统计" description={value.fields.usage}>
-        <Switch aria-label="发送版本与平台统计" isSelected={value.usage} onChange={(usage) => onChange({ ...value, usage })} />
-      </SettingsRow>
-      <SettingsRow label="自动发送错误诊断" description={value.fields.errors}>
-        <Switch aria-label="自动发送错误诊断" isSelected={value.errors} onChange={(errors) => onChange({ ...value, errors })} />
+      <SettingsRow label="发送版本统计与错误诊断" description={`${value.fields.usage} ${value.fields.errors}`}>
+        <Switch aria-label="发送版本统计与错误诊断" isSelected={value.usage && value.errors}
+          onChange={(enabled) => onChange({ ...value, usage: enabled, errors: enabled })} />
       </SettingsRow>
     </Rows>
     <Stack divided>
@@ -37,7 +35,7 @@ export function RemoteReportingSettings({ initial, receipt }: {
 }) {
   const [value, setValue] = useState(initial);
   const action = useAction();
-  return <Section title="遥测与错误诊断" onSubmit={(event) => {
+  return <Section title="版本统计与错误诊断" onSubmit={(event) => {
     event.preventDefault();
     void action.run('save', (signal) => apiSend<RemoteReportingState>('/api/configuration/remote-reporting',
       { usage: value.usage, errors: value.errors }, 'POST', signal), (saved) => {

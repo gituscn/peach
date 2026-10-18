@@ -246,7 +246,7 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
 
       {failure ? <ErrorText>{failure}</ErrorText> : null}
       {reporting ? <CardGroup>
-        <GroupTitle>遥测与错误诊断</GroupTitle>
+        <GroupTitle>版本统计与错误诊断</GroupTitle>
         <ReportingChoices value={reporting} onChange={setReporting} />
         <Help>馆藏与口味分享默认关闭。完成设置后，可在「应用与维护」查看明细预览并明确同意。</Help>
       </CardGroup> : null}

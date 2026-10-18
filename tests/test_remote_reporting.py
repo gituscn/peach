@@ -41,17 +41,30 @@ class RemoteReportingTests(unittest.TestCase):
             client.assert_not_called()
         self.assertFalse((path.parent / "remote-reporting-budget.json").exists())
 
-    def test_consent_is_strict_and_independent_and_missing_endpoint_is_visible(self):
-        for invalid in ({"usage": "false", "errors": False}, {"usage": True}, []):
+    def test_consent_requires_joint_choice_and_missing_endpoint_is_visible(self):
+        for invalid in ({"usage": "false", "errors": False}, {"usage": True}, [],
+                        {"usage": True, "errors": False}, {"usage": False, "errors": True}):
             with self.assertRaises(ValueError):
                 reporting.save(invalid)
-        reporting.save({"usage": True, "errors": False})
+        reporting.save({"usage": True, "errors": True})
         self.assertTrue(reporting.snapshot()["usage"])
-        self.assertFalse(reporting.snapshot()["errors"])
+        self.assertTrue(reporting.snapshot()["errors"])
         with mock.patch.dict(os.environ, {"PEACH_SENTRY_DSN": ""}):
             self.assertFalse(reporting.snapshot()["available"])
             with mock.patch.object(reporting, "_new_client") as client:
                 reporting.usage()
+                client.assert_not_called()
+
+    def test_partial_consent_keeps_both_channels_disabled(self):
+        path = self.config.directory("state") / "remote-reporting.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        for usage, errors in ((True, False), (False, True)):
+            path.write_text(json.dumps({"usage": usage, "errors": errors, "revision": "partial"}))
+            with mock.patch.object(reporting, "_new_client") as client:
+                self.assertFalse(reporting.snapshot()["usage"])
+                self.assertFalse(reporting.snapshot()["errors"])
+                reporting.usage()
+                reporting.capture("unhandled-main", ValueError("private"))
                 client.assert_not_called()
 
     def test_dsn_only_accepts_hosted_public_https_endpoint(self):
@@ -117,7 +130,7 @@ class RemoteReportingTests(unittest.TestCase):
             self.assertNotIn(value, wire)
         self.assertIn('ValueError', wire)
 
-    def test_queued_event_is_dropped_after_disable_and_reenable(self):
+    def test_queued_event_requires_current_joint_consent_revision(self):
         from sentry_sdk.transport import HttpTransport
         from sentry_sdk.envelope import Envelope
         reporting.save({"usage": True, "errors": True})
@@ -133,10 +146,15 @@ class RemoteReportingTests(unittest.TestCase):
         with mock.patch.object(HttpTransport, "_send_envelope") as network:
             client.transport._send_envelope(envelope)
             network.assert_not_called()
+            path = self.config.directory('state') / 'remote-reporting.json'
+            for usage, errors in ((True, False), (False, True)):
+                path.write_text(json.dumps({"usage": usage, "errors": errors, "revision": previous['revision']}))
+                client.transport._send_envelope(envelope)
+            network.assert_not_called()
 
     def test_sdk_failure_does_not_break_local_error_recording(self):
         from peach import error_reporting
-        reporting.save({"usage": False, "errors": True})
+        reporting.save({"usage": True, "errors": True})
         with mock.patch.object(reporting, "_new_client", side_effect=OSError('offline')), \
                 mock.patch.object(error_reporting, 'log_directories', return_value=[self.root / 'logs']):
             path = error_reporting.event('unhandled-main', ValueError('local detail'))
@@ -166,7 +184,7 @@ class RemoteReportingTests(unittest.TestCase):
     def test_installer_helper_persists_explicit_choices_in_fresh_process(self):
         root = Path(__file__).resolve().parents[1]
         env = {**os.environ, 'PYTHONPATH': str(root / 'src'), 'PEACH_SENTRY_DSN': ''}
-        for usage, errors in (('0', '1'), ('0', '0')):
+        for usage, errors in (('1', '1'), ('0', '0')):
             result = subprocess.run([sys.executable, '-X', 'utf8', str(root / 'scripts/build_app_entry.py'),
                                      '--installer-reporting', usage, errors], env=env,
                                     capture_output=True, text=True, encoding='utf-8', timeout=30)
@@ -196,10 +214,13 @@ class RemoteReportingApiTests(unittest.TestCase):
 
     def test_local_save_and_remote_and_cross_origin_denial(self):
         endpoint = '/api/configuration/remote-reporting'
-        body = {'usage': False, 'errors': True}
+        body = {'usage': True, 'errors': True}
         response = self.request('POST', endpoint, body=body)
         self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()['usage'])
         self.assertTrue(response.json()['errors'])
+        response = self.request('POST', endpoint, body={'usage': False, 'errors': True})
+        self.assertEqual(response.status_code, 400, response.text)
         for peer, origin in (('198.51.100.7', 'http://test'), ('127.0.0.1', 'https://external.invalid')):
             response = self.request('POST', endpoint, body={'usage': False, 'errors': False}, peer=peer, origin=origin)
             self.assertEqual(response.status_code, 403, response.text)
