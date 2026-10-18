@@ -97,6 +97,7 @@ describe('馆藏与口味分享', () => {
         await region.getByRole('checkbox').focus();
         await region.getByRole('checkbox').press('Space');
         await region.getByRole('button', { name: '同意并开启上传', exact: true }).click();
+        await preview.waitFor({ state: 'hidden' });
         await settle(page);
         assert.deepEqual(posts[0], { enabled: true, schema: 4, consent: true, preview_token: 'preview-token' });
         assert.equal(await preview.count(), 0, '同意后收起数据预览');
@@ -108,7 +109,11 @@ describe('馆藏与口味分享', () => {
         assert.equal(posts.length, 1, '查看预览不重复保存同意');
         assert.equal(await region.getByRole('checkbox').count(), 0, '已开启时查看预览不重复要求同意');
         await toggle.focus();
+        const disabled = page.waitForResponse(response => response.url().endsWith('/api/configuration/library-sharing')
+          && response.request().method() === 'POST');
         await toggle.press('Space');
+        await disabled;
+        await toggle.and(page.locator(':not(:checked)')).waitFor({ state: 'attached' });
         await settle(page);
         assert.equal(posts[1]?.enabled, false);
         assert.equal(await toggle.isChecked(), false);
