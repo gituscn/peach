@@ -172,7 +172,7 @@ Windows 连接清理复用 [CPython 3.14.7 的 Proactor 对象协议](https://gi
 
 诊断页复用同一报告、TanStack Query、BoardUI 设置组合件及覆盖式滚动条。库健康参照 javm `dd0e6b62`（MIT）的计数→清单入口，采用 Peach 的资产、封面键与处理日志。来源证据复用 `performer_profile_followup` 成功落库来源与 `scraping_access.cooldown_state`，不复用 HTTP 200 作为内容健康。无新增依赖；本机只读试验已核对现有日志与成功记录。
 
-系统诊断作为配置分区，复用配置页签及深链。来源会话各自复用 BoardUI `SettingsCard`，站标由共用 `SiteMark` 读取本站缓存、静态资源并提供失败回退；近期解析、历史成功和无记录分别显示。无新增依赖或 ledger 写入。
+系统诊断作为配置分区，复用配置页签及深链。来源会话各自复用 BoardUI `SettingsCard`，由共用 `SiteMark` 读取已核对的本地 favicon 并提供失败回退；近期解析、历史成功和无记录分别显示。会话列表展示资料平台与连接服务；片商页面及按片商选择站点的路由不单列。默认链之外的可选来源有实际检查或冷却记录时展示。图标来源见 `resources/site-marks/ORIGIN.md`。无新增依赖或 ledger 写入。
 
 ## 资源索引器
 

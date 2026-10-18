@@ -945,11 +945,11 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                                   headers={"content-type": "image/png"})
         self._swap_http_client(upstream)
 
-        denied = await self.client.get("/site-mark?source=mgstage")
+        denied = await self.client.get("/site-mark?source=airav")
         self.assertEqual(denied.status_code, 401)
-        await self.client.get("/site-mark?t=secret&source=mgstage")
+        await self.client.get("/site-mark?t=secret&source=airav")
         self.assertTrue(hosts, "表里的采集来源要真的去问对方站点")
-        self.assertTrue(all(host.endswith("mgstage.com") for host in hosts), hosts)
+        self.assertTrue(all(host.endswith("airav.io") for host in hosts), hosts)
 
         reached = len(hosts)
         for query in ("source=evil.example", "domain=evil.example",
@@ -960,6 +960,21 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
 
         await self.client.get("/site-mark?t=secret&domain=kemono.cr")
         self.assertTrue(any(host.endswith("kemono.cr") for host in hosts[reached:]), hosts)
+
+    async def test_source_favicons_keep_verified_pixels_without_upstream_discovery(self):
+        from peach.config import PROJECT_ROOT
+
+        reached = []
+        def upstream(request):
+            reached.append(str(request.url))
+            return httpx.Response(502, request=request)
+        self._swap_http_client(upstream)
+        for name in ('avsox', 'manko', 'sukebei', 'mgstage', 'dmm', 'fc2'):
+            response = await self.client.get(f'/site-mark?source={name}&t=secret')
+            self.assertEqual(response.status_code, 200, name)
+            self.assertEqual(response.content, (PROJECT_ROOT / 'resources/site-marks' / f'{name}.png').read_bytes())
+            self.assertEqual(response.headers['Cache-Control'], 'public, no-cache')
+        self.assertEqual(reached, [])
 
     async def test_copy_editor_is_source_only_and_rejects_cross_origin_saves(self):
         from unittest.mock import patch

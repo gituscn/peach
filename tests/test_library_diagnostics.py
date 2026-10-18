@@ -110,8 +110,11 @@ class LibraryDiagnosticsTests(unittest.TestCase):
         self.assertEqual(rows['airav']['status'], 'stale')
         self.assertIn('解析成功', rows['airav']['reason'])
         self.assertIsNotNone(rows['airav']['last_success_at'])
-        self.assertEqual(rows['fc2club']['status'], 'unchecked')
-        self.assertIn('尚无', rows['fc2club']['reason'])
+        self.assertEqual(rows['avsox']['status'], 'unchecked')
+        self.assertIn('尚无', rows['avsox']['reason'])
+        self.assertNotIn('fc2club', rows)
+        self.assertFalse({'makers', 'prestige', 'faleno', 'dahlia'} & rows.keys())
+        self.assertTrue({'mgstage', 'dmm', 'fc2'} <= rows.keys())
 
     def test_connection_and_parsing_evidence_remain_distinct_for_all_bridge_sources(self):
         from peach.scraping_access import record_source_check

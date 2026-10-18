@@ -28,6 +28,7 @@ describe('馆藏卡片与列表', () => {
       const opened = await visit(browser, '/?browse=folders&loc=local', viewport);
       const { page } = opened;
       try {
+        await page.locator('#grid [data-media-card]').first().waitFor({ state: 'visible' });
         const folder = page.getByRole('button', { name: '文件夹模式', exact: true });
         assert.equal(await folder.getAttribute('aria-pressed'), 'true');
         assert.equal(await folder.evaluate(node => !!node.closest('[data-entity-sorts]')), true);
