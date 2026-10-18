@@ -98,6 +98,9 @@ export function coverAnchor(img: HTMLImageElement): void {
   center('--cover-x', coverFace(img, 'cx'), car / r);
   center('--cover-y', coverFace(img, 'cy'), r / car);
   posterPanel(img, car);
+  // 传统封面的整图与竖版正封保持完整，比例不同处用同图补底；整幅大封保持纯色底。
+  if (img.dataset.frame !== 'still' && (img.classList.contains('whole') || img.dataset.frame === 'front')
+    && Math.abs(r / car - 1) > .02) coverBackdrop(img);
 }
 
 /* 只把折痕右边那块正封摆进卡片，封底一个像素都不露。折痕位置在 `data-posterbox` 里，
@@ -128,6 +131,14 @@ export function posterPanel(img: HTMLImageElement, ratio: number): void {
   img.style.setProperty('--panel-left', `${frame.left}%`);
   img.style.setProperty('--panel-top', `${frame.top}%`);
   img.style.setProperty('--panel-height', `${frame.height}%`);
+  if (img.dataset.frame !== 'still' && img.classList.contains('front')
+    && Math.abs(panelAspect / ratio - 1) > .02) coverBackdrop(img);
+}
+
+/** 传统正封的留白使用同图模糊补底，优先复用已加载的派生档。 */
+function coverBackdrop(img: HTMLImageElement): void {
+  const src = (img.dataset.thumbSrc || img.currentSrc || img.src).replace(/"/g, '%22');
+  img.closest<HTMLElement>('.pic,[data-media-pic]')?.style.setProperty('--cover-blur', `url("${src}")`);
 }
 
 function wideSleeve(img: HTMLImageElement): boolean {

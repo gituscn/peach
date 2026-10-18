@@ -30,7 +30,7 @@ describe('FC2 合集与封面取景', () => {
       } finally { await opened.close(); }
     });
 
-    it(`${viewport.name}: 正封完整居中，卡片边缘使用纯色底`, async () => {
+    it(`${viewport.name}: 正封完整居中，卡片边缘使用封面模糊补底`, async () => {
       const opened = await openItemPage(browser, '/', viewport, {
         ready: '[data-media-card]', settings: { javLayout: 'big', homeLayout: 'big', javImage: 'cover' },
       });
@@ -57,8 +57,8 @@ describe('FC2 合集与封面取景', () => {
             heightGap: Math.abs(card.height - image.height) };
         });
         assert.equal(framed.panel, true);
-        assert.equal(framed.blur, '');
-        assert.equal(framed.background, 'none');
+        assert.match(framed.blur, /^url\(/);
+        assert.notEqual(framed.background, 'none');
         assert.ok(framed.left >= -.5 && framed.right >= -.5 && Math.abs(framed.left - framed.right) < 1, JSON.stringify(framed));
         assert.ok(framed.heightGap < 1, JSON.stringify(framed));
         assert.deepEqual(opened.problems, []);

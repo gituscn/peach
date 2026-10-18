@@ -8,6 +8,50 @@ describe('新作封面显示时机',()=>{
  before(async()=>{browser=await launch()});
  after(async()=>{await browser?.close()});
  for(const viewport of VIEWPORTS){
+  it(`${viewport.name} 新作正封完整居中并补底，整幅大封不使用模糊`,{timeout:60000},async()=>{
+   const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},reducedMotion:'reduce'});
+   try{
+    await context.addInitScript(()=>localStorage.setItem('peach.settings.v1',JSON.stringify({detailAutoplay:false,feedAutoScroll:false})));
+    const page=await context.newPage();
+    const cases=[
+     {width:632,height:900,front:632},
+     {width:1500,height:1000,front:704},
+     {width:1500,height:1000,front:667,poster_box:{x0:833,y0:0,x1:1500,y1:1000,px:[1500,1000],method:'manual'}},
+     {width:1800,height:1000,front:850,wide:true},
+     {width:2184,height:1638,front:2184,layout:'still'},
+    ];
+    await page.route('https://covers.example.test/fit/*',route=>{
+     const one=cases[Number(route.request().url().split('/').pop())]!;
+     return route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="http://www.w3.org/2000/svg" width="${one.width}" height="${one.height}"><rect width="${one.width}" height="${one.height}" fill="#f00"/><rect x="${one.width-one.front}" width="${one.front}" height="${one.height}" fill="#0f0"/></svg>`});
+    });
+    await page.route(/\/api\/entity\/shapes/,route=>route.fulfill({json:{home:{feed:true},entities:[]}}));
+    await page.route(/\/api\/feeds\/discoveries\?/,route=>route.fulfill({json:{ok:true,items:cases.map((one,index)=>({
+     id:index+1,code:`EXM-00${index+1}`,title:one.wide?'Blu-ray 示例新作':'示例新作',cover_url:`https://covers.example.test/fit/${index}`,poster_box:one.poster_box,cover_frame:{layout:one.layout},
+    }))}}));
+    await page.goto(requiredEnv('PEACH_E2E_ORIGIN')+'/');
+    for(let index=0;index<cases.length;index++){
+     const card=page.locator(`#feedNew [data-feed-id="${index+1}"]`);
+     await card.scrollIntoViewIfNeeded();
+     await card.locator('img.cover[data-frame]').waitFor({state:'visible'});
+     const shape=await card.evaluate(el=>{
+      const pic=el.querySelector('.pic')!,img=pic.querySelector('img')!;
+      const box=pic.getBoundingClientRect(),image=img.getBoundingClientRect();
+      const clip=getComputedStyle(img).clipPath.match(/[\d.]+/g)?.map(Number)||[0,0,0,0];
+      const left=image.left+image.width*clip[3]!/100,right=image.right-image.width*clip[1]!/100;
+      return {width:box.width,height:box.height,left:left-box.left,right:box.right-right,background:getComputedStyle(pic,'::before').backgroundImage};
+     });
+     assert.ok(Math.abs(shape.width/shape.height-.75)<.001,'新作卡片保持固定比例');
+     assert.ok(Math.abs(shape.height-224)<1,'同排封面等高');
+     if(cases[index]!.layout==='still')assert.equal(shape.background,'none','整幅大封不使用模糊');
+     else{
+      assert.notEqual(shape.background,'none','普通正封的留白由封面模糊补底');
+      assert.ok(shape.left>=-1&&shape.right>=-1&&Math.abs(shape.left-shape.right)<1,'正封完整居中');
+     }
+    }
+    assert.ok((await layout(page)).scrollWidth<=viewport.width+1,'横滚限制在新作行');
+    await page.screenshot({path:`../build/feed-cover-fit-${viewport.name}.png`});
+   }finally{await context.close()}
+  });
   it(`${viewport.name} 新作头像显示人物图与首字并提供独立资料入口`,{timeout:60000},async()=>{
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},reducedMotion:'reduce'});
    try{

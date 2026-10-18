@@ -224,15 +224,15 @@ describe('设计决定：作品卡、管理页与复核', () => {
           return filter;
         });
       assert.match(scan, /grayscale\(0\.9\)/, '待删卡的悬停扫视层没有跟着灰化');
-      /* 待删卡的封面和元信息一起压暗，封面边缘使用卡片纯色底。 */
+      /* 待删卡的封面、补底和元信息一起压暗。 */
       const pending = await page.locator('#grid [data-media-card][data-pending-delete]:not([data-variant="resource"])')
         .first().evaluate((card) => ({
           meta: getComputedStyle(card.querySelector('[data-media-meta]')!).opacity,
-          backdrop: getComputedStyle(card.querySelector('[data-media-pic]')!, '::before').backgroundImage,
+          backdrop: getComputedStyle(card.querySelector('[data-media-pic]')!, '::before').filter,
           image: getComputedStyle(card.querySelector('[data-media-pic] img')!).filter,
         }));
       assert.equal(pending.meta, '0.58', '待删卡的元信息区没有压暗');
-      assert.equal(pending.backdrop, 'none', '待删卡封面边缘使用纯色底');
+      assert.match(pending.backdrop, /blur\(26px\) grayscale\(0\.9\) brightness\(0\.27\)/, '待删卡的模糊补底跟随封面灰化');
       assert.match(pending.image, /grayscale\(0\.9\) brightness\(0\.54\)/, '待删卡封面没有跟着灰化');
     } finally {
       await opened.close();

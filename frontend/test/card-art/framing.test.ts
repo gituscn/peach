@@ -124,14 +124,14 @@ describe('coverAnchor：封面按自己的宽高比分流', () => {
     expect(edge.style.getPropertyValue('--cover-y')).toBe('');
   });
 
-  it('没有框的封套按正封比例从右缘量回去，正封边缘保持纯色底', () => {
+  it('没有框的封套按正封比例从右缘量回去，正封边缘使用封面模糊补底', () => {
     const img = cover('/cover?code=SSIS-001&thumb=1', 800, 538);
     img.parentElement!.style.setProperty('--cover-blur', 'url("/cover?code=SSIS-001&thumb=1")');
     coverAnchor(img);
     expect(img.classList.contains('panel')).toBe(true);
     expect(img.style.getPropertyValue('--panel-clip')).toMatch(/^0% 0% 0% \d/);
     expect(img.style.getPropertyValue('--panel-height')).toBe('100%');
-    expect(img.parentElement!.style.getPropertyValue('--cover-blur')).toBe('');
+    expect(img.parentElement!.style.getPropertyValue('--cover-blur')).toContain('/cover?code=SSIS-001&thumb=1');
   });
 
   it('整幅大封按主体人脸居中，重取景会清掉正封框样式', () => {
@@ -144,6 +144,7 @@ describe('coverAnchor：封面按自己的宽高比分流', () => {
     expect(img.classList.contains('panel')).toBe(false);
     expect(img.style.getPropertyValue('--panel-clip')).toBe('');
     expect(img.style.getPropertyValue('--cover-x')).toBe('63%');
+    expect(img.parentElement!.style.getPropertyValue('--cover-blur')).toBe('');
   });
 
   it('Blu-ray 与已知宽封套按宽正封取景，FC2 保留整幅画面', () => {
