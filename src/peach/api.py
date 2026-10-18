@@ -10,6 +10,7 @@
 | `routes_configuration` | 本机配置与账号设置 |
 | `routes_jav_browser` | JAV 用户脚本的专用权限、添加与状态查询 |
 | `routes_media` | 播放、分片、缩图、封面、头像、外链圆标 |
+| `routes_subtitles` | 字幕转换、ASSRT 搜索与加载、本机字幕服务配置 |
 | `routes_api` | JSON 契约出口，含两条 `/api/{route:path}` catch-all |
 
 `include_router` 的顺序是契约的一部分，不是排版：FastAPI 按注册顺序匹配，
@@ -35,7 +36,7 @@ from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES, GZipMiddle
 
 from . import (__version__, browser_transport, feeds, tunnel, web_batch, web_contract,
                web_feeds, web_follow, web_settings)
-from . import routes_api, routes_auth, routes_configuration, routes_jav_browser, routes_media, routes_pages
+from . import routes_api, routes_auth, routes_configuration, routes_jav_browser, routes_media, routes_pages, routes_subtitles
 from .buildinfo import frozen_build
 from .config import LOCATION_ROOT_DECLARATIONS, PeachSettings
 from .ffmpeg import FFmpegResolver
@@ -584,5 +585,6 @@ def create_app(
     app.include_router(routes_configuration.router)
     app.include_router(routes_jav_browser.create_router(routes_configuration.local_only))
     app.include_router(routes_media.router)
+    app.include_router(routes_subtitles.router)
     app.include_router(routes_api.router)
     return app

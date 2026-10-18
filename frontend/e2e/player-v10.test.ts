@@ -101,7 +101,8 @@ describe('Video.js 10 播放链', () => {
           const track = node.addTextTrack('subtitles', '测试字幕', 'zh'); track.mode = 'disabled';
           track.addCue(new VTTCue(0, 2, '字幕回归'));
         });
-        await page.locator('#stage .vjs-subtitles-control > button').click();
+        await page.locator('#stage [data-player-quality] > button').click();
+        await page.locator('#stage [data-player-subtitles]').click();
         await page.getByRole('menuitemradio', { name: '测试字幕', exact: true }).click();
         assert.equal(await page.locator('#stage video.vjs-tech').evaluate((node: HTMLVideoElement) =>
           [...node.textTracks].find(track => track.label === '测试字幕')?.mode), 'showing');

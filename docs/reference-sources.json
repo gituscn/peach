@@ -408,8 +408,8 @@
       "name": "YouTube 播放器控件、设置、影院与氛围模式证据",
       "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
       "snapshot": "docs/reference-snapshots/youtube-player-controls-user-screenshot.md",
-      "checked_on": "2026-09-04",
-      "sha256": "56082f84a3d1ef68ec02431959b6fa72d95b666d52531e665ea2da418aee89c3",
+      "checked_on": "2026-10-18",
+      "sha256": "96b05d0119ecbbe8c8e17d5097acb103183f398bedf726cebd7cc063e57c6781",
       "role": "实际 YouTube e937390a DOM、CSS、JS 与用户截图锁定播放器几何、状态和设置面板；官方帮助锁定氛围模式和影院模式语义。；窄屏折叠门槛与统一悬停提示取自播放器 9470c977 的 www-player.css 与 base.js。",
       "consumers": [
         "web/css/",
