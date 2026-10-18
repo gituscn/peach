@@ -72364,29 +72364,19 @@ function URe({ initial: e, initialJob: t }) {
 //#endregion
 //#region src/react/settings/remote-reporting-settings.tsx
 function WRe({ value: e, onChange: t }) {
-	return /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [/* @__PURE__ */ (0, C.jsxs)(WA, { children: [/* @__PURE__ */ (0, C.jsx)(BA, {
-		label: "发送版本与平台统计",
-		description: e.fields.usage,
+	return /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [/* @__PURE__ */ (0, C.jsx)(WA, { children: /* @__PURE__ */ (0, C.jsx)(BA, {
+		label: "发送版本统计与错误诊断（推荐）",
+		description: `${e.fields.usage} ${e.fields.errors}`,
 		children: /* @__PURE__ */ (0, C.jsx)(Oz, {
-			"aria-label": "发送版本与平台统计",
-			isSelected: e.usage,
+			"aria-label": "发送版本统计与错误诊断（推荐）",
+			isSelected: e.usage && e.errors,
 			onChange: (n) => t({
 				...e,
-				usage: n
-			})
-		})
-	}), /* @__PURE__ */ (0, C.jsx)(BA, {
-		label: "自动发送错误诊断",
-		description: e.fields.errors,
-		children: /* @__PURE__ */ (0, C.jsx)(Oz, {
-			"aria-label": "自动发送错误诊断",
-			isSelected: e.errors,
-			onChange: (n) => t({
-				...e,
+				usage: n,
 				errors: n
 			})
 		})
-	})] }), /* @__PURE__ */ (0, C.jsxs)(GA, {
+	}) }), /* @__PURE__ */ (0, C.jsxs)(GA, {
 		divided: !0,
 		children: [/* @__PURE__ */ (0, C.jsx)(qA, { children: e.notice }), e.available ? null : /* @__PURE__ */ (0, C.jsx)(qA, { children: "此版本尚未配置诊断接收端，当前不会发送；选项保存在本机。" })]
 	})] });
@@ -72394,7 +72384,7 @@ function WRe({ value: e, onChange: t }) {
 function GRe({ initial: e, receipt: t }) {
 	let [n, r] = (0, S.useState)(e), i = zA();
 	return /* @__PURE__ */ (0, C.jsxs)(UA, {
-		title: "遥测与错误诊断",
+		title: "版本统计与错误诊断",
 		onSubmit: (e) => {
 			e.preventDefault(), i.run("save", (e) => U("/api/configuration/remote-reporting", {
 				usage: n.usage,

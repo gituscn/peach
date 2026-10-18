@@ -6,7 +6,7 @@
 
 ## 运行态
 
-- [诊断与研究](DIAGNOSTICS_AUDIT.md)：默认关；明细预览同意；无 DSN。
+- [诊断与研究](DIAGNOSTICS_AUDIT.md)：统计与错误默认开启；馆藏独立同意。
 - [115](BROWSER_HISTORY.md)
 - [Docker](DOCKER.md)
 - 名册：艺人（含动画作者）｜卖家｜在线；素人须有非职业出演证据，FC2 仅筛作品。

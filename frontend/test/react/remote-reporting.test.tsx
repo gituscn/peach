@@ -9,22 +9,24 @@ const initial: RemoteReportingState = {
   notice: '不自动发送日志正文或媒体信息。',
 };
 
-describe('遥测与错误诊断', () => {
-  it('默认关闭，缺少接收端时显示明确状态，两个选项独立保存', async () => {
-    const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ ...initial, errors: true }) }));
+describe('版本统计与错误诊断', () => {
+  it('单个推荐开关保留已保存的关闭选择，开启后共同保存版本统计与错误诊断', async () => {
+    const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ ...initial, usage: true, errors: true }) }));
     vi.stubGlobal('fetch', fetcher);
     const receipt = vi.fn();
     const host = await mount(<RemoteReportingSettings initial={initial} receipt={receipt} />);
-    expect(switches(host).map((node) => node.checked)).toEqual([false, false]);
+    expect(switches(host).map((node) => node.checked)).toEqual([false]);
     expect(host.textContent).toContain('此版本尚未配置诊断接收端');
-    await click(switches(host)[1]!);
+    expect(host.textContent).toContain(initial.fields.usage);
+    expect(host.textContent).toContain(initial.fields.errors);
+    await click(switches(host)[0]!);
     await click(buttonNamed('保存配置', host));
     await settle();
     const [url, init] = fetcher.mock.calls[0]! as unknown as [string, RequestInit];
     expect(url).toBe('/api/configuration/remote-reporting');
-    expect(JSON.parse(String(init.body))).toEqual({ usage: false, errors: true });
+    expect(JSON.parse(String(init.body))).toEqual({ usage: true, errors: true });
     expect(receipt).toHaveBeenCalledWith('已保存诊断选项');
-    expect(switches(host).map((node) => node.checked)).toEqual([false, true]);
+    expect(switches(host).map((node) => node.checked)).toEqual([true]);
   });
 
   it('保存失败保留选择和错误，关闭选项可以再次提交', async () => {

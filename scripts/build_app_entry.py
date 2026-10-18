@@ -84,6 +84,31 @@ def installer_reporting(usage: str, errors: str) -> int:
     return 0
 
 
+def installer_command(argv: list[str]) -> int:
+    """执行安装辅助协议，启动与故障只在本机取证。"""
+    from peach import remote_reporting, error_reporting
+    remote_reporting.disable_for_process()
+    if len(argv) == 4 and argv[1] == "--installer-reporting":
+        return installer_reporting(argv[2], argv[3])
+    error_reporting.install()
+    if len(argv) == 2 and argv[1] in {"--installer-stop", "--installer-uninstall"}:
+        from peach.desktop_installer import main as run_installer
+        return run_installer(argv[1])
+    if len(argv) == 5 and argv[1] == "--installer-prepare":
+        from peach.desktop_installer import prepare
+        return prepare(Path(argv[2]), int(argv[3]), Path(argv[4]))
+    if len(argv) == 5 and argv[1] == "--installer-tools":
+        from peach.desktop_installer import prepare_install_tools
+        return prepare_install_tools(Path(argv[2]), Path(argv[3]), Path(argv[4]))
+    if len(argv) == 4 and argv[1] == "--installer-finish":
+        from peach.desktop_installer import finish_install
+        return finish_install(Path(argv[2]), int(argv[3]))
+    if len(argv) == 3 and argv[1] == "--installer-migrate":
+        from peach.desktop_installer import migrate_install
+        return migrate_install(Path(argv[2]))
+    raise ValueError("安装辅助参数无效")
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
     if "--data-root" in argv:
@@ -93,8 +118,8 @@ def main(argv: list[str] | None = None) -> int:
         os.environ["PEACH_DATA_ROOT"] = argv[index + 1]
         del argv[index:index + 2]
         sys.argv = argv
-    if len(argv) == 4 and argv[1] == "--installer-reporting":
-        return installer_reporting(argv[2], argv[3])
+    if len(argv) > 1 and argv[1].startswith("--installer-"):
+        return installer_command(argv)
     from peach import error_reporting
     error_reporting.install()
     if len(argv) in (2, 3) and argv[1] == "--diagnostic-report":
@@ -111,21 +136,6 @@ def main(argv: list[str] | None = None) -> int:
     if len(argv) == 4 and argv[1] == "--apply-standalone-update":
         from peach.standalone_update import apply
         return apply(Path(argv[2]), int(argv[3]))
-    if len(argv) == 2 and argv[1] in {"--installer-stop", "--installer-uninstall"}:
-        from peach.desktop_installer import main as installer_main
-        return installer_main(argv[1])
-    if len(argv) == 5 and argv[1] == "--installer-prepare":
-        from peach.desktop_installer import prepare
-        return prepare(Path(argv[2]), int(argv[3]), Path(argv[4]))
-    if len(argv) == 5 and argv[1] == "--installer-tools":
-        from peach.desktop_installer import prepare_install_tools
-        return prepare_install_tools(Path(argv[2]), Path(argv[3]), Path(argv[4]))
-    if len(argv) == 4 and argv[1] == "--installer-finish":
-        from peach.desktop_installer import finish_install
-        return finish_install(Path(argv[2]), int(argv[3]))
-    if len(argv) == 3 and argv[1] == "--installer-migrate":
-        from peach.desktop_installer import migrate_install
-        return migrate_install(Path(argv[2]))
     if wants_cli(argv):
         _prepare_console()
         try:

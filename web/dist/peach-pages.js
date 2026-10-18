@@ -20924,29 +20924,19 @@ Object.fromEntries(Object.entries({
 //#endregion
 //#region src/react/settings/remote-reporting-settings.tsx
 function wg({ value: e, onChange: t }) {
-	return /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsxs)(hm, { children: [/* @__PURE__ */ (0, z.jsx)(fm, {
-		label: "发送版本与平台统计",
-		description: e.fields.usage,
+	return /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsx)(hm, { children: /* @__PURE__ */ (0, z.jsx)(fm, {
+		label: "发送版本统计与错误诊断（推荐）",
+		description: `${e.fields.usage} ${e.fields.errors}`,
 		children: /* @__PURE__ */ (0, z.jsx)(Om, {
-			"aria-label": "发送版本与平台统计",
-			isSelected: e.usage,
+			"aria-label": "发送版本统计与错误诊断（推荐）",
+			isSelected: e.usage && e.errors,
 			onChange: (n) => t({
 				...e,
-				usage: n
-			})
-		})
-	}), /* @__PURE__ */ (0, z.jsx)(fm, {
-		label: "自动发送错误诊断",
-		description: e.fields.errors,
-		children: /* @__PURE__ */ (0, z.jsx)(Om, {
-			"aria-label": "自动发送错误诊断",
-			isSelected: e.errors,
-			onChange: (n) => t({
-				...e,
+				usage: n,
 				errors: n
 			})
 		})
-	})] }), /* @__PURE__ */ (0, z.jsxs)(gm, {
+	}) }), /* @__PURE__ */ (0, z.jsxs)(gm, {
 		divided: !0,
 		children: [/* @__PURE__ */ (0, z.jsx)(_m, { children: e.notice }), e.available ? null : /* @__PURE__ */ (0, z.jsx)(_m, { children: "此版本尚未配置诊断接收端，当前不会发送；选项保存在本机。" })]
 	})] });
@@ -21245,7 +21235,7 @@ function kg({ setup: e, onDone: t }) {
 			}),
 			E ? /* @__PURE__ */ (0, z.jsx)(vm, { children: E }) : null,
 			b ? /* @__PURE__ */ (0, z.jsxs)(Tt, { children: [
-				/* @__PURE__ */ (0, z.jsx)(Et, { children: "遥测与错误诊断" }),
+				/* @__PURE__ */ (0, z.jsx)(Et, { children: "版本统计与错误诊断" }),
 				/* @__PURE__ */ (0, z.jsx)(wg, {
 					value: b,
 					onChange: x

@@ -74,18 +74,17 @@ const alertsWith = (root: ParentNode, message: string) =>
   [...root.querySelectorAll('[role="alert"]')].filter((node) => node.textContent?.includes(message));
 const occurrences = (root: HTMLElement, message: string) => (root.textContent ?? '').split(message).length - 1;
 
-it('首启诊断开关按服务端同意值显示，明确提交独立选择', async () => {
-  const reporting = { usage: false, errors: false, available: false,
+it('首启版本统计与错误诊断默认勾选，取消后共同关闭', async () => {
+  const reporting = { usage: true, errors: true, available: false,
     fields: { usage: '版本与系统', errors: '异常链与错误码' }, notice: '不发送媒体信息' };
   const { host, sent } = await open({ remote_reporting: reporting, access_enabled: false },
     { [SETUP_URL]: { status: 200, body: done() } });
-  const usage = host.querySelector<HTMLInputElement>('input[aria-label="发送版本与平台统计"]')!;
-  const errors = host.querySelector<HTMLInputElement>('input[aria-label="自动发送错误诊断"]')!;
-  expect(usage.checked).toBe(false);
-  expect(errors.checked).toBe(false);
-  await click(errors);
+  const reportingSwitches = host.querySelectorAll<HTMLInputElement>('input[aria-label="发送版本统计与错误诊断（推荐）"]');
+  expect(reportingSwitches).toHaveLength(1);
+  expect(reportingSwitches[0]!.checked).toBe(true);
+  await click(reportingSwitches[0]!);
   await submitForm(host);
-  expect(sent(SETUP_URL).remote_reporting).toEqual({ usage: false, errors: true });
+  expect(sent(SETUP_URL).remote_reporting).toEqual({ usage: false, errors: false });
 });
 
 /** 这句错误在页面上只有一份，落在一个 `role="alert"` 里，并由框的 `aria-describedby` 指到。 */

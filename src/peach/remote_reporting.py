@@ -1,4 +1,4 @@
-"""明确同意后发送技术诊断；不读取历史日志、账本或媒体。"""
+"""按本机选择发送技术诊断；不读取历史日志、账本或媒体。"""
 from __future__ import annotations
 
 import atexit
@@ -23,6 +23,7 @@ NOTICE = "发送至 Sentry。不上报错误原文、完整日志、诊断 ZIP�
 _lock = threading.RLock()
 _client = None
 _client_dsn = ""
+_disabled = False
 
 
 def _config(config=None):
@@ -32,18 +33,25 @@ def _config(config=None):
     return config
 
 
-def _read(path):
+def _read(path, *, missing=None):
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
         return value if isinstance(value, dict) else {}
+    except FileNotFoundError:
+        return missing if missing is not None else {}
     except (OSError, ValueError, UnicodeError):
         return {}
 
 
-def consent(config=None):
-    value = _read(_config(config).directory("state") / "remote-reporting.json")
-    return {"usage": value.get("usage") is True, "errors": value.get("errors") is True,
+def _consent(path):
+    value = _read(path, missing={"usage": True, "errors": True, "revision": "default"})
+    enabled = all(value.get(key) is True for key in FIELDS)
+    return {"usage": enabled, "errors": enabled,
             "revision": str(value.get("revision", ""))}
+
+
+def consent(config=None):
+    return _consent(_config(config).directory("state") / "remote-reporting.json")
 
 
 def dsn(environment="PEACH_SENTRY_DSN", key="dsn"):
@@ -73,9 +81,12 @@ def snapshot(config=None):
 def parse_choices(body, *, partial=False):
     if not isinstance(body, dict):
         raise ValueError("遥测和自动错误诊断必须是布尔值")
-    choices = {key: body.get(key, False) if partial else body.get(key) for key in FIELDS}
+    defaults = consent() if partial else {}
+    choices = {key: body.get(key, defaults.get(key)) for key in FIELDS}
     if any(type(value) is not bool for value in choices.values()):
         raise ValueError("遥测和自动错误诊断必须是布尔值")
+    if choices["usage"] != choices["errors"]:
+        raise ValueError("版本统计与错误诊断须同时开启或关闭")
     return choices
 
 
@@ -118,6 +129,8 @@ def _new_client(target, *, envelope_gate=None):
         TIMEOUT = 5
 
         def _send_envelope(self, envelope):
+            if _disabled:
+                return
             if envelope_gate is not None:
                 if envelope_gate(envelope):
                     super()._send_envelope(envelope)
@@ -129,8 +142,8 @@ def _new_client(target, *, envelope_gate=None):
                     return
                 permit = event.pop("extra", {})
                 try:
-                    current = _read(Path(permit["consent"]))
-                    if current.get(permit["kind"]) is not True or current["revision"] != permit["revision"]:
+                    current = _consent(Path(permit["consent"]))
+                    if not all(current.get(key) is True for key in FIELDS) or current["revision"] != permit["revision"]:
                         return
                 except Exception:
                     return
@@ -154,6 +167,8 @@ def _new_client(target, *, envelope_gate=None):
 def send(kind, event, config=None):
     """发送失败不影响应用；关闭时不初始化 SDK，也不生成补传文件。"""
     global _client, _client_dsn
+    if _disabled:
+        return
     try:
         config = _config(config)
         current = consent(config)
@@ -280,6 +295,13 @@ def capture(stage, error=None, **fields):
     if error_id:
         event["event_id"] = error_id
     send("errors", event)
+
+
+def disable_for_process():
+    """本进程停止远程发送，保留本机选择。"""
+    global _disabled
+    _disabled = True
+    close()
 
 
 def close():
