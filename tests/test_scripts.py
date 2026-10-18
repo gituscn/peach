@@ -226,6 +226,24 @@ class DesktopSmokeTests(unittest.TestCase):
     def setUpClass(cls):
         cls.script = load_script("smoke_desktop")
 
+    def test_smoke_environment_disables_remote_reporting_before_startup(self):
+        from peach import remote_reporting
+        with tempfile.TemporaryDirectory() as directory:
+            data = Path(directory).resolve() / 'data'
+            environment = self.script.smoke_environment(data)
+            self.assertEqual(environment['PEACH_DATA_ROOT'], str(data))
+            config = SimpleNamespace(directory=lambda name: data / name)
+            self.assertEqual(remote_reporting.consent(config), {
+                'usage': False, 'errors': False, 'revision': 'desktop-smoke',
+            })
+            with mock.patch.dict(os.environ, {
+                    'PEACH_SENTRY_DSN': 'https://public@o1.ingest.us.sentry.io/1',
+                    }), mock.patch.object(remote_reporting, '_disabled', False), \
+                    mock.patch.object(remote_reporting, '_new_client') as client:
+                remote_reporting.usage(config)
+                remote_reporting.send('errors', {'level': 'error'}, config)
+            client.assert_not_called()
+
     def test_distribution_resources_accept_an_application_without_private_exports(self):
         with tempfile.TemporaryDirectory() as directory:
             application = Path(directory).resolve()
