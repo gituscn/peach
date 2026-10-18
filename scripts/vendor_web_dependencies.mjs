@@ -90,6 +90,8 @@ copyPackageFiles({
 });
 
 const lucideIcons = new Map([
+  // 处理速度的低占用、标准与全速刻度；全速叠放同一枚闪电。
+  ["snail", "snail"], ["zap", "zap"],
   ["heart-hand","hand-heart"], ["flame","flame"], ["cherry","cherry"], ["gem","gem"],
   ["crown","crown"], ["shirt","shirt"], ["footprints","footprints"], ["flower","flower"],
   ["venetian-mask","venetian-mask"], ["hand","hand"], ["bed-double","bed-double"],
