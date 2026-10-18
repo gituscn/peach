@@ -215,6 +215,11 @@ def wait_for(check, description: str, *, timeout: float = 60):
 
 
 def smoke_environment(data: Path) -> dict[str, str]:
+    state = data / 'state'
+    state.mkdir(parents=True, exist_ok=True)
+    (state / 'remote-reporting.json').write_text(json.dumps({
+        'usage': False, 'errors': False, 'revision': 'desktop-smoke',
+    }), encoding='utf-8')
     environment = dict(os.environ, PEACH_DATA_ROOT=str(data), PYTHONIOENCODING="utf-8")
     environment["LOCALAPPDATA"] = str(data.parent / "local-app-data")
     environment.pop("PYTHONPATH", None)
@@ -369,7 +374,8 @@ def complete_first_run(opener, base: str, media: Path, port: int, password: str,
             assert response.status == 200, path
     answers = {"media_dir": [{"path": str(media), "location": "115"}], "host": "2",
                "port": str(port), "mdns_name": "peach", "access_enabled": True,
-               "access_password": password, "access_confirm": password}
+               "access_password": password, "access_confirm": password,
+               "remote_reporting": {"usage": False, "errors": False}}
     if data_root is not None:
         answers["data_root"] = str(data_root)
     request = urllib.request.Request(base + "/api/setup", data=json.dumps(answers).encode(),
