@@ -39,7 +39,7 @@
 - [标签归一](reference-snapshots/tag-vocabulary-audit.md)
 - 种子 `2026-10-17.1`：1,199 实体、13 撤销（ADR-0106）；`0047` 已应用。
 - STRM/ISO、目录读取策略、预览开关与 Video.js 10 已部署。
-- Windows v0.42.0 已发布；安装/卸载、拆分包与任务恢复验收通过。
+- Windows v0.45.0；收键盘保留搜索建议；空预览按画框留高。
 - 推送发现开：本地 watch 加 CloudDrive 云端前缀 `/115open→B:`、`/Pikpak→A:`；关注每 60 分钟轮询；自动更新关闭。
 - Cloudflare 公网入口默认关，配置页启停前须设密码；临时链接写状态文件，命名隧道限源码部署、令牌存设置文件；整站 `noindex` 与 `/robots.txt`。
 - FC2PPV-DB、JAVten、被拦的 minnano-av 经本机 Chrome 取页（ADR-0065），profile 在 `secrets/browser/`。

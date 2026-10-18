@@ -84,6 +84,29 @@ describe('顶栏搜索', () => {
   after(async () => { await browser?.close(); });
 
   for (const viewport of VIEWPORTS) {
+    it(`${viewport.name} 收起输入法保留搜索建议，焦点移出搜索区或点击页面关闭`, { timeout: 60_000 }, async () => {
+      const opened = await openSearch(browser, { viewport, history: ['最近搜索'] });
+      try {
+        const { page } = opened;
+        if (viewport.mobile) await page.locator('#searchBtn').click();
+        await typeQuery(opened);
+        await page.locator('#q').evaluate(field => field.blur());
+        await page.waitForTimeout(220);
+        assert.equal(await page.locator(MENU).isVisible(), true, '输入法收起后建议仍可选择');
+        assert.equal(await page.locator('#q').inputValue(), SUGGEST.q);
+        await page.locator('#grid [data-media-title]').first().focus();
+        await page.waitForTimeout(220);
+        assert.equal(await page.locator(MENU).isVisible(), false, '键盘焦点移出搜索区关闭建议');
+        await page.locator('#q').focus();
+        await page.locator(MENU).waitFor({ state: 'visible' });
+        await page.locator('#q').evaluate(field => field.blur());
+        await page.waitForTimeout(220);
+        await page.locator('#grid [data-media-title]').first().dispatchEvent('pointerdown');
+        await page.locator(MENU).waitFor({ state: 'hidden' });
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close(); }
+    });
+
     it(`${viewport.name} 空搜索显示作品封面、作者头像和新作订阅入口`, { timeout: 60_000 }, async () => {
       const opened = await openSearch(browser, { viewport, history: ['最近搜索'] });
       try {
