@@ -34,8 +34,9 @@ describe('通知和任务卡的共用外框', () => {
         const measure = () => page.evaluate(() => [...document.querySelectorAll<HTMLElement>(
           '#toasts [data-sonner-toast][data-styled="true"],#toasts [data-processing-dock]')].map(node => {
           const css = getComputedStyle(node), box = node.getBoundingClientRect();
-          return { radius: css.borderRadius, shadow: css.boxShadow, border: css.border,
-            width: box.width, height: box.height, padding: css.padding };
+          return { kind: node.hasAttribute('data-processing-dock') ? 'task' : 'receipt',
+            visibility: css.visibility, radius: css.borderRadius, shadow: css.boxShadow, border: css.border,
+            x: box.x, y: box.y, width: box.width, height: box.height, padding: css.padding };
         }));
         const aligned = await measure();
         assert.equal(aligned.length, 2);
@@ -43,7 +44,9 @@ describe('通知和任务卡的共用外框', () => {
         assert.equal(aligned[0]!.radius, aligned[1]!.radius);
         assert.equal(aligned[0]!.shadow, aligned[1]!.shadow);
         assert.equal(aligned[0]!.border, aligned[1]!.border);
-        const box = (await task.boundingBox())!, top = (await receipt.boundingBox())!.y;
+        // 外观与坐标使用同一次测量，尺寸必须来自可见的布局框。
+        for (const item of aligned) assert.ok(item.visibility === 'visible' && item.width > 0 && item.height > 0, JSON.stringify(item));
+        const box = aligned.find(item => item.kind === 'task')!, top = aligned.find(item => item.kind === 'receipt')!.y;
         const clip = { x: Math.max(0, viewport.width - 600), y: Math.max(0, top - 20),
           width: Math.min(viewport.width, 600), height: viewport.height - Math.max(0, top - 20) };
         assert.ok(box.x >= 0 && box.x + box.width <= viewport.width);
