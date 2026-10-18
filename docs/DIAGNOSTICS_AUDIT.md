@@ -41,7 +41,7 @@
 
 接收端由维护者配置：源码与 Docker 使用 `PEACH_SENTRY_DSN`；Windows 发行构建从同名环境变量写入包内 `sentry.json`，GitHub Release 使用仓库变量 `PEACH_SENTRY_DSN`。只接受 Sentry 的公开 HTTPS DSN（含 US / DE 区域），不需要 API token。没有 DSN 时不会创建 SDK 客户端。SDK 自动框架集成、日志、性能追踪和指标均关闭；版本统计作为普通事件计入 Sentry 错误事件额度。账号套餐和总量以 [Sentry 订阅页](https://sentry.io/settings/) 为准。
 
-回归验收使用临时数据根和 SDK 内存接收端。本机已配置独立的 `peach-errors` 与 `peach-library-research` 接收项目，合成错误 `PEACH-ERRORS-1` 已在 Sentry 核对代码位置；没有发送真实馆藏。发布包的 CI 接收地址尚未配置。
+回归验收使用临时数据根和 SDK 内存接收端。本机已配置独立的 `peach-errors` 与 `peach-library-research` 接收项目，合成错误 `PEACH-ERRORS-1` 已在 Sentry 核对代码位置；没有发送真实馆藏。发布工作流的两个公开 DSN 仓库变量已配置并回读核对，构建包从变量取得接收地址；配置变量不触发发布。技术诊断选择见 [ADR-0110](adr/0110-recommended-diagnostics-choice.md)。安装辅助进程只在本机取证，不初始化远程客户端或发送事件；应用进程按用户选择发送。
 
 ### 馆藏与口味群体研究
 

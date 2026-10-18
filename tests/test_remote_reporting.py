@@ -24,6 +24,7 @@ class RemoteReportingTests(unittest.TestCase):
         self.addCleanup(mock.patch.stopall)
         mock.patch.dict(os.environ, {"PEACH_DATA_ROOT": str(self.root), "PEACH_SENTRY_DSN": DSN}).start()
         mock.patch("peach.settings_file.active", return_value=self.config).start()
+        mock.patch.object(reporting, "_disabled", False).start()
         self.addCleanup(reporting.close)
         reporting.close()
         reporting.save({"usage": False, "errors": False})
@@ -84,6 +85,11 @@ class RemoteReportingTests(unittest.TestCase):
                 reporting.usage()
                 reporting.capture("unhandled-main", ValueError("private"))
                 client.assert_not_called()
+
+    def test_optional_setup_choices_preserve_saved_opt_out(self):
+        self.assertEqual(reporting.parse_choices({}, partial=True), {"usage": False, "errors": False})
+        (self.config.directory("state") / "remote-reporting.json").unlink()
+        self.assertEqual(reporting.parse_choices({}, partial=True), {"usage": True, "errors": True})
 
     def test_dsn_only_accepts_hosted_public_https_endpoint(self):
         for value in (DSN, DSN.replace('.us.', '.'), DSN.replace('.us.', '.de.')):
@@ -199,6 +205,32 @@ class RemoteReportingTests(unittest.TestCase):
         self.assertFalse(reporting.consent()["usage"])
         self.assertFalse(reporting.consent()["errors"])
 
+    def test_installer_helpers_keep_startup_and_faults_local(self):
+        reporting.save({"usage": True, "errors": True})
+        entry = runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/build_app_entry.py"))
+
+        def helper(*_args):
+            reporting.capture("unhandled-main", RuntimeError("installer fault"))
+            return 0
+
+        cases = (
+            ("--installer-stop", "main", []),
+            ("--installer-uninstall", "main", []),
+            ("--installer-prepare", "prepare", [str(self.root), "123", str(self.root / "error.txt")]),
+            ("--installer-tools", "prepare_install_tools", [str(self.root)] * 3),
+            ("--installer-finish", "finish_install", [str(self.root), "123"]),
+            ("--installer-migrate", "migrate_install", [str(self.root)]),
+        )
+        for mode, handler, args in cases:
+            with self.subTest(mode=mode), mock.patch.object(reporting, "_disabled", False), \
+                    mock.patch("peach.error_reporting.install", side_effect=reporting.usage), \
+                    mock.patch(f"peach.desktop_installer.{handler}", side_effect=helper), \
+                    mock.patch.object(reporting, "_new_client") as client:
+                self.assertEqual(entry["main"](["Peach.exe", mode, *args]), 0)
+                client.assert_not_called()
+                self.assertTrue(reporting.consent()["usage"])
+                self.assertTrue(reporting.consent()["errors"])
+
     def test_installer_helper_persists_explicit_choices_in_fresh_process(self):
         root = Path(__file__).resolve().parents[1]
         env = {**os.environ, 'PYTHONPATH': str(root / 'src'), 'PEACH_SENTRY_DSN': ''}
@@ -210,6 +242,19 @@ class RemoteReportingTests(unittest.TestCase):
             self.assertEqual(reporting.consent()['usage'], usage == '1')
             self.assertEqual(reporting.consent()['errors'], errors == '1')
         self.assertFalse(self.config.path.exists())
+
+    def test_invalid_installer_arguments_do_not_start_tray_or_network(self):
+        reporting.save({"usage": True, "errors": True})
+        entry = runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/build_app_entry.py"))
+        tray = mock.Mock()
+        with mock.patch.dict(entry["main"].__globals__, {"tray_main": tray}), \
+                mock.patch("peach.error_reporting.install", side_effect=reporting.usage), \
+                mock.patch.object(reporting, "_new_client") as client:
+            for mode in ("--installer-prepare", "--installer-reporting", "--installer-unknown"):
+                with self.subTest(mode=mode), self.assertRaises(ValueError):
+                    entry["main"](["Peach.exe", mode])
+            tray.assert_not_called()
+            client.assert_not_called()
 
 
 class RemoteReportingApiTests(unittest.TestCase):
