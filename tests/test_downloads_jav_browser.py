@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import tempfile
 import threading
 import unittest
@@ -12,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from peach import downloads as dl
 from peach.api import create_app
-from peach.config import PeachSettings
+from peach.config import PROJECT_ROOT, PeachSettings
 from peach.jav_browser import CREDENTIAL, JavBrowser, code_key, source_page, source_sites
 from support.ledger import fresh_ledger
 
@@ -274,6 +275,11 @@ class BrowserTests(unittest.TestCase):
         self.assertNotIn("__PEACH_JAV_MATCHES__", response.text)
         for host in ("javdb.com", "javbus.com", "javlibrary.com", "dmm.co.jp"):
             self.assertIn(f"// @match        https://{host}/*", response.text)
+        directory = PROJECT_ROOT / "web" / "integrations"
+        release = json.loads((directory / "jav-userscript-release.json").read_text(encoding="utf-8"))
+        self.assertEqual(hashlib.sha256(response.content).hexdigest(), release["files"]["peach-jav.user.js"])
+        self.assertEqual(hashlib.sha256((directory / "jav-sites.json").read_bytes()).hexdigest(),
+                         release["files"]["jav-sites.json"])
 
     def test_shutdown_waits_for_search_and_leaves_a_resumable_job(self):
         self.add()
@@ -369,6 +375,19 @@ class BrowserTests(unittest.TestCase):
         self.service.process_one()
         task = self.downloads.store.get(self.status().json()["task_id"])
         self.assertEqual(task.origin, "browser:https://javdb.com/v/AbCd12")
+        self.remote.submit.assert_called_once()
+
+    def test_registered_mirror_and_online_source_use_the_cloud_pipeline(self):
+        for page in ("https://missav123.com/cn/abc-123", "https://www.busfan.casa/ABC-123",
+                     "https://javgo.to/zh/v/abc-123", "https://netflav5.com/video/abc-123",
+                     "https://www.av01.media/video/abc-123"):
+            with self.subTest(page=page):
+                self.assertEqual(source_page(page), page)
+        page = "https://netflav5.com/video/abc-123"
+        self.assertEqual(self.add(source_url=page).json()["state"], "queued")
+        self.service.process_one()
+        task = self.downloads.store.get(self.status().json()["task_id"])
+        self.assertEqual(task.origin, f"browser:{page}")
         self.remote.submit.assert_called_once()
 
     def test_site_inventory_exposes_automatic_and_selected_code_modes(self):

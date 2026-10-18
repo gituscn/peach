@@ -71149,7 +71149,7 @@ function DFe({ initial: e, receipt: t }) {
 		title: "浏览器添加 JAV",
 		children: [/* @__PURE__ */ (0, C.jsxs)(jk, { children: [
 			/* @__PURE__ */ (0, C.jsx)("div", { children: /* @__PURE__ */ (0, C.jsx)(Ik, {
-				href: "/integrations/peach-jav.user.js",
+				href: "https://sleazyfork.org/zh-CN/scripts/600821",
 				children: "安装 Peach 用户脚本"
 			}) }),
 			/* @__PURE__ */ (0, C.jsxs)("div", {

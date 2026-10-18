@@ -3,7 +3,6 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
 from .config import PROJECT_ROOT
-from .jav_browser import source_sites
 from .routes_auth import require_auth
 
 
@@ -19,14 +18,7 @@ def browser_client(request: Request):
 
 
 def userscript():
-    import json
-    sites = source_sites()
-    domains = dict.fromkeys(host for site in sites for host in site["domains"])
-    matches = "\n".join(line for host in domains for line in (
-        f"// @match        https://{host}/*", f"// @match        https://*.{host}/*"))
-    template = (PROJECT_ROOT / "web" / "integrations" / "peach-jav.user.js").read_text(encoding="utf-8")
-    script = template.replace("// __PEACH_JAV_MATCHES__", matches).replace(
-        "__PEACH_JAV_SITES__", json.dumps({"version": 1, "sites": sites}, ensure_ascii=False))
+    script = (PROJECT_ROOT / "web" / "integrations" / "peach-jav.user.js").read_bytes()
     return Response(script, media_type="application/javascript", headers={"Cache-Control": "no-cache"})
 
 

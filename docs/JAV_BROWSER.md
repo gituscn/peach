@@ -8,14 +8,14 @@
 - 配置 115（经 CloudDrive2）或 PikPak 的云下载账号、目标目录，以及对应的挂载与入库路径。先用 Peach 的云下载完成一次下载，确认文件能入库。配置见[资源搜索](RESOURCE_SEARCH.md)与 [CloudDrive2](CLOUDDRIVE.md)。
 - 浏览器安装支持 GM API 的用户脚本管理器；以 [Tampermonkey 官方安装与浏览器说明](https://www.tampermonkey.net/)为准。
 
-脚本覆盖在线播放、数据库与资料、发行销售平台、片商官网、无码发行站和资源索引。各站的域名与识别方式见[完整站点清单](JAV_BROWSER_SITES.md)。镜像域名单独登记，不根据相似名称自动认作同一站。面向使用者的安装、配对和站点说明集中在 [Sleazy 发布页文案](JAV_USERSCRIPT_SLEAZY.md)，Peach 配置页只保留安装与配对操作。
+脚本由 [peach-mitao/peach-userscript](https://github.com/peach-mitao/peach-userscript) 独立维护，覆盖在线播放、数据库与资料、发行销售平台、片商官网、无码发行站和资源索引。各站的域名与识别方式见[完整站点清单](JAV_BROWSER_SITES.md)。镜像域名单独登记，不根据相似名称自动认作同一站。面向使用者的安装、配对和站点说明集中在 [Sleazy 发布页文案](JAV_USERSCRIPT_SLEAZY.md)，Peach 配置页只保留安装与配对操作。
 
 自动识别站点只读取作品详情页的主标题与明确番号字段；字段缺失或身份冲突时，使用选中番号的方式。标记为「选中番号」的站点需要先选中一个完整番号，再从脚本菜单选择「选中番号加入 Peach」，最后点击浮出的添加按钮。
 
 ## 安装与配对
 
 1. 在运行 Peach 的电脑上打开「Peach 配置 → 下载渠道 → 浏览器添加 JAV」。
-2. 点击「安装 Peach 用户脚本」，由脚本管理器安装。
+2. 点击「安装 Peach 用户脚本」打开 [Sleazy 发布页](https://sleazyfork.org/zh-CN/scripts/600821)，再由脚本管理器安装。
 3. 选择默认下载渠道，点击「启用并生成令牌」，复制专用令牌。令牌只在本次生成后显示；离开页面后需要用「更新渠道与令牌」重新生成。
 4. 打开已登记站点，从脚本管理器菜单选择「配置 Peach 地址与令牌」，填写配置页显示的 Peach 地址和专用令牌。目标浏览器必须信任 Peach 的 HTTPS 证书；HTTP 只允许回环地址。
 5. 允许脚本管理器连接自己的 Peach 地址。远程设备填写该设备能访问的 Peach HTTPS 地址。
@@ -47,3 +47,9 @@
 ## 核验范围
 
 临时账本与模拟网盘完成服务端回归；模拟 GM API 的真实 Chromium 页面覆盖桌面、390×844、SPA 切页、身份冲突、番号规范化与请求重试。真实 Tampermonkey 扩展安装、MissAV／Jable 当前页面和真实网盘下载的联合验收未取得。
+
+## 制品同步
+
+脚本与站点规则的唯一维护源在独立仓库。Peach 的 `web/integrations/` 保存同一次发布的完整安装脚本、站点快照与 `jav-userscript-release.json` 来源记录；安装端点直接返回该脚本，服务端使用本地快照独立校验来源地址。运行时不下载远程规则或代码。
+
+更新时在用户脚本仓库构建、验证并提交，通过其 `scripts/export-peach.mjs` 导出到 Peach 隔离工作树，再按本项目测试和集成入口交付。来源记录包含上游提交、版本与 SHA256；同步方法见[独立仓库说明](https://github.com/peach-mitao/peach-userscript#发布与-peach-同步)。
