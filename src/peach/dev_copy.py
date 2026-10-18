@@ -8,6 +8,7 @@ import re
 
 def files(root: Path):
     yield root / "web/index.html"
+    yield root / "src/peach/library_sharing.py"
     yield from sorted((root / "frontend/src").rglob("*.js"))
     yield from sorted((root / "frontend/src").rglob("*.tsx"))
     yield from sorted((root / "frontend/src").rglob("*.ts"))

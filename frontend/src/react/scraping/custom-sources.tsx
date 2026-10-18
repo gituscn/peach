@@ -7,6 +7,7 @@ import { confirmModal, spinnerHtml } from '@peach/legacy/ui';
 import { esc } from '@peach/legacy/core';
 import { apiSend, errorMessage } from '../../api';
 import { queryClient } from '../query';
+import { CodeBlock } from '../components/code-block';
 import { ErrorText, FieldLabel, Footer, Help, Section, Stack } from '../settings/section';
 import { busyProps, useAction } from '../settings/use-action';
 import { SelectField } from '../settings-panel/legacy-controls';
@@ -98,7 +99,7 @@ function SourceForm({ initial, cancel, saved }: {
           }, (cause) => { if (current === revision.current) action.setError(errorMessage(cause)) });
       }} />
       {action.busy === 'preview' ? <Help role="status"><span dangerouslySetInnerHTML={{ __html: spinnerHtml('正在试查来源') }} />正在试查来源…</Help> : null}
-      {preview ? <pre className="whitespace-pre-wrap break-all">{preview}</pre> : null}
+      {preview ? <CodeBlock code={preview} language="json" label="元数据接口返回" /> : null}
       {action.error ? <ErrorText>{action.error}</ErrorText> : null}
     </Stack>
     <Footer><Button variant="secondary" type="button" onClick={cancel}>取消</Button>

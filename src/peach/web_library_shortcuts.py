@@ -6,59 +6,21 @@ import time
 import uuid
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
-from .entities import resolve_entity, resolve_entity_id
 from .catalog_rules import solo_performer_clause
+from .library_favorites import KEY, favorite_entry, favorite_entities
+from .profiles import DEFAULT_PROFILE_ID, read_settings
 from .web_catalog import VISIBLE_CATALOG_ASSET, entity_ref
-from .web_settings import DEFAULT_PROFILE_ID
 
-KEY = "libraryShortcuts"
-KINDS = frozenset({"performer", "creator", "studio", "series", "agency", "tag"})
 QUERY_KEYS = frozenset({"loc", "creator", "studio", "owner", "tag", "tag_match", "len",
                         "dur_min", "dur_max", "orient", "region", "sort", "dir", "q", "jav", "thumb", "state",
                         "browse", "folder", "folder_recursive"})
 PATHS = frozenset({"/", "/unseen", "/watch-later", "/flagged"})
 
 
-def _profile(c):
-    row = c.execute("SELECT settings_json FROM profile WHERE id=?", (DEFAULT_PROFILE_ID,)).fetchone()
-    if row is None:
-        return {}
-    try:
-        value = json.loads(row[0] or "{}")
-    except (ValueError, TypeError):
-        value = {}
-    return value if isinstance(value, dict) else {}
-
-
-def _favorite(c, entry):
-    if not isinstance(entry, dict):
-        return None
-    if entry.get("kind") == "tag" and not entry.get("entity_id"):
-        tag = entry.get("name")
-        if isinstance(tag, str) and 0 < len(tag.strip()) <= 120:
-            entity = resolve_entity(c, "tag", tag.strip())
-            if entity:
-                return _favorite(c, {"entity_id": entity["id"]})
-        return None
-    value = entry.get("entity_id")
-    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        return None
-    resolved = resolve_entity_id(c, value)
-    row = c.execute("SELECT id,kind,canonical_name FROM entity WHERE id=?", (resolved,)).fetchone() if resolved else None
-    if row is None or row[1] not in KINDS:
-        return None
-    return {"key": "entity:" + str(row[0]), "entity_id": row[0], "kind": row[1], "name": row[2]}
-
-
 def _snapshot(c, settings):
     stored = settings.get(KEY)
     stored = stored if isinstance(stored, dict) else {}
-    favorites = {}
-    raw_favorites = stored.get("favorites", [])
-    for item in (raw_favorites if isinstance(raw_favorites, list) else [])[:1000]:
-        current = _favorite(c, item)
-        if current:
-            favorites[current["key"]] = current
+    favorites = favorite_entities(c, settings)
     raw_filters = stored.get("filters", [])
     filters = []
     for item in (raw_filters if isinstance(raw_filters, list) else [])[:100]:
@@ -69,7 +31,7 @@ def _snapshot(c, settings):
         except ValueError:
             continue
         filters.append({"id": item["id"][:80], "name": item["name"][:80], "href": href})
-    return {"favorites": list(favorites.values()), "filters": filters}
+    return {"favorites": favorites, "filters": filters}
 
 
 def clean_href(raw):
@@ -87,7 +49,7 @@ def clean_href(raw):
 
 def q_library_shortcuts(contract, _args=None):
     with contract.read_connection() as c:
-        data = _snapshot(c, _profile(c))
+        data = _snapshot(c, read_settings(c))
         _attach_art(contract, c, data["favorites"])
         return data
 
@@ -125,16 +87,16 @@ def _favorite_art(contract, row, representative):
 
 
 def favorite_ids(connection):
-    return {row["entity_id"] for row in _snapshot(connection, _profile(connection))["favorites"]}
+    return {row["entity_id"] for row in favorite_entities(connection)}
 
 
 def w_library_shortcuts(contract, body):
     action = body.get("action")
     with contract.write_transaction() as c:
-        settings = _profile(c)
+        settings = read_settings(c)
         data = _snapshot(c, settings)
         if action == "favorite":
-            item = _favorite(c, body)
+            item = favorite_entry(c, body)
             if item is None or not isinstance(body.get("on"), bool):
                 raise ValueError("收藏对象不存在或状态不正确")
             data["favorites"] = [row for row in data["favorites"] if row["key"] != item["key"]]

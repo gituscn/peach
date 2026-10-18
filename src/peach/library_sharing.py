@@ -4,28 +4,26 @@ from __future__ import annotations
 import gzip
 import io
 import json
-import math
 import threading
 import time
 import uuid
-from collections import defaultdict
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 from . import __version__, remote_reporting
 from .fsutil import atomic_write_text
 
-SCHEMA = 3
+SCHEMA = 4
 MAX_BYTES = 18 * 1024 * 1024
 MAX_RAW_BYTES = 100 * 1024 * 1024
 FILENAME = "peach-library-taste.json.gz"
 FIELDS = [
-    "作品编号、同编号文件数量、标签、出演者、创作者、厂牌、系列、媒体类型与时长",
-    "每部作品的评分、喜欢状态、累计播放次数与观看比例",
-    "出演者、创作者、标签、厂牌、系列、年代和时长偏好的名称、强度与证据来源类别",
+    "去重后的作品编号，以及评分、喜欢、不喜欢、已看、稍后看、播放次数、观看比例与手动添加的标签",
+    "出演者、创作者、厂牌、系列、手动标签、年代与时长分组的收藏、喜欢、不喜欢、观看数量和评分分布（有编号作品与无编号条目分开），以及主动收藏的实体名称",
+    "馆藏文件数量、有编号作品数量与无编号条目数量",
     "Peach 版本、字段版本与 UTC 自然周",
 ]
-NOTICE = "用于 Peach 群体研究；每周上传完整明细，存在关联风险，接收服务可见 IP。"
+NOTICE = "匿名处理后上传馆藏与各类偏好明细。"
 
 
 def _path(config):
@@ -64,51 +62,13 @@ def snapshot(config):
 
 
 def collect(contract):
-    """只读投影完整明细，偏好计算不写本机缓存。"""
-    from .taste_preferences import preference_profile
-    from .catalog_rules import is_jav_code, normalise_code_key
-    from .error_reporting import redact
+    """在本机生成群体分析投影，不读取浏览历史或写入缓存。"""
+    from .library_research import project
     with contract.read_connection() as connection:
-        tags, entities, likes = defaultdict(set), defaultdict(lambda: defaultdict(set)), set()
-        for asset, tag in connection.execute("SELECT asset_id,tag FROM asset_tag"):
-            tags[asset].add(redact(str(tag)))
-        for asset, kind, name in connection.execute(
-                "SELECT ae.asset_id,e.kind,e.canonical_name FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id"):
-            if kind in {"performer", "creator", "studio", "series"}:
-                entities[asset][kind].add(redact(str(name)))
-        for asset, in connection.execute("SELECT asset_id FROM asset_preference WHERE profile_id='local-default' AND liked=1"):
-            likes.add(asset)
-        works = {}
-        for aid, code, medium, duration, rating, plays, ratio in connection.execute(
-                "SELECT id,code,medium,duration,rating,play_count,watch_ratio FROM asset WHERE disposal IS NULL"):
-            code = normalise_code_key(code) if is_jav_code(code) else None
-            key = ("code", code) if code else ("uncoded", aid)
-            work = works.setdefault(key, {"code": code or None, "copies": 0, "tags": set(),
-                "entities": defaultdict(set), "media": set(), "ratings": set(), "liked": False,
-                "play_count": 0, "watch_ratio": 0, "duration_seconds": 0})
-            work["copies"] += 1
-            work["tags"].update(tags[aid])
-            for kind, names in entities[aid].items():
-                work["entities"][kind].update(names)
-            if medium in {"video", "image", "audio"}:
-                work["media"].add(medium)
-            if type(rating) in (int, float) and math.isfinite(rating):
-                work["ratings"].add(rating)
-            work["liked"] |= aid in likes
-            work["play_count"] += max(0, int(plays or 0))
-            work["watch_ratio"] = max(work["watch_ratio"], min(1, max(0, float(ratio or 0))))
-            work["duration_seconds"] = max(work["duration_seconds"], max(0, float(duration or 0)))
-        strengths, names, evidence = preference_profile(connection, contract.taste_history_store, cache=False)
-    library = [{**work, "tags": sorted(work["tags"]), "media": sorted(work["media"]),
-                "ratings": sorted(work["ratings"]),
-                "entities": {kind: sorted(values) for kind, values in work["entities"].items()}}
-               for work in works.values()]
-    preferences = {kind: [{"name": redact(str(names.get(kind, {}).get(identity, identity))),
-                           "strength": round(score, 6), "evidence": evidence[kind][identity]}
-                          for identity, score in values.items()]
-                   for kind, values in strengths.items()}
+        connection.execute("BEGIN")
+        projection = project(connection)
     payload = {"schema": SCHEMA, "peach": __version__, "period": datetime.now(timezone.utc).strftime("%G-W%V"),
-               "library": library, "preferences": preferences}
+               **projection}
     data = json.dumps(payload, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode()
     if len(data) > MAX_RAW_BYTES:
         raise ValueError("馆藏与口味明细超过 100 MiB，整份未发送")
@@ -124,50 +84,13 @@ def compressed(data):
 
 
 def valid_payload(payload):
-    if (not isinstance(payload, dict) or set(payload) != {"schema", "peach", "period", "library", "preferences"}
+    from .library_research import valid_projection
+    if (not isinstance(payload, dict) or set(payload) != {"schema", "peach", "period", "library", "preferences", "coverage"}
             or payload["schema"] != SCHEMA or payload["peach"] != __version__
             or payload["period"] != datetime.now(timezone.utc).strftime("%G-W%V")
             or not isinstance(payload["library"], list) or not isinstance(payload["preferences"], dict)):
         return False
-    fields = {"code", "copies", "tags", "entities", "media", "ratings", "liked", "play_count", "watch_ratio", "duration_seconds"}
-    for work in payload["library"]:
-        if (not isinstance(work, dict) or set(work) != fields or not isinstance(work["entities"], dict)
-                or not set(work["entities"]) <= {"performer", "creator", "studio", "series"}
-                or not _valid_work_values(work)):
-            return False
-    if not set(payload["preferences"]) <= {"performer", "creator", "tag", "studio", "series", "era", "length"}:
-        return False
-    return all(isinstance(rows, list) and all(_valid_preference(row) for row in rows)
-               for rows in payload["preferences"].values())
-
-
-def _public_strings(values):
-    from .error_reporting import redact
-    return isinstance(values, list) and all(isinstance(value, str) and redact(value) == value for value in values)
-
-
-def _finite(value):
-    return type(value) in (int, float) and math.isfinite(value)
-
-
-def _valid_work_values(work):
-    from .catalog_rules import is_jav_code
-    return ((work["code"] is None or isinstance(work["code"], str) and is_jav_code(work["code"]))
-            and type(work["copies"]) is int and work["copies"] > 0
-            and type(work["play_count"]) is int and work["play_count"] >= 0
-            and type(work["liked"]) is bool and _finite(work["watch_ratio"]) and 0 <= work["watch_ratio"] <= 1
-            and _finite(work["duration_seconds"]) and work["duration_seconds"] >= 0
-            and isinstance(work["ratings"], list) and all(_finite(rating) for rating in work["ratings"])
-            and _public_strings(work["tags"]) and isinstance(work["media"], list)
-            and set(work["media"]) <= {"video", "image", "audio"}
-            and all(_public_strings(names) for names in work["entities"].values()))
-
-
-def _valid_preference(row):
-    return (isinstance(row, dict) and set(row) == {"name", "strength", "evidence"}
-            and _public_strings([row["name"]]) and _finite(row["strength"]) and 0 <= row["strength"] <= 1
-            and isinstance(row["evidence"], list) and set(row["evidence"]) <= {
-                "观看与反馈", "馆藏积累", "浏览记录", "浏览器书签", "关注"})
+    return valid_projection(payload)
 
 
 class Service:

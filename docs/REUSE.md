@@ -158,7 +158,11 @@ Peach 播放器皮肤直接装饰 Video.js 10 的 light DOM：右侧控制组用
 
 Windows 连接清理复用 [CPython 3.14.7 的 Proactor 对象协议](https://github.com/python/cpython/blob/v3.14.7/Lib/asyncio/proactor_events.py)（PSF 许可，无新增依赖）。精确识别纯标准库清理回调中的 `WinError 10054`，只补完 socket 关闭、服务端解除登记和关闭状态，不重复通知协议，不全局修改标准库类或替换事件循环。它使用 `_sock`、`_server._detach` 与 `_called_connection_lost` 私有接口，升级 Python 时须核验。真实 socket 和 `asyncio.Server` 配合合成故障验证资源释放；收尾自身失败保留原始异常链并上报。33 次回环实验未复现原始竞争时序，不据此认定客户端来源。协议类别只写本机日志；来源、任务、媒体和浏览器的远程筛选复用现有领域状态，见 [诊断核验](DIAGNOSTICS.md#远程错误筛选核验)。
 
-馆藏与口味群体研究复用 `LedgerDatabase.read_connection`、`taste_preferences.preference_profile(cache=False)`、`error_reporting.redact` 与固定版 Sentry 的内存附件 API。只读偏好计算沿用同一证据算法，禁用偏好和浏览偏好缓存写入；不复制原始浏览资料。完整 JSON 使用 Python 3.14 标准库 `gzip`（PSF，无新增依赖）无损压缩，固定文件名，gzip 头不含源文件名或生成时间。超过 10 MiB 的合成明细逐字节还原，并通过真实 SDK 的拦截传输验证附件与同意门槛。Sentry 附件接收复用官方 SDK（MIT）；没有引入匿名中继或独立聚合服务，因为本契约明确保留逐份明细并披露关联风险。字段、体积上限和验收见[馆藏与口味群体研究](DIAGNOSTICS.md#馆藏与口味群体研究)。
+馆藏与口味群体研究复用 `LedgerDatabase.read_connection`、规范编号、`entities.male_performer_ids`、`taste_evidence.era/length_band`、实体收藏快照、`error_reporting.redact` 与固定版 Sentry 内存附件 API。`library_research` 负责本机去重、用户信号、手动标签和分组评分直方图，这是 Peach 的领域投影；不读取浏览历史或写入偏好缓存。JSON 使用 Python 3.14 标准库 `gzip`（PSF，无新增依赖），固定文件名，gzip 头不含源文件名或生成时间。万条作品投影逐字节还原，真实 SDK 的内存传输验证最终附件、白名单与同意门槛。Sentry 附件接收复用官方 SDK（MIT）；没有引入匿名中继或独立聚合服务，本契约保留逐份投影并披露关联风险。字段、体积上限和验收见[馆藏与口味群体研究](DIAGNOSTICS.md#馆藏与口味群体研究)。
+
+代码展示统一复用 `frontend/src/react/components/code-block.tsx`：BoardUI 已固定版本的 Button、语义颜色、排版与圆角，加现有覆盖式滚动条；包含语言标识、完整原文复制、可聚焦滚动区、剪贴板失败反馈与可选的屏幕截断。用于馆藏上传 JSON、CloudDrive2 TOML 和自定义来源 JSON。2026-10-19 核对 [BoardUI 官方目录](https://www.boardui.com/components) 与 `boardui list`，公开注册表没有独立 Code Block，故以现有原语组合 Peach 包装件；无需引入只为只读文本服务的语法解析依赖，也不复制 Pro 模板。组件测试覆盖原文复制与 HTML 文本安全，布局通过桌面和窄屏浏览器验证。无新增依赖，vendored 上游源文件保持原样。
+
+实体收藏复用 `profiles.read_settings` 与 `library_favorites.favorite_entities`，集中处理规范身份、重定向、标签选择、数量上限与去重，供页面和群体研究共用。命名筛选及 HTTP 展示由网页层负责；数据层不依赖网页模块。
 
 `src/peach/diagnostics.py` 统一生成 CLI 与本机 API 报告；复用 `settings_file`、`health` 的只读迁移校验、`FFmpegResolver`、访问策略和挂载快照。数据库用 SQLite `mode=ro`；写入与端口检查用标准库短暂探针，不新增运行依赖。
 
@@ -356,7 +360,7 @@ MGS 专属发行先查自营商品目录，Prestige 番号复用 `metadata_route
 - 标签发布用系统 Git、GitHub CLI（MIT）与 [Actions runs REST API](https://docs.github.com/en/rest/actions/workflow-runs)；[release_tag.py](../scripts/release_tag.py) 管版本、主线归属、同提交成功 CI 与不可覆盖策略，工作流用 Release 制品验收。
 - 独立 Windows 测试包用 PyInstaller（GPL-2.0-or-later，带 bootloader 分发例外）的 [onedir 与自启动子进程](https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html)：完整目录共享资源、避免重复解包，onefile 托盘入口只用于源码部署；Peach 保留进程所有权、数据目录、配置和扫描策略。
 - 首启数据目录定位复用标准库 `pathlib` 和现有 `fsutil.atomic_write_text`，在启动落点记录本机绝对路径，读取限定跳转次数并检查循环。目录选择、单实例锁交接及服务环境属于 Peach 生命周期策略，无新增依赖。临时目录回归覆盖保存配置、真实子服务启动、正常首页、再次发现所选位置和锁冲突。
-- Windows 安装包用 Inno Setup 6.7.3（Inno Setup License，允许免费分发）与官方 `Files/Languages/Unofficial/ChineseSimplified.isl` 译文（在 `scripts/installer/`）。目录选择与升级目录记忆复用官方 [`DisableDirPage`](https://jrsoftware.org/ishelp/topic_setup_disabledirpage.htm)、[`UsePreviousAppDir`](https://jrsoftware.org/ishelp/topic_setup_usepreviousappdir.htm)；Peach 在目录页和安装前校验独立目录、数据重叠、目录链接、写入权限及已有安装位置，使用现有 Inno Setup，无新增依赖。`test_desktop_installer.py` 编译正式脚本并运行共用判据的隔离 EXE，覆盖中文和空格路径、原位升级及目录保护，不安装到真实位置、不写 ledger。`.iss` 只管文件、开始菜单项和卸载登记；停托盘、补迁移、撤快捷方式经 `desktop_installer` 调已有入口，自更新与应用内卸载是唯一实现。
+- Windows 安装包用 Inno Setup 6.7.3（Inno Setup License，允许免费分发）与官方 `Files/Languages/Unofficial/ChineseSimplified.isl` 译文（在 `scripts/installer/`）。目录选择与升级目录记忆复用官方 [`DisableDirPage`](https://jrsoftware.org/ishelp/topic_setup_disabledirpage.htm)、[`UsePreviousAppDir`](https://jrsoftware.org/ishelp/topic_setup_usepreviousappdir.htm)；Peach 在目录页和安装前校验独立目录、数据重叠、目录链接、写入权限及已有安装位置，使用现有 Inno Setup，无新增依赖。馆藏与口味上传说明复用 [`CreateOutputMsgMemoPage`](https://jrsoftware.org/ishelp/topic_isxfunc_createoutputmsgmemopage.htm) 的只读滚动页与 `ShouldSkipPage`；Unicode 正文赋给 `RichEditViewer.Text`，仅主动选择上传时显示。`test_desktop_installer.py` 编译正式脚本并运行共用判据的隔离 EXE，覆盖中文和空格路径、原位升级及目录保护，不安装到真实位置、不写 ledger。`.iss` 只管文件、开始菜单项和卸载登记；停托盘、补迁移、撤快捷方式经 `desktop_installer` 调已有入口，自更新与应用内卸载是唯一实现。
 - 运行一致性：用 `LedgerDatabase.write_transaction` 的提交边界与 `OrderedDict`；HTTP 导航用 FastAPI/Starlette，图片复验用 `StaticFiles.is_not_modified` 与 `FileResponse` 的 ETag；列表用 SQLite 的 IN/UNION 保留隐藏标签与多标签组合，不引查询框架。
 - 馆藏侧栏用 `catalog_filter` 的列表条件，已保存在线卡片用关注来源的标签与封面投影，详情用 `openFollowDetail`、Video.js 与媒体队列；导航范围与标签计数在 `frontend/src/sidebar.ts`。
 - wheel 资源用 setuptools 的 `build_py.copy_tree`（[官方包内数据建议](https://setuptools.pypa.io/en/stable/userguide/datafiles.html)），钩子只复制三个既有资源目录，因为源码、桌面构建和前端产物共用其维护位置。
@@ -662,7 +666,9 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.17.0，版本
 ## 原位改字
 
 `scripts/dev/copy-editor.js` 复用官网本地预览的 `edit-client.js` 交互：文字范围提示、原位编辑、按钮文字就近输入、回车和失焦保存、Esc 取消。
+改字浮条使用多选操作条的 `data-selection-dock`、`data-glass-pane` 与 `data-batch-scope` 样式，几何、玻璃、字体和按钮共享；窄屏状态提示独占一行。
 应用的 React 与动态页面使用现有静态文案定位、摘要校验和备份入口；演示站使用浏览器草稿。两者只在 `?edit` 启用，无新增依赖。
+馆藏上传的动态说明与字段复用同一入口，Python 源文件仅纳入 `src/peach/library_sharing.py`，其他 Python 文件不属于改字范围。
 
 ## 馆藏处理控制与耗时预估
 
