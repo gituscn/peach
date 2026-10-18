@@ -39,6 +39,45 @@ class SubtitleSearchTests(unittest.TestCase):
         self.assertEqual([row['index'] for row in rows], [0, 1])
         self.assertTrue(all(row['playable'] and 'url' not in row for row in rows))
 
+    def test_release_search_filters_other_identities_before_pagination(self):
+        titles = ['ABP-7580', 'XABP-758', 'ABP-757', 'ABP-00758', 'abp758 中文',
+                  'ABP-758-kor-ja', 'ABP_758 中文字幕', 'ABP-758中文']
+        html = '<table class="sub-table">' + ''.join(
+            f'<tr><td><a href="/subs/{index}/track.html">{title}</a></td></tr>'
+            for index, title in enumerate(titles)) + '</table>'
+        details = []
+        def respond(request):
+            if request.url.path == '/index.php':
+                self.assertEqual(request.url.params['search'], 'ABP-758')
+                return httpx.Response(200, text=html)
+            details.append(request.url.path)
+            return httpx.Response(200, text=DETAIL)
+        with self.client(respond):
+            result = source.search('abp00758')
+        self.assertEqual([row['title'] for row in result['results']], titles[3:])
+        self.assertFalse(result['more'])
+        self.assertEqual(len(details), 5)
+
+    def test_keyword_search_keeps_the_query_and_language_filter(self):
+        def respond(request):
+            if request.url.path == '/index.php':
+                self.assertEqual(request.url.params['search'], '电影片名')
+                return httpx.Response(200, text=SEARCH)
+            return httpx.Response(200, text=DETAIL)
+        with self.client(respond):
+            self.assertEqual(len(source.search('电影片名')['results']), 2)
+
+    def test_matching_preserves_distribution_prefixes_and_date_separators(self):
+        for title, code, expected in (
+            ('390JAC-040 中文', 'JAC-040', False),
+            ('259LUXU-1475 中文', 'LUXU-1475', True),
+            ('092415_001 中文', '092415-001', False),
+            ('FC2-PPV-1812235-zh', 'FC2-PPV-1812235', True),
+            ('SSIS-291_(extract_from_Chinese)-en', 'SSIS-291', True),
+        ):
+            with self.subTest(title=title):
+                self.assertEqual(bool(source._matches(title, code)), expected)
+
     def test_download_uses_selected_chinese_and_reuses_encoding_conversion(self):
         requested = []
         def respond(request):
