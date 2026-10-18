@@ -663,9 +663,17 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.17.0，版本
 
 扫描、探测、资料请求和九宫格复用 `process_library`、`scan_location`、`SourceTransport`、`frame_capture` 与已有影片检查点；任务恢复沿用 `BackgroundJob`、`job_recovery` 和 `task_run`，用户暂停意图单独持久保存。当前树及 `library_processing.py` 的 Git 历史已核对，安装暂停只用于安装事务，不能直接代表用户暂停。Python 标准库 `threading.Event` 与 `contextvars.ContextVar` 提供等待唤醒和当前任务隔离，沿用项目 Python 版本，跨 Windows 与 macOS，无额外依赖体积；许可证为 PSF，官方文档与实现见 [threading](https://docs.python.org/3/library/threading.html) 和 [contextvars](https://docs.python.org/3/library/contextvars.html)。现有 APScheduler 3.11.3 用于定时派发，不能暂停已进入媒体读取的函数，因此不承担安全停点。隔离测试使用临时账本、暂停线程与模拟时钟验证安全停点、跨重启意图、低占用间隔和暂停预算补偿，不读取真实媒体、不发外部请求。
 
-`processing_control` 保留 Peach 的阶段、模式与估时策略：启动仅汇总账本文件数和大小，优先使用本机同类完成耗时；未知新增明确不在初始范围内。阶段样本形成后按实际耗时校准，并返回估时范围、依据和范围所指阶段。处理强度为低占用、标准和高强度：低占用采用单线程 FFmpeg 与较大单项间隔，标准采用两个解码、滤镜和编码线程与短间隔，高强度采用工具自动线程且没有额外间隔。amane 低占用逐站查询，其余沿用现有调度；各档均遵守来源限流，单资产流水线与暂停检查点共用。强度只作用于当前任务，历史耗时按档位系数归一，初始与切换时的范围属于粗估，实际样本继续校准。持久状态不修改 ledger schema，不改变生产入口。
+`processing_control` 保留 Peach 的阶段、模式与估时策略：启动仅汇总账本文件数和大小，优先使用本机同类完成耗时；未知新增明确不在初始范围内。整趟剩余时间合计当前阶段和待执行阶段；当前阶段采用最近 20 次完成增量，后续阶段使用保守粗估。无番号、无 NFO 的文件完成同目录检查后不计入外部采集数量；任务停滞时读接口撤下旧估时。处理强度为低占用、标准和高强度：低占用采用单线程 FFmpeg 与较大单项间隔，标准采用两个解码、滤镜和编码线程与短间隔，高强度采用工具自动线程且没有额外间隔。amane 低占用逐站查询，其余沿用现有调度；各档均遵守来源限流，单资产流水线与暂停检查点共用。强度只作用于当前任务，历史耗时按档位系数归一，初始与切换时的范围属于粗估，实际样本继续校准。持久状态不修改 ledger schema，不改变生产入口。
 
-任务卡复用 Sonner 2.0.8（MIT）的 `toast.custom`、稳定任务 id 与无限停留时间；`processing` 和 `receipts` 两个栈按 `toasterId` 分流，普通回执按任务面板实测高度避让。任务栈启用 `expand` 保持自动高度，详情开合由卡片管理；收起只隐藏正文，暂停、速度与估时仍可见。服务端 `steps` 在实际处理边界更新，完成步骤以勾选与删除线显示。React Aria 1.22.1 的 Slider、Popover 与现有 BoardUI Button 承担键盘、焦点与浮层行为，三档对应 `low/standard/high`；最高档流光使用 SVG 与 CSS，浮层关闭后卸载，暂停与后台页面停止运动。界面重建依据与差异见 [控件取证](reference-snapshots/processing-task-controls.md)。无新增依赖。问题明细沿用 `state/library-processing-<job_id>.issues.jsonl`。
+配套图片沿用 Pillow 12.3.0（MIT-CMU）解码与 `install_cover` 登记。网盘及未知来源的文件读取和 JPEG 转换放在独立子进程，20 秒超时后终止并等待退出，再登记可重试问题；声明为本地磁盘的来源直接在线程内解码，不逐张启动进程。2026-10-18 的运行调用栈确认采集线程停在 PikPak 挂载图片的 `Image.open` / `read(16)`；隔离测试使用 Unicode 路径图片、无效图片与真实超时子进程验证。进程超时复用项目使用的 Python 3.14.7 标准库 [`subprocess.run`](https://docs.python.org/3.14/library/subprocess.html#subprocess.run)（PSF 许可，无新增安装体积），Windows 隐藏窗口，源码模块和独立包 CLI 共用转换函数。线程等待超时不能终止同步文件读取，因此网盘不采用单纯线程包装；FFmpeg 已用于媒体任务，但单张图片继续复用 Pillow，不增加解码依赖。
+
+目录列表与 `SidecarIndex` 在本趟任务内复用，每个目录建一次文件名索引；同名、共享 NFO 与编号图片的归属沿用 `library_nfo`。500 个视频、1,000 个目录条目的隔离夹具中，逐项匹配耗时约 1.01 秒，复用索引约 0.007 秒，输出一致；该数字仅反映文件名匹配，不代表网盘读取或整趟耗时。配套图片与免费来源的媒体属性探测复用标准库 `ThreadPoolExecutor`，三档各领 1、2、4 项，空闲后补位，主线程保存结果并经过暂停停点；计费来源的媒体读取限制与各资料站限流保持原策略。不同阶段仍按实际依赖推进，界面步骤仅展示这些边界。
+
+`_RemoteSession` 按来源与番号复用本趟新取得的原始证据及明确未收录答复；重试首个同番号资产取得新答复，其余资产共用。来源错误和超时仍可重试，不记为未收录。复用结果逐资产生成候选，字段仍经过既有来源和冲突判据，不直接复制其他资产的真相字段。自定义来源配置实时读取，停用和字段映射变化立即生效。
+
+卡片与任务浮层的等待时长以服务端快照为起点，用浏览器单调时钟每秒推进当前文字。新快照重设起点，暂停、结束和卸载清理定时器；每秒重渲染限定在进度子树，不改变两秒一次的状态请求。组件测试核对连续秒数、请求数、换文件复位和卸载清理，桌面与手机浏览器验证实际跳秒。
+
+任务卡复用 Sonner 2.0.8（MIT）的 `toast.custom`、稳定任务 id 与无限停留时间；`processing` 和 `receipts` 两个栈按 `toasterId` 分流，普通回执按任务面板实测高度避让。任务栈启用 `expand` 保持自动高度，详情开合由卡片管理；收起只隐藏正文，暂停、速度与估时仍可见。服务端 `steps` 在实际处理边界更新，完成步骤以勾选与删除线显示。失败浮层只自动展示本次观察到的结束状态或两分钟内的结果，旧失败快照不自动弹出；用户关闭后保持关闭。React Aria 1.22.1 的 Slider、Popover 与现有 BoardUI Button 承担键盘、焦点与浮层行为，三档对应 `low/standard/high`；最高档流光使用 SVG 与 CSS，浮层关闭后卸载，暂停与后台页面停止运动。界面重建依据与差异见 [控件取证](reference-snapshots/processing-task-controls.md)。无新增依赖。问题明细沿用 `state/library-processing-<job_id>.issues.jsonl`，新任务保留其他任务的明细。
 
 站点强调色检查覆盖进度、焦点、选中态、操作按钮与流光：旧 `--feedback-success` 引用既有强调色色阶；RSS 订阅保留橙色，信息、成功、警告、错误、品牌与图表分类保留语义色。
 

@@ -89,13 +89,53 @@ class ProcessingControlTests(unittest.TestCase):
             estimate.update(state)
         self.assertTrue(state['eta_initial'])
         self.assertEqual(state['eta_kind'], 'estimating')
-        self.assertEqual(state['eta_scope'], '当前阶段：采集缺失资料')
+        self.assertEqual(state['eta_scope'], '整趟任务')
         state['checked'] = 2
         with patch('peach.processing_control.time.monotonic', return_value=204):
             estimate.update(state)
         self.assertLessEqual(state['eta_seconds_min'], 16)
         self.assertGreaterEqual(state['eta_seconds_max'], 16)
         self.assertLess(state['eta_seconds_max'], 40)
+
+    def test_total_estimate_includes_pending_media_and_collection(self):
+        state = dict(speed_mode='standard', status='running', requested_stage='all',
+                     stage='读取本地资料', checked=0, total=10,
+                     estimate_pending={'local': 10, 'probe': 2, 'previews': 3, 'metadata': 10})
+        with patch('peach.processing_control.time.monotonic', return_value=100):
+            estimate = ProcessingEstimate(self.config, state, None)
+            estimate.update(state)
+        state['checked'] = 8
+        with patch('peach.processing_control.time.monotonic', return_value=108):
+            estimate.update(state)
+        self.assertEqual(state['eta_scope'], '整趟任务')
+        self.assertTrue(state['eta_initial'])
+        self.assertGreater(state['eta_seconds_min'], 40)
+        state.update(checked=0, total=2, stage='采集缺失资料', estimate_pending={'metadata': 2})
+        with patch('peach.processing_control.time.monotonic', return_value=120):
+            estimate.update(state)
+        self.assertLessEqual(state['eta_seconds_max'], 40)
+
+    def test_unmeasured_finalization_does_not_keep_a_completed_phase_estimate(self):
+        state = dict(speed_mode='standard', status='running', requested_stage='metadata',
+                     stage='保存资料候选', checked=10, total=10, estimate_pending={},
+                     eta_seconds_min=1, eta_seconds_max=2)
+        estimate = ProcessingEstimate(self.config, state, None)
+        estimate.update(state)
+        self.assertIsNone(state['eta_seconds_max'])
+
+    def test_slow_tail_uses_recent_completions_instead_of_the_fast_prefix(self):
+        state = dict(speed_mode='standard', status='running', requested_stage='metadata',
+                     stage='读取本地资料', checked=0, total=120, estimate_pending={'local': 120})
+        with patch('peach.processing_control.time.monotonic', return_value=100):
+            estimate = ProcessingEstimate(self.config, state, None)
+            estimate.update(state)
+        for done in range(1, 101):
+            state['checked'] = done
+            elapsed = done if done <= 80 else 80 + (done - 80) * 10
+            with patch('peach.processing_control.time.monotonic', return_value=100 + elapsed):
+                estimate.update(state)
+        self.assertGreaterEqual(state['eta_seconds_min'], 150)
+        self.assertGreaterEqual(state['eta_seconds_max'], 240)
 
     def test_progress_count_rewind_starts_a_new_sample_for_same_stage(self):
         self.seed()

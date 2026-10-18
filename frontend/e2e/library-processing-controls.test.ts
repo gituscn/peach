@@ -15,6 +15,7 @@ describe('扫描与采集控制', () => {
         steps: [{ id: 'sources', label: '扫描文件', status: 'complete' },
           { id: 'collect', label: '采集外部资料与封面', status: 'current' }],
         current_asset_name: '', current_action: '', stage: '',
+        stalled: false, waited_seconds: 0,
         eta_kind: 'historical', eta_initial: true, eta_seconds_min: 1200, eta_seconds_max: 2400 };
       const writes: Record<string, unknown>[] = [];
       const opened = await visit(browser, '/data-cleanup', viewport, async page => {
@@ -151,6 +152,20 @@ describe('扫描与采集控制', () => {
         await page.screenshot({ path: path.join(artifacts, `${viewport.name}-notice.png`) });
         await page.waitForTimeout(6500);
         assert.equal(await dock.isVisible(), true, '任务卡不会随普通回执超时消失');
+        state = { ...state, stalled: true, current_action: 'reading_local_cover',
+          current_asset_name: '2026-07-15 创作者合集 多机位完整版.mp4',
+          waited_seconds: 33,
+          eta_seconds_min: 63, eta_seconds_max: 94 };
+        await dock.getByText('等待当前文件响应，剩余时间待更新', { exact: true }).waitFor();
+        await page.waitForFunction(() => document.querySelector('[data-processing-dock]')?.textContent?.includes('已等待 33 秒'));
+        await page.waitForFunction(() => document.querySelector('[data-processing-dock]')?.textContent?.includes('已等待 34 秒'),
+          undefined, { timeout: 1800 });
+        assert.match(await dock.innerText(), /读取配套图片/);
+        assert.doesNotMatch(await dock.innerText(), /预计剩余/);
+        const stalledLayout = await layout(page);
+        assert.ok(stalledLayout.scrollWidth <= stalledLayout.viewportWidth, JSON.stringify(stalledLayout));
+        assert.deepEqual(stalledLayout.offenders, []);
+        await page.screenshot({ path: path.join(artifacts, `${viewport.name}-stalled.png`) });
         state.status = 'complete';
         await dock.waitFor({ state: 'hidden' });
         assert.deepEqual(opened.problems, []);

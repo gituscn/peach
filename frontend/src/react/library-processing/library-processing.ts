@@ -92,6 +92,7 @@ export function remainingTime(state: LibraryProcessingData): string {
   if (!processingActive(state)) return '';
   if (state.status === 'paused') return '已暂停，继续后更新预估';
   if (state.status === 'pausing') return '正在暂停，当前步骤结束后暂停';
+  if (state.stalled) return '等待当前文件响应，剩余时间待更新';
   const low = state.eta_seconds_min, high = state.eta_seconds_max;
   if (low == null || high == null || !Number.isFinite(low) || !Number.isFinite(high) || low < 0 || high < low)
     return '正在估算剩余时间…';
@@ -134,7 +135,8 @@ export function pollInterval(
 
 const ACTION_LABELS: Record<string, string> = {
   scanning_files: '扫描文件',
-  reading_local: '读取本地资料',
+  reading_local: '检查配套文件',
+  reading_local_cover: '读取配套图片',
   querying_metadata: '查询外部资料',
   fetching_cover: '采集缺失封面',
   generating_preview: '生成视频预览',
@@ -206,13 +208,16 @@ export function issueDetails(state: LibraryProcessingData): IssueDetails | null 
 const ANNOUNCED_KEY = 'peach.library-processing.announced';
 const FRESH_COMPLETION_SECONDS = 120;
 
+export function freshProcessingResult(state: LibraryProcessingData): boolean {
+  const age = state.completed_at == null ? Infinity : Date.now() / 1000 - state.completed_at;
+  return !!state.job_id && age >= 0 && age < FRESH_COMPLETION_SECONDS;
+}
+
 export function announceCompletion(
   state: LibraryProcessingData, toast: (message: string) => void, witnessed: boolean,
 ): void {
   if (state.status !== 'complete') return;
-  const fresh = !!state.job_id && !!state.completed_at
-    && Date.now() / 1000 - state.completed_at < FRESH_COMPLETION_SECONDS;
-  if (!witnessed && !fresh) return;
+  if (!witnessed && !freshProcessingResult(state)) return;
   try {
     if (state.job_id && localStorage.getItem(ANNOUNCED_KEY) === state.job_id) return;
     if (state.job_id) localStorage.setItem(ANNOUNCED_KEY, state.job_id);

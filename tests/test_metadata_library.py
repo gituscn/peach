@@ -86,6 +86,48 @@ def _archive_pages(url):
 
 
 class LibraryNfoTests(unittest.TestCase):
+    def test_task_sidecar_index_does_not_walk_the_folder_for_each_video(self):
+        from peach.library_nfo import SidecarIndex
+        class CountedFiles(dict):
+            walks = 0
+            def values(self):
+                self.walks += 1
+                return super().values()
+        files = CountedFiles()
+        for index in range(100):
+            for suffix in ('.mp4', '.jpg'):
+                name = f'合集-{index}{suffix}'
+                files[name.casefold()] = self.root / name
+        listing = SidecarIndex(files)
+        for index in range(100):
+            nfo, posters = listing.for_video(self.root / f'合集-{index}.mp4')
+            self.assertIsNone(nfo)
+            self.assertEqual(posters, [self.root / f'合集-{index}.jpg'])
+        self.assertEqual(files.walks, 1)
+
+    @windows_ledger_roots
+    def test_retry_assets_with_one_code_share_a_fresh_source_answer(self):
+        media = self.root / 'media'
+        media.mkdir()
+        for name in ('ABW-101-CD1.mp4', 'ABW-101-CD2.mp4'):
+            (media / name).write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True, locations={'local': (str(media),)})
+        process_library(config, db, self.root / 'generated', self.root / 'covers', stage='scan')
+        provider = stub_provider()
+        provider.query.return_value = {'id': 'ABW-101', 'title': '同一作品', 'maker': '厂牌',
+            'release_date': '2026-01-01', 'actresses': [{'japanese_name': '测试演员'}]}
+        provider.cover.side_effect = NotFound('没有封面')
+        result = process_library(config, db, self.root / 'generated', self.root / 'covers', stage='metadata',
+            retry_ids=[1, 2], provider_factory=lambda: provider)
+        r18 = [call for call in provider.query.call_args_list if call.args[1] == 'r18dev']
+        self.assertEqual(len(r18), 1)
+        self.assertEqual(provider.cover.call_count, 1)
+        candidates = read_rows(self.root / 'generated/library-metadata-field-candidates.csv')
+        titles = [row for row in candidates if row['field'] == 'title']
+        self.assertEqual({row['asset_id'] for row in titles}, {'1', '2'})
+        self.assertEqual(result['checked'], 2)
+
     @windows_ledger_roots
     def test_a_later_source_requires_review_to_replace_a_field_filled_during_the_run(self):
         media = self.root / 'media'
@@ -758,6 +800,33 @@ class LibraryNfoTests(unittest.TestCase):
         self.assertEqual(result['covers'], 1)
         self.assertTrue(
             (self.root / 'generated' / 'posters' / f'{asset_id}_4.jpg').is_file())
+
+    @windows_ledger_roots
+    def test_slow_sibling_cover_is_retryable_and_the_next_file_is_processed(self):
+        import subprocess
+        from peach.local_poster import read_jpeg
+        media = self.root / 'media'
+        media.mkdir()
+        for name in ('合集一', '合集二'):
+            (media / f'{name}.mp4').write_bytes(b'video')
+            Image.new('RGB', (24, 36), 'teal').save(media / f'{name}.png')
+        db = fresh_ledger(self.root)
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        def read(source, **options):
+            if source.stem == '合集一':
+                raise subprocess.TimeoutExpired('local-image', 20)
+            return read_jpeg(source, **options)
+        reports = []
+        with patch('peach.local_poster.read_jpeg', side_effect=read):
+            result = process_library(config, db, self.root / 'generated', self.root / 'covers',
+                                     report=lambda state: reports.append(dict(state)))
+        self.assertEqual((result['checked'], result['total'], result['covers']), (2, 2, 1))
+        self.assertEqual(result['issue_count'], 1)
+        self.assertEqual(result['issue_preview'][0]['message'], '读取配套图片超时，可稍后重试')
+        self.assertEqual(len(result['retryable_asset_ids']), 1)
+        reading = next(state for state in reports if state['current_action'] == 'reading_local_cover')
+        self.assertAlmostEqual(reading['current_deadline_at'] - reading['current_started_at'], 20, places=2)
 
     def test_reader_cannot_scan_or_create_candidates(self):
         from peach.settings_file import ReplicationSettings
@@ -1584,11 +1653,17 @@ class LibraryNfoTests(unittest.TestCase):
         db = fresh_ledger(self.root)
         config = PeachConfig(self.root, self.root / 'config.toml', present=True, locations={'local': (str(media),)})
         factory = Mock()
+        reports = []
         result = process_library(config, db, self.root / 'generated', self.root / 'covers',
-                                 provider_factory=factory)
+                                 provider_factory=factory, report=lambda state: reports.append(dict(state)))
         factory.assert_not_called()
         self.assertEqual((result['status'], result['issue_count'], result['checked']), ('complete', 0, 1))
         self.assertTrue((self.root / 'generated' / 'posters' / '1_4.jpg').is_file(), '本地海报照常登记')
+        local = next(state for state in reports if state.get('current_action') == 'reading_local')
+        self.assertEqual(local['stage'], '检查配套文件')
+        self.assertEqual(local['eta_scope'], '整趟任务')
+        prepared = next(state for state in reports if state.get('estimate_pending', {}).get('metadata') == 0)
+        self.assertNotIn('local', prepared['estimate_pending'])
 
     @windows_ledger_roots
     def test_a_directory_name_sitting_in_the_code_column_counts_as_no_code(self):
@@ -2343,6 +2418,38 @@ class LibraryWatchdogTests(unittest.TestCase):
                             'current_deadline_at': now - 1}, now=now)
         self.assertFalse(within['stalled'])
         self.assertTrue(expired['stalled'])
+
+    def test_stalled_read_hides_stale_eta_without_mutating_worker_state(self):
+        state = dict(status='running', last_progress_at=100, current_started_at=100,
+                     eta_seconds_min=63, eta_seconds_max=94, eta_kind='measured')
+        waiting = decorate(state, now=100 + STALL_AFTER_SECONDS + 1)
+        self.assertTrue(waiting['stalled'])
+        self.assertIsNone(waiting['eta_seconds_min'])
+        self.assertIsNone(waiting['eta_seconds_max'])
+        self.assertEqual(state['eta_seconds_max'], 94)
+        resumed = decorate({**state, 'last_progress_at': 1000}, now=1001)
+        self.assertFalse(resumed['stalled'])
+        self.assertEqual(resumed['eta_seconds_max'], 94)
+
+    def test_starting_a_job_keeps_the_previous_issue_log(self):
+        from peach.library_processing import _processing_issue_log
+        config = self._config(self.root / 'media')
+        path = state_path(config)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        previous = issues_path(config, 'previous')
+        previous.write_text('previous evidence\n', encoding='utf-8')
+        current = _processing_issue_log(config, path, 'current', False)
+        self.assertEqual(current, issues_path(config, 'current'))
+        self.assertEqual(previous.read_text(encoding='utf-8'), 'previous evidence\n')
+
+    def test_interleaved_folders_share_the_same_task_directory_index(self):
+        from peach.library_processing import _DirectoryIndex
+        folders = [self.root / str(index) for index in range(10)]
+        listing = _DirectoryIndex()
+        with patch('peach.library_processing.directory_files', side_effect=lambda path: {'video.mp4': path / 'video.mp4'}) as read:
+            for folder in folders + folders:
+                self.assertIn('video.mp4', listing.files(folder))
+        self.assertEqual(read.call_count, 10)
 
     def test_legacy_issue_list_projects_into_count_and_preview(self):
         legacy = [{'asset_id': index, 'message': '未识别到番号'} for index in range(1, 26)]

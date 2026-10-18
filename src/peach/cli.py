@@ -701,6 +701,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="peach")
     commands = parser.add_subparsers(dest="command", required=True)
 
+    from .local_poster import main as local_image_main
+    local_image = commands.add_parser('local-image', help='读取单张配套图片')
+    local_image.add_argument('source', type=Path)
+    local_image.add_argument('output', type=Path)
+    local_image.set_defaults(handler=lambda args: local_image_main([str(args.source), str(args.output)]))
+
     init = commands.add_parser(
         "init", help="首次运行：不带参数在终端里问答；带任何参数或 --no-input 走非交互")
     init.add_argument("--no-input", action="store_true",
