@@ -53,6 +53,91 @@ def load_script(name: str):
     return module
 
 
+class ProjectBoardTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.script = load_script("project_board")
+
+    def issue(self, **changes):
+        return {"__typename": "Issue", "state": "OPEN", "labels": {"nodes": []}, **changes}
+
+    def test_merge_and_publication_keep_open_issue_waiting_for_acceptance(self):
+        release = {"tag_name": "v1.2.0", "html_url": "https://example.test/release"}
+        result = self.script.decision(self.issue(), {"Status": "进行中"}, [{"merged": True}], release)
+        self.assertEqual(result["Status"], "待验证")
+        self.assertEqual(result["交付进度"], "已发布")
+        self.assertEqual(result["发布版本"], "v1.2.0")
+
+    def test_closed_not_planned_is_cancelled_and_reopened_returns_to_queue(self):
+        result = self.script.decision(self.issue(state="CLOSED", stateReason="NOT_PLANNED"), {}, [], None)
+        self.assertEqual(result["Status"], "已取消")
+        result = self.script.decision(self.issue(), {"Status": "已取消"}, [], None)
+        self.assertEqual(result["Status"], "待安排")
+
+    def test_manual_priority_and_queue_are_not_replaced_by_unrelated_activity(self):
+        result = self.script.decision(self.issue(), {"Status": "待安排", "Priority": "P1"}, [], None)
+        self.assertEqual(result["Status"], "待安排")
+        self.assertNotIn("Priority", result)
+        waiting = self.issue(labels={"nodes": [{"name": "status:needs-info"}]})
+        self.assertEqual(self.script.decision(waiting, {}, [{"merged": True}], None)["Status"], "待评估")
+
+    def test_reference_lines_exclude_other_repositories_and_casual_mentions(self):
+        body = "参考 #64 的讨论\nRefs #65, peach-mitao/peach#66, other/repo#67\nCloses #68"
+        self.assertEqual(self.script.references(body, "peach-mitao/peach"), {65, 66, 68})
+
+    def test_pr_closure_is_distinct_from_merge(self):
+        pr = {"__typename": "PullRequest", "state": "CLOSED", "merged": False}
+        self.assertEqual(self.script.decision(pr, {}, [], None)["Status"], "已关闭未合入")
+        pr["merged"] = True
+        self.assertEqual(self.script.decision(pr, {}, [], None)["交付进度"], "已合入待发布")
+
+    def test_reconcile_uses_published_assets_and_keeps_archived_items_untouched(self):
+        commit = "a" * 40
+        fields = [{"id": name, "name": name} for name in ("发布版本", "发布说明", "实现关联")]
+        fields += [{"id": "status", "name": "Status", "options": [{"id": "verify", "name": "待验证"}]},
+                   {"id": "delivery", "name": "交付进度", "options": [{"id": "published", "name": "已发布"}]}]
+        issue = self.issue(id="issue", number=65, title="历史导入", url="https://github.com/peach-mitao/peach/issues/65")
+        item = {"id": "item", "content": issue, "isArchived": False, "fieldValues": {"nodes": []}}
+        archived = {**item, "id": "archive", "isArchived": True, "content": {**issue, "id": "old", "number": 90}}
+        draft = {"id": "draft", "isArchived": False, "content": {"__typename": "DraftIssue", "id": "draft-content"}}
+        releases = [[{"tag_name": tag, "html_url": f"https://example.test/{tag}", "published_at": date,
+                      "draft": is_draft, "assets": assets} for tag, date, is_draft, assets in [
+            ("v0.42.0", "2026-10-16", False, []),
+            ("v0.43.0", "2026-10-17", False, [{"name": "app.zip"}]),
+            ("v0.44.0", "2026-10-18", True, [{"name": "app.zip"}]),
+            ("v0.45.0", "2026-10-19", False, [{"name": "app.zip"}])]]]
+        with mock.patch.object(self.script, "graphql", return_value={"node": {"fields": {"nodes": fields}}}) as api, \
+                mock.patch.object(self.script, "connection", side_effect=[[item, archived, draft], [], []]), \
+                mock.patch.object(self.script, "gh", return_value=releases), \
+                mock.patch.object(self.script, "ancestor", return_value=True):
+            changes = self.script.reconcile({"project_id": "project", "repository": "peach-mitao/peach",
+                                              "implementation_commits": {"65": [commit]}}, apply=False)
+        self.assertEqual(api.call_count, 1)
+        self.assertEqual({change["number"] for change in changes}, {65})
+        actual = {change["field"]: change["value"] for change in changes}
+        self.assertEqual(actual["发布版本"], "v0.43.0")
+        self.assertEqual(actual["Status"], "待验证")
+        self.assertTrue(actual["实现关联"].endswith(commit))
+
+    def test_ancestor_uses_actual_commit_graph_and_rejects_unmerged_commit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            def git(*args):
+                return subprocess.run(["git", *args], cwd=root, check=True, capture_output=True,
+                                      text=True, encoding="utf-8").stdout.strip()
+            git("init", "-b", "master")
+            git("-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "--allow-empty", "-m", "base")
+            base = git("rev-parse", "HEAD")
+            git("tag", "v1.0")
+            git("checkout", "-b", "feature")
+            git("-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "--allow-empty", "-m", "feature")
+            feature = git("rev-parse", "HEAD")
+            with mock.patch.object(self.script, "ROOT", root):
+                self.assertTrue(self.script.ancestor(base, "refs/tags/v1.0"))
+                self.assertFalse(self.script.ancestor(feature, "refs/tags/v1.0"))
+                self.assertFalse(self.script.ancestor("not-a-commit", "refs/tags/v1.0"))
+
+
 class UpdateTaskSmokeTests(unittest.TestCase):
     def test_dry_run_does_not_open_artifacts_or_create_installation_data(self):
         with mock.patch.dict(sys.modules, {'smoke_desktop': load_script('smoke_desktop')}):
