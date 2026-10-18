@@ -1,19 +1,18 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { RiFileListLine } from '@remixicon/react';
 import { Button } from '@/components/base/buttons/button';
+import { Chip } from '@/components/base/badges/chip';
 import { SettingsCard, SettingsSectionLabel } from '@/components/application/settings/settings-rows';
 import { cx } from '@/utils/cx';
 import { errorMessage } from '../../api';
 import { diagnosticsSkeleton } from '../../diagnostics-skeleton';
 import { ErrorExcerpt } from '../activity/error-excerpt';
-import { EmptyState } from '../components/empty-state';
-import { useOverlayScrollbar } from '../components/overlay-scrollbar';
 import { Note } from '../components/note';
 import { SiteMark } from '../components/site-mark';
 import { Disclosure, Fact, FactList, Section, Stack } from '../settings/section';
 import { busyProps, useAction } from '../settings/use-action';
-import { DIAGNOSTICS_KEY, fetchDiagnostics, type DiagnosticCheck, type LibraryGroup } from './diagnostics';
+import { DIAGNOSTICS_KEY, fetchDiagnostics, type DiagnosticCheck } from './diagnostics';
+import { HealthList } from './health-list';
 
 const STATUS: Record<string, string> = { ok: '正常', warning: '需检查', failed: '需处理', unknown: '未取得', disabled: '未配置',
   stale: '待复查', unchecked: '尚无记录' };
@@ -28,6 +27,13 @@ const SECTIONS = [
   ['后台任务', ['tasks']],
 ] as const;
 const moment = (value: string) => new Date(value).toLocaleString();
+
+function DiagnosticStatus({ status }: { status: string }) {
+  return <Chip variant="caption" data-diagnostic-status={status}
+    color={status === 'failed' ? 'rose' : status === 'warning' || status === 'stale' ? 'yellow' : 'neutral'}>
+    {STATUS[status] ?? '未取得'}
+  </Chip>;
+}
 
 export interface DiagnosticsProps {
   navigate(path: string): void; configure(section: string): void; openItem(id: number): void;
@@ -63,7 +69,7 @@ function Check({ name, check, navigate, configure, compact = false }: Pick<Diagn
     <div className={cx('flex min-w-0 flex-1 flex-col', compact ? 'gap-1' : 'gap-2')}>
       <div className="flex flex-wrap items-center gap-3">
         <Heading className={cx('text-text-primary', compact ? 'text-body-2-medium' : 'text-body-medium')}>{check.label}</Heading>
-        <span className="text-caption-1-regular text-text-secondary">{STATUS[check.status] ?? '未取得'}</span>
+        <DiagnosticStatus status={check.status} />
       </div>
       <p data-check-reason className={cx('text-body-2-regular break-words', compact ? 'text-text-secondary' : 'text-text-primary')}>{check.reason}</p>
       {check.action ? <p className="text-body-2-regular text-text-secondary">处理建议：{check.action}</p> : null}
@@ -72,27 +78,6 @@ function Check({ name, check, navigate, configure, compact = false }: Pick<Diagn
       ? configure(section) : navigate(check.target!)}>{check.target === '/settings/library'
         ? `打开${section}` : TARGET_LABELS[check.target] ?? '打开相关页面'}</Button></div> : null}
   </div>;
-}
-
-function HealthList({ group, openItem, receipt }: Pick<DiagnosticsProps, 'openItem' | 'receipt'> & { group: LibraryGroup }) {
-  const action = useAction();
-  const scroll = useOverlayScrollbar<HTMLUListElement>();
-  const list = group.items.map(row => row.code || `作品 #${row.id}`).join('\n');
-  return <Disclosure summary={`${group.label} · ${group.count === null ? '未取得' : `${group.count.toLocaleString()} 项`}`}>
-    {group.count === null ? <Note tone="neutral">清单未取得，请重新检查。</Note> : !group.items.length
-      ? <EmptyState icon={RiFileListLine} title="清单为空" shell="plain">没有需要处理的作品。</EmptyState>
-      : <Stack>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {group.truncated ? <span className="text-body-2-regular text-text-secondary">当前显示 {group.items.length.toLocaleString()} 项</span> : null}
-            <Button size="small" variant="secondary" {...busyProps(action.busy === 'copy')} onClick={() => void action.run('copy',
-              () => navigator.clipboard.writeText(list), () => receipt('已复制清单'))}>复制当前清单</Button>
-          </div>
-          {action.error ? <Note tone="error">{action.error}</Note> : null}
-          <div className="relative"><ul ref={scroll} className="flex max-h-80 flex-col gap-2 overflow-y-auto">
-            {group.items.map(row => <li key={row.id}><Button size="small" variant="ghost" onClick={() => openItem(row.id)}>{row.code || `作品 #${row.id}`}</Button></li>)}
-          </ul></div>
-        </Stack>}
-  </Disclosure>;
 }
 
 export function DiagnosticsPage(props: DiagnosticsProps) {
@@ -142,7 +127,7 @@ export function DiagnosticsPage(props: DiagnosticsProps) {
         <SettingsCard><Stack>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="flex min-w-0 items-center gap-2 text-body-medium text-text-primary"><SiteMark source={source.source} />{source.label}</h3>
-          <span className="text-body-2-regular text-text-secondary">{STATUS[source.status] ?? '未取得'}</span>
+          <DiagnosticStatus status={source.status} />
         </div>
         {/* 原因常是整段堆栈：平时只露异常那一行，全文收在「查看详情」后面。 */}
         <ErrorExcerpt text={source.reason} className="text-body-regular text-text-primary" />

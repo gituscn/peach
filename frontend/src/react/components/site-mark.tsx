@@ -9,5 +9,5 @@ export function SiteMark({ source }: { source: string }) {
   if (failed) return <RiGlobalLine aria-hidden className="size-4 shrink-0" />;
   const bundled = ['javten', 'fc2ppvdb', 'avwikidb', 'minnano-av', 'github'].includes(source);
   return <img src={bundled ? `/site-icon/${source}.png` : siteMarkUrl({ source })} alt="" width={16} height={16}
-    loading="lazy" onError={() => setFailed(true)} className="size-4 shrink-0 rounded-sm object-contain" />;
+    loading="lazy" onError={() => setFailed(true)} className="size-4 shrink-0 rounded-none object-contain" />;
 }

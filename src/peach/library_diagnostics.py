@@ -87,21 +87,28 @@ def failures(config):
         return None, None
 
 
+def _library_item(row):
+    asset_id, code, duration, name, title, original, location, path, size = row
+    candidate = str(code or "")
+    safe_code = release_code_from_text(candidate) if len(candidate) <= 80 else None
+    filename = str(name or str(path or "").replace("\\", "/").rsplit("/", 1)[-1])
+    return {"id": asset_id, "code": safe_code or None, "name": filename,
+            "title": str(title or original or filename), "location": location,
+            "path": str(path or ""), "duration": duration, "size": size}
+
+
 def library(settings, config):
     groups = {key: group(label) for key, label in (("identification", "识别失败"),
               ("metadata", "补资料失败"), ("cover", "缺封面"), ("duration", "缺时长"))}
     try:
         with closing(sqlite3.connect(settings.db_path.resolve().as_uri() + "?mode=ro", uri=True, timeout=1)) as connection:
             connection.execute("PRAGMA query_only=ON")
-            rows = connection.execute("SELECT id,code,duration FROM asset WHERE medium='video' "
+            rows = connection.execute("SELECT id,code,duration,name,catalog_title,original_title,location,path,size "
+                                      "FROM asset WHERE medium='video' "
                                       "AND COALESCE(disposal,'') NOT IN ('vanished','trash')").fetchall()
     except (sqlite3.Error, OSError):
         return {"groups": groups, "issue_at": None}
-    assets = {}
-    for asset_id, code, duration in rows:
-        candidate = str(code or "")
-        safe_code = release_code_from_text(candidate) if len(candidate) <= 80 else None
-        assets[asset_id] = {"id": asset_id, "code": safe_code or None}
+    assets = {row[0]: _library_item(row) for row in rows}
     groups["duration"] = group("缺时长", [assets[row[0]] for row in rows if not row[2] or row[2] <= 0])
     covers, posters = inventory(settings.cover_root), inventory(settings.poster_root)
     if covers is not None and posters is not None:

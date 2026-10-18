@@ -12,7 +12,10 @@ const data = (): DiagnosticReport => ({ version: 'test', status: 'warning', chec
   security: { label: '访问安全', status: 'warning', reason: '密码未开启', action: '开启密码', target: '/settings/library', details: {} },
   data_root: { label: '数据目录', status: 'failed', reason: '没有权限', action: '调整权限', target: null, details: {} },
 }, library: { issue_at: null, groups: {
-  duration: { label: '缺时长', count: 2, status: 'ok', truncated: false, items: [{ id: 1, code: 'ABC-123' }, { id: 2, code: null }] },
+  duration: { label: '缺时长', count: 2, status: 'ok', truncated: false, items: [
+    { id: 1, code: 'ABC-123', title: '作品甲', name: '甲.mp4', path: 'R:\\Media\\甲.mp4', location: 'local', duration: null, size: 1024 },
+    { id: 2, code: null, title: '作品乙', name: '乙.mp4', path: 'R:\\Media\\乙.mp4', location: 'local', duration: null, size: 2048 },
+  ] },
   cover: { label: '缺封面', count: 0, status: 'ok', truncated: false, items: [] },
 } }, sources: [{ source: 'javdb', label: 'javdb', status: 'unknown', reason: '当前解析状态未取得', last_success_at: null, cooldown_until: null }] });
 async function open(report = data()) {
@@ -31,16 +34,18 @@ it('诊断跳到具体配置分栏，系统权限项只显示动作', async () =
   expect(root.querySelector('button')).toBeNull();
   expect(host.textContent).toContain('当前解析状态未取得');
 });
-it('展开清单、复制番号与作品编号；零结果有独立空态', async () => {
-  const clipboard = vi.fn(async () => {});
+it('展开作品表格并复制可识别信息；零结果有独立空态', async () => {
+  const clipboard = vi.fn<(text: string) => Promise<void>>(async () => {});
   vi.stubGlobal('navigator', { clipboard: { writeText: clipboard } });
   const { host, props } = await open();
   await click(host.querySelector('summary'));
-  await click(buttonNamed('ABC-123', host));
+  await click(buttonNamed('作品甲', host));
   expect(props.openItem).toHaveBeenCalledWith(1);
   await click(buttonNamed('复制当前清单', host));
   await settle();
-  expect(clipboard).toHaveBeenCalledWith('ABC-123\n作品 #2');
+  expect(clipboard.mock.calls[0][0]).toContain('作品甲\tABC-123\t甲.mp4\t本地\tR:\\Media\\甲.mp4');
+  expect(clipboard.mock.calls[0][0]).toContain('作品乙\t\t乙.mp4\t本地\tR:\\Media\\乙.mp4');
+  expect(host.textContent).toContain('未识别');
   expect(props.receipt).toHaveBeenCalledWith('已复制清单');
   expect(host.querySelector('[data-empty-state]')?.textContent).toContain('清单为空');
 });

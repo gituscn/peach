@@ -51,10 +51,26 @@ class LibraryDiagnosticsTests(unittest.TestCase):
         groups = result['groups']
         self.assertEqual({key: value['count'] for key, value in groups.items()},
                          {'identification': 1, 'metadata': 1, 'cover': 1, 'duration': 2})
-        self.assertEqual(groups['duration']['items'][0], {'id': 2, 'code': None})
-        self.assertEqual(groups['cover']['items'], [{'id': 3, 'code': 'DEF-456'}])
+        self.assertEqual(groups['duration']['items'][0], {
+            'id': 2, 'code': None, 'name': 'private-name', 'title': 'private-name',
+            'location': 'local', 'path': 'R:/private/2', 'duration': 0, 'size': None})
+        self.assertEqual([row['id'] for row in groups['cover']['items']], [3])
+        self.assertEqual(groups['cover']['items'][0]['code'], 'DEF-456')
         self.assertIsNotNone(result['issue_at'])
-        self.assertNotIn('private', json.dumps(result))
+        self.assertNotIn('private-cookie', json.dumps(result))
+        self.assertEqual(before, self.db.read_bytes())
+
+    def test_library_items_expose_local_identity_and_keep_title_and_filename_distinct(self):
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("UPDATE asset SET catalog_title='作品标题',name='未识别文件.mp4',"
+                               "path='R:\\Media\\未识别文件.mp4',size=1048576 WHERE id=2")
+        before = self.db.read_bytes()
+        row = diagnostics.library(self.settings, self.config)['groups']['duration']['items'][0]
+        self.assertEqual(row['title'], '作品标题')
+        self.assertEqual(row['name'], '未识别文件.mp4')
+        self.assertEqual(row['path'], 'R:\\Media\\未识别文件.mp4')
+        self.assertIsNone(row['code'])
+        self.assertEqual(row['size'], 1048576)
         self.assertEqual(before, self.db.read_bytes())
 
     def test_missing_database_and_broken_or_oversized_logs_are_unknown(self):
