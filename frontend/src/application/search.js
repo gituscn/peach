@@ -129,15 +129,15 @@ applicationEffects.handler($('#searchBack'), 'onclick', ()=>{
   $('#q').blur();
   $('#searchBtn').focus({preventScroll:true});
 });
-applicationEffects.listen($('#q'), 'blur', ()=>applicationEffects.delay(()=>{
-  if(document.activeElement===$('#q'))return;
-  if($('#searchMenu').contains(document.activeElement))return;
-  if(!$('#q').value&&!$('#searchMenu').matches(':hover'))setNarrowSearchOpen(false);
+const dismissOutsideSearch=event=>{
+  if(event.target.closest('.search'))return;
+  // 输入法收起只把焦点交回页面；建议仍可继续选择。
+  if(event.type==='focusin'&&(event.target===document.body||event.target===document.documentElement))return;
+  if(!$('#q').value)setNarrowSearchOpen(false);
   hideSearchMenu();
-},140));
-applicationEffects.listen(document, 'pointerdown', event=>{
-  if(!event.target.closest('.search'))hideSearchMenu();
-}, true);
+};
+applicationEffects.listen(document, 'pointerdown', dismissOutsideSearch, true);
+applicationEffects.listen(document, 'focusin', dismissOutsideSearch);
 applicationEffects.handler($('#brandHome'), 'onclick', e=>{e.preventDefault();goHome(null,true)});
 applicationEffects.listen(document, 'keydown', e=>{
   if(e.key==='Escape'){

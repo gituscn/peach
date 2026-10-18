@@ -232,9 +232,8 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
     }
     bump();
   };
-  /* 每一下输入都排一次补全，但只发一次请求。先按手头已有的内容重画一遍，下拉栏不会在等请求的这段
-     里空着。回调回来时焦点可能已经不在输入框上：失焦那条 140ms 的兜底先把下拉栏收了，晚到的回调
-     再掀开，这一刻没有焦点，也就不会再有第二次失焦来收场，所以先问焦点还在不在。 */
+  /* 每一下输入都排一次补全，但只发一次请求。先按手头已有的内容重画一遍；请求返回时核对焦点，
+     点击页面或移到其他控件后不再打开建议。 */
   const refresh = () => {
     s.active = -1;
     // 换了词就回到「全部」：上一个词选中的那一类，这个词下可能一条都没有。
@@ -363,7 +362,7 @@ function Tabs({ tabs, kind, onPick, wire }: {
   useLayoutEffect(() => { wire(row.current) }, [wire, tabs]);
   const tab = (k: string, label: string, total?: number) => (
     <button key={k || 'all'} type="button" role="tab" data-suggest-kind={k} aria-selected={kind === k}
-      // 按下不抢焦点：抢走会触发 `#q` 的失焦，140ms 后整个下拉栏收掉，页签等于白点。
+      // 页签选择保留输入焦点，便于继续输入与使用方向键。
       onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(k)}>
       {label}{total ? <TabCount value={total} /> : null}
     </button>

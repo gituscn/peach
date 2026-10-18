@@ -37,9 +37,12 @@
 }
 /* 什么都没有的那一格占同一个 16:9 框：它顶替的就是画面本身，缩成一条窄带看着像没加载完。 */
 .peach-react [data-follow-detail] [data-follow-detail-placeholder] {
+  width: 100%;
+  max-height: 100%;
   aspect-ratio: 16 / 9;
   display: grid;
   place-items: center;
+  place-content: center;
   gap: 10px;
   color: var(--muted);
 }

@@ -417,6 +417,27 @@ describe('关注详情岛', () => {
   });
 
   for (const viewport of [DESKTOP, MOBILE]) {
+    it(`没有预览的关注详情保留完整画框（${viewport.name}）`, { timeout: 60_000 }, async () => {
+      const opened = await openDetail(browser, DETAIL.bare, viewport);
+      try {
+        const { page } = opened;
+        const placeholder = page.locator('#stage [data-follow-detail-placeholder]');
+        await placeholder.waitFor();
+        const box = await placeholder.evaluate(node => {
+          const frame = node.closest('[data-stage-media]')!.getBoundingClientRect();
+          const rect = node.getBoundingClientRect();
+          return { width: rect.width, height: rect.height, frameWidth: frame.width, frameHeight: frame.height };
+        });
+        assert.ok(Math.abs(box.width - box.frameWidth) < 1, `空态占满媒体宽度：${JSON.stringify(box)}`);
+        if (viewport.mobile) assert.ok(Math.abs(box.width / box.height - 16 / 9) < .02, `空态按画框比例留高：${JSON.stringify(box)}`);
+        else assert.ok(box.height >= 180, `桌面空态完整显示图标与说明：${JSON.stringify(box)}`);
+        assert.ok(box.frameHeight >= box.height - 1, '媒体框容纳完整空态');
+        assert.equal(await page.locator('#closeStage').isVisible(), true);
+        assert.deepEqual((await layout(page)).offenders, []);
+        assert.deepEqual(withoutPlayer(opened.problems), []);
+      } finally { await opened.close(); }
+    });
+
     it(`长摘要收在八行内、不被侧栏压扁，长串标题与媒体报错不撑宽侧栏（${viewport.name}）`, { timeout: 60_000 }, async () => {
       const opened = await openDetail(browser, DETAIL.long, viewport);
       try {
