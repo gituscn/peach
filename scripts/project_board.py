@@ -101,7 +101,7 @@ def decision(content, current, linked, published):
     return result
 
 
-CONTENT = '''__typename ... on DraftIssue{id title} ... on Issue{id number title url state stateReason
+CONTENT = '''__typename ... on DraftIssue{id title} ... on Issue{id number title url state stateReason author{login}
 labels(first:100){nodes{name}}}
 ... on PullRequest{id number title url state merged mergeCommit{oid} body
 closingIssuesReferences(first:100){nodes{id number}}}'''
@@ -118,7 +118,7 @@ fields(first:100){nodes{... on ProjectV2Field{id name dataType}
         if required not in fields:
             raise ValueError(f"看板缺少字段：{required}")
     items = connection('''query($id:ID!,$cursor:String){node(id:$id){... on ProjectV2{
-items(first:100,after:$cursor){nodes{id isArchived content{''' + CONTENT + '''}
+items(first:100,after:$cursor,archivedStates:[ARCHIVED,NOT_ARCHIVED]){nodes{id isArchived content{''' + CONTENT + '''}
 fieldValues(first:100){nodes{... on ProjectV2ItemFieldSingleSelectValue{name field{... on ProjectV2SingleSelectField{name}}}
 ... on ProjectV2ItemFieldTextValue{text field{... on ProjectV2Field{name}}}}}}
 pageInfo{hasNextPage endCursor}}}}}''', ("node", "items"), id=project)
@@ -148,7 +148,7 @@ def include_incoming(config, candidates, prs, event, apply):
     repository, project = config["repository"], config["project_id"]
     owner, name = repository.split("/")
     incoming = connection('''query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){
-issues(first:100,after:$cursor,states:OPEN){nodes{__typename id number title url state stateReason
+issues(first:100,after:$cursor,states:OPEN){nodes{__typename id number title url state stateReason author{login}
 labels(first:100){nodes{name}}}pageInfo{hasNextPage endCursor}}}}''',
                           ("repository", "issues"), owner=owner, name=name)
     tracked = {item["content"].get("number") for item in candidates.values()
@@ -160,6 +160,8 @@ labels(first:100){nodes{name}}}pageInfo{hasNextPage endCursor}}}}''',
         node = graphql('''query($id:ID!){node(id:$id){''' + CONTENT + '''}}''', id=subject["node_id"])["node"]
         incoming.append(node)
     for node in incoming:
+        if config.get("issues_only") and node["__typename"] != "Issue":
+            continue
         if node["id"] not in candidates:
             item = {"id": None, "content": node, "fieldValues": {"nodes": []}, "isArchived": False}
             if apply:
@@ -232,6 +234,8 @@ def reconcile(config, *, apply=False, event=None):
         if not content["url"].startswith(f"https://github.com/{repository}/"):
             continue
         desired = delivery_fields(config, content, values(item), linked, releases)
+        if "来源" in fields and content.get("author"):
+            desired["来源"] = "维护者待办" if content["author"]["login"] in config.get("maintainers", []) else "用户反馈"
         changes.extend(apply_fields(project, item, fields, desired, apply))
     return changes
 

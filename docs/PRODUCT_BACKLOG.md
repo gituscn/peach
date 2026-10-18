@@ -2,7 +2,7 @@
 
 最后核验：2026-10-07。这里只记还没做完的需求和待执行的操作；做完就删，历史去 Git 查。运行数字以 `peach-data/state/job-status.md` 的自动区块为准。
 
-当前开发与版本范围见 [Peach 项目看板](https://github.com/orgs/peach-mitao/projects/6)，关联与自动同步方式见[项目看板与交付关联](PROJECT_BOARD.md)；本文件保留资料复核、运维等待条件与长期待办。
+当前开发与版本范围见 [Peach 需求与路线图](https://github.com/orgs/peach-mitao/projects/7)，关联与自动同步方式见[项目看板与交付关联](PROJECT_BOARD.md)；本文件保留资料复核、运维等待条件与长期待办。
 
 ## 功能验收与范围
 

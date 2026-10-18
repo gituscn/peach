@@ -12,12 +12,14 @@
   <a href="https://demo.peach.video">在线演示</a> ·
   <a href="https://github.com/peach-mitao/peach/releases/tag/intro-video">介绍视频</a> ·
   <a href="https://github.com/peach-mitao/peach/issues">问题反馈</a> ·
+  <a href="https://github.com/orgs/peach-mitao/projects/7/views/1">需求看板</a> ·
+  <a href="https://github.com/orgs/peach-mitao/projects/7/views/3">路线图</a> ·
   <a href="#文档">文档</a> ·
   <a href="README.en.md">English</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/peach-mitao/peach/releases"><img src="https://img.shields.io/github/v/release/peach-mitao/peach?include_prereleases&amp;filter=v*&amp;sort=semver&amp;label=release" alt="release"></a>
+  <a href="https://github.com/peach-mitao/peach/releases"><img src="https://img.shields.io/github/v/release/peach-mitao/peach?include_prereleases&amp;filter=v*&amp;sort=semver&amp;display_name=tag" alt="release"></a>
   <a href="https://github.com/peach-mitao/peach/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/peach-mitao/peach/test.yml?branch=master&amp;label=tests&amp;logo=githubactions&amp;logoColor=white" alt="CI 状态"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue?logo=gnu&amp;logoColor=white" alt="license"></a>
   <a href="docs/TESTING_DESKTOP.md"><img src="https://img.shields.io/badge/Windows-x64-0078D4" alt="Windows x64"></a>
