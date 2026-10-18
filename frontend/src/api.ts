@@ -6,7 +6,8 @@
  * 迟到的响应不能再往新页面上写东西。 */
 
 /** 服务端明确回了非 2xx。`status` 留给调用方区分 401／409／404 这类需要不同处置的情况。 */
-import {requestErrorMessage, registerResponseEntities} from '@peach/legacy/core';
+import { requestErrorMessage } from './core/request-error';
+import { registerResponseEntities } from './core/entity-links';
 
 export class ApiError extends Error {
   readonly status: number;
