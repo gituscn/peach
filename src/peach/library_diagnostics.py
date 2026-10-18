@@ -124,7 +124,7 @@ SOURCE_CHECK_REASONS = {
 }
 
 
-def _source_health(cooling, failed, fresh, recent, connection_ok, reason_key):
+def _source_health(cooling, failed, fresh, recent, connection_ok, reason_key, *, has_success, has_check):
     """来源诊断优先报告冷却与失败，再报告解析和连接证据。"""
     if cooling:
         return "warning", "来源正在冷却"
@@ -132,9 +132,13 @@ def _source_health(cooling, failed, fresh, recent, connection_ok, reason_key):
         return "warning", SOURCE_CHECK_REASONS.get(reason_key, "来源未取得资料")
     if fresh:
         return "ok", "资料解析通过"
+    if has_success:
+        return "stale", "曾解析成功，近期解析状态待复查"
     if recent and connection_ok:
         return "unknown", "连接检查通过；解析状态未取得"
-    return "unknown", "当前解析状态未取得"
+    if has_check:
+        return "stale", "已有检查记录，解析状态待复查"
+    return "unchecked", "尚无检查或解析记录，可在来源和凭证中检查连接"
 
 
 def sources(settings, config, *, now=None):
@@ -178,7 +182,8 @@ def sources(settings, config, *, now=None):
         recent = 0 <= now - float(last.get("checked_at", 0)) <= 86400
         reason_key = last.get("reason", "") if recent else ""
         failed = recent and not last.get("ok") and reason_key != "not_found"
-        status, reason = _source_health(cooling, failed, fresh, recent, connection.get("ok"), reason_key)
+        status, reason = _source_health(cooling, failed, fresh, recent, connection.get("ok"), reason_key,
+                                        has_success=bool(stamp), has_check=bool(last))
         result.append({"source": key, "label": SOURCES[key]["label"],
                        "status": status,
                        "reason": reason, "last_check_at": timestamp(last.get("checked_at")),

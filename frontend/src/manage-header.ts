@@ -72,7 +72,7 @@ export function manageHeaderView(props: ManageHeaderProps): ManageHeaderView | n
   if (!entry) return null;
   const crumb = MANAGE_CRUMB_PAGES[props.path] ?? '';
   return {
-    title: props.path === '/diagnostics' ? '系统诊断' : (props.section === 'cleanup' && crumb) || entry[1],
+    title: (props.section === 'cleanup' && crumb) || entry[1],
     pressed: pressedManageKey(props),
     crumb,
     compact: COMPACT_TITLE_PATHS.has(props.path) || props.section === 'configuration',

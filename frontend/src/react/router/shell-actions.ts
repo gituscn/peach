@@ -175,7 +175,6 @@ export interface ManagedOpenProps extends Record<ConfigurationPath, { section?: 
   '/sources': Record<string, never>;
   /** `section`：首帧选中的那一组页签名，取走 `requestConfigurationSection` 记下的那一次（地址带 `#peachProxy` 时是「网络与访问」）。 */
   '/settings/library': { section?: string };
-  '/diagnostics': Record<string, never>;
   '/tasks': Record<string, never>;
   '/subscriptions': {
     tab: string; page: number; sort: string; dir: string; pageSize: number; layout: string;

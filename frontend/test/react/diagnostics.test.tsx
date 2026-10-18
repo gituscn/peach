@@ -61,7 +61,7 @@ it('异常检查位于首区，其他检查可展开且没有重复条目', asyn
   expect(host.querySelector('section')).toBe(priority);
   expect([...priority!.querySelectorAll('h3')].map(node => node.textContent)).toEqual(['媒体挂载', '访问安全', '数据目录']);
   for (const check of Object.values(report.checks)) {
-    expect([...host.querySelectorAll('h3')].filter(node => node.textContent === check.label)).toHaveLength(1);
+    expect([...host.querySelectorAll('h3,h4')].filter(node => node.textContent === check.label)).toHaveLength(1);
   }
   const summary = [...host.querySelectorAll('summary')].find(node => node.textContent === '其他检查 · 1 项');
   expect(summary?.getAttribute('aria-expanded')).toBe('false');

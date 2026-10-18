@@ -3,6 +3,7 @@ export const PREFERENCE_SECTIONS = {
 } as const;
 export const CONFIGURATION_SECTIONS = {
   library: '媒体库与入库', subscriptions: '来源与订阅', downloads: '下载渠道', network: '网络与访问', maintenance: '应用与维护',
+  diagnostics: '系统诊断',
 } as const;
 export type ConfigurationPath = `/settings/${keyof typeof CONFIGURATION_SECTIONS}`;
 export function configurationSection(path: string): string {

@@ -1,4 +1,4 @@
-/* 「应用与维护」中的运行信息、诊断、安装教程与卸载。 */
+/* 「应用与维护」中的运行信息、安装教程与卸载。 */
 import { useState, type FormEvent } from 'react';
 import { confirmModal } from '@peach/legacy/ui';
 
@@ -6,7 +6,6 @@ import { SettingsCard, SettingsRow } from '@/components/application/settings/set
 import { Button } from '@/components/base/buttons/button';
 import { Select, SelectItem } from '@/components/base/select/select';
 import { Switch } from '@/components/base/switch/switch';
-import { ButtonLink } from '@/components/base/buttons/button';
 
 import { apiSend } from '../../api';
 import type {
@@ -101,9 +100,6 @@ function Facts({ facts }: { facts: ConfigurationFact[] }) {
           </Fact>
         ))}
       </FactList>
-      <Rows><SettingsRow label="系统诊断">
-        <ButtonLink variant="secondary" href="/diagnostics">打开系统诊断</ButtonLink>
-      </SettingsRow></Rows>
     </Section>
   );
 }

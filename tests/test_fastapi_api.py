@@ -1914,13 +1914,16 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                      "/unseen", "/watch-later", "/flagged", "/junk-files",
                      "/data-cleanup", "/duplicates", "/quality-goals", "/tasks",
                      "/assets/2?mix=1", "/assets/2?parts=1", "/assets/2?editions=1", "/playlists",
-                     "/resource-sync", "/diagnostics",
+                     "/resource-sync", "/settings/diagnostics",
                      "/assets/1?playlist=1", "/follow", "/subscriptions",
                      "/posts/190", "/sources", "/settings", "/works/ABC-001"):
             response = await self.client.get(path)
             self.assertEqual(response.status_code, 200, path)
             self.assertIn("Peach test", response.text)
 
+        diagnostic = await self.client.get('/diagnostics?tab=x', follow_redirects=False)
+        self.assertEqual(diagnostic.status_code, 307)
+        self.assertEqual(diagnostic.headers['location'], '/settings/diagnostics?tab=x')
         removed = await self.client.get("/entity/performer/Alice")
         self.assertEqual(removed.status_code, 404)
 

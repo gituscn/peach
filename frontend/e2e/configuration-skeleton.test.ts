@@ -66,7 +66,7 @@ describe('配置页等待态', () => {
         await page.keyboard.press('ArrowRight');
         assert.equal(await nav.getByRole('tab', { name: '来源与订阅', exact: true }).getAttribute('aria-selected'), 'true');
         await page.keyboard.press('End');
-        assert.equal(await nav.getByRole('tab', { name: '应用与维护' }).getAttribute('aria-selected'), 'true');
+        assert.equal(await nav.getByRole('tab', { name: '系统诊断' }).getAttribute('aria-selected'), 'true');
         await page.keyboard.press('Home');
         assert.equal(await input.inputValue(), 'example.invalid');
         const bounds = await layout(page);

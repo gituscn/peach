@@ -51,7 +51,6 @@ const PLACEHOLDERS: Record<string, () => string> = {
   // /resource-sync 只是数据管理页上的一个锚点，占位也该是数据管理那张。
   '/resource-sync': () => cleanupSkeletonHtml(),
   '/review': () => reviewSkeletonHtml(),
-  '/diagnostics': () => configurationSkeletonHtml(),
   /* 采集来源是 812px 窄列里一叠同宽的 Fieldset：一块高清封面加六个来源。骨架画四块，
      那是首屏装得下的张数；说明那一句是静态文案，与数据无关，立刻显示。 */
   '/sources': () => `<div class="scraping-page"><p>高清图片可能要经代理才能下载，先检查连接。</p>

@@ -73,6 +73,7 @@
 | `/settings/downloads` | 下载渠道 |
 | `/settings/network` | 网络与访问 |
 | `/settings/maintenance` | 应用与维护 |
+| `/settings/diagnostics` | 系统诊断：系统检查、库健康与来源会话 |
 | `/subscriptions` | 关注管理：关注列表、添加关注、JAV 订阅源 |
 | `/sources` | 来源和凭证：采集来源、访问方式与凭据状态 |
 | `/tasks` | 任务中心与云下载进度 |
@@ -82,10 +83,9 @@
 | `/data-cleanup` | 数据管理 |
 | `/duplicates` | 重复文件 |
 | `/quality-goals` | 高清版目标 |
-| `/diagnostics` | 系统诊断 |
 | `/login` | 登录 |
 
-设置分区可直接打开、刷新和用浏览器前进后退。偏好面板从当前页面打开时保留背景；配置分区复用配置页及其权限检查。
+设置分区可直接打开、刷新和用浏览器前进后退。偏好面板从当前页面打开时保留背景；配置分区复用配置页及其权限检查。配置分类导航停在搜索栏下方，切换分类时显示所选分区的开头。
 
 ## 兼容地址与服务接口
 
@@ -101,6 +101,7 @@
 | `/scraping` | `/sources` |
 | `/follow-manage` | `/subscriptions` |
 | `/configuration` | `/settings/library` |
+| `/diagnostics` | `/settings/diagnostics` |
 | `/resource-sync` | `/data-cleanup#resource-sync` |
 
 兼容跳转保留查询参数；后退前进的背景信息留在历史条目中。索引尾斜杠跳到无尾斜杠路径。

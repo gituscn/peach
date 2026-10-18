@@ -13,7 +13,7 @@ it('三类对象与队列兼容地址保留筛选和播放位置', () => {
   }
   expect(canonicalPath('/api/item?id=12')).toBe('/api/item?id=12');
   for (const [source, target] of [['activity', 'tasks'], ['scraping', 'sources'],
-    ['follow-manage', 'subscriptions'], ['configuration', 'settings/library']]) {
+    ['follow-manage', 'subscriptions'], ['configuration', 'settings/library'], ['diagnostics', 'settings/diagnostics']]) {
     expect(canonicalPath(`/${source}?tab=x`)).toBe(`/${target}?tab=x`);
   }
 });

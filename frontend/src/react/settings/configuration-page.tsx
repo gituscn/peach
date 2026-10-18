@@ -1,12 +1,12 @@
 /* 配置页（`/settings/library`）：这台运行 Peach 的电脑上那些要「保存配置」的多字段表单。
- * 五个分区各占一格页签，一次只摆一组；本机配置权限与账本写入权限由服务端分别判定。
+ * 每个分区各占一格页签，一次只摆一组；本机配置权限与账本写入权限由服务端分别判定。
  * 设置弹层里的「Peach 配置」入口指到这里。
  *
  * `.ui-configpage` 的第一层：最前面是页签条（`.ui-board-local-nav`），后面每组一个 `h2.ui-configgroup` 小标题
  * 紧跟这一组的根节点，根节点就是那一格页签面板。小标题在样式里不显示，它的字已经写在页签上；
  * 没有内容的组连标题与页签一起省略。页签条第一帧就在，和整页同一次提交画出来。 */
 import { useQuery } from '@tanstack/react-query';
-import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
 import { peachHistory, shellNavigate, settingsPath } from '@peach/history';
 
 import { errorMessage } from '../../api';
@@ -22,7 +22,7 @@ import { NetworkSettings } from './network-settings';
 import { SourceSettings } from './source-settings';
 import { groupRoot } from './configuration-panel';
 
-export function ConfigurationPage({ receipt, reopenTutorial, section = '' }: ConfigurationProps) {
+export function ConfigurationPage({ receipt, reopenTutorial, section = '', diagnostics }: ConfigurationProps & { diagnostics?: ReactElement }) {
   const config = useQuery({
     queryKey: CONFIGURATION_KEY, queryFn: ({ signal }) => fetchConfiguration(signal),
   });
@@ -36,7 +36,7 @@ export function ConfigurationPage({ receipt, reopenTutorial, section = '' }: Con
       </div>
     );
   }
-  return <ConfigurationGroups data={data} receipt={receipt} reopenTutorial={reopenTutorial} section={section} />;
+  return <ConfigurationGroups data={data} receipt={receipt} reopenTutorial={reopenTutorial} section={section} diagnostics={diagnostics} />;
 }
 
 interface Group { title: string; body(panel: ConfigurationPanel): ReactElement }
@@ -47,11 +47,24 @@ let tabSequence = 0;
 /* 页签条是一个 tablist，方向键在整排里走、首尾相接，Home／End 到两头，挪到哪一格就选中哪一格、焦点跟过去。
    分区地址与选中项同步，表单保持挂载。 */
 function ConfigurationGroups(
-  { data, receipt, reopenTutorial, section }: Required<ConfigurationProps> & { data: ConfigurationData },
+  { data, receipt, reopenTutorial, section, diagnostics }: Required<ConfigurationProps> & { data: ConfigurationData; diagnostics?: ReactElement },
 ) {
   const [prefix] = useState(() => `board-tabs-${++tabSequence}`);
   const [chosen, setChosen] = useState(section);
+  const workspace = useRef<HTMLDivElement>(null);
+  const previous = useRef(chosen);
   useEffect(() => { setChosen(section) }, [section]);
+  useLayoutEffect(() => {
+    if (previous.current === chosen) return;
+    previous.current = chosen;
+    const nav = workspace.current?.querySelector<HTMLElement>('[role="tablist"]');
+    const panel = workspace.current?.querySelector<HTMLElement>('.ui-board-group-active');
+    if (!nav || !panel) return;
+    const boundary = parseFloat(getComputedStyle(nav).top);
+    if (!Number.isFinite(boundary) || nav.getBoundingClientRect().top > boundary + 1) return;
+    const top = matchMedia('(max-width:900px)').matches ? nav.getBoundingClientRect().bottom + 8 : boundary;
+    window.scrollTo(0, Math.max(0, window.scrollY + panel.getBoundingClientRect().top - top));
+  }, [chosen]);
   const choose = (title: string) => {
     setChosen(title);
     shellNavigate(settingsPath(title), { replace: true, state: peachHistory.navigation.location.state });
@@ -84,6 +97,7 @@ function ConfigurationGroups(
         <MaintenanceSettings {...group} reopenTutorial={reopenTutorial} />
       </div>,
     },
+    { title: '系统诊断', body: panel => <div {...groupRoot(panel)}>{panel.active ? diagnostics : null}</div> },
   ];
   const at = Math.max(0, groups.findIndex((item) => item.title === chosen));
   const move = (event: KeyboardEvent<HTMLButtonElement>, from: number) => {
@@ -99,7 +113,7 @@ function ConfigurationGroups(
     buttons.current[next]?.focus();
   };
   return (
-    <div className="ui-configpage">
+    <div ref={workspace} className="ui-configpage">
       <div className="ui-board-local-nav" role="tablist" aria-label="配置分区" data-section-nav="" data-section-items=""
         aria-orientation={narrow ? 'horizontal' : 'vertical'}>
         {groups.map(({ title }, i) => (

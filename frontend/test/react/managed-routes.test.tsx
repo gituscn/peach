@@ -321,8 +321,8 @@ it('配置页打开返回的那一刻，页签条已经在容器里，选中的�
     const open = { section: '网络与访问' };
     expect(await r.openManagedRoute('/settings/library', open, { container: stats, isCurrent: () => true })).toBe(true);
     const tabs = [...stats.querySelectorAll('.ui-configpage > .ui-board-local-nav[role="tablist"] > [role="tab"]')];
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['媒体库与入库', '来源与订阅', '网络与访问', '应用与维护']);
-    expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'false', 'true', 'false']);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['媒体库与入库', '来源与订阅', '网络与访问', '应用与维护', '系统诊断']);
+    expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'false', 'true', 'false', 'false']);
     const active = stats.querySelector('.ui-board-group-active');
     expect(active?.id).toBe(tabs[2].getAttribute('aria-controls'));
     expect(stats.querySelector('.ui-configpage')?.parentElement?.classList.contains('peach-react')).toBe(true);
@@ -363,7 +363,8 @@ it('诊断页先选配置分栏再导航，作品与任务交给共享入口', a
   const order: string[] = [];
   const go = vi.fn((path: string) => { order.push(path) });
   vi.mocked(actions.requestConfigurationSection).mockImplementation(section => { order.push(section) });
-  const props = element<DiagnosticsProps>('/diagnostics', r, {}, actions, go);
+  const page = element<ConfigurationProps & { diagnostics: ReactElement<DiagnosticsProps> }>('/settings/diagnostics', r, {}, actions, go);
+  const props = page.diagnostics.props;
   props.configure('网络与访问');
   props.openItem(12);
   props.navigate('/tasks');
