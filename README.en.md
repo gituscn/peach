@@ -11,7 +11,7 @@
   <a href="https://github.com/peach-mitao/peach/releases">Download for Windows</a> ·
   <a href="https://demo.peach.video">Live demo</a> ·
   <a href="https://github.com/peach-mitao/peach/releases/tag/intro-video">Intro video</a> ·
-  <a href="https://github.com/peach-mitao/peach/issues?q=is%3Aissue+is%3Aopen+-author%3Alongmeidao">Report a problem</a> ·
+  <a href="https://github.com/peach-mitao/peach/issues">Report a problem</a> ·
   <a href="https://github.com/orgs/peach-mitao/projects/7/views/1">Requests board</a> ·
   <a href="https://github.com/orgs/peach-mitao/projects/7/views/3">Roadmap</a> ·
   <a href="#documentation">Documentation</a> ·
@@ -102,7 +102,7 @@ See [Docker deployment](docs/DOCKER.md) for setup and supported configurations.
 
 ## Reporting problems
 
-Check [user feedback](https://github.com/peach-mitao/peach/issues?q=is%3Aissue+is%3Aopen+-author%3Alongmeidao), or [open an issue](https://github.com/peach-mitao/peach/issues/new/choose) with the version, steps, expected result and actual result. Hide credentials, LAN addresses and full paths in screenshots; do not upload databases or media. Report security issues privately through the [security policy](SECURITY.md).
+Check [user feedback](https://github.com/peach-mitao/peach/issues), or [open an issue](https://github.com/peach-mitao/peach/issues/new/choose) with the version, steps, expected result and actual result. Hide credentials, LAN addresses and full paths in screenshots; do not upload databases or media. Report security issues privately through the [security policy](SECURITY.md).
 
 ## Documentation
 
