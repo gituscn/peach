@@ -935,9 +935,6 @@ class LibraryNfoTests(unittest.TestCase):
     @windows_ledger_roots
     def test_a_performer_marker_is_not_a_content_tag_the_ledger_already_has(self):
         """`演员:` 是出演者在 `asset_tag` 上的扁平投影，算成标签就再也采不回 genre。
-
-        本机 110 部片卡在这上面：`asset_tag` 里只有 `演员:` 那几行，采集因此判定标签
-        有着落，摘掉它们的旧候选也换不回日文原词。
         """
         media = self.root / 'media'
         media.mkdir()

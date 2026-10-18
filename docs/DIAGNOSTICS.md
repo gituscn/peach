@@ -1,6 +1,6 @@
-# 日志与诊断核验
+# 日志与诊断
 
-核验范围覆盖 269 个 Python 模块的异常与子进程入口，以及浏览器错误上报、托盘、更新和诊断导出。静态枚举用于建立候选清单，各链路按故障语义复查；正常取消、缓存回退、来源未命中和任务互斥保留各自状态。
+本页说明异常日志、浏览器错误上报、诊断导出与可选远程诊断的边界。正常取消、缓存回退、来源未命中和任务互斥保留各自状态。
 
 ## 反馈入口
 
@@ -45,7 +45,7 @@
 
 接收端由维护者配置：源码与 Docker 使用 `PEACH_SENTRY_DSN`；Windows 发行构建从同名环境变量写入包内 `sentry.json`，GitHub Release 使用仓库变量 `PEACH_SENTRY_DSN`。只接受 Sentry 的公开 HTTPS DSN（含 US / DE 区域），不需要 API token。没有 DSN 时不会创建 SDK 客户端。SDK 自动框架集成、日志、性能追踪和指标均关闭；版本统计作为普通事件计入 Sentry 错误事件额度。账号套餐和总量以 [Sentry 订阅页](https://sentry.io/settings/) 为准。
 
-回归验收使用临时数据根和 SDK 内存接收端。本机已配置独立的 `peach-errors` 与 `peach-library-research` 接收项目，合成错误 `PEACH-ERRORS-1` 已在 Sentry 核对代码位置；没有发送真实馆藏。发布工作流的两个公开 DSN 仓库变量已配置并回读核对，构建包从变量取得接收地址；配置变量不触发发布。技术诊断选择见 [ADR-0110](adr/0110-recommended-diagnostics-choice.md)。安装辅助进程只在本机取证，不初始化远程客户端或发送事件；应用进程按用户选择发送。
+回归验收使用临时数据根和 SDK 内存接收端。实际接收与发行制品的验收记录保存在仓库外。技术诊断选择见 [ADR-0110](adr/0110-recommended-diagnostics-choice.md)。安装辅助进程只在本机取证，不初始化远程客户端或发送事件；应用进程按用户选择发送。
 
 `asyncio` 连接清理只在同时满足以下条件时识别为连接重置收尾：`ConnectionResetError` 的 `winerror` 为 `10054`，回调为标准库 `_ProactorBasePipeTransport._call_connection_lost`，调用栈只含该回调与 `asyncio.events._run`，且没有关联异常。处理器核对真实 Proactor transport 处于清理状态，关闭 socket、解除服务端登记并完成关闭状态；不重复通知协议。成功记录 `classification=connection-cleanup` 与 `cleanup_recovered=true`，仅保留本机证据。收尾自身失败则保留原始异常链、上报技术故障并交给默认处理器；不能确认对象状态时也沿用默认处理器。没有全局修改 Python 类或替换事件循环。
 
@@ -98,26 +98,8 @@
 
 ZIP 不包含 ledger、配置文件、私钥、登录 Cookie 或媒体文件。路径、网址、地址、凭据字段及命令行凭据值脱敏；处理记录中的媒体名称隐藏。故障注入的默认日志落在测试进程临时目录。
 
-## AV1 样本
+## 媒体工具
 
-样本 SHA256 为 `97e67a7e9521de3771480ed4f4ffe21461f3d4d13d95e68bc46618524461ace0`，体积 55,805,806 字节，视频为 AV1、1280×700、26 fps、585.153855 秒。
+AV1 抽帧需要可用的软件解码器。`scripts/build_ffmpeg_windows.sh` 静态编入固定版 dav1d；完整源码归档、许可证和 SHA256 清单通过 `media_tool_bundle.py --validate-only` 核验。
 
-未包含 `libdav1d` 的 FFmpeg 9.0.2 工具返回退出码 `69`，stderr 包含 `Your platform doesn't support hardware accelerated AV1 decoding` 和 `Function not implemented`。`scripts/build_ffmpeg_windows.sh` 静态编入固定版 dav1d；完整源码归档、许可证和 SHA256 清单通过 `media_tool_bundle.py --validate-only`。
-
-自构建工具对同一原文件完成全部 9 个采样点及 1440×789 九宫格，原媒体只读。发行验收使用内嵌的合成 AV1 片段，在 CPU 上完成解码和抽帧，不依赖机器显卡或 AV1 编码器。
-
-其余 52 项媒体未取得，不能据一个样本断言全部失败原因。AV1 修复随包含该工具构建的发行包交付；外部用户侧安装与剩余媒体重试尚未验证。
-
-## 影响面
-
-| 影响面 | 适用性 |
-| --- | --- |
-| 数据层 | 本机独立同意、限额与故障频率聚合文件；研究只读账本，复用派生偏好；没有迁移或真实 ledger 写入 |
-| API／契约 | 诊断选择、研究预览与同意；浏览器接收可选异常类型用于取消识别；本机、鉴权、同源限制 |
-| 页面 | 配置页「应用与维护」、首次设置；Windows 安装器默认勾选推荐的诊断选项；其他馆藏页面不适用 |
-| 反向状态 | 诊断与研究分别关闭；关闭使排队载荷失效，研究重新开启须预览并同意 |
-| 视口 | 桌面和 390×844 手机验证明细折行、内部滚动、同意与关闭；无横向溢出 |
-| 测试 | 诊断与研究选择、SDK 内存传输、脱敏与权限；实际 socket 和服务端清理、收尾失败、预期状态、解析错误、浏览器取消与构建参数堆栈；跨进程次数、重启与退出补报、日期及限额、关闭清除与 SDK 拒收 |
-| 文档 | 中英文 README、STATUS、REUSE、待办、本记录与 ADR-0109 |
-| 智能体入口 | 没有新增规则、技能或入口 |
-| 生产 | 本机源码运行态按托盘入口重启并严格校验 HTTPS；外部测试包发布独立验收 |
+发行验收使用内嵌的合成 AV1 片段，在 CPU 上完成解码和抽帧，不依赖机器显卡或 AV1 编码器。真实媒体的失败记录、文件指纹与重试结果保存在仓库外的私有诊断记录中。

@@ -36,9 +36,7 @@ IMAGE_ORIGINS = (("dmm", ("dmm.co.jp", "dmm.com")), ("duga", ("duga.jp",)),
 ORIGIN_REFERERS = {JAVBUS.name: JAVBUS.referer, JAVDB.name: JAVDB.referer}
 ASPECT_TOLERANCE = 0.04
 HASH_DISTANCE = 10
-#: 两张图按一个相似变换对上的特征点至少这么多才算同一张。2026-09-24 实测：同一张商品图
-#: 的方图、竖图与水印框缩略图两两 275～301 个；本机 FC2 封面同卖家 28 张、随机 60 张两两
-#: 比下来最高 28 个（同一场拍摄拼成的两张图，共用一帧），其余不过 10 个。
+#: 两张图按一个相似变换对上的特征点至少这么多才算同一张。
 SCENE_INLIERS = 60
 #: 算特征点前把长边缩到这么长：几百像素已经够认，原图 3000 多像素只是白算。
 SCENE_SIDE = 400

@@ -1578,8 +1578,7 @@ class FollowContractTests(unittest.TestCase):
     def test_the_work_icon_takes_the_cover_not_the_250px_thumbnail(self):
         """候选取的是卡片上那张高清封面，不是 250px 的缩略图。
 
-        圆标只有 28px，两层看起来一样；差别在检脸——250px 里一张脸只剩十几个像素。
-        实测本库 77 个题材，高清那层检出 58 张脸，缩略那层 49 张。没有封面的旧行才
+        圆标只有 28px，两层看起来一样；差别在检脸——250px 里一张脸只剩十几个像素。没有封面的旧行才
         退回缩略图，那也好过这一枚圆标空着。
         """
         host = "https://api-cdn.rule34.xxx"

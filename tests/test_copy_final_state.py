@@ -64,7 +64,7 @@ class CopyFinalStateTests(unittest.TestCase):
     def test_the_scan_covers_every_declared_surface(self):
         """扫描面写死成 glob 就会漏掉新目录，所以直接核对它收到了哪些文件。"""
         picked = {path.relative_to(ROOT).as_posix() for path in checker.targets(ROOT)}
-        for required in ("AGENTS.md", "README.md", "docs/HANDOFF.md",
+        for required in ("AGENTS.md", "README.md", "docs/WRITING.md",
                          "web/index.html", "frontend/src/application/composition.js", "frontend/src/core/index.ts",
                          "src/peach/web_entity.py",
                          "tests/test_web_ui.py",

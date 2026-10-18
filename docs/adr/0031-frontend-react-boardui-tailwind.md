@@ -146,7 +146,7 @@ BoardUI 通过 shadcn 注册表发布 React + Tailwind v4 源码，表单与弹�
 
 2026-09-15，1500 部合成库（`scripts/demo_dataset.py`，占位短片、无缩略图），回环 `peach serve --no-auth`，
 无头 Chrome 1280×800，每批 60 张，沿 `#loadSentinel` 连续加载；脚本与原始结果在
-`attic/evidence/20260915-grid-dom-scale/`。
+`<私有验证记录>`。
 
 | 卡片 | DOM 元素 | JS 堆 MB | 帧间隔均值 ms（原样） | 最长帧 ms（原样） | 帧间隔均值 ms（加 `content-visibility: auto`） | 最长帧 ms（同） |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |

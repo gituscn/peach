@@ -10,14 +10,20 @@ Peach 使用 [seiso](https://github.com/scarletkc/seiso) 检查 Markdown 的职�
 | --- | --- | --- |
 | 产品用途、安装入口、文档导航 | [README](../README.md)，英文版同步维护 | `readme` |
 | 安装、配置、测试与维护步骤 | [运行与配置](OPERATIONS.md)、[测试与依赖](TESTING.md) 等操作文档 | `howto` |
-| 架构、术语、接口约束、复用依据 | [总体架构](ARCHITECTURE.md)、[长期约定](HANDOFF.md)、[复用清单](REUSE.md) | `reference` |
+| 架构、术语、接口约束、复用依据 | [总体架构](ARCHITECTURE.md)、[开发约定](../AGENTS.md)、[复用清单](REUSE.md) | `reference` |
 | 决策背景、选择与代价 | `adr/` 下按编号命名的决策文件 | `adr` |
-| 尚未完成的工作 | [待办](PRODUCT_BACKLOG.md) | `plan` |
-| 发布记录、有核验日期的运行与审计记录 | [变更日志](../CHANGELOG.md)、[状态记录](STATUS.md)、[采集审计](SCRAPING_AUDIT.md) | `changelog` |
+| 尚未完成的工作 | [公开路线图](https://github.com/orgs/peach-mitao/projects/7) | `plan` |
+| 面向使用者的发布记录 | [变更日志](../CHANGELOG.md) | `changelog` |
 
 同一事实只维护一处，其他页面链接到文件或章节。版本、文件数量、部署状态优先指向清单、代码或查询入口；保留观察值时写明核验日期。代码版本不能用来推断服务已更新。
 
 README 保留开始使用所需的信息。字段定义放参考文档，操作步骤放 howto，设计理由放 ADR。保留现有章节锚点；移动内容时同步修复引用。
+
+## 公开与私有记录
+
+- 本机交接、运行状态、个人待办、会话复盘、馆藏盘点和逐条复核记录保存到 `<数据根>/state/project-context/`、`review/` 或 `archive/`，不进入 Git。
+- 公开文档使用中性账号、`<项目目录>` 等占位路径与 RFC 5737 文档地址。主机名、网络布局、媒体文件名与馆藏数量不从真实部署复制。
+- 公开参考证据保留来源、许可和复现方法；本机样本清单、原始日志与账号信息留在私有记录中。
 
 ## 界面文字
 

@@ -4,7 +4,7 @@
 - 上游：<https://github.com/sqzw-x/amane>，GPL-3.0，`requires-python >=3.14`，v0.16.1
 - 固定 revision：`79ecfa763cc786318e1964a3d7f4e244a7d5c96d`（2026-09-22 08:34 +0800，`fix(scrape): 长文本存纯文本并移除简介 CDATA (#229)`）
 - 取证方式：仓库外独立克隆与独立 venv，手工构造对象跑真实番号；不改 Peach 生产代码，不写 ledger
-- 环境与脚本留在 `Desktop\peach\attic\evidence\20260922-amane-crawlers-poc\`，不进仓库
+- 环境与脚本保存在仓库外的私有证据目录
 
 **本文不登记进 `docs/reference-sources.json`**：这是对上游源码的一次性只读实证，不是需要跟踪漂移的
 可变 Markdown，也没有对应的 `docs/reference-snapshots/upstream/` 原文。上游要跟踪时按固定 revision
@@ -19,8 +19,7 @@ Peach 的 `auth` / 封禁分档拿不到。
 `uv venv --python 3.14` + `uv sync --no-dev`：CPython 3.14.7，**72 个包，98 MB**（含 amane 自身）。
 可选 extra `browser`（patchright 及其浏览器）未装，不装也能跑；PG 只有 r18dev 一个来源需要。
 
-本机 Peach 主 venv 也是 CPython 3.14.7，所以 `>=3.14` 当下不阻塞；但 Peach 自己声明
-`requires-python >= 3.12` 并在 classifiers 里列了 3.12 / 3.13，引用 amane 等于把下限抬到 3.14。
+amane 要求 Python 3.14；Peach 的解释器范围以 `pyproject.toml` 为准，桥使用独立 venv。
 
 重依赖与冲突（Peach 侧取 `pyproject.toml` 的精确钉）：
 

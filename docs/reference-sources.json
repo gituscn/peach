@@ -26,7 +26,10 @@
         "revision": "501c05a587404048c6877b1358b70d4a17f20169"
       },
       "role": "MIT 的第三方设计手册，仅采用可解释 Peach 需求的原则；官方还原与参数自述不视为实测。",
-      "consumers": ["docs/DESIGN_GUIDELINES.md", "docs/reference-snapshots/open-claude-ui.md"]
+      "consumers": [
+        "docs/DESIGN_GUIDELINES.md",
+        "docs/reference-snapshots/open-claude-ui.md"
+      ]
     },
     {
       "id": "open-claude-ui-rich-composer",
@@ -42,7 +45,10 @@
         "revision": "501c05a587404048c6877b1358b70d4a17f20169"
       },
       "role": "MIT 的输入法合成状态与键盘优先级参考；不采用指令、模拟建议源或 Token 估算。",
-      "consumers": ["docs/DESIGN_GUIDELINES.md", "docs/reference-snapshots/open-claude-ui.md"]
+      "consumers": [
+        "docs/DESIGN_GUIDELINES.md",
+        "docs/reference-snapshots/open-claude-ui.md"
+      ]
     },
     {
       "id": "open-claude-ui-scroll-fade",
@@ -58,7 +64,10 @@
         "revision": "501c05a587404048c6877b1358b70d4a17f20169"
       },
       "role": "MIT 的纵向多段渐隐与边缘状态参考；Peach 保留现有滚动生命周期，曲线需视觉核验。",
-      "consumers": ["docs/DESIGN_GUIDELINES.md", "docs/reference-snapshots/open-claude-ui.md"]
+      "consumers": [
+        "docs/DESIGN_GUIDELINES.md",
+        "docs/reference-snapshots/open-claude-ui.md"
+      ]
     },
     {
       "id": "open-claude-ui-lightbox",
@@ -74,7 +83,10 @@
         "revision": "501c05a587404048c6877b1358b70d4a17f20169"
       },
       "role": "MIT 的缩放锚点与受限预载原则；不采用其焦点、拖动或缩放完整实现，不替换 Swiper。",
-      "consumers": ["docs/DESIGN_GUIDELINES.md", "docs/reference-snapshots/open-claude-ui.md"]
+      "consumers": [
+        "docs/DESIGN_GUIDELINES.md",
+        "docs/reference-snapshots/open-claude-ui.md"
+      ]
     },
     {
       "id": "open-claude-ui-license",
@@ -90,7 +102,9 @@
         "revision": "501c05a587404048c6877b1358b70d4a17f20169"
       },
       "role": "保存上游原文快照的 MIT 版权与许可声明。",
-      "consumers": ["docs/reference-snapshots/open-claude-ui.md"]
+      "consumers": [
+        "docs/reference-snapshots/open-claude-ui.md"
+      ]
     },
     {
       "id": "folia-wall-reflows",
@@ -106,7 +120,9 @@
         "revision": "9a01e788ed52d25ea01b1f0d37934e5e371ae82b"
       },
       "role": "AGPL-3.0 的原始 6×6 展开让位表，其他磁贴同步换位，收起返回原槽。",
-      "consumers": ["frontend/src/react/video-wall/folia/blockReflows.ts"]
+      "consumers": [
+        "frontend/src/react/video-wall/folia/blockReflows.ts"
+      ]
     },
     {
       "id": "folia-wall-motion",
@@ -122,7 +138,9 @@
         "revision": "9a01e788ed52d25ea01b1f0d37934e5e371ae82b"
       },
       "role": "AGPL-3.0 的块内展开弹簧与控件淡入参数，使用项目已有 motion。",
-      "consumers": ["frontend/src/react/video-wall/wall-motion.ts"]
+      "consumers": [
+        "frontend/src/react/video-wall/wall-motion.ts"
+      ]
     },
     {
       "id": "folia-wall-style",
@@ -138,7 +156,9 @@
         "revision": "9a01e788ed52d25ea01b1f0d37934e5e371ae82b"
       },
       "role": "AGPL-3.0 的独立暗色封面墙样式；视频比例与播放器行为由 Peach 处理。",
-      "consumers": ["frontend/src/react/video-wall/video-wall.css"]
+      "consumers": [
+        "frontend/src/react/video-wall/video-wall.css"
+      ]
     },
     {
       "id": "folia-wall-blocks",
@@ -154,7 +174,10 @@
         "revision": "9a01e788ed52d25ea01b1f0d37934e5e371ae82b"
       },
       "role": "AGPL-3.0 的矩形块模板算法参考；固定三列续页并使用 Peach 的单一视频播放器。",
-      "consumers": ["frontend/src/react/video-wall/wall-layout.ts", "frontend/src/react/video-wall/folia/blockTemplates.ts"]
+      "consumers": [
+        "frontend/src/react/video-wall/wall-layout.ts",
+        "frontend/src/react/video-wall/folia/blockTemplates.ts"
+      ]
     },
     {
       "id": "fluid-springs",
@@ -245,8 +268,7 @@
       "sha256": "18c384344c0889885ba236081d75db5675902f78d88859230290b57c8ed3d427",
       "role": "只作厂牌日文分类名和 Logo 候选发现；第三方博客不直接升级为 Peach 真相或已安装素材。",
       "consumers": [
-        "scripts/normalize_studio_logos.py",
-        "docs/HANDOFF.md"
+        "scripts/normalize_studio_logos.py"
       ]
     },
     {
@@ -314,7 +336,7 @@
       "url": "https://github.com/Nandaka/PixivUtil2/blob/fc0f9adf44e590dde9242b3755b53528f159720a/common/PixivBrowserFactory.py",
       "snapshot": "docs/reference-snapshots/fanbox-browser-transport.md",
       "checked_on": "2026-08-28",
-      "sha256": "6d329f1cbf8e7e9eeec5e59397a427e7b3e8f419353c172121f09a41a35e8c7b",
+      "sha256": "0e56d115606a53b7136f6333d9d069fd3eb0b9131a3ecb36be07f2da894d6e0e",
       "git": {
         "repository": "https://github.com/Nandaka/PixivUtil2.git",
         "ref": "refs/heads/master",
@@ -409,7 +431,7 @@
       "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
       "snapshot": "docs/reference-snapshots/youtube-player-controls-user-screenshot.md",
       "checked_on": "2026-10-18",
-      "sha256": "96b05d0119ecbbe8c8e17d5097acb103183f398bedf726cebd7cc063e57c6781",
+      "sha256": "25fab3d77d187cd469fce2bf7c30f24f08cbd74fc146db87398b53a4a46d2935",
       "role": "实际 YouTube e937390a DOM、CSS、JS 与用户截图锁定播放器几何、状态和设置面板；官方帮助锁定氛围模式和影院模式语义。；窄屏折叠门槛与统一悬停提示取自播放器 9470c977 的 www-player.css 与 base.js。",
       "consumers": [
         "web/css/",
@@ -620,7 +642,6 @@
       },
       "role": "同类本地馆藏管理器的信息组织：人物页三个直达入口、本地作品与作品总数并列、页头的数据质量计数。源码未公开（README 自己写着这一条），结论来自 README 与它挂的 5 张演示图，加上论坛帖里 8 张真实截图的测读；截图给不出可哈希的上游字节，登记的是 README 本体。Peach 不复制它的界面，只取这三处的组织方式。README 另取它的页头链接行、粗体引导的主要功能短列表和「问题反馈要附什么、遮盖什么」的写法。",
       "consumers": [
-        "docs/HANDOFF.md",
         "README.md",
         "README.en.md"
       ]
@@ -755,10 +776,9 @@
         "ref": "refs/heads/main",
         "revision": "154c3b2fce82f890414388c120604f8ba6a0097a"
       },
-      "role": "SakuraMedia 后端（GPL-3.0）只作行为与算法边界证据，不引入代码：字幕同目录纯番号配对、封套左右分割点的对称判据（Peach 不采用对称判据，见 jav_poster_crop）、「想要」与关注分开、记录比文件重要、被并实体留指针，以及待办第 27、28、43、47、51、63、66 条引用的推荐权重、Torznab 客户端、自动下载判据、时刻合集、遥测与图片打包。",
+      "role": "SakuraMedia 后端（GPL-3.0）只作行为与算法边界证据，不引入代码：字幕同目录纯番号配对、封套左右分割点的对称判据（Peach 不采用对称判据，见 jav_poster_crop）、「想要」与关注分开、记录比文件重要、被并实体留指针，以及推荐权重、Torznab 客户端、自动下载判据、时刻合集、遥测与图片打包。",
       "consumers": [
         "docs/REUSE.md",
-        "docs/PRODUCT_BACKLOG.md",
         "src/peach/jav_poster_crop.py",
         "src/peach/wants.py"
       ]
@@ -777,9 +797,7 @@
         "revision": "8cfc99b7963404694ae563ef0d1f3af58254b195"
       },
       "role": "SakuraMedia 的 Flutter 客户端只作行为证据：诊断提示的「原因、修法、跳转」三元组（待办第 26 条）、先看画面再选片（第 49 条）与多端原生客户端（第 70 条）。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-neoavdc",
@@ -797,7 +815,6 @@
       "role": "NeoAVDC（MIT）的番号解析、字幕扩展名、HTTP 正文解码与封套折痕位置只作参照；Peach 的番号规则、字幕配对与正封取景各有自己的判据。待办第 25 条（NFO 与目录收纳）、第 59 条（番号清洗语料）引用它。",
       "consumers": [
         "docs/REUSE.md",
-        "docs/PRODUCT_BACKLOG.md",
         "src/peach/catalog_rules.py",
         "src/peach/http.py",
         "src/peach/jav_poster_crop.py"
@@ -818,7 +835,6 @@
       },
       "role": "JavBoss（GPL-3.0）只作流程证据：CloudDrive2 gRPC 离线下载的提交、轮询与 infohash 对账（ADR-0089），NFO 里 `javboss` 类型的番号字段，以及待办第 58 条的来源缺陷台账。Peach 不复制代码，只提交到已挂载的网盘目录、不拉回本地。",
       "consumers": [
-        "docs/PRODUCT_BACKLOG.md",
         "src/peach/downloads.py",
         "src/peach/downloads_clouddrive.py",
         "src/peach/library_nfo.py"
@@ -838,9 +854,7 @@
         "revision": "004dc15d303dde90eb2829ca01d4f092b9f0ed2d"
       },
       "role": "Javdex（MIT）只作产品行为证据：局域网六位配对码、隐私模式（设置页的 SFW 模式）、外部清单导入的消歧规则与四种 NFO 兼容样例。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-javm",
@@ -856,9 +870,7 @@
         "revision": "dd0e6b62b263258b6e78106c72017b3b470b4097"
       },
       "role": "javm（MIT）只作行为证据：库健康计数（待办第 26 条）、字段级跨源融合与广告片识别。它写死的遥测地址与流媒体截流不照搬（第 63 条）。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-mdcz",
@@ -874,9 +886,7 @@
         "revision": "295f828c76158c6411b52caf6fba9e7b0ee945ba"
       },
       "role": "mdcz（GPL-3.0，可并入 AGPL）的 DMM 失败分类、来源测试录制回放、无码官方站解析与字段聚合策略，对应待办第 44、45、54、55 条。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-javinizer-go",
@@ -893,7 +903,6 @@
       },
       "role": "Javinizer-Go（MIT）最新版：DMM cid 前缀表、女优身份冲突四动作、无码官方站、头像裁剪记源图指纹、续传与停滞看门狗、r18.dev dump 本地镜像，对应待办第 44、50、54、56、57、61 条。历史快照与封面层引用的旧 revision 见 docs/REUSE.md，运行时调用路径已关（ADR-0044）。",
       "consumers": [
-        "docs/PRODUCT_BACKLOG.md",
         "docs/REUSE.md"
       ]
     },
@@ -911,9 +920,7 @@
         "revision": "177ccfceecd2902114a1b18a5818a09a19fe2f86"
       },
       "role": "AMMDS 的 API 文档与版本说明只作行为证据：独立 API key 与统一信封（待办第 27 条）、番号规则覆盖（第 44 条）、r18.dev dump 导入（第 61 条）、站点互联（第 67 条）与漫画库（第 68 条）。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-ammds-docker",
@@ -929,9 +936,7 @@
         "revision": "a9a82ea4ebd8b87aa8c4aecf53acc1e5736bb595"
       },
       "role": "AMMDS 的部署形态与版本号参照，配合文档仓核对待办第 27、44、61、67、68 条所引的版本。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-javranking-extension",
@@ -947,9 +952,7 @@
         "revision": "206ec971b618e4a4e946604b6d333dc9222e616f"
       },
       "role": "javranking 扩展（MIT）读的公开静态榜单索引：版本清单与 search-index.json 的取法与规模，对应待办第 48 条。索引数据的许可条款未取得，只读引用并标明来源。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-cuelume",
@@ -965,9 +968,7 @@
         "revision": "3ff42e3ea9e43c5b1ada736600875eea960d158f"
       },
       "role": "Cuelume（MIT，npm 0.2.4）的接口与音效清单，待办第 60 条的候选依赖；README 的迁移段写的是 0.3，引入时按 npm 实际版本精确钉住。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-jav-moviemanager",
@@ -983,9 +984,7 @@
         "revision": "2ea646cc35a5f237c0724785ad741ededbae75b3"
       },
       "role": "JAV_MovieManager（GPL-3.0）只作行为证据：女优按体型属性筛选（待办第 53 条）；它直接执行用户 SQL、读写不分，第 62 条只借保存筛选的形状。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-nassav",
@@ -1001,9 +1000,7 @@
         "revision": "0c5ff7fe11d77cae5d4367776bce92e1b687c6ae"
       },
       "role": "NASSAV（MIT）的下载器按权重回退与 sqlite 去重只作调度形状参照；数据源是未授权转载站，整体不采用。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-garage",
@@ -1019,9 +1016,7 @@
         "revision": "915e477f640f0501b682f68052ba7097716f42ef"
       },
       "role": "garage 的 `garage_jav/javbus.go` 是 JavBus 作品页磁力取法（gid、uc 与 ajax 接口）的协议证据，对应待办第 43 条。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-atlas",
@@ -1037,9 +1032,7 @@
         "revision": "b1a3b518d87edc8052502401e747f7ec276cab22"
       },
       "role": "Atlas 的 `services/jav-utils.ts` `parseMagnets` 只解析 JavBus 一家，作待办第 43 条磁力取法的第二份证据；其余「磁力搜索」只是跳转链接。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-javinfo-cli",
@@ -1055,9 +1048,7 @@
         "revision": "6db9d837ac044c9c1dc04fe4a9552659f0f5cf12"
       },
       "role": "javinfo.dev API 的调用方式与计费口径，待办第 65 条「可选来源」的依据；用户自带 API key 才启用。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-javinfo-mcp",
@@ -1073,9 +1064,7 @@
         "revision": "55bda1d7b33a6a5f0695f9dc5d93b05903b6b243"
       },
       "role": "javinfo.dev 的 MCP 封装，与命令行仓同属待办第 65 条的证据；只看端点与字段，不引入。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     },
     {
       "id": "readme-javinfo-legacy",
@@ -1091,9 +1080,7 @@
         "revision": "d9e3ed31520b6afb6ad3ad5abd90b8f17a955e60"
       },
       "role": "javinfo 的归档仓没有许可证，只借思路不借代码；它依赖的 r18 旧 API 已失效，没有 Peach 缺的解析器（待办第 65 条）。",
-      "consumers": [
-        "docs/PRODUCT_BACKLOG.md"
-      ]
+      "consumers": []
     }
   ]
 }

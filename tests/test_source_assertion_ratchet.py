@@ -3,8 +3,7 @@
 这类断言读出 `web/app.js`、样式表或文档的原文，再 `assertIn` 一段写法。它守住的是
 「这几个字符还在」，不是「功能是对的」：换一种等价写法就红，把条件写反了照样绿。
 2026-08-01 到 2026-09-23，`tests/test_web_ui.py` 被 670 个提交改过，净增约 1.3 万行，
-几乎每次界面修复都在同步改这些断言；同期 `docs/PRODUCT_BACKLOG.md`「待执行的操作」第 31 项盘出约
-3 700 条这样的断言。改一处样式要同时改它的测试，测试就只是在复述实现。
+几乎每次界面修复都在同步改这些断言。改一处样式要同时改它的测试，测试就只是在复述实现。
 
 要守的东西换成能跑的验收：
 - 行为（点了提交什么、状态怎么变、算出什么值）写 vitest（`frontend/test/`）或
@@ -42,9 +41,9 @@ BASELINE: dict[str, int] = {
     "test_follow_assets.py": 1,
     "test_follow_web.py": 1,
     "test_frontend_build.py": 20,
-    "test_job_status.py": 3,
+    "test_job_status.py": 1,
     "test_metadata_library.py": 5,
-    "test_repo_hygiene.py": 2,
+    "test_repo_hygiene.py": 1,
     "test_scripts.py": 13,
     "test_social_avatar_harvest.py": 2,
     "test_studio_icon_variants.py": 2,

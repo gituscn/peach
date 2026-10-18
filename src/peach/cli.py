@@ -301,7 +301,7 @@ def _ledger_sync(args: argparse.Namespace) -> int:
 def _parse_mounts(
     raw: list[str] | None, locations: dict[str, tuple[str, ...]] | None = None,
 ) -> dict[str, tuple[str, ...]]:
-    """`--mount local=/Volumes/RESOURCES/media` 形式的挂载点；同一来源重复给就按顺序
+    """`--mount local=/Volumes/Media/media` 形式的挂载点；同一来源重复给就按顺序
     对应它的几个声明根。
 
     键是 `asset.location`（`[media.locations]` 里声明过的来源 ID），不是盘符：

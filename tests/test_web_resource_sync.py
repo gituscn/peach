@@ -449,10 +449,7 @@ class PurgeMissingTests(unittest.TestCase):
         self.assertEqual(self.ids(), [1, 2, 3, 4])
 
     def test_a_directory_listing_that_silently_skips_a_file_does_not_condemn_its_row(self):
-        """网盘的目录枚举会成功返回、却少给几个名字。
-
-        2026-09-16 本机连测三次 PikPak：677 条、0 条、452 条，三次交集是空的；其中
-        一次报的 383 条挨个 `stat` 过去，前 200 条全都在。少给名字的那一趟不抛错，
+        """网盘的目录枚举会成功返回、却少给几个名字。少给名字的那一趟不抛错，
         `unreadable` 数不到它，所以清理那一侧照名单删就会删掉几百行文件还在的资产。
         """
         for name in ("002.jpg", "003.jpg"):

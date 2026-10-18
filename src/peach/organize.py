@@ -159,9 +159,7 @@ def _rows(connection: sqlite3.Connection, location: str,
           asset_ids: Sequence[int] | None = None) -> list[sqlite3.Row]:
     """这个来源上会被整理的行：只有视频，且不在回收站里。
 
-    只取视频不是图省事。旁挂的封面、截图、下载页残渣（`.jpg`／`.gif`／`.js`）在账本里
-    继承着同一个番号，按同一份模板算出来的目标名只差扩展名——2026-09-22 在真实库上
-    试了一次，115 那趟 581 条「目标已存在」几乎全是它们。模板说的是「一部片叫什么」，
+    只取视频不是图省事。模板说的是「一部片叫什么」，
     它回答不了一张封面该叫什么。
     """
     connection.row_factory = sqlite3.Row

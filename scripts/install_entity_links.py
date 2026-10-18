@@ -182,14 +182,7 @@ def resolves(url: str, timeout: float = 12.0,
 def is_gone(note: str) -> bool:
     """这条「打不开」是不是「页面没了」的确证。
 
-    取不到不等于没了，这两件事只有 404／410 能划清。实测全库 152 条打不开的里面：
-
-        linktr.ee            403   Linktree 挡爬虫，浏览器里能正常打开
-        facebook.com         400   同理
-        x.com/MomotaEmiri    500   X 的临时错误，账号很可能还在
-        diaz-g.com           连接错误    一次探测说明不了什么
-
-    按「非 200 就删」会连这 26 条一起删掉，其中大部分链接本身是好的。5xx、403 和
+    取不到不等于没了，这两件事只有 404／410 能划清。5xx、403 和
     超时要留着下次复查，不是删除的理由——这和取证失败时写 `未取得` 而不是写结论是同一条。
 
     停放页是另一种确证：域名已经换了主人，页面打得开，内容却不再是这个人或这家公司。
@@ -233,8 +226,6 @@ def on_host(url: str, host: str) -> bool:
 def dead_links(connection: sqlite3.Connection, interval: float = 0.4, probe=None,
                host: str = "", retired: bool = False) -> list[dict]:
     """已经在库里、但现在打不开的链接；给了 `host` 就只查这个站和它的子域。
-
-    可达性门槛只挡住新写入；库里那 703 条是在门槛存在之前进去的，得单独清一遍。
     链接还会随时间烂掉——事务所改版、艺人解约、博客注销——所以这条路要留着复用，
     不是一次性的清理脚本。
 

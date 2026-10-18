@@ -18,8 +18,7 @@ export const PHOTO_SIZES: readonly [big: Choice, small: Choice] = [
 export const PHOTO_LAYOUTS: readonly (readonly [value: string, label: string, icon: string])[] = [
   ['fixed', '固定比例', 'layout-grid'], ['masonry', '瀑布流', 'columns-2'],
 ];
-/* 大图卡片的容器比例。本机 1014 张封面实测，683 张判定有正封，正封自己的宽高比从 0.667 到 0.749 都有，
-   中位数 0.704、99% 分位 0.725——一行卡片必须等高，容器只能取一个数，所以它对不上其中大多数。0.75 比
+/* 大图卡片的容器比例。0.75 比
    最宽的那张还宽：683 张一张都不用从左边切，全部居中摆，两侧保持卡片纯色底，每边
    中位 3.1%、最大 5.6%。取 0.72 会让 10 张被切掉最多 3.8%，取 0.76 同样一张不切但留白到每边中位 3.7%。 */
 export const COVER_FRONT_RATIO = 0.75;

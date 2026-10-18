@@ -951,19 +951,15 @@ def _text(raw):
 def _provider_code(raw):
     """能拿去问来源的番号；不是发行番号的写法返回空串。
 
-    `asset.code` 里有一部分存的是目录名而不是番号：创作者账号（`BANBI_555`、
-    `RAIKUN325`）、片源站编号（`WX17`）和创作者自编号（`DTW003`）。2026-09-16 只读
-    盘点，本机账本 617 行是这样的值。它们问哪家来源都只会查空，拿番号形态逐行校验
-    还会把这 617 行全报成问题项，真正要处理的几十条就此淹掉。当作没有番号处理：
-    这些行本来就只登记本地海报。
+    `asset.code` 可能存放目录名、创作者账号、片源站编号或创作者自编号。
+    这些值按没有番号处理，仅登记本地海报，不生成发行番号校验问题。
     """
     if not is_jav_code(raw):
         return ''
     try:
         return validate_provider_code(normalise_code_key(raw))
     except ValueError:
-        # 形态两把尺（`is_jav_code` 与 `metadata._SAFE_CODE`）对不上的写法，本机账本
-        # 1673 个番号里一个都没有；真出现也只能当作没有番号，采集不为一行停摆。
+
         return ''
 
 

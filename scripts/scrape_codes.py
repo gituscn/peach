@@ -385,10 +385,7 @@ def _read_snapshot(path: Path, code: str) -> dict | None:
     return result
 
 
-#: 只有来源明确答「没有这部片」才算定论。`unknown`、`empty`、`unavailable` 都是
-#: 「这次没问出结果」：把它们当定论复用过一次真实代价——2026-08-30 前一批错误快照
-#: 记的是本机配置问题，被冻结成来源判决后，之后每次续跑都直接跳过，10 个番号再也
-#: 没被问过。
+#: 只有来源明确答「没有这部片」才算定论。
 SETTLED_ERROR_KINDS = frozenset({"not_found"})
 
 #: 鉴权失败这一档。它比冷却更早也更硬：冷却是「先歇 300 秒再说」，这里是「本批

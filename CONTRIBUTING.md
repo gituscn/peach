@@ -12,7 +12,7 @@ Peach 是单人自托管应用，由一个人维护。欢迎提 Issue 和 PR。
 ## 开 Issue
 
 - **报缺陷**：写清 Peach 版本或构建、系统版本及架构、安装方式、复现步骤、期望结果和实际结果，附上完整报错。无法稳定复现时说明发生条件，不要求自行判断根因。Python 版本仅用于源码部署，可选；`/healthz` 返回也可选，服务无法启动时写「无法访问」即可。贴日志或诊断报告前先遮盖本机路径、网络地址、账号及凭据。
-- **提需求**：写清问题和使用场景。开放需求见 [待办](docs/PRODUCT_BACKLOG.md)，设计边界见 [总体架构](docs/ARCHITECTURE.md#明确不做)。涉及多用户、云托管、微服务或 PostgreSQL 的提案，先讨论是否需要新增 ADR。
+- **提需求**：写清问题和使用场景。开放需求见 [公开路线图](https://github.com/orgs/peach-mitao/projects/7)，设计边界见 [总体架构](docs/ARCHITECTURE.md#明确不做)。涉及多用户、云托管、微服务或 PostgreSQL 的提案，先讨论是否需要新增 ADR。
 - **安全问题**：不要开公开 issue，按 [`SECURITY.md`](SECURITY.md) 私下报告。
 
 ## Issue 处理规范
@@ -85,9 +85,9 @@ GitHub 的字段与模板机制见 [Issue types](https://docs.github.com/en/issu
 
 ## 提交说明与变更日志
 
-- 提交主题按 Conventional Commits 写，例如 `feat:`、`fix:`、`perf:`、`docs:`、`refactor:`。
+- 提交主题使用 `type(scope): 中文描述`，例如 `fix(web): 修正列表滚动`；类型与范围按项目提交检查器核对。
 - 破坏性变化在主题里加 `!`，或写 `BREAKING CHANGE:` 脚注。
-- PR 不用改 [`CHANGELOG.md`](CHANGELOG.md)。维护者发布时用 `python scripts/changelog.py` 按提交起草，再改成使用者读得懂的话；每个 PR 各改一次只会互相冲突。
+- PR 不用改 [`CHANGELOG.md`](CHANGELOG.md)。版本、变更日志与发布统一由 `scripts/release_tag.py` 处理，流程见 [运行与配置](docs/OPERATIONS.md)。
 
 ## 文案
 

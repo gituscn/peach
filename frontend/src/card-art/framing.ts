@@ -101,9 +101,7 @@ export function coverAnchor(img: HTMLImageElement): void {
 }
 
 /* 只把折痕右边那块正封摆进卡片，封底一个像素都不露。折痕位置在 `data-posterbox` 里，
-   换算要的容器比例只有页面知道，两边在这里才凑齐。整张封套和「剧照 | 正封 | 剧照」
-   的 16:9 拼图才有正封可切；没有框（本机 1516 张封面里 771 张判定为不裁，永远拿不到）
-   就一个字都不写，CSS 里那份贴右缘或按人脸的回退照旧生效。 */
+   换算要的容器比例只有页面知道，两边在这里才凑齐。 */
 export function posterPanel(img: HTMLImageElement, ratio: number): void {
   if (img.dataset.frame === 'front' || img.dataset.coverLayout === 'still') return;
   let [x0 = NaN, imgW = NaN, imgH = NaN, y0 = NaN, x1 = NaN, y1 = NaN] = String(img.dataset.posterbox || '').split(' ').map(Number);

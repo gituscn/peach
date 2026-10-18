@@ -17,8 +17,7 @@ HLS_SEGMENT_SECONDS = 6
 # 片段缓存上限。超了按最后访问时间淘汰；片段可再生，丢了只是重跑一次 FFmpeg。
 DEFAULT_CACHE_BYTES = 2 << 30
 PLAN_CACHE_LIMIT = 256
-#: 交给 NVDEC 解码的编码。名单之外（含探测不到编码的片源）一律软件解码：NVDEC 对老
-#: 编码吐坏帧时不报错，而这几种是本机 23338 个视频里占绝大多数的、值得省 CPU 的。
+#: 交给 NVDEC 解码的编码。
 CUDA_DECODE_CODECS = frozenset({"h264", "hevc", "vp9", "av1"})
 CODEC_CACHE_LIMIT = 256
 PROBE_TIMEOUT_SECONDS = 20

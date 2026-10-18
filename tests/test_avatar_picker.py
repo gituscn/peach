@@ -113,9 +113,6 @@ class IndexTests(unittest.TestCase):
 
     def test_every_name_on_the_chain_brings_its_own_pictures(self):
         """并起来，不是停在第一个命中的名字上。
-
-        同一个人在图库里常按好几种写法各存一批，停下来就只剩其中一批——实测「新有菜」
-        那条链，先命中的那个名下 1 张、后面那个名下 11 张。
         """
         index = gfriends.parse_filetree(json.dumps(FILETREE).encode("utf-8"))
         match = gfriends.candidates(index, ["葵司", "葵つかさ", "葵ツカサ"])

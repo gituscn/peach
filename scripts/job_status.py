@@ -3,16 +3,7 @@
 r"""
 批处理进度同步 —— 从账本和产物反推当前状态，写进 peach-data/state/job-status.md。
 
-为什么需要它：项目里没有任何 hook、git hook 或计划任务会更新文档，全靠接手的
-人记得写。2026-08-14 已经因此出过两次事：一次视觉打标的结论只留在对话里没落库
-（asset_tag 至今 source='vision' 为 0 行），一次删除清单在结论被推翻后没重新生成，
-里面躺着一个 3.2 GB 的正片。
-
-所以这里的数字一律现算，不接受任何人工传入的"我记得是多少"。
-
-产物落在 `peach-data/state/`，不进 Git：这个区块每次 hook 都会重算，写进被跟踪的
-docs/STATUS.md 只会让工作区永远是 modified 状态，逼每个智能体先分辨「这行改动是我的
-还是 hook 的」。STATUS.md 里只留一行指针。
+数字从当前数据计算；产物落在仓库外的 `peach-data/state/`，不进入 Git。
 
 用法:
     python scripts/job_status.py            # 打印，不改文件
@@ -37,8 +28,7 @@ from peach.config import DATABASE_PATH, GENERATED_DIR, STATE_DIR
 from peach.media_sources import SCANNABLE_LOCATIONS
 from peach.review_csv import read_rows
 
-# 两个路径都从 peach.config 推出来：2026 年上半年数据根从 `R:\peach-data` 搬到内置盘，
-# 这里写死的 `R:` 路径跟着失效了大半年，hook 每次都静默记不上交接事件。
+# 路径由配置解析，不依赖开发机器的盘符与目录布局。
 DOC = STATE_DIR / "job-status.md"
 STATE = STATE_DIR / "agent-handoff.json"
 START = "<!-- job-status:start -->"
@@ -59,14 +49,7 @@ def _readonly(path: Path) -> sqlite3.Connection:
 
 
 def _local(text: str) -> str:
-    """把存成 UTC 的时间戳按本机时区显示。
-
-    存储一律 UTC 是对的，不动；但 STATUS.md 是给人读的，显示 UTC 等于让每个数字
-    都要心算 8 小时。这条口径 2026-08-26 就定了（账本存 UTC，看的地方按本地渲染），
-    当时只落到了 web/app.js，这条生成链路漏了。
-
-    解析不了就原样返回：显示得难看，好过把一个解析不出的值显示成某个确定的时刻。
-    """
+    """将 UTC 时间戳按本机时区显示；无法解析时保留原值。"""
     try:
         moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except (AttributeError, TypeError, ValueError):

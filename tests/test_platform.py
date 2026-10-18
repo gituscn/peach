@@ -56,7 +56,7 @@ class LocationResolutionTests(unittest.TestCase):
     def test_windows_path_shape_is_recognised(self):
         self.assertTrue(is_windows_path(r"R:\Media\one.mp4"))
         self.assertTrue(is_windows_path("B:/one.mp4"))
-        self.assertFalse(is_windows_path("/Volumes/RESOURCES/media/one.mp4"))
+        self.assertFalse(is_windows_path("/Volumes/Media/media/one.mp4"))
         self.assertFalse(is_windows_path("relative/one.mp4"))
 
     def test_path_under_a_declared_root_resolves_to_that_location(self):

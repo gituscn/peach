@@ -42,9 +42,7 @@ javbus 补空候选全部滞留人工，补的都是账本里空着的发行日�
 两类补空日后要分开回溯时，`note` 是唯一留着这个区别的地方。
 
 **已确认的值不被低一级来源挑战。** 现值由 `official` 源写入、而挑战方只有 `community` 源
-的行不进复核队列，账本保留 official 值。实测 26 条发行日期冲突里，现值全部由 official 写入
-（r18dev 10、aventertainment 9、libredmm 1），挑战方无一例外是 javbus：`SOURCE_SPECS`
-早就排好了序，让人再判一遍等于把定好的信任模型丢回给人。没有落库记录的行照常进队列：
+的行不进复核队列，账本保留 official 值。没有落库记录的行照常进队列：
 现值来路不明时 community 的异议有意义。现值与记录不符（被别的动作改过）时同样交回人工。
 **只有记下了取值的记录才算数。** 人工批准写的 note 只有 `candidate_key` 与 `source`，
 证明不了账本现在这一个是它写的；拿它当已确认会把 `metadata_decision_is_stale`

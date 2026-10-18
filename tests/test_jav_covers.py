@@ -541,7 +541,7 @@ class CrossProductCoverTests(unittest.TestCase):
 
     错图来自已删除的 avbase 抓取——那个页面上 258/259 系番号的主图是 DVD 合集
     封套。抓取路径删掉之后错图仍在，因为「复用上一轮成功记录」只看 result 是不是
-    「取得」。全库同一成因的还有 300MIUM、428SUKE 等共 10 条。
+    「取得」。
     """
 
     def test_dmm_content_id_must_carry_the_code_letters(self):

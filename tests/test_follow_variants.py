@@ -2,7 +2,7 @@
 
 标题取自 2026-08-25 实测的真实来源页：rule34video.com 的
 `/models/lazyprocrastinator/`、kemono.cr 的 `fanbox/30917150` 帖子列表，以及 f95zone
-`latest_data.php` 里 thread 50685 的记录。证据登记见 `docs/HANDOFF.md`。
+`latest_data.php` 里 thread 50685 的记录。证据登记见 `docs/reference-sources.json`。
 """
 import unittest
 from dataclasses import dataclass

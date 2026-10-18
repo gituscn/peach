@@ -150,8 +150,7 @@ def refresh_current_values(connection, rows: list[dict]) -> None:
     for row in rows:
         field = str(row.get("field") or "").strip()
         raw = str(row.get("asset_id") or "").strip()
-        # 取值范围必须和 `_apply_metadata_candidate` 写的范围一样：钉住单个文件的行
-        # （带 `asset_path`，本机 275 行）只看那一个，其余按番号整组。范围不一致就会
+        # 范围不一致就会
         # 出现「按九卷里空着的那一卷判成空位，落库却把第十卷已有的值一起改掉」。
         if str(row.get("asset_path") or "").strip() and raw.isdigit() and int(raw) in by_asset:
             targets = [int(raw)]
@@ -200,9 +199,7 @@ def _fold_genre_decisions(field: str, candidate: dict, decided: dict[str, str | 
     留一句「来源还有 2 个未收录 genre」只能读，读完还是没有出口。
 
     静态表也要重查一遍，不只查用户的决定：候选文件停在抓取那一刻，而 `CONTENT_GENRES`
-    与 `NON_CONTENT_GENRES` 一直在补。实测本机 304 条带未收录 genre 的候选里，101 条
-    的未收录项按当前的表全部认得出来——`配信専用`、`ナンパ`、`清楚` 早就在表里了，
-    页面上却还摆着它们等人判。
+    与 `NON_CONTENT_GENRES` 一直在补。
     """
     if field != "tags":
         return candidate
@@ -774,10 +771,7 @@ def _settled_candidates(connection, field: str, code: str, candidates: list[dict
     的那天是硬事实，谁报出来都算——`092415_001` 只有 javbus 报对，先降级就把它丢了。
 
     取值仍然不一时按字段优先级链取第一位（ADR-0038）：本地 NFO、官方来源、javdb、
-    其余社区、兜底，同层之间用 `FIELD_SOURCE_ORDER` 再排。此前这里只处理「在场的全是
-    社区来源」那一种，官方之间的分歧一律交人工——而本机队列里那类分歧 60 条全是同一件
-    事：mgstage 是转售店，标题带着店铺加赠、系列写的是店内货架名，dmm 与 libredmm 那一
-    侧才是片商自己的口径。链上 dmm 本来就排在 mgstage 前面，让它说话就不必再问人。
+    其余社区、兜底，同层之间用 `FIELD_SOURCE_ORDER` 再排。链上 dmm 本来就排在 mgstage 前面，让它说话就不必再问人。
 
     被压下的取值原样返回，调用方写进 `review_decision.note`：自动结算的前提是事后
     答得出「当时还有哪些说法、为什么没选它」，那句话只能落在这里。
@@ -820,7 +814,6 @@ def _filename_carries_code(code: str, name: str) -> bool:
 
     逐字出现最直白，但盘里有大量不写连字符的名字（`MEYD911.mp4`）。编目规则本来就
     知道怎么从文件名读番号，读出来同号是比子串更强的身份证据——子串只是碰巧包含。
-    两条任一成立即可：本机 2611 条有番号的视频里，逐字命中 1715 条，合起来 2012 条。
 
     FC2 另算一条：它的身份就是商品号那串数字，前缀谁爱怎么写怎么写——账本存
     `FC2-PPV-4927200`，盘里同一部片叫 `FC2-4927200-CD1.mp4`、`fc4592208.mp4`、
@@ -958,8 +951,6 @@ def metadata_auto_apply_candidate(connection, row: dict, *,
     3. 该番号名下有资产的文件名认得出这个番号，认不出的那些也没有指向别的番号
        （`_group_identifies_code`）——逐字出现，或按编目规则解析出来就是它；整组文件名
        都读不出番号时，父目录逐字写着番号、文件名带着番号里三位以上那段数字也算。
-       `MEYD911.mp4` 只差一个连字符，逐字比对认不出，而它就是 `MEYD-911`；本机
-       2611 条有番号的视频里这样的有 297 条。
 
     补空那一支不看来源是不是 official（用户 2026-09-04 决定）：补空不覆盖任何东西，
     唯一的风险是「这个值属不属于这部片」，而那由第 3 条管，与来源可信度无关。卡住

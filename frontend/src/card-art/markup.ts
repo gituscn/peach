@@ -70,9 +70,7 @@ export function performerLabel(item: { is_jav?: boolean } | null | undefined): s
    兜底链最后一环必须真的把 `<img>` 拿掉（`data-drop="self"`）：留着取不到图的
    `<img>`，`:has(img)` 仍然匹配，首字母垫底回不来，浏览器还会把 alt 画出来。
 
-   `thumb` 要的是实体图缩到长边 640 的那一份。开给一屏几十格的位置用：实体图是给
-   资料页大位存的照片，本库 727 张均 221 KB，索引页一屏 120 格铺进 150 px 的格子就是
-   十几 MB，而屏幕上用得着的只有其中百分之几的像素。资料页仍取原件——那里就是要看清。
+   `thumb` 要的是实体图缩到长边 640 的那一份。资料页仍取原件——那里就是要看清。
 
    `version` 是服务端随 `has_image` 下发的 `image_version`，`logoVersion` 是 `logo_version`。
 

@@ -69,9 +69,7 @@ class ReviewContract(Protocol):
     def write_transaction(self): ...
 
 
-#: 队列现算、不读候选文件的类别，取行的函数见 `LIVE_CATEGORY_ROWS`。判据的输入就是
-#: 账本本身，没有需要留存的外部证据，所以 CSV 只是某一次跑脚本时的快照：实测那份
-#: 44 行里有 27 行的实体早已不在库里，点进去无事可做，真正该看的只有 24 条。
+#: 队列现算、不读候选文件的类别，取行的函数见 `LIVE_CATEGORY_ROWS`。
 LIVE_CATEGORIES = ("code_creators",)
 #: 复核页的类别全集。页面的 tab 次序由 `app.js` 的 `REVIEW_LABELS` 定，与这里无关。
 REVIEW_CATEGORIES = (*CANDIDATE_PREFIX, *LIVE_CATEGORIES)
@@ -258,8 +256,7 @@ def _drop_fallback_challenges(rows: list[dict]) -> list[dict]:
     """兜底来源不挑战账本已有的值，这种行不该进队列（ADR-0038）。
 
     javbus 搜不到就返回首个近似命中：`AR-101` 给 `STAR-101`、`259LUXU-891` 给
-    `259LUXU-1891`（ADR-0035）。本机队列里「现值非空、剔完兜底一家不剩」的 107 行
-    （系列 41、出演者 33、厂牌 33）全是这一种，没有一行值得让人看第二眼。
+    `259LUXU-1891`（ADR-0035）。
 
     空着的格子不走这条：那里只有它一家给得出值，有一个比没有强（ADR-0034）。
     """
@@ -553,9 +550,7 @@ _MAKER_SIDE_SOURCES = frozenset({"dmm", "libredmm"})
 def _drop_shop_side_dissent(rows: list[dict]) -> list[dict]:
     """转售店口径的异议不进队列：片商自己那份已经跟账本对上了。
 
-    用户 2026-09-16 定的口径。本机 214 条「账本已有值、来源给的不一样」里，158 条
-    是这一种——发行日期 65、标题 64、系列 29，反对方全是 mgstage 一家，与账本一致的
-    一方是 dmm+libredmm 129 条、dmm 29 条。
+    用户 2026-09-16 定的口径。
 
     片商方必须真的在场且与账本一致才成立：MGS 独家发行的片子没有片商方候选，它给的
     值是这个番号唯一的说法，照常进队列。多值字段不走这条——那里的差异是集合成员，

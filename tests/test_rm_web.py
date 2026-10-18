@@ -1277,8 +1277,7 @@ class WebDataTests(unittest.TestCase):
     def test_a_censored_and_an_uncensored_release_share_one_card(self):
         """同一番号的有码与无码是两个版次，不该占两个格子。
 
-        用户实测：`ABF-234` 和 `ABF-234 UN` 并排两张卡，`ABF-216` 也是。全库有 15 个
-        番号是这种情况，除了无码还有中字（`-C`／`CH`／`.Uncen` 各种写法）。
+        多个版次可能使用 `-C`、`CH`、`.Uncen` 等文件名后缀。
 
         版次判据只用 `jav_display_metadata`，和卡片上已经显示的徽章同一份——自己按
         文件名再写一套「像不像无码」，会出现角标写着无码、分组却当它是正片。
@@ -1324,9 +1323,7 @@ class WebDataTests(unittest.TestCase):
         `asset_tag_preference.normalized_tag` 写入时走 Python 的 `strip().casefold()`，
         而查询侧一度用 SQLite 的 `lower(trim())`。SQLite 的 lower() 只认 ASCII：西里尔
         字母和罗马数字 Ⅱ 原样放过，两边算出的键就对不上，`NOT EXISTS` 永远成立——
-        用户点了「隐藏」而标签照常显示，没有任何报错。
-
-        这两个例子取自真实账本：6167 个标签里正好这两个会分歧。按今天的数据它们都落在
+        用户点了「隐藏」而标签照常显示，没有任何报错。按今天的数据它们都落在
         走实体名比对的那条路径上，所以线上没有真的出错；这条测试守的是那个前提别再变。
         """
         cyrillic = "УбийцаАкаме"
@@ -2385,7 +2382,7 @@ class JavModeAndCoverTests(unittest.TestCase):
 
         番号形状（`040221-001`、`HEYZO-1380`）和文件名里的发行站都是本机可核验
         的证据，不依赖抓取——这些番号在 r18.dev 永远 404，等元数据到齐再判，
-        徽章就永远不会出现。全库命中 13 条，全部是 carib/1pon/HEYZO。
+        徽章就永远不会出现。
         """
         for name, code in (
             ("040221-001-carib-1080p.mp4", "040221-001"),
@@ -3123,9 +3120,7 @@ class DuplicateDetectionTests(unittest.TestCase):
     def test_parts_group_when_the_edition_suffix_sits_after_the_volume_number(self):
         """卷号后面挂着版次或修复标记时，剥掉组内共有尾缀仍认得出这是一部片的几卷。
 
-        实测 PPT-018：三份 `PPT-018-N-uncensored.mp4`（11785／10511／6551 秒）各占一张卡、
-        标题完全相同，点开只能靠时长认是哪一卷。库里同形的还有 `_prob3`、`-4K修复`、
-        `_8k`；全库 156 个同番号多文件组里，这条判据把成组数从 83 抬到 92。
+        卷号后可带 `_prob3`、`-4K修复`、`_8k` 等组内共有后缀。
         """
         uncensored = [
             {"id": 31442, "name": "PPT-018-1-uncensored.mp4", "duration": 11785.8},

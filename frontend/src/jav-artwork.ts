@@ -22,8 +22,7 @@ export function javImageKind(item: { is_jav?: boolean; code?: string; has_cover?
   return item.has_thumb ? 'thumbnail' : '';
 }
 
-/** 正封的宽高比，与 `jav_poster_crop.PANEL_ASPECT` 同一个数：DVD 正面印刷面 135×190mm，
- *  本机 637 张实测中位数也是它。封面框选按它锁比例；没有边车的双页封套按它从右缘量回正封
+/** 正封宽高比与 `jav_poster_crop.PANEL_ASPECT` 一致。封面框选按它锁比例；没有边车的双页封套按它从右缘量回正封
  *  宽度，贴右缘时 0.75 的卡片比正封宽，不量就会带进一条书脊。 */
 export const PANEL_ASPECT = 0.704;
 // 与 jav_poster_crop 的宽封套模板共用尺寸；明确的 Blu-ray 版次才启用。

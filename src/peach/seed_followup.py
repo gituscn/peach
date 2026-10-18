@@ -1,6 +1,6 @@
-"""导入实体种子后继：扫描结算后把随版本附带的种子包补进账本（ADR-0075）。
+"""导入实体种子后继：扫描结算后把私有种子包补进账本（ADR-0075、ADR-0111）。
 
-种子包是仓库里的一份 JSON（`seed_pack.DEFAULT_PACK`），导入只给本机已有实体填空、换掉种子
+种子包位于数据根的 `state/seed/entities.json`（`seed_pack.DEFAULT_PACK`），导入只给本机已有实体填空、换掉种子
 自己写过的旧行（`seed_pack.land`）。这条后继由扫描与采集在结算时声明（ADR-0040 第一条），
 派的条件是两个里有一个：这一轮登记了新的女优、厂牌或事务所，或这个版本的包还没有成功导入过。
 同一版本因此会跑多次；`land` 幂等，多跑一次只是没有东西可补。
@@ -30,7 +30,7 @@ def followup_key(version: str, content_hash: str = "") -> str:
 
 
 def pack_version(path: Path | None = None) -> str | None:
-    """随仓库走的包版本；缺包时返回 None，包损坏时报告校验错误。"""
+    """私有种子包版本；缺包时返回 None，包损坏时报告校验错误。"""
     path = Path(path) if path is not None else seed_pack.DEFAULT_PACK
     if not path.is_file():
         return None
@@ -100,11 +100,7 @@ def outcome(report: dict) -> str:
 
 
 def run(contract, key: str, handle) -> dict:
-    """把随仓库走的包补进账本。
-
-    包的路径只有 `seed_pack.DEFAULT_PACK` 一处：测试把它换成临时目录里的小包，否则仓库里的真包
-    会给测试账本里的真人名补上站上编号，后面的后继就真的去联网了。
-    """
+    """将私有种子包补进账本；测试使用临时种子包。"""
     pack = seed_pack.load(seed_pack.DEFAULT_PACK)
     if key != followup_key(pack["version"], seed_validation.digest(pack)):
         raise ValueError("种子内容与排队任务的摘要不一致，请重新派发")

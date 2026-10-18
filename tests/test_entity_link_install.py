@@ -221,7 +221,7 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(self.module.install(self.connection, planned, "review.csv"), 1)
 
     def test_dead_links_already_in_the_ledger_are_found_for_pruning(self):
-        """可达性门槛只挡新写入；库里那 703 条是在门槛存在之前进去的。
+        """
 
         链接还会随时间烂掉——事务所改版、艺人解约、博客注销——所以这条路要留着复用，
         不是一次性的清理脚本。
@@ -239,12 +239,7 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(dead[0]["note"], "HTTP 404")
 
     def test_only_a_gone_status_counts_as_proof_that_a_link_is_dead(self):
-        """取不到不等于没了，这两件事只有 404／410 能划清。
-
-        实测全库 152 条打不开的链接里，有 26 条属于「取不到」而非「没了」：
-        `linktr.ee` 回 403（Linktree 挡爬虫，浏览器里能正常打开）、`facebook.com`
-        回 400、`x.com/MomotaEmiri` 回 500（X 的临时错误，账号很可能还在）、
-        `diaz-g.com` 直接连接失败。按「非 200 就删」会把这些好链接一起删掉。
+        """取不到不等于没了，这两件事只有 404／410 能划清。按「非 200 就删」会把这些好链接一起删掉。
 
         这和取证失败时写 `未取得` 而不是写结论是同一条规矩。
         """

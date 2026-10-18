@@ -10,7 +10,7 @@
   `5b4bd0e8f05798738bbdb46b828e2bd8331a7dbc6e6108fb7a787e9902134586`
 - 桌面站脚本 `desktop_polymer.js` 的可重抓 URL 未取得，`ytd-miniplayer` 的规则只有计算样式一侧
 - 完整实测原文与失败记录留在仓库外、与 `peach-app` 同级的
-  `attic/evidence/20260906-youtube-miniplayer/live-measurements.md`
+  `<私有验证记录>`
 
 ## 不登记进 docs/reference-sources.json 的原因
 

@@ -14,12 +14,10 @@ ADR-0002 把 Stash 定为「可关闭的 adapter」，路线图（[docs/STASH.md
 
 | 判据 | 实测 |
 | --- | --- |
-| adapter 自己的入口 | `stream_candidates` 先读 `asset.external_id("stash")`，而真实账本 `media_binding` **0 行**，任何资产都返回空 |
+| adapter 自己的入口 | `stream_candidates` 依赖 `media_binding` 中的 Stash 外部编号，扫描流程不维护该绑定 |
 | 唯一调用方 | `MediaEngine.stream_candidates` 全仓库只被 `tests/` 调用，`api.py` 一次都没有调过 |
 
-2546 个资产的 `asset.stash_scene_id` 从未迁进 `media_binding`，所以第一条判据对
-全部 75499 个资产都成立。也就是说播放路径一直只有 `FilesystemBackend`，而这一点
-在读代码时看不出来：backend 列表的写法明示「这里有两个来源」。
+播放路径仅使用 `FilesystemBackend`，backend 列表却明示存在另一套来源。
 
 ## 决策
 

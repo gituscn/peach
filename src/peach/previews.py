@@ -446,9 +446,6 @@ def cover_thumb_root(cover_root: Path) -> Path:
 
 class DerivedImageService:
     """原件的缩小派生件：实体图给索引页，封面给卡片网格。
-
-    实体图是给资料页大位存的高清照片，本库 727 张合计 157 MB、均 221 KB；索引页把它
-    铺进 150 px 的格子，一屏 120 格就是二十多 MB，而屏幕上只要其中百分之几的像素。
     所以索引页取的是这里缩好的一份，资料页照旧取原件。封面同理，详情与裁切取原件。
 
     落在自己的目录而不是原件目录：`web_state._scan_avatar_root` 与 `cover_index` 逐次

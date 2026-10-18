@@ -81,8 +81,6 @@ class PairingTests(unittest.TestCase):
 
     def test_a_subtitle_named_exactly_like_the_video_is_labelled_by_format(self):
         """完全同名时文件名一个字也没多说，菜单里写 `SRT` 比复述正片标题好读。
-
-        本库里这是主流形态：真实账本里 195 条 sidecar 有 175 条正是完全同名。
         """
         self.assertEqual(subtitles.track_label("ABP-758.srt", "", "ABP-758.mp4"), "SRT")
         self.assertEqual(subtitles.track_label("ABP-758.ass", "", "ABP-758.mp4"), "ASS")
