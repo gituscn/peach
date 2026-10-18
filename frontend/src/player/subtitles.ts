@@ -29,6 +29,8 @@ export class SubtitleControls {
   private query = '';
   private offset = 0;
   private results: SearchResult[] = [];
+  private more = false;
+  private searched = false;
 
   constructor(private player: VjsPlayer, private video: HTMLVideoElement, private panels: Panels) {
     this.styles = mountCaptionStyle(player.el(), video, this.cleanup.signal);
@@ -83,7 +85,7 @@ export class SubtitleControls {
     this.page = 'tracks';
     const tracks = this.tracks();
     const choices = [null, ...tracks];
-    const panel = this.panel(this.header('字幕', '<button type="button" class="vjs-peach-caption-options" data-subtitle-options>选项</button>') +
+    const panel = this.panel(this.header('字幕', `<button type="button" class="vjs-peach-caption-options" data-subtitle-options aria-label="字幕选项">${icon('settings')}</button>`) +
       `<div class="vjs-peach-panel-menu">${choices.map((track, index) => {
         const selected = track ? track.mode === 'showing' : tracks.every(row => row.mode !== 'showing');
         return `<button type="button" class="vjs-peach-menu-option" role="menuitemradio" aria-checked="${selected}" data-subtitle-track="${index}"><span class="vjs-peach-option-check">${selected ? icon('check') : ''}</span><span class="vjs-peach-option-label">${esc(track?.label || track?.language || (track ? '字幕' : '关闭'))}</span></button>`;
@@ -167,33 +169,46 @@ export class SubtitleControls {
   }
 
   private searchPanel() {
+    this.request?.abort();
     this.page = 'search';
-    const panel = this.panel(this.header('搜索中文字幕') + `<div class="vjs-peach-subtitle-search"><form data-subtitle-query role="search"><input type="search" aria-label="搜索字幕" placeholder="输入番号或片名" minlength="3" maxlength="200" value="${esc(this.query || String(this.player.peachItem?.code || this.player.peachItem?.title || this.player.peachItem?.name || '').replace(/\.[^.]+$/, ''))}"><button type="submit" aria-label="搜索中文字幕">${icon('search')}</button></form><p class="vjs-peach-subtitle-status" data-subtitle-status role="status" hidden></p><div data-subtitle-results></div><a href="https://www.subtitlecat.com" target="_blank" rel="noopener noreferrer">中文字幕由 SubtitleCat 提供，可能包含机翻</a></div>`, () => this.show(-1));
-    const form = panel.querySelector<HTMLFormElement>('form')!, input = form.querySelector('input')!;
-    form.onsubmit = event => {
-      event.preventDefault(); if (form.getAttribute('aria-busy') === 'true') return;
-      this.query = input.value.trim(); this.offset = 0; this.results = [];
-      panel.querySelector('[data-subtitle-results]')!.replaceChildren(); void this.runSearch(panel);
-    };
+    const item = this.player.peachItem;
+    const query = String(item?.code || item?.title || String(item?.name || '').replace(/\.(mp4|mkv|avi|mov|webm|m4v|ts|wmv)$/i, '')).trim().slice(0, 200);
+    if (query !== this.query) { this.query = query; this.offset = 0; this.results = []; this.searched = false }
+    const panel = this.panel(this.header('搜索中文字幕') + '<div class="vjs-peach-subtitle-search"><p class="vjs-peach-subtitle-status" data-subtitle-status role="status" hidden></p><div data-subtitle-results></div><a href="https://www.subtitlecat.com" target="_blank" rel="noopener noreferrer">中文字幕由 SubtitleCat 提供，可能包含机翻</a></div>', () => { this.request?.abort(); this.show(-1) });
+    if (query.length < 3) { this.status('当前作品没有可用于搜索的番号或片名'); return }
+    if (this.searched) this.searchResults(panel);
+    else void this.runSearch(panel, 0);
+  }
+
+  private searchResults(panel: HTMLElement) {
+    const list = panel.querySelector<HTMLElement>('[data-subtitle-results]')!;
+    list.innerHTML = this.results.map((row, index) => `<button type="button" class="vjs-peach-subtitle-result" data-subtitle-result="${index}"><span>${esc(row.title)}</span><small>${esc([row.language, row.format].filter(Boolean).join(' · '))}</small></button>`).join('') +
+      (this.more ? '<button type="button" class="vjs-peach-caption-action" data-subtitle-more>更多字幕</button>' : '');
+    list.querySelectorAll<HTMLButtonElement>('[data-subtitle-result]').forEach(button => { button.onclick = () => { void this.showFiles(this.results[Number(button.dataset.subtitleResult)]!) } });
+    list.querySelector<HTMLButtonElement>('[data-subtitle-more]')?.addEventListener('click', () => { void this.runSearch(panel, this.offset + 6) });
+    this.status(this.results.length ? `找到 ${this.results.length} 条中文字幕` : this.more ? '这批结果没有中文，可查看更多字幕' : '没有找到当前作品的中文字幕');
   }
 
   private async runSearch(panel: HTMLElement, offset = this.offset) {
-    const form = panel.querySelector('form')!;
-    if (form.getAttribute('aria-busy') === 'true') return;
+    if (panel.getAttribute('aria-busy') === 'true') return;
     const signal = this.busy(), generation = this.generation;
-    const submit = form.querySelector('button')!, list = panel.querySelector<HTMLElement>('[data-subtitle-results]')!;
-    form.setAttribute('aria-busy', 'true'); setActionBusy(submit); list.inert = true; this.status('正在搜索字幕…', false, true);
+    const trigger = panel.querySelector<HTMLButtonElement>('[data-subtitle-more],[data-subtitle-retry]');
+    const list = panel.querySelector<HTMLElement>('[data-subtitle-results]')!;
+    panel.setAttribute('aria-busy', 'true'); if (trigger) setActionBusy(trigger); list.inert = true; this.status('正在搜索字幕…', false, true);
     try {
       const payload = await api(`/api/subtitles/search?q=${encodeURIComponent(this.query)}&offset=${offset}`, { signal }) as { results: SearchResult[]; more: boolean };
       if (signal.aborted || generation !== this.generation) return;
-      this.offset = offset; this.results.push(...payload.results);
-      list.innerHTML = this.results.map((row, index) => `<button type="button" class="vjs-peach-subtitle-result" data-subtitle-result="${index}"><span>${esc(row.title)}</span><small>${esc([row.language, row.format].filter(Boolean).join(' · '))}</small></button>`).join('') +
-        (payload.more ? '<button type="button" class="vjs-peach-caption-action" data-subtitle-more>更多字幕</button>' : '');
-      list.querySelectorAll<HTMLButtonElement>('[data-subtitle-result]').forEach(button => { button.onclick = () => { void this.showFiles(this.results[Number(button.dataset.subtitleResult)]!) } });
-      list.querySelector<HTMLButtonElement>('[data-subtitle-more]')?.addEventListener('click', () => { void this.runSearch(panel, this.offset + 6) });
-      this.status(this.results.length ? `找到 ${this.results.length} 条中文字幕` : payload.more ? '这批结果没有中文，可查看更多字幕' : '没有找到中文字幕，换个番号试试');
-    } catch (error) { if (!signal.aborted && generation === this.generation) this.status(error instanceof Error ? error.message : '字幕搜索失败', true) }
-    finally { form.removeAttribute('aria-busy'); setActionBusy(submit, false); list.inert = false }
+      this.offset = offset; this.results.push(...payload.results); this.more = payload.more; this.searched = true;
+      this.searchResults(panel);
+    } catch (error) {
+      if (!signal.aborted && generation === this.generation) {
+        this.status(error instanceof Error ? error.message : '字幕搜索失败', true);
+        list.querySelector('[data-subtitle-more]')?.remove();
+        list.querySelector('[data-subtitle-retry]')?.remove();
+        list.insertAdjacentHTML('beforeend', '<button type="button" class="vjs-peach-caption-action" data-subtitle-retry>重试</button>');
+        list.querySelector<HTMLButtonElement>('[data-subtitle-retry]')!.onclick = () => { void this.runSearch(panel, offset) };
+      }
+    } finally { panel.removeAttribute('aria-busy'); if (trigger) setActionBusy(trigger, false); list.inert = false }
   }
 
   private async showFiles(result: SearchResult) {

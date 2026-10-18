@@ -5,6 +5,7 @@ import type { PlayerSource, VjsPlayer } from './types';
 import { ensureVideojs } from './videojs';
 
 export function mountPreviewPlayer(video: HTMLVideoElement, source: PlayerSource, failed: () => void): () => void {
+  video.controls = false;
   let released = false;
   let player: VjsPlayer | null = null;
   void ensureVideojs().then(factory => {

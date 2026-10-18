@@ -225,7 +225,7 @@ video.video-js{vertical-align:top;font-size:10px;line-height:1;font-family:Arial
 .vjs-peach-settings,.vjs-peach-theater,.vjs-peach-expand{position:relative;flex:0 0 48px;width:48px!important;min-width:48px}
 .vjs-peach-settings>button,.vjs-peach-theater>button,.vjs-peach-expand>button{width:100%;height:100%;padding:0;border:0;background:transparent;color:inherit;cursor:pointer;display:grid;place-items:center}
 .vjs-peach-expand>button>svg{width:24px;height:24px;fill:currentColor;stroke:none;filter:drop-shadow(0 0 1px rgba(0,0,0,.8))}
-.vjs-peach-settings>button>svg,.vjs-peach-theater>button>svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;filter:drop-shadow(0 0 1px rgba(0,0,0,.8))}
+.vjs-peach-settings>button>svg,.vjs-peach-theater>button>svg,.vjs-peach-caption-options>svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;filter:drop-shadow(0 0 1px rgba(0,0,0,.8))}
 .vjs-peach-settings [data-player-quality-badge]{position:absolute;z-index:2;right:4px;top:1px;min-width:17px;height:12px;padding:0 2px;
   display:grid;place-items:center;border-radius:var(--badge-radius);background:var(--tungsten);color:var(--ground);font-size:var(--fs-xs);font-weight:600;line-height:1;transform:scale(.67);transform-origin:top right}
 .vjs-peach-settings [data-player-quality-badge][hidden]{display:none}
@@ -265,8 +265,8 @@ video.video-js{vertical-align:top;font-size:10px;line-height:1;font-family:Arial
 .vjs-peach-panel-header .vjs-peach-menu-back svg{width:32px;height:32px;display:block;fill:currentColor;stroke:none}
 .vjs-peach-panel-header strong{font-size:var(--fs-md);line-height:18.2px;font-weight:500;color:#eee}
 .vjs-peach-panel-menu{padding:8px}
-.video-js .vjs-peach-menu-option{display:grid;grid-template-columns:35px minmax(0,1fr);align-items:center;padding:0 20px 0 0!important;text-align:left;font-size:var(--fs-md)!important;line-height:18.2px}
-.vjs-peach-option-check{width:35px;height:24px;display:grid;place-items:center}.vjs-peach-option-check svg{width:24px;height:24px;display:block;fill:currentColor;stroke:none}
+.video-js .vjs-peach-menu-option{display:grid;grid-template-columns:40px minmax(0,1fr);align-items:center;padding:0 20px 0 8px!important;text-align:left;font-size:var(--fs-md)!important;line-height:18.2px}
+.vjs-peach-option-check{width:40px;height:24px;display:grid;place-items:center}.vjs-peach-option-check svg{width:24px;height:24px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .vjs-peach-option-label{min-width:0}
 /* 播放速度面板照 YouTube delhi-modern（player 9470c977 的 www-player.css 与 base.js）：
    内容区 24px/16px/16px 内距；读数 18px/900/22px 居中、下留 24px；滑条一行 gap 16px、

@@ -10,6 +10,24 @@ describe('播放器皮肤', () => {
   before(async () => { browser = await launch() });
   after(async () => { await browser?.close() });
 
+  it('首次加载模块期间保留海报，控制条从完整皮肤开始显示', { timeout: 60_000 }, async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve });
+    const opened = await visit(browser, `/assets/${requiredEnv('PEACH_E2E_ITEM')}`, VIEWPORTS[0]!, async page => {
+      await page.route('**/vendor/videojs/10.1.0/video-player.js', async route => { await gate; await route.continue() });
+    });
+    try {
+      const video = opened.page.locator('#stage video.video-js');
+      await video.waitFor();
+      assert.equal(await video.evaluate((node: HTMLVideoElement) => node.controls), false, '模块加载期间不显示浏览器控制条');
+      release();
+      await opened.page.locator('#stage .vjs-peach-right-controls').waitFor();
+      assert.equal(await opened.page.locator('#stage .vjs-control-bar').evaluate(bar => getComputedStyle(bar).visibility), 'visible');
+      assert.equal(await opened.page.locator('#stage video.vjs-tech').evaluate((node: HTMLVideoElement) => node.controls), false);
+      assert.deepEqual(opened.problems, []);
+    } finally { release(); await opened.close() }
+  });
+
   for (const viewport of VIEWPORTS) {
     it(`${viewport.name}：控制组贴右、进度圆点唯一、全屏保留控件`, { timeout: 60_000 }, async () => {
       const opened = await visit(browser, `/assets/${requiredEnv('PEACH_E2E_ITEM')}`, viewport, async page => {
