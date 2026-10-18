@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+import json
 import tempfile
 import unittest
 from contextlib import closing
@@ -220,6 +221,23 @@ class PlanTests(unittest.TestCase):
 
 class ApplyTests(unittest.TestCase):
     """执行与回滚都真的动文件：`translate_ledger_path` 指到临时目录，两个平台一致。"""
+
+    def test_committed_moves_keep_one_journal_and_resume_without_renaming_twice(self):
+        for index in (1, 2):
+            self._file(f'old/{index}.mp4')
+        _seed(self.db_path, [dict(id=index, path=f'R:\\media\\old\\{index}.mp4',
+                                  name=f'{index}.mp4', code=f'ABC-00{index}') for index in (1, 2)])
+        plan = _plan(self.db_path, file_template='{number}')
+        def stop(**fields):
+            raise InterruptedError('模拟整理中断')
+        with closing(sqlite3.connect(self.db_path)) as connection, self.assertRaises(InterruptedError):
+            organize.apply_plan(connection, plan['rows'], generated_root=self.holder, stamp='resume', progress=stop)
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            result = organize.apply_plan(connection, plan['rows'], generated_root=self.holder, stamp='resume')
+        self.assertEqual((result['moved'], result['failed']), (2, 0))
+        journal = json.loads(Path(result['log_path']).read_text(encoding='utf-8'))
+        self.assertEqual(len(journal['entries']), 2)
+        self.assertEqual(len(list(organize.batch_log_dir(self.holder).glob('*.json'))), 1)
 
     def setUp(self):
         self.holder = Path(tempfile.mkdtemp(prefix="peach-organize-apply-")).resolve()

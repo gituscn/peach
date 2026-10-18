@@ -1,5 +1,6 @@
 """发现资料边车、固定批次、预算和失败状态的行为契约。"""
 import tempfile
+import json
 import unittest
 import threading
 from pathlib import Path
@@ -11,6 +12,20 @@ from peach.web_jav_discovery import _metadata_response
 
 
 class DiscoveryMetadataTests(unittest.TestCase):
+    def test_restart_retains_batch_identity_budget_and_completed_codes(self):
+        self.cache.remember('EXM-001', {'number': 'EXM-001', 'tags': [], 'score': 4, 'duration': 120})
+        self.path.with_suffix('.job.json').write_text(json.dumps(dict(
+            job_id='original', status='running', codes=['EXM-001', 'EXM-002'], refresh=True,
+            completed=1, completed_codes=['EXM-001'], attempted_codes=['EXM-001'], requests=3, bytes=120,
+            active_seconds=10)), encoding='utf-8')
+        with patch.object(self.api, 'movie', return_value={'number': 'EXM-002', 'tags': [], 'score': 4, 'duration': 120}) as movie:
+            restarted = DiscoveryMetadata(self.path, api=self.api, clock=lambda: self.now[0])
+            self.addCleanup(restarted.stop)
+            restarted.job.thread.join(5)
+        final = restarted.job.snapshot()
+        movie.assert_called_once_with('EXM-002', refresh=True)
+        self.assertEqual((final['job_id'], final['completed'], final['requests'], final['bytes']), ('original', 2, 3, 120))
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -19,6 +34,25 @@ class DiscoveryMetadataTests(unittest.TestCase):
         self.api = PublicAPI(sleeper=lambda _: None)
         self.cache = DiscoveryMetadata(self.path, api=self.api, clock=lambda: self.now[0])
         self.addCleanup(self.cache.stop)
+
+    def test_repeated_restart_keeps_checkpoint_before_the_next_item_finishes(self):
+        self.path.with_suffix('.job.json').write_text(json.dumps(dict(
+            job_id='original', status='running', codes=['EXM-001', 'EXM-002'], refresh=True,
+            started_at=100, completed=1, completed_codes=['EXM-001'], attempted_codes=['EXM-001'],
+            failed_codes=[], requests=3, bytes=120, active_seconds=10)), encoding='utf-8')
+        with patch.object(DiscoveryMetadata, '_run_batch'):
+            first = DiscoveryMetadata(self.path, api=self.api, clock=lambda: self.now[0])
+            first.job.thread.join(5)
+            first.stop()
+        saved = json.loads(self.path.with_suffix('.job.json').read_text(encoding='utf-8'))
+        self.assertEqual(saved['completed_codes'], ['EXM-001'])
+        self.assertEqual(saved['started_at'], 100)
+        with patch.object(self.api, 'movie', return_value={'number': 'EXM-002', 'tags': [], 'score': 4, 'duration': 120}) as movie:
+            second = DiscoveryMetadata(self.path, api=self.api, clock=lambda: self.now[0])
+            self.addCleanup(second.stop)
+            second.job.thread.join(5)
+        movie.assert_called_once_with('EXM-002', refresh=True)
+        self.assertEqual(second.job.snapshot()['completed'], 2)
 
     def test_sidecar_survives_restart_and_distinguishes_empty_unknown_and_stale(self):
         movie = {"number": "EXM-001", "tags": [], "score": "4.23", "duration": 180,

@@ -3,6 +3,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -56,6 +57,24 @@ class FakeContract:
 
 
 class VerdictTests(unittest.TestCase):
+    def test_prune_checks_retain_definitive_results_across_interruption(self):
+        planned = [{'id': index, 'url': f'https://example.invalid/{index}'} for index in (1, 2, 3)]
+        saved = {}
+        def remember(**fields):
+            saved.update(fields)
+            if fields['checked'] == 2:
+                raise InterruptedError('停止于检查点')
+            return True
+        with mock.patch.object(web_links, '_probe', side_effect=[(404, ''), (503, '')]):
+            with self.assertRaises(InterruptedError):
+                web_links._recheck_prune_links(planned, None, remember, {})
+        with mock.patch.object(web_links, '_probe', side_effect=[(200, ''), (404, '')]) as probe:
+            confirmed, recovered = web_links._recheck_prune_links(planned, None, None, saved)
+        self.assertEqual([call.args[0] for call in probe.call_args_list],
+                         ['https://example.invalid/2', 'https://example.invalid/3'])
+        self.assertEqual([row['id'] for row in confirmed], [1, 3])
+        self.assertEqual([row['id'] for row in recovered], [2])
+
     def test_only_a_gone_status_is_deletable(self):
         """取不到不等于没了，这两件事只有 404／410 能划清。
 

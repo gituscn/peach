@@ -157,10 +157,11 @@ def _backfill_solo_works(contract, transport, source, report: dict) -> None:
     report["codes"] = list(report.get("codes") or []) + codes
 
 
-def _execute_check(contract, body, job_id: str) -> dict:
-    only = body.get("sources")
+def _check_sources(contract, body, previous):
+    """首次按请求选取到期来源，续跑只读取本批次冻结的来源集合。"""
+    only = previous.get('source_ids') if 'source_ids' in previous else body.get("sources")
     with contract.database.read_connection() as connection:
-        if isinstance(only, list) and only:
+        if isinstance(only, list):
             wanted = {int(value) for value in only}
             rows = [row for row in connection.execute(
                 "SELECT * FROM feed_source ORDER BY id") if int(row["id"]) in wanted]
@@ -169,16 +170,32 @@ def _execute_check(contract, body, job_id: str) -> dict:
                 "SELECT * FROM feed_source WHERE enabled=1 ORDER BY id"))
         else:
             rows = feeds.due_sources(connection)
-    rows = rows[:MAX_SOURCES_PER_RUN]
+    return rows[:MAX_SOURCES_PER_RUN]
+
+
+def _execute_check(contract, body, job_id: str) -> dict:
+    previous = contract.feed_job.snapshot() or {}
+    rows = _check_sources(contract, body, previous)
     transport = _transport(contract)
-    results, codes = [], []
+    results = list(previous.get('results') or [])
+    completed = {row['source'] for row in results if row.get('ok') and not row.get('backfill_error')}
+    codes = [code for row in results for code in row.get('codes') or []]
+    if not contract.feed_job.checkpoint(job_id, source_ids=[int(row['id']) for row in rows]):
+        raise InterruptedError('订阅检查已停止')
     try:
         for index, source in enumerate(rows):
-            contract.feed_job.update(job_id, checked=index, total=len(rows),
-                                     current=source["name"] or source["url"])
+            if int(source['id']) in completed:
+                continue
+            if not contract.feed_job.update(job_id, checked=len(results), total=len(rows),
+                                            current=source["name"] or source["url"]):
+                raise InterruptedError('订阅检查已停止')
             report = poll_source(contract, transport, source)
+            results = [row for row in results if row['source'] != report['source']]
             results.append(report)
             codes.extend(report.get("codes") or [])
+            if not contract.feed_job.checkpoint(job_id, results=results, checked=len(results),
+                                                total=len(rows), added=len(set(codes))):
+                raise InterruptedError('订阅检查已停止')
     finally:
         close = getattr(transport, "close", None)
         if close:

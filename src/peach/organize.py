@@ -27,6 +27,7 @@ from .organize_templates import MAX_PATH, TemplateError, render, validate_templa
 from .platform import (is_windows_path, location_mounts, location_roots, resolve_root, root_online,
                        translate_ledger_path, within_root)
 from .review_csv import write_rows
+from .fsutil import atomic_write_text
 
 #: 计划 CSV 的列。`reason` 只在 `action=skip` 时有值。
 PLAN_FIELDS = ["asset_id", "location", "current_path", "target_path", "action", "reason"]
@@ -370,28 +371,37 @@ def apply_plan(connection: sqlite3.Connection, rows: Sequence[dict], *,
     """
     movable = [row for row in rows if row.get("action") in {"rename", "move"}]
     refuse_unverified(path for row in movable for path in (row["current_path"], row["target_path"]))
-    entries: list[dict] = []
-    failures: list[dict] = []
     log_path = batch_log_dir(generated_root) / (
         f"organize-{stamp or time.strftime('%Y%m%d-%H%M%S')}.json")
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    previous = json.loads(log_path.read_text(encoding='utf-8')) if stamp and log_path.exists() else {}
+    entries = list(previous.get('entries') or [])
+    failures: list[dict] = []
+    completed = {entry['asset_id'] for entry in entries}
+    def save():
+        atomic_write_text(log_path, json.dumps(
+            {'stamp': stamp or time.strftime('%Y%m%d-%H%M%S'), 'entries': entries, 'failures': failures},
+            ensure_ascii=False, indent=1))
     try:
         for index, row in enumerate(movable, 1):
+            if int(row['asset_id']) in completed:
+                continue
             old_path, new_path = str(row["current_path"]), str(row["target_path"])
-            outcome = _move_one(connection, int(row["asset_id"]), old_path, new_path)
+            current = connection.execute('SELECT path FROM asset WHERE id=?', (int(row['asset_id']),)).fetchone()
+            landed = (current is not None and current[0] == new_path
+                      and translate_ledger_path(new_path).is_file() and not translate_ledger_path(old_path).exists())
+            outcome = 'ok' if landed else _move_one(connection, int(row["asset_id"]), old_path, new_path)
             if outcome == "ok":
                 entries.append({"asset_id": int(row["asset_id"]),
                                 "old_path": old_path, "new_path": new_path})
             else:
                 failures.append({"asset_id": int(row["asset_id"]),
                                  "path": old_path, "reason": outcome})
+            save()
             if progress:
                 progress(checked=index, total=len(movable))
     finally:
-        log_path.write_text(json.dumps(
-            {"stamp": stamp or time.strftime("%Y%m%d-%H%M%S"),
-             "entries": entries, "failures": failures},
-            ensure_ascii=False, indent=1), encoding="utf-8")
+        save()
     return {"moved": len(entries), "failed": len(failures), "failures": failures[:50],
             "batch": log_path.name, "log_path": str(log_path)}
 
@@ -402,28 +412,36 @@ def rollback_batch(connection: sqlite3.Connection, log_path: Path | str, *,
     path = Path(log_path)
     payload = json.loads(path.read_text(encoding="utf-8"))
     entries = list(payload.get("entries") or [])
+    previous_restored = int(payload.get('restored_count') or 0)
     refuse_unverified(path for entry in entries for path in (entry["new_path"], entry["old_path"]))
     restored: list[dict] = []
     failures: list[dict] = []
     for index, entry in enumerate(reversed(entries), 1):
-        outcome = _move_one(connection, int(entry["asset_id"]),
-                            str(entry["new_path"]), str(entry["old_path"]))
+        current = connection.execute('SELECT path FROM asset WHERE id=?', (int(entry['asset_id']),)).fetchone()
+        landed = (current is not None and current[0] == entry['old_path']
+                  and translate_ledger_path(entry['old_path']).is_file()
+                  and not translate_ledger_path(entry['new_path']).exists())
+        outcome = 'ok' if landed else _move_one(connection, int(entry["asset_id"]),
+                                                str(entry["new_path"]), str(entry["old_path"]))
         if outcome == "ok":
             restored.append(entry)
         else:
             failures.append({"asset_id": int(entry["asset_id"]),
                              "path": str(entry["new_path"]), "reason": outcome})
+        payload['entries'] = [row for row in entries if row not in restored]
+        payload['restored_count'] = previous_restored + len(restored)
+        atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=1))
         if progress:
-            progress(checked=index, total=len(entries))
+            progress(checked=previous_restored + index, total=previous_restored + len(entries))
     remaining = [entry for entry in entries
                  if entry not in restored]
     if remaining:
         payload["entries"] = remaining
-        path.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+        atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=1))
     else:
         # 整批都退回去了，这个批次就不该再出现在「回滚上一批」里。
         path.unlink(missing_ok=True)
-    return {"restored": len(restored), "failed": len(failures), "failures": failures[:50],
+    return {"restored": previous_restored + len(restored), "failed": len(failures), "failures": failures[:50],
             "batch": path.name}
 
 

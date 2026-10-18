@@ -31,7 +31,7 @@ from .platform import translate_ledger_path
 #: 判定结论的落盘位置，放在边车自己的目录里：它们同生同灭，清缓存时一起走。
 SCAN_CACHE_NAME = "mp4-repair-scan.json"
 
-#: 只有这两个结论值得记：需要修的当场就修了，修完有边车或新文件为证。
+#: 文件身份对应的判定缓存；修复产物由边车或新文件核验。
 CLEAN = "clean"
 UNAVAILABLE = "unavailable"
 
@@ -116,14 +116,18 @@ def _survey(contract, job, job_id: str, rows, cache: dict[str, str]) -> list[tup
         if store.lookup(asset_id, source) is not None or cache.get(key) in (CLEAN, UNAVAILABLE):
             _advance(job, job_id, index, skipped=True)
             continue
-        try:
-            kind = _diagnose(contract, source, duration)
-        except OSError:
-            kind = None
+        kind = cache.get(key)
+        if kind not in (HEADER, INDEX):
+            try:
+                kind = _diagnose(contract, source, duration)
+            except OSError:
+                continue
         if kind:
             found.append((asset_id, raw, kind))
-        else:
-            cache[key] = CLEAN
+        cache[key] = kind or CLEAN
+        _save_cache(contract, cache)
+        if not job.checkpoint(job_id, survey_checked=index, survey_cache=dict(cache)):
+            raise InterruptedError('媒体检查已停止')
         _advance(job, job_id, index, skipped=False)
     return found
 
@@ -132,9 +136,13 @@ def _advance(job, job_id: str, checked: int, *, skipped: bool) -> None:
     with job.editing(job_id) as state:
         if state is None:
             return
-        state["checked"] = checked
-        if skipped:
+        state["checked"] = max(state.get('checked', 0), checked)
+        if skipped and checked > state.get('survey_checked', 0):
             state["skipped"] = state.get("skipped", 0) + 1
+        state['survey_checked'] = max(state.get('survey_checked', 0), checked)
+        saved = {key: state.get(key, 0) for key in ('checked', 'survey_checked', 'skipped')}
+    if not job.checkpoint(job_id, **saved):
+        raise InterruptedError('媒体检查已停止')
 
 
 def _reference_candidates(contract, asset_id: int, raw: str) -> list[str]:
@@ -201,7 +209,9 @@ def _repair(contract, job, job_id: str, found, cache: dict[str, str]) -> None:
     """逐个修。一部片要整片读一遍，所以这里刻意不并发。"""
     store = contract.header_repairs
     tools = _recovery_tools(contract) if any(kind == INDEX for *_, kind in found) else None
-    job.update(job_id, stage="修复", checked=0, total=len(found), repaired=0, failed=0)
+    previous = job.snapshot() or {}
+    job.update(job_id, stage="修复", checked=previous.get('repaired', 0),
+               total=len(found) + previous.get('repaired', 0))
     for index, (asset_id, raw, kind) in enumerate(found, start=1):
         if job.snapshot() is None:
             return
@@ -221,20 +231,26 @@ def _repair(contract, job, job_id: str, found, cache: dict[str, str]) -> None:
         with job.editing(job_id) as state:
             if state is None:
                 return
-            state["checked"] = index
+            state["checked"] = previous.get('repaired', 0) + index
             state["repaired"] = state.get("repaired", 0) + (1 if made else 0)
             state["failed"] = state.get("failed", 0) + (0 if made else 1)
             state["missing_tool"] = state.get("missing_tool", 0) + (1 if made is None else 0)
             state["message"] = source.name[:80]
         _save_cache(contract, cache)
+        state = job.snapshot() or {}
+        if not job.checkpoint(job_id, **{key: state.get(key, 0) for key in
+                              ('checked', 'total', 'repaired', 'failed', 'missing_tool')}):
+            raise InterruptedError('媒体修复已停止')
 
 
 def run_media_repair(contract, job_id: str, scope: tuple[str, list]) -> None:
     """一轮完整的批量修复。异常由 `BackgroundJob` 变成可轮询的失败状态。"""
     job = contract.media_repair_job
     cache = _load_cache(contract)
+    cache.update((job.snapshot() or {}).get('survey_cache') or {})
     rows = _candidates(contract, scope)
-    job.update(job_id, stage="扫描", total=len(rows), checked=0)
+    previous = job.snapshot() or {}
+    job.update(job_id, stage="扫描", total=len(rows), checked=previous.get('survey_checked', 0))
     found = _survey(contract, job, job_id, rows, cache)
     _save_cache(contract, cache)
     if job.snapshot() is None:
@@ -276,7 +292,7 @@ def w_media_repair(contract, body=None):
     body = body or {}
     job = contract.media_repair_job
     if body.get("stop") is True:
-        job.stop()
+        job.stop(resume=False)
         return _public(None)
     if body.get("status_only") is True:
         return _public(job.snapshot())
@@ -291,4 +307,5 @@ def w_media_repair(contract, body=None):
         initial={"library": library, "stage": "扫描", "total": 0, "checked": 0, "found": 0,
                  "repaired": 0, "failed": 0, "missing_tool": 0, "skipped": 0, "message": ""},
         restart=body.get("restart") is True,
+        recovery={'library': library, 'restart': True},
     ))

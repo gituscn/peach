@@ -114,7 +114,8 @@ class LedgerCase(unittest.TestCase):
                 "SELECT code,position,url,site,source FROM code_sample_image ORDER BY code,position")]
 
     def run_followup(self, fetchers: dict, run_id: int = 7) -> dict:
-        handle = SimpleNamespace(run_id=run_id, progress=lambda **_kwargs: None)
+        handle = SimpleNamespace(run_id=run_id, progress=lambda **_kwargs: None,
+                                 saved={}, checkpoint=lambda **_kwargs: None)
         with mock.patch.dict(sample_images.FETCHERS, fetchers, clear=True):
             return sample_followup.run(self.contract, sample_followup.FOLLOWUP_KEY, handle,
                                        transport=object())

@@ -10,12 +10,14 @@ POSIX 形态那条平台无关，哪台机器上都跑。Windows 形态那条只
 from __future__ import annotations
 
 import io
+import json
 import os
 import sqlite3
 import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path, PureWindowsPath
+from unittest.mock import patch
 
 from peach import scan
 from peach.migrations import upgrade
@@ -103,6 +105,56 @@ class WindowsShapeTests(_ScanCase):
 
 class PosixShapeTests(_ScanCase):
     """macOS：账本里写 `R:\\media\\...`，遍历的是挂载点，读取侧按挂载表翻回去。"""
+
+    def test_resume_skips_committed_directories_and_retains_subtitles_and_new_ids(self):
+        (self.media / '创作者/sub/a.srt').write_text('subtitle', encoding='utf-8')
+        saved = {}
+        def save(state):
+            saved.clear()
+            saved.update(json.loads(json.dumps(state)))
+            if state.get('files') == 2:
+                raise InterruptedError('模拟服务退出')
+        options = dict(declared_roots={'local': ('R:\\media',)},
+                       mounts={'local': (self.media,)}, windows=False)
+        with self.assertRaises(InterruptedError):
+            self._scan('R:\\media', save_checkpoint=save, **options)
+        visited = []
+        scandir = os.scandir
+        def walk(path):
+            visited.append(Path(path))
+            return scandir(path)
+        with patch.object(scan.os, 'scandir', side_effect=walk):
+            result, _ = self._scan('R:\\media', resume_state=saved, **options)
+        self.assertNotIn(self.media, visited)
+        self.assertEqual((result.files, result.total_bytes, result.subtitles), (4, 22, 1))
+        self.assertEqual(len(result.new_ids), 4)
+        self.assertEqual(len(self._paths()), 4)
+
+    def test_finished_root_checkpoint_does_not_enumerate_the_tree(self):
+        saved = []
+        options = dict(declared_roots={'local': ('R:\\media',)}, mounts={'local': (self.media,)}, windows=False)
+        first, _ = self._scan('R:\\media', save_checkpoint=lambda value: saved.append(value), **options)
+        with patch.object(scan.os, 'scandir', side_effect=AssertionError('已完成的根不应再次枚举')):
+            second, _ = self._scan('R:\\media', resume_state=json.loads(json.dumps(saved[-1])), **options)
+        self.assertEqual(second, first)
+
+    def test_file_batch_cursor_resumes_inside_a_directory(self):
+        saved = {}
+        def save(state):
+            saved.update(json.loads(json.dumps(state)))
+            if state.get('cursor'):
+                raise InterruptedError('模拟文件批次提交后退出')
+        options = dict(declared_roots={'local': ('R:\\media',)}, mounts={'local': (self.media,)}, windows=False)
+        with patch.object(scan, 'BATCH_SIZE', 1), self.assertRaises(InterruptedError):
+            self._scan('R:\\media', save_checkpoint=save, **options)
+        self.assertEqual(saved['files'], 1)
+        (self.media / saved['cursor']).write_bytes(b'changed after checkpoint')
+        progress = []
+        result, _ = self._scan('R:\\media', resume_state=saved,
+                               progress=lambda count, size: progress.append((count, size)), **options)
+        self.assertEqual((result.files, result.total_bytes), (3, 14))
+        self.assertTrue(all(count >= 1 for count, _ in progress))
+        self.assertEqual(len(self._paths()), 3)
 
     def test_structured_progress_reports_discovered_files_and_bytes(self):
         progress = []

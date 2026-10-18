@@ -64,6 +64,27 @@ def _missing(error: Exception) -> bool:
         isinstance(error, SourceFailure) and error.reason == FailureReason.NOT_FOUND)
 
 
+class _SampleCheckpoint:
+    """固定本批次番号，保留已经落库的样张与累计产物数。"""
+
+    def __init__(self, contract, handle, misses, snapshots):
+        self.handle = handle
+        saved = getattr(handle, 'saved', {}) if handle is not None else {}
+        saved = saved if isinstance(saved, dict) else {}
+        self.completed = set(saved.get('completed_codes') or [])
+        self.landed, self.images = saved.get('landed', 0), saved.get('images', 0)
+        with contract.database.read_connection() as connection:
+            self.codes = saved.get('codes') or sample_images.pending(
+                connection, contract.has_cover, misses, snapshots, limit=SCAN)
+        if handle is not None:
+            handle.checkpoint(codes=self.codes)
+
+    def mark(self, code, landed, images):
+        self.completed.add(code)
+        if self.handle is not None:
+            self.handle.checkpoint(completed_codes=sorted(self.completed), landed=landed, images=images)
+
+
 def run(contract, key: str, handle, *, transport=None, clock=time.monotonic) -> dict:
     """跑一条补样张后继，返回活动页上那一行的摘要。"""
     from .jav_cover_fetch import DeadlineExceeded, HostLimitedTransport
@@ -72,8 +93,8 @@ def run(contract, key: str, handle, *, transport=None, clock=time.monotonic) -> 
     generated = Path(contract.candidate_root)
     misses = sample_images.Misses(sample_images.misses_path(generated))
     snapshots = sample_images.snapshot_index(Path(contract.follow_sources_root))
-    with contract.database.read_connection() as connection:
-        codes = sample_images.pending(connection, contract.has_cover, misses, snapshots, limit=SCAN)
+    checkpoint = _SampleCheckpoint(contract, handle, misses, snapshots)
+    codes = checkpoint.codes
     if not codes:
         return {"outcome": "没有要补的番号", "codes": 0}
     batch = sample_images.batch_for(getattr(handle, "run_id", None))
@@ -83,7 +104,8 @@ def run(contract, key: str, handle, *, transport=None, clock=time.monotonic) -> 
             SourceTransport(Path(contract.follow_secrets_root), max_requests=BATCH * 3,
                             max_bytes=64 * 1024 * 1024, max_seconds=BUDGET_SECONDS), 2.0)
     deadline = clock() + BUDGET_SECONDS
-    landed = images = absent = failed = deferred = asked = 0
+    landed, images = checkpoint.landed, checkpoint.images
+    absent = failed = deferred = asked = 0
     #: 快照第一次看过、里面没有样张的部数：下一轮改为联网问，也算这一轮往前推了。
     probed = 0
     #: 没问站就跳过的部数，按原因分：快照里没样张又没有可问的官方站、那一站近期说过没有、那一站冷却中。
@@ -91,8 +113,10 @@ def run(contract, key: str, handle, *, transport=None, clock=time.monotonic) -> 
     paused: set[str] = set()
     try:
         for index, code in enumerate(codes):
+            if code in checkpoint.completed:
+                continue
             if handle is not None:
-                handle.progress(current=index, total=len(codes), label=f"{TASK_LABEL}：{code}")
+                handle.progress(current=max(index, len(checkpoint.completed)), total=len(codes), label=f"{TASK_LABEL}：{code}")
             site, urls = "", []
             snapshot = sample_images.snapshot_samples(snapshots.get(code, ()))
             if snapshot:
@@ -144,6 +168,7 @@ def run(contract, key: str, handle, *, transport=None, clock=time.monotonic) -> 
             if count:
                 landed += 1
                 images += count
+            checkpoint.mark(code, landed, images)
     finally:
         misses.save()
         if owned:

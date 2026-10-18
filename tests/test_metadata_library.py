@@ -2985,6 +2985,7 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
             result = self.run_processing(stage='previews', asset_ids=[1, 5], resume_state=saved)
         self.assertEqual(seen, [5])
         self.assertEqual(result['status'], 'complete')
+        self.assertEqual(result['previews'], 2)
 
     def test_real_local_video_produces_a_snapshot_and_card_poster(self):
         import subprocess

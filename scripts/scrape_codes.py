@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+from contextlib import ExitStack
 import json
 import os
 import random
@@ -50,7 +51,8 @@ from peach.metadata import (
 from peach.metadata_policy import (PEACH_FIELDS, POLICY_VERSION, SOURCE_SPECS, field_rank,
                                    preferred_tag_source, sort_candidates)
 from peach.platform import system_volume
-from peach.review_csv import ENCODING, write_rows
+from peach.review_csv import ENCODING, read_rows, write_rows
+from peach.fsutil import atomic_write_text
 from peach.sources import Session
 from peach.sources.seesaa import SEESAA, WIKI_SOURCES as WIKI_SITES, WikiPages
 
@@ -510,6 +512,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="系统盘最低可用 GiB；运行中每隔一段时间复查")
     parser.add_argument("--disk-check-secs", type=float, default=20.0)
     parser.add_argument("--refresh", action="store_true", help="ignore reusable raw snapshots")
+    parser.add_argument('--resume', action=argparse.BooleanOptionalAction, default=True,
+                        help='复用同一批次已保存的成功结果；--no-resume 开始新批次')
     parser.add_argument("--wiki-pages-file", type=Path, help="预取 Wiki 作品目录页，每行一个 URL")
     parser.add_argument("--wiki-max-requests", type=int, default=80,
                         help="每个 Wiki 本批 HTTP 请求上限；每个请求最多 4 MiB，同主机几个 Wiki 合计间隔至少 2 秒")
@@ -889,15 +893,17 @@ def main(argv: list[str] | None = None, *, provider=None) -> int:
     """
     parser = build_parser()
     args = parser.parse_args(argv)
-    with cli_run("scrape-codes", args.db, label="番号资料刮削") as handle:
-        code = _scrape(parser, args, handle, provider=provider)
+    with cli_run("scrape-codes", args.db, label="番号资料刮削") as handle, ExitStack() as resources:
+        resources.callback(close_log)
+        code = _scrape(parser, args, handle, provider=provider, resources=resources)
         if code:
             handle.finish("cancelled", summary={"exit_code": code},
                           error=f"提前收工，退出码 {code}")
         return code
 
 
-def _scrape(parser, args, handle, *, provider=None) -> int:
+def _scrape_batch(parser, args):
+    """按参数签名定位同一批次及其输出。"""
     sources = None
     if args.sources is not None:
         try:
@@ -905,7 +911,41 @@ def _scrape(parser, args, handle, *, provider=None) -> int:
         except ValueError as error:
             parser.error(str(error))
     profile = CUSTOM_PROFILE if sources is not None else args.profile
-    output = args.out or _default_output()
+    scope = dict(db=str(args.db.resolve()), profile=profile, sources=sources,
+                 english_title_only=args.english_title_only, refresh=args.refresh, limit=args.limit,
+                 codes=_requested_codes(args.codes_file) if args.codes_file else None,
+                 wiki_pages=args.wiki_pages_file.read_text(encoding=ENCODING) if args.wiki_pages_file else None)
+    signature = hashlib.sha256(json.dumps(scope, sort_keys=True).encode()).hexdigest()
+    active_path = args.log_dir / 'scrape-codes-active.json'
+    active = json.loads(active_path.read_text(encoding='utf-8')) if args.resume and active_path.is_file() else {}
+    output = args.out or (Path(active['output']) if active.get('signature') == signature
+                         and active.get('status') == 'active' else _default_output())
+    checkpoint_path = output.with_suffix('.resume.json')
+    saved = json.loads(checkpoint_path.read_text(encoding='utf-8')) if args.resume and checkpoint_path.is_file() else {}
+    completed = set(saved.get('completed') or [])
+    if completed and not output.is_file():
+        parser.error('续跑候选文件未取得，请恢复原文件或使用 --no-resume')
+    return sources, profile, signature, active_path, output, checkpoint_path, saved, completed
+
+
+def _prepare_scrape_output(parser, args, connection, saved, signature, output, errors_path, completed):
+    """固定原批次番号，并保留成功番号的候选行。"""
+    codes = _load_codes(connection, args, parser)
+    if saved and saved.get('signature') != signature:
+        parser.error('续跑参数与原批次不一致，请使用原参数或 --no-resume')
+    if saved.get('codes'):
+        by_code = {normalise_code_key(row[0]): row for row in codes}
+        codes = [by_code[code] for code in saved['codes'] if code in by_code]
+    previous_rows = read_rows(output) if saved and output.is_file() else []
+    previous_rows = [row for row in previous_rows if row['query'] in completed]
+    write_rows(output, FIELDS, previous_rows, atomic=True)
+    previous_errors = read_rows(errors_path) if saved and errors_path.is_file() else []
+    write_rows(errors_path, ERROR_FIELDS, previous_errors, atomic=True)
+    return codes, len(previous_rows), len(previous_errors)
+
+
+def _scrape(parser, args, handle, *, provider=None, resources) -> int:
+    sources, profile, signature, active_path, output, checkpoint_path, saved, completed = _scrape_batch(parser, args)
     error_name = output.name.replace("metadata-field-candidates-", "metadata-source-errors-", 1)
     if error_name == output.name:
         error_name = output.stem + "-errors.csv"
@@ -926,27 +966,40 @@ def _scrape(parser, args, handle, *, provider=None) -> int:
     # 健康表覆盖这一趟可能问到的全部来源：点名的就是那几家，走链的是所有链的并集。
     covered = sources or ((WIKI_SOURCE,) if profile == WIKI_PROFILE else CHAIN_SOURCES)
     health = _health_rows(covered, profile)
+    health.update(saved.get('health') or {})
     unmapped_genres: dict[tuple[str, str], list] = {}
+    unmapped_genres.update({tuple(key): value for key, value in saved.get('unmapped', [])})
     adapter = _build_adapter(args, covered, provider)
+    resources.callback(adapter.close)
 
     connection = open_readonly(args.db)
+    resources.callback(connection.close)
     # 用户在复核页收录过的 genre 这一批就当已知词，不再作为未收录回来问一遍。
     genre_decisions = load_genre_decisions(connection)
-    codes = _load_codes(connection, args, parser)
+    codes, groups_written, errors_written = _prepare_scrape_output(
+        parser, args, connection, saved, signature, output, errors_path, completed)
+    def save_progress(status='active'):
+        record = dict(signature=signature, output=str(output.resolve()), status=status,
+                      completed=sorted(completed), codes=[normalise_code_key(row[0]) for row in codes],
+                      health=health, unmapped=list(unmapped_genres.items()))
+        atomic_write_text(checkpoint_path, json.dumps(record, ensure_ascii=False))
+        atomic_write_text(active_path, json.dumps(record, ensure_ascii=False))
+    save_progress()
     log(f"字段候选批次：profile {profile}，番号 {len(codes)}，来源 {','.join(covered)}；只读查询，不写 ledger")
 
     throttle = _Throttle(health)
-    groups_written = errors_written = 0
     stopped: JobPolicyError | None = None
     # 流式写：两个文件同时开着，行在长循环里边跑边落盘，中途还有 guard.check()
     # 打断点。write_rows 收的是完整行集合，改用它等于「跑完才落盘」，被打断就全丢。
-    with output.open("w", encoding=ENCODING, newline="") as candidate_handle, \
-            errors_path.open("w", encoding=ENCODING, newline="") as error_handle:
+    with output.open("a", encoding='utf-8', newline="") as candidate_handle, \
+            errors_path.open("a", encoding='utf-8', newline="") as error_handle:
         candidate_writer = csv.DictWriter(candidate_handle, fieldnames=FIELDS)
         error_writer = csv.DictWriter(error_handle, fieldnames=ERROR_FIELDS)
-        candidate_writer.writeheader(); error_writer.writeheader()
         for index, row in enumerate(codes, 1):
             code, size_gb, videos = row[0], row[1], row[2]
+            if normalise_code_key(code) in completed:
+                handle.progress(index, len(codes), normalise_code_key(code))
+                continue
             try:
                 guard.check()
             except JobPolicyError as error:
@@ -979,13 +1032,16 @@ def _scrape(parser, args, handle, *, provider=None) -> int:
                 })
                 groups_written += 1
             candidate_handle.flush()
+            error_handle.flush()
+            if by_field and not errors:
+                completed.add(query)
+            save_progress()
             _write_health(health_path, health)
             _write_unmapped(unmapped_path, unmapped_genres)
             if index % 25 == 0:
                 log(f"{index}/{len(codes)}：已落 {groups_written} 个字段组，错误 {errors_written}")
             handle.progress(index, len(codes), f"{query}")
-    connection.close()
-    adapter.close()
+    save_progress('complete' if len(completed) == len(codes) else 'active')
     _write_health(health_path, health)
     _write_unmapped(unmapped_path, unmapped_genres)
     log(f"完成：{groups_written} 个字段候选组 → {output}")

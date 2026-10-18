@@ -35,6 +35,47 @@ MOMENT = datetime(2026, 8, 25, 9, 0, tzinfo=timezone.utc)
 
 
 class FollowContractTests(unittest.TestCase):
+    def test_service_recovery_skips_completed_sources_with_the_same_progress(self):
+        from peach import job_recovery
+        first = self._seed(ref='first')
+        second = self._seed(ref='second')
+        job = self.contract.follow_job
+        run = self.contract.task_runs.start('follow-check', trigger='manual', total=2)
+        self.contract.task_runs.suspend(run.id)
+        job_recovery.save(self.db, 'follow-check', 'original', {'background': True}, run_id=run.id, waiting=True)
+        job_recovery.checkpoint(self.db, 'follow-check', 'original', dict(
+            source_ids=[first, second], checked=1, total=2, results=[{'source': first, 'ok': True, 'added': 4}]))
+        seen = []
+        def check(row, **kwargs):
+            seen.append((row['id'], job.snapshot()['checked'], job.snapshot()['run_id']))
+            return {'source': row['id'], 'ok': True, 'page': 0}
+        with mock.patch.object(web_follow, 'run_check', side_effect=check), \
+                mock.patch.object(web_follow, '_check_payload', side_effect=lambda result: result):
+            self.assertEqual(job_recovery.resume(self.db, {'follow-check':
+                lambda body: web_follow.w_follow_check(self.contract, body)}), ['follow-check'])
+            job.thread.join(5)
+        self.assertEqual(seen, [(second, 1, run.id)])
+        self.assertEqual(job.snapshot()['job_id'], 'original')
+        self.assertEqual(job.snapshot()['checked'], 2)
+        self.assertEqual(job.snapshot()['results'][0]['added'], 4)
+
+    def test_rewind_recovery_uses_the_saved_page_cursor(self):
+        from peach import job_recovery
+        source = self._seed()
+        job_recovery.save(self.db, 'follow-check', 'original',
+            {'background': True, 'older': True, 'rewind': True, 'backfill_all': True}, waiting=True)
+        job_recovery.checkpoint(self.db, 'follow-check', 'original',
+                                {'source_ids': [source], 'backfill_pages': {str(source): 7}})
+        seen = []
+        def check(row, **kwargs):
+            seen.append(row['backfill_page'])
+            return {'source': row['id'], 'ok': True, 'page': 8, 'exhausted': True}
+        with mock.patch.object(web_follow, 'run_check', side_effect=check), \
+                mock.patch.object(web_follow, '_check_payload', side_effect=lambda result: result):
+            job_recovery.resume(self.db, {'follow-check': lambda body: web_follow.w_follow_check(self.contract, body)})
+            self.contract.follow_job.thread.join(5)
+        self.assertEqual(seen, [7])
+
     def test_background_check_exposes_progress_and_deduplicates(self):
         self._seed()
         entered, release = threading.Event(), threading.Event()
@@ -63,6 +104,32 @@ class FollowContractTests(unittest.TestCase):
         self.assertEqual(final['checked'], 1)
         self.assertFalse(final['results'][0]['ok'])
         self.assertEqual(factory.call_count, 1)
+
+    def test_finished_page_checkpoint_resumes_without_another_page_request(self):
+        source = self._seed()
+        for backfill_all in (False, True):
+            with self.subTest(backfill_all=backfill_all):
+                saved = {}
+                def checkpoint(_job_id, *, saved=saved, **fields):
+                    saved.update(fields)
+                    if fields.get('results'):
+                        raise InterruptedError('停止于检查点')
+                    return True
+                job = SimpleNamespace(snapshot=lambda saved=saved: saved, checkpoint=checkpoint,
+                                      update=lambda *a, **k: True)
+                body = {'older': True, 'rewind': True, 'backfill_all': backfill_all}
+                result = {'source': source, 'ok': True, 'page': 3, 'exhausted': backfill_all}
+                with mock.patch.object(self.contract, 'follow_job', job), \
+                        mock.patch.object(web_follow, 'run_check', return_value=result) as check, \
+                        mock.patch.object(web_follow, '_check_payload', side_effect=lambda value: value):
+                    with self.assertRaises(InterruptedError):
+                        web_follow._run_follow_check(self.contract, body, 'original')
+                    self.assertEqual(saved['backfill_pages'], {str(source): 3})
+                    self.assertEqual(saved['results'][0]['source'], source)
+                    job.checkpoint = lambda *a, **k: True
+                    resumed = web_follow._run_follow_check(self.contract, body, 'original')
+                self.assertEqual(check.call_count, 1)
+                self.assertEqual(resumed['checked'], 1)
 
     def test_discovery_result_can_be_read_after_request_returns(self):
         started = self._post('/api/follow/resolve', {'background': True,

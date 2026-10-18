@@ -137,6 +137,10 @@ def _run_link_check(contract: LinkContract, check_id: str,
     给了 `link_ids` 就只验点名的那几条，别的链接的判定由调用方原样带进初始状态。
     """
     job = contract.link_check
+    previous = job.snapshot() or {}
+    completed = set(previous.get('completed_links') or [])
+    if 'link_ids' in previous:
+        link_ids = previous['link_ids']
     # 已标记失效的不再验：结论已经落账，每次都去敲一个停放域名只会招来杀毒软件告警。
     query = ("SELECT l.id, l.link_kind, l.label, l.url, e.canonical_name AS entity "
              "FROM entity_link l JOIN entity e ON e.id=l.entity_id "
@@ -153,13 +157,23 @@ def _run_link_check(contract: LinkContract, check_id: str,
         if state is None:
             return
         state["total"] = len(rows)
+    if not job.checkpoint(check_id, link_ids=[row['id'] for row in rows]):
+        raise InterruptedError('链接检查已停止')
     for row in rows:
+        if row['id'] in completed:
+            continue
+        if job.snapshot() is None:
+            raise InterruptedError('链接检查已停止')
         status, note = _probe(row["url"])
         verdict = link_verdict(status, note)
         with job.editing(check_id) as state:
             if state is None:
                 return   # 被新的检查顶掉了，安静收工
-            state["checked"] += 1
+            state['gone'] = [item for item in state['gone'] if item['id'] != row['id']]
+            state['unclear'] = [item for item in state['unclear'] if item['id'] != row['id']]
+            if verdict != 'unclear':
+                completed.add(row['id'])
+            state["checked"] = len(completed)
             if verdict != "ok":
                 state["gone" if verdict == "gone" else "unclear"].append({
                     "id": row["id"], "entity": row["entity"],
@@ -167,8 +181,12 @@ def _run_link_check(contract: LinkContract, check_id: str,
                     "url": row["url"],
                     "note": _note(status, note),
                 })
+        snapshot = job.snapshot() or {}
+        if not job.checkpoint(check_id, completed_links=sorted(completed), checked=len(completed),
+                              total=len(rows), gone=snapshot.get('gone', []), unclear=snapshot.get('unclear', [])):
+            raise InterruptedError('链接检查已停止')
         time.sleep(CHECK_INTERVAL)
-    job.update(check_id, status="complete", completed_at=time.time())
+    job.update(check_id, checked=len(rows), status="complete", completed_at=time.time())
 
 
 def _retry_state(state: dict, link_ids: list[int]) -> dict:
@@ -193,6 +211,13 @@ def w_links_check(contract: LinkContract, body=None):
     `BackgroundJob` 的后台线程 + 可轮询状态。
     """
     body = body or {}
+    from .job_recovery import current_job_id, read
+    if current_job_id.get() and not body.get('status_only'):
+        saved = read(contract.db_path, 'link-check').get('checkpoint') or {}
+        return _check_public(contract.link_check.start(
+            lambda check_id: _run_link_check(contract, check_id, saved.get('link_ids')),
+            initial={'checked': 0, 'total': 0, 'gone': [], 'unclear': [], 'scope': 'all'},
+            restart=True, recovery=body))
     if body.get("status_only") is True:
         state = contract.link_check.snapshot()
         if state is None:
@@ -217,12 +242,14 @@ def w_links_check(contract: LinkContract, body=None):
         return _check_public(contract.link_check.start(
             lambda check_id: _run_link_check(contract, check_id, link_ids),
             initial=_retry_state(state, link_ids), restart=True,
+            recovery={'retry': link_ids},
         ))
 
     return _check_public(contract.link_check.start(
         lambda check_id: _run_link_check(contract, check_id),
         initial={"checked": 0, "total": 0, "gone": [], "unclear": [], "scope": "all"},
         restart=body.get("restart") is True,
+        recovery={},
     ))
 
 
@@ -239,7 +266,35 @@ def _prune_selection(planned: list[dict], body: dict) -> list[dict]:
     return [item for item in planned if item["id"] in requested]
 
 
-def w_links_prune(contract: LinkContract, body, *, progress=None):
+def _recheck_prune_links(planned, progress, checkpoint, resume_state):
+    """保存逐条重验结果，临时无法判定的链接留待重试。"""
+    saved = (resume_state or {}).get('prune_checks') or {}
+    confirmed = list(saved.get('confirmed') or [])
+    recovered = list(saved.get('recovered') or [])
+    completed = set(saved.get('completed') or [])
+    for index, item in enumerate(planned):
+        if item['id'] in completed:
+            continue
+        if progress:
+            progress(checked=index, total=len(planned),
+                     message=f"重验失效链接：已检查 {index} / {len(planned)} 条")
+        status, note = _probe(item['url'])
+        verdict = link_verdict(status, note)
+        confirmed[:] = [row for row in confirmed if row['id'] != item['id']]
+        recovered[:] = [row for row in recovered if row['id'] != item['id']]
+        if verdict == 'gone':
+            confirmed.append({**item, 'note': _note(status, note)})
+        else:
+            recovered.append(item)
+        if verdict != 'unclear':
+            completed.add(item['id'])
+        if checkpoint and not checkpoint(prune_checks=dict(confirmed=confirmed, recovered=recovered,
+                completed=sorted(completed)), checked=index + 1, total=len(planned)):
+            raise InterruptedError('链接清理已停止')
+    return confirmed, recovered
+
+
+def w_links_prune(contract: LinkContract, body, *, progress=None, checkpoint=None, resume_state=None):
     """删掉上一次检查判定为 gone 的链接。
 
     只接受**刚跑完的那一次**检查的 `check_id`：拿一份放了半天的清单去删，删的可能是
@@ -252,9 +307,12 @@ def w_links_prune(contract: LinkContract, body, *, progress=None):
         job = contract.link_prune_job
         def work(job_id):
             result = w_links_prune(contract, {**body, "background": False},
-                progress=lambda **fields: job.update(job_id, **fields))
+                progress=lambda **fields: job.update(job_id, **fields),
+                checkpoint=lambda **fields: job.checkpoint(job_id, **fields), resume_state=job.snapshot())
             job.update(job_id, **result, status="complete" if result.get("ok") else "failed", completed_at=time.time())
-        return job.start(work, restart=True, initial={"message": "正在核对失效链接清单"})
+        return job.start(work, restart=True, initial={"message": "正在核对失效链接清单"}, recovery=body)
+    if (resume_state or {}).get('prune_receipt'):
+        return resume_state['prune_receipt']
     state = contract.link_check.snapshot()
     if state is None or state["status"] != "complete":
         return {"ok": False, "error": "没有已完成的检查结果"}
@@ -265,15 +323,7 @@ def w_links_prune(contract: LinkContract, body, *, progress=None):
     except ValueError as error:
         return {"ok": False, "error": str(error)}
 
-    confirmed, recovered = [], []
-    for index, item in enumerate(planned):
-        if progress:
-            progress(checked=index, total=len(planned), message=f"重验失效链接：已检查 {index} / {len(planned)} 条")
-        status, note = _probe(item["url"])
-        if link_verdict(status, note) == "gone":
-            confirmed.append({**item, "note": _note(status, note)})
-        else:
-            recovered.append(item)
+    confirmed, recovered = _recheck_prune_links(planned, progress, checkpoint, resume_state)
 
     removed = marked = 0
     if progress:
@@ -287,5 +337,8 @@ def w_links_prune(contract: LinkContract, body, *, progress=None):
         if state is not None:
             processed = {item["id"] for item in planned}
             state["gone"] = [item for item in state["gone"] if item["id"] not in processed]
-    return {"ok": True, "removed": removed, "marked": marked, "recovered": len(recovered),
-            "entities": len({item["entity"] for item in confirmed})}
+    receipt = {"ok": True, "removed": removed, "marked": marked, "recovered": len(recovered),
+               "entities": len({item["entity"] for item in confirmed})}
+    if checkpoint:
+        checkpoint(prune_receipt=receipt)
+    return receipt

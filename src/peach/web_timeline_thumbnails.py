@@ -111,7 +111,8 @@ def w_thumbnail_jobs(contract, body):
             active=lambda: ((contract.thumbnail_job.snapshot() or {}).get('job_id') == job_id
                             and not metadata_only(contract.follow_state_root)),
             report=lambda **fields: contract.thumbnail_job.update(job_id, **_with_progress(fields)),
-            guard=guard)
+            guard=guard, resume_state=contract.thumbnail_job.snapshot(),
+            checkpoint=lambda **fields: contract.thumbnail_job.checkpoint(job_id, **fields))
         # 磁盘触线停下来的那一轮不能记成完成：队列后面还剩几千部，而页面上「完成」
         # 和「跑完了」是同一个意思。按停是用户自己做的，不算故障。
         stopped = str(result.get('stopped') or '')

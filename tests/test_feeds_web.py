@@ -129,6 +129,29 @@ class FeedWebFixture(unittest.TestCase):
 
 
 class FeedWebTest(FeedWebFixture):
+    def test_recovery_keeps_source_selection_progress_and_discovered_codes(self):
+        from peach import job_recovery
+        first = self._add()
+        self.url = 'https://javdb.com/actors/Smp2'
+        second = self._add()
+        run = self.contract.task_runs.start('feed-check', trigger='manual', total=2)
+        self.contract.task_runs.suspend(run.id)
+        job_recovery.save(self.db_path, 'feed-check', 'original', {'background': True}, run_id=run.id, waiting=True)
+        job_recovery.checkpoint(self.db_path, 'feed-check', 'original', dict(source_ids=[first, second],
+            checked=1, total=2, added=1, results=[{'source': first, 'ok': True, 'codes': ['AAA-001']}]))
+        seen = []
+        def poll(contract, transport, source):
+            seen.append((source['id'], contract.feed_job.snapshot()['checked']))
+            return {'source': source['id'], 'ok': True, 'codes': ['BBB-002']}
+        with patch.object(web_feeds, 'poll_source', side_effect=poll), \
+                patch.object(web_feeds, '_transport', return_value=self.transport):
+            job_recovery.resume(self.db_path, {'feed-check': lambda body: web_feeds.w_feed_check(self.contract, body)})
+            self.contract.feed_job.thread.join(5)
+        final = self.contract.feed_job.snapshot()
+        self.assertEqual(seen, [(second, 1)])
+        self.assertEqual((final['job_id'], final['run_id'], final['checked'], final['added']), ('original', run.id, 2, 2))
+        self.assertEqual({row['source'] for row in final['results']}, {first, second})
+
     def test_javdb_provenance_is_unavailable_to_cover_readers(self):
         from PIL import Image
         target = self.contract.cover_root / 'SSIS-950.jpg'

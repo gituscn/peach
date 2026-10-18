@@ -46,7 +46,7 @@ def q_organize(contract, _args=None) -> dict:
     latest = organize.latest_batch(contract.candidate_root)
     declared = location_roots()
     return {
-        **state,
+        **{key: value for key, value in state.items() if key not in ('plan', 'batch_stamp')},
         "status": state.get("status", "idle"),
         "locations": [{"location": location, "roots": list(declared.get(location, ()))}
                       for location in ORGANIZE_LOCATIONS if declared.get(location)],
@@ -108,37 +108,56 @@ def w_organize_apply(contract, body) -> dict:
     job = contract.organize_job
 
     def work(job_id: str) -> None:
-        with contract.read_connection() as connection:
-            plan = organize.build_plan(connection, location=location,
-                                       file_template=file_template,
-                                       dir_template=dir_template)
+        batch_stamp = (job.snapshot() or {}).get('batch_stamp') or f"{time.strftime('%Y%m%d-%H%M%S')}-{job_id}"
+        plan = (job.snapshot() or {}).get('plan')
+        if plan is None:
+            with contract.read_connection() as connection:
+                plan = organize.build_plan(connection, location=location,
+                                           file_template=file_template,
+                                           dir_template=dir_template)
+            if not job.checkpoint(job_id, plan=plan, batch_stamp=batch_stamp):
+                raise InterruptedError('整理已停止')
         job.update(job_id, total=plan["counts"]["change"], stage="正在整理")
         result = _run_write(contract, job_id, lambda connection: organize.apply_plan(
             connection, plan["rows"], generated_root=contract.candidate_root,
-            progress=lambda **fields: job.update(job_id, **fields)))
+            stamp=batch_stamp,
+            progress=lambda **fields: job.checkpoint(job_id, **fields)))
         job.update(job_id, **result, counts=plan["counts"], status="complete",
                    completed_at=time.time())
 
-    return job.start(work, restart=True,
-                     initial={"stage": "正在核对计划", "location": location})
+    started = job.start(work, restart=True,
+                     initial={"stage": "正在核对计划", "location": location},
+                     recovery={'confirm': True, 'location': location, 'file_template': file_template,
+                               'dir_template': dir_template, 'action': 'apply'})
+    return {key: value for key, value in started.items() if key not in ('plan', 'batch_stamp')}
 
 
 def w_organize_rollback(contract, body) -> dict:
     """把上一批整理原样退回去。"""
     if body.get("confirm") is not True:
         raise ValueError("回滚需要确认")
-    latest = organize.latest_batch(contract.candidate_root)
+    from .job_recovery import current_job_id, read
+    saved = read(contract.db_path, 'organize') if current_job_id.get() else {}
+    batch = (saved.get('checkpoint') or {}).get('rollback_batch')
+    latest = (organize.batch_log_dir(contract.candidate_root) / batch if batch
+              else organize.latest_batch(contract.candidate_root))
     if latest is None:
         raise ValueError("没有可以回滚的批次")
     job = contract.organize_job
 
     def work(job_id: str) -> None:
+        if not job.checkpoint(job_id, rollback_batch=latest.name):
+            raise InterruptedError('整理回滚已停止')
+        if not latest.exists():
+            job.update(job_id, status='complete', restored=0, failed=0)
+            return
         result = _run_write(contract, job_id, lambda connection: organize.rollback_batch(
-            connection, latest, progress=lambda **fields: job.update(job_id, **fields)))
+            connection, latest, progress=lambda **fields: job.checkpoint(job_id, **fields)))
         job.update(job_id, **result, status="complete", completed_at=time.time())
 
     return job.start(work, restart=True,
-                     initial={"stage": "正在回滚上一批", "batch": latest.name})
+                     initial={"stage": "正在回滚上一批", "batch": latest.name},
+                     recovery={'confirm': True, 'action': 'rollback'})
 
 
 __all__ = ["ORGANIZE_LOCATIONS", "TemplateError", "q_organize", "w_organize_apply",

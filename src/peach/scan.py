@@ -31,16 +31,20 @@
 from __future__ import annotations
 
 import os
+import hashlib
+import json
 import re
 import sqlite3
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path, PureWindowsPath
+from filelock import FileLock
 
 from . import folder_rules, record_rehome, subtitles, wants
 from .platform import is_windows_path, resolve_location, resolve_root
 from .processing_control import checkpoint
+from .fsutil import atomic_write_text
 
 VIDEO = {".mp4", ".m4v", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".rmvb", ".mpg",
          ".m2ts", ".strm", ".iso"}
@@ -336,14 +340,14 @@ class ScanResult:
                 f"字幕 {self.subtitles:,} 条（孤立 {self.orphan_subtitles:,} 条）")
 
 
-def _walk(top: Path):
+def _walk(top: Path, pending: list[str] | None = None):
     """自顶向下遍历，每个目录给出它里面的非目录条目（`os.DirEntry`）。
 
     与 `os.walk` 的差别只在一处：条目的大小与时间从 `DirEntry.stat()` 拿。Windows 的目录
     列表自带这两项，不必再对每个文件发一次 `os.stat`——网盘挂载上那一次就是一趟往返，
     几万个文件就是几万趟。读不了的目录跳过；符号链接指向的目录列出但不进入。
     """
-    stack = [os.fspath(top)]
+    stack = pending if pending is not None else [os.fspath(top)]
     while stack:
         checkpoint('scan')
         directory = stack.pop()
@@ -368,7 +372,8 @@ def _walk(top: Path):
             else:
                 files.append(entry)
         # 倒着压栈，弹出来就是字典序，进度行读起来和目录里看到的一致。
-        stack.extend(sorted(subdirectories, reverse=True))
+        queued = set(stack)
+        stack.extend(path for path in sorted(subdirectories, reverse=True) if path not in queued)
         yield directory, sorted(files, key=lambda entry: entry.name)
 
 
@@ -385,11 +390,39 @@ class _ScanProgress:
             self.reported_at = now
 
 
-def scan_location(
+def scan_location(db_path, location, root, **kwargs) -> ScanResult:
+    """命令行按来源与根目录保存断点，组合任务可提供自己的持久检查点。"""
+    if 'save_checkpoint' in kwargs or 'resume_state' in kwargs:
+        return _scan_location(db_path, location, root, **kwargs)
+    from .update_tasks import state_for
+    key = hashlib.sha256(f'{location}:{root}'.encode()).hexdigest()
+    path = state_for(Path(db_path)).parent / 'scan-checkpoints' / f'{key}.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with FileLock(str(path) + '.lock', timeout=0):
+        previous = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {}
+        result = _scan_location(db_path, location, root, **kwargs, resume_state=previous,
+            save_checkpoint=lambda state: atomic_write_text(path, json.dumps(state, ensure_ascii=False)))
+        path.unlink(missing_ok=True)
+        return result
+
+
+def _pending_directories(previous, walk_root):
+    """恢复目录栈，并核对本机挂载仍属于当前扫描根。"""
+    pending = list(previous.get('pending', [os.fspath(walk_root)]))
+    if previous.get('current_directory'):
+        pending.append(previous['current_directory'])
+    if any(not Path(value).is_relative_to(walk_root) for value in pending):
+        raise ScanTargetError('扫描目录与保存的断点不一致，请核对挂载设置')
+    return pending
+
+
+def _scan_location(
     db_path: str | os.PathLike[str], location: str, root: str, *,
     declared_roots: Mapping[str, str], mounts: Mapping[str, str | Path] | None = None,
     report: Callable[[str], None] = print, windows: bool | None = None,
     progress: Callable[[int, int], None] = lambda files, total_bytes: None,
+    resume_state: dict | None = None,
+    save_checkpoint: Callable[[dict], None] = lambda state: None,
 ) -> ScanResult:
     """遍历 `root`（账本口径）对应的本机目录，把文件元数据 upsert 进 `asset`。
 
@@ -399,27 +432,41 @@ def scan_location(
     check_scan_target(location, root, declared_roots=declared_roots)
     walk_root = walk_root_for(
         location, root, declared_roots=declared_roots, mounts=mounts or {}, windows=windows)
+    previous = resume_state or {}
+    if previous.get('result'):
+        return ScanResult(**{**previous['result'], 'new_ids': tuple(previous['result']['new_ids'])})
     ledger_root = PureWindowsPath(root)
-    now = time.strftime("%Y-%m-%d %H:%M:%S")
+    now = previous.get('scan_time') or time.strftime("%Y-%m-%d %H:%M:%S")
     started = time.time()
     progress = _ScanProgress(progress)
-    files = 0
-    total = 0
-    skipped = 0
-    video_dirs: set[str] = set()
+    files = previous.get('files', 0)
+    total = previous.get('total_bytes', 0)
+    skipped = previous.get('sidecars', 0)
+    tracks = previous.get('subtitles', 0)
+    orphans = previous.get('orphan_subtitles', 0)
+    video_dirs = set(previous.get('video_dirs', []))
+    pending = _pending_directories(previous, walk_root)
     batch: list[tuple] = []
-    # 字幕要等正片的行落库之后才能按 `(location, path)` 查到 asset_id，所以先攒着，
-    # 遍历完再一次登记。sidecar 按定义与正片同目录，配对只看当前这一个目录。
-    sidecars: list[subtitles.Sidecar] = []
+    # 文件批次提交后保存文件名游标；同目录的配对资料随断点保留。
+    def save_directory(directory=None, cursor=None, here=None):
+        artwork_parents = {os.path.dirname(value) for value in [*pending, *([directory] if directory else [])]
+                           if os.path.basename(value).casefold() in ARTWORK_DIRS}
+        video_dirs.intersection_update(artwork_parents)
+        save_checkpoint(dict(scan_time=now, pending=list(pending), files=files,
+                             total_bytes=total, sidecars=skipped, subtitles=tracks,
+                             orphan_subtitles=orphans, video_dirs=sorted(video_dirs),
+                             current_directory=directory, cursor=cursor, here=dict(here or {})))
     # 写事务只在每批 upsert 到 commit 之间打开，遍历与 stat 都在两次 commit 之间，不持锁。
     # 忙等时长与 `LedgerDatabase.connect` 一致。
     connection = sqlite3.connect(db_path, timeout=30)
     try:
         connection.execute("PRAGMA journal_mode=WAL")
-        for directory, entries in _walk(walk_root):
+        for directory, entries in _walk(walk_root, pending):
             checkpoint('scan')
             relative = Path(directory).relative_to(walk_root).parts
-            here: dict[str, tuple[int, str]] = {}
+            continuing = directory == previous.get('current_directory')
+            here = dict(previous.get('here') or {}) if continuing else {}
+            cursor = previous.get('cursor') if continuing else None
             videos = video_stems(entry.name for entry in entries)
             if videos:
                 video_dirs.add(directory)
@@ -429,6 +476,8 @@ def scan_location(
             for entry in entries:
                 checkpoint('scan')
                 name = entry.name
+                if cursor is not None and name <= cursor:
+                    continue
                 if is_sidecar(name, videos, artwork_dir=artwork_dir):
                     skipped += 1
                     continue
@@ -448,15 +497,22 @@ def scan_location(
                     connection.executemany(_UPSERT, batch)
                     connection.commit()
                     batch.clear()
+                    save_directory(directory, name, here)
                     report(f"  {time.time() - started:5.0f}s  {files:,} 文件  "
                            f"{total / 1024 ** 4:.2f} TB")
-            sidecars.extend(subtitles.directory_sidecars(
+            sidecars = subtitles.directory_sidecars(
                 ledger_root.joinpath(*relative), here,
-                [name for name in here if medium_of(name) == "video"]))
+                [name for name in here if medium_of(name) == "video"])
+            if batch:
+                connection.executemany(_UPSERT, batch)
+                batch.clear()
+            directory_tracks, directory_orphans = subtitles.record(connection, location, sidecars, now)
+            connection.commit()
+            tracks += directory_tracks
+            orphans += directory_orphans
+            save_directory()
         if batch:
             connection.executemany(_UPSERT, batch)
-        connection.commit()
-        tracks, orphans = subtitles.record(connection, location, sidecars, now)
         connection.commit()
         # 只有 INSERT 那一支写 `first_seen`，等于本次时刻的就是这一轮新建的行。
         new_ids = tuple(row[0] for row in connection.execute(
@@ -472,6 +528,7 @@ def scan_location(
         connection.close()
     result = ScanResult(location, root, files, total, time.time() - started, gone,
                         tracks, orphans, skipped, new_ids, reattached, acquired)
+    save_checkpoint({'result': asdict(result)})
     progress(files, total, force=True)
     report(result.summary())
     return result

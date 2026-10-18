@@ -336,7 +336,11 @@ def task_gate(db: Path, *, host: str, alive: Callable[[int], bool]) -> TaskGate:
     for row in rows:
         run = ActiveRun(int(row[0]), str(row[1]), str(row[2]), str(row[3]),
                         None if row[4] is None else int(row[4]), row[5])
-        if run.followup_key or run.trigger in RESUMABLE_TRIGGERS:
+        from .job_recovery import read
+        recovery = read(db, run.task_key)
+        can_resume = (recovery.get('status') == 'active' and recovery.get('run_id') == run.id
+                      and isinstance(recovery.get('request'), dict))
+        if run.followup_key or run.trigger in RESUMABLE_TRIGGERS or can_resume:
             resumable.append(run)
         elif run.pid is not None and not alive(run.pid):
             stale.append(run)

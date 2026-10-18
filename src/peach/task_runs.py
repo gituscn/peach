@@ -546,7 +546,7 @@ class TaskRunStore:
                 return None
             run_id = int(row["id"])
             cursor = connection.execute(
-                "UPDATE task_run SET status='running',pid=?,host=?,started_at=?,"
+                "UPDATE task_run SET status='running',pid=?,host=?,started_at=COALESCE(started_at,?),"
                 "heartbeat_at=? WHERE id=? AND status='pending'",
                 (os.getpid(), self.host, moment, moment, run_id))
         return self.get(run_id) if cursor.rowcount else None
@@ -567,8 +567,8 @@ class TaskRunStore:
             if not rows:
                 return []
             connection.execute(
-                "UPDATE task_run SET status='pending',started_at=NULL,heartbeat_at=?,"
-                "progress_current=0 WHERE followup_key IS NOT NULL AND status='running'",
+                "UPDATE task_run SET status='pending',heartbeat_at=? "
+                "WHERE followup_key IS NOT NULL AND status='running'",
                 (stamp(),))
         return [int(row["id"]) for row in rows]
 
@@ -635,6 +635,12 @@ class TaskRunStore:
             expired = beat is None or beat < deadline
             if alive or (not local and not expired):
                 continue
+            if local:
+                from .job_recovery import read
+                recovery = read(self.database.db_path, run.task_key)
+                if recovery.get('status') == 'active' and recovery.get('run_id') == run.id:
+                    self.suspend(run.id, label='等待服务启动后继续')
+                    continue
             if self.finish(run.id, "interrupted",
                            error="服务重启，这一轮没有跑完"):
                 recovered.append(run.id)
@@ -822,6 +828,25 @@ class TaskRunHandle:
     store: TaskRunStore
     run_id: int | None
     settled: bool = False
+
+    @property
+    def saved(self) -> dict:
+        """同一条持久任务已提交的领域检查点。"""
+        run = self.store.get(self.run_id) if self.run_id is not None else None
+        return dict(run.result_summary.get('checkpoint') or {}) if run else {}
+
+    def checkpoint(self, **fields) -> None:
+        """领域结果提交后保存完成集合；后继重新领取时沿用。"""
+        if self.run_id is None or not self.store.enabled:
+            return
+        with self.store.database.write_transaction(notify=False) as connection:
+            row = connection.execute('SELECT result_summary FROM task_run WHERE id=?', (self.run_id,)).fetchone()
+            if row is None:
+                return
+            summary = json.loads(row[0] or '{}')
+            summary['checkpoint'] = {**summary.get('checkpoint', {}), **fields}
+            connection.execute("UPDATE task_run SET result_summary=? WHERE id=? AND status='running'",
+                               (json.dumps(summary, ensure_ascii=False), self.run_id))
 
     def progress(self, current: int | None = None, total: int | None = None,
                  label: str | None = None, *,

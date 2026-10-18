@@ -265,4 +265,4 @@ def w_scraping_amane_check(contract, body):
 def w_scraping_amane_rebuild(contract, body):
     """按锁重建桥的 venv。首次要下载约 98 MB，放后台跑，页面轮询 `q_scraping_amane_bridge` 那条读接口。"""
     from . import metadata_amane
-    return contract.amane_bridge_job.start_result(lambda: metadata_amane.rebuild(contract.tools_root))
+    return contract.amane_bridge_job.start_result(lambda: metadata_amane.rebuild(contract.tools_root), recovery={})
