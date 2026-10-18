@@ -124,7 +124,7 @@ export class SubtitleControls {
   }
 
   private status(message: string, error = false, busy = false) {
-    const target = this.player.el().querySelector<HTMLElement>('[data-subtitle-status]');
+    const target = this.player.el().querySelector<HTMLElement>('.vjs-peach-panel:not(.vjs-peach-panel-leaving) [data-subtitle-status]');
     if (target) { target.hidden = false; target.innerHTML = `${busy ? spinnerHtml('') : ''}<span>${esc(message)}</span>`; target.toggleAttribute('data-error', error) }
   }
   private busy() { this.request?.abort(); this.request = new AbortController(); return this.request.signal }

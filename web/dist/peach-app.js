@@ -31086,7 +31086,7 @@ var dde = () => "<svg viewBox=\"0 0 36 36\" aria-hidden=\"true\"><path d=\"M11,1
 		});
 	}
 	status(e, t = !1, n = !1) {
-		let r = this.player.el().querySelector("[data-subtitle-status]");
+		let r = this.player.el().querySelector(".vjs-peach-panel:not(.vjs-peach-panel-leaving) [data-subtitle-status]");
 		r && (r.hidden = !1, r.innerHTML = `${n ? ko("") : ""}<span>${B(e)}</span>`, r.toggleAttribute("data-error", t));
 	}
 	busy() {

@@ -26,6 +26,47 @@ describe('播放器字幕', () => {
   before(async () => { browser = await launch() });
   after(async () => { await browser?.close() });
   for (const viewport of VIEWPORTS) {
+    it(`${viewport.name}：面板切换中显示搜索动画，空结果提示保持可见`, { timeout: 60_000 }, async () => {
+      let release!: () => void;
+      const response = new Promise<void>(resolve => { release = resolve });
+      let searches = 0;
+      const opened = await visit(browser, `/assets/${requiredEnv('PEACH_E2E_ITEM')}`, viewport, async page => {
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.route('**/api/subtitles/search?**', async route => {
+          searches++;
+          await response;
+          await route.fulfill({ json: { results: [], more: false } });
+        });
+      });
+      const { page, problems } = opened;
+      try {
+        await page.locator('#stage .vjs-peach-bezel').waitFor({ state: 'attached' });
+        await menu(page);
+        await page.locator('[data-subtitle-search]').click();
+        const panel = page.locator('.vjs-peach-panel:not(.vjs-peach-panel-leaving)');
+        const status = panel.locator('[data-subtitle-status]');
+        await status.waitFor({ state: 'visible', timeout: 5_000 });
+        assert.match(await status.textContent() || '', /正在搜索字幕/);
+        assert.equal(await panel.getAttribute('aria-busy'), 'true');
+        const spinner = status.locator('.ui-geist-spinner');
+        assert.equal(await spinner.count(), 1);
+        assert.equal(await spinner.locator('i').first().evaluate(node =>
+          node.getAnimations().some(animation => animation.playState === 'running')), true);
+        await page.waitForFunction(() => !document.querySelector('.vjs-peach-popup-animating'));
+        await page.screenshot({ path: join(process.cwd(), `../build/subtitles-search-loading-${viewport.name}.png`) });
+        release();
+        await status.filter({ hasText: '没有找到当前作品的中文字幕' }).waitFor();
+        assert.equal(await spinner.count(), 0);
+        assert.equal(await panel.getAttribute('aria-busy'), null);
+        await page.screenshot({ path: join(process.cwd(), `../build/subtitles-search-empty-${viewport.name}.png`) });
+        await page.locator('[data-subtitle-back]').click();
+        await page.locator('[data-subtitle-search]').click();
+        await status.filter({ hasText: '没有找到当前作品的中文字幕' }).waitFor();
+        assert.equal(searches, 1);
+        assert.deepEqual(problems, []);
+      } finally { release(); await opened.close() }
+    });
+
     it(`${viewport.name}：本地字幕、选项持久化、关闭和重新开启`, { timeout: 60_000 }, async () => {
       const opened = await visit(browser, `/assets/${requiredEnv('PEACH_E2E_ITEM')}`, viewport);
       const { page, problems } = opened;
