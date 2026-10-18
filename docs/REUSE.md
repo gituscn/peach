@@ -158,7 +158,7 @@ Peach 播放器皮肤直接装饰 Video.js 10 的 light DOM：右侧控制组用
 
 Windows 连接清理复用 [CPython 3.14.7 的 Proactor 对象协议](https://github.com/python/cpython/blob/v3.14.7/Lib/asyncio/proactor_events.py)（PSF 许可，无新增依赖）。精确识别纯标准库清理回调中的 `WinError 10054`，只补完 socket 关闭、服务端解除登记和关闭状态，不重复通知协议，不全局修改标准库类或替换事件循环。它使用 `_sock`、`_server._detach` 与 `_called_connection_lost` 私有接口，升级 Python 时须核验。真实 socket 和 `asyncio.Server` 配合合成故障验证资源释放；收尾自身失败保留原始异常链并上报。33 次回环实验未复现原始竞争时序，不据此认定客户端来源。协议类别只写本机日志；来源、任务、媒体和浏览器的远程筛选复用现有领域状态，见 [诊断核验](DIAGNOSTICS.md#远程错误筛选核验)。
 
-馆藏与口味群体研究复用 `LedgerDatabase.read_connection`、`taste_preferences.preference_profile`、`error_reporting.redact` 与同一固定版 Sentry 的内存附件 API；偏好权重与身份口径不另写一份。研究使用独立项目、独立同意文件和字段版本；默认关闭，预览只在用户点击时读取，后台读取要求有效同意与接收端。没有复制浏览器资料、原始历史或媒体，没有真实 ledger 写入。Windows 构建复制 SDK 的 MIT 许可证元数据；发行体积以实际构建产物为准。
+馆藏与口味群体研究复用 `LedgerDatabase.read_connection`、`taste_preferences.preference_profile(cache=False)`、`error_reporting.redact` 与固定版 Sentry 的内存附件 API。只读偏好计算沿用同一证据算法，禁用偏好和浏览偏好缓存写入；不复制原始浏览资料。完整 JSON 使用 Python 3.14 标准库 `gzip`（PSF，无新增依赖）无损压缩，固定文件名，gzip 头不含源文件名或生成时间。超过 10 MiB 的合成明细逐字节还原，并通过真实 SDK 的拦截传输验证附件与同意门槛。Sentry 附件接收复用官方 SDK（MIT）；没有引入匿名中继或独立聚合服务，因为本契约明确保留逐份明细并披露关联风险。字段、体积上限和验收见[馆藏与口味群体研究](DIAGNOSTICS.md#馆藏与口味群体研究)。
 
 `src/peach/diagnostics.py` 统一生成 CLI 与本机 API 报告；复用 `settings_file`、`health` 的只读迁移校验、`FFmpegResolver`、访问策略和挂载快照。数据库用 SQLite `mode=ro`；写入与端口检查用标准库短暂探针，不新增运行依赖。
 

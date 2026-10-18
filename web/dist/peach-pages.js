@@ -20919,10 +20919,10 @@ function Cg({ label: e, password: t, confirmation: n, onPassword: r, onConfirmat
 }
 //#endregion
 //#region src/react/settings/remote-reporting-settings.tsx
-function wg({ value: e, onChange: t }) {
+function wg({ value: e, onChange: t, busy: n = !1 }) {
 	return /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsx)(hm, { children: /* @__PURE__ */ (0, z.jsx)(fm, {
 		label: "发送版本统计与错误诊断（推荐）",
-		description: `${e.fields.usage} ${e.fields.errors}`,
+		description: "上传版本、系统信息、故障类型、代码位置与发生次数。",
 		children: /* @__PURE__ */ (0, z.jsx)(Om, {
 			"aria-label": "发送版本统计与错误诊断（推荐）",
 			isSelected: e.usage && e.errors,
@@ -20930,11 +20930,12 @@ function wg({ value: e, onChange: t }) {
 				...e,
 				usage: n,
 				errors: n
-			})
+			}),
+			...eg(n)
 		})
-	}) }), /* @__PURE__ */ (0, z.jsxs)(gm, {
+	}) }), e.available ? null : /* @__PURE__ */ (0, z.jsx)(gm, {
 		divided: !0,
-		children: [/* @__PURE__ */ (0, z.jsx)(_m, { children: e.notice }), e.available ? null : /* @__PURE__ */ (0, z.jsx)(_m, { children: "此版本尚未配置诊断接收端，当前不会发送；选项保存在本机。" })]
+		children: /* @__PURE__ */ (0, z.jsx)(_m, { children: "上传服务未配置。" })
 	})] });
 }
 //#endregion
@@ -21236,7 +21237,7 @@ function kg({ setup: e, onDone: t }) {
 					value: b,
 					onChange: x
 				}),
-				/* @__PURE__ */ (0, z.jsx)(_m, { children: "馆藏与口味分享默认关闭。完成设置后，可在「应用与维护」查看明细预览并明确同意。" })
+				/* @__PURE__ */ (0, z.jsx)(_m, { children: "馆藏与口味明细上传默认关闭，可在「应用与维护」查看并选择。" })
 			] }) : null,
 			/* @__PURE__ */ (0, z.jsx)(St, {
 				type: "submit",

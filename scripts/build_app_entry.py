@@ -90,6 +90,12 @@ def installer_command(argv: list[str]) -> int:
     remote_reporting.disable_for_process()
     if len(argv) == 4 and argv[1] == "--installer-reporting":
         return installer_reporting(argv[2], argv[3])
+    if len(argv) == 3 and argv[1] == "--installer-library-sharing":
+        if argv[2] not in {"0", "1"}:
+            return 2
+        from peach import library_sharing, settings_file
+        library_sharing.save_choice(settings_file.active(), argv[2] == "1")
+        return 0
     error_reporting.install()
     if len(argv) == 2 and argv[1] in {"--installer-stop", "--installer-uninstall"}:
         from peach.desktop_installer import main as run_installer

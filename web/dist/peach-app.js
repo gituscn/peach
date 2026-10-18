@@ -72472,10 +72472,10 @@ function JRe({ initial: e, initialJob: t }) {
 }
 //#endregion
 //#region src/react/settings/remote-reporting-settings.tsx
-function YRe({ value: e, onChange: t }) {
+function YRe({ value: e, onChange: t, busy: n = !1 }) {
 	return /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [/* @__PURE__ */ (0, C.jsx)(WA, { children: /* @__PURE__ */ (0, C.jsx)(BA, {
 		label: "发送版本统计与错误诊断（推荐）",
-		description: `${e.fields.usage} ${e.fields.errors}`,
+		description: "上传版本、系统信息、故障类型、代码位置与发生次数。",
 		children: /* @__PURE__ */ (0, C.jsx)(Mz, {
 			"aria-label": "发送版本统计与错误诊断（推荐）",
 			isSelected: e.usage && e.errors,
@@ -72483,142 +72483,156 @@ function YRe({ value: e, onChange: t }) {
 				...e,
 				usage: n,
 				errors: n
-			})
+			}),
+			...Y(n)
 		})
-	}) }), /* @__PURE__ */ (0, C.jsxs)(GA, {
+	}) }), e.available ? null : /* @__PURE__ */ (0, C.jsx)(GA, {
 		divided: !0,
-		children: [/* @__PURE__ */ (0, C.jsx)(qA, { children: e.notice }), e.available ? null : /* @__PURE__ */ (0, C.jsx)(qA, { children: "此版本尚未配置诊断接收端，当前不会发送；选项保存在本机。" })]
+		children: /* @__PURE__ */ (0, C.jsx)(qA, { children: "上传服务未配置。" })
 	})] });
 }
 function XRe({ initial: e, receipt: t }) {
 	let [n, r] = (0, S.useState)(e), i = zA();
-	return /* @__PURE__ */ (0, C.jsxs)(UA, {
-		title: "版本统计与错误诊断",
-		onSubmit: (e) => {
-			e.preventDefault(), i.run("save", (e) => U("/api/configuration/remote-reporting", {
-				usage: n.usage,
-				errors: n.errors
-			}, "POST", e), (e) => {
+	return /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [/* @__PURE__ */ (0, C.jsx)(YRe, {
+		value: n,
+		busy: i.busy === "save",
+		onChange: (e) => {
+			i.run("save", (t) => U("/api/configuration/remote-reporting", {
+				usage: e.usage,
+				errors: e.errors
+			}, "POST", t), (e) => {
 				r(e), t("已保存诊断选项");
 			});
-		},
-		children: [
-			/* @__PURE__ */ (0, C.jsx)(YRe, {
-				value: n,
-				onChange: r
-			}),
-			i.error ? /* @__PURE__ */ (0, C.jsx)(GA, {
-				divided: !0,
-				children: /* @__PURE__ */ (0, C.jsx)(JA, { children: i.error })
-			}) : null,
-			/* @__PURE__ */ (0, C.jsx)(KA, { children: /* @__PURE__ */ (0, C.jsx)(q, {
-				type: "submit",
-				...Y(i.busy === "save"),
-				children: "保存配置"
-			}) })
-		]
-	});
+		}
+	}), i.error ? /* @__PURE__ */ (0, C.jsx)(GA, {
+		divided: !0,
+		children: /* @__PURE__ */ (0, C.jsx)(JA, { children: i.error })
+	}) : null] });
 }
 //#endregion
 //#region src/react/settings/library-sharing-settings.tsx
 function ZRe({ initial: e, receipt: t }) {
-	let [n, r] = (0, S.useState)(e), [i, a] = (0, S.useState)(null), [o, s] = (0, S.useState)(!1), c = (0, S.useRef)(null), l = zA();
+	let [n, r] = (0, S.useState)(e), [i, a] = (0, S.useState)(null), [o, s] = (0, S.useState)(!1), [c, l] = (0, S.useState)(!1), u = (0, S.useMemo)(() => i ? JSON.stringify(i.data, null, 2) : "", [i]), d = (0, S.useRef)(null), f = zA();
 	(0, S.useEffect)(() => {
-		c.current?.parentElement && Cs(c.current.parentElement);
+		d.current?.parentElement && Cs(d.current.parentElement);
 	}, [i]);
-	let u = (e) => void l.run("save", (t) => U("/api/configuration/library-sharing", {
+	let p = (e) => void f.run("save", (t) => U("/api/configuration/library-sharing", {
 		enabled: e,
 		schema: n.schema,
-		consent: o,
+		consent: c,
 		preview_token: i?.token
 	}, "POST", t), (e) => {
-		r(e), a(null), s(!1), t("已保存馆藏与口味分享选项");
-	});
-	return /* @__PURE__ */ (0, C.jsxs)(UA, {
-		title: "馆藏与口味研究",
-		children: [
-			/* @__PURE__ */ (0, C.jsxs)(GA, { children: [
-				/* @__PURE__ */ (0, C.jsx)(qA, { children: n.notice }),
-				/* @__PURE__ */ (0, C.jsx)("ul", {
-					className: "list-disc space-y-2 pl-5 text-body-2-regular text-text-secondary",
-					children: n.fields.map((e) => /* @__PURE__ */ (0, C.jsx)("li", { children: e }, e))
-				}),
-				n.available ? null : /* @__PURE__ */ (0, C.jsx)(qA, { children: "此版本尚未配置馆藏与口味接收端，当前不会发送；同意选项保存在本机。" }),
-				n.last_attempt?.status ? /* @__PURE__ */ (0, C.jsxs)(qA, { children: [
-					"最近尝试：",
-					n.last_attempt.period,
-					"，",
-					n.last_attempt.status === "failed" ? `未完成（${n.last_attempt.reason}）` : "已尝试发送，接收状态需在 Sentry 核对",
-					"。"
-				] }) : null
-			] }),
-			n.enabled ? /* @__PURE__ */ (0, C.jsx)(WA, { children: /* @__PURE__ */ (0, C.jsx)(BA, {
-				label: "自动分享馆藏与口味明细",
-				description: "关闭后停止后续发送",
-				children: /* @__PURE__ */ (0, C.jsx)(Mz, {
-					"aria-label": "自动分享馆藏与口味明细",
-					isSelected: !0,
-					onChange: () => u(!1)
-				})
-			}) }) : null,
-			i ? /* @__PURE__ */ (0, C.jsxs)(GA, {
-				divided: !0,
-				children: [
-					/* @__PURE__ */ (0, C.jsxs)(qA, { children: [
-						"当前快照包含 ",
-						i.data.library.length,
-						" 部作品，约 ",
-						(i.bytes / 1024).toFixed(1),
-						" KiB。开启后每周自动发送相同字段的最新数据。"
-					] }),
-					/* @__PURE__ */ (0, C.jsx)($A, {
-						summary: "查看完整数据预览",
-						defaultOpen: !0,
-						children: /* @__PURE__ */ (0, C.jsxs)("div", {
-							ref: c,
-							className: "ui-geist-scroller",
-							"data-geist-scroller": !0,
-							children: [/* @__PURE__ */ (0, C.jsx)("div", {
-								className: "ui-geist-scroller-overlay",
-								"aria-hidden": !0
-							}), /* @__PURE__ */ (0, C.jsx)("div", {
-								className: "ui-geist-scroller-container max-h-80",
-								"data-overflow": "y",
-								tabIndex: 0,
-								"aria-label": "馆藏与口味上传预览",
-								children: /* @__PURE__ */ (0, C.jsx)("pre", {
-									className: "whitespace-pre-wrap break-all text-caption-1-regular",
-									children: JSON.stringify(i.data, null, 2)
-								})
-							})]
-						})
-					}),
-					/* @__PURE__ */ (0, C.jsx)(oP, {
-						isSelected: o,
-						onChange: s,
-						children: "我已查看字段与预览，同意每周自动上传馆藏与口味明细用于 Peach 群体研究"
+		r(e), a(null), l(!1), s(!1), t("已保存馆藏与口味上传选项");
+	}), m = () => {
+		let e = URL.createObjectURL(new Blob([u], { type: "application/json" })), t = document.createElement("a");
+		t.href = e, t.download = "peach-library-taste-preview.json", document.body.append(t);
+		try {
+			t.click();
+		} finally {
+			t.remove(), setTimeout(() => URL.revokeObjectURL(e), 1e3);
+		}
+	};
+	return /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [
+		/* @__PURE__ */ (0, C.jsx)(WA, { children: /* @__PURE__ */ (0, C.jsx)(BA, {
+			label: "上传馆藏与口味明细",
+			description: n.notice,
+			children: /* @__PURE__ */ (0, C.jsx)(Mz, {
+				"aria-label": "上传馆藏与口味明细",
+				isSelected: n.enabled,
+				onChange: (e) => e ? s(!0) : p(!1),
+				...Y(f.busy === "save")
+			})
+		}) }),
+		n.available ? null : /* @__PURE__ */ (0, C.jsx)(GA, {
+			divided: !0,
+			children: /* @__PURE__ */ (0, C.jsx)(qA, { children: "上传服务未配置。" })
+		}),
+		n.enabled && n.last_attempt?.status === "failed" ? /* @__PURE__ */ (0, C.jsx)(GA, {
+			divided: !0,
+			children: /* @__PURE__ */ (0, C.jsx)(JA, { children: "馆藏与口味上传失败，下周自动重试。" })
+		}) : null,
+		o ? /* @__PURE__ */ (0, C.jsxs)(GA, {
+			divided: !0,
+			children: [/* @__PURE__ */ (0, C.jsx)("ul", {
+				className: "list-disc space-y-2 pl-5 text-body-2-regular text-text-secondary",
+				children: n.fields.map((e) => /* @__PURE__ */ (0, C.jsx)("li", { children: e }, e))
+			}), /* @__PURE__ */ (0, C.jsx)(qA, { children: "不含账号、设备或安装标识、文件路径、媒体、网址和逐条浏览记录；明细仍可能关联或被再识别。关闭可停止后续发送，已发送的数据无法通过本机开关撤回。" })]
+		}) : null,
+		i ? /* @__PURE__ */ (0, C.jsxs)(GA, {
+			divided: !0,
+			children: [
+				/* @__PURE__ */ (0, C.jsxs)(qA, { children: [
+					"当前预览包含 ",
+					i.data.library.length,
+					" 部作品，约 ",
+					(i.bytes / 1024).toFixed(1),
+					" KiB。"
+				] }),
+				/* @__PURE__ */ (0, C.jsx)($A, {
+					summary: "上传数据预览",
+					defaultOpen: !0,
+					children: /* @__PURE__ */ (0, C.jsxs)("div", {
+						ref: d,
+						className: "ui-geist-scroller",
+						"data-geist-scroller": !0,
+						children: [/* @__PURE__ */ (0, C.jsx)("div", {
+							className: "ui-geist-scroller-overlay",
+							"aria-hidden": !0
+						}), /* @__PURE__ */ (0, C.jsx)("div", {
+							className: "ui-geist-scroller-container max-h-80",
+							"data-overflow": "y",
+							tabIndex: 0,
+							"aria-label": "馆藏与口味上传预览",
+							children: /* @__PURE__ */ (0, C.jsx)("pre", {
+								className: "whitespace-pre-wrap break-all text-caption-1-regular",
+								children: u.slice(0, 24e3)
+							})
+						})]
 					})
-				]
-			}) : null,
-			l.error ? /* @__PURE__ */ (0, C.jsx)(GA, {
-				divided: !0,
-				children: /* @__PURE__ */ (0, C.jsx)(JA, { children: l.error })
-			}) : null,
-			/* @__PURE__ */ (0, C.jsx)(KA, { children: n.enabled ? /* @__PURE__ */ (0, C.jsx)(qA, { children: "分享已开启，可用上方开关关闭。" }) : /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [/* @__PURE__ */ (0, C.jsx)(q, {
-				variant: "secondary",
-				onClick: () => void l.run("preview", (e) => H("/api/configuration/library-sharing/preview", e), (e) => {
-					a(e), s(!1);
 				}),
-				...Y(l.busy === "preview"),
+				u.length > 24e3 ? /* @__PURE__ */ (0, C.jsx)(qA, { children: "屏幕显示前 24,000 个字符，下载可查看完整内容。" }) : null,
+				/* @__PURE__ */ (0, C.jsx)(q, {
+					variant: "secondary",
+					onClick: m,
+					children: "下载完整预览"
+				}),
+				n.enabled ? null : /* @__PURE__ */ (0, C.jsx)(oP, {
+					isSelected: c,
+					onChange: l,
+					children: "我已查看字段与预览，接受关联风险，同意每周上传馆藏与口味明细"
+				})
+			]
+		}) : null,
+		f.error ? /* @__PURE__ */ (0, C.jsx)(GA, {
+			divided: !0,
+			children: /* @__PURE__ */ (0, C.jsx)(JA, { children: f.error })
+		}) : null,
+		/* @__PURE__ */ (0, C.jsxs)(KA, { children: [
+			/* @__PURE__ */ (0, C.jsx)(q, {
+				variant: "secondary",
+				onClick: () => {
+					s(!0), f.run("preview", (e) => H("/api/configuration/library-sharing/preview", e), (e) => {
+						a(e), l(!1);
+					});
+				},
+				...Y(f.busy === "preview"),
 				children: "预览上传内容"
-			}), i ? /* @__PURE__ */ (0, C.jsx)(q, {
-				disabled: !o,
-				onClick: () => u(!0),
-				...Y(l.busy === "save"),
-				children: "同意并开启分享"
-			}) : null] }) })
-		]
-	});
+			}),
+			!n.enabled && i ? /* @__PURE__ */ (0, C.jsx)(q, {
+				disabled: !c,
+				onClick: () => p(!0),
+				...Y(f.busy === "save"),
+				children: "同意并开启上传"
+			}) : null,
+			o && !n.enabled ? /* @__PURE__ */ (0, C.jsx)(q, {
+				variant: "secondary",
+				onClick: () => {
+					s(!1), a(null), l(!1);
+				},
+				children: "取消"
+			}) : null
+		] })
+	] });
 }
 //#endregion
 //#region src/react/settings/general-settings.tsx
@@ -72626,13 +72640,18 @@ function QRe({ data: e, receipt: t, panel: n }) {
 	return /* @__PURE__ */ (0, C.jsxs)("div", {
 		...kV(n),
 		children: [
-			e.remote_reporting ? /* @__PURE__ */ (0, C.jsx)(XRe, {
-				initial: e.remote_reporting,
-				receipt: t
-			}) : null,
-			e.library_sharing ? /* @__PURE__ */ (0, C.jsx)(ZRe, {
-				initial: e.library_sharing,
-				receipt: t
+			e.remote_reporting || e.library_sharing ? /* @__PURE__ */ (0, C.jsxs)(UA, {
+				title: "数据上传",
+				children: [e.remote_reporting ? /* @__PURE__ */ (0, C.jsx)(XRe, {
+					initial: e.remote_reporting,
+					receipt: t
+				}) : null, e.library_sharing ? /* @__PURE__ */ (0, C.jsx)("div", {
+					className: "border-t border-separator-border",
+					children: /* @__PURE__ */ (0, C.jsx)(ZRe, {
+						initial: e.library_sharing,
+						receipt: t
+					})
+				}) : null]
 			}) : null,
 			e.startup ? /* @__PURE__ */ (0, C.jsx)($Re, {
 				startup: e.startup,
@@ -72734,7 +72753,7 @@ function tze({ online: e }) {
 	return /* @__PURE__ */ (0, C.jsxs)("span", {
 		"data-mount": e === !0 ? "online" : e === !1 ? "offline" : "unknown",
 		className: DA("inline-flex items-center gap-1.5 whitespace-nowrap text-body-2-medium", e === !0 ? "text-notification-success-foreground" : e === !1 ? "text-text-error-primary" : "text-text-secondary"),
-		children: [/* @__PURE__ */ (0, C.jsx)(eze, { color: e === !0 ? "green" : e === !1 ? "yellow" : "indigo" }), e === !0 ? "在线" : e === !1 ? "离线" : "未检测"]
+		children: [/* @__PURE__ */ (0, C.jsx)(eze, { color: e === void 0 ? "indigo" : "green" }), e === !0 ? "在线" : e === !1 ? "离线" : "未检测"]
 	});
 }
 //#endregion

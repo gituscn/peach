@@ -52,6 +52,17 @@ class TastePreferenceTests(unittest.TestCase):
                                     for day, url, title in visits]), encoding="utf-8")
         import_history_exports([path], self.store, host="test")
 
+    def test_readonly_profile_preserves_history_and_does_not_create_preference_caches(self):
+        self.asset(1, played=2)
+        self.history([(1, 'https://example.invalid/work', 'demo_actor')])
+        before = self.store.read_bytes()
+        with patch('peach.fsutil.atomic_write_text', side_effect=AssertionError('只读计算不能写缓存')):
+            strengths, _, _ = preference_profile(self.db, self.store, cache=False)
+        self.assertGreater(strengths['performer'][1], 0)
+        self.assertEqual(self.store.read_bytes(), before)
+        self.assertFalse((self.store.parent / 'preference-cache.json').exists())
+        self.assertFalse((self.store.parent / 'browser-preference-cache.json').exists())
+
     def test_bookmarks_feed_preferences_without_creating_visits_and_removal_clears_evidence(self):
         from peach.taste_history import build_taste_dashboard, remove_history_source
         path = self.root / "bookmarks.html"
