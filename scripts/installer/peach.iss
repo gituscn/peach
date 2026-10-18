@@ -27,6 +27,7 @@ PrivilegesRequired=lowest
 DefaultDirName={userpf}\Peach
 DisableDirPage=no
 UsePreviousAppDir=yes
+UsePreviousTasks=no
 DisableProgramGroupPage=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -58,9 +59,12 @@ chs.DirectoryNotDedicated=请选择空文件夹或已有的 Peach 安装目录�
 chs.DirectoryNotWritable=当前用户无法写入程序目录或其上级目录。请选择有写入权限的位置，以便安装和更新 Peach。
 chs.DirectoryLink=程序目录和数据目录不能经过目录链接。请选择普通文件夹。
 chs.DirectoryMove=请先卸载现有 Peach（保留数据），再选择新的安装目录。
+chs.ReportingFailed=遥测与错误诊断选项未能保存。首次设置或设置页可再次选择；未保存的同意不会启用上传。
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "usage"; Description: "发送版本与操作系统类型至 Sentry（每天最多一次，不含安装标识）"; GroupDescription: "可选遥测与诊断（默认关闭，设置页可关闭）："; Flags: unchecked
+Name: "errors"; Description: "发送技术错误诊断至 Sentry（版本、系统、Python、CPU 架构、异常类型、代码文件名与行号；每天最多 20 条，不含错误原文、日志正文或媒体信息；服务端可见连接 IP）"; GroupDescription: "可选遥测与诊断（默认关闭，设置页可关闭）："; Flags: unchecked
 
 [InstallDelete]
 ; PyInstaller 的依赖都在 _internal 里；覆盖安装留下上一版多出来的库会被新版误加载。
@@ -206,7 +210,19 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
+  UsageConsent, ErrorConsent: String;
 begin
+  if (CurStep = ssPostInstall) and not WizardSilent() then
+  begin
+    UsageConsent := '0';
+    ErrorConsent := '0';
+    if WizardIsTaskSelected('usage') then UsageConsent := '1';
+    if WizardIsTaskSelected('errors') then ErrorConsent := '1';
+    if not Exec(ExpandConstant('{app}\Peach.exe'),
+      '--installer-reporting ' + UsageConsent + ' ' + ErrorConsent,
+      ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
+      SuppressibleMsgBox(CustomMessage('ReportingFailed'), mbError, MB_OK, IDOK);
+  end;
   { 服务启动时不迁移账本；覆盖安装换了程序，要在这里补上。没有账本的新机器不跑，
     否则会凭空建出账本，首次设置页就再也不出现。migrate 自己会先备份。 }
   if CurStep = ssPostInstall then

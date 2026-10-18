@@ -14,6 +14,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  PEACH_SENTRY_DSN: ${{ vars.PEACH_SENTRY_DSN }}
+  PEACH_LIBRARY_SENTRY_DSN: ${{ vars.PEACH_LIBRARY_SENTRY_DSN }}
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"
 

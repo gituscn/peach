@@ -334,6 +334,9 @@ def create_app(
     # 分叉。活动页在只读端照常能看——读不受影响，只是看到的是写入端那台的记录。
     contract.task_runs.enabled = (
         (sync is None or not sync.read_only) and contract.task_runs.available())
+    from .library_sharing import Service as LibrarySharing
+    from . import settings_file
+    sharing = LibrarySharing(settings_file.active(), contract)
     from .automatic_updates import AutomaticUpdates
     from .routes_configuration import managed_configuration
     automatic_updates = AutomaticUpdates(
@@ -371,6 +374,8 @@ def create_app(
             ledger_ready = _start_ledger_services(settings, contract,
                 (follow_scheduler, feed_scheduler, push_discovery, downloads, recovery_service, jav_browser))
             automatic_updates.start()
+            if ledger_ready:
+                sharing.start()
             mount_reachability.start()
         _app.state.ledger_background_ready = ledger_ready
         warmup = asyncio.create_task(warm_startup_entries())
@@ -393,6 +398,7 @@ def create_app(
             follow_scheduler.stop()
             feed_scheduler.stop()
             automatic_updates.stop()
+            await asyncio.to_thread(sharing.stop)
             push_discovery.stop()
             await asyncio.to_thread(jav_browser.stop)
             downloads.stop()
@@ -419,6 +425,7 @@ def create_app(
     app.state.settings = settings
     app.state.database = database
     app.state.web_contract = contract
+    app.state.library_sharing = sharing
     app.state.repository = repository
     app.state.media_engine = media_engine
     app.state.preview_service = preview_service

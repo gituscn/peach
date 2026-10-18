@@ -45,6 +45,10 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 Watch history, favorites and settings stay on your computer. Scanning leaves original files untouched; manual organization offers a preview and an undo for the last batch.
 
+Telemetry and automatic error diagnostics are off by default. Choose each separately during installation, first setup or in settings, and turn them off whenever needed. Opting in sends the listed technical fields to Sentry; full logs, diagnostic ZIPs, media details and watch history are excluded. See [remote diagnostics](docs/DIAGNOSTICS_AUDIT.md#可选远程诊断).
+
+Sharing library and taste details for population research is a separate option, off by default. Review the fields and full local preview in settings, then explicitly consent to weekly snapshots of works, tags, ratings and derived preferences. Identity fields and raw browsing records are excluded, but detailed preferences cannot be guaranteed anonymous.
+
 ## Screenshots
 
 Try search, filters and profiles in the [read-only demo](https://demo.peach.video). Click a screenshot for the original image.
