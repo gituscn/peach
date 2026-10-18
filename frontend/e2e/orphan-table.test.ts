@@ -30,6 +30,17 @@ describe('孤儿记录数据表', () => {
       const table = page.getByRole('grid', { name: '文件已消失的作品', exact: true });
       await table.waitFor();
       await settle(page);
+      const faces = await page.evaluate(() => {
+        const read = (node: Element) => {
+          const style = getComputedStyle(node);
+          return { shadow: style.boxShadow, border: style.border, radius: style.borderRadius };
+        };
+        return {
+          table: read(document.querySelector('#orphan-records [data-data-table-panel]')!),
+          fieldset: read(document.querySelector('#link-manager section')!),
+        };
+      });
+      assert.deepEqual(faces.table, faces.fieldset, '数据表面板与管理卡片使用统一边线和阴影');
       const scroller = table.locator('..');
       assert.equal(await scroller.getAttribute('data-overlay-scrollbar'), 'true');
       if (viewport.mobile) {
@@ -67,6 +78,26 @@ describe('孤儿记录数据表', () => {
       await page.screenshot({ path: `../build/table-evidence/orphan-selected-${viewport.name}.png` });
       await section.getByRole('button', { name: '彻底删除所选（2）', exact: true }).click();
       await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
+      await table.locator('thead label:has(input[type="checkbox"])').click();
+      await section.getByRole('button', { name: '彻底删除所选（23）', exact: true }).click();
+      const dialog = page.getByRole('dialog');
+      const list = dialog.getByRole('list', { name: '所选记录', exact: true });
+      await list.waitFor();
+      assert.equal(await list.locator(':scope > li').count(), items.length);
+      assert.equal(await list.getAttribute('data-overlay-scrollbar'), 'true');
+      const overflow = await list.evaluate(node => node.scrollHeight > node.clientHeight);
+      assert.equal(overflow, true, '长清单在弹层内滚动');
+      const edges = dialog.locator('.ui-ov-edges');
+      await page.waitForFunction(() => !!document.querySelector('dialog .ui-can-scroll-bottom'));
+      assert.equal(await edges.locator('.ui-ov-edge-bottom').evaluate(node => getComputedStyle(node).visibility), 'visible');
+      await list.evaluate(node => { node.scrollTop = node.scrollHeight / 2 });
+      await page.waitForFunction(() => !!document.querySelector('dialog .ui-can-scroll-top.ui-can-scroll-bottom'));
+      await list.evaluate(node => { node.scrollTop = node.scrollHeight });
+      await page.waitForFunction(() => !!document.querySelector('dialog .ui-can-scroll-top:not(.ui-can-scroll-bottom)'));
+      const box = await dialog.boundingBox();
+      assert.ok(box && box.y >= 0 && box.y + box.height <= viewport.height);
+      await dialog.screenshot({ path: `../build/table-evidence/orphan-confirm-${viewport.name}.png` });
+      await dialog.getByRole('button', { name: '取消', exact: true }).click();
       assert.deepEqual(writes, []);
       const geometry = await layout(page);
       assert.ok(geometry.scrollWidth <= geometry.viewportWidth + 1, JSON.stringify(geometry));

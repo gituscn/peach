@@ -17,7 +17,11 @@ import { LibraryProcessingNotice } from '../../src/react/library-processing/libr
 import { RESOURCE_NOTICE_KEY } from '../../src/react/library-processing/processing-actions';
 import type { LibraryProcessingProps } from '../../src/react/bundle';
 
-import { buttonNamed, click, mount, mountRoot, submit } from './render';
+import { buttonNamed as textButtonNamed, click, mount, mountRoot, submit } from './render';
+
+const buttonNamed = (name: string, root: ParentNode = document) =>
+  [...root.querySelectorAll('button')].find(button => button.getAttribute('aria-label') === name)
+  ?? textButtonNamed(name, root);
 
 // 客户端是模块级的单例（所有 React 根共用一个），用例之间不清就互相喂数据。
 // 报过的任务号记在 `localStorage` 里，也要清，否则下一条用例的通知被当成重复的。

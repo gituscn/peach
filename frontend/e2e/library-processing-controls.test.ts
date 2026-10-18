@@ -60,11 +60,16 @@ describe('扫描与采集控制', () => {
         await card.getByText('预计剩余约 20–40 分钟（粗估）', { exact: true }).waitFor();
         assert.equal(writes[0]?.speed_mode, 'low');
         const dock = page.locator('#toasts [data-processing-dock]');
+        const pause = dock.getByRole('button', { name: '暂停', exact: true });
+        assert.equal(await pause.innerText(), '');
+        assert.equal(await pause.locator('svg').count(), 1);
         await dock.getByRole('button', { name: '暂停', exact: true }).click();
         await dock.getByText('正在暂停，当前步骤结束后暂停', { exact: true }).waitFor();
         state.status = 'paused';
         const resume = dock.getByRole('button', { name: '继续', exact: true });
         await resume.waitFor();
+        assert.equal(await resume.innerText(), '');
+        assert.equal(await resume.locator('svg').count(), 1);
         assert.equal(await card.getByRole('button', { name: '同步媒体库', exact: true }).getAttribute('aria-disabled'), 'true');
         await page.reload();
         await resume.waitFor();

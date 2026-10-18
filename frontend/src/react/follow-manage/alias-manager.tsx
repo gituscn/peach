@@ -334,7 +334,8 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
         <SelectionDock label="已保存别名批量操作" visible={savedNames.length > 0} count={`已选 ${savedNames.length} 个别名`}>
           <Button variant="secondary" size="small" disabled={readOnly} {...busyProps(drop.isPending)}
             onClick={() => void confirmModal({ title: '移除所选创作者别名',
-              body: `将移除以下 ${savedNames.length} 个别名：${savedNames.map((name) => `「${name}」`).join('、')}，对应来源恢复为独立创作者组。`,
+              body: `将移除以下 ${savedNames.length} 个别名，对应来源恢复为独立创作者组。`,
+              items: savedNames,
               confirmLabel: '移除所选别名', onConfirm: () => drop.mutateAsync(savedNames) })}>
             {`移除所选别名（${savedNames.length}）`}
           </Button>

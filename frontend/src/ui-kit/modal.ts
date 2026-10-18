@@ -4,6 +4,7 @@
 import { setActionBusy } from './controls';
 import { noteHtml } from './markup';
 import { playUiSound } from './sounds';
+import { attachOverlayScrollbar } from './overlay-scrollbar';
 
 /* Geist Modal 的另一种正文：要填的一份表单，而不是一句待确认的话。
 
@@ -81,10 +82,12 @@ export function formModal({title,description='',body='',confirmLabel,cancelLabel
 let modalSeq=0;
 export function confirmModal(options:{
   title: string; body: string; confirmLabel: string; cancelLabel?: string; danger?: boolean;
+  items?: readonly string[];
   onConfirm?: () => Promise<unknown>;
 }):Promise<{confirmed:boolean;result?:unknown}>;
-export function confirmModal({title,body,confirmLabel,cancelLabel='取消',onConfirm=null,danger=false}:{
+export function confirmModal({title,body,items=[],confirmLabel,cancelLabel='取消',onConfirm=null,danger=false}:{
   title?: string; body?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean;
+  items?: readonly string[];
   onConfirm?: (()=>unknown)|null;
 }={}):Promise<{confirmed:boolean;result?:unknown}>{
   const trigger=document.activeElement;
@@ -100,6 +103,21 @@ export function confirmModal({title,body,confirmLabel,cancelLabel='取消',onCon
     </footer>`;
   dialog.querySelector('h3')!.textContent=title as string;
   dialog.querySelector('.ui-geist-modal-body p')!.textContent=body as string;
+  let list: HTMLUListElement | null = null;
+  if(items.length){
+    const host=document.createElement('div');
+    host.className='ui-geist-modal-list';
+    list=document.createElement('ul');
+    list.setAttribute('aria-label','所选记录');
+    list.tabIndex=0;
+    for(const text of items){
+      const item=document.createElement('li');
+      item.textContent=text;
+      list.append(item);
+    }
+    host.append(list);
+    dialog.querySelector('[data-modal-error]')!.before(host);
+  }
   const cancel:any=dialog.querySelector('[data-modal-cancel]');
   const accept:any=dialog.querySelector('[data-modal-confirm]');
   if(danger){accept.classList.remove('primary');accept.classList.add('danger')}
@@ -135,6 +153,7 @@ export function confirmModal({title,body,confirmLabel,cancelLabel='取消',onCon
       }finally{busy=false}
     };
     dialog.showModal();
+    attachOverlayScrollbar(list);
     playUiSound('pop');
     (danger?cancel:accept).focus();
   });
