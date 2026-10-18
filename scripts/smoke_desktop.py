@@ -53,6 +53,11 @@ def assert_av1_decoder(ffmpeg: Path, root: Path) -> None:
     assert image.is_file() and image.stat().st_size > 0, 'AV1 抽帧未取得'
 
 
+def assert_public_resources(application: Path) -> None:
+    """发行资源不包含本机实体导出。"""
+    assert not (application / "_internal/resources/seed").exists(), "发行包包含私有实体导出"
+
+
 def assert_bundled_media_tools(application: Path) -> None:
     """在没有系统媒体工具的机器上验证随包转码、探测和抽帧。"""
     tools = application / "tools" / "ffmpeg"
@@ -71,9 +76,7 @@ def assert_bundled_media_tools(application: Path) -> None:
         assert path.resolve().is_relative_to(untrunc_root.resolve()), name
         with path.open("rb") as stream:
             assert hashlib.file_digest(stream, "sha256").hexdigest() == expected, name
-    # resources 是冻结资源的一部分，首次扫描可读到随版本附带的种子。
-    seed = json.loads((application / "_internal/resources/seed/entities.json").read_text(encoding="utf-8"))
-    assert seed["version"] and seed["entities"], "随包种子缺失"
+    assert_public_resources(application)
     ffmpeg, ffprobe = tools / "bin/ffmpeg.exe", tools / "bin/ffprobe.exe"
     with tempfile.TemporaryDirectory(prefix="peach-media-smoke-") as directory:
         root = Path(directory).resolve()
@@ -447,7 +450,7 @@ def main() -> int:
                 assert (data / "config.previous.toml").is_file()
                 assert (data / "state" / "configuration-reload.request").is_file()
                 print(json.dumps({"ok": True, "version": health.get("version"),
-                                  "checks": ["oobe", "migrations", "lan-bind", "mdns", "password-login", "unauthenticated-api", "pages", "island", "items", "clouddrive-configuration", "cloudflared-sidecar", "bundled-media-tools", "seed-pack"]}))
+                                  "checks": ["oobe", "migrations", "lan-bind", "mdns", "password-login", "unauthenticated-api", "pages", "island", "items", "clouddrive-configuration", "cloudflared-sidecar", "bundled-media-tools", "public-resources"]}))
             finally:
                 process.terminate()
                 process.wait(timeout=15)

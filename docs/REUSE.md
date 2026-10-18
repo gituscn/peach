@@ -512,7 +512,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 - macOS Ledger 同步在共享根判为 `offline` 时先经 NetFS 挂载 `peach-sync` 再重判，挂载失败才保留离线结果，不弹阻塞认证框。
 - 浏览历史增量采集使用 SQLite backup API 与 `browserexport`，也接受 Google Takeout ZIP；原始 URL 与标题只留本机私有目录，聚合候选不写 ledger。
 - 首次设置的可选历史引导转到 `/taste?onboarding=1`，用现有读取与导入入口；指南链接按 [Google 导出说明](https://support.google.com/accounts/answer/3024190?hl=zh-Hans) 与 [browserexport](https://github.com/purarue/browserexport) 核验（2026-09-06）。
-- 实体事实包默认保存在私有数据根：`scripts/seed_pack.py export` 只读账本生成 `state/seed/entities.json`，不随仓库或发行包分发（ADR-0111）。已有私有包由扫描结算后的种子后继导入，幂等键绑定内容摘要。v2 结构校验复用已固定的 Pydantic，SQLite 历史表记录版本、修订与累计精确撤销，防止旧包回放；别名保留源 confidence，用户资料由归属保护。种子不含图片；包中缺席不视为错误撤销。分发边界、复核与纠错见 ADR-0073、ADR-0075、[ADR-0106](adr/0106-seed-correction-history-and-explicit-withdrawals.md)。
+- 实体事实包默认保存在私有数据根：`scripts/seed_pack.py export` 只读账本生成 `state/seed/entities.json`，不随仓库或发行包分发（ADR-0111）。Windows 构建与制品验收均拒绝发行资源中的 `seed` 目录。已有私有包由扫描结算后的种子后继导入，幂等键绑定内容摘要。v2 结构校验复用已固定的 Pydantic，SQLite 历史表记录版本、修订与累计精确撤销，防止旧包回放；别名保留源 confidence，用户资料由归属保护。种子不含图片；包中缺席不视为错误撤销。分发边界、复核与纠错见 ADR-0073、ADR-0075、[ADR-0106](adr/0106-seed-correction-history-and-explicit-withdrawals.md)。
 - 数据管理首屏直接复用实际 `cleanupfieldset` 正文和操作条，只有计数等待取数；资源同步与重复文件网盘操作根据 `/api/sources` 已配置来源显示，离线来源保留入口。资源同步的检查与执行覆盖已配置的 local、115、PikPak，一次检查同时报失效记录、空文件夹与孤儿缓存；按目录清理也支持本地磁盘。
 
 ## 必须复用的成熟实现

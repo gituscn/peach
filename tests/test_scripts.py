@@ -226,6 +226,21 @@ class DesktopSmokeTests(unittest.TestCase):
     def setUpClass(cls):
         cls.script = load_script("smoke_desktop")
 
+    def test_distribution_resources_accept_an_application_without_private_exports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            application = Path(directory).resolve()
+            (application / '_internal/resources').mkdir(parents=True)
+            self.script.assert_public_resources(application)
+
+    def test_distribution_resources_reject_private_entity_exports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            application = Path(directory).resolve()
+            seed = application / '_internal/resources/seed'
+            seed.mkdir(parents=True)
+            (seed / 'entities.json').write_text('{}', encoding='utf-8')
+            with self.assertRaisesRegex(AssertionError, '私有实体导出'):
+                self.script.assert_public_resources(application)
+
     def test_cleanup_waits_for_a_released_windows_directory(self):
         error = PermissionError('目录仍被占用')
         error.winerror = 32
