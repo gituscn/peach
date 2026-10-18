@@ -216,7 +216,9 @@ describe('播放器清晰度', () => {
     configurePlayer(host());
     const root = document.createElement('div'), bar = document.createElement('div'), video = document.createElement('video');
     bar.className = 'vjs-control-bar';
-    root.append(video, bar); document.body.append(root);
+    bar.innerHTML = '<div class="vjs-subtitles-control vjs-control"><button type="button">CC</button></div>';
+    const container = document.createElement('media-container'); container.append(video, bar);
+    root.append(container); document.body.append(root);
     const { player, fire } = fakePlayer({ time: 0, duration: 100 });
     const events = new Map<string, () => void>();
     const levels = Object.assign(entries, { selectedIndex, on: (names: string | string[], fn: () => void) => {

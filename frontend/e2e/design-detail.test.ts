@@ -548,7 +548,7 @@ describe('设计决定：关注详情、作品详情、播放器与侧栏', () =
         { left: '12px', right: '12px', bottom: '8px', height: '59px' });
       /* 彩条 6px，抓取区 18px，多出来的 12px 全在条上方：往下扩会盖住按钮那一排的顶边。 */
       assert.deepEqual(await styleOf(page, '#stage .vjs-progress-control', ['height', 'top']), { height: '18px', top: '-12px' });
-      assert.equal((await styleOf(page, '#stage .vjs-progress-holder', ['height']))!.height, '6px', '彩条本身不变粗');
+      assert.equal((await styleOf(page, '#stage .vjs-progress-holder > media-slider-track', ['height']))!.height, '6px', '彩条本身不变粗');
       assert.equal((await styleOf(page, '#stage .vjs-play-progress', ['background-color']))!['background-color'],
         await tokenColor(page, '#stage', '--tungsten'));
       assert.equal((await styleOf(page, '#stage .video-js', ['font-family']))!['font-family'],

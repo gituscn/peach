@@ -48,7 +48,7 @@ export const createV10Player: VideojsFactory = (video, options) => {
           <media-slider-track><media-slider-buffer class="vjs-load-progress"></media-slider-buffer><media-slider-fill class="vjs-play-progress"></media-slider-fill></media-slider-track>
           <media-slider-thumb class="vjs-progress-thumb"></media-slider-thumb>
         </media-time-slider></div>
-        <div class="vjs-subtitles-control" hidden><button type="button" class="vjs-button" aria-label="字幕" aria-expanded="false">CC</button><div class="vjs-subtitles-menu" role="menu" hidden></div></div>
+        <div class="vjs-subtitles-control vjs-control"><button type="button" class="vjs-button" aria-label="开启字幕" aria-pressed="false">CC</button></div>
         <media-pip-button class="vjs-picture-in-picture-control vjs-control vjs-button" label="画中画"></media-pip-button>
         <media-fullscreen-button class="vjs-fullscreen-control vjs-control vjs-button" label="全屏"></media-fullscreen-button>
       </div>`);
@@ -58,42 +58,6 @@ export const createV10Player: VideojsFactory = (video, options) => {
   const signal = cleanup.signal;
   let disposed = false, sourceGeneration = 0, playGeneration = 0, expectedDuration = 0, source: PlayerSource = { src: '', type: '' }, failure: unknown = null;
   let idle: ReturnType<typeof setTimeout> | undefined;
-  const subtitleControl = root.querySelector<HTMLElement>('.vjs-subtitles-control');
-  const subtitleMenu = subtitleControl?.querySelector<HTMLElement>('[role="menu"]');
-  const subtitleToggle = subtitleControl?.querySelector('button');
-  const closeSubtitles = () => { if (subtitleMenu) subtitleMenu.hidden = true; subtitleToggle?.setAttribute('aria-expanded', 'false') };
-  const renderSubtitles = () => {
-    if (!subtitleControl || !subtitleMenu) return;
-    const tracks = Array.from(video.textTracks).filter(track => ['subtitles', 'captions'].includes(track.kind));
-    subtitleControl.hidden = !tracks.length;
-    subtitleMenu.replaceChildren();
-    const choices = [{ label: '关闭', track: null }, ...tracks.map(track => ({ label: track.label || track.language, track }))];
-    choices.forEach(choice => {
-      const button = document.createElement('button'); button.type = 'button'; button.textContent = choice.label;
-      button.setAttribute('role', 'menuitemradio');
-      button.setAttribute('aria-checked', String(choice.track ? choice.track.mode === 'showing' : tracks.every(track => track.mode !== 'showing')));
-      button.onclick = () => {
-        tracks.forEach(track => { track.mode = track === choice.track ? 'showing' : 'disabled' });
-        closeSubtitles(); renderSubtitles(); subtitleToggle?.focus();
-      };
-      subtitleMenu.append(button);
-    });
-  };
-  if (subtitleToggle && subtitleMenu) subtitleToggle.onclick = () => {
-    subtitleMenu.hidden = !subtitleMenu.hidden; subtitleToggle.setAttribute('aria-expanded', String(!subtitleMenu.hidden));
-  };
-  video.textTracks.addEventListener('addtrack', renderSubtitles, { signal });
-  video.textTracks.addEventListener('change', renderSubtitles, { signal });
-  subtitleControl?.addEventListener('keydown', event => {
-    if (event.key === 'Escape') { event.stopPropagation(); closeSubtitles(); subtitleToggle?.focus() }
-    if (['ArrowDown', 'ArrowUp'].includes(event.key) && subtitleMenu && !subtitleMenu.hidden) {
-      event.preventDefault();
-      const buttons = [...subtitleMenu.querySelectorAll('button')];
-      const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
-      buttons[(current + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length]?.focus();
-    }
-  }, { signal });
-  document.addEventListener('pointerdown', event => { if (!subtitleControl?.contains(event.target as Node)) closeSubtitles() }, { signal });
   const active = () => {
     root.classList.add('vjs-user-active'); root.classList.remove('vjs-user-inactive');
     if (idle) clearTimeout(idle);

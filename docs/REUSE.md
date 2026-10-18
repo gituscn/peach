@@ -136,6 +136,12 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 播放器按 [Video.js 10 官方迁移指南](https://videojs.org/docs/framework/html/guides/migrate-from-video-js-8) 和 [10.1.0 源码](https://github.com/videojs/video.js/tree/919ad955a9baf2433c68aba8151654dde0e58b5d/packages)接入 `video-player`、`media-container`、官方按钮／滑条与 HLS／DASH 媒体组件。`@videojs/cdn` 10.1.0（Apache-2.0）提供固定 ESM 模块，构建脚本按静态与字面量动态导入闭包分发并登记哈希；浏览器支持沿用项目目标。Peach 保留片源授权、时长口径、统计、字幕菜单和舞台生命周期，原生视频经 `media` 插槽携带字幕与观看上报。`video.js` 10.1.0 包的旧入口只有带错误码的 shim，不作为运行依赖；v8 的组件和 VHS 不进入产物。真实短片回归覆盖 MP4、HLS 和 DASH 解码，质量档位选择按 HLS 引擎验证，DASH 不声明手动档位能力。生产切换与 ledger 不属于依赖接管工作树。
 
+Peach 播放器皮肤直接装饰 Video.js 10 的 light DOM：右侧控制组用自动左外边距贴住控制条右缘；官方时间滑条承接完整 18 px 命中区，6 px 轨道与唯一的 12 px 滑块分别绘制，悬停和聚焦放大滑块。浏览器回归 `frontend/e2e/player-skin.test.ts` 使用合成短片验证桌面、390×844 手机、进度点击与全屏进出；不增加播放器依赖。
+
+字幕文件加载复用 `subtitles.to_webvtt`，接受 SRT、ASS、SSA、VTT，兼容已有的编码探测；4 MiB 以内的文件经 `/api/subtitles/convert` 转换后挂到当前 video 的 TextTrack，关闭播放器释放 Blob URL。字幕列表、CC 开关与外观选项按用户截图和 [YouTube 官方说明](https://support.google.com/youtube/answer/100078?hl=en) 组织；字体、字号、颜色、不透明度、背景、窗口与边缘样式保存在当前浏览器，时间轴仍由浏览器驱动。字幕文件不写 ledger，不保存到媒体目录。
+
+在线中文字幕采用 [SubtitleCat](https://www.subtitlecat.com)，复用现有 httpx 与 BeautifulSoup 依赖。来源选择参考 [PotPlayer JAV 中文字幕插件](https://github.com/736368217/PotplayerJavChineseSubs_subtitlecat/tree/0b569fdc3bd2cb27fca2140858ad77bf6d7ddcb8)（MIT；仅参考公开协议与语言选择，不复制代码）。2026-10-18 用 `SSIS-291` 实测三条结果的简繁中文链接，简体 SRT 均返回 200、927–981 条时间轴。搜索每页检查六条详情，仅列已有 `zh-CN`／`zh-TW` 文件的结果，最多检查前 60 条，翻页由用户触发；不触发生成翻译。下载限固定 HTTPS 主机、字幕路径与 4 MiB，复用现有转码器。界面说明可能包含机翻，不声称人工翻译。ASSRT 的 JAV 覆盖未验证；JavSub.ai 有中文目录但检索返回 403，未取得可用下载链路，因此不接入。无需凭据，不增加依赖，不写 ledger 或媒体目录。
+
 ## 分级诊断
 
 启动取证复用 Python 3.14 标准库的 `sys.excepthook`、`threading.excepthook`、`sys.unraisablehook`、`logging.Handler`、`faulthandler` 和 `zipfile`（PSF 许可，无额外安装体积）。`error_reporting` 在配置与第三方依赖之前加载，`support_bundle` 仅收集选定日志和系统字段；Peach 保留脱敏、备用目录、本机权限与报告内容策略。已有诊断报告继续用于页面和运行期导出。已用临时目录与独立子进程核对无控制台、导入失败、线程异常、备用目录、配置损坏和脱敏。Sentry 等远程 SDK 不符合本机取证范围，且增加运行依赖与打包体积，因此不引入。没有新增依赖或 ledger 写入。

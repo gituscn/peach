@@ -8,6 +8,7 @@ import { playerHost } from './host';
 import { detailPlayer, resizeSoon } from './registry';
 import { PLAYER_PANEL_EVENT } from './stats';
 import type { PlayerItem, SourceQuality, VjsPlayer } from './types';
+import { SubtitleControls, subtitleIcon } from './subtitles';
 
 type TooltipSync = (label?: string, aria?: string) => void;
 
@@ -135,6 +136,7 @@ export function mountPlayerQualityControl(
   const toggle = root.querySelector('button')!, badge = root.querySelector<HTMLElement>('[data-player-quality-badge]')!;
   playerControlTooltip(toggle, '设置');
   const menu = root.querySelector<HTMLElement>('.vjs-peach-settings-menu')!;
+  let subtitleControls: SubtitleControls | undefined;
   const levels = typeof player.qualityLevels === 'function' ? player.qualityLevels() : null;
   let sourceQualities = initialSourceQualities;
   let selectedQuality = 'auto';
@@ -174,6 +176,7 @@ export function mountPlayerQualityControl(
   const isOpen = () => menu.getAttribute('aria-hidden') !== 'true';
   const setOpen = (open: boolean) => {
     menu.setAttribute('aria-hidden', String(!open)); toggle.setAttribute('aria-expanded', String(open));
+    if (!open) subtitleControls?.hide();
     if (open) document.dispatchEvent(new CustomEvent(PLAYER_PANEL_EVENT, { detail: 'settings' }));
   };
   const close = () => setOpen(false);
@@ -185,17 +188,25 @@ export function mountPlayerQualityControl(
      先钉在旧值、下一帧再写新值，同一帧写两次只会直接跳到新值，看不到过渡。 */
   const PANEL_MS = 250;
   let panelTimer: ReturnType<typeof setTimeout> | null = null;
+  let panelRun = 0;
   const renderPanel = (html: string, direction: number): HTMLElement => {
+    const run = ++panelRun;
+    if (panelTimer) {
+      clearTimeout(panelTimer); panelTimer = null;
+      menu.classList.remove('vjs-peach-popup-animating'); menu.style.height = '';
+    }
+    menu.querySelectorAll('.vjs-peach-panel-leaving').forEach(panel => panel.remove());
+    menu.scrollTop = 0;
     const current = menu.querySelector<HTMLElement>('.vjs-peach-panel');
     const next = document.createElement('div'); next.className = 'vjs-peach-panel'; next.innerHTML = html;
-    if (!current || !direction || !isOpen()) { menu.replaceChildren(next); menu.style.height = ''; return next }
-    if (panelTimer) { clearTimeout(panelTimer); panelTimer = null }
+    if (!current || !direction || !isOpen() || matchMedia('(prefers-reduced-motion:reduce)').matches) { menu.replaceChildren(next); menu.style.height = ''; return next }
     const from = menu.getBoundingClientRect().height;
-    current.classList.add('vjs-peach-panel-leaving');
+    current.classList.add('vjs-peach-panel-leaving'); current.inert = true; current.setAttribute('aria-hidden', 'true');
     next.classList.add(direction > 0 ? 'vjs-peach-panel-animate-forward' : 'vjs-peach-panel-animate-back');
     menu.append(next); menu.style.height = `${from}px`;
     const to = next.scrollHeight;
     requestAnimationFrame(() => {
+      if (run !== panelRun) return;
       menu.classList.add('vjs-peach-popup-animating'); menu.style.height = `${to}px`;
       next.classList.remove('vjs-peach-panel-animate-forward', 'vjs-peach-panel-animate-back');
       current.classList.add(direction > 0 ? 'vjs-peach-panel-animate-back' : 'vjs-peach-panel-animate-forward');
@@ -208,16 +219,18 @@ export function mountPlayerQualityControl(
   };
   const button = (panel: HTMLElement, selector: string) => panel.querySelector<HTMLElement>(selector)!;
   /** 菜单此刻摆的是哪一面；轨道与尺寸变化只就地改这一面（`refreshPanel`）。 */
-  let view: 'main' | 'speed' | 'quality' = 'main';
+  let view: 'main' | 'speed' | 'quality' | 'subtitles' = 'main';
   const showMain = (direction = 0) => {
     view = 'main';
     const { active } = qualityRows(), speed = Number(player.playbackRate()) || 1;
     const panel = renderPanel(`<div class="vjs-peach-panel-menu"><button type="button" class="vjs-peach-menu-row" role="menuitemcheckbox" data-player-ambient aria-checked="${playerHost().settings().ambientMode}">
       ${icon('player-ambient')}<span>氛围模式</span><i class="vjs-peach-switch" aria-hidden="true"></i></button>
       <button type="button" class="vjs-peach-menu-row" role="menuitem" data-player-speed>${icon('player-speed')}<span>播放速度</span><b>${speed === 1 ? '正常' : `${speed}×`}</b>${icon('player-menu-next')}</button>
+      <button type="button" class="vjs-peach-menu-row" role="menuitem" data-player-subtitles><span class="vjs-peach-menu-cc" aria-hidden="true">${subtitleIcon()}</span><span>字幕</span><b>${esc(subtitleControls?.label() || '关闭')}</b>${icon('player-menu-next')}</button>
       <button type="button" class="vjs-peach-menu-row" role="menuitem" data-player-quality-view>${icon('player-quality')}<span>清晰度</span><b>${esc(active.label)}</b>${icon('player-menu-next')}</button></div>`, direction);
     button(panel, '[data-player-ambient]').onclick = () => { applyAmbientMode(!playerHost().settings().ambientMode); showMain() };
     button(panel, '[data-player-speed]').onclick = () => showSpeed();
+    button(panel, '[data-player-subtitles]').onclick = () => subtitleControls?.show();
     button(panel, '[data-player-quality-view]').onclick = () => showQuality();
   };
   /* 播放速度面板照 YouTube delhi-modern（player 9470c977 的 base.js）：滑条两端取播放器
@@ -309,14 +322,27 @@ export function mountPlayerQualityControl(
   toggle.onclick = (event) => { event.stopPropagation(); const open = !isOpen(); if (open) showMain(); setOpen(open) };
   const outside = (event: Event) => { if (!root.contains(event.target as Node)) close() };
   document.addEventListener('pointerdown', outside);
-  root.addEventListener('keydown', (event) => { if (event.key === 'Escape') { close(); toggle.focus() } });
+  root.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') { event.stopPropagation(); close(); toggle.focus() }
+    if (['ArrowDown', 'ArrowUp'].includes(event.key) && isOpen() && !(event.target instanceof HTMLInputElement)) {
+      event.preventDefault();
+      const buttons = [...menu.querySelectorAll<HTMLElement>('button:not([disabled]),input,a[href]')].filter(node => node.offsetParent !== null && !node.closest('[inert]'));
+      const current = buttons.indexOf(document.activeElement as HTMLElement);
+      buttons[(current + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length]?.focus();
+    }
+  });
   video.addEventListener('loadedmetadata', refreshPanel);
   video.addEventListener('resize', refreshPanel);
   levels?.on?.(['addqualitylevel', 'removequalitylevel', 'change'], refreshPanel);
   player.on('dispose', () => {
+    panelRun++;
     document.removeEventListener('pointerdown', outside);
     document.removeEventListener(PLAYER_PANEL_EVENT, closeSettingsForOtherPanel);
     if (panelTimer) clearTimeout(panelTimer);
+  });
+  subtitleControls = new SubtitleControls(player, video, {
+    render: renderPanel, open: () => { view = 'subtitles'; setOpen(true) }, close,
+    back: () => { subtitleControls?.hide(); showMain(-1) },
   });
   qualityRows();
   mountPlayerTheaterControl(player, root);
@@ -439,6 +465,7 @@ function mountPlayerChromeLayout(player: VjsPlayer): void {
   player.on(['timeupdate', 'durationchange', 'loadedmetadata'], syncTime); syncTime();
   if (volume) volume.insertAdjacentElement('afterend', time); else controlBar.append(time);
   const pip = controlBar.querySelector<HTMLElement>(':scope>.vjs-picture-in-picture-control');
+  playerControlTooltip(controlBar.querySelector('.vjs-subtitles-control>button'), '字幕');
   explicitIcon(pip, 'player-pip');
   // i 键归迷你播放器（YouTube 的 aria-keyshortcuts="i"），画中画只留按钮。
   const syncPipTooltip = playerControlTooltip(pip, '画中画');
@@ -460,6 +487,7 @@ function mountPlayerChromeLayout(player: VjsPlayer): void {
   syncFullscreenState();
   const controls = [
     pip,
+    controlBar.querySelector<HTMLElement>(':scope>.vjs-subtitles-control'),
     controlBar.querySelector<HTMLElement>(':scope>.vjs-peach-settings'),
     controlBar.querySelector<HTMLElement>(':scope>.vjs-peach-theater'),
     fullscreen,

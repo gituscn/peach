@@ -461,7 +461,7 @@ BoardUI 的 `chart-*` 档。点一个内容标签是「回目录并按它筛选�
    再 `npm --prefix frontend run build` 并把 `web/dist/` 一起提交。
 
 应用骨架与全局外壳沿用 `web/css/` 下仍被读取的分区。主界面组件与共享控件样式由 `react/styles.css` 汇入 `peach-app.css`。
-只由 `frontend/src` 产出标记的规则（含 `ui-kit` 模板与骨架拼的 HTML）住在组件旁的 css，类名带 `ui-` 前缀，经 `react/styles.css` 引入、随 `peach-app.css` 加载；壳也拼的类和尚未搬的类仍在 `web/css/` 与 `web/board.css`。原地换态的动效类在 `ui-kit/motion.css`。Video.js 的样式表不进首屏，由 `player/videojs.ts` 随播放器插到第一张样式表之前。
+只由 `frontend/src` 产出标记的规则（含 `ui-kit` 模板与骨架拼的 HTML）住在组件旁的 css，类名带 `ui-` 前缀，经 `react/styles.css` 引入、随 `peach-app.css` 加载；壳也拼的类和尚未搬的类仍在 `web/css/` 与 `web/board.css`。原地换态的动效类在 `ui-kit/motion.css`。播放器皮肤与字幕外观由 `player/player.css`、`player/subtitles.css` 随主界面样式加载；Video.js 10 的控件模块由 `player/videojs.ts` 按需加载。
 React 子树的样式是 Tailwind v4 加 BoardUI 主题，产物 `peach-app.css`；它与旧样式表同处一页的
 三条约束（工具类不分层、只扫描 `src/react/`、Preflight 限定在 `.peach-react` 里）写在
 `frontend/src/react/styles.css` 开头，逐字复制与没有复制的上游文件见 `frontend/src/react/boardui/ORIGIN.md`。

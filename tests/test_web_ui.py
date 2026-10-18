@@ -132,6 +132,7 @@ class WebUiPolicyTests(unittest.TestCase):
         ".watchprogress", ".vjs-play-progress", ".vjs-progress-holder",  # 进度与数据
         ".ptoggle:checked",  # Toggle 开态：Geist Toggle 实测轨道 rgb(0,112,243)
         ".flink", ".taste-history-guide-content a",  # 真正的链接
+        ".vjs-subtitles-control>button[aria-pressed=true]:after", "[data-player-quality-badge]",  # 播放器字幕开态与清晰度
     )
 
     def test_tungsten_is_reserved_for_focus_links_progress_and_toggle(self):
