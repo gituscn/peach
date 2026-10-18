@@ -5,11 +5,11 @@
  * 前缀 → 媒体根」的对应表。定期全量扫描不受这一页影响，它仍是漏发时的兜底。
  *
  * 地址、密钥不单独列成读数：它们只在那段配置里有用，抄两处只会抄漏一处。整段由服务端
- * 拼（`peach.push_discovery.clouddrive_config`），页面不在前端再拼一份。
+ * 拼（`peach.push_discovery.clouddrive_config`）。
  *
  * 前缀怎么算合法、根是不是已声明过，同样由服务端判；这一页只把那句原因显示出来。
  *
- * 整块只有一种行：读数写在它所属那个开关的说明里，配置那段也是一行（复制键在右），
+ * 整块只有一种行：读数写在它所属那个开关的说明里，配置通过共用代码块展示与复制，
  * 前缀表排在最后。读数与配置跟着各自的开关收起：网盘通道关着时那段配置指向一件不会
  * 发生的事；本机监视在总开关关着时读作「没有运行」，分不出是没开还是坏了。 */
 import { useState, type FormEvent } from 'react';
@@ -23,7 +23,7 @@ import { Switch } from '@/components/base/switch/switch';
 
 import { apiSend, errorMessage } from '../../api';
 import type { PushDiscoveryPrefix, PushDiscoveryState } from '../bundle';
-import { useOverlayScrollbar } from '../components/overlay-scrollbar';
+import { CodeBlock } from '../components/code-block';
 import { Disclosure, ErrorText, FieldLabel, Footer, Help, Rows, Section, Stack } from './section';
 import { busyProps, useAction } from './use-action';
 
@@ -38,7 +38,6 @@ export function PushDiscoveryForm({ initial, receipt }: {
   const [rows, setRows] = useState<PushDiscoveryPrefix[]>(initial.prefixes);
   const [failure, setFailure] = useState('');
   const action = useAction();
-  const configScroll = useOverlayScrollbar<HTMLPreElement>();
   const roots = state.media_roots;
   /* 读数说的是服务端此刻在跑什么，所以按已保存的开关收放：拨一下开关它们就跟着出现的话，
      写的还是上一次的状态，「本机文件夹监视 · 没有运行」会被读成「打开了也没用」。
@@ -70,12 +69,6 @@ export function PushDiscoveryForm({ initial, receipt }: {
       (next) => settle(next, '已更换共享密钥'), (cause) => setFailure(errorMessage(cause)));
   };
 
-  const copy = () => {
-    void navigator.clipboard.writeText(live.config_toml).then(
-      () => receipt('已复制 CloudDrive2 配置'),
-      () => setFailure('浏览器没让这一页写剪贴板，展开「查看配置」选中自己复制。'));
-  };
-
   const ingested = `已入库 ${live.queue.ingested} 个文件`
     + (live.queue.pending ? `，队列里还有 ${live.queue.pending} 条` : '');
   const watching = live.local_running
@@ -104,7 +97,6 @@ export function PushDiscoveryForm({ initial, receipt }: {
             : live.origin
               ? '还没有共享密钥，保存配置后生成。'
               : '要先有 CloudDrive2 能访问的 HTTPS 地址才能生成。'}>
-            {live.config_toml ? <Button variant="secondary" size="small" onClick={copy}>复制配置</Button> : null}
           </SettingsRow>
         ) : null}
       </Rows>
@@ -114,17 +106,8 @@ export function PushDiscoveryForm({ initial, receipt }: {
             {/* 收起来是因为抄它的人不用读它：三十行里只有地址和密钥两处跟这台机器有关，
                 两处都已经填好了。展开是留给要核对推到哪儿的那一次。 */}
             <Disclosure summary="查看配置">
-              {/* 只读的一段文本，不做成输入框：它没有可编辑的部分，贴进 CloudDrive2 的
-                  是原样这一段。换行要保留，所以窄屏下横向自己滚，不折行。
-                  纵向不设上限：这一整页本来就在设置面板自己的滚动区里，再套一层的话滚轮
-                  落在哪一层要看指针停在哪儿。横向那条用全站的覆盖式滑块，轨道挂在只裹着
-                  它的这层 `relative` 上。 */}
-              <div className="relative">
-                <pre ref={configScroll} tabIndex={0}
-                  className="overflow-x-auto rounded-2xl bg-background-tertiary-default p-3 text-caption-1-regular whitespace-pre text-text-primary">
-                  {live.config_toml}
-                </pre>
-              </div>
+              <CodeBlock code={live.config_toml} language="toml" label="CloudDrive2 配置" bounded={false} copyLabel="复制配置"
+                onCopy={() => receipt('已复制 CloudDrive2 配置')} />
               <Help>Windows 桌面版粘贴后显示「无效」时，把这段存成 .toml 文件，放进
                 %LOCALAPPDATA%\CloudDrive.WinUI\webhooks\ 目录。</Help>
             </Disclosure>

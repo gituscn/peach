@@ -26,7 +26,7 @@ it('配置块给的是服务端拼好的那一段，复制键把它整个写进�
   const receipt = vi.fn();
   const host = await mount(<PushDiscoveryForm initial={state()} receipt={receipt} />);
   // 卡片自己就是 `secondary`，代码块用同一档等于没有块——底色要比它亮一级才看得出来。
-  expect(host.querySelector('pre')?.className).toContain('bg-background-tertiary-default');
+  expect(host.querySelector('[data-code-block]')?.className).toContain('bg-background-tertiary-default');
   expect(host.querySelector('pre')?.textContent).toBe(TOML);
   expect(host.textContent).not.toContain('共享密钥');
   expect(host.textContent).not.toContain('通知地址');

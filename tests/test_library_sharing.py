@@ -69,64 +69,112 @@ class LibrarySharingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.service.save(body)
 
-    def test_complete_details_exclude_identity_and_do_not_write_caches(self):
+    def test_work_signals_are_deduplicated_and_collection_is_read_only(self):
         with self.database.write_transaction() as connection:
             for code, path in (('EXM-001', 'R:/private-person/movie-a.mp4'), ('EXM-001', 'R:/private-person/movie-b.mp4')):
                 connection.execute("INSERT INTO asset(location,path,name,code,medium,rating,play_count,watch_ratio,duration) "
-                                   "VALUES('local',?,'private-title',?,'video',4,2,.5,600)", (path, code))
-            connection.execute("INSERT INTO asset_tag(asset_id,tag,source) VALUES(1,'公开标签','manual')")
+                                   "VALUES('local',?,'private-title',?,'video',80,2,.5,600)", (path, code))
+            connection.execute("INSERT INTO asset_tag(asset_id,tag,source) VALUES(1,'手动标签','web-user')")
+            connection.execute("INSERT INTO asset_tag(asset_id,tag,source) VALUES(2,'720P','metadata')")
+            connection.execute("INSERT INTO asset_tag(asset_id,tag,source) VALUES(1,'已隐藏标签','web-user')")
+            connection.execute("INSERT INTO asset_tag_preference(profile_id,asset_id,normalized_tag,hidden,updated_at) "
+                               "VALUES('local-default',1,'已隐藏标签',1,'now')")
             connection.execute("INSERT INTO asset_preference(profile_id,asset_id,liked,updated_at) VALUES('local-default',1,1,'2026-10-18')")
         before = self.database.db_path.read_bytes()
         payload, data = sharing.collect(self.contract)
         self.assertEqual(self.database.db_path.read_bytes(), before)
         self.assertFalse((self.contract.taste_history_store.parent / 'preference-cache.json').exists())
         self.assertFalse((self.contract.taste_history_store.parent / 'browser-preference-cache.json').exists())
-        self.assertEqual(set(payload), {'schema', 'peach', 'period', 'library', 'preferences'})
+        self.assertEqual(set(payload), {'schema', 'peach', 'period', 'library', 'preferences', 'coverage'})
         self.assertEqual(len(payload['library']), 1)
         work = payload['library'][0]
         self.assertEqual(work['code'], 'EXM-001')
-        self.assertEqual(work['copies'], 2)
-        self.assertEqual(work['tags'], ['公开标签'])
-        self.assertEqual(work['ratings'], [4])
+        self.assertEqual(work['manual_tags'], ['手动标签'])
+        self.assertEqual(work['rating'], 80)
         self.assertTrue(work['liked'])
         self.assertEqual(work['play_count'], 4)
         self.assertEqual(work['watch_ratio'], .5)
-        self.assertEqual(work['duration_seconds'], 600)
+        self.assertEqual(payload['coverage'], {'active_files': 2, 'coded_files': 2, 'coded_works': 1, 'uncoded_items': 0})
+        self.assertEqual(payload['preferences']['tag'][0]['works']['collected'], 1)
+        self.assertEqual(payload['preferences']['tag'][0]['works']['ratings'], {'80.0': 1})
+        self.assertTrue(sharing.valid_payload(payload))
         for private in ('private-person', 'private-title', 'movie-a', 'movie-b', 'asset_id', 'visited_at', 'last_played',
-                        'profile_id', 'fingerprint', 'R:/'):
+                        'profile_id', 'fingerprint', 'R:/', '720P', '已隐藏标签', 'duration_seconds', 'entities'):
             self.assertNotIn(private, data.decode())
 
-    def test_every_preference_dimension_preserves_names_strengths_and_evidence(self):
-        kinds = ('performer', 'creator', 'tag', 'studio', 'series', 'era', 'length')
-        model = ({kind: {index: .75} for index, kind in enumerate(kinds)},
-                 {kind: {index: f'名称-{kind}'} for index, kind in enumerate(kinds)},
-                 {kind: {index: ['馆藏积累', '观看与反馈']} for index, kind in enumerate(kinds)})
-        with mock.patch('peach.taste_preferences.preference_profile', return_value=model) as profile:
-            payload, _ = sharing.collect(self.contract)
-        self.assertEqual(set(payload['preferences']), set(kinds))
-        self.assertFalse(profile.call_args.kwargs['cache'])
-        for kind in kinds:
-            self.assertEqual(payload['preferences'][kind], [{'name': f'名称-{kind}', 'strength': .75,
-                                                            'evidence': ['馆藏积累', '观看与反馈']}])
+    def test_entity_distributions_include_uncoded_signals_and_explicit_favorites(self):
+        from peach.entities import upsert_asset_entity
+        with self.database.write_transaction() as connection:
+            for code in ('EXM-001', 'EXM-001', None):
+                connection.execute("INSERT INTO asset(location,path,name,code,medium,rating,play_count,duration,release_date) "
+                                   "VALUES('local',?,'title',?,'video',60,1,2400,'2021-01-01')", (str(code) + str(connection.total_changes), code))
+            for aid in (1, 2, 3):
+                for kind in ('performer', 'creator', 'studio', 'series'):
+                    upsert_asset_entity(connection, asset_id=aid, kind=kind, role=kind, name='名称-' + kind, source='test', confidence=1)
+            eid = connection.execute("SELECT id FROM entity WHERE kind='performer'").fetchone()[0]
+            connection.execute("UPDATE profile SET settings_json=? WHERE id='local-default'",
+                               (json.dumps({'libraryShortcuts': {'favorites': [{'entity_id': eid}]}}),))
+            connection.execute("UPDATE asset SET feedback='dislike',feedback_at=5,rating=100 WHERE id=2")
+            connection.execute("UPDATE asset SET disposal='trash' WHERE id=3")
+            connection.execute("INSERT INTO asset(location,path,name,medium,rating) VALUES('local','uncoded','title','image',20)")
+            upsert_asset_entity(connection, asset_id=4, kind='performer', role='performer', name='名称-performer', source='test', confidence=1)
+            connection.execute("INSERT INTO watch_queue(profile_id,asset_id,added_at,source) VALUES('local-default',1,'now','web')")
+        payload, _ = sharing.collect(self.contract)
+        self.assertEqual(payload['coverage'], {'active_files': 3, 'coded_files': 2, 'coded_works': 1, 'uncoded_items': 1})
+        self.assertEqual(payload['library'], [{'code': 'EXM-001', 'rating': 80, 'watch_later': True,
+                                              'play_count': 2, 'feedback': 'dislike'}])
+        performer = payload['preferences']['performer'][0]
+        self.assertEqual(performer, {'name': '名称-performer',
+            'works': {'collected': 1, 'liked': 0, 'disliked': 1, 'watched': 1, 'ratings': {'80.0': 1}},
+            'uncoded': {'collected': 1, 'liked': 0, 'disliked': 0, 'watched': 0, 'ratings': {'20.0': 1}}, 'favorite': True})
+        self.assertEqual(payload['preferences']['era'][0]['name'], '2020')
+        self.assertEqual(payload['preferences']['length'][0]['name'], '1')
+        self.assertEqual(payload['preferences']['tag'], [])
+        self.assertTrue(sharing.valid_payload(payload))
 
-    def test_large_complete_snapshot_uses_lossless_compression(self):
+    def test_large_population_projection_uses_lossless_compression(self):
         count = 12000
-        model = ({'tag': {index: .75 for index in range(count)}},
-                 {'tag': {index: '公开标签' * 100 + str(index) for index in range(count)}},
-                 {'tag': {index: ['馆藏积累'] for index in range(count)}})
-        with mock.patch('peach.taste_preferences.preference_profile', return_value=model):
-            payload, data = sharing.collect(self.contract)
+        with self.database.write_transaction() as connection:
+            connection.executemany("INSERT INTO asset(location,path,name,code) VALUES('local',?,'title',?)",
+                                   ((str(i), f'EXM-{i:05}') for i in range(count)))
+        payload, data = sharing.collect(self.contract)
         wire = sharing.compressed(data)
-        self.assertGreater(len(data), 10 * 1024 * 1024)
         self.assertLess(len(wire), sharing.MAX_BYTES)
         self.assertEqual(gzip.decompress(wire), data)
-        self.assertEqual(len(json.loads(gzip.decompress(wire))['preferences']['tag']), count)
+        self.assertEqual(len(json.loads(gzip.decompress(wire))['library']), count)
         self.assertTrue(sharing.valid_payload(payload))
         self.assertEqual(wire[3:8], bytes(5), 'gzip 不含文件名或生成时间')
 
     def test_research_project_must_be_separate_from_diagnostics(self):
         with mock.patch.dict(os.environ, {'PEACH_SENTRY_DSN': DSN}):
             self.assertEqual(sharing.target(), '')
+
+    def test_schema_three_consent_does_not_authorize_population_projection(self):
+        self.enable()
+        path = self.config.directory('state') / 'library-sharing.json'
+        state = json.loads(path.read_text())
+        path.write_text(json.dumps({**state, 'schema': 3}))
+        with mock.patch.object(sharing, 'collect') as collect:
+            self.service.attempt()
+            collect.assert_not_called()
+        self.assertFalse(sharing.snapshot(self.config)['enabled'])
+
+    def test_transport_rejects_invalid_signal_and_distribution_values(self):
+        from copy import deepcopy
+        with self.database.write_transaction() as connection:
+            connection.execute("INSERT INTO asset(location,path,name,code,rating) VALUES('local','a','title','EXM-001',80)")
+        payload, _ = sharing.collect(self.contract)
+        self.assertTrue(sharing.valid_payload(payload))
+        for key, invalid in [('rating', float('nan')), ('rating', 101), ('rating', True),
+                             ('liked', 'yes'), ('manual_tags', ['R:/private']), ('play_count', -1),
+                             ('watch_ratio', 1.1), ('entities', {'performer': ['name']}), ('tags', ['720P'])]:
+            altered = deepcopy(payload)
+            altered['library'][0][key] = invalid
+            self.assertFalse(sharing.valid_payload(altered), (key, invalid))
+        altered = deepcopy(payload)
+        altered['preferences']['tag'] = [{'name': 'tag', 'works': {'collected': 1, 'liked': 0, 'disliked': 0,
+                                         'watched': 0, 'ratings': {'80': 2}}}]
+        self.assertFalse(sharing.valid_payload(altered))
 
     def test_installer_saves_explicit_selection_without_reading_or_sending(self):
         import runpy

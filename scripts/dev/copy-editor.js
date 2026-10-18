@@ -9,17 +9,18 @@
     [data-copy-highlight]{position:fixed;pointer-events:none;z-index:2147483646;outline:1.5px dashed var(--tungsten);outline-offset:3px;border-radius:var(--badge-radius);display:none}
     [data-copy-inline]{outline:2px solid var(--tungsten);outline-offset:3px;border-radius:var(--badge-radius);background:var(--hover);user-select:text;cursor:text}
     [data-copy-input]{position:fixed;z-index:2147483647;padding:2px 6px;border:0;border-radius:var(--badge-radius);outline:2px solid var(--tungsten);background:var(--ground);color:var(--ink)}
-    [data-copy-bar]{position:fixed;bottom:calc(16px + var(--demo-notice-height,0px));left:50%;transform:translateX(-50%);z-index:2147483647;padding:8px 14px;border-radius:var(--floating-radius);display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--ground,#fff);color:var(--ink,#111);box-shadow:0 2px 18px #0003;font:13px/1.4 system-ui;max-width:calc(100vw - 32px);width:max-content}
-    [data-copy-bar] button{font:inherit;cursor:pointer}
-    [data-copy-bar] [role=status]{flex-basis:100%}
+    [data-copy-bar]>[role=status]{max-width:min(360px,calc(100vw - 64px));white-space:normal;overflow-wrap:anywhere}
+    @media(max-width:600px){[data-copy-bar]>[role=status]{flex-basis:100%;text-align:center}}
     [data-copy-choice]{position:fixed;z-index:2147483647;background:var(--ground);color:var(--ink);border:1px solid var(--border-15);border-radius:var(--control-radius);padding:8px;max-width:calc(100vw - 32px)}
   `;
   document.head.append(css);
   const highlight = document.createElement('div'); highlight.dataset.copyEditor = ''; highlight.dataset.copyHighlight = '';
+  const host = document.createElement('div'); host.className = 'peach-react'; host.dataset.copyEditor = ''; host.dataset.batchScope = '';
   const bar = document.createElement('div'); bar.dataset.copyEditor = ''; bar.dataset.copyBar = '';
-  const title = document.createElement('b'); title.textContent = '改字模式';
-  const hint = document.createElement('span'); hint.textContent = '点文字直接改，回车或点别处保存，Esc 取消';
-  const status = document.createElement('span'); status.setAttribute('role', 'status'); bar.append(title, hint);
+  bar.dataset.selectionDock = ''; bar.dataset.glassPane = ''; bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', '文案编辑');
+  const hint = document.createElement('span'); hint.id = 'peach-copy-hint'; hint.hidden = true; hint.textContent = '点击文字修改，回车或点别处保存，Esc 取消；暂停编辑后可操作页面。';
+  bar.setAttribute('aria-describedby', hint.id);
+  const status = document.createElement('span'); status.setAttribute('role', 'status'); status.textContent = '编辑文案'; bar.append(status);
   const say = text => { status.textContent = text; };
   const button = (text, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.onclick = fn; bar.append(b); return b; };
   const toggle = button('暂停编辑', () => {
@@ -30,8 +31,8 @@
     const url = URL.createObjectURL(new Blob([JSON.stringify(edits, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = 'peach-copy-edits.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
-  button('退出', () => { if (saving) return; commit(true); const url = new URL(location.href); url.searchParams.delete('edit'); location.href = url; });
-  bar.append(status); document.body.append(highlight, bar);
+  button('退出编辑', () => { if (saving) return; commit(true); const url = new URL(location.href); url.searchParams.delete('edit'); location.href = url; });
+  host.append(hint, bar); document.body.append(highlight, host);
   function apply() {
     if (editing || saving) return;
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -83,7 +84,7 @@
     box.setAttribute('aria-label', '修改文字'); editing = { node, before, lead, trail, core, box, original: originals.get(node) || core }; box.focus();
     if (box.tagName === 'INPUT') box.select();
     else { const range = document.createRange(); range.selectNodeContents(box); getSelection().removeAllRanges(); getSelection().addRange(range); }
-    highlight.style.display = 'none'; say('回车或点别处保存，Esc 取消');
+    highlight.style.display = 'none'; say('Enter 保存 · Esc 取消');
     box.addEventListener('keydown', event => {
       event.stopPropagation(); if (event.isComposing) return;
       if (event.key === 'Enter') { event.preventDefault(); commit(); }
@@ -116,7 +117,7 @@
     if (!replacement) { say('不能留空，没有保存'); return; }
     saving = true; bar.setAttribute('aria-busy', 'true'); say('保存中…');
     try {
-      let message = '已保存到本浏览器';
+      let message = '已保存草稿';
       if (source) {
         const response = await fetch('/dev/copy-candidates?text=' + encodeURIComponent(ed.core)), candidates = await response.json();
         if (!response.ok || !candidates.length) throw Error('未找到静态源文案');
@@ -124,10 +125,10 @@
         if (!candidate) { say('已取消'); return; }
         const saved = await fetch('/dev/copy-save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ original: ed.core, replacement, candidate }) });
         const result = await saved.json(); if (!saved.ok) throw Error(result.error || '保存失败');
-        message = result.needs_build ? '已保存源码；前端重建后在普通模式生效' : '已保存源码';
+        message = '已保存修改';
       }
       edits[ed.original] = replacement; originals.set(ed.node, ed.original); localStorage.setItem(key, JSON.stringify(edits)); ed.node.data = ed.lead + replacement + ed.trail;
-      say(message + '「' + replacement.slice(0, 24) + (replacement.length > 24 ? '…' : '') + '」');
+      say(message);
     } catch (error) { ed.node.data = ed.before; say('没保存：' + error.message); }
     finally { saving = false; bar.removeAttribute('aria-busy'); apply(); }
   }
