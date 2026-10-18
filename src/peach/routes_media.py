@@ -34,7 +34,7 @@ from . import (
     jav_poster_crop, link_marks, link_status, scraping_access, site_icons, social_links, subtitles,
     taste_history, timeline_sheets, web_follow,
 )
-from .config import GENERATED_DIR
+from .config import GENERATED_DIR, PROJECT_ROOT
 from .entities import resolve_entity_id
 from .follow import FollowSourceError
 from .follow_avatar import profile_avatar_tiers, profile_identities, resolve_official_avatar
@@ -1194,7 +1194,7 @@ def link_mark(request: Request, id: int = 0, args: dict[str, str] = Depends(requ
 @router.api_route("/site-mark", methods=["GET", "HEAD"])
 def site_mark(request: Request, source: str = "", domain: str = "",
               args: dict[str, str] = Depends(require_auth)):
-    """采集来源与口味排行的站点圆标。
+    """采集来源的已核对 favicon 与口味排行的站点圆标。
 
     两个参数都不是地址，是键：`source` 查 `scraping_access.SOURCES`，`domain` 查
     `taste_history.TASTE_DOMAIN_SUFFIXES`，都不在表里就是 404。和 `/link-mark`
@@ -1212,6 +1212,12 @@ def site_mark(request: Request, source: str = "", domain: str = "",
         spec = scraping_access.SOURCES.get(source)
         if spec is None:
             return JSONResponse({"error": "no such source"}, status_code=404)
+        # 来源身份使用已核对的原图，保留站点 favicon 的颜色和画布。
+        icon = PROJECT_ROOT / "resources" / "site-marks" / f"{source}.png"
+        if icon.is_file():
+            result = FileResponse(icon, media_type="image/png")
+            result.headers["Cache-Control"] = "public, no-cache"
+            return result
         target = spec["login"]
     else:
         host = domain.casefold().strip().removeprefix("www.").rstrip(".")

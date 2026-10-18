@@ -14,8 +14,8 @@ const props = (section: string, path: string, patch: Partial<ManageHeaderProps> 
   ({ section, path, sections: SECTIONS, menu: MENU, trash: null, ...patch });
 
 describe('页头判据', () => {
-  it('配置下的诊断入口显示系统诊断标题', () => {
-    expect(manageHeaderView(props('configuration', '/diagnostics'))).toMatchObject({ title: '系统诊断', compact: true });
+  it('诊断分区共用配置页标题', () => {
+    expect(manageHeaderView(props('configuration', '/settings/diagnostics'))).toMatchObject({ title: 'Peach 配置', compact: true });
   });
   it('不在管理区时整块不画', () => {
     expect(manageHeaderView(props('', '/'))).toBeNull();

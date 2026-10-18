@@ -725,9 +725,11 @@ def post_route_redirect(request: Request, item_id: int,
 @router.api_route("/scraping", methods=["GET", "HEAD"])
 @router.api_route("/configuration", methods=["GET", "HEAD"])
 @router.api_route("/follow-manage", methods=["GET", "HEAD"])
+@router.api_route("/diagnostics", methods=["GET", "HEAD"])
 def management_route_redirect(request: Request, args: dict[str, str] = Depends(require_page_auth)):
     paths = {"/activity": "/tasks", "/scraping": "/sources",
-             "/configuration": "/settings/library", "/follow-manage": "/subscriptions"}
+             "/configuration": "/settings/library", "/follow-manage": "/subscriptions",
+             "/diagnostics": "/settings/diagnostics"}
     return _page_redirect(request, paths[request.url.path])
 
 
@@ -735,7 +737,7 @@ def management_route_redirect(request: Request, args: dict[str, str] = Depends(r
 def settings_section_route(request: Request, section: str,
                            args: dict[str, str] = Depends(require_page_auth)):
     if section not in {"appearance", "playback", "jav", "search", "content", "library",
-                       "subscriptions", "downloads", "network", "maintenance"}:
+                       "subscriptions", "downloads", "network", "maintenance", "diagnostics"}:
         raise HTTPException(404, "not found")
     return index(request, args)
 
@@ -811,7 +813,6 @@ def entity_route(request: Request, name: str,
 # 配置页是主站里的一屏（island），数据走 `/api/configuration`。未配置时 `index()` 给的是
 # 首次运行表单，正好就是「请先完成首次设置」该长的样子。
 @router.api_route("/settings", methods=["GET", "HEAD"])
-@router.api_route("/diagnostics", methods=["GET", "HEAD"])
 def client_route(request: Request, item_id: int | None = None,
                  args: dict[str, str] = Depends(require_page_auth)):
     return index(request, args)

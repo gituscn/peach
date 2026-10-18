@@ -29,7 +29,6 @@ it('分区依次是运行信息、安装教程、卸载；缺依赖的那条运�
   expect([...host.firstElementChild!.children].map((node) => node.getAttribute('aria-label')))
     .toEqual(['运行信息', '安装教程', '卸载 Peach']);
   const facts = section(host, '运行信息')!;
-  expect(facts.querySelector('a[href="/diagnostics"]')?.textContent).toBe('打开系统诊断');
   expect([...facts.querySelectorAll('dt')].map((dt) => dt.textContent)).toEqual(['版本', 'FFmpeg']);
   const link = facts.querySelector('a[href="https://ffmpeg.org/download.html"]');
   expect(link?.getAttribute('target')).toBe('_blank');

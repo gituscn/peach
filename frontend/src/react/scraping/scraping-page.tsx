@@ -8,10 +8,9 @@
  *   新结果。轮询跟着组件走，遗留壳换页时卸根，它自己就停了。 */
 import { useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { RiArrowRightLine, RiBuildingLine } from '@remixicon/react';
+import { RiArrowRightLine } from '@remixicon/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Radio } from 'react-aria-components';
-import { siteMarkUrl } from '@peach/legacy/core';
 
 import { SettingsRow } from '@/components/application/settings/settings-rows';
 import { Button } from '@/components/base/buttons/button';
@@ -25,6 +24,7 @@ import type { ScrapingProps } from '../bundle';
 import { LoadingDots } from '../components/loading-dots';
 import { Note } from '../components/note';
 import { Page } from '../components/page';
+import { SiteMark } from '../components/site-mark';
 import { SEGMENT, SEGMENTED_TRACK, SegmentedRadioGroup as RadioGroup } from '../components/segmented';
 import { queryClient } from '../query';
 import {
@@ -56,22 +56,6 @@ export function linkHost(url: string): string {
   }
 }
 const COOKIE_METHODS = [['paste', '粘贴 Cookie'], ['file', '导入文件']] as const;
-
-/* 前面是站点自己的图标（指对象），后面是外链箭头（指形态）——两枚都在
-   `vercel-geist-button-icons.md` 的「加图标」那一侧，中间的地址不重复说这两件事。
-   图标走服务端的 `/site-mark`：这一页确实本来就要连这些站，但浏览器直连只拿得到
-   `/favicon.ico` 那一枚 16px，站点自己备好的 apple-touch-icon 和 SVG 问都不问；
-   需要代理才通的来源更是常年空着。取不到时把 `<img>` 摘掉，不留破图。 */
-function SiteMark({ source }: { source: string }) {
-  if (source === 'makers') return <RiBuildingLine aria-hidden className="size-4 shrink-0" />;
-  // 这几站的公开图标随静态资源提供，验证页和离线回放不影响来源身份。
-  const bundled = ['javten', 'fc2ppvdb', 'avwikidb', 'minnano-av', 'github'].includes(source);
-  return (
-    <img src={bundled ? `/site-icon/${source}.png` : siteMarkUrl({ source })} alt="" width={16} height={16} loading="lazy"
-      onError={(event) => event.currentTarget.remove()}
-      className="size-4 shrink-0 rounded-sm object-contain" />
-  );
-}
 
 function GitHubMark() {
   return <SiteMark source="github" />;

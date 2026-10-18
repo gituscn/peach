@@ -278,8 +278,9 @@ describe('设计决定：控件、状态与首页顶部', () => {
       // 数据管理子页继续保留同一趟尚未处理的失败提示。
       await failed.page.goto(new URL('/junk-files', failed.page.url()).href, { waitUntil: 'load' });
       await failed.page.locator('[data-junk-filters]').waitFor({ state: 'visible', timeout: 15_000 });
-      await failed.page.waitForTimeout(1_000);
-      assert.equal(await failed.page.locator('#toasts [data-processing-dock][role="alert"]').count(), 1,
+      const retainedFailure = failed.page.locator('#toasts [data-processing-dock][role="alert"]');
+      await retainedFailure.waitFor({ state: 'visible', timeout: 15_000 });
+      assert.equal(await retainedFailure.count(), 1,
         '未处理的失败在换页后仍可找到');
     } finally {
       await failed.close();

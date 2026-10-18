@@ -107,9 +107,13 @@ function openCleanupSection(section: DataCleanupSection, actions: ShellActions, 
  * 紧接着就读它画出来的结构（配置页按地址里的 `#peachProxy` 滚过去，那一刻选中的页签已经是「网络与访问」）。 */
 const configurationRoute = (path: ConfigurationPath): ManagedRoute<ManagedOpenProps['/settings/library']> => ({
   element: <ManagedMatch path={path} />,
-  prefetch: (_open, signal) => prefetchConfiguration(signal),
-  page: (open, actions) => <ConfigurationPage receipt={message => actions.receipt(message)}
-    reopenTutorial={actions.reopenTutorial} section={open.section ?? ''} />,
+  prefetch: async (_open, signal) => {
+    await Promise.all([prefetchConfiguration(signal), ...(path === '/settings/diagnostics' ? [prefetchDiagnostics(signal)] : [])]);
+  },
+  page: (open, actions, go) => <ConfigurationPage receipt={message => actions.receipt(message)}
+    reopenTutorial={actions.reopenTutorial} section={path === '/settings/diagnostics' ? '系统诊断' : open.section ?? ''}
+    diagnostics={<DiagnosticsPage navigate={go} openItem={actions.openItem} receipt={message => actions.receipt(message)}
+      configure={section => { actions.requestConfigurationSection(section); go(settingsPath(section)) }} />} />,
 });
 
 export const MANAGED_ROUTES: ManagedRouteTable = {
@@ -182,13 +186,7 @@ export const MANAGED_ROUTES: ManagedRouteTable = {
   '/settings/downloads': configurationRoute('/settings/downloads'),
   '/settings/network': configurationRoute('/settings/network'),
   '/settings/maintenance': configurationRoute('/settings/maintenance'),
-  '/diagnostics': {
-    element: <ManagedMatch path="/diagnostics" />,
-    prefetch: (_open, signal) => prefetchDiagnostics(signal),
-    page: (_open, actions, go) => <DiagnosticsPage navigate={go} openItem={actions.openItem}
-      receipt={message => actions.receipt(message)}
-      configure={section => { actions.requestConfigurationSection(section); go(settingsPath(section)) }} />,
-  },
+  '/settings/diagnostics': configurationRoute('/settings/diagnostics'),
   '/tasks': {
     element: <ManagedMatch path="/tasks" />,
     prefetch: (_open, signal) => prefetchTasks(signal),

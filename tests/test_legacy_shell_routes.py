@@ -25,7 +25,7 @@ FROZEN_ROUTES = frozenset({
     "/performers", "/creators", "/studios", "/agencies", "/tags", "/stats", "/taste",
     "/review", "/data-cleanup", "/duplicates", "/resource-sync", "/quality-goals",
     "/sources", "/follow", "/subscriptions", "/tasks", "/immerse", "/wall",
-    "/diagnostics", "/jav", "/works/:code", "/settings", "/settings/appearance",
+    "/settings/diagnostics", "/jav", "/works/:code", "/settings", "/settings/appearance",
     "/settings/playback", "/settings/jav", "/settings/search", "/settings/content",
     "/settings/library", "/settings/subscriptions", "/settings/downloads",
     "/settings/network", "/settings/maintenance",

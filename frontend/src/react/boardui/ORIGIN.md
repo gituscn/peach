@@ -65,7 +65,7 @@
 | 二选一切换 | `../scraping/scraping-page.tsx` 提供 Cookie 的两种方式用 React Aria 的 `RadioGroup`，选中项取 `background-tertiary-default` 配 `text-primary` | 注册表里 `tabs` 是页面级导航、`segmented-control` 没有条目；这里切的是同一个字段的两种填法，不是两块内容 |
 | 选文件 | 同上：原生 `input[type=file]` 只留着接文件，点它的是一颗 `secondary` 按钮，选中的文件名跟在旁边 | 注册表里没有文件选择组件；原生控件的按钮长相由浏览器决定，改不动 |
 | 分区标题旁的次要内容 | `../settings/section.tsx` 的 `Section` 收一个 `aside`，标题占剩下的宽度、它靠右（来源站点的站标与登录地址） | `SettingsSectionLabel` 只画标题；把外链塞进标题里会进无障碍名称 |
-| 站点标识 | `../scraping/scraping-page.tsx` 的 `SiteMark` 直接画 `<img>` 取服务端的 `/site-mark`，取不到就把节点摘掉 | `../settings/section.tsx` 的 `SourceMark` 只认雪碧图字形与内嵌 PNG，采集来源的图标是一条服务端地址 |
+| 站点标识 | `../components/site-mark.tsx` 的 `SiteMark` 读取本站缓存与静态站标，失败时显示通用站点字形；来源凭据与诊断页共用 | `../settings/section.tsx` 的 `SourceMark` 只认雪碧图字形与内嵌 PNG，采集来源的图标是一条服务端地址 |
 | 主键带下拉 | `../library-processing/processing-actions.tsx` 的 `ProcessingActions`：扫描与缺图补全共用，触发键是一颗 `iconOnly` 的 `Button`，面板用 React Aria 的 `Popover` + `MenuDialog`，行的外观取 `components/base/dropdown/menu-styles.ts` | `dropdown` 条目的 `DropdownTrigger` 自己就是那颗按钮、外观全由 `className` 给，`@shadcn/lint` 的 `no-restyle` 只放行布局类，套不进 `Button` 的档位 |
 | 常驻处理任务 | `../library-processing/library-processing-notice.tsx` 与 `library-processing-dock.tsx` 组合进度、折叠正文、估时和直接控制，Sonner 按目标栈管理位置与持久停留 | 用户要求参考公开 Agent Progress 自行实现，任务由服务端真实阶段推进；取证与领域差异见 `docs/reference-snapshots/processing-task-controls.md` |
 | 进度环 | 同上的 `Gauge`：SVG 两圈，`pathLength={100}` 把一圈长度钉成 100，画出来的那一段就是当前阶段百分比 | 任务总量未知时使用静态任务图标，已知总量才绘制读数 |

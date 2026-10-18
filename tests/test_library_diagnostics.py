@@ -89,7 +89,7 @@ class LibraryDiagnosticsTests(unittest.TestCase):
         with patch.object(diagnostics, 'cooldown_state', return_value=(0, 0)):
             result = diagnostics.sources(self.settings, self.config, now=1_700_000_100)
         self.assertEqual(result[0]['status'], 'ok')
-        self.assertEqual(result[1]['status'], 'unknown')
+        self.assertEqual(result[1]['status'], 'unchecked')
         self.assertIsNone(result[1]['last_success_at'])
         with patch.object(diagnostics, 'cooldown_state', return_value=(1_700_000_200, 1)):
             cooling = diagnostics.sources(self.settings, self.config, now=1_700_000_100)
@@ -100,6 +100,21 @@ class LibraryDiagnosticsTests(unittest.TestCase):
     def test_cover_inventory_permission_errors_are_unknown(self):
         with patch.object(diagnostics.os, 'scandir', side_effect=PermissionError):
             self.assertIsNone(diagnostics.inventory(self.root))
+
+    def test_source_history_and_absent_checks_have_explicit_states(self):
+        from peach.scraping_access import record_source_check
+        root = self.config.directory('secrets')
+        record_source_check(root, 'airav', 'metadata', {
+            'ok': True, 'kind': 'ok', 'reason': 'parsed', 'checked_at': 1_700_000_000})
+        rows = {row['source']: row for row in diagnostics.sources(self.settings, self.config, now=1_700_172_800)}
+        self.assertEqual(rows['airav']['status'], 'stale')
+        self.assertIn('解析成功', rows['airav']['reason'])
+        self.assertIsNotNone(rows['airav']['last_success_at'])
+        self.assertEqual(rows['avsox']['status'], 'unchecked')
+        self.assertIn('尚无', rows['avsox']['reason'])
+        self.assertNotIn('fc2club', rows)
+        self.assertFalse({'makers', 'prestige', 'faleno', 'dahlia'} & rows.keys())
+        self.assertTrue({'mgstage', 'dmm', 'fc2'} <= rows.keys())
 
     def test_connection_and_parsing_evidence_remain_distinct_for_all_bridge_sources(self):
         from peach.scraping_access import record_source_check

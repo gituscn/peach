@@ -8,7 +8,7 @@ vi.mock('@peach/legacy/core', async importOriginal => ({
 }));
 
 describe('Board 页面骨架', () => {
-  it.each(['/stats', '/taste', '/subscriptions', '/settings/library', '/tasks', '/duplicates', '/quality-goals', '/playlists'])('为 %s 提供单一等待语义', path => {
+  it.each(['/stats', '/taste', '/subscriptions', '/settings/library', '/settings/diagnostics', '/tasks', '/duplicates', '/quality-goals', '/playlists'])('为 %s 提供单一等待语义', path => {
     const root = document.createElement('div');
     root.innerHTML = boardPageSkeleton(path);
     expect(root.querySelectorAll('[role="status"]')).toHaveLength(1);

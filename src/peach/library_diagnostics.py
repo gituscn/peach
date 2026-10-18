@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 from .catalog_rules import normalise_code_key, release_code_from_text
+from .metadata_policy import MAKER_SOURCES
+from .metadata_routes import AMANE_STAGE, ROUTES
 from .scraping_access import SOURCES, cooldown_state, source_checks
 
 LIMIT = 500
@@ -124,7 +126,7 @@ SOURCE_CHECK_REASONS = {
 }
 
 
-def _source_health(cooling, failed, fresh, recent, connection_ok, reason_key):
+def _source_health(cooling, failed, fresh, recent, connection_ok, reason_key, *, has_success, has_check):
     """来源诊断优先报告冷却与失败，再报告解析和连接证据。"""
     if cooling:
         return "warning", "来源正在冷却"
@@ -132,13 +134,17 @@ def _source_health(cooling, failed, fresh, recent, connection_ok, reason_key):
         return "warning", SOURCE_CHECK_REASONS.get(reason_key, "来源未取得资料")
     if fresh:
         return "ok", "资料解析通过"
+    if has_success:
+        return "stale", "曾解析成功，近期解析状态待复查"
     if recent and connection_ok:
         return "unknown", "连接检查通过；解析状态未取得"
-    return "unknown", "当前解析状态未取得"
+    if has_check:
+        return "stale", "已有检查记录，解析状态待复查"
+    return "unchecked", "尚无检查或解析记录，可在来源和凭证中检查连接"
 
 
-def sources(settings, config, *, now=None):
-    now = time.time() if now is None else now
+def _profile_success(settings):
+    """从女优资料的来源证据读取最近解析成功时间。"""
     success = {"minnano-av": None, "javdb": None}
     try:
         with closing(sqlite3.connect(settings.db_path.resolve().as_uri() + "?mode=ro", uri=True, timeout=1)) as connection:
@@ -159,13 +165,22 @@ def sources(settings, config, *, now=None):
                     break
     except (sqlite3.Error, OSError, ValueError):
         pass
+    return success
+
+
+def sources(settings, config, *, now=None):
+    now = time.time() if now is None else now
+    success = _profile_success(settings)
     result = []
+    optional = set(AMANE_STAGE) - {source for chain in ROUTES.values() for source in chain}
     for key in dict.fromkeys([*success, *SOURCES]):
-        if key == "instagram":
+        if key == "instagram" or key in MAKER_SOURCES:
             continue
         until, _ = cooldown_state(config.directory("secrets"), key)
         cooling = now < until < now + 366 * 86400
         checks = source_checks(config.directory("secrets"), key)
+        if key in optional and not cooling and not checks:
+            continue
         parsed = checks.get("metadata", {})
         connection = checks.get("connection", {})
         candidate = timestamp(parsed.get("last_success_at"))
@@ -178,7 +193,8 @@ def sources(settings, config, *, now=None):
         recent = 0 <= now - float(last.get("checked_at", 0)) <= 86400
         reason_key = last.get("reason", "") if recent else ""
         failed = recent and not last.get("ok") and reason_key != "not_found"
-        status, reason = _source_health(cooling, failed, fresh, recent, connection.get("ok"), reason_key)
+        status, reason = _source_health(cooling, failed, fresh, recent, connection.get("ok"), reason_key,
+                                        has_success=bool(stamp), has_check=bool(last))
         result.append({"source": key, "label": SOURCES[key]["label"],
                        "status": status,
                        "reason": reason, "last_check_at": timestamp(last.get("checked_at")),
