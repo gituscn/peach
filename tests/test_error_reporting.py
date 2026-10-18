@@ -291,6 +291,13 @@ class ErrorReportingTests(unittest.TestCase):
         self.assertEqual(browser["stack"], "at render")
         self.assertEqual(browser['line'], 21)
         self.assertEqual(browser['source_file'], 'app-abcd.js')
+        from peach import remote_reporting
+        with mock.patch.object(remote_reporting, 'send') as send:
+            response = client.post(path, json={'message': 'request cancelled', 'error_name': 'AbortError',
+                                               'stack': 'at peach-app.js:12:34'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.records()[-1]['error_name'], 'AbortError')
+        send.assert_not_called()
         with mock.patch("peach.diagnostics.report", side_effect=RuntimeError("diagnostics unavailable")):
             response = client.get("/api/diagnostics/bundle")
         self.assertEqual(response.status_code, 200)
@@ -395,25 +402,81 @@ class ErrorReportingTests(unittest.TestCase):
         loop.default_exception_handler.assert_called_once()
 
     def asyncio_callback(self, error, *, module='asyncio.proactor_events',
-                         name='_call_connection_lost', business=False, cleared=False):
+                         name='_call_connection_lost', business=False, cleared=False,
+                         recoverable=False, close_error=None, socket_override=None, server_override=None):
         namespace = {'__name__': module, 'failure': error}
+        from asyncio.proactor_events import _ProactorBasePipeTransport
+        namespace['Base'] = _ProactorBasePipeTransport if recoverable else object
         if business:
             exec(compile('def fail():\n    raise failure\n', 'peach/network_fixture.py', 'exec'), namespace)
         operation = 'fail()' if business else 'raise failure'
-        exec(compile(f'class _ProactorBasePipeTransport:\n    def {name}(self):\n        {operation}\n',
+        if recoverable:
+            operation = ('if self._called_connection_lost:\n            return\n'
+                         '        self._protocol.connection_lost(None)\n        raise failure')
+        exec(compile(f'class _ProactorBasePipeTransport(Base):\n    def {name}(self):\n        {operation}\n',
                      'asyncio/proactor_events.py', 'exec'), namespace)
-        transport = namespace['_ProactorBasePipeTransport']()
+        transport = object.__new__(namespace['_ProactorBasePipeTransport'])
         protocol_type = type('H11Protocol', (), {'__module__': 'uvicorn.protocols.http.h11_impl'})
         ssl_type = type('SSLProtocol', (), {'__module__': 'asyncio.sslproto'})
         transport._protocol = ssl_type()
         transport._protocol._app_protocol = None if cleared else protocol_type()
+        transport._protocol.connection_lost = mock.Mock()
+        if recoverable:
+            transport._sock = socket_override if socket_override is not None else mock.Mock()
+            if socket_override is None:
+                transport._sock.close.side_effect = close_error
+            transport._server = server_override if server_override is not None else mock.Mock()
+            if server_override is not None:
+                transport._server._attach(transport)
+            transport._closing = True
+            transport._called_connection_lost = False
+            self.addCleanup(lambda: setattr(transport, '_sock', None))
         transport.private_url = 'https://private.example/?token=private-token'
         transport.private_path = 'D:/private/movie.mp4'
         loop = mock.Mock()
         loop.get_debug.return_value = False
+        loop.diagnostic_transport = transport
+        if recoverable:
+            loop.diagnostic_socket = transport._sock
+            loop.diagnostic_server = transport._server
         loop.call_exception_handler.side_effect = lambda context: error_reporting.asyncio_handler(loop, context)
         asyncio.Handle(getattr(transport, name), (), loop)._run()
         return loop
+
+    def test_connection_cleanup_completes_socket_close_and_server_detach_once(self):
+        from peach import remote_reporting
+        error = ConnectionResetError(10054, 'connection reset')
+        error.winerror = 10054
+        with mock.patch.object(remote_reporting, 'send') as send:
+            loop = self.asyncio_callback(error, recoverable=True)
+        transport = loop.diagnostic_transport
+        self.assertIsNone(transport._sock)
+        self.assertIsNone(transport._server)
+        self.assertTrue(transport._called_connection_lost)
+        self.assertTrue(self.records()[-1]['cleanup_recovered'])
+        loop.diagnostic_socket.close.assert_called_once()
+        loop.diagnostic_server._detach.assert_called_once_with(transport)
+        self.assertEqual(transport._protocol.connection_lost.call_count, 1)
+        asyncio.Handle(transport._call_connection_lost, (), loop)._run()
+        self.assertEqual(len(self.records()), 1)
+        self.assertEqual(transport._protocol.connection_lost.call_count, 1)
+        loop.default_exception_handler.assert_not_called()
+        send.assert_not_called()
+
+    def test_socket_cleanup_failure_keeps_the_original_exception_and_reports(self):
+        from peach import remote_reporting
+        error = ConnectionResetError(10054, 'connection reset')
+        error.winerror = 10054
+        close_error = OSError(5, 'close failed')
+        with mock.patch.object(remote_reporting, 'send') as send:
+            loop = self.asyncio_callback(error, recoverable=True, close_error=close_error)
+        send.assert_called_once()
+        self.assertFalse(loop.diagnostic_transport._called_connection_lost)
+        record = self.records()[-1]
+        self.assertEqual(record['classification'], 'connection-cleanup-failed')
+        self.assertFalse(record['cleanup_recovered'])
+        self.assertIs(close_error.__cause__, error)
+        loop.default_exception_handler.assert_called_once()
 
     def test_windows_asyncio_connection_cleanup_stays_local_with_safe_context(self):
         from peach import remote_reporting
@@ -434,6 +497,31 @@ class ErrorReportingTests(unittest.TestCase):
         for value in ('private.example', 'private-token', 'movie.mp4', 'private_url', 'private_path'):
             self.assertNotIn(value, json.dumps(record))
         loop.default_exception_handler.assert_called_once()
+
+    def test_connection_cleanup_closes_real_socket_and_releases_asyncio_server(self):
+        import socket
+        from peach import remote_reporting
+
+        async def run():
+            server = await asyncio.get_running_loop().create_server(asyncio.Protocol, '127.0.0.1', 0)
+            accepted, peer = socket.socketpair()
+            try:
+                error = ConnectionResetError(10054, 'connection reset')
+                error.winerror = 10054
+                with mock.patch.object(remote_reporting, 'send') as send:
+                    loop = self.asyncio_callback(error, recoverable=True,
+                        socket_override=accepted, server_override=server)
+                self.assertEqual(accepted.fileno(), -1)
+                self.assertEqual(len(server._clients), 0)
+                loop.default_exception_handler.assert_not_called()
+                send.assert_not_called()
+            finally:
+                accepted.close()
+                peer.close()
+                server.close()
+                await asyncio.wait_for(server.wait_closed(), timeout=2)
+
+        asyncio.run(run())
 
     def test_asyncio_tls_cleanup_keeps_protocol_class_after_application_detaches(self):
         from peach import remote_reporting

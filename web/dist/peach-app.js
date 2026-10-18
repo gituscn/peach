@@ -20,17 +20,19 @@ function d() {
 	if (u || typeof window > "u") return;
 	u = !0;
 	let e = Date.now(), t = 0, n = /* @__PURE__ */ new Set(), r = (r, i, a = "", o) => {
-		if (Date.now() - e >= 6e4 && (e = Date.now(), t = 0, n.clear()), t >= 10) return;
-		let s = (i instanceof Error ? i.message : typeof i == "string" ? i : a).slice(0, 2e3);
-		if (!s) return;
-		let c = i instanceof Error ? (i.stack ?? "").slice(0, 6e3) : "", l = `${r}:${s}:${c}`;
-		n.has(l) || (n.add(l), t += 1, fetch("/api/diagnostics/client-error", {
+		let s = i instanceof Error || i instanceof DOMException ? i.name : "";
+		if (s === "AbortError" || (Date.now() - e >= 6e4 && (e = Date.now(), t = 0, n.clear()), t >= 10)) return;
+		let c = (i instanceof Error ? i.message : typeof i == "string" ? i : a).slice(0, 2e3);
+		if (!c) return;
+		let l = i instanceof Error ? (i.stack ?? "").slice(0, 6e3) : "", u = `${r}:${c}:${l}`;
+		n.has(u) || (n.add(u), t += 1, fetch("/api/diagnostics/client-error", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				kind: r,
-				message: s,
-				stack: c,
+				message: c,
+				stack: l,
+				error_name: s,
 				page: window.location.pathname,
 				source_file: o?.filename?.split("/").pop()?.split("?")[0],
 				line: o?.lineno,

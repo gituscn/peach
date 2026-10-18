@@ -293,10 +293,35 @@ def is_asyncio_connection_cleanup(error, fields) -> bool:
     return last == ("asyncio.proactor_events", "_call_connection_lost")
 
 
+def _finish_asyncio_connection_cleanup(context) -> bool:
+    """完成 CPython 清理回调中 shutdown 之后的资源收尾，不重复通知协议。"""
+    from asyncio.proactor_events import _ProactorBasePipeTransport
+    callback = getattr(context.get("handle"), "_callback", None)
+    transport = getattr(callback, "__self__", None)
+    if (not isinstance(transport, _ProactorBasePipeTransport) or not transport._closing
+            or transport._called_connection_lost or transport._sock is None):
+        return False
+    transport._sock.close()
+    transport._sock = None
+    if transport._server is not None:
+        transport._server._detach(transport)
+        transport._server = None
+    transport._called_connection_lost = True
+    return True
+
+
 def asyncio_handler(loop, context) -> None:
     error = context.get("exception")
     fields = _asyncio_fields(context)
     if is_asyncio_connection_cleanup(error, fields):
         fields["classification"] = "connection-cleanup"
+        try:
+            fields["cleanup_recovered"] = _finish_asyncio_connection_cleanup(context)
+        except Exception as cleanup_error:
+            cleanup_error.__cause__ = error
+            error = cleanup_error
+            fields.update(classification="connection-cleanup-failed", cleanup_recovered=False)
+            context = {**context, "exception": error}
     event("unhandled-asyncio", error, message=context.get("message", ""), **fields)
-    loop.default_exception_handler(context)
+    if not fields.get("cleanup_recovered"):
+        loop.default_exception_handler(context)

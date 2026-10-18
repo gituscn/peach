@@ -1833,6 +1833,7 @@ def _generate_preview(config, row, database, resolver, *, progress):
     """复用九宫格抽帧原语，产物可用后在共享写锁内登记。"""
     from . import frame_capture, media_probe
     from .fsutil import atomic_path
+    from .previews import PreviewUnavailable
 
     root = (config.directory('generated') / 'snapshots').resolve()
     previous = row.get('snapshot_path')
@@ -1842,19 +1843,19 @@ def _generate_preview(config, row, database, resolver, *, progress):
             return False
     choice = resolver.ffmpeg()
     if choice is None:
-        raise ValueError('未找到 FFmpeg，无法生成预览图，请在诊断页检查工具状态')
+        raise PreviewUnavailable('未找到 FFmpeg，无法生成预览图，请在诊断页检查工具状态')
     video = translate_ledger_path(row['path'])
     if not video.is_file():
-        raise ValueError('媒体文件不可访问')
+        raise PreviewUnavailable('媒体文件不可访问')
     duration = row.get('duration') or 0
     if duration <= 0:
         probe = resolver.ffprobe()
         if probe is None:
-            raise ValueError('未找到 ffprobe，无法读取视频时长')
+            raise PreviewUnavailable('未找到 ffprobe，无法读取视频时长')
         measured = media_probe.measure(str(probe.path), row['id'], str(video))
         duration = measured[0]
         if duration <= 0:
-            raise ValueError('视频时长未取得，请检查媒体文件后重试')
+            raise PreviewUnavailable('视频时长未取得，请检查媒体文件后重试')
         progress()
         with database.write_transaction() as connection:
             connection.execute(media_probe.UPDATE, measured)
@@ -1896,6 +1897,7 @@ def _generate_preview(config, row, database, resolver, *, progress):
 def _generate_previews(config, rows, database, *, update, issue, guard,
                        completed=(), checkpoint=lambda row: None):
     """只读本机视频；来源失败与抽帧失败各自保留可重试项目。"""
+    from .previews import PreviewUnavailable
     if database is None:
         return 0
     rows = [row for row in rows if row['location'] == 'local' and not skip_background_read(row['path'])]
@@ -1918,10 +1920,10 @@ def _generate_previews(config, rows, database, *, update, issue, guard,
             checkpoint(row)
         except InterruptedError:
             raise
-        except (OSError, ValueError, subprocess.SubprocessError) as error:
+        except (OSError, ValueError, subprocess.SubprocessError, PreviewUnavailable) as error:
             from .error_reporting import event
             event('library-preview', error, asset_id=row['id'])
-            message = (str(error) if isinstance(error, ValueError) else
+            message = (str(error) if isinstance(error, (ValueError, PreviewUnavailable)) else
                        '生成预览图超时，请重试' if isinstance(error, subprocess.SubprocessError) else
                        '生成预览图失败，请检查 FFmpeg 与目录权限后重试')
             details = {'diagnostics': error.diagnostics} if isinstance(error, _PreviewCaptureError) else {}

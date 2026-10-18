@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import atexit
+import errno
 import hashlib
 import json
 import os
 import platform
 import re
+import subprocess
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -24,6 +26,17 @@ _lock = threading.RLock()
 _client = None
 _client_dsn = ""
 _disabled = False
+MEDIA_STAGES = frozenset({"frame-capture", "frame-tile", "media-probe", "preview", "library-preview"})
+LOCAL_EXCEPTION_TYPES = frozenset({
+    ("asyncio.exceptions", "CancelledError"), ("concurrent.futures._base", "CancelledError"),
+    ("builtins", "InterruptedError"), ("peach.jobs", "JobPolicyError"),
+    ("peach.jav_cover_fetch", "Unavailable"), ("peach.jav_cover_fetch", "DeadlineExceeded"),
+    ("peach.scraping_access", "SourcePaused"), ("peach.previews", "PreviewUnavailable"),
+    ("peach.transcodes", "TranscodeCancelled"), ("peach.segments", "SegmentCancelled"),
+    ("peach.browser_transport", "BrowserUnavailable"), ("peach.browser_transport", "ChallengeUnsolved"),
+    ("peach.face_detect", "FaceModelUnavailable"), ("peach.avatar_watermark", "WatermarkModelUnavailable"),
+    ("starlette.requests", "ClientDisconnect"),
+})
 
 
 def _config(config=None):
@@ -194,16 +207,28 @@ def usage(config=None):
     send("usage", {"message": "Peach started", "level": "info", "tags": {"os": platform.system()}}, config)
 
 
+def _http_status(error):
+    status = getattr(error, "status_code", None)
+    if type(status) is not int or not 100 <= status <= 599:
+        status = getattr(getattr(error, "response", None), "status_code", None)
+    if type(status) is not int and any(cls.__module__ == "urllib.error" and cls.__name__ == "HTTPError"
+                                      for cls in type(error).__mro__):
+        status = getattr(error, "code", None)
+    return status if type(status) is int and 100 <= status <= 599 else None
+
+
 def _exception_details(error):
     frames, codes, chain = [], {}, []
     current, visited = error, set()
     while current is not None and id(current) not in visited and len(chain) < 8:
         visited.add(id(current))
         chain.append(type(current).__name__)
-        for key in ("errno", "winerror", "returncode", "status_code"):
+        for key in ("errno", "winerror", "returncode"):
             value = getattr(current, key, None)
             if type(value) is int:
                 codes[key] = value
+        if (status := _http_status(current)) is not None:
+            codes["status_code"] = status
         tb = current.__traceback__
         while tb is not None and len(frames) < 40:
             filename = Path(tb.tb_frame.f_code.co_filename)
@@ -217,15 +242,43 @@ def _exception_details(error):
 
 def _media_details(error, fields, codes):
     detail = getattr(error, "diagnostics", {}) if error is not None else {}
+    detail = detail if isinstance(detail, dict) else {}
     if type(detail.get("returncode")) is int:
         codes["returncode"] = detail["returncode"]
     raw = str(fields.get("stderr", "")) + str(detail.get("stderr", ""))
     for marker, code in (("Your platform doesn't support hardware accelerated AV1 decoding", "av1_decoder_unavailable"),
+                         ("Unknown decoder", "decoder_unavailable"),
                          ("Invalid data found", "invalid_media"), ("Permission denied", "permission_denied"),
-                         ("No space left", "disk_full"), ("Unknown decoder", "decoder_unavailable")):
+                         ("No space left", "disk_full"), ("No such file or directory", "missing_media")):
         if marker in raw:
             return code
     return ""
+
+
+def _expected_failure(stage, error, fields):
+    if stage == "logging" and fields.get("level", "ERROR") not in {"ERROR", "CRITICAL"}:
+        return True
+    if stage == "browser" and fields.get("error_name") == "AbortError":
+        return True
+    kinds = {(cls.__module__, cls.__name__) for cls in type(error).__mro__}
+    if kinds & LOCAL_EXCEPTION_TYPES:
+        return True
+    if ("peach.sources.base", "SourceFailure") in kinds:
+        return str(error.reason) in {"cloudflare_challenge", "ip_banned", "geo_restricted", "auth_required",
+            "not_found", "gone", "no_usable_metadata", "rate_limited", "timeout", "server_error", "network"}
+    if ("peach.metadata", "MetadataProviderError") in kinds and error.detail != "parse_error":
+        return error.kind in {"auth", "not_found"} or error.retryable is True or error.temporary is True
+    if stage in MEDIA_STAGES:
+        detail = getattr(error, "diagnostics", {})
+        if isinstance(error, subprocess.TimeoutExpired) or isinstance(detail, dict) and detail.get("reason") == "timeout":
+            return True
+        if isinstance(error, OSError) and error.errno == errno.ENOSPC:
+            return True
+        if isinstance(error, (FileNotFoundError, PermissionError, IsADirectoryError, NotADirectoryError)):
+            filename = getattr(error, "filename", None)
+            if filename and Path(filename).name != Path(str(fields.get("tool", ""))).name:
+                return True
+    return False
 
 
 def _actionable(stage, error, fields):
@@ -242,11 +295,11 @@ def _actionable(stage, error, fields):
               "preview", "standalone-update-install", "standalone-update-rollback", "logging"}
     if stage not in stages or isinstance(error, (SystemExit, KeyboardInterrupt)):
         return False
-    if error is not None and type(error).__name__ in {"CancelledError", "JobCancelled", "NotFound", "Unavailable"}:
+    if _expected_failure(stage, error, fields):
         return False
     if stage == "http-request" and fields.get("status_code", 500) < 500:
         return False
-    if error is not None and type(getattr(error, "status_code", None)) is int and error.status_code < 500:
+    if (status := _http_status(error)) is not None and 400 <= status < 500:
         return False
     return True
 
@@ -266,17 +319,27 @@ def _http_details(stage, fields):
     return tags, error_id
 
 
+def _browser_frames(stack):
+    frames = []
+    pattern = r"(peach-(?:app|pages)\.js)(?:\?[^\s):]*)?:(\d+):(\d+)"
+    for line in str(stack).splitlines()[:80]:
+        if "chrome-extension://" in line or "moz-extension://" in line:
+            continue
+        for name, row, column in re.findall(pattern, line):
+            frames.append({"filename": name, "lineno": int(row), "colno": int(column)})
+    return frames[:20]
+
+
 def capture(stage, error=None, **fields):
     """只投影代码位置和错误类别，不发送异常文本或日志文本。"""
     if not _actionable(stage, error, fields):
         return
-    media_stage = stage in {"frame-capture", "frame-tile", "media-probe", "preview", "library-preview"}
+    media_stage = stage in MEDIA_STAGES
     if error is None and stage != "browser" and not media_stage:
         return
     frames, codes, chain = _exception_details(error)
     if error is None and stage == "browser":
-        for name, line, column in re.findall(r"(peach-(?:app|pages)\.js):(\d+):(\d+)", str(fields.get("stack", "")))[:20]:
-            frames.append({"filename": name, "lineno": int(line), "colno": int(column)})
+        frames = _browser_frames(fields.get("stack", ""))
         if not frames:
             return
     if stage == "logging" and not frames:
@@ -287,6 +350,8 @@ def capture(stage, error=None, **fields):
     reason = ""
     if media_stage:
         reason = _media_details(error, fields, codes)
+        if reason in {"invalid_media", "permission_denied", "disk_full", "missing_media"}:
+            return
         if not reason and not codes and error is None:
             return
     category = type(error).__name__ if error is not None else ("BrowserError" if stage == "browser" else "LogError")
