@@ -10,6 +10,8 @@ import httpx
 from bs4 import BeautifulSoup
 
 from . import subtitles
+from .catalog_rules import code_query_variants, release_code_from_text, same_release_code
+from .feeds import scan_code
 from .user_agent import USER_AGENT
 
 MAX_BYTES = 4 * 1024 * 1024
@@ -90,10 +92,24 @@ def _files(client: httpx.Client, url: str) -> list[dict]:
             for index, code in enumerate(LANGUAGES) if code in rows]
 
 
+def _matches(title: str, code: str) -> bool:
+    if same_release_code(scan_code(title), code):
+        return True
+    for variant in code_query_variants(code):
+        if not same_release_code(variant, code):
+            continue
+        pattern = r"(?<![A-Za-z0-9])" + re.escape(variant).replace(r"\-", r"[-_ ]?") + r"(?![A-Za-z0-9])"
+        if any(same_release_code(match.group(), code) for match in re.finditer(pattern, title, re.I)):
+            return True
+    return False
+
+
 def search(query: str, offset: int = 0) -> dict:
     query = query.strip()
     if not 3 <= len(query) <= 200 or not 0 <= offset < 60 or offset % PAGE_SIZE:
         raise SubtitleSearchError("搜索词需为 3–200 个字符，分页位置无效时请重新搜索")
+    code = release_code_from_text(query)
+    query = code or query
     with _client() as client:
         page = BeautifulSoup(_get(client, SITE + "/index.php", params={"search": query}), "html.parser")
         table = page.select_one("table.sub-table")
@@ -101,11 +117,14 @@ def search(query: str, offset: int = 0) -> dict:
             raise SubtitleSearchError("SubtitleCat 搜索页面未取得，请稍后重试")
         candidates = {}
         for link in table.select("a[href]"):
+            title = link.get_text(" ", strip=True)
+            if code and not _matches(title, code):
+                continue
             try:
                 url = _url(str(link["href"]), ".html")
             except SubtitleSearchError:
                 continue
-            candidates.setdefault(url, link.get_text(" ", strip=True))
+            candidates.setdefault(url, title)
         results = []
         for url, title in list(candidates.items())[offset:offset + PAGE_SIZE]:
             files = _files(client, url)
