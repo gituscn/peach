@@ -59,7 +59,8 @@ class ProjectBoardTests(unittest.TestCase):
         cls.script = load_script("project_board")
 
     def issue(self, **changes):
-        return {"__typename": "Issue", "state": "OPEN", "labels": {"nodes": []}, **changes}
+        return {"__typename": "Issue", "state": "OPEN", "labels": {"nodes": []},
+                "repository": {"nameWithOwner": "peach-mitao/peach"}, **changes}
 
     def test_merge_and_publication_keep_open_issue_waiting_for_acceptance(self):
         release = {"tag_name": "v1.2.0", "html_url": "https://example.test/release"}
@@ -83,7 +84,46 @@ class ProjectBoardTests(unittest.TestCase):
 
     def test_reference_lines_exclude_other_repositories_and_casual_mentions(self):
         body = "参考 #64 的讨论\nRefs #65, peach-mitao/peach#66, other/repo#67\nCloses #68"
-        self.assertEqual(self.script.references(body, "peach-mitao/peach"), {65, 66, 68})
+        self.assertEqual(self.script.references(body, "peach-mitao/peach"),
+                         {f"peach-mitao/peach#{number}" for number in (65, 66, 68)})
+
+    def test_migrated_references_deduplicate_without_cross_repository_number_collision(self):
+        main, planning = "peach-mitao/peach", "peach-mitao/peach-roadmap"
+        config = {"repository": main, "issue_repositories": [main, planning],
+                  "issue_aliases": {f"{main}#70": f"{planning}#1"}}
+        pr = {"state": "MERGED", "merged": True, "mergeCommit": {"oid": "a" * 40}, "url": "https://example.test/pr",
+              "body": f"Refs #70, {planning}#1, other/repo#1\nRefs https://github.com/{planning}/issues/1",
+              "closingIssuesReferences": {"nodes": [self.issue(number=1, repository={"nameWithOwner": planning}),
+                                                       self.issue(number=1, repository={"nameWithOwner": "other/repo"})]}}
+        linked = self.script.issue_links([pr], config)
+        self.assertEqual(linked, {f"{planning}#1": [pr]})
+        config["implementation_commits"] = {f"{main}#1": ["b" * 40]}
+        with mock.patch.object(self.script, "ancestor") as ancestry:
+            untouched = self.script.delivery_fields(config, self.issue(number=1, repository={"nameWithOwner": planning}), {}, {}, [])
+        self.assertEqual(untouched["交付进度"], "未关联实现")
+        ancestry.assert_not_called()
+        release = {"tag_name": "v1.0", "html_url": "https://example.test/v1.0"}
+        with mock.patch.object(self.script, "ancestor", return_value=True) as ancestry:
+            result = self.script.delivery_fields(config, self.issue(number=1, repository={"nameWithOwner": planning}), {}, linked, [release])
+        self.assertEqual(result["发布版本"], "v1.0")
+        self.assertEqual(result["实现关联"], pr["url"])
+        self.assertTrue(all(call.args[0] == "a" * 40 for call in ancestry.call_args_list))
+        with mock.patch.object(self.script, "ancestor") as ancestry:
+            result = self.script.delivery_fields(config, self.issue(number=1), {}, linked, [])
+        self.assertEqual(result["交付进度"], "已合入待发布")
+        ancestry.assert_called_once_with("b" * 40, "origin/master")
+
+    def test_planning_poll_includes_closed_issues_and_alias_cycles_fail(self):
+        main, planning = "peach-mitao/peach", "peach-mitao/peach-roadmap"
+        closed = self.issue(id="closed", state="CLOSED")
+        with mock.patch.object(self.script, "connection", side_effect=[[], [closed]]) as read:
+            result = self.script.incoming_issues({"repository": main, "planning_repository": planning,
+                                                  "issue_repositories": [main, planning]})
+        self.assertEqual(result, [closed])
+        self.assertEqual(read.call_args_list[0].kwargs["states"], ["OPEN"])
+        self.assertIsNone(read.call_args_list[1].kwargs["states"])
+        with self.assertRaisesRegex(ValueError, "循环"):
+            self.script.canonical("a", {"a": "b", "b": "a"})
 
     def test_pr_closure_is_distinct_from_merge(self):
         pr = {"__typename": "PullRequest", "state": "CLOSED", "merged": False}
@@ -125,9 +165,10 @@ class ProjectBoardTests(unittest.TestCase):
                 mock.patch.object(self.script, "gh", return_value=releases), \
                 mock.patch.object(self.script, "ancestor", return_value=True):
             changes = self.script.reconcile({"project_id": "project", "repository": "peach-mitao/peach",
-                                              "implementation_commits": {"65": [commit]}}, apply=True)
-            maintained = self.script.reconcile({"project_id": "project", "repository": "peach-mitao/peach", "maintainers": ["visitor"],
-                                                "implementation_commits": {"65": [commit]}}, apply=False)
+                                              "implementation_commits": {"peach-mitao/peach#65": [commit]}}, apply=True)
+            maintained = self.script.reconcile({"project_id": "project", "repository": "peach-mitao/peach",
+                                                "planning_repository": "peach-mitao/peach",
+                                                "implementation_commits": {"peach-mitao/peach#65": [commit]}}, apply=False)
         self.assertEqual({change["number"] for change in changes}, {65})
         actual = {change["field"]: change["value"] for change in changes}
         self.assertEqual(actual["发布版本"], "v0.43.0")

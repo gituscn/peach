@@ -11,7 +11,7 @@
   <a href="https://github.com/peach-mitao/peach/releases">下载 Windows 版</a> ·
   <a href="https://demo.peach.video">在线演示</a> ·
   <a href="https://github.com/peach-mitao/peach/releases/tag/intro-video">介绍视频</a> ·
-  <a href="https://github.com/peach-mitao/peach/issues?q=is%3Aissue+is%3Aopen+-author%3Alongmeidao">问题反馈</a> ·
+  <a href="https://github.com/peach-mitao/peach/issues">问题反馈</a> ·
   <a href="https://github.com/orgs/peach-mitao/projects/7/views/1">需求看板</a> ·
   <a href="https://github.com/orgs/peach-mitao/projects/7/views/3">路线图</a> ·
   <a href="#文档">文档</a> ·
@@ -102,7 +102,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 ## 问题反馈
 
-先查看[用户反馈](https://github.com/peach-mitao/peach/issues?q=is%3Aissue+is%3Aopen+-author%3Alongmeidao)，或[提交问题](https://github.com/peach-mitao/peach/issues/new/choose)，附上版本、操作步骤、预期与实际结果。截图请遮掉凭据、局域网地址和完整路径，不要上传数据库或媒体；安全问题按[安全政策](SECURITY.md)私下报告。
+先查看[用户反馈](https://github.com/peach-mitao/peach/issues)，或[提交问题](https://github.com/peach-mitao/peach/issues/new/choose)，附上版本、操作步骤、预期与实际结果。截图请遮掉凭据、局域网地址和完整路径，不要上传数据库或媒体；安全问题按[安全政策](SECURITY.md)私下报告。
 
 ## 文档
 
