@@ -95,8 +95,9 @@ class ProjectBoardTests(unittest.TestCase):
         commit = "a" * 40
         fields = [{"id": name, "name": name} for name in ("发布版本", "发布说明", "实现关联")]
         fields += [{"id": "status", "name": "Status", "options": [{"id": "verify", "name": "待验证"}]},
-                   {"id": "delivery", "name": "交付进度", "options": [{"id": "published", "name": "已发布"}]}]
-        issue = self.issue(id="issue", number=65, title="历史导入", url="https://github.com/peach-mitao/peach/issues/65")
+                   {"id": "delivery", "name": "交付进度", "options": [{"id": "published", "name": "已发布"}]},
+                   {"id": "source", "name": "来源", "options": [{"id": "feedback", "name": "用户反馈"}, {"id": "plan", "name": "维护者待办"}]}]
+        issue = self.issue(id="issue", number=65, title="历史导入", author={"login": "visitor"}, url="https://github.com/peach-mitao/peach/issues/65")
         item = {"id": "item", "content": issue, "isArchived": False, "fieldValues": {"nodes": []}}
         archived = {**item, "id": "archive", "isArchived": True, "content": {**issue, "id": "old", "number": 90}}
         draft = {"id": "draft", "isArchived": False, "content": {"__typename": "DraftIssue", "id": "draft-content"}}
@@ -106,17 +107,33 @@ class ProjectBoardTests(unittest.TestCase):
             ("v0.43.0", "2026-10-17", False, [{"name": "app.zip"}]),
             ("v0.44.0", "2026-10-18", True, [{"name": "app.zip"}]),
             ("v0.45.0", "2026-10-19", False, [{"name": "app.zip"}])]]]
-        with mock.patch.object(self.script, "graphql", return_value={"node": {"fields": {"nodes": fields}}}) as api, \
-                mock.patch.object(self.script, "connection", side_effect=[[item, archived, draft], [], []]), \
+        def api_result(query, **variables):
+            if "fields(first:" in query:
+                return {"node": {"fields": {"nodes": fields}}}
+            if "archivedStates:[ARCHIVED,NOT_ARCHIVED]" in query:
+                return {"node": {"items": {"nodes": [item, archived, draft], "pageInfo": {"hasNextPage": False}}}}
+            if "issues(first:" in query:
+                return {"repository": {"issues": {"nodes": [archived["content"]], "pageInfo": {"hasNextPage": False}}}}
+            if "pullRequests(first:" in query:
+                return {"repository": {"pullRequests": {"nodes": [], "pageInfo": {"hasNextPage": False}}}}
+            if "updateProjectV2ItemFieldValue(" in query:
+                self.assertEqual(variables["item"], "item")
+                return {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "item"}}}
+            self.fail(f"不允许的看板调用：{query}")
+
+        with mock.patch.object(self.script, "graphql", side_effect=api_result), \
                 mock.patch.object(self.script, "gh", return_value=releases), \
                 mock.patch.object(self.script, "ancestor", return_value=True):
             changes = self.script.reconcile({"project_id": "project", "repository": "peach-mitao/peach",
-                                              "implementation_commits": {"65": [commit]}}, apply=False)
-        self.assertEqual(api.call_count, 1)
+                                              "implementation_commits": {"65": [commit]}}, apply=True)
+            maintained = self.script.reconcile({"project_id": "project", "repository": "peach-mitao/peach", "maintainers": ["visitor"],
+                                                "implementation_commits": {"65": [commit]}}, apply=False)
         self.assertEqual({change["number"] for change in changes}, {65})
         actual = {change["field"]: change["value"] for change in changes}
         self.assertEqual(actual["发布版本"], "v0.43.0")
         self.assertEqual(actual["Status"], "待验证")
+        self.assertEqual(actual["来源"], "用户反馈")
+        self.assertEqual(next(change["value"] for change in maintained if change["field"]=="来源"), "维护者待办")
         self.assertTrue(actual["实现关联"].endswith(commit))
 
     def test_ancestor_uses_actual_commit_graph_and_rejects_unmerged_commit(self):
@@ -136,6 +153,21 @@ class ProjectBoardTests(unittest.TestCase):
                 self.assertTrue(self.script.ancestor(base, "refs/tags/v1.0"))
                 self.assertFalse(self.script.ancestor(feature, "refs/tags/v1.0"))
                 self.assertFalse(self.script.ancestor("not-a-commit", "refs/tags/v1.0"))
+
+    def test_public_roadmap_adds_issues_without_copying_internal_drafts_or_prs(self):
+        issue = self.issue(id="public-issue", number=7)
+        pr = {"__typename": "PullRequest", "id": "pr", "state": "OPEN"}
+        internal = {"id": "private-card", "isArchived": False,
+                    "content": {"id": "private-draft", "__typename": "DraftIssue"}}
+        candidates = {"private-draft": internal}
+        with mock.patch.object(self.script, "connection", return_value=[issue]), \
+                mock.patch.object(self.script, "graphql", return_value={"node": pr}) as api:
+            self.script.include_incoming({"repository": "peach-mitao/peach", "project_id": "public", "issues_only": True},
+                                         candidates, [pr], {"repository": {"full_name": "peach-mitao/peach"},
+                                                            "pull_request": {"node_id": "pr"}}, False)
+        self.assertEqual(set(candidates), {"private-draft", "public-issue"})
+        self.assertIs(candidates["private-draft"], internal)
+        self.assertEqual(api.call_count, 1)
 
 
 class UpdateTaskSmokeTests(unittest.TestCase):
