@@ -48,7 +48,7 @@ describe('馆藏与口味分享', () => {
       const posts: Record<string, unknown>[] = [];
       const state = { enabled: false, available: true, schema: 3,
         fields: ['作品编号、标签、人物、评分与全部偏好维度'],
-        notice: '每周上传完整明细，存在关联风险，接收服务可见 IP。' };
+        notice: '每周上传馆藏与各类偏好明细，用于群体研究；移除直接标识，仍可能关联，接收服务可见 IP。' };
       const opened = await visit(browser, '/settings/library?section=' + encodeURIComponent('应用与维护'), viewport,
         async page => {
           await page.route('**/api/configuration', async route => {

@@ -65,7 +65,7 @@ chs.LibrarySharingFailed=馆藏与口味上传选项未能保存。可在设置�
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "reporting"; Description: "发送版本统计与错误诊断（推荐）：版本、系统信息、故障类型、代码位置与发生次数"; GroupDescription: "数据上传（可在设置页关闭）："
-Name: "librarysharing"; Description: "每周上传馆藏与口味明细用于 Peach 群体研究：作品编号、副本数量、标签、出演者、创作者、厂牌、系列、媒体类型、时长、评分、喜欢状态、播放汇总、各类偏好名称及强度、证据类别、版本与自然周。不上传账号、设备或安装标识；存在关联与再识别风险，接收服务可见 IP。"; GroupDescription: "数据上传（可在设置页关闭）："; Flags: unchecked
+Name: "librarysharing"; Description: "每周上传馆藏与各类偏好明细（移除直接标识；仍可能关联，接收服务可见 IP）"; GroupDescription: "数据上传（可在设置页关闭）："; Flags: unchecked
 
 [InstallDelete]
 ; PyInstaller 的依赖都在 _internal 里；覆盖安装留下上一版多出来的库会被新版误加载。
@@ -95,6 +95,7 @@ Type: filesandordirs; Name: "{app}"
 [Code]
 var
   GuardPrepared: Boolean;
+  LibrarySharingPage: TOutputMsgMemoWizardPage;
 #ifdef LiteInstaller
   ToolsPrepared: Boolean;
   ToolsPage: TOutputMarqueeProgressWizardPage;
@@ -102,6 +103,26 @@ var
 
 function GetCurrentProcessId(): LongWord;
   external 'GetCurrentProcessId@kernel32.dll stdcall';
+
+procedure InitializeWizard();
+begin
+  LibrarySharingPage := CreateOutputMsgMemoPage(wpSelectTasks,
+    '馆藏与口味明细上传', '用于 Peach 群体的馆藏结构与偏好研究。',
+    '继续表示同意每周上传以下明细；不参与可返回取消勾选。', '');
+  LibrarySharingPage.RichEditViewer.Text :=
+    '馆藏：作品编号、同编号文件数量、标签、出演者、创作者、厂牌、系列、媒体类型、时长。' + #13#10#13#10 +
+    '反馈与观看汇总：评分、喜欢状态、累计播放次数、观看比例。' + #13#10#13#10 +
+    '各类偏好：出演者、创作者、标签、厂牌、系列、年代和时长偏好的名称、强度与证据来源类别。' + #13#10#13#10 +
+    '版本与周期：Peach 版本、字段版本、UTC 自然周。' + #13#10#13#10 +
+    '不上传账号、设备或安装标识、内部行号、文件名、路径、标题、媒体、网址、搜索词及逐条浏览或观看记录。' + #13#10#13#10 +
+    '完整明细可反映成人内容偏好，仍可能关联或被再识别；接收服务为独立 Sentry 项目，可见连接 IP。' + #13#10#13#10 +
+    '可在设置页查看完整本机预览或关闭。关闭停止后续发送，已发送数据无法通过本机开关撤回。';
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := (PageID = LibrarySharingPage.ID) and not WizardIsTaskSelected('librarysharing');
+end;
 
 procedure FinishTaskGuard();
 var
