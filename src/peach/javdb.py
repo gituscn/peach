@@ -39,7 +39,7 @@ BOX = re.compile(r'class="box actor-box">\s*<a href="(/actors/[^"]+)" title="([^
 #: 整张卡：站内 id、`title` 与卡片正文。正文里头像上那枚 `info` 标记是记录类型。
 CARD = re.compile(r'class="box actor-box">\s*<a href="/actors/([A-Za-z0-9]+)" title="([^"]*)">(.*?)</a>',
                   re.S)
-#: 2026-09-27 本机缓存的 2016 张卡片里，这枚标记只见过 `無碼`（322 张），其余 1694 张没有。
+
 INFO = re.compile(r'class="info">([^<]*)<')
 NAME = re.compile(r'class="actor-section-name">([^<]*)<')
 META = re.compile(r'class="section-meta">([^<]*)<')

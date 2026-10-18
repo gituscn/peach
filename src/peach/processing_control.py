@@ -6,6 +6,7 @@ import math
 import sqlite3
 import threading
 import time
+from collections import deque
 from contextlib import contextmanager, closing, nullcontext
 from contextvars import ContextVar
 
@@ -292,6 +293,8 @@ class ProcessingEstimate:
         self.phase_started = self.started
         self.base_done = 0
         self.last_done = 0
+        self.samples = deque(maxlen=20)
+        self.sample_at = self.started
         self.paused_at_start = control.paused_seconds if control is not None else 0
         self.mode = state['speed_mode']
 
@@ -300,13 +303,41 @@ class ProcessingEstimate:
 
     def _phase_estimate(self, state, phase, done, total):
         """阶段切换时用该阶段保守范围起算，采样只消费当前阶段的增量。"""
-        rates = {'local': 0.2, 'metadata': 8.0, 'previews': 12.0, 'probe': 1.0}
+        rates = {'local': 0.2, 'metadata': 8.0, 'previews': 12.0, 'probe': 1.0, 'images': 1.0}
         seconds = max(0, total - done) * rates.get(phase, 0) * MODE_FACTORS[self.mode]
         known = phase in rates and total > 0
         state.update(eta_seconds_min=math.ceil(seconds * 0.4) if known else None,
                      eta_seconds_max=math.ceil(seconds * 2.5) if known else None,
-                     eta_kind='estimating', eta_initial=True, eta_scope=f"当前阶段：{state.get('stage') or '准备处理'}",
+                     eta_kind='estimating', eta_initial=True, eta_scope='整趟任务',
                      eta_basis='根据当前阶段待处理数量粗估，运行后校准')
+
+    def _total_estimate(self, state, phase, done, total, now):
+        """当前阶段用独立样本校准，待执行阶段保留各自的粗估范围。"""
+        rates = {'local': 0.2, 'metadata': 8.0, 'previews': 12.0, 'probe': 1.0, 'images': 1.0}
+        pending = state.get('estimate_pending')
+        if pending is None:
+            return
+        low = high = 0
+        rough = False
+        for key, count in pending.items():
+            remaining = max(0, total - done) if key == phase else count
+            if remaining <= 0:
+                continue
+            completed = sum(count for _, count in self.samples)
+            if key == phase and completed >= 2:
+                seconds = sum(elapsed for elapsed, _ in self.samples) / completed * remaining
+                uncertainty = max(0.2, 1 / math.sqrt(completed))
+                low += seconds * (1 - uncertainty)
+                high += seconds * (1 + uncertainty)
+            else:
+                seconds = remaining * rates[key] * MODE_FACTORS[self.mode]
+                low += seconds * 0.4
+                high += seconds * 2.5
+                rough = True
+        state.update(eta_seconds_min=math.ceil(low) if high else None,
+                     eta_seconds_max=math.ceil(high) if high else None,
+                     eta_kind='estimating' if rough or not high else 'measured', eta_initial=rough,
+                     eta_scope='整趟任务', eta_basis='汇总当前阶段与所有待执行阶段的剩余耗时')
 
     def update(self, state):
         mode = self.control.mode if self.control is not None else self.mode
@@ -329,9 +360,12 @@ class ProcessingEstimate:
             return
         if state.get('status') != 'running':
             return
+        if any(step['id'] == 'sources' and step['status'] == 'current' for step in state.get('steps', [])):
+            return
         stage = state.get('stage')
         phase = ('previews' if stage == '生成预览图' else
-                 'local' if stage == '读取本地资料' else
+                 'images' if stage == '读取配套图片' else
+                 'local' if stage in ('读取本地资料', '检查配套文件') else
                  'metadata' if stage in ('采集缺失资料', '采集缺失封面', '保存资料候选') else
                  'probe' if stage == '读取时长与分辨率' else None)
         done, total = state.get('checked', 0), state.get('total', 0)
@@ -340,16 +374,24 @@ class ProcessingEstimate:
             if self.phase is not None:
                 self._phase_estimate(state, phase, done, total)
             self.phase, self.phase_started, self.base_done = phase, now, done
+            self.samples.clear()
+            self.sample_at = now
+        elif done > self.last_done:
+            self.samples.append((max(0.01, now - self.sample_at), done - self.last_done))
+            self.sample_at = now
         self.last_done = done
         completed = done - self.base_done
+        if 'estimate_pending' in state:
+            self._total_estimate(state, phase, done, total, now)
+            return
         if phase is None or completed < 2 or total <= done:
             return
-        elapsed = max(0.01, now - self.phase_started)
-        per_item = elapsed / completed
+        sampled = sum(count for _, count in self.samples)
+        per_item = sum(elapsed for elapsed, _ in self.samples) / sampled
         # 采样增多时收窄当前阶段的范围，范围所指阶段随结果一同返回。
-        uncertainty = max(0.2, 1 / math.sqrt(completed))
+        uncertainty = max(0.2, 1 / math.sqrt(sampled))
         remaining = (total - done) * per_item
         state.update(eta_seconds_min=max(1, math.ceil(remaining * (1 - uncertainty))),
                      eta_seconds_max=max(1, math.ceil(remaining * (1 + uncertainty))),
-                     eta_kind='measured', eta_initial=False, eta_scope=f'当前阶段：{stage}',
-                     eta_basis=f'根据当前阶段已完成的 {completed} 个视频耗时校准')
+                     eta_kind='measured', eta_initial=False, eta_scope='整趟任务',
+                     eta_basis=f'根据当前阶段最近完成的 {sampled} 个视频耗时校准')

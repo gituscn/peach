@@ -50,15 +50,6 @@ path = "docs/{OPERATIONS,CLOUDDRIVE,FRONTEND,TESTING,TESTING_DESKTOP,README_MAIN
 kind = "howto"
 
 [[kinds]]
-path = "docs/PRODUCT_BACKLOG.md"
-kind = "plan"
-
-# 状态与采集审计记录有日期的观察，不代表实时部署状态。
-[[kinds]]
-path = "docs/{STATUS,SCRAPING_AUDIT}.md"
-kind = "changelog"
-
-[[kinds]]
 path = "docs/reference-snapshots/*.md"
 kind = "reference"
 

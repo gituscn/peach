@@ -520,7 +520,7 @@ describe('孤儿记录', () => {
     const seen = confirmWith(true);
     await click(buttonNamed('彻底删除所选（2）', host));
     await settle();
-    expect(seen[0]!.body).toContain('「作品 0」、「作品 20」');
+    expect(seen[0]!.items).toEqual(['作品 0', '作品 20']);
     expect(server.posts('/api/batch')).toEqual([{ ids: [30, 50], operation: 'delete' }]);
     expect(toast).toHaveBeenCalledWith('已彻底删除 1 条记录，1 条文件已恢复，未删除');
   });

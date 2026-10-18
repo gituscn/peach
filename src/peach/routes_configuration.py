@@ -157,7 +157,7 @@ async def client_error(request: Request):
         raise HTTPException(400, "错误记录格式无效") from None
     if not isinstance(data, dict) or not isinstance(data.get("message"), str):
         raise HTTPException(400, "错误记录缺少原因")
-    fields = {key: value[:6000] for key in ("message", "stack", "kind", "page", "source_file")
+    fields = {key: value[:6000] for key in ("message", "stack", "kind", "page", "source_file", "error_name")
               if isinstance(value := data.get(key), str)}
     fields.update({key: value for key in ('line', 'column')
                    if type(value := data.get(key)) is int and value >= 0})

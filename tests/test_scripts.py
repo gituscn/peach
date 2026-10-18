@@ -1724,7 +1724,7 @@ class OperationalScriptTests(unittest.TestCase):
         self.assertIn("full|auto|follow|catalog|media|sync|metadata|tooling|web|checks|core|packaging)", posix)
         # 文档里可以「提到」裸命令来说明它为什么不可信，但绝不能让它单独出现成为一条可照抄的指令。
         # 判据因此不是黑名单，而是：凡出现该命令的行，必须在同一行指向某个正式入口。
-        for relative in ("AGENTS.md", "docs/TESTING.md", "docs/HANDOFF.md"):
+        for relative in ("AGENTS.md", "docs/TESTING.md"):
             instructions = (ROOT / relative).read_text(encoding="utf-8")
             self.assertIn("scripts\\test.ps1", instructions)
             self.assertIn("scripts/test.sh", instructions)
@@ -3064,10 +3064,7 @@ class OperationalScriptTests(unittest.TestCase):
         self.assertEqual(capture.call_count, 1)
 
     def test_sheets_leaves_the_recycle_bin_alone_unless_a_row_is_named(self):
-        """回收站里的行不领，点名的除外。
-
-        那些行等着用户决定删不删，文件多半已经不在盘上：2026-09-16 本机 647 行回收站里
-        469 行的文件已经没了。对它们抽帧每次都要向网盘发一次注定失败的读请求，那一轮
+        """回收站里的行不领，点名的除外。对它们抽帧每次都要向网盘发一次注定失败的读请求，那一轮
         115 抽帧的 73 条 `broken_source` 里 72 条是这种行。
         """
         sheets = self.sheets

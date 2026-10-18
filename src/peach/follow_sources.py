@@ -4,7 +4,7 @@
 它们不写 ledger、不下载媒体、不在服务启动或普通浏览时联网，也不绕过任何机器人验证。
 凭据由 `follow_secrets.CredentialStore` 提供，只进请求头或 POST 体，绝不进 URL。
 
-站点结构证据取自 2026-08-25 的实测抓取，登记在 `docs/HANDOFF.md`。
+站点结构证据登记在 `docs/reference-sources.json`。
 """
 from __future__ import annotations
 
@@ -1408,9 +1408,6 @@ class Rule34XxxConnector(_BaseConnector):
     @classmethod
     def content_hash(cls, url: str | None) -> str | None:
         """原图文件名是文件内容的 MD5：dapi 每条帖子自报的 `hash` 就是这个文件名。
-
-        2026-09-24 按本机已落盘的 dapi 原始响应核对，2000 条帖子的 `hash` 与文件名
-        逐条相同。
         """
         try:
             parsed = urllib.parse.urlsplit(str(url or ""))
@@ -1765,9 +1762,7 @@ class Rule34PahealConnector(_BaseConnector):
     def content_hash(cls, url: str | None) -> str | None:
         """原始文件按内容 MD5 命名，两级目录是哈希的前四位。
 
-        2026-09-24 本机 ledger 只读实测：195 个原始文件地址的目录全部等于文件名前四位；
-        同组里 11 对 paheal 与 rule34.xxx 的条目文件名相同，而 rule34.xxx 的文件名就是
-        站点自报的 MD5，两个站各自给出同一串 128 位名字，只能是同一个文件的哈希。
+        地址形状与站点自报的 MD5 一致时，作为跨来源内容身份使用。
         """
         try:
             parsed = urllib.parse.urlsplit(str(url or ""))

@@ -7,9 +7,10 @@ import { LinkButton } from '@/components/base/buttons/link-button';
 import { cx } from '@/utils/cx';
 import { errorMessage } from '../../api';
 import type { LibraryProcessingProps } from '../bundle';
-import { processingLine, DISCONNECTED_TEXT, processingActive, remainingTime, type LibraryProcessingData } from './library-processing';
+import { DISCONNECTED_TEXT, processingActive, remainingTime, type LibraryProcessingData } from './library-processing';
 import { ProcessingControls } from './processing-controls';
 import { useLibraryProcessingJob } from './use-library-processing';
+import { ProcessingLine } from './processing-line';
 
 const COLLAPSE_KEY = 'peach.library-processing.collapsed';
 function expandedFor(jobId?: string): boolean {
@@ -88,7 +89,7 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
           {step.status === 'complete' ? <s className="wrap-anywhere">{step.label}</s> : <span className="wrap-anywhere">{step.label}</span>}
         </li>)}
       </ol> : null}
-      <p className="text-body-2-regular wrap-anywhere">{problem || (failed ? state?.error || '请查看并处理未完成项' : processingLine(state!))}</p>
+      <p className="text-body-2-regular wrap-anywhere">{problem || (failed ? state?.error || '请查看并处理未完成项' : <ProcessingLine state={state!} />)}</p>
       {active && state?.stage && !state.steps?.length ? <p className="text-caption-1-regular text-text-tertiary">当前阶段 · {state.stage}</p> : null}
       {state?.stalled && !problem ? <p className="text-caption-1-regular">当前步骤耗时较长，正在等待进展</p> : null}
     </div> : null}

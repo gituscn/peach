@@ -10,9 +10,6 @@
 
 - 空目录只有数据管理页上一对手动按钮（`/api/data-cleanup/empty-folders`），不在
   `task_runs.TASK_LABELS` 里，任务中心看不到它跑过没有。
-- 账本这一侧归资源对账扫描（`resource-scan` / `resource-apply`），而它刻意跳过回收站
-  （`COALESCE(disposal,'')!='trash'`）。2026-09-16 本机 647 行回收站里有 469 行的文件
-  已经不在盘上，对账扫描一条都看不见。
 
 这 469 行不是静止的。115 那一轮抽帧报的 73 条 `broken_source` 里有 72 条是它们，每次重跑
 再失败一遍。那一轮的直接原因由 `jobs.ACTIVE_ASSET_SQL` 修掉了（长跑批处理不再领回收站的

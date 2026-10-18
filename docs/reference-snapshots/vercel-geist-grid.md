@@ -1,6 +1,6 @@
 # Geist Grid 取证记录
 
-- 取证日期：2026-08-28（原记录在 `docs/HANDOFF.md`「参考产品证据登记」，2026-09-02 移入）
+- 取证日期：2026-08-28（原记录在 [开发约定](../../AGENTS.md)，2026-09-02 移入）
 - URL：<https://vercel.com/geist/grid>
 - 取证方式：实时 DOM 读取（Geist 文档站是 React 渲染，视觉规格拿不到可哈希的快照；
   与 `vercel-geist-controls-measured.md` 同一策略，不在 `docs/reference-sources.json` 登记）

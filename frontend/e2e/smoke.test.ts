@@ -217,7 +217,7 @@ describe('路由冒烟', () => {
           if (polls.length >= least) return;
           await opened.page.waitForTimeout(250);
         }
-        assert.fail(`${what}：只看到 ${polls.length} 次 /api/tasks，要 ${least} 次`);
+        assert.ok(polls.length >= least, `${what}：只看到 ${polls.length} 次 /api/tasks，要 ${least} 次`);
       };
       await expectBody(opened.page, '/tasks',
         [heading(opened.page, '#stats', '还没有任务记录')]);

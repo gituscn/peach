@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import atexit
+import errno
 import hashlib
 import json
 import os
 import platform
 import re
+import subprocess
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -17,13 +19,26 @@ from . import __version__
 
 FIELDS = {
     "usage": "Peach 版本、操作系统类型；每天最多一次，不含安装标识。",
-    "errors": "Peach 版本、系统类型、Python 版本、CPU 架构、故障环节、异常链、Peach 代码文件名/函数名/行号、结构化错误码、媒体工具故障类别、HTTP 方法/路由模板/关联错误编号；每天最多 20 条，同类错误每天一次。",
+    "errors": "Peach 版本、系统类型、Python 版本、CPU 架构、故障环节、异常链、Peach 代码文件名/函数名/行号、结构化错误码、媒体工具故障类别、HTTP 方法/路由模板/关联错误编号、同类故障次数与统计日期；首次立即上传，重复次数每小时或退出时合并，每天最多 20 批。",
 }
 NOTICE = "发送至 Sentry。不上报错误原文、完整日志、诊断 ZIP、媒体名称、路径、网址、观看记录或凭据。接收服务会接触连接 IP；关闭后停止新发送，已发送的信息无法撤回。"
 _lock = threading.RLock()
 _client = None
 _client_dsn = ""
 _disabled = False
+_frequency_timer = None
+_frequency_configs = {}
+MEDIA_STAGES = frozenset({"frame-capture", "frame-tile", "media-probe", "preview", "library-preview"})
+LOCAL_EXCEPTION_TYPES = frozenset({
+    ("asyncio.exceptions", "CancelledError"), ("concurrent.futures._base", "CancelledError"),
+    ("builtins", "InterruptedError"), ("peach.jobs", "JobPolicyError"),
+    ("peach.jav_cover_fetch", "Unavailable"), ("peach.jav_cover_fetch", "DeadlineExceeded"),
+    ("peach.scraping_access", "SourcePaused"), ("peach.previews", "PreviewUnavailable"),
+    ("peach.transcodes", "TranscodeCancelled"), ("peach.segments", "SegmentCancelled"),
+    ("peach.browser_transport", "BrowserUnavailable"), ("peach.browser_transport", "ChallengeUnsolved"),
+    ("peach.face_detect", "FaceModelUnavailable"), ("peach.avatar_watermark", "WatermarkModelUnavailable"),
+    ("starlette.requests", "ClientDisconnect"),
+})
 
 
 def _config(config=None):
@@ -96,6 +111,8 @@ def save(body, config=None):
     config = _config(config)
     payload["revision"] = uuid.uuid4().hex
     atomic_write_text(config.directory("state") / "remote-reporting.json", json.dumps(payload))
+    from . import diagnostic_frequency
+    diagnostic_frequency.clear(config)
     return snapshot(config)
 
 
@@ -164,9 +181,55 @@ def _new_client(target, *, envelope_gate=None):
                   before_send=final_event)
 
 
-def send(kind, event, config=None):
-    """发送失败不影响应用；关闭时不初始化 SDK，也不生成补传文件。"""
+def _submit(kind, event, config, current, target):
     global _client, _client_dsn
+    with _lock:
+        if _client is None or _client_dsn != target:
+            if _client is not None:
+                _client.close(timeout=0)
+            _client, _client_dsn = _new_client(target), target
+        return _client.capture_event({**event, "platform": "python",
+            "extra": {"consent": str(config.directory("state") / "remote-reporting.json"),
+                      "kind": kind, "revision": current["revision"]}})
+
+
+def _schedule_frequency(config):
+    global _frequency_timer
+    with _lock:
+        _frequency_configs[str(config.directory("state"))] = config
+        if _frequency_timer is None:
+            _frequency_timer = threading.Timer(60, _frequency_tick)
+            _frequency_timer.daemon = True
+            _frequency_timer.start()
+
+
+def _frequency_tick():
+    global _frequency_timer
+    with _lock:
+        _frequency_timer = None
+        configs = list(_frequency_configs.values())
+    for config in configs:
+        flush_counts(config)
+    with _lock:
+        if _frequency_configs and not _disabled:
+            _schedule_frequency(next(iter(_frequency_configs.values())))
+
+
+def flush_counts(config=None, *, force=False):
+    try:
+        from . import diagnostic_frequency
+        config = _config(config)
+        current, target = consent(config), dsn()
+        if _disabled or not current["errors"] or not target:
+            return
+        diagnostic_frequency.flush(config, current["revision"],
+            lambda event: _submit("errors", event, config, current, target), force=force)
+    except Exception:
+        pass
+
+
+def send(kind, event, config=None):
+    """发送失败不影响应用；技术诊断按同意版本聚合，关闭时不初始化 SDK。"""
     if _disabled:
         return
     try:
@@ -175,16 +238,14 @@ def send(kind, event, config=None):
         target = dsn()
         if kind not in FIELDS or not current[kind] or not target:
             return
-        if not _reserve(config, kind, {**event, "release": __version__}):
-            return
-        with _lock:
-            if _client is None or _client_dsn != target:
-                if _client is not None:
-                    _client.close(timeout=0)
-                _client, _client_dsn = _new_client(target), target
-            _client.capture_event({**event, "release": __version__, "platform": "python",
-                "extra": {"consent": str(config.directory("state") / "remote-reporting.json"),
-                          "kind": kind, "revision": current["revision"]}})
+        event = {**event, "release": __version__}
+        if kind == "errors":
+            from . import diagnostic_frequency
+            diagnostic_frequency.record(config, current["revision"], event,
+                lambda batch: _submit(kind, batch, config, current, target))
+            _schedule_frequency(config)
+        elif _reserve(config, kind, event):
+            _submit(kind, event, config, current, target)
     except Exception:
         # 不能把遥测自身故障写回错误钩子而递归发送。
         pass
@@ -192,6 +253,22 @@ def send(kind, event, config=None):
 
 def usage(config=None):
     send("usage", {"message": "Peach started", "level": "info", "tags": {"os": platform.system()}}, config)
+    flush_counts(config)
+    try:
+        if not _disabled and consent(config)["errors"] and dsn():
+            _schedule_frequency(_config(config))
+    except Exception:
+        pass
+
+
+def _http_status(error):
+    status = getattr(error, "status_code", None)
+    if type(status) is not int or not 100 <= status <= 599:
+        status = getattr(getattr(error, "response", None), "status_code", None)
+    if type(status) is not int and any(cls.__module__ == "urllib.error" and cls.__name__ == "HTTPError"
+                                      for cls in type(error).__mro__):
+        status = getattr(error, "code", None)
+    return status if type(status) is int and 100 <= status <= 599 else None
 
 
 def _exception_details(error):
@@ -200,10 +277,12 @@ def _exception_details(error):
     while current is not None and id(current) not in visited and len(chain) < 8:
         visited.add(id(current))
         chain.append(type(current).__name__)
-        for key in ("errno", "winerror", "returncode", "status_code"):
+        for key in ("errno", "winerror", "returncode"):
             value = getattr(current, key, None)
             if type(value) is int:
                 codes[key] = value
+        if (status := _http_status(current)) is not None:
+            codes["status_code"] = status
         tb = current.__traceback__
         while tb is not None and len(frames) < 40:
             filename = Path(tb.tb_frame.f_code.co_filename)
@@ -217,32 +296,64 @@ def _exception_details(error):
 
 def _media_details(error, fields, codes):
     detail = getattr(error, "diagnostics", {}) if error is not None else {}
+    detail = detail if isinstance(detail, dict) else {}
     if type(detail.get("returncode")) is int:
         codes["returncode"] = detail["returncode"]
     raw = str(fields.get("stderr", "")) + str(detail.get("stderr", ""))
     for marker, code in (("Your platform doesn't support hardware accelerated AV1 decoding", "av1_decoder_unavailable"),
+                         ("Unknown decoder", "decoder_unavailable"),
                          ("Invalid data found", "invalid_media"), ("Permission denied", "permission_denied"),
-                         ("No space left", "disk_full"), ("Unknown decoder", "decoder_unavailable")):
+                         ("No space left", "disk_full"), ("No such file or directory", "missing_media")):
         if marker in raw:
             return code
     return ""
+
+
+def _expected_failure(stage, error, fields):
+    if stage == "logging" and fields.get("level", "ERROR") not in {"ERROR", "CRITICAL"}:
+        return True
+    if stage == "browser" and fields.get("error_name") == "AbortError":
+        return True
+    kinds = {(cls.__module__, cls.__name__) for cls in type(error).__mro__}
+    if kinds & LOCAL_EXCEPTION_TYPES:
+        return True
+    if ("peach.sources.base", "SourceFailure") in kinds:
+        return str(error.reason) in {"cloudflare_challenge", "ip_banned", "geo_restricted", "auth_required",
+            "not_found", "gone", "no_usable_metadata", "rate_limited", "timeout", "server_error", "network"}
+    if ("peach.metadata", "MetadataProviderError") in kinds and error.detail != "parse_error":
+        return error.kind in {"auth", "not_found"} or error.retryable is True or error.temporary is True
+    if stage in MEDIA_STAGES:
+        detail = getattr(error, "diagnostics", {})
+        if isinstance(error, subprocess.TimeoutExpired) or isinstance(detail, dict) and detail.get("reason") == "timeout":
+            return True
+        if isinstance(error, OSError) and error.errno == errno.ENOSPC:
+            return True
+        if isinstance(error, (FileNotFoundError, PermissionError, IsADirectoryError, NotADirectoryError)):
+            filename = getattr(error, "filename", None)
+            if filename and Path(filename).name != Path(str(fields.get("tool", ""))).name:
+                return True
+    return False
 
 
 def _actionable(stage, error, fields):
     """仅允许技术故障入口；预期领域状态和 SDK 自身日志留在本机。"""
     if str(fields.get("logger", "")).startswith(("sentry_sdk", "urllib3")):
         return False
+    if stage == "unhandled-asyncio":
+        from .error_reporting import is_asyncio_connection_cleanup
+        if is_asyncio_connection_cleanup(error, fields):
+            return False
     stages = {"browser", "http-request", "unhandled-main", "unhandled-thread", "unraisable",
               "unhandled-asyncio", "cli", "packaged-cli", "desktop-entry", "tray-import",
               "background-job", "library-preview", "frame-capture", "frame-tile", "media-probe",
               "preview", "standalone-update-install", "standalone-update-rollback", "logging"}
     if stage not in stages or isinstance(error, (SystemExit, KeyboardInterrupt)):
         return False
-    if error is not None and type(error).__name__ in {"CancelledError", "JobCancelled", "NotFound", "Unavailable"}:
+    if _expected_failure(stage, error, fields):
         return False
     if stage == "http-request" and fields.get("status_code", 500) < 500:
         return False
-    if error is not None and type(getattr(error, "status_code", None)) is int and error.status_code < 500:
+    if (status := _http_status(error)) is not None and 400 <= status < 500:
         return False
     return True
 
@@ -262,17 +373,27 @@ def _http_details(stage, fields):
     return tags, error_id
 
 
+def _browser_frames(stack):
+    frames = []
+    pattern = r"(peach-(?:app|pages)\.js)(?:\?[^\s):]*)?:(\d+):(\d+)"
+    for line in str(stack).splitlines()[:80]:
+        if "chrome-extension://" in line or "moz-extension://" in line:
+            continue
+        for name, row, column in re.findall(pattern, line):
+            frames.append({"filename": name, "lineno": int(row), "colno": int(column)})
+    return frames[:20]
+
+
 def capture(stage, error=None, **fields):
     """只投影代码位置和错误类别，不发送异常文本或日志文本。"""
     if not _actionable(stage, error, fields):
         return
-    media_stage = stage in {"frame-capture", "frame-tile", "media-probe", "preview", "library-preview"}
+    media_stage = stage in MEDIA_STAGES
     if error is None and stage != "browser" and not media_stage:
         return
     frames, codes, chain = _exception_details(error)
     if error is None and stage == "browser":
-        for name, line, column in re.findall(r"(peach-(?:app|pages)\.js):(\d+):(\d+)", str(fields.get("stack", "")))[:20]:
-            frames.append({"filename": name, "lineno": int(line), "colno": int(column)})
+        frames = _browser_frames(fields.get("stack", ""))
         if not frames:
             return
     if stage == "logging" and not frames:
@@ -283,6 +404,8 @@ def capture(stage, error=None, **fields):
     reason = ""
     if media_stage:
         reason = _media_details(error, fields, codes)
+        if reason in {"invalid_media", "permission_denied", "disk_full", "missing_media"}:
+            return
         if not reason and not codes and error is None:
             return
     category = type(error).__name__ if error is not None else ("BrowserError" if stage == "browser" else "LogError")
@@ -305,8 +428,12 @@ def disable_for_process():
 
 
 def close():
-    global _client, _client_dsn
+    global _client, _client_dsn, _frequency_timer
     with _lock:
+        if _frequency_timer is not None:
+            _frequency_timer.cancel()
+        _frequency_timer = None
+        _frequency_configs.clear()
         if _client is not None:
             _client.close(timeout=0)
         _client, _client_dsn = None, ""
@@ -314,6 +441,10 @@ def close():
 
 def _shutdown():
     try:
+        with _lock:
+            configs = list(_frequency_configs.values())
+        for config in configs:
+            flush_counts(config, force=True)
         with _lock:
             if _client is not None:
                 _client.flush(timeout=1)

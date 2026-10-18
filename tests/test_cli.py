@@ -202,7 +202,7 @@ class InitCommandTests(unittest.TestCase):
         """
         self.root.mkdir(parents=True)
         (self.root / "config.toml").write_text(
-            "[media]\nR = '/Volumes/RESOURCES'\n", encoding="utf-8")
+            "[media]\nR = '/Volumes/Media'\n", encoding="utf-8")
         code, output = self._init("--from-existing", "--force")
         self.assertEqual(code, 0)
         self.assertIn("media.mounts", output)      # 原始错误里的升级提示

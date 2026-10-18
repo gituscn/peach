@@ -33,7 +33,7 @@ MOUNTS_ENV = "PEACH_MEDIA_MOUNTS"
 
 @lru_cache(maxsize=8)
 def _parse_override(raw: str) -> tuple[tuple[str, str], ...]:
-    """`PEACH_MEDIA_MOUNTS=local=/Volumes/RESOURCES/media,115=/Volumes/CloudDrive/115` 形式的覆盖。"""
+    """`PEACH_MEDIA_MOUNTS=local=/Volumes/Media/media,115=/Volumes/CloudDrive/115` 形式的覆盖。"""
     pairs: list[tuple[str, str]] = []
     for chunk in raw.split(","):
         location, separator, mount = chunk.partition("=")
@@ -135,7 +135,7 @@ def within_root(path: Path, root: Path) -> bool:
     """路径是否落在授权根内。
 
     字面比较先走一遍；不匹配时用 inode 比较兜底，因为账本里是 `R:\\Media`
-    而授权根是 `/Volumes/RESOURCES/media`，exFAT/NTFS 大小写不敏感、pathlib 不是。
+    而授权根是 `/Volumes/Media/media`，exFAT/NTFS 大小写不敏感、pathlib 不是。
     """
     if path == root or root in path.parents:
         return True

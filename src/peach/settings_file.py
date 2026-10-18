@@ -358,7 +358,7 @@ def _merge(
     media = _table(document, "media", path)
     stray = sorted(set(media) - {_LOCATIONS_KEY, _MOUNTS_KEY, "libraries", "library_icons", "costs"})
     if stray:
-        # 第一阶段的 `[media] R = '/Volumes/RESOURCES'`。键空间从盘符换成了 location ID，
+        # 第一阶段的 `[media] R = '/Volumes/Media'`。键空间从盘符换成了 location ID，
         # 把它当未知键忽略等于「所有来源都没挂」——整台机器安静地进脱盘模式。
         raise _fail(path, (
             "`[media]` 下不再接受盘符键：" + "、".join(stray)

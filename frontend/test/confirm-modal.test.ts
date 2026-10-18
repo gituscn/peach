@@ -2,6 +2,16 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { confirmModal } from '../src/ui-kit';
 
 afterEach(() => document.body.replaceChildren());
+it('确认清单逐条呈现文件名，文件名保持纯文本', async () => {
+  const names = ['作品一.mp4', '<img src=x onerror=alert(1)>.mp4'];
+  const pending = confirmModal({title:'清理记录',body:'清理 2 项',items:names,confirmLabel:'清理记录'});
+  const list = document.querySelector('dialog ul')!;
+  expect([...list.children].map(item => item.textContent)).toEqual(names);
+  expect(list.querySelector('img')).toBeNull();
+  expect(list.getAttribute('tabindex')).toBe('0');
+  document.querySelector<HTMLButtonElement>('[data-modal-cancel]')!.click();
+  expect((await pending).confirmed).toBe(false);
+});
 it('危险操作聚焦取消，取消不写入，关闭归还焦点', async () => {
   const trigger = document.createElement('button'); document.body.append(trigger); trigger.focus();
   const write = vi.fn();

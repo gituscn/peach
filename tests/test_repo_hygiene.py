@@ -1,9 +1,6 @@
 """仓库与顶层目录的整洁门槛。
 
-这里守的都是「清理过一次、过几天又长回来」的东西。一次性清理解决不了它们：
-2026-08-29 把顶层收敛到 4 个运行时目录、工作树清到 3 个，两天后顶层多出三个违规目录、
-工作树长回 74 个。原因是规则只写在 `../attic/README.md`——仓库外、不进 Git、AGENTS.md
-也没提，在 peach-app 里干活的人根本看不到。约定不是门槛。
+检查顶层布局、工作树登记、私有产物和公开文档中的个人信息。
 """
 import ast
 import os
@@ -30,6 +27,78 @@ TOP_LEVEL_ALLOWED = {"peach-app", "peach-data", "peach-sync", "peach-worktrees",
 #: `.DS_Store`，Windows 资源管理器写 `desktop.ini` 与 `Thumbs.db`，删掉照样再长出来。
 #: 不豁免它们，这条门槛在任何有图形界面的开发机上都是红的，红得和布局无关。
 TOP_LEVEL_GENERATED_FILES = frozenset({".ds_store", "desktop.ini", "thumbs.db"})
+
+PRIVATE_CONTEXT_DOCUMENTS = frozenset({
+    "HANDOFF.md", "STATUS.md", "PRODUCT_BACKLOG.md", "VERIFICATION_EFFICIENCY.md",
+    "UI_REUSE_REVIEW.md", "SCRAPING_AUDIT.md",
+})
+PRIVATE_CONTEXT_PATHS = frozenset({
+    "docs/reference-snapshots/tag-vocabulary-audit.md", "docs/scraping-audit.csv",
+    "resources/seed/entities.json",
+})
+PRIVATE_ARTIFACT_ROOTS = frozenset({
+    "peach-data", "peach-sync", "peach-worktrees", "secrets", "generated", "review", "attic", "build",
+})
+PRIVATE_RECORD_PATH = re.compile(r"(?:peach-data/(?:review|archive)/|attic/(?:evidence|reviews)/)(?![<*])[^`\s)]+")
+COLLECTION_INVENTORY = re.compile(
+    r"(?:本机|本库|真实馆藏|真实库|库里|馆里)[^。\n]{0,100}\d[\d,]*\s*"
+    r"(?:条资产|行|部|作品|张头像|张封面|个文件|条来源|个题材|枚圆标|位缺头像)"
+)
+
+
+def _private_artifact(name: str) -> bool:
+    path = pathlib.PurePosixPath(name)
+    if path.parts[0].casefold() in PRIVATE_ARTIFACT_ROOTS:
+        return True
+    if name.startswith((".claude/worktrees/", ".codex/environments/")):
+        return True
+    if name in PRIVATE_CONTEXT_PATHS:
+        return True
+    if path.parent == pathlib.PurePosixPath("docs") and path.name in PRIVATE_CONTEXT_DOCUMENTS:
+        return True
+    if path.name == ".env" or path.name.startswith(".env.") and path.name != ".env.example":
+        return True
+    return bool(re.search(r"\.(?:db|sqlite\d*)(?:-(?:wal|shm))?$", path.name, re.I))
+
+
+class PrivateArtifactTests(unittest.TestCase):
+    """公开代码树拒收私有上下文、账本与运行产物。"""
+
+    def test_private_artifact_paths_are_rejected_and_public_sources_are_allowed(self):
+        for name in ("docs/HANDOFF.md", "docs/STATUS.md", "docs/PRODUCT_BACKLOG.md",
+                     "peach-data/review/catalog.csv", "review/current-inventory.csv",
+                     "attic/evidence/session.json", "secrets/access.json", ".env.local",
+                     "database/ledger.db-wal", "database/history.sqlite3"):
+            with self.subTest(path=name):
+                self.assertTrue(_private_artifact(name))
+        for name in ("docs/REUSE.md", "docs/OPERATIONS.md", "docs/TESTING.md",
+                     "tests/test_job_status.py", "web/dist/peach-app.js", ".env.example"):
+            with self.subTest(path=name):
+                self.assertFalse(_private_artifact(name))
+
+    def test_tracked_files_exclude_private_artifacts(self):
+        done = subprocess.run(["git", "ls-files", "-z"], cwd=REPO, capture_output=True, check=True)
+        names = done.stdout.decode("utf-8").split("\0")
+        offenders = [name for name in names if name and (REPO / name).is_file() and _private_artifact(name)]
+        self.assertEqual(offenders, [], "私有记录与运行产物必须保存在代码仓库外")
+
+    def test_git_ignores_private_context_and_runtime_directories(self):
+        names = [f"docs/{name}" for name in sorted(PRIVATE_CONTEXT_DOCUMENTS)]
+        names += sorted(PRIVATE_CONTEXT_PATHS)
+        names += ["peach-data/review/catalog.csv", "secrets/access.json", "review/catalog.csv",
+                  "attic/evidence/session.json"]
+        public_sources = ["frontend/src/react/review/review-page.tsx"]
+        done = subprocess.run(["git", "check-ignore", "--no-index", "-z", "--stdin"], cwd=REPO,
+                              input=("\0".join([*names, *public_sources]) + "\0").encode("utf-8"),
+                              capture_output=True, check=False)
+        self.assertEqual(done.returncode, 0, done.stderr.decode("utf-8"))
+        self.assertEqual(set(done.stdout.decode("utf-8").strip("\0").split("\0")), set(names))
+
+    def test_private_inventory_and_record_references_are_distinguished_from_examples(self):
+        self.assertIsNotNone(COLLECTION_INVENTORY.search("本机盘点有 1234 部作品"))
+        self.assertIsNotNone(PRIVATE_RECORD_PATH.search("peach-data/review/current-catalog.csv"))
+        self.assertIsNone(COLLECTION_INVENTORY.search("示例库包含 12 部合成视频"))
+        self.assertIsNone(PRIVATE_RECORD_PATH.search("<数据根>/review/<复核产物>"))
 
 
 def _loose_files(top: pathlib.Path) -> list[str]:
@@ -189,68 +258,6 @@ class DocumentationMediaTests(unittest.TestCase):
                 )
 
 
-class BacklogSelfConsistencyTests(unittest.TestCase):
-    """产品待办自己报的数必须和它列的条目对得上。
-
-    测试逼不出「有人去更新 prose」，但能逼出「改了条目却忘了改总数」——那是这份文档
-    最常见的失真，而且一旦失真，后面每次读它的人都会被那个总数误导。
-    """
-
-    def setUp(self):
-        self.text = (DOCS / "PRODUCT_BACKLOG.md").read_text(encoding="utf-8")
-
-    def _numbered(self, heading: str) -> int:
-        body = self.text.split(heading, 1)[1].split("\n## ", 1)[0]
-        return len(re.findall(r"^\d+\. ", body, re.M))
-
-    def test_the_stated_totals_match_the_items_listed(self):
-        skeleton = self._numbered("## 已有骨架、尚未完成")
-        other = self._numbered("## 其他开放需求")
-        claimed = re.search(r"合计：\*\*(\d+) 项开放需求\*\*，其中 (\d+) 项已有骨架，(\d+) 项其他开放需求",
-                            self.text)
-        self.assertIsNotNone(claimed, "结尾那句合计被改写了，请保持可核对的写法")
-        total, said_skeleton, said_other = (int(g) for g in claimed.groups())
-        self.assertEqual((said_skeleton, said_other), (skeleton, other),
-                         "分项数和实际列出的条目对不上")
-        self.assertEqual(total, skeleton + other, "合计和分项加起来对不上")
-
-    def test_pending_operations_do_not_creep_back_into_the_entry_file(self):
-        """编号待办只许住在这份文档里。
-
-        `docs/STATUS.md` 每次会话开头都要读，23 条待办要占掉它三分之一的字节预算，
-        其中十条还是「另行授权后才能跑」的操作，绝大多数任务读到它们只是白读。
-        搬出去容易，长回来更容易，所以在这里钉住。
-        """
-        status = (DOCS / "STATUS.md").read_text(encoding="utf-8")
-        self.assertNotIn("## 下一批工作", status, "待办去 docs/PRODUCT_BACKLOG.md，别放回入口文件")
-        self.assertEqual(
-            re.findall(r"^\d+\. ", status, re.M), [],
-            "入口文件不留编号待办：写现状用无序列表，要做的事去 docs/PRODUCT_BACKLOG.md",
-        )
-
-    def test_the_status_entry_file_only_holds_runtime_state(self):
-        """入口文件的小节是白名单，加一节要先来改这里。
-
-        `docs/STATUS.md` 装得下的只有「原地替换、边界固定」的内容：机器、端口、链路、
-        账本版本。清单型的小节一进来就再也不出去——每上线一个特性加一行，永不减，
-        因为「已经做过」这个断言没有任何事件能让它失效。已定型的行为判据去
-        `docs/REUSE.md`，要做的事去 `docs/PRODUCT_BACKLOG.md`，长期知识去
-        `docs/HANDOFF.md`，三处都是按需读取，不占每轮预算。
-        """
-        status = (DOCS / "STATUS.md").read_text(encoding="utf-8")
-        self.assertEqual(
-            re.findall(r"^## (.+)$", status, re.M), ["运行态", "批处理进度"],
-            "入口文件只留这两节；新内容按判据落到 REUSE／PRODUCT_BACKLOG／HANDOFF",
-        )
-
-    def test_the_section_headings_declare_their_own_counts(self):
-        for heading, actual in (("已有骨架、尚未完成", self._numbered("## 已有骨架、尚未完成")),
-                                ("其他开放需求", self._numbered("## 其他开放需求")),
-                                ("待执行的操作", self._numbered("## 待执行的操作"))):
-            declared = re.search(rf"## {heading}（(\d+) 项）", self.text)
-            self.assertIsNotNone(declared, f"「{heading}」的标题应当带上条数，便于一眼核对")
-            self.assertEqual(int(declared.group(1)), actual,
-                             f"「{heading}」标题写的条数和实际列出的对不上")
 
 
 #: 家目录路径：`C:\Users\<名字>\…`、`/Users/<名字>/…`、`/home/<名字>/…`。名字段要以字母开头，
@@ -389,7 +396,7 @@ class PersonalLiteralTests(unittest.TestCase):
         """门槛自身也要能被证伪，否则它可能只是一段永远为真的代码。"""
         for sample in (r"C:\Users\alice\Desktop\peach\peach-data", "~/Desktop/peach",
                        "/Users/alice/peach", "/home/alice/peach", "alice-mbp.local",
-                       "/Volumes/peach-sync", "https://192.168.50.162",
+                       "/Volumes/peach-sync", "https://10.234.56.78",
                        "/Volumes/RESOURCES/media", "/Users/x/Desktop/IMSL/115"):
             self.assertTrue(PERSONAL_LITERAL.search(sample), sample)
         for allowed in ("127.0.0.1", "0.0.0.0", "peach.local", "224.0.0.251",
@@ -484,6 +491,16 @@ class MachineCoordinateTests(unittest.TestCase):
             "或中性的主机名、账号名、`<用户目录>` 这类占位",
         )
 
+    def test_public_documents_exclude_collection_inventories_and_private_record_names(self):
+        offenders = []
+        for name, text in self._tracked_text_files():
+            if not name.endswith(".md"):
+                continue
+            for number, line in enumerate(text.splitlines(), 1):
+                if COLLECTION_INVENTORY.search(line) or PRIVATE_RECORD_PATH.search(line.replace("\\", "/")):
+                    offenders.append(f"{name}:{number}")
+        self.assertEqual(offenders, [], "馆藏盘点与私有记录名应保存在部署数据根，检查输出只列文件和行号")
+
     def test_no_tracked_file_names_this_machine(self):
         """本机的账号名与主机名对任何维护者都成立，正好不用在正则里点名。
 
@@ -508,7 +525,7 @@ class MachineCoordinateTests(unittest.TestCase):
 
     def test_the_whole_tree_guard_catches_the_shape_it_describes(self):
         """门槛自身也要能被证伪，否则它可能只是一段永远为真的代码。"""
-        for sample in ("https://192.168.50.162", "PEACH_SHARED_SMB_HOST=192.168.1.9",
+        for sample in ("https://10.234.56.78", "PEACH_SHARED_SMB_HOST=192.168.1.9",
                        "review_writer_origin = 'https://10.0.0.5'", "172.31.112.1",
                        r"C:\Users\alice\Desktop\peach", "/Users/alice/Desktop/peach",
                        "/home/alice/peach", "smb://alice@alice-mbp.local/peach-sync",

@@ -28,7 +28,7 @@ const SUGGESTIONS: AliasSuggestion[] = [
   { canonical: '作者 B', alias: '别名 B', evidence: '来源 B' },
 ];
 
-type Confirmation = { title: string; body: string; onConfirm(): Promise<unknown> };
+type Confirmation = { title: string; body: string; items?: readonly string[]; onConfirm(): Promise<unknown> };
 
 /** 确认框只记下参数不自己点：合并由人点这一条是这里要守住的东西。 */
 function stubConfirm() {
@@ -230,7 +230,7 @@ it('别名分页保留跨页选择，已保存别名批量移除只处理所选�
   await click(box(host, '选择已保存别名 创作者 20'));
   await click(buttonNamed('移除所选别名（2）', host));
   expect(aliasWrites(fetcher)).toEqual([]);
-  expect(asked[0]!.body).toContain('「别名 0」、「别名 20」');
+  expect(asked[0]!.items).toEqual(['别名 0', '别名 20']);
   await asked[0]!.onConfirm();
   await settle();
   expect(aliasWrites(fetcher)).toEqual([

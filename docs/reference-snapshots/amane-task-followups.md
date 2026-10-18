@@ -3,7 +3,7 @@
 - 来源：<https://github.com/sqzw-x/amane>，GPL-3.0
 - 固定 revision：`79ecfa763cc786318e1964a3d7f4e244a7d5c96d`
 - 取得日期：2026-09-22
-- 取证方式：仓库外独立克隆（`Desktop\peach\attic\evidence\20260922-amane-crawlers-poc\amane`），
+- 取证方式：仓库外独立克隆，
   只读源码与其单元测试，不引入代码。GPL 与 Peach 的许可证不兼容，本文只记录设计判据，
   Peach 侧按自己的表结构与并发模型重写。
 - 本文不登记进 `docs/reference-sources.json`：与 `amane-crawlers-poc.md` 同理，这是对上游

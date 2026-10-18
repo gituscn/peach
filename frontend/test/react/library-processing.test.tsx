@@ -10,14 +10,18 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { queryClient } from '../../src/react/query';
 import {
-  currentLine, notesLine, prefetchLibraryProcessing, processingLine, remainingTime, type LibraryProcessingData,
+  currentLine, LIBRARY_PROCESSING_KEY, notesLine, prefetchLibraryProcessing, processingLine, remainingTime, type LibraryProcessingData,
 } from '../../src/react/library-processing/library-processing';
 import { LibraryProcessingCard } from '../../src/react/library-processing/library-processing-card';
 import { LibraryProcessingNotice } from '../../src/react/library-processing/library-processing-notice';
 import { RESOURCE_NOTICE_KEY } from '../../src/react/library-processing/processing-actions';
 import type { LibraryProcessingProps } from '../../src/react/bundle';
 
-import { buttonNamed, click, mount, mountRoot, submit } from './render';
+import { buttonNamed as textButtonNamed, click, mount, mountRoot, submit } from './render';
+
+const buttonNamed = (name: string, root: ParentNode = document) =>
+  [...root.querySelectorAll('button')].find(button => button.getAttribute('aria-label') === name)
+  ?? textButtonNamed(name, root);
 
 // 客户端是模块级的单例（所有 React 根共用一个），用例之间不清就互相喂数据。
 // 报过的任务号记在 `localStorage` 里，也要清，否则下一条用例的通知被当成重复的。
@@ -331,6 +335,40 @@ it('两个容器读同一趟任务：一个周期只问一次，撤掉一个另�
   expect(served.calls, '横幅还在页面上，节律不该跟着卡片一起停').toHaveLength(3);
 });
 
+it('两个容器的等待秒数每秒推进，不增加轮询请求，换文件和暂停时对齐快照', async () => {
+  vi.useFakeTimers();
+  const state: LibraryProcessingData = { status: 'running', checked: 2, total: 10,
+    current_asset_id: 1, current_action: 'reading_local_cover', waited_seconds: 33 };
+  const served = await open(state);
+  const banner = await mountRoot(notice({ toast: vi.fn(), mode: 'notice' }));
+  const panel = await mountRoot(card({ toast: vi.fn(), monitor: true }));
+  expect(banner.host.textContent).toContain('已等待 33 秒');
+  expect(panel.host.textContent).toContain('已等待 33 秒');
+  await tick(1000);
+  expect(banner.host.textContent).toContain('已等待 34 秒');
+  expect(panel.host.textContent).toContain('已等待 34 秒');
+  expect(served.calls).toHaveLength(0);
+  await tick(1000);
+  expect(banner.host.textContent).toContain('已等待 35 秒');
+  expect(panel.host.textContent).toContain('已等待 35 秒');
+  expect(served.calls).toHaveLength(1);
+  await act(async () => {
+    queryClient.setQueryData(LIBRARY_PROCESSING_KEY, { ...state, current_asset_id: 2, waited_seconds: 0 });
+  });
+  expect(banner.host.textContent).not.toContain('已等待 35 秒');
+  await tick(1000);
+  expect(banner.host.textContent).toContain('已等待 1 秒');
+  expect(panel.host.textContent).toContain('已等待 1 秒');
+  await act(async () => { queryClient.setQueryData(LIBRARY_PROCESSING_KEY, { ...state, status: 'paused' }) });
+  expect(banner.host.textContent).not.toContain('已等待');
+  expect(panel.host.textContent).not.toContain('已等待');
+  await banner.unmount();
+  await panel.unmount();
+  const requests = served.calls.length;
+  await tick(10_000);
+  expect(served.calls).toHaveLength(requests);
+});
+
 it('卡片卸载之后轮询就停了', async () => {
   vi.useFakeTimers();
   const served = await open({ status: 'running', checked: 2, total: 10 });
@@ -433,6 +471,19 @@ it('预估按粗估与实测速率显示区间，缺少有效范围时等待估�
   expect(remainingTime({ ...state, eta_seconds_min: 2500 })).toBe('正在估算剩余时间…');
   expect(remainingTime({ ...state, eta_seconds_min: 0, eta_seconds_max: 10 })).toBe('预计剩余不到 1 分钟');
   expect(remainingTime({ ...state, status: 'complete' })).toBe('');
+});
+
+it('处理较慢时各任务面显示等待进展，不沿用旧估时', async () => {
+  await open({ status: 'running', job_id: 'slow', stalled: true,
+    eta_seconds_min: 63, eta_seconds_max: 94, eta_kind: 'measured',
+    current_action: 'reading_local', current_asset_name: '示例视频.mp4' });
+  const host = await mount(card({ toast: vi.fn() }));
+  const banner = await mount(notice({ toast: vi.fn(), mode: 'notice' }));
+  for (const surface of [host, banner]) {
+    expect(surface.textContent).toContain('等待当前文件响应，剩余时间待更新');
+    expect(surface.textContent).not.toContain('预计剩余');
+    expect(surface.textContent).toContain('检查配套文件');
+  }
 });
 
 it('扫描总量未知时显示已发现文件数，已知阶段显示完成数', () => {

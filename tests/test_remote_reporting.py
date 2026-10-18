@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -112,8 +113,154 @@ class RemoteReportingTests(unittest.TestCase):
                 reporting.send("errors", event)
                 reporting.send("errors", event)
         self.assertEqual(client.capture_event.call_count, 21)
-        payload = json.loads((self.config.directory("state") / "remote-reporting-budget.json").read_text())
-        self.assertEqual(len(payload["errors"]), 20)
+        payload = json.loads((self.config.directory("state") / "remote-reporting-frequency.json").read_text())
+        self.assertEqual(len(payload["records"]), 20)
+        self.assertTrue(all(row['total'] == 2 for row in payload['records'].values()))
+
+    def test_frequency_batches_send_disjoint_counts_and_keep_group_identity(self):
+        from peach import diagnostic_frequency as frequency
+        reporting.save({"usage": True, "errors": True})
+        client = mock.Mock()
+        now = datetime(2026, 10, 18, 12, tzinfo=timezone.utc)
+        with mock.patch.object(reporting, '_new_client', return_value=client), \
+                mock.patch.object(frequency, '_now', return_value=now) as clock:
+            for index in range(5):
+                reporting.capture('unhandled-main', ValueError('private title'), error_id=str(index))
+            self.assertEqual(client.capture_event.call_count, 1)
+            first = client.capture_event.call_args.args[0]
+            self.assertEqual(first['tags']['occurrence_count'], '1')
+            clock.return_value = now + timedelta(hours=1)
+            reporting.flush_counts()
+            second = client.capture_event.call_args.args[0]
+            self.assertEqual(second['tags']['occurrence_count'], '4')
+            self.assertEqual(second['tags']['diagnostic_key'], first['tags']['diagnostic_key'])
+            self.assertEqual(second['tags']['occurrence_day'], '2026-10-18')
+            reporting.flush_counts(force=True)
+            self.assertEqual(client.capture_event.call_count, 2)
+        payload = (self.config.directory('state') / 'remote-reporting-frequency.json').read_text()
+        self.assertNotIn('private title', payload)
+        self.assertNotIn('installation', payload)
+
+    def test_frequency_survives_client_restart_and_http_ids_do_not_split_groups(self):
+        reporting.save({"usage": True, "errors": True})
+        client = mock.Mock()
+        with mock.patch.object(reporting, '_new_client', return_value=client):
+            for error_id in ('a' * 32, 'b' * 32, 'c' * 32):
+                reporting.capture('http-request', RuntimeError('private'), status_code=500, error_id=error_id)
+            first = client.capture_event.call_args.args[0]
+            self.assertEqual(first['event_id'], 'a' * 32)
+            reporting.close()
+            reporting.flush_counts(force=True)
+            second = client.capture_event.call_args.args[0]
+            self.assertNotIn('event_id', second)
+            self.assertEqual(second['tags']['occurrence_count'], '2')
+            self.assertEqual(first['tags']['diagnostic_key'], second['tags']['diagnostic_key'])
+            self.assertEqual(client.capture_event.call_count, 2)
+
+    def test_frequency_pending_counts_expire_with_consent_and_expected_states_are_excluded(self):
+        import asyncio
+        reporting.save({"usage": True, "errors": True})
+        client = mock.Mock()
+        with mock.patch.object(reporting, '_new_client', return_value=client):
+            reporting.capture('background-job', asyncio.CancelledError())
+            reporting.capture('unhandled-main', ValueError('private'))
+            reporting.capture('unhandled-main', ValueError('private'))
+            reporting.save({"usage": False, "errors": False})
+            self.assertFalse((self.config.directory('state') / 'remote-reporting-frequency.json').exists())
+            reporting.flush_counts(force=True)
+            reporting.save({"usage": True, "errors": True})
+            reporting.flush_counts(force=True)
+            self.assertEqual(client.capture_event.call_count, 1)
+            reporting.capture('unhandled-main', ValueError('private'))
+            self.assertEqual(client.capture_event.call_args.args[0]['tags']['occurrence_count'], '1')
+
+    def test_frequency_daily_limit_defers_counts_and_preserves_occurrence_day(self):
+        from peach import diagnostic_frequency as frequency
+        reporting.save({"usage": True, "errors": True})
+        client = mock.Mock()
+        now = datetime(2026, 10, 18, 12, tzinfo=timezone.utc)
+        with mock.patch.object(reporting, '_new_client', return_value=client), \
+                mock.patch.object(frequency, '_now', return_value=now) as clock:
+            for index in range(20):
+                reporting.send('errors', {'message': str(index)})
+            reporting.send('errors', {'message': '0'})
+            reporting.flush_counts(force=True)
+            self.assertEqual(client.capture_event.call_count, 20)
+            clock.return_value = now + timedelta(days=1)
+            reporting.flush_counts(force=True)
+            self.assertEqual(client.capture_event.call_count, 21)
+            self.assertEqual(client.capture_event.call_args.args[0]['tags']['occurrence_count'], '1')
+            self.assertEqual(client.capture_event.call_args.args[0]['tags']['occurrence_day'], '2026-10-18')
+
+    def test_frequency_sdk_rejection_keeps_pending_counts_for_later_batch(self):
+        reporting.save({"usage": True, "errors": True})
+        client = mock.Mock()
+        client.capture_event.return_value = None
+        with mock.patch.object(reporting, '_new_client', return_value=client):
+            reporting.capture('unhandled-main', ValueError('private'))
+            client.capture_event.return_value = 'accepted'
+            reporting.flush_counts(force=True)
+            self.assertEqual(client.capture_event.call_args.args[0]['tags']['occurrence_count'], '1')
+            reporting.flush_counts(force=True)
+            self.assertEqual(client.capture_event.call_count, 2)
+
+    def test_frequency_shared_file_serializes_independent_processes(self):
+        from peach import diagnostic_frequency as frequency
+        root = Path(__file__).resolve().parents[1]
+        reporting.save({"usage": True, "errors": True})
+        program = ('from peach import diagnostic_frequency as f; '
+                   'from peach.settings_file import active; '
+                   'from peach.remote_reporting import consent; '
+                   'f.record(active(), consent()["revision"], {"release":"test", "tags":{"stage":"cli"}}, lambda e: True)')
+        env = {**os.environ, 'PYTHONPATH': str(root / 'src'), 'PEACH_SENTRY_DSN': ''}
+        processes = [subprocess.Popen([sys.executable, '-X', 'utf8', '-c', program], env=env,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(2)]
+        for process in processes:
+            try:
+                stdout, stderr = process.communicate(timeout=30)
+                self.assertEqual(process.returncode, 0, (stdout, stderr))
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.communicate()
+        sent = []
+        frequency.flush(self.config, reporting.consent()['revision'], lambda e: sent.append(e) or True, force=True)
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0]['tags']['occurrence_count'], '1')
+
+    def test_frequency_shutdown_submits_pending_counts_and_stops_timer(self):
+        reporting.save({"usage": True, "errors": True})
+        client = mock.Mock()
+        with mock.patch.object(reporting, '_new_client', return_value=client):
+            for _ in range(3):
+                reporting.capture('unhandled-main', ValueError('private'))
+            reporting._shutdown()
+        self.assertEqual(client.capture_event.call_count, 2)
+        self.assertEqual(client.capture_event.call_args.args[0]['tags']['occurrence_count'], '2')
+        self.assertIsNone(reporting._frequency_timer)
+        self.assertFalse(reporting._frequency_configs)
+
+    def test_frequency_background_failure_does_not_break_startup(self):
+        reporting.save({"usage": True, "errors": True})
+        with mock.patch.object(reporting, '_schedule_frequency', side_effect=OSError('unavailable')), \
+                mock.patch.object(reporting, '_new_client'):
+            reporting.usage()
+
+    def test_frequency_timer_flushes_without_another_occurrence(self):
+        from peach import diagnostic_frequency as frequency
+        reporting.save({"usage": True, "errors": True})
+        now = datetime(2026, 10, 18, 12, tzinfo=timezone.utc)
+        client = mock.Mock()
+        with mock.patch.object(reporting, '_new_client', return_value=client), \
+                mock.patch.object(reporting.threading, 'Timer') as timer, \
+                mock.patch.object(frequency, '_now', return_value=now) as clock:
+            for _ in range(4):
+                reporting.capture('unhandled-main', ValueError('private'))
+            callback = timer.call_args.args[1]
+            clock.return_value = now + timedelta(hours=1)
+            callback()
+            self.assertEqual(client.capture_event.call_count, 2)
+            self.assertEqual(client.capture_event.call_args.args[0]['tags']['occurrence_count'], '3')
 
     def test_actionable_faults_keep_codes_and_omit_private_text(self):
         with mock.patch.object(reporting, "send") as send:
@@ -141,6 +288,137 @@ class RemoteReportingTests(unittest.TestCase):
             self.assertEqual(send.call_args.args[1]['exception']['values'][0]['stacktrace']['frames'],
                              [{'filename': 'peach-app.js', 'lineno': 12, 'colno': 34}])
 
+    def test_control_and_source_states_keep_local_records_without_remote_events(self):
+        import asyncio
+        from concurrent.futures import CancelledError
+        from peach import error_reporting
+        from peach.browser_transport import BrowserUnavailable, ChallengeUnsolved
+        from peach.jav_cover_fetch import CoverConnectError, DeadlineExceeded
+        from peach.jobs import JobPaused, MeteredSourceDenied, DiskSpaceDenied, TaskRunConflict
+        from peach.metadata import MetadataProviderError
+        from peach.previews import PreviewUnavailable
+        from peach.scraping_access import SourcePaused
+        from peach.segments import SegmentCancelled
+        from peach.sources.base import SourceFailure, FailureReason
+        from peach.transcodes import TranscodeCancelled
+        from starlette.requests import ClientDisconnect
+        errors = [asyncio.CancelledError(), CancelledError(), InterruptedError(), JobPaused(),
+                  MeteredSourceDenied(), DiskSpaceDenied(), TaskRunConflict('processing', 1),
+                  SourcePaused(), DeadlineExceeded(), CoverConnectError(), PreviewUnavailable(),
+                  SegmentCancelled(), TranscodeCancelled(), BrowserUnavailable(), ChallengeUnsolved(),
+                  ClientDisconnect(),
+                  MetadataProviderError('auth', kind='auth'),
+                  MetadataProviderError('absent', kind='not_found'),
+                  MetadataProviderError('retry', kind='unavailable', retryable=True)]
+        errors += [SourceFailure(reason, 'source state') for reason in FailureReason
+                   if reason != FailureReason.PARSE_ERROR]
+        with mock.patch.object(reporting, 'send') as send:
+            for error in errors:
+                with self.subTest(error=type(error).__name__):
+                    path = error_reporting.event('background-job', error)
+                    self.assertTrue(path.is_file())
+            send.assert_not_called()
+
+    def test_source_parser_and_unknown_provider_failures_are_actionable(self):
+        from peach.metadata import MetadataProviderError
+        from peach.sources.base import SourceFailure, FailureReason
+        errors = [SourceFailure(FailureReason.PARSE_ERROR, 'parser failure'),
+                  MetadataProviderError('parser failure', kind='unavailable', detail='parse_error'),
+                  MetadataProviderError('unknown failure')]
+        for error in errors:
+            with self.subTest(error=type(error).__name__), mock.patch.object(reporting, 'send') as send:
+                reporting.capture('background-job', error)
+                send.assert_called_once()
+
+    def test_unrelated_exception_names_do_not_acquire_domain_state_semantics(self):
+        for name in ('CancelledError', 'NotFound', 'Unavailable'):
+            with self.subTest(name=name), mock.patch.object(reporting, 'send') as send:
+                error = type(name, (RuntimeError,), {'__module__': 'peach.fixture'})('unexpected failure')
+                reporting.capture('background-job', error)
+                send.assert_called_once()
+
+    def test_source_client_http_statuses_are_local_and_server_failures_are_reported(self):
+        import httpx
+        from urllib.error import HTTPError
+        for code in (400, 401, 403, 404, 410, 429, 500, 503):
+            response = httpx.Response(code, request=httpx.Request('GET', 'https://example.test/'))
+            errors = [httpx.HTTPStatusError('http state', request=response.request, response=response),
+                      HTTPError('https://example.test/', code, 'http state', {}, None)]
+            for error in errors:
+                with self.subTest(code=code, error=type(error).__name__), \
+                        mock.patch.object(reporting, 'send') as send:
+                    reporting.capture('background-job', error)
+                    if code < 500:
+                        send.assert_not_called()
+                    else:
+                        send.assert_called_once()
+                        self.assertEqual(send.call_args.args[1]['tags']['status_code'], str(code))
+
+    def test_warning_exceptions_do_not_consume_remote_error_budget(self):
+        namespace = {}
+        exec(compile('def fail():\n    raise ValueError("retrying")\n', 'peach/fixture.py', 'exec'), namespace)
+        try:
+            namespace['fail']()
+        except ValueError as error:
+            with mock.patch.object(reporting, 'send') as send:
+                reporting.capture('logging', error, level='WARNING', logger='peach.fixture')
+                send.assert_not_called()
+                reporting.capture('logging', error, level='ERROR', logger='peach.fixture')
+                send.assert_called_once()
+
+    def test_expected_media_input_conditions_are_local_and_decoder_faults_are_reported(self):
+        for marker in ('Invalid data found', 'Permission denied', 'No space left', 'No such file or directory'):
+            with self.subTest(marker=marker), mock.patch.object(reporting, 'send') as send:
+                reporting.capture('frame-capture', returncode=1, stderr=marker)
+                send.assert_not_called()
+        with mock.patch.object(reporting, 'send') as send:
+            import errno
+            reporting.capture('media-probe', OSError(errno.ENOSPC, 'disk full'), tool='ffprobe')
+            send.assert_not_called()
+            reporting.capture('media-probe', subprocess.TimeoutExpired('ffprobe', 20), tool='ffprobe')
+            send.assert_not_called()
+            reporting.capture('media-probe', FileNotFoundError(2, 'missing input', 'movie.mp4'), tool='ffprobe')
+            send.assert_not_called()
+            reporting.capture('media-probe', FileNotFoundError(2, 'missing tool', 'ffprobe'), tool='ffprobe')
+            send.assert_called_once()
+            send.reset_mock()
+            reporting.capture('frame-capture', returncode=69,
+                              stderr="Your platform doesn't support hardware accelerated AV1 decoding")
+            send.assert_called_once()
+            send.reset_mock()
+            reporting.capture('frame-capture', returncode=1,
+                              stderr='Unknown decoder; Invalid data found')
+            send.assert_called_once()
+
+    def test_browser_abort_and_extension_frames_stay_local_and_bundle_versions_keep_positions(self):
+        with mock.patch.object(reporting, 'send') as send:
+            reporting.capture('browser', error_name='AbortError', stack='peach-app.js:12:34')
+            reporting.capture('browser', stack='at chrome-extension://extension/peach-app.js:12:34')
+            reporting.capture('browser', stack='at moz-extension://extension/peach-pages.js:12:34')
+            send.assert_not_called()
+            reporting.capture('browser', stack='at https://example.test/dist/peach-app.js?v=build:12:34')
+            send.assert_called_once()
+            frames = send.call_args.args[1]['exception']['values'][0]['stacktrace']['frames']
+            self.assertEqual(frames, [{'filename': 'peach-app.js', 'lineno': 12, 'colno': 34}])
+
+    def test_preview_environment_conditions_preserve_guidance_and_local_issue(self):
+        from peach import library_processing
+        from peach.previews import PreviewUnavailable
+        resolver = mock.Mock()
+        resolver.ffmpeg.return_value = None
+        row = {'id': 1, 'path': str(self.root / 'missing.mp4'), 'location': 'local', 'name': 'missing.mp4'}
+        with self.assertRaises(PreviewUnavailable) as raised:
+            library_processing._generate_preview(self.config, row, mock.Mock(), resolver, progress=lambda: None)
+        issue = mock.Mock()
+        with mock.patch.object(reporting, 'send') as send, \
+                mock.patch.object(library_processing, '_generate_preview', side_effect=raised.exception):
+            made = library_processing._generate_previews(self.config, [row], mock.Mock(),
+                update=mock.Mock(), issue=issue, guard=mock.Mock())
+        self.assertEqual(made, 0)
+        self.assertIn('FFmpeg', issue.call_args.args[1])
+        self.assertTrue(issue.call_args.kwargs['retryable'])
+        send.assert_not_called()
+
     def test_sdk_wire_payload_has_no_local_context_or_consent_path(self):
         from sentry_sdk.transport import HttpTransport
         sent = []
@@ -153,6 +431,8 @@ class RemoteReportingTests(unittest.TestCase):
         for value in ('private title', 'secret', str(self.root), 'server_name', 'contexts', 'extra', 'consent'):
             self.assertNotIn(value, wire)
         self.assertIn('ValueError', wire)
+        self.assertIn('occurrence_count', wire)
+        self.assertIn('diagnostic_key', wire)
 
     def test_queued_event_requires_current_joint_consent_revision(self):
         from sentry_sdk.transport import HttpTransport

@@ -3,7 +3,7 @@
 - 取证日期：2026-09-22
 - 上游：<https://github.com/sqzw-x/amane>，GPL-3.0
 - 固定 revision：`79ecfa763cc786318e1964a3d7f4e244a7d5c96d`
-- 取证方式：仓库外独立克隆（`Desktop\peach\attic\evidence\20260922-amane-crawlers-poc\amane`）读源码，
+- 取证方式：仓库外独立克隆并读取源码，
   逐文件核对前端组件、API 路由、图像函数与派生资源落盘；未运行其服务，未截图。
 
 **本文不登记进 `docs/reference-sources.json`**：这是对上游源码的一次性只读实证，不是需要跟踪漂移的

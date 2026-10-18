@@ -5,7 +5,7 @@ description: 在 macOS 上开工、改动路径解析或挂载判定、遇到 gi
 
 # 跨 Windows / macOS 双机开发
 
-最后复核：2026-09-14
+最后复核：2026-10-18
 证据来源：`src/peach/platform.py`、ADR-0017、2026-08-19 的 macOS 迁移实测、
 2026-08-21 的 Windows 现状核对，以及 2026-09-14 用 junction 复现的临时目录别名。
 
@@ -23,20 +23,17 @@ description: 在 macOS 上开工、改动路径解析或挂载判定、遇到 gi
 `src/peach/platform.py` 一处；写回账本的索引脚本仍只在 Windows 上跑，路径口径
 因此保持单一。**禁止从 macOS 写 `asset.path`**。
 
-来源映射按 `asset.location` 而不是盘符：`local`（声明根 `R:\media`，macOS 挂在
-`/Volumes/RESOURCES/media`）、`115`（`B:/`，`~/Desktop/IMSL/115`）、`pikpak`（`A:/`，
-`~/Desktop/IMSL/Pikpak`）。声明根在设置文件的 `[media.locations]`，本机落点在 `[media.mounts]`。
+来源映射按 `asset.location` 而不是盘符。声明根在设置文件的 `[media.locations]`，本机落点在 `[media.mounts]`；不要从其他部署复制挂载路径。
 
 用 `PEACH_MEDIA_MOUNTS=local=/mnt/res,115=/mnt/115` 覆盖；数据目录用 `PEACH_DATA_ROOT`。
 CloudDrive 在 Windows 是盘符、在 macOS 是 macFUSE 挂载点，这层不是可选优化。
 
-运行目录不跟着媒体盘符走。Windows 根目录是 `C:\Users\<user>\Desktop\peach`，macOS 是
-`~/Desktop/<用户目录>/peach`；代码、数据、venv 和 worktree 都在内置盘。外置 `R:` 只承担媒体资源。
+运行目录不跟着媒体盘符走。代码、数据、venv 和 worktree 各机独立保存，媒体挂载点由配置声明。
 
 ## 三条只在 Windows 成立的假设
 
 - **授权根比较不能只看字面**。账本写 `R:\Media`，macOS 侧授权根是
-  `/Volumes/RESOURCES/media`；pathlib 区分大小写而 exFAT/NTFS 不区分，字面比较会把
+  `<mounts.local>`；pathlib 区分大小写而 exFAT/NTFS 不区分，字面比较会把
   全部本地资产判成越权。`within_root` 在字面不匹配时改用 inode 比较，交给文件系统
   判定。
 - **挂载点「在不在」的判据是能否列出第一个条目**，不是 `is_dir()`。CloudDrive 掉线后
@@ -49,8 +46,8 @@ CloudDrive 在 Windows 是盘符、在 macOS 是 macFUSE 挂载点，这层不�
 
 ## 脱盘模式
 
-脱盘是**来源级**的，不是全局开关。外置盘拔掉只影响 `local` 的约 2.5k 条资产，
-115/PikPak 的约 78k 条云端资产照常可播；CloudDrive 掉线时反过来也一样。
+脱盘是**来源级**的，不是全局开关。外置盘拔掉只影响 `local`，115/PikPak 的可达性单独判断；
+CloudDrive 掉线不影响仍可读取的本地来源。
 
 判据只有 `GET /api/sources` 一份。媒体层把整盘不可达从 `MediaUnavailable` 里分出
 `MediaOffline`，HTTP 回 503 加 `X-Peach-Offline: 1`，和「单个文件缺失」的 404 分开。
@@ -105,7 +102,7 @@ macOS 因此用 `dns-sd -P` 请系统 mDNSResponder 代发，Windows 继续用 z
 `scripts/check_mdns.py`（从终端跑）。排查手法：同一条命令分别从 shell 和 launchd 起各查一次，
 差异只在启动者时就是这个门。
 
-macOS 固定 `peach.local`，Windows 固定 `peach-writer.local`；`check_mdns.py` 负责验证没有撞名。
+主机名取本机 `server.mdns_name`，用 `/healthz` 与 `check_mdns.py` 核对广播名称及可达性；两台机器不得同名。
 
 ## Git 陷阱
 - **换行**由 `.gitattributes` 的 `* text=auto eol=lf` 固定，不要依赖各自的

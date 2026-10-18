@@ -43,7 +43,7 @@ class RevealPathTests(unittest.TestCase):
         reveal.assert_called_once_with(source)
 
     def test_macos_reveals_in_finder(self):
-        source = Path("/Volumes/RESOURCES/media/a.mp4")
+        source = Path("/Volumes/Media/media/a.mp4")
         with (patch("peach.interaction.os.name", "posix"),
               patch("peach.interaction.sys.platform", "darwin"),
               patch("peach.interaction.subprocess.Popen") as launch):

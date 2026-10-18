@@ -7,14 +7,14 @@
 README 面向初次访问项目的人，依次讲它是什么、介绍视频与截图、能做什么、怎么装、常见问题、
 问题反馈和文档入口。用使用者的话写：说能做什么、会不会动文件，不写账本、候选、实体这类内部
 概念，内部机制与开发流程只留链接。中英文同批维护，平台支持、安装方式和能力限制保持一致。主线能力、已安装运行态和发行制品分别
-以实现、STATUS 和 Releases 为准，README 不填写本机 IP、端口归属、真实馆藏数字或动态版本号。
+以实现、本机健康检查和 Releases 为准，README 不填写本机 IP、端口归属、真实馆藏数字或动态版本号。
 
 | 内容 | 核验入口 |
 | --- | --- |
 | Python 与桌面命令 | `pyproject.toml`、`src/peach/cli.py`、`src/peach/tray.py` |
 | 前端工具与产物 | `frontend/package.json`、[docs/FRONTEND.md](FRONTEND.md) |
 | 桌面包与平台范围 | [docs/TESTING_DESKTOP.md](TESTING_DESKTOP.md)、`.github/workflows/release.yml` |
-| 当前行为与已部署范围 | 实现与测试、[docs/STATUS.md](STATUS.md)、[docs/PRODUCT_BACKLOG.md](PRODUCT_BACKLOG.md) |
+| 当前行为与已部署范围 | 实现与测试、[运行与配置](OPERATIONS.md)、[公开路线图](https://github.com/orgs/peach-mitao/projects/7) |
 | 来源、配置与数据边界 | [docs/SOURCING.md](SOURCING.md)、[docs/OPERATIONS.md](OPERATIONS.md)、[docs/CLOUDDRIVE.md](CLOUDDRIVE.md) |
 
 README 迭代绑定 Codex 与 Claude 共用的工作树交付流程。每次提交前核对暂存差异，

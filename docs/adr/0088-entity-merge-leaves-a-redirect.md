@@ -49,7 +49,6 @@ SakuraMedia 在被并实体上留 `merged_into` 指针，旧 id 照样能找到�
 
 ## 后果
 
-- 真实账本里迁移前完成的合并没有墓碑。按别名来源与合并复核 CSV 只读盘点，127 对里 126 对能回填；
-  回填是真实写入，按 `peach-ledger-write` 单独授权后执行。
-- `PRODUCT_BACKLOG.md` 第 8 条的孤立头像 relink 按墓碑反查。
+- 迁移前完成的合并需要按来源与复核产物判断是否回填墓碑；真实写入按 `peach-ledger-write` 单独授权执行。
+- 孤立头像 relink 按墓碑反查。
 - `review_decision.item_key` 的 `code_creators` 类别与多数复核 CSV 的 `entity_id` 列尚未按墓碑映射。

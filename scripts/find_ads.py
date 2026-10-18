@@ -15,7 +15,6 @@ r"""
   E 目录名是「域名+番号」的推广打包（bbsxv.xyz-DOCP-324 形态）
 
 B 是主力：它不依赖任何关键词，纯靠"广告是同一个文件复制多份"的结构特征。
-故意不把"短"或"小"单独当判据 —— 库里 8710 条 20 秒内的视频绝大多数是正常短片。
 
 用法:
     python scripts/find_ads.py [--min-group 3]
@@ -55,9 +54,7 @@ RE_ADNAME = re.compile(
     r"\b(?:18my|hgame\d?|[0-9a-z]{2,6}(?:gm|gg))\.(?:cc|xyz|com|net|app)|"
     r"(?:全網最火爆|全网最火爆|開後宮|开后宫)[^.]{0,12}(?:遊戲|游戏|手遊|手游))", re.I)
 
-# D：文件名里带任意站点域名。单靠这个不能判 —— 库里 73 条带域名的视频里，
-# legalporno.com / hhd800.com@259LUXU / nyap2p.com / fuckbe.com 那些是 0.8~6.4 GB
-# 的正片，域名只是片源水印。真广告全是又小又短的，所以必须叠加体积时长门槛。
+# D：文件名里带任意站点域名。真广告全是又小又短的，所以必须叠加体积时长门槛。
 RE_ANYDOMAIN = re.compile(
     r"\b[0-9a-z][-0-9a-z]{1,20}\.(?:cc|xyz|com|net|la|me|top|vip|club|app|cn|pw|tv|gg)\b", re.I)
 # 域名旁边有没有推广文案，是"广告"和"正片被打了站点水印"的分界线。

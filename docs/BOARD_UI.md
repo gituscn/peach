@@ -24,7 +24,7 @@ Tree View 直接使用上游的目录图标、层级线、32px 紧凑行、键�
 
 关注管理的六项概览使用填充卡，关注列表使用外层填充卡、创作者卡与底部汇总条。来源勾选、展开、检查、排序、分页、表格视图与批量操作沿用共用组件。添加关注时，输入法合成期间不请求建议或发起查找；查找失败保留输入和原因，可直接重试。字体、颜色与控件均复用 BoardUI token。
 
-这些页面按 [设计准则](DESIGN_GUIDELINES.md) 核对独立对象、输入与真实状态反馈。桌面和手机使用实际构建产物验收；布局与交互证据归档位于 `attic/evidence/20261015-design-review/`。
+这些页面按 [设计准则](DESIGN_GUIDELINES.md) 核对独立对象、输入与真实状态反馈。桌面和手机使用实际构建产物验收；布局与交互证据归档位于 `<私有验证记录>`。
 
 ## 收藏窗口与组件目录
 
@@ -32,7 +32,7 @@ Tree View 直接使用上游的目录图标、层级线、32px 紧凑行、键�
 
 收藏读取实体图、厂牌标识、代表作头像和已绑定在线来源的本地代理，候选耗尽时显示对象图标。入口是 32px 中性星形按钮，位于筛选条读数旁；弹层导航复用液态玻璃、ViewGlide 与覆盖式滚动条，入口本身没有滑动玻璃。实体分类与保存的筛选各有独立页签，已标记和稍后看位于导航底部。窄屏分类与正文分别滚动。
 
-同次核对 `tabs`（`7b89651220b86041aa0db74cf6be6b9b77de24045344bd7fc9627e62f1d98857`）、`carousel`（`5a8506c353b8ace96bf51171168cf1617ca775c45e22362de07dba990e79a1a9`）与 `tree-view`（`72b06e3187ae7738bd1eabd46bc15ebe1d2d49be768e44306b266d91206eeb9c`）。收藏使用类型筛选，已有媒体轮播包含视频、缩略图与圆点；不引入页面 Tabs、树形层级或替换媒体轮播。以上组件均免费，没有 Pro 消费者；官方 Pro 源码未取得。原始 JSON 与生产封面响应证据保存在 `attic/evidence/20261014-card-collections/`。
+同次核对 `tabs`（`7b89651220b86041aa0db74cf6be6b9b77de24045344bd7fc9627e62f1d98857`）、`carousel`（`5a8506c353b8ace96bf51171168cf1617ca775c45e22362de07dba990e79a1a9`）与 `tree-view`（`72b06e3187ae7738bd1eabd46bc15ebe1d2d49be768e44306b266d91206eeb9c`）。收藏使用类型筛选，已有媒体轮播包含视频、缩略图与圆点；不引入页面 Tabs、树形层级或替换媒体轮播。以上组件均免费，没有 Pro 消费者；官方 Pro 源码未取得。原始 JSON 与生产封面响应证据保存在 `<私有验证记录>`。
 
 这份文档登记 Peach 界面对齐 BoardUI 的做法：每个控件取了上游哪份公开证据（注册表 SHA-256、取证日期），Peach 照抄了什么、主动偏离了什么、为什么。代码注释写「登记在 docs/BOARD_UI.md」的，证据都在这里。拿不到的证据写「未取得」，不拿猜测顶替。
 
@@ -155,11 +155,11 @@ Peach 使用 Board 的视觉与组件语义，保留 Vite、FastAPI 和现有媒
 - 设置页的保存键统一叫「保存配置」，回执「已保存配置」；保存、检查、添加、刷新这类操作键用 BoardUI `Button` 的 `primary`（缺省值，蓝底白字）。`secondary` 只给面板触发键与「取消」，不可逆操作用 `danger`（`frontend/test/settings-buttons.test.ts`）。
 - 数值非法时不保存；关闭搜索记录后不读取或记入搜索记录，关闭相关推荐后不请求该模块。
 - Board 免费源码以官网声明的 MIT 条款使用；Pro 图表与模板不取用收费源码。项目自有图表不宣称来自 Pro，也不承诺 Pro 更新权益。
-- Remix Icon 固定为 4.9.1，按包内 Remix Icon License v1.0 登记；官网所写的 Apache 2.0 不代替实际包许可证。保留已确认图标，候选由 `attic/evidence/20260908-boardui-preview/boardui-full/icon-review.html` 审查。
+- Remix Icon 固定为 4.9.1，按包内 Remix Icon License v1.0 登记；官网所写的 Apache 2.0 不代替实际包许可证。保留已确认图标，候选由 `<私有验证记录>` 审查。
 
 ## 参考证据
 
-2026-09-08 读取官方公开注册表，原始文件在 `attic/evidence/20260908-boardui-preview/board-reference/`。
+2026-09-08 读取官方公开注册表，原始文件在 `<私有验证记录>`。
 
 | 来源 | SHA-256 |
 | --- | --- |
@@ -275,7 +275,7 @@ Radial Chart Card、Bar List Card、Heatmap 与 Sankey 的 Pro 源码**未取得
 
 ### 口味、复核、首页与详情控件的对齐（2026-09-08）
 
-新增取证：公开注册表 `r/tabs.json`（SHA-256 `feab9789b17008436597b51e52b90de5cff6180924f2a7c8bef14a2136d3a240`，含 `tabs.tsx` 与 `pill-tab.tsx`）、`r/avatar.json`（`614f2a384e2d44c0a15df8e3fc42c1648ccd7101f1c8be98911087641ab28aec`）、`r/chip.json`（`d2b0dd38146325acada58fbc241d13fcd633bb5407ce1ef457e752023fe282de`），与已登记的 `segmented-control.json`、`sidebar.json` 一起保存在 `attic/evidence/20260908-boardui-preview/board-reference/`。`avatar-group`、`bar-list-card`、`radar-chart-card` 在注册表返回 404，未取得。
+新增取证：公开注册表 `r/tabs.json`（SHA-256 `feab9789b17008436597b51e52b90de5cff6180924f2a7c8bef14a2136d3a240`，含 `tabs.tsx` 与 `pill-tab.tsx`）、`r/avatar.json`（`614f2a384e2d44c0a15df8e3fc42c1648ccd7101f1c8be98911087641ab28aec`）、`r/chip.json`（`d2b0dd38146325acada58fbc241d13fcd633bb5407ce1ef457e752023fe282de`），与已登记的 `segmented-control.json`、`sidebar.json` 一起保存在 `<私有验证记录>`。`avatar-group`、`bar-list-card`、`radar-chart-card` 在注册表返回 404，未取得。
 
 | 位置 | 上游 | Peach |
 | --- | --- | --- |
@@ -328,7 +328,7 @@ Radial Chart Card、Bar List Card、Heatmap 与 Sankey 的 Pro 源码**未取得
 | 首页女优一排 | Avatar 只到 lg 36px，没有竖排人像格 | 竖排格：48px 圆头像在上（取上游 `size-12` 那一级）、名字 Caption 在下，格宽 76、圆角 12、不描边；悬停 primary-hover，选中 tertiary 底 |
 | 首页厂牌一排 | PillTab gray | 40px 灰 Pill 放大一档：28px 圆标识在左、名字在右、圆角 12。标签那一排是 30px 描边药丸，厂牌靠身量、圆标识和无边框跟它分开 |
 | 关注页批量条 | 无对应 | 批量条只有保存、跳过这类按行动作；勾选靠每行行首的「全选／全不选」 |
-| 复核队列分页 | Pagination：nav 两端对齐 `gap-2`；Previous／Next 是 32px 次级小键（圆角 8、内边距 6/8、带箭头）；页码 `size-8 rounded-lg` Body Medium，当前页 border-button 描边 + primary 底 + xs 阴影并标 `aria-current="page"`，其余次文字色、悬停 secondary-hover；两侧折成「…」各留一个邻页；一页时不渲染；没有过渡 | 尺寸与颜色照抄；分页做在前端，一页 20 张（接口 4.6 MB 本机读 0.1 秒，卡的是一次画 1300 张卡）；箭头用雪碧图的 `chevron-left/right`，文案「上一页／下一页」；分组与筛选按整条队列算、卡片只画本页；换分类／分组／筛选回第 1 页 |
+| 复核队列分页 | Pagination：nav 两端对齐 `gap-2`；Previous／Next 是 32px 次级小键（圆角 8、内边距 6/8、带箭头）；页码 `size-8 rounded-lg` Body Medium，当前页 border-button 描边 + primary 底 + xs 阴影并标 `aria-current="page"`，其余次文字色、悬停 secondary-hover；两侧折成「…」各留一个邻页；一页时不渲染；没有过渡 | 尺寸与颜色照抄；分页做在前端，一页 20 张，限制一次渲染的卡片数量；箭头用雪碧图的 `chevron-left/right`，文案「上一页／下一页」；分组与筛选按整条队列算、卡片只画本页；换分类／分组／筛选回第 1 页 |
 | 数据管理页 | dashboard／finance 模板：顶上一排 plain stat card（132px、圆角 16、secondary 底、p 16；32px 图标格 + 20px 字形；标签 Body Medium 次文字色；读数 title-1-medium 24/34；`grid-cols-2 lg:grid-cols-4 gap-4`），下面是图表卡与数据表 | 五张读数卡一行（1120 内），窄了折两列、再折一列；整张卡是入口按钮，悬停抬主文字色 6% 底（上游卡不可点）；读数下一行 Caption 是同一份 payload 的分项；扫描与采集、媒体修复各占一整行，左说明右按钮；资源同步的结果读数同一副卡片，来源一行、待永久删除／空文件夹／缓存一行，各自等分 |
 
 ### 复核卡的候选、未收录 genre 与骨架（2026-09-11）
@@ -347,7 +347,7 @@ Radio card 沿用 2026-09-08 取得的 `r/checkbox-card.json`（`checkbox-card.t
 
 ### 艺人／厂牌资料页与关注页（2026-09-12）
 
-证据在 `attic/evidence/20260912-boardui-profile-tabs/`：`tabs.json`（SHA-256
+证据在 `<私有验证记录>`：`tabs.json`（SHA-256
 `feab9789b17008436597b51e52b90de5cff6180924f2a7c8bef14a2136d3a240`，13612 B）、`avatar.json`
 （`614f2a38…b28aec`）、`chip.json`（`d2b0dd38…e282de`）、`badge.json`（`264755bb…9aec6`）。
 `card`、`page-header`、`profile-card` 三个注册表条目 404，未取得：资料卡的形沿用 2026-09-08
@@ -381,10 +381,10 @@ Radio card 沿用 2026-09-08 取得的 `r/checkbox-card.json`（`checkbox-card.t
 
 - 服务端拿题材身份在账本里按「带 `3d`、评分高」排出五个候选，顺着取第一张脸够大的封面。取的是站点高清那层：250px 缩略图里一张脸只剩十几像素，检不出来。
 - 「脸够大」是 `_usable_face` 的两条线，两条都过才停，否则看下一张：
-  - 占比 `_WORK_ICON_FACE_SHARE`（`FACE_PX_IN_STORE ÷ ICON_SIDE`，脸框宽占画面长边 6.6%）问圆里落下的是不是脸。只看「YuNet 检出了脸」太松：它在远景图上会给出占长边 5%、分数 0.69 的框，罩在肩背的纹身上，圆标按这个框放大，圆里就只剩一小块皮肤。本库 74 个题材按这条线分开的两边，正是「一眼认得出」和「认不出」。
-  - 像素 `FACE_PX_IN_STORE`（34px）问这张脸放不放得大：页面按脸放大时不许上采样，源图里那张脸有多少像素就是天花板。本库 74 枚圆标里有五枚占比全过却仍看不清：它们没有封面，只能退回站点那层 250px 缩略图，脸只剩 18～24 像素，放到头也只占圆的三成。
+  - 占比 `_WORK_ICON_FACE_SHARE`（`FACE_PX_IN_STORE ÷ ICON_SIDE`，脸框宽占画面长边 6.6%）要求圆标中有足够大的人脸。仅有 YuNet 检测结果不能排除远景误检，低占比候选继续尝试下一张。
+  - 像素 `FACE_PX_IN_STORE`（34px）限制放大能力：页面按脸放大时不许上采样，源图里的人脸像素数决定可用尺寸。低分辨率缩略图即使占比合格，也可能不满足这条要求。
 - 本库几张都不够时，接着去站点问一趟（`work_icon_search_urls`）：用 `sort:score` 要最热的 8 张接在本库那几张后面继续找，先只要带 `3d` 的，那个标签下一张都没有再问一次不限形式的。库里一个题材常常只有一两条、未必有正脸，站上同一标签下有成千上万帖。
-- 标签写法取本库 rule34xxx 条目里用得最多的那个（`the_witcher_(series)`、`dbd`、`clair_obscur:_expedition_33`）。照归一化后的题材身份拼出来的写法，在站上零命中。
+- 标签写法取已有 rule34xxx 来源条目中最常用的原词。规范化后的题材名称不一定能用于站点检索。
 - 出网是惰性的：本库挑得出脸就一个字节都不出网。取不到凭据、站点报错或网络不通，一律当作没有候选，圆标退回首字母，不返回 500。
 - 都走完还没有够格的，按「没有头」处理：退回第一张取得到的图，不写人脸记录，页面按样式表的默认取景摆整张封面。这类题材多半真的给不出正脸（顶着头发的背影、非人形的主角、站上只有远景）；与其把最大的一块皮肤放大成认不出的圆，不如摆一张全身，至少认得出是哪部作品。
 
@@ -516,7 +516,7 @@ setup 使用同一勾线形状、蓝色渐变及这两组状态规则。
 分段切换、勾选卡、图标弹层、玻璃与进度反馈这些共用控件的证据与状态规则。
 
 2026-09-08 通过严格证书校验取得公开 `checkbox-card.json`、`date-picker.json` 与
-`segmented-control.json`，保存于本机 `attic/evidence/20260908-boardui-preview/board-reference/`。
+`segmented-control.json`，保存于本机 `<私有验证记录>`。
 分段切换复用原生 radio，选中底板按实际位置与尺寸作 200ms 位移，设置主题保留系统选项。
 Checkbox Card 的整卡选择与独立操作按钮分离；暂停使用黄色 Chip。媒体库图标弹层采用
 DatePicker 的内面板、候选草稿及取消／应用结构，候选不包含网盘品牌图标。

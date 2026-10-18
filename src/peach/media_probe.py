@@ -17,7 +17,7 @@ import os
 import sqlite3
 import subprocess
 from collections.abc import Callable, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from contextlib import closing
 from pathlib import PureWindowsPath
 
@@ -151,26 +151,29 @@ def _record(db_path, ffprobe: str, rows: Sequence, report: Callable[[int, int], 
     if not rows:
         return 0
     done = 0
-    if CURRENT.get() is not None:
-        # 馆藏任务逐项领取探测，不预先提交整库，安全停点没有仍在读盘的排队任务。
-        with closing(sqlite3.connect(db_path, timeout=120)) as connection:
-            report(0, len(rows))
-            for row in rows:
-                checkpoint('probe')
-                measured = measure(ffprobe, row[0], row[1])
-                connection.execute(UPDATE, measured)
-                connection.commit()
-                done += 1
-                report(done, len(rows))
-        return done
-    executor = ThreadPoolExecutor(max_workers=min(WORKERS, len(rows)), thread_name_prefix="PeachProbe")
-    try:
-        with closing(sqlite3.connect(db_path, timeout=120)) as connection:
-            for measured in executor.map(lambda row: measure(ffprobe, row[0], row[1]), rows):
-                connection.execute(UPDATE, measured)
-                connection.commit()
-                done += 1
-                report(done, len(rows))
-    finally:
-        executor.shutdown(wait=False, cancel_futures=True)
+    with closing(sqlite3.connect(db_path, timeout=120)) as connection:
+        report(0, len(rows))
+        for measured in _measure_batches(ffprobe, rows):
+            connection.execute(UPDATE, measured)
+            connection.commit()
+            done += 1
+            report(done, len(rows))
     return done
+
+
+def _measure_batches(ffprobe, rows):
+    """安全停点按档位领取探测，空闲后补位；退出时等待在途进程返回。"""
+    start = 0
+    futures = set()
+    with ThreadPoolExecutor(max_workers=WORKERS, thread_name_prefix='PeachProbe') as executor:
+        while start < len(rows) or futures:
+            checkpoint('probe')
+            control = CURRENT.get()
+            workers = {'low': 1, 'standard': 2, 'high': WORKERS}[control.mode] if control else WORKERS
+            while start < len(rows) and len(futures) < workers:
+                row = rows[start]
+                futures.add(executor.submit(measure, ffprobe, row[0], row[1]))
+                start += 1
+            completed, futures = wait(futures, return_when=FIRST_COMPLETED)
+            for future in completed:
+                yield future.result()

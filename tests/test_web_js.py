@@ -441,8 +441,7 @@ class WebJsBehaviourTests(unittest.TestCase):
         总时长显示 `0:NaN`。链条是——`Number(it.duration)||0` 对 -1 求值仍是 -1，通过了
         真值判断，于是强行 `player.duration(-1)`；而 Video.js 的 setter 写着
         `parseFloat(e)<0 ? Infinity : e`，随后 `=== Infinity` 就 `addClass("vjs-live")`。
-        一部本地影片因此被当成直播流。全库有 1440 个视频资产 duration<=0（其中 1101 个
-        正好是 -1）。`fmtDur(-1)` 同样算过 `0:-1`，用户在卡片上看到过。
+        一部本地影片因此被当成直播流。`fmtDur(-1)` 同样算过 `0:-1`，用户在卡片上看到过。
 
         所以判据是「有限且大于零」，不是「非空」。这条直接拿 -1 去问函数，不比对
         源码文本——把三元换成 if 不该让它红，把条件写反才该红。

@@ -22,50 +22,68 @@ POSTER_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.tbn')
 _NUMBERED = re.compile(r'(.*\D|)(\d+)(\D*)')
 
 
-def _numbered_image_set(stem: str, files: dict[str, Path]) -> bool:
-    """`stem` 是不是一组连号文件里的一个号，而同组别的号只有图片、没有视频。
+class SidecarIndex:
+    """目录的影片、NFO 和连号图片分组；一份索引服务同目录的全部影片。"""
 
-    批量改名的图集把正片和图片编进同一组号：`(1).mp4` 旁边是 `(1).jpg` 到 `(119).jpg`，
-    同名的那张只是图集第一张，不是海报。多部番号放一个目录时 `ABC-124.jpg` 有自己的
-    `ABC-124.mp4`，不算图集。
-    """
-    match = _NUMBERED.fullmatch(stem.casefold())
-    if match is None:
-        return False
-    videos = {path.stem.casefold() for path in files.values() if path.suffix.lower() in VIDEO}
-    for path in files.values():
-        other = _NUMBERED.fullmatch(path.stem.casefold())
-        if (path.suffix.lower() in POSTER_EXTENSIONS and other is not None
-                and other.group(1, 3) == match.group(1, 3) and other.group(2) != match.group(2)
-                and path.stem.casefold() not in videos):
-            return True
-    return False
+    def __init__(self, files: dict[str, Path]):
+        self.files = files
+        self.videos = []
+        images = []
+        self.nfos = []
+        for path in files.values():
+            suffix = path.suffix.lower()
+            if suffix in VIDEO:
+                self.videos.append(path)
+            elif suffix == '.nfo':
+                self.nfos.append((path, release_code_from_filename(path.stem)))
+            elif suffix in POSTER_EXTENSIONS:
+                images.append(path)
+        self.single = len(self.videos) == 1
+        stems = {path.stem.casefold() for path in self.videos}
+        self.numbered = {}
+        for image in images:
+            match = _NUMBERED.fullmatch(image.stem.casefold())
+            if match is not None and image.stem.casefold() not in stems:
+                self.numbered.setdefault(match.group(1, 3), set()).add(match.group(2))
+        self.shared = {}
+        self.video_codes = None
+
+    def _shared_movie(self, code):
+        if self.single:
+            return self.files.get('movie.nfo')
+        if not code or 'movie.nfo' not in self.files:
+            return None
+        if self.video_codes is None:
+            self.video_codes = [release_code_from_filename(path.name) for path in self.videos]
+        if code not in self.shared:
+            self.shared[code] = all(same_release_code(code, value) for value in self.video_codes)
+        return self.files.get('movie.nfo') if self.shared[code] else None
+
+    def for_video(self, video: Path):
+        nfo = self.files.get((video.stem + '.nfo').casefold())
+        if nfo is None and self.nfos:
+            code = release_code_from_filename(video.name)
+            matching = [path for path, value in self.nfos if code and same_release_code(code, value)]
+            if len(matching) == 1:
+                nfo = matching[0]
+            elif not matching:
+                nfo = self._shared_movie(code)
+        names = [video.stem + '-poster']
+        match = _NUMBERED.fullmatch(video.stem.casefold())
+        numbered = bool(match and self.numbered.get(match.group(1, 3), set()) - {match.group(2)})
+        if not numbered:
+            names.append(video.stem)
+        if self.single:
+            names.extend(['poster', 'folder', 'cover'])
+        posters = [self.files[name.casefold() + extension] for name in names
+                   for extension in POSTER_EXTENSIONS if name.casefold() + extension in self.files]
+        return nfo, posters
 
 
 def sidecars(video: Path, files: dict[str, Path] | None = None):
     """`video` 旁边的 NFO 与海报候选；`files` 是调用方已列好的同目录索引，省掉再列一遍。"""
     files = directory_files(video.parent) if files is None else files
-    single = sum(path.suffix.lower() in VIDEO for path in files.values()) == 1
-    nfo = files.get((video.stem + '.nfo').casefold())
-    if nfo is None:
-        code = release_code_from_filename(video.name)
-        matching = [path for path in files.values() if path.suffix.lower() == '.nfo'
-                    and code and same_release_code(code, release_code_from_filename(path.stem))]
-        if len(matching) == 1:
-            nfo = matching[0]
-        elif not matching and (single or (code and all(
-                same_release_code(code, release_code_from_filename(path.name))
-                for path in files.values() if path.suffix.lower() in VIDEO))):
-            nfo = files.get('movie.nfo')
-    names = [video.stem + '-poster']
-    if not _numbered_image_set(video.stem, files):
-        names.append(video.stem)
-    if single:
-        names.extend(['poster', 'folder', 'cover'])
-    posters = [files[name.casefold() + extension] for name in names
-               for extension in POSTER_EXTENSIONS
-               if name.casefold() + extension in files]
-    return nfo, posters
+    return SidecarIndex(files).for_video(video)
 
 
 def read_nfo(path: Path):

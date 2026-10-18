@@ -87,7 +87,7 @@ export function DataTable<T extends RowData>({ label, items, columns, rowId, row
   const chosen = table.getSelectedRowModel().rows.map((row) => row.original);
   return (
     <div data-data-table-panel={panel || undefined} className={panel
-      ? cardClass({ padding: 'none', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })
+      ? cardClass({ padding: 'none', bordered: 'line', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })
       : 'flex min-w-0 flex-col gap-4'}>
       <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label={`${label}工具栏`}>
         <h3 id={titleId} className="mr-auto text-title-2-medium text-text-primary">{title}</h3>

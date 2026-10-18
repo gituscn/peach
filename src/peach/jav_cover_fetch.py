@@ -515,8 +515,7 @@ def _fc2_names_another_work(code: str, url: str) -> bool:
     """FC2 番号的图，文件名写着别的作品号。
 
     JavArchive 的图床 img.javstore.net 按作品号起文件名（`FC2PPV-2543627.gif`、
-    `1083921pl.jpg`）。页面上挂着相关作品时，取回的会是另一部的图：`FC2-PPV-1512205`
-    与 `FC2-PPV-1931440` 都拿到了 `2184960PL.gif`，本机同样对不上的共 10 张。
+    `1083921pl.jpg`）。
     """
     key = normalise_code_key(code)
     wanted = _CODE_NUMBER.search(key) if key.startswith("FC2") else None
@@ -1032,13 +1031,11 @@ def pending(database: Path, root: Path, only_shaped: bool,
     for code, _count in rows:
         if fc2_only and not str(code).upper().startswith("FC2"):
             continue
-        # 判形态必须看原值。`normalise_code_key` 会补上分隔符，把 `RAIKUN325`
-        # （myfans 账号名，241 个文件）改写成 `RAIKUN-325` 并通过形态检查，
-        # 于是队列里全是查不到的账号名。判据与 web_contract 共用一份实现。
+        # 判形态必须看原值；`normalise_code_key` 补分隔符可能将创作者账号名
+        # 归一成番号形态。判据与 web_contract 共用一份实现。
         if only_shaped and not is_jav_code(str(code)):
             continue
-        # FC2 在 r18/avsox/javbus 三源实测零命中（见 HANDOFF），本抓取器用的是
-        # 同一批来源。默认跳过 400 个必然落空的请求；`--all-codes` 仍可强制尝试。
+        # FC2 不走本抓取器使用的 r18/avsox/javbus 来源；`--all-codes` 可强制尝试。
         if only_shaped and str(code).upper().startswith("FC2"):
             continue
         # MIB 不走 JAV 封面来源（见 `best_cover`），排进队列只会每轮落空一次。

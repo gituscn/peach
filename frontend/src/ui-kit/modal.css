@@ -21,6 +21,11 @@
 .ui-geist-modal-body h3{margin:0;font-size:var(--fs-xl);line-height:26px;font-weight:600;color:var(--ink)}
 .ui-geist-modal-body p{margin:8px 0 0;line-height:20px;overflow-wrap:anywhere}
 .ui-geist-modal-body [data-modal-error]:not(:empty){margin-top:12px}
+.ui-geist-modal-list{position:relative;margin-top:12px;min-width:0}
+.ui-geist-modal-list>ul{box-sizing:border-box;max-height:min(320px,32dvh);margin:0;padding:4px 16px 4px 20px;
+  overflow:auto;overscroll-behavior:contain;list-style:disc;overflow-wrap:anywhere}
+.ui-geist-modal-list>ul>li{padding:4px 0}
+.ui-geist-modal-list>ul:focus-visible{outline:2px solid var(--tungsten);outline-offset:2px}
 /* 表单正文：字段和列表都在这 20px 内边距里，和标题、操作条对着同一条边。 */
 .ui-geist-modal-form{display:contents}
 .ui-geist-modal-fields{display:grid;gap:14px;margin-top:16px}

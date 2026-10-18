@@ -5,10 +5,7 @@
 
 ## 背景
 
-Peach 的目标是 Windows 与 macOS 各自拥有内置盘上的代码、运行数据、虚拟环境和 worktree，
-两台机器可以同时开发并启动 Peach；外置 `RESOURCES` 盘只承担媒体资源盘角色。本 ADR 立项时
-核对发现，macOS 已完成本机化，但 Windows 当时仍从外置盘的 `R:\peach-app`、`R:\peach-data`
-运行，没有独立代码与运行数据。该迁移随后已实施，本段保留为决策背景。
+Windows 与 macOS 各自持有代码、运行数据、虚拟环境和 worktree，媒体盘只承担资源存储。移除媒体盘不应同时移除代码或运行账本。
 
 外置盘现有 `peach-data` 也不能整体搬进 GitHub或普通双向同步：`database/` 含活跃 WAL 账本和
 大量历史备份，`generated/` 同时混有可重建缓存、图片资产和人工复核产物，另外还有凭据、日志、
@@ -18,18 +15,14 @@ Peach 的目标是 Windows 与 macOS 各自拥有内置盘上的代码、运行�
 
 ### 每台机器独立持有运行环境
 
-- Windows 根目录为 `C:\Users\<user>\Desktop\peach`：`peach-app`、`peach-data`、
-  `peach-worktrees` 和 `peach-sync` 均位于内置盘。`R:\peach-app`、`R:\peach-data` 是迁移前的旧运行位置，
-  不再是当前路径。
-- macOS 保持 `~/Desktop/<用户目录>/peach/{peach-app,peach-data,peach-worktrees}`。
-- 外置盘的正式职责收窄为媒体资源：Windows `R:\media`，macOS
-  `/Volumes/RESOURCES/media`。拔盘只让 `local` 来源进入脱盘模式，不影响代码、账本、115/PikPak
+- 两个平台都使用 `<项目父目录>/{peach-app,peach-data,peach-worktrees,peach-sync}`，各机独立持有运行文件。
+- 媒体挂载路径由配置声明。拔盘只让 `local` 来源进入脱盘模式，不影响代码、账本、115/PikPak
   或应用启动。
 - `.venv`、打包产物、凭据、日志、机器锁、临时文件和可重建缓存均为本机状态，不跨机器复制。
 
 ### 不同步 worktree 目录
 
-- 私有 GitHub 仓库只同步被跟踪的代码、文档、迁移、资源和 Git 分支。
+- Git 仓库只同步被跟踪的代码、公开文档、迁移、可分发资源和分支。
 - 主分支和仍需跨机器继续的任务分支必须先 commit/push；另一台 fetch 后按分支重建 worktree。
 - `peach-worktrees` 目录及其 `.git` 指针带绝对本机路径，不进入 GitHub，也不通过文件同步工具复制。
 

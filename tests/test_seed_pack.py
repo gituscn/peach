@@ -329,6 +329,12 @@ class ImportTests(SeedPackCase):
 
 
 class ScriptTests(SeedPackCase):
+    def test_default_pack_and_export_destination_stay_outside_the_repository(self):
+        script = load_script("seed_pack")
+        export = script.build_parser().parse_args(["export"])
+        self.assertEqual(export.out, seed_pack.DEFAULT_PACK)
+        self.assertNotIn(ROOT, export.out.resolve().parents)
+
     def test_validate_checks_package_without_opening_a_database(self):
         pack = self.root / "package.json"
         pack.write_text(seed_pack.dump(self.seeded_source()), encoding="utf-8")

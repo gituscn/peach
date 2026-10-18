@@ -22,8 +22,7 @@ Peach 不复用 PixivUtil2 的下载器、登录、数据库或 Cookie 管理，
 - Python 3.14.7 / Windows x64 的依赖解析命中
   `curl_cffi-0.16.2-cp310-abi3-win_amd64.whl` 与
   `cffi-2.1.1-cp314-cp314-win_amd64.whl`。
-- Peach 固定 `firefox147`；当前主机 Firefox 是 154.0.1，但 `curl_cffi 0.16.2` 的已支持
-  Firefox 档位止于 147，因此不猜一个未实现的档位。
+- Peach 固定 `firefox147`；`curl_cffi 0.16.2` 的已支持 Firefox 档位止于 147，不指定未实现的档位。
 
 ## 现场复现
 

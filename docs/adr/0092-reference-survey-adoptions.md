@@ -13,7 +13,7 @@ javranking、Cuelume 等 16 个项目的最新版做了一轮调研，最新代�
 
 ## 决策
 
-下表里的「待办 N」指 [docs/PRODUCT_BACKLOG.md](../PRODUCT_BACKLOG.md)「尚未实现」的编号。
+下表里的「待办 N」指 [公开路线图](https://github.com/orgs/peach-mitao/projects/7)「尚未实现」的编号。
 
 ### 已落地
 

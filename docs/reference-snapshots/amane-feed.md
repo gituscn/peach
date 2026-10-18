@@ -3,7 +3,7 @@
 - 来源：<https://github.com/sqzw-x/amane>，GPL-3.0
 - 固定 revision：`79ecfa763cc786318e1964a3d7f4e244a7d5c96d`
 - 取得日期：2026-09-22
-- 取证方式：仓库外独立克隆（`Desktop\peach\attic\evidence\20260922-amane-crawlers-poc\amane`），
+- 取证方式：仓库外独立克隆，
   只读 `docs/dev/feeds.md`、`src/amane/scheduler/feeds.py`、`scheduler/rss.py`、`db/models.py`、
   `db/repos/feeds.py`、`db/feed_keywords.py`、`api/models/feeds.py`，不引入代码。GPL 与 Peach 的
   许可证不兼容，本文只记录设计判据，Peach 侧按自己的表结构、HTTP 栈与调度模型重写。

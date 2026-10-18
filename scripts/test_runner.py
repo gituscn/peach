@@ -73,7 +73,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
              "test_mdns.py", "test_netwatch.py", "test_certs.py",
              "test_review_mirror.py", "test_runtime_prepare.py"),
     "metadata": ("test_custom_metadata.py", "test_scraping_access.py", "test_browser_transport.py", "test_metadata*.py", "test_genre_taxonomy.py", "test_processing_control.py",
-                 "test_fc2*.py",
+                 "test_fc2*.py", "test_local_poster.py",
                  "test_community_catalog.py",
                  "test_babepedia_match.py",
                  "test_western_artwork.py",
@@ -205,6 +205,7 @@ AUTO_SCOPE_FILES: dict[str, tuple[str, ...]] = {
     # `test_stale_candidates.py` 在 metadata，`test_web_e2e.py` 在 web 里整条跑它。
     # 模块名与测试文件名对不上，按名字推不出来，不指明就退化成 full。
     "src/peach/library_processing.py": ("metadata", "web"),
+    "src/peach/local_poster.py": ("metadata", "web"),
     "src/peach/processing_control.py": ("media", "metadata", "web"),
     # 刮削后继：主体测试 `test_followups.py` 与 `test_studio_followup.py`，按名字推不出来。
     "src/peach/avatar_followup.py": ("catalog", "media", "tooling"),
@@ -250,7 +251,6 @@ AUTO_SCOPE_FILES: dict[str, tuple[str, ...]] = {
     # 这几份文档有测试在读它们的正文：改文档也要跑到那条测试。
     "README.md": ("checks", "tooling"),
     "README.en.md": ("checks", "tooling"),
-    "docs/STATUS.md": ("checks", "tooling"),
     # 差异表是 token 判据的另一半：偏离上游的每一条都要在那张表里写明原因，所以
     # `test_frontend_build.py` 读它——改表就得跑到 web。
     "frontend/src/react/boardui/ORIGIN.md": ("checks", "web"),

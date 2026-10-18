@@ -270,8 +270,7 @@ def plan(site: Site, connection, args) -> list[dict[str, object]]:
                    "entity_id": "", "performer": "", "current_agency": "",
                    "evidence": f"{note}；名册 {roster_note}"}
             if not matched:
-                # 站上有、库里没有的人占名册的绝大多数（T-POWERS 首 90 位里 88 位，
-                # 2026-09-05 实测），而这一行没有任何可执行的下一步。默认收成一行
+                # 默认收成一行
                 # 计数，`--all-names` 才逐个记：复核件是给人看的，不是站点镜像。
                 if args.all_names:
                     rows.append({**row, "verdict": ABSENT})

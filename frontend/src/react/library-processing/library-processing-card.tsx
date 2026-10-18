@@ -20,16 +20,16 @@ import { Fieldset, FieldsetTitle } from '../components/fieldset';
 import { Note } from '../components/note';
 import { useOverlayScrollbar } from '../components/overlay-scrollbar';
 import { PathLine } from '../components/path-line';
-import { TaskProgress } from '../components/task-progress';
 import { Disclosure } from '../settings/section';
 import { queryClient } from '../query';
 import {
-  processingLine, DISCONNECTED_TEXT, issueDetails, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL,
+  DISCONNECTED_TEXT, issueDetails, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL,
   notesLine, processingActive, remainingTime, type LibraryProcessingCommand, type LibraryProcessingData,
 } from './library-processing';
 import { useLibraryProcessingJob } from './use-library-processing';
 import { ProcessingActions } from './processing-actions';
 import { ProcessingControls } from './processing-controls';
+import { ProcessingProgress } from './processing-line';
 
 /* 中文正文写成常量：JSX 里换行的文字会在接缝处多出一个空格，中文句子里看得见。
    卡片正文与首屏骨架共用 `SCAN_CARD_TEXT`（`management.ts`）。 */
@@ -156,7 +156,6 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
     : job.isError ? (job.data ? DISCONNECTED_TEXT : errorMessage(job.error))
     : '';
   const busy = start.isPending || processingActive(state);
-  const line = processingLine(state);
 
   const run = async (command: LibraryProcessingCommand) => {
     if (busy) return;
@@ -188,7 +187,7 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
           {state.status === 'paused' && !state.total
             ? <p className="text-caption-1-regular text-text-secondary">已暂停</p>
             : processingActive(state)
-            ? <TaskProgress embedded label={line} value={Math.min(state.checked || 0, state.total || 0)} total={state.total} />
+            ? <ProcessingProgress state={state} />
             : null}
           {processingActive(state) ? <p className="text-body-2-regular text-text-secondary tabular-nums" data-processing-eta="">
             {remainingTime(state)}

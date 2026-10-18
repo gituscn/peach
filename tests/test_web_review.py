@@ -369,7 +369,7 @@ class ReviewQueueTests(unittest.TestCase):
         """`MEYD911.mp4` 就是 `MEYD-911`，编目规则读得出来，逐字比对读不出。
 
         差一个连字符就要人去点一遍，而点的人在界面上看到的仍只是番号和候选值，
-        并不比这条判据知道得更多。本机 2611 条有番号的视频里这样的有 297 条。
+        并不比这条判据知道得更多。
         """
         self._asset(94, "MEYD-911", "MEYD911.mp4")
         self.write_metadata_rows([{"item_key": "MEYD-911:release_date", "field": "release_date",
@@ -520,9 +520,6 @@ class ReviewQueueTests(unittest.TestCase):
 
     def test_a_tag_set_with_nowhere_left_to_judge_lands_without_a_human(self):
         """当前值为空、只有一个来源、每个 genre 都有去向——页面上没有可判断项。
-
-        `当前值：尚无；1 个匹配资产；1 个来源候选` 这样的卡片本机有 268 条，
-        点「通过」和不点的区别只是谁去点。
         """
         self._asset(95, "ABW-251", "ABW-251.mp4")
         self.write_metadata_rows([self._tag_row(
@@ -822,9 +819,6 @@ class ReviewQueueTests(unittest.TestCase):
 
     def test_the_chain_settles_a_disagreement_between_two_official_sources(self):
         """转售店与片商的口径差不是「哪个对」，链上片商排在前面就该听它的（ADR-0038）。
-
-        本机队列里按链取舍的 60 行全是这一种：mgstage 的标题缀着店铺加赠、系列
-        写的是店内货架名，dmm 与 libredmm 那一侧才是片商自己的口径。
         """
         self._asset(120, "ABW-360", "ABW-360.mp4")
         self.write_metadata_rows([
@@ -901,9 +895,6 @@ class ReviewQueueTests(unittest.TestCase):
 
     def test_a_fallback_source_does_not_challenge_a_value_the_ledger_has(self):
         """兜底来源改不动账本已有的值，也不必让人看一眼（ADR-0038）。
-
-        本机队列里这样的行有 111 条（系列 41、出演者 37、厂牌 33），挑战方无一例外
-        是 javbus——它搜不到就返回首个近似命中。
         """
         self._asset(124, "TRE-080", "TRE-080.mp4")
         con = sqlite3.connect(self.db_path)
@@ -2224,8 +2215,7 @@ class ReviewQueueTests(unittest.TestCase):
         """厂牌在账本里是实体，字段里那串字符只是投影。
 
         同一家在三处各有写法：账本存规范名 `Prestige`，javbus 给日文名，
-        mgstage 与 libredmm 给日英并写的一串。实测本机队列里 10 条「厂牌冲突」
-        全是这一种，指的都是同一条实体。
+        mgstage 与 libredmm 给日英并写的一串。
         """
         con = sqlite3.connect(self.db_path)
         con.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at) "
@@ -2281,8 +2271,6 @@ class ReviewQueueTests(unittest.TestCase):
         """MGS 是转售店，它跟片商那份的三处差异是店铺口径，不是事实争议。
 
         标题尾巴上缀店铺加赠，发行日期写自己的先行配信日，系列写店内货架名。
-        本机 214 条「账本已有值、来源给的不一样」里 158 条是这一种：发行日期 65、
-        标题 64、系列 29，与账本一致的一方是 dmm+libredmm 129 条、dmm 29 条。
         """
         self.write_metadata_rows([
             {"item_key": "BONUS", "field": "title", "current": "圧倒的ケツ圧ピストン！！",

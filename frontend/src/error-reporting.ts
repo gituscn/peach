@@ -8,6 +8,8 @@ export function installErrorReporting(): void {
   let count = 0;
   const seen = new Set<string>();
   const send = (kind: string, cause: unknown, fallback = '', source?: ErrorEvent) => {
+    const errorName = cause instanceof Error || cause instanceof DOMException ? cause.name : '';
+    if (errorName === 'AbortError') return;
     if (Date.now() - start >= 60_000) {
       start = Date.now(); count = 0; seen.clear();
     }
@@ -20,7 +22,7 @@ export function installErrorReporting(): void {
     seen.add(key); count += 1;
     void fetch('/api/diagnostics/client-error', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind, message, stack, page: window.location.pathname,
+      body: JSON.stringify({ kind, message, stack, error_name: errorName, page: window.location.pathname,
         source_file: source?.filename?.split('/').pop()?.split('?')[0],
         line: source?.lineno, column: source?.colno }), credentials: 'same-origin', keepalive: true,
     }).catch(() => {});

@@ -7,15 +7,11 @@
 
 人物页的 JavDB 入口只按 `entity_external_ref(provider='javdb')` 拼地址，没有 id 就不出（`entry_links`）。
 这个 id 原先只有两条来路：作品的演员字段恰好采用了 javdb 作品页（`sources.javdb.actresses`），或者
-`scripts/backfill_performer_entry_ids.py` 读本机 javdb 页面缓存一次性回填。9 月 12 日之后缓存不再更新，
+`scripts/backfill_performer_entry_ids.py` 读本机 javdb 页面缓存一次性回填。缓存无法保证持续更新，
 新导入的女优走补女优资料后继（ADR-0067），只补 minnano-av 与 avwikidb。
 
-2026-09-27 实测：758 位在 JAV 目录站有 id 的女优里，219 位没有 javdb id，其中 127 位缓存里根本没有，
-90 位只出现在搜索结果页里（资料页当时被限流或要登录）。`夢実かなえ`（`eKxd1`）就是前一种。
-
 javdb 的演员搜索 `search?f=actor&q=` 回的每张卡都带站内 id 和标题一栏（这个人在站上的全部写法）；
-同一位女优常有两条记录，無碼那条的头像上有 `<span class="info">無碼</span>`。本机缓存的 2016 张卡片里，
-这枚标记只见过 `無碼` 一种。
+同一位女优可能有多条记录；無碼条目的头像上有 `<span class="info">無碼</span>` 标记。
 
 ## 决策
 

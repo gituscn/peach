@@ -76,11 +76,7 @@ class JobStatusTests(unittest.TestCase):
             self.assertFalse(list(state.parent.glob("*.tmp")))
 
     def test_rendered_times_are_local_while_stored_times_stay_utc(self) -> None:
-        """STATUS.md 是给人读的：时间按本地时区渲染，存进 state 的仍是 UTC。
-
-        这条口径 2026-08-26 定下时只落到了 web/app.js，这条生成链路漏了，
-        于是同一份文档里「generated」和交接时间是 UTC、产物表格是本地，
-        三个数字两种时钟且都不标注。"""
+        """时间按本地时区渲染，存进 state 的仍是 UTC。"""
         moment = datetime.fromisoformat(MODULE._local("2026-08-29T02:51:51+00:00"))
         self.assertEqual(
             moment, datetime(2026, 8, 29, 2, 51, 51, tzinfo=timezone.utc),
@@ -103,20 +99,13 @@ class JobStatusTests(unittest.TestCase):
         )
 
     def test_the_generated_block_lands_outside_the_repository(self) -> None:
-        """自动区块写进 peach-data/state/，不写被跟踪的 STATUS.md。
-
-        它每次 hook 都重算，写进 Git 里的文件就等于让工作区永远 modified，
-        每个智能体都得先分辨「这行是我改的还是 hook 改的」；而 `--state` 的
-        默认值写死成 `R:\\peach-data` 这类盘上路径时，数据根一搬没人会发现。"""
+        """自动区块使用配置中的数据根，保存在仓库外。"""
         from peach.config import STATE_DIR
 
         self.assertEqual(MODULE.DOC, STATE_DIR / "job-status.md")
         self.assertEqual(MODULE.STATE, STATE_DIR / "agent-handoff.json")
         repo = SCRIPT.parents[1]
         self.assertNotIn(repo, MODULE.DOC.parents, "自动产物不能落在仓库里")
-        status = (repo / "docs" / "STATUS.md").read_text(encoding="utf-8")
-        self.assertNotIn(MODULE.START, status, "STATUS.md 不再持有受管区块")
-        self.assertIn("peach-data/state/job-status.md", status, "STATUS.md 要留一行指针")
 
     def test_write_back_creates_the_document_when_it_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as root:

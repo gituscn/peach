@@ -427,7 +427,7 @@ Windows 托盘在取得单实例锁后启动独立监视器。监视器用 Win32
 
 页面地址加 `?edit` 开启文字编辑，悬停文字显示编辑范围，点文字在原位修改，回车或点别处保存、Esc 取消。
 按钮和链接的文字使用贴在文字位置的输入框。「暂停编辑」可继续操作页面。
-静态文案写回 `web/index.html`、`web/app.js` 或 `frontend/src` 中选定的来源；同一文字有多个位置时需选择来源。
+静态文案写回 `web/index.html` 或 `frontend/src` 中选定的来源；同一文字有多个位置时需选择来源。
 保存前校验源文件摘要，备份位于 `build/copy-editor/backups/`。React 文案重建前端后在普通模式生效。
 修改记录可从工具栏导出。界面里的馆藏数据与动态计数没有静态文案来源，不能借此修改账本。
 
@@ -439,7 +439,7 @@ Windows 托盘在取得单实例锁后启动独立监视器。监视器用 Win32
 适用于生产入口的 EXE 本身要换成新构建的情况。换生产入口是发布动作，执行前需要人工确认，脚本不代替这次确认。
 
 - 在主检出里用项目 venv 的 Python 运行 `python scripts/deploy_windows_tray.py`。步骤：拒绝脏检出 → 按 HEAD 提交号在 `<数据根>/state/source-sync-build/<commit>/` 构建 → 让暂存包自己跑一次 `migrate status` → 停旧托盘，原地替换 `dist/Peach/Peach.exe`（旧文件留成 `Peach.pre-source-sync-<时间>.exe`），起新托盘 → 用项目 CA 严格校验读取生产 HTTPS 口的 `/healthz`。
-- 验收看是谁在回话。独立发行版里回话的是冻结进程自己，核对它报的 `build_commit` 等于这次打包的提交。本机这套形态下回话的是 venv 里的源码进程（`src/peach/tray.py` 的 `_peach_executable()` 把子服务交回项目 venv），`build_commit` 恒为 None；这时核对生产入口文件的 sha256 等于这次的暂存包。
+- 验收看是谁在回话。独立发行版由冻结进程响应，核对 `build_commit` 等于打包提交。源码部署由项目 venv 的进程响应（`src/peach/tray.py` 的 `_peach_executable()` 选择子服务入口），`build_commit` 为 None；这时核对生产入口文件的 sha256 等于暂存包。
 - 两种验收都不看版本号：版本号一次发布才加一格，同一个版本号下有很多个构建。
 - 结果打印成一份 JSON，`step` 说明停在哪一步。新托盘起不来或接管不了两个服务时，自动换回备份并重开旧托盘。`--staged <路径>` 复用已经打好的包，跳过构建。
 - 不要就地构建 `dist/Peach/`：运行中的托盘占用着那个文件，PyInstaller 清目录会遇到 WinError 5。
@@ -456,36 +456,7 @@ Windows 托盘在取得单实例锁后启动独立监视器。监视器用 Win32
 - `.stignore` 不跨设备同步，两端每个目录各放一份。方向固定，在 Mac 上生成的图片不会回到 Windows。
 - 两台机器的内部口令要一致：reader 取 writer 的复核结果时发的是自己的口令。
 - 两台机器的本机 CA 各自独立，`secrets` 按设计不共享。
-- 双机广播的名字固定：macOS 是 `peach.local`，Windows 是 `peach-writer.local`。默认值在 `peach.config.MDNS_NAME`，`PEACH_MDNS_NAME` 只做临时覆盖。
-
-#### 把两台机器切到设置文件
-
-先 Windows（写者）后 macOS（读者）：读者的 `--writer-origin` 要按写者的地址填。
-
-Windows（PowerShell，项目根）：
-
-```powershell
-Copy-Item ..\peach-data\config.toml ..\peach-data\config.toml.bak
-& .\.venv\Scripts\peach.exe init --from-existing --force
-Get-Content ..\peach-data\config.toml
-python scripts\restart_windows_tray.py
-```
-
-核对四点：`[media]` 下只有 `locations` 和 `mounts` 两个子表，没有 `R = ...` 这类盘符键；`[media.mounts]` 为空；`[replication] enabled = true`；重启后 `/healthz` 的 `ledger_sync` 仍是 `writer`，托盘菜单里两个 Ledger 项都在。
-
-macOS（读者，项目根）：
-
-```bash
-cp ../peach-data/config.toml ../peach-data/config.toml.bak 2>/dev/null
-./.venv/bin/peach init --from-existing --force \
-  --mount local=/Volumes/<卷名>/media \
-  --writer-origin https://<writer>.local --smb-host <writer>.local --smb-user <钥匙串账号>
-launchctl kickstart -k gui/$(id -u)/io.github.longmeidao.peach.tray
-```
-
-核对：随便打开一个本地媒体能播（挂载表生效），`/healthz` 报 `ledger_sync: reader`，菜单栏里「同步 Ledger」还在。只有一台电脑的，只用 `--mount`，并让 `replication.enabled` 保持 `false`。
-
-回退：把 `config.toml.bak` 改回 `config.toml` 再重启。这次切换只改设置文件，数据库、媒体和凭据都没有被碰过，也没有数据需要回滚。
+- 双机广播名分别取各机的 `server.mdns_name`，必须不同；读取 `/healthz` 的 `mdns` 核对实际名称。`PEACH_MDNS_NAME` 只作临时覆盖。
 
 ### 版本、更新与自我重启
 
@@ -521,7 +492,7 @@ launchctl kickstart -k gui/$(id -u)/io.github.longmeidao.peach.tray
 - `<数据根>/logs` 里的 `*.log` 统一保留半年，不限大小（`peach.log_retention.sweep`，托盘在启动任何子进程之前运行）：半年没写过的文件整份删除；还在写的文件按自然月分段，上次写入在更早月份的改名成 `<名字>.until-<最后写入日期>.log`，再过半年删除。子进程直接追加 stdout，不经过 `logging`，所以按文件处理，不按行处理。
 - 更新与打包产物自动清退：托盘每次启动只保留最近 2 份 `dist/Peach/Peach.pre-source-sync-*.exe` 备份，并删掉 `<数据根>/state/source-sync-build/` 里不属于待应用记录的暂存构建（`WindowsUpdateInstaller.sweep_artifacts`）；`build_windows.ps1` 成功后删掉 PyInstaller 工作目录 `build/windows/app`；单文件托盘每次启动删掉 `%TEMP%` 里超过一天、不属于自己的 `_MEI*` 解压残留（`sweep_onefile_extractions`，托盘被结束进程时 PyInstaller 不会自己清理，每份 40–80 MB）。自动清理只认这几种命名：`Peach.exe` 本体、手工放进 `dist/` 的目录、`build/release-*`、`attic/` 都不碰，手工构建的残留要自己删。
 - 可重建缓存的删除范围由当前数据库路径决定：生产库只能清理同一个 `peach-data` 下的缓存，临时库只能清理它的临时目录，范围之外一律跳过。测试里的清空回收站必须用临时数据根，漏配会删到真实封面。
-- 真实账本规模下，逐文件或同步 HTTP 请求的全库扫描 5 分钟都不返回，所以资源同步必须是后台作业、逐来源报告进度；同一目录只枚举一次，目录元数据并发固定为 8，不重跑全库，也不盲信旧结果。
+- 资源同步使用后台作业并逐来源报告进度，避免同步全库扫描阻塞请求；同一目录只枚举一次，目录元数据并发固定为 8，不重跑全库，也不盲信旧结果。
 - 运维脚本被导入时不能产生文件、网络或数据库副作用。`scrape_codes.py` 默认写可续跑的复核 CSV；`clean_names.py` 先预览，`--apply` 必须同时给出 `--backup <路径>`，备份写完后当场校验完整性（`peach.scripting.open_for_write`）。
 - 追更的合集判据只作用于新抓到的候选。收紧阈值后用 `scripts/prune_follow_compilations.py` 扫描存量：默认只列清单并写一份复核 CSV，`--apply` 先备份成 `ledger.pre-follow-compilations-*.db` 再删除，已保存成 asset 的条目一律不动。没探过详情页的旧行拿不到署名，判据数不到它们。
 - 文件名只按数据库里已确认的番号规范化，不从文件名重新猜番号。只改大小写时经同目录临时名中转；去广告后重名的，用 `(2)` 起的后缀两份都保留。

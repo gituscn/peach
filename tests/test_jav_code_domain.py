@@ -247,9 +247,7 @@ class DatedCodeSeparatorTests(unittest.TestCase):
 
 
 class TokyoHotShapeTests(unittest.TestCase):
-    """Tokyo-Hot 的编号没有厂牌字母段，规范写法是小写。
-
-    样本是本机账本里全部 9 条 Tokyo-Hot 视频的文件名。`k` 与 `red` 两支账本里一条
+    """Tokyo-Hot 的编号没有厂牌字母段，规范写法是小写。`k` 与 `red` 两支账本里一条
     没有，按同一发行体系一并认。
     """
 
@@ -307,9 +305,7 @@ class TokyoHotShapeTests(unittest.TestCase):
 
 
 class DeliveryFilenameTests(unittest.TestCase):
-    """发行站自己交付的文件名，番号被站方的写法包着。
-
-    样本是本机账本里全部 4 条这样的视频。收益和误判用同一批名字量过：解析不出番号
+    """发行站自己交付的文件名，番号被站方的写法包着。收益和误判用同一批名字量过：解析不出番号
     却已有 code 的从 803 条降到 799 条，解析出来与 code 不符的仍是 4 条，20721 条
     没有 code 的文件新增解析出 0 条。
     """

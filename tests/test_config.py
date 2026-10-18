@@ -244,7 +244,7 @@ class BadFileTests(unittest.TestCase):
     def test_phase_one_drive_letter_keys_are_rejected_with_an_upgrade_hint(self):
         """第一阶段的 `[media] R = ...` 是盘符键；静默忽略等于整台机器安静地脱盘。"""
         with TempTree() as tree:
-            tree.write("[media]\nR = '/Volumes/RESOURCES'\n")
+            tree.write("[media]\nR = '/Volumes/Media'\n")
             with self.assertRaises(SettingsFileError) as caught:
                 tree.load()
         message = str(caught.exception)

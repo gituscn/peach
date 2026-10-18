@@ -8,7 +8,7 @@
 - [Composer Panel](https://www.boardui.com/components/composer-panel)：实测模型菜单内的 Effort 浮层有六个停点，轨道宽 240px、高 27px；拖柄宽 21px、高 27px，左右预留各 10.5px。最高档在轨道内用两层 canvas 绘制流光，装饰不接收指针，滑块由 React Aria 驱动。
 - 用户截图确认最高档保留流光，三档文案上方为最慢／最快，下方为占用少／占用多。用户明确要求参考公开代码和 CSS 自行实现组件。
 
-公开演示截图存于本机 `attic/evidence/20261017-processing-controls/`：
+公开演示截图存于本机 `<私有验证记录>`：
 
 | 文件 | SHA-256 |
 | --- | --- |

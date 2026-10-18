@@ -5,6 +5,7 @@ import os
 import sqlite3
 import subprocess
 import tempfile
+import threading
 import unittest
 from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
@@ -107,6 +108,30 @@ class ProbeUnmeasuredTests(unittest.TestCase):
             self.assertEqual(media_probe.probe_path(self.db, "ffprobe", "local", ROOT + r"\a.mp4"), 1)
         self.assertEqual(self.row(pushed)[0], 1800.0)
         self.assertIsNone(self.row(other)[0])
+
+    def test_controlled_probe_uses_parallel_readers_and_serial_progress(self):
+        from peach.processing_control import control_for
+        from peach.settings_file import PeachConfig
+        root = Path(self.tmp.name).resolve()
+        config = PeachConfig(root, root / 'config.toml', present=True, locations={'local': (ROOT,)})
+        control = control_for(config)
+        for mode, workers in (('low', 1), ('standard', 2), ('high', 4)):
+            with self.subTest(mode=mode):
+                selected = [self.add(ROOT + f'\\{mode}-{index}.mp4') for index in range(workers)]
+                barrier = threading.Barrier(workers, timeout=3)
+                readers, writers = set(), set()
+                def probe(*_args, readers=readers, barrier=barrier):
+                    readers.add(threading.get_ident())
+                    barrier.wait()
+                    return 1800.0, 1920, 1080, 'h264', 30.0, None
+                with control.bind(mode, publish=lambda **_: None, active=lambda: True, db_path=self.db, mode=mode), \
+                        mock.patch.object(media_probe, 'probe_file', probe), \
+                        mock.patch.object(media_probe, 'resolve_case_insensitive', str):
+                    count = media_probe.probe_unmeasured(self.db, 'ffprobe', 'local', ROOT, config=config,
+                        asset_ids=selected, report=lambda *_, writers=writers: writers.add(threading.get_ident()))
+                self.assertEqual(count, workers)
+                self.assertEqual(len(readers), workers)
+                self.assertEqual(writers, {threading.get_ident()})
 
 
 class ProbeProcessTests(unittest.TestCase):

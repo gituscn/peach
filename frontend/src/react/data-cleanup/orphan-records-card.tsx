@@ -110,7 +110,8 @@ export function OrphanRecordsCard({ toast }: { toast(message: string): void }) {
   });
   const removeSelected = (chosen: OrphanRecord[]) => void confirmModal({
     title: '彻底删除所选记录',
-    body: `将删除以下 ${chosen.length} 条作品和它们带的全部记录：${chosen.map((item) => `「${item.name}」`).join('、')}。此操作不可撤销。`,
+    body: `将删除以下 ${chosen.length} 条作品和它们带的全部记录。此操作不可撤销。`,
+    items: chosen.map((item) => item.name),
     confirmLabel: '彻底删除所选记录', danger: true,
     onConfirm: () => purge.mutateAsync(chosen.map((item) => item.id)),
   });
