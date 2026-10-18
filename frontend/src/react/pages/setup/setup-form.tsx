@@ -18,6 +18,7 @@ import { SEGMENT, SEGMENTED_TRACK, SegmentedRadioGroup } from '../../components/
 import { busyProps } from '../../settings/busy-props';
 import { FolderRow, isCloudSource, MediaReadPolicy, MediaReadPolicyHelp, SourceSelect, useFolderRows, WindowsRootInput } from '../../settings/folder-rows';
 import { PasswordPair } from '../../settings/password-pair';
+import { ReportingChoices } from '../../settings/remote-reporting-settings';
 import { Disclosure, ErrorText, ExternalLink, Help } from '../../settings/section';
 import { CardGroup, GroupTitle } from '../auth-card';
 import {
@@ -60,6 +61,7 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
   const [confirmation, setConfirmation] = useState('');
   const [scanNow, setScanNow] = useState(setup.scan_now);
   const [historyGuide, setHistoryGuide] = useState(setup.history_guide);
+  const [reporting, setReporting] = useState(setup.remote_reporting);
   const [errors, setErrors] = useState<SetupErrors>({});
   const [tableError, setTableError] = useState('');
   const [failure, setFailure] = useState('');
@@ -98,6 +100,7 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
     setFailure('');
     const submission: SetupSubmission = {
       media_dir: folders.rows, access_enabled: accessOn, scan_now: scanNow, history_guide: historyGuide,
+      ...(reporting ? { remote_reporting: { usage: reporting.usage, errors: reporting.errors } } : {}),
     };
     // 隐藏的题不提交，服务端按题目默认值补上。
     for (const question of others) if (visible(question)) submission[question.key] = values[question.key] ?? '';
@@ -242,6 +245,11 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
       </CardGroup>
 
       {failure ? <ErrorText>{failure}</ErrorText> : null}
+      {reporting ? <CardGroup>
+        <GroupTitle>遥测与错误诊断</GroupTitle>
+        <ReportingChoices value={reporting} onChange={setReporting} />
+        <Help>馆藏与口味分享默认关闭。完成设置后，可在「应用与维护」查看明细预览并明确同意。</Help>
+      </CardGroup> : null}
       <Button type="submit" className="self-start" {...busyProps(busy)}>完成设置</Button>
     </form>
   );

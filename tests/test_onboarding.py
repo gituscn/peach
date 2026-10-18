@@ -477,6 +477,22 @@ class SetupJsonContractTests(_SetupHttpCase):
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
+    def test_remote_reporting_defaults_off_and_is_saved_in_selected_data_root(self):
+        from peach import remote_reporting
+        response = self._send("GET", self.QUESTIONS)
+        self.assertFalse(response.json()["remote_reporting"]["usage"])
+        self.assertFalse(response.json()["remote_reporting"]["errors"])
+        self._submit(remote_reporting={"usage": False, "errors": True})
+        config = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(self.data_root)})
+        self.assertFalse(remote_reporting.consent(config)["usage"])
+        self.assertTrue(remote_reporting.consent(config)["errors"])
+
+    def test_remote_reporting_rejects_non_boolean_consent_before_creating_settings(self):
+        for value in ([], {"usage": "true"}, {"errors": 1}):
+            response = self._send("POST", self.SUBMIT, json=self._body(remote_reporting=value))
+            self.assertEqual(response.status_code, 400)
+            self.assertFalse((self.data_root / "config.toml").exists())
+
     def test_the_first_run_page_is_a_shell_around_the_standalone_page_bundle(self):
         """首次运行页由独立页面包画：薄壳只带主题预读、样式、脚本、借来的字形与挂载点。"""
         response = self._get("/")

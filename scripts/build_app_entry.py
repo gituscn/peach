@@ -76,6 +76,14 @@ def wants_cli(argv: list[str]) -> bool:
     return len(argv) > 1 and argv[1] in cli_commands()
 
 
+def installer_reporting(usage: str, errors: str) -> int:
+    from peach import remote_reporting
+    if usage not in {"0", "1"} or errors not in {"0", "1"}:
+        return 2
+    remote_reporting.save({"usage": usage == "1", "errors": errors == "1"})
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
     if "--data-root" in argv:
@@ -85,6 +93,8 @@ def main(argv: list[str] | None = None) -> int:
         os.environ["PEACH_DATA_ROOT"] = argv[index + 1]
         del argv[index:index + 2]
         sys.argv = argv
+    if len(argv) == 4 and argv[1] == "--installer-reporting":
+        return installer_reporting(argv[2], argv[3])
     from peach import error_reporting
     error_reporting.install()
     if len(argv) in (2, 3) and argv[1] == "--diagnostic-report":

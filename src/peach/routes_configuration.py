@@ -178,8 +178,11 @@ def configurable(request: Request) -> bool:
 def snapshot(config) -> dict[str, Any]:
     """配置页首屏要的一切：当前值、修订号、可写与否，以及这台机器的运行信息。"""
     editable = managed_configuration()
+    from . import remote_reporting, library_sharing
     media = config.mounts.get("local") or config.locations.get("local", ())
     return {
+        "remote_reporting": remote_reporting.snapshot(config),
+        "library_sharing": library_sharing.snapshot(config),
         "startup": desktop_startup.snapshot(config),
         "uninstall": desktop_uninstall.snapshot(config),
         "peach_proxy": peach_proxy.describe(config.directory("secrets")),
@@ -273,6 +276,37 @@ def read_configuration(request: Request, _args=Depends(require_auth)):
 def read_automatic_updates(request: Request, _args=Depends(require_auth)):
     local_only(request)
     return request.app.state.automatic_updates.snapshot()
+
+
+@router.post("/api/configuration/remote-reporting")
+def save_remote_reporting(request: Request, body: dict = Body(...), _args=Depends(require_auth)):
+    local_only(request)
+    same_origin(request)
+    from . import remote_reporting
+    try:
+        return remote_reporting.save(body)
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+
+
+@router.get("/api/configuration/library-sharing/preview")
+def preview_library_sharing(request: Request, _args=Depends(require_auth)):
+    local_only(request)
+    same_origin(request)
+    try:
+        return JSONResponse(request.app.state.library_sharing.preview(), headers={"Cache-Control": "no-store"})
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+
+
+@router.post("/api/configuration/library-sharing")
+def save_library_sharing(request: Request, body: dict = Body(...), _args=Depends(require_auth)):
+    local_only(request)
+    same_origin(request)
+    try:
+        return request.app.state.library_sharing.save(body)
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
 
 
 @router.post("/api/configuration/automatic-updates")

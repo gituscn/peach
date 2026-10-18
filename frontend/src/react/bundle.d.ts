@@ -239,6 +239,8 @@ export interface ConfigurationFact {
 }
 
 export interface ConfigurationData {
+  remote_reporting?: import('./settings/remote-reporting-settings').RemoteReportingState;
+  library_sharing?: import('./settings/library-sharing-settings').LibrarySharingState;
   ledger_read_only?: boolean;
   startup?: StartupState;
   uninstall?: UninstallState;

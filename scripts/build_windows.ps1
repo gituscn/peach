@@ -81,6 +81,10 @@ $BuildInfo = [ordered]@{
     built_at = (Get-Date).ToString('o')
 }
 Set-Content -LiteralPath $BuildInfoPath -Value (ConvertTo-Json $BuildInfo) -Encoding utf8
+$SentryConfigPath = Join-Path $BuildPath 'sentry.json'
+Set-Content -LiteralPath $SentryConfigPath -Value (ConvertTo-Json @{
+    dsn = "$env:PEACH_SENTRY_DSN"; library_dsn = "$env:PEACH_LIBRARY_SENTRY_DSN"
+}) -Encoding utf8
 
 $BuildMode = @('--onefile')
 $BuildDestination = $OutputPath
@@ -127,6 +131,7 @@ if ($Standalone) {
     --distpath $BuildDestination --workpath $WorkPath --specpath $BuildPath `
     --paths (Join-Path $ProjectRoot 'src') --python-option 'X utf8' `
     --collect-all curl_cffi --collect-all resvg_py `
+    --copy-metadata sentry-sdk `
     --hidden-import uvicorn.logging --hidden-import uvicorn.loops.auto `
     --hidden-import uvicorn.protocols.http.auto --hidden-import uvicorn.protocols.websockets.auto `
     --hidden-import uvicorn.lifespan.on `
@@ -135,6 +140,7 @@ if ($Standalone) {
     --add-data "$(Join-Path $ProjectRoot 'migrations');migrations" `
     --add-data "$(Join-Path $ProjectRoot 'resources');resources" `
     --add-data "${BuildInfoPath};." `
+    --add-data "${SentryConfigPath};." `
     (Join-Path $ProjectRoot 'scripts\build_app_entry.py')
 if ($LASTEXITCODE -ne 0) { throw 'Peach build failed.' }
 if ($Standalone) {

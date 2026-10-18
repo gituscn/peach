@@ -337,6 +337,7 @@ def setup_questions(request: Request):
     只是不看 Origin：配置完成后这里 404，运行事实不再对外。
     """
     _setup_guard(request, submit=False)
+    from . import remote_reporting
     windows = os.name == "nt"
     asked = onboarding.questions(settings_file.active(), windows=windows)
     host_labels = dict(onboarding.HOST_OPTIONS)
@@ -373,6 +374,7 @@ def setup_questions(request: Request):
         "access_enabled": _access_on_by_default(asked),
         "scan_now": True,
         "history_guide": False,
+        "remote_reporting": remote_reporting.snapshot(),
     })
 
 
@@ -399,6 +401,11 @@ async def setup_submit_json(request: Request):
         body = None
     if not isinstance(body, dict):
         raise HTTPException(status_code=400, detail="请求正文要是 JSON 对象")
+    from . import remote_reporting
+    try:
+        reporting = remote_reporting.parse_choices(body.get("remote_reporting", {}), partial=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     rows = body.get("media_dir")
     rows = [row if isinstance(row, dict) else {} for row in rows] if isinstance(rows, list) else []
     submitted: dict[str, object] = {
@@ -442,6 +449,7 @@ async def setup_submit_json(request: Request):
             errors = {"data_root": str(exc)}
     if errors:
         raise HTTPException(status_code=400, detail={"message": "有几项需要修改", "errors": errors})
+    remote_reporting.save(reporting, applied.config)
     if scan_now:
         onboarding.request_first_scan(applied.config, "configured" if answers.media_sources is not None else "local")
     return _setup_done(applied.config, scan_now=scan_now, history_guide=history_guide)

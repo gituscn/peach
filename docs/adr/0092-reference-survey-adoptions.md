@@ -79,7 +79,7 @@ javlibrary 六站，写在 [docs/SOURCING.md](../SOURCING.md) 的 minnano 一节
 | --- | --- | --- | --- |
 | javinfo.dev 作可选来源 | javinfo | 付费、闭源、限速 | 待办 65：用户自带 API key，接入前对一组已复核番号对照字段准确率与速度 |
 | 画面向量 | SakuraMedia | 单机单人用不着向量库的运维 | 待办 51：用 SQLite 扩展 `sqlite-vec`，不多起服务 |
-| 遥测 | SakuraMedia、javm | 默认开启、上报过多 | 待办 63：默认关闭，只报版本号与平台，上报内容在设置页逐字列出 |
+| 遥测 | SakuraMedia、javm | 默认开启、上报过多 | 默认关闭、字段明示；技术诊断与明确同意的群体研究见 [ADR-0109](0109-opt-in-diagnostics-and-population-research.md) |
 | 小文件打包 | SakuraMedia | 图片打包的迁移不可回退 | 待办 66：能解包回原样，和待办 32 一起设计 |
 | 自定义 SQL | JAV_MovieManager | 绕过 ledger 读写边界 | 待办 62：只读连接，写不进去 |
 

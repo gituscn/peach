@@ -116,6 +116,11 @@ def exception_facts(error: BaseException) -> dict:
 
 
 def event(stage: str, error: BaseException | None = None, **fields) -> Path | None:
+    try:
+        from . import remote_reporting
+        remote_reporting.capture(stage, error, **fields)
+    except Exception:
+        pass
     record = {"at": datetime.now(timezone.utc).isoformat(), "stage": stage,
               **system_facts(), 'thread': threading.current_thread().name, **fields}
     if error is not None:
@@ -193,6 +198,11 @@ def install(log_dir: Path | None = None) -> None:
                 _fault_stream.close()
                 _fault_stream = None
     event("entry")
+    try:
+        from . import remote_reporting
+        remote_reporting.usage()
+    except Exception:
+        pass
 
 
 def console_ready() -> None:
