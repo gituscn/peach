@@ -1,4 +1,4 @@
-"""明确同意后发送技术诊断；不读取历史日志、账本或媒体。"""
+"""按本机选择发送技术诊断；不读取历史日志、账本或媒体。"""
 from __future__ import annotations
 
 import atexit
@@ -32,19 +32,25 @@ def _config(config=None):
     return config
 
 
-def _read(path):
+def _read(path, *, missing=None):
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
         return value if isinstance(value, dict) else {}
+    except FileNotFoundError:
+        return missing if missing is not None else {}
     except (OSError, ValueError, UnicodeError):
         return {}
 
 
-def consent(config=None):
-    value = _read(_config(config).directory("state") / "remote-reporting.json")
+def _consent(path):
+    value = _read(path, missing={"usage": True, "errors": True, "revision": "default"})
     enabled = all(value.get(key) is True for key in FIELDS)
     return {"usage": enabled, "errors": enabled,
             "revision": str(value.get("revision", ""))}
+
+
+def consent(config=None):
+    return _consent(_config(config).directory("state") / "remote-reporting.json")
 
 
 def dsn(environment="PEACH_SENTRY_DSN", key="dsn"):
@@ -74,7 +80,7 @@ def snapshot(config=None):
 def parse_choices(body, *, partial=False):
     if not isinstance(body, dict):
         raise ValueError("遥测和自动错误诊断必须是布尔值")
-    choices = {key: body.get(key, False) if partial else body.get(key) for key in FIELDS}
+    choices = {key: body.get(key, True) if partial else body.get(key) for key in FIELDS}
     if any(type(value) is not bool for value in choices.values()):
         raise ValueError("遥测和自动错误诊断必须是布尔值")
     if choices["usage"] != choices["errors"]:
@@ -132,7 +138,7 @@ def _new_client(target, *, envelope_gate=None):
                     return
                 permit = event.pop("extra", {})
                 try:
-                    current = _read(Path(permit["consent"]))
+                    current = _consent(Path(permit["consent"]))
                     if not all(current.get(key) is True for key in FIELDS) or current["revision"] != permit["revision"]:
                         return
                 except Exception:

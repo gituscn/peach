@@ -20925,10 +20925,10 @@ Object.fromEntries(Object.entries({
 //#region src/react/settings/remote-reporting-settings.tsx
 function wg({ value: e, onChange: t }) {
 	return /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsx)(hm, { children: /* @__PURE__ */ (0, z.jsx)(fm, {
-		label: "发送版本统计与错误诊断",
+		label: "发送版本统计与错误诊断（推荐）",
 		description: `${e.fields.usage} ${e.fields.errors}`,
 		children: /* @__PURE__ */ (0, z.jsx)(Om, {
-			"aria-label": "发送版本统计与错误诊断",
+			"aria-label": "发送版本统计与错误诊断（推荐）",
 			isSelected: e.usage && e.errors,
 			onChange: (n) => t({
 				...e,

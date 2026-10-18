@@ -63,7 +63,7 @@ chs.ReportingFailed=版本统计与错误诊断选项未能保存。首次设置
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "reporting"; Description: "发送版本统计与错误诊断至 Sentry（版本与系统每天最多一次；Python、CPU 架构、异常类型及代码位置等诊断每天最多 20 条；不含安装标识、错误原文、日志正文或媒体信息；服务端可见连接 IP）"; GroupDescription: "可选版本统计与错误诊断（默认关闭，设置页可关闭）："; Flags: unchecked
+Name: "reporting"; Description: "发送版本统计与错误诊断（推荐；发送至 Sentry：版本与系统每天最多一次，Python、CPU 架构、异常类型及代码位置等诊断每天最多 20 条；不含安装标识、错误原文、日志正文或媒体信息；服务端可见连接 IP）"; GroupDescription: "可选版本统计与错误诊断（可取消勾选，设置页可关闭）："
 
 [InstallDelete]
 ; PyInstaller 的依赖都在 _internal 里；覆盖安装留下上一版多出来的库会被新版误加载。

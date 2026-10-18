@@ -10,7 +10,7 @@ const initial: RemoteReportingState = {
 };
 
 describe('版本统计与错误诊断', () => {
-  it('单个开关默认关闭，开启后共同保存版本统计与错误诊断', async () => {
+  it('单个推荐开关保留已保存的关闭选择，开启后共同保存版本统计与错误诊断', async () => {
     const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ ...initial, usage: true, errors: true }) }));
     vi.stubGlobal('fetch', fetcher);
     const receipt = vi.fn();

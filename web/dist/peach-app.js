@@ -72365,10 +72365,10 @@ function URe({ initial: e, initialJob: t }) {
 //#region src/react/settings/remote-reporting-settings.tsx
 function WRe({ value: e, onChange: t }) {
 	return /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [/* @__PURE__ */ (0, C.jsx)(WA, { children: /* @__PURE__ */ (0, C.jsx)(BA, {
-		label: "发送版本统计与错误诊断",
+		label: "发送版本统计与错误诊断（推荐）",
 		description: `${e.fields.usage} ${e.fields.errors}`,
 		children: /* @__PURE__ */ (0, C.jsx)(Oz, {
-			"aria-label": "发送版本统计与错误诊断",
+			"aria-label": "发送版本统计与错误诊断（推荐）",
 			isSelected: e.usage && e.errors,
 			onChange: (n) => t({
 				...e,

@@ -26,8 +26,9 @@ class RemoteReportingTests(unittest.TestCase):
         mock.patch("peach.settings_file.active", return_value=self.config).start()
         self.addCleanup(reporting.close)
         reporting.close()
+        reporting.save({"usage": False, "errors": False})
 
-    def test_missing_invalid_and_disabled_consent_never_constructs_client(self):
+    def test_invalid_and_disabled_choices_never_construct_client(self):
         with mock.patch.object(reporting, "_new_client") as client:
             reporting.usage()
             reporting.capture("unhandled-main", ValueError("secret"))
@@ -40,6 +41,23 @@ class RemoteReportingTests(unittest.TestCase):
                 reporting.capture("unhandled-main", ValueError("secret"))
             client.assert_not_called()
         self.assertFalse((path.parent / "remote-reporting-budget.json").exists())
+
+    def test_default_enables_both_channels_and_saved_disable_is_persistent(self):
+        path = self.config.directory("state") / "remote-reporting.json"
+        path.unlink()
+        client = mock.Mock()
+        with mock.patch.object(reporting, "_new_client", return_value=client):
+            self.assertTrue(reporting.snapshot()["usage"])
+            self.assertTrue(reporting.snapshot()["errors"])
+            reporting.usage()
+            reporting.capture("unhandled-main", ValueError("private"))
+            self.assertEqual(client.capture_event.call_count, 2)
+            reporting.save({"usage": False, "errors": False})
+            self.assertFalse(reporting.snapshot()["usage"])
+            self.assertFalse(reporting.snapshot()["errors"])
+            reporting.usage()
+            reporting.capture("unhandled-main", ValueError("private"))
+            self.assertEqual(client.capture_event.call_count, 2)
 
     def test_consent_requires_joint_choice_and_missing_endpoint_is_visible(self):
         for invalid in ({"usage": "false", "errors": False}, {"usage": True}, [],
@@ -120,7 +138,7 @@ class RemoteReportingTests(unittest.TestCase):
     def test_sdk_wire_payload_has_no_local_context_or_consent_path(self):
         from sentry_sdk.transport import HttpTransport
         sent = []
-        reporting.save({"usage": True, "errors": True})
+        (self.config.directory("state") / "remote-reporting.json").unlink()
         with mock.patch.object(HttpTransport, "_send_envelope", side_effect=lambda envelope: sent.append(envelope.serialize())):
             reporting.capture("unhandled-main", ValueError("private title token=secret"))
             reporting._client.flush(timeout=2)

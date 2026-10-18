@@ -18,8 +18,8 @@ export function ReportingChoices({ value, onChange }: {
 }) {
   return <>
     <Rows>
-      <SettingsRow label="发送版本统计与错误诊断" description={`${value.fields.usage} ${value.fields.errors}`}>
-        <Switch aria-label="发送版本统计与错误诊断" isSelected={value.usage && value.errors}
+      <SettingsRow label="发送版本统计与错误诊断（推荐）" description={`${value.fields.usage} ${value.fields.errors}`}>
+        <Switch aria-label="发送版本统计与错误诊断（推荐）" isSelected={value.usage && value.errors}
           onChange={(enabled) => onChange({ ...value, usage: enabled, errors: enabled })} />
       </SettingsRow>
     </Rows>
