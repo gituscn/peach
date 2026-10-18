@@ -1288,18 +1288,18 @@ var f = /* @__PURE__ */ o(((e) => {
 			hoistableScripts: /* @__PURE__ */ new Map()
 		}, t;
 	}
-	function R(e) {
+	function Pt(e) {
 		e[Dt] = !0;
 	}
-	function Pt(e) {
+	function R(e) {
 		e[Ot] = void 0;
 	}
-	var z = /* @__PURE__ */ new Set(), Ft = {};
+	var Ft = /* @__PURE__ */ new Set(), z = {};
 	function It(e, t) {
 		Lt(e, t), Lt(e + "Capture", t);
 	}
 	function Lt(e, t) {
-		for (Ft[e] = t, e = 0; e < t.length; e++) z.add(t[e]);
+		for (z[e] = t, e = 0; e < t.length; e++) Ft.add(t[e]);
 	}
 	var Rt = RegExp("^[:A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD][:A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\-.0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$"), zt = {}, Bt = {};
 	function ree(e) {
@@ -5531,7 +5531,7 @@ var f = /* @__PURE__ */ o(((e) => {
 										t = e.type, n = e.memoizedProps, a = o.ownerDocument || o;
 										b: switch (t) {
 											case "title":
-												r = a.getElementsByTagName("title")[0], (!r || r[Dt] || r[xt] || r.namespaceURI === "http://www.w3.org/2000/svg" || r.hasAttribute("itemprop")) && (r = a.createElement(t), a.head.insertBefore(r, a.querySelector("head > title"))), Yf(r, t, n), r[xt] = e, R(r), t = r;
+												r = a.getElementsByTagName("title")[0], (!r || r[Dt] || r[xt] || r.namespaceURI === "http://www.w3.org/2000/svg" || r.hasAttribute("itemprop")) && (r = a.createElement(t), a.head.insertBefore(r, a.querySelector("head > title"))), Yf(r, t, n), r[xt] = e, Pt(r), t = r;
 												break a;
 											case "link":
 												if (o = Mm("link", "href", a).get(t + (n.href || ""))) {
@@ -5553,7 +5553,7 @@ var f = /* @__PURE__ */ o(((e) => {
 												break;
 											default: throw Error(i(468, t));
 										}
-										r[xt] = e, R(r), t = r;
+										r[xt] = e, Pt(r), t = r;
 									}
 									e.stateNode = t;
 								}
@@ -6796,7 +6796,7 @@ var f = /* @__PURE__ */ o(((e) => {
 	var Ff = "_reactListening" + Math.random().toString(36).slice(2);
 	function If(e) {
 		if (!e[Ff]) {
-			e[Ff] = !0, z.forEach(function(t) {
+			e[Ff] = !0, Ft.forEach(function(t) {
 				t !== "selectionchange" && (jf.has(t) || Pf(t, !1, e), Pf(t, !0, e));
 			});
 			var t = e.nodeType === 9 ? e : e.ownerDocument;
@@ -7256,7 +7256,7 @@ var f = /* @__PURE__ */ o(((e) => {
 			case "innerText":
 			case "textContent": return;
 			default:
-				if (!Ft.hasOwnProperty(n)) a: {
+				if (!z.hasOwnProperty(n)) a: {
 					if (n[0] === "o" && n[1] === "n" && (a = n.endsWith("Capture"), o = n.slice(2, a ? n.length - 7 : void 0), t = e[St] || null, t = t == null ? null : t[n], typeof t == "function" && e.removeEventListener(o, t, a), typeof r == "function")) {
 						typeof t != "function" && t !== null && (n in e ? e[n] = null : e.hasAttribute(n) && e.removeAttribute(n)), e.addEventListener(o, r, a);
 						break a;
@@ -7600,7 +7600,7 @@ var f = /* @__PURE__ */ o(((e) => {
 		return e === 1 && t === "foreignObject" ? 0 : e;
 	}
 	function ap(e, t, n, r) {
-		return n = np(n).createElement(e), n[xt] = r, n[St] = t, Yf(n, e, t), R(n), n;
+		return n = np(n).createElement(e), n[xt] = r, n[St] = t, Yf(n, e, t), Pt(n), n;
 	}
 	function op(e, t) {
 		return e === "textarea" || e === "noscript" || typeof t.children == "string" || typeof t.children == "number" || typeof t.children == "bigint" || typeof t.dangerouslySetInnerHTML == "object" && t.dangerouslySetInnerHTML !== null && t.dangerouslySetInnerHTML.__html != null;
@@ -8252,7 +8252,7 @@ var f = /* @__PURE__ */ o(((e) => {
 				rel: e,
 				crossOrigin: n,
 				href: t
-			}, r.querySelector(i) === null && (t = r.createElement("link"), Yf(t, "link", e), R(t), r.head.appendChild(t)));
+			}, r.querySelector(i) === null && (t = r.createElement("link"), Yf(t, "link", e), Pt(t), r.head.appendChild(t)));
 		}
 	}
 	function pm(e) {
@@ -8281,8 +8281,8 @@ var f = /* @__PURE__ */ o(((e) => {
 			}, n), am.set(a, e), r.querySelector(i) !== null || t === "style" && r.querySelector(Sm(a)) || t === "script" && r.querySelector(Em(a))))) {
 				var o = r.createElement("link");
 				Yf(o, "link", e), t === "style" && (o[Ot] = !0, o.onload = o.onerror = function() {
-					Pt(o);
-				}), R(o), r.head.appendChild(o);
+					R(o);
+				}), Pt(o), r.head.appendChild(o);
 			}
 		}
 	}
@@ -8311,7 +8311,7 @@ var f = /* @__PURE__ */ o(((e) => {
 					case "worker":
 					case "script": if (n.querySelector(Em(a))) return;
 				}
-				r = n.createElement("link"), Yf(r, "link", e), R(r), n.head.appendChild(r);
+				r = n.createElement("link"), Yf(r, "link", e), Pt(r), n.head.appendChild(r);
 			}
 		}
 	}
@@ -8335,7 +8335,7 @@ var f = /* @__PURE__ */ o(((e) => {
 						"data-precedence": t
 					}, n), (n = am.get(a)) && km(e, n);
 					var c = o = r.createElement("link");
-					R(c), Yf(c, "link", e), c._p = new Promise(function(e, t) {
+					Pt(c), Yf(c, "link", e), c._p = new Promise(function(e, t) {
 						c.onload = e, c.onerror = t;
 					}), c.addEventListener("load", function() {
 						s.loading |= 1;
@@ -8360,7 +8360,7 @@ var f = /* @__PURE__ */ o(((e) => {
 			a || (a = n.querySelector(Em(i)), a || (e = D({
 				src: e,
 				async: !0
-			}, t), (t = am.get(i)) && Am(e, t), a = n.createElement("script"), R(a), Yf(a, "link", e), n.head.appendChild(a)), a = {
+			}, t), (t = am.get(i)) && Am(e, t), a = n.createElement("script"), Pt(a), Yf(a, "link", e), n.head.appendChild(a)), a = {
 				type: "script",
 				instance: a,
 				count: 1,
@@ -8377,7 +8377,7 @@ var f = /* @__PURE__ */ o(((e) => {
 				src: e,
 				async: !0,
 				type: "module"
-			}, t), (t = am.get(i)) && Am(e, t), a = n.createElement("script"), R(a), Yf(a, "link", e), n.head.appendChild(a)), a = {
+			}, t), (t = am.get(i)) && Am(e, t), a = n.createElement("script"), Pt(a), Yf(a, "link", e), n.head.appendChild(a)), a = {
 				type: "script",
 				instance: a,
 				count: 1,
@@ -8460,7 +8460,7 @@ var f = /* @__PURE__ */ o(((e) => {
 				r.loading = 1;
 				return;
 			}
-		} else t = e.createElement("link"), t[Ot] = !0, t.onload = t.onerror = Pt.bind(null, t), Yf(t, "link", n), R(t), e.head.appendChild(t);
+		} else t = e.createElement("link"), t[Ot] = !0, t.onload = t.onerror = R.bind(null, t), Yf(t, "link", n), Pt(t), e.head.appendChild(t);
 		r.preload = t, t.addEventListener("load", function() {
 			return r.loading |= 1;
 		}), t.addEventListener("error", function() {
@@ -8477,24 +8477,24 @@ var f = /* @__PURE__ */ o(((e) => {
 		if (t.count++, t.instance === null) switch (t.type) {
 			case "style":
 				var r = e.querySelector("style[data-href~=\"" + Zt(n.href) + "\"]");
-				if (r) return t.instance = r, R(r), r;
+				if (r) return t.instance = r, Pt(r), r;
 				var a = D({}, n, {
 					"data-href": n.href,
 					"data-precedence": n.precedence,
 					href: null,
 					precedence: null
 				});
-				return r = (e.ownerDocument || e).createElement("style"), R(r), Yf(r, "style", a), Om(r, n.precedence, e), t.instance = r;
+				return r = (e.ownerDocument || e).createElement("style"), Pt(r), Yf(r, "style", a), Om(r, n.precedence, e), t.instance = r;
 			case "stylesheet":
 				a = xm(n.href);
 				var o = e.querySelector(Sm(a));
-				if (o) return t.state.loading |= 4, t.instance = o, R(o), o;
-				r = Cm(n), (a = am.get(a)) && km(r, a), o = (e.ownerDocument || e).createElement("link"), R(o);
+				if (o) return t.state.loading |= 4, t.instance = o, Pt(o), o;
+				r = Cm(n), (a = am.get(a)) && km(r, a), o = (e.ownerDocument || e).createElement("link"), Pt(o);
 				var s = o;
 				return s._p = new Promise(function(e, t) {
 					s.onload = e, s.onerror = t;
 				}), Yf(o, "link", r), t.state.loading |= 4, Om(o, n.precedence, e), t.instance = o;
-			case "script": return o = Tm(n.src), (a = e.querySelector(Em(o))) ? (t.instance = a, R(a), a) : (r = n, (a = am.get(o)) && (r = D({}, n), Am(r, a)), e = e.ownerDocument || e, a = e.createElement("script"), R(a), Yf(a, "link", r), e.head.appendChild(a), t.instance = a);
+			case "script": return o = Tm(n.src), (a = e.querySelector(Em(o))) ? (t.instance = a, Pt(a), a) : (r = n, (a = am.get(o)) && (r = D({}, n), Am(r, a)), e = e.ownerDocument || e, a = e.createElement("script"), Pt(a), Yf(a, "link", r), e.head.appendChild(a), t.instance = a);
 			case "void": return null;
 			default: throw Error(i(443, t.type));
 		}
@@ -8571,10 +8571,10 @@ var f = /* @__PURE__ */ o(((e) => {
 			if (n.instance === null) {
 				var i = xm(r.href), a = t.querySelector(Sm(i));
 				if (a) {
-					t = a._p, typeof t == "object" && t && typeof t.then == "function" && (e.count++, e = Hm.bind(e), t.then(e, e)), n.state.loading |= 4, n.instance = a, R(a);
+					t = a._p, typeof t == "object" && t && typeof t.then == "function" && (e.count++, e = Hm.bind(e), t.then(e, e)), n.state.loading |= 4, n.instance = a, Pt(a);
 					return;
 				}
-				a = t.ownerDocument || t, r = Cm(r), (i = am.get(i)) && km(r, i), a = a.createElement("link"), R(a);
+				a = t.ownerDocument || t, r = Cm(r), (i = am.get(i)) && km(r, i), a = a.createElement("link"), Pt(a);
 				var o = a;
 				o._p = new Promise(function(e, t) {
 					o.onload = e, o.onerror = t;
@@ -11098,14 +11098,10 @@ var Dt = [
 		cloud: !0,
 		icon: "database"
 	}
-], Ot = Dt, kt = Dt.map((e) => [e.id, e.label]), At = Dt.map((e) => e.id), jt = Dt.filter((e) => e.cloud).map((e) => e.id), Mt = Object.fromEntries(Dt.map((e) => [e.id, e.name])), Nt = (e) => Dt.find((t) => t.id === e)?.default_cost === "free" ? "free" : "metered", R = (e) => document.querySelector(e), Pt = {
-	"text-aa": 1.435,
-	"mark-javdb": 326 / 111
-}, z = (e, t = "") => {
-	let n = Pt[e], r = [n ? "iconwide" : "", t].filter(Boolean).join(" "), i = n ? `0 0 ${(24 * n).toFixed(2)} 24` : "0 0 24 24";
-	return `<svg${r ? ` class="${r}"` : ""} viewBox="${i}" aria-hidden="true"><use href="#i-${e}"/></svg>`;
-};
-function Ft(e, t = 0) {
+], Ot = Dt, kt = Dt.map((e) => [e.id, e.label]), At = Dt.map((e) => e.id), jt = Dt.filter((e) => e.cloud).map((e) => e.id), Mt = Object.fromEntries(Dt.map((e) => [e.id, e.name])), Nt = (e) => Dt.find((t) => t.id === e)?.default_cost === "free" ? "free" : "metered";
+//#endregion
+//#region src/core/request-error.ts
+function Pt(e, t = 0) {
 	let n = String(e?.message ?? e ?? ""), r = Number(t || e?.status || n.match(/\b(400|401|403|404|408|409|413|429|500|502|503|504)\b/)?.[1]), i = {
 		400: "提交内容有误，请检查输入后重试。",
 		401: "登录已失效，请刷新页面重新登录。",
@@ -11122,7 +11118,15 @@ function Ft(e, t = 0) {
 	};
 	return /Failed to fetch|fetch failed|NetworkError|Load failed|network request failed|ERR_CONNECTION/i.test(n) ? "无法连接到 Peach 服务，请确认网络连接和托盘服务已启动。" : e?.name === "TimeoutError" || !r && /timed? ?out|timeout/i.test(n) ? "等待服务响应超时，请检查连接后重试。" : /[㐀-鿿]/.test(n) && !/^请求失败[（(]/.test(n) ? n : i[r] ? i[r] : "操作未完成，请重试；持续失败时查看托盘日志。";
 }
-var It = async (e, t) => {
+//#endregion
+//#region src/core/index.ts
+var R = (e) => document.querySelector(e), Ft = {
+	"text-aa": 1.435,
+	"mark-javdb": 326 / 111
+}, z = (e, t = "") => {
+	let n = Ft[e], r = [n ? "iconwide" : "", t].filter(Boolean).join(" "), i = n ? `0 0 ${(24 * n).toFixed(2)} 24` : "0 0 24 24";
+	return `<svg${r ? ` class="${r}"` : ""} viewBox="${i}" aria-hidden="true"><use href="#i-${e}"/></svg>`;
+}, It = async (e, t) => {
 	if (!t?.method || t.method === "GET") {
 		let t = sessionStorage.getItem("peach.library");
 		t && /^\/api\/(items|facets)(\?|$)/.test(e) && (e += (e.includes("?") ? "&" : "?") + "library=" + encodeURIComponent(t));
@@ -11136,7 +11140,7 @@ var It = async (e, t) => {
 	try {
 		a = await fetch(e, i);
 	} catch (e) {
-		throw e?.name === "AbortError" ? e : Error(Ft(e), { cause: e });
+		throw e?.name === "AbortError" ? e : Error(Pt(e), { cause: e });
 	}
 	let o = null;
 	try {
@@ -11144,7 +11148,7 @@ var It = async (e, t) => {
 	} catch {}
 	if (!a.ok) {
 		let e = o && (o.message || o.detail || o.error);
-		throw Error(Ft(e, a.status));
+		throw Error(Pt(e, a.status));
 	}
 	return Et(e, o), o;
 }, Lt = (e) => e?.name === "AbortError", Rt = async (e, t, n) => {
@@ -11310,7 +11314,7 @@ var It = async (e, t) => {
 	status;
 	body;
 	constructor(e, t, n = null) {
-		super(Ft(e, t)), this.name = "ApiError", this.status = t, this.body = n;
+		super(Pt(e, t)), this.name = "ApiError", this.status = t, this.body = n;
 	}
 }, yn = (e) => {
 	if (!e || typeof e != "object") return "";
@@ -11324,7 +11328,7 @@ var It = async (e, t) => {
 		if (typeof n == "string" && n) return n;
 	}
 	return "";
-}, V = (e) => Ft(e);
+}, V = (e) => Pt(e);
 async function H(e, t) {
 	let n = await fetch(e, {
 		headers: { Accept: "application/json" },
@@ -12785,7 +12789,7 @@ function Do({ label: e = "", items: t = [], footnote: n = "" } = {}) {
 function Oo(e, { variant: t = "secondary", label: n = "", className: r = "", size: i = "medium", filled: a = !1, actionLabel: o = "", actionHref: s = "", details: c = null } = {}) {
 	let l = Eo.has(t) ? t : "secondary", u = l === "secondary" ? "info" : l === "success" ? "check" : "alert", d = l === "error" ? " role=\"alert\"" : " role=\"note\"", f = o ? s ? `<a class="geist-button" href="${B(s)}" data-note-action>${B(o)}</a>` : `<button type="button" class="geist-button primary" data-note-action>${B(o)}</button>` : "";
 	return `<div class="geist-note geist-note-${l}${r ? ` ${B(r)}` : ""}${i === "small" ? " geist-note-small" : ""}${a ? " geist-note-filled" : ""}"${d}>
-    ${z(u)}<p>${n ? `<b>${B(n)}</b>` : ""}<span>${B(l === "error" ? Ft(e) : e)}</span></p>${f}${c ? Do(c) : ""}</div>`;
+    ${z(u)}<p>${n ? `<b>${B(n)}</b>` : ""}<span>${B(l === "error" ? Pt(e) : e)}</span></p>${f}${c ? Do(c) : ""}</div>`;
 }
 function ko(e = "加载中") {
 	let t = Array.from({ length: 10 }, (e, t) => `<i aria-hidden="true" style="--spinner-angle:${t * 36}deg;--spinner-delay:${t * 100 - 900}ms"></i>`).join("");
@@ -52380,7 +52384,7 @@ function zCe({ item: e, playing: t, frame: n, starting: r, pendingGroup: i, grou
 		if (!(w || a && !s)) try {
 			t === e.id ? await x.toggle() : await f();
 		} catch (e) {
-			y(Ft(e));
+			y(Pt(e));
 		}
 	};
 	return /* @__PURE__ */ (0, C.jsxs)(K_.div, {
@@ -52768,7 +52772,7 @@ function WCe({ items: e, finite: t, hasMore: n, busy: r, loading: i = !1, error:
 			}
 			w.current = r, oe(n);
 		} catch (e) {
-			t.signal.aborted || fe(Ft(e));
+			t.signal.aborted || fe(Pt(e));
 		} finally {
 			T.current === t && ue(!1);
 		}
@@ -52785,7 +52789,7 @@ function WCe({ items: e, finite: t, hasMore: n, busy: r, loading: i = !1, error:
 	]);
 	let Ve = I?.items || e, He = Ve.findIndex((e) => e.id === ee?.id), Ue = (n) => {
 		if (N(!1), n.id === ee?.id) {
-			ae ? b.current?.querySelector("video")?.play().catch((e) => fe(Ft(e))) : ze(n);
+			ae ? b.current?.querySelector("video")?.play().catch((e) => fe(Pt(e))) : ze(n);
 			return;
 		}
 		if (I) {
@@ -52803,7 +52807,7 @@ function WCe({ items: e, finite: t, hasMore: n, busy: r, loading: i = !1, error:
 			try {
 				await c();
 			} catch (e) {
-				me(Ft(e)), v(null);
+				me(Pt(e)), v(null);
 			} finally {
 				g.current = !1;
 			}
@@ -52943,7 +52947,7 @@ function WCe({ items: e, finite: t, hasMore: n, busy: r, loading: i = !1, error:
 			"data-wall-play-error": "",
 			children: [/* @__PURE__ */ (0, C.jsx)(J, {
 				tone: "error",
-				children: de || Ft(F.error)
+				children: de || Pt(F.error)
 			}), F.error && !I ? /* @__PURE__ */ (0, C.jsx)(q, {
 				size: "small",
 				variant: "ghost",
@@ -55945,7 +55949,7 @@ function mEe(e) {
 			}),
 			/* @__PURE__ */ (0, C.jsx)(dL, { assetIds: e.filters?.state === "trash" ? [] : uL(u, e.layout.javImage) }),
 			l.isError ? /* @__PURE__ */ (0, C.jsx)(wI, {
-				message: Ft(l.error),
+				message: Pt(l.error),
 				onRetry: () => void l.refetch()
 			}) : null,
 			/* @__PURE__ */ (0, C.jsx)(ez, {
@@ -56171,7 +56175,7 @@ function vEe(e) {
 					hasMore: !!l.hasNextPage,
 					busy: l.isFetchingNextPage,
 					loading: l.isPending || !l.data && l.isFetching,
-					error: !l.data && !l.isPending ? Ft(l.error) : "",
+					error: !l.data && !l.isPending ? Pt(l.error) : "",
 					retry: () => void l.refetch(),
 					emptyHtml: l.data && !_.length ? d.length ? Mo("image", "这批作品没有封面", l.hasNextPage ? "载入更多作品后继续浏览。" : "换个筛选范围再试。") : e.emptyHtml?.({
 						trash: a,
@@ -56184,7 +56188,7 @@ function vEe(e) {
 				}, h ? "finite" : "explore");
 				if (l.isPending) return null;
 				if (!l.data) return /* @__PURE__ */ (0, C.jsx)(wI, {
-					message: Ft(l.error),
+					message: Pt(l.error),
 					onRetry: () => void l.refetch()
 				});
 				if (!d.length) {
@@ -56245,7 +56249,7 @@ function oz({ entity: e, load: t, enabled: n, children: r }) {
 			} catch (e) {
 				o.current = !0, i.current && c({
 					busy: !1,
-					error: Ft(e)
+					error: Pt(e)
 				});
 			} finally {
 				a.current = !1;
@@ -60161,7 +60165,7 @@ function qke(e) {
 	if (!c) return o.isError ? /* @__PURE__ */ (0, C.jsxs)("div", {
 		"data-follow-feed": "",
 		children: [/* @__PURE__ */ (0, C.jsx)(mH, { onManage: i.openManage }), /* @__PURE__ */ (0, C.jsx)(wI, {
-			message: Ft(o.error),
+			message: Pt(o.error),
 			onRetry: () => void o.refetch()
 		})]
 	}) : null;
@@ -60263,7 +60267,7 @@ function qke(e) {
 							children: [/* @__PURE__ */ (0, C.jsx)(pH, { className: "size-3.5" }), "加载更多"]
 						}, o.data?.pages.length) : /* @__PURE__ */ (0, C.jsx)(Jke, {
 							busy: o.isFetchingNextPage,
-							error: o.isFetchNextPageError ? Ft(o.error) : "",
+							error: o.isFetchNextPageError ? Pt(o.error) : "",
 							load: () => {
 								!h.busyRef.current && !o.isFetchingNextPage && o.fetchNextPage();
 							}
@@ -60372,7 +60376,7 @@ function Yke(e, t) {
 			} catch (t) {
 				g.current.actions.checkReport({ results: [{
 					ok: !1,
-					error: Ft(t)
+					error: Pt(t)
 				}] }), e && W.invalidateQueries({ queryKey: ["follow-feed"] });
 			} finally {
 				m.current = t, l("");
@@ -60733,7 +60737,7 @@ function gH(e) {
 			} });
 		},
 		onError: (e, { id: t }) => {
-			l(t, Ft(e), s), r.failure("更新关注状态", e);
+			l(t, Pt(e), s), r.failure("更新关注状态", e);
 		},
 		onSettled: (e, t, { id: n }) => l(n, "", a)
 	}), m = ht({
@@ -60742,7 +60746,7 @@ function gH(e) {
 			u(t, "saved"), d(), r.toast("已保存到账本");
 		},
 		onError: (e, t) => {
-			l(t, Ft(e), s), r.failure("保存到账本", e);
+			l(t, Pt(e), s), r.failure("保存到账本", e);
 		},
 		onSettled: (e, t, n) => l(n, "", a)
 	}), h = (0, S.useRef)({
@@ -60774,7 +60778,7 @@ function gH(e) {
 function aAe(e) {
 	let { result: t, data: n, media: r, helpers: i } = e, a = t.isPending || t.isPlaceholderData, o = CI(a, () => i.listSkeletonHtml(r));
 	return !n && t.isError ? /* @__PURE__ */ (0, C.jsx)(wI, {
-		message: Ft(t.error),
+		message: Pt(t.error),
 		onRetry: () => {
 			t.refetch();
 		}
@@ -66728,7 +66732,7 @@ function wMe(e) {
 							onClick: () => void w.refetch(),
 							children: "重试"
 						}),
-						children: Ft(w.error)
+						children: Pt(w.error)
 					});
 					if (!T.length) return /* @__PURE__ */ (0, C.jsx)(EMe, {
 						kind: u,
@@ -67210,7 +67214,7 @@ function VMe({ props: e, data: t, pending: n, error: r, retry: i }) {
 		children: [a.layer, (() => {
 			if (n) return null;
 			if (!t) return /* @__PURE__ */ (0, C.jsx)(wI, {
-				message: Ft(r),
+				message: Pt(r),
 				onRetry: i
 			});
 			if (!l.length) {
@@ -76886,7 +76890,7 @@ function VLe(e) {
 			children: [/* @__PURE__ */ (0, C.jsx)(XK, { onClose: n.close }), /* @__PURE__ */ (0, C.jsx)("div", {
 				"data-follow-detail-placeholder": "",
 				children: r.isError ? HLe(r.error) ? /* @__PURE__ */ (0, C.jsx)(ULe, { onBack: n.close }) : /* @__PURE__ */ (0, C.jsx)(wI, {
-					message: Ft(r.error),
+					message: Pt(r.error),
 					onRetry: () => void r.refetch()
 				}) : null
 			})]
@@ -77006,7 +77010,7 @@ function GLe({ data: e, media: t, limit: n, context: r, helpers: i, actions: a }
 		wireDrag: i.wireDrag,
 		busy: o.isPending,
 		empty: !!o.data && !l.length,
-		error: o.isError ? `读取接着看失败：${Ft(o.error)}` : void 0,
+		error: o.isError ? `读取接着看失败：${Pt(o.error)}` : void 0,
 		onRetry: () => {
 			o.refetch();
 		},
@@ -77447,7 +77451,7 @@ function XLe(e, t, n) {
 			}
 		}), pi(r, e);
 	}, d = (e) => {
-		c(Ft(e) || "操作失败"), t.failure("更新关注状态", e);
+		c(Pt(e) || "操作失败"), t.failure("更新关注状态", e);
 	}, f = ht({
 		mutationFn: ({ to: e }) => U(Vn, {
 			item: r,
@@ -77963,7 +77967,7 @@ function oRe(e) {
 				children: [/* @__PURE__ */ (0, C.jsx)(gq, { onClose: n.close }), /* @__PURE__ */ (0, C.jsx)("div", {
 					"data-item-placeholder": "",
 					children: e ? /* @__PURE__ */ (0, C.jsx)(wI, {
-						message: Ft(e),
+						message: Pt(e),
 						onRetry: () => {
 							r.error && r.refetch(), o.error && o.refetch();
 						}
@@ -78127,7 +78131,7 @@ function cRe({ item: e, gate: t, helpers: n, actions: r, autoplay: i, onEnded: a
 				}) : /* @__PURE__ */ (0, C.jsx)(q, {
 					variant: "secondary",
 					...Y(f.isFetching),
-					title: f.data?.message || Ft(f.error),
+					title: f.data?.message || Pt(f.error),
 					onClick: () => {
 						d.current = !0, f.refetch();
 					},
@@ -78995,7 +78999,7 @@ function SRe(e) {
 		wireDrag: r.wireDrag,
 		busy: a.isPending,
 		empty: a.data?.length === 0,
-		error: a.isError ? `读取接着看失败：${Ft(a.error)}` : void 0,
+		error: a.isError ? `读取接着看失败：${Pt(a.error)}` : void 0,
 		onRetry: () => {
 			a.refetch();
 		},

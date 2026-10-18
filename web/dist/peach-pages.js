@@ -20917,12 +20917,6 @@ function Cg({ label: e, password: t, confirmation: n, onPassword: r, onConfirmat
 		hint: a ? void 0 : c
 	})] });
 }
-Object.fromEntries(Object.entries({
-	fresh: "/unseen",
-	later: "/watch-later",
-	flagged: "/flagged",
-	ads: "/junk-files"
-}).map(([e, t]) => [t, e])), typeof Intl < "u" && typeof Intl.Segmenter == "function" && new Intl.Segmenter(void 0, { granularity: "grapheme" }), { ...lm };
 //#endregion
 //#region src/react/settings/remote-reporting-settings.tsx
 function wg({ value: e, onChange: t }) {
