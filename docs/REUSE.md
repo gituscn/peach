@@ -8,7 +8,7 @@
 
 ## JAV 用户脚本添加
 
-用户脚本模板 `web/integrations/peach-jav.user.js`（0.2.0）使用 [Tampermonkey 官方 GM API](https://www.tampermonkey.net/documentation.php) 的本机存储、菜单与 `GM_xmlhttpRequest`；SPA 通知依据 `window.onurlchange` 契约。`jav-sites.json` 集中登记站点、域名、详情规则、明确字段和作品参数，安装端点生成 `@match` 与脚本运行规则，设置页读取同一份清单。脚本独立编写，不复制第三方源码、不新增依赖。宿主扩展由用户安装，兼容性以实际浏览器及脚本管理器授权为准；本轮通过模拟 GM API 的真实 Chromium 页面验证，真实扩展安装及源站页面验收未取得。
+用户脚本由 [peach-mitao/peach-userscript](https://github.com/peach-mitao/peach-userscript)（AGPL-3.0-or-later）独立维护，使用 [Tampermonkey 官方 GM API](https://www.tampermonkey.net/documentation.php) 的本机存储、菜单与 `GM_xmlhttpRequest`；SPA 通知依据 `window.onurlchange` 契约。上游使用 Node.js 24 LTS 内置模块确定性构建，运行时零依赖。Peach 的 `web/integrations/` 消费同一发布的完整安装脚本与站点快照，固定版本、上游提交与 SHA256 见 `jav-userscript-release.json`。安装端点直接返回制品，后端独立校验已登记域名与作品参数；上游导出工具在隔离工作树同步这两份制品和来源记录。Sleazy 热门脚本只提供显式域名与镜像发现证据，不复制其实现或执行第三方代码。宿主扩展由用户安装，兼容性以实际浏览器及脚本管理器授权为准；模拟 GM API 的真实 Chromium 页面完成回归，真实扩展安装及源站页面联合验收未取得。
 
 Peach 保留页面粗提取与身份冲突提示，服务端复用 `catalog_rules` 的唯一番号规则、`feeds.scan_code`、`web_resource_search.q_resource_search` 的来源顺序与质量排序、`submit_offline_download` 的 infohash 幂等、现有云下载落地与后处理。浏览器添加在共享提交锁内按番号接管已有任务，覆盖其他入口同时提交不同磁力的情况。专用令牌经 `CredentialStore` 仅保存 SHA-256 摘要，不声明跨机同步字段。队列用已有 `atomic_write_text` 保存本机运行状态，关闭功能会撤销令牌并停止尚未提交的添加。
 

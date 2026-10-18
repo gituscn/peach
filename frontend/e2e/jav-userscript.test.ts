@@ -10,11 +10,7 @@ interface Site {
 }
 const MANIFEST: { version: number; sites: Site[] } = JSON.parse(readFileSync(
   new URL('../../web/integrations/jav-sites.json', import.meta.url), 'utf8'));
-const MATCHES = MANIFEST.sites.flatMap(site => site.domains.flatMap(domain =>
-  [`// @match        https://${domain}/*`, `// @match        https://*.${domain}/*`])).join('\n');
-const SCRIPT = readFileSync(new URL('../../web/integrations/peach-jav.user.js', import.meta.url), 'utf8')
-  .replace('__PEACH_JAV_SITES__', JSON.stringify(MANIFEST))
-  .replace('// __PEACH_JAV_MATCHES__', MATCHES);
+const SCRIPT = readFileSync(new URL('../../web/integrations/peach-jav.user.js', import.meta.url), 'utf8');
 const TOKEN = 'test-only-peach-jav-secret-8b4d';
 const BASE = 'https://peach.example.invalid';
 const ROOT = '#peach-jav-action';

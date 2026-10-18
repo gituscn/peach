@@ -41,7 +41,7 @@ function BrowserForm({ initial, receipt }: { initial: State; receipt(message: st
   const ready = state.providers.some(item => item.key === provider && item.configured && item.target);
   return <Section title="浏览器添加 JAV">
     <Stack>
-      <div><ExternalLink href="/integrations/peach-jav.user.js">安装 Peach 用户脚本</ExternalLink></div>
+      <div><ExternalLink href="https://sleazyfork.org/zh-CN/scripts/600821">安装 Peach 用户脚本</ExternalLink></div>
       <div className="flex flex-col gap-1"><FieldLabel>浏览器添加的下载渠道</FieldLabel>
       <Select aria-label="浏览器添加的下载渠道" selectedKey={provider}
         onSelectionChange={key => setProvider(String(key))} isDisabled={Boolean(action.busy)}>
