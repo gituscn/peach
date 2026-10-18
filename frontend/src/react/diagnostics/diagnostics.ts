@@ -5,8 +5,12 @@ export interface DiagnosticCheck {
   label: string; status: string; reason: string; action: string; target: string | null;
   details: Record<string, unknown>;
 }
+export interface LibraryItem {
+  id: number; code: string | null; name: string; title: string; location: string; path: string;
+  duration: number | null; size: number | null;
+}
 export interface LibraryGroup {
-  label: string; status: string; count: number | null; items: Array<{ id: number; code: string | null }>;
+  label: string; status: string; count: number | null; items: LibraryItem[];
   truncated: boolean;
 }
 export interface DiagnosticReport {

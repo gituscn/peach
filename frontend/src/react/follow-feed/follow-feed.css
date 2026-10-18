@@ -526,7 +526,7 @@ body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-follo
   width: 14px;
   height: 14px;
   margin-right: 5px;
-  border-radius: var(--badge-radius);
+  border-radius: 0;
   object-fit: contain;
   vertical-align: -2px;
 }

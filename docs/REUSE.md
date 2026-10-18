@@ -170,9 +170,9 @@ Windows 连接清理复用 [CPython 3.14.7 的 Proactor 对象协议](https://gi
 
 已核对 sakuramedia `a10fcef8`（GPL-3.0）的诊断字段与提示组织，仅作产品参考，不复制源码。OpenAver `8cc17e50`（MIT）的 HTTP 健康探针不足以表达分项状态。[fastapi-health 0.4.0](https://pypi.org/project/fastapi-health/)（MIT）在离线试验中将状态字典视为真值；CLI、分级规则和脱敏仍需本项目处理，因此未引入。
 
-诊断页复用同一报告、TanStack Query、BoardUI 设置组合件及覆盖式滚动条。库健康参照 javm `dd0e6b62`（MIT）的计数→清单入口，采用 Peach 的资产、封面键与处理日志。来源证据复用 `performer_profile_followup` 成功落库来源与 `scraping_access.cooldown_state`，不复用 HTTP 200 作为内容健康。无新增依赖；本机只读试验已核对现有日志与成功记录。
+诊断页复用同一报告、TanStack Query、BoardUI 设置组合件。库健康参照 javm `dd0e6b62`（MIT）的计数→清单入口，采用 Peach 的资产、封面键与处理日志；作品清单复用现有 TanStack Table、BoardUI Table、排序与分页、跨页选择和复制动作，展示标题、文件名、番号、媒体库、完整路径、时长与大小。单组报告最多加载 500 项，完整计数与已载入数量分别显示。身份字段仅供本机诊断页面使用，分享诊断包继续排除库清单。来源证据复用 `performer_profile_followup` 成功落库来源与 `scraping_access.cooldown_state`，不复用 HTTP 200 作为内容健康。无新增依赖；本机只读试验已核对现有日志与成功记录。
 
-系统诊断作为配置分区，复用配置页签及深链。来源会话各自复用 BoardUI `SettingsCard`，由共用 `SiteMark` 读取已核对的本地 favicon 并提供失败回退；近期解析、历史成功和无记录分别显示。会话列表展示资料平台与连接服务；片商页面及按片商选择站点的路由不单列。默认链之外的可选来源有实际检查或冷却记录时展示。图标来源见 `resources/site-marks/ORIGIN.md`。无新增依赖或 ledger 写入。
+系统诊断作为配置分区，复用配置页签及深链。检查和来源状态复用 BoardUI `Chip`；来源会话各自复用 BoardUI `SettingsCard`，由共用 `SiteMark` 读取已核对的本地 favicon 并提供失败回退，图标保留方形画布；近期解析、历史成功和无记录分别显示。会话列表展示资料平台与连接服务；片商页面及按片商选择站点的路由不单列。默认链之外的可选来源有实际检查或冷却记录时展示。图标来源见 `resources/site-marks/ORIGIN.md`。无新增依赖或 ledger 写入。
 
 ## 资源索引器
 

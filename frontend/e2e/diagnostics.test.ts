@@ -8,6 +8,45 @@ describe('配置中的系统诊断', () => {
   let browser: Browser;
   installDesignBrowser(next => { browser = next; });
   for (const viewport of VIEWPORTS) {
+    it(`方形站标、状态标签与可识别的作品表格（${viewport.name}）`, { timeout: 60_000 }, async () => {
+      const opened = await visit(browser, '/settings/diagnostics', viewport, async page => {
+        await page.route('**/api/diagnostics', async route => {
+          const report = await (await route.fetch()).json();
+          report.checks.media_mounts = { label: '媒体挂载', status: 'warning', reason: '媒体目录不存在',
+            action: '检查媒体目录', target: '/settings/library', details: {} };
+          report.library.groups.cover = { label: '缺封面', status: 'ok', count: 31, truncated: false,
+            items: Array.from({ length: 31 }, (_, index) => ({ id: index + 1, code: null,
+              title: `演示条目 ${index + 1}`, name: `演示文件 ${index + 1}.mp4`,
+              path: `R:\\Media\\演示文件 ${index + 1}.mp4`, location: 'local', duration: 123, size: 1048576 })) };
+          await route.fulfill({ json: report });
+        });
+      });
+      try {
+        const { page } = opened;
+        const icon = page.locator('[data-diagnostic-source="minnano-av"] img');
+        await icon.waitFor();
+        assert.equal(await icon.evaluate(node => getComputedStyle(node).borderRadius), '0px');
+        const badge = page.locator('[data-diagnostic-check="media_mounts"] [data-diagnostic-status="warning"]');
+        await badge.waitFor();
+        assert.notEqual(await badge.evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)');
+        await page.locator('summary').filter({ hasText: '缺封面 · 31 项' }).click();
+        const table = page.getByRole('grid', { name: '缺封面', exact: true });
+        await table.waitFor();
+        assert.equal(await table.getByRole('row').count(), 21);
+        assert.ok((await table.innerText()).includes('演示文件 1.mp4'));
+        assert.ok((await table.innerText()).includes('R:\\Media\\演示文件 1.mp4'));
+        const pagination = page.getByRole('navigation', { name: '缺封面分页' });
+        await pagination.getByRole('button', { name: '下一页', exact: true }).click();
+        assert.equal(await table.getByRole('row').count(), 12);
+        assert.ok((await table.innerText()).includes('演示条目 21'));
+        assert.ok((await layout(page)).scrollWidth <= viewport.width);
+        assert.deepEqual(opened.problems, []);
+        await page.goto(new URL('/sources', page.url()).href);
+        const settingsIcon = page.locator('form[aria-label="MGStage"] img');
+        await settingsIcon.waitFor();
+        assert.equal(await settingsIcon.evaluate(node => getComputedStyle(node).borderRadius), '0px');
+      } finally { await opened.close(); }
+    });
     it(`配置导航停在搜索栏下方，分区切换保持正文可见（${viewport.name}）`, { timeout: 60_000 }, async () => {
       const opened = await visit(browser, '/settings/diagnostics', viewport);
       try {
