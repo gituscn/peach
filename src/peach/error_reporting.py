@@ -266,7 +266,7 @@ def _asyncio_fields(context) -> dict:
         fields["asyncio_callback"] = name
     tls = _code_name(type(protocol)) == "asyncio.sslproto.SSLProtocol"
     if tls:
-        protocol = getattr(protocol, "_app_protocol", None)
+        protocol = getattr(protocol, "_app_protocol", None) or protocol
     if protocol is not None and (name := _code_name(type(protocol))):
         fields["asyncio_protocol"] = name
         if name.startswith("uvicorn.protocols.http."):

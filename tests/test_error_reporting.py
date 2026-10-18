@@ -395,7 +395,7 @@ class ErrorReportingTests(unittest.TestCase):
         loop.default_exception_handler.assert_called_once()
 
     def asyncio_callback(self, error, *, module='asyncio.proactor_events',
-                         name='_call_connection_lost', business=False):
+                         name='_call_connection_lost', business=False, cleared=False):
         namespace = {'__name__': module, 'failure': error}
         if business:
             exec(compile('def fail():\n    raise failure\n', 'peach/network_fixture.py', 'exec'), namespace)
@@ -406,7 +406,7 @@ class ErrorReportingTests(unittest.TestCase):
         protocol_type = type('H11Protocol', (), {'__module__': 'uvicorn.protocols.http.h11_impl'})
         ssl_type = type('SSLProtocol', (), {'__module__': 'asyncio.sslproto'})
         transport._protocol = ssl_type()
-        transport._protocol._app_protocol = protocol_type()
+        transport._protocol._app_protocol = None if cleared else protocol_type()
         transport.private_url = 'https://private.example/?token=private-token'
         transport.private_path = 'D:/private/movie.mp4'
         loop = mock.Mock()
@@ -433,6 +433,19 @@ class ErrorReportingTests(unittest.TestCase):
         self.assertEqual(record['frames'][-1]['function'], '_call_connection_lost')
         for value in ('private.example', 'private-token', 'movie.mp4', 'private_url', 'private_path'):
             self.assertNotIn(value, json.dumps(record))
+        loop.default_exception_handler.assert_called_once()
+
+    def test_asyncio_tls_cleanup_keeps_protocol_class_after_application_detaches(self):
+        from peach import remote_reporting
+        error = ConnectionResetError(10054, 'connection reset')
+        error.winerror = 10054
+        with mock.patch.object(remote_reporting, 'send') as send:
+            loop = self.asyncio_callback(error, cleared=True)
+        send.assert_not_called()
+        record = self.records()[-1]
+        self.assertEqual(record['asyncio_protocol'], 'asyncio.sslproto.SSLProtocol')
+        self.assertTrue(record['asyncio_tls'])
+        self.assertNotIn('asyncio_connection_role', record)
         loop.default_exception_handler.assert_called_once()
 
     def test_asyncio_connection_faults_require_the_exact_cleanup_signature(self):
