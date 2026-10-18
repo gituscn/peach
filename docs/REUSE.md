@@ -140,6 +140,8 @@ Peach 播放器皮肤直接装饰 Video.js 10 的 light DOM：右侧控制组用
 
 字幕文件加载复用 `subtitles.to_webvtt`，接受 SRT、ASS、SSA、VTT，兼容已有的编码探测；4 MiB 以内的文件经 `/api/subtitles/convert` 转换后挂到当前 video 的 TextTrack，关闭播放器释放 Blob URL。字幕列表、CC 开关与外观选项按用户截图和 [YouTube 官方说明](https://support.google.com/youtube/answer/100078?hl=en) 组织；字体、字号、颜色、不透明度、背景、窗口与边缘样式保存在当前浏览器，时间轴仍由浏览器驱动。字幕文件不写 ledger，不保存到媒体目录。
 
+字幕面板复用播放器的选项行、描边勾选、设置齿轮和悬停表面；在线入口按当前作品的番号或片名自动检索，结果保留在当前播放会话，失败可重试。详情原生 `dialog` 只处理自身的 `cancel`，文件输入框冒泡的取消事件保留详情与字幕菜单（[浏览器事件说明](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/cancel_event)）。播放器模块加载期间只显示海报，原生控制条仅用于加载失败后的播放回退。桌面与手机回归覆盖首次加载、文件取消、菜单 Escape、结果加载及字幕外观。
+
 在线中文字幕只采用 [SubtitleCat](https://www.subtitlecat.com)，复用现有 httpx 与 BeautifulSoup 依赖。来源选择参考 [PotPlayer JAV 中文字幕插件](https://github.com/736368217/PotplayerJavChineseSubs_subtitlecat/tree/0b569fdc3bd2cb27fca2140858ad77bf6d7ddcb8)（MIT；仅参考公开协议与语言选择，不复制代码）。番号检索复用 `catalog_rules` 的规范化、查询变体与身份比较，结合 `feeds.scan_code` 读取结果标题；仅保留同一发行身份，再按每页六条读取详情。标题支持紧凑番号、语言和版本后缀；日期分隔符与未经确认的发行前缀保持区分。片名检索保留用户关键词。只列已有 `zh-CN`／`zh-TW` 文件的结果，最多检查前 60 条，翻页由用户触发；不触发生成翻译。下载限固定 HTTPS 主机、字幕路径与 4 MiB，复用现有转码器。2026-10-18 固定 20 个公开番号均取得中文文件；该小样本不代表全站或馆藏覆盖率，也不证明翻译准确。界面说明可能包含机翻，不声称人工翻译。ASSRT 不接入；JavSub.ai 在同批样本中有 8 个中文条目，7 个需购买、1 个标为免费，但下载返回 403，故不作为在线来源。无需凭据，不增加依赖，不写 ledger 或媒体目录。
 
 ## 分级诊断

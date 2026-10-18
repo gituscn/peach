@@ -137,7 +137,7 @@ export function attachStagePlayer(frame: HTMLElement, options: StagePlayerOption
   const video = document.createElement('video');
   if (options.id) video.id = options.id;
   video.className = 'video-js vjs-big-play-centered';
-  video.controls = true;
+  video.controls = false;
   video.setAttribute('playsinline', '');
   video.preload = 'metadata';
   if (options.poster) video.poster = options.poster;

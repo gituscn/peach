@@ -35,6 +35,27 @@ describe('播放器字幕', () => {
         await page.waitForFunction(() => document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')!.readyState >= 2);
         await page.locator('#stage video.vjs-tech').evaluate((video: HTMLVideoElement) => { video.currentTime = .25 });
         await menu(page);
+        const selected = page.locator('[data-subtitle-track][aria-checked="true"]');
+        const appearance = await selected.evaluate(button => {
+          const svg = button.querySelector('svg')!, label = button.querySelector('.vjs-peach-option-label')!;
+          return { fill: getComputedStyle(svg).fill, stroke: getComputedStyle(svg).stroke,
+            inset: label.getBoundingClientRect().left - button.getBoundingClientRect().left };
+        });
+        assert.equal(appearance.fill, 'none');
+        assert.equal(appearance.stroke, 'rgb(255, 255, 255)');
+        assert.ok(appearance.inset >= 48, JSON.stringify(appearance));
+        assert.equal(await page.locator('[data-subtitle-options] use').getAttribute('href'), '#i-settings');
+        assert.equal(await page.locator('[data-subtitle-options]').getAttribute('aria-label'), '字幕选项');
+        const cancelled = page.waitForEvent('filechooser');
+        await page.locator('[data-subtitle-file]').click();
+        await (await cancelled).setFiles([]);
+        await page.locator('input[type="file"][aria-label="加载字幕文件"]').dispatchEvent('cancel', { bubbles: true });
+        assert.equal(await page.locator('#stage').evaluate((dialog: HTMLDialogElement) => dialog.open), true);
+        await page.locator('[data-subtitle-file]').focus();
+        await page.keyboard.press('Escape');
+        await page.locator('.vjs-peach-settings-menu[aria-hidden="true"]').waitFor({ state: 'attached' });
+        assert.equal(await page.locator('#stage').evaluate((dialog: HTMLDialogElement) => dialog.open), true);
+        await menu(page);
         const chooser = page.waitForEvent('filechooser');
         await page.locator('[data-subtitle-file]').click();
         await (await chooser).setFiles({ name: '测试.chs.srt', mimeType: 'text/plain', buffer: Buffer.from(SRT) });
@@ -42,6 +63,7 @@ describe('播放器字幕', () => {
         await caption(page, '测试字幕');
         assert.equal(await page.locator('#stage .vjs-subtitles-control>button').evaluate(node => getComputedStyle(node, '::after').backgroundColor), await page.locator('#stage .vjs-play-progress').evaluate(node => getComputedStyle(node).backgroundColor));
         assert.equal(await page.locator('.vjs-peach-caption-line b').textContent(), '粗体');
+        await page.screenshot({ path: join(process.cwd(), `../build/subtitles-tracks-${viewport.name}.png`) });
         await page.locator('[data-subtitle-options]').click();
         await page.locator('[data-subtitle-style="size"]').click();
         await page.locator('[data-subtitle-value="150"]').click();
@@ -74,10 +96,16 @@ describe('播放器字幕', () => {
     });
   }
 
-  it('搜索结果在播放器内选文件并加载，重选同一文件复用会话字幕', { timeout: 60_000 }, async () => {
-    let downloads = 0;
-    const opened = await visit(browser, `/assets/${requiredEnv('PEACH_E2E_ITEM')}`, VIEWPORTS[0]!, async page => {
+  for (const viewport of VIEWPORTS) {
+  it(`${viewport.name}：自动搜索、返回结果与重复加载复用会话`, { timeout: 60_000 }, async () => {
+    let downloads = 0, searches = 0;
+    const opened = await visit(browser, `/assets/${requiredEnv('PEACH_E2E_ITEM')}`, viewport, async page => {
+      await page.route('**/api/item?**', async route => {
+        const response = await route.fetch(), item = await response.json();
+        return route.fulfill({ response, json: { ...item, code: 'ABP-758' } });
+      });
       await page.route('**/api/subtitles/search?**', route => {
+        searches++;
         assert.equal(new URL(route.request().url()).searchParams.get('q'), 'ABP-758');
         return route.fulfill({ json: { results: [{ id: 'test42', title: 'ABP-758 中文字幕', language: '简体中文', format: 'SRT' }], more: false } });
       });
@@ -92,15 +120,49 @@ describe('播放器字幕', () => {
       await menu(page);
       for (let index = 0; index < 2; index++) {
         await page.locator('[data-subtitle-search]').click();
-        await page.getByRole('searchbox', { name: '搜索字幕' }).fill('ABP-758');
-        await page.getByRole('searchbox', { name: '搜索字幕' }).press('Enter');
+        assert.equal(await page.locator('.vjs-peach-settings-menu').getByRole('searchbox').count(), 0);
+        await page.locator('[data-subtitle-result]').waitFor();
+        const inset = await page.locator('[data-subtitle-result]').evaluate(button =>
+          button.querySelector('span')!.getBoundingClientRect().left - button.getBoundingClientRect().left);
+        assert.ok(inset >= 16, `字幕结果左侧内距 ${inset}px`);
+        await page.screenshot({ path: join(process.cwd(), `../build/subtitles-search-${viewport.name}.png`) });
         await page.locator('[data-subtitle-result]').click();
+        if (index === 0) {
+          await page.locator('[data-subtitle-online]').waitFor();
+          await page.locator('[data-subtitle-back]').click();
+          await page.locator('[data-subtitle-result]').click();
+        }
         await page.locator('[data-subtitle-online]').click();
         await page.getByRole('menuitemradio', { name: 'ABP-758.chs.srt', exact: true }).waitFor();
       }
       await caption(page, '在线字幕');
       assert.equal(downloads, 1);
+      assert.equal(searches, 1);
       assert.equal(await page.locator('#stage video.vjs-tech > track').count(), 1);
+      assert.deepEqual(problems, []);
+    } finally { await opened.close() }
+  });
+  }
+
+  it('自动搜索失败可重试，空的中文批次可继续查看更多', { timeout: 60_000 }, async () => {
+    const offsets: string[] = [];
+    const opened = await visit(browser, `/assets/${requiredEnv('PEACH_E2E_ITEM')}`, VIEWPORTS[0]!, async page => {
+      await page.route('**/api/subtitles/search?**', route => {
+        offsets.push(new URL(route.request().url()).searchParams.get('offset')!);
+        if (offsets.length === 1) return route.fulfill({ contentType: 'application/json', body: '{' });
+        return route.fulfill({ json: { results: offsets.length === 2 ? [] : [{ id: 'next', title: '中文字幕', language: '简体中文', format: 'SRT' }], more: offsets.length === 2 } });
+      });
+    });
+    try {
+      const { page, problems } = opened;
+      await page.locator('#stage .vjs-peach-bezel').waitFor({ state: 'attached' });
+      await menu(page);
+      await page.locator('[data-subtitle-search]').click();
+      await page.locator('[data-subtitle-retry]').click();
+      await page.locator('[data-subtitle-more]').click();
+      await page.locator('[data-subtitle-result]').waitFor();
+      assert.deepEqual(offsets, ['0', '0', '6']);
+      assert.equal(await page.locator('.vjs-peach-settings-menu [aria-busy="true"]').count(), 0);
       assert.deepEqual(problems, []);
     } finally { await opened.close() }
   });

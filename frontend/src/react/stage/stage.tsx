@@ -113,7 +113,8 @@ function StageDialog({ view: current }: { view: View }) {
      keydown 上就处理掉了：那里 `preventDefault` 之后浏览器不再派 `cancel`。 */
   useLayoutEffect(() => {
     const dialog = ref.current!;
-    const cancel = (event: Event) => { event.preventDefault(); requestClose() };
+    // 文件选择框的 cancel 会冒泡；详情只处理自己的关闭请求。
+    const cancel = (event: Event) => { if (event.target === dialog) { event.preventDefault(); requestClose() } };
     dialog.addEventListener('cancel', cancel);
     return () => dialog.removeEventListener('cancel', cancel);
   }, []);

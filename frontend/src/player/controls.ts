@@ -323,7 +323,7 @@ export function mountPlayerQualityControl(
   const outside = (event: Event) => { if (!root.contains(event.target as Node)) close() };
   document.addEventListener('pointerdown', outside);
   root.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') { event.stopPropagation(); close(); toggle.focus() }
+    if (event.key === 'Escape' && isOpen()) { event.preventDefault(); event.stopPropagation(); close(); toggle.focus() }
     if (['ArrowDown', 'ArrowUp'].includes(event.key) && isOpen() && !(event.target instanceof HTMLInputElement)) {
       event.preventDefault();
       const buttons = [...menu.querySelectorAll<HTMLElement>('button:not([disabled]),input,a[href]')].filter(node => node.offsetParent !== null && !node.closest('[inert]'));

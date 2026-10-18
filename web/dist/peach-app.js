@@ -30986,6 +30986,8 @@ var hde = () => "<svg viewBox=\"0 0 36 36\" aria-hidden=\"true\"><path d=\"M11,1
 	query = "";
 	offset = 0;
 	results = [];
+	more = !1;
+	searched = !1;
 	constructor(e, t, n) {
 		this.player = e, this.video = t, this.panels = n, this.styles = mde(e.el(), t, this.cleanup.signal), this.cc = e.el().querySelector(".vjs-subtitles-control > button"), this.cc.innerHTML = hde(), this.cc.onclick = () => {
 			let e = this.tracks().find((e) => e.mode === "showing");
@@ -31029,7 +31031,7 @@ var hde = () => "<svg viewBox=\"0 0 36 36\" aria-hidden=\"true\"><path d=\"M11,1
 	}
 	show(e = 1) {
 		this.page = "tracks";
-		let t = this.tracks(), n = [null, ...t], r = this.panel(this.header("字幕", "<button type=\"button\" class=\"vjs-peach-caption-options\" data-subtitle-options>选项</button>") + `<div class="vjs-peach-panel-menu">${n.map((e, n) => {
+		let t = this.tracks(), n = [null, ...t], r = this.panel(this.header("字幕", `<button type="button" class="vjs-peach-caption-options" data-subtitle-options aria-label="字幕选项">${z("settings")}</button>`) + `<div class="vjs-peach-panel-menu">${n.map((e, n) => {
 			let r = e ? e.mode === "showing" : t.every((e) => e.mode !== "showing");
 			return `<button type="button" class="vjs-peach-menu-option" role="menuitemradio" aria-checked="${r}" data-subtitle-track="${n}"><span class="vjs-peach-option-check">${r ? z("check") : ""}</span><span class="vjs-peach-option-label">${B(e?.label || e?.language || (e ? "字幕" : "关闭"))}</span></button>`;
 		}).join("")}<button type="button" class="vjs-peach-caption-action" data-subtitle-file>加载字幕文件</button><button type="button" class="vjs-peach-caption-action" data-subtitle-search>在线搜索字幕</button></div><p class="vjs-peach-subtitle-status" data-subtitle-status role="status" hidden></p>`, () => {
@@ -31123,31 +31125,38 @@ var hde = () => "<svg viewBox=\"0 0 36 36\" aria-hidden=\"true\"><path d=\"M11,1
 		}
 	}
 	searchPanel() {
-		this.page = "search";
-		let e = this.panel(this.header("搜索中文字幕") + `<div class="vjs-peach-subtitle-search"><form data-subtitle-query role="search"><input type="search" aria-label="搜索字幕" placeholder="输入番号或片名" minlength="3" maxlength="200" value="${B(this.query || String(this.player.peachItem?.code || this.player.peachItem?.title || this.player.peachItem?.name || "").replace(/\.[^.]+$/, ""))}"><button type="submit" aria-label="搜索中文字幕">${z("search")}</button></form><p class="vjs-peach-subtitle-status" data-subtitle-status role="status" hidden></p><div data-subtitle-results></div><a href="https://www.subtitlecat.com" target="_blank" rel="noopener noreferrer">中文字幕由 SubtitleCat 提供，可能包含机翻</a></div>`, () => this.show(-1)), t = e.querySelector("form"), n = t.querySelector("input");
-		t.onsubmit = (r) => {
-			r.preventDefault(), t.getAttribute("aria-busy") !== "true" && (this.query = n.value.trim(), this.offset = 0, this.results = [], e.querySelector("[data-subtitle-results]").replaceChildren(), this.runSearch(e));
-		};
+		this.request?.abort(), this.page = "search";
+		let e = this.player.peachItem, t = String(e?.code || e?.title || String(e?.name || "").replace(/\.(mp4|mkv|avi|mov|webm|m4v|ts|wmv)$/i, "")).trim().slice(0, 200);
+		t !== this.query && (this.query = t, this.offset = 0, this.results = [], this.searched = !1);
+		let n = this.panel(this.header("搜索中文字幕") + "<div class=\"vjs-peach-subtitle-search\"><p class=\"vjs-peach-subtitle-status\" data-subtitle-status role=\"status\" hidden></p><div data-subtitle-results></div><a href=\"https://www.subtitlecat.com\" target=\"_blank\" rel=\"noopener noreferrer\">中文字幕由 SubtitleCat 提供，可能包含机翻</a></div>", () => {
+			this.request?.abort(), this.show(-1);
+		});
+		t.length < 3 ? this.status("当前作品没有可用于搜索的番号或片名") : this.searched ? this.searchResults(n) : this.runSearch(n, 0);
+	}
+	searchResults(e) {
+		let t = e.querySelector("[data-subtitle-results]");
+		t.innerHTML = this.results.map((e, t) => `<button type="button" class="vjs-peach-subtitle-result" data-subtitle-result="${t}"><span>${B(e.title)}</span><small>${B([e.language, e.format].filter(Boolean).join(" · "))}</small></button>`).join("") + (this.more ? "<button type=\"button\" class=\"vjs-peach-caption-action\" data-subtitle-more>更多字幕</button>" : ""), t.querySelectorAll("[data-subtitle-result]").forEach((e) => {
+			e.onclick = () => {
+				this.showFiles(this.results[Number(e.dataset.subtitleResult)]);
+			};
+		}), t.querySelector("[data-subtitle-more]")?.addEventListener("click", () => {
+			this.runSearch(e, this.offset + 6);
+		}), this.status(this.results.length ? `找到 ${this.results.length} 条中文字幕` : this.more ? "这批结果没有中文，可查看更多字幕" : "没有找到当前作品的中文字幕");
 	}
 	async runSearch(e, t = this.offset) {
-		let n = e.querySelector("form");
-		if (n.getAttribute("aria-busy") === "true") return;
-		let r = this.busy(), i = this.generation, a = n.querySelector("button"), o = e.querySelector("[data-subtitle-results]");
-		n.setAttribute("aria-busy", "true"), Ss(a), o.inert = !0, this.status("正在搜索字幕…", !1, !0);
+		if (e.getAttribute("aria-busy") === "true") return;
+		let n = this.busy(), r = this.generation, i = e.querySelector("[data-subtitle-more],[data-subtitle-retry]"), a = e.querySelector("[data-subtitle-results]");
+		e.setAttribute("aria-busy", "true"), i && Ss(i), a.inert = !0, this.status("正在搜索字幕…", !1, !0);
 		try {
-			let n = await It(`/api/subtitles/search?q=${encodeURIComponent(this.query)}&offset=${t}`, { signal: r });
-			if (r.aborted || i !== this.generation) return;
-			this.offset = t, this.results.push(...n.results), o.innerHTML = this.results.map((e, t) => `<button type="button" class="vjs-peach-subtitle-result" data-subtitle-result="${t}"><span>${B(e.title)}</span><small>${B([e.language, e.format].filter(Boolean).join(" · "))}</small></button>`).join("") + (n.more ? "<button type=\"button\" class=\"vjs-peach-caption-action\" data-subtitle-more>更多字幕</button>" : ""), o.querySelectorAll("[data-subtitle-result]").forEach((e) => {
-				e.onclick = () => {
-					this.showFiles(this.results[Number(e.dataset.subtitleResult)]);
-				};
-			}), o.querySelector("[data-subtitle-more]")?.addEventListener("click", () => {
-				this.runSearch(e, this.offset + 6);
-			}), this.status(this.results.length ? `找到 ${this.results.length} 条中文字幕` : n.more ? "这批结果没有中文，可查看更多字幕" : "没有找到中文字幕，换个番号试试");
-		} catch (e) {
-			!r.aborted && i === this.generation && this.status(e instanceof Error ? e.message : "字幕搜索失败", !0);
+			let i = await It(`/api/subtitles/search?q=${encodeURIComponent(this.query)}&offset=${t}`, { signal: n });
+			if (n.aborted || r !== this.generation) return;
+			this.offset = t, this.results.push(...i.results), this.more = i.more, this.searched = !0, this.searchResults(e);
+		} catch (i) {
+			!n.aborted && r === this.generation && (this.status(i instanceof Error ? i.message : "字幕搜索失败", !0), a.querySelector("[data-subtitle-more]")?.remove(), a.querySelector("[data-subtitle-retry]")?.remove(), a.insertAdjacentHTML("beforeend", "<button type=\"button\" class=\"vjs-peach-caption-action\" data-subtitle-retry>重试</button>"), a.querySelector("[data-subtitle-retry]").onclick = () => {
+				this.runSearch(e, t);
+			});
 		} finally {
-			n.removeAttribute("aria-busy"), Ss(a, !1), o.inert = !1;
+			e.removeAttribute("aria-busy"), i && Ss(i, !1), a.inert = !1;
 		}
 	}
 	async showFiles(e) {
@@ -31394,7 +31403,7 @@ function Cde(e, t, n = 0, r = null) {
 		a.contains(e.target) || y();
 	};
 	return document.addEventListener("pointerdown", P), a.addEventListener("keydown", (e) => {
-		if (e.key === "Escape" && (e.stopPropagation(), y(), s.focus()), ["ArrowDown", "ArrowUp"].includes(e.key) && _() && !(e.target instanceof HTMLInputElement)) {
+		if (e.key === "Escape" && _() && (e.preventDefault(), e.stopPropagation(), y(), s.focus()), ["ArrowDown", "ArrowUp"].includes(e.key) && _() && !(e.target instanceof HTMLInputElement)) {
 			e.preventDefault();
 			let t = [...l.querySelectorAll("button:not([disabled]),input,a[href]")].filter((e) => e.offsetParent !== null && !e.closest("[inert]"));
 			t[(t.indexOf(document.activeElement) + (e.key === "ArrowDown" ? 1 : t.length - 1)) % t.length]?.focus();
@@ -32288,6 +32297,7 @@ function nfe(e, t) {
 //#endregion
 //#region src/player/preview-player.ts
 function rfe(e, t, n) {
+	e.controls = !1;
 	let r = !1, i = null;
 	return sD().then((a) => {
 		if (r) return;
@@ -79691,7 +79701,7 @@ function WU(e, t) {
 	};
 	NU = o;
 	let s = document.createElement("video");
-	t.id && (s.id = t.id), s.className = "video-js vjs-big-play-centered", s.controls = !0, s.setAttribute("playsinline", ""), s.preload = "metadata", t.poster && (s.poster = t.poster), t.onError && s.addEventListener("error", t.onError), e.append(s);
+	t.id && (s.id = t.id), s.className = "video-js vjs-big-play-centered", s.controls = !1, s.setAttribute("playsinline", ""), s.preload = "metadata", t.poster && (s.poster = t.poster), t.onError && s.addEventListener("error", t.onError), e.append(s);
 	let c = dD(s, {
 		kind: n,
 		item: r,
@@ -80138,8 +80148,8 @@ function CW(e) {
 function zHe({ view: e }) {
 	let t = (0, S.useRef)(null);
 	(0, S.useLayoutEffect)(() => {
-		let e = t.current, n = (e) => {
-			e.preventDefault(), wW();
+		let e = t.current, n = (t) => {
+			t.target === e && (t.preventDefault(), wW());
 		};
 		return e.addEventListener("cancel", n), () => e.removeEventListener("cancel", n);
 	}, []);
