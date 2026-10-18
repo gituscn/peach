@@ -72720,13 +72720,6 @@ function $Re({ initial: e, receipt: t }) {
 			divided: !0,
 			children: /* @__PURE__ */ (0, C.jsx)(GA, { children: "馆藏与口味上传失败，自动重试。" })
 		}) : null,
-		o ? /* @__PURE__ */ (0, C.jsxs)(HA, {
-			divided: !0,
-			children: [/* @__PURE__ */ (0, C.jsx)("ul", {
-				className: "list-disc space-y-2 pl-5 text-body-2-regular text-text-secondary",
-				children: n.fields.map((e) => /* @__PURE__ */ (0, C.jsx)("li", { children: e }, e))
-			}), /* @__PURE__ */ (0, C.jsx)(WA, { children: "不含账号、设备、文件路径和浏览器历史记录等个人数据。" })]
-		}) : null,
 		i ? /* @__PURE__ */ (0, C.jsxs)(HA, {
 			divided: !0,
 			children: [
@@ -72737,7 +72730,7 @@ function $Re({ initial: e, receipt: t }) {
 					i.data.coverage.uncoded_items,
 					" 条无编号馆藏的汇总，约 ",
 					(i.bytes / 1024).toFixed(1),
-					" KiB。"
+					" KiB。不含账号、设备、文件路径和浏览器历史记录等个人数据。"
 				] }),
 				/* @__PURE__ */ (0, C.jsx)(XA, {
 					summary: "上传数据预览",
@@ -72749,7 +72742,7 @@ function $Re({ initial: e, receipt: t }) {
 						maxCharacters: 24e3
 					})
 				}),
-				u.length > 24e3 ? /* @__PURE__ */ (0, C.jsx)(WA, { children: "屏幕显示前 24,000 个字符，下载可查看完整内容。" }) : null,
+				u.length > 24e3 ? /* @__PURE__ */ (0, C.jsx)(WA, { children: "显示前 24,000 个字符，下载可查看完整内容。" }) : null,
 				/* @__PURE__ */ (0, C.jsx)(q, {
 					variant: "secondary",
 					onClick: p,
@@ -72758,7 +72751,7 @@ function $Re({ initial: e, receipt: t }) {
 				n.enabled ? null : /* @__PURE__ */ (0, C.jsx)(aP, {
 					isSelected: c,
 					onChange: l,
-					children: "我已查看字段与预览，同意上传馆藏与口味明细"
+					children: "我已查看上传预览，同意上传馆藏与口味明细"
 				})
 			]
 		}) : null,

@@ -7,7 +7,7 @@ const initial: LibrarySharingState = { enabled: false, available: true, schema: 
   fields: ['作品编号、标签、评分与全部偏好维度'], notice: '匿名处理后上传馆藏与各类偏好明细。' };
 
 describe('馆藏与口味分享的明确同意', () => {
-  it('开关始终可见，字段预览和明确同意完整后才能开启', async () => {
+  it('开关始终可见，上传预览和明确同意完整后才能开启', async () => {
     const fetcher = vi.fn(async (url: string) => ({ ok: true, json: async () => url.endsWith('/preview')
       ? { data: { library: [{ code: 'EXM-001' }], preferences: {}, coverage: { uncoded_items: 0 } }, bytes: 80, token: 'preview-token', schema: 4 }
       : { ...initial, enabled: true } }));
@@ -20,11 +20,12 @@ describe('馆藏与口味分享的明确同意', () => {
     await click(switches(host)[0]);
     expect(fetcher).not.toHaveBeenCalled();
     expect(switches(host)[0]?.checked).toBe(false);
-    expect(host.textContent).toContain(initial.fields[0]);
+    expect(host.textContent).not.toContain(initial.fields[0]);
     expect(host.querySelector('input[type="checkbox"]:not([role="switch"])')).toBeNull();
     await click(buttonNamed('预览上传内容', host));
     await settle();
     expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(host.textContent).toContain('KiB。不含账号、设备、文件路径和浏览器历史记录等个人数据。');
     expect((buttonNamed('同意并开启上传', host) as HTMLButtonElement).disabled).toBe(true);
     await click(host.querySelector('input[type="checkbox"]:not([role="switch"])'));
     await click(buttonNamed('同意并开启上传', host));

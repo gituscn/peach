@@ -44,7 +44,7 @@ describe('馆藏与口味分享', () => {
         assert.deepEqual(opened.problems, []);
       } finally { await opened.close() }
     });
-    it(`${viewport.name}：明细、风险、预览与独立开关可访问`, async () => {
+    it(`${viewport.name}：预览说明与独立开关可访问`, async () => {
       const posts: Record<string, unknown>[] = [];
       const state = { enabled: false, available: true, schema: 4,
         fields: ['作品编号、标签、人物、评分与全部偏好维度'],
@@ -77,6 +77,8 @@ describe('馆藏与口味分享', () => {
         const preview = region.getByLabel('馆藏与口味上传预览', { exact: true });
         await preview.waitFor();
         assert.equal(posts.length, 0);
+        assert.equal(await region.getByText(state.fields[0], { exact: true }).count(), 0);
+        assert.equal(await region.getByText(/当前预览包含.*不含账号、设备、文件路径和浏览器历史记录/).count(), 1);
         assert.match(await preview.innerText(), /EXM-001/);
         assert.match(await preview.innerText(), /performer/);
         assert.equal(await region.locator('[data-code-block]').count(), 1);
