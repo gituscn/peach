@@ -658,6 +658,33 @@ def _mark_record_holders(contract: ResourceSyncContract,
     return marked, reattached, [row for row in rows if int(row["id"]) not in kept]
 
 
+def _apply_missing_records(contract, state, report, checkpoint, resume_state):
+    """逐批复核失效记录，保存完成集合与累计回执。"""
+    saved = (resume_state or {}).get('apply_checkpoint') or {}
+    processed = set(saved.get('processed') or [])
+    report(checked=len(processed), total=len(state['vanished_ids']), message="正在逐条复核失效记录")
+    marked, reattached = list(saved.get('marked') or []), list(saved.get('reattached') or [])
+    purge = dict(saved.get('purge') or {'purged': 0, 'blocked': [], 'empty_dirs_removed': 0})
+    pending = [value for value in state['vanished_ids'] if value not in processed]
+    for offset in range(0, len(pending), 100):
+        selected = pending[offset:offset + 100]
+        added, attached, confirmed = _mark_record_holders(contract, _recheck_vanished(contract, selected))
+        marked.extend(added)
+        reattached.extend(attached)
+        if confirmed:
+            from .web_batch import purge_vanished_rows
+            result = purge_vanished_rows(contract, confirmed)
+            for field in ('purged', 'empty_dirs_removed'):
+                purge[field] += int(result.get(field) or 0)
+            purge['blocked'].extend(result.get('blocked') or [])
+        processed.update(selected)
+        report(checked=len(processed), total=len(state['vanished_ids']), message='正在处理失效记录')
+        if checkpoint and not checkpoint(apply_checkpoint=dict(processed=sorted(processed), marked=marked,
+                                                                reattached=reattached, purge=purge)):
+            raise InterruptedError('资源清理已停止')
+    return marked, reattached, purge
+
+
 def w_resource_sync_apply(contract: ResourceSyncContract, body, *, progress=None, checkpoint=None, resume_state=None):
     """处理这一轮检查报出的失效记录与空文件夹，再清孤儿缓存。
 
@@ -687,28 +714,8 @@ def w_resource_sync_apply(contract: ResourceSyncContract, body, *, progress=None
         return resume_state['apply_receipt']
     state = _completed_scan(contract, scan_id)
     report = progress or (lambda **_fields: None)
-    saved = (resume_state or {}).get('apply_checkpoint') or {}
-    processed = set(saved.get('processed') or [])
-    report(checked=len(processed), total=len(state['vanished_ids']), message="正在逐条复核失效记录")
-    marked, reattached = list(saved.get('marked') or []), list(saved.get('reattached') or [])
-    purge = dict(saved.get('purge') or {'purged': 0, 'blocked': [], 'empty_dirs_removed': 0})
-    pending = [value for value in state['vanished_ids'] if value not in processed]
-    for offset in range(0, len(pending), 100):
-        selected = pending[offset:offset + 100]
-        added, attached, confirmed = _mark_record_holders(contract, _recheck_vanished(contract, selected))
-        marked.extend(added)
-        reattached.extend(attached)
-        if confirmed:
-            from .web_batch import purge_vanished_rows
-            result = purge_vanished_rows(contract, confirmed)
-            for field in ('purged', 'empty_dirs_removed'):
-                purge[field] += int(result.get(field) or 0)
-            purge['blocked'].extend(result.get('blocked') or [])
-        processed.update(selected)
-        report(checked=len(processed), total=len(state['vanished_ids']), message='正在处理失效记录')
-        if checkpoint and not checkpoint(apply_checkpoint=dict(processed=sorted(processed), marked=marked,
-                                                                reattached=reattached, purge=purge)):
-            raise InterruptedError('资源清理已停止')
+    marked, reattached, purge = _apply_missing_records(
+        contract, state, report, checkpoint, resume_state)
     report(checked=0, total=None, message="正在删除空文件夹")
     dirs_removed, dir_errors = 0, 0
     for location, paths in state["empty_dirs"].items():

@@ -35,6 +35,25 @@ class DiscoveryMetadataTests(unittest.TestCase):
         self.cache = DiscoveryMetadata(self.path, api=self.api, clock=lambda: self.now[0])
         self.addCleanup(self.cache.stop)
 
+    def test_repeated_restart_keeps_checkpoint_before_the_next_item_finishes(self):
+        self.path.with_suffix('.job.json').write_text(json.dumps(dict(
+            job_id='original', status='running', codes=['EXM-001', 'EXM-002'], refresh=True,
+            started_at=100, completed=1, completed_codes=['EXM-001'], attempted_codes=['EXM-001'],
+            failed_codes=[], requests=3, bytes=120, active_seconds=10)), encoding='utf-8')
+        with patch.object(DiscoveryMetadata, '_run_batch'):
+            first = DiscoveryMetadata(self.path, api=self.api, clock=lambda: self.now[0])
+            first.job.thread.join(5)
+            first.stop()
+        saved = json.loads(self.path.with_suffix('.job.json').read_text(encoding='utf-8'))
+        self.assertEqual(saved['completed_codes'], ['EXM-001'])
+        self.assertEqual(saved['started_at'], 100)
+        with patch.object(self.api, 'movie', return_value={'number': 'EXM-002', 'tags': [], 'score': 4, 'duration': 120}) as movie:
+            second = DiscoveryMetadata(self.path, api=self.api, clock=lambda: self.now[0])
+            self.addCleanup(second.stop)
+            second.job.thread.join(5)
+        movie.assert_called_once_with('EXM-002', refresh=True)
+        self.assertEqual(second.job.snapshot()['completed'], 2)
+
     def test_sidecar_survives_restart_and_distinguishes_empty_unknown_and_stale(self):
         movie = {"number": "EXM-001", "tags": [], "score": "4.23", "duration": 180,
                  "preview_video_url": "https://example.invalid/secret",

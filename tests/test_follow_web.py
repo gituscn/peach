@@ -105,6 +105,32 @@ class FollowContractTests(unittest.TestCase):
         self.assertFalse(final['results'][0]['ok'])
         self.assertEqual(factory.call_count, 1)
 
+    def test_finished_page_checkpoint_resumes_without_another_page_request(self):
+        source = self._seed()
+        for backfill_all in (False, True):
+            with self.subTest(backfill_all=backfill_all):
+                saved = {}
+                def checkpoint(_job_id, *, saved=saved, **fields):
+                    saved.update(fields)
+                    if fields.get('results'):
+                        raise InterruptedError('停止于检查点')
+                    return True
+                job = SimpleNamespace(snapshot=lambda saved=saved: saved, checkpoint=checkpoint,
+                                      update=lambda *a, **k: True)
+                body = {'older': True, 'rewind': True, 'backfill_all': backfill_all}
+                result = {'source': source, 'ok': True, 'page': 3, 'exhausted': backfill_all}
+                with mock.patch.object(self.contract, 'follow_job', job), \
+                        mock.patch.object(web_follow, 'run_check', return_value=result) as check, \
+                        mock.patch.object(web_follow, '_check_payload', side_effect=lambda value: value):
+                    with self.assertRaises(InterruptedError):
+                        web_follow._run_follow_check(self.contract, body, 'original')
+                    self.assertEqual(saved['backfill_pages'], {str(source): 3})
+                    self.assertEqual(saved['results'][0]['source'], source)
+                    job.checkpoint = lambda *a, **k: True
+                    resumed = web_follow._run_follow_check(self.contract, body, 'original')
+                self.assertEqual(check.call_count, 1)
+                self.assertEqual(resumed['checked'], 1)
+
     def test_discovery_result_can_be_read_after_request_returns(self):
         started = self._post('/api/follow/resolve', {'background': True,
             'lines': ['https://rule34video.com/models/sample/']})

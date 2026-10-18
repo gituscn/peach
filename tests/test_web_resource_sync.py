@@ -317,6 +317,24 @@ class PurgeMissingTests(unittest.TestCase):
         self.assertEqual((result['purged'], result['vanished']), (2, 1))
         self.assertEqual(self.ids(), [1, 2, 4])
 
+    def test_apply_resumes_after_a_committed_chunk_with_cumulative_receipt(self):
+        saved = {}
+        def remember(**fields):
+            saved.update(fields)
+            if 'apply_checkpoint' in fields:
+                raise InterruptedError('停止于检查点')
+            return True
+        with self._synced():
+            scan = finish_scan(self.contract)
+            body = {'confirm': True, 'clean_cache': False, 'scan_id': scan['scan_id']}
+            with self.assertRaises(InterruptedError):
+                rm_sync.w_resource_sync_apply(self.contract, body, checkpoint=remember)
+            self.assertEqual(self.ids(), [1, 2, 4])
+            with mock.patch.object(rm_sync, '_recheck_vanished', wraps=rm_sync._recheck_vanished) as recheck:
+                result = rm_sync.w_resource_sync_apply(self.contract, body, resume_state=saved)
+        recheck.assert_not_called()
+        self.assertEqual((result['purged'], result['vanished']), (1, 1))
+
     def test_local_only_configuration_has_resource_check(self):
         with mock.patch.object(rm_sync, 'LOCATION_ROOT_DECLARATIONS', {'local': ('R:\\',)}):
             self.assertEqual(rm_sync.configured_resource_locations(), ('local',))

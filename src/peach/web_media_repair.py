@@ -139,6 +139,10 @@ def _advance(job, job_id: str, checked: int, *, skipped: bool) -> None:
         state["checked"] = max(state.get('checked', 0), checked)
         if skipped and checked > state.get('survey_checked', 0):
             state["skipped"] = state.get("skipped", 0) + 1
+        state['survey_checked'] = max(state.get('survey_checked', 0), checked)
+        saved = {key: state.get(key, 0) for key in ('checked', 'survey_checked', 'skipped')}
+    if not job.checkpoint(job_id, **saved):
+        raise InterruptedError('媒体检查已停止')
 
 
 def _reference_candidates(contract, asset_id: int, raw: str) -> list[str]:

@@ -266,6 +266,34 @@ def _prune_selection(planned: list[dict], body: dict) -> list[dict]:
     return [item for item in planned if item["id"] in requested]
 
 
+def _recheck_prune_links(planned, progress, checkpoint, resume_state):
+    """保存逐条重验结果，临时无法判定的链接留待重试。"""
+    saved = (resume_state or {}).get('prune_checks') or {}
+    confirmed = list(saved.get('confirmed') or [])
+    recovered = list(saved.get('recovered') or [])
+    completed = set(saved.get('completed') or [])
+    for index, item in enumerate(planned):
+        if item['id'] in completed:
+            continue
+        if progress:
+            progress(checked=index, total=len(planned),
+                     message=f"重验失效链接：已检查 {index} / {len(planned)} 条")
+        status, note = _probe(item['url'])
+        verdict = link_verdict(status, note)
+        confirmed[:] = [row for row in confirmed if row['id'] != item['id']]
+        recovered[:] = [row for row in recovered if row['id'] != item['id']]
+        if verdict == 'gone':
+            confirmed.append({**item, 'note': _note(status, note)})
+        else:
+            recovered.append(item)
+        if verdict != 'unclear':
+            completed.add(item['id'])
+        if checkpoint and not checkpoint(prune_checks=dict(confirmed=confirmed, recovered=recovered,
+                completed=sorted(completed)), checked=index + 1, total=len(planned)):
+            raise InterruptedError('链接清理已停止')
+    return confirmed, recovered
+
+
 def w_links_prune(contract: LinkContract, body, *, progress=None, checkpoint=None, resume_state=None):
     """删掉上一次检查判定为 gone 的链接。
 
@@ -295,18 +323,7 @@ def w_links_prune(contract: LinkContract, body, *, progress=None, checkpoint=Non
     except ValueError as error:
         return {"ok": False, "error": str(error)}
 
-    confirmed, recovered = [], []
-    for index, item in enumerate(planned):
-        if progress:
-            progress(checked=max(index, (resume_state or {}).get('checked', 0)), total=len(planned),
-                     message=f"重验失效链接：已检查 {index} / {len(planned)} 条")
-        status, note = _probe(item["url"])
-        if link_verdict(status, note) == "gone":
-            confirmed.append({**item, "note": _note(status, note)})
-        else:
-            recovered.append(item)
-        if checkpoint and not checkpoint(checked=max(index + 1, (resume_state or {}).get('checked', 0)), total=len(planned)):
-            raise InterruptedError('链接清理已停止')
+    confirmed, recovered = _recheck_prune_links(planned, progress, checkpoint, resume_state)
 
     removed = marked = 0
     if progress:

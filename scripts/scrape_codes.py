@@ -902,7 +902,8 @@ def main(argv: list[str] | None = None, *, provider=None) -> int:
         return code
 
 
-def _scrape(parser, args, handle, *, provider=None, resources) -> int:
+def _scrape_batch(parser, args):
+    """按参数签名定位同一批次及其输出。"""
     sources = None
     if args.sources is not None:
         try:
@@ -924,6 +925,27 @@ def _scrape(parser, args, handle, *, provider=None, resources) -> int:
     completed = set(saved.get('completed') or [])
     if completed and not output.is_file():
         parser.error('续跑候选文件未取得，请恢复原文件或使用 --no-resume')
+    return sources, profile, signature, active_path, output, checkpoint_path, saved, completed
+
+
+def _prepare_scrape_output(parser, args, connection, saved, signature, output, errors_path, completed):
+    """固定原批次番号，并保留成功番号的候选行。"""
+    codes = _load_codes(connection, args, parser)
+    if saved and saved.get('signature') != signature:
+        parser.error('续跑参数与原批次不一致，请使用原参数或 --no-resume')
+    if saved.get('codes'):
+        by_code = {normalise_code_key(row[0]): row for row in codes}
+        codes = [by_code[code] for code in saved['codes'] if code in by_code]
+    previous_rows = read_rows(output) if saved and output.is_file() else []
+    previous_rows = [row for row in previous_rows if row['query'] in completed]
+    write_rows(output, FIELDS, previous_rows, atomic=True)
+    previous_errors = read_rows(errors_path) if saved and errors_path.is_file() else []
+    write_rows(errors_path, ERROR_FIELDS, previous_errors, atomic=True)
+    return codes, len(previous_rows), len(previous_errors)
+
+
+def _scrape(parser, args, handle, *, provider=None, resources) -> int:
+    sources, profile, signature, active_path, output, checkpoint_path, saved, completed = _scrape_batch(parser, args)
     error_name = output.name.replace("metadata-field-candidates-", "metadata-source-errors-", 1)
     if error_name == output.name:
         error_name = output.stem + "-errors.csv"
@@ -954,30 +976,18 @@ def _scrape(parser, args, handle, *, provider=None, resources) -> int:
     resources.callback(connection.close)
     # 用户在复核页收录过的 genre 这一批就当已知词，不再作为未收录回来问一遍。
     genre_decisions = load_genre_decisions(connection)
-    codes = _load_codes(connection, args, parser)
-    if saved and saved.get('signature') != signature:
-        connection.close()
-        close_log()
-        parser.error('续跑参数与原批次不一致，请使用原参数或 --no-resume')
-    if saved.get('codes'):
-        by_code = {normalise_code_key(row[0]): row for row in codes}
-        codes = [by_code[code] for code in saved['codes'] if code in by_code]
+    codes, groups_written, errors_written = _prepare_scrape_output(
+        parser, args, connection, saved, signature, output, errors_path, completed)
     def save_progress(status='active'):
         record = dict(signature=signature, output=str(output.resolve()), status=status,
                       completed=sorted(completed), codes=[normalise_code_key(row[0]) for row in codes],
                       health=health, unmapped=list(unmapped_genres.items()))
         atomic_write_text(checkpoint_path, json.dumps(record, ensure_ascii=False))
         atomic_write_text(active_path, json.dumps(record, ensure_ascii=False))
-    previous_rows = read_rows(output) if saved and output.is_file() else []
-    previous_rows = [row for row in previous_rows if row['query'] in completed]
-    write_rows(output, FIELDS, previous_rows, atomic=True)
-    previous_errors = read_rows(errors_path) if saved and errors_path.is_file() else []
-    write_rows(errors_path, ERROR_FIELDS, previous_errors, atomic=True)
     save_progress()
     log(f"字段候选批次：profile {profile}，番号 {len(codes)}，来源 {','.join(covered)}；只读查询，不写 ledger")
 
     throttle = _Throttle(health)
-    groups_written, errors_written = len(previous_rows), len(previous_errors)
     stopped: JobPolicyError | None = None
     # 流式写：两个文件同时开着，行在长循环里边跑边落盘，中途还有 guard.check()
     # 打断点。write_rows 收的是完整行集合，改用它等于「跑完才落盘」，被打断就全丢。
