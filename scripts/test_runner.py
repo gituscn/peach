@@ -413,7 +413,8 @@ def changed_contents(root: Path, base: str, paths: Iterable[str]) -> dict:
             continue
         try:
             raw = test_evidence.git(root, "diff", "--raw", base, "--", path)
-            if raw and len(raw.split()) >= 2 and raw.split()[0].lstrip(":") != raw.split()[1]:
+            modes = [part.lstrip(":") for part in raw.split()[:2]]
+            if "120000" in modes or (len(modes) == 2 and "000000" not in modes and modes[0] != modes[1]):
                 result[path] = (None, None)
                 continue
             result[path] = (test_evidence.git(root, "show", f"{base}:{path}"),
