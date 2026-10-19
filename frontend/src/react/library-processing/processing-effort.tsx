@@ -39,24 +39,13 @@ function EffortFlow({ animate }: { animate: boolean }) {
   </div>;
 }
 
-export function ProcessingMode({ value, busy, onChange, animate = true }: {
+export function ProcessingEffort({ value, busy, onChange, animate = true }: {
   value: ProcessingSpeed; busy: boolean; onChange(value: ProcessingSpeed): void; animate?: boolean;
 }) {
-  const trigger = useRef<HTMLButtonElement>(null);
-  const [open, setOpen] = useState(false);
   const index = Math.max(0, MODES.indexOf(value));
   const [draft, setDraft] = useState(index);
   useEffect(() => { if (!busy) setDraft(index) }, [index, busy]);
-  return <>
-    <span className="processing-effort-trigger" data-speed={value}>
-    <Button ref={trigger} size="small" variant="secondary"
-      aria-label={`处理速度：${LABELS[index]}`}
-      aria-haspopup="dialog" aria-expanded={open} aria-disabled={busy}
-      leadingIcon={SPEED_ICONS[index]} trailingIcon={RiArrowDownSLine}
-      onClick={() => { if (!busy) setOpen(!open) }}>{LABELS[index]}</Button>
-    </span>
-    <Popover triggerRef={trigger} isOpen={open} onOpenChange={setOpen} placement="top start" offset={8} className={MENU_POPOVER_SURFACE}>
-      <MenuDialog aria-label="处理速度" className="processing-effort-panel flex flex-col gap-3 p-2 outline-none">
+  return <div className="processing-effort-panel flex flex-col gap-3 p-2">
         <p className="text-body-medium"><span className="text-text-tertiary">处理强度 </span>{LABELS[draft]}</p>
         <div className="processing-effort-scale text-caption-1-regular text-text-tertiary" aria-hidden="true">
           <span data-selected={draft === 0 || undefined}><Snail />最慢</span>
@@ -76,6 +65,26 @@ export function ProcessingMode({ value, busy, onChange, animate = true }: {
           </div>
         </Slider>
         <div className="flex justify-between text-caption-1-regular text-text-tertiary"><span>占用少</span><span>占用多</span></div>
+    </div>;
+}
+
+export function ProcessingMode({ value, busy, onChange, animate = true }: {
+  value: ProcessingSpeed; busy: boolean; onChange(value: ProcessingSpeed): void; animate?: boolean;
+}) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const index = Math.max(0, MODES.indexOf(value));
+  return <>
+    <span className="processing-effort-trigger" data-speed={value}>
+      <Button ref={trigger} size="small" variant="secondary"
+        aria-label={`处理速度：${LABELS[index]}`}
+        aria-haspopup="dialog" aria-expanded={open} aria-disabled={busy}
+        leadingIcon={SPEED_ICONS[index]} trailingIcon={RiArrowDownSLine}
+        onClick={() => { if (!busy) setOpen(!open) }}>{LABELS[index]}</Button>
+    </span>
+    <Popover triggerRef={trigger} isOpen={open} onOpenChange={setOpen} placement="top start" offset={8} className={MENU_POPOVER_SURFACE}>
+      <MenuDialog aria-label="处理速度" className="outline-none">
+        <ProcessingEffort value={value} busy={busy} onChange={onChange} animate={animate} />
       </MenuDialog>
     </Popover>
   </>;

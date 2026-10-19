@@ -16,10 +16,17 @@ describe('扫描与采集控制', () => {
           { id: 'collect', label: '采集外部资料与封面', status: 'current' }],
         current_asset_name: '', current_action: '', stage: '',
         stalled: false, waited_seconds: 0,
+        traffic: { used_bytes: 0, estimated_min_bytes: 1048576, estimated_max_bytes: 8388608,
+          metered_used_bytes: 0, metered_estimated_min_bytes: 0, metered_estimated_max_bytes: 4194304,
+          partial: true, unknown_files: true,
+          sources: [{ key: 'drive-a', label: '示例网盘 A', root: 'A:\\Media', location: '115', metered: true,
+            used_bytes: 0, estimated_min_bytes: 0, estimated_max_bytes: 4194304, unobserved: ['挂载缓存与预读未观测'] },
+          { key: 'drive-b', label: '示例网盘 B', root: 'B:\\Media', location: 'pikpak', metered: false,
+            used_bytes: 0, estimated_min_bytes: 1048576, estimated_max_bytes: 4194304, unobserved: ['挂载缓存与预读未观测'] }] },
         eta_kind: 'historical', eta_initial: true, eta_seconds_min: 1200, eta_seconds_max: 2400 };
       const writes: Record<string, unknown>[] = [];
       const opened = await visit(browser, '/data-cleanup', viewport, async page => {
-        await page.route('**/api/library-processing', async route => {
+        await page.route('**/api/library-processing{,?*}', async route => {
           if (route.request().method() === 'POST') {
             const body = route.request().postDataJSON();
             writes.push(body);
@@ -40,6 +47,7 @@ describe('扫描与采集控制', () => {
       try {
         await card.waitFor();
         await settle(page);
+        assert.equal(await card.locator('[data-processing-controls]').count(), 0);
         await card.getByRole('button', { name: '同步媒体库', exact: true }).click();
         const dialog = page.getByRole('dialog', { name: '同步媒体库', exact: true });
         await dialog.waitFor();
@@ -48,18 +56,51 @@ describe('扫描与采集控制', () => {
         const modalLayout = await layout(page);
         assert.ok(modalLayout.scrollWidth <= modalLayout.viewportWidth, JSON.stringify(modalLayout));
         assert.deepEqual(modalLayout.offenders, []);
-        const optionFits = await dialog.locator('label').evaluateAll(labels => labels.every(label => {
-          const text = label.querySelector('span[aria-hidden="true"]')!.getBoundingClientRect();
-          const box = label.getBoundingClientRect();
-          return text.top >= box.top && text.bottom <= box.bottom && text.right <= box.right;
-        }));
-        assert.equal(optionFits, true, '处理模式文字应保持单行并落在控件内');
+        await dialog.getByText('预计总流量', { exact: true }).waitFor();
+        const centering = await dialog.locator('.processing-effort-panel').evaluate(el => {
+          const panel = el.getBoundingClientRect();
+          const modal = el.closest('dialog')!.getBoundingClientRect();
+          return Math.abs((panel.left + panel.right) / 2 - (modal.left + modal.right) / 2);
+        });
+        assert.ok(centering < 1, `处理强度面板居中偏差 ${centering}px`);
+        const footer = await dialog.locator('.geist-modal-footer').evaluate(el => ({ display: getComputedStyle(el).display, padding: getComputedStyle(el).padding }));
+        assert.equal(footer.display, 'flex');
+        assert.notEqual(footer.padding, '0px');
+        const disclosure = dialog.locator('summary');
+        assert.equal(await disclosure.getAttribute('aria-expanded'), 'false');
+        assert.equal(await disclosure.locator('svg').count(), 1);
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await dialog.getByText('查看明细', { exact: true }).click();
+        assert.equal(await disclosure.getAttribute('aria-expanded'), 'true');
+        const sources = dialog.locator('[data-processing-traffic] li');
+        assert.match(await sources.nth(0).innerText(), /示例网盘 A[\s\S]*代理/);
+        assert.match(await sources.nth(1).innerText(), /示例网盘 B[\s\S]*直连/);
+        assert.equal(await sources.locator('svg, img').count(), 2);
+        assert.equal((await dialog.innerText()).includes('未观测'), false);
+        assert.match(await dialog.innerText(), /1-8MB/);
+        const collapse = dialog.locator('.ui-fcollapse');
+        const transition = await collapse.evaluate(el => ({ property: getComputedStyle(el).transitionProperty, duration: getComputedStyle(el).transitionDuration }));
+        assert.equal(transition.property, 'height');
+        assert.notEqual(transition.duration, '0s');
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        assert.equal(await collapse.evaluate(el => getComputedStyle(el).transitionProperty), 'none');
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await disclosure.click();
+        await page.waitForFunction(() => !document.querySelector('dialog [data-processing-traffic] details')?.hasAttribute('open'));
+        await disclosure.click();
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        const startupSlider = dialog.getByRole('slider');
+        await startupSlider.press('Home');
         await dialog.screenshot({ path: path.join(artifacts, `${viewport.name}-startup.png`) });
-        await dialog.getByRole('radio', { name: '低占用', exact: true }).check();
         await dialog.getByRole('button', { name: '同步媒体库', exact: true }).click();
         await card.getByText('预计剩余约 20–40 分钟（粗估）', { exact: true }).waitFor();
         assert.equal(writes[0]?.speed_mode, 'low');
         const dock = page.locator('#toasts [data-processing-dock]');
+        await dock.locator('[data-processing-traffic]').waitFor();
+        state.traffic = { ...state.traffic, used_bytes: 2097152, metered_used_bytes: 1048576,
+          estimated_min_bytes: 2097152, metered_estimated_min_bytes: 1048576, unknown_files: false,
+          sources: state.traffic.sources.map(source => ({ ...source, used_bytes: 1048576, estimated_min_bytes: 1048576 })) };
+        await dock.getByText('约 2MB', { exact: true }).waitFor();
         const pause = dock.getByRole('button', { name: '暂停', exact: true });
         assert.equal(await pause.innerText(), '');
         assert.equal(await pause.locator('svg').count(), 1);
@@ -114,7 +155,7 @@ describe('扫描与采集控制', () => {
         assert.ok(writes.some(body => body.action === 'resume' && body.job_id === 'controlled'));
         assert.ok(writes.some(body => body.action === 'set_speed' && body.speed_mode === 'standard'));
         // 同步入口在后台任务期间保持忙态；这里只等待有限的控制请求结束。
-        await settle(page, 'section[aria-label="扫描与采集"] [data-processing-controls]');
+        await settle(page, 'section[aria-label="扫描与采集"] [data-processing-traffic]');
         const measured = await layout(page);
         assert.ok(measured.scrollWidth <= measured.viewportWidth, JSON.stringify(measured));
         assert.deepEqual(measured.offenders, []);
@@ -123,7 +164,28 @@ describe('扫描与采集控制', () => {
         await page.goto(new URL('/', page.url()).href);
         assert.equal(await page.locator('[data-library-completion]').count(), 0, '运行期间首页由常驻任务卡承接进度');
         await dock.getByRole('button', { name: '暂停', exact: true }).waitFor();
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await dock.getByText('查看明细', { exact: true }).click();
+        assert.equal(await dock.locator('summary').getAttribute('aria-expanded'), 'true');
+        const expandedHeight = (await dock.boundingBox())!.height;
+        const noticeMotion = await dock.evaluate(el => ({
+          frame: getComputedStyle(el.querySelector('.processing-notice-fold')!).transitionProperty,
+          arrow: getComputedStyle(el.querySelector('[data-processing-toggle] > svg')!).transitionProperty,
+          arrowDuration: getComputedStyle(el.querySelector('[data-processing-toggle] > svg')!).transitionDuration,
+        }));
+        assert.ok(noticeMotion.frame.includes('height'));
+        assert.equal(noticeMotion.arrow, 'transform');
+        assert.notEqual(noticeMotion.arrowDuration, '0s');
         await dock.getByRole('button', { name: '收起任务详情' }).click();
+        assert.equal(await dock.locator('summary').getAttribute('aria-expanded'), 'false');
+        await page.waitForFunction(() => !document.querySelector('#toasts [data-processing-dock] details')?.hasAttribute('open'));
+        assert.ok((await dock.boundingBox())!.height < expandedHeight);
+        await dock.getByRole('button', { name: '展开任务详情' }).click();
+        assert.equal(await dock.locator('summary').getAttribute('aria-expanded'), 'false');
+        await dock.getByRole('button', { name: '收起任务详情' }).click();
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        assert.equal(await dock.locator('.processing-notice-fold').evaluate(el => getComputedStyle(el).transitionProperty), 'none');
+        assert.equal(await dock.locator('[data-processing-traffic]').isVisible(), true);
         const fixed = await dock.boundingBox();
         await dock.hover();
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));

@@ -1,15 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { RiArrowDownSLine, RiDatabase2Line, RiGlobalLine, RiHardDrive2Line } from '@remixicon/react';
 import { Popover } from 'react-aria-components';
 import { Button } from '@/components/base/buttons/button';
 import { MENU_ITEM, MENU_ITEM_INTERACTIVE, MENU_POPOVER_SURFACE } from '@/components/base/dropdown/menu-styles';
 import { cx } from '@/utils/cx';
-import { formModal, iconSwitchHtml } from '@peach/legacy/ui';
+import { formModal } from '@peach/legacy/ui';
 import { MenuDialog } from '../components/menu-dialog';
 import { busyProps } from '../settings/use-action';
-import type { LibraryProcessingCommand, ProcessingSpeed } from './library-processing';
+import { errorMessage } from '../../api';
+import { fetchProcessingEstimate, type LibraryProcessingCommand, type ProcessingSpeed, type ProcessingTraffic } from './library-processing';
+import { ProcessingEffort } from './processing-effort';
+import { TrafficProgress } from './processing-traffic';
 
-export const RESOURCE_NOTICE_KEY = 'peach.library-processing.resource-notice.v1';
+function ProcessingPrompt({ command, speed, dialog, onSpeed, busy }: {
+  command: LibraryProcessingCommand; speed: ProcessingSpeed; dialog: ReturnType<typeof formModal>;
+  onSpeed(value: ProcessingSpeed): void; busy: boolean;
+}) {
+  const [mode, setMode] = useState(speed);
+  const [traffic, setTraffic] = useState<ProcessingTraffic>();
+  const [failure, setFailure] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchProcessingEstimate(command, controller.signal).then(result => {
+      if (!result.traffic) throw new Error('服务端未提供流量预估');
+      if (!controller.signal.aborted) setTraffic(result.traffic);
+    }).catch(error => {
+      if (!controller.signal.aborted) setFailure(errorMessage(error));
+    }).finally(() => { if (!controller.signal.aborted) dialog.confirmButton.disabled = false });
+    return () => controller.abort();
+  }, [command, dialog]);
+  return <div className="flex flex-col gap-4">
+    <div className="flex justify-center"><ProcessingEffort value={mode} busy={busy} onChange={value => { setMode(value); onSpeed(value) }} /></div>
+    {traffic ? <TrafficProgress traffic={traffic} initial />
+      : <p role="status" className="text-body-2-regular text-text-secondary">{failure ? `流量预估未取得：${failure}` : '正在估算流量…'}</p>}
+  </div>;
+}
 
 /** 扫描和已有作品补全共用资料流水线，视频预览由媒体库设置决定。 */
 export function ProcessingActions({ busy, scan = false, metadataOnly = false, speedMode = 'standard', onRun }: {
@@ -18,6 +44,8 @@ export function ProcessingActions({ busy, scan = false, metadataOnly = false, sp
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const prompt = useRef<ReturnType<typeof formModal> | null>(null);
+  const [promptView, setPromptView] = useState<{ host: HTMLElement; dialog: ReturnType<typeof formModal>; command: LibraryProcessingCommand } | null>(null);
+  const selectedSpeed = useRef(speedMode);
   useEffect(() => () => prompt.current?.close(), []);
   const [open, setOpen] = useState(false);
   const primary: { label: string; icon: typeof RiDatabase2Line; command: LibraryProcessingCommand } = { label: scan ? '同步媒体库' : '同步这些影片', icon: RiDatabase2Line,
@@ -31,32 +59,34 @@ export function ProcessingActions({ busy, scan = false, metadataOnly = false, sp
   const run = (command: LibraryProcessingCommand) => {
     if (busy) return;
     setOpen(false);
-    let acknowledged = false;
-    try { acknowledged = localStorage.getItem(RESOURCE_NOTICE_KEY) === 'seen' } catch { /* 存储不可用时保留提示 */ }
-    if (!scan || acknowledged || command.stage === 'metadata') {
+    if (!scan) {
       void Promise.resolve(onRun(command)).catch(() => { /* 错误由任务入口留在原位 */ });
       return;
     }
     if (prompt.current) return;
+    selectedSpeed.current = speedMode;
     const previews = command.stage === 'previews';
-    const title = previews ? '生成视频预览' : command.stage === 'scan' ? '扫描媒体文件' : '同步媒体库';
+    const title = previews ? '生成视频预览' : command.stage === 'scan' ? '扫描媒体文件'
+      : command.stage === 'metadata' ? '补全影片资料' : command.stage === 'collect' ? '同步已入库影片' : '同步媒体库';
     const dialog = formModal({
       title,
       description: previews
         ? '生成视频预览会读取视频并占用处理器，可能让电脑变慢。需要同时使用电脑时，可选择低占用模式。'
-        : `处理会读取媒体文件${command.stage === 'scan' ? '' : metadataOnly ? '并下载资料' : '、下载资料并生成视频预览'}，可能让电脑变慢。需要同时使用电脑时，可选择低占用模式。`,
-      body: iconSwitchHtml('processing-speed', '处理模式', [['low', '低占用'], ['standard', '标准'], ['high', '全速']], speedMode, { text: true }),
+        : `处理会读取媒体文件${command.stage === 'scan' ? '' : metadataOnly || command.stage === 'metadata' ? '并下载资料' : '、下载资料并生成视频预览'}，可能让电脑变慢。需要同时使用电脑时，可选择低占用模式。`,
+      body: '<div class="peach-react" data-processing-prompt></div>',
       confirmLabel: title,
+      confirmDisabled: true,
       onConfirm: async () => {
-        const selected = dialog.dialog.querySelector<HTMLInputElement>('input[name="processing-speed"]:checked')?.value;
-        await onRun({ ...command, speed_mode: selected === 'low' ? 'low' : selected === 'high' ? 'high' : 'standard' });
-        try { localStorage.setItem(RESOURCE_NOTICE_KEY, 'seen') } catch { /* 本次启动照常完成 */ }
+        await onRun({ ...command, ...(selectedSpeed.current === speedMode ? {} : { speed_mode: selectedSpeed.current }) });
       },
     });
     prompt.current = dialog;
-    void dialog.done.then(() => { if (prompt.current === dialog) prompt.current = null });
+    setPromptView({ host: dialog.dialog.querySelector<HTMLElement>('[data-processing-prompt]')!, dialog, command });
+    void dialog.done.then(() => { if (prompt.current === dialog) { prompt.current = null; setPromptView(null) } });
   };
   return <>
+    {promptView ? createPortal(<ProcessingPrompt command={promptView.command} dialog={promptView.dialog}
+      speed={speedMode} busy={busy} onSpeed={value => { selectedSpeed.current = value }} />, promptView.host) : null}
     <span data-button-group data-split-button data-variant="primary">
       <Button leadingIcon={primary.icon} {...busyProps(busy)} onClick={() => run(primary.command)}>{primary.label}</Button>
       <Button ref={trigger} iconOnly leadingIcon={RiArrowDownSLine} aria-label="更多同步方式"

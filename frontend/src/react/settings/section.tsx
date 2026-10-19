@@ -3,7 +3,7 @@
  * 外框取 BoardUI 设置弹层的 `SettingsSectionLabel` + `SettingsCard`，开关行直接用 `SettingsRow`。
  * 注册表里没有折叠，它用 BoardUI token 组合，差异登记在 `boardui/ORIGIN.md`。
  * 提示与进度条另有页面共用的一份，在 `../components/`。 */
-import { useId, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ComponentType, FormEvent, MouseEvent, ReactNode } from 'react';
 import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 import { setCollapseOpen } from '@peach/legacy/ui';
@@ -116,14 +116,19 @@ export function Fact({ term, children }: { term: ReactNode; children: ReactNode 
 /** 展开正文。原生 `details` 给键盘与无障碍语义；开合交给共用 Collapse 的 `setCollapseOpen`，
  *  它给正文外层挂上 `ui-kit/collapse.css` 的 `.ui-fcollapse` 让高度过渡。内边距放在里层，高度才能收到 0。 */
 export function Disclosure(
-  { summary, defaultOpen = false, children, trailing = false, onOpenChange, contentClassName }:
-  { summary: ReactNode; defaultOpen?: boolean; children: ReactNode; trailing?: boolean; onOpenChange?(open: boolean): void; contentClassName?: string },
+  { summary, defaultOpen = false, isOpen, children, trailing = false, onOpenChange, contentClassName }:
+  { summary: ReactNode; defaultOpen?: boolean; isOpen?: boolean; children: ReactNode; trailing?: boolean; onOpenChange?(open: boolean): void; contentClassName?: string },
 ) {
   const id = useId();
   const details = useRef<HTMLDetailsElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const primed = useRef(false);
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(isOpen ?? defaultOpen);
+  useLayoutEffect(() => {
+    if (isOpen === undefined || isOpen === open || !details.current || !body.current) return;
+    setCollapseOpen(details.current, body.current, isOpen);
+    setOpen(isOpen);
+  }, [isOpen, open]);
   const toggle = (event: MouseEvent) => {
     event.preventDefault();
     if (!details.current || !body.current) return;
@@ -135,7 +140,7 @@ export function Disclosure(
      过渡里它会被重新画成展开。这里只在第一次挂上时把初始状态落到 DOM 上。 */
   const attach = (node: HTMLDetailsElement | null) => {
     details.current = node;
-    if (node && defaultOpen && !primed.current) {
+    if (node && (isOpen ?? defaultOpen) && !primed.current) {
       primed.current = true;
       node.open = true;
     }

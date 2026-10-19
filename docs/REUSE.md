@@ -106,6 +106,12 @@ Folia（`chthollyphile/folia-major`，AGPL-3.0，revision `9a01e788ed52d25ea01b1
 
 脚本路径读取 `settings_file` 的目录配置。`sync_sha1_115.py` 的 Cookie 默认位于 `secrets/115-cookies.txt`，复核 CSV 默认位于 `review/115-sha1重复.csv`；可通过 `--cookie-file`、`--dupes-out` 或对应的 `PEACH_115_COOKIE_FILE`、`PEACH_115_DUPES_OUT` 指定现有文件。目录排序偏好使用可重复的 `--deprioritize-dir`。TLS 两种 shell 共用 `resolve_tls_directory.py`，显式 `-OutDir`／`PEACH_TLS_DIR` 优先；`rehome_unknown_jav.py` 的目标账本根由 `--ledger-unknown-root` 明确指定。
 
+## 馆藏处理流量
+
+馆藏处理的流量分账复用 `media_sources.cost_for` 的最长路径前缀与逐目录保护设置、`ContextVar`、现有任务快照和断点恢复。HTTP 下载复用固定版 HTTPX 0.28.1（BSD-3-Clause）的 [`num_bytes_downloaded`](https://www.python-httpx.org/advanced/clients/#monitoring-download-progress)，按压缩传输字节累计，失败的部分响应保留读数；不使用解压后的正文大小替代下载量。FFmpeg 输入读取复用 verbose 级别的 AVIO Statistics，NFO 与配套图片累计实际应用读取量。挂载缓存、预读与系统协议开销无法由这些读数推导，媒体读数仅作流量估算；浏览器、amane 与 curl 指纹传输保留未观测标记，不填零。预估只查询账本，不遍历或下载媒体；资料按每部 0.25–8 MiB、配套图片至多 2 MiB、待探测媒体 1–32 MiB、九帧至多 288 MiB 粗估，文件大小限制媒体项，保护开启的目录不计自动探测。估算是 Peach 的任务策略，不是上游流量保证；读数按任务保存，逐目录明细与代理、全部合计共用一份状态。界面复用 React Aria Slider、现有 `ProcessingEffort` 与 `formModal`；无新增依赖。HTTPX 官方接口已用压缩响应和中断流做隔离实证，未接入机器全局流量监控，以免混入其他应用与任务。
+
+明细开合复用设置页 `Disclosure` 与 `setCollapseOpen`，可由任务提示同步收起；任务正文的网格高度与同一枚箭头沿用 Collapse 的 200ms 节奏。全局减少动态效果设置关闭这些过渡。网盘标识复用 `SourceLabel`，115、PikPak 等使用已登记的站标。
+
 ## Windows 常驻托盘
 
 诊断报告完成窗口复用 Windows `DialogBoxIndirectParamW` 与 `EndDialog` 的系统消息循环，控件和回调声明指针宽度；导出放在独立单实例线程，托盘消息回调可返回。原生隔离进程验证「打开目录」「打开文件」「关闭」、标题栏关闭、Esc 与 Enter，不操作现有托盘。未采用需要 common-controls v6 激活上下文的 `TaskDialogIndirect`，也未为单个窗口引入 GUI 依赖或 PowerShell 子进程；无新增依赖。

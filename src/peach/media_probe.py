@@ -19,6 +19,7 @@ import subprocess
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from contextlib import closing
+from contextvars import copy_context
 from pathlib import PureWindowsPath
 
 from .jobs import ACTIVE_ASSET_SQL
@@ -55,11 +56,12 @@ def context_fields(width: int, height: int, duration: float) -> tuple[str | None
 
 
 def probe_file(ffprobe: str, path: str, timeout: float = TIMEOUT_SECONDS) -> tuple:
+    from .processing_traffic import CURRENT as TRAFFIC, media_statistics
     if skip_background_read(path):
         raise ValueError('STRM 和 ISO 不执行视频探测')
     result = subprocess.run(
         [
-            ffprobe, "-v", "error", "-rw_timeout", "8000000",
+            ffprobe, "-v", "verbose" if TRAFFIC.get() is not None else "error", "-rw_timeout", "8000000",
             "-select_streams", "v:0", "-show_entries",
             "format=duration:stream=width,height,codec_name,avg_frame_rate",
             "-of", "json", path,
@@ -68,6 +70,7 @@ def probe_file(ffprobe: str, path: str, timeout: float = TIMEOUT_SECONDS) -> tup
         timeout=timeout,
         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )
+    media_statistics(path, result.stderr)
     if result.returncode:
         raise subprocess.CalledProcessError(result.returncode, 'ffprobe', stderr=result.stderr)
     payload = json.loads(result.stdout or b"{}")
@@ -97,6 +100,9 @@ def measure(ffprobe: str, asset_id: int, path: str, timeout: float = TIMEOUT_SEC
         duration, width, height, codec, fps, audio = probe_file(
             ffprobe, resolve_case_insensitive(path), timeout)
     except Exception as error:  # 超时、文件读不到、输出不是 JSON：对这一行都是「没拿到」
+        if isinstance(error, subprocess.TimeoutExpired):
+            from .processing_traffic import media_statistics
+            media_statistics(path, error.stderr)
         from .error_reporting import subprocess_failure
         subprocess_failure('media-probe', tool=ffprobe, error=error, asset_id=asset_id,
                            returncode=getattr(error, 'returncode', None), timeout_seconds=timeout)
@@ -172,7 +178,7 @@ def _measure_batches(ffprobe, rows):
             workers = {'low': 1, 'standard': 2, 'high': WORKERS}[control.mode] if control else WORKERS
             while start < len(rows) and len(futures) < workers:
                 row = rows[start]
-                futures.add(executor.submit(measure, ffprobe, row[0], row[1]))
+                futures.add(executor.submit(copy_context().run, measure, ffprobe, row[0], row[1]))
                 start += 1
             completed, futures = wait(futures, return_when=FIRST_COMPLETED)
             for future in completed:

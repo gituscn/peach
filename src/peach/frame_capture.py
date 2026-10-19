@@ -47,7 +47,8 @@ def capture_frame(ffmpeg: str, path: str, timestamp: float, destination: Path, *
     那个时间点，两小时的片子抽最后一帧要几分钟。
     """
     destination.unlink(missing_ok=True)
-    command = [ffmpeg, "-y", "-v", "error", "-rw_timeout", "8000000"]
+    from .processing_traffic import CURRENT as TRAFFIC, media_statistics
+    command = [ffmpeg, "-y", "-v", "verbose" if TRAFFIC.get() is not None else "error", "-rw_timeout", "8000000"]
     checkpoint('frame')
     command += ffmpeg_options(filter_option='-filter_threads')
     if color_override:
@@ -61,12 +62,14 @@ def capture_frame(ffmpeg: str, path: str, timestamp: float, destination: Path, *
         completed = subprocess.run(command, capture_output=True, timeout=timeout,
                                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
     except subprocess.TimeoutExpired as error:
+        media_statistics(path, error.stderr)
         if diagnostics is not None:
             diagnostics.update(reason='timeout', returncode=None,
                                stderr=(error.stderr or b'').decode('utf-8', 'replace'))
         destination.unlink(missing_ok=True)
         return False, "ffmpeg timeout"
     stderr = (completed.stderr or b'').decode('utf-8', 'replace')
+    media_statistics(path, stderr)
     ok = completed.returncode == 0 and _readable_image(destination)
     if diagnostics is not None:
         diagnostics.update(reason='success' if ok else

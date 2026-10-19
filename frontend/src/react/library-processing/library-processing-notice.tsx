@@ -12,6 +12,7 @@ import { ProcessingControls } from './processing-controls';
 import { useLibraryProcessingJob } from './use-library-processing';
 import { ProcessingLine } from './processing-line';
 import { CollapseChevron, CollapseRegion } from '../components/collapse-region';
+import { TrafficProgress } from './processing-traffic';
 
 const COLLAPSE_KEY = 'peach.library-processing.collapsed';
 function expandedFor(jobId?: string): boolean {
@@ -34,15 +35,17 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
 }) {
   const [expanded, setExpanded] = useState(() => expandedFor(state?.job_id));
   const bodyId = useId();
+  const [trafficExpanded, setTrafficExpanded] = useState(false);
   const panel = useRef<HTMLElement>(null);
   const failed = state?.status === 'failed';
   const active = processingActive(state);
-  useEffect(() => { setExpanded(expandedFor(state?.job_id)) }, [state?.job_id]);
+  useEffect(() => { setExpanded(expandedFor(state?.job_id)); setTrafficExpanded(false) }, [state?.job_id]);
   const toggle = () => {
     try {
       if (expanded && state?.job_id) sessionStorage.setItem(COLLAPSE_KEY, state.job_id);
       else sessionStorage.removeItem(COLLAPSE_KEY);
     } catch { /* 会话存储不可用时当前页面仍可收起 */ }
+    if (expanded) setTrafficExpanded(false);
     setExpanded(!expanded);
   };
   useEffect(() => {
@@ -67,6 +70,7 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
       failed ? 'border-current/35 text-text-error-primary'
         : warning ? 'border-current/35 text-status-yellow-text'
           : 'border-border-button-default text-text-primary')}>
+    <div className="flex min-w-0 flex-col gap-3">
     <div className="flex min-w-0 items-center gap-3">
       {active && state?.total ? <Gauge value={state.checked || 0} max={state.total} />
         : failed || warning ? <RiErrorWarningLine aria-hidden className="size-5 shrink-0" />
@@ -75,10 +79,12 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
         <p className="text-body-medium">{title}</p>
         {active ? <p data-processing-eta="" className="text-caption-1-regular text-text-secondary tabular-nums wrap-anywhere">{remainingTime(state!)}</p> : null}
       </div>
-      <Button size="small" variant="secondary" iconOnly leadingIcon={CollapseChevron}
+      <Button size="small" variant="secondary" iconOnly leadingIcon={CollapseChevron} data-processing-toggle=""
         aria-label={expanded ? '收起任务详情' : '展开任务详情'} aria-expanded={expanded} aria-controls={bodyId} onClick={toggle} />
     </div>
-    <CollapseRegion id={bodyId} open={expanded}><div className="pt-3"><div className={cx('flex min-w-0 flex-col gap-2 border-t pt-3',
+    <TrafficProgress traffic={state?.traffic} detailsOpen={trafficExpanded} onDetailsChange={setTrafficExpanded} />
+    </div>
+    <CollapseRegion id={bodyId} open={expanded} className="processing-notice-fold"><div className="pt-3"><div className={cx('flex min-w-0 flex-col gap-2 border-t pt-3',
       failed ? 'border-border-error-default/20' : warning ? 'border-current/20' : 'border-separator-border')}>
       {state?.steps?.length ? <ol aria-label="处理步骤" className="flex min-w-0 flex-col gap-1.5">
         {state.steps.map(step => <li key={step.id} data-processing-step={step.status}
