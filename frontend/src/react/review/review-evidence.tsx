@@ -37,7 +37,7 @@ function RequestedSourceImage({ source }: { source: string }) {
         <span dangerouslySetInnerHTML={{ __html: spinnerHtml('正在加载图片') }} />正在加载图片
       </span> : null}
       {source && (status === 'loading' || status === 'ready')
-        ? <img src={source} alt="来源候选图片" referrerPolicy="no-referrer" decoding="async"
+        ? <img src={source} alt="来源提供的备选图片" referrerPolicy="no-referrer" decoding="async"
             className={`size-full object-contain ${status === 'loading' ? 'invisible' : ''}`} onLoad={() => setStatus('ready')}
             onError={() => setStatus('failed')} />
         : source ? <div className="flex flex-col items-center gap-2">
@@ -121,7 +121,7 @@ export function IdentityEvidence(
   const works = Math.max(0, Number(row.video_count || row.videos || 0));
   return (
     <section className="flex flex-col gap-3">
-      <h5 className="text-body-medium text-text-primary">{`候选身份：${row.babepedia_name || '未标注'}`}</h5>
+      <h5 className="text-body-medium text-text-primary">{`待确认人物：${row.babepedia_name || '未标注'}`}</h5>
       <div className="flex flex-wrap items-center gap-2">
         {profile
           ? <ButtonLink variant="secondary" size="small" trailingIcon={RiExternalLinkLine}

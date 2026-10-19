@@ -1,4 +1,4 @@
-/* 关注页与播放列表页的路由元素（`src/react/router/pages/follow.tsx`）：页面组匹配到这两条时挂上，按开次代次、
+/* 关注页与播放列表页的路由元素（`src/react/router/pages/follow.tsx`）：页面组匹配到这两条时挂上，按页面打开序号、
  * 壳的重开次数（`@peach/shell` 的 `pageOpens`）与覆盖层决定什么时候按地址打开那一页，画进 `#stats`。
  *
  * 关注页不按代次挂 key：每次打开先交壳按地址读筛选（`follow.refresh`），列表还画着就由壳就地推，

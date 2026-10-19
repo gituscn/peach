@@ -214,7 +214,7 @@ class ContractRegistrationTests(unittest.TestCase):
         self.assertIs(web_contract.POST_HANDLERS["/api/settings"], w_settings)
         self.assertNotIn(
             "/api/settings", web_contract.READ_ONLY_POST_ROUTES,
-            "这个 POST 写账本，不能放进只读白名单",
+            "这个 POST 写数据库，不能放进只读白名单",
         )
 
     def test_the_sidebar_key_lists_match_the_web_surface(self):

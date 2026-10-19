@@ -3,7 +3,7 @@
  * 脱盘说明、共演收起、标题折叠、评分与标签的撤销、反馈键态、四种队列、播放列表排序与移出、保存 Mix、接着看、
  * 实体页入口与手机布局。
  *
- * 桩数据见 `item-fixture.ts`；读写接口全部由桩接住，演示库账本一次都不写。 */
+ * 桩数据见 `item-fixture.ts`；读写接口全部由桩接住，演示库数据库一次都不写。 */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
@@ -361,7 +361,7 @@ describe('作品详情岛', () => {
     try {
       const page = opened.page;
       const gate = page.locator('#stage [data-item-gate="offline"]');
-      assert.match(await gate.innerText(), /脱盘模式/);
+      assert.match(await gate.innerText(), /媒体目录无法访问/);
       assert.equal(await page.locator('#stage .vjs-tech').count(), 0, '脱盘的条目挂了播放器');
       await page.locator('#offlineRetry').click();
       await page.locator('#offlineRetry', { hasText: '仍无法读取 · 刷新' }).waitFor();

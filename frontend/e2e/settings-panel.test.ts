@@ -234,7 +234,7 @@ describe('设置面板', () => {
     }
   });
 
-  it('侧栏排序拖动一行：侧栏当场按新顺序重排，再写进账本', { timeout: 60_000 }, async () => {
+  it('侧栏排序拖动一行：侧栏当场按新顺序重排，再写进数据库', { timeout: 60_000 }, async () => {
     const opened = await openHome(browser);
     const { page, server } = opened;
     try {
@@ -244,7 +244,7 @@ describe('设置面板', () => {
       const rows = list.locator('[data-sidebar-row]');
       const keys = () => rows.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-sidebar-row')));
       const initial = await keys();
-      assert.deepEqual(initial, ORDER, '面板里的顺序不是账本那一份');
+      assert.deepEqual(initial, ORDER, '面板里的顺序不是数据库那一份');
       const from = (await rows.nth(1).boundingBox())!, to = (await rows.nth(3).boundingBox())!;
       await page.mouse.move(from.x + 30, from.y + from.height / 2);
       await page.mouse.down();

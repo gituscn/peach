@@ -2,7 +2,7 @@
 
 本页说明异常日志、浏览器错误上报、诊断导出与可选远程诊断的边界。正常取消、缓存回退、来源未命中和任务互斥保留各自状态。
 
-桌面制品验收在临时数据根显式关闭版本统计与错误上传，并在首启提交中保持关闭，避免合成测试进入正式遥测。
+桌面制品验收在临时 Peach 数据目录显式关闭版本统计与错误上传，并在首启提交中保持关闭，避免合成测试进入正式遥测。
 
 ## 反馈入口
 
@@ -47,7 +47,7 @@
 
 接收端由维护者配置：源码与 Docker 使用 `PEACH_SENTRY_DSN`；Windows 发行构建从同名环境变量写入包内 `sentry.json`，GitHub Release 使用仓库变量 `PEACH_SENTRY_DSN`。只接受 Sentry 的公开 HTTPS DSN（含 US / DE 区域），不需要 API token。没有 DSN 时不会创建 SDK 客户端。SDK 自动框架集成、日志、性能追踪和指标均关闭；版本统计作为普通事件计入 Sentry 错误事件额度。账号套餐和总量以 [Sentry 订阅页](https://sentry.io/settings/) 为准。
 
-回归验收使用临时数据根和 SDK 内存接收端。实际接收与发行制品的验收记录保存在仓库外。技术诊断选择见 [ADR-0110](adr/0110-recommended-diagnostics-choice.md)。安装辅助进程只在本机取证，不初始化远程客户端或发送事件；应用进程按用户选择发送。
+回归验收使用临时 Peach 数据目录和 SDK 内存接收端。实际接收与发行制品的验收记录保存在仓库外。技术诊断选择见 [ADR-0110](adr/0110-recommended-diagnostics-choice.md)。安装辅助进程只在本机取证，不初始化远程客户端或发送事件；应用进程按用户选择发送。
 
 `asyncio` 连接清理只在同时满足以下条件时识别为连接重置收尾：`ConnectionResetError` 的 `winerror` 为 `10054`，回调为标准库 `_ProactorBasePipeTransport._call_connection_lost`，调用栈只含该回调与 `asyncio.events._run`，且没有关联异常。处理器核对真实 Proactor transport 处于清理状态，关闭 socket、解除服务端登记并完成关闭状态；不重复通知协议。成功记录 `classification=connection-cleanup` 与 `cleanup_recovered=true`，仅保留本机证据。收尾自身失败则保留原始异常链、上报技术故障并交给默认处理器；不能确认对象状态时也沿用默认处理器。没有全局修改 Python 类或替换事件循环。
 

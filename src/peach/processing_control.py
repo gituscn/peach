@@ -366,7 +366,7 @@ class ProcessingEstimate:
         phase = ('previews' if stage == '生成预览图' else
                  'images' if stage == '读取配套图片' else
                  'local' if stage in ('读取本地资料', '检查配套文件') else
-                 'metadata' if stage in ('采集缺失资料', '采集缺失封面', '保存资料候选') else
+                 'metadata' if stage in ('采集缺失资料', '采集缺失封面', '保存待确认资料') else
                  'probe' if stage == '读取时长与分辨率' else None)
         done, total = state.get('checked', 0), state.get('total', 0)
         now = time.monotonic() - self.paused_elapsed()

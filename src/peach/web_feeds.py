@@ -440,7 +440,7 @@ def _follow_by_name(contract, body) -> dict:
             if held is not None:
                 holders[int(held[0])] = str(held[1])
         if len(holders) > 1:
-            raise ValueError("这几张卡分属账本里不同的人：" + "、".join(holders.values()))
+            raise ValueError("这几张卡分属数据库里不同的人：" + "、".join(holders.values()))
         created = False
         if holders:
             [(entity_id, canonical)] = holders.items()

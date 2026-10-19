@@ -19,7 +19,7 @@ watchdog 的缓冲区溢出，都会静默丢事件。所以定期全量扫描�
 当成当前盘的根、把 `\\` 也当分隔符，在 macOS 上又会当成真实的根目录路径——两种都能拼出
 一条看着像样、指向别处的路径。映射只用一张前缀表加纯字符串切分：前缀命中之后剩下的层级
 按 `/` 拆开，逐段拒掉空串、`.`、`..` 和带分隔符或控制字符的段，再用 `PureWindowsPath`
-拼到声明根上。
+与数据库路径前缀拼接。
 
 **写完了没有，按大小稳定判。** 事件在第一个字节写下时就来了，那时去 stat 只会把一个
 0 字节的半成品登记进账本。判据是：最后一次事件之后静置 `DEBOUNCE_SECONDS`，再隔
@@ -225,7 +225,7 @@ def normalise_prefix(raw: str) -> str:
 
 @dataclass(frozen=True)
 class CloudPrefix:
-    """一条「CloudDrive2 挂载树里的前缀 → 账本声明根」。"""
+    """一条「CloudDrive2 挂载目录前缀 → 数据库路径前缀」的对应关系。"""
     prefix: str
     root: str
 
@@ -459,10 +459,10 @@ class PushDiscoveryConfig:
 
 
 def _prefix_rows(raw, declared_roots) -> tuple[CloudPrefix, ...]:
-    """收敛前缀表：前缀归一，声明根必须是 `[media.locations]` 里真有的那个。
+    """统一前缀写法，并核对数据库路径前缀是否已配置在 `[media.locations]` 中。
 
-    声明根不核对的话，用户写错一个盘符，推送来的每条路径都会落到一个既翻译不出本机
-    路径、也通不过授权根的位置上，而且要等到有人点开那条资产才会发现。
+    用户写错盘符会使推送来的路径无法转换为本机路径，也无法通过目录访问权限检查。
+    在保存时拒绝这种配置，避免直到打开媒体记录时才发现文件无法读取。
     """
     known = {str(root).casefold(): str(root)
              for roots in declared_roots.values() for root in roots}
@@ -679,14 +679,14 @@ class PushDiscoveryService:
         from .platform import resolve_location
         location = resolve_location(path, self.declared_roots)[0]
         if location is None:
-            raise CloudPathError(f"✗ {path} 不在任何来源的声明根下")
+            raise CloudPathError(f"✗ {path} 不在任何媒体来源已配置的目录下")
         self.submit(location, path)
         return path
 
     # -- 本地通道
 
     def _local_roots(self) -> list[tuple[str, str, Path]]:
-        """本地来源的每个声明根与它在本机的落点。网盘来源不在这里。"""
+        """列出本地来源的数据库路径前缀及其本机目录；不包含网盘来源。"""
         from .scan import walk_root_for
         found: list[tuple[str, str, Path]] = []
         for root in self.declared_roots.get("local", ()):
@@ -751,7 +751,7 @@ class PushDiscoveryService:
 
     def save(self, body: dict) -> dict:
         if not self.available:
-            raise ValueError("推送发现只在账本写入端可用")
+            raise ValueError("推送发现只在允许修改数据库的设备上可用")
         with self._lock:
             self.config = self.settings.save(body, self.declared_roots)
             # 密钥由 `start` 补：云端通道一打开，CloudDrive2 那一侧马上要填，页面得当场给出来。
@@ -761,7 +761,7 @@ class PushDiscoveryService:
 
     def rotate_secret(self) -> dict:
         if not self.available:
-            raise ValueError("推送发现只在账本写入端可用")
+            raise ValueError("推送发现只在允许修改数据库的设备上可用")
         self.secret.rotate()
         return self.snapshot(reveal=True)
 

@@ -576,7 +576,7 @@ export function SourceList(props: SourceListProps) {
             这些来源这一轮没有取到更新。
           </Note>
         ) : null}
-        {evidence ? <Note tone="warning">{`候选已入库，但这一次的原始响应没有留档：${evidence}`}</Note> : null}
+        {evidence ? <Note tone="warning">{`条目已保存，但这次未保存来源的原始响应：${evidence}`}</Note> : null}
       </div>
 
         <SelectionDock label="关注来源批量操作" visible={chosen.length > 0} count={`已选 ${chosen.length} 个来源`}>

@@ -112,7 +112,7 @@ applyTheme();
 /* 侧栏的光晕配色卡照 boardui.com 右下角那枚「Accent color」：钮上不画字形，画的就是它管的那两样——
    左上一枚光晕色的圆、右下一枚强调色的圆叠在它上面（`appearance/glow.ts` 的 `paintGlowButton`）。
    卡的外壳在这里建、由 `wireAnchoredMenu` 锚定与开合，材质与媒体库选择弹层同一条规则；卡里的内容归
-   常驻面 `glow-picker`（`frontend/src/react/glow-picker/`），由路由树画进来。 */
+   常驻组件 `glow-picker`（`frontend/src/react/glow-picker/`），由路由树画进来。 */
 const glowPicker=document.createElement('div');
 glowPicker.className='popmenu board-glow-menu';glowPicker.id='boardGlowMenu';glowPicker.hidden=true;
 glowPicker.setAttribute('popover','manual');glowPicker.setAttribute('role','dialog');

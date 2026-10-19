@@ -536,7 +536,7 @@ it('检查失败逐条说出是哪个站上的谁，缺哪样就往下一样取'
     'Kemono 乙：连不上', 'pawchive 甲 · Pawchive：未说明原因', 'F95zone threads/42：要登录',
   ]);
   // 成功的那条也可能没留下原始响应：候选照样入库，但这件事得说出来。
-  expect(host.textContent).toContain('候选已入库，但这一次的原始响应没有留档：磁盘已满');
+  expect(host.textContent).toContain('条目已保存，但这次未保存来源的原始响应：磁盘已满');
 });
 
 it('创作者卡上那一枚只检查这位创作者还开着的来源', async () => {
@@ -986,7 +986,7 @@ it('按名字查找列出每张演员卡，同一个人的两张先勾上；说�
   expect(boxNamed(host, '瀬戸環奈、瀨戶環奈')?.checked).toBe(true);
   expect(boxNamed(host, '無碼')?.checked).toBe(true);
   expect(boxNamed(host, '別人さん')?.checked).toBe(false);
-  expect(host.textContent).toContain('账本里还没有「瀬戸環奈」，会新建一位');
+  expect(host.textContent).toContain('数据库里还没有「瀬戸環奈」，会新建一位');
   expect([...host.querySelectorAll('a')].find((a) => a.textContent?.includes('Kn01'))?.getAttribute('href'))
     .toBe('https://javdb.com/actors/Kn01');
 
@@ -1002,7 +1002,7 @@ it('按名字查找列出每张演员卡，同一个人的两张先勾上；说�
   expect(nameField(host).value).toBe('');
 });
 
-it('回车也是查找；勾的卡已在账本里谁名下就说会挂给谁，分属两个人时添加键停用', async () => {
+it('回车也是查找；勾的卡已在数据库里谁名下就说会挂给谁，分属两个人时添加键停用', async () => {
   const held = { ...LOOKUP, suggested: [], candidates: [
     card('Kn01', ['瀬戸環奈'], '', { id: 3, name: '甲' }), card('Kn02', ['瀬戸環奈'], '無碼', { id: 4, name: '乙' }),
   ] };
@@ -1018,7 +1018,7 @@ it('回车也是查找；勾的卡已在账本里谁名下就说会挂给谁，�
   expect(host.textContent).toContain('会登记到「乙」名下');
   expect(buttonNamed('添加订阅（1）', host)?.disabled).toBe(false);
   await click(boxNamed(host, '瀬戸環奈'));
-  expect(host.textContent).toContain('所勾的卡分属账本里不同的人：甲、乙');
+  expect(host.textContent).toContain('所勾的卡分属数据库里不同的人：甲、乙');
   expect(buttonNamed('添加订阅（2）', host)?.disabled).toBe(true);
   expect(sentBody(fetcher, FEED_SOURCE_URL)).toEqual([]);
 });

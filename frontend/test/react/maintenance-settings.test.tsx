@@ -174,11 +174,11 @@ describe('安装教程', () => {
   it('写入失败时原因留在原位，不发回执', async () => {
     const receipt = vi.fn();
     const host = await mount(
-      <TutorialSettings receipt={receipt} reopenTutorial={vi.fn(async () => { throw new Error('账本写入失败') })} />,
+      <TutorialSettings receipt={receipt} reopenTutorial={vi.fn(async () => { throw new Error('数据库写入失败') })} />,
     );
     await click(buttonNamed('重新打开教程', host));
     await settle();
-    expect(host.querySelector('[role="alert"]')?.textContent).toBe('账本写入失败');
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('数据库写入失败');
     expect(receipt).not.toHaveBeenCalled();
   });
 });

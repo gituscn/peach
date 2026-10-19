@@ -1,6 +1,6 @@
 /* 客户端导航（`src/react/router/`）：两组 `<Routes>` 怎么匹配。页面组按条目记的背景匹配（启动那一条不读），
  * 覆盖组按真实地址匹配；`path="*"` 是认不出的地址，那一格在认不出的地址之间从头到尾是同一个实例。没人认领的
- * 历史变化（后退前进、React 子树里的 `navigate`）各领一个开次代次，壳认领写的不领。各页什么时候打开见
+ * 历史变化（后退前进、React 子树里的 `navigate`）各领一个页面打开序号，壳认领写的不领。各页什么时候打开见
  * `pages/` 各自的用例，详情覆盖见 `pages/overlay.test.tsx`，管理区那几页的宿主见 `managed-routes.test.tsx`。
  *
  * 历史对象是模块级的，和页面上只有一份一致，所以每条用例重新装载 `src/history` 与 `src/react/router`。
@@ -112,7 +112,7 @@ it('启动那一条不读背景：刷新落在带背景的详情条目上时当�
   expect(seen.mounted, '后退前进回到这一条，按背景匹配').toBe(1);
 });
 
-it('壳认领写的地址不领开次代次；后退前进与 React 子树里的 navigate 各领一个，地址没变的 popstate 也算', async () => {
+it('壳认领写的地址不领页面打开序号；后退前进与 React 子树里的 navigate 各领一个，地址没变的 popstate 也算', async () => {
   const r = await load('/nowhere');
   let navigate: ReturnType<typeof useNavigate> | null = null;
   function Probe() { navigate = useNavigate(); return null }

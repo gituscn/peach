@@ -70,7 +70,7 @@ _HOST_ORDER = ("2", "1")
 
 
 def setup_shell() -> str:
-    """首次运行页的薄壳：题目、表单与完成态都由 `/dist/peach-pages.js` 按 `/api/setup/questions` 画出来。
+    """首次运行页的 HTML 模板：题目、表单与完成态都由 `/dist/peach-pages.js` 按 `/api/setup/questions` 画出来。
 
     字形从 `web/index.html` 的雪碧图里按名字摘。
     """
@@ -90,11 +90,8 @@ def _copy_for(key: str, fallback: str) -> tuple[str, str]:
     return _SETUP_COPY.get(key, (fallback, ""))
 
 
-#: 非 Windows 上每行媒体来源多出的那一格：账本里的 Windows 形态路径。
-_MEDIA_ROOT_LABEL = "Windows 中的对应路径"
-_MEDIA_ROOT_PLACEHOLDER = "例如 B:\\"
-#: 非 Windows 上媒体库底下多出的一句说明：本机挂载点和账本路径是两回事。
-_POSIX_MEDIA_NOTE = "本机文件夹是这台电脑读取媒体的位置；Windows 中的对应路径用于匹配馆藏中已有的路径。"
+#: 非 Windows 表单说明实际目录的填写位置。
+_POSIX_MEDIA_NOTE = "填写这台设备实际读取媒体的文件夹；Docker 部署填写容器内目录，例如 /media。"
 
 
 #: 有一行媒体来源选了云盘时，媒体库底下出现的那句提示和它的帮助链接。
@@ -112,7 +109,7 @@ def missing_mount_dependencies(*, windows: bool) -> list[dict[str, str]]:
 
 
 def _media_dir_values(values: Mapping[str, object], default: str) -> list[str]:
-    """提交里的媒体文件夹：提交的是几行就几行，一行都没有就一行默认值。"""
+    """提交里的媒体目录：提交的是几行就几行，一行都没有就一行默认值。"""
     raw = values.get("media_dir")
     if isinstance(raw, (list, tuple)):
         return [str(item) for item in raw] or [default]
@@ -368,7 +365,7 @@ def setup_questions(request: Request):
         "questions": items,
         "media_sources": [{"value": value, "label": label} for value, label in SOURCE_OPTIONS],
         "media_source_default": "local",
-        "media_root": None if windows else {"label": _MEDIA_ROOT_LABEL, "placeholder": _MEDIA_ROOT_PLACEHOLDER},
+        "media_root": None,
         "cloud": {"help": _CLOUD_HELP, "link": {"url": _CLOUD_HELP_URL, "label": _CLOUD_HELP_LABEL},
                   "dependencies": missing_mount_dependencies(windows=windows)},
         "access_enabled": _access_on_by_default(asked),
@@ -437,7 +434,7 @@ async def setup_submit_json(request: Request):
         except ValueError as exc:
             errors["port"] = str(exc)
     if not errors:
-        # 数据根决定设置文件在哪，所以拿到它之后要按它重新解析一次，不能沿用进程启动
+        # Peach 数据目录决定设置文件在哪，所以拿到它之后要按它重新解析一次，不能沿用进程启动
         # 那一刻按发现顺序算出来的这份。
         resolved, _broken = onboarding.resolve_config(answers.data_root)
         if resolved.path.exists():
@@ -484,7 +481,7 @@ async def setup_restore(request: Request):
         if not config.present:
             raise ValueError("此目录中没有有效的 config.toml")
         if not (config.directory("database") / "ledger.db").is_file():
-            raise ValueError("此目录中没有账本，请选择保存原配置和账本的数据目录")
+            raise ValueError("此目录中没有数据库，请选择保存原配置和数据库的数据目录")
         if distribution.standalone():
             onboarding.check_available_port(config.server.port, request.url.port or 80)
         settings_file.remember_data_root(settings_file.active(), config)
@@ -499,7 +496,7 @@ def _setup_media_source_errors(dirs: Sequence[str], kinds: object,
 
     `media_configuration.validate` 对整表不成立的情况（一行都没填、超过 100 行）
     只回一句话，和行数对不上。那种时候原样交回去让页面显示，不能按行去覆盖——
-    索引会越界，用户看到的是 500 而不是「请添加 1 到 100 个媒体文件夹」。
+    索引会越界，用户看到的是 500 而不是「请添加 1 到 100 个媒体目录」。
     """
     if problems and len(problems) != len(dirs):
         return list(problems)
@@ -521,7 +518,7 @@ def _read_answers(
 ) -> tuple[object, dict[str, object]]:
     """逐字段校验，错误按字段收集。校验器和 CLI 问答用的是同一批。
 
-    媒体文件夹那一项是多行：错误是与行对应的列表，其余字段的错误是一句话。
+    媒体目录那一项是多行：错误是与行对应的列表，其余字段的错误是一句话。
     """
     values: dict[str, object] = {}
     errors: dict[str, object] = {}
@@ -537,7 +534,8 @@ def _read_answers(
             for index, row in enumerate(sources):
                 if index < len(costs) and costs[index] is not None:
                     row["cost"] = costs[index]
-            _, _, problems = media_configuration.validate(sources, windows=windows)
+            sources = media_configuration.prepare_sources(sources, windows=windows, config=config)
+            _, _, problems = media_configuration.validate(sources, windows=windows, config=config)
             problems = _setup_media_source_errors(dirs, kinds, problems, question.validate)
             if problems:
                 errors["media_dir"] = problems

@@ -97,7 +97,7 @@ TASK_LABELS = {
     "batch": "批量操作",
     "scrape-codes": "番号资料刮削",
     "jav-covers": "封面批量抓取",
-    "entity-avatar": "补实体头像",
+    "entity-avatar": "补全资料图片",
     "studio-mark": "补厂牌官网与标识",
     "creator-identity": "查创作者身份",
     "code-samples": "补番号样张",
@@ -106,7 +106,7 @@ TASK_LABELS = {
     "want-scrape": "取想要的资料",
     "timeline-thumbnails": "视频缩略图采集",
     "download-postprocess": "云下载后处理",
-    "seed-import": "导入实体种子",
+    "seed-import": "导入初始资料",
 }
 
 

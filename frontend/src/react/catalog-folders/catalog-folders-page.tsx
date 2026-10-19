@@ -145,9 +145,9 @@ function FolderTree({ scope, selected, current, go }: {
           : searchQuery.error ? <Note tone="error">{errorMessage(searchQuery.error)}</Note>
           : searchQuery.data?.matches.length ? searchQuery.data.matches.map(node => <Button key={node.id} variant="secondary" size="small" leadingIcon={RiFolder3Line}
             onClick={() => { setSearch(''); go(node.id) }}>{node.name}</Button>) : <EmptyState shell="plain" icon={RiSearchLine} title="没有匹配的文件夹">换个目录名称试试。</EmptyState>}</div>
-        : <TreeView aria-label="媒体文件夹" size="sm" expandedKeys={expanded} onExpandedChange={setExpanded}
+        : <TreeView aria-label="媒体目录" size="sm" expandedKeys={expanded} onExpandedChange={setExpanded}
           selectedKeys={new Set(selected ? [selected] : [])} onSelectionChange={choose}
-          renderEmptyState={() => <EmptyState shell="plain" icon={RiFolder3Line} title="尚未添加媒体文件夹">在媒体库设置中添加目录并扫描。</EmptyState>}>
+          renderEmptyState={() => <EmptyState shell="plain" icon={RiFolder3Line} title="尚未添加媒体目录">在媒体库设置中添加目录并扫描。</EmptyState>}>
           {roots.data?.roots.map(render)}
         </TreeView>}
     </div></div>

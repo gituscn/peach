@@ -1,5 +1,5 @@
 /* 沉浸模式：片单怎么抽、起播与深链落在哪一条、每换一条取几次详情、动作键写回哪几份缓存、关掉之后
- * 读取有没有按会话取消，以及单击、双击、横划、竖划与进度条这几种手势；还有它作为常驻面
+ * 读取有没有按会话取消，以及单击、双击、横划、竖划与进度条这几种手势；还有它作为常驻组件
  * （`RESIDENT_ROUTES.immerse`）在路由树里的行为：宿主是 body 末尾的 `[data-immerse-host]`、画上之后才交出
  * 句柄、`open` 里的几次绘制同步画完、抛错只卸组件而模块上的监听还在。
  *
@@ -144,7 +144,7 @@ function makeHost(): HostMock {
   };
 }
 
-/* 常驻面适配层直接读取同一包内的配置函数；测试只接本场景的句柄契约。 */
+/* 常驻组件适配层直接读取同一包内的配置函数；测试只接本场景的句柄契约。 */
 type ShellIslands = { connectApplication(next: (actions: ShellActions) => void): () => void;
   loadImmerse(host: ImmerseHost): Promise<ImmerseApi>;
   immerseApi(): ImmerseApi | null;
@@ -680,7 +680,7 @@ describe('播放键', () => {
   });
 });
 
-describe('常驻面', () => {
+describe('常驻组件', () => {
   const immerseHostOf = (r: Loaded) => r.managedEntries().find((entry) => entry.path === 'immerse')?.container as HTMLElement;
 
   it('画上之后句柄才交出；宿主是 body 末尾的 [data-immerse-host]，里面直接是藏着的外框，不包 .peach-react', async () => {

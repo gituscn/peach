@@ -83,7 +83,7 @@ export function PeopleGrid(
 }
 
 /** 在线那一档：关注来源里的创作者。建过档的点开去他的创作者资料页；还没建档的名下那批东西
- *  全在关注页上，点开等于「关注 · 这个人」；账本里有同名创作者、等用户认的，读数带「待确认」，
+ *  全在关注页上，点开等于「关注 · 这个人」；数据库里有同名创作者、等用户认的，读数带「待确认」，
  *  点开去那位的资料页，认人的按钮在那里。`data-follow-author` 挂的是关注页那套创作者键。 */
 export function OnlineAuthors(
   { items, layout, props }: { items: OnlineAuthor[]; layout: PeopleLayout; props: IndexProps },

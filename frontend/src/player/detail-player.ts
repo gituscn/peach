@@ -217,7 +217,7 @@ export async function mountDetailPlayer(
     if (options.checkSourceStatus === false) return;
     void host.loadSourceStatus().then((status) => {
       if (status[String(item.location)] !== false || player.isDisposed()) return;
-      player.error({ code: 2, message: `脱盘模式 · ${host.offlineReason(String(item.location))}` });
+      player.error({ code: 2, message: `媒体目录无法访问 · ${host.offlineReason(String(item.location))}` });
     });
   });
   player.ready(() => {

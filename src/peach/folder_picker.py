@@ -38,7 +38,7 @@ _LOCK = threading.Lock()
 #: 用户在对话框里翻多久都行，但进程不能被一个忘了关的窗口永久占住。
 DIALOG_TIMEOUT_SECONDS = 15 * 60
 
-PROMPT = "选择媒体文件夹"
+PROMPT = "选择媒体目录"
 
 #: `IFileOpenDialog` 的最小互操作：vtable 顺序必须与 shobjidl 一致，一个都不能少。
 #: FOS_NOCHANGEDIR 0x8 不改进程工作目录，FOS_PICKFOLDERS 0x20 选文件夹，

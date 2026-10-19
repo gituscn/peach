@@ -424,7 +424,7 @@ class VenvHolderTests(unittest.TestCase):
 
 class RestartEntryTests(unittest.TestCase):
     def setUp(self):
-        # 入口默认读真实账本的任务表与数据根下的启动记录；这里换成空闸门与给定记录。
+        # 入口默认读真实账本的任务表与 Peach 数据目录下的启动记录；这里换成空闸门与给定记录。
         # 入口用 `from … import` 绑定名字，所以补丁打在来源模块上、并且先于 `load_entry()`。
         self.gate = runtime_prepare.TaskGate()
         self.startup = None

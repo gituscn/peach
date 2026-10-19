@@ -676,7 +676,7 @@ def judge(pages: list[dict], site_links: list[str], performers: list[dict],
         entity_id = matched.pop()
         record = by_id[entity_id]
         base.update(entity_id=entity_id, name=record["name"], matched_name=matched_name)
-        where = f"{page['source']} {page['page']}；页面名「{matched_name}」对上账本「{record['name']}」"
+        where = f"{page['source']} {page['page']}；页面名「{matched_name}」对上数据库「{record['name']}」"
         if not socials and not page["official"] and not page["owned"]:
             rows.append(row(**base, verdict="未取得", evidence=f"{where}；页面上没有社交链接"))
             stats["命中但无社媒"] += 1
@@ -801,7 +801,7 @@ def probe_rows(rows: list[dict], existing_handles: dict, site: Site | None) -> C
                     if held_name == "X" and handle(url) != handle(item["url"])]
             for old in olds:
                 old_state, _ = probe_x(site, handle(old), memo)
-                item["evidence"] += f"；账本旧号 {old}：{old_state}"
+                item["evidence"] += f"；数据库旧号 {old}：{old_state}"
     return stats
 
 

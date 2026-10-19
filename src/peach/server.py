@@ -36,7 +36,7 @@ def initialize() -> None:
     if config.present:
         return
     if config.directory("database").joinpath("ledger.db").exists():
-        raise RuntimeError("已有账本但缺少配置文件，请恢复 config.toml 后启动")
+        raise RuntimeError("已有数据库但缺少配置文件，请恢复 config.toml 后启动")
     process = launch("init", "--no-input")
     try:
         code = process.wait(timeout=120)
@@ -76,7 +76,7 @@ def supervise(host: str, port: int, stopping: threading.Event) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="运行 Peach 无桌面服务")
+    parser = argparse.ArgumentParser(description="运行通过浏览器管理的 Peach 服务")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8900)
     args = parser.parse_args(argv)

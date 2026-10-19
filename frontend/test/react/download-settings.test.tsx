@@ -402,5 +402,5 @@ it('等太久没登录时报出原因，上一次留在服务端的结果不当�
 it('只读端整块不可操作，并说明原因', async () => {
   const host = await mount(<DownloadSettings initial={state({ available: false })} receipt={vi.fn()} />);
   expect(buttonNamed('保存配置', host)?.disabled).toBe(true);
-  expect(host.textContent).toContain('云下载只在账本写入端可用');
+  expect(host.textContent).toContain('云下载只在允许修改数据库的设备上可用');
 });

@@ -140,7 +140,7 @@ const ACTION_LABELS: Record<string, string> = {
   querying_metadata: '查询外部资料',
   fetching_cover: '采集缺失封面',
   generating_preview: '生成视频预览',
-  writing_candidates: '保存资料候选',
+  writing_candidates: '保存待确认资料',
 };
 
 /* 来源说「没有」按类型报一个数，不进问题清单：馆藏里大量独立资源和创作者作品
@@ -227,6 +227,6 @@ export function announceCompletion(
     return;
   }
   toast(`扫描与资料采集已完成：识别 ${state.identified || 0} 个番号，`
-    + `整理 ${state.candidates || 0} 组资料候选，自动落库 ${state.auto_applied || 0} 条`
+    + `整理 ${state.candidates || 0} 组资料结果，自动保存 ${state.auto_applied || 0} 条`
     + (state.previews ? `，生成 ${state.previews} 部视频预览` : ''));
 }

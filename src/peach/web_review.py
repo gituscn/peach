@@ -630,7 +630,7 @@ def _review_evidence(category: str, row: dict) -> str:
         return (f"当前值：{current}"
                 + (f"（{owner}）" if owner else "")
                 + f"；{row.get('videos') or 0} 个{target}；"
-                f"{len(row.get('candidates') or [])} 个来源候选")
+                f"{len(row.get('candidates') or [])} 个资料来源")
     if category == "western_identity":
         overlap = row.get("token_overlap") or "0"
         variant = row.get("matched_variant") or ""
@@ -657,7 +657,7 @@ def _review_evidence(category: str, row: dict) -> str:
         return "；".join(bits)
     if category == "fc2_similarity":
         kinds = str(row.get("evidence_kinds") or "").replace(" ", "、")
-        detail = [f"证据 {kinds}" if kinds else "候选证据不足"]
+        detail = [f"证据 {kinds}" if kinds else "所选资料缺少足够依据"]
         if row.get("duration_delta_seconds") != "":
             detail.append(f"时长差 {row.get('duration_delta_seconds')} 秒")
         if row.get("size_delta_percent") != "":
@@ -695,18 +695,18 @@ def _selected_metadata_candidate(contract: ReviewContract, item_key: str, candid
               for row in read_candidates("metadata_fields", contract.candidate_root)[0]}
     group = groups.get(item_key)
     if group is None:
-        raise ValueError("字段候选不在当前批次，无法批准")
+        raise ValueError("所选字段资料不在当前批次，无法批准")
     if str(group.get("status") or "").strip() != "candidate":
-        raise ValueError("只有 candidate 状态的字段候选可以批准")
+        raise ValueError("只有待确认的资料字段可以批准")
     try:
         candidates = json.loads(str(group.get("candidates_json") or "[]"))
     except (TypeError, ValueError) as exc:
-        raise ValueError("字段候选 JSON 无效") from exc
+        raise ValueError("待确认资料的 JSON 格式无效") from exc
     selected = next((candidate for candidate in candidates
                      if isinstance(candidate, dict)
                      and str(candidate.get("candidate_key") or "") == candidate_key), None)
     if selected is None:
-        raise ValueError("所选来源值不在当前字段候选中")
+        raise ValueError("所选来源的资料不在当前待确认列表中")
     return group, selected
 
 
@@ -730,8 +730,8 @@ DECISION_ONLY_CATEGORIES = {
     "western_identity": "身份判断落在 entity 上，由专门的合并流程写，不在复核这一步",
     "code_creators": "番号与创作者的绑定由 metadata_fields 那条路写",
     "cover_sources": "封面已在 /cover 缓存里，复核只是确认取得与否",
-    "fc2_markings": "只标注证据状态，不改真相字段",
-    "fc2_similarity": "产出的是跨号候选，合并要另行授权",
+    "fc2_markings": "只记录识别依据，不修改影片资料",
+    "fc2_similarity": "提供不同番号之间的对应线索，合并需另行确认",
     "video_endcards": "只登记首尾帧证据，不改资产",
 }
 
@@ -758,20 +758,20 @@ def _install_performer_avatar(contract: ReviewContract, entity_id: str) -> int:
             for row in read_candidates("performer_avatars", contract.candidate_root)[0]}
     candidate = rows.get(str(entity_id))
     if candidate is None:
-        raise ValueError("候选不在当前批次，无法批准")
+        raise ValueError("所选资料不在当前批次，无法批准")
     if str(candidate.get("verdict") or "").strip() != "ok":
-        raise ValueError("只有质量判定为 ok 的候选可以装载")
+        raise ValueError("只有通过图片质量检查的备选图片可以使用")
     digest = str(candidate.get("sha256") or "").strip().lower()
     if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
-        raise ValueError("候选没有可用的 SHA-256")
+        raise ValueError("所选图片缺少有效的 SHA-256 校验值")
     objects_root = contract.candidate_root / "provider-cache" / "performer-avatars"
     source = next((item for item in objects_root.glob(f"*/objects/{digest}.*")
                    if item.is_file()), None)
     if source is None:
-        raise ValueError(f"候选图片不在本机缓存：{digest[:12]}")
+        raise ValueError(f"所选图片不在本机缓存：{digest[:12]}")
     body = source.read_bytes()
     if hashlib.sha256(body).hexdigest() != digest:
-        raise ValueError("缓存对象与候选记录的哈希不一致，拒绝装载")
+        raise ValueError("图片内容与待确认记录不一致，无法使用")
     content_type = str(candidate.get("mime_type") or "").strip() or "image/jpeg"
     with contract.read_connection() as connection:
         # 候选出来之后实体并入了别人：图装到现在那一条名下，不写成没人读的孤立文件。
@@ -802,21 +802,21 @@ def _install_studio_logo(contract: ReviewContract, studio: str) -> int:
     `review_decision` 记一笔，logo 一张也没装上；配合「队列不过滤已判项」，
     表现就是点完通过、一刷新又回来。
 
-    候选 CSV 的 `saved` 列写的是 `R:\peach-data\...`，那是旧数据根；现在数据在
+    候选 CSV 的 `saved` 列写的是 `R:\peach-data\...`，那是旧 Peach 数据目录；现在数据在
     `peach-data` 下，按绝对路径找必然落空。所以只取文件名，在当前候选目录里解析。
     """
     rows = {row["item_key"]: row
             for row in read_candidates("studio_logos", contract.candidate_root)[0]}
     candidate = rows.get(studio)
     if candidate is None:
-        raise ValueError("候选不在当前批次，无法批准")
+        raise ValueError("所选资料不在当前批次，无法批准")
     saved = str(candidate.get("saved") or "").strip()
     if not saved:
-        raise ValueError("该候选没有已下载的图片，无法装载")
+        raise ValueError("所选资料中没有可用的本机图片，无法使用")
     source = contract.candidate_root / "studio-logos" / PurePosixPath(
         saved.replace("\\", "/")).name
     if not source.is_file():
-        raise ValueError(f"候选图片不在本机：{source.name}")
+        raise ValueError(f"所选图片未保存在本机：{source.name}")
     key = studio_logo_key(studio)
     if not key:
         raise ValueError("厂牌名无法生成存盘文件名")
@@ -900,7 +900,7 @@ def w_review_decision(contract: ReviewContract, body):
         if category == "metadata_fields" and status == "approved":
             candidate_key = str(body.get("candidate_key") or "").strip()
             if not candidate_key:
-                raise ValueError("批准字段候选时必须选择一个来源值")
+                raise ValueError("批准资料字段时，请先选择要采用的来源")
             group, candidate = _selected_metadata_candidate(contract, item_key, candidate_key)
             applied, asset_revisions = _approve_metadata_with_receipt(
                 connection, group, candidate, now, note, expected_revision)
@@ -911,7 +911,7 @@ def w_review_decision(contract: ReviewContract, body):
                           for row in read_candidates(category, contract.candidate_root)[0]}
             candidate = candidates.get(item_key)
             if candidate is None:
-                raise ValueError("候选不在当前批次，无法批准")
+                raise ValueError("所选资料不在当前批次，无法批准")
             if str(candidate.get("status") or "").strip() != "candidate":
                 raise ValueError("只有 candidate 状态的复核项可以批准")
             creator = str(candidate.get("creator") or "").strip()
@@ -919,7 +919,7 @@ def w_review_decision(contract: ReviewContract, body):
             claimed_creator = str(body.get("creator", "")).strip()
             claimed_tags = [tag.strip() for tag in str(body.get("tags", "")).split("|") if tag.strip()]
             if (claimed_creator and claimed_creator != creator) or (claimed_tags and claimed_tags != tags):
-                raise ValueError("提交内容与候选不一致，拒绝写入")
+                raise ValueError("提交内容与所选资料不一致，未保存")
             if not creator or not tags:
                 raise ValueError("approved creator review requires creator and tags")
             entity = resolve_entity(connection, "creator", creator)

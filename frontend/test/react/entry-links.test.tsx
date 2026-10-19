@@ -16,7 +16,7 @@ it('外部入口：能换镜像的两站各一个地址框，默认留空，保�
   vi.stubGlobal('fetch', fetcher);
   const receipt = vi.fn();
   const host = await mount(<EntryLinksForm initial={state} receipt={receipt} />);
-  // 入口出不出现由账本里有没有站点 id 决定，三枚按钮自己就在资料页上，这里没有开关。
+  // 入口出不出现由数据库里有没有站点 id 决定，三枚按钮自己就在资料页上，这里没有开关。
   expect(switches(host)).toEqual([]);
   // みんなのAV 只此一家，没有域名可换，它不出现在这一页上。
   expect(host.querySelector('#entry-link-minnano-av')).toBeNull();

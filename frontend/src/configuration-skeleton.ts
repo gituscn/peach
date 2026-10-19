@@ -8,6 +8,6 @@ const row = (label: string, description = '', control = 'ui-configuration-skelet
 
 export function configurationSkeleton(chosen = '媒体库与入库'): string {
   const nav = `<div class="ui-board-local-nav" data-section-nav data-section-items>${Object.values(CONFIGURATION_SECTIONS).map(title => `<button type="button" tabindex="-1" aria-selected="${title === chosen}">${title}</button>`).join('')}</div>`;
-  const media = section('媒体文件夹', `<div class="flex flex-col gap-3 py-4 pr-3">${row('媒体文件夹', '', 'ui-configuration-skeleton-select')}${row('媒体库名称', '', 'ui-configuration-skeleton-select')}</div>`);
+  const media = section('媒体目录', `<div class="flex flex-col gap-3 py-4 pr-3">${row('媒体目录', '', 'ui-configuration-skeleton-select')}${row('媒体库名称', '', 'ui-configuration-skeleton-select')}</div>`);
   return `<div class="peach-react"><div class="ui-configpage">${nav}<div class="flex min-w-0 flex-col gap-6">${chosen === '系统诊断' ? diagnosticsSkeleton() : media}</div></div></div>`;
 }

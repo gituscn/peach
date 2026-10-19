@@ -24,7 +24,7 @@ RECENT_LIMIT = 20
 
 #: 账本还没跑到 0028 时页面上显示这一句。迁移是单独一步，升级后第一次打开活动页
 #: 撞上没有这张表是正常路径，不该是一个 500。
-NO_TABLE = "账本还没有任务中心的表，执行一次 peach migrate --apply 就好"
+NO_TABLE = "数据库缺少任务记录表，请按运行文档检查备份后执行 peach migrate upgrade --yes"
 
 
 def q_tasks(contract, args):

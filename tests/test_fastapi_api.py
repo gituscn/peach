@@ -410,7 +410,7 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             status = "reader"
             detail = "写入端是 mac"
             read_only = True
-            read_only_message = "账本由 mac 负责写入，本机当前只能浏览。"
+            read_only_message = "数据库由 mac 负责写入，本机当前只能浏览。"
 
             def observe(self):
                 return None
@@ -2949,8 +2949,8 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
     async def test_reveal_by_path_stays_inside_peach_own_data_root(self):
         """页面上印着全路径的那几处（凭据文件、问题日志、要删的数据目录）按 `path` 定位。
 
-        递回来的那一串只是候选：服务端拿同一份设置把数据根重算一遍再比对，所以往上爬
-        出去的、数据根外面的一律不开。媒体文件不走这条——它的路径压根没发给过前端。
+        递回来的那一串只是候选：服务端拿同一份设置把 Peach 数据目录重算一遍再比对，所以往上爬
+        出去的、Peach 数据目录外面的一律不开。媒体文件不走这条——它的路径压根没发给过前端。
         """
         from peach import settings_file
 
@@ -2974,7 +2974,7 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(opened.status_code, 200)
         reveal.assert_called_once_with(log.resolve())
         self.assertEqual(refused.status_code, 403)
-        self.assertEqual(climbing.status_code, 403, "`..` 爬出数据根的一样不开")
+        self.assertEqual(climbing.status_code, 403, "`..` 爬出 Peach 数据目录的一样不开")
         self.assertEqual(gone.status_code, 410)
         # 410 与 403 在页面那层的通用错误映射里都没有说法，原因得由这条自己写成中文。
         self.assertEqual(gone.json()["message"], "这个位置已经不在了")
@@ -3137,7 +3137,7 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(again.content, first.content)
         self.assertEqual(full.content, picture.getvalue())
         self.assertEqual(asked, ["https://pics.dmm.co.jp/digital/video/ssis00057/ssis00057jp-2.jpg"],
-                         "同一张只下载一次，账本里没有的序号不出网")
+                         "同一张只下载一次，数据库里没有的序号不出网")
         self.assertEqual(unknown.status_code, 404)
         folder = self.root / "sample-cache" / "SSIS-057"
         self.assertEqual(sorted(path.name for path in folder.iterdir()), ["2.jpg", "2.thumb.jpg"])
@@ -3263,7 +3263,7 @@ class UnconfiguredMachineTests(unittest.IsolatedAsyncioTestCase):
                         self.assertEqual(ready.status_code, 503)
                         self.assertFalse(ready.json()["ready"])
                 self.assertEqual([record.levelname for record in captured.records], ["WARNING"])
-                self.assertIn("账本准备完成后重启服务", captured.output[0])
+                self.assertIn("数据库准备完成后重启服务", captured.output[0])
                 self.assertNotIn(str(database), captured.output[0])
                 self.assertEqual(database.read_bytes() if database.exists() else None, original)
 
@@ -3389,7 +3389,7 @@ class UnconfiguredMachineTests(unittest.IsolatedAsyncioTestCase):
                 shutdown = asyncio.create_task(context.__aexit__(None, None, None))
                 while app.state.ledger_background_ready and not shutdown.done():
                     await asyncio.sleep(0)
-                self.assertFalse(shutdown.done(), "服务退出须等待预热查询释放账本")
+                self.assertFalse(shutdown.done(), "服务退出须等待预热查询释放数据库")
                 release.set()
                 await shutdown
                 self.assertTrue(closed.is_set())

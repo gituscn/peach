@@ -180,7 +180,7 @@ class LandingTests(Case):
                              [followup.followup_key(fresh)])
         self.assertEqual(self.run_followup(reviewed)["outcome"], "已有身份")
         self.assertEqual(self.transport.calls, [])
-        self.assertEqual(self.run_followup(999), {"outcome": "实体已不存在"})
+        self.assertEqual(self.run_followup(999), {"outcome": "档案已不存在"})
 
 
 class RevertTests(Case):

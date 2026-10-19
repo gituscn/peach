@@ -502,7 +502,7 @@ describe('写操作', () => {
     // 换统称会重写整条实体的扁平投影：写之前让人看见换成什么、旧写法去哪；按钮与回执同一个动词。
     expect(legacyUi.confirmModal).toHaveBeenCalledWith(expect.objectContaining({
       title: '更改统称', confirmLabel: '更改统称',
-      body: `「しのだゆう」将成为这条实体的规范名，「${NAME}」留作别名。作品上的署名、搜索和标签都会跟着改写。`,
+      body: `「しのだゆう」将成为这份档案显示的名称，「${NAME}」留作别名。作品上的署名、搜索和标签都会跟着改写。`,
     }));
     expect(page.writes[0]).toEqual({ url: '/api/entity-name', body: { kind: 'performer', name: NAME, canonical: 'しのだゆう' } });
     expect(page.props.actions.openEntity).toHaveBeenLastCalledWith('performer', 'しのだゆう');

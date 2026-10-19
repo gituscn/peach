@@ -90,7 +90,7 @@ SHA-256 对不上是硬错误，不降级放行。
 三种形状对应三条产品路径：番号型（`<番号>/<番号>.mp4` 配 NFO 与 `-poster.jpg`，部分带
 `P/` 图集）走本地资料入库；创作者型（`<创作者>/<标题>.mp4` 配 PNG 与无番号 NFO）走
 `posters/<id>_4.jpg` 本地海报；裸文件演示没有番号也没有边车的条目，只登记、不报问题。让 Peach 看见它：`peach init`
-建演示数据根，在设置文件 `[media.locations]` 声明这个目录，`peach scan local`、
+建演示 Peach 数据目录，在设置文件 `[media.locations]` 声明这个目录，`peach scan local`、
 `peach process local`，候选在复核页全选通过或用 `scripts/apply_metadata_tags.py --source local_nfo`
 按字段落地；要九宫格再跑 `scripts/probe.py` 与 `scripts/sheets.py`。生成器结束时会把这几步连同
 当前平台的设置行一起打印出来。

@@ -1,5 +1,5 @@
-/* 设置面板（常驻面 `settings-panel`）与壳之间的接缝：每一项改完只落一次盘、只报自己那一个效果名，
- * 拉条拖动中只排重画、松手才落盘，面板 DOM 只建一次；以及它作为常驻面（`RESIDENT_ROUTES['settings-panel']`）
+/* 设置面板（常驻组件 `settings-panel`）与壳之间的接缝：每一项改完只落一次盘、只报自己那一个效果名，
+ * 拉条拖动中只排重画、松手才落盘，面板 DOM 只建一次；以及它作为常驻组件（`RESIDENT_ROUTES['settings-panel']`）
  * 在路由树里的行为：宿主 `[data-settings-host]` 第一次打开时放进 body 末尾、不包 `.peach-react`，画上之后句柄
  * 才交出，`open` 返回时面板已经画好，抛错只卸组件。开合动效、焦点圈、写接口与像素在真浏览器里验，见
  * `e2e/settings-panel.test.ts` 与 `e2e/design-*.test.ts`。 */
@@ -42,7 +42,7 @@ vi.mock(import('../../src/react/settings-panel/icon'), async (importOriginal) =>
   };
 });
 
-/* 常驻面适配层直接读取同一包内的配置函数；测试只接本场景的句柄契约。 */
+/* 常驻组件适配层直接读取同一包内的配置函数；测试只接本场景的句柄契约。 */
 type ShellIslands = { connectApplication(next: (actions: ShellActions) => void): () => void;
   loadSettingsPanel(host: SettingsPanelHost): Promise<SettingsPanelApi>;
   settingsPanelApi(): SettingsPanelApi | null;
@@ -273,7 +273,7 @@ describe('设置面板与壳的接缝', () => {
   });
 });
 
-describe('常驻面', () => {
+describe('常驻组件', () => {
   it('第一次装载：画上之前没有宿主、句柄为 null；画上之后宿主在 body 末尾、不包 .peach-react，面板收着，句柄才交出', async () => {
     const r = await load();
     await mountRouter(r);

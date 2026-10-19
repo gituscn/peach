@@ -85,7 +85,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 ### Windows
 
 1. 从 [Releases](https://github.com/peach-mitao/peach/releases) 下载完整安装包 `Peach-<版本>-windows-x64-setup.exe`，双击安装，无需管理员权限；也可下载完整免安装包，解压后运行 `Peach.exe`。
-2. 浏览器打开首次设置页后，选择媒体文件夹和访问范围。
+2. 浏览器打开首次设置页后，选择媒体目录和访问范围。
 3. 开始扫描，随后在浏览器里浏览和播放。
 
 完整安装包携带媒体工具，可离线安装；轻量安装包体积更小，安装时按需下载工具。

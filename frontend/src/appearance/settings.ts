@@ -16,9 +16,9 @@ export const SETTINGS_KEY = 'peach.settings.v1';
    已经按 `prefers-color-scheme` 和 `[data-theme]` 两条路径写好，这里只负责选哪一条。
    跟随系统是默认档，选它等于不写属性。 */
 export const THEME_CHOICES: readonly string[] = ['system', 'light', 'dark'];
-/** 关注首次采集往回取多少天；与账本那一份同一张表。 */
+/** 关注首次采集往回取多少天；与数据库那一份同一张表。 */
 export const FOLLOW_INITIAL_DAYS: readonly number[] = [0, 7, 30, 90];
-/* 新作那一行收不收合集由服务端按账本里的设置筛（列表、未读数、补封面同一份），这里只是
+/* 新作那一行收不收合集由服务端按数据库里的设置筛（列表、未读数、补封面同一份），这里只是
    镜像：开关的真相在 `/api/settings`。默认收起大合集与切片、单人合集照列。 */
 export const FEED_COMPILATION_KEYS = ['feedHideGroupCompilations', 'feedHideSoloCompilations', 'feedHideExcerpts'] as const;
 
@@ -129,7 +129,7 @@ export function appSettingsStore(): SettingsStore<AppSettings> {
   return store;
 }
 
-/** 账本那一份要求某个壳侧效果跟着做时报的名字（同设置面板的效果名）。 */
+/** 数据库那一份要求某个壳侧效果跟着做时报的名字（同设置面板的效果名）。 */
 export type SyncedEffect = 'searchHistoryLimit';
 
 /** 搜索记录条数在 `/api/settings` 上的形状：还没定过时是 null。 */
@@ -142,7 +142,7 @@ export interface SyncedSettings {
   sidebarOrder?: unknown;
 }
 
-/* 账本那一份落进本地缓存。启动时壳取一次、设置面板每次打开再取一次，都交到这里；开着的面板与
+/* 数据库那一份落进本地缓存。启动时壳取一次、设置面板每次打开再取一次，都交到这里；开着的面板与
    侧栏经 store 通知跟上：侧栏顺序变了，它当场按新顺序重排。搜索记录条数变了要推给搜索岛，那一下
    由 `changed` 交回壳。 */
 export function applySyncedSettings(
@@ -156,7 +156,7 @@ export function applySyncedSettings(
     if (typeof remote?.[key] !== 'boolean' || remote[key] === settings[key]) continue;
     settings[key] = remote[key] as boolean; target.save();
   }
-  /* 账本里还没有条数时，这台设备本地改过的那个数替所有访问端先定下来，只送这一次。 */
+  /* 数据库里还没有条数时，这台设备本地改过的那个数替所有访问端先定下来，只送这一次。 */
   const limit = remote && remote.searchHistoryLimit;
   if (Number.isInteger(limit) && (limit as number) >= 0 && (limit as number) <= 50) {
     if (limit !== settings.searchHistoryLimit) {
@@ -171,7 +171,7 @@ export function applySyncedSettings(
   target.save();
 }
 
-/** 把本地那个搜索记录条数送上账本；失败不报，下次对账再送。 */
+/** 把本地那个搜索记录条数送上数据库；失败不报，下次对账再送。 */
 export function postSearchHistoryLimit(target: SettingsStore<AppSettings> = appSettingsStore()): Promise<unknown> {
   return api('/api/settings', {
     method: 'POST', body: JSON.stringify({ searchHistoryLimit: target.value.searchHistoryLimit }),

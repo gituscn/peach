@@ -243,7 +243,7 @@ describe('身份与标签', () => {
     expect([ratingText(60), ratingText(0), ratingText(null)]).toEqual(['3 星', '未评分', '未评分']);
   });
 
-  it('播放区挡在前面的说明：没挂载、在线资产反查不到、计费来源', () => {
+  it('播放区挡在前面的说明：没挂载、在线作品反查不到、计费来源', () => {
     expect(mediaGate(item(1), true)).toBe('offline');
     expect(mediaGate(item(1, { location: 'online' }), false)).toBe('online');
     expect(mediaGate(item(1, { location: 'online', follow_item_id: 5 } as Partial<DetailItem>), false)).toBe('');
@@ -256,7 +256,7 @@ describe('身份与标签', () => {
 describe('首屏取数', () => {
   const signal = new AbortController().signal;
 
-  it('保存过的在线资产转关注详情；条目已不在收起舞台', async () => {
+  it('保存过的在线作品转关注详情；条目已不在收起舞台', async () => {
     serve(undefined, { '/api/item?id=1': item(1, { location: 'online', follow_item_id: 9 } as Partial<DetailItem>),
       '/api/item?id=2': { error: 'gone' } });
     const first = props({ id: 1 });

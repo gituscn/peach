@@ -1,4 +1,4 @@
-/* 批量条：四种语境下列哪几颗键、计数、选空时收起、点下去回到壳的哪条流程，以及它作为常驻面
+/* 批量条：四种语境下列哪几颗键、计数、选空时收起、点下去回到壳的哪条流程，以及它作为常驻组件
  * （`RESIDENT_ROUTES['batch-dock']`）在路由树里的行为：宿主就是 `[data-batch-dock]`、句柄同步画完、
  * 收起与抛错都只卸组件不撤宿主，抛错之后这一面空到刷新为止。
  *
@@ -31,7 +31,7 @@ vi.mock(import('../../src/react/components/selection-dock'), async (importOrigin
   };
 });
 
-/* 常驻面适配层直接读取同一包内的配置函数；测试只接本场景的句柄契约。 */
+/* 常驻组件适配层直接读取同一包内的配置函数；测试只接本场景的句柄契约。 */
 type ShellIslands = { connectApplication(next: (actions: ShellActions) => void): () => void; loadBatchDock(host: BatchDockHost): Promise<BatchDockApi>; batchDockApi(): BatchDockApi | null };
 const ISLANDS_MODULE = '../../src/react/application-residents';
 
@@ -116,7 +116,7 @@ describe('每种语境的键', () => {
     expect(shape('trash')).toEqual(['还原', '彻底删除!', '取消']);
     expect(shape('junk')).toEqual(['不是垃圾', '移入回收站!', '取消']);
     expect(shape('junk', true)).toEqual(['重新判断', '移入回收站!', '取消']);
-    expect(shape('follow')).toEqual(['保存到账本', '标记已看', '忽略', '取消']);
+    expect(shape('follow')).toEqual(['保存到数据库', '标记已看', '忽略', '取消']);
   });
 
   it('「忽略」用划掉的眼睛，不借「取消」那枚叉', () => {
@@ -168,7 +168,7 @@ describe('浮条', () => {
   });
 });
 
-describe('常驻面', () => {
+describe('常驻组件', () => {
   it('宿主就是 [data-batch-dock] 本身：组件那层 .peach-react 是它的直接子节点，中间不多包一层', async () => {
     const { root } = await setup();
     expect([...root.children].map((child) => [child.className, child.getAttribute('data-context')]))
@@ -189,7 +189,7 @@ describe('常驻面', () => {
     const r = await load();
     await mountRouter(r);
     const host = dockHost();
-    expect(r.islands.batchDockApi(), '常驻面尚未挂载时没有句柄，应用只记着当前那份').toBeNull();
+    expect(r.islands.batchDockApi(), '常驻组件尚未挂载时没有句柄，应用只记着当前那份').toBeNull();
     let api: BatchDockApi | null = null;
     await act(async () => { api = await r.islands.loadBatchDock(host) });
     expect(r.islands.batchDockApi()).toBe(api);

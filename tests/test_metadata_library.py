@@ -679,7 +679,7 @@ class LibraryNfoTests(unittest.TestCase):
         database.after_commit = lambda: commits.append(alive['value'])
 
         def report(state):
-            if state.get('stage') == '保存资料候选':
+            if state.get('stage') == '保存待确认资料':
                 alive['value'] = False
 
         with self.assertRaises(InterruptedError):

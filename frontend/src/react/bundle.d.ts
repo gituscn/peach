@@ -1,4 +1,4 @@
-/* 内部常驻面与页面的类型契约。
+/* 内部常驻组件与页面的类型契约。
  * application-residents.ts 与 entry.tsx 在主界面同一源码图内组合这些接口，不发布独立运行时桥包。
  * 配置数据以 /api/configuration（src/peach/routes_configuration.py）为准。 */
 import type { QualityGoal } from './quality-goals/quality-goals';
@@ -85,7 +85,7 @@ export interface PushDiscoveryState {
   watch_local: boolean;
   cloud: boolean;
   prefixes: PushDiscoveryPrefix[];
-  /** 这台机器是账本写入端才为真；只读端不起任何监听。 */
+  /** 这台机器是数据库写入端才为真；只读端不起任何监听。 */
   available: boolean;
   secret: string;
   secret_set: boolean;
@@ -112,7 +112,7 @@ export type DownloadProviderKey = '115' | 'pikpak';
 export interface DownloadConfig {
   clouddrive_address: string;
   targets: Partial<Record<DownloadProviderKey, string>>;
-  /** PikPak 根目录在账本里对应的声明根，空串表示还没选。 */
+  /** PikPak 根目录对应的数据库路径前缀，空串表示还没选。 */
   pikpak_root: string;
   wait_hours: number;
 }
@@ -150,7 +150,7 @@ export interface DownloadCheckReport {
   quota: { total: number; used: number; left: number } | null;
   /** 115 目标目录留空时按推送发现推的目录；`exists` 为假时 CloudDrive2 里还没有它。 */
   suggested_target: { path: string; exists: boolean } | null;
-  /** PikPak 根目录对应的媒体文件夹留空时按推送发现推的声明根，推不出时为空串。 */
+  /** 未选择 PikPak 对应目录时，按推送发现的配置建议数据库路径前缀；无法确定时为空串。 */
   suggested_pikpak_root: string;
   problems: string[];
 }
@@ -273,9 +273,9 @@ export interface ConfigurationData {
 export interface ConfigurationProps {
   /** 保存成功后的过去时回执（遗留层的 Toast）。 */
   receipt(message: string): void;
-  /** 让安装教程重新出现：跳过与折叠归位、撤回账本标记。 */
+  /** 让安装教程重新出现：跳过与折叠归位、撤回数据库标记。 */
   reopenTutorial(): Promise<void>;
-  /** 首帧选中的那一组页签名（别处点「管理媒体库」「添加媒体文件夹」等进来）；认不出或没给就选第一组。 */
+  /** 首帧选中的那一组页签名（别处点「管理媒体库」「添加媒体目录」等进来）；认不出或没给就选第一组。 */
   section?: string;
 }
 
@@ -316,7 +316,7 @@ export interface StatsProps {
   onTag(key: string): void;
   /** 打开配置页的「媒体」页签。没有视频或没有存储来源时空态里的那个去处。 */
   openMediaSettings(): void;
-  /** 这台机器能不能改配置。不能改时空态不给「添加媒体文件夹」。 */
+  /** 这台机器能不能改配置。不能改时空态不给「添加媒体目录」。 */
   configurable: boolean;
 }
 
@@ -361,7 +361,7 @@ export interface FollowManageProps {
   /** 去「看更新」那一页（`/follow`）。整页换成哪一屏仍归遗留壳。 */
   openFollow(): void;
   openServiceConfiguration(): void;
-  /** 账本只读：这台机器只能浏览，写操作全部不给点。 */
+  /** 数据库只读：这台机器只能浏览，写操作全部不给点。 */
   readOnly: boolean;
   readOnlyMessage: string;
   /** 写入端上这一页的地址。取不到时门禁里不给去处。 */
@@ -386,7 +386,7 @@ export interface ReviewProps {
   revealSource(id: number): Promise<string>;
   /** 写操作在服务端落地之后的过去时回执。 */
   toast(message: string): void;
-  /** 账本只读：这台机器只能浏览，判定与收录全部不给点，进页面也不发那一次自动落库。 */
+  /** 数据库只读：这台机器只能浏览，判定与收录全部不给点，进页面也不发那一次自动落库。 */
   readOnly: boolean;
   readOnlyMessage: string;
   /** 写入端上这一页的地址。取不到时门禁里不给去处。 */

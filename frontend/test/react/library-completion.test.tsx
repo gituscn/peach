@@ -102,11 +102,11 @@ it('启动等待期间不重复提交，结束后刷新馆藏并给出封面与�
 
 it('启动失败保留入口与处理详情，不显示完成回执', async () => {
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => init?.method === 'POST'
-    ? { ok: false, status: 400, json: async () => ({ error: '请先添加媒体文件夹' }) }
+    ? { ok: false, status: 400, json: async () => ({ error: '请先添加媒体目录' }) }
     : { ok: true, json: async () => ({ status: 'idle' }) }));
   const host = await mount(prompt());
   await click(buttonNamed('同步这些影片', host));
-  expect(host.textContent).toContain('请先添加媒体文件夹');
+  expect(host.textContent).toContain('请先添加媒体目录');
   expect(host.textContent).not.toContain('补全完成');
   expect(host.querySelector('a[href="/data-cleanup#libraryProcessing"]')?.textContent).toBe('查看并处理');
   expect(buttonNamed('同步这些影片', host)?.disabled).toBe(false);

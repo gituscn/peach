@@ -143,7 +143,7 @@ export function pickerNote(name: string, data: AvatarChoices | undefined): strin
   }
   return data.choices.length
     ? `${name}：换上的那张留在本机，随时能换回来。`
-    : `${name}：还没有候选图片，可输入番号、图片地址或从本机选择。`;
+    : `${name}：还没有备选图片，可输入番号、图片地址或从本机选择。`;
 }
 
 /** 超过两天按天数说：「124 小时」要人自己去除。 */

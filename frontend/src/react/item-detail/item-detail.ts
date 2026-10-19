@@ -103,7 +103,7 @@ export const WATCH_LATER_URL = '/api/watch-later';
 export const QUALITY_GOAL_URL = '/api/quality-goal';
 export const PREFERENCE_URL = '/api/preference';
 
-/** 条目已不在账本里：服务端回 `{error}`，不是一次失败的请求。 */
+/** 条目已不在数据库里：服务端回 `{error}`，不是一次失败的请求。 */
 export class ItemGone extends Error {}
 
 export async function fetchItem(id: number, signal?: AbortSignal): Promise<DetailItem> {
@@ -178,7 +178,7 @@ export function nextPart(queue: DetailQueue | null, id: number): QueueItem | nul
 }
 
 /** 首屏：先定队列（这一下要不要重取由壳说），再定停在哪一条，最后取那一条。要转走的几种情形
- *  （在线资产转关注详情、队列取不到退回普通详情、播放列表空了回列表页、条目已不在）交给壳，
+ *  （在线作品转关注详情、队列取不到退回普通详情、播放列表空了回列表页、条目已不在）交给壳，
  *  壳一换舞台，这一次挂载就作废，不会画出来。 */
 export async function prefetchItemDetail(props: ItemDetailProps, signal: AbortSignal): Promise<void> {
   const { queue: ref, actions } = props;
@@ -279,7 +279,7 @@ export interface ItemDetailActions {
   reopen(): void;
   /** 重新检测一个来源挂没挂上。 */
   checkSource(location: string): Promise<boolean>;
-  /** 在线资产反查不到关注条目时的出口：打开关注页「已保存」那一档。 */
+  /** 在线作品反查不到关注条目时的出口：打开关注页「已保存」那一档。 */
   openSavedFollow(): void;
   openEntity(kind: string, name: string): void;
   openUnowned(): void;
@@ -472,8 +472,8 @@ export const sameOrder = (a: readonly number[], b: readonly number[]) =>
 
 export type MediaGate = 'offline' | 'online' | 'metered' | 'disc' | '';
 
-/** 播放区此刻挡在视频前面的是哪一种说明：来源没挂载、在线资产反查不到关注条目、计费来源要
- *  点一下才拉流。保存过的在线资产照常播（壳在取数时已经把它转去关注详情）。 */
+/** 播放区此刻挡在视频前面的是哪一种说明：来源没挂载、在线作品反查不到关注条目、计费来源要
+ *  点一下才拉流。保存过的在线作品照常播（壳在取数时已经把它转去关注详情）。 */
 export function mediaGate(item: DetailItem, offline: boolean): MediaGate {
   if (offline) return 'offline';
   if (String(item.name || '').toLowerCase().endsWith('.iso')) return 'disc';

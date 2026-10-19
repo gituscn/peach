@@ -1,8 +1,7 @@
-/* 「媒体库与入库」分组：媒体文件夹与自动入库，每个文件夹标着挂载状态。
+/* 「媒体库与入库」分组：媒体目录与自动入库，每个文件夹标着挂载状态。
  *
- * 服务端按两道门放行：托盘管理的服务、且从运行 Peach 的这台电脑打开时 `editable` 才为真；
- * 其它情况表单不画，只留一句为什么。保存成功后 Peach 会重启，这里给一句持久提示、一条新地址
- * 的链接，并在托盘换好进程后自己跳过去。
+ * 服务端检查管理权限后用 `editable` 控制表单；没有权限时只说明原因。
+ * 保存成功后显示持久提示和访问地址，等待服务就绪后跳转。
  *
  * 校验原因由服务端按字段给（400 的 `errors`），页面写回原位，不在前端复制一份路径与端口的判定。 */
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -22,7 +21,7 @@ import { RESTART_REDIRECT_MS } from '../restart-redirect';
 import { CloudDriveGuide } from './clouddrive-guide';
 import { CONFIGURATION_KEY, fetchConfiguration } from './configuration';
 import { groupRoot } from './configuration-panel';
-import { FolderRow, isCloudSource, MEDIA_SOURCES, MediaReadPolicy, MediaReadPolicyHelp, SourceSelect, sourceMark, useFolderRows, WindowsRootInput } from './folder-rows';
+import { FolderRow, isCloudSource, MEDIA_SOURCES, MediaReadPolicy, MediaReadPolicyHelp, SourceSelect, sourceMark, useFolderRows } from './folder-rows';
 import { sourceDefaultCost, type SourceCost } from '../../core/media-sources';
 import { LibraryIconPicker } from './library-icon-picker';
 import { PushDiscoveryForm } from './push-discovery-settings';
@@ -117,7 +116,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
 
   if (saved) {
     return (
-      <Section title="媒体文件夹">
+      <Section title="媒体目录">
         <Stack>
           <Note tone="success" title="配置已保存">
             Peach 正在重新启动。稍后自动跳转，或点击<LinkButton href={saved.url} size="small">进入馆藏</LinkButton>。
@@ -132,13 +131,13 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
   const cloud = rows.some((row) => isCloudSource(row.location));
   const missing = cloud ? (data.mount_dependencies ?? []).filter((dependency) => !dependency.available) : [];
   return (
-    <Section title="媒体文件夹" onSubmit={submit}>
+    <Section title="媒体目录" onSubmit={submit}>
       <Stack>
         <div className="flex flex-col gap-3">
-          <FieldLabel>媒体文件夹</FieldLabel>
-          <div role="group" aria-label="媒体文件夹" className="flex flex-col gap-3">
+          <FieldLabel>媒体目录</FieldLabel>
+          <div role="group" aria-label="媒体目录" className="flex flex-col gap-3">
             {rows.map((row, index) => (
-              <FolderRow key={index} label={`媒体文件夹 ${index + 1}`} path={row.path}
+              <FolderRow key={index} label={`媒体目录 ${index + 1}`} path={row.path}
                 onPath={(path) => edit(index, { path })} error={rowErrors[index]} inputRef={inputRef(index)}
                 picking={picking === index} onPick={() => void pick(index)}
                 onRemove={rows.length > 1 ? () => remove(index) : undefined}
@@ -152,9 +151,6 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                   value={row.library} onChange={(library) => edit(index, { library })} />
                 <LibraryIconPicker label={`媒体库图标 ${index + 1}`} value={row.library_icon} kind={row.location}
                   onChange={(library_icon) => edit(index, { library_icon })} />
-                {data.windows === false
-                  ? <WindowsRootInput value={row.root} onChange={(root) => edit(index, { root })} />
-                  : null}
               </FolderRow>
             ))}
           </div>
@@ -166,9 +162,6 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
             未检测到 {dependency.name}。<ExternalLink href={dependency.download_url}>下载 {dependency.name}</ExternalLink>
           </Help>
         ))}
-        {data.windows === false
-          ? <Help>Windows 对应路径应与馆藏中记录的路径一致。</Help>
-          : null}
         <Checkbox isSelected={scanNow} onChange={setScanNow}>保存后扫描并补全资料</Checkbox>
         {failure ? <Note tone="error" title="没有保存">{failure}</Note> : null}
       </Stack>

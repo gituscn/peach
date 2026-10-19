@@ -44,7 +44,7 @@ export function QueueRequests(): ReactNode {
 
 /** 挂上的这一格要不要按地址打开、什么时候打开。`run(boot)` 只跑一次：`boot` 为真是启动那一次（壳开始路由时，
  *  或路由根晚装上时地址还是启动那一条），为假是一次历史变化。`claimedOpens` 允许认领写地址的打开请求。
- *  覆盖元素按导航序号挂 key；沉浸元素按开次代次挂 key。 */
+ *  覆盖元素按导航序号挂 key；沉浸元素按页面打开序号挂 key。 */
 export function useRouteOpen(run: (boot: boolean) => void, claimedOpens = false): void {
   const opens = useSyncExternalStore(subscribeShell, readOpens);
   const pending = useRef<'boot' | 'history' | null | undefined>(undefined);
@@ -110,7 +110,7 @@ function FollowGroundOpen() {
   return null;
 }
 
-/** 页面组 `/posts/:id` 的元素，按页面开次代次挂 key。 */
+/** 页面组 `/posts/:id` 的元素，按页面打开序号挂 key。 */
 export function FollowDetailGround(): ReactNode {
   return <FollowGroundOpen key={useOpenEpoch()} />;
 }

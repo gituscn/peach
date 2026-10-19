@@ -157,7 +157,7 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
       // 记录读不到就用手上这份：搜索本身不受影响。
     }
   };
-  /* 搜索本身是只读能力；账本暂时只读时，历史记录降级为本次页面内存，写失败不妨碍搜索。 */
+  /* 搜索本身是只读能力；数据库暂时只读时，历史记录降级为本次页面内存，写失败不妨碍搜索。 */
   const rememberSearch = (query: string) => {
     if (!query || !props().historyLimit) return;
     writeHistory([query, ...readHistory().filter((value) => fold(value) !== fold(query))]);

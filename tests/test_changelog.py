@@ -68,8 +68,8 @@ class EntryTests(unittest.TestCase):
         self.assertIsNone(entry_for(Commit("fix(docs): 链接失效", "")))
 
     def test_breaking_changes_are_told_by_the_bang_or_the_footer(self):
-        self.assertEqual(entry_for(Commit("fix!: 账本路径改成 location 键", "")),
-                         ("破坏性变化", "账本路径改成 location 键"))
+        self.assertEqual(entry_for(Commit("fix!: 数据库路径改成 location 键", "")),
+                         ("破坏性变化", "数据库路径改成 location 键"))
         self.assertEqual(
             entry_for(Commit("feat(config): 换掉盘符键", "BREAKING CHANGE: 设置文件要重写")),
             ("破坏性变化", "**配置**：设置文件要重写"))

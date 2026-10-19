@@ -122,7 +122,7 @@ export function wireSourceTools(root,done){
 export async function entityAliasForm(mine,write){
   const form=formModal({
     title:'添加别名',
-    description:'图库按名字存图，多记一个写法就多一批候选；这里添的名字也能提为统称。',
+    description:'图库按名字存图，补充名字写法能找到更多备选图片；这里添加的名字也能设为统称。',
     body:`<label class="modalfield"><span>别名</span>
         <input class="geist-input" name="alias" maxlength="80" autocomplete="off"
           placeholder="另一种写法，或另一个艺名"></label>`
@@ -148,7 +148,7 @@ export async function entityAliasForm(mine,write){
   if(!confirmed)return;
   if(result?.added)receiptsState.actionReceipt(`已添加别名 ${result.alias}`,{undo:async()=>{
     await write({alias:result.alias,remove:true})}});
-  else receiptsState.actionReceipt(`${result?.alias} 已经是这条实体的名字`);
+  else receiptsState.actionReceipt(`${result?.alias} 已经是这份档案中的名字`);
 }
 
 export function showEntityLoading(kind,name){
@@ -228,7 +228,7 @@ entityState.entityFollowActions = {...followState.followFeedActions,
 entityState.SOURCE_HINTS = {
   'source offline':'来源不在线，这一次不对账；接上这个来源后重试',
   'source not mapped':'本机没有映射这个来源的盘符',
-  'file missing':'源文件已不在盘上；点右边的同步把账本对齐',
+  'file missing':'找不到源文件；点击右侧的扫描按钮，重新检查目录并更新数据库记录',
   'unsupported platform':'当前服务端系统不支持直接定位文件',
   'reveal failed':'打开文件管理器失败，请重试',
 };

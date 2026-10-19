@@ -389,7 +389,7 @@ def load_named_studios(connection: sqlite3.Connection, names: list[str]) -> list
             continue
         found.append({"entity_id": row[0], "studio": name, "assets": row[1]})
     if missing:
-        raise SystemExit(f"账本里没有这些厂牌：{'、'.join(missing)}")
+        raise SystemExit(f"数据库里没有这些厂牌：{'、'.join(missing)}")
     return found
 
 

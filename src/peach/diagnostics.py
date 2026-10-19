@@ -56,12 +56,12 @@ def configuration(config, configured, *, validate=True):
 
 def database_checks(settings):
     state = inspect_database(settings.db_path)
-    reasons = {"missing": "账本不存在", "empty": "账本尚未初始化", "unavailable": "账本无法读取"}
+    reasons = {"missing": "数据库不存在", "empty": "数据库尚未初始化", "unavailable": "数据库无法读取"}
     readable = state["database"] == "available" and state["readable"]
     database = item("数据库", "ok" if readable else "failed",
-                    "账本可读取" if readable else reasons.get(state["database"], "账本结构无法读取"),
-                    action="" if readable else "检查本机账本与备份", details={"state": state["database"]})
-    schema_reasons = {"current": "迁移校验通过", "pending": "存在待执行迁移", "empty": "账本尚未初始化",
+                    "数据库可读取" if readable else reasons.get(state["database"], "数据库结构无法读取"),
+                    action="" if readable else "检查本机数据库与备份", details={"state": state["database"]})
+    schema_reasons = {"current": "迁移校验通过", "pending": "存在待执行迁移", "empty": "数据库尚未初始化",
                       "mismatch": "迁移记录与当前程序不一致", "unavailable": "迁移校验未取得"}
     current = state["schema"] == "current"
     schema = item("数据库迁移", "ok" if current else "failed", schema_reasons[state["schema"]],

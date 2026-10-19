@@ -79,7 +79,7 @@ describe('配置中的系统诊断', () => {
         const skeleton = page.locator('[data-skeleton="board/settings/diagnostics"]');
         await skeleton.waitFor();
         assert.equal(await skeleton.locator('.ui-board-local-nav [aria-selected="true"]').textContent(), '系统诊断');
-        assert.equal(await skeleton.locator('section[aria-label="媒体文件夹"]').count(), 0);
+        assert.equal(await skeleton.locator('section[aria-label="媒体目录"]').count(), 0);
         assert.equal(await skeleton.locator('[data-skeleton="diagnostics"]').count(), 1);
         const pending = await skeleton.locator('.ui-configpage').evaluate(element => {
           const body = element.lastElementChild!.getBoundingClientRect();

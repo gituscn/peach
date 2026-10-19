@@ -4,7 +4,7 @@
 
 重启前先过任务闸门：本机有重启后续跑不了的任务就拒绝，`--force` 越过。旧托盘退出后、
 新托盘启动前按 `uv.lock` 同步项目 venv；迁移与就绪检查由新托盘启动时执行，结果从
-`<数据根>/state/runtime-prepare.json` 读回来一起报告（ADR-0091）。stdout 只打一行 JSON。
+`<Peach 数据目录>/state/runtime-prepare.json` 读回来一起报告（ADR-0091）。stdout 只打一行 JSON。
 
 这个进程只能加载标准库与本包的纯 Python 模块：它要在活着的时候替换项目 venv 里的包，
 而 Windows 上被加载的 `.pyd` 换不掉。

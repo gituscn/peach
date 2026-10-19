@@ -150,7 +150,7 @@ def _retry_ids(previous, body):
 def _processing_request(contract, config, previous, body):
     """校验馆藏、阶段与互斥的处理范围。"""
     if not config.configured or not config.locations:
-        raise ValueError('请先添加媒体文件夹')
+        raise ValueError('请先添加媒体目录')
     if contract.db_path.resolve() != (config.directory('database') / 'ledger.db').resolve():
         raise ValueError('当前馆藏与媒体配置不一致')
     retry_ids = _retry_ids(previous, body)

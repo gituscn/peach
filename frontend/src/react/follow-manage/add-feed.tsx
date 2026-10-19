@@ -2,7 +2,7 @@
  *
  * 查找只是列出候选、不写任何东西：同名的人站上可能不止一位，替用户决定「就是这个」是错的。
  * 名字对得上、又只有一个人的那几张先勾上，其余的要用户自己点。地址仍由服务端按勾选的 id 拼，
- * 页面从头到尾不送地址。这位在账本里不存在也可以订：服务端会新建她。 */
+ * 页面从头到尾不送地址。这位在数据库里不存在也可以订：服务端会新建她。 */
 import { useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { RiSearchLine } from '@remixicon/react';
@@ -27,19 +27,19 @@ export interface AddFeedProps {
   onAdded(): void;
 }
 
-/** 勾下去会登记到谁名下：先看勾选的卡已经在谁名下，再看账本里按名字认得出谁，都没有就新建。 */
+/** 勾下去会登记到谁名下：先看勾选的卡已经在谁名下，再看数据库里按名字认得出谁，都没有就新建。 */
 function destination(result: FeedLookup, picked: ReadonlySet<string>): { text: string; blocked: boolean } {
   const holders = new Map<number, string>();
   for (const card of result.candidates) {
     if (picked.has(card.id) && card.held_by) holders.set(card.held_by.id, card.held_by.name);
   }
   if (holders.size > 1) {
-    return { text: `所勾的卡分属账本里不同的人：${[...holders.values()].join('、')}，先去合并再订`, blocked: true };
+    return { text: `所勾的卡分属数据库里不同的人：${[...holders.values()].join('、')}，先去合并再订`, blocked: true };
   }
   const [holder] = holders.values();
   if (holder) return { text: `会登记到「${holder}」名下`, blocked: false };
-  if (result.known) return { text: `会登记到账本里的「${result.known.name}」名下`, blocked: false };
-  return { text: `账本里还没有「${result.q}」，会新建一位`, blocked: false };
+  if (result.known) return { text: `会登记到数据库里的「${result.known.name}」名下`, blocked: false };
+  return { text: `数据库里还没有「${result.q}」，会新建一位`, blocked: false };
 }
 
 function CandidateRow({ card, picked, onPick }: { card: FeedCandidate; picked: boolean; onPick(on: boolean): void }) {

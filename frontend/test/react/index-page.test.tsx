@@ -272,7 +272,7 @@ describe('名册', () => {
     expect(given.openEntity).not.toHaveBeenCalled();
   });
 
-  it('在线名册里建过档的去创作者资料页；同名待确认的读数带「待确认」，去账本里那位的资料页', async () => {
+  it('在线名册里建过档的去创作者资料页；同名待确认的读数带「待确认」，去数据库里那位的资料页', async () => {
     const bound = { k: 'Jul3D', key: 'entity:9', n: 3, entity_id: 9, held_by: '', avatar: '', avatar_fallback: '', providers: [] };
     const held = { k: 'InitialA', key: 'name:initiala', n: 8, entity_id: null, held_by: 'InitialA',
       avatar: '', avatar_fallback: '', providers: [] };

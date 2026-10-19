@@ -151,7 +151,7 @@ async function openFilter(r: Loaded): Promise<HTMLElement> {
   return el;
 }
 
-it('附属面渲染抛错：只空那一面、撤掉登记、上报一次，另一面与整棵树照旧', async () => {
+it('页面内组件渲染抛错：只空那一面、撤掉登记、上报一次，另一面与整棵树照旧', async () => {
   const reported = watchReports();
   pages.feedBroken = true;
   const r = await load();
@@ -210,7 +210,7 @@ it('首屏取数失败不是渲染错误：照画、不上报', async () => {
   expect(reported).not.toHaveBeenCalled();
 });
 
-it('一页抛错：四座附属面照画，后退前进照旧跟着走', async () => {
+it('一页抛错：四座页面内组件照画，后退前进照旧跟着走', async () => {
   const reported = watchReports();
   pages.junkBroken = true;
   const r = await load();

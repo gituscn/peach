@@ -402,7 +402,7 @@ class LandingTests(Case):
         self.assertEqual(names["雲母そら"], f"{alias.SOURCE}@7")
         with self.database.read_connection() as connection:
             self.assertEqual(alias._works(connection, other), 3)
-        self.assertEqual(self.run_followup(momoka, run_id=8)["outcome"], "实体已不存在")
+        self.assertEqual(self.run_followup(momoka, run_id=8)["outcome"], "档案已不存在")
 
     def test_the_page_main_name_breaks_a_tie(self):
         momoka = self.entity("神山ももか")

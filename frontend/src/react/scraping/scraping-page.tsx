@@ -41,7 +41,7 @@ import {
 
 const NETWORKS = [['peach', 'Peach 代理'], ['direct', '直接连接']] as const;
 
-/** 连接方式的选项。账本里存着这两种以外的值（旧版写下的、手改的）时把它原样列成一项，
+/** 连接方式的选项。数据库里存着这两种以外的值（旧版写下的、手改的）时把它原样列成一项，
  *  下拉框照实显示现在是什么，不落到空占位上。 */
 export function networkOptions(current: string): (readonly [string, string])[] {
   return NETWORKS.some(([key]) => key === current) || !current ? [...NETWORKS] : [...NETWORKS, [current, current]];
@@ -160,7 +160,7 @@ function SourceCard({ source, toast }: { source: Source } & ScrapingProps) {
     }>
       <Rows>
         <SettingsRow label="连接方式">
-          {/* 定宽：账本里的长取值按内容撑宽会把左边的「连接方式」挤成竖排，定宽后取值在框里截断。 */}
+          {/* 定宽：数据库里的长取值按内容撑宽会把左边的「连接方式」挤成竖排，定宽后取值在框里截断。 */}
           <Select aria-label="连接方式" className="w-44 min-w-0" selectedKey={network}
             onSelectionChange={(key) => { if (key !== null) setNetwork(String(key)) }}>
             {networkOptions(network).map(([key, name]) => <SelectItem key={key} id={key}>{name}</SelectItem>)}

@@ -59,7 +59,7 @@ describe('设计决定：配置控件', () => {
         }));
         assert.equal(centers.length, 3);
         for (const delta of centers) assert.ok(delta <= 1, `状态偏离输入框中线 ${delta}px`);
-        const media = page.getByRole('form', { name: '媒体文件夹', exact: true });
+        const media = page.getByRole('form', { name: '媒体目录', exact: true });
         assert.notEqual(await media.getByRole('button', { name: '添加文件夹', exact: true }).evaluate((node) => getComputedStyle(node).backgroundImage),
           await media.getByRole('button', { name: '保存配置', exact: true }).evaluate((node) => getComputedStyle(node).backgroundImage));
         await page.getByRole('tab', { name: '应用与维护', exact: true }).click();
@@ -107,7 +107,7 @@ describe('设计决定：配置控件', () => {
 
   it('大量已完成后继可通过键盘展开和收起', { timeout: 60_000 }, async () => {
     const parent = settledRun(1000, 'succeeded', '订阅源拉取');
-    const children = Array.from({ length: 20 }, (_, index) => ({ ...settledRun(index + 1, 'succeeded', '补实体头像'),
+    const children = Array.from({ length: 20 }, (_, index) => ({ ...settledRun(index + 1, 'succeeded', '补全资料图片'),
       parent_run_id: parent.id, root_run_id: parent.id, followup_key: `entity-avatar:${index}`, followup_depth: 1 }));
     const opened = await openActivity(browser, [parent, ...children]);
     try {

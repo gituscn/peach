@@ -201,7 +201,7 @@ def w_settings(contract: SettingsContract, body) -> dict:
         raise TypeError("settings body must be an object")
     unknown = set(body) - SYNCED_SETTING_KEYS
     if unknown:
-        raise ValueError(f"这些设置不跟账本同步：{sorted(unknown)}")
+        raise ValueError(f"这些设置不跟数据库同步：{sorted(unknown)}")
     if not body:
         raise ValueError("没有要写入的设置")
 

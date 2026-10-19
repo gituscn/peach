@@ -1,4 +1,4 @@
-/* 界面偏好的启动归一化、整页那一份 store 与账本对账（`src/appearance/settings.ts`）。 */
+/* 界面偏好的启动归一化、整页那一份 store 与数据库对账（`src/appearance/settings.ts`）。 */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_ACCENT, DEFAULT_HOME_GLOW } from '../../src/appearance/home-glow';
@@ -78,7 +78,7 @@ describe('整页那一份 store', () => {
   });
 });
 
-describe('账本那一份落进本地缓存', () => {
+describe('数据库那一份落进本地缓存', () => {
   const stage = (patch: Partial<AppSettings> = {}) => {
     const store = createSettingsStore(SETTINGS_KEY, { ...normalizeAppSettings({}).settings, ...patch });
     const changed = vi.fn();
@@ -101,7 +101,7 @@ describe('账本那一份落进本地缓存', () => {
     expect([changed.mock.calls.length, store.value.followInitialDays]).toEqual([0, 7]);
   });
 
-  it('账本里还没定条数时，这台设备改过的那个数送上去一次；没改过不送', async () => {
+  it('数据库里还没定条数时，这台设备改过的那个数送上去一次；没改过不送', async () => {
     const fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }));
     vi.stubGlobal('fetch', fetch);
     applySyncedSettings({ searchHistoryLimit: null }, vi.fn(), stage().store);

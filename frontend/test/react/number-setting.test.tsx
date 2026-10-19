@@ -11,7 +11,7 @@ const unmounts: (() => void)[] = [];
 beforeEach(() => { localStorage.clear() });
 afterEach(() => { for (const unmount of unmounts.splice(0)) act(unmount) });
 
-/** 挂一枚控件，`rerender` 换一个外部值（账本对账、请求回来）。 */
+/** 挂一枚控件，`rerender` 换一个外部值（数据库对账、请求回来）。 */
 async function setup(id: NumberSettingId, value: number | null, label = '搜索记录') {
   const host = document.createElement('div');
   document.body.append(host);

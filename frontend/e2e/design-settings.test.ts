@@ -482,7 +482,7 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
       const add = row.locator('[data-sidebar-add]'), trigger = row.locator('[data-sidebar-add-trigger]');
       for (let left = 30; left > 0 && await add.isEnabled(); left -= 1) await add.click();
       assert.equal(await trigger.isDisabled(), true, '全部入口都加回侧栏之后触发器还能点');
-      assert.ok((server.settings.sidebarOrder as string[]).length > ORDER.length, '加回的入口没有写进账本');
+      assert.ok((server.settings.sidebarOrder as string[]).length > ORDER.length, '加回的入口没有写进数据库');
       assert.equal(await trigger.evaluate((node) => getComputedStyle(node).cursor), 'not-allowed',
         '没有可添加的入口时触发器还是普通光标');
       assert.deepEqual(opened.problems, []);

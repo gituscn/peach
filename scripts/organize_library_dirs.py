@@ -394,7 +394,7 @@ def pending_paths(all_rows, mounts, covered, existing=None):
             if root and not mounts[root]:
                 reason = '来源离线，保留原位置'
             elif row.get('_code_conflict'):
-                reason = '账本番号与文件名编号不一致，待确认'
+                reason = '数据库番号与文件名编号不一致，待确认'
             elif owner and beneath(row['path'], canonical_directory(root, owner, existing)):
                 reason = '已在规范分类目录'
             elif row['medium'] == 'other':

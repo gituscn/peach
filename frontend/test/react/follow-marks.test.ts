@@ -128,7 +128,7 @@ describe('标题前后的字样', () => {
     const when = followWhen(item(2, { published_at: '2026-09-04T00:00:00Z' }));
     expect(when).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d$/);
     expect(when).not.toContain('约');
-    /* 账本存 UTC：没带时区标记的串也按 UTC 读，不按本机时区读，否则 UTC+8 的人每个时间都早 8 小时。 */
+    /* 数据库存 UTC：没带时区标记的串也按 UTC 读，不按本机时区读，否则 UTC+8 的人每个时间都早 8 小时。 */
     expect(followWhen(item(3, { published_at: '2026-09-04T00:00:00' }))).toBe(when);
   });
 

@@ -214,7 +214,7 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
       if (chosen === current) return;
       void confirmModal({
         title: '更改统称',
-        body: `「${chosen}」将成为这条实体的规范名，「${current}」留作别名。作品上的署名、搜索和标签都会跟着改写。`,
+        body: `「${chosen}」将成为这份档案显示的名称，「${current}」留作别名。作品上的署名、搜索和标签都会跟着改写。`,
         confirmLabel: '更改统称',
         onConfirm: () => rename.mutateAsync({ from: current, to: chosen }),
       }).then(({ confirmed, result }) => {
@@ -339,7 +339,7 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
     sorts: helpers.sortKeys(filters.sort || 'new', filters.dir || '', javPage),
     jav: javPage ? { layout: props.javLayout, options: props.javLayouts } : null,
   };
-  /* 照片这一排不给排序键：账本里图片只有文件名、体积和来源三样。在一个图集里多两枚源文件键。 */
+  /* 照片这一排不给排序键：数据库里图片只有文件名、体积和来源三样。在一个图集里多两枚源文件键。 */
   const inSet = !!wallPage?.id && !wallPage.error;
   const photo: EntityPhotoHead | null = wallPage && !wallPage.error ? {
     back: inSet, shuffle: !!wallPage.total, layout: props.photoLayout, layouts: props.photoLayouts,

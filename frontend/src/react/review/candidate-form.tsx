@@ -1,8 +1,8 @@
 /* 元数据字段那一类卡片的正文：一组互斥的来源值，加上还没收录的 genre。
  *
- * 一张候选卡上下两段读的是两件事：上段是这个来源给的那个值，也就是选中它就会写进账本
+ * 一张候选卡上下两段读的是两件事：上段是这个来源给的那个值，也就是选中它就会写进数据库
  * 的东西；下段是同一来源顺带交回来的其它字段，只作判断依据。两段各自铺底色并由一条线
- * 隔开，选哪一段能改账本就不用猜。 */
+ * 隔开，选哪一段能改数据库就不用猜。 */
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Radio, RadioGroup } from 'react-aria-components';
@@ -105,7 +105,7 @@ export function CandidateChoices(
     );
   }
   return (
-    <RadioGroup aria-label={`${fieldName || '候选'}的来源`} value={value} isDisabled={locked}
+    <RadioGroup aria-label={`${fieldName || '资料'}的来源`} value={value} isDisabled={locked}
       onChange={onChange} className="flex flex-col gap-2">
       {candidates.map((candidate) => (
         <Radio key={candidate.candidate_key} value={candidate.candidate_key}

@@ -290,7 +290,7 @@ def plan(local: Path, shared: Path) -> SyncPlan:
 
     local_exists, shared_exists = local.is_file(), shared.is_file()
     if not shared_exists and not local_exists:
-        return SyncPlan("missing", "两侧都没有账本")
+        return SyncPlan("missing", "两侧都没有数据库")
     if not shared_exists:
         return SyncPlan("push", "共享副本不存在，用本地副本播种")
     if not local_exists:
@@ -304,7 +304,7 @@ def plan(local: Path, shared: Path) -> SyncPlan:
     if local_marker is None or shared_marker is None:
         # 没有血缘可比，两份都有数据。这种情况只能人来选，自动挑一边就是丢数据。
         return SyncPlan(
-            "conflict", "缺少同步标记，无法判断两份账本的先后",
+            "conflict", "缺少同步标记，无法判断两份数据库的先后",
             local_generation, shared_generation,
         )
     if (local_generation == shared_generation
@@ -375,13 +375,13 @@ class LedgerSync:
         """409 时给界面的解释：发生了什么、影响、怎么恢复。"""
         if self.status == "conflict":
             return (
-                f"账本处于冲突状态（{self.detail}），本机暂时只读。"
-                "请在托盘执行「同步 Ledger」；若提示仍冲突，需按日志人工处理。"
+                f"数据库处于冲突状态（{self.detail}），本机暂时只读。"
+                "请在托盘执行「同步数据库」；若提示仍冲突，需按日志人工处理。"
             )
         owner = writer_device(self.local, self.shared) or "另一台机器"
         return (
-            f"账本由 {owner} 负责写入，本机当前只能浏览。"
-            "请改在该机器上操作，或在托盘执行「接管 Ledger 写入」"
+            f"数据库由 {owner} 负责写入，本机当前只能浏览。"
+            "请改在该机器上操作，或在托盘执行「由本机接管数据库写入」"
             "（要求两侧数据一致）后再试。"
         )
 
@@ -468,7 +468,7 @@ class LedgerSync:
             return "pushed"
         if decision.action == "conflict":
             self.status, self.detail = "conflict", decision.reason
-            LOGGER.error("账本同步冲突：%s", decision.reason)
+            LOGGER.error("数据库同步冲突：%s", decision.reason)
             return "conflict"
         self.status = decision.action
         return decision.action

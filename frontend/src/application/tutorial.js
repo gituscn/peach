@@ -92,7 +92,7 @@ tutorialState.postSetupTutorialDone = null;
 tutorialState.postSetupTutorialNeedsReopen = false;
 if(cameFromSetup){
   setPostSetupTutorialMarker('pending');
-  // 账本里那句「教程做完了」可能是上一次安装留下的，刚走完设置就得撤回。
+  // 数据库里那句「教程做完了」可能是上一次安装留下的，刚走完设置就得撤回。
   tutorialState.postSetupTutorialDone=false;tutorialState.postSetupTutorialNeedsReopen=true;
   const clean=new URL(location.href);clean.searchParams.delete('onboarding');
   shellNavigate(clean,{replace:true,state:peachHistory.navigation.location.state});

@@ -39,7 +39,7 @@ export interface TelemetryOptions {
  *
  *  同一个 -1 哨兵：`it.duration||v.duration||0` 对 -1 求值仍是 -1，通过了真值判断，于是
  *  currentTime/-1 得到负比例，面板上就是「离开位置 -3320%」。后端 w_activity 有 `dur > 0` 守卫，
- *  脏比例不会进账本；坏的只是显示。
+ *  脏比例不会进数据库；坏的只是显示。
  *
  *  十秒一次的上报只有一个定时器。onplay 每次新起一个而只有 onpause 清的话，「播放→拖动→播放」
  *  这类不经过 pause 的序列会把定时器叠起来；更要紧的是离开详情时既不 pause 也不 ended，

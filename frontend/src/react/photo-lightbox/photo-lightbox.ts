@@ -5,7 +5,7 @@
  * 定位源文件，样张和在线图只展示来源、序号、尺寸和可取得的大小。 */
 import { fmtSize, LOC } from '@peach/legacy/core';
 
-/** 本地图片在账本里的那几样。定位只把 `id` 交给服务端，路径绝不进浏览器。 */
+/** 本地图片在数据库里的那几样。定位只把 `id` 交给服务端，路径绝不进浏览器。 */
 export interface LightboxAsset {
   id: number;
   name?: string;

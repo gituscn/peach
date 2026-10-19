@@ -1,7 +1,7 @@
 /* 统计页的数据契约与折算：`/api/stats` 一次请求供整页使用。
  *
  * 端点在 `frontend/src` 里只在这里声明一次（`tests/test_frontend_build.py` 盯着）。
- * 这一页是账本当前的快照，没有后台任务也不轮询：整页只有一个 `queryKey`，一屏里的四个
+ * 这一页是数据库当前的快照，没有后台任务也不轮询：整页只有一个 `queryKey`，一屏里的四个
  * 指标、下面那三个面板读的都是同一份数，分开取就会出现这一格是新的、那一格是旧的。
  *
  * 体积走 `src/core/index.ts` 的 `fmtSize`，与馆藏、重复项、高清版同一套口径；播放时长、百分比
@@ -87,7 +87,7 @@ export const fetchStats = (signal?: AbortSignal) => apiGet<StatsData>(STATS_URL,
 
 /** 首屏：取完数才画。
  *
- * 不给 `staleTime`。这一页读的是账本此刻的样子，每进一次都该重新问一遍；缓存住的话，
+ * 不给 `staleTime`。这一页读的是数据库此刻的样子，每进一次都该重新问一遍；缓存住的话，
  * 扫完一批回来看到的还是进页面之前那个数。 */
 export async function prefetchStats(signal: AbortSignal): Promise<void> {
   await queryClient.fetchQuery({ queryKey: STATS_KEY, queryFn: () => fetchStats(signal) });

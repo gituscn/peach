@@ -375,10 +375,10 @@ def merge_entity(
     改指 target，链条始终只有一跳；`resolve_entity_id` 按它把旧 id 解析到 target。
     """
     if source_id == target_id:
-        raise ValueError("实体不能并入自己")
+        raise ValueError("不能合并到同一份档案")
     target = connection.execute("SELECT kind FROM entity WHERE id=?", (target_id,)).fetchone()
     if target is None:
-        raise ValueError(f"合并目标实体 {target_id} 不存在")
+        raise ValueError(f"合并目标档案 {target_id} 不存在")
     target_kind = str(target[0])
     stamp = now or datetime.now(timezone.utc).isoformat()
     moved = {"assets": 0, "aliases": 0, "refs": 0, "links": 0, "terms": 0,

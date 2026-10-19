@@ -4,7 +4,7 @@
  * `GlowPresetGrid`）、下面一组强调色（BoardUI 自己那颗 radial-gradient 的球），底部一枚全宽主按钮
  * 通到详细设置。实测见 docs/reference-snapshots/feralui-studio-boardui-accent-measured.md。
  *
- * 常驻面 `glow-picker`（`router/managed-routes.tsx` 的常驻表）：路由树把内容直接画成壳常驻在 body 末尾的
+ * 常驻组件 `glow-picker`（`router/managed-routes.tsx` 的常驻表）：路由树把内容直接画成壳常驻在 body 末尾的
  * `#boardGlowMenu` 的子节点，宿主就是卡本身，壳启动时打开。卡没有命令式句柄，读写的是壳那一份界面偏好
  * store。锚定、开合、玻璃材质与和媒体库菜单互斥都在壳的 `wireAnchoredMenu` 里，卡不换成 BoardUI
  * Popover：那一套动效与材质要在 Popover 外面再复刻一遍才对得上像素，复刻出来的就是第二份。

@@ -22,7 +22,7 @@ _GENERATED_BACKUP = re.compile(r"config\.toml\.[A-Za-z0-9._-]*?-\d{8}-\d{6}")
 
 
 def _generated_backups(root: Path) -> list[Path]:
-    """数据根里由 Peach 自己写下的设置备份。
+    """Peach 数据目录里由 Peach 自己写下的设置备份。
 
     `config.toml.bak` 是 `docs/OPERATIONS.md` 教用户在升级前自己复制的一份，删掉它
     等于把回退的路一起删了；只认带时间戳的那种形态，其它未列名文件同样保留。
@@ -213,7 +213,7 @@ def poll(tray) -> None:
         if any(data.get(key) != value for key, value in checked.items()):
             raise ValueError("配置已变更，请重新确认卸载")
         shell = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32/WindowsPowerShell/v1.0/powershell.exe"
-        # 桌面图标和启动项都在数据根之外，`_SCRIPT` 的路径校验只认数据根里的东西，
+        # 桌面图标和启动项都在 Peach 数据目录之外，`_SCRIPT` 的路径校验只认 Peach 数据目录里的东西，
         # 列进 `files` 会被它 `exit 2`。卸载前先由这一步把两个 `.lnk` 都撤掉。
         desktop_startup.save(config, enabled=False, silent=True, desktop=False)
         process = subprocess.Popen([str(shell), "-NoProfile", "-NonInteractive", "-EncodedCommand",

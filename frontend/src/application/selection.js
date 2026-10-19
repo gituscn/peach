@@ -24,7 +24,7 @@ export function paintSelection(){
   pushGridPage({selected:new Set(selected),selectMode});
   pushEntityPage({selected:new Set(selected),selectMode});
   pushFollowFeed({selected:new Set(followSelected),selectMode});
-  /* 底部浮条归常驻面 `batch-dock`（`react/batch-dock/`）：壳推计数与语境，每种语境列哪几颗键由它按语境定。 */
+  /* 底部浮条归常驻组件 `batch-dock`（`react/batch-dock/`）：壳推计数与语境，每种语境列哪几颗键由它按语境定。 */
   selectionState.batchDockProps=selectionDockProps();
   /* 浮条宿主在 `#main` 外面，玻璃贴图的观察器看不到它长出来，画完补扫一遍。 */
   if(batchDockApi()){batchDockApi().render(selectionState.batchDockProps);preferencesState.syncGlassOptics()}
@@ -108,7 +108,7 @@ export async function pickBatchRegion(){
 
 export async function runFollowBatch(action,button){
   const items=[...followSelected];if(!items.length)return;
-  const labels={save:'保存到账本',seen:'标记已看',ignored:'忽略'};
+  const labels={save:'保存到数据库',seen:'标记已看',ignored:'忽略'};
   const titles={save:'保存所选作品',seen:'标记为已看',ignored:'忽略所选作品'};
   return confirmModal({title:titles[action],body:`将处理选中的 ${items.length} 项关注作品。`,confirmLabel:titles[action],danger:false,onConfirm:async()=>{
   setActionBusy(button);

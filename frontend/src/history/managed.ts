@@ -1,19 +1,19 @@
-/* 由路由画的那几页与页面里的附属面（ADR-0031「页面与页面里的附属面只由路由树画」）：壳决定什么时候开、
+/* 由路由画的那几页与页面里的页面内组件（ADR-0031「页面与页面里的页面内组件只由路由树画」）：壳决定什么时候开、
  * 什么时候收，React 路由树画。
  *
  * 页面画进壳的三个容器：管理区正文 `#stats`，索引页与资料页共用的 `#index`，目录网格与垃圾队列共用的
- * `#grid`。附属面各有自己的容器：首页筛选条 `#catalogFilter`、首页新作行 `#feedNew`、
+ * `#grid`。页面内组件各有自己的容器：首页筛选条 `#catalogFilter`、首页新作行 `#feedNew`、
  * 顶栏搜索下拉 `#searchMenu`。一个容器同时只有一页（或一面），各个容器各记各的：
  * 资料页画进 `#index` 时，管理区那一页只是被壳藏起来、照旧活着（有轮询的页面照着原节律取数），等壳下一次
  * 认领表面（`claimSurface`）才把 `#stats` 与 `#index` 一起收；`#grid` 不在其中，目录内换筛选也认领表面，网格
- * 要一直画着；附属面由壳按各自的路由判据收，搜索下拉壳从不收。页面跟着这里登记的那一条走，不跟着
+ * 要一直画着；页面内组件由壳按各自的路由判据收，搜索下拉壳从不收。页面跟着这里登记的那一条走，不跟着
  * 地址匹配走：详情舞台压在页面上时地址是 `/assets/:id`，页面要留着。
  *
- * 常驻面（批量条、配色卡、管理区页头、沉浸模式、设置面板、侧栏、舞台）不跟某一页走，经 `openResidentSurface` 打开：
+ * 常驻组件（批量条、配色卡、管理区页头、沉浸模式、设置面板、侧栏、舞台）不跟某一页走，经 `openResidentSurface` 打开：
  * 没有首屏取数、一直算当前页，宿主就是那个常驻节点。它们从不收；只有错误边界会卸掉它的组件，而且只卸组件、
  * 不撤宿主。
  *
- * 登记键是「面」：页面用路径（`/stats`、`/performers/*`、`/`），附属面与常驻面用名字（`search`、
+ * 登记键是「面」：页面用路径（`/stats`、`/performers/*`、`/`），页面内组件与常驻组件用名字（`search`、
  * `batch-dock`），两者不重叠，路由树按键查同一组表（`react/router/managed-routes.tsx`）。
  *
  * 一次打开：壳铺好骨架后调 `openManagedRoute`，这里先收起同一容器里的上一页，再取首屏；取齐、壳也还停在
@@ -24,14 +24,14 @@
 
 /** 画在某个容器里的那一页（或一面）。`host` 是页面 portal 进去的那个 `.peach-react` 宿主。 */
 export interface ManagedEntry {
-  /** 登记键：页面的路径，或附属面的名字。 */
+  /** 登记键：页面的路径，或页面内组件的名字。 */
   path: string;
   props: object;
   revision: number;
-  /** 壳的容器（`#stats`、`#index`、`#grid` 或某个附属面的容器）。 */
+  /** 壳的容器（`#stats`、`#index`、`#grid` 或某个页面内组件的容器）。 */
   container: Element;
   host: HTMLElement;
-  /** 常驻面：宿主是壳的节点，收起与抛错时只卸组件、不撤宿主。 */
+  /** 常驻组件：宿主是壳的节点，收起与抛错时只卸组件、不撤宿主。 */
   resident: boolean;
 }
 
@@ -47,7 +47,7 @@ export interface ManagedOpenOptions {
    *  放进一个新的 `.peach-react`。资料页要这个：浮层吸顶要它的父盒就是 `#index`，新作那一行是遗留层
    *  卡片、不进 `.peach-react`，所以框架的四块由壳排，页面只占其中一块，再经 portal 画进另外三块。 */
   place?: (container: Element) => HTMLElement;
-  /** 常驻面（`openResidentSurface` 打开的那几座）：宿主归壳，收起与抛错时只卸组件、不撤宿主。 */
+  /** 常驻组件（`openResidentSurface` 打开的那几座）：宿主归壳，收起与抛错时只卸组件、不撤宿主。 */
   resident?: boolean;
 }
 
@@ -128,7 +128,7 @@ export async function openManagedRoute(path: string, props: object, options: Man
   return true;
 }
 
-/** 打开一座常驻面（常驻表 `RESIDENT_ROUTES` 里的名字）：一直算当前页，宿主就是壳交来的节点本身，组件直接画成
+/** 打开一座常驻组件（常驻表 `RESIDENT_ROUTES` 里的名字）：一直算当前页，宿主就是壳交来的节点本身，组件直接画成
  *  它的子节点，所以 DOM 与这座面自己建根时一样。没有首屏取数，路由树接上就画；画上了回 true。
  *
  *  `place` 在画首帧的同一个任务里把宿主交给路由树，返回的仍须是这个节点本身；不给就原样交出。宿主里先有
@@ -163,7 +163,7 @@ export function updateManagedRoute(container: Element | null, patch: object): vo
 
 /** 收起这几个容器里的页面：中止在途的首屏取数，卸掉页面并撤掉宿主，一次通知。没有页面的容器是空操作。
  *  容器逐个点名，没有「全部收起」：壳换页认领表面时收 `#stats` 与 `#index`，`#grid` 在目录各路径与回收站
- *  之间一直画着，只在离开目录时由壳单独收；附属面由壳按各自的路由判据收。常驻面的宿主是壳的节点，
+ *  之间一直画着，只在离开目录时由壳单独收；页面内组件由壳按各自的路由判据收。常驻组件的宿主是壳的节点，
  *  这里只卸组件、不撤宿主。 */
 export function releaseManagedRoute(container: Element, ...more: Element[]): void {
   const removed: ManagedEntry[] = [];
@@ -192,7 +192,7 @@ export function releaseAllManagedRoutes(): void {
 
 /** 某一面渲染抛错、路由树的错误边界接住之后调：只撤这一面的登记与宿主，别的面照画。之后
  *  `managedTaken` 回 false、`updateManagedRoute` 对它是空操作，壳下一次打开就重开。代次对不上（这一格
- *  已经收起或重开过）是空操作：过期的那一面不能撤掉壳刚开的新一面。常驻面的宿主是壳的节点，只卸组件、
+ *  已经收起或重开过）是空操作：过期的那一面不能撤掉壳刚开的新一面。常驻组件的宿主是壳的节点，只卸组件、
  *  不撤宿主；壳不会再打开它，这一面空到刷新为止。
  *
  *  删登记与撤宿主当场做，通知延到微任务：这里在 React 的提交阶段里（错误边界的 `componentDidCatch`），

@@ -1,7 +1,7 @@
 /* 沉浸模式（ADR-0031 第 11e 步）：`/immerse` 的全屏连播。片单、每一格的播放器、加载提示、手势、
  * 动作键、作者与标题都在这一面里。
  *
- * 常驻面 `immerse`（`router/managed-routes.tsx` 的常驻表）：路由树把它画进 body 末尾的常驻宿主
+ * 常驻组件 `immerse`（`router/managed-routes.tsx` 的常驻表）：路由树把它画进 body 末尾的常驻宿主
  * `[data-immerse-host]`，宿主就是那个节点本身，第一次打开沉浸模式时由 `application-residents.ts` 的 `loadImmerse` 建好、
  * 在画首帧的同一个任务里挂进文档。首帧就是藏着的外框。壳只拿 `configureImmerse` 给的命令式入口：沉浸
  * 模式盖在所有页面之上，壳的键盘、换批与播放快捷键要随时同步问它开没开、当前是哪一个 video。句柄写本模块

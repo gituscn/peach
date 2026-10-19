@@ -10,7 +10,7 @@
  *
  * 每一次历史变化（壳写的、React 子树写的、后退前进）都领一个递增的序号 `seq`。壳写地址走 `shellNavigate`，
  * 那一次当场认领（`claimed`）：页面元素保持代次，覆盖元素接走这一次的打开请求。后退前进、React
- * 子树写的与壳经 `peachHistory` 直接写的那几次没人认领，另领一个开次代次（`openEpoch`）：每一次都要把那一页
+ * 子树写的与壳经 `peachHistory` 直接写的那几次没人认领，另领一个页面打开序号（`openEpoch`）：每一次都要把那一页
  * 按地址重开一遍。代次在通知订阅者之前就定了，路由根同步提交那一次渲染里读到的已经是新代次，页面按它挂 key，
  * 一次打开只挂一次。判据用序号与代次不用地址：同一条目重放的 `popstate` 地址不变，那一页照样要重开。 */
 import { UNSAFE_createBrowserHistory, type Location, type NavigationType, type Navigator, type To } from 'react-router';
@@ -21,7 +21,7 @@ import { settingsBackgroundOf, isPreferencePath } from './settings-route';
 export * from './settings-route';
 export { canonicalPath } from './canonical-path';
 
-/** 一次历史变化：动作、变化之后的地址、它领到的序号、到这一次为止的开次代次，和这一次是不是壳认领写的。 */
+/** 一次历史变化：动作、变化之后的地址、它领到的序号、到这一次为止的页面打开序号，和这一次是不是壳认领写的。 */
 export interface Navigation {
   action: NavigationType;
   location: Location;

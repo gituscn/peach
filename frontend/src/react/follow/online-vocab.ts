@@ -11,7 +11,7 @@ export const FOLLOW_AUTHORS_URL = '/api/follow/authors';
 export const FOLLOW_TAGS_URL = '/api/follow/tags';
 
 /** 来源上的一位创作者。`key` 是关注页筛选用的那套创作者键：建过档的是 `entity:<id>`，
- *  还没建档的按名字归组。`held_by` 是账本里同名的那位创作者，等用户在那一页认过才绑定。 */
+ *  还没建档的按名字归组。`held_by` 是数据库里同名的那位创作者，等用户在那一页认过才绑定。 */
 export interface OnlineAuthor {
   k: string;
   key: string;

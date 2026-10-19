@@ -327,7 +327,7 @@ class SuggestionTests(_Server):
         report = cd.check(self.address, TOKEN, "/115/云下载", hints=self.hints(prefixes=prefixes, roots=roots))
         self.assertEqual(report["suggested_pikpak_root"], "")
         self.assertEqual(len(report["problems"]), 1)
-        self.assertIn("PikPak 根目录对应的媒体文件夹", report["problems"][0])
+        self.assertIn("PikPak 根目录对应的媒体目录", report["problems"][0])
 
     def test_without_a_pikpak_account_the_pikpak_root_is_left_alone(self):
         report = cd.check(self.address, TOKEN, TARGET, hints=self.hints(prefixes=(), pikpak_account=False))

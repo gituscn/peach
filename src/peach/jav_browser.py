@@ -126,7 +126,7 @@ class JavBrowser:
         if action not in {"enable", "rotate", "disable"}:
             raise ValueError("请选择启用、更新令牌或关闭")
         if not self.downloads.available:
-            raise ValueError("浏览器添加只在账本写入端可用")
+            raise ValueError("浏览器添加只在允许修改数据库的设备上可用")
         with self._lock:
             if action == "disable":
                 self.credentials.clear(CREDENTIAL)
@@ -152,7 +152,7 @@ class JavBrowser:
 
     def _ready(self, provider: str):
         if not self.downloads.available:
-            raise ValueError("浏览器添加只在账本写入端可用")
+            raise ValueError("浏览器添加只在允许修改数据库的设备上可用")
         state = next((row for row in self.downloads.snapshot(1)["providers"] if row["key"] == provider), None)
         if not state or not state["configured"] or not state["target"]:
             raise ValueError("请先在下载渠道配置网盘账号和目标目录")

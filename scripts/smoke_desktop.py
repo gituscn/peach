@@ -257,7 +257,7 @@ def smoke_tray(executable: Path, evidence_dir: Path) -> None:
     with smoke_directory(evidence_dir) as root:
         data, media = root / "data", root / "media"
         media.mkdir()
-        # 全新数据根的默认端口必须空闲，避免把其他部署当作首启服务。
+        # 全新 Peach 数据目录的默认端口必须空闲，避免把其他部署当作首启服务。
         with socket.socket() as reservation:
             reservation.bind(("127.0.0.1", 8900))
         with socket.socket() as reservation:

@@ -711,7 +711,7 @@ def land(connection: sqlite3.Connection, entity_id: int, expected_name: str, sit
                 for name in names]
     if normalize_entity_name(current[0]) != normalize_entity_name(expected_name):
         return [{**base, "alias": name, "action": STALE,
-                 "detail": f"账本里这条实体现在叫 {current[0]}"} for name in names]
+                 "detail": f"数据库里这条实体现在叫 {current[0]}"} for name in names]
     have = {normalize_entity_name(name) for name in [current[0], *current[1]]}
     owners, rows = _owners(connection, allow_creator=allow_creator), []
     for name in dict.fromkeys(names):
@@ -740,7 +740,7 @@ def land(connection: sqlite3.Connection, entity_id: int, expected_name: str, sit
             have.add(normalize_entity_name(name))
             owners.setdefault(match_key(name), set()).add(entity_id)
             rows.append({**base, "alias": name, "action": WRITE, "batch": batch,
-                         "detail": f"{site} 页面列着账本里她的名字"})
+                         "detail": f"{site} 页面列着数据库里她的名字"})
     return rows
 
 
@@ -832,7 +832,7 @@ def _run(contract, key: str, handle) -> dict:
         refs = _refs(connection, entity_id)
         codes = fc2_codes(connection, entity_id)
     if names is None:
-        return {"outcome": "实体已不存在"}
+        return {"outcome": "档案已不存在"}
     canonical = names[0]
     if handle is not None:
         handle.progress(label=_label(canonical), throttle=0)
@@ -881,7 +881,7 @@ def _visit_fc2cmadb(contract, sites: dict, entity_id: int, canonical: str, codes
     with contract.database.read_connection() as connection:
         current = _names(connection, entity_id)
     if current is None:
-        reports[FC2CMADB] = "未命中：实体已不存在"
+        reports[FC2CMADB] = "未命中：档案已不存在"
         return []
     mine = {match_key(name) for name in [current[0], *current[1]] if name}
     try:
@@ -919,7 +919,7 @@ def _visit(contract, sites: dict, entity_id: int, canonical: str, refs: list[str
             with contract.database.read_connection() as connection:
                 current = _names(connection, entity_id)
             if current is None:
-                reports[site] = "未命中：实体已不存在"
+                reports[site] = "未命中：档案已不存在"
                 continue
             mine = {match_key(name) for name in [current[0], *current[1]] if not rejection(name)}
             keys = [name for name in search_keys(*current) if name not in tried[site]][:MAX_KEYS]
@@ -940,7 +940,7 @@ def _visit(contract, sites: dict, entity_id: int, canonical: str, refs: list[str
             pages = [(url, found) for url, found in pages
                      if url not in visited and _anchored(found, mine)]
             if not pages:
-                reports[site] = f"未命中：{note or '页面上没有账本里她的名字'}"
+                reports[site] = f"未命中：{note or '页面上没有数据库里她的名字'}"
                 continue
             for url, found in pages:
                 visited.add(url)

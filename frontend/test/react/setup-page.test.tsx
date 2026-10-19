@@ -195,9 +195,15 @@ describe('媒体库', () => {
     expect(host.textContent).not.toContain('挂载帮助');
   });
 
-  it('其它系统每行多一格 Windows 中的对应路径', async () => {
-    const { host } = await open({ windows: false, media_root: { label: 'Windows 中的对应路径', placeholder: '例如 B:\\' } });
-    expect(rows(host)[0]!.textContent).toContain('Windows 中的对应路径');
+  it('非 Windows 首启只填写媒体目录即可提交', async () => {
+    const { host, sent } = await open({ windows: false,
+      media_root: { label: '数据库中的路径前缀', placeholder: '自动配置' } },
+    { [SETUP_URL]: { status: 200, body: done() } });
+    expect(rows(host)[0]!.querySelector('details')).toBeNull();
+    expect(rows(host)[0]!.querySelector('input[placeholder="自动配置"]')).toBeNull();
+    await type(paths(host)[0], '/media/movies');
+    await submitForm(host);
+    expect(sent(SETUP_URL).media_dir[0]).toMatchObject({ path: '/media/movies', root: '' });
   });
 });
 
@@ -221,13 +227,13 @@ describe('填错时原位标错', () => {
 
   it('整表不成立的那一句写在目录区上方，不挂到某一行', async () => {
     const { host } = await open({}, { [SETUP_URL]: { status: 400, body: {
-      error: '有几项需要修改', errors: { media_dir: ['请添加 1 到 100 个媒体文件夹'] } } } });
+      error: '有几项需要修改', errors: { media_dir: ['请添加 1 到 100 个媒体目录'] } } } });
     await click(buttonNamed('添加媒体库', host));
     await submitForm(host);
-    const [alert, ...more] = alertsWith(host, '请添加 1 到 100 个媒体文件夹');
+    const [alert, ...more] = alertsWith(host, '请添加 1 到 100 个媒体目录');
     expect(alert).toBeDefined();
     expect(more).toHaveLength(0);
-    expect(occurrences(host, '请添加 1 到 100 个媒体文件夹')).toBe(1);
+    expect(occurrences(host, '请添加 1 到 100 个媒体目录')).toBe(1);
     expect(rows(host).some((row) => row.contains(alert!))).toBe(false);
     expect(alert!.compareDocumentPosition(rows(host)[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(advanced(host)?.getAttribute('aria-expanded')).toBe('false');

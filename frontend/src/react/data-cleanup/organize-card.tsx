@@ -2,7 +2,7 @@
  *
  * 预览是一次同步请求，结果只活在这张卡上；执行与回滚是同一趟后台任务，快照摊在
  * `/api/organize` 的顶层，所以 `useBackgroundJob` 用 `withJob` 只换任务那几格，来源、模板
- * 与上一批原样留着。执行与回滚动的是真实文件名与账本路径，都要先过确认弹层。 */
+ * 与上一批原样留着。执行与回滚动的是真实文件名与数据库路径，都要先过确认弹层。 */
 import { useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { confirmModal, MEDIA_SOURCE_ICONS } from '@peach/legacy/ui';
@@ -28,7 +28,7 @@ import {
 
 const APPLY_BODY = (name: string) => `将按这两份模板改动「${name}」上的文件名与目录，目标已存在的行会整行跳过。`
   + '这一批可以从「回滚上一批」整批退回。';
-const ROLLBACK_BODY = '将把上一批整理动过的文件退回整理前的名字与位置，账本路径跟着退回。'
+const ROLLBACK_BODY = '将把上一批整理动过的文件退回整理前的名字与位置，数据库路径跟着退回。'
   + '退回后这一批不再出现在这里。';
 /** 预览只列前 8 行：这里是给人扫一眼方向对不对，完整计划在 CSV 里。 */
 const PLAN_ROWS = 8;

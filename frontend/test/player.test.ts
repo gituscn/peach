@@ -38,7 +38,7 @@ const host = (seekSeconds = 10): PlayerHost => ({
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('片源判据', () => {
-  it('保存过的在线资产走关注条目的代理，不问 stream-plan', async () => {
+  it('保存过的在线作品走关注条目的代理，不问 stream-plan', async () => {
     const calls = stubFetch(() => null);
     const source = await playableStreamSource({ id: 7, location: 'online', follow_item_id: 42 }, 's1');
     expect(source).toEqual({ src: '/follow-stream?id=42', type: 'video/mp4' });

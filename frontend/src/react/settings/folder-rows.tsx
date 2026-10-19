@@ -1,7 +1,7 @@
-/* 媒体文件夹的行：配置页「这台电脑」与首启页共用。
+/* 媒体目录的行：配置页「这台电脑」与首启页共用。
  *
  * 一行是一块描边卡：路径框、「选择文件夹」、多行时的移除键，下面一排放这一行的其余字段
- * （来源、Windows 对应路径，配置页另有媒体库名称与图标），宽度够时并成一行。行的增删、
+ * （媒体来源与读取策略，配置页另有媒体库名称与图标），宽度够时并成一行。行的增删、
  * 按行错误、新行接焦点与选择文件夹的忙态归 `useFolderRows`；弹系统对话框那一请求由调用方注入，这里不认识任何端点，首启页的独立
  * 页面包因此不必带上主界面的请求封装。 */
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
@@ -153,7 +153,7 @@ export function FolderRow({ label, path, onPath, error, inputRef, picking, onPic
   return (
     <div data-folder-row className="@container flex flex-col gap-2 rounded-2lg border border-separator-border bg-background-primary-default p-3">
       <div className="flex items-start gap-2">
-        <Input className="min-w-0 flex-1" aria-label={label} placeholder="本机文件夹路径"
+        <Input className="min-w-0 flex-1" aria-label={label} placeholder="媒体目录路径"
           value={path} onChange={onPath} ref={attach}
           onBlur={() => requestAnimationFrame(showTail)}
           validationBehavior="aria" isInvalid={Boolean(error)} hint={error || undefined} />
@@ -184,14 +184,4 @@ export function SourceSelect({ index, value, onChange, options = MEDIA_SOURCES }
       ))}
     </Select>
   );
-}
-
-/** 非 Windows 上每行多出的那一格：账本里的 Windows 形态路径。 */
-export function WindowsRootInput({ value, onChange, label = 'Windows 中的对应路径', placeholder = '例如 B:\\' }: {
-  value: string;
-  onChange: (root: string) => void;
-  label?: string;
-  placeholder?: string;
-}) {
-  return <Input label={label} placeholder={placeholder} value={value} onChange={onChange} />;
 }

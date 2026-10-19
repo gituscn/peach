@@ -160,7 +160,7 @@ it('人像框选里能整张使用，作品画面不给这条路', async () => {
   await click(cells()[1]);
   await settle();
   expect(buttonNamed('整张使用')).toBeNull();
-  await click(buttonNamed('回候选'));
+  await click(buttonNamed('返回备选图片'));
   await settle();
   await click(cells()[0]);
   await settle();
@@ -526,12 +526,12 @@ it('在线作品可在封面与正文图片间选底图，裁切回递创作者�
     crop: { x0: 130, y0: 0, x1: 670, y1: 540 }, version: '' });
 });
 
-it('框错了能回候选，回去还是那一屏', async () => {
+it('框错了能返回备选图片，回去还是那一屏', async () => {
   const calls = server(listing([artwork()]));
   await openPicker();
   await click(cells()[0]);
   await settle();
-  await click(buttonNamed('回候选'));
+  await click(buttonNamed('返回备选图片'));
   await settle();
   expect(cells()).toHaveLength(1);
   expect(calls).toHaveLength(1);

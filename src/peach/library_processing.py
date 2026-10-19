@@ -308,7 +308,7 @@ class LibraryMetadataProvider:
         from .scraping_access import SourceTransport
         from .jav_cover_fetch import HostLimitedTransport
         self.secrets_root = Path(secrets_root)
-        #: amane 桥的 venv 所在的工具区（`<数据根>/tools`）；不给就用配置里的默认位置。
+        #: amane 桥的 venv 所在的工具区（`<Peach 数据目录>/tools`）；不给就用配置里的默认位置。
         self.tools_root = Path(tools_root) if tools_root is not None else None
         self.transport = HostLimitedTransport(
             SourceTransport(secrets_root, max_requests=MAX_SOURCE_REQUESTS,
@@ -1504,7 +1504,7 @@ class _RemoteSession:
                                 else f'{SOURCE_LABELS.get(source, source)}：{describe_failure(error)}')
                 held.append(source_paused(error))
                 continue
-            update(stage='保存资料候选')
+            update(stage='保存待确认资料')
             results.save(found)
             if metadata_routes.settles(required, _given_fields(entries),
                                        wants_tags=wants_tags, then=then):
@@ -1543,7 +1543,7 @@ class _RemoteSession:
                 issue(row, 'JavDB 标签未取得：' + describe_failure(error),
                       action='querying_metadata', retryable=True, paused=source_paused(error))
             return []
-        update(stage='保存资料候选')
+        update(stage='保存待确认资料')
         return [self._evidence(source, code, payload)]
 
     def _cover(self, row, code, cover_root, *, update, issue, snapshots=(), absent=()):
@@ -1588,7 +1588,7 @@ def _apply_finished_candidates(database, candidate_root, active, asset_ids=None,
     from .jav_cover_fetch import DEFAULT_METADATA_ROOT
     from .metadata_auto_apply import auto_apply_metadata
     # 快照目录是企划名义解析的证据来源（ADR-0038）。路径只有 `DEFAULT_METADATA_ROOT`
-    # 一份定义，这里传它而不是再拼一次：两处各拼一份，改数据根时会有一处留在原地。
+    # 一份定义，这里传它而不是再拼一次：两处各拼一份，改 Peach 数据目录时会有一处留在原地。
     return auto_apply_metadata(database, Path(candidate_root), active=active,
                                snapshot_root=DEFAULT_METADATA_ROOT, asset_ids=asset_ids,
                                candidate_rows=candidate_rows)
@@ -2441,7 +2441,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                         publish(row, code, fields, verify, entries))
                 state['covers'] += covers
                 covered.append((row['id'], covers))
-                update(stage='保存资料候选', current_action='writing_candidates',
+                update(stage='保存待确认资料', current_action='writing_candidates',
                        current_started_at=time.time(), current_deadline_at=None)
                 checkpoints.queue_metadata(row, local_entries + found if local_ok else [], issues_before)
                 flush_candidates()

@@ -280,7 +280,7 @@ class BackgroundJobDispatchTests(LedgerTestCase):
 
     def declared(self):
         return [{"key": "entity-avatar:performer:1", "task_key": AVATAR_TASK_KEY,
-                 "label": "补实体头像：甲"}]
+                 "label": "补全资料图片：甲"}]
 
     def test_a_successful_run_dispatches_what_it_declared(self):
         job = self.job()
@@ -384,7 +384,7 @@ class AvatarFollowupTests(LedgerTestCase):
             avatar_root=avatars, candidate_root=self.root / "generated",
             database=self.database, task_runs=self.store, cache_bust=lambda: None)
         summary = avatar_run(contract, followup_key("performer", 999), None)
-        self.assertEqual(summary, {"outcome": "实体已不存在"})
+        self.assertEqual(summary, {"outcome": "档案已不存在"})
 
 
 class CoverFaceFollowupTests(LedgerTestCase):
@@ -1333,7 +1333,7 @@ class AccountFaceFollowupTests(FaceStubCase):
 class ProcessLibraryTests(LedgerTestCase):
     """一整条链走通：刮削登记新女优 → 声明后继 → 派出 → 真的跑完。
 
-    这里不桩 `avatar_followup`：跑的就是补头像那条后继本身。图库索引在临时数据根下是空的，
+    这里不桩 `avatar_followup`：跑的就是补头像那条后继本身。图库索引在临时 Peach 数据目录下是空的，
     封面目录也是空的，于是它两档都给不出图并正常收尾——判不准不装图，本来就是这条后继的判据。
     实体种子换成临时目录里的一份小包（`seed()`）：仓库里的真包会给这位真人补上 avwikidb 编号，
     补头像那条就会真的去站上找单人作品，结论随当天有没有网而变。

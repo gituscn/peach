@@ -30,7 +30,7 @@ def path_predicate(location: str, path: str, recursive: bool = True, alias: str 
 
 
 def directory_index(connection, config, *, locations: str = '', library: str = '') -> dict[str, dict]:
-    """声明根及其已登记目录；同名目录按来源和完整路径保持独立。"""
+    """列出数据库路径前缀及其已登记目录；同名目录按来源和完整路径保持独立。"""
     allowed = set(locations.split(',')) if locations else set(config.locations)
     declared = [(location, str(PureWindowsPath(root)))
                 for location, roots in config.locations.items() if location in allowed for root in roots]

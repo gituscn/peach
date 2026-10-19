@@ -195,7 +195,7 @@ def snapshot(config) -> dict[str, Any]:
         "revision": revision(config),
         "media_dirs": list(media),
         "media_sources": media_configuration.rows(config, windows=os.name == "nt", probe=True),
-        # 媒体库按 `media_libraries.libraries` 数：同名的几个声明根是一个库，和侧栏切换器、
+        # 媒体库按 `media_libraries.libraries` 数：同名的几个数据库路径前缀是一个库，和侧栏切换器、
         # `/api/libraries` 同一份分组，页面不自己再归并一遍。
         "library_count": len(media_libraries.libraries(config)),
         "mount_dependencies": media_configuration.mount_dependencies(),
@@ -361,7 +361,7 @@ def rotate_push_discovery_secret(request: Request, _args=Depends(require_auth)):
 
 
 def _downloads(request: Request):
-    """云下载服务与声明根。声明根取推送发现那份，两边对「哪些是 PikPak 根」口径一致。"""
+    """取得云下载服务，以及推送发现使用的同一份数据库路径前缀配置。"""
     return (request.app.state.downloads,
             getattr(request.app.state.push_discovery, "declared_roots", {}))
 
@@ -551,14 +551,15 @@ def _validate(body: dict[str, Any], config) -> tuple[dict[str, Any], dict[str, A
     raws = body.get("media_dirs")
     rows = [str(item) for item in raws] if isinstance(raws, list) else [str(raws or "")]
     if "media_sources" in body:
-        locations, mounts, problems = media_configuration.validate(body["media_sources"], windows=os.name == "nt")
+        sources = media_configuration.prepare_sources(body["media_sources"], windows=os.name == "nt", config=config)
+        locations, mounts, problems = media_configuration.validate(sources, windows=os.name == "nt", config=config)
         paths = []
         validated.update(locations=locations, mounts=mounts)
         if not problems:
-            validated["media_costs"] = media_configuration.costs(body["media_sources"], config, windows=os.name == "nt")
+            validated["media_costs"] = media_configuration.costs(sources, config, windows=os.name == "nt")
         names, icons = {}, {}
         if not problems:
-            for index, row in enumerate(body["media_sources"]):
+            for index, row in enumerate(sources):
                 name = str(row.get("library", "")).strip()
                 if len(name) > 80 or any(ord(char) < 32 for char in name):
                     problems = [""] * len(body["media_sources"])
@@ -808,8 +809,14 @@ def save_configuration(request: Request, body: dict[str, Any] = Body(default_fac
         elif os.name == "nt":
             locations["local"] = tuple(str(path) for path in paths)
         else:
-            locations["local"] = onboarding.posix_declared_roots(len(paths))
-            mounts["local"] = tuple(str(path) for path in paths)
+            sources = media_configuration.prepare_sources(
+                [{"location": "local", "path": str(path)} for path in paths], windows=False, config=config)
+            local_roots, local_mounts, problems = media_configuration.validate(sources, windows=False, config=config)
+            if problems:
+                raise HTTPException(400, {"message": "有几项需要修改", "errors": {"media_dirs": problems}})
+            locations["local"], mounts["local"] = local_roots["local"], local_mounts["local"]
+            validated["library_names"] = {**config.library_names, **{
+                row["root"]: row["library"] for row in sources if row.get("library")}}
         prepared = replace(config, locations=locations, mounts=mounts,
                            library_names=validated.get("library_names", config.library_names),
                            library_icons=validated.get("library_icons", config.library_icons),

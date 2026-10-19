@@ -194,7 +194,7 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
         ) : gate === 'online' ? (
           <div id="onlineGate" role="status" data-item-gate="online">
             <Html html={badge} />
-            <b>在线资产</b>
+            <b>在线作品</b>
             <span>这条没有对应的关注条目，媒体地址无从解析。</span>
             <button className="chip" id="openSavedFollow" type="button" onClick={actions.openSavedFollow}>打开已保存关注</button>
           </div>
@@ -223,7 +223,7 @@ function OfflineGate({ item, badge, helpers, actions }: {
   return (
     <div id="offlineGate" role="status" data-item-gate="offline">
       <Html html={badge} />
-      <b>脱盘模式</b>
+      <b>媒体目录无法访问</b>
       <span>{helpers.offlineReason(item.location || '')}</span>
       <button className="chip" id="offlineRetry" type="button" disabled={checking} onClick={() => void retry()}>
         {still ? '仍无法读取 · 刷新' : '刷新状态'}

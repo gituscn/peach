@@ -49,7 +49,7 @@ def _is_loopback(host: str) -> bool:
 def _require_readable_settings() -> None:
     """设置文件在但读不出来时，明确拒绝。
 
-    这种情况下 `config` 里那份是退回的内建默认——数据根仍然对（发现顺序不看文件内容），
+    这种情况下 `config` 里那份是退回的内建默认——Peach 数据目录仍然对（发现顺序不看文件内容），
     但端口、mDNS 名、复制坐标全是通用值。拿它启动会得到一个「看起来正常」的服务，
     比直接失败难查得多。
     """
@@ -81,11 +81,11 @@ def _serve(args: argparse.Namespace) -> int:
     publish_mdns = not args.no_mdns and not _is_loopback(args.host)
     if not args.no_mdns and not publish_mdns:
         print(
-            f"mDNS 未发布：--host {args.host} 只监听回环，"
+            f"mDNS 未发布：--host {args.host} 只允许本机访问，"
             f"发布 peach.local 会指向一个连不上的地址。"
             f"需要局域网访问就用 --host 0.0.0.0。"
         )
-    # `--setup` 是托盘首启拉起的引导服务：只提供首次运行表单，不认发现到的数据根，
+    # `--setup` 是托盘首启拉起的引导服务：只提供首次运行表单，不认发现到的 Peach 数据目录，
     # 也不要口令。口令刻意置空而不是读文件——表单一提交就会生成一份口令，那之后要是
     # 有人重启这条引导服务，读到新口令的它会把还没看到口令的用户关在门外。
     # 安全边界由绑定地址给：这条服务只监听回环（`build_setup_service_specs`）。
@@ -138,7 +138,7 @@ def _serve_token(args: argparse.Namespace) -> str:
     if getattr(args, "no_auth", False):
         if not _is_loopback(args.host):
             raise SystemExit(
-                f"拒绝启动：--no-auth 只对回环地址成立，而 --host {args.host} 不是。\n"
+                f"拒绝启动：--no-auth 仅允许监听本机地址时使用，而 --host {args.host} 不是。\n"
                 f"在局域网地址上关掉登录，等于把整个馆藏和写接口交给同网段的任何设备。"
             )
         # 直接写而不是 setdefault：走到这里就是这次启动确实要开调试口径，
@@ -150,7 +150,7 @@ def _serve_token(args: argparse.Namespace) -> str:
     if token or _is_loopback(args.host):
         return token
     raise SystemExit(
-        f"拒绝启动：--host {args.host} 不是回环地址，而这台机器还没有访问口令。\n"
+        f"拒绝启动：--host {args.host} 允许其他设备访问，而这台机器还没有访问口令。\n"
         f"这样起服务，同网段的任何设备都能读整个馆藏并调用写接口。\n"
         f"先跑 `peach token` 生成并查看口令（存在 {auth.token_path(secrets_dir)}），"
         f"再重新启动；只给本机用就改成 --host 127.0.0.1。"
@@ -168,17 +168,17 @@ def _build_sync(args: argparse.Namespace, settings: PeachSettings) -> LedgerSync
     （`sync is None` 时 `/healthz` 的 `ledger_sync` 是 `disabled`，不是 `writer`）。
     """
     if not REPLICATION_ENABLED:
-        print("账本角色：disabled · replication.enabled = false，按独立写者运行")
+        print("数据库角色：disabled · replication.enabled = false，允许本机独立修改数据库")
         return None
     sync = LedgerSync(
         settings.db_path, args.shared_db, device_id(STATE_DIR),
         interval=0,
     )
     decision = sync.observe()
-    print(f"账本角色：{sync.status} · {sync.detail}")
+    print(f"数据库角色：{sync.status} · {sync.detail}")
     if decision.conflict:
         print(
-            "  服务转只读。请人工选定一份账本："
+            "  服务转只读。请人工选定一份数据库："
             f"本地 {settings.db_path}，共享 {args.shared_db}。"
         )
     return sync
@@ -222,14 +222,14 @@ def _status(args: argparse.Namespace) -> int:
     """
     _require_readable_settings()
     if not args.db.is_file():
-        print(f"账本不存在：{args.db}")
+        print(f"数据库不存在：{args.db}")
         if not args.db.parent.is_dir():
             print("这台机器还没初始化过，先跑 `peach init`。")
         return 4
     connection = open_readonly(args.db)
     try:
         one = lambda sql: connection.execute(sql).fetchone()[0]      # noqa: E731
-        print(f"账本 {args.db}")
+        print(f"数据库 {args.db}")
         for location, count, size in connection.execute(
                 "SELECT location,COUNT(*),COALESCE(SUM(size),0) FROM asset "
                 "GROUP BY 1 ORDER BY 3 DESC"):
@@ -294,7 +294,7 @@ def _ledger_sync(args: argparse.Namespace) -> int:
         "take-ownership": "本机已成为唯一写入端",
         "disabled": decision.reason,
     }
-    print(f"账本同步：{decision.action} · {completed.get(decision.action, decision.reason)}")
+    print(f"数据库同步：{decision.action} · {completed.get(decision.action, decision.reason)}")
     return {"conflict": 2, "offline": 3, "missing": 4}.get(decision.action, 0)
 
 
@@ -302,7 +302,7 @@ def _parse_mounts(
     raw: list[str] | None, locations: dict[str, tuple[str, ...]] | None = None,
 ) -> dict[str, tuple[str, ...]]:
     """`--mount local=/Volumes/Media/media` 形式的挂载点；同一来源重复给就按顺序
-    对应它的几个声明根。
+    对应它的几个数据库路径前缀。
 
     键是 `asset.location`（`[media.locations]` 里声明过的来源 ID），不是盘符：
     打错一个 ID 如果静默收下，那个来源就会安静地进脱盘模式，所以这里直接拒绝。
@@ -415,7 +415,7 @@ def _init_interactive(
                 onboarding.collect(config, ask, windows=windows, home=home)):
             collected[key] = value
             if index == 0:
-                # 数据根定了，设置文件在哪也就定了。这一题之后就判，别让人把剩下四题
+                # Peach 数据目录定了，设置文件在哪也就定了。这一题之后就判，别让人把剩下四题
                 # 答完才听到「文件已存在」——那四个答案会被整份丢掉。
                 config, _broken = _resolved_config(collected["data_root"])
                 if config.path.exists():
@@ -427,7 +427,7 @@ def _init_interactive(
     answers = onboarding.Answers(**collected)  # type: ignore[arg-type]
     applied = onboarding.apply(config, answers, windows=windows)
     prepared = applied.config
-    print(f"数据根：{prepared.data_root}")
+    print(f"Peach 数据目录：{prepared.data_root}")
     _report_data_tree(applied.tree)
     print(f"设置文件：{applied.settings_path}")
     if not windows:
@@ -454,10 +454,10 @@ def _init_interactive(
 
 
 def _scan(args: argparse.Namespace) -> int:
-    """`peach scan <来源ID> [根目录]`：根目录省略时逐个扫该来源的全部声明根（本机目录按挂载表取）。"""
+    """`peach scan <来源ID> [根目录]`：根目录省略时逐个扫该来源的全部数据库路径前缀（本机目录按挂载表取）。"""
     _require_readable_settings()
     if not args.db.is_file():
-        print(f"账本不存在：{args.db}")
+        print(f"数据库不存在：{args.db}")
         print("这台机器还没初始化过，先跑 `peach init`。")
         return 4
     config = settings_file.active()
@@ -522,16 +522,16 @@ def _create_data_tree(config: settings_file.PeachConfig) -> None:
     """建目录、把库迁到最新、生成本机 CA。事情由 `onboarding.create_data_tree` 做，
     这里只把它做过的事说出来——托盘的设置页调同一个函数，两条前端不会各做一套。
     """
-    print(f"数据根：{config.data_root}")
+    print(f"Peach 数据目录：{config.data_root}")
     _report_data_tree(onboarding.create_data_tree(config))
 
 
 def _report_data_tree(tree: onboarding.DataTree) -> None:
     if tree.ledger_existed:
-        print(f"账本已存在，跳过建库：{tree.database}")
+        print(f"数据库已存在，跳过建库：{tree.database}")
         print("要为现有部署生成设置文件，用 `peach init --from-existing`。")
     else:
-        print(f"账本：{tree.database}（已应用 {tree.migrations} 个迁移）")
+        print(f"数据库：{tree.database}（已应用 {tree.migrations} 个迁移）")
     if tree.ca_cert is not None:
         print(f"本机 CA：{tree.ca_cert}")
     else:
@@ -647,8 +647,8 @@ def _report_blanks(config: settings_file.PeachConfig) -> None:
         # Windows 上盘符本身就是挂载点，空表是正常的，提示它只会让人去填没用的值。
         known = "、".join(sorted(config.locations)) or "local"
         blanks.append(
-            f"  [media.mounts] 为空 → 所有来源按脱盘处理；"
-            f"要填就加 --mount <来源ID>=<挂载点>（已知来源：{known}）"
+            f"  [media.mounts] 为空 → 无法读取媒体来源的目录；"
+            f"可用 --mount <媒体来源ID>=<媒体目录> 指定目录（已知来源：{known}）"
         )
     if blanks:
         print("以下坐标是空的（这不是错误，单机部署本来就该空）：")
@@ -711,7 +711,7 @@ def build_parser() -> argparse.ArgumentParser:
         "init", help="首次运行：不带参数在终端里问答；带任何参数或 --no-input 走非交互")
     init.add_argument("--no-input", action="store_true",
                       help="不进入问答，按参数与内建默认直接生成")
-    init.add_argument("--data-root", type=Path, help="数据根；默认沿用当前发现结果")
+    init.add_argument("--data-root", type=Path, help="Peach 数据目录；默认沿用当前发现结果")
     init.add_argument("--from-existing", action="store_true",
                       help="只为已在运行的部署生成设置文件，不建目录、不建库")
     init.add_argument("--force", action="store_true", help="覆盖已存在的设置文件")
@@ -725,7 +725,7 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--smb-share", help="共享名")
     init.add_argument("--smb-user", help="挂载共享用的账号")
     init.add_argument("--mount", action="append", metavar="来源ID=路径",
-                      help="来源（asset.location）的声明根在本机的落点，可重复")
+                      help="媒体来源 ID 与本机媒体目录的对应关系，例如 local=/mnt/media；可重复指定")
     init.set_defaults(handler=_init)
 
     serve = commands.add_parser("serve", help="run the FastAPI application")
@@ -736,9 +736,9 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--token", default="")
     serve.add_argument("--docs", action="store_true")
     serve.add_argument("--setup", action="store_true",
-                       help="只提供首次运行表单：忽略发现到的数据根，也不要口令")
+                       help="只提供首次运行表单：忽略发现到的 Peach 数据目录，也不要口令")
     serve.add_argument("--no-auth", action="store_true",
-                       help="跳过登录页；只对回环地址成立，不读也不改口令文件")
+                       help="跳过登录页；仅允许本机访问时可用，不读取或修改口令文件")
     serve.add_argument("--no-mdns", action="store_true")
     serve.add_argument("--shared-db", type=Path, default=SHARED_DATABASE_PATH)
     serve.add_argument("--no-ledger-sync", action="store_true")
@@ -751,10 +751,10 @@ def build_parser() -> argparse.ArgumentParser:
     serve.set_defaults(handler=_serve)
 
     scan_parser = commands.add_parser(
-        "scan", help="扫描一个来源的目录，把文件元数据写进账本")
+        "scan", help="扫描一个媒体来源的目录，将文件信息保存到数据库")
     scan_parser.add_argument("location", help="来源 ID（asset.location），要在 [media.locations] 里声明过")
     scan_parser.add_argument("root", nargs="?",
-                             help="要扫的目录；省略时取该来源的声明根（本机目录按 [media.mounts] 取）")
+                             help="要扫描的媒体目录；省略时读取该来源的配置（非 Windows 系统使用 [media.mounts]）")
     scan_parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     scan_parser.set_defaults(handler=_scan)
     process_parser = commands.add_parser('process', help='扫描文件并补全馆藏资料')

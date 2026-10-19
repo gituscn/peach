@@ -63,7 +63,7 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
   '/junk-files': { nav: 'ads', title: '垃圾文件' },
   '/trash': { section: 'trash' },
   // 覆盖：详情、四种队列与关注详情。分卷与版本队列没有自己的标签。
-  '/assets/:id': { title: '资产' },
+  '/assets/:id': { title: '媒体记录' },
   '/works/:code': { nav: 'jav', title: 'JAV 作品' },
   '/posts/:id': { title: '关注' },
   // 沉浸模式进页面组，不算覆盖。

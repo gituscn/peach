@@ -1,5 +1,5 @@
 /* 路由基座（`src/react/router/router.tsx` 与 `src/history/`）：路由根在历史变化的同一调用里同步提交；没人认领的
- * 历史变化各领一个开次代次，按代次挂 key 的元素随之重挂，认领的写地址不重挂；路由元数据覆盖管理区、索引与资料那几页。
+ * 历史变化各领一个页面打开序号，按代次挂 key 的元素随之重挂，认领的写地址不重挂；路由元数据覆盖管理区、索引与资料那几页。
  *
  * 历史对象是模块级的，每条用例重新装载 `src/history` 与 `src/react/router`（同 `router.test.tsx`）。 */
 import { act, useEffect } from 'react';
@@ -38,7 +38,7 @@ function pop(path?: string) {
   window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
 }
 
-/** 页面组 `path="*"` 那一格的探针：记它看到的地址、开次代次，和按代次挂 key 的那一格挂了几次。 */
+/** 页面组 `path="*"` 那一格的探针：记它看到的地址、页面打开序号，和按代次挂 key 的那一格挂了几次。 */
 function probe(r: Loaded) {
   const seen = { paths: [] as string[], epochs: [] as number[], mounted: 0, unmounted: 0, keyed: 0 };
   function Keyed() {
@@ -72,7 +72,7 @@ it('shellNavigate 返回时页面组的匹配已经提交：离开的那一页�
   expect(seen.paths.at(-1)).toBe('/no/such');
 });
 
-it('没人认领的历史变化各领一个开次代次、按代次挂的元素当场重挂；认领的写地址不领', async () => {
+it('没人认领的历史变化各领一个页面打开序号、按代次挂的元素当场重挂；认领的写地址不领', async () => {
   const r = await load('/nowhere');
   const { seen, Probe } = probe(r);
   await mount(r, <Probe />);

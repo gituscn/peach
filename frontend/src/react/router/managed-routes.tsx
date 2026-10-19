@@ -1,12 +1,12 @@
-/* 由路由画的那几页、页面里的附属面与常驻面：登记键到首屏取数与画法的对照表，七张；另有旧直达地址的
+/* 由路由画的那几页、页面里的页面内组件与常驻组件：登记键到首屏取数与画法的对照表，七张；另有旧直达地址的
  * 改写表 `REDIRECT_ROUTES` 和沉浸模式的 `IMMERSE_ROUTES`，只挂元素。
  *
  * `MANAGED_ROUTES` 是管理区那几页（画进 `#stats`），键是精确路径，每条带页面组按匹配挂上的元素；
  * `BROWSE_ROUTES` 是同样画进 `#stats` 的播放列表页与关注页；`INDEX_ROUTES` 是索引页、`ENTITY_ROUTES` 是资料页（都画进 `#index`），资料页按模式登记
  * （`/performers/*`），种类与名字跟着打开走；`CATALOG_ROUTES` 是画进 `#grid` 的目录网格与垃圾队列，按页面
- * 分键；`SURFACE_ROUTES` 是页面里的附属面，`RESIDENT_ROUTES` 是不跟某一页走的常驻面，都按名字登记，不是地址、
+ * 分键；`SURFACE_ROUTES` 是页面里的页面内组件，`RESIDENT_ROUTES` 是不跟某一页走的常驻组件，都按名字登记，不是地址、
  * 不进 `<Routes>`。每次打开交进来的 `open`（管理区由页面元素算，其余由壳算）只带那一次才算得出的值（地址上的分类与页签、只读状态、引导标记、一次性预填、刷新代次），`#grid` 那两页
- * 与附属面是壳那一整份 props；回执与换到还归壳的那几屏走 `ShellActions`。
+ * 与页面内组件是壳那一整份 props；回执与换到还归壳的那几屏走 `ShellActions`。
  * 管理区几页之间的跳转走 `go`：落在 `MANAGED_ROUTES` 上的交给 React Router 的 `navigate`，其余交壳。另外
  * 四张表的页面不走 `go`：它们在页内写地址一律由壳认领（`routeIndex`、资料页与关注页的 `actions.route`、
  * 目录的换筛选、垃圾队列的换分类），跨页也交壳，打开次数同壳自己打开。 */
@@ -91,7 +91,7 @@ type EntityRouteTable = { [Path in EntityRoutePath]: ManagedRoute<EntityPageProp
 type CatalogRouteTable = { [Path in CatalogPagePath]: ManagedRoute<CatalogOpenProps[Path]> };
 type SurfaceRouteTable = { [Name in SurfaceName]: ManagedRoute<SurfaceOpenProps[Name]> };
 type ResidentRouteTable = { [Name in ResidentName]: ManagedRoute<ResidentOpenProps[Name]> };
-/** 路由树画的全部页面与面：管理区那几页、播放列表页与关注页、索引页与资料页、目录网格，加上附属面与常驻面的名字。 */
+/** 路由树画的全部页面与面：管理区那几页、播放列表页与关注页、索引页与资料页、目录网格，加上页面内组件与常驻组件的名字。 */
 export type RoutedPath =
   ManagedPath | BrowseRoutePath | IndexRoutePath | EntityRoutePath | CatalogPagePath | SurfaceName | ResidentName;
 
@@ -214,7 +214,7 @@ export const REDIRECT_ROUTES: Readonly<Record<string, { element: ReactElement }>
   '/resource-sync': { element: <ResourceSyncRedirect /> },
 };
 
-/** 沉浸模式：页面组按匹配挂上元素（`pages/immerse.tsx`），元素交壳打开常驻面 `immerse`，自己不画。 */
+/** 沉浸模式：页面组按匹配挂上元素（`pages/immerse.tsx`），元素交壳打开常驻组件 `immerse`，自己不画。 */
 export const IMMERSE_ROUTES: Readonly<Record<string, { element: ReactElement }>> = {
   '/immerse': { element: <ImmerseMatch /> },
 };
@@ -242,7 +242,7 @@ export const BROWSE_ROUTES: BrowseRouteTable = {
 const isBrowsePath = (path: string): path is BrowseRoutePath => Object.hasOwn(BROWSE_ROUTES, path);
 
 /* 索引页：地址栏上的四项由元素从地址读出、跟着这一次打开交进来；页内换档经 `routeIndex` 由壳写地址并认领，
-   不重挂（后退前进到同一页的另一份 search 时领新的开次代次，元素按地址重开一次）。首屏只取第一页。 */
+   不重挂（后退前进到同一页的另一份 search 时领新的页面打开序号，元素按地址重开一次）。首屏只取第一页。 */
 const indexRoute: ManagedRoute<IndexOpenProps> = {
   element: <IndexMatch />,
   prefetch: (open, signal) => prefetchIndex(open, signal),
@@ -300,7 +300,7 @@ const LibraryProcessing = (props: LibraryProcessingProps) => (
   props.mode === 'notice' ? <LibraryProcessingNotice {...props} /> : <LibraryProcessingCard {...props} />
 );
 
-/* 页面里的附属面，按名字登记：壳每次打开交进来整份 props，之后经 `updateManagedRoute` 推补丁，页面就地
+/* 页面里的页面内组件，按名字登记：壳每次打开交进来整份 props，之后经 `updateManagedRoute` 推补丁，页面就地
    重渲染。首页筛选条与搜索下拉不在打开前等数据（筛选条的读数与头像由壳推进来，搜索下拉的记录与推荐聚焦
    时才取）；首页新作行连头几张封面一起等，再一次换掉骨架；任务面先取一份进度快照。 */
 export const SURFACE_ROUTES: SurfaceRouteTable = {
@@ -324,7 +324,7 @@ export const SURFACE_ROUTES: SurfaceRouteTable = {
 };
 const isSurfaceName = (key: string): key is SurfaceName => Object.hasOwn(SURFACE_ROUTES, key);
 
-/* 常驻面，按名字登记：壳启动时经 `openResidentSurface` 各开一次，一直算当前页，没有首屏取数，宿主就是壳的
+/* 常驻组件，按名字登记：壳启动时经 `openResidentSurface` 各开一次，一直算当前页，没有首屏取数，宿主就是壳的
    那个节点。从不收，只有错误边界会卸它的组件，宿主照旧留在文档里。打开不带 props：壳经命令式句柄推内容，
    组件订阅自己模块里的 store，句柄里的绘制同步做完。管理区页头与侧栏的宿主里先有壳的启动骨架，打开时由
    `place` 在画出首帧的同一个任务里清掉；沉浸与舞台的宿主不在壳的页面里，第一次打开时新建，由 `place` 在画出首帧
@@ -370,7 +370,7 @@ export const ROUTED_PATHS: readonly string[] = [
   ...Object.keys(MANAGED_ROUTES), ...Object.keys(BROWSE_ROUTES), ...Object.keys(INDEX_ROUTES),
   ...Object.keys(ENTITY_ROUTES), ...CATALOG_PATHS,
 ];
-/** 路由树画得了这一页吗：首屏取数与画页按槽里记的登记键查，`#grid` 那两页只认页面键，附属面与常驻面只认名字。 */
+/** 路由树画得了这一页吗：首屏取数与画页按槽里记的登记键查，`#grid` 那两页只认页面键，页面内组件与常驻组件只认名字。 */
 export const isRoutedPath = (path: string): path is RoutedPath => (
   isManagedPath(path) || isBrowsePath(path) || Object.hasOwn(INDEX_ROUTES, path) || Object.hasOwn(ENTITY_ROUTES, path)
   || isCatalogPage(path) || isSurfaceName(path) || isResidentName(path));

@@ -84,7 +84,7 @@ def resolve(ref: str, connection: sqlite3.Connection, entity_id: int, *, project
     listed = choices(connection, entity_id, project=project)
     allowed = {base for choice in listed for base in (choice.bases or (choice.ref,))}
     if ref not in allowed:
-        raise PickerError("这个候选不在这位创作者名下")
+        raise PickerError("这张备选图片不属于当前创作者")
     if ref.startswith("follow-link:"):
         row = connection.execute("SELECT url FROM entity_link WHERE id=? AND entity_id=?",
                                  (int(ref.split(":")[1]), entity_id)).fetchone()

@@ -195,9 +195,9 @@ function DownloadForm({ state, settle, receipt, pikpakAccount }: CardProps & { p
           hint="目录要已经存在。"
           value={target('pikpak')} isDisabled={!state.available} onChange={(value) => setTarget('pikpak', value)} />
         <div className="flex flex-col gap-1">
-          <FieldLabel><SourceLabel source="pikpak" label="PikPak 根目录对应的媒体文件夹" /></FieldLabel>
+          <FieldLabel><SourceLabel source="pikpak" label="PikPak 根目录对应的媒体目录" /></FieldLabel>
           {state.pikpak_roots.length ? (
-            <Select aria-label="PikPak 根目录对应的媒体文件夹" selectedKey={config.pikpak_root || null}
+            <Select aria-label="PikPak 根目录对应的媒体目录" selectedKey={config.pikpak_root || null}
               isDisabled={!state.available} placeholder="检查时按推送发现选"
               onSelectionChange={(key) => setConfig({ ...config, pikpak_root: key === null ? '' : String(key) })}>
               {state.pikpak_roots.map((root) => <SelectItem key={root} id={root}>{root}</SelectItem>)}
@@ -216,7 +216,7 @@ function DownloadForm({ state, settle, receipt, pikpakAccount }: CardProps & { p
           create={state.available ? create : undefined} creating={action.busy === 'folder'} />
       ) : null}
       {failure || action.error ? <Stack divided><ErrorText>{failure || action.error}</ErrorText></Stack> : null}
-      <Footer status={state.available ? undefined : '云下载只在账本写入端可用。'}>
+      <Footer status={state.available ? undefined : '云下载只在允许修改数据库的设备上可用。'}>
         <Button variant="secondary" onClick={check} disabled={!state.available} {...busyProps(action.busy === 'check')}>检查连接</Button>
         <Button type="submit" disabled={!state.available} {...busyProps(action.busy === 'save')}>保存配置</Button>
       </Footer>

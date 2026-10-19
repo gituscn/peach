@@ -30,7 +30,7 @@ describe('Board 页面骨架', () => {
     ['/duplicates', '[data-duplicate-group] .duplicate-row', 4],
     ['/quality-goals', '.peach-react .card-grid-cover > li', 6],
     ['/subscriptions', '.peach-react .ui-follow-skeleton-surface .follow-skeleton-author', 3],
-    ['/settings/library', '.peach-react .ui-configpage section[aria-label="媒体文件夹"]', 1],
+    ['/settings/library', '.peach-react .ui-configpage section[aria-label="媒体目录"]', 1],
     ['/playlists', '.ui-playlistcards > .playlistcard', 6],
   ] as const)('%s 复用最终内容容器', (path, selector, count) => {
     const root = document.createElement('div');
@@ -110,7 +110,7 @@ describe('Board 页面骨架', () => {
     expect(root.querySelector('.peach-react')).not.toBeNull();
     expect(root.querySelector('[data-taste-segments] [data-selected]')?.textContent).toBe('浏览器记录');
     expect([...root.querySelectorAll('[data-taste-metrics] > div > span')].map((span) => span.textContent))
-      .toEqual(['浏览记录', '口味维度', '浏览候选', '私有导出']);
+      .toEqual(['浏览记录', '口味维度', '浏览线索', '私有导出']);
     expect(root.querySelector('[data-taste-portrait]')?.textContent).toContain('浏览器画像');
     expect([...root.querySelectorAll('h3')].map((h3) => h3.textContent))
       .toEqual(['浏览活跃时间', '每日活跃', '创作者线索来源']);

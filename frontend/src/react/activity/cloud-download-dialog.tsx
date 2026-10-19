@@ -144,7 +144,7 @@ function SubmitForm({ header, snapshot, prefill, close, receipt, provider: prefe
           </Select>
           {provider === '115' ? <Help>每提交一次扣一条离线配额，重新提交也算。</Help> : null}
         </div>
-        {!snapshot.available ? <Note tone="neutral">云下载只在账本写入端可用。</Note> : null}
+        {!snapshot.available ? <Note tone="neutral">云下载只在允许修改数据库的设备上可用。</Note> : null}
         {!configured.length ? <Note tone="neutral">尚未配置下载渠道。<a href={'/settings/library?section=' + encodeURIComponent('下载渠道')}>下载渠道设置</a></Note> : null}
         <Input label="目标目录" placeholder="/云下载" autoComplete="off" maxLength={300}
           value={target} onChange={setTarget} />

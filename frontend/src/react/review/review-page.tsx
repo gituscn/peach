@@ -188,7 +188,7 @@ export function ReviewPage(props: ReviewProps) {
     if (bulk.isPending || !selectedRows.length) return;
     if (status === 'approved' && metadata
       && selectedRows.some((row) => !choiceOf(row).candidateKey)) {
-      setFeedback('先为所选的多来源候选选择来源。');
+      setFeedback('请先为所选资料选择要采用的来源。');
       return;
     }
     setFeedback('');
@@ -334,7 +334,7 @@ export function ReviewPage(props: ReviewProps) {
             </Note>
           ) : (
             <EmptyState icon={RiCheckboxCircleLine} title="此分类没有待复核项目">
-              可切换分类查看其他候选。
+              可切换分类查看其他待确认资料。
             </EmptyState>
           )}
 

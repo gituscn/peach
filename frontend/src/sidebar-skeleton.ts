@@ -1,4 +1,4 @@
-/* 侧栏导航的骨架：壳启动时同步写进 `#drawerScroll`，路由树画上常驻面 `sidebar`（`react/sidebar/`）的那一刻
+/* 侧栏导航的骨架：壳启动时同步写进 `#drawerScroll`，路由树画上常驻组件 `sidebar`（`react/sidebar/`）的那一刻
  * 整块换掉。
  *
  * 左侧导航只认地址和本地设置，一个请求都不等；React 包装载回来之前这一列不能是空的。骨架与组件画的是

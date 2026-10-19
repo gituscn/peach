@@ -143,7 +143,7 @@ def _run(contract, key: str, handle) -> dict:
         current = _current(connection, entity_id)
         if current is None:
             # 实体被合并、删掉或改成厂牌了。这不是失败：那件事已经不存在了。
-            return {"outcome": "实体已不存在"}
+            return {"outcome": "档案已不存在"}
         name, open_ = current
         if not open_:
             return {"name": name, "outcome": "已有身份"}

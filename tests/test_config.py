@@ -102,7 +102,7 @@ class DataRootDiscoveryTests(unittest.TestCase):
                 settings_file.discover_data_root(nested, {}), (tree.data_root, True))
 
     def test_frozen_build_searches_from_the_executable_directory(self):
-        """单文件包的 `_MEIPASS` 是临时目录，起点必须是 EXE 所在目录才找得到数据根。"""
+        """单文件包的 `_MEIPASS` 是临时目录，起点必须是 EXE 所在目录才找得到 Peach 数据目录。"""
         with TempTree() as tree:
             executable = tree.project / "dist" / "Peach" / "Peach.exe"
             executable.parent.mkdir(parents=True)
@@ -281,7 +281,7 @@ class BadFileTests(unittest.TestCase):
         self.assertEqual(loaded.locations, {"local": (r"D:\Videos",)})
 
     def test_a_location_may_declare_several_roots_with_matching_mounts(self):
-        """两块硬盘都是 `local`：声明根写数组，落点按同样的顺序写数组，写回时形状不变。"""
+        """两块硬盘都是 `local`：数据库路径前缀与媒体目录均写数组，按顺序对应，保存时保留。"""
         with TempTree() as tree:
             tree.write("[media.locations]\nlocal = ['D:\\Videos', 'E:\\Movies']\n"
                        "[media.mounts]\nlocal = ['/mnt/a', '/mnt/b']\n")
@@ -295,13 +295,13 @@ class BadFileTests(unittest.TestCase):
             self.assertEqual(tree.load().locations, loaded.locations)
 
     def test_mount_count_must_match_the_declared_roots(self):
-        # 落点按顺序对应声明根：数目不齐时猜不出哪个目录漏了，直接拒绝。
+        # 媒体目录按顺序对应数据库路径前缀，数目不一致时拒绝保存。
         with TempTree() as tree:
             tree.write("[media.locations]\nlocal = ['D:\\Videos', 'E:\\Movies']\n"
                        "[media.mounts]\nlocal = '/mnt/a'\n")
             with self.assertRaises(SettingsFileError) as caught:
                 tree.load()
-        self.assertIn("2 个根", str(caught.exception))
+        self.assertIn("2 个数据库路径前缀", str(caught.exception))
         with TempTree() as tree:
             tree.write("[media.locations]\nlocal = ['D:\\Videos', 'D:\\Videos']\n")
             with self.assertRaises(SettingsFileError) as caught:
@@ -311,7 +311,7 @@ class BadFileTests(unittest.TestCase):
             tree.write("[media.locations]\nlocal = []\n")
             with self.assertRaises(SettingsFileError) as caught:
                 tree.load()
-        self.assertIn("没有声明根", str(caught.exception))
+        self.assertIn("没有配置目录前缀", str(caught.exception))
 
     def test_without_a_locations_table_the_builtin_defaults_apply(self):
         with TempTree() as tree:
@@ -320,7 +320,7 @@ class BadFileTests(unittest.TestCase):
         self.assertEqual(loaded.locations, settings_file.DEFAULT_LOCATION_ROOTS)
 
     def test_lenient_load_falls_back_to_builtin_defaults(self):
-        """坏文件不能让进程连数据根都不知道——发现顺序不看文件内容。"""
+        """坏文件不能让进程连 Peach 数据目录都不知道——发现顺序不看文件内容。"""
         with TempTree() as tree:
             tree.write("nonsense = =\n")
             loaded = tree.load(strict=False)
@@ -439,7 +439,7 @@ class ModuleConstantTests(unittest.TestCase):
         self.assertEqual(config.SHARED_SMB_SHARE, config.SHARED_DATA_ROOT.name)
 
     def test_location_declarations_stay_in_ledger_shape(self):
-        # 账本里的 `asset.path` 是 Windows 形态，声明根必须同口径，否则授权全落空。
+        # `asset.path` 与配置中的路径前缀均使用 Windows 格式，供目录访问权限检查匹配。
         self.assertEqual(set(config.LOCATION_ROOT_DECLARATIONS), {"local", "115", "pikpak"})
         self.assertEqual(
             tuple(root for roots in config.LOCATION_ROOT_DECLARATIONS.values() for root in roots),

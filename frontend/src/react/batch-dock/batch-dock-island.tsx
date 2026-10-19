@@ -1,6 +1,6 @@
 /* 批量条（ADR-0031 第 11g 步）：目录、回收站、垃圾文件与关注页多选时底部那块浮条。
  *
- * 常驻面 `batch-dock`（`router/managed-routes.tsx` 的常驻表）：路由树把它画进壳常驻在 `body` 末尾的
+ * 常驻组件 `batch-dock`（`router/managed-routes.tsx` 的常驻表）：路由树把它画进壳常驻在 `body` 末尾的
  * `[data-batch-dock]`，宿主就是那个节点本身。壳只拿 `configureBatchDock` 给的命令式入口：每次重画选中态
  * 推一份计数与语境，句柄把它写进本模块的 store 再 `flushSync` 通知，返回时浮条已经画好——壳紧接着就
  * 补扫玻璃贴图（`syncGlassOptics`）。浮条外壳是共用的 `SelectionDock`（复核、标签页、关注管理同一块），

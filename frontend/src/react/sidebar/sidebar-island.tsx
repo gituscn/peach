@@ -1,6 +1,6 @@
 /* 侧栏（ADR-0031 第 11f 步）：左侧抽屉里滚动的那一层。
  *
- * 常驻面 `sidebar`（`router/managed-routes.tsx` 的常驻表）：路由树把它画进壳常驻的 `#drawerScroll`，宿主就是
+ * 常驻组件 `sidebar`（`router/managed-routes.tsx` 的常驻表）：路由树把它画进壳常驻的 `#drawerScroll`，宿主就是
  * 那个节点本身（覆盖式滚动条挂在它上面，轨道住在 `#drawer` 里）。壳启动时先同步在宿主里写一份同结构的导航
  * 骨架（`sidebarSkeletonHtml`）；打开这一面时 `place` 清掉骨架，路由树在同一个任务里画出首帧（只有导航），
  * 壳紧接着经 `attached` 把品牌与开合键挪进标题行，再拿到句柄、把手上那份 props 推进来。

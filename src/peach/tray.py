@@ -79,8 +79,8 @@ def ledger_menu_items(make_item, sync_ledger, take_ownership) -> list:
     if not REPLICATION_ENABLED or standalone():
         return []
     return [
-        make_item("同步 Ledger", sync_ledger),
-        make_item("接管 Ledger 写入", take_ownership),
+        make_item("同步数据库", sync_ledger),
+        make_item("由本机接管数据库写入", take_ownership),
     ]
 
 #: 改到这些路径就得重启托盘进程本身。托盘启动那一刻就把它们装进了内存，重启子服务
@@ -103,8 +103,8 @@ TRAY_SOURCES = (
 
 #: `/healthz?ready=1` 各项检查给人看的名字（`peach.health.readiness`）。
 READINESS_LABELS = {
-    "configured": "未初始化", "web": "页面文件缺失", "database": "账本打不开",
-    "schema": "账本结构与迁移不一致",
+    "configured": "未初始化", "web": "页面文件缺失", "database": "数据库打不开",
+    "schema": "数据库结构与迁移不一致",
 }
 
 #: 托盘拉起的整托盘重启脚本最多等多久。脚本停旧托盘、同步依赖、起新托盘各有期限，
@@ -263,8 +263,8 @@ class ServiceManager:
         extra_env: dict[str, str] | None = None,
     ) -> None:
         self.specs = specs
-        # 日志目录与子进程环境可替换：首次设置完成后数据根可能换了地方，那之后拉起的
-        # 服务必须把日志写进新数据根，也必须显式看到新的 PEACH_DATA_ROOT——托盘进程
+        # 日志目录与子进程环境可替换：首次设置完成后 Peach 数据目录可能换了地方，那之后拉起的
+        # 服务必须把日志写进新 Peach 数据目录，也必须显式看到新的 PEACH_DATA_ROOT——托盘进程
         # 自己的模块常量还停在启动那一刻。
         self._log_dir = Path(log_dir) if log_dir is not None else LOG_DIR
         self._extra_env = dict(extra_env or {})
@@ -490,7 +490,7 @@ class ServiceManager:
         try:
             decision = self._ledger_plan_after_mount()
         except OSError as exc:                     # 判定本身失败也不该拖着服务停机
-            return False, f"未同步：无法判定账本状态（{exc}）"
+            return False, f"未同步：无法判定数据库状态（{exc}）"
         if take_ownership:
             if decision.action == "offline":
                 return False, f"未接管：{decision.reason}；先挂上共享副本所在的盘。"
@@ -499,7 +499,7 @@ class ServiceManager:
             return None
         if decision.action in ("offline", "conflict", "missing"):
             return False, f"未同步：{decision.reason}"
-        return True, f"账本同步：{decision.action} · {decision.reason}"
+        return True, f"数据库同步：{decision.action} · {decision.reason}"
 
     def sync_ledger(
         self, executable: Path | None = None, *, take_ownership: bool = False,
@@ -510,7 +510,7 @@ class ServiceManager:
         而这条路径会去探测一个这台机器根本没有的共享传输点。
         """
         if not REPLICATION_ENABLED:
-            return False, "未同步：replication.enabled = false，这台机器不做账本复制"
+            return False, "未同步：replication.enabled = false，这台机器不做数据库复制"
         shortcut = self._ledger_shortcut(take_ownership=take_ownership)
         if shortcut is not None:
             return shortcut
@@ -545,10 +545,10 @@ class ServiceManager:
                 env=sync_environment,
                 creationflags=creationflags,
             )
-            output = (result.stdout or result.stderr or "账本同步没有输出").strip()
+            output = (result.stdout or result.stderr or "数据库同步没有输出").strip()
             ok = result.returncode == 0
         except (OSError, subprocess.SubprocessError) as exc:
-            ok, output = False, f"账本同步启动失败：{exc}"
+            ok, output = False, f"数据库同步启动失败：{exc}"
         finally:
             self.start_missing()
             ready = self.wait_until_ready()
@@ -777,8 +777,8 @@ SETUP_SPEC_NAME = "setup"
 def needs_setup(config) -> bool:
     """这台机器还得先走一遍首次设置吗。
 
-    判据不是 `config.configured`，而是「没有设置文件，也没有账本」。数据根目录本身
-    不算数：托盘的单实例锁一启动就会在数据根下建出 `state/`，而 `discover_data_root`
+    判据不是 `config.configured`，而是「没有设置文件，也没有账本」。Peach 数据目录本身
+    不算数：托盘的单实例锁一启动就会在 Peach 数据目录下建出 `state/`，而 `discover_data_root`
     只看目录在不在——只用 `configured` 的话，一次失败的托盘启动就足以让下一次启动
     认为这台机器已经配置好，然后照旧倒在缺 TLS 材料上。反过来，还没生成过
     `config.toml` 的老部署账本是在的，不能被拖进首次设置。
@@ -857,7 +857,7 @@ def configured_service_specs(config) -> tuple[ServiceSpec, ...]:
 class SetupGate:
     """首次设置期间的服务切换。Windows 托盘与 macOS 菜单栏共用这一层。
 
-    托盘不重启自己就能完成切换，因为真正读数据根的是**子进程**：`peach serve` 每次
+    托盘不重启自己就能完成切换，因为真正读 Peach 数据目录的是**子进程**：`peach serve` 每次
     都自己读一遍设置文件。托盘进程里剩下的几处依赖都已经改成可传入——服务规格的
     TLS 目录、日志目录、子进程环境里的 `PEACH_DATA_ROOT`、菜单里的地址。账本复制那
     几个模块常量不在此列，但首次设置写出的 `replication.enabled` 恒为 false，
@@ -1190,13 +1190,13 @@ class PeachTray:
             return
         tray_icon = icon or self.icon
         action = "接管写入" if take_ownership else "同步"
-        tray_icon.notify(f"正在安全停止服务并{action}…", "Peach Ledger")
+        tray_icon.notify(f"正在安全停止服务并{action}…", "Peach 数据库")
 
         def work() -> None:
             try:
                 ok, message = self.manager.sync_ledger(take_ownership=take_ownership)
                 tray_icon.update_menu()
-                tray_icon.notify(message, "Peach Ledger" if ok else "Peach Ledger 同步失败")
+                tray_icon.notify(message, "Peach 数据库" if ok else "Peach 数据库同步失败")
             finally:
                 self._action_lock.release()
 
@@ -1417,7 +1417,7 @@ class PeachTray:
         try:
             ledger_backups.prune(DATABASE_PATH, apply=True)
         except Exception:
-            logging.getLogger(__name__).warning("账本备份清退失败", exc_info=True)
+            logging.getLogger(__name__).warning("数据库备份清退失败", exc_info=True)
         self._startup_warning = None
         if self.gate.waiting:
             if self.manager.wait_until_ready():
@@ -1572,9 +1572,9 @@ def run_macos_menu_bar(manager: "ServiceManager", gate: "SetupGate | None" = Non
         def work() -> None:
             try:
                 action = "接管写入" if take_ownership else "同步"
-                notify(f"正在判定账本状态并{action}…", "Peach Ledger")
+                notify(f"正在判定数据库状态并{action}…", "Peach 数据库")
                 ok, message = manager.sync_ledger(take_ownership=take_ownership)
-                notify(message, "Peach Ledger" if ok else "Peach Ledger 同步失败")
+                notify(message, "Peach 数据库" if ok else "Peach 数据库同步失败")
             finally:
                 action_lock.release()
 
@@ -1626,7 +1626,7 @@ def run_macos_menu_bar(manager: "ServiceManager", gate: "SetupGate | None" = Non
         报证书无效。由系统的网络变化事件驱动，不轮询——换 Wi-Fi 的那一刻就跑。
         """
         try:
-            # 目录和主机名取 gate 手上那份配置：首次设置可能刚把数据根和 mDNS 名换掉，
+            # 目录和主机名取 gate 手上那份配置：首次设置可能刚把 Peach 数据目录和 mDNS 名换掉，
             # 模块常量还停在托盘启动那一刻。
             reason = ensure_certificate(
                 gate.config.directory("secrets") / "tls",
@@ -1722,7 +1722,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def _main(argv: list[str] | None = None) -> int:
     # 参数解析必须排在任何进程级副作用之前：`--help` 和拼错的参数都要在 HiDPI 设置、
-    # 单实例锁和目录创建之前退出，否则一条试探命令就会在磁盘上凭空造出一个数据根，
+    # 单实例锁和目录创建之前退出，否则一条试探命令就会在磁盘上凭空造出一个 Peach 数据目录，
     # 让之后的安装探测把这台机器误判成已配置。
     args = build_parser().parse_args(argv)
     config = settings_file.load_config()

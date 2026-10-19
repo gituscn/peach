@@ -1,18 +1,18 @@
-"""设置文件层：数据根的发现，以及 `<数据根>/config.toml` 的读取、合并与写回。
+"""设置文件层：Peach 数据目录的发现，以及 `<Peach 数据目录>/config.toml` 的读取、合并与写回。
 
 三层优先级固定为 **环境变量 > 设置文件 > 内建默认**，`config.py` 只消费合并结果。
 内建默认必须对一个全新用户成立，所以这里（和 `config.py`）不许出现任何一台具体机器的
 路径、主机名、账号名或局域网地址（ADR-0023 第一阶段）。当前部署的那些值不是删掉了，
 而是搬进设置文件：`peach init --from-existing` 生成它。
 
-数据根的发现刻意**不**依赖设置文件内容——设置文件本身就住在数据根里面：
+Peach 数据目录的发现刻意**不**依赖设置文件内容——设置文件本身就住在 Peach 数据目录里面：
 
 1. `PEACH_DATA_ROOT` 环境变量；
 2. 从起点逐级向上，第一个存在的 `<上级目录>/peach-data`。起点在源码树里是项目根，
    打包后是 EXE 所在目录——单文件包的 `_MEIPASS` 是 `%TEMP%` 下的临时目录，它上面
    没有任何东西。ADR-0017 的顶层布局把 `peach-app` 与 `peach-data` 并列，向上找因此
    覆盖主检出、`peach-worktrees/<task>` 里的隔离工作树和 `dist/Peach` 里的托盘；
-3. 都没有 → 未配置。此时仍然给出一个落点（`peach init` 会去建它），但 `configured`
+3. 都没有 → 未配置。此时仍然给出建议的数据目录（`peach init` 会去建它），但 `configured`
    为 False：服务照常启动，`/healthz` 报 `configured=false`，页面提示去跑 `peach init`。
 
 读用标准库 `tomllib`（Python 3.11+ 只读），写用本模块自带的最小序列化器。设置文件里
@@ -30,7 +30,7 @@ from pathlib import Path
 
 from . import distribution
 
-#: 设置文件名。位置固定为数据根下，不做多候选路径搜索。
+#: 设置文件名。位置固定为 Peach 数据目录下，不做多候选路径搜索。
 SETTINGS_FILENAME = "config.toml"
 DATA_ROOT_ENV = "PEACH_DATA_ROOT"
 DATA_ROOT_LOCATION = "data-root.txt"
@@ -38,7 +38,7 @@ DATA_ROOT_LOCATION = "data-root.txt"
 DATA_ROOT_DIRNAME = "peach-data"
 SHARED_ROOT_DIRNAME = "peach-sync"
 
-#: 数据根下的子目录键。设置文件里省略某项就取同名目录；写绝对路径可以搬出数据根。
+#: Peach 数据目录下的子目录键。设置文件里省略某项就取同名目录；写绝对路径可以搬出 Peach 数据目录。
 DIRECTORY_KEYS = (
     "database", "generated", "sources", "state", "secrets", "logs", "tools", "review",
 )
@@ -62,7 +62,7 @@ _MOUNTS_KEY = "mounts"
 class SettingsFileError(RuntimeError):
     """设置文件存在但读不出来。
 
-    消息必须带文件路径；`tomllib` 的语法错误自带行列号，一并转述。数据根的发现不看
+    消息必须带文件路径；`tomllib` 的语法错误自带行列号，一并转述。Peach 数据目录的发现不看
     文件内容，所以出错后仍然知道账本在哪：调用方退回内建默认并显式拒绝提供服务，
     而不是拿一份半生不熟的配置去跑。
     """
@@ -84,7 +84,7 @@ def _search_anchor(
     project_root: Path = PROJECT_ROOT, *,
     frozen: bool = bool(getattr(sys, "frozen", False)), executable: str = sys.executable,
 ) -> Path:
-    """向上找数据根的起点：源码树用项目根，打包产物用 EXE 所在目录。
+    """向上找 Peach 数据目录的起点：源码树用项目根，打包产物用 EXE 所在目录。
 
     资源根和发现起点是两回事。PyInstaller 的资源在 `_MEIPASS`，单文件包把它解到
     `%TEMP%/_MEIxxxx`，从那里向上只会走到用户目录，托盘于是把一台配置好的机器判成
@@ -99,14 +99,14 @@ SEARCH_ANCHOR = _search_anchor()
 
 #: 向上找几层。四层刚好覆盖最深的那种形态（`peach-app/dist/Peach` 里的 EXE 走三层
 #: 回到 `peach/`，再留一层给更深的检出）。不做无界搜索：一路走到磁盘根会撞上碰巧同名的
-#: 目录，而那种「找错数据根」的故障看起来完全像是数据丢了。
+#: 目录，而那种「找错 Peach 数据目录」的故障看起来完全像是数据丢了。
 _SEARCH_DEPTH = 4
 
 
 def _bootstrap_data_root(
     project_root: Path = SEARCH_ANCHOR, environ: dict[str, str] | None = None,
 ) -> tuple[Path, bool]:
-    """返回 (数据根, 是否真的找到了)。找不到时第一项是 `peach init` 的默认落点。
+    """返回 (Peach 数据目录, 是否真的找到了)。找不到时第一项是 `peach init` 的默认数据目录。
 
     `project_root` 是向上找的起点，默认取 `SEARCH_ANCHOR`。
     """
@@ -146,14 +146,14 @@ def _selected_data_root(root: Path) -> Path:
 def discover_data_root(
     project_root: Path = SEARCH_ANCHOR, environ: dict[str, str] | None = None,
 ) -> tuple[Path, bool]:
-    """从启动落点读取已保存的数据目录位置，返回实际数据根及发现状态。"""
+    """从默认数据目录读取已保存的数据目录位置，返回实际 Peach 数据目录及发现状态。"""
     root, found = _bootstrap_data_root(project_root, environ)
     selected = _selected_data_root(root)
     return selected, found or (selected / SETTINGS_FILENAME).is_file()
 
 
 def remember_data_root(bootstrap: PeachConfig, selected: PeachConfig) -> None:
-    """将首次设置选定的位置原子记录在启动落点，不复制账本或其他数据。"""
+    """将首次设置选定的位置原子记录在默认数据目录，不复制账本或其他数据。"""
     if bootstrap.data_root.resolve() == selected.data_root.resolve():
         return
     from .fsutil import atomic_write_text
@@ -185,7 +185,7 @@ class ReplicationSettings:
     """
 
     enabled: bool = False
-    #: 共享传输点。空串表示取 `<数据根的上级>/peach-sync`。
+    #: 共享传输点。空串表示取 `<Peach 数据目录的上级>/peach-sync`。
     shared_root: str = ""
     smb_host: str = ""
     smb_share: str = ""
@@ -221,16 +221,16 @@ class PeachConfig:
     #: 设置文件**应该**在哪。文件不存在时这个值照样有效，`present` 才是存在判据。
     path: Path
     present: bool = False
-    #: 数据根是被找到的，还是只是一个建议落点。
+    #: Peach 数据目录是被找到的，还是只是一个建议使用的数据目录。
     data_root_found: bool = False
     directories: dict[str, str] = field(default_factory=dict)
-    #: `asset.location` -> 本机挂载点，即该来源的每个声明根落在本机哪个目录，按顺序
-    #: 与 `locations` 里的声明根一一对应。Windows 上通常为空：盘符本身就是挂载点。
+    #: `asset.location` -> 本机挂载点，即该来源的每个数据库路径前缀落在本机哪个目录，按顺序
+    #: 与 `locations` 里的数据库路径前缀一一对应。Windows 上通常为空：盘符本身就是挂载点。
     mounts: dict[str, tuple[str, ...]] = field(default_factory=dict)
     library_names: dict[str, str] = field(default_factory=dict)
     library_icons: dict[str, str] = field(default_factory=dict)
     media_costs: dict[str, str] = field(default_factory=dict)
-    #: `asset.location` -> 账本口径的声明根，至少一个。
+    #: `asset.location` -> 数据库中的目录前缀，至少一个。
     locations: dict[str, tuple[str, ...]] = field(
         default_factory=lambda: dict(DEFAULT_LOCATION_ROOTS))
     server: ServerSettings = ServerSettings()
@@ -239,16 +239,16 @@ class PeachConfig:
 
     @property
     def configured(self) -> bool:
-        """有设置文件，或者已经找到数据根，就算配置过。
+        """有设置文件，或者已经找到 Peach 数据目录，就算配置过。
 
-        单独看设置文件会把所有现有部署判成「未配置」——它们的数据根真实存在、账本也在
+        单独看设置文件会把所有现有部署判成「未配置」——它们的 Peach 数据目录真实存在、账本也在
         跑，只是还没生成过 config.toml。反过来，全新克隆两个条件都不成立，页面才应该
         弹首次运行提示。
         """
         return self.present or self.data_root_found
 
     def directory(self, key: str) -> Path:
-        """数据根下的子目录。相对路径按数据根解析，绝对路径原样使用。"""
+        """Peach 数据目录下的子目录。相对路径按 Peach 数据目录解析，绝对路径原样使用。"""
         raw = (self.directories.get(key) or "").strip() or key
         candidate = Path(raw)
         return candidate if candidate.is_absolute() else self.data_root / candidate
@@ -364,7 +364,7 @@ def _merge(
             "`[media]` 下不再接受盘符键：" + "、".join(stray)
             + "。改写成 `[media.mounts] <location-id> = <本机路径>`，"
             "ID 取 `[media.locations]` 中已配置的来源键，"
-            "路径填该来源的声明根在本机的落点，例如 "
+            "路径填写该来源的本机媒体目录，例如 "
             "`local = '/mnt/media'`"
         ))
     # 文件里写了 `[media.locations]` 就以它为准：`peach init` 的问答只声明用户给过的
@@ -374,7 +374,7 @@ def _merge(
         locations = _root_map(_table(media, _LOCATIONS_KEY, path), path, "media.locations.")
         empty = sorted(key for key, roots in locations.items() if not roots)
         if empty:
-            raise _fail(path, "`[media.locations]` 里这些来源没有声明根：" + "、".join(empty))
+            raise _fail(path, "`[media.locations]` 中这些媒体来源没有配置目录前缀：" + "、".join(empty))
     else:
         locations = dict(DEFAULT_LOCATION_ROOTS)
     mounts = _root_map(_table(media, _MOUNTS_KEY, path), path, "media.mounts.")
@@ -386,11 +386,11 @@ def _merge(
             + "、".join(unknown_mounts)
         ))
     for key, points in mounts.items():
-        # 落点按顺序对应声明根：数目不齐时无法判断哪个目录漏了，与其猜不如拒绝。
+        # 媒体目录按顺序对应数据库路径前缀，数目不一致时拒绝保存。
         if points and len(points) != len(locations[key]):
             raise _fail(path, (
-                f"`[media.mounts] {key}` 给了 {len(points)} 个落点，"
-                f"但 `[media.locations] {key}` 声明了 {len(locations[key])} 个根；"
+                f"`[media.mounts] {key}` 配置了 {len(points)} 个媒体目录，"
+                f"但 `[media.locations] {key}` 配置了 {len(locations[key])} 个数据库路径前缀；"
                 "两边按顺序一一对应，要么数目相同，要么整项留空"
             ))
 
@@ -492,7 +492,7 @@ def load_config(
 ) -> PeachConfig:
     """读一次设置文件并合并三层。
 
-    `strict=False` 时坏文件退回内建默认（数据根仍然照发现顺序算），给 `peach init
+    `strict=False` 时坏文件退回内建默认（Peach 数据目录仍然照发现顺序算），给 `peach init
     --force` 留一条自救路径；否则抛 `SettingsFileError`。
 
     「坏」包括语法读不出来和合并时被拒（未知目录键、`[media]` 下的盘符键之类）。
@@ -516,7 +516,7 @@ def load_config(
     except SettingsFileError:
         if strict:
             raise
-        # 文件内容整份作废，只保留数据根的发现结果和环境变量层。
+        # 文件内容整份作废，只保留 Peach 数据目录的发现结果和环境变量层。
         return _merge(data_root, path, False, found, {}, environ)
 
 
@@ -561,7 +561,7 @@ def _render_value(value: object) -> str:
 
 
 def _render_roots(pairs: dict[str, tuple[str, ...]]) -> list[str]:
-    """声明根与落点：只有一个就写成字符串，多个才写数组，文件保持最好读的形状。"""
+    """渲染数据库路径前缀或媒体目录：单个写成字符串，多个写成数组。"""
     rendered: dict[str, object] = {}
     for key, roots in pairs.items():
         if len(roots) == 1:
@@ -602,6 +602,8 @@ def render(config: PeachConfig) -> str:
     lines += [
         "",
         "[media.locations]",
+        "# 通常在网页的媒体目录中填写实际目录即可；Peach 保存时自动维护本表和 [media.mounts]。",
+        "# 以下说明供手动编辑配置参考；已有影片按本表查找文件，改成不匹配的值会使影片无法读取。",
         "# local、115、pikpak 等键表示媒体来源；值是数据库中影片路径的目录前缀。",
         "# Peach 数据库在所有系统上都保存 Windows 格式的路径，例如 R:\\media\\a.mp4。",
         "# 因此 Docker / Linux / macOS 也使用本表；R:\\media 无需在这些系统上实际存在。",
@@ -644,7 +646,8 @@ def render(config: PeachConfig) -> str:
         "# Docker 服务固定监听 0.0.0.0:8900；宿主机访问地址与端口由 Compose 配置。",
         "# 此处 host、port 用于直接运行 peach serve；Docker 入口参数优先。",
         "# mdns_name 在局域网里必须唯一：两台机器同名会互相抢占。",
-        "# review_writer_origin 是 reader 复核镜像要读的 writer 源，留空表示本机不做镜像。",
+        "# review_writer_origin 是允许修改数据库的设备的地址；只读设备通过它获取待确认资料。",
+        "# 留空表示本机不显示另一台设备的待确认资料。",
     ]
     lines += _render_pairs({
         "host": config.server.host,

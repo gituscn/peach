@@ -382,8 +382,8 @@ function Side({ item, data, context, media, write, issue, helpers, actions }: {
           </div>
         ) : null}
         <div data-stage-actions="" data-follow-detail-actions="">
-          <button type="button" data-stage-action="later" data-follow-detail-save="" aria-label={saved ? '已保存' : '保存到账本'}
-            title={saved ? '已保存' : '保存到账本'} disabled={saved} {...busyAttrs('save')}
+          <button type="button" data-stage-action="later" data-follow-detail-save="" aria-label={saved ? '已保存' : '保存到数据库'}
+            title={saved ? '已保存' : '保存到数据库'} disabled={saved} {...busyAttrs('save')}
             onClick={write.save} dangerouslySetInnerHTML={{ __html: icon(saved ? 'check' : 'bookmark-plus') }} />
           <button type="button" data-stage-action="later" data-follow-detail-want="" aria-pressed={!!write.want}
             aria-label={write.want ? '取消想要' : '想要'} title={write.want ? '取消想要' : '想要'}
@@ -508,7 +508,7 @@ function useDetailWrite(item: FollowDetailItem, actions: FollowDetailActions, on
   });
   const saveMutation = useMutation({
     mutationFn: () => apiSend(FOLLOW_SAVE_URL, { item: id }),
-    onSuccess: () => { apply('saved'); setFailure(''); actions.toast('已保存到账本') },
+    onSuccess: () => { apply('saved'); setFailure(''); actions.toast('已保存到数据库') },
     onError: failed,
     onSettled: () => mark('save', false),
   });

@@ -17,7 +17,7 @@ export function directStreamSource(item: PlayerItem, session: string): PlayerSou
   };
 }
 
-/* 在线资产的 `path` 是来源作品页，不是可播地址。能播的那条代理在 `/follow-stream?id=<follow_item>`，
+/* 在线作品的 `path` 是来源作品页，不是可播地址。能播的那条代理在 `/follow-stream?id=<follow_item>`，
    保存时写了 `follow_item.asset_id`，`/api/item` 反查后回传 `follow_item_id`。 */
 function followStreamSource(item: PlayerItem): PlayerSource | null {
   return item.location === 'online' && item.follow_item_id
