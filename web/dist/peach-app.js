@@ -75144,7 +75144,7 @@ function jIe({ initial: e, receipt: t }) {
 				}),
 				u.enabled && u.cloud ? /* @__PURE__ */ (0, C.jsx)(hA, {
 					label: "Webhook 配置",
-					description: u.config_toml ? "贴进 CloudDrive2「设置 → Webhooks」，需要会员；更换密钥后要重贴。" : u.origin ? "还没有共享密钥，保存配置后生成。" : "要先有 CloudDrive2 能访问的 HTTPS 地址才能生成。"
+					description: u.config_toml ? "贴进 CloudDrive2「设置 → Webhooks」，需要会员；更换密钥后要重贴。" : u.origin ? "还没有共享密钥，保存配置后生成。" : "要先有 CloudDrive2 能访问的局域网地址才能生成。"
 				}) : null
 			] }),
 			u.enabled && u.cloud && u.config_toml ? /* @__PURE__ */ (0, C.jsx)(bA, {
