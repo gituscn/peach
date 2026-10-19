@@ -1,16 +1,16 @@
-"""账本来源与本机挂载点之间的受控映射。
+"""把数据库中的媒体路径转换为当前系统可以读取的文件路径。
 
 账本里的 `asset.path` 一律是 Windows 形态的绝对路径：`R:\\media\\...`（本地硬盘）、
 `A:\\...`（PikPak）、`B:\\...`（115）。这是不变量，不随平台改写。
 
-真正会变的是「同一个来源在这台机器上落在哪」。`asset.location` 本来就是挂载点 ID
-（来源 ID 见 `media_sources.SOURCE_REGISTRY`），设置文件用 `[media.locations]` 声明每个 ID 的账本口径根
-（一个来源可以有几个根：两块硬盘都算 `local`），用 `[media.mounts]` 按同样的顺序声明每个
-根在本机的落点，翻译按「声明根前缀 → 本机挂载点」进行（ADR-0023 第 2 阶段勘误）。
-Windows 上盘符本身就是挂载点，路径原样返回。
+`asset.location` 保存媒体来源的键，例如 local、115、pikpak（见 `media_sources.SOURCE_REGISTRY`）。
+`[media.locations]` 保存每个来源在数据库中的目录前缀；`[media.mounts]` 保存本机实际目录。
+Linux 即使没有相同盘符，也需要用这两项配置将数据库路径转换成实际文件路径。
+一个来源有多个目录时，两项均使用数组，数量和顺序相同（ADR-0023 第 2 阶段勘误）。
+Windows 直接使用数据库中的路径，无需这一步转换。
 
-没有挂载点的来源会被映射到 `UNMAPPED_ROOT` 下，一定通不过 `allowed_media_roots`
-授权，于是该来源整体按「脱盘」处理，而不是意外落到当前工作目录下的同名相对路径。
+其他系统缺少对应实际目录时，将路径指向 `UNMAPPED_ROOT` 下不存在的目录，禁止读取。
+这不表示媒体已删除，也不表示 Docker / Linux / macOS 可以省略 `[media.locations]`。
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from . import settings_file
 
 LOGGER = logging.getLogger(__name__)
 
-# 未映射来源的落点。刻意选一个不可能存在的绝对路径，让授权和存在性检查都必然失败。
+# 缺少路径配置时使用的不存在目录；文件授权和存在性检查均拒绝该路径。
 UNMAPPED_ROOT = Path("/nonexistent/peach-unmapped-drive")
 
 #: 运行期覆盖挂载表的环境变量。键是 location ID，不是盘符。
@@ -44,17 +44,16 @@ def _parse_override(raw: str) -> tuple[tuple[str, str], ...]:
     return tuple(pairs)
 
 
-#: 一个来源的声明根或落点：按顺序一一对应的字符串元组。
+#: 按媒体来源分组的目录；数据库目录前缀与本机实际目录按顺序对应。
 Roots = Mapping[str, Sequence[str]]
 
 
 def location_mounts() -> dict[str, tuple[Path, ...]]:
-    """当前生效的「来源 ID → 本机挂载点」，与该来源的声明根按顺序一一对应；
-    没有条目表示「本机没有这个来源」。
+    """读取各媒体来源的本机实际目录，与 [media.locations] 中的目录前缀按顺序对应。
 
-    基础映射来自设置文件的 `[media.mounts]`（内建默认为空：一台新机器什么都没挂，
-    对应资产按脱盘处理）。`MOUNTS_ENV` 每次现读而不是缓存进设置层——测试和临时诊断
-    会在运行期改它，缓存住就看不到变化；覆盖值只给一个目录，对应该来源的第一个根。
+    基础映射来自设置文件的 [media.mounts]，默认没有条目。Linux 和 macOS 缺少条目时无法
+    读取该来源的媒体文件；Windows 直接使用数据库路径，不需要本表。MOUNTS_ENV 每次现读——测试和临时诊断
+    会在运行期改它，缓存住就看不到变化；覆盖值只给一个目录，对应该来源的第一个数据库目录前缀。
     """
     merged: dict[str, tuple[str, ...]] = dict(settings_file.active().mounts)
     for location, mount in _parse_override(os.environ.get(MOUNTS_ENV, "")):
@@ -64,7 +63,7 @@ def location_mounts() -> dict[str, tuple[Path, ...]]:
 
 
 def location_roots() -> dict[str, tuple[str, ...]]:
-    """来源 ID → 账本口径的声明根（至少一个），来自 `[media.locations]`。"""
+    """媒体来源键对应的数据库目录前缀（至少一个），来自 `[media.locations]`。"""
     return dict(settings_file.active().locations)
 
 

@@ -43,10 +43,10 @@ DIRECTORY_KEYS = (
     "database", "generated", "sources", "state", "secrets", "logs", "tools", "review",
 )
 
-#: `asset.location` -> 账本口径的声明根。键是 ledger 里的 `asset.location` 值，它本来
-#: 就是挂载点 ID；值仍是 Windows 盘符形态，因为账本路径的形状是不变量（AGENTS.md）。
-#: 一个来源可以有多个声明根（两块硬盘都算 `local`），文件里写一个字符串或一个数组。
-#: 本机落点由 `[media.mounts]` 按同一批 ID 给出，翻译在 `peach.platform`（ADR-0023 勘误）。
+#: 媒体来源的键（如 local、115）对应数据库 asset.location 的值，不是盘符。
+#: 值是数据库 asset.path 中保存的目录前缀；各系统均使用 Windows 格式。
+#: 一个来源有多个目录时写数组；[media.mounts] 按同一顺序保存本机实际目录。
+#: peach.platform 在读取文件前转换路径（ADR-0023 勘误）。
 DEFAULT_LOCATION_ROOTS: dict[str, tuple[str, ...]] = {
     "local": (r"R:\media",),
     "115": ("B:/",),
@@ -586,58 +586,62 @@ def _render_pairs(pairs: dict[str, object]) -> list[str]:
 def render(config: PeachConfig) -> str:
     """把设置渲染成带注释的 TOML。注释是给人读的，`load_config` 不依赖它们。"""
     lines = [
-        "# Peach 设置文件。优先级：环境变量 > 本文件 > 内建默认；改完重启服务生效。",
-        "# 本文件住在数据根内部，数据根本身由 PEACH_DATA_ROOT 或项目旁的 peach-data 决定。",
-        "# Docker：本文件位于 /data/config.toml，/data 必须持久化；媒体使用容器内路径 /media。",
+        "# Peach 设置文件。优先级：环境变量 > 本文件 > 程序默认值；手动修改后重启服务生效。",
+        "# 本文件保存在 Peach 数据目录中；该目录由 PEACH_DATA_ROOT 或项目旁的 peach-data 决定。",
+        "# Docker：本文件位于 /data/config.toml；将 /data 放在数据卷中，重建容器时保留该卷。",
+        "# Docker 中的 /media 是容器内的媒体目录，宿主机目录由 Compose 挂载到这里。",
         "# Docker 部署说明：https://github.com/peach-mitao/peach/blob/master/docs/DOCKER.md",
-        f"# 生成入口：peach init（数据根：{config.data_root}）",
+        f"# 生成入口：peach init（Peach 数据目录：{config.data_root}）",
         "",
         "[directories]",
-        "# 数据根下的子目录，省略即取同名目录；写绝对路径可以把某一类数据搬出数据根。",
-        "# Docker 中相对目录位于 /data 下；绝对路径必须在容器内可访问并持久化。",
+        "# Peach 数据目录下的子目录，例如 database、logs；省略时使用同名目录。",
+        "# 也可填写绝对路径。Docker 中相对目录位于 /data 下；其他目录需要单独挂载并保留数据。",
     ]
     lines += _render_pairs({key: config.directories[key]
                             for key in DIRECTORY_KEYS if key in config.directories})
     lines += [
         "",
         "[media.locations]",
-        "# 来源 ID -> 账本中的声明根，统一使用带盘符的路径作为标识。已有声明根通常不要改。",
-        "# Docker / Linux / macOS 的实际目录填在 [media.mounts]；无需创建 Windows 盘符。",
-        "# Docker 示例：local = 'R:\\media'，在 [media.mounts] 中配 local = '/media'。",
+        "# local、115、pikpak 等键表示媒体来源；值是数据库中影片路径的目录前缀。",
+        "# Peach 数据库在所有系统上都保存 Windows 格式的路径，例如 R:\\media\\a.mp4。",
+        "# 因此 Docker / Linux / macOS 也使用本表；R:\\media 无需在这些系统上实际存在。",
+        "# 例：本表 local = 'R:\\media'，[media.mounts] local = '/media'。",
+        "# Peach 会把数据库中的 R:\\media\\a.mp4 转换为 /media/a.mp4，再读取文件。",
+        "# 本表必须匹配数据库中的路径；Docker / Linux / macOS 搬动实际目录时保留本表，修改 [media.mounts]。",
         "# Windows 示例：local = ['D:\\Videos', 'E:\\Movies']，直接使用本机媒体目录。",
     ]
     lines += _render_roots(dict(config.locations))
     lines += [
         "",
         "[media.libraries]",
-        "# 声明根 -> 馆藏在界面上的名字。不写就取目录名；同名的几个根合成一个馆藏。",
+        "# [media.locations] 中的目录前缀 -> 界面显示的媒体库名称；不写时取目录名。",
+        "# 多个目录使用相同名称时，在界面中显示为同一个媒体库。",
     ]
     lines += [f"{_render_value(root)} = {_render_value(name)}" for root, name in config.library_names.items()]
     lines += [
         "",
         "[media.library_icons]",
-        "# 声明根 -> 馆藏图标。取值是 peach.media_libraries.LIBRARY_ICONS 里的字形名，",
+        "# [media.locations] 中的目录前缀 -> 媒体库图标。取值是 peach.media_libraries.LIBRARY_ICONS 里的图标名，",
         "# 不认识的值忽略：只含一个来源的馆藏回落到该来源的图标，跨来源的用 database。",
     ]
     lines += [f"{_render_value(root)} = {_render_value(icon)}" for root, icon in config.library_icons.items()]
-    lines += ["", "[media.costs]", "# 声明根 -> 代理流量保护。free 关闭，metered 开启。"]
+    lines += ["", "[media.costs]", "# [media.locations] 中的目录前缀 -> 代理流量保护。free 关闭，metered 开启。"]
     lines += [f"{_render_value(root)} = {_render_value(cost)}" for root, cost in config.media_costs.items()]
     lines += [
         "",
         "[media.mounts]",
-        "# 来源 ID -> 实际媒体目录，与 [media.locations] 的声明根一一对应。",
-        "# Docker 示例：local = '/media'，R:\\media\\a.mp4 实际读取 /media/a.mp4。",
-        "# Docker 只填写容器内路径；宿主机目录在 Compose 的 volumes 中配置。",
+        "# 与 [media.locations] 使用相同的媒体来源键；值是 Peach 实际读取文件的目录。",
+        "# Docker 填容器内路径，例如 local = '/media'；宿主机目录在 Compose 的 volumes 中配置。",
         "# Linux / macOS 也使用本机绝对路径，例如 /mnt/media 或 /Volumes/Media。",
-        "# 声明了多个根就按同样的顺序给同样多个落点。",
-        "# 不写或留空表示本机没有这个来源，对应资产按「脱盘」处理，不报错。",
-        "# Windows 上整表为空：盘符本身就是挂载点，路径不需要翻译。",
+        "# 一个来源有多个目录时，两表都写数组，目录数量和顺序必须相同。",
+        "# Docker / Linux / macOS 必须提供实际目录，否则无法读取该来源的媒体文件；媒体记录仍保留。",
+        "# Windows 直接读取 [media.locations] 中的目录，无需填写本表。",
     ]
     lines += _render_roots(dict(config.mounts))
     lines += [
         "",
         "[server]",
-        "# Docker 无桌面入口固定监听 0.0.0.0:8900；宿主机访问地址与端口由 Compose 配置。",
+        "# Docker 服务固定监听 0.0.0.0:8900；宿主机访问地址与端口由 Compose 配置。",
         "# 此处 host、port 用于直接运行 peach serve；Docker 入口参数优先。",
         "# mdns_name 在局域网里必须唯一：两台机器同名会互相抢占。",
         "# review_writer_origin 是 reader 复核镜像要读的 writer 源，留空表示本机不做镜像。",
@@ -652,9 +656,11 @@ def render(config: PeachConfig) -> str:
     lines += [
         "",
         "[replication]",
-        "# 多机单写者账本复制设置（ADR-0017）。单机与独立 Docker 部署保持 enabled = false。",
+        "# 两台电脑之间的数据库复制设置（ADR-0017）；只有一台允许修改数据库，另一台只读。",
+        "# 单机与独立 Docker 部署保持 enabled = false。",
         "# 关闭时不启动同步观察器、不探测 SMB；桌面托盘不显示 Ledger 菜单项。",
-        "# shared_root 留空表示 <数据根的上级>/peach-sync；smb_* 留空表示不挂载共享。",
+        "# shared_root 是两台电脑交换数据库副本的目录；留空时使用 Peach 数据目录旁的 peach-sync。",
+        "# smb_* 用于连接另一台电脑的共享目录；留空时不连接共享目录。",
     ]
     lines += _render_pairs({
         "enabled": config.replication.enabled,
