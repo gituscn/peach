@@ -51,6 +51,38 @@ def ready(name: str) -> None:
     raise RuntimeError("容器未就绪：" + docker("logs", name))
 
 
+def transcode_checks(name: str) -> None:
+    """无 GPU 的容器核对 VAAPI 软件栈与应用的整片、分片软件回退。"""
+    assert "vaapi" in docker("exec", name, "ffmpeg", "-hide_banner", "-hwaccels")
+    assert "h264_vaapi" in docker("exec", name, "ffmpeg", "-hide_banner", "-encoders")
+    assert "scale_vaapi" in docker("exec", name, "ffmpeg", "-hide_banner", "-filters")
+    assert "vaapi" in docker("exec", name, "ffmpeg", "-hide_banner", "-h", "decoder=h264")
+    docker("exec", name, "python", "-c",
+           "import ctypes; from pathlib import Path; "
+           "drivers=list(Path('/usr/lib').glob('*/dri/radeonsi_drv_video.so')); "
+           "assert drivers, '缺少 AMD VAAPI 驱动'; ctypes.CDLL(str(drivers[0]))")
+    docker("exec", name, "ffmpeg", "-v", "error", "-i", "/data/smoke-media/fixture.mp4",
+           "-c:v", "mpeg4", "/data/smoke-media/transcode.mkv")
+    docker("exec", name, "python", "-c",
+           "import asyncio; from pathlib import Path; from peach.ffmpeg import FFmpegResolver; "
+           "from peach.transcodes import TranscodeService; from peach.segments import HlsSegmentService; "
+           "from peach.streaming import StreamSessionRegistry; "
+           "root=Path('/data/smoke-media'); resolver=FFmpegResolver(root/'tools'); "
+           "whole=TranscodeService(resolver,root/'mp4-cache'); "
+           "assert not whole.hardware.encoders(resolver.ffmpeg().path), '验收容器应未透传 GPU'; "
+           "source=root/'transcode.mkv'; target,converted=whole.browser_path(95,source); "
+           "assert converted and target.stat().st_size; target.rename(root/'converted.mp4'); "
+           "hls=HlsSegmentService(resolver,root/'hls-cache',hardware=whole.hardware); "
+           "segment=asyncio.run(hls.generate(source,0,1,asset_id=95,index=0,session='smoke',"
+           "registry=StreamSessionRegistry(),transcode=True)); "
+           "assert segment.stat().st_size; segment.rename(root/'converted.ts')")
+    for filename in ("converted.mp4", "converted.ts"):
+        report = json.loads(docker("exec", name, "ffprobe", "-v", "error", "-select_streams", "v:0",
+                                   "-show_entries", "stream=codec_name,pix_fmt", "-of", "json",
+                                   "/data/smoke-media/" + filename))
+        assert report["streams"][0] == {"codec_name": "h264", "pix_fmt": "yuv420p"}, report
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("image")
@@ -89,6 +121,7 @@ def main() -> None:
         assert asset is not None, "资料处理请求未登记测试视频"
         media = json.loads(request(name, f"/stream?id={asset}", headers={"Range": "bytes=0-63"}))
         assert media == {"status": 206, "size": 64}, media
+        transcode_checks(name)
         config_path = "/data/config.toml"
         original = docker("exec", name, "cat", config_path)
         docker("exec", name, "python", "-c",
@@ -106,7 +139,8 @@ def main() -> None:
         ready(name)
         assert docker("exec", name, "cat", config_path) == original
         print(json.dumps({"image": args.image, "checks": ["non-root", "ready", "auth", "configuration",
-                                                         "scan", "range", "reload", "restart", "persistence"]}))
+                                                         "scan", "range", "vaapi-stack", "transcode-fallback",
+                                                         "reload", "restart", "persistence"]}))
     finally:
         docker("rm", "--force", name, check=False)
         docker("volume", "rm", volume, check=False)

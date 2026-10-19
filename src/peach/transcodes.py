@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 import threading
@@ -11,6 +12,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .ffmpeg import FFmpegResolver
+from .hardware_transcode import HardwareTranscoder
 from .mp4index import composition_offsets_present
 
 
@@ -18,6 +20,7 @@ BROWSER_NATIVE_SUFFIXES = frozenset({".mp4", ".m4v", ".webm", ".ogv", ".ogg"})
 DIRECT_MP4_PIXEL_FORMATS = frozenset({"yuv420p", "yuvj420p"})
 TRANSCODE_TIMEOUT_SECONDS = 3600
 PROBE_TIMEOUT_SECONDS = 20
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -58,9 +61,8 @@ class TranscodeService:
     ):
         self.resolver = resolver
         self.cache_root = cache_root
-        # 当前生产机是 NVIDIA Windows。macOS 走软件编码，避免每次先跑两次
-        # 必然失败的 CUDA/NVENC 命令；测试和后续平台适配可显式覆盖。
-        self.prefer_hardware = os.name == "nt" if prefer_hardware is None else prefer_hardware
+        self.prefer_hardware = prefer_hardware is not False
+        self.hardware = HardwareTranscoder(enabled=self.prefer_hardware)
         self._locks: dict[int, list] = {}
         self._locks_guard = threading.Lock()
         self._slots = threading.Semaphore(max(1, max_concurrent))
@@ -179,6 +181,7 @@ class TranscodeService:
                         if (returncode == 0 and temporary.is_file()
                                 and temporary.stat().st_size):
                             temporary.replace(target)
+                            logger.info("整片转码完成：%s", attempt.name)
                             completed = True
                             break
                         detail = (stderr or b"").decode("utf-8", "replace")[-1000:]
@@ -293,13 +296,12 @@ class TranscodeService:
         source: Path,
         temporary: Path,
         profile: _MediaProfile | None,
-    ) -> tuple[_TranscodeAttempt, ...]:
+    ):
         prefix = (
             str(ffmpeg), "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
         )
         mapping = ("-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn")
         finish = ("-movflags", "+faststart", str(temporary))
-        attempts: list[_TranscodeAttempt] = []
 
         if (profile is not None and profile.video_codec == "h264"
                 and profile.pixel_format in DIRECT_MP4_PIXEL_FORMATS):
@@ -308,47 +310,30 @@ class TranscodeService:
                 if profile.audio_codec in {"", "aac"}
                 else ("-c:a", "aac", "-b:a", "160k")
             )
-            attempts.append(_TranscodeAttempt(
+            yield _TranscodeAttempt(
                 "video-copy",
                 prefix + ("-i", str(source)) + mapping + ("-c:v", "copy") + audio + finish,
-            ))
+            )
 
         fast_audio = (
             ("-c:a", "copy")
             if profile is not None and profile.audio_codec in {"", "aac"}
             else ("-c:a", "aac", "-b:a", "160k")
         )
-        nvenc = (
-            "-c:v", "h264_nvenc", "-preset", "p1", "-tune", "hq",
-            "-rc", "vbr", "-cq", "21", "-b:v", "0",
-        )
-        if self.prefer_hardware:
-            # CUDA surfaces stay on the GPU; scale_cuda also converts common 10-bit HEVC
-            # inputs to NV12 so H.264 NVENC does not have to fall back to a CPU transfer.
-            attempts.append(_TranscodeAttempt(
-                "cuda-nvenc",
-                prefix + (
-                    "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
-                    "-i", str(source),
-                ) + mapping + ("-vf", "scale_cuda=format=nv12") + nvenc + fast_audio + finish,
-            ))
-            # Some codecs have no NVDEC path but can still keep the expensive encode on NVENC.
-            attempts.append(_TranscodeAttempt(
-                "nvenc",
-                prefix + ("-i", str(source)) + mapping + nvenc + (
-                    "-pix_fmt", "yuv420p",
-                ) + fast_audio + finish,
-            ))
+        for encoder in self.hardware.encoders(ffmpeg):
+            for attempt in encoder.attempts(profile.video_codec if profile else ""):
+                yield _TranscodeAttempt(
+                    attempt.name, prefix + attempt.before_input + ("-i", str(source))
+                    + mapping + attempt.output + fast_audio + finish,
+                )
 
-        # Final compatibility path: preserve the previous encoder and always normalize audio.
-        attempts.append(_TranscodeAttempt(
+        yield _TranscodeAttempt(
             "libx264",
             prefix + ("-i", str(source)) + mapping + (
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
                 "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
             ) + finish,
-        ))
-        return tuple(attempts)
+        )
 
     def _execute(
         self,

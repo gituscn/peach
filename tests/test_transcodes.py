@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from peach.ffmpeg import BinaryChoice
+from peach.hardware_transcode import HardwareEncoder
 from peach.transcodes import TranscodeCancelled, TranscodeService, TranscodeUnavailable
 from support.mp4 import minimal_mp4
 
@@ -59,6 +60,15 @@ def _media_process(commands, profile, fail=None, duration=None):
 
 
 class TranscodeServiceTests(unittest.TestCase):
+    def setUp(self):
+        candidates = patch("peach.hardware_transcode.HardwareTranscoder._candidates",
+                           return_value=(HardwareEncoder("nvenc"),))
+        probe = patch("peach.hardware_transcode.HardwareTranscoder._probe", return_value=True)
+        candidates.start()
+        probe.start()
+        self.addCleanup(candidates.stop)
+        self.addCleanup(probe.stop)
+
     def test_native_containers_are_checked_against_their_streams(self):
         cases = (
             (".mp4", "mpeg4", "yuv420p", "aac", True),
