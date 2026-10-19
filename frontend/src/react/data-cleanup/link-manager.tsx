@@ -231,7 +231,7 @@ export function LinkManager() {
                         {hosts.map(([host, n]) => <span key={host} data-top-host="" className="inline-flex min-w-0 max-w-full items-center gap-1.5">
                           <a href={`https://${host}`} target="_blank" rel="noopener noreferrer"
                             className="inline-flex min-w-0 items-center gap-1.5 text-body-2-medium text-text-primary">
-                            <SiteMark linkId={info.top_host_link_ids[host]!} /><span className="min-w-0 wrap-anywhere">{host}</span>
+                            <SiteMark linkId={info.top_host_link_ids?.[host]} /><span className="min-w-0 wrap-anywhere">{host}</span>
                             <RiExternalLinkLine aria-hidden className="size-3.5 shrink-0" />
                           </a>
                           <Chip variant="caption" color="neutral"><span className="tabular-nums">{count(n)}</span></Chip>
