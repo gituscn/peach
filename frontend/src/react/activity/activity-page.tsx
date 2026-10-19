@@ -13,11 +13,12 @@
  * 轮询只管第一页，翻过的那些不会被下一次刷新冲掉。 */
 import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
-import { RiArrowDownSLine, RiHistoryLine } from '@remixicon/react';
+import { RiArrowDownSLine, RiArrowRightLine, RiHistoryLine } from '@remixicon/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { Chip } from '@/components/base/badges/chip';
 import { Button } from '@/components/base/buttons/button';
+import { LinkButton } from '@/components/base/buttons/link-button';
 
 import { errorMessage } from '../../api';
 import { cardClass } from '../components/card';
@@ -70,7 +71,7 @@ function FollowupList({ rows }: { rows: TaskRunPayload[] }) {
               ? <span className="min-w-0 break-words text-caption-1-regular text-text-secondary">{detail}</span>
               : null}
             <div className="w-full min-w-0">
-              <Disclosure summary="技术详情">
+              <Disclosure summary="技术详情" contentClassName="pb-2.5">
                 <CodeBlock code={JSON.stringify(row.result_summary, null, 2)} language="json"
                   label={`${row.task_label}技术详情`} />
               </Disclosure>
@@ -106,12 +107,13 @@ function RunCard(
       </div>
       {followups?.length ? <div className="border-t border-separator-border px-5 py-2.5">
         <Disclosure summary={`任务明细 · ${followups.length} 项`}
+          contentClassName="pb-2.5"
           defaultOpen={followups.some((row) => isActive(row) || row.status === 'failed')}>
           <FollowupList rows={followups} />
         </Disclosure>
       </div> : null}
       {Object.keys(run.result_summary || {}).length ? <div className="border-t border-separator-border px-5 py-2.5">
-        <Disclosure summary="技术详情">
+        <Disclosure summary="技术详情" contentClassName="pb-2.5">
           <CodeBlock code={JSON.stringify(run.result_summary, null, 2)} language="json"
             label={`${run.task_label}技术详情`} />
         </Disclosure>
@@ -163,9 +165,10 @@ function SettledRun(
         {summary.map((line, index) => <li key={index}>{line}</li>)}
       </ul> : null}
       {run.task_key === 'link-check' && hasResultProblems(run)
-        ? <a href="/data-cleanup#link-manager" className="self-start text-caption-1-regular text-text-primary underline">
-            查看链接结果
-          </a> : null}
+        ? <LinkButton href="/data-cleanup#link-manager" size="small" trailingIcon={RiArrowRightLine}
+            className="self-start">
+            查看有问题的链接
+          </LinkButton> : null}
     </RunCard>
   );
 }

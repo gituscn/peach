@@ -31,6 +31,10 @@ afterEach(() => queryClient.clear());
    断言到的还是上一帧的 DOM。用例里改成当场派发。 */
 notifyManager.setScheduler((notify) => notify());
 
+/* 铺满一整页的用例时限：表格不按行记忆化，每点一下整页 20 行连同勾选框、开关一起重画，单跑就要
+   0.5–0.8 秒；全量测试十六片并行时整机慢六到七倍，会越过默认的 5 秒。15 秒仍能抓住真正卡死的用例。 */
+const FULL_PAGE = { timeout: 15_000 };
+
 const source = (over: Partial<FollowSource> & { id: number }): FollowSource => ({
   provider: 'kemono',
   provider_label: 'Kemono',
@@ -353,7 +357,7 @@ it('表格视图把每条来源摊成一行，勾的还是来源 ID', async () =
   expect(sentBody(fetcher, FOLLOW_SOURCE_URL)).toEqual([{ action: 'enabled', id: 2, enabled: false }]);
 });
 
-it('关注表格分页和排序保留来源选择，批量操作覆盖跨页集合', async () => {
+it('关注表格分页和排序保留来源选择，批量操作覆盖跨页集合', FULL_PAGE, async () => {
   const many = Array.from({ length: 12 }, (_, at) => source({
     id: at + 1, label: `来源 ${String(at + 1).padStart(2, '0')}`,
   }));
@@ -885,10 +889,6 @@ it('订阅源页签不收地址，只读的这台查找、开关、移除与拉�
   expect(buttonLabelled(host, '移除 甲 的新作')?.disabled).toBe(true);
   expect(host.querySelector<HTMLInputElement>('input[aria-label="启用 甲 的新作"]')?.disabled).toBe(true);
 });
-
-/* 铺满一整页的用例时限：表格不按行记忆化，每点一下整页 20 行连同勾选框、开关一起重画，单跑就要
-   0.5–0.8 秒；全量测试十六片并行时整机慢六到七倍，会越过默认的 5 秒。15 秒仍能抓住真正卡死的用例。 */
-const FULL_PAGE = { timeout: 15_000 };
 
 /** 刚好铺满两页的订阅源：每页 20 条起，第二页只剩一条。 */
 const twoPagesOfFeeds = (unread = 0) => ({ unread, sources: Array.from({ length: 21 }, (_, i) => ({

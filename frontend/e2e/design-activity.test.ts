@@ -26,15 +26,23 @@ describe('任务页云下载布局', () => {
       await card.getByText('发现问题', { exact: true }).waitFor();
       assert.equal(await card.getByText('链接已失效 5', { exact: true }).count(), 1);
       assert.equal(await card.getByText('链接访问失败 54', { exact: true }).count(), 1);
-      assert.equal(await card.getByRole('link', { name: '查看链接结果' }).getAttribute('href'), '/data-cleanup#link-manager');
+      const resultLink = card.getByRole('link', { name: '查看有问题的链接' });
+      assert.equal(await resultLink.getAttribute('href'), '/data-cleanup#link-manager');
+      assert.equal(await resultLink.evaluate(link => getComputedStyle(link).textDecorationLine), 'none');
       await card.locator('summary').click();
       assert.equal(await card.locator('[data-code-block] code').textContent(), JSON.stringify(result, null, 2));
       const geometry = await card.locator('pre').evaluate(pre => ({
         overflows: pre.scrollWidth > pre.clientWidth,
         pageFits: document.documentElement.scrollWidth <= innerWidth,
+        leftGap: pre.closest('[data-code-block]')!.getBoundingClientRect().left
+          - pre.closest('[data-run-id]')!.getBoundingClientRect().left,
+        bottomGap: pre.closest('[data-run-id]')!.getBoundingClientRect().bottom
+          - pre.closest('[data-code-block]')!.getBoundingClientRect().bottom,
       }));
       assert.equal(geometry.overflows, true, '长行在代码块内部横向滚动');
       assert.equal(geometry.pageFits, true);
+      assert.ok(Math.abs(geometry.leftGap - geometry.bottomGap) <= 1,
+        '技术详情代码块的底部留白与卡片左右内边距一致');
       assert.equal(await card.getByRole('button', { name: '复制代码' }).count(), 1);
       assert.deepEqual(opened.problems, []);
     } finally { await opened.close(); }
