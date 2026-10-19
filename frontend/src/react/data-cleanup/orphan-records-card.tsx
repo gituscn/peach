@@ -31,23 +31,27 @@ function OrphanActions({ item, toast }: { item: OrphanRecord; toast(message: str
   const [target, setTarget] = useState<number | null>(item.candidates[0]?.id ?? null);
   const attach = useMutation({
     mutationFn: () => attachOrphan(item.id, Number(target)),
-    onSuccess: (data) => { toast(`记录已接到新文件，批次 ${data.batch}`); void refresh(); },
+    onSuccess: () => {
+      const destination = item.candidates.find((candidate) => candidate.id === target);
+      toast(`已将「${item.name}」的个人记录转移到「${destination?.name ?? '所选文件'}」`);
+      void refresh();
+    },
     onError: (error) => toast(errorMessage(error)),
   });
   const purge = useMutation({
     mutationFn: () => purgeOrphan(item.id),
     onSuccess: (data) => {
       toast(data.blocked.length
-        ? `${item.name} 的文件又回到盘上，没有删除；下一次扫描会把它接回在库`
-        : `已彻底删除 ${item.name}`);
+        ? `「${item.name}」的文件已恢复，记录未删除；下次扫描后恢复为在库状态`
+        : `已删除「${item.name}」的作品记录及个人记录`);
       void refresh();
     },
   });
   const remove = () => {
     void confirmModal({
-      title: '彻底删除',
-      body: `将删除「${item.name}」这一条和它带的记录（${recordsText(item.records)}）。此操作不可撤销。`,
-      confirmLabel: '彻底删除',
+      title: '删除记录',
+      body: `将删除「${item.name}」的作品记录${recordsText(item.records) ? `及其个人记录（${recordsText(item.records)}）` : ''}。此操作不可撤销。`,
+      confirmLabel: '删除记录',
       danger: true,
       onConfirm: () => purge.mutateAsync(),
     });
@@ -56,7 +60,7 @@ function OrphanActions({ item, toast }: { item: OrphanRecord; toast(message: str
   return (
     <span className="flex min-w-48 flex-wrap items-center gap-2">
         {item.candidates.length
-          ? <Select aria-label={`把 ${item.name} 的记录接到哪个文件`} className="w-52" selectedKey={target}
+          ? <Select aria-label={`选择接收 ${item.name} 个人记录的文件`} className="w-52" selectedKey={target}
               onSelectionChange={(key) => { if (key !== null) setTarget(Number(key)) }}>
               {item.candidates.map((candidate) => (
                 <SelectItem key={candidate.id} id={candidate.id} textValue={candidateText(candidate)}>
@@ -64,12 +68,12 @@ function OrphanActions({ item, toast }: { item: OrphanRecord; toast(message: str
                 </SelectItem>
               ))}
             </Select>
-          : <span className="text-text-secondary">没有番号或文件名对得上的文件</span>}
+          : null}
         {item.candidates.length
           ? <Button size="small" disabled={target === null} {...busyProps(busy)}
-              onClick={() => attach.mutate()}>接到这个文件</Button>
+              onClick={() => attach.mutate()}>转移记录</Button>
           : null}
-        <Button variant="danger" size="small" {...busyProps(busy)} onClick={remove}>彻底删除</Button>
+        <Button variant="danger" size="small" {...busyProps(busy)} onClick={remove}>删除记录</Button>
     </span>
   );
 }
@@ -104,22 +108,22 @@ export function OrphanRecordsCard({ toast }: { toast(message: string): void }) {
   const purge = useMutation({
     mutationFn: (ids: number[]) => purgeOrphan(ids),
     onSuccess: (data) => {
-      toast(`已彻底删除 ${data.purged} 条记录${data.blocked.length ? `，${data.blocked.length} 条文件已恢复，未删除` : ''}`);
+      toast(`已删除 ${data.purged} 条作品记录及其个人记录${data.blocked.length ? `；${data.blocked.length} 条文件已恢复，记录未删除` : ''}`);
       setSelected([]); void refresh();
     },
   });
   const removeSelected = (chosen: OrphanRecord[]) => void confirmModal({
-    title: '彻底删除所选记录',
-    body: `将删除以下 ${chosen.length} 条作品和它们带的全部记录。此操作不可撤销。`,
+    title: '删除所选记录',
+    body: `将删除以下 ${chosen.length} 条作品记录及其全部个人记录。此操作不可撤销。`,
     items: chosen.map((item) => item.name),
-    confirmLabel: '彻底删除所选记录', danger: true,
+    confirmLabel: '删除所选记录', danger: true,
     onConfirm: () => purge.mutateAsync(chosen.map((item) => item.id)),
   });
   const columns: DataColumn<OrphanRecord>[] = [
     { id: 'item', label: '作品', value: (item) => item.name, render: (item) => <OrphanIdentity item={item} /> },
-    { id: 'records', label: '带的记录', min: 144, value: (item) => recordsText(item.records),
-      render: (item) => <span className="block min-w-28">{recordsText(item.records) || '无个人记录'}</span> },
-    { id: 'target', label: '接到与操作', width: 360, min: 240, value: (item) => item.candidates.length,
+    { id: 'records', label: '个人记录', min: 144, value: (item) => recordsText(item.records),
+      render: (item) => <span className="block min-w-28">{recordsText(item.records) || '无'}</span> },
+    { id: 'target', label: '操作', width: 360, min: 240, value: (item) => item.candidates.length,
       render: (item) => <OrphanActions item={item} toast={toast} /> },
   ];
   if (!query.isError && !items.length) return null;
@@ -137,7 +141,7 @@ export function OrphanRecordsCard({ toast }: { toast(message: string): void }) {
               selected={selected} onSelected={setSelected}
               actions={(chosen) => <Button variant="danger" size="small" disabled={!chosen.length}
                 {...busyProps(purge.isPending)} onClick={() => removeSelected(chosen)}>
-                {`彻底删除所选（${chosen.length}）`}
+                {`删除所选记录（${chosen.length}）`}
               </Button>} />}
     </section>
   );

@@ -738,6 +738,6 @@ Python 源文件纳入 `src/peach/library_sharing.py` 与 `src/peach/library_pro
 
 云下载卡片的 `artwork` 只读取已入库任务绑定的本机资产，复用 `attach_artwork_fields`、`attach_card_performers`、`coverImage`、`ArtSlot` 与 `avatarInner`；封面沿用缩略图、版本和正封取景，女优头像沿用实体图片及姓名回退。页面轮询同步入库资料，提交与进度跟踪不等待图片，不额外创建取图任务或请求外部来源。没有封面时保留占位，图片失败使用共享回退处理。未新增依赖或 ledger 写入。
 
-桌面封面与右侧标题到按钮等高，取景复用 `coverAnchor` 并通过 `ResizeObserver` 同步实际容器比例；手机使用固定比例小封面。展开的完整标题位于卡片信息区下方，封面高度保持稳定。已入库且具有 `asset_id` 的任务，封面和标题使用原生链接打开 `/assets/:id`，同时保留新标签页与键盘访问；其他任务不提供详情链接。
+云下载封面复用首页 JAV 大图的 `COVER_FRONT_RATIO`、`data-media-pic` 容器、`coverAnchor` 正封裁切和同图模糊背景。桌面封面与右侧标题到按钮等高，`ResizeObserver` 按右侧内容高度和共享比例计算封面宽度；手机使用固定宽度的 3:4 小封面。展开的完整标题位于卡片信息区下方，封面高度保持稳定。已入库且具有 `asset_id` 的任务，封面和标题使用原生链接打开 `/assets/:id`，同时保留新标签页与键盘访问；其他任务不提供详情链接。
 
 普通 Toast 与扫描任务卡共用 Agent Progress 外框，16px 半径由通知栈内的既有 token 解析，细边框与接触阴影分别复用 `border-button-default`、`elevation-xs`，不改变内容排版。浏览器回归核对桌面、手机和明暗主题下的外框一致性，并以同一任务、同一内容回放外框基线生成对比图。

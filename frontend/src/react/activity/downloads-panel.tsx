@@ -27,6 +27,7 @@ import { SourceLabel } from '../components/source-label';
 import { ArtSlot } from '../components/art-slot';
 import { avatarInner, coverAnchor, coverImage, relayoutCovers } from '@peach/card-art';
 import { entityPath } from '@peach/legacy/core';
+import { COVER_FRONT_RATIO } from '@peach/appearance';
 
 export const DOWNLOADS_URL = '/api/downloads';
 export const DOWNLOADS_KEY = ['downloads'] as const;
@@ -94,17 +95,18 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
   const cover = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const box = cover.current;
-    if (!box) return;
+    const details = box?.nextElementSibling;
+    if (!box || !details) return;
     const frame = () => {
-      const { width, height } = box.getBoundingClientRect();
-      if (!width || !height) return;
-      box.style.setProperty('--card-ratio', `${width} / ${height}`);
+      const { height } = details.getBoundingClientRect();
+      if (!height) return;
+      box.style.setProperty('--download-cover-width', `${height * COVER_FRONT_RATIO}px`);
       box.querySelectorAll<HTMLImageElement>('img.cover').forEach((image) => {
         if (image.complete && image.naturalWidth) coverAnchor(image);
       });
     };
     const observer = new ResizeObserver(frame);
-    observer.observe(box);
+    observer.observe(details);
     frame();
     return () => observer.disconnect();
   }, []);
@@ -140,8 +142,9 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
         className: failed ? 'flex flex-col border-border-error-default' : 'flex flex-col',
       })}>
       <div className="flex items-start gap-3 px-5 pt-5 pb-4">
-        <div ref={cover} data-download-cover="" style={{ '--card-ratio': '3 / 4' } as CSSProperties}
-          className="relative flex aspect-3/4 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-background-tertiary-default text-caption-1-regular text-text-secondary sm:aspect-auto sm:w-24 sm:self-stretch">
+        <div ref={cover} data-download-cover="" data-media-pic=""
+          style={{ '--card-ratio': String(COVER_FRONT_RATIO), '--download-cover-width': '6rem' } as CSSProperties}
+          className="w-20 shrink-0 text-caption-1-regular text-text-secondary sm:w-(--download-cover-width) sm:self-stretch">
           {!artwork?.has_cover ? <span>无封面</span> : null}
           {artwork?.has_cover ? <ArtSlot artwork={{ kind: 'cover', html: coverImage(artwork, 'big') }}
             relayout={(root) => relayoutCovers(root, 'big')} /> : null}

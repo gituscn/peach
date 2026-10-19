@@ -11,7 +11,8 @@ describe('任务页云下载布局', () => {
     const title = '制作记录与采访合集：摄影、场景设计及幕后访谈 '.repeat(12);
     const assetId = Number(requiredEnv('PEACH_E2E_ITEM'));
     const opened = await visit(browser, '/tasks', viewport, async (page) => {
-      await page.route('**/cover?*', (route) => route.fulfill({ contentType: 'image/png', body: Buffer.from(PIXEL, 'base64') }));
+      await page.route('**/cover?*', (route) => route.fulfill({ contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1000"><path fill="#666" d="M0 0h1480v1000H0z"/><path fill="#ddd" d="M776 0h704v1000H776z"/><path fill="#c44" d="M776 0h704v12H776zM776 988h704v12H776z"/></svg>' }));
       await page.route('**/entity-image?*', (route) => route.fulfill({ contentType: 'image/png', body: Buffer.from(PIXEL, 'base64') }));
       await page.route('**/api/downloads?*', (route) => route.fulfill({ json: {
         available: false, providers: [], tasks: [{ id: 1, title, code: 'ABC-123', provider: '115',
@@ -19,6 +20,7 @@ describe('任务页云下载布局', () => {
           postprocess_state: 'complete', postprocess_label: '整理完成', target: '/云下载',
           source_uri: '', submitted_at: '2026-10-01T00:00:00Z', asset_id: assetId,
           artwork: { id: 10, code: 'ABC-123', has_cover: true, cover_key: 'ABC-123',
+            poster_box: { x0: 776, y0: 0, x1: 1480, y1: 1000, px: [1480, 1000], method: 'fold' },
             performer_entities: [{ id: 30, name: '测试女优', has_image: true }] } }],
       } }));
     });
@@ -50,6 +52,8 @@ describe('任务页云下载布局', () => {
         const headingText = heading.querySelector('a')?.firstChild || heading.firstChild!;
         code.setStart(headingText, 0);
         code.setEnd(headingText, 'ABC-123'.length);
+        const pictureBox = picture.getBoundingClientRect();
+        const coverBox = cover.getBoundingClientRect();
         return { title: heading.getBoundingClientRect().height,
           line: Number.parseFloat(getComputedStyle(heading).lineHeight),
           row: row.getBoundingClientRect().height, clipped: titleContent.scrollWidth > titleContent.clientWidth,
@@ -57,7 +61,12 @@ describe('任务页云下载布局', () => {
           providerTop: provider.getBoundingClientRect().top, metadataTop: detail.getBoundingClientRect().top,
           coverLeft: cover.getBoundingClientRect().left, textLeft: heading.getBoundingClientRect().left,
           coverTop: cover.getBoundingClientRect().top, coverBottom: cover.getBoundingClientRect().bottom,
-          coverHeight: cover.getBoundingClientRect().height,
+          coverHeight: coverBox.height, coverRatio: coverBox.width / coverBox.height,
+          panelLeft: pictureBox.left + pictureBox.width * 776 / 1480,
+          panelRight: pictureBox.right, panelTop: pictureBox.top, panelBottom: pictureBox.bottom,
+          coverRight: coverBox.right,
+          backdrop: getComputedStyle(cover, '::before').backgroundImage,
+          backdropFilter: getComputedStyle(cover, '::before').filter,
           detailTop: detailColumn.getBoundingClientRect().top, detailBottom: detailColumn.getBoundingClientRect().bottom,
           coverReady: picture.complete && picture.naturalWidth > 0, avatarReady: avatar.complete && avatar.naturalWidth > 0,
           codeFits: code.getBoundingClientRect().width <= heading.clientWidth };
@@ -73,6 +82,12 @@ describe('任务页云下载布局', () => {
         assert.equal(geometry.coverBottom, geometry.detailBottom);
       }
       assert.equal(geometry.coverReady, true);
+      assert.ok(Math.abs(geometry.coverRatio - .75) < .01, '封面框复用首页 JAV 大图比例');
+      assert.ok(geometry.panelLeft >= geometry.coverLeft - 1 && geometry.panelRight <= geometry.coverRight + 1
+        && geometry.panelTop >= geometry.coverTop - 1 && geometry.panelBottom <= geometry.coverBottom + 1,
+      `正封四边完整可见：${JSON.stringify(geometry)}`);
+      assert.notEqual(geometry.backdrop, 'none', '正封比例留白使用同图补底');
+      assert.ok(geometry.backdropFilter.includes('blur('), '补底复用首页模糊效果');
       assert.equal(geometry.avatarReady, true);
       assert.equal(await page.locator('[data-download-cover]').getByText('无封面').count(), 0);
       assert.equal(geometry.providerTop, geometry.metadataTop, '来源文字与目录、时间没有对齐');

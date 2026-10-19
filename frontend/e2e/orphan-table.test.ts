@@ -61,7 +61,7 @@ describe('孤儿记录数据表', () => {
       }
       assert.equal(await section.locator('[data-data-table-panel] #orphan-records-title').count(), 1);
       assert.equal(await table.locator('tbody tr').count(), 20);
-      assert.equal(await section.getByRole('button', { name: '彻底删除所选（0）', exact: true }).count(), 0);
+      assert.equal(await section.getByRole('button', { name: '删除所选记录（0）', exact: true }).count(), 0);
       const pagination = section.locator('[data-table-pagination]');
       assert.ok((await pagination.textContent())?.includes('1–20 / 23 条作品'));
       await pagination.getByRole('button', { name: /每页显示数量/ }).waitFor();
@@ -78,10 +78,10 @@ describe('孤儿记录数据表', () => {
       assert.ok((await table.locator('tbody tr').first().textContent())?.includes('作品 1・'));
       await pagination.scrollIntoViewIfNeeded();
       await page.screenshot({ path: `../build/table-evidence/orphan-selected-${viewport.name}.png` });
-      await section.getByRole('button', { name: '彻底删除所选（2）', exact: true }).click();
+      await section.getByRole('button', { name: '删除所选记录（2）', exact: true }).click();
       await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
       await table.locator('thead label:has(input[type="checkbox"])').click();
-      await section.getByRole('button', { name: '彻底删除所选（23）', exact: true }).click();
+      await section.getByRole('button', { name: '删除所选记录（23）', exact: true }).click();
       const dialog = page.getByRole('dialog');
       const list = dialog.getByRole('list', { name: '所选记录', exact: true });
       await list.waitFor();

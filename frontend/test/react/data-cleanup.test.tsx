@@ -287,7 +287,7 @@ describe('资源同步', () => {
     await settle();
     expect(seen[0]!.body).toBe(
       '将永久删除文件已不在盘上的 3 条记录（含回收站里的）、3 个空文件夹，并清理 2 个闲置缓存。来源根目录保留。'
-      + '这几样不可撤销。2 条作品记录的文件已丢失，个人记录保留，可在「文件已丢失的记录」中选择替代文件或彻底删除。');
+      + '这几样不可撤销。2 条作品记录的文件已丢失，个人记录保留，可在「文件已丢失的记录」中转移个人记录或删除记录。');
     await settle();
     expect(host.textContent).toContain(
       '1 条作品记录已标为文件丢失，可在「文件已丢失的记录」中处理。1 条的记录已接到库里的另一个版本。');
@@ -478,7 +478,7 @@ describe('孤儿记录', () => {
     expect(server.calls.map((call) => call.path)).toContain('/api/orphan-records');
   });
 
-  it('每条列出带的记录与候选文件；没有候选的只给彻底删除', async () => {
+  it('每条列出个人记录与候选文件；没有候选的只给删除记录', async () => {
     serve({ '/api/orphan-records': orphans });
     const host = await wrap(<OrphanRecordsCard toast={vi.fn()} />);
     await settle();
@@ -488,37 +488,37 @@ describe('孤儿记录', () => {
     expect(rows[0]!.textContent).toContain('ABC-123.mkv · 60 分钟');
     expect(rows[0]!.querySelector('img')?.getAttribute('src')).toBe('/thumb?id=7&c=4');
     expect(rows[1]!.textContent).toContain('稍后看 1 · 播放过');
-    expect(rows[1]!.textContent).toContain('没有番号或文件名对得上的文件');
-    expect(buttonNamed('接到这个文件', rows[1]!)).toBeFalsy();
-    expect(buttonNamed('彻底删除', rows[1]!)).toBeTruthy();
+    expect(rows[1]!.querySelector('[role="combobox"]')).toBeNull();
+    expect(buttonNamed('转移记录', rows[1]!)).toBeFalsy();
+    expect(buttonNamed('删除记录', rows[1]!)).toBeTruthy();
   });
 
-  it('接到这个文件直接发，目标默认是时长最接近的那个', async () => {
+  it('转移记录直接发，目标默认是时长最接近的那个', async () => {
     const server = serve({ '/api/orphan-records': orphans, '/api/orphan-records/attach': { ok: true, batch: 'user:reattach@1' } });
     const toast = vi.fn();
     const host = await wrap(<OrphanRecordsCard toast={toast} />);
     await settle();
-    await click(buttonNamed('接到这个文件', host));
+    await click(buttonNamed('转移记录', host));
     await settle();
     expect(server.posts('/api/orphan-records/attach')).toEqual([{ id: 7, target: 9 }]);
-    expect(toast).toHaveBeenCalledWith('记录已接到新文件，批次 user:reattach@1');
+    expect(toast).toHaveBeenCalledWith('已将「ABC-123.mp4」的个人记录转移到「ABC-123.mkv」');
   });
 
-  /** 点第二条的「彻底删除」，交回弹层上写的与发出去的批量请求。 */
+  /** 点第二条的「删除记录」，交回弹层上写的与发出去的批量请求。 */
   async function purgeSecond(answer: boolean) {
     const seen = confirmWith(answer);
     const server = serve({ '/api/orphan-records': orphans, '/api/batch': { ok: true, purged: 1, blocked: [] } });
     const host = await wrap(<OrphanRecordsCard toast={vi.fn()} />);
     await settle();
-    await click(buttonNamed('彻底删除', host.querySelectorAll('[aria-label="文件已消失的作品"] tbody tr')[1]!));
+    await click(buttonNamed('删除记录', host.querySelectorAll('[aria-label="文件已消失的作品"] tbody tr')[1]!));
     await settle();
     return { seen, posts: server.posts('/api/batch') };
   }
 
-  it('彻底删除是危险确认，正文写明不可撤销，确认了才发批量删除', async () => {
+  it('删除记录需危险确认，正文写明不可撤销，确认了才发批量删除', async () => {
     const { seen, posts } = await purgeSecond(true);
     expect(seen[0]!.danger).toBe(true);
-    expect(seen[0]!.body).toBe('将删除「海边.mp4」这一条和它带的记录（稍后看 1 · 播放过）。此操作不可撤销。');
+    expect(seen[0]!.body).toBe('将删除「海边.mp4」的作品记录及其个人记录（稍后看 1 · 播放过）。此操作不可撤销。');
     expect(posts).toEqual([{ ids: [12], operation: 'delete' }]);
   });
 
@@ -537,14 +537,14 @@ describe('孤儿记录', () => {
     await click(buttonNamed('下一页', host));
     await click(host.querySelector('input[aria-label="选择 作品 20"]'));
     confirmWith(false);
-    await click(buttonNamed('彻底删除所选（2）', host));
+    await click(buttonNamed('删除所选记录（2）', host));
     expect(server.posts('/api/batch')).toEqual([]);
     const seen = confirmWith(true);
-    await click(buttonNamed('彻底删除所选（2）', host));
+    await click(buttonNamed('删除所选记录（2）', host));
     await settle();
     expect(seen[0]!.items).toEqual(['作品 0', '作品 20']);
     expect(server.posts('/api/batch')).toEqual([{ ids: [30, 50], operation: 'delete' }]);
-    expect(toast).toHaveBeenCalledWith('已彻底删除 1 条记录，1 条文件已恢复，未删除');
+    expect(toast).toHaveBeenCalledWith('已删除 1 条作品记录及其个人记录；1 条文件已恢复，记录未删除');
   });
 });
 
