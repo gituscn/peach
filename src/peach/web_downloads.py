@@ -72,7 +72,14 @@ def q_downloads(contract, args) -> dict:
         limit = int(args.get("limit") or 100)
     except (TypeError, ValueError):
         limit = 100
-    return _service(contract).snapshot(limit)
+    before = args.get("before_id")
+    try:
+        before_id = int(before) if before is not None else None
+    except (TypeError, ValueError):
+        raise ValueError("下载任务分页位置无效") from None
+    if before_id is not None and before_id < 1:
+        raise ValueError("下载任务分页位置无效")
+    return _service(contract).snapshot(limit, before_id=before_id)
 
 
 def w_download_submit(contract, body) -> dict:

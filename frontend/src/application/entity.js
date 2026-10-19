@@ -122,7 +122,7 @@ export function wireSourceTools(root,done){
 export async function entityAliasForm(mine,write){
   const form=formModal({
     title:'添加别名',
-    description:'图库按名字存图，补充名字写法能找到更多备选图片；这里添加的名字也能设为统称。',
+    description:'图库按名字查找图片，添加别名可能找到更多备选图片；也可以将别名设为统一显示的名称。',
     body:`<label class="modalfield"><span>别名</span>
         <input class="geist-input" name="alias" maxlength="80" autocomplete="off"
           placeholder="另一种写法，或另一个艺名"></label>`
@@ -226,7 +226,7 @@ entityState.entityPageHelpers = {
 entityState.entityFollowActions = {...followState.followFeedActions,
   route:()=>{},shuffle:()=>{},loaded:()=>{},toggleSelection:()=>{}};
 entityState.SOURCE_HINTS = {
-  'source offline':'来源不在线，这一次不对账；接上这个来源后重试',
+  'source offline':'媒体库无法访问，暂时无法核对文件；恢复连接后重试',
   'source not mapped':'本机没有映射这个来源的盘符',
   'file missing':'找不到源文件；点击右侧的扫描按钮，重新检查目录并更新数据库记录',
   'unsupported platform':'当前服务端系统不支持直接定位文件',

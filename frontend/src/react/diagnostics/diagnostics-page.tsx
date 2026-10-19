@@ -135,7 +135,7 @@ export function DiagnosticsPage(props: DiagnosticsProps) {
           <Fact term="上次解析成功">{source.last_success_at ? moment(source.last_success_at) : '尚无成功记录'}</Fact>
           {source.last_check_at ? <Fact term="上次检查">{moment(source.last_check_at)}
             {source.elapsed_s !== undefined && source.elapsed_s !== null ? ` · ${source.elapsed_s.toFixed(2)} 秒` : ''}</Fact> : null}
-          <Fact term="冷却截止">{source.cooldown_until ? moment(source.cooldown_until) : '未在冷却'}</Fact>
+          <Fact term="暂停访问至">{source.cooldown_until ? moment(source.cooldown_until) : '未暂停'}</Fact>
         </FactList>
         </Stack></SettingsCard>
       </article>)}

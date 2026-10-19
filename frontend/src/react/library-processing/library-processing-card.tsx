@@ -43,7 +43,7 @@ const profileText = (state: LibraryProcessingData) => {
   const failed = state.performer_profile_failed || 0;
   if (!aliases && !avatars && !conflicts && !failed) return '';
   const parts = [`补齐女优资料：别名 ${aliases} 个，头像 ${avatars} 张`];
-  if (conflicts) parts.push(`${conflicts} 个同名冲突交回人工`);
+  if (conflicts) parts.push(`${conflicts} 项同名人物资料需要确认是否为同一人`);
   if (failed) parts.push(`${failed} 张头像未取得`);
   return `${parts.join('，')}。`;
 };
@@ -51,7 +51,7 @@ const profileText = (state: LibraryProcessingData) => {
 const receiptText = (state: LibraryProcessingData) =>
   state.requested_stage === 'previews' ? `已生成 ${state.previews || 0} 部视频预览。`
   : `已扫描 ${state.scanned || 0} 个文件，识别 ${state.identified || 0} 个番号，`
-  + `整理 ${state.candidates || 0} 组资料结果，自动保存 ${state.auto_applied || 0} 条。`
+  + `取得 ${state.candidates || 0} 组作品资料，自动保存 ${state.auto_applied || 0} 条。`
   + (state.previews ? `已生成 ${state.previews} 部视频预览。` : '')
   + profileText(state);
 

@@ -75,10 +75,10 @@ export function PushDiscoveryForm({ initial, receipt }: {
     ? `正在监视 ${live.local_roots.join('、')}` : live.local_message || '没有运行';
 
   return (
-    <Section title="推送发现" onSubmit={submit}>
+    <Section title="自动发现新文件" onSubmit={submit}>
       <Rows>
-        <SettingsRow label="新文件落地就入库" description={live.enabled ? ingested : undefined}>
-          <Switch aria-label="新文件落地就入库" isSelected={state.enabled} isDisabled={!state.available}
+        <SettingsRow label="发现新文件后自动入库" description={live.enabled ? ingested : undefined}>
+          <Switch aria-label="发现新文件后自动入库" isSelected={state.enabled} isDisabled={!state.available}
             onChange={(enabled) => setState({ ...state, enabled })} />
         </SettingsRow>
         <SettingsRow label="监视本机文件夹" description={live.enabled && live.watch_local ? watching : undefined}>

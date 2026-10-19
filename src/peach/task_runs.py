@@ -98,6 +98,8 @@ TASK_LABELS = {
     "scrape-codes": "番号资料刮削",
     "jav-covers": "封面批量抓取",
     "entity-avatar": "补全资料图片",
+    "performer-profile": "补全女优资料",
+    "performer-alias": "补全女优别名",
     "studio-mark": "补厂牌官网与标识",
     "creator-identity": "查创作者身份",
     "code-samples": "补番号样张",

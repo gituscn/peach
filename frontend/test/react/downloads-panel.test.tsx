@@ -105,7 +105,7 @@ it('后处理失败可以单独重试，不会重新提交磁力', async () => {
   });
   const host = await show();
   expect(host.textContent).toContain('资料采集失败');
-  await click(buttonNamed('重试后处理', host));
+  await click(buttonNamed('重试入库后整理', host));
   await settle();
   expect(posts()).toEqual([['/api/downloads/postprocess', { id: 1 }]]);
 });
@@ -128,4 +128,28 @@ it('有任务还在跟进时五秒查一次，全是终态三十秒一次', () =
     cancellable: false, state: 'ingested', postprocess_active: true, postprocess_state: 'running',
   })] }))).toBe(5_000);
   expect(downloadPollInterval(undefined)).toBe(30_000);
+});
+
+it('加载更多接上较早任务，失败保留列表并允许重试，刷新不丢已加载的任务', async () => {
+  let fail = true;
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+    const earlier = input.includes('before_id=2');
+    if (earlier && fail) return { ok: false, status: 500, json: async () => ({ message: '读取失败' }) };
+    return { ok: true, status: 200, json: async () => snapshot({
+      tasks: earlier ? [task({ id: 1 })] : [task({ id: 3 }), task({ id: 2 })],
+      has_more: !earlier, next_before_id: earlier ? null : 2,
+    }) };
+  }));
+  const host = await show();
+  await click(buttonNamed('加载更多', host));
+  await vi.waitFor(() => expect(host.textContent).toContain('读取失败'));
+  expect(host.querySelectorAll('[data-download-id]')).toHaveLength(2);
+  fail = false;
+  await click(buttonNamed('加载更多', host));
+  await vi.waitFor(() => expect(host.querySelectorAll('[data-download-id]')).toHaveLength(3));
+  await queryClient.invalidateQueries({ queryKey: ['downloads'] });
+  await settle();
+  expect([...host.querySelectorAll('[data-download-id]')].map((node) => node.getAttribute('data-download-id')))
+    .toEqual(['3', '2', '1']);
+  expect(buttonNamed('加载更多', host)).toBeNull();
 });

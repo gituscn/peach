@@ -175,7 +175,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
         ),
       }),
       column.accessor('canonical', {
-        header: '规范创作者',
+        header: '统一名称',
         cell: (context) => <AuthorIdentity sources={handlers.current.sources} name={context.getValue()} />,
       }),
       column.accessor('alias', { header: '平台别名', cell: (context) => context.getValue() }),
@@ -204,7 +204,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
           isSelected={row.getIsSelected()} onChange={(on) => row.toggleSelected(on)} />
       ) }),
       column.accessor('canonical_name', {
-        id: 'canonical', header: '规范创作者',
+        id: 'canonical', header: '统一名称',
         cell: (context) => (
           <AuthorIdentity sources={handlers.current.sources} name={context.getValue()}
             canonicalKey={context.row.original.canonical_key} />
@@ -262,7 +262,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
       <div className="flex flex-col gap-2">
         <FieldLabel>手动添加别名</FieldLabel>
         <div className="flex flex-wrap items-end gap-2">
-          <Input aria-label="规范创作者名" placeholder="规范创作者名" value={canonical}
+          <Input aria-label="统一名称" placeholder="在 Peach 中统一显示的名称" value={canonical}
             onChange={setCanonical} isDisabled={readOnly} className="w-56" />
           <Input aria-label="平台别名" placeholder="平台别名" value={alias}
             onChange={setAlias} isDisabled={readOnly} className="w-56" />
@@ -286,7 +286,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
             <Button variant="primary" size="small" disabled={readOnly} {...busy}
               onClick={() => mergeSome(suggestions, true)}>{`全部合并（${suggestions.length}）`}</Button>
             <DataTableSort label="待合并创作者别名" sorting={sorting}
-              options={[{ id: 'canonical', label: '规范创作者' }, { id: 'alias', label: '平台别名' }, { id: 'evidence', label: '依据' }]}
+              options={[{ id: 'canonical', label: '统一名称' }, { id: 'alias', label: '平台别名' }, { id: 'evidence', label: '依据' }]}
               onChange={(next) => { setSorting(next); setPagination((now) => ({ ...now, pageIndex: 0 })); }} />
           </div>
           <SelectionDock label="待合并别名批量操作" visible={chosen.length > 0} count={`已选 ${chosen.length} 组`}>
@@ -328,7 +328,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
           <FieldLabel>已保存别名</FieldLabel>
           <span className="mr-auto text-body-2-regular text-text-secondary">{`${groups.length} 组`}</span>
           <DataTableSort label="已保存创作者别名" sorting={savedSorting}
-            options={[{ id: 'canonical', label: '规范创作者' }, { id: 'aliases', label: '平台别名' }]}
+            options={[{ id: 'canonical', label: '统一名称' }, { id: 'aliases', label: '平台别名' }]}
             onChange={(next) => { setSavedSorting(next); setSavedPagination((now) => ({ ...now, pageIndex: 0 })); }} />
         </div>
         <SelectionDock label="已保存别名批量操作" visible={savedNames.length > 0} count={`已选 ${savedNames.length} 个别名`}>
@@ -372,7 +372,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
           </>
         ) : (
           <EmptyState shell="plain" icon={RiUserLine} title="还没有保存创作者别名">
-            填写规范创作者名和平台别名以添加。
+            填写统一名称，以及该创作者在其他平台使用的名字。
           </EmptyState>
         )}
       </div>

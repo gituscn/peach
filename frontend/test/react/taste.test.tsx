@@ -154,7 +154,7 @@ it('首屏读 prefetch 落进缓存的那一份，两套证据是页签不是并
   expect(tasteGets(fetcher)).toHaveLength(1);
   expect(tasteGets(fetcher)[0]?.[0]).toBe(`${TASTE_URL}?window=all`);
   expect([...host.querySelectorAll('[role=tab]')].map((tab) => tab.textContent).slice(0, 2))
-    .toEqual(['浏览器记录', 'Peach 内部']);
+    .toEqual(['浏览器记录', 'Peach 观看与评价']);
   expect(host.textContent).toContain('900');
   expect(host.textContent).not.toContain('个作品有内部行为证据');
 });
@@ -203,10 +203,10 @@ it('维度不足三个时画像卡不出雷达，排行条照常出', async () =
 
 it('没有名次的榜给一句怎么补，不重复「暂无足够证据」', async () => {
   const { host } = await open();
-  await click([...host.querySelectorAll('[role=tab]')].find((tab) => tab.textContent === 'Peach 内部') ?? null);
+  await click([...host.querySelectorAll('[role=tab]')].find((tab) => tab.textContent === 'Peach 观看与评价') ?? null);
   await click([...host.querySelectorAll('[role=tab]')].find((tab) => tab.textContent === '创作者') ?? null);
   const panel = [...host.querySelectorAll('[role=tabpanel]')].at(-1)!;
-  expect(panel.textContent).toContain('暂无足够证据');
+  expect(panel.textContent).toContain('记录还不够');
   expect(panel.textContent).toContain('在 Peach 里播放或评价作品后，这里会列出对应的创作者。');
 });
 
@@ -241,7 +241,7 @@ it('雷达半径按平方根刻度：最大的维度落在外圈，浮层读的�
   });
   const tip = host.querySelector('.recharts-tooltip-wrapper')!;
   expect(tip.textContent).toContain('维度0');
-  expect([...tip.querySelectorAll('span')].map((span) => span.textContent)).toEqual(['标签命中', '657']);
+  expect([...tip.querySelectorAll('span')].map((span) => span.textContent)).toEqual(['标签出现次数', '657']);
 });
 
 it('浏览器画像的雷达、排行与浏览活跃热力图都按这一份数画', async () => {

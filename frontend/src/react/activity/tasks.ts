@@ -3,6 +3,7 @@
  * 分三次取会出现「在跑那段是新的、完成那段是旧的」这种自相矛盾的一屏，所以只有一个
  * queryKey。首屏由 `prefetchTasks` 写进 Query 缓存，组件挂上去读的就是它。 */
 import { apiGet } from '../../api';
+import { requestErrorMessage } from '../../core/request-error';
 import { queryClient } from '../query';
 
 export const TASKS_URL = '/api/tasks';
@@ -87,22 +88,25 @@ export const TRIGGER_LABELS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   pending: '排队中', running: '进行中', succeeded: '已完成',
-  failed: '失败', cancelled: '已取消', interrupted: '被打断',
+  failed: '失败', cancelled: '已取消', interrupted: '意外中断',
 };
 
 /** 状态的中文名。表里的状态集是封闭的，认不出来只可能是表先改了，那就原样显示。 */
 export const statusLabel = (status: string): string => STATUS_LABELS[status] || status;
 
-/* 摘要里的键来自各域自己的状态字典，是英文标识；能认出来的翻成中文，认不出的原样
-   显示——瞎猜一个中文名比留着英文键更难查。 */
+/* 主摘要使用已定义的中文字段；原始状态字典由技术详情保留。 */
 const SUMMARY_LABELS: Record<string, string> = {
   checked: '已检查', total: '总数', scanned: '已扫描', identified: '已识别',
-  candidates: '资料结果', covers: '封面', changed: '已改动', operation: '操作',
+  candidates: '作品资料', covers: '封面', changed: '已改动', operation: '操作',
   ok: '取得', miss: '未取得', kept: '保留', planned: '计划', done: '已处理', added: '新增',
-  written: '已写入', removed: '已移除', exit_code: '退出码', issue_count: '问题',
-  followups: '派出后继', followups_duplicate: '已在排队', followups_truncated: '超上限未派',
-  followups_depth_exceeded: '超深度未派', outcome: '结果', name: '档案名称',
-  matched: '图库命中', size: '尺寸', source: '来源', cover_network: '封面连不上图片主机',
+  written: '已保存', removed: '已移除', issue_count: '需要处理',
+  followups_duplicate: '补充任务已在排队', followups_truncated: '补充任务超出数量上限',
+  followups_depth_exceeded: '补充任务超出层级上限', name: '名称',
+  matched: '匹配项', size: '尺寸', source: '来源', cover_network: '封面图片连接失败',
+  probed: '已读取媒体信息', previews: '预览图', paused_count: '等待来源恢复',
+  auto_applied: '已自动保存', auto_rejected: '未采用', performer_avatars: '女优头像',
+  performer_profile_failed: '女优资料采集失败', performer_aliases: '女优别名',
+  performer_profile_conflicts: '女优资料待复核', conflicts: '待复核冲突',
 };
 
 /** 把一批任务按 `parent_run_id` 归到各自的父任务下。没有父的那些留在外面。 */
@@ -156,9 +160,11 @@ export const isActive = (run: TaskRunPayload) => run.status === 'pending' || run
 export function followupDetail(row: TaskRunPayload): string {
   const prefix = `${row.task_label}：`;
   const label = row.progress_label || '';
-  const item = label.startsWith(prefix) ? label.slice(prefix.length) : label === row.task_label ? '' : label;
+  const item = String(row.result_summary?.name || '')
+    || (label.startsWith(prefix) ? label.slice(prefix.length) : label === row.task_label ? '' : label);
   const total = row.progress_total || 0;
-  const tail = errorHeadline(row.error) || summaryText(row.result_summary)
+  const { name: _name, ...result } = row.result_summary || {};
+  const tail = readableErrorHeadline(row.error) || summaryText(result)
     || (isActive(row) && total > 0 ? `${progressText(row.progress_current, total)} 项` : '');
   return [item, tail].filter(Boolean).join(' · ');
 }
@@ -190,6 +196,37 @@ export function errorHeadline(text: string | null | undefined): string {
   return /^Traceback \(most recent call last\)/.test(lines[0]!) ? lines[lines.length - 1]! : lines[0]!;
 }
 
+/** 异常类型和原始堆栈由详情保留，摘要说明实际原因。 */
+export function readableErrorHeadline(text: string | null | undefined): string {
+  const head = errorHeadline(text);
+  const technical = head.match(/^(?:[\w.]*Error|Exception):\s*(.*)$/);
+  if (!technical) return head;
+  return requestErrorMessage(technical[1]);
+}
+
+const OUTCOME_LABELS: Record<string, string> = {
+  '没有新写法': '未发现新别名', '已装上': '已保存资料图片',
+  '已装着认得准的小图': '已保留身份核对通过的小尺寸图片',
+  '档案已不存在': '资料记录已不存在', '资料未过期': '现有资料仍在有效期内',
+  '图太小': '图片分辨率不足', '官网未取得': '未取得厂牌官网信息',
+  '两站都没有作品一览': '两个来源均未提供作品列表',
+  '哪一站都没对上她': '未找到与该人物相符的资料页',
+  '两站都没对上她': '两个来源均未找到与该人物相符的资料页',
+  '三站都没对上她': '三个来源均未找到与该人物相符的资料页',
+  '已有身份': '已有创作者分类', '已变': '资料已被其他操作修改，本次未保存',
+};
+const SOURCE_NAMES: Record<string, string> = { avwikidb: 'AVWikiDB', javdb: 'JavDB', 'minnano-av': 'みんなのAV' };
+const OPERATION_LABELS: Record<string, string> = {
+  like: '标记喜欢', seen: '标记看过', later: '加入稍后看', dispose: '移入回收站',
+  restore: '还原', delete: '永久删除', 'empty-trash': '清空回收站',
+  'dismiss-junk': '确认不是垃圾', 'reconsider-junk': '重新判定垃圾', region: '判定产地',
+};
+const outcomeText = (text: string): string => OUTCOME_LABELS[text] || text
+  .replace(/(avwikidb|javdb|minnano-av) (绑定|写入)/gi, (_, site: string, action: string) =>
+    action === '绑定' ? `已关联 ${SOURCE_NAMES[site.toLowerCase()]} 资料页`
+      : `已保存来自 ${SOURCE_NAMES[site.toLowerCase()]} 的资料`)
+  .replace(/^探针不可用：/, '无法读取媒体信息：');
+
 /** 时间戳说成本地的「月-日 时:分」。数据库里存的是 UTC，界面上一律按本机时区读。 */
 export function momentText(stamp: string | null | undefined): string {
   if (!stamp) return '';
@@ -206,12 +243,20 @@ const SUMMARY_HIDDEN = new Set([
   'blocked_by', 'status', 'run_id', 'request_id', 'started_at', 'completed_at', 'finished_at',
 ]);
 
-/** 摘要压成一行。只取标量：明细留在各域自己的页面和日志里。 */
-export function summaryText(summary: Record<string, unknown>): string {
+/** 任务结果只展示面向使用者的字段。 */
+export function summaryItems(summary: Record<string, unknown>): string[] {
   return Object.entries(summary || {})
     .filter(([key, value]) => !SUMMARY_HIDDEN.has(key)
+      && (key in SUMMARY_LABELS || key === 'outcome' || key === 'followups' || key === 'error')
       && (typeof value === 'number' || typeof value === 'string')
-      && String(value) !== '')
-    .map(([key, value]) => `${SUMMARY_LABELS[key] || key} ${typeof value === 'number' ? value.toLocaleString() : value}`)
-    .join(' · ');
+      && String(value) !== '' && (value !== 0 || key === 'checked' || key === 'total'))
+    .map(([key, value]) => {
+      if (key === 'followups') return `已安排 ${Number(value).toLocaleString()} 项补充任务`;
+      if (key === 'error') return readableErrorHeadline(String(value));
+      if (key === 'outcome') return outcomeText(String(value));
+      if (key === 'operation') return `操作：${OPERATION_LABELS[String(value)] || '批量操作'}`;
+      return `${SUMMARY_LABELS[key]} ${typeof value === 'number' ? value.toLocaleString() : value}`;
+    });
 }
+
+export const summaryText = (summary: Record<string, unknown>): string => summaryItems(summary).join(' · ');

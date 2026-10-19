@@ -6,13 +6,13 @@ import { useId, useState } from 'react';
 
 import { Button } from '@/components/base/buttons/button';
 
-import { errorHeadline } from './tasks';
+import { readableErrorHeadline } from './tasks';
 
 export function ErrorExcerpt({ text, className = '' }: { text: string; className?: string }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   const full = String(text || '').trim();
-  const head = errorHeadline(full);
+  const head = readableErrorHeadline(full);
   if (!head) return null;
   const more = head !== full;
   return (

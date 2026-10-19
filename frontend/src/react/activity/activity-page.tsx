@@ -32,7 +32,7 @@ import { DownloadsPanel } from './downloads-panel';
 import { ErrorExcerpt } from './error-excerpt';
 import {
   elapsedText, fetchEarlier, fetchTasks, foldRoutine, followupDetail, groupFollowups, isActive,
-  isRoutine, mergeFinished, momentText, pollInterval, progressText, statusLabel, summaryText, TASKS_KEY, TRIGGER_LABELS, type TaskRunPayload,
+  isRoutine, mergeFinished, momentText, pollInterval, progressText, statusLabel, summaryItems, TASKS_KEY, TRIGGER_LABELS, type TaskRunPayload,
 } from './tasks';
 
 /* 状态徽章只有三档颜色：成功是绿、失败是红、被叫停与被打断是黄，其余留中性底。
@@ -65,6 +65,11 @@ function FollowupList({ rows }: { rows: TaskRunPayload[] }) {
             {detail
               ? <span className="min-w-0 break-words text-caption-1-regular text-text-secondary">{detail}</span>
               : null}
+            <div className="w-full min-w-0">
+              <Disclosure summary="技术详情"><pre className="max-h-60 overflow-y-auto whitespace-pre-wrap wrap-anywhere text-caption-1-regular text-text-secondary">
+                {JSON.stringify(row.result_summary, null, 2)}
+              </pre></Disclosure>
+            </div>
           </li>
         );
       })}
@@ -100,6 +105,13 @@ function RunCard(
           <FollowupList rows={followups} />
         </Disclosure>
       </div> : null}
+      {Object.keys(run.result_summary || {}).length ? <div className="border-t border-separator-border px-5 py-2.5">
+        <Disclosure summary="技术详情">
+          <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap wrap-anywhere text-caption-1-regular text-text-secondary">
+            {JSON.stringify(run.result_summary, null, 2)}
+          </pre>
+        </Disclosure>
+      </div> : null}
       {footer
         ? <div className="flex min-h-14 flex-col justify-center rounded-b-2xl border-t border-separator-border bg-card-footer px-5 py-3">
             <ErrorExcerpt text={footer} className="text-caption-1-regular text-text-secondary" />
@@ -133,7 +145,7 @@ function RunningRun({ run, followups }: { run: TaskRunPayload; followups?: TaskR
 function SettledRun(
   { run, followups, runs }: { run: TaskRunPayload; followups?: TaskRunPayload[]; runs?: TaskRunPayload[] },
 ) {
-  const summary = summaryText(run.result_summary);
+  const summary = summaryItems(run.result_summary).filter((line) => line !== run.error);
   const elapsed = elapsedText(run.elapsed_seconds);
   const oldest = runs && runs.length > 1 ? runs[runs.length - 1] : undefined;
   const meta = (oldest
@@ -143,7 +155,9 @@ function SettledRun(
        elapsed && `用时 ${elapsed}`]).filter(Boolean).join(' · ');
   return (
     <RunCard run={run} meta={meta} footer={run.error} followups={followups}>
-      {summary ? <p className="text-caption-1-regular text-text-secondary wrap-anywhere">{summary}</p> : null}
+      {summary.length ? <ul className="list-disc space-y-1 pl-5 text-caption-1-regular text-text-secondary wrap-anywhere">
+        {summary.map((line, index) => <li key={index}>{line}</li>)}
+      </ul> : null}
     </RunCard>
   );
 }
@@ -243,7 +257,7 @@ export function ActivityPage() {
             {/* 「刚才那一轮为什么没跑」只有这一段答得出：定时触发撞上在跑的那一轮会
                 安静跳过，不留记录的话它在界面上和从没触发过一模一样。 */}
             {skipped.length
-              ? <Section title="被挡下的">
+              ? <Section title="本次未执行">
                   <RunList>{skipped.map((run) => (
                     <SettledRun key={run.id} run={run} followups={byParent.get(run.id)} />))}</RunList>
                 </Section>

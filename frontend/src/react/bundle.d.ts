@@ -174,6 +174,7 @@ export interface DownloadTask {
   code: string | null;
   title: string | null;
   origin: string | null;
+  display_code?: string | null;
   state: string;
   state_label: string;
   failure: string | null;
@@ -202,6 +203,8 @@ export interface DownloadsSnapshot {
   available: boolean;
   providers: { key: DownloadProviderKey; label: string; configured: boolean; target: string }[];
   tasks: DownloadTask[];
+  has_more?: boolean;
+  next_before_id?: number | null;
 }
 
 export interface DownloadSubmitResult {

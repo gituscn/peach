@@ -26,7 +26,7 @@ import { SourceIcon } from './source-view';
 import { RiKey2Line } from '@remixicon/react';
 
 const CLEAR_BODY = '将清除这个来源在本机和共享副本中的登录凭据。';
-const WORLD_READABLE = '文件权限过宽。在运行 Peach 的 POSIX 主机上收紧为 0600。';
+const WORLD_READABLE = '其他系统用户可以读取此凭据文件。请在运行 Peach 的 Mac 或 Linux 电脑上，将文件权限设为仅当前用户可读写（0600）。';
 
 /** 一个字段此刻的样子：共享回填的、本机存过的，还是从来没填过。 */
 function fieldHint(row: CredentialRow, name: string): string {
@@ -98,7 +98,7 @@ function CredentialForm({ row, readOnly, toast }:
       </div>
       {problem ? <ErrorText>{problem}</ErrorText> : null}
       {(row.shared_fields || []).length
-        ? <Help>{`${row.shared_fields!.join('、')} 是从共享副本回填的，本机没有单独存。清除会把两边一起删。`}</Help>
+        ? <Help>{`${row.shared_fields!.join('、')} 使用共享副本中的登录信息，本机没有单独保存。清除时，本机和共享副本中的登录信息都会删除。`}</Help>
         : null}
       {row.path
         ? <Disclosure summary="凭据文件"><PathLine path={row.path} className="font-mono text-caption-1-regular text-text-tertiary" onRevealed={toast} /></Disclosure>

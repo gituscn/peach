@@ -227,6 +227,6 @@ export function announceCompletion(
     return;
   }
   toast(`扫描与资料采集已完成：识别 ${state.identified || 0} 个番号，`
-    + `整理 ${state.candidates || 0} 组资料结果，自动保存 ${state.auto_applied || 0} 条`
+    + `取得 ${state.candidates || 0} 组作品资料，自动保存 ${state.auto_applied || 0} 条`
     + (state.previews ? `，生成 ${state.previews} 部视频预览` : ''));
 }

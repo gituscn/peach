@@ -714,4 +714,6 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.17.0，版本
 
 站点强调色检查覆盖进度、焦点、选中态、操作按钮与流光：旧 `--feedback-success` 引用既有强调色色阶；RSS 订阅保留橙色，信息、成功、警告、错误、品牌与图表分类保留语义色。
 
+任务中心的摘要复用结果字段白名单和 `Disclosure`：主区域以中文列表显示处理结果，原始字段与来源报告保留在「技术详情」。云下载复用 TanStack Query 5.104.3（MIT）的 `useInfiniteQuery`，按任务 id 倒序每批读取 20 条，轮询覆盖已加载页面；`has_more` 与 `next_before_id` 指定后续页面，更新状态不改变提交顺序。展示番号复用 `catalog_rules.release_code_from_filename`，保留已保存的番号，缺失时只展示名称中取得的唯一番号；冲突或未识别时不推断，不写真实 ledger。标题与状态保持一行，可展开完整标题。未新增依赖。
+
 普通 Toast 与扫描任务卡共用 Agent Progress 外框，16px 半径由通知栈内的既有 token 解析，细边框与接触阴影分别复用 `border-button-default`、`elevation-xs`，不改变内容排版。浏览器回归核对桌面、手机和明暗主题下的外框一致性，并以同一任务、同一内容回放外框基线生成对比图。

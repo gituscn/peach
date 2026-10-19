@@ -820,7 +820,7 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
       await opened.page.getByRole('region', { name: '可配置凭据', exact: true }).waitFor();
       await settle(opened.page);
       const faces: Record<string, string> = {};
-      for (const state of ['需要', '已配置', '接不进来', '不需要']) {
+      for (const state of ['需要', '已配置', '暂时无法连接', '不需要']) {
         faces[state] = await opened.page.getByText(state, { exact: true }).first()
           .evaluate((chip) => getComputedStyle(chip).backgroundColor);
       }
