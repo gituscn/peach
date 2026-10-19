@@ -304,7 +304,7 @@ class InteractiveInitTests(unittest.TestCase):
         self.assertIn("✓ local: 1 文件", output)
         self.assertIn("下一步", output)
         self.assertEqual(output.count("扫描结果："), 2, "每个目录各报一行")
-        self.assertNotIn("115", (self.data_root / "config.toml").read_text(encoding="utf-8"))
+        self.assertNotIn("115", loaded.locations)
 
     def test_posix_flow_keeps_the_ledger_shape_and_mounts_the_directory(self):
         code, output, _ = self._run(["", str(self.media), "", "2", "9443", "peach-two", ""],
