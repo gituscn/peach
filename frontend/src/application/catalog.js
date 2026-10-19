@@ -1,5 +1,6 @@
 import { initialCatalogFilters, resetCatalogFilters, homeCatalogState, homePath as pathForCatalog, onlineDefaultLoc as defaultLocations, resolveSort } from '../react/catalog-grid/catalog-state';
 import { CatalogController } from '../react/catalog-grid/catalog-controller';
+import { nextRating, ratingStars } from '../react/components/rating-values';
 /* catalog 域控制器：本域状态与动作，启动由 Application 的生命周期统一安装。 */
 import { censorOn, preferencesState, refreshAll, replaceCatalogAddress, sidebarFacets, wireDrag } from './preferences.js';
 import { nextSortState } from './../sort-preferences';
@@ -105,6 +106,18 @@ export async function runResourceOperation(it,operation){
       await loadCatalog();
     }});
   }catch(error){receiptsState.actionFailure('操作',error);throw error}
+}
+
+export async function rateCatalogItem(it,star,onChange,signal){
+  const before=Number(it.rating)||0,value=nextRating(before,star);
+  const save=async(value,signal)=>{
+    const result=await api('/api/feedback',{method:'POST',body:JSON.stringify({id:it.id,kind:'rate',value}),signal});
+    const rating=result.rating??null;onChange(rating);return rating;
+  };
+  try{
+    const rating=await save(value,signal);
+    receiptsState.actionReceipt(rating?`已评 ${ratingStars(rating)} 星`:'已取消评分',{undo:()=>save(before)});
+  }catch(error){if(!signal?.aborted)receiptsState.actionFailure('评分',error);throw error}
 }
 
 export async function getBarsData(context){
@@ -569,6 +582,7 @@ catalogState.gridActions = {
   },
   toggleSelection:(id,range)=>toggleSelection(id,range),
   watchLater:(it,onChange)=>toggleWatchLater(it,onChange),
+  rate:(it,star,onChange,signal)=>rateCatalogItem(it,star,onChange,signal),
   resourceOperation:(it,operation)=>runResourceOperation(it,operation),
   mixRelated:seedId=>mixRelated(seedId),
   canFlip:()=>!selectMode&&!censorOn()&&!window.__scrolling&&!catalogState.reduceMotion(),

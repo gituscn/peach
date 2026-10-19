@@ -191,33 +191,7 @@
    空心，再把指针那一颗和它左边的填上。`:has(~ …:hover)` 是这里唯一需要的「前一个兄弟」——把 DOM
    倒过来写也能做到，代价是读屏和 Tab 顺序跟着倒过来。 */
 .peach-react [data-item-detail] [data-item-rating] { display: flex; align-items: center; gap: 8px; margin: -6px 0 10px; }
-.peach-react [data-item-detail] [data-rating-stars] { display: inline-flex; align-items: center; gap: 2px; margin-left: -4px; }
-.peach-react [data-item-detail] [data-rate] {
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--control-radius);
-  background: transparent;
-  color: var(--rating);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-.peach-react [data-item-detail] [data-rate] svg {
-  width: 19px;
-  height: 19px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.peach-react [data-item-detail] [data-rate][data-on="true"] svg { fill: currentColor; }
-.peach-react [data-item-detail] [data-rating-stars]:hover button[data-rate] svg { fill: none; }
-.peach-react [data-item-detail] [data-rating-stars]:hover button[data-rate]:hover svg,
-.peach-react [data-item-detail] [data-rating-stars]:hover button[data-rate]:has(~ [data-rate]:hover) svg { fill: currentColor; }
-.peach-react [data-item-detail] [data-rate]:focus-visible { outline: 2px solid var(--tungsten); outline-offset: 2px; }
+.peach-react [data-item-detail] [data-rating-stars] { margin-left: -4px; }
 .peach-react [data-item-detail] [data-rating-value] { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 
 /* ── 规格行 ──

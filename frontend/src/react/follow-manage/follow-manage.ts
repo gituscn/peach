@@ -467,6 +467,9 @@ export const addAlias = (canonical: string, alias: string) =>
 export const removeAlias = (alias: string) =>
   apiSend<{ ok: boolean }>(FOLLOW_ALIAS_URL, { action: 'remove', alias });
 
+export const renameAliasGroup = (key: string, name: string, signal?: AbortSignal) =>
+  apiSend<{ ok: boolean }>(FOLLOW_ALIAS_URL, { action: 'rename', canonical_key: key, canonical: name }, 'POST', signal);
+
 /** 保存或清除一个站点的凭据。`values` 为空就是清除。 */
 export const saveCredential = (provider: string, values: Record<string, string>) =>
   apiSend<{ note?: string }>(FOLLOW_CREDENTIAL_URL, { provider, values });

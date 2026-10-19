@@ -19328,32 +19328,37 @@ var Yp = (e) => Jp(Gp, { signal: e }, "没能读取设置题目"), Xp = (e) => J
 	body: JSON.stringify({ initial: e })
 }, "没能打开文件夹对话框")).path, $p = (e) => e instanceof Error && e.message || "请求失败，请重试", em = 8e3, tm = /* @__PURE__ */ new WeakMap();
 function nm(e, t, n) {
-	t.classList.add("ui-fcollapse");
-	let r = (tm.get(t) || 0) + 1;
-	tm.set(t, r);
-	let i = () => tm.get(t) === r;
-	if (n) {
-		t.inert = !1;
-		let n = e.open ? t.getBoundingClientRect().height : 0;
-		e.open = !0, im(t, n, i);
-	} else t.inert = !0, t.classList.remove("ui-fcollapse-settled"), t.style.height = t.getBoundingClientRect().height + "px", t.getBoundingClientRect(), t.style.height = "0px", rm(t, () => {
-		i() && (e.open = !1, t.style.height = "");
+	rm(t, n, () => e.open, (t) => {
+		e.open = t;
 	});
 }
-function rm(e, t) {
+function rm(e, t, n, r) {
+	e.classList.add("ui-fcollapse");
+	let i = (tm.get(e) || 0) + 1;
+	tm.set(e, i);
+	let a = () => tm.get(e) === i;
+	if (t) {
+		e.inert = !1;
+		let t = n() ? e.getBoundingClientRect().height : 0;
+		r(!0), am(e, t, a);
+	} else e.inert = !0, e.classList.remove("ui-fcollapse-settled"), e.style.height = e.getBoundingClientRect().height + "px", e.getBoundingClientRect(), e.style.height = "0px", im(e, () => {
+		a() && (r(!1), e.style.height = "");
+	});
+}
+function im(e, t) {
 	let n = !1, r, i = (a) => {
 		a && a.propertyName !== "height" || n || (n = !0, e.removeEventListener("transitionend", i), clearTimeout(r), t());
 	};
 	e.addEventListener("transitionend", i), r = setTimeout(i, 260);
 }
-function im(e, t, n = () => !0) {
-	e.classList.remove("ui-fcollapse-settled"), e.style.height = t + "px", e.getBoundingClientRect(), e.style.height = e.scrollHeight + "px", rm(e, () => {
+function am(e, t, n = () => !0) {
+	e.classList.remove("ui-fcollapse-settled"), e.style.height = t + "px", e.getBoundingClientRect(), e.style.height = e.scrollHeight + "px", im(e, () => {
 		n() && (e.style.height = "auto", e.classList.add("ui-fcollapse-settled"));
 	});
 }
 //#endregion
 //#region ../resources/media-sources.json
-var am = [
+var om = [
 	{
 		id: "local",
 		name: "本地磁盘",
@@ -19402,18 +19407,18 @@ var am = [
 		cloud: !0,
 		icon: "database"
 	}
-], om = am, sm = am.map((e) => [e.id, e.label]);
-am.map((e) => e.id);
-var cm = am.filter((e) => e.cloud).map((e) => e.id), lm = Object.fromEntries(am.map((e) => [e.id, e.name])), um = {
+], sm = om, cm = om.map((e) => [e.id, e.label]);
+om.map((e) => e.id);
+var lm = om.filter((e) => e.cloud).map((e) => e.id), um = Object.fromEntries(om.map((e) => [e.id, e.name])), dm = {
 	local: "hard-drive",
 	guangya: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEWUlEQVR42sWXT2hcVRTGf/fNYCZdNNPGTaHaSUXFVQZSLLowoe3GdpEERHFhYqTQRBATcWlpSly56YQu4ipNZivYxCK46Z9EsBGkHdwItdhXrLixzaASo2bucXHve/feNzOagqQXHnPf/XPOd77z3XPfKLwmkxTZit4lkiEiykQK8wA5+5v0c5i5nNj3ZJ03nwPyKpmvEekFpGNZvV6PE58qdT7BEIoLRKqYOo0g6PtOogQEDkDWeS4DVgQ0MVpNqbGNpRSATDCEcLHJYcAAzWz4QHIqZCcdswwloWr7iBpWJzeWlIxTAq4CJSK7MNmQOhXrSGXeWzj205AGAiiLQAAt0JA6HZ09eRRDCKV0UmGoUsq8SzJoKRS7DgFJxpQxmjhRXsRg5pU4AAKIKvL7xmQeGPVWerJIHBACSX9TQw5EAlB75lLnnm1t18NgHqHsAPjGvCj8KHN27rEuONgPnV3w96/wVx3urZrotefMj0n5DABalfME59CjUXwGPGDlEegbgZ5+mtpmHW5fgusz8NtdF30AwKZCa9AKJeNIYERZ4anM0esuwWvzJurttK8+hLUZY1B5gaUpMIHlW+8Wh0YL7O2BU5dhb4lttxc/sEBmnE3lmba6yrf0re1RE7vj7RbOf1iBWhXqdw1D+3rh8DtQLIUgNuvwzXmaUm3T25yCJA3Kgjg+DS+fcXMPYvjkLYhXw1Ql/YHT0H861MXcs7C5bo+2BCzkpg8x3ZpDZTa8cQE6i274XB/8/K0TVt8oPDcI67FxFq9AYQ/sP2zm8wXIdcDWn7D7AOwuGdZsRWzNQFJMegfh1EU3tjoLy+85oR4agVfnzdydFZg/ZuY6izD1PRSKzXbjFageS2tF1FZEIvD0QDj29aKt41bJHV0Z7YiZ31iH7z5rbfdmFRruTsj/q5K7D4TvP9Ys9fZofXkeuntgz5Nw6X1jNDn363FzjbgyAzeqnhCzKXhmAKauuk2LY7C2YAWJExyJ6CyQ5LL5aMvtvVE1YlWZtBIexTAF9zOonyg7tCn1Ht2JohsCPS+Fe3+quas3eRpi6G9o82hpAWCj7t5fGIVdxRCE9mt5ereb0+C3ezWnCS1eXweAmkW4tuj6nUU4fiZTQPCMmijY1wvPj4a14vaKi1pjhScOsG6VAoArlZCFo5NwIgvCA/JUP5z8NLTxxVnn2Hx8uPUND1TbOnB0El45R1N6Ls8aagEeL5kUZY/qgximD3riU5n7Jbz62xeikQXj4GHa/RhmjxgQqkV5F3sSRKfA2hei6pvw+dntO791DSpH4Jc7nuCyAhT3NWTT0Z6BtBiV4MR0ezZuXTPCvb7Q8jpJo/aveNyF9N8AkrarCPvL7lr+o270kK0dD9mUTHAz/C7cwSbUIoRlHlWLWIwoUEGoPwL3McJSpCrUiRjbcfeKKfUxcQSg5lhCMQzEO5D3OophNcdS8O8YQMYpoRkix+j/LkxFDWGZAhVVcSn/Bw2n+w/oK+fWAAAAAElFTkSuQmCC",
 	115: "data:image/png;base64,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",
 	pikpak: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACY0lEQVR4nNWXy2tTQRSHv7m5RUWttqlNW1OairhKNbrU+lhE/AOkdCOIIO7arty0QhSxCIIQ7VJwIfgfCIJdFB+rgC32AVIflD5CbFUsoohJRiZzb5Ne05p4kxv94HCTc+bO+c0MM3eOoICD/TJswAAQBdoBH5UhA8wDo1mIv7ojpuyAsH9EBuQgkmuASXVJI4lN3BXDawIifXIQwQ28RDA0ERfDwpr2cQ9G7iSdhcOGteZeJ1eYKreB5DS1I2oiCJba2hDQVA9tjdDaCHMfICuhMwDJz5D8BMtftK9E2s2NttrJMOxvzSdT1rIb6goW69KIXsjr5/K+nxlIWWKWrOebJIxNFhXgK7r20QjcPL+59PllGH8LarDvU3oWFHU+CDZpK+TKA3j88vd+zGKd93av/y8lrKxao7Ls6bROrrj6EE6E9WzZppZKrJ0y0Hu8RAGhZuhohqk5nShp2Y/0+nZqxPaoFQsr2my2mNDSkBe01w/7AvAu9QcB/nrYs0vboU4qSsNOwCHAoMYY/5WAsckNt1NJ8WKY5TS+fF8/E7f/Lu5aQDrjLu5agOlzF3ct4NYFd3HXAk51uYv/k9vQLPeFr9/h4gh0dcCBNu17vaiP7nt9sGNblQVs3wo9x+DZNCRm9aUyFICebh0rF9PpWP22+QvqC3f2qLZyKda34XTMLsGLGSrO8xndtxMR6ZfqQ+tz7uczRyDor0zyxY/6LlDkoMqYVsUSKvSqho8SVB/JglqCUWqF4ImharVcueQ96j4bN3KFoiDmeXpJTOXO7QJVoyEZ8mgm0rm6sLA4talFef4LaurBZfZxNPMAAAAASUVORK5CYII=",
 	onedrive: "data:image/png;base64,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"
-}, dm = Object.fromEntries(om.map((e) => [e.id, um[e.id] || e.icon]));
+}, fm = Object.fromEntries(sm.map((e) => [e.id, dm[e.id] || e.icon]));
 //#endregion
 //#region src/react/boardui/components/application/settings/settings-rows.tsx
-function fm({ label: e, description: t, children: n }) {
+function pm({ label: e, description: t, children: n }) {
 	return /* @__PURE__ */ (0, z.jsxs)("div", {
 		className: R("flex min-h-[52px] w-full items-center justify-between gap-4 py-2.5 pr-2.5", "border-b border-separator-border last:border-b-0"),
 		children: [/* @__PURE__ */ (0, z.jsxs)("div", {
@@ -19430,7 +19435,7 @@ function fm({ label: e, description: t, children: n }) {
 }
 //#endregion
 //#region src/react/boardui/components/base/buttons/link-button.tsx
-var pm = yt({
+var mm = yt({
 	base: [
 		"inline-flex items-center justify-center gap-1 whitespace-nowrap",
 		"font-sans select-none cursor-pointer rounded-sm",
@@ -19454,15 +19459,15 @@ var pm = yt({
 		secondary: ["text-text-secondary active:text-text-primary", "disabled:text-text-tertiary aria-disabled:text-text-tertiary"].join(" ")
 	}
 });
-function mm({ variant: e = "primary", size: t = "medium", leadingIcon: n, trailingIcon: r, children: i, className: a, disabled: o = !1, ...s }) {
-	let c = R(pm.base, pm.size[t], pm.variant[e], a), l = /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [
+function hm({ variant: e = "primary", size: t = "medium", leadingIcon: n, trailingIcon: r, children: i, className: a, disabled: o = !1, ...s }) {
+	let c = R(mm.base, mm.size[t], mm.variant[e], a), l = /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [
 		n ? /* @__PURE__ */ (0, z.jsx)(n, {
-			className: pm.icon[t],
+			className: mm.icon[t],
 			"aria-hidden": !0
 		}) : null,
 		i != null && /* @__PURE__ */ (0, z.jsx)("span", { children: i }),
 		r ? /* @__PURE__ */ (0, z.jsx)(r, {
-			className: pm.icon[t],
+			className: mm.icon[t],
 			"aria-hidden": !0
 		}) : null
 	] });
@@ -19489,13 +19494,13 @@ function mm({ variant: e = "primary", size: t = "medium", leadingIcon: n, traili
 }
 //#endregion
 //#region src/react/settings/section.tsx
-function hm({ children: e }) {
+function gm({ children: e }) {
 	return /* @__PURE__ */ (0, z.jsx)("div", {
 		className: "flex flex-col",
 		children: e
 	});
 }
-function gm({ divided: e = !1, children: t }) {
+function _m({ divided: e = !1, children: t }) {
 	return e ? /* @__PURE__ */ (0, z.jsx)("div", {
 		className: "flex flex-col gap-4 border-t border-separator-border py-4 pr-3",
 		children: t
@@ -19504,22 +19509,22 @@ function gm({ divided: e = !1, children: t }) {
 		children: t
 	});
 }
-function _m({ role: e, children: t }) {
+function vm({ role: e, children: t }) {
 	return /* @__PURE__ */ (0, z.jsx)("p", {
 		role: e,
 		className: "text-body-2-regular text-text-secondary",
 		children: t
 	});
 }
-function vm({ children: e }) {
+function ym({ children: e }) {
 	return /* @__PURE__ */ (0, z.jsx)("p", {
 		role: "alert",
 		className: "text-body-2-regular text-text-error-primary",
 		children: e
 	});
 }
-function ym({ href: e, children: t, leadingIcon: n }) {
-	return /* @__PURE__ */ (0, z.jsx)(mm, {
+function bm({ href: e, children: t, leadingIcon: n }) {
+	return /* @__PURE__ */ (0, z.jsx)(hm, {
 		href: e,
 		target: "_blank",
 		rel: "noopener noreferrer",
@@ -19533,13 +19538,13 @@ function ym({ href: e, children: t, leadingIcon: n }) {
 		})
 	});
 }
-function bm({ children: e }) {
+function xm({ children: e }) {
 	return /* @__PURE__ */ (0, z.jsx)("dl", {
 		className: "flex flex-col",
 		children: e
 	});
 }
-function xm({ term: e, children: t }) {
+function Sm({ term: e, children: t }) {
 	return /* @__PURE__ */ (0, z.jsxs)("div", {
 		className: "flex min-h-11 items-center justify-between gap-4 border-b border-separator-border py-2.5 pr-3 last:border-b-0",
 		children: [/* @__PURE__ */ (0, z.jsx)("dt", {
@@ -19551,42 +19556,44 @@ function xm({ term: e, children: t }) {
 		})]
 	});
 }
-function Sm({ summary: e, defaultOpen: t = !1, children: n, trailing: r = !1, onOpenChange: i, contentClassName: a }) {
-	let o = (0, y.useId)(), s = (0, y.useRef)(null), c = (0, y.useRef)(null), l = (0, y.useRef)(!1), [u, d] = (0, y.useState)(t);
-	return /* @__PURE__ */ (0, z.jsxs)("details", {
+function Cm({ summary: e, defaultOpen: t = !1, isOpen: n, children: r, trailing: i = !1, onOpenChange: a, contentClassName: o }) {
+	let s = (0, y.useId)(), c = (0, y.useRef)(null), l = (0, y.useRef)(null), u = (0, y.useRef)(!1), [d, f] = (0, y.useState)(n ?? t);
+	return (0, y.useLayoutEffect)(() => {
+		n !== void 0 && n !== d && c.current && l.current && (nm(c.current, l.current, n), f(n));
+	}, [n, d]), /* @__PURE__ */ (0, z.jsxs)("details", {
 		ref: (e) => {
-			s.current = e, e && t && !l.current && (l.current = !0, e.open = !0);
+			c.current = e, e && (n ?? t) && !u.current && (u.current = !0, e.open = !0);
 		},
 		children: [/* @__PURE__ */ (0, z.jsxs)("summary", {
-			"aria-expanded": u,
-			"aria-controls": o,
+			"aria-expanded": d,
+			"aria-controls": s,
 			onClick: (e) => {
-				e.preventDefault(), s.current && c.current && (nm(s.current, c.current, !u), d(!u), i?.(!u));
+				e.preventDefault(), c.current && l.current && (nm(c.current, l.current, !d), f(!d), a?.(!d));
 			},
-			className: `${r ? "w-full" : "w-fit"} flex cursor-pointer list-none items-center gap-1 rounded-sm text-body-2-medium text-text-secondary outline-none select-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring`,
+			className: `${i ? "w-full" : "w-fit"} flex cursor-pointer list-none items-center gap-1 rounded-sm text-body-2-medium text-text-secondary outline-none select-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring`,
 			children: [
-				r ? null : /* @__PURE__ */ (0, z.jsx)(jp, {
+				i ? null : /* @__PURE__ */ (0, z.jsx)(jp, {
 					"aria-hidden": !0,
-					className: u ? "size-4 shrink-0 rotate-90 transition-transform" : "size-4 shrink-0 transition-transform"
+					className: d ? "size-4 shrink-0 rotate-90 transition-transform" : "size-4 shrink-0 transition-transform"
 				}),
 				e,
-				r ? /* @__PURE__ */ (0, z.jsx)(jp, {
+				i ? /* @__PURE__ */ (0, z.jsx)(jp, {
 					"aria-hidden": !0,
-					className: u ? "ml-auto size-4 shrink-0 -rotate-90 transition-transform" : "ml-auto size-4 shrink-0 rotate-90 transition-transform"
+					className: d ? "ml-auto size-4 shrink-0 -rotate-90 transition-transform" : "ml-auto size-4 shrink-0 rotate-90 transition-transform"
 				}) : null
 			]
 		}), /* @__PURE__ */ (0, z.jsx)("div", {
-			ref: c,
-			id: o,
-			inert: !u,
+			ref: l,
+			id: s,
+			inert: !d,
 			children: /* @__PURE__ */ (0, z.jsx)("div", {
-				className: R("flex flex-col gap-2 pt-3", a),
-				children: n
+				className: R("flex flex-col gap-2 pt-3", o),
+				children: r
 			})
 		})]
 	});
 }
-function Cm({ name: e }) {
+function wm({ name: e }) {
 	return /* @__PURE__ */ (0, z.jsx)("svg", {
 		"aria-hidden": !0,
 		viewBox: "0 0 24 24",
@@ -19595,18 +19602,18 @@ function Cm({ name: e }) {
 		children: /* @__PURE__ */ (0, z.jsx)("use", { href: `#i-${e}` })
 	});
 }
-function wm({ mark: e }) {
+function Tm({ mark: e }) {
 	return e.startsWith("data:image/png;base64,") ? /* @__PURE__ */ (0, z.jsx)("img", {
 		src: e,
 		alt: "",
 		width: 16,
 		height: 16,
 		className: "size-4 shrink-0"
-	}) : /* @__PURE__ */ (0, z.jsx)(Cm, { name: e });
+	}) : /* @__PURE__ */ (0, z.jsx)(wm, { name: e });
 }
 //#endregion
 //#region src/react/pages/setup/setup-done.tsx
-function Tm({ done: e }) {
+function Em({ done: e }) {
 	let t = (0, y.useRef)(null);
 	return (0, y.useEffect)(() => {
 		document.title = "Peach · 设置完成", t.current?.focus();
@@ -19629,11 +19636,11 @@ function Tm({ done: e }) {
 				className: "self-start",
 				children: e.history_guide ? "导入浏览器历史记录" : "进入 Peach"
 			}),
-			/* @__PURE__ */ (0, z.jsx)(Sm, {
+			/* @__PURE__ */ (0, z.jsx)(Cm, {
 				summary: "运行信息",
-				children: /* @__PURE__ */ (0, z.jsx)(bm, { children: e.facts.map((e) => /* @__PURE__ */ (0, z.jsxs)(xm, {
+				children: /* @__PURE__ */ (0, z.jsx)(xm, { children: e.facts.map((e) => /* @__PURE__ */ (0, z.jsxs)(Sm, {
 					term: e.term,
-					children: [e.value, e.download_url ? /* @__PURE__ */ (0, z.jsx)(ym, {
+					children: [e.value, e.download_url ? /* @__PURE__ */ (0, z.jsx)(bm, {
 						href: e.download_url,
 						children: e.download_label ?? e.download_url
 					}) : null]
@@ -19644,7 +19651,7 @@ function Tm({ done: e }) {
 }
 //#endregion
 //#region src/react/boardui/components/base/switch/switch.tsx
-var Em = yt({
+var Dm = yt({
 	sm: {
 		track: "h-4 w-7",
 		trackRadius: {
@@ -19706,8 +19713,8 @@ var Em = yt({
 		}
 	}
 });
-function Dm({ state: e, size: t = "md", shape: n = "pill" }) {
-	let r = Em[t];
+function Om({ state: e, size: t = "md", shape: n = "pill" }) {
+	let r = Dm[t];
 	return /* @__PURE__ */ (0, z.jsx)("span", {
 		"aria-hidden": !0,
 		className: R("relative shrink-0 transition-colors duration-200 ease", r.track, r.trackRadius[n], e.isSelected ? R("bg-linear-to-b from-accent-500 to-accent-600", r.onShadow) : "bg-background-tertiary-default", e.isDisabled && "opacity-50", e.isFocusVisible && "ring-2 ring-border-focus-ring ring-offset-2"),
@@ -19717,12 +19724,12 @@ function Dm({ state: e, size: t = "md", shape: n = "pill" }) {
 		})
 	});
 }
-function Om({ className: e, children: t, size: n = "md", shape: r = "pill", ref: i, ...a }) {
+function km({ className: e, children: t, size: n = "md", shape: r = "pill", ref: i, ...a }) {
 	return /* @__PURE__ */ (0, z.jsx)(xp, {
 		ref: i,
 		...a,
 		className: (t) => R("group inline-flex items-center gap-2 select-none", t.isDisabled ? "cursor-not-allowed" : "cursor-pointer", typeof e == "function" ? e(t) : e),
-		children: (e) => /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsx)(Dm, {
+		children: (e) => /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsx)(Om, {
 			state: e,
 			size: n,
 			shape: r
@@ -19734,56 +19741,56 @@ function Om({ className: e, children: t, size: n = "md", shape: r = "pill", ref:
 }
 //#endregion
 //#region node_modules/motion-utils/dist/es/clamp.mjs
-var km = (e, t, n) => n > t ? t : n < e ? e : n, Am = {};
+var Am = (e, t, n) => n > t ? t : n < e ? e : n, jm = {};
 //#endregion
 //#region node_modules/motion-utils/dist/es/memo.mjs
 /*#__NO_SIDE_EFFECTS__*/
-function jm(e) {
+function Mm(e) {
 	let t;
 	return () => (t === void 0 && (t = e()), t);
 }
 //#endregion
 //#region node_modules/motion-utils/dist/es/noop.mjs
-var Mm = /* @__NO_SIDE_EFFECTS__ */ (e) => e, Nm = /* @__NO_SIDE_EFFECTS__ */ (e) => e * 1e3, Pm = /* @__NO_SIDE_EFFECTS__ */ (e) => e / 1e3, Fm = /* @__NO_SIDE_EFFECTS__ */ (e) => Array.isArray(e) && typeof e[0] == "number", Im = {
+var Nm = /* @__NO_SIDE_EFFECTS__ */ (e) => e, Pm = /* @__NO_SIDE_EFFECTS__ */ (e) => e * 1e3, Fm = /* @__NO_SIDE_EFFECTS__ */ (e) => e / 1e3, Im = /* @__NO_SIDE_EFFECTS__ */ (e) => Array.isArray(e) && typeof e[0] == "number", Lm = {
 	delta: 0,
 	timestamp: 0,
 	isProcessing: !1
-}, Lm;
-function Rm() {
-	Lm = void 0;
+}, Rm;
+function zm() {
+	Rm = void 0;
 }
-var zm = {
-	now: () => (Lm === void 0 && zm.set(Im.isProcessing || Am.useManualTiming ? Im.timestamp : performance.now()), Lm),
+var Bm = {
+	now: () => (Rm === void 0 && Bm.set(Lm.isProcessing || jm.useManualTiming ? Lm.timestamp : performance.now()), Rm),
 	set: (e) => {
-		Lm = e, queueMicrotask(Rm);
+		Rm = e, queueMicrotask(zm);
 	}
-}, Bm = (e, t, n = 10) => {
+}, Vm = (e, t, n = 10) => {
 	let r = "", i = Math.max(Math.round(t / n), 2);
 	for (let t = 0; t < i; t++) r += Math.round(e(t / (i - 1)) * 1e4) / 1e4 + ", ";
 	return `linear(${r.substring(0, r.length - 2)})`;
-}, Vm = 2e4;
-function Hm(e, t = 50, n = Vm, r) {
+}, Hm = 2e4;
+function Um(e, t = 50, n = Hm, r) {
 	let i = 0, a = e.next(i);
 	for (r?.push(a.value); !a.done && i < n;) i += t, a = e.next(i), r?.push(a.value);
 	return i >= n ? Infinity : i;
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/generators/utils/create-generator-easing.mjs
-function Um(e, t = 100, n) {
+function Wm(e, t = 100, n) {
 	let { keyframes: r, velocity: i } = e, a = r && r[r.length - 1] - r[0], o = n({
 		...e,
 		velocity: i && a ? i * t / a : i,
 		keyframes: [0, t]
-	}), s = Math.min(Hm(o), Vm);
+	}), s = Math.min(Um(o), Hm);
 	return {
 		type: "keyframes",
 		ease: (e) => o.next(s * e).value / t,
-		duration: /* @__PURE__ */ Pm(s)
+		duration: /* @__PURE__ */ Fm(s)
 	};
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/generators/spring.mjs
-var Wm = {
+var Gm = {
 	stiffness: 100,
 	damping: 10,
 	mass: 1,
@@ -19801,63 +19808,63 @@ var Wm = {
 	minDuration: .01,
 	maxDuration: 10,
 	minDamping: .05
-}, Gm = (e) => e < 0 ? 1 / Math.max(1 + e, Wm.minDamping) : Math.max(1 - e, Wm.minDamping);
-function Km(e, t) {
+}, Km = (e) => e < 0 ? 1 / Math.max(1 + e, Gm.minDamping) : Math.max(1 - e, Gm.minDamping);
+function qm(e, t) {
 	if (!(e > 1)) return 1;
 	let n = Math.sqrt(e * e - 1), r = e - n, i = e + n, a = 2 * n * Math.exp(-t) * (1 + t);
-	return Ym((e) => i * Math.exp(-r * e) - r * Math.exp(-i * e) - a, (e) => Math.exp(-i * e) - Math.exp(-r * e), t) / t;
+	return Xm((e) => i * Math.exp(-r * e) - r * Math.exp(-i * e) - a, (e) => Math.exp(-i * e) - Math.exp(-r * e), t) / t;
 }
-function qm(e, t) {
+function Jm(e, t) {
 	return e * Math.sqrt(1 - t * t);
 }
-var Jm = 12;
-function Ym(e, t, n) {
+var Ym = 12;
+function Xm(e, t, n) {
 	let r = n;
-	for (let n = 1; n < Jm; n++) r -= e(r) / t(r);
+	for (let n = 1; n < Ym; n++) r -= e(r) / t(r);
 	return r;
 }
-var Xm = .001;
-function Zm({ duration: e = Wm.duration, bounce: t = Wm.bounce }) {
+var Zm = .001;
+function Qm({ duration: e = Gm.duration, bounce: t = Gm.bounce }) {
 	let n, r;
-	Wm.maxDuration;
-	let i = Gm(t);
-	e = km(Wm.minDuration, Wm.maxDuration, /* @__PURE__ */ Pm(e)), i < 1 ? (n = (t) => {
-		let n = t * i, r = n * e, a = qm(t, i), o = Math.exp(-r);
-		return Xm - n / a * o;
+	Gm.maxDuration;
+	let i = Km(t);
+	e = Am(Gm.minDuration, Gm.maxDuration, /* @__PURE__ */ Fm(e)), i < 1 ? (n = (t) => {
+		let n = t * i, r = n * e, a = Jm(t, i), o = Math.exp(-r);
+		return Zm - n / a * o;
 	}, r = (t) => {
-		let r = t * i * e, a = i * i * t * t * e, o = Math.exp(-r), s = qm(t * t, i);
-		return (-n(t) + Xm > 0 ? -1 : 1) * -a * o / s;
+		let r = t * i * e, a = i * i * t * t * e, o = Math.exp(-r), s = Jm(t * t, i);
+		return (-n(t) + Zm > 0 ? -1 : 1) * -a * o / s;
 	}) : (n = (t) => -.001 + Math.exp(-t * e) * (t * e + 1), r = (t) => Math.exp(-t * e) * (-t * (e * e)));
-	let a = 5 / e, o = Ym(n, r, a), s = o * Km(i, o * e), c = s * s;
+	let a = 5 / e, o = Xm(n, r, a), s = o * qm(i, o * e), c = s * s;
 	return {
 		stiffness: c,
 		damping: i * 2 * Math.sqrt(c),
-		duration: /* @__PURE__ */ Nm(e)
+		duration: /* @__PURE__ */ Pm(e)
 	};
 }
-var Qm = (e, t) => (t ? e >= 0 : e > 0) && e < Infinity;
-function $m(e, t) {
-	if (Qm(e, t)) return e;
+var $m = (e, t) => (t ? e >= 0 : e > 0) && e < Infinity;
+function eh(e, t) {
+	if ($m(e, t)) return e;
 }
-function eh(e) {
-	let t = $m(e.stiffness), n = $m(e.damping, !0), r = $m(e.mass), i = {
+function th(e) {
+	let t = eh(e.stiffness), n = eh(e.damping, !0), r = eh(e.mass), i = {
 		...e,
-		stiffness: t ?? Wm.stiffness,
-		damping: n ?? Wm.damping,
-		mass: r ?? Wm.mass,
+		stiffness: t ?? Gm.stiffness,
+		damping: n ?? Gm.damping,
+		mass: r ?? Gm.mass,
 		isResolvedFromDuration: !1,
 		isTimeDefined: (t ?? n ?? r) === void 0 && (e.duration !== void 0 || e.bounce !== void 0)
 	};
 	if (i.isTimeDefined) {
 		if (e.visualDuration) {
-			let t = Gm(e.bounce || 0), n = 2 * Math.PI / (e.visualDuration * 1.2) * Km(t, 2 * Math.PI / 1.2);
+			let t = Km(e.bounce || 0), n = 2 * Math.PI / (e.visualDuration * 1.2) * qm(t, 2 * Math.PI / 1.2);
 			i.stiffness = n * n, i.damping = 2 * t * Math.sqrt(i.stiffness);
-		} else Object.assign(i, Zm(i)), i.isResolvedFromDuration = !0;
-		(!Qm(i.stiffness) || !Qm(i.damping, !0)) && (i.stiffness = Wm.stiffness, i.damping = Wm.damping);
+		} else Object.assign(i, Qm(i)), i.isResolvedFromDuration = !0;
+		(!$m(i.stiffness) || !$m(i.damping, !0)) && (i.stiffness = Gm.stiffness, i.damping = Gm.damping);
 	}
 	return i;
 }
-function th(e = Wm.visualDuration, t = Wm.bounce) {
+function nh(e = Gm.visualDuration, t = Gm.bounce) {
 	let n = typeof e == "object" ? e : {
 		visualDuration: e,
 		keyframes: [0, 1],
@@ -19865,7 +19872,7 @@ function th(e = Wm.visualDuration, t = Wm.bounce) {
 	}, r = n.keyframes[0], i = n.keyframes[n.keyframes.length - 1], a = {
 		done: !1,
 		value: r
-	}, { stiffness: o, damping: s, mass: c, duration: l, isResolvedFromDuration: u, isTimeDefined: d } = eh({ ...n }), f = (e) => d ? 0 : -/* @__PURE__ */ Pm(e), p = s / (2 * Math.sqrt(o * c)), m = /* @__PURE__ */ Pm(Math.sqrt(o / c)), h = p * m, g = {
+	}, { stiffness: o, damping: s, mass: c, duration: l, isResolvedFromDuration: u, isTimeDefined: d } = th({ ...n }), f = (e) => d ? 0 : -/* @__PURE__ */ Fm(e), p = s / (2 * Math.sqrt(o * c)), m = /* @__PURE__ */ Fm(Math.sqrt(o / c)), h = p * m, g = {
 		target: i,
 		delta: i - r,
 		velocity: f(n.velocity || 0) || 0,
@@ -19873,12 +19880,12 @@ function th(e = Wm.visualDuration, t = Wm.bounce) {
 		restDelta: 0
 	}, _ = () => {
 		let e = Math.abs(g.delta) < 5;
-		g.restSpeed = n.restSpeed || (e ? Wm.restSpeed.granular : Wm.restSpeed.default), g.restDelta = n.restDelta || (e ? Wm.restDelta.granular : Wm.restDelta.default);
+		g.restSpeed = n.restSpeed || (e ? Gm.restSpeed.granular : Gm.restSpeed.default), g.restDelta = n.restDelta || (e ? Gm.restDelta.granular : Gm.restDelta.default);
 	};
 	_();
 	let v, y, b;
 	if (p < 1) {
-		let e = qm(m, p), t = {
+		let e = Jm(m, p), t = {
 			A: 0,
 			sinC: 0,
 			cosC: 0,
@@ -19916,51 +19923,51 @@ function th(e = Wm.visualDuration, t = Wm.bounce) {
 		retarget: (e, t) => {
 			g.target = e[e.length - 1], g.delta = g.target - e[0], g.velocity = f(t), n.restSpeed && n.restDelta || _(), S.calculatedDuration = x, a.done = !1, b();
 		},
-		velocity: (e) => /* @__PURE__ */ Nm(y(e)),
+		velocity: (e) => /* @__PURE__ */ Pm(y(e)),
 		next: (e) => {
 			let t = v(e);
 			if (u) a.done = e >= l;
 			else {
-				let n = /* @__PURE__ */ Nm(y(e));
+				let n = /* @__PURE__ */ Pm(y(e));
 				a.done = Math.abs(n) <= g.restSpeed && Math.abs(g.target - t) <= g.restDelta;
 			}
 			return a.value = a.done ? g.target : t, a;
 		},
 		toString: () => {
-			let e = Math.min(Hm(S), Vm), t = Bm((t) => S.next(e * t).value, e, 30);
+			let e = Math.min(Um(S), Hm), t = Vm((t) => S.next(e * t).value, e, 30);
 			return e + "ms " + t;
 		},
 		toTransition: () => {}
 	};
 	return S;
 }
-th.applyToOptions = (e) => {
-	let t = Um(e, 100, th);
-	return e.ease = t.ease, e.duration = /* @__PURE__ */ Nm(t.duration), e.type = "keyframes", e;
+nh.applyToOptions = (e) => {
+	let t = Wm(e, 100, nh);
+	return e.ease = t.ease, e.duration = /* @__PURE__ */ Pm(t.duration), e.type = "keyframes", e;
 };
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/keyframes/get-final.mjs
-var nh = (e) => e !== null;
-function rh(e, { repeat: t, repeatType: n = "loop" }, r, i = 1) {
-	let a = e.filter(nh), o = i < 0 || t && n !== "loop" && t % 2 == 1 ? 0 : a.length - 1;
+var rh = (e) => e !== null;
+function ih(e, { repeat: t, repeatType: n = "loop" }, r, i = 1) {
+	let a = e.filter(rh), o = i < 0 || t && n !== "loop" && t % 2 == 1 ? 0 : a.length - 1;
 	return !o || r === void 0 ? a[o] : r;
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/utils/notify-inspector.mjs
-function ih(e, t) {
+function ah(e, t) {
 	return {
 		kind: e,
 		animation: t,
-		timestamp: zm.now(),
-		frameTimestamp: Im.timestamp,
-		frameIsProcessing: Im.isProcessing
+		timestamp: Bm.now(),
+		frameTimestamp: Lm.timestamp,
+		frameIsProcessing: Lm.isProcessing
 	};
 }
-function ah(e, t, n) {
+function oh(e, t, n) {
 	let r = globalThis.__MOTION_INSPECT__;
 	if (r) try {
 		r({
-			...ih("animation-start", e),
+			...ah("animation-start", e),
 			options: n ? {
 				...t,
 				...n
@@ -19970,7 +19977,7 @@ function ah(e, t, n) {
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/utils/WithPromise.mjs
-var oh = class {
+var sh = class {
 	constructor() {
 		this.isResolved = !1;
 	}
@@ -19991,60 +19998,60 @@ var oh = class {
 };
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/keyframes/utils/fill-wildcards.mjs
-function sh(e) {
+function ch(e) {
 	for (let t = 1; t < e.length; t++) e[t] ?? (e[t] = e[t - 1]);
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/render/dom/is-css-var.mjs
-var ch = (e) => e.startsWith("--");
+var lh = (e) => e.startsWith("--");
 //#endregion
 //#region node_modules/motion-dom/dist/es/render/dom/style-set.mjs
-function lh(e, t, n) {
-	ch(t) ? e.style.setProperty(t, n) : e.style[t] = n;
+function uh(e, t, n) {
+	lh(t) ? e.style.setProperty(t, n) : e.style[t] = n;
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/utils/supports/flags.mjs
-var uh = {};
+var dh = {};
 //#endregion
 //#region node_modules/motion-dom/dist/es/utils/supports/memo.mjs
-function dh(e, t) {
-	let n = /* @__PURE__ */ jm(e);
-	return () => uh[t] ?? n();
+function fh(e, t) {
+	let n = /* @__PURE__ */ Mm(e);
+	return () => dh[t] ?? n();
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/utils/supports/scroll-timeline.mjs
-var fh = /* @__PURE__ */ dh(() => window.ScrollTimeline !== void 0, "scrollTimeline"), ph = /*@__PURE__*/ dh(() => {
+var ph = /* @__PURE__ */ fh(() => window.ScrollTimeline !== void 0, "scrollTimeline"), mh = /*@__PURE__*/ fh(() => {
 	try {
 		document.createElement("div").animate({ opacity: 0 }, { easing: "linear(0, 1)" });
 	} catch {
 		return !1;
 	}
 	return !0;
-}, "linearEasing"), mh = ([e, t, n, r]) => `cubic-bezier(${e}, ${t}, ${n}, ${r})`, hh = {
+}, "linearEasing"), hh = ([e, t, n, r]) => `cubic-bezier(${e}, ${t}, ${n}, ${r})`, gh = {
 	linear: "linear",
 	ease: "ease",
 	easeIn: "ease-in",
 	easeOut: "ease-out",
 	easeInOut: "ease-in-out",
-	circIn: /*@__PURE__*/ mh([
+	circIn: /*@__PURE__*/ hh([
 		0,
 		.65,
 		.55,
 		1
 	]),
-	circOut: /*@__PURE__*/ mh([
+	circOut: /*@__PURE__*/ hh([
 		.55,
 		0,
 		1,
 		.45
 	]),
-	backIn: /*@__PURE__*/ mh([
+	backIn: /*@__PURE__*/ hh([
 		.31,
 		.01,
 		.66,
 		-.59
 	]),
-	backOut: /*@__PURE__*/ mh([
+	backOut: /*@__PURE__*/ hh([
 		.33,
 		1.53,
 		.69,
@@ -20053,15 +20060,15 @@ var fh = /* @__PURE__ */ dh(() => window.ScrollTimeline !== void 0, "scrollTimel
 };
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/waapi/easing/map-easing.mjs
-function gh(e, t) {
-	if (e) return typeof e == "function" ? ph() ? Bm(e, t) : "ease-out" : /* @__PURE__ */ Fm(e) ? mh(e) : Array.isArray(e) ? e.map((e) => gh(e, t) || hh.easeOut) : hh[e];
+function _h(e, t) {
+	if (e) return typeof e == "function" ? mh() ? Vm(e, t) : "ease-out" : /* @__PURE__ */ Im(e) ? hh(e) : Array.isArray(e) ? e.map((e) => _h(e, t) || gh.easeOut) : gh[e];
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/waapi/start-waapi-animation.mjs
-function _h(e, t, n, { delay: r = 0, duration: i = 300, repeat: a = 0, repeatType: o = "loop", ease: s = "easeOut", times: c } = {}, l = void 0) {
+function vh(e, t, n, { delay: r = 0, duration: i = 300, repeat: a = 0, repeatType: o = "loop", ease: s = "easeOut", times: c } = {}, l = void 0) {
 	let u = { [t]: n };
 	c && (u.offset = c);
-	let d = gh(s, i);
+	let d = _h(s, i);
 	Array.isArray(d) && (u.easing = d);
 	let f = {
 		delay: r,
@@ -20075,29 +20082,29 @@ function _h(e, t, n, { delay: r = 0, duration: i = 300, repeat: a = 0, repeatTyp
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/generators/utils/is-generator.mjs
-function vh(e) {
+function yh(e) {
 	return typeof e == "function" && "applyToOptions" in e;
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/waapi/utils/apply-generator.mjs
-function yh({ type: e, ...t }) {
-	return vh(e) && ph() ? e.applyToOptions(t) : (t.duration ??= 300, t.ease ??= "easeOut", t);
+function bh({ type: e, ...t }) {
+	return yh(e) && mh() ? e.applyToOptions(t) : (t.duration ??= 300, t.ease ??= "easeOut", t);
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/NativeAnimation.mjs
-var bh = class extends oh {
+var xh = class extends sh {
 	constructor(e) {
 		if (super(), this.finishedTime = null, this.isStopped = !1, this.manualStartTime = null, !e) return;
 		let { element: t, name: n, keyframes: r, pseudoElement: i, allowFlatten: a = !1, finalKeyframe: o, onComplete: s } = e;
 		this.isPseudoElement = !!i, this.allowFlatten = a, this.options = e, e.type;
-		let c = yh(e);
-		this.animation = _h(t, n, r, c, i), c.autoplay === !1 && this.animation.pause(), this.animation.onfinish = () => {
+		let c = bh(e);
+		this.animation = vh(t, n, r, c, i), c.autoplay === !1 && this.animation.pause(), this.animation.onfinish = () => {
 			if (this.finishedTime = this.time, !i) {
-				let e = rh(r, this.options, o, this.speed);
-				this.updateMotionValue && this.updateMotionValue(e), lh(t, n, e), this.animation.cancel();
+				let e = ih(r, this.options, o, this.speed);
+				this.updateMotionValue && this.updateMotionValue(e), uh(t, n, e), this.animation.cancel();
 			}
 			s?.(), this.notifyFinished();
-		}, ah(this, e, c);
+		}, oh(this, e, c);
 	}
 	play() {
 		this.isStopped || (this.manualStartTime = null, this.animation.play(), this.state === "finished" && this.updateFinished());
@@ -20125,18 +20132,18 @@ var bh = class extends oh {
 	}
 	get duration() {
 		let e = this.animation.effect?.getComputedTiming?.().duration || 0;
-		return /* @__PURE__ */ Pm(Number(e));
+		return /* @__PURE__ */ Fm(Number(e));
 	}
 	get iterationDuration() {
 		let { delay: e = 0 } = this.options || {};
-		return this.duration + /* @__PURE__ */ Pm(e);
+		return this.duration + /* @__PURE__ */ Fm(e);
 	}
 	get time() {
-		return /* @__PURE__ */ Pm(Number(this.animation.currentTime) || 0);
+		return /* @__PURE__ */ Fm(Number(this.animation.currentTime) || 0);
 	}
 	set time(e) {
 		let t = this.finishedTime !== null;
-		this.manualStartTime = null, this.finishedTime = null, this.animation.currentTime = /* @__PURE__ */ Nm(e), t && this.animation.pause();
+		this.manualStartTime = null, this.finishedTime = null, this.animation.currentTime = /* @__PURE__ */ Pm(e), t && this.animation.pause();
 	}
 	get speed() {
 		return this.animation.playbackRate;
@@ -20154,9 +20161,9 @@ var bh = class extends oh {
 		this.manualStartTime = this.animation.startTime = e;
 	}
 	attachTimeline({ timeline: e, onAttach: t, observe: n }) {
-		return this.allowFlatten && this.animation.effect?.updateTiming({ easing: "linear" }), this.animation.onfinish = null, e && fh() ? (this.animation.timeline = e, t?.(this.animation), Mm) : n(this);
+		return this.allowFlatten && this.animation.effect?.updateTiming({ easing: "linear" }), this.animation.onfinish = null, e && ph() ? (this.animation.timeline = e, t?.(this.animation), Nm) : n(this);
 	}
-}, xh = class {
+}, Sh = class {
 	constructor(e) {
 		this.stop = () => this.runAll("stop"), this.animations = e.filter(Boolean);
 	}
@@ -20196,10 +20203,10 @@ var bh = class extends oh {
 		return this.getAll("startTime");
 	}
 	get duration() {
-		return Sh(this.animations, "duration");
+		return Ch(this.animations, "duration");
 	}
 	get iterationDuration() {
-		return Sh(this.animations, "iterationDuration");
+		return Ch(this.animations, "iterationDuration");
 	}
 	runAll(e) {
 		this.animations.forEach((t) => t[e]());
@@ -20217,7 +20224,7 @@ var bh = class extends oh {
 		this.runAll("complete");
 	}
 };
-function Sh(e, t) {
+function Ch(e, t) {
 	let n = 0;
 	for (let r = 0; r < e.length; r++) {
 		let i = e[r][t];
@@ -20227,18 +20234,18 @@ function Sh(e, t) {
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/GroupAnimationWithThen.mjs
-var Ch = class extends xh {
+var wh = class extends Sh {
 	then(e, t) {
 		return this.finished.finally(e).then(() => {});
 	}
-}, wh = /* @__PURE__ */ new WeakMap(), Th = (e, t = "") => `${e}:${t}`;
-function Eh(e) {
-	let t = wh.get(e);
-	return t || (t = /* @__PURE__ */ new Map(), wh.set(e, t)), t;
+}, Th = /* @__PURE__ */ new WeakMap(), Eh = (e, t = "") => `${e}:${t}`;
+function Dh(e) {
+	let t = Th.get(e);
+	return t || (t = /* @__PURE__ */ new Map(), Th.set(e, t)), t;
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/utils/resolve-transition.mjs
-function Dh(e, t) {
+function Oh(e, t) {
 	if (e?.inherit && t) {
 		let { inherit: n, ...r } = e;
 		return {
@@ -20250,21 +20257,21 @@ function Dh(e, t) {
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/utils/get-value-transition.mjs
-function Oh(e, t) {
+function kh(e, t) {
 	let n = e?.[t] ?? e?.default ?? e;
-	return n === e ? n : Dh(n, e);
+	return n === e ? n : Oh(n, e);
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/waapi/utils/px-values.mjs
-var kh = /* @__PURE__ */ new Set(/* @__PURE__ */ "borderWidth.borderTopWidth.borderRightWidth.borderBottomWidth.borderLeftWidth.borderRadius.borderTopLeftRadius.borderTopRightRadius.borderBottomRightRadius.borderBottomLeftRadius.width.maxWidth.height.maxHeight.top.right.bottom.left.inset.insetBlock.insetBlockStart.insetBlockEnd.insetInline.insetInlineStart.insetInlineEnd.padding.paddingTop.paddingRight.paddingBottom.paddingLeft.paddingBlock.paddingBlockStart.paddingBlockEnd.paddingInline.paddingInlineStart.paddingInlineEnd.margin.marginTop.marginRight.marginBottom.marginLeft.marginBlock.marginBlockStart.marginBlockEnd.marginInline.marginInlineStart.marginInlineEnd.fontSize.backgroundPositionX.backgroundPositionY".split("."));
+var Ah = /* @__PURE__ */ new Set(/* @__PURE__ */ "borderWidth.borderTopWidth.borderRightWidth.borderBottomWidth.borderLeftWidth.borderRadius.borderTopLeftRadius.borderTopRightRadius.borderBottomRightRadius.borderBottomLeftRadius.width.maxWidth.height.maxHeight.top.right.bottom.left.inset.insetBlock.insetBlockStart.insetBlockEnd.insetInline.insetInlineStart.insetInlineEnd.padding.paddingTop.paddingRight.paddingBottom.paddingLeft.paddingBlock.paddingBlockStart.paddingBlockEnd.paddingInline.paddingInlineStart.paddingInlineEnd.margin.marginTop.marginRight.marginBottom.marginLeft.marginBlock.marginBlockStart.marginBlockEnd.marginInline.marginInlineStart.marginInlineEnd.fontSize.backgroundPositionX.backgroundPositionY".split("."));
 //#endregion
 //#region node_modules/motion-dom/dist/es/animation/keyframes/utils/apply-px-defaults.mjs
-function Ah(e, t) {
-	for (let n = 0; n < e.length; n++) typeof e[n] == "number" && kh.has(t) && (e[n] = e[n] + "px");
+function jh(e, t) {
+	for (let n = 0; n < e.length; n++) typeof e[n] == "number" && Ah.has(t) && (e[n] = e[n] + "px");
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/utils/resolve-elements.mjs
-function jh(e, t, n) {
+function Mh(e, t, n) {
 	if (e == null) return [];
 	if (e instanceof EventTarget) return [e];
 	if (typeof e == "string") {
@@ -20277,24 +20284,24 @@ function jh(e, t, n) {
 }
 //#endregion
 //#region node_modules/motion-dom/dist/es/render/dom/style-computed.mjs
-function Mh(e, t) {
+function Nh(e, t) {
 	let n = window.getComputedStyle(e);
-	return ch(t) ? n.getPropertyValue(t) : n[t];
+	return lh(t) ? n.getPropertyValue(t) : n[t];
 }
 //#endregion
 //#region node_modules/framer-motion/dist/es/animation/animators/waapi/animate-elements.mjs
-function Nh(e, t, n, r) {
+function Ph(e, t, n, r) {
 	if (e == null) return [];
-	let i = jh(e, r), a = i.length, o = [];
+	let i = Mh(e, r), a = i.length, o = [];
 	for (let e = 0; e < a; e++) {
 		let r = i[e], s = { ...n };
 		typeof s.delay == "function" && (s.delay = s.delay(e, a));
 		for (let e in t) {
 			let n = t[e];
 			Array.isArray(n) || (n = [n]);
-			let i = { ...Oh(s, e) };
-			i.duration &&= /* @__PURE__ */ Nm(i.duration), i.delay &&= /* @__PURE__ */ Nm(i.delay);
-			let a = Eh(r), c = Th(e, i.pseudoElement || ""), l = a.get(c);
+			let i = { ...kh(s, e) };
+			i.duration &&= /* @__PURE__ */ Pm(i.duration), i.delay &&= /* @__PURE__ */ Pm(i.delay);
+			let a = Dh(r), c = Eh(e, i.pseudoElement || ""), l = a.get(c);
 			l && l.stop(), o.push({
 				map: a,
 				key: c,
@@ -20310,33 +20317,33 @@ function Nh(e, t, n, r) {
 	}
 	for (let e = 0; e < o.length; e++) {
 		let { unresolvedKeyframes: t, options: n } = o[e], { element: r, name: i, pseudoElement: a } = n;
-		!a && t[0] === null && (t[0] = Mh(r, i)), sh(t), Ah(t, i), !a && t.length < 2 && t.unshift(Mh(r, i)), n.keyframes = t;
+		!a && t[0] === null && (t[0] = Nh(r, i)), ch(t), jh(t, i), !a && t.length < 2 && t.unshift(Nh(r, i)), n.keyframes = t;
 	}
 	let s = [];
 	for (let e = 0; e < o.length; e++) {
-		let { map: t, key: n, options: r } = o[e], i = new bh(r);
+		let { map: t, key: n, options: r } = o[e], i = new xh(r);
 		t.set(n, i), i.finished.finally(() => t.delete(n)), s.push(i);
 	}
 	return s;
 }
-var Ph = /*@__PURE__*/ ((e) => {
+var Fh = /*@__PURE__*/ ((e) => {
 	function t(t, n, r) {
-		return new Ch(Nh(t, n, r, e));
+		return new wh(Ph(t, n, r, e));
 	}
 	return t;
-})(), Fh = {
+})(), Ih = {
 	selection: {
-		type: th,
+		type: nh,
 		duration: .16,
 		bounce: 0
 	},
 	hover: {
-		type: th,
+		type: nh,
 		duration: .08,
 		bounce: 0
 	}
 };
-function Ih(e) {
+function Lh(e) {
 	let [t, n] = (0, y.useState)(null);
 	return (0, y.useLayoutEffect)(() => {
 		if (!t) return;
@@ -20357,7 +20364,7 @@ function Ih(e) {
 			let E = `translate(${b}px, ${x}px) scale(1, 1)`;
 			if (u && a && !r.matches && T && s !== h) {
 				let r = `translate(${(T.left - _.left) / v + t.scrollLeft - t.clientLeft}px, ${(T.top - _.top) / y + t.scrollTop - t.clientTop}px) scale(${T.width / v / S}, ${T.height / y / C})`;
-				l = Ph(n, { transform: [r, E] }, Fh[e]);
+				l = Fh(n, { transform: [r, E] }, Ih[e]);
 			} else n.style.transform = E;
 			s = h, c = w, t.dataset.surfaceReady = "";
 		}, m = (t) => {
@@ -20397,14 +20404,14 @@ Object.fromEntries(Object.entries({
 	later: "/watch-later",
 	flagged: "/flagged",
 	ads: "/junk-files"
-}).map(([e, t]) => [t, e])), typeof Intl < "u" && typeof Intl.Segmenter == "function" && new Intl.Segmenter(void 0, { granularity: "grapheme" }), { ...lm };
+}).map(([e, t]) => [t, e])), typeof Intl < "u" && typeof Intl.Segmenter == "function" && new Intl.Segmenter(void 0, { granularity: "grapheme" }), { ...um };
 //#endregion
 //#region src/ui-kit/scroll.ts
-var Lh = /* @__PURE__ */ new Map(), Rh, zh = 240, Bh = 50, Vh = 70, Hh = .55, Uh = .35, Wh = 480;
-function Gh(e, t) {
-	return !e || !(t > 0) ? 0 : Math.sign(e) * (1 - 1 / (Math.abs(e) * Hh / t + 1)) * t;
+var Rh = /* @__PURE__ */ new Map(), zh, Bh = 240, Vh = 50, Hh = 70, Uh = .55, Wh = .35, Gh = 480;
+function Kh(e, t) {
+	return !e || !(t > 0) ? 0 : Math.sign(e) * (1 - 1 / (Math.abs(e) * Uh / t + 1)) * t;
 }
-function Kh(e) {
+function qh(e) {
 	let t = null, n = 0, r = () => typeof e.animate != "function" || matchMedia("(prefers-reduced-motion:reduce)").matches, i = () => {
 		t = null, n || e.classList.remove("edgepull");
 	}, a = (n, r) => {
@@ -20412,11 +20419,11 @@ function Kh(e) {
 	};
 	return {
 		drag(i) {
-			r() || (t?.cancel(), t = null, n = -Gh(i, e.clientWidth), e.classList.toggle("edgepull", !!n), n ? e.style.setProperty("--edge-pull", `${n}px`) : e.style.removeProperty("--edge-pull"));
+			r() || (t?.cancel(), t = null, n = -Kh(i, e.clientWidth), e.classList.toggle("edgepull", !!n), n ? e.style.setProperty("--edge-pull", `${n}px`) : e.style.removeProperty("--edge-pull"));
 		},
 		release() {
 			if (!n) return;
-			let t = n, r = Yh();
+			let t = n, r = Xh();
 			n = 0, e.style.removeProperty("--edge-pull"), a([{
 				"--edge-pull": `${t}px`,
 				easing: r.easing
@@ -20424,9 +20431,9 @@ function Kh(e) {
 		},
 		kick(t) {
 			if (r() || n) return;
-			let i = -Gh(t * Uh, Math.min(e.clientWidth, Wh));
+			let i = -Kh(t * Wh, Math.min(e.clientWidth, Gh));
 			if (!i) return;
-			let o = Yh();
+			let o = Xh();
 			a([
 				{
 					"--edge-pull": "0px",
@@ -20442,101 +20449,109 @@ function Kh(e) {
 		}
 	};
 }
-function qh(e, { drag: t = !1, fade: n = !0 } = {}) {
+function Jh(e, { drag: t = !1, fade: n = !0, wheel: r = !0, elastic: i = !0, dragIgnore: a = "" } = {}) {
 	if (!e) return;
-	let r = Lh.get(e);
-	if (r) return r.options.drag ||= t, r.options.fade ||= n, r.update(), r;
-	let i = {
+	let o = Rh.get(e);
+	if (o) return o.options.drag ||= t, o.options.fade ||= n, o.update(), o;
+	let s = {
 		drag: t,
-		fade: n
-	}, a = new AbortController(), o = Kh(e), s = null, c = 0, l = 0, u = 0, d = !1, f = 0, p = 0, m = 0, h = 0, g = (t, n) => {
+		fade: n,
+		wheel: r,
+		elastic: i,
+		dragIgnore: a
+	}, c = new AbortController(), l = qh(e), u = null, d = 0, f = 0, p = 0, m = !1, h = 0, g = 0, _ = 0, v = 0, y = (t, n) => {
 		e.dataset[t] !== n && (e.dataset[t] = n);
-	}, _ = () => [
+	}, b = () => [
 		"auto",
 		"scroll",
 		"hidden"
-	].includes(getComputedStyle(e).overflowX), v = () => {
-		if (i.fade) {
-			let t = _();
-			g("overflowLeft", String(t && e.scrollLeft > 1)), g("overflowRight", String(t && e.scrollLeft + e.clientWidth < e.scrollWidth - 1));
+	].includes(getComputedStyle(e).overflowX), x = () => {
+		if (s.fade) {
+			let t = b();
+			y("overflowLeft", String(t && e.scrollLeft > 1)), y("overflowRight", String(t && e.scrollLeft + e.clientWidth < e.scrollWidth - 1));
 		}
-	}, y = (e, t, n, r = {}) => e.addEventListener(t, n, {
+	}, S = (e, t, n, r = {}) => e.addEventListener(t, n, {
 		...r,
-		signal: a.signal
+		signal: c.signal
 	});
-	y(e, "scroll", v, { passive: !0 });
-	let b = (e) => {
-		d || (d = !0, o.kick(e));
-	}, x = () => {
-		cancelAnimationFrame(f), f = 0, h = 0;
-	}, S = (t) => {
-		let n = Math.min(Math.max(t - p, 0), 64);
-		if (p = t, m += (u - m) * (1 - Math.exp(-n / Vh)), Math.abs(u - m) < .5 && (m = u), e.scrollLeft = m, m !== u) f = requestAnimationFrame(S);
-		else if (f = 0, h) {
-			let e = h;
-			h = 0, b(e);
+	S(e, "scroll", x, { passive: !0 });
+	let C = (e) => {
+		s.elastic && !m && (m = !0, l.kick(e));
+	}, w = () => {
+		cancelAnimationFrame(h), h = 0, v = 0;
+	}, T = (t) => {
+		let n = Math.min(Math.max(t - g, 0), 64);
+		if (g = t, _ += (p - _) * (1 - Math.exp(-n / Hh)), Math.abs(p - _) < .5 && (_ = p), e.scrollLeft = _, _ !== p) h = requestAnimationFrame(T);
+		else if (h = 0, v) {
+			let e = v;
+			v = 0, C(e);
 		}
 	};
-	y(e, "wheel", (t) => {
+	S(e, "wheel", (t) => {
+		if (!s.wheel) return;
 		let n = e.scrollWidth - e.clientWidth;
-		if (t.defaultPrevented || !t.cancelable || Math.abs(t.deltaY) <= Math.abs(t.deltaX) || n <= 0 || !_()) return;
+		if (t.defaultPrevented || !t.cancelable || Math.abs(t.deltaY) <= Math.abs(t.deltaX) || n <= 0 || !b()) return;
 		t.preventDefault();
 		let r = performance.now(), i = Math.abs(t.deltaY);
-		r > l && (d = !1), l = r + zh;
-		let a = f ? u : e.scrollLeft, o = a + t.deltaY;
-		u = Math.min(n, Math.max(0, o));
-		let s = o === u ? 0 : t.deltaY;
-		i < Bh || u === a ? (u !== a && (x(), e.scrollLeft = u), s && !f ? b(s) : s && (h = s)) : (s && (h = s), f ||= (m = e.scrollLeft, p = performance.now(), requestAnimationFrame(S)));
-	}, { passive: !1 }), y(e, "mousedown", (t) => {
-		!i.drag || t.button !== 0 || e.scrollWidth - e.clientWidth <= 1 || (t.stopPropagation(), x(), s = {
+		r > f && (m = !1), f = r + Bh;
+		let a = h ? p : e.scrollLeft, o = a + t.deltaY;
+		p = Math.min(n, Math.max(0, o));
+		let c = o === p ? 0 : t.deltaY;
+		i < Vh || p === a ? (p !== a && (w(), e.scrollLeft = p), c && !h ? C(c) : c && (v = c)) : (c && (v = c), h ||= (_ = e.scrollLeft, g = performance.now(), requestAnimationFrame(T)));
+	}, { passive: !1 }), S(e, "mousedown", (t) => {
+		d = 0, !(!s.drag || t.button !== 0 || e.scrollWidth - e.clientWidth <= 1) && (s.dragIgnore && (t.shiftKey || t.ctrlKey || t.metaKey || t.altKey || t.target.closest?.(s.dragIgnore)) || (t.stopPropagation(), w(), u = {
 			x: t.pageX,
 			left: e.scrollLeft
-		}, c = 0, e.style.cursor = "grabbing");
-	}), y(window, "mousemove", (t) => {
-		if (!s) return;
-		let n = t.pageX - s.x, r = s.left - n, i = e.scrollWidth - e.clientWidth;
-		c = Math.max(c, Math.abs(n)), e.scrollLeft = r, o.drag(r < 0 ? r : r > i ? r - i : 0), t.preventDefault();
-	}), y(window, "mouseup", () => {
-		s && o.release(), s = null, e.style.cursor = "";
-	}), y(e, "click", (e) => {
-		c > 6 && (e.stopPropagation(), e.preventDefault(), c = 0);
-	}, { capture: !0 });
-	let C = new ResizeObserver(v), w = () => {
-		C.observe(e);
-		for (let t of e.children) C.observe(t);
-		v();
-	}, T = new MutationObserver(() => {
-		C.disconnect(), w();
+		}, d = 0, e.style.cursor = "grabbing"));
+	}), S(window, "mousemove", (t) => {
+		if (!u) return;
+		let n = t.pageX - u.x, r = u.left - n, i = e.scrollWidth - e.clientWidth;
+		d = Math.max(d, Math.abs(n)), e.scrollLeft = r, s.elastic && l.drag(r < 0 ? r : r > i ? r - i : 0), t.preventDefault();
 	});
-	T.observe(e, {
+	let E = () => {
+		u && s.elastic && l.release(), u = null, e.style.cursor = "";
+	};
+	S(window, "mouseup", E), S(window, "blur", E), S(e, "keydown", () => {
+		d = 0;
+	}), S(e, "click", (e) => {
+		d > 6 && (e.stopPropagation(), e.preventDefault(), d = 0);
+	}, { capture: !0 });
+	let D = new ResizeObserver(x), O = () => {
+		D.observe(e);
+		for (let t of e.children) D.observe(t);
+		x();
+	}, k = new MutationObserver(() => {
+		D.disconnect(), O();
+	});
+	k.observe(e, {
 		childList: !0,
 		characterData: !0,
 		subtree: !0
-	}), w();
-	let E = {
-		options: i,
-		update: v,
+	}), O();
+	let A = {
+		options: s,
+		update: x,
 		destroy() {
-			a.abort(), x(), C.disconnect(), T.disconnect(), Lh.delete(e), e.style.cursor = "", Lh.size || (Rh?.disconnect(), Rh = null);
+			c.abort(), w(), D.disconnect(), k.disconnect(), Rh.delete(e), e.style.cursor = "", Rh.size || (zh?.disconnect(), zh = null);
 		}
 	};
-	return Lh.set(e, E), Rh || (Rh = new MutationObserver(() => {
-		for (let [e, t] of Lh) e.isConnected || t.destroy();
-	}), Rh.observe(document.body, {
+	return Rh.set(e, A), zh || (zh = new MutationObserver(() => {
+		for (let [e, t] of Rh) e.isConnected || t.destroy();
+	}), zh.observe(document.body, {
 		childList: !0,
 		subtree: !0
-	})), v(), E;
+	})), x(), A;
 }
-var Jh = null;
-function Yh() {
-	if (!Jh) {
+var Yh = null;
+function Xh() {
+	if (!Yh) {
 		let e = getComputedStyle(document.documentElement);
-		Jh = {
+		Yh = {
 			easing: e.getPropertyValue("--spring-pane").trim() || "ease",
 			duration: parseFloat(e.getPropertyValue("--spring-pane-ms")) || 300
 		};
 	}
-	return Jh;
+	return Yh;
 }
 [
 	"[data-stage-side-content]",
@@ -20561,14 +20576,14 @@ function Yh() {
 ].join(",");
 //#endregion
 //#region src/react/components/use-horizontal-scroller.ts
-function Xh(e, t = !0) {
+function Zh(e, t = !0) {
 	let [n, r] = (0, y.useState)(null), i = (0, y.useCallback)((t) => {
 		r(t), typeof e == "function" ? e(t) : e && (e.current = t);
 	}, [e]);
 	return (0, y.useLayoutEffect)(() => {
 		if (!n || !t) return;
 		n.dataset.horizontalScroll = "";
-		let e = qh(n);
+		let e = Jh(n);
 		return () => {
 			e.destroy(), delete n.dataset.horizontalScroll, delete n.dataset.overflowLeft, delete n.dataset.overflowRight;
 		};
@@ -20576,17 +20591,17 @@ function Xh(e, t = !0) {
 }
 //#endregion
 //#region src/react/components/segmented.tsx
-function Zh(e) {
-	let t = Xh(Ih("selection"));
+function Qh(e) {
+	let t = Zh(Lh("selection"));
 	return /* @__PURE__ */ (0, z.jsx)(ep, {
 		...e,
 		ref: t
 	});
 }
-var Qh = "inline-flex w-max max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-2lg bg-background-tertiary-default p-1", $h = "flex min-h-7 flex-none cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 max-sm:px-2 text-body-medium whitespace-nowrap text-text-secondary outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring data-focus-visible:ring-2 data-focus-visible:ring-border-focus-ring data-selected:bg-background-primary-default data-selected:text-text-primary data-selected:shadow-card dark:data-selected:bg-background-primary-hover";
+var $h = "inline-flex w-max max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-2lg bg-background-tertiary-default p-1", eg = "flex min-h-7 flex-none cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 max-sm:px-2 text-body-medium whitespace-nowrap text-text-secondary outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring data-focus-visible:ring-2 data-focus-visible:ring-border-focus-ring data-selected:bg-background-primary-default data-selected:text-text-primary data-selected:shadow-card dark:data-selected:bg-background-primary-hover";
 //#endregion
 //#region src/react/settings/busy-props.ts
-function eg(e) {
+function tg(e) {
 	return e ? {
 		"aria-busy": !0,
 		"aria-disabled": !0
@@ -20594,7 +20609,7 @@ function eg(e) {
 }
 //#endregion
 //#region src/react/boardui/components/base/buttons/icon-button.tsx
-var tg = yt({
+var ng = yt({
 	base: [
 		"relative inline-flex shrink-0 items-center justify-center overflow-visible rounded-2lg",
 		"bg-background-primary-default text-foreground-icon-primary",
@@ -20615,21 +20630,21 @@ var tg = yt({
 		small: "size-4 shrink-0"
 	}
 });
-function ng({ icon: e, size: t = "medium", className: n, type: r = "button", ref: i, ...a }) {
+function rg({ icon: e, size: t = "medium", className: n, type: r = "button", ref: i, ...a }) {
 	return /* @__PURE__ */ (0, z.jsx)("button", {
 		ref: i,
 		type: r,
-		className: R(tg.base, tg.size[t], n),
+		className: R(ng.base, ng.size[t], n),
 		...a,
 		children: /* @__PURE__ */ (0, z.jsx)(e, {
-			className: tg.icon[t],
+			className: ng.icon[t],
 			"aria-hidden": !0
 		})
 	});
 }
 //#endregion
 //#region src/react/boardui/components/base/dropdown/menu-styles.ts
-var rg = [
+var ig = [
 	"max-w-[calc(100vw-32px)] overflow-y-auto",
 	"rounded-2xl border border-border-button-default bg-background-primary-default p-2.5 shadow-dropdown",
 	"transition duration-150 ease-out",
@@ -20637,10 +20652,10 @@ var rg = [
 	"data-[exiting]:opacity-0 data-[exiting]:scale-95 data-[exiting]:blur-[2px]",
 	"data-[placement=bottom]:origin-top-left data-[placement=top]:origin-bottom-left",
 	"data-[placement=left]:origin-right data-[placement=right]:origin-left"
-].join(" "), ig = "w-[266px]", ag = "flex w-full flex-col gap-1 outline-none", og = ["flex w-full cursor-pointer items-center gap-2 rounded-2lg p-2 text-left", "text-text-primary outline-none transition-colors"].join(" ");
+].join(" "), ag = "w-[266px]", og = "flex w-full flex-col gap-1 outline-none", sg = ["flex w-full cursor-pointer items-center gap-2 rounded-2lg p-2 text-left", "text-text-primary outline-none transition-colors"].join(" ");
 //#endregion
 //#region src/react/boardui/components/foundations/icons/chevrons.tsx
-function sg(e) {
+function cg(e) {
 	return /* @__PURE__ */ (0, z.jsx)("svg", {
 		viewBox: "0 0 16 16",
 		fill: "none",
@@ -20656,7 +20671,7 @@ function sg(e) {
 }
 //#endregion
 //#region src/react/boardui/utils/use-dismiss-on-outside-press.ts
-function cg(e, t, n) {
+function lg(e, t, n) {
 	(0, y.useEffect)(() => {
 		if (!e) return;
 		let r = (e) => {
@@ -20670,7 +20685,7 @@ function cg(e, t, n) {
 		n
 	]);
 }
-function lg(e, t) {
+function ug(e, t) {
 	let n = (0, y.useRef)(!1);
 	return (0, y.useEffect)(() => {
 		if (!e) return;
@@ -20684,11 +20699,11 @@ function lg(e, t) {
 }
 //#endregion
 //#region src/react/boardui/components/base/select/select.tsx
-var ug = (0, y.createContext)("md");
-function dg({ className: e, triggerClassName: t, popoverClassName: n, size: r = "md", children: i, items: a, renderValue: o, ref: s, ...c }) {
+var dg = (0, y.createContext)("md");
+function fg({ className: e, triggerClassName: t, popoverClassName: n, size: r = "md", children: i, items: a, renderValue: o, ref: s, ...c }) {
 	let l = (0, y.useRef)(null), u = (0, y.useRef)(null), [d, f] = (0, y.useState)(!1);
-	cg(d, () => f(!1), [l, u]);
-	let p = lg(d, l);
+	lg(d, () => f(!1), [l, u]);
+	let p = ug(d, l);
 	return /* @__PURE__ */ (0, z.jsx)(pp, {
 		ref: s,
 		...c,
@@ -20701,16 +20716,16 @@ function dg({ className: e, triggerClassName: t, popoverClassName: n, size: r = 
 			children: [/* @__PURE__ */ (0, z.jsx)(_p, {
 				className: R("flex min-w-0 items-center truncate", r === "sm" ? "gap-1" : "gap-[5px]"),
 				children: o
-			}), /* @__PURE__ */ (0, z.jsx)(sg, { className: R("shrink-0 text-text-secondary transition-transform duration-200 ease", r === "sm" ? "size-3.5" : "size-4", e && "rotate-180") })]
+			}), /* @__PURE__ */ (0, z.jsx)(cg, { className: R("shrink-0 text-text-secondary transition-transform duration-200 ease", r === "sm" ? "size-3.5" : "size-4", e && "rotate-180") })]
 		}), /* @__PURE__ */ (0, z.jsx)(nf, {
 			ref: u,
 			isNonModal: !0,
 			offset: 4,
-			className: R(ig, rg, "p-2", n),
+			className: R(ag, ig, "p-2", n),
 			children: /* @__PURE__ */ (0, z.jsx)(Xl, {
 				items: a,
-				className: R(ag, "max-h-[240px] overflow-auto"),
-				children: /* @__PURE__ */ (0, z.jsx)(ug.Provider, {
+				className: R(og, "max-h-[240px] overflow-auto"),
+				children: /* @__PURE__ */ (0, z.jsx)(dg.Provider, {
 					value: r,
 					children: i
 				})
@@ -20718,17 +20733,17 @@ function dg({ className: e, triggerClassName: t, popoverClassName: n, size: r = 
 		})] })
 	});
 }
-function fg({ className: e, children: t, ...n }) {
-	let r = (0, y.useContext)(ug);
+function pg({ className: e, children: t, ...n }) {
+	let r = (0, y.useContext)(dg);
 	return /* @__PURE__ */ (0, z.jsx)(eu, {
 		...n,
-		className: (t) => R(og, r === "sm" ? "px-2 py-1.5 text-body-2-medium" : "text-body-medium", (t.isFocused || t.isSelected) && "bg-dropdown-item-hover-background", t.isDisabled && "cursor-not-allowed text-text-disabled", typeof e == "function" ? e(t) : e),
+		className: (t) => R(sg, r === "sm" ? "px-2 py-1.5 text-body-2-medium" : "text-body-medium", (t.isFocused || t.isSelected) && "bg-dropdown-item-hover-background", t.isDisabled && "cursor-not-allowed text-text-disabled", typeof e == "function" ? e(t) : e),
 		children: t
 	});
 }
 //#endregion
 //#region src/react/settings/folder-rows.tsx
-function pg({ className: e }) {
+function mg({ className: e }) {
 	return /* @__PURE__ */ (0, z.jsx)("svg", {
 		"aria-hidden": !0,
 		viewBox: "0 0 24 24",
@@ -20741,12 +20756,12 @@ function pg({ className: e }) {
 		children: /* @__PURE__ */ (0, z.jsx)("use", { href: "#i-folder-search" })
 	});
 }
-var mg = sm, hg = (e) => dm[e] || "database", gg = (e) => cm.includes(e);
-function _g({ index: e, cost: t, error: n, onChange: r }) {
+var hg = cm, gg = (e) => fm[e] || "database", _g = (e) => lm.includes(e);
+function vg({ index: e, cost: t, error: n, onChange: r }) {
 	return /* @__PURE__ */ (0, z.jsxs)("div", {
 		"data-media-read-policy": e,
 		className: "flex w-full flex-col gap-1.5 @lg:w-48",
-		children: [/* @__PURE__ */ (0, z.jsxs)(dg, {
+		children: [/* @__PURE__ */ (0, z.jsxs)(fg, {
 			"aria-label": `媒体读取策略 ${e + 1}`,
 			placeholder: "选择读取策略",
 			isRequired: !0,
@@ -20756,20 +20771,20 @@ function _g({ index: e, cost: t, error: n, onChange: r }) {
 			onSelectionChange: (e) => {
 				(e === "free" || e === "metered") && r(e);
 			},
-			children: [/* @__PURE__ */ (0, z.jsx)(fg, {
+			children: [/* @__PURE__ */ (0, z.jsx)(pg, {
 				id: "free",
 				children: "正常读取"
-			}), /* @__PURE__ */ (0, z.jsx)(fg, {
+			}), /* @__PURE__ */ (0, z.jsx)(pg, {
 				id: "metered",
 				children: "代理流量保护"
 			})]
-		}), n ? /* @__PURE__ */ (0, z.jsx)(vm, { children: n }) : null]
+		}), n ? /* @__PURE__ */ (0, z.jsx)(ym, { children: n }) : null]
 	});
 }
-function vg() {
-	return /* @__PURE__ */ (0, z.jsx)(_m, { children: "按挂载工具实际配置选择；代理流量保护会限制自动媒体读取。" });
+function yg() {
+	return /* @__PURE__ */ (0, z.jsx)(vm, { children: "按挂载工具实际配置选择；代理流量保护会限制自动媒体读取。" });
 }
-function yg({ initial: e, blank: t, pickFolder: n, describe: r, focusAfterPick: i = !1 }) {
+function bg({ initial: e, blank: t, pickFolder: n, describe: r, focusAfterPick: i = !1 }) {
 	let [a, o] = (0, y.useState)(e), [s, c] = (0, y.useState)([]), [l, u] = (0, y.useState)(null), [d, f] = (0, y.useState)(null), p = (0, y.useRef)(!1), m = (0, y.useRef)([]);
 	(0, y.useLayoutEffect)(() => {
 		l !== null && (m.current[l]?.focus(), u(null));
@@ -20812,7 +20827,7 @@ function yg({ initial: e, blank: t, pickFolder: n, describe: r, focusAfterPick: 
 		}
 	};
 }
-function bg({ label: e, path: t, onPath: n, error: r, inputRef: i, picking: a, onPick: o, onRemove: s, status: c, children: l }) {
+function xg({ label: e, path: t, onPath: n, error: r, inputRef: i, picking: a, onPick: o, onRemove: s, status: c, children: l }) {
 	let u = (0, y.useRef)(null), d = () => {
 		let e = u.current;
 		e && e.ownerDocument.activeElement !== e && (e.scrollLeft = e.scrollWidth);
@@ -20843,11 +20858,11 @@ function bg({ label: e, path: t, onPath: n, error: r, inputRef: i, picking: a, o
 					className: "flex h-9 shrink-0 items-center",
 					children: c
 				}) : null,
-				/* @__PURE__ */ (0, z.jsx)(ng, {
-					icon: pg,
+				/* @__PURE__ */ (0, z.jsx)(rg, {
+					icon: mg,
 					"aria-label": "选择文件夹",
 					onClick: o,
-					...eg(a)
+					...tg(a)
 				}),
 				s ? /* @__PURE__ */ (0, z.jsx)(St, {
 					variant: "danger",
@@ -20863,24 +20878,24 @@ function bg({ label: e, path: t, onPath: n, error: r, inputRef: i, picking: a, o
 		})]
 	});
 }
-function xg({ index: e, value: t, onChange: n, options: r = mg }) {
-	return /* @__PURE__ */ (0, z.jsx)(dg, {
+function Sg({ index: e, value: t, onChange: n, options: r = hg }) {
+	return /* @__PURE__ */ (0, z.jsx)(fg, {
 		className: "w-full @lg:w-60",
 		"aria-label": `媒体来源 ${e + 1}`,
 		selectedKey: t,
 		onSelectionChange: (e) => {
 			e !== null && n(String(e));
 		},
-		children: r.map(([e, t]) => /* @__PURE__ */ (0, z.jsxs)(fg, {
+		children: r.map(([e, t]) => /* @__PURE__ */ (0, z.jsxs)(pg, {
 			id: e,
 			textValue: t,
-			children: [/* @__PURE__ */ (0, z.jsx)(wm, { mark: hg(e) }), t]
+			children: [/* @__PURE__ */ (0, z.jsx)(Tm, { mark: gg(e) }), t]
 		}, e))
 	});
 }
 //#endregion
 //#region src/react/settings/password-pair.tsx
-function Sg({ label: e, password: t, confirmation: n, onPassword: r, onConfirmation: i, disabled: a = !1, passwordError: o, passwordHint: s, confirmationError: c, confirmationInvalid: l = !1 }) {
+function Cg({ label: e, password: t, confirmation: n, onPassword: r, onConfirmation: i, disabled: a = !1, passwordError: o, passwordHint: s, confirmationError: c, confirmationInvalid: l = !1 }) {
 	return /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsx)(Vp, {
 		id: "access-password",
 		type: "password",
@@ -20911,11 +20926,11 @@ function Sg({ label: e, password: t, confirmation: n, onPassword: r, onConfirmat
 }
 //#endregion
 //#region src/react/settings/remote-reporting-settings.tsx
-function Cg({ value: e, onChange: t, busy: n = !1 }) {
-	return /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsx)(hm, { children: /* @__PURE__ */ (0, z.jsx)(fm, {
+function wg({ value: e, onChange: t, busy: n = !1 }) {
+	return /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsx)(gm, { children: /* @__PURE__ */ (0, z.jsx)(pm, {
 		label: "发送版本统计与错误诊断（推荐）",
 		description: "上传版本、系统信息、故障类型、代码位置与发生次数。",
-		children: /* @__PURE__ */ (0, z.jsx)(Om, {
+		children: /* @__PURE__ */ (0, z.jsx)(km, {
 			"aria-label": "发送版本统计与错误诊断（推荐）",
 			isSelected: e.usage && e.errors,
 			onChange: (n) => t({
@@ -20923,22 +20938,22 @@ function Cg({ value: e, onChange: t, busy: n = !1 }) {
 				usage: n,
 				errors: n
 			}),
-			...eg(n)
+			...tg(n)
 		})
-	}) }), e.available ? null : /* @__PURE__ */ (0, z.jsx)(gm, {
+	}) }), e.available ? null : /* @__PURE__ */ (0, z.jsx)(_m, {
 		divided: !0,
-		children: /* @__PURE__ */ (0, z.jsx)(_m, { children: "上传服务未配置。" })
+		children: /* @__PURE__ */ (0, z.jsx)(vm, { children: "上传服务未配置。" })
 	})] });
 }
 //#endregion
 //#region src/react/pages/setup/setup-form.tsx
-var wg = [
+var Tg = [
 	"data_root",
 	"host",
 	"port",
 	"mdns_name"
 ];
-function Tg(e, t) {
+function Eg(e, t) {
 	return Array.isArray(e) ? e.length === t ? {
 		rows: e,
 		table: ""
@@ -20950,17 +20965,17 @@ function Tg(e, t) {
 		table: e ?? ""
 	};
 }
-function Eg(e) {
+function Dg(e) {
 	return e.length ? e.length === 1 ? `完成设置后扫描并补全资料：${e[0]}` : `完成设置后扫描这 ${e.length} 个文件夹并补全资料` : "完成设置后扫描并补全资料";
 }
-var Dg = (e) => Array.isArray(e) ? e.filter(Boolean).join(" ") : e ?? "";
-function Og({ setup: e, onDone: t }) {
+var Og = (e) => Array.isArray(e) ? e.filter(Boolean).join(" ") : e ?? "";
+function kg({ setup: e, onDone: t }) {
 	let n = e.questions.find((e) => e.input === "folders"), r = e.questions.filter((e) => e.input !== "folders"), i = e.media_sources.map(({ value: e, label: t }) => [e, t]), a = (t = "") => ({
 		path: t,
 		location: e.media_source_default,
 		root: "",
 		cost: e.media_source_default === "local" ? "free" : ""
-	}), o = yg({
+	}), o = bg({
 		initial: () => [a(n?.default ?? "")],
 		blank: () => a(),
 		pickFolder: Qp,
@@ -21003,14 +21018,14 @@ function Og({ setup: e, onDone: t }) {
 			t(await Xp(i));
 		} catch (e) {
 			if (e instanceof qp && e.status === 400 && e.errors) {
-				let t = e.errors, { rows: n, table: r } = Tg(t.media_dir, o.rows.length);
-				o.setErrors(n), T(r), C(t), wg.some((e) => t[e]) && ee((e) => e + 1), t.access_password && u(!0), re((e) => e + 1);
+				let t = e.errors, { rows: n, table: r } = Eg(t.media_dir, o.rows.length);
+				o.setErrors(n), T(r), C(t), Tg.some((e) => t[e]) && ee((e) => e + 1), t.access_password && u(!0), re((e) => e + 1);
 			} else D($p(e));
 		} finally {
 			k(!1);
 		}
 	}, ce = (e) => {
-		let t = Dg(S[e.key]), n = e.help.join("");
+		let t = Og(S[e.key]), n = e.help.join("");
 		if (e.input === "choice") {
 			let r = `setup-${e.key}-label`;
 			return /* @__PURE__ */ (0, z.jsxs)("div", {
@@ -21021,20 +21036,20 @@ function Og({ setup: e, onDone: t }) {
 						elementType: "span",
 						children: e.label
 					}),
-					/* @__PURE__ */ (0, z.jsx)(Zh, {
+					/* @__PURE__ */ (0, z.jsx)(Qh, {
 						"aria-labelledby": r,
 						orientation: "horizontal",
-						className: Qh,
+						className: $h,
 						value: s[e.key] ?? e.default,
 						onChange: (t) => oe(e.key, t),
 						children: (e.options ?? []).map((e) => /* @__PURE__ */ (0, z.jsx)(tp, {
 							value: e.value,
-							className: $h,
+							className: eg,
 							children: e.label
 						}, e.value))
 					}),
-					n ? /* @__PURE__ */ (0, z.jsx)(_m, { children: n }) : null,
-					t ? /* @__PURE__ */ (0, z.jsx)(vm, { children: t }, N) : null
+					n ? /* @__PURE__ */ (0, z.jsx)(vm, { children: n }) : null,
+					t ? /* @__PURE__ */ (0, z.jsx)(ym, { children: t }, N) : null
 				]
 			}, e.key);
 		}
@@ -21059,7 +21074,7 @@ function Og({ setup: e, onDone: t }) {
 			isInvalid: !!t,
 			hint: ie(t) ?? (n || void 0)
 		}, e.key);
-	}, le = o.rows.map((e) => e.path.trim()).filter(Boolean), ue = o.rows.some((e) => gg(e.location));
+	}, le = o.rows.map((e) => e.path.trim()).filter(Boolean), ue = o.rows.some((e) => _g(e.location));
 	return /* @__PURE__ */ (0, z.jsxs)("form", {
 		ref: te,
 		noValidate: !0,
@@ -21079,12 +21094,12 @@ function Og({ setup: e, onDone: t }) {
 							children: "*"
 						})]
 					}),
-					w ? /* @__PURE__ */ (0, z.jsx)(vm, { children: w }, N) : null,
+					w ? /* @__PURE__ */ (0, z.jsx)(ym, { children: w }, N) : null,
 					/* @__PURE__ */ (0, z.jsx)("div", {
 						role: "group",
 						"aria-labelledby": "setup-media-title",
 						className: "flex flex-col gap-3",
-						children: o.rows.map((e, t) => /* @__PURE__ */ (0, z.jsxs)(bg, {
+						children: o.rows.map((e, t) => /* @__PURE__ */ (0, z.jsxs)(xg, {
 							label: `${n.label} ${t + 1}`,
 							path: e.path,
 							onPath: (e) => o.edit(t, { path: e }),
@@ -21095,7 +21110,7 @@ function Og({ setup: e, onDone: t }) {
 							onRemove: o.rows.length > 1 ? () => {
 								o.remove(t), ne.current?.focus();
 							} : void 0,
-							children: [/* @__PURE__ */ (0, z.jsx)(xg, {
+							children: [/* @__PURE__ */ (0, z.jsx)(Sg, {
 								index: t,
 								value: e.location,
 								options: i,
@@ -21103,7 +21118,7 @@ function Og({ setup: e, onDone: t }) {
 									location: e,
 									cost: e === "local" ? "free" : ""
 								})
-							}), /* @__PURE__ */ (0, z.jsx)(_g, {
+							}), /* @__PURE__ */ (0, z.jsx)(vg, {
 								index: t,
 								cost: e.cost ?? "",
 								error: A && !e.cost ? "请选择媒体读取策略" : void 0,
@@ -21120,17 +21135,17 @@ function Og({ setup: e, onDone: t }) {
 						children: "添加媒体库"
 					}),
 					ue ? /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [
-						/* @__PURE__ */ (0, z.jsx)(vg, {}),
-						/* @__PURE__ */ (0, z.jsxs)(_m, { children: [e.cloud.help, /* @__PURE__ */ (0, z.jsx)(ym, {
+						/* @__PURE__ */ (0, z.jsx)(yg, {}),
+						/* @__PURE__ */ (0, z.jsxs)(vm, { children: [e.cloud.help, /* @__PURE__ */ (0, z.jsx)(bm, {
 							href: e.cloud.link.url,
 							children: e.cloud.link.label
 						})] }),
-						e.cloud.dependencies.map((e) => /* @__PURE__ */ (0, z.jsxs)(_m, { children: [e.message, /* @__PURE__ */ (0, z.jsx)(ym, {
+						e.cloud.dependencies.map((e) => /* @__PURE__ */ (0, z.jsxs)(vm, { children: [e.message, /* @__PURE__ */ (0, z.jsx)(bm, {
 							href: e.download_url,
 							children: e.download_label
 						})] }, e.name))
 					] }) : null,
-					n.help.map((e) => /* @__PURE__ */ (0, z.jsx)(_m, { children: e }, e))
+					n.help.map((e) => /* @__PURE__ */ (0, z.jsx)(vm, { children: e }, e))
 				]
 			}) : null,
 			/* @__PURE__ */ (0, z.jsxs)(Tt, {
@@ -21148,27 +21163,27 @@ function Og({ setup: e, onDone: t }) {
 								className: "text-body-2-regular text-text-secondary",
 								children: "开启后，访问 Peach 需要先登录。"
 							})]
-						}), /* @__PURE__ */ (0, z.jsx)(Om, {
+						}), /* @__PURE__ */ (0, z.jsx)(km, {
 							"aria-labelledby": "setup-access-title",
 							"aria-describedby": "setup-access-description",
 							isSelected: l,
 							onChange: u
 						})]
 					}),
-					/* @__PURE__ */ (0, z.jsx)(_m, { children: "未设置密码时，能连接到 Peach 的设备可直接进入。" }),
-					l ? /* @__PURE__ */ (0, z.jsx)(Sg, {
+					/* @__PURE__ */ (0, z.jsx)(vm, { children: "未设置密码时，能连接到 Peach 的设备可直接进入。" }),
+					l ? /* @__PURE__ */ (0, z.jsx)(Cg, {
 						label: "访问密码",
 						password: d,
 						confirmation: p,
 						onPassword: f,
 						onConfirmation: m,
-						passwordError: ie(Dg(S.access_password)),
+						passwordError: ie(Og(S.access_password)),
 						passwordHint: "请输入 8–256 个字符。",
 						confirmationInvalid: !!S.access_password
 					}) : null
 				]
 			}),
-			/* @__PURE__ */ (0, z.jsx)(Tt, { children: /* @__PURE__ */ (0, z.jsx)(Sm, {
+			/* @__PURE__ */ (0, z.jsx)(Tt, { children: /* @__PURE__ */ (0, z.jsx)(Cm, {
 				summary: "高级设置",
 				defaultOpen: M > 0,
 				children: /* @__PURE__ */ (0, z.jsx)("div", {
@@ -21188,8 +21203,8 @@ function Og({ setup: e, onDone: t }) {
 						children: [/* @__PURE__ */ (0, z.jsx)(kp, {
 							isSelected: h,
 							onChange: g,
-							children: Eg(le)
-						}), /* @__PURE__ */ (0, z.jsx)(_m, { children: "读取已有 NFO 和封面，采集缺失资料。符合自动规则的资料会在处理完成后保存到数据库，其余资料留待确认。" })]
+							children: Dg(le)
+						}), /* @__PURE__ */ (0, z.jsx)(vm, { children: "读取已有 NFO 和封面，采集缺失资料。符合自动规则的资料会在处理完成后保存到数据库，其余资料留待确认。" })]
 					}),
 					/* @__PURE__ */ (0, z.jsxs)("section", {
 						"aria-labelledby": "setup-history-title",
@@ -21208,24 +21223,24 @@ function Og({ setup: e, onDone: t }) {
 								onChange: v,
 								children: "接下来导入浏览器历史记录"
 							}),
-							/* @__PURE__ */ (0, z.jsx)(_m, { children: "用于生成口味分析。完成设置后选择读取这台电脑，或导入其他设备的记录；也可稍后从「口味」进入。" })
+							/* @__PURE__ */ (0, z.jsx)(vm, { children: "用于生成口味分析。完成设置后选择读取这台电脑，或导入其他设备的记录；也可稍后从「口味」进入。" })
 						]
 					})
 				]
 			}),
-			E ? /* @__PURE__ */ (0, z.jsx)(vm, { children: E }) : null,
+			E ? /* @__PURE__ */ (0, z.jsx)(ym, { children: E }) : null,
 			b ? /* @__PURE__ */ (0, z.jsxs)(Tt, { children: [
 				/* @__PURE__ */ (0, z.jsx)(Et, { children: "版本统计与错误诊断" }),
-				/* @__PURE__ */ (0, z.jsx)(Cg, {
+				/* @__PURE__ */ (0, z.jsx)(wg, {
 					value: b,
 					onChange: x
 				}),
-				/* @__PURE__ */ (0, z.jsx)(_m, { children: "馆藏与口味明细上传默认关闭，可在「应用与维护」查看并选择。" })
+				/* @__PURE__ */ (0, z.jsx)(vm, { children: "馆藏与口味明细上传默认关闭，可在「应用与维护」查看并选择。" })
 			] }) : null,
 			/* @__PURE__ */ (0, z.jsx)(St, {
 				type: "submit",
 				className: "self-start",
-				...eg(O),
+				...tg(O),
 				children: "完成设置"
 			})
 		]
@@ -21233,7 +21248,7 @@ function Og({ setup: e, onDone: t }) {
 }
 //#endregion
 //#region src/react/pages/setup/setup-restore.tsx
-function kg({ onDone: e }) {
+function Ag({ onDone: e }) {
 	let [t, n] = (0, y.useState)(""), [r, i] = (0, y.useState)(""), [a, o] = (0, y.useState)(!1);
 	return /* @__PURE__ */ (0, z.jsxs)("form", {
 		className: "flex flex-col gap-4",
@@ -21267,14 +21282,14 @@ function kg({ onDone: e }) {
 		}), /* @__PURE__ */ (0, z.jsx)(St, {
 			type: "submit",
 			className: "self-start",
-			...eg(a),
+			...tg(a),
 			children: a ? "正在连接数据目录…" : "使用此目录"
 		})]
 	});
 }
 //#endregion
 //#region src/react/pages/setup/setup-page.tsx
-function Ag() {
+function jg() {
 	let [e, t] = (0, y.useState)({ kind: "loading" }), [n, r] = (0, y.useState)(0), [i, a] = (0, y.useState)(!1);
 	return (0, y.useEffect)(() => {
 		let e = new AbortController();
@@ -21287,7 +21302,7 @@ function Ag() {
 				message: $p(n)
 			});
 		}), () => e.abort();
-	}, [n]), e.kind === "done" ? /* @__PURE__ */ (0, z.jsx)(Tm, { done: e.done }) : /* @__PURE__ */ (0, z.jsxs)(wt, {
+	}, [n]), e.kind === "done" ? /* @__PURE__ */ (0, z.jsx)(Em, { done: e.done }) : /* @__PURE__ */ (0, z.jsxs)(wt, {
 		title: "欢迎使用 Peach",
 		lede: "添加媒体库，开始整理馆藏。",
 		busy: e.kind === "loading",
@@ -21312,10 +21327,10 @@ function Ag() {
 				className: "self-start",
 				onClick: () => a((e) => !e),
 				children: i ? "返回首次设置" : "使用已有数据目录"
-			}), i ? /* @__PURE__ */ (0, z.jsx)(kg, { onDone: (e) => t({
+			}), i ? /* @__PURE__ */ (0, z.jsx)(Ag, { onDone: (e) => t({
 				kind: "done",
 				done: e
-			}) }) : /* @__PURE__ */ (0, z.jsx)(Og, {
+			}) }) : /* @__PURE__ */ (0, z.jsx)(kg, {
 				setup: e.setup,
 				onDone: (e) => t({
 					kind: "done",
@@ -21327,12 +21342,12 @@ function Ag() {
 }
 //#endregion
 //#region src/react/pages/index.tsx
-var jg = {
-	setup: Ag,
+var Mg = {
+	setup: jg,
 	login: Hp,
 	error: kt
 };
 u();
-var Mg = document.getElementById("peach-page"), Ng = Mg ? jg[Mg.dataset.page ?? ""] : void 0;
-Mg && Ng && (0, b.createRoot)(Mg).render(/* @__PURE__ */ (0, z.jsx)(Ng, { data: { ...Mg.dataset } }));
+var Ng = document.getElementById("peach-page"), Pg = Ng ? Mg[Ng.dataset.page ?? ""] : void 0;
+Ng && Pg && (0, b.createRoot)(Ng).render(/* @__PURE__ */ (0, z.jsx)(Pg, { data: { ...Ng.dataset } }));
 //#endregion

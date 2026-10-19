@@ -9,8 +9,6 @@
 .peach-react [data-jav-facts]:empty { display: none; }
 .peach-react [data-jav-facts] span { overflow-wrap: anywhere; }
 .peach-react [data-jav-detail] [data-jav-actions] { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 18px; }
-.peach-react [data-jav-rating] [data-rate] { cursor: default; }
-.peach-react [data-jav-rating] [data-rate][data-on="true"] svg { fill: currentColor; }
 .peach-react [data-jav-video] { width: 100%; position: relative; }
 .peach-react [data-jav-video] > [class~="video-js"] { width: 100%; height: auto; max-height: calc(76vh - 112px); aspect-ratio: 16 / 9; }
 .peach-react [data-jav-video] > [role="note"] { margin: 16px; }
@@ -25,15 +23,11 @@
 .peach-react [data-jav-review] { padding-top: 12px; border-top: 1px solid var(--line-soft); font-size: var(--fs-sm); }
 .peach-react [data-jav-review-meta] { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
 .peach-react [data-jav-review] time { color: var(--muted); }
-.peach-react [data-jav-rating] [data-rating-icon] { position: relative; display: block; width: 19px; height: 19px; }
-.peach-react [data-jav-rating] [data-rating-icon] svg { display: block; position: absolute; inset: 0; }
-.peach-react [data-jav-rating] [data-rating-fill] { position: absolute; inset: 0 auto 0 0; overflow: hidden; }
-.peach-react [data-jav-rating] [data-rating-fill] svg { fill: currentColor; max-width: none; }
 .peach-react [data-item-detail] [data-review-rating] { margin: 0; }
 .peach-react [data-review-rating] [data-rating-stars] { margin-left: 0; }
 .peach-react [data-review-rating] [data-rating-icon] { width: 16px; height: 16px; }
-.peach-react [data-review-rating] [data-rate] { width: 16px; height: 16px; }
-.peach-react [data-review-rating] [data-rate] svg { width: 16px; height: 16px; }
+.peach-react [data-review-rating] [data-rating-stars] [data-rate] { width: 16px; height: 16px; }
+.peach-react [data-review-rating] [data-rating-stars] [data-rate] svg { width: 16px; height: 16px; }
 .peach-react [data-review-rating] [data-rating-value] { display: none; }
 @media (min-width: 761px) {
   .peach-react [data-jav-detail] > [data-stage-side] { min-height: 0; }

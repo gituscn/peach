@@ -19,11 +19,11 @@ import sqlite3
 import time
 from collections.abc import Callable, Iterable, Sequence
 from contextlib import contextmanager
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from .catalog_rules import is_jav_code, is_uncensored_release, normalise_code_key, part_marker
 from .jobs import ACTIVE_ASSET_SQL
-from .organize_templates import MAX_PATH, TemplateError, render, validate_template
+from .organize_templates import MAX_PATH, TemplateError, clean_filename, render, validate_template
 from .platform import (is_windows_path, location_mounts, location_roots, resolve_root, root_online,
                        translate_ledger_path, within_root)
 from .review_csv import write_rows
@@ -32,11 +32,17 @@ from .fsutil import atomic_write_text
 #: 计划 CSV 的列。`reason` 只在 `action=skip` 时有值。
 PLAN_FIELDS = ["asset_id", "location", "current_path", "target_path", "action", "reason"]
 
-#: 界面上给的几组模板。第一组是最小可用的一套，后两组演示目录分层。
+#: 文件名与目录组合，以及使用示例字段时的完整路径。
 PRESETS: tuple[dict[str, str], ...] = (
-    {"label": "番号 标题", "file": "{number}[ {title}]", "dir": ""},
-    {"label": "厂牌分目录", "file": "{number}[ {title}]", "dir": "{studio}"},
-    {"label": "厂牌 / 番号目录", "file": "{number}[ {title}][ CD{cd}]", "dir": "{studio}/{number}"},
+    {"label": "仅番号", "file": "{code}", "dir": "", "example": "ABC-123.mp4"},
+    {"label": "番号和标题", "file": "{code}[ {title}]", "dir": "", "example": "ABC-123 标题.mp4"},
+    {"label": "番号和画质", "file": "{code}[ {definition}]", "dir": "", "example": "ABC-123 1080p.mp4"},
+    {"label": "番号和出演者", "file": "{code}[ {actors}]", "dir": "", "example": "ABC-123 甲、乙.mp4"},
+    {"label": "按厂牌建文件夹", "file": "{code}[ {title}]", "dir": "{studio}", "example": "厂牌/ABC-123 标题.mp4"},
+    {"label": "按系列建文件夹", "file": "{code}[ {title}]", "dir": "{series}", "example": "系列/ABC-123 标题.mp4"},
+    {"label": "按出演者建文件夹", "file": "{code}[ {title}]", "dir": "{actors}", "example": "甲、乙/ABC-123 标题.mp4"},
+    {"label": "按发行年建文件夹", "file": "{code}[ {title}]", "dir": "{year}", "example": "2024/ABC-123 标题.mp4"},
+    {"label": "厂牌下按番号建文件夹", "file": "{code}[ {title}][ CD{cd}]", "dir": "{studio}/{code}", "example": "厂牌/ABC-123/ABC-123 标题 CD2.mp4"},
 )
 
 #: 跳过原因的固定写法。界面按这几个键分组计数，所以它们是契约的一部分。
@@ -128,7 +134,7 @@ def placeholder_values(row, performers: Sequence[str] = ()) -> dict[str, str]:
     release_date = str(row["release_date"] or "")
     marker = part_marker(name)
     return {
-        "number": normalise_code_key(code) if is_jav_code(code) else code.strip(),
+        "code": normalise_code_key(code) if is_jav_code(code) else code.strip(),
         "title": title.strip(),
         "studio": str(row["studio"] or "").strip(),
         "series": str(row["series"] or "").strip(),
@@ -181,11 +187,38 @@ def _extension(name: str) -> str:
     return f".{ext}" if dot and stem else ""
 
 
+def scope_path(location: str, path: str = '', roots=None) -> str:
+    """将指定目录核对并转换为账本路径；空值表示整个来源。"""
+    if not isinstance(path, str):
+        raise OrganizeError('整理路径必须是目录路径')
+    text = path.strip()
+    if not text:
+        return ''
+    if '..' in PureWindowsPath(text).parts or '\x00' in text:
+        raise OrganizeError('整理路径不能包含上级目录跳转或空字符')
+    declared = location_roots() if roots is None else roots
+    if resolve_root(text, declared)[0] != location:
+        local = Path(text)
+        if local.is_absolute():
+            for index, mount in enumerate(location_mounts().get(location, ())):
+                if within_root(local, mount) and index < len(declared.get(location, ())):
+                    tail = local.resolve().relative_to(mount.resolve())
+                    text = str(PureWindowsPath(declared[location][index], *tail.parts))
+                    break
+    candidate = PureWindowsPath(text)
+    if not candidate.is_absolute() or '..' in candidate.parts:
+        raise OrganizeError('整理路径须为所选来源内的绝对目录路径，不能包含上级目录跳转')
+    canonical = ntpath.normpath(text)
+    if resolve_root(canonical, declared)[0] != location:
+        raise OrganizeError('整理路径不在所选来源内')
+    return canonical
+
+
 def build_plan(connection: sqlite3.Connection, *, location: str,
                file_template: str = "", dir_template: str = "",
                roots=None, online: bool | None = None,
-               asset_ids: Sequence[int] | None = None) -> dict:
-    """按模板给一个来源生成逐文件计划。
+               asset_ids: Sequence[int] | None = None, path: str = '') -> dict:
+    """按目录范围与可选模板生成逐文件整理计划。
 
     返回 `{"rows": [...], "counts": {...}}`：`rows` 只含会变的行与被跳过的行，
     已经就是目标名字的行只进 `counts["unchanged"]`——几万行原样列出来，用户要找的
@@ -196,11 +229,12 @@ def build_plan(connection: sqlite3.Connection, *, location: str,
     """
     file_template = validate_template(file_template)
     dir_template = validate_template(dir_template, directory=True)
-    if not file_template and not dir_template:
-        raise OrganizeError("至少要给一个模板")
-
     declared = dict(location_roots() if roots is None else roots)
+    selected_path = scope_path(location, path, declared)
     rows = _rows(connection, location, asset_ids)
+    if selected_path:
+        selected = PureWindowsPath(selected_path)
+        rows = [row for row in rows if PureWindowsPath(row['path']).is_relative_to(selected)]
     counts: dict[str, int] = {"total": len(rows), "unchanged": 0, "change": 0, "skip": 0}
     reasons: dict[str, int] = {}
     plan: list[dict] = []
@@ -223,7 +257,8 @@ def build_plan(connection: sqlite3.Connection, *, location: str,
     performers = _performers(connection, location)
     # 目标撞名先按账本已知的路径判一遍：同一批里两行算出同一个名字，或者目标位置上
     # 已经躺着另一条记录，都在预览里就说清楚，而不是等执行到一半才报一行失败。
-    claimed = {str(row["path"]).casefold(): int(row["id"]) for row in rows}
+    claimed = {str(path).casefold(): int(aid) for aid, path in connection.execute(
+        'SELECT id,path FROM asset WHERE location=? AND path IS NOT NULL', (location,))}
 
     for row in rows:
         path = str(row["path"])
@@ -242,9 +277,9 @@ def build_plan(connection: sqlite3.Connection, *, location: str,
             if not rendered:
                 skip(row, SKIP_MISSING_FIELD)
                 continue
-            target_dir = ntpath.join(root, *rendered.split("/"))
+            target_dir = ntpath.join(selected_path or root, *rendered.split("/"))
         name = str(row["name"] or ntpath.basename(path))
-        target_name = name
+        target_name = clean_filename(name)
         if file_template:
             rendered, absent = render(file_template, values)
             missing |= absent

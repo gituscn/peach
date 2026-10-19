@@ -418,6 +418,8 @@ class BrowserTransport:
         atexit.register(self.close)
 
     def __call__(self, request: HttpRequest, timeout: float, max_bytes: int) -> HttpResponse:
+        from .processing_traffic import unobserved
+        unobserved('浏览器采集流量未观测')
         if request.method.upper() != "GET":
             raise BrowserUnavailable("浏览器传输只发 GET")
         with self._lock:

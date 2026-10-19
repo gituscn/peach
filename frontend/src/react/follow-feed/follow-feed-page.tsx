@@ -22,6 +22,7 @@ import { FilterGlassRows, FilterPill } from '../components/filter-glass';
 import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
 import { RetryNote, useSkeletonReveal } from '../components/grid-reveal';
 import { spriteGlyph } from '../components/sprite-glyph';
+import { IconSwap } from '../components/icon-swap';
 import { useViewGlide } from '../components/use-view-glide';
 import { useMasonryGrid } from '../components/use-masonry-grid';
 import { Segments, Shuffle } from '../entity-filter/entity-filter-page';
@@ -45,6 +46,7 @@ const Sep = () => <span data-entity-sep="" aria-hidden="true" />;
 const SETTINGS = spriteGlyph('settings');
 const CHEVRON_DOWN = spriteGlyph('chevron-down');
 const HISTORY = spriteGlyph('history');
+const SortUpIcon = spriteGlyph('arrow-up'), SortDownIcon = spriteGlyph('arrow-down');
 
 /** 照片墙那一排的图片布局两档，同壳里 `PHOTO_LAYOUTS`。 */
 export const FOLLOW_PHOTO_LAYOUTS: readonly SegmentOption[] = [
@@ -479,7 +481,6 @@ function Glass({ facets, view, total, busy, props, route }: {
           ) : null}
           {FOLLOW_FEED_SORTS.map(([key, label]) => {
             const pressed = view.sort === key;
-            const Arrow = spriteGlyph(view.dir === 'asc' ? 'arrow-up' : 'arrow-down');
             return (
               <button key={key} type="button" data-entity-sort={key} data-follow-sort={key} data-entity-press=""
                 aria-pressed={pressed} aria-label={sortAriaLabel(key, label, view.sort, view.dir) || undefined}
@@ -487,7 +488,7 @@ function Glass({ facets, view, total, busy, props, route }: {
                   const next = nextSort(key, view.sort, view.dir);
                   if (next) route(next);
                 }}>
-                {label}{pressed ? <Arrow className="size-3.5" /> : null}
+                {label}{pressed ? <IconSwap a={SortUpIcon} b={SortDownIcon} state={view.dir === 'asc' ? 'a' : 'b'} className="size-3.5" /> : null}
               </button>
             );
           })}

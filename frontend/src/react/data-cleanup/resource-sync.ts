@@ -119,7 +119,7 @@ export const purgeCount = (scan: ResourceScanState) =>
 
 /** 标为已消失那一档的那一句；没有这一档时是空串。 */
 const vanishText = (scan: ResourceScanState) => (scan.vanish
-  ? `${count(scan.vanish)} 条作品记录的文件已丢失，个人记录保留，可在「文件已丢失的记录」中选择替代文件或彻底删除。`
+  ? `${count(scan.vanish)} 条作品记录的文件已丢失，个人记录保留，可在「文件已丢失的记录」中转移个人记录或删除记录。`
   : '');
 
 /** 不可撤销那一句：有标为已消失那一档时，只说删除的这几样。 */

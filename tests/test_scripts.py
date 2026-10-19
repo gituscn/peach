@@ -2067,8 +2067,21 @@ class OperationalScriptTests(unittest.TestCase):
         )
         self.assertEqual(
             propose("❤成人游戏-导航-【688GM.CC】.png"),
-            "❤成人游戏-导航.png",
+            "成人游戏-导航.png",
         )
+
+    def test_filename_cleanup_removes_symbols_and_preserves_words_and_extensions(self):
+        propose = self.clean_names.propose
+        for original, expected in (
+            ('01_Title⧹⧹Part.mp4', '01_Title Part.mp4'),
+            ('★片名💎👩🏽\u200d💻.mp4', '片名.mp4'),
+            ('片名\u200b\ue519�.mp4.jpg', '片名.mp4.jpg'),
+            ('café ガール (2) 1920×1080.mp4', 'café ガール (2) 1920×1080.mp4'),
+            ('★💎.mp4', '★💎.mp4'),
+        ):
+            with self.subTest(original=original):
+                self.assertEqual(propose(original), expected)
+                self.assertEqual(propose(expected), expected)
         self.assertEqual(
             propose("QR CODE--扫一扫.png"),
             "QR CODE--扫一扫.png",

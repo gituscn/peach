@@ -67,7 +67,7 @@ export function StatusBadge({ source }: { source: FollowSource }) {
 export function SourceLink({ source }: { source: FollowSource }) {
   return (
     <a href={source.url} target="_blank" rel="noreferrer noopener" title="打开原来源"
-      className="min-w-0 text-body-medium wrap-anywhere text-text-primary underline-offset-2 hover:underline">
+      className="max-w-full min-w-0 self-start text-body-medium wrap-anywhere text-text-primary underline-offset-2 hover:underline">
       {source.label}
     </a>
   );

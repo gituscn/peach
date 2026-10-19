@@ -71,11 +71,11 @@ function edgeBounce(el:HTMLElement){
 }
 /** 同一容器只绑定一次。指针在这一排上时滚轮只滚这一排，滚到头弹一下，不带着整页走。 */
 /** 会超宽的横向滚动层：两端按滚动位置渐隐，竖向滚轮转成横向，`drag` 为真时可拖。 */
-export function wireHorizontalScroller(el:any,{drag=false,fade=true}={}):any{
+export function wireHorizontalScroller(el:any,{drag=false,fade=true,wheel=true,elastic=true,dragIgnore=''}={}):any{
   if(!el)return;
   const existing=horizontalControls.get(el);
   if(existing){existing.options.drag ||= drag;existing.options.fade ||= fade;existing.update();return existing}
-  const options={drag,fade},abort=new AbortController(),bounce=edgeBounce(el);
+  const options={drag,fade,wheel,elastic,dragIgnore},abort=new AbortController(),bounce=edgeBounce(el);
   let start:{x:number;left:number}|null=null,moved=0,heldUntil=0,target=0,kicked=false,glide=0,glideAt=0,pos=0,pending=0;
   /* 值没变就不写：自动滚动每一帧都触发一次 `scroll`，同值重写属性照样让样式重算一遍。 */
   const mark=(key:string,value:string)=>{if(el.dataset[key]!==value)el.dataset[key]=value};
@@ -83,7 +83,7 @@ export function wireHorizontalScroller(el:any,{drag=false,fade=true}={}):any{
   const update=()=>{if(options.fade){const active=scrollable();mark('overflowLeft',String(active&&el.scrollLeft>1));mark('overflowRight',String(active&&el.scrollLeft+el.clientWidth<el.scrollWidth-1))}};
   const listen=(target:EventTarget,event:string,handler:(event:any)=>void,extra={})=>target.addEventListener(event,handler,{...extra,signal:abort.signal});
   listen(el,'scroll',update,{passive:true});
-  const kick=(delta:number)=>{if(!kicked){kicked=true;bounce.kick(delta)}};
+  const kick=(delta:number)=>{if(options.elastic&&!kicked){kicked=true;bounce.kick(delta)}};
   const stopGlide=()=>{cancelAnimationFrame(glide);glide=0;pending=0};
   /* 位置自己记一份小数：一帧只走零点几个像素时，`scrollLeft` 读回来是取整后的值。
      推过头的那一下等走到头再弹，半路就弹看起来是没到头先弹了。 */
@@ -102,6 +102,7 @@ export function wireHorizontalScroller(el:any,{drag=false,fade=true}={}):any{
      要滚整页，指针挪到这一排外面去。推过头就弹一下，一次手势只弹一次：触控板的惯性
      尾巴一格一格地撞在边上，每格都弹就是一串抖动。 */
   listen(el,'wheel',event=>{
+    if(!options.wheel)return;
     const max=el.scrollWidth-el.clientWidth;
     if(event.defaultPrevented||!event.cancelable||Math.abs(event.deltaY)<=Math.abs(event.deltaX)||max<=0||!scrollable())return;
     event.preventDefault();
@@ -120,15 +121,23 @@ export function wireHorizontalScroller(el:any,{drag=false,fade=true}={}):any{
     if(over)pending=over;
     if(!glide){pos=el.scrollLeft;glideAt=performance.now();glide=requestAnimationFrame(frame)}
   },{passive:false});
-  listen(el,'mousedown',event=>{if(!options.drag||event.button!==0||el.scrollWidth-el.clientWidth<=1)return;event.stopPropagation();stopGlide();start={x:event.pageX,left:el.scrollLeft};moved=0;el.style.cursor='grabbing'});
+  listen(el,'mousedown',event=>{
+    moved=0;
+    if(!options.drag||event.button!==0||el.scrollWidth-el.clientWidth<=1)return;
+    if(options.dragIgnore&&(event.shiftKey||event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.(options.dragIgnore)))return;
+    event.stopPropagation();stopGlide();start={x:event.pageX,left:el.scrollLeft};moved=0;el.style.cursor='grabbing';
+  });
   listen(window,'mousemove',event=>{
     if(!start)return;
     const dx=event.pageX-start.x,want=start.left-dx,max=el.scrollWidth-el.clientWidth;
     moved=Math.max(moved,Math.abs(dx));el.scrollLeft=want;
-    bounce.drag(want<0?want:want>max?want-max:0);
+    if(options.elastic)bounce.drag(want<0?want:want>max?want-max:0);
     event.preventDefault();
   });
-  listen(window,'mouseup',()=>{if(start)bounce.release();start=null;el.style.cursor=''});
+  const endDrag=()=>{if(start&&options.elastic)bounce.release();start=null;el.style.cursor=''};
+  listen(window,'mouseup',endDrag);
+  listen(window,'blur',endDrag);
+  listen(el,'keydown',()=>{moved=0});
   listen(el,'click',event=>{if(moved>6){event.stopPropagation();event.preventDefault();moved=0}},{capture:true});
   const resize=new ResizeObserver(update);
   const observe=()=>{resize.observe(el);for(const child of el.children)resize.observe(child);update()};
@@ -138,6 +147,12 @@ export function wireHorizontalScroller(el:any,{drag=false,fade=true}={}):any{
   horizontalControls.set(el,control);
   if(!horizontalCleanup){horizontalCleanup=new MutationObserver(()=>{for(const [node,item] of horizontalControls)if(!node.isConnected)item.destroy()});horizontalCleanup.observe(document.body,{childList:true,subtree:true})}
   update();return control;
+}
+
+/** 表格使用横向拖动；滚轮维持浏览器行为，控件与列宽手柄独立处理指针。 */
+export function wireTableScroller(el:HTMLElement|null):any{
+  return wireHorizontalScroller(el,{drag:true,fade:false,wheel:false,elastic:false,
+    dragIgnore:'a,button,input,select,textarea,label,[role="button"],[role="checkbox"],[role="slider"],.react-aria-ColumnResizer'});
 }
 
 /* 一排横卡自己缓缓往前走，走到头停一下再往回走。一秒 24px 是看得出在动、又不催人读的

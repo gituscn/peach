@@ -28,8 +28,8 @@ import {
 } from './library-processing';
 import { useLibraryProcessingJob } from './use-library-processing';
 import { ProcessingActions } from './processing-actions';
-import { ProcessingControls } from './processing-controls';
 import { ProcessingProgress } from './processing-line';
+import { TrafficProgress } from './processing-traffic';
 
 /* 中文正文写成常量：JSX 里换行的文字会在接缝处多出一个空格，中文句子里看得见。
    卡片正文与首屏骨架共用 `SCAN_CARD_TEXT`（`management.ts`）。 */
@@ -192,7 +192,7 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
           {processingActive(state) ? <p className="text-body-2-regular text-text-secondary tabular-nums" data-processing-eta="">
             {remainingTime(state)}
           </p> : null}
-          <ProcessingControls state={state} disabled={start.isPending || job.isError} />
+          {processingActive(state) ? <TrafficProgress traffic={state.traffic} /> : null}
         </div>
       </Fieldset>
       <Outcome state={state} problem={problem} settled={settled} onRetry={retry} toast={toast} />

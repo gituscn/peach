@@ -1,0 +1,2 @@
+.peach-react [data-collapse-chevron] { transform: rotate(0deg); transition: transform var(--motion-swap); }
+.peach-react :is(button,summary)[aria-expanded="true"] > [data-collapse-chevron] { transform: rotate(180deg); }

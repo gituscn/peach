@@ -10,7 +10,7 @@ import { ActivityPage } from '../../src/react/activity/activity-page';
 import { DOWNLOADS_URL } from '../../src/react/activity/downloads-panel';
 import { ErrorExcerpt } from '../../src/react/activity/error-excerpt';
 import {
-  elapsedText, errorHeadline, followupDetail, prefetchTasks, progressText, summaryItems, summaryText, TASKS_URL,
+  elapsedText, errorHeadline, followupDetail, hasResultProblems, isRoutine, prefetchTasks, progressText, summaryItems, summaryText, TASKS_URL,
 } from '../../src/react/activity/tasks';
 import type { ActivityData, FinishedPage, TaskRunPayload } from '../../src/react/activity/tasks';
 import type { DownloadsSnapshot } from '../../src/react/bundle';
@@ -151,6 +151,47 @@ it('跑完那一轮显示摘要，失败那一轮显示原因', async () => {
     .toEqual(['已检查 7']);
 });
 
+it('链接检查显示失效和访问失败数量，技术详情使用可复制代码块', async () => {
+  const summary = { checked: 1218, total: 1218, gone_count: 5, unclear_count: 54 };
+  const writeText = vi.fn(async () => {});
+  vi.stubGlobal('navigator', { clipboard: { writeText } });
+  const { host } = await open(payload({ finished: [run({ task_key: 'link-check',
+    task_label: '链接检查', status: 'succeeded', result_summary: summary })] }));
+  const card = host.querySelector('[data-task-key=link-check]')!;
+  expect(card.querySelector('span')?.textContent).toBe('发现问题');
+  expect([...card.querySelectorAll('ul > li')].map(node => node.textContent))
+    .toEqual(['已检查 1,218', '总数 1,218', '链接已失效 5', '链接访问失败 54']);
+  await click(card.querySelector('summary')!);
+  expect(card.querySelector('[data-code-block] code')?.textContent).toBe(JSON.stringify(summary, null, 2));
+  await click(buttonNamed('复制代码', host)!);
+  expect(writeText).toHaveBeenCalledWith(JSON.stringify(summary, null, 2));
+});
+
+it('含问题的定时结果单独显示，普通成功轮次仍可折叠', async () => {
+  const hourly = (id: number, result_summary = {}) => run({ id, task_key: 'link-check',
+    status: 'succeeded', trigger: 'scheduled', result_summary });
+  const { host } = await open(payload({ finished: [hourly(4), hourly(3),
+    hourly(2, { unclear_count: 1 }), hourly(1, { unclear_count: 1 })] }));
+  expect(shownIds(host)).toEqual([4, 2, 1]);
+  expect(host.querySelector('[data-run-id="4"]')?.textContent).toContain('近 2 轮');
+  expect(host.querySelector('[data-run-id="2"] span')?.textContent).toBe('发现问题');
+});
+
+it('处理任务的成功、失败与清理结果都可读', () => {
+  expect(summaryItems({ repaired: 3, failed: 2, missing_tool: 1, moved: 8, restored: 4,
+    purged: 9, cache_blocked_count: 2, bytes_reclaimed: 1024 }))
+    .toEqual(['已修复 3', '失败 2', '缺少修复工具 1', '已整理文件 8', '已还原 4',
+      '已删除记录 9', '缓存清理失败 2', '已释放空间 1 KB']);
+  expect(summaryItems({ result: '高清封面已保存' })).toEqual(['高清封面已保存']);
+  expect(summaryItems({ incomplete: 1 })).toEqual(['资料或封面未取得 1']);
+  for (const result_summary of [{ incomplete: 1 }, { source_failed: 2 }, { failed: 3 },
+    { missing: 1 }, { cache_blocked_count: 1 }, { warning_count: 1 }]) {
+    const task = run({ status: 'succeeded', trigger: 'scheduled', result_summary });
+    expect(hasResultProblems(task)).toBe(true);
+    expect(isRoutine(task)).toBe(false);
+  }
+});
+
 it('后继挂在派出它的那一轮下面，不另占一张卡', async () => {
   const parent = run({ id: 4, status: 'succeeded', task_label: '扫描与采集',
                        progress_total: null, finished_at: '2026-09-11T10:03:00Z',
@@ -159,7 +200,7 @@ it('后继挂在派出它的那一轮下面，不另占一张卡', async () => {
   expect(host.querySelectorAll('[data-task-key]')).toHaveLength(1);
   const row = host.querySelector('[data-followup-key]')!;
   expect(host.querySelector('[data-task-key=follow-check]')!.contains(row)).toBe(true);
-  expect([...row.querySelectorAll('span')].map((node) => node.textContent))
+  expect([...row.querySelectorAll(':scope > span')].map((node) => node.textContent))
     .toEqual(['补全资料图片', '已完成', '涼森れむ · 已保存资料图片']);
   expect(host.textContent).toContain('已安排 1 项补充任务');
 });
@@ -201,7 +242,7 @@ it('后继还在跑时，派出它的那一轮整张卡留在正在进行，那�
   const { host } = await open(payload({ running: [scraping], finished: [parent] }));
   expect(sections(host)).toEqual(['正在进行']);
   const row = host.querySelector('[data-followup-key]')!;
-  expect([...row.querySelectorAll('span')].map((node) => node.textContent))
+  expect([...row.querySelectorAll(':scope > span')].map((node) => node.textContent))
     .toEqual(['取新作资料', '进行中', 'MIZD-441 · 13 / 22 项']);
 });
 

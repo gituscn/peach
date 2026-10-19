@@ -278,6 +278,8 @@ class AmaneBridge:
               direct_sites: Sequence[str] = (),
               timeout: float | None = None) -> dict:
         """问几站，返回桥的整份报告（`sites` 键下每站一条记录）。"""
+        from .processing_traffic import unobserved
+        unobserved('外部采集器流量未观测')
         number = validate_provider_code(code)
         names = [str(site).strip() for site in sites]
         unknown = [site for site in names if site not in SITES]

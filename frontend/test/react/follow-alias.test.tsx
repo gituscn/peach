@@ -240,3 +240,28 @@ it('别名分页保留跨页选择，已保存别名批量移除只处理所选�
   expect(saved().querySelectorAll('tbody tr')).toHaveLength(2);
   expect(host.textContent).toContain('1–2 / 2 组');
 });
+
+it('点击别名行空白选择整组，修改统一名称使用独立写操作且失败留在弹层', async () => {
+  const fetcher = okFetch();
+  const { host, toast } = await open(fetcher);
+  const saved = host.querySelector('[aria-label="已保存创作者别名"]')!;
+  await click(saved.querySelector('tbody [data-table-space]'));
+  expect(box(saved, '选择已保存别名 作者 A')?.checked).toBe(true);
+  await click(saved.querySelector('tbody [data-table-space]'));
+  await click(saved.querySelector('button[aria-label="修改 作者 A 的统一名称"]'));
+  expect(box(saved, '选择已保存别名 作者 A')?.checked).toBe(false);
+  const dialog = document.querySelector('[role="dialog"][aria-label="修改统一名称"]')!;
+  await click(buttonNamed('已存别名', dialog));
+  fetcher.mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ ok: false, error: '名称已占用' }) });
+  await click(buttonNamed('修改统一名称', dialog));
+  await settle();
+  expect(dialog.textContent).toContain('名称已占用');
+  expect(document.contains(dialog)).toBe(true);
+  await click(buttonNamed('修改统一名称', dialog));
+  await settle();
+  expect(aliasWrites(fetcher)).toEqual([
+    { action: 'rename', canonical_key: 'name:作者 A', canonical: '已存别名' },
+    { action: 'rename', canonical_key: 'name:作者 A', canonical: '已存别名' },
+  ]);
+  expect(toast).toHaveBeenCalledWith('已把统一名称改为 已存别名');
+});

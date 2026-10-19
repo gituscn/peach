@@ -18,6 +18,14 @@ Peach 负责独立数据目录、首启、构建身份和资源清单。arm64 �
 
 Peach 只保留设备选择、一次性合成帧探测、命令尝试顺序与失败回退；探测结果由两个服务共享。复用检索覆盖当前 NVENC 链、媒体工具解析器与 Git 历史，没有独立 VAAPI 路径。FFmpeg 已覆盖编解码与滤镜，ffmpeg-python 一类包装层不提供设备驱动或硬件可用性判定，因此沿用项目 subprocess 入口，不新增 Python 依赖。回归用合成输入与进程替身验证 Linux 节点选择、权限和超时、10-bit 转 NV12、整片及分片回退。2026-10-19 的 Windows NVENC 实测使用 640×360 合成帧完成探测，合成 10-bit HEVC 经整片 MP4 与 HLS 两条 CUDA / NVENC 路径输出 H.264 `yuv420p`；128×128 不满足该编码器的最低尺寸，因此探测统一用 640×360。目标 AMD GPU 的驱动初始化、解码与播放验收未取得。无生产入口或真实 ledger 写入。
 
+## 文件名噪声清理
+
+整理模板与 `scripts/clean_names.py` 共用 `organize_templates.clean_name_symbols` 和 `clean_filename`。字符分类复用 Python 标准库 `unicodedata`，按 Unicode 类别清除装饰图形、emoji、替代字符、控制字符和私用区噪声；Peach 保留常用标点、文字组合音标、单位、算术符号、扩展名与空名称保护。不新增依赖。
+
+外部候选核对了 [pathvalidate 的文件名清洗](https://pathvalidate.readthedocs.io/en/latest/pages/examples/sanitize.html)与 [ftfy 的编码修复](https://ftfy.readthedocs.io/en/latest/)。前者主要处理文件系统非法字符，其通用符号替换还会删掉番号连接号和扩展名句点；后者通过启发式还原编码，超出本次删除噪声的范围，因此不引入。隔离用例覆盖装饰符号、复合 emoji、不可见字符、乱码替代字形、正常中日文与重音字母、空名称、重复执行和改名回滚；馆藏只读盘点与逐条预览保存在数据目录的复核产物中。
+
+目录范围复用 `platform.resolve_root`、`location_mounts` 与标准库路径组件比较。界面复用 BoardUI Input、IconButton、已有 `FolderSearchIcon` 和 `/api/pick-folder`；预览、执行及后台任务恢复共用 `path` 参数，目录模板以所选目录为起点。空路径表示整个来源，目录边界按组件匹配，不按文本前缀匹配。
+
 ## 独立页面的请求反馈
 
 请求错误文案复用 `core/request-error.ts`，实体登记复用 `core/entity-links.ts`。API 直接引用这两个模块，首启与登录页不加载主界面的路由和字素分段初始化；主界面仍通过 `core/index.ts` 导出同一份错误文案。冷启动导入回归核对 API 不构造界面分段器，既有反馈测试覆盖状态码、超时与服务端中文原因。无新增依赖。
@@ -97,6 +105,12 @@ Folia（`chthollyphile/folia-major`，AGPL-3.0，revision `9a01e788ed52d25ea01b1
 ## 脚本目录与参数
 
 脚本路径读取 `settings_file` 的目录配置。`sync_sha1_115.py` 的 Cookie 默认位于 `secrets/115-cookies.txt`，复核 CSV 默认位于 `review/115-sha1重复.csv`；可通过 `--cookie-file`、`--dupes-out` 或对应的 `PEACH_115_COOKIE_FILE`、`PEACH_115_DUPES_OUT` 指定现有文件。目录排序偏好使用可重复的 `--deprioritize-dir`。TLS 两种 shell 共用 `resolve_tls_directory.py`，显式 `-OutDir`／`PEACH_TLS_DIR` 优先；`rehome_unknown_jav.py` 的目标账本根由 `--ledger-unknown-root` 明确指定。
+
+## 馆藏处理流量
+
+馆藏处理的流量分账复用 `media_sources.cost_for` 的最长路径前缀与逐目录保护设置、`ContextVar`、现有任务快照和断点恢复。HTTP 下载复用固定版 HTTPX 0.28.1（BSD-3-Clause）的 [`num_bytes_downloaded`](https://www.python-httpx.org/advanced/clients/#monitoring-download-progress)，按压缩传输字节累计，失败的部分响应保留读数；不使用解压后的正文大小替代下载量。FFmpeg 输入读取复用 verbose 级别的 AVIO Statistics，NFO 与配套图片累计实际应用读取量。挂载缓存、预读与系统协议开销无法由这些读数推导，媒体读数仅作流量估算；浏览器、amane 与 curl 指纹传输保留未观测标记，不填零。预估只查询账本，不遍历或下载媒体；资料按每部 0.25–8 MiB、配套图片至多 2 MiB、待探测媒体 1–32 MiB、九帧至多 288 MiB 粗估，文件大小限制媒体项，保护开启的目录不计自动探测。估算是 Peach 的任务策略，不是上游流量保证；读数按任务保存，逐目录明细与代理、全部合计共用一份状态。界面复用 React Aria Slider、现有 `ProcessingEffort` 与 `formModal`；无新增依赖。HTTPX 官方接口已用压缩响应和中断流做隔离实证，未接入机器全局流量监控，以免混入其他应用与任务。
+
+明细开合复用设置页 `Disclosure` 与 `setCollapseOpen`，可由任务提示同步收起；任务正文的网格高度与同一枚箭头沿用 Collapse 的 200ms 节奏。全局减少动态效果设置关闭这些过渡。网盘标识复用 `SourceLabel`，115、PikPak 等使用已登记的站标。
 
 ## Windows 常驻托盘
 
@@ -236,8 +250,13 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 - 首页、人物页和 JAV「发现」的新作头像共用 `feedIdentity`、`web_catalog.entity_ref` 与 `avatarInner`，携带实体图片版本和人脸取景，多人最多叠三枚，图片缺失时显示首字。已建档人物的头像通往规范资料页，不新增实体、头像采集或运行依赖。
 - 作者别名管理复用 `@tanstack/react-table` 9.3.1（MIT）和 BoardUI `Table`、`DataTableFrame`、`DataTableFooter`、`AuthorAvatar` 与既有别名 API。两张表均支持全集排序、分页和跨页选择；待合并表以平台别名为行身份，已保存表以规范创作者键为行身份。批量合并与移除读当前清单的所选行，串行执行并报告部分失败；勾写 `slot={null}`。`frontend/test/react/follow-alias.test.tsx` 验证清单刷新、勾选、合并、保存与移除，不新增依赖。扫描与采集方式收在 BoardUI `Button` 与 React Aria `Popover` 下拉里，行外观复用 `menu-styles.ts`（见 `frontend/src/react/boardui/ORIGIN.md`）。
 - 数据管理的孤儿记录与链接结果复用 `react/components/data-table.tsx`，由同版 TanStack Table 处理全集排序、行选择与最后一步分页，外观复用 BoardUI `Table` 与 `DataTableFrame`。七张表共用 `table-controls.tsx` 的分页底栏；关注列表保留卡片与表格共享的排序状态，其余表的排序控件复用 `DataTableSort`。默认每页 20 条，批量动作在选中后使用 `SelectionDock`。`use-table-selection.ts` 在同页表格间互斥选择，保持一份批量栏。孤儿记录批量删除复用 `/api/batch`；链接清理的可选 `ids` 必须属于 `check_id` 对应的失效清单，只重验和处理所选链接，未选行保留。组件回归与临时数据库验证跨页选择、清单刷新、确认和删除范围；不新增依赖。
-- 关注列表分页用 `pagination.ts` 的页码范围与边界裁剪（React 与遗留层共用这份纯函数）；默认视图按创作者组，表格按来源。关注列表与 JAV 订阅源表格复用 `@tanstack/react-table` 9.3.1（MIT，https://github.com/TanStack/table ，按 ADR-0031「前端基础库」引入），兼容 React 18+ 与 Node 20+；传递依赖为 `table-core`、`react-store`、`store` 和 `use-sync-external-store`，精确版本由前端锁文件记录。按官方 [React 迁移指南](https://tanstack.com/table/latest/docs/framework/react/guide/migrating) 使用 `useTable`、`tableFeatures` 和带 features 类型的 `createColumnHelper().columns()`，注册分页、行选择与排序状态；固定列用 `getAllCells`，不接列隐藏、全功能集合或 legacy 兼容层。Peach 保留共用排序比较器、来源 ID（`getRowId`）、跨视图勾选集合、页码裁剪和批量写入策略；排序作用在全集，分页只切最后一步，频率、日期与数量按原始值排序。`frontend/test/react/follow-manage.test.tsx` 验证排序、取消选择、跨页跨视图勾选、批量写与清单变化。
-- 馆藏表格列宽复用 React Aria Components 1.22.1（Apache-2.0）的 `ResizableTableContainer` 与 `ColumnResizer`，按官方 [Table 列宽调整](https://react-aria.adobe.com/Table#column-resizing) 组合现有 BoardUI Table；鼠标、触摸与键盘调整由该组件处理。列隐藏复用 TanStack Table 9.3.1 的 `columnVisibilityFeature` 与现有 Popover、Checkbox；隐藏列仍可参与服务端排序。星级复用详情页的星形字形与按评分比例填充的方式。Peach 维护各列默认值和上下限、浏览器偏好保存与重置；横向溢出由表格滚动容器和现有覆盖式滚动条承接。使用现有依赖，无新增包；浏览器回归覆盖长名称、无预览图、横向滚动、列宽与显示偏好保存及隐藏列排序。
+- 关注列表分页用 `pagination.ts` 的页码范围与边界裁剪（React 与遗留层共用这份纯函数）；默认视图按创作者组，表格按来源。关注列表与 JAV 订阅源表格复用 `@tanstack/react-table` 9.3.1（MIT，https://github.com/TanStack/table ，按 ADR-0031「前端基础库」引入），兼容 React 18+ 与 Node 20+；传递依赖为 `table-core`、`react-store`、`store` 和 `use-sync-external-store`，精确版本由前端锁文件记录。按官方 [React 迁移指南](https://tanstack.com/table/latest/docs/framework/react/guide/migrating) 使用 `useTable`、`tableFeatures` 和带 features 类型的 `createColumnHelper().columns()`，注册分页、行选择、排序与列显隐状态，单元格使用 `getVisibleCells`。Peach 保留共用排序比较器、来源 ID（`getRowId`）、跨视图勾选集合、页码裁剪和批量写入策略；排序作用在全集，分页只切最后一步，频率、日期与数量按原始值排序。`frontend/test/react/follow-manage.test.tsx` 验证排序、取消选择、跨页跨视图勾选、批量写与清单变化。
+- 馆藏表格列宽复用 React Aria Components 1.22.1（Apache-2.0）的 `ResizableTableContainer` 与 `ColumnResizer`，按官方 [Table 列宽调整](https://react-aria.adobe.com/Table#column-resizing) 组合现有 BoardUI Table；鼠标、触摸与键盘调整由该组件处理。列隐藏复用 TanStack Table 9.3.1 的 `columnVisibilityFeature` 与现有 Popover、Checkbox；隐藏列仍可参与服务端排序。`RatingStars` 共用馆藏表格、馆藏详情和 JAV 来源评分的图形与颜色，支持交互星级与只读小数填充；评分取值共用 `rating-values.ts`，表格写入复用 `/api/feedback`、`useAction`、查询缓存与操作回执。Peach 维护各列默认值和上下限、浏览器偏好保存与重置；右侧弹性空白列承接剩余宽度，不参与偏好保存。使用现有依赖，无新增包；回归覆盖长名称、缺图、宽屏两种布局、列宽与显示偏好、隐藏列排序、评分保存与取消、失败重试及撤销。
+- 所有数据表格通过 `DataTableFrame` 复用 React Aria 的列宽容器、`wireTableScroller` 和覆盖式滚动条，`TableColumnControls` 负责列显示菜单和重置，`useTablePreferences` 按表隔离浏览器列宽与显示偏好。各表只声明列名、默认宽度、上下限和必留身份列，TanStack 的 `columnVisibilityFeature` 负责实际显隐，隐藏字段保留排序入口。拖动沿用 `wireHorizontalScroller` 的阈值、点击拦截与卸载清理，表格关闭滚轮转向、渐隐和回弹。按钮、链接、勾选框及列宽手柄自行处理指针；拖动不触发行选择。馆藏的勾选框由显式多选状态控制，取消动作共用 `setSelectMode(false, true)`。
+- 表头选择复用 `TableSelectionHeader`，只统计对应范围内仍存在且可选的行；关注与 JAV 订阅选择当前页，别名和通用管理表选择筛选全集。链接命中范围由共用表格样式和 `SourceLink` 限定为内容宽度；站点图标复用 `SourceIcon`、`SiteLabel` 与缓存端点。
+- 别名改名复用现有别名端点和 `FollowStore.rename_author_group`；实体名称更新从既有端点提取为 `entities.prefer_entity_name`，共用名称碰撞检查、原名别名和兼容字段同步。别名组、关联实体与作品字段使用同一 SQLite 事务，冲突整体回滚；测试仅操作临时数据库，无迁移和新依赖。
+- 折叠正文复用 `setCollapseRegionOpen`、`setCollapseOpen` 和 `growCollapse`；React 外置按钮通过 `CollapseRegion` 保留挂载内容，原生详情使用 `Disclosure`。`CollapseChevron` 与侧栏、教程的稳定箭头元素使用现有 `--motion-swap`；高度维持共享 Collapse 的 200ms 过渡，快速反向点击由同一代次保护处理，减少动态效果沿用全站样式。
+- 排序方向的 React `IconSwap` 与 HTML `iconSwapHtml` 共用 `.iconswap` 状态、模糊与缩放参数；两枚图标保持挂载，BoardUI 按钮通过直属 `data-icon-state` 驱动稳定图标节点，不修改 vendor。换批忙态复用 `#i-shuffle` 的两条描线及既定 2.2s 周期，`FilterIconButton` 仅为此保留图标，其余动作继续使用 Spinner。JAV 标题复用 Stage 的 `revealTexts`，不新增触发计时器或动效依赖。
 - 窄屏筛选框共用 `filterScrollState()`、现有滚动帧调度和原生 sticky；同一方向累计 8px 再切换吸顶，保留文档占位与键盘可达性。
 - 搜索玻璃用 `glideEase()` 的采样弹簧，`frontend/src/application/search-morph.js` 只管视口边界与轮廓关键帧。
 - 横排滚到头的回弹是 `wireHorizontalScroller` 内的 `edgeBounce`，头像排、厂牌排、新作排、筛选条共用；transitions.dev 的 43 条配方里没有（2026-09-23 核对）。越界位移借 UIScrollView 的橡皮筋公式 `(1 - 1/(x·c/d + 1))·d`，c = 0.55，与 use-gesture（MIT）的 `rubberband` 同一条，回弹走 `--spring-pane`。只抄公式不引依赖：拖动与滚轮归属已由 `wireHorizontalScroller` 判定。新作排自动滚动是同文件的 `wireAutoScroll`。
@@ -498,6 +517,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 - 名字里的括号都走 `split_composite_aliases.py`：自动那拨只认罗马字复合人名，`--from-review` 那拨按人工判定清掉不承载名字的尾巴，旧写法留作别名；读音、厂牌消歧和角色出处不拆。`<私有验证记录>` 中的 28 条 creator 注音、575 条 tag 角色出处和 10 条 series 厂牌或载体消歧均保留，不属于待执行批次。
 - 全库创作者归属复核走 `scripts/audit_creator_attributions.py` 与 `metadata_creator_attributions`：复用 `code_creators` 的文件番号核对、DMM `matching_cids`、`western_release_identity`、厂牌规范名和别名、`studio_sites.is_platform`、字段归属、SQLite 备份及 `review_csv`。发行站作品号同时核对目录名与媒体文件名；来源目录见 [Legs Japan](https://www.legsjapan.com/en/)、[Fellatio Japan](https://www.fellatiojapan.com/en/)，平台身份见 [myfans 官方说明](https://creators.myfans.jp/)。预览覆盖全部来源关系与无作品实体；执行带冻结计划、备份和回滚记录，在事务内重算。只撤下有文件或发行来源证据的 `legacy:asset` 关系，保留用户判断、外部身份、规范实体和个人记录。月份、画质、份数与合集注记只回归已存在的完整账号；结构目录按整名切分判定，词汇取 `catalog_rules` 标签、`genre_taxonomy` 来源词与 `resources/naming/structural_directory_words.txt`，不登记具体馆藏的目录名；`creator_collection_base` 同时用于审计与摄取。公开厂牌断言可补空厂牌投影及关系，缺少规范厂牌时记录新实体完整快照；`upsert_asset_entity(update_entity_metadata=False)` 保留既有资料。结构目录、已知转载站及可信厂牌不进入自动 creator 摄取。外键检查逐项比较既有悬空；回滚核对字段版本、关系和新实体引用，后续改动拒绝整批恢复。
 - 实体链接可安装：`entity_link` 表、`q_entity` 的 `links` 契约、资料页 favicon 与管理页链接管理成套；死链区分「搬走了」和「没了」，`rediscover_entity_links.py` 从站点索引页上溯找新锚，确证没了的由 `link_status.settle_gone` 处置（已隐退女优留成不可点的失效标记，其余删除）。
+- 链接管理的主要站点复用 `SiteMark` 与 `/link-mark?id=`；`/api/links` 的 `top_host_link_ids` 为每个主要站点提供一条现有实体链接的 ID，取图范围由账本记录确定，计数使用链接外的中性 `Chip`。整理规则复用 BoardUI `Input`、描边模板按钮与轻量参数按钮；参数插入当前输入框的光标或选区，模板同时填入文件名与目录。`/api/organize/example` 以固定示例字段调用正式模板解析器，随自定义输入显示路径与语法问题，不读取账本或生成计划 CSV。编辑后须重新预览实际整理计划。番号参数使用 `{code}`，解析器接受 `{number}` 别名以读取已保存的规则。无新增依赖或真实 ledger 写入。
 - 厂牌社媒核查：`find_studio_socials.py` 用 Beautiful Soup 4.15.0 解析锚点，传输与字符集用 `peach.http`，账号键用 `social_links.handle`，不加浏览器运行时；Peach 负责同站年龄门、已有账号差集与证据表。整页正则会混进帖子与脚本里的地址，不用于账号提取。
 - 事务所是实体：57 家各有 `/agencies/<名字>` 页，成员、官网、标签与作品都按 `entity_membership` 算，女优页点得进去，搜名字出这家人的片；原文留在 `metadata.agency`。
 - 外链圆标与厂牌标识取站点自己声明的资产，宽扁字标不参加小圆标竞选；`/logo` 的 `variant` 分 `icon`、`logo` 与最清晰的 `large`，大图版式和资料页取 `large`，紧凑版式取 `icon`。头像与标识共用 `nativeImageFit`：按像素密度折算的源尺寸不足框四成时等比居中、不放大、同图模糊补底，框短边小于 64 px 不补底；加载、回落和版式切换都重新度量。
@@ -718,6 +738,8 @@ Python 源文件纳入 `src/peach/library_sharing.py` 与 `src/peach/library_pro
 
 云下载卡片的 `artwork` 只读取已入库任务绑定的本机资产，复用 `attach_artwork_fields`、`attach_card_performers`、`coverImage`、`ArtSlot` 与 `avatarInner`；封面沿用缩略图、版本和正封取景，女优头像沿用实体图片及姓名回退。页面轮询同步入库资料，提交与进度跟踪不等待图片，不额外创建取图任务或请求外部来源。没有封面时保留占位，图片失败使用共享回退处理。未新增依赖或 ledger 写入。
 
-桌面封面与右侧标题到按钮等高，取景复用 `coverAnchor` 并通过 `ResizeObserver` 同步实际容器比例；手机使用固定比例小封面。展开的完整标题位于卡片信息区下方，封面高度保持稳定。已入库且具有 `asset_id` 的任务，封面和标题使用原生链接打开 `/assets/:id`，同时保留新标签页与键盘访问；其他任务不提供详情链接。
+云下载封面复用首页 JAV 大图的 `COVER_FRONT_RATIO`、`data-media-pic` 容器、`coverAnchor` 正封裁切和同图模糊背景。每张卡片使用相同宽度的 3:4 画框，桌面宽 128px，手机宽 80px；右侧标题起点对齐，桌面按钮靠信息区底部排列。不同宽度的传统正封完整居中，比例留白使用同图模糊补底；缺图底色共用 `--color-background-quaternary-default`，明暗主题均与卡片底色区分。展开的完整标题位于卡片信息区下方，封面高度保持稳定。已入库且具有 `asset_id` 的任务，封面和标题使用原生链接打开 `/assets/:id`，同时保留新标签页与键盘访问；其他任务不提供详情链接。
+
+任务中心复用 `CodeBlock` 展示可复制的 JSON 技术详情。`task_results.result_counts` 将链接检查、资源扫描、追更、订阅、来源查找及浏览记录分析的明细折算为领域数量，供后台结算与读取投影共用；读取投影只补同一轮已结束的恢复检查点，不写 ledger。想要资料任务按作品保存未完整取得的结果，续跑时逐项更新数量。页面保留失败、访问失败、未能清理等结果，有问题的完成任务显示“发现问题”并独立展示；原始任务执行状态仍由任务服务维护。未新增依赖。
 
 普通 Toast 与扫描任务卡共用 Agent Progress 外框，16px 半径由通知栈内的既有 token 解析，细边框与接触阴影分别复用 `border-button-default`、`elevation-xs`，不改变内容排版。浏览器回归核对桌面、手机和明暗主题下的外框一致性，并以同一任务、同一内容回放外框基线生成对比图。

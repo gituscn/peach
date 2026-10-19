@@ -12,14 +12,15 @@ import { spinnerHtml } from '@peach/legacy/ui';
 
 import { useStuck } from './use-stuck';
 import { useHorizontalScroller } from './use-horizontal-scroller';
+import './filter-glass.css';
 
 const BusyIcon = ({ className }: { className?: string }) => <span aria-hidden className={className}
   dangerouslySetInnerHTML={{ __html: spinnerHtml('正在处理') }} />;
 
 /** 筛选栏动作使用 30px 尺寸和蓝色动作表面。 */
-export function FilterIconButton({ label, icon, busy = false, onPress, ...props }:
-  Omit<IconButtonProps, 'aria-label' | 'size' | 'onClick'> & { label: string; busy?: boolean; onPress(): void }) {
-  return <IconButton {...props} data-filter-action="" size="small" icon={busy ? BusyIcon : icon}
+export function FilterIconButton({ label, icon, busy = false, busyStyle = 'spinner', onPress, ...props }:
+  Omit<IconButtonProps, 'aria-label' | 'size' | 'onClick'> & { label: string; busy?: boolean; busyStyle?: 'spinner' | 'strand'; onPress(): void }) {
+  return <IconButton {...props} data-filter-action="" size="small" icon={busy && busyStyle === 'spinner' ? BusyIcon : icon}
     aria-label={label} title={props.title || label} aria-busy={busy || undefined} aria-disabled={busy || undefined}
     onClick={() => { if (!busy) onPress() }} />;
 }

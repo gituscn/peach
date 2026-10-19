@@ -100,19 +100,23 @@ def w_links(contract: LinkContract, args=None):
     by_kind: dict[str, int] = {}
     by_entity_kind: dict[str, int] = {}
     hosts: dict[str, int] = {}
+    host_link_ids: dict[str, int] = {}
     for row in rows:
         by_kind[row["link_kind"]] = by_kind.get(row["link_kind"], 0) + 1
         by_entity_kind[row["entity_kind"]] = by_entity_kind.get(row["entity_kind"], 0) + 1
         host = row["hostname"] or urlsplit(row["url"]).hostname or ""
         if host:
             hosts[host] = hosts.get(host, 0) + 1
+            host_link_ids.setdefault(host, row["id"])
+    top_hosts = sorted(hosts.items(), key=lambda item: (-item[1], item[0]))[:12]
     return {
         "ok": True,
         "total": len(rows),
         "entities": len({row["entity_id"] for row in rows}),
         "by_kind": by_kind,
         "by_entity_kind": by_entity_kind,
-        "top_hosts": sorted(hosts.items(), key=lambda item: (-item[1], item[0]))[:12],
+        "top_hosts": top_hosts,
+        "top_host_link_ids": {host: host_link_ids[host] for host, _ in top_hosts},
     }
 
 

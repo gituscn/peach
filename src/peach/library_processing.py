@@ -11,6 +11,7 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 from contextlib import closing
+from contextvars import copy_context
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from dataclasses import dataclass
 from pathlib import Path
@@ -42,6 +43,7 @@ from .media_sources import cost_for
 from .media_processing_policy import metadata_only
 from .strm import skip_background_read
 from .record_rehome import reattach_in
+from .processing_traffic import ProcessingTraffic
 from .processing_control import (task_control, bind_control, checkpoint_values,
                                  initial_estimate, ProcessingEstimate, interrupted_state,
                                  deadline_after, resume_fields)
@@ -887,7 +889,7 @@ def _read_local_posters(jobs, state, *, update, issue):
             workers = {'low': 1, 'standard': 2, 'high': 4}[state['speed_mode']]
             while submitted < len(jobs) and len(futures) < workers:
                 row, source, code, target = jobs[submitted]
-                futures[executor.submit(read_jpeg, source, isolated=row.get('location') != 'local')] = (
+                futures[executor.submit(copy_context().run, read_jpeg, source, isolated=row.get('location') != 'local')] = (
                     row, code, target, time.time())
                 submitted += 1
             completed, _ = wait(futures, return_when=FIRST_COMPLETED)
@@ -2230,14 +2232,17 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
     scope_ids = chosen_ids if targeted else None
     control = task_control(config, state_file)
     identity = job_id or uuid.uuid4().hex
+    traffic = ProcessingTraffic(config, db_path, stage, scope_ids,
+                                resume_state=resume_state)
     def control_report(**values):
         resume_fields(state, values)
         state.update(values)
         estimate.update(state)
+        state['traffic'] = traffic.snapshot(finished=state.get('status') in ('complete', 'failed'))
         flush_state(force=True)
         report(dict(state))
     from .update_tasks import activity
-    with (activity(Path(db_path), 'library-processing'),
+    with (activity(Path(db_path), 'library-processing'), traffic.bind(),
           FileLock(str(state_path(config)) + '.lock', timeout=0),
           bind_control(control, identity, publish=control_report, active=active, db_path=Path(db_path),
                        mode=speed_mode)):
@@ -2283,10 +2288,18 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             checkpoint_values(values)
             state.update(values)
             estimate.update(state)
+            state['traffic'] = traffic.snapshot(finished=state.get('status') in ('complete', 'failed'))
             state['last_progress_at'] = time.time()
             state['progress_seq'] += 1
             flush_state(force='status' in values)
             report(dict(state))
+
+        def traffic_report():
+            state['traffic'] = traffic.snapshot()
+            flush_state()
+            report(dict(state))
+
+        traffic.publish = traffic_report
 
         def issue(asset, message, *, action='', retryable=False, paused=False, diagnostics=None):
             """`asset` 是这一项的馆藏行，来源离线一类与具体项目无关的问题给 `None`。
@@ -2325,6 +2338,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                                     scan_checkpoints=state['scan_checkpoints'],
                                     save_checkpoint=lambda: flush_state(force=True), initial_probed=state['probed'])
             state.update(scanned=sources.scanned, scanned_bytes=sources.scanned_bytes, probed=sources.probed)
+            traffic.unknown_files = False
+            traffic.refresh_plan()
             finish_step('sources')
             if stage == SCAN_STAGE:
                 # `checked`／`total` 在探时长时借给进度条用过；只扫描这一段没有采集，读数归零。
@@ -2334,6 +2349,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 return state
             rows, genre_decisions = _collection_rows(
                 db_path, locations=locations, online_roots=sources.online_roots, asset_ids=scope_ids)
+            traffic.refresh_plan(rows)
             pending = _processing_workload(config, rows, stage, database, checkpoints.completed['completed_previews'])
             update(estimate_pending=dict(pending))
             if stage == PREVIEWS_STAGE:
@@ -2467,6 +2483,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
         except Exception:
             state.update(status='failed', error='处理被中断。核对媒体目录后重试。', completed_at=time.time())
             state.update(interrupted_state(control))
+            state['traffic'] = traffic.snapshot(finished=state.get('status') == 'failed')
             _save(path, state)
             raise
         finally:

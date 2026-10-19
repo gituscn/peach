@@ -5,8 +5,8 @@ description: 在新增、修改或复核 Peach 页面、控件、提示、错误
 
 # Peach Web UI 复用门槛
 
-最后复核：2026-10-18
-证据来源：现有 UI 契约、`docs/TESTING.md`、2026-09-19 本机会话工具记录、jakubkrehel/skills 与 emilkowalski/skills 摘录、`docs/reference-snapshots/open-claude-ui.md`。
+最后复核：2026-10-19
+证据来源：现有 UI 契约、`docs/TESTING.md`、2026-09-19 本机会话工具记录、jakubkrehel/skills 与 emilkowalski/skills 摘录、`docs/reference-snapshots/open-claude-ui.md`、2026-10-19 用户要求样式修改先预览再测试。
 
 ## 开工顺序
 
@@ -84,6 +84,7 @@ description: 在新增、修改或复核 Peach 页面、控件、提示、错误
 
 ## 验收门槛
 
+- 样式修改完成后，运行测试前先启动并保留可访问的预览服务器，向用户提供地址与查看入口；用户明确只要图片时才仅提供截图。提供预览后再运行测试，不把测试通过作为首次预览的前提。
 - UI 标签、身份、反馈状态和搜索推荐属于语义契约：按实际影响验证数据层、组件或浏览器行为。
   推荐词上线前对真实 `/api/items` 验证至少一个命中，说明性后缀不得
   混入搜索词（坏例 `ABW 番号`，好例 `ABW`）。

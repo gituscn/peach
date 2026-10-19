@@ -3,6 +3,7 @@
  * 分三次取会出现「在跑那段是新的、完成那段是旧的」这种自相矛盾的一屏，所以只有一个
  * queryKey。首屏由 `prefetchTasks` 写进 Query 缓存，组件挂上去读的就是它。 */
 import { apiGet } from '../../api';
+import { fmtSize } from '@peach/legacy/core';
 import { requestErrorMessage } from '../../core/request-error';
 import { queryClient } from '../query';
 
@@ -107,7 +108,35 @@ const SUMMARY_LABELS: Record<string, string> = {
   auto_applied: '已自动保存', auto_rejected: '未采用', performer_avatars: '女优头像',
   performer_profile_failed: '女优资料采集失败', performer_aliases: '女优别名',
   performer_profile_conflicts: '女优资料待复核', conflicts: '待复核冲突',
+  gone_count: '链接已失效', unclear_count: '链接访问失败',
+  source_failed: '来源检查失败', source_warning: '来源补查失败',
+  resolve_failed: '查找失败', sources_found: '找到来源',
+  warning_count: '需要留意', profiles_checked: '已读取浏览器资料',
+  missing: '文件已丢失', purge: '可删除记录', vanish: '需保留个人记录',
+  empty: '空目录', unreadable: '无法读取', cache_files: '可清理缓存文件',
+  cache_bytes: '可清理缓存大小', bytes_reclaimed: '已释放空间',
+  cache_removed: '已清理缓存文件', cache_blocked_count: '缓存清理失败',
+  purged: '已删除记录', vanished: '已标记文件丢失', reattached: '已转移记录',
+  blocked_count: '未能删除记录', dirs_removed: '已删除空目录', dir_errors: '目录清理失败',
+  marked: '已标记失效', recovered: '复查后可访问', entities: '涉及资料',
+  found: '发现待修复文件', repaired: '已修复', failed: '失败', missing_tool: '缺少修复工具',
+  moved: '已整理文件', restored: '已还原', skipped: '已跳过', made: '已生成预览图',
+  fetched: '已取得资料', updated: '已更新', discovered: '发现作品', without_code: '未识别番号',
+  incomplete: '资料或封面未取得',
+  result: '结果',
 };
+
+const PROBLEM_COUNTS = [
+  'gone_count', 'unclear_count', 'source_failed', 'source_warning', 'resolve_failed',
+  'warning_count', 'missing', 'unreadable', 'cache_blocked_count', 'blocked_count', 'dir_errors',
+  'failed', 'missing_tool', 'issue_count', 'cover_network', 'performer_profile_failed',
+  'performer_profile_conflicts', 'conflicts', 'paused_count', 'miss', 'incomplete',
+];
+
+/** 完成检查与检查结果有问题是两件事，问题不能被例行折叠隐藏。 */
+export const hasResultProblems = (run: TaskRunPayload): boolean => run.result_summary?.ok === false
+  || Boolean(run.result_summary?.error)
+  || PROBLEM_COUNTS.some((key) => Number(run.result_summary?.[key]) > 0);
 
 /** 把一批任务按 `parent_run_id` 归到各自的父任务下。没有父的那些留在外面。 */
 export function groupFollowups(rows: TaskRunPayload[]): Map<number, TaskRunPayload[]> {
@@ -151,6 +180,7 @@ export function foldRoutine(rows: TaskRunPayload[],
 /** 按时跑完、什么也没发生的一轮：定时触发、成功、没有新增也没派后继。 */
 export const isRoutine = (run: TaskRunPayload) => run.trigger === 'scheduled'
   && run.status === 'succeeded' && !run.error
+  && !hasResultProblems(run)
   && !(Number(run.result_summary?.added) > 0) && !(Number(run.result_summary?.followups) > 0);
 
 export const isActive = (run: TaskRunPayload) => run.status === 'pending' || run.status === 'running';
@@ -253,7 +283,8 @@ export function summaryItems(summary: Record<string, unknown>): string[] {
     .map(([key, value]) => {
       if (key === 'followups') return `已安排 ${Number(value).toLocaleString()} 项补充任务`;
       if (key === 'error') return readableErrorHeadline(String(value));
-      if (key === 'outcome') return outcomeText(String(value));
+      if (key === 'outcome' || key === 'result') return outcomeText(String(value));
+      if (key === 'cache_bytes' || key === 'bytes_reclaimed') return `${SUMMARY_LABELS[key]} ${fmtSize(Number(value))}`;
       if (key === 'operation') return `操作：${OPERATION_LABELS[String(value)] || '批量操作'}`;
       return `${SUMMARY_LABELS[key]} ${typeof value === 'number' ? value.toLocaleString() : value}`;
     });

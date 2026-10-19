@@ -41,21 +41,19 @@ describe('馆藏表格列宽与占位图', () => {
       assert.equal(geometry.overflow, 'ellipsis');
       assert.equal(await row.locator('[data-list-name]').getAttribute('title'), name);
       const defaultLabels = ['名称', '时长', '分辨率', '体积', '评分', '观看次数'];
-      const visibleLabels = () => page.locator('[data-catalog-table] th > span').allTextContents();
-      assert.deepEqual(await visibleLabels(), ['', ...defaultLabels]);
+      const visibleLabels = () => page.locator('[data-catalog-table] th:not([data-table-space]) > span').allTextContents();
+      assert.deepEqual(await visibleLabels(), defaultLabels);
       await page.getByRole('button', { name: '显示列', exact: true }).click();
       await page.getByRole('button', { name: '显示全部列', exact: true }).click();
       await page.keyboard.press('Escape');
-      assert.deepEqual(await visibleLabels(), ['', '名称', '番号', '时长', '分辨率', '体积', '评分', '观看次数', '高潮计数', '观看时间', '入库时间', '发行时间']);
+      assert.deepEqual(await visibleLabels(), ['名称', '番号', '时长', '分辨率', '体积', '评分', '观看次数', '高潮计数', '观看时间', '入库时间', '发行时间']);
       for (const label of ['分辨率', '评分', '高潮计数', '观看次数', '时长', '体积', '入库时间', '观看时间', '发行时间', '番号']) {
         await page.getByRole('columnheader', { name: label, exact: false }).waitFor();
       }
       assert.ok((await row.textContent())?.includes('1920 × 1080'));
-      assert.equal(await row.getByRole('img', { name: '评分 4 / 5', exact: true }).count(), 1);
-      assert.equal(await row.locator('[data-catalog-star]').count(), 5);
-      const fills = await row.locator('[data-catalog-star-fill]').evaluateAll(stars => stars.map(star => star.getBoundingClientRect().width));
-      assert.equal(fills.filter(width => width >= 15).length, 4);
-      assert.equal(fills.at(-1), 0);
+      assert.equal(await row.getByRole('group', { name: '评分 4 / 5', exact: true }).count(), 1);
+      assert.equal(await row.locator('[data-rating-stars] [data-rate]').count(), 5);
+      assert.equal(await row.locator('[data-rating-stars] [data-rate][data-on="true"]').count(), 4);
       assert.ok((await row.textContent())?.includes('2026-01-03'));
       const header = page.getByRole('columnheader', { name: /^名称/ });
       const initialWidth = (await header.boundingBox())!.width;
@@ -67,7 +65,7 @@ describe('馆藏表格列宽与占位图', () => {
         await page.mouse.down();
         await page.mouse.move(handle.x + handle.width / 2 + 48, handle.y + handle.height / 2, { steps: 8 });
         await page.mouse.up();
-        await page.waitForFunction(width => document.querySelector('[data-catalog-table] th:nth-child(2)')!.getBoundingClientRect().width > width + 20, initialWidth);
+        await page.waitForFunction(width => document.querySelector('[data-catalog-table] th[data-key="name"]')!.getBoundingClientRect().width > width + 20, initialWidth);
         assert.equal(await header.getAttribute('aria-sort'), sort);
       }
       const beforeKeyboard = (await header.boundingBox())!.width;
@@ -77,7 +75,7 @@ describe('馆藏表格列宽与占位图', () => {
       await resizer.press('ArrowRight');
       await resizer.press('ArrowRight');
       await resizer.press('Tab');
-      await page.waitForFunction(width => document.querySelector('[data-catalog-table] th:nth-child(2)')!.getBoundingClientRect().width > width, beforeKeyboard);
+      await page.waitForFunction(width => document.querySelector('[data-catalog-table] th[data-key="name"]')!.getBoundingClientRect().width > width, beforeKeyboard);
       const resizedWidth = (await header.boundingBox())!.width;
       await page.getByRole('button', { name: '显示列', exact: true }).click();
       const columnMenu = page.getByRole('dialog', { name: '表格显示列' });
@@ -107,12 +105,12 @@ describe('馆藏表格列宽与占位图', () => {
       });
       assert.ok(scrolled.extra > 0 && scrolled.left > 0, JSON.stringify(scrolled));
       await page.getByRole('button', { name: '重置列宽', exact: true }).click();
-      await page.waitForFunction(width => Math.abs(document.querySelector('[data-catalog-table] th:nth-child(2)')!.getBoundingClientRect().width - width) <= 1, initialWidth);
+      await page.waitForFunction(width => Math.abs(document.querySelector('[data-catalog-table] th[data-key="name"]')!.getBoundingClientRect().width - width) <= 1, initialWidth);
       await scroll.evaluate(node => { node.scrollLeft = 0 });
       await page.getByRole('button', { name: '显示列', exact: true }).click();
       await page.getByRole('button', { name: '恢复默认显示', exact: true }).click();
       await page.keyboard.press('Escape');
-      assert.deepEqual(await visibleLabels(), ['', ...defaultLabels]);
+      assert.deepEqual(await visibleLabels(), defaultLabels);
       const measured = await layout(page);
       assert.ok(measured.scrollWidth <= measured.viewportWidth + 1, JSON.stringify(measured));
       const screenshots = join('..', 'build', 'agent-verification', 'library-table');

@@ -2774,6 +2774,44 @@ class FollowSourceAddTests(FollowContractTests):
         self.assertTrue(removed["ok"])
         self.assertEqual(len({row["author_key"] for row in self._get()["sources"]}), 2)
 
+    def test_renaming_an_alias_group_updates_its_linked_creator_and_keeps_names(self):
+        current, chosen = "Suzutaru 3D (鈴太郎3D)", "鈴太郎3D"
+        source = self._source("fanbox", "suzutaro3d", current)
+        self._post("/api/follow/author-alias", {"action": "add", "canonical": current, "alias": chosen})
+        with self.contract.database.write_transaction() as connection:
+            entity_id = connection.execute(
+                "INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at) VALUES('creator',?,?,?,?)",
+                (current, current.casefold(), MOMENT.isoformat(), MOMENT.isoformat()),
+            ).lastrowid
+            connection.execute("UPDATE follow_source SET entity_id=? WHERE id=?", (entity_id, source))
+            connection.execute("INSERT INTO asset(location,path,name,medium,creator,first_seen) VALUES('local',?,'example.mp4','video',?,?)",
+                               ("R:\\Media\\example.mp4", current, MOMENT.isoformat()))
+        result = self._post("/api/follow/author-alias", {"action": "rename",
+            "canonical_key": follow_store.normalized_author_name(current), "canonical": chosen})
+        self.assertEqual(result["author_aliases"][0]["canonical_name"], chosen)
+        payload = self._get()
+        self.assertEqual(payload["sources"][0]["entity_name"], chosen)
+        with self.contract.database.read_connection() as connection:
+            self.assertEqual(connection.execute("SELECT creator FROM asset").fetchone()[0], chosen)
+            self.assertEqual(connection.execute("SELECT alias FROM entity_alias WHERE entity_id=? AND alias=?",
+                                               (entity_id, current)).fetchone()[0], current)
+
+    def test_alias_group_name_conflict_rolls_back_the_whole_write(self):
+        self._source("fanbox", "a", "作者 A")
+        self._post("/api/follow/author-alias", {"action": "add", "canonical": "作者 A", "alias": "alias A"})
+        before = self._get()["author_aliases"]
+        with self.contract.database.write_transaction() as connection:
+            entity_id = connection.execute("INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at) VALUES('creator','作者 A','作者 a',?,?)",
+                                           (MOMENT.isoformat(), MOMENT.isoformat())).lastrowid
+            connection.execute("UPDATE follow_source SET entity_id=?", (entity_id,))
+            connection.execute("INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at) VALUES('creator','作者 B','作者 b',?,?)",
+                               (MOMENT.isoformat(), MOMENT.isoformat()))
+        with self.assertRaises(ValueError):
+            self._post("/api/follow/author-alias", {"action": "rename",
+                "canonical_key": follow_store.normalized_author_name("作者 A"), "canonical": "作者 B"})
+        self.assertEqual(self._get()["author_aliases"], before)
+        self.assertEqual(self._get()["sources"][0]["entity_name"], "作者 A")
+
     def test_an_official_profile_learns_its_handle_as_an_alias(self):
         self._source("rule34video", "ffxivinitiala", "FFXIVInitialA")
         fetch = SourceFetch(

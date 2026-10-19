@@ -32,6 +32,7 @@ export interface LinkStats {
   entities: number;
   by_kind: Record<string, number>;
   top_hosts: [string, number][];
+  top_host_link_ids: Record<string, number>;
 }
 
 /** 一条被判出来的链接。`note` 是站点回的那句结果。 */

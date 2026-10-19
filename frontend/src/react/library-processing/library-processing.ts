@@ -68,7 +68,25 @@ export interface LibraryProcessingData {
   stalled?: boolean;
   waited_seconds?: number;
   completed_at?: number;
+  traffic?: ProcessingTraffic;
 }
+
+export interface TrafficSource {
+  key: string; label: string; root: string; location: string; metered: boolean;
+  used_bytes: number; estimated_min_bytes: number; estimated_max_bytes: number;
+  unobserved: string[];
+}
+export interface ProcessingTraffic {
+  used_bytes: number; estimated_min_bytes: number; estimated_max_bytes: number;
+  metered_used_bytes: number; metered_estimated_min_bytes: number; metered_estimated_max_bytes: number;
+  sources: TrafficSource[]; partial: boolean; unknown_files: boolean;
+}
+
+export const fetchProcessingEstimate = (command: LibraryProcessingCommand, signal?: AbortSignal) => {
+  const params = new URLSearchParams({ estimate: '1', stage: command.stage || 'all' });
+  if (command.asset_ids) params.set('asset_ids', JSON.stringify(command.asset_ids));
+  return apiGet<{ traffic: ProcessingTraffic }>(`${LIBRARY_PROCESSING_URL}?${params}`, signal);
+};
 
 /** 一次写操作的请求体：指定处理阶段与影片，或者按任务号重试失败项。 */
 export type ProcessingSpeed = 'low' | 'standard' | 'high';
