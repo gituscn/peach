@@ -25,6 +25,7 @@ import {
 } from '@peach/shell';
 
 import { managementSkeletonHtml, paintManagementPlaceholder } from '../../../management-placeholder';
+import { routeScrollBehavior, scrollToAnchor } from '../../../ui-kit/anchor-scroll';
 import { isReviewCategory } from '../../review/review';
 import { javLibraryPath, javTab } from '../../jav/jav';
 import { ShellActionsContext, useOpenEpoch } from '../router';
@@ -51,9 +52,6 @@ const FOLLOW_MANAGE_TABS = ['list', 'add', 'feeds'];
 const readStarted = () => pageOpens > 0;
 /** 壳开始路由没有（`pageOpens` 大于 0）。 */
 const useRoutingStarted = (): boolean => useSyncExternalStore(subscribeShell, readStarted);
-
-/* `/resource-sync` 改写过来的那一次数据管理页，打开后滚到资源同步那一块；取一次就清。 */
-let resourceSyncPending = false;
 
 const followLayout = (): string => (appSettingsStore().value.followLayout === 'table' ? 'table' : 'default');
 const search = (): URLSearchParams => new URLSearchParams(window.location.search);
@@ -121,14 +119,12 @@ async function openProps(path: ManagedPath, run: Run): Promise<object | null> {
   return {};
 }
 
-const scrollTop = (): void => { window.scrollTo({ top: 0, behavior: 'smooth' }) };
-const scrollToBlock = (id: string): void => { document.getElementById(id)?.scrollIntoView({ block: 'start' }) };
-
-/* 统计页与口味页取完就回顶，不论这一页还在不在；其余几页只在还停在这一页时滚。 */
-const SCROLL_ALWAYS = new Set<ManagedPath>(['/stats', '/taste']);
-const SCROLL_WHEN_CURRENT = new Set<ManagedPath>(['/review', '/quality-goals', '/tasks', '/subscriptions']);
+const scrollTop = (): void => { window.scrollTo({ top: 0, behavior: routeScrollBehavior() }) };
+const SCROLL_TOP = new Set<ManagedPath>(['/stats', '/taste', '/review', '/quality-goals', '/tasks', '/subscriptions']);
 
 async function openPage(path: ManagedPath, actions: ShellActions, run: Run): Promise<void> {
+  const seq = peachHistory.navigation.seq;
+  const isCurrent = () => run.live && peachHistory.navigation.seq === seq;
   if (path === '/jav' && javTab(search().get('tab')) === 'library') {
     peachHistory.replace(javLibraryPath(window.location.search)); return;
   }
@@ -151,8 +147,6 @@ async function openPage(path: ManagedPath, actions: ShellActions, run: Run): Pro
     });
     actions.clearSearch();
   }
-  const syncAnchor = path === '/data-cleanup' && resourceSyncPending;
-  if (syncAnchor) resourceSyncPending = false;
   paintManagementPlaceholder(stats, placeholder(path));
   const props = await openProps(path, run);
   if (!props) return;
@@ -160,20 +154,16 @@ async function openPage(path: ManagedPath, actions: ShellActions, run: Run): Pro
   if (opened) run.revision = managedEntry(stats)?.revision ?? 0;
   /* 配置页选中的页签只交给画上的那一次：没画上（取数途中走开了）就留给下一次打开。 */
   if (path.startsWith('/settings/') && opened) writeShell({ configurationRequestedSection: '' });
-  if (SCROLL_ALWAYS.has(path)) scrollTop();
-  if (run.live) {
+  if (opened && isCurrent()) {
     const { hash } = window.location;
-    if (SCROLL_WHEN_CURRENT.has(path)) scrollTop();
-    if (path === '/settings/library') {
-      /* 处理进度那一块搬到了数据管理页：改写地址（不加条目、不改标题），由数据管理页的元素接着打开。 */
-      if (hash === '#libraryProcessing') {
-        queueMicrotask(() => { if (run.live) shellNavigate('/data-cleanup#libraryProcessing', { replace: true, state: null }) });
-      } else if (hash === '#peachProxy') scrollToBlock('peachProxy');
-      else scrollTop();
+    if (path === '/settings/library' && hash === '#libraryProcessing') {
+      queueMicrotask(() => { if (isCurrent()) shellNavigate('/data-cleanup#libraryProcessing', { replace: true, state: null }) });
+    } else if (hash) {
+      void scrollToAnchor(hash, isCurrent);
+    } else if (SCROLL_TOP.has(path) || path === '/settings/library') {
+      scrollTop();
     }
-    if (path === '/data-cleanup' && hash === '#libraryProcessing') scrollToBlock('libraryProcessing');
   }
-  if (syncAnchor) scrollToBlock('resource-sync');
 }
 
 /** 管理区一页的元素。 */
@@ -231,7 +221,6 @@ export function ResourceSyncRedirect() {
     let live = true;
     queueMicrotask(() => {
       if (!live) return;
-      resourceSyncPending = true;
       shellNavigate('/data-cleanup#resource-sync', { replace: true });
     });
     return () => { live = false };
