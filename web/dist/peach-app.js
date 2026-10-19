@@ -38485,6 +38485,7 @@ function _ye({ rows: e }) {
 						className: "w-full min-w-0",
 						children: /* @__PURE__ */ (0, C.jsx)(OA, {
 							summary: "技术详情",
+							contentClassName: "pb-2.5",
 							children: /* @__PURE__ */ (0, C.jsx)(oA, {
 								code: JSON.stringify(e.result_summary, null, 2),
 								language: "json",
@@ -38529,6 +38530,7 @@ function nj({ run: e, meta: t, children: n, footer: r, followups: i }) {
 				className: "border-t border-separator-border px-5 py-2.5",
 				children: /* @__PURE__ */ (0, C.jsx)(OA, {
 					summary: `任务明细 · ${i.length} 项`,
+					contentClassName: "pb-2.5",
 					defaultOpen: i.some((e) => RA(e) || e.status === "failed"),
 					children: /* @__PURE__ */ (0, C.jsx)(_ye, { rows: i })
 				})
@@ -38537,6 +38539,7 @@ function nj({ run: e, meta: t, children: n, footer: r, followups: i }) {
 				className: "border-t border-separator-border px-5 py-2.5",
 				children: /* @__PURE__ */ (0, C.jsx)(OA, {
 					summary: "技术详情",
+					contentClassName: "pb-2.5",
 					children: /* @__PURE__ */ (0, C.jsx)(oA, {
 						code: JSON.stringify(e.result_summary, null, 2),
 						language: "json",

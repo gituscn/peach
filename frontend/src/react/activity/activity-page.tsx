@@ -70,7 +70,7 @@ function FollowupList({ rows }: { rows: TaskRunPayload[] }) {
               ? <span className="min-w-0 break-words text-caption-1-regular text-text-secondary">{detail}</span>
               : null}
             <div className="w-full min-w-0">
-              <Disclosure summary="技术详情">
+              <Disclosure summary="技术详情" contentClassName="pb-2.5">
                 <CodeBlock code={JSON.stringify(row.result_summary, null, 2)} language="json"
                   label={`${row.task_label}技术详情`} />
               </Disclosure>
@@ -106,12 +106,13 @@ function RunCard(
       </div>
       {followups?.length ? <div className="border-t border-separator-border px-5 py-2.5">
         <Disclosure summary={`任务明细 · ${followups.length} 项`}
+          contentClassName="pb-2.5"
           defaultOpen={followups.some((row) => isActive(row) || row.status === 'failed')}>
           <FollowupList rows={followups} />
         </Disclosure>
       </div> : null}
       {Object.keys(run.result_summary || {}).length ? <div className="border-t border-separator-border px-5 py-2.5">
-        <Disclosure summary="技术详情">
+        <Disclosure summary="技术详情" contentClassName="pb-2.5">
           <CodeBlock code={JSON.stringify(run.result_summary, null, 2)} language="json"
             label={`${run.task_label}技术详情`} />
         </Disclosure>

@@ -32,9 +32,15 @@ describe('任务页云下载布局', () => {
       const geometry = await card.locator('pre').evaluate(pre => ({
         overflows: pre.scrollWidth > pre.clientWidth,
         pageFits: document.documentElement.scrollWidth <= innerWidth,
+        leftGap: pre.closest('[data-code-block]')!.getBoundingClientRect().left
+          - pre.closest('[data-run-id]')!.getBoundingClientRect().left,
+        bottomGap: pre.closest('[data-run-id]')!.getBoundingClientRect().bottom
+          - pre.closest('[data-code-block]')!.getBoundingClientRect().bottom,
       }));
       assert.equal(geometry.overflows, true, '长行在代码块内部横向滚动');
       assert.equal(geometry.pageFits, true);
+      assert.ok(Math.abs(geometry.leftGap - geometry.bottomGap) <= 1,
+        '技术详情代码块的底部留白与卡片左右内边距一致');
       assert.equal(await card.getByRole('button', { name: '复制代码' }).count(), 1);
       assert.deepEqual(opened.problems, []);
     } finally { await opened.close(); }
