@@ -48,11 +48,11 @@ describe('孤儿记录数据表', () => {
         await track.waitFor({ state: 'visible' });
         const before = await track.locator('.ovthumb').evaluate(node => getComputedStyle(node).transform);
         await scroller.evaluate(node => { node.scrollLeft = node.scrollWidth });
-        await page.waitForFunction(() => {
-          const node = document.querySelector('#orphan-records [data-overlay-scrollbar]')!;
-          return node.scrollLeft > 0;
-        });
-        await settle(page);
+        await page.waitForFunction(previous => {
+          const node = document.querySelector('#orphan-records [data-overlay-scrollbar]');
+          const thumb = document.querySelector('#orphan-records [data-board-data-table] > .ov-x .ovthumb');
+          return !!node && !!thumb && node.scrollLeft > 0 && getComputedStyle(thumb).transform !== previous;
+        }, before);
         const after = await track.locator('.ovthumb').evaluate(node => getComputedStyle(node).transform);
         assert.notEqual(after, before, '横向滑块没有跟随表格滚动');
         await scroller.evaluate(node => { node.scrollLeft = 0 });
