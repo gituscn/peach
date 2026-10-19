@@ -18,6 +18,7 @@ import type { SidebarApi, SidebarHost } from './sidebar/sidebar-api';
 import type { ManageHeaderApi, ManageHeaderHost } from './manage-header/manage-header-api';
 import type { BatchDockApi, BatchDockHost } from './batch-dock/batch-dock-api';
 import type { GlowPickerHost } from './glow-picker/glow-picker-api';
+import type { CoverItem, FaceRef } from '@peach/card-art';
 
 export type { IndexProps };
 export type { CatalogGridProps };
@@ -175,6 +176,8 @@ export interface DownloadTask {
   title: string | null;
   origin: string | null;
   display_code?: string | null;
+  display_title?: string | null;
+  artwork?: (CoverItem & { performer_entities?: (FaceRef & { name: string })[]; performer_total?: number }) | null;
   state: string;
   state_label: string;
   failure: string | null;

@@ -7,7 +7,7 @@
  *
  * 一条任务都没有时整段不画。失败的任务给中文原因；失败、取消与停滞的可以重新提交，被判
  * 违规的不给（服务端也会拒）。每张卡都能复制磁力：接口失效时退回手动添加。 */
-import { useId, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { RiArrowDownSLine } from '@remixicon/react';
 
@@ -15,6 +15,7 @@ import { Chip } from '@/components/base/badges/chip';
 import { Button } from '@/components/base/buttons/button';
 
 import { apiGet, apiSend, errorMessage } from '../../api';
+import { javTitleParts } from '../../core/jav-title';
 import type { DownloadsSnapshot, DownloadTask } from '../bundle';
 import { cardClass } from '../components/card';
 import { Note } from '../components/note';
@@ -23,6 +24,9 @@ import { ErrorText } from '../settings/section';
 import { busyProps, useAction } from '../settings/use-action';
 import { momentText } from './tasks';
 import { SourceLabel } from '../components/source-label';
+import { ArtSlot } from '../components/art-slot';
+import { avatarInner, coverAnchor, coverImage, relayoutCovers } from '@peach/card-art';
+import { entityPath } from '@peach/legacy/core';
 
 export const DOWNLOADS_URL = '/api/downloads';
 export const DOWNLOADS_KEY = ['downloads'] as const;
@@ -36,8 +40,13 @@ const STATE_COLORS: Record<string, 'lime' | 'rose' | 'yellow'> = {
   ingested: 'lime', failed: 'rose', cancelled: 'yellow', stalled: 'yellow',
 };
 
-const taskName = (task: DownloadTask) =>
-  task.title || task.display_name || task.remote_name || task.code || `磁力 ${task.info_hash?.slice(0, 8) ?? task.id}`;
+const taskName = (task: DownloadTask) => {
+  const code = task.display_code || task.code || '';
+  const { title } = javTitleParts({
+    is_jav: Boolean(code), code, name: task.display_title ?? task.title ?? task.display_name ?? task.remote_name,
+  });
+  return [code, title].filter(Boolean).join(' · ') || `磁力 ${task.info_hash?.slice(0, 8) ?? task.id}`;
+};
 
 export const failureText = (task: DownloadTask) =>
   task.failure_label ? [task.failure_label, task.failure_detail].filter(Boolean).join('：') : '';
@@ -82,9 +91,29 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
   const [copied, setCopied] = useState(false);
   const [fullTitle, setFullTitle] = useState(false);
   const titleId = useId();
+  const cover = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const box = cover.current;
+    if (!box) return;
+    const frame = () => {
+      const { width, height } = box.getBoundingClientRect();
+      if (!width || !height) return;
+      box.style.setProperty('--card-ratio', `${width} / ${height}`);
+      box.querySelectorAll<HTMLImageElement>('img.cover').forEach((image) => {
+        if (image.complete && image.naturalWidth) coverAnchor(image);
+      });
+    };
+    const observer = new ResizeObserver(frame);
+    observer.observe(box);
+    frame();
+    return () => observer.disconnect();
+  }, []);
   const reason = failureText(task);
+  const artwork = task.artwork;
+  const people = artwork?.performer_entities || [];
+  const detailHref = task.state === 'ingested' && task.asset_id ? `/assets/${task.asset_id}` : undefined;
   const failed = task.state === 'failed' || task.postprocess_state === 'failed';
-  const meta = [task.display_code || task.code || '番号未识别', task.target, momentText(task.submitted_at)]
+  const meta = [task.display_code || task.code ? '' : '番号未识别', task.target, momentText(task.submitted_at)]
     .filter(Boolean).join(' · ');
   const refresh = () => { void client.invalidateQueries({ queryKey: DOWNLOADS_KEY }) };
 
@@ -110,9 +139,21 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
         padding: 'none', bordered: 'line',
         className: failed ? 'flex flex-col border-border-error-default' : 'flex flex-col',
       })}>
-      <div className="flex flex-col gap-1.5 px-5 pt-5 pb-4">
-        <div className="flex min-w-0 items-center gap-2">
-          <strong className="min-w-0 flex-1 truncate text-title-1-medium text-text-primary" title={taskName(task)}>{taskName(task)}</strong>
+      <div className="flex items-start gap-3 px-5 pt-5 pb-4">
+        <div ref={cover} data-download-cover="" style={{ '--card-ratio': '3 / 4' } as CSSProperties}
+          className="relative flex aspect-3/4 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-background-tertiary-default text-caption-1-regular text-text-secondary sm:aspect-auto sm:w-24 sm:self-stretch">
+          {!artwork?.has_cover ? <span>无封面</span> : null}
+          {artwork?.has_cover ? <ArtSlot artwork={{ kind: 'cover', html: coverImage(artwork, 'big') }}
+            relayout={(root) => relayoutCovers(root, 'big')} /> : null}
+          {detailHref ? <a data-download-cover-link="" href={detailHref} aria-label={`打开作品详情：${taskName(task)}`}
+            className="absolute inset-0 z-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus-ring" /> : null}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
+          <strong className="min-w-0 w-full flex-1 truncate text-title-1-medium text-text-primary sm:w-auto" title={taskName(task)}>
+            {detailHref ? <a data-download-title-link="" href={detailHref}
+              className="block truncate rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus-ring">{taskName(task)}</a> : taskName(task)}
+          </strong>
           <div className="flex shrink-0 items-center gap-2">
             <Chip color={STATE_COLORS[task.state] ?? 'neutral'}>{task.state_label}</Chip>
             {task.state === 'ingested'
@@ -122,7 +163,15 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
           </div>
         </div>
         <div className="flex min-w-0 items-center gap-2 text-caption-1-regular text-text-secondary"><span className="flex shrink-0"><SourceLabel source={task.provider} label={task.provider_label} /></span><span className="min-w-0 truncate" title={meta}>{meta}</span></div>
-        {fullTitle ? <p id={titleId} data-download-title-full className="wrap-anywhere text-body-2-regular text-text-secondary">{taskName(task)}</p> : null}
+        {people.length ? <div className="flex min-w-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1">
+            {people.slice(0, 3).map((person) => <a key={person.id || person.name} data-media-avatar=""
+              href={entityPath('performer', person.name, person.id)} aria-label={`打开女优页：${person.name}`} title={person.name}
+              dangerouslySetInnerHTML={{ __html: avatarInner(person.name, person, null) }} />)}
+          </div>
+          <span className="min-w-0 truncate text-caption-1-regular text-text-secondary"
+            title={people.map((person) => person.name).join('、')}>{people.map((person) => person.name).join('、')}{(artwork?.performer_total || 0) > people.length ? ` 等 ${artwork!.performer_total} 人` : ''}</span>
+        </div> : null}
         {task.state === 'remote_running' && task.progress != null
           ? <Progress label="远端下载进度" value={Math.round(task.progress * 100)} max={100} />
           : null}
@@ -145,7 +194,9 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
             : null}
           <Button variant="ghost" size="small" onClick={copy}>{copied ? '已复制磁力' : '复制磁力'}</Button>
         </div>
+        </div>
       </div>
+      {fullTitle ? <p id={titleId} data-download-title-full className="wrap-anywhere px-5 pb-4 text-body-2-regular text-text-secondary">{taskName(task)}</p> : null}
       {reason || task.postprocess_detail
         ? <div className="flex min-h-14 flex-col justify-center rounded-b-2xl border-t border-separator-border bg-card-footer px-5 py-3">
             <p className="wrap-anywhere text-caption-1-regular text-text-secondary">{reason || postprocessDetail(task)}</p>
