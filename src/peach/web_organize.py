@@ -60,13 +60,15 @@ def q_organize(contract, _args=None) -> dict:
 def w_organize_preview(contract, body) -> dict:
     """出计划：写一份 CSV，回给界面会变的行（上限 200）与跳过统计。"""
     location, file_template, dir_template = _templates(contract, body)
+    path_scope = organize.scope_path(location, body.get('path', ''))
     with contract.read_connection() as connection:
         plan = organize.build_plan(connection, location=location,
-                                   file_template=file_template, dir_template=dir_template)
+                                   file_template=file_template, dir_template=dir_template,
+                                   path=path_scope)
     path = organize.plan_path(contract.candidate_root, location)
     organize.write_plan(path, plan["rows"])
     changes = [row for row in plan["rows"] if row["action"] != "skip"]
-    return {"ok": True, "location": location, "counts": plan["counts"],
+    return {"ok": True, "location": location, "path": path_scope, "counts": plan["counts"],
             "reasons": plan["reasons"], "rows": changes[:200],
             "truncated": len(changes) > 200, "plan_csv": str(path)}
 
@@ -97,12 +99,11 @@ def _run_write(contract, job_id: str, work) -> dict:
 
 
 def w_organize_apply(contract, body) -> dict:
-    """按确认过的模板执行整理。重跑一次计划，不信任界面手上那份。"""
+    """按确认过的范围与可选模板执行整理，计划由服务端核对。"""
     if body.get("confirm") is not True:
         raise ValueError("整理需要确认")
     location, file_template, dir_template = _templates(contract, body)
-    if not file_template and not dir_template:
-        raise ValueError("至少要给一个模板")
+    path_scope = organize.scope_path(location, body.get('path', ''))
     if organize.unverified_location(location):
         raise ValueError(f"{location} 挂载上的改名无法核验云端结果，界面只出预览，不执行")
     job = contract.organize_job
@@ -114,7 +115,7 @@ def w_organize_apply(contract, body) -> dict:
             with contract.read_connection() as connection:
                 plan = organize.build_plan(connection, location=location,
                                            file_template=file_template,
-                                           dir_template=dir_template)
+                                           dir_template=dir_template, path=path_scope)
             if not job.checkpoint(job_id, plan=plan, batch_stamp=batch_stamp):
                 raise InterruptedError('整理已停止')
         job.update(job_id, total=plan["counts"]["change"], stage="正在整理")
@@ -126,9 +127,9 @@ def w_organize_apply(contract, body) -> dict:
                    completed_at=time.time())
 
     started = job.start(work, restart=True,
-                     initial={"stage": "正在核对计划", "location": location},
+                     initial={"stage": "正在核对计划", "location": location, 'path': path_scope},
                      recovery={'confirm': True, 'location': location, 'file_template': file_template,
-                               'dir_template': dir_template, 'action': 'apply'})
+                               'dir_template': dir_template, 'path': path_scope, 'action': 'apply'})
     return {key: value for key, value in started.items() if key not in ('plan', 'batch_stamp')}
 
 

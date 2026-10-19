@@ -22,7 +22,7 @@ import { hasResourceRoots, RESOURCE_SCAN_KEY, type ResourceScanState } from '../
 import { IDLE_REPAIR } from '../../src/react/media-repair/media-repair';
 import type { MediaSourcesData } from '../../src/react/media-sources';
 import { queryClient } from '../../src/react/query';
-import { buttonNamed, click, mount, settle, type } from './render';
+import { buttonNamed, choose, click, mount, settle, type } from './render';
 
 afterEach(() => {
   queryClient.clear();
@@ -555,7 +555,7 @@ describe('整理', () => {
     await click(buttonNamed('预览', host));
     await settle();
     expect(server.posts('/api/organize/preview')).toEqual([
-      { location: 'local', file_template: '{number} {title}', dir_template: '' },
+      { location: 'local', path: '', file_template: '{number} {title}', dir_template: '' },
     ]);
     expect(server.posts('/api/settings')).toEqual([]);
     expect(host.textContent).toContain('2 个文件会改名或移动，5 个已经就是目标名字；跳过 缺番号 1。');
@@ -572,14 +572,60 @@ describe('整理', () => {
     await settle();
     await click(buttonNamed('执行整理', host));
     await settle();
-    expect(seen.map((options) => options.title)).toEqual(['按模板整理文件']);
+    expect(seen.map((options) => options.title)).toEqual(['整理文件']);
     expect(seen[0]!.body).toContain('「本地」上的文件名与目录');
     expect(server.posts('/api/organize/apply')).toEqual([
-      { location: 'local', file_template: '{number}', dir_template: '', confirm: true },
+      { location: 'local', path: '', file_template: '{number}', dir_template: '', confirm: true },
     ]);
     expect(server.posts('/api/settings')).toEqual([
       { organizeTemplates: { local: { file: '{number}', dir: '' } } },
     ]);
+  });
+
+  it('路径选择与输入共用预览范围；编辑路径后须重新预览', async () => {
+    const seen = confirmWith(true);
+    const server = serve({
+      '/api/organize': { ...organizeIdle, status: 'running' },
+      '/api/organize/preview': plan,
+      '/api/organize/apply': { status: 'running', job_id: 'scoped-1' },
+      '/api/pick-folder': { path: 'R:\\media\\合集' },
+      '/api/settings': { ok: true },
+    });
+    queryClient.setQueryData(['organize'], organizeIdle);
+    const host = await wrap(<OrganizeCard toast={vi.fn()} failure={vi.fn()} />);
+    const path = host.querySelector<HTMLInputElement>('input[name="organize-path"]');
+    await click(host.querySelector('[aria-label="选择整理路径"]'));
+    await settle();
+    expect(server.posts('/api/pick-folder')).toEqual([{ initial: 'R:\\media' }]);
+    expect(path?.value).toBe('R:\\media\\合集');
+    await click(buttonNamed('预览', host));
+    await settle();
+    expect(server.posts('/api/organize/preview')[0]).toMatchObject({ path: 'R:\\media\\合集' });
+    await type(path, 'R:\\media\\其他');
+    expect(buttonNamed('执行整理', host)).toBeNull();
+    await click(buttonNamed('预览', host));
+    await settle();
+    await click(buttonNamed('执行整理', host));
+    await settle();
+    expect(seen[0]?.body).toContain('R:\\media\\其他');
+    expect(server.posts('/api/organize/apply')[0]).toMatchObject({ path: 'R:\\media\\其他', confirm: true });
+  });
+
+  it('取消目录选择保留输入；切换来源清空路径和预览', async () => {
+    const data = { ...organizeIdle, locations: [...organizeIdle.locations, { location: '115', roots: ['B:\\'] }] };
+    serve({ '/api/organize': data, '/api/organize/preview': plan, '/api/pick-folder': { path: null } });
+    queryClient.setQueryData(['organize'], data);
+    const host = await wrap(<OrganizeCard toast={vi.fn()} failure={vi.fn()} />);
+    const path = host.querySelector<HTMLInputElement>('input[name="organize-path"]');
+    await type(path, 'R:\\media\\合集');
+    await click(host.querySelector('[aria-label="选择整理路径"]'));
+    await settle();
+    expect(path?.value).toBe('R:\\media\\合集');
+    await click(buttonNamed('预览', host));
+    await settle();
+    await choose(host.querySelector('[aria-label="整理哪个来源"]'), '115');
+    expect(path?.value).toBe('');
+    expect(buttonNamed('执行整理', host)).toBeNull();
   });
 
   it('有上一批才给回滚；回滚也先确认，取消就不发', async () => {

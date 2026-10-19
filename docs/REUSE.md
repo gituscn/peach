@@ -18,6 +18,14 @@ Peach 负责独立数据目录、首启、构建身份和资源清单。arm64 �
 
 Peach 只保留设备选择、一次性合成帧探测、命令尝试顺序与失败回退；探测结果由两个服务共享。复用检索覆盖当前 NVENC 链、媒体工具解析器与 Git 历史，没有独立 VAAPI 路径。FFmpeg 已覆盖编解码与滤镜，ffmpeg-python 一类包装层不提供设备驱动或硬件可用性判定，因此沿用项目 subprocess 入口，不新增 Python 依赖。回归用合成输入与进程替身验证 Linux 节点选择、权限和超时、10-bit 转 NV12、整片及分片回退。2026-10-19 的 Windows NVENC 实测使用 640×360 合成帧完成探测，合成 10-bit HEVC 经整片 MP4 与 HLS 两条 CUDA / NVENC 路径输出 H.264 `yuv420p`；128×128 不满足该编码器的最低尺寸，因此探测统一用 640×360。目标 AMD GPU 的驱动初始化、解码与播放验收未取得。无生产入口或真实 ledger 写入。
 
+## 文件名噪声清理
+
+整理模板与 `scripts/clean_names.py` 共用 `organize_templates.clean_name_symbols` 和 `clean_filename`。字符分类复用 Python 标准库 `unicodedata`，按 Unicode 类别清除装饰图形、emoji、替代字符、控制字符和私用区噪声；Peach 保留常用标点、文字组合音标、单位、算术符号、扩展名与空名称保护。不新增依赖。
+
+外部候选核对了 [pathvalidate 的文件名清洗](https://pathvalidate.readthedocs.io/en/latest/pages/examples/sanitize.html)与 [ftfy 的编码修复](https://ftfy.readthedocs.io/en/latest/)。前者主要处理文件系统非法字符，其通用符号替换还会删掉番号连接号和扩展名句点；后者通过启发式还原编码，超出本次删除噪声的范围，因此不引入。隔离用例覆盖装饰符号、复合 emoji、不可见字符、乱码替代字形、正常中日文与重音字母、空名称、重复执行和改名回滚；馆藏只读盘点与逐条预览保存在数据目录的复核产物中。
+
+目录范围复用 `platform.resolve_root`、`location_mounts` 与标准库路径组件比较。界面复用 BoardUI Input、IconButton、已有 `FolderSearchIcon` 和 `/api/pick-folder`；预览、执行及后台任务恢复共用 `path` 参数，目录模板以所选目录为起点。空路径表示整个来源，目录边界按组件匹配，不按文本前缀匹配。
+
 ## 独立页面的请求反馈
 
 请求错误文案复用 `core/request-error.ts`，实体登记复用 `core/entity-links.ts`。API 直接引用这两个模块，首启与登录页不加载主界面的路由和字素分段初始化；主界面仍通过 `core/index.ts` 导出同一份错误文案。冷启动导入回归核对 API 不构造界面分段器，既有反馈测试覆盖状态码、超时与服务端中文原因。无新增依赖。

@@ -9,8 +9,8 @@
 
 清洗与逃逸防护分两层，缺一层都会出事：
 
-* **取值这一层**只可能带来非法字符（标题里的 `:` 与 `?`、演员名之间的 `/`），所以按
-  Windows 的保留字符逐个替换，并挡住 `CON`、`PRN` 这类保留名与结尾的点和空格。
+* **取值这一层**清除符号噪声，并将 Windows 保留字符（标题里的 `:` 与 `?`、演员名之间的 `/`）
+  逐个替换，同时挡住 `CON`、`PRN` 这类保留名与结尾的点和空格。
 * **模板本身这一层**才可能带来路径逃逸：`..\\..\\Windows`、`C:\\`、`/etc`。取值那层的
   清洗挡不住它——那些字符是用户自己写在模板里的字面量。所以模板在保存和使用前都要过
   `validate_template`，而不是等渲染完再看结果像不像话。
@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import ntpath
 import re
+import unicodedata
 from dataclasses import dataclass
 
 #: 模板认识的占位符，以及它在界面上的说明。顺序就是界面上列出来的顺序。
@@ -62,13 +63,48 @@ class _Token:
     parts: tuple = ()
 
 
+def clean_name_symbols(value: str) -> str:
+    """清除装饰符号、替代字形与不可见噪声，保留文字、标点、单位及算术符号。"""
+    parts: list[str] = []
+    for char in value:
+        category = unicodedata.category(char)
+        point = ord(char)
+        if category.startswith('C') or char in '\ufe0e\ufe0f\u20e3':
+            continue
+        if (category in {'So', 'Sm'} and point > 127 and char not in '×÷±−＋＝～°℃℉'
+                and not 0x3300 <= point <= 0x33FF):
+            parts.append(' ')
+        elif category == 'Sk' and 0x1F3FB <= point <= 0x1F3FF:
+            continue
+        elif char in '※⁂⁎⁑⁕†‡＼﹨／':
+            parts.append(' ')
+        else:
+            parts.append(char)
+    text = ''.join(parts)
+    return re.sub(r'\s+', ' ', text).strip() if text != value else value
+
+
+def clean_filename(name: str) -> str:
+    """只清理名称主干；扩展名和可辨认的名称保留，空名称不生成改名计划。"""
+    stem, suffix = ntpath.splitext(name)
+    cleaned = clean_name_symbols(stem)
+    if cleaned != stem:
+        cleaned = re.sub(r' +(?=\.[A-Za-z0-9]{2,4}(?:\.|$))', '', cleaned)
+    cleaned = cleaned.rstrip('. ')
+    if not any(char.isalnum() for char in cleaned):
+        return name
+    if cleaned.split('.', 1)[0].upper() in _RESERVED:
+        cleaned = '_' + cleaned
+    return cleaned + suffix
+
+
 def sanitise_component(value: str) -> str:
     """把一个取值收敛成能当路径组件的样子。
 
     替换成 `_` 而不是删掉：`ABC-123：完整版` 删掉冒号会变成 `ABC-123完整版`，看不出
     该处有过分隔；`_` 一眼能看出这个位置上有个不能进文件名的符号。
     """
-    text = _ILLEGAL.sub("_", str(value or "")).strip()
+    text = _ILLEGAL.sub("_", clean_name_symbols(str(value or ""))).strip()
     # 结尾的点和空格在 Windows 上会被静默吃掉，于是「建出来的名字」和「要求的名字」
     # 不一致，下一轮整理又会认为这一行还没做完。
     text = text.rstrip(". ")
