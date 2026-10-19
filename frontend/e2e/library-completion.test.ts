@@ -59,6 +59,10 @@ describe('缺预览时的统一补全入口', () => {
             `宽容器中按钮应位于说明右侧：${JSON.stringify(placement)}`);
           assert.ok(placement.action.top < placement.text.bottom,
             `宽容器中按钮不应另起一行：${JSON.stringify(placement)}`);
+          const textCenter = placement.text.top + placement.text.height / 2;
+          const actionCenter = placement.action.top + placement.action.height / 2;
+          assert.ok(Math.abs(textCenter - actionCenter) <= 1,
+            `说明文字应与按钮垂直居中：${JSON.stringify(placement)}`);
         }
         await prompt.evaluate(element => { element.style.width = '320px' });
         const narrowText = await prompt.locator('p').boundingBox();

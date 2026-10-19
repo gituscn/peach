@@ -37319,7 +37319,7 @@ function J({ tone: e, title: t, action: n, extra: r, children: i, actionLayout: 
 		"data-note-layout": "",
 		className: SA("flex flex-col items-start gap-3", a === "inline" && "@xl:flex-row @xl:items-center @xl:justify-between"),
 		children: [/* @__PURE__ */ (0, C.jsxs)("div", {
-			className: "flex min-w-0 flex-1 flex-col gap-0.5 self-stretch",
+			className: "flex min-w-0 flex-1 flex-col justify-center gap-0.5 self-stretch",
 			children: [t ? /* @__PURE__ */ (0, C.jsx)("p", {
 				className: "text-body-medium wrap-anywhere",
 				children: t
