@@ -209,6 +209,9 @@ describe('路由冒烟', () => {
   it('离开活动页之后轮询停下，回到这一页又接上', { timeout: 120_000 }, async () => {
     const opened = await visit(browser, '/tasks', DESKTOP);
     try {
+      const taskResponse = () => opened.page.waitForResponse(response =>
+        new URL(response.url()).pathname === '/api/tasks' && response.status() === 200);
+      const initialTasks = taskResponse();
       const polls: string[] = [];
       opened.page.on('request', (request) => {
         if (request.url().includes('/api/tasks')) polls.push(request.url());
@@ -220,6 +223,7 @@ describe('路由冒烟', () => {
         }
         assert.ok(polls.length >= least, `${what}：只看到 ${polls.length} 次 /api/tasks，要 ${least} 次`);
       };
+      await initialTasks;
       await expectBody(opened.page, '/tasks',
         [heading(opened.page, '#stats', '还没有任务记录')]);
       // 先确认轮询真的在跑，否则下面「停下来了」在它从没开始时也成立。
@@ -241,7 +245,9 @@ describe('路由冒烟', () => {
       await opened.page.waitForTimeout(3_000);
       assert.equal(polls.length, stopped, '离开活动页之后 /api/tasks 还在轮询');
 
+      const returningTasks = taskResponse();
       await opened.page.goBack();
+      await returningTasks;
       await expectBody(opened.page, '/tasks',
         [heading(opened.page, '#stats', '还没有任务记录')]);
       await waitForPolls(stopped + 2, '回到活动页之后轮询没有接上');
@@ -317,6 +323,7 @@ describe('路由冒烟', () => {
   it('远程封套按正封先验比例切，不带进书脊', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/stats', DESKTOP);
     try {
+      await expectBody(opened.page, '/stats', [statsInventoryTab(opened.page)]);
       const remote = 'https://covers.example.test/sleeve.svg';
       await opened.page.route(remote, (route) => route.fulfill({
         contentType: 'image/svg+xml',

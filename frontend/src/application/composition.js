@@ -6,7 +6,7 @@ import { disposeStage, mediaState, openItem, openJavMovie, openPlaylist, openQue
 import { currentBarsContext, entityState, openEntity, revealForIsland, routeEntityPage, showEntityMissing } from './entity.js';
 import { applyFilterStateInPlace, buildBars, catalogState, clearCatalogGrid, gridTaken, loadCatalog, onlineDefaultLoc, paintCatalogGrid, refreshFacetCounts, syncCatalogFilterScreen, toggleTag } from './catalog.js';
 import { openTasteSignal, routeReview } from './playlists.js';
-import { navigationState, syncNavigation, syncRouteChrome } from './navigation.js';
+import { navigationState, requestOverlay, syncNavigation, syncRouteChrome } from './navigation.js';
 import { enterFollow, followState, openFollowDetail } from './follow.js';
 import { receiptsState } from './receipts.js';
 import { reopenPostSetupTutorial } from './tutorial.js';
@@ -18,7 +18,9 @@ import { releaseHoverPreviews } from './../card-art/hover';
 import { bootEntry, peachHistory } from './../history/index';
 import { $ } from '../core';
 import { dropBars } from './../catalog-bars';
-import { isOverlayPath } from './../history/overlay';
+import { isOverlayPath, overlayTarget } from './../history/overlay';
+import { navigationLinkPath } from './../history/links';
+import { scrollToAnchor } from '../ui-kit/anchor-scroll';
 import { loadRouter, settingsPanelApi } from '../react/application-residents';
 import { applicationEffects } from './effects';
 export const compositionState = { shellActions: undefined, routing: undefined };
@@ -27,6 +29,12 @@ export const compositionState = { shellActions: undefined, routing: undefined };
 
 export function installComposition24() {
 const effects=applicationEffects;
+const openOverlayTarget=target=>{
+  if(target.kind==='item')void openItem(target.id,false);
+  else if(target.kind==='jav')void openJavMovie(target.code,false);
+  else if(target.kind==='follow')void openFollowDetail(target.id,false);
+  else void openQueue(target.queue,target.key,target.item,false);
+};
 installEntityShapeBootstrap();
 loadingState.entityShapesReady=loadEntityShapes();
 renderInitialSurfaceLoading();
@@ -40,9 +48,15 @@ compositionState.shellActions = {
   openTag:key=>{closeStats();toggleTag(key)},
   openTasteSignal,
   navigate:path=>{
-    const movie=/^\/works\/([A-Za-z0-9_-]{2,64})$/.exec(path);
-    const item=/^\/assets\/(\d+)$/.exec(path);
-    if(movie)void openJavMovie(movie[1]);else if(item)void openItem(+item[1]);else navigationState.navigatePath(path);
+    const url=new URL(path,location.href),target=overlayTarget(url.pathname,url.search);
+    if(target){
+      const kind=target.kind==='queue'?'item':target.kind;
+      requestOverlay(url.pathname+url.search+url.hash,kind,()=>openOverlayTarget(target));
+    }else if(url.hash&&url.pathname===location.pathname&&url.search===location.search&&!isOverlayPath(location.pathname)){
+      navigationState.route(path);
+      const seq=peachHistory.navigation.seq;
+      void scrollToAnchor(url.hash,()=>peachHistory.navigation.seq===seq);
+    }else navigationState.navigatePath(path);
   },
   openManage,
   managePath:section=>navigationState.routePathOf('section',section)||'',
@@ -102,14 +116,11 @@ compositionState.shellActions = {
     const requested=navigationState.requestedOverlay;
     navigationState.requestedOverlay=null;
     if(peachHistory.navigation.claimed&&(!bootEntry()||navigationState.initialOverlayOpened)){
-      if(requested?.path===location.pathname)void requested.open();
+      if(requested?.path===location.pathname+location.search+location.hash)void requested.open();
       return;
     }
     if(bootEntry())navigationState.initialOverlayOpened=true;
-    if(target.kind==='item')void openItem(target.id,false);
-    else if(target.kind==='jav')void openJavMovie(target.code,false);
-    else if(target.kind==='follow')void openFollowDetail(target.id,false);
-    else void openQueue(target.queue,target.key,target.item,false);
+    openOverlayTarget(target);
   },
   closeStage:()=>{if(mediaState.stageOpen())disposeStage(false)},
   grid:{helpers:catalogState.gridHelpers,actions:catalogState.gridActions},
@@ -167,6 +178,11 @@ compositionState.shellActions = {
   },
 };
 compositionState.routing = false;
+effects.listen(document,'click',event=>{
+  const path=navigationLinkPath(event);
+  if(!path)return;
+  event.preventDefault();compositionState.shellActions.navigate(path);
+});
 applicationEffects.own(peachHistory.listen(navigation=>{
   /* 取齐前地址仍在源页：任何非覆盖历史变化（包括同地址 POP）都撤回这一趟，晚到的包或响应不能再开舞台。 */
   if(navigationState.queueOpenRequest&&navigation.seq!==navigationState.queueOpenRequest.seq&&!isOverlayPath(navigation.location.pathname))disposeStage(false);
