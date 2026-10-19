@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {after,before,describe,it} from 'node:test';
 import type {Browser} from 'playwright-core';
-import {launch,requiredEnv,VIEWPORTS} from './harness.ts';
+import {expectBody,launch,requiredEnv,VIEWPORTS} from './harness.ts';
 
 describe('首页加载结构',()=>{
  let browser:Browser;
@@ -28,6 +28,9 @@ describe('首页加载结构',()=>{
      }).observe(document,{childList:true,subtree:true});
     },{hasFeed});
     const page=await context.newPage();
+    const problems:string[]=[];
+    page.on('pageerror',error=>problems.push(error.message));
+    page.on('console',message=>{if(message.type()==='error')problems.push(message.text())});
     page.setDefaultTimeout(8000);
     const scopes:string[]=[];
     await page.route('**/api/sources',route=>route.fulfill({json:{ok:true,sources:[{location:'local',online:true},{location:'115',online:false}]}}));
@@ -55,7 +58,7 @@ describe('首页加载结构',()=>{
     });
     await page.goto(requiredEnv('PEACH_E2E_ORIGIN')+'/',{waitUntil:'load'});
     const card=page.locator('#grid [data-media-card]').first();
-    await card.waitFor({state:'visible'});
+    await expectBody(page,'首页目录',[card],problems);
     await page.waitForTimeout(1100);
     const before=(await card.boundingBox())!;
     const first=await card.elementHandle();
