@@ -67,7 +67,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
               "test_mp4recover.py", "test_web_media_repair.py",
               "test_previews.py", "test_preview_transport.py",
               "test_providers.py", "test_segments.py", "test_streaming.py",
-              "test_subtitles.py", "test_transcodes.py", "test_strm.py",
+              "test_subtitles.py", "test_transcodes.py", "test_hardware_transcode.py", "test_strm.py",
               "test_guangya_sources.py", "test_media_sources.py"),
     "sync": ("test_sync*.py", "test_platform.py", "test_mount.py", "test_tray*.py", "test_log_retention.py",
              "test_mdns.py", "test_netwatch.py", "test_certs.py",
@@ -266,6 +266,7 @@ AUTO_SCOPE_FILES: dict[str, tuple[str, ...]] = {
 # tooling 里的脚本策略门槛验它的形态。
 AUTO_SCOPE_PREFIXES: tuple[tuple[str, str | tuple[str, ...]], ...] = (
     ("src/peach/media.py", "media"),
+    ("src/peach/hardware_transcode.py", "media"),
     # 关键帧与 ctts 都从 moov 读，测试住在 `test_segments.py` 里。
     ("src/peach/mp4index.py", "media"),
     ("src/peach/mp4repair.py", "media"),

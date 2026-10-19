@@ -8,6 +8,7 @@ from unittest import mock
 from peach.mp4index import (
     composition_offsets_present, keyframe_seconds, movie_seconds, segment_plan,
 )
+from peach.hardware_transcode import HardwareEncoder
 from peach.segments import HlsSegmentService, StreamSessionRegistry, build_hls_playlist
 from support.mp4 import minimal_mp4
 
@@ -312,6 +313,9 @@ class SegmentCommandTests(unittest.TestCase):
                     work_root=root / "cache", prefer_hardware=True,
                 )
                 with mock.patch("asyncio.create_subprocess_exec", fake_exec), \
+                        mock.patch("peach.hardware_transcode.HardwareTranscoder._candidates",
+                                   return_value=(HardwareEncoder("nvenc"),)), \
+                        mock.patch("peach.hardware_transcode.HardwareTranscoder._probe", return_value=True), \
                         mock.patch("peach.segments._probe_video_codec", return_value=codec):
                     target = await service.generate(
                         source, 12.0, 6.0, asset_id=6562, index=2, session="s",

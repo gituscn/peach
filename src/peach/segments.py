@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import os
 import subprocess
@@ -10,6 +11,7 @@ from collections import OrderedDict
 from pathlib import Path
 
 from .ffmpeg import FFmpegResolver
+from .hardware_transcode import HardwareTranscoder
 from .mp4index import keyframe_seconds, segment_plan
 from .streaming import StreamSessionRegistry
 
@@ -17,10 +19,9 @@ HLS_SEGMENT_SECONDS = 6
 # 片段缓存上限。超了按最后访问时间淘汰；片段可再生，丢了只是重跑一次 FFmpeg。
 DEFAULT_CACHE_BYTES = 2 << 30
 PLAN_CACHE_LIMIT = 256
-#: 交给 NVDEC 解码的编码。
-CUDA_DECODE_CODECS = frozenset({"h264", "hevc", "vp9", "av1"})
 CODEC_CACHE_LIMIT = 256
 PROBE_TIMEOUT_SECONDS = 20
+logger = logging.getLogger(__name__)
 
 
 def _probe_video_codec(ffprobe: Path, source: Path) -> str:
@@ -74,13 +75,14 @@ class HlsSegmentService:
         max_concurrent: int | None = None,
         cache_bytes: int = DEFAULT_CACHE_BYTES,
         prefer_hardware: bool = False,
+        hardware: HardwareTranscoder | None = None,
     ):
         self.resolver = resolver
         self.work_root = work_root
         self.segment_seconds = segment_seconds
         self.cache_bytes = cache_bytes
-        # 重编码的分片先试 NVENC，失败再退回 libx264；与整片转码用同一个偏好。
         self.prefer_hardware = prefer_hardware
+        self.hardware = hardware if hardware is not None else HardwareTranscoder(enabled=prefer_hardware)
         # 每个分片请求都会起一个 FFmpeg；播放器本身就并发预取，多设备同看能把机器打满。
         self._limit = max_concurrent or max(1, (os.cpu_count() or 4) // 2)
         self._semaphore: asyncio.Semaphore | None = None
@@ -209,15 +211,19 @@ class HlsSegmentService:
         if registry.is_cancelled(session):
             raise SegmentCancelled(session)
         target.parent.mkdir(parents=True, exist_ok=True)
-        codec = await self.video_codec(source) if transcode and self.prefer_hardware else ""
+        codec = await self.video_codec(source) if transcode and self.hardware.enabled else ""
         detail = ""
         async with self._gate():
-            for name, build in self._attempts(choice.path, source, start, duration, transcode, codec):
+            attempts = await asyncio.to_thread(
+                self._attempts, choice.path, source, start, duration, transcode, codec,
+            )
+            for name, build in attempts:
                 temporary = target.with_name(f"{uuid.uuid4().hex}.tmp.ts")
                 try:
                     returncode, stderr = await self._run(build(temporary), session, registry)
                     if returncode == 0 and temporary.is_file() and temporary.stat().st_size:
                         temporary.replace(target)
+                        logger.info("HLS 分片完成：%s", name)
                         self._evict()
                         return target
                     if registry.is_cancelled(session):
@@ -241,8 +247,7 @@ class HlsSegmentService:
                   transcode: bool, codec: str = ""):
         """依次尝试的命令，每项是 (名字, 接收临时文件路径的构造函数)。
 
-        封装复制只有一种。重编码与整片转码用同一条链：CUDA 解码加 NVENC、软件解码加 NVENC、
-        最后 libx264；没有显卡的机器只是多失败两次，不会没有分片。
+        封装复制只有一种。重编码与整片转码共享可用硬件后端，最后回退 libx264。
 
         NVDEC 解得出来的编码才走 CUDA 解码，`codec` 空或不在名单里就从软件解码起。
         判据要在开跑前定，因为坏结果不会自报：实测 `MIAD573_02.wmv`（vc1、1080p）经
@@ -263,15 +268,12 @@ class HlsSegmentService:
             return [("copy", lambda out: prefix + window + mapping + ["-c", "copy", "-copyts"] + mux + [str(out)])]
         window = ["-ss", f"{start:.3f}", "-i", str(source), "-t", f"{duration:.3f}"]
         audio = ["-c:a", "aac", "-b:a", "160k", "-output_ts_offset", f"{start:.3f}"]
-        nvenc = ["-c:v", "h264_nvenc", "-preset", "p1", "-tune", "hq", "-rc", "vbr", "-cq", "21", "-b:v", "0"]
         attempts = []
-        if self.prefer_hardware:
-            if codec in CUDA_DECODE_CODECS:
-                cuda = ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"]
-                attempts.append(("cuda-nvenc", lambda out: prefix + cuda + window + mapping
-                                 + ["-vf", "scale_cuda=format=nv12"] + nvenc + audio + mux + [str(out)]))
-            attempts.append(("nvenc", lambda out: prefix + window + mapping
-                             + nvenc + ["-pix_fmt", "yuv420p"] + audio + mux + [str(out)]))
+        for encoder in self.hardware.encoders(ffmpeg):
+            for attempt in encoder.attempts(codec):
+                attempts.append((attempt.name, lambda out, attempt=attempt:
+                                 prefix + list(attempt.before_input) + window + mapping
+                                 + list(attempt.output) + audio + mux + [str(out)]))
         attempts.append(("libx264", lambda out: prefix + window + mapping + [
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", "-threads", "2",
         ] + audio + mux + [str(out)]))

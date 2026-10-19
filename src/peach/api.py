@@ -270,6 +270,7 @@ def create_app(
     )
     hls_service = HlsSegmentService(
         resolver, settings.stream_root, prefer_hardware=transcode_service.prefer_hardware,
+        hardware=transcode_service.hardware,
     )
     mdns = create_mdns_publisher(
         settings.mdns_name, settings.mdns_port, secure=settings.tls_enabled,
