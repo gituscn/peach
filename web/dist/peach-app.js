@@ -37443,14 +37443,14 @@ function sA({ code: e, language: t, label: n, maxCharacters: r, bounded: i = !0,
 //#region src/react/components/empty-state.tsx
 var Vve = {
 	page: "min-h-80 justify-center rounded-floating border border-separator-border bg-background-secondary-default px-6 py-12",
-	plain: "px-6 py-12",
+	plain: "px-3 py-6",
 	inset: "min-h-40 justify-center rounded-xl bg-background-secondary-default px-4 py-4"
 };
 function cA({ icon: e, title: t, actions: n, children: r, shell: i = "page" }) {
 	let a = i === "page";
 	return /* @__PURE__ */ (0, C.jsxs)("div", {
 		"data-empty-state": "",
-		className: `flex flex-col items-center gap-2 text-center ${Vve[i]}`,
+		className: `flex min-w-0 max-w-full flex-col items-center gap-2 text-center ${Vve[i]}`,
 		children: [
 			a ? /* @__PURE__ */ (0, C.jsx)("span", {
 				"aria-hidden": !0,
@@ -37464,7 +37464,7 @@ function cA({ icon: e, title: t, actions: n, children: r, shell: i = "page" }) {
 				className: "size-6 text-text-tertiary"
 			}),
 			/* @__PURE__ */ (0, C.jsx)("h3", {
-				className: `${a ? "text-body-semibold" : "text-headline-medium"} text-text-primary`,
+				className: `${a ? "text-body-semibold" : i === "plain" ? "text-body-medium" : "text-headline-medium"} text-pretty text-text-primary`,
 				children: t
 			}),
 			/* @__PURE__ */ (0, C.jsx)("p", {
@@ -37508,9 +37508,9 @@ function lA({ label: e, inline: t = !1 }) {
 function J({ tone: e, title: t, action: n, extra: r, children: i, actionLayout: a = "inline", className: o }) {
 	let s = /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [/* @__PURE__ */ (0, C.jsxs)("div", {
 		"data-note-layout": "",
-		className: $k("flex flex-col items-start gap-3", a === "inline" && "@xl:flex-row @xl:items-center @xl:justify-between"),
+		className: $k("flex gap-3", a === "inline" ? "flex-wrap items-center justify-between" : "flex-col items-start"),
 		children: [/* @__PURE__ */ (0, C.jsxs)("div", {
-			className: "flex min-w-0 flex-1 flex-col justify-center gap-0.5 self-stretch",
+			className: $k("flex min-w-0 flex-auto flex-col justify-center gap-0.5", a === "below" && "w-full"),
 			children: [t ? /* @__PURE__ */ (0, C.jsx)("p", {
 				className: "text-body-medium wrap-anywhere",
 				children: t
@@ -37520,7 +37520,7 @@ function J({ tone: e, title: t, action: n, extra: r, children: i, actionLayout: 
 			})]
 		}), n ? /* @__PURE__ */ (0, C.jsx)("div", {
 			"data-note-action": "",
-			className: "max-w-full",
+			className: "max-w-full shrink-0",
 			children: n
 		}) : null]
 	}), r] });
@@ -47050,14 +47050,16 @@ function uCe(e) {
 			e !== n && (i.disconnect(), n = e, e && i.observe(e));
 			let a = parseFloat(e ? getComputedStyle(e).top : getComputedStyle(document.documentElement).getPropertyValue("--topH")), o = (Number.isFinite(a) ? a : 0) + (e?.getBoundingClientRect().height ?? 0) + 16;
 			document.body.style.setProperty("--folder-sticky-top", `${o}px`);
+			let s = document.getElementById("catalogFoldersTree")?.getBoundingClientRect().top ?? o, c = visualViewport, l = c ? c.offsetTop + c.height : innerHeight, u = document.getElementById("main"), d = u && parseFloat(getComputedStyle(u).paddingBottom) || 0, f = document.querySelector("[data-demo-notice]")?.getBoundingClientRect(), p = Math.min(l - d, f?.top ?? l);
+			document.body.style.setProperty("--folder-available-height", `${Math.max(0, p - Math.max(s, o) - 16)}px`);
 		}, o = () => {
 			r ||= requestAnimationFrame(a);
 		}, s = new MutationObserver(o);
 		return t && s.observe(t, {
 			childList: !0,
 			subtree: !0
-		}), addEventListener("resize", o), a(), () => {
-			i.disconnect(), s.disconnect(), cancelAnimationFrame(r), removeEventListener("resize", o), document.body.style.removeProperty("--folder-sticky-top");
+		}), addEventListener("resize", o), addEventListener("scroll", o, { passive: !0 }), visualViewport?.addEventListener("resize", o), visualViewport?.addEventListener("scroll", o), a(), () => {
+			i.disconnect(), s.disconnect(), cancelAnimationFrame(r), removeEventListener("resize", o), removeEventListener("scroll", o), visualViewport?.removeEventListener("resize", o), visualViewport?.removeEventListener("scroll", o), document.body.style.removeProperty("--folder-sticky-top"), document.body.style.removeProperty("--folder-available-height");
 		};
 	}, [e]);
 }
@@ -47112,13 +47114,11 @@ function pCe() {
 		scope: i,
 		selected: a,
 		current: m,
-		go: p
+		go: p,
+		reportedError: s ? null : o.error
 	});
 	return /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [
-		(0, gt.createPortal)(/* @__PURE__ */ (0, C.jsx)("div", {
-			className: "min-w-0",
-			children: h
-		}), d),
+		(0, gt.createPortal)(h, d),
 		(0, gt.createPortal)(/* @__PURE__ */ (0, C.jsxs)("div", {
 			className: "catalog-folder-heading",
 			children: [
@@ -47159,7 +47159,7 @@ function pCe() {
 						}) : null
 					]
 				}),
-				o.error ? /* @__PURE__ */ (0, C.jsx)(J, {
+				o.error && !s ? /* @__PURE__ */ (0, C.jsx)(J, {
 					tone: "error",
 					action: /* @__PURE__ */ (0, C.jsx)(q, {
 						variant: "secondary",
@@ -47242,90 +47242,90 @@ function pCe() {
 		}, m.selected.id) : null
 	] });
 }
-function mCe({ scope: e, selected: t, current: n, go: r }) {
-	let i = pt(qF(e)), [a, o] = (0, S.useState)(/* @__PURE__ */ new Set()), [s, c] = (0, S.useState)(""), l = (0, S.useDeferredValue)(s), u = pt({
-		...qF(e, "", l),
-		enabled: !!l.trim()
-	}), d = oA();
+function mCe({ scope: e, selected: t, current: n, go: r, reportedError: i }) {
+	let a = pt(qF(e)), [o, s] = (0, S.useState)(/* @__PURE__ */ new Set()), [c, l] = (0, S.useState)(""), u = (0, S.useDeferredValue)(c), d = pt({
+		...qF(e, "", u),
+		enabled: !!u.trim()
+	}), f = oA();
 	(0, S.useEffect)(() => {
-		n?.ancestors.length && o((e) => /* @__PURE__ */ new Set([...e, ...n.ancestors.filter((e) => e.has_children).map((e) => e.id)]));
+		n?.ancestors.length && s((e) => /* @__PURE__ */ new Set([...e, ...n.ancestors.filter((e) => e.has_children).map((e) => e.id)]));
 	}, [n?.ancestors]);
-	let f = [...a].map(String), p = dt({ queries: f.map((t) => qF(e, t)) }), m = /* @__PURE__ */ new Map();
-	p.forEach((e, t) => {
-		e.data && m.set(f[t], e.data.children);
-	}), n?.selected && m.set(n.selected.id, n.children);
-	let h = (e) => {
-		let t = m.get(e.id);
+	let p = [...o].map(String), m = dt({ queries: p.map((t) => qF(e, t)) }), h = /* @__PURE__ */ new Map();
+	m.forEach((e, t) => {
+		e.data && h.set(p[t], e.data.children);
+	}), n?.selected && h.set(n.selected.id, n.children);
+	let g = (e) => {
+		let t = h.get(e.id);
 		return /* @__PURE__ */ (0, C.jsx)(KP, {
 			id: e.id,
 			label: e.name,
 			icon: wk,
 			expandedIcon: $ge,
 			trailingContent: e.parent ? void 0 : e.location === "local" ? "本地" : e.location,
-			children: e.has_children ? t ? t.map(h) : /* @__PURE__ */ (0, C.jsx)(KP, {
+			children: e.has_children ? t ? t.map(g) : /* @__PURE__ */ (0, C.jsx)(KP, {
 				id: `${e.id}:loading`,
 				label: "正在读取文件夹",
 				isDisabled: !0
 			}) : null
 		}, e.id);
-	}, g = (e) => {
+	}, _ = (e) => {
 		if (e !== "all") {
 			let t = e.values().next().value;
 			t && !String(t).endsWith(":loading") && r(String(t));
 		}
-	}, _ = i.error || p.find((e) => e.error)?.error;
+	}, v = [a.error, ...m.map((e) => e.error)].find((e) => e && e !== i);
 	return /* @__PURE__ */ (0, C.jsxs)("section", {
 		"aria-label": "文件夹导航",
-		className: "flex min-w-0 flex-col gap-3",
+		className: "catalog-folder-navigation flex min-h-0 min-w-0 flex-col gap-3",
 		children: [
 			/* @__PURE__ */ (0, C.jsx)(SP, {
 				"aria-label": "查找文件夹",
 				placeholder: "查找文件夹",
 				leadingIcon: Ak,
-				value: s,
-				onChange: c,
+				value: c,
+				onChange: l,
 				size: "small"
 			}),
-			_ ? /* @__PURE__ */ (0, C.jsx)(J, {
+			v ? /* @__PURE__ */ (0, C.jsx)(J, {
 				tone: "error",
 				action: /* @__PURE__ */ (0, C.jsx)(q, {
 					variant: "secondary",
 					size: "small",
 					onClick: () => {
-						i.refetch(), p.forEach((e) => {
+						a.refetch(), m.forEach((e) => {
 							e.error && e.refetch();
 						});
 					},
 					children: "重试"
 				}),
-				children: V(_)
+				children: V(v)
 			}) : null,
 			/* @__PURE__ */ (0, C.jsx)("div", {
-				className: "relative",
+				className: "relative flex min-h-0 flex-col",
 				children: /* @__PURE__ */ (0, C.jsx)("div", {
-					ref: d,
+					ref: f,
 					className: "folder-tree-scroller",
-					children: i.isPending ? /* @__PURE__ */ (0, C.jsx)("div", {
+					children: a.error ? null : a.isPending ? /* @__PURE__ */ (0, C.jsx)("div", {
 						"data-skeleton": "",
 						"aria-busy": "true",
 						"aria-label": "正在读取目录树",
 						className: "h-60 w-full rounded-xl skeleton-sheen"
-					}) : l ? /* @__PURE__ */ (0, C.jsx)("div", {
+					}) : u ? /* @__PURE__ */ (0, C.jsx)("div", {
 						className: "flex flex-col gap-1",
-						children: u.isPending ? /* @__PURE__ */ (0, C.jsx)("div", {
+						children: d.isPending ? /* @__PURE__ */ (0, C.jsx)("div", {
 							"data-skeleton": "",
 							"aria-busy": "true",
 							className: "h-8 skeleton-sheen",
 							"aria-label": "正在查找文件夹"
-						}) : u.error ? /* @__PURE__ */ (0, C.jsx)(J, {
+						}) : d.error ? /* @__PURE__ */ (0, C.jsx)(J, {
 							tone: "error",
-							children: V(u.error)
-						}) : u.data?.matches.length ? u.data.matches.map((e) => /* @__PURE__ */ (0, C.jsx)(q, {
+							children: V(d.error)
+						}) : d.data?.matches.length ? d.data.matches.map((e) => /* @__PURE__ */ (0, C.jsx)(q, {
 							variant: "secondary",
 							size: "small",
 							leadingIcon: wk,
 							onClick: () => {
-								c(""), r(e.id);
+								l(""), r(e.id);
 							},
 							children: e.name
 						}, e.id)) : /* @__PURE__ */ (0, C.jsx)(cA, {
@@ -47337,17 +47337,18 @@ function mCe({ scope: e, selected: t, current: n, go: r }) {
 					}) : /* @__PURE__ */ (0, C.jsx)(Xxe, {
 						"aria-label": "媒体目录",
 						size: "sm",
-						expandedKeys: a,
-						onExpandedChange: o,
+						className: "data-[empty]:p-0",
+						expandedKeys: o,
+						onExpandedChange: s,
 						selectedKeys: new Set(t ? [t] : []),
-						onSelectionChange: g,
+						onSelectionChange: _,
 						renderEmptyState: () => /* @__PURE__ */ (0, C.jsx)(cA, {
 							shell: "plain",
 							icon: wk,
 							title: "尚未添加媒体目录",
 							children: "在媒体库设置中添加目录并扫描。"
 						}),
-						children: i.data?.roots.map(h)
+						children: a.data?.roots.map(g)
 					})
 				})
 			})
