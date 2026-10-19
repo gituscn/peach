@@ -2,13 +2,15 @@
 
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { ColumnResizer, ResizableTableContainer } from 'react-aria-components';
 import {
   createColumnHelper, flexRender, rowPaginationFeature, rowSelectionFeature, rowSortingFeature,
-  tableFeatures, useTable, type RowSelectionState, type SortingState,
+  columnVisibilityFeature, tableFeatures, useTable, type RowSelectionState, type SortingState,
 } from '@tanstack/react-table';
 import { cardArtwork, relayoutCovers } from '@peach/card-art';
 import { fmtDur, fmtSize, requestErrorMessage } from '@peach/legacy/core';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
+import { Button } from '@/components/base/buttons/button';
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@/components/base/table/table';
 import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 import { apiGet } from '../../api';
@@ -19,9 +21,11 @@ import { RetryNote } from '../components/grid-reveal';
 import { LibraryCompletionPrompt, missingPreviewIds } from '../library-processing/library-completion';
 import { catalogParams } from './catalog-grid';
 import type { CatalogGridProps, MediaItem, MediaPage } from './types';
+import { columnSizes, useCatalogColumnVisibility, useCatalogColumnWidths } from './catalog-column-widths';
+import { CatalogColumnMenu, CatalogRating, catalogTableDate } from './catalog-table-controls';
 import './catalog-list.css';
 
-const features = tableFeatures({ rowSortingFeature, rowSelectionFeature, rowPaginationFeature });
+const features = tableFeatures({ rowSortingFeature, rowSelectionFeature, rowPaginationFeature, columnVisibilityFeature });
 const sortOptions = [
   { id: 'name', label: '名称' }, { id: 'dur', label: '时长' }, { id: 'size', label: '体积' },
   { id: 'new', label: '入库时间' }, { id: 'release', label: '发行时间' },
@@ -34,6 +38,8 @@ const positions = new Map<string, ListState>();
 
 /** 服务端对完整筛选结果排序、分页；选择集及批量栏归现有馆藏控制器。 */
 export function CatalogListPage(props: CatalogGridProps) {
+  const sizing = useCatalogColumnWidths();
+  const visibility = useCatalogColumnVisibility();
   const params = catalogParams(props.filters || {}, false);
   const [scope] = useState(() => {
     const position = new URLSearchParams(params);
@@ -92,18 +98,34 @@ export function CatalogListPage(props: CatalogGridProps) {
         isSelected={row.getIsSelected()} onChange={on => row.toggleSelected(on)} /> }),
       helper.accessor(item => item.name || '', { id: 'name', header: '名称', enableSorting: true,
         cell: ({ row }) => <ListIdentity item={row.original} props={props} disabled={result.isPlaceholderData} /> }),
+      helper.display({ id: 'code', header: '番号', cell: ({ row }) => row.original.code || '—' }),
       helper.accessor(item => item.duration, { id: 'dur', header: '时长', enableSorting: true,
         cell: ({ row }) => fmtDur(row.original.duration) || '—' }),
+      helper.display({ id: 'resolution', header: '分辨率', cell: ({ row }) => {
+        const { width, height } = row.original;
+        return width && height ? `${width} × ${height}` : '—';
+      } }),
       helper.accessor(item => item.size, { id: 'size', header: '体积', enableSorting: true,
         cell: ({ row }) => row.original.size == null ? '—' : fmtSize(row.original.size) }),
+      helper.accessor(item => item.rating, { id: 'rating', header: '评分', enableSorting: true,
+        cell: ({ row }) => <CatalogRating rating={row.original.rating} /> }),
       helper.accessor(item => item.play_count, { id: 'plays', header: '观看次数', enableSorting: true,
         cell: ({ row }) => Number(row.original.play_count || 0).toLocaleString() }),
+      helper.accessor(item => item.o_count, { id: 'o', header: '高潮计数', enableSorting: true,
+        cell: ({ row }) => Number(row.original.o_count || 0).toLocaleString() }),
+      helper.accessor(item => item.last_played, { id: 'played', header: '观看时间', enableSorting: true,
+        cell: ({ row }) => catalogTableDate(row.original.last_played) }),
+      helper.accessor(item => item.first_seen, { id: 'new', header: '入库时间', enableSorting: true,
+        cell: ({ row }) => catalogTableDate(row.original.first_seen) }),
+      helper.accessor(item => item.release_date, { id: 'release', header: '发行时间', enableSorting: true,
+        cell: ({ row }) => row.original.release_date || '—' }),
     ]);
   }, [props.helpers, props.actions, props.layout, props.selectMode, result.isPlaceholderData]);
   const table = useTable({
     features, columns, data: items, getRowId: item => String(item.id),
     manualSorting: true, manualPagination: true, rowCount: total,
-    state: { sorting, pagination, rowSelection },
+    state: { sorting, pagination, rowSelection, columnVisibility: visibility.visibility },
+    onColumnVisibilityChange: visibility.change,
     onSortingChange: updater => setState(now => ({
       sorting: typeof updater === 'function' ? updater(now.sorting) : updater,
       pagination: { ...now.pagination, pageIndex: 0 },
@@ -120,21 +142,31 @@ export function CatalogListPage(props: CatalogGridProps) {
   });
   return <div data-catalog-view-mode="list" data-catalog-table="" aria-busy={result.isFetching || undefined} className="flex min-w-0 flex-col gap-4">
     <div className="flex flex-wrap justify-end gap-2" role="toolbar" aria-label="作品列表工具栏">
+      <CatalogColumnMenu columns={table.getAllLeafColumns().filter(column => column.id !== 'select' && column.id !== 'name')
+        .map(column => ({ id: column.id, label: String(column.columnDef.header), visible: column.getIsVisible() }))}
+        onChange={(id, visible) => table.getColumn(id)?.toggleVisibility(visible)}
+        onReset={() => table.toggleAllColumnsVisible(true)} onDefaults={() => table.setColumnVisibility({})} />
+      <Button variant="secondary" size="small" onClick={sizing.reset}>重置列宽</Button>
       <DataTableSort label="作品列表" options={sortOptions} sorting={sorting}
         onChange={next => table.setSorting(next)} />
     </div>
     <LibraryCompletionPrompt assetIds={props.filters?.state === 'trash' ? [] : missingPreviewIds(items, props.layout.javImage)} />
     {result.isError ? <RetryNote message={requestErrorMessage(result.error)} onRetry={() => void result.refetch()} /> : null}
+    <ResizableTableContainer className="min-w-0" onResize={sizing.resize} onResizeEnd={sizing.save}>
     <DataTableFrame follow onRowClick={id => { if (!result.isPlaceholderData) props.actions.toggleSelection(Number(id), false) }}>
       <Table aria-label="作品列表" size="sm"
         sortDescriptor={sort ? { column: sort.id, direction: sort.desc ? 'descending' : 'ascending' } : undefined}
         onSortChange={next => table.setSorting([{ id: String(next.column), desc: next.direction === 'descending' }])}>
         <TableHeader>{table.getHeaderGroups()[0]!.headers.map((header, index) =>
-          <TableColumn key={header.id} id={header.id} isRowHeader={index === 1} allowsSorting={header.column.getCanSort()}>
-            {({ sortDirection }) => <span className="flex items-center gap-0.5">
+          <TableColumn key={header.id} id={header.id} isRowHeader={index === 1} allowsSorting={header.column.getCanSort()}
+            width={sizing.widths[header.id]} minWidth={columnSizes[header.id]!.min} maxWidth={columnSizes[header.id]!.max}>
+            {({ sortDirection }) => <>
+            <span className="flex items-center gap-0.5">
               {flexRender(header.column.columnDef.header, header.getContext())}
               {header.column.getCanSort() ? <span data-sort-indicator data-direction={sortDirection || undefined}><ChevronSortDown /></span> : null}
-            </span>}
+            </span>
+            {header.id !== 'select' ? <ColumnResizer aria-label={`调整${String(header.column.columnDef.header)}列宽`} /> : null}
+            </>}
           </TableColumn>)}</TableHeader>
         <TableBody renderEmptyState={() => result.isPending
           ? <div data-skeleton="" data-table-skeleton="" aria-busy="true" role="status" aria-label="正在读取作品列表">
@@ -142,11 +174,12 @@ export function CatalogListPage(props: CatalogGridProps) {
           </div> : result.isError ? '作品列表未取得' : '没有符合的作品'}>
           {table.getRowModel().rows.map(row => <TableRow key={row.id} id={row.id} data-catalog-row="" data-id={row.original.id}
             data-board-selected={row.getIsSelected() || undefined}>
-            {row.getAllCells().map(cell => <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}
+            {row.getVisibleCells().map(cell => <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}
           </TableRow>)}
         </TableBody>
       </Table>
     </DataTableFrame>
+    </ResizableTableContainer>
     {result.data ? <DataTableFooter label="作品列表" total={total} pagination={pagination}
       onChange={next => table.setPagination(next)} unit="部作品" pageUnit="部" /> : null}
   </div>;
@@ -167,7 +200,7 @@ function ListIdentity({ item, props, disabled }: { item: MediaItem; props: Catal
       <span data-list-picture="">{artwork.html
         ? <ArtSlot artwork={artwork} relayout={root => relayoutCovers(root, 'small')} /> : <span>无预览</span>}</span>
       <span data-list-text=""><span data-list-name="" title={name}>{name}</span>
-        <span data-list-byline="">{who || '未归属'}<span data-list-mobile-metrics="">{fmtDur(item.duration)} · {fmtSize(item.size)}</span></span>
+        <span data-list-byline="">{who || '未归属'}</span>
       </span>
     </button>
   </div>;

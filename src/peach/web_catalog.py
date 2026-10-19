@@ -346,7 +346,7 @@ def q_items(contract: WebContract, args):
     sql = ("SELECT a.id,a.location,a.path,a.name,a.catalog_title,a.original_title,a.medium,"
            "a.creator,a.studio,a.code,a.release_date,a.size,"
            "a.duration,a.width,a.height,a.ctx_length,a.ctx_orient,a.snapshot_path,"
-           "a.play_count,a.leave_ratio,a.feedback,a.disposal,a.disposal_reason,a.rating,a.o_count,"
+           "a.play_count,a.first_seen,a.last_played,a.leave_ratio,a.feedback,a.disposal,a.disposal_reason,a.rating,a.o_count,"
            "a.play_seconds,a.max_reached,a.seek_count,a.region,"
            f"{EFFECTIVE_REGION_SQL} AS effective_region,"
            "EXISTS(SELECT 1 FROM watch_queue w WHERE w.asset_id=a.id "

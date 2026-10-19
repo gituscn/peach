@@ -25,6 +25,19 @@ from support.ledger import fresh_ledger
 
 
 class WebDataTests(unittest.TestCase):
+    def test_catalog_projects_dates_and_counts_used_for_table_sorting(self):
+        with self.contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET first_seen=?,last_played=?,o_count=2,rating=80 WHERE id=1",
+                               ("2026-01-03", "1767312000"))
+        for args in ({"sort": "played", "dir": "desc"}, {"loc": "local", "sort": "new"}):
+            rows = q_items(self.contract, args)["items"]
+            item = next(row for row in rows if row["id"] == 1)
+            self.assertEqual(item["first_seen"], "2026-01-03")
+            self.assertEqual(str(item["last_played"]), "1767312000")
+            self.assertEqual((item["o_count"], item["rating"]), (2, 80))
+        missing = next(row for row in q_items(self.contract, {})["items"] if row["id"] == 2)
+        self.assertIsNone(missing["last_played"])
+
     def test_recycle_bin_reasons_round_trip_and_restore_clears_them(self):
         for reason in ("manual", "junk", "duplicate", "missing"):
             rm_web.w_batch(self.contract, {"ids": [1], "operation": "dispose", "disposal_reason": reason})
