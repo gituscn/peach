@@ -207,6 +207,16 @@ class CommitMessageGuardTests(_WorktreeCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("README-Impact", result.stderr)
 
+    def test_counterpart_review_trailer_requires_a_file_reason_and_contiguous_block(self):
+        for declaration in ("README-Reviewed: README.en.md; 已核对\n\n",
+                            "README-Reviewed: README.en.md;\n",
+                            "README-Reviewed: unknown.md; 已核对\n"):
+            result = self.attempt("test: 核对声明\n\n" + declaration + AUTHOR)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("README-Reviewed", result.stderr)
+        result = self.attempt("test: 核对声明\n\nREADME-Reviewed: README.en.md; 英文正确\n" + AUTHOR)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_valid_trailers_and_amend_preserve_the_message(self):
         message = ("test: 中文提交\n\nREADME-Impact: updated; 两种语言\n" + AUTHOR
                    + "\nCo-Authored-By: Claude Code (Opus 5) <noreply@anthropic.com>\n")
@@ -595,9 +605,21 @@ class ReadmeImpactTests(unittest.TestCase):
         self.save("src/peach/example.py", "x = 1")
         self.assertEqual(self.commit("README-Impact: none; 内部缓存实现，使用方式不变"), [])
 
-    def test_updated_requires_both_languages(self):
+    def test_single_language_update_requires_counterpart_review(self):
         self.save("README.md", "新内容")
         self.assertTrue(self.commit("README-Impact: updated; 功能说明"))
+
+    def test_single_language_typo_accepts_explicit_counterpart_review(self):
+        self.save("README.md", "修正错字")
+        self.assertEqual(self.commit("README-Impact: updated; 中文错字\n"
+                                     "README-Reviewed: README.en.md; 英文表述正确，无需修改"), [])
+
+    def test_counterpart_review_requires_correct_file_and_reason(self):
+        self.save("README.md", "修正错字")
+        for trailer in ("README-Reviewed: README.md; 已核对", "README-Reviewed: README.en.md;",
+                        "README-Reviewed: README.en.md; 已核对\nREADME-Reviewed: README.en.md; 重复"):
+            self.assertTrue(self.commit("README-Impact: updated; 中文错字\n" + trailer))
+            git(self.repo, "reset", "--soft", "HEAD^")
 
     def test_bilingual_update_accepts_review(self):
         self.save("README.md", "新内容")

@@ -3,7 +3,6 @@
 检查顶层布局、工作树登记、私有产物和公开文档中的个人信息。
 """
 import ast
-import os
 import pathlib
 import re
 import socket
@@ -359,25 +358,31 @@ def _repository_identity(repo: pathlib.Path = REPO) -> frozenset[str]:
 
 
 def _this_machine_guard(names, identity) -> re.Pattern[str] | None:
-    """把「只属于这台机器」的名字编成正则，先剔掉仓库自己的归属名。
+    """只在网址、挂载目录和账号/主机配置中匹配本机名字。
 
-    剔除是必需的：维护者的账号名可以同时是公开仓库的 owner，那时
-    `github.com/<owner>/…`、`io.github.<owner>.…`、`Copyright (C) <年> <owner>` 和发行名
-    候选都是这个名字正当出现的地方，全树扫名字会把它们一并判成本机坐标，判据也就在
-    维护者自己的机器上永远不成立。剔除不放过真的坐标：`/Users/<owner>/…`、
-    `<owner>.local`、`smb://<owner>@…` 都是形状，`MACHINE_COORDINATE` 那条与名字是谁无关。
-
-    名字全被剔掉时返回 `None`。空的 `(?:)` 会在任何位置匹配成功，那不是更严格，是全错。
+    仓库公开归属不属于个人坐标；用户目录与 mDNS 等坐标仍由 MACHINE_COORDINATE
+    检查。无剩余名字时返回 None，避免空正则匹配全部内容。
     """
     remaining = sorted(name for name in names if name and name.casefold() not in identity)
     if not remaining:
         return None
-    return re.compile(r"(?<![\w-])(?:" + "|".join(map(re.escape, remaining)) + r")(?![\w-])",
-                      re.IGNORECASE)
+    names_pattern = r"(?:" + "|".join(map(re.escape, remaining)) + r")"
+    context = (r"(?:https?://|smb://|\\\\|/Volumes/|/mnt/|/media/)"
+               r"|\b(?:username|user_name|hostname|smb_host|account)['\"]?\s*[:=]\s*['\"]?")
+    return re.compile("(?:" + context + ")" + names_pattern + r"(?![\w.-])", re.IGNORECASE)
 
 
 class PersonalLiteralTests(unittest.TestCase):
     """`src/peach/` 里不许留只对某一台机器成立的默认值。"""
+
+    def test_common_machine_names_require_coordinate_context(self):
+        guard = _this_machine_guard({"test", "desktop"}, frozenset())
+        for text in ("test the desktop app", "https://example.invalid/test", "desktop-client", "accounting test"):
+            self.assertIsNone(guard.search(text), text)
+        for text in ("https://desktop/media", "smb://test/share", r"\\desktop\share",
+                     "/Volumes/test/media", "hostname = 'desktop'", "username: test",
+                     '{"hostname": "desktop"}', '{"username": "test"}'):
+            self.assertIsNotNone(guard.search(text), text)
 
     def test_no_module_hardcodes_a_personal_coordinate(self):
         source = pathlib.Path(peach.__file__).parent
@@ -508,8 +513,6 @@ class MachineCoordinateTests(unittest.TestCase):
         `_this_machine_guard`。本文件自己也扫：形状门槛豁免它是因为它要写出形状，
         可它没有理由写出这台机器。
         """
-        if os.environ.get("GITHUB_ACTIONS"):
-            self.skipTest("CI 靶机的账号名是 runner，文档里会正当地提到它")
         hostname = socket.gethostname()
         names = {pathlib.Path.home().name, hostname, hostname.split(".", 1)[0]}
         this_machine = _this_machine_guard(names, _repository_identity())

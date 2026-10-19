@@ -96,6 +96,39 @@ class CIFrontendOwnershipTests(unittest.TestCase):
 
 
 class TestPlanningTests(unittest.TestCase):
+    def test_comments_and_display_metadata_select_checks_without_hiding_logic(self):
+        fixtures = {
+            'tests/support/ledger.py': ('x = 1\n', '# 说明\nx = 1\n'),
+            'scripts/test_runner.py': ('x = 1\n', 'x = 1 # 说明\n'),
+            'frontend/package.json': ('{"description":"a","scripts":{"test":"x"}}',
+                                      '{"description":"b","scripts":{"test":"x"}}'),
+            'pyproject.toml': ('[project]\ndependencies=[]\n', '# 说明\n[project]\ndependencies=[]\n'),
+        }
+        for path, content in fixtures.items():
+            with self.subTest(path=path):
+                self.assertEqual(runner.scopes_for_changes([path], contents={path: content})[0], ('checks',))
+                plan = ci_plan.plan('pull_request', [path], {path: content})
+                self.assertFalse(plan['browser'])
+                self.assertFalse(plan['frontend'])
+        for content in (('x = 1', 'x = 2'), ('"help a"', '"help b"'), ('x = 1', 'x = (')):
+            self.assertEqual(runner.scopes_for_changes(['tests/support/ledger.py'],
+                                                     contents={'tests/support/ledger.py': content})[0], ('full',))
+
+    def test_ci_jobs_follow_their_own_inputs(self):
+        for path in ('tests/test_follow_store.py', 'tests/test_metadata_sources.py',
+                     '.github/workflows/project-board.yml'):
+            with self.subTest(path=path):
+                plan = ci_plan.plan('pull_request', [path])
+                self.assertFalse(plan['browser'])
+                self.assertFalse(plan['wheel'])
+        for path in ('src/peach/server.py', 'src/peach/auth.py', 'frontend/src/core/index.ts',
+                     'tests/test_web_e2e.py', 'frontend/e2e/setup.test.ts'):
+            with self.subTest(path=path):
+                self.assertTrue(ci_plan.plan('pull_request', [path])['browser'])
+        self.assertTrue(ci_plan.plan('pull_request', ['.github/workflows/release.yml'])['wheel'])
+        self.assertTrue(ci_plan.plan('pull_request', ['.github/workflows/upgrade-smoke.yml'])['wheel'])
+        self.assertTrue(ci_plan.plan('pull_request', ['.github/workflows/unknown.yml'])['wide'])
+
     def setUp(self):
         environment = patch.dict(os.environ, {'PEACH_TEST_FOCUS': '', 'PEACH_E2E_FILES': ''})
         environment.start()

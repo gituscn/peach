@@ -1359,10 +1359,7 @@ class WebDataTests(unittest.TestCase):
                          "请改调 tag_is_not_a_performer_name()")
 
     def test_item_tag_rolls_back_and_closes_when_the_entity_write_fails(self):
-        """加标签是一个事务：实体那步失败时 asset_tag 不能留下半条记录，连接也要关掉。
-
-        改用 write_transaction 之前这里是手动 commit/close，只有「资产不存在」那条
-        路径会关连接，任何 execute 抛出都既不回滚也不关闭。"""
+        """加标签是一个事务：实体写入失败时回滚 asset_tag，并在所有分支关闭连接。"""
         opened = []
         real_connect = self.contract.database.connect
 

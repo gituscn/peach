@@ -15,7 +15,7 @@ from . import check_readme_impact, co_author
 def check(repo: Path, message: str) -> list[str]:
     parsed = check_readme_impact.trailers(repo, message)
     problems = co_author.problems("待提交", parsed.get("co-authored-by", []))
-    for name in ("Co-Authored-By", "README-Impact"):
+    for name in ("Co-Authored-By", "README-Impact", "README-Reviewed"):
         mentioned = sum(line.partition(":")[0].casefold() == name.casefold()
                         for line in message.splitlines())
         values = parsed.get(name.casefold(), [])
@@ -23,6 +23,8 @@ def check(repo: Path, message: str) -> list[str]:
             problems.append(f"{name} 须连续放在提交消息末尾的同一块，中间不要留空行。")
         if name == "README-Impact" and (mentioned or values):
             problems.extend(check_readme_impact.declaration(values)[1])
+        if name == "README-Reviewed" and (mentioned or values):
+            problems.extend(check_readme_impact.reviewed_declaration(values))
     return problems
 
 

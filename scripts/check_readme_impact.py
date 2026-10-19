@@ -59,6 +59,17 @@ def declaration(values: list[str]) -> tuple[str, list[str]]:
     return status, []
 
 
+def reviewed_declaration(values: list[str], counterpart: str | None = None) -> list[str]:
+    """另一语言的核对声明必须唯一，指明文件及无需修改的原因。"""
+    if len(values) != 1:
+        return ["README-Reviewed 须有唯一的未改 README 文件名和原因"]
+    name, separator, reason = values[0].partition(";")
+    allowed = {counterpart} if counterpart else READMES
+    if name.strip() not in allowed or not separator or not reason.strip():
+        return ["README-Reviewed 须填写未改 README 文件名，并在英文分号后写明无需修改的原因"]
+    return []
+
+
 def check(repo: Path, base: str, head: str = "HEAD") -> list[str]:
     """以实际交付差异和最后提交的 Git trailer 为依据。"""
     paths = set(git(repo, "diff", "--name-only", "--no-renames", "-z",
@@ -72,9 +83,12 @@ def check(repo: Path, base: str, head: str = "HEAD") -> list[str]:
     if problems:
         return problems
     if touched and touched != READMES:
-        return ["README.md 与 README.en.md 必须同批维护"]
-    if status == "updated" and touched != READMES:
-        return ["README-Impact 声明 updated，但交付差异未包含两份 README"]
+        reviewed = trailers(repo, message).get("readme-reviewed", [])
+        other = next(iter(READMES - touched))
+        if problems := reviewed_declaration(reviewed, other):
+            return problems
+    if status == "updated" and not touched:
+        return ["README-Impact 声明 updated，但交付差异未包含 README"]
     if status == "none" and touched:
         return ["README-Impact 声明 none，但交付差异包含 README"]
     return []

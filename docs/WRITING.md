@@ -60,6 +60,10 @@ uv run --locked --extra dev seiso policy
 
 正式测试入口的文案检查执行 seiso 稳定规则，并保留 [最终状态检查器](../scripts/check_copy_final_state.py)。预览规则仅供人工复核，不作为 CI 门槛；语言风格、内容真伪和界面适配也不能由 seiso 的通过结果证明。
 
+最终状态检查共用 `scripts/copy-rules.json`。明确叙述实现变更、测试名称描述变更过程时拒绝通过；可能属于条件说明的词语只提示人工核对。合法条件说明不需要添加豁免标记。明确需要保留的事故原文仍用 `copy-lint-disable-line` 逐行说明例外。
+
+Python 检查读取 AST 字符串、f-string 静态片段及注释；HTML 读取正文、注释和可见属性。JS/TS 由 `frontend/scripts/copy-check.mjs` 使用 Oxc 解析注释、字符串、模板及 JSX，忽略变量名、静态属性键和模块路径。前端文案检查随正式入口的前端 lint 用例执行，CI 由 `web-bundle` 执行；纯 Python 文档检查不要求安装 Node。
+
 提交模板不是成稿；`docs/reference-snapshots/upstream/` 保存第三方原文，相对链接属于上游仓库。这两类在配置中排除。Peach 自己撰写的取证摘要、ADR、技能和依赖来源说明仍接受检查；构建目录、依赖安装目录不属于项目文档。
 
 必要例外按 [seiso 的例外语法](https://github.com/scarletkc/seiso/blob/main/docs/guides/checking.md#explain-an-exception) 写明完整规则编号和原因。规则提示需先判断是否成立，不能通过扩大排除范围掩盖项目问题。

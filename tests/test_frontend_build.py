@@ -369,6 +369,9 @@ class VitestTests(unittest.TestCase):
         self.assertEqual(report["diagnostics"], [], output)
         # 没有问题时 Oxlint 什么都不打印，路径写错查了 0 个文件也照样退出 0。
         self.assertGreater(report["number_of_files"], 0, output)
+        copy = subprocess.run([npm, "--prefix", str(FRONTEND), "run", "check:copy"],
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=FRONTEND)
+        self.assertEqual(copy.returncode, 0, copy.stdout + copy.stderr)
 
     def test_the_island_suite_passes(self):
         npm = self._npm("vitest", "vitest")

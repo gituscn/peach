@@ -12,7 +12,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import tomllib
 import unittest
 from collections.abc import Iterable
 from contextlib import nullcontext
@@ -25,7 +24,7 @@ TESTS = ROOT / "tests"
 if not __package__:
     sys.path.insert(0, str(ROOT))
     __package__ = "scripts"
-from . import test_evidence
+from . import change_impact, test_evidence, test_progress
 
 COMMON_PATTERNS = ("test_context_budget.py", "test_test_collection.py", "test_complexity_ratchet.py",
                    "test_source_assertion_ratchet.py", "test_python_lint.py")
@@ -339,7 +338,7 @@ AUTO_SCOPE_PREFIXES: tuple[tuple[str, str | tuple[str, ...]], ...] = (
 FULL_ONLY_PREFIXES: tuple[str, ...] = (
     "pyproject.toml",
     "scripts/test_runner.py", "scripts/test_evidence.py", "scripts/test.ps1", "scripts/test.sh",
-    "scripts/ci_plan.py", "scripts/test_environment.py", "uv.lock",
+    "scripts/ci_plan.py", "scripts/test_environment.py", "scripts/change_impact.py", "scripts/test_progress.py", "uv.lock",
     "migrations/",
     "tests/support/",
     "package.json",
@@ -402,73 +401,88 @@ def repository_paths_read_by(source: str) -> tuple[str, ...]:
 
 
 def dependency_inputs(source: str) -> dict:
-    """只忽略不改变依赖图的 uv 工具版本和项目展示字段。"""
-    data = tomllib.loads(source)
-    project = data.get("project", {})
-    uv = dict(data.get("tool", {}).get("uv", {}))
-    uv.pop("required-version", None)
-    return {"build": data.get("build-system"), "requires-python": project.get("requires-python"),
-            "dependencies": project.get("dependencies"), "extras": project.get("optional-dependencies"),
-            "groups": data.get("dependency-groups"), "uv": uv}
+    """提取依赖输入，供调用方比较构建与运行环境。"""
+    return change_impact.dependency_inputs(source)
 
 
 def changed_contents(root: Path, base: str, paths: Iterable[str]) -> dict:
     result = {}
-    if "pyproject.toml" in paths:
+    for path in paths:
+        if not (path.endswith(".py") or path in {*change_impact.PACKAGE_FILES, "pyproject.toml"}):
+            continue
         try:
-            result["pyproject.toml"] = (test_evidence.git(root, "show", f"{base}:pyproject.toml"),
-                                        (root / "pyproject.toml").read_text(encoding="utf-8"))
+            raw = test_evidence.git(root, "diff", "--raw", base, "--", path)
+            if raw and len(raw.split()) >= 2 and raw.split()[0].lstrip(":") != raw.split()[1]:
+                result[path] = (None, None)
+                continue
+            result[path] = (test_evidence.git(root, "show", f"{base}:{path}"),
+                            (root / path).read_text(encoding="utf-8"))
         except (OSError, subprocess.CalledProcessError):
             pass
     return result
 
 
-def scopes_for_changes(paths: Iterable[str], *, contents: dict | None = None) -> tuple[tuple[str, ...], str]:
-    """纯函数：改动文件清单 → (要跑的域, 一行说明)。
+def special_scopes(path: str, kind: str) -> tuple[str, ...] | None:
+    """内容类型、共享设施和工作流职责的优先边界。"""
+    if kind == "unsafe":
+        return ("full",)
+    if kind == "prose":
+        return ("checks",)
+    if kind == "metadata":
+        return ("packaging",)
+    if kind == "version":
+        return ("tooling",)
+    if path == "scripts/copy-rules.json":
+        return ("checks", "web")
+    if change_impact.documentation(path):
+        return AUTO_SCOPE_FILES.get(path, ("checks",))
+    if path.startswith(("scripts/build_", "scripts/release_")) \
+            or path in {".github/workflows/release.yml", ".github/workflows/upgrade-smoke.yml"}:
+        return ("packaging", "tooling")
+    if path.startswith(".github/workflows/"):
+        return ("tooling",) if path in {".github/workflows/project-board.yml", ".github/workflows/docker.yml"} else ("full",)
+    if path.rsplit("/", 1)[-1] == "conftest.py" or any(path.startswith(p) for p in FULL_ONLY_PREFIXES):
+        return ("full",)
+    return None
 
-    退化为 `full` 的条件只有两个：某个文件映射不到任何域，或改动触及必须 full 的面。
-    """
+
+def mapped_scopes(path: str) -> tuple[str, ...]:
+    """按显式映射、测试归属和模块测试名定位功能域。"""
+    name = path.rsplit("/", 1)[-1]
+    if path in AUTO_SCOPE_FILES:
+        return AUTO_SCOPE_FILES[path]
+    if path.startswith("tests/test_") and path.endswith(".py"):
+        return scopes_of_test_file(name)
+    for prefix, scope in AUTO_SCOPE_PREFIXES:
+        if path.startswith(prefix):
+            return (scope,) if isinstance(scope, str) else scope
+    if path.startswith("src/peach/") and path.endswith(".py"):
+        return scopes_of_module(name.removesuffix(".py"))
+    return ()
+
+
+def scopes_for_changes(paths: Iterable[str], *, contents: dict | None = None,
+                       kinds: dict | None = None) -> tuple[tuple[str, ...], str]:
+    """纯函数：改动清单与可选内容差异 → 验证范围和原因。"""
     picked: dict[str, list[str]] = {}
-    full_reasons: list[str] = []
+    full_reasons = []
     for raw in paths:
         path = raw.replace("\\", "/").strip("/")
         if not path:
             continue
-        name = path.rsplit("/", 1)[-1]
-        if path == "pyproject.toml" and contents and path in contents:
-            try:
-                before, after = contents[path]
-                if dependency_inputs(before) == dependency_inputs(after):
-                    picked.setdefault("packaging", []).append(path)
-                    continue
-            except (ValueError, TypeError):
-                pass
-        if path.startswith(("scripts/build_", "scripts/release_", ".github/workflows/")):
-            picked.setdefault("packaging", []).append(path)
-            picked.setdefault("tooling", []).append(path)
-            continue
-        if name == "conftest.py" or any(path.startswith(p) for p in FULL_ONLY_PREFIXES):
-            full_reasons.append(f"{path} 属于必须 full 的面")
-            continue
-        scopes: tuple[str, ...] = ()
-        if path in AUTO_SCOPE_FILES:
-            scopes = AUTO_SCOPE_FILES[path]
-        elif path.startswith("tests/test_") and path.endswith(".py"):
-            scopes = scopes_of_test_file(name)
-        elif path.endswith(".md"):
-            scopes = ("checks",)
-        else:
-            for prefix, scope in AUTO_SCOPE_PREFIXES:
-                if path.startswith(prefix):
-                    scopes = (scope,) if isinstance(scope, str) else scope
-                    break
-            if not scopes and path.startswith("src/peach/") and path.endswith(".py"):
-                scopes = scopes_of_module(name.removesuffix(".py"))
+        kind = (kinds or {}).get(path, "logic")
+        if contents and path in contents:
+            kind = change_impact.kind(path, *contents[path])
+        scopes = special_scopes(path, kind)
+        if scopes is None:
+            scopes = mapped_scopes(path)
         if not scopes:
             full_reasons.append(f"{path} 映射不到任何域")
-            continue
-        for scope in scopes:
-            picked.setdefault(scope, []).append(path)
+        elif "full" in scopes:
+            full_reasons.append(f"{path} 属于必须 full 的面")
+        else:
+            for scope in scopes:
+                picked.setdefault(scope, []).append(path)
     if full_reasons:
         return ("full",), "Peach auto scope: full <- " + "; ".join(full_reasons)
     if not picked:
@@ -790,28 +804,47 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
 
+def scoped_baseline(record, scopes, needed):
+    """有效域记录只能补齐调用方所需范围，完整基线保留原通过时间。"""
+    if "full" in needed:
+        return None
+    if "full" in record["passed"]:
+        return {"full": record["validated"]["full"]}, needed
+    if "full" in scopes:
+        return None
+    retained = {scope: record["validated"][scope] for scope in scopes
+                if scope in record["passed"] and scope not in needed}
+    if not retained:
+        return None
+    return retained, tuple(scope for scope in scopes if scope not in retained)
+
+
 def incremental_scopes(context, scopes, files, *, failed=()):
     """选择有效基线，只补测受差异影响或缺少记录的域。"""
     choices = []
     if "full" in failed:
         return None, scopes
     for record, delta, version_only in test_evidence.baselines(ROOT, context, partial=True):
-        needed, _ = scopes_for_changes(delta) if delta else ((), "")
+        if record.get("cohort") and record.get("coverage"):
+            coverage = test_progress.retained(record, context, scopes_for_changes, selected_files)
+            # 已知失败必须实际补测，不能从其他记录恢复同一批文件。
+            invalid = test_progress.names(selected_files, failed)
+            coverage = {name: stamp for name, stamp in coverage.items() if name not in invalid}
+            if coverage:
+                needed = test_progress.pending(coverage, selected_files, SCOPES)
+                weight = len(test_progress.names(selected_files, needed))
+                if weight <= len(files):
+                    choices.append((weight, {**record, "coverage": coverage, "validated": {}}, needed))
+            continue
+        _, kinds = change_impact.delta(record["manifest"], context["manifest"])
+        needed, _ = scopes_for_changes(delta, kinds=kinds) if delta else ((), "")
         if version_only and "full" not in needed:
             needed = tuple(dict.fromkeys((*needed, "tooling")))
         needed = tuple(dict.fromkeys((*needed, *failed)))
-        if "full" in needed:
+        reusable = scoped_baseline(record, scopes, needed)
+        if reusable is None:
             continue
-        if "full" in record["passed"]:
-            retained = {"full": record["validated"]["full"]}
-        else:
-            if "full" in scopes:
-                continue
-            retained = {scope: record["validated"][scope] for scope in scopes
-                        if scope in record["passed"] and scope not in needed}
-            if not retained:
-                continue
-            needed = tuple(scope for scope in scopes if scope not in retained)
+        retained, needed = reusable
         weight = len({p for scope in needed for p in selected_files(scope)})
         if weight <= len(files):
             choices.append((weight, {**record, "validated": retained}, needed))
@@ -834,8 +867,10 @@ def verified_run(args, requested, scopes, files) -> int:
             return 0
         previous = test_evidence.read(ROOT, state)
         baseline = None
-        if requested == ("auto",) and not args.fresh and (not previous or previous.get("passed")):
+        if requested == ("auto",) and not args.fresh and (not previous or previous.get("passed") or previous.get("coverage")):
             baseline, scopes = incremental_scopes(context, scopes, files, failed=previous.get("failed_scopes", ()))
+        actual = len({path for scope in scopes for path in selected_files(scope)})
+        print(f"实际运行：{' '.join(scopes) or '无需补测'}（{actual} 个测试文件）", flush=True)
         folder = test_evidence.evidence_dir(ROOT)
         (folder / f"{state}.json").unlink(missing_ok=True)
         started = time.monotonic()
@@ -844,15 +879,34 @@ def verified_run(args, requested, scopes, files) -> int:
         stable = state == test_evidence.key(ROOT)
         success = passed and stable
         slowest = sorted(timings, reverse=True)[:20]
+        cohort, coverage = test_progress.after_run(context, scopes, success, previous, baseline,
+                                                   selected_files, time.time())
+        if success and test_progress.completion(coverage, selected_files):
+            previous = {**previous, "validated": {**previous.get("validated", {}), "full": min(coverage.values())}}
         test_evidence.write(ROOT, state, scopes, success=success, previous=previous,
                             context=context, baseline=baseline,
+                            cohort=cohort, coverage=coverage,
                             elapsed=time.monotonic() - started, slowest=slowest, count=count)
         for seconds, name in slowest[:5]:
             print(f"慢测试 {seconds:.3f}s：{name}", flush=True)
         if not stable:
-            print("验证期间代码或依赖环境改变，本次记录无效。", flush=True)
+            retain_inflight(context, scopes, passed, previous, baseline, count)
             return 4
         return 0 if success else 1
+
+
+def retain_inflight(context, scopes, passed, previous, baseline, count):
+    """运行中改动只保留同环境、完整批次中未受影响的结果。"""
+    current = test_evidence.inputs(ROOT)
+    cohort, coverage = test_progress.after_run(context, scopes, passed, previous, baseline,
+                                               selected_files, time.time())
+    source = {**context, "cohort": cohort, "coverage": coverage}
+    kept = test_progress.retained(source, current, scopes_for_changes, selected_files) if passed else {}
+    if kept:
+        test_evidence.write(ROOT, current["state"], (), success=False, previous={}, context=current,
+                            cohort=cohort, coverage=kept, elapsed=0, slowest=[], count=count)
+    print(f"验证期间代码或依赖环境改变；保留 {len(kept)} 个未受影响的文件结果。"
+          "请运行 auto 补齐验证，本次不签发完整通过记录。", flush=True)
 
 
 if __name__ == "__main__":

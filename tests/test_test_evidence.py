@@ -16,6 +16,7 @@ from unittest import mock
 from scripts import agent_worktree as coordinator
 from scripts import test_evidence as evidence
 from scripts import test_runner as runner
+from scripts import test_progress
 from support.gitrepo import seed_repository
 
 
@@ -138,6 +139,14 @@ class VerificationTests(unittest.TestCase):
         self.assertEqual(baseline, evidence.snapshot(self.repo))
         (self.repo / "README.md").unlink()
         self.assertNotEqual(baseline, evidence.snapshot(self.repo))
+
+    def test_git_execute_mode_changes_require_full_even_without_content_changes(self):
+        original = evidence.manifest(self.repo)
+        self.git("update-index", "--chmod=+x", "README.md")
+        current = evidence.manifest(self.repo)
+        paths, kinds = runner.change_impact.delta(original, current)
+        self.assertEqual(kinds["README.md"], "unsafe")
+        self.assertEqual(runner.scopes_for_changes(paths, kinds=kinds)[0], ("full",))
 
     def test_repeated_import_path_preserves_dependency_identity(self):
         site = self.root / "site"
@@ -545,6 +554,77 @@ class VerificationTests(unittest.TestCase):
                     unittest.FunctionTestCase(mutate)])):
             self.assertEqual(runner.main(["--scope", "checks"]), 4)
         self.assertFalse(evidence.covers(evidence.read(self.repo, evidence.key(self.repo)), ("checks",)))
+
+    def test_full_run_retains_unaffected_files_then_completes_with_auto(self):
+        mapping = {"full": ("test_checks.py", "test_web.py"), "checks": ("test_checks.py",),
+                   "web": ("test_web.py",)}
+        select = lambda scope: tuple(Path(name) for name in mapping.get(scope, ()))
+
+        def mutate(*args):
+            (self.repo / "README.md").write_text("检查期间的文档修订\n", encoding="utf-8")
+            return True, 2, []
+
+        with redirect_stdout(io.StringIO()), mock.patch.object(runner, "ROOT", self.repo), \
+                mock.patch.object(runner, "selected_files", side_effect=select), \
+                mock.patch.object(runner, "environment_preflight"), \
+                mock.patch.object(runner, "run_local_suite", side_effect=mutate):
+            self.assertEqual(runner.main(["--scope", "full"]), 4)
+        current = evidence.key(self.repo)
+        record = evidence.read(self.repo, current)
+        self.assertEqual(set(record["coverage"]), {"test_web.py"})
+        self.assertFalse(evidence.covers(record, ("full",)))
+        stamp = record["coverage"]["test_web.py"]
+        with redirect_stdout(io.StringIO()), mock.patch.object(runner, "ROOT", self.repo), \
+                mock.patch.object(runner, "selected_files", side_effect=select), \
+                mock.patch.object(runner, "resolve_auto_scope", return_value=(("full",), "fixture")), \
+                mock.patch.object(runner, "environment_preflight"), \
+                mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
+            self.assertEqual(runner.main(["--scope", "auto"]), 0)
+        run.assert_called_once_with(("checks",), 1)
+        record = evidence.read(self.repo, current)
+        self.assertTrue(evidence.covers(record, ("full",)))
+        self.assertEqual(record["validated"]["full"], stamp)
+
+    def test_shared_logic_and_environment_changes_discard_inflight_coverage(self):
+        context = evidence.inputs(self.repo)
+        source = {**context, "cohort": context["state"], "coverage": {"test_web.py": 100}}
+        select = lambda scope: (Path("test_web.py"),)
+        changed = self.repo / "tests/support/shared.py"
+        changed.parent.mkdir(parents=True)
+        changed.write_text("value = 1\n", encoding="utf-8")
+        self.assertEqual(test_progress.retained(source, evidence.inputs(self.repo), runner.scopes_for_changes, select), {})
+        changed.unlink()
+        other = {**context, "environment": "different"}
+        self.assertEqual(test_progress.retained(source, other, runner.scopes_for_changes, select), {})
+        self.assertEqual(test_progress.retained({**source, "cohort": None}, context, runner.scopes_for_changes, select), {})
+
+    def test_content_signatures_preserve_narrow_comment_and_metadata_deltas(self):
+        path = self.repo / "tests/support/shared.py"
+        path.parent.mkdir(parents=True)
+        path.write_text("value = 1\n", encoding="utf-8")
+        original = evidence.inputs(self.repo)
+        path.write_text("# 说明\nvalue = 1\n", encoding="utf-8")
+        _, kinds = runner.change_impact.delta(original["manifest"], evidence.inputs(self.repo)["manifest"])
+        self.assertEqual(kinds["tests/support/shared.py"], "prose")
+        self.assertEqual(runner.scopes_for_changes(kinds, kinds=kinds)[0], ("checks",))
+        original = evidence.manifest(self.repo)
+        (self.repo / "src/peach/__init__.py").write_text('__version__ = "0.7.31"\n', encoding="utf-8")
+        paths, kinds = runner.change_impact.delta(original, evidence.manifest(self.repo))
+        self.assertEqual(runner.scopes_for_changes(paths, kinds=kinds)[0], ("tooling",))
+
+    def test_expired_file_results_cannot_complete_full_coverage(self):
+        state = evidence.key(self.repo)
+        with mock.patch.object(evidence.time, "time", return_value=100):
+            evidence.write(self.repo, state, (), success=False, elapsed=0, slowest=[], count=1,
+                           cohort=state, coverage={"test_web.py": 100})
+        with mock.patch.object(evidence.time, "time", return_value=86501):
+            self.assertEqual(evidence.read(self.repo, state)["coverage"], {})
+
+    def test_pending_coverage_chooses_the_smallest_file_union(self):
+        mapping = {"full": ("a", "b", "c", "d"), "catalog": ("a", "b", "d"),
+                   "media": ("b", "c", "d"), "web": ("a", "b", "c")}
+        select = lambda scope: tuple(Path(name) for name in mapping[scope])
+        self.assertEqual(test_progress.pending({"d": 100}, select, ("catalog", "media", "web")), ("web",))
 
     def test_partial_baseline_preserves_unaffected_scopes_and_their_age(self):
         original = self.certify(self.repo, ("catalog", "metadata", "web"))
