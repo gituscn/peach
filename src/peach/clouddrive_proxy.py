@@ -77,6 +77,9 @@ def _accounts(client):
 
 
 def read(config):
+    from .media_sources import CLOUD_LOCATIONS
+    if not any(config.locations.get(key) for key in CLOUD_LOCATIONS):
+        return dict(accounts=[], unlinked=[])
     with client_for(config) as client:
         permissions, apis = _accounts(client)
         bindings = _bindings(config, client, permissions, apis)

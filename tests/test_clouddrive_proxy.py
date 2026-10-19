@@ -69,6 +69,12 @@ class ProxyTests(_Server):
         PushDiscoverySettings(self.config.directory('state')).save(
             {'prefixes': [{'prefix': '/drive1', 'root': 'A:\\Movies'}]}, self.config.locations)
 
+    def test_local_libraries_need_no_clouddrive_connection(self):
+        config = replace(self.config, locations={'local': ('C:\\Movies',)})
+        with patch.object(proxy, 'client_for') as create_client:
+            self.assertEqual(proxy.read(config), {'accounts': [], 'unlinked': []})
+            create_client.assert_not_called()
+
     def test_reads_are_fresh_and_passwords_are_not_exposed(self):
         state = proxy.read(self.config)
         self.assertEqual(len(state['accounts']), 2)

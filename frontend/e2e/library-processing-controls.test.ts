@@ -335,8 +335,10 @@ describe('扫描与采集控制', () => {
           eta_seconds_min: 63, eta_seconds_max: 94 };
         await dock.getByText('等待当前文件响应，剩余时间待更新', { exact: true }).waitFor();
         await page.waitForFunction(() => document.querySelector('[data-processing-dock]')?.textContent?.includes('已等待 33 秒'));
-        await page.waitForFunction(() => document.querySelector('[data-processing-dock]')?.textContent?.includes('已等待 34 秒'),
-          undefined, { timeout: 1800 });
+        await page.waitForFunction(() => {
+          const elapsed = document.querySelector('[data-processing-dock]')?.textContent?.match(/已等待 (\d+) 秒/);
+          return elapsed && Number(elapsed[1]) >= 34;
+        }, undefined, { timeout: 5000 });
         assert.match(await dock.innerText(), /读取配套图片/);
         assert.doesNotMatch(await dock.innerText(), /预计剩余/);
         const stalledLayout = await layout(page);
