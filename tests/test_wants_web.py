@@ -278,6 +278,13 @@ class WantWebFixture(unittest.TestCase):
 
 
 class WantListTests(WantWebFixture):
+    def test_a_missing_cover_is_counted_when_the_metadata_succeeds(self):
+        with patch.object(feed_followup, 'ensure_cover', return_value=False):
+            self.post('/api/wants', {'action': 'add', 'code': 'SSIS-952'})
+            self.settle()
+        summary = self.contract.task_runs.query(task_key='want-scrape')[0].result_summary
+        self.assertEqual((summary['fetched'], summary['covers'], summary['incomplete']), (1, 0, 1))
+
     def test_adding_a_typed_code_fetches_its_details_and_cover(self):
         result = self.post("/api/wants", {"action": "add", "code": "ssis950"})
         self.settle()
@@ -289,6 +296,7 @@ class WantListTests(WantWebFixture):
                          ("SSIS-950", "SSIS-950 的标题", "示例厂牌", "深田えいみ", wants.SEARCHING))
         self.assertEqual((item["cover"], item["remote_cover"]), ("/cover?code=SSIS-950&thumb=1", False))
         self.assertTrue((self.contract.cover_root / "SSIS-950.jpg").is_file())
+        self.assertEqual(self.contract.task_runs.query(task_key='want-scrape')[0].result_summary['incomplete'], 0)
         self.assertEqual(listed["counts"], {"searching": 1, "unreleased": 0, "given_up": 0, "acquired": 0})
 
     def test_a_failed_lookup_is_recorded_and_retried_only_after_the_interval(self):
@@ -297,6 +305,7 @@ class WantListTests(WantWebFixture):
         self.settle()
         item = self.get()["items"][0]
         self.assertEqual(item["scrape_error"], "来源链上都没有这个番号的资料")
+        self.assertEqual(self.contract.task_runs.query(task_key='want-scrape')[0].result_summary['incomplete'], 1)
         with self.contract.database.read_connection() as connection:
             self.assertEqual(web_wants.backlog(connection, self.contract.cover_root), [])
             later = datetime.now(timezone.utc) + web_wants.RETRY_AFTER + timedelta(minutes=1)

@@ -145,7 +145,7 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
   justify-content: center;
   overflow: hidden;
   aspect-ratio: var(--card-ratio, 16 / 9);
-  background: #000;
+  background: var(--color-background-quaternary-default);
 }
 /* 传统正封的比例留白复用共享封面取景写入的同图补底。 */
 .peach-react [data-media-pic]::before {
@@ -169,7 +169,7 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
 /* 封面那一层铺满格子，图本身的几何归旧样式表的 `.poster`。 */
 .peach-react [data-media-art] { position: absolute; inset: 0; display: block; }
 .peach-react [data-media-nopic] {
-  color: var(--muted);
+  color: var(--ink-2);
   font-size: var(--fs-xs);
   letter-spacing: .12em;
   text-transform: uppercase;

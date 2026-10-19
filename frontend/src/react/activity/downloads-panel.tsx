@@ -7,7 +7,7 @@
  *
  * 一条任务都没有时整段不画。失败的任务给中文原因；失败、取消与停滞的可以重新提交，被判
  * 违规的不给（服务端也会拒）。每张卡都能复制磁力：接口失效时退回手动添加。 */
-import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useId, useState, type CSSProperties } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { RiArrowDownSLine } from '@remixicon/react';
 
@@ -25,7 +25,7 @@ import { busyProps, useAction } from '../settings/use-action';
 import { momentText } from './tasks';
 import { SourceLabel } from '../components/source-label';
 import { ArtSlot } from '../components/art-slot';
-import { avatarInner, coverAnchor, coverImage, relayoutCovers } from '@peach/card-art';
+import { avatarInner, coverImage, relayoutCovers } from '@peach/card-art';
 import { entityPath } from '@peach/legacy/core';
 import { COVER_FRONT_RATIO } from '@peach/appearance';
 
@@ -92,24 +92,6 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
   const [copied, setCopied] = useState(false);
   const [fullTitle, setFullTitle] = useState(false);
   const titleId = useId();
-  const cover = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const box = cover.current;
-    const details = box?.nextElementSibling;
-    if (!box || !details) return;
-    const frame = () => {
-      const { height } = details.getBoundingClientRect();
-      if (!height) return;
-      box.style.setProperty('--download-cover-width', `${height * COVER_FRONT_RATIO}px`);
-      box.querySelectorAll<HTMLImageElement>('img.cover').forEach((image) => {
-        if (image.complete && image.naturalWidth) coverAnchor(image);
-      });
-    };
-    const observer = new ResizeObserver(frame);
-    observer.observe(details);
-    frame();
-    return () => observer.disconnect();
-  }, []);
   const reason = failureText(task);
   const artwork = task.artwork;
   const people = artwork?.performer_entities || [];
@@ -141,11 +123,11 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
         padding: 'none', bordered: 'line',
         className: failed ? 'flex flex-col border-border-error-default' : 'flex flex-col',
       })}>
-      <div className="flex items-start gap-3 px-5 pt-5 pb-4">
-        <div ref={cover} data-download-cover="" data-media-pic=""
-          style={{ '--card-ratio': String(COVER_FRONT_RATIO), '--download-cover-width': '6rem' } as CSSProperties}
-          className="w-20 shrink-0 text-caption-1-regular text-text-secondary sm:w-(--download-cover-width) sm:self-stretch">
-          {!artwork?.has_cover ? <span>无封面</span> : null}
+      <div className="flex items-stretch gap-3 px-5 pt-5 pb-4">
+        <div data-download-cover="" data-media-pic=""
+          style={{ '--card-ratio': String(COVER_FRONT_RATIO) } as CSSProperties}
+          className="w-20 shrink-0 self-start text-caption-1-regular text-text-secondary sm:w-32">
+          {!artwork?.has_cover ? <span data-media-nopic="">无封面</span> : null}
           {artwork?.has_cover ? <ArtSlot artwork={{ kind: 'cover', html: coverImage(artwork, 'big') }}
             relayout={(root) => relayoutCovers(root, 'big')} /> : null}
           {detailHref ? <a data-download-cover-link="" href={detailHref} aria-label={`打开作品详情：${taskName(task)}`}
@@ -182,7 +164,7 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
           ? <p className="min-w-0 truncate text-caption-1-regular text-text-secondary" title={task.ledger_path}>{task.ledger_path}</p>
           : null}
         {action.error ? <ErrorText>{action.error}</ErrorText> : null}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
+        <div className="flex flex-wrap items-center gap-2 pt-1 sm:mt-auto">
           <Button variant="ghost" size="small" aria-expanded={fullTitle} aria-controls={fullTitle ? titleId : undefined}
             onClick={() => setFullTitle(!fullTitle)}>{fullTitle ? '收起标题' : '展开标题'}</Button>
           {writable && task.cancellable

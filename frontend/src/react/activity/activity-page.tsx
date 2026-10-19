@@ -21,6 +21,7 @@ import { Button } from '@/components/base/buttons/button';
 
 import { errorMessage } from '../../api';
 import { cardClass } from '../components/card';
+import { CodeBlock } from '../components/code-block';
 import { EmptyState } from '../components/empty-state';
 import { LoadingDots } from '../components/loading-dots';
 import { Note } from '../components/note';
@@ -32,7 +33,7 @@ import { DownloadsPanel } from './downloads-panel';
 import { ErrorExcerpt } from './error-excerpt';
 import {
   elapsedText, fetchEarlier, fetchTasks, foldRoutine, followupDetail, groupFollowups, isActive,
-  isRoutine, mergeFinished, momentText, pollInterval, progressText, statusLabel, summaryItems, TASKS_KEY, TRIGGER_LABELS, type TaskRunPayload,
+  hasResultProblems, isRoutine, mergeFinished, momentText, pollInterval, progressText, statusLabel, summaryItems, TASKS_KEY, TRIGGER_LABELS, type TaskRunPayload,
 } from './tasks';
 
 /* 状态徽章只有三档颜色：成功是绿、失败是红、被叫停与被打断是黄，其余留中性底。
@@ -41,8 +42,11 @@ const BADGE_COLORS: Record<string, 'lime' | 'rose' | 'yellow'> = {
   succeeded: 'lime', failed: 'rose', cancelled: 'yellow', interrupted: 'yellow',
 };
 
-function StatusBadge({ status }: { status: string }) {
-  return <Chip color={BADGE_COLORS[status] ?? 'neutral'}>{statusLabel(status)}</Chip>;
+function StatusBadge({ run }: { run: TaskRunPayload }) {
+  const problems = run.status === 'succeeded' && hasResultProblems(run);
+  return <Chip color={problems ? 'yellow' : BADGE_COLORS[run.status] ?? 'neutral'}>
+    {problems ? '发现问题' : statusLabel(run.status)}
+  </Chip>;
 }
 
 /** 一轮任务派出的后继（ADR-0040）。挂在父任务卡里，一条一行。
@@ -61,14 +65,15 @@ function FollowupList({ rows }: { rows: TaskRunPayload[] }) {
             <span className="min-w-0 break-words text-caption-1-regular text-text-primary">
               {row.task_label}
             </span>
-            <StatusBadge status={row.status} />
+            <StatusBadge run={row} />
             {detail
               ? <span className="min-w-0 break-words text-caption-1-regular text-text-secondary">{detail}</span>
               : null}
             <div className="w-full min-w-0">
-              <Disclosure summary="技术详情"><pre className="max-h-60 overflow-y-auto whitespace-pre-wrap wrap-anywhere text-caption-1-regular text-text-secondary">
-                {JSON.stringify(row.result_summary, null, 2)}
-              </pre></Disclosure>
+              <Disclosure summary="技术详情">
+                <CodeBlock code={JSON.stringify(row.result_summary, null, 2)} language="json"
+                  label={`${row.task_label}技术详情`} />
+              </Disclosure>
             </div>
           </li>
         );
@@ -94,7 +99,7 @@ function RunCard(
       <div className="flex flex-col gap-1.5 px-5 pt-5 pb-4">
         <div className="flex flex-wrap items-center gap-2">
           <strong className="min-w-0 break-words text-title-1-medium text-text-primary">{run.task_label}</strong>
-          <StatusBadge status={run.status} />
+          <StatusBadge run={run} />
         </div>
         <p className="text-caption-1-regular text-text-secondary">{meta}</p>
         {children}
@@ -107,9 +112,8 @@ function RunCard(
       </div> : null}
       {Object.keys(run.result_summary || {}).length ? <div className="border-t border-separator-border px-5 py-2.5">
         <Disclosure summary="技术详情">
-          <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap wrap-anywhere text-caption-1-regular text-text-secondary">
-            {JSON.stringify(run.result_summary, null, 2)}
-          </pre>
+          <CodeBlock code={JSON.stringify(run.result_summary, null, 2)} language="json"
+            label={`${run.task_label}技术详情`} />
         </Disclosure>
       </div> : null}
       {footer
@@ -158,6 +162,10 @@ function SettledRun(
       {summary.length ? <ul className="list-disc space-y-1 pl-5 text-caption-1-regular text-text-secondary wrap-anywhere">
         {summary.map((line, index) => <li key={index}>{line}</li>)}
       </ul> : null}
+      {run.task_key === 'link-check' && hasResultProblems(run)
+        ? <a href="/data-cleanup#link-manager" className="self-start text-caption-1-regular text-text-primary underline">
+            查看链接结果
+          </a> : null}
     </RunCard>
   );
 }
