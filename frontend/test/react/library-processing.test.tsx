@@ -131,7 +131,7 @@ it('启动只提交一次，进度用 GET 读回来，完成后给出回执与�
   const receipt = host.querySelector('[role="status"]');
   expect(receipt?.textContent).toContain('处理完成');
   expect(receipt?.textContent).toContain(
-    '已扫描 9 个文件，识别 4 个番号，整理 2 组资料候选，自动落库 0 条。');
+    '已扫描 9 个文件，识别 4 个番号，整理 2 组资料结果，自动保存 0 条。');
   // 这一趟没补任何女优资料，回执里就不出现那句话。
   expect(receipt?.textContent).not.toContain('补齐女优资料');
 });
@@ -314,7 +314,7 @@ it('刚结束的任务横幅第一次读到也报，同一个任务号只报一�
   }
   expect(toast).toHaveBeenCalledTimes(1);
   expect(toast).toHaveBeenNthCalledWith(
-    1, '扫描与资料采集已完成：识别 3 个番号，整理 2 组资料候选，自动落库 0 条');
+    1, '扫描与资料采集已完成：识别 3 个番号，整理 2 组资料结果，自动保存 0 条');
 });
 
 it('两个容器读同一趟任务：一个周期只问一次，撤掉一个另一个照常', async () => {

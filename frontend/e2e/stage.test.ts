@@ -2,7 +2,7 @@
  * 骨架揭示、Video.js 与它的控件（清晰度、剧场、提示、窄屏折叠、统计角标、右键菜单）、小窗（进出、
  * 展开不重建、拖动吸附）、队列换条时播放器的交接、Escape 先关最里层，以及手机 390。
  *
- * 桩数据见 `item-fixture.ts` 与 `follow-fixture.ts`；读写接口全部由桩接住，演示库账本一次都不写。
+ * 桩数据见 `item-fixture.ts` 与 `follow-fixture.ts`；读写接口全部由桩接住，演示库数据库一次都不写。
  * 片源不给正片：小窗一律经 i 键或右键菜单请求进入（越过播放态判定），不靠真在放。 */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';

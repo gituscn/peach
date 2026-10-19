@@ -1,4 +1,4 @@
-/* 沉浸模式（常驻面 `immerse`，`immerse-island.tsx`）对壳的契约：壳只拿命令式入口，片单、每一格的播放器、
+/* 沉浸模式（常驻组件 `immerse`，`immerse-island.tsx`）对壳的契约：壳只拿命令式入口，片单、每一格的播放器、
  * 手势、动作键与作者标题都在 `peach-app.js` 里。地址栏、首页筛选、头像拼法与「关掉之后去哪儿」归壳。 */
 
 export interface ImmerseHost {

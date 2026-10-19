@@ -33,11 +33,11 @@ describe('首页文件夹浏览', () => {
         if (viewport.mobile) {
           await page.getByRole('button', { name: '打开文件夹目录', exact: true }).click();
           const dialog = page.getByRole('dialog', { name: '文件夹目录', exact: true });
-          await dialog.getByRole('treegrid', { name: '媒体文件夹' }).waitFor();
+          await dialog.getByRole('treegrid', { name: '媒体目录' }).waitFor();
           await page.screenshot({ path: join(screenshots, 'mobile-tree.png'), fullPage: false });
           await dialog.getByRole('button', { name: '关闭文件夹目录' }).click();
         } else {
-          await page.locator('#catalogFoldersTree').getByRole('treegrid', { name: '媒体文件夹' }).waitFor();
+          await page.locator('#catalogFoldersTree').getByRole('treegrid', { name: '媒体目录' }).waitFor();
           for (const width of [1280, 1120]) {
             await page.setViewportSize({ width, height: 800 });
             await page.evaluate(async () => {

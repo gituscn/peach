@@ -72,7 +72,7 @@ class LedgerBackupRetentionTests(unittest.TestCase):
 
             self.assertIsNone(decided.refused)
             self.assertEqual(set(decided.remove), set(old),
-                             "最近 5 份、24 小时内和比账本新的都留，其余清退")
+                             "最近 5 份、24 小时内和比数据库新的都留，其余清退")
             self.assertEqual(set(decided.keep), set(recent) | {young, future})
             for path in old:
                 self.assertTrue(path.exists(), "只算计划时一个字节都不动")
@@ -100,7 +100,7 @@ class LedgerBackupRetentionTests(unittest.TestCase):
 
             self.assertIsNotNone(decided.refused)
             self.assertEqual(decided.remove, ())
-            self.assertTrue(backup.exists(), "账本坏了正是要用备份的时候")
+            self.assertTrue(backup.exists(), "数据库坏了正是要用备份的时候")
 
     def test_refuses_when_the_live_ledger_is_missing_and_no_ops_without_backups(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -125,7 +125,7 @@ class LedgerBackupRetentionTests(unittest.TestCase):
             decided = ledger_backups.plan(live, keep_recent=0, now=NOW)
 
             self.assertEqual(decided.remove, (backup,),
-                             "主库文件时间没动但 -wal 动过，备份并不比账本新")
+                             "主库文件时间没动但 -wal 动过，备份并不比数据库新")
 
     def test_sidecars_whose_backup_is_gone_get_swept_even_with_nothing_else_to_remove(self):
         """无主的 `-wal`／`-shm` 没人会再列到，只能单独扫。"""
@@ -168,7 +168,7 @@ class LedgerBackupRetentionTests(unittest.TestCase):
             decided = ledger_backups.prune(live, apply=True, keep_recent=0, now=NOW)
 
             self.assertIsNotNone(decided.refused)
-            self.assertTrue(orphan.exists(), "账本坏了就什么都别动，先看清楚再说")
+            self.assertTrue(orphan.exists(), "数据库坏了就什么都别动，先看清楚再说")
 
     def test_script_reports_the_plan_as_json_and_only_deletes_with_apply(self):
         script = load_script()

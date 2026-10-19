@@ -84,7 +84,7 @@ class OrphanRecordsTests(unittest.TestCase):
         back.write_bytes(b"x")
         result = web_batch.w_batch(self.contract, {"ids": [7, 12], "operation": "delete"})
         self.assertEqual(result["purged"], 1)
-        self.assertEqual([item["id"] for item in result["blocked"]], [12], "文件又回到盘上，只删账本行的口径不删它")
+        self.assertEqual([item["id"] for item in result["blocked"]], [12], "文件又回到盘上，只删数据库行的口径不删它")
         self.assertTrue(back.exists())
         self.assertEqual(self.owners("asset_preference"), [])
         self.assertEqual(self.owners("activity_event"), [])

@@ -617,7 +617,7 @@ def restart_source_tray(
 ) -> RestartResult:
     """源码部署托盘的正常重启：按同一命令行自起新托盘。
 
-    依据现有托盘自己的命令行重建 argv：`--show`／`--silent` 和数据根都在
+    依据现有托盘自己的命令行重建 argv：`--show`／`--silent` 和 Peach 数据目录都在
     那一串里，照抄它们就不会把静默启动重启成开浏览器，或者反过来。入口
     是项目 `.venv` 的 `pythonw.exe`，服务入口由它旁推出
     `.venv\\Scripts\\peach.exe`。没有换二进制这一步，也不涉及备份回滚。

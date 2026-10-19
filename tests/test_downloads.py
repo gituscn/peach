@@ -206,7 +206,7 @@ class SubmitTests(_Deployment):
 
     def test_the_reader_never_submits(self):
         self.service.available = False
-        with self.assertRaisesRegex(ValueError, "写入端"):
+        with self.assertRaisesRegex(ValueError, "只在允许修改数据库的设备上可用"):
             self.submit()
 
 

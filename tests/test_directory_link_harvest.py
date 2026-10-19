@@ -571,7 +571,7 @@ class JudgeTests(unittest.TestCase):
         self.assertEqual({row["label"] for row in rows},
                          {"X @kanna_seto0510", "X @setokan_sub", "Instagram @setokanna_", "Bstar"})
         self.assertTrue(all(row["entity_id"] == 2 and row["name"] == "濑户环奈" for row in rows))
-        self.assertIn("对上账本「濑户环奈」", rows[0]["evidence"])
+        self.assertIn("对上数据库「濑户环奈」", rows[0]["evidence"])
         self.assertEqual(stats["ok"], 4)
 
     def test_the_same_account_in_the_old_host_shape_is_已有_not_a_duplicate(self):
@@ -757,7 +757,7 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual([row["alive"] for row in rows], ["活", "疑似失效", "疑似失效", "未验", "", ""])
         self.assertIn("X 显示名「瀬戸環奈 (@kanna_seto0510) / X」", rows[0]["evidence"])
         self.assertIn("X 验活：登出页无资料，对照账号正常", rows[1]["evidence"])
-        self.assertIn("账本旧号 https://x.com/old_hatano：疑似失效", rows[2]["evidence"])
+        self.assertIn("数据库旧号 https://x.com/old_hatano：疑似失效", rows[2]["evidence"])
         self.assertEqual(dict(stats), {"活": 1, "疑似失效": 2})
         queue = self.module.installable(rows)
         self.assertEqual([row["url"] for row in queue],

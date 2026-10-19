@@ -20828,7 +20828,7 @@ function bg({ label: e, path: t, onPath: n, error: r, inputRef: i, picking: a, o
 				/* @__PURE__ */ (0, z.jsx)(Vp, {
 					className: "min-w-0 flex-1",
 					"aria-label": e,
-					placeholder: "本机文件夹路径",
+					placeholder: "媒体目录路径",
 					value: t,
 					onChange: n,
 					ref: (e) => {
@@ -20878,17 +20878,9 @@ function xg({ index: e, value: t, onChange: n, options: r = mg }) {
 		}, e))
 	});
 }
-function Sg({ value: e, onChange: t, label: n = "Windows 中的对应路径", placeholder: r = "例如 B:\\" }) {
-	return /* @__PURE__ */ (0, z.jsx)(Vp, {
-		label: n,
-		placeholder: r,
-		value: e,
-		onChange: t
-	});
-}
 //#endregion
 //#region src/react/settings/password-pair.tsx
-function Cg({ label: e, password: t, confirmation: n, onPassword: r, onConfirmation: i, disabled: a = !1, passwordError: o, passwordHint: s, confirmationError: c, confirmationInvalid: l = !1 }) {
+function Sg({ label: e, password: t, confirmation: n, onPassword: r, onConfirmation: i, disabled: a = !1, passwordError: o, passwordHint: s, confirmationError: c, confirmationInvalid: l = !1 }) {
 	return /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsx)(Vp, {
 		id: "access-password",
 		type: "password",
@@ -20919,7 +20911,7 @@ function Cg({ label: e, password: t, confirmation: n, onPassword: r, onConfirmat
 }
 //#endregion
 //#region src/react/settings/remote-reporting-settings.tsx
-function wg({ value: e, onChange: t, busy: n = !1 }) {
+function Cg({ value: e, onChange: t, busy: n = !1 }) {
 	return /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsx)(hm, { children: /* @__PURE__ */ (0, z.jsx)(fm, {
 		label: "发送版本统计与错误诊断（推荐）",
 		description: "上传版本、系统信息、故障类型、代码位置与发生次数。",
@@ -20940,13 +20932,13 @@ function wg({ value: e, onChange: t, busy: n = !1 }) {
 }
 //#endregion
 //#region src/react/pages/setup/setup-form.tsx
-var Tg = [
+var wg = [
 	"data_root",
 	"host",
 	"port",
 	"mdns_name"
 ];
-function Eg(e, t) {
+function Tg(e, t) {
 	return Array.isArray(e) ? e.length === t ? {
 		rows: e,
 		table: ""
@@ -20958,11 +20950,11 @@ function Eg(e, t) {
 		table: e ?? ""
 	};
 }
-function Dg(e) {
+function Eg(e) {
 	return e.length ? e.length === 1 ? `完成设置后扫描并补全资料：${e[0]}` : `完成设置后扫描这 ${e.length} 个文件夹并补全资料` : "完成设置后扫描并补全资料";
 }
-var Og = (e) => Array.isArray(e) ? e.filter(Boolean).join(" ") : e ?? "";
-function kg({ setup: e, onDone: t }) {
+var Dg = (e) => Array.isArray(e) ? e.filter(Boolean).join(" ") : e ?? "";
+function Og({ setup: e, onDone: t }) {
 	let n = e.questions.find((e) => e.input === "folders"), r = e.questions.filter((e) => e.input !== "folders"), i = e.media_sources.map(({ value: e, label: t }) => [e, t]), a = (t = "") => ({
 		path: t,
 		location: e.media_source_default,
@@ -21011,14 +21003,14 @@ function kg({ setup: e, onDone: t }) {
 			t(await Xp(i));
 		} catch (e) {
 			if (e instanceof qp && e.status === 400 && e.errors) {
-				let t = e.errors, { rows: n, table: r } = Eg(t.media_dir, o.rows.length);
-				o.setErrors(n), T(r), C(t), Tg.some((e) => t[e]) && ee((e) => e + 1), t.access_password && u(!0), re((e) => e + 1);
+				let t = e.errors, { rows: n, table: r } = Tg(t.media_dir, o.rows.length);
+				o.setErrors(n), T(r), C(t), wg.some((e) => t[e]) && ee((e) => e + 1), t.access_password && u(!0), re((e) => e + 1);
 			} else D($p(e));
 		} finally {
 			k(!1);
 		}
 	}, ce = (e) => {
-		let t = Og(S[e.key]), n = e.help.join("");
+		let t = Dg(S[e.key]), n = e.help.join("");
 		if (e.input === "choice") {
 			let r = `setup-${e.key}-label`;
 			return /* @__PURE__ */ (0, z.jsxs)("div", {
@@ -21092,41 +21084,32 @@ function kg({ setup: e, onDone: t }) {
 						role: "group",
 						"aria-labelledby": "setup-media-title",
 						className: "flex flex-col gap-3",
-						children: o.rows.map((t, r) => /* @__PURE__ */ (0, z.jsxs)(bg, {
-							label: `${n.label} ${r + 1}`,
-							path: t.path,
-							onPath: (e) => o.edit(r, { path: e }),
-							error: ie(o.errors[r]),
-							inputRef: o.inputRef(r),
-							picking: o.picking === r,
-							onPick: () => void o.pick(r),
+						children: o.rows.map((e, t) => /* @__PURE__ */ (0, z.jsxs)(bg, {
+							label: `${n.label} ${t + 1}`,
+							path: e.path,
+							onPath: (e) => o.edit(t, { path: e }),
+							error: ie(o.errors[t]),
+							inputRef: o.inputRef(t),
+							picking: o.picking === t,
+							onPick: () => void o.pick(t),
 							onRemove: o.rows.length > 1 ? () => {
-								o.remove(r), ne.current?.focus();
+								o.remove(t), ne.current?.focus();
 							} : void 0,
-							children: [
-								/* @__PURE__ */ (0, z.jsx)(xg, {
-									index: r,
-									value: t.location,
-									options: i,
-									onChange: (e) => o.edit(r, {
-										location: e,
-										cost: e === "local" ? "free" : ""
-									})
-								}),
-								/* @__PURE__ */ (0, z.jsx)(_g, {
-									index: r,
-									cost: t.cost ?? "",
-									error: A && !t.cost ? "请选择媒体读取策略" : void 0,
-									onChange: (e) => o.edit(r, { cost: e })
-								}),
-								e.media_root ? /* @__PURE__ */ (0, z.jsx)(Sg, {
-									label: e.media_root.label,
-									placeholder: e.media_root.placeholder,
-									value: t.root,
-									onChange: (e) => o.edit(r, { root: e })
-								}) : null
-							]
-						}, r))
+							children: [/* @__PURE__ */ (0, z.jsx)(xg, {
+								index: t,
+								value: e.location,
+								options: i,
+								onChange: (e) => o.edit(t, {
+									location: e,
+									cost: e === "local" ? "free" : ""
+								})
+							}), /* @__PURE__ */ (0, z.jsx)(_g, {
+								index: t,
+								cost: e.cost ?? "",
+								error: A && !e.cost ? "请选择媒体读取策略" : void 0,
+								onChange: (e) => o.edit(t, { cost: e })
+							})]
+						}, t))
 					}),
 					/* @__PURE__ */ (0, z.jsx)(St, {
 						ref: ne,
@@ -21173,13 +21156,13 @@ function kg({ setup: e, onDone: t }) {
 						})]
 					}),
 					/* @__PURE__ */ (0, z.jsx)(_m, { children: "未设置密码时，能连接到 Peach 的设备可直接进入。" }),
-					l ? /* @__PURE__ */ (0, z.jsx)(Cg, {
+					l ? /* @__PURE__ */ (0, z.jsx)(Sg, {
 						label: "访问密码",
 						password: d,
 						confirmation: p,
 						onPassword: f,
 						onConfirmation: m,
-						passwordError: ie(Og(S.access_password)),
+						passwordError: ie(Dg(S.access_password)),
 						passwordHint: "请输入 8–256 个字符。",
 						confirmationInvalid: !!S.access_password
 					}) : null
@@ -21205,8 +21188,8 @@ function kg({ setup: e, onDone: t }) {
 						children: [/* @__PURE__ */ (0, z.jsx)(kp, {
 							isSelected: h,
 							onChange: g,
-							children: Dg(le)
-						}), /* @__PURE__ */ (0, z.jsx)(_m, { children: "读取已有 NFO 和封面，采集缺失资料。符合自动规则的资料会在处理完成后落库，其余候选留在复核。" })]
+							children: Eg(le)
+						}), /* @__PURE__ */ (0, z.jsx)(_m, { children: "读取已有 NFO 和封面，采集缺失资料。符合自动规则的资料会在处理完成后保存到数据库，其余资料留待确认。" })]
 					}),
 					/* @__PURE__ */ (0, z.jsxs)("section", {
 						"aria-labelledby": "setup-history-title",
@@ -21233,7 +21216,7 @@ function kg({ setup: e, onDone: t }) {
 			E ? /* @__PURE__ */ (0, z.jsx)(vm, { children: E }) : null,
 			b ? /* @__PURE__ */ (0, z.jsxs)(Tt, { children: [
 				/* @__PURE__ */ (0, z.jsx)(Et, { children: "版本统计与错误诊断" }),
-				/* @__PURE__ */ (0, z.jsx)(wg, {
+				/* @__PURE__ */ (0, z.jsx)(Cg, {
 					value: b,
 					onChange: x
 				}),
@@ -21250,7 +21233,7 @@ function kg({ setup: e, onDone: t }) {
 }
 //#endregion
 //#region src/react/pages/setup/setup-restore.tsx
-function Ag({ onDone: e }) {
+function kg({ onDone: e }) {
 	let [t, n] = (0, y.useState)(""), [r, i] = (0, y.useState)(""), [a, o] = (0, y.useState)(!1);
 	return /* @__PURE__ */ (0, z.jsxs)("form", {
 		className: "flex flex-col gap-4",
@@ -21291,7 +21274,7 @@ function Ag({ onDone: e }) {
 }
 //#endregion
 //#region src/react/pages/setup/setup-page.tsx
-function jg() {
+function Ag() {
 	let [e, t] = (0, y.useState)({ kind: "loading" }), [n, r] = (0, y.useState)(0), [i, a] = (0, y.useState)(!1);
 	return (0, y.useEffect)(() => {
 		let e = new AbortController();
@@ -21329,10 +21312,10 @@ function jg() {
 				className: "self-start",
 				onClick: () => a((e) => !e),
 				children: i ? "返回首次设置" : "使用已有数据目录"
-			}), i ? /* @__PURE__ */ (0, z.jsx)(Ag, { onDone: (e) => t({
+			}), i ? /* @__PURE__ */ (0, z.jsx)(kg, { onDone: (e) => t({
 				kind: "done",
 				done: e
-			}) }) : /* @__PURE__ */ (0, z.jsx)(kg, {
+			}) }) : /* @__PURE__ */ (0, z.jsx)(Og, {
 				setup: e.setup,
 				onDone: (e) => t({
 					kind: "done",
@@ -21344,12 +21327,12 @@ function jg() {
 }
 //#endregion
 //#region src/react/pages/index.tsx
-var Mg = {
-	setup: jg,
+var jg = {
+	setup: Ag,
 	login: Hp,
 	error: kt
 };
 u();
-var Ng = document.getElementById("peach-page"), Pg = Ng ? Mg[Ng.dataset.page ?? ""] : void 0;
-Ng && Pg && (0, b.createRoot)(Ng).render(/* @__PURE__ */ (0, z.jsx)(Pg, { data: { ...Ng.dataset } }));
+var Mg = document.getElementById("peach-page"), Ng = Mg ? jg[Mg.dataset.page ?? ""] : void 0;
+Mg && Ng && (0, b.createRoot)(Mg).render(/* @__PURE__ */ (0, z.jsx)(Ng, { data: { ...Mg.dataset } }));
 //#endregion

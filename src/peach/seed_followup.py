@@ -1,6 +1,6 @@
 """导入实体种子后继：扫描结算后把私有种子包补进账本（ADR-0075、ADR-0111）。
 
-种子包位于数据根的 `state/seed/entities.json`（`seed_pack.DEFAULT_PACK`），导入只给本机已有实体填空、换掉种子
+种子包位于 Peach 数据目录的 `state/seed/entities.json`（`seed_pack.DEFAULT_PACK`），导入只给本机已有实体填空、换掉种子
 自己写过的旧行（`seed_pack.land`）。这条后继由扫描与采集在结算时声明（ADR-0040 第一条），
 派的条件是两个里有一个：这一轮登记了新的女优、厂牌或事务所，或这个版本的包还没有成功导入过。
 同一版本因此会跑多次；`land` 幂等，多跑一次只是没有东西可补。
@@ -17,7 +17,7 @@ from . import seed_pack, seed_corrections, seed_validation
 from .followups import Followup, FollowupType, register
 
 TASK_KEY = "seed-import"
-TASK_LABEL = "导入实体种子"
+TASK_LABEL = "导入初始资料"
 REVIEW_FILE = "seed-landing.csv"
 FIELDS = ("kind", "entity", "field", "ours", "source", "theirs", "detail", "batch", "withdrawal_id", "evidence")
 #: 活动页摘要里的计数键与它们的中文名，按这个顺序拼结论。

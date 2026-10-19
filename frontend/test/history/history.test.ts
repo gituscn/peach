@@ -64,7 +64,7 @@ it('每一次变化领一个递增序号，后退前进也算', () => {
   expect(seen[1]!.location.pathname).toBe('/');
 });
 
-it('开次代次只在没人认领的变化上递增：壳认领的写地址不领，后退前进、路由树 push 与 replace 各领一个', () => {
+it('页面打开序号只在没人认领的变化上递增：壳认领的写地址不领，后退前进、路由树 push 与 replace 各领一个', () => {
   const start = peachHistory.navigation.openEpoch;
   shellNavigate('/stats');
   shellNavigate('/stats?tab=1', { replace: true });

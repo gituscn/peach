@@ -1,5 +1,5 @@
 /* 人工复核页的行为：分类是地址栏上的身份，分组筛选分页是这一刻的看法，判定只改缓存里
- * 那几行，以及只读账本上这一页什么都不写。
+ * 那几行，以及只读数据库上这一页什么都不写。
  *
  * 外观（卡片底色、页签选中态）是设计决定，由 `frontend/e2e/design-*.test.ts` 读
  * `getComputedStyle` 断言；这里只看结构、文字与请求。 */
@@ -28,7 +28,7 @@ notifyManager.setScheduler((notify) => notify());
 const candidate = (source: string, value: string): ReviewCandidate =>
   ({ candidate_key: `${source}:${value}`, source, display_value: value });
 
-/** 一条元数据字段候选。`sources` 给几家就是几个候选，给一家就是单一候选。 */
+/** 一条元数据字段候选。`sources` 给几家就是几个候选，给一家就是单一来源。 */
 const row = (at: number, sources: string[] = ['javdb', 'nfo']): ReviewRow => ({
   item_key: `row-${at}`,
   field: 'title',
@@ -37,7 +37,7 @@ const row = (at: number, sources: string[] = ['javdb', 'nfo']): ReviewRow => ({
   candidates: sources.map((source) => candidate(source, `${source} 给的标题 ${at}`)),
 });
 
-/** 22 条多来源、3 条单一候选：够两页，也够两个分组。 */
+/** 22 条多来源、3 条单一来源：够两页，也够两个分组。 */
 const QUEUE: ReviewRow[] = [
   ...Array.from({ length: 22 }, (_, at) => row(at)),
   ...Array.from({ length: 3 }, (_, at) => row(100 + at, ['nfo'])),
@@ -125,7 +125,7 @@ it('分组、筛选与分页各按整条队列算，不是按屏幕上这一批'
   expect(reviewGroupingOptions(QUEUE, true).map(([key]) => key)).toEqual(['candidates', 'source', 'field']);
   const groups = groupReviewRows(QUEUE, 'candidates');
   expect(groups.map((group) => [group.title, group.rows.length]))
-    .toEqual([['需选择来源', 22], ['单一候选', 3]]);
+    .toEqual([['需选择来源', 22], ['单一来源', 3]]);
   expect(filterReviewRows(QUEUE, 'candidates', 'single')).toHaveLength(3);
   expect(reviewWindow(QUEUE, 1).rows).toHaveLength(REVIEW_PAGE_SIZE);
   expect(reviewWindow(QUEUE, 2)).toMatchObject({ page: 2, pages: 2 });
@@ -145,7 +145,7 @@ it('一页只画二十张，翻页换的是哪二十行', async () => {
 
 it('筛掉一个分组之后回到第一页', async () => {
   const { host } = await open();
-  await choose(host.querySelector('button[aria-label="筛选当前分类"]'), '单一候选 · 3');
+  await choose(host.querySelector('button[aria-label="筛选当前分类"]'), '单一来源 · 3');
   expect(keys(host)).toEqual(['row-100', 'row-101', 'row-102']);
   expect(buttonIn(host, '下一页')).toBeNull();
 });
@@ -183,7 +183,7 @@ it('判过的行从缓存里摘掉并同步计数，不为一次判定重取整�
   expect(reads()).toBe(1);
   await click(buttonIn(cards(host)[0]!, '通过'));
   await settle();
-  expect(props.toast).toHaveBeenCalledWith('已通过候选');
+  expect(props.toast).toHaveBeenCalledWith('已通过资料');
   expect(queueOf().sections.metadata_fields).toHaveLength(QUEUE.length - 1);
   expect(queueOf().counts.metadata_fields).toBe(QUEUE.length - 1);
   expect(keys(host)).not.toContain('row-0');
@@ -203,7 +203,7 @@ it('批量判定把成功的摘掉，没写成的留下来等重试', async () =
   const { host, props } = await open({
     decisions: [{ ok: true }, { ok: false, error: '来源已失效' }, { ok: true }],
   });
-  await choose(host.querySelector('button[aria-label="筛选当前分类"]'), '单一候选 · 3');
+  await choose(host.querySelector('button[aria-label="筛选当前分类"]'), '单一来源 · 3');
   await click(buttonIn(host, '全选当前分类'));
   expect(statusText(host)).toContain('已选 3 项');
   await click(buttonIn(host, '通过所选'));
@@ -255,11 +255,11 @@ it('多来源候选没选来源就批量通过时先说清楚，不替人按下�
   await click(buttonIn(host, '全选本页'));
   await click(buttonIn(host, '通过所选'));
   await settle();
-  expect(statusText(host)).toContain('先为所选的多来源候选选择来源。');
+  expect(statusText(host)).toContain('请先为所选资料选择要采用的来源。');
   expect(queueOf().sections.metadata_fields).toHaveLength(QUEUE.length);
 });
 
-it('只读账本上判定与批量都不给点', async () => {
+it('只读数据库上判定与批量都不给点', async () => {
   const { host, fetcher } = await open(
     { data: review({ mirror: { state: 'live' } }) },
     { readOnly: true, writerUrl: 'https://writer.example/review' });

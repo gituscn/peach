@@ -52,7 +52,7 @@ export function NumberSetting({ id, label, value, disabled = false, onApply }: {
   const apply = useRef(onApply);
   apply.current = onApply;
 
-  /* 外面换了值（账本对账、另一台设备改过、请求回来）就跟上；null 只禁用，不动显示。 */
+  /* 外面换了值（数据库对账、另一台设备改过、请求回来）就跟上；null 只禁用，不动显示。 */
   useLayoutEffect(() => {
     if (value === null) return;
     setShown(value);

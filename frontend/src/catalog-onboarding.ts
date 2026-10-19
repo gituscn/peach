@@ -38,5 +38,5 @@ export function catalogEmptyHtml({ kind = 'catalog', filtered = false, jav = fal
       online ? '添加关注来源并获取内容后，这里会显示来源上的' + label + '。' : '添加内容并补充资料后，这里会显示对应信息。',
       { actions: online ? follow : add + follow });
   }
-  return emptyStateHtml('play', '还没有视频', '添加媒体文件夹或关注来源，开始建立你的馆藏。', { actions: add + follow });
+  return emptyStateHtml('play', '还没有视频', '添加媒体目录或关注来源，开始建立你的馆藏。', { actions: add + follow });
 }

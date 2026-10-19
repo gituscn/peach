@@ -1,4 +1,4 @@
-"""挂载来源能力与按声明根配置的代理流量保护。"""
+"""挂载来源能力与按数据库路径前缀配置的代理流量保护。"""
 from dataclasses import dataclass
 import json
 from pathlib import PureWindowsPath
@@ -48,7 +48,7 @@ def _root_costs(config):
 
 
 def cost_for(location: str, path: str | None = "", config=None) -> str:
-    """实际路径按最长声明根取保护设置；空路径聚合同来源的已配置根。"""
+    """实际路径按最长数据库路径前缀取保护设置；空路径聚合同来源的已配置根。"""
     roots = [row for row in _root_costs(_config(config)) if row[0] == location]
     if not path and roots:
         return "metered" if any(cost == "metered" for _, _, cost in roots) else "free"

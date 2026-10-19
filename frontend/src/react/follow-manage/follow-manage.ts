@@ -484,7 +484,7 @@ export interface FeedSource {
   id: number;
   kind: string;
   kind_label: string;
-  /** 挂着人物时是她在账本里的统称，否则是存下的名字。 */
+  /** 挂着人物时是她在数据库里的统称，否则是存下的名字。 */
   name: string;
   /** 上次拉取时这一页在站上挂的名字。同一个人的旧艺名页靠它和本名页分开。 */
   page_name?: string;
@@ -535,9 +535,9 @@ export interface FeedCandidate {
   /** 记录类型：無碼那条带 `無碼`，有碼那条是空串。 */
   record: string;
   url: string;
-  /** 这个 id 已经在账本里谁名下。 */
+  /** 这个 id 已经在数据库里谁名下。 */
   held_by: { id: number; name: string } | null;
-  /** 卡上的写法对得上账本里哪几位的正名或别名。 */
+  /** 卡上的写法对得上数据库里哪几位的正名或别名。 */
   matched: { id: number; name: string }[];
 }
 
@@ -547,7 +547,7 @@ export interface FeedLookup {
   candidates: FeedCandidate[];
   /** 名字对得上、又只有一个人的那几张，先替用户勾上；同名不止一位时是空的。 */
   suggested: string[];
-  /** 账本里按这个名字认得出的那位；认不出是 null，登记时会新建。 */
+  /** 数据库里按这个名字认得出的那位；认不出是 null，登记时会新建。 */
   known: { id: number; name: string } | null;
 }
 
@@ -557,7 +557,7 @@ export const lookupFeedActor = (name: string, signal?: AbortSignal) =>
 export interface FeedFollowed {
   entity_id: number;
   entity_name: string;
-  /** 这位是这一次新建到账本里的。 */
+  /** 这位是这一次新建到数据库里的。 */
   created: boolean;
   sources: number[];
 }

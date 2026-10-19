@@ -349,7 +349,7 @@ export function emptyTrash(){
   return confirmModal({title:'清空回收站',body:'回收站中的全部文件和馆藏记录将永久删除，无法恢复。',confirmLabel:'清空回收站',danger:true,onConfirm:async()=>{
     try{
       const r=await api('/api/trash/empty',{method:'POST'});
-      /* 删不掉的文件（占用中、网盘离线）会连同账本行一起留在回收站，必须说出来，
+      /* 删不掉的文件（占用中、网盘离线）会连同数据库行一起留在回收站，必须说出来，
          否则用户看到条目还在会以为清空又没生效。 */
       if(r.blocked&&r.blocked.length)throw new Error(`已永久删除 ${r.purged} 项；${r.blocked.length} 项未能删除，仍在回收站：\n`
         +r.blocked.slice(0,5).map(x=>`${x.path}（${x.reason}）`).join('\n'));

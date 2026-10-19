@@ -158,7 +158,7 @@ export const REVIEW_ROW = {
   field_label: '厂牌',
   code: 'ABC-123',
   query: 'ABC-123',
-  evidence: '当前值：尚无；1 个匹配资产；2 个来源候选',
+  evidence: '当前值：尚无；1 个匹配资产；2 个资料来源',
   candidates: [{ candidate_key: 'javdb:studio', source: 'javdb', display_value: '示例厂牌' }],
 };
 

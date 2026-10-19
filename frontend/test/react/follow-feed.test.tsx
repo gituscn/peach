@@ -425,20 +425,20 @@ describe('页面', () => {
     expect(JSON.parse(String(undo?.[1]?.body))).toEqual({ item: 1, to: 'new' });
   });
 
-  it('保存到账本不给撤销；只读端写入回 409 时原因留在卡上', async () => {
+  it('保存到数据库不给撤销；只读端写入回 409 时原因留在卡上', async () => {
     serve(feed([group(item(1))]), { status: 409, body: { error: '只读副本不能写入' } });
     const given = props();
     const host = await open(given);
     await click(host.querySelector('[data-follow-save="1"]'));
     await settle();
     expect(host.querySelector('[data-follow-item="1"] [data-follow-state]')?.textContent).toBe('只读副本不能写入');
-    expect(given.actions.failure).toHaveBeenCalledWith('保存到账本', expect.anything());
+    expect(given.actions.failure).toHaveBeenCalledWith('保存到数据库', expect.anything());
 
     serve(feed([group(item(1))]));
     await click(host.querySelector('[data-follow-save="1"]'));
     await settle();
     const toast = given.actions.toast as ReturnType<typeof vi.fn>;
-    expect(toast).toHaveBeenLastCalledWith('已保存到账本');
+    expect(toast).toHaveBeenLastCalledWith('已保存到数据库');
     expect(host.querySelector('[data-follow-item="1"] [data-follow-state]')?.textContent).toBe('');
   });
 

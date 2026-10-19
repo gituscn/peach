@@ -349,15 +349,15 @@ def _move_one(connection: sqlite3.Connection, asset_id: int,
         return f"改名失败：{error.strerror or error}"
     try:
         if not _update_row(connection, asset_id, old_path, new_path):
-            raise OrganizeError("账本里这一行已经变了")
+            raise OrganizeError("数据库里这一行已经变了")
         connection.commit()
     except Exception as error:
         connection.rollback()
         try:
             _rename(new_path, old_path)
-            return f"账本写入失败，已改回原名：{error}"
+            return f"数据库写入失败，已改回原名：{error}"
         except OSError:
-            return f"账本写入失败且改不回原名，需要人工处理：{error}"
+            return f"数据库写入失败且改不回原名，需要人工处理：{error}"
     return "ok"
 
 

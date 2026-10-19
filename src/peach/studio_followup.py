@@ -145,7 +145,7 @@ def _run(contract, key: str, handle) -> dict:
                                  (entity_id,)).fetchone()
         if row is None:
             # 实体被合并或删掉了。这不是失败：那件事已经不存在了。
-            return {"outcome": "实体已不存在"}
+            return {"outcome": "档案已不存在"}
         name = str(row[0] or "")
         if has_mark(logo_root, name):
             return {"name": name, "outcome": "已有标识"}

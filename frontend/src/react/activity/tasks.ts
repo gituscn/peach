@@ -97,11 +97,11 @@ export const statusLabel = (status: string): string => STATUS_LABELS[status] || 
    显示——瞎猜一个中文名比留着英文键更难查。 */
 const SUMMARY_LABELS: Record<string, string> = {
   checked: '已检查', total: '总数', scanned: '已扫描', identified: '已识别',
-  candidates: '资料候选', covers: '封面', changed: '已改动', operation: '操作',
+  candidates: '资料结果', covers: '封面', changed: '已改动', operation: '操作',
   ok: '取得', miss: '未取得', kept: '保留', planned: '计划', done: '已处理', added: '新增',
   written: '已写入', removed: '已移除', exit_code: '退出码', issue_count: '问题',
   followups: '派出后继', followups_duplicate: '已在排队', followups_truncated: '超上限未派',
-  followups_depth_exceeded: '超深度未派', outcome: '结果', name: '实体',
+  followups_depth_exceeded: '超深度未派', outcome: '结果', name: '档案名称',
   matched: '图库命中', size: '尺寸', source: '来源', cover_network: '封面连不上图片主机',
 };
 
@@ -190,7 +190,7 @@ export function errorHeadline(text: string | null | undefined): string {
   return /^Traceback \(most recent call last\)/.test(lines[0]!) ? lines[lines.length - 1]! : lines[0]!;
 }
 
-/** 时间戳说成本地的「月-日 时:分」。账本里存的是 UTC，界面上一律按本机时区读。 */
+/** 时间戳说成本地的「月-日 时:分」。数据库里存的是 UTC，界面上一律按本机时区读。 */
 export function momentText(stamp: string | null | undefined): string {
   if (!stamp) return '';
   const moment = new Date(stamp);

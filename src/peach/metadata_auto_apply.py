@@ -1455,7 +1455,7 @@ def auto_apply_metadata(database, candidate_root, *, batch_size=AUTO_APPLY_BATCH
     那些保留。
 
     `snapshot_root` 是本机落盘的来源快照目录，企划名义解析要读它（ADR-0038）。缺省
-    是 None，也就是只走 `entity_alias` 那一条路：这一层不去猜真实数据根在哪儿，
+    是 None，也就是只走 `entity_alias` 那一条路：这一层不去猜真实 Peach 数据目录在哪儿，
     猜错的表现是测试悄悄读起了真实库。
     `asset_ids` 非空时只结算给定资产的候选；空集合不落库，None 表示全部候选。
     `candidate_rows` 是当前采集的字段快照；提供时不重新扫描全库 CSV。

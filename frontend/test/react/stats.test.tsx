@@ -76,7 +76,7 @@ function serve(...responses: (StatsData | null)[]) {
     at += 1;
     return body
       ? { ok: true, status: 200, json: async () => body }
-      : { ok: false, status: 500, json: async () => ({ message: '账本当前只能浏览' }) };
+      : { ok: false, status: 500, json: async () => ({ message: '数据库当前只能浏览' }) };
   });
   vi.stubGlobal('fetch', fetcher);
   return fetcher;
@@ -106,7 +106,7 @@ it('整页一个请求：四张卡和下面三个面板读的是同一份快照'
 
 it('抬头那一句用遗留层同一套体积口径', async () => {
   const { host } = await open();
-  expect(host.querySelector('p')?.textContent).toBe('账本当前快照 · 4 个视频 · 4.0 GB');
+  expect(host.querySelector('p')?.textContent).toBe('数据库中的当前统计 · 4 个视频 · 4.0 GB');
 });
 
 it('四张卡就是页签：点「看过」换到看过那一层，其余的收起来', async () => {
@@ -211,7 +211,7 @@ it('全是 0 的分布图与没有分段的径向图都换成说明卡', async (
   }));
   const panel = host.querySelector('[role=tabpanel]')!;
   expect(panel.querySelector('section[aria-label="媒体库"] p')?.textContent)
-    .toBe('把媒体文件夹归进媒体库后，这里会按库显示视频数。');
+    .toBe('把媒体目录归进媒体库后，这里会按库显示视频数。');
   expect(panel.querySelector('section[aria-label="画质"] p')?.textContent).toBe('探测画质后，这里会显示画质分布。');
 });
 
@@ -340,19 +340,19 @@ it('快进扫过和正常看完是两回事，一行里分得出来', async () =
   expect(entry.textContent).toContain('真实 50% · 到达 90%');
 });
 
-it('一个视频都没有时给空态，能改配置就给去添加媒体文件夹', async () => {
+it('一个视频都没有时给空态，能改配置就给去添加媒体目录', async () => {
   const { host, props } = await open(payload({ by_loc: [], by_library: [] }));
   expect(host.querySelector('h3')?.textContent).toBe('还没有视频');
   expect(radialCharts(host)).toEqual([]);
   expect(host.querySelector('[role=tabpanel] section[aria-label]')).toBeNull();
-  await click(buttonNamed('添加媒体文件夹', host));
+  await click(buttonNamed('添加媒体目录', host));
   expect(props.openMediaSettings).toHaveBeenCalledTimes(1);
 });
 
 it('这台机器不能改配置时空态不给那个按钮，只留能走的那条路', async () => {
   const props = { ...legacyProps(), configurable: false };
   const { host } = await open(payload({ by_loc: [], by_library: [] }), props);
-  expect(buttonNamed('添加媒体文件夹', host)).toBeNull();
+  expect(buttonNamed('添加媒体目录', host)).toBeNull();
   expect(host.querySelector('a')?.textContent).toBe('添加关注');
   expect(looksLikeButton(host.querySelector('a'))).toBe(true);
 });
@@ -375,7 +375,7 @@ it('首屏取数就失败时只剩一条错误，不画空看板', async () => {
   const alert = host.querySelector('[role=alert]');
   // 文案走遗留层的 `requestErrorMessage`：服务端给了中文原因就用它，页面不另说一遍。
   expect(alert?.textContent).toContain('读取失败');
-  expect(alert?.textContent).toContain('账本当前只能浏览');
+  expect(alert?.textContent).toContain('数据库当前只能浏览');
   expect(host.querySelector('[role=tablist]')).toBeNull();
 });
 
@@ -390,7 +390,7 @@ it('重新进这一页会重取：这一页的刷新就是重新进来一次，�
   const host = await mount(
     <QueryClientProvider client={queryClient}><StatsPage {...legacyProps()} /></QueryClientProvider>);
   expect(first.fetcher).toHaveBeenCalledTimes(2);
-  expect(host.textContent).toContain('账本当前快照');
+  expect(host.textContent).toContain('数据库中的当前统计');
 });
 
 it('卸载之后不再敲库：这一页没有轮询，也不该留下别的定时器', async () => {

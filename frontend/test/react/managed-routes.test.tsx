@@ -341,7 +341,7 @@ it('这几页之间的跳转交给 React Router，别的路径交壳', async () 
   expect(vi.mocked(actions.navigate).mock.calls).toEqual([['/'], ['/trash']]);
 });
 
-it('页面里的跳转：只领一个开次代次、历史只多一条', async () => {
+it('页面里的跳转：只领一个页面打开序号、历史只多一条', async () => {
   const r = await load('/sources');
   await mount(r);
   const epoch = r.peachHistory.navigation.openEpoch;
@@ -372,7 +372,7 @@ it('诊断页先选配置分栏再导航，作品与任务交给共享入口', a
   expect(actions.openItem).toHaveBeenCalledWith(12);
 });
 
-it('统计页：点标签交壳回目录；「添加媒体文件夹」先交页签再换到配置页', async () => {
+it('统计页：点标签交壳回目录；「添加媒体目录」先交页签再换到配置页', async () => {
   const r = await load();
   const actions = shellActions();
   const order: string[] = [];

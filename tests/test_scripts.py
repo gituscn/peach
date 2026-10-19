@@ -1268,7 +1268,7 @@ class LibraryDirectoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             plan = self._rehome_plan(Path(directory).resolve(), [(1, path, '122614-947', '一本道')])
         self.assertEqual(plan['operations'], [])
-        self.assertEqual(plan['skipped'], [dict(source=path, reason='账本番号与文件名编号不一致，待确认')])
+        self.assertEqual(plan['skipped'], [dict(source=path, reason='数据库番号与文件名编号不一致，待确认')])
 
     def test_rename_into_an_existing_directory_merges_and_removes_the_source(self):
         script = self.script

@@ -18,10 +18,8 @@ def missing_prerequisite(reason: str) -> NoReturn:
     raise unittest.SkipTest(reason)
 
 
-#: 声明根（`[media.locations]`）一律是 Windows 盘符，扫描与落库也只在 Windows 上
-#: 发生（ADR-0023、`peach-cross-platform`）。拿临时目录当声明根的用例因此只在 Windows 上
-#: 跑得通：那里的临时路径本身就是 Windows 形态，`resolve_root` 认得；POSIX 临时路径
-#: 不是账本口径的路径，写入侧门槛会把它当成「不在任何声明根下」拒掉。要让这些用例在
-#: macOS 上也跑，得先让 `translate_ledger_path` 在 Windows 上也过 `[media.mounts]`——那是
-#: 产品行为的改动，不是测试的事。
-windows_ledger_roots = unittest.skipUnless(os.name == "nt", "声明根是 Windows 盘符")
+#: 直接把临时目录填入 `[media.locations]` 的用例只适用于 Windows，因为该表保存
+#: Windows 格式的数据库路径前缀。POSIX 临时路径无法通过目录访问权限检查。
+#: 跨平台用例应将 Windows 格式的前缀填入 `[media.locations]`，将临时媒体目录填入
+#: `[media.mounts]`，按产品的路径转换规则验证。
+windows_ledger_roots = unittest.skipUnless(os.name == "nt", "数据库中的目录前缀是 Windows 盘符")

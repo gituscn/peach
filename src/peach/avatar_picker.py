@@ -142,7 +142,7 @@ def cover_version(cover: Path | None) -> str:
 def _check_version(cover: Path | None, version: str | None) -> None:
     """框是在 `version` 那一张封面上画的；封面此后被换过，同一组坐标就落在别的地方。"""
     if version is not None and cover_version(cover) != version:
-        raise PickerError("这张封面刚换过，回候选重新框一次")
+        raise PickerError("这张封面刚换过，返回备选图片重新框一次")
 
 
 def name_chain(connection: sqlite3.Connection, entity_id: int) -> list[str]:
@@ -631,7 +631,7 @@ def _asset_image(ref: str, connection: sqlite3.Connection, entity_id: int,
     try:
         asset_id = int(raw_id)
     except ValueError as error:
-        raise PickerError("认不出这个候选") from error
+        raise PickerError("无法识别这张备选图片") from error
     row = connection.execute(
         "SELECT a.code FROM asset_entity ae JOIN asset a ON a.id=ae.asset_id "
         "WHERE ae.entity_id=? AND ae.asset_id=?",
@@ -647,13 +647,13 @@ def _asset_image(ref: str, connection: sqlite3.Connection, entity_id: int,
         try:
             cell = int(what[len("cell"):])
         except ValueError as error:
-            raise PickerError("认不出这个候选") from error
+            raise PickerError("无法识别这张备选图片") from error
         if not 0 <= cell < SHEET_CELLS:
-            raise PickerError("认不出这个候选")
+            raise PickerError("无法识别这张备选图片")
         path = artwork.frame(asset_id, cell)
         label = f"第 {cell + 1} 格"
     else:
-        raise PickerError("认不出这个候选")
+        raise PickerError("无法识别这张备选图片")
     if path is None or not Path(path).is_file():
         raise PickerError(f"这部作品的{label}还没有落在本机")
     try:
@@ -682,7 +682,7 @@ def resolve(ref: str, connection: sqlite3.Connection, providers_root: Path,
     """
     if ref.startswith(("follow:", "follow-avatar:", "follow-link:")):
         if online is None:
-            raise PickerError("在线头像候选未取得")
+            raise PickerError("未取得在线备选头像")
         return online(ref)
     if ref.startswith("sha256:"):
         digest = ref.split(":", 1)[1].strip().lower()
@@ -711,12 +711,12 @@ def resolve(ref: str, connection: sqlite3.Connection, providers_root: Path,
         return body, {"source": "avatar picker", "provider": ADDRESS_CACHE,
                       "external_id": "", "upstream_url": url}
     if not ref.startswith("gfriends:"):
-        raise PickerError("认不出这个候选")
+        raise PickerError("无法识别这张备选图片")
     category, _, filename = ref.split(":", 1)[1].partition("/")
     index = gfriends.load_index(providers_root / GFRIENDS_CACHE)
     match = gfriends.candidates(index, name_chain(connection, entity_id))
     if (category, filename) not in match.finder:
-        raise PickerError("这个候选不在当前索引里")
+        raise PickerError("当前索引中没有这张备选图片")
     # 证据里记的是找到这一张的那个名字，不是整条链：事后要答的是「这张图凭什么算他」。
     matched = match.finder[(category, filename)]
     url = gfriends.image_url(category, filename)

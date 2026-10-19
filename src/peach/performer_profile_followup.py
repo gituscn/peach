@@ -298,7 +298,7 @@ def _run(contract, key: str, handle) -> dict:
                  "codes": work_codes(connection, entity_id),
                  "fetched": profile_fetched_at(connection, entity_id)}
     if names is None:
-        return {"outcome": "实体已不存在"}
+        return {"outcome": "档案已不存在"}
     canonical = names[0]
     if handle is not None:
         handle.progress(label=_label(canonical), throttle=0)
@@ -362,14 +362,14 @@ def _visit_minnano(contract, pages, entity_id: int, names, state: dict, batch: s
             anchored.append((url, parsed))
     if len(anchored) != 1:
         detail = (f"{len(anchored)} 张资料页都列着她" if anchored
-                  else note or "资料页上没有账本里她的名字")
+                  else note or "资料页上没有数据库里她的名字")
         reports[MINNANO] = f"{MISS}：{detail}"
         rows.append({**base, "site": MINNANO, "page": "", "action": MISS, "detail": detail})
         return
     url, parsed = anchored[0]
     with contract.database.write_transaction() as connection:
         if not _alive(connection, entity_id, canonical):
-            reports[MINNANO] = f"{MISS}：账本里这条实体已经变了"
+            reports[MINNANO] = f"{MISS}：数据库里这条实体已经变了"
             return
         wrote = write_profile(connection, entity_id, parsed, source=batch, source_url=url)
         bound = ""
@@ -380,7 +380,7 @@ def _visit_minnano(contract, pages, entity_id: int, names, state: dict, batch: s
     reports[MINNANO] = f"命中 {url}"
     rows.append({**base, "site": MINNANO, "page": url, "action": WRITE if wrote else MISS,
                  "batch": batch if wrote else "",
-                 "detail": "资料页列着账本里她的名字" if wrote else "这一行是人写的，不覆盖"})
+                 "detail": "资料页列着数据库里她的名字" if wrote else "这一行是人写的，不覆盖"})
     if bound:
         rows.append({**base, "site": MINNANO, "page": url, "action": bound,
                      "batch": batch if bound == BIND else "",
@@ -420,7 +420,7 @@ def _visit_avwikidb(contract, pages, entity_id: int, names, state: dict, batch: 
     found = conflicts(state.get("profile") or profile, actor)
     with contract.database.write_transaction() as connection:
         if not _alive(connection, entity_id, canonical):
-            reports[AVWIKIDB] = f"{MISS}：账本里这条实体已经变了"
+            reports[AVWIKIDB] = f"{MISS}：数据库里这条实体已经变了"
             return 0
         verdict = bind(connection, entity_id, AVWIKIDB, actor_ref,
                        _actor_metadata(actor, work, batch, found))
@@ -542,7 +542,7 @@ def _visit_javdb(contract, pages, entity_id: int, names, batch: str, base: dict,
         return
     with contract.database.write_transaction() as connection:
         if not _alive(connection, entity_id, canonical):
-            reports[JAVDB] = f"{MISS}：账本里这条实体已经变了"
+            reports[JAVDB] = f"{MISS}：数据库里这条实体已经变了"
             return
         verdicts = [(card, bind(connection, entity_id, JAVDB, card["id"],
                                 {"source": SOURCE, "batch": batch})) for card in cards]

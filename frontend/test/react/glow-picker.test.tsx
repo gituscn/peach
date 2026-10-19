@@ -1,5 +1,5 @@
 /* 侧栏配色卡与它底下那枚配色钮：两组球画什么、点下去写什么，光晕关掉之后卡上剩什么，设置面板那一格改了
- * 配色这里当场跟上，以及卡作为常驻面（`RESIDENT_ROUTES['glow-picker']`）由路由树直接画成 `#boardGlowMenu`
+ * 配色这里当场跟上，以及卡作为常驻组件（`RESIDENT_ROUTES['glow-picker']`）由路由树直接画成 `#boardGlowMenu`
  * 的子节点。卡的锚定、开合、玻璃材质与球的像素在真浏览器里量（`e2e/design-*.test.ts`）。 */
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -61,7 +61,7 @@ beforeEach(() => {
   vi.stubGlobal('requestAnimationFrame', (run: FrameRequestCallback) => { run(0); return 0 });
 });
 
-describe('常驻面', () => {
+describe('常驻组件', () => {
   it('内容直接是 #boardGlowMenu 的子节点，不包 .peach-react；收起只卸内容，卡留在文档里', async () => {
     const { root } = await setup();
     expect([...root.children].map((child) => child.tagName.toLowerCase())).toEqual(['header', 'div', 'p', 'div', 'footer']);

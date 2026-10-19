@@ -11,10 +11,10 @@
 两条不变量都在这里守：
 
 - `asset.location` 是来源 ID，`asset.path` 一律是 Windows 形态的账本路径。扫描根必须
-  落在该来源 `[media.locations]` 声明根之内（`check_scan_target`），否则写进去的行既
+  落在该来源 `[media.locations]` 数据库路径前缀之内（`check_scan_target`），否则写进去的行既
   翻译不出本机路径、也通不过授权根，而且要等到有人点开那个资产才会发现。
-- 目录在本机哪里，由 `[media.mounts]` 决定。Windows 上盘符本身就是挂载点，声明根原样
-  就是要遍历的目录；macOS 上遍历的是挂载点，写进账本的仍是 `声明根\\相对路径`，这样
+- 目录在本机哪里，由 `[media.mounts]` 决定。Windows 上盘符本身就是挂载点，数据库路径前缀原样
+  就是要遍历的目录；macOS 上遍历的是挂载点，写进账本的仍是 `数据库路径前缀\\相对路径`，这样
   读取侧的 `platform.translate_ledger_path` 才翻得回同一个文件。
 
 字幕 sidecar 顺带在这里登记：遍历时每个目录的文件名已经在手上，配对判据只看同目录，
@@ -26,7 +26,7 @@
 
 `peach init` 的首次扫描与 `peach scan` 调 `scan_location` 遍历整个根；推送发现拿到一条
 路径时调 `ingest_path`，登记口径、不变量与 upsert 语句都是同一份。
-声明根和挂载表由调用方传入而不是读进程缓存：`init` 刚写完设置文件时缓存还是旧的。
+数据库路径前缀和挂载表由调用方传入而不是读进程缓存：`init` 刚写完设置文件时缓存还是旧的。
 """
 from __future__ import annotations
 
@@ -129,7 +129,7 @@ def is_sidecar(name: str, videos: frozenset[str], *, artwork_dir: bool = False) 
 def check_scan_target(
     location: str, root: str, *, declared_roots: Mapping[str, Sequence[str]],
 ) -> None:
-    """扫描根必须落在这个来源的某个声明根内，否则拒绝（ADR-0023 第 2 阶段的写入侧门槛）。"""
+    """扫描根必须落在这个来源的某个数据库路径前缀内，否则拒绝（ADR-0023 第 2 阶段的写入侧门槛）。"""
     declared = declared_roots.get(location)
     if declared is None:
         known = "、".join(sorted(declared_roots)) or "（设置文件里一个都没有）"
@@ -137,9 +137,9 @@ def check_scan_target(
     actual = resolve_location(root, declared_roots)[0]
     if actual != location:
         raise ScanTargetError(
-            f"✗ 扫描根与来源对不上：{location} 的声明根是 {'、'.join(declared)}，"
+            f"✗ 扫描目录与媒体来源不一致：{location} 的数据库路径前缀是 {'、'.join(declared)}，"
             f"但要扫的是 {root}"
-            + (f"（那是 {actual} 的地盘）" if actual else "（不在任何声明根下）")
+            + (f"（该目录属于 {actual}）" if actual else "（不在任何已配置的媒体目录下）")
         )
 
 
@@ -148,10 +148,10 @@ def ledger_root_for(
     declared_roots: Mapping[str, Sequence[str]],
     mounts: Mapping[str, Sequence[str | Path]], windows: bool | None = None,
 ) -> str:
-    """把用户给的目录换成账本口径的扫描根。
+    """将媒体目录转换为数据库使用的 Windows 格式路径。
 
     Windows 上任何绝对路径本来就是账本形态，相对路径先按当前目录补全。其他平台上
-    给的是本机目录（某个挂载点下的某一层），换成对应那个 `声明根\\相对路径`；没有
+    给的是本机目录（某个挂载点下的某一层），换成对应那个 `数据库路径前缀\\相对路径`；没有
     挂载点或不在任何挂载点下都拒绝——那种目录扫出来的行谁也翻译不回去。
     """
     windows = os.name == "nt" if windows is None else windows
@@ -170,8 +170,8 @@ def ledger_root_for(
         return text
     if not location_mounts:
         raise ScanTargetError(
-            f"✗ 来源 {location!r} 在本机没有挂载点，无法把 {text} 换成账本路径；"
-            f"先在 [media.mounts] 里声明它的落点")
+            f"✗ 媒体来源 {location!r} 未配置本机目录，无法转换 {text} 的路径；"
+            f"请先在 [media.mounts] 中配置媒体目录")
     shown = "、".join(os.fspath(mount) for mount in location_mounts)
     raise ScanTargetError(f"✗ {text} 不在来源 {location!r} 的挂载点 {shown} 之下")
 
@@ -180,7 +180,7 @@ def walk_root_for(
     location: str, root: str, *, declared_roots: Mapping[str, Sequence[str]],
     mounts: Mapping[str, Sequence[str | Path]], windows: bool | None = None,
 ) -> Path:
-    """账本口径的扫描根在本机要遍历哪个目录。调用前先过 `check_scan_target`。"""
+    """取得数据库路径在本机对应的扫描目录。调用前先过 `check_scan_target`。"""
     windows = os.name == "nt" if windows is None else windows
     if windows:
         return Path(root)
@@ -188,8 +188,8 @@ def walk_root_for(
     location_mounts = tuple(mounts.get(location, ()))
     if index >= len(location_mounts):
         raise ScanTargetError(
-            f"✗ 来源 {location!r} 的第 {index + 1} 个声明根在本机没有挂载点；"
-            f"先在 [media.mounts] 里按顺序声明它的落点")
+            f"✗ 媒体来源 {location!r} 的第 {index + 1} 个数据库路径前缀没有对应的本机目录；"
+            f"请先在 [media.mounts] 中按相同顺序配置媒体目录")
     return Path(location_mounts[index]).joinpath(*tail)
 
 
@@ -255,7 +255,7 @@ def ingest_path(
 ) -> IngestResult:
     """按扫描的同一口径登记一个文件。
 
-    `path` 是账本口径的绝对路径。两条不变量与 `scan_location` 共用同一段判定，upsert
+    `path` 是数据库使用的 Windows 格式绝对路径。两条不变量与 `scan_location` 共用同一段判定，upsert
     也是同一条语句：推送发现拿到一条路径之后走的就是这里，账本里不会出现第二种
     「新文件怎么变成一行」的写法。
 
@@ -424,7 +424,7 @@ def _scan_location(
     resume_state: dict | None = None,
     save_checkpoint: Callable[[dict], None] = lambda state: None,
 ) -> ScanResult:
-    """遍历 `root`（账本口径）对应的本机目录，把文件元数据 upsert 进 `asset`。
+    """遍历 `root`（数据库中的路径格式）对应的本机目录，把文件元数据 upsert 进 `asset`。
 
     读不了的目录和文件直接跳过，不中断整轮：网盘挂载里零星几个条目读失败很常见，
     一个坏条目不该让几万个好条目白扫。

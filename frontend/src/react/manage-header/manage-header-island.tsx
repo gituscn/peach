@@ -1,6 +1,6 @@
 /* 管理区页头（ADR-0031 第 11g 步）：管理条、面包屑、页面标题与回收站说明行。
  *
- * 常驻面 `manage-header`（`router/managed-routes.tsx` 的常驻表）：路由树把它画进壳常驻的
+ * 常驻组件 `manage-header`（`router/managed-routes.tsx` 的常驻表）：路由树把它画进壳常驻的
  * `[data-manage-header]`（`display: contents`，四块直接落在 `main` 的流里），宿主就是那个节点本身。壳启动时
  * 先同步在宿主里写一份同结构的骨架（`manageHeaderSkeletonHtml`）；打开这一面时 `place` 清掉骨架，路由树在
  * 同一个任务里画出首帧。首帧还没有 props，画成空，壳拿到句柄就把手上那份推进来。之后壳只经

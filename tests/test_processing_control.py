@@ -117,7 +117,7 @@ class ProcessingControlTests(unittest.TestCase):
 
     def test_unmeasured_finalization_does_not_keep_a_completed_phase_estimate(self):
         state = dict(speed_mode='standard', status='running', requested_stage='metadata',
-                     stage='保存资料候选', checked=10, total=10, estimate_pending={},
+                     stage='保存待确认资料', checked=10, total=10, estimate_pending={},
                      eta_seconds_min=1, eta_seconds_max=2)
         estimate = ProcessingEstimate(self.config, state, None)
         estimate.update(state)

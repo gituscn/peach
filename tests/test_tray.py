@@ -243,7 +243,7 @@ class ServiceStatusTests(unittest.TestCase):
         spec = ServiceSpec("http", "http://127.0.0.1/healthz", ("peach", "serve"), True)
         process = Mock()
         process.poll.return_value = None
-        completed = Mock(returncode=0, stdout="账本同步：in-sync · 两侧已经一致\n", stderr="")
+        completed = Mock(returncode=0, stdout="数据库同步：in-sync · 两侧已经一致\n", stderr="")
         manager = ServiceManager(
             (spec,), popen=Mock(return_value=process), run=Mock(return_value=completed),
             ledger_plan=lambda: SyncPlan("pull", "共享副本更新"),
@@ -270,7 +270,7 @@ class ServiceStatusTests(unittest.TestCase):
         manager = ServiceManager(
             tuple(),
             run=Mock(return_value=Mock(
-                returncode=0, stdout="账本同步：take-ownership\n", stderr="")),
+                returncode=0, stdout="数据库同步：take-ownership\n", stderr="")),
             ledger_plan=lambda: SyncPlan("in-sync", "两侧一致"),
         )
         with patch.object(manager, "start_missing"), patch.object(
@@ -336,7 +336,7 @@ class ServiceStatusTests(unittest.TestCase):
         manager = ServiceManager(
             tuple(),
             run=Mock(return_value=Mock(
-                returncode=0, stdout="账本同步：take-ownership\n", stderr="")),
+                returncode=0, stdout="数据库同步：take-ownership\n", stderr="")),
             ledger_plan=lambda: SyncPlan("in-sync", "两侧一致"),
         )
         with patch.object(manager, "start_missing"), patch.object(
@@ -368,7 +368,7 @@ class ServiceStatusTests(unittest.TestCase):
             SyncPlan("pull", "共享副本更新"),
         ])
         mount = Mock(return_value=True)
-        completed = Mock(returncode=0, stdout="账本同步：pull · 共享副本更新\n", stderr="")
+        completed = Mock(returncode=0, stdout="数据库同步：pull · 共享副本更新\n", stderr="")
         manager = ServiceManager(
             (spec,), popen=Mock(return_value=process), run=Mock(return_value=completed),
             ledger_plan=lambda: next(plans), mount_share=mount,
@@ -415,7 +415,7 @@ class ServiceStatusTests(unittest.TestCase):
         manager = ServiceManager(
             tuple(),
             run=Mock(return_value=Mock(
-                returncode=0, stdout="账本同步：take-ownership\n", stderr="")),
+                returncode=0, stdout="数据库同步：take-ownership\n", stderr="")),
             ledger_plan=lambda: next(plans), mount_share=Mock(return_value=True),
         )
         with patch.object(manager, "start_missing"), patch.object(
@@ -453,7 +453,7 @@ class ReplicationSwitchTests(unittest.TestCase):
 
     def test_menu_items_are_assembled_when_replication_is_on(self):
         labels = [label for label, _ in self.items(True)]
-        self.assertEqual(labels, ["同步 Ledger", "接管 Ledger 写入"])
+        self.assertEqual(labels, ["同步数据库", "由本机接管数据库写入"])
 
     def test_sync_ledger_refuses_instead_of_probing_a_share(self):
         """菜单项没了，但托盘还有别的入口；这条路径会去探一个不存在的共享。"""
@@ -497,10 +497,10 @@ class SetupGateTests(unittest.TestCase):
 
     def test_a_fresh_machine_needs_setup_even_after_a_state_directory_appeared(self):
         self.assertTrue(needs_setup(self._config()))
-        # 托盘的单实例锁会建出 `state/`，数据根目录于是存在、`configured` 变成 True。
+        # 托盘的单实例锁会建出 `state/`，Peach 数据目录于是存在、`configured` 变成 True。
         (self.data_root / "state").mkdir(parents=True)
         self.assertTrue(self._config().configured)
-        self.assertTrue(needs_setup(self._config()), "空数据根不算配置过")
+        self.assertTrue(needs_setup(self._config()), "空 Peach 数据目录不算配置过")
 
     def test_an_existing_deployment_without_a_settings_file_is_left_alone(self):
         (self.data_root / "database").mkdir(parents=True)
@@ -1500,11 +1500,11 @@ class TrayPreparationTests(unittest.TestCase):
 
     def test_startup_reports_a_failed_migration_and_an_unready_schema(self):
         failed = runtime_prepare.Step("migrations", "failed", "migrate status 失败：database is locked")
-        manager = self.manager(problems=["HTTPS 未就绪：账本结构与迁移不一致"])
+        manager = self.manager(problems=["HTTPS 未就绪：数据库结构与迁移不一致"])
         tray = self.tray(manager, self.preparation(migration=failed))
         self.run_tray(tray)
         self.assertIn("database is locked", tray._startup_warning)
-        self.assertIn("账本结构与迁移不一致", tray._startup_warning)
+        self.assertIn("数据库结构与迁移不一致", tray._startup_warning)
         self.assertFalse(runtime_prepare.read_record(self.root / "state", pid=os.getpid())["ok"])
 
     def test_restart_migrates_while_the_services_are_stopped(self):
@@ -1577,7 +1577,7 @@ class TrayPreparationTests(unittest.TestCase):
         specs = (ServiceSpec("http", "http://127.0.0.1/healthz", ("peach",), True),
                  ServiceSpec("https", "https://192.0.2.10/healthz", ("peach",), "ca.crt"))
         manager = ServiceManager(specs, health_get=get, log_dir=self.root)
-        self.assertEqual(manager.readiness_problems(), ["HTTPS 未就绪：账本结构与迁移不一致"])
+        self.assertEqual(manager.readiness_problems(), ["HTTPS 未就绪：数据库结构与迁移不一致"])
         self.assertEqual(asked, [("http://127.0.0.1/healthz?ready=1", True),
                                  ("https://192.0.2.10/healthz?ready=1", "ca.crt")])
 

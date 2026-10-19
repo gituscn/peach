@@ -74,13 +74,13 @@ const entityPath=(kind:string,name:string,id?:number|null)=>{
   return `/${ENTITY_ROUTES[kind]||kind}/${target||encodeURIComponent(name)}`;
 };
 const esc=(s:unknown)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'} as Record<string,string>)[c] as string);
-/* 外链上写的是站点的短名：事务所和片商平时就被叫作 NAX、T-POWERS、DMM，而账本里的
+/* 外链上写的是站点的短名：事务所和片商平时就被叫作 NAX、T-POWERS、DMM，而数据库里的
    label 是采集时抄下来的全称（`New Actor eXperience`、`DMM 检索`），域名又要人先在
    `OFFICIAL.NAX-PRO.COM` 里认出哪一段是名字。两样都比短名难读，一排链接里尤其。
 
    按主机名查表，末尾后缀也算（`official.nax-pro.com` 命中 `nax-pro.com`）。表里没有的
-   退回账本 label：这张表覆盖常来常往的那些站，剩下的长尾不值得逐条登记，而 label 至少
-   是人写过的。账本里的 label 不动——它是采集证据，显示是另一件事。 */
+   退回数据库 label：这张表覆盖常来常往的那些站，剩下的长尾不值得逐条登记，而 label 至少
+   是人写过的。数据库里的 label 不动——它是采集证据，显示是另一件事。 */
 const SITE_NAMES:[string,string][]=[['nax-pro.com','NAX'],['t-powers.co.jp','T-POWERS'],['dmm.co.jp','DMM'],
   ['mgstage.com','MGStage'],['av-event.jp','AV-EVENT'],['k-mib.com','K-MIB'],
   ['minnano-av.com','みんなのAV'],
@@ -104,7 +104,7 @@ const siteName=(url:unknown)=>{
    做不了就把原图按 32 px 转出来。放服务端有三个理由：它要读别人站点的图、要缓存，
    而且这样浏览器不再直接向对方站点发请求（也就不泄露正在看谁的资料页）。
 
-   传的是链接 id 而不是地址。跟 `/follow-stream` 同一条规矩：服务端只取账本里已有的
+   传的是链接 id 而不是地址。跟 `/follow-stream` 同一条规矩：服务端只取数据库里已有的
    地址，绝不去取前端递过来的任意 URL——那等于开一个任意地址抓取的口子。 */
 const linkMarkUrl=(link:{link_id?:number|null})=>`/link-mark?id=${encodeURIComponent(link.link_id ?? '')}`;
 /* 采集来源和口味排行里那些站点的圆标，同一条规矩的另一个入口：递的是服务端已经
@@ -130,7 +130,7 @@ const brandIcon=(url:unknown)=>{
 };
 /** 名字比对用的折叠：NFKC、去首尾空白、小写。 */
 const foldName=(s:unknown)=>String(s??'').normalize('NFKC').trim().toLocaleLowerCase();
-/* 官网链接上那行字。写站点短名（`siteName`），表里没有就用账本 label。
+/* 官网链接上那行字。写站点短名（`siteName`），表里没有就用数据库 label。
 
    厂牌页和事务所页上指回自家站的写「官方网站」：页头已经是公司名，链接再写一遍 S1、
    LIGHT 只是重复。人物页照旧写名字，那里的名字说的是她归哪一家，正是要看的信息。名字是
@@ -156,7 +156,7 @@ const officialLinkText=(link:{url?:string;label?:string},kind:string,names:reado
 };
 /* 什么才算一个真时长——只有这一处说了算。
 
-   账本里 `-1` 是 probe 的「硬失败」哨兵（见 scripts/probe.py：抽帧的 duration>2 门槛
+   数据库里 `-1` 是 probe 的「硬失败」哨兵（见 scripts/probe.py：抽帧的 duration>2 门槛
    会让失败条目永远卡住，所以硬失败写成 -1），它不是时长。而 `!s` 这种真值判断挡不住
    负数：`fmtDur(-1)` 会算出 `0:-1`，喂进播放器更糟——Video.js 的 duration() setter 里写着
    `parseFloat(e)<0 ? Infinity : e`，随后 `=== Infinity` 就 `addClass("vjs-live")`，

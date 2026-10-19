@@ -106,10 +106,10 @@ def plan(
     if not backups and not orphans:
         return BackupPlan((), ())
     if not live.is_file():
-        return BackupPlan(tuple(backups), (), "当前账本不存在，不清退任何备份")
+        return BackupPlan(tuple(backups), (), "当前数据库不存在，不清退任何备份")
     check = integrity(live)
     if check != "ok":
-        return BackupPlan(tuple(backups), (), f"当前账本 integrity_check 不是 ok：{check}")
+        return BackupPlan(tuple(backups), (), f"当前数据库 integrity_check 不是 ok：{check}")
     moment = now or datetime.now()
     live_mtime = _live_mtime(live)
     recent = set(backups[-keep_recent:]) if keep_recent > 0 else set()
@@ -147,5 +147,5 @@ def prune(
         try:
             target.unlink(missing_ok=True)
         except OSError as exc:
-            log.warning("账本备份未能删除 %s: %s", target, exc)
+            log.warning("数据库备份未能删除 %s: %s", target, exc)
     return decided

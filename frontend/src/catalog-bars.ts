@@ -13,7 +13,7 @@ import { api } from '@peach/legacy/core';
 
 import { queryClient } from './query';
 
-/** 两份聚合复用多久：换页回来不重取，半分钟后再进页就按新账本取。 */
+/** 两份聚合复用多久：换页回来不重取，半分钟后再进页就按新数据库取。 */
 export const BARS_STALE_MS = 30_000;
 
 let revision = 0;

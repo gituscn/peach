@@ -166,7 +166,7 @@ def _check_inputs(service: DownloadService, body) -> tuple[dict, str, str]:
 
 
 def _hints(service: DownloadService, body: dict):
-    """推建议值用的前缀表与声明根取推送发现那份，和落地换算同一个口径。
+    """使用推送发现的前缀表生成目录建议，与下载完成后的路径转换使用相同配置。
 
     PikPak 算在用：本机存着 PikPak 登录令牌，或页面说用户已在账号框里填了账号。
     """
@@ -244,7 +244,7 @@ def _browser_login(service: DownloadService):
 def pikpak_browser_start(service: DownloadService, declared_roots) -> dict:
     """拉起登录窗口，立刻回设置块；页面看 `pikpak_browser.state` 轮询，不在这里等。"""
     if not service.available:
-        raise ValueError("云下载只在账本写入端可用")
+        raise ValueError("云下载只在允许修改数据库的设备上可用")
     login = _browser_login(service)
     if login is None:
         raise ValueError("浏览器登录没有启用")

@@ -223,7 +223,7 @@ export function ActivityPage() {
     <Page>
       {problem ? <Note tone="error">{problem}</Note> : null}
       {data.available === false
-        ? <Note tone="warning">{data.message || '账本上还没有任务中心的表'}</Note>
+        ? <Note tone="warning">{data.message || '数据库尚未准备好任务记录表'}</Note>
         : null}
       {quiet
         ? <EmptyState shell="plain" icon={RiHistoryLine} title="还没有任务记录">

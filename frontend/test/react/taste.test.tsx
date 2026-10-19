@@ -110,7 +110,7 @@ function serve(plan: Plan) {
       if (reply === HOLD) return new Promise<never>(() => {});
       return reply
         ? ok(reply)
-        : { ok: false, status: 500, json: async () => ({ message: '账本当前只能浏览' }) };
+        : { ok: false, status: 500, json: async () => ({ message: '数据库当前只能浏览' }) };
     }
     throw new Error(`没有安排这个端点：${input}${init?.method ? ` ${init.method}` : ''}`);
   });

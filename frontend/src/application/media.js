@@ -127,7 +127,7 @@ export async function closeItemDetail(){
   await stageExit();
   disposeStage(false,false,{miniplayer:false});writeShell({detailReturnBarsContext:null});clearOverlayBackground();
   writeShell({barsContext:restore||{type:'home',filters:state}});
-  /* 下面没有那一屏、要照地址重建时，管理区不认领写地址、领一个开次代次重开，其余认领写地址后要路由树从头重开。 */
+  /* 下面没有那一屏、要照地址重建时，管理区不认领写地址、领一个页面打开序号重开，其余认领写地址后要路由树从头重开。 */
   if(restoreSurface&&navigationState.managedPagePath(new URL(returnPath,location.href).pathname)){navigationState.navigatePath(returnPath);return}
   navigationState.route(returnPath);
   if(restoreSurface)writeShell({pageOpens:pageOpens+1});
@@ -213,7 +213,7 @@ mediaState.itemDetailActions = {
     if(pendingQueueRoute){navigationState.queueOpenRequest=null;navigationState.route(`/assets/${item.id}?${pendingQueueRoute}`,false,overlayState('item'));writeShell({pendingQueueRoute:null})}
     buildBars();
   },
-  /* 取数时发现要换去别处：保存过的在线资产转关注详情，队列取不到退回普通详情，播放列表空了
+  /* 取数时发现要换去别处：保存过的在线作品转关注详情，队列取不到退回普通详情，播放列表空了
      回列表页，条目已不在就收起舞台。壳一换舞台，岛这一次挂载就作废。 */
   redirect:to=>{
     const push=!!pendingQueueRoute;

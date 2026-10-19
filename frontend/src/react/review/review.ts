@@ -55,7 +55,7 @@ export const REVIEW_PAGE_SIZE = 20;
 
 export interface CatalogEvidence { display_value?: string; warnings?: string[] }
 
-/** 一个来源给出的候选值。选中它就是把 `display_value` 写进账本。 */
+/** 一个来源给出的候选值。选中它就是把 `display_value` 写进数据库。 */
 export interface ReviewCandidate {
   candidate_key: string;
   source?: string;
@@ -96,7 +96,7 @@ export interface ReviewRow {
   name?: string;
   board?: string;
   source?: string;
-  /** 账本规范名当标题时，来源自己的写法留在这里。 */
+  /** 数据库规范名当标题时，来源自己的写法留在这里。 */
   source_name?: string;
   /** 竖线分隔的候选标签。 */
   tags?: string;
@@ -153,7 +153,7 @@ export interface ReviewGroup { key: string; title: string; rows: ReviewRow[] }
 /** 这一批队列能按什么分组。按来源、按字段两档要队列里真有那一项才出现。 */
 export function reviewGroupingOptions(rows: ReviewRow[], metadata: boolean): [ReviewGrouping, string][] {
   const options: [ReviewGrouping, string][] = [
-    ['candidates', metadata ? '按候选数量' : '全部待复核'],
+    ['candidates', metadata ? '按来源数量' : '全部待复核'],
   ];
   if (rows.some((row) => row.source || row.candidates?.some((candidate) => candidate.source))) {
     options.push(['source', '按来源']);
@@ -178,7 +178,7 @@ export function groupReviewRows(rows: ReviewRow[], by: ReviewGrouping): ReviewGr
       title = sources.join(' / ') || '未标注来源';
     } else {
       key = row.candidates ? (row.candidates.length === 1 ? 'single' : 'multiple') : 'pending';
-      title = key === 'single' ? '单一候选' : key === 'multiple' ? '需选择来源' : '待复核';
+      title = key === 'single' ? '单一来源' : key === 'multiple' ? '需选择来源' : '待复核';
     }
     if (!groups.has(key)) groups.set(key, { key, title, rows: [] });
     groups.get(key)!.rows.push(row);
@@ -296,7 +296,7 @@ export function decisionPayload(
 }
 
 export const decisionReceipt = (status: DecisionStatus): string =>
-  (status === 'approved' ? '已通过候选' : status === 'rejected' ? '已拒绝候选' : '已跳过候选');
+  (status === 'approved' ? '已通过资料' : status === 'rejected' ? '已拒绝资料' : '已跳过资料');
 
 /* ── 取数与写操作 ── */
 

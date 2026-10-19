@@ -45,7 +45,7 @@ describe('配置表单与行间距', () => {
           ] } });
         });
         await page.reload();
-        const form = page.getByRole('form', { name: '媒体文件夹', exact: true });
+        const form = page.getByRole('form', { name: '媒体目录', exact: true });
         const protectedFolder = form.locator('[data-media-read-policy="0"] [aria-haspopup="listbox"]');
         await protectedFolder.waitFor();
         await page.waitForFunction(() => {

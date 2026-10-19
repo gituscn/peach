@@ -1,4 +1,4 @@
-/* 详情舞台作为常驻面（`RESIDENT_ROUTES.stage`）在路由树里的行为：宿主是 body 末尾的 `[data-stage-host]`、
+/* 详情舞台作为常驻组件（`RESIDENT_ROUTES.stage`）在路由树里的行为：宿主是 body 末尾的 `[data-stage-host]`、
  * 画上之后才交出句柄、小窗节点在句柄交出时已经画好、`open` 里的几次绘制同步画完、换详情不换宿主、抛错只卸
  * 组件而句柄照调不抛。
  *
@@ -98,7 +98,7 @@ function request(id: number, patch: Partial<StageItemRequest> = {}): StageItemRe
   };
 }
 
-/* 常驻面适配层直接读取同一包内的配置函数；测试只接本场景的句柄契约。 */
+/* 常驻组件适配层直接读取同一包内的配置函数；测试只接本场景的句柄契约。 */
 type ShellIslands = { connectApplication(next: (actions: ShellActions) => void): () => void;
   loadStage(host: StageHost): Promise<StageApi>;
   stageApi(): StageApi | null;
@@ -174,7 +174,7 @@ afterEach(async () => {
   document.body.replaceChildren();
 });
 
-describe('常驻面', () => {
+describe('常驻组件', () => {
   it('画上之后句柄才交出；宿主是 body 末尾的 [data-stage-host]，里面直接是藏着的小窗，不包 .peach-react', async () => {
     const r = await load();
     await mountRouter(r);

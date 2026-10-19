@@ -160,7 +160,7 @@ function OnlineFilters({ head, actions }: { head: EntityOnlineHead; actions: Ent
 }
 
 /** 名册、视频、照片与在线是互斥视图，共用一组圆键：它们回答的是同一个问题。键名带上数目，悬停读得到。
- *  前三样是本地账本里的东西，在线是关注里还没入库的更新，所以排在最末。 */
+ *  前三样是本地数据库里的东西，在线是关注里还没入库的更新，所以排在最末。 */
 function ViewKeys({ keys, view, row, glide, onView }: {
   keys: EntityViewKeys;
   view: EntityView;
@@ -321,7 +321,7 @@ function OnlineControls({ head, actions }: { head: EntityOnlineHead; actions: En
   );
 }
 
-/** 照片视图：这一排不给排序键（账本里图片只有文件名、体积和来源），只放换一批、图片布局，
+/** 照片视图：这一排不给排序键（数据库里图片只有文件名、体积和来源），只放换一批、图片布局，
  *  在一个图集里再加那两枚源文件键。换一批的键自己转圈，等到新的一面墙回来。 */
 function PhotoControls({ head, actions, helpers }: {
   head: EntityPhotoHead; actions: EntityFilterActions; helpers: EntityFilterHelpers;

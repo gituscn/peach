@@ -1,4 +1,4 @@
-/* 侧栏（常驻面 `sidebar`，`sidebar-island.tsx`）对壳的契约。
+/* 侧栏（常驻组件 `sidebar`，`sidebar-island.tsx`）对壳的契约。
  *
  * 它画的是左侧抽屉 `#drawer` 里滚动的那一层：标题行的空槽、导航那一列、导航上那块滑动玻璃，
  * 以及导航下面按语境出现的筛选分组（目录与资料页的来源、时长、产地、画幅、创作者、标签，
@@ -58,7 +58,7 @@ export interface SidebarProps {
 }
 
 export interface SidebarHost {
-  /** 侧栏画进去的那一层（`#drawerScroll`），也是常驻面的宿主。覆盖式滚动条由壳挂在它上面，轨道住在 `#drawer` 里。 */
+  /** 侧栏画进去的那一层（`#drawerScroll`），也是常驻组件的宿主。覆盖式滚动条由壳挂在它上面，轨道住在 `#drawer` 里。 */
   scroll: HTMLElement;
   /** 界面偏好的那一份 store（`appSettings`）；侧栏只读写其中的 `sidebarOrder`。 */
   store: SettingsStore<{ sidebarOrder: string[] }>;

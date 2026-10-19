@@ -139,7 +139,7 @@ class RevisionConflict(ValueError):
         self.expected = int(expected)
         self.revisions = {int(key): int(value) for key, value in revisions.items()}
         current = "、".join(f"{key}={value}" for key, value in sorted(self.revisions.items()))
-        super().__init__(f"资产已被改过：期望 revision {expected}，账本现值 {current}")
+        super().__init__(f"资产已被改过：期望 revision {expected}，数据库现值 {current}")
 
 
 @dataclass(frozen=True)

@@ -2017,7 +2017,7 @@ class SocialOnlyCompanyTests(unittest.TestCase):
         icon = self.harvest()[0]
         self.assertEqual(icon["verdict"], MODULE.OK)
         self.assertEqual(icon["url"], self.AVATAR)
-        self.assertEqual(icon["evidence"], "账本里登记的社媒头像")
+        self.assertEqual(icon["evidence"], "数据库里登记的社媒头像")
 
     def test_the_same_avatar_fills_the_hero_slot(self):
         """大位没有别的候选可挑，站点自己那张字标根本不存在。"""

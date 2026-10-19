@@ -77,7 +77,7 @@ export async function refreshAll(automatic=false){
     /* 管理区的换批行为写在路由元数据的 `refresh` 上：`reopen` 重开自己，
        `skip` 不参与（追更页重画要联网，只能由它自己的按钮触发），
        没写的（统计、数据管理、资源同步）落到统计页。播放列表页画着就只重读（`rereadPlaylists`）；别的页原地
-       改写一次不认领的地址，领一个新的开次代次，页面元素换一次 key 重开，历史条数不变。 */
+       改写一次不认领的地址，领一个新的页面打开序号，页面元素换一次 key 重开，历史条数不变。 */
     const path=decodeURIComponent(location.pathname),refresh=navigationState.routeMeta(path)?.route.refresh;
     if(refresh==='skip')return;
     if(path==='/playlists'){rereadPlaylists();return}
@@ -135,11 +135,11 @@ export function installPreferences5() {
 preferencesState.sourceOnline = {};
 preferencesState.sourceProblems = {};
 preferencesState.sourceOffline = key=>preferencesState.sourceOnline[key]===false;
-preferencesState.OFFLINE_HINT = '脱盘模式：这个来源当前没有挂载';
-preferencesState.OFFLINE_REASON = {local:'本地硬盘没有挂载，接上后点重新检测即可播放。',
-  '115':'115 网盘没有挂载，检查 CloudDrive 是否在运行。',
-  pikpak:'PikPak 没有挂载，检查 CloudDrive 是否在运行。'};
-preferencesState.offlineReason = key=>preferencesState.sourceProblems[key]||preferencesState.OFFLINE_REASON[key]||'这个来源当前没有挂载。';
+preferencesState.OFFLINE_HINT = '媒体目录无法访问，请检查目录、读取权限和网盘挂载状态';
+preferencesState.OFFLINE_REASON = {local:'无法读取媒体目录，请检查目录是否存在及读取权限。',
+  '115':'无法读取 115 媒体目录，请检查目录权限及网盘挂载工具是否正常运行。',
+  pikpak:'无法读取 PikPak 媒体目录，请检查目录权限及网盘挂载工具是否正常运行。'};
+preferencesState.offlineReason = key=>preferencesState.sourceProblems[key]||preferencesState.OFFLINE_REASON[key]||'无法读取这个来源的媒体目录，请检查目录权限及挂载状态。';
 preferencesState.settingsStore = appSettingsStore();
 preferencesState.appSettings = preferencesState.settingsStore.value;
 preferencesState.saveSettings = ()=>preferencesState.settingsStore.save();

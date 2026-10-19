@@ -438,7 +438,7 @@ describe('库外 JAV 作品详情', () => {
         await page.waitForURL('**/jav?tab=discover');
       } finally { await context.close() }
     });
-    for (const readOnly of [false, true]) it(`${viewport.name}：下载服从账本只读状态`, { timeout: 60000 }, async () => {
+    for (const readOnly of [false, true]) it(`${viewport.name}：下载服从数据库只读状态`, { timeout: 60000 }, async () => {
       const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: 'reduce' });
       try {
         const page = await context.newPage();

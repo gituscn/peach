@@ -1,6 +1,6 @@
 /* 客户端导航（ADR-0031「React Router 外壳阶段接管」）：React Router 的 Declarative 模式接管 history。
- * 管理区那几页、播放列表页与关注页、索引页与资料页、目录网格与垃圾队列，以及页面里的附属面（首页筛选条、
- * 首页新作行、顶栏搜索下拉）与常驻面（后台任务、底部批量条、侧栏配色卡、管理区页头、沉浸模式、设置面板、
+ * 管理区那几页、播放列表页与关注页、索引页与资料页、目录网格与垃圾队列，以及页面里的页面内组件（首页筛选条、
+ * 首页新作行、顶栏搜索下拉）与常驻组件（后台任务、底部批量条、侧栏配色卡、管理区页头、沉浸模式、设置面板、
  * 侧栏、详情舞台）（`managed-routes.tsx`）由这棵树画。每一页、沉浸模式与详情覆盖都由路由按匹配打开
  * （`pages/` 下各元素），壳不接派发：它只订阅历史同步标题与侧栏，换页时写地址。
  *
@@ -43,7 +43,7 @@ import {
 import { FollowDetailGround, OverlayMatch, QueueRequests } from './pages/overlay';
 import type { ShellActions } from './shell-actions';
 
-/* 开次代次（`@peach/history` 的 `openEpoch`）：没人认领的历史变化各领一个，认领的写地址不领。地址没变的
+/* 页面打开序号（`@peach/history` 的 `openEpoch`）：没人认领的历史变化各领一个，认领的写地址不领。地址没变的
  * `popstate`（同一条目重放）不会让 Router 的 location 变，代次照样变，按它挂 key 的元素照样重开。 */
 const OpenEpoch = createContext(0);
 
@@ -80,14 +80,14 @@ function NavigateInto({ target }: { target: RefObject<NavigateFunction | null> }
 }
 
 /** 管理区页面里的跳转：落在管理区那几页上的交给 React Router，别的路径交 `actions.navigate`。两条路都不认领，
- * 各领一个开次代次，打开次数与后退前进相同。 */
+ * 各领一个页面打开序号，打开次数与后退前进相同。 */
 export function managedGo(path: string, actions: ShellActions, navigate: NavigateFunction): void {
   const target = new URL(path, window.location.href);
   if (!isManagedPath(target.pathname)) { actions.navigate(path); return }
   void navigate(`${target.pathname}${target.search}${target.hash}`);
 }
 
-/** 页面宿主：画壳在各个容器里登记的那一页（`#stats`、`#index`、`#grid` 与各附属面的容器各一页，互不相收）。
+/** 页面宿主：画壳在各个容器里登记的那一页（`#stats`、`#index`、`#grid` 与各页面内组件的容器各一页，互不相收）。
  *
  * 换页与收起都由 `@peach/history` 同步通知，这里用 `flushSync` 当场画完：壳在同一个任务里刚换上宿主
  * （或刚撤掉它），晚一拍画就是一帧空白。每次打开领一个代次，页面按代次重挂，首屏读的是刚取回的缓存。

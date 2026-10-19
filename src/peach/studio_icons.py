@@ -954,7 +954,7 @@ def icon_row(safe: str, target: dict[str, str], entries: list[dict[str, str]],
     """
     if not entries:
         return _row(safe, target, None, ICON, SKIP,
-                    evidence="账本里这个厂牌没有能取图的链接（存档快照不算）"), None
+                    evidence="数据库里这个厂牌没有能取图的链接（存档快照不算）"), None
     attempts: list[str] = []
     reachable = False
     policy = SquareMark(faces)
@@ -965,7 +965,7 @@ def icon_row(safe: str, target: dict[str, str], entries: list[dict[str, str]],
         if entry["link_kind"] == FALLBACK_LINK_KIND:
             got = first_mark(avatar_urls(entry["url"], fetch), fetch, policy)
             if got:
-                found.append((got[0], got[1], "账本里登记的社媒头像",
+                found.append((got[0], got[1], "数据库里登记的社媒头像",
                               policy.size, policy.aspect))
             if found:
                 return _made_rows(safe, target, entry, policy, found, candidate_dir)
@@ -1296,7 +1296,7 @@ def install(rows: list[dict[str, object]], logo_root: Path, *,
             raise ValueError(f'候选文件与复核记录哈希不一致，拒绝安装：{row["safe"]}')
         payload = images.bake_square(candidate)
         if payload is None:
-            raise ValueError(f'候选烤不成方图，拒绝安装：{row["safe"]}')
+            raise ValueError(f'无法生成可用的方形图片，未安装：{row["safe"]}')
         installed_sha256 = hashlib.sha256(payload).hexdigest()
         variant = str(row.get("variant") or ICON)
         targets = [logo_root / f'{row["safe"]}.{variant}.img']

@@ -197,7 +197,7 @@ describe('写操作', () => {
     const save = host.querySelectorAll('[data-follow-detail-save]');
     expect(save).toHaveLength(1);
     expect(save[0]!.getAttribute('aria-label')).toBe('已保存');
-    expect(given.toast).toHaveBeenCalledWith('已保存到账本');
+    expect(given.toast).toHaveBeenCalledWith('已保存到数据库');
   });
 
   it('标记已看：键按下、多一枚「恢复未看」；回执的撤销写回原状态', async () => {

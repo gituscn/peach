@@ -195,8 +195,8 @@ function FollowCardView(props: FollowCardProps) {
               </button>
             ) : null}
             {props.variant !== 'next' ? <div data-follow-actions="">
-              <button type="button" data-follow-save={item.id} title={saved ? '已保存' : '保存到账本'}
-                aria-label={saved ? '已保存' : '保存到账本'} disabled={saved}
+              <button type="button" data-follow-save={item.id} title={saved ? '已保存' : '保存到数据库'}
+                aria-label={saved ? '已保存' : '保存到数据库'} disabled={saved}
                 aria-busy={busy === 'save' || undefined} aria-disabled={busy === 'save' || undefined}
                 onClick={(event) => act(event, () => props.onSave?.(item.id))}
                 dangerouslySetInnerHTML={{ __html: icon(saved ? 'check' : 'bookmark-plus') }} />

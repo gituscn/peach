@@ -22,7 +22,7 @@ class BumpPartTests(unittest.TestCase):
         self.assertEqual(bump_part_for(["refactor(follow): 来源登记表变成唯一真相"], []), "patch")
         self.assertEqual(bump_part_for(["feat: 配置页并入主站管理菜单"], []), "minor")
         self.assertEqual(bump_part_for(["feat(web): 滚动条改成自绘覆盖式"], []), "minor")
-        self.assertEqual(bump_part_for(["fix!: 账本路径改成 location 键"], []), "minor")
+        self.assertEqual(bump_part_for(["fix!: 数据库路径改成 location 键"], []), "minor")
         self.assertEqual(bump_part_for(["refactor(config)!: 删掉盘符键"], []), "minor")
         self.assertEqual(bump_part_for(["fix: 补迁移"], ["migrations/0027_thing.sql"]), "minor")
         self.assertEqual(bump_part_for(["fix: 补迁移"], [r"migrations\0027_thing.sql"]), "minor")

@@ -247,7 +247,7 @@ def apply_plan(connection: sqlite3.Connection, plan: list[dict]) -> dict:
     """调用方持有事务；校验整批当前判定，保留实体与其它来源断言。"""
     current = [row for row in collect(connection) if row['action'] in {'remove','replace'}]
     if fingerprint(current) != fingerprint(plan):
-        raise ValueError('审计计划与当前账本不一致，请重新预览')
+        raise ValueError('审计计划与当前数据库不一致，请重新预览')
     removed = []
     added = []
     created = []
@@ -328,7 +328,7 @@ def restore(connection: sqlite3.Connection, manifest: dict) -> None:
                               tuple(row[key] for key in ('asset_id', 'entity_id', 'role', 'source'))).fetchone():
             raise ValueError('创作者关系已存在，拒绝回滚整批')
         if not connection.execute('SELECT 1 FROM entity WHERE id=?', (row['entity_id'],)).fetchone():
-            raise ValueError('实体已不存在，拒绝回滚整批')
+            raise ValueError('档案已不存在，拒绝回滚整批')
     for row in manifest['relations']:
         columns = tuple(row)
         connection.execute(f"INSERT INTO asset_entity({','.join(columns)}) VALUES({','.join('?' for _ in columns)})",

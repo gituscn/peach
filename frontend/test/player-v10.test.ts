@@ -51,11 +51,11 @@ describe('Video.js 10 播放会话', () => {
 
   it('媒体错误可补充来源状态文案，展示错误不会再次触发错误处理', () => {
     const { player, media } = mounted();
-    const callback = vi.fn(() => player.error({ code: 2, message: '脱盘模式' }));
+    const callback = vi.fn(() => player.error({ code: 2, message: '媒体目录无法访问' }));
     player.on('error', callback);
     media.dispatchEvent(new Event('error'));
     expect(callback).toHaveBeenCalledOnce();
-    expect(player.error()).toEqual({ code: 2, message: '脱盘模式' });
+    expect(player.error()).toEqual({ code: 2, message: '媒体目录无法访问' });
     player.dispose();
   });
 

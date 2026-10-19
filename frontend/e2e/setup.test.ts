@@ -1,8 +1,8 @@
 /* 首次运行页的整条流程：加载、填错、原位写回、改对、完成态。
  *
- * 跑在 `peach serve --setup` 上，不是路由冒烟那台已配置的服务：服务与临时数据根由
+ * 跑在 `peach serve --setup` 上，不是路由冒烟那台已配置的服务：服务与临时 Peach 数据目录由
  * `tests/test_web_e2e.py` 的 `SetupE2ETests` 准备，经 PEACH_E2E_SETUP_ORIGIN、
- * PEACH_E2E_SETUP_DATA（临时数据根）和 PEACH_E2E_SETUP_MEDIA（一个已建好的空媒体目录）传进来。
+ * PEACH_E2E_SETUP_DATA（临时 Peach 数据目录）和 PEACH_E2E_SETUP_MEDIA（一个已建好的空媒体目录）传进来。
  * 本文件由首启专用入口执行；单独执行时缺少这些变量则整组跳过。 */
 import assert from 'node:assert/strict';
 import { readFile, unlink } from 'node:fs/promises';
@@ -16,7 +16,6 @@ import { launch, layout, VIEWPORTS } from './harness.ts';
 const origin = process.env.PEACH_E2E_SETUP_ORIGIN ?? '';
 const media = process.env.PEACH_E2E_SETUP_MEDIA ?? '';
 const dataRoot = process.env.PEACH_E2E_SETUP_DATA ?? '';
-const ledgerRoot = process.env.PEACH_E2E_SETUP_LEDGER_ROOT ?? '';
 
 /** 填错那一轮的 400 是预期内的：Chrome 会把它同时记成一条控制台错误和一条 4xx 响应。 */
 const expectedRejection = (problem: string) =>
@@ -48,11 +47,8 @@ describe('首次运行页', { skip: origin && media && dataRoot ? false : '只�
       await heading.waitFor({ state: 'visible', timeout: 15_000 });
       const folder = page.getByRole('textbox', { name: '媒体库 1' });
       await folder.waitFor({ state: 'visible', timeout: 15_000 });
-      const windowsRoot = page.getByRole('textbox', { name: 'Windows 中的对应路径' });
-      if (await windowsRoot.count()) {
-        assert.ok(ledgerRoot, '非 Windows 首启需要账本中的声明根');
-        await windowsRoot.fill(ledgerRoot);
-      }
+      assert.equal(await page.getByRole('textbox', { name: '数据库中的路径前缀' }).count(), 0,
+        '普通首次设置不需要填写内部路径');
       await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), undefined, { timeout: 15_000 });
       const host = page.getByRole('radiogroup');
       assert.equal(await host.count(), 0, '局域网单选收在高级设置里，首屏不露出');
@@ -69,7 +65,7 @@ describe('首次运行页', { skip: origin && media && dataRoot ? false : '只�
       const port = page.locator('#f-port');
       await port.waitFor({ state: 'visible' });
       const defaultPort = await port.inputValue();
-      // 落盘位置跟着服务进程的 PEACH_DATA_ROOT 走；不是临时数据根就不往下提交。
+      // 落盘位置跟着服务进程的 PEACH_DATA_ROOT 走；不是临时 Peach 数据目录就不往下提交。
       assert.equal(await page.locator('#f-data_root').inputValue(), dataRoot);
       await port.fill('70000');
       // 折叠关上，验证出错时它自己展开。

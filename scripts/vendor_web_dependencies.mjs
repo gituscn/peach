@@ -146,7 +146,7 @@ const lucideIcons = new Map([
   ["calendar", "calendar"], ["download", "download"], ["monitor", "monitor"],
   // 侧栏「管理」那一层：收拾库里的东西。`settings` 只归右上角的界面偏好。
   ["wrench", "wrench"],
-  // 管理菜单里的「配置」：这台电脑的媒体文件夹与端口。
+  // 管理菜单里的「配置」：这台电脑的媒体目录与端口。
   ["folder-cog", "folder-cog"],
   // 配置页每行文件夹的「选择文件夹」：弹系统对话框去挑。`folder-open` 归「打开位置」，不兼任。
   ["folder-search", "folder-search"],

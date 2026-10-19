@@ -1044,7 +1044,7 @@ class FollowStore:
         if item.asset_id:
             return item.asset_id
         if not item.url:
-            raise FollowSourceError("候选没有作品页 URL，无法作为在线资产保存")
+            raise FollowSourceError("候选没有作品页 URL，无法作为在线作品保存")
         stamp = _now_text(moment)
         existing = connection.execute(
             "SELECT id FROM asset WHERE location='online' AND path=?", (item.url,)

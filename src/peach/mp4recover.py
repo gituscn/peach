@@ -45,7 +45,7 @@ class Recovery:
 
 
 def untrunc_path(tools_root: Path) -> Path | None:
-    """依次查环境变量、随包工具、数据根托管目录与 PATH。"""
+    """依次查环境变量、随包工具、Peach 数据目录托管目录与 PATH。"""
     configured = os.environ.get(UNTRUNC_ENV)
     if configured and Path(configured).expanduser().is_file():
         return Path(configured).expanduser().resolve()

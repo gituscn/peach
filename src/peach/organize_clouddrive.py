@@ -207,7 +207,7 @@ class PikPakDav:
                 raise
             except (UnconfirmedMove, OSError, ValueError):
                 if final:
-                    raise UnconfirmedMove('移动状态未确认，保留意图回执并停止；不重复操作、不写账本') from None
+                    raise UnconfirmedMove('移动状态未确认，保留意图回执并停止；不重复操作、不写数据库') from None
                 time.sleep(2)
 
     def confirm_move(self, source, target, source_entry, before, response_status, *, final=True):
@@ -234,7 +234,7 @@ class PikPakDav:
         except MoveNotExecuted:
             raise
         except Exception:
-            raise UnconfirmedMove('移动状态未确认，保留意图回执并停止；不重复操作、不写账本') from None
+            raise UnconfirmedMove('移动状态未确认，保留意图回执并停止；不重复操作、不写数据库') from None
 
 
 def _cloud_listing(cloud, path):

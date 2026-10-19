@@ -85,7 +85,7 @@ Try search, filters and profiles in the [read-only demo](https://demo.peach.vide
 ### Windows
 
 1. Download the full installer, `Peach-<version>-windows-x64-setup.exe`, from [Releases](https://github.com/peach-mitao/peach/releases) and run it. No administrator rights needed. Alternatively, extract the full portable package and run `Peach.exe`.
-2. Choose media folders and access permissions on the setup page that opens in your browser.
+2. Choose media directories and access permissions on the setup page that opens in your browser.
 3. Start scanning, then browse and play in your browser.
 
 The full installer includes media tools for offline installation. The smaller lite installer downloads tools as needed during setup.

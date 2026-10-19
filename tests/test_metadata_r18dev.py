@@ -96,7 +96,7 @@ class R18DevSourceTests(unittest.TestCase):
         japanese = with_japanese(record, COMBINED)
         self.assertEqual(japanese.performers, (JAPANESE_ACTRESS,))
         self.assertEqual(japanese.tags, ("スレンダー", "企画"))
-        self.assertEqual(japanese.studio, "Prestige", "账本厂牌实体用品牌名，日文写法会另起一个实体")
+        self.assertEqual(japanese.studio, "Prestige", "数据库厂牌实体用品牌名，日文写法会另起一个实体")
         self.assertEqual(japanese.extra["translations"], EXPECTED["translations"])
         self.assertIs(japanese.extra["combined"], COMBINED)
         self.assertEqual((japanese.title, japanese.series), ("涼森れむ流", "保健室の先生"))

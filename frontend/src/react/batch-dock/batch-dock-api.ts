@@ -1,4 +1,4 @@
-/* 批量条（常驻面 `batch-dock`，`batch-dock-island.tsx`）对壳的契约，以及每种语境下列哪几颗键。
+/* 批量条（常驻组件 `batch-dock`，`batch-dock-island.tsx`）对壳的契约，以及每种语境下列哪几颗键。
  *
  * 多选的状态归共享 shell store 与 application/selection.js：开关、选中集、Shift 连选与切页退出只有一份。壳每次重画
  * 选中态时把计数与语境推进来；这一面只负责画底部那块浮条（共用的 `SelectionDock`）。点下去回到壳的
@@ -28,7 +28,7 @@ export interface BatchDockProps {
 }
 
 export interface BatchDockHost {
-  /** 这一面画进去的那一层（`[data-batch-dock]`，本身 `display: contents`），也就是常驻面的宿主。 */
+  /** 这一面画进去的那一层（`[data-batch-dock]`，本身 `display: contents`），也就是常驻组件的宿主。 */
   root: HTMLElement;
   run(group: BatchGroup, operation: string, button: HTMLButtonElement): void;
 }
@@ -58,7 +58,7 @@ export function batchActions(context: BatchContext, junkDismissed = false): Batc
       ];
     case 'follow':
       return [
-        { group: 'follow', operation: 'save', label: '保存到账本', glyph: 'bookmark-plus' },
+        { group: 'follow', operation: 'save', label: '保存到数据库', glyph: 'bookmark-plus' },
         { group: 'follow', operation: 'seen', label: '标记已看', glyph: 'eye' },
         { group: 'follow', operation: 'ignored', label: '忽略', glyph: 'eye-off' },
         CLEAR,

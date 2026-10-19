@@ -230,7 +230,7 @@ describe('批量条', () => {
       const opened = await openFollowFeed(browser, '/follow', viewport);
       try {
         await pickTwo(opened.page.locator('[data-follow-list] > [data-follow-item]'));
-        assert.deepEqual(await readDock(opened.page), { count: '已选 2 项', buttons: ['保存到账本', '标记已看', '忽略', '取消'] });
+        assert.deepEqual(await readDock(opened.page), { count: '已选 2 项', buttons: ['保存到数据库', '标记已看', '忽略', '取消'] });
         assert.deepEqual(opened.stub.writes.filter((write) => write.url !== '/api/follow/check'), []);
       } finally {
         await opened.close();

@@ -30,7 +30,7 @@ export interface ShellActions {
   openTag(key: string): void;
   /** 口味页点一条名次：标签回目录筛选，人名进资料页。 */
   openTasteSignal(kind: string, name: string): void;
-  /** 换到一个路径：push 一条不认领的地址，像后退前进一样领一个开次代次，由页面组按匹配打开那一页。 */
+  /** 换到一个路径：push 一条不认领的地址，像后退前进一样领一个页面打开序号，由页面组按匹配打开那一页。 */
   navigate(path: string): void;
   /** 按管理区身份进一屏（路由表里 `section` 等于它的第一条；认不出的落到垃圾文件）。 */
   openManage(section: string): void;
@@ -227,7 +227,7 @@ export type IndexOpenPropsTable = { [Path in IndexRoutePath]: IndexOpenProps };
  *  名字是壳从地址解码出来的那一份。 */
 export type EntityRoutePath = '/performers/*' | '/studios/*' | '/creators/*' | '/series/*' | '/agencies/*' | '/tags/*';
 
-/** 页面里的附属面，按名字登记、各画进壳的一个容器：首页筛选条（`#catalogFilter`）、首页新作行（`#feedNew`）、
+/** 页面里的页面内组件，按名字登记、各画进壳的一个容器：首页筛选条（`#catalogFilter`）、首页新作行（`#feedNew`）、
  *  顶栏搜索下拉（`#searchMenu`）。props 由壳算好、整份交进来，
  *  之后经 `updateManagedRoute` 推补丁。 */
 export interface SurfaceOpenProps {
@@ -239,7 +239,7 @@ export interface SurfaceOpenProps {
 
 export type SurfaceName = keyof SurfaceOpenProps;
 
-/** 常驻面，按名字登记、宿主就是那个常驻节点：底部批量条（`[data-batch-dock]`）、侧栏配色卡（`#boardGlowMenu`）、
+/** 常驻组件，按名字登记、宿主就是那个常驻节点：底部批量条（`[data-batch-dock]`）、侧栏配色卡（`#boardGlowMenu`）、
  *  管理区页头（`[data-manage-header]`）、沉浸模式（body 末尾的 `[data-immerse-host]`）、设置面板
  *  （`[data-settings-host]`，第一次打开时放进 body 末尾）、侧栏（`#drawerScroll`）与舞台（body 末尾的
  *  `[data-stage-host]`，第一次打开详情时放进去）。打开时不带 props（`openResidentSurface`），内容由壳经各自的

@@ -16,7 +16,7 @@ Peach 不另申请 115 应用，复用 CloudDrive2 已有的 115open 授权：�
 都走这一套）：对每条前缀调 `FindFileByPath`，CloudDrive2 回的 `CloudAPI.name` 是 115 那一类
 的才算 115 前缀，候选是 `<前缀>/云下载`。判据取 CloudDrive2 自报的云盘类型，不看前缀名字；`FindFileByPath` 只要
 「列目录」权限，查目标目录本来就要它，不另要挂载点或云盘列表的权限。PikPak 根目录对应的
-媒体文件夹同理：前缀是 PikPak 云盘根、对应的本机根是已声明的 PikPak 来源，就推它。
+媒体目录同理：前缀是 PikPak 云盘根、对应的本机根是已声明的 PikPak 来源，就推它。
 """
 from __future__ import annotations
 
@@ -432,7 +432,7 @@ def _suggest_target(report: dict, client: CloudDriveClient, probe: _PrefixProbe,
             "在「推送发现」卡里加上 CloudDrive2 里 115 的挂载根，再点检查；也可以直接填目标目录"
             if known else
             "还没有填 115 目标目录，「推送发现」里也没有登记云端路径前缀。在「推送发现」卡里登记 "
-            "CloudDrive2 里 115 的挂载根和它对应的媒体文件夹，再点检查；也可以直接填目标目录")
+            "CloudDrive2 里 115 的挂载根和它对应的媒体目录，再点检查；也可以直接填目标目录")
         return ""
     candidate = f"{hits[0][0].prefix}/{SUGGESTED_FOLDER}"
     found = client.find(candidate)
@@ -442,7 +442,7 @@ def _suggest_target(report: dict, client: CloudDriveClient, probe: _PrefixProbe,
 
 
 def _suggest_pikpak_root(report: dict, probe: _PrefixProbe, hints: Hints) -> None:
-    """PikPak 根目录对应的媒体文件夹：前缀必须就是 PikPak 云盘根，子目录前缀对不上根。"""
+    """PikPak 根目录对应的媒体目录：前缀必须就是 PikPak 云盘根，子目录前缀对不上根。"""
     declared = _roots(hints, "pikpak")
     if not declared:
         return
@@ -453,5 +453,5 @@ def _suggest_pikpak_root(report: dict, probe: _PrefixProbe, hints: Hints) -> Non
             report["suggested_pikpak_root"] = declared[entry.root.casefold()]
             return
     report["problems"].append(
-        "还没有选 PikPak 根目录对应的媒体文件夹，「推送发现」里也没有 PikPak 云盘根那条前缀可以推。"
+        "还没有选 PikPak 根目录对应的媒体目录，「推送发现」里也没有 PikPak 云盘根那条前缀可以推。"
         "在下拉框里直接选，或在「推送发现」卡里登记 PikPak 的挂载根")

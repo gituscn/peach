@@ -105,7 +105,7 @@ function JunkBody({ props, data, pending, error, retry }: {
       const dismissed = props.view === 'dismissed';
       return (
         <EmptyState icon={CheckGlyph} title={dismissed ? '没有已排除的文件' : '没有待判断的垃圾文件'}>
-          {dismissed ? '点“不是垃圾”的资源会保留在这里，可随时重新判断。' : '当前分类没有候选文件。'}
+          {dismissed ? '点“不是垃圾”的资源会保留在这里，可随时重新判断。' : '当前分类没有待检查文件。'}
         </EmptyState>
       );
     }

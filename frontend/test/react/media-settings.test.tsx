@@ -21,7 +21,7 @@ const data = (over: Partial<ConfigurationData> = {}): ConfigurationData => ({
 const open = (over: Partial<ConfigurationData> = {}, receipt = vi.fn()) =>
   mount(<MediaSettings data={data(over)} receipt={receipt} />);
 const rows = (root: ParentNode) => [...root.querySelectorAll('[data-folder-row]')];
-const paths = (root: ParentNode) => [...root.querySelectorAll<HTMLInputElement>('input[aria-label^="媒体文件夹 "]')];
+const paths = (root: ParentNode) => [...root.querySelectorAll<HTMLInputElement>('input[aria-label^="媒体目录 "]')];
 
 it('媒体表单保留重启提示，访问端口由网络分区管理', async () => {
   const host = await open({ port_editable: false });
@@ -50,7 +50,7 @@ it('不能编辑时只说原因，不画表单', async () => {
   expect(host.querySelector('[role="note"]')?.textContent).toContain('请在运行 Peach 的电脑上打开配置');
 });
 
-describe('媒体文件夹', () => {
+describe('媒体目录', () => {
   it.each([['guangya', '光鸭云盘'], ['onedrive', 'OneDrive'], ['mounted', '其他已挂载网盘']])(
     '%s 来源回填名称、挂载帮助和现有图标，保存带上来源', async (location, label) => {
     const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
@@ -79,14 +79,16 @@ describe('媒体文件夹', () => {
     expect(host.textContent).toContain('挂载帮助');
   });
 
-  it('其它系统每行带 Windows 对应路径，挂载状态标在各自那一行', async () => {
+  it('其它系统每行只展示媒体目录和各自的访问状态', async () => {
     const host = await open({ windows: false, media_sources: [
       { location: '115', root: 'B:/', path: '/Volumes/115', online: true },
       { location: 'pikpak', root: 'A:/', path: '/Volumes/PikPak', online: false },
       { location: 'local', root: 'D:/', path: '/Volumes/Media' },
     ] });
     expect(rows(host)).toHaveLength(3);
-    expect(rows(host).every((row) => row.textContent?.includes('Windows 中的对应路径'))).toBe(true);
+    expect(rows(host).some((row) => row.textContent?.includes('高级路径设置'))).toBe(false);
+    const internalPaths = [...host.querySelectorAll('input[placeholder="自动配置"]')];
+    expect(internalPaths).toHaveLength(0);
     expect(rows(host).map((row) => [row.querySelector('[data-mount]')?.getAttribute('data-mount'), row.querySelector('[data-mount]')?.textContent]))
       .toEqual([['online', '在线'], ['offline', '离线'], ['unknown', '未检测']]);
     expect(section(host, '挂载状态')).toBeNull();

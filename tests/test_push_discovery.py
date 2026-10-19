@@ -260,7 +260,7 @@ class QueueTests(unittest.TestCase):
 
     def test_one_failing_path_does_not_take_the_queue_down(self):
         def boom(_location, _path):
-            raise OSError("账本忙")
+            raise OSError("数据库忙")
 
         queue = push.DiscoveryQueue(boom, lambda _location, _path: 1,
                                     debounce=0.0, settle=0.0)
@@ -268,9 +268,9 @@ class QueueTests(unittest.TestCase):
         queue.tick(0.0)
         with self.assertLogs("peach.push_discovery", level="ERROR") as captured:
             queue.tick(0.0)
-        self.assertIn("账本忙", "\n".join(captured.output))
+        self.assertIn("数据库忙", "\n".join(captured.output))
         self.assertEqual(queue.snapshot()["failed"], 1)
-        self.assertIn("账本忙", queue.snapshot()["last_error"])
+        self.assertIn("数据库忙", queue.snapshot()["last_error"])
 
 
 class SecretTests(unittest.TestCase):
@@ -500,7 +500,7 @@ class SettingsTests(_ServiceCase):
 
     def test_the_reader_never_starts_a_channel(self):
         service = self.service(available=False)
-        with self.assertRaisesRegex(ValueError, "写入端"):
+        with self.assertRaisesRegex(ValueError, "只在允许修改数据库的设备上可用"):
             service.save({"enabled": True})
         service.start()
         self.assertFalse(service.local_channel.running)

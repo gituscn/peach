@@ -5,7 +5,7 @@ import { fetchMock, mount, sentBody, settle, submit, type } from './render';
 const data: ConfigurationData = { editable: true, notice: '', revision: 'rev-1',
   media_dirs: ['D:\\Media'], media_sources: [{ location: 'local', root: 'D:\\Media', path: 'D:\\Media' }],
   library_count: 1, port: 9123, facts: [] };
-it('保存端口保留已保存的媒体文件夹与来源映射', async () => {
+it('保存端口保留已保存的媒体目录与来源映射', async () => {
   const fetcher = fetchMock(200, { saved: true, revision: 'rev-2', url: 'http://127.0.0.1:9124/' });
   vi.stubGlobal('fetch', fetcher);
   const receipt = vi.fn();

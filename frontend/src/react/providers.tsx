@@ -1,6 +1,6 @@
 /* 每一棵 React 根外面的那三层：共享 QueryClient、Motion 的减弱动效与弹出层容器。
  *
- * 路由树的根（`router/router.tsx`）包这一份，页面、附属面与常驻面（舞台在内）都画在这棵树里：舞台里的两座
+ * 路由树的根（`router/router.tsx`）包这一份，页面、页面内组件与常驻组件（舞台在内）都画在这棵树里：舞台里的两座
  * 详情和目录网格读同一个缓存，从列表点进详情时卡片已经在缓存里。 */
 import type { ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';

@@ -263,7 +263,7 @@ class WindowsUpdateInstaller:
         """在换上生产入口之前，先让暂存包自己跑一次 `migrate status`。
 
         PyInstaller 漏掉 `migrations/` 的话包能构建、能启动，直到第一次开库才炸；
-        那时旧二进制已经被换走了。这一步用真实的包在真实数据根上验证一遍。
+        那时旧二进制已经被换走了。这一步用真实的包在真实 Peach 数据目录上验证一遍。
         """
         reset_environment = os.environ.copy()
         reset_environment["PYINSTALLER_RESET_ENVIRONMENT"] = "1"

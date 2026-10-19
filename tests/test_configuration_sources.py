@@ -1,7 +1,9 @@
 """CloudDrive 表单、来源映射与离线状态的隔离回归。"""
 from dataclasses import replace
 import ntpath
-from pathlib import Path
+import os
+from pathlib import Path, PurePosixPath, PureWindowsPath
+from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -10,6 +12,130 @@ from peach import media_configuration as media_config, onboarding, settings_file
 
 
 class MediaConfigurationTests(unittest.TestCase):
+    def test_posix_paths_without_internal_prefixes_can_be_saved(self):
+        sources = [{"location": "local", "path": "/media/local"},
+                   {"location": "115", "path": "/media/115"},
+                   {"location": "115", "path": "/media/115-more"}]
+        roots, mounts, errors = media_config.validate(sources, windows=False)
+        self.assertEqual(errors, [])
+        self.assertEqual(mounts, {"local": ("/media/local",), "115": ("/media/115", "/media/115-more")})
+        declared = [PureWindowsPath(root) for group in roots.values() for root in group]
+        self.assertTrue(all(path.is_absolute() for path in declared))
+        for index, first in enumerate(declared):
+            for second in declared[index + 1:]:
+                self.assertFalse(first.is_relative_to(second) or second.is_relative_to(first))
+        self.assertTrue(all("root" not in row for row in sources), "解析不应修改调用方的表单")
+
+    def test_existing_paths_keep_prefixes_and_names_when_rows_are_reordered(self):
+        config = replace(settings_file.PeachConfig(Path('/unused'), Path('/unused/config.toml')),
+                         present=True, locations={"local": (r"D:\Videos",), "115": ("B:/",)},
+                         mounts={"local": ("/media/local",), "115": ("/media/115",)},
+                         library_names={r"D:\Videos": "收藏"})
+        sources = [{"location": "115", "path": "/media/115"}, {"location": "local", "path": "/media/local"}]
+        prepared = media_config.prepare_sources(sources, windows=False, config=config)
+        roots, mounts, errors = media_config.validate(sources, windows=False, config=config)
+        self.assertEqual(errors, [])
+        self.assertEqual(roots, {"115": ("B:\\",), "local": (r"D:\Videos",)})
+        self.assertEqual(mounts, {"115": ("/media/115",), "local": ("/media/local",)})
+        self.assertEqual(prepared[1]["library"], "收藏")
+
+    def test_readding_an_automatic_path_keeps_its_identity_and_other_paths_differ(self):
+        first = [{"location": "local", "path": "/media/movies"}]
+        root = media_config.validate(first, windows=False)[0]["local"][0]
+        empty = replace(settings_file.PeachConfig(Path('/unused'), Path('/unused/config.toml')),
+                        present=True, locations={}, mounts={})
+        restored, _, errors = media_config.validate(first, windows=False, config=empty)
+        self.assertEqual(errors, [])
+        self.assertEqual(restored["local"], (root,))
+        different, _, errors = media_config.validate(
+            [{"location": "local", "path": "/media/other"}], windows=False, config=empty)
+        self.assertEqual(errors, [])
+        self.assertNotEqual(different["local"], (root,))
+
+    def test_explicit_paths_are_reserved_before_automatic_paths(self):
+        first = {"location": "local", "path": "/media/movies"}
+        automatic = media_config.validate([first], windows=False)[0]["local"][0]
+        roots, _, errors = media_config.validate(
+            [first, {"location": "115", "path": "/media/115", "root": automatic}], windows=False)
+        self.assertEqual(errors, [])
+        self.assertEqual(roots["115"], (automatic,))
+        self.assertNotEqual(roots["local"], (automatic,))
+
+    def test_fully_occupied_drive_prefixes_return_a_row_error(self):
+        config = replace(settings_file.PeachConfig(Path('/unused'), Path('/unused/config.toml')),
+                         present=True, locations={"local": tuple(f"{chr(code)}:/" for code in range(65, 91))})
+        roots, _, errors = media_config.validate(
+            [{"location": "local", "path": "/media/movies"}], windows=False, config=config)
+        self.assertEqual(roots, {})
+        self.assertIn("无法自动配置", errors[0])
+
+    def test_configuration_uses_the_automatic_prefix_for_library_name_and_cost(self):
+        from peach import routes_configuration
+        config = settings_file.PeachConfig(Path('/unused'), Path('/unused/config.toml'))
+        for path, name in (("/media/movies", "movies"), ("/media", "media"),
+                           ("/vol02/nas-user/video/影视", "影视")):
+            with self.subTest(path=path):
+                body = {"media_sources": [{"location": "local", "path": path, "cost": "free"}]}
+                with patch.object(routes_configuration, "os", SimpleNamespace(name="posix")):
+                    errors, prepared = routes_configuration._validate(body, config)
+                self.assertEqual(errors, {})
+                root = prepared["locations"]["local"][0]
+                self.assertTrue(PureWindowsPath(root).is_absolute())
+                self.assertEqual(prepared["mounts"], {"local": (path,)})
+                self.assertEqual(prepared["library_names"], {root: name})
+                self.assertEqual(prepared["media_costs"][root], "free")
+
+    def test_existing_prefix_is_kept_when_its_actual_directory_moves(self):
+        config = replace(settings_file.PeachConfig(Path('/unused'), Path('/unused/config.toml')),
+                         present=True, locations={"local": (r"D:\Videos",)}, mounts={"local": ("/old",)})
+        roots, mounts, errors = media_config.validate(
+            [{"location": "local", "path": "/new", "root": r"D:\Videos"}], windows=False, config=config)
+        self.assertEqual(errors, [])
+        self.assertEqual(roots, {"local": (r"D:\Videos",)})
+        self.assertEqual(mounts, {"local": ("/new",)})
+
+    def test_path_only_configuration_save_keeps_existing_prefixes_when_reordered(self):
+        from starlette.requests import Request
+        from peach import routes_configuration
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory).resolve()
+            config = replace(settings_file.load_config(environ={"PEACH_DATA_ROOT": str(base)}), present=True,
+                             locations={"local": (r"D:\Movies", r"E:\Films"), "115": ("B:/",)},
+                             mounts={"local": ("/media/movies", "/media/films"), "115": ("/media/115",)})
+            settings_file.write(config)
+            request = Request({"type": "http", "scheme": "http", "server": ("127.0.0.1", 8900),
+                               "client": ("127.0.0.1", 1234), "path": "/api/configuration", "headers": [],
+                               "app": SimpleNamespace(state=SimpleNamespace(settings=SimpleNamespace(mdns_name="peach")))})
+            validated = {"media_dirs": [PurePosixPath("/media/films"), PurePosixPath("/media/movies")], "port": 8900}
+            with patch.object(routes_configuration, "managed_configuration", return_value=True), \
+                    patch.object(settings_file, "load_config", return_value=config), \
+                    patch.object(routes_configuration, "_validate", return_value=({}, validated)), \
+                    patch.object(routes_configuration, "os", SimpleNamespace(name="posix", replace=os.replace, environ=os.environ)):
+                receipt = routes_configuration.save_configuration(request, {"revision": routes_configuration.revision(config)})
+            loaded = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(base)})
+        self.assertTrue(receipt["saved"])
+        self.assertEqual(loaded.locations["local"], (r"E:\Films", r"D:\Movies"))
+        self.assertEqual(loaded.mounts["local"], ("/media/films", "/media/movies"))
+        self.assertEqual(loaded.mounts["115"], ("/media/115",))
+
+    def test_setup_can_save_a_cloud_folder_without_an_internal_path(self):
+        from peach.routes_pages import _read_answers
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory).resolve()
+            config = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(base)})
+            submitted = {"data_root": str(base), "media_dir": ["/media/115"],
+                         "media_location": ["115"], "host": "1"}
+            answers, errors = _read_answers(config, submitted, windows=False)
+            self.assertEqual(errors, {})
+            prepared = onboarding.configure(config, answers, windows=False)
+            settings_file.write(prepared)
+            loaded = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(base)})
+        root = loaded.locations["115"][0]
+        self.assertTrue(PureWindowsPath(root).is_absolute())
+        self.assertEqual(loaded.mounts, {"115": ("/media/115",)})
+        self.assertEqual(loaded.library_names[root], "115")
+        self.assertFalse(loaded.replication.enabled)
+
     def test_setup_local_source_accepts_a_mapped_nas_drive(self):
         from peach.routes_pages import _read_answers
 

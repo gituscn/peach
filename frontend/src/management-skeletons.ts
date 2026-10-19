@@ -19,7 +19,7 @@ export function statsSkeleton(): string {
     <div class="inline-grid w-full grid-cols-3 gap-2 max-sm:grid-cols-2">${Array.from({ length: 3 }, () => `<div class="flex min-w-0 flex-col gap-1 rounded-xl bg-background-tertiary-default p-2.5"><span class="text-caption-1-regular">${text()}</span><b class="text-title-2-medium">${text('3em')}</b><small class="text-caption-1-regular">${text()}</small></div>`).join('')}</div>
   </section>`;
   return `<div class="peach-react"><div class="mx-auto flex w-full max-w-board flex-col gap-8">
-    <p class="text-caption-1-regular text-text-secondary">账本当前快照 · ${text('12em')}</p>
+    <p class="text-caption-1-regular text-text-secondary">数据库中的当前统计 · ${text('12em')}</p>
     <div class="flex flex-col gap-4"><div class="inline-grid w-full grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" data-stats-metrics>${metrics}</div>
       <div class="flex flex-col gap-5"><div class="inline-grid w-full gap-5 md:grid-cols-2">${radial('网盘与本地')}${radial('媒体库')}</div>
         <div class="inline-grid w-full gap-5 md:grid-cols-2 xl:grid-cols-3">${['时长', '画质', '文件类型'].map(title => `<section class="${chart}"><h3 class="text-title-2-medium">${title}</h3><div class="${placeholder} h-64"></div></section>`).join('')}</div>
@@ -37,7 +37,7 @@ export function statsSkeleton(): string {
 export function tasteSkeleton(): string {
   const segment = 'flex min-h-7 flex-none items-center gap-1.5 rounded-md px-2.5 py-1 text-body-medium whitespace-nowrap text-text-secondary data-selected:bg-background-primary-default data-selected:text-text-primary data-selected:shadow-card dark:data-selected:bg-background-primary-hover';
   const track = (labels: string[]) => `<div class="inline-flex w-max max-w-full items-center gap-0.5 overflow-x-auto rounded-2lg bg-background-tertiary-default p-1" data-taste-segments>${labels.map((label, index) => `<span class="${segment}"${index === 0 ? ' data-selected="true"' : ''}>${label}</span>`).join('')}</div>`;
-  const metrics = ['浏览记录', '口味维度', '浏览候选', '私有导出'].map(label => `
+  const metrics = ['浏览记录', '口味维度', '浏览线索', '私有导出'].map(label => `
     <div class="min-w-0 rounded-2xl shadow-card bg-background-secondary-default flex flex-col overflow-hidden pt-4 text-left">
       <span class="flex min-w-0 items-center gap-2 px-4 text-body-regular text-text-secondary max-sm:gap-1.5 max-sm:px-3"><i class="${placeholder} size-7 max-sm:size-6"></i>${label}</span>
       <b class="px-4 pt-3 pb-4 text-title-1-medium max-sm:px-3 max-sm:pb-3">${text('4em')}</b>
@@ -61,7 +61,7 @@ export function tasteSkeleton(): string {
       <div class="inline-grid w-full items-start gap-5 lg:grid-cols-2">${heat('浏览活跃时间')}${heat('每日活跃')}</div>
       <section class="${chart}"><h3 class="text-title-2-medium text-text-primary">创作者线索来源</h3><div class="${placeholder} h-72 max-sm:h-48"></div></section>
       <section class="min-w-0 bg-background-secondary-default rounded-2xl shadow-card flex flex-col">
-        <div class="px-4 pt-3">${track(['标签', '创作者', '常访问网站', '浏览候选'])}</div>
+        <div class="px-4 pt-3">${track(['标签', '创作者', '常访问网站', '浏览线索'])}</div>
         <div class="flex flex-col gap-3 px-4 pt-3.5 pb-4">${Array.from({ length: 5 }, () => `<div class="${placeholder} h-7"></div>`).join('')}</div>
       </section>
     </div>

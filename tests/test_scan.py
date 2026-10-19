@@ -1,10 +1,10 @@
 """`peach.scan`：扫描写进账本的行必须能被读取侧翻译回同一个文件。
 
 两种设置文件写法各一条：Windows 上 `[media.locations] local = <真实目录>`、挂载表为空；
-macOS 上声明根仍是 `R:\\media`，`[media.mounts] local = <真实目录>`。两条都在临时目录里跑。
+macOS 上数据库路径前缀使用 `R:\\media`，`[media.mounts] local = <真实目录>`。两条都在临时目录里跑。
 
 POSIX 形态那条平台无关，哪台机器上都跑。Windows 形态那条只在 Windows 上跑：它的前提是
-声明根本身就是一个真实存在的盘符目录，而 POSIX 机器上造不出这种目录——拿 `/var/...` 配
+配置中的路径前缀本身就是一个真实存在的盘符目录，而 POSIX 机器上造不出这种目录——拿 `/var/...` 配
 `windows=True` 不是注入平台，是喂一个账本里不可能出现的形态，写入侧门槛会当场拒收。
 """
 from __future__ import annotations
@@ -54,9 +54,9 @@ class _ScanCase(unittest.TestCase):
         return result, output.getvalue()
 
 
-@unittest.skipUnless(os.name == "nt", "声明根要是真实存在的盘符目录，只有 Windows 造得出来")
+@unittest.skipUnless(os.name == "nt", "本用例需要真实存在的 Windows 盘符目录")
 class WindowsShapeTests(_ScanCase):
-    """Windows：声明根就是真实目录，路径原样进账本。"""
+    """Windows：配置的路径前缀就是真实目录，路径原样保存到数据库。"""
 
     def test_rows_are_written_under_the_declared_root(self):
         declared = {"local": (str(self.media),)}
@@ -175,7 +175,7 @@ class PosixShapeTests(_ScanCase):
         rows = self._paths()
         self.assertEqual(set(rows), {r"R:\media\创作者\sub\a.mp4", r"R:\media\cover.jpg",
                                      r"R:\media\notes.txt"})
-        # 与 `platform.translate_ledger_path` 同一套算法：声明根后的层级接到挂载点上。
+        # 与 `platform.translate_ledger_path` 一致：路径前缀后的层级拼到本机媒体目录。
         for path in rows:
             tail = PureWindowsPath(path).relative_to(PureWindowsPath(r"R:\media")).parts
             self.assertTrue(self.media.joinpath(*tail).is_file(), path)
@@ -195,7 +195,7 @@ class PosixShapeTests(_ScanCase):
         self.assertEqual(self._paths(), {})
 
     def test_a_second_root_maps_to_its_own_mount(self):
-        """两个目录都是 `local`：第二个挂载点对应第二个声明根，账本路径带序号前缀。"""
+        """两个目录都是 `local`：第二个挂载目录对应第二个数据库路径前缀。"""
         second = self.root / "more"
         (second / "deep").mkdir(parents=True)
         (second / "deep" / "c.mp4").write_bytes(b"2")
@@ -207,11 +207,11 @@ class PosixShapeTests(_ScanCase):
         result, _ = self._scan(root, declared_roots=declared, mounts=mounts, windows=False)
         self.assertEqual(result.files, 1)
         self.assertEqual(set(self._paths()), {r"R:\media2\deep\c.mp4"})
-        # 挂载表比声明根短：第二个根没有落点，扫描它必须拒绝而不是落到第一个目录。
+        # 第二个路径前缀没有对应的挂载目录时拒绝扫描，不能读取第一个目录。
         with self.assertRaises(scan.ScanTargetError) as caught:
             scan.walk_root_for("local", r"R:\media2", declared_roots=declared,
                                mounts={"local": (str(self.media),)}, windows=False)
-        self.assertIn("第 2 个声明根", str(caught.exception))
+        self.assertIn("第 2 个数据库路径前缀", str(caught.exception))
 
     def test_a_directory_outside_the_mount_is_refused(self):
         with self.assertRaises(scan.ScanTargetError) as caught:

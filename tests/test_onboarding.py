@@ -184,7 +184,7 @@ class ConfigureTests(_Case):
         self.assertIn(str(self.media), onboarding.mounts_explanation(self.media))
 
     def test_several_directories_all_belong_to_the_local_source(self):
-        """两块硬盘都是 `local`：Windows 上每个目录一个声明根，macOS 上声明根按序号生成。"""
+        """终端设置的两个本地目录：Windows 直接使用目录路径，macOS 按序号生成数据库路径前缀。"""
         second = self.root / "more"
         second.mkdir()
         answers = self._answers(media_dirs=(self.media, second))
@@ -265,12 +265,12 @@ class InterviewTests(_Case):
         self.assertEqual(answers, onboarding.Answers(
             data_root=self.root / "peach-data", media_dirs=(self.media, second), host="0.0.0.0",
             port=8900, mdns_name="peach-two"))
-        # 媒体文件夹问完一个就问「再加一个」，回车结束；追加的目录和第一个走同一套校验。
+        # 媒体目录问完一个就问「再加一个」，回车结束；追加的目录和第一个走同一套校验。
         self.assertEqual([prompt for prompt, _ in ask.seen], [
             "数据目录（Peach 数据库、缓存和设置文件都放在这里）",
-            "媒体文件夹（必须已经存在，可以在外置硬盘上）",
-            "再加一个媒体文件夹（不加就直接回车）",
-            "再加一个媒体文件夹（不加就直接回车）",
+            "媒体目录（必须已经存在，可以在外置硬盘上）",
+            "再加一个媒体目录（不加就直接回车）",
+            "再加一个媒体目录（不加就直接回车）",
             "谁可以访问：1 = 只有这台电脑，2 = 同一局域网的设备",
             "端口",
             "局域网访问地址（<名字>.local，只在允许局域网访问时发布）",
@@ -392,7 +392,7 @@ class ApplyTests(_Case):
 
 
 class _SetupHttpCase(_Case):
-    """首启服务的 HTTP 夹具：临时数据根、证书生成打桩、没有口令的应用。"""
+    """首启服务的 HTTP 夹具：临时 Peach 数据目录、证书生成打桩、没有口令的应用。"""
 
     def setUp(self):
         super().setUp()
@@ -646,7 +646,7 @@ class SetupJsonContractTests(_SetupHttpCase):
             self.assertIsNone(data["media_root"])
             self.assertEqual(len(by_key["media_dir"]["help"]), 1)
         else:
-            self.assertEqual(data["media_root"]["label"], "Windows 中的对应路径")
+            self.assertIsNone(data["media_root"])
             self.assertIn("本机文件夹是这台电脑读取媒体的位置", by_key["media_dir"]["help"][-1])
         self.assertEqual(data["cloud"]["link"]["url"], "https://www.clouddrive2.com/help.html")
         # 默认对局域网开放，所以访问密码开关第一次出现就开着；扫描默认勾上，导入历史默认不勾。
@@ -787,7 +787,7 @@ class SetupJsonContractTests(_SetupHttpCase):
         self.assertEqual(rows["media_dir"][0], "")
         self.assertTrue(rows["media_dir"][1])
         table = self._errors(cases["超过 100 行"])
-        self.assertEqual(table["media_dir"], ["请添加 1 到 100 个媒体文件夹"])
+        self.assertEqual(table["media_dir"], ["请添加 1 到 100 个媒体目录"])
 
     def test_an_occupied_port_on_the_standalone_package_is_a_port_error(self):
         import socket
@@ -1041,7 +1041,7 @@ class StandaloneConfigurationTests(_Case):
                 self.assertTrue(response.json()["ledger_read_only"])
 
     def test_the_snapshot_counts_libraries_the_way_the_library_switcher_groups_them(self):
-        """摘要卡的「媒体库」由服务端给：同名的声明根算一个库，跨来源也一样。"""
+        """摘要卡的媒体库数量由服务端给出：库名相同的目录算一个库，跨来源也一样。"""
         from dataclasses import replace
         from peach import media_libraries
         first, second, third = (str(self.media / name) for name in ("a", "b", "c"))

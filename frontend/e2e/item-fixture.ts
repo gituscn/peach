@@ -113,7 +113,7 @@ async function stub(page: Page, catalogIds: readonly number[] = CATALOG): Promis
       else state.writes.push({ url: path, body: body(request) });
       return route.fulfill({ json: respond(new URL(request.url()), request) });
     });
-  await json('/api/item', (url) => DETAILS.get(Number(url.searchParams.get('id'))) || { error: '这一条已不在账本里' });
+  await json('/api/item', (url) => DETAILS.get(Number(url.searchParams.get('id'))) || { error: '这一条已不在数据库里' });
   await json('/api/items', () => ({ items: catalogIds.map(card), total: catalogIds.length, has_more: false }));
   await json('/api/related', () => ({ items: RELATED.map(card) }));
   await json('/api/parts', () => PARTS);

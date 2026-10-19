@@ -277,5 +277,5 @@ export function detailSlides(item: FollowDetailItem, media: DetailMedia): Lightb
 
 /* ── 写完之后 ── */
 
-/** 状态回执的说法与撤销：保存进账本的不给撤销，那是另一件事。 */
+/** 状态回执的说法与撤销：保存进数据库的不给撤销，那是另一件事。 */
 export const statusReceipt = (to: string) => (to === 'seen' ? '已标记看过' : '已更新关注状态');

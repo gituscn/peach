@@ -1,8 +1,8 @@
 /* 设置偏好与 Peach 配置的三份服务端数据，各一个 Query 键。
  *
- * - `['settings']`：跟账本走、所有访问端同一份的那几项（`/api/settings`，`src/peach/web_settings.py`）。
+ * - `['settings']`：跟数据库走、所有访问端同一份的那几项（`/api/settings`，`src/peach/web_settings.py`）。
  *   面板每次打开都重取一次，取回来交给壳对账（`host.syncRemote`）：界面偏好的真相仍是壳里那一份
- *   `appSettings`，这个键只是账本那边的快照。写入同样走这个端点，成功后回来的整份写回这个键。
+ *   `appSettings`，这个键只是数据库那边的快照。写入同样走这个端点，成功后回来的整份写回这个键。
  * - `['follow-schedule']`：这台机器上关注自动更新的档位与上次运行状态。
  * - `['thumbnail-jobs']`：视频缩略图采集的档位与状态。档位跟着机器走，不存在浏览器里。
  *
@@ -28,7 +28,7 @@ export interface SyncedSettings {
   feedHideGroupCompilations?: boolean;
   feedHideSoloCompilations?: boolean;
   feedHideExcerpts?: boolean;
-  /** 账本里还没存过时是 null：这台设备本地那个数替所有访问端先定下来。 */
+  /** 数据库里还没存过时是 null：这台设备本地那个数替所有访问端先定下来。 */
   searchHistoryLimit?: number | null;
 }
 
@@ -62,7 +62,7 @@ export function refreshPanelData(client: QueryClient = queryClient): Promise<Syn
   }).catch(() => null);
 }
 
-/** 写跟账本走的那几项。回来的是合并之后的整份，写回 `['settings']`。 */
+/** 写跟数据库走的那几项。回来的是合并之后的整份，写回 `['settings']`。 */
 export function useSaveSettings() {
   return useMutation({
     mutationFn: (patch: SyncedSettings) => apiSend<SyncedSettings>(SETTINGS_URL, patch),

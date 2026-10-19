@@ -166,7 +166,7 @@ def _start_ledger_services(settings: PeachSettings, contract, services) -> bool:
     """只读核对当前账本后，恢复任务并启动依赖账本的后台服务。"""
     status = inspect_database(settings.db_path)
     if not status["readable"] or status["schema"] != "current":
-        LOGGER.warning("账本未就绪，依赖账本的后台任务保持停止（数据库：%s；结构：%s）；账本准备完成后重启服务。",
+        LOGGER.warning("数据库未就绪，依赖数据库的后台任务保持停止（数据库：%s；结构：%s）；数据库准备完成后重启服务。",
                        status["database"], status["schema"])
         return False
     _restore_task_center(contract)

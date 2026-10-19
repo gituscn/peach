@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-"""真浏览器冒烟：临时数据根上的合成演示库，交给 `frontend/e2e` 的 playwright-core 用例。
+"""真浏览器冒烟：临时 Peach 数据目录上的合成演示库，交给 `frontend/e2e` 的 playwright-core 用例。
 
 页面源断言守不住布局之后才成立的事实（横向溢出、等待态卡住、控制台报错、失败请求），
 靠手动开浏览器逐轮重测的话，既费时又不稳定。这里把它们固定成确定性的用例：Python 这一侧准备
 数据与服务，Node 那一侧只认 `PEACH_E2E_ORIGIN`。
 
 数据全在临时目录：`scripts/demo_dataset.py` 生成 SFW 合成库，账本来自迁移模板，
-设置文件把 `local` 的声明根直接写成演示库目录。Windows 上 `[media.mounts]` 不参与
-路径翻译，声明根若沿用内建默认，process 读到的就是这台机器的真实媒体目录。
+设置文件把 `local` 的数据库路径前缀写成演示库目录。Windows 上 `[media.mounts]` 不参与
+路径转换，若使用程序默认的前缀，测试进程会读到这台机器的真实媒体目录。
 
 短片由 ffmpeg 编码成真能解码的 2 秒片段：详情页的播放器会预加载源，占位字节只会让
 `/stream` 返回 503。缺 Node、`playwright-core`、ffmpeg 或本机 Chrome 时，本机显式跳过，
@@ -35,6 +35,7 @@ from pathlib import Path
 from unittest import mock
 
 from peach import follow_assets, link_marks, scraping_access, settings_file
+from peach import platform as peach_platform
 from peach.config import FFMPEG_DIR
 from peach.ffmpeg import FFmpegResolver
 from peach.library_processing import process_library
@@ -241,7 +242,7 @@ class WebE2ESmokeTests(unittest.TestCase):
             row = connection.execute(
                 "SELECT id FROM asset WHERE medium='video' ORDER BY id LIMIT 1").fetchone()
         if row is None:
-            raise AssertionError("演示库 process 之后账本里没有视频")
+            raise AssertionError("演示库 process 之后数据库里没有视频")
         cls.data, cls.item = data, row[0]
 
     @classmethod
@@ -344,7 +345,7 @@ class WebE2ESmokeTests(unittest.TestCase):
 
 
 class SetupE2ETests(unittest.TestCase):
-    """首次运行页跑在 `serve --setup` 上：临时数据根里还没有设置文件，提交成功后才有。
+    """首次运行页跑在 `serve --setup` 上：临时 Peach 数据目录里还没有设置文件，提交成功后才有。
 
     托盘拉起引导服务用的就是这组参数（`tray.build_setup_service_specs`）。页面那一侧是
     `frontend/e2e/setup.test.ts`，只由本组在首启服务执行。
@@ -437,11 +438,14 @@ class SetupE2ETests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, f"{output}\n--- serve.log ---\n{self._server_log()}")
         self.assertRegex(output, r"# pass 1\b", output)
         self.assertRegex(output, r"# skipped 0\b", output)
-        # 改对的那一次提交在临时数据根里落了设置文件，媒体库就是传进去的那个目录。
+        # 改对的那一次提交在临时 Peach 数据目录里落了设置文件，媒体库就是传进去的那个目录。
         written = settings_file.load_config(environ={settings_file.DATA_ROOT_ENV: str(self.data)})
         self.assertTrue(written.present)
-        self.assertEqual(list(written.locations.get("local", ())), [self.ledger_root])
-        if os.name != "nt":
+        if os.name == "nt":
+            self.assertEqual(list(written.locations.get("local", ())), [self.ledger_root])
+        else:
+            self.assertEqual(len(written.locations["local"]), 1)
+            self.assertTrue(peach_platform.is_windows_path(written.locations["local"][0]))
             self.assertEqual([Path(path) for path in written.mounts.get("local", ())], [self.media])
 
 

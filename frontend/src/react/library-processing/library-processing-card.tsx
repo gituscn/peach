@@ -51,7 +51,7 @@ const profileText = (state: LibraryProcessingData) => {
 const receiptText = (state: LibraryProcessingData) =>
   state.requested_stage === 'previews' ? `已生成 ${state.previews || 0} 部视频预览。`
   : `已扫描 ${state.scanned || 0} 个文件，识别 ${state.identified || 0} 个番号，`
-  + `整理 ${state.candidates || 0} 组资料候选，自动落库 ${state.auto_applied || 0} 条。`
+  + `整理 ${state.candidates || 0} 组资料结果，自动保存 ${state.auto_applied || 0} 条。`
   + (state.previews ? `已生成 ${state.previews} 部视频预览。` : '')
   + profileText(state);
 

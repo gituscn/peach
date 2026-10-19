@@ -66,7 +66,7 @@ class PurgeMissingTests(unittest.TestCase):
         # 只有 001 和 a.mp4 还在盘上；002、003 当作已被手动删除。
         for name in ("001.jpg", "a.mp4"):
             (self.root / name).write_bytes(b"x")
-        # 检查会遍历每个在线来源的根找空文件夹：声明根不钉在临时目录里，遍历的就是
+        # 检查会遍历在线来源的目录来找空文件夹；测试目录必须固定在临时目录中，否则会遍历
         # 这台机器上真实的 `R:\media` 与网盘挂载。
         self.mount = self.root / "mount"
         self.mount.mkdir()
@@ -244,7 +244,7 @@ class PurgeMissingTests(unittest.TestCase):
         # 快照随账本行一起删（`_finish_purge`），剩下的才轮到孤儿缓存那一步。
         self.assertEqual(result["cache_removed"], len(cache_files) - 1)
         self.assertTrue(all(not path.exists() for path in cache_files))
-        self.assertTrue(kept.is_file(), "账本里还在的片子，它那套时间轴图不算孤儿")
+        self.assertTrue(kept.is_file(), "数据库里还在的片子，它那套时间轴图不算孤儿")
         self.assertTrue(evidence.is_file(), "候选证据不属于可删除缓存")
         self.assertEqual(self.ids(), [1, 4])
 
@@ -349,9 +349,9 @@ class PurgeMissingTests(unittest.TestCase):
     def test_no_configured_source_requires_media_folder(self):
         with mock.patch.object(rm_sync, 'LOCATION_ROOT_DECLARATIONS', {}):
             for body in ({}, {'background': True}):
-                with self.assertRaisesRegex(ValueError, '添加媒体文件夹'):
+                with self.assertRaisesRegex(ValueError, '添加媒体目录'):
                     rm_sync.w_resource_sync_scan(self.contract, body)
-            with self.assertRaisesRegex(ValueError, '添加媒体文件夹'):
+            with self.assertRaisesRegex(ValueError, '添加媒体目录'):
                 rm_sync.w_resource_sync_apply(self.contract, {'confirm': True})
 
     def test_full_sync_skips_an_unreadable_directory_instead_of_trashing_it(self):
@@ -606,7 +606,7 @@ class ResourceSyncCleanupTests(unittest.TestCase):
         self.assertFalse(self.orphan_poster.exists())
         self.assertTrue(self.live_poster.is_file())
         run = self.contract.task_runs.query(task_key="resource-apply")[0]
-        self.assertEqual(run.status, "succeeded", "删账本行这件事要在任务中心留下记录")
+        self.assertEqual(run.status, "succeeded", "删数据库行这件事要在任务中心留下记录")
         self.assertEqual((run.result_summary["purged"], run.result_summary["dirs_removed"],
                           run.result_summary["cache_removed"]), (2, 4, 1))
 
@@ -718,6 +718,6 @@ class ResourceSyncCleanupTests(unittest.TestCase):
     def test_apply_is_gated_as_a_ledger_write_and_check_stays_read_only(self):
         self.assertIs(rm_web.POST_HANDLERS["/api/resource-sync/apply"], rm_sync.w_resource_sync_apply)
         self.assertNotIn("/api/resource-sync/apply", rm_web.READ_ONLY_POST_ROUTES,
-                         "它永久删除账本行，只读端那份复制来的账本不能被它清掉")
+                         "它永久删除数据库行，只读端那份复制来的数据库不能被它清掉")
         self.assertIn("/api/resource-sync/scan", rm_web.READ_ONLY_POST_ROUTES)
         self.assertNotIn("/api/data-cleanup/empty-folders", rm_web.POST_HANDLERS)

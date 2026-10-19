@@ -90,7 +90,7 @@ class BackgroundJobTaskRunTests(unittest.TestCase):
         def work(job_id):
             blocker.execute("BEGIN IMMEDIATE")
             try:
-                job.update(job_id, checked=1, total=2, stage="账本被别的写入者占着")
+                job.update(job_id, checked=1, total=2, stage="数据库被别的写入者占着")
             finally:
                 blocker.execute("ROLLBACK")
             reached.append(job_id)

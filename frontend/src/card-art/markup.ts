@@ -338,7 +338,7 @@ export function cardIdentity(item: IdentityItem): {
    头像和标题会被甩到行外面去，所以这里一律出 `<span>`、不可点。
 
    头像和名字必须落到同一个身份。各自挑 kind（头像先看 performer、名字先看
-   creator）时，同名的 creator/performer 重复实体（账本里有 35 组）会一个跳
+   creator）时，同名的 creator/performer 重复实体（数据库里有 35 组）会一个跳
    `/performers/x`、另一个跳 `/creators/x`，同一张卡上两个入口去两个地方。 */
 export function queueAvatarHtml(item: IdentityItem): string {
   const { kind, name, coStarred, performers, refs } = cardIdentity(item);

@@ -572,10 +572,10 @@ def w_resource_sync_scan(contract: ResourceSyncContract, body=None):
                 }
             return _resource_scan_public(state)
         if not configured_resource_locations():
-            raise ValueError("请先在配置页添加媒体文件夹")
+            raise ValueError("请先在配置页添加媒体目录")
         return _background_resource_scan(contract, restart=body.get("restart") is True)
     if not configured_resource_locations():
-        raise ValueError("请先在配置页添加媒体文件夹")
+        raise ValueError("请先在配置页添加媒体目录")
     return _scan_result(contract, _scan_sources(contract))
 
 
@@ -694,7 +694,7 @@ def w_resource_sync_apply(contract: ResourceSyncContract, body, *, progress=None
     `blocked`；删除这一档不可撤销，所以只认检查给的候选集合。
     """
     if not configured_resource_locations():
-        raise ValueError("请先在配置页添加媒体文件夹")
+        raise ValueError("请先在配置页添加媒体目录")
     if body.get("confirm") is not True:
         raise ValueError("resource sync requires confirmation")
     scan_id = str(body.get("scan_id") or "")

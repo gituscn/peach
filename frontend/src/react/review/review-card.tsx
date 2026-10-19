@@ -127,7 +127,7 @@ export function ReviewCard(props: ReviewCardProps) {
             onPicked={(next) => onChoice({ ...choice, assets: next })} />
         /* 空白一片会被当成界面坏了。真实原因是这些作品还没抽帧，说清楚比留白好。 */
         : <EmptyState shell="inset" icon={RiImageLine} title="这批作品尚未抽帧">
-            {`${row.video_count || ''} 条作品还没有可用预览；批准后仍会按候选写入标签。`}
+            {`${row.video_count || ''} 条作品还没有可用预览；批准后仍会按所选资料写入标签。`}
           </EmptyState>)
       : category === 'fc2_similarity'
         ? null
@@ -173,14 +173,14 @@ export function ReviewCard(props: ReviewCardProps) {
           滚动块本身的定位祖先，否则会跑到整页的右边缘去。 */}
       <div className="relative flex min-w-0 min-h-0 flex-1 flex-col">
         <div ref={body} className="flex min-w-0 min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-          {/* 账本规范名当标题，抓取来源给的写法（多为罗马音）留作副标题。 */}
+          {/* 数据库规范名当标题，抓取来源给的写法（多为罗马音）留作副标题。 */}
           {row.source_name
             ? <p className="text-body-2-regular text-text-secondary">{`来源写法：${row.source_name}`}</p>
             : null}
           {/* 实体类卡片的作品数已经写在创作者入口里，这里再写一遍就是同一个数字两处。 */}
           {!asEntity && (row.board || row.assets)
             ? <p className="text-body-2-regular text-text-secondary">
-                {`样本/资产：${Number(row.video_count || row.assets || 0).toLocaleString()}`}
+                {`对照文件：${Number(row.video_count || row.assets || 0).toLocaleString()}`}
               </p>
             : null}
           {!asEntity && origin ? origin : null}
@@ -188,7 +188,7 @@ export function ReviewCard(props: ReviewCardProps) {
             <div className="flex flex-wrap gap-1">
               {tags.length
                 ? tags.map((tag) => <Chip key={tag} variant="caption" color="soft">{tag}</Chip>)
-                : <small className="text-body-2-regular text-text-secondary">暂无候选标签</small>}
+                : <small className="text-body-2-regular text-text-secondary">暂无待确认标签</small>}
             </div>
           ) : null}
           {preview}
@@ -220,7 +220,7 @@ export function ReviewCard(props: ReviewCardProps) {
           onClick={() => onDecide('skipped')}>跳过</Button>
         {/* 没有可采纳的候选时这颗键灰着，字面说它为什么点不了，和旁边的「跳过」分得开。 */}
         <Button variant="primary" size="small" disabled={locked || !approvable} {...busyProps(busy)}
-          title={approvable ? undefined : '没有可采纳的候选，只能拒绝或跳过'}
+          title={approvable ? undefined : '没有可采用的资料，只能拒绝或跳过'}
           onClick={() => onDecide('approved')}>
           {approvable ? '通过' : '不可通过'}
         </Button>

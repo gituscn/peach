@@ -30,12 +30,12 @@ from peach.repository import MediaAsset
 
 POSIX_ONLY = unittest.skipIf(os.name == "nt", "路径翻译只在非 Windows 上发生")
 
-#: 测试里固定的账本口径声明根，和内建默认一致；不依赖本机 config.toml。
+#: 测试固定使用程序默认的数据库路径前缀，不依赖本机 config.toml。
 LOCATIONS = {"local": (r"R:\media",), "115": ("B:/",), "pikpak": ("A:/",)}
 
 
 def _roots(table):
-    """测试里写单个字符串更顺手；设置层一律是与声明根按序对应的元组。"""
+    """测试可传单个字符串；设置层使用与数据库路径前缀按序对应的元组。"""
     return {key: ((value,) if value else ()) if isinstance(value, str) else tuple(value)
             for key, value in table.items()}
 
@@ -51,7 +51,7 @@ def with_media(mounts, locations=None):
 
 
 class LocationResolutionTests(unittest.TestCase):
-    """来源判定只看声明根前缀，两个平台上行为一致。"""
+    """按数据库路径前缀判定来源，两个平台的行为一致。"""
 
     def test_windows_path_shape_is_recognised(self):
         self.assertTrue(is_windows_path(r"R:\Media\one.mp4"))
@@ -68,7 +68,7 @@ class LocationResolutionTests(unittest.TestCase):
             self.assertEqual(resolve_location("B:/x/one.mp4"), ("115", ("x", "one.mp4")))
 
     def test_declared_root_matching_ignores_case(self):
-        """账本里写 `R:\\Media`、声明根写 `R:\\media`，是同一处，不能判成未声明。"""
+        """数据库中 `R:\\Media` 与配置中的 `R:\\media` 对应同一目录，匹配时忽略大小写。"""
         with with_media({}):
             self.assertEqual(resolve_location(r"R:\MEDIA\one.mp4")[0], "local")
 
@@ -81,7 +81,7 @@ class LocationResolutionTests(unittest.TestCase):
     def test_path_outside_every_declared_root_has_no_location(self):
         with with_media({}):
             self.assertEqual(resolve_location(r"Z:\secret\one.mp4"), (None, ()))
-            # 同一个盘但不在声明根下：`R:\Resources` 不是 `R:\media`。
+            # 同一盘符下仍按目录区分：`R:\Resources` 不在 `R:\media` 中。
             self.assertIsNone(resolve_location(r"R:\Resources\Intake\one.mp4")[0])
 
     def test_declared_roots_are_read_from_the_settings_layer(self):
@@ -102,7 +102,7 @@ class LocationResolutionTests(unittest.TestCase):
                         {"local": [r"R:\media", r"R:\media2"]}):
             self.assertEqual(translate_ledger_path(r"R:\media\one.mp4"), Path("/Volumes/A/one.mp4"))
             self.assertEqual(translate_ledger_path(r"R:\media2\two.mp4"), Path("/Volumes/B/two.mp4"))
-        # 挂载表比声明根短：多出来的根按脱盘处理，不能悄悄落到别的目录。
+        # 部分前缀没有对应的本机目录时按无法访问处理，不转换到其他目录。
         with with_media({"local": ["/Volumes/A"]}, {"local": [r"R:\media", r"R:\media2"]}):
             self.assertTrue(is_unmapped(translate_ledger_path(r"R:\media2\two.mp4")))
 
@@ -149,7 +149,7 @@ class TranslationTests(unittest.TestCase):
 
     @POSIX_ONLY
     def test_unmapped_source_never_becomes_a_relative_path(self):
-        """没有挂载点的来源必须落到不可达根，否则会被当成当前目录下的同名文件。"""
+        """没有本机挂载目录的来源转换到 UNMAPPED_ROOT，避免读取当前目录下的同名文件。"""
         with with_media({"local": "/mnt/res/media"}):
             with patch.dict("os.environ", {MOUNTS_ENV: ""}):
                 path = translate_ledger_path(r"Z:\secret\one.mp4")
@@ -159,7 +159,7 @@ class TranslationTests(unittest.TestCase):
 
     @POSIX_ONLY
     def test_declared_but_unmounted_source_is_unmapped_too(self):
-        """声明根认得出来、本机没挂，同样是脱盘，不能落回相对路径。"""
+        """已配置路径前缀但没有本机挂载目录时，仍标为无法访问，不返回相对路径。"""
         with with_media({}):
             with patch.dict("os.environ", {MOUNTS_ENV: ""}):
                 self.assertTrue(is_unmapped(translate_ledger_path(r"R:\media\one.mp4")))

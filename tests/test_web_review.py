@@ -1515,7 +1515,7 @@ class ReviewQueueTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()) as printed:
             self.assertEqual(revert.main(base), 0)
         self.assertIn("'否决': 1", printed.getvalue())
-        self.assertEqual(self._decision("AUTO")[0], "rejected", "只列计划时不动账本")
+        self.assertEqual(self._decision("AUTO")[0], "rejected", "只列计划时不动数据库")
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(revert.main(
                 [*base, "--apply", "--backup", str(Path(self.tmp.name) / "backup.db")]), 0)
@@ -2298,9 +2298,9 @@ class ReviewQueueTests(unittest.TestCase):
         """
         self._asset(120, "LIVE-1", "LIVE-1.mp4")
         con = sqlite3.connect(self.db_path)
-        con.execute("UPDATE asset SET catalog_title='账本里已经有的标题' WHERE id=120")
+        con.execute("UPDATE asset SET catalog_title='数据库里已经有的标题' WHERE id=120")
         con.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,"
-                    "updated_at) VALUES(60,'performer','账本里的女优','账本里的女优',"
+                    "updated_at) VALUES(60,'performer','数据库里的女优','数据库里的女优',"
                     "'2026-01-01','2026-01-01')")
         con.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) "
                     "VALUES(120,60,'performer','board',1.0)")
@@ -2312,10 +2312,10 @@ class ReviewQueueTests(unittest.TestCase):
              "candidates": ["来源给的另一个人"], "code": "LIVE-1"},
         ])
         self.assertEqual(self.queue_row("metadata_fields", "LIVE-1:title")["current_value"],
-                         "账本里已经有的标题")
+                         "数据库里已经有的标题")
         self.assertEqual(
             self.queue_row("metadata_fields", "LIVE-1:performers")["current_value"],
-            "账本里的女优")
+            "数据库里的女优")
 
     def test_a_community_source_reads_the_ledger_not_the_snapshot_for_emptiness(self):
         """「这个字段是不是空的」问的必须是账本此刻，不是抓取那一刻的快照。
@@ -2325,7 +2325,7 @@ class ReviewQueueTests(unittest.TestCase):
         """
         self._asset(121, "LIVE-2", "LIVE-2.mp4")
         con = sqlite3.connect(self.db_path)
-        con.execute("UPDATE asset SET catalog_title='账本里已经有的标题' WHERE id=121")
+        con.execute("UPDATE asset SET catalog_title='数据库里已经有的标题' WHERE id=121")
         con.commit(); con.close()
         self.write_metadata_rows([
             {"item_key": "LIVE-2:title", "field": "title", "current": "",
@@ -2336,7 +2336,7 @@ class ReviewQueueTests(unittest.TestCase):
         try:
             self.assertEqual(
                 con.execute("SELECT catalog_title FROM asset WHERE id=121").fetchone()[0],
-                "账本里已经有的标题")
+                "数据库里已经有的标题")
             self.assertEqual(con.execute(
                 "SELECT count(*) FROM review_decision WHERE item_key='LIVE-2:title'"
             ).fetchone()[0], 0)
@@ -2450,7 +2450,7 @@ class ReviewQueueTests(unittest.TestCase):
         source_dir = self.candidates / "studio-logos"
         source_dir.mkdir()
         (source_dir / "Deep_s.png").write_bytes(b"PNGDATA")
-        # `saved` 列写的是旧数据根 R:\peach-data\...，本机上并不存在，
+        # `saved` 列写的是旧 Peach 数据目录 R:\peach-data\...，本机上并不存在，
         # 必须按文件名在当前候选目录里解析，否则批准永远失败。
         sep = chr(92)
         stale = sep.join(["R:", "peach-data", "generated", "studio-logos", "Deep_s.png"])
@@ -3250,7 +3250,7 @@ class PerformerAvatarApplyTests(ReviewQueueTests):
 
     def test_a_candidate_that_did_not_pass_quality_is_refused(self):
         self._seed(verdict="rejected")
-        with self.assertRaisesRegex(ValueError, "ok"):
+        with self.assertRaisesRegex(ValueError, "通过图片质量检查"):
             self._decide()
         self.assertFalse((self.avatar_root / "performer-9.img").exists())
 

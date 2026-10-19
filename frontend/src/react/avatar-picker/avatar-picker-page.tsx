@@ -196,7 +196,7 @@ function PickerBody({ kind, entityId, name, onPicked, close }: AvatarPickerProps
         <div ref={grid} className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-separator-border px-5 py-4">
           {/* 候选回来之前摆同一种格子的占位，格子外框、比例与标签那一行都和真格子一样，
               换上真格子时网格不跳。 */}
-          <div role="listbox" aria-label="候选头像" aria-busy={listing.isPending || undefined}
+          <div role="listbox" aria-label="备选头像" aria-busy={listing.isPending || undefined}
             data-skeleton={listing.isPending ? 'avatar-choices' : undefined}
             className="inline-grid grid-cols-3 content-start gap-2 sm:grid-cols-4">
             {listing.isPending ? Array.from({ length: SKELETON_TILES }, (_, index) => (
@@ -380,7 +380,7 @@ function CropStep({ kind, entityId, choice, file, busy, back, confirm }: {
             '--crop-preview-at': preview.position,
           } as CSSProperties : undefined} />
         <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
-          <Button variant="secondary" onClick={back} {...busyProps(busy)}>回候选</Button>
+          <Button variant="secondary" onClick={back} {...busyProps(busy)}>返回备选图片</Button>
           {choice.crop ? null : (
             <Button variant="secondary" {...busyProps(busy)}
               onClick={() => { if (!busy) confirm(null) }}>整张使用</Button>

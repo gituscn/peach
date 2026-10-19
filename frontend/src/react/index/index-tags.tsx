@@ -153,7 +153,7 @@ export function TagFilters(
 }
 
 /** 所选标签的操作条。三颗键都只动这一屏：「广泛匹配」切的是回目录时按任一还是全部匹配，
- *  「清空」只清本地所选，「显示结果」回目录按所选标签筛选——没有一颗写账本。 */
+ *  「清空」只清本地所选，「显示结果」回目录按所选标签筛选——没有一颗写数据库。 */
 export function TagDock(
   { count, match, onMatch, onClear, onApply }:
   { count: number; match: 'any' | 'all'; onMatch(match: 'any' | 'all'): void; onClear(): void; onApply(): void },

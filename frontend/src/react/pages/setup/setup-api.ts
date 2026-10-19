@@ -1,7 +1,7 @@
 /* 首启页的三条请求：取题目、提交、让这台电脑弹文件夹对话框。
  *
  * 页面包不带主界面的请求封装与 Query 缓存，这里直接用 `fetch`。形态见 `docs/OPERATIONS.md`
- * 「首次设置的内部流程」：错误正文是 `{error, errors?}`，`errors` 按题目 key 给，媒体文件夹那一项是
+ * 「首次设置的内部流程」：错误正文是 `{error, errors?}`，`errors` 按题目 key 给，媒体目录那一项是
  * 与行对应的列表，整表不成立时是只有一句话的列表。 */
 import { PICK_FOLDER_URL } from '../../../configuration-endpoints';
 

@@ -70,15 +70,15 @@ def location_roots() -> dict[str, tuple[str, ...]]:
 def resolve_root(
     raw: str | os.PathLike[str], roots: Roots | None = None,
 ) -> tuple[str | None, int, tuple[str, ...]]:
-    """账本路径属于哪个来源的第几个声明根，以及它在那个根之后的层级。
+    """账本路径属于哪个来源的第几个数据库路径前缀，以及它在那个根之后的层级。
 
     翻译和写入侧门槛共用这一段判定，所以它只碰 `PureWindowsPath` 和字符串，
-    在两个平台上行为一致、也都能测。声明根重叠时取最长的那个（`R:\\` 与
+    在两个平台上行为一致、也都能测。数据库路径前缀重叠时取最长的那个（`R:\\` 与
     `R:\\media` 同时声明时，`R:\\media\\x` 归后者）。大小写不敏感由
-    `PureWindowsPath` 负责：账本里写 `R:\\Media`、声明根写 `R:\\media` 是同一处。
+    `PureWindowsPath` 负责：账本里写 `R:\\Media`、数据库路径前缀写 `R:\\media` 是同一处。
 
     `roots` 缺省取当前生效的 `[media.locations]`。`peach init` 刚写完设置文件时进程里
-    那份缓存还是旧的，这种调用方把要用的声明根显式传进来。不属于任何来源时返回
+    那份缓存还是旧的，这种调用方把要用的数据库路径前缀显式传进来。不属于任何来源时返回
     `(None, -1, ())`。
     """
     text = os.fspath(raw)
@@ -102,7 +102,7 @@ def resolve_root(
 def resolve_location(
     raw: str | os.PathLike[str], roots: Roots | None = None,
 ) -> tuple[str | None, tuple[str, ...]]:
-    """账本路径属于哪个来源，以及它在声明根之后的层级。判定见 `resolve_root`。"""
+    """账本路径属于哪个来源，以及它在数据库路径前缀之后的层级。判定见 `resolve_root`。"""
     location, _index, tail = resolve_root(raw, roots)
     return location, tail
 
@@ -174,8 +174,8 @@ def translate_ledger_path(raw: str | os.PathLike[str]) -> Path:
         mounts = location_mounts().get(location, ())
         if index < len(mounts):
             return mounts[index].joinpath(*tail)
-    # 没声明过的前缀（例如遗留的 `R:\\Resources\\...`）或没挂载的来源：落到不可达根，
-    # 保留盘符和其余层级，方便日志里认出是哪条路径。
+    # 未配置的路径前缀或未挂载的来源转换到 UNMAPPED_ROOT，供读取端识别并拒绝访问。
+    # 保留盘符和其余层级，方便日志中定位原路径。
     parts = PureWindowsPath(text).parts
     return UNMAPPED_ROOT.joinpath(parts[0][0].upper(), *parts[1:])
 

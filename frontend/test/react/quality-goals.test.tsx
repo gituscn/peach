@@ -59,7 +59,7 @@ function serve(...responses: (QualityGoalsData | null)[]) {
     at += 1;
     return body
       ? { ok: true, status: 200, json: async () => body }
-      : { ok: false, status: 500, json: async () => ({ message: '账本当前只能浏览' }) };
+      : { ok: false, status: 500, json: async () => ({ message: '数据库当前只能浏览' }) };
   });
   vi.stubGlobal('fetch', fetcher);
   return fetcher;
@@ -159,7 +159,7 @@ it('首屏取数就失败时只剩一条错误，不画空列表', async () => {
   const alert = host.querySelector('[role=alert]');
   // 文案走遗留层的 `requestErrorMessage`：服务端给了中文原因就用它，页面不另说一遍。
   expect(alert?.textContent).toContain('读取失败');
-  expect(alert?.textContent).toContain('账本当前只能浏览');
+  expect(alert?.textContent).toContain('数据库当前只能浏览');
   expect(host.querySelector('ul')).toBeNull();
 });
 

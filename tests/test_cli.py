@@ -91,7 +91,7 @@ class StatusCommandTests(unittest.TestCase):
         code, output = self._run(["status", "--db", str(missing),
                                   "--shared-db", str(self.shared)])
         self.assertEqual(code, 4)
-        self.assertIn("账本不存在", output)
+        self.assertIn("数据库不存在", output)
         self.assertFalse(missing.exists())
 
 
@@ -157,7 +157,7 @@ class InitCommandTests(unittest.TestCase):
         self.assertEqual(
             cli._parse_mounts(["local=/mnt/res"], {"local": (r"R:\media",)}),
             {"local": ("/mnt/res",)})
-        # 同一来源重复给，就按顺序对应它的几个声明根。
+        # 同一来源的多个媒体目录，按顺序对应数据库路径前缀。
         self.assertEqual(
             cli._parse_mounts(["local=/mnt/a", "local=/mnt/b"], {"local": (r"R:\media", r"R:\media2")}),
             {"local": ("/mnt/a", "/mnt/b")})
@@ -247,7 +247,7 @@ class InteractiveInitTests(unittest.TestCase):
         patcher = mock.patch.object(cli.onboarding.certs, "bootstrap_certificates")
         self.certs = patcher.start()
         self.addCleanup(patcher.stop)
-        # 第一题的默认值要落在临时目录里，回车接受默认才不会碰真实数据根。
+        # 第一题的默认值要落在临时目录里，回车接受默认才不会碰真实 Peach 数据目录。
         env = mock.patch.dict(os.environ, {"PEACH_DATA_ROOT": str(self.data_root)})
         env.start()
         self.addCleanup(env.stop)
@@ -275,7 +275,7 @@ class InteractiveInitTests(unittest.TestCase):
     def _loaded(self):
         return settings_file.load_config(environ={"PEACH_DATA_ROOT": str(self.data_root)})
 
-    @unittest.skipUnless(NATIVE_WINDOWS, "声明根要是真实存在的盘符目录，只有 Windows 造得出来")
+    @unittest.skipUnless(NATIVE_WINDOWS, "本用例需要真实存在的 Windows 盘符目录")
     def test_windows_flow_declares_the_directory_and_scans_it(self):
         second = self.root / "more"
         second.mkdir()
@@ -315,10 +315,10 @@ class InteractiveInitTests(unittest.TestCase):
         self.assertEqual(loaded.mounts, {"local": (str(self.media),)})
         self.assertEqual((loaded.server.host, loaded.server.port, loaded.server.mdns_name),
                          ("0.0.0.0", 9443, "peach-two"))
-        self.assertIn("本机挂载点", output)
+        self.assertIn("媒体目录", output)
         paths = self._ledger_paths()
         self.assertEqual(paths, [r"R:\media\b.jpg", r"R:\media\sub\a.mp4"])
-        # 读取侧按同一套规则翻回去：声明根后的层级接到挂载点上。
+        # 读取文件时，将数据库路径前缀之后的层级拼到本机媒体目录。
         for path in paths:
             tail = PureWindowsPath(path).relative_to(PureWindowsPath(r"R:\media")).parts
             self.assertTrue(Path(loaded.mounts["local"][0]).joinpath(*tail).is_file(), path)
@@ -328,7 +328,7 @@ class InteractiveInitTests(unittest.TestCase):
         code, output, prompts = self._run(
             ["", str(missing), str(self.media), "", "", "", "", "n"], windows=NATIVE_WINDOWS)
         self.assertEqual(code, 0)
-        self.assertEqual(prompts.count("媒体文件夹（必须已经存在，可以在外置硬盘上）"), 2)
+        self.assertEqual(prompts.count("媒体目录（必须已经存在，可以在外置硬盘上）"), 2)
         self.assertIn("目录不存在", output)
         self.assertFalse(missing.exists(), "问答不替人建媒体目录")
 
@@ -369,7 +369,7 @@ class InteractiveInitTests(unittest.TestCase):
 
         self._run(["", str(self.media), "", "", "", "", ""], windows=NATIVE_WINDOWS)
         loaded = self._loaded()
-        # POSIX 形态的声明根是 `R:\media`，翻回本机目录要读这份设置的 [media.mounts]；
+        # POSIX 系统也用 `R:\media` 作为数据库路径前缀，按 [media.mounts] 转换为本机目录；
         # 模块级 `active()` 指的是这台机器自己的设置，临时目录不在里面。
         active = mock.patch.object(settings_file, "active", lambda: loaded)
         active.start()
@@ -441,15 +441,15 @@ class InitDispatchTests(unittest.TestCase):
             self._run(["init", "--data-root", str(self.root), "--no-input", "--force"], tty=True), 0)
         self.interactive.assert_not_called()
         loaded = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(self.root)})
-        # 非交互路径的形状不变：三个来源的默认声明根照旧写出。
+        # 非交互设置写出三个来源的默认数据库路径前缀。
         self.assertEqual(set(loaded.locations), {"local", "115", "pikpak"})
 
 
 class ScanCommandTests(unittest.TestCase):
-    """`peach scan <来源ID> [根目录]`：根目录省略时取设置文件里的声明根。
+    """`peach scan <来源ID> [根目录]`：目录省略时取配置中的数据库路径前缀。
 
     `cli._scan` 不带 `windows=`，走的就是测试机的形态，所以设置也按本机形态搭：Windows 上
-    声明根是真实目录、挂载表为空，POSIX 上声明根是 `R:\\media`、挂载表指向真实目录。
+    数据库路径前缀就是真实目录、挂载表为空；POSIX 系统使用 `R:\\media`，挂载表指向真实目录。
     """
 
     def setUp(self):

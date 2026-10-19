@@ -233,7 +233,7 @@ class SiteTests(StudioFollowupCase):
         discover.assert_not_called()
 
     def test_a_vanished_studio_is_not_a_failure(self):
-        self.assertEqual(self.run_followup(999), {"outcome": "实体已不存在"})
+        self.assertEqual(self.run_followup(999), {"outcome": "档案已不存在"})
 
 
 class MarkTests(StudioFollowupCase):

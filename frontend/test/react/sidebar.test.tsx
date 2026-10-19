@@ -1,5 +1,5 @@
 /* 侧栏：骨架与路由树的换手、导航顺序跟 store 走、拖动排序写回、筛选键的按下态与计数、分组开合、
- * 「展开全部」、关注标签与时长两端，以及它作为常驻面（`RESIDENT_ROUTES.sidebar`）在路由树里的行为：
+ * 「展开全部」、关注标签与时长两端，以及它作为常驻组件（`RESIDENT_ROUTES.sidebar`）在路由树里的行为：
  * 宿主就是 `#drawerScroll`、骨架在首帧的同一个任务里换掉、`attached` 在首帧之后调一次、句柄同步画完、
  * 壳挪进标题行的节点经重画仍在、抛错只卸组件。
  *
@@ -38,7 +38,7 @@ vi.mock(import('../../src/react/settings-panel/icon'), async (importOriginal) =>
   };
 });
 
-/* 常驻面适配层直接读取同一包内的配置函数；测试只接本场景的句柄契约。 */
+/* 常驻组件适配层直接读取同一包内的配置函数；测试只接本场景的句柄契约。 */
 type ShellIslands = { connectApplication(next: (actions: ShellActions) => void): () => void;
   loadSidebar(host: SidebarHost): Promise<SidebarApi>;
   sidebarApi(): SidebarApi | null;
@@ -464,7 +464,7 @@ describe('筛选分组', async () => {
   });
 });
 
-describe('常驻面', () => {
+describe('常驻组件', () => {
   it('句柄 render 与 navChanged 返回时 DOM 已画好，不等下一次渲染', async () => {
     const { scroll, api, press } = await setup();
     /* 不包 act：act 会把 flushSync 推到它结束时，看不出句柄自己同步没有。 */

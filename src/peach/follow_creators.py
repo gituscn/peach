@@ -198,7 +198,7 @@ def plan(connection: sqlite3.Connection) -> list[Landing]:
         held = _name_held(connection, normalize_entity_name(name))
         if held is not None:
             landings.append(Landing(key, name, "hold", ids, links, entity_id=held,
-                                    providers=providers, reason="账本里已有同名创作者"))
+                                    providers=providers, reason="数据库里已有同名创作者"))
             continue
         normalized = normalize_entity_name(name)
         spellings = [author_display_name(row) for row in group] + alias_names.get(key, [])

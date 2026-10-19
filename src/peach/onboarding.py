@@ -6,16 +6,16 @@
 `PeachConfig`，`apply()` 把它变成一台能直接起服务的机器（目录、账本、CA、口令、设置
 文件）。前端只负责把字串送进来、把结果和错误显示出去。
 
-终端问答收集数据根、本地媒体目录、监听范围、端口和局域网名字。网页引导另按每个目录收集
-本地、115 或 PikPak 来源及 macOS 映射，校验由 `media_configuration` 负责。复制、writer
+终端问答收集 Peach 数据目录、本地媒体目录、监听范围、端口和局域网名字。网页引导另按每个目录收集
+媒体来源与实际目录，校验和内部路径配置由 `media_configuration` 负责。复制、writer
 镜像与 SMB 保持关闭或留空，设置文件只写用户声明过的来源。
 
-媒体目录在两个平台上落成不同的写法，因为账本路径的形状是不变量（AGENTS.md）：
+数据库路径统一使用 Windows 格式，配置区分数据库路径与实际目录：
 
 - Windows：盘符本身就是挂载点，`[media.locations] local = <这些目录>`，`[media.mounts]` 留空。
-- macOS：声明根仍写账本口径的 `R:\\media`（第二个起是 `R:\\media2`、`R:\\media3`……），
-  `[media.mounts] local = <这些目录>` 按同样顺序给出，读取侧按「声明根前缀 → 本机挂载点」
-  翻译（`peach.platform`），扫描侧按同一规则反着写（`peach.scan`）。
+- macOS、Linux：`[media.locations]` 保存数据库路径前缀，`[media.mounts]` 保存实际目录，
+  两表按来源和顺序对应。`peach.platform` 在读取文件前转换路径，`peach.scan` 在登记时反向转换。
+  网页保存时自动补齐内部路径；终端本地目录使用 `R:\\media`、`R:\\media2` 等前缀。
 
 终端问答的目录归 `local`；网页引导用 `Answers.media_sources` 保存逐行选择。
 """
@@ -26,7 +26,7 @@ import re
 import socket
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, replace
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from . import auth, certs, settings_file
 from .migrations import upgrade
@@ -40,17 +40,17 @@ LOOPBACK_HOST = "127.0.0.1"
 LAN_HOST = "0.0.0.0"
 #: 每题最多问几次。三次都不是有效值就放弃，不能让人困在一个死循环里。
 MAX_ATTEMPTS = 3
-#: 非 Windows 平台上本地来源的账本口径声明根。账本一律 Windows 形态，这个值只是个前缀，
-#: 真正的目录由 `[media.mounts] local` 给出。第二个目录起在后面加序号：`R:\media2`。
+#: 非 Windows 终端设置使用的数据库路径前缀；实际目录保存在 `[media.mounts] local`。
+#: 第二个目录起在后面加序号：`R:\media2`。
 POSIX_LOCAL_DECLARED_ROOT = r"R:\media"
 #: 本地来源的 ID。所有本地媒体目录都是 `asset.location = 'local'`。
 LOCAL_LOCATION = "local"
 #: 命令行里追加目录的题面：空答案就是「不加了」。
-MORE_MEDIA_PROMPT = "再加一个媒体文件夹（不加就直接回车）"
+MORE_MEDIA_PROMPT = "再加一个媒体目录（不加就直接回车）"
 #: 迁移随代码走，不随数据走。这里不 import `peach.config`：那个模块的常量在进程启动
-#: 那一刻就定型了，而首次设置正是要改变它们指向的数据根。
+#: 那一刻就定型了，而首次设置正是要改变它们指向的 Peach 数据目录。
 MIGRATIONS_DIR = settings_file.PROJECT_ROOT / "migrations"
-#: 「现在扫描」的一次性标记，落在 `<数据根>/state/`。设置页写它、托盘消费它：
+#: 「现在扫描」的一次性标记，落在 `<Peach 数据目录>/state/`。设置页写它、托盘消费它：
 #: 设置页所在的引导服务在设置完成的那一刻就会被托盘停掉，扫描不能跑在它的进程里。
 SCAN_REQUEST_NAME = "first-scan.request"
 RELOAD_NAME = "configuration-reload.request"
@@ -99,10 +99,10 @@ class Answers:
 def validate_data_root(raw: str) -> Path:
     text = raw.strip()
     if not text:
-        raise ValueError("数据根不能为空")
+        raise ValueError("Peach 数据目录不能为空")
     path = Path(text).expanduser()
     if path.is_file():
-        raise ValueError(f"{path} 是一个文件，数据根要是目录")
+        raise ValueError(f"{path} 是一个文件，Peach 数据目录要是目录")
     return path
 
 
@@ -123,7 +123,7 @@ def media_dir_validator(*, windows: bool) -> Callable[[str], Path]:
 
 
 def check_media_dirs(dirs: Sequence[Path]) -> dict[int, str]:
-    """几个媒体文件夹之间不能重复、不能一个套在另一个里面。
+    """几个媒体目录之间不能重复、不能一个套在另一个里面。
 
     返回「下标 → 原因」，两个前端各自决定错误写在哪一行。套着的目录会让同一个文件被
     登记两次，所以和重复一样拒绝，而不是悄悄合并。
@@ -144,7 +144,7 @@ def check_media_dirs(dirs: Sequence[Path]) -> dict[int, str]:
 def read_media_dirs(
     raws: Sequence[str], *, validate: Callable[[str], Path], default: str = "",
 ) -> tuple[list[Path], list[str]]:
-    """页面表单里的几行媒体文件夹：逐行校验，再查行与行之间的关系。
+    """页面表单里的几行媒体目录：逐行校验，再查行与行之间的关系。
 
     第一行留空取默认值，后面的空行当没填。返回 `(合格的路径, 每行的错误)`；错误列表与
     提交的行一一对应，全对时为空列表，页面据此把原因写回出错的那一行底下。
@@ -242,7 +242,7 @@ def questions(
     return (
         Question("data_root", "数据目录（Peach 数据库、缓存和设置文件都放在这里）",
                  str(config.data_root), validate_data_root),
-        Question("media_dir", "媒体文件夹（必须已经存在，可以在外置硬盘上）",
+        Question("media_dir", "媒体目录（必须已经存在，可以在外置硬盘上）",
                  str(media_default) if media_default else "",
                  media_dir_validator(windows=windows)),
         Question("host",
@@ -293,8 +293,8 @@ def collect(
 ) -> Iterator[tuple[str, object]]:
     """逐题产出 `(Answers 的字段名, 值)`。`ask` 由前端注入，测试用脚本化答案驱动。
 
-    媒体文件夹问完第一个之后接着问「再加一个」，回车即结束，整组目录作为 `media_dirs`
-    一次产出；页面上对应的是「添加文件夹」。做成生成器是为了让命令行在数据根那一题
+    媒体目录问完第一个之后接着问「再加一个」，回车即结束，整组目录作为 `media_dirs`
+    一次产出；页面上对应的是「添加文件夹」。做成生成器是为了让命令行在 Peach 数据目录那一题
     之后就能判「设置文件已存在」并退出，不必等剩下的题答完。
     """
     for question in questions(config, windows=windows, home=home):
@@ -338,7 +338,8 @@ def configure(config: PeachConfig, answers: Answers, *, windows: bool) -> PeachC
         mounts = {LOCAL_LOCATION: tuple(str(path) for path in answers.media_dirs)}
     if answers.media_sources is not None:
         from . import media_configuration
-        locations, mounts, errors = media_configuration.validate(answers.media_sources, windows=windows)
+        sources = media_configuration.prepare_sources(answers.media_sources, windows=windows, config=config)
+        locations, mounts, errors = media_configuration.validate(sources, windows=windows, config=config)
         if errors:
             raise ValueError("；".join(error for error in errors if error))
     prepared = settings_file.capture_existing(
@@ -347,8 +348,13 @@ def configure(config: PeachConfig, answers: Answers, *, windows: bool) -> PeachC
                    "mdns_name": answers.mdns_name},
         mounts=mounts,
     )
-    return replace(prepared, locations=locations,
-                   media_costs=(media_configuration.costs(answers.media_sources, config, windows=windows)
+    library_names = dict(config.library_names)
+    if answers.media_sources is not None:
+        for row in sources:
+            if row.get("library"):
+                library_names[str(PureWindowsPath(row["path"] if windows else row["root"]))] = str(row["library"])
+    return replace(prepared, locations=locations, library_names=library_names,
+                   media_costs=(media_configuration.costs(sources, config, windows=windows)
                                 if answers.media_sources is not None else dict(config.media_costs)))
 
 
@@ -380,9 +386,9 @@ class Applied:
 def resolve_config(
     data_root: Path | None = None, environ: dict[str, str] | None = None,
 ) -> tuple[PeachConfig, settings_file.SettingsFileError | None]:
-    """按给定数据根重新解析设置；文件坏了就退回内建默认并把错误一并交出。
+    """按给定 Peach 数据目录重新解析设置；文件坏了就退回内建默认并把错误一并交出。
 
-    `peach init` 与设置页都要在拿到数据根之后重新解析一次：数据根决定设置文件在哪，
+    `peach init` 与设置页都要在拿到 Peach 数据目录之后重新解析一次：Peach 数据目录决定设置文件在哪，
     而进程启动时那一份是按发现顺序算的，用户完全可以填一个别的目录。
     """
     environ = dict(os.environ if environ is None else environ)
@@ -475,24 +481,24 @@ def take_first_scan_request(config: PeachConfig) -> str | None:
 
 
 def posix_declared_roots(count: int) -> tuple[str, ...]:
-    """非 Windows 平台上 `count` 个本地目录的账本口径声明根：`R:\\media`、`R:\\media2`……"""
+    """为非 Windows 终端设置的本地目录生成数据库路径前缀：`R:\\media`、`R:\\media2`……"""
     return tuple(POSIX_LOCAL_DECLARED_ROOT + ("" if index == 0 else str(index + 1))
                  for index in range(count))
 
 
 def scan_roots(config: PeachConfig) -> tuple[str, ...]:
-    """首次扫描的账本口径根：`local` 的全部声明根。本机目录由 `peach.scan` 按挂载表取。"""
+    """取得本地来源的全部数据库路径前缀；扫描时由 `peach.scan` 转成实际目录。"""
     return tuple(config.locations[LOCAL_LOCATION])
 
 
 def mounts_explanation(media_dirs: Sequence[Path | str] | Path | str) -> str:
-    """非 Windows 平台写出的两行为什么长那样，一句话说清。"""
+    """说明非 Windows 终端设置保存的两种路径。"""
     if isinstance(media_dirs, (Path, str)):
         media_dirs = (media_dirs,)
     shown = "、".join(str(path) for path in media_dirs) or "（还没填）"
     roots = "、".join(posix_declared_roots(max(len(media_dirs), 1)))
-    return (f"账本用统一的 Windows 形态记路径（{roots} 下的 ...），"
-            f"本机挂载点 [media.mounts] local = {shown} 按同样的顺序负责翻译成真实文件。")
+    return (f"Peach 数据库用 Windows 格式保存影片路径，前缀为 {roots}；"
+            f"实际媒体目录为 {shown}，按相同顺序保存在 [media.mounts] local，读取文件前自动转换。")
 
 
 def console_ask(prompt: str, default: str) -> str:

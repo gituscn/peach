@@ -34,7 +34,7 @@ class MountRoot:
 
 
 def source_roots() -> list[MountRoot]:
-    """沿用账本声明根与平台映射；构造探测对象时不读取挂载。"""
+    """沿用数据库路径前缀与平台路径转换；构造检查对象时不访问挂载目录。"""
     from .config import LOCATION_ROOT_DECLARATIONS
     from .media_configuration import SOURCE_OPTIONS
     from .platform import is_unmapped, translate_ledger_path
@@ -138,7 +138,7 @@ class MountReachability:
                 slots -= 1
 
     def sources(self) -> list[dict]:
-        """纯内存读取；来源接口保留声明根，公开健康摘要不携带路径。"""
+        """纯内存读取；来源接口保留数据库路径前缀，公开健康摘要不携带路径。"""
         grouped: dict[str, dict] = {}
         with self._lock:
             for root in self.roots:

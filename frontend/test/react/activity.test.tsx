@@ -50,8 +50,8 @@ const run = (overrides: Partial<TaskRunPayload> = {}): TaskRunPayload => ({
 /** 一条后继（ADR-0040）：跑完的一行，挂在 `parent` 那一轮下面。 */
 const followup = (parent: number, overrides: Partial<TaskRunPayload> = {}): TaskRunPayload =>
   run({
-    id: 90, task_key: 'entity-avatar', task_label: '补实体头像', status: 'succeeded',
-    progress_total: null, progress_current: null, progress_label: '补实体头像：涼森れむ',
+    id: 90, task_key: 'entity-avatar', task_label: '补全资料图片', status: 'succeeded',
+    progress_total: null, progress_current: null, progress_label: '补全资料图片：涼森れむ',
     finished_at: '2026-09-11T10:04:00Z', parent_run_id: parent, root_run_id: parent,
     followup_key: 'entity-avatar:performer:12', followup_depth: 1,
     result_summary: { outcome: '已装上' }, ...overrides,
@@ -77,7 +77,7 @@ function serve(...responses: (ActivityData | null)[]) {
     at += 1;
     return body
       ? { ok: true, status: 200, json: async () => body }
-      : { ok: false, status: 500, json: async () => ({ message: '账本当前只能浏览' }) };
+      : { ok: false, status: 500, json: async () => ({ message: '数据库当前只能浏览' }) };
   });
   stubFetch(fetcher);
   return fetcher;
@@ -158,7 +158,7 @@ it('后继挂在派出它的那一轮下面，不另占一张卡', async () => {
   const row = host.querySelector('[data-followup-key]')!;
   expect(host.querySelector('[data-task-key=follow-check]')!.contains(row)).toBe(true);
   expect([...row.querySelectorAll('span')].map((node) => node.textContent))
-    .toEqual(['补实体头像', '已完成', '涼森れむ · 结果 已装上']);
+    .toEqual(['补全资料图片', '已完成', '涼森れむ · 结果 已装上']);
   expect(host.textContent).toContain('派出后继 1');
 });
 
@@ -235,17 +235,17 @@ it('一条记录都没有时给空态，不是一片白', async () => {
   expect(sections(host)).toEqual([]);
 });
 
-it('账本上还没有这张表时说清怎么办，不当成故障', async () => {
+it('数据库上还没有这张表时说清怎么办，不当成故障', async () => {
   const { host } = await open(payload({
-    available: false, message: '账本还没有任务中心的表，执行一次 peach migrate --apply 就好' }));
-  expect(host.querySelector('[role=note]')?.textContent).toContain('migrate --apply');
+    available: false, message: '数据库缺少任务记录表，请按运行文档检查备份后执行 peach migrate upgrade --yes' }));
+  expect(host.querySelector('[role=note]')?.textContent).toContain('migrate upgrade --yes');
   expect(host.querySelector('[role=alert]')).toBeNull();
 });
 
 it('首屏取数就失败时只剩一条错误，不画空的三段', async () => {
   const { host } = await open(null);
   // 文案走遗留层的 `requestErrorMessage`：服务端给了中文原因就用它，页面不另说一遍。
-  expect(host.querySelector('[role=alert]')?.textContent).toContain('账本当前只能浏览');
+  expect(host.querySelector('[role=alert]')?.textContent).toContain('数据库当前只能浏览');
   expect(host.querySelector('section')).toBeNull();
 });
 
@@ -274,7 +274,7 @@ it('一轮请求失败不擦掉上一份数据，只在页内多一条原因', a
 
   await tick(10_000);
   expect(fetcher).toHaveBeenCalledTimes(2);
-  expect(host.querySelector('[role=alert]')?.textContent).toContain('账本当前只能浏览');
+  expect(host.querySelector('[role=alert]')?.textContent).toContain('数据库当前只能浏览');
   expect(host.textContent, '失败一次就把上一份结果擦掉，页面比原来知道得更少').toContain('扫描与采集');
 });
 
@@ -310,7 +310,7 @@ function route(polls: ActivityData[], pages: (FinishedPage | null)[]) {
     paged += 1;
     return body
       ? { ok: true, status: 200, json: async () => body }
-      : { ok: false, status: 500, json: async () => ({ message: '账本当前只能浏览' }) };
+      : { ok: false, status: 500, json: async () => ({ message: '数据库当前只能浏览' }) };
   });
   stubFetch(fetcher);
   return fetcher;
@@ -381,7 +381,7 @@ it('往前翻失败时原位说原因，已有的行不动，再点一次照常�
 
   await click(buttonNamed('加载更早', host));
   await settle();
-  expect(host.querySelector('[role=alert]')?.textContent).toContain('账本当前只能浏览');
+  expect(host.querySelector('[role=alert]')?.textContent).toContain('数据库当前只能浏览');
   expect(shownIds(host)).toEqual([9]);
 
   await click(buttonNamed('加载更早', host));

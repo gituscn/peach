@@ -83,7 +83,7 @@ class PlanTests(Case):
     def test_a_version_never_landed_is_planned_even_without_new_entities(self):
         found = self.plan(since_entity_id=10 ** 9)
         self.assertEqual([(item.key, item.task_key, item.label) for item in found],
-                         [(KEY, "seed-import", f"导入实体种子：{VERSION}")])
+                         [(KEY, "seed-import", f"导入初始资料：{VERSION}")])
 
     def test_a_landed_version_is_planned_again_only_when_new_entities_appear(self):
         self.finished_run(KEY)
@@ -118,7 +118,7 @@ class RunTests(Case):
         self.assertEqual((summary["matched"], summary["aliases"], summary["links"], summary["memberships"],
                           summary["makers"], summary["conflicts"], summary["duplicates"]), (2, 1, 1, 1, 0, 1, 0))
         self.assertEqual(summary["outcome"], "别名 1、链接 1、归属 1、不一致 1")
-        self.assertEqual(self.busts, 1, "动了账本就清一次聚合缓存")
+        self.assertEqual(self.busts, 1, "动了数据库就清一次聚合缓存")
         with self.database.read_connection() as connection:
             self.assertEqual(connection.execute("SELECT maker_id FROM label_maker WHERE label_id=?",
                                                 (label,)).fetchone()[0], kmp, "人复核过的片商不被种子改")
@@ -130,7 +130,7 @@ class RunTests(Case):
         again = seed_followup.run(self.contract, KEY, None)
         self.assertEqual((again["aliases"], again["links"], again["memberships"], again["refreshed"]), (0, 0, 0, 0),
                          "同一包再跑一遍没有东西可补")
-        self.assertEqual(self.busts, 1, "没动账本就不清缓存")
+        self.assertEqual(self.busts, 1, "没动数据库就不清缓存")
         self.assertTrue(again["outcome"].startswith("不一致 1"), again["outcome"])
 
     def test_two_local_entities_for_one_pack_item_become_a_duplicate_row(self):

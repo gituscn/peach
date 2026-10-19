@@ -321,7 +321,7 @@ it('amane 桥：检查上游只填「上游最新版本」那一行，重建跟�
   expect(toast).toHaveBeenCalledWith('amane 桥已按 79ecfa763cc7 重建');
 });
 
-it('登录外链只写主机名；账本里认不出的连接方式原样列成一项，下拉框不落到空占位', () => {
+it('登录外链只写主机名；数据库里认不出的连接方式原样列成一项，下拉框不落到空占位', () => {
   expect(linkHost('https://www.javbus.com/login?next=%2F')).toBe('www.javbus.com');
   expect(linkHost('不是地址')).toBe('不是地址');
   expect(networkOptions('peach').map(([key]) => key)).toEqual(['peach', 'direct']);

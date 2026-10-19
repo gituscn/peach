@@ -1,10 +1,10 @@
 /* 设置面板：顶栏齿轮打开的那一屏浮层，左栏分区、右边一组组设置行。
  *
- * 常驻面 `settings-panel`（`router/managed-routes.tsx` 的常驻表）：第一次打开时壳的 `loadSettingsPanel` 建一枚
- * `[data-settings-host]`，常驻面的 `place` 把它放进 body 末尾，路由树在同一个任务里把面板画成它的子节点。
+ * 常驻组件 `settings-panel`（`router/managed-routes.tsx` 的常驻表）：第一次打开时壳的 `loadSettingsPanel` 建一枚
+ * `[data-settings-host]`，常驻组件的 `place` 把它放进 body 末尾，路由树在同一个任务里把面板画成它的子节点。
  * 之后开合只换 `hidden`，分区、滚动位置之外的状态跨次打开保留。壳经 `configureSettingsPanel` 给的句柄开合：
  * 句柄写本模块的 store 再 `flushSync` 通知，返回时面板已经画好，锁滚、取数与焦点紧跟在后面。界面偏好读写的是
- * 壳递进来的那一份 `appSettings`（`host.store`），改完一项用 `host.changed(effect)` 告诉壳跟着做什么；跟账本走的
+ * 壳递进来的那一份 `appSettings`（`host.store`），改完一项用 `host.changed(effect)` 告诉壳跟着做什么；跟数据库走的
  * 那几项经 `/api/settings` 写（`settings-data.ts`）。
  *
  * 宿主不在 `.peach-react` 里：行、开关、下拉、拉条与色块都是全站共用的遗留控件，外观由
@@ -47,7 +47,7 @@ const SORT_OPTIONS: readonly Choice[] = [
 ];
 const DIRECTION_OPTIONS: readonly Choice[] = [['desc', '降序'], ['asc', '升序']];
 const JAV_IMAGE_OPTIONS: readonly Choice[] = [['cover', '官方封面', ''], ['thumbnail', '预览图', '']];
-/* 新作那一行收不收合集由服务端按账本里的设置筛，这里的开关只是镜像：真相在 `/api/settings`。 */
+/* 新作那一行收不收合集由服务端按数据库里的设置筛，这里的开关只是镜像：真相在 `/api/settings`。 */
 const FEED_COMPILATIONS = [
   ['feedHideGroupSetting', 'feedHideGroupCompilations', '大合集', '隐藏大合集'],
   ['feedHideSoloSetting', 'feedHideSoloCompilations', '单人合集', '隐藏单人合集'],
@@ -516,7 +516,7 @@ function PlaybackRows({ host: current, epoch }: Omit<GroupProps, 'tab'>) {
 function SearchHistoryRow({ host: current, epoch }: { host: SettingsPanelHost; epoch: number }) {
   const settings = current.store.value;
   const save = useSaveSettings();
-  /* 条数跟着账本走（`/api/settings`），所有访问端看到同一个数；本地那份只是镜像。 */
+  /* 条数跟着数据库走（`/api/settings`），所有访问端看到同一个数；本地那份只是镜像。 */
   return (
     <Row title="搜索记录数量">
       <div id="searchHistoryLimitSetting">

@@ -49,10 +49,10 @@ export function LibraryIconPicker({ value, label, kind = 'local', onChange }: {
       </Button>
       <Popover triggerRef={trigger} isOpen={open} onOpenChange={setOpen} placement="bottom start" offset={4}
         className={MENU_POPOVER_SURFACE}>
-        <Dialog aria-label={`${label}候选`} className="flex w-72 flex-col gap-3 outline-none">
+        <Dialog aria-label={`${label}可选图标`} className="flex w-72 flex-col gap-3 outline-none">
           <Heading slot="title" className="px-1 text-body-medium text-text-primary">选择媒体库图标</Heading>
           {/* 格子里只放图标，名字走 aria-label：带着字的话 42 个候选要排十几行。 */}
-          <RadioGroup aria-label="候选图标" value={draft || AUTO} onChange={(next) => setDraft(next === AUTO ? '' : next)}
+          <RadioGroup aria-label="可选图标" value={draft || AUTO} onChange={(next) => setDraft(next === AUTO ? '' : next)}
             className="inline-grid grid-cols-7 gap-1">
             {LIBRARY_ICON_CHOICES.map(([key, name]) => (
               <Radio key={key || AUTO} value={key || AUTO} aria-label={key ? name : autoLabel}

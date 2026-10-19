@@ -514,7 +514,7 @@ export function TastePage(props: TasteProps) {
               detail={historySpan(summary)} detailTitle={`${tasteDate(summary.range_start)}—${tasteDate(summary.range_end)}`} />
             <SummaryCard accent={1} icon={RiPriceTag3Line} term="口味维度"
               figure={categories.length.toLocaleString()} detail={categories[0]?.name || '尚无主维度'} />
-            <SummaryCard accent={2} icon={RiSearchLine} term="浏览候选" figure={gaps.length.toLocaleString()} />
+            <SummaryCard accent={2} icon={RiSearchLine} term="浏览线索" figure={gaps.length.toLocaleString()} />
             <SummaryCard accent={3} icon={RiBookmarkLine} term="浏览器书签"
               figure={Number(summary.bookmarks || 0).toLocaleString()}
               detail={`${Number(storage.exports || 0).toLocaleString()} 份私有导出 · ${fmtSize(storage.bytes || 0)}`} />
@@ -547,7 +547,7 @@ export function TastePage(props: TasteProps) {
               { id: 'creators', name: '创作者', props: { rows: rank.browser_creators || [], kind: 'creator', visual: 'creator', empty: NO_BROWSER_CREATOR_HINT } },
               { id: 'performers', name: '女优', props: { rows: rank.browser_performers || [], kind: 'performer', visual: 'entity', empty: '还没有与已建档女优关联的浏览记录。' } },
               { id: 'domains', name: '常访问网站', props: { rows: rank.domains || [], kind: '', visual: 'domain', empty: NO_DOMAIN_HINT } },
-              { id: 'gaps', name: '浏览候选', props: { rows: gaps, kind: '', visual: 'none', empty: GAP_HINT } },
+              { id: 'gaps', name: '浏览线索', props: { rows: gaps, kind: '', visual: 'none', empty: GAP_HINT } },
             ]} />
         </TabPanel>
         <TabPanel id="peach" className="flex flex-col gap-5">

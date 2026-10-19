@@ -48,7 +48,7 @@ from .followups import Attempts, Followup, FollowupType, attempts_root, register
 
 #: 这类后继在任务中心的身份，也是活动页上那一行的名字来源。
 TASK_KEY = "entity-avatar"
-TASK_LABEL = "补实体头像"
+TASK_LABEL = "补全资料图片"
 
 #: 会被派后继的实体种类。厂牌的图是标识，归 `studio_followup`；系列、标签没有头像位。
 #: 发布账号只派过 `work_portrait_predicate` 的那些（`_candidates`）。
@@ -297,7 +297,7 @@ def _run(contract, key: str, handle) -> dict:
             (entity_id, kind)).fetchone()
         if row is None:
             # 实体被合并或删掉了。这不是失败：那件事已经不存在了。
-            return {"outcome": "实体已不存在"}
+            return {"outcome": "档案已不存在"}
         name = str(row[0] or "")
         if kind == "creator":
             handle.progress(label=f"{TASK_LABEL}：{name}", throttle=0)

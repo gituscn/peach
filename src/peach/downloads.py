@@ -485,7 +485,7 @@ def normalise_target(raw: str) -> str:
 class DownloadConfig:
     clouddrive_address: str = ""
     targets: dict = field(default_factory=dict)
-    #: PikPak 根目录在账本里对应哪个声明根。115 的对应走推送发现的云端路径前缀。
+    #: PikPak 根目录对应的数据库路径前缀；115 使用推送发现中配置的云端路径前缀。
     pikpak_root: str = ""
     wait_hours: int = DEFAULT_WAIT_HOURS
 
@@ -609,7 +609,7 @@ class DownloadService:
                code: str | None = None, title: str | None = None,
                origin: str | None = None, dedupe_code: bool = False) -> SubmitResult:
         if not self.available:
-            raise ValueError("云下载只在账本写入端可用")
+            raise ValueError("云下载只在允许修改数据库的设备上可用")
         magnet = parse_magnet(source)
         if provider not in PROVIDER_LABELS:
             raise ValueError("请选择 115 或 PikPak")
@@ -672,7 +672,7 @@ class DownloadService:
 
     def cancel(self, task_id: int) -> DownloadTask:
         if not self.available:
-            raise ValueError("云下载只在账本写入端可用")
+            raise ValueError("云下载只在允许修改数据库的设备上可用")
         task = self.store.get(int(task_id))
         if task is None:
             raise ValueError("没有这个下载任务")
@@ -835,8 +835,8 @@ class DownloadService:
         if mapped is None:
             raise DownloadError(
                 "not_landed",
-                "目标目录对应不到媒体文件夹。115 在「推送发现」里配置云端路径前缀；"
-                "PikPak 在「云下载」设置里选 PikPak 根目录对应的媒体文件夹")
+                "目标目录对应不到媒体目录。115 在「推送发现」里配置云端路径前缀；"
+                "PikPak 在「云下载」设置里选 PikPak 根目录对应的媒体目录")
         location, ledger_path = mapped
         task.ledger_path = ledger_path
         asset_id = self.store.asset_under(location, ledger_path, task.code)
@@ -894,7 +894,7 @@ class Landing:
     """远端完成之后的那一段：网盘路径换成账本路径，账本里没有就定向登记一次。
 
     115 的网盘路径是 CloudDrive2 挂载树里的路径，换算用推送发现已经配好的云端路径前缀，
-    不另存一张表。PikPak 直连拿到的是 PikPak 自己的路径，按设置里选的声明根拼。
+    不另存一张表。PikPak 直连取得网盘内部路径，再与设置中选定的数据库路径前缀拼接。
     """
 
     def __init__(self, push_discovery, *, mounts=None, declared_roots=None):

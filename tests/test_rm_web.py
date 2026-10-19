@@ -1383,7 +1383,7 @@ class WebDataTests(unittest.TestCase):
         self.assertIsNone(
             con.execute(
                 "SELECT 1 FROM asset_tag WHERE asset_id=1 AND tag='回滚标签'").fetchone(),
-            "事务中途失败后不能把标签行留在账本里",
+            "事务中途失败后不能把标签行留在数据库里",
         )
         con.close()
         self.assertTrue(opened, "没有取到写连接，测试本身失效")
@@ -1427,7 +1427,7 @@ class WebDataTests(unittest.TestCase):
 
         self.assertEqual((result["purged"], result["blocked"]), (1, []))
         self.assertFalse(path.exists(), "回收站的彻底删除必须真的删掉文件")
-        self.assertIsNone(self.row(1), "账本行也要一起消失")
+        self.assertIsNone(self.row(1), "数据库行也要一起消失")
         con = sqlite3.connect(self.db_path)
         for table in rm_web.ASSET_REFERENCE_TABLES:
             left = con.execute(f"SELECT count(*) FROM {table} WHERE asset_id=1").fetchone()[0]

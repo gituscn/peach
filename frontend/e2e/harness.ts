@@ -1,7 +1,7 @@
 /* 真浏览器冒烟的夹具：打开页面、收集运行期问题、测布局几何。
  *
  * 只用 playwright-core 驱动本机已装的 Chrome，不下载浏览器；路径由
- * `tests/test_web_e2e.py` 探测后经 PEACH_E2E_CHROME 传进来。服务、账本和演示库
+ * `tests/test_web_e2e.py` 探测后经 PEACH_E2E_CHROME 传进来。服务、数据库和演示库
  * 也归 Python 那一侧准备，这里只认 PEACH_E2E_ORIGIN。
  *
  * 用例只写语义断言（没有横向溢出、等待态会结束、控制台无错误），不做截图比对：

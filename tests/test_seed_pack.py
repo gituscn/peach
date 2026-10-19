@@ -147,7 +147,7 @@ class ExportTests(SeedPackCase):
                           "tags": ["巨乳", "美肌"]}, "资料按列导，raw 残片不导")
         self.assertEqual(sora["profile"]["source"], "auto:performer-profile@7")
         self.assertEqual(sora["agency"], {"name": "STARTUP", "source": "minnano-av:所属事務所"})
-        self.assertNotIn("只有名字", by_name, "光一个名字对别的账本没有用处")
+        self.assertNotIn("只有名字", by_name, "光一个名字对别的数据库没有用处")
         text = seed_pack.dump(pack)
         self.assertNotIn("raw_snapshot", text)
         self.assertNotIn("somewhere", text)

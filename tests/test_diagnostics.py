@@ -199,12 +199,12 @@ class DiagnosticsTests(unittest.TestCase):
 
     def test_doctor_text_reports_failure_and_exits_nonzero(self):
         result = {"version": "test", "status": "failed", "checks": {
-            "database": diagnostics.item("数据库", "failed", "账本不存在", action="检查本机账本与备份")}}
+            "database": diagnostics.item("数据库", "failed", "数据库不存在", action="检查本机数据库与备份")}}
         output = io.StringIO()
         with patch.object(diagnostics, "report", return_value=result), \
              patch.object(diagnostics, "probe_mounts", return_value=EMPTY_MOUNTS), \
              patch.object(diagnostics.settings_file, "active", return_value=self.config), redirect_stdout(output):
             code = cli.main(["doctor", "--db", str(self.db)])
         self.assertEqual(code, 1)
-        self.assertIn("数据库 [failed] 账本不存在", output.getvalue())
-        self.assertIn("检查本机账本与备份", output.getvalue())
+        self.assertIn("数据库 [failed] 数据库不存在", output.getvalue())
+        self.assertIn("检查本机数据库与备份", output.getvalue())

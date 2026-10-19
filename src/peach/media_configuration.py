@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path, PurePath, PureWindowsPath, PurePosixPath
+import hashlib
 import shutil
 import sys
 from typing import Any
@@ -64,26 +65,78 @@ def rows(config, *, windows: bool, probe: bool = False) -> list[dict[str, Any]]:
     return result
 
 
+def _overlaps(first: PureWindowsPath, second: PureWindowsPath) -> bool:
+    return first == second or first.is_relative_to(second) or second.is_relative_to(first)
+
+
+def _automatic_root(location: str, path: str, used: list[PureWindowsPath]) -> str:
+    # 媒体来源和目录决定内部路径；已有路径占用时改用其他盘符，避免不同目录共用前缀。
+    token = hashlib.sha256(f"{location}\0{PurePosixPath(path)}".encode()).hexdigest()[:32]
+    drives = dict.fromkeys(["R:", *(f"{chr(code)}:" for code in range(65, 91))])
+    for drive in drives:
+        candidate = PureWindowsPath(drive + "\\", "peach", location, token)
+        if not any(_overlaps(candidate, other) for other in used):
+            return str(candidate)
+    return ""
+
+
+def _prepare_source(row: dict, existing: list[dict], used: list[PureWindowsPath]) -> None:
+    location = row.get("location")
+    if not isinstance(location, str) or location not in dict(SOURCE_OPTIONS):
+        return
+    path = str(row.get("path", "")).strip()
+    matches = [previous for previous in existing
+               if previous["location"] == location and previous["path"]
+               and PurePosixPath(previous["path"]) == PurePosixPath(path)]
+    row["root"] = matches[0]["root"] if len(matches) == 1 else _automatic_root(location, path, used)
+    if not row.get("library"):
+        row["library"] = (matches[0]["library"] if len(matches) == 1 and "library" not in row
+                          else PurePosixPath(path).name or dict(SOURCE_OPTIONS)[location])
+    if row["root"]:
+        used.append(PureWindowsPath(row["root"]))
+
+
+def prepare_sources(raws: object, *, windows: bool, config=None) -> object:
+    """为非 Windows 表单补齐内部路径，保留已配置目录和显式填写的值；不读取或改写数据库。"""
+    if windows or not isinstance(raws, list) or not 1 <= len(raws) <= 100:
+        return raws
+    result = [dict(row) if isinstance(row, dict) else row for row in raws]
+    existing = rows(config, windows=False) if config is not None else []
+    reserved = [row["root"] for row in existing] if config is not None and (config.present or config.mounts) else []
+    reserved += [str(row.get("root", "")).strip() for row in result if isinstance(row, dict)]
+    used = [PureWindowsPath(root) for root in reserved if platform.is_windows_path(root)]
+    for row in result:
+        if not isinstance(row, dict) or str(row.get("root", "")).strip():
+            continue
+        _prepare_source(row, existing, used)
+    return result
+
+
 def _validated_paths(row: dict, *, windows: bool) -> tuple[PureWindowsPath, PurePath]:
-    """将表单路径转换为可比较的声明根与本机绝对路径。"""
+    """取得数据库路径前缀与本机实际目录，用于检查重复和包含关系。"""
     text = str(row.get("path", "")).strip()
     root = text if windows else str(row.get("root", "")).strip()
     if any(ord(char) < 32 for char in text + root):
         raise ValueError("路径不能包含控制字符")
+    if not windows and not root:
+        raise ValueError("无法自动配置媒体目录，请检查配置文件中的目录对应关系")
     if not platform.is_windows_path(root) or ".." in PureWindowsPath(root).parts:
-        raise ValueError("Windows 中的对应路径必须包含盘符，例如 B:\\；网络共享请先映射为 Windows 盘符")
+        raise ValueError("媒体路径必须包含盘符，例如 B:\\；网络共享请先映射为 Windows 盘符" if windows
+                         else "配置文件中 [media.locations] 的路径格式无效；请使用 Windows 格式，例如 R:\\media")
     path = PureWindowsPath(text) if windows else PurePosixPath(text)
     if not text or not (platform.is_windows_path(text) if windows else text.startswith("/")):
-        raise ValueError("请填写本机挂载点的绝对路径")
+        raise ValueError("请填写媒体目录的完整路径，例如 D:\\Movies" if windows
+                         else "请填写媒体目录的完整路径，例如 /media")
     if ".." in path.parts:
-        raise ValueError("挂载点不能包含上级目录 ..")
+        raise ValueError("媒体目录路径不能包含上级目录 ..")
     return PureWindowsPath(root), path
 
 
-def validate(raws: object, *, windows: bool) -> tuple[dict, dict, list[str]]:
+def validate(raws: object, *, windows: bool, config=None) -> tuple[dict, dict, list[str]]:
     """离线来源允许保存；绝对路径、盘符根与来源间重叠在保存前校验。"""
     if not isinstance(raws, list) or not raws or len(raws) > 100:
-        return {}, {}, ["请添加 1 到 100 个媒体文件夹"]
+        return {}, {}, ["请添加 1 到 100 个媒体目录"]
+    raws = prepare_sources(raws, windows=windows, config=config)
     locations: dict[str, list[str]] = {}
     mounts: dict[str, list[str]] = {}
     errors = [""] * len(raws)
@@ -101,9 +154,10 @@ def validate(raws: object, *, windows: bool) -> tuple[dict, dict, list[str]]:
             for other_root, other_path in seen:
                 if (declared == other_root or declared.is_relative_to(other_root)
                         or other_root.is_relative_to(declared)):
-                    raise ValueError("Windows 中的对应路径与另一文件夹重复或重叠")
+                    raise ValueError("媒体路径与另一文件夹重复或互相包含" if windows
+                                     else "配置文件中的目录对应关系重复或互相包含")
                 if path == other_path or path.is_relative_to(other_path) or other_path.is_relative_to(path):
-                    raise ValueError("本机挂载点与另一行重复或重叠")
+                    raise ValueError("媒体目录与另一行重复或互相包含")
             seen.append((declared, path))
             locations.setdefault(location, []).append(str(declared))
             if not windows:
@@ -116,7 +170,7 @@ def validate(raws: object, *, windows: bool) -> tuple[dict, dict, list[str]]:
 
 
 def costs(raws: list[dict], config, *, windows: bool) -> dict[str, str]:
-    """为已校验的媒体行保存声明根保护设置。"""
+    """按数据库路径前缀保存已校验媒体行的读取策略。"""
     result = dict(getattr(config, "media_costs", {}))
     for row in raws:
         root = str(PureWindowsPath(row["path"] if windows else row["root"]))

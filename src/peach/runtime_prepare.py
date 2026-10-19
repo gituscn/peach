@@ -42,7 +42,7 @@ from .fsutil import atomic_write_text
 
 #: 判据与动作共用的参数；判据只多一个 `--check`。
 UV_SYNC = ("sync", "--locked", "--all-extras", "--inexact", "--no-install-project")
-#: 托盘启动后把这次准备的结果落在 `<数据根>/state/` 下，重启脚本据此报告新托盘的状况。
+#: 托盘启动后把这次准备的结果落在 `<Peach 数据目录>/state/` 下，重启脚本据此报告新托盘的状况。
 STATE_FILE = "runtime-prepare.json"
 #: 子进程输出只留尾巴进通知与日志：uv 与 migrate 出错时有用的都在最后几行。
 OUTPUT_TAIL = 600
@@ -211,7 +211,7 @@ class Migrations:
 
     def apply(self) -> Step:
         if not self.db.is_file():
-            return Step("migrations", "skipped", f"账本不存在：{self.db}")
+            return Step("migrations", "skipped", f"数据库不存在：{self.db}")
         writer, why = self._writer()
         if not writer:
             return Step("migrations", "skipped", f"不迁移：{why}")
@@ -227,14 +227,14 @@ class Migrations:
         if found is None:
             return Step("migrations", "failed", f"migrate status 没有报待迁移数：{_tail(status)}")
         if int(found.group(1)) == 0:
-            return Step("migrations", "current", "账本结构已是最新")
+            return Step("migrations", "current", "数据库结构已是最新")
         try:
             upgrade = self._migrate(executable, "upgrade", "--yes")
         except OSError as exc:
             return Step("migrations", "failed", f"迁移没能启动：{exc}")
         if upgrade.returncode != 0:
             return Step("migrations", "failed",
-                        f"执行 {found.group(1)} 个待迁移时失败，账本目录里有迁移前备份："
+                        f"执行 {found.group(1)} 个待迁移时失败，数据库目录里有迁移前备份："
                         f"{_tail(upgrade)}")
         applied = re.search(r"^applied:\s*(.+)$", upgrade.stdout or "", re.MULTILINE)
         backup = re.search(r"^backup:\s*(.+)$", upgrade.stdout or "", re.MULTILINE)
@@ -244,7 +244,7 @@ class Migrations:
 
 
 def record(state_dir: Path, steps: Iterable[Step], *, pid: int | None = None) -> dict:
-    """把托盘这次启动的准备结果写到 `<数据根>/state/`，重启脚本读它来报告新托盘。"""
+    """把托盘这次启动的准备结果写到 `<Peach 数据目录>/state/`，重启脚本读它来报告新托盘。"""
     items = list(steps)
     payload = {
         "pid": os.getpid() if pid is None else pid,
@@ -315,7 +315,7 @@ def task_gate(db: Path, *, host: str, alive: Callable[[int], bool]) -> TaskGate:
     """只读查 `task_run`，把本机的活跃行分类。"""
     db = Path(db)
     if not db.is_file():
-        return TaskGate(note=f"账本不存在：{db}")
+        return TaskGate(note=f"数据库不存在：{db}")
     try:
         with closing(sqlite3.connect(db.resolve().as_uri() + "?mode=ro", uri=True,
                                      timeout=2)) as connection:
@@ -326,7 +326,7 @@ def task_gate(db: Path, *, host: str, alive: Callable[[int], bool]) -> TaskGate:
                 (host,)).fetchall()
     except sqlite3.OperationalError as exc:
         if "no such table" in str(exc) or "no such column" in str(exc):
-            return TaskGate(note=f"账本里还没有可判的任务表：{exc}")
+            return TaskGate(note=f"数据库里还没有可判的任务表：{exc}")
         return TaskGate(error=str(exc))
     except sqlite3.Error as exc:
         return TaskGate(error=str(exc))
@@ -353,7 +353,7 @@ def task_gate(db: Path, *, host: str, alive: Callable[[int], bool]) -> TaskGate:
 class RestartPreparation:
     """`windows_restart` 在旧托盘停下前后各调一次的准备步骤，只管依赖。
 
-    迁移不在这里：新托盘启动时自己会跑，它的数据根与环境变量才是服务真正用的那一份。
+    迁移不在这里：新托盘启动时自己会跑，它的 Peach 数据目录与环境变量才是服务真正用的那一份。
     `holders(tray_pid)` 返回旧托盘那棵进程树以外、还在用项目 venv 的进程；要同步依赖时
     有这种进程就拒绝重启，因为它们加载着的 `.pyd` 换不掉，uv 会在半路失败。
     """
