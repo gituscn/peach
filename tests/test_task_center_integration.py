@@ -88,7 +88,7 @@ class BackgroundJobTaskRunTests(unittest.TestCase):
         for key, state, expected in cases:
             with self.subTest(key=key):
                 job = self.job(key)
-                job.start(lambda job_id: job.update(job_id, status='complete'), initial=state)
+                job.start(lambda job_id, current=job: current.update(job_id, status='complete'), initial=state)
                 job.thread.join(5)
                 self.assertFalse(job.thread.is_alive())
                 summary = self.store.query(task_key=key)[0].result_summary

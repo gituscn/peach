@@ -14,6 +14,30 @@ RESULT_FIELDS = {
 }
 
 
+def _resource_scan_counts(result: dict) -> dict:
+    """资源扫描的文件、目录与缓存数量。"""
+    summary = {field: result[field] for field in ('missing', 'purge', 'vanish', 'empty', 'unreadable')
+               if isinstance(result.get(field), int)}
+    cache = result.get('cache') if isinstance(result.get('cache'), dict) else {}
+    summary.update({f'cache_{field}': cache[field] for field in ('files', 'bytes')
+                    if isinstance(cache.get(field), int)})
+    return summary
+
+
+def _source_check_counts(state: dict) -> dict:
+    """来源检查的成功、新增与补查失败数量。"""
+    rows = [row for row in state['results'] if isinstance(row, dict)]
+    summary = {
+        'source_failed': sum(row.get('ok') is False for row in rows),
+        'source_warning': sum(bool(row.get('backfill_error')) for row in rows),
+    }
+    for field in ('added', 'updated', 'discovered', 'without_code'):
+        if field not in state and any(field in row for row in rows):
+            summary[field] = sum(row.get(field, 0) for row in rows
+                                 if isinstance(row.get(field, 0), int))
+    return summary
+
+
 def result_counts(task_key: str, state: dict) -> dict:
     """只折算已知的结果结构；缺失的明细不推断成零。"""
     summary = {}
@@ -22,24 +46,11 @@ def result_counts(task_key: str, state: dict) -> dict:
             if isinstance(state.get(field), list):
                 summary[f'{field}_count'] = len(state[field])
     elif task_key == 'resource-scan' and isinstance(state.get('result'), dict):
-        result = state['result']
-        for field in ('missing', 'purge', 'vanish', 'empty', 'unreadable'):
-            if isinstance(result.get(field), int):
-                summary[field] = result[field]
-        cache = result.get('cache') if isinstance(result.get('cache'), dict) else {}
-        for field in ('files', 'bytes'):
-            if isinstance(cache.get(field), int):
-                summary[f'cache_{field}'] = cache[field]
+        summary.update(_resource_scan_counts(state['result']))
     elif task_key == 'resource-apply' and isinstance(state.get('cache_blocked'), list):
         summary['cache_blocked_count'] = len(state['cache_blocked'])
     elif task_key in ('follow-check', 'feed-check') and isinstance(state.get('results'), list):
-        rows = [row for row in state['results'] if isinstance(row, dict)]
-        summary['source_failed'] = sum(row.get('ok') is False for row in rows)
-        summary['source_warning'] = sum(bool(row.get('backfill_error')) for row in rows)
-        for field in ('added', 'updated', 'discovered', 'without_code'):
-            if field not in state and any(field in row for row in rows):
-                summary[field] = sum(row.get(field, 0) for row in rows
-                                     if isinstance(row.get(field, 0), int))
+        summary.update(_source_check_counts(state))
     elif task_key == 'follow-resolve' and isinstance(state.get('results'), list):
         rows = [row for row in state['results'] if isinstance(row, dict)]
         summary['resolve_failed'] = sum(row.get('kind') == 'error' for row in rows)

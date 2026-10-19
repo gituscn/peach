@@ -31,7 +31,7 @@ describe('孤儿记录数据表', () => {
       const table = page.getByRole('grid', { name: '文件已消失的作品', exact: true });
       await table.waitFor();
       await settle(page);
-      await verifyTablePreferences(page, table, '文件已消失的作品', 'item', { id: 'records', label: '带的记录' });
+      await verifyTablePreferences(page, table, '文件已消失的作品', 'item', { id: 'records', label: '个人记录' });
       const faces = await page.evaluate(() => {
         const read = (node: Element) => {
           const style = getComputedStyle(node);
