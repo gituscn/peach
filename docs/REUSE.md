@@ -709,10 +709,16 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.17.0，版本
 
 ## 原位改字
 
-`scripts/dev/copy-editor.js` 复用官网本地预览的 `edit-client.js` 交互：文字范围提示、原位编辑、按钮文字就近输入、回车和失焦保存、Esc 取消。
+`frontend/src/copy-editor-core.js` 是应用、官网与演示站的原位编辑核心，以 classic script 注册 `PeachCopyEditorCore`。核心负责文字命中、原位输入、回车和失焦保存、Esc 取消、连续草稿和 JSON 结果解析；`create` 的 `resolve`／`prepare`／`save`／`onSaved` 保留各端来源定位与保存入口。空字符串可作为删除结果，无法确认的保存响应保留核对提示。切换控件正常响应点击，Alt 点击进入文字编辑。官网与演示站按应用提交与 SHA256 同步核心，适配器先取得原始文字索引再运行页面脚本。
+
+应用适配器 `scripts/dev/copy-editor.js` 负责源码候选、草稿、工具条和自动生效状态。源码模式按顺序加载 `/dev/copy-editor-core.js` 与 `/dev/copy-editor.js`，动态文案保留模板占位符。
 改字浮条使用多选操作条的 `data-selection-dock`、`data-glass-pane` 与 `data-batch-scope` 样式，几何、玻璃、字体和按钮共享；窄屏状态提示独占一行。
 应用的 React 与动态页面使用源码定位、摘要校验和备份入口；演示站使用浏览器草稿。两者只在 `?edit` 启用，无新增依赖。
 Python 源文件纳入 `src/peach/library_sharing.py` 与 `src/peach/library_processing.py`。动态句子复用标准库 `ast`、`string.Formatter` 定位 f-string 与相邻字符串，编辑时显示命名占位符，保存时校验占位符齐全且各出现一次。求值表达式与格式保留在 AST 中，当前数量只用于显示；其他 Python 文件不属于改字范围。
+
+生效状态由 `dev_copy_runtime` 持久保存，保存与重试复用项目固定的 FileLock 4.2.0（MIT，纯 Python），文件替换使用 `fsutil.atomic_write_*`。构建沿用锁定的 Vite 8.3.4 与 `npm --prefix frontend run build`，通过 `PEACH_FRONTEND_OUT_DIR` 指定临时产物目录；前端主包和独立页面包均支持。源码服务重载复用托盘的子服务所有权、`runtime_prepare.task_gate` 与就绪检查，不引入额外进程管理器或依赖。隔离用例覆盖失败产物保护、重试、任务拒绝和浏览器自动刷新。
+
+链接检查结果的身份引用复用 `web_catalog.entity_ref`，页面头像沿用 `entityFaceImg` 的取景和回退，地址前的 favicon 复用 `SiteMark` 与 `/link-mark`；两张结果表共用列定义，Peach 资料名称使用 `entityPath` 生成内部链接。明确的 HTTP 状态码使用 BoardUI Chip，解释与长错误使用可展开的普通正文；永久删除入口位于失效清单自己的页脚，说明与分隔线使用中性色。关注列表无来源时使用 `EmptyState` 的 page 外壳，背景、边框与添加入口同属空状态。断链按钮使用现有 Lucide unlink 字形，仅四条短线循环改变透明度，周期沿用 Loading Dots 的 1.2 秒，reduced motion 沿用全局规则。
 
 ## 馆藏处理控制与耗时预估
 

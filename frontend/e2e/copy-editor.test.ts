@@ -4,11 +4,89 @@ import { after, before, describe, it } from 'node:test';
 import type { Browser } from 'playwright-core';
 import { launch, visit, settle, VIEWPORTS } from './harness.ts';
 
+async function editorScripts() {
+  return await readFile(new URL('../src/copy-editor-core.js', import.meta.url), 'utf8') + '\n'
+    + await readFile(new URL('../../scripts/dev/copy-editor.js', import.meta.url), 'utf8');
+}
+
 describe('原位改字', () => {
   let browser: Browser;
   before(async () => { browser = await launch(); });
   after(async () => { await browser?.close(); });
   for (const viewport of VIEWPORTS) {
+    it(`切换控件可操作、Alt 改字与清空草稿可保存（${viewport.name}）`, async () => {
+      const context = await browser.newContext({ viewport });
+      try {
+        const page = await context.newPage();
+        await page.route('https://copy.example/**', route => route.fulfill({ contentType: 'text/html; charset=utf-8',
+          body: '<meta charset="utf-8"><body><main style="margin:80px 20px"><button id="tab" role="tab" aria-selected="false" onclick="this.setAttribute(\'aria-selected\',\'true\')">平台切换</button><p id="copy">可删除说明</p><pre id="command">命令一</pre><div style="height:1800px"></div></main></body>' }));
+        await page.goto('https://copy.example/?edit');
+        await page.addScriptTag({ content: await editorScripts() });
+        await page.locator('#tab').click();
+        assert.equal(await page.locator('#tab').getAttribute('aria-selected'), 'true');
+        assert.equal(await page.locator('[data-copy-input]').count(), 0);
+        await page.locator('#tab').click({ modifiers: ['Alt'] });
+        const input = page.locator('[data-copy-input]');
+        await input.waitFor();
+        await page.evaluate(() => scrollTo(0, 120));
+        const rect = await input.boundingBox();
+        assert.ok(rect && rect.x >= 16 && rect.y >= 16 && rect.x + rect.width <= viewport.width - 15);
+        await input.fill('切换文字'); await input.press('Enter');
+        assert.equal(await page.locator('#tab').innerText(), '切换文字');
+        await page.locator('#command').click({ position: { x: 5, y: 8 } });
+        const multiline = page.locator('#command [contenteditable]');
+        await multiline.fill('命令一'); await multiline.press('End'); await multiline.press('Shift+Enter');
+        await multiline.pressSequentially('command2'); await multiline.press('Enter');
+        assert.equal(await page.locator('#command').innerText(), '命令一\ncommand2');
+        await page.locator('#copy').click({ position: { x: 5, y: 8 } });
+        const inline = page.locator('#copy [contenteditable]');
+        await inline.fill(''); await inline.press('Enter');
+        assert.equal(await page.locator('#copy').innerText(), '');
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('peach.copy-edits.v1')!)['可删除说明']), '');
+        await page.reload(); await page.addScriptTag({ content: await editorScripts() });
+        assert.equal(await page.locator('#copy').innerText(), '');
+      } finally { await context.close(); }
+    });
+
+    it(`保存后等待生效并保留编辑地址刷新，失败可单独重试（${viewport.name}）`, async () => {
+      const context = await browser.newContext({ viewport });
+      try {
+        const page = await context.newPage();
+        let navigations = 0, saves = 0, retries = 0;
+        let job = { id: 'build-1', state: 'building', message: '已保存，正在构建…' };
+        await page.route('https://copy.example/**', async route => {
+          const path = new URL(route.request().url()).pathname;
+          if (path === '/dev/copy-edits') return route.fulfill({ json: {} });
+          if (path === '/dev/copy-candidates') return route.fulfill({ json: [{ file: 'frontend/src/copy.ts', line: 1 }] });
+          if (path === '/dev/copy-save') { saves++; return route.fulfill({ json: { ok: true, text: '生效说明', apply: job } }); }
+          if (path === '/dev/copy-apply') {
+            if (route.request().method() === 'POST') {
+              retries++; job = { id: 'build-2', state: 'ready', message: '构建完成，正在刷新…' };
+              return route.fulfill({ json: { ok: true, apply: job } });
+            }
+            return route.fulfill({ json: job });
+          }
+          navigations++;
+          return route.fulfill({ contentType: 'text/html; charset=utf-8', body: `<meta charset="utf-8"><body data-peach-copy-mode="source"><p id="copy" style="margin:60px 20px">${navigations === 1 ? '原说明' : '生效说明'}</p></body>` });
+        });
+        await page.goto('https://copy.example/settings?section=library&edit');
+        await page.addScriptTag({ content: await editorScripts() });
+        await page.locator('#copy').click({ position: { x: 5, y: 8 } });
+        const inline = page.locator('#copy [contenteditable]');
+        await inline.fill('生效说明'); await inline.press('Enter');
+        await page.getByRole('status').filter({ hasText: '正在构建' }).waitFor();
+        assert.equal(navigations, 1);
+        job = { ...job, state: 'error', message: '构建失败' };
+        await page.getByRole('status').filter({ hasText: '已保存，未生效：构建失败' }).waitFor();
+        assert.equal(await page.locator('#copy').innerText(), '生效说明');
+        await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: '重试生效' }).click()]);
+        assert.equal(navigations, 2); assert.equal(saves, 1); assert.equal(retries, 1);
+        assert.equal(page.url(), 'https://copy.example/settings?section=library&edit');
+        assert.equal(await page.locator('#copy').innerText(), '生效说明');
+        assert.equal(await page.evaluate(() => sessionStorage.getItem('peach.copy-apply.v1')), null);
+      } finally { await context.close(); }
+    });
+
     it(`连续改字记录显示最终文案并终止循环（${viewport.name}）`, async () => {
       const context = await browser.newContext({ viewport });
       try {
@@ -20,7 +98,7 @@ describe('原位改字', () => {
         await page.evaluate(() => localStorage.setItem('peach.copy-edits.v1', JSON.stringify({
           说明: '中间文案', 中间文案: '最终文案', 循环甲: '循环乙', 循环乙: '循环甲',
         })));
-        await page.addScriptTag({ content: await readFile(new URL('../../scripts/dev/copy-editor.js', import.meta.url), 'utf8') });
+        await page.addScriptTag({ content: await editorScripts() });
         assert.equal(await page.locator('#copy').innerText(), '最终文案');
         assert.equal(await page.locator('#cycle').innerText(), '循环甲');
       } finally { await context.close(); }
@@ -48,7 +126,7 @@ describe('原位改字', () => {
             body: `<meta charset="utf-8"><body data-peach-copy-mode="source"><p id="copy" style="margin:60px 20px">${original}</p></body>` });
         });
         await page.goto('https://copy.example/?edit');
-        await page.addScriptTag({ content: await readFile(new URL('../../scripts/dev/copy-editor.js', import.meta.url), 'utf8') });
+        await page.addScriptTag({ content: await editorScripts() });
         await page.locator('#copy').click({ position: { x: 5, y: 8 } });
         const inline = page.locator('#copy [contenteditable]');
         await inline.waitFor();
@@ -109,7 +187,7 @@ describe('原位改字', () => {
           contentType: 'text/html; charset=utf-8', body: '<meta charset="utf-8"><body data-peach-copy-mode="local"><main style="margin:80px 20px"><p id="copy" style="width:max-content">原位说明</p><button id="action">操作名称</button><div id="other" style="height:60px"></div></main></body>',
         }));
         await page.goto('https://copy.example/?edit');
-        await page.addScriptTag({ content: await readFile(new URL('../../scripts/dev/copy-editor.js', import.meta.url), 'utf8') });
+        await page.addScriptTag({ content: await editorScripts() });
         await page.locator('#copy').click();
         const inline = page.locator('#copy [contenteditable]');
         await inline.waitFor();

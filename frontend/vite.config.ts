@@ -22,7 +22,7 @@ export default defineConfig({
   // 告警按这个值判断，不替换的话浏览器里读到一个不存在的 `process`，整个模块加载失败。
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   build: {
-    outDir: '../web/dist',
+    outDir: process.env.PEACH_FRONTEND_OUT_DIR || '../web/dist',
     // 产物进 Git，所以目录必须只剩当前构建的东西；残留文件会被一起提交。
     emptyOutDir: true,
     target: 'es2022',

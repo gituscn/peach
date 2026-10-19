@@ -40,6 +40,12 @@ class LinkContract(Protocol):
 
     def write_transaction(self): ...
 
+    def has_entity_image(self, kind: str, entity_id: int) -> bool: ...
+
+    def entity_image_version(self, kind: str, entity_id: int) -> str: ...
+
+    def avatar_focus(self, kind: str, entity_id: int): ...
+
 
 def _probe(url: str, timeout: float = CHECK_TIMEOUT) -> tuple[int, str]:
     """(status, 说明)。status 为 0 表示连都没连上；停放页的说明里写停放依据。
@@ -120,8 +126,8 @@ def w_links(contract: LinkContract, args=None):
     }
 
 
-def _check_public(state: dict) -> dict:
-    return {
+def _check_public(state: dict, contract: LinkContract) -> dict:
+    result = {
         "ok": state["status"] != "failed",
         "status": state["status"],
         "check_id": state["check_id"],
@@ -132,6 +138,22 @@ def _check_public(state: dict) -> dict:
         "scope": state.get("scope", "all"),
         **({"error": state["error"]} if state["status"] == "failed" else {}),
     }
+    items = result['gone'] + result['unclear']
+    if items:
+        from .web_catalog import entity_ref
+        with contract.read_connection() as connection:
+            refs = {row['id']: dict(row) for row in connection.execute(
+                'SELECT l.id, e.id AS entity_id, e.kind, e.canonical_name '
+                'FROM entity_link l JOIN entity e ON e.id=l.entity_id')}
+        faces = {}
+        for item in items:
+            ref = refs.get(item['id'])
+            if ref:
+                key = (ref['kind'], ref['entity_id'])
+                if key not in faces:
+                    faces[key] = entity_ref(contract, *key, ref['canonical_name'])
+                item.update(entity=ref['canonical_name'], entity_id=ref['entity_id'], entity_kind=ref['kind'], face=faces[key])
+    return result
 
 
 def _run_link_check(contract: LinkContract, check_id: str,
@@ -221,13 +243,13 @@ def w_links_check(contract: LinkContract, body=None):
         return _check_public(contract.link_check.start(
             lambda check_id: _run_link_check(contract, check_id, saved.get('link_ids')),
             initial={'checked': 0, 'total': 0, 'gone': [], 'unclear': [], 'scope': 'all'},
-            restart=True, recovery=body))
+            restart=True, recovery=body), contract)
     if body.get("status_only") is True:
         state = contract.link_check.snapshot()
         if state is None:
             return {"ok": True, "status": "idle", "check_id": "", "checked": 0,
                     "total": 0, "gone": [], "unclear": [], "scope": "all"}
-        return _check_public(state)
+        return _check_public(state, contract)
 
     if body.get("retry") is not None:
         state = contract.link_check.snapshot()
@@ -247,14 +269,14 @@ def w_links_check(contract: LinkContract, body=None):
             lambda check_id: _run_link_check(contract, check_id, link_ids),
             initial=_retry_state(state, link_ids), restart=True,
             recovery={'retry': link_ids},
-        ))
+        ), contract)
 
     return _check_public(contract.link_check.start(
         lambda check_id: _run_link_check(contract, check_id),
         initial={"checked": 0, "total": 0, "gone": [], "unclear": [], "scope": "all"},
         restart=body.get("restart") is True,
         recovery={},
-    ))
+    ), contract)
 
 
 def _prune_selection(planned: list[dict], body: dict) -> list[dict]:

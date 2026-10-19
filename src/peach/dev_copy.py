@@ -122,8 +122,8 @@ def save(root: Path, body: dict) -> dict:
     if not isinstance(body, dict):
         raise ValueError("修改内容必须是对象")
     original, replacement = body.get("original", ""), body.get("replacement", "")
-    if not isinstance(replacement, str) or not replacement.strip() or len(replacement) > 2000:
-        raise ValueError("新文案不能为空，且不能超过 2000 字")
+    if not isinstance(replacement, str) or len(replacement) > 2000:
+        raise ValueError("新文案必须是文字，且不能超过 2000 字")
     selected = body.get("candidate")
     if selected not in candidates(root, original):
         raise ValueError("源文件已变化，请重新选择文字")
