@@ -340,7 +340,7 @@ class ScanResult:
                 f"字幕 {self.subtitles:,} 条（孤立 {self.orphan_subtitles:,} 条）")
 
 
-def _walk(top: Path, pending: list[str] | None = None):
+def _walk(top: Path, pending: list[str] | None = None, *, onerror=lambda error: None):
     """自顶向下遍历，每个目录给出它里面的非目录条目（`os.DirEntry`）。
 
     与 `os.walk` 的差别只在一处：条目的大小与时间从 `DirEntry.stat()` 拿。Windows 的目录
@@ -354,7 +354,8 @@ def _walk(top: Path, pending: list[str] | None = None):
         try:
             with os.scandir(directory) as scanner:
                 entries = list(scanner)
-        except OSError:
+        except OSError as error:
+            onerror(error)
             continue
         files = []
         subdirectories = []

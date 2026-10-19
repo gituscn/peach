@@ -78,7 +78,7 @@ const notice = (props: LibraryProcessingProps) => (
 const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) });
 
 const menuItem = (label: string) =>
-  [...document.querySelectorAll('[role="dialog"] button')].find((item) => item.textContent?.trim() === label);
+  [...document.querySelectorAll('[role="dialog"] button')].find((item) => item.querySelector('span > span')?.textContent === label);
 
 const startFrom = async (element: Element | null | undefined) => {
   await click(element);
@@ -116,14 +116,14 @@ it('扫描与补全方式共用一颗主键加一个下拉，各自交自己的�
 
   await startFrom(buttonNamed('同步媒体库', host));
   await click(host.querySelector('[data-split-button] [aria-haspopup="dialog"]'));
-  expect(menuItem('同步媒体库')).not.toBeNull();
+  expect(menuItem('同步媒体库')).toBeUndefined();
   await startFrom(menuItem('仅扫描文件'));
   await click(host.querySelector('[data-split-button] [aria-haspopup="dialog"]'));
-  await startFrom(menuItem('仅同步已入库影片'));
+  await startFrom(menuItem('仅补全已入库影片'));
   await click(host.querySelector('[data-split-button] [aria-haspopup="dialog"]'));
-  await startFrom(menuItem('仅生成视频预览'));
+  await startFrom(menuItem('仅补全预览图'));
   await click(host.querySelector('[data-split-button] [aria-haspopup="dialog"]'));
-  await startFrom(menuItem('仅补全资料'));
+  await startFrom(menuItem('仅补全影片资料'));
 
   expect(served.posts()).toEqual([{}, { stage: 'scan' }, { stage: 'collect' }, { stage: 'previews' }, { stage: 'metadata' }]);
   expect(host.querySelector('a[href="/sources"]')?.textContent).toContain('来源和凭证');

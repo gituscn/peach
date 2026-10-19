@@ -20760,7 +20760,7 @@ var hg = cm, gg = (e) => fm[e] || "database", _g = (e) => lm.includes(e);
 function vg({ index: e, cost: t, error: n, onChange: r }) {
 	return /* @__PURE__ */ (0, z.jsxs)("div", {
 		"data-media-read-policy": e,
-		className: "flex w-full flex-col gap-1.5 @lg:w-48",
+		className: "flex w-full flex-col gap-1.5 @lg:w-32",
 		children: [/* @__PURE__ */ (0, z.jsxs)(fg, {
 			"aria-label": `媒体读取策略 ${e + 1}`,
 			placeholder: "选择读取策略",
@@ -20776,13 +20776,13 @@ function vg({ index: e, cost: t, error: n, onChange: r }) {
 				children: "正常读取"
 			}), /* @__PURE__ */ (0, z.jsx)(pg, {
 				id: "metered",
-				children: "代理流量保护"
+				children: "代理保护"
 			})]
 		}), n ? /* @__PURE__ */ (0, z.jsx)(ym, { children: n }) : null]
 	});
 }
 function yg() {
-	return /* @__PURE__ */ (0, z.jsx)(vm, { children: "按挂载工具实际配置选择；代理流量保护会限制自动媒体读取。" });
+	return /* @__PURE__ */ (0, z.jsx)(vm, { children: "代理保护会限制自动读取视频。" });
 }
 function bg({ initial: e, blank: t, pickFolder: n, describe: r, focusAfterPick: i = !1 }) {
 	let [a, o] = (0, y.useState)(e), [s, c] = (0, y.useState)([]), [l, u] = (0, y.useState)(null), [d, f] = (0, y.useState)(null), p = (0, y.useRef)(!1), m = (0, y.useRef)([]);

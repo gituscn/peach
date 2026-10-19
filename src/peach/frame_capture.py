@@ -69,8 +69,8 @@ def capture_frame(ffmpeg: str, path: str, timestamp: float, destination: Path, *
         destination.unlink(missing_ok=True)
         return False, "ffmpeg timeout"
     stderr = (completed.stderr or b'').decode('utf-8', 'replace')
-    media_statistics(path, stderr)
     ok = completed.returncode == 0 and _readable_image(destination)
+    media_statistics(path, stderr, kind='frame', successful=ok)
     if diagnostics is not None:
         diagnostics.update(reason='success' if ok else
                            'ffmpeg_error' if completed.returncode else 'no_frame',

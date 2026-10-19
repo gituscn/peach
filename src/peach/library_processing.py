@@ -2232,8 +2232,9 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
     scope_ids = chosen_ids if targeted else None
     control = task_control(config, state_file)
     identity = job_id or uuid.uuid4().hex
+    from .processing_inventory import recent_rows
     traffic = ProcessingTraffic(config, db_path, stage, scope_ids,
-                                resume_state=resume_state)
+                                resume_state=resume_state, inventory_rows=recent_rows(config, db_path, stage, scope_ids))
     def control_report(**values):
         resume_fields(state, values)
         state.update(values)
@@ -2322,6 +2323,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
 
         def finish_step(key):
             """阶段成功返回后发布完成状态；异常退出的阶段保留当前状态。"""
+            traffic.finish_work(key)
             update(steps=_complete_processing_step(state['steps'], key))
 
         update()
@@ -2429,6 +2431,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                    current_asset_id=None, current_asset_name='', current_action='',
                    current_started_at=None, current_deadline_at=None)
             finish_step('local')
+            traffic.prepare_metadata(prepared)
             if stage in (ALL_STAGES, COLLECT_STAGE):
                 _probe_sources(config, db_path, locations, sources.online_roots, scope_ids, update,
                                total_pending=pending.get('probe', 0), initial_probed=state['probed'])
@@ -2451,10 +2454,12 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                        current_asset_name=Path(str(row['name'] or '')).name)
                 target_key = f"asset:{row['id']}"
                 missing = list(COLLECTED_FIELDS) if verify_existing else _missing_fields(row, local_fields)
+                traffic.start_metadata(code)
                 found, covers = remote.collect(row, code, missing, cover_root, update=update, issue=issue,
                     answered=() if verify_existing else _answered_sources(groups, target_key, missing),
                     received=lambda entries, row=row, code=code, fields=local_fields, verify=verify_existing:
                         publish(row, code, fields, verify, entries))
+                traffic.finish_work('metadata', code, successful=state['issue_count'] == issues_before)
                 state['covers'] += covers
                 covered.append((row['id'], covers))
                 update(stage='保存待确认资料', current_action='writing_candidates',

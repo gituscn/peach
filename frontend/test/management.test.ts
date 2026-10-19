@@ -37,7 +37,8 @@ describe('数据管理首屏', () => {
     expect(split.getAttribute('data-variant')).toBe('primary');
     expect([...split.querySelectorAll('button')].map(button => button.classList.contains('bg-button-primary')))
       .toEqual([true, true]);
-    expect(split.querySelector('button use')?.getAttribute('href')).toBe('#i-database');
+    expect(split.querySelector('button:first-child svg')).toBeNull();
+    expect(split.querySelector('button:last-child use')?.getAttribute('href')).toBe('#i-chevron-down');
     const repair = root.querySelector('.cleanupmediarepair footer > button')!;
     expect(repair.textContent).toBe('开始修复');
     expect(repair.classList.contains('bg-button-primary')).toBe(true);

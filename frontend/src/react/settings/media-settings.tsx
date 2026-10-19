@@ -19,6 +19,7 @@ import { Note } from '../components/note';
 import { queryClient } from '../query';
 import { RESTART_REDIRECT_MS } from '../restart-redirect';
 import { CloudDriveGuide } from './clouddrive-guide';
+import { CloudProxySettings } from './cloud-proxy-settings';
 import { CONFIGURATION_KEY, fetchConfiguration } from './configuration';
 import { groupRoot } from './configuration-panel';
 import { FolderRow, isCloudSource, MEDIA_SOURCES, MediaReadPolicy, MediaReadPolicyHelp, SourceSelect, sourceMark, useFolderRows } from './folder-rows';
@@ -62,6 +63,7 @@ export function MediaSettings({ data, receipt, panel }: ConfigurationGroupProps)
     <div {...groupRoot(panel)}>
       {data.editable ? <MediaForm data={data} receipt={receipt} /> : <Note tone="neutral" title="只读">{data.notice}</Note>}
       {data.editable ? null : <MountStatus data={data} />}
+      {data.media_sources?.some(row => isCloudSource(row.location)) ? <CloudProxySettings receipt={receipt} /> : null}
       {data.push_discovery
         ? <PushDiscoveryForm initial={data.push_discovery} receipt={receipt} />
         : null}
@@ -146,7 +148,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                   onChange={(location) => edit(index, { location, cost: location === 'local' ? 'free' : '' })} />
                 <MediaReadPolicy index={index} cost={row.cost} onChange={(cost) => edit(index, { cost })}
                   error={requireReadPolicy && !row.cost ? '请选择媒体读取策略' : undefined} />
-                <Input className="min-w-40 flex-1" aria-label={`媒体库名称 ${index + 1}`} maxLength={80}
+                <Input className="w-full min-w-32 @lg:w-auto @lg:flex-1" aria-label={`媒体库名称 ${index + 1}`} maxLength={80}
                   placeholder="媒体库名称"
                   value={row.library} onChange={(library) => edit(index, { library })} />
                 <LibraryIconPicker label={`媒体库图标 ${index + 1}`} value={row.library_icon} kind={row.location}

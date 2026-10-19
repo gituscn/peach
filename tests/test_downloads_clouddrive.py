@@ -52,6 +52,23 @@ class FakeCloudDrive:
         return pb.TokenInfo(token=request.value, rootDir="/", permissions=pb.TokenPermissions(
             allow_add_offline_download=True, allow_list_offline_downloads=True))
 
+    def GetAllCloudApis(self, request, context):
+        self._auth('GetAllCloudApis', request, context)
+        return pb.CloudAPIList()
+
+    def GetCloudAPIConfig(self, request, context):
+        self._auth('GetCloudAPIConfig', request, context)
+        return pb.CloudAPIConfig()
+
+    def SetCloudAPIConfig(self, request, context):
+        self._auth('SetCloudAPIConfig', request, context)
+        from google.protobuf.empty_pb2 import Empty
+        return Empty()
+
+    def GetMountPoints(self, request, context):
+        self._auth('GetMountPoints', request, context)
+        return pb.GetMountPointsResult()
+
     def FindFileByPath(self, request, context):
         self._auth("FindFileByPath", request, context)
         full = f"{request.parentPath.rstrip('/')}/{request.path}"

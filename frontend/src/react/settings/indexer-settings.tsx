@@ -39,8 +39,8 @@ function IndexerForm({ initial, receipt }: { initial: State; receipt(message: st
   return (
     <Section title="资源搜索" onSubmit={save}>
       <Stack>
-        <Disclosure summary="索引器连接帮助"><Help>填写 Prowlarr 或 Jackett 提供的 Torznab 地址和 API key。</Help>
-          <ExternalLink href="https://github.com/peach-mitao/peach/blob/master/docs/RESOURCE_SEARCH.md">详细配置说明</ExternalLink>
+        <Disclosure summary="索引器连接帮助"><Help>填写 Prowlarr 或 Jackett 提供的 Torznab 地址和 API key。{' '}
+          <ExternalLink href="https://github.com/peach-mitao/peach/blob/master/docs/RESOURCE_SEARCH.md">详细配置说明</ExternalLink></Help>
         </Disclosure>
         {rows.map((row, index) => (
           <div key={row.key} className="flex min-w-0 flex-col gap-4 border-t border-separator-border pt-4">

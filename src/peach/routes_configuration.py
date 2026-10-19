@@ -367,6 +367,37 @@ def _downloads(request: Request):
             getattr(request.app.state.push_discovery, "declared_roots", {}))
 
 
+@router.get("/api/configuration/cloud-proxies")
+def read_cloud_proxies(request: Request, _args=Depends(require_auth)):
+    from . import clouddrive_proxy
+    from .downloads import DownloadError
+    local_only(request)
+    try:
+        result = clouddrive_proxy.read(settings_file.load_config())
+    except DownloadError:
+        raise HTTPException(502, "无法读取 CloudDrive2 代理配置，请检查连接和令牌权限") from None
+    except (ValueError, OSError) as error:
+        raise HTTPException(400, str(error)) from None
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/api/configuration/cloud-proxies")
+def save_cloud_proxies(request: Request, body: dict = Body(...), _args=Depends(require_auth)):
+    from . import clouddrive_proxy
+    from .downloads import DownloadError
+    local_only(request)
+    same_origin(request)
+    try:
+        result = clouddrive_proxy.save(settings_file.load_config(), body)
+    except clouddrive_proxy.ProxyConflict as error:
+        raise HTTPException(409, str(error)) from None
+    except DownloadError:
+        raise HTTPException(502, "未能确认 CloudDrive2 已保存，请重新读取配置后核对") from None
+    except (ValueError, OSError) as error:
+        raise HTTPException(400, str(error)) from None
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
 @router.get("/api/configuration/indexers")
 def get_indexers(request: Request, _args=Depends(require_auth)):
     from .resource_search import Indexers

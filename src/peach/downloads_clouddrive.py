@@ -4,7 +4,7 @@ Peach 不另申请 115 应用，复用 CloudDrive2 已有的 115open 授权：�
 会顶掉第一次。CloudDrive2 的 API 令牌由用户在设置页填一次，存本机 `CredentialStore`，
 只放进 gRPC 的 `authorization` 元数据，不进 URL、日志与 ledger。
 
-用到的八个方法见 `downloads_clouddrive.proto`。流程参照 JavBoss
+接口子集见 `downloads_clouddrive.proto`。流程参照 JavBoss
 `internal/clouddrive/client.go` 与 `internal/service/download.go`：提交前确认目标目录
 `canOfflineDownload` 并查配额，提交时让 CloudDrive2 10 秒后自己看一眼目录，之后按 infohash
 在目录的离线列表里对账；列表里找不到时看目录里有没有那个文件。
@@ -61,6 +61,10 @@ SUGGESTED_FOLDER = "云下载"
 _METHODS = {
     "GetSystemInfo": (empty_pb2.Empty, pb.CloudDriveSystemInfo),
     "GetApiTokenInfo": (pb.StringValue, pb.TokenInfo),
+    "GetAllCloudApis": (empty_pb2.Empty, pb.CloudAPIList),
+    "GetCloudAPIConfig": (pb.GetCloudAPIConfigRequest, pb.CloudAPIConfig),
+    "SetCloudAPIConfig": (pb.SetCloudAPIConfigRequest, empty_pb2.Empty),
+    "GetMountPoints": (empty_pb2.Empty, pb.GetMountPointsResult),
     "FindFileByPath": (pb.FindFileByPathRequest, pb.CloudDriveFile),
     "CreateFolder": (pb.CreateFolderRequest, pb.CreateFolderResult),
     "AddOfflineFiles": (pb.AddOfflineFileRequest, pb.FileOperationResult),
@@ -142,12 +146,13 @@ class Folder:
 
 
 class CloudDriveClient:
-    """要令牌的那七个方法的薄封装。"""
+    """带令牌调用官方 gRPC 接口。"""
 
     def __init__(self, address: str, token: str, *, timeout: float = CALL_TIMEOUT):
         if not token:
             raise DownloadError("config", "还没有填 CloudDrive2 的 API 令牌")
         self.token = token
+        self.address = address
         self.timeout = timeout
         self.channel = open_channel(address)
 

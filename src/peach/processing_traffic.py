@@ -1,12 +1,11 @@
-"""馆藏任务的逐目录流量读数、代理流量保护分账与粗估。"""
+"""馆藏任务的逐目录流量读数、连接分账与预估。"""
 from __future__ import annotations
 
 import math
 import re
-import sqlite3
 import threading
 import time
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import PureWindowsPath
 
@@ -40,7 +39,7 @@ def record_media_read(path, size):
         meter.media_read(str(path), size)
 
 
-def media_statistics(path, stderr):
+def media_statistics(path, stderr, *, kind=None, successful=False):
     """FFmpeg 的输入读取量；挂载缓存和预读由挂载工具管理。"""
     meter = CURRENT.get()
     if meter is None:
@@ -48,7 +47,10 @@ def media_statistics(path, stderr):
     text = stderr.decode('utf-8', 'replace') if isinstance(stderr, bytes) else str(stderr or '')
     sizes = STATISTICS.findall(text)
     if sizes:
-        record_media_read(path, sum(map(int, sizes)))
+        amount = sum(map(int, sizes))
+        record_media_read(path, amount)
+        if kind and successful:
+            meter.observe_media(path, kind, amount)
     else:
         meter.media_read(str(path), 0, missing=True)
 
@@ -63,24 +65,28 @@ def download_route(metered):
 
 
 class ProcessingTraffic:
-    def __init__(self, config, db_path, stage, asset_ids=None, *, resume_state=None):
+    def __init__(self, config, db_path, stage, asset_ids=None, *, resume_state=None, inventory_rows=()):
         self.config, self.db_path, self.stage, self.asset_ids = config, db_path, stage, asset_ids
         self.lock = threading.RLock()
         self.publish = lambda: None
         self.published_at = 0
         self.owner = threading.get_ident()
         self.rows = {}
+        from .clouddrive_proxy import connections
+        routes = connections(config)
         for location, roots in config.locations.items():
             for root in roots:
+                network = location in CLOUD_LOCATIONS or cost_for(location, root, config) == 'metered'
+                connection = routes.get(_key(root), 'unknown') if network else 'direct'
                 self.rows[f'{location}:{_key(root)}'] = dict(
                     label=config.library_names.get(root) or root, root=root, location=location,
-                    metered=cost_for(location, root, config) == 'metered',
-                    network=location in CLOUD_LOCATIONS or cost_for(location, root, config) == 'metered',
+                    metered=connection == 'proxy', connection=connection, network=network,
                     used_bytes=0, remaining_min=0, remaining_max=0, unobserved=[])
         for key, label, metered in [('metadata', '影片资料', True),
                                      ('metadata-proxy', '影片资料', True),
                                      ('metadata-direct', '影片资料', False)]:
             self.rows[key] = dict(label=label, root='', location='metadata', metered=metered,
+                connection='proxy' if metered else 'direct',
                 network=True, used_bytes=0, remaining_min=0, remaining_max=0, unobserved=[])
         previous = (resume_state or {}).get('traffic') or {}
         for old in previous.get('sources', []):
@@ -92,7 +98,17 @@ class ProcessingTraffic:
                     ('label', 'root', 'location', 'metered', 'network', 'used_bytes', 'unobserved')}
                 self.rows[old['key']].update(remaining_min=0, remaining_max=0)
         self.unknown_files = stage in ('all', 'scan') and asset_ids is None
+        from .processing_traffic_plan import TrafficPlan
+        self.plan = TrafficPlan(config, stage, self._media_key)
+        self.plan.completed.update(previous.get('completed_work', []))
+        self.active_sample = None
         self.refresh_plan()
+        self.seed_inventory(inventory_rows)
+
+    def seed_inventory(self, rows):
+        if rows:
+            known = {(row['location'], _key(row['path'])) for row in self.plan.assets}
+            self.plan.extend(row for row in rows if (row['location'], _key(row['path'])) not in known)
 
     @contextmanager
     def bind(self):
@@ -120,42 +136,45 @@ class ProcessingTraffic:
 
     def refresh_plan(self, rows=None):
         """账本统计不访问媒体目录；保护开启的目录不预估自动探测。"""
-        query = "SELECT location,path,size,duration,snapshot_path FROM asset WHERE medium='video' AND disposal IS NULL"
-        params = []
-        if self.asset_ids is not None:
-            query += ' AND id IN (' + ','.join('?' for _ in self.asset_ids) + ')'
-            params += self.asset_ids
         if rows is None:
-            with closing(sqlite3.connect(self.db_path, timeout=30)) as connection:
-                assets = connection.execute(query, params).fetchall()
-        else:
-            assets = [(row['location'], row['path'], row['size'], row['duration'], row['snapshot_path']) for row in rows]
+            from .processing_traffic_plan import ledger_rows
+            rows = ledger_rows(self.db_path, self.asset_ids)
         with self.lock:
+            self.plan.refresh(rows)
             for row in self.rows.values():
-                row.update(remaining_min=0, remaining_max=0)
-            for location, path, size, duration, preview in assets:
-                key = self._media_key(path, location)
-                if key is None or self.stage == 'previews' and location != 'local':
-                    continue
-                row = self.rows[key]
-                size = max(0, size or 0)
-                from .strm import skip_background_read
-                readable = not skip_background_read(path)
-                if self.stage != 'previews' and self.stage != 'scan':
-                    # 资料和配套图片的工作量只用于粗估，不当作实测下载。
-                    self.rows['metadata']['remaining_min'] += MIB // 4
-                    self.rows['metadata']['remaining_max'] += 8 * MIB
-                    if row['network']:
-                        row['remaining_max'] += 2 * MIB
-                if self.stage != 'metadata' and duration is None and not row['metered'] and row['network'] and readable:
-                    row['remaining_min'] += min(size, MIB)
-                    row['remaining_max'] += min(size, 32 * MIB)
-                if self.stage in ('all', 'collect', 'previews') and location == 'local' and row['network'] and not preview and readable:
-                    from .media_processing_policy import metadata_only
-                    if not metadata_only(self.config.directory('state')):
-                        row['remaining_max'] += min(size, 9 * 32 * MIB)
-                if row['network']:
+                if row['root'] and row['network']:
                     self._reason(row, '挂载缓存与预读未观测')
+
+    def start_metadata(self, code):
+        from .library_processing import _provider_code
+        token = 'metadata:' + str(_provider_code(code))
+        with self.lock:
+            profile = self.plan.profiles.get(token)
+            self.active_sample = dict(profile=profile, blocked=set(),
+                before={key: row['used_bytes'] for key, row in self.rows.items()}) if profile else None
+
+    def finish_work(self, stage, code=None, *, successful=True):
+        with self.lock:
+            if stage == 'metadata' and self.active_sample:
+                sample, self.active_sample = self.active_sample, None
+                if successful:
+                    for key, before in sample['before'].items():
+                        if not self.rows[key]['root'] and key not in sample['blocked']:
+                            self.plan.history.observe(sample['profile'] + ':' + key, self.rows[key]['used_bytes'] - before)
+                    self.plan.calibrate()
+                    self.plan.history.save()
+            self.plan.finish(stage, code)
+
+    def observe_media(self, path, kind, amount):
+        key = self._media_key(path)
+        with self.lock:
+            if key and self.rows[key]['network']:
+                self.plan.history.observe(key + ':' + kind, amount)
+                self.plan.history.save()
+
+    def prepare_metadata(self, prepared):
+        with self.lock:
+            self.plan.prepare_metadata(prepared)
 
     @staticmethod
     def _reason(row, reason):
@@ -165,6 +184,8 @@ class ProcessingTraffic:
     def mark(self, key, reason):
         with self.lock:
             self._reason(self.rows[key], reason)
+            if self.active_sample is not None:
+                self.active_sample['blocked'].add(key)
 
     def add(self, key, size):
         if not isinstance(size, (int, float)) or not math.isfinite(size) or size <= 0:
@@ -174,9 +195,6 @@ class ProcessingTraffic:
             if not row['network']:
                 return
             row['used_bytes'] += int(size)
-            remaining = self.rows['metadata'] if key.startswith('metadata-') else row
-            for field in ('remaining_min', 'remaining_max'):
-                remaining[field] = max(0, remaining[field] - int(size))
             if threading.get_ident() != self.owner or time.monotonic() - self.published_at < 0.5:
                 return
             self.published_at = time.monotonic()
@@ -193,17 +211,24 @@ class ProcessingTraffic:
 
     def snapshot(self, *, finished=False):
         with self.lock:
+            self.plan.history.save(force=finished)
             sources = []
+            remaining = self.plan.remaining(self.rows)
             for key, row in self.rows.items():
-                if not row['root'] and not row['used_bytes'] and not row['remaining_max'] and not row['unobserved']:
+                amount = 0 if finished else remaining[key]
+                if not row['root'] and not row['used_bytes'] and not amount and not row['unobserved']:
                     continue
                 source = {**row, 'unobserved': list(row['unobserved'])}
-                sources.append(dict(key=key, **source,
-                    estimated_min_bytes=row['used_bytes'] + (0 if finished else row['remaining_min']),
-                    estimated_max_bytes=row['used_bytes'] + (0 if finished else row['remaining_max'])))
-            result = dict(sources=sources, unknown_files=self.unknown_files and not finished,
-                          partial=any(row['unobserved'] for row in sources))
-            for field in ('used_bytes', 'estimated_min_bytes', 'estimated_max_bytes'):
+                sources.append(dict(key=key, **source, workload=self.plan.workload(key),
+                    estimated_bytes=row['used_bytes'] + amount,
+                    estimated_min_bytes=row['used_bytes'],
+                    estimated_max_bytes=row['used_bytes'] + amount))
+            result = dict(sources=sources, workload=self.plan.workload(), unknown_files=self.unknown_files and not finished,
+                          partial=any(row['unobserved'] for row in sources),
+                          completed_work=sorted(self.plan.completed))
+            for field in ('used_bytes', 'estimated_bytes', 'estimated_min_bytes', 'estimated_max_bytes'):
                 result[field] = sum(row[field] for row in sources)
                 result['metered_' + field] = sum(row[field] for row in sources if row['metered'])
+                result['unknown_route_' + field] = sum(row[field] for row in sources
+                    if row.get('connection', 'unknown') in ('system', 'unknown'))
             return result
