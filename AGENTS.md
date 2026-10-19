@@ -35,11 +35,12 @@
 
 ## 技能索引
 
-按需读取，不要预先全部展开。Claude 按 description 自动加载；Codex 在触发条件成立时直接读文件。
+按需读取；Claude 按 description、Codex 按触发条件加载。
 
 | 触发条件 | 文件 |
 | --- | --- |
 | 并行任务、创建工作树、暂存与提交、集成分支、回收工作树、顶层目录归置 | `.claude/skills/peach-worktree/SKILL.md` |
+| issue、PR 交付 | `.claude/skills/peach-issue-delivery/SKILL.md` |
 | 迁移、`--apply`、实体合并、批量删除等真实 ledger 写入 | `.claude/skills/peach-ledger-write/SKILL.md` |
 | 改完界面、API、契约或文案后声明影响面 | `.claude/skills/peach-surfaces/SKILL.md` |
 | 长跑批处理、刮削、限流、磁盘与流量预算 | `.claude/skills/peach-batch-jobs/SKILL.md` |
