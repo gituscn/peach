@@ -39,9 +39,14 @@
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       if (!node.parentElement || node.parentElement.closest(skip)) continue;
       const original = originals.get(node) || node.data.trim();
-      if (Object.hasOwn(edits, original) && original !== edits[original]) {
+      let replacement = edits[original];
+      const seen = new Set([original]);
+      while (Object.hasOwn(edits, replacement) && !seen.has(replacement)) {
+        seen.add(replacement); replacement = edits[replacement];
+      }
+      if (Object.hasOwn(edits, original) && original !== replacement) {
         originals.set(node, original);
-        const next = /^\s*/.exec(node.data)[0] + edits[original] + /\s*$/.exec(node.data)[0];
+        const next = /^\s*/.exec(node.data)[0] + replacement + /\s*$/.exec(node.data)[0];
         if (node.data !== next) node.data = next;
       }
     }
@@ -69,8 +74,20 @@
     const node = textAt(event.clientX, event.clientY); if (!node) return;
     event.preventDefault(); event.stopImmediatePropagation(); begin(node);
   }, true);
-  function begin(node) {
-    const before = node.data, lead = /^\s*/.exec(before)[0], trail = /\s*$/.exec(before)[0], core = before.trim(); let box;
+  async function begin(node) {
+    const before = node.data, lead = /^\s*/.exec(before)[0], trail = /\s*$/.exec(before)[0], originalText = before.trim();
+    let core = originalText, candidate = null, box;
+    if (source) {
+      saving = true; bar.setAttribute('aria-busy', 'true'); say('查找文案来源…');
+      try {
+        const response = await fetch('/dev/copy-candidates?text=' + encodeURIComponent(originalText)), candidates = await response.json();
+        if (!response.ok || !candidates.length) throw Error('这段文字尚无可编辑的文案来源');
+        candidate = candidates.length === 1 ? candidates[0] : await choose(candidates, rectsOf(node)[0]);
+        if (!candidate || !node.isConnected || node.data !== before) { say('已取消'); return; }
+        core = candidate.template || originalText;
+      } catch (error) { say(error.message); return; }
+      finally { saving = false; bar.removeAttribute('aria-busy'); }
+    }
     if (node.parentElement.closest('button,a,[role=button]')) {
       const rect = rectsOf(node)[0], style = getComputedStyle(node.parentElement);
       box = document.createElement('input'); box.value = core; box.dataset.copyEditor = ''; box.dataset.copyInput = '';
@@ -81,10 +98,10 @@
       box = document.createElement('span'); box.dataset.copyInline = ''; box.contentEditable = 'plaintext-only'; box.spellcheck = false; box.textContent = core;
       node.replaceWith(...[lead, box, trail].filter(Boolean));
     }
-    box.setAttribute('aria-label', '修改文字'); editing = { node, before, lead, trail, core, box, original: originals.get(node) || core }; box.focus();
+    box.setAttribute('aria-label', '修改文字'); editing = { node, before, lead, trail, core, box, candidate, originalText, original: originals.get(node) || originalText }; box.focus();
     if (box.tagName === 'INPUT') box.select();
     else { const range = document.createRange(); range.selectNodeContents(box); getSelection().removeAllRanges(); getSelection().addRange(range); }
-    highlight.style.display = 'none'; say('Enter 保存 · Esc 取消');
+    highlight.style.display = 'none'; say(candidate?.template ? '保留 {占位符}，只改文字 · Enter 保存 · Esc 取消' : 'Enter 保存 · Esc 取消');
     box.addEventListener('keydown', event => {
       event.stopPropagation(); if (event.isComposing) return;
       if (event.key === 'Enter') { event.preventDefault(); commit(); }
@@ -111,23 +128,19 @@
   async function commit(cancel = false) {
     const ed = editing; if (!ed) return; editing = null;
     const replacement = (ed.box.tagName === 'INPUT' ? ed.box.value : ed.box.textContent).replace(/\s*\n\s*/g, ' ').trim();
-    const connected = ed.node.isConnected || ed.box.isConnected, rect = ed.box.getBoundingClientRect(); putBack(ed);
+    const connected = ed.node.isConnected || ed.box.isConnected; putBack(ed);
     if (cancel || !connected) { say('已取消'); return; }
     if (replacement === ed.core) return;
     if (!replacement) { say('不能留空，没有保存'); return; }
     saving = true; bar.setAttribute('aria-busy', 'true'); say('保存中…');
     try {
-      let message = '已保存草稿';
+      let message = '已保存草稿', text = replacement;
       if (source) {
-        const response = await fetch('/dev/copy-candidates?text=' + encodeURIComponent(ed.core)), candidates = await response.json();
-        if (!response.ok || !candidates.length) throw Error('未找到静态源文案');
-        const candidate = candidates.length === 1 ? candidates[0] : await choose(candidates, rect);
-        if (!candidate) { say('已取消'); return; }
-        const saved = await fetch('/dev/copy-save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ original: ed.core, replacement, candidate }) });
+        const saved = await fetch('/dev/copy-save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ original: ed.originalText, replacement, candidate: ed.candidate }) });
         const result = await saved.json(); if (!saved.ok) throw Error(result.error || '保存失败');
-        message = '已保存修改';
+        text = result.text ?? replacement; message = '已保存修改';
       }
-      edits[ed.original] = replacement; originals.set(ed.node, ed.original); localStorage.setItem(key, JSON.stringify(edits)); ed.node.data = ed.lead + replacement + ed.trail;
+      edits[ed.original] = text; originals.set(ed.node, ed.original); localStorage.setItem(key, JSON.stringify(edits)); ed.node.data = ed.lead + text + ed.trail;
       say(message);
     } catch (error) { ed.node.data = ed.before; say('没保存：' + error.message); }
     finally { saving = false; bar.removeAttribute('aria-busy'); apply(); }

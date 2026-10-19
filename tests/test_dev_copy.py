@@ -1,4 +1,4 @@
-"""改字工具只保存静态源文案，冲突与代码路径不能误写。"""
+"""改字工具保存源文案与动态模板，冲突与代码路径不能误写。"""
 from pathlib import Path
 import tempfile
 import unittest
@@ -6,6 +6,48 @@ from peach import dev_copy
 
 
 class DevCopyTests(unittest.TestCase):
+    def test_processing_template_keeps_live_values_and_validates_placeholders(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            package = root / "src/peach"
+            package.mkdir(parents=True)
+            path = package / "library_processing.py"
+            source = ("# 中文说明\n"
+                      "def summary(problems, paused):\n"
+                      "    return (f'{problems} 项需要处理，其中 {paused} 项是来源限流；'\n"
+                      "            '其余可重试。')\n")
+            path.write_text(source, encoding="utf-8")
+            original = "768 项需要处理，其中 533 项是来源限流；其余可重试。"
+            candidate, = dev_copy.candidates(root, original)
+            self.assertEqual(candidate["template"], "{problems} 项需要处理，其中 {paused} 项是来源限流；其余可重试。")
+            for replacement in ["处理 {problems} 项", "处理 {unknown} 项", "处理 {problems!r}、{paused}", "{problems} {paused} {paused}"]:
+                with self.assertRaises(ValueError):
+                    dev_copy.save(root, {"original": original, "replacement": replacement, "candidate": candidate})
+                self.assertEqual(path.read_text(encoding="utf-8"), source)
+            result = dev_copy.save(root, {"original": original,
+                "replacement": "来源限流 {paused} 项，共 {problems} 项待处理。", "candidate": candidate})
+            self.assertEqual(result["text"], "来源限流 533 项，共 768 项待处理。")
+            namespace = {}
+            exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace)
+            self.assertEqual(namespace["summary"](10, 3), "来源限流 3 项，共 10 项待处理。")
+            self.assertEqual(len(list((root / "build/copy-editor/backups").rglob(path.name))), 1)
+            with self.assertRaises(ValueError):
+                dev_copy.save(root, {"original": original, "replacement": "{problems} {paused}", "candidate": candidate})
+
+    def test_template_preserves_expressions_formatting_and_literal_braces(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            package = root / "src/peach"
+            package.mkdir(parents=True)
+            path = package / "library_processing.py"
+            path.write_text("def summary(total):\n    return f'共 {{数量}} {total + 1:04d} 项'\n", encoding="utf-8")
+            candidate, = dev_copy.candidates(root, "共 {数量} 0003 项")
+            self.assertEqual(candidate["template"], "共 {{数量}} {value1} 项")
+            dev_copy.save(root, {"original": "共 {数量} 0003 项", "replacement": "{{总数}} '{value1}' 项", "candidate": candidate})
+            namespace = {}
+            exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace)
+            self.assertEqual(namespace["summary"](4), "{总数} '0005' 项")
+
     def test_library_notice_is_editable_and_other_python_files_are_excluded(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
