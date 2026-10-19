@@ -13,6 +13,8 @@ import { IdentityCell, IdentitySeries } from '../components/identity-cell';
 import { SourceAvatar } from '../components/source-avatar';
 import { SourcePicture as JavPicture } from '../components/source-picture';
 import { MediaCarousel } from '../components/media-carousel';
+import { RatingStars } from '../components/rating-stars';
+import { CollapseChevron } from '../components/collapse-region';
 import { useFoldedTitle } from '../components/folded-title';
 import { busyProps, useAction } from '../settings/use-action';
 import { Disclosure } from '../settings/section';
@@ -76,7 +78,7 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
     <aside data-stage-side=""><div data-stage-side-content="" data-jav-info="">
       <JavTitle item={item} />
       {Number(item.score) > 0 ? <SourceRating score={Number(item.score)} /> : null}
-      <div className="mono" data-stage-meta="">
+      <div className="mono" data-stage-meta="" data-reveal-line="">
         <Spec glyph="calendar" label="发行日期" value={item.release_date} />
         <Spec glyph="clock" label="时长" value={item.duration ? `${item.duration} 分钟` : undefined} />
       </div>
@@ -111,23 +113,17 @@ const Spec = ({ glyph, label, value }: { glyph: string; label: string; value?: s
 function JavTitle({ item }: { item: JavDetail }) {
   const { text, expanded, foldable, toggle } = useFoldedTitle(item.title);
   const title = item.title === item.code ? '' : item.title;
-  return <div data-item-title=""><h1 data-stage-title="" data-title-line=""><span ref={text} data-detail-title=""
+  return <div data-item-title=""><h1 data-stage-title="" data-title-line="" data-reveal-line=""><span ref={text} data-detail-title=""
     data-expanded={expanded ? '' : undefined} data-foldable={foldable ? '' : undefined}
     onClick={() => { if (foldable && !String(getSelection() || '')) toggle() }}><b>{item.code}</b>{title ? ` ${title}` : ''}</span></h1>
     <span data-title-tools=""><button type="button" data-title-fold="" hidden={!foldable} aria-expanded={expanded}
-      aria-label={expanded ? '收起标题' : '展开标题'} title={expanded ? '收起标题' : '展开完整标题'} onClick={toggle}><Glyph name={expanded ? 'chevron-up' : 'chevron-down'} /></button></span>
+      aria-label={expanded ? '收起标题' : '展开标题'} title={expanded ? '收起标题' : '展开完整标题'} onClick={toggle}><CollapseChevron /></button></span>
   </div>;
 }
 
 function SourceRating({ score, review = false }: { score: number; review?: boolean }) {
-  const value = Math.max(0, Math.min(5, score));
   return <div data-item-rating="" data-jav-rating="" data-review-rating={review ? '' : undefined} role="img" aria-label={`${review ? '评论' : 'JavDB'}评分 ${score} / 5`}>
-    <div data-rating-stars="" aria-hidden="true">{[1, 2, 3, 4, 5].map(star => {
-      const fraction = Math.max(0, Math.min(1, value - star + 1));
-      return <span key={star} data-rate={star} data-on={String(fraction === 1)}><span data-rating-icon=""><Glyph name="star" />
-        {/* oxlint-disable-next-line shadcn/no-inline-styles -- 星星填充宽度表示实际评分的小数比例 */}
-        <span data-rating-fill="" style={{ width: `${fraction * 100}%` }}><Glyph name="star" /></span></span></span>;
-    })}</div>
+    <RatingStars value={score} />
     <span data-rating-value="">{score.toFixed(1)} / 5</span>
   </div>;
 }

@@ -13,9 +13,9 @@ export const PROVIDER_ICONS = { '115': Cloud115Icon, pikpak: PikPakIcon };
 /** 站点标识经本站缓存读取。 */
 export function SiteLabel({ site, label }: { site: string; label: string }) {
   const [failed, setFailed] = useState(false);
-  const source = site === 'javdb' ? '/site-mark?source=javdb' : '/site-mark?domain=missav.com';
+  const source = site === 'javdb' ? '/site-mark?source=javdb' : site === 'missav' ? '/site-mark?domain=missav.com' : null;
   return <span className="inline-flex min-w-0 items-center gap-1.5">
-    {failed ? <SourceMark mark="globe" /> : <img src={source} alt="" className="size-4 shrink-0 object-contain" onError={() => setFailed(true)} />}
+    {failed || !source ? <SourceMark mark="globe" /> : <img src={source} alt="" className="size-4 shrink-0 object-contain" onError={() => setFailed(true)} />}
     <span>{label}</span>
   </span>;
 }

@@ -114,6 +114,7 @@ describe('馆藏卡片与列表', () => {
         assert.equal(requests.at(-1)!.get('browse'), 'folders');
         const first = page.locator('[data-catalog-row]').first();
         const firstId = await first.getAttribute('data-id');
+        await page.locator('#selectMode').click();
         await first.locator('label').click();
         assert.equal(await first.getAttribute('data-board-selected'), 'true');
         await page.getByRole('button', { name: '下一页', exact: true }).click();

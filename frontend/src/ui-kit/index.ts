@@ -2,7 +2,7 @@
  * 别名直接指向本文件，控件随 peach-app.js 发出一份，类型检查也读同一清单。
  * 独立页面包仅将用到的控件直接打进自己的产物。 */
 export { attachOverlayScrollbar } from './overlay-scrollbar';
-export { growCollapse, setCollapseOpen, wireCollapse } from './collapse';
+export { growCollapse, setCollapseOpen, setCollapseRegionOpen, wireCollapse } from './collapse';
 export { closeAnchoredMenu, dismissMenu, presentMenu, scrollMovesAnchor, wireAnchoredMenu } from './anchored-menu';
 export { selectFieldHtml, selectOptionIconHtml, wireSelectField } from './select-field';
 export { MEDIA_SOURCE_ICONS } from './media-source-icons';

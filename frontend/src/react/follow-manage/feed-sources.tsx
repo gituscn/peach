@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   createColumnHelper, createPaginatedRowModel, createSortedRowModel, flexRender, rowPaginationFeature,
-  rowSelectionFeature, rowSortingFeature, tableFeatures, useTable,
+  rowSelectionFeature, rowSortingFeature, columnVisibilityFeature, tableFeatures, useTable,
   type RowSelectionState, type SortingState,
 } from '@tanstack/react-table';
 import { RiDeleteBinLine, RiRefreshLine, RiRssLine } from '@remixicon/react';
@@ -33,10 +33,14 @@ import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 
 import { errorMessage } from '../../api';
 import { DataTableFrame } from '../components/data-table-frame';
+import { useTablePreferences } from '../components/table-column-preferences';
+import { TableColumnControls, TableColumnResizer } from '../components/table-column-controls';
+import { TableSelectionHeader } from '../components/table-selection-header';
 import { DataTableFooter, DataTableSort } from '../components/table-controls';
 import { cardClass } from '../components/card';
 import { EmptyState } from '../components/empty-state';
 import { LEGACY_AVATAR_IMG } from '../components/legacy-avatar';
+import { SiteLabel } from '../components/source-label';
 import { Note } from '../components/note';
 import { SelectionDock } from '../components/selection-dock';
 import { queryClient } from '../query';
@@ -53,6 +57,7 @@ const feedTableFeatures = tableFeatures({
   rowPaginationFeature,
   rowSelectionFeature,
   rowSortingFeature,
+  columnVisibilityFeature,
   sortedRowModel: createSortedRowModel(),
   paginatedRowModel: createPaginatedRowModel(),
 });
@@ -70,7 +75,12 @@ const COLUMN_LABELS: Record<string, string> = {
 };
 
 /** 表头里不占字的列：勾选那一格自己会说「选择 谁」，行尾三个控件也各带自己的名字。 */
-const SILENT_COLUMNS = new Set(['select', 'actions']);
+const SILENT_COLUMNS = new Set(['actions']);
+const preferenceColumns = Object.entries(COLUMN_LABELS).map(([id, label]) => ({ id, label,
+  width: id === 'select' ? 48 : id === 'name' ? 300 : id === 'actions' ? 208 : id === 'fetched' ? 200 : 160,
+  min: id === 'select' ? 48 : id === 'actions' ? 200 : 112, max: id === 'select' ? 48 : 800,
+  required: id === 'select' || id === 'name',
+}));
 
 const reload = () => queryClient.invalidateQueries({ queryKey: FEEDS_KEY, exact: true });
 
@@ -157,6 +167,7 @@ export function FeedSources({ readOnly, toast }: {
 }) {
   const feeds = useQuery({ queryKey: FEEDS_KEY, queryFn: ({ signal }) => fetchFeeds(signal) });
   const action = useAction();
+  const preferences = useTablePreferences('jav-feeds', preferenceColumns);
   const data = feeds.data;
   const sources = useMemo(() => data?.sources ?? [], [data]);
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set<number>());
@@ -224,7 +235,7 @@ export function FeedSources({ readOnly, toast }: {
     return column.columns([
       column.display({
         id: 'select',
-        header: label('select'),
+        header: context => <TableSelectionHeader table={context.table} label="全选本页订阅源" page />,
         /* `slot={null}`：表格自带一个叫 selection 的插槽，摆进去的勾不声明归属就会被它
            拦下报错。这一列的勾归 TanStack Table 那份行选择管，不走 Table 自己的选择。 */
         cell: (context) => (
@@ -264,7 +275,8 @@ export function FeedSources({ readOnly, toast }: {
         cell: (context) => (
           <a href={context.getValue()} target="_blank" rel="noreferrer noopener" title="打开来源页面"
             className="text-text-primary underline-offset-2 hover:underline">
-            {originHost(context.getValue())}
+            <SiteLabel site={context.row.original.kind.startsWith('javdb') ? 'javdb' : originHost(context.getValue())}
+              label={originHost(context.getValue())} />
           </a>
         ),
       }),
@@ -320,7 +332,8 @@ export function FeedSources({ readOnly, toast }: {
     data: sources,
     columns,
     getRowId: (row) => String(row.id),
-    state: { rowSelection, sorting, pagination: { pageIndex: win.page - 1, pageSize } },
+    state: { rowSelection, sorting, pagination: { pageIndex: win.page - 1, pageSize }, columnVisibility: preferences.visibility },
+    onColumnVisibilityChange: preferences.change,
     onSortingChange: (next) => { setSorting(next); setPage(1); },
     enableRowSelection: true,
     onRowSelectionChange: (updater) => {
@@ -353,6 +366,7 @@ export function FeedSources({ readOnly, toast }: {
         <h3 className="mr-auto text-title-2-medium text-text-primary">JAV 订阅源</h3>
         <span className="text-body-2-regular text-text-secondary">{`${sources.length.toLocaleString()} 个订阅源 · ${(Number(data.unread) || 0).toLocaleString()} 条未看`}</span>
         <Button onClick={check} disabled={readOnly} {...busyProps(action.busy === 'check')}>立即拉取</Button>
+        <TableColumnControls preferences={preferences} label="JAV 订阅源" />
         <DataTableSort label="JAV 订阅源" sorting={sorting} onChange={(next) => { setSorting(next); setPage(1); }}
           options={['name', 'kind', 'origin', 'status', 'interval', 'fetched', 'fresh'].map((id) => ({ id, label: COLUMN_LABELS[id]! }))} />
       </div>
@@ -389,7 +403,7 @@ export function FeedSources({ readOnly, toast }: {
         </SelectionDock>
 
       {sources.length ? (
-        <DataTableFrame follow onRowClick={(key) => toggleRow(Number(key))}>
+        <DataTableFrame follow preferences={preferences} onRowClick={(key) => toggleRow(Number(key))}>
           <Table aria-label="JAV 订阅源" size="sm"
             sortDescriptor={sorting[0] ? { column: sorting[0].id, direction: sorting[0].desc ? 'descending' : 'ascending' } : undefined}
             onSortChange={(sort) => table.getColumn(String(sort.column))?.toggleSorting(sort.direction === 'descending')}>
@@ -397,23 +411,25 @@ export function FeedSources({ readOnly, toast }: {
               {table.getHeaderGroups()[0]!.headers.map((header) => {
                 const text = flexRender(header.column.columnDef.header, header.getContext());
                 return (
-                  <TableColumn key={header.id} id={header.id} isRowHeader={header.column.id === 'name'} allowsSorting={header.column.getCanSort()}>
-                    {({ sortDirection }) => SILENT_COLUMNS.has(header.column.id) ? <VisuallyHidden>{text}</VisuallyHidden>
+                  <TableColumn key={header.id} id={header.id} isRowHeader={header.column.id === 'name'} allowsSorting={header.column.getCanSort()} {...preferences.columnProps(header.id)}>
+                    {({ sortDirection }) => <>{SILENT_COLUMNS.has(header.column.id) ? <VisuallyHidden>{text}</VisuallyHidden>
                       : <span className="flex items-center gap-0.5">{text}
                         {header.column.getCanSort() ? <span data-sort-indicator data-direction={sortDirection || undefined}><ChevronSortDown /></span> : null}
-                      </span>}
+                      </span>}<TableColumnResizer preferences={preferences} id={header.id} /></>}
                   </TableColumn>
                 );
               })}
+              <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width="1fr" minWidth={0} />
             </TableHeader>
             <TableBody>
               {table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} id={row.id} data-follow-selected={row.getIsSelected() || undefined}>
-                  {row.getAllCells().map((cell) => (
+                  {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
+                  <TableCell data-table-space="" />
                 </TableRow>
               ))}
             </TableBody>

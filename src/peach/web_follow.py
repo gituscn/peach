@@ -46,6 +46,7 @@ from .follow_sources import (
 from .follow_store import (
     FollowStore, ReleaseGroup, normalized_author_name,
 )
+from .entities import canonicalize_entity_name, normalize_entity_name, prefer_entity_name
 from .taste_history import read_creator_candidates
 from .web_state import path_version
 
@@ -2442,8 +2443,29 @@ def w_follow_creator(contract, body) -> dict:
 
 
 def w_follow_author_alias(contract, body) -> dict:
-    """Add or remove a user-confirmed cross-platform follow-author alias."""
+    """维护人工确认的跨站创作者别名和统一名称。"""
     action = str(body.get("action") or "add")
+    if action == "rename":
+        contract.cache_bust()
+        with contract.database.write_transaction() as connection:
+            store = _store(contract, connection)
+            key = str(body.get("canonical_key") or "")
+            chosen = canonicalize_entity_name("creator", str(body.get("canonical") or ""))
+            mapping, _ = store.author_aliases()
+            linked = {int(row["entity_id"]) for row in store.sources()
+                      if row["entity_id"] and name_key(row, mapping) == f"name:{key}"}
+            if len(linked) > 1:
+                raise ValueError("这组别名关联了多份创作者档案，请先确认档案归属")
+            if not chosen:
+                raise ValueError("请填写有效的创作者名称")
+            result = store.rename_author_group(key, chosen)
+            for entity_id in linked:
+                connection.execute(
+                    "INSERT OR IGNORE INTO entity_alias(entity_id,alias,normalized_alias,source,confidence) VALUES(?,?,?,?,1.0)",
+                    (entity_id, chosen, normalize_entity_name(chosen), "user:alias"))
+                prefer_entity_name(connection, entity_id, chosen)
+            _, groups = store.author_aliases()
+        return {"ok": True, **result, "author_aliases": groups}
     if action == "remove":
         alias_name = str(body.get("alias") or "").strip()
         with contract.database.write_transaction() as connection:

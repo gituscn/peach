@@ -849,8 +849,10 @@ html.board-high-contrast :is(.card .badge,[data-glass-pane]){background:var(--gr
 .post-setup-notification p{margin:4px 0 0;color:var(--color-text-secondary);font:var(--board-body-2-regular)}
 .post-setup-collapse{display:grid;place-items:center;width:32px;height:32px;margin:0 -4px 0 0;padding:0;border:0;border-radius:8px;background:transparent;color:var(--color-text-secondary)}
 .post-setup-collapse:hover{background:var(--color-background-primary-hover);color:var(--color-text-primary)}
-.post-setup-collapse>svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
-.post-setup-notification[data-collapsed=true]>.post-setup-task-list,.post-setup-notification[data-collapsed=true]>footer{display:none}
+.post-setup-collapse>svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;transform:rotate(0deg);transition:transform var(--motion-swap)}
+.post-setup-collapse[aria-expanded=true]>svg{transform:rotate(180deg)}
+.post-setup-collapse-body{display:flex;flex-direction:column;min-height:0}
+.post-setup-collapse-body[hidden]{display:none}
 .post-setup-task-list{display:grid;gap:0;min-height:0;margin:0;padding:4px;border-block:1px solid var(--color-border-button-default);overflow-y:auto;list-style:none}
 .post-setup-task{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
 .post-setup-task+.post-setup-task::before{content:"";position:absolute;inset:0 12px auto;height:1px;background:var(--color-border-button-default);pointer-events:none}
@@ -869,8 +871,8 @@ html.board-high-contrast :is(.card .badge,[data-glass-pane]){background:var(--gr
 .post-setup-task[data-state=checked] .post-setup-check{border-color:var(--color-accent-500);background:var(--color-accent-500);color:#fff}
 .post-setup-task[data-state=checked] b{text-decoration:line-through;color:var(--muted)}
 .post-setup-task[data-state=checked]>a{opacity:.72}
-.post-setup-notification>footer{padding:12px}
-.post-setup-notification>footer>.geist-button{width:100%}
+.post-setup-notification footer{flex:none;padding:12px}
+.post-setup-notification footer>.geist-button{width:100%}
 .post-setup-loading{display:flex;flex-direction:row;align-items:center;gap:10px;min-height:54px;padding:16px}
 .post-setup-loading p{margin:0}
 .post-setup-error{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;padding:16px}

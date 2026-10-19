@@ -1,12 +1,12 @@
 import { act } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { defaultColumnVisibility, useCatalogColumnVisibility, useCatalogColumnWidths } from '../../src/react/catalog-grid/catalog-column-widths';
+import { defaultColumnVisibility, useCatalogTablePreferences } from '../../src/react/catalog-grid/catalog-column-widths';
 import { mountRoot } from './render';
 
 const key = 'peach.catalog-column-widths.v1';
-let sizing!: ReturnType<typeof useCatalogColumnWidths>;
-let visibility!: ReturnType<typeof useCatalogColumnVisibility>;
-function Probe() { sizing = useCatalogColumnWidths(); visibility = useCatalogColumnVisibility(); return null }
+let sizing!: ReturnType<typeof useCatalogTablePreferences>;
+let visibility!: ReturnType<typeof useCatalogTablePreferences>;
+function Probe() { sizing = useCatalogTablePreferences(); visibility = sizing; return null }
 beforeEach(() => localStorage.clear());
 
 it('损坏或超限偏好不会破坏列宽，选择列保持固定', async () => {

@@ -954,6 +954,27 @@ class ReleaseGroupTests(unittest.TestCase):
 class AuthorIdentityTests(_StoreCase):
     """作者别名表的写入口径。这些 SQL 归存储层，不写在 Web 处理函数里。"""
 
+    def test_preferred_name_preserves_all_spellings_and_the_group(self):
+        current = "Suzutaru 3D (鈴太郎3D)"
+        self.store.upsert_author_alias(current, "suzutaro3d", source="manual")
+        self.store.upsert_author_alias(current, "鈴太郎3D", source="manual")
+        result = self.store.rename_author_group(normalized_author_name(current), "鈴太郎3D")
+        mapping, groups = self.store.author_aliases()
+        self.assertEqual(result, {"previous": current, "canonical": "鈴太郎3D"})
+        self.assertEqual(groups[0]["canonical_name"], "鈴太郎3D")
+        self.assertEqual({row["name"] for row in groups[0]["aliases"]}, {current, "suzutaro3d"})
+        self.assertEqual(set(mapping.values()), {normalized_author_name("鈴太郎3D")})
+
+    def test_preferred_name_rejects_other_groups_and_missing_groups(self):
+        self.store.upsert_author_alias("作者 A", "alias A", source="manual")
+        self.store.upsert_author_alias("作者 B", "alias B", source="manual")
+        before = self.store.author_aliases()
+        for key, name in ((normalized_author_name("作者 A"), "alias B"), ("missing", "名称"),
+                          (normalized_author_name("作者 A"), "")):
+            with self.subTest(key=key, name=name), self.assertRaises(ValueError):
+                self.store.rename_author_group(key, name)
+            self.assertEqual(self.store.author_aliases(), before)
+
     def test_the_container_suffix_is_not_part_of_the_author_name(self):
         """F95 的线程标题说的是一个容器，不是另一个作者。
 

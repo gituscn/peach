@@ -25,6 +25,8 @@ import { RetryNote } from '../components/grid-reveal';
 import { MixQueue, MixQueueRow } from '../components/mix-queue';
 import { RelatedSection } from '../components/related-section';
 import { DetailContinuation } from '../components/detail-continuation';
+import { RatingStars } from '../components/rating-stars';
+import { CollapseChevron } from '../components/collapse-region';
 import { IdentityCell, IdentitySeries } from '../components/identity-cell';
 import { useFoldedTitle } from '../components/folded-title';
 import { MediaCarousel } from '../components/media-carousel';
@@ -443,7 +445,7 @@ function DetailTitle({ item, queue, helpers, actions, onStatus }: {
         <span data-title-tools="">
           <button type="button" data-title-fold="" hidden={!foldable} aria-expanded={expanded}
             aria-label={expanded ? '收起标题' : '展开标题'} title={expanded ? '收起标题' : '展开完整标题'} onClick={toggle}>
-            <Glyph name={expanded ? 'chevron-up' : 'chevron-down'} />
+            <CollapseChevron />
           </button>
           {/* 取景框存的是坐标不是图片：存完重取这一条，封面地址没变，变的是接口给的 `poster_box`。
               背后网格里同一番号的卡不重取，就地换上新框，关掉详情看到的就是框过的样子。 */}
@@ -500,14 +502,9 @@ function Rating({ item, write }: { item: DetailItem; write: DetailWrite }) {
   const on = ratingStars(item.rating);
   return (
     <div id="detailRating" role="group" data-item-rating="" aria-label="评分" data-value={clampRating(item.rating)}>
-      <div data-rating-stars="">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button key={star} type="button" data-rate={star} data-on={String(star <= on)}
-            title={star === on ? '再点一次取消评分' : `${star} 星`}
-            aria-label={star === on ? `取消评分（当前 ${star} 星）` : `评为 ${star} 星`}
-            {...write.busyAttrs(`rate:${star}`)} onClick={() => write.rate(star)}><Glyph name="star" /></button>
-        ))}
-      </div>
+      <RatingStars value={on} onRate={star => write.rate(star)}
+        busyStar={[1, 2, 3, 4, 5].find(star => write.busy.has(`rate:${star}`))}
+        busyAttrs={star => write.busyAttrs(`rate:${star}`)} />
       <span data-rating-value="" aria-live="polite">{ratingText(item.rating)}</span>
     </div>
   );

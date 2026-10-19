@@ -1,16 +1,7 @@
-.peach-react [data-catalog-table] .bui-table { table-layout: fixed; }
 .peach-react [data-catalog-table] .bui-table :is(th,td) { border-radius: 0; }
-.peach-react [data-catalog-table] .bui-table th { position: relative; padding-right: 16px; }
 .peach-react [data-catalog-table] .bui-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.peach-react [data-catalog-table] .react-aria-ColumnResizer { position: absolute; top: 0; right: 0; bottom: 0; width: 12px; cursor: col-resize; touch-action: none; }
-.peach-react [data-catalog-table] .react-aria-ColumnResizer::after { content: ''; position: absolute; top: 8px; bottom: 8px; left: 5px; width: 1px; background: var(--border-15); }
-.peach-react [data-catalog-table] .react-aria-ColumnResizer:is([data-hovered],[data-resizing],[data-focus-visible])::after { background: var(--ink); }
-.peach-react [data-catalog-table] .react-aria-ColumnResizer[data-focus-visible] { outline: 2px solid var(--tungsten); outline-offset: -2px; }
-.peach-react [data-catalog-rating] { display: inline-flex; gap: 2px; vertical-align: middle; }
-.peach-react [data-catalog-star] { position: relative; display: block; width: 16px; height: 16px; color: var(--muted); }
-.peach-react [data-catalog-star] svg { display: block; width: 16px; height: 16px; }
-.peach-react [data-catalog-star-fill] { position: absolute; inset: 0 auto 0 0; overflow: hidden; color: var(--ink); }
-.peach-react [data-catalog-star-fill] svg { fill: currentColor; max-width: none; }
+.peach-react [data-catalog-rating] { display: flex; flex-direction: column; align-items: stretch; gap: 8px; white-space: normal; }
+.peach-react [data-catalog-rating] [data-rating-stars] { align-self: flex-start; }
 .peach-react [data-catalog-table] [data-list-identity] { position: relative; min-width: 0; padding: 12px 0; }
 .peach-react [data-catalog-table] [data-list-open] { display: flex; align-items: center; gap: 16px; width: 100%; min-width: 0; text-align: left; }
 .peach-react [data-catalog-table] [data-list-picture] { position: relative; display: flex; align-items: center; justify-content: center; flex: none; width: 112px; height: 63px; overflow: hidden; border-radius: var(--control-radius); background: var(--sunk); color: var(--muted); font-size: var(--fs-sm); }

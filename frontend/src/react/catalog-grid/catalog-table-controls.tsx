@@ -1,46 +1,33 @@
-import { useRef, useState } from 'react';
-import { Popover } from 'react-aria-components';
+import { useRef } from 'react';
 import { Button } from '@/components/base/buttons/button';
-import { Checkbox } from '@/components/base/checkbox/checkbox';
-import { MENU_POPOVER_SURFACE } from '@/components/base/dropdown/menu-styles';
-import { MenuDialog } from '../components/menu-dialog';
-import { spriteGlyph } from '../components/sprite-glyph';
+import { RatingStars } from '../components/rating-stars';
+import { ratingStars } from '../components/rating-values';
+import { Note } from '../components/note';
+import { useAction } from '../settings/use-action';
+import { queryClient } from '../query';
+import { replaceCatalogItem } from './catalog-grid';
+import type { MediaCardActions, MediaItem } from './types';
 
-const Star = spriteGlyph('star');
-
-export function CatalogRating({ rating }: { rating?: number | null }) {
-  const score = Math.max(0, Math.min(5, Number(rating || 0) / 20));
+export function CatalogRating({ item, actions }: { item: MediaItem; actions: Pick<MediaCardActions, 'rate'> }) {
+  const { rating } = item;
+  const action = useAction();
+  const lastStar = useRef(0);
+  const score = ratingStars(rating);
   const label = rating == null ? '未评分' : `评分 ${score} / 5`;
-  return <span data-catalog-rating="" role="img" aria-label={label} title={label}>
-    {[0, 1, 2, 3, 4].map(index => <span key={index} data-catalog-star="" aria-hidden="true">
-      <Star />
-      {/* oxlint-disable-next-line shadcn/no-inline-styles -- 星星填充宽度表示实际评分的小数比例 */}
-      <span data-catalog-star-fill="" style={{ width: `${Math.max(0, Math.min(1, score - index)) * 100}%` }}><Star /></span>
-    </span>)}
-  </span>;
-}
-
-export function CatalogColumnMenu({ columns, onChange, onReset, onDefaults }: {
-  columns: { id: string; label: string; visible: boolean }[];
-  onChange(id: string, visible: boolean): void;
-  onReset(): void;
-  onDefaults(): void;
-}) {
-  const trigger = useRef<HTMLButtonElement>(null);
-  const [open, setOpen] = useState(false);
-  return <>
-    <Button ref={trigger} variant="secondary" size="small" aria-haspopup="dialog" aria-expanded={open}
-      onClick={() => setOpen(true)}>显示列</Button>
-    <Popover triggerRef={trigger} isOpen={open} onOpenChange={setOpen} placement="bottom end" offset={4}
-      className={`${MENU_POPOVER_SURFACE} overscroll-contain`}>
-      <MenuDialog aria-label="表格显示列" className="flex w-48 flex-col gap-2 outline-none">
-        {columns.map(column => <Checkbox key={column.id} isSelected={column.visible}
-          onChange={on => onChange(column.id, on)}>{column.label}</Checkbox>)}
-        <Button variant="ghost" size="small" onClick={onReset}>显示全部列</Button>
-        <Button variant="ghost" size="small" onClick={onDefaults}>恢复默认显示</Button>
-      </MenuDialog>
-    </Popover>
-  </>;
+  const apply = (rating: number | null) => {
+    replaceCatalogItem(item.id, { rating });
+    queryClient.setQueryData<MediaItem>(['item', item.id], cached => cached ? { ...cached, rating } : cached);
+  };
+  const rate = (star: number) => {
+    lastStar.current = star;
+    void action.run(String(star), signal => actions.rate(item, star, apply, signal), () => {});
+  };
+  return <div data-catalog-rating="" role="group" aria-label={label} title={label}>
+    <RatingStars value={score} onRate={rate} busyStar={action.busy ? Number(action.busy) : undefined} />
+    {action.error ? <Note tone="error" action={<Button variant="secondary" size="small" onClick={() => rate(lastStar.current)}>重试评分</Button>}>
+      {action.error}
+    </Note> : null}
+  </div>;
 }
 
 export function catalogTableDate(value: string | number | null | undefined): string {

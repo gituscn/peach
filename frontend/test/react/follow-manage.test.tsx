@@ -338,8 +338,8 @@ it('换成表格视图时勾选还是那一批', async () => {
 it('表格视图把每条来源摊成一行，勾的还是来源 ID', async () => {
   const { host, fetcher } = await open({}, { layout: 'table' });
 
-  expect([...host.querySelectorAll('[role="columnheader"]')].map((cell) => cell.textContent?.trim()))
-    .toEqual(['选择', '创作者', '来源', '站点', '状态', '上次检查', '操作']);
+  expect([...host.querySelectorAll('[role="columnheader"]:not([data-table-space])')].map((cell) => cell.textContent?.trim()))
+    .toEqual(['', '创作者', '来源', '站点', '状态', '上次检查', '操作']);
   // 卡片视图是三张卡（甲有两条来源），表格摊平之后是四行。
   expect(host.querySelectorAll('[role="row"][data-key]')).toHaveLength(4);
 
@@ -432,12 +432,22 @@ it('卡片里点来源那一行的空白处同样选中整行，点勾选框仍�
   const { host } = await open();
   const row = () => checkboxNamed(host, '选择 甲 · Pawchive')!.closest('[data-source-divider] > div')!;
 
-  await click(row().querySelector('span[title="Pawchive"]'));
+  await click(row().querySelector('[data-follow-leading-site]'));
   expect(row().hasAttribute('data-selected')).toBe(true);
   expect(host.textContent).toContain('已选 1 个来源');
 
   await click(checkboxNamed(host, '选择 甲 · Pawchive'));
   expect(row().hasAttribute('data-selected')).toBe(false);
+});
+
+it('来源表头全选可再次点击取消本页选择', async () => {
+  const { host } = await open();
+  await click(buttonLabelled(host, '表格视图'));
+  await click(checkboxNamed(host, '全选本页来源'));
+  expect(CAST.every(item => checkboxNamed(host, `选择 ${item.label}`)?.checked)).toBe(true);
+  expect(checkboxNamed(host, '全选本页来源')?.checked).toBe(true);
+  await click(checkboxNamed(host, '全选本页来源'));
+  expect(CAST.every(item => !checkboxNamed(host, `选择 ${item.label}`)?.checked)).toBe(true);
 });
 
 it('表格的可排序列显示并更新排序三角', async () => {
@@ -740,10 +750,10 @@ it('地址栏指着订阅源时首屏就带着清单，开关、移除与立即�
   stubConfirm(true);
   const { host, fetcher } = await open({ feeds: FEEDS }, { tab: 'feeds' });
   expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('JAV 订阅源');
-  expect([...host.querySelectorAll('[role="columnheader"]')].map((cell) => cell.textContent?.trim()))
-    .toEqual(['选择', '名称', '类型', '来源', '状态', '频率', '上次拉取', '上次新增', '操作']);
+  expect([...host.querySelectorAll('[role="columnheader"]:not([data-table-space])')].map((cell) => cell.textContent?.trim()))
+    .toEqual(['', '名称', '类型', '来源', '状态', '频率', '上次拉取', '上次新增', '操作']);
   const first = checkboxNamed(host, '选择 甲 的新作')!.closest('[role="row"]')!;
-  expect([...first.querySelectorAll('[role="rowheader"],[role="gridcell"]')].map(shown))
+  expect([...first.querySelectorAll('[role="rowheader"]:not([data-table-space]),[role="gridcell"]:not([data-table-space])')].map(shown))
     .toEqual(['', '甲 的新作', 'JAV 订阅', 'feeds.test', '正常', '每 12 小时', '还没拉过', '0 条', '']);
   expect(first.querySelector('a')?.getAttribute('href')).toBe('https://feeds.test/a');
   // 名字前的圆框由 `card-art` 的回落链拼：身份引用带着有没有图，图有了才叠上去。

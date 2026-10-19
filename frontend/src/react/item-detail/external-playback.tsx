@@ -3,7 +3,7 @@ import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { apiSend } from '../../api';
 import { SelectField } from '../settings-panel/legacy-controls';
-import { ErrorText, Help, Stack } from '../settings/section';
+import { Disclosure, ErrorText, Help, Stack } from '../settings/section';
 import { busyProps, useAction } from '../settings/use-action';
 
 const KEY = 'peach.external-player.v1';
@@ -21,8 +21,7 @@ export function ExternalPlayback({ id }: { id: number }) {
   });
   const [links, setLinks] = useState<{ url: string; playlist: string } | null>(null);
   const action = useAction();
-  return <details key={id}>
-    <summary>外部播放器 / VR</summary>
+  return <Disclosure key={id} summary="外部播放器 / VR">
     <Stack>
       <SelectField id={`external-player-${id}`} label="此设备的外部播放器" options={PLAYERS} value={player}
         epoch={0} onPick={(value) => {
@@ -44,5 +43,5 @@ export function ExternalPlayback({ id }: { id: number }) {
         <Help>链接有效期为 6 小时。VR 播放器可使用网络播放地址；另一台设备需要能访问当前 Peach 地址。</Help>
       </> : null}
     </Stack>
-  </details>;
+  </Disclosure>;
 }

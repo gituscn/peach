@@ -1,8 +1,8 @@
-import { RiArrowDownLine, RiArrowUpLine } from '@remixicon/react';
 import type { SortingState } from '@tanstack/react-table';
 import { Button } from '@/components/base/buttons/button';
 import { Select, SelectItem } from '@/components/base/select/select';
 import { Pagination } from './table-pagination';
+import { SortDirectionIcon } from './icon-swap';
 
 export function DataTableSort({ label, options, sorting, onChange }: {
   label: string; options: { id: string; label: string }[]; sorting: SortingState;
@@ -18,7 +18,7 @@ export function DataTableSort({ label, options, sorting, onChange }: {
       {options.map((option) => <SelectItem key={option.id} id={option.id}>{option.label}</SelectItem>)}
     </Select>
     <Button variant="secondary" iconOnly disabled={!current}
-      leadingIcon={current?.desc ? RiArrowDownLine : RiArrowUpLine}
+      leadingIcon={SortDirectionIcon} data-icon-state={current?.desc ? 'b' : 'a'}
       aria-label={`${label}改为${current?.desc ? '升序' : '降序'}`}
       onClick={() => { if (current) onChange([{ ...current, desc: !current.desc }]); }} />
   </span>;

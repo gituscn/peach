@@ -64,15 +64,15 @@ function LinkTable(
 ) {
   if (!items.length) return null;
   const columns: DataColumn<LinkRow>[] = [
-    { id: 'entity', label: '所属', value: (item) => item.entity,
+    { id: 'entity', label: '所属', width: 180, min: 128, value: (item) => item.entity,
       render: (item) => <span className="block min-w-24 wrap-anywhere">{item.entity}</span> },
-    { id: 'kind', label: '类型', value: (item) => LINK_KINDS[item.link_kind] || item.link_kind,
+    { id: 'kind', label: '类型', width: 128, value: (item) => LINK_KINDS[item.link_kind] || item.link_kind,
       render: (item) => LINK_KINDS[item.link_kind] || item.link_kind },
-    { id: 'label', label: '标签', value: (item) => item.label || '',
+    { id: 'label', label: '标签', min: 128, value: (item) => item.label || '',
       render: (item) => <span className="block min-w-24 wrap-anywhere">{item.label || ''}</span> },
-    { id: 'note', label: '结果', value: (item) => item.note,
+    { id: 'note', label: '结果', width: 320, min: 192, value: (item) => item.note,
       render: (item) => <div className="min-w-40 max-w-80"><ErrorExcerpt text={item.note} className="tabular-nums text-text-error-primary" /></div> },
-    { id: 'url', label: '地址', value: (item) => item.url,
+    { id: 'url', label: '地址', width: 360, min: 180, value: (item) => item.url,
       render: (item) => <a href={item.url} target="_blank" rel="noreferrer" title={item.url}
         className="flex max-w-90 min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary">
         <span data-middle-truncate className="min-w-0 truncate">{item.url}</span>

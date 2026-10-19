@@ -117,9 +117,9 @@ export function OrphanRecordsCard({ toast }: { toast(message: string): void }) {
   });
   const columns: DataColumn<OrphanRecord>[] = [
     { id: 'item', label: '作品', value: (item) => item.name, render: (item) => <OrphanIdentity item={item} /> },
-    { id: 'records', label: '带的记录', value: (item) => recordsText(item.records),
+    { id: 'records', label: '带的记录', min: 144, value: (item) => recordsText(item.records),
       render: (item) => <span className="block min-w-28">{recordsText(item.records) || '无个人记录'}</span> },
-    { id: 'target', label: '接到与操作', value: (item) => item.candidates.length,
+    { id: 'target', label: '接到与操作', width: 360, min: 240, value: (item) => item.candidates.length,
       render: (item) => <OrphanActions item={item} toast={toast} /> },
   ];
   if (!query.isError && !items.length) return null;

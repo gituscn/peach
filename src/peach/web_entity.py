@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import json
 import re
-import time
 
 from urllib.parse import urlsplit
 
 from . import (company_profiles, entry_links, feeds, link_status, performer_header, web_feeds,
                web_follow)
 from .catalog_rules import (LENGTH_TAGS, dir_expr, photo_set_title, solo_performer_clause, tag_cat)
-from .entities import normalize_entity_name, resolve_entity, resolve_entity_id, rewrite_flat_projection
+from .entities import normalize_entity_name, resolve_entity, resolve_entity_id, prefer_entity_name
 from .social_links import ARCHIVE_HOSTS, is_archive
 from .media_sources import cost_for
 from .web_catalog import (
@@ -1134,9 +1133,6 @@ def q_suggest(contract: WebContract, q: str, limit: int = SUGGEST_GROUP_LIMIT,
     ]}
 
 
-#: 用户在资料页选定统称时，被换下的旧规范名记这个来源。合并留的是 `merge:*`，
-#: 刮削留的是站点名；分得开才答得出「这个名字是谁定的」。
-PREFERRED_NAME_SOURCE = "user:preferred-name"
 #: 用户自己敲进来的别名记这个来源。它是唯一允许在界面上删掉的一类——刮削和合并留下的
 #: 那些是这个人真的用过的名字，删掉就问不出这条实体当初为什么长这样。
 USER_ALIAS_SOURCE = "user:alias"
@@ -1226,28 +1222,4 @@ def w_entity_name(contract: WebContract, body):
         row = resolve_entity(c, kind, name)
         if not row:
             raise ValueError("entity not found")
-        entity_id, current = int(row["id"]), str(row["canonical_name"])
-        chosen_key = normalize_entity_name(chosen)
-        if chosen_key == normalize_entity_name(current):
-            return {"ok": True, "canonical_name": current, "changed": False}
-        known = {normalize_entity_name(str(item[0])): str(item[0]) for item in c.execute(
-            "SELECT alias FROM entity_alias WHERE entity_id=?", (entity_id,))}
-        if chosen_key not in known:
-            raise ValueError("canonical must be one of this entity's existing names")
-        taken = c.execute(
-            "SELECT canonical_name FROM entity WHERE kind=? AND normalized_name=? AND id<>?",
-            (kind, chosen_key, entity_id)).fetchone()
-        if taken:
-            raise ValueError(f"another {kind} is already named {taken[0]}")
-        stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        c.execute(
-            "UPDATE entity SET canonical_name=?,normalized_name=?,updated_at=? WHERE id=?",
-            (known[chosen_key], chosen_key, stamp, entity_id))
-        # 旧规范名留成别名：它是这个人真的用过的名字，也是选回去的入口。
-        c.execute(
-            "INSERT OR IGNORE INTO entity_alias(entity_id,alias,normalized_alias,source,confidence)"
-            " VALUES(?,?,?,?,1.0)",
-            (entity_id, current, normalize_entity_name(current), PREFERRED_NAME_SOURCE))
-        flat = rewrite_flat_projection(c, kind, entity_id, current, known[chosen_key])
-        return {"ok": True, "canonical_name": known[chosen_key], "changed": True,
-                "previous_name": current, "flat_rewritten": flat}
+        return prefer_entity_name(c, int(row["id"]), chosen)

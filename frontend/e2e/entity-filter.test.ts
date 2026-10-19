@@ -196,7 +196,9 @@ describe('实体页筛选浮层', () => {
       await page.locator('[data-entity-sort="rating"]').click();
       assert.equal(await page.locator('[data-entity-sort="rating"]').getAttribute('aria-pressed'), 'true');
       assert.equal(await page.locator('[data-entity-sort="new"]').getAttribute('aria-pressed'), 'false');
-      assert.equal(await page.locator('[data-entity-sort="rating"] svg').count(), 1, '选中的排序键没有方向箭头');
+      const visibleArrows = await page.locator('[data-entity-sort="rating"] svg').evaluateAll(nodes =>
+        nodes.filter(node => getComputedStyle(node.closest('[data-icon]') || node).opacity === '1').length);
+      assert.equal(visibleArrows, 1, '选中的排序键应显示一个方向');
       stubs.release();
       await page.locator('[data-entity-readout]', { hasText: '视频 · 24' }).waitFor({ timeout: 15_000 });
       assert.equal(await page.locator('[data-entity-sort="rating"]').getAttribute('aria-label'), '按评分从低到高排序');

@@ -15,6 +15,7 @@ import { FilterGlassRows, FilterIconButton, FilterPill } from '../components/fil
 import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
 import { SEGMENTED_GLASS_TRACK, SEGMENT_GLASS } from '../components/segmented';
 import { spriteGlyph } from '../components/sprite-glyph';
+import { IconSwap } from '../components/icon-swap';
 import { useViewGlide } from '../components/use-view-glide';
 import { useCatalogView } from '../catalog-grid/catalog-view';
 import { CatalogViewToggle } from '../catalog-grid/catalog-view-toggle';
@@ -25,6 +26,8 @@ import {
 } from './entity-filter';
 
 const Sep = () => <span data-entity-sep="" aria-hidden="true" />;
+const ShuffleIcon = spriteGlyph('shuffle');
+const SortUpIcon = spriteGlyph('arrow-up'), SortDownIcon = spriteGlyph('arrow-down');
 
 export function EntityFilterPage(props: EntityFilterProps) {
   const { view, views, state, states, tags, combo, actions, helpers } = props;
@@ -264,7 +267,7 @@ export function Segments({ name, label, value, options, onChange }: {
 
 export function Shuffle({ onPress, busy = false }: { onPress(): void; busy?: boolean }) {
   return (
-    <FilterIconButton data-entity-batch="" label="换一批" busy={busy} icon={spriteGlyph('shuffle')} onPress={onPress} />
+    <FilterIconButton data-entity-batch="" label="换一批" busy={busy} busyStyle="strand" icon={ShuffleIcon} onPress={onPress} />
   );
 }
 
@@ -289,11 +292,10 @@ export function SortKeys({ sorts, onSort }: { sorts: readonly EntitySortKey[]; o
   return (
     <>
       {sorts.map((sort) => {
-        const Arrow = spriteGlyph(sort.dir === 'asc' ? 'arrow-up' : 'arrow-down');
         return (
           <button key={sort.key} type="button" data-entity-sort={sort.key} data-entity-press=""
             aria-pressed={sort.pressed} aria-label={sort.ariaLabel || undefined} onClick={() => onSort(sort.key)}>
-            {sort.label}{sort.pressed && sort.dir ? <Arrow className="size-3.5" /> : null}
+            {sort.label}{sort.pressed && sort.dir ? <IconSwap a={SortUpIcon} b={SortDownIcon} state={sort.dir === 'asc' ? 'a' : 'b'} className="size-3.5" /> : null}
           </button>
         );
       })}

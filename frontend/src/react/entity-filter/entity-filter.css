@@ -242,6 +242,8 @@
   height: 14px;
   margin-left: 5px;
 }
+.peach-react [data-entity-sort] [data-icon-swap] { margin-left: 5px; }
+.peach-react [data-entity-sort] [data-icon-swap] svg { margin-left: 0; }
 
 
 /* 分段器两侧各让 6px，跟换一批和排序键分开：它答的是「这批东西怎么摆」，不是同一排里的又一枚键。 */
