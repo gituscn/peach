@@ -32,11 +32,17 @@ from .fsutil import atomic_write_text
 #: 计划 CSV 的列。`reason` 只在 `action=skip` 时有值。
 PLAN_FIELDS = ["asset_id", "location", "current_path", "target_path", "action", "reason"]
 
-#: 界面上给的几组模板。第一组是最小可用的一套，后两组演示目录分层。
+#: 文件名与目录组合，以及使用示例字段时的完整路径。
 PRESETS: tuple[dict[str, str], ...] = (
-    {"label": "番号 标题", "file": "{number}[ {title}]", "dir": ""},
-    {"label": "厂牌分目录", "file": "{number}[ {title}]", "dir": "{studio}"},
-    {"label": "厂牌 / 番号目录", "file": "{number}[ {title}][ CD{cd}]", "dir": "{studio}/{number}"},
+    {"label": "仅番号", "file": "{code}", "dir": "", "example": "ABC-123.mp4"},
+    {"label": "番号和标题", "file": "{code}[ {title}]", "dir": "", "example": "ABC-123 标题.mp4"},
+    {"label": "番号和画质", "file": "{code}[ {definition}]", "dir": "", "example": "ABC-123 1080p.mp4"},
+    {"label": "番号和出演者", "file": "{code}[ {actors}]", "dir": "", "example": "ABC-123 甲、乙.mp4"},
+    {"label": "按厂牌建文件夹", "file": "{code}[ {title}]", "dir": "{studio}", "example": "厂牌/ABC-123 标题.mp4"},
+    {"label": "按系列建文件夹", "file": "{code}[ {title}]", "dir": "{series}", "example": "系列/ABC-123 标题.mp4"},
+    {"label": "按出演者建文件夹", "file": "{code}[ {title}]", "dir": "{actors}", "example": "甲、乙/ABC-123 标题.mp4"},
+    {"label": "按发行年建文件夹", "file": "{code}[ {title}]", "dir": "{year}", "example": "2024/ABC-123 标题.mp4"},
+    {"label": "厂牌下按番号建文件夹", "file": "{code}[ {title}][ CD{cd}]", "dir": "{studio}/{code}", "example": "厂牌/ABC-123/ABC-123 标题 CD2.mp4"},
 )
 
 #: 跳过原因的固定写法。界面按这几个键分组计数，所以它们是契约的一部分。
@@ -128,7 +134,7 @@ def placeholder_values(row, performers: Sequence[str] = ()) -> dict[str, str]:
     release_date = str(row["release_date"] or "")
     marker = part_marker(name)
     return {
-        "number": normalise_code_key(code) if is_jav_code(code) else code.strip(),
+        "code": normalise_code_key(code) if is_jav_code(code) else code.strip(),
         "title": title.strip(),
         "studio": str(row["studio"] or "").strip(),
         "series": str(row["series"] or "").strip(),

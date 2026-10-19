@@ -3,7 +3,7 @@
  * 预览是一次同步请求，结果只活在这张卡上；执行与回滚是同一趟后台任务，快照摊在
  * `/api/organize` 的顶层，所以 `useBackgroundJob` 用 `withJob` 只换任务那几格，来源、模板
  * 与上一批原样留着。执行与回滚动的是真实文件名与数据库路径，都要先过确认弹层。 */
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { confirmModal, MEDIA_SOURCE_ICONS } from '@peach/legacy/ui';
 import { LOC } from '@peach/legacy/core';
@@ -23,7 +23,7 @@ import { SourceMark } from '../settings/section';
 import { FolderSearchIcon } from '../settings/folder-rows';
 import { busyProps } from '../settings/use-action';
 import {
-  baseName, DIRECTORY_TEMPLATE_ERROR, fetchOrganize, ORGANIZE_KEY, organizeOutcome, planSummary,
+  baseName, DIRECTORY_TEMPLATE_ERROR, fetchOrganize, fetchOrganizeExample, ORGANIZE_KEY, organizeOutcome, planSummary,
   pickOrganizeFolder, previewOrganize, rememberTemplates, startOrganize, withOrganizeJob,
   type OrganizeCommand, type OrganizeData, type OrganizeJob, type OrganizePlan,
 } from './organize';
@@ -76,6 +76,22 @@ export function OrganizeCard(
   const fileInput = useRef<HTMLInputElement>(null);
   const dirInput = useRef<HTMLInputElement>(null);
   const pathInput = useRef<HTMLInputElement>(null);
+  const example = useQuery({
+    queryKey: ['organize-example', fields.file, fields.dir],
+    queryFn: ({ signal }) => fetchOrganizeExample(fields.file, fields.dir, signal),
+    enabled: Boolean(data),
+  });
+  const [target, setTarget] = useState<'file' | 'dir'>('file');
+  const focused = useRef(false);
+  const insertion = useRef<{ field: 'file' | 'dir'; caret: number } | null>(null);
+  useLayoutEffect(() => {
+    const next = insertion.current;
+    if (!next) return;
+    insertion.current = null;
+    const input = (next.field === 'file' ? fileInput : dirInput).current;
+    input?.focus();
+    input?.setSelectionRange(next.caret, next.caret);
+  });
 
   const request = () => ({ location, path: path.trim(), file_template: fields.file.trim(), dir_template: fields.dir.trim() });
   const preview = useMutation({
@@ -119,7 +135,18 @@ export function OrganizeCard(
   const plan = previewMatches ? preview.data : undefined;
   const changes = Number(plan?.counts?.change || 0);
   const name = LOC[location] || location;
-  const hint = (data?.placeholders ?? []).map((item) => `{${item.key}} ${item.label}`).join(' · ');
+  const changeTemplates = (patch: Partial<{ file: string; dir: string }>) => {
+    edit(patch); setInvalid(null); preview.reset();
+  };
+  const insertParameter = (key: string) => {
+    const input = (target === 'file' ? fileInput : dirInput).current;
+    const value = fields[target];
+    const start = focused.current ? input?.selectionStart ?? value.length : value.length;
+    const end = focused.current ? input?.selectionEnd ?? start : start;
+    const token = `{${key}}`;
+    insertion.current = { field: target, caret: start + token.length };
+    changeTemplates({ [target]: value.slice(0, start) + token + value.slice(end) });
+  };
 
   const runPreview = () => {
     if (preview.isPending || running || !location) return;
@@ -196,7 +223,7 @@ export function OrganizeCard(
               onSelectionChange={(key) => {
                 if (key === null) return;
                 setChosen(String(key)); setScope({ location: String(key), path: '' });
-                setInvalid(null); preview.reset(); picker.reset();
+                setInvalid(null); preview.reset(); picker.reset(); focused.current = false;
               }}>
               {locations.map((row) => (
                 <SelectItem key={row.location} id={row.location} textValue={LOC[row.location] || row.location}>
@@ -216,25 +243,48 @@ export function OrganizeCard(
         </div>
         <p className="text-caption-1-regular text-text-secondary">指定路径时包含子目录，目录模板以该路径为起点。模板均留空时只清理文件名。</p>
         {picker.isError ? <Note tone="error" title="目录选择失败">{errorMessage(picker.error)}；也可直接输入路径。</Note> : null}
-        <Input label="文件名模板" placeholder="{number}[ {title}]" value={fields.file} ref={fileInput}
+        <Input label="文件名模板" placeholder="{code}[ {title}]" value={fields.file} ref={fileInput}
           spellCheck="false" isInvalid={invalid === 'file'}
-          onChange={(value) => { edit({ file: value }); setInvalid(null) }} />
+          onFocus={() => { setTarget('file'); focused.current = true }}
+          onChange={(value) => changeTemplates({ file: value })} />
         <Input label="目录模板" placeholder="留空表示原地改名" value={fields.dir} ref={dirInput}
           spellCheck="false" isInvalid={invalid === 'dir'}
-          onChange={(value) => { edit({ dir: value }); setInvalid(null) }} />
+          onFocus={() => { setTarget('dir'); focused.current = true }}
+          onChange={(value) => changeTemplates({ dir: value })} />
         {data?.presets?.length
-          ? <div className="flex flex-wrap gap-2">
+          ? <div className="flex flex-col gap-2" role="group" aria-label="套用模板">
+              <p className="text-caption-1-medium text-text-secondary">套用模板</p>
+              <div className="flex flex-wrap gap-2">
               {data.presets.map((preset) => (
-                <Button key={preset.label} variant="secondary" title={preset.label}
+                <Button key={preset.label} variant="secondary" size="small" title={preset.example || preset.label}
                   className="max-w-full [&>span]:min-w-0 [&>span]:shrink"
-                  onClick={() => { edit({ file: preset.file, dir: preset.dir }); setInvalid(null) }}>
+                  onClick={() => { changeTemplates({ file: preset.file, dir: preset.dir }); focused.current = false }}>
                   <span className="truncate">{preset.label}</span>
                 </Button>
               ))}
+              </div>
             </div>
           : null}
+        <p aria-live="polite" aria-busy={example.isFetching} data-organize-example=""
+          className="text-caption-1-regular text-text-secondary">
+          路径示例：<code className="wrap-anywhere">{example.data?.example || example.data?.error
+            || (example.isError ? errorMessage(example.error) : '正在预览…')}</code>
+        </p>
+        {data?.placeholders?.length ? <div className="flex flex-col gap-2" role="group" aria-label="插入参数">
+          <p className="text-caption-1-regular text-text-secondary" aria-live="polite">
+            <strong className="text-caption-1-semibold text-text-primary">插入参数</strong>（到{target === 'file' ? '文件名模板' : '目录模板'}）
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {data.placeholders.map((item) => <Button key={item.key} variant="ghost" size="small"
+              aria-label={`${item.label} {${item.key}}`} onClick={() => insertParameter(item.key)}>
+              <span className="inline-flex flex-wrap items-center gap-x-1.5">
+                <code>{`{${item.key}}`}</code><span className="text-text-secondary">{item.label}</span>
+              </span>
+            </Button>)}
+          </div>
+        </div> : null}
         <p className="text-caption-1-regular leading-4.5 text-text-secondary">
-          {`${hint ? `${hint}；` : ''}方括号里的内容在字段为空时整段省略。`}
+          点击参数插入光标处，选中文字可替换。方括号里的内容在字段为空时整段省略。
         </p>
       </div>
       <div aria-live="polite" className="mt-3 flex flex-col gap-2 empty:hidden">{state}</div>

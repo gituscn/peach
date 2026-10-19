@@ -138,6 +138,11 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(info["by_kind"], {"social": 1, "official": 2})
         self.assertEqual(info["by_entity_kind"], {"performer": 2, "studio": 1})
         self.assertIn(("moodyz.com", 1), info["top_hosts"])
+        with self.contract.read_connection() as connection:
+            for host, _ in info["top_hosts"]:
+                link = connection.execute("SELECT url FROM entity_link WHERE id=?",
+                                          (info["top_host_link_ids"][host],)).fetchone()
+                self.assertEqual(web_links.urlsplit(link["url"]).hostname, host)
 
     def test_prune_refuses_without_a_finished_check(self):
         """没有检查结果就删除，等于凭空删。"""

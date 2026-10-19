@@ -86,7 +86,7 @@ from .web_links import w_links, w_links_check, w_links_prune
 from .web_library_processing import q_library_processing, q_library_processing_issues, w_library_processing
 from .web_media_repair import q_media_repair, w_media_repair
 from .web_organize import (
-    q_organize, w_organize_apply, w_organize_preview, w_organize_rollback,
+    q_organize, q_organize_example, w_organize_apply, w_organize_preview, w_organize_rollback,
 )
 from .web_orphan_records import q_orphan_records, w_orphan_attach
 from .web_playlists import q_playlist, q_playlists, w_playlist
@@ -354,6 +354,7 @@ GET_HANDLERS = {
     "/api/media-repair": q_media_repair,
     "/api/orphan-records": q_orphan_records,
     "/api/organize": q_organize,
+    "/api/organize/example": q_organize_example,
     "/api/items": q_items,
     "/api/item": _get_item,
     "/api/parts": q_parts,

@@ -1,7 +1,7 @@
 """整理用的路径模板：占位符取值、可选分组、文件名清洗与逃逸防护（ADR-0039）。
 
 模板只有三种记号：字面量、`{占位符}`、`[可选分组]`。分组里的占位符只要有一个取不到值，
-整段就不出现——`{number}[ {title}][ CD{cd}]` 在没有标题时给 `ABC-123`，而不是
+整段就不出现——`{code}[ {title}][ CD{cd}]` 在没有标题时给 `ABC-123`，而不是
 `ABC-123  CD2` 这种带着两个空格的名字。
 
 占位符一律从 approved 真相字段取值（见 `organize.placeholder_values`）。候选不参与：
@@ -24,7 +24,7 @@ from dataclasses import dataclass
 
 #: 模板认识的占位符，以及它在界面上的说明。顺序就是界面上列出来的顺序。
 PLACEHOLDERS: dict[str, str] = {
-    "number": "番号",
+    "code": "番号",
     "title": "标题",
     "studio": "厂牌",
     "series": "系列",
@@ -33,6 +33,11 @@ PLACEHOLDERS: dict[str, str] = {
     "cd": "分片号",
     "mosaic": "有码无码",
     "definition": "画质",
+}
+
+EXAMPLE_VALUES = {
+    "code": "ABC-123", "title": "标题", "studio": "厂牌", "series": "系列",
+    "year": "2024", "actors": "甲、乙", "cd": "2", "mosaic": "无码", "definition": "1080p",
 }
 
 #: 单个路径组件的长度上限。Windows 的组件上限是 255 个字符，但长名字在资源管理器、
@@ -144,6 +149,9 @@ def _parse(template: str) -> tuple[_Token, ...]:
             if end < 0:
                 raise TemplateError("占位符的 `{` 没有配对的 `}`")
             name = template[index + 1:end].strip()
+            # 已保存的模板可以使用番号别名。
+            if name == "number":
+                name = "code"
             if name not in PLACEHOLDERS:
                 raise TemplateError(
                     f"不认识的占位符 `{{{name}}}`；可用的是 "
@@ -267,3 +275,15 @@ def render(template: str, values: dict[str, str], *,
         else [sanitise_component(text)]
     components = [part for part in components if part]
     return "/".join(components), frozenset(missing)
+
+
+def example_path(file_template: str, dir_template: str) -> dict:
+    """以固定示例字段渲染当前输入的路径。"""
+    parts = {}
+    for field, text, directory in (("file", file_template, False), ("dir", dir_template, True)):
+        try:
+            parts[field], _missing = render(text, EXAMPLE_VALUES, directory=directory)
+        except TemplateError as error:
+            return {"ok": False, "error": str(error), "field": field}
+    filename = (parts["file"] if file_template.strip() else "ABC-123 标题") + ".mp4"
+    return {"ok": True, "example": "/".join(filter(None, (parts["dir"], filename)))}

@@ -19,7 +19,7 @@ ROOT_DECLARATION = "R:\\media"
 DECLARED = {"local": (ROOT_DECLARATION,)}
 
 VALUES = {
-    "number": "ABC-123", "title": "标题", "studio": "厂牌", "series": "系列",
+    "code": "ABC-123", "title": "标题", "studio": "厂牌", "series": "系列",
     "year": "2024", "actors": "甲、乙", "cd": "2", "mosaic": "无码",
     "definition": "1080p",
 }
@@ -28,6 +28,8 @@ VALUES = {
 class TemplateRenderTests(unittest.TestCase):
     CASES = [
         # (模板, 取值覆盖, 期望)
+        ("{code}", {}, "ABC-123"),
+        ("{code}[ {title}]", {}, "ABC-123 标题"),
         ("{number}", {}, "ABC-123"),
         ("{number} {title}", {}, "ABC-123 标题"),
         ("{number}[ {title}]", {"title": ""}, "ABC-123"),
@@ -65,6 +67,14 @@ class TemplateRenderTests(unittest.TestCase):
     def test_directory_template_keeps_layers(self):
         text, _missing = render("{studio}/{number}", VALUES, directory=True)
         self.assertEqual(text, "厂牌/ABC-123")
+
+    def test_presets_render_the_displayed_example_path(self):
+        for preset in organize.PRESETS:
+            with self.subTest(preset=preset["label"]):
+                filename, missing = render(preset["file"], VALUES)
+                directory, directory_missing = render(preset["dir"], VALUES, directory=True)
+                self.assertFalse(missing | directory_missing)
+                self.assertEqual("/".join(filter(None, (directory, filename + ".mp4"))), preset["example"])
 
 
 class SanitiseTests(unittest.TestCase):
@@ -540,7 +550,19 @@ class EndpointTests(unittest.TestCase):
         payload = q_organize(self.contract)
         self.assertEqual(payload["status"], "idle")
         self.assertTrue(payload["presets"])
-        self.assertIn("number", [item["key"] for item in payload["placeholders"]])
+        self.assertIn("code", [item["key"] for item in payload["placeholders"]])
+        self.assertNotIn("number", [item["key"] for item in payload["placeholders"]])
+
+    def test_custom_template_example_uses_the_registered_read_route(self):
+        from peach.web_router import dispatch_api_get
+
+        output = dispatch_api_get(None, "/api/organize/example", {
+            "file_template": "自定义_{code}[_{definition}]", "dir_template": "{year}/{studio}"})
+        self.assertEqual(output, {"ok": True, "example": "2024/厂牌/自定义_ABC-123_1080p.mp4"})
+        invalid = dispatch_api_get(None, "/api/organize/example", {"file_template": "{code"})
+        self.assertFalse(invalid["ok"])
+        self.assertEqual(invalid["field"], "file")
+        self.assertIn("没有配对", invalid["error"])
 
 
 if __name__ == "__main__":

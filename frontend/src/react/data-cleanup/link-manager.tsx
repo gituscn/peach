@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { confirmModal } from '@peach/legacy/ui';
 
 import { Button } from '@/components/base/buttons/button';
+import { Chip } from '@/components/base/badges/chip';
 
 import { errorMessage } from '../../api';
 import { ErrorExcerpt } from '../activity/error-excerpt';
@@ -22,6 +23,7 @@ import {
   Fieldset, FieldsetTitle, PanelFooter, RESULT_PANEL, RESULT_SECTION,
 } from '../components/fieldset';
 import { Note } from '../components/note';
+import { SiteMark } from '../components/site-mark';
 import { TaskProgress } from '../components/task-progress';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { queryClient } from '../query';
@@ -125,7 +127,7 @@ export function LinkManager() {
   const selectedGone = gone.filter((item) => gonePicked.includes(item.id)).map((item) => item.id);
   const selectedRetryable = retryable.filter((item) => picked.includes(item.id)).map((item) => item.id);
   const info = stats.data;
-  const hosts = (info?.top_hosts ?? []).slice(0, 3).map(([host, n]) => `${host} ${count(n)}`).join(' · ');
+  const hosts = (info?.top_hosts ?? []).slice(0, 3);
 
   const run = (retry?: readonly number[]) => {
     if (running || (retry && !retry.length)) return;
@@ -222,10 +224,19 @@ export function LinkManager() {
                     <Stat key={kind} label={LINK_KINDS[kind] || kind} value={count(value)} />
                   ))}
                 </div>
-                {hosts
+                {hosts.length
                   ? <div className="mt-4 flex min-w-0 flex-col gap-0.5">
                       <span className="text-caption-1-regular text-text-secondary">主要站点</span>
-                      <b className="text-body-2-medium break-words text-text-primary">{hosts}</b>
+                      <div className="flex min-w-0 flex-wrap gap-x-5 gap-y-2">
+                        {hosts.map(([host, n]) => <span key={host} data-top-host="" className="inline-flex min-w-0 max-w-full items-center gap-1.5">
+                          <a href={`https://${host}`} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex min-w-0 items-center gap-1.5 text-body-2-medium text-text-primary">
+                            <SiteMark linkId={info.top_host_link_ids[host]!} /><span className="min-w-0 wrap-anywhere">{host}</span>
+                            <RiExternalLinkLine aria-hidden className="size-3.5 shrink-0" />
+                          </a>
+                          <Chip variant="caption" color="neutral"><span className="tabular-nums">{count(n)}</span></Chip>
+                        </span>)}
+                      </div>
                     </div>
                   : null}
               </>

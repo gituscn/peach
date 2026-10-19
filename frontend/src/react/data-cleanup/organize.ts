@@ -16,6 +16,11 @@ export const ORGANIZE_APPLY_URL = '/api/organize/apply';
 export const ORGANIZE_ROLLBACK_URL = '/api/organize/rollback';
 
 export const ORGANIZE_KEY = ['organize'] as const;
+export const ORGANIZE_EXAMPLE_URL = '/api/organize/example';
+
+export interface OrganizeExample { ok: boolean; example?: string; error?: string; field?: 'file' | 'dir' }
+export const fetchOrganizeExample = (file: string, dir: string, signal?: AbortSignal) =>
+  apiGet<OrganizeExample>(`${ORGANIZE_EXAMPLE_URL}?${new URLSearchParams({ file_template: file, dir_template: dir })}`, signal);
 
 export interface OrganizeTemplate { file: string; dir: string }
 
@@ -36,7 +41,7 @@ export interface OrganizeJob {
 export interface OrganizeData extends OrganizeJob {
   locations: { location: string; roots: string[] }[];
   templates: Record<string, OrganizeTemplate>;
-  presets: ({ label: string } & OrganizeTemplate)[];
+  presets: ({ label: string; example?: string } & OrganizeTemplate)[];
   placeholders: { key: string; label: string }[];
   last_batch: string;
 }

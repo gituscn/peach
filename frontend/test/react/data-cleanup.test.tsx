@@ -45,6 +45,10 @@ function serve(routes: Record<string, Route>) {
     const method = init?.method ?? 'GET';
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     calls.push({ path, method, body });
+    if (path.startsWith('/api/organize/example?')) {
+      const params = new URL(path, 'http://localhost').searchParams;
+      return { ok: true, status: 200, json: async () => ({ ok: true, example: `${params.get('dir_template')}/${params.get('file_template')}.mp4` }) };
+    }
     if (!(path in routes)) {
       unknown.push(path);
       return { ok: false, status: 404, json: async () => ({}) };
@@ -88,9 +92,9 @@ const withoutRoots: MediaSourcesData = {
 
 const organizeIdle: OrganizeData = {
   status: 'idle', locations: [{ location: 'local', roots: ['R:\\media'] }],
-  templates: { local: { file: '{number}', dir: '' } },
-  presets: [{ label: '番号 + 标题', file: '{number}[ {title}]', dir: '{studio}' }],
-  placeholders: [{ key: 'number', label: '番号' }, { key: 'title', label: '标题' }],
+  templates: { local: { file: '{code}', dir: '' } },
+  presets: [{ label: '番号 + 标题', file: '{code}[ {title}]', dir: '{studio}' }],
+  placeholders: [{ key: 'code', label: '番号' }, { key: 'title', label: '标题' }],
   last_batch: '',
 };
 
@@ -106,7 +110,7 @@ const pageRoutes = (sources: MediaSourcesData): Record<string, Route> => ({
   '/api/media-repair': IDLE_REPAIR,
   '/api/libraries': { libraries: [] },
   '/api/organize': organizeIdle,
-  '/api/links': { total: 0, entities: 0, by_kind: {}, top_hosts: [] },
+  '/api/links': { total: 0, entities: 0, by_kind: {}, top_hosts: [], top_host_link_ids: {} },
   '/api/links/check': { status: 'idle', check_id: '', checked: 0, total: 0, gone: [], unclear: [], scope: '' },
   '/api/links/prune': { status: 'idle' },
   '/api/orphan-records': { total: 0, items: [] },
@@ -343,6 +347,22 @@ describe('资源同步', () => {
 });
 
 describe('链接管理', () => {
+  it('主要站点分别链接到主页并通过本站读取 favicon，图标失败时保留链接', async () => {
+    const { host } = await openPage(withRoots, {
+      '/api/links': { total: 8, entities: 3, by_kind: {}, top_hosts: [['example.com', 5], ['example.org', 3]], top_host_link_ids: { 'example.com': 8, 'example.org': 9 } },
+    });
+    const link = host.querySelector<HTMLAnchorElement>('#link-manager a[href="https://example.com"]')!;
+    expect(link.textContent).toBe('example.com');
+    expect(link.parentElement?.textContent).toBe('example.com5');
+    expect(link.querySelector('svg')).not.toBeNull();
+    expect(link.rel).toContain('noopener');
+    const image = link.querySelector('img')!;
+    expect(image.getAttribute('src')).toBe('/link-mark?id=8');
+    await act(async () => { image.dispatchEvent(new Event('error')) });
+    expect(link.querySelector('img')).toBeNull();
+    expect(link.querySelector('svg')).not.toBeNull();
+    expect(link.href).toBe('https://example.com/');
+  });
   const row = (id: number, patch: Partial<LinkCheckState['gone'][number]> = {}) => ({
     id, entity: `女优 ${id}`, link_kind: 'official', label: '官网', url: `https://example.com/talent/${id}`, note: '404', ...patch,
   });
@@ -353,6 +373,7 @@ describe('链接管理', () => {
   const stats = {
     total: 719, entities: 210, by_kind: { official: 224, social: 373, catalog: 100, source_reference: 22 },
     top_hosts: [['x.com', 300], ['instagram.com', 70], ['linktr.ee', 3], ['tiktok.com', 1]],
+    top_host_link_ids: { 'x.com': 1, 'instagram.com': 2, 'linktr.ee': 3, 'tiktok.com': 4 },
   };
 
   it('每一类链接各占一格，类型用界面上的名字，主要站点只列前三', async () => {
@@ -363,7 +384,8 @@ describe('链接管理', () => {
     expect(cells).toEqual([
       '链接总数719分布在 210 个女优、厂牌与系列', '官网/事务所224', '社交账号373', '作品资料站100', '资料出处22',
     ]);
-    expect(host.textContent).toContain('x.com 300 · instagram.com 70 · linktr.ee 3');
+    expect([...host.querySelectorAll('#link-manager a')].map((link) => link.textContent))
+      .toEqual(['x.com', 'instagram.com', 'linktr.ee']);
     expect(host.textContent).not.toContain('tiktok.com');
   });
 
@@ -527,6 +549,50 @@ describe('孤儿记录', () => {
 });
 
 describe('整理', () => {
+  it('每个参数都能插入模板，默认追加到文件名并把光标留在参数后', async () => {
+    serve({ '/api/organize': organizeIdle });
+    queryClient.setQueryData(['organize'], organizeIdle);
+    const host = await wrap(<OrganizeCard toast={vi.fn()} failure={vi.fn()} />);
+    const file = host.querySelector<HTMLInputElement>('input[placeholder="{code}[ {title}]"]')!;
+    for (const { key, label } of organizeIdle.placeholders) {
+      const before = file.value;
+      await click(host.querySelector(`button[aria-label="${label} {${key}}"]`));
+      expect(file.value).toBe(`${before}{${key}}`);
+      expect(document.activeElement).toBe(file);
+      expect(file.selectionStart).toBe(file.value.length);
+    }
+  });
+
+  it('参数替换目录模板的选区，连续插入沿用光标，不改变文件名', async () => {
+    serve({ '/api/organize': organizeIdle });
+    queryClient.setQueryData(['organize'], organizeIdle);
+    const host = await wrap(<OrganizeCard toast={vi.fn()} failure={vi.fn()} />);
+    const dir = host.querySelector<HTMLInputElement>('input[placeholder="留空表示原地改名"]')!;
+    await type(dir, '厂牌/作品');
+    await act(async () => { dir.focus(); dir.setSelectionRange(3, 5) });
+    await click(host.querySelector('button[aria-label="番号 {code}"]'));
+    expect(dir.value).toBe('厂牌/{code}');
+    await click(host.querySelector('button[aria-label="标题 {title}"]'));
+    expect(dir.value).toBe('厂牌/{code}{title}');
+    expect(document.activeElement).toBe(dir);
+    expect(host.querySelector<HTMLInputElement>('input[placeholder="{code}[ {title}]"]')!.value).toBe('{code}');
+  });
+
+  it('套用模板替换两个输入框，编辑参数后需要重新预览', async () => {
+    const server = organizeServer();
+    queryClient.setQueryData(['organize'], organizeIdle);
+    const host = await wrap(<OrganizeCard toast={vi.fn()} failure={vi.fn()} />);
+    await click(buttonNamed('预览', host));
+    await settle();
+    expect(buttonNamed('执行整理', host)).not.toBeNull();
+    await click(buttonNamed('番号 + 标题', host));
+    expect(buttonNamed('执行整理', host)).toBeNull();
+    expect(host.querySelector<HTMLInputElement>('input[placeholder="{code}[ {title}]"]')!.value).toBe('{code}[ {title}]');
+    expect(host.querySelector<HTMLInputElement>('input[placeholder="留空表示原地改名"]')!.value).toBe('{studio}');
+    await click(host.querySelector('button[aria-label="标题 {title}"]'));
+    expect(host.querySelector<HTMLInputElement>('input[placeholder="{code}[ {title}]"]')!.value).toBe('{code}[ {title}]{title}');
+    expect(server.posts('/api/organize/apply')).toEqual([]);
+  });
   const plan = {
     counts: { change: 2, unchanged: 5 }, reasons: { 缺番号: 1 }, truncated: false,
     rows: [
@@ -549,13 +615,13 @@ describe('整理', () => {
     const server = organizeServer();
     queryClient.setQueryData(['organize'], organizeIdle);
     const host = await wrap(<OrganizeCard toast={vi.fn()} failure={vi.fn()} />);
-    const file = host.querySelector<HTMLInputElement>('input[placeholder="{number}[ {title}]"]');
-    expect(file?.value).toBe('{number}');
-    await type(file, ' {number} {title} ');
+    const file = host.querySelector<HTMLInputElement>('input[placeholder="{code}[ {title}]"]');
+    expect(file?.value).toBe('{code}');
+    await type(file, ' {code} {title} ');
     await click(buttonNamed('预览', host));
     await settle();
     expect(server.posts('/api/organize/preview')).toEqual([
-      { location: 'local', path: '', file_template: '{number} {title}', dir_template: '' },
+      { location: 'local', path: '', file_template: '{code} {title}', dir_template: '' },
     ]);
     expect(server.posts('/api/settings')).toEqual([]);
     expect(host.textContent).toContain('2 个文件会改名或移动，5 个已经就是目标名字；跳过 缺番号 1。');
@@ -575,10 +641,10 @@ describe('整理', () => {
     expect(seen.map((options) => options.title)).toEqual(['整理文件']);
     expect(seen[0]!.body).toContain('「本地」上的文件名与目录');
     expect(server.posts('/api/organize/apply')).toEqual([
-      { location: 'local', path: '', file_template: '{number}', dir_template: '', confirm: true },
+      { location: 'local', path: '', file_template: '{code}', dir_template: '', confirm: true },
     ]);
     expect(server.posts('/api/settings')).toEqual([
-      { organizeTemplates: { local: { file: '{number}', dir: '' } } },
+      { organizeTemplates: { local: { file: '{code}', dir: '' } } },
     ]);
   });
 

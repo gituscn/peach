@@ -15,7 +15,7 @@ from pathlib import Path
 from . import organize
 from .migrations import sqlite_backup
 from .media_sources import SCANNABLE_LOCATIONS
-from .organize_templates import PLACEHOLDERS, TemplateError, validate_template
+from .organize_templates import PLACEHOLDERS, TemplateError, example_path, validate_template
 from .platform import location_roots
 from .scripting import verify_after_write
 from .web_settings import organize_templates
@@ -55,6 +55,12 @@ def q_organize(contract, _args=None) -> dict:
         "placeholders": [{"key": key, "label": label} for key, label in PLACEHOLDERS.items()],
         "last_batch": latest.name if latest else "",
     }
+
+
+def q_organize_example(_contract, args=None) -> dict:
+    """以示例字段预览模板，保持账本与文件系统只读。"""
+    args = args or {}
+    return example_path(str(args.get("file_template") or ""), str(args.get("dir_template") or ""))
 
 
 def w_organize_preview(contract, body) -> dict:
