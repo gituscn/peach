@@ -18,6 +18,8 @@ from pathlib import Path
 
 from filelock import FileLock, Timeout
 
+from . import change_impact
+
 
 def git(root: Path, *args: str) -> str:
     return subprocess.run(
@@ -40,13 +42,25 @@ _STATE = re.compile(r"[0-9a-f]{64}")
 
 def manifest(root: Path) -> dict:
     names = git(root, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
-    files = {}
+    stages = git(root, "ls-files", "--stage", "-z").split("\0")
+    modes = {entry.split("\t", 1)[1]: entry.split(" ", 1)[0] for entry in stages if "\t" in entry}
+    # 未跟踪文件按 Git 的 filemode 策略预估暂存模式，暂存本身不使内容记录失效。
+    policy = git(root, "config", "--get", "--default", "true", "core.filemode") == "true"
+    files, signatures = {}, {}
     for name in sorted(set(names.split("\0")) - {""}):
         path = root / name
         if path.is_symlink():
             files[name] = "link:" + os.readlink(path)
         elif path.is_file():
-            files[name] = [stat.S_IMODE(path.stat().st_mode), hashlib.sha256(path.read_bytes()).hexdigest()]
+            content = path.read_bytes()
+            mode = stat.S_IMODE(path.stat().st_mode)
+            index_mode = modes.get(name, "100755" if policy and mode & 0o111 else "100644")
+            files[name] = [mode, hashlib.sha256(content).hexdigest(), index_mode]
+            if name.endswith(".py") or name in {*change_impact.PACKAGE_FILES, "pyproject.toml"}:
+                try:
+                    signatures[name] = change_impact.signatures(name, content.decode("utf-8"))
+                except UnicodeError:
+                    pass
         elif not path.exists():
             files[name] = "deleted"
         else:
@@ -54,7 +68,7 @@ def manifest(root: Path) -> dict:
     version = root / "src/peach/__init__.py"
     body = version.read_text(encoding="utf-8") if version.is_file() else ""
     body = re.sub(r'(?m)^__version__ = "\d+\.\d+\.\d+"$', '__version__ = "VERSION"', body)
-    return {"files": files, "version_body": digest(body)}
+    return {"files": files, "signatures": signatures, "version_body": digest(body)}
 
 
 def snapshot(root: Path) -> str:
@@ -150,7 +164,7 @@ def environment(root: Path) -> str:
                         if d.metadata.get("Name", "").casefold() != "peach"})
     node_lock = root / "frontend/node_modules/.package-lock.json"
     return digest({
-        "schema": 6, "python": identity["version"], "executable": str(python),
+        "schema": 7, "python": identity["version"], "executable": str(python),
         "platform": platform.platform(), "packages": installed, "tools": tools,
         "node_modules": hashlib.sha256(node_lock.read_bytes()).hexdigest() if node_lock.exists() else None,
         "flags": {k: v for k, v in os.environ.items()
@@ -185,7 +199,8 @@ def recent_records(folder: Path, limit: int = 32) -> list[Path]:
 def baselines(root: Path, current: dict, *, partial: bool = False):
     for path in recent_records(evidence_dir(root)):
         record = read(root, path.stem)
-        if not record.get("passed") or (not partial and "full" not in record["passed"]) \
+        if not (record.get("passed") or (partial and record.get("coverage"))) \
+                or (not partial and "full" not in record["passed"]) \
                 or record.get("environment") != current["environment"]:
             continue
         old = record.get("manifest", {})
@@ -195,9 +210,7 @@ def baselines(root: Path, current: dict, *, partial: bool = False):
         changed = sorted(name for name in old["files"].keys() | new["files"].keys()
                          if old["files"].get(name) != new["files"].get(name))
         version = "src/peach/__init__.py"
-        version_only = version in changed and version in old["files"] and version in new["files"] \
-            and old.get("version_body") == new.get("version_body") \
-            and old["files"][version][0] == new["files"][version][0]
+        version_only = version in changed and change_impact.version_only(old, new)
         if version_only:
             changed.remove(version)
         yield record, changed, version_only
@@ -211,6 +224,8 @@ def read(root: Path, state: str) -> dict:
         if record.get("state") == state:
             record["passed"] = [scope for scope, stamp in record["validated"].items()
                                 if isinstance(stamp, (float, int)) and 0 <= time.time() - stamp < 86400]
+            record["coverage"] = {name: stamp for name, stamp in record.get("coverage", {}).items()
+                                  if isinstance(stamp, (float, int)) and 0 <= time.time() - stamp < 86400}
             return record
     except (OSError, ValueError, KeyError, TypeError):
         pass
@@ -224,7 +239,8 @@ def covers(record: dict, scopes: tuple[str, ...]) -> bool:
 
 def write(root: Path, state: str, scopes: tuple[str, ...], *, success: bool,
           elapsed: float, slowest: list, count: int, previous: dict | None = None,
-          context: dict | None = None, baseline: dict | None = None) -> None:
+          context: dict | None = None, baseline: dict | None = None,
+          cohort: str | None = None, coverage: dict | None = None) -> None:
     folder = evidence_dir(root)
     folder.mkdir(parents=True, exist_ok=True)
     prior = previous if previous is not None else read(root, state)
@@ -242,6 +258,7 @@ def write(root: Path, state: str, scopes: tuple[str, ...], *, success: bool,
             validated.update(baseline["validated"])
         validated.update({scope: time.time() for scope in scopes})
     record = {**(context or inputs(root)), "state": state, "validated": validated, "finished": time.time(),
+              "cohort": cohort, "coverage": coverage or {},
               "baseline": baseline.get("state") if baseline else None,
               "failed_scopes": sorted(failed),
               "elapsed": elapsed, "count": count, "slowest": slowest}

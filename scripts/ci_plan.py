@@ -51,6 +51,24 @@ def validate_results(results: dict, required: list[str], *, phase: str = "comple
         raise ValueError(f"验证任务未通过：{bad}")
 
 
+def runtime_paths(paths: list[str], contents: dict | None) -> list[str]:
+    from . import change_impact
+    return [path for path in paths if not change_impact.documentation(path)
+            and not (contents and path in contents
+                     and change_impact.kind(path, *contents[path]) == "prose")]
+
+
+def browser_input(path: str) -> bool:
+    from . import test_runner as runner
+    if path == "tests/test_web_e2e.py" or path.startswith("frontend/e2e/"):
+        return True
+    if path.startswith(("tests/", "frontend/test/", "frontend/scripts/", "scripts/")):
+        return False
+    return path in {"src/peach/auth.py", "src/peach/server.py"} \
+        or path.startswith(("src/peach/web_", "src/peach/routes_")) \
+        or "web" in runner.scopes_for_changes([path])[0]
+
+
 def plan(event: str, paths: list[str], contents: dict | None = None) -> dict:
     from . import test_runner as runner
     scopes, _ = runner.scopes_for_changes(paths, contents=contents)
@@ -66,16 +84,15 @@ def plan(event: str, paths: list[str], contents: dict | None = None) -> dict:
     wheels = [{"os": "windows-latest", "python": "3.14"},
               {"os": "macos-latest", "python": "3.14"}]
     shared = wide
-    browser = shared or any(path.startswith(("src/", "web/", "frontend/", "migrations/", "resources/",
-                                             "tests/", ".github/workflows/test.yml"))
-                            or path in {"pyproject.toml", "uv.lock"} for path in paths)
+    effective = runtime_paths(paths, contents)
+    browser = shared or any(browser_input(path) for path in effective)
     frontend = shared or any(path.startswith(("frontend/", "web/dist/", ".github/workflows/test.yml"))
-                             for path in paths)
+                             or path == "scripts/copy-rules.json" for path in effective)
     vendor = shared or any(path.startswith(("web/vendor/", ".github/workflows/test.yml"))
                            or path in {"package.json", "package-lock.json", "web/index.html",
-                                       "scripts/vendor_web_dependencies.mjs"} for path in paths)
+                                       "scripts/vendor_web_dependencies.mjs"} for path in effective)
     wheel = shared or "packaging" in scopes or any(path.startswith(("src/", "migrations/", "web/", "resources/"))
-                                                 for path in paths)
+                                                 for path in effective)
     required = ["plan", "python", "workflow-lint", "frontend-ready"]
     required += [name for enabled, names in ((browser, ["web-e2e"]), (frontend, ["web-bundle"]),
                                             (vendor, ["web-vendor"]), (wheel, ["wheel-build", "wheel-smoke"]))

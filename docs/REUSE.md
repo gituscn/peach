@@ -1,5 +1,11 @@
 # 复用清单
 
+## 检查输入与源码文案
+
+测试差异复用 Git 文件快照、Python AST、标准库 TOML/JSON 解析器及现有 filelock。Python 注释和清单说明字段通过有效内容比较识别；真实依赖、执行模式和无法解析的输入保留完整验证。完整批次按测试文件保存结果，仅补齐受影响范围，不延长结果有效期。
+
+JS/TS 文案复用 [Oxc parser](https://oxc.rs/docs/guide/usage/parser)，开发依赖固定 `oxc-parser@0.154.0`，MIT 许可，来源为 [Oxc 官方仓库](https://github.com/oxc-project/oxc)。项目 Vite/Oxlint 工具链已有 Oxc；独立 Node 检查器解析注释、字符串、模板与 JSX，不进入应用运行包。当前 470 个前端源码文件解析错误为零。Tree-sitter 的试用在具名元组成员与 JSX 查询参数处产生错误，未采用；不新增 Python 解析器依赖。中文和英文判据集中于 `scripts/copy-rules.json`，含糊词语只提示人工核对。
+
 ## 硬件转码后端
 
 整片 MP4 与 HLS 复用现有 FFmpeg 的 CUDA / NVENC、VAAPI、`scale_vaapi` 与 `hwupload`，不引入 Python 命令包装库。Windows 发行工具固定为 FFmpeg 9.0.2（GPL-3.0-or-later，来源清单见 `scripts/ffmpeg-sources.json`）；Linux 镜像使用 Debian trixie 的 FFmpeg、`mesa-va-drivers` 与 `vainfo`，随 Debian 安全更新取得版本，不另行复制驱动代码。Mesa 按上游各组件许可证分发，驱动增加的镜像体积由构建决定，AMD 需要宿主机 amdgpu 与固件。设备参数和硬件解码接口依据 [FFmpeg 官方文档](https://ffmpeg.org/ffmpeg.html#Advanced-Video-options)，驱动范围依据 [Debian VAAPI 说明](https://wiki.debian.org/HardwareVideoAcceleration)。

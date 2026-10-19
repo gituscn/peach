@@ -1,7 +1,7 @@
 # README 维护
 
 1. 按下表核对本次涉及的能力、安装方式与限制。
-2. 同批修改中英文 README，保留使用入口和安全说明。
+2. 同批核对中英文 README，修改需要调整的内容，保留使用入口和安全说明。
 3. 按 [文档与界面文案](WRITING.md#检查与复核) 检查，再运行 [正式测试入口](TESTING.md#正式入口)。
 
 README 面向初次访问项目的人，依次讲它是什么、介绍视频与截图、能做什么、怎么装、常见问题、
@@ -24,6 +24,8 @@ README 迭代绑定 Codex 与 Claude 共用的工作树交付流程。每次提�
 | 判断 | 提交消息末尾的独立字段 |
 | --- | --- |
 | 已更新两份 README | `README-Impact: updated; 同步了哪些用户说明` |
+| 只需修改中文 README | `README-Impact: updated; 中文修改原因`，另加 `README-Reviewed: README.en.md; 英文无需修改的原因` |
+| 只需修改英文 README | `README-Impact: updated; 英文修改原因`，另加 `README-Reviewed: README.md; 中文无需修改的原因` |
 | 不影响 README | `README-Impact: none; 具体原因` |
 
 声明与 `Co-Authored-By` 等其它 trailer 连续写在提交消息末尾的同一块里，彼此之间不留空行。
@@ -34,7 +36,8 @@ README 迭代绑定 Codex 与 Claude 共用的工作树交付流程。每次提�
 `scripts/check_readme_impact.py` 读取目标分支到交付 HEAD 的实际差异，并使用
 `git interpret-trailers --parse` 读取最后提交的声明。涉及运行时代码、前端、迁移、资源、
 依赖或安装说明时必须声明；纯测试和其他内部文档不触发。触发清单由脚本统一维护。
-README 改动必须包含两种语言；`updated` 必须对应两份实际差异，`none` 不得伴随 README 改动。
+README 改动必须核对两种语言；`updated` 至少对应一份实际差异，`none` 不得伴随 README 改动。
+仅一份需要调整时，用唯一 `README-Reviewed` 写明未改文件及原因，不能为了满足检查改动正确的译文。
 提交后的暂存内容不能满足要求。原因的真实性仍由代码审阅负责，脚本不代替语义判断。
 
 `agent_worktree.py ready/integrate` 在接受测试记录前执行这一门槛。检查覆盖本次分支交付，

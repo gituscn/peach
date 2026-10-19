@@ -28,7 +28,7 @@ class CopyFinalStateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_no_copy_narrates_a_rejected_or_superseded_state(self):
-        findings = checker.scan_repo(ROOT)
+        findings = [item for item in checker.scan_repo(ROOT) if item.severity == "error"]
         self.assertEqual(
             findings, [],
             "文案只写最终状态。逐行修掉下列位置，或确认它是真实事故记录后在行尾加"
@@ -48,6 +48,23 @@ class CopyFinalStateTests(unittest.TestCase):
         found = checker.scan_python("sample.py", "HELP = '以前的写法'\n")
         self.assertEqual([item.line for item in found], [1])
 
+    def test_f_strings_include_static_prose_and_keep_expressions_as_code(self):
+        for source in ('message = f"以前这里是旧实现 {value}"',
+                       'message = f"{value} 以前这里是旧实现"',
+                       'message = f"{f\'以前这里是旧实现 {value}\'}"'):
+            with self.subTest(source=source):
+                self.assertTrue(any(item.severity == "error" for item in checker.scan_python("sample.py", source)))
+        self.assertEqual(checker.scan_python("sample.py", 'message = f"{previously_used_to}"'), [])
+
+    def test_conditional_instructions_are_advisory(self):
+        found = checker.scan_lines("sample.md", "如果以前配置过代理，请核对代理地址。", skip_code_fences=True)
+        self.assertTrue(found)
+        self.assertTrue(all(item.severity == "warning" for item in found))
+
+    def test_html_reads_visible_text_without_inspecting_attributes_as_code(self):
+        found = checker.scan_html("sample.html", '<p data-id="previously">正常</p><input title="以前这里是旧实现">')
+        self.assertEqual([(item.line, item.severity) for item in found], [(1, "error")])
+
     def test_markdown_code_fences_carry_commands_not_prose(self):
         source = "正文\n```\ngit log --grep 以前\n```\n以前\n"
         found = checker.scan_lines("sample.md", source, skip_code_fences=True)
@@ -65,12 +82,12 @@ class CopyFinalStateTests(unittest.TestCase):
         """扫描面写死成 glob 就会漏掉新目录，所以直接核对它收到了哪些文件。"""
         picked = {path.relative_to(ROOT).as_posix() for path in checker.targets(ROOT)}
         for required in ("AGENTS.md", "README.md", "docs/WRITING.md",
-                         "web/index.html", "frontend/src/application/composition.js", "frontend/src/core/index.ts",
+                         "web/index.html",
                          "src/peach/web_entity.py",
                          "tests/test_web_ui.py",
                          ".claude/skills/peach-worktree/SKILL.md"):
             self.assertIn(required, picked)
-        self.assertTrue(any(path.startswith("frontend/src/") for path in picked))
+        self.assertFalse(any(path.startswith("frontend/src/") for path in picked))
         # ADR 正文的内容就是决策与被否掉的备选方案，本门槛不适用。
         self.assertFalse(any(path.startswith("docs/adr/") for path in picked))
 
