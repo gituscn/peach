@@ -293,19 +293,29 @@ class DownloadTask:
     def from_row(cls, row: sqlite3.Row) -> "DownloadTask":
         return cls(**{name: row[name] for name in row.keys()})
 
-    def payload(self) -> dict:
-        from .catalog_rules import release_code_from_filename
+    def payload(self, asset: dict | None = None) -> dict:
+        from .catalog_rules import jav_fallback_title, release_code_from_filename, same_release_code
 
         kind = FAILURE_KINDS.get(self.failure or "")
         codes = {code for name in (self.remote_name, self.display_name, self.title)
                  if name and (code := release_code_from_filename(name))}
-        display_code = self.code or (next(iter(codes)) if len(codes) == 1 else None)
+        display_code = self.code or (asset or {}).get("code") or (next(iter(codes)) if len(codes) == 1 else None)
+        matched_asset = asset if asset and (not display_code or not asset.get("code")
+                                            or same_release_code(display_code, asset["code"])) else {}
+        display_title = next((str(matched_asset.get(field) or "").strip()
+                              for field in ("catalog_title", "original_title")
+                              if str(matched_asset.get(field) or "").strip()), "")
+        if not display_title:
+            display_title = (self.title or "").strip() if jav_fallback_title(self.title, display_code) else ""
+        if not display_title:
+            display_title = next((title for name in (self.display_name, self.remote_name)
+                                  if (title := jav_fallback_title(name, display_code))), "")
         return {
             "id": self.id, "info_hash": self.info_hash, "provider": self.provider,
             "provider_label": PROVIDER_LABELS.get(self.provider, self.provider),
             "source_uri": self.source_uri, "display_name": self.display_name,
             "target": self.target, "code": self.code, "title": self.title, "origin": self.origin,
-            "display_code": display_code,
+            "display_code": display_code, "display_title": display_title,
             "state": self.state, "state_label": STATE_LABELS.get(self.state, self.state),
             "failure": self.failure, "failure_label": kind.label if kind else None,
             "failure_detail": self.failure_detail,
@@ -377,6 +387,17 @@ class DownloadStore:
             rows = connection.execute(
                 f"SELECT * FROM download_task{where} ORDER BY id DESC LIMIT ?", args).fetchall()
         return [DownloadTask.from_row(row) for row in rows]
+
+    def display_assets(self, tasks: list[DownloadTask]) -> dict[int, dict]:
+        """一页任务已绑定作品的只读标题资料。"""
+        ids = sorted({task.asset_id for task in tasks if task.asset_id is not None})
+        if not ids:
+            return {}
+        with self.database.read_connection() as connection:
+            rows = connection.execute(
+                "SELECT id,code,catalog_title,original_title FROM asset "
+                f"WHERE id IN ({','.join('?' for _ in ids)})", ids).fetchall()
+        return {row["id"]: dict(row) for row in rows}
 
     def due(self, now: float) -> list[DownloadTask]:
         states = tuple(sorted(TRACKED_STATES))
@@ -711,10 +732,11 @@ class DownloadService:
         rows = self.store.page(limit + 1, before_id)
         tasks = rows[:limit]
         has_more = len(rows) > limit
+        assets = self.store.display_assets(tasks)
         return {
             "available": self.available,
             "providers": [self._provider_state(key) for key in PROVIDER_LABELS],
-            "tasks": [task.payload() for task in tasks],
+            "tasks": [task.payload(assets.get(task.asset_id)) for task in tasks],
             "has_more": has_more,
             "next_before_id": tasks[-1].id if has_more else None,
         }

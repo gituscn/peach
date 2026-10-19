@@ -13,7 +13,7 @@ from unittest import mock
 import httpx
 from fastapi.testclient import TestClient
 
-from peach import download_postprocess
+from peach import download_postprocess, entities
 from peach import downloads as dl
 from peach import downloads_clouddrive, web_downloads
 from peach.api import create_app
@@ -92,6 +92,39 @@ class _App(unittest.TestCase):
 
 
 class RouteTests(_App):
+    def test_download_artwork_uses_local_library_images_after_ingestion(self):
+        from PIL import Image
+
+        contract = self.app.state.web_contract
+        contract.cover_root = self.root / "covers"
+        contract.avatar_root = self.root / "avatars"
+        contract.cover_root.mkdir()
+        contract.avatar_root.mkdir()
+        Image.new("RGB", (640, 360), "white").save(contract.cover_root / "ABC-123.jpg")
+        with self.service.store.database.write_transaction() as connection:
+            asset_id = connection.execute(
+                "INSERT INTO asset(location,path,name,medium,code) VALUES(?,?,?,?,?)",
+                ("115", "B:\\云下载\\ABC-123.mp4", "ABC-123.mp4", "video", "ABC-123"),
+            ).lastrowid
+            performer_id = entities.upsert_asset_entity(
+                connection, kind="performer", name="测试女优", asset_id=asset_id,
+                role="performer", source="test:downloads")
+        Image.new("RGB", (128, 128), "white").save(
+            contract.avatar_root / f"performer-{performer_id}.img", format="JPEG")
+        task = self.service.store.save(dl.DownloadTask(
+            id=0, info_hash="d" * 40, provider="115", source_uri="magnet:?xt=urn:btih:" + HASH,
+            display_name="ABC-123", code="ABC-123", target="/云下载", state=dl.REMOTE_RUNNING,
+            asset_id=asset_id))
+        self.assertIsNone(self.client.get("/api/downloads").json()["tasks"][0]["artwork"])
+        task.state = dl.INGESTED
+        self.service.store.save(task)
+        artwork = self.client.get("/api/downloads").json()["tasks"][0]["artwork"]
+        self.assertTrue(artwork["has_cover"])
+        self.assertEqual(artwork["cover_key"], "ABC-123")
+        self.assertEqual([(ref["name"], ref["has_image"]) for ref in artwork["performer_entities"]],
+                         [("测试女优", True)])
+        self.assertEqual(self.provider.submitted, [])
+
     def test_the_contract_and_the_app_share_one_service(self):
         self.assertIs(self.app.state.web_contract.downloads, self.service)
 
@@ -129,6 +162,36 @@ class RouteTests(_App):
         self.assertFalse(last["has_more"])
         for position in ("nope", "0", "-1"):
             self.assertEqual(self.client.get(f"/api/downloads?before_id={position}").status_code, 400)
+
+    def test_download_titles_use_bound_work_metadata_without_changing_saved_tasks(self):
+        with self.service.store.database.write_transaction() as connection:
+            asset_id = connection.execute(
+                "INSERT INTO asset(location,path,name,medium,code,catalog_title) VALUES(?,?,?,?,?,?)",
+                ("115", "B:\\云下载\\ABC-123.mp4", "ABC-123.mp4", "video", "ABC-123", "制作记录与访谈"),
+            ).lastrowid
+        bound = self.service.store.save(dl.DownloadTask(
+            id=0, info_hash="a" * 40, provider="115", source_uri="magnet:?xt=urn:btih:" + HASH,
+            display_name="ABC-123", target="/云下载", state=dl.INGESTED,
+            title="ABC-123", asset_id=asset_id))
+        named = self.service.store.save(dl.DownloadTask(
+            id=0, info_hash="b" * 40, provider="115", source_uri="magnet:?xt=urn:btih:" + HASH,
+            display_name="XYZ-456 制作花絮.mp4", target="/云下载", state=dl.FAILED, code="XYZ-456"))
+        listed = {task["id"]: task for task in self.client.get("/api/downloads").json()["tasks"]}
+        self.assertEqual((listed[bound.id]["display_code"], listed[bound.id]["display_title"]),
+                         ("ABC-123", "制作记录与访谈"))
+        self.assertEqual((listed[named.id]["display_code"], listed[named.id]["display_title"]),
+                         ("XYZ-456", "制作花絮"))
+        self.assertEqual(self.service.store.get(bound.id).title, "ABC-123")
+        self.assertIsNone(self.service.store.get(bound.id).code)
+        with self.service.store.database.write_transaction() as connection:
+            connection.execute("UPDATE asset SET catalog_title=NULL,original_title=? WHERE id=?",
+                               ("原始作品标题", asset_id))
+        self.assertEqual(self.client.get("/api/downloads").json()["tasks"][1]["display_title"], "原始作品标题")
+        bound.code = "DEF-456"
+        bound.title = "提交时的标题"
+        self.service.store.save(bound)
+        conflicted = self.client.get("/api/downloads").json()["tasks"][1]
+        self.assertEqual((conflicted["display_code"], conflicted["display_title"]), ("DEF-456", "提交时的标题"))
 
     def test_failed_postprocess_can_be_requeued_without_resubmitting(self):
         result = self.service.submit(

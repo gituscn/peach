@@ -714,6 +714,10 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.17.0，版本
 
 站点强调色检查覆盖进度、焦点、选中态、操作按钮与流光：旧 `--feedback-success` 引用既有强调色色阶；RSS 订阅保留橙色，信息、成功、警告、错误、品牌与图表分类保留语义色。
 
-任务中心的摘要复用结果字段白名单和 `Disclosure`：主区域以中文列表显示处理结果，原始字段与来源报告保留在「技术详情」。云下载复用 TanStack Query 5.104.3（MIT）的 `useInfiniteQuery`，按任务 id 倒序每批读取 20 条，轮询覆盖已加载页面；`has_more` 与 `next_before_id` 指定后续页面，更新状态不改变提交顺序。展示番号复用 `catalog_rules.release_code_from_filename`，保留已保存的番号，缺失时只展示名称中取得的唯一番号；冲突或未识别时不推断，不写真实 ledger。标题与状态保持一行，可展开完整标题。未新增依赖。
+任务中心的摘要复用结果字段白名单和 `Disclosure`：主区域以中文列表显示处理结果，原始字段与来源报告保留在「技术详情」。云下载复用 TanStack Query 5.104.3（MIT）的 `useInfiniteQuery`，按任务 id 倒序每批读取 20 条，轮询覆盖已加载页面；`has_more` 与 `next_before_id` 指定后续页面，更新状态不改变提交顺序。展示番号复用 `catalog_rules.release_code_from_filename`，优先已保存的番号和已绑定作品的番号，缺失时只展示名称中取得的唯一番号；冲突或未识别时不推断。标题资料按页批量读取已绑定作品的 `catalog_title`／`original_title`，其次使用提交标题和 `jav_fallback_title` 清理后的资源名称；`display_code`／`display_title` 是只读投影，不写真实 ledger。卡片复用 `javTitleParts` 去除标题开头的重复番号，以「番号 · 标题」显示，缺少标题时只显示番号。标题单行截断，状态在桌面与标题同行，窄屏另起一行；完整标题可展开。未新增依赖。
+
+云下载卡片的 `artwork` 只读取已入库任务绑定的本机资产，复用 `attach_artwork_fields`、`attach_card_performers`、`coverImage`、`ArtSlot` 与 `avatarInner`；封面沿用缩略图、版本和正封取景，女优头像沿用实体图片及姓名回退。页面轮询同步入库资料，提交与进度跟踪不等待图片，不额外创建取图任务或请求外部来源。没有封面时保留占位，图片失败使用共享回退处理。未新增依赖或 ledger 写入。
+
+桌面封面与右侧标题到按钮等高，取景复用 `coverAnchor` 并通过 `ResizeObserver` 同步实际容器比例；手机使用固定比例小封面。展开的完整标题位于卡片信息区下方，封面高度保持稳定。已入库且具有 `asset_id` 的任务，封面和标题使用原生链接打开 `/assets/:id`，同时保留新标签页与键盘访问；其他任务不提供详情链接。
 
 普通 Toast 与扫描任务卡共用 Agent Progress 外框，16px 半径由通知栈内的既有 token 解析，细边框与接触阴影分别复用 `border-button-default`、`elevation-xs`，不改变内容排版。浏览器回归核对桌面、手机和明暗主题下的外框一致性，并以同一任务、同一内容回放外框基线生成对比图。

@@ -1,5 +1,6 @@
 /* 活动页云下载段的行为：任务卡给哪些键、没有任务时整段不画、只读端不给写操作。 */
 import { QueryClientProvider } from '@tanstack/react-query';
+import { act } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 
 import { DownloadsPanel, downloadPollInterval } from '../../src/react/activity/downloads-panel';
@@ -54,6 +55,53 @@ const show = async () => {
   });
   return host;
 };
+
+it.each([
+  [{ title: '制作记录' }, 'ABC-123 · 制作记录'],
+  [{ title: 'ABC-123 制作记录' }, 'ABC-123 · 制作记录'],
+  [{ title: 'ABC-123' }, 'ABC-123'],
+  [{ title: null, display_title: '', display_code: 'ABC-123' }, 'ABC-123'],
+  [{ title: 'ABC-123', display_title: '作品资料中的标题' }, 'ABC-123 · 作品资料中的标题'],
+  [{ code: null, display_code: 'XYZ-456', display_title: '制作花絮' }, 'XYZ-456 · 制作花絮'],
+  [{ code: null, title: '制作记录', display_name: '' }, '制作记录'],
+] as [Partial<DownloadTask>, string][])('云下载卡片用番号和标题标识作品：%j', async (patch, expected) => {
+  serve(snapshot({ tasks: [task(patch)] }));
+  const host = await show();
+  expect(host.querySelector('strong')?.textContent).toBe(expected);
+  await click(buttonNamed('展开标题', host));
+  expect(host.querySelector('[data-download-title-full]')?.textContent).toBe(expected);
+});
+
+it('入库资料随轮询补上本机封面和女优头像，不发起来源取图', async () => {
+  const shown = snapshot({ tasks: [task()] });
+  const { calls } = serve(shown);
+  const host = await show();
+  expect(host.querySelector('[data-download-cover] img')).toBeNull();
+  expect(buttonNamed('取消', host)).not.toBeNull();
+  const refreshed = serve(snapshot({ tasks: [task({ state: 'ingested', cancellable: false, artwork: {
+    has_cover: true, code: 'ABC-123', cover_key: 'ABC-123', cover_version: 'v2',
+    performer_entities: [{ id: 20, name: '测试女优', has_image: true, image_version: 'a2' }],
+  } })] }));
+  await act(async () => { await queryClient.invalidateQueries({ queryKey: ['downloads'] }); });
+  await vi.waitFor(async () => {
+    await settle();
+    expect(host.querySelector('[data-download-cover] img')?.getAttribute('src')).toBe('/cover?code=ABC-123&thumb=1&v=v2');
+  });
+  expect(host.querySelector('[data-media-avatar] img')?.getAttribute('src')).toContain('/entity-image?');
+  expect(host.querySelector('[data-media-avatar]')?.getAttribute('aria-label')).toBe('打开女优页：测试女优');
+  expect([...calls, ...refreshed.calls].every(([url]) => url.startsWith('/api/downloads'))).toBe(true);
+});
+
+it.each([
+  [{ state: 'ingested', asset_id: 42 }, '/assets/42'],
+  [{ state: 'ingested', asset_id: null }, null],
+  [{ state: 'remote_running', asset_id: 42 }, null],
+] as [Partial<DownloadTask>, string | null][])('只有已入库并关联作品的任务提供封面和标题链接：%j', async (patch, href) => {
+  serve(snapshot({ tasks: [task(patch)] }));
+  const host = await show();
+  expect(host.querySelector('[data-download-cover-link]')?.getAttribute('href') ?? null).toBe(href);
+  expect(host.querySelector('[data-download-title-link]')?.getAttribute('href') ?? null).toBe(href);
+});
 
 it('远端在跑的任务给进度与取消键，取消发到取消接口', async () => {
   const { posts } = serve(snapshot({ tasks: [task()] }), { '/api/downloads/cancel': { ok: true, task: task() } });

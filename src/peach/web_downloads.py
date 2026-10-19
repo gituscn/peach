@@ -79,7 +79,31 @@ def q_downloads(contract, args) -> dict:
         raise ValueError("下载任务分页位置无效") from None
     if before_id is not None and before_id < 1:
         raise ValueError("下载任务分页位置无效")
-    return _service(contract).snapshot(limit, before_id=before_id)
+    snapshot = _service(contract).snapshot(limit, before_id=before_id)
+    _attach_library_artwork(contract, snapshot["tasks"])
+    return snapshot
+
+
+def _attach_library_artwork(contract, tasks: list[dict]) -> None:
+    """已入库任务复用本机馆藏封面与人物资料；不发起远端取图。"""
+    from .catalog_rules import same_release_code
+    from .web_catalog import attach_artwork_fields, attach_card_performers
+
+    ids = sorted({task["asset_id"] for task in tasks if task["state"] == "ingested" and task["asset_id"]})
+    assets = {}
+    if ids:
+        with contract.read_connection() as connection:
+            rows = connection.execute(
+                f"SELECT id,code FROM asset WHERE id IN ({','.join('?' for _ in ids)})", ids).fetchall()
+        assets = {row["id"]: dict(row) for row in rows}
+        attach_card_performers(contract, list(assets.values()))
+        for asset in assets.values():
+            attach_artwork_fields(contract, asset)
+    for task in tasks:
+        asset = assets.get(task["asset_id"]) if task["state"] == "ingested" else None
+        if asset and task["display_code"] and asset["code"] and not same_release_code(task["display_code"], asset["code"]):
+            asset = None
+        task["artwork"] = asset
 
 
 def w_download_submit(contract, body) -> dict:
