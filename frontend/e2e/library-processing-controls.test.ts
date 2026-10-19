@@ -169,7 +169,7 @@ describe('扫描与采集控制', () => {
         assert.equal(await dock.locator('summary').getAttribute('aria-expanded'), 'true');
         const expandedHeight = (await dock.boundingBox())!.height;
         const noticeMotion = await dock.evaluate(el => ({
-          frame: getComputedStyle(el.querySelector('.processing-notice-fold')!).transitionProperty,
+          frame: getComputedStyle(el.querySelector('[data-processing-body]')!).transitionProperty,
           arrow: getComputedStyle(el.querySelector('[data-processing-toggle] > svg')!).transitionProperty,
           arrowDuration: getComputedStyle(el.querySelector('[data-processing-toggle] > svg')!).transitionDuration,
         }));
@@ -184,7 +184,7 @@ describe('扫描与采集控制', () => {
         assert.equal(await dock.locator('summary').getAttribute('aria-expanded'), 'false');
         await dock.getByRole('button', { name: '收起任务详情' }).click();
         await page.emulateMedia({ reducedMotion: 'reduce' });
-        assert.equal(await dock.locator('.processing-notice-fold').evaluate(el => getComputedStyle(el).transitionProperty), 'none');
+        assert.equal(await dock.locator('[data-processing-body]').evaluate(el => getComputedStyle(el).transitionProperty), 'none');
         assert.equal(await dock.locator('[data-processing-traffic]').isVisible(), true);
         const fixed = await dock.boundingBox();
         await dock.hover();

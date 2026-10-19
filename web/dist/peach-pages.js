@@ -19556,37 +19556,39 @@ function Sm({ term: e, children: t }) {
 		})]
 	});
 }
-function Cm({ summary: e, defaultOpen: t = !1, children: n, trailing: r = !1, onOpenChange: i, contentClassName: a }) {
-	let o = (0, y.useId)(), s = (0, y.useRef)(null), c = (0, y.useRef)(null), l = (0, y.useRef)(!1), [u, d] = (0, y.useState)(t);
-	return /* @__PURE__ */ (0, z.jsxs)("details", {
+function Cm({ summary: e, defaultOpen: t = !1, isOpen: n, children: r, trailing: i = !1, onOpenChange: a, contentClassName: o }) {
+	let s = (0, y.useId)(), c = (0, y.useRef)(null), l = (0, y.useRef)(null), u = (0, y.useRef)(!1), [d, f] = (0, y.useState)(n ?? t);
+	return (0, y.useLayoutEffect)(() => {
+		n !== void 0 && n !== d && c.current && l.current && (nm(c.current, l.current, n), f(n));
+	}, [n, d]), /* @__PURE__ */ (0, z.jsxs)("details", {
 		ref: (e) => {
-			s.current = e, e && t && !l.current && (l.current = !0, e.open = !0);
+			c.current = e, e && (n ?? t) && !u.current && (u.current = !0, e.open = !0);
 		},
 		children: [/* @__PURE__ */ (0, z.jsxs)("summary", {
-			"aria-expanded": u,
-			"aria-controls": o,
+			"aria-expanded": d,
+			"aria-controls": s,
 			onClick: (e) => {
-				e.preventDefault(), s.current && c.current && (nm(s.current, c.current, !u), d(!u), i?.(!u));
+				e.preventDefault(), c.current && l.current && (nm(c.current, l.current, !d), f(!d), a?.(!d));
 			},
-			className: `${r ? "w-full" : "w-fit"} flex cursor-pointer list-none items-center gap-1 rounded-sm text-body-2-medium text-text-secondary outline-none select-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring`,
+			className: `${i ? "w-full" : "w-fit"} flex cursor-pointer list-none items-center gap-1 rounded-sm text-body-2-medium text-text-secondary outline-none select-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring`,
 			children: [
-				r ? null : /* @__PURE__ */ (0, z.jsx)(jp, {
+				i ? null : /* @__PURE__ */ (0, z.jsx)(jp, {
 					"aria-hidden": !0,
-					className: u ? "size-4 shrink-0 rotate-90 transition-transform" : "size-4 shrink-0 transition-transform"
+					className: d ? "size-4 shrink-0 rotate-90 transition-transform" : "size-4 shrink-0 transition-transform"
 				}),
 				e,
-				r ? /* @__PURE__ */ (0, z.jsx)(jp, {
+				i ? /* @__PURE__ */ (0, z.jsx)(jp, {
 					"aria-hidden": !0,
-					className: u ? "ml-auto size-4 shrink-0 -rotate-90 transition-transform" : "ml-auto size-4 shrink-0 rotate-90 transition-transform"
+					className: d ? "ml-auto size-4 shrink-0 -rotate-90 transition-transform" : "ml-auto size-4 shrink-0 rotate-90 transition-transform"
 				}) : null
 			]
 		}), /* @__PURE__ */ (0, z.jsx)("div", {
-			ref: c,
-			id: o,
-			inert: !u,
+			ref: l,
+			id: s,
+			inert: !d,
 			children: /* @__PURE__ */ (0, z.jsx)("div", {
-				className: R("flex flex-col gap-2 pt-3", a),
-				children: n
+				className: R("flex flex-col gap-2 pt-3", o),
+				children: r
 			})
 		})]
 	});

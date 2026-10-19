@@ -84,7 +84,7 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
     </div>
     <TrafficProgress traffic={state?.traffic} detailsOpen={trafficExpanded} onDetailsChange={setTrafficExpanded} />
     </div>
-    <CollapseRegion id={bodyId} open={expanded} className="processing-notice-fold"><div className="pt-3"><div className={cx('flex min-w-0 flex-col gap-2 border-t pt-3',
+    <CollapseRegion id={bodyId} open={expanded} data-processing-body=""><div className="pt-3"><div className={cx('flex min-w-0 flex-col gap-2 border-t pt-3',
       failed ? 'border-border-error-default/20' : warning ? 'border-current/20' : 'border-separator-border')}>
       {state?.steps?.length ? <ol aria-label="处理步骤" className="flex min-w-0 flex-col gap-1.5">
         {state.steps.map(step => <li key={step.id} data-processing-step={step.status}
