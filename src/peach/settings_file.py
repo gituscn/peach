@@ -588,18 +588,23 @@ def render(config: PeachConfig) -> str:
     lines = [
         "# Peach 设置文件。优先级：环境变量 > 本文件 > 内建默认；改完重启服务生效。",
         "# 本文件住在数据根内部，数据根本身由 PEACH_DATA_ROOT 或项目旁的 peach-data 决定。",
+        "# Docker：本文件位于 /data/config.toml，/data 必须持久化；媒体使用容器内路径 /media。",
+        "# Docker 部署说明：https://github.com/peach-mitao/peach/blob/master/docs/DOCKER.md",
         f"# 生成入口：peach init（数据根：{config.data_root}）",
         "",
         "[directories]",
         "# 数据根下的子目录，省略即取同名目录；写绝对路径可以把某一类数据搬出数据根。",
+        "# Docker 中相对目录位于 /data 下；绝对路径必须在容器内可访问并持久化。",
     ]
     lines += _render_pairs({key: config.directories[key]
                             for key in DIRECTORY_KEYS if key in config.directories})
     lines += [
         "",
         "[media.locations]",
-        "# asset.location -> 账本口径的声明根。改这里等于改账本口径，通常不要动。",
-        "# 一个来源有几个目录就写几个：local = ['D:\\Videos', 'E:\\Movies']。",
+        "# 来源 ID -> 账本中的声明根，统一使用带盘符的路径作为标识。已有声明根通常不要改。",
+        "# Docker / Linux / macOS 的实际目录填在 [media.mounts]；无需创建 Windows 盘符。",
+        "# Docker 示例：local = 'R:\\media'，在 [media.mounts] 中配 local = '/media'。",
+        "# Windows 示例：local = ['D:\\Videos', 'E:\\Movies']，直接使用本机媒体目录。",
     ]
     lines += _render_roots(dict(config.locations))
     lines += [
@@ -620,8 +625,10 @@ def render(config: PeachConfig) -> str:
     lines += [
         "",
         "[media.mounts]",
-        "# asset.location -> 本机挂载点：上面那个声明根落在本机的哪个目录。",
-        "# 例如 local = '/mnt/media' 时，R:\\media\\a.mp4 读作 /mnt/media/a.mp4。",
+        "# 来源 ID -> 实际媒体目录，与 [media.locations] 的声明根一一对应。",
+        "# Docker 示例：local = '/media'，R:\\media\\a.mp4 实际读取 /media/a.mp4。",
+        "# Docker 只填写容器内路径；宿主机目录在 Compose 的 volumes 中配置。",
+        "# Linux / macOS 也使用本机绝对路径，例如 /mnt/media 或 /Volumes/Media。",
         "# 声明了多个根就按同样的顺序给同样多个落点。",
         "# 不写或留空表示本机没有这个来源，对应资产按「脱盘」处理，不报错。",
         "# Windows 上整表为空：盘符本身就是挂载点，路径不需要翻译。",
@@ -630,6 +637,8 @@ def render(config: PeachConfig) -> str:
     lines += [
         "",
         "[server]",
+        "# Docker 无桌面入口固定监听 0.0.0.0:8900；宿主机访问地址与端口由 Compose 配置。",
+        "# 此处 host、port 用于直接运行 peach serve；Docker 入口参数优先。",
         "# mdns_name 在局域网里必须唯一：两台机器同名会互相抢占。",
         "# review_writer_origin 是 reader 复核镜像要读的 writer 源，留空表示本机不做镜像。",
     ]
@@ -643,8 +652,8 @@ def render(config: PeachConfig) -> str:
     lines += [
         "",
         "[replication]",
-        "# 单写者 ledger 复制的坐标（ADR-0017）。enabled = false 时不启动同步观察器、",
-        "# 不探测 SMB、托盘不出 Ledger 菜单项，服务按独立写者跑。只有一台机器就别开。",
+        "# 多机单写者账本复制设置（ADR-0017）。单机与独立 Docker 部署保持 enabled = false。",
+        "# 关闭时不启动同步观察器、不探测 SMB；桌面托盘不显示 Ledger 菜单项。",
         "# shared_root 留空表示 <数据根的上级>/peach-sync；smb_* 留空表示不挂载共享。",
     ]
     lines += _render_pairs({
