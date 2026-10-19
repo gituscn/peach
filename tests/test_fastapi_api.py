@@ -995,10 +995,16 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             root = Path(tmp).resolve()
             (root / 'scripts/dev').mkdir(parents=True)
             (root / 'scripts/dev/copy-editor.js').write_text('', encoding='utf-8')
+            (root / 'frontend/src').mkdir(parents=True)
+            (root / 'frontend/src/copy-editor-core.js').write_text('/* 核心 */', encoding='utf-8')
             (root / 'web').mkdir()
             path = root / 'web/index.html'
             path.write_text('<p>说明</p>', encoding='utf-8')
             with patch.object(routes_pages, 'PROJECT_ROOT', root):
+                core = await self.client.get('/dev/copy-editor-core.js?t=secret')
+                self.assertEqual(core.status_code, 200)
+                self.assertEqual(core.text, '/* 核心 */')
+                self.assertEqual((await self.client.get('/dev/copy-editor-core.js')).status_code, 401)
                 candidate, = (await self.client.get('/dev/copy-candidates?t=secret&text=说明')).json()
                 saved = await self.client.post('/dev/copy-save?t=secret',
                     headers={'Origin': str(self.client.base_url).rstrip('/')},
@@ -1014,6 +1020,7 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(refused.status_code, 403)
                 with patch.object(routes_pages.sys, 'frozen', True, create=True):
                     self.assertEqual((await self.client.get('/dev/copy-apply?t=secret')).status_code, 404)
+                    self.assertEqual((await self.client.get('/dev/copy-editor-core.js?t=secret')).status_code, 404)
 
     async def test_bundled_site_icons_require_auth_and_validate_names(self):
         from peach.config import PROJECT_ROOT

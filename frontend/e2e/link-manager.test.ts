@@ -16,7 +16,7 @@ describe('链接检查身份与断链动效', () => {
           url: 'https://example.com/profile', note: 'HTTP 404' };
         await page.route('**/api/links/check', route => route.fulfill({ json: {
           status: 'complete', check_id: 'test', checked: 2, total: 2,
-          gone: [row], unclear: [{ ...row, id: 2, note: 'HTTP 403' }], scope: 'all',
+          gone: [row], unclear: [{ ...row, id: 2, note: 'HTTP 403\n站点拒绝本次访问，暂时无法确认链接是否失效。链接保留，可稍后重试。' }], scope: 'all',
         } }));
         for (const pattern of ['**/entity-image?**', '**/link-mark?**']) {
           await page.route(pattern, route => route.fulfill({ contentType: 'image/svg+xml',
@@ -31,7 +31,8 @@ describe('链接检查身份与断链动效', () => {
           await table.waitFor();
           assert.equal(await table.locator('[data-link-identity]').getAttribute('href'), '/performers/31');
           assert.equal(await table.locator('[data-link-identity] img').count(), 1);
-          assert.equal(await table.locator('[data-link-name] img').count(), 1);
+          assert.equal(await table.locator('[data-link-address] img').count(), 1);
+          assert.equal(await table.locator('[data-link-name] img').count(), 0);
           assert.ok((await table.innerText()).includes('Peach 资料'));
           assert.ok((await table.innerText()).includes('链接名称'));
         }
@@ -39,15 +40,19 @@ describe('链接检查身份与断链动效', () => {
           const gone = document.querySelector('[data-link-results="gone"]')!;
           const unclear = document.querySelector('[data-link-results="unclear"]')!;
           const action = [...gone.querySelectorAll('button')].find(node => node.textContent?.includes('条失效链接'))!;
-          const chip = document.querySelector('[data-link-result="unclear"] span')!;
+          const text = document.querySelector('[data-link-result="unclear"] p')!;
           return { deletionBottom: action.getBoundingClientRect().bottom, unclearTop: unclear.getBoundingClientRect().top,
-            chipBackground: getComputedStyle(chip).backgroundColor,
+            textBackground: getComputedStyle(text).backgroundColor,
             footerBackground: getComputedStyle(action.parentElement!).backgroundColor,
             panelBackground: getComputedStyle(gone).backgroundColor };
         });
         assert.ok(sections.deletionBottom < sections.unclearTop);
-        assert.notEqual(sections.chipBackground, 'rgba(0, 0, 0, 0)');
+        assert.equal(sections.textBackground, 'rgba(0, 0, 0, 0)');
         assert.equal(sections.footerBackground, sections.panelBackground);
+        assert.equal(await page.locator('[data-link-results="gone"] [data-link-code]').innerText(), 'HTTP 404');
+        assert.equal(await page.locator('[data-link-results="unclear"] [data-link-code]').count(), 0);
+        await page.locator('[data-link-results="unclear"]').getByRole('button', { name: '查看详情', exact: true }).click();
+        await page.getByText('暂时无法确认链接是否失效', { exact: false }).waitFor();
         const motion = await page.locator('[data-link-check-icon]').evaluate(svg => {
           const rays = svg.querySelector('[data-link-check-rays]')!;
           const css = getComputedStyle(rays);

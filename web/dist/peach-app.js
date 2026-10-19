@@ -38422,28 +38422,28 @@ function hye({ task: e, writable: t }) {
 }
 //#endregion
 //#region src/react/activity/error-excerpt.tsx
-function ej({ text: e, className: t = "", summary: n }) {
-	let [r, i] = (0, S.useState)(!1), a = (0, S.useId)(), o = String(e || "").trim(), s = VA(o);
-	if (!s) return null;
-	let c = s !== o;
+function ej({ text: e, className: t = "" }) {
+	let [n, r] = (0, S.useState)(!1), i = (0, S.useId)(), a = String(e || "").trim(), o = VA(a);
+	if (!o) return null;
+	let s = o !== a;
 	return /* @__PURE__ */ (0, C.jsxs)("div", {
 		"data-error-excerpt": "",
 		className: `flex min-w-0 max-w-full flex-col items-start gap-1 ${t}`,
-		children: [r ? /* @__PURE__ */ (0, C.jsx)("p", {
-			id: a,
+		children: [n ? /* @__PURE__ */ (0, C.jsx)("p", {
+			id: i,
 			className: "max-h-80 w-full overflow-y-auto whitespace-pre-line wrap-anywhere",
-			children: o
-		}) : n ?? /* @__PURE__ */ (0, C.jsx)("p", {
+			children: a
+		}) : /* @__PURE__ */ (0, C.jsx)("p", {
 			className: "w-full wrap-anywhere",
-			children: s
-		}), c ? /* @__PURE__ */ (0, C.jsx)(q, {
+			children: o
+		}), s ? /* @__PURE__ */ (0, C.jsx)(q, {
 			variant: "ghost",
 			size: "xs",
 			className: "-ml-2",
-			"aria-expanded": r,
-			"aria-controls": r ? a : void 0,
-			onClick: () => i(!r),
-			children: r ? "收起详情" : "查看详情"
+			"aria-expanded": n,
+			"aria-controls": n ? i : void 0,
+			onClick: () => r(!n),
+			children: n ? "收起详情" : "查看详情"
 		}) : null]
 	});
 }
@@ -59211,13 +59211,13 @@ function OV({ title: e, items: t, hint: n, picked: r, onPick: i, children: a, fo
 					label: "链接名称",
 					min: 128,
 					value: (e) => e.label || "",
-					render: (e) => /* @__PURE__ */ (0, C.jsxs)("span", {
+					render: (e) => /* @__PURE__ */ (0, C.jsx)("span", {
 						className: "flex min-w-24 items-center gap-2",
 						"data-link-name": "",
-						children: [/* @__PURE__ */ (0, C.jsx)(CV, { linkId: e.id }), /* @__PURE__ */ (0, C.jsx)("span", {
+						children: /* @__PURE__ */ (0, C.jsx)("span", {
 							className: "min-w-0 wrap-anywhere",
 							children: e.label || new URL(e.url).hostname
-						})]
+						})
 					})
 				},
 				{
@@ -59229,17 +59229,14 @@ function OV({ title: e, items: t, hint: n, picked: r, onPick: i, children: a, fo
 					render: (e) => /* @__PURE__ */ (0, C.jsx)("div", {
 						className: "min-w-40 max-w-80",
 						"data-link-result": s ? "gone" : "unclear",
-						children: /* @__PURE__ */ (0, C.jsx)(ej, {
+						children: /^(?:HTTP\s+)?[1-5]\d{2}$/.test(e.note.trim()) ? /* @__PURE__ */ (0, C.jsx)(tA, {
+							variant: "caption",
+							color: s ? "rose" : "neutral",
+							"data-link-code": "",
+							children: e.note.trim()
+						}) : /* @__PURE__ */ (0, C.jsx)(ej, {
 							text: e.note,
-							className: "tabular-nums",
-							summary: /* @__PURE__ */ (0, C.jsx)(tA, {
-								variant: "caption",
-								color: s ? "rose" : "neutral",
-								children: /* @__PURE__ */ (0, C.jsx)("span", {
-									className: "max-w-64 truncate",
-									children: VA(e.note)
-								})
-							})
+							className: `tabular-nums ${s ? "text-text-error-primary" : "text-text-secondary"}`
 						})
 					})
 				},
@@ -59254,15 +59251,20 @@ function OV({ title: e, items: t, hint: n, picked: r, onPick: i, children: a, fo
 						target: "_blank",
 						rel: "noreferrer",
 						title: e.url,
+						"data-link-address": "",
 						className: "flex max-w-90 min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary",
-						children: [/* @__PURE__ */ (0, C.jsx)("span", {
-							"data-middle-truncate": !0,
-							className: "min-w-0 truncate",
-							children: e.url
-						}), /* @__PURE__ */ (0, C.jsx)(xk, {
-							"aria-hidden": !0,
-							className: "size-3.5 shrink-0"
-						})]
+						children: [
+							/* @__PURE__ */ (0, C.jsx)(CV, { linkId: e.id }),
+							/* @__PURE__ */ (0, C.jsx)("span", {
+								"data-middle-truncate": !0,
+								className: "min-w-0 truncate",
+								children: e.url
+							}),
+							/* @__PURE__ */ (0, C.jsx)(xk, {
+								"aria-hidden": !0,
+								className: "size-3.5 shrink-0"
+							})
+						]
 					})
 				}
 			],

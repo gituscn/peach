@@ -246,7 +246,7 @@ def index(request: Request, args: dict[str, str] = Depends(require_page_auth)):
             html = html.replace("</head>", script + "</head>", 1) if "</head>" in html else html + script
         if editor:
             html = html.replace("<body", '<body data-peach-copy-mode="source"', 1)
-            html = html.replace("</body>", '<script src="/dev/copy-editor.js" defer></script></body>')
+            html = html.replace("</body>", '<script src="/dev/copy-editor-core.js" defer></script><script src="/dev/copy-editor.js" defer></script></body>')
         response = HTMLResponse(html)
     else:
         response = FileResponse(settings.page_path, media_type="text/html")
@@ -256,7 +256,8 @@ def index(request: Request, args: dict[str, str] = Depends(require_page_auth)):
 
 
 def _copy_editor_available() -> bool:
-    return not getattr(sys, "frozen", False) and (PROJECT_ROOT / "scripts/dev/copy-editor.js").is_file()
+    return not getattr(sys, "frozen", False) and all((PROJECT_ROOT / path).is_file() for path in (
+        "scripts/dev/copy-editor.js", "frontend/src/copy-editor-core.js"))
 
 
 def _require_copy_editor():
@@ -268,6 +269,12 @@ def _require_copy_editor():
 def copy_editor_script(request: Request, args: dict[str, str] = Depends(require_asset_auth)):
     _require_copy_editor()
     return asset_response(request, PROJECT_ROOT / "scripts/dev/copy-editor.js", "text/javascript")
+
+
+@router.get("/dev/copy-editor-core.js")
+def copy_editor_core(request: Request, args: dict[str, str] = Depends(require_asset_auth)):
+    _require_copy_editor()
+    return asset_response(request, PROJECT_ROOT / "frontend/src/copy-editor-core.js", "text/javascript")
 
 
 @router.get("/dev/copy-edits")

@@ -19,7 +19,6 @@ import { Chip } from '@/components/base/badges/chip';
 
 import { errorMessage } from '../../api';
 import { ErrorExcerpt } from '../activity/error-excerpt';
-import { readableErrorHeadline } from '../activity/tasks';
 import { useBackgroundJob } from '../background-job';
 import { DataTable, type DataColumn } from '../components/data-table';
 import {
@@ -84,19 +83,18 @@ function LinkTable(
     { id: 'kind', label: '类型', width: 128, value: (item) => LINK_KINDS[item.link_kind] || item.link_kind,
       render: (item) => LINK_KINDS[item.link_kind] || item.link_kind },
     { id: 'label', label: '链接名称', min: 128, value: (item) => item.label || '',
-      render: (item) => <span className="flex min-w-24 items-center gap-2" data-link-name=""><SiteMark linkId={item.id} />
+      render: (item) => <span className="flex min-w-24 items-center gap-2" data-link-name="">
         <span className="min-w-0 wrap-anywhere">{item.label || new URL(item.url).hostname}</span></span> },
     { id: 'note', label: '结果', width: 320, min: 192, value: (item) => item.note,
       render: (item) => <div className="min-w-40 max-w-80" data-link-result={confirmed ? 'gone' : 'unclear'}>
-        <ErrorExcerpt text={item.note} className="tabular-nums" summary={
-          <Chip variant="caption" color={confirmed ? 'rose' : 'neutral'}>
-            <span className="max-w-64 truncate">{readableErrorHeadline(item.note)}</span>
-          </Chip>
-        } />
+        {/^(?:HTTP\s+)?[1-5]\d{2}$/.test(item.note.trim())
+          ? <Chip variant="caption" color={confirmed ? 'rose' : 'neutral'} data-link-code="">{item.note.trim()}</Chip>
+          : <ErrorExcerpt text={item.note} className={`tabular-nums ${confirmed ? 'text-text-error-primary' : 'text-text-secondary'}`} />}
       </div> },
     { id: 'url', label: '地址', width: 360, min: 180, value: (item) => item.url,
-      render: (item) => <a href={item.url} target="_blank" rel="noreferrer" title={item.url}
+      render: (item) => <a href={item.url} target="_blank" rel="noreferrer" title={item.url} data-link-address=""
         className="flex max-w-90 min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary">
+        <SiteMark linkId={item.id} />
         <span data-middle-truncate className="min-w-0 truncate">{item.url}</span>
         <RiExternalLinkLine aria-hidden className="size-3.5 shrink-0" />
       </a> },

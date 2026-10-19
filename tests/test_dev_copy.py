@@ -11,6 +11,25 @@ from peach import dev_copy
 
 
 class DevCopyTests(unittest.TestCase):
+    def test_static_text_can_be_deleted_and_dynamic_placeholders_are_required(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / 'frontend/src').mkdir(parents=True)
+            path = root / 'frontend/src/copy.tsx'
+            path.write_text("const a = '说明'; const b = <p>正文</p>;", encoding='utf-8')
+            for original in ('说明', '正文'):
+                candidate, = dev_copy.candidates(root, original)
+                result = dev_copy.save(root, {'original': original, 'replacement': '', 'candidate': candidate})
+                self.assertEqual(result['text'], '')
+            self.assertEqual(path.read_text(encoding='utf-8'), "const a = ''; const b = <p></p>;")
+            (root / 'src/peach').mkdir(parents=True)
+            dynamic = root / 'src/peach/library_processing.py'
+            dynamic.write_text('message = f"待处理 {count} 项"', encoding='utf-8')
+            candidate, = dev_copy.candidates(root, '待处理 5 项')
+            with self.assertRaises(ValueError):
+                dev_copy.save(root, {'original': '待处理 5 项', 'replacement': '', 'candidate': candidate})
+            self.assertEqual(dynamic.read_text(encoding='utf-8'), 'message = f"待处理 {count} 项"')
+
     def test_build_failure_preserves_served_files_and_can_be_retried(self):
         from peach import dev_copy_runtime as runtime
         from subprocess import CompletedProcess

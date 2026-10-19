@@ -388,7 +388,8 @@ describe('链接管理', () => {
     expect(gone.textContent).toContain('Peach 资料');
     expect(gone.querySelector('[data-link-identity]')?.getAttribute('href')).toBe('/performers/31');
     expect(gone.querySelector('[data-link-identity] img')?.getAttribute('src')).toContain('/entity-image?kind=performer&id=31');
-    expect(gone.querySelector('[data-link-name] img')?.getAttribute('src')).toBe('/link-mark?id=1');
+    expect(gone.querySelector('[data-link-address] img')?.getAttribute('src')).toBe('/link-mark?id=1');
+    expect(gone.querySelector('[data-link-name] img')).toBeNull();
     const unclear = host.querySelector('[aria-label="本次未访问成功"]')!;
     expect(unclear.querySelector('[data-link-name]')?.textContent).toBe('example.com');
     expect(unclear.querySelector('[data-link-identity]')?.textContent).toContain('女优 2');
