@@ -3,10 +3,9 @@ from __future__ import annotations
 
 import math
 import re
-import sqlite3
 import threading
 import time
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import PureWindowsPath
 
@@ -92,6 +91,9 @@ class ProcessingTraffic:
                     ('label', 'root', 'location', 'metered', 'network', 'used_bytes', 'unobserved')}
                 self.rows[old['key']].update(remaining_min=0, remaining_max=0)
         self.unknown_files = stage in ('all', 'scan') and asset_ids is None
+        from .processing_traffic_plan import TrafficPlan
+        self.plan = TrafficPlan(config, stage, self._media_key)
+        self.plan.completed.update(previous.get('completed_work', []))
         self.refresh_plan()
 
     @contextmanager
@@ -120,42 +122,22 @@ class ProcessingTraffic:
 
     def refresh_plan(self, rows=None):
         """账本统计不访问媒体目录；保护开启的目录不预估自动探测。"""
-        query = "SELECT location,path,size,duration,snapshot_path FROM asset WHERE medium='video' AND disposal IS NULL"
-        params = []
-        if self.asset_ids is not None:
-            query += ' AND id IN (' + ','.join('?' for _ in self.asset_ids) + ')'
-            params += self.asset_ids
         if rows is None:
-            with closing(sqlite3.connect(self.db_path, timeout=30)) as connection:
-                assets = connection.execute(query, params).fetchall()
-        else:
-            assets = [(row['location'], row['path'], row['size'], row['duration'], row['snapshot_path']) for row in rows]
+            from .processing_traffic_plan import ledger_rows
+            rows = ledger_rows(self.db_path, self.asset_ids)
         with self.lock:
+            self.plan.refresh(rows)
             for row in self.rows.values():
-                row.update(remaining_min=0, remaining_max=0)
-            for location, path, size, duration, preview in assets:
-                key = self._media_key(path, location)
-                if key is None or self.stage == 'previews' and location != 'local':
-                    continue
-                row = self.rows[key]
-                size = max(0, size or 0)
-                from .strm import skip_background_read
-                readable = not skip_background_read(path)
-                if self.stage != 'previews' and self.stage != 'scan':
-                    # 资料和配套图片的工作量只用于粗估，不当作实测下载。
-                    self.rows['metadata']['remaining_min'] += MIB // 4
-                    self.rows['metadata']['remaining_max'] += 8 * MIB
-                    if row['network']:
-                        row['remaining_max'] += 2 * MIB
-                if self.stage != 'metadata' and duration is None and not row['metered'] and row['network'] and readable:
-                    row['remaining_min'] += min(size, MIB)
-                    row['remaining_max'] += min(size, 32 * MIB)
-                if self.stage in ('all', 'collect', 'previews') and location == 'local' and row['network'] and not preview and readable:
-                    from .media_processing_policy import metadata_only
-                    if not metadata_only(self.config.directory('state')):
-                        row['remaining_max'] += min(size, 9 * 32 * MIB)
-                if row['network']:
+                if row['root'] and row['network']:
                     self._reason(row, '挂载缓存与预读未观测')
+
+    def finish_work(self, stage, code=None):
+        with self.lock:
+            self.plan.finish(stage, code)
+
+    def prepare_metadata(self, prepared):
+        with self.lock:
+            self.plan.prepare_metadata(prepared)
 
     @staticmethod
     def _reason(row, reason):
@@ -174,9 +156,6 @@ class ProcessingTraffic:
             if not row['network']:
                 return
             row['used_bytes'] += int(size)
-            remaining = self.rows['metadata'] if key.startswith('metadata-') else row
-            for field in ('remaining_min', 'remaining_max'):
-                remaining[field] = max(0, remaining[field] - int(size))
             if threading.get_ident() != self.owner or time.monotonic() - self.published_at < 0.5:
                 return
             self.published_at = time.monotonic()
@@ -194,16 +173,20 @@ class ProcessingTraffic:
     def snapshot(self, *, finished=False):
         with self.lock:
             sources = []
+            remaining = self.plan.remaining(self.rows)
             for key, row in self.rows.items():
-                if not row['root'] and not row['used_bytes'] and not row['remaining_max'] and not row['unobserved']:
+                amount = 0 if finished else remaining[key]
+                if not row['root'] and not row['used_bytes'] and not amount and not row['unobserved']:
                     continue
                 source = {**row, 'unobserved': list(row['unobserved'])}
                 sources.append(dict(key=key, **source,
-                    estimated_min_bytes=row['used_bytes'] + (0 if finished else row['remaining_min']),
-                    estimated_max_bytes=row['used_bytes'] + (0 if finished else row['remaining_max'])))
+                    estimated_bytes=row['used_bytes'] + amount,
+                    estimated_min_bytes=row['used_bytes'],
+                    estimated_max_bytes=row['used_bytes'] + amount))
             result = dict(sources=sources, unknown_files=self.unknown_files and not finished,
-                          partial=any(row['unobserved'] for row in sources))
-            for field in ('used_bytes', 'estimated_min_bytes', 'estimated_max_bytes'):
+                          partial=any(row['unobserved'] for row in sources),
+                          completed_work=sorted(self.plan.completed))
+            for field in ('used_bytes', 'estimated_bytes', 'estimated_min_bytes', 'estimated_max_bytes'):
                 result[field] = sum(row[field] for row in sources)
                 result['metered_' + field] = sum(row[field] for row in sources if row['metered'])
             return result

@@ -1,5 +1,6 @@
 """馆藏任务按媒体目录的流量保护选项分账。"""
 import gzip
+import json
 import sqlite3
 import subprocess
 import tempfile
@@ -136,10 +137,109 @@ class ProcessingTrafficTests(unittest.TestCase):
         traffic = ProcessingTraffic(self.config, self.db, 'scan')
         rows = [dict(location='mounted', path='B:\\Cloud\\a.mp4', size=1024**3,
                      duration=None, snapshot_path=None)]
-        with patch('peach.processing_traffic.sqlite3.connect', side_effect=AssertionError('重复查询')):
+        with patch('peach.processing_traffic_plan.sqlite3.connect', side_effect=AssertionError('重复查询')):
             traffic.refresh_plan(rows)
         self.assertGreater(traffic.snapshot()['estimated_max_bytes'], 0)
         self.assertEqual(traffic.snapshot()['metered_estimated_max_bytes'], 0)
+
+    def _video(self, **values):
+        return dict(id=1, location='mounted', path='A:\\Cloud\\ABW-001.mp4', name='ABW-001.mp4',
+                    code='ABW-001', size=1024**3, duration=3600, snapshot_path=None, **values)
+
+    def test_download_plan_deduplicates_releases_and_ignores_creator_files(self):
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        with patch.object(traffic.plan, '_ready', return_value=False):
+            traffic.refresh_plan([self._video()])
+            single = sum(row['estimated_bytes'] for row in traffic.snapshot()['sources'] if not row['root'])
+            rows = [{**self._video(), 'id': index, 'path': f'A:\\Cloud\\copy{index}.mp4'} for index in range(20)]
+            traffic.refresh_plan(rows)
+            repeated = sum(row['estimated_bytes'] for row in traffic.snapshot()['sources'] if not row['root'])
+        self.assertGreater(single, 0)
+        self.assertEqual(single, repeated)
+        traffic.refresh_plan([{**self._video(), 'code': None, 'name': '创作者作品.mp4'}])
+        self.assertEqual(sum(row['estimated_bytes'] for row in traffic.snapshot()['sources'] if not row['root']), 0)
+
+    def test_complete_fields_and_local_cover_have_no_download_work(self):
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        row = self._video(catalog_title='影片', performers='演员', studio='厂牌', release_date='2026-01-01', tags='类别')
+        with patch.object(traffic.plan, '_ready', return_value=True):
+            traffic.refresh_plan([row])
+        self.assertEqual(sum(source['estimated_bytes'] for source in traffic.snapshot()['sources'] if not source['root']), 0)
+
+    def test_local_evidence_recalculates_actual_metadata_verification_work(self):
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        row = self._video()
+        fields = dict(title='影片', performers='演员', studio='厂牌', release_date='2026-01-01', tags='类别')
+        with patch.object(traffic.plan, '_ready', return_value=True):
+            traffic.prepare_metadata([(row, 'ABW-001', False, fields, [], True)])
+            self.assertEqual(sum(source['estimated_bytes'] for source in traffic.snapshot()['sources'] if not source['root']), 0)
+            traffic.prepare_metadata([(row, 'ABW-001', True, fields, [], True)])
+            self.assertGreater(sum(source['estimated_bytes'] for source in traffic.snapshot()['sources'] if not source['root']), 0)
+
+    def test_fresh_source_cache_and_misses_do_not_plan_network_requests(self):
+        directory = self.config.directory('sources') / 'library-metadata'
+        directory.mkdir(parents=True)
+        for source in ('r18dev', 'javdb'):
+            (directory / f'ABW-001-{source}.json').write_text(json.dumps({'title': '影片'}), encoding='utf-8')
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        with patch.object(traffic.plan.remote, '_chain', return_value=('r18dev', 'javdb')), patch.object(traffic.plan, '_ready', return_value=True):
+            traffic.refresh_plan([self._video()])
+            self.assertEqual(sum(row['estimated_bytes'] for row in traffic.snapshot()['sources'] if not row['root']), 0)
+        traffic.plan.evidence_names.clear()
+        with patch.object(traffic.plan.remote, '_chain', return_value=('r18dev', 'javdb')), patch.object(traffic.plan.remote.misses, 'fresh', return_value=True), patch.object(traffic.plan, '_ready', return_value=True):
+            traffic.refresh_plan([self._video()])
+            self.assertEqual(sum(row['estimated_bytes'] for row in traffic.snapshot()['sources'] if not row['root']), 0)
+
+    def test_download_budget_is_shared_and_finished_work_leaves_used_bytes(self):
+        from peach.library_processing import MAX_SOURCE_BYTES
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        traffic.plan.units = {'metadata:ABW-001': {'metadata-proxy': MAX_SOURCE_BYTES * 3, 'metadata-direct': MAX_SOURCE_BYTES * 2}}
+        result = traffic.snapshot()
+        self.assertLessEqual(result['estimated_bytes'], MAX_SOURCE_BYTES)
+        self.assertEqual(result['estimated_bytes'], sum(row['estimated_bytes'] for row in result['sources']))
+        self.assertEqual(result['metered_estimated_bytes'], sum(row['estimated_bytes'] for row in result['sources'] if row['metered']))
+        with traffic.bind(), download_route(True):
+            record_download(100)
+        traffic.finish_work('metadata', 'ABW-001')
+        self.assertEqual(traffic.snapshot()['estimated_bytes'], 100)
+        restored = ProcessingTraffic(self.config, self.db, 'collect', resume_state={'traffic': traffic.snapshot()})
+        restored.refresh_plan([self._video()])
+        self.assertEqual(sum(row['estimated_bytes'] for row in restored.snapshot()['sources'] if not row['root']), 100)
+
+    def test_source_network_choice_splits_pending_downloads(self):
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        with patch.object(traffic.plan.remote, '_chain', return_value=('r18dev', 'javdb')), patch.object(traffic.plan, '_ready', return_value=True), patch('peach.scraping_access.values_for', side_effect=lambda root, source: {'network': 'direct' if source == 'javdb' else 'peach'}), patch('peach.peach_proxy.client_options', return_value={'proxy': 'http://example.invalid', 'trust_env': False}):
+            traffic.refresh_plan([self._video()])
+        sources = {row['key']: row for row in traffic.snapshot()['sources']}
+        self.assertEqual(sources['metadata-direct']['estimated_bytes'], 500 * 1024)
+        self.assertEqual(sources['metadata-proxy']['estimated_bytes'], 500 * 1024)
+
+    def test_external_collector_plan_is_separate_from_http_download_budget(self):
+        from peach.library_processing import MAX_SOURCE_BYTES
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        traffic.plan._add('metadata:ABW-001', 'metadata-proxy', MAX_SOURCE_BYTES * 2)
+        traffic.plan._add('metadata:ABW-001', 'metadata-proxy', 1000, budgeted=False)
+        self.assertEqual(traffic.snapshot()['estimated_bytes'], MAX_SOURCE_BYTES + 1000)
+
+    def test_non_release_metadata_completion_leaves_other_releases_pending(self):
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        traffic.plan._add('metadata:ABW-001', 'metadata-proxy', 1000)
+        traffic.finish_work('metadata', None)
+        self.assertEqual(traffic.snapshot()['estimated_bytes'], 1000)
+
+    def test_local_cache_file_sizes_inform_sidecar_plan_and_local_stage_settles(self):
+        evidence = self.config.directory('sources') / 'library-metadata'
+        evidence.mkdir(parents=True)
+        (evidence / 'sample.nfo').write_bytes(b'x' * 1234)
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        with patch.object(traffic.plan, '_ready', return_value=True):
+            traffic.refresh_plan([self._video()])
+            root = next(row for row in traffic.snapshot()['sources'] if row['root'] == 'A:\\Cloud')
+            self.assertEqual(root['estimated_bytes'], 1234)
+            traffic.finish_work('local')
+            root = next(row for row in traffic.snapshot()['sources'] if row['root'] == 'A:\\Cloud')
+            self.assertEqual(root['estimated_bytes'], 0)
+            self.assertEqual(traffic.snapshot()['completed_work'], ['local:*'])
 
     def test_real_ffmpeg_probe_and_frame_report_input_reads(self):
         from peach.ffmpeg import FFmpegResolver

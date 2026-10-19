@@ -17,12 +17,13 @@ describe('扫描与采集控制', () => {
         current_asset_name: '', current_action: '', stage: '',
         stalled: false, waited_seconds: 0,
         traffic: { used_bytes: 0, estimated_min_bytes: 1048576, estimated_max_bytes: 8388608,
+          estimated_bytes: 6291456, metered_estimated_bytes: 3145728,
           metered_used_bytes: 0, metered_estimated_min_bytes: 0, metered_estimated_max_bytes: 4194304,
           partial: true, unknown_files: true,
           sources: [{ key: 'drive-a', label: '示例网盘 A', root: 'A:\\Media', location: '115', metered: true,
-            used_bytes: 0, estimated_min_bytes: 0, estimated_max_bytes: 4194304, unobserved: ['挂载缓存与预读未观测'] },
+            used_bytes: 0, estimated_bytes: 3145728, estimated_min_bytes: 0, estimated_max_bytes: 4194304, unobserved: ['挂载缓存与预读未观测'] },
           { key: 'drive-b', label: '示例网盘 B', root: 'B:\\Media', location: 'pikpak', metered: false,
-            used_bytes: 0, estimated_min_bytes: 1048576, estimated_max_bytes: 4194304, unobserved: ['挂载缓存与预读未观测'] }] },
+            used_bytes: 0, estimated_bytes: 3145728, estimated_min_bytes: 1048576, estimated_max_bytes: 4194304, unobserved: ['挂载缓存与预读未观测'] }] },
         eta_kind: 'historical', eta_initial: true, eta_seconds_min: 1200, eta_seconds_max: 2400 };
       const writes: Record<string, unknown>[] = [];
       const opened = await visit(browser, '/data-cleanup', viewport, async page => {
@@ -77,7 +78,7 @@ describe('扫描与采集控制', () => {
         assert.match(await sources.nth(1).innerText(), /示例网盘 B[\s\S]*直连/);
         assert.equal(await sources.locator('svg, img').count(), 2);
         assert.equal((await dialog.innerText()).includes('未观测'), false);
-        assert.match(await dialog.innerText(), /1-8MB/);
+        assert.match(await dialog.innerText(), /约 6MB/);
         const collapse = dialog.locator('.ui-fcollapse');
         const transition = await collapse.evaluate(el => ({ property: getComputedStyle(el).transitionProperty, duration: getComputedStyle(el).transitionDuration }));
         assert.equal(transition.property, 'height');

@@ -11,6 +11,8 @@ const range = (low: number, high: number) => {
   const [end, endUnit] = fmtSize(high).split(' ');
   return startUnit === endUnit ? `${start}-${end}${endUnit}` : `${size(low)}-${size(high)}`;
 };
+const forecast = (expected: number | undefined, low: number, high: number) => expected === undefined
+  ? range(low, high) : `${expected > 0 ? '约 ' : ''}${size(expected)}`;
 
 /** 确认弹窗、任务卡和管理页共用逐目录分账。 */
 export function TrafficProgress({ traffic, initial = false, detailsOpen, onDetailsChange }: {
@@ -21,8 +23,8 @@ export function TrafficProgress({ traffic, initial = false, detailsOpen, onDetai
   return <div data-processing-traffic="" className="flex min-w-0 flex-col gap-2 text-caption-1-regular text-text-secondary tabular-nums wrap-anywhere">
     <dl className="inline-grid grid-cols-2 items-baseline gap-x-4 gap-y-1">
       {!initial ? <><dt>已用流量</dt><dd className="text-right text-text-primary">{traffic.partial ? '约 ' : ''}{size(traffic.used_bytes)}</dd></> : null}
-      <dt>预计总流量</dt><dd className="text-right text-body-2-medium text-text-primary">{range(traffic.estimated_min_bytes, traffic.estimated_max_bytes)}</dd>
-      <dt>其中代理流量</dt><dd className="text-right">{initial ? '' : `已用 ${size(traffic.metered_used_bytes)} / 预计 `}{range(traffic.metered_estimated_min_bytes, traffic.metered_estimated_max_bytes)}</dd>
+      <dt>预计总流量</dt><dd className="text-right text-body-2-medium text-text-primary">{forecast(traffic.estimated_bytes, traffic.estimated_min_bytes, traffic.estimated_max_bytes)}</dd>
+      <dt>其中代理流量</dt><dd className="text-right">{initial ? '' : `已用 ${size(traffic.metered_used_bytes)} / 预计 `}{forecast(traffic.metered_estimated_bytes, traffic.metered_estimated_min_bytes, traffic.metered_estimated_max_bytes)}</dd>
     </dl>
     <Disclosure summary="查看明细" trailing isOpen={detailsOpen} onOpenChange={onDetailsChange}>
       <div className="relative min-w-0">
@@ -35,7 +37,7 @@ export function TrafficProgress({ traffic, initial = false, detailsOpen, onDetai
           </div>
           <div className="flex flex-wrap justify-between gap-x-4 text-text-tertiary">
             {!initial ? <span>已用{source.unobserved.length ? '约' : ''} {size(source.used_bytes)}</span> : null}
-            <span>预计 {range(source.estimated_min_bytes, source.estimated_max_bytes)}</span>
+            <span>预计 {forecast(source.estimated_bytes, source.estimated_min_bytes, source.estimated_max_bytes)}</span>
           </div>
         </li>)}
       </ul>

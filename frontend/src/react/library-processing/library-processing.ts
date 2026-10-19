@@ -72,11 +72,13 @@ export interface LibraryProcessingData {
 }
 
 export interface TrafficSource {
+  estimated_bytes?: number;
   key: string; label: string; root: string; location: string; metered: boolean;
   used_bytes: number; estimated_min_bytes: number; estimated_max_bytes: number;
   unobserved: string[];
 }
 export interface ProcessingTraffic {
+  estimated_bytes?: number; metered_estimated_bytes?: number;
   used_bytes: number; estimated_min_bytes: number; estimated_max_bytes: number;
   metered_used_bytes: number; metered_estimated_min_bytes: number; metered_estimated_max_bytes: number;
   sources: TrafficSource[]; partial: boolean; unknown_files: boolean;
