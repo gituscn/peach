@@ -62,9 +62,23 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
         run: uv run --locked --python 3.14 scripts/ci_plan.py --event "$EVENT_NAME" --base "$BASE_SHA"
 
+  frontend-ready:
+    name: 前端检查结果
+    needs: [plan, web-bundle, web-vendor]
+    if: ${{ always() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: 所选前端检查均成功
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          REQUIRED_JOBS: ${{ needs.plan.outputs.required_jobs }}
+        run: python scripts/ci_plan.py --verify-results --phase frontend
+
   wheel-build:
-    needs: plan
-    if: needs.plan.outputs.wheel == 'true'
+    needs: [plan, frontend-ready]
+    if: ${{ !cancelled() && needs.frontend-ready.result == 'success' && needs.plan.outputs.wheel == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -89,7 +103,7 @@ jobs:
   wheel-smoke:
     name: wheel 最小安装 / ${{ matrix.os }} / ${{ matrix.python }}
     needs: [plan, wheel-build]
-    if: needs.plan.outputs.wheel == 'true'
+    if: ${{ !cancelled() && needs.wheel-build.result == 'success' && needs.plan.outputs.wheel == 'true' }}
     strategy:
       matrix: ${{ fromJSON(needs.plan.outputs.wheel_matrix) }}
     runs-on: ${{ matrix.os }}
@@ -113,7 +127,8 @@ jobs:
           python "$GITHUB_WORKSPACE/scripts/smoke_wheel.py"
   python:
     name: ${{ matrix.os }} / Python ${{ matrix.python }} / ${{ matrix.scope }} / ${{ matrix.shard_index }}
-    needs: plan
+    needs: [plan, frontend-ready]
+    if: ${{ !cancelled() && needs.frontend-ready.result == 'success' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -227,15 +242,15 @@ jobs:
       - name: 核对 web/dist 与源码一致
         run: |
           git add --intent-to-add -- web/dist
-          git diff --exit-code -- web/dist
+          git diff --exit-code --stat -- web/dist
       - name: npm audit (frontend)
         run: python scripts/npm_audit.py --prefix frontend
 
   # 每片拥有独立服务与演示库；文件内的浏览器交互保持串行。
   web-e2e:
     name: 浏览器回归 / ${{ matrix.index }}
-    needs: [plan]
-    if: needs.plan.outputs.browser == 'true'
+    needs: [plan, frontend-ready]
+    if: ${{ !cancelled() && needs.frontend-ready.result == 'success' && needs.plan.outputs.browser == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 40
     strategy:
@@ -313,7 +328,7 @@ jobs:
   verified:
     name: 完整验证结果
     if: always()
-    needs: [plan, workflow-lint, python, wheel-build, wheel-smoke, web-bundle, web-e2e, web-vendor]
+    needs: [plan, workflow-lint, frontend-ready, python, wheel-build, wheel-smoke, web-bundle, web-e2e, web-vendor]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

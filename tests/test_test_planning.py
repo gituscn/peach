@@ -96,6 +96,11 @@ class CIFrontendOwnershipTests(unittest.TestCase):
 
 
 class TestPlanningTests(unittest.TestCase):
+    def setUp(self):
+        environment = patch.dict(os.environ, {'PEACH_TEST_FOCUS': '', 'PEACH_E2E_FILES': ''})
+        environment.start()
+        self.addCleanup(environment.stop)
+
     def test_every_supplementary_test_id_names_a_real_test(self):
         """域的补充用例按名字装载：被引用的用例改名后，装进来的是一个必然报错的占位用例，
         选到这一域的 auto 都签不出记录。在这里按名字装一遍，改名当场就红。"""
@@ -188,7 +193,7 @@ class TestPlanningTests(unittest.TestCase):
 
     def test_document_changes_avoid_optional_jobs_and_unknown_changes_require_them(self):
         documents = ci_plan.plan('pull_request', ['docs/TESTING.md'])
-        self.assertEqual(documents['required_jobs'], ['plan', 'python', 'workflow-lint'])
+        self.assertEqual(documents['required_jobs'], ['plan', 'python', 'workflow-lint', 'frontend-ready'])
         unknown = ci_plan.plan('pull_request', ['unknown.file'])
         self.assertLessEqual({'web-e2e', 'web-bundle', 'web-vendor', 'wheel-smoke'},
                              set(unknown['required_jobs']))
@@ -198,7 +203,7 @@ class TestPlanningTests(unittest.TestCase):
                              set(mainline['required_jobs']))
 
     def test_result_gate_rejects_missing_failed_cancelled_or_required_skipped_jobs(self):
-        required = ['plan', 'python', 'workflow-lint', 'web-e2e']
+        required = ['plan', 'python', 'workflow-lint', 'frontend-ready', 'web-e2e']
         passed = {name: {'result': 'success'} for name in required}
         ci_plan.validate_results({**passed, 'web-vendor': {'result': 'skipped'}}, required)
         for result in ('failure', 'cancelled', 'skipped'):
@@ -208,6 +213,33 @@ class TestPlanningTests(unittest.TestCase):
             ci_plan.validate_results({name: value for name, value in passed.items() if name != 'python'}, required)
         with self.assertRaises(ValueError):
             ci_plan.validate_results(passed, [])
+
+    def test_frontend_gate_requires_only_the_selected_frontend_jobs(self):
+        required = ci_plan.plan('push', ['frontend/package-lock.json'])['required_jobs']
+        passed = {name: {'result': 'success'} for name in ('plan', 'web-bundle', 'web-vendor')}
+        ci_plan.validate_results(passed, required, phase='frontend')
+        for name in ('web-bundle', 'web-vendor'):
+            for result in ('missing', 'failure', 'cancelled', 'skipped'):
+                results = dict(passed)
+                if result == 'missing':
+                    results.pop(name)
+                else:
+                    results[name] = {'result': result}
+                with self.subTest(name=name, result=result), self.assertRaises(ValueError):
+                    ci_plan.validate_results(results, required, phase='frontend')
+
+    def test_frontend_gate_allows_document_plans_and_rejects_an_invalid_plan(self):
+        required = ci_plan.plan('pull_request', ['docs/TESTING.md'])['required_jobs']
+        results = {'plan': {'result': 'success'}, 'web-bundle': {'result': 'skipped'},
+                   'web-vendor': {'result': 'skipped'}}
+        ci_plan.validate_results(results, required, phase='frontend')
+        for result in ('failure', 'cancelled', 'skipped'):
+            with self.subTest(result=result), self.assertRaises(ValueError):
+                ci_plan.validate_results({**results, 'plan': {'result': result}}, required, phase='frontend')
+        with self.assertRaises(ValueError):
+            ci_plan.validate_results(results, [], phase='frontend')
+        with self.assertRaises(ValueError):
+            ci_plan.validate_results(results, required, phase='unknown')
 
     def test_dependency_and_manual_runs_cover_both_systems(self):
         for event, paths in [('push', ['uv.lock']), ('pull_request', ['migrations/0025.sql']),

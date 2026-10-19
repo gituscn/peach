@@ -32,9 +32,16 @@ def browser_matrix(root: Path = ROOT, count: int = 6) -> dict:
                         for index, group in enumerate(groups)]}
 
 
-def validate_results(results: dict, required: list[str]) -> None:
+def validate_results(results: dict, required: list[str], *, phase: str = "complete") -> None:
     """所选任务全部成功；未选择的任务可以跳过，不能隐藏失败。"""
-    if not {"plan", "python", "workflow-lint"}.issubset(required):
+    if phase == "frontend":
+        required = [name for name in required if name in {"plan", "web-bundle", "web-vendor"}]
+        mandatory = {"plan"}
+    elif phase == "complete":
+        mandatory = {"plan", "python", "workflow-lint", "frontend-ready"}
+    else:
+        raise ValueError(f"未知验证阶段：{phase}")
+    if not mandatory.issubset(required):
         raise ValueError("验证计划缺少必需任务")
     bad = {name: results.get(name, {}).get("result", "missing")
            for name in required if results.get(name, {}).get("result") != "success"}
@@ -69,7 +76,7 @@ def plan(event: str, paths: list[str], contents: dict | None = None) -> dict:
                                        "scripts/vendor_web_dependencies.mjs"} for path in paths)
     wheel = shared or "packaging" in scopes or any(path.startswith(("src/", "migrations/", "web/", "resources/"))
                                                  for path in paths)
-    required = ["plan", "python", "workflow-lint"]
+    required = ["plan", "python", "workflow-lint", "frontend-ready"]
     required += [name for enabled, names in ((browser, ["web-e2e"]), (frontend, ["web-bundle"]),
                                             (vendor, ["web-vendor"]), (wheel, ["wheel-build", "wheel-smoke"]))
                  if enabled for name in names]
@@ -83,9 +90,11 @@ def main() -> None:
     parser.add_argument("--event", choices=("push", "pull_request", "workflow_dispatch"))
     parser.add_argument("--base")
     parser.add_argument("--verify-results", action="store_true")
+    parser.add_argument("--phase", choices=("complete", "frontend"), default="complete")
     args = parser.parse_args()
     if args.verify_results:
-        validate_results(json.loads(os.environ["RESULTS"]), json.loads(os.environ["REQUIRED_JOBS"]))
+        validate_results(json.loads(os.environ["RESULTS"]), json.loads(os.environ["REQUIRED_JOBS"]),
+                         phase=args.phase)
         return
     if not args.event or not args.base:
         parser.error("生成计划需要 --event 与 --base")

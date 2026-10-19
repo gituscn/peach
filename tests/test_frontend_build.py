@@ -293,7 +293,7 @@ class FrontendManifestTests(unittest.TestCase):
                      "npm --prefix frontend test",
                      "npm --prefix frontend run build",
                      "git add --intent-to-add -- web/dist",
-                     "git diff --exit-code -- web/dist"):
+                     "git diff --exit-code --stat -- web/dist"):
             self.assertIn(step, workflow, f"CI 缺了 {step}")
 
     def test_the_bundle_is_committed_and_the_toolchain_is_not(self):
