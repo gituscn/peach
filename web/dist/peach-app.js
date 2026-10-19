@@ -340,7 +340,7 @@ var f = /* @__PURE__ */ o(((e) => {
 		return T.H.useSyncExternalStore(e, t, n);
 	}, e.useTransition = function() {
 		return T.H.useTransition();
-	}, e.version = "19.3.0";
+	}, e.version = "19.3.1";
 })), p = /* @__PURE__ */ o(((e, t) => {
 	t.exports = f();
 })), m = /* @__PURE__ */ o(((e) => {
@@ -671,7 +671,7 @@ var f = /* @__PURE__ */ o(((e) => {
 		return l.H.useFormState(e, t, n);
 	}, e.useFormStatus = function() {
 		return l.H.useHostTransitionStatus();
-	}, e.version = "19.3.0";
+	}, e.version = "19.3.1";
 })), _ = /* @__PURE__ */ o(((e, t) => {
 	function n() {
 		if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ < "u" && typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE == "function") try {
@@ -9047,7 +9047,7 @@ var f = /* @__PURE__ */ o(((e) => {
 		}
 	};
 	var Sh = n.version;
-	if (Sh !== "19.3.0") throw Error(i(527, Sh, "19.3.0"));
+	if (Sh !== "19.3.1") throw Error(i(527, Sh, "19.3.1"));
 	me.findDOMNode = function(e) {
 		var t = e._reactInternals;
 		if (t === void 0) throw typeof e.render == "function" ? Error(i(188)) : (e = Object.keys(e).join(","), Error(i(268, e)));
@@ -9055,10 +9055,10 @@ var f = /* @__PURE__ */ o(((e) => {
 	};
 	var Ch = {
 		bundleType: 0,
-		version: "19.3.0",
+		version: "19.3.1",
 		rendererPackageName: "react-dom",
 		currentDispatcherRef: pe,
-		reconcilerVersion: "19.3.0"
+		reconcilerVersion: "19.3.1"
 	};
 	if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ < "u") {
 		var wh = __REACT_DEVTOOLS_GLOBAL_HOOK__;
@@ -14101,7 +14101,7 @@ var Eu = {
 function zu(e) {
 	return isNaN(e) && typeof e == "string" && (Lu.test(e) || Ru.test(e));
 }
-var Bu = "number", Vu = "color", Hu = "var", Uu = "var(", Wu = "${}", Gu = /var\s*\(\s*--(?:[\w-]+\s*|[\w-]+\s*,(?:\s*[^)(\s]|\s*\((?:[^)(]|\([^)(]*\))*\))+\s*)\)|#[\da-f]{3,8}|(?:rgb|hsl)a?\((?:-?[\d.]+%?[,\s]+){2}-?[\d.]+%?\s*(?:[,/]\s*)?(?:\b\d+(?:\.\d+)?|\.\d+)?%?\)|-?(?:\d+(?:\.\d+)?|\.\d+)/giu;
+var Bu = "number", Vu = "color", Hu = "var", Uu = "var(", Wu = "${}", Gu = /var\s*\(\s*--(?:[\w-]+\s*|[\w-]+\s*,(?:\s*[^)(\s]|\s*\((?:[^)(]|\([^)(]*\))*\))+\s*)\)|#[\da-f]{3,8}|(?:rgb|hsl)a?\((?:-?[\d.]+%?[,\s]+){2}-?[\d.]+%?\s*(?:[,/]\s*)?(?:\b\d+(?:\.\d+)?|\.\d+)?%?\)|-?(?:\d+(?:\.\d+)?|\.\d+)(?![a-z]*\()/giu;
 function Ku(e) {
 	let t = e.toString();
 	return Lu.test(t) || Ru.test(t);
@@ -14960,13 +14960,14 @@ var Tf = (e) => e * 180 / Math.PI, Ef = (e) => Of(Tf(Math.atan2(e[1], e[0]))), D
 	translateY: 5,
 	scaleX: 0,
 	scaleY: 3,
+	scaleZ: () => 1,
 	scale: (e) => (Math.abs(e[0]) + Math.abs(e[3])) / 2,
 	rotate: Ef,
 	rotateZ: Ef,
 	skewX: (e) => Tf(Math.atan(e[1])),
 	skewY: (e) => Tf(Math.atan(e[2])),
 	skew: (e) => (Math.abs(e[1]) + Math.abs(e[2])) / 2
-}, Of = (e) => (e %= 360, e < 0 && (e += 360), e), kf = Ef, Af = (e) => Math.sqrt(e[0] * e[0] + e[1] * e[1]), jf = (e) => Math.sqrt(e[4] * e[4] + e[5] * e[5]), Mf = {
+}, Of = (e) => (e %= 360, e < 0 && (e += 360), e), kf = Ef, Af = (e) => Math.hypot(e[0], e[1]), jf = (e) => Math.hypot(e[4], e[5]), Mf = {
 	x: 12,
 	y: 13,
 	z: 14,
@@ -14975,6 +14976,7 @@ var Tf = (e) => e * 180 / Math.PI, Ef = (e) => Of(Tf(Math.atan2(e[1], e[0]))), D
 	translateZ: 14,
 	scaleX: Af,
 	scaleY: jf,
+	scaleZ: (e) => Math.hypot(e[8], e[9], e[10]),
 	scale: (e) => (Af(e) + jf(e)) / 2,
 	rotateX: (e) => Of(Tf(Math.atan2(e[6], e[5]))),
 	rotateY: (e) => Of(Tf(Math.atan2(-e[2], e[0]))),
@@ -15019,6 +15021,7 @@ var Lf = [
 	"scale",
 	"scaleX",
 	"scaleY",
+	"scaleZ",
 	"rotate",
 	"rotateX",
 	"rotateY",
@@ -17108,11 +17111,13 @@ function cte(e, t, n) {
 			i === f && (i = null, e.animation = void 0, e.events.animationComplete?.notify());
 		});
 	}, l), ym(t)) {
-		let r = n.skipInitialAnimation === !0, i = t.on("change", (t) => {
+		let r = n.skipInitialAnimation === !0, i = (t) => {
 			r ? (r = !1, e.jump(lte(t, o), !1)) : e.set(lte(t, o));
-		}), a = e.on("destroy", i);
+		}, a = t.on("change", i), s = t.get();
+		Xh(s) - Xh(e.get()) && i(s);
+		let c = e.on("destroy", a);
 		return () => {
-			i(), a();
+			a(), c(), l();
 		};
 	}
 	return l;
@@ -17496,7 +17501,7 @@ function Ate(e, t, n, r) {
 //#region node_modules/motion-dom/dist/es/render/svg/utils/scrape-motion-values.mjs
 function jte(e, t, n) {
 	let r = cg(e, t, n);
-	for (let n in e) if (ym(e[n]) || ym(t[n])) {
+	for (let n in e) if (n !== "children" && (ym(e[n]) || ym(t[n]))) {
 		let t = Lf.indexOf(n) === -1 ? n : "attr" + n.charAt(0).toUpperCase() + n.substring(1);
 		r[t] = e[n];
 	}

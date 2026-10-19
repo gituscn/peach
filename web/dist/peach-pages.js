@@ -534,7 +534,7 @@ var d = /* @__PURE__ */ o(((e) => {
 		return T.H.useSyncExternalStore(e, t, n);
 	}, e.useTransition = function() {
 		return T.H.useTransition();
-	}, e.version = "19.3.0";
+	}, e.version = "19.3.1";
 })), m = /* @__PURE__ */ o(((e, t) => {
 	t.exports = p();
 })), h = /* @__PURE__ */ o(((e) => {
@@ -664,7 +664,7 @@ var d = /* @__PURE__ */ o(((e) => {
 		return l.H.useFormState(e, t, n);
 	}, e.useFormStatus = function() {
 		return l.H.useHostTransitionStatus();
-	}, e.version = "19.3.0";
+	}, e.version = "19.3.1";
 })), g = /* @__PURE__ */ o(((e, t) => {
 	function n() {
 		if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ < "u" && typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE == "function") try {
@@ -9040,7 +9040,7 @@ var d = /* @__PURE__ */ o(((e) => {
 		}
 	};
 	var Kh = n.version;
-	if (Kh !== "19.3.0") throw Error(i(527, Kh, "19.3.0"));
+	if (Kh !== "19.3.1") throw Error(i(527, Kh, "19.3.1"));
 	_e.findDOMNode = function(e) {
 		var t = e._reactInternals;
 		if (t === void 0) throw typeof e.render == "function" ? Error(i(188)) : (e = Object.keys(e).join(","), Error(i(268, e)));
@@ -9048,10 +9048,10 @@ var d = /* @__PURE__ */ o(((e) => {
 	};
 	var qh = {
 		bundleType: 0,
-		version: "19.3.0",
+		version: "19.3.1",
 		rendererPackageName: "react-dom",
 		currentDispatcherRef: P,
-		reconcilerVersion: "19.3.0"
+		reconcilerVersion: "19.3.1"
 	};
 	if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ < "u") {
 		var Jh = __REACT_DEVTOOLS_GLOBAL_HOOK__;
