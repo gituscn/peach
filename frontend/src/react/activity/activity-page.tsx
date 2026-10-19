@@ -13,11 +13,12 @@
  * 轮询只管第一页，翻过的那些不会被下一次刷新冲掉。 */
 import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
-import { RiArrowDownSLine, RiHistoryLine } from '@remixicon/react';
+import { RiArrowDownSLine, RiArrowRightLine, RiHistoryLine } from '@remixicon/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { Chip } from '@/components/base/badges/chip';
 import { Button } from '@/components/base/buttons/button';
+import { LinkButton } from '@/components/base/buttons/link-button';
 
 import { errorMessage } from '../../api';
 import { cardClass } from '../components/card';
@@ -164,9 +165,10 @@ function SettledRun(
         {summary.map((line, index) => <li key={index}>{line}</li>)}
       </ul> : null}
       {run.task_key === 'link-check' && hasResultProblems(run)
-        ? <a href="/data-cleanup#link-manager" className="self-start text-caption-1-regular text-text-primary underline">
-            查看链接结果
-          </a> : null}
+        ? <LinkButton href="/data-cleanup#link-manager" size="small" trailingIcon={RiArrowRightLine}
+            className="self-start">
+            查看有问题的链接
+          </LinkButton> : null}
     </RunCard>
   );
 }
