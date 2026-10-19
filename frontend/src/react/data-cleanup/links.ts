@@ -39,6 +39,9 @@ export interface LinkStats {
 export interface LinkRow {
   id: number;
   entity: string;
+  entity_id?: number;
+  entity_kind?: string;
+  face?: { id: number; name: string; has_image: boolean; image_version?: string; avatar_focus?: unknown };
   link_kind: string;
   label: string;
   url: string;

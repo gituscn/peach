@@ -2,10 +2,87 @@
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
+import threading
+import time
+import os
 from peach import dev_copy
 
 
 class DevCopyTests(unittest.TestCase):
+    def test_build_failure_preserves_served_files_and_can_be_retried(self):
+        from peach import dev_copy_runtime as runtime
+        from subprocess import CompletedProcess
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / 'frontend/src').mkdir(parents=True)
+            path = root / 'frontend/src/copy.ts'
+            path.write_text("const title = '说明';", encoding='utf-8')
+            (root / 'web/dist').mkdir(parents=True)
+            served = root / 'web/dist/peach-app.js'
+            served.write_text('有效产物', encoding='utf-8')
+            candidate, = dev_copy.candidates(root, '说明')
+            with patch('peach.dev_copy_runtime.subprocess.run', return_value=CompletedProcess([], 1, '', '语法错误')):
+                result = runtime.submit(root, {'original': '说明', 'replacement': '新说明', 'candidate': candidate})
+                self._wait_for_state(runtime, root, 'error')
+            self.assertEqual(served.read_text(encoding='utf-8'), '有效产物')
+            self.assertEqual(path.read_text(encoding='utf-8'), "const title = '新说明';")
+            self.assertIn('语法错误', runtime.status(root)['message'])
+            with patch('peach.dev_copy_runtime.build_frontend'):
+                retry = runtime.submit(root, {'id': result['apply']['id']}, retry=True)
+                self._wait_for_state(runtime, root, 'ready')
+            self.assertNotEqual(result['apply']['id'], retry['apply']['id'])
+
+    def test_tray_reload_obeys_task_gate_and_releases_ownership_lock(self):
+        from peach import dev_copy_runtime as runtime
+        from peach.runtime_prepare import TaskGate, ActiveRun, Step
+        from unittest.mock import Mock
+        for blocked in (True, False):
+            with self.subTest(blocked=blocked), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                (root / 'src/peach').mkdir(parents=True)
+                path = root / 'src/peach/library_processing.py'
+                path.write_text("TITLE = '说明'", encoding='utf-8')
+                candidate, = dev_copy.candidates(root, '说明')
+                runtime.submit(root, {'original': '说明', 'replacement': '新说明', 'candidate': candidate})
+                with self.assertRaises(ValueError):
+                    runtime.submit(root, {})
+                tray = SimpleNamespace(_action_lock=threading.Lock(), manager=Mock(),
+                                       _readiness=lambda: Step('readiness', 'current', '服务已就绪'))
+                gate = TaskGate(blocking=(ActiveRun(1, 'test', 'manual', 'running', os.getpid(), None),)) if blocked else TaskGate()
+                with patch('peach.runtime_prepare.task_gate', return_value=gate):
+                    runtime.poll(tray, root)
+                    self._wait_for_state(runtime, root, 'error' if blocked else 'ready')
+                self.assertEqual(tray.manager.restart.call_count, 0 if blocked else 1)
+                self.assertFalse(tray._action_lock.locked())
+
+    @staticmethod
+    def _wait_for_state(runtime, root, state):
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if runtime.status(root).get('state') == state:
+                return
+            time.sleep(.01)
+        raise AssertionError(runtime.status(root))
+
+    def test_saved_frontend_copy_is_built_and_published(self):
+        from peach import dev_copy_runtime
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / 'web/dist').mkdir(parents=True)
+            (root / 'web/dist/peach-app.js').write_text('现有产物', encoding='utf-8')
+            def build(argv, **kwargs):
+                from subprocess import CompletedProcess
+                stage = Path(kwargs['env']['PEACH_FRONTEND_OUT_DIR'])
+                for name in dev_copy_runtime.BUNDLES:
+                    (stage / name).write_text('有效产物', encoding='utf-8')
+                self.assertEqual((root / 'web/dist/peach-app.js').read_text(encoding='utf-8'), '现有产物')
+                return CompletedProcess(argv, 0, stdout='构建完成', stderr='')
+            with patch('peach.dev_copy_runtime.subprocess.run', side_effect=build):
+                dev_copy_runtime.build_frontend(root)
+            self.assertEqual((root / 'web/dist/peach-app.js').read_text(encoding='utf-8'), '有效产物')
+
     def test_processing_template_keeps_live_values_and_validates_placeholders(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()

@@ -988,6 +988,33 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                                          headers={'Origin': 'https://another.example'})
         self.assertEqual(refused.status_code, 403)
 
+    async def test_copy_editor_exposes_saved_application_state_and_protects_retries(self):
+        from unittest.mock import patch
+        from peach import routes_pages
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / 'scripts/dev').mkdir(parents=True)
+            (root / 'scripts/dev/copy-editor.js').write_text('', encoding='utf-8')
+            (root / 'web').mkdir()
+            path = root / 'web/index.html'
+            path.write_text('<p>说明</p>', encoding='utf-8')
+            with patch.object(routes_pages, 'PROJECT_ROOT', root):
+                candidate, = (await self.client.get('/dev/copy-candidates?t=secret&text=说明')).json()
+                saved = await self.client.post('/dev/copy-save?t=secret',
+                    headers={'Origin': str(self.client.base_url).rstrip('/')},
+                    json={'original': '说明', 'replacement': '新说明', 'candidate': candidate})
+                self.assertEqual(saved.status_code, 200)
+                state = await self.client.get('/dev/copy-apply?t=secret')
+                self.assertEqual(state.headers['cache-control'], 'no-store')
+                self.assertEqual(state.json()['state'], 'ready')
+                self.assertEqual(state.json()['id'], saved.json()['apply']['id'])
+                self.assertEqual(path.read_text(encoding='utf-8'), '<p>新说明</p>')
+                self.assertEqual((await self.client.get('/dev/copy-apply')).status_code, 401)
+                refused = await self.client.post('/dev/copy-apply?t=secret', json={}, headers={'Origin': 'https://another.example'})
+                self.assertEqual(refused.status_code, 403)
+                with patch.object(routes_pages.sys, 'frozen', True, create=True):
+                    self.assertEqual((await self.client.get('/dev/copy-apply?t=secret')).status_code, 404)
+
     async def test_bundled_site_icons_require_auth_and_validate_names(self):
         from peach.config import PROJECT_ROOT
         self.assertEqual((await self.client.get('/site-icon/github.png')).status_code, 401)

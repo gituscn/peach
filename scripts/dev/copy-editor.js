@@ -22,6 +22,49 @@
   bar.setAttribute('aria-describedby', hint.id);
   const status = document.createElement('span'); status.setAttribute('role', 'status'); status.textContent = '编辑文案'; bar.append(status);
   const say = text => { status.textContent = text; };
+  const pendingKey = 'peach.copy-apply.v1';
+  let applyButton;
+  function recovery(text, action) {
+    applyButton?.remove();
+    applyButton = button(text, () => { applyButton.remove(); applyButton = null; action(); });
+  }
+  async function watchApply(job) {
+    applyButton?.remove(); applyButton = null;
+    sessionStorage.setItem(pendingKey, JSON.stringify(job));
+    saving = true; bar.setAttribute('aria-busy', 'true');
+    const deadline = Date.now() + 300000;
+    try {
+      while (Date.now() < deadline) {
+        say(job.message || '已保存，等待生效…');
+        if (job.state === 'ready') {
+          sessionStorage.removeItem(pendingKey);
+          sessionStorage.setItem('peach.copy-scroll', String(scrollY));
+          location.reload(); return;
+        }
+        if (job.state === 'error') {
+          say('已保存，未生效：' + job.message);
+          recovery('重试生效', async () => {
+            try {
+              const response = await fetch('/dev/copy-apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: job.id }) });
+              const result = await response.json(); if (!response.ok) throw Error(result.error || '重试失败');
+              watchApply(result.apply);
+            } catch (error) { say('已保存，未生效：' + error.message); recovery('继续等待', () => watchApply(job)); }
+          });
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          const response = await fetch('/dev/copy-apply', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+          if (!response.ok) continue;
+          const next = await response.json();
+          if (next.id !== job.id) { say('已保存，生效任务已更新'); sessionStorage.removeItem(pendingKey); return; }
+          job = next;
+        } catch { /* 服务重载期间保留等待状态。 */ }
+      }
+      say('已保存，生效仍在处理中');
+      recovery('继续等待', () => watchApply(job));
+    } finally { saving = false; bar.removeAttribute('aria-busy'); }
+  }
   const button = (text, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.onclick = fn; bar.append(b); return b; };
   const toggle = button('暂停编辑', () => {
     if (saving) return;
@@ -33,6 +76,16 @@
   });
   button('退出编辑', () => { if (saving) return; commit(true); const url = new URL(location.href); url.searchParams.delete('edit'); location.href = url; });
   host.append(hint, bar); document.body.append(highlight, host);
+  if (source) {
+    const position = sessionStorage.getItem('peach.copy-scroll');
+    if (position !== null) { sessionStorage.removeItem('peach.copy-scroll'); requestAnimationFrame(() => scrollTo(0, Number(position))); }
+    try {
+      const pending = JSON.parse(sessionStorage.getItem(pendingKey) || 'null');
+      if (pending) fetch('/dev/copy-apply', { cache: 'no-store' }).then(response => response.json())
+        .then(job => { if (job.id === pending.id) watchApply(job); else sessionStorage.removeItem(pendingKey); })
+        .catch(() => recovery('继续等待', () => watchApply(pending)));
+    } catch { sessionStorage.removeItem(pendingKey); }
+  }
   function apply() {
     if (editing || saving) return;
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -134,14 +187,15 @@
     if (!replacement) { say('不能留空，没有保存'); return; }
     saving = true; bar.setAttribute('aria-busy', 'true'); say('保存中…');
     try {
-      let message = '已保存草稿', text = replacement;
+      let message = '已保存草稿', text = replacement, job;
       if (source) {
         const saved = await fetch('/dev/copy-save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ original: ed.originalText, replacement, candidate: ed.candidate }) });
         const result = await saved.json(); if (!saved.ok) throw Error(result.error || '保存失败');
-        text = result.text ?? replacement; message = '已保存修改';
+        text = result.text ?? replacement; message = '已保存修改'; job = result.apply;
       }
       edits[ed.original] = text; originals.set(ed.node, ed.original); localStorage.setItem(key, JSON.stringify(edits)); ed.node.data = ed.lead + text + ed.trail;
       say(message);
+      if (job) await watchApply(job);
     } catch (error) { ed.node.data = ed.before; say('没保存：' + error.message); }
     finally { saving = false; bar.removeAttribute('aria-busy'); apply(); }
   }

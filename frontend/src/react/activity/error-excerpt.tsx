@@ -2,13 +2,13 @@
  *
  * 后端回的常是整段 traceback 或整页 HTML，铺开会把一张卡撑成几屏高；只露一行又看不到全文，
  * 所以全文收在键后面，展开后保留原有换行、长 URL 就地折断，太长时在自己的框里滚。 */
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 
 import { Button } from '@/components/base/buttons/button';
 
 import { readableErrorHeadline } from './tasks';
 
-export function ErrorExcerpt({ text, className = '' }: { text: string; className?: string }) {
+export function ErrorExcerpt({ text, className = '', summary }: { text: string; className?: string; summary?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   const full = String(text || '').trim();
@@ -19,7 +19,7 @@ export function ErrorExcerpt({ text, className = '' }: { text: string; className
     <div data-error-excerpt="" className={`flex min-w-0 max-w-full flex-col items-start gap-1 ${className}`}>
       {open
         ? <p id={id} className="max-h-80 w-full overflow-y-auto whitespace-pre-line wrap-anywhere">{full}</p>
-        : <p className="w-full wrap-anywhere">{head}</p>}
+        : summary ?? <p className="w-full wrap-anywhere">{head}</p>}
       {more
         ? <Button variant="ghost" size="xs" className="-ml-2" aria-expanded={open} aria-controls={open ? id : undefined}
             onClick={() => setOpen(!open)}>

@@ -31,13 +31,6 @@ const FOOT: Record<Layout, string> = {
     + ' bg-card-footer px-5 py-3 max-cleanup-tight:px-4.5',
 };
 
-/** 结果面板底下那条带子，和 `stack` 页脚同一副几何；颜色按语气另给。 */
-const BAND = 'flex min-h-14 flex-wrap items-center justify-end gap-2 border-t px-5 py-3';
-const BAND_TONE = {
-  neutral: 'border-border-button-default bg-card-footer',
-  error: 'border-border-error-default bg-background-tertiary-error',
-};
-
 /** 卡下面那块结果面板：同一副填充底，一条描边、14px 圆角、不浮起。
  *  链接检查与资源同步把一趟后台任务的结论摆在这里，一段一段往下叠，段间一条发丝线。 */
 export const RESULT_PANEL = cardClass({
@@ -46,24 +39,6 @@ export const RESULT_PANEL = cardClass({
 
 /** 结果面板里的一段：16px 内边距，除第一段外顶上一条线。 */
 export const RESULT_SECTION = 'border-t border-border-button-default p-4 first:border-t-0';
-
-/** 面板底下那条放按钮的带子。`error` 是「这一步删了就回不来」的那一档：红线红底，左边
- *  那句说明也换成红字。 */
-export function PanelFooter(
-  { tone = 'neutral', status, children }:
-  { tone?: 'neutral' | 'error'; status?: string; children: ReactNode },
-) {
-  return (
-    <div className={`${BAND} ${BAND_TONE[tone]}`}>
-      {status
-        ? <p className={`mr-auto min-w-0 text-caption-1-regular ${tone === 'error' ? 'text-text-error-primary' : 'text-text-secondary'}`}>
-            {status}
-          </p>
-        : null}
-      {children}
-    </div>
-  );
-}
 
 /** 卡外那一行分区标题（链接管理、资源同步），Title 2，与下面那张卡隔 16px。
  *

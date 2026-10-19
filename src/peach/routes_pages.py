@@ -295,11 +295,32 @@ async def copy_editor_save(request: Request, args: dict[str, str] = Depends(requ
         raise HTTPException(403, "same origin required")
     if len(await request.body()) > 32768:
         raise HTTPException(413, "too large")
-    from . import dev_copy
     try:
-        return JSONResponse(dev_copy.save(PROJECT_ROOT, await request.json()))
+        from . import dev_copy_runtime
+        return JSONResponse(dev_copy_runtime.submit(PROJECT_ROOT, await request.json()))
     except (ValueError, TypeError, KeyError) as error:
         return JSONResponse({"error": str(error)}, status_code=409)
+
+
+@router.get('/dev/copy-apply')
+def copy_editor_apply_status(args: dict[str, str] = Depends(require_asset_auth)):
+    _require_copy_editor()
+    from . import dev_copy_runtime
+    return JSONResponse(dev_copy_runtime.status(PROJECT_ROOT), headers={'Cache-Control': 'no-store'})
+
+
+@router.post('/dev/copy-apply')
+async def copy_editor_apply_retry(request: Request, args: dict[str, str] = Depends(require_asset_auth)):
+    _require_copy_editor()
+    if request.headers.get('origin') != str(request.base_url).rstrip('/'):
+        raise HTTPException(403, 'same origin required')
+    if len(await request.body()) > 32768:
+        raise HTTPException(413, 'too large')
+    from . import dev_copy_runtime
+    try:
+        return JSONResponse(dev_copy_runtime.submit(PROJECT_ROOT, await request.json(), retry=True))
+    except (ValueError, TypeError, KeyError) as error:
+        return JSONResponse({'error': str(error)}, status_code=409)
 
 
 def _setup_guard(request: Request, *, submit: bool) -> None:

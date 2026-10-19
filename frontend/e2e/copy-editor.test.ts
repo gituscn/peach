@@ -9,6 +9,45 @@ describe('原位改字', () => {
   before(async () => { browser = await launch(); });
   after(async () => { await browser?.close(); });
   for (const viewport of VIEWPORTS) {
+    it(`保存后等待生效并保留编辑地址刷新，失败可单独重试（${viewport.name}）`, async () => {
+      const context = await browser.newContext({ viewport });
+      try {
+        const page = await context.newPage();
+        let navigations = 0, saves = 0, retries = 0;
+        let job = { id: 'build-1', state: 'building', message: '已保存，正在构建…' };
+        await page.route('https://copy.example/**', async route => {
+          const path = new URL(route.request().url()).pathname;
+          if (path === '/dev/copy-edits') return route.fulfill({ json: {} });
+          if (path === '/dev/copy-candidates') return route.fulfill({ json: [{ file: 'frontend/src/copy.ts', line: 1 }] });
+          if (path === '/dev/copy-save') { saves++; return route.fulfill({ json: { ok: true, text: '生效说明', apply: job } }); }
+          if (path === '/dev/copy-apply') {
+            if (route.request().method() === 'POST') {
+              retries++; job = { id: 'build-2', state: 'ready', message: '构建完成，正在刷新…' };
+              return route.fulfill({ json: { ok: true, apply: job } });
+            }
+            return route.fulfill({ json: job });
+          }
+          navigations++;
+          return route.fulfill({ contentType: 'text/html; charset=utf-8', body: `<meta charset="utf-8"><body data-peach-copy-mode="source"><p id="copy" style="margin:60px 20px">${navigations === 1 ? '原说明' : '生效说明'}</p></body>` });
+        });
+        await page.goto('https://copy.example/settings?section=library&edit');
+        await page.addScriptTag({ content: await readFile(new URL('../../scripts/dev/copy-editor.js', import.meta.url), 'utf8') });
+        await page.locator('#copy').click({ position: { x: 5, y: 8 } });
+        const inline = page.locator('#copy [contenteditable]');
+        await inline.fill('生效说明'); await inline.press('Enter');
+        await page.getByRole('status').filter({ hasText: '正在构建' }).waitFor();
+        assert.equal(navigations, 1);
+        job = { ...job, state: 'error', message: '构建失败' };
+        await page.getByRole('status').filter({ hasText: '已保存，未生效：构建失败' }).waitFor();
+        assert.equal(await page.locator('#copy').innerText(), '生效说明');
+        await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: '重试生效' }).click()]);
+        assert.equal(navigations, 2); assert.equal(saves, 1); assert.equal(retries, 1);
+        assert.equal(page.url(), 'https://copy.example/settings?section=library&edit');
+        assert.equal(await page.locator('#copy').innerText(), '生效说明');
+        assert.equal(await page.evaluate(() => sessionStorage.getItem('peach.copy-apply.v1')), null);
+      } finally { await context.close(); }
+    });
+
     it(`连续改字记录显示最终文案并终止循环（${viewport.name}）`, async () => {
       const context = await browser.newContext({ viewport });
       try {

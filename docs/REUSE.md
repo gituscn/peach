@@ -714,6 +714,10 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.17.0，版本
 应用的 React 与动态页面使用源码定位、摘要校验和备份入口；演示站使用浏览器草稿。两者只在 `?edit` 启用，无新增依赖。
 Python 源文件纳入 `src/peach/library_sharing.py` 与 `src/peach/library_processing.py`。动态句子复用标准库 `ast`、`string.Formatter` 定位 f-string 与相邻字符串，编辑时显示命名占位符，保存时校验占位符齐全且各出现一次。求值表达式与格式保留在 AST 中，当前数量只用于显示；其他 Python 文件不属于改字范围。
 
+生效状态由 `dev_copy_runtime` 持久保存，保存与重试复用项目固定的 FileLock 4.2.0（MIT，纯 Python），文件替换使用 `fsutil.atomic_write_*`。构建沿用锁定的 Vite 8.3.4 与 `npm --prefix frontend run build`，通过 `PEACH_FRONTEND_OUT_DIR` 指定临时产物目录；前端主包和独立页面包均支持。源码服务重载复用托盘的子服务所有权、`runtime_prepare.task_gate` 与就绪检查，不引入额外进程管理器或依赖。隔离用例覆盖失败产物保护、重试、任务拒绝和浏览器自动刷新。
+
+链接检查结果的身份引用复用 `web_catalog.entity_ref`，页面头像沿用 `entityFaceImg` 的取景和回退，favicon 复用 `SiteMark` 与 `/link-mark`；两张结果表共用列定义，Peach 资料名称使用 `entityPath` 生成内部链接。结果状态使用 BoardUI Chip，长错误仍可展开；永久删除入口位于失效清单自己的页脚，说明与分隔线使用中性色。关注列表无来源时使用 `EmptyState` 的 page 外壳，背景、边框与添加入口同属空状态。断链按钮使用现有 Lucide unlink 字形，仅四条短线循环改变透明度，周期沿用 Loading Dots 的 1.2 秒，reduced motion 沿用全局规则。
+
 ## 馆藏处理控制与耗时预估
 
 长时任务续跑复用 `job_recovery` 的本机原子记录、`BackgroundJob.checkpoint` 与 `TaskRunHandle.checkpoint`。主任务保留原 `job_id`、`run_id`、开始时间、处理范围和领域检查点；后继重排保留原进度。扫描复用现有 `os.scandir`、SQLite 批次提交、`filelock` 和 `fsutil.atomic_write_text`，保存遍历栈、文件名游标及字幕配对资料。本地资料按影片保存小份证据边车，候选成功落盘后才提交元数据完成集合；整理逐项原子保存同一批次的日志。`scrape_codes.py` 复用流式 CSV 与原始来源快照，续跑只保留已确认完成的番号，未完成番号可以重放。

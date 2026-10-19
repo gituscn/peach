@@ -22,7 +22,7 @@ export default defineConfig({
   },
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   build: {
-    outDir: '../web/dist',
+    outDir: process.env.PEACH_FRONTEND_OUT_DIR || '../web/dist',
     emptyOutDir: false,
     target: 'es2022',
     cssTarget: ['chrome111', 'edge111', 'firefox128', 'safari16.4', 'ios16.4'],

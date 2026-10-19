@@ -376,6 +376,24 @@ describe('链接管理', () => {
     top_host_link_ids: { 'x.com': 1, 'instagram.com': 2, 'linktr.ee': 3, 'tiktok.com': 4 },
   };
 
+  it('结果表用所属头像和链接站标识别对象，链接名称保留可读回退', async () => {
+    serve({ '/api/links': stats, '/api/links/check': { ...checked,
+      gone: [row(1, { entity_id: 31, entity_kind: 'performer', face: { id: 31, name: '女优 1', has_image: true, image_version: 'v1' } })],
+      unclear: [row(2, { label: '' })],
+    }, '/api/links/prune': { status: 'idle' } });
+    const host = await wrap(<LinkManager />);
+    await settle();
+    const gone = host.querySelector('[aria-label="地址已失效"]')!;
+    expect(gone.textContent).toContain('链接名称');
+    expect(gone.textContent).toContain('Peach 资料');
+    expect(gone.querySelector('[data-link-identity]')?.getAttribute('href')).toBe('/performers/31');
+    expect(gone.querySelector('[data-link-identity] img')?.getAttribute('src')).toContain('/entity-image?kind=performer&id=31');
+    expect(gone.querySelector('[data-link-name] img')?.getAttribute('src')).toBe('/link-mark?id=1');
+    const unclear = host.querySelector('[aria-label="本次未访问成功"]')!;
+    expect(unclear.querySelector('[data-link-name]')?.textContent).toBe('example.com');
+    expect(unclear.querySelector('[data-link-identity]')?.textContent).toContain('女优 2');
+  });
+
   it('每一类链接各占一格，类型用界面上的名字，主要站点只列前三', async () => {
     serve({ '/api/links': stats, '/api/links/check': { ...checked, status: 'idle' }, '/api/links/prune': { status: 'idle' } });
     const host = await wrap(<LinkManager />);
