@@ -122,13 +122,14 @@ Windows 测试包默认使用 `%LOCALAPPDATA%\Peach\peach-data`。首次设置�
 
 ### 在 macOS 上对应 Windows 路径：`[media.mounts]`
 
-数据库里的路径统一按 Windows 的形式记录（例如 `R:\media\x`）。macOS 用 `[media.mounts]` 告诉 Peach 这些路径在本机的实际位置：
+Peach 数据库中每部影片的 `path` 字段都使用 Windows 格式，例如 `R:\media\x`，即使服务运行在 macOS 或 Linux 上。这个值是数据库里的字符串；本机没有对应盘符时，Peach 需要用以下两项配置找到实际文件。Docker 配置见 [Docker 部署](DOCKER.md#配置文件与路径)。
 
-- 键是来源 ID（`[media.locations]` 里声明过的，例如 `local`、`115`）。
-- 值是这个来源的声明目录在本机的落点。例如声明 `local = 'R:\media'`、挂载 `local = '/Volumes/<卷名>/media'` 时，数据库里的 `R:\media\x` 在本机读作 `/Volumes/<卷名>/media/x`。
-- 声明了几个目录，就按同样的顺序给几个落点，两边都写成数组，数量对不上会被拒绝。
+- 两项使用相同的媒体来源键，例如 `local`、`115`。
+- `[media.locations] local = 'R:\media'` 表示数据库中的文件路径以 `R:\media` 开头，不要求 macOS 或 Linux 存在这个目录。
+- `[media.mounts] local = '/Volumes/<卷名>/media'` 表示本机实际读取的目录。数据库中的 `R:\media\x` 会转换成 `/Volumes/<卷名>/media/x`。
+- 一个来源有多个目录时，两项都写数组，目录数量和顺序必须相同。
 
-Windows 上这一段留空是正常的，盘符本身就是挂载点。没挂上的来源整体按离线处理，不报错。来源 ID 写错或写成盘符，会被直接拒绝。
+Windows 直接使用 `[media.locations]` 中的路径，`[media.mounts]` 可以留空。macOS 和 Linux 仍然使用两项配置；缺少对应实际目录时，该来源显示离线，媒体记录保留，但无法读取文件。把 `[media.locations]` 的值改成 POSIX 路径不会同步修改已有影片记录，也无法替代这一步转换。媒体来源键写错或写成盘符时，配置会被拒绝。
 
 临时诊断时可以用环境变量覆盖，例如 `PEACH_MEDIA_MOUNTS=local=/mnt/res,115=/mnt/115`。
 

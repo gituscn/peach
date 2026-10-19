@@ -2,8 +2,8 @@
 
 页面整个是 `frontend/src/react/settings/` 下的 React 子树（入口 `configuration-page.tsx`），
 挂在主站的 `/configuration` 路由里（ADR-0031）；这里只回数据。桌面由托盘管理，无桌面服务由专用入口管理；调用方范围与配置写入都在服务端校验。
-手机上的管理菜单不列这一页，靠的是 `/healthz` 的 `configurable`，但那只是入口的显隐，
-拒绝写入的判定在这里。
+桌面部署只允许本机管理；Docker 部署还允许已登录的私有网络客户端管理。
+`/healthz` 的 `configurable` 只控制入口显隐；这里负责实际访问检查。
 """
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ def tunnel_forwarded(request: Request) -> bool:
 
 
 def local_client(request: Request) -> bool:
-    """按连接两端的 IP 识别本机；Host 只用于校验允许的入口名称。"""
+    """按 IP 检查管理请求；桌面限本机，Docker 允许本机与私有网络，拒绝代理转发。"""
     if not request.client or tunnel_forwarded(request):
         return False
     server = request.scope.get("server")
