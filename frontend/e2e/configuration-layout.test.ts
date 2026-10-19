@@ -8,6 +8,28 @@ describe('配置表单与行间距', () => {
   before(async () => { browser = await launch() });
   after(async () => { await browser?.close() });
   for (const viewport of VIEWPORTS) {
+    it(`${viewport.name}：来源站标本地提供，帮助链接紧接文字`, async () => {
+      const opened = await visit(browser, '/settings/subscriptions', viewport);
+      const { page } = opened;
+      try {
+        const section = page.getByRole('form', { name: '资源搜索', exact: true });
+        await section.getByText('索引器连接帮助', { exact: true }).click();
+        const link = section.getByRole('link', { name: '详细配置说明', exact: true });
+        await link.waitFor({ state: 'visible' });
+        assert.equal(await link.evaluate(node => node.parentElement?.tagName), 'P');
+        const head = page.locator('b').filter({ hasText: /^F95zone$/ }).locator('..');
+        const icon = head.locator('img');
+        await icon.scrollIntoViewIfNeeded();
+        await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>('img[src*="provider=f95zone"]')].some(image => image.complete && image.naturalWidth > 0));
+        assert.equal(await icon.getAttribute('src'), '/source-icon?provider=f95zone');
+        await icon.evaluate(image => image.dispatchEvent(new Event('error')));
+        await head.locator('svg').waitFor();
+        assert.equal(await head.locator('img').count(), 0);
+        await section.screenshot({ path: `../build/indexer-help-${viewport.name}.png` });
+        assert.deepEqual((await layout(page)).offenders, []);
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close() }
+    });
     it(`${viewport.name}：应用更新包说明和体积不越出视口`, async () => {
       const opened = await visit(browser, '/settings/library?section=' + encodeURIComponent('应用与维护'), viewport);
       const { page } = opened;
@@ -30,10 +52,11 @@ describe('配置表单与行间距', () => {
         assert.deepEqual(opened.problems, []);
       } finally { await opened.close() }
     });
-    it(`${viewport.name}：挂载目录的代理流量保护可切换且不越出视口`, async () => {
+    it(`${viewport.name}：挂载目录的代理保护可切换且不越出视口`, async () => {
       const opened = await visit(browser, '/settings/library?section=' + encodeURIComponent('这台电脑'), viewport);
       const { page } = opened;
       try {
+        await page.route('**/api/configuration/cloud-proxies', route => route.fulfill({ json: { accounts: [] } }));
         await page.route('**/api/configuration', async route => {
           const data = await (await route.fetch()).json();
           await route.fulfill({ json: { ...data, editable: true, windows: true, media_sources: [
@@ -59,8 +82,23 @@ describe('配置表单与行间距', () => {
         }));
         assert.deepEqual(marks, Array.from({ length: 8 }, () => ({ inline: true, width: 16, height: 16 })));
         assert.ok(!(await form.innerText()).includes('（只读）'));
-        assert.ok((await protectedFolder.textContent())?.includes('代理流量保护'));
+        assert.ok((await protectedFolder.textContent())?.includes('代理保护'));
         assert.ok((await form.locator('[data-media-read-policy="1"]').textContent())?.includes('正常读取'));
+        if (!viewport.mobile) {
+          for (let index = 0; index < 5; index++) {
+            const row = form.locator('[data-folder-row]').nth(index);
+            const source = await row.locator('[aria-haspopup="listbox"]').first().boundingBox();
+            const policy = await row.locator('[data-media-read-policy] [aria-haspopup="listbox"]').boundingBox();
+            const name = await row.getByRole('textbox', { name: `媒体库名称 ${index + 1}`, exact: true }).boundingBox();
+            const icon = await row.getByRole('button', { name: `媒体库图标 ${index + 1}`, exact: true }).boundingBox();
+            assert.ok(source && policy && name && icon);
+            const centers = [source, policy, name, icon].map(box => box.y + box.height / 2);
+            assert.ok(Math.max(...centers) - Math.min(...centers) <= 3, JSON.stringify({ index, source, policy, name, icon }));
+            assert.ok(policy.width <= 132);
+            const bounds = await row.boundingBox();
+            assert.ok(bounds && bounds.x + bounds.width - (icon.x + icon.width) <= 14);
+          }
+        }
         await protectedFolder.click();
         await page.getByRole('option', { name: '正常读取', exact: true }).click();
         await settle(page);

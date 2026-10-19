@@ -17,6 +17,7 @@ describe('扫描与采集控制', () => {
         current_asset_name: '', current_action: '', stage: '',
         stalled: false, waited_seconds: 0,
         traffic: { used_bytes: 0, estimated_min_bytes: 1048576, estimated_max_bytes: 8388608,
+          workload: { video_files: 200, jav_files: 60, jav_titles: 40 },
           estimated_bytes: 6291456, metered_estimated_bytes: 3145728,
           metered_used_bytes: 0, metered_estimated_min_bytes: 0, metered_estimated_max_bytes: 4194304,
           partial: true, unknown_files: true,
@@ -26,8 +27,18 @@ describe('扫描与采集控制', () => {
             used_bytes: 0, estimated_bytes: 3145728, estimated_min_bytes: 1048576, estimated_max_bytes: 4194304, unobserved: ['挂载缓存与预读未观测'] }] },
         eta_kind: 'historical', eta_initial: true, eta_seconds_min: 1200, eta_seconds_max: 2400 };
       const writes: Record<string, unknown>[] = [];
+      let inventoryComplete = false;
+      let inventoryReads = 0;
       const opened = await visit(browser, '/data-cleanup', viewport, async page => {
         await page.route('**/api/library-processing{,?*}', async route => {
+          const url = new URL(route.request().url());
+          if (url.searchParams.has('estimate')) {
+            inventoryReads += 1;
+            await route.fulfill({ json: { traffic: { ...state.traffic,
+              workload: inventoryComplete ? state.traffic.workload : { video_files: 10, jav_files: 3, jav_titles: 2 },
+              inventory: inventoryComplete ? { complete: true, errors: 0 } : { complete: false, errors: 0, token: 'inventory' } } } });
+            return;
+          }
           if (route.request().method() === 'POST') {
             const body = route.request().postDataJSON();
             writes.push(body);
@@ -49,6 +60,17 @@ describe('扫描与采集控制', () => {
         await card.waitFor();
         await settle(page);
         assert.equal(await card.locator('[data-processing-controls]').count(), 0);
+        assert.equal(await card.getByRole('button', { name: '同步媒体库', exact: true }).locator('svg').count(), 0);
+        await card.getByRole('button', { name: '更多同步方式', exact: true }).click();
+        const menu = page.getByRole('dialog', { name: '同步方式', exact: true });
+        assert.equal(await menu.locator('svg').count(), 0);
+        assert.equal(await menu.getByRole('button').count(), 4);
+        for (const label of ['仅扫描文件', '仅补全已入库影片', '仅补全影片资料', '仅补全预览图']) {
+          await menu.getByText(label, { exact: true }).waitFor();
+        }
+        await menu.getByText('为已入库的本地视频生成九宫格', { exact: true }).waitFor();
+        await menu.screenshot({ path: path.join(artifacts, `${viewport.name}-processing-menu.png`) });
+        await menu.press('Escape');
         await card.getByRole('button', { name: '同步媒体库', exact: true }).click();
         const dialog = page.getByRole('dialog', { name: '同步媒体库', exact: true });
         await dialog.waitFor();
@@ -57,7 +79,31 @@ describe('扫描与采集控制', () => {
         const modalLayout = await layout(page);
         assert.ok(modalLayout.scrollWidth <= modalLayout.viewportWidth, JSON.stringify(modalLayout));
         assert.deepEqual(modalLayout.offenders, []);
+        await dialog.getByText('正在统计新目录…', { exact: true }).waitFor();
+        assert.equal(await dialog.getByRole('button', { name: '同步媒体库', exact: true }).isEnabled(), true);
+        await dialog.getByText('视频 10 个', { exact: true }).waitFor();
+        const inventoryAtClose = inventoryReads;
+        const libraryLink = dialog.getByRole('link', { name: '管理媒体库', exact: true });
+        assert.equal(await libraryLink.getAttribute('href'), '/settings/library');
+        const footerOrder = await dialog.locator('.geist-modal-footer').evaluate(el => {
+          const link = el.querySelector('a')!.getBoundingClientRect();
+          const confirm = el.querySelector('[data-modal-confirm]')!.getBoundingClientRect();
+          return link.left < confirm.left && Math.abs((link.top + link.bottom) / 2 - (confirm.top + confirm.bottom) / 2) < 1;
+        });
+        assert.equal(footerOrder, true, '管理媒体库与主按钮在右下同排居中');
+        await libraryLink.click();
+        await page.waitForURL('**/settings/library');
+        assert.equal(await page.getByRole('dialog', { name: '同步媒体库', exact: true }).count(), 0);
+        await page.waitForTimeout(600);
+        assert.equal(inventoryReads, inventoryAtClose);
+        assert.equal(writes.length, 0);
+        await page.goto(new URL('/data-cleanup', page.url()).href);
+        await card.waitFor();
+        await card.getByRole('button', { name: '同步媒体库', exact: true }).click();
+        await dialog.getByText('正在统计新目录…', { exact: true }).waitFor();
+        inventoryComplete = true;
         await dialog.getByText('预计总流量', { exact: true }).waitFor();
+        await dialog.getByText('可识别 JAV 60 个（40 部）', { exact: true }).waitFor();
         const centering = await dialog.locator('.processing-effort-panel').evaluate(el => {
           const panel = el.getBoundingClientRect();
           const modal = el.closest('dialog')!.getBoundingClientRect();
@@ -91,6 +137,8 @@ describe('扫描与采集控制', () => {
         await disclosure.click();
         await page.emulateMedia({ reducedMotion: 'reduce' });
         const startupSlider = dialog.getByRole('slider');
+        await startupSlider.press('End');
+        await dialog.screenshot({ path: path.join(artifacts, `${viewport.name}-high-startup.png`) });
         await startupSlider.press('Home');
         await dialog.screenshot({ path: path.join(artifacts, `${viewport.name}-startup.png`) });
         await dialog.getByRole('button', { name: '同步媒体库', exact: true }).click();
@@ -132,7 +180,7 @@ describe('扫描与采集控制', () => {
         };
         await assertSelectedSpeed(0);
         assert.deepEqual(await scale.locator(':scope > span').allTextContents(), ['最慢', '标准', '最快']);
-        assert.deepEqual(await scale.locator(':scope > span').evaluateAll(marks => marks.map(mark => mark.querySelectorAll('svg > use').length)), [1, 1, 2]);
+        assert.deepEqual(await scale.locator(':scope > span').evaluateAll(marks => marks.map(mark => mark.querySelectorAll('svg > use, svg > path').length)), [1, 1, 2]);
         const scaleLayout = await scale.evaluate(el => {
           const marks = [...el.children].map(mark => mark.getBoundingClientRect());
           const track = el.parentElement!.querySelector('.processing-effort-track')!.getBoundingClientRect();
@@ -205,7 +253,7 @@ describe('扫描与采集控制', () => {
         await dock.getByRole('button', { name: '处理速度：全速' }).waitFor();
         const highSpeed = dock.getByRole('button', { name: '处理速度：全速' });
         assert.equal(await highSpeed.innerText(), '全速');
-        assert.equal(await highSpeed.locator('svg > use[href="#i-zap"]').count(), 2);
+        assert.equal(await highSpeed.locator('svg > use[href="#i-zap"]').count(), 1);
         await assertSelectedSpeed(2);
         const theme = await page.evaluate(() => ({ value: document.documentElement.dataset.theme,
           dark: document.documentElement.classList.contains('dark') }));
@@ -215,14 +263,13 @@ describe('扫描与采集控制', () => {
           for (const hovered of [false, true]) {
             if (hovered) await highSpeed.hover();
             else await page.mouse.move(1, 1);
-            await page.waitForFunction(() => {
-              const button = document.querySelector('.processing-effort-trigger[data-speed="high"] > button')!;
-              return getComputedStyle(button.querySelector('.processing-effort-double > use:last-child')!).fill === getComputedStyle(button).backgroundColor;
-            });
-            const paint = await highSpeed.evaluate(el => ({ background: getComputedStyle(el).backgroundColor,
+            const paint = await highSpeed.evaluate(el => ({
+              rear: getComputedStyle(el.querySelector('.processing-effort-double > path')!).fill,
               foreground: getComputedStyle(el.querySelector('.processing-effort-double > use:last-child')!).fill }));
-            assert.equal(paint.foreground, paint.background, '前方闪电用控件背景遮住后方轮廓');
+            assert.equal(paint.foreground, 'none', '前方闪电内部透明，适配当前表面');
+            assert.equal(paint.rear, 'none', '后方闪电内部透明，适配当前表面');
           }
+          await highSpeed.screenshot({ path: path.join(artifacts, `${viewport.name}-double-lightning-${dark ? 'dark' : 'light'}.png`) });
         }
         await page.mouse.move(1, 1);
         await page.evaluate(theme => {

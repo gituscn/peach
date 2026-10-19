@@ -38,19 +38,19 @@ export const isCloudSource = (location: string) => CLOUD_LOCATIONS.includes(loca
 export function MediaReadPolicy({ index, cost, error, onChange }: {
   index: number; cost: SourceCost | ''; error?: string; onChange(cost: SourceCost): void;
 }) {
-  return <div data-media-read-policy={index} className="flex w-full flex-col gap-1.5 @lg:w-48">
+  return <div data-media-read-policy={index} className="flex w-full flex-col gap-1.5 @lg:w-32">
     <Select aria-label={`媒体读取策略 ${index + 1}`} placeholder="选择读取策略" isRequired
       validationBehavior="aria" isInvalid={Boolean(error)} selectedKey={cost || null}
       onSelectionChange={(key) => { if (key === 'free' || key === 'metered') onChange(key); }}>
       <SelectItem id="free">正常读取</SelectItem>
-      <SelectItem id="metered">代理流量保护</SelectItem>
+      <SelectItem id="metered">代理保护</SelectItem>
     </Select>
     {error ? <ErrorText>{error}</ErrorText> : null}
   </div>;
 }
 
 export function MediaReadPolicyHelp() {
-  return <Help>按挂载工具实际配置选择；代理流量保护会限制自动媒体读取。</Help>;
+  return <Help>代理保护会限制自动读取视频。</Help>;
 }
 
 export interface FolderRowValue { path: string; location: string }

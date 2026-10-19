@@ -15,8 +15,12 @@ const Lightning = spriteGlyph('zap');
 function DoubleLightning({ className }: { className?: string }) {
   return <svg className={`processing-effort-double ${className ?? ''}`} aria-hidden="true" viewBox="0 0 30 24"
     fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <use href="#i-zap" transform="translate(7 -1) scale(.85)" />
-    <use href="#i-zap" transform="translate(0 2) scale(.85)" fill="var(--processing-effort-icon-background,var(--color-background-primary-default))" />
+    <path transform="translate(7 -1) scale(.85)" d="m12.6 3.279.84-.84A1.5 1.5 0 0 1 15.914 4l-1.883 5.333a.5.5 0 0 0 .472.667H18.5a1.5 1.5 0 0 1 1.061 2.56l-5.56 5.56" />
+    <g fill="var(--processing-effort-icon-background,var(--color-background-primary-default))"
+      stroke="var(--processing-effort-icon-background,var(--color-background-primary-default))" strokeWidth="3">
+      <use href="#i-zap" transform="translate(0 2) scale(.85)" />
+    </g>
+    <use href="#i-zap" transform="translate(0 2) scale(.85)" />
   </svg>;
 }
 const SPEED_ICONS = [Snail, Lightning, DoubleLightning];

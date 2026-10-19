@@ -753,15 +753,23 @@ def follow_avatar(request: Request, service: str = "", id: str = "",
 
 @router.api_route("/source-icon", methods=["GET", "HEAD"])
 def source_icon(request: Request, provider: str = "", args: dict[str, str] = Depends(require_auth)):
-    """来源的站点图标。地址只认 `follow_assets.SOURCE_ICON_URLS` 那张表，没登记的 404。"""
+    """来源站标优先取应用资源，缓存未取得时显示地球；未知来源返回 404。"""
     state = request.app.state
+    if provider in follow_assets.SOURCE_ICON_URLS:
+        bundled = PROJECT_ROOT / 'resources' / 'site-marks' / f'{provider}.png'
+        if bundled.is_file():
+            return _image_response(request, bundled, media_type='image/png')
     target = follow_assets.SOURCE_ICON_URLS.get(provider)
     if target is None:
-        return _asset_response(request, None)
-    client = state.http_transport.client
-    path = follow_assets.cached_image(
-        _asset_root(state), "icons", provider, FAVICON_REFRESH_SECONDS,
-        lambda: follow_assets.fetch_image(client, target))
+        path = None
+    else:
+        client = state.http_transport.client
+        path = follow_assets.cached_image(
+            _asset_root(state), "icons", provider, FAVICON_REFRESH_SECONDS,
+            lambda: follow_assets.fetch_image(client, target))
+    if path is None:
+        return Response((PROJECT_ROOT / 'resources' / 'site-marks' / 'globe.svg').read_bytes(),
+                        status_code=404, media_type='image/svg+xml', headers={'cache-control': 'no-store'})
     return _asset_response(request, path)
 
 

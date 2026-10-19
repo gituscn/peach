@@ -1,6 +1,7 @@
 import { notifyManager, QueryClientProvider } from '@tanstack/react-query';
 import { act } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
+vi.mock('../../src/react/settings/cloud-proxy-settings', () => ({ CloudProxySettings: () => null }));
 import { CONFIGURATION_URL } from '../../src/configuration-endpoints';
 import type { ConfigurationData, DownloadSettingsState } from '../../src/react/bundle';
 import { queryClient } from '../../src/react/query';

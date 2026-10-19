@@ -61,6 +61,11 @@ class TrafficPlan:
         self.cover_names = cached_names(self.cover_root)
         self.evidence_names = cached_names(config.directory('sources') / 'library-metadata')
         self.proxy = {}
+        from .processing_traffic_history import TrafficHistory
+        self.history = TrafficHistory(config)
+        self.profiles = {}
+        self.baselines = {}
+        self.counts = {}
 
     def _add(self, token, key, amount, *, budgeted=True):
         if amount <= 0 or token in self.completed or token.partition(':')[0] + ':*' in self.completed:
@@ -94,13 +99,21 @@ class TrafficPlan:
         return 'metadata-proxy' if self.proxy[source] else 'metadata-direct'
 
     def refresh(self, rows):
-        from .library_processing import _provider_code, _scrapes_as_jav, _missing_fields
-        from .catalog_rules import release_code_from_filename
-        self.assets = list(rows)
+        self.assets = []
         self.units = {}
         self.outside_budget = {}
-        titles = {}
-        for row in self.assets:
+        self.profiles = {}
+        self.baselines = {}
+        self.counts = {}
+        self.titles = {}
+        self.extend(rows)
+
+    def extend(self, rows):
+        from .library_processing import _provider_code, _scrapes_as_jav, _missing_fields
+        from .catalog_rules import release_code_from_filename
+        changed = set()
+        for row in rows:
+            self.assets.append(row)
             if self.stage == 'previews' and row['location'] != 'local':
                 continue
             key = self.media_key(row['path'], row['location'])
@@ -108,6 +121,11 @@ class TrafficPlan:
                 continue
             code = _provider_code(row.get('code')) or release_code_from_filename(row.get('name') or '')
             eligible = bool(code and _scrapes_as_jav(row, code))
+            counts = self.counts.setdefault(key, dict(video_files=0, jav_files=0, titles=set()))
+            counts['video_files'] += 1
+            if eligible:
+                counts['jav_files'] += 1
+                counts['titles'].add(code)
             path = str(row['path'])
             if self.stage not in ('scan', 'previews'):
                 # 无发行番号的创作者文件只检查配套文件，不进入 JAV 下载链。
@@ -115,11 +133,17 @@ class TrafficPlan:
                     self._add('local:' + path, key, self.nfo_bytes)
                     if not self._ready(code):
                         self._add('local:' + path, key, self.cover_bytes)
-                    title = titles.setdefault(code, dict(row=row, missing=set()))
+                    title = self.titles.setdefault(code, dict(row=row, missing=set()))
                     title['missing'].update(_missing_fields(row))
+                    changed.add(code)
             self._media(row, key)
-        for code, title in titles.items():
-            self._downloads(code, title)
+        for code in changed:
+            token = 'metadata:' + code
+            self.units.pop(token, None)
+            self.outside_budget.pop(token, None)
+            self.profiles.pop(token, None)
+            self.baselines.pop(token, None)
+            self._downloads(code, self.titles[code])
 
     def _media(self, row, key):
         from .media_processing_policy import metadata_only
@@ -128,13 +152,13 @@ class TrafficPlan:
         path = str(row['path'])
         if skip_background_read(path):
             return
-        size = max(0, row.get('size') or 0)
+        size = max(0, row.get('size') if row.get('size') is not None else 9 * 8 * MIB)
         if (self.stage != 'metadata' and row.get('duration') is None
                 and cost_for(row['location'], path, self.config) == 'free'):
-            self._add('media:' + path, key, min(size, 8 * MIB))
+            self._add('media:' + path, key, min(size, self.history.average(key + ':probe', 8 * MIB)))
         if (self.stage in ('all', 'collect', 'previews') and row['location'] == 'local'
                 and not row.get('snapshot_path') and not metadata_only(self.config.directory('state'))):
-            self._add('media:' + path, key, min(size, 9 * 8 * MIB))
+            self._add('media:' + path, key, min(size, 9 * self.history.average(key + ':frame', 8 * MIB)))
 
     def _downloads(self, code, title):
         from .library_processing import _studio_evidence
@@ -144,14 +168,29 @@ class TrafficPlan:
         names = [source for source in askable if f'{code}-{source}.json'.casefold() in self.evidence_names]
         cached = {source for source, _, _ in self.remote._cached_evidence(names, code)}
         pending = [source for source in askable if source not in cached]
+        token = 'metadata:' + code
+        wants_cover = (not self._ready(code) and chain
+                       and not self.remote._fresh_miss('cover', code, chain))
         if title['missing']:
             for source in pending:
                 # 每站一至两次请求，沿用采集器约 250KB/次的工作量基准。
                 self._add('metadata:' + code, self._network(source), 2 * 250 * 1024,
                           budgeted=stage_name(source) not in ('amane', 'amane_official'))
-        if (not self._ready(code) and chain
-                and not self.remote._fresh_miss('cover', code, chain)):
+        if wants_cover:
             self._add('metadata:' + code, self._network(chain[0]), self.cover_bytes)
+        if token in self.units:
+            self.profiles[token] = 'jav:' + ','.join(sorted(pending if title['missing'] else [])) + ':cover=' + str(bool(wants_cover))
+            self.baselines[token] = dict(self.units[token])
+            self.calibrate([token])
+
+    def calibrate(self, tokens=None):
+        for token in self.profiles if tokens is None else tokens:
+            profile = self.profiles[token]
+            if token not in self.units:
+                continue
+            for key, baseline in self.baselines[token].items():
+                if key not in self.outside_budget.get(token, {}):
+                    self.units[token][key] = self.history.average(profile + ':' + key, baseline)
 
     def prepare_metadata(self, prepared):
         """配套文件读完后，使用任务实际取得的字段和核查范围。"""
@@ -160,6 +199,8 @@ class TrafficPlan:
             if token.startswith('metadata:'):
                 self.units.pop(token)
                 self.outside_budget.pop(token, None)
+                self.profiles.pop(token, None)
+                self.baselines.pop(token, None)
         titles = {}
         for row, code, verify, local_fields, *_ in prepared:
             if code and _scrapes_as_jav(row, code):
@@ -182,10 +223,12 @@ class TrafficPlan:
         for token in tokens:
             self.units.pop(token, None)
             self.outside_budget.pop(token, None)
+            self.profiles.pop(token, None)
+            self.baselines.pop(token, None)
         if stage == 'local':
             self.cover_ready.clear()
             self.cover_names = cached_names(self.cover_root)
-            self.refresh(self.assets)
+            self.refresh(list(self.assets))
 
     def remaining(self, rows):
         from .library_processing import MAX_SOURCE_BYTES
@@ -205,3 +248,17 @@ class TrafficPlan:
                 planned[key] = outside[key] + value
                 remaining -= value
         return planned
+
+    def workload(self, key=None):
+        counts = [value for source, value in self.counts.items() if key is None or source == key]
+        result = dict(video_files=sum(row['video_files'] for row in counts),
+                      jav_files=sum(row['jav_files'] for row in counts),
+                      jav_titles=len(set().union(*(row['titles'] for row in counts))))
+        tokens = [token for token in self.units if token.startswith('metadata:')]
+        if key is None or key.startswith('metadata'):
+            amounts = [sum(value for source, value in self.units[token].items() if key is None or source == key)
+                       for token in tokens]
+            active = [value for value in amounts if value > 0]
+            result.update(pending_jav_titles=len(active),
+                          metadata_average_bytes=sum(active) // max(1, len(active)))
+        return result

@@ -70,7 +70,7 @@ def probe_file(ffprobe: str, path: str, timeout: float = TIMEOUT_SECONDS) -> tup
         timeout=timeout,
         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )
-    media_statistics(path, result.stderr)
+    media_statistics(path, result.stderr, kind='probe', successful=result.returncode == 0)
     if result.returncode:
         raise subprocess.CalledProcessError(result.returncode, 'ffprobe', stderr=result.stderr)
     payload = json.loads(result.stdout or b"{}")

@@ -9,6 +9,7 @@ import { MediaSettings } from '../../src/react/settings/media-settings';
 import { buttonNamed, choose, click, fetchMock, mount, section, sentBody, settle, submit } from './render';
 
 vi.mock('../../src/react/settings/service-preferences', () => ({ VideoThumbnailRow: () => null }));
+vi.mock('../../src/react/settings/cloud-proxy-settings', () => ({ CloudProxySettings: () => null }));
 vi.mock('@peach/legacy/ui', async (original) => ({
   ...await original<Record<string, unknown>>(),
   MEDIA_SOURCE_ICONS: (await import('../../src/ui-kit/media-source-icons')).MEDIA_SOURCE_ICONS,
@@ -120,7 +121,7 @@ describe('媒体目录', () => {
       { location: 'onedrive', root: 'O:\\Movies', path: 'O:\\Movies', cost: 'metered' },
     ] });
     const policy = rows(host)[0]?.querySelector('[data-media-read-policy] [aria-haspopup="listbox"]');
-    expect(policy?.textContent).toContain('代理流量保护');
+    expect(policy?.textContent).toContain('代理保护');
     await choose(policy, '正常读取');
     await submit(host.querySelector('form'));
     expect(sentBody(fetcher).media_sources).toEqual([

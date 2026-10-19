@@ -1,4 +1,4 @@
-"""馆藏任务按媒体目录的流量保护选项分账。"""
+"""馆藏任务按目录的连接分账，代理保护决定自动读取范围。"""
 import gzip
 import json
 import sqlite3
@@ -28,6 +28,20 @@ class ProcessingTrafficTests(unittest.TestCase):
             locations={'mounted': ('A:\\Cloud', 'B:\\Cloud'), 'local': ('R:\\Media',)},
             media_costs={'A:\\Cloud': 'metered', 'B:\\Cloud': 'free'})
         self.db = fresh_ledger(self.root)
+        routes = patch('peach.clouddrive_proxy.connections', return_value={
+            'a:\\cloud': 'proxy', 'b:\\cloud': 'direct'})
+        routes.start()
+        self.addCleanup(routes.stop)
+
+    def test_unknown_routes_are_separate_from_confirmed_proxy_bytes(self):
+        with patch('peach.clouddrive_proxy.connections', return_value={'a:\\cloud': 'system'}):
+            traffic = ProcessingTraffic(self.config, self.db, 'metadata')
+        with traffic.bind():
+            record_media_read('A:\\Cloud\\a.nfo', 100)
+        result = traffic.snapshot()
+        self.assertEqual(result['metered_used_bytes'], 0)
+        self.assertEqual(result['unknown_route_used_bytes'], 100)
+        self.assertEqual(result['sources'][0]['connection'], 'system')
 
     def test_media_reads_follow_each_root_and_totals_conserve_bytes(self):
         traffic = ProcessingTraffic(self.config, self.db, 'metadata')
@@ -264,3 +278,68 @@ class ProcessingTrafficTests(unittest.TestCase):
             success, _ = capture_frame(str(ffmpeg.path), str(source), 0.1, self.root / 'frame.jpg')
             self.assertTrue(success)
             self.assertGreater(traffic.snapshot()['used_bytes'], probed)
+
+    def test_workload_counts_files_and_distinct_eligible_releases_per_drive(self):
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        traffic.refresh_plan([self._video(), {**self._video(), 'path': 'B:\\Cloud\\ABW-001.mp4'},
+            {**self._video(), 'path': 'A:\\Cloud\\ABW-002.mp4', 'code': 'ABW-002'},
+            {**self._video(), 'path': 'A:\\Cloud\\creator.mp4', 'name': '日常.mp4', 'code': None}])
+        result = traffic.snapshot()
+        self.assertEqual({key: result['workload'][key] for key in ('video_files', 'jav_files', 'jav_titles')},
+                         dict(video_files=4, jav_files=3, jav_titles=2))
+        drives = {row['root']: row['workload'] for row in result['sources'] if row['root']}
+        self.assertEqual(drives['A:\\Cloud'], dict(video_files=3, jav_files=2, jav_titles=2))
+        self.assertEqual(drives['B:\\Cloud'], dict(video_files=1, jav_files=1, jav_titles=1))
+
+    def test_successful_jav_samples_calibrate_matching_work_and_persist(self):
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        with patch.object(traffic.plan.remote, '_chain', return_value=('r18dev',)), patch.object(traffic.plan, '_ready', return_value=True):
+            traffic.refresh_plan([{**self._video(), 'code': f'ABW-{number:03}'} for number in range(1, 5)])
+            for number, amount in ((1, 1000), (2, 2000), (3, 3000)):
+                code = f'ABW-{number:03}'
+                traffic.start_metadata(code)
+                with traffic.bind(), download_route(True):
+                    record_download(amount)
+                traffic.finish_work('metadata', code)
+            self.assertEqual(traffic.plan.units['metadata:ABW-004']['metadata-proxy'], 2000)
+            traffic.snapshot(finished=True)
+        restored = ProcessingTraffic(self.config, self.db, 'collect')
+        with patch.object(restored.plan.remote, '_chain', return_value=('r18dev',)), patch.object(restored.plan, '_ready', return_value=True):
+            restored.refresh_plan([self._video()])
+            self.assertEqual(restored.plan.units['metadata:ABW-001']['metadata-proxy'], 2000)
+        with patch.object(restored.plan.remote, '_chain', return_value=('r18dev', 'javdb')), patch.object(restored.plan, '_ready', return_value=True):
+            restored.refresh_plan([self._video()])
+            self.assertEqual(restored.plan.units['metadata:ABW-001']['metadata-proxy'], 1000 * 1024)
+
+    def test_failed_incomplete_and_cached_metadata_are_not_average_samples(self):
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        with patch.object(traffic.plan.remote, '_chain', return_value=('r18dev',)), patch.object(traffic.plan, '_ready', return_value=True):
+            for number in range(4):
+                code = f'ABW-{number:03}'
+                traffic.refresh_plan([{**self._video(), 'code': code}])
+                traffic.start_metadata(code)
+                if number != 0:
+                    with traffic.bind(), download_route(True):
+                        record_download(1000)
+                if number >= 2:
+                    traffic.mark('metadata-proxy', '外部采集器流量未取得')
+                traffic.finish_work('metadata', code, successful=number != 1)
+        self.assertEqual(traffic.plan.history.samples, {})
+
+    def test_successful_probe_average_is_separate_for_each_drive_and_frame(self):
+        traffic = ProcessingTraffic(self.config, self.db, 'scan')
+        with traffic.bind():
+            for _ in range(3):
+                media_statistics('B:\\Cloud\\a.mp4', 'Statistics: 1024 bytes read', kind='probe', successful=True)
+                media_statistics('B:\\Cloud\\a.mp4', 'Statistics: 9000 bytes read', kind='frame', successful=True)
+                media_statistics('B:\\Cloud\\a.mp4', 'Statistics: 999999 bytes read', kind='probe')
+        row = {**self._video(), 'path': 'B:\\Cloud\\a.mp4', 'duration': None}
+        traffic.refresh_plan([row])
+        key = traffic._media_key(row['path'])
+        self.assertEqual(traffic.plan.units['media:' + row['path']][key], 1024)
+        traffic.snapshot(finished=True)
+        restored = ProcessingTraffic(self.config, self.db, 'scan')
+        restored.refresh_plan([row])
+        self.assertEqual(restored.plan.units['media:' + row['path']][key], 1024)
+        self.assertEqual(restored.plan.history.average(key + ':frame', 0), 9000)
+        self.assertEqual(restored.plan.history.average(traffic._media_key('A:\\Cloud\\a.mp4') + ':probe', 8), 8)

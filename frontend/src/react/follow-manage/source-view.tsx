@@ -5,6 +5,7 @@
  * 在表格里说「正常」。 */
 import { useLayoutEffect, useRef, useState } from 'react';
 import { VisuallyHidden } from 'react-aria-components';
+import { RiGlobalLine } from '@remixicon/react';
 
 import { Chip } from '@/components/base/badges/chip';
 import { Button } from '@/components/base/buttons/button';
@@ -17,15 +18,15 @@ import {
 /** 站点圆标。
  *
  * 给了 `label` 就是「画得出图标就只画图标」：图标在时名字交给读屏，没登记图标或者那一枚
- * 取不下来时名字显出来——一个站在屏幕上总要认得出是哪个站，不能两种情况都指望同一枚图。 */
+ * 取不下来时显示地球与名字。 */
 export function SourceIcon({ provider, label }: { provider: string; label?: string }) {
   const src = sourceIconUrl(provider);
-  const [broken, setBroken] = useState(false);
-  if (!src || broken) return label ? <>{label}</> : null;
+  const [broken, setBroken] = useState('');
+  if (!src || broken === provider) return <><RiGlobalLine aria-hidden className="size-3.5 shrink-0" />{label || null}</>;
   return (
     <>
       <img src={src} alt="" width={14} height={14} loading="lazy"
-        onError={() => setBroken(true)}
+        onError={() => setBroken(provider)}
         className="size-3.5 shrink-0 rounded-sm object-contain" />
       {label ? <VisuallyHidden>{label}</VisuallyHidden> : null}
     </>

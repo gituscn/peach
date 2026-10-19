@@ -22,8 +22,8 @@ def q_library_processing(contract, _args):
         if 'asset_ids' in _args:
             body['asset_ids'] = json.loads(_args['asset_ids'])
         _, asset_ids, stage = _processing_request(contract, config, {}, body)
-        from .processing_traffic import ProcessingTraffic
-        return {'traffic': ProcessingTraffic(config, contract.db_path, stage, asset_ids).snapshot()}
+        from .processing_inventory import preview
+        return {'traffic': preview(config, contract.db_path, stage, asset_ids, _args.get('inventory'))}
     state = decorate(_current(contract))
     control = control_for(settings_file.active())
     control.refresh(force=True)

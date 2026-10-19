@@ -71,22 +71,32 @@ export interface LibraryProcessingData {
   traffic?: ProcessingTraffic;
 }
 
+export interface TrafficWorkload {
+  video_files: number; jav_files: number; jav_titles: number;
+  pending_jav_titles?: number; metadata_average_bytes?: number;
+}
 export interface TrafficSource {
+  connection?: 'direct' | 'proxy' | 'system' | 'unknown';
+  workload?: TrafficWorkload;
   estimated_bytes?: number;
   key: string; label: string; root: string; location: string; metered: boolean;
   used_bytes: number; estimated_min_bytes: number; estimated_max_bytes: number;
   unobserved: string[];
 }
 export interface ProcessingTraffic {
+  unknown_route_estimated_bytes?: number;
+  workload?: TrafficWorkload;
+  inventory?: { complete: boolean; errors: number; token?: string };
   estimated_bytes?: number; metered_estimated_bytes?: number;
   used_bytes: number; estimated_min_bytes: number; estimated_max_bytes: number;
   metered_used_bytes: number; metered_estimated_min_bytes: number; metered_estimated_max_bytes: number;
   sources: TrafficSource[]; partial: boolean; unknown_files: boolean;
 }
 
-export const fetchProcessingEstimate = (command: LibraryProcessingCommand, signal?: AbortSignal) => {
+export const fetchProcessingEstimate = (command: LibraryProcessingCommand, signal?: AbortSignal, inventory?: string) => {
   const params = new URLSearchParams({ estimate: '1', stage: command.stage || 'all' });
   if (command.asset_ids) params.set('asset_ids', JSON.stringify(command.asset_ids));
+  if (inventory) params.set('inventory', inventory);
   return apiGet<{ traffic: ProcessingTraffic }>(`${LIBRARY_PROCESSING_URL}?${params}`, signal);
 };
 
