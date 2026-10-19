@@ -15,6 +15,7 @@ identity = Path(os.environ["PEACH_MACOS_BUILD_INFO"])
 version = json.loads(identity.read_text(encoding="utf-8"))["version"]
 datas = [(str(root / name), name) for name in ("web", "migrations", "resources")]
 datas += [(str(identity), "."), (str(root / "scripts" / "standalone.txt"), ".")]
+datas += [(str(root / "LICENSE"), ".")]
 datas += copy_metadata("sentry-sdk")
 binaries = []
 hiddenimports = [

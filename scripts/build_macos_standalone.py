@@ -43,19 +43,30 @@ def minimum_system_version(app: Path) -> str:
 
 
 def package_dmg(app: Path, destination: Path) -> Path:
-    """镜像只携带应用、Applications 快捷入口与许可证。"""
+    """以固定拖放布局分发应用，许可证随应用资源保留。"""
     if not (app / "Contents" / "MacOS" / "Peach").is_file():
         raise FileNotFoundError(f"找不到应用可执行文件：{app}")
     destination.parent.mkdir(parents=True, exist_ok=True)
+    from dmgbuild import build_dmg
+    from resvg_py import svg_to_bytes
+
     with tempfile.TemporaryDirectory(prefix="peach-dmg-") as directory:
         staging = Path(directory)
-        shutil.copytree(app, staging / "Peach.app", symlinks=True)
-        (staging / "Applications").symlink_to("/Applications", target_is_directory=True)
-        shutil.copy2(ROOT / "LICENSE", staging / "LICENSE.txt")
-        subprocess.run([
-            "hdiutil", "create", "-volname", "Peach", "-srcfolder", str(staging),
-            "-format", "UDZO", "-ov", str(destination),
-        ], check=True)
+        source = str(ROOT / "resources" / "dmg-background.svg")
+        background = staging / "background.png"
+        for scale in (1, 2):
+            path = background if scale == 1 else staging / "background@2x.png"
+            path.write_bytes(svg_to_bytes(svg_path=source, zoom=scale))
+        build_dmg(str(destination), "Peach", settings={
+            "format": "UDZO", "files": [str(app)],
+            "symlinks": {"Applications": "/Applications"},
+            "background": str(background), "window_rect": ((160, 160), (640, 420)),
+            "icon_locations": {"Peach.app": (174, 220), "Applications": (466, 220)},
+            "icon_size": 128, "text_size": 13, "hide_extensions": ["Peach.app"],
+            "default_view": "icon-view", "arrange_by": None,
+            "show_toolbar": False, "show_sidebar": False, "show_status_bar": False,
+            "show_tab_view": False, "show_pathbar": False,
+        })
     return destination
 
 

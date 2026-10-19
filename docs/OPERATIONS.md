@@ -41,6 +41,10 @@ MACOSX_DEPLOYMENT_TARGET=11.0 uv sync --locked --extra build --extra macos
 
 打开匹配架构的 DMG，把 `Peach.app` 拖入 Applications，再打开应用完成首次设置。菜单栏提供打开页面、重启和退出入口；数据默认保存在 `~/Library/Application Support/Peach/peach-data`，可用 `PEACH_DATA_ROOT` 指定独立目录。
 
+安装镜像使用浅桃色背景，固定左侧 Peach、右侧 Applications 的拖放布局，隐藏工具栏与边栏，背景同时提供标准与 Retina 分辨率。许可证保留在应用的 `Contents/Resources/LICENSE`，安装窗口只显示两个入口。
+
+版本标签触发 Release 工作流，在 Apple Silicon 与 Intel 原生 runner 分别构建，再由干净 runner 下载并挂载 DMG，验证签名、架构和独立运行。两种 DMG 与 Windows 安装包全部通过后，才一同上传到 GitHub 预发布，统一生成 SHA-256 清单。手动运行工作流只验收候选制品，不创建 Release；推送普通提交不会触发安装包构建。发版检查见[测试与依赖](TESTING.md#每次发版检查)，打标签统一使用 `scripts/release_tag.py`。
+
 Mac 与 Windows 托盘的首层只显示简短状态与提醒数量，展开状态子菜单按行查看服务和媒体来源。长地址与路径会缩略，子菜单中的「查看完整配置」保留完整设置入口；提醒消失后会随下一轮健康检查更新。
 
 单机设置默认关闭账本复制，不需要 Windows、SMB、LaunchAgent 或系统端口转发。各台电脑各自保存数据；共享馆藏仍按下文的[双机复制](#两台电脑之间的复制)配置，离线修改不能自动合并。已有数据目录不会自动导入。

@@ -34,16 +34,27 @@ class MacStandaloneDistributionTests(TestCase):
         (resource / "runtime").symlink_to("../MacOS/Peach")
         destination = self.root / "release" / "Peach.dmg"
 
-        def create_image(command, *, check):
-            staging = Path(command[command.index("-srcfolder") + 1])
-            self.assertEqual((staging / "Applications").readlink(), Path("/Applications"))
-            copied = staging / "Peach.app" / "Contents" / "Resources" / "runtime"
-            self.assertEqual(copied.read_bytes(), b"native executable")
-            self.assertTrue(copied.is_symlink())
-            self.assertTrue((staging / "LICENSE.txt").is_file())
+        def create_image(filename, volume_name, *, settings):
+            from PIL import Image
+
+            self.assertEqual(filename, str(destination))
+            self.assertEqual(volume_name, "Peach")
+            self.assertEqual(settings["files"], [str(app)])
+            self.assertEqual(settings["symlinks"], {"Applications": "/Applications"})
+            self.assertTrue((resource / "runtime").is_symlink())
+            self.assertEqual((resource / "runtime").read_bytes(), b"native executable")
+            self.assertEqual(settings["icon_locations"],
+                             {"Peach.app": (174, 220), "Applications": (466, 220)})
+            background = Path(settings["background"])
+            for path, dimensions in ((background, (640, 420)),
+                    (background.with_name("background@2x.png"), (1280, 840))):
+                with Image.open(path) as image:
+                    self.assertEqual(image.size, dimensions)
+            self.assertFalse(settings["show_toolbar"])
+            self.assertFalse(settings["show_sidebar"])
             destination.write_bytes(b"disk image")
 
-        with mock.patch.object(self.builder.subprocess, "run", side_effect=create_image):
+        with mock.patch.dict(sys.modules, {"dmgbuild": SimpleNamespace(build_dmg=create_image)}):
             result = self.builder.package_dmg(app, destination)
         self.assertEqual(result.read_bytes(), b"disk image")
         self.assertTrue((resource / "runtime").is_symlink())
