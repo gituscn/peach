@@ -53467,7 +53467,6 @@ function Rwe({ assetIds: e, onComplete: t }) {
 		className: "@container mb-4",
 		children: /* @__PURE__ */ (0, C.jsxs)(J, {
 			tone: d ? "warning" : "neutral",
-			actionLayout: "below",
 			action: /* @__PURE__ */ (0, C.jsx)("div", {
 				className: "flex flex-wrap items-center gap-2",
 				children: /* @__PURE__ */ (0, C.jsx)(yI, {
