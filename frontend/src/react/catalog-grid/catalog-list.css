@@ -6,7 +6,8 @@
 .peach-react [data-catalog-table] [data-list-open] { display: flex; align-items: center; gap: 16px; width: 100%; min-width: 0; text-align: left; }
 .peach-react [data-catalog-table] [data-list-picture] { position: relative; display: flex; align-items: center; justify-content: center; flex: none; width: 112px; height: 63px; overflow: hidden; border-radius: var(--control-radius); background: var(--sunk); color: var(--muted); font-size: var(--fs-sm); }
 .peach-react [data-catalog-table] [data-list-picture] [data-media-art] { position: absolute; inset: 0; display: block; }
-.peach-react [data-catalog-table] [data-list-picture] :is(img,video) { width: 100%; height: 100%; object-fit: cover; }
+.peach-react [data-catalog-table] [data-list-picture] :is(img,video) { width: 100%; height: 100%; }
+.peach-react [data-catalog-table] [data-list-picture] :is(img:not([data-jav-image]),video) { object-fit: cover; }
 .peach-react [data-catalog-table] [data-list-text] { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
 .peach-react [data-catalog-table] [data-list-name] { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .peach-react [data-catalog-table] [data-list-open]:hover [data-list-name] { text-decoration: underline; }

@@ -53,7 +53,7 @@
 | 焦点环 | 输入框只画 BoardUI 外框上的 `ring`；`web/css/01-base.css` 的全局 `:focus-visible` 排除 `.peach-react` 子树 | 旧样式表排在后面，同特指度时会盖过 `outline-none`，内层输入框多出一圈 |
 | 与旧样式表同名的类 | 网格容器放在 flex 父元素里写 `inline-grid`，块级化后按 `display:grid` 计算，类名不和卡片网格撞，也不触发任意值 lint；`../styles.css` 用 `@source not inline("ring")` 不生成注释里扫到的 `ring`；`frontend/test/legacy-class-names.test.ts` 核对产物与旧样式表无同名类 | 旧样式表排在后面，卡片网格那条同名规则会把 `grid-cols-*` 压成一列，生成的 `.ring` 也会落到旧页面的 `.ring` 元素上 |
 | 提交键忙态 | 写 `aria-busy` 与 `aria-disabled`，不画 Spinner | `button` 条目没有加载态 |
-| 行内提示 | `../components/note.tsx` 的 `Note` 按语气取 `status-yellow`、`background-tertiary-error`、`notification-*` token 组合 | 注册表里没有行内 Note 组件；`notification` 条目是带关闭键和动效的浮动通知 |
+| 行内提示 | `../components/note.tsx` 的 `Note` 按语气取 `status-yellow`、`background-tertiary-error`、`notification-*` token 组合；正文与动作按内容宽度换行，`below` 将动作固定在下方 | 注册表里没有行内 Note 组件；`notification` 条目是带关闭键和动效的浮动通知 |
 | 进度条 | `../components/progress.tsx` 的 `Progress` 用 SVG 矩形画 | 注册表里没有进度组件 |
 | 空态 | `../components/empty-state.tsx` 用一圈 `separator-border` 框住图标、标题与说明 | 注册表里没有空态组件 |
 | 等待点 | `../components/loading-dots.tsx` 三颗点，错相由 `../styles.css` 的 `dot-wave-*` 给 | 注册表里没有等待态组件，没有总量时也不画进度条 |

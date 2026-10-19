@@ -19246,9 +19246,9 @@ function Hp({ data: e }) {
 function Up({ tone: e, title: t, action: n, extra: r, children: i, actionLayout: a = "inline", className: o }) {
 	let s = /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsxs)("div", {
 		"data-note-layout": "",
-		className: R("flex flex-col items-start gap-3", a === "inline" && "@xl:flex-row @xl:items-center @xl:justify-between"),
+		className: R("flex gap-3", a === "inline" ? "flex-wrap items-center justify-between" : "flex-col items-start"),
 		children: [/* @__PURE__ */ (0, z.jsxs)("div", {
-			className: "flex min-w-0 flex-1 flex-col justify-center gap-0.5 self-stretch",
+			className: R("flex min-w-0 flex-auto flex-col justify-center gap-0.5", a === "below" && "w-full"),
 			children: [t ? /* @__PURE__ */ (0, z.jsx)("p", {
 				className: "text-body-medium wrap-anywhere",
 				children: t
@@ -19258,7 +19258,7 @@ function Up({ tone: e, title: t, action: n, extra: r, children: i, actionLayout:
 			})]
 		}), n ? /* @__PURE__ */ (0, z.jsx)("div", {
 			"data-note-action": "",
-			className: "max-w-full",
+			className: "max-w-full shrink-0",
 			children: n
 		}) : null]
 	}), r] });

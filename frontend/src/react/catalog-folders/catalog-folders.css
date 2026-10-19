@@ -1,14 +1,15 @@
 body[data-folder-browse] #main{display:grid;grid-template-columns:224px minmax(0,1fr);column-gap:24px;align-items:start}
 body[data-folder-browse] #main>:not(#catalogFoldersTree){grid-column:2;min-width:0}
 body[data-folder-browse] #catalogFoldersTree{grid-column:1;grid-row:1 / span 20;position:sticky;top:var(--folder-sticky-top,calc(var(--topH) + 16px));min-width:0}
-body[data-folder-browse] #catalogFoldersTree .folder-tree-scroller{max-height:calc(100dvh - var(--folder-sticky-top,calc(var(--topH) + 16px)) - 72px)}
+body[data-folder-browse] #catalogFoldersTree .catalog-folder-navigation{max-height:var(--folder-available-height,calc(100dvh - var(--folder-sticky-top,calc(var(--topH) + 16px)) - 16px))}
+body[data-folder-browse] #catalogFoldersTree .folder-tree-scroller{max-height:none}
 #catalogFolderHeader{margin-bottom:20px}
 .catalog-folder-heading{display:flex;min-width:0;flex-direction:column;gap:12px}
 .folder-scope-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .folder-children{display:flex;flex-wrap:wrap;gap:4px}
 .folder-children>button{max-width:100%}
 .folder-crumb-name{display:block;max-width:180px;overflow:hidden;text-overflow:ellipsis}
-.folder-tree-scroller{max-height:calc(100dvh - var(--topH) - 124px);overflow:auto;overscroll-behavior:contain}
+.folder-tree-scroller{min-height:0;max-height:calc(100dvh - var(--topH) - 124px);overflow:auto;overscroll-behavior:contain;scroll-padding-block:4px}
 .folder-drawer-trigger{display:none}
 .peach-react button[data-folder-mode-toggle]{width:30px;height:30px;padding:0;border:0;border-radius:var(--control-radius);background:transparent;box-shadow:none;color:color-mix(in srgb,var(--glass-text) 60%,transparent)}
 .peach-react button[data-folder-mode-toggle]:is(:hover,[aria-pressed="true"]){color:var(--glass-text)}
