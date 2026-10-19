@@ -674,7 +674,7 @@ export const sourceIconUrl = (provider: string): string =>
 
 /** 四种凭据状态四种说法：待办（缺凭据）和完成（已配置）不能同色，那正是要一眼分开的两件事。 */
 export const CREDENTIAL_STATE: Record<string, string> = {
-  required: '需要', optional: '可选', none: '不需要', blocked: '接不进来',
+  required: '需要', optional: '可选', none: '不需要', blocked: '暂时无法连接',
 };
 
 export const credentialDone = (row: CredentialRow): boolean =>

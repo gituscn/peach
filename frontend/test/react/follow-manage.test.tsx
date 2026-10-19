@@ -1465,12 +1465,12 @@ const credentialRow = (root: ParentNode, label: string) =>
   [...root.querySelectorAll('b')].find((b) => b.textContent === label)!.closest('div')!;
 
 const chipText = (row: Element) => [...row.querySelectorAll('span')]
-  .map((span) => span.textContent).filter((text) => ['需要', '已配置', '接不进来', '不需要', '可选'].includes(text!));
+  .map((span) => span.textContent).filter((text) => ['需要', '已配置', '暂时无法连接', '不需要', '可选'].includes(text!));
 
 it('每个站说清自己的处境：需要、已配置、接不进来、不需要', async () => {
   const { host } = await open({ creds: CREDENTIAL_CAST }, { tab: 'source' });
   expect(['Fanbox', 'Patreon', 'OnlyFans', 'Kemono'].map((label) => chipText(credentialRow(host, label))))
-    .toEqual([['需要'], ['已配置'], ['接不进来'], ['不需要']]);
+    .toEqual([['需要'], ['已配置'], ['暂时无法连接'], ['不需要']]);
   expect(host.textContent).toContain('1 个待配置');
   const groupNames = ['可配置凭据', '不需要凭据', '暂不支持'];
   expect(groupNames.map(name => [...host.querySelectorAll(`section[aria-label="${name}"] b`)]

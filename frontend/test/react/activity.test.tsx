@@ -10,7 +10,7 @@ import { ActivityPage } from '../../src/react/activity/activity-page';
 import { DOWNLOADS_URL } from '../../src/react/activity/downloads-panel';
 import { ErrorExcerpt } from '../../src/react/activity/error-excerpt';
 import {
-  elapsedText, errorHeadline, prefetchTasks, progressText, summaryText, TASKS_URL,
+  elapsedText, errorHeadline, followupDetail, prefetchTasks, progressText, summaryItems, summaryText, TASKS_URL,
 } from '../../src/react/activity/tasks';
 import type { ActivityData, FinishedPage, TaskRunPayload } from '../../src/react/activity/tasks';
 import type { DownloadsSnapshot } from '../../src/react/bundle';
@@ -128,7 +128,7 @@ it('被挡下的那一轮单独成段，不在最近完成里再出现一次', a
     result_summary: { blocked_by: 3 }, error: '与第 3 轮（手动触发）冲突，本次跳过',
   });
   const { host } = await open(payload({ skipped: [blocked], finished: [blocked] }));
-  expect(sections(host)).toEqual(['正在进行', '被挡下的']);
+  expect(sections(host)).toEqual(['正在进行', '本次未执行']);
   expect(host.querySelectorAll('li')).toHaveLength(1);
   // 原因落在卡片底部的说明区，状态由徽章说。
   expect(host.querySelector('[data-status=cancelled]')?.textContent).toContain('与第 3 轮');
@@ -146,7 +146,9 @@ it('跑完那一轮显示摘要，失败那一轮显示原因', async () => {
   expect(host.querySelector('[data-status=failed]')?.textContent).toContain('上游挡回来了');
   expect(host.querySelector('[data-status=succeeded] span')?.textContent).toBe('已完成');
   // 跑成功那张没有说明区：没有原因可写时不留一条空条子。
-  expect(host.querySelectorAll('[data-status=succeeded] p')).toHaveLength(2);
+  expect(host.querySelectorAll('[data-status=succeeded] p')).toHaveLength(1);
+  expect([...host.querySelectorAll('[data-status=succeeded] ul > li')].map((node) => node.textContent))
+    .toEqual(['已检查 7']);
 });
 
 it('后继挂在派出它的那一轮下面，不另占一张卡', async () => {
@@ -158,8 +160,8 @@ it('后继挂在派出它的那一轮下面，不另占一张卡', async () => {
   const row = host.querySelector('[data-followup-key]')!;
   expect(host.querySelector('[data-task-key=follow-check]')!.contains(row)).toBe(true);
   expect([...row.querySelectorAll('span')].map((node) => node.textContent))
-    .toEqual(['补全资料图片', '已完成', '涼森れむ · 结果 已装上']);
-  expect(host.textContent).toContain('派出后继 1');
+    .toEqual(['补全资料图片', '已完成', '涼森れむ · 已保存资料图片']);
+  expect(host.textContent).toContain('已安排 1 项补充任务');
 });
 
 it('完成的任务明细默认收起，展开和收起不丢失后继结果', async () => {
@@ -172,7 +174,7 @@ it('完成的任务明细默认收起，展开和收起不丢失后继结果', a
   await click(trigger);
   expect(trigger.getAttribute('aria-expanded')).toBe('true');
   expect(details.open).toBe(true);
-  expect(details.textContent).toContain('涼森れむ · 结果 已装上');
+  expect(details.textContent).toContain('涼森れむ · 已保存资料图片');
   await click(trigger);
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
 });
@@ -216,7 +218,7 @@ it('连着几轮什么也没发生的定时任务按种类各并成一张卡，�
   expect(shownIds(host)).toEqual([9, 8, 4, 3]);
   const first = host.querySelector('[data-run-id="9"]')!;
   expect(first.textContent).toContain('定时 · 近 3 轮 · ');
-  expect(first.textContent).toContain('已检查 83 · 总数 83');
+  expect([...first.querySelectorAll('ul > li')].map((node) => node.textContent)).toEqual(['已检查 83', '总数 83']);
   expect(host.querySelector('[data-run-id="8"]')!.textContent).toContain('近 2 轮');
   expect(host.querySelector('[data-run-id="4"]')!.textContent).toContain('新增 3');
   expect(host.querySelector('[data-run-id="3"]')!.textContent).toContain('近 2 轮');
@@ -406,12 +408,21 @@ it('时长与摘要的折算各自成立', () => {
   expect(progressText(null, null)).toBe('0 / 0');
   // 明细与「谁挡的」不进这一行：前者太长，后者已经写在错误那一句里了。
   expect(summaryText({ checked: 7, operation: 'like', rows: [1], blocked_by: 3 }))
-    .toBe('已检查 7 · 操作 like');
+    .toBe('已检查 7 · 操作：标记喜欢');
   // 追更检查结算时带着整份状态字典，簿记字段不能漏到卡片上。
   expect(summaryText({
     status: 'complete', run_id: 351, started_at: 1790138114.86, checked: 83, total: 83,
     request_id: '417dab8d', completed_at: 1790138495.48,
   })).toBe('已检查 83 · 总数 83');
+});
+
+it('任务主摘要使用中文结果，内部字段保留给技术详情', () => {
+  expect(summaryItems({ followups: 9, stage: 'finished', requested_stage: 'all',
+    eta_seconds_min: 0, entity_watermark: 9936, performer_aliases: 7, auto_rejected: 0 }))
+    .toEqual(['已安排 9 项补充任务', '女优别名 7']);
+  expect(followupDetail(followup(4, { task_key: 'performer-profile', task_label: '补全女优资料',
+    progress_label: '补女优资料：演示人物', result_summary: { name: '演示人物', outcome: 'avwikidb 绑定；javdb 绑定' } })))
+    .toBe('演示人物 · 已关联 AVWikiDB 资料页；已关联 JavDB 资料页');
 });
 
 it('报错在列表里只露一行：traceback 取最后一行，别的取第一行非空', () => {
@@ -425,12 +436,12 @@ it('报错在列表里只露一行：traceback 取最后一行，别的取第一
 it('报错摘要平时只露一行，「查看详情」展开全文、再点收起；只有一行时不给这颗键', async () => {
   const stack = 'Traceback (most recent call last):\n  File "x.py", line 1\nValueError: 坏了';
   const host = await mount(<ErrorExcerpt text={stack} />);
-  expect(host.textContent).toBe('ValueError: 坏了查看详情');
+  expect(host.textContent).toBe('坏了查看详情');
   await click(buttonNamed('查看详情', host));
   expect(host.textContent).toContain('File "x.py", line 1');
   expect(buttonNamed('收起详情', host)?.getAttribute('aria-expanded')).toBe('true');
   await click(buttonNamed('收起详情', host));
-  expect(host.textContent).toBe('ValueError: 坏了查看详情');
+  expect(host.textContent).toBe('坏了查看详情');
 
   const single = await mount(<ErrorExcerpt text="只有一行" />);
   expect(single.textContent).toBe('只有一行');

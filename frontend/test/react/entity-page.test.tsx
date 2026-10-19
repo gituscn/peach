@@ -501,13 +501,13 @@ describe('写操作', () => {
     await settle();
     // 换统称会重写整条实体的扁平投影：写之前让人看见换成什么、旧写法去哪；按钮与回执同一个动词。
     expect(legacyUi.confirmModal).toHaveBeenCalledWith(expect.objectContaining({
-      title: '更改统称', confirmLabel: '更改统称',
+      title: '更改统一名称', confirmLabel: '更改统一名称',
       body: `「しのだゆう」将成为这份档案显示的名称，「${NAME}」留作别名。作品上的署名、搜索和标签都会跟着改写。`,
     }));
     expect(page.writes[0]).toEqual({ url: '/api/entity-name', body: { kind: 'performer', name: NAME, canonical: 'しのだゆう' } });
     expect(page.props.actions.openEntity).toHaveBeenLastCalledWith('performer', 'しのだゆう');
     const [message, options] = vi.mocked(page.props.helpers.receipt).mock.calls[0]!;
-    expect(message).toBe('已把统称更改为 しのだゆう');
+    expect(message).toBe('已把统一名称更改为 しのだゆう');
     await act(async () => { await options?.undo?.() });
     expect(page.writes[1]).toEqual({ url: '/api/entity-name', body: { kind: 'performer', name: 'しのだゆう', canonical: NAME } });
     expect(page.props.actions.openEntity).toHaveBeenLastCalledWith('performer', NAME);

@@ -151,7 +151,7 @@ it('已保存别名清单刷新和只读状态都更新到单元格操作', asyn
 it('手动保存别名提交输入并在成功后清空', async () => {
   const fetcher = okFetch();
   const { host, toast } = await open(fetcher);
-  const canonical = () => host.querySelector<HTMLInputElement>('input[aria-label="规范创作者名"]');
+  const canonical = () => host.querySelector<HTMLInputElement>('input[aria-label="统一名称"]');
   const alias = () => host.querySelector<HTMLInputElement>('input[aria-label="平台别名"]');
   await type(canonical(), '规范名');
   await type(alias(), '平台上的名字');

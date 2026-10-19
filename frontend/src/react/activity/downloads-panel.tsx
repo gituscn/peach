@@ -8,7 +8,8 @@
  * 一条任务都没有时整段不画。失败的任务给中文原因；失败、取消与停滞的可以重新提交，被判
  * 违规的不给（服务端也会拒）。每张卡都能复制磁力：接口失效时退回手动添加。 */
 import { useId, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { RiArrowDownSLine } from '@remixicon/react';
 
 import { Chip } from '@/components/base/badges/chip';
 import { Button } from '@/components/base/buttons/button';
@@ -41,24 +42,36 @@ const taskName = (task: DownloadTask) =>
 export const failureText = (task: DownloadTask) =>
   task.failure_label ? [task.failure_label, task.failure_detail].filter(Boolean).join('：') : '';
 
+const postprocessDetail = (task: DownloadTask) => (task.postprocess_detail || '')
+  .replace('正片已绑定', '已确认主视频对应的作品')
+  .replace('整理跳过：', '未整理文件：');
+
 export function DownloadsPanel() {
   const id = useId();
-  const query = useQuery({
-    queryKey: DOWNLOADS_KEY,
-    queryFn: ({ signal }) => apiGet<DownloadsSnapshot>(`${DOWNLOADS_URL}?limit=50`, signal),
-    refetchInterval: (state) => downloadPollInterval(state.state.data),
+  const query = useInfiniteQuery({
+    queryKey: [...DOWNLOADS_KEY, 'pages'],
+    initialPageParam: null as number | null,
+    queryFn: ({ signal, pageParam }) => apiGet<DownloadsSnapshot>(
+      `${DOWNLOADS_URL}?limit=20${pageParam === null ? '' : `&before_id=${pageParam}`}`, signal),
+    getNextPageParam: (page) => page.has_more ? page.next_before_id ?? undefined : undefined,
+    refetchInterval: (state) => state.state.data?.pages.some((page) => downloadPollInterval(page) === 5_000) ? 5_000 : 30_000,
   });
-  const data = query.data;
-  if (!data?.tasks.length && !query.error) return null;
+  const pages = query.data?.pages || [];
+  const tasks = [...new Map(pages.flatMap((page) => page.tasks).map((task) => [task.id, task])).values()];
+  if (!tasks.length && !query.error) return null;
   return (
     <section aria-labelledby={id} className="flex min-w-0 flex-col gap-3">
-      <h3 id={id} className="text-title-2-semibold text-text-primary">云下载</h3>
+      <h3 id={id} className="text-title-2-medium text-text-primary">云下载</h3>
       {query.error ? <Note tone="error">{errorMessage(query.error)}</Note> : null}
-      {data?.tasks.length
+      {tasks.length
         ? <ul aria-live="polite" className="flex min-w-0 flex-col gap-3">
-            {data.tasks.map((task) => <TaskCard key={task.id} task={task} writable={data.available} />)}
+            {tasks.map((task) => <TaskCard key={task.id} task={task} writable={pages[0]?.available ?? false} />)}
           </ul>
         : null}
+      {query.hasNextPage ? <Button variant="secondary" size="small" leadingIcon={RiArrowDownSLine}
+        className="self-start" {...busyProps(query.isFetchingNextPage)} onClick={() => {
+          if (!query.isFetching) void query.fetchNextPage();
+        }}>加载更多</Button> : null}
     </section>
   );
 }
@@ -67,9 +80,11 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
   const client = useQueryClient();
   const action = useAction();
   const [copied, setCopied] = useState(false);
+  const [fullTitle, setFullTitle] = useState(false);
+  const titleId = useId();
   const reason = failureText(task);
   const failed = task.state === 'failed' || task.postprocess_state === 'failed';
-  const meta = [task.code, task.target, momentText(task.submitted_at)]
+  const meta = [task.display_code || task.code || '番号未识别', task.target, momentText(task.submitted_at)]
     .filter(Boolean).join(' · ');
   const refresh = () => { void client.invalidateQueries({ queryKey: DOWNLOADS_KEY }) };
 
@@ -96,23 +111,28 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
         className: failed ? 'flex flex-col border-border-error-default' : 'flex flex-col',
       })}>
       <div className="flex flex-col gap-1.5 px-5 pt-5 pb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <strong className="min-w-0 break-words text-title-1-medium text-text-primary">{taskName(task)}</strong>
-          <Chip color={STATE_COLORS[task.state] ?? 'neutral'}>{task.state_label}</Chip>
-          {task.state === 'ingested'
+        <div className="flex min-w-0 items-center gap-2">
+          <strong className="min-w-0 flex-1 truncate text-title-1-medium text-text-primary" title={taskName(task)}>{taskName(task)}</strong>
+          <div className="flex shrink-0 items-center gap-2">
+            <Chip color={STATE_COLORS[task.state] ?? 'neutral'}>{task.state_label}</Chip>
+            {task.state === 'ingested'
             ? <Chip color={task.postprocess_state === 'complete' ? 'lime'
               : task.postprocess_state === 'failed' ? 'rose' : 'yellow'}>{task.postprocess_label}</Chip>
             : null}
+          </div>
         </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-2 text-caption-1-regular text-text-secondary"><SourceLabel source={task.provider} label={task.provider_label} /><span className="break-words">{meta}</span></div>
+        <div className="flex min-w-0 items-center gap-2 text-caption-1-regular text-text-secondary"><span className="flex shrink-0"><SourceLabel source={task.provider} label={task.provider_label} /></span><span className="min-w-0 truncate" title={meta}>{meta}</span></div>
+        {fullTitle ? <p id={titleId} data-download-title-full className="wrap-anywhere text-body-2-regular text-text-secondary">{taskName(task)}</p> : null}
         {task.state === 'remote_running' && task.progress != null
           ? <Progress label="远端下载进度" value={Math.round(task.progress * 100)} max={100} />
           : null}
         {task.ledger_path
-          ? <p className="min-w-0 break-all text-caption-1-regular text-text-secondary">{task.ledger_path}</p>
+          ? <p className="min-w-0 truncate text-caption-1-regular text-text-secondary" title={task.ledger_path}>{task.ledger_path}</p>
           : null}
         {action.error ? <ErrorText>{action.error}</ErrorText> : null}
         <div className="flex flex-wrap items-center gap-2 pt-1">
+          <Button variant="ghost" size="small" aria-expanded={fullTitle} aria-controls={fullTitle ? titleId : undefined}
+            onClick={() => setFullTitle(!fullTitle)}>{fullTitle ? '收起标题' : '展开标题'}</Button>
           {writable && task.cancellable
             ? <Button variant="secondary" size="small" {...busyProps(action.busy === 'cancel')} onClick={cancel}>取消</Button>
             : null}
@@ -121,14 +141,14 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
             : null}
           {writable && task.postprocess_retryable
             ? <Button variant="secondary" size="small" {...busyProps(action.busy === 'postprocess')}
-                onClick={retryPostprocess}>重试后处理</Button>
+                onClick={retryPostprocess}>重试入库后整理</Button>
             : null}
           <Button variant="ghost" size="small" onClick={copy}>{copied ? '已复制磁力' : '复制磁力'}</Button>
         </div>
       </div>
       {reason || task.postprocess_detail
         ? <div className="flex min-h-14 flex-col justify-center rounded-b-2xl border-t border-separator-border bg-card-footer px-5 py-3">
-            <p className="text-caption-1-regular text-text-secondary">{reason || task.postprocess_detail}</p>
+            <p className="wrap-anywhere text-caption-1-regular text-text-secondary">{reason || postprocessDetail(task)}</p>
           </div>
         : null}
     </li>

@@ -213,14 +213,14 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
       const current = entity.canonical_name;
       if (chosen === current) return;
       void confirmModal({
-        title: '更改统称',
+        title: '更改统一名称',
         body: `「${chosen}」将成为这份档案显示的名称，「${current}」留作别名。作品上的署名、搜索和标签都会跟着改写。`,
-        confirmLabel: '更改统称',
+        confirmLabel: '更改统一名称',
         onConfirm: () => rename.mutateAsync({ from: current, to: chosen }),
       }).then(({ confirmed, result }) => {
         const done = result as { changed?: boolean; canonical_name?: string; previous_name?: string } | undefined;
         if (!confirmed || !done?.changed) return;
-        helpers.receipt(`已把统称更改为 ${done.canonical_name}`, { undo: async () => {
+        helpers.receipt(`已把统一名称更改为 ${done.canonical_name}`, { undo: async () => {
           await rename.mutateAsync({ from: done.canonical_name || '', to: done.previous_name || '' });
           actions.openEntity(kind, done.previous_name || '');
         } });
@@ -267,7 +267,7 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
       try {
         await bindFollow.mutateAsync(key);
       } catch (error) {
-        helpers.failure('绑定关注作者', error);
+        helpers.failure('关联关注中的创作者', error);
         throw error;
       }
       helpers.receipt(`已把关注里的 ${author} 记到 ${entity.canonical_name} 名下`);

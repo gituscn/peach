@@ -106,7 +106,7 @@ Peach 不实时监视网盘目录，因为每列一次目录都是一次网络�
 
 这个通知（webhook）是 CloudDrive2 的会员功能。不配置也不影响其他功能，新文件仍由定期的全量扫描发现。设计说明见 [ADR-0041](adr/0041-new-files-are-pushed-in-scanning-is-the-backstop.md)。
 
-1. 在 Peach 配置页「媒体」分组里，打开「新文件落地就入库」和「接收 CloudDrive2 通知」。
+1. 在 Peach 配置页「媒体」分组里，打开「发现新文件后自动入库」和「接收 CloudDrive2 通知」。
 2. 在「云端路径前缀」里，把 CloudDrive2 里看到的目录和媒体目录对应起来，例如 `/115` 对应 `B:\`。
 3. 点「保存配置」。页面会生成一整段 CloudDrive2 配置，地址、端点和密钥都已经填好。
 4. 点「复制配置」，到 CloudDrive2 的「设置 → Webhooks」里新增一条，粘贴后保存。

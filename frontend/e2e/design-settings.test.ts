@@ -96,7 +96,7 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
     const opened = await openTaste(browser, DESKTOP);
     try {
       const page = opened.page;
-      await page.getByRole('tablist', { name: '口味证据来源' }).getByRole('tab', { name: 'Peach 内部' }).click();
+      await page.getByRole('tablist', { name: '口味分析的数据来源' }).getByRole('tab', { name: 'Peach 观看与评价' }).click();
       for (const name of ['女优', '创作者']) {
         await page.getByRole('tablist', { name: 'Peach 口味维度' }).getByRole('tab', { name }).click();
         const img = page.getByRole('tabpanel', { name }).locator('img[data-facebox]').first();

@@ -61,15 +61,15 @@ POSTPROCESS_RUNNING = "running"
 POSTPROCESS_COMPLETE = "complete"
 POSTPROCESS_FAILED = "failed"
 POSTPROCESS_LABELS = {
-    POSTPROCESS_NOT_REQUESTED: "未开始", POSTPROCESS_PENDING: "待后处理",
-    POSTPROCESS_QUEUED: "已排队", POSTPROCESS_RUNNING: "后处理中",
-    POSTPROCESS_COMPLETE: "后处理完成", POSTPROCESS_FAILED: "后处理失败",
+    POSTPROCESS_NOT_REQUESTED: "整理未开始", POSTPROCESS_PENDING: "等待整理",
+    POSTPROCESS_QUEUED: "整理已排队", POSTPROCESS_RUNNING: "整理中",
+    POSTPROCESS_COMPLETE: "整理完成", POSTPROCESS_FAILED: "整理失败",
 }
 
 STATE_LABELS = {
-    CANDIDATE: "候选", SELECTED: "已选定", SUBMITTED: "已提交", REMOTE_RUNNING: "远端进行中",
-    REMOTE_DONE: "远端完成", LANDED: "已落地", INGESTED: "已入库",
-    FAILED: "失败", CANCELLED: "已取消", STALLED: "停滞",
+    CANDIDATE: "待选择的资源", SELECTED: "已选定", SUBMITTED: "已提交", REMOTE_RUNNING: "网盘下载中",
+    REMOTE_DONE: "网盘下载完成", LANDED: "文件已可访问", INGESTED: "已入库",
+    FAILED: "失败", CANCELLED: "已取消", STALLED: "长时间未完成",
 }
 #: 轮询要看的状态。远端完成与已落地还在等账本里出现那个文件。
 TRACKED_STATES = frozenset({SUBMITTED, REMOTE_RUNNING, REMOTE_DONE, LANDED})
@@ -85,15 +85,15 @@ class FailureKind:
 
 
 FAILURE_KINDS: dict[str, FailureKind] = {kind.key: kind for kind in (
-    FailureKind("config", "配置与认证"),
-    FailureKind("quota", "配额耗尽"),
-    FailureKind("rejected", "资源被拒"),
+    FailureKind("config", "配置或登录有误"),
+    FailureKind("quota", "下载额度已用完"),
+    FailureKind("rejected", "网盘拒绝下载该资源"),
     FailureKind("invalid_link", "链接无效"),
-    FailureKind("no_source", "无源或停滞"),
-    FailureKind("duplicate", "重复"),
-    FailureKind("not_landed", "落地未见"),
-    FailureKind("mismatch", "内容不符"),
-    FailureKind("network", "瞬时网络", retryable=True),
+    FailureKind("no_source", "没有可用下载源或进度长时间未更新"),
+    FailureKind("duplicate", "下载任务已存在"),
+    FailureKind("not_landed", "目标目录中未找到下载文件"),
+    FailureKind("mismatch", "下载内容与目标作品不符"),
+    FailureKind("network", "网络暂时不可用", retryable=True),
 )}
 
 
@@ -294,12 +294,18 @@ class DownloadTask:
         return cls(**{name: row[name] for name in row.keys()})
 
     def payload(self) -> dict:
+        from .catalog_rules import release_code_from_filename
+
         kind = FAILURE_KINDS.get(self.failure or "")
+        codes = {code for name in (self.remote_name, self.display_name, self.title)
+                 if name and (code := release_code_from_filename(name))}
+        display_code = self.code or (next(iter(codes)) if len(codes) == 1 else None)
         return {
             "id": self.id, "info_hash": self.info_hash, "provider": self.provider,
             "provider_label": PROVIDER_LABELS.get(self.provider, self.provider),
             "source_uri": self.source_uri, "display_name": self.display_name,
             "target": self.target, "code": self.code, "title": self.title, "origin": self.origin,
+            "display_code": display_code,
             "state": self.state, "state_label": STATE_LABELS.get(self.state, self.state),
             "failure": self.failure, "failure_label": kind.label if kind else None,
             "failure_detail": self.failure_detail,
@@ -361,6 +367,15 @@ class DownloadStore:
             rows = connection.execute(
                 "SELECT * FROM download_task ORDER BY updated_at DESC, id DESC LIMIT ?",
                 (max(1, min(int(limit), 500)),)).fetchall()
+        return [DownloadTask.from_row(row) for row in rows]
+
+    def page(self, limit: int, before_id: int | None = None) -> list[DownloadTask]:
+        """按提交顺序读取一页；状态更新时间不影响分页位置。"""
+        where = " WHERE id<?" if before_id is not None else ""
+        args = (before_id, limit) if before_id is not None else (limit,)
+        with self.database.read_connection() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM download_task{where} ORDER BY id DESC LIMIT ?", args).fetchall()
         return [DownloadTask.from_row(row) for row in rows]
 
     def due(self, now: float) -> list[DownloadTask]:
@@ -691,12 +706,17 @@ class DownloadService:
         self.store.save(task)
         return task
 
-    def snapshot(self, limit: int = 100) -> dict:
-        tasks = self.store.recent(limit)
+    def snapshot(self, limit: int = 100, *, before_id: int | None = None) -> dict:
+        limit = max(1, min(int(limit), 500))
+        rows = self.store.page(limit + 1, before_id)
+        tasks = rows[:limit]
+        has_more = len(rows) > limit
         return {
             "available": self.available,
             "providers": [self._provider_state(key) for key in PROVIDER_LABELS],
             "tasks": [task.payload() for task in tasks],
+            "has_more": has_more,
+            "next_before_id": tasks[-1].id if has_more else None,
         }
 
     def retry_postprocess(self, task_id: int) -> DownloadTask:

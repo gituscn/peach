@@ -168,7 +168,7 @@ function SourceCard({ source, toast }: { source: Source } & ScrapingProps) {
         </SettingsRow>
       </Rows>
       {source.cooldown_until && source.cooldown_until > Date.now() / 1000 ? (
-        <Note tone="warning">来源正在冷却，截止 {new Date(source.cooldown_until * 1000).toLocaleString('zh-CN')}</Note>
+        <Note tone="warning">已暂停访问此来源，可在 {new Date(source.cooldown_until * 1000).toLocaleString('zh-CN')} 后重试。</Note>
       ) : null}
       {detailed ? <Stack divided>
         {network === 'peach'

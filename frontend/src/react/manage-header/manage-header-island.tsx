@@ -105,7 +105,7 @@ function Crumb({ host: at, label }: { host: ManageHeaderHost; label: string }) {
     at.openDataCleanup();
   };
   return (
-    <nav data-manage-crumb="" aria-label="Breadcrumb">
+    <nav data-manage-crumb="" aria-label="当前位置">
       <ol>
         <li><a href="/data-cleanup" onClick={follow}>数据管理</a><Icon name="chevron-right" /></li>
         <li aria-current="true"><span>{label}</span></li>

@@ -69,10 +69,10 @@ const TILE = 'rounded-xl bg-background-primary-default p-3';
 
 /* 中文正文写成常量：JSX 里换行的文字会在接缝处多出一个空格，中文句子里看得见。 */
 const REFRESH_TITLE = '读取运行 Peach 的这台电脑上的浏览历史与书签';
-const NO_SOURCE_HINT = '导入或读取浏览记录后，这里会列出已采集设备。';
-const NO_LEAD_HINT = '馆藏里暂时没有对得上浏览信号的标签。';
-const NO_CATEGORY_HINT = '采集浏览记录后，这里会显示聚合后的口味证据。';
-const GAP_HINT = '这些词在浏览记录中出现，但 Peach 观看记录还没有对应证据';
+const NO_SOURCE_HINT = '导入或读取浏览记录后，这里会列出记录来自哪些设备。';
+const NO_LEAD_HINT = '馆藏中暂时没有与你浏览过的内容相符的标签。';
+const NO_CATEGORY_HINT = '读取浏览记录后，这里会按类别汇总你浏览过的内容。';
+const GAP_HINT = '这些标签出现在浏览记录中，Peach 的观看或评价记录中尚未出现这些标签';
 const NO_BROWSER_TAG_HINT = '采集浏览记录后，这里会列出浏览过的标签。';
 const NO_BROWSER_CREATOR_HINT = '采集浏览记录后，这里会列出浏览过的创作者。';
 const NO_DOMAIN_HINT = '采集浏览记录后，这里会列出常访问的网站。';
@@ -136,7 +136,7 @@ interface RankListProps {
 /** 一榜名次。点得动的那些是按钮，其余是行——馆藏里没有对应条目时点进去只会是一张空页。 */
 function RankList({ rows, kind, visual, empty, onSignal }: RankListProps) {
   if (!rows.length) {
-    return <EmptyState shell="plain" icon={RiSearchLine} title="暂无足够证据">{empty}</EmptyState>;
+    return <EmptyState shell="plain" icon={RiSearchLine} title="记录还不够">{empty}</EmptyState>;
   }
   const shares = rankShares(rows);
   return (
@@ -478,9 +478,9 @@ export function TastePage(props: TasteProps) {
         className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* 旧 `.insightswitch`：证据来源是两个互斥视图，形态是分段控件不是两枚裸按钮。 */}
-          <TabList aria-label="口味证据来源" className={SEGMENTED_TRACK}>
+          <TabList aria-label="口味分析的数据来源" className={SEGMENTED_TRACK}>
             <Tab id="browser" className={SEGMENT}>浏览器记录</Tab>
-            <Tab id="peach" className={SEGMENT}>Peach 内部</Tab>
+            <Tab id="peach" className={SEGMENT}>Peach 观看与评价</Tab>
           </TabList>
           <div className="flex flex-wrap items-center gap-2">
             <Select aria-label="分析范围" selectedKey={range}
@@ -565,7 +565,7 @@ export function TastePage(props: TasteProps) {
               <b className="text-display-4-medium tabular-nums text-text-primary">
                 {Number(summary.peach_items || 0).toLocaleString()}
               </b>
-              <span className="text-body-2-regular text-text-secondary">个作品有内部行为证据</span>
+              <span className="text-body-2-regular text-text-secondary">部作品有观看或评价记录</span>
             </div>
             <div className="flex min-w-0 grow flex-col">
               <CoverageMetric term="有标签" value={tagged} rest={coverage.untagged || 0} />

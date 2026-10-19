@@ -127,12 +127,12 @@ export function OrphanRecordsCard({ toast }: { toast(message: string): void }) {
     <section id="orphan-records" aria-labelledby="orphan-records-title" className="flex scroll-mt-20 flex-col gap-4">
         {query.isError
           ? <Fieldset layout="stack" labelledBy="orphan-records-title">
-              <FieldsetTitle id="orphan-records-title">孤儿记录</FieldsetTitle>
-              <Note tone="error" title="孤儿记录读取失败">{errorMessage(query.error)}</Note>
+              <FieldsetTitle id="orphan-records-title">文件已丢失的记录</FieldsetTitle>
+              <Note tone="error" title="读取文件已丢失的记录失败">{errorMessage(query.error)}</Note>
             </Fieldset>
           : <DataTable label="文件已消失的作品" items={items} columns={columns}
-              title="孤儿记录" titleId="orphan-records-title" unit="条作品"
-              description="这些作品的文件已不在盘上，喜欢、稍后看、播放列表与观看历史都还留着。接到新文件后记录跟过去，旧的这一条删掉。"
+              title="文件已丢失的记录" titleId="orphan-records-title" unit="条作品"
+              description="这些作品的文件已找不到，喜欢、稍后看、播放列表与观看历史仍保留。选择替代文件后，这些记录会转移到该文件，旧作品记录随之删除。"
               rowId={(item) => String(item.id)} rowLabel={(item) => item.name}
               selected={selected} onSelected={setSelected}
               actions={(chosen) => <Button variant="danger" size="small" disabled={!chosen.length}

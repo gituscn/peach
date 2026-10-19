@@ -187,7 +187,7 @@ function DownloadForm({ state, settle, receipt, pikpakAccount }: CardProps & { p
           placeholder={state.token_set ? '已保存，留空不改' : '在 CloudDrive2「设置 → API 令牌」中生成'}
           hint="需要离线任务权限。"
           value={token} isDisabled={!state.available} onChange={setToken} />
-        <Input label={<SourceLabel source="115" label="115 目标目录" />} placeholder="留空时按推送发现自动填写" autoComplete="off" maxLength={300}
+        <Input label={<SourceLabel source="115" label="115 目标目录" />} placeholder="留空时根据媒体库目录自动填写" autoComplete="off" maxLength={300}
           validationBehavior="aria" isInvalid={missing}
           hint={missing ? (saveBlocked ? '先新建这个目录，或填写已有目录。' : '这个目录不存在。') : '应位于自动入库的云端路径前缀内。'}
           value={target('115')} isDisabled={!state.available} onChange={(value) => setTarget('115', value)} />
@@ -198,7 +198,7 @@ function DownloadForm({ state, settle, receipt, pikpakAccount }: CardProps & { p
           <FieldLabel><SourceLabel source="pikpak" label="PikPak 根目录对应的媒体目录" /></FieldLabel>
           {state.pikpak_roots.length ? (
             <Select aria-label="PikPak 根目录对应的媒体目录" selectedKey={config.pikpak_root || null}
-              isDisabled={!state.available} placeholder="检查时按推送发现选"
+              isDisabled={!state.available} placeholder="检查时根据媒体库目录选择"
               onSelectionChange={(key) => setConfig({ ...config, pikpak_root: key === null ? '' : String(key) })}>
               {state.pikpak_roots.map((root) => <SelectItem key={root} id={root}>{root}</SelectItem>)}
             </Select>
@@ -255,7 +255,7 @@ function CheckReport({ report, detected, suggested, create, creating }: {
         {detected ? <Fact term="CloudDrive2 地址">{`探测到 ${detected}，保存配置后生效`}</Fact> : null}
         {folder?.exists ? (
           <Fact term={<SourceLabel source="115" label="115 目标目录" />}>
-            {suggested.saved ? `已按推送发现填入 ${folder.path}` : `按推送发现填入 ${folder.path}，保存配置后生效`}
+            {suggested.saved ? `已根据媒体库目录填入 ${folder.path}` : `根据媒体库目录填入 ${folder.path}，保存配置后生效`}
           </Fact>
         ) : null}
         {folder && !folder.exists ? (
@@ -264,7 +264,7 @@ function CheckReport({ report, detected, suggested, create, creating }: {
             {create ? <Button variant="secondary" size="small" onClick={() => create(folder.path)} {...busyProps(creating)}>新建这个目录</Button> : null}
           </Fact>
         ) : null}
-        {suggested.root ? <Fact term={<SourceLabel source="pikpak" label="PikPak 根目录" />}>{`按推送发现填入 ${suggested.root}，保存配置后生效`}</Fact> : null}
+        {suggested.root ? <Fact term={<SourceLabel source="pikpak" label="PikPak 根目录" />}>{`根据媒体库目录填入 ${suggested.root}，保存配置后生效`}</Fact> : null}
         {report.permissions.length ? (
           <Fact term="离线权限">
             <Chip variant="caption" color={report.missing.length ? 'yellow' : 'lime'}>

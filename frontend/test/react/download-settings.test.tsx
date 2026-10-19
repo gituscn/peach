@@ -103,13 +103,13 @@ it('目标目录与 PikPak 根留空时检查按推送发现填回，保存配�
   }));
   vi.stubGlobal('fetch', fetcher);
   const host = await mount(<DownloadSettings initial={unfilled()} receipt={vi.fn()} />);
-  expect(field(host, '115 目标目录')?.placeholder).toBe('留空时按推送发现自动填写');
+  expect(field(host, '115 目标目录')?.placeholder).toBe('留空时根据媒体库目录自动填写');
   await click(buttonNamed('检查连接', host));
   await settle();
   expect(sentBody(fetcher)).toMatchObject({ target: '', pikpak_root: '', pikpak_account: false });
   expect(field(host, '115 目标目录')?.value).toBe('/115open/云下载');
-  expect(host.textContent).toContain('按推送发现填入 /115open/云下载，保存配置后生效');
-  expect(host.textContent).toContain('按推送发现填入 A:\\，保存配置后生效');
+  expect(host.textContent).toContain('根据媒体库目录填入 /115open/云下载，保存配置后生效');
+  expect(host.textContent).toContain('根据媒体库目录填入 A:\\，保存配置后生效');
   expect(fetcher).toHaveBeenCalledTimes(1);
   fetcher.mockImplementation(async () => ({ ok: true, status: 200, json: async () => unfilled() }));
   await submit(section(host, '云下载'));
@@ -124,7 +124,7 @@ it('用户填过的目标目录不被建议值覆盖', async () => {
   await click(buttonNamed('检查连接', host));
   await settle();
   expect(field(host, '115 目标目录')?.value).toBe('/115/云下载');
-  expect(host.textContent).not.toContain('按推送发现填入');
+  expect(host.textContent).not.toContain('根据媒体库目录填入');
 });
 
 it('在账号框里填了 PikPak 账号或已登录时，检查才问 PikPak 根', async () => {
@@ -173,7 +173,7 @@ it('推出的目录不存在时标成无效，点了「新建这个目录」才�
   expect(buttonNamed('新建这个目录', host)).toBeNull();
   expect(field(host, '115 目标目录')?.getAttribute('aria-invalid')).not.toBe('true');
   expect(host.textContent).toContain('/115open/云下载 可以离线下载');
-  expect(host.textContent).toContain('按推送发现填入 /115open/云下载，保存配置后生效');
+  expect(host.textContent).toContain('根据媒体库目录填入 /115open/云下载，保存配置后生效');
 });
 
 it('地址和令牌都已保存时一打开就按已保存的配置检查，检查键不转', async () => {
@@ -227,7 +227,7 @@ it('目标目录留空保存后直接渲染响应里的检查报告，服务端�
   expect(receipt).toHaveBeenCalledWith('已保存配置');
   expect(field(host, '115 目标目录')?.value).toBe('/115open/云下载');
   expect(field(host, '115 目标目录')?.getAttribute('aria-invalid')).not.toBe('true');
-  expect(host.textContent).toContain('已按推送发现填入 /115open/云下载');
+  expect(host.textContent).toContain('已根据媒体库目录填入 /115open/云下载');
   expect(host.textContent).not.toContain('/115open/云下载，保存配置后生效');
   expect(host.textContent).toContain('/115open/云下载 可以离线下载');
   expect(host.textContent).toContain('本月还剩 1497 条，共 1500 条');

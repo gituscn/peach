@@ -67,6 +67,17 @@ class Clock:
 
 
 class MagnetTests(unittest.TestCase):
+    def test_payload_exposes_a_display_code_without_changing_the_task(self):
+        task = dl.DownloadTask(id=1, info_hash=HASH, provider="115", source_uri=MAGNET,
+                               display_name="ABC-123.mp4", target="/cloud", state=dl.SUBMITTED)
+        self.assertEqual(task.payload()["display_code"], "ABC-123")
+        self.assertIsNone(task.code)
+        task.remote_name = "XYZ-999.mp4"
+        self.assertIsNone(task.payload()["display_code"])
+        task.remote_name = None
+        task.display_name = "无编号作品.mp4"
+        self.assertIsNone(task.payload()["display_code"])
+
     def test_hex_and_base32_spellings_are_one_key(self):
         base32 = "ZHQVOY7XELZD5GFCTXWN7LRUDOMNKMCW"
         self.assertEqual(dl.normalise_info_hash(base32), HASH)
@@ -400,6 +411,23 @@ class SettingsTests(_Deployment):
         self.credentials.save(dl.CLOUDDRIVE_CREDENTIAL, {"token": "t"})
         providers = {row["key"]: row["configured"] for row in self.service.snapshot()["providers"]}
         self.assertEqual(providers, {"115": True, "pikpak": False})
+
+    def test_snapshot_pages_keep_submission_order_during_status_updates(self):
+        for number in range(5):
+            self.service.store.save(dl.DownloadTask(
+                id=0, info_hash=f"{number:040x}", provider="115", source_uri=MAGNET,
+                display_name="ABC-123", target="/cloud", state=dl.SUBMITTED))
+        first = self.service.snapshot(2)
+        self.assertEqual([row["id"] for row in first["tasks"]], [5, 4])
+        self.assertTrue(first["has_more"])
+        changed = self.service.store.get(3)
+        changed.updated_at = "2099-01-01T00:00:00Z"
+        self.service.store.save(changed)
+        second = self.service.snapshot(2, before_id=first["next_before_id"])
+        self.assertEqual([row["id"] for row in second["tasks"]], [3, 2])
+        last = self.service.snapshot(2, before_id=second["next_before_id"])
+        self.assertEqual([row["id"] for row in last["tasks"]], [1])
+        self.assertFalse(last["has_more"])
 
 
 class CredentialSaveTests(unittest.TestCase):

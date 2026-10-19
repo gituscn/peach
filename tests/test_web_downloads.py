@@ -116,6 +116,20 @@ class RouteTests(_App):
         self.assertIn("infohash", response.text)
         self.assertEqual(self.client.post("/api/downloads/cancel", json={}).status_code, 400)
 
+    def test_download_pages_return_a_cursor_and_reject_invalid_positions(self):
+        for number in range(3):
+            self.service.store.save(dl.DownloadTask(
+                id=0, info_hash=f"{number:040x}", provider="115", source_uri="magnet:?xt=urn:btih:" + HASH,
+                display_name="ABC-123.mp4", target="/115/云下载", state=dl.SUBMITTED))
+        first = self.client.get("/api/downloads?limit=2").json()
+        self.assertTrue(first["has_more"])
+        self.assertEqual(first["tasks"][0]["display_code"], "ABC-123")
+        last = self.client.get(f"/api/downloads?limit=2&before_id={first['next_before_id']}").json()
+        self.assertEqual(len(last["tasks"]), 1)
+        self.assertFalse(last["has_more"])
+        for position in ("nope", "0", "-1"):
+            self.assertEqual(self.client.get(f"/api/downloads?before_id={position}").status_code, 400)
+
     def test_failed_postprocess_can_be_requeued_without_resubmitting(self):
         result = self.service.submit(
             source=f"magnet:?xt=urn:btih:{HASH}&dn=ABC-123", provider="115",
