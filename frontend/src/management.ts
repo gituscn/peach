@@ -4,8 +4,8 @@ import { islandButton, islandGlyph, islandSelect } from './island-skeleton';
 
 /* 「扫描与采集」「媒体修复」两张卡的正文。卡片本体由 React 画，骨架与遗留层的取数占位
    画的是同一段话：写两份的话，骨架上的那句会比真卡短一截，接管时整张卡跳一次。 */
-export const SCAN_CARD_TEXT = '同步文件与影片资料，按设置生成本地视频预览。下拉菜单可选择只扫描文件、同步已入库影片、生成预览或补全资料。';
-export const REPAIR_CARD_TEXT = '修缺时间戳表（播放卡顿）和缺索引（打不开）的 MP4。常看的片子先修。';
+export const SCAN_CARD_TEXT = '扫描文件并更新馆藏，读取本地资料、补齐缺失资料和封面，按设置生成视频预览。';
+export const REPAIR_CARD_TEXT = '部分视频文件可能播放卡顿、打不开，修复缺时间戳表和缺索引的问题。';
 
 const bar = '<span class="skeleton skeleton-text" aria-hidden="true"></span>';
 /* 要等数据才能执行的键是真的按不了：原生 `disabled` 挡住点击与聚焦，`data-skeleton-action`

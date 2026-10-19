@@ -57938,7 +57938,7 @@ function QB({ label: e, icon: t, accent: n = 0, figure: r, footer: i }) {
 }
 //#endregion
 //#region src/management.ts
-var $B = "同步文件与影片资料，按设置生成本地视频预览。下拉菜单可选择只扫描文件、同步已入库影片、生成预览或补全资料。", eV = "修缺时间戳表（播放卡顿）和缺索引（打不开）的 MP4。常看的片子先修。", tV = "<span class=\"skeleton skeleton-text\" aria-hidden=\"true\"></span>", nV = "type=\"button\" disabled data-skeleton-action", rV = "disabled data-skeleton-action", COe = "aria-disabled=\"true\"", iV = (e) => `<div class="peach-react"><div class="flex flex-col gap-4">${e}</div></div>`, aV = (e, t) => `<div data-geist-fieldset-content>
+var $B = "扫描文件并更新馆藏，读取本地资料、补齐缺失资料和封面，按设置生成视频预览。", eV = "部分视频文件可能播放卡顿、打不开，修复缺时间戳表和缺索引的问题。", tV = "<span class=\"skeleton skeleton-text\" aria-hidden=\"true\"></span>", nV = "type=\"button\" disabled data-skeleton-action", rV = "disabled data-skeleton-action", COe = "aria-disabled=\"true\"", iV = (e) => `<div class="peach-react"><div class="flex flex-col gap-4">${e}</div></div>`, aV = (e, t) => `<div data-geist-fieldset-content>
           <h3 class="text-title-2-medium text-text-primary">${e}</h3>
           <p class="text-body-2-regular text-text-secondary">${t}</p></div>`;
 function wOe() {
@@ -59312,7 +59312,7 @@ function dke({ toast: e }) {
 			title: "文件已丢失的记录",
 			titleId: "orphan-records-title",
 			unit: "条作品",
-			description: "这些作品的文件已找不到，喜欢、稍后看、播放列表与观看历史仍保留。选择替代文件后，这些记录会转移到该文件，旧作品记录随之删除。",
+			description: "这些作品的源文件已删除，喜欢、稍后看、播放列表与观看历史仍保留。选择替代文件后，这些记录会转移到该文件，旧作品记录随之删除。",
 			rowId: (e) => String(e.id),
 			rowLabel: (e) => e.name,
 			selected: t,
@@ -59471,26 +59471,20 @@ function hke({ toast: e }) {
 	});
 	else if (r?.status === "complete") {
 		let e = oOe(r);
-		f = /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [
-			/* @__PURE__ */ (0, C.jsx)(AV, { scan: r }),
-			e ? /* @__PURE__ */ (0, C.jsx)(J, {
-				tone: "neutral",
-				title: "清理内容",
-				children: cOe(r)
-			}) : null,
-			/* @__PURE__ */ (0, C.jsx)("div", {
-				className: "flex flex-wrap items-center justify-end gap-2",
-				children: e ? /* @__PURE__ */ (0, C.jsx)(q, {
-					variant: "danger",
-					...Y(a),
-					onClick: () => c(r),
-					children: a ? "正在复核并清理…" : DV
-				}) : /* @__PURE__ */ (0, C.jsx)("p", {
-					className: "mr-auto text-body-regular text-notification-success-foreground",
-					children: "已检查可访问的来源，没有待清理的记录、空文件夹或缓存。"
-				})
-			})
-		] });
+		f = /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [/* @__PURE__ */ (0, C.jsx)(AV, { scan: r }), e ? /* @__PURE__ */ (0, C.jsx)(J, {
+			tone: "neutral",
+			title: "清理内容",
+			action: /* @__PURE__ */ (0, C.jsx)(q, {
+				variant: "danger",
+				...Y(a),
+				onClick: () => c(r),
+				children: a ? "正在复核并清理…" : DV
+			}),
+			children: cOe(r)
+		}) : /* @__PURE__ */ (0, C.jsx)("p", {
+			className: "mr-auto text-body-regular text-notification-success-foreground",
+			children: "已检查可访问的来源，没有待清理的记录、空文件夹或缓存。"
+		})] });
 	}
 	return t.start.isError && !l && (f = /* @__PURE__ */ (0, C.jsxs)(C.Fragment, { children: [f, /* @__PURE__ */ (0, C.jsx)(J, {
 		tone: "error",

@@ -158,16 +158,15 @@ export function ResourceSyncCard(
     result = (
       <>
         <ScanResult scan={state} />
-        {changes ? <Note tone="neutral" title="清理内容">{applyPlanText(state)}</Note> : null}
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {changes
-            ? <Button variant="danger" {...busyProps(cleaning)} onClick={() => runApply(state)}>
+        {changes
+          ? <Note tone="neutral" title="清理内容" action={
+              <Button variant="danger" {...busyProps(cleaning)} onClick={() => runApply(state)}>
                 {cleaning ? '正在复核并清理…' : APPLY_LABEL}
               </Button>
-            : <p className="mr-auto text-body-regular text-notification-success-foreground">
-                已检查可访问的来源，没有待清理的记录、空文件夹或缓存。
-              </p>}
-        </div>
+            }>{applyPlanText(state)}</Note>
+          : <p className="mr-auto text-body-regular text-notification-success-foreground">
+              已检查可访问的来源，没有待清理的记录、空文件夹或缓存。
+            </p>}
       </>
     );
   }

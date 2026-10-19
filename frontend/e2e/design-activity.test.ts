@@ -26,6 +26,15 @@ describe('任务页云下载布局', () => {
       const page = opened.page;
       await page.locator('[data-download-id="1"]').waitFor();
       await settle(page);
+      await page.waitForFunction(async () => {
+        const images = document.querySelectorAll<HTMLImageElement>(
+          '[data-download-id="1"] [data-download-cover] img, [data-download-id="1"] [data-media-avatar] img');
+        if (images.length !== 2) return false;
+        try {
+          await Promise.all([...images].map(image => image.decode()));
+          return [...images].every(image => image.complete && image.naturalWidth > 0);
+        } catch { return false; }
+      });
       const geometry = await page.locator('[data-download-id="1"]').evaluate((card) => {
         const heading = card.querySelector('strong')!;
         const titleContent = heading.querySelector('a') || heading;
