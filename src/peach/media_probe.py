@@ -27,6 +27,7 @@ from .media import resolve_case_insensitive
 from .media_sources import cost_for
 from .strm import skip_background_read
 from .processing_control import CURRENT, checkpoint
+from . import junk, record_rehome
 
 #: 一次探测最多等多久。ffprobe 只读文件头，网盘上实测一两秒。
 TIMEOUT_SECONDS = 20.0
@@ -118,14 +119,15 @@ def probe_unmeasured(
     db_path, ffprobe: str | None, location: str, root: str, *,
     report: Callable[[int, int], None] = lambda done, total: None,
     asset_ids: Sequence[int] | None = None,
-    config=None,
+    config=None, protected_ids=(), on_junk=lambda result: None,
 ) -> int:
     """`root`（账本口径）下还没探过的视频逐个探一遍，返回探了几个。"""
     if not ffprobe:
         return 0
-    prefix = str(PureWindowsPath(root)).rstrip("\\") + "\\"
+    exact = str(PureWindowsPath(root)).rstrip("\\")
+    prefix = exact + "\\"
     selected = ''
-    parameters = (location, len(prefix), prefix)
+    parameters = (location, exact, len(prefix), prefix)
     if asset_ids is not None:
         if not asset_ids:
             return 0
@@ -133,10 +135,10 @@ def probe_unmeasured(
         parameters += tuple(asset_ids)
     with closing(sqlite3.connect(db_path, timeout=30)) as connection:
         rows = connection.execute(
-            f"SELECT id,path FROM asset WHERE {_UNMEASURED} AND substr(path,1,?)=?{selected} ORDER BY id",
+            f"SELECT id,path FROM asset WHERE {_UNMEASURED} AND (path=? OR substr(path,1,?)=?){selected} ORDER BY id",
             parameters).fetchall()
     rows = [row for row in rows if cost_for(location, row[1], config) == 'free']
-    return _record(db_path, ffprobe, rows, report)
+    return _record(db_path, ffprobe, rows, report, protected_ids=protected_ids, on_junk=on_junk)
 
 
 def probe_path(db_path, ffprobe: str | None, location: str, path: str, *, config=None) -> int:
@@ -151,7 +153,8 @@ def probe_path(db_path, ffprobe: str | None, location: str, path: str, *, config
     return _record(db_path, ffprobe, rows, lambda done, total: None)
 
 
-def _record(db_path, ffprobe: str, rows: Sequence, report: Callable[[int, int], None]) -> int:
+def _record(db_path, ffprobe: str, rows: Sequence, report: Callable[[int, int], None], *,
+            protected_ids=(), on_junk=lambda result: None) -> int:
     """探完一条写一条。`report` 抛出来（任务被停）时，还没开始的那些不再探。"""
     rows = [row for row in rows if not skip_background_read(row[1])]
     if not rows:
@@ -164,6 +167,9 @@ def _record(db_path, ffprobe: str, rows: Sequence, report: Callable[[int, int], 
             connection.commit()
             done += 1
             report(done, len(rows))
+        record_rehome.reattach(connection, [row[0] for row in rows])
+        connection.commit()
+    on_junk(junk.isolate(db_path, asset_ids=[row[0] for row in rows], protected_ids=protected_ids))
     return done
 
 

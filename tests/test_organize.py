@@ -350,6 +350,17 @@ class ApplyTests(unittest.TestCase):
             row = connection.execute("SELECT path,name FROM asset WHERE id=1").fetchone()
         self.assertEqual(row, ("R:\\media\\厂牌\\ABC-123.mp4", "ABC-123.mp4"))
 
+    def test_a_disposed_asset_in_a_saved_plan_is_left_on_disk(self):
+        original = self._file('old/title.mp4')
+        _seed(self.db_path, [dict(id=1, path=r'R:\media\old\title.mp4', name='title.mp4', code='ABC-123')])
+        plan = _plan(self.db_path, file_template='{number}')
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            connection.execute("UPDATE asset SET disposal='trash' WHERE id=1")
+            connection.commit()
+        result = self._apply(plan)
+        self.assertEqual((result['moved'], result['failed']), (0, 1))
+        self.assertTrue(original.is_file())
+
     def test_scoped_symbol_cleanup_and_rollback_preserve_unselected_files(self):
         self._file('合集/★标题⧹⧹片段.mp4')
         self._file('合集2/★标题.mp4')
@@ -491,6 +502,19 @@ class EndpointTests(unittest.TestCase):
         self.assertEqual(result["counts"]["change"], 1)
         self.assertEqual(result["rows"][0]["target_path"], "R:\\media\\旧\\ABC-123 标题.mp4")
         self.assertTrue(Path(result["plan_csv"]).is_file())
+
+    def test_write_reports_existing_foreign_keys_and_rejects_new_violations(self):
+        from peach.web_organize import _run_write
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            connection.execute("INSERT INTO media_binding(asset_id,backend,external_id) VALUES(99999,'test','old')")
+            connection.commit()
+        self.assertEqual(_run_write(self.contract, 'test', lambda _: {})['existing_foreign_keys'], 1)
+        def introduce(connection):
+            connection.execute("INSERT INTO media_binding(asset_id,backend,external_id) VALUES(99998,'test','new')")
+            connection.commit()
+            return {}
+        with self.assertRaisesRegex(RuntimeError, 'new_foreign_keys=1'):
+            _run_write(self.contract, 'test-new', introduce)
 
     def test_apply_without_confirmation_is_refused(self):
         from peach.web_organize import w_organize_apply

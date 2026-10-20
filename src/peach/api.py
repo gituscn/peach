@@ -34,7 +34,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES, GZipMiddleware
 
-from . import (__version__, browser_transport, feeds, tunnel, web_batch, web_contract,
+from . import (__version__, browser_transport, feeds, tunnel, web_contract,
                web_feeds, web_follow, web_settings)
 from . import routes_api, routes_auth, routes_configuration, routes_jav_browser, routes_media, routes_pages, routes_subtitles
 from .buildinfo import frozen_build
@@ -233,7 +233,6 @@ def create_app(
         taste_history_manifest=settings.taste_history_manifest,
         database=database,
     )
-    contract.download_junk_candidates = lambda: web_batch.automatic_junk_candidates(contract)
     contract.download_organize_templates = lambda: web_settings.organize_templates(contract)
     repository = LedgerRepository(database)
     from .mount_reachability import source_roots

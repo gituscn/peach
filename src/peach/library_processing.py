@@ -30,6 +30,7 @@ from .library_nfo import directory_files, read_nfo, sidecars, local_art, Sidecar
 from .genre_decisions import load_genre_decisions
 from .metadata import extract_catalog_evidence, extract_peach_fields, validate_provider_code
 from . import metadata_routes
+from . import junk
 from . import sample_followup
 from .metadata_policy import SOURCE_SPECS, preferred_tag_source
 from .platform import root_online, translate_ledger_path
@@ -1743,12 +1744,15 @@ class _SourceScan:
     scanned: int = 0
     probed: int = 0
     scanned_bytes: int = 0
+    junk_isolated: int = 0
 
 
 def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update, issue,
                   scan_checkpoints=None, save_checkpoint=lambda: None, initial_probed=0):
     """发现本趟可访问的来源根，按阶段登记文件并探测新视频。"""
     result = _SourceScan([], probed=initial_probed)
+    def count_junk(checked):
+        result.junk_isolated += checked['isolated']
     scan_checkpoints = scan_checkpoints if scan_checkpoints is not None else {}
     chosen_paths = _chosen_asset_paths(db_path, asset_ids)
     scan = asset_ids is None and stage in (ALL_STAGES, SCAN_STAGE)
@@ -1778,9 +1782,11 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
                                                checked=0, total=0, current_action='scanning_files'))
                 result.scanned += registered.files
                 result.scanned_bytes += registered.total_bytes
+                result.junk_isolated += registered.junk_isolated
                 if stage == SCAN_STAGE:
                     result.probed += probe_unmeasured(
                         db_path, ffprobe, source, root, config=config,
+                        on_junk=count_junk,
                         report=lambda done, total: update(stage='读取时长与分辨率',
                             checked=result.probed + done, total=result.probed + total, probed=result.probed + done))
                 reattach_in(db_path, registered.new_ids)
@@ -1788,7 +1794,8 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
     return result
 
 
-def _probe_sources(config, db_path, locations, online_roots, asset_ids, update, *, total_pending=0, initial_probed=0):
+def _probe_sources(config, db_path, locations, online_roots, asset_ids, update, *, total_pending=0,
+                   initial_probed=0, protected_ids=(), on_junk=lambda result: None):
     """已登记视频按可访问来源逐项读取媒体属性。"""
     probed = initial_probed
     checked = initial_probed
@@ -1801,10 +1808,47 @@ def _probe_sources(config, db_path, locations, online_roots, asset_ids, update, 
             if translate_ledger_path(root) in online_roots:
                 probed += probe_unmeasured(
                     db_path, ffprobe, source, root, asset_ids=asset_ids, config=config,
-                    report=report)
+                    report=report, protected_ids=protected_ids, on_junk=on_junk)
                 checked = probed
     update(probed=probed)
     return probed
+
+
+def _check_processing_junk(database, locations, online_roots, asset_ids, protected_ids, state, update):
+    """只检查本趟可访问目录或显式选择，并把隔离与复核计数记进可恢复状态。"""
+    roots = [(source, root) for source, paths in locations.items() for root in paths
+             if translate_ledger_path(root) in online_roots]
+    checked = junk.isolate(database, asset_ids=asset_ids, roots=roots, protected_ids=protected_ids)
+    update(junk_isolated=state.get('junk_isolated', 0) + checked['isolated'],
+           junk_review=checked['review'])
+
+
+def _prepare_processing_media(config, db_path, database, locations, sources, asset_ids,
+                              protected_ids, stage, state, update):
+    """在配套资料、预览和联网采集前检查已知证据，补媒体测量后重新检查。"""
+    update(stage='检查垃圾文件', checked=0, total=0)
+    _check_processing_junk(database, locations, sources.online_roots, asset_ids, protected_ids, state, update)
+    if stage in (ALL_STAGES, COLLECT_STAGE, PREVIEWS_STAGE):
+        _probe_sources(config, db_path, locations, sources.online_roots, asset_ids, update,
+                       initial_probed=state['probed'], protected_ids=protected_ids,
+                       on_junk=lambda result: update(junk_isolated=state['junk_isolated'] + result['isolated']))
+        update(stage='复查垃圾文件', checked=0, total=0)
+        _check_processing_junk(database, locations, sources.online_roots, asset_ids, protected_ids, state, update)
+
+
+def _active_prepared(database, prepared):
+    """媒体处理后的活动视频携带最新测量值，已隔离或被用户移出的条目不继续采集。"""
+    if not prepared:
+        return []
+    ids = [row[0]['id'] for row in prepared]
+    with database.read_connection() as connection:
+        current = {}
+        for start in range(0, len(ids), 500):
+            batch = ids[start:start + 500]
+            current.update((row['id'], dict(row)) for row in connection.execute(
+                "SELECT * FROM asset WHERE disposal IS NULL AND id IN (" + ','.join('?' for _ in batch) + ')', batch))
+    return [(dict(item[0], **current[item[0]['id']]), *item[1:]) for item in prepared
+            if item[0]['id'] in current]
 
 
 def _collection_rows(db_path, *, locations, online_roots, asset_ids):
@@ -2113,11 +2157,13 @@ def _processing_steps(stage, asset_ids, *, metadata_only_enabled):
     """按本趟真实处理范围构造有序阶段清单。"""
     scanning = asset_ids is None and stage in (ALL_STAGES, SCAN_STAGE)
     steps = [('sources', '扫描文件' if scanning else '检查媒体目录')]
+    steps.append(('inspect', '检查垃圾文件' if stage in (SCAN_STAGE, PREVIEWS_STAGE, METADATA_STAGE)
+                  else '读取媒体属性与检查垃圾'))
     if stage not in (SCAN_STAGE, PREVIEWS_STAGE):
         steps.append(('local', '检查配套文件'))
     if stage == PREVIEWS_STAGE or stage in (ALL_STAGES, COLLECT_STAGE):
-        media_label = ('生成视频预览' if stage == PREVIEWS_STAGE else
-                       '读取媒体属性' if metadata_only_enabled else '读取媒体属性与生成预览')
+        media_label = ('生成视频预览' if stage == PREVIEWS_STAGE or not metadata_only_enabled
+                       else '检查媒体预览设置')
         steps.append(('media', media_label))
     if stage not in (SCAN_STAGE, PREVIEWS_STAGE):
         steps.append(('collect', '采集外部资料与封面'))
@@ -2157,7 +2203,7 @@ def _restore_processing_counts(state, previous):
     """同一处理任务沿用累计数、问题清单和已保存证据索引。"""
     previous = previous or {}
     for key in ('started_at', 'identified', 'covers', 'previews', 'probed', 'issue_count', 'paused_count',
-                'issue_preview', 'issues_truncated', 'notes', 'retryable_asset_ids'):
+                'issue_preview', 'issues_truncated', 'notes', 'retryable_asset_ids', 'junk_isolated', 'junk_review'):
         if key in previous:
             state[key] = previous[key]
     for key in ('scan_checkpoints', 'local_metadata'):
@@ -2205,7 +2251,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                     report=lambda state: None, provider_factory=None, job_id=None,
                     retry_ids=None, active=lambda: True, stage=ALL_STAGES,
                     database=None, route_overrides=None, state_file=None, asset_ids=None,
-                    resume_state=None, speed_mode=None):
+                    resume_state=None, speed_mode=None, protected_ids=()):
     """登记文件与确定的番号，外部资料保留为可复核候选。
 
     `retry_ids` 为 `None` 时处理整个馆藏；给定时只处理这些项目（上一任务记录的
@@ -2216,13 +2262,16 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
     `asset_ids` 指定仍在馆藏中的视频，不扫描来源目录；空选择无效。
 
     `database` 是调用方已经在用的 `LedgerDatabase`。给了它才做收尾的自动落库与人物
-    资料补齐与本地预览登记，并且与调用方共用同一把进程内写锁；不给就只采集候选。
+    资料补齐与本地预览登记，并且与调用方共用同一把进程内写锁。所有模式都会按范围
+    检查垃圾并隔离到回收站；不给 `database` 时外部资料只采集候选。
 
     `route_overrides` 覆盖某几种内容类型的来源链，形状与判据见
     `metadata_routes.parse_route_overrides`；不给就用内建那张表。
     `state_file` 给后台定向任务保存独立进度，共享候选写入仍使用全库处理锁。
     """
     selected_ids = _validate_processing_request(config, db_path, stage, asset_ids, retry_ids, database)
+    from .repository import LedgerDatabase
+    judgement_database = database if database is not None else LedgerDatabase(db_path)
     routes = metadata_routes.parse_route_overrides(route_overrides)
     path = Path(state_file) if state_file is not None else state_path(config)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -2257,6 +2306,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                      current_asset_id=None, current_asset_name='', current_action='',
                      current_started_at=None, current_deadline_at=None,
                      followups=[],
+                     junk_isolated=0, junk_review=0,
                      started_at=time.time(), error='')
         state.update(initial_estimate(config, db_path, stage, scope_ids, speed_mode))
         state['steps'] = _processing_steps(stage, scope_ids,
@@ -2340,9 +2390,13 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                                     scan_checkpoints=state['scan_checkpoints'],
                                     save_checkpoint=lambda: flush_state(force=True), initial_probed=state['probed'])
             state.update(scanned=sources.scanned, scanned_bytes=sources.scanned_bytes, probed=sources.probed)
+            state['junk_isolated'] = max(state['junk_isolated'], sources.junk_isolated)
             traffic.unknown_files = False
             traffic.refresh_plan()
             finish_step('sources')
+            _prepare_processing_media(config, db_path, judgement_database, locations, sources,
+                                      scope_ids, protected_ids, stage, state, update)
+            finish_step('inspect')
             if stage == SCAN_STAGE:
                 # `checked`／`total` 在探时长时借给进度条用过；只扫描这一段没有采集，读数归零。
                 update(status='failed' if state['issue_count'] else 'complete',
@@ -2359,6 +2413,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                                    completed=checkpoints.completed['completed_previews'],
                                    initial_made=state['previews'],
                                    checkpoint=lambda row: checkpoints.mark('completed_previews', row, flush_state))
+                _check_processing_junk(judgement_database, locations, sources.online_roots,
+                                       scope_ids, protected_ids, state, update)
                 finish_step('media')
                 update(status='failed' if state['issue_count'] else 'complete', stage='处理结束',
                        completed_at=time.time(), error=issue_summary(state['issue_count'], state['paused_count']))
@@ -2433,8 +2489,6 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             finish_step('local')
             traffic.prepare_metadata(prepared)
             if stage in (ALL_STAGES, COLLECT_STAGE):
-                _probe_sources(config, db_path, locations, sources.online_roots, scope_ids, update,
-                               total_pending=pending.get('probe', 0), initial_probed=state['probed'])
                 pending.pop('probe', None)
                 update(estimate_pending=dict(pending), stage='准备生成预览', checked=0, total=0)
                 if not metadata_only(config.directory('state')):
@@ -2445,6 +2499,9 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 pending.pop('previews', None)
                 update(estimate_pending=dict(pending), stage='准备采集外部资料', checked=0, total=0)
                 finish_step('media')
+            _check_processing_junk(judgement_database, locations, sources.online_roots,
+                                   scope_ids, protected_ids, state, update)
+            prepared = _active_prepared(judgement_database, prepared)
             for position, (row, code, verify_existing, local_fields, local_entries, local_ok) in enumerate(prepared):
                 local_ok = local_ok and row['id'] not in poster_failed
                 guard.check()

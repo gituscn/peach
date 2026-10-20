@@ -3036,14 +3036,11 @@ class OperationalScriptTests(unittest.TestCase):
         sheets = self.sheets
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            db = root / "ledger.db"
+            db = fresh_ledger(root)
             connection = sqlite3.connect(db)
             connection.execute(
-                "CREATE TABLE asset(id INTEGER PRIMARY KEY,location TEXT,path TEXT,"
-                "medium TEXT,duration REAL,size INTEGER,snapshot_path TEXT,disposal TEXT)"
-            )
-            connection.execute(
-                "INSERT INTO asset VALUES(18349,'local',?,'video',752.24,1000,NULL,NULL)",
+                "INSERT INTO asset(id,location,path,medium,duration,size,snapshot_path,disposal) "
+                "VALUES(18349,'local',?,'video',752.24,1000,NULL,NULL)",
                 (str(root / "one.mp4"),),
             )
             connection.commit()
@@ -3072,19 +3069,17 @@ class OperationalScriptTests(unittest.TestCase):
         sheets = self.sheets
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            db = root / "ledger.db"
+            db = fresh_ledger(root)
             connection = sqlite3.connect(db)
-            connection.execute(
-                "CREATE TABLE asset(id INTEGER PRIMARY KEY,location TEXT,path TEXT,"
-                "medium TEXT,duration REAL,size INTEGER,snapshot_path TEXT,disposal TEXT)"
-            )
             # 18349 已有陈旧产物且已登记；1 是同来源的另一条待抽项，不该被顺带带走。
             connection.execute(
-                "INSERT INTO asset VALUES(18349,'local',?,'video',110.87,2000,'stale.jpg',NULL)",
+                "INSERT INTO asset(id,location,path,medium,duration,size,snapshot_path,disposal) "
+                "VALUES(18349,'local',?,'video',110.87,2000,'stale.jpg',NULL)",
                 (str(root / "one.mp4"),),
             )
             connection.execute(
-                "INSERT INTO asset VALUES(1,'local',?,'video',600.0,1000,NULL,NULL)",
+                "INSERT INTO asset(id,location,path,medium,duration,size,snapshot_path,disposal) "
+                "VALUES(1,'local',?,'video',600.0,1000,NULL,NULL)",
                 (str(root / "two.mp4"),),
             )
             connection.commit()
@@ -3150,18 +3145,16 @@ class OperationalScriptTests(unittest.TestCase):
         for named, expected in ((False, ["keep.mp4"]), (True, ["trashed.mp4"])):
             with self.subTest(named=named), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
-                db = root / "ledger.db"
+                db = fresh_ledger(root)
                 connection = sqlite3.connect(db)
                 connection.execute(
-                    "CREATE TABLE asset(id INTEGER PRIMARY KEY,location TEXT,path TEXT,"
-                    "medium TEXT,duration REAL,size INTEGER,snapshot_path TEXT,disposal TEXT)"
-                )
-                connection.execute(
-                    "INSERT INTO asset VALUES(1,'local',?,'video',600.0,2000,NULL,'trash')",
+                    "INSERT INTO asset(id,location,path,medium,duration,size,snapshot_path,disposal) "
+                    "VALUES(1,'local',?,'video',600.0,2000,NULL,'trash')",
                     (str(root / "trashed.mp4"),),
                 )
                 connection.execute(
-                    "INSERT INTO asset VALUES(2,'local',?,'video',600.0,1000,NULL,NULL)",
+                    "INSERT INTO asset(id,location,path,medium,duration,size,snapshot_path,disposal) "
+                    "VALUES(2,'local',?,'video',600.0,1000,NULL,NULL)",
                     (str(root / "keep.mp4"),),
                 )
                 connection.commit()
@@ -3194,15 +3187,12 @@ class OperationalScriptTests(unittest.TestCase):
         sheets = self.sheets
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            db = root / "ledger.db"
+            db = fresh_ledger(root)
             connection = sqlite3.connect(db)
-            connection.execute(
-                "CREATE TABLE asset(id INTEGER PRIMARY KEY,location TEXT,path TEXT,"
-                "medium TEXT,duration REAL,size INTEGER,snapshot_path TEXT,disposal TEXT)"
-            )
             for asset_id in range(1, 61):
                 connection.execute(
-                    "INSERT INTO asset VALUES(?,?,?,?,?,?,NULL,NULL)",
+                    "INSERT INTO asset(id,location,path,medium,duration,size,snapshot_path,disposal) "
+                    "VALUES(?,?,?,?,?,?,NULL,NULL)",
                     (asset_id, "local", str(root / f"{asset_id}.mp4"), "video", 600.0, 1000),
                 )
             connection.commit()
@@ -3301,14 +3291,8 @@ class OperationalScriptTests(unittest.TestCase):
         probe = self.probe
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            db = root / "ledger.db"
+            db = fresh_ledger(root)
             connection = sqlite3.connect(db)
-            connection.execute(
-                "CREATE TABLE asset(id INTEGER PRIMARY KEY,location TEXT,path TEXT,"
-                "medium TEXT,duration REAL,size INTEGER,width INTEGER,height INTEGER,"
-                "vcodec TEXT,fps REAL,has_audio INTEGER,ctx_length TEXT,ctx_orient TEXT,"
-                "ctx_quality TEXT,disposal TEXT)"
-            )
             for asset_id, duration in ((18349, 752.24), (1, None)):
                 connection.execute(
                     "INSERT INTO asset(id,location,path,medium,duration,size) "

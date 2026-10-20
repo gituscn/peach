@@ -499,7 +499,7 @@ class ProcessingControlTests(unittest.TestCase):
         def scan(*_args, **kwargs):
             kwargs['progress'](1, 10)
             kwargs['progress'](2, 30)
-            return SimpleNamespace(files=2, total_bytes=30, new_ids=[])
+            return SimpleNamespace(files=2, total_bytes=30, new_ids=[], junk_isolated=1)
         with patch('peach.library_processing.scan_location', side_effect=scan), \
                 patch('peach.library_processing._online_source_root', return_value=self.root), \
                 patch('peach.library_processing._ffprobe_path', return_value=None), \
@@ -513,3 +513,4 @@ class ProcessingControlTests(unittest.TestCase):
         self.assertEqual([row['scanned_bytes'] for row in discovering], [10, 30, 40, 60])
         self.assertTrue(all(row['total'] == 0 for row in discovering))
         self.assertEqual((result.scanned, result.scanned_bytes), (4, 60))
+        self.assertEqual(result.junk_isolated, 2)
