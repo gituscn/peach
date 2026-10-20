@@ -35,7 +35,7 @@ class GitLabForge:
             return json.loads(self.command(executable, "api", "--hostname", self.host,
                                            "--method", "GET", path))
         except subprocess.CalledProcessError as error:
-            if "403" not in (error.stderr or ""):
+            if not any(status in (error.stderr or "") for status in ("401", "403")):
                 raise
             # 公开项目的只读元数据可匿名取得，不扩大本机细粒度凭据权限。
             request = Request(f"https://{self.host}/api/v4/{path}",
