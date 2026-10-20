@@ -283,7 +283,7 @@ function VideoControls({ head, actions }: { head: EntityVideoHead; actions: Enti
       ) : null}
       <CatalogViewToggle />
       <FolderBrowseToggle />
-      {view === 'cards' ? <SortKeys sorts={head.sorts} onSort={actions.setSort} /> : null}
+      <SortKeys sorts={head.sorts} onSort={actions.setSort} />
     </span>
   );
 }

@@ -48083,10 +48083,10 @@ function qCe({ head: e, actions: t }) {
 			}) : null,
 			/* @__PURE__ */ (0, C.jsx)(KF, {}),
 			/* @__PURE__ */ (0, C.jsx)(RF, {}),
-			n === "cards" ? /* @__PURE__ */ (0, C.jsx)(_I, {
+			/* @__PURE__ */ (0, C.jsx)(_I, {
 				sorts: e.sorts,
 				onSort: t.setSort
-			}) : null
+			})
 		]
 	});
 }
@@ -48372,10 +48372,10 @@ function twe({ count: e, refreshing: t, layout: n, sorts: r, actions: i }) {
 			}, n.name) : null,
 			/* @__PURE__ */ (0, C.jsx)(KF, {}),
 			/* @__PURE__ */ (0, C.jsx)(RF, {}),
-			a === "cards" ? /* @__PURE__ */ (0, C.jsx)(_I, {
+			/* @__PURE__ */ (0, C.jsx)(_I, {
 				sorts: r,
 				onSort: i.setSort
-			}) : null
+			})
 		]
 	})] });
 }
@@ -110441,7 +110441,7 @@ function Kgt(e, t) {
 		"list",
 		"列表",
 		"ri-list-unordered"
-	]])}<button type="button" data-folder-mode-toggle="" aria-label="文件夹模式" aria-pressed="${r.get("browse") === "folders" || !!r.get("folder")}" ${r7}>${n7("ri-folder-3-line")}</button>${n === "cards" ? e.map((e) => `<button type="button" data-entity-sort="${B(e.key)}" aria-pressed="${e.pressed}" ${r7}>${B(e.label)}${e.dir ? n7(e.dir === "asc" ? "arrow-up" : "arrow-down") : ""}</button>`).join("") : ""}</span>`;
+	]])}<button type="button" data-folder-mode-toggle="" aria-label="文件夹模式" aria-pressed="${r.get("browse") === "folders" || !!r.get("folder")}" ${r7}>${n7("ri-folder-3-line")}</button>${e.map((e) => `<button type="button" data-entity-sort="${B(e.key)}" aria-pressed="${e.pressed}" ${r7}>${B(e.label)}${e.dir ? n7(e.dir === "asc" ? "arrow-up" : "arrow-down") : ""}</button>`).join("")}</span>`;
 }
 //#endregion
 //#region src/catalog-content-skeleton.ts

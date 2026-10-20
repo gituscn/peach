@@ -159,6 +159,17 @@ describe('馆藏卡片与列表', () => {
           await page.waitForFunction(() => document.querySelector('[data-catalog-row]')?.getAttribute('data-id') === '9000');
           assert.equal(requests.at(-1)!.get('dir'), 'asc');
         }
+        const durationSort = page.locator('[data-entity-sort="dur"]');
+        await durationSort.scrollIntoViewIfNeeded();
+        const durationResponse = page.waitForResponse(response => {
+          const url = new URL(response.url());
+          return url.pathname === '/api/items' && url.searchParams.get('sort') === 'dur' && url.searchParams.get('dir') === 'desc';
+        });
+        await durationSort.click();
+        await durationResponse;
+        await page.waitForFunction(() => document.querySelector('[data-catalog-row]')?.getAttribute('data-id') === '9000');
+        assert.equal(await durationSort.getAttribute('aria-pressed'), 'true');
+        assert.equal(requests.at(-1)!.get('offset'), '0');
         const measured = await layout(page);
         assert.ok(measured.scrollWidth <= measured.viewportWidth + 1, JSON.stringify(measured));
         assert.deepEqual(opened.problems.filter(line => !line.includes('VIDEOJS')), []);

@@ -193,29 +193,31 @@
   letter-spacing: normal;
   white-space: nowrap;
 }
-/* 资料页这一行的读数可以让位：右边那排排序键放不下时它截成省略号，不把页面撑宽。 */
-.peach-react [data-entity-filter-glass] [data-entity-readout] {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* 读数与操作保持完整，空间不足时整行横滚；最左侧读数和最右侧排序都能到达。 */
+.peach-react :is([data-entity-filter-glass], [data-catalog-frame]) > [data-filter-row="bottom"] {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
 }
+.peach-react :is([data-entity-filter-glass], [data-catalog-frame]) > [data-filter-row="bottom"]::-webkit-scrollbar { display: none; }
 
 .peach-react [data-entity-sorts] {
   display: flex;
+  flex: none;
   flex-wrap: nowrap;
   align-items: center;
   gap: 4px;
-  min-width: 0;
+  width: max-content;
   margin-left: auto;
   /* 横滚容器会把里面东西的落影从上下两边裁掉：分段器滑块最远那层影落在 14px 外。上下各留出
      这 14px 再用负外边距收回，排在行里还是 30px 高。 */
   margin-block: -14px;
   padding: 14px 2px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  overflow: visible;
 }
-.peach-react [data-entity-sorts]::-webkit-scrollbar { display: none; }
 
 .peach-react [data-entity-sort] {
   display: inline-flex;
@@ -284,26 +286,11 @@
 .peach-react [data-entity-srctools] > * { flex: none; margin: 0; }
 .peach-react [data-entity-srctools] [aria-live] { flex: none; }
 
-/* 浮层下半在手机上仍是一横条：读数在左，控件跟在右边，装不下就整条往右滚。 */
+/* 手机操作行使用紧凑间距。 */
 @media (max-width: 760px) {
   .peach-react :is([data-entity-filter-glass], [data-catalog-frame]) > [data-filter-row="bottom"] {
-    flex-wrap: nowrap;
     gap: 10px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-inline: contain;
-    scrollbar-width: none;
-    touch-action: pan-x pan-y;
   }
-  .peach-react :is([data-entity-filter-glass], [data-catalog-frame]) > [data-filter-row="bottom"]::-webkit-scrollbar { display: none; }
-  .peach-react [data-entity-sorts] {
-    flex: none;
-    width: max-content;
-    max-width: none;
-    overflow: visible;
-  }
-  /* 整条在横滚，读数不用让位：让位的话它会先被挤成 0 宽。 */
-  .peach-react [data-entity-filter-glass] [data-entity-readout] { flex: none; }
 }
 
 /* 窄屏往下滚时浮层让出顶栏下沿，往回滚再落下来；`--filter-free-top` 与标记由壳的
