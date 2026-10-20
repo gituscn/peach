@@ -4,6 +4,8 @@
 
 GitLab API、CI 认证和 Release 创建复用官方 [glab 1.124.0](https://gitlab.com/gitlab-org/cli)（MIT，维护中）；GitLab CI 的发布写入使用短期 `CI_JOB_TOKEN` 与官方 CI 自动登录。R2 的 S3 上传复用 [rclone 1.75.2](https://rclone.org/)（MIT，维护中），使用单桶对象读写凭据；版本文件不可覆盖，并由独立 HTTPS 下载校验 SHA-256。两者都是构建期 CLI，不进入应用运行时依赖。
 
+轻量安装器的 R2 优先与 GitHub 同版本回退复用 `standalone_update.download`、既有 HTTPX 和内置工具清单；每个来源分别验证大小与 SHA-256。发布后空缓存验收复用 `smoke_split_update.py` 与实际冻结程序的 `--installer-tools` 入口，不新增下载器或依赖。
+
 `fetch_release_tools.py` 从固定版本官方发行站读取 SHA-256 清单，仅提取指定二进制。Python 标准库负责制品清单、版本与提交判据，不另实现 GitLab 认证、S3 签名或多段上传协议。Windows 与 macOS 的 CI 入口复用既有测试、构建和独立制品验收脚本。下载后端及费用边界见[运维说明](OPERATIONS.md#gitlab-发布与下载后端)。
 
 细粒度凭据缺少公开 CI 元数据的读取权限时，发版查询可在官方 API 上进行一次匿名 GET，使用标准库 HTTPS 与项目共用 User-Agent；不扩大凭据权限，也不携带本机认证头。私有资源仍须通过服务端权限检查。

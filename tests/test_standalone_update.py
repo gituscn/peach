@@ -282,6 +282,61 @@ class StandaloneUpdateTests(unittest.TestCase):
         for bundle in manifest['tools'].values():
             self.assertTrue(update_packages.matches(stage, bundle['files']))
 
+    def prepare_online_lite(self, outcome='r2'):
+        from peach.desktop_installer import prepare_install_tools
+        output, manifest, _, stage, error = self.lite_fixture()
+        target = self.root / 'fresh-online-install'
+        requests = []
+        original_client = httpx.Client
+
+        def respond(request):
+            requests.append(str(request.url))
+            r2 = request.url.host == 'downloads.peach.video'
+            if r2 and outcome == 'unavailable':
+                return httpx.Response(503)
+            if not r2 and outcome == 'r2':
+                raise httpx.ConnectError('GitHub unavailable', request=request)
+            name = request.url.path.rsplit('/', 1)[-1]
+            bad = outcome == 'both-corrupt' or (r2 and outcome == 'mismatch')
+            return httpx.Response(200, content=b'corrupt' if bad else (output / name).read_bytes())
+
+        with patch('peach.__version__', '1.0.0'), patch.object(update.httpx, 'Client', side_effect=lambda **kwargs:
+                original_client(**kwargs, transport=httpx.MockTransport(respond), trust_env=False)):
+            result = prepare_install_tools(target, self.root / 'empty-cache', error, stage=stage)
+        self.assertFalse(target.exists())
+        return result, requests, manifest, stage, error
+
+    def test_lite_installer_prepares_from_r2_with_no_github_or_adjacent_archives(self):
+        result, requests, manifest, stage, error = self.prepare_online_lite()
+        self.assertEqual(result, 0, error.read_text(encoding='utf-8') if error.exists() else '')
+        self.assertEqual(len(requests), 3)
+        self.assertTrue(all(url.startswith('https://downloads.peach.video/v1.0.0/') for url in requests))
+        for bundle in manifest['tools'].values():
+            self.assertTrue(update_packages.matches(stage, bundle['files']))
+
+    def test_lite_installer_uses_same_version_github_when_r2_is_unavailable(self):
+        result, requests, manifest, stage, _ = self.prepare_online_lite('unavailable')
+        self.assertEqual(result, 0)
+        self.assertEqual(len(requests), 6)
+        self.assertTrue(all(url.startswith('https://github.com/peach-mitao/peach/releases/download/v1.0.0/')
+                            for url in requests[1::2]))
+        for bundle in manifest['tools'].values():
+            self.assertTrue(update_packages.matches(stage, bundle['files']))
+
+    def test_lite_installer_accepts_only_the_embedded_manifest_digest_across_sources(self):
+        result, requests, manifest, stage, _ = self.prepare_online_lite('mismatch')
+        self.assertEqual(result, 0)
+        self.assertEqual(len(requests), 6)
+        for bundle in manifest['tools'].values():
+            self.assertTrue(update_packages.matches(stage, bundle['files']))
+
+    def test_lite_installer_rejects_both_sources_when_their_bytes_do_not_match(self):
+        result, requests, manifest, stage, error = self.prepare_online_lite('both-corrupt')
+        self.assertEqual(result, 1)
+        self.assertEqual(len(requests), 2)
+        self.assertIn('校验失败', error.read_text(encoding='utf-8'))
+        self.assertFalse(update_packages.matches(stage, manifest['tools']['ffmpeg']['files']))
+
     def test_lite_installer_rejects_a_corrupt_archive_and_can_retry_without_touching_the_install(self):
         from peach.desktop_installer import prepare_install_tools
         output, manifest, _, stage, error = self.lite_fixture()

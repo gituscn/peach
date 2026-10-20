@@ -17,6 +17,15 @@ if not __package__:
 from peach.user_agent import USER_AGENT
 
 
+def r2_release_notes(body: str, version: str, base: str, project_url: str) -> str:
+    from .package_windows_release import download_notes
+    text = body.split('\n## 下载选择\n', 1)[0].rstrip() + '\n'
+    text = text.replace('https://github.com/peach-mitao/peach/blob/master/',
+                        f'{project_url.rstrip("/")}/-/blob/v{version}/')
+    return text + download_notes(version, lite_installer=True, download_base=f'{base.rstrip("/")}/v{version}',
+                                 macos=True)
+
+
 def publish() -> None:
     tag = os.environ["CI_COMMIT_TAG"]
     sha = os.environ["CI_COMMIT_SHA"]
@@ -45,6 +54,8 @@ def publish() -> None:
             raise ValueError("R2 发布清单尚未就绪")
         links = [{"name": item["name"], "url": item["browser_download_url"], "link_type": "package",
                   "direct_asset_path": "/" + item["name"]} for item in release["assets"]]
+        notes.write_text(r2_release_notes(notes.read_text(encoding='utf-8'), tag[1:], base,
+                                         os.environ['CI_PROJECT_URL']), encoding='utf-8')
         command.extend(["--assets-links", json.dumps(links)])
     elif backend == "gitgud":
         from .release_r2 import inventory
