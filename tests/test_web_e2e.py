@@ -605,10 +605,12 @@ class MissingPrerequisiteTests(unittest.TestCase):
                 e2e_concurrency(invalid)
 
     def test_missing_prerequisites_skip_locally_and_fail_on_ci(self):
-        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
-            with self.assertRaisesRegex(AssertionError, "没有 npm"):
-                missing_prerequisite("没有 npm")
-        local = {key: value for key, value in os.environ.items() if key != "GITHUB_ACTIONS"}
+        for provider in ("GITHUB_ACTIONS", "GITLAB_CI"):
+            with self.subTest(provider=provider), mock.patch.dict(os.environ, {provider: "true"}, clear=True):
+                with self.assertRaisesRegex(AssertionError, "没有 npm"):
+                    missing_prerequisite("没有 npm")
+        local = {key: value for key, value in os.environ.items()
+                 if key not in {"GITHUB_ACTIONS", "GITLAB_CI"}}
         with mock.patch.dict(os.environ, local, clear=True):
             with self.assertRaises(unittest.SkipTest):
                 missing_prerequisite("没有 npm")

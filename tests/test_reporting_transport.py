@@ -96,7 +96,10 @@ class ReportingTransportTests(unittest.TestCase):
         self.assertEqual(reporting.snapshot(self.config)["delivery"], {})
 
     def test_identity_uses_only_finite_environment_and_verified_build_commit(self):
-        with mock.patch.object(reporting_identity.sys, "frozen", False, create=True), \
+        source_root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
+        (source_root / ".git").write_text("gitdir: ../shared.git/worktrees/fixture\n", encoding="utf-8")
+        with mock.patch("peach.settings_file.PROJECT_ROOT", source_root), \
+                mock.patch.object(reporting_identity.sys, "frozen", False, create=True), \
                 mock.patch.object(reporting_identity, "_source_commit", return_value="a" * 40), \
                 mock.patch.dict(os.environ, {"PEACH_REPORTING_ENVIRONMENT": "private-host"}):
             metadata = reporting_identity.event_metadata("errors")
