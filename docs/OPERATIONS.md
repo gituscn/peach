@@ -41,7 +41,7 @@ MACOSX_DEPLOYMENT_TARGET=11.0 uv sync --locked --extra build --extra macos
 
 打开匹配架构的 DMG，把 `Peach.app` 拖入 Applications，再打开应用完成首次设置。菜单栏提供打开页面、重启和退出入口；数据默认保存在 `~/Library/Application Support/Peach/peach-data`，可用 `PEACH_DATA_ROOT` 指定独立目录。
 
-安装镜像使用浅桃色背景，固定左侧 Peach、右侧 Applications 的拖放布局，隐藏工具栏与边栏，背景同时提供标准与 Retina 分辨率。许可证保留在应用的 `Contents/Resources/LICENSE`，安装窗口只显示两个入口。
+安装镜像使用 APFS 文件系统，保留已签名资源的 Unicode 文件名及应用扩展属性。浅桃色背景固定左侧 Peach、右侧 Applications 的拖放布局，隐藏工具栏与边栏，背景同时提供标准与 Retina 分辨率。许可证保留在应用的 `Contents/Resources/LICENSE`，安装窗口只显示两个入口。
 
 版本标签触发 Release 工作流，在 Apple Silicon 与 Intel 原生 runner 分别构建，再由干净 runner 下载并挂载 DMG，验证签名、架构和独立运行。两种 DMG 与 Windows 安装包全部通过后，才一同上传到 GitHub 预发布，统一生成 SHA-256 清单。手动运行工作流只验收候选制品，不创建 Release；推送普通提交不会触发安装包构建。发版检查见[测试与依赖](TESTING.md#每次发版检查)，打标签统一使用 `scripts/release_tag.py`。
 
@@ -54,6 +54,8 @@ GitLab 兼容平台使用 `.gitlab-ci.yml`。唯一版本入口支持 `--gitlab-
 Windows 原生 Runner 在深目录中检出项目时，需为 Git 启用 `core.longpaths=true`，供检出与清理阶段处理 npm 缓存。设置可限定到 Runner 的任务环境，通过 `GIT_CONFIG_COUNT` 与对应的 `GIT_CONFIG_KEY_<索引>`、`GIT_CONFIG_VALUE_<索引>` 条目传递；已有条目按索引追加。宿主系统的长路径开关与 Git 设置分别核对。
 
 版本标签须受保护。标签流水线重新核对提交与版本，构建固定来源的媒体工具、Windows 完整包与拆分包、macOS 双架构 DMG，并进行独立制品验收。只有全部成功后才创建 GitLab Release。`PEACH_DOWNLOAD_BACKEND` 默认 `gitgud`，通过 Generic Package Registry 保存制品；不把会过期的 job artifacts 当作永久下载地址。
+
+Linux 发布任务使用官方 uv Python 3.14 容器，并在获取制品工具前核对解释器版本；源码归档使用 `tarfile` 的 `data` 过滤器解压。CI 的 `.npm/` 与 `.uv-cache/` 属于生成缓存，不计入源码工作区变化。
 
 可选的 `r2` 后端使用独立 Standard 桶与 HTTPS 自定义域名。`PEACH_R2_ACCESS_KEY_ID`、`PEACH_R2_SECRET_ACCESS_KEY`、`PEACH_R2_ENDPOINT` 放入受保护且隐藏的 CI 变量，环境作用域为 `release`；`PEACH_R2_BUCKET` 和 `PEACH_R2_PUBLIC_BASE` 指定发布目标。S3 传输复用 rclone，版本文件禁止覆盖；每份文件必须从公开入口完整下载并核对大小及 SHA-256 后，才更新公开版本索引和 Release 链接。
 
