@@ -41,7 +41,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path, PureWindowsPath
 from filelock import FileLock
 
-from . import folder_rules, record_rehome, subtitles, wants
+from . import folder_rules, junk, record_rehome, subtitles, wants
 from .platform import is_windows_path, resolve_location, resolve_root
 from .processing_control import checkpoint
 from .fsutil import atomic_write_text
@@ -308,6 +308,7 @@ def ingest_path(
         connection.commit()
     finally:
         connection.close()
+    junk.isolate(db_path, asset_ids=[asset_id])
     return IngestResult(location, str(ledger_path), True, stat.st_size, tracks,
                         asset_id=asset_id, new=new, reattached=reattached, acquired=acquired)
 
@@ -332,12 +333,15 @@ class ScanResult:
     reattached: int = 0
     #: 本次让几条「想要」标了已入库。
     acquired: int = 0
+    junk_isolated: int = 0
+    junk_review: int = 0
 
     def summary(self) -> str:
         return (f"✓ {self.location}: {self.files:,} 文件 / "
                 f"{self.total_bytes / 1024 ** 4:.2f} TB / 耗时 {self.seconds:.0f}s；"
                 f"附属文件未登记 {self.sidecars:,} 个；清单中已消失 {self.gone:,} 个；"
-                f"字幕 {self.subtitles:,} 条（孤立 {self.orphan_subtitles:,} 条）")
+                f"字幕 {self.subtitles:,} 条（孤立 {self.orphan_subtitles:,} 条）；"
+                f"垃圾移入回收站 {self.junk_isolated:,} 个，待复核 {self.junk_review:,} 个")
 
 
 def _walk(top: Path, pending: list[str] | None = None, *, onerror=lambda error: None):
@@ -527,8 +531,10 @@ def _scan_location(
             (location, now)).fetchone()[0]
     finally:
         connection.close()
+    checked = junk.isolate(db_path, roots=[(location, root)])
     result = ScanResult(location, root, files, total, time.time() - started, gone,
-                        tracks, orphans, skipped, new_ids, reattached, acquired)
+                        tracks, orphans, skipped, new_ids, reattached, acquired,
+                        checked['isolated'], checked['review'])
     save_checkpoint({'result': asdict(result)})
     progress(files, total, force=True)
     report(result.summary())

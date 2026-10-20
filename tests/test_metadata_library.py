@@ -2804,7 +2804,7 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
         finish.assert_not_called()
         factory.assert_not_called()
         self.assertEqual([(step['id'], step['status']) for step in result['steps']],
-                         [('sources', 'complete'), ('media', 'complete')])
+                         [('sources', 'complete'), ('inspect', 'complete'), ('media', 'complete')])
 
     def test_missing_ffmpeg_is_retryable_and_collection_can_finish_its_work(self):
         self.resolver.ffmpeg.return_value = None
@@ -2858,6 +2858,48 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
         with self.database.read_connection() as connection:
             path = connection.execute('SELECT snapshot_path FROM asset WHERE id=1').fetchone()[0]
         self.assertTrue(Path(path).is_file())
+
+    def test_inspection_uses_measured_rows_and_removes_ads_before_preview_or_metadata(self):
+        events = []
+        with self.database.write_transaction() as connection:
+            connection.execute("UPDATE asset SET duration=NULL,code='ABW-358' WHERE id=1")
+            connection.execute("INSERT INTO asset(id,location,path,name,medium,size,duration,creator,code) "
+                "VALUES(5,'local',?,'附件.mp4','video',1048576,NULL,'bbsxv.xyz','ABC-123')",
+                (str(self.media / 'bbsxv.xyz-ABC-123' / '附件.mp4'),))
+        def probe(_ffprobe, path, _timeout):
+            events.append('probe')
+            return (10 if path.endswith('附件.mp4') else 1800), 1920, 1080, 'h264', 30, None
+        def previews(_config, rows, *_args, **_options):
+            events.append('preview')
+            self.assertEqual([(row['id'], row['duration']) for row in rows], [(1, 1800)])
+        def collect(*_args, **_options):
+            events.append('metadata')
+            return [], 0
+        self.resolver.ffprobe.return_value = SimpleNamespace(path=Path('test-ffprobe'))
+        with patch('peach.media_probe.probe_file', side_effect=probe), \
+                patch('peach.media_probe.resolve_case_insensitive', str), \
+                patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
+                patch('peach.library_processing._generate_previews', side_effect=previews), \
+                patch('peach.library_processing._RemoteSession.collect', side_effect=collect), \
+                patch('peach.library_processing._finish_collection', return_value={}):
+            result = self.run_processing(stage='collect', asset_ids=[1, 5])
+        self.assertEqual(events, ['probe', 'probe', 'preview', 'metadata'])
+        self.assertEqual((result['status'], result['junk_isolated']), ('complete', 1))
+        with self.database.read_connection() as connection:
+            self.assertEqual(connection.execute('SELECT disposal FROM asset WHERE id=5').fetchone()[0], 'trash')
+
+    def test_metadata_stage_inspects_known_evidence_without_reading_video(self):
+        with self.database.write_transaction() as connection:
+            connection.execute("UPDATE asset SET name='点击进入.mp4',size=1000 WHERE id=1")
+        with patch('peach.library_processing.probe_unmeasured') as probe, \
+                patch('peach.library_processing._generate_previews') as previews, \
+                patch('peach.library_processing._RemoteSession.collect') as collect, \
+                patch('peach.library_processing._finish_collection', return_value={}):
+            result = self.run_processing(stage='metadata', asset_ids=[1])
+        self.assertEqual((result['status'], result['junk_isolated']), ('complete', 1))
+        probe.assert_not_called()
+        previews.assert_not_called()
+        collect.assert_not_called()
 
     def test_failed_tiling_leaves_no_registered_or_partial_snapshot(self):
         import subprocess

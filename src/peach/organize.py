@@ -422,10 +422,13 @@ def apply_plan(connection: sqlite3.Connection, rows: Sequence[dict], *,
             if int(row['asset_id']) in completed:
                 continue
             old_path, new_path = str(row["current_path"]), str(row["target_path"])
-            current = connection.execute('SELECT path FROM asset WHERE id=?', (int(row['asset_id']),)).fetchone()
+            current = connection.execute('SELECT path,disposal FROM asset WHERE id=?', (int(row['asset_id']),)).fetchone()
             landed = (current is not None and current[0] == new_path
                       and translate_ledger_path(new_path).is_file() and not translate_ledger_path(old_path).exists())
-            outcome = 'ok' if landed else _move_one(connection, int(row["asset_id"]), old_path, new_path)
+            if current is None or current[1] is not None:
+                outcome = '资产已不在馆藏，未执行整理'
+            else:
+                outcome = 'ok' if landed else _move_one(connection, int(row["asset_id"]), old_path, new_path)
             if outcome == "ok":
                 entries.append({"asset_id": int(row["asset_id"]),
                                 "old_path": old_path, "new_path": new_path})

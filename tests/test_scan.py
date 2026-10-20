@@ -15,7 +15,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import closing, redirect_stdout
 from pathlib import Path, PureWindowsPath
 from unittest.mock import patch
 
@@ -72,6 +72,23 @@ class WindowsShapeTests(_ScanCase):
         # 读取侧：Windows 上账本路径就是本机路径，每一行都指向真实存在的文件。
         for path in rows:
             self.assertTrue(Path(path).is_file(), path)
+
+    def test_scan_isolates_shortcuts_without_removing_files_or_media_sidecars(self):
+        ad = self.media / '点击进入.url'
+        ad.write_bytes(b'link')
+        video = self.media / 'ABC-123.mp4'
+        video.write_bytes(b'video')
+        (self.media / 'ABC-123.nfo').write_text('<movie/>', encoding='utf-8')
+        kwargs = dict(declared_roots={'local': (str(self.media),)}, windows=True)
+        first, _ = self._scan(str(self.media), **kwargs)
+        second, _ = self._scan(str(self.media), **kwargs)
+        self.assertEqual((first.junk_isolated, second.junk_isolated), (1, 0))
+        self.assertTrue(ad.is_file())
+        with closing(sqlite3.connect(self.db)) as connection:
+            self.assertEqual(connection.execute('SELECT disposal,disposal_reason FROM asset WHERE path=?',
+                                               (str(ad),)).fetchone(), ('trash', 'junk'))
+            self.assertEqual(connection.execute('SELECT disposal FROM asset WHERE path=?',
+                                               (str(video),)).fetchone(), (None,))
 
     def test_scanned_video_is_visible_without_a_thumbnail_filter(self):
         from support.web import route_client

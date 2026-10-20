@@ -10,7 +10,7 @@ from contextlib import closing
 from pathlib import Path
 from unittest import mock
 
-from peach import web_batch
+from peach import junk, web_batch
 from peach.web_contract import (
     BUNDLE_DIR_ASSETS,
     CONTENT_BYTES,
@@ -174,6 +174,60 @@ class ResourceJunkQueueTests(unittest.TestCase):
         finally:
             connection.close()
 
+    def test_automatic_isolation_requires_a_scope_and_observes_source_and_directory_boundaries(self):
+        for aid, location, folder in ((1, 'local', 'media'), (2, 'local', 'media2'), (3, '115', 'media')):
+            self.add(aid, location, rf'R:\{folder}\点击进入.url', 'other')
+        with self.assertRaises(ValueError):
+            junk.isolate(self.db_path)
+        self.assertEqual(junk.isolate(self.db_path, asset_ids=[])['isolated'], 0)
+        self.assertEqual(junk.isolate(self.db_path, roots=[])['isolated'], 0)
+        checked = junk.isolate(self.db_path, roots=[('local', r'r:\MEDIA')])
+        self.assertEqual(checked['ids'], [1])
+        self.assertEqual(junk.isolate(self.db_path, roots=[('local', r'R:\media')])['isolated'], 0)
+        with self.contract.read_connection() as connection:
+            self.assertEqual([tuple(row) for row in connection.execute(
+                'SELECT id,disposal,disposal_reason FROM asset ORDER BY id')],
+                [(1, 'trash', 'junk'), (2, None, None), (3, None, None)])
+
+    def test_automatic_isolation_preserves_user_choices_records_subtitles_and_main_identity(self):
+        for aid in range(1, 8):
+            self.add(aid, 'local', rf'R:\media\{aid}\点击进入.url', 'other')
+        self.add(8, 'local', r'R:\media\123.com-ABC-123.mp4', 'video', 2000, 5)
+        with self.contract.database.write_transaction() as connection:
+            connection.execute("UPDATE asset SET feedback='like' WHERE id=1")
+            connection.execute('UPDATE asset SET play_count=1 WHERE id=2')
+            connection.execute("INSERT INTO watch_queue(profile_id,asset_id,added_at) VALUES('local-default',3,'now')")
+            connection.execute("INSERT INTO asset_subtitle(asset_id,location,path,name,format,pairing,first_seen,last_seen) "
+                               "VALUES(4,'local','R:\\media\\sub.srt','sub.srt','srt','exact','now','now')")
+        w_batch(self.contract, {'ids': [5], 'operation': 'dismiss-junk'})
+        checked = junk.isolate(self.contract.database, asset_ids=list(range(1, 9)), protected_ids=[6])
+        self.assertEqual(checked['ids'], [7])
+        w_batch(self.contract, {'ids': [7], 'operation': 'restore'})
+        w_batch(self.contract, {'ids': [7], 'operation': 'dismiss-junk'})
+        self.assertEqual(junk.isolate(self.db_path, asset_ids=[7])['isolated'], 0)
+
+    def test_isolation_rechecks_evidence_after_scoring(self):
+        self.add(1, 'local', r'R:\media\点击进入.url', 'other')
+        original = junk.scored_candidates
+        def score_then_change(*args, **options):
+            result = original(*args, **options)
+            with self.contract.database.write_transaction() as connection:
+                connection.execute("UPDATE asset SET name='notes.txt' WHERE id=1")
+            return result
+        with mock.patch.object(junk, 'scored_candidates', side_effect=score_then_change):
+            self.assertEqual(junk.isolate(self.db_path, asset_ids=[1])['isolated'], 0)
+
+    def test_unmeasured_and_failed_videos_await_review(self):
+        for aid, duration in enumerate((None, 0, -1), 1):
+            self.add(aid, 'local', rf'R:\media\{aid}\点击进入.mp4', 'video', 1000, duration)
+        result = junk.isolate(self.db_path, asset_ids=[1, 2, 3])
+        self.assertEqual((result['isolated'], result['review']), (0, 3))
+
+    def test_short_attachment_structure_stays_in_review_during_automatic_processing(self):
+        self.release_with_shorts(r'B:\发行物\正片标题')
+        checked = junk.isolate(self.db_path, roots=[('115', r'B:\发行物')])
+        self.assertEqual((checked['isolated'], checked['review']), (0, 3))
+
     def test_video_image_audio_archive_and_url_shortcut_are_all_judged(self):
         self.add(1, "115", r"B:\广告\tuu26.com.mp4", "video",
                  10 * 1024**2, 60)
@@ -218,7 +272,7 @@ class ResourceJunkQueueTests(unittest.TestCase):
             self.assertIn("游戏下载站推广视频", row["why"])
             self.assertGreaterEqual(row["score"], web_batch.JUNK_REVIEW_SCORE)
             self.assertLess(row["score"], web_batch.AUTO_TRASH_SCORE)
-        self.assertEqual(web_batch.automatic_junk_candidates(self.contract), [])
+        self.assertEqual(junk.isolate(self.db_path, asset_ids=list(candidates))['isolated'], 0)
 
     def release_with_shorts(self, base, first_id=300, names=None, **short_values):
         self.add(first_id, "115", base + "\\" + base.rsplit("\\", 1)[-1] + ".mp4",
@@ -236,7 +290,7 @@ class ResourceJunkQueueTests(unittest.TestCase):
         self.assertTrue(all("6 条极短小附件" in row["why"] for row in items))
         self.assertTrue(all(web_batch.JUNK_REVIEW_SCORE <= row["score"] < web_batch.AUTO_TRASH_SCORE
                             for row in items))
-        self.assertEqual(web_batch.automatic_junk_candidates(self.contract), [])
+        self.assertEqual(junk.isolate(self.db_path, asset_ids=[row['id'] for row in items])['isolated'], 0)
 
     def test_a_pair_of_shorts_and_standalone_animation_loops_stay_out(self):
         self.release_with_shorts(r"B:\发行物\正片标题", names=("附件甲", "附件乙"))
@@ -283,7 +337,7 @@ class ResourceJunkQueueTests(unittest.TestCase):
         items = q_ads(self.contract)["items"]
         self.assertEqual({row["id"] for row in items}, {601, 611, 621})
         self.assertTrue(all("3 个发行目录" in row["why"] for row in items))
-        self.assertEqual(web_batch.automatic_junk_candidates(self.contract), [])
+        self.assertEqual(junk.isolate(self.db_path, asset_ids=[row['id'] for row in items])['isolated'], 0)
 
     def test_cross_release_spread_requires_full_matching_measurements(self):
         for index in range(3):
@@ -308,7 +362,7 @@ class ResourceJunkQueueTests(unittest.TestCase):
         for asset_id, name in enumerate(names, 700):
             self.add(asset_id, "115", "B:\\发行物\\" + name, "video", 10 * 1024**2, 400)
         self.assertEqual(q_ads(self.contract)["items"], [])
-        self.assertEqual(web_batch.automatic_junk_candidates(self.contract), [])
+        self.assertEqual(junk.isolate(self.db_path, asset_ids=range(700, 704))['isolated'], 0)
 
     def test_numbered_source_watermarks_only_enter_review(self):
         for asset_id, name in enumerate(("【来源站example.com】1", "[example.com]84 (2)"), 710):
@@ -316,7 +370,7 @@ class ResourceJunkQueueTests(unittest.TestCase):
         items = q_ads(self.contract)["items"]
         self.assertEqual({row["id"] for row in items}, {710, 711})
         self.assertTrue(all(row["score"] < web_batch.AUTO_TRASH_SCORE for row in items))
-        self.assertEqual(web_batch.automatic_junk_candidates(self.contract), [])
+        self.assertEqual(junk.isolate(self.db_path, asset_ids=[row['id'] for row in items])['isolated'], 0)
 
     def test_non_video_trash_items_remain_visible_and_recoverable(self):
         self.add(10, "115", r"B:\番号\广告图.jpg", "image", disposal="trash")
@@ -515,8 +569,8 @@ class ResourceJunkQueueTests(unittest.TestCase):
         items = q_ads(self.contract, limit=200)['items']
         self.assertEqual([item['id'] for item in items], [211])
         self.assertIn('推广安装包', items[0]['why'])
-        self.assertEqual(web_batch._promo_name_reason('.rar', path, 128 * 1024), '')
-        self.assertEqual(web_batch._promo_name_reason('.rar', r'B:\MVP\n1025.rar', 4111), '')
+        self.assertEqual(junk._promo_name_reason('.rar', path, 128 * 1024), '')
+        self.assertEqual(junk._promo_name_reason('.rar', r'B:\MVP\n1025.rar', 4111), '')
 
     def test_promotional_page_navigation_images_with_inherited_release_code(self):
         base = r'B:\MVP\1pon-092415_001-fhd'
@@ -531,10 +585,10 @@ class ResourceJunkQueueTests(unittest.TestCase):
         items = q_ads(self.contract, limit=200)['items']
         self.assertEqual([item['id'] for item in items], [201])
         self.assertIn('导航图片', items[0]['why'])
-        self.assertEqual(web_batch._attachment_junk_reason('.gif', page + r'\1.gif', 974),
+        self.assertEqual(junk._attachment_junk_reason('.gif', page + r'\1.gif', 974),
                          '推广网页存档的横幅、标志或导航图片')
-        self.assertEqual(web_batch._attachment_junk_reason('.gif', page + r'\1.gif', 6000), '')
-        self.assertTrue(web_batch._attachment_junk_reason('.gif', page + r'\1000x90yunding.gif', 97843))
+        self.assertEqual(junk._attachment_junk_reason('.gif', page + r'\1.gif', 6000), '')
+        self.assertTrue(junk._attachment_junk_reason('.gif', page + r'\1000x90yunding.gif', 97843))
 
 
 if __name__ == "__main__":

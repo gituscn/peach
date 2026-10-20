@@ -12,7 +12,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-from . import organize
+from . import junk, organize
 from .migrations import sqlite_backup
 from .media_sources import SCANNABLE_LOCATIONS
 from .organize_templates import PLACEHOLDERS, TemplateError, example_path, validate_template
@@ -93,15 +93,20 @@ def _run_write(contract, job_id: str, work) -> dict:
     connection = sqlite3.connect(str(contract.db_path), timeout=30)
     connection.row_factory = sqlite3.Row
     try:
+        before, _ = verify_after_write(connection)
+        if before != 'ok':
+            raise RuntimeError(f'写入前 ledger 校验失败：integrity={before}')
+        baseline = {tuple(row) for row in connection.execute('PRAGMA foreign_key_check')}
         result = work(connection)
-        integrity, violations = verify_after_write(connection)
+        integrity, _ = verify_after_write(connection)
+        introduced = {tuple(row) for row in connection.execute('PRAGMA foreign_key_check')} - baseline
     finally:
         connection.close()
     contract.cache_bust()
-    if integrity != "ok" or violations:
+    if integrity != "ok" or introduced:
         raise RuntimeError(
-            f"写入后 ledger 校验失败：integrity={integrity} foreign_keys={violations}")
-    return {**result, "backup": str(backup)}
+            f"写入后 ledger 校验失败：integrity={integrity} new_foreign_keys={len(introduced)}")
+    return {**result, "backup": str(backup), 'existing_foreign_keys': len(baseline)}
 
 
 def w_organize_apply(contract, body) -> dict:
@@ -116,6 +121,9 @@ def w_organize_apply(contract, body) -> dict:
 
     def work(job_id: str) -> None:
         batch_stamp = (job.snapshot() or {}).get('batch_stamp') or f"{time.strftime('%Y%m%d-%H%M%S')}-{job_id}"
+        roots = [(location, path_scope)] if path_scope else [(location, root) for root in location_roots()[location]]
+        checked = junk.isolate(contract.database, roots=roots)
+        job.update(job_id, junk_isolated=checked['isolated'], junk_review=checked['review'])
         plan = (job.snapshot() or {}).get('plan')
         if plan is None:
             with contract.read_connection() as connection:

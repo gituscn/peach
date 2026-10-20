@@ -46,6 +46,8 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 Watch history, favorites and settings stay on your computer. Scanning leaves original files untouched; manual organization offers a preview and an undo for the last batch.
 
+Scanning, cloud downloads and media processing share junk checks. Attachments with sufficient evidence go to the recoverable trash; uncertain items await review. You can restore an item and mark it as “not junk”. See [junk files](docs/OPERATIONS.md#垃圾文件) for processing order and protections.
+
 Scanning, follow updates and new-release metadata collection save their progress and continue unfinished items after the app restarts. See [task recovery](docs/OPERATIONS.md#长时任务断点续跑) for recovery boundaries.
 
 Scanning and collection show video and recognizable JAV counts, with incremental checks for new folders. Traffic estimates use pending work, local caches, deduplicated release codes, and local samples of similar operations. Library settings read and save CloudDrive API and data proxies; traffic totals follow each linked folder's connection setting. Proxy protection limits automatic video reads. See [configuration](docs/OPERATIONS.md#配置页) for measurement coverage and estimation limits.
