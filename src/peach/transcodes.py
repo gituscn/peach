@@ -41,7 +41,13 @@ class _TranscodeAttempt:
 
 
 class TranscodeUnavailable(RuntimeError):
-    pass
+    """转码不可用；本机保留有界工具证据，远程仅投影错误码和类别。"""
+
+    def __init__(self, message='', *, diagnostics=None):
+        super().__init__(message)
+        from .error_reporting import scrub
+        self.diagnostics = scrub(diagnostics or {})
+        self.returncode = self.diagnostics.get('returncode')
 
 
 class TranscodeCancelled(TranscodeUnavailable):
@@ -153,6 +159,8 @@ class TranscodeService:
             temporary = target.with_name(f"{target.stem}.{uuid.uuid4().hex}.tmp.mp4")
             deadline = time.monotonic() + TRANSCODE_TIMEOUT_SECONDS
             last_detail = ""
+            last_diagnostics = {}
+            last_error = None
             completed = False
             try:
                 with self._slots:
@@ -175,6 +183,8 @@ class TranscodeService:
                             raise
                         except (OSError, TranscodeUnavailable) as exc:
                             last_detail = f"{attempt.name}: {exc}"
+                            last_diagnostics = getattr(exc, 'diagnostics', {})
+                            last_error = exc
                             if time.monotonic() >= deadline:
                                 break
                             continue
@@ -186,8 +196,12 @@ class TranscodeService:
                             break
                         detail = (stderr or b"").decode("utf-8", "replace")[-1000:]
                         last_detail = f"{attempt.name}: {detail or 'ffmpeg failed'}"
+                        last_diagnostics = {'reason': 'ffmpeg_error', 'returncode': returncode,
+                                            'stderr': detail, 'attempt': attempt.name}
+                        last_error = None
                 if not completed:
-                    raise TranscodeUnavailable(last_detail or "ffmpeg failed")
+                    raise TranscodeUnavailable(last_detail or "ffmpeg failed",
+                                               diagnostics=last_diagnostics) from last_error
             finally:
                 temporary.unlink(missing_ok=True)
 
@@ -372,8 +386,10 @@ class TranscodeService:
                         raise TranscodeCancelled(session)
                     if time.monotonic() >= deadline:
                         process.kill()
-                        process.communicate()
-                        raise TranscodeUnavailable(f"{label} timed out")
+                        _stdout, stderr = process.communicate()
+                        raise TranscodeUnavailable(f"{label} timed out", diagnostics={
+                            'reason': 'timeout', 'returncode': process.returncode,
+                            'stderr': (stderr or b'').decode('utf-8', 'replace')[-1000:]})
             self._raise_if_cancelled(session, registry)
             return (
                 process.returncode if process.returncode is not None else -1,

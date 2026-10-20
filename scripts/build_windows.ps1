@@ -128,7 +128,13 @@ if ($Standalone) {
         throw "cloudflared SHA-256 mismatch: expected $($CloudflaredManifest.sha256), got $CloudflaredHash"
     }
 }
-& $Python -m PyInstaller --noconfirm --clean @BuildMode --windowed --name Peach `
+$ResourceArguments = @()
+$ResourceEntries = & $Python -X utf8 (Join-Path $ProjectRoot 'src/peach/bundle_resources.py') --root $ProjectRoot
+if ($LASTEXITCODE -ne 0) { throw 'Runtime resource manifest is incomplete.' }
+foreach ($ResourceEntry in $ResourceEntries) {
+    $ResourceArguments += @('--add-data', $ResourceEntry)
+}
+& $Python -m PyInstaller --noconfirm --clean @BuildMode @ResourceArguments --windowed --name Peach `
     --distpath $BuildDestination --workpath $WorkPath --specpath $BuildPath `
     --paths (Join-Path $ProjectRoot 'src') --python-option 'X utf8' `
     --collect-all curl_cffi --collect-all resvg_py `
@@ -137,9 +143,6 @@ if ($Standalone) {
     --hidden-import uvicorn.protocols.http.auto --hidden-import uvicorn.protocols.websockets.auto `
     --hidden-import uvicorn.lifespan.on `
     --icon (Join-Path $ProjectRoot 'resources\peach.ico') `
-    --add-data "$(Join-Path $ProjectRoot 'web');web" `
-    --add-data "$(Join-Path $ProjectRoot 'migrations');migrations" `
-    --add-data "$(Join-Path $ProjectRoot 'resources');resources" `
     --add-data "${BuildInfoPath};." `
     --add-data "${SentryConfigPath};." `
     (Join-Path $ProjectRoot 'scripts\build_app_entry.py')
