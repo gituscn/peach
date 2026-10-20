@@ -29,7 +29,7 @@ from .taste_history import (
     write_manifest,
 )
 from .web_activity import DEFAULT_PROFILE_ID
-from .web_catalog import attach_avatar_availability, tag_is_not_a_performer_name
+from .web_catalog import attach_avatar_availability, tag_is_not_a_performer_name, tag_not_hidden
 from .media_sources import cost_for
 from .web_state import WebContract, path_version
 from .taste_browsers import browser_sources, configure_browser, enabled_history_sources, enabled_bookmark_sources
@@ -402,6 +402,7 @@ def q_stats(contract: WebContract):
             f"WHERE a.medium='video' AND {PRESENT_A} AND t.source IN ('name','r18','vision','vision-creator',"
             "'vision_creator','vision_creator_review') "
             "AND " + tag_is_not_a_performer_name("peach_normalize(t.tag)") + " "
+            "AND " + tag_not_hidden('t.asset_id', 'peach_normalize(t.tag)') + ' ' +
             "GROUP BY t.tag ORDER BY n DESC LIMIT 30")]
         tables = {row[0] for row in c.execute(
             "SELECT name FROM sqlite_schema WHERE type='table'"

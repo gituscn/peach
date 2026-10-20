@@ -44,7 +44,7 @@ BASELINE: dict[str, int] = {
     "src/peach/web_follow.py:q_follow": 35,
     "scripts/merge_duplicate_identities.py:collect": 50,
     "src/peach/web_review.py:_attach_review_asset_context": 46,
-    "src/peach/web_review.py:w_review_decision": 44,
+    "src/peach/web_review.py:w_review_decision": 43,
     "scripts/harvest_social_avatars.py:run": 45,
     "scripts/fetch_studio_avatar_candidates.py:main": 44,
     "src/peach/web_catalog.py:q_item": 44,

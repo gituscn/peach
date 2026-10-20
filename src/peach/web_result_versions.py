@@ -7,7 +7,7 @@ RESULT_TABLES = {
     'catalog': ('asset', 'asset_entity', 'asset_tag', 'asset_subtitle', 'entity', 'entity_alias',
                 'entity_link', 'entity_external_ref', 'entity_membership', 'performer_profile', 'asset_quality_goal',
                 'playlist', 'playlist_item'),
-    'follow': ('follow_item', 'follow_source', 'follow_author_alias'),
+    'follow': ('follow_item', 'follow_source', 'follow_author_alias', 'profile'),
     'discoveries': ('feed_source', 'feed_item', 'feed_discovery', 'feed_discovery_entity', 'watch_queue'),
     'review': ('review_decision', 'genre_decision'),
 }

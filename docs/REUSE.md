@@ -1,5 +1,15 @@
 # 复用清单
 
+## 标签身份与管理
+
+标签复用 `entities.merge_entity`、实体别名、兼容投影、SQLite 事务及在线备份。字符宽度归一使用 Python 标准库 `unicodedata.normalize('NFKC', ...)`；同义词和用户别名属于 Peach 的身份规则。当前树、标签改名脚本与 Git 历史提供了关系迁移能力，无需引入通用模糊匹配库；语义近似不足以自动合并。隔离用例覆盖重叠关系、来源证据、隐藏偏好、旧名入库、过期计划和备份。
+
+页面复用已安装的 React Aria 1.22.1、BoardUI Button/Input/Select、标签云和选择操作条。编辑字段沿用同步任务表单的 React portal 接法，外壳共用 `formModal` 与 `confirmModal`，按顺序打开。没有新增依赖。
+
+在线标签复用 `profiles.read_settings` 与 `profile.settings_json` 保存本机名称、来源词成员和隐藏状态；账本版本触发器负责缓存失效，无新增表。读取投影复用 `_follow_tag_index` 的发布组计数和来源类型，标签索引、关注卡片、详情、筛选项与旧名查询共用 `OnlineTagPolicy`，不改写来源 metadata。合并限制在相同来源类型；事务、影响范围预览、过期计划和备份复用标签管理端点。归类属于 Peach 的用户决定，不引入模糊匹配或外部同义词服务。
+
+在线标签收藏复用 `FavoriteButton`、`libraryShortcuts` 设置和既有读写端点，以 `scope=online` 与稳定来源词键区分本地实体；收藏快照经在线归类解析并去重。收藏面板沿用标签分类，以「在线标签」标明去处，链接打开 `/follow` 标签筛选；馆藏实体收藏快照继续供研究和实体标注使用。未新增依赖或存储表。
+
 ## 检查输入与源码文案
 
 测试差异复用 Git 文件快照、Python AST、标准库 TOML/JSON 解析器及现有 filelock。Python 注释和清单说明字段通过有效内容比较识别；真实依赖、执行模式和无法解析的输入保留完整验证。完整批次按测试文件保存结果，仅补齐受影响范围，不延长结果有效期。

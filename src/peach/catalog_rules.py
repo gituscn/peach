@@ -10,6 +10,7 @@ web 层——`repository`（数据层）取 `is_jav_code`，`taste_history` 取 
 from __future__ import annotations
 
 import re
+import unicodedata
 from pathlib import PureWindowsPath
 
 
@@ -152,6 +153,30 @@ RETIRED_TAGS = {
     "美爆乳": "巨乳",
     "美贫乳": "贫乳",
 }
+
+# 界面名称与来源写法指向同一标签身份。
+TAG_NAME_ALIASES = {
+    **RETIRED_TAGS,
+    '眼镜娘': '眼镜', '性感内衣': '情趣内衣', '口罩': '口罩遮脸',
+    '强制': '强制剧情', '骑乘位': '骑乘', '背后位': '后入',
+    '3P': '3P多人', '双洞齐下': '双洞齐插', '毒龙钻': '毒龙', 'AI解码': 'AI去码',
+}
+_TAG_ALIASES = {old.casefold(): new for old, new in TAG_NAME_ALIASES.items()}
+_TAG_SPELLINGS = {tag.casefold(): tag for tag in (
+    TECH_TAGS | ATTRIBUTE_TAGS | RELATIONSHIP_TAGS | ROLE_TAGS | APPEARANCE_TAGS | SCENE_TAGS | STORY_TAGS | POSITION_TAGS)}
+
+
+def clean_tag_name(name: str) -> str:
+    """统一标签中的字符宽度、零宽字符和连续空白。"""
+    value = unicodedata.normalize('NFKC', str(name))
+    return ' '.join(''.join(ch for ch in value if ch not in '\u200b\u200c\u200d\ufeff').split())
+
+
+def canonical_tag_name(name: str) -> str:
+    """标签输入按登记同义词与词表大小写归一。"""
+    value = clean_tag_name(name)
+    key = value.casefold()
+    return _TAG_ALIASES.get(key, _TAG_SPELLINGS.get(key, value))
 
 _CODE_STUDIO = re.compile(r"^[A-Z]{2,8}-\d{2,5}$")
 _CODE_AMATEUR = re.compile(r"^\d{3}[A-Z]{2,8}-\d{2,5}$")
@@ -385,7 +410,7 @@ _BONUS_PART = re.compile(r"(?:[-_ ](?:sp|gift)[-_ ]?(\d{1,2})?|[（(]特典[）)
 
 def current_tags(names) -> list[str]:
     """按现在的词表读一串标签：退役名换成规范名，撤掉的粗桶丢掉，去重保序。"""
-    return [tag for tag in dict.fromkeys(RETIRED_TAGS.get(name, name) for name in names)
+    return [tag for tag in dict.fromkeys(canonical_tag_name(name) for name in names)
             if tag not in DROPPED_TAGS]
 
 

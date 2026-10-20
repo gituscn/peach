@@ -77,6 +77,9 @@ export interface IndexPerson {
 }
 
 export interface IndexTag {
+  id?: string;
+  aliases?: string[];
+  hidden?: boolean;
   entity_id?: number;
   favorite?: boolean;
   k: string;

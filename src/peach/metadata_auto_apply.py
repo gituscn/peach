@@ -1029,6 +1029,8 @@ def metadata_auto_apply_candidate(connection, row: dict, *,
 def _approved_entity_name(value: object, kind: str) -> str:
     name = str(value or "").strip()
     cleaned = canonicalize_entity_name(kind, name)
+    if kind == 'tag' and name and cleaned and collapse_repeated_entity_name(name) == name:
+        return cleaned
     if kind not in {"creator", "performer"}:
         cleaned = collapse_repeated_entity_name(cleaned)
     if not name or not cleaned or cleaned != name:

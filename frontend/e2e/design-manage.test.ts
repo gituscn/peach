@@ -479,7 +479,7 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
       const page = opened.page;
       const spacing = await page.locator('#index [data-tag-chip]').first().evaluate((chip) => {
         // 名字那段文字按字符切开量：字的右缘到计数左缘，与末尾那个空格自己画出来的宽度相比。
-        const name = chip.firstChild!;
+        const name = chip.firstElementChild!.firstChild!;
         const end = name.textContent!.trimEnd().length;
         const box = (from: number, to: number) => {
           const part = document.createRange();

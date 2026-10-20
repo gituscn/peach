@@ -1,0 +1,253 @@
+"""标签身份归一、合并与隐藏的事务回归。"""
+import json
+import sqlite3
+import runpy
+import tempfile
+import unittest
+from contextlib import closing
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
+
+from support.ledger import fresh_ledger
+from peach.catalog_rules import current_tags
+from peach.entities import upsert_asset_entity
+from peach.repository import LedgerDatabase
+from peach.tag_management import apply_plan, duplicate_groups, preview, tag_rows
+from peach.web_catalog import con_tags, tag_not_hidden
+from peach.web_tags import w_tag_management
+from peach import online_tag_management, web_follow, web_library_shortcuts
+from peach.follow_sources import FollowCandidate, SourceFetch
+from peach.follow_store import FollowStore
+from peach.web_contract import WebContract
+from peach.library_favorites import favorite_entities
+
+
+class TagManagementTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.db = fresh_ledger(Path(self.tmp.name).resolve())
+        self.database = LedgerDatabase(self.db)
+        self.c = self.database.connect(write=True)
+        self.addCleanup(self.c.close)
+        self.c.executemany("INSERT INTO asset(id,location,path,name,medium) VALUES(?,'local',?,?,'video')",
+                           [(i, f'R:\\demo\\{i}.mp4', f'{i}.mp4') for i in range(1, 5)])
+        self.c.commit()
+
+    def tag(self, name, assets=(1,), source='web-user'):
+        entity_id = None
+        for aid in assets:
+            self.c.execute('INSERT OR IGNORE INTO asset_tag(asset_id,tag,confidence,source) VALUES(?,?,1,?)', (aid, name, source))
+            entity_id = upsert_asset_entity(self.c, kind='tag', name=name, asset_id=aid, role='tag', source=source)
+        return entity_id
+
+    def execute(self, operation, ids, **fields):
+        body = dict(operation=operation, ids=ids, **fields)
+        plan = preview(self.c, body)
+        return apply_plan(self.c, dict(body, token=plan['token']))
+
+    def test_display_spellings_and_width_share_one_identity(self):
+        self.assertEqual(current_tags(['眼镜娘', '眼镜', '３Ｐ', '3P多人', 'ＶＲ', 'vr']), ['眼镜', '3P多人', 'VR'])
+        first = self.tag('眼镜')
+        self.assertEqual(self.tag('眼镜娘', (2,)), first)
+        self.assertEqual([row[0] for row in self.c.execute('SELECT DISTINCT tag FROM asset_tag')], ['眼镜'])
+
+    def test_renamed_tag_accepts_old_names_and_keeps_hidden_decision(self):
+        entity_id = self.tag('自定义标签')
+        self.execute('rename', [entity_id], name='我的标签')
+        self.execute('hide', [entity_id])
+        self.assertEqual(self.tag('自定义标签', (2,), source='javinizer:javdb:tag'), entity_id)
+        row = self.c.execute('SELECT canonical_name,metadata_json FROM entity WHERE id=?', (entity_id,)).fetchone()
+        self.assertEqual(row[0], '我的标签')
+        self.assertEqual(json.loads(row[1])['user_tag_hidden'], 1)
+        self.assertEqual([row[0] for row in self.c.execute('SELECT DISTINCT tag FROM asset_tag')], ['我的标签'])
+
+    def test_merge_keeps_source_assertions_preferences_and_genre_mapping(self):
+        first = self.tag('甲', (1, 2), source='javinizer:javdb:tag')
+        second = self.tag('乙', (1, 3), source='filename')
+        self.c.execute("INSERT INTO asset_tag_preference VALUES('local-default',2,'甲',1,'now')")
+        self.c.execute("INSERT INTO genre_decision VALUES('source','source','甲','now')")
+        body = dict(operation='merge', ids=[first, second], target_id=second)
+        plan = preview(self.c, body)
+        self.assertEqual((plan['assets'], plan['overlap']), (3, 1))
+        apply_plan(self.c, dict(body, token=plan['token']))
+        self.assertEqual(self.c.execute('SELECT count(*) FROM entity').fetchone()[0], 1)
+        self.assertEqual(self.c.execute('SELECT count(DISTINCT asset_id) FROM asset_entity WHERE entity_id=?', (second,)).fetchone()[0], 3)
+        self.assertEqual(self.c.execute('SELECT normalized_tag FROM asset_tag_preference').fetchone()[0], '乙')
+        self.assertEqual(self.c.execute('SELECT peach_tag FROM genre_decision').fetchone()[0], '乙')
+        self.assertEqual(self.c.execute('SELECT source FROM asset_tag WHERE asset_id=1').fetchone()[0], 'javinizer:javdb:tag')
+        self.assertEqual(self.tag('甲', (4,)), second)
+        self.assertEqual(list(self.c.execute('PRAGMA foreign_key_check')), [])
+
+    def test_rename_conflict_requires_explicit_merge(self):
+        first = self.tag('甲')
+        self.tag('乙')
+        with self.assertRaisesRegex(ValueError, '请使用合并'):
+            preview(self.c, dict(operation='rename', ids=[first], name='乙'))
+
+    def test_stale_plan_does_not_apply(self):
+        entity_id = self.tag('甲')
+        body = dict(operation='rename', ids=[entity_id], name='乙')
+        plan = preview(self.c, body)
+        self.tag('甲', (2,))
+        with self.assertRaisesRegex(ValueError, '重新预览'):
+            apply_plan(self.c, dict(body, token=plan['token']))
+        self.assertEqual(self.c.execute('SELECT canonical_name FROM entity').fetchone()[0], '甲')
+
+    def test_hidden_tag_can_be_restored_for_all_assets(self):
+        entity_id = self.tag('甲', (1, 2))
+        self.execute('hide', [entity_id])
+        sql = 'SELECT ae.asset_id FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id WHERE ' + tag_not_hidden('ae.asset_id', 'e.normalized_name')
+        self.assertEqual(list(self.c.execute(sql)), [])
+        self.execute('restore', [entity_id])
+        self.assertEqual(len(list(self.c.execute(sql))), 2)
+
+    def test_raw_source_spelling_obeys_hidden_tag_and_keeps_its_evidence(self):
+        entity_id = self.tag('眼镜娘', source='pixiv_tag')
+        self.execute('hide', [entity_id])
+        self.c.commit()
+        contract = SimpleNamespace(read_connection=self.database.read_connection)
+        self.assertEqual(con_tags(contract, [1], '?'), [])
+        self.assertEqual(self.c.execute('SELECT tag,source FROM asset_tag').fetchone()[:], ('眼镜娘', 'pixiv_tag'))
+        self.execute('restore', [entity_id])
+        self.c.commit()
+        self.assertEqual(len(con_tags(contract, [1], '?')), 1)
+
+    def test_repair_unifies_registered_spellings_and_is_idempotent(self):
+        first = self.tag('眼镜')
+        self.c.execute("INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at) VALUES('tag','眼镜娘','眼镜娘','now','now')")
+        second = self.c.execute('SELECT last_insert_rowid()').fetchone()[0]
+        self.c.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source) VALUES(2,?,'tag','legacy')", (second,))
+        self.c.execute("INSERT INTO asset_tag VALUES(2,'眼镜娘',1,'legacy')")
+        self.assertEqual(len(duplicate_groups(tag_rows(self.c))), 1)
+        self.execute('repair', [])
+        self.assertEqual([row['entity_id'] for row in tag_rows(self.c)], [first])
+        self.assertEqual(duplicate_groups(tag_rows(self.c)), [])
+        self.execute('repair', [])
+
+    def test_http_write_creates_a_sqlite_backup_and_commits(self):
+        entity_id = self.tag('甲')
+        body = dict(operation='rename', ids=[entity_id], name='乙')
+        body['token'] = preview(self.c, body)['token']
+        self.c.commit()
+        contract = SimpleNamespace(db_path=self.db, read_connection=self.database.read_connection,
+            write_transaction=self.database.write_transaction, cache_bust=Mock())
+        self.assertTrue(w_tag_management(contract, body)['ok'])
+        backups = list(self.db.parent.glob('ledger.pre-tag-management-*.db'))
+        self.assertEqual(len(backups), 1)
+        with closing(sqlite3.connect(backups[0])) as backup:
+            self.assertEqual(backup.execute('SELECT canonical_name FROM entity').fetchone()[0], '甲')
+        self.assertEqual(self.c.execute('SELECT canonical_name FROM entity').fetchone()[0], '乙')
+
+    def test_maintenance_script_previews_and_requires_backup_for_apply(self):
+        self.tag('眼镜')
+        self.c.execute("INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at) VALUES('tag','眼镜娘','眼镜娘','now','now')")
+        self.c.commit()
+        script = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'scripts' / 'repair_duplicate_tags.py'))
+        report = self.db.parent / 'review.csv'
+        parser = script['build_parser']()
+        options = ['--db', str(self.db), '--review-csv', str(report)]
+        self.assertEqual(script['run'](parser.parse_args(options)), 0)
+        self.assertIn('眼镜娘', report.read_text(encoding='utf-8'))
+        self.assertEqual(len(tag_rows(self.c)), 2)
+        with self.assertRaises(SystemExit):
+            script['run'](parser.parse_args([*options, '--apply']))
+        backup = self.db.parent / 'before.db'
+        self.assertEqual(script['run'](parser.parse_args([*options, '--apply', '--backup', str(backup)])), 0)
+        self.assertTrue(backup.exists())
+        self.assertEqual(len(tag_rows(self.c)), 1)
+
+
+class OnlineTagManagementTests(unittest.TestCase):
+    setUp = TagManagementTests.setUp
+
+    def seed(self):
+        root = Path(self.tmp.name).resolve()
+        self.contract = WebContract(self.db, follow_sources_root=root / 'sources', follow_secrets_root=root / 'secrets',
+            follow_shared_root=root / 'shared', candidate_root=root / 'generated', follow_state_root=root / 'state')
+        self.addCleanup(self.contract.stop_background_jobs)
+        self.contract.followups.stop()
+        with self.database.write_transaction() as connection:
+            store = FollowStore(lambda: connection)
+            source = store.register(provider='rule34video', ref='preview', label='预览', url='https://example.invalid/preview')
+            self.record(store, source, 1, ['outdoors', 'landscape', 'preview_artist'])
+            self.record(store, source, 2, ['outdoors'])
+            self.record(store, source, 3, ['landscape'])
+        return source
+
+    def record(self, store, source, index, tags):
+        candidate = FollowCandidate(provider='rule34video', external_id=str(index), title=f'作品 {index}', title_is_name=False,
+            extra={'tags': tags, 'tag_types': {name: 'artist' if name == 'preview_artist' else 'general' for name in tags}})
+        store.record(source, SourceFetch(provider='rule34video', ref='preview', request_url='https://example.invalid/preview',
+                                        semantics='work', candidates=(candidate,)))
+
+    def execute(self, operation, ids, **fields):
+        command = dict(scope='online', operation=operation, ids=ids, **fields)
+        with self.database.read_connection() as connection:
+            command['token'] = online_tag_management.preview(connection, command, web_follow.online_tag_inventory(connection))['token']
+        return w_tag_management(self.contract, command)
+
+    def test_rename_merge_and_source_updates_share_one_online_identity(self):
+        source = self.seed()
+        originals = list(map(tuple, self.c.execute('SELECT id,metadata_json FROM follow_item ORDER BY id')))
+        self.execute('rename', ['outdoors'], name='户外')
+        self.execute('merge', ['outdoors', 'landscape'], target_id='outdoors')
+        rows = web_follow.q_follow_tags(self.contract, {'types': 'all'})['items']
+        tag = next(row for row in rows if row['id'] == 'outdoors')
+        self.assertEqual((tag['k'], tag['n'], tag['cat']), ('户外', 3, 'general'))
+        self.assertIn('landscape', tag['aliases'])
+        self.assertEqual(list(map(tuple, self.c.execute('SELECT id,metadata_json FROM follow_item ORDER BY id'))), originals)
+        for name in ['户外', 'landscape', 'outdoors']:
+            feed = web_follow.q_follow(self.contract, {'tag': name})
+            self.assertEqual(len(feed['groups']), 3)
+            self.assertEqual([name for name, _count in feed['facets']['tags']], ['户外'])
+            self.assertTrue(all(group['primary']['tags'] == ['户外'] for group in feed['groups']))
+        with self.database.write_transaction() as connection:
+            self.record(FollowStore(lambda: connection), source, 4, ['landscape'])
+        self.assertEqual(next(row for row in web_follow.q_follow_tags(self.contract, {'types': 'all'})['items']
+                              if row['id'] == 'outdoors')['n'], 4)
+
+    def test_hidden_online_tags_restore_across_index_cards_and_facets(self):
+        self.seed()
+        self.execute('hide', ['outdoors'])
+        self.assertNotIn('outdoors', [row['k'] for row in web_follow.q_follow_tags(self.contract, {'types': 'all'})['items']])
+        feed = web_follow.q_follow(self.contract, {})
+        self.assertNotIn('outdoors', dict(feed['facets']['tags']))
+        self.assertTrue(all('outdoors' not in group['primary']['detail_tags'] for group in feed['groups']))
+        self.assertTrue(any('outdoors' in group['primary']['source_tags'] for group in feed['groups']))
+        self.execute('restore', ['outdoors'])
+        self.assertIn('outdoors', [row['k'] for row in web_follow.q_follow_tags(self.contract, {'types': 'all'})['items']])
+
+    def test_online_conflicts_types_and_stale_plans_are_rejected(self):
+        self.seed()
+        with self.assertRaisesRegex(ValueError, '相同来源类型'):
+            online_tag_management.preview(self.c, dict(operation='merge', ids=['outdoors', 'preview_artist'], target_id='outdoors'), web_follow.online_tag_inventory(self.c))
+        with self.assertRaisesRegex(ValueError, '合并标签'):
+            online_tag_management.preview(self.c, dict(operation='rename', ids=['outdoors'], name='landscape'), web_follow.online_tag_inventory(self.c))
+        command = dict(scope='online', operation='rename', ids=['outdoors'], name='户外')
+        command['token'] = online_tag_management.preview(self.c, command, web_follow.online_tag_inventory(self.c))['token']
+        self.execute('hide', ['outdoors'])
+        with self.assertRaisesRegex(ValueError, '重新预览'):
+            w_tag_management(self.contract, command)
+
+    def test_online_favorites_follow_rename_merge_and_keep_local_tags_independent(self):
+        self.seed()
+        entity_id = upsert_asset_entity(self.c, kind='tag', name='户外', asset_id=1, role='tag', source='web-user')
+        self.c.commit()
+        web_library_shortcuts.w_library_shortcuts(self.contract, dict(action='favorite', entity_id=entity_id, on=True))
+        for tag in ['outdoors', 'landscape']:
+            web_library_shortcuts.w_library_shortcuts(self.contract,
+                dict(action='favorite', scope='online', kind='tag', tag_id=tag, name='客户端名称', on=True))
+        self.execute('rename', ['outdoors'], name='户外')
+        self.execute('merge', ['outdoors', 'landscape'], target_id='outdoors')
+        favorites = web_library_shortcuts.q_library_shortcuts(self.contract)['favorites']
+        self.assertEqual(len(favorites), 2)
+        self.assertEqual([row['name'] for row in favorites], ['户外', '户外'])
+        self.assertEqual(len(favorite_entities(self.c)), 1)
+        online = next(row for row in favorites if row.get('scope') == 'online')
+        self.assertEqual(online['tag_id'], 'outdoors')
+        index = web_follow.q_follow_tags(self.contract, {'types': 'all'})['items']
+        self.assertTrue(next(row for row in index if row['id'] == 'outdoors')['favorite'])
+        web_library_shortcuts.w_library_shortcuts(self.contract, dict(action='favorite', **online, on=False))
+        self.assertEqual(len(web_library_shortcuts.q_library_shortcuts(self.contract)['favorites']), 1)

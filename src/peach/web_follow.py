@@ -49,6 +49,7 @@ from .follow_store import (
 from .entities import canonicalize_entity_name, normalize_entity_name, prefer_entity_name
 from .taste_history import read_creator_candidates
 from .web_state import path_version
+from .online_tag_management import OnlineTagPolicy, TYPE_RANK, tag_key
 
 
 #: 界面上给每个来源的中文短名。没登记的 provider 直接显示原名。
@@ -1000,9 +1001,11 @@ def _excluded_item(item) -> bool:
             and not _f95_has_resource(item.media_url, item.metadata))
 
 
-def _item_payload(item, credential_providers: frozenset[str] = frozenset()) -> dict:
+def _item_payload(item, credential_providers: frozenset[str] = frozenset(), tag_policy=None) -> dict:
     tags = _item_tags(item)
     detail_tags = _item_all_tags(item)
+    policy = tag_policy or OnlineTagPolicy()
+    tag_types = policy.types(_item_tag_types(item, detail_tags))
     media_kind = _media_kind(item)
     media_items, hidden_media = _media_projection(item)
     if media_items:
@@ -1075,20 +1078,21 @@ def _item_payload(item, credential_providers: frozenset[str] = frozenset()) -> d
                          for media in hidden_media],
         # 只投影连接器已验证过的文件页域名；原始媒体 URL 仍不进入 feed。
         "resource_urls": safe_resource_urls,
-        "tags": tags,
-        "detail_tags": detail_tags,
-        "tag_types": _item_tag_types(item, detail_tags),
+        "tags": policy.project(tags),
+        "detail_tags": policy.project(detail_tags),
+        "tag_types": tag_types,
+        "source_tags": detail_tags,
     }
 
 
 def _group_payload(group: ReleaseGroup,
-                   credential_providers: frozenset[str] = frozenset()) -> dict:
+                   credential_providers: frozenset[str] = frozenset(), tag_policy=None) -> dict:
     return {
         "release_key": group.release_key,
-        "primary": _item_payload(group.primary, credential_providers),
-        "variants": [_item_payload(item, credential_providers)
+        "primary": _item_payload(group.primary, credential_providers, tag_policy),
+        "variants": [_item_payload(item, credential_providers, tag_policy)
                      for item in group.variants],
-        "duplicates": [_item_payload(item, credential_providers)
+        "duplicates": [_item_payload(item, credential_providers, tag_policy)
                        for item in group.duplicates],
         "providers": list(group.providers),
         "has_wip": group.has_wip,
@@ -1289,7 +1293,7 @@ def _legacy_history_end(row) -> bool:
                                 str(row["last_error"] or ""))
 
 
-def _follow_facets(store, items, by_source, alias_map, icon_root=None) -> dict:
+def _follow_facets(store, items, by_source, alias_map, icon_root=None, tag_policy=None) -> dict:
     """筛选条上能选什么。
 
     必须按全库算而不是按筛后结果——否则选中一个作者之后，作者栏里就只剩他自己，
@@ -1307,7 +1311,7 @@ def _follow_facets(store, items, by_source, alias_map, icon_root=None) -> dict:
             if key:
                 authors.add(key)
             providers.add(str(row["provider"] or ""))
-        for tag in _item_tags(group.primary):
+        for tag in (tag_policy or OnlineTagPolicy()).project(_item_tags(group.primary)):
             tags[tag] = tags.get(tag, 0) + 1
         # 末位是「这个题材挑得出代表图吗」。页面据它决定出不出 `<img>`：无条件出图、
         # 靠 `/work-icon` 回 404 换回字母的话，那条响应不可缓存，每次重绘再打一轮。
@@ -1333,7 +1337,7 @@ def _follow_facets(store, items, by_source, alias_map, icon_root=None) -> dict:
     }
 
 
-def _author_facets(contract, store, everything, by_source, alias_map, args, scope) -> dict:
+def _author_facets(contract, store, everything, by_source, alias_map, args, scope, tag_policy=None) -> dict:
     """只按一位作者算的筛选项，创作者资料页的在线视图读它（ADR-0096）。
 
     `facets` 按全库算，摆到一位创作者的资料页上就混进了别人的标签与来源。这一份只看这位
@@ -1348,14 +1352,14 @@ def _author_facets(contract, store, everything, by_source, alias_map, args, scop
     return contract.cached_until_changed(
         f"follow-author-facets:{source_id}:{authors[0]}",
         lambda: _follow_facets(store, tuple(item for item in everything if matches(item)),
-                               by_source, alias_map))
+                               by_source, alias_map, tag_policy=tag_policy))
 
 
-def _follow_tag_index(store, items) -> list[dict]:
+def _follow_tag_index(store, items, tag_policy=None, *, evidence=False) -> list[dict]:
     """按发布组汇总全部已分类来源标签，供在线标签索引使用。"""
     rows: dict[str, dict] = {}
-    type_rank = {"general": 0, "metadata": 1, "copyright": 2,
-                 "character": 3, "artist": 4}
+    type_rank = TYPE_RANK
+    policy = tag_policy or OnlineTagPolicy()
     for group in store.group(items):
         grouped: dict[str, tuple[str, str]] = {}
         for item in (group.primary, *group.variants, *group.duplicates):
@@ -1363,17 +1367,37 @@ def _follow_tag_index(store, items) -> list[dict]:
                 tag_type = _recorded_tag_type(item, tag)
                 if not tag_type:
                     continue
-                key = tag.casefold()
+                key, name, hidden = policy.identity(tag)
+                row = rows.setdefault(key, {"id": key, "k": name, "n": 0, "cat": tag_type,
+                                           'hidden': hidden, 'aliases': set(), 'members': set(), '_releases': set()})
+                row['members'].add(tag_key(tag))
+                row['aliases'].add(tag)
+                saved = policy.groups.get(key, {})
+                row['aliases'].update(saved.get('aliases', []))
+                row['members'].update(saved.get('members', []))
                 previous = grouped.get(key)
                 if (previous is None
                         or type_rank[tag_type] > type_rank[previous[1]]):
                     grouped[key] = (tag, tag_type)
         for key, (tag, tag_type) in grouped.items():
-            row = rows.setdefault(key, {"k": tag, "n": 0, "cat": tag_type})
+            row = rows[key]
             row["n"] += 1
+            row['_releases'].add(group.release_key)
             if type_rank[tag_type] > type_rank[row["cat"]]:
                 row["cat"] = tag_type
-    return sorted(rows.values(), key=lambda row: (-row["n"], row["k"]))
+    return sorted(({key: sorted(value) if isinstance(value, set) else value for key, value in row.items()
+                    if evidence or key != '_releases'} for row in rows.values()), key=lambda row: (-row['n'], row['k']))
+
+
+def online_tag_inventory(connection):
+    """在线管理与收藏共用的完整标签词表，包含隐藏项与发布组证据。"""
+    from .library_favorites import online_tag_ids
+    store = FollowStore(lambda: connection)
+    enabled = {row['id'] for row in store.sources() if row['enabled']}
+    items = tuple(item for item in store.items(limit=_ALL_ITEMS) if item.source_id in enabled and not _excluded_item(item))
+    favorites = online_tag_ids(connection)
+    return [{**row, 'favorite': row['id'] in favorites}
+            for row in _follow_tag_index(store, items, OnlineTagPolicy(connection), evidence=True)]
 
 
 def q_follow_tags(contract, args) -> dict:
@@ -1401,6 +1425,7 @@ def q_follow_tags(contract, args) -> dict:
         offset = 0
     with contract.database.read_connection() as connection:
         store = _store(contract, connection)
+        tag_policy = OnlineTagPolicy(connection)
         source_rows = store.sources()
         alias_map, _aliases = store.author_aliases()
         enabled = {int(row["id"]) for row in source_rows if row["enabled"]}
@@ -1408,16 +1433,20 @@ def q_follow_tags(contract, args) -> dict:
         items = tuple(item for item in store.items(limit=_ALL_ITEMS)
                       if item.source_id in enabled and not _excluded_item(item))
         facets = _follow_facets(store, items, by_source, alias_map,
-                                work_icon_root(contract))
-        rows = (_follow_tag_index(store, items) if include_types else
+                                work_icon_root(contract), tag_policy)
+        rows = ([row for row in _follow_tag_index(store, items, tag_policy) if not row['hidden']] if include_types else
                 [{"k": tag, "n": count, "cat": "general"}
                  for tag, count in facets["tags"]])
+        if include_types:
+            from .library_favorites import online_tag_ids
+            favorites = online_tag_ids(connection)
+            rows = [{**row, 'favorite': row['id'] in favorites} for row in rows]
     categories: dict[str, int] = {}
     for row in rows:
         categories[row["cat"]] = categories.get(row["cat"], 0) + 1
     rows = [row for row in rows
             if (not wanted_type or row["cat"] == wanted_type)
-            and (not query or query in row["k"].casefold())]
+            and (not query or any(query in word.casefold() for word in [row['k'], *row.get('aliases', [])]))]
     return {"kind": "tags", "scope": "online",
             "items": rows[offset:offset + limit],
             "has_more": offset + limit < len(rows),
@@ -1713,7 +1742,7 @@ def _duration_arg(raw) -> float:
     return value if value > 0 else 0.0
 
 
-def _follow_matcher(args, by_source, alias_map):
+def _follow_matcher(args, by_source, alias_map, tag_policy=None):
     """关注页筛选条件落到一条条目上：给一条，回它在不在这次筛选里。
 
     作者、来源、标签、题材都接受逗号分隔的多个值。作者、来源在同一维度内是「任一」：
@@ -1722,7 +1751,8 @@ def _follow_matcher(args, by_source, alias_map):
     """
     authors = frozenset(_csv_values(args.get("author")))
     providers = frozenset(_csv_values(args.get("provider")))
-    wanted_tags = _csv_values(args.get("tag"))
+    policy = tag_policy or OnlineTagPolicy()
+    wanted_tags = [policy.query_name(tag) for tag in _csv_values(args.get("tag"))]
     # 题材跟作者、来源一样是「任一」：两部作品同时成立的条目几乎没有，取交集等于
     # 点第二枚就清空列表。
     wanted_works = frozenset(_work_root(value) for value in _csv_values(args.get("work")))
@@ -1743,8 +1773,8 @@ def _follow_matcher(args, by_source, alias_map):
             # 在线标签索引包含 artist/character/copyright/metadata；点进去也必须
             # 能筛到对应更新，而不是只允许卡片上那份 general 投影。
             # 多个标签取交集：并集会把筛选变成越点越多，跟用户的意图正好相反。
-            tags = set(_item_all_tags(item))
-            if not all(tag in tags for tag in wanted_tags):
+            tags = {tag_key(tag) for tag in policy.project(_item_all_tags(item), include_hidden=True)}
+            if not all(tag_key(tag) in tags for tag in wanted_tags):
                 return False
         if wanted_works and not any(_work_root(tag) in wanted_works
                                     for tag in _item_works(item)):
@@ -1787,6 +1817,7 @@ def q_follow(contract, args) -> dict:
         store = _store(contract, connection)
         source_rows = store.sources()
         alias_map, author_aliases = store.author_aliases()
+        tag_policy = OnlineTagPolicy(connection)
         sources = [_source_payload(row, alias_map) for row in source_rows]
         alias_suggestions = _follow_alias_suggestions(source_rows, alias_map)
         enabled_source_ids = {int(row["id"]) for row in source_rows if row["enabled"]}
@@ -1795,7 +1826,7 @@ def q_follow(contract, args) -> dict:
         # 推导等于把同一个语义实现两遍，迟早漂移。所以整库取回来在 Python 里筛——
         # 实测 3054 条连 metadata 解析一起 15ms，不值得为它另设一套索引。
         by_source = {int(row["id"]): row for row in source_rows}
-        _matches = _follow_matcher(args, by_source, alias_map)
+        _matches = _follow_matcher(args, by_source, alias_map, tag_policy)
 
         # 全部条目和筛选项只随账本与来源参数变，与筛选、排序、分页无关，按账本版本号
         # 缓存：一次请求省下解析上万条 metadata 与整库分组的好几秒。
@@ -1811,17 +1842,17 @@ def q_follow(contract, args) -> dict:
             order=(sort, direction, seed), window=(offset, limit))
         # 翻卡与封面计数要知道组里哪几张是同一个画面，判据与缓存见 `follow_faces`。
         faces = getattr(contract, "follow_faces", None)
-        groups = [annotate_group(_group_payload(group, credential_providers), faces,
+        groups = [annotate_group(_group_payload(group, credential_providers, tag_policy), faces,
                                  _content_hashes(group))
                   for group in ranked]
         # 题材圆标的有无与取景读题材头像目录，目录版本进键。
         icon_root = work_icon_root(contract)
         facets = {} if summary else contract.cached_until_changed(
             f"follow-facets:{source_id}",
-            lambda: _follow_facets(store, everything, by_source, alias_map, icon_root),
+            lambda: _follow_facets(store, everything, by_source, alias_map, icon_root, tag_policy),
             path_version(icon_root))
         author_facets = _author_facets(contract, store, everything, by_source, alias_map, args,
-                                       (source_id, summary))
+                                       (source_id, summary), tag_policy)
         # counts 与列表同源，两边都从 `counted` 出发：筛选怎么变，数字就怎么变，
         # 扣减逻辑也只写一份。写成一句全库 SQL 再逐条减掉被隐藏的 rule34video 和
         # 无资源的 f95zone 的话，同一套排除规则要维护两份，而且它不看作者、来源和

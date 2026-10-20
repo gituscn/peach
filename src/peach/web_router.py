@@ -21,6 +21,7 @@ from .web_activity import (
     w_watch_later,
 )
 from .web_batch import q_ads, q_duplicates, w_batch, w_empty_trash
+from .web_tags import q_tag_management, w_tag_management, w_tag_preview
 from .taste_history import history_source_count
 from .web_catalog import (
     catalog_filter,
@@ -317,6 +318,7 @@ def _post_empty_trash(contract, _body):
 
 
 GET_HANDLERS = {
+    "/api/tag-management": q_tag_management,
     "/api/media-processing": q_media_processing,
     "/api/folders": q_folders,
     "/api/tasks": q_tasks,
@@ -385,6 +387,8 @@ GET_HANDLERS = {
 }
 
 POST_HANDLERS = {
+    "/api/tag-management": w_tag_management,
+    "/api/tag-management/preview": w_tag_preview,
     "/api/media-processing": w_media_processing,
     "/api/folders/preview": w_folder_preview,
     "/api/folders/rule": w_folder_rule,
@@ -452,6 +456,7 @@ POST_HANDLERS = {
 #: 不该拦它们——「查找」只联网、「存凭据」只写本机 secrets 文件，都不碰账本。
 #: 追更的「查找」在只读端被拦成 409 是实测踩到的。
 READ_ONLY_POST_ROUTES = frozenset({
+    "/api/tag-management/preview",
     "/api/media-processing",
     "/api/folders/preview",
     "/api/custom-metadata",

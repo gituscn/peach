@@ -116,7 +116,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
                 "test_task_center_integration.py", "test_reference_updates.py",
                 "test_repo_hygiene.py", "test_seed_pack.py", "test_seed_followup.py",
                 "test_review_csv.py", "test_jav_code_domain.py", "test_organize.py",
-                "test_link_repair.py",
+                "test_link_repair.py", "test_tag_management.py",
                 "test_subprocess_encoding.py", "test_module_layering.py",
                 "test_copy_final_state.py", "test_demo_dataset.py",
                 "test_cloudflared_packaging.py", "test_tunnel.py", "test_process_job.py",
@@ -132,6 +132,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
     # 所以本域也要登记它们：改了 `web/app.js` 却漏跑读它的测试，`test_test_planning.py`
     # 的域映射门槛会在本地就红。
     "web": ("test_frontend_build.py", "test_web_ui.py", "test_web_js.py", "test_web_e2e.py",
+            "test_tag_management.py",
             "test_subtitle_search.py",
             "test_legacy_shell_routes.py",
             "test_web_perf.py", "test_copy_final_state.py",
