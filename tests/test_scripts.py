@@ -1851,7 +1851,7 @@ class OperationalScriptTests(unittest.TestCase):
                 continue
             probe = subprocess.run([path, "-c", "uname -s"],
                                    capture_output=True, text=True, encoding="utf-8", check=False)
-            if probe.returncode == 0 and "linux" not in probe.stdout.casefold():
+            if probe.returncode == 0 and (sys.platform != "win32" or "linux" not in probe.stdout.casefold()):
                 shells.append(path)
         self.assertTrue(shells)
         for shell in dict.fromkeys(shells):

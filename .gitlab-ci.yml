@@ -34,7 +34,7 @@ verify-linux:
     paths: [.uv-cache/, .npm/]
   before_script:
     - apt-get update
-    - apt-get install -y --no-install-recommends python3-pip chromium ffmpeg
+    - apt-get install -y --no-install-recommends python3-pip chromium ffmpeg xvfb xauth
     - python3 -m pip install --break-system-packages uv==0.13.3
     - uv sync --locked --all-extras --python 3.14
     - npm ci --ignore-scripts --prefer-offline
@@ -48,7 +48,7 @@ verify-linux:
     - test -z "$(git status --porcelain --untracked-files=all -- web/dist)"
     - uv run --locked python scripts/npm_audit.py
     - uv run --locked python scripts/npm_audit.py --prefix frontend
-    - ./scripts/test.sh full --fresh
+    - xvfb-run -a ./scripts/test.sh full --fresh
   artifacts:
     when: always
     expire_in: 14 days
