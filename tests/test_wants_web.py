@@ -6,7 +6,7 @@ import json
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -183,8 +183,11 @@ class WantWebFixture(unittest.TestCase):
         self.contract = WebContract(fresh_ledger(self.temporary.name))
         self.addCleanup(self.contract.stop_background_jobs)
         self.contract.followups.stop()
-        self.contract.cover_root = Path(self.temporary.name) / "covers"
+        self.contract.cover_root = Path(self.temporary.name).resolve() / "covers"
         self.contract.follow_secrets_root = Path(self.temporary.name).resolve() / 'secrets'
+        detector = Mock()
+        detector.detect.return_value = []
+        self.enterContext(patch('peach.cover_artwork._default_detector', return_value=detector))
         # 取资料与取图都替掉：番号是假的，配额是真的。
         self.collected: list[str] = []
         self.collect_misses: set[str] = set()
@@ -256,6 +259,7 @@ class WantWebFixture(unittest.TestCase):
         thread = self.contract.want_job.thread
         if thread is not None:
             thread.join(10)
+            self.assertFalse(thread.is_alive(), self.contract.want_job.snapshot())
 
     def execute(self, sql, params=()):
         with self.contract.database.write_transaction() as connection:

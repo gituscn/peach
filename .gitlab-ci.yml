@@ -1,0 +1,182 @@
+workflow:
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/ && $CI_COMMIT_REF_PROTECTED == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+
+stages: [verify, package, validate, media, build, smoke, publish]
+
+default:
+  tags: [docker]
+
+variables:
+  GIT_DEPTH: "0"
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: utf-8
+  UV_LINK_MODE: copy
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.uv-cache"
+  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+  npm_config_fetch_retries: "5"
+  npm_config_fetch_retry_mintimeout: "10000"
+  npm_config_fetch_retry_maxtimeout: "60000"
+  PEACH_DOWNLOAD_BACKEND: r2
+
+verify-linux:
+  stage: verify
+  image: node:24-bookworm
+  rules:
+    - if: '$CI_COMMIT_BRANCH || $CI_PIPELINE_SOURCE == "merge_request_event"'
+  cache:
+    key:
+      files: [uv.lock, frontend/package-lock.json]
+    paths: [.uv-cache/, .npm/]
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends python3-pip chromium ffmpeg xvfb xauth
+    - python3 -m pip install --break-system-packages uv==0.13.3
+    - uv sync --locked --all-extras --python 3.14
+    - npm ci --ignore-scripts --prefer-offline
+    - npm --prefix frontend ci --prefer-offline
+    - export PEACH_E2E_CHROME=/usr/bin/chromium
+    - test -x "$PEACH_E2E_CHROME"
+    - ffmpeg -version
+  script:
+    - npm run check:vendor
+    - npm --prefix frontend run build
+    - test -z "$(git status --porcelain --untracked-files=all -- web/dist)"
+    - uv run --locked python scripts/npm_audit.py
+    - uv run --locked python scripts/npm_audit.py --prefix frontend
+    - xvfb-run -a ./scripts/test.sh full --fresh
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - build/agent-verification/browser/*.tap
+      - build/agent-verification/browser/serve.log
+      - build/agent-verification/browser/setup-serve.log
+
+verify-windows:
+  stage: verify
+  tags: [peach-windows]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+  script:
+    - '& ./scripts/ci_windows.ps1 verify'
+    - if ($LASTEXITCODE -ne 0) { throw 'Windows 全量回归未通过' }
+
+verify-macos:
+  stage: verify
+  tags: [peach-macos]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+  script:
+    - bash scripts/ci_macos.sh verify arm64
+
+wheel-smoke:
+  stage: package
+  image: ghcr.io/astral-sh/uv:0.13.3-python3.14-trixie-slim
+  rules:
+    - if: '$CI_COMMIT_BRANCH || $CI_PIPELINE_SOURCE == "merge_request_event"'
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends git
+  script:
+    - uv lock --check
+    - uv build --wheel --out-dir build/wheelhouse
+    - uv venv .wheel-smoke --python 3.14
+    - uv pip install --python .wheel-smoke/bin/python build/wheelhouse/*.whl
+    - uv pip check --python .wheel-smoke/bin/python
+    - |
+      cd "$(mktemp -d)"
+      "$CI_PROJECT_DIR/.wheel-smoke/bin/python" "$CI_PROJECT_DIR/scripts/smoke_wheel.py"
+      cd "$CI_PROJECT_DIR"
+      sha256sum build/wheelhouse/*.whl > build/wheelhouse/SHA256SUMS.txt
+  artifacts:
+    expire_in: 14 days
+    paths: [build/wheelhouse/]
+
+.release-linux:
+  image: node:24-bookworm
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/ && $CI_COMMIT_REF_PROTECTED == "true"'
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends python3 ca-certificates git
+    - python3 scripts/fetch_release_tools.py
+    - export PATH="$CI_PROJECT_DIR/build/release-tools:$PATH"
+    - export GLAB_ENABLE_CI_AUTOLOGIN=true
+
+validate-release:
+  extends: .release-linux
+  stage: validate
+  script:
+    - python3 scripts/release_tag.py --gitlab-host "$CI_SERVER_HOST" --repo "$CI_PROJECT_PATH" --verify-sha "$CI_COMMIT_SHA"
+    - python3 -c 'import os; from pathlib import Path; from scripts.version_bump import read_version; assert os.environ["CI_COMMIT_TAG"] == "v" + read_version(Path.cwd())'
+    - python3 scripts/changelog.py --notes "${CI_COMMIT_TAG#v}" --to build/release-notes.md
+
+windows-media:
+  extends: .release-linux
+  stage: media
+  script:
+    - apt-get install -y build-essential gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config clang meson ninja-build curl xz-utils
+    - bash scripts/build_ffmpeg_windows.sh build/ffmpeg-windows
+    - bash scripts/build_untrunc_windows.sh build/untrunc-windows
+  artifacts:
+    expire_in: 14 days
+    paths:
+      - build/ffmpeg-windows/ffmpeg/
+      - build/ffmpeg-windows/ffmpeg-corresponding-source.zip
+      - build/untrunc-windows/untrunc/
+      - build/untrunc-windows/untrunc-corresponding-source.zip
+
+build-windows:
+  stage: build
+  tags: [peach-windows]
+  rules: !reference [.release-linux, rules]
+  needs: [windows-media]
+  script:
+    - '& ./scripts/ci_windows.ps1 build'
+    - if ($LASTEXITCODE -ne 0) { throw 'Windows 构建失败' }
+  artifacts:
+    expire_in: 14 days
+    paths: [release/]
+
+build-macos:
+  stage: build
+  tags: [peach-macos]
+  rules: !reference [.release-linux, rules]
+  needs: [validate-release]
+  script:
+    - bash scripts/ci_macos.sh build arm64
+    - bash scripts/ci_macos.sh build x86_64
+  artifacts:
+    expire_in: 14 days
+    paths: [dist/macos.noindex/]
+
+smoke-windows:
+  stage: smoke
+  tags: [peach-windows]
+  rules: !reference [.release-linux, rules]
+  needs: [build-windows]
+  variables:
+    GIT_STRATEGY: empty
+  script:
+    - '& ./release/ci_windows.ps1 smoke'
+    - if ($LASTEXITCODE -ne 0) { throw 'Windows 独立制品验收失败' }
+
+publish-release:
+  extends: .release-linux
+  stage: publish
+  needs: [build-windows, smoke-windows, build-macos]
+  resource_group: peach-release-publication
+  environment:
+    name: release
+    url: https://downloads.peach.video
+  variables:
+    PEACH_R2_BUCKET: peach-releases
+    PEACH_R2_PUBLIC_BASE: https://downloads.peach.video
+  script:
+    - cp dist/macos.noindex/arm64/*.dmg dist/macos.noindex/x86_64/*.dmg release/
+    - python3 scripts/publish_gitlab_release.py

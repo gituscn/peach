@@ -413,9 +413,13 @@ def changed_contents(root: Path, base: str, paths: Iterable[str]) -> dict:
         if not (path.endswith(".py") or path in {*change_impact.PACKAGE_FILES, "pyproject.toml"}):
             continue
         try:
-            raw = test_evidence.git(root, "diff", "--raw", base, "--", path)
-            modes = [part.lstrip(":") for part in raw.split()[:2]]
-            if "120000" in modes or (len(modes) == 2 and "000000" not in modes and modes[0] != modes[1]):
+            raw = "\n".join((
+                test_evidence.git(root, "diff", "--raw", base, "--", path),
+                test_evidence.git(root, "diff", "--raw", "--cached", base, "--", path),
+            ))
+            modes = [[part.lstrip(":") for part in row.split()[:2]] for row in raw.splitlines()]
+            if any("120000" in pair or (len(pair) == 2 and "000000" not in pair and pair[0] != pair[1])
+                   for pair in modes):
                 result[path] = (None, None)
                 continue
             result[path] = (test_evidence.git(root, "show", f"{base}:{path}"),

@@ -6,7 +6,7 @@ import sqlite3
 import tempfile
 import time
 import unittest
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
 from unittest.mock import DEFAULT, Mock, patch
 from contextlib import closing
@@ -2734,9 +2734,15 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
         self.root = Path(temporary.name).resolve()
         self.media = self.root / 'media'
         self.media.mkdir()
+        self.ledger_roots = {
+            'local': str(self.media) if os.name == 'nt' else 'R:\\Media',
+            'pikpak': str(self.root / 'unmounted-cloud') if os.name == 'nt' else 'A:\\Media',
+        }
         self.config = PeachConfig(self.root, self.root / 'config.toml', present=True,
-                                  locations={'local': (str(self.media),),
-                                             'pikpak': (str(self.root / 'unmounted-cloud'),)})
+                                  locations={key: (root,) for key, root in self.ledger_roots.items()},
+                                  mounts={'local': (str(self.media),),
+                                          'pikpak': (str(self.root / 'unmounted-cloud'),)})
+        self.enterContext(patch('peach.settings_file.active', return_value=self.config))
         directory = self.root / 'database'
         directory.mkdir()
         self.db = fresh_ledger(directory)
@@ -2752,7 +2758,8 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
                 video.write_bytes(b'video')
                 connection.execute(
                     'INSERT INTO asset(id,location,path,name,medium,duration,disposal) VALUES(?,?,?,?,?,?,?)',
-                    (aid, location, str(video), video.name, medium, 30, disposal))
+                    (aid, location, str(PureWindowsPath(self.ledger_roots[location]) / video.name),
+                     video.name, medium, 30, disposal))
 
     def run_processing(self, **options):
         return process_library(self.config, self.db, self.root / 'candidates', self.root / 'covers',
@@ -2865,7 +2872,7 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
             connection.execute("UPDATE asset SET duration=NULL,code='ABW-358' WHERE id=1")
             connection.execute("INSERT INTO asset(id,location,path,name,medium,size,duration,creator,code) "
                 "VALUES(5,'local',?,'附件.mp4','video',1048576,NULL,'bbsxv.xyz','ABC-123')",
-                (str(self.media / 'bbsxv.xyz-ABC-123' / '附件.mp4'),))
+                (str(PureWindowsPath(self.ledger_roots['local']) / 'bbsxv.xyz-ABC-123' / '附件.mp4'),))
         def probe(_ffprobe, path, _timeout):
             events.append('probe')
             return (10 if path.endswith('附件.mp4') else 1800), 1920, 1080, 'h264', 30, None
@@ -3008,7 +3015,7 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
             video.write_bytes(b'video')
             connection.execute(
                 "INSERT INTO asset(id,location,path,name,medium,duration) VALUES(5,'local',?,?, 'video',30)",
-                (str(video), video.name))
+                (str(PureWindowsPath(self.ledger_roots['local']) / video.name), video.name))
         seen = []
         def capture(_config, row, _database, _resolver, *, progress):
             seen.append(row['id'])
@@ -3020,7 +3027,8 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
             with self.assertRaises(InterruptedError):
                 self.run_processing(stage='previews', asset_ids=[1, 5])
         saved = snapshot(self.config)
-        self.assertEqual(saved['completed_previews'], [f'1:{self.media / "clip-1.mp4"}'])
+        self.assertEqual(saved['completed_previews'],
+                         [f'1:{PureWindowsPath(self.ledger_roots["local"]) / "clip-1.mp4"}'])
         seen.clear()
         with patch.object(library_processing, '_generate_preview',
                           side_effect=lambda _c, row, *_a, **_k: seen.append(row['id']) or True):
