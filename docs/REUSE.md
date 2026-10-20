@@ -8,6 +8,8 @@ GitLab API、CI 认证和 Release 创建复用官方 [glab 1.124.0](https://gitl
 
 细粒度凭据缺少公开 CI 元数据的读取权限时，发版查询可在官方 API 上进行一次匿名 GET，使用标准库 HTTPS 与项目共用 User-Agent；不扩大凭据权限，也不携带本机认证头。私有资源仍须通过服务端权限检查。
 
+npm 安装沿用 Node.js 24 LTS 附带的官方 [`npm ci`](https://docs.npmjs.com/cli/v11/commands/npm-ci/)，锁文件与完整性校验由 npm 维护。`npm_ci.py` 复用既有 `npm_audit.py` 的有限重试方式及 Python 3.14 标准库 `subprocess`（PSF 许可，无额外安装体积），只为明确的 `ECONNRESET`、`ETIMEDOUT`、`EAI_AGAIN` 下载错误重试，最多三次；锁文件、完整性与生命周期错误保留失败。Linux、Windows、macOS CI 和 Windows 打包入口共用此策略，不重试测试失败、不变更包版本。真实锁定安装与注入失败回归覆盖成功、重试耗尽和非网络错误，无新增应用依赖、生产入口或账本改动。
+
 ## 真实样本界面预览
 
 用户验收预览复用项目记忆登记的真实账本小样本和已有缓存。启动入口强制调用 `scripts/check_ui_preview.py`，使用标准库 SQLite 的只读连接核对作品、实体、关联和来源清单，产出样本内容摘要；通用契约见 `docs/UI_PREVIEW.md`。核验与图像查看分别记录，隔离自动化测试夹具保留在测试范围内。没有新增依赖或生产数据写入。

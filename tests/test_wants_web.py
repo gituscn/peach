@@ -5,6 +5,7 @@ import io
 import json
 import sys
 import tempfile
+import traceback
 import unittest
 from unittest.mock import Mock, patch
 from datetime import date, datetime, timedelta, timezone
@@ -259,7 +260,11 @@ class WantWebFixture(unittest.TestCase):
         thread = self.contract.want_job.thread
         if thread is not None:
             thread.join(10)
-            self.assertFalse(thread.is_alive(), self.contract.want_job.snapshot())
+            frame = sys._current_frames().get(thread.ident)
+            self.assertFalse(thread.is_alive(), {
+                'job': self.contract.want_job.snapshot(),
+                'stack': ''.join(traceback.format_stack(frame)) if frame else '',
+            })
 
     def execute(self, sql, params=()):
         with self.contract.database.write_transaction() as connection:

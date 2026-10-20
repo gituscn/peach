@@ -10,9 +10,9 @@ if ($Mode -eq 'verify' -or $Mode -eq 'build') {
     Assert-Exit '锁定依赖安装失败'
     uv pip check --python .venv/Scripts/python.exe
     Assert-Exit '依赖检查失败'
-    npm ci --ignore-scripts --prefer-offline
+    & .venv/Scripts/python.exe -X utf8 scripts/npm_ci.py --ignore-scripts
     Assert-Exit '根目录 npm 安装失败'
-    npm --prefix frontend ci --prefer-offline
+    & .venv/Scripts/python.exe -X utf8 scripts/npm_ci.py --prefix frontend
     Assert-Exit '前端依赖安装失败'
 }
 

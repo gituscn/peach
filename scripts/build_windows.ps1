@@ -47,7 +47,7 @@ $Npm = Get-Command npm -ErrorAction SilentlyContinue
 if (-not $Npm) {
     throw 'npm not found. Frontend bundles must be rebuilt before packaging; install Node 24+.'
 }
-& $Npm.Source --prefix $FrontendPath ci
+& $Python -X utf8 (Join-Path $ProjectRoot 'scripts/npm_ci.py') --prefix $FrontendPath
 if ($LASTEXITCODE -ne 0) { throw 'npm ci failed in frontend/.' }
 & $Npm.Source --prefix $FrontendPath run build
 if ($LASTEXITCODE -ne 0) { throw 'Frontend bundle build failed (frontend/).' }

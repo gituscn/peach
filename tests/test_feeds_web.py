@@ -501,15 +501,13 @@ class FeedWebTest(FeedWebFixture):
         self.assertEqual(len(listing["items"]), 2)
 
     def _drain(self, expected):
-        """等后继排上再跑掉它们。
-
-        `w_feed_check` 在任务体收尾时就放行调用方，而声明的后继是任务包装那一层在
-        之后派的（ADR-0040）。直接 `drain()` 会赶在入队之前，跑到零条。
-        """
-        deadline = time.monotonic() + 5.0
-        done = 0
-        while done < expected and time.monotonic() < deadline:
-            done += self.contract.followups.drain()
+        """等待检查线程完成派发，再同步执行已入队的后继（ADR-0040）。"""
+        thread = self.contract.feed_job.thread
+        if thread is not None:
+            thread.join(5)
+            self.assertFalse(thread.is_alive(), self.contract.feed_job.snapshot())
+        done = self.contract.followups.drain()
+        self.assertGreaterEqual(done, expected, "检查线程结束后未取得预期后继")
         return done
 
     def test_the_scrape_followup_fills_the_shell_and_links_the_performer(self):
@@ -691,6 +689,9 @@ class FeedWebTest(FeedWebFixture):
         self._add()
         self._check()
         self._drain(1)
+        attempt = self.contract.cover_root.parent / 'feed-cover-attempts' / 'SSIS-950.json'
+        self.assertTrue(feed_followup.has_local_cover(self.contract.cover_root, 'SSIS-950'),
+                        attempt.read_text(encoding='utf-8') if attempt.exists() else '未取得封面处理记录')
         self.transport.responses[self.url] = HttpResponse(304, {}, b"", self.url)
         self.assertEqual([item["key"] for item in self._check()["followups"]],
                          ["feed-scrape:HMN-071"])
