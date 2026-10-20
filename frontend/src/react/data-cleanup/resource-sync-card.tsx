@@ -15,6 +15,8 @@ import { errorMessage } from '../../api';
 import { useBackgroundJob } from '../background-job';
 import { Fieldset, FieldsetTitle } from '../components/fieldset';
 import { Note } from '../components/note';
+import { ConnectionStatus } from '../components/connection-status';
+import { StatusLabel } from '../components/status-label';
 import { TaskProgress } from '../components/task-progress';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { PlainStat, plainStatClass } from '../components/stat-card';
@@ -49,11 +51,11 @@ function ScanResult({ scan, partial = false }: { scan: ResourceScanState; partia
           <article key={source.location} className={plainStatClass()}>
             <PlainStat label={SOURCE_LABELS[source.location] || '媒体来源'}
               mark={<SourceMark mark={MEDIA_SOURCE_ICONS[source.location] ?? 'database'} />}
-              aside={<span className={source.online ? 'text-notification-success-foreground' : 'text-text-error-primary'}>
-                {source.online ? '可访问' : '离线，已跳过'}
-              </span>}
+              aside={<ConnectionStatus online={source.online}>{source.online ? '可访问' : '离线'}</ConnectionStatus>}
               figure={source.online ? `${count(source.missing)} 项` : '—'}
-              meta={sourceMeta(source)} wrapMeta />
+              meta={source.online ? sourceMeta(source) : `${sourceMeta(source)} · 本次已跳过`} wrapMeta />
+            {source.online && source.unreadable > 0
+              ? <span className="self-start"><StatusLabel tone="warning">{count(source.unreadable)} 个目录未读取</StatusLabel></span> : null}
           </article>
         ))}
       </div>

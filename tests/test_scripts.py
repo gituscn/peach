@@ -5201,5 +5201,64 @@ class Fc2SellerAndDescriptiveNameRepairTests(unittest.TestCase):
         self.assertEqual(self.query("SELECT count(*) FROM entity WHERE id=2"), [(0,)])
 
 
+class RealPreviewSourceTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve()
+        self.source, self.sample = self.root / 'source', self.root / 'sample'
+        (self.source / 'database').mkdir(parents=True)
+        (self.sample / 'database').mkdir(parents=True)
+        self.db = fresh_ledger(self.source / 'database')
+        self.checker = load_script('check_ui_preview')
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("INSERT INTO asset(id,location,path,name,medium) VALUES(1,'local','R:\\Media\\one.mp4','海边.mp4','video')")
+            connection.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at) VALUES(11,'performer','林晚晴','林晚晴','2026-10-20','2026-10-20')")
+            connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source) VALUES(1,11,'performer','fixture')")
+        with closing(sqlite3.connect(self.db)) as source, closing(sqlite3.connect(self.sample / 'database/ledger.db')) as sample:
+            source.backup(sample)
+        manifest = {'source':str(self.db), 'counts':{'asset':1,'entity':1,'asset_entity':1}}
+        (self.sample / 'sample-manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
+        cache = self.source / 'generated/avatars'
+        cache.mkdir(parents=True)
+        shutil.copy2(ROOT / 'resources/peach-logo.png', cache / 'performer-11.img')
+        shutil.copytree(self.source / 'generated', self.sample / 'generated')
+
+    def test_real_subset_is_verified_without_database_writes(self):
+        before = self.db.read_bytes()
+        result = self.checker.verify_sample(self.source, self.sample)
+        self.assertEqual(result['kind'], 'real-ledger-subset')
+        self.assertEqual(result['counts'], {'asset':1,'entity':1,'asset_entity':1})
+        self.assertEqual(result['cached_images'], 1)
+        self.assertEqual(self.db.read_bytes(), before)
+
+    def test_missing_provenance_is_rejected(self):
+        (self.sample / 'sample-manifest.json').unlink()
+        with self.assertRaisesRegex(ValueError, '来源清单未取得'):
+            self.checker.verify_sample(self.source, self.sample)
+
+    def test_invented_title_is_rejected(self):
+        with closing(sqlite3.connect(self.sample / 'database/ledger.db')) as connection, connection:
+            connection.execute("UPDATE asset SET catalog_title='样本标题' WHERE id=1")
+        with self.assertRaisesRegex(ValueError, 'catalog_title'):
+            self.checker.verify_sample(self.source, self.sample)
+
+    def test_invented_relationship_is_rejected(self):
+        with closing(sqlite3.connect(self.sample / 'database/ledger.db')) as connection, connection:
+            connection.execute("UPDATE asset_entity SET source='invented' WHERE asset_id=1")
+        with self.assertRaisesRegex(ValueError, '作品实体关联'):
+            self.checker.verify_sample(self.source, self.sample)
+
+    def test_missing_cached_artwork_is_rejected(self):
+        (self.sample / 'generated/avatars/performer-11.img').unlink()
+        with self.assertRaisesRegex(ValueError, '图像缓存未取得'):
+            self.checker.verify_sample(self.source, self.sample)
+
+    def test_invented_cached_artwork_is_rejected(self):
+        (self.sample / 'generated/avatars/performer-11.img').write_bytes(b'invented')
+        with self.assertRaisesRegex(ValueError, '图像缓存与原数据不一致'):
+            self.checker.verify_sample(self.source, self.sample)
+
+
 if __name__ == "__main__":
     unittest.main()

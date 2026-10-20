@@ -205,10 +205,10 @@ describe('作品卡', () => {
     expect(host.querySelector('[data-media-open]')?.getAttribute('aria-label')).toBe('打开 未命名视频详情');
   });
 
-  it('大小不明写「大小未知」，看过几次写出来，标签取作品自己的标签、至多三枚', async () => {
+  it('大小未知和作品标签各自显示，观看次数不占卡片正文', async () => {
     const { host } = await render(item(11, { size: 0, play_count: 3, performers: ['甲'], tags: ['a', 'b', 'c', 'd'] }));
     expect(host.querySelector('[data-media-size]')?.textContent).toBe('大小未知');
-    expect(host.querySelector('[data-media-watch-count]')?.textContent).toBe('看过 3');
+    expect(host.querySelector('[data-media-watch-count]')).toBeNull();
     expect([...host.querySelectorAll('[data-media-tag]')].map((tag) => tag.textContent)).toEqual(['#a', '#b', '#c']);
   });
 

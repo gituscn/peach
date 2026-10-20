@@ -173,6 +173,44 @@ class ProcessingTrafficTests(unittest.TestCase):
         traffic.refresh_plan([{**self._video(), 'code': None, 'name': '创作者作品.mp4'}])
         self.assertEqual(sum(row['estimated_bytes'] for row in traffic.snapshot()['sources'] if not row['root']), 0)
 
+    def test_disk_forecast_deduplicates_cover_and_releases_completed_work(self):
+        traffic = ProcessingTraffic(self.config, self.db, 'metadata')
+        with patch.object(traffic.plan, '_ready', return_value=False):
+            traffic.refresh_plan([self._video()])
+            traffic.finish_work('local')
+            first = traffic.snapshot()['disk']['estimated_bytes']
+            traffic.refresh_plan([{**self._video(), 'path': f'A:\\Cloud\\copy{index}.mp4'} for index in range(3)])
+            deduplicated = traffic.snapshot()['disk']['estimated_bytes']
+        self.assertGreater(first, 0)
+        self.assertEqual(deduplicated, first)
+        traffic.finish_work('metadata', self._video()['code'])
+        self.assertEqual(traffic.snapshot()['disk']['estimated_bytes'], 0)
+        self.assertEqual(traffic.snapshot(finished=True)['disk']['temporary_bytes'], 0)
+
+    def test_disk_forecast_combines_one_volume_and_reports_shortfall(self):
+        traffic = ProcessingTraffic(self.config, self.db, 'previews')
+        traffic.refresh_plan([{**self._video(), 'location':'local', 'path':'R:\\Media\\a.mp4'}])
+        with patch('peach.processing_storage.volume_space', return_value=(1, 1024, 'R:\\')):
+            result = traffic.snapshot()['disk']
+        self.assertEqual(len(result['volumes']), 1)
+        volume = result['volumes'][0]
+        self.assertGreater(result['estimated_bytes'], 0)
+        self.assertGreater(result['temporary_bytes'], 0)
+        self.assertEqual(volume['reserve_bytes'], 1024**3)
+        self.assertEqual(volume['shortfall_bytes'], result['estimated_bytes'] + result['temporary_bytes'] + 1024**3 - 1024)
+        self.assertFalse(result['can_fit'])
+
+    def test_disk_forecast_uses_each_output_volume_and_keeps_unknown_capacity(self):
+        traffic = ProcessingTraffic(self.config, self.db, 'metadata')
+        traffic.refresh_plan([self._video()])
+        def space(path):
+            return (1, None, 'X:\\') if path == traffic.storage.generated else (2, 10 * 1024**3, 'Y:\\')
+        with patch('peach.processing_storage.volume_space', side_effect=space):
+            result = traffic.snapshot()['disk']
+        self.assertEqual(len(result['volumes']), 2)
+        self.assertIsNone(result['can_fit'])
+        self.assertTrue(result['cache_unknown'])
+
     def test_complete_fields_and_local_cover_have_no_download_work(self):
         traffic = ProcessingTraffic(self.config, self.db, 'collect')
         row = self._video(catalog_title='影片', performers='演员', studio='厂牌', release_date='2026-01-01', tags='类别')

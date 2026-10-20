@@ -139,8 +139,7 @@ export const applyConfirmText = (scan: ResourceScanState) =>
 export const sourceMeta = (source: ResourceSource) => (source.online
   ? [`找不到文件 · 共 ${count(source.total)} 项`,
     source.vanish ? `${count(source.vanish)} 项带个人记录` : '',
-    source.empty ? `空文件夹 ${count(source.empty)} 个` : '',
-    source.unreadable ? `${count(source.unreadable)} 个目录读取失败，已跳过` : ''].filter(Boolean).join(' · ')
+    source.empty ? `空文件夹 ${count(source.empty)} 个` : ''].filter(Boolean).join(' · ')
   : `馆藏中有 ${count(source.total)} 项`);
 
 /** 执行结束后留在原地的那几样：文件其实还在、目录这会儿读不了、缓存正被占用。 */

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/base/buttons/button';
+import { StatusLabel } from '../components/status-label';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
 import { confirmModal, spinnerHtml } from '@peach/legacy/ui';
@@ -32,7 +33,8 @@ export function CustomSources({ receipt }: { receipt(message: string): void }) {
       {query.isPending ? <div aria-busy="true" data-skeleton="" aria-label="读取自定义来源" /> : null}
       {query.error ? <ErrorText>{errorMessage(query.error)}</ErrorText> : null}
       {query.data?.items.map((source) => <div key={source.id} className="flex flex-wrap items-center gap-3">
-        <span className="min-w-0 flex-1">{source.name} · {source.enabled ? '已启用' : '已停用'}</span>
+        <span className="min-w-0 flex-1">{source.name}</span>
+        <StatusLabel tone={source.enabled ? 'success' : 'neutral'}>{source.enabled ? '已启用' : '已停用'}</StatusLabel>
         <Button variant="secondary" onClick={() => setEditing(source)}>编辑</Button>
         <Button variant="secondary" {...busyProps(action.busy === source.id)} onClick={() => void action.run(source.id!,
           (signal) => apiSend<{ items: Source[] }>(URL, { ...source, enabled: !source.enabled }, 'POST', signal),

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { RiArrowDownSLine } from '@remixicon/react';
+import { RiArrowDownSLine, RiArrowRightLine } from '@remixicon/react';
 import { Popover } from 'react-aria-components';
 import { Button } from '@/components/base/buttons/button';
 import { LinkButton } from '@/components/base/buttons/link-button';
@@ -104,7 +104,7 @@ export function ProcessingActions({ busy, scan = false, metadataOnly = false, sp
   return <>
     {promptView ? createPortal(<ProcessingPrompt command={promptView.command} dialog={promptView.dialog}
       speed={speedMode} busy={busy} onSpeed={value => { selectedSpeed.current = value }} />, promptView.host) : null}
-    {promptView ? createPortal(<LinkButton href="/settings/library" size="small" variant="secondary" disabled={busy}
+    {promptView ? createPortal(<LinkButton href="/settings/library" size="small" variant="primary" trailingIcon={RiArrowRightLine} disabled={busy}
       onClick={event => {
         if (promptView.dialog.confirmButton.getAttribute('aria-busy') === 'true') { event.preventDefault(); return }
         promptView.dialog.close();

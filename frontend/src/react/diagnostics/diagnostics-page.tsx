@@ -30,7 +30,7 @@ const moment = (value: string) => new Date(value).toLocaleString();
 
 function DiagnosticStatus({ status }: { status: string }) {
   return <Chip variant="caption" data-diagnostic-status={status}
-    color={status === 'failed' ? 'rose' : status === 'warning' || status === 'stale' ? 'yellow' : 'neutral'}>
+    color={status === 'failed' ? 'rose' : status === 'ok' ? 'lime' : status === 'warning' || status === 'stale' ? 'yellow' : 'neutral'}>
     {STATUS[status] ?? '未取得'}
   </Chip>;
 }

@@ -100,6 +100,8 @@ class ProcessingTraffic:
         self.unknown_files = stage in ('all', 'scan') and asset_ids is None
         from .processing_traffic_plan import TrafficPlan
         self.plan = TrafficPlan(config, stage, self._media_key)
+        from .processing_storage import ProcessingStorage
+        self.storage = ProcessingStorage(config)
         self.plan.completed.update(previous.get('completed_work', []))
         self.active_sample = None
         self.refresh_plan()
@@ -226,6 +228,7 @@ class ProcessingTraffic:
             result = dict(sources=sources, workload=self.plan.workload(), unknown_files=self.unknown_files and not finished,
                           partial=any(row['unobserved'] for row in sources),
                           completed_work=sorted(self.plan.completed))
+            result['disk'] = self.storage.snapshot(self.plan, self.rows, finished=finished)
             for field in ('used_bytes', 'estimated_bytes', 'estimated_min_bytes', 'estimated_max_bytes'):
                 result[field] = sum(row[field] for row in sources)
                 result['metered_' + field] = sum(row[field] for row in sources if row['metered'])

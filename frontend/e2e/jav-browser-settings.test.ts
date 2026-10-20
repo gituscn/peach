@@ -39,12 +39,13 @@ describe('浏览器添加 JAV 设置', () => {
         const install = region.getByRole('link', { name: '安装 Peach 用户脚本' });
         await install.waitFor();
         const channel = region.locator('button[aria-haspopup="listbox"]');
-        const installBox = await region.getByRole('note').boundingBox();
+        const installBox = await region.locator('[data-userscript-status]').boundingBox();
         const channelBox = await channel.boundingBox();
         assert.ok(installBox && channelBox && Math.abs(installBox.x - channelBox.x) <= 1,
           JSON.stringify({ installBox, channelBox }));
         assert.equal(await channel.locator('img').count(), 1);
-        const status = region.getByRole('status');
+        const status = region.locator('[data-userscript-status]').getByText('未启用', { exact: true }).or(
+          region.locator('[data-userscript-status]').getByText('已启用', { exact: true }));
         assert.equal(await status.innerText(), '未启用');
         const statusColor = () => status.evaluate(node => getComputedStyle(node).color);
         const disabledColor = await statusColor();
@@ -140,15 +141,19 @@ describe('浏览器添加 JAV 设置', () => {
       });
       await page.reload();
       const region = page.getByRole('region', { name: '浏览器添加 JAV', exact: true });
-      await region.getByText(/用户脚本 v.*已配对当前 Peach/).waitFor();
+      const connection = region.locator('[data-userscript-status] [data-connection-tone]');
+      await connection.getByText('已连接', { exact: true }).waitFor();
+      assert.equal(await connection.getAttribute('data-connection-tone'), 'success');
+      await region.getByText(`用户脚本 v${RELEASE.version}`, { exact: true }).waitFor();
       assert.equal(await region.getByRole('link', { name: '安装 Peach 用户脚本' }).count(), 0);
       assert.equal(await region.getByLabel('浏览器添加专用令牌', { exact: true }).count(), 0);
       installed = false;
       await region.getByRole('button', { name: '重新检测', exact: true }).click();
-      await region.getByText('未检测到用户脚本', { exact: true }).waitFor();
+      await connection.getByText('未检测到', { exact: true }).waitFor();
+      assert.equal(await connection.getAttribute('data-connection-tone'), 'neutral');
       await page.evaluate(() => window.postMessage({ type: 'peach-userscript:ready', protocol: 1,
         version: '9.0.0', paired: true, nonce: crypto.randomUUID() }, location.origin));
-      assert.equal(await region.getByText('未检测到用户脚本', { exact: true }).count(), 1);
+      assert.equal(await connection.getByText('未检测到', { exact: true }).count(), 1);
       assert.equal(await region.getByRole('link', { name: '安装 Peach 用户脚本' }).count(), 1);
       assert.deepEqual(opened.problems, []);
     } finally { await opened.close(); }

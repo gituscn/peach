@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {after,before,describe,it} from 'node:test';
 import type {Browser,Page} from 'playwright-core';
-import {launch,requiredEnv,VIEWPORTS} from './harness.ts';
+import {launch,requiredEnv,settle,VIEWPORTS} from './harness.ts';
+import {ITEM,openItemPage} from './item-fixture.ts';
 
 const FRAMES='#grid [data-media-grid] > [data-media-card] [data-media-pic], #grid [data-mix-cover]';
 
@@ -39,6 +40,80 @@ describe('混排作品的画面框',()=>{
  let browser:Browser;
  before(async()=>{browser=await launch()});
  after(async()=>{await browser?.close()});
+ for(const viewport of [...VIEWPORTS,{name:'compact',width:320,height:844,mobile:true}]){
+  it(`${viewport.name} 多列等高、单列自然高度，元信息保留一行`,async()=>{
+   const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},reducedMotion:'reduce'});
+   try{
+    const page=await context.newPage();
+    await openHome(page,'small',i=>({
+     name:i%2?'PCH-021 沿海旅行摄影记录：清晨出发，穿过山间步道到达海边的完整行程':'PCH-001 海边',
+     is_jav:true,creator:'',performers:i%2?['青川遥','夏目明里','竹内里奈','水野葵','森田优'] :['青川遥'],performer_total:i%2?21:1,
+     release_date:i%3?'2026-10-20':'',size:i%2?5*1024**4:0,play_count:1284,
+     tags:i%2?['旅行记录','自然风景','清晨的海岸线与沿途的山间步道']:[],
+    }));
+    await settle(page);
+    for(const density of ['roomy','dense']){
+     await page.evaluate(value=>{document.body.dataset.density=value},density);
+     await page.waitForFunction(()=>[...document.querySelectorAll('[data-media-grid]')].every(grid=>
+      grid.hasAttribute('data-single-column')===(getComputedStyle(grid).gridTemplateColumns.split(' ').length===1)));
+     const shown=await page.locator('#grid [data-media-grid] > [data-media-card]').evaluateAll(nodes=>nodes.slice(0,6).map(node=>{
+      const line=node.querySelector('[data-media-byline]')!,box=line.getBoundingClientRect(),meta=node.querySelector('[data-media-meta]')!;
+      const visible=[...line.children].filter(child=>getComputedStyle(child).display!=='none').map(child=>child.getBoundingClientRect());
+      return {height:node.getBoundingClientRect().height,meta:meta.getBoundingClientRect().height,single:node.closest('[data-media-grid]')!.hasAttribute('data-single-column'),
+       line:box.height,wrapped:visible.some(child=>child.top<box.top-1||child.bottom>box.bottom+1),
+       spill:visible.some(child=>child.right>box.right+1)};
+     }));
+     assert.ok(shown.length>=2);assert.ok(shown.every(row=>!row.wrapped&&!row.spill),JSON.stringify({density,shown}));
+     if(shown[0].single)assert.ok(Math.max(...shown.map(row=>row.meta))-Math.min(...shown.map(row=>row.meta))>8,JSON.stringify(shown));
+     else assert.ok(Math.max(...shown.map(row=>row.height))-Math.min(...shown.map(row=>row.height))<1,JSON.stringify(shown));
+     assert.equal(await page.locator('[data-media-flags],[data-media-watch-count]').count(),0);
+     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    }
+   }finally{await context.close()}
+  });
+ }
+ for(const theme of ['light','dark'])it(`${theme} 稍后看底色与按钮及撤销同步`,async()=>{
+  const context=await browser.newContext({viewport:{width:1280,height:800},colorScheme:theme,reducedMotion:'reduce'});
+  try{
+   const page=await context.newPage();let later=false;
+   await page.route('**/api/watch-later',route=>route.fulfill({json:{watch_later:later=!later}}));
+   await openHome(page,'small',()=>({watch_later:false}));await settle(page);
+   await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.classList.toggle('dark',theme==='dark')},theme);
+   const card=page.locator('#grid [data-media-card]').first(),button=card.locator('[data-later]');
+   const background=()=>card.evaluate(node=>getComputedStyle(node).backgroundColor);
+   await page.locator('#filterBtn').focus();await page.mouse.move(0,0);const base=await background();
+   await card.hover();await button.click();await page.locator('#filterBtn').focus();await page.mouse.move(0,0);
+   await page.waitForFunction(()=>document.querySelector('#grid [data-media-card]')?.hasAttribute('data-watch-later'));
+   assert.equal(await button.getAttribute('aria-pressed'),'true');assert.notEqual(await background(),base);
+   await page.getByRole('button',{name:'撤销',exact:true}).last().click();await page.locator('#filterBtn').focus();await page.mouse.move(0,0);
+   await page.waitForFunction(()=>!document.querySelector('#grid [data-media-card]')?.hasAttribute('data-watch-later'));
+   assert.equal(await button.getAttribute('aria-pressed'),'false');assert.equal(await background(),base);
+  }finally{await context.close()}
+ });
+ for(const viewport of VIEWPORTS)it(`${viewport.name} 接着看理由独占两行并可打开完整文本`,async()=>{
+  const opened=await openItemPage(browser,`/assets/${ITEM.plain}`,viewport);
+  try{
+   const page=opened.page,reason='同出演者 · 标签接近 · 同厂牌 · 同系列';
+   await page.route(url=>url.pathname==='/api/related',route=>route.fulfill({json:{items:[14,15].map((id,index)=>({
+    id,name:index?'PCH-015 沿海旅行摄影记录的完整篇章':'PCH-014 海边',creator:'旅行摄影作者',location:'local',has_thumb:true,
+    size:4096,duration:120,why:reason,tags:[],
+   }))}}));
+   await page.reload({waitUntil:'load'});await page.locator('[data-media-next-reason]').first().waitFor();await settle(page);
+   const rows=await page.locator('[data-media-next-row] [data-media-card]').evaluateAll(nodes=>nodes.map(node=>({
+    height:node.getBoundingClientRect().height,why:node.querySelector('[data-media-next-reason]')!.getBoundingClientRect().top,
+    byline:node.querySelector('[data-media-byline]')!.getBoundingClientRect().bottom,
+   })));
+   assert.ok(rows.every(row=>row.why>=row.byline));assert.ok(Math.abs(rows[0].height-rows[1].height)<1);
+   const url=page.url();await page.locator('[data-media-next-reason]').first().click();
+   const popup=page.getByRole('dialog',{name:'推荐理由',exact:true});await popup.waitFor();
+   assert.equal((await popup.innerText()).trim(),reason);assert.equal(page.url(),url);
+   assert.ok(await popup.evaluate(node=>{
+    const box=node.getBoundingClientRect(),hit=document.elementFromPoint(box.left+box.width/2,box.top+box.height/2);
+    return !!hit&&(node===hit||node.contains(hit));
+   }),'推荐理由浮层可见且可点击');
+   await popup.click();assert.equal(page.url(),url);await page.keyboard.press('Escape');await popup.waitFor({state:'hidden'});
+  }finally{await opened.close()}
+ });
  for(const viewport of VIEWPORTS)for(const size of ['big','small']){
   it(`${viewport.name} ${size} 作品与 Mix 等高并保留横图`,async()=>{
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height}});
@@ -160,12 +235,15 @@ describe('混排作品的画面框',()=>{
    assert.ok(box.badges<=box.title+0.5,`版本徽标越出标题框：${JSON.stringify(box)}`);
   }finally{await context.close()}
  });
- it('十二位共演都没有头像图：网格卡五枚首字母都露在外面，竖屏卡只放两枚，标题照样有宽度',async()=>{
-  const context=await browser.newContext({viewport:{width:1280,height:900}});
+ for(const width of [1280,760,390,320])for(const pictures of ['none','all','mixed'])it(`${width} 宽共演头像 ${pictures} 紧叠占位并浮于文字上展开`,async()=>{
+  const context=await browser.newContext({viewport:{width,height:900},reducedMotion:'reduce'});
   try{
    const page=await context.newPage();
    const names=['七海ひな','桜井まい','白石りん','水瀬ゆい','藤原あや','J','K','L','M','N','O','P'];
-   await openHome(page,'small',()=>({creator:'',performers:names,performer_total:12}));
+   await page.route('**/entity-image?*',route=>route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" fill="white"/></svg>'}));
+   await openHome(page,'small',()=>({creator:'',performers:names,performer_total:12,
+    performer_entities:names.map((_,index)=>({id:index+1,has_image:pictures==='all'||pictures==='mixed'&&index%2===0})),
+   }));
    const short=page.locator('[data-media-card][data-variant="short"]').first();
    await short.waitFor();
    /* 命中测试只认视口里、没被吸顶栏压着的点：先把头像那一排即时滚到视口中间，等滚动落定再量。 */
@@ -174,19 +252,36 @@ describe('混排作品的画面框',()=>{
     for(let frame=0;frame<2;frame+=1)await new Promise(requestAnimationFrame);
     const avatars=[...card.querySelectorAll('[data-media-avatars] > [data-media-avatar]')]
      .filter(node=>getComputedStyle(node).display!=='none');
-    const covered=avatars.filter(node=>{
-     const box=node.getBoundingClientRect();
-     return document.elementFromPoint(box.left+box.width/2,box.top+box.height/2)?.closest('[data-media-avatar]')!==node;
-    }).length;
-    return {shown:avatars.length,covered,text:Math.round(card.querySelector('[data-media-text]')!.getBoundingClientRect().width),card:Math.round(card.getBoundingClientRect().width)};
+    const group=card.querySelector('[data-media-avatars]')!.getBoundingClientRect(),text=card.querySelector('[data-media-text]')!.getBoundingClientRect();
+    return {shown:avatars.length,group:group.width,text:text.width,card:card.getBoundingClientRect().width,
+     spread:avatars.at(-1)!.getBoundingClientRect().left-avatars[0]!.getBoundingClientRect().left,
+     spilled:avatars.some(node=>node.getBoundingClientRect().right>group.right+1),overlap:group.right>text.left+1,
+     outsideCard:avatars.some(node=>node.getBoundingClientRect().right>card.getBoundingClientRect().right+1)};
    };
-   const grid=await page.locator('#grid [data-media-grid] > [data-media-card]').first().evaluate(measure);
-   assert.equal(grid.shown,5);
-   assert.equal(grid.covered,0,`有首字母被左邻盖住：${JSON.stringify(grid)}`);
+   const gridCard=page.locator('#grid [data-media-grid] > [data-media-card]').first();
+   const grid=await gridCard.evaluate(measure);
    const portrait=await short.evaluate(measure);
-   assert.equal(portrait.shown,2);
-   assert.equal(portrait.covered,0,JSON.stringify(portrait));
-   assert.ok(portrait.text>=portrait.card*0.6,`竖屏卡的标题列被头像挤窄：${JSON.stringify(portrait)}`);
+   for(const row of [grid,portrait]){
+    assert.ok(row.shown>=1&&row.shown<=5,JSON.stringify(row));
+    assert.ok(row.group<=Math.min(109,Math.max(45,row.card*.3))+1,JSON.stringify(row));
+    assert.ok(row.text>=row.card*.55&&!row.spilled&&!row.overlap,JSON.stringify(row));
+   }
+   assert.ok(grid.text>=grid.card*.65,JSON.stringify(grid));
+   assert.equal(grid.shown,5);assert.equal(portrait.shown,2);
+   await gridCard.evaluate(measure);await gridCard.locator('[data-media-avatars]').hover();
+   const expanded=await gridCard.evaluate(measure);
+   assert.ok(expanded.spread>grid.spread&&!expanded.outsideCard,JSON.stringify({grid,expanded}));
+   assert.ok(Math.abs(expanded.group-grid.group)<1&&Math.abs(expanded.text-grid.text)<1,JSON.stringify({grid,expanded}));
+   await page.mouse.move(0,0);await page.keyboard.press('Tab');
+   const avatars=gridCard.locator('[data-media-avatars] > [data-media-avatar]:visible');
+   for(const index of [0,await avatars.count()-1]){
+    const avatar=avatars.nth(index);await avatar.focus();
+    assert.ok(await avatar.evaluate(async node=>{
+     await new Promise(requestAnimationFrame);
+     const box=node.getBoundingClientRect(),hit=document.elementFromPoint(box.left+box.width/2,box.top+box.height/2);
+     return hit?.closest('[data-media-avatar]')===node;
+    }),'聚焦的堆叠头像完整露出并可操作');
+   }
   }finally{await context.close()}
  });
  it('Shift 连选几张卡不把中间的文字刷成选区',async()=>{

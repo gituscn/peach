@@ -28,6 +28,8 @@ import { cardClass } from '../components/card';
 import { EmptyState } from '../components/empty-state';
 import { ExpandableRanking } from '../components/expandable-ranking';
 import { Note } from '../components/note';
+import { ConnectionStatus } from '../components/connection-status';
+import { StatusLabel } from '../components/status-label';
 import { Page } from '../components/page';
 import { Progress } from '../components/progress';
 import { SEGMENT, SEGMENTED_TRACK, SegmentedTabList } from '../components/segmented';
@@ -188,7 +190,7 @@ function VolumeRow({ volume }: { volume: StorageVolume }) {
             {fmtSize(used)}
             <span className="ml-1.5 text-caption-1-regular text-text-secondary">{percentText(used, total)}</span>
           </b>
-        ) : <span className="whitespace-nowrap text-text-secondary">{volume.online ? '容量未取得' : '离线'}</span>}
+        ) : volume.online ? <StatusLabel>容量未取得</StatusLabel> : <ConnectionStatus online={false} />}
       </header>
       {total != null
         ? <Progress label={`${volume.label}空间使用率`} value={within(used, Math.max(total, 1))} max={Math.max(total, 1)} />

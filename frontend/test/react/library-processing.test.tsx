@@ -412,7 +412,7 @@ it('整库任务先显示流量预估，确认模式后才启动，取消不启�
   await click(buttonNamed('取消', document.querySelector('dialog')!));
   expect(served.posts()).toEqual([]);
   await click(buttonNamed('同步媒体库', host));
-  expect(document.querySelector('dialog')?.textContent).toContain('预计总流量');
+  expect(document.querySelector('dialog [aria-label="流量预估"]')?.textContent).toContain('预计流量');
   expect(host.querySelector('[data-processing-controls]')).toBeNull();
   await chooseLow();
   await submit(document.querySelector('dialog form'));

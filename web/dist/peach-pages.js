@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "51220fc2-38b3-41f1-8f0f-8630a01a6eab", e._sentryDebugIdIdentifier = "sentry-dbid-51220fc2-38b3-41f1-8f0f-8630a01a6eab");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "b817e2a3-bb25-4e2d-a40f-f2176d12689a", e._sentryDebugIdIdentifier = "sentry-dbid-b817e2a3-bb25-4e2d-a40f-f2176d12689a");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, i, o, s) => {
@@ -20953,8 +20953,53 @@ function Dg({ label: e, password: t, confirmation: n, onPassword: r, onConfirmat
 	})] });
 }
 //#endregion
+//#region src/react/boardui/components/base/badges/chip.tsx
+var Og = St({
+	base: "inline-flex items-center justify-center rounded-md px-1.5 whitespace-nowrap transition-[padding,font-size] duration-200 ease",
+	variant: {
+		bold: "py-0.5 text-body-medium",
+		subtle: "py-1 text-body-medium",
+		caption: "py-1 text-caption-1-medium"
+	},
+	color: {
+		lime: "bg-status-lime-background text-status-lime-text",
+		rose: "bg-status-rose-background text-status-rose-text",
+		yellow: "bg-status-yellow-background text-status-yellow-text",
+		cyan: "bg-status-cyan-background text-status-cyan-text",
+		blue: "bg-status-blue-background text-status-blue-text",
+		purple: "bg-status-purple-background text-status-purple-text",
+		neutral: "bg-background-tertiary-default text-text-secondary",
+		gray: "bg-background-secondary-default text-text-primary",
+		soft: "bg-background-secondary-default text-text-secondary"
+	}
+});
+function kg({ variant: e = "bold", color: t = "neutral", className: n, ref: r, ...i }) {
+	return /* @__PURE__ */ (0, B.jsx)("span", {
+		ref: r,
+		className: z(Og.base, Og.variant[e], Og.color[t], n),
+		...i
+	});
+}
+//#endregion
+//#region src/react/components/status-label.tsx
+var Ag = {
+	success: "lime",
+	progress: "blue",
+	warning: "yellow",
+	error: "rose",
+	neutral: "neutral"
+};
+function jg({ tone: e = "neutral", ...t }) {
+	return /* @__PURE__ */ (0, B.jsx)(kg, {
+		"data-status-tone": e,
+		variant: "caption",
+		color: Ag[e],
+		...t
+	});
+}
+//#endregion
 //#region src/react/settings/remote-reporting-settings.tsx
-function Og({ value: e, onChange: t, busy: n = !1 }) {
+function Mg({ value: e, onChange: t, busy: n = !1 }) {
 	return /* @__PURE__ */ (0, B.jsxs)(B.Fragment, { children: [/* @__PURE__ */ (0, B.jsx)(bm, { children: /* @__PURE__ */ (0, B.jsx)(_m, {
 		label: "发送版本统计与错误诊断（推荐）",
 		description: "上传版本、系统信息、故障类型、代码位置与发生次数。",
@@ -20970,18 +21015,21 @@ function Og({ value: e, onChange: t, busy: n = !1 }) {
 		})
 	}) }), e.available ? null : /* @__PURE__ */ (0, B.jsx)(xm, {
 		divided: !0,
-		children: /* @__PURE__ */ (0, B.jsx)(Sm, { children: "上传服务未配置。" })
+		children: /* @__PURE__ */ (0, B.jsx)("span", {
+			className: "self-start",
+			children: /* @__PURE__ */ (0, B.jsx)(jg, { children: "上传服务未配置" })
+		})
 	})] });
 }
 //#endregion
 //#region src/react/pages/setup/setup-form.tsx
-var kg = [
+var Ng = [
 	"data_root",
 	"host",
 	"port",
 	"mdns_name"
 ];
-function Ag(e, t) {
+function Pg(e, t) {
 	return Array.isArray(e) ? e.length === t ? {
 		rows: e,
 		table: ""
@@ -20993,11 +21041,11 @@ function Ag(e, t) {
 		table: e ?? ""
 	};
 }
-function jg(e) {
+function Fg(e) {
 	return e.length ? e.length === 1 ? `完成设置后扫描并补全资料：${e[0]}` : `完成设置后扫描这 ${e.length} 个文件夹并补全资料` : "完成设置后扫描并补全资料";
 }
-var Mg = (e) => Array.isArray(e) ? e.filter(Boolean).join(" ") : e ?? "";
-function Ng({ setup: e, onDone: t }) {
+var Ig = (e) => Array.isArray(e) ? e.filter(Boolean).join(" ") : e ?? "";
+function Lg({ setup: e, onDone: t }) {
 	let n = e.questions.find((e) => e.input === "folders"), r = e.questions.filter((e) => e.input !== "folders"), i = e.media_sources.map(({ value: e, label: t }) => [e, t]), a = (t = "") => ({
 		path: t,
 		location: e.media_source_default,
@@ -21046,14 +21094,14 @@ function Ng({ setup: e, onDone: t }) {
 			t(await em(i));
 		} catch (e) {
 			if (e instanceof Zp && e.status === 400 && e.errors) {
-				let t = e.errors, { rows: n, table: r } = Ag(t.media_dir, o.rows.length);
-				o.setErrors(n), T(r), S(t), kg.some((e) => t[e]) && ee((e) => e + 1), t.access_password && u(!0), re((e) => e + 1);
+				let t = e.errors, { rows: n, table: r } = Pg(t.media_dir, o.rows.length);
+				o.setErrors(n), T(r), S(t), Ng.some((e) => t[e]) && ee((e) => e + 1), t.access_password && u(!0), re((e) => e + 1);
 			} else D(rm(e));
 		} finally {
 			k(!1);
 		}
 	}, ce = (e) => {
-		let t = Mg(x[e.key]), n = e.help.join("");
+		let t = Ig(x[e.key]), n = e.help.join("");
 		if (e.input === "choice") {
 			let r = `setup-${e.key}-label`;
 			return /* @__PURE__ */ (0, B.jsxs)("div", {
@@ -21205,7 +21253,7 @@ function Ng({ setup: e, onDone: t }) {
 						confirmation: p,
 						onPassword: f,
 						onConfirmation: m,
-						passwordError: ie(Mg(x.access_password)),
+						passwordError: ie(Ig(x.access_password)),
 						passwordHint: "请输入 8–256 个字符。",
 						confirmationInvalid: !!x.access_password
 					}) : null
@@ -21231,7 +21279,7 @@ function Ng({ setup: e, onDone: t }) {
 						children: [/* @__PURE__ */ (0, B.jsx)(Np, {
 							isSelected: h,
 							onChange: g,
-							children: jg(le)
+							children: Fg(le)
 						}), /* @__PURE__ */ (0, B.jsx)(Sm, { children: "读取已有 NFO 和封面，采集缺失资料。符合自动规则的资料会在处理完成后保存到数据库，其余资料留待确认。" })]
 					}),
 					/* @__PURE__ */ (0, B.jsxs)("section", {
@@ -21259,7 +21307,7 @@ function Ng({ setup: e, onDone: t }) {
 			E ? /* @__PURE__ */ (0, B.jsx)(Cm, { children: E }) : null,
 			y ? /* @__PURE__ */ (0, B.jsxs)(Ot, { children: [
 				/* @__PURE__ */ (0, B.jsx)(kt, { children: "版本统计与错误诊断" }),
-				/* @__PURE__ */ (0, B.jsx)(Og, {
+				/* @__PURE__ */ (0, B.jsx)(Mg, {
 					value: y,
 					onChange: b
 				}),
@@ -21276,7 +21324,7 @@ function Ng({ setup: e, onDone: t }) {
 }
 //#endregion
 //#region src/react/pages/setup/setup-restore.tsx
-function Pg({ onDone: e }) {
+function Rg({ onDone: e }) {
 	let [t, n] = (0, C.useState)(""), [r, i] = (0, C.useState)(""), [a, o] = (0, C.useState)(!1);
 	return /* @__PURE__ */ (0, B.jsxs)("form", {
 		className: "flex flex-col gap-4",
@@ -21317,7 +21365,7 @@ function Pg({ onDone: e }) {
 }
 //#endregion
 //#region src/react/pages/setup/setup-page.tsx
-function Fg() {
+function zg() {
 	let [e, t] = (0, C.useState)({ kind: "loading" }), [n, r] = (0, C.useState)(0), [i, a] = (0, C.useState)(!1);
 	return (0, C.useEffect)(() => {
 		let e = new AbortController();
@@ -21355,10 +21403,10 @@ function Fg() {
 				className: "self-start",
 				onClick: () => a((e) => !e),
 				children: i ? "返回首次设置" : "使用已有数据目录"
-			}), i ? /* @__PURE__ */ (0, B.jsx)(Pg, { onDone: (e) => t({
+			}), i ? /* @__PURE__ */ (0, B.jsx)(Rg, { onDone: (e) => t({
 				kind: "done",
 				done: e
-			}) }) : /* @__PURE__ */ (0, B.jsx)(Ng, {
+			}) }) : /* @__PURE__ */ (0, B.jsx)(Lg, {
 				setup: e.setup,
 				onDone: (e) => t({
 					kind: "done",
@@ -21370,14 +21418,14 @@ function Fg() {
 }
 //#endregion
 //#region src/react/pages/index.tsx
-var Ig = {
-	setup: Fg,
+var Bg = {
+	setup: zg,
 	login: Kp,
 	error: Mt
 };
 m();
-var Lg = document.getElementById("peach-page"), Rg = Lg ? Ig[Lg.dataset.page ?? ""] : void 0;
-Lg && Rg && (0, w.createRoot)(Lg).render(/* @__PURE__ */ (0, B.jsx)(Rg, { data: { ...Lg.dataset } }));
+var Vg = document.getElementById("peach-page"), Hg = Vg ? Bg[Vg.dataset.page ?? ""] : void 0;
+Vg && Hg && (0, w.createRoot)(Vg).render(/* @__PURE__ */ (0, B.jsx)(Hg, { data: { ...Vg.dataset } }));
 //#endregion
 
-//# debugId=51220fc2-38b3-41f1-8f0f-8630a01a6eab
+//# debugId=b817e2a3-bb25-4e2d-a40f-f2176d12689a

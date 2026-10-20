@@ -65,7 +65,7 @@ function LayoutSwitch(
   return (
     <RadioGroup aria-label={`${INDEX_TITLES[kind]}索引版式`} orientation="horizontal" value={layout}
       onChange={(next) => onChange(next as PeopleLayout)} data-index-layout=""
-      className={`flex-none max-board-narrow:order-3 ${SEGMENTED_TRACK}`}>
+      className={`flex-none ${SEGMENTED_TRACK}`}>
       {LAYOUTS[isCompany(kind) ? 'company' : 'people'].map(([value, label, symbol]) => {
         const Glyph = spriteGlyph(symbol);
         return (
@@ -100,7 +100,7 @@ function IndexSearch({ label, value, onQuery }: { label: string; value: string; 
     onQuery(text.trim());
   };
   return (
-    <div data-index-search="" className="ml-auto min-w-35 max-w-80 flex-1 max-board-narrow:order-1 max-board-narrow:basis-40"
+    <div data-index-search="" className="ml-auto min-w-0 max-w-80 flex-1"
       onCompositionStart={() => { composing.current = true }}
       onCompositionEnd={(event) => { composing.current = false; later((event.target as HTMLInputElement).value) }}>
       <TextField aria-label={label} value={text}
@@ -236,23 +236,21 @@ export function IndexPage(props: IndexProps) {
 
   return (
     <div ref={root} data-index-page={kind} className="flex min-w-0 flex-col">
-      <div data-index-head="" className="mb-5 flex min-w-0 flex-wrap items-center gap-3">
-        <h2 data-index-title="" className="flex items-center text-display-4-medium whitespace-nowrap text-text-primary max-board-narrow:text-title-1-medium">
+      <div data-index-head="" className="mb-5 flex min-w-0 flex-wrap items-center gap-3 max-board-narrow:gap-x-2">
+        <h2 data-index-title="" className="flex flex-none items-center text-display-4-medium whitespace-nowrap text-text-primary max-board-narrow:text-title-1-medium">
           {title}
         </h2>
         {isPeople(kind) ? (
-          <span data-index-count="" className="text-caption-1-regular leading-5 whitespace-nowrap text-text-secondary tabular-nums">
+          <span data-index-count="" className="text-caption-1-regular leading-5 whitespace-nowrap text-text-secondary tabular-nums max-board-narrow:order-1 max-board-narrow:basis-full">
             {/* 没取到就没有读数：「0 项」读起来是「名册是空的」，和报错说的是两件事。 */}
             {result.isPending || result.isError ? '' : readout}
           </span>
         ) : null}
         {isPeople(kind) ? <LayoutSwitch kind={kind} layout={layout} onChange={changeLayout} /> : null}
         <LibraryShortcuts kind={kind === 'tags' ? 'tag' : kind === 'studios' ? 'studio' : kind === 'agencies' ? 'agency' : kind === 'creators' ? 'creator' : 'performer'} />
-        {kind === 'tags' ? <Button variant={managing ? 'primary' : 'ghost'} size="small" iconOnly data-tag-mode=""
+        {kind === 'tags' ? <Button variant={managing ? 'primary' : 'ghost'} size="small" iconOnly className="flex-none" data-tag-mode=""
           leadingIcon={spriteGlyph('pencil')} aria-label={managing ? '返回标签浏览' : '管理标签'} title={managing ? '返回标签浏览' : '管理标签'} aria-pressed={managing}
           onClick={() => { props.exitSelectMode(); setPicked(new Set()); setManaging(!managing) }} /> : null}
-        {/* 窄屏一行放不下四样东西：标题与过滤框一行，开关另起一行。 */}
-        <span aria-hidden className="hidden h-0 basis-full max-board-narrow:order-2 max-board-narrow:block" />
         <IndexSearch label={`过滤${title}`} value={q} onQuery={(next) => { if (next !== q) go({ q: next }, !!next) }} />
       </div>
       {kind === 'performers' || kind === 'creators' ? (

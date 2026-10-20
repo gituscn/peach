@@ -13,6 +13,39 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
   let browser: Browser;
   installDesignBrowser((next) => { browser = next; });
 
+  for (const viewport of [DESKTOP, MOBILE]) {
+    it(`数据管理骨架与内容卡共用外框、内边距和操作区布局（${viewport.name}）`, { timeout: 60_000 }, async () => {
+      const opened = await visit(browser, '/data-cleanup', viewport);
+      try {
+        const page = opened.page;
+        await page.route('**/api/library-processing', route => route.fulfill({ json: { status: 'idle' } }));
+        const release = await holdApi(page);
+        await page.reload({ waitUntil: 'load' });
+        await page.locator('[data-skeleton="cleanup"] #mediaRepair footer').waitFor({ timeout: 15_000 });
+        const geometry = () => page.locator('section[aria-label="扫描与采集"], section[aria-label="媒体修复"]')
+          .evaluateAll(cards => cards.map(card => {
+            const style = (part: Element) => {
+              const css = getComputedStyle(part);
+              return [css.display, css.padding, css.gap, css.borderTopWidth, css.borderRadius, css.backgroundColor];
+            };
+            const box = card.getBoundingClientRect();
+            return { width: Math.round(box.width), face: style(card), body: style(card.firstElementChild!),
+              footer: style(card.querySelector('footer')!) };
+          }));
+        const waiting = await geometry();
+        assert.equal(waiting.length, 2);
+        for (const card of waiting) assert.equal(card.face[3], '1px', '骨架卡缺少外框');
+        release();
+        await page.locator('section[aria-label="媒体修复"] footer > button:not([data-skeleton-action])')
+          .waitFor({ timeout: 15_000 });
+        await settle(page);
+        assert.deepEqual(await geometry(), waiting, '骨架与内容卡的容器布局不一致');
+      } finally {
+        await opened.close();
+      }
+    });
+  }
+
   it('数据管理骨架里等数据的操作键是禁用态，数据到了才换回蓝色主按钮', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/data-cleanup', DESKTOP);
     try {

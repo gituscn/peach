@@ -15,6 +15,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 
 import { Button } from '@/components/base/buttons/button';
 import { Chip } from '@/components/base/badges/chip';
+import { StatusLabel } from '../components/status-label';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
 import { Select, SelectItem } from '@/components/base/select/select';
@@ -396,7 +397,9 @@ function PikPakAccount({ state, settle, receipt, username, setUsername }: CardPr
   const outcomeFailed = browser.state === 'timeout' || browser.state === 'failed';
 
   return (
-    <Section title="PikPak 账号" icon={<PikPakIcon />} onSubmit={login}>
+    <Section title="PikPak 账号" icon={<PikPakIcon />} onSubmit={login}
+      aside={<StatusLabel tone={account.logged_in ? 'success' : waiting ? 'progress' : outcomeFailed ? 'error' : 'neutral'}>
+        {account.logged_in ? '已登录' : waiting ? '等待登录' : outcomeFailed ? '登录未完成' : '待登录'}</StatusLabel>}>
       {account.logged_in ? (
         <FactList>
           <Fact term="账号">{account.username || '已登录'}</Fact>

@@ -149,10 +149,11 @@ describe('设计决定：控件、状态与首页顶部', () => {
     }
   });
 
-  it('状态徽章只有三档颜色：成功绿、失败红、被叫停黄，其余中性', { timeout: 60_000 }, async () => {
+  it('任务结果成功绿、失败红、中断黄，取消与排队中性', { timeout: 60_000 }, async () => {
     const opened = await openActivity(browser, [
       settledRun(1, 'succeeded', '追更检查'), settledRun(2, 'failed', '扫描与采集'),
       settledRun(3, 'cancelled', '批量操作'), settledRun(4, 'pending', '命令行批处理'),
+      settledRun(5, 'interrupted', '资料采集'),
     ]);
     try {
       const badge = (status: string) => opened.page.locator(`li[data-status="${status}"] span`).first()
@@ -160,8 +161,8 @@ describe('设计决定：控件、状态与首页顶部', () => {
       const token = (name: string) => tokenColor(opened.page, '.peach-react', name);
       assert.equal(await badge('succeeded'), await token('--color-status-lime-background'));
       assert.equal(await badge('failed'), await token('--color-status-rose-background'));
-      assert.equal(await badge('cancelled'), await token('--color-status-yellow-background'));
-      // 第四种状态不另给颜色：三档之外都读同一个中性底，颜色才还说得出「成功／失败／被叫停」。
+      assert.equal(await badge('interrupted'), await token('--color-status-yellow-background'));
+      assert.equal(await badge('cancelled'), await token('--color-background-tertiary-default'));
       assert.equal(await badge('pending'), await token('--color-background-tertiary-default'));
       assert.deepEqual(opened.problems, []);
     } finally {
@@ -531,7 +532,7 @@ describe('设计决定：控件、状态与首页顶部', () => {
     }
   });
 
-  it('五枚叠放头像只朝标题方向展开，左缘和窄卡边界不动', { timeout: 60_000 }, async () => {
+  it('五枚叠放头像浮于文字上展开，左缘与标题列不动', { timeout: 60_000 }, async () => {
     const names = Array.from({ length: 7 }, (_, index) => `演示演员 ${index + 1}`);
     const opened = await openCatalogFixture(browser, (payload) => {
       const item = payload.items[0];
@@ -547,8 +548,9 @@ describe('设计决定：控件、状态与首页顶部', () => {
       await stack.waitFor({ timeout: 5_000 });
       const avatars = stack.locator('[data-media-avatar]');
       assert.equal(await avatars.count(), 5, 'API 给七位表演者时卡片没有收在五枚以内');
-      const before = await avatars.evaluateAll((items) => items.map((item) => item.getBoundingClientRect().x));
+      const before = await avatars.evaluateAll((items) => items.map((item) => parseFloat(getComputedStyle(item).left)));
       const left = (await stack.boundingBox())!.x;
+      const textBefore = await stack.locator('xpath=ancestor::article[@data-media-card]').first().locator('[data-media-text]').boundingBox();
       const waitForAvatarMotion = () => stack.evaluate(async (element) => {
         const animations = element.getAnimations({ subtree: true });
         await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
@@ -556,17 +558,14 @@ describe('设计决定：控件、状态与首页顶部', () => {
 
       await avatars.first().hover();
       await waitForAvatarMotion();
-      const firstSpread = await avatars.evaluateAll((items) => items.map((item) => item.getBoundingClientRect().x));
+      const firstSpread = await avatars.evaluateAll((items) => items.map((item) => parseFloat(getComputedStyle(item).left)));
       for (let index = 1; index < firstSpread.length; index += 1) {
         assert.ok(firstSpread[index] > before[index], `首枚悬停时第 ${index + 1} 枚没有向标题方向展开`);
       }
 
-      /* 第三枚要从静止位置指上去：首枚悬停时它被推开 20px，直接移过去，它让回原位后指针会落到右邻上。 */
-      await opened.page.mouse.move(0, 0);
-      await waitForAvatarMotion();
       await avatars.nth(2).hover();
       await waitForAvatarMotion();
-      const after = await avatars.evaluateAll((items) => items.map((item) => item.getBoundingClientRect().x));
+      const after = await avatars.evaluateAll((items) => items.map((item) => parseFloat(getComputedStyle(item).left)));
       const card = stack.locator('xpath=ancestor::article[@data-media-card]').first();
       const bounds = await card.evaluate((cardElement) => {
         const stackRect = cardElement.querySelector('[data-media-avatars]')!.getBoundingClientRect();
@@ -575,6 +574,8 @@ describe('设计决定：控件、状态与首页顶部', () => {
         const cardRect = cardElement.getBoundingClientRect();
         return {
           stackLeft: stackRect.left,
+          stackRight: stackRect.right,
+          textLeft: cardElement.querySelector('[data-media-text]')!.getBoundingClientRect().left,
           firstRingLeft: firstRect.left - 2,
           lastRingRight: lastRect.right + 2,
           cardLeft: cardRect.left,
@@ -585,10 +586,12 @@ describe('设计决定：控件、状态与首页顶部', () => {
       // Chrome 合成层结束 transition 时会留下远小于一个物理像素的浮点残差；这里守的是
       // 头像没有发生可见位移，不把 303 与 302.9933 这种同一像素内的取整差判成布局回退。
       assert.ok(Math.abs(after[0] - before[0]) <= .5, '指向第三枚时第一枚被往左推');
-      assert.ok(Math.abs(after[1] - before[1]) <= .5, '指向第三枚时第二枚被往左推');
-      assert.ok(after[3] > before[3] && after[4] > before[4], '右侧邻座没有朝标题方向让开');
+      assert.ok(after.slice(1).every((value,index)=>Math.abs(value-firstSpread[index+1]!)<=.5), '在头像间移动时展开位置不稳定');
+      assert.ok(after[3] > before[3] && after[4] > before[4], '头像没有朝标题方向展开');
       assert.ok(bounds.firstRingLeft >= bounds.cardLeft - .5, '首枚放大加描边后被卡片左缘裁切');
       assert.ok(bounds.lastRingRight <= bounds.cardRight + .5, '头像展开越出卡片右缘');
+      assert.ok(bounds.lastRingRight > bounds.textLeft && bounds.stackRight <= bounds.textLeft, '展开头像没有浮于文字上方');
+      assert.ok(Math.abs(bounds.textLeft-textBefore!.x)<=.5, '展开头像改变了标题列位置');
 
       await opened.page.mouse.move(0, 0);
       await avatars.nth(2).focus();
