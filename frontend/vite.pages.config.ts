@@ -11,9 +11,10 @@ import { fileURLToPath } from 'node:url';
 
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
+import { browserArtifacts, browserSymbols } from './scripts/sentry-build.ts';
 
 export default defineConfig({
-  plugins: [tailwindcss()],
+  plugins: [tailwindcss(), ...browserSymbols('peach-pages')],
   resolve: {
     alias: {
       '@peach/legacy/ui': fileURLToPath(new URL('./src/react/pages/legacy-ui.ts', import.meta.url)),
@@ -22,12 +23,12 @@ export default defineConfig({
   },
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   build: {
-    outDir: process.env.PEACH_FRONTEND_OUT_DIR || '../web/dist',
+    outDir: browserArtifacts,
     emptyOutDir: false,
     target: 'es2022',
     cssTarget: ['chrome111', 'edge111', 'firefox128', 'safari16.4', 'ios16.4'],
     minify: 'oxc',
-    sourcemap: false,
+    sourcemap: 'hidden',
     cssCodeSplit: false,
     lib: {
       entry: 'src/react/pages/index.tsx',

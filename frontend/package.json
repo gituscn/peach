@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build && vite build -c vite.pages.config.ts",
+    "sentry:upload": "node scripts/upload-sourcemaps.ts",
     "build:agentation": "vite build -c vite.agentation.config.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/react",
     "lint": "oxlint -c .oxlintrc.json src test e2e",
@@ -34,6 +35,8 @@
     "tailwind-merge": "3.7.0"
   },
   "devDependencies": {
+    "@sentry/cli": "3.8.0",
+    "@sentry/vite-plugin": "11.8.0",
     "@shadcn/lint": "0.2.1",
     "@tailwindcss/vite": "4.3.3",
     "@types/d3-sankey": "0.12.5",
