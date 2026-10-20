@@ -1160,6 +1160,7 @@ class WebDataTests(unittest.TestCase):
 
     def test_contract_handler_registries_are_complete_and_unknown_routes_fail(self):
         self.assertEqual(set(rm_web.GET_HANDLERS), {
+            "/api/tag-management",
             "/api/tasks",
             "/api/library-processing",
             "/api/library-processing/issues",
@@ -1186,6 +1187,7 @@ class WebDataTests(unittest.TestCase):
             "/api/jav/detail", "/api/jav/reviews", "/api/jav/image", "/api/jav/resources", "/api/jav/discoveries",
         })
         self.assertEqual(set(rm_web.POST_HANDLERS), {
+            "/api/tag-management", "/api/tag-management/preview",
             "/api/downloads", "/api/downloads/cancel", "/api/downloads/postprocess",
             "/api/library-processing", "/api/thumbnail-jobs", "/api/media-repair",
             "/api/media-processing",
@@ -1276,6 +1278,28 @@ class WebDataTests(unittest.TestCase):
             "id": 1, "operation": "remove", "tag": repeated["tag"],
         })
         self.assertNotIn("秘书OL", removed["tags"])
+
+    def test_tag_management_visibility_agrees_across_catalog_surfaces(self):
+        from peach.web_tags import w_tag_management, w_tag_preview
+        name = '管理可见性'
+        rm_web.w_item_tag(self.contract, {'id': 1, 'operation': 'add', 'tag': name})
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            entity_id = connection.execute("SELECT id FROM entity WHERE kind='tag' AND canonical_name=?", (name,)).fetchone()[0]
+            connection.execute("UPDATE asset_tag SET source='name' WHERE tag=?", (name,))
+            connection.commit()
+        command = {'operation': 'hide', 'ids': [entity_id]}
+        planned = w_tag_preview(self.contract, command)
+        w_tag_management(self.contract, {**command, 'token': planned['token']})
+        self.assertNotIn(name, [row['k'] for row in rm_web.q_item(self.contract, 1)['tags']])
+        self.assertNotIn(name, [row['k'] for row in rm_web.q_index(self.contract, 'tags')['items']])
+        self.assertNotIn(name, [row['k'] for row in rm_web.q_facets(self.contract)['tags']])
+        self.assertNotIn(name, [row['k'] for row in rm_web.q_stats(self.contract)['top_tags']])
+        for row in rm_web.q_items(self.contract, {'limit': '20'})['items']:
+            self.assertNotIn(name, row['tags'])
+        command['operation'] = 'restore'
+        planned = w_tag_preview(self.contract, command)
+        w_tag_management(self.contract, {**command, 'token': planned['token']})
+        self.assertIn(name, [row['k'] for row in rm_web.q_item(self.contract, 1)['tags']])
 
     def _seed_editions(self, rows):
         con = sqlite3.connect(self.db_path)

@@ -1769,6 +1769,27 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(added.status_code, 200)
         self.assertIn("手动标签", added.json()["tags"])
 
+    async def test_tag_management_requires_auth_and_applies_the_preview(self):
+        denied = await self.client.get('/api/tag-management')
+        self.assertEqual(denied.status_code, 401)
+        added = await self.client.post('/api/item-tag?t=secret', json={'id': 1, 'operation': 'add', 'tag': '管理标签'})
+        self.assertEqual(added.status_code, 200)
+        inventory = (await self.client.get('/api/tag-management?t=secret')).json()
+        tag = next(row for row in inventory['items'] if row['k'] == '管理标签')
+        command = {'operation': 'rename', 'ids': [tag['entity_id']], 'name': '我的标签'}
+        with closing(sqlite3.connect(self.db)) as connection:
+            connection.execute('CREATE TABLE IF NOT EXISTS genre_decision(source_genre TEXT PRIMARY KEY,raw_genre TEXT,peach_tag TEXT,decided_at TEXT)')
+            connection.commit()
+        planned = await self.client.post('/api/tag-management/preview?t=secret', json=command)
+        self.assertEqual(planned.status_code, 200, planned.text)
+        denied_write = await self.client.post('/api/tag-management', json={**command, 'token': planned.json()['token']})
+        self.assertEqual(denied_write.status_code, 401)
+        written = await self.client.post('/api/tag-management?t=secret', json={**command, 'token': planned.json()['token']})
+        self.assertEqual(written.status_code, 200, written.text)
+        detail = (await self.client.get('/api/item?t=secret&id=1')).json()
+        self.assertIn('我的标签', [row['k'] for row in detail['tags']])
+        self.assertNotIn('管理标签', [row['k'] for row in detail['tags']])
+
     async def test_opencode_models_endpoint_is_explicit_and_normalized(self):
         denied = await self.client.get("/api/providers/opencode-go/models")
         self.assertEqual(denied.status_code, 401)

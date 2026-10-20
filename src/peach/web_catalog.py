@@ -16,6 +16,7 @@ from . import entities, media_libraries, sample_images, settings_file
 
 from .catalog_rules import (
     LENGTH_TAGS,
+    canonical_tag_name,
     current_tags,
     fc2_collection_label,
     is_jav_asset,
@@ -130,9 +131,14 @@ def tag_not_hidden(asset: str, tag: str) -> str:
     `tag` 传比较用的表达式。列一侧要用 `peach_normalize()`——SQLite 的 lower() 只认
     ASCII，拿它去比 Python casefold 写进去的值，非 ASCII 标签永远匹配不上。
     """
-    return ("NOT EXISTS(SELECT 1 FROM asset_tag_preference p "
+    return (f"NOT EXISTS(SELECT 1 FROM (SELECT {tag} AS name) tag_visibility WHERE "
+            "EXISTS(SELECT 1 FROM asset_tag_preference p "
             f"WHERE p.asset_id={asset} AND p.profile_id='{DEFAULT_PROFILE_ID}' "
-            f"AND p.hidden=1 AND p.normalized_tag={tag})")
+            "AND p.hidden=1 AND p.normalized_tag=tag_visibility.name) OR "
+            "EXISTS(SELECT 1 FROM entity hidden_tag WHERE json_extract(hidden_tag.metadata_json,'$.user_tag_hidden')=1 "
+            "AND hidden_tag.id IN (SELECT id FROM entity WHERE kind='tag' AND normalized_name=tag_visibility.name "
+            "UNION SELECT al.entity_id FROM entity_alias al JOIN entity owner ON owner.id=al.entity_id "
+            "WHERE owner.kind='tag' AND al.normalized_alias=tag_visibility.name)))")
 
 
 #: 「未归属」是一个真实的集合，不是详情页上的一句说明文字：22509 部视频里 4566 部
@@ -203,6 +209,17 @@ def _entity_asset_filter(connection, kind: str, name: str) -> tuple[str, list[in
     return f"a.id IN (SELECT scoped.asset_id FROM asset_entity scoped WHERE {predicate})", [entity["id"]]
 
 
+def _canonical_tag_names(contract, names):
+    """筛选使用当前规范名，重复别名只生成一份条件。"""
+    with contract.read_connection() as connection:
+        canonical = []
+        for name in names:
+            tag_id = entities._ingest_name_id(connection, 'tag', canonical_tag_name(name))
+            canonical.append(connection.execute('SELECT canonical_name FROM entity WHERE id=?', (tag_id,)).fetchone()[0]
+                             if tag_id is not None else canonical_tag_name(name))
+        return list(dict.fromkeys(canonical))
+
+
 def catalog_filter(contract: WebContract, args):
     """视频列表与侧栏使用同一组筛选条件。"""
     trash = args.get("state") == "trash"
@@ -235,6 +252,7 @@ def catalog_filter(contract: WebContract, args):
         where.append(UNOWNED_ASSET_CLAUSE)
     if args.get("tag"):
         tags = [x for x in args["tag"].split(",") if x]
+        tags = _canonical_tag_names(contract, tags)
         tag_clause = (
             "(a.id IN (SELECT ae.asset_id FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id "
             "WHERE e.kind='tag' AND e.canonical_name=? UNION "
@@ -424,7 +442,8 @@ def q_items(contract: WebContract, args):
 def con_tags(contract: WebContract, ids, qm):
     with contract.read_connection() as c:
         rows = c.execute(
-            f"SELECT asset_id, tag FROM asset_tag WHERE asset_id IN ({qm})", ids).fetchall()
+            f"SELECT t.asset_id,t.tag FROM asset_tag t WHERE t.asset_id IN ({qm}) AND "
+            + tag_not_hidden('t.asset_id', 'peach_normalize(t.tag)'), ids).fetchall()
         return visible_identity_data(c, [], rows, tag_column=1)[1]
 
 
@@ -451,8 +470,9 @@ def con_entities(contract: WebContract, ids, qm):
             f"SELECT DISTINCT ae.asset_id,e.id,e.kind,e.canonical_name "
             f"FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id "
             f"WHERE ae.asset_id IN ({qm}) "
-            f"AND e.kind IN ('tag','performer','creator','studio','series') "
-            f"ORDER BY ae.asset_id,e.kind,e.canonical_name", ids,
+            "AND e.kind IN ('tag','performer','creator','studio','series') "
+            "AND (e.kind<>'tag' OR " + tag_not_hidden('ae.asset_id', 'e.normalized_name') + ') '
+            "ORDER BY ae.asset_id,e.kind,e.canonical_name", ids,
         ).fetchall()
         return [row for row in rows if row[1] not in excluded]
 
@@ -1320,6 +1340,7 @@ def q_facets(
             "SELECT e.canonical_name AS k, count(DISTINCT ae.asset_id) AS n "
             "FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id "
             "JOIN asset a ON a.id=ae.asset_id WHERE a.medium='video' AND e.kind='tag' " + scope +
+            "AND " + tag_not_hidden('ae.asset_id', 'e.normalized_name') + ' ' +
             "AND " + tag_is_not_a_performer_name("e.normalized_name") + " "
             "GROUP BY e.id,e.canonical_name ORDER BY n DESC LIMIT 400", scope_params)]
         classified = [
@@ -1386,6 +1407,11 @@ def w_item_tag(contract: WebContract, body):
     with contract.write_transaction() as c:
         if not c.execute("SELECT 1 FROM asset WHERE id=?", (aid,)).fetchone():
             raise ValueError("asset not found")
+        from .entities import _ingest_name_id
+        identity = _ingest_name_id(c, 'tag', canonical_tag_name(tag))
+        if identity is not None:
+            tag = c.execute('SELECT canonical_name FROM entity WHERE id=?', (identity,)).fetchone()[0]
+            normalized = normalize_entity_name(tag)
         if operation == "remove":
             c.execute(
                 "INSERT INTO asset_tag_preference(profile_id,asset_id,normalized_tag,hidden,updated_at) "

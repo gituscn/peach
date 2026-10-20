@@ -33,6 +33,8 @@ import {
 } from './index-data';
 import { OnlineAuthors, PeopleGrid } from './index-people';
 import { TagAlphabet, TagCloud, TagDock, TagFilters, type TagEntry } from './index-tags';
+import { TagManager } from './tag-manager';
+import { TagEditor, type ManagedTag } from './tag-operations';
 
 /* 厂牌与事务所是两种实体，不是同一份数据的两种筛选：厂牌出片，事务所出人。所以这个开关切的
    是地址。场记板归厂牌，公文包归事务所，字形各说各的那一件事。 */
@@ -113,6 +115,8 @@ function IndexSearch({ label, value, onQuery }: { label: string; value: string; 
 type Item = IndexPerson | IndexTag | OnlineAuthor | OnlineTag;
 
 export function IndexPage(props: IndexProps) {
+  const [managing, setManaging] = useState(false);
+  const [editingTag, setEditingTag] = useState<ManagedTag | null>(null);
   const [route, setRoute] = useState<IndexRoute>(() => indexRoute(
     { kind: props.kind, q: props.q, scope: props.scope, view: props.view, category: props.category },
   ));
@@ -143,6 +147,7 @@ export function IndexPage(props: IndexProps) {
      视图或公司类型问的是另一份东西，照常先铺骨架。 */
   const [refining, setRefining] = useState(false);
   const go = (patch: Partial<IndexRoute>, replace = false) => {
+    if (patch.scope !== undefined) setManaging(false);
     const next = { ...route, ...patch };
     setRefining(Object.keys(patch).every((key) => key === 'q'));
     setRoute(next);
@@ -176,9 +181,9 @@ export function IndexPage(props: IndexProps) {
   useLayoutEffect(() => { if (root.current) refitNativeImages(root.current) }, [layout]);
 
   const tags = useMemo<TagEntry[]>(() => kind === 'tags'
-    ? (items as IndexTag[]).map((tag) => ({ ...tag, label: props.tagLabel(tag.k) })) : [], [items, kind]);
+    ? (items as IndexTag[]).map((tag) => ({ ...tag, label: onlineTags ? tag.k : props.tagLabel(tag.k) })) : [], [items, kind, onlineTags]);
   const groups = useMemo(() => kind === 'tags' && view === 'alphabet'
-    ? tagGroups(tags, (tag) => props.tagLabel(tag)) : [], [tags, view, kind]);
+    ? tagGroups(tags, (tag) => onlineTags ? tag : props.tagLabel(tag)) : [], [tags, view, kind, onlineTags]);
 
   const changeLayout = (next: PeopleLayout) => { setLayout(next); props.savePreference({ layout: next }) };
 
@@ -226,7 +231,10 @@ export function IndexPage(props: IndexProps) {
       online={onlineTags || onlineAuthors} configurable={props.configurable} />;
     if (onlineAuthors) return <OnlineAuthors items={items as OnlineAuthor[]} layout={layout} props={props} />;
     if (isPeople(kind)) return <PeopleGrid kind={kind} items={items as IndexPerson[]} layout={layout} props={props} />;
-    const actions = { online: onlineTags, picked, press: pressTag };
+    const actions = { online: onlineTags, picked, press: pressTag, edit: (key: string) => {
+      const tag = tags.find(row => row.k === key);
+      if (tag && (tag.entity_id || tag.id)) setEditingTag({ entity_id: tag.entity_id, id: tag.id, k: tag.k, n: tag.n, aliases: tag.aliases || [], hidden: !!tag.hidden, cat: tag.cat });
+    } };
     return view === 'alphabet' ? <TagAlphabet groups={groups} actions={actions} /> : <TagCloud tags={tags} actions={actions} />;
   };
 
@@ -244,6 +252,9 @@ export function IndexPage(props: IndexProps) {
         ) : null}
         {isPeople(kind) ? <LayoutSwitch kind={kind} layout={layout} onChange={changeLayout} /> : null}
         <LibraryShortcuts kind={kind === 'tags' ? 'tag' : kind === 'studios' ? 'studio' : kind === 'agencies' ? 'agency' : kind === 'creators' ? 'creator' : 'performer'} />
+        {kind === 'tags' ? <Button variant={managing ? 'primary' : 'ghost'} size="small" iconOnly data-tag-mode=""
+          leadingIcon={spriteGlyph('list-filter')} aria-label={managing ? '返回标签浏览' : '管理标签'} title={managing ? '返回标签浏览' : '管理标签'} aria-pressed={managing}
+          onClick={() => { props.exitSelectMode(); setPicked(new Set()); setManaging(!managing) }} /> : null}
         {/* 窄屏一行放不下四样东西：标题与过滤框一行，开关另起一行。 */}
         <span aria-hidden className="hidden h-0 basis-full max-board-narrow:order-2 max-board-narrow:block" />
         <IndexSearch label={`过滤${title}`} value={q} onQuery={(next) => { if (next !== q) go({ q: next }, !!next) }} />
@@ -257,6 +268,9 @@ export function IndexPage(props: IndexProps) {
           }} />
       ) : null}
       {tabs}
+      {managing && kind === 'tags' ? <TagManager key={scope} scope={scope} search={q} category={category} view={view}
+        onCategory={next => go({ category: next })} onView={next => go({ view: next })}
+        onJump={at => root.current?.querySelector(`[data-alpha-group="${at}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })} /> : <>
       {kind === 'performers' && scope === 'local' ? (
         <div aria-label="身份分类" className={IDENTITY_ROW_CLASS}>
           {IDENTITY_CATEGORIES.filter((entry) => entry[0] === category || hasEntries(entry)).map(([key, label]) => (
@@ -290,6 +304,8 @@ export function IndexPage(props: IndexProps) {
           onClear={() => setPicked(new Set())}
           onApply={() => { const chosen = [...picked]; setPicked(new Set()); props.showTags(chosen, match) }} />
       ) : null}
+      </>}
+      {editingTag ? <TagEditor operation="rename" scope={scope} selected={[editingTag]} close={() => setEditingTag(null)} done={() => {}} /> : null}
     </div>
   );
 }

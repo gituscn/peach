@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type FormEvent, type KeyboardEvent } from 'react';
 import { attachOverlayScrollbar, revealTexts, spinnerHtml, wireHorizontalScroller } from '@peach/legacy/ui';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
@@ -21,8 +21,13 @@ const LABELS: Record<string, string> = { performer: '艺人', creator: '创作�
 const GLYPHS = { all: spriteGlyph('star'), performer: spriteGlyph('user-round'), creator: spriteGlyph('user-round'), studio: spriteGlyph('clapperboard'), series: spriteGlyph('film'), agency: spriteGlyph('briefcase'), tag: spriteGlyph('tags'), filters: spriteGlyph('list-filter') };
 const SCOPES = [['all', '全部'], ...Object.entries(LABELS), ['filters', '保存的筛选']];
 
+/** 实体行内的图标动作，共用收藏按钮的尺寸、悬停与焦点反馈。 */
+export function EntityActionButton({ label, children, ...props }: ComponentProps<'button'> & { label: string }) {
+  return <button type="button" {...props} data-entity-action="" aria-label={label} title={props.title || label}>{children}</button>;
+}
+
 export function FavoriteButton({ item }: { item: Favorite }) {
-  return <FavoriteChoice key={`${item.kind}:${item.entity_id}:${item.name}`} item={item} />;
+  return <FavoriteChoice key={`${item.scope || 'local'}:${item.kind}:${item.tag_id || item.entity_id}:${item.name}`} item={item} />;
 }
 
 function FavoriteChoice({ item }: { item: Favorite }) {
@@ -33,12 +38,11 @@ function FavoriteChoice({ item }: { item: Favorite }) {
     ? isFavorite(query.data.favorites || [], item)
     : item.favorite ?? (query.data ? isFavorite(query.data.favorites || [], item) : false);
   return <span className="inline-flex min-w-0 flex-col gap-1">
-    <button type="button" data-favorite="" aria-pressed={!!selected}
-      aria-label={`${selected ? '取消收藏' : '收藏'}${item.name}`}
-      title={`${selected ? '取消收藏' : '收藏'}${item.name}`}
+    <EntityActionButton data-favorite="" aria-pressed={!!selected}
+      label={`${selected ? '取消收藏' : '收藏'}${item.name}`}
       {...busyProps(write.isPending)} onClick={() => {
         if (!write.isPending) write.mutate({ action: 'favorite', ...item, on: !selected });
-      }}>{write.isPending ? <span aria-hidden dangerouslySetInnerHTML={{ __html: spinnerHtml('') }} /> : <Star />}</button>
+      }}>{write.isPending ? <span aria-hidden dangerouslySetInnerHTML={{ __html: spinnerHtml('') }} /> : <Star />}</EntityActionButton>
     {write.isError ? <Note tone="error">{errorMessage(write.error)}</Note> : null}
     {query.isError ? <Button variant="secondary" size="small" onClick={() => void query.refetch()}>重试读取收藏</Button> : null}
   </span>;
@@ -148,7 +152,7 @@ function ShortcutContents({ currentHref, kind, close }: { currentHref?: () => st
         <a href={favoriteHref(row)} aria-label={row.name} onClick={close} className="flex min-w-0 flex-1 items-center gap-3 text-body-regular text-text-primary">
           <FavoriteAvatar key={row.image_url} item={row} />
           <span className="flex min-w-0 flex-col gap-1"><span className="truncate">{row.name}</span>
-            <span className="text-caption-1-regular text-text-secondary">{LABELS[row.kind]}</span></span>
+            <span className="text-caption-1-regular text-text-secondary">{row.scope === 'online' ? '在线标签' : LABELS[row.kind]}</span></span>
         </a>
         <Button variant="secondary" size="small" aria-label={`取消收藏${row.name}`} {...busyProps(write.isPending)}
           onClick={() => { if (!write.isPending) write.mutate({ action: 'favorite', ...row, on: false }) }}>取消收藏</Button>
