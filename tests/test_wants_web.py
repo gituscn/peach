@@ -189,6 +189,12 @@ class WantWebFixture(unittest.TestCase):
         detector = Mock()
         detector.detect.return_value = []
         self.enterContext(patch('peach.cover_artwork._default_detector', return_value=detector))
+        # 图像扩展在测试线程初始化，后台等待只覆盖资料与封面任务。
+        from peach.face_detect import decode
+        try:
+            decode(self._fetch_cover(self.contract, 'DEMO-001')[0])
+        except ImportError:
+            pass
         # 取资料与取图都替掉：番号是假的，配额是真的。
         self.collected: list[str] = []
         self.collect_misses: set[str] = set()
