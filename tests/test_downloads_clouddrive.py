@@ -35,6 +35,7 @@ class FakeCloudDrive:
         self.quota = pb.OfflineQuotaInfo(total=1500, used=3, left=1497)
         self.add_error = ""
         self.files: set[str] = set()
+        self.can_manage = True
 
     def _auth(self, name, request, context):
         header = dict(context.invocation_metadata()).get("authorization", "")
@@ -77,6 +78,7 @@ class FakeCloudDrive:
                        key=len, default="/115")
             return pb.CloudDriveFile(name=request.path, fullPathName=full, isDirectory=True,
                                      isCloudRoot=full == root, canOfflineDownload=self.folders[full],
+                                     supportOfflineDownloadManagement=self.can_manage,
                                      CloudAPI=pb.CloudAPI(name=self.clouds.get(root, "115open"),
                                                           userName="u1", path=root))
         if full in self.files:
@@ -149,6 +151,19 @@ class _Server(unittest.TestCase):
 
 
 class SubmitTests(_Server):
+    def test_cloud_without_task_management_submits_and_waits_for_the_file(self):
+        self.fake.can_manage = False
+        self.assertEqual(self.provider.submit(MAGNET, TARGET).state, dl.RUNNING)
+        self.assertNotIn("ListOfflineFilesByPath", self.methods())
+        self.assertNotIn("GetOfflineQuotaInfo", self.methods())
+        task = dl.DownloadTask(1, HASH, "clouddrive:guangya:test", MAGNET.uri, "ABC-123", TARGET, dl.SUBMITTED)
+        self.assertEqual(self.provider.status(task).state, dl.RUNNING)
+        self.fake.files.add(f"{TARGET}/ABC-123")
+        self.assertEqual(self.provider.status(task).state, dl.DONE)
+        with self.assertRaisesRegex(dl.DownloadError, "到网盘中处理"):
+            self.provider.cancel(task)
+        self.assertNotIn("RemoveOfflineFiles", self.methods())
+
     def test_a_submission_checks_the_folder_and_quota_then_adds(self):
         status = self.provider.submit(MAGNET, TARGET)
         self.assertEqual((status.state, status.adopted), (dl.RUNNING, False))

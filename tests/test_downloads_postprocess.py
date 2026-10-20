@@ -68,6 +68,14 @@ class DownloadPostprocessTests(unittest.TestCase):
         main, path, _ = post._bind_main(self.contract, self.store.get(self.task.id))
         self.assertEqual((main, path), (self.asset_id, str(self.target)))
 
+    def test_cloud_library_channel_binds_assets_by_media_source(self):
+        self.task.provider = 'clouddrive:guangya:test-library'
+        with self.database.write_transaction() as connection:
+            connection.execute("UPDATE asset SET location='guangya' WHERE id=?", (self.asset_id,))
+        main, path, ids = post._bind_main(self.contract, self.task)
+        self.assertEqual((main, path, ids), (self.asset_id, str(self.source), [self.asset_id]))
+        self.assertEqual(self.task.payload()['provider_label'], '光鸭云盘')
+
     def test_occupied_target_is_a_retryable_failure(self):
         self.target.parent.mkdir()
         self.target.write_bytes(b'existing file')

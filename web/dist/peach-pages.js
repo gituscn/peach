@@ -19499,16 +19499,16 @@ function hm({ variant: e = "primary", size: t = "medium", leadingIcon: n, traili
 //#region src/react/settings/section.tsx
 function gm({ children: e }) {
 	return /* @__PURE__ */ (0, z.jsx)("div", {
-		className: "flex flex-col",
+		className: "flex flex-col empty:hidden",
 		children: e
 	});
 }
 function _m({ divided: e = !1, children: t }) {
 	return e ? /* @__PURE__ */ (0, z.jsx)("div", {
-		className: "flex flex-col gap-4 border-t border-separator-border py-4 pr-3",
+		className: "flex flex-col gap-4 border-t border-separator-border py-4 pr-3 empty:hidden",
 		children: t
 	}) : /* @__PURE__ */ (0, z.jsx)("div", {
-		className: "flex flex-col gap-4 py-4 pr-3",
+		className: "flex flex-col gap-4 py-4 pr-3 empty:hidden",
 		children: t
 	});
 }
@@ -19543,7 +19543,7 @@ function bm({ href: e, children: t, leadingIcon: n }) {
 }
 function xm({ children: e }) {
 	return /* @__PURE__ */ (0, z.jsx)("dl", {
-		className: "flex flex-col",
+		className: "flex flex-col empty:hidden",
 		children: e
 	});
 }

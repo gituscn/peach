@@ -58,12 +58,12 @@ def _bind_main(contract, task) -> tuple[int, str, list[int]]:
     if not task.ledger_path:
         raise ValueError("下载任务没有落地路径")
     store = DownloadStore(contract.database)
-    rows = store.assets_under(task.provider, task.ledger_path)
+    rows = store.assets_under(task.location, task.ledger_path)
     with contract.database.read_connection() as connection:
         bound = connection.execute(
             "SELECT id FROM asset WHERE id=? AND location=? AND medium='video' AND disposal IS NULL",
-            (task.asset_id, task.provider)).fetchone()
-    main = int(bound['id']) if bound else store.asset_under(task.provider, task.ledger_path, task.code)
+            (task.asset_id, task.location)).fetchone()
+    main = int(bound['id']) if bound else store.asset_under(task.location, task.ledger_path, task.code)
     if main is None:
         raise ValueError("落地目录里没有可识别的视频")
     wrote_code = False
@@ -123,14 +123,14 @@ def _collect(contract, main: int, handle) -> dict:
 
 
 def _organize(contract, task, main: int) -> dict:
-    templates = contract.download_organize_templates().get(task.provider, {})
+    templates = contract.download_organize_templates().get(task.location, {})
     if not templates:
         return {"moved": 0, "skipped": "未配置整理模板"}
-    if organize.unverified_location(task.provider):
-        return {"moved": 0, "skipped": f"{task.provider} 缺少官方核验改名通道"}
+    if organize.unverified_location(task.location):
+        return {"moved": 0, "skipped": f"{task.location} 缺少官方核验改名通道"}
     with contract.database.read_connection() as connection:
         plan = organize.build_plan(
-            connection, location=task.provider, file_template=templates.get("file", ""),
+            connection, location=task.location, file_template=templates.get("file", ""),
             dir_template=templates.get("dir", ""), asset_ids=[main])
     movable = [row for row in plan["rows"] if row.get("action") in {"rename", "move"}]
     blocked = [row for row in plan['rows'] if row.get('reason') in {

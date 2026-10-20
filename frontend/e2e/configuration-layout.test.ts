@@ -8,6 +8,32 @@ describe('配置表单与行间距', () => {
   before(async () => { browser = await launch() });
   after(async () => { await browser?.close() });
   for (const viewport of VIEWPORTS) {
+    it(`${viewport.name}：云下载空检查报告不占据分隔区域`, async () => {
+      const opened = await visit(browser, '/settings/library?section=' + encodeURIComponent('下载渠道'), viewport);
+      const { page } = opened;
+      try {
+        await page.route('**/api/configuration', async route => {
+          const data = await (await route.fetch()).json();
+          await route.fulfill({ json: { ...data, downloads: { ...data.downloads, media_sources: ['guangya'], token_set: true,
+            config: { ...data.downloads.config, clouddrive_address: 'http://127.0.0.1:19798' } } } });
+        });
+        await page.route('**/api/configuration/downloads/check', route => route.fulfill({ json: {
+          ok: true, address: 'http://127.0.0.1:19798', permissions: [], missing: [], root: '/', folder: null,
+          quota: null, suggested_target: null, suggested_pikpak_root: '', problems: [],
+        } }));
+        await page.reload();
+        const form = page.getByRole('form', { name: '云下载', exact: true });
+        await form.getByRole('button', { name: '检查连接', exact: true }).click();
+        await settle(page);
+        assert.equal(await form.locator('dl').count(), 0);
+        assert.equal(await form.locator('.border-t').count(), 1);
+        const empty = await form.locator('div').evaluateAll(nodes => nodes.filter(node =>
+          !node.childNodes.length && node.getBoundingClientRect().height > 0).map(node => node.className));
+        assert.deepEqual(empty, []);
+        assert.ok((await layout(page)).scrollWidth <= viewport.width + 1);
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close() }
+    });
     it(`${viewport.name}：来源站标本地提供，帮助链接紧接文字`, async () => {
       const opened = await visit(browser, '/settings/subscriptions', viewport);
       const { page } = opened;
@@ -113,10 +139,12 @@ describe('配置表单与行间距', () => {
       const opened = await visit(browser, '/settings/library?section=' + encodeURIComponent('下载渠道'), viewport);
       const { page } = opened;
       try {
-        await page.route('**/api/configuration/downloads', async route => {
-          const body = await (await route.fetch()).json();
-          await route.fulfill({ json: { ...body, available: true, pikpak: { ...body.pikpak, logged_in: false },
-            pikpak_browser: { available: true, state: 'idle', message: '' } } });
+        await page.route('**/api/configuration', async route => {
+          const data = await (await route.fetch()).json();
+          const body = data.downloads;
+          await route.fulfill({ json: { ...data, downloads: { ...body, available: true, media_sources: ['pikpak'],
+            pikpak: { ...body.pikpak, logged_in: false },
+            pikpak_browser: { available: true, state: 'idle', message: '' } } } });
         });
         await page.reload();
         const form = page.getByRole('form', { name: 'PikPak 账号', exact: true });

@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .downloads import (
-    CLOUDDRIVE_CREDENTIAL, MAX_WAIT_HOURS, PIKPAK_CREDENTIAL, PROVIDER_LABELS, DownloadError,
+    CLOUDDRIVE_CREDENTIAL, MAX_WAIT_HOURS, PIKPAK_CREDENTIAL, DownloadError,
     DownloadService, Landing, OfflineProvider, clean_address, normalise_target,
     submit_offline_download,
 )
@@ -39,7 +39,7 @@ def build_download_service(*, database: LedgerDatabase, state_root: Path,
     holder: dict[str, DownloadService] = {}
 
     def providers(key: str) -> OfflineProvider:
-        if key == "115":
+        if key == "115" or key.startswith("clouddrive:"):
             token = _values(credentials, CLOUDDRIVE_CREDENTIAL).get("token", "")
             return CloudDriveProvider(holder["service"].config.clouddrive_address, token)
         if key == "pikpak":
@@ -51,6 +51,10 @@ def build_download_service(*, database: LedgerDatabase, state_root: Path,
                               providers=providers, landing=Landing(push_discovery),
                               available=available, after_ingest=after_ingest)
     holder["service"] = service
+    from .downloads_channels import LibraryChannels
+    from .settings_file import active
+    service.channel_catalog = LibraryChannels(service, lambda: active().library_names)
+    service.landing.channel_catalog = service.channel_snapshot
     service.pikpak_browser = BrowserLogin(
         profile_dir(Path(credentials.root).parent),
         persist=lambda values: credentials.save(PIKPAK_CREDENTIAL, values), on_done=service.wake)
@@ -143,13 +147,14 @@ def settings_payload(service: DownloadService, declared_roots) -> dict:
     login = _browser_login(service)
     return {
         "available": service.available,
+        "media_sources": [key for key, roots in declared_roots.items() if roots],
         "config": service.config.payload(),
         "token_set": "token" in credentials.describe(CLOUDDRIVE_CREDENTIAL)["fields"],
         "pikpak": pikpak,
         "pikpak_browser": {"available": login is not None and login.available(),
                            **(login.status() if login is not None else {"state": "idle", "message": ""})},
         "pikpak_roots": list(declared_roots.get("pikpak", ())),
-        "providers": [{"key": key, "label": label} for key, label in PROVIDER_LABELS.items()],
+        "providers": service.channel_snapshot()["providers"],
         "max_wait_hours": MAX_WAIT_HOURS,
     }
 
@@ -212,7 +217,9 @@ def _hints(service: DownloadService, body: dict):
         logged_in = False
     return Hints(prefixes=prefixes, declared_roots=dict(landing.declared_roots or {}),
                  pikpak_root=pikpak_root.strip(),
-                 pikpak_account=body.get("pikpak_account") is True or logged_in)
+                 target_enabled=bool(landing.declared_roots.get("115")),
+                 pikpak_account=bool(landing.declared_roots.get("pikpak")) and (
+                     body.get("pikpak_account") is True or logged_in))
 
 
 def check_clouddrive(service: DownloadService, body: dict) -> dict:

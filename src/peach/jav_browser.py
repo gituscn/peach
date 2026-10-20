@@ -12,7 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
-from .catalog_rules import is_jav_code, normalise_code_key, release_code_from_text, same_release_code
+from .catalog_rules import is_jav_code, normalise_code_key, release_code_from_text, release_identity, same_release_code
 from .config import PROJECT_ROOT
 from .downloads import INGESTED, RESUBMITTABLE_STATES, submit_offline_download, parse_magnet
 from .follow_secrets import CredentialError
@@ -23,8 +23,8 @@ LOGGER = logging.getLogger(__name__)
 CREDENTIAL = "jav-browser"
 ACTIVE = {"queued", "searching"}
 MESSAGES = {
-    "idle": "加入 Peach", "queued": "等待搜索磁力", "searching": "正在搜索磁力",
-    "submitted": "云下载进行中", "ingested": "已入库", "owned": "馆藏已有这部作品",
+    "idle": "可以加入 Peach 馆藏", "queued": "等待搜索磁力", "searching": "正在搜索磁力",
+    "submitted": "云下载进行中", "ingested": "已加入 Peach 馆藏", "owned": "馆藏已有该番号影片",
     "failed": "添加失败，可重试", "no_match": "未找到可自动下载的磁力，可重试",
 }
 
@@ -43,11 +43,20 @@ def source_sites() -> list[dict]:
                 or not isinstance(site.get("domains"), list) or not site["domains"]):
             raise ValueError("JAV 站点清单包含无效条目")
         ids.add(site["id"])
+        if site.get("identity") is not None and (site["identity"] != "peach" or site["mode"] != "automatic"
+                or not isinstance(site.get("detail_pattern"), str) or not site["detail_pattern"].startswith("^")
+                or len(site.get("query_keys", ())) > 1):
+            raise ValueError("发行商品号识别配置无效")
         for host in site["domains"]:
             if not isinstance(host, str) or not re.fullmatch(r"[a-z0-9-]+(?:\.[a-z0-9-]+)+", host) or host in domains:
                 raise ValueError("JAV 站点清单包含无效域名")
             domains.add(host)
     return sites
+
+
+def source_site(host: str) -> dict | None:
+    return next((site for site in source_sites() if any(
+        host == name or host.endswith("." + name) for name in site["domains"])), None)
 
 
 def code_key(value: object) -> str:
@@ -63,8 +72,7 @@ def source_page(value: object) -> str:
     try:
         parsed = urlsplit(raw)
         host = (parsed.hostname or "").lower()
-        site = next((site for site in source_sites() if any(
-            host == name or host.endswith("." + name) for name in site["domains"])), None)
+        site = source_site(host)
         if (len(raw) > 2048 or parsed.scheme != "https" or site is None or parsed.username
                 or parsed.password or parsed.port not in {None, 443} or parsed.fragment):
             raise ValueError
@@ -76,6 +84,25 @@ def source_page(value: object) -> str:
     except ValueError:
         raise ValueError("请从支持的 JAV 影片详情页添加") from None
     return parsed._replace(query=urlencode(parameters), fragment="").geturl()
+
+
+def identify_source(value: object) -> str:
+    """从已登记发行平台的详情地址提取商品号，复用编目规则确认番号。"""
+    source = source_page(value)
+    url = urlsplit(source)
+    site = source_site(url.hostname or "")
+    product = ""
+    if site and site.get("identity") == "peach":
+        match = re.fullmatch(site["detail_pattern"], url.path, re.IGNORECASE)
+        if match:
+            product = (match.group(1) if match.lastindex else "") or next(
+                (dict(parse_qsl(url.query)).get(key, "") for key in site.get("query_keys", ())), "")
+    if not product:
+        raise ValueError("未识别到作品番号，请选中页面的完整番号后加入 Peach")
+    try:
+        return code_key(product)
+    except ValueError:
+        return code_key(normalise_code_key(release_identity(product)))
 
 
 class JavBrowser:
@@ -115,9 +142,17 @@ class JavBrowser:
 
     def settings(self) -> dict:
         config = self._config()
-        providers = self.downloads.snapshot(1)["providers"] if self.downloads.available else []
-        return {"enabled": bool(config.get("token_hash")), "provider": config.get("provider", "115"),
-                "available": self.downloads.available, "providers": providers,
+        release = json.loads((PROJECT_ROOT / "web/integrations/jav-userscript-release.json").read_text(encoding="utf-8"))
+        catalog = self.downloads.channel_snapshot() if self.downloads.available else {"providers": [], "problems": []}
+        providers = catalog["providers"]
+        preferred = config.get("provider", "")
+        selected = preferred if any(row["key"] == preferred for row in providers) else (
+            providers[0]["key"] if providers else "")
+        return {"enabled": bool(config.get("token_hash")), "provider": selected,
+                "active_provider": preferred, "available": self.downloads.available, **catalog,
+                "userscript": {"version": release["version"],
+                               "minimum_version": release.get("bridge_min_version", release["version"]),
+                               "install_url": release.get("install_url", "/integrations/peach-jav.user.js")},
                 "sites": [{key: site[key] for key in ("id", "label", "kind", "domains", "mode")}
                           for site in source_sites()]}
 
@@ -153,7 +188,7 @@ class JavBrowser:
     def _ready(self, provider: str):
         if not self.downloads.available:
             raise ValueError("浏览器添加只在允许修改数据库的设备上可用")
-        state = next((row for row in self.downloads.snapshot(1)["providers"] if row["key"] == provider), None)
+        state = next((row for row in self.downloads.channel_snapshot()["providers"] if row["key"] == provider), None)
         if not state or not state["configured"] or not state["target"]:
             raise ValueError("请先在下载渠道配置网盘账号和目标目录")
 

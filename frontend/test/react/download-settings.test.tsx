@@ -9,6 +9,7 @@ vi.mock('../../src/react/settings/jav-browser-settings', () => ({ JavBrowserSett
 
 const state = (patch: Partial<DownloadSettingsState> = {}): DownloadSettingsState => ({
   available: true,
+  media_sources: ['115', 'pikpak'],
   config: { clouddrive_address: 'http://127.0.0.1:19798', targets: { '115': '/115/云下载' },
     pikpak_root: '', wait_hours: 168 },
   token_set: false,
@@ -33,6 +34,48 @@ const unfilled = () => state({
 const field = (host: HTMLElement, label: string) =>
   [...host.querySelectorAll('label')].find((node) => node.textContent?.trim() === label)
     ?.closest('[data-input-size]')?.querySelector('input') ?? null;
+
+it('空检查报告不保留分隔区，只有错误时直接显示原因', async () => {
+  const fetcher = fetchMock(200, report());
+  vi.stubGlobal('fetch', fetcher);
+  const host = await mount(<DownloadSettings initial={state({ media_sources: ['guangya'] })} receipt={vi.fn()} />);
+  const form = section(host, '云下载')!;
+  await click(buttonNamed('检查连接', host));
+  await settle();
+  expect(form.querySelector('dl')).toBeNull();
+  expect(form.querySelectorAll('.border-t')).toHaveLength(1);
+  fetcher.mockImplementation(async () => ({ ok: true, status: 200, json: async () => report({ problems: ['无法连接 CloudDrive2'] }) }));
+  await click(buttonNamed('检查连接', host));
+  await settle();
+  expect(form.querySelector('[role="alert"]')?.textContent).toBe('无法连接 CloudDrive2');
+  expect(form.querySelector('dl')).toBeNull();
+});
+
+it('未添加 PikPak 时隐藏账号和专属字段，并保留已有配置', async () => {
+  const fetcher = fetchMock(200, state({ media_sources: ['115'] }));
+  vi.stubGlobal('fetch', fetcher);
+  const initial = state({ media_sources: ['115'], pikpak: {
+    logged_in: true, username: 'test-only-account', remember: true, method: 'browser',
+  } });
+  const host = await mount(<DownloadSettings initial={initial} receipt={vi.fn()} />);
+  expect(host.textContent).not.toContain('PikPak');
+  expect(field(host, '115 目标目录')).not.toBeNull();
+  expect(initial.pikpak.logged_in).toBe(true);
+  await submit(section(host, '云下载'));
+  await settle();
+  expect(sentBody(fetcher)).toMatchObject({ pikpak_account: false });
+});
+
+it('光鸭媒体库不显示 115 与 PikPak 专属字段，本地媒体库不显示云下载配置', async () => {
+  vi.stubGlobal('fetch', fetchMock(200, state({ media_sources: ['guangya'] })));
+  const cloud = await mount(<DownloadSettings initial={state({ media_sources: ['guangya'] })} receipt={vi.fn()} />);
+  expect(field(cloud, 'CloudDrive2 地址')).not.toBeNull();
+  expect(cloud.textContent).not.toContain('115 目标目录');
+  expect(cloud.textContent).not.toContain('PikPak');
+  const local = await mount(<DownloadSettings initial={state({ media_sources: ['local'] })} receipt={vi.fn()} />);
+  expect(field(local, 'CloudDrive2 地址')).toBeNull();
+  expect(local.textContent).not.toContain('PikPak');
+});
 
 it('保存时令牌随表单交给服务端，回来后清空，提示改成已保存', async () => {
   const fetcher = fetchMock(200, state({ token_set: true }));
