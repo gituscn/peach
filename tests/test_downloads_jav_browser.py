@@ -7,14 +7,14 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 
 from peach import downloads as dl
 from peach.api import create_app
 from peach.config import PROJECT_ROOT, PeachSettings
-from peach.jav_browser import CREDENTIAL, JavBrowser, code_key, source_page, source_sites
+from peach.jav_browser import CREDENTIAL, JavBrowser, code_key, identify_source, source_page, source_sites
 from support.ledger import fresh_ledger
 
 HASH = "c9e15763f722f23e98a29decdfae341b98d53056"
@@ -36,6 +36,8 @@ class BrowserTests(unittest.TestCase):
         self.remote = Mock()
         self.remote.submit.return_value = dl.RemoteStatus(dl.RUNNING, "remote-1", "ABC-123")
         self.downloads.providers = lambda key: self.remote
+        self.downloads.channel_catalog = lambda: {
+            "providers": [self.downloads._provider_state(key) for key in dl.PROVIDER_LABELS], "problems": []}
         self.downloads.config = dl.DownloadConfig("http://127.0.0.1:19798", {"115": "/115/Movies"})
         self.downloads.credentials.save(dl.CLOUDDRIVE_CREDENTIAL, {"token": "cloud-secret"})
         self.service.search = Mock(return_value={"items": [{"name": "ABC-123 1080p", "uri": MAGNET}]})
@@ -265,6 +267,36 @@ class BrowserTests(unittest.TestCase):
         self.service.process_one()
         self.assertEqual(self.status().json()["state"], "failed")
 
+    def test_library_cloud_channel_submits_to_its_mapped_target(self):
+        key = "clouddrive:guangya:test-library"
+        self.downloads.channel_catalog = lambda: {"providers": [{
+            "key": key, "label": "收藏 · 光鸭云盘", "configured": True, "target": "/duck/收藏"}], "problems": []}
+        response = self.configure("rotate", key)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.script_headers["Authorization"] = "Bearer " + response.json()["token"]
+        self.add()
+        self.service.process_one()
+        task = self.downloads.store.get(self.status().json()["task_id"])
+        self.assertEqual((task.provider, task.target), (key, "/duck/收藏"))
+        self.assertEqual(self.downloads.snapshot()["tasks"][0]["provider_label"], "收藏 · 光鸭云盘")
+        with self.assertRaisesRegex(ValueError, "所选媒体库"):
+            self.downloads.submit(source=MAGNET, provider=key, target="/other")
+
+    def test_empty_or_removed_library_channel_does_not_choose_a_fixed_provider(self):
+        self.downloads.channel_catalog = lambda: {"providers": [], "problems": []}
+        state = self.service.settings()
+        self.assertEqual((state["provider"], state["providers"], state["active_provider"]), ("", [], "115"))
+        self.assertEqual(self.configure("rotate", "115").status_code, 400)
+
+    def test_product_identity_uses_the_registered_domains_and_detail_pattern(self):
+        dmm = dict(next(site for site in source_sites() if site["id"] == "dmm"))
+        dmm["domains"] = ["publisher.example"]
+        with patch("peach.jav_browser.source_sites", return_value=[dmm]):
+            self.assertEqual(identify_source("https://video.publisher.example/av/content/?id=ssis00519"), "SSIS-519")
+            self.assertEqual(identify_source("https://publisher.example/digital/videoa/-/detail/=/cid=ssis00519/"), "SSIS-519")
+            with self.assertRaises(ValueError):
+                identify_source("https://publisher.example/unrelated/ssis00519")
+
     def test_installer_is_available_without_an_admin_token(self):
         response = self.client.get("/integrations/peach-jav.user.js")
         self.assertEqual(response.status_code, 200)
@@ -280,6 +312,41 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(response.content).hexdigest(), release["files"]["peach-jav.user.js"])
         self.assertEqual(hashlib.sha256((directory / "jav-sites.json").read_bytes()).hexdigest(),
                          release["files"]["jav-sites.json"])
+
+    def test_official_product_identification_is_read_only_and_uses_catalog_rules(self):
+        cases = {
+            "https://video.dmm.co.jp/av/content/?id=ssis00519": "SSIS-519",
+            "https://www.dmm.co.jp/digital/videoa/-/detail/=/cid=ssis00057/": "SSIS-057",
+            "https://www.dmm.co.jp/mono/dvd/-/detail/=/cid=h_086iqqq00026/": "IQQQ-026",
+            "https://www.mgstage.com/product/product_detail/300MIUM-1239/": "300MIUM-1239",
+            "https://www.mgstage.com/product/product_detail/259LUXU-1475/": "259LUXU-1475",
+        }
+        for source, expected in cases.items():
+            with self.subTest(source=source):
+                self.assertEqual(identify_source(source), expected)
+                result = self.client.get("/api/jav-browser/identify", params={"source_url": source}, headers=self.script_headers)
+                self.assertEqual(result.status_code, 200, result.text)
+                self.assertEqual(result.json()["code"], expected)
+                self.assertEqual(result.json()["state"], "idle")
+        self.service.search.assert_not_called()
+        self.remote.submit.assert_not_called()
+        self.assertEqual(self.service.rows, {})
+        for source in ("https://video.dmm.co.jp/av/content/?id=1ssis00519", "https://video.dmm.co.jp/av/content/?id=ssis00519&id=abw00123",
+                       "https://unrelated.invalid/av/content/?id=ssis00519", "https://www.mgstage.com/search/?q=300MIUM-1239"):
+            with self.subTest(source=source):
+                result = self.client.get("/api/jav-browser/identify", params={"source_url": source}, headers=self.script_headers)
+                self.assertEqual(result.status_code, 400, result.text)
+        self.assertEqual(self.client.get("/api/jav-browser/identify", params={"source_url": next(iter(cases))}).status_code, 401)
+
+    def test_userscript_bridge_requires_the_peach_session_and_contains_no_credential(self):
+        path = "/integrations/peach-userscript-bridge"
+        self.assertEqual(self.client.get(path).status_code, 401)
+        response = self.client.get(path, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertEqual(response.headers["x-frame-options"], "SAMEORIGIN")
+        self.assertNotIn(self.token, response.text)
+        self.assertNotIn("admin-secret", response.text)
 
     def test_shutdown_waits_for_search_and_leaves_a_resumable_job(self):
         self.add()

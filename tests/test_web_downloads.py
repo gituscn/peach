@@ -84,6 +84,9 @@ class _App(unittest.TestCase):
         self.service = self.app.state.downloads
         self.provider = FakeProvider()
         self.service.providers = lambda key: self.provider
+        self.service.channel_catalog = lambda: {"providers": [
+            {"key": key, "label": label, "configured": True, "target": self.service.config.targets.get(key, "")}
+            for key, label in dl.PROVIDER_LABELS.items()], "problems": []}
         self.client = TestClient(self.app)
 
     def secrets(self) -> dict:

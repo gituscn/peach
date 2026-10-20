@@ -107,12 +107,12 @@ export interface AutomaticUpdateState {
   mode: string; interval_hours: number; available: boolean; download_available: boolean; error?: string;
 }
 
-/** 云下载的两条渠道：115 经 CloudDrive2，PikPak 直连。 */
-export type DownloadProviderKey = '115' | 'pikpak';
+/** 媒体库中可用的直连渠道与 CloudDrive2 路径渠道。 */
+export type DownloadProviderKey = '115' | 'pikpak' | `clouddrive:${string}:${string}`;
 
 export interface DownloadConfig {
   clouddrive_address: string;
-  targets: Partial<Record<DownloadProviderKey, string>>;
+  targets: Record<string, string>;
   /** PikPak 根目录对应的数据库路径前缀，空串表示还没选。 */
   pikpak_root: string;
   wait_hours: number;
@@ -122,6 +122,7 @@ export type PikPakBrowserState = 'idle' | 'waiting' | 'done' | 'cancelled' | 'ti
 
 /** 设置页的云下载块。凭据只报存没存过，不回值。 */
 export interface DownloadSettingsState {
+  media_sources: string[];
   available: boolean;
   config: DownloadConfig;
   token_set: boolean;

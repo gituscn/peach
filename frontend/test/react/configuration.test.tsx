@@ -17,6 +17,7 @@ const data = (over: Partial<ConfigurationData> = {}): ConfigurationData => ({
   port: 9123, facts: [], ...over,
 });
 const downloads: DownloadSettingsState = {
+  media_sources: ['115', 'pikpak'],
   available: true, config: { clouddrive_address: '', targets: {}, pikpak_root: '', wait_hours: 168 },
   token_set: false, pikpak: { logged_in: false, username: '', remember: false, method: 'password' },
   pikpak_browser: { available: true, state: 'idle', message: '' }, pikpak_roots: [],

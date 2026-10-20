@@ -46,15 +46,15 @@ export function Section({ title, icon, id, aside, onSubmit, children }: SectionP
 
 /** 一组 `SettingsRow`。行自己画下边线、最后一行不画，所以要有一层只装行的父元素。 */
 export function Rows({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col">{children}</div>;
+  return <div className="flex flex-col empty:hidden">{children}</div>;
 }
 
 /** 卡片只管左内边距和底色；不是 `SettingsRow` 的内容由这一层给行距和上下右内边距。
  *  排在 `Rows` 或 `FactList` 后面时 `divided`，和上面那组行之间补一道分隔线。 */
 export function Stack({ divided = false, children }: { divided?: boolean; children: ReactNode }) {
   return divided
-    ? <div className="flex flex-col gap-4 border-t border-separator-border py-4 pr-3">{children}</div>
-    : <div className="flex flex-col gap-4 py-4 pr-3">{children}</div>;
+    ? <div className="flex flex-col gap-4 border-t border-separator-border py-4 pr-3 empty:hidden">{children}</div>
+    : <div className="flex flex-col gap-4 py-4 pr-3 empty:hidden">{children}</div>;
 }
 
 /** 底栏：左边一句说这颗按钮此刻意味着什么，右边是按钮。
@@ -63,7 +63,7 @@ export function Stack({ divided = false, children }: { divided?: boolean; childr
  *  卡片的左内边距在卡自己身上，所以这一条要把它抵掉再自己补回来。 */
 export function Footer({ status, children }: { status?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="-ml-3 flex flex-wrap items-center justify-end gap-3 rounded-b-2xl border-t border-separator-border bg-card-footer px-3 py-3">
+    <div className="-ml-3 flex flex-wrap items-center justify-end gap-3 rounded-b-2xl border-t border-separator-border bg-card-footer px-3 py-3 empty:hidden">
       {status ? <div className="mr-auto min-w-0 text-body-2-regular text-text-secondary">{status}</div> : null}
       {children}
     </div>
@@ -99,7 +99,7 @@ export function ExternalLink({ href, children, leadingIcon }: {
 
 /** 只读的名目与读数，一行一对，行距与分隔线同 `SettingsRow`。 */
 export function FactList({ children }: { children: ReactNode }) {
-  return <dl className="flex flex-col">{children}</dl>;
+  return <dl className="flex flex-col empty:hidden">{children}</dl>;
 }
 
 /* 名目按内容宽，最多占一半，再长就在自己那一半里折行；读数靠右，折成多行时行内文字左对齐，

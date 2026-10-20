@@ -389,6 +389,18 @@ class LandingTests(_Deployment):
 
 
 class SettingsTests(_Deployment):
+    def test_snapshot_hides_remote_cancel_when_the_channel_cannot_cancel(self):
+        task_id = self.submit()["task"]["id"]
+        self.service.channel_catalog = lambda: {"providers": [{
+            "key": "115", "label": "影片库", "can_cancel": False}], "problems": []}
+        task = self.service.snapshot()["tasks"][0]
+        self.assertEqual(task["provider_label"], "影片库")
+        self.assertFalse(task["cancellable"])
+        stored = self.service.store.get(task_id)
+        stored.state = dl.REMOTE_DONE
+        self.service.store.save(stored)
+        self.assertTrue(self.service.snapshot()["tasks"][0]["cancellable"])
+
     def test_settings_hold_no_credentials_and_check_the_pikpak_root(self):
         with self.assertRaisesRegex(ValueError, "不是已声明的 PikPak 媒体根"):
             self.service.save_settings({"pikpak_root": "Z:\\"}, self.declared)

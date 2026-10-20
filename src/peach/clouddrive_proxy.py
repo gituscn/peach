@@ -149,7 +149,8 @@ def _relative(path, root):
         return None
 
 
-def _remote(root, mount, prefixes, mounts):
+def media_remote_path(root, mount, prefixes, mounts):
+    """媒体库路径按推送前缀或已挂载的 CloudDrive2 目录取得云端路径。"""
     candidates = []
     for prefix in prefixes:
         tail = _relative(root, prefix.root)
@@ -179,7 +180,7 @@ def _bindings(config, client, permissions, apis):
             continue
         for index, root in enumerate(config.locations.get(location, ())):
             mapped = config.mounts.get(location, ())
-            remote = _remote(root, mapped[index] if index < len(mapped) else root, prefixes, mounts)
+            remote = media_remote_path(root, mapped[index] if index < len(mapped) else root, prefixes, mounts)
             matches = [api for api in apis if api.path and
                        (remote == api.path.rstrip('/') or remote.startswith(api.path.rstrip('/') + '/'))]
             api = max(matches, key=lambda item: len(item.path)) if matches else None

@@ -15,7 +15,7 @@ import type { Want } from './wants';
 import { recordWantMagnets } from './wants';
 import { Disclosure } from '../settings/section';
 import { cachedResources, rememberResources, resourcesFresh } from './resource-cache';
-import { PROVIDER_ICONS } from '../components/source-label';
+import { providerIcon } from '../components/source-label';
 import { resourceNotice, resourceSize } from './resource-display';
 import './want-magnets.css';
 
@@ -145,7 +145,7 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
             </div>
             <div data-resource-actions="" className="flex flex-wrap gap-2">
               {candidate.protocol === 'magnet' ?
-              <Button variant="primary" size="small" leadingIcon={configured ? PROVIDER_ICONS[configured.key] : RiCloudLine} title={configured ? `下载到 ${configured.label}` : undefined} disabled={readOnly || !downloads?.available || !configured || added}
+              <Button variant="primary" size="small" leadingIcon={configured ? providerIcon(configured.key) : RiCloudLine} title={configured ? `下载到 ${configured.label}` : undefined} disabled={readOnly || !downloads?.available || !configured || added}
                 {...busyProps(action.busy === candidate.id)} onClick={() => add(candidate)}>
                 {added ? '已添加' : '添加下载'}
               </Button> : null}

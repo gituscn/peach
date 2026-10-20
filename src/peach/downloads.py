@@ -289,12 +289,18 @@ class DownloadTask:
     postprocess_run_id: int | None = None
     postprocessed_at: str | None = None
 
+    @property
+    def location(self) -> str:
+        """渠道关联的媒体来源。"""
+        return self.provider.split(":", 2)[1] if self.provider.startswith("clouddrive:") else self.provider
+
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "DownloadTask":
         return cls(**{name: row[name] for name in row.keys()})
 
     def payload(self, asset: dict | None = None) -> dict:
         from .catalog_rules import jav_fallback_title, release_code_from_filename, same_release_code
+        from .media_sources import SOURCES
 
         kind = FAILURE_KINDS.get(self.failure or "")
         codes = {code for name in (self.remote_name, self.display_name, self.title)
@@ -312,7 +318,7 @@ class DownloadTask:
                                   if (title := jav_fallback_title(name, display_code))), "")
         return {
             "id": self.id, "info_hash": self.info_hash, "provider": self.provider,
-            "provider_label": PROVIDER_LABELS.get(self.provider, self.provider),
+            "provider_label": SOURCES[self.location].name if self.location in SOURCES else self.provider,
             "source_uri": self.source_uri, "display_name": self.display_name,
             "target": self.target, "code": self.code, "title": self.title, "origin": self.origin,
             "display_code": display_code, "display_title": display_title,
@@ -566,9 +572,10 @@ class DownloadSettings:
             return DownloadConfig()
 
     def _parse(self, body: dict, *, declared_roots) -> DownloadConfig:
+        from .media_sources import SOURCE_REGISTRY
         targets = {}
         raw_targets = body.get("targets") if isinstance(body.get("targets"), dict) else {}
-        for key in PROVIDER_LABELS:
+        for key in (source.id for source in SOURCE_REGISTRY if source.cloud):
             value = str(raw_targets.get(key) or "").strip()
             if value:
                 targets[key] = normalise_target(value)
@@ -624,6 +631,7 @@ class DownloadService:
         providers: Callable[[str], OfflineProvider], landing: "Landing",
         available: bool = True, clock: Callable[[], float] = time.time,
         after_ingest: Callable[[DownloadTask], None] | None = None,
+        channel_catalog: Callable[[], dict] | None = None,
     ):
         self.store = DownloadStore(database)
         self.settings = DownloadSettings(state_root)
@@ -633,6 +641,7 @@ class DownloadService:
         self.available = bool(available)
         self.clock = clock
         self.after_ingest = after_ingest
+        self.channel_catalog = channel_catalog
         self.config = self.settings.load()
         self._submit_lock = threading.Lock()
         self._wake = threading.Event()
@@ -647,9 +656,14 @@ class DownloadService:
         if not self.available:
             raise ValueError("云下载只在允许修改数据库的设备上可用")
         magnet = parse_magnet(source)
-        if provider not in PROVIDER_LABELS:
-            raise ValueError("请选择 115 或 PikPak")
-        folder = normalise_target(target or self.config.targets.get(provider, ""))
+        channels = self.channel_snapshot()["providers"]
+        channel = next((row for row in channels if row["key"] == provider), None)
+        if channel is None or (self.channel_catalog is not None and not channel["configured"]):
+            raise ValueError("请选择媒体库中可用的云下载渠道")
+        folder = normalise_target(target or channel["target"])
+        if provider.startswith("clouddrive:") and not (
+                folder == channel["target"] or folder.startswith(channel["target"].rstrip("/") + "/")):
+            raise ValueError("下载目标目录必须位于所选媒体库内")
         with self._submit_lock:
             now = self.clock()
             if dedupe_code and code and (existing := self.store.active_by_code(code)) is not None:
@@ -733,13 +747,26 @@ class DownloadService:
         tasks = rows[:limit]
         has_more = len(rows) > limit
         assets = self.store.display_assets(tasks)
+        catalog = self.channel_snapshot()
+        labels = {row["key"]: row["label"] for row in catalog["providers"]}
+        uncancellable = {row["key"] for row in catalog["providers"] if row.get("can_cancel") is False}
+        payloads = [task.payload(assets.get(task.asset_id)) for task in tasks]
+        for payload in payloads:
+            payload["provider_label"] = labels.get(payload["provider"], payload["provider_label"])
+            if payload["provider"] in uncancellable and payload["state"] in {SUBMITTED, REMOTE_RUNNING}:
+                payload["cancellable"] = False
         return {
             "available": self.available,
-            "providers": [self._provider_state(key) for key in PROVIDER_LABELS],
-            "tasks": [task.payload(assets.get(task.asset_id)) for task in tasks],
+            **catalog,
+            "tasks": payloads,
             "has_more": has_more,
             "next_before_id": tasks[-1].id if has_more else None,
         }
+
+    def channel_snapshot(self) -> dict:
+        if self.channel_catalog is not None:
+            return self.channel_catalog()
+        return {"providers": [self._provider_state(key) for key in PROVIDER_LABELS], "problems": []}
 
     def retry_postprocess(self, task_id: int) -> DownloadTask:
         task = self.store.get(int(task_id))
@@ -877,8 +904,7 @@ class DownloadService:
         if mapped is None:
             raise DownloadError(
                 "not_landed",
-                "目标目录对应不到媒体目录。115 在「推送发现」里配置云端路径前缀；"
-                "PikPak 在「云下载」设置里选 PikPak 根目录对应的媒体目录")
+                "目标目录对应不到媒体目录，请检查媒体库挂载和云端路径前缀关联")
         location, ledger_path = mapped
         task.ledger_path = ledger_path
         asset_id = self.store.asset_under(location, ledger_path, task.code)
@@ -941,6 +967,7 @@ class Landing:
 
     def __init__(self, push_discovery, *, mounts=None, declared_roots=None):
         self.push_discovery = push_discovery
+        self.channel_catalog = None
         self.mounts = mounts if mounts is not None else getattr(push_discovery, "mounts", {})
         self.declared_roots = (declared_roots if declared_roots is not None
                                else getattr(push_discovery, "declared_roots", {}))
@@ -962,6 +989,10 @@ class Landing:
             remote = "/pikpak" + remote
         else:
             prefixes = tuple(self.push_discovery.config.prefixes)
+            if self.channel_catalog:
+                channel = next((row for row in self.channel_catalog()["providers"] if row["key"] == task.provider), None)
+                if channel and channel.get("cloud_root"):
+                    prefixes = (CloudPrefix(channel["cloud_root"], channel["root"]),)
         try:
             path = map_cloud_path(remote, prefixes)
         except CloudPathError:

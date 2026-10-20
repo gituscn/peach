@@ -56,9 +56,15 @@ Peach 只保留设备选择、一次性合成帧探测、命令尝试顺序与�
 
 ## JAV 用户脚本添加
 
-用户脚本由 [peach-mitao/peach-userscript](https://github.com/peach-mitao/peach-userscript)（AGPL-3.0-or-later）独立维护，使用 [Tampermonkey 官方 GM API](https://www.tampermonkey.net/documentation.php) 的本机存储、菜单与 `GM_xmlhttpRequest`；SPA 通知依据 `window.onurlchange` 契约。上游使用 Node.js 24 LTS 内置模块确定性构建，运行时零依赖。Peach 的 `web/integrations/` 消费同一发布的完整安装脚本与站点快照，固定版本、上游提交与 SHA256 见 `jav-userscript-release.json`。安装端点直接返回制品，后端独立校验已登记域名与作品参数；上游导出工具在隔离工作树同步这两份制品和来源记录。Sleazy 热门脚本只提供显式域名与镜像发现证据，不复制其实现或执行第三方代码。宿主扩展由用户安装，兼容性以实际浏览器及脚本管理器授权为准；模拟 GM API 的真实 Chromium 页面完成回归，真实扩展安装及源站页面联合验收未取得。
+下载渠道复用 `media_sources` 注册表、媒体库名称、`clouddrive_proxy.media_remote_path` 的挂载与推送路径关联，以及现有 CloudDrive2 gRPC 客户端的 `canOfflineDownload` 与 `supportOfflineDownloadManagement` 能力。`LibraryChannels` 在只读探测后生成渠道，PikPak 直连仍使用已有客户端；配置区与专属检查按已声明媒体来源显示。支持任务管理时查询远端列表，仅支持提交时按文件落地确认；取消按钮随渠道能力显示。挂载点关联复用 `CloudPrefix` 和 `map_cloud_path` 完成入库路径转换。渠道标识与媒体来源分别用于提交和落地后处理，未新增依赖、账本表或迁移。账号未实际验证时不把模拟能力视为网盘验收。版本要求与安装入口由上游发布清单传给配置页；配置页安装当前 Peach 随附的同版脚本。
+
+用户脚本由 [peach-mitao/peach-userscript](https://github.com/peach-mitao/peach-userscript)（AGPL-3.0-or-later）独立维护，使用 [Tampermonkey 官方 GM API](https://www.tampermonkey.net/documentation.php) 的本机存储、菜单与 `GM_xmlhttpRequest`；SPA 通知依据 `window.onurlchange` 契约。上游使用 Node.js 24 LTS 内置模块确定性构建，运行时零依赖。Peach 的 `web/integrations/` 消费同一发布的完整安装脚本与站点快照，固定版本、上游提交与 SHA256 见 `jav-userscript-release.json`。安装端点直接返回制品，后端独立校验已登记域名与作品参数；上游导出工具在隔离工作树同步这两份制品和来源记录。Sleazy 热门脚本只提供显式域名与镜像发现证据，不复制其实现或执行第三方代码。宿主扩展由用户安装，兼容性以实际浏览器及脚本管理器授权为准；模拟 GM API 的真实 Chromium 页面完成回归，DMM 与 MGS 实页通过隔离只读 GM 适配核验番号、页面浮层与设置窗口。真实扩展、Peach 与网盘联合下载验收未取得。
 
 Peach 保留页面粗提取与身份冲突提示，服务端复用 `catalog_rules` 的唯一番号规则、`feeds.scan_code`、`web_resource_search.q_resource_search` 的来源顺序与质量排序、`submit_offline_download` 的 infohash 幂等、现有云下载落地与后处理。浏览器添加在共享提交锁内按番号接管已有任务，覆盖其他入口同时提交不同磁力的情况。专用令牌经 `CredentialStore` 仅保存 SHA-256 摘要，不声明跨机同步字段。队列用已有 `atomic_write_text` 保存本机运行状态，关闭功能会撤销令牌并停止尚未提交的添加。
+
+DMM / MGS 的只读商品号识别复用 `code_key`、`release_code_from_text`、`normalise_code_key` 和 `release_identity`，脚本只提交已净化的详情地址，不维护独立的前缀映射。DMM 官方 GraphQL 对 `ssis00519` 返回 `makerContentId: SSIS-519`；详情 DOM 的配信品番为 `ssis00519`，厂商番号为 `SSIS-519`。MGS 详情 DOM 的品番为 `300MIUM-1239`，三位数字前缀沿用同一套编目规则，不将不同发行物的前缀直接剥掉。
+
+配置页继续使用 BoardUI Button / Input / Select 与共享 Note。配对信息复用当前页面 origin、签发响应和浏览器 Clipboard API，脚本在用户粘贴时填表，保存后写入 GM 存储。同源子框架桥接只回报脚本版本和当前地址的配置状态，父窗口、origin、协议版本与一次性 nonce 均须匹配，不回传令牌。未收到回报显示「未检测到」，不推断安装列表。桥接路径窄匹配与来源站顶层注入分别处理；实际脚本管理器权限和扩展联合验收未取得。无新增运行依赖、迁移或 ledger 写入。
 
 书签不能执行云下载链路；完整浏览器扩展增加发布与权限管理面；现有外部下载器不承接 Peach 的网盘目标、入库和后处理，因此未引入。临时账本与模拟 115／PikPak 的 API 回归验证搜索、重复点击、重启恢复、失败重试和凭据隔离；用户脚本及配置页通过桌面与 390×844 浏览器回归。无新增 ledger 表或迁移。
 

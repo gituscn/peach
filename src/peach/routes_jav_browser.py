@@ -1,8 +1,9 @@
 """JAV 用户脚本的专用权限端点与本机配对设置。"""
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from .config import PROJECT_ROOT
+from .jav_browser import identify_source
 from .routes_auth import require_auth
 
 
@@ -22,9 +23,24 @@ def userscript():
     return Response(script, media_type="application/javascript", headers={"Cache-Control": "no-cache"})
 
 
+def userscript_bridge():
+    return HTMLResponse('<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'
+                        '<meta name="peach-userscript-bridge" content="1">'
+                        '<title>Peach 用户脚本连接</title></head><body></body></html>',
+                        headers={"Cache-Control": "no-store", "X-Frame-Options": "SAMEORIGIN",
+                                 "Content-Security-Policy": "default-src 'none'; frame-ancestors 'self'; base-uri 'none'"})
+
+
 def status(code: str, service=Depends(browser_client)):
     try:
         return JSONResponse(service.status(code), headers={"Cache-Control": "no-store"})
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from None
+
+
+def identify(source_url: str, service=Depends(browser_client)):
+    try:
+        return JSONResponse(service.status(identify_source(source_url)), headers={"Cache-Control": "no-store"})
     except ValueError as error:
         raise HTTPException(400, str(error)) from None
 
@@ -50,7 +66,10 @@ def configure(request: Request, body: dict = Body(...)):
 def create_router(local_only) -> APIRouter:
     router = APIRouter()
     router.add_api_route("/integrations/peach-jav.user.js", userscript, methods=["GET"])
+    router.add_api_route("/integrations/peach-userscript-bridge", userscript_bridge, methods=["GET"],
+                        dependencies=[Depends(require_auth)])
     router.add_api_route("/api/jav-browser", status, methods=["GET"])
+    router.add_api_route("/api/jav-browser/identify", identify, methods=["GET"])
     router.add_api_route("/api/jav-browser", add, methods=["POST"])
     permissions = [Depends(require_auth), Depends(local_only)]
     router.add_api_route("/api/configuration/jav-browser", settings, methods=["GET"], dependencies=permissions)
