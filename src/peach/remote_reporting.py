@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from . import __version__
+from .reporting_identity import event_metadata
 
 FIELDS = {
     "usage": "Peach 版本、操作系统类型；每天最多一次，不含安装标识。",
@@ -89,8 +89,11 @@ def dsn(environment="PEACH_SENTRY_DSN", key="dsn"):
 
 
 def snapshot(config=None):
+    from . import reporting_delivery
+    config = _config(config)
     return {**{key: value for key, value in consent(config).items() if key != "revision"},
-            "available": bool(dsn()), "fields": FIELDS, "notice": NOTICE}
+            "available": bool(dsn()), "fields": FIELDS, "notice": NOTICE,
+            "delivery": reporting_delivery.snapshot(config)}
 
 
 def parse_choices(body, *, partial=False):
@@ -138,41 +141,38 @@ def _reserve(config, kind, event):
         return True
 
 
-def _new_client(target, *, envelope_gate=None):
+def _new_client(target, *, envelope_gate=None, delivery_callback=None):
     from sentry_sdk import Client
-    from sentry_sdk.transport import HttpTransport
+    from .reporting_transport import transport_class
 
-    class ConsentTransport(HttpTransport):
-        TIMEOUT = 5
-
-        def _send_envelope(self, envelope):
-            if _disabled:
-                return
-            if envelope_gate is not None:
-                if envelope_gate(envelope):
-                    super()._send_envelope(envelope)
-                return
-            # SDK 后台队列真正发送前复查同意版本，跨进程关闭也生效。
-            for item in envelope.items:
-                event = item.get_event()
-                if event is None:
-                    return
-                permit = event.pop("extra", {})
-                try:
-                    current = _consent(Path(permit["consent"]))
-                    if not all(current.get(key) is True for key in FIELDS) or current["revision"] != permit["revision"]:
-                        return
-                except Exception:
-                    return
-            super()._send_envelope(envelope)
+    def gate(envelope):
+        if _disabled:
+            return False
+        if envelope_gate is not None:
+            return envelope_gate(envelope)
+        for item in envelope.items:
+            event = item.get_event()
+            if event is None:
+                return False
+            permit = event.pop("extra", {})
+            try:
+                current = _consent(Path(permit["consent"]))
+                if not all(current.get(key) is True for key in FIELDS) or current["revision"] != permit["revision"]:
+                    return False
+            except Exception:
+                return False
+        for key in tuple(envelope.headers):
+            if key not in {"event_id", "sent_at"}:
+                del envelope.headers[key]
+        return bool(envelope.items)
 
     def final_event(event, _hint):
         # SDK 的服务器名、上下文、SDK 包清单和全局 scope 均不进入发送载荷。
         return {key: value for key, value in event.items() if key in {
-            "event_id", "timestamp", "platform", "release", "level", "message", "tags", "exception", "extra",
+            "event_id", "timestamp", "platform", "release", "environment", "dist", "level", "message", "tags", "exception", "extra",
         }}
 
-    return Client(dsn=target, transport=ConsentTransport, default_integrations=False,
+    return Client(dsn=target, transport=transport_class(gate, delivery_callback), default_integrations=False,
                   auto_enabling_integrations=False, auto_session_tracking=False,
                   send_default_pii=False, include_local_variables=False, include_source_context=False,
                   send_client_reports=False, enable_backpressure_handling=False,
@@ -188,9 +188,16 @@ def _submit(kind, event, config, current, target):
             if _client is not None:
                 _client.close(timeout=0)
             _client, _client_dsn = _new_client(target), target
-        return _client.capture_event({**event, "platform": "python",
-            "extra": {"consent": str(config.directory("state") / "remote-reporting.json"),
-                      "kind": kind, "revision": current["revision"]}})
+        from .reporting_delivery import record
+        permit = {"consent": str(config.directory("state") / "remote-reporting.json"),
+                  "kind": kind, "revision": current["revision"]}
+        event_id = event.get("event_id") or uuid.uuid4().hex
+        record(permit, event_id, {"status": "queued"})
+        accepted = _client.capture_event({**event, "event_id": event_id,
+            "platform": event.get("platform", "python"), "extra": permit})
+        if not accepted:
+            record(permit, event_id, {"status": "failed", "reason": "queue_full"})
+        return accepted
 
 
 def _schedule_frequency(config):
@@ -238,7 +245,8 @@ def send(kind, event, config=None):
         target = dsn()
         if kind not in FIELDS or not current[kind] or not target:
             return
-        event = {**event, "release": __version__}
+        metadata = event_metadata(kind)
+        event = {**event, **metadata, "tags": {**event.get("tags", {}), **metadata["tags"]}}
         if kind == "errors":
             from . import diagnostic_frequency
             diagnostic_frequency.record(config, current["revision"], event,

@@ -152,7 +152,7 @@ class RemoteReportingTests(unittest.TestCase):
             reporting.close()
             reporting.flush_counts(force=True)
             second = client.capture_event.call_args.args[0]
-            self.assertNotIn('event_id', second)
+            self.assertNotEqual(second['event_id'], first['event_id'])
             self.assertEqual(second['tags']['occurrence_count'], '2')
             self.assertEqual(first['tags']['diagnostic_key'], second['tags']['diagnostic_key'])
             self.assertEqual(client.capture_event.call_count, 2)

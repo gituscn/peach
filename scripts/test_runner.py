@@ -914,7 +914,9 @@ def retain_inflight(context, scopes, passed, previous, baseline, count):
 
 if __name__ == "__main__":
     # 故障注入的默认错误日志属于当前测试进程，不能写进真实数据目录。
-    from peach import error_reporting
+    os.environ["PEACH_REPORTING_TEST_MODE"] = "1"
+    from peach import error_reporting, remote_reporting
+    remote_reporting.disable_for_process()
     with tempfile.TemporaryDirectory(prefix='peach-test-errors-') as error_logs:
         error_reporting._log_dir = Path(error_logs)
         raise SystemExit(main())
