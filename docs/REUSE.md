@@ -1,5 +1,9 @@
 # 复用清单
 
+## 元数据标题原文
+
+持久元数据候选复用 `metadata.extract_peach_fields` 的原文取值和 `metadata_auto_apply` 的统一写入入口。r18 的纯拉丁字母标题需由同一作品快照的原文侧精确印证；缺少快照或只有英文译文时不进入自动结算，人工批准入口同样拒收。来源原文中的拉丁字母片名保留，不按字符集自动翻译。无新增依赖。
+
 ## 浏览器错误的构建映射
 
 前端复用官方 [`@sentry/vite-plugin` 11.8.0](https://github.com/getsentry/sentry-javascript-bundler-plugins)（MIT，维护中，Node ≥23.2，与项目 Node 24 和 Vite 8 兼容）生成确定性 Debug ID 与 hidden source maps；[`@sentry/cli` 3.8.0](https://github.com/getsentry/sentry-cli)（FSL-1.1-MIT）仅用于构建期本地定位和显式上传。两者精确固定在前端开发依赖，纳入现有 Dependabot；不进入 Python 运行时或独立包依赖。
