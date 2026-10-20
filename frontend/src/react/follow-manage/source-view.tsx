@@ -58,7 +58,7 @@ export function AuthorAvatar({ group, name }: { group: FollowSource[]; name: str
 
 /** 状态徽章。三档颜色对应三件事：要处理的、正常的、还没有结论的。 */
 export function StatusBadge({ source }: { source: FollowSource }) {
-  const color = isBroken(source) ? 'rose'
+  const color = !source.enabled || source.history_exhausted ? 'neutral' : isBroken(source) ? 'rose'
     : source.enabled && source.last_status === 'ok' ? 'lime'
     : source.enabled ? 'yellow' : 'neutral';
   return <Chip variant="caption" color={color}>{statusText(source)}</Chip>;

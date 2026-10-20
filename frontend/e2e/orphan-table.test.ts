@@ -89,7 +89,7 @@ describe('孤儿记录数据表', () => {
       assert.equal(await list.getAttribute('data-overlay-scrollbar'), 'true');
       const overflow = await list.evaluate(node => node.scrollHeight > node.clientHeight);
       assert.equal(overflow, true, '长清单在弹层内滚动');
-      const edges = dialog.locator('.ui-ov-edges');
+      const edges = list.locator('..').locator(':scope > .ui-ov-edges');
       await page.waitForFunction(() => !!document.querySelector('dialog .ui-can-scroll-bottom'));
       assert.equal(await edges.locator('.ui-ov-edge-bottom').evaluate(node => getComputedStyle(node).visibility), 'visible');
       await list.evaluate(node => { node.scrollTop = node.scrollHeight / 2 });

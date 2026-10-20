@@ -14,22 +14,7 @@
 import type { ReactNode } from 'react';
 
 import { cardClass } from './card';
-
-type Layout = 'split' | 'stack';
-
-const FACE = cardClass({ padding: 'none', bordered: 'line', className: 'overflow-hidden' });
-
-const BODY: Record<Layout, string> = {
-  split: 'min-w-0 p-6',
-  stack: 'flex min-h-30 min-w-0 flex-1 flex-col px-5 pt-5 pb-4 max-cleanup-tight:min-h-0 max-cleanup-tight:p-4.5',
-};
-
-const FOOT: Record<Layout, string> = {
-  split: 'flex flex-wrap items-center justify-end gap-2 self-stretch p-6'
-    + ' max-[1001px]:justify-start max-[1001px]:pt-0',
-  stack: 'flex min-h-14 flex-wrap items-center justify-end gap-2 border-t border-border-button-default'
-    + ' bg-card-footer px-5 py-3 max-cleanup-tight:px-4.5',
-};
+import { FIELDSET_BODY, FIELDSET_FOOT, fieldsetClass, type FieldsetLayout } from './fieldset-layout';
 
 /** 卡下面那块结果面板：同一副填充底，一条描边、14px 圆角、不浮起。
  *  链接检查与资源同步把一趟后台任务的结论摆在这里，一段一段往下叠，段间一条发丝线。 */
@@ -60,7 +45,7 @@ export function FieldsetTitle(
 export function Fieldset(
   { layout, label, labelledBy, id, footer, children, attributes }:
   {
-    layout: Layout;
+    layout: FieldsetLayout;
     /** 没有可见标题可指的时候（扫描与采集那两张的标题在正文那一列里）用它。 */
     label?: string;
     labelledBy?: string;
@@ -73,9 +58,9 @@ export function Fieldset(
 ) {
   return (
     <section id={id} aria-label={label} aria-labelledby={labelledBy} {...attributes}
-      className={`${FACE} ${layout === 'split' ? 'fieldset-split' : 'flex flex-col'}`}>
-      <div className={BODY[layout]}>{children}</div>
-      {footer ? <footer className={FOOT[layout]}>{footer}</footer> : null}
+      className={fieldsetClass(layout)}>
+      <div className={FIELDSET_BODY[layout]}>{children}</div>
+      {footer ? <footer className={FIELDSET_FOOT[layout]}>{footer}</footer> : null}
     </section>
   );
 }

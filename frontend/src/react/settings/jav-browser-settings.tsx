@@ -1,7 +1,6 @@
 /* JAV 用户脚本的默认下载渠道与专用令牌。 */
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Chip } from '@/components/base/badges/chip';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { Select, SelectItem } from '@/components/base/select/select';
@@ -75,9 +74,7 @@ function BrowserForm({ initial, receipt }: { initial: State; receipt(message: st
       </> : null}
       {action.error ? <ErrorText>{action.error}</ErrorText> : null}
     </Stack>
-    <Footer status={<Chip role="status" color={state.enabled ? 'lime' : 'neutral'}>
-      {state.enabled ? '已启用' : '未启用'}
-    </Chip>}>
+    <Footer>
       {state.enabled ? <Button variant="secondary" type="button" disabled={Boolean(action.busy)}
         onClick={() => save('disable')}>关闭浏览器添加</Button> : null}
       <Button type="button" disabled={!state.available || !ready || Boolean(action.busy)}

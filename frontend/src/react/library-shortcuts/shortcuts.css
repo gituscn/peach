@@ -61,6 +61,3 @@
   .peach-react [data-shortcuts-content] { order: 2; flex: 1; padding: 16px 20px 20px; }
   .peach-react [data-shortcuts-footer] { order: 3; flex: none; flex-direction: row; padding: 10px; }
 }
-@media (width <= 640px) {
-  :is(.peach-react[data-index-head], .peach-react [data-index-head]) [data-shortcuts-entry] { order: 3; }
-}

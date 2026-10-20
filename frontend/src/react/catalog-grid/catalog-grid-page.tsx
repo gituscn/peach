@@ -43,6 +43,22 @@ function Icon({ name }: { name: string }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><use href={`#i-${name}`} /></svg>;
 }
 
+/** 元信息按实际网格列数选择固定或自然高度。 */
+function MediaGrid({ children, selectMode }: { children: ReactNode; selectMode?: boolean }) {
+  const grid = useRef<HTMLDivElement>(null);
+  const [single, setSingle] = useState(false);
+  useLayoutEffect(() => {
+    const node = grid.current;
+    if (!node) return;
+    const measure = () => setSingle(getComputedStyle(node).gridTemplateColumns.split(' ').filter(Boolean).length === 1);
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);measure();
+    return () => observer.disconnect();
+  }, []);
+  return <div ref={grid} data-media-grid="" data-catalog-view-mode="cards" data-single-column={single ? '' : undefined}
+    data-select-mode={selectMode ? '' : undefined}>{children}</div>;
+}
+
 /** 壳手上已有的一批（详情页的接着看）：不取数，只画卡。`next` 那一排的卡直接排进壳的横排。 */
 function ItemsGrid(props: CatalogGridProps) {
   const { actions } = props;
@@ -54,7 +70,7 @@ function ItemsGrid(props: CatalogGridProps) {
       helpers={props.helpers} actions={actions} onOpen={onOpen} />
   ));
   if (variant === 'next') return <div data-media-next-row="">{cards}</div>;
-  return <div data-media-grid="" data-select-mode={props.selectMode ? '' : undefined}>{cards}</div>;
+  return <MediaGrid selectMode={props.selectMode}>{cards}</MediaGrid>;
 }
 
 /** 一次查询的整个生命周期：骨架、首屏、续页、竖屏带与读数。 */
@@ -162,7 +178,7 @@ function GridBody(props: CatalogGridProps) {
         <div data-media-sections="" data-select-mode={props.selectMode ? '' : undefined}>
           {splitSections(tiles, cuts).map((section) => (
             <Fragment key={section.start}>
-              <div data-media-grid="" data-catalog-view-mode="cards">{section.tiles.map(card)}</div>
+              <MediaGrid>{section.tiles.map(card)}</MediaGrid>
               {section.strip ? <ShortsStrip cut={section.strip} props={props} onOpen={openShort} /> : null}
             </Fragment>
           ))}

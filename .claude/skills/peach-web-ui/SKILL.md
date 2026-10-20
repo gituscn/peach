@@ -1,15 +1,16 @@
 ---
 name: peach-web-ui
-description: 在新增、修改或复核 Peach 页面、控件、提示、错误、数据面板、响应式布局或视觉样式时使用。
+description: 在新增、修改、预览或复核 Peach 页面、控件、提示、错误、数据面板、响应式布局或视觉样式时使用。
 ---
 
 # Peach Web UI 复用门槛
 
 最后复核：2026-10-21
-证据来源：现有 UI 契约、`docs/TESTING.md`、本机重复文案与异步轮询回归记录、jakubkrehel/skills 与 emilkowalski/skills 摘录、`docs/reference-snapshots/open-claude-ui.md`、用户明确确认预览后才能测试的约定。
+证据来源：现有 UI 契约、`docs/TESTING.md`、本机重复文案与异步轮询回归记录、jakubkrehel/skills 与 emilkowalski/skills 摘录、`docs/reference-snapshots/open-claude-ui.md`、用户真实小样本预览与明确确认后测试的约定。
 
 ## 开工顺序
 
+0. 先检索项目记忆“界面预览与真实样本”，读取已有入口及覆盖清单。用户验收预览只用真实小样本及现有缓存；来源核验与交付门槛见 `docs/UI_PREVIEW.md`、`scripts/check_ui_preview.py`。来源未取得就停止交付，合成夹具仅用于隔离自动化测试。
 1. 读取相关页面、`frontend/src/ui-kit/`、`web/css/` 与 `tests/test_web_ui.py`，先找现成控件、token 和行为；按 `docs/DESIGN_GUIDELINES.md` 对应章节核对层级、容器、输入、滚动、手势与反馈，验收参数仍以本技能和现有契约为准。
 2. 外部产品被称为参考时同时执行 `peach-reference-evidence`；没有当前可复现证据就写 `未取得`，不补动画、间距或交互猜测。
 3. 视觉与交互先过 `docs/reference-snapshots/vercel-web-interface-guidelines.md` 的 Focus States、Forms、Animation、Content 四节，以及 `vercel-report-design.md`（即 `vercel.com/design.md`）的「Reject generated-design reflexes」；第三方逆向测量的 DESIGN.md（如 design-bites）不作证据。
@@ -84,6 +85,7 @@ description: 在新增、修改或复核 Peach 页面、控件、提示、错误
 
 ## 验收门槛
 
+- 监听预览端口前由启动入口调用 `check_ui_preview.py`，取得成功的 `real-ledger-subset` 报告；提供地址时说明已读约定、实际样本与已查看场景。缺少清单、伪造字段或关联、图像缓存缺失均拒收，不以进程就绪代替实图验收。
 - 预览前核对标题、说明、持久提示与操作回执的职责，同一事实只在承担该职责的位置说明；检查加载、空态、错误和完成态，避免重复说明与残余内容。
 - 界面改动先构建并保留可访问的预览，提供地址；只有用户明确确认当前预览后才能运行测试，确认绑定该预览与范围，范围内沿用。发出地址、用户继续纠正和等待超时都不算确认；收到界面新纠正时停止本任务运行中及排队的测试，修好后重新等待确认。确认前只做实现、预览构建与视觉查看；用户明确只要图片时才仅提供截图。
 - UI 标签、身份、反馈状态和搜索推荐属于语义契约：按实际影响验证数据层、组件或浏览器行为。
@@ -100,7 +102,7 @@ description: 在新增、修改或复核 Peach 页面、控件、提示、错误
 4. 浏览器取证只留给用例表达不了的：新布局首次成形、对齐外部参考、hover／focus 与观感判断。默认用 `agent-browser`（全局 CLI，装法 `npm i -g agent-browser`；
    环境变量 `AGENT_BROWSER_EXECUTABLE_PATH` 指向本机 Chrome，`AGENT_BROWSER_SESSION=<任务名>` 隔离会话）：`open <url>` → `wait <选择器>` → `snapshot -i -c -s <选择器>`／`get styles <选择器>`／`eval <js>`／`screenshot <文件>`，验完 `close`。
    Bash 工具里每条命令加 `</dev/null` 或把输出重定向到文件：接管道时 CLI 会等 stdin 直到工具超时。残留守护进程核对任务归属后按 PID 清理，不按进程名批量结束。
-   托盘服务发的是主检出的 `web/`：从 worktree 根另起实例，`python -m peach serve --host 127.0.0.1 --port 8099 --no-mdns --no-ledger-sync`（`PYTHONPATH=<worktree>/src`），验完停掉。点第一下之前先把 `peach.settings.v1` 的 `detailAutoplay` 置 false：用户就在这台机器旁，点进详情会出声。
+   托盘服务发的是主检出的 `web/`；界面预览复用项目记忆登记的启动入口，指定当前代码工作树及独立真实样本，通过来源核验后才监听端口。不要直接启动连接原账本的服务。进入详情前关闭 `peach.settings.v1.detailAutoplay`，避免发声。
 5. 接口字段、sidecar 取值和锚点算术走 Python 严格 HTTPS（项目 CA 加 `ProxyHandler({})`）核对，不进浏览器。浏览器只留给布局后才成立的事实：`getComputedStyle`、真实裁切几何、hover／focus 态和实际像素；用读源码顶替这几样是降精度。
 6. 一轮验收要读的页面状态先列全，再合成一次 `agent-browser eval` 取回一个 JSON。桌面应用的 Browser 面板只在要让用户当场看画面时才开：私有网络主机（`.local` 与 `10.`／`172.16-31.`／`192.168.` 段的局域网 IP 归同一类）在那里只能逐次授权，站点级放行只给只读工具，点击与执行 JS 拿不到常驻许可，每多发一次调用就多一次弹窗。
 7. 按 `peach-surfaces` 报告数据层、API、页面、契约、测试与文档各影响面；未部署不得称为生产已生效。

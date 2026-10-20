@@ -96,10 +96,11 @@ function originHost(url: string): string {
   }
 }
 
-/** 一条源此刻的状态：拉不动最要紧，其次才是开着还是停着。 */
+/** 启用状态与已取得的拉取结果共同决定当前标签。 */
 function StatusChip({ source }: { source: FeedSource }) {
-  if (source.last_error) return <Chip variant="caption" color="rose">拉取失败</Chip>;
   if (!source.enabled) return <Chip variant="caption" color="neutral">已暂停</Chip>;
+  if (source.last_error) return <Chip variant="caption" color="rose">拉取失败</Chip>;
+  if (!source.last_fetched_at) return <Chip variant="caption" color="neutral">未检查</Chip>;
   return <Chip variant="caption" color="lime">正常</Chip>;
 }
 

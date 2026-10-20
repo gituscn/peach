@@ -9,7 +9,7 @@
  * 版式偏好由调用方读好交进来：这个模块壳与 React 包各带一份，设置 store 只能有一份。 */
 import { boardTabsHtml, fitSkeleton, iconSwitchHtml, indexSkeletonHtml } from '@peach/legacy/ui';
 import { identityFilterSkeletonHtml } from './identity-filter';
-import { islandShortcutsEntry, islandSearchInput } from './island-skeleton';
+import { islandButton, islandShortcutsEntry, islandSearchInput } from './island-skeleton';
 
 export type IndexPageKind = 'performers' | 'creators' | 'studios' | 'agencies' | 'tags';
 
@@ -68,7 +68,8 @@ export function indexPlaceholderHtml({ kind, q, scope, view, category }: IndexPa
       <h2 class="disp indexheading">${title}</h2>
       ${people ? '<span class="mono" id="indexCount"><span class="countskeleton"></span></span>' : ''}${switcher}
       ${islandShortcutsEntry()}
-      <div data-index-search class="ml-auto min-w-35 max-w-80 flex-1 max-board-narrow:order-1 max-board-narrow:basis-40">${islandSearchInput('', q, '过滤' + title)}</div>
+      ${kind === 'tags' ? islandButton({variant: 'ghost', size: 'small', glyph: 'pencil', attrs: 'data-tag-mode data-skeleton-action disabled tabindex="-1" aria-label="管理标签"'}) : ''}
+      <div data-index-search class="ml-auto min-w-0 max-w-80 flex-1">${islandSearchInput('', q, '过滤' + title)}</div>
     </div>
     ${kind === 'tags' ? tabs(INDEX_SCOPES, scope, '词表') : kind === 'performers' || kind === 'creators'
       ? tabs(PEOPLE_INDEX_TABS, kind === 'performers' && scope === 'online' ? 'online' : kind, '人物名册')

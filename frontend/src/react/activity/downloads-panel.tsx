@@ -37,8 +37,9 @@ const POSTPROCESS_URL = '/api/downloads/postprocess';
 export const downloadPollInterval = (data: DownloadsSnapshot | undefined) =>
   data?.tasks.some((task) => task.cancellable || task.postprocess_active) ? 5_000 : 30_000;
 
-const STATE_COLORS: Record<string, 'lime' | 'rose' | 'yellow'> = {
-  ingested: 'lime', failed: 'rose', cancelled: 'yellow', stalled: 'yellow',
+const STATE_COLORS: Record<string, 'lime' | 'rose' | 'yellow' | 'blue' | 'neutral'> = {
+  ingested: 'lime', failed: 'rose', cancelled: 'neutral', stalled: 'yellow',
+  remote_running: 'blue', remote_done: 'lime', landed: 'lime', submitted: 'neutral',
 };
 
 const taskName = (task: DownloadTask) => {
@@ -143,7 +144,7 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
             <Chip color={STATE_COLORS[task.state] ?? 'neutral'}>{task.state_label}</Chip>
             {task.state === 'ingested'
             ? <Chip color={task.postprocess_state === 'complete' ? 'lime'
-              : task.postprocess_state === 'failed' ? 'rose' : 'yellow'}>{task.postprocess_label}</Chip>
+              : task.postprocess_state === 'failed' ? 'rose' : task.postprocess_state === 'running' ? 'blue' : 'neutral'}>{task.postprocess_label}</Chip>
             : null}
           </div>
         </div>

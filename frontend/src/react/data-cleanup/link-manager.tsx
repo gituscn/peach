@@ -16,6 +16,7 @@ import { entityFaceImg } from '@peach/card-art';
 
 import { Button } from '@/components/base/buttons/button';
 import { Chip } from '@/components/base/badges/chip';
+import { StatusLabel } from '../components/status-label';
 
 import { errorMessage } from '../../api';
 import { ErrorExcerpt } from '../activity/error-excerpt';
@@ -88,8 +89,9 @@ function LinkTable(
     { id: 'note', label: '结果', width: 320, min: 192, value: (item) => item.note,
       render: (item) => <div className="min-w-40 max-w-80" data-link-result={confirmed ? 'gone' : 'unclear'}>
         {/^(?:HTTP\s+)?[1-5]\d{2}$/.test(item.note.trim())
-          ? <Chip variant="caption" color={confirmed ? 'rose' : 'gray'} data-link-code="">{item.note.trim()}</Chip>
-          : <ErrorExcerpt text={item.note} className={`tabular-nums ${confirmed ? 'text-text-error-primary' : 'text-text-primary'}`} />}
+          ? <StatusLabel tone={confirmed || /^(?:HTTP\s+)?5\d{2}$/.test(item.note.trim()) ? 'error' : 'warning'} data-link-code="">{item.note.trim()}</StatusLabel>
+          : <div className="flex flex-col items-start gap-1"><StatusLabel tone={confirmed ? 'error' : 'warning'}>{confirmed ? '地址已失效' : '未取得结论'}</StatusLabel>
+              <ErrorExcerpt text={item.note} className="tabular-nums text-text-secondary" /></div>}
       </div> },
     { id: 'url', label: '地址', width: 360, min: 180, value: (item) => item.url,
       render: (item) => <a href={item.url} target="_blank" rel="noreferrer" title={item.url} data-link-address=""

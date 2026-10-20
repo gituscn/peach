@@ -1,5 +1,19 @@
 # 复用清单
 
+## 真实样本界面预览
+
+用户验收预览复用项目记忆登记的真实账本小样本和已有缓存。启动入口强制调用 `scripts/check_ui_preview.py`，使用标准库 SQLite 的只读连接核对作品、实体、关联和来源清单，产出样本内容摘要；通用契约见 `docs/UI_PREVIEW.md`。核验与图像查看分别记录，隔离自动化测试夹具保留在测试范围内。没有新增依赖或生产数据写入。
+
+## 采集磁盘预估
+
+采集磁盘预估复用 `ProcessingTraffic`、`TrafficPlan` 的待执行与完成范围，以及 `typical_size` 的本地缓存采样。`processing_storage` 仅用 Python 标准库 `shutil.disk_usage` 和文件系统设备编号合并同盘、分别核对跨盘容量；输出读数由现有 `TrafficProgress` 同时用于启动弹窗、运行任务卡和任务通知。网盘挂载缓存保持未观测状态，不把流量数直接算成最终磁盘产物。无新增依赖。
+
+## 状态与同步弹窗
+
+连接状态复用 BoardUI `StatusDot` 与 `ConnectionStatus`，圆点和文字保持同一色系；成功为绿、检测中为蓝、离线或待配对为黄、失败为红、未知为灰。稳定任务结果和配置状态复用 `Chip`，由 `StatusLabel` 统一成功、进行、警告、失败和中性状态。暂停状态优先于历史错误；未经检查的来源保持未检查。用户脚本检测与功能启用分开呈现，仍由同源桥接协议核对版本、nonce 和配对回报。HTTP 状态颜色仅表示本次访问结果，删除仍以服务端确认失效的清单为准。
+
+`formModal` 与 `confirmModal` 共用正文覆盖式滚动条，标题及底部操作固定；启动预估的来源明细跟随弹窗正文滚动，运行通知的明细维持独立限高。全部沿用已有组件、主题 token 和依赖。
+
 ## 元数据标题原文
 
 持久元数据候选复用 `metadata.extract_peach_fields` 的原文取值和 `metadata_auto_apply` 的统一写入入口。r18 的纯拉丁字母标题需由同一作品快照的原文侧精确印证；缺少快照或只有英文译文时不进入自动结算，人工批准入口同样拒收。来源原文中的拉丁字母片名保留，不按字符集自动翻译。无新增依赖。
@@ -11,6 +25,15 @@
 `frontend/scripts/sentry-build.ts` 只保留 Peach 的公开／私有目录边界与产物匹配检查。官方插件禁用遥测、自动上传与 release 注入，普通构建不需要凭据；私有目录保存 JS/CSS/maps，公开目录只复制四个正式 JS/CSS。显式上传复用官方 CLI，先核对分发字节和 map 身份。没有实现自定义 source map 编解码器或上传协议，也没有为此引入浏览器 SDK、页面回放或性能采集。
 
 回归使用真实 Vite 构建与官方 CLI 本地解析 source map，验证源码文件和行号；相同输入两次构建的文件字节一致，Debug ID 与 map 对应，映射源只使用相对路径。构建体积由 Vite 输出，source maps 只增加私有构建产物，不增加页面分发体积。字段与发布配置见[诊断核验](DIAGNOSTICS.md#可选远程诊断)；真实接收端符号化独立验收。
+## 索引标题栏
+
+标签、艺人、卖家、厂牌与事务所共用 `IndexPage`、现有 BoardUI Input／Button、收藏入口和版式分段器。标题与操作保留固定宽度，搜索框使用原生 Flex 的剩余空间；窄屏名册计数独占次行。首屏占位复用 `islandSearchInput`、`islandButton` 与相同布局规则，标签管理入口也预留真实尺寸。浏览器几何回归覆盖 320px 至桌面、断点两侧，以及本地／在线和管理模式。没有新增依赖、API 或 ledger 写入。
+
+## 作品卡片与推荐理由
+
+目录、实体作品区、竖屏条与接着看复用 `MediaCard`。多列网格统一卡片高度，`MediaGrid` 沿用现有 `ResizeObserver` 和 `gridTemplateColumns` 测量方式，单列按实际内容定高。元信息保持一行，容器查询按扣除头像后的文字区宽度决定日期、共演人数与体积的显隐。普通卡片保留最多五枚共演头像，常态按实际紧叠宽度占位，在 45px 至 109px 之间随卡宽压缩。悬停与键盘聚焦时头像浮于文字上方展开并抬起对应头像，不预留展开空间，标题列位置保持稳定；占位文字始终居中，图片沿用原有头像取景。接着看和竖屏条保留两枚头像，新作卡片复用同一几何。稍后看复用已有动作回调、撤销回执与中性填充 token，同步按钮和卡片底色，不渲染状态色块及观看次数。
+
+接着看的推荐理由独占两行，完整内容使用已安装的 React Aria Components 1.22.1（Apache-2.0）`Popover`／`Dialog` 与现有 BoardUI 浮层样式展示，触屏、键盘与鼠标共用同一入口。没有新增依赖、API、迁移或 ledger 写入。
 
 ## 空状态与操作入口
 
@@ -574,6 +597,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 - 厂牌社媒核查：`find_studio_socials.py` 用 Beautiful Soup 4.15.0 解析锚点，传输与字符集用 `peach.http`，账号键用 `social_links.handle`，不加浏览器运行时；Peach 负责同站年龄门、已有账号差集与证据表。整页正则会混进帖子与脚本里的地址，不用于账号提取。
 - 事务所是实体：57 家各有 `/agencies/<名字>` 页，成员、官网、标签与作品都按 `entity_membership` 算，女优页点得进去，搜名字出这家人的片；原文留在 `metadata.agency`。
 - 外链圆标与厂牌标识取站点自己声明的资产，宽扁字标不参加小圆标竞选；`/logo` 的 `variant` 分 `icon`、`logo` 与最清晰的 `large`，大图版式和资料页取 `large`，紧凑版式取 `icon`。头像与标识共用 `nativeImageFit`：按像素密度折算的源尺寸不足框四成时等比居中、不放大、同图模糊补底，框短边小于 64 px 不补底；加载、回落和版式切换都重新度量。
+- 共用网站的厂牌专页通过 `site_logos.logo_images(owner=...)` 核对图片的明确归属，只接收名称匹配的标识，不沿用平台页头、推荐厂牌或全站社媒账号；独立官网继续复用站点声明与页头标识。
 - 关注的作者头像与来源图标是元数据：`follow_assets` 取回落在 `generated/follow-assets/`，经 `/follow-avatar`、`/source-icon` 给页面；地址只从固定表或固定主机拼，字节先认成图再写盘，到期重取失败继续用旧的并退避一小时，缓存有效期与 `/link-mark` 共用 `web_settings.metadata_refresh_seconds`。视频与图片不存本机。官方头像先认 FANBOX，没有时 `follow_avatar.profile_avatar_tiers` 取名片上的 X 与 Patreon，`follow_assets.largest_image` 留像素最大的那张。
 - 厂牌标识由契约位 `has_logo` 决定出不出图：没装标识的厂牌一个 `<img>` 都不发，改用首字母底板，不靠 404 摘。标识 198 张随仓库分发（ADR-0026）。
 - 关注检查分两阶段：列表阶段落 partial 行，详情补全按 provider 额度只补新行和未补齐行。「补齐过」由连接器的 `ENRICHED_MARK` 声明、判据登记在 `follow_store._ENRICHED_PREDICATES`。

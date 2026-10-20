@@ -764,7 +764,7 @@ it('地址栏指着订阅源时首屏就带着清单，开关、移除与立即�
     .toEqual(['', '名称', '类型', '来源', '状态', '频率', '上次拉取', '上次新增', '操作']);
   const first = checkboxNamed(host, '选择 甲 的新作')!.closest('[role="row"]')!;
   expect([...first.querySelectorAll('[role="rowheader"]:not([data-table-space]),[role="gridcell"]:not([data-table-space])')].map(shown))
-    .toEqual(['', '甲 的新作', 'JAV 订阅', 'feeds.test', '正常', '每 12 小时', '还没拉过', '0 条', '']);
+    .toEqual(['', '甲 的新作', 'JAV 订阅', 'feeds.test', '未检查', '每 12 小时', '还没拉过', '0 条', '']);
   expect(first.querySelector('a')?.getAttribute('href')).toBe('https://feeds.test/a');
   // 名字前的圆框由 `card-art` 的回落链拼：身份引用带着有没有图，图有了才叠上去。
   expect(first.querySelector('[role="rowheader"] img')?.getAttribute('src'))

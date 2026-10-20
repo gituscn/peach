@@ -228,7 +228,8 @@ describe('资源同步', () => {
     const host = await wrap(<ResourceSyncCard toast={toast} />);
     await settle();
     expect(host.textContent).toContain('本地磁盘');
-    expect(host.textContent).toContain('离线，已跳过');
+    expect(host.querySelector('[data-connection-tone="warning"]')?.textContent).toBe('离线');
+    expect(host.textContent).toContain('本次已跳过');
     expect(host.textContent).toContain('馆藏中有 30 项');
     expect(host.textContent).toContain('空文件夹 3 个');
     expect(host.textContent).toContain('待永久删除');

@@ -37,10 +37,9 @@ import {
   hasResultProblems, isRoutine, mergeFinished, momentText, pollInterval, problemDestination, progressText, statusLabel, summaryItems, taskIssues, TASKS_KEY, TRIGGER_LABELS, type TaskRunPayload,
 } from './tasks';
 
-/* 状态徽章只有三档颜色：成功是绿、失败是红、被叫停与被打断是黄，其余留中性底。
-   BoardUI 的 Chip 把这三档写成 lime／rose／yellow，第四种颜色不存在。 */
-const BADGE_COLORS: Record<string, 'lime' | 'rose' | 'yellow'> = {
-  succeeded: 'lime', failed: 'rose', cancelled: 'yellow', interrupted: 'yellow',
+/* 完成绿、失败红、进行中蓝、意外中断黄，主动取消和排队为中性。 */
+const BADGE_COLORS: Record<string, 'lime' | 'rose' | 'yellow' | 'blue' | 'neutral'> = {
+  succeeded: 'lime', failed: 'rose', cancelled: 'neutral', interrupted: 'yellow', running: 'blue', pending: 'neutral',
 };
 
 function StatusBadge({ run }: { run: TaskRunPayload }) {

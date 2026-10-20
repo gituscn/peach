@@ -148,7 +148,7 @@ it('保存后清空秘密输入，列表就地换成服务端回的那一条，�
     },
   });
   expect(password(host)?.value, '保存回来之后页面上不再留着刚交上去的那一份').toBe('');
-  expect(host.textContent).toContain('登录是否有效要到抓取时才知道');
+  expect(host.textContent).toContain('登录有效性待验证');
   expect(buttonNamed('撤销 Cookie', host)).not.toBeNull();
   expect(toast).toHaveBeenCalledWith('来源设置已保存');
   expect(calls.filter((call) => call.path === '/api/scraping' && call.method === 'GET'),
@@ -194,8 +194,10 @@ it('连接结果按来源名称与这一跳查的是什么说成一句话', asyn
   await click(buttonNamed('检查连接', host));
   await settle();
 
-  expect(host.querySelector('[role=status]')?.textContent).toBe('JavBus：可连接 · 800 × 538');
-  expect(host.querySelector('[role=alert]')?.textContent).toBe('JavBus 高清图片：不能连接。需要登录');
+  expect(host.querySelector('[role=status] [data-connection-tone="success"]')?.textContent).toBe('可访问');
+  expect(host.querySelector('[role=status]')?.textContent).toContain('JavBus：可连接 · 800 × 538');
+  expect(host.querySelector('[role=alert] [data-connection-tone="error"]')?.textContent).toBe('连接失败');
+  expect(host.querySelector('[role=alert]')?.textContent).toContain('JavBus 高清图片：不能连接。需要登录');
 });
 
 it('Cookie 二选一：切过去的那一种才交，另一种连输入都不留', async () => {

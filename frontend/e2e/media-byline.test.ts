@@ -9,7 +9,7 @@ describe('作品卡片署名信息行', () => {
   let browser: Browser;
   installDesignBrowser(next => { browser = next });
   for (const viewport of VIEWPORTS) {
-    it(`${viewport.name} 姓名靠左，与日期大小自然排列`, { timeout: 60_000 }, async () => {
+    it(`${viewport.name} 姓名靠左，日期按可用宽度显示`, { timeout: 60_000 }, async () => {
       const opened = await openCatalogFixture(browser, payload => {
         Object.assign(payload.items[0], { is_jav: true, code: 'MIAA-155', name: '演示作品',
           performers: ['篠田优'], performer_total: 1, release_date: '2019-09-13', size: 6549825126 });
@@ -20,7 +20,9 @@ describe('作品卡片署名信息行', () => {
         const card = opened.page.locator('#grid [data-media-card]').first();
         for (const [field, glyph] of [['who', 'user-round'], ['release', 'calendar'], ['size', 'hard-drive']]) {
           assert.equal(await card.locator(`[data-media-${field}] svg use`).getAttribute('href'), `#i-${glyph}`);
-          assert.equal(await card.locator(`[data-media-${field}] svg`).evaluate(node => node.getBoundingClientRect().width), 14);
+          const icon = card.locator(`[data-media-${field}] svg`);
+          if (viewport.mobile && field === 'release') assert.equal(await icon.isVisible(), false);
+          else assert.equal(await icon.evaluate(node => node.getBoundingClientRect().width), 14);
         }
         const geometry = await card.evaluate(element => {
           const who = element.querySelector('[data-media-who]')!;

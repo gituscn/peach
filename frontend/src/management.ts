@@ -1,4 +1,5 @@
 import { islandButton, islandGlyph, islandSelect } from './island-skeleton';
+import { FIELDSET_FACE, FIELDSET_BODY, FIELDSET_FOOT, fieldsetClass, type FieldsetLayout } from './react/components/fieldset-layout';
 
 /* 「扫描与采集」「媒体修复」两张卡的正文。卡片本体由 React 画，骨架与遗留层的取数占位
    画的是同一段话：写两份的话，骨架上的那句会比真卡短一截，接管时整张卡跳一次。 */
@@ -15,35 +16,35 @@ const bar = '<span class="skeleton skeleton-text" aria-hidden="true"></span>';
 const waitingAction = 'disabled data-skeleton-action';
 const unavailable = 'aria-disabled="true"';
 const island = (card: string) => `<div class="peach-react"><div class="flex flex-col gap-4">${card}</div></div>`;
-const cardText = (title: string, text: string) => `<div data-geist-fieldset-content>
+const cardText = (title: string, text: string, layout: FieldsetLayout) => `<div class="${FIELDSET_BODY[layout]}"><div class="flex flex-col gap-2">
           <h3 class="text-title-2-medium text-text-primary">${title}</h3>
-          <p class="text-body-2-regular text-text-secondary">${text}</p></div>`;
+          <p class="text-body-2-regular text-text-secondary">${text}</p></div></div>`;
 
 /** 「扫描与采集」卡：与 React `LibraryProcessingCard` 同一副容器、同一段正文、同一组键。
  *  「复核资料」只在有候选时出现，这里不预画。 */
 export function scanCardSkeletonHtml(): string {
-  return island(`<section aria-label="扫描与采集" data-geist-fieldset data-cleanup-task data-cleanup-processing data-fieldset-stack>
-        ${cardText('扫描与采集', SCAN_CARD_TEXT)}
-        <footer data-geist-fieldset-footer><a href="/sources" class="inline-flex items-center justify-center gap-1 whitespace-nowrap font-sans rounded-sm text-body-medium text-accent-600"><span>来源和凭证</span>${islandGlyph('arrow-up', 'size-[18px] shrink-0 rotate-90')}</a><span data-button-group data-split-button data-variant="primary">${islandButton({ label: '同步媒体库', attrs: waitingAction })}${islandButton({ glyph: 'chevron-down', attrs: `${waitingAction} aria-label="更多同步方式"` })}</span></footer>
+  return island(`<section aria-label="扫描与采集" class="${fieldsetClass('stack')}" data-cleanup-task data-cleanup-processing>
+        ${cardText('扫描与采集', SCAN_CARD_TEXT, 'stack')}
+        <footer class="${FIELDSET_FOOT.stack}"><a href="/sources" class="inline-flex items-center justify-center gap-1 whitespace-nowrap font-sans rounded-sm text-body-medium text-accent-600"><span>来源和凭证</span>${islandGlyph('arrow-up', 'size-[18px] shrink-0 rotate-90')}</a><span data-button-group data-split-button data-variant="primary">${islandButton({ label: '同步媒体库', attrs: waitingAction })}${islandButton({ glyph: 'chevron-down', attrs: `${waitingAction} aria-label="更多同步方式"` })}</span></footer>
       </section>`);
 }
 
 /** 「媒体修复」卡：页脚的媒体库下拉框先按最终尺寸画出来，库名要等数据；「开始修复」要等选定
  *  媒体库，骨架里是禁用态。 */
 export function repairCardSkeletonHtml(): string {
-  return island(`<section aria-label="媒体修复" data-geist-fieldset data-cleanup-task data-cleanup-processing>
-        ${cardText('媒体修复', REPAIR_CARD_TEXT)}
-        <footer data-geist-fieldset-footer>${islandSelect(bar, { className: 'w-48', attrs: unavailable })}${islandButton({ label: '开始修复', attrs: waitingAction })}</footer>
+  return island(`<section aria-label="媒体修复" class="${fieldsetClass('split')}" data-cleanup-task data-cleanup-processing>
+        ${cardText('媒体修复', REPAIR_CARD_TEXT, 'split')}
+        <footer class="${FIELDSET_FOOT.split}">${islandSelect(bar, { className: 'w-48', attrs: unavailable })}${islandButton({ label: '开始修复', attrs: waitingAction })}</footer>
       </section>`);
 }
 
 /** 首屏复用读数卡、三张任务卡、链接管理与资源同步的最终容器；静态标题、正文和键立即呈现。 */
 export function cleanupSkeletonHtml(): string {
   const stats = [['人工复核', 'square-check-big'], ['高清版', 'sparkles'], ['重复文件', 'file-stack'], ['垃圾文件', 'file-archive'], ['回收站', 'trash']];
-  const face = 'min-w-0 bg-background-secondary-default rounded-2xl shadow-card border border-border-button-default overflow-hidden';
-  const body = 'flex min-h-30 min-w-0 flex-1 flex-col px-5 pt-5 pb-4 max-cleanup-tight:min-h-0 max-cleanup-tight:p-4.5';
+  const face = FIELDSET_FACE;
+  const body = FIELDSET_BODY.stack;
   const title = (label: string, gap = 'mb-2') => `<h3 class="text-title-2-medium text-text-primary ${gap}">${label}</h3>`;
-  const footer = (label: string) => `<footer class="flex min-h-14 flex-wrap items-center justify-end gap-2 border-t border-border-button-default bg-card-footer px-5 py-3 max-cleanup-tight:px-4.5">${islandButton({ label, attrs: waitingAction })}</footer>`;
+  const footer = (label: string) => `<footer class="${FIELDSET_FOOT.stack}">${islandButton({ label, attrs: waitingAction })}</footer>`;
   const input = (label: string) => `<div class="flex flex-col gap-1.5"><span class="text-body-medium text-text-primary">${label}</span><span class="skeleton ui-configuration-skeleton-input"></span></div>`;
   return `<div class="peach-react" data-skeleton="cleanup" aria-busy="true" role="status" aria-label="正在读取数据管理状态"><div aria-hidden="true" inert class="mx-auto flex w-full max-w-board flex-col gap-8">
     <div class="inline-grid w-full grid-cols-5 gap-4 max-plain-stat-pair:grid-cols-2 max-plain-stat-single:grid-cols-1">${stats.map(([label, glyph]) => `<div class="min-w-0 bg-background-secondary-default rounded-2xl flex min-h-33 flex-col gap-2 p-4 text-left"><span class="flex min-w-0 items-center gap-2 text-body-medium text-text-secondary"><i class="flex size-8 shrink-0 items-center justify-center rounded-md bg-background-primary-default text-text-primary">${islandGlyph(glyph!, 'size-4')}</i>${label}</span><strong class="text-title-1-medium">${bar}</strong><span class="text-caption-1-regular">${bar}</span></div>`).join('')}</div>

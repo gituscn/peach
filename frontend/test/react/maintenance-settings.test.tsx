@@ -81,7 +81,7 @@ describe('检查更新', () => {
     expect([...host.querySelectorAll('a')].some((a) => a.textContent === '完整安装包')).toBe(false);
   });
 
-  it('还没检查过时「尚未检查」只在最新版本那一行出现一次', async () => {
+  it('尚未检查的状态只显示一次，最新版本保持未取得', async () => {
     vi.stubGlobal('fetch', fetchMock(200, { state: 'idle', progress: 0 }));
     const host = await mount(<ReleaseUpdates initial={release} />);
     expect(host.textContent?.split('尚未检查')).toHaveLength(2);

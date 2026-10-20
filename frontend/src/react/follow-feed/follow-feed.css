@@ -326,6 +326,15 @@ body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-follo
   min-height: calc(var(--card-meta-block) + 16px);
   contain-intrinsic-block-size: auto var(--card-meta-block);
 }
+/* 窄屏关注卡按实际内容定高，紧凑视图的长标题保留两行。 */
+@media (max-width: 760px) {
+  body .peach-react [data-follow-list] [data-follow-item] [data-media-meta] {
+    min-height: 0; content-visibility: visible; contain-intrinsic-block-size: none;
+  }
+  body[data-density]:not([data-surface="/trash"]) .peach-react [data-follow-item] [data-media-title] {
+    display: -webkit-box; min-height: 0; white-space: normal; -webkit-line-clamp: 2;
+  }
+}
 /* 已看的卡片保持原样：看过不等于不想再看，只有忽略的才淡下去。 */
 .peach-react [data-follow-item][data-status="ignored"] { opacity: .62; }
 .peach-react [data-follow-visual] { position: relative; isolation: isolate; border-radius: var(--surface-radius); }

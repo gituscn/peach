@@ -18,6 +18,7 @@ import { SCAN_CARD_TEXT } from '../../management';
 import type { LibraryProcessingProps } from '../bundle';
 import { Fieldset, FieldsetTitle } from '../components/fieldset';
 import { Note } from '../components/note';
+import { StatusLabel } from '../components/status-label';
 import { useOverlayScrollbar } from '../components/overlay-scrollbar';
 import { PathLine } from '../components/path-line';
 import { Disclosure } from '../settings/section';
@@ -185,7 +186,7 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
           <FieldsetTitle>扫描与采集</FieldsetTitle>
           <p className="text-body-2-regular text-text-secondary">{SCAN_CARD_TEXT}</p>
           {state.status === 'paused' && !state.total
-            ? <p className="text-caption-1-regular text-text-secondary">已暂停</p>
+            ? <span className="self-start"><StatusLabel>已暂停</StatusLabel></span>
             : processingActive(state)
             ? <ProcessingProgress state={state} />
             : null}

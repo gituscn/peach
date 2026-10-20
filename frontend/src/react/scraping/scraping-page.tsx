@@ -23,6 +23,8 @@ import { useBackgroundJob } from '../background-job';
 import type { ScrapingProps } from '../bundle';
 import { LoadingDots } from '../components/loading-dots';
 import { Note } from '../components/note';
+import { StatusLabel } from '../components/status-label';
+import { ConnectionStatus } from '../components/connection-status';
 import { Page } from '../components/page';
 import { SiteMark } from '../components/site-mark';
 import { SEGMENT, SEGMENTED_TRACK, SegmentedRadioGroup as RadioGroup } from '../components/segmented';
@@ -168,7 +170,7 @@ function SourceCard({ source, toast }: { source: Source } & ScrapingProps) {
         </SettingsRow>
       </Rows>
       {source.cooldown_until && source.cooldown_until > Date.now() / 1000 ? (
-        <Note tone="warning">已暂停访问此来源，可在 {new Date(source.cooldown_until * 1000).toLocaleString('zh-CN')} 后重试。</Note>
+        <Note tone="warning"><span className="inline-flex flex-wrap items-center gap-2"><StatusLabel tone="warning">冷却中</StatusLabel><span>可在 {new Date(source.cooldown_until * 1000).toLocaleString('zh-CN')} 后重试。</span></span></Note>
       ) : null}
       {detailed ? <Stack divided>
         {network === 'peach'
@@ -185,11 +187,8 @@ function SourceCard({ source, toast }: { source: Source } & ScrapingProps) {
             </p>
           : null}
         {source.accepts_cookie && !source.browser ? <>
-          <p className="text-body-2-regular text-text-secondary">
-            {source.cookie_saved
-              ? 'Cookie 已保存；登录是否有效要到抓取时才知道。'
-              : '需要登录时，任选一种方式提供 Cookie。'}
-          </p>
+          <div className="flex flex-col gap-2"><span className="self-start"><StatusLabel tone={source.cookie_saved ? 'success' : 'neutral'}>{source.cookie_saved ? 'Cookie 已保存' : 'Cookie 未配置'}</StatusLabel></span>
+            <p className="text-body-2-regular text-text-secondary">{source.cookie_saved ? '登录有效性待验证。' : '需要登录时，任选一种方式提供 Cookie。'}</p></div>
           {/* 两种方式互斥，交上去的只能是其中一种：切换时把另一种的输入清掉，
               不让看不见的那一份跟着提交。 */}
           <RadioGroup aria-label="提供 Cookie 的方式（二选一）" value={method}
@@ -219,7 +218,7 @@ function SourceCard({ source, toast }: { source: Source } & ScrapingProps) {
         {problem ? <ErrorText>{problem}</ErrorText> : null}
         {results.map((result) => (
           <Note key={result.label} tone={result.ok ? 'success' : 'error'}>
-            {checkText(result, source.label)}
+            <span className="flex flex-col items-start gap-1"><ConnectionStatus tone={result.ok ? 'success' : 'error'}>{result.ok ? '可访问' : '连接失败'}</ConnectionStatus><span>{checkText(result, source.label)}</span></span>
           </Note>
         ))}
       </Stack> : null}
