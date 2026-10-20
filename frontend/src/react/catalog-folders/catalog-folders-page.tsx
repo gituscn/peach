@@ -1,4 +1,4 @@
-import { useContext, useDeferredValue, useEffect, useLayoutEffect, useState } from 'react';
+import { useContext, useDeferredValue, useEffect, useId, useLayoutEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useInRouterContext, useLocation } from 'react-router';
 import { useQueries, useQuery } from '@tanstack/react-query';
@@ -29,7 +29,7 @@ export function FolderBrowseToggle() {
 function FolderBrowseControl() {
   const address = useLocation();
   const actions = useContext(ShellActionsContext);
-  if (!isCatalogPath(address.pathname)) return null;
+  if (!isCatalogPath(address.pathname) && !/^\/(performers|creators|studios|series|agencies|tags)\/[^/]+$/.test(address.pathname)) return null;
   const params = new URLSearchParams(address.search);
   const active = params.get('browse') === 'folders' || !!params.get('folder');
   return <IconButton size="small" data-folder-mode-toggle="" aria-label="文件夹模式" title="文件夹模式" aria-pressed={active}
@@ -38,29 +38,48 @@ function FolderBrowseControl() {
       active ? { browse: null, folder: null, folder_recursive: null } : { browse: 'folders' }))} />;
 }
 
-export function CatalogFolders() {
+export function EntityFolderWorkspace({ children, enabled }: { children: ReactNode; enabled: boolean }) {
+  return useInRouterContext() ? <RoutedFolderWorkspace enabled={enabled}>{children}</RoutedFolderWorkspace> : <>{children}</>;
+}
+
+function RoutedFolderWorkspace({ children, enabled }: { children: ReactNode; enabled: boolean }) {
+  const [tree, setTree] = useState<HTMLElement | null>(null);
+  const [header, setHeader] = useState<HTMLDivElement | null>(null);
+  const address = useLocation();
+  const params = new URLSearchParams(address.search);
+  const active = enabled && (params.get('browse') === 'folders' || !!params.get('folder'));
+  return <div className="entity-folder-workspace" data-folder-workspace="" data-folder-browse={active ? '' : undefined}>
+    <aside ref={setTree} data-folder-tree-host="" hidden={!active} />
+    <div className="min-w-0"><div ref={setHeader} data-folder-header-host="" hidden={!active} />{children}</div>
+    {tree && header ? <CatalogFolders treeTarget={tree} headerTarget={header} enabled={enabled} /> : null}
+  </div>;
+}
+
+export function CatalogFolders({ treeTarget, headerTarget, enabled = true }: {
+  treeTarget?: HTMLElement; headerTarget?: HTMLElement; enabled?: boolean;
+} = {}) {
   const address = useLocation();
   const actions = useContext(ShellActionsContext);
   const params = new URLSearchParams(address.search);
-  const active = params.get('browse') === 'folders' || !!params.get('folder');
+  const active = enabled && (params.get('browse') === 'folders' || !!params.get('folder'));
   const scope: FolderScope = { loc: params.get('loc') ?? '', library: params.get('library') ?? '' };
-  useFolderStickyOffset(active);
+  useFolderStickyOffset(active, treeTarget);
   const key = params.get('folder') || '';
   const query = useQuery({ ...folderQuery(scope, key), enabled: active });
   const [drawer, setDrawer] = useState(false);
   const [editing, setEditing] = useState(false);
-  const treeHost = document.getElementById('catalogFoldersTree');
-  const headerHost = document.getElementById('catalogFolderHeader');
+  const treeHost = treeTarget ?? document.getElementById('catalogFoldersTree');
+  const headerHost = headerTarget ?? document.getElementById('catalogFolderHeader');
   useLayoutEffect(() => {
     if (treeHost) treeHost.hidden = !active;
     if (headerHost) headerHost.hidden = !active;
-    document.body.toggleAttribute('data-folder-browse', active);
+    if (!treeTarget) document.body.toggleAttribute('data-folder-browse', active);
     return () => {
       if (treeHost) treeHost.hidden = true;
       if (headerHost) headerHost.hidden = true;
-      document.body.removeAttribute('data-folder-browse');
+      if (!treeTarget) document.body.removeAttribute('data-folder-browse');
     };
-  }, [active, treeHost, headerHost]);
+  }, [active, treeHost, headerHost, treeTarget]);
   useEffect(() => { setDrawer(false); setEditing(false) }, [key, active]);
   if (!active || !treeHost || !headerHost || !actions) return null;
   const go = (id: string) => {
@@ -90,10 +109,8 @@ export function CatalogFolders() {
           onChange={on => actions.navigate(folderHref(address, { folder_recursive: on ? null : '0' }))}>包含子文件夹</Checkbox>
         <span className="text-caption-1-regular text-text-tertiary">{data.rule ? `${PURPOSES[data.rule.purpose]}${data.rule.name ? ` · ${data.rule.name}` : ''}` : '个人分类'}</span>
       </div> : null}
-      {query.isPending ? <div data-skeleton="" aria-busy="true" aria-label="正在读取文件夹" className="h-8 w-full rounded-md skeleton-sheen" /> : null}
-      {data?.children.length ? <div className="folder-children" aria-label="子文件夹">{data.children.map(node =>
-        <Button key={node.id} variant="secondary" size="small" leadingIcon={RiFolder3Line}
-          onClick={() => go(node.id)}><span className="truncate">{node.name}</span></Button>)}</div> : null}
+      {query.isPending ? <div data-skeleton="" aria-busy="true" aria-label="正在读取文件夹" className="folder-children">{Array.from({ length: 6 }, (_, i) => <span key={i} className="skeleton-sheen h-8 w-28 rounded-lg" />)}</div> : null}
+      {data?.children.length ? <FolderChildren key={key} nodes={data.children} go={go} /> : null}
     </div>, headerHost)}
     <ModalFrame isOpen={drawer} onOpenChange={setDrawer} width="form" label="文件夹目录">
       <div className="flex items-center justify-between border-b border-separator-border p-4">
@@ -104,6 +121,19 @@ export function CatalogFolders() {
     {editing && data?.selected ? <FolderRuleDialog key={data.selected.id} folder={data.selected} rule={data.rule}
       revision={data.rules_revision} close={() => setEditing(false)} /> : null}
   </>;
+}
+
+function FolderChildren({ nodes, go }: { nodes: MediaFolder[]; go(id: string): void }) {
+  const [expanded, setExpanded] = useState(false);
+  const id = useId();
+  const visible = expanded ? nodes : nodes.slice(0, 12);
+  return <div className="flex min-w-0 flex-col items-start gap-2">
+    <div id={id} className="folder-children" aria-label="子文件夹">{visible.map(node =>
+      <Button key={node.id} variant="secondary" size="small" leadingIcon={RiFolder3Line}
+        onClick={() => go(node.id)}><span className="truncate">{node.name}</span></Button>)}</div>
+    {nodes.length > 12 ? <Button variant="ghost" size="small" aria-expanded={expanded} aria-controls={id}
+      onClick={() => setExpanded(value => !value)}>{expanded ? '收起文件夹' : `展开全部 ${nodes.length} 个文件夹`}</Button> : null}
+  </div>;
 }
 
 function FolderTree({ scope, selected, current, go, reportedError }: {
@@ -139,8 +169,8 @@ function FolderTree({ scope, selected, current, go, reportedError }: {
     <Input aria-label="查找文件夹" placeholder="查找文件夹" leadingIcon={RiSearchLine} value={search}
       onChange={setSearch} size="small" />
     {failed ? <Note tone="error" action={<Button variant="secondary" size="small" onClick={() => { void roots.refetch(); branches.forEach(branch => { if (branch.error) void branch.refetch() }) }}>重试</Button>}>{errorMessage(failed)}</Note> : null}
-    <div className="relative flex min-h-0 flex-col"><div ref={scroll} className="folder-tree-scroller">
-      {roots.error ? null : roots.isPending ? <div data-skeleton="" aria-busy="true" aria-label="正在读取目录树" className="h-60 w-full rounded-xl skeleton-sheen" />
+    <div className="folder-tree-frame relative flex min-h-0 flex-col overflow-hidden rounded-3xl"><div ref={scroll} className="folder-tree-scroller">
+      {roots.error ? null : roots.isPending ? <div data-skeleton="" aria-busy="true" aria-label="正在读取目录树" className="flex flex-col gap-2">{Array.from({ length: 8 }, (_, i) => <div key={i} className="flex h-8 items-center gap-2 px-3"><span className="skeleton-sheen size-4" /><span className="skeleton-sheen h-4 flex-1" /></div>)}</div>
         : deferredSearch ? <div className="flex flex-col gap-1">{searchQuery.isPending ? <div data-skeleton="" aria-busy="true" className="h-8 skeleton-sheen" aria-label="正在查找文件夹" />
           : searchQuery.error ? <Note tone="error">{errorMessage(searchQuery.error)}</Note>
           : searchQuery.data?.matches.length ? searchQuery.data.matches.map(node => <Button key={node.id} variant="secondary" size="small" leadingIcon={RiFolder3Line}

@@ -1,16 +1,16 @@
 import { useLayoutEffect } from 'react';
 
 /** 目录栏的吸顶边界跟随首页筛选浮层的实际高度。 */
-export function useFolderStickyOffset(active: boolean) {
+export function useFolderStickyOffset(active: boolean, target?: HTMLElement) {
   useLayoutEffect(() => {
     if (!active) return;
-    const host = document.getElementById('catalogFilter');
+    const host = target ? document.getElementById('index') : document.getElementById('catalogFilter');
     let observed: Element | null = null;
     let frame = 0;
     const resize = new ResizeObserver(() => schedule());
     const measure = () => {
       frame = 0;
-      const filter = host?.querySelector<HTMLElement>('[data-catalog-frame]') ?? null;
+      const filter = host?.querySelector<HTMLElement>('[data-catalog-frame],[data-entity-filter-glass]') ?? null;
       if (filter !== observed) {
         resize.disconnect();
         observed = filter;
@@ -20,7 +20,7 @@ export function useFolderStickyOffset(active: boolean) {
         parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topH'));
       const offset = (Number.isFinite(top) ? top : 0) + (filter?.getBoundingClientRect().height ?? 0) + 16;
       document.body.style.setProperty('--folder-sticky-top', `${offset}px`);
-      const treeTop = document.getElementById('catalogFoldersTree')?.getBoundingClientRect().top ?? offset;
+      const treeTop = (target ?? document.getElementById('catalogFoldersTree'))?.getBoundingClientRect().top ?? offset;
       const viewport = visualViewport;
       const bottom = viewport ? viewport.offsetTop + viewport.height : innerHeight;
       const main = document.getElementById('main');
@@ -48,5 +48,5 @@ export function useFolderStickyOffset(active: boolean) {
       document.body.style.removeProperty('--folder-sticky-top');
       document.body.style.removeProperty('--folder-available-height');
     };
-  }, [active]);
+  }, [active, target]);
 }

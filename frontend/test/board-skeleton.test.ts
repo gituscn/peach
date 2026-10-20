@@ -8,6 +8,14 @@ vi.mock('@peach/legacy/core', async importOriginal => ({
 }));
 
 describe('Board 页面骨架', () => {
+  it.each([
+    ['subscriptions', '来源与订阅'], ['downloads', '下载渠道'], ['network', '网络与访问'], ['maintenance', '应用与维护'],
+  ])('配置深链 %s 使用对应分区', (key, label) => {
+    const root = document.createElement('div');
+    root.innerHTML = boardPageSkeleton(`/settings/${key}`);
+    expect(root.querySelector('.ui-board-local-nav [aria-selected="true"]')?.textContent).toBe(label);
+    expect(root.querySelector('[aria-label="媒体目录"]')).toBeNull();
+  });
   it.each(['/stats', '/taste', '/subscriptions', '/settings/library', '/settings/diagnostics', '/tasks', '/duplicates', '/quality-goals', '/playlists'])('为 %s 提供单一等待语义', path => {
     const root = document.createElement('div');
     root.innerHTML = boardPageSkeleton(path);

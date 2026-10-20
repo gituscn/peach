@@ -114,6 +114,25 @@ class BackgroundJobTaskRunTests(unittest.TestCase):
         release.set()
         job.thread.join(5)
 
+    def test_source_issues_keep_the_round_identity_and_readable_reason(self):
+        job = self.job('follow-check')
+        job.start(lambda job_id: job.update(job_id, status='complete'), initial={
+            'results': [
+                {'source': 17, 'label': '示例作者', 'provider_label': '示例站点',
+                 'ok': False, 'error': 'HTTP 403', 'url': 'private'},
+                {'source': 18, 'label': '另一来源', 'ok': True, 'backfill_error': '连接超时'},
+            ],
+        })
+        job.thread.join(5)
+        summary = self.store.query(task_key='follow-check')[0].result_summary
+        self.assertEqual(summary['source_failed'], 1)
+        self.assertEqual(summary['source_warning'], 1)
+        self.assertEqual(summary['issues'], [
+            {'source': 17, 'label': '示例作者', 'provider': '示例站点', 'kind': '检查失败', 'error': 'HTTP 403'},
+            {'source': 18, 'label': '另一来源', 'provider': '', 'kind': '补查失败', 'error': '连接超时'},
+        ])
+        self.assertNotIn('private', json.dumps(summary))
+
     def test_a_locked_ledger_during_progress_does_not_fail_the_round(self):
         """进度写不进去只丢这一次进度：这一轮照常跑完，结算照常落地。"""
         job = self.job()

@@ -16,12 +16,13 @@ describe('切换主题', () => {
   after(async () => { await browser.close() });
 
   it('切换瞬间带颜色过渡的控件没有动画，明暗键滑块照常位移，下一帧过渡恢复', { timeout: 60_000 }, async () => {
-    const opened = await visit(browser, '/resource-sync', desktop);
+    const opened = await visit(browser, '/data-cleanup', desktop);
     try {
       const { page } = opened;
       await page.emulateMedia({ reducedMotion: 'no-preference' });
-      const section = page.locator('#stats section#resource-sync');
+      const section = page.locator('section[aria-label="媒体修复"]');
       await section.waitFor({ state: 'visible', timeout: 15_000 });
+      await section.locator('button[aria-haspopup="listbox"]:not(:disabled)').waitFor({ state: 'visible', timeout: 15_000 });
       // 侧栏收起时滑块不显示，也就没有位移可看；桌面视口默认展开。
       await page.locator('#drawer.open .board-theme-thumb').waitFor({ state: 'visible', timeout: 5_000 });
       await settle(page);
@@ -30,9 +31,7 @@ describe('切换主题', () => {
         const entry = '/dist/peach-app.js', ui = await import(entry);
         const root = document.documentElement;
         const thumb = document.querySelector<HTMLElement>('.board-theme-thumb')!;
-        /* `.resourceaction` 只在这一页的加载骨架里出现，页面画完就换成 React 卡片；
-           这里放一枚同类按钮，吃的是同一份 web/css 规则。 */
-        const node = host.appendChild(Object.assign(document.createElement('button'), { className: 'resourceaction', textContent: '检查文件' }));
+        const node = host.querySelector<HTMLButtonElement>('button[aria-haspopup="listbox"]')!;
         const frame = () => new Promise((done) => requestAnimationFrame(() => setTimeout(done, 150)));
         // 只结束过渡：动效开着时页面上还有无限循环的光晕动画，`finish()` 会对它们抛错。
         const finish = () => document.getAnimations()
@@ -73,7 +72,6 @@ describe('切换主题', () => {
         ui.applyTheme('light');
         await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
         const settled = [...transitions(node), ...colours()];
-        node.remove();
         return { declared, raw, switched, page, slid, restored, settled };
       });
 

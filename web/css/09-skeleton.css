@@ -21,7 +21,6 @@
 .skeleton-text{display:inline-block;vertical-align:middle;height:1em;width:12em;max-width:70%}
 /* 整理卡的来源下拉按「本地」那一档的宽度画。它挂在 `.gselectfield` 上、同一档特指度，
    靠排在 01-base.css 后面压住那条 `width:100%`。 */
-.organize-source-skeleton{width:100px}
 .skeletoncard{display:grid;gap:10px;min-width:0}
 .skeletoncard i,.skeletoncard b,.skeletoncard em{display:block;
   border-radius:var(--control-radius);background:var(--hover)}
@@ -90,7 +89,8 @@
    infinite reverse，位移半个自身宽度。全局的 prefers-reduced-motion 规则会关掉它。 */
 @keyframes skeleton-sweep{to{transform:translateX(-50%)}}
 /* 本地读取在 180ms 内完成时不展示骨架；JS 到门槛后直接移除这一类，不依赖动效偏好。 */
-.skeleton-awaiting{visibility:hidden}
+.skeleton-awaiting,.skeleton-awaiting *,.skeleton-awaiting::before,.skeleton-awaiting::after,
+.skeleton-awaiting *::before,.skeleton-awaiting *::after{visibility:hidden!important}
 .skeleton,.skeletoncard i,.skeletoncard b,.skeletoncard em,
 .skeletoncard s,.skeletoncard u,
 .countskeleton,.avskeleton .ring,.avskeleton .nm,.brandskeleton,.tagskeleton{position:relative;overflow:hidden}
@@ -98,7 +98,7 @@
 .skeletoncard s::after,.skeletoncard u::after,
 .countskeleton::after,.avskeleton .ring::after,.avskeleton .nm::after,
 .brandskeleton::after,.tagskeleton::after{content:'';position:absolute;inset:0;right:-200%;
-  visibility:visible;border-radius:inherit;
+  visibility:inherit;border-radius:inherit;
   background:linear-gradient(to right,var(--hover),var(--skeleton-sheen) 50%,var(--hover));
   background-size:50% 100%;
   animation:skeleton-sweep 1.5s ease-in-out infinite reverse}

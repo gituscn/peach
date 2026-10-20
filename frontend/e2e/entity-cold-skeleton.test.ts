@@ -8,8 +8,8 @@ describe('实体页冷启动等待态', () => {
   let browser: Browser;
   before(async () => { browser = await launch() });
   after(async () => { await browser.close() });
-  for (const viewport of VIEWPORTS) for (const jav of [false, true]) {
-    it(`${viewport.name} ${jav ? 'JAV' : '普通'}艺人直达和刷新保持首次形状`, { timeout: 60_000 }, async () => {
+  for (const viewport of VIEWPORTS) for (const jav of [false, true]) for (const theme of ['light', 'dark']) {
+    it(`${viewport.name} ${theme} ${jav ? 'JAV' : '普通'}艺人直达和刷新保持首次形状`, { timeout: 60_000 }, async () => {
       const context = await browser.newContext({ viewport });
       const releases: (() => void)[] = [];
       const gate = () => new Promise<void>(resolve => { releases.push(resolve) });
@@ -17,7 +17,8 @@ describe('实体页冷启动等待态', () => {
       const name = '演示艺人';
       const shape = { id: 90001, kind: 'performer', names: [name], parts: jav ? ['facts', 'costars', 'jav'] : [] };
       try {
-        await context.addInitScript(() => {
+        await context.addInitScript(theme => {
+          localStorage.setItem('peach.settings.v1', JSON.stringify({ theme, detailAutoplay: false }));
           const seen: { facts: boolean; costars: boolean; jav: boolean }[] = [];
           Object.assign(window, { entityWaitingFrames: seen });
           let previous: Element | null = null;
@@ -26,9 +27,9 @@ describe('实体页冷启动等待态', () => {
             if (!root || root === previous) return;
             previous = root;
             seen.push({ facts: !!root.querySelector('[data-entity-facts]'),
-              costars: !!root.querySelector('[data-entity-foot]'), jav: !!root.querySelector('[data-entity-layout]') });
+              costars: !!root.querySelector('[data-entity-foot]'), jav: !!root.querySelector('[aria-label="JAV 卡片版式"]') });
           }).observe(document, { childList: true, subtree: true });
-        });
+        }, theme);
         const page = await context.newPage();
         await page.route('**/performers/90001', async route => {
           const response = await route.fetch({ url: requiredEnv('PEACH_E2E_ORIGIN') + '/' });
@@ -59,7 +60,32 @@ describe('实体页冷启动等待态', () => {
             getComputedStyle(node).borderTopLeftRadius), '50%', '艺人头像等待态形状不准确');
           assert.equal(await root.locator('[data-entity-facts]').count() > 0, jav, '首次等待态资料栏不准确');
           assert.equal(await root.locator('[data-entity-foot]').count() > 0, jav, '首次等待态相关艺人不准确');
-          assert.equal(await root.locator('[data-entity-layout]').count() > 0, jav, '首次等待态卡片版式不准确');
+          assert.equal(await root.locator('[aria-label="JAV 卡片版式"]').count() > 0, jav, '首次等待态卡片版式不准确');
+          assert.equal(await root.locator('[aria-label="馆藏显示方式"]').count(), 1);
+          assert.equal(await root.locator('[data-folder-mode-toggle]').count(), 1);
+          await page.waitForFunction(() => !document.querySelector('[data-skeleton="entity/performer"] .skeleton-awaiting'));
+          const visibility = await root.evaluate(node => {
+            node.classList.add('skeleton-awaiting');
+            const leaks = [node, ...node.querySelectorAll('*')].flatMap(child => ['', '::before', '::after'].filter(pseudo => {
+              const css = getComputedStyle(child, pseudo || null);
+              return (!pseudo || !['none', 'normal'].includes(css.content)) && css.visibility !== 'hidden';
+            }).map(pseudo => `${child.tagName}${pseudo}`));
+            node.classList.remove('skeleton-awaiting');
+            return leaks;
+          });
+          assert.deepEqual(visibility, [], '等待门槛内出现了单独可见的骨架或微光');
+          const controls = async () => page.locator('[data-entity-filter-glass]').evaluate(node => {
+            const selectors = ['[data-filter-row="top"]','[data-filter-row="bottom"]','[data-entity-state=""]',
+              '[data-entity-batch]','[data-entity-sort="rating"]','[data-folder-mode-toggle]'];
+            return selectors.map(selector => {
+              const el = node.querySelector(selector)!;
+              const css = getComputedStyle(el), box = el.getBoundingClientRect();
+              return { selector, height: box.height, width: selector.includes('data-filter-row') ? 0 : box.width,
+                padding: css.padding, gap: css.gap, font: css.fontSize };
+            });
+          });
+          const waitingControls = await controls();
+          assert.equal(await root.locator('[data-entity-tags] .skeleton').first().evaluate(node => node.getBoundingClientRect().height), 30);
           assert.ok(await root.locator('[data-entity-state]').count(), '静态观看筛选尚未显示');
           const ratio = () => root.locator('[style*="--skeleton-card-ratio"]').first().evaluate(node =>
             Number((node as HTMLElement).style.getPropertyValue('--skeleton-card-ratio')));
@@ -75,6 +101,7 @@ describe('实体页冷启动等待态', () => {
           assert.equal(await ratio(), jav ? .75 : 16 / 9);
           releases.shift()!();
           await root.waitFor({ state: 'detached' });
+          assert.deepEqual(await controls(), waitingControls, '筛选按钮的尺寸或间距与就绪状态不一致');
           const frames = await page.evaluate(() =>
             (window as Window & { entityWaitingFrames: { facts: boolean; costars: boolean; jav: boolean }[] }).entityWaitingFrames);
           assert.deepEqual(frames, [{ facts: jav, costars: jav, jav }], '一次打开画出了多段或不准确的等待态');

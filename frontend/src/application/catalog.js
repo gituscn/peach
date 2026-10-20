@@ -20,6 +20,7 @@ import { currentBarsContext, entityState, openEntity, pushEntityPage, routeEntit
 import { applicationEffects } from './effects';
 import { managedEntry, managedTaken, openManagedRoute, releaseManagedRoute, updateManagedRoute } from './../history/managed';
 import { catalogFilterSkeletonHtml } from './../catalog-filter-skeleton';
+import { catalogContentSkeletonHtml } from '../catalog-content-skeleton';
 import { JAV_LAYOUTS, cardRatio, gridLayout, javLayout } from './../appearance/layout';
 import { entityFaceImg, facePos, logoUrl } from './../card-art/markup';
 import { sidebarHasCatalogContent } from './../sidebar';
@@ -447,7 +448,7 @@ export function catalogGridLayout(){
 }
 
 export function catalogSkeletonHtml(label='正在读取作品'){
-  return pageSkeletonHtml(label,{cards:true,className:'catalog-skeleton postercard-skeleton',cardRatio:catalogCardRatio()});
+  return catalogContentSkeletonHtml(label,catalogCardRatio());
 }
 
 export function catalogCardRatio(){

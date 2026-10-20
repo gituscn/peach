@@ -85,6 +85,16 @@ function serve(...responses: (ActivityData | null)[]) {
 
 const page = () => <QueryClientProvider client={queryClient}><ActivityPage /></QueryClientProvider>;
 
+it('追更检查的问题详情绑定任务快照并提供来源入口', async () => {
+  serve(payload({ finished: [run({ status: 'succeeded', result_summary: { source_failed: 1,
+    issues: [{ source: 7, label: '示例作者', provider: '示例站点', kind: '检查失败', error: 'HTTP 403' }] } })] }));
+  await prefetchTasks(new AbortController().signal);
+  const host = await mount(page());
+  expect(host.querySelector('[data-task-issues]')?.textContent).toContain('示例作者 · 示例站点 · 检查失败');
+  expect(host.querySelector('[data-task-issues]')?.textContent).toContain('HTTP 403');
+  expect(host.querySelector('a[href="/subscriptions"]')?.textContent).toContain('查看关注来源');
+});
+
 /** 走完真实的首屏路径：先 prefetch 落进缓存，再挂载。 */
 async function open(...responses: (ActivityData | null)[]) {
   const fetcher = serve(...responses);

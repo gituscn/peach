@@ -72,7 +72,7 @@ function LinkTable(
     { id: 'entity', label: 'Peach 资料', width: 180, min: 128, value: (item) => item.entity,
       render: (item) => <a className="flex min-w-24 items-center gap-2 text-text-secondary hover:text-text-primary hover:underline"
         href={item.entity_id && item.entity_kind ? entityPath(item.entity_kind, item.entity, item.entity_id) : undefined} data-link-identity="">
-        <span className={`relative flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-avatar-neutral-background text-caption-1-regular text-text-secondary ${LEGACY_AVATAR_IMG}`}
+        <span data-link-avatar="" className={`relative flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-background-quaternary-default text-caption-1-medium text-text-primary ${LEGACY_AVATAR_IMG}`}
           aria-hidden dangerouslySetInnerHTML={{ __html: `<span>${esc(firstGrapheme(item.entity))}</span>` + entityFaceImg({
             kind: item.entity_kind, id: item.entity_id, hasImage: item.face?.has_image,
             version: item.face?.image_version, focus: item.face?.avatar_focus, thumb: true,
@@ -88,8 +88,8 @@ function LinkTable(
     { id: 'note', label: '结果', width: 320, min: 192, value: (item) => item.note,
       render: (item) => <div className="min-w-40 max-w-80" data-link-result={confirmed ? 'gone' : 'unclear'}>
         {/^(?:HTTP\s+)?[1-5]\d{2}$/.test(item.note.trim())
-          ? <Chip variant="caption" color={confirmed ? 'rose' : 'neutral'} data-link-code="">{item.note.trim()}</Chip>
-          : <ErrorExcerpt text={item.note} className={`tabular-nums ${confirmed ? 'text-text-error-primary' : 'text-text-secondary'}`} />}
+          ? <Chip variant="caption" color={confirmed ? 'rose' : 'gray'} data-link-code="">{item.note.trim()}</Chip>
+          : <ErrorExcerpt text={item.note} className={`tabular-nums ${confirmed ? 'text-text-error-primary' : 'text-text-primary'}`} />}
       </div> },
     { id: 'url', label: '地址', width: 360, min: 180, value: (item) => item.url,
       render: (item) => <a href={item.url} target="_blank" rel="noreferrer" title={item.url} data-link-address=""

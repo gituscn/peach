@@ -163,7 +163,7 @@ export function Disclosure(
 /** 遗留雪碧图（`web/index.html` 的 `#i-*` symbol）里的字形。媒体库图标的取值就是这些名字。 */
 export function SpriteIcon({ name }: { name: string }) {
   return (
-    <svg aria-hidden viewBox="0 0 24 24" fill="none" className="size-4 shrink-0 stroke-current stroke-2">
+      <svg aria-hidden data-source-mark={name} viewBox="0 0 24 24" fill="none" className="size-4 shrink-0 stroke-current stroke-2">
       <use href={`#i-${name}`} />
     </svg>
   );

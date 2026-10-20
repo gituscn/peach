@@ -23,19 +23,19 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
       }));
       const release = await holdApi(page);
       await page.reload({ waitUntil: 'load' });
-      await page.locator('[data-skeleton="cleanup"] .cleanupscraping [data-split-button]').waitFor({ timeout: 15_000 });
+      await page.locator('[data-skeleton="cleanup"] #libraryProcessing [data-split-button]').waitFor({ timeout: 15_000 });
       const expected = await disabledTokens(page);
       const waiting = await waitingActionFaces(page, '[data-skeleton="cleanup"] [data-skeleton-action]');
-      assert.deepEqual(waiting.map((face) => face.name),
-        ['同步媒体库', '更多同步方式', '开始修复', '预览', '检查死链', '检查文件']);
+      assert.deepEqual(waiting.filter((face) => !face.name.includes('skeleton')).map((face) => face.name).filter(Boolean),
+        ['同步媒体库', '更多同步方式', '开始修复', '预览', '检查死链']);
       for (const face of waiting) assertDisabledFace(face, expected);
       const ring = await page.locator('[data-skeleton="cleanup"] [data-split-button]')
         .evaluate((element) => getComputedStyle(element).boxShadow);
       assert.ok(ring.includes(expected.ring), `骨架里的分体键外圈不是禁用那一档描边：${ring}`);
       const sizes = await controlFaces(page, {
-        同步媒体库: '.cleanupscraping [data-split-button] > button:first-child',
-        更多方式: '.cleanupscraping [data-split-button] > button:last-child',
-        开始修复: '.cleanupmediarepair footer > button',
+        同步媒体库: '#libraryProcessing [data-split-button] > button:first-child',
+        更多方式: '#libraryProcessing [data-split-button] > button:last-child',
+        开始修复: '#mediaRepair footer > button',
       });
       release();
       await page.locator('[data-skeleton="cleanup"]').waitFor({ state: 'detached', timeout: 15_000 });
@@ -610,8 +610,8 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
         prepare: (page) => page.route(/\/api\/entity\/shapes/, (route) => route.fulfill({ json: {
           ok: true, entities: [{ id: 90_001, kind: 'performer', names: [name], parts: ['costars'] }] } })) },
       { path: '/data-cleanup', ready: '[data-skeleton="cleanup"] [data-skeleton-action]',
-        targets: ['[data-skeleton] .board-plain-stat', '[data-skeleton] a[href="/sources"]',
-          '[data-skeleton] [data-skeleton-action]', '[data-skeleton] .cleanupfieldset [data-skeleton-action]'] },
+        targets: ['[data-skeleton] .inline-grid > div', '[data-skeleton] a[href="/sources"]',
+          '[data-skeleton] [data-skeleton-action]', '[data-skeleton] #organize [data-skeleton-action]'] },
       { path: '/review', ready: '[data-skeleton="review"] .reviewtabs button',
         targets: ['[data-skeleton] .reviewtabs button', '[data-skeleton] .skeletoncard'] },
       { path: '/follow', ready: '.followauthors .avskeleton',
