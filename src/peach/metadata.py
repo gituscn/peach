@@ -443,7 +443,7 @@ def extract_catalog_evidence(payload: dict) -> dict[str, dict]:
     out: dict[str, dict] = {}
     text_fields = {
         "title": original_wording(payload, "title"),
-        "original_title": payload.get("original_title"),
+        "original_title": original_wording(payload, "original_title"),
         "director": japanese.get("director") or payload.get("director"),
         "label": japanese.get("label") or payload.get("label"),
     }
