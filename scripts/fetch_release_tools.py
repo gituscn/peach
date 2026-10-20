@@ -5,9 +5,13 @@ import hashlib
 import io
 from pathlib import Path
 import re
+import sys
 import tarfile
 from urllib.request import Request, urlopen
 import zipfile
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from peach.user_agent import USER_AGENT
 
 
 TOOLS = (
@@ -17,7 +21,7 @@ TOOLS = (
 
 
 def download(url: str) -> bytes:
-    with urlopen(Request(url, headers={"User-Agent": "Peach-release-tools"}), timeout=120) as response:
+    with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=120) as response:
         return response.read()
 
 

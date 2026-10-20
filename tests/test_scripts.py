@@ -4750,6 +4750,25 @@ class R2ReleaseTests(unittest.TestCase):
 class GitLabReleaseTests(unittest.TestCase):
     SHA = "1" * 40
 
+    def test_public_ci_metadata_does_not_require_expanding_token_permissions(self):
+        from scripts import release_forge
+        forge = self.forge()
+        forge.command.side_effect = subprocess.CalledProcessError(1, ["glab"], stderr="glab: HTTP 403")
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b'[{"id":7}]'
+        with mock.patch.dict(os.environ, {"PEACH_GLAB": "glab"}), \
+                mock.patch.object(release_forge, "urlopen", return_value=response) as fetch:
+            self.assertEqual(forge.api("owner/repo", "pipelines"), [{"id": 7}])
+        request = fetch.call_args.args[0]
+        self.assertEqual(request.full_url, "https://gitgud.io/api/v4/projects/owner%2Frepo/pipelines")
+        self.assertNotIn("Private-token", request.headers)
+        self.assertNotIn("Authorization", request.headers)
+        forge.command.side_effect = subprocess.CalledProcessError(1, ["glab"], stderr="network unavailable")
+        with mock.patch.dict(os.environ, {"PEACH_GLAB": "glab"}), \
+                mock.patch.object(release_forge, "urlopen") as fetch, self.assertRaises(subprocess.CalledProcessError):
+            forge.api("owner/repo", "pipelines")
+        fetch.assert_not_called()
+
     def forge(self):
         from scripts.release_forge import GitLabForge
         return GitLabForge("gitgud.io", mock.Mock())

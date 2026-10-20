@@ -141,7 +141,8 @@ def _require_free_tag(repo: str, tag: str) -> None:
         raise ValueError(f"{tag} 已存在，不覆盖；发布新版本请先推进 __version__")
 
 
-def prepare(repo: str, part: str, *, apply: bool) -> dict:
+def prepare(repo: str, part: str, *, apply: bool,
+            reference_evidence: dict[str, Path] | None = None) -> dict:
     """为下一次发布推进版本号并起草变更日志。
 
     只写文件，不提交：变更日志的措辞要人过一遍，脚本自己提交等于鼓励不看。
@@ -155,8 +156,10 @@ def prepare(repo: str, part: str, *, apply: bool) -> dict:
     if not apply:
         return result
     from .release_review import review
-    result["upstream_review"] = (review(ROOT, repo, public_github=True)
-                                 if GITLAB else review(ROOT, repo))
+    options = {"public_github": True} if GITLAB else {}
+    if reference_evidence:
+        options["reference_evidence"] = reference_evidence
+    result["upstream_review"] = review(ROOT, repo, **options)
     version_bump.write_version(ROOT, str(planned["bump"]))
     changelog.release(ROOT, version, repo=repo, spec=str(planned["range"]))
     # 那一节原样带在输出里：确认措辞的人不该再去翻文件才知道自己在确认什么。
@@ -277,6 +280,8 @@ def main(argv=None) -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--repo", default="peach-mitao/peach")
     parser.add_argument("--gitlab-host", help="使用此 GitLab 主机发布，例如 gitgud.io；默认使用 GitHub")
+    parser.add_argument("--reference-evidence", action="append", default=[], metavar="SOURCE=FILE",
+                        help="为 --bump 明确提供本次参考正文，报告保留用户取证渠道")
     parser.add_argument("--apply", action="store_true",
                         help="真的动手：带 --bump 时写版本号与变更日志，带 --ship 时走完发布，"
                              "都不带时创建并推送标签")
@@ -293,11 +298,16 @@ def main(argv=None) -> int:
     try:
         from .release_forge import GitLabForge
         GITLAB = GitLabForge(args.gitlab_host, command) if args.gitlab_host else None
+        if args.reference_evidence and not args.bump:
+            raise ValueError("--reference-evidence 仅用于 --bump 的参考检查")
         if args.verify_sha:
             print(json.dumps(verify(args.repo, args.verify_sha), ensure_ascii=False, indent=2))
             return 0
         if args.bump:
-            print(json.dumps(prepare(args.repo, args.bump, apply=args.apply),
+            from .release_review import local_reference_files
+            options = ({"reference_evidence": local_reference_files(args.reference_evidence)}
+                       if args.reference_evidence else {})
+            print(json.dumps(prepare(args.repo, args.bump, apply=args.apply, **options),
                              ensure_ascii=False, indent=2))
             return 0
         if args.ship:

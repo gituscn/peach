@@ -5,7 +5,14 @@ import json
 import os
 import re
 import shutil
+import subprocess
+import sys
+from pathlib import Path
 from urllib.parse import quote, urlencode
+from urllib.request import Request, urlopen
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from peach.user_agent import USER_AGENT
 
 
 REQUIRED_TEST_JOBS = frozenset({"verify-linux", "verify-windows", "verify-macos", "wheel-smoke"})
@@ -23,8 +30,18 @@ class GitLabForge:
         executable = os.environ.get("PEACH_GLAB") or shutil.which("glab")
         if not executable:
             raise ValueError("GitLab 发布需要官方 glab；可用 PEACH_GLAB 指定其路径")
-        return json.loads(self.command(executable, "api", "--hostname", self.host,
-                                       "--method", "GET", f"projects/{quote(repo, safe='')}/{endpoint}"))
+        path = f"projects/{quote(repo, safe='')}/{endpoint}"
+        try:
+            return json.loads(self.command(executable, "api", "--hostname", self.host,
+                                           "--method", "GET", path))
+        except subprocess.CalledProcessError as error:
+            if "403" not in (error.stderr or ""):
+                raise
+            # 公开项目的只读元数据可匿名取得，不扩大本机细粒度凭据权限。
+            request = Request(f"https://{self.host}/api/v4/{path}",
+                              headers={"Accept": "application/json", "User-Agent": USER_AGENT})
+            with urlopen(request, timeout=60) as response:
+                return json.load(response)
 
     def remote_url(self, repo: str) -> str:
         # 使用已配置的 Git 认证；PAT 和 Runner token 不进入命令参数。

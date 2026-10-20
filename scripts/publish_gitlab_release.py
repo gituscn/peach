@@ -9,13 +9,21 @@ import subprocess
 import sys
 from urllib.request import Request, urlopen
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+if not __package__:
+    sys.path.insert(0, str(ROOT))
+    __package__ = "scripts"
+from peach.user_agent import USER_AGENT
+
 
 def publish() -> None:
     tag = os.environ["CI_COMMIT_TAG"]
     sha = os.environ["CI_COMMIT_SHA"]
     if not re.fullmatch(r"v\d+\.\d+\.\d+", tag) or not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise ValueError("Release 必须使用明确的版本标签与完整提交 SHA")
-    actual = subprocess.check_output(["git", "rev-parse", f"refs/tags/{tag}^{{commit}}"], text=True).strip()
+    actual = subprocess.check_output(["git", "rev-parse", f"refs/tags/{tag}^{{commit}}"],
+                                     text=True, encoding="utf-8").strip()
     if actual != sha:
         raise ValueError("标签不指向当前已验收的提交")
     notes = Path("release/RELEASE_NOTES.md")
@@ -29,7 +37,7 @@ def publish() -> None:
     if backend == "r2":
         subprocess.run([sys.executable, "scripts/release_r2.py", "--root", "release", "--version", tag[1:], "--apply"], check=True)
         base = os.environ["PEACH_R2_PUBLIC_BASE"].rstrip("/")
-        with urlopen(Request(f"{base}/{tag}/release.json", headers={"User-Agent": "Peach-release-verification"}), timeout=60) as response:
+        with urlopen(Request(f"{base}/{tag}/release.json", headers={"User-Agent": USER_AGENT}), timeout=60) as response:
             release = json.load(response)
         if (release["tag_name"] != tag or release.get("commit_sha") != sha or not release["assets"]
                 or any(item["state"] != "uploaded" or not item["browser_download_url"].startswith(f"{base}/{tag}/")
@@ -39,8 +47,7 @@ def publish() -> None:
                   "direct_asset_path": "/" + item["name"]} for item in release["assets"]]
         command.extend(["--assets-links", json.dumps(links)])
     elif backend == "gitgud":
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-        from scripts.release_r2 import inventory
+        from .release_r2 import inventory
         files = inventory(Path("release"), tag[1:])
         sums = Path("release/SHA256SUMS.txt")
         sums.write_text("".join(f"{item['sha256']}  {item['name']}\n" for item in files), encoding="utf-8")

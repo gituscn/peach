@@ -1,4 +1,4 @@
-param([ValidateSet('verify', 'build', 'smoke')][string]$Mode = 'verify')
+﻿param([ValidateSet('verify', 'build', 'smoke')][string]$Mode = 'verify')
 $ErrorActionPreference = 'Stop'
 
 function Assert-Exit([string]$Message) {

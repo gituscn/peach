@@ -9,10 +9,14 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from urllib.error import HTTPError
 from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from peach.user_agent import USER_AGENT
 
 
 def inventory(root: Path, version: str) -> list[dict]:
@@ -37,7 +41,7 @@ def inventory(root: Path, version: str) -> list[dict]:
 def verify_download(url: str, item: dict) -> None:
     checksum = hashlib.sha256()
     size = 0
-    with urlopen(Request(url, headers={"User-Agent": "Peach-release-verification"}), timeout=120) as response:
+    with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=120) as response:
         if response.status != 200:
             raise ValueError(f"公开下载未返回完整文件：{item['name']}")
         while chunk := response.read(1024 * 1024):
@@ -109,7 +113,8 @@ def publish(root: Path, version: str, *, apply: bool = False) -> dict:
         configuration = temporary / "rclone.conf"
         configuration.touch()
         listing = subprocess.check_output([executable, "lsjson", f"peach:{environment['PEACH_R2_BUCKET']}",
-                                           "--recursive", "--files-only", "--config", str(configuration)], env=environment, text=True)
+                                           "--recursive", "--files-only", "--config", str(configuration)],
+                                          env=environment, text=True, encoding="utf-8")
         result["projected_bucket_bytes"] = require_capacity(json.loads(listing), items, tag,
                                                             int(environment.get("PEACH_R2_MAX_BYTES", "8000000000")))
         sums = temporary / "SHA256SUMS.txt"
@@ -122,13 +127,15 @@ def publish(root: Path, version: str, *, apply: bool = False) -> dict:
             item["browser_download_url"] = f"{base}/{tag}/{quote(item['name'])}"
             verify_download(item["browser_download_url"], item)
             item["state"] = "uploaded"
+            item["digest"] = "sha256:" + item["sha256"]
         release = {"tag_name": tag, "commit_sha": sha, "name": f"Peach {version}", "draft": False, "prerelease": True,
+                   "html_url": f"https://gitgud.io/peach-mitao/peach/-/releases/{tag}",
                    "published_at": published_at, "assets": [*items, manifest]}
         release_file = temporary / "release.json"
         release_file.write_text(json.dumps(release, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         upload(release_file, f"{prefix}/release.json")
         try:
-            with urlopen(base + "/releases.json", timeout=60) as response:
+            with urlopen(Request(base + "/releases.json", headers={"User-Agent": USER_AGENT}), timeout=60) as response:
                 releases = json.load(response)
         except HTTPError as error:
             if error.code != 404:

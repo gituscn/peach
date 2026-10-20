@@ -568,6 +568,8 @@ Windows 托盘在取得单实例锁后启动独立监视器。监视器用 Win32
 
 ### 版本、更新与自我重启
 
+- 独立包的版本检查读取 R2 公开清单与 GitHub 公开发行记录，选择可下载的最高版本；同版本优先 R2。R2 制品必须具有 SHA-256，下载地址限定于公开下载域名，发行说明指向 GitGud。任一来源不可用时仍检查另一来源。
+
 - 版本号只在 `src/peach/__init__.py::__version__` 里定义，采用 pre-1.0 SemVer。Git 提交是构建标识，`vX.Y.Z` 标签是发布点，推到 GitHub 就触发 Release 工作流（见「桌面入口与发布」）。
 - 版本号在发布时才动，一次发布加一格，所以每个 `X.Y.Z` 都有一份能下载的制品。
 - **定版**：在干净的 master 主检出上运行 `python scripts/release_tag.py --bump auto --apply`。它按上一个版本标签到 HEAD 的区间定档（`bump_part_for()`：主题以 `feat` 开头、带破坏性标记 `!`，或 `migrations/` 有新文件时推 minor，其余推 patch；1.0 要手工 `--bump major` 并另立 ADR，见 ADR-0012），写入 `__version__`，并把 `CHANGELOG.md` 的未发布一节定成这个版本号。区间只改了文档、技能和测试时直接拒绝，因为那样打出的包和上一个标签完全相同。`--bump` 只写文件不提交，并打印定版的那一节供人检查；不带 `--apply` 只打印计划。
