@@ -73,6 +73,18 @@ const tab = (host: ParentNode, value: string) => host.querySelector(`[role="tab"
 const alphaTag = (host: ParentNode, k: string) => host.querySelector(`[data-alpha-tag][data-k="${k}"]`);
 
 describe('地址栏上的类型', () => {
+  it('筛选无结果时清除条件并保留当前在线索引和版式', async () => {
+    seed(onlineTagsKey('missing', 'artist'), []);
+    serve(() => ({ items: [], has_more: false }));
+    const given = props({ kind: 'tags', scope: 'online', q: 'missing', category: 'artist', view: 'alphabet' });
+    const host = await open(given);
+    await settle();
+    await click(buttonNamed('清除筛选', host));
+    expect(given.route).toHaveBeenLastCalledWith(expect.objectContaining({
+      kind: 'tags', scope: 'online', view: 'alphabet', q: '', category: 'all',
+    }), { replace: false });
+    expect(search(host).value).toBe('');
+  });
   it('认不出的类型回到「全部」，名册页不带词表那一档', () => {
     expect(indexRoute({ kind: 'tags', q: '', scope: 'local', view: 'alphabet', category: 'bogus' }).category).toBe('all');
     expect(indexRoute({ kind: 'tags', q: '', scope: 'local', view: 'alphabet', category: 'role' }).category).toBe('role');

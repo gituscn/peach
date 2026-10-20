@@ -39,13 +39,23 @@ it('浏览器修饰键、其它按钮、已处理的链接与其它窗口不进�
   expect(clickPath('/assets/11', {}, { target: '_self' })).toBe('/assets/11');
 });
 
-it.each(['https://other.invalid/assets/11', '/data-cleanup', '/assets/0', '/assets/no-id', '/works/!', '/posts/0'])(
-  '普通页面、外站与无效详情地址保留原行为：%s', path => { expect(clickPath(path)).toBeNull() },
+it.each(['/', '/subscriptions?tab=add', '/settings/library', '/follow?status=new', '/tags?scope=online&view=alphabet',
+  '/data-cleanup', '/junk-files?phase=pending', '/taste', '/jav?tab=discover'])(
+  '已登记页面由客户端导航接管：%s', path => { expect(clickPath(path)).toBe(path) },
+);
+
+it.each(['https://other.invalid/assets/11', '/api/export', '/unregistered', '/assets/0', '/assets/no-id', '/works/!', '/posts/0'])(
+  '外站、未登记页面与无效详情地址保留原行为：%s', path => { expect(clickPath(path)).toBeNull() },
 );
 
 it('详情页内的锚点、空地址与无效 URL 保留原行为', () => {
   window.history.replaceState(null, '', '/assets/11');
   for (const href of ['#comments', '', 'http://[']) expect(clickPath(href)).toBeNull();
+});
+
+it('目录页内的锚点保留浏览器原生滚动', () => {
+  window.history.replaceState(null, '', '/');
+  expect(clickPath('#main')).toBeNull();
 });
 
 it('管理区锚点通过站内导航，页内锚点也保留当前页面', () => {

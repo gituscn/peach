@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { motion, useReducedMotion } from 'motion/react';
 import { cardArtwork, coverAnchor } from '@peach/card-art';
 import { fmtDur, requestErrorMessage } from '@peach/legacy/core';
-import { spinnerHtml } from '@peach/legacy/ui';
+import { setActionBusy, spinnerHtml } from '@peach/legacy/ui';
 import { isOverlayPath, peachHistory } from '@peach/history';
 import { Button } from '@/components/base/buttons/button';
 import type { MediaCardActions, MediaCardHelpers, MediaItem } from '../catalog-grid/types';
@@ -414,9 +414,14 @@ export function VideoWall({ items, finite, hasMore, busy, loading = false, error
       </div>
     </div>
     {!loading && queryError ? <div data-wall-error=""><Note tone="error">{queryError}</Note><Button size="small" variant="ghost" onClick={retry}>重试</Button></div> : null}
-    {!loading && !queryError && !items.length ? <div data-wall-empty="" dangerouslySetInnerHTML={{ __html:emptyHtml }} /> : null}
+    {!loading && !queryError && !items.length ? <div data-wall-empty="" onClick={async event => {
+      const control = (event.target as Element).closest('[data-wall-load-more]');
+      if (!control || busy || moreFlight.current) return;
+      setActionBusy(control);
+      try { await more() } finally { setActionBusy(control, false) }
+    }} dangerouslySetInnerHTML={{ __html:emptyHtml }} /> : null}
     {!finite && (hasMore || items.length > 0) ? <div data-wall-refresh=""><Shuffle busy={busy} onPress={() => void fresh()} /></div> : null}
-    {hasMore && finite ? <div data-wall-footer=""><Button size="small" variant="secondary" {...busyProps(busy)} onClick={() => void more()}>
+    {hasMore && finite && items.length > 0 ? <div data-wall-footer=""><Button size="small" variant="secondary" {...busyProps(busy)} onClick={() => void more()}>
       {busy ? <span dangerouslySetInnerHTML={{ __html:spinnerHtml() }} /> : null}载入更多</Button></div> : null}
     {moreError ? <div data-wall-error=""><Note tone="error">{moreError}</Note><Button size="small" variant="ghost" {...busyProps(busy)} onClick={() => void more()}>重试</Button></div> : null}
     <button type="button" data-wall-tools-button="" aria-label="播放墙工具" title="播放墙工具" aria-expanded={toolsOpen} onClick={() => setToolsOpen(!toolsOpen)}>

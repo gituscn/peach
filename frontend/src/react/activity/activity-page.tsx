@@ -262,7 +262,7 @@ export function ActivityPage() {
         ? <Note tone="warning">{data.message || '数据库尚未准备好任务记录表'}</Note>
         : null}
       {quiet
-        ? <EmptyState shell="plain" icon={RiHistoryLine} title="还没有任务记录">
+        ? <EmptyState icon={RiHistoryLine} title="还没有任务记录">
             扫描、追更检查、批量操作和命令行批处理跑起来之后，这里会显示它们的进度与结果。
           </EmptyState>
         : <>

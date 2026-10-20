@@ -322,8 +322,6 @@ export interface StatsProps {
   onTag(key: string): void;
   /** 打开配置页的「媒体」页签。没有视频或没有存储来源时空态里的那个去处。 */
   openMediaSettings(): void;
-  /** 这台机器能不能改配置。不能改时空态不给「添加媒体目录」。 */
-  configurable: boolean;
 }
 
 /** 口味页仍由遗留层提供的能力。都是导航、查表或回执，页面不持有它们的状态。 */

@@ -38,7 +38,7 @@ import { TableColumnControls, TableColumnResizer } from '../components/table-col
 import { TableSelectionHeader } from '../components/table-selection-header';
 import { DataTableFooter, DataTableSort } from '../components/table-controls';
 import { cardClass } from '../components/card';
-import { EmptyState } from '../components/empty-state';
+import { EmptyState, EmptyFocusButton } from '../components/empty-state';
 import { LEGACY_AVATAR_IMG } from '../components/legacy-avatar';
 import { SiteLabel } from '../components/source-label';
 import { Note } from '../components/note';
@@ -436,7 +436,8 @@ export function FeedSources({ readOnly, toast }: {
           </Table>
         </DataTableFrame>
       ) : (
-        <EmptyState icon={RiRssLine} title="还没有订阅源" shell="plain">
+        <EmptyState icon={RiRssLine} title="还没有订阅源" size="compact"
+          actions={!readOnly ? <EmptyFocusButton target='input[aria-label="女优名"]'>添加订阅</EmptyFocusButton> : undefined}>
           在上面按女优名添加，或在人物页点「订阅新作」。
         </EmptyState>
       )}

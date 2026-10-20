@@ -27,7 +27,7 @@ import { DataTableFooter, DataTableSort } from '../components/table-controls';
 import { SelectionDock } from '../components/selection-dock';
 import { useTableSelection } from '../components/use-table-selection';
 import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
-import { EmptyState } from '../components/empty-state';
+import { EmptyState, EmptyFocusButton } from '../components/empty-state';
 import { ErrorText, FieldLabel } from '../settings/section';
 import { busyProps } from '../settings/use-action';
 import {
@@ -390,7 +390,8 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
           <DataTableFooter label="已保存创作者别名" unit="组" total={groups.length} pagination={savedPage} onChange={setSavedPagination} />
           </>
         ) : (
-          <EmptyState shell="plain" icon={RiUserLine} title="还没有保存创作者别名">
+          <EmptyState size="compact" icon={RiUserLine} title="还没有保存创作者别名"
+            actions={!readOnly ? <EmptyFocusButton target='input[aria-label="统一名称"]'>添加别名</EmptyFocusButton> : undefined}>
             填写统一名称，以及该创作者在其他平台使用的名字。
           </EmptyState>
         )}

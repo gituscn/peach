@@ -23,7 +23,7 @@ import { VisuallyHidden } from 'react-aria-components';
 import { mapLimit } from '@peach/legacy/core';
 import { confirmModal } from '@peach/legacy/ui';
 
-import { Button, ButtonLink } from '@/components/base/buttons/button';
+import { Button } from '@/components/base/buttons/button';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Select, SelectItem } from '@/components/base/select/select';
 import { Switch } from '@/components/base/switch/switch';
@@ -133,6 +133,7 @@ export interface SourceListProps {
   onSelected(next: Set<number>): void;
   toast(message: string): void;
   openFollow(): void;
+  onAdd(): void;
 }
 
 /** 页码。上一页／下一页在两端，页码居中，页数多时两侧折成「…」。 */
@@ -244,7 +245,7 @@ function AuthorCard(
 export function SourceList(props: SourceListProps) {
   const {
     data, sort, dir, page, layout, pageSize, selected, readOnly,
-    onSort, onPage, onLayout, onPageSize, onSelected, toast, openFollow,
+    onSort, onPage, onLayout, onPageSize, onSelected, toast, openFollow, onAdd,
   } = props;
   const sources = data.sources;
   const aliases = useMemo(() => data.author_aliases || [], [data.author_aliases]);
@@ -503,9 +504,8 @@ export function SourceList(props: SourceListProps) {
 
   if (!sources.length) {
     return (
-      /* 去处写成地址：遗留层那个全局点击处理器认这条链接，已经在关注管理页上时只换到「添加关注」页签。 */
       <EmptyState icon={RiRssLine} title="还没有关注来源" actions={
-        <ButtonLink variant="primary" size="small" href="/subscriptions?tab=add">添加关注</ButtonLink>
+        <Button variant="primary" size="small" onClick={onAdd}>添加关注</Button>
       }>关注来源及其检查状态会显示在这里。</EmptyState>
     );
   }

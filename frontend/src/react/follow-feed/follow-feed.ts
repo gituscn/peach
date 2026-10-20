@@ -135,6 +135,8 @@ export interface FollowSource {
   provider: string;
   provider_label?: string;
   author_key?: string;
+  entity_id?: number | null;
+  entity_name?: string;
   last_status?: string;
   can_backfill?: boolean;
   backfill_page?: number;

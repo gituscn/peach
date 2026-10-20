@@ -148,7 +148,7 @@ export function Credentials(
   const rows = data.providers || [];
   const pending = rows.filter((row) => row.requirement === 'required' && !credentialDone(row));
   if (!rows.length) {
-    return <EmptyState shell="plain" icon={RiKey2Line} title="没有可配置的来源">已接入的站点及其凭据状态会显示在这里。</EmptyState>;
+    return <EmptyState size="compact" icon={RiKey2Line} title="没有可配置的来源">已接入的站点及其凭据状态会显示在这里。</EmptyState>;
   }
   const pendingLabel = pending.length ? <span className="text-body-2-regular text-text-error-primary">{`${pending.length} 个待配置`}</span> : null;
   const groups = <>{[

@@ -16,6 +16,7 @@ import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { requestErrorMessage } from '@peach/legacy/core';
 import { loadingDotsHtml, popBadges } from '@peach/legacy/ui';
+import { ButtonLink } from '@/components/base/buttons/button';
 
 import { EmptyState } from '../components/empty-state';
 import { RetryNote, useSkeletonReveal } from '../components/grid-reveal';
@@ -104,7 +105,8 @@ function JunkBody({ props, data, pending, error, retry }: {
     if (!items.length) {
       const dismissed = props.view === 'dismissed';
       return (
-        <EmptyState icon={CheckGlyph} title={dismissed ? '没有已排除的文件' : '没有待判断的垃圾文件'}>
+        <EmptyState icon={CheckGlyph} title={dismissed ? '没有已排除的文件' : '没有待判断的垃圾文件'}
+          actions={dismissed ? <ButtonLink size="small" href="/junk-files">查看待判断</ButtonLink> : undefined}>
           {dismissed ? '点“不是垃圾”的资源会保留在这里，可随时重新判断。' : '当前分类没有待检查文件。'}
         </EmptyState>
       );

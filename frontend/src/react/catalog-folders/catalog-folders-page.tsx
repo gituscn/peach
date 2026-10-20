@@ -6,7 +6,7 @@ import type { Key, Selection } from 'react-aria-components';
 import { RiFolder3Line, RiFolderOpenLine, RiFolderSettingsLine, RiSearchLine, RiSideBarLine } from '@remixicon/react';
 import { Breadcrumb, BreadcrumbItem } from '@/components/base/breadcrumb/breadcrumb';
 import { TreeView, TreeViewItem } from '@/components/base/tree-view/tree-view';
-import { Button } from '@/components/base/buttons/button';
+import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { IconButton } from '@/components/base/buttons/icon-button';
 import { Input } from '@/components/base/input/input';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
@@ -174,8 +174,10 @@ function FolderTree({ scope, selected, current, go, reportedError }: {
         : deferredSearch ? <div className="flex flex-col gap-1">{searchQuery.isPending ? <div data-skeleton="" aria-busy="true" className="h-8 skeleton-sheen" aria-label="正在查找文件夹" />
           : searchQuery.error ? <Note tone="error">{errorMessage(searchQuery.error)}</Note>
           : searchQuery.data?.matches.length ? searchQuery.data.matches.map(node => <Button key={node.id} variant="secondary" size="small" leadingIcon={RiFolder3Line}
-            onClick={() => { setSearch(''); go(node.id) }}>{node.name}</Button>) : <EmptyState shell="plain" icon={RiSearchLine} title="没有匹配的文件夹">换个目录名称试试。</EmptyState>}</div>
-        : !roots.data?.roots.length ? <EmptyState shell="plain" icon={RiFolder3Line} title="尚未添加媒体目录">在媒体库设置中添加目录并扫描。</EmptyState>
+            onClick={() => { setSearch(''); go(node.id) }}>{node.name}</Button>) : <EmptyState size="compact" icon={RiSearchLine} title="没有匹配的文件夹"
+              actions={<Button size="small" onClick={() => setSearch('')}>清除搜索</Button>}>换个目录名称试试。</EmptyState>}</div>
+        : !roots.data?.roots.length ? <EmptyState size="compact" icon={RiFolder3Line} title="尚未添加媒体目录"
+          actions={<ButtonLink size="small" href="/settings/library">添加媒体</ButtonLink>}>在媒体库设置中添加目录并扫描。</EmptyState>
         : <TreeView aria-label="媒体目录" size="sm" expandedKeys={expanded} onExpandedChange={setExpanded}
           selectedKeys={new Set(selected ? [selected] : [])} onSelectionChange={choose}
           >

@@ -195,10 +195,6 @@
 [data-settings-panel] [data-sidebar-add-row] svg{width:17px;height:17px;stroke:currentColor;fill:none}
 @media (max-width:600px){[data-settings-panel] [data-settings-scroll]{padding:0 17px 17px}}
 @media (max-width:600px){[data-settings-panel] [data-settings-head]{padding:17px 17px 14px}}
-@media (max-width:600px){[data-settings-panel] [data-setting-row]{grid-template-columns:1fr;gap:9px}}
-/* 单列是给下拉留的：148px 的下拉配上标题和说明在窄屏挤不下。开关只有 36px，
-     跟标题同一行绰绰有余，跟着换行只是白占一行高度。 */
-@media (max-width:600px){[data-settings-panel] [data-setting-row]:has(input[type="checkbox"]){grid-template-columns:minmax(0,1fr) auto;gap:12px}}
 @media (max-width:600px){[data-settings-panel] [data-setting-row] [class~=ui-gselect]{width:100%;min-width:0}}
 @media (max-width:600px){[data-settings-panel] [data-setting-row] [class~=ui-pcheck]{justify-self:start}}
 [data-settings-panel] [data-sidebar-add-row] [data-sidebar-add-menu] button{justify-items:start}
@@ -307,8 +303,6 @@ html[data-theme-snapshot] [data-settings-panel] :is([data-settings-glide],[data-
 [data-settings-panel] [data-number-help]{font-size:11px!important}
 [data-settings-panel] [data-number-error]{color:#ef6868!important;font-size:12px!important}
 [data-settings-panel] [data-number-error]:empty{display:none}
-@media (max-width:600px){[data-settings-panel] [data-settings-scroll] [data-setting-row]{grid-template-columns:1fr;gap:12px}}
-@media (max-width:600px){[data-settings-panel] [data-settings-scroll] [data-setting-row]:has(input[type=checkbox]){grid-template-columns:minmax(0,1fr) auto}}
 @media (max-width:600px){[data-settings-panel] [data-number-control] input{width:110px}}
 [data-settings-panel] [data-settings-nav] button[aria-selected="true"] [class~=ui-board-tab-count]{background:color-mix(in srgb,var(--tungsten) 12%,transparent);color:var(--tungsten);opacity:1}
 @media (max-width:1000px){[data-settings-panel] [data-settings-card]{width:calc(100vw - 32px)}}
@@ -316,7 +310,6 @@ html[data-theme-snapshot] [data-settings-panel] :is([data-settings-glide],[data-
 @media (max-width:760px){[data-settings-panel] [data-settings-head]{padding:16px 20px}}
 @media (max-width:760px){[data-settings-panel] [data-settings-card]>[data-settings-nav]{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);padding:8px 12px;background:var(--ground);overflow-x:auto}}
 @media (max-width:760px){[data-settings-panel] [data-settings-scroll]{min-height:0;padding:20px;overflow:auto}}
-@media (max-width:760px){[data-settings-panel] [data-settings-scroll] [data-setting-row]{gap:16px;flex-wrap:wrap}}
 @media (max-width:760px){[data-settings-panel] [data-settings-nav]{gap:0}}
 @media (max-width:760px){[data-settings-panel] [data-settings-nav] button{padding:10px 9px;font-size:13px}}
 /* 排序那一行和其余设置行同一条基线：标题在左、两枚下拉在右，只在窄屏换行。 */
@@ -347,17 +340,17 @@ html[data-theme-snapshot] [data-settings-panel] :is([data-settings-glide],[data-
 [data-settings-panel] [data-toggle]:checked::after{left:3px;transform:translateX(18px)}
 [data-settings-panel] [data-toggle]:checked::before{transform:translateX(18px);background:linear-gradient(var(--color-accent-700),var(--color-accent-500))}
 [data-settings-panel] [data-toggle]:disabled{opacity:.5}
-@media (max-width:760px){[data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-row][data-setting-sort]{grid-template-columns:1fr;gap:10px}}
-@media (max-width:760px){[data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-sort-controls]{width:100%}}
-@media (max-width:760px){[data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-sort-controls]>div{flex:1}}
-@media (max-width:760px){[data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-sort-controls] [class~=ui-gselect]{width:100%}}
 @media (prefers-reduced-motion:reduce){[data-settings-panel] [data-toggle],[data-settings-panel] [data-toggle]::after,[data-settings-panel] [data-toggle]::before{transition:none}}
 @media (max-width:760px){[data-settings-panel][data-settings-panel]{padding:12px;grid-template-columns:minmax(0,1fr)}}
 @media (max-width:760px){[data-settings-panel] [data-settings-card][data-settings-card]{width:calc(100vw - 24px);max-width:calc(100vw - 24px);min-width:0}}
-@media (max-width:760px){[data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-row]:has([data-number-setting]){grid-template-columns:minmax(0,1fr) auto;gap:12px}}
-/* 再窄的手机上开关加数字框要占去一半宽，名目会挤成一字一行：控件换到名目下面、靠右。 */
-@media (max-width:420px){[data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-row]:has([data-number-setting]){grid-template-columns:minmax(0,1fr);gap:8px}}
-@media (max-width:420px){[data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-row]:has([data-number-setting])>:last-child{justify-self:end}}
+/* 设置行按标题与控件的实际宽度换行，控件始终靠右。 */
+@media (max-width:760px){
+  [data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-row]{display:flex;flex-wrap:wrap;gap:8px 12px}
+  [data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-row]>:first-child{flex:1 1 max-content;min-width:0}
+  [data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-row]:has(>span>small)>:first-child{flex-basis:0}
+  [data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-row]>:last-child{flex:0 0 auto;margin-left:auto;max-width:100%}
+  [data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-sort-controls] [class~=ui-gselect]{max-width:100%}
+}
 @media (max-width:760px){[data-settings-panel] [data-settings-card]>[data-settings-nav]{min-width:0;max-width:100%}}
 /* 纯图标按钮不继承浏览器按钮的水平内边距。 */
 [data-settings-panel] :is([data-settings-head] button,[data-sidebar-row] button){padding:0;display:inline-grid;place-items:center;line-height:1;flex-shrink:0}

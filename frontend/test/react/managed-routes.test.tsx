@@ -372,18 +372,18 @@ it('诊断页先选配置分栏再导航，作品与任务交给共享入口', a
   expect(actions.openItem).toHaveBeenCalledWith(12);
 });
 
-it('统计页：点标签交壳回目录；「添加媒体目录」先交页签再换到配置页', async () => {
+it('统计页：点标签交壳回目录；添加媒体先交页签再换到配置页', async () => {
   const r = await load();
   const actions = shellActions();
   const order: string[] = [];
   const go = vi.fn((path: string) => { order.push(`go ${path}`) });
   vi.mocked(actions.requestConfigurationSection).mockImplementation((section) => { order.push(`section ${section}`) });
-  const props = element<StatsProps>('/stats', r, { configurable: false }, actions, go);
+  const props = element<StatsProps>('/stats', r, {}, actions, go);
   props.onTag('痴女');
   props.openMediaSettings();
   expect(vi.mocked(actions.openTag).mock.calls).toEqual([['痴女']]);
   expect(order).toEqual(['section 媒体库与入库', 'go /settings/library']);
-  expect([props.configurable, props.tagLabel('JK制服')]).toEqual([false, 'JK制服']);
+  expect(props.tagLabel('JK制服')).toBe('JK制服');
 });
 
 it('口味页：总结里的下一步按路径走 go', async () => {

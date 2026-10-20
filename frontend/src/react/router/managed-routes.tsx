@@ -126,8 +126,8 @@ export const MANAGED_ROUTES: ManagedRouteTable = {
     element: <ManagedMatch path="/stats" />,
     prefetch: (_open, signal) => prefetchStats(signal),
     /* 点一个内容标签是「回目录并按它筛选」，整页换成目录仍归壳。 */
-    page: (open, actions, go) => (
-      <StatsPage tagLabel={tagLabel} onTag={actions.openTag} configurable={open.configurable}
+    page: (_open, actions, go) => (
+      <StatsPage tagLabel={tagLabel} onTag={actions.openTag}
         openMediaSettings={() => { actions.requestConfigurationSection('媒体库与入库'); go('/settings/library') }} />
     ),
   },

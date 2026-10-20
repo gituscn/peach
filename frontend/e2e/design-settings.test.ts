@@ -443,6 +443,50 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
     }
   });
 
+  it('偏好设置按标题与控件的实际宽度同行，空间不足时完整换行', { timeout: 60_000 }, async () => {
+    for (const width of [320, 375, 390, 428, DESKTOP.width]) {
+      const opened = await openHome(browser, { ...(width > 760 ? DESKTOP : MOBILE), width });
+      try {
+        await openPanel(opened.page);
+        for (const section of ['外观与导航', '浏览与播放', 'JAV 与新作', '搜索与推荐', '内容显示']) {
+          await opened.page.locator(PANEL).getByRole('tab', { name: section, exact: true }).click();
+          const rows = await opened.page.locator(`${PANEL} [data-setting-group]:not([hidden]) [data-setting-row]`)
+          .evaluateAll((nodes) => nodes.map((row) => {
+            const title = row.querySelector('b')!;
+            const control = row.lastElementChild!.getBoundingClientRect();
+            const bounds = row.getBoundingClientRect();
+            const style = getComputedStyle(row);
+            const range = document.createRange();
+            range.selectNodeContents(title);
+            const text = range.getBoundingClientRect();
+            return {
+              title: title.textContent,
+              textLines: range.getClientRects().length,
+              sameLine: text.top < control.bottom && control.top < text.bottom,
+              fits: text.width + control.width + 12 <= bounds.width - parseFloat(style.paddingRight),
+              gap: control.left - text.right,
+              contained: control.left >= bounds.left - 1 && control.right <= bounds.right + 1,
+              rightGap: bounds.right - control.right - parseFloat(style.paddingRight),
+            };
+          }));
+          assert.ok(rows.length > 0);
+          for (const row of rows) {
+            assert.equal(row.textLines, 1, `${width}px：${row.title}标题发生折行`);
+            assert.equal(row.contained, true, `${width}px：${row.title}控件越出设置行`);
+            assert.ok(Math.abs(row.rightGap) <= 1, `${width}px：${row.title}控件没有靠右`);
+            if (row.fits || (section === '搜索与推荐' && width >= 375)) {
+              assert.equal(row.sameLine, true, `${width}px：${row.title}控件没有与标题同行`);
+              assert.ok(row.gap >= 11, `${width}px：${row.title}与控件之间缺少间距`);
+            }
+          }
+        }
+        assert.deepEqual(opened.problems, []);
+      } finally {
+        await opened.close();
+      }
+    }
+  });
+
   it('侧栏排序的添加行：触发器与「添加」同高 --control-h，「添加」是主按钮，候选用完时触发器给禁止光标', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/', DESKTOP);
     const { page } = opened;

@@ -87,6 +87,7 @@ function IndexSearch({ label, value, onQuery }: { label: string; value: string; 
   const [text, setText] = useState(value);
   const composing = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => { clearTimeout(timer.current); setText(value) }, [value]);
   useEffect(() => () => clearTimeout(timer.current), []);
   const later = (next: string) => {
     clearTimeout(timer.current);
@@ -226,7 +227,7 @@ export function IndexPage(props: IndexProps) {
       );
     }
     if (!items.length) return <IndexEmpty kind={kind} filtered={!!q || category !== 'all'}
-      online={onlineTags || onlineAuthors} configurable={props.configurable} />;
+      online={onlineTags || onlineAuthors} onClear={() => go({ q: '', category: 'all' })} />;
     if (onlineAuthors) return <OnlineAuthors items={items as OnlineAuthor[]} layout={layout} props={props} />;
     if (isPeople(kind)) return <PeopleGrid kind={kind} items={items as IndexPerson[]} layout={layout} props={props} />;
     const actions = { online: onlineTags, picked, press: pressTag };
@@ -311,12 +312,12 @@ const LABELS: Record<IndexKind, string> = {
 /** 空馆藏、筛选无结果与在线来源还没有内容分别给出可执行的去处。文案同目录页的空态
  *  （`frontend/src/catalog-onboarding.ts` 的 `catalogEmptyHtml`）。 */
 function IndexEmpty(
-  { kind, filtered, online, configurable }: { kind: IndexKind; filtered: boolean; online: boolean; configurable: boolean },
+  { kind, filtered, online, onClear }: { kind: IndexKind; filtered: boolean; online: boolean; onClear(): void },
 ) {
   if (filtered) {
     return (
       <EmptyState icon={spriteGlyph('search')} title="没有符合条件的内容"
-        actions={<ButtonLink variant="primary" href="/?loc=&thumb=0">查看全部内容</ButtonLink>}>
+        actions={<Button size="small" onClick={onClear}>清除筛选</Button>}>
         清除筛选或搜索条件后查看全部内容。
       </EmptyState>
     );
@@ -324,12 +325,12 @@ function IndexEmpty(
   // 在线那一档数的是来源上的东西，名字也跟着来源的说法：艺人页在线摆的是关注来源里的创作者。
   const label = online && kind === 'performers' ? '创作者' : LABELS[kind];
   const follow = (
-    <ButtonLink variant={!configurable || online ? 'primary' : 'secondary'} href="/subscriptions?tab=add">添加关注</ButtonLink>
+    <ButtonLink size="small" variant={online ? 'primary' : 'secondary'} href="/subscriptions?tab=add">添加关注</ButtonLink>
   );
   return (
     <EmptyState icon={spriteGlyph(kind === 'tags' ? 'tags' : 'user-round')} title={`还没有${label}`}
       actions={online ? follow : <>
-        {configurable ? <Button variant="primary" data-empty-settings="">添加内容</Button> : null}
+        <ButtonLink size="small" href="/settings/library">添加媒体</ButtonLink>
         {follow}
       </>}>
       {online ? `添加关注来源并获取内容后，这里会显示来源上的${label}。` : '添加内容并补充资料后，这里会显示对应信息。'}

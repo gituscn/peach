@@ -153,7 +153,7 @@ function Related({ data, media, limit, context, helpers, actions }: {
   const groups = followRelatedGroups(result.data?.pages || [], data, media, limit);
   const sources = result.data?.pages.at(-1)?.sources || data.sources;
   const relatedContext = { ...context, sources, aliases: result.data?.pages.at(-1)?.author_aliases || context.aliases };
-  return <RelatedSection data-follow-related="" wireDrag={helpers.wireDrag} busy={result.isPending}
+  return <RelatedSection online data-follow-related="" wireDrag={helpers.wireDrag} busy={result.isPending}
     empty={!!result.data && !groups.length}
     error={result.isError ? `读取接着看失败：${requestErrorMessage(result.error)}` : undefined}
     onRetry={() => { void result.refetch() }}>
