@@ -16,6 +16,7 @@ export interface PlayerSource { src: string; type: string }
 export interface VjsPlayer {
   /** 挂载时记下的条目：右键菜单复制网址按它取 id。 */
   peachItem?: PlayerItem;
+  peachPlaybackKey?: string;
   on(events: PlayerEvents, handler: (...args: unknown[]) => void): void;
   off(events: PlayerEvents, handler: (...args: unknown[]) => void): void;
   one(events: PlayerEvents, handler: (...args: unknown[]) => void): void;

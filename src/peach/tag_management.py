@@ -136,6 +136,7 @@ def apply_plan(connection, body: dict) -> dict:
     plan = preview(connection, body)
     if body.get('token') != plan['token']:
         raise ValueError('标签已变化，请重新预览操作范围')
+    foreign_keys_before = set(map(tuple, connection.execute('PRAGMA foreign_key_check')))
     stamp = datetime.now(timezone.utc).isoformat()
     operation = plan['operation']
     rows = plan['tags']
@@ -161,6 +162,6 @@ def apply_plan(connection, body: dict) -> dict:
         for row in rows:
             connection.execute("UPDATE entity SET metadata_json=json_set(metadata_json,'$.user_tag_hidden',?),updated_at=? WHERE id=?",
                                (int(operation == 'hide'), stamp, row['entity_id']))
-    if connection.execute('PRAGMA foreign_key_check').fetchone():
+    if set(map(tuple, connection.execute('PRAGMA foreign_key_check'))) - foreign_keys_before:
         raise ValueError('标签操作未通过外键检查')
     return {'ok': True, 'operation': operation, 'tags': len(rows), 'assets': plan['assets']}

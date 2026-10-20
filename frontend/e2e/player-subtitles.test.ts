@@ -3,9 +3,17 @@ import assert from 'node:assert/strict';
 import { before, after, describe, it } from 'node:test';
 import { join } from 'node:path';
 import type { Browser, Page } from 'playwright-core';
-import { launch, requiredEnv, visit, VIEWPORTS } from './harness.ts';
+import { launch, requiredEnv, visit as visitPage, VIEWPORTS } from './harness.ts';
+import { mockSubtitleMemory } from './subtitle-fixture.ts';
 
 const SRT = '1\n00:00:00,000 --> 00:00:02,000\n测试字幕 <b>粗体</b>\n';
+// 每个浏览器用例独立持有服务端字幕夹具，页面刷新沿用同一份记忆。
+async function visit(...[browser, path, viewport, prepare]: Parameters<typeof visitPage>) {
+  return visitPage(browser, path, viewport, async page => {
+    await mockSubtitleMemory(page);
+    await prepare?.(page);
+  });
+}
 async function caption(page: Page, text: string) {
   await page.locator('.vjs-peach-caption-line').filter({ hasText: text }).waitFor({ timeout: 5_000 }).catch(async error => {
     const state = await page.locator('#stage video.vjs-tech').evaluate((video: HTMLVideoElement) => ({
@@ -99,9 +107,17 @@ describe('播放器字幕', () => {
         await menu(page);
         const chooser = page.waitForEvent('filechooser');
         await page.locator('[data-subtitle-file]').click();
-        await (await chooser).setFiles({ name: '测试.chs.srt', mimeType: 'text/plain', buffer: Buffer.from(SRT) });
-        await page.waitForFunction(() => [...document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')!.textTracks].some(track => track.label === '测试.chs.srt' && track.mode === 'showing'));
+        const subtitleName = '[PREVIEW-096] A long subtitle filename with several wrapped lines decensored-zh-CN.chs.srt';
+        await (await chooser).setFiles({ name: subtitleName, mimeType: 'text/plain', buffer: Buffer.from(SRT) });
+        await page.waitForFunction(name => [...document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')!.textTracks].some(track => track.label === name && track.mode === 'showing'), subtitleName);
         await caption(page, '测试字幕');
+        const selectedSpacing = await page.locator('[data-subtitle-track][aria-checked="true"]').evaluate(button => {
+          const row = button.getBoundingClientRect(), label = button.querySelector('.vjs-peach-option-label')!.getBoundingClientRect();
+          return { top: label.top - row.top, bottom: row.bottom - label.bottom, textHeight: label.height };
+        });
+        assert.ok(selectedSpacing.textHeight > 30);
+        assert.ok(selectedSpacing.top >= 10 && selectedSpacing.bottom >= 10);
+        assert.ok(Math.abs(selectedSpacing.top - selectedSpacing.bottom) <= 1);
         assert.equal(await page.locator('#stage .vjs-subtitles-control>button').evaluate(node => getComputedStyle(node, '::after').backgroundColor), await page.locator('#stage .vjs-play-progress').evaluate(node => getComputedStyle(node).backgroundColor));
         assert.equal(await page.locator('.vjs-peach-caption-line b').textContent(), '粗体');
         await page.screenshot({ path: join(process.cwd(), `../build/subtitles-tracks-${viewport.name}.png`) });
@@ -127,7 +143,15 @@ describe('播放器字幕', () => {
         await page.locator('.vjs-peach-captions').waitFor({ state: 'visible' });
         await page.reload();
         await page.locator('#stage .vjs-peach-bezel').waitFor({ state: 'attached' });
+        await page.waitForFunction(name => [...document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')!.textTracks]
+          .some(track => track.label === name && track.mode === 'showing'), subtitleName);
         assert.equal(await page.locator('#stage .video-js').evaluate(node => getComputedStyle(node).getPropertyValue('--peach-caption-scale').trim()), '1.5');
+        await menu(page);
+        await page.getByRole('menuitemradio', { name: '关闭', exact: true }).click();
+        await page.reload();
+        await page.locator('#stage .vjs-peach-bezel').waitFor({ state: 'attached' });
+        await page.waitForFunction(name => [...document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')!.textTracks].some(track => track.label === name), subtitleName);
+        assert.equal(await page.locator('#stage video.vjs-tech').evaluate((video: HTMLVideoElement) => [...video.textTracks].some(track => track.mode === 'showing')), false);
         await menu(page);
         await page.locator('[data-subtitle-options]').click();
         await page.locator('[data-subtitle-reset]').click();
@@ -180,6 +204,20 @@ describe('播放器字幕', () => {
       assert.equal(downloads, 1);
       assert.equal(searches, 1);
       assert.equal(await page.locator('#stage video.vjs-tech > track').count(), 1);
+      const chooser = page.waitForEvent('filechooser');
+      await page.locator('[data-subtitle-file]').click();
+      await (await chooser).setFiles({ name: '本地字幕.srt', mimeType: 'text/plain', buffer: Buffer.from(SRT) });
+      await page.getByRole('menuitemradio', { name: '本地字幕.srt', exact: true }).waitFor();
+      await page.getByRole('menuitemradio', { name: 'ABP-758.chs.srt', exact: true }).click();
+      await page.reload();
+      await page.locator('#stage .vjs-peach-bezel').waitFor({ state: 'attached' });
+      await page.waitForFunction(() => [...document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')!.textTracks]
+        .some(track => track.label === 'ABP-758.chs.srt' && track.mode === 'showing'));
+      assert.equal(downloads, 1);
+      assert.equal(searches, 1);
+      await menu(page);
+      assert.equal(await page.getByRole('menuitemradio', { name: '本地字幕.srt', exact: true }).count(), 1);
+      assert.equal(await page.locator('[data-subtitle-track][aria-checked="true"]').textContent(), 'ABP-758.chs.srt');
       assert.deepEqual(problems, []);
     } finally { await opened.close() }
   });

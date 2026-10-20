@@ -34,7 +34,6 @@ import {
 import { OnlineAuthors, PeopleGrid } from './index-people';
 import { TagAlphabet, TagCloud, TagDock, TagFilters, type TagEntry } from './index-tags';
 import { TagManager } from './tag-manager';
-import { TagEditor, type ManagedTag } from './tag-operations';
 
 /* 厂牌与事务所是两种实体，不是同一份数据的两种筛选：厂牌出片，事务所出人。所以这个开关切的
    是地址。场记板归厂牌，公文包归事务所，字形各说各的那一件事。 */
@@ -116,7 +115,6 @@ type Item = IndexPerson | IndexTag | OnlineAuthor | OnlineTag;
 
 export function IndexPage(props: IndexProps) {
   const [managing, setManaging] = useState(false);
-  const [editingTag, setEditingTag] = useState<ManagedTag | null>(null);
   const [route, setRoute] = useState<IndexRoute>(() => indexRoute(
     { kind: props.kind, q: props.q, scope: props.scope, view: props.view, category: props.category },
   ));
@@ -231,10 +229,7 @@ export function IndexPage(props: IndexProps) {
       online={onlineTags || onlineAuthors} configurable={props.configurable} />;
     if (onlineAuthors) return <OnlineAuthors items={items as OnlineAuthor[]} layout={layout} props={props} />;
     if (isPeople(kind)) return <PeopleGrid kind={kind} items={items as IndexPerson[]} layout={layout} props={props} />;
-    const actions = { online: onlineTags, picked, press: pressTag, edit: (key: string) => {
-      const tag = tags.find(row => row.k === key);
-      if (tag && (tag.entity_id || tag.id)) setEditingTag({ entity_id: tag.entity_id, id: tag.id, k: tag.k, n: tag.n, aliases: tag.aliases || [], hidden: !!tag.hidden, cat: tag.cat });
-    } };
+    const actions = { online: onlineTags, picked, press: pressTag };
     return view === 'alphabet' ? <TagAlphabet groups={groups} actions={actions} /> : <TagCloud tags={tags} actions={actions} />;
   };
 
@@ -253,7 +248,7 @@ export function IndexPage(props: IndexProps) {
         {isPeople(kind) ? <LayoutSwitch kind={kind} layout={layout} onChange={changeLayout} /> : null}
         <LibraryShortcuts kind={kind === 'tags' ? 'tag' : kind === 'studios' ? 'studio' : kind === 'agencies' ? 'agency' : kind === 'creators' ? 'creator' : 'performer'} />
         {kind === 'tags' ? <Button variant={managing ? 'primary' : 'ghost'} size="small" iconOnly data-tag-mode=""
-          leadingIcon={spriteGlyph('list-filter')} aria-label={managing ? '返回标签浏览' : '管理标签'} title={managing ? '返回标签浏览' : '管理标签'} aria-pressed={managing}
+          leadingIcon={spriteGlyph('pencil')} aria-label={managing ? '返回标签浏览' : '管理标签'} title={managing ? '返回标签浏览' : '管理标签'} aria-pressed={managing}
           onClick={() => { props.exitSelectMode(); setPicked(new Set()); setManaging(!managing) }} /> : null}
         {/* 窄屏一行放不下四样东西：标题与过滤框一行，开关另起一行。 */}
         <span aria-hidden className="hidden h-0 basis-full max-board-narrow:order-2 max-board-narrow:block" />
@@ -305,7 +300,6 @@ export function IndexPage(props: IndexProps) {
           onApply={() => { const chosen = [...picked]; setPicked(new Set()); props.showTags(chosen, match) }} />
       ) : null}
       </>}
-      {editingTag ? <TagEditor operation="rename" scope={scope} selected={[editingTag]} close={() => setEditingTag(null)} done={() => {}} /> : null}
     </div>
   );
 }

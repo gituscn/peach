@@ -11,7 +11,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { useInfiniteQuery, type InfiniteData, type QueryKey } from '@tanstack/react-query';
 import { mixFace as mixArtwork, mixLabel, relayoutCovers, type Artwork } from '@peach/card-art';
 import { requestErrorMessage } from '@peach/legacy/core';
-import { emptyStateHtml, loadingDotsHtml } from '@peach/legacy/ui';
+import { loadingDotsHtml } from '@peach/legacy/ui';
 
 import { apiGet } from '../../api';
 import { RetryNote, useSkeletonReveal } from '../components/grid-reveal';
@@ -24,6 +24,7 @@ import {
 import type { CatalogGridProps, MediaCardLayout, MediaCardHelpers, MediaItem, MediaPage } from './types';
 import { VideoWall } from '../video-wall/video-wall';
 import { finiteWallFilters, wallHasCover } from '../video-wall/wall-layout';
+import { wallEmptyHtml } from '../video-wall/wall-empty';
 import { LibraryCompletionPrompt, missingPreviewIds } from '../library-processing/library-completion';
 import { useCatalogView } from './catalog-view';
 import { CatalogListPage } from './catalog-list-page';
@@ -143,9 +144,10 @@ function GridBody(props: CatalogGridProps) {
       loading={result.isPending || (!result.data && result.isFetching)}
       error={!result.data && !result.isPending ? requestErrorMessage(result.error) : ''}
       retry={() => void result.refetch()}
-      emptyHtml={result.data && !wallPool.length ? tiles.length
-        ? emptyStateHtml('image', '这批作品没有封面', result.hasNextPage ? '载入更多作品后继续浏览。' : '换个筛选范围再试。')
-        : props.emptyHtml?.({ trash, libraryEmpty:!!result.data.pages[0]?.libraryEmpty }) : ''}
+      emptyHtml={result.data && !wallPool.length ? wallEmptyHtml({
+        libraryEmpty: !!result.data.pages[0]?.libraryEmpty, matches: total, hasMore: !!result.hasNextPage,
+        catalogEmpty: props.emptyHtml?.({ trash, libraryEmpty: !!result.data.pages[0]?.libraryEmpty }),
+      }) : ''}
       loadMore={loadNext} actions={actions} helpers={helpers} javImage={layout.javImage} />;
     if (result.isPending) return null;
     if (!result.data) {

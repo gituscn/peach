@@ -270,14 +270,15 @@ class WebJsBehaviourTests(unittest.TestCase):
 
     # ── 标签显示名 ──────────────────────────────────────────────────────────
 
-    def test_tag_labels_only_rename_and_never_invent(self):
-        # 映射只做「显示名」，不做同义词归并：账本里的标签名是真相。查不到就原样
-        # 返回，绝不能顺手补一个机翻后缀（`深喉` 曾被显示成 `深喉咙`）。
+    def test_tag_labels_keep_the_current_server_names(self):
+        # 浏览、收藏与编辑使用服务端当前名称，大小写与词形由同一个身份提供。
         self.assertJsResults([
             # `足交` 是通行写法，不改成 `脚交`。
             ("tags.js", "tagLabel", ["足交"], "足交"),
             ("tags.js", "tagLabel", ["美腿"], "美腿"),
-            ("tags.js", "tagLabel", ["1080P"], "1080p"),
+            ("tags.js", "tagLabel", ["1080P"], "1080P"),
+            ("tags.js", "tagLabel", ["眼镜"], "眼镜"),
+            ("tags.js", "tagLabel", ["AI去码"], "AI去码"),
             ("tags.js", "tagLabel", ["OL制服"], "OL制服"),
             ("tags.js", "tagLabel", ["JK制服"], "JK制服"),
             ("tags.js", "tagLabel", ["秘书OL"], "秘书OL"),

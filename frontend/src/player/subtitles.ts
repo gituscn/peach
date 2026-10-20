@@ -3,6 +3,7 @@ import { api, esc, icon } from '@peach/legacy/core';
 import { setActionBusy, spinnerHtml } from '@peach/legacy/ui';
 import { CAPTION_OPTIONS, mountCaptionStyle, type CaptionKey } from './subtitle-style';
 import type { VjsPlayer } from './types';
+import { SubtitleSession } from './subtitle-memory';
 
 interface Panels {
   render(html: string, direction: number): HTMLElement;
@@ -19,7 +20,7 @@ export const subtitleIcon = () => '<svg viewBox="0 0 36 36" aria-hidden="true"><
 export class SubtitleControls {
   private cleanup = new AbortController();
   private request: AbortController | null = null;
-  private imported = new Map<string, { node: HTMLTrackElement; url: string }>();
+  private session: SubtitleSession;
   private last: TextTrack | null = null;
   private page = '';
   private generation = 0;
@@ -49,12 +50,11 @@ export class SubtitleControls {
       if (file) void this.importFile(file);
     }, { signal: this.cleanup.signal });
     video.textTracks.addEventListener('change', () => this.sync(), { signal: this.cleanup.signal });
-    video.textTracks.addEventListener('addtrack', () => { this.sync(); if (this.page === 'tracks') this.show(0) }, { signal: this.cleanup.signal });
     video.textTracks.addEventListener('removetrack', () => { this.sync(); if (this.page === 'tracks') this.show(0) }, { signal: this.cleanup.signal });
     player.on('dispose', () => {
       this.hide(); this.cleanup.abort();
-      this.imported.forEach(({ url }) => URL.revokeObjectURL(url)); this.imported.clear();
     });
+    this.session = new SubtitleSession(player, video, () => { this.sync(); if (this.page === 'tracks') this.show(0) });
     this.sync();
   }
 
@@ -68,7 +68,8 @@ export class SubtitleControls {
     if (active) this.last = active;
   }
   private select(track: TextTrack | null) {
-    this.tracks().forEach(current => { current.mode = current === track ? 'showing' : 'disabled' });
+    this.request?.abort();
+    this.session.select(track);
     this.sync();
   }
   private header(title: string, extra = '') {
@@ -96,6 +97,11 @@ export class SubtitleControls {
     panel.querySelectorAll<HTMLButtonElement>('[data-subtitle-track]').forEach(button => {
       button.onclick = () => { this.select(choices[Number(button.dataset.subtitleTrack)]!); this.show(0) };
     });
+    if (this.session.error) {
+      this.status(this.session.error, true);
+      panel.querySelector('[data-subtitle-status]')!.insertAdjacentHTML('beforeend', '<button type="button" class="vjs-peach-caption-action" data-subtitle-memory-retry>重试</button>');
+      panel.querySelector<HTMLButtonElement>('[data-subtitle-memory-retry]')!.onclick = () => { void this.session.retry() };
+    }
   }
 
   private options(direction = 1) {
@@ -135,35 +141,16 @@ export class SubtitleControls {
     }
     return response.text();
   }
-  private async attach(text: string, name: string, key: string, signal: AbortSignal) {
-    const existing = this.imported.get(key);
-    if (existing) { this.select(existing.node.track); return }
-    const url = URL.createObjectURL(new Blob([text], { type: 'text/vtt' }));
-    const node = document.createElement('track'); node.kind = 'subtitles'; node.label = name; node.src = url;
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => finish(new Error('字幕加载超时，请重试')), 15_000);
-        const finish = (error?: Error) => {
-          clearTimeout(timer); node.removeEventListener('load', loaded); node.removeEventListener('error', failed); signal.removeEventListener('abort', aborted);
-          if (error) reject(error); else resolve();
-        };
-        const loaded = () => finish(), failed = () => finish(new Error('字幕时间轴无法读取'));
-        const aborted = () => finish(new DOMException('字幕加载已取消', 'AbortError'));
-        node.addEventListener('load', loaded); node.addEventListener('error', failed); signal.addEventListener('abort', aborted, { once: true });
-        if (signal.aborted) { aborted(); return }
-        this.video.append(node); node.track.mode = 'hidden';
-      });
-      if (signal.aborted || this.player.isDisposed()) throw new DOMException('字幕加载已取消', 'AbortError');
-      this.imported.set(key, { node, url }); this.select(node.track);
-    } catch (error) { node.remove(); URL.revokeObjectURL(url); throw error }
-  }
   private async importFile(file: File) {
     this.show(0);
     if (!/\.(srt|ass|ssa|vtt)$/i.test(file.name) || file.size > 4 * 1024 * 1024) { this.status('请选择 4 MiB 以内的 SRT、ASS、SSA 或 VTT 文件', true); return }
     const signal = this.busy(); this.status('正在加载字幕…', false, true);
     try {
+      await this.session.ready;
+      if (signal.aborted) return;
       const text = await this.text(await fetch(`/api/subtitles/convert?name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file, signal }));
-      await this.attach(text, file.name, `file:${file.name}:${file.size}:${file.lastModified}`, signal);
+      const key = `file:${file.name}:${file.size}:${file.lastModified}`;
+      await this.session.import(text, file.name, key, signal);
       if (!signal.aborted) { this.show(0); this.status(`已加载 ${file.name}`) }
     } catch (error) { if (!signal.aborted) this.status(error instanceof Error ? error.message : '字幕加载失败', true) }
   }
@@ -230,9 +217,14 @@ export class SubtitleControls {
   private async loadOnline(id: string, file: SubtitleFile) {
     const signal = this.busy(); this.status('正在加载字幕…', false, true);
     try {
-      const key = `subtitlecat:${id}:${file.index}`, existing = this.imported.get(key);
-      if (existing) this.select(existing.node.track);
-      else await this.attach(await this.text(await fetch(`/api/subtitles/subtitlecat/${id}/${file.index}`, { signal })), file.name, key, signal);
+      await this.session.ready;
+      if (signal.aborted) return;
+      const key = `subtitlecat:${id}:${file.index}`;
+      if (this.session.has(key)) this.session.selectImported(key);
+      else {
+        const text = await this.text(await fetch(`/api/subtitles/subtitlecat/${id}/${file.index}`, { signal }));
+        await this.session.import(text, file.name, key, signal);
+      }
       if (!signal.aborted) { this.show(0); this.status(`已加载 ${file.name}`) }
     } catch (error) { if (!signal.aborted) this.status(error instanceof Error ? error.message : '字幕加载失败', true) }
   }
