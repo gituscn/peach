@@ -117,19 +117,39 @@ it('修复阶段点名当前这部片，停止之后回到可以再开始的样�
   expect(buttonNamed('开始修复', host)).not.toBeNull();
 });
 
-it('一部都没找到时说清楚这个库里的片子都能直接播', async () => {
+it('进入页面不重放已完成的修复提示', async () => {
   vi.useFakeTimers();
   const host = await open({ ...idle, status: 'complete', library: '网盘', stage: '完成' });
-  expect(host.textContent).toContain('这个库里的片子都能直接播');
+  expect(host.textContent).not.toContain('这个库里的片子都能直接播');
+  expect(host.querySelector('[role="status"]')).toBeNull();
 });
 
 it('缺索引的片子卡在没装 untrunc 上时，指明去配置页的运行信息里下载', async () => {
   vi.useFakeTimers();
-  const host = await open({
+  confirmEverything();
+  vi.stubGlobal('fetch', fetchMock(200, {
     ...idle, status: 'complete', library: '网盘', stage: '完成', found: 2, failed: 2, missing_tool: 2,
-  });
+  }));
+  const host = await open();
+  await click(buttonNamed('开始修复', host));
+  await settle();
   expect(host.querySelector('p[role="status"]')?.textContent).toBe('修好 0 部，2 部修不了');
   expect(host.textContent).toContain('2 部缺索引的片子要装上 untrunc 才修得了，下载入口在配置页的「运行信息」里');
+  await click(buttonNamed('关闭提示', host));
+  expect(host.textContent).not.toContain('缺少 untrunc');
+});
+
+it('本次检查完成只发一次回执', async () => {
+  confirmEverything();
+  vi.stubGlobal('fetch', fetchMock(200, { ...idle, status: 'complete', library: '网盘' }));
+  queryClient.setQueryData(MEDIA_REPAIR_KEY, idle);
+  queryClient.setQueryData(REPAIR_LIBRARIES_KEY, libraries);
+  const toast = vi.fn();
+  const host = await mount(<QueryClientProvider client={queryClient}><MediaRepairCard toast={toast} /></QueryClientProvider>);
+  await click(buttonNamed('开始修复', host));
+  await settle();
+  expect(toast).toHaveBeenCalledExactlyOnceWith('已检查媒体库，没有需要修复的视频');
+  expect(host.textContent).not.toContain('没有要修的');
 });
 
 it('进度读数按总数封顶：服务端报出的已查数超过总数时不写成 1,500 / 1,000', () => {

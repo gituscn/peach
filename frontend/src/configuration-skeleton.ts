@@ -1,13 +1,50 @@
-import { islandButton } from './island-skeleton';
+import { islandButton, islandSelect } from './island-skeleton';
 import { CONFIGURATION_SECTIONS } from './history/settings-route';
 import { diagnosticsSkeleton } from './diagnostics-skeleton';
 
-// 首屏在 React 包到达前绘制，几何与 settings/section.tsx、BoardUI SettingsRow 共用类名。
-const section = (title: string, content: string) => `<section aria-label="${title}" class="flex w-full flex-col gap-2"><p class="w-full px-3 text-body-2-medium text-text-secondary">${title}</p><div class="flex w-full flex-col rounded-2xl bg-background-secondary-default pl-3">${content}<div class="-ml-3 flex flex-wrap items-center justify-end gap-3 rounded-b-2xl border-t border-separator-border bg-card-footer px-3 py-3">${islandButton({ label: '保存配置', attrs: 'disabled data-skeleton-action' })}</div></div></section>`;
+const wait = 'disabled data-skeleton-action';
+const text = (width = '60%') => `<span class="skeleton skeleton-text" style="width:${width}"></span>`;
+const input = (width = '100%') => `<span class="skeleton ui-configuration-skeleton-input" style="width:${width}"></span>`;
+const button = (label: string, variant: 'primary' | 'secondary' = 'primary') => islandButton({ label, variant, attrs: wait });
+const footer = (content: string) => `<div class="-ml-3 flex flex-wrap items-center justify-end gap-3 rounded-b-2xl border-t border-separator-border bg-card-footer px-3 py-3">${content}</div>`;
+const stack = (content: string) => `<div class="flex flex-col gap-4 py-4 pr-3">${content}</div>`;
+const section = (title: string, content: string, actions = '') => `<section aria-label="${title}" class="flex w-full flex-col gap-2 wrap-anywhere"><p class="w-full px-3 text-body-2-medium text-text-secondary">${title}</p><div class="flex w-full flex-col rounded-2xl bg-background-secondary-default pl-3">${content}${actions ? footer(actions) : ''}</div></section>`;
 const row = (label: string, description = '', control = 'ui-configuration-skeleton-toggle') => `<div class="flex min-h-[52px] w-full items-center justify-between gap-4 py-2.5 pr-2.5 border-b border-separator-border last:border-b-0"><div class="flex min-w-0 flex-col"><p class="text-body-regular text-text-primary">${label}</p>${description ? `<p class="text-body-2-regular text-text-secondary">${description}</p>` : ''}</div><span class="skeleton ${control}"></span></div>`;
+
+/** 媒体目录按路径行、来源行与底部动作预留空间。 */
+const media = () => section('媒体目录', stack(`<div class="flex flex-col gap-3"><p class="text-body-medium text-text-primary">媒体目录</p>
+  <div data-folder-row class="@container flex flex-col gap-2 rounded-2lg border border-separator-border bg-background-primary-default p-3">
+    <div class="flex items-start gap-2"><span class="min-w-0 flex-1">${input()}</span>${islandButton({ glyph: 'folder-search', attrs: wait })}</div>
+    <div class="flex flex-wrap items-end gap-2">${islandSelect(text('6em'), { className: 'w-full @lg:w-60' })}<span class="w-full @lg:w-32">${input()}</span><span class="w-full min-w-32 @lg:w-auto @lg:flex-1">${input()}</span>${islandButton({ glyph: 'hard-drive', attrs: wait })}</div>
+  </div><div class="self-start">${button('添加文件夹', 'secondary')}</div></div><span class="text-body-medium text-text-primary">${text('15em')}</span>`),
+  `<span class="mr-auto min-w-0 text-body-2-regular text-text-secondary">保存后 Peach 会重新启动。</span>${button('保存配置')}`)
+  + section('视频预览', row('生成视频预览', '为本地视频生成九宫格与时间轴预览；关闭后仍按入库规则探测时长与分辨率。')
+    + row('时间轴预览', '按所选间隔抽帧，仅处理本机磁盘上的视频。', 'ui-configuration-skeleton-select'));
+
+/** 各分区复用正式表单的 Section、Stack 与 SettingsRow 几何。 */
+export function configurationContentSkeleton(chosen: string): string {
+  switch (chosen) {
+    case '系统诊断': return diagnosticsSkeleton();
+    case '媒体库与入库': return media();
+    case '来源与订阅': return `<div>${button('采集来源与登录状态', 'secondary')}</div>`
+      + section('来源凭据', stack(`${text('40%')}${input()}${text('70%')}`))
+      + section('作品资料站点', stack(`${input()}${input()}`), button('保存配置'))
+      + section('资源搜索', stack(`${text('40%')}${input()}`))
+      + section('关注采集', row('首次采集范围', '', 'ui-configuration-skeleton-select') + row('头像刷新') + row('favicon 刷新'));
+    case '下载渠道': return section('云下载', stack(`${text('35%')}${input()}${input()}${input()}${input()}`), button('保存配置'))
+      + section('PikPak 账号', stack(`${input()}${input()}`), button('登录账号'));
+    case '网络与访问': return section('本机访问端口', stack(input('128px')), button('保存配置'))
+      + section('Peach 代理', row('连接方式', '', 'ui-configuration-skeleton-select'), button('保存配置'))
+      + section('访问密码', stack(input()), button('保存配置'))
+      + section('公网访问', stack(`${text('60%')}${input()}`));
+    case '应用与维护': return section('数据上传', row('发送版本统计与错误诊断（推荐）') + row('馆藏与口味明细上传'))
+      + section('开机自启', row('开机后启动 Peach') + row('只启动托盘，不打开网页') + row('在桌面创建快捷方式'), button('保存配置'))
+      + section('运行信息', stack(`${text('80%')}${text('60%')}${text('40%')}`));
+    default: return media();
+  }
+}
 
 export function configurationSkeleton(chosen = '媒体库与入库'): string {
   const nav = `<div class="ui-board-local-nav" data-section-nav data-section-items>${Object.values(CONFIGURATION_SECTIONS).map(title => `<button type="button" tabindex="-1" aria-selected="${title === chosen}">${title}</button>`).join('')}</div>`;
-  const media = section('媒体目录', `<div class="flex flex-col gap-3 py-4 pr-3">${row('媒体目录', '', 'ui-configuration-skeleton-select')}${row('媒体库名称', '', 'ui-configuration-skeleton-select')}</div>`);
-  return `<div class="peach-react"><div class="ui-configpage">${nav}<div class="flex min-w-0 flex-col gap-6">${chosen === '系统诊断' ? diagnosticsSkeleton() : media}</div></div></div>`;
+  return `<div class="peach-react"><div class="ui-configpage">${nav}<div class="flex min-w-0 flex-col gap-6">${configurationContentSkeleton(chosen)}</div></div></div>`;
 }

@@ -13,6 +13,7 @@ import { icon } from '@peach/legacy/core';
 
 import { FilterGlassRows, FilterIconButton, FilterPill } from '../components/filter-glass';
 import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
+import { FolderBrowseToggle } from '../catalog-folders/catalog-folders-page';
 import { SEGMENTED_GLASS_TRACK, SEGMENT_GLASS } from '../components/segmented';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { IconSwap } from '../components/icon-swap';
@@ -281,6 +282,7 @@ function VideoControls({ head, actions }: { head: EntityVideoHead; actions: Enti
         <Segments label="JAV 卡片版式" value={head.jav.layout} options={head.jav.options} onChange={actions.setJavLayout} />
       ) : null}
       <CatalogViewToggle />
+      <FolderBrowseToggle />
       {view === 'cards' ? <SortKeys sorts={head.sorts} onSort={actions.setSort} /> : null}
     </span>
   );

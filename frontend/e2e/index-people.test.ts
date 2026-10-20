@@ -52,6 +52,21 @@ describe('本地与在线艺人共用名册布局', () => {
             return image?.complete && image.naturalWidth > 0;
           });
           assert.equal(await page.locator('#index [data-index-feed]').count(), 1);
+          for (const dark of [false, true]) {
+            await page.evaluate(dark => {
+              document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+              document.documentElement.classList.toggle('dark', dark);
+            }, dark);
+            const tone = await marker.evaluate(node => {
+              const badge = node.firstElementChild!;
+              const probe = document.createElement('span');
+              probe.style.color = 'var(--feed-mark)'; node.append(probe);
+              const orange = getComputedStyle(probe).color; probe.remove();
+              return { foreground: getComputedStyle(badge).color, orange, background: getComputedStyle(badge).backgroundColor };
+            });
+            assert.equal(tone.foreground, tone.orange);
+            assert.notEqual(tone.background, 'rgba(0, 0, 0, 0)');
+          }
           assert.equal(await marker.evaluate(node => {
             const a = node.getBoundingClientRect(), b = node.closest('[data-index-cell]')!.getBoundingClientRect();
             return a.width >= 16 && a.height >= 16 && a.left >= b.left && a.right <= b.right && a.top >= b.top && a.bottom <= b.bottom;

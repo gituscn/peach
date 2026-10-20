@@ -1,5 +1,3 @@
-import { icon } from '@peach/legacy/core';
-
 import { islandButton, islandGlyph, islandSelect } from './island-skeleton';
 
 /* 「扫描与采集」「媒体修复」两张卡的正文。卡片本体由 React 画，骨架与遗留层的取数占位
@@ -10,7 +8,6 @@ export const REPAIR_CARD_TEXT = '部分视频文件可能播放卡顿、打不�
 const bar = '<span class="skeleton skeleton-text" aria-hidden="true"></span>';
 /* 要等数据才能执行的键是真的按不了：原生 `disabled` 挡住点击与聚焦，`data-skeleton-action`
    让各档按键在骨架里统一成同一副禁用面（`board.css`），尺寸仍是最终那一档，数据一到只换颜色。 */
-const waiting = 'type="button" disabled data-skeleton-action';
 
 /* 两张 React 卡的骨架包在同一层 `.peach-react` 里，按键与下拉照 Board UI 的尺寸画（见
    `island-skeleton.ts`）。卡片这一层的结构照 React 那两张卡抄：外面一列 `gap-4`，标题与正文
@@ -43,42 +40,18 @@ export function repairCardSkeletonHtml(): string {
 /** 首屏复用读数卡、三张任务卡、链接管理与资源同步的最终容器；静态标题、正文和键立即呈现。 */
 export function cleanupSkeletonHtml(): string {
   const stats = [['人工复核', 'square-check-big'], ['高清版', 'sparkles'], ['重复文件', 'file-stack'], ['垃圾文件', 'file-archive'], ['回收站', 'trash']];
-  const presets = `<span class="geist-button ui-organize-preset-skeleton">${bar}</span>`.repeat(3);
-  const organizeField = (label: string) => `<div class="ui-organizefield"><span>${label}</span>
-            <span class="geist-input ui-organize-input-skeleton">${bar}</span></div>`;
-  return `<div class="ui-cleanuppage" data-skeleton="cleanup" aria-busy="true" aria-label="正在读取数据管理状态">
-    <div class="ui-cleanupstats">${stats.map(([title, glyph]) => `
-      <button type="button" class="board-plain-stat" disabled>
-        <span class="ui-board-plain-stat-head"><span class="ui-board-stat-tile">${icon(glyph!)}</span>${title}</span>
-        <strong>${bar}</strong><span class="cleanupmeta">${bar}</span></button>`).join('')}</div>
-    <div class="cleanupgrid">
-      <div class="cleanupscraping">${scanCardSkeletonHtml()}</div>
-      <div class="cleanupmediarepair">${repairCardSkeletonHtml()}</div>
-      <section class="cleanupfieldset cleanuporganize" data-geist-fieldset data-cleanup-task aria-labelledby="cleanup-loading-organize">
-        <div class="geist-fieldset-content"><h3 class="geist-fieldset-title" id="cleanup-loading-organize">整理</h3>
-          <p>按模板给文件改名并归入目录。先预览，确认后执行；执行过的一批可以整批退回。</p>
-          <div class="ui-organizefields">
-            <div class="organizesource"><span class="ui-gselect"><span class="gselectfield organize-source-skeleton">${bar}${icon('chevron-down')}</span></span></div>
-            ${organizeField('文件名模板')}
-            ${organizeField('目录模板')}
-            <div class="ui-organizepresets">${presets}</div>
-            <p class="cleanupmeta">${bar}</p>
-          </div></div>
-        <footer class="geist-fieldset-footer" data-geist-fieldset-footer><button class="geist-button primary" ${waiting}>预览</button></footer>
-      </section></div>
-    <section class="ui-resourcesync" aria-labelledby="cleanup-loading-links">
-      <h2 id="cleanup-loading-links">链接管理</h2>
-      <div class="resourcesyncbox" data-geist-fieldset data-cleanup-task data-fieldset-stack>
-        <div class="resourcesyncbody geist-fieldset-content"><h3 class="geist-fieldset-title">站外链接</h3>
-          <div class="linksummary"><div class="ui-linkstats"><div><span>链接总数</span><b>${bar}</b><small>${bar}</small></div>${['官网/事务所', '社交账号', '作品资料站'].map(title => `<div><span>${title}</span><b>${bar}</b></div>`).join('')}</div>
-          <div class="ui-linkhosts"><span>主要站点</span><b>${bar}</b></div></div></div>
-        <div class="resourcesyncfooter geist-fieldset-footer" data-geist-fieldset-footer><button class="resourceaction primary" ${waiting}>${icon('unlink')}<span>检查死链</span></button></div>
-      </div></section>
-    <section class="ui-resourcesync" aria-labelledby="cleanup-loading-sync">
-      <h2 id="cleanup-loading-sync">资源同步</h2>
-      <div class="resourcesyncbox" data-geist-fieldset data-cleanup-task>
-        <div class="resourcesyncbody geist-fieldset-content"><h3 class="geist-fieldset-title">文件与记录核对</h3>
-          <p>按馆藏记录逐条查找本地磁盘与网盘上的文件，列出文件已不存在的记录、空文件夹，以及不再被引用的缓存。</p></div>
-        <div class="resourcesyncfooter geist-fieldset-footer" data-geist-fieldset-footer><button class="resourceaction primary" ${waiting}>${icon('git-compare')}<span>检查文件</span></button></div>
-      </div></section></div>`;
+  const face = 'min-w-0 bg-background-secondary-default rounded-2xl shadow-card border border-border-button-default overflow-hidden';
+  const body = 'flex min-h-30 min-w-0 flex-1 flex-col px-5 pt-5 pb-4 max-cleanup-tight:min-h-0 max-cleanup-tight:p-4.5';
+  const title = (label: string, gap = 'mb-2') => `<h3 class="text-title-2-medium text-text-primary ${gap}">${label}</h3>`;
+  const footer = (label: string) => `<footer class="flex min-h-14 flex-wrap items-center justify-end gap-2 border-t border-border-button-default bg-card-footer px-5 py-3 max-cleanup-tight:px-4.5">${islandButton({ label, attrs: waitingAction })}</footer>`;
+  const input = (label: string) => `<div class="flex flex-col gap-1.5"><span class="text-body-medium text-text-primary">${label}</span><span class="skeleton ui-configuration-skeleton-input"></span></div>`;
+  return `<div class="peach-react" data-skeleton="cleanup" aria-busy="true" role="status" aria-label="正在读取数据管理状态"><div aria-hidden="true" inert class="mx-auto flex w-full max-w-board flex-col gap-8">
+    <div class="inline-grid w-full grid-cols-5 gap-4 max-plain-stat-pair:grid-cols-2 max-plain-stat-single:grid-cols-1">${stats.map(([label, glyph]) => `<div class="min-w-0 bg-background-secondary-default rounded-2xl flex min-h-33 flex-col gap-2 p-4 text-left"><span class="flex min-w-0 items-center gap-2 text-body-medium text-text-secondary"><i class="flex size-8 shrink-0 items-center justify-center rounded-md bg-background-primary-default text-text-primary">${islandGlyph(glyph!, 'size-4')}</i>${label}</span><strong class="text-title-1-medium">${bar}</strong><span class="text-caption-1-regular">${bar}</span></div>`).join('')}</div>
+    <div class="flex flex-col gap-4 max-cleanup-tight:gap-3">
+      <div id="libraryProcessing">${scanCardSkeletonHtml()}</div><div id="mediaRepair">${repairCardSkeletonHtml()}</div>
+      <section id="organize" class="${face} flex flex-col" data-cleanup-organize><div class="${body}">${title('整理', 'mb-3')}<p class="text-body-regular text-text-secondary">清理文件名中的特殊符号与乱码，也可按模板改名并归入目录。先预览，确认后执行；执行过的一批可以整批退回。</p>
+        <div class="mt-3 flex flex-col gap-3"><div class="flex min-w-0 flex-wrap items-start gap-2">${islandSelect(bar)}<span class="skeleton ui-configuration-skeleton-input min-w-0 basis-64 flex-1"></span></div><p class="text-caption-1-regular text-text-secondary">指定路径时包含子目录，目录模板以该路径为起点。模板均留空时只清理文件名。</p>${input('文件名模板')}${input('目录模板')}<div class="flex flex-wrap gap-2">${Array.from({ length: 3 }, () => islandButton({ variant: 'secondary', label: bar, attrs: waitingAction })).join('')}</div></div></div>${footer('预览')}</section>
+    </div>
+    <section id="link-manager" class="flex scroll-mt-20 flex-col gap-4"><div class="${face} flex flex-col"><div class="${body}">${title('链接管理')}<div class="link-stat-grid mt-4 gap-x-8 gap-y-3">${['链接总数', '官网/事务所', '社交账号', '作品资料站'].map(label => `<div class="flex min-w-0 flex-col gap-0.5"><span class="text-caption-1-regular text-text-secondary">${label}</span><b class="text-title-2-semibold">${bar}</b></div>`).join('')}</div><div class="mt-4 flex flex-col gap-0.5"><span class="text-caption-1-regular text-text-secondary">主要站点</span>${bar}</div></div>${footer('检查死链')}</div></section>
+    </div></div>`;
 }

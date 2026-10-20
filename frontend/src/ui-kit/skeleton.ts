@@ -93,11 +93,13 @@ const SKELETON_SLOT:Record<string,(width:number)=>string>={
   av:()=>`<span class="av avskeleton"><span class="ring"></span><span class="nm">&nbsp;</span></span>`,
   brandpill:width=>`<span class="brandpill brandskeleton" style="width:${width}px"><span class="mk"></span></span>`,
   pill:width=>`<span class="pill tagskeleton" style="width:${width}px"></span>`,
+  'filter-pill':width=>`<span class="skeleton" style="width:${width}px;height:30px;border-radius:8px;flex:none"></span>`,
 };
 const SKELETON_SLOT_WIDTHS:Record<string,number[]>={
   av:[0],
   brandpill:[132,158,118,146,124,164,138],
   pill:[92,68,104,76,88,64,96,72,100,80,68,92,76,84],
+  'filter-pill':[92,68,104,76,88,64,96,72,100,80,68,92,76,84],
 };
 
 /* 低于这一段的请求直接显示内容。Peach 的数据多在本机，立即把占位画出来会让几十毫秒的

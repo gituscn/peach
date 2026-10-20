@@ -7,6 +7,31 @@ import { requiredEnv, settle, visit, VIEWPORTS } from './harness.ts';
 describe('任务页云下载布局', () => {
   let browser: Browser;
   installDesignBrowser((next) => { browser = next; });
+  for (const viewport of VIEWPORTS) it(`${viewport.name} 追更问题展示来源原因和管理入口`, async () => {
+    const opened = await visit(browser, '/tasks', viewport, async page => {
+      await page.route('**/api/tasks*', route => route.fulfill({ json: {
+        available: true, running: [], skipped: [], finished: [{ id: 4038, task_key: 'follow-check',
+          task_label: '追更检查', trigger: 'scheduled', status: 'succeeded',
+          finished_at: '2026-10-20T00:00:00Z', result_summary: { source_failed: 1,
+            issues: [{ source: 12, label: '示例作者', provider: '示例站点', kind: '检查失败', error: 'HTTP 403：站点拒绝访问' }] },
+          error: '', parent_run_id: null, followup_key: '',
+        }],
+      } }));
+    });
+    try {
+      const card = opened.page.locator('[data-run-id="4038"]');
+      await card.getByText('发现问题', { exact: true }).waitFor();
+      assert.match(await card.locator('[data-task-issues]').innerText(), /示例作者.*示例站点.*检查失败/s);
+      assert.match(await card.locator('[data-task-issues]').innerText(), /HTTP 403：站点拒绝访问/);
+      const link = card.getByRole('link', { name: '查看关注来源', exact: true });
+      assert.equal(await link.getAttribute('href'), '/subscriptions');
+      await link.click();
+      await opened.page.waitForURL('**/subscriptions');
+      await opened.page.locator('[data-empty-state]').filter({ hasText: '还没有关注来源' }).waitFor();
+      await settle(opened.page);
+      assert.deepEqual(opened.problems, []);
+    } finally { await opened.close() }
+  });
   for (const viewport of VIEWPORTS) it(`${viewport.name} 检查结果和技术代码块完整可读`, async () => {
     const result = { checked: 1218, total: 1218, gone_count: 5, unclear_count: 54,
       diagnostic: 'technical-detail-'.repeat(80) };

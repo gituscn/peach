@@ -6,8 +6,8 @@ RESULT_FIELDS = {
     'link-check': ('gone_count', 'unclear_count'),
     'resource-scan': ('missing', 'unreadable', 'cache_files'),
     'resource-apply': ('cache_blocked_count',),
-    'follow-check': ('source_failed', 'source_warning'),
-    'feed-check': ('source_failed', 'source_warning'),
+    'follow-check': ('source_failed', 'source_warning', 'issues'),
+    'feed-check': ('source_failed', 'source_warning', 'issues'),
     'follow-resolve': ('resolve_failed', 'sources_found', 'source_failed'),
     'taste-refresh': ('warning_count', 'profiles_checked'),
     'organize': ('skipped',),
@@ -30,7 +30,19 @@ def _source_check_counts(state: dict) -> dict:
     summary = {
         'source_failed': sum(row.get('ok') is False for row in rows),
         'source_warning': sum(bool(row.get('backfill_error')) for row in rows),
+        'issues': [],
     }
+    for row in rows:
+        source = row.get('source')
+        if not isinstance(source, int) or isinstance(source, bool) or source <= 0:
+            continue
+        for field, kind in (('error', '检查失败'), ('backfill_error', '补查失败')):
+            if (field == 'error' and row.get('ok') is False) or row.get(field):
+                summary['issues'].append({
+                    'source': source, 'label': str(row.get('label') or row.get('name') or row.get('ref') or source),
+                    'provider': str(row.get('provider_label') or row.get('provider') or ''),
+                    'kind': kind, 'error': str(row.get(field) or '来源未返回检查结果'),
+                })
     for field in ('added', 'updated', 'discovered', 'without_code'):
         if field not in state and any(field in row for row in rows):
             summary[field] = sum(row.get(field, 0) for row in rows

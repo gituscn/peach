@@ -138,6 +138,31 @@ export const hasResultProblems = (run: TaskRunPayload): boolean => run.result_su
   || Boolean(run.result_summary?.error)
   || PROBLEM_COUNTS.some((key) => Number(run.result_summary?.[key]) > 0);
 
+export interface TaskIssue { source: number; label: string; provider: string; kind: string; error: string }
+
+/** 问题明细绑定本轮快照，当前来源状态由对应管理页查看。 */
+export function taskIssues(run: TaskRunPayload): TaskIssue[] {
+  const issues = run.result_summary?.issues;
+  return Array.isArray(issues) ? issues.filter((item): item is TaskIssue => !!item
+    && typeof item === 'object' && typeof item.error === 'string' && typeof item.label === 'string') : [];
+}
+
+export function problemDestination(run: TaskRunPayload): { href: string; label: string } | null {
+  if (!hasResultProblems(run) && run.status !== 'failed') return null;
+  const targets: Record<string, [string, string]> = {
+    'link-check': ['/data-cleanup#link-manager', '查看有问题的链接'],
+    'follow-check': ['/subscriptions', '查看关注来源'],
+    'feed-check': ['/subscriptions?tab=feeds', '查看订阅源'],
+    'follow-resolve': ['/subscriptions?tab=add', '查看来源查找'],
+    'resource-scan': ['/data-cleanup#resource-sync', '查看资源同步'],
+    'resource-apply': ['/data-cleanup#resource-sync', '查看资源同步'],
+    'media-repair': ['/data-cleanup#mediaRepair', '查看媒体修复'],
+    'taste-refresh': ['/taste', '查看口味数据来源'],
+  };
+  const target = targets[run.task_key];
+  return target ? { href: target[0], label: target[1] } : null;
+}
+
 /** 把一批任务按 `parent_run_id` 归到各自的父任务下。没有父的那些留在外面。 */
 export function groupFollowups(rows: TaskRunPayload[]): Map<number, TaskRunPayload[]> {
   const grouped = new Map<number, TaskRunPayload[]>();

@@ -12,6 +12,7 @@ import { tagLabel } from '@peach/legacy/tags';
 import { confirmModal } from '@peach/legacy/ui';
 
 import { Button } from '@/components/base/buttons/button';
+import { EntityFolderWorkspace } from '../catalog-folders/catalog-folders-page';
 
 import { errorMessage } from '../../api';
 import type { MediaCardLayout } from '../catalog-grid/types';
@@ -394,7 +395,7 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
           helpers={filterHelpers} />,
         hosts.filter)}
       {createPortal(
-        view === 'online'
+        <EntityFolderWorkspace enabled={view === 'videos'}>{view === 'online'
           ? <EntityOnline key={online.key} view={online.view} media={online.media} result={online.result}
             data={online.data} visible={online.visible} context={online.context} photoSize={props.photoSize}
             photoLayout={props.photoLayout} imagesOnly={props.followImagesOnly} helpers={props.follow.helpers}
@@ -411,7 +412,7 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
               selectMode={props.selectMode} selected={props.selected} seekSeconds={props.seekSeconds}
               wireDrag={props.wireDrag} skeletonHtml={props.skeletonHtml} groupCollapse={props.groupCollapse}
               canLoadMore={props.canLoadMore} />
-          ),
+          )}</EntityFolderWorkspace>,
         hosts.body)}
     </>
   );

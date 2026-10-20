@@ -413,7 +413,7 @@ class BackgroundJob:
         return ""
 
     def _summary(self, state: dict) -> dict:
-        """结算摘要：只留标量，明细留在各域自己的状态与日志里。"""
+        """结算摘要保留标量与领域定义的问题清单。"""
         from .task_results import result_counts
         summary: dict[str, object] = {}
         for key, value in state.items():

@@ -40,3 +40,26 @@ it('连续滚动按帧更新位置，内容尺寸变化后刷新滑块比例', a
   expect(host.querySelector<HTMLElement>('.ov-y')!.hidden).toBe(true);
   expect(container.hasAttribute('data-scroll-edges')).toBe(false);
 });
+
+it('短轨道的滑块保持在可见范围内', () => {
+  const host=document.createElement('div'),container=document.createElement('div');
+  host.append(container);document.body.append(host);
+  Object.defineProperties(container,{
+    clientHeight:{get:()=>32},scrollHeight:{get:()=>500},
+    clientWidth:{get:()=>32},scrollWidth:{get:()=>500},
+  });
+  vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockImplementation(function(this:HTMLElement){
+    return this.classList.contains('ov-y')?16:0;
+  });
+  vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockImplementation(function(this:HTMLElement){
+    return this.classList.contains('ov-x')?16:0;
+  });
+  container.scrollTop=468;container.scrollLeft=468;
+  attachOverlayScrollbar(container);
+  const vertical=host.querySelector<HTMLElement>('.ov-y .ovthumb')!;
+  const horizontal=host.querySelector<HTMLElement>('.ov-x .ovthumb')!;
+  expect(vertical.style.height).toBe('16px');
+  expect(horizontal.style.width).toBe('16px');
+  expect(vertical.style.transform).toBe('translateY(0px)');
+  expect(horizontal.style.transform).toBe('translateX(0px)');
+});

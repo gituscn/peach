@@ -1,4 +1,4 @@
-/* 断链字形保持原位，断口周围的四条短线持续闪烁。 */
+/* 检查执行期间，断口周围的四条短线闪烁。 */
 import './link-check-icon.css';
 
 export function LinkCheckIcon({ className }: { className?: string }) {

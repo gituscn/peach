@@ -25,7 +25,10 @@ const previousPlace=preferencesState.placeSidebarHead,previousOptics=preferences
 const nativeBrand=nativeNodes[0].node;
 const brandAttributes=['aria-label','aria-haspopup','aria-controls','aria-expanded'].map(name=>[name,nativeBrand.getAttribute(name)]);
 effects.own(()=>{
-  for(const {node,parent,next} of [...nativeNodes].reverse())parent.insertBefore(node,next?.parentNode===parent?next:null);
+  for(const {node,parent,next} of [...nativeNodes].reverse()){
+    const target=parent.isConnected?parent:document.querySelector('.top');
+    target.insertBefore(node,next?.parentNode===target?next:null);
+  }
   for(const [name,value] of brandAttributes){if(value===null)nativeBrand.removeAttribute(name);else nativeBrand.setAttribute(name,value)}
   drawer.inert=drawerInert;
   if(preferencesState.placeSidebarHead===placeBrand)preferencesState.placeSidebarHead=previousPlace;
@@ -33,13 +36,15 @@ effects.own(()=>{
 /* Board 外壳：媒体库选择、侧栏底部、玻璃折射。 */
 document.documentElement.classList.toggle('board-high-contrast',localStorage.getItem('peach.high-contrast')==='true');
 const boardBrand=document.querySelector('#brandHome');
-boardBrand.setAttribute('aria-label','Peach 首页');
+boardBrand.setAttribute('aria-label','选择媒体库');
 const libraryPicker=document.createElement('div');libraryPicker.className='board-library-menu';libraryPicker.id='boardLibraryMenu';libraryPicker.hidden=true;libraryPicker.setAttribute('popover','manual');libraryPicker.setAttribute('role','dialog');libraryPicker.setAttribute('aria-label','媒体库');
 document.body.append(libraryPicker);
 effects.own(()=>libraryPicker.remove());
 boardBrand.setAttribute('aria-haspopup','dialog');boardBrand.setAttribute('aria-controls',libraryPicker.id);
-boardBrand.insertAdjacentHTML('beforeend','<svg class="board-library-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m5 6 3-3 3 3M5 10l3 3 3-3"/></svg>');
-const brandChevron=boardBrand.lastElementChild;effects.own(()=>brandChevron.remove());
+if(!boardBrand.querySelector('.board-library-chevron')){
+  boardBrand.insertAdjacentHTML('beforeend','<svg class="board-library-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m5 6 3-3 3 3M5 10l3 3 3-3"/></svg>');
+  const brandChevron=boardBrand.lastElementChild;effects.own(()=>brandChevron.remove());
+}
 effects.handler(boardBrand, 'onclick', event=>{event.preventDefault()});
 const libraryFloating=wireAnchoredMenu(document.querySelector('#drawer'),boardBrand,libraryPicker,{side:true});
 effects.own(libraryFloating.dispose);
@@ -93,7 +98,8 @@ api('/api/libraries',{signal:effects.signal}).then(data=>{
   });
   syncLibraryGlide(false);
 }).catch(()=>{if(effects.isActive)libraryPicker.hidden=true});
-const boardToggle=document.querySelector('#filterBtn'),toggleHome=document.createComment('sidebar toggle');boardToggle.before(toggleHome);
+const boardToggle=document.querySelector('#filterBtn'),toggleHome=document.createComment('sidebar toggle');
+(document.querySelector('.top')||boardToggle.closest('header')).prepend(toggleHome);
 effects.own(()=>toggleHome.remove());
 const boardFoot=document.createElement('div');boardFoot.className='board-sidebar-foot';
 effects.own(()=>boardFoot.remove());

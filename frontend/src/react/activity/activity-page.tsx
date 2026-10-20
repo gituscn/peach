@@ -34,7 +34,7 @@ import { DownloadsPanel } from './downloads-panel';
 import { ErrorExcerpt } from './error-excerpt';
 import {
   elapsedText, fetchEarlier, fetchTasks, foldRoutine, followupDetail, groupFollowups, isActive,
-  hasResultProblems, isRoutine, mergeFinished, momentText, pollInterval, progressText, statusLabel, summaryItems, TASKS_KEY, TRIGGER_LABELS, type TaskRunPayload,
+  hasResultProblems, isRoutine, mergeFinished, momentText, pollInterval, problemDestination, progressText, statusLabel, summaryItems, taskIssues, TASKS_KEY, TRIGGER_LABELS, type TaskRunPayload,
 } from './tasks';
 
 /* 状态徽章只有三档颜色：成功是绿、失败是红、被叫停与被打断是黄，其余留中性底。
@@ -152,6 +152,8 @@ function SettledRun(
   { run, followups, runs }: { run: TaskRunPayload; followups?: TaskRunPayload[]; runs?: TaskRunPayload[] },
 ) {
   const summary = summaryItems(run.result_summary).filter((line) => line !== run.error);
+  const issues = taskIssues(run);
+  const destination = problemDestination(run);
   const elapsed = elapsedText(run.elapsed_seconds);
   const oldest = runs && runs.length > 1 ? runs[runs.length - 1] : undefined;
   const meta = (oldest
@@ -164,10 +166,19 @@ function SettledRun(
       {summary.length ? <ul className="list-disc space-y-1 pl-5 text-caption-1-regular text-text-secondary wrap-anywhere">
         {summary.map((line, index) => <li key={index}>{line}</li>)}
       </ul> : null}
-      {run.task_key === 'link-check' && hasResultProblems(run)
-        ? <LinkButton href="/data-cleanup#link-manager" size="small" trailingIcon={RiArrowRightLine}
+      {issues.length ? <Disclosure summary={`问题详情 · ${issues.length} 项`} defaultOpen contentClassName="py-2">
+        <ul className="flex min-w-0 flex-col gap-3" data-task-issues="">
+          {issues.map((issue, index) => <li key={`${issue.source}-${index}`} className="flex min-w-0 flex-col gap-1 text-body-2-regular wrap-anywhere">
+            <strong className="text-body-medium text-text-primary">{[issue.label, issue.provider, issue.kind].filter(Boolean).join(' · ')}</strong>
+            <ErrorExcerpt text={issue.error} className="text-text-primary" />
+          </li>)}
+        </ul>
+      </Disclosure> : hasResultProblems(run) && ['follow-check', 'feed-check'].includes(run.task_key)
+        ? <p className="text-body-2-regular text-text-secondary">未取得本轮逐项详情，可到来源列表查看检查结果。</p> : null}
+      {destination
+        ? <LinkButton href={destination.href} size="small" trailingIcon={RiArrowRightLine}
             className="self-start">
-            查看有问题的链接
+            {destination.label}
           </LinkButton> : null}
     </RunCard>
   );

@@ -40,8 +40,10 @@ export function attachOverlayScrollbar(
     const track=document.createElement('div');
     // 两个类名写全，别拼 `ov-${axis}`：样式表的选择器要能在源码里查到消费者。
     track.className=`ovtrack ${axis==='y'?'ov-y':'ov-x'}${variant?` ${variant}`:''}`;
+    track.dataset.overlayTrack=axis;
     const thumb=document.createElement('div');
     thumb.className='ovthumb';
+    thumb.dataset.overlayThumb='';
     track.append(thumb);
     host.append(track);
     return {axis,track,thumb,range:0,travel:0};
@@ -132,7 +134,7 @@ export function attachOverlayScrollbar(
       if(!trackSize)return;
       // 短到抓不住的滑块等于没有滑块：内容特别长时给它一个下限，代价是滑块位置与
       // 滚动进度不再严格线性，但可拖动比可换算重要。
-      const thumbSize=Math.max(24,Math.min(trackSize,size/content*trackSize));
+      const thumbSize=Math.min(trackSize,Math.max(24,size/content*trackSize));
       lane.travel=trackSize-thumbSize;
       thumb.style[vertical?'height':'width']=`${thumbSize}px`;
     });
