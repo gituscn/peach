@@ -11,7 +11,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from urllib.error import HTTPError
 from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
 
@@ -115,7 +114,8 @@ def publish(root: Path, version: str, *, apply: bool = False) -> dict:
         listing = subprocess.check_output([executable, "lsjson", f"peach:{environment['PEACH_R2_BUCKET']}",
                                            "--recursive", "--files-only", "--config", str(configuration)],
                                           env=environment, text=True, encoding="utf-8")
-        result["projected_bucket_bytes"] = require_capacity(json.loads(listing), items, tag,
+        existing = json.loads(listing)
+        result["projected_bucket_bytes"] = require_capacity(existing, items, tag,
                                                             int(environment.get("PEACH_R2_MAX_BYTES", "8000000000")))
         sums = temporary / "SHA256SUMS.txt"
         sums.write_text("".join(f"{item['sha256']}  {item['name']}\n" for item in items), encoding="utf-8")
@@ -134,19 +134,21 @@ def publish(root: Path, version: str, *, apply: bool = False) -> dict:
         release_file = temporary / "release.json"
         release_file.write_text(json.dumps(release, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         upload(release_file, f"{prefix}/release.json")
-        try:
-            with urlopen(Request(base + "/releases.json", headers={"User-Agent": USER_AGENT}), timeout=60) as response:
-                releases = json.load(response)
-        except HTTPError as error:
-            if error.code != 404:
-                raise
-            releases = []
+        releases = []
+        if any(item["Path"] == "releases.json" for item in existing):
+            releases = json.loads(subprocess.check_output(
+                [executable, "cat", f"peach:{environment['PEACH_R2_BUCKET']}/releases.json",
+                 "--config", str(configuration)], env=environment, text=True, encoding="utf-8"))
         if not isinstance(releases, list):
             raise ValueError("公开版本索引格式无效")
         index = temporary / "releases.json"
         index.write_text(json.dumps([release, *(item for item in releases if item["tag_name"] != tag)][:30],
                                     ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         upload(index, f"peach:{environment['PEACH_R2_BUCKET']}/releases.json", immutable=False)
+        with index.open("rb") as source:
+            index_info = {"name": index.name, "size": index.stat().st_size,
+                          "sha256": hashlib.file_digest(source, "sha256").hexdigest()}
+        verify_download(f"{base}/releases.json?release={tag}", index_info)
     return result
 
 

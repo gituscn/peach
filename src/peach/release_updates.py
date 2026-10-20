@@ -28,6 +28,36 @@ def _version(value: object) -> tuple[int, ...] | None:
     return tuple(map(int, value.removeprefix("v").split(".")))
 
 
+def _release_candidates(rows: list, endpoint: str) -> list[tuple]:
+    """从一个公开发行源选择完整包，并构造受信任的下载地址。"""
+    releases = []
+    for row in rows:
+        if not isinstance(row, dict) or row.get("draft"):
+            continue
+        version = _version(row.get("tag_name"))
+        if version is None:
+            continue
+        tag = row["tag_name"]
+        assets = row.get("assets") or []
+        prefix = f"Peach-{tag.removeprefix('v')}-windows-x64"
+        uploaded = {a.get("name"): a for a in assets if isinstance(a, dict) and a.get("state") == "uploaded"}
+        full = uploaded.get(prefix + ".zip")
+        if full is None:
+            continue
+        complete_tools = all(prefix + f"-tools-{tool}.zip" in uploaded for tool in TOOL_PATHS)
+        asset = uploaded.get(prefix + "-update.zip", full) if complete_tools else full
+        if endpoint == DOWNLOADS_API:
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", asset.get("digest") or ""):
+                continue
+            asset_url = f"{DOWNLOADS_BASE}/{tag}/{asset['name']}"
+            release_url = f"{GITGUD_RELEASES}/{tag}"
+        else:
+            asset_url = f"{RELEASES_URL}/download/{tag}/{asset['name']}"
+            release_url = f"{RELEASES_URL}/tag/{tag}"
+        releases.append((version, tag, asset, full, asset_url, release_url))
+    return releases
+
+
 def check(*, transport=None) -> dict:
     result = snapshot()
     client = transport or HttpxTransport()
@@ -46,30 +76,7 @@ def check(*, transport=None) -> dict:
                 if not isinstance(rows, list):
                     continue
                 obtained = True
-                for row in rows:
-                    if not isinstance(row, dict) or row.get("draft"):
-                        continue
-                    version = _version(row.get("tag_name"))
-                    if version is None:
-                        continue
-                    tag = row["tag_name"]
-                    assets = row.get("assets") or []
-                    prefix = f"Peach-{tag.removeprefix('v')}-windows-x64"
-                    uploaded = {a.get("name"): a for a in assets if isinstance(a, dict) and a.get("state") == "uploaded"}
-                    full = uploaded.get(prefix + ".zip")
-                    if full is None:
-                        continue
-                    complete_tools = all(prefix + f"-tools-{tool}.zip" in uploaded for tool in TOOL_PATHS)
-                    asset = uploaded.get(prefix + "-update.zip", full) if complete_tools else full
-                    if endpoint == DOWNLOADS_API:
-                        if not re.fullmatch(r"sha256:[0-9a-f]{64}", asset.get("digest") or ""):
-                            continue
-                        asset_url = f"{DOWNLOADS_BASE}/{tag}/{asset['name']}"
-                        release_url = f"{GITGUD_RELEASES}/{tag}"
-                    else:
-                        asset_url = f"{RELEASES_URL}/download/{tag}/{asset['name']}"
-                        release_url = f"{RELEASES_URL}/tag/{tag}"
-                    releases.append((version, tag, asset, full, asset_url, release_url))
+                releases.extend(_release_candidates(rows, endpoint))
             except (OSError, ValueError, TypeError, TimeoutError, httpx.HTTPError):
                 continue
         if not releases:

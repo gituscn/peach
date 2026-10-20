@@ -4695,6 +4695,49 @@ class ScriptingConventionTests(unittest.TestCase):
 
 
 class R2ReleaseTests(unittest.TestCase):
+    def test_publication_preserves_existing_index_and_verifies_published_metadata(self):
+        module = load_script("release_r2")
+        objects = {"releases.json": json.dumps([{"tag_name": "v1.0.0"}]).encode()}
+        uploads = []
+
+        def read(command, **_kwargs):
+            if command[1] == "lsjson":
+                return json.dumps([{"Path": key, "Size": len(value)} for key, value in objects.items()])
+            self.assertEqual(command[1], "cat")
+            return objects["releases.json"].decode()
+
+        def upload(command, **_kwargs):
+            key = command[3].split("peach:peach-releases/", 1)[1]
+            objects[key] = Path(command[2]).read_bytes()
+            uploads.append((key, "--immutable" in command))
+
+        def verify(url, item):
+            key = url.split("https://downloads.example/", 1)[1].split("?", 1)[0]
+            content = objects[key]
+            self.assertEqual(len(content), item["size"])
+            self.assertEqual(hashlib.sha256(content).hexdigest(), item["sha256"])
+
+        environment = {"PEACH_RCLONE": "rclone", "PEACH_R2_BUCKET": "peach-releases",
+                       "PEACH_R2_PUBLIC_BASE": "https://downloads.example", "CI_COMMIT_SHA": "a" * 40,
+                       "CI_COMMIT_TIMESTAMP": "2026-10-21T00:00:00Z"}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            names = [f"Peach-1.2.3-windows-x64{suffix}" for suffix in (".zip", "-setup.exe", "-lite-setup.exe", "-update.zip")]
+            names += [f"Peach-1.2.3-macos-{arch}.dmg" for arch in ("arm64", "x86_64")]
+            for name in names:
+                (root / name).write_bytes(name.encode())
+            with mock.patch.object(module, "rclone_environment", return_value=environment), \
+                    mock.patch.object(module.subprocess, "check_output", side_effect=read), \
+                    mock.patch.object(module.subprocess, "run", side_effect=upload), \
+                    mock.patch.object(module, "verify_download", side_effect=verify):
+                module.publish(root, "1.2.3", apply=True)
+        index = json.loads(objects["releases.json"])
+        self.assertEqual([item["tag_name"] for item in index], ["v1.2.3", "v1.0.0"])
+        self.assertEqual(index[0]["commit_sha"], "a" * 40)
+        self.assertTrue(all(item["digest"] == "sha256:" + item["sha256"] for item in index[0]["assets"]))
+        self.assertEqual(uploads[-1], ("releases.json", False))
+        self.assertTrue(all(immutable for _key, immutable in uploads[:-1]))
+
     def test_capacity_keeps_existing_versions_and_stops_before_upload(self):
         module = load_script("release_r2")
         existing = [{"Path": "v1.0.0/old.zip", "Size": 2_000_000}, {"Path": "v1.2.3/app.zip", "Size": 3_000_000}]
