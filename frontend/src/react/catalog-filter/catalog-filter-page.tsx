@@ -213,7 +213,7 @@ function Head({ count, refreshing, layout, sorts, actions }: CatalogFilterProps)
           onChange={actions.setLayout} /> : null}
         <CatalogViewToggle />
         <FolderBrowseToggle />
-        {view === 'cards' ? <SortKeys sorts={sorts} onSort={actions.setSort} /> : null}
+        <SortKeys sorts={sorts} onSort={actions.setSort} />
       </span>
     </>
   );
