@@ -133,7 +133,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
     # 的域映射门槛会在本地就红。
     "web": ("test_frontend_build.py", "test_web_ui.py", "test_web_js.py", "test_web_e2e.py",
             "test_tag_management.py",
-            "test_subtitle_search.py",
+            "test_subtitle_search.py", "test_subtitle_memory.py",
             "test_legacy_shell_routes.py",
             "test_web_perf.py", "test_copy_final_state.py",
             "test_agency_entity.py", "test_label_maker.py", "test_dependency_policy.py",

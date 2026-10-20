@@ -47,6 +47,33 @@ class TagManagementTests(unittest.TestCase):
         plan = preview(self.c, body)
         return apply_plan(self.c, dict(body, token=plan['token']))
 
+    def test_rename_preserves_unrelated_historical_reference_violations(self):
+        entity_id = self.tag('眼镜')
+        self.c.commit()
+        self.c.execute('PRAGMA foreign_keys=OFF')
+        self.c.execute('CREATE TABLE historical_parent(id INTEGER PRIMARY KEY)')
+        self.c.execute('CREATE TABLE historical_reference(id INTEGER PRIMARY KEY,parent_id REFERENCES historical_parent(id))')
+        self.c.execute('INSERT INTO historical_reference VALUES(1,999)')
+        self.c.commit()
+        self.c.execute('PRAGMA foreign_keys=ON')
+        historical = list(map(tuple, self.c.execute('PRAGMA foreign_key_check')))
+        self.execute('rename', [entity_id], name='我的眼镜')
+        self.assertEqual(list(map(tuple, self.c.execute('PRAGMA foreign_key_check'))), historical)
+        self.assertEqual(self.c.execute('SELECT canonical_name FROM entity WHERE id=?', (entity_id,)).fetchone()[0], '我的眼镜')
+
+    def test_tag_operation_rejects_new_foreign_key_violations(self):
+        entity_id = self.tag('眼镜')
+        self.c.commit()
+        self.c.execute('PRAGMA foreign_keys=OFF')
+        self.c.execute('CREATE TABLE tag_reference(entity_id REFERENCES entity(id))')
+        self.c.execute('CREATE TRIGGER bad_tag_reference AFTER UPDATE OF canonical_name ON entity BEGIN INSERT INTO tag_reference VALUES(-1); END')
+        self.c.commit()
+        with self.assertRaisesRegex(ValueError, '外键检查'):
+            self.execute('rename', [entity_id], name='我的眼镜')
+        self.c.rollback()
+        self.assertEqual(self.c.execute('SELECT canonical_name FROM entity WHERE id=?', (entity_id,)).fetchone()[0], '眼镜')
+        self.assertEqual(self.c.execute('SELECT count(*) FROM tag_reference').fetchone()[0], 0)
+
     def test_display_spellings_and_width_share_one_identity(self):
         self.assertEqual(current_tags(['眼镜娘', '眼镜', '３Ｐ', '3P多人', 'ＶＲ', 'vr']), ['眼镜', '3P多人', 'VR'])
         first = self.tag('眼镜')

@@ -8,6 +8,7 @@ import { act, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { refitNativeImages } from '@peach/card-art';
+import { tagLabel } from '@peach/legacy/tags';
 
 import { indexKey, indexRoute, type IndexProps, type IndexRoute } from '../../src/react/index/index-data';
 import { IndexPage } from '../../src/react/index/index-page';
@@ -49,7 +50,7 @@ function props(route: Partial<IndexRoute> = {}, patch: Partial<IndexProps> = {})
     route: vi.fn(), savePreference: vi.fn(), exitSelectMode: vi.fn(),
     personAvatar: vi.fn(() => ({ html: '<span class="ini">A</span>', face: '' })),
     authorAvatar: vi.fn(() => '<span class="ini">B</span>'),
-    tagLabel: (value: string) => value,
+    tagLabel,
     openEntity: vi.fn(), showTags: vi.fn(), openFollowAuthor: vi.fn(), openFollowTag: vi.fn(),
     configurable: true, ...patch,
   };
@@ -341,6 +342,27 @@ describe('过滤框', () => {
 });
 
 describe('标签', () => {
+  for (const scope of ['local', 'online'] as const) for (const view of ['alphabet', 'cloud'] as const) {
+    it(`${scope} ${view} 浏览使用当前名称且仅管理模式提供编辑`, async () => {
+      const row = { ...tag('眼镜', 'appearance'), entity_id: 4472, id: 'glasses', aliases: ['眼镜娘'], hidden: false };
+      seed(indexKey('tags', '', 'all'), [row]);
+      seed(onlineTagsKey('', 'all'), [row]);
+      serve(() => ({ items: [row], duplicate_groups: [], favorites: [], filters: [], has_more: false }));
+      const host = await open(props({ kind: 'tags', scope, view }));
+      await settle();
+      expect(host.querySelector('[data-alpha-tag], [data-tag-chip]')?.textContent).toContain('眼镜');
+      expect(host.querySelector('[data-alpha-tag], [data-tag-chip]')?.textContent).not.toContain('眼镜娘');
+      expect(host.querySelector('[aria-label="收藏眼镜"]')).not.toBeNull();
+      expect(host.querySelector('[aria-label="编辑标签 眼镜"]')).toBeNull();
+      expect(host.querySelector('[data-tag-mode] use')?.getAttribute('href')).toBe('#i-pencil');
+      await click(host.querySelector('[aria-label="管理标签"]'));
+      await settle();
+      expect(host.querySelector('[data-tag-manager] [aria-label="编辑标签 眼镜"]')).not.toBeNull();
+      await click(host.querySelector('[aria-label="返回标签浏览"]'));
+      expect(host.querySelector('[aria-label="编辑标签 眼镜"]')).toBeNull();
+    });
+  }
+
   it('浮层只摆数得到的类型；点一类写回地址', async () => {
     seed(indexKey('tags', '', 'all'), [tag('痴女'), tag('秘书OL', 'scene')], false, { role: 1, scene: 1 });
     serve(() => ({ items: [tag('痴女')], has_more: false, categories: { role: 1 } }));

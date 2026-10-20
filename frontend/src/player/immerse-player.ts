@@ -9,6 +9,10 @@ import { cancelStreamSession, directStreamSource, playableStreamSource } from '.
 import { stopTelemetry, wireTelemetry } from './telemetry';
 import type { PlayerItem, VjsPlayer } from './types';
 import { ensureVideojs } from './videojs';
+import { mountPlayerSubtitles } from './controls';
+import { playbackKey } from './progress';
+import { SubtitleSession } from './subtitle-memory';
+import { mountCaptionStyle } from './subtitle-style';
 
 export interface ImmersePlayerOptions {
   kind: 'immerse';
@@ -38,6 +42,13 @@ export function mountImmersePlayer(video: HTMLVideoElement, options: ImmersePlay
     else {
       const mounted = vjs(video, BARE);
       player = mounted;
+      mounted.peachItem = item;
+      mounted.peachPlaybackKey = playbackKey('item', item);
+      const captions = new AbortController();
+      mountCaptionStyle(mounted.el(), video, captions.signal);
+      mounted.on('dispose', () => captions.abort());
+      new SubtitleSession(mounted, video);
+      mountPlayerSubtitles(mounted, item.id);
       if (segmented) mounted.one('error', () => { if (!released) mounted.src(direct) });
       mounted.src(source);
     }

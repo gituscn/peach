@@ -25,12 +25,12 @@ describe('标签管理的完整操作', () => {
       assert.equal(await page.locator('[data-tag-manager] input[type="search"]').count(), 0);
       assert.equal(await page.getByRole('heading', { name: '标签管理', exact: true }).count(), 0);
       await page.getByRole('button', { name: '返回标签浏览', exact: true }).click();
+      assert.equal(await page.getByRole('button', { name: `编辑标签 ${first}`, exact: true }).count(), 0);
+      await page.getByRole('button', { name: '管理标签', exact: true }).click();
       await page.getByRole('button', { name: `编辑标签 ${first}`, exact: true }).click();
       const editorClass = await page.locator('dialog[open]').getAttribute('class');
       await page.getByRole('button', { name: '取消', exact: true }).click();
-      await page.getByRole('button', { name: '管理标签', exact: true }).click();
       const chip = (name: string) => page.locator(`[data-tag-manager] [data-tag-chip][data-k="${name}"]`);
-      await chip(first).click();
       await page.getByRole('button', { name: '重命名', exact: true }).click();
       await page.getByRole('textbox', { name: '标签名称', exact: true }).fill(renamed);
       await page.getByRole('button', { name: '预览影响范围', exact: true }).click();
@@ -73,16 +73,17 @@ describe('标签管理的完整操作', () => {
             right: outer.right - box.right };
         });
       });
-      assert.equal(iconGeometry.length, 2);
+      assert.equal(iconGeometry.length, 1);
       for (const icon of iconGeometry) {
         assert.deepEqual(icon.size, [24, 24]);
         assert.ok(icon.top >= 4 && icon.bottom >= 4 && icon.right >= 4);
       }
-      const pencil = token.getByRole('button', { name: `编辑标签 ${survivor.k}`, exact: true });
+      assert.equal(await token.getByRole('button', { name: `编辑标签 ${survivor.k}`, exact: true }).count(), 0);
+      const favorite = token.locator('[data-entity-action]').first();
       await page.mouse.move(0, 0);
-      const resting = await pencil.evaluate(node => getComputedStyle(node).backgroundColor);
-      await pencil.hover();
-      assert.notEqual(await pencil.evaluate(node => getComputedStyle(node).backgroundColor), resting);
+      const resting = await favorite.evaluate(node => getComputedStyle(node).backgroundColor);
+      await favorite.hover();
+      assert.notEqual(await favorite.evaluate(node => getComputedStyle(node).backgroundColor), resting);
       await settle(page);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     } finally { await page.context().close() }

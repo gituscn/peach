@@ -645,11 +645,11 @@ export function mountPlayerSpinner(player: VjsPlayer): void {
  *  一律不设 default：自动打开某一条等于替用户选了语言，而同一部片常有简体、繁体、日语三条。
  *  Peach 字幕菜单只在有轨的时候出现；轨道挂在原生 video 上，随同一枚元素保留。 */
 export function mountPlayerSubtitles(player: VjsPlayer, assetId: number): void {
-  (api(`/api/assets/${assetId}/subtitles`) as Promise<{ subtitles?: { playable?: boolean; src: string; language?: string; label: string }[] } | null>)
+  (api(`/api/assets/${assetId}/subtitles`) as Promise<{ subtitles?: { id: string; playable?: boolean; src: string; language?: string; label: string }[] } | null>)
     .then((payload) => {
       if (!player || player.isDisposed()) return;
       (payload?.subtitles || []).filter((track) => track.playable).forEach((track) => {
-        player.addRemoteTextTrack({ kind: 'subtitles', src: track.src, srclang: track.language || '', label: track.label, default: false }, true);
+        player.addRemoteTextTrack({ id: track.id, kind: 'subtitles', src: track.src, srclang: track.language || '', label: track.label, default: false }, true);
       });
     }).catch(() => {});
 }

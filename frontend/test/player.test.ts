@@ -119,14 +119,20 @@ describe('沉浸模式的每一格', () => {
       const record: (typeof made)[number] = { sources: [], disposed: false };
       made.push(record);
       const shell = document.createElement('div');
-      shell.append(video);
+      const container = document.createElement('media-container'); container.append(video); shell.append(container);
+      Object.defineProperty(video, 'textTracks', { value: Object.assign([], new EventTarget(), {
+        addEventListener: () => {}, removeEventListener: () => {},
+      }) });
+      const disposing: (() => void)[] = [];
       return {
+        on: (_event: string, handler: () => void) => { disposing.push(handler) },
+        addRemoteTextTrack: () => {},
         src: (source: unknown) => { record.sources.push(source) },
         one: (_event: string, handler: () => void) => { record.error = handler },
         el: () => shell,
         isDisposed: () => record.disposed,
         pause: () => {},
-        dispose: () => { record.disposed = true },
+        dispose: () => { record.disposed = true; disposing.forEach(handler => handler()) },
       } as unknown as VjsPlayer;
     });
     vi.spyOn(videojsLoader, 'ensureVideojs').mockResolvedValue(factory);
@@ -348,16 +354,16 @@ describe('画中画的快进快退', () => {
 describe('外挂字幕', () => {
   it('能播的轨全挂上，一条都不预先打开', async () => {
     stubFetch(() => ({ subtitles: [
-      { playable: true, src: '/sub/1.vtt', language: 'zh', label: '简体' },
-      { playable: false, src: '/sub/2.ass', language: 'ja', label: '日语' },
-      { playable: true, src: '/sub/3.vtt', label: '繁体' },
+      { id: 'sidecar:1', playable: true, src: '/sub/1.vtt', language: 'zh', label: '简体' },
+      { id: 'sidecar:2', playable: false, src: '/sub/2.ass', language: 'ja', label: '日语' },
+      { id: 'sidecar:3', playable: true, src: '/sub/3.vtt', label: '繁体' },
     ] }));
     const { player, raw } = fakePlayer({ time: 0, duration: 0 });
     mountPlayerSubtitles(player, 21);
     await flush(); await flush();
     expect(raw.addRemoteTextTrack.mock.calls).toEqual([
-      [{ kind: 'subtitles', src: '/sub/1.vtt', srclang: 'zh', label: '简体', default: false }, true],
-      [{ kind: 'subtitles', src: '/sub/3.vtt', srclang: '', label: '繁体', default: false }, true],
+      [{ id: 'sidecar:1', kind: 'subtitles', src: '/sub/1.vtt', srclang: 'zh', label: '简体', default: false }, true],
+      [{ id: 'sidecar:3', kind: 'subtitles', src: '/sub/3.vtt', srclang: '', label: '繁体', default: false }, true],
     ]);
   });
 });

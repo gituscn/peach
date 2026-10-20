@@ -480,6 +480,7 @@ def asset_subtitles(request: Request, id: int, args: dict[str, str] = Depends(re
     for index, row in enumerate(rows):
         note = _subtitle_note(state, asset, row)
         tracks.append({
+            "id": f"sidecar:{row['id']}",
             "index": index,
             "name": row["name"],
             "format": row["format"],

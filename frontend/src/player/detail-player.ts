@@ -32,6 +32,7 @@ import { ensureVideojs } from './videojs';
 export interface PlayerResume { time: number; autoplay: boolean }
 
 export interface DetailPlayerOptions {
+  playbackKey?: string;
   /** 给定片源（关注条目的 `/follow-stream`）；不给就按作品的来源解析。 */
   source?: PlayerSource;
   /** 播放出错时要不要查来源状态判脱盘。关注条目的片源不在本机来源里，不查。 */
@@ -107,6 +108,7 @@ export async function mountDetailPlayer(
   });
   setDetailPlayer(player);
   player.peachItem = item;
+  player.peachPlaybackKey = options.playbackKey || playbackKey('item', item);
   wirePlayerContextMenu(player);
   /* 手机上的画面格按视频自己的比例排（`--peach-video-ratio`）。 */
   player.on('loadedmetadata', () => {
@@ -340,7 +342,7 @@ export function mountPlayer(video: HTMLVideoElement, options: MountPlayerOptions
   const frame = options.chrome === false ? null : video.parentElement;
   if (frame) preparePlayerFrame(frame, video);
   const key = playbackKey(kind, item, media?.index ?? null);
-  let detail: DetailPlayerOptions = { resume: options.resume ?? { time: playbackPosition(key, item), autoplay: false } };
+  let detail: DetailPlayerOptions = { playbackKey: key, resume: options.resume ?? { time: playbackPosition(key, item), autoplay: false } };
   if (kind === 'follow') {
     detail = {
       ...detail,
