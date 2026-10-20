@@ -23,7 +23,10 @@ from functools import cache
 from pathlib import Path, PureWindowsPath
 from typing import Sequence
 
-from .catalog_rules import duration_clusters, is_jav_code, normalise_code_key
+from .catalog_rules import (
+    duration_clusters, is_jav_code, normalise_code_key, promo_free_key,
+    release_code_from_filename,
+)
 from .config import GENERATED_DIR, LOCATION_ROOT_DECLARATIONS
 from .field_owners import USER_MANUAL, write_owned_fields
 from .media_sources import SCANNABLE_LOCATIONS
@@ -156,6 +159,12 @@ JUNK_REVIEW_SCORE = 40
 #: `scripts/trash_junk.py --apply` 默认的自动移入回收站分数线。只能复核的证据
 #: （固定命名、未探测时长视频的目录与体积证据）单独凑不到这一档。
 AUTO_TRASH_SCORE = 60
+#: 极短附件的结构证据只进入复核：目录中须有同名长正片，且附件相对它足够短、小。
+SHORT_ATTACHMENT_SECONDS = 30
+SHORT_ATTACHMENT_BYTES = 32 * 1024**2
+SHORT_ATTACHMENT_CLUSTER = 3
+#: 「来源站名 + 序号」也用于正常短片；站点水印不能成为自动隔离依据。
+NUMBERED_SOURCE_VIDEO = re.compile(r"^(?:\[[^\]]+\]|【[^】]+】)[\s._-]*\d+(?:[\s._-]*\(\d+\))?$")
 PAGE_COMPONENT_SUFFIXES = frozenset({".js", ".css", ".aspx"})
 PAGE_CHROME_IMAGE = re.compile(r"^(?:banner(?:_[bs])?|1000x90(?:yunding)?|count\d*|logo|lan\d*|you|zuo|zuoxia)$", re.I)
 PAGE_PROMO_CLAIM = re.compile(r"(?:记住|記住).{0,12}(?:网址|網址)|(?:网址|網址).{0,8}(?:发布|發布)")
@@ -250,8 +259,17 @@ def _junk_rows(connection):
         (*SCANNABLE_LOCATIONS, JUNK_VIDEO_MAX_BYTES)).fetchall()
     # NFO 是媒体资料边车，不是等待清理的物理内容；即使名字或所在目录带推广词，
     # 也应由资料读取报告解析问题，不能进入会把文件移入回收站的垃圾队列。
-    return [row for row in rows if PureWindowsPath(
-        row["name"] or row["path"] or "").suffix.casefold() not in MEDIA_SIDECAR_SUFFIXES]
+    return [row for row in rows if _junk_file_eligible(row)]
+
+
+def _junk_file_eligible(row) -> bool:
+    """资料边车和文件自身带番号的分卷不属于垃圾附件。"""
+    item = PureWindowsPath(row["name"] or row["path"] or "")
+    if item.suffix.casefold() in MEDIA_SIDECAR_SUFFIXES:
+        return False
+    identity = PART_MARK.sub("", PROMO_DOMAIN.sub("", item.stem)).strip("@._- ")
+    return not (row["medium"] == "video" and PART_MARK.search(item.stem)
+                and release_code_from_filename(identity))
 
 
 def q_ads(contract: WebContract, limit=200, offset=0, kind="", status="pending"):
@@ -382,8 +400,68 @@ def _attachment_junk_reason(suffix: str, path: str, size: int) -> str:
     return ""
 
 
+def _short_attachment(row) -> bool:
+    """有测量值、没有自身作品身份或分卷标记的极短视频。"""
+    stem = PureWindowsPath(row["name"] or row["path"] or "").stem
+    owner = row["creator"] or ""
+    return (row["medium"] == "video"
+            and 0 < (row["duration"] or 0) <= SHORT_ATTACHMENT_SECONDS
+            and 0 < (row["size"] or 0) <= SHORT_ATTACHMENT_BYTES
+            and not (owner and not AD_DOMAIN.search(owner))
+            and not PART_MARK.search(stem)
+            and not release_code_from_filename(stem))
+
+
+def _release_main_videos(connection) -> dict[str, list[tuple[float, int]]]:
+    """按活动物理文件建立发行目录的长正片索引；普通混合目录不算发行目录。"""
+    mains: dict[str, list[tuple[float, int]]] = {}
+    marks = ",".join("?" for _ in SCANNABLE_LOCATIONS)
+    for path, duration, size in connection.execute(
+            "SELECT path,duration,size FROM asset WHERE disposal IS NULL AND medium='video' "
+            f"AND location IN ({marks}) AND duration>=1200 AND size>=? AND path IS NOT NULL",
+            (*SCANNABLE_LOCATIONS, JUNK_VIDEO_MAX_BYTES)):
+        item = PureWindowsPath(path)
+        key = promo_free_key(item.stem)
+        if key and key == promo_free_key(item.parent.name):
+            mains.setdefault(str(item.parent).casefold(), []).append((duration, size))
+    return mains
+
+
+def _short_attachment_reasons(connection, rows) -> dict[int, str]:
+    """从正片与附件的量级关系、同目录成群和跨发行目录扩散生成复核证据。
+
+    不读媒体，也不按题材、游戏名或推广词命中。相同测量值只是扩散线索，不能证明内容相同。
+    """
+    mains = _release_main_videos(connection)
+    folders: dict[str, set[str]] = {}
+    signatures: dict[tuple, set[str]] = {}
+    candidates = []
+    for row in rows:
+        if not _short_attachment(row):
+            continue
+        path = PureWindowsPath(row["path"] or "")
+        folder = str(path.parent).casefold()
+        if not any(duration >= row["duration"] * 40 and size >= row["size"] * 10
+                   for duration, size in mains.get(folder, ())):
+            continue
+        signature = (row["size"], round(row["duration"], 3), row["width"], row["height"])
+        folders.setdefault(folder, set()).add(str(path).casefold())
+        if (row["width"] or 0) > 0 and (row["height"] or 0) > 0:
+            signatures.setdefault(signature, set()).add(folder)
+        candidates.append((row["id"], folder, signature))
+    reasons = {}
+    for asset_id, folder, signature in candidates:
+        count = len(folders[folder])
+        spread = len(signatures.get(signature, ()))
+        if count >= SHORT_ATTACHMENT_CLUSTER:
+            reasons[asset_id] = f"同目录长正片旁有 {count} 条极短小附件，须核验内容"
+        elif spread >= SHORT_ATTACHMENT_CLUSTER:
+            reasons[asset_id] = f"同体积、时长与分辨率的极短附件散布在 {spread} 个发行目录，须核验内容"
+    return reasons
+
+
 def _video_evidence(row, stem: str, longer: dict, promo_dir: bool,
-                    directory_points: int) -> tuple[int, int, list[str]]:
+                    directory_points: int, attachment_reason: str = "") -> tuple[int, int, list[str]]:
     """视频自己的证据：同番号完整版、时长、体积与推广目录。
 
     返回（分数，其中只够复核的分数，理由）。时长没探测到的视频可能就是正片：
@@ -409,7 +487,13 @@ def _video_evidence(row, stem: str, longer: dict, promo_dir: bool,
         # 要再叠一条时长或体积证据才到门槛。
         score += 30; context += 30; why.append("住在推广目录")
     probed = duration is not None and duration > 0
-    return score, 0 if probed else context, why
+    review_only = 0 if probed else context
+    if NUMBERED_SOURCE_VIDEO.fullmatch(stem) and PROMO_DOMAIN.search(stem):
+        review_only += AUTO_TRASH_SCORE
+        why.append("编号视频可能只有来源水印，须核验内容")
+    if attachment_reason:
+        score += JUNK_REVIEW_SCORE; review_only += JUNK_REVIEW_SCORE; why.append(attachment_reason)
+    return score, review_only, why
 
 
 def _scored_junk(contract: WebContract) -> tuple[list[dict], frozenset[int]]:
@@ -429,6 +513,7 @@ def _scored_junk(contract: WebContract) -> tuple[list[dict], frozenset[int]]:
         )]
         dismissed_ids = {int(key) for key in dismissed_keys if key.isdigit()}
         folder_assets, folder_videos = _folder_index(c)
+        short_attachments = _short_attachment_reasons(c, rows)
     # 每个目录里挂着推广名的候选有多少个；插页判据要看它有没有同伙。
     promo_neighbours = _promo_neighbour_counts(rows)
     out = []
@@ -516,7 +601,8 @@ def _scored_junk(contract: WebContract) -> tuple[list[dict], frozenset[int]]:
             elif promo_dir:
                 s += 50; why.append("住在推广目录")
         if d.get("medium") == "video":
-            points, weak, reasons = _video_evidence(d, nm, longer, promo_dir, directory_points)
+            points, weak, reasons = _video_evidence(
+                d, nm, longer, promo_dir, directory_points, short_attachments.get(d["id"], ""))
             s += points; review_only += weak; why.extend(reasons)
         # 有真实创作者归属、且名字剥完仍有实质描述的，是被打了水印的正片，不是广告。
         if real_owner and residue >= 14 and not (attachment_reason or name_reason):
