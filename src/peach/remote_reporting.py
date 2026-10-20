@@ -18,8 +18,8 @@ from urllib.parse import urlsplit
 from .reporting_identity import event_metadata
 
 FIELDS = {
-    "usage": "Peach 版本、操作系统类型；每天最多一次，不含安装标识。",
-    "errors": "Peach 版本、系统类型、Python 版本、CPU 架构、故障环节、异常链、Peach 代码文件名/函数名/行号、结构化错误码、媒体工具故障类别、HTTP 方法/路由模板/关联错误编号、同类故障次数与统计日期；首次立即上传，重复次数每小时或退出时合并，每天最多 20 批。",
+    "usage": "Peach 版本、操作系统类型、运行环境与公开构建编号；每天最多一次，不含安装标识。",
+    "errors": "Peach 版本、运行环境与公开构建编号、系统类型、Python 版本、CPU 架构、故障环节、异常链、Peach 与白名单框架的代码文件名/函数名/行号、结构化错误码、媒体工具故障类别、浏览器白名单异常类型与正式脚本构建映射、HTTP 方法/路由模板/关联错误编号、同类故障次数与统计日期；首次立即上传，重复次数每小时或退出时合并，每天最多 20 批。",
 }
 NOTICE = "发送至 Sentry。不上报错误原文、完整日志、诊断 ZIP、媒体名称、路径、网址、观看记录或凭据。接收服务会接触连接 IP；关闭后停止新发送，已发送的信息无法撤回。"
 _lock = threading.RLock()
@@ -168,9 +168,13 @@ def _new_client(target, *, envelope_gate=None, delivery_callback=None):
 
     def final_event(event, _hint):
         # SDK 的服务器名、上下文、SDK 包清单和全局 scope 均不进入发送载荷。
-        return {key: value for key, value in event.items() if key in {
+        result = {key: value for key, value in event.items() if key in {
             "event_id", "timestamp", "platform", "release", "environment", "dist", "level", "message", "tags", "exception", "extra",
         }}
+        from .diagnostic_browser import clean_debug_meta
+        if event.get("platform") == "javascript" and (metadata := clean_debug_meta(event.get("debug_meta"))):
+            result["debug_meta"] = metadata
+        return result
 
     return Client(dsn=target, transport=transport_class(gate, delivery_callback), default_integrations=False,
                   auto_enabling_integrations=False, auto_session_tracking=False,
@@ -254,6 +258,7 @@ def send(kind, event, config=None):
             _schedule_frequency(config)
         elif _reserve(config, kind, event):
             _submit(kind, event, config, current, target)
+        return True
     except Exception:
         # 不能把遥测自身故障写回错误钩子而递归发送。
         pass
@@ -280,26 +285,8 @@ def _http_status(error):
 
 
 def _exception_details(error):
-    frames, codes, chain = [], {}, []
-    current, visited = error, set()
-    while current is not None and id(current) not in visited and len(chain) < 8:
-        visited.add(id(current))
-        chain.append(type(current).__name__)
-        for key in ("errno", "winerror", "returncode"):
-            value = getattr(current, key, None)
-            if type(value) is int:
-                codes[key] = value
-        if (status := _http_status(current)) is not None:
-            codes["status_code"] = status
-        tb = current.__traceback__
-        while tb is not None and len(frames) < 40:
-            filename = Path(tb.tb_frame.f_code.co_filename)
-            if filename.parent.name == "peach":
-                frames.append({"filename": filename.name, "lineno": tb.tb_lineno,
-                               "function": tb.tb_frame.f_code.co_name})
-            tb = tb.tb_next
-        current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
-    return frames, codes, chain
+    from .diagnostic_exceptions import project
+    return project(error, _http_status)
 
 
 def _media_details(error, fields, codes):
@@ -381,30 +368,20 @@ def _http_details(stage, fields):
     return tags, error_id
 
 
-def _browser_frames(stack):
-    frames = []
-    pattern = r"(peach-(?:app|pages)\.js)(?:\?[^\s):]*)?:(\d+):(\d+)"
-    for line in str(stack).splitlines()[:80]:
-        if "chrome-extension://" in line or "moz-extension://" in line:
-            continue
-        for name, row, column in re.findall(pattern, line):
-            frames.append({"filename": name, "lineno": int(row), "colno": int(column)})
-    return frames[:20]
-
-
-def capture(stage, error=None, **fields):
-    """只投影代码位置和错误类别，不发送异常文本或日志文本。"""
-    if not _actionable(stage, error, fields):
-        return
+def _technical_projection(stage, error, fields):
+    """投影各入口的故障证据，排除缺少定位信息与已知媒体输入条件的记录。"""
     media_stage = stage in MEDIA_STAGES
     if error is None and stage != "browser" and not media_stage:
         return
-    frames, codes, chain = _exception_details(error)
+    values, codes, _chain = _exception_details(error)
+    debug_meta = None
     if error is None and stage == "browser":
-        frames = _browser_frames(fields.get("stack", ""))
-        if not frames:
+        from .diagnostic_browser import project
+        value, debug_meta = project(fields)
+        if not value["stacktrace"]["frames"]:
             return
-    if stage == "logging" and not frames:
+        values = [value]
+    if stage == "logging" and not any("module" not in frame for value in values for frame in value["stacktrace"]["frames"]):
         return
     for key in ("returncode", "status_code"):
         if type(fields.get(key)) is int:
@@ -416,16 +393,39 @@ def capture(stage, error=None, **fields):
             return
         if not reason and not codes and error is None:
             return
-    category = type(error).__name__ if error is not None else ("BrowserError" if stage == "browser" else "LogError")
+    category = type(error).__name__ if error is not None else ("BrowserError" if stage == "browser" else "MediaToolError")
+    if not values:
+        values = [{"type": category, "value": reason or category, "stacktrace": {"frames": []}}]
+    return values, codes, reason, debug_meta
+
+
+def capture(stage, error=None, **fields):
+    """只投影代码位置和错误类别，不发送异常文本或日志文本。"""
+    if not _actionable(stage, error, fields):
+        return
+    capture_key = (os.getpid(), id(error.__traceback__)) if error is not None else None
+    if error is not None and getattr(error, "_peach_remote_capture", None) == capture_key:
+        return
+    projection = _technical_projection(stage, error, fields)
+    if projection is None:
+        return
+    values, codes, reason, debug_meta = projection
     http, error_id = _http_details(stage, fields)
     event = {"level": "error", "tags": {"os": platform.system(),
         "python": platform.python_version(), "architecture": platform.machine(), "stage": stage,
         **http, **{key: str(value) for key, value in codes.items()}, **({"media_failure": reason} if reason else {})},
-        "exception": {"values": [{"type": category, "value": " / ".join(chain) or reason or category,
-                                    "stacktrace": {"frames": frames}}]}}
+        "exception": {"values": values}}
+    if stage == "browser":
+        event["platform"] = "javascript"
+        if debug_meta:
+            event["debug_meta"] = debug_meta
     if error_id:
         event["event_id"] = error_id
-    send("errors", event)
+    if send("errors", event) and error is not None:
+        try:
+            error._peach_remote_capture = capture_key
+        except (AttributeError, TypeError):
+            pass
 
 
 def disable_for_process():

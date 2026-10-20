@@ -7,6 +7,16 @@ const initial: LibrarySharingState = { enabled: false, available: true, schema: 
   fields: ['作品编号、标签、评分与全部偏好维度'], notice: '匿名处理后上传馆藏与各类偏好明细。' };
 
 describe('馆藏与口味分享的明确同意', () => {
+  it.each([
+    [{ status: 'waiting-data', attempted: false }, '等待可分析的馆藏或偏好数据。'],
+    [{ status: 'failed', attempted: false }, '馆藏与口味上传未完成，将自动重新准备。'],
+    [{ status: 'failed', attempted: true }, '馆藏与口味上传失败，本周不再发送。'],
+    [{ status: 'unknown', attempted: true }, '未取得上传结果，本周不再发送。'],
+  ])('按实际发送状态显示反馈 %j', async (last_attempt, message) => {
+    const host = await mount(<LibrarySharingSettings initial={{ ...initial, enabled: true, last_attempt }} receipt={vi.fn()} />);
+    expect(host.textContent).toContain(message);
+  });
+
   it('开关始终可见，上传预览和明确同意完整后才能开启', async () => {
     const fetcher = vi.fn(async (url: string) => ({ ok: true, json: async () => url.endsWith('/preview')
       ? { data: { library: [{ code: 'EXM-001' }], preferences: {}, coverage: { uncoded_items: 0 } }, bytes: 80, token: 'preview-token', schema: 4 }

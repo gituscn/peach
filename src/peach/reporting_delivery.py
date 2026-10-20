@@ -1,5 +1,6 @@
 """诊断通道的本机传输回执，不保存载荷或服务端错误正文。"""
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 
 from filelock import FileLock
@@ -11,6 +12,14 @@ REASONS = {"network", "http_status", "rate_limit", "queue_full", "consent", "dis
 
 
 def record(permit, event_id, result):
+    try:
+        _record(permit, event_id, result)
+    except Exception:
+        # 本机回执不可写不能阻止原本获准的诊断，也不能触发错误钩子。
+        pass
+
+
+def _record(permit, event_id, result):
     from .remote_reporting import _consent, _read
     if not isinstance(permit, dict) or permit.get("kind") not in {"usage", "errors"}:
         return
@@ -24,10 +33,14 @@ def record(permit, event_id, result):
     state_path = path.with_name("remote-reporting-delivery.json")
     state_path.parent.mkdir(parents=True, exist_ok=True)
     with FileLock(str(state_path) + ".lock", timeout=.1):
+        current = _consent(path)
+        if current["revision"] != permit.get("revision") or not current[permit["kind"]]:
+            return
         state = _read(state_path)
         if state.get("revision") != current["revision"]:
             state = {"revision": current["revision"]}
         previous = state.get(permit["kind"], {})
+        previous = previous if isinstance(previous, dict) else {}
         if status != "queued" and previous.get("event_id") != event_id:
             return
         row = {"status": status, "event_id": event_id, "at": datetime.now(timezone.utc).isoformat()}
@@ -37,7 +50,6 @@ def record(permit, event_id, result):
         if type(code) is int and 100 <= code <= 599:
             row["status_code"] = code
         state[permit["kind"]] = row
-        import json
         atomic_write_text(state_path, json.dumps(state))
 
 

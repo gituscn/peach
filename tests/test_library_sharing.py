@@ -357,7 +357,7 @@ class LibrarySharingTests(unittest.TestCase):
                        {'status': 'failed', 'status_code': 403, 'reason': 'http_status'},
                        {'status': 'unknown', 'reason': 'network'}):
             sharing._state_path(self.config).unlink(missing_ok=True)
-            def make_client(*_args, envelope_gate, delivery_callback):
+            def make_client(*_args, envelope_gate, delivery_callback, result=result):
                 def capture(*_args, **_kwargs):
                     self.assertTrue(envelope_gate(self.envelope()))
                     delivery_callback({**result, 'url': 'private-url', 'detail': 'private-content'})
@@ -393,7 +393,6 @@ class LibrarySharingTests(unittest.TestCase):
         self.assertNotIn('reason', self.attempt_state())
 
     def test_real_sdk_http_receipt_controls_local_research_status(self):
-        from sentry_sdk.transport import HttpTransport
         self.add_work()
         self.enable()
         for status, headers, expected in ((200, {}, 'accepted'), (413, {}, 'failed'), (429, {}, 'failed'),
@@ -402,7 +401,7 @@ class LibrarySharingTests(unittest.TestCase):
                 sharing._state_path(self.config).unlink(missing_ok=True)
                 response = SimpleNamespace(status=status, headers=headers, close=mock.Mock(), data=b'private')
                 with mock.patch.dict(os.environ, {'PEACH_REPORTING_TEST_MODE': '0'}), \
-                        mock.patch.object(HttpTransport, '_request', return_value=response,
+                        mock.patch('urllib3.PoolManager.request', return_value=response,
                             side_effect=OSError('private proxy') if status is None else None) as request:
                     self.service.attempt()
                     self.service.attempt()

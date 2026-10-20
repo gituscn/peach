@@ -76,6 +76,20 @@ class ErrorReportingTests(unittest.TestCase):
         self.assertTrue(all(json.loads(line)['asset_id'] == 23 for line in text.splitlines()))
         self.assertTrue(next(row for row in report['logs'] if row['name'] == path.name)['truncated'])
 
+    def test_support_bundle_contains_local_delivery_receipts_without_research_payloads(self):
+        from peach.settings_file import PeachConfig
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True)
+        state = config.directory('state')
+        state.mkdir(parents=True)
+        (state / 'remote-reporting-delivery.json').write_text(json.dumps({'errors': {'status': 'accepted', 'status_code': 200}}))
+        (state / 'library-sharing-attempt.json').write_text(json.dumps({'status': 'unknown', 'attempted': True}))
+        (state / 'remote-reporting-frequency.json').write_text('private-technical-sample')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes(config=config))) as archive:
+            self.assertEqual(json.loads(archive.read('processing/remote-reporting-delivery.json'))['errors']['status'], 'accepted')
+            self.assertEqual(json.loads(archive.read('processing/library-sharing-attempt.json'))['status'], 'unknown')
+            self.assertNotIn('processing/remote-reporting-frequency.json', archive.namelist())
+
     def test_bundle_contains_update_tunnel_rotated_and_startup_evidence_with_invalid_config(self):
         from peach import settings_file
         self.logs.mkdir()

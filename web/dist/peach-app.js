@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "970d2958-dec1-4fc7-a87b-0bdba852d7c9", e._sentryDebugIdIdentifier = "sentry-dbid-970d2958-dec1-4fc7-a87b-0bdba852d7c9");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "18847759-1e92-447c-862a-d2db1459b8d7", e._sentryDebugIdIdentifier = "sentry-dbid-18847759-1e92-447c-862a-d2db1459b8d7");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -75862,7 +75862,15 @@ function LIe({ initial: e, receipt: t }) {
 		}),
 		n.enabled && n.last_attempt?.status === "failed" ? /* @__PURE__ */ (0, D.jsx)(pA, {
 			divided: !0,
-			children: /* @__PURE__ */ (0, D.jsx)(gA, { children: "馆藏与口味上传失败，自动重试。" })
+			children: /* @__PURE__ */ (0, D.jsx)(gA, { children: n.last_attempt.attempted ? "馆藏与口味上传失败，本周不再发送。" : "馆藏与口味上传未完成，将自动重新准备。" })
+		}) : null,
+		n.enabled && n.last_attempt?.status === "waiting-data" ? /* @__PURE__ */ (0, D.jsx)(pA, {
+			divided: !0,
+			children: /* @__PURE__ */ (0, D.jsx)(hA, { children: "等待可分析的馆藏或偏好数据。" })
+		}) : null,
+		n.enabled && n.last_attempt?.status === "unknown" ? /* @__PURE__ */ (0, D.jsx)(pA, {
+			divided: !0,
+			children: /* @__PURE__ */ (0, D.jsx)(hA, { children: "未取得上传结果，本周不再发送。" })
 		}) : null,
 		i ? /* @__PURE__ */ (0, D.jsxs)(pA, {
 			divided: !0,
@@ -114931,4 +114939,4 @@ Abt(jbt);
 //#endregion
 export { JT as applyTheme, $O as peachHistory, Go as popCount, igt as showToast };
 
-//# debugId=970d2958-dec1-4fc7-a87b-0bdba852d7c9
+//# debugId=18847759-1e92-447c-862a-d2db1459b8d7

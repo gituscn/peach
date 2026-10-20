@@ -40,10 +40,11 @@ def transport_class(gate, callback):
             except Exception:
                 pass
 
-        def _request(self, *args, **kwargs):
+        def _request(self, method, endpoint_type, body, headers):
             if os.environ.get("PEACH_REPORTING_TEST_MODE") == "1":
                 raise OSError("测试进程禁止远程诊断外发")
-            return super()._request(*args, **kwargs)
+            return self._pool.request(method, self._auth.get_api_url(endpoint_type), body=body,
+                                      headers=headers, retries=False, redirect=False)
 
         def _send_envelope(self, envelope):
             self._context(envelope)
@@ -79,6 +80,8 @@ def transport_class(gate, callback):
         def on_dropped_event(self, reason):
             super().on_dropped_event(reason)
             if reason in {"full_queue", "self_rate_limits"}:
+                if reason == "self_rate_limits":
+                    self._outcome = True
                 self._notify("failed", "queue_full" if reason == "full_queue" else "rate_limit")
 
     return ReportingTransport

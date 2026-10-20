@@ -21,6 +21,8 @@ class ReportingTransportTests(unittest.TestCase):
         self.enterContext(mock.patch.object(reporting, "_disabled", False))
         self.enterContext(mock.patch("peach.settings_file.active", return_value=self.config))
         self.enterContext(mock.patch.dict(os.environ, {"PEACH_REPORTING_TEST_MODE": "0"}))
+        reporting.close()
+        self.addCleanup(reporting.close)
 
     def envelope(self):
         from sentry_sdk.envelope import Envelope
@@ -35,7 +37,6 @@ class ReportingTransportTests(unittest.TestCase):
         return client
 
     def test_actual_http_status_and_network_uncertainty_have_distinct_receipts(self):
-        from sentry_sdk.transport import HttpTransport
         for status, headers, expected in ((200, {}, "accepted"), (202, {}, "accepted"),
                 (200, {"x-sentry-rate-limits": "60:error:organization"}, "unknown"),
                 (429, {}, "failed"), (413, {}, "failed"), (500, {}, "failed")):
@@ -43,23 +44,24 @@ class ReportingTransportTests(unittest.TestCase):
                 outcomes = []
                 client = self.client(outcomes)
                 response = SimpleNamespace(status=status, headers=headers, close=mock.Mock(), data=b"private")
-                with mock.patch.object(HttpTransport, "_request", return_value=response):
+                with mock.patch('urllib3.PoolManager.request', return_value=response) as request:
                     client.transport._send_envelope(self.envelope())
+                self.assertIs(request.call_args.kwargs['retries'], False)
+                self.assertIs(request.call_args.kwargs['redirect'], False)
                 self.assertEqual(outcomes[-1]["status"], expected)
                 self.assertEqual(outcomes[-1]["status_code"], status)
                 self.assertNotIn("private", str(outcomes))
         outcomes = []
-        with mock.patch.object(HttpTransport, "_request", side_effect=OSError("private proxy")):
+        with mock.patch('urllib3.PoolManager.request', side_effect=OSError("private proxy")):
             with self.assertRaises(OSError):
                 self.client(outcomes).transport._send_envelope(self.envelope())
         self.assertEqual(outcomes, [{"status": "unknown", "reason": "network"}])
 
     def test_test_mode_blocks_the_base_http_request_even_with_a_valid_dsn(self):
-        from sentry_sdk.transport import HttpTransport
         outcomes = []
         client = self.client(outcomes)
         with mock.patch.dict(os.environ, {"PEACH_REPORTING_TEST_MODE": "1"}), \
-                mock.patch.object(HttpTransport, "_request") as network:
+                mock.patch('urllib3.PoolManager.request') as network:
             with self.assertRaises(OSError):
                 client.transport._send_envelope(self.envelope())
             network.assert_not_called()
@@ -106,3 +108,41 @@ class ReportingTransportTests(unittest.TestCase):
                 mock.patch.object(reporting_identity, "frozen_build", return_value=SimpleNamespace(commit="bad")), \
                 mock.patch.dict(os.environ, {"PEACH_REPORTING_ENVIRONMENT": "production"}):
             self.assertNotIn("dist", reporting_identity.event_metadata("research"))
+
+    def test_unwritable_local_receipt_does_not_block_event_submission(self):
+        reporting.save({"usage": True, "errors": True}, self.config)
+        client = mock.Mock()
+        with mock.patch.object(reporting, '_new_client', return_value=client), \
+                mock.patch.object(reporting_delivery, 'atomic_write_text', side_effect=PermissionError('read only')), \
+                mock.patch.object(reporting, 'dsn', return_value=DSN):
+            reporting._submit('usage', {'message': 'Peach started'}, self.config, reporting.consent(self.config), DSN)
+        client.capture_event.assert_called_once()
+        reporting.close()
+
+    def test_sdk_rate_limit_receipt_is_not_overwritten_with_unknown(self):
+        from datetime import datetime, timedelta, timezone
+        outcomes = []
+        client = self.client(outcomes)
+        client.transport._disabled_until[None] = datetime.now(timezone.utc) + timedelta(seconds=60)
+        with mock.patch('urllib3.PoolManager.request') as network:
+            client.transport._send_envelope(self.envelope())
+            network.assert_not_called()
+        self.assertEqual(outcomes, [{'status': 'failed', 'reason': 'rate_limit'}])
+
+    def test_consent_is_rechecked_inside_delivery_file_lock(self):
+        reporting.save({"usage": True, "errors": True}, self.config)
+        permit = {'kind': 'errors', 'revision': reporting.consent(self.config)['revision'],
+                  'consent': str(self.config.directory('state') / 'remote-reporting.json')}
+        original = reporting._consent
+        count = 0
+
+        def racing_consent(path):
+            nonlocal count
+            count += 1
+            if count == 2:
+                reporting.save({'usage': False, 'errors': False}, self.config)
+            return original(path)
+
+        with mock.patch.object(reporting, '_consent', side_effect=racing_consent):
+            reporting_delivery.record(permit, 'a' * 32, {'status': 'queued'})
+        self.assertEqual(reporting_delivery.snapshot(self.config), {})
