@@ -17,6 +17,42 @@ from tests.support.gitrepo import seed_repository
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class NpmInstallTests(unittest.TestCase):
+    def test_transport_errors_retry_the_same_locked_install(self):
+        from scripts import npm_ci
+        for style in ("error", "ERR!"):
+            for code in ("ECONNRESET", "ETIMEDOUT", "EAI_AGAIN"):
+                with self.subTest(style=style, code=code):
+                    interrupted = subprocess.CompletedProcess([], 152, "", f"npm {style} code {code}\n")
+                    clean = subprocess.CompletedProcess([], 0, "installed\n", "")
+                    run, sleep = mock.Mock(side_effect=[interrupted, clean]), mock.Mock()
+                    self.assertEqual(npm_ci.install(ROOT, ignore_scripts=True, runner=run, sleep=sleep), 0)
+                    self.assertEqual(run.call_count, 2)
+                    self.assertEqual(run.call_args_list[0], run.call_args_list[1])
+                    self.assertIn("--ignore-scripts", run.call_args.args[0])
+                    self.assertEqual(run.call_args.kwargs["cwd"], ROOT)
+                    sleep.assert_called_once_with(5)
+
+    def test_transport_exhaustion_keeps_the_failure(self):
+        from scripts import npm_ci
+        run = mock.Mock(return_value=subprocess.CompletedProcess([], 152, "", "npm error code ECONNRESET\n"))
+        sleep = mock.Mock()
+        self.assertEqual(npm_ci.install(ROOT, runner=run, sleep=sleep), 152)
+        self.assertEqual(run.call_count, 3)
+        self.assertEqual(sleep.call_args_list, [mock.call(5), mock.call(10)])
+
+    def test_lock_and_lifecycle_failures_are_not_retried(self):
+        from scripts import npm_ci
+        for code in ("EUSAGE", "ELIFECYCLE", "EINTEGRITY"):
+            with self.subTest(code=code):
+                run = mock.Mock(return_value=subprocess.CompletedProcess(
+                    [], 1, "a lifecycle mentioned ECONNRESET", f"npm error code {code}\n"))
+                sleep = mock.Mock()
+                self.assertEqual(npm_ci.install(ROOT, runner=run, sleep=sleep), 1)
+                run.assert_called_once()
+                sleep.assert_not_called()
+
+
 class NpmAuditTests(unittest.TestCase):
     def test_docker_dependency_updates_have_a_takeover_recipe(self):
         for manifest in ('Dockerfile', '.github/actions/actionlint/Dockerfile'):

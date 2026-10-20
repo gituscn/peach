@@ -69,8 +69,8 @@ uv sync --locked --all-extras --python "$python"
 python="$root/.venv/bin/python"
 "$python" -c 'import platform,sys; assert platform.machine() == sys.argv[1], (platform.machine(),sys.argv[1])' "$architecture"
 uv pip check --python "$python"
-npm ci
-npm ci --prefix frontend
+"$python" -X utf8 scripts/npm_ci.py --ignore-scripts
+"$python" -X utf8 scripts/npm_ci.py --prefix frontend
 
 if [[ "$mode" == verify ]]; then
     npm run build --prefix frontend

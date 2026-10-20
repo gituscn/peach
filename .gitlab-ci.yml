@@ -29,6 +29,7 @@ verify-linux:
   rules:
     - if: '$CI_COMMIT_BRANCH || $CI_PIPELINE_SOURCE == "merge_request_event"'
   cache:
+    when: always
     key:
       files: [uv.lock, frontend/package-lock.json]
     paths: [.uv-cache/, .npm/]
@@ -37,8 +38,8 @@ verify-linux:
     - apt-get install -y --no-install-recommends python3-pip chromium ffmpeg xvfb xauth
     - python3 -m pip install --break-system-packages uv==0.13.3
     - uv sync --locked --all-extras --python 3.14
-    - npm ci --ignore-scripts --prefer-offline
-    - npm --prefix frontend ci --prefer-offline
+    - python3 -X utf8 scripts/npm_ci.py --ignore-scripts
+    - python3 -X utf8 scripts/npm_ci.py --prefix frontend
     - export PEACH_E2E_CHROME=/usr/bin/chromium
     - test -x "$PEACH_E2E_CHROME"
     - ffmpeg -version
