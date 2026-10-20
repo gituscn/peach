@@ -268,8 +268,9 @@ _HOME_DIRECTORY = (r"(?<!\w)[\\/](?:Users|home)[\\/]"
 
 #: mDNS 主机名 `<名字>.local`。只放行三个有文档意义的占位：默认名 `peach` 与讲双机布局用的
 #: `peach-writer`／`peach-reader`。`self.local`／`this.local` 是属性名与后缀同形，不算主机名；
+#: `threading.local()` 是标准库调用；同名主机地址仍按机器坐标检查。
 #: `<mounts.local>` 是占位；`settings.local.json`、`_tcp.local.` 后面还有段，都不是主机名。
-_MDNS_HOST = (r"(?<![\w<-])(?!(?:self|this|peach|peach-writer|peach-reader)\.local\b)"
+_MDNS_HOST = (r"(?<![\w<-])(?!(?:self|this|peach|peach-writer|peach-reader)\.local\b|threading\.local\s*\()"
               r"[a-z0-9-]+\.local\b(?![.\w])")
 
 #: RFC 1918 私网地址；`10.` 段收尾要词边界，Windows 版本号 `10.0.26200.1234` 才不会被算进去。
@@ -532,14 +533,14 @@ class MachineCoordinateTests(unittest.TestCase):
                        "review_writer_origin = 'https://10.0.0.5'", "172.31.112.1",
                        r"C:\Users\alice\Desktop\peach", "/Users/alice/Desktop/peach",
                        "/home/alice/peach", "smb://alice@alice-mbp.local/peach-sync",
-                       "peach-two.local", "https://Alice-PC.local/"):
+                       "peach-two.local", "https://Alice-PC.local/", "https://threading.local/"):
             self.assertTrue(MACHINE_COORDINATE.search(sample), sample)
         for allowed in ("127.0.0.1", "0.0.0.0", "224.0.0.251", "198.18.0.1",
                         "192.0.2.2", "198.51.100.162", "203.0.113.1",
                         "peach.local", "peach-writer.local", "peach-reader.local",
                         "https://<writer>.local", "<mounts.local>/x",
                         ".claude/settings.local.json", "_https._tcp.local.",
-                        "copy_database(self.shared, self.local)", "peach-sync",
+                        "copy_database(self.shared, self.local)", "threading.local()", "peach-sync",
                         r"C:\Users\<user>\Desktop\peach", "~/Desktop/<用户目录>/peach",
                         r"C:\Users\RUNNER~1\AppData\Local\Temp", "/home/runner/work",
                         "https://www.pixiv.net/users/93812377",
