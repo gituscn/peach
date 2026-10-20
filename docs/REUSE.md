@@ -478,6 +478,10 @@ A 盘同父目录改名复用 CloudDrive 官方 `RenameFile`；跨父且改名�
 
 推广网页资源目录中的横幅、标志和导航图片由 `web_batch._attachment_junk_reason` 进入复核队列。判据同时要求 `_files`、网址推广套话、域名、导航元素文件名和体积上限；继承的作品番号不豁免网页导航图片，作品图片、字幕、NFO 与普通 `_files` 目录保留。固定命名的推广附件（安装包、宣传视频、二维码卡片、下载站横幅）按扩展名、体积上限与整名收在词库 `resources/junk/promo_attachment_names.json`，由 `web_batch._promo_name_reason` 读取；命中只计复核档 `JUNK_REVIEW_SCORE`，未探测时长视频的推广目录、推广创作者位与体积证据同样只到复核档，这类分数单独凑不到 `trash_junk.py` 默认的自动移入回收站门槛 `AUTO_TRASH_SCORE`，不凭名称移入回收站或删除。永久删除仍走 `trash_junk.py --purge --review-csv` 和 `purge_assets`。
 
+极短视频附件复用同一垃圾复核评分、`promo_free_key` 的名称比较和 `release_code_from_filename` 的自身番号识别。发行目录须有与目录同名、至少 20 分钟且至少 120 MiB 的活动物理正片；附件须有有效测量值、不超过 30 秒与 32 MiB，正片至少为附件时长的 40 倍、体积的 10 倍。同目录至少 3 条此类附件，或相同体积、毫秒时长与有效分辨率的附件分布在至少 3 个发行目录，才计结构证据。真实创作者归属、自身番号、分卷、独立短动画与普通混合目录受保护；目录继承的番号不能证明附件身份。结构证据只够复核，短、小或同测量值都不能单独证明是广告，默认自动隔离线不接收仅由这些证据凑分的候选。查询只读账本，不读取云盘媒体，不新增依赖。
+
+带站点水印的文件名先核对自身番号与分卷标记，明确分卷排除在垃圾队列外；「方括号来源站名 + 序号」视频只计复核证据，避免把短片的打包水印当作广告。画面取证可复用已有 FFmpeg 抽帧与 `scripts/windows_ocr.ps1`；本机复核先使用缓存缩略图。现有 `opencv-python-headless==5.0.0.93`（Apache-2.0，vision 可选组）提供 [QRCodeDetector](https://docs.opencv.org/4.7.0/de/dc3/classcv_1_1QRCodeDetector.html)，只能定位或解码二维码，不能证明整片是广告；[Windows OcrEngine](https://learn.microsoft.com/en-us/uwp/api/windows.media.ocr.ocrengine.trycreatefromlanguage) 依赖 Windows 与已安装的识别语言。两者均不放进列表请求的同步评分路径，避免平台依赖、图片读取及文字识别失败影响复核队列；内容结论写入仓库外的逐文件复核产物。
+
 普通作品图片和 `images.rar` 保留。CloudDrive WebDAV 的小文件删除复用原生 `Path.unlink`：同目录隔离改名报 WinError 50 时，最多 1 MiB 的文件先用标准库 `shutil.copyfile` 完整备份到 `generated/purge-staging/`，记录原路径、大小和 SHA256，再删除。数据库失败时恢复备份，提交后清退；大文件继续报告阻塞。该路径没有新增依赖，备份和恢复只由 `purge_assets` 管理。
 
 英文媒体文件名分词复用 `wordninja-enhanced==3.2.0`（MIT，2026-09-04 发布，Python ≥3.9，纯 Python，wheel 11.4 MB，无传递依赖）。源码经 `opensrc path pypi:wordninja-enhanced@3.2.0` 读取；原版 wordninja 的发布较旧，增强版提供标点保留和可补充词典。`space_media_names.py` 先出逐文件复核 CSV，只插入空格，保留序号、字符与扩展名，不推断人物或出处；指定目录内的真实文件核验后复用 `organize.apply_plan`、SQLite 备份及回滚日志。领域词汇在 `english_filename_words.txt`（置顶加权，条目宜少：每多一条都会压低 `a`、`of` 等高频词），常被误当成单词的拼接串在 `english_filename_nonwords.txt` 里移出词频表。撇号缩写、全大写缩写、域名与站点编号、十六进制 viewkey 不拆；西里尔形近字母按拉丁字母算切点、原字符保留。已执行批次用 `--recompute-batch <日志>` 按原名重算出复核 CSV，再走 `--apply --review-csv`。

@@ -7,6 +7,7 @@ import sqlite3
 import tempfile
 import unittest
 from contextlib import closing
+from pathlib import Path
 from unittest import mock
 
 from peach import web_batch
@@ -156,7 +157,7 @@ class ResourceJunkQueueTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.db_path = fresh_ledger(self.temporary.name)
+        self.db_path = fresh_ledger(Path(self.temporary.name).resolve())
         self.contract = WebContract(self.db_path)
 
     def add(self, asset_id, location, path, medium, size=1000, duration=None,
@@ -217,6 +218,104 @@ class ResourceJunkQueueTests(unittest.TestCase):
             self.assertIn("游戏下载站推广视频", row["why"])
             self.assertGreaterEqual(row["score"], web_batch.JUNK_REVIEW_SCORE)
             self.assertLess(row["score"], web_batch.AUTO_TRASH_SCORE)
+        self.assertEqual(web_batch.automatic_junk_candidates(self.contract), [])
+
+    def release_with_shorts(self, base, first_id=300, names=None, **short_values):
+        self.add(first_id, "115", base + "\\" + base.rsplit("\\", 1)[-1] + ".mp4",
+                 "video", 1103584330, 3264.96)
+        for offset, name in enumerate(names or ("附件甲", "附件乙", "附件丙"), 1):
+            values = dict(size=24880490, duration=19.319002)
+            values.update(short_values)
+            self.add(first_id + offset, "115", base + "\\" + name + ".mp4", "video", **values)
+
+    def test_short_attachment_cluster_is_reviewed_without_promo_words(self):
+        self.release_with_shorts(r"B:\发行物\正片标题", names=(
+            "海贼王3D版 成人欲海狂潮 黄 游", "附件甲", "附件乙", "附件丙", "附件丁", "附件戊"))
+        items = q_ads(self.contract)["items"]
+        self.assertEqual({row["id"] for row in items}, set(range(301, 307)))
+        self.assertTrue(all("6 条极短小附件" in row["why"] for row in items))
+        self.assertTrue(all(web_batch.JUNK_REVIEW_SCORE <= row["score"] < web_batch.AUTO_TRASH_SCORE
+                            for row in items))
+        self.assertEqual(web_batch.automatic_junk_candidates(self.contract), [])
+
+    def test_a_pair_of_shorts_and_standalone_animation_loops_stay_out(self):
+        self.release_with_shorts(r"B:\发行物\正片标题", names=("附件甲", "附件乙"))
+        for asset_id in range(310, 316):
+            self.add(asset_id, "115", rf"B:\画师作品集\动画{asset_id}.mp4", "video", 24880490, 19.319002)
+        self.assertEqual(q_ads(self.contract)["items"], [])
+
+    def test_short_attachment_identity_and_measurements_must_be_eligible(self):
+        cases = (
+            ({"duration": None}, None), ({"duration": 0}, None), ({"duration": -1}, None),
+            ({"duration": 31}, None), ({"size": 0}, None),
+            ({"size": 33 * 1024**2}, None), ({"creator": "示例画师"}, None),
+            ({}, ("作品 CD1", "作品 part2", "作品 分卷")),
+            ({}, ("ABW-153", "ABW-154", "ABW-155")),
+        )
+        for index, (values, names) in enumerate(cases):
+            self.release_with_shorts(rf"B:\发行物\正片{index}", 400 + index * 10,
+                                     names=names, **values)
+        self.assertEqual(q_ads(self.contract)["items"], [])
+
+    def test_short_attachments_can_have_inherited_directory_codes(self):
+        self.release_with_shorts(r"B:\发行物\ABW-153", code="ABW-153")
+        self.assertEqual({row["id"] for row in q_ads(self.contract)["items"]}, {301, 302, 303})
+
+    def test_mixed_folder_or_inactive_main_cannot_support_attachment_evidence(self):
+        for index, main_values in enumerate((
+                {"path": r"B:\发行物\正片0\别的标题.mp4"}, {"disposal": "trash"}, {"location": "online"},
+                {"duration": 1100}, {"size": 40 * 1024**2})):
+            main_id = 500 + index * 10
+            self.release_with_shorts(rf"B:\发行物\正片{index}", main_id)
+            with closing(sqlite3.connect(self.db_path)) as connection:
+                for column, value in main_values.items():
+                    connection.execute(f"UPDATE asset SET {column}=? WHERE id=?", (value, main_id))
+                connection.commit()
+        self.assertEqual(q_ads(self.contract)["items"], [])
+
+    def test_cross_release_spread_uses_measurements_with_different_names(self):
+        for index in range(3):
+            self.release_with_shorts(rf"B:\发行物\正片{index}", 600 + index * 10,
+                                     names=(f"无推广字样的名字{index}",))
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            connection.execute("UPDATE asset SET width=1920,height=1080")
+            connection.commit()
+        items = q_ads(self.contract)["items"]
+        self.assertEqual({row["id"] for row in items}, {601, 611, 621})
+        self.assertTrue(all("3 个发行目录" in row["why"] for row in items))
+        self.assertEqual(web_batch.automatic_junk_candidates(self.contract), [])
+
+    def test_cross_release_spread_requires_full_matching_measurements(self):
+        for index in range(3):
+            self.release_with_shorts(rf"B:\发行物\正片{index}", 600 + index * 10, names=("附件",))
+        self.assertEqual(q_ads(self.contract)["items"], [])
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            connection.execute("UPDATE asset SET width=1920,height=1080")
+            connection.execute("UPDATE asset SET duration=20 WHERE id=621")
+            connection.commit()
+        self.assertEqual(q_ads(self.contract)["items"], [])
+
+    def test_dismissed_short_attachment_can_be_reconsidered(self):
+        self.release_with_shorts(r"B:\发行物\正片标题")
+        w_batch(self.contract, {"ids": [301], "operation": "dismiss-junk"})
+        self.assertEqual({row["id"] for row in q_ads(self.contract)["items"]}, {302, 303})
+        w_batch(self.contract, {"ids": [301], "operation": "reconsider-junk"})
+        self.assertEqual({row["id"] for row in q_ads(self.contract)["items"]}, {301, 302, 303})
+
+    def test_domain_watermarked_release_volumes_are_not_junk(self):
+        names = ("www.98T.la@FC2-1529680-CD2.mp4", "www.example.com_ABW-153-part1.mp4",
+                 "FC2-PPV-1234567-2.mp4", "ABW-153 (3).mp4")
+        for asset_id, name in enumerate(names, 700):
+            self.add(asset_id, "115", "B:\\发行物\\" + name, "video", 10 * 1024**2, 400)
+        self.assertEqual(q_ads(self.contract)["items"], [])
+        self.assertEqual(web_batch.automatic_junk_candidates(self.contract), [])
+
+    def test_numbered_source_watermarks_only_enter_review(self):
+        for asset_id, name in enumerate(("【来源站example.com】1", "[example.com]84 (2)"), 710):
+            self.add(asset_id, "115", "B:\\短片\\" + name + ".mp4", "video", 5 * 1024**2, 10)
+        items = q_ads(self.contract)["items"]
+        self.assertEqual({row["id"] for row in items}, {710, 711})
+        self.assertTrue(all(row["score"] < web_batch.AUTO_TRASH_SCORE for row in items))
         self.assertEqual(web_batch.automatic_junk_candidates(self.contract), [])
 
     def test_non_video_trash_items_remain_visible_and_recoverable(self):
