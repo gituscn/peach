@@ -11,6 +11,20 @@ from peach import dev_copy
 
 
 class DevCopyTests(unittest.TestCase):
+    def test_status_recovers_from_a_short_read_lock_and_preserves_persistent_denial(self):
+        from peach import dev_copy_runtime as runtime
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            with patch.object(Path, 'read_text', side_effect=[PermissionError('sharing'), '{"state":"ready"}']), \
+                    patch.object(runtime.time, 'sleep') as sleep:
+                self.assertEqual(runtime.status(root)['state'], 'ready')
+                sleep.assert_called_once()
+            with patch.object(Path, 'read_text', side_effect=PermissionError('denied')) as read, \
+                    patch.object(runtime.time, 'sleep') as sleep, self.assertRaises(PermissionError):
+                runtime.status(root)
+            self.assertEqual(read.call_count, 5)
+            self.assertEqual(sleep.call_count, 4)
+
     def test_static_text_can_be_deleted_and_dynamic_placeholders_are_required(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
