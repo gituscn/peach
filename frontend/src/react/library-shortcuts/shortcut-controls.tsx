@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type FormEvent, type KeyboardEvent } from 'react';
 import { attachOverlayScrollbar, revealTexts, spinnerHtml, wireHorizontalScroller } from '@peach/legacy/ui';
-import { Button } from '@/components/base/buttons/button';
+import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { errorMessage } from '../../api';
 import { ModalFrame } from '../components/modal-frame';
@@ -145,7 +145,10 @@ function ShortcutContents({ currentHref, kind, close }: { currentHref?: () => st
     {write.isError ? <Note tone="error">{errorMessage(write.error)}</Note> : null}
     {data ? scope !== 'filters' ? <>
       <Input aria-label="搜索收藏" placeholder="搜索收藏" leadingIcon={spriteGlyph('search')} value={search} onChange={setSearch} />
-      {!rows.length ? <EmptyState shell="plain" icon={Star} title={search ? '没有匹配的收藏' : (data.favorites.length ? '还没有此类收藏' : '还没有收藏')}>
+      {!rows.length ? <EmptyState size="compact" icon={Star} title={search ? '没有匹配的收藏' : (data.favorites.length ? '还没有此类收藏' : '还没有收藏')}
+        actions={search ? <Button size="small" onClick={() => setSearch('')}>清除搜索</Button>
+          : data.favorites.length ? <Button size="small" onClick={() => setScope('all')}>查看全部收藏</Button>
+          : <ButtonLink size="small" href="/" onClick={close}>浏览馆藏</ButtonLink>}>
         {search ? '试试其他名称。' : '在资料页或标签页收藏常用内容。'}
       </EmptyState> : null}
       <div data-shortcuts-list="">{rows.map((row) => <div key={row.key} data-shortcuts-row="" className="flex min-w-0 items-center justify-between gap-3">
@@ -158,7 +161,8 @@ function ShortcutContents({ currentHref, kind, close }: { currentHref?: () => st
           onClick={() => { if (!write.isPending) write.mutate({ action: 'favorite', ...row, on: false }) }}>取消收藏</Button>
       </div>)}</div>
     </> : <>
-      {!data.filters.length ? <EmptyState shell="plain" icon={spriteGlyph('list-filter')} title="还没有保存的筛选">在馆藏页保存当前条件，随时打开。</EmptyState> : null}
+      {!data.filters.length ? <EmptyState size="compact" icon={spriteGlyph('list-filter')} title="还没有保存的筛选"
+        actions={<ButtonLink size="small" href="/" onClick={close}>浏览馆藏</ButtonLink>}>在馆藏页保存当前条件，随时打开。</EmptyState> : null}
       {data.filters.map((row) => <div key={row.id} className="flex min-w-0 items-center justify-between gap-2">
         <a href={row.href} onClick={close} className="min-w-0 flex-1 break-all text-body-regular text-text-primary underline">{row.name}</a>
         <Button variant="secondary" size="small" aria-label={`删除筛选${row.name}`} {...busyProps(write.isPending)}

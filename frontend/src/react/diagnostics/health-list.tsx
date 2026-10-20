@@ -45,7 +45,7 @@ export function HealthList({ group, openItem, receipt }: {
   ];
   return <Disclosure summary={`${group.label} · ${group.count === null ? '未取得' : `${group.count.toLocaleString()} 项`}`}>
     {group.count === null ? <Note tone="neutral">清单未取得，请重新检查。</Note> : !group.items.length
-      ? <EmptyState icon={RiFileListLine} title="清单为空" shell="plain">没有需要处理的作品。</EmptyState>
+      ? <EmptyState icon={RiFileListLine} title="清单为空" size="compact">没有需要处理的作品。</EmptyState>
       : <Stack>
         <div className="flex flex-wrap items-center justify-between gap-2">
           {group.truncated ? <span className="text-body-2-regular text-text-secondary">

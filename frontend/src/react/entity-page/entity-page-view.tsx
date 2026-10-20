@@ -11,7 +11,7 @@ import { api } from '@peach/legacy/core';
 import { tagLabel } from '@peach/legacy/tags';
 import { confirmModal } from '@peach/legacy/ui';
 
-import { Button } from '@/components/base/buttons/button';
+import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { EntityFolderWorkspace } from '../catalog-folders/catalog-folders-page';
 
 import { errorMessage } from '../../api';
@@ -399,10 +399,11 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
           ? <EntityOnline key={online.key} view={online.view} media={online.media} result={online.result}
             data={online.data} visible={online.visible} context={online.context} photoSize={props.photoSize}
             photoLayout={props.photoLayout} imagesOnly={props.followImagesOnly} helpers={props.follow.helpers}
-            actions={props.follow.actions} canLoadMore={props.canLoadMore} />
+            actions={props.follow.actions} canLoadMore={props.canLoadMore} clearFilters={online.clearFilters} />
           : view === 'videos' && items.isError
           ? <RetryNote message={errorMessage(items.error)} onRetry={() => { void items.refetch() }} />
-          : worksEmpty ? <WorksEmpty filtered={filtered} onShowAll={showAll} />
+          : worksEmpty ? <WorksEmpty filtered={filtered} onShowAll={showAll}
+            onOnline={followKey ? () => filterActions.setView('online') : undefined} />
           : (
             <EntityBodyPage kind={kind} name={name} view={view} roster={rosterProps} items={items.data ?? null}
               revision={itemsRevision} fetchPage={fetchPage}
@@ -419,14 +420,16 @@ function EntityLoaded(props: EntityPageProps & { entity: EntityPageData }) {
 }
 
 /** 作品区一部也没有。筛完一部不剩时给一条回到全部视频的路：观看状态与交集条上的筛选一起撤掉。 */
-function WorksEmpty({ filtered, onShowAll }: { filtered: boolean; onShowAll(): void }) {
+function WorksEmpty({ filtered, onShowAll, onOnline }: { filtered: boolean; onShowAll(): void; onOnline?: () => void }) {
   return filtered ? (
     <EmptyState icon={spriteGlyph('search')} title="没有符合条件的视频"
-      actions={<Button variant="secondary" onClick={onShowAll}>查看全部视频</Button>}>
+      actions={<Button size="small" onClick={onShowAll}>清除筛选</Button>}>
       清除筛选后查看名下全部视频。
     </EmptyState>
   ) : (
-    <EmptyState icon={spriteGlyph('film')} title="还没有视频">
+    <EmptyState icon={spriteGlyph('film')} title="还没有视频"
+      actions={onOnline ? <Button size="small" onClick={onOnline}>查看在线作品</Button>
+        : <ButtonLink size="small" href="/">浏览馆藏</ButtonLink>}>
       署上这个名字的视频入库后会显示在这里。
     </EmptyState>
   );

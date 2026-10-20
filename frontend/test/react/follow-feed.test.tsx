@@ -370,8 +370,13 @@ describe('页面', () => {
     expect(bare.querySelector('[data-follow-empty]')?.textContent).not.toContain('筛选');
     queryClient.clear();
     serve(feed([]));
-    const filtered = await open(props({ view: view({ status: 'saved' }), revision: 2 }));
-    expect(filtered.querySelector('[data-follow-empty]')?.textContent).toContain('切换状态或来源筛选后再试');
+    const given = props({ view: view({ status: 'saved' }), revision: 2 });
+    const filtered = await open(given);
+    const empty = filtered.querySelector('[data-follow-empty]');
+    expect(empty?.querySelector('h3')?.textContent).toBe('当前筛选下没有更新');
+    expect(empty?.querySelector('button')?.textContent).toBe('清除筛选');
+    await click(empty?.querySelector('button') ?? null);
+    expect(given.actions.route).toHaveBeenLastCalledWith(view());
   });
 
   it('全部创作者可从同一横滚行访问', async () => {

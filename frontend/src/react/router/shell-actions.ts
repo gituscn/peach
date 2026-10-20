@@ -166,7 +166,7 @@ export type SurfaceKind = 'management' | 'index' | 'entity' | 'catalog' | 'follo
  *  管理区那几页画进 `#stats`。 */
 export interface ManagedOpenProps extends Record<ConfigurationPath, { section?: string }> {
   '/jav': { tab: string; readOnly: boolean };
-  '/stats': { configurable: boolean };
+  '/stats': Record<string, never>;
   '/taste': { onboarding: boolean };
   '/review': { category: string; readOnly: boolean; readOnlyMessage: string; writerUrl: string };
   '/data-cleanup': Record<string, never>;

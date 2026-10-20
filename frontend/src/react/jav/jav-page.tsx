@@ -54,7 +54,7 @@ export function JavPage({ tab, readOnly, navigate, receipt }: {
     </form>
     {tab === 'discover'
       ? <Discover readOnly={readOnly} receipt={receipt} resource={setDownload} query={text.trim()} navigate={navigate} clearText={() => setText('')} />
-      : <WantList readOnly={readOnly} toast={receipt} query={text.trim()} />}
+      : <WantList readOnly={readOnly} toast={receipt} query={text.trim()} clearQuery={() => setText('')} />}
     <CloudDownloadDialog prefill={download} close={() => setDownload(null)} receipt={receipt} />
   </div>;
 }
@@ -149,8 +149,11 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
       ? <Note tone="neutral" action={<Button variant="secondary" {...busyProps(metadataAction.busy === 'retry')}
         onClick={() => updateMetadata('retry')}>重新读取资料</Button>}>{metadata.message || `作品资料 ${metadata.completed} / ${metadata.total} 部`}</Note> : null}
     {metadataAction.error ? <Note tone="error">{metadataAction.error}</Note> : null}
-    {!waiting && !discoveries.error && !items.length ? <EmptyState shell="plain" icon={RiCompassLine} title={query || tag ? '没有符合条件的推荐' : '暂无匹配口味的作品'}
-      actions={<ButtonLink href="/taste" variant="secondary">查看口味</ButtonLink>}>
+    {!waiting && !discoveries.error && !items.length ? <EmptyState icon={RiCompassLine} title={query || tag ? '没有符合条件的推荐' : '暂无匹配口味的作品'}
+      actions={<>{query || tag ? <Button size="small" onClick={() => { clearText(); changeTag(''); writeJavQuery({ q: '', tag: '' }) }}>清除筛选</Button>
+        : scope === 'library' ? <ButtonLink size="small" href="/">浏览馆藏</ButtonLink>
+        : <Button size="small" onClick={() => resource({})}>查找作品</Button>}
+        <ButtonLink size="small" href="/taste" variant="secondary">查看口味</ButtonLink></>}>
       {query || tag ? '清除筛选后查看其他作品。' : scope === 'library' ? '观看或标记作品后，可以探索少看的馆藏。' : '可以查找番号，或更新关注来源。'}
     </EmptyState> : null}
     {action.error ? <Note tone="error">{action.error}</Note> : null}

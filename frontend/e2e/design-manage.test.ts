@@ -542,7 +542,59 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
     }
   });
 
-  it('整页空态沉一档底色、20px 圆角、至少 320px 高，图标装进 54px 描边方框；卡里的空态不带方框', { timeout: 60_000 }, async () => {
+  it('统计、高清版和配置空清单有背景与边框，窄屏不越界', { timeout: 60_000 }, async () => {
+    const cases = [
+      { path: '/stats', title: '还没有视频', height: 320 },
+      { path: '/quality-goals', title: '没有标记中的高清版目标', height: 320 },
+      { path: '/settings/diagnostics', title: '清单为空', height: 240 },
+      { path: '/settings/subscriptions', title: '没有可配置的来源', height: 240 },
+    ];
+    for (const viewport of [DESKTOP, MOBILE]) {
+      for (const example of cases) {
+        const opened = await visit(browser, example.path, viewport, async page => {
+          await page.route('**/api/stats', async route => {
+            const report = await (await route.fetch()).json();
+            await route.fulfill({ json: { ...report, by_loc: [] } });
+          });
+          await page.route('**/api/quality-goals?**', route => route.fulfill({ json: { total: 0, items: [] } }));
+          await page.route('**/api/follow/credentials', route => route.fulfill({ json: { providers: [] } }));
+          await page.route('**/api/diagnostics', async route => {
+            const report = await (await route.fetch()).json();
+            report.library.groups = { empty: { label: '空清单样例', status: 'ok', count: 0, items: [], truncated: false } };
+            await route.fulfill({ json: report });
+          });
+        });
+        try {
+          const { page } = opened;
+          if (example.path === '/settings/diagnostics') {
+            await page.locator('summary').filter({ hasText: '空清单样例 · 0 项' }).click();
+          }
+          const empty = page.locator('[data-empty-state]').filter({
+            has: page.getByRole('heading', { name: example.title, exact: true }),
+          });
+          await empty.waitFor();
+          await settle(page);
+          const face = await empty.evaluate(node => {
+            const style = getComputedStyle(node);
+            const glyph = node.querySelector('svg')!;
+            const frame = glyph.parentElement!;
+            return { background: style.backgroundColor, border: style.borderTopWidth, color: style.borderTopColor,
+              height: node.getBoundingClientRect().height, glyph: getComputedStyle(glyph).width,
+              frame: getComputedStyle(frame).width, title: getComputedStyle(node.querySelector('h3')!).fontSize };
+          });
+          assert.equal(face.background, await tokenColor(page, '.peach-react', '--color-background-secondary-default'));
+          assert.equal(face.border, '1px', `${example.path}空态缺少边框`);
+          assert.equal(face.color, await tokenColor(page, '.peach-react', '--color-separator-border'));
+          assert.ok(face.height >= example.height);
+          assert.deepEqual([face.glyph, face.frame, face.title], ['32px', '54px', '14px']);
+          assert.deepEqual((await layout(page)).offenders, []);
+          assert.deepEqual(opened.problems, []);
+        } finally { await opened.close(); }
+      }
+    }
+  });
+
+  it('标准空态共用底色、圆角、320px 高度与 54px 图标框', { timeout: 60_000 }, async () => {
     // 演示库在一轮里凑得出重复组，桩成空的才一定落到整页空态上。
     const opened = await visit(browser, '/duplicates', DESKTOP);
     try {
@@ -583,7 +635,7 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
     } finally {
       await opened.close();
     }
-    // 卡里那一档（活动页没有任务记录）图标直接挂在空态上，外面没有方框。
+    // 任务记录使用同一档标准空态。
     const activity = await visit(browser, '/tasks', DESKTOP);
     try {
       await activity.page.route('**/api/tasks', (route) => route.fulfill({
@@ -594,8 +646,8 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
       const empty = activity.page.locator('[data-empty-state]');
       await empty.waitFor({ timeout: 15_000 });
       await settle(activity.page);
-      assert.equal(await empty.evaluate((root) => root.querySelector('svg')!.parentElement === root), true,
-        '卡里的空态也套了图标方框');
+      assert.equal(await empty.evaluate((root) => root.querySelector('svg')!.parentElement === root), false,
+        '任务空态缺少图标框');
       assert.deepEqual(activity.problems, []);
     } finally {
       await activity.close();

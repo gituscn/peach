@@ -155,6 +155,7 @@ export function FollowManagePage(props: FollowManageProps) {
           <SourceList data={data} sort={sort} dir={dir} page={page} layout={layout}
             pageSize={pageSize} selected={selected} readOnly={readOnly} toast={toast}
             openFollow={openFollow}
+            onAdd={() => { setTab('add'); go({ tab: 'add' }) }}
             onSort={(nextSort, nextDir) => {
               setSort(nextSort);
               setDir(nextDir);

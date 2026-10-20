@@ -144,14 +144,19 @@ describe('链接检查身份与断链动效', () => {
         const face = await empty.evaluate(node => {
           const style = getComputedStyle(node);
           return { background: style.backgroundColor, border: style.borderTopWidth,
-            action: node.querySelector('a')?.getAttribute('href') };
+            action: node.querySelector('button')?.textContent };
         });
         assert.notEqual(face.background, 'rgba(0, 0, 0, 0)');
-        assert.equal(face.border, '1px'); assert.equal(face.action, '/subscriptions?tab=add');
+        assert.equal(face.border, '1px'); assert.equal(face.action, '添加关注');
         await settle(page);
         const geometry = await layout(page);
         assert.ok(geometry.scrollWidth <= geometry.viewportWidth);
         assert.deepEqual(geometry.offenders, []); assert.deepEqual(opened.problems, []);
+        const timeOrigin = await page.evaluate(() => performance.timeOrigin);
+        await empty.getByRole('button', { name: '添加关注', exact: true }).click();
+        await page.getByRole('textbox', { name: '来源链接、名字或 id', exact: true }).waitFor();
+        assert.equal(new URL(page.url()).searchParams.get('tab'), 'add');
+        assert.equal(await page.evaluate(() => performance.timeOrigin), timeOrigin);
       } finally { await opened.close(); }
     });
   }

@@ -65,7 +65,6 @@ const legacyProps = () => ({
   tagLabel: (key: string) => `标签 ${key}`,
   onTag: vi.fn<(key: string) => void>(),
   openMediaSettings: vi.fn<() => void>(),
-  configurable: true,
 });
 
 /** 依次回这几份数据，最后一份之后一直回它。`null` 那一份回 500。 */
@@ -340,19 +339,20 @@ it('快进扫过和正常看完是两回事，一行里分得出来', async () =
   expect(entry.textContent).toContain('真实 50% · 到达 90%');
 });
 
-it('一个视频都没有时给空态，能改配置就给去添加媒体目录', async () => {
+it('空馆藏提供添加媒体入口', async () => {
   const { host, props } = await open(payload({ by_loc: [], by_library: [] }));
   expect(host.querySelector('h3')?.textContent).toBe('还没有视频');
   expect(radialCharts(host)).toEqual([]);
   expect(host.querySelector('[role=tabpanel] section[aria-label]')).toBeNull();
-  await click(buttonNamed('添加媒体目录', host));
+  await click(buttonNamed('添加媒体', host));
   expect(props.openMediaSettings).toHaveBeenCalledTimes(1);
 });
 
-it('这台机器不能改配置时空态不给那个按钮，只留能走的那条路', async () => {
-  const props = { ...legacyProps(), configurable: false };
+it('媒体配置与添加关注是两个独立去向', async () => {
+  const props = legacyProps();
   const { host } = await open(payload({ by_loc: [], by_library: [] }), props);
-  expect(buttonNamed('添加媒体目录', host)).toBeNull();
+  await click(buttonNamed('添加媒体', host));
+  expect(props.openMediaSettings).toHaveBeenCalledTimes(1);
   expect(host.querySelector('a')?.textContent).toBe('添加关注');
   expect(looksLikeButton(host.querySelector('a'))).toBe(true);
 });

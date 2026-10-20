@@ -21,7 +21,7 @@ import {
 } from '@peach/history';
 import { api, isAbort } from '@peach/legacy/core';
 import {
-  cameFromSetup, configurationRequestedSection, pageOpens, runtimeConfigurable, state, subscribeShell, writeShell,
+  cameFromSetup, configurationRequestedSection, pageOpens, state, subscribeShell, writeShell,
 } from '@peach/shell';
 
 import { managementSkeletonHtml, paintManagementPlaceholder } from '../../../management-placeholder';
@@ -85,7 +85,7 @@ async function openProps(path: ManagedPath, run: Run): Promise<object | null> {
     if (!run.live) return null;
     return { tab: javTab(search().get('tab')), readOnly: !!runtime?.ledger_read_only } satisfies ManagedOpenProps['/jav'];
   }
-  if (path === '/stats') return { configurable: !!runtimeConfigurable } satisfies ManagedOpenProps['/stats'];
+  if (path === '/stats') return {} satisfies ManagedOpenProps['/stats'];
   if (path === '/taste') {
     const onboarding = cameFromSetup;
     writeShell({ cameFromSetup: false });

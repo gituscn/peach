@@ -333,7 +333,12 @@ export function ReviewPage(props: ReviewProps) {
               {errorMessage(review.error)}
             </Note>
           ) : (
-            <EmptyState icon={RiCheckboxCircleLine} title="此分类没有待复核项目">
+            <EmptyState icon={RiCheckboxCircleLine} title="此分类没有待复核项目"
+              actions={REVIEW_CATEGORIES.some(key => key !== category && Number(data.counts[key] || 0) > 0)
+                ? <Button size="small" onClick={() => {
+                    const next = REVIEW_CATEGORIES.find(key => key !== category && Number(data.counts[key] || 0) > 0);
+                    if (next) goCategory(next);
+                  }}>查看其他分类</Button> : undefined}>
               可切换分类查看其他待确认资料。
             </EmptyState>
           )}

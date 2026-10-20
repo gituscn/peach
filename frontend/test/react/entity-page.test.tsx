@@ -302,14 +302,14 @@ describe('换筛选与视图', () => {
     expect(page.props.hosts.body.textContent).toContain('还没有视频');
     expect(page.props.hosts.body.querySelector('[data-media-grid]')).toBeNull();
     expect(page.props.hosts.filter.querySelector('[data-entity-sort]')).toBeNull();
-    expect(buttonNamed('查看全部视频', page.props.hosts.body)).toBeNull();
+    expect(buttonNamed('清除筛选', page.props.hosts.body)).toBeNull();
   });
 
   it('筛完一部不剩：空态给一条回到全部视频的路，撤掉观看状态与交集条上的筛选', async () => {
     const page = await open({ items: (query) => items(query.get('tag') ? [] : [1, 2, 3]) },
       { filters: { tag: '巨乳', state: 'fresh', sort: 'new' } });
     expect(page.props.hosts.body.textContent).toContain('没有符合条件的视频');
-    await click(buttonNamed('查看全部视频', page.props.hosts.body));
+    await click(buttonNamed('清除筛选', page.props.hosts.body));
     expect(page.props.actions.route).toHaveBeenCalledWith(
       expect.objectContaining({ sort: 'new', tag: '', state: '', creator: '', studio: '', owner: '' }),
       expect.objectContaining({ media: 'videos' }));

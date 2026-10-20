@@ -12,9 +12,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 import { useInfiniteQuery, useMutation, useQuery, type InfiniteData } from '@tanstack/react-query';
 import { icon, leadingGraphemes, requestErrorMessage } from '@peach/legacy/core';
 import { tagLabel } from '@peach/legacy/tags';
-import { emptyStateHtml, spinnerHtml } from '@peach/legacy/ui';
+import { spinnerHtml } from '@peach/legacy/ui';
 
-import { Button } from '@/components/base/buttons/button';
+import { Button, ButtonLink } from '@/components/base/buttons/button';
+import { EmptyState } from '../components/empty-state';
 
 import { apiGet, apiSend } from '../../api';
 import { LoadMore } from '../catalog-grid/catalog-grid-page';
@@ -184,7 +185,8 @@ export function FollowFeedPage(props: FollowFeedProps) {
           onClear={() => route({ author: '', provider: '', work: '', tags: [], durMin: 0, durMax: 0 })} />
         {facets.broken.length ? <BrokenNote count={facets.broken.length} onManage={actions.openManage} /> : null}
         <List key={query.queryKey.join('\u0000')} retryKey={result.dataUpdatedAt} pending={listPending} facets={facets} data={data} context={context}
-          props={props} />
+          props={props} checkAction={<Button size="small" variant="secondary" aria-label="检查每个来源的更新" aria-busy={job.busy || undefined}
+            aria-disabled={job.busy || undefined} onClick={() => { if (!job.busy) void job.start(false) }}>检查更新</Button>} />
         {data.has_more || canBackfill ? (
           <div data-follow-pagination="">
             {data.has_more ? (
@@ -538,9 +540,9 @@ function BrokenNote({ count, onManage }: { count: number; onManage(): void }) {
 
 /* ── 列表 ── */
 
-function List({ pending, facets, data, context, props, retryKey }: {
+function List({ pending, facets, data, context, props, retryKey, checkAction }: {
   pending: boolean; facets: Facets; data: FollowPage; context: FollowContext; props: FollowFeedProps;
-  retryKey: number;
+  retryKey: number; checkAction: ReactNode;
 }) {
   const { view, helpers } = props;
   const images = view.media === 'images';
@@ -549,15 +551,15 @@ function List({ pending, facets, data, context, props, retryKey }: {
     <div data-follow-list-body="" data-grid-reveal={reveal.fading ? '' : undefined}>
       {reveal.layer}
       {pending ? null : (
-        <Cards facets={facets} data={data} context={context} props={props} images={images} retryKey={retryKey} />
+        <Cards facets={facets} data={data} context={context} props={props} images={images} retryKey={retryKey} checkAction={checkAction} />
       )}
     </div>
   );
 }
 
-function Cards({ facets, data, context, props, images, retryKey }: {
+function Cards({ facets, data, context, props, images, retryKey, checkAction }: {
   facets: Facets; data: FollowPage; context: FollowContext; props: FollowFeedProps; images: boolean;
-  retryKey: number;
+  retryKey: number; checkAction: ReactNode;
 }) {
   const { view, actions } = props;
   const write = useFollowWrite(props);
@@ -578,7 +580,9 @@ function Cards({ facets, data, context, props, images, retryKey }: {
       );
     });
   } else {
-    body = <Empty data={data} filtered={!!(view.status || facets.author || facets.provider || view.work || view.tags.length)} />;
+    body = <Empty data={data} filtered={!!(view.status || facets.author || facets.provider || view.work || view.tags.length || view.durMin || view.durMax)}
+      checkAction={checkAction} clear={() => actions.route({ ...view, status: '', author: '', provider: '', work: '', tags: [], durMin: 0, durMax: 0,
+        media: data.groups.length ? (data.groups.some(group => groupMediaKinds(group).has('video')) ? 'videos' : 'images') : view.media })} />;
   }
   return (
     <div ref={wallRef} data-follow-list="" data-follow-wall={images ? '' : undefined} {...wall}>
@@ -594,16 +598,18 @@ function cardId(group: FollowGroup, view: FollowView): number {
 
 /** 空列表分四种：这一页有组只是媒体类型没对上；设了筛选没筛出东西；有来源但一条都还没抓到；
  *  一个来源都没有。没设筛选时不叫人去改筛选。 */
-function Empty({ data, filtered }: { data: FollowPage; filtered: boolean }) {
-  const html = (data.groups || []).length
-    ? emptyStateHtml('search-x', '当前筛选下没有更新', '切换媒体类型、创作者、来源、时长或标签后再试。')
-    : (data.sources || []).length
-      ? filtered
-        ? emptyStateHtml('rss', '没有符合条件的更新', '切换状态或来源筛选后再试。')
-        : emptyStateHtml('rss', '还没有更新', '点「检查更新」去各个来源取一遍；来源有新内容时会集中显示在这里。')
-      : emptyStateHtml('rss', '还没有关注任何来源', '添加创作者或订阅来源后，更新会集中显示在这里。',
-        { actions: '<a class="geist-button primary" href="/subscriptions?tab=add">添加关注</a>' });
-  return <div data-follow-empty="" className="contents" dangerouslySetInnerHTML={{ __html: html }} />;
+function Empty({ data, filtered, clear, checkAction }: {
+  data: FollowPage; filtered: boolean; clear(): void; checkAction: ReactNode;
+}) {
+  const noMatch = !!data.groups.length || filtered;
+  const hasSources = !!data.sources.length;
+  return <div data-follow-empty="" className="contents"><EmptyState icon={spriteGlyph(noMatch ? 'search-x' : 'rss')}
+    title={noMatch ? '当前筛选下没有更新' : hasSources ? '还没有更新' : '还没有关注任何来源'}
+    actions={noMatch ? <Button size="small" onClick={clear}>清除筛选</Button>
+      : hasSources ? checkAction : <ButtonLink size="small" href="/subscriptions?tab=add">添加关注</ButtonLink>}>
+    {noMatch ? '切换媒体类型、创作者、来源、时长或标签后再试。'
+      : hasSources ? '检查来源更新后，新内容会集中显示在这里。' : '添加创作者或订阅来源后，更新会集中显示在这里。'}
+  </EmptyState></div>;
 }
 
 /* ── 写操作 ──
