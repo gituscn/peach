@@ -38,6 +38,8 @@ JS/TS 文案复用 [Oxc parser](https://oxc.rs/docs/guide/usage/parser)，开发
 
 ## macOS 独立构建
 
+Windows、macOS 与 wheel 通过 `bundle_resources.data_files` 共用运行资源清单，amane 桥只收集脚本、依赖清单和锁文件，运行环境仍位于用户数据目录。资源定位复用 `settings_file.PROJECT_ROOT`，覆盖源码、wheel 的 `_resources` 和 PyInstaller 的资源根，不按模块目录深度猜测。打包机制沿用官方 [PyInstaller 数据文件约定](https://www.pyinstaller.org/en/stable/runtime-information.html)与 setuptools 的资源复制，无新增依赖。
+
 独立应用复用项目已有的 PyInstaller 6.22.3（GPL-2.0-or-later，带发行例外），由 macOS 原生 bootloader 承载 Python 3.14 与 Cocoa 菜单栏，资源与 CLI 入口沿用现有桌面实现。镜像使用系统自带的 `hdiutil`，无需新增运行时依赖。构建与签名依据 [PyInstaller macOS 文档](https://www.pyinstaller.org/en/stable/usage.html)和 [Apple 分发文档](https://developer.apple.com/documentation/xcode/packaging-mac-software-for-distribution)。
 
 Peach 负责独立数据目录、首启、构建身份和资源清单。arm64 与 x86_64 使用各自的 Python 和原生扩展，按 [PyInstaller 架构约束](https://pyinstaller.org/en/stable/feature-notes.html#macos-multi-arch-support)分别生成；不使用 lipo 合并冻结程序。应用不安装系统组件，采用 DMG 拖放安装；PKG 的系统级安装流程不属于这条路径。源码运行的 LaunchAgent 外壳继续使用自己的构建入口。独立制品的启动与读写验收使用隔离数据目录，不改变真实 ledger 或双机配置。
@@ -87,6 +89,8 @@ DMM / MGS 的只读商品号识别复用 `code_key`、`release_code_from_text`�
 显示层复用 SQLite `ledger_revision` 触发器、候选与图片目录版本，以及 TanStack Query 5.104.3（MIT）查询失效和任务轮询；不新增推送服务或依赖。应用根按结果版本刷新相关读缓存，任务心跳不使资料失效；慢请求期间的新版本排队，保留当前内容。资源同步扫描同时显示已完成来源，清理仍需完整扫描和确认。隔离账本、暂停的来源调用与手动放行的 Promise 验证中间结果可见及中断保留；无真实抓取或真实 ledger 写入。
 
 ## STRM 与挂载来源
+
+响应头策略复用 Starlette 1.8.0（BSD-3-Clause，项目已有固定依赖）的 `MutableHeaders` 与官方 [ASGI 中间件模式](https://www.starlette.io/middleware/#pure-asgi-middleware)，只在 `http.response.start` 阶段设置缓存、安全及机器人策略。文件响应继续使用同一 `receive` 的断连消息，真实异常直接传播，不维护异常文本匹配或统一忽略网络错误的分支。整片转码继续复用 FFmpeg 和现有回退链，Peach 只保留有界本机证据与隐私投影，无新增依赖。
 
 STRM 采用文本指针、播放时解析的通用行为，参考 SmartStrm 文档、OpenList 的 `drivers/strm` 与 Jellyfin 的 STRM 探测入口；固定 revision、许可证与实际读取位置见 [取证记录](reference-snapshots/strm-source-evidence.md)。SmartStrm 核心闭源，源码未取得。Peach 独立实现受限 HTTP(S) 指针，复用 HTTPX、现有 Range 传输、`m3u8` 解析与播放器计划；无新增运行依赖，也不复制上游应用代码。
 

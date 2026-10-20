@@ -82,7 +82,6 @@ describe('扫描与采集控制', () => {
         await dialog.getByText('正在统计新目录…', { exact: true }).waitFor();
         assert.equal(await dialog.getByRole('button', { name: '同步媒体库', exact: true }).isEnabled(), true);
         await dialog.getByText('视频 10 个', { exact: true }).waitFor();
-        const inventoryAtClose = inventoryReads;
         const libraryLink = dialog.getByRole('link', { name: '管理媒体库', exact: true });
         assert.equal(await libraryLink.getAttribute('href'), '/settings/library');
         const footerOrder = await dialog.locator('.geist-modal-footer').evaluate(el => {
@@ -94,6 +93,7 @@ describe('扫描与采集控制', () => {
         await libraryLink.click();
         await page.waitForURL('**/settings/library');
         assert.equal(await page.getByRole('dialog', { name: '同步媒体库', exact: true }).count(), 0);
+        const inventoryAtClose = inventoryReads;
         await page.waitForTimeout(600);
         assert.equal(inventoryReads, inventoryAtClose);
         assert.equal(writes.length, 0);

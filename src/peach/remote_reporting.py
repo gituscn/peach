@@ -304,6 +304,11 @@ def _media_details(error, fields, codes):
     return ""
 
 
+def _media_failure(stage, error):
+    return stage in MEDIA_STAGES or any(cls.__module__ == 'peach.transcodes'
+        and cls.__name__ == 'TranscodeUnavailable' for cls in type(error).__mro__)
+
+
 def _expected_failure(stage, error, fields):
     if stage == "logging" and fields.get("level", "ERROR") not in {"ERROR", "CRITICAL"}:
         return True
@@ -317,7 +322,7 @@ def _expected_failure(stage, error, fields):
             "not_found", "gone", "no_usable_metadata", "rate_limited", "timeout", "server_error", "network"}
     if ("peach.metadata", "MetadataProviderError") in kinds and error.detail != "parse_error":
         return error.kind in {"auth", "not_found"} or error.retryable is True or error.temporary is True
-    if stage in MEDIA_STAGES:
+    if _media_failure(stage, error):
         detail = getattr(error, "diagnostics", {})
         if isinstance(error, subprocess.TimeoutExpired) or isinstance(detail, dict) and detail.get("reason") == "timeout":
             return True
@@ -370,7 +375,7 @@ def _http_details(stage, fields):
 
 def _technical_projection(stage, error, fields):
     """投影各入口的故障证据，排除缺少定位信息与已知媒体输入条件的记录。"""
-    media_stage = stage in MEDIA_STAGES
+    media_stage = _media_failure(stage, error)
     if error is None and stage != "browser" and not media_stage:
         return
     values, codes, _chain = _exception_details(error)
