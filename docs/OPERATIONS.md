@@ -51,6 +51,8 @@ GitLab 兼容平台使用 `.gitlab-ci.yml`。唯一版本入口支持 `--gitlab-
 
 平台共享 Runner 的系统由管理员提供。注册页面列出 Windows 和 macOS，表示可以接入这些系统上的 Runner；不能据此判断平台提供相应云主机。临时原生 Runner 只接入受保护主线和版本标签，使用项目专属标签，验收后停止并注销。Mac 的 Intel 构建需要真实 x86_64 Python 和依赖；在 Apple Silicon 上通过 Rosetta 验收时，应明确记录未覆盖 Intel 真机。
 
+Windows 原生 Runner 在深目录中检出项目时，需为 Git 启用 `core.longpaths=true`，供检出与清理阶段处理 npm 缓存。设置可限定到 Runner 的任务环境，通过 `GIT_CONFIG_COUNT` 与对应的 `GIT_CONFIG_KEY_<索引>`、`GIT_CONFIG_VALUE_<索引>` 条目传递；已有条目按索引追加。宿主系统的长路径开关与 Git 设置分别核对。
+
 版本标签须受保护。标签流水线重新核对提交与版本，构建固定来源的媒体工具、Windows 完整包与拆分包、macOS 双架构 DMG，并进行独立制品验收。只有全部成功后才创建 GitLab Release。`PEACH_DOWNLOAD_BACKEND` 默认 `gitgud`，通过 Generic Package Registry 保存制品；不把会过期的 job artifacts 当作永久下载地址。
 
 可选的 `r2` 后端使用独立 Standard 桶与 HTTPS 自定义域名。`PEACH_R2_ACCESS_KEY_ID`、`PEACH_R2_SECRET_ACCESS_KEY`、`PEACH_R2_ENDPOINT` 放入受保护且隐藏的 CI 变量，环境作用域为 `release`；`PEACH_R2_BUCKET` 和 `PEACH_R2_PUBLIC_BASE` 指定发布目标。S3 传输复用 rclone，版本文件禁止覆盖；每份文件必须从公开入口完整下载并核对大小及 SHA-256 后，才更新公开版本索引和 Release 链接。
