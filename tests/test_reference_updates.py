@@ -19,6 +19,16 @@ def load_checker():
 
 
 class ReleaseReviewTests(unittest.TestCase):
+    def test_public_review_paginates_dependabot_without_account_credentials(self):
+        from scripts import release_review as review
+        item = {"number": 3, "title": "更新", "html_url": "url", "user": {"login": "dependabot[bot]"}}
+        with mock.patch.object(review, "public_github_api", side_effect=[[item] * 100, []]) as api:
+            self.assertEqual(len(review.public_dependabot("owner/repo")), 100)
+        self.assertEqual(api.call_count, 2)
+        with mock.patch.object(review, "public_github_api", side_effect=OSError("network unavailable")), \
+                self.assertRaises(OSError):
+            review.public_dependabot("owner/repo")
+
     def test_network_failure_keeps_later_checks_and_records_missing_evidence(self):
         from scripts import release_review as review
         registry = {"pins": [], "sources": [

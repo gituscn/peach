@@ -4694,6 +4694,124 @@ class ScriptingConventionTests(unittest.TestCase):
         self.assertFalse(scripting.host_under("", ("x.com",)))
 
 
+class R2ReleaseTests(unittest.TestCase):
+    def test_capacity_keeps_existing_versions_and_stops_before_upload(self):
+        module = load_script("release_r2")
+        existing = [{"Path": "v1.0.0/old.zip", "Size": 2_000_000}, {"Path": "v1.2.3/app.zip", "Size": 3_000_000}]
+        files = [{"name": "app.zip", "size": 3_000_000}, {"name": "new.dmg", "size": 4_000_000}]
+        self.assertEqual(module.require_capacity(existing, files, "v1.2.3", 10_000_000), 10_000_000)
+        with self.assertRaisesRegex(ValueError, "停止上传"):
+            module.require_capacity(existing, files, "v1.2.3", 9_999_999)
+
+    def test_public_download_checks_all_bytes_and_checksum(self):
+        module = load_script("release_r2")
+        data = b"Peach public artifact"
+        response = mock.MagicMock()
+        response.__enter__.return_value = response
+        response.status = 200
+        response.read.side_effect = [data[:5], data[5:], b""]
+        expected = {"name": "Peach.zip", "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+        with mock.patch.object(module, "urlopen", return_value=response):
+            module.verify_download("https://downloads.example/Peach.zip", expected)
+        response.read.side_effect = [data[:-1], b""]
+        with mock.patch.object(module, "urlopen", return_value=response), self.assertRaisesRegex(ValueError, "SHA-256"):
+            module.verify_download("https://downloads.example/Peach.zip", expected)
+
+    def test_inventory_requires_complete_platforms_and_does_not_upload_helpers(self):
+        module = load_script("release_r2")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            names = [f"Peach-1.2.3-windows-x64{suffix}" for suffix in (".zip", "-setup.exe", "-lite-setup.exe", "-update.zip")]
+            names += [f"Peach-1.2.3-macos-{arch}.dmg" for arch in ("arm64", "x86_64")]
+            for name in names:
+                (root / name).write_bytes(name.encode())
+            (root / "private-config.toml").write_text("private", encoding="utf-8")
+            plan = module.publish(root, "1.2.3")
+            self.assertFalse(plan["applied"])
+            self.assertEqual({item["name"] for item in plan["files"]}, set(names))
+            (root / names[-1]).unlink()
+            with self.assertRaisesRegex(ValueError, "双架构"):
+                module.inventory(root, "1.2.3")
+
+    def test_credentials_only_enter_rclone_environment_and_https_is_required(self):
+        module = load_script("release_r2")
+        environment = {"PEACH_R2_ACCESS_KEY_ID": "access", "PEACH_R2_SECRET_ACCESS_KEY": "secret",
+                       "PEACH_R2_ENDPOINT": "https://account.r2.cloudflarestorage.com",
+                       "PEACH_R2_BUCKET": "peach-releases", "PEACH_R2_PUBLIC_BASE": "https://downloads.example"}
+        with mock.patch.dict(os.environ, environment, clear=True):
+            result = module.rclone_environment()
+        self.assertEqual(result["RCLONE_CONFIG_PEACH_SECRET_ACCESS_KEY"], "secret")
+        self.assertEqual(result["RCLONE_CONFIG_PEACH_NO_CHECK_BUCKET"], "true")
+        for key in ("PEACH_R2_ENDPOINT", "PEACH_R2_PUBLIC_BASE"):
+            with mock.patch.dict(os.environ, {**environment, key: "http://example"}, clear=True), self.assertRaises(ValueError):
+                module.rclone_environment()
+
+
+class GitLabReleaseTests(unittest.TestCase):
+    SHA = "1" * 40
+
+    def forge(self):
+        from scripts.release_forge import GitLabForge
+        return GitLabForge("gitgud.io", mock.Mock())
+
+    def pipeline(self, **changes):
+        return {"id": 7, "sha": self.SHA, "ref": "master", "source": "push",
+                "status": "success", "web_url": "https://gitgud.io/pipeline/7", **changes}
+
+    def jobs(self):
+        from scripts.release_forge import REQUIRED_TEST_JOBS
+        return [{"id": index, "name": name, "status": "success", "allow_failure": False,
+                 "commit": {"id": self.SHA}} for index, name in enumerate(sorted(REQUIRED_TEST_JOBS), 1)]
+
+    def test_release_requires_native_system_jobs_for_the_same_commit(self):
+        forge = self.forge()
+        for change in ({"status": "skipped"}, {"status": "failed"}, {"allow_failure": True},
+                       {"commit": {"id": "other"}}):
+            jobs = self.jobs()
+            jobs[0] = {**jobs[0], **change}
+            with self.subTest(change=change), mock.patch.object(forge, "api", side_effect=[
+                [self.pipeline()], jobs
+            ]), self.assertRaisesRegex(ValueError, "必需成功任务"):
+                forge.test_runs("owner/repo", self.SHA)
+        with mock.patch.object(forge, "api", side_effect=[[self.pipeline()], self.jobs()]) as api:
+            checked = forge.test_runs("owner/repo", self.SHA)
+        self.assertEqual(checked[0]["html_url"], "https://gitgud.io/pipeline/7")
+        self.assertEqual(checked[0]["conclusion"], "success")
+        self.assertEqual(api.call_count, 2)
+
+    def test_latest_push_pipeline_is_required_and_failed_retries_block_release(self):
+        forge = self.forge()
+        pipelines = [self.pipeline(), self.pipeline(id=8, status="failed"),
+                     self.pipeline(id=9, ref="feature"), self.pipeline(id=10, source="web")]
+        with mock.patch.object(forge, "api", return_value=pipelines):
+            checked = forge.test_runs("owner/repo", self.SHA)
+        self.assertEqual(checked[0]["id"], 8)
+        self.assertEqual(checked[0]["conclusion"], "failed")
+
+    def test_missing_native_jobs_cannot_be_replaced_by_linux_success(self):
+        forge = self.forge()
+        jobs = [job for job in self.jobs() if job["name"] != "verify-macos"]
+        with mock.patch.object(forge, "api", side_effect=[[self.pipeline()], jobs]), \
+                self.assertRaisesRegex(ValueError, "verify-macos"):
+            forge.test_runs("owner/repo", self.SHA)
+
+    def test_mainline_membership_uses_the_git_commit_graph(self):
+        forge = self.forge()
+        forge.command.side_effect = ["", self.SHA, "ancestor"]
+        with mock.patch.object(forge, "master_sha", return_value=self.SHA), \
+                self.assertRaisesRegex(ValueError, "不属于"):
+            forge.require_ancestor("owner/repo", "divergent")
+        self.assertEqual(forge.remote_url("owner/repo"), "https://gitgud.io/owner/repo.git")
+
+    def test_glab_is_scoped_to_the_selected_host_without_inline_credentials(self):
+        forge = self.forge()
+        forge.command.return_value = '{"commit":{"id":"sha"}}'
+        with mock.patch.dict(os.environ, {"PEACH_GLAB": "glab"}):
+            self.assertEqual(forge.master_sha("owner/repo"), "sha")
+        forge.command.assert_called_once_with("glab", "api", "--hostname", "gitgud.io", "--method", "GET",
+                                              "projects/owner%2Frepo/repository/branches/master")
+
+
 class ReleaseTagTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

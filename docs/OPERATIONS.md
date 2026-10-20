@@ -45,6 +45,20 @@ MACOSX_DEPLOYMENT_TARGET=11.0 uv sync --locked --extra build --extra macos
 
 版本标签触发 Release 工作流，在 Apple Silicon 与 Intel 原生 runner 分别构建，再由干净 runner 下载并挂载 DMG，验证签名、架构和独立运行。两种 DMG 与 Windows 安装包全部通过后，才一同上传到 GitHub 预发布，统一生成 SHA-256 清单。手动运行工作流只验收候选制品，不创建 Release；推送普通提交不会触发安装包构建。发版检查见[测试与依赖](TESTING.md#每次发版检查)，打标签统一使用 `scripts/release_tag.py`。
 
+### GitLab 发布与下载后端
+
+GitLab 兼容平台使用 `.gitlab-ci.yml`。唯一版本入口支持 `--gitlab-host` 指定主机，默认入口使用 GitHub。主线发布判据要求同一提交最新的 push 流水线成功，且 Linux、Windows、macOS 和 wheel 验收任务全部成功；缺少原生系统任务时拒绝打标签。CLI 传输复用官方 glab，不在仓库或命令参数里存访问令牌。
+
+平台共享 Runner 的系统由管理员提供。注册页面列出 Windows 和 macOS，表示可以接入这些系统上的 Runner；不能据此判断平台提供相应云主机。临时原生 Runner 只接入受保护主线和版本标签，使用项目专属标签，验收后停止并注销。Mac 的 Intel 构建需要真实 x86_64 Python 和依赖；在 Apple Silicon 上通过 Rosetta 验收时，应明确记录未覆盖 Intel 真机。
+
+版本标签须受保护。标签流水线重新核对提交与版本，构建固定来源的媒体工具、Windows 完整包与拆分包、macOS 双架构 DMG，并进行独立制品验收。只有全部成功后才创建 GitLab Release。`PEACH_DOWNLOAD_BACKEND` 默认 `gitgud`，通过 Generic Package Registry 保存制品；不把会过期的 job artifacts 当作永久下载地址。
+
+可选的 `r2` 后端使用独立 Standard 桶与 HTTPS 自定义域名。`PEACH_R2_ACCESS_KEY_ID`、`PEACH_R2_SECRET_ACCESS_KEY`、`PEACH_R2_ENDPOINT` 放入受保护且隐藏的 CI 变量，环境作用域为 `release`；`PEACH_R2_BUCKET` 和 `PEACH_R2_PUBLIC_BASE` 指定发布目标。S3 传输复用 rclone，版本文件禁止覆盖；每份文件必须从公开入口完整下载并核对大小及 SHA-256 后，才更新公开版本索引和 Release 链接。
+
+R2 公网下载流量免费，存储与请求按账户共享额度计费。预算告警只通知，不会停止服务；R2 后端不提供零费用硬封顶。要求绝不产生按量费用的部署应使用不绑定按量计费的下载服务，不启用 R2 自动发布。
+
+上传前列举本桶现有文件并计算新增制品的总容量；默认超过 8 GB 时停止上传，保留已有文件。`PEACH_R2_MAX_BYTES` 可明确调整该桶预算；此检查不能限制同账户其他桶，也不代替请求量计费保护。版本文件设置长期缓存，公开版本索引只缓存一分钟。
+
 Mac 与 Windows 托盘的首层只显示简短状态与提醒数量，展开状态子菜单按行查看服务和媒体来源。长地址与路径会缩略，子菜单中的「查看完整配置」保留完整设置入口；提醒消失后会随下一轮健康检查更新。
 
 单机设置默认关闭账本复制，不需要 Windows、SMB、LaunchAgent 或系统端口转发。各台电脑各自保存数据；共享馆藏仍按下文的[双机复制](#两台电脑之间的复制)配置，离线修改不能自动合并。已有数据目录不会自动导入。

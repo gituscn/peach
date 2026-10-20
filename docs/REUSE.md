@@ -1,5 +1,11 @@
 # 复用清单
 
+## GitLab 与 R2 发布
+
+GitLab API、CI 认证和 Release 创建复用官方 [glab 1.124.0](https://gitlab.com/gitlab-org/cli)（MIT，维护中）；GitLab CI 的发布写入使用短期 `CI_JOB_TOKEN` 与官方 CI 自动登录。R2 的 S3 上传复用 [rclone 1.75.2](https://rclone.org/)（MIT，维护中），使用单桶对象读写凭据；版本文件不可覆盖，并由独立 HTTPS 下载校验 SHA-256。两者都是构建期 CLI，不进入应用运行时依赖。
+
+`fetch_release_tools.py` 从固定版本官方发行站读取 SHA-256 清单，仅提取指定二进制。Python 标准库负责制品清单、版本与提交判据，不另实现 GitLab 认证、S3 签名或多段上传协议。Windows 与 macOS 的 CI 入口复用既有测试、构建和独立制品验收脚本。下载后端及费用边界见[运维说明](OPERATIONS.md#gitlab-发布与下载后端)。
+
 ## 真实样本界面预览
 
 用户验收预览复用项目记忆登记的真实账本小样本和已有缓存。启动入口强制调用 `scripts/check_ui_preview.py`，使用标准库 SQLite 的只读连接核对作品、实体、关联和来源清单，产出样本内容摘要；通用契约见 `docs/UI_PREVIEW.md`。核验与图像查看分别记录，隔离自动化测试夹具保留在测试范围内。没有新增依赖或生产数据写入。

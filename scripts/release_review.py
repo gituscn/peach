@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+from urllib.request import Request, urlopen
 
 if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -26,7 +27,26 @@ def run(args: list[str], root: Path, *, allowed: tuple[int, ...] = (0,)) -> str:
     return result.stdout.strip()
 
 
-def collect(root: Path, repo: str) -> dict:
+def public_github_api(endpoint: str):
+    """公开上游元数据使用匿名官方 API，不携带本机账号凭据。"""
+    request = Request(f"https://api.github.com/{endpoint}",
+                      headers={"Accept": "application/vnd.github+json", "User-Agent": "Peach-release-review"})
+    with urlopen(request, timeout=60) as response:
+        return json.load(response)
+
+
+def public_dependabot(repo: str) -> list[dict]:
+    found = []
+    for page in range(1, 11):
+        batch = public_github_api(f"repos/{repo}/pulls?state=open&per_page=100&page={page}")
+        found.extend({"number": item["number"], "title": item["title"], "url": item["html_url"]}
+                     for item in batch if item.get("user", {}).get("login") == "dependabot[bot]")
+        if len(batch) < 100:
+            return found
+    raise ValueError("公开上游 PR 超过可核对上限，检查未完成")
+
+
+def collect(root: Path, repo: str, *, public_github: bool = False) -> dict:
     registry = references.load_registry(root / "docs/reference-sources.json")
     problems = references.validate_registry(root, registry)
     if problems:
@@ -53,6 +73,8 @@ def collect(root: Path, repo: str) -> dict:
                         f"repos/{repo}/pulls?state=open&per_page=100"], (0,)),
     ):
         def inspect_dependency(args=args, allowed=allowed, label=label):
+            if label == "dependabot" and public_github:
+                return public_dependabot(repo)
             output = run(args, root, allowed=allowed)
             if label == "dependabot":
                 return [{"number": item["number"], "title": item["title"], "url": item["html_url"]}
@@ -82,8 +104,9 @@ def collect(root: Path, repo: str) -> dict:
         web = pin["repository"].removesuffix(".git")
         if web.startswith("https://github.com/"):
             upstream = web.removeprefix("https://github.com/")
-            check(pin["id"] + "-release", lambda upstream=upstream: json.loads(run(
-                ["gh", "api", f"repos/{upstream}/releases/latest"], root)))
+            check(pin["id"] + "-release", lambda upstream=upstream:
+                  public_github_api(f"repos/{upstream}/releases/latest") if public_github else json.loads(run(
+                      ["gh", "api", f"repos/{upstream}/releases/latest"], root)))
     for source in references.selected_sources(registry, None):
         def inspect(source=source):
             result = references.inspect_source(root, source, revision_resolver=resolve)
@@ -92,8 +115,8 @@ def collect(root: Path, repo: str) -> dict:
     return report
 
 
-def review(root: Path, repo: str) -> dict:
-    report = collect(root, repo)
+def review(root: Path, repo: str, *, public_github: bool = False) -> dict:
+    report = collect(root, repo, public_github=True) if public_github else collect(root, repo)
     path = root / "build/release-review.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
