@@ -104,7 +104,7 @@
 
 后台只有在有效同意和独立接收端同时存在时才读取明细并初始化 SDK。快照须至少包含一部公共编号作品或一个偏好分组；没有可分析内容时记为 `waiting-data`，每小时重新检查，不占周传输机会。收集、压缩或入队前失败可以重新准备。每机每 UTC 自然周最多通过一次最终发送门槛，跨进程使用同一文件锁预约；重新选择同意不重置周限次。实际发送后无论明确失败还是结果未知，本周均不再发送，不补传历史快照。空快照不会进入研究样本，分析结果须披露这个筛选口径。
 
-`state/library-sharing-attempt.json` 区分 `waiting-data`、`queued`、`accepted`、`failed`、`unknown` 与 `blocked`，`attempted` 表示是否已通过最终发送门槛。`accepted` 仅证明取得 HTTP 2xx；未取得 HTTP 回执、网络中断和历史无回执记录均不解释为接收成功。旧字段版本、旧 UTC 周与旧同意版本的队列不能发送；旧尝试回执不能覆盖新尝试。
+`state/library-sharing-attempt.json` 区分 `waiting-data`、`queued`、`accepted`、`failed`、`unknown` 与 `blocked`，`attempted` 表示是否已通过最终发送门槛。设置 API 的 `last_attempt` 只提供当前 UTC 周的回执，跨周不改写原记录。`accepted` 仅证明取得 HTTP 2xx；未取得 HTTP 回执、网络中断和历史无回执记录均不解释为接收成功。旧字段版本、旧 UTC 周与旧同意版本的队列不能发送；旧尝试回执不能覆盖新尝试。
 
 原始 JSON 上限 100 MiB，gzip 附件上限 18 MiB；任一超限均整份拒绝，不发送截断数据。gzip 头不含源文件名和生成时间。传输只接受固定用途事件、固定文件名附件与字段白名单，后台真正发送前复查同意版本。关闭让排队记录失效，已发送数据无法经本机开关撤回。
 

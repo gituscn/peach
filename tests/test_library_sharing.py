@@ -437,6 +437,18 @@ class LibrarySharingTests(unittest.TestCase):
             self.service.attempt()
             collect.assert_not_called()
 
+    def test_settings_snapshot_only_exposes_the_current_week_without_changing_receipts(self):
+        self.enable()
+        for status in ('failed', 'unknown', 'waiting-data', 'accepted'):
+            with self.subTest(status=status):
+                state = {'schema': sharing.SCHEMA, 'period': sharing._period(),
+                         'status': status, 'attempted': True}
+                sharing._state_path(self.config).write_text(json.dumps(state))
+                self.assertEqual(sharing.snapshot(self.config)['last_attempt'], state)
+                with mock.patch.object(sharing, '_period', return_value='2099-W01'):
+                    self.assertEqual(sharing.snapshot(self.config)['last_attempt'], {})
+                self.assertEqual(self.attempt_state(), state)
+
     def test_concurrent_services_allow_only_one_network_reservation(self):
         self.add_work()
         self.enable()

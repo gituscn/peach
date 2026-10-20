@@ -90,7 +90,7 @@ def snapshot(config):
         attempt = {**attempt, "status": "unknown", "attempted": True}
     return {"enabled": bool(consent(config)), "available": bool(target()),
             "schema": SCHEMA, "fields": FIELDS, "notice": NOTICE,
-            "last_attempt": attempt if attempt.get("schema") == SCHEMA else {}}
+            "last_attempt": attempt if attempt.get("schema") == SCHEMA and attempt.get("period") == _period() else {}}
 
 
 def collect(contract):
