@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://peach.video">官网</a> ·
-  <a href="https://github.com/peach-mitao/peach/releases">下载安装包</a> ·
+  <a href="https://peach.video/#download">下载安装包</a> ·
   <a href="https://demo.peach.video">在线演示</a> ·
   <a href="https://github.com/peach-mitao/peach/releases/tag/intro-video">介绍视频</a> ·
   <a href="https://github.com/peach-mitao/peach/issues">问题反馈</a> ·
@@ -89,7 +89,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 ### Windows
 
-1. 从 [Releases](https://github.com/peach-mitao/peach/releases) 下载完整安装包 `Peach-<版本>-windows-x64-setup.exe`，双击安装，无需管理员权限；也可下载完整免安装包，解压后运行 `Peach.exe`。
+1. 从[官网下载区](https://peach.video/#download)下载完整安装包 `Peach-<版本>-windows-x64-setup.exe`，双击安装，无需管理员权限；也可下载完整免安装包，解压后运行 `Peach.exe`。
 2. 浏览器打开首次设置页后，选择媒体目录和访问范围。
 3. 开始扫描，随后在浏览器里浏览和播放。
 
@@ -101,7 +101,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 macOS 可在本机构建独立 `.app` 与 DMG，运行不需要 Python、源码或另一台电脑。构建与安装见 [macOS 独立测试包](docs/OPERATIONS.md#macos-独立测试包)。
 
-发版流程分别生成 Apple Silicon（`macos-arm64.dmg`）与 Intel（`macos-x86_64.dmg`）测试包；可下载版本以 [Releases](https://github.com/peach-mitao/peach/releases) 的实际资产为准。在「关于本机」确认芯片，打开对应镜像并将 Peach 拖入「应用程序」。测试包未完成 Apple 公证，媒体工具需另行准备。
+发版流程分别生成 Apple Silicon（`macos-arm64.dmg`）与 Intel（`macos-x86_64.dmg`）测试包；可下载版本以[官网下载区](https://peach.video/#download)的实际资产为准。在「关于本机」确认芯片，打开对应镜像并将 Peach 拖入「应用程序」。测试包未完成 Apple 公证，媒体工具需另行准备。
 
 ### 从源码运行（Windows、macOS）
 

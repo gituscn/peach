@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://peach.video">Website</a> ·
-  <a href="https://github.com/peach-mitao/peach/releases">Download installers</a> ·
+  <a href="https://peach.video/#download">Download installers</a> ·
   <a href="https://demo.peach.video">Live demo</a> ·
   <a href="https://github.com/peach-mitao/peach/releases/tag/intro-video">Intro video</a> ·
   <a href="https://github.com/peach-mitao/peach/issues">Report a problem</a> ·
@@ -89,7 +89,7 @@ Try search, filters and profiles in the [read-only demo](https://demo.peach.vide
 
 ### Windows
 
-1. Download the full installer, `Peach-<version>-windows-x64-setup.exe`, from [Releases](https://github.com/peach-mitao/peach/releases) and run it. No administrator rights needed. Alternatively, extract the full portable package and run `Peach.exe`.
+1. Download the full installer, `Peach-<version>-windows-x64-setup.exe`, from the [website download section](https://peach.video/#download) and run it. No administrator rights needed. Alternatively, extract the full portable package and run `Peach.exe`.
 2. Choose media directories and access permissions on the setup page that opens in your browser.
 3. Start scanning, then browse and play in your browser.
 
@@ -101,7 +101,7 @@ Test builds are unsigned. If Windows says “Windows protected your PC”, confi
 
 Build a self-contained `.app` and DMG locally on macOS. Running it requires neither Python, a source checkout, nor another computer. See [the macOS build guide](docs/OPERATIONS.md#macos-独立测试包).
 
-The release workflow generates separate Apple Silicon (`macos-arm64.dmg`) and Intel (`macos-x86_64.dmg`) test packages. Check the actual assets on [Releases](https://github.com/peach-mitao/peach/releases) for availability. Check your chip in About This Mac, open the matching image, and drag Peach into Applications. Test packages are not notarized; media tools must be installed separately.
+The release workflow generates separate Apple Silicon (`macos-arm64.dmg`) and Intel (`macos-x86_64.dmg`) test packages. Check the actual assets in the [website download section](https://peach.video/#download) for availability. Check your chip in About This Mac, open the matching image, and drag Peach into Applications. Test packages are not notarized; media tools must be installed separately.
 
 ### Run from source (Windows, macOS)
 
