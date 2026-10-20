@@ -15,7 +15,8 @@ LOG_NAMES = ("tray.log", "tray-lifecycle.log", "tray-setup.err.log", "tray-setup
              "tray-http.err.log", "tray-http.out.log", "tray-https.err.log", "tray-https.out.log",
              'tray-restart.out.log', 'tray-scan.out.log', 'windows-source-sync.log', 'cloudflare-tunnel.log')
 STATE_NAMES = ('library-processing.json', 'runtime-prepare.json', 'standalone-update.json',
-               'automatic-updates.json', 'windows-source-sync.json', 'cloudflare-tunnel.json')
+               'automatic-updates.json', 'windows-source-sync.json', 'cloudflare-tunnel.json',
+               'remote-reporting-delivery.json', 'library-sharing-attempt.json')
 TAIL_BYTES = 96 * 1024
 
 

@@ -152,7 +152,7 @@ class RemoteReportingTests(unittest.TestCase):
             reporting.close()
             reporting.flush_counts(force=True)
             second = client.capture_event.call_args.args[0]
-            self.assertNotIn('event_id', second)
+            self.assertNotEqual(second['event_id'], first['event_id'])
             self.assertEqual(second['tags']['occurrence_count'], '2')
             self.assertEqual(first['tags']['diagnostic_key'], second['tags']['diagnostic_key'])
             self.assertEqual(client.capture_event.call_count, 2)
@@ -286,7 +286,7 @@ class RemoteReportingTests(unittest.TestCase):
             send.assert_not_called()
             reporting.capture('browser', message='private title', stack='at https://private/dist/peach-app.js:12:34')
             self.assertEqual(send.call_args.args[1]['exception']['values'][0]['stacktrace']['frames'],
-                             [{'filename': 'peach-app.js', 'lineno': 12, 'colno': 34}])
+                             [{'filename': 'peach-app.js', 'abs_path': 'app:///peach-app.js', 'lineno': 12, 'colno': 34}])
 
     def test_control_and_source_states_keep_local_records_without_remote_events(self):
         import asyncio
@@ -399,7 +399,7 @@ class RemoteReportingTests(unittest.TestCase):
             reporting.capture('browser', stack='at https://example.test/dist/peach-app.js?v=build:12:34')
             send.assert_called_once()
             frames = send.call_args.args[1]['exception']['values'][0]['stacktrace']['frames']
-            self.assertEqual(frames, [{'filename': 'peach-app.js', 'lineno': 12, 'colno': 34}])
+            self.assertEqual(frames, [{'filename': 'peach-app.js', 'abs_path': 'app:///peach-app.js', 'lineno': 12, 'colno': 34}])
 
     def test_preview_environment_conditions_preserve_guidance_and_local_issue(self):
         from peach import library_processing

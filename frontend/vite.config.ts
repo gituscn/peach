@@ -4,11 +4,12 @@
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
+import { browserArtifacts, browserSymbols } from './scripts/sentry-build.ts';
 
 const source = (name: string) => fileURLToPath(new URL(`./src/${name}`, import.meta.url));
 
 export default defineConfig({
-  plugins: [tailwindcss()],
+  plugins: [tailwindcss(), ...browserSymbols('peach-app')],
   resolve: { alias: {
     'next/link': source('react/components/board-navigation-link.tsx'),
     '@peach/legacy/core': source('core/index.ts'), '@peach/legacy/ui': source('ui-kit/index.ts'),
@@ -22,14 +23,14 @@ export default defineConfig({
   // 告警按这个值判断，不替换的话浏览器里读到一个不存在的 `process`，整个模块加载失败。
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   build: {
-    outDir: process.env.PEACH_FRONTEND_OUT_DIR || '../web/dist',
-    // 产物进 Git，所以目录必须只剩当前构建的东西；残留文件会被一起提交。
+    outDir: browserArtifacts,
+    // 私有目录保留 JavaScript 与 source maps；发布插件只复制四个正式文件。
     emptyOutDir: true,
     target: 'es2022',
     cssTarget: ['chrome111','edge111','firefox128','safari16.4','ios16.4'],
     // Vite 8 的内核是 rolldown，压缩走 oxc；写 'esbuild' 会落到已废弃的转译插件上。
     minify: 'oxc',
-    sourcemap: false,
+    sourcemap: 'hidden',
     cssCodeSplit: false,
     lib: {
       entry: 'src/react/bootstrap.tsx',

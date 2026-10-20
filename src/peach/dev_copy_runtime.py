@@ -32,9 +32,22 @@ def _write(root: Path, data: dict) -> dict:
     return data
 
 
+def _read_status(path: Path) -> dict:
+    """Windows 原子替换期间短暂占用可重读；持续拒绝访问仍交给调用方。"""
+    for attempt in range(5):
+        try:
+            return json.loads(path.read_text(encoding='utf-8'))
+        except FileNotFoundError:
+            return {}
+        except PermissionError:
+            if attempt == 4:
+                raise
+            time.sleep(.02)
+    return {}
+
+
 def status(root: Path) -> dict:
-    path = _directory(root) / 'apply.json'
-    data = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+    data = _read_status(_directory(root) / 'apply.json')
     if data.get('state') in ACTIVE:
         if data['state'] == 'waiting_restart':
             if time.time() - data['updated'] > 30:

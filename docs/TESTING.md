@@ -207,6 +207,7 @@ PR 的浏览器 CI 根据界面、Web API、认证与浏览器用例选择；普
 记录只在「代码、环境、范围」三项都匹配时可复用，环境那一项由 `scripts/test_evidence.py`
 的 `environment()` 算成一个摘要：解释器与已安装包、平台、`PEACH_*` 等环境变量、前端
 `node_modules` 锁，以及 node／npm／git／ffmpeg／ffprobe／openssl 六个外部工具。
+测试入口强制设置的 `PEACH_REPORTING_TEST_MODE` 防外发标记不参与环境选择；入口源码仍参与代码快照。
 
 uv 只探针、不进指纹：它负责建环境，装出来的解释器与包已经逐个记在摘要里，而它自己由
 winget 自动升级。把它的版本也算进去的话，升级当天全部记录一起失效，被验证的那套环境

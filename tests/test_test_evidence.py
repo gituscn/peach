@@ -105,6 +105,20 @@ class VerificationTests(unittest.TestCase):
         with self.assertRaisesRegex(coordinator.WorkspaceError, "已前进"):
             coordinator.integrate(self.repo, branch)
 
+    def test_reporting_guard_preserves_verification_and_environment_selection_invalidates_it(self):
+        worker, _ = self.worker()
+        with mock.patch.dict(os.environ, {"PEACH_REPORTING_TEST_MODE": "1",
+                                         "PEACH_REPORTING_ENVIRONMENT": "production"}):
+            state = self.certify(worker)
+        with mock.patch.dict(os.environ, {"PEACH_REPORTING_ENVIRONMENT": "production"}):
+            os.environ.pop("PEACH_REPORTING_TEST_MODE", None)
+            self.assertEqual(evidence.key(worker), state)
+            coordinator.ready(worker)
+            with mock.patch.dict(os.environ, {"PEACH_REPORTING_ENVIRONMENT": "test"}):
+                self.assertNotEqual(evidence.key(worker), state)
+                with self.assertRaisesRegex(coordinator.WorkspaceError, "有效测试记录"):
+                    coordinator.ready(worker)
+
     def test_target_change_during_verification_prevents_merge(self):
         worker, branch = self.worker()
         self.certify(worker)
