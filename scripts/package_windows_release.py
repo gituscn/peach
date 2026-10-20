@@ -25,14 +25,19 @@ def archive(destination: Path, root: Path, files: list[Path], manifest: dict | N
             package.writestr("Peach/" + MANIFEST, json.dumps(manifest, ensure_ascii=False, sort_keys=True))
 
 
-def download_notes(version: str, *, lite_installer: bool = False) -> str:
+def download_notes(version: str, *, lite_installer: bool = False,
+                   download_base: str | None = None, macos: bool = False) -> str:
     """发布页的下载入口与包类型说明。"""
-    base = f"https://github.com/peach-mitao/peach/releases/download/v{version}/Peach-{version}-windows-x64"
+    directory = (download_base or f"https://github.com/peach-mitao/peach/releases/download/v{version}").rstrip('/')
+    base = f"{directory}/Peach-{version}-windows-x64"
+    mac = (f"| [macOS Apple Silicon（DMG）]({directory}/Peach-{version}-macos-arm64.dmg) | Apple Silicon Mac |\n"
+           f"| [macOS Intel（DMG）]({directory}/Peach-{version}-macos-x86_64.dmg) | Intel Mac |\n" if macos else "")
     lite = (f"| [轻量安装包（lite-setup.exe）]({base}-lite-setup.exe) | 不含工具，安装时复用已有工具或按需联网下载 |\n"
             if lite_installer else "")
     return (
         "\n## 下载选择\n\n"
         "| 下载 | 用途 |\n| --- | --- |\n"
+        + mac +
         f"| [安装包（setup.exe）]({base}-setup.exe) | 包含全部工具，首次安装推荐 |\n"
         + lite +
         f"| [完整免安装包（ZIP）]({base}.zip) | 包含全部工具，解压后运行 `Peach.exe` |\n"

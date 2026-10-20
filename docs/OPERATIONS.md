@@ -57,6 +57,8 @@ Windows 原生 Runner 在深目录中检出项目时，需为 Git 启用 `core.l
 
 可选的 `r2` 后端使用独立 Standard 桶与 HTTPS 自定义域名。`PEACH_R2_ACCESS_KEY_ID`、`PEACH_R2_SECRET_ACCESS_KEY`、`PEACH_R2_ENDPOINT` 放入受保护且隐藏的 CI 变量，环境作用域为 `release`；`PEACH_R2_BUCKET` 和 `PEACH_R2_PUBLIC_BASE` 指定发布目标。S3 传输复用 rclone，版本文件禁止覆盖；每份文件必须从公开入口完整下载并核对大小及 SHA-256 后，才更新公开版本索引和 Release 链接。
 
+Windows 轻量安装器缺少本地工具包时，先从 R2 下载当前版本的工具；连接失败或内容校验失败时，尝试 GitHub 的同版本文件。两个来源均须匹配安装器内置清单的大小与 SHA-256，不能混用其他版本。发布完成后，用 `scripts/smoke_split_update.py` 的 `--prepare-with-app --online` 在空缓存中运行实际制品，核对联网取得的工具能否重建完整程序。GitLab Release 的下载表指向当前后端，文档链接指向对应版本标签。
+
 R2 公网下载流量免费，存储与请求按账户共享额度计费。预算告警只通知，不会停止服务；R2 后端不提供零费用硬封顶。要求绝不产生按量费用的部署应使用不绑定按量计费的下载服务，不启用 R2 自动发布。
 
 上传前列举本桶现有文件并计算新增制品的总容量；默认超过 8 GB 时停止上传，保留已有文件。`PEACH_R2_MAX_BYTES` 可明确调整该桶预算；此检查不能限制同账户其他桶，也不代替请求量计费保护。版本文件设置长期缓存，公开版本索引只缓存一分钟。

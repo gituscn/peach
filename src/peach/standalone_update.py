@@ -212,7 +212,7 @@ def start() -> dict:
     if public().get("state") in ACTIVE | {"ready"}:
         lock.release()
         return public()
-    data = write({"id": uuid.uuid4().hex}, state="downloading", progress=0, message="正在连接 GitHub")
+    data = write({"id": uuid.uuid4().hex}, state="downloading", progress=0, message="正在连接发布源")
     threading.Thread(target=prepare, args=(data, lock), daemon=True, name="PeachPackageUpdate").start()
     return public()
 

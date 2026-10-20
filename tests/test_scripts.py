@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -4788,6 +4789,32 @@ class R2ReleaseTests(unittest.TestCase):
         for key in ("PEACH_R2_ENDPOINT", "PEACH_R2_PUBLIC_BASE"):
             with mock.patch.dict(os.environ, {**environment, key: "http://example"}, clear=True), self.assertRaises(ValueError):
                 module.rclone_environment()
+
+
+class ReleaseDownloadNotesTests(unittest.TestCase):
+    def test_default_download_notes_use_the_github_version_directory(self):
+        from scripts.package_windows_release import download_notes
+        links = re.findall(r'https://[^\s)]+', download_notes('1.0.0', lite_installer=True))
+        self.assertEqual(len(links), 7)
+        self.assertTrue(all(url.startswith('https://github.com/peach-mitao/peach/releases/download/v1.0.0/')
+                            for url in links))
+
+    def test_r2_release_notes_link_both_native_platforms_and_tagged_docs(self):
+        from scripts.package_windows_release import download_notes
+        from scripts.publish_gitlab_release import r2_release_notes
+        body = ('### 新增\n\n- **更新**：支持公开下载。\n\n'
+                '[说明](https://github.com/peach-mitao/peach/blob/master/docs/OPERATIONS.md)\n'
+                + download_notes('1.0.0', lite_installer=True))
+        result = r2_release_notes(body, '1.0.0', 'https://downloads.peach.video',
+                                  'https://gitgud.io/peach-mitao/peach')
+        links = re.findall(r'https://[^\s)]+', result)
+        self.assertIn('### 新增\n\n- **更新**：支持公开下载。', result)
+        self.assertEqual(result.count('## 下载选择'), 1)
+        self.assertEqual(links[0], 'https://gitgud.io/peach-mitao/peach/-/blob/v1.0.0/docs/OPERATIONS.md')
+        self.assertEqual(len(links[1:]), 9)
+        self.assertTrue(all(url.startswith('https://downloads.peach.video/v1.0.0/') for url in links[1:]))
+        self.assertIn('https://downloads.peach.video/v1.0.0/Peach-1.0.0-macos-arm64.dmg', links)
+        self.assertIn('https://downloads.peach.video/v1.0.0/Peach-1.0.0-macos-x86_64.dmg', links)
 
 
 class GitLabReleaseTests(unittest.TestCase):
