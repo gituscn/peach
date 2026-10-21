@@ -21,7 +21,7 @@ Removed / Fixed / Security。
 
 ## [未发布]
 
-## [0.47.2] - 2026-10-21
+## [0.47.3] - 2026-10-21
 
 ### 新增
 
@@ -46,7 +46,6 @@ Removed / Fixed / Security。
 - **配置**：诊断区分预期断连与实际故障，完整记录浏览器及转码异常，并展示当前周研究上传状态与传输回执。
 - **桌面**：macOS 安装镜像保留日文资源名、软链及应用签名。
 - **更新**：轻量安装包优先从 R2 获取同版本工具，按内置清单校验大小与 SHA-256。
-- **更新**：发行构建通过 R2 传递并校验安装包与媒体工具。
 
 ## [0.46.1] - 2026-10-19
 
@@ -644,8 +643,8 @@ Removed / Fixed / Security。
 - **桌面**：独立包使用 UTF-8 启动日志。
 - **配置**：首次设置后的跳转目标取新鲜读到的 mDNS 名。
 
-[未发布]: https://github.com/peach-mitao/peach/compare/v0.47.2...HEAD
-[0.47.2]: https://github.com/peach-mitao/peach/compare/v0.46.1...v0.47.2
+[未发布]: https://github.com/peach-mitao/peach/compare/v0.47.3...HEAD
+[0.47.3]: https://github.com/peach-mitao/peach/compare/v0.46.1...v0.47.3
 [0.46.1]: https://github.com/peach-mitao/peach/compare/v0.45.0...v0.46.1
 [0.45.0]: https://github.com/peach-mitao/peach/compare/v0.43.0...v0.45.0
 [0.43.0]: https://github.com/peach-mitao/peach/compare/v0.42.0...v0.43.0
