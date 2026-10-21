@@ -10,6 +10,7 @@ import time
 import unittest
 from datetime import timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -727,6 +728,24 @@ class FeedWebTest(FeedWebFixture):
         self.assertTrue(feed_followup.has_local_cover(self.contract.cover_root, "HMN-071"))
         [run] = self.contract.task_runs.query(task_key=feed_followup.COVER_TASK_KEY)
         self.assertEqual(run.result_summary, {"total": 1, "covers": 1})
+
+    def test_a_resumed_batch_does_not_retry_a_code_it_already_tried(self):
+        """服务重启后续跑这一批：上次试过没取到的那部不再在批首重耗一遍，计数接着上次的。"""
+        self._add()
+        self._check()
+        thread = self.contract.feed_job.thread
+        if thread is not None:
+            thread.join(5)
+        asked = []
+        collect = feed_followup.collect
+        feed_followup.collect = lambda provider, code: asked.append(code) or collect(provider, code)
+        saved = {"done_codes": ["SSIS-950"], "fetched": 0, "covers": 0, "miss": 1}
+        handle = SimpleNamespace(saved=saved, progress=lambda **_: None,
+                                 checkpoint=lambda **fields: saved.update(fields))
+        summary = feed_followup.run(self.contract, "feed-scrape:SSIS-950,HMN-071", handle)
+        self.assertEqual(asked, ["HMN-071"])
+        self.assertEqual(summary, {"total": 2, "ok": 1, "miss": 1, "covers": 1})
+        self.assertEqual(saved["done_codes"], ["HMN-071", "SSIS-950"])
 
     def test_covers_cut_off_at_the_connection_are_counted_for_the_new_release_row(self):
         """连不上图片主机的几部单独记数，列表把最近一轮的数带给页面去提示换线路；

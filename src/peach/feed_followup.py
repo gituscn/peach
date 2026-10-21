@@ -376,6 +376,10 @@ def run(contract, key: str, handle) -> dict:
 
     封面断在连接上的几部另记 `cover_network`：这一类换条线路就能取到，新作页据此提示
     去配来源的连接方式，而不是让人以为官方没出图。
+
+    检查点记的是这一批里已经试过的番号，不论取没取到：服务重启后这一条重新领取时只接着
+    试余下的。没取到的那几部由 `scrape_batch`、`cover_backlog` 到了重试时间再排，不在
+    同一批的续跑里每次重启都重耗一遍。
     """
     import httpx
 
@@ -386,11 +390,11 @@ def run(contract, key: str, handle) -> dict:
     provider = None
     saved = getattr(handle, 'saved', {})
     saved = saved if isinstance(saved, dict) else {}
-    completed = set(saved.get('completed_codes') or [])
+    done = set(saved.get('done_codes') or [])
     fetched, covers = saved.get('fetched', 0), saved.get('covers', 0)
-    missed = unreachable = 0
+    missed, unreachable = saved.get('miss', 0), saved.get('cover_network', 0)
     for index, code in enumerate(codes):
-        if code in completed:
+        if code in done:
             continue
         handle.progress(current=index, total=len(codes),
                         label=f"{TASK_LABEL}：{code}", throttle=0)
@@ -401,12 +405,10 @@ def run(contract, key: str, handle) -> dict:
         if row is None:
             # 壳被删了，或者这个番号这中间已经入库。两种都不该再取一遍。
             continue
-        metadata_ok = row['scraped_at'] is not None and row['scrape_error'] is None
         if row["scraped_at"] is None or row["scrape_error"] is not None:
             provider = provider or LibraryMetadataProvider(contract.follow_secrets_root)
             if _scrape_fields(contract, provider, row):
                 fetched += 1
-                metadata_ok = True
             else:
                 missed += 1
         # 封面地址在取资料那一步才写上壳，所以取完再读一遍，不用循环开头那份。
@@ -414,10 +416,7 @@ def run(contract, key: str, handle) -> dict:
             cover_url = connection.execute(
                 "SELECT cover_url FROM feed_discovery WHERE id=?", (int(row["id"]),)).fetchone()
         try:
-            covered = ensure_cover(contract, code, cover_url[0] if cover_url else None)
-            covers += covered
-            if metadata_ok and covered:
-                completed.add(code)
+            covers += ensure_cover(contract, code, cover_url[0] if cover_url else None)
         except (CoverConnectError, httpx.TransportError):
             unreachable += 1
         except Exception:  # noqa: BLE001 - 取不到封面这一部照样有资料，下一轮再试
@@ -426,7 +425,9 @@ def run(contract, key: str, handle) -> dict:
         with contract.database.write_transaction() as connection:
             connection.execute("UPDATE feed_discovery SET scraped_at=? WHERE id=?",
                                (feeds.stamp(), int(row["id"])))
-        handle.checkpoint(completed_codes=sorted(completed), fetched=fetched, covers=covers)
+        done.add(code)
+        handle.checkpoint(done_codes=sorted(done), fetched=fetched, covers=covers,
+                          miss=missed, cover_network=unreachable)
     handle.progress(current=len(codes), total=len(codes), label=TASK_LABEL, throttle=0)
     contract.cache_bust()
     summary = {"total": len(codes), "ok": fetched, "miss": missed, "covers": covers}
