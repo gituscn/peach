@@ -10,7 +10,6 @@ from .avatar_picker import Choice, MAX_ASSET_CHOICES, MAX_IMAGE_BYTES, PickerErr
 from .follow_avatar import profile_identities
 from .follow_identity import official_avatar_url
 from .follow_store import FollowItemRow, FollowStore
-from . import images
 
 
 @dataclass(frozen=True)
