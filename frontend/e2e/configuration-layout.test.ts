@@ -97,16 +97,17 @@ describe('配置表单与行间距', () => {
         const form = page.getByRole('form', { name: '媒体目录', exact: true });
         const protectedFolder = form.locator('[data-media-read-policy="0"] [aria-haspopup="listbox"]');
         await protectedFolder.waitFor();
+        // 带品牌图的四行，来源、所属媒体库与图标各显示一枚站标。
         await page.waitForFunction(() => {
           const marks = [...document.querySelectorAll<HTMLImageElement>('[data-folder-row] img')];
-          return marks.length === 8 && marks.every(image => image.complete && image.naturalWidth > 0);
+          return marks.length === 12 &&marks.every(image => image.complete && image.naturalWidth > 0);
         });
         const marks = await form.locator('[data-folder-row] img').evaluateAll(images => images.map(image => {
           const box = image.getBoundingClientRect();
           return { inline: image.getAttribute('src')?.startsWith('data:image/png;base64,'),
             width: box.width, height: box.height };
         }));
-        assert.deepEqual(marks, Array.from({ length: 8 }, () => ({ inline: true, width: 16, height: 16 })));
+        assert.deepEqual(marks, Array.from({ length: 12 }, () => ({ inline: true, width: 16, height: 16 })));
         assert.ok(!(await form.innerText()).includes('（只读）'));
         assert.ok((await protectedFolder.textContent())?.includes('代理保护'));
         assert.ok((await form.locator('[data-media-read-policy="1"]').textContent())?.includes('正常读取'));
@@ -115,11 +116,19 @@ describe('配置表单与行间距', () => {
             const row = form.locator('[data-folder-row]').nth(index);
             const source = await row.locator('[aria-haspopup="listbox"]').first().boundingBox();
             const policy = await row.locator('[data-media-read-policy] [aria-haspopup="listbox"]').boundingBox();
+            const library = await row.getByRole('button', { name: new RegExp(`目录所属媒体库 ${index + 1}`) }).boundingBox();
             const name = await row.getByRole('textbox', { name: `媒体库名称 ${index + 1}`, exact: true }).boundingBox();
             const icon = await row.getByRole('button', { name: `媒体库图标 ${index + 1}`, exact: true }).boundingBox();
-            assert.ok(source && policy && name && icon);
-            const centers = [source, policy, name, icon].map(box => box.y + box.height / 2);
-            assert.ok(Math.max(...centers) - Math.min(...centers) <= 3, JSON.stringify({ index, source, policy, name, icon }));
+            assert.ok(source && policy && library && name && icon);
+            // 两排：来源与读取策略一排，所属媒体库、名称、图标一排；同排控件中线对齐，所属媒体库与来源同列。
+            const spread = (boxes: { y: number; height: number }[]) => {
+              const centers = boxes.map(box => box.y + box.height / 2);
+              return Math.max(...centers) - Math.min(...centers);
+            };
+            assert.ok(spread([source, policy]) <= 3, JSON.stringify({ index, source, policy }));
+            assert.ok(spread([library, name, icon]) <= 3, JSON.stringify({ index, library, name, icon }));
+            assert.ok(library.y >= source.y + source.height, JSON.stringify({ index, source, library }));
+            assert.ok(Math.abs(library.x - source.x) <= 1 && Math.abs(library.width - source.width) <= 1);
             assert.ok(policy.width <= 132);
             const bounds = await row.boundingBox();
             assert.ok(bounds && bounds.x + bounds.width - (icon.x + icon.width) <= 14);

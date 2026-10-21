@@ -246,9 +246,10 @@ def build_plan(connection: sqlite3.Connection, *, location: str,
                      "current_path": str(row["path"]), "target_path": target,
                      "action": "skip", "reason": reason})
 
+    root_states = None
     if online is None:
-        mounts = [translate_ledger_path(root) for root in declared.get(location, ())]
-        online = any(root_online(mount) for mount in mounts)
+        root_states = [root_online(translate_ledger_path(root)) for root in declared.get(location, ())]
+        online = any(root_states)
     if not online:
         for row in rows:
             skip(row, SKIP_OFFLINE)
@@ -267,6 +268,9 @@ def build_plan(connection: sqlite3.Connection, *, location: str,
             skip(row, SKIP_OUTSIDE_ROOT)
             continue
         root = declared[location][index]
+        if root_states is not None and not root_states[index]:
+            skip(row, SKIP_OFFLINE)
+            continue
         values = placeholder_values(row, performers.get(int(row["id"]), []))
         current_dir = ntpath.dirname(path)
         target_dir = current_dir

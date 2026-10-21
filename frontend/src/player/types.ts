@@ -56,6 +56,8 @@ export type VideojsFactory = (video: HTMLVideoElement, options: Record<string, u
 /** 作品与关注条目共有的那几样。作品来自 `/api/item`，关注来自 `/api/follow/item`。 */
 export interface PlayerItem {
   id: number;
+  root_id?: string;
+  library_id?: string;
   name?: string;
   title?: string;
   location?: string;

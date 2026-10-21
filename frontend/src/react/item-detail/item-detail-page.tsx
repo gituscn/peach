@@ -106,7 +106,7 @@ function Detail(props: ItemDetailProps & { item: DetailItem; queue: DetailQueue 
     apiSend(PLAYLIST_URL, { action: 'progress', id: queue.playlistId, asset_id: item.id }).catch(() => {});
   }, []);
 
-  const gate = mediaGate(item, helpers.sourceOffline(item.location || ''));
+  const gate = mediaGate(item, helpers.sourceOffline(String(item.root_id || item.location || '')));
   const next = nextPart(queue, item.id);
   const continuePart = () => {
     if (next && queue) actions.openQueueItem({ kind: queue.kind, seedId: queue.seedId, autoplay: true }, next.id);
@@ -226,7 +226,7 @@ function OfflineGate({ item, badge, helpers, actions }: {
     <div id="offlineGate" role="status" data-item-gate="offline">
       <Html html={badge} />
       <b>媒体目录无法访问</b>
-      <span>{helpers.offlineReason(item.location || '')}</span>
+      <span>{helpers.offlineReason(String(item.root_id || item.location || ''))}</span>
       <button className="chip" id="offlineRetry" type="button" disabled={checking} onClick={() => void retry()}>
         {still ? '仍无法读取 · 刷新' : '刷新状态'}
       </button>

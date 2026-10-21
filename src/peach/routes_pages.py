@@ -407,6 +407,19 @@ def _json_text(value: object) -> str:
     return "" if value is None else str(value)
 
 
+def _submitted_media_rows(rows: object) -> dict[str, list]:
+    """JSON 媒体行拆成与表单相同的逐列列表；身份字段按行原样带给配置校验。"""
+    rows = [row if isinstance(row, dict) else {} for row in rows] if isinstance(rows, list) else []
+    return {
+        "media_dir": [_json_text(row.get("path")) for row in rows],
+        "media_location": [_json_text(row.get("location", "local")) for row in rows],
+        "media_root": [_json_text(row.get("root")) for row in rows],
+        "media_cost": [row.get("cost") for row in rows],
+        "media_identity": [{key: row[key] for key in ("root_id", "library_id", "library", "library_icon", "change_mode")
+                            if key in row} for row in rows],
+    }
+
+
 @router.post("/api/setup")
 async def setup_submit_json(request: Request):
     """首启提交：校验一份答卷，全对就落盘；错误按题目 key 回给页面写回原位。
@@ -431,16 +444,11 @@ async def setup_submit_json(request: Request):
         reporting = remote_reporting.parse_choices(body.get("remote_reporting", {}), partial=True)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    rows = body.get("media_dir")
-    rows = [row if isinstance(row, dict) else {} for row in rows] if isinstance(rows, list) else []
     submitted: dict[str, object] = {
         key: _json_text(body[key])
         for key in ("data_root", "host", "port", "mdns_name", "access_password", "access_confirm")
         if body.get(key) is not None}
-    submitted["media_dir"] = [_json_text(row.get("path")) for row in rows]
-    submitted["media_location"] = [_json_text(row.get("location", "local")) for row in rows]
-    submitted["media_root"] = [_json_text(row.get("root")) for row in rows]
-    submitted["media_cost"] = [row.get("cost") for row in rows]
+    submitted.update(_submitted_media_rows(body.get("media_dir")))
     scan_now = body.get("scan_now") is True
     history_guide = body.get("history_guide") is True
     windows = os.name == "nt"
@@ -562,8 +570,17 @@ def _read_answers(
             for index, row in enumerate(sources):
                 if index < len(costs) and costs[index] is not None:
                     row["cost"] = costs[index]
+                identities = submitted.get("media_identity", [])
+                if isinstance(identities, list) and index < len(identities) and isinstance(identities[index], dict):
+                    row.update(identities[index])
             sources = media_configuration.prepare_sources(sources, windows=windows, config=config)
             _, _, problems = media_configuration.validate(sources, windows=windows, config=config)
+            if not problems:
+                from . import media_identity
+                try:
+                    media_identity.configure_sources(config, sources, windows=windows)
+                except ValueError as exc:
+                    problems = [str(exc)] * len(sources)
             problems = _setup_media_source_errors(dirs, kinds, problems, question.validate)
             if problems:
                 errors["media_dir"] = problems

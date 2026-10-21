@@ -111,7 +111,9 @@ class LibraryChannels:
 
     @staticmethod
     def _row(key, source, root, target, names, *, cloud_root="", can_cancel=True):
+        from . import media_identity, settings_file
         name = names.get(root_key(root)) or PureWindowsPath(root).name or root
         label = name if name == SOURCES[source].name else f"{name} · {SOURCES[source].name}"
         return {"key": key, "source": source, "label": label, "configured": True,
-                "target": target, "root": root, "cloud_root": cloud_root, "can_cancel": can_cancel}
+                "target": target, "root": root, "cloud_root": cloud_root, "can_cancel": can_cancel,
+                **media_identity.ownership(settings_file.active(), root)}

@@ -281,6 +281,9 @@ describe('片单与起播', () => {
     expect(playable(row(2, { cost: 'metered' }), offline)).toBe(false);
     expect(playable(row(3, { duration: 0 }), offline)).toBe(false);
     expect(playable(row(4, { location: 'gone' }), offline)).toBe(false);
+    const rootOffline = (key: string) => key === 'root-offline';
+    expect(playable(row(5, { location: 'local', root_id: 'root-offline' }), rootOffline)).toBe(false);
+    expect(playable(row(6, { location: 'local', root_id: 'root-online' }), rootOffline)).toBe(true);
     serve({ draws: [[row(1, { location: 'gone' }), row(2)]] });
     await open();
     expect(current().item.id).toBe(2);

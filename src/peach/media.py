@@ -107,6 +107,7 @@ class MediaOffline(MediaUnavailable):
         super().__init__(asset_id)
         self.asset_id = asset_id
         self.source = source
+        self.root_id = ""
 
 
 class FilesystemBackend:
@@ -142,13 +143,19 @@ class FilesystemBackend:
         if not thumbnail and is_windows_path(raw):
             translated = translate_ledger_path(raw)
             source = PureWindowsPath(raw).drive
+            from . import media_identity, settings_file
+            root_id = media_identity.ownership(settings_file.active(), raw).get("root_id", "")
+            def offline():
+                error = MediaOffline(asset_id, source)
+                error.root_id = root_id
+                return error
             if is_unmapped(translated):
-                raise MediaOffline(asset_id, source)
+                raise offline()
             candidate = normalized_path(raw)
             for root in self.allowed_roots:
                 if within_root(candidate, root):
                     if not root_online(root):
-                        raise MediaOffline(asset_id, source)
+                        raise offline()
                     break
         raise MediaUnavailable(asset_id)
 

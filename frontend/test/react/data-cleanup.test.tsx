@@ -83,7 +83,7 @@ function confirmWith(answer: boolean) {
 const wrap = (element: ReactElement) => mount(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>);
 
 const withRoots: MediaSourcesData = {
-  sources: [{ location: 'local', online: true, roots: ['R:\\media'] }, { location: '115', online: false, roots: ['B:\\'] },
+  sources: [{ location: 'local', online: true, roots: [{ online: true }] }, { location: '115', online: false, roots: [{ online: false }] },
     { location: 'online', online: true }],
 };
 const withoutRoots: MediaSourcesData = {

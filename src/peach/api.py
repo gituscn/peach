@@ -139,7 +139,7 @@ _DEFAULT_DETAILS = {
 def _offline_response(exc: MediaOffline) -> JSONResponse:
     """脱盘：来源盘整体不在，客户端据此显示「脱盘模式」而不是当成文件丢失。"""
     response = JSONResponse(
-        {"error": "offline", "source": exc.source, "id": exc.asset_id},
+        {"error": "offline", "source": exc.source, "root_id": exc.root_id, "id": exc.asset_id},
         status_code=503,
     )
     response.headers["X-Peach-Offline"] = "1"

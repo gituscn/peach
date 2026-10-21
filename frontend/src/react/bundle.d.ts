@@ -235,6 +235,7 @@ export interface UpdateJob {
 }
 
 export interface MediaSource {
+  root_id?: string; library_id?: string;
   location: string; root: string; path: string; online?: boolean; library?: string; library_icon?: string; cost?: 'free' | 'metered';
 }
 

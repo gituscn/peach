@@ -6,7 +6,7 @@ import type { ConfigurationData } from '../../src/react/bundle';
 import { CloudDriveGuide } from '../../src/react/settings/clouddrive-guide';
 import { MEDIA_SOURCE_ICONS } from '../../src/ui-kit/media-source-icons';
 import { MediaSettings } from '../../src/react/settings/media-settings';
-import { buttonNamed, choose, click, fetchMock, mount, section, sentBody, settle, submit } from './render';
+import { buttonNamed, choose, click, fetchMock, mount, section, sentBody, settle, submit, type } from './render';
 
 vi.mock('../../src/react/settings/service-preferences', () => ({ VideoThumbnailRow: () => null }));
 vi.mock('../../src/react/settings/cloud-proxy-settings', () => ({ CloudProxySettings: () => null }));
@@ -52,6 +52,35 @@ it('不能编辑时只说原因，不画表单', async () => {
 });
 
 describe('媒体目录', () => {
+  it('同一媒体库的名称同步到全部目录，保存保留根目录身份', async () => {
+    const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
+    vi.stubGlobal('fetch', fetcher);
+    const host = await open({ windows: true, media_sources: [
+      { location: 'local', root: 'D:\\JAV', path: 'D:\\JAV', root_id: 'root-one', library_id: 'library-one', library: 'JAV', cost: 'free' },
+      { location: 'local', root: 'E:\\JAV', path: 'E:\\JAV', root_id: 'root-two', library_id: 'library-one', library: 'JAV', cost: 'free' },
+    ] });
+    await type(host.querySelector<HTMLInputElement>('[aria-label="媒体库名称 1"]'), '私人馆藏');
+    expect(host.querySelector<HTMLInputElement>('[aria-label="媒体库名称 2"]')?.value).toBe('私人馆藏');
+    await submit(host.querySelector('form'));
+    expect(sentBody(fetcher).media_sources).toMatchObject([
+      { root_id: 'root-one', library_id: 'library-one', library: '私人馆藏' },
+      { root_id: 'root-two', library_id: 'library-one', library: '私人馆藏' },
+    ]);
+  });
+
+  it('目录重定位保留账本前缀，添加另一目录交由服务端生成身份', async () => {
+    const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
+    vi.stubGlobal('fetch', fetcher);
+    const host = await open({ windows: true, media_sources: [
+      { location: 'local', root: 'D:\\JAV', path: 'D:\\JAV', root_id: 'root-one', library_id: 'library-one', library: 'JAV', cost: 'free' },
+    ] });
+    await type(paths(host)[0], 'F:\\JAV');
+    await choose(host.querySelector('[aria-label="目录变更方式 1"]'), '重定位此目录，保留文件记录');
+    await submit(host.querySelector('form'));
+    expect(sentBody(fetcher).media_sources[0]).toMatchObject({
+      root_id: 'root-one', root: 'D:\\JAV', path: 'F:\\JAV', change_mode: 'relocate',
+    });
+  });
   it.each([['guangya', '光鸭云盘'], ['onedrive', 'OneDrive'], ['mounted', '其他已挂载网盘']])(
     '%s 来源回填名称、挂载帮助和现有图标，保存带上来源', async (location, label) => {
     const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
@@ -66,7 +95,7 @@ describe('媒体目录', () => {
     else expect(host.querySelector('img')?.getAttribute('src')).toBe(MEDIA_SOURCE_ICONS[location]);
     expect(host.textContent).toContain('CloudDrive2 v1.1.0');
     await submit(host.querySelector('form'));
-    expect(sentBody(fetcher).media_sources).toEqual([
+    expect(sentBody(fetcher).media_sources).toMatchObject([
       { location, root: 'G:\\Movies', path: 'G:\\Movies', library: '', library_icon: '',
         cost: location === 'guangya' ? 'free' : 'metered' },
     ]);
@@ -108,7 +137,7 @@ describe('媒体目录', () => {
     expect(paths(host).map((input) => input.value)).toEqual(['/Volumes/115', '/Volumes/PikPak']);
     await submit(host.querySelector('form'));
     await settle();
-    expect(sentBody(fetcher).media_sources).toEqual([
+    expect(sentBody(fetcher).media_sources).toMatchObject([
       { location: '115', root: 'B:\\', path: '/Volumes/115', library: '收藏', library_icon: 'heart', cost: 'free' },
       { location: 'pikpak', root: 'A:\\', path: '/Volumes/PikPak', library: '', library_icon: '', cost: 'metered' },
     ]);
@@ -124,7 +153,7 @@ describe('媒体目录', () => {
     expect(policy?.textContent).toContain('代理保护');
     await choose(policy, '正常读取');
     await submit(host.querySelector('form'));
-    expect(sentBody(fetcher).media_sources).toEqual([
+    expect(sentBody(fetcher).media_sources).toMatchObject([
       { location: 'onedrive', root: 'O:\\Movies', path: 'O:\\Movies', library: '', library_icon: '', cost: 'free' },
     ]);
   });

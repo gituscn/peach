@@ -168,6 +168,20 @@ class PlanTests(unittest.TestCase):
         self.addCleanup(lambda: __import__("shutil").rmtree(self.holder, ignore_errors=True))
         self.db_path = fresh_ledger(self.holder)
 
+    def test_online_root_does_not_hide_another_roots_offline_state(self):
+        _seed(self.db_path, [
+            dict(id=1, path='R:\\media\\a.mp4', name='a.mp4', code='ABC-001'),
+            dict(id=2, path='S:\\media\\b.mp4', name='b.mp4', code='ABC-002'),
+        ])
+        with closing(sqlite3.connect(self.db_path)) as connection, \
+                mock.patch.object(organize, 'translate_ledger_path', side_effect=lambda root: root), \
+                mock.patch.object(organize, 'root_online', side_effect=lambda root: str(root).startswith('R:')):
+            result = organize.build_plan(connection, location='local', roots={'local': ('R:\\media', 'S:\\media')},
+                                         file_template='{number}')
+        self.assertEqual(result['counts']['change'], 1)
+        self.assertEqual(result['counts']['skip'], 1)
+        self.assertEqual(result['rows'][1]['reason'], organize.SKIP_OFFLINE)
+
     def test_rename_in_place_and_move_into_template_directory(self):
         _seed(self.db_path, [
             {"id": 1, "path": "R:\\media\\旧\\[site.com]abc123.mp4",

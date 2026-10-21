@@ -7,7 +7,7 @@ import shutil
 import sys
 from typing import Any
 
-from . import platform
+from . import platform, media_identity
 from .media_sources import SOURCE_OPTIONS, cost_for
 
 
@@ -53,20 +53,21 @@ def mount_dependencies(*, system: str | None = None) -> list[dict[str, Any]]:
 
 def rows(config, *, windows: bool, probe: bool = False) -> list[dict[str, Any]]:
     result = []
+    libraries, stored = media_identity.catalog(config)
     for location, roots in config.locations.items():
         mounts = config.mounts.get(location, ())
         for index, root in enumerate(roots):
-            mount = root if windows else (mounts[index] if index < len(mounts) else "")
+            mount = (mounts[index] if index < len(mounts) and mounts[index] else root if windows else "")
+            identity = next(((key, value) for key, value in stored.items()
+                             if media_identity.path_key(value["root"]) == media_identity.path_key(root)), None)
+            root_id, value = identity
+            library = libraries[value["library_id"]]
             result.append({"location": location, "root": root, "path": mount,
-                           "library": config.library_names.get(root) or PureWindowsPath(root).name or root,
-                           "library_icon": config.library_icons.get(root, ""),
+                           "root_id": root_id, "library_id": value["library_id"],
+                           "library": library["name"], "library_icon": library.get("icon", ""),
                            "cost": cost_for(location, root, config),
                            "online": platform.root_online(Path(mount)) if probe and mount else False})
     return result
-
-
-def _overlaps(first: PureWindowsPath, second: PureWindowsPath) -> bool:
-    return first == second or first.is_relative_to(second) or second.is_relative_to(first)
 
 
 def _automatic_root(location: str, path: str, used: list[PureWindowsPath]) -> str:
@@ -75,7 +76,7 @@ def _automatic_root(location: str, path: str, used: list[PureWindowsPath]) -> st
     drives = dict.fromkeys(["R:", *(f"{chr(code)}:" for code in range(65, 91))])
     for drive in drives:
         candidate = PureWindowsPath(drive + "\\", "peach", location, token)
-        if not any(_overlaps(candidate, other) for other in used):
+        if not any(media_identity.overlaps(candidate, other) for other in used):
             return str(candidate)
     return ""
 
@@ -115,7 +116,7 @@ def prepare_sources(raws: object, *, windows: bool, config=None) -> object:
 def _validated_paths(row: dict, *, windows: bool) -> tuple[PureWindowsPath, PurePath]:
     """取得数据库路径前缀与本机实际目录，用于检查重复和包含关系。"""
     text = str(row.get("path", "")).strip()
-    root = text if windows else str(row.get("root", "")).strip()
+    root = str(row.get("root") or text).strip() if windows else str(row.get("root", "")).strip()
     if any(ord(char) < 32 for char in text + root):
         raise ValueError("路径不能包含控制字符")
     if not windows and not root:
@@ -160,12 +161,11 @@ def validate(raws: object, *, windows: bool, config=None) -> tuple[dict, dict, l
                     raise ValueError("媒体目录与另一行重复或互相包含")
             seen.append((declared, path))
             locations.setdefault(location, []).append(str(declared))
-            if not windows:
-                mounts.setdefault(location, []).append(str(path))
+            mounts.setdefault(location, []).append(str(path) if not windows or declared != path else "")
         except ValueError as exc:
             errors[index] = str(exc)
     return ({key: tuple(value) for key, value in locations.items()},
-            {key: tuple(value) for key, value in mounts.items()},
+            {key: tuple(value) for key, value in mounts.items() if any(value)},
             errors if any(errors) else [])
 
 
@@ -173,7 +173,7 @@ def costs(raws: list[dict], config, *, windows: bool) -> dict[str, str]:
     """按数据库路径前缀保存已校验媒体行的读取策略。"""
     result = dict(getattr(config, "media_costs", {}))
     for row in raws:
-        root = str(PureWindowsPath(row["path"] if windows else row["root"]))
+        root = str(PureWindowsPath(row.get("root") or row["path"]))
         for previous in tuple(result):
             if PureWindowsPath(previous) == PureWindowsPath(root):
                 del result[previous]

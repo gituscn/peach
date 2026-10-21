@@ -353,9 +353,19 @@ def configure(config: PeachConfig, answers: Answers, *, windows: bool) -> PeachC
         for row in sources:
             if row.get("library"):
                 library_names[str(PureWindowsPath(row["path"] if windows else row["root"]))] = str(row["library"])
-    return replace(prepared, locations=locations, library_names=library_names,
+    prepared = replace(prepared, locations=locations, library_names=library_names,
+                   library_catalog={}, storage_roots={},
                    media_costs=(media_configuration.costs(sources, config, windows=windows)
                                 if answers.media_sources is not None else dict(config.media_costs)))
+    from . import media_identity
+    if answers.media_sources is not None:
+        identities = media_identity.configure_sources(config, sources, windows=windows)
+        return media_identity.project(prepared, identities.library_catalog, identities.storage_roots)
+    if config.storage_roots:
+        sources = media_identity.sources_for_paths(config, answers.media_dirs, windows=windows)
+        identities = media_identity.configure_sources(config, sources, windows=windows)
+        return media_identity.project(prepared, identities.library_catalog, identities.storage_roots)
+    return media_identity.project(prepared)
 
 
 @dataclass(frozen=True)

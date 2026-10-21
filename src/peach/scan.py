@@ -42,7 +42,7 @@ from pathlib import Path, PureWindowsPath
 from filelock import FileLock
 
 from . import folder_rules, junk, record_rehome, subtitles, wants
-from .platform import is_windows_path, resolve_location, resolve_root
+from .platform import is_windows_path, is_unmapped, resolve_location, resolve_root
 from .processing_control import checkpoint
 from .fsutil import atomic_write_text
 
@@ -81,6 +81,30 @@ _UPSERT = """INSERT INTO asset(location,path,name,medium,size,mtime,first_seen,l
 
 class ScanTargetError(ValueError):
     """来源与扫描根对不上，或者来源在本机没有落点。消息可以直接给人看。"""
+
+
+def _registered_paths(connection, location, root):
+    """保留既有文件路径写法；有歧义时拒绝自动合并个人记录。"""
+    declared = PureWindowsPath(root)
+    result = {}
+    for (path,) in connection.execute("SELECT path FROM asset WHERE location=? AND path IS NOT NULL", (location,)):
+        target = PureWindowsPath(path)
+        if not target.is_relative_to(declared):
+            continue
+        key = str(target).casefold()
+        if key in result and result[key] != path:
+            raise ScanTargetError("同一规范路径有多条文件记录，请先复核重复记录")
+        result[key] = path
+    return result
+
+
+def _upsert_records(connection, batch, registered):
+    rows = []
+    for location, path, *values in batch:
+        key = str(PureWindowsPath(path)).casefold()
+        stored = registered.setdefault(key, path)
+        rows.append((location, stored, *values))
+    connection.executemany(_UPSERT, rows)
 
 
 def medium_of(name: str) -> str:
@@ -156,16 +180,18 @@ def ledger_root_for(
     """
     windows = os.name == "nt" if windows is None else windows
     text = os.fspath(root)
-    if windows:
-        return text if is_windows_path(text) else str(Path(text).resolve())
     declared = declared_roots.get(location, ())
     location_mounts = tuple(mounts.get(location, ()))
     for declared_root, mount in zip(declared, location_mounts):
+        if not str(mount):
+            continue
         try:
             tail = Path(text).resolve().relative_to(Path(mount).resolve()).parts
         except ValueError:
             continue
         return str(PureWindowsPath(declared_root, *tail))
+    if windows:
+        return text if is_windows_path(text) else str(Path(text).resolve())
     if is_windows_path(text):
         return text
     if not location_mounts:
@@ -182,11 +208,11 @@ def walk_root_for(
 ) -> Path:
     """取得数据库路径在本机对应的扫描目录。调用前先过 `check_scan_target`。"""
     windows = os.name == "nt" if windows is None else windows
-    if windows:
-        return Path(root)
     _location, index, tail = resolve_root(root, declared_roots)
     location_mounts = tuple(mounts.get(location, ()))
-    if index >= len(location_mounts):
+    if index >= len(location_mounts) or str(location_mounts[index]) in ("", ".") or is_unmapped(Path(location_mounts[index])):
+        if windows:
+            return Path(root)
         raise ScanTargetError(
             f"✗ 媒体来源 {location!r} 的第 {index + 1} 个数据库路径前缀没有对应的本机目录；"
             f"请先在 [media.mounts] 中按相同顺序配置媒体目录")
@@ -294,13 +320,15 @@ def ingest_path(
     connection = sqlite3.connect(db_path, timeout=30)
     try:
         connection.execute("PRAGMA journal_mode=WAL")
-        connection.execute(_UPSERT, (location, str(ledger_path), name, medium,
-                                     stat.st_size, mtime, now, now))
+        registered = _registered_paths(connection, location, str(ledger_dir))
+        _upsert_records(connection, [(location, str(ledger_path), name, medium,
+                                     stat.st_size, mtime, now, now)], registered)
+        stored_path = registered[str(ledger_path).casefold()]
         if pairing is not None:
             tracks = subtitles.record(connection, location, pairing, now)[0]
         asset_id, first_seen = connection.execute(
             "SELECT id,first_seen FROM asset WHERE location=? AND path=?",
-            (location, str(ledger_path))).fetchone()
+            (location, stored_path)).fetchone()
         new = first_seen == now
         reattached = len(record_rehome.reattach(connection, [asset_id] if new else [], now=now))
         acquired = len(wants.reconcile(connection, [asset_id] if new else []))
@@ -400,7 +428,9 @@ def scan_location(db_path, location, root, **kwargs) -> ScanResult:
     if 'save_checkpoint' in kwargs or 'resume_state' in kwargs:
         return _scan_location(db_path, location, root, **kwargs)
     from .update_tasks import state_for
-    key = hashlib.sha256(f'{location}:{root}'.encode()).hexdigest()
+    mapped = walk_root_for(location, root, declared_roots=kwargs['declared_roots'],
+                           mounts=kwargs.get('mounts') or {}, windows=kwargs.get('windows'))
+    key = hashlib.sha256(f'{location}:{PureWindowsPath(root)}:{mapped}'.casefold().encode()).hexdigest()
     path = state_for(Path(db_path)).parent / 'scan-checkpoints' / f'{key}.json'
     path.parent.mkdir(parents=True, exist_ok=True)
     with FileLock(str(path) + '.lock', timeout=0):
@@ -438,6 +468,9 @@ def _scan_location(
     walk_root = walk_root_for(
         location, root, declared_roots=declared_roots, mounts=mounts or {}, windows=windows)
     previous = resume_state or {}
+    mapping = str(walk_root)
+    if previous.get('mapping') != mapping:
+        previous = {}
     if previous.get('result'):
         return ScanResult(**{**previous['result'], 'new_ids': tuple(previous['result']['new_ids'])})
     ledger_root = PureWindowsPath(root)
@@ -457,7 +490,7 @@ def _scan_location(
         artwork_parents = {os.path.dirname(value) for value in [*pending, *([directory] if directory else [])]
                            if os.path.basename(value).casefold() in ARTWORK_DIRS}
         video_dirs.intersection_update(artwork_parents)
-        save_checkpoint(dict(scan_time=now, pending=list(pending), files=files,
+        save_checkpoint(dict(mapping=mapping, scan_time=now, pending=list(pending), files=files,
                              total_bytes=total, sidecars=skipped, subtitles=tracks,
                              orphan_subtitles=orphans, video_dirs=sorted(video_dirs),
                              current_directory=directory, cursor=cursor, here=dict(here or {})))
@@ -466,6 +499,7 @@ def _scan_location(
     connection = sqlite3.connect(db_path, timeout=30)
     try:
         connection.execute("PRAGMA journal_mode=WAL")
+        registered = _registered_paths(connection, location, root)
         for directory, entries in _walk(walk_root, pending):
             checkpoint('scan')
             relative = Path(directory).relative_to(walk_root).parts
@@ -499,7 +533,7 @@ def _scan_location(
                 total += stat.st_size
                 progress(files, total)
                 if len(batch) >= BATCH_SIZE:
-                    connection.executemany(_UPSERT, batch)
+                    _upsert_records(connection, batch, registered)
                     connection.commit()
                     batch.clear()
                     save_directory(directory, name, here)
@@ -509,7 +543,7 @@ def _scan_location(
                 ledger_root.joinpath(*relative), here,
                 [name for name in here if medium_of(name) == "video"])
             if batch:
-                connection.executemany(_UPSERT, batch)
+                _upsert_records(connection, batch, registered)
                 batch.clear()
             directory_tracks, directory_orphans = subtitles.record(connection, location, sidecars, now)
             connection.commit()
@@ -517,25 +551,27 @@ def _scan_location(
             orphans += directory_orphans
             save_directory()
         if batch:
-            connection.executemany(_UPSERT, batch)
+            _upsert_records(connection, batch, registered)
         connection.commit()
         # 只有 INSERT 那一支写 `first_seen`，等于本次时刻的就是这一轮新建的行。
+        from .media_folders import path_predicate
+        scope, parameters = path_predicate(location, root)
         new_ids = tuple(row[0] for row in connection.execute(
-            "SELECT id FROM asset WHERE location=? AND first_seen=? ORDER BY id", (location, now)))
+            "SELECT a.id FROM asset a WHERE " + scope + " AND a.first_seen=? ORDER BY a.id", (*parameters, now)))
         reattached = len(record_rehome.reattach(connection, new_ids, now=now))
         acquired = len(wants.reconcile(connection, new_ids))
         folder_rules.apply_new(connection, new_ids)
         connection.commit()
-        gone =connection.execute(
-            "SELECT COUNT(*) FROM asset WHERE location=? AND last_seen<?",
-            (location, now)).fetchone()[0]
+        gone = connection.execute(
+            "SELECT COUNT(*) FROM asset a WHERE " + scope + " AND a.last_seen<?",
+            (*parameters, now)).fetchone()[0]
     finally:
         connection.close()
     checked = junk.isolate(db_path, roots=[(location, root)])
     result = ScanResult(location, root, files, total, time.time() - started, gone,
                         tracks, orphans, skipped, new_ids, reattached, acquired,
                         checked['isolated'], checked['review'])
-    save_checkpoint({'result': asdict(result)})
+    save_checkpoint({'mapping': mapping, 'result': asdict(result)})
     progress(files, total, force=True)
     report(result.summary())
     return result

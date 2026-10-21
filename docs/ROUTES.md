@@ -28,6 +28,12 @@
 
 ## 浏览入口
 
+馆藏查询的 `library` 参数使用持久 `library_id`。`GET /api/libraries` 返回 `id`、`name`、`icon`、`folders`、`metered` 与根目录身份列表；名称只用于展示。未知 ID 筛选为空集。`GET /api/items` 和 `/api/item` 的可归属资产附带 `root_id`、`library_id`，版本和分卷仍使用各自资产 ID。
+
+`GET /api/sources` 在来源行的 `roots` 中提供 `root_id`、`library_id`、根目录状态和检测时间；`offline_roots` 列出确认离线的根目录 ID，`offline` 保留全部根目录离线的来源摘要。媒体访问失败的 `offline` 响应同时包含对应 `root_id`。
+
+配置和首次设置的媒体行接受 `root_id`、`library_id`；新增媒体库使用独立 ID，同名不合并。既有根目录更改实际位置必须附 `change_mode: "relocate"`，保留 `root` 账本前缀；添加另一目录省略根目录身份。名称与图标在同一 `library_id` 的行间必须一致。非法路径、归属或身份通过原字段错误契约返回，不写配置。详见 [媒体库与存储根目录](OPERATIONS.md#媒体库与存储根目录)。
+
 | 地址 | 用途 |
 | --- | --- |
 | `/` | 全部馆藏，含本地硬盘与已挂载网盘；新作行使用作品详情地址 |

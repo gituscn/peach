@@ -58,8 +58,11 @@ def location_mounts() -> dict[str, tuple[Path, ...]]:
     merged: dict[str, tuple[str, ...]] = dict(settings_file.active().mounts)
     for location, mount in _parse_override(os.environ.get(MOUNTS_ENV, "")):
         merged[location] = (mount,) if mount else ()
-    return {location: tuple(Path(mount) for mount in mounts)
-            for location, mounts in merged.items() if mounts}
+    declared = settings_file.active().locations
+    return {location: tuple(Path(mount) if mount else (
+                Path(declared[location][index]) if os.name == "nt" and index < len(declared.get(location, ()))
+                else UNMAPPED_ROOT / location / str(index))
+            for index, mount in enumerate(mounts)) for location, mounts in merged.items() if mounts}
 
 
 def location_roots() -> dict[str, tuple[str, ...]]:
@@ -167,13 +170,15 @@ def is_unmapped(path: Path) -> bool:
 def translate_ledger_path(raw: str | os.PathLike[str]) -> Path:
     """把账本里的 Windows 路径翻译成本机路径；非 Windows 形态原样返回。"""
     text = os.fspath(raw)
-    if os.name == "nt" or not is_windows_path(text):
+    if not is_windows_path(text):
         return Path(text)
     location, index, tail = resolve_root(text)
     if location is not None:
         mounts = location_mounts().get(location, ())
-        if index < len(mounts):
+        if index < len(mounts) and str(mounts[index]) not in ("", "."):
             return mounts[index].joinpath(*tail)
+    if os.name == "nt":
+        return Path(text)
     # 未配置的路径前缀或未挂载的来源转换到 UNMAPPED_ROOT，供读取端识别并拒绝访问。
     # 保留盘符和其余层级，方便日志中定位原路径。
     parts = PureWindowsPath(text).parts
