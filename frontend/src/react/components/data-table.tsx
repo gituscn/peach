@@ -100,14 +100,18 @@ export function DataTable<T extends RowData>({ label, items, columns, rowId, row
     <div data-data-table-panel={panel || undefined} className={panel
       ? cardClass({ padding: 'none', bordered: 'line', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })
       : 'flex min-w-0 flex-col gap-4'}>
-      <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label={`${label}工具栏`}>
-        <h3 id={titleId} className="mr-auto text-title-2-medium text-text-primary">{title}</h3>
+      <div data-responsive-toolbar="" role="toolbar" aria-label={`${label}工具栏`}>
+        <div data-toolbar-heading="">
+        <h3 id={titleId} className="text-title-2-medium text-text-primary">{title}</h3>
         <span className="text-body-2-regular tabular-nums text-text-secondary">
           {`${items.length.toLocaleString()} ${unit}`}
         </span>
+        </div>
+        <div data-toolbar-actions="">
         <TableColumnControls preferences={preferences} label={label} />
         <DataTableSort label={label} options={columns.filter((column) => column.value).map((column) => ({ id: column.id, label: column.label }))}
           sorting={sorting} onChange={(next) => { setSorting(next); setPagination((now) => ({ ...now, pageIndex: 0 })); }} />
+        </div>
       </div>
       {description ? <p className="text-body-2-regular text-text-secondary">{description}</p> : null}
       <SelectionDock label={`${label}批量操作`} visible={chosen.length > 0} count={`已选 ${chosen.length.toLocaleString()} ${unit}`}>

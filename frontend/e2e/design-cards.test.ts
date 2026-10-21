@@ -386,12 +386,17 @@ describe('设计决定：作品卡、管理页与复核', () => {
       const read = await page.evaluate(() => {
         const items = [...document.querySelectorAll<HTMLElement>('[data-manage-crumb] li')];
         const pressed = document.querySelector<HTMLElement>('[data-manage][aria-pressed="true"]')!;
+        const thumb = pressed.parentElement!.querySelector('[data-pill-thumb]')!;
+        const selectedBox = pressed.getBoundingClientRect(), thumbBox = thumb.getBoundingClientRect();
         return {
           colors: items.map((item) => getComputedStyle(item).color),
           separators: items.map((item) => item.querySelector('svg') ? getComputedStyle(item.querySelector('svg')!).stroke : null),
           gap: getComputedStyle(document.querySelector('[data-manage-crumb] ol')!).columnGap,
           tab: getComputedStyle(pressed).color,
-          fill: getComputedStyle(pressed).backgroundColor,
+          fill: getComputedStyle(thumb).backgroundColor,
+          buttonFill: getComputedStyle(pressed).backgroundColor,
+          selectionDelta: [thumbBox.left - selectedBox.left, thumbBox.top - selectedBox.top,
+            thumbBox.width - selectedBox.width, thumbBox.height - selectedBox.height],
           navBeforeCrumb: document.querySelector('[data-manage-bar]')!.getBoundingClientRect().bottom <= document.querySelector('[data-manage-crumb]')!.getBoundingClientRect().top,
           crumbBeforeTitle: document.querySelector('[data-manage-crumb]')!.getBoundingClientRect().bottom <= document.querySelector('[data-manage-title]')!.getBoundingClientRect().top,
           titleLeft: Math.round(document.querySelector('[data-manage-title]')!.getBoundingClientRect().left - document.querySelector('#grid')!.getBoundingClientRect().left),
@@ -401,6 +406,8 @@ describe('设计决定：作品卡、管理页与复核', () => {
       assert.deepEqual(read.separators, [muted, null], '分隔符跟着当前项提亮了，或最后一项也带了分隔符');
       assert.equal(read.gap, '6px');
       assert.deepEqual([read.tab, read.fill], [ink, fill]);
+      assert.equal(read.buttonFill, 'rgba(0, 0, 0, 0)');
+      assert.ok(read.selectionDelta.every(value => Math.abs(value) < 1), '选中底板没有对齐当前导航项');
       assert.equal(read.navBeforeCrumb, true);
       assert.equal(read.crumbBeforeTitle, true);
       assert.equal(read.titleLeft, 0);
@@ -987,12 +994,12 @@ describe('设计决定：作品卡、管理页与复核', () => {
         await page.locator('[data-skeleton="board/subscriptions"] .ui-follow-skeleton-toolbar').waitFor({ timeout: 15_000 });
         const toolbar = '[data-skeleton] .ui-follow-skeleton-toolbar';
         const skeleton = await controlFaces(page, {
-          检查全部: `${toolbar} > button:nth-of-type(1)`,
+          检查全部: `${toolbar} [data-follow-toolbar-actions] > button:nth-of-type(1)`,
           默认视图: `${toolbar} [data-button-group] > button:first-child`,
           表格视图: `${toolbar} [data-button-group] > button:last-child`,
           排序框: `${toolbar} button[aria-haspopup="listbox"]`,
-          方向键: `${toolbar} [data-follow-toolbar-controls] > button:nth-of-type(1)`,
-          全部收起: `${toolbar} [data-follow-toolbar-controls] > button:nth-of-type(2)`,
+          方向键: `${toolbar} [data-follow-toolbar-controls] > span:last-of-type > button:last-child`,
+          全部收起: `${toolbar} [data-follow-toolbar-controls] > button`,
           移除来源: '[data-skeleton] .follow-skeleton-source [data-follow-source-controls] > span:last-child > button:last-child',
         });
         const expected = await disabledTokens(page);

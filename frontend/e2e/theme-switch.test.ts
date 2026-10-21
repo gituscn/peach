@@ -15,6 +15,33 @@ describe('切换主题', () => {
   before(async () => { browser = await launch() });
   after(async () => { await browser.close() });
 
+  it('侧栏底部的明暗、配色与设置控件在展开和收起时顺序一致', async () => {
+    const opened = await visit(browser, '/', desktop);
+    try {
+      const { page } = opened;
+      const drawer = page.locator('#drawer');
+      if (!await drawer.evaluate(node => node.classList.contains('open'))) await page.locator('#filterBtn').click();
+      await settle(page);
+      const positions = () => page.locator('.board-sidebar-foot').evaluate(root => {
+        const selectors = ['.board-theme-toggle', '#boardGlowBtn', '#settingsBtn'];
+        return selectors.map(selector => {
+          const r = root.querySelector(selector)!.getBoundingClientRect();
+          return { x: r.left, y: r.top };
+        });
+      });
+      const expanded = await positions();
+      assert.ok(expanded[0]!.x < expanded[1]!.x && expanded[1]!.x < expanded[2]!.x);
+      const buttons = await page.locator('.board-sidebar-foot button').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')));
+      assert.deepEqual(buttons, ['浅色主题', '深色主题', '光晕配色', '打开设置']);
+      await page.locator('#filterBtn').click();
+      await page.waitForFunction(() => Math.round(document.querySelector('#drawer')!.getBoundingClientRect().width) === 60);
+      await settle(page);
+      const collapsed = await positions();
+      assert.ok(collapsed[0]!.y < collapsed[1]!.y && collapsed[1]!.y < collapsed[2]!.y);
+      assert.deepEqual(opened.problems, []);
+    } finally { await opened.close(); }
+  });
+
   it('切换瞬间带颜色过渡的控件没有动画，明暗键滑块照常位移，下一帧过渡恢复', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/data-cleanup', desktop);
     try {

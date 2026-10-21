@@ -31,7 +31,7 @@ import { Progress } from '../components/progress';
 import { busyProps } from '../settings/use-action';
 import { Disclosure } from '../settings/section';
 import { DownloadsPanel } from './downloads-panel';
-import { ErrorExcerpt } from './error-excerpt';
+import { ErrorDetails, ErrorExcerpt } from './error-excerpt';
 import {
   elapsedText, fetchEarlier, fetchTasks, foldRoutine, followupDetail, groupFollowups, isActive,
   hasResultProblems, isRoutine, mergeFinished, momentText, pollInterval, problemDestination, progressText, statusLabel, summaryItems, taskIssues, TASKS_KEY, TRIGGER_LABELS, type TaskRunPayload,
@@ -107,7 +107,7 @@ function RunCard(
       {followups?.length ? <div className="border-t border-separator-border px-5 py-2.5">
         <Disclosure summary={`任务明细 · ${followups.length} 项`}
           contentClassName="pb-2.5"
-          defaultOpen={followups.some((row) => isActive(row) || row.status === 'failed')}>
+          defaultOpen={followups.some((row) => isActive(row))}>
           <FollowupList rows={followups} />
         </Disclosure>
       </div> : null}
@@ -165,13 +165,15 @@ function SettledRun(
       {summary.length ? <ul className="list-disc space-y-1 pl-5 text-caption-1-regular text-text-secondary wrap-anywhere">
         {summary.map((line, index) => <li key={index}>{line}</li>)}
       </ul> : null}
-      {issues.length ? <Disclosure summary={`问题详情 · ${issues.length} 项`} defaultOpen contentClassName="py-2">
+      {issues.length ? <Disclosure summary={`问题详情 · ${issues.length} 项`} contentClassName="pt-2">
+        <ErrorDetails label="任务问题详情">
         <ul className="flex min-w-0 flex-col gap-3" data-task-issues="">
           {issues.map((issue, index) => <li key={`${issue.source}-${index}`} className="flex min-w-0 flex-col gap-1 text-body-2-regular wrap-anywhere">
-            <strong className="text-body-medium text-text-primary">{[issue.label, issue.provider, issue.kind].filter(Boolean).join(' · ')}</strong>
+            <p className="text-body-regular text-text-primary">{[issue.label, issue.provider, issue.kind].filter(Boolean).join(' · ')}</p>
             <ErrorExcerpt text={issue.error} className="text-text-primary" />
           </li>)}
         </ul>
+        </ErrorDetails>
       </Disclosure> : hasResultProblems(run) && ['follow-check', 'feed-check'].includes(run.task_key)
         ? <p className="text-body-2-regular text-text-secondary">未取得本轮逐项详情，可到来源列表查看检查结果。</p> : null}
       {destination

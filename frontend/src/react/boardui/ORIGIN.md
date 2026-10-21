@@ -41,6 +41,8 @@
 
 | 上游 | 处理 | 原因 |
 | --- | --- | --- |
+| PillTabList | `../components/pill-tab.tsx` 从公开 `tabs` 条目适配，保留上游测量与 300ms 过渡，增加外部集合宿主的 Portal；`pill-aria-tab-list.tsx` 对接 React Aria，灰色面、行高与焦点沿用 Peach 语义样式 | React Aria 的集合只接收选项；装饰层通过 Portal 加入同一宿主，不参与集合。来源、原始 SHA-256 与消费范围见 `docs/reference-snapshots/boardui-settings-tabs.md` |
+| 设置行分隔线 | 配置页与设置弹层沿用 `SettingsCard` 的左侧 12px 内缩、右侧通到卡片边缘；`../settings/section.tsx` 的行组标记由 `configuration-page.css` 连接相邻行组 | 设置项由独立组件组合时，组与组之间仍保留一条分隔线；底部操作栏使用通栏线 |
 | `globals`（`693885494e6f229637fe118852efbfb3df820dd8d174a2a7e47f65dadfcd96bf`） | 不复制整份；用到的 `check-draw` 动画、根元素的字体平滑和 `.bui-table` 那一组规则逐字搬进 `../styles.css`，作用域是 `.peach-react` | 整份 `@import "tailwindcss"` 会把 Preflight 和 `html`、`body` 的底色铺到整页，未迁移页面仍由旧样式表绘制。`table` 条目的外观全在 `globals.css` 里（React Aria 的集合组件包不进自定义组件），不搬就只剩一张没有边线和字阶的裸表 |
 | `data-table`（`7bb73a6cd099b9b16390e5fe00f8ba2d55b5ef96c1e8f90a056168cd2e3235e6`） | 不复制；表格视图用 `table` 条目的 `Table` 配 `@tanstack/react-table`，列定义、排序、行选择与分页写在 `../follow-manage/` 里 | 该条目是 `registry:block`，只有一份 `docs/examples/data-table-example.tsx` 示例，依赖的 avatar、segmented-control、status-dot、tooltip 等条目 Peach 都没有；它演示的正是「`table` 加 TanStack Table」这套接法 |
 | Tailwind Preflight | `../preflight-scoped.css` 逐字包进 `@scope (.peach-react)` | 同上 |

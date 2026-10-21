@@ -291,17 +291,21 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
 
       {suggestions.length ? (
         <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
+          <div data-responsive-toolbar="">
+            <div data-toolbar-heading="">
             <FieldLabel>待合并</FieldLabel>
-            <span className="mr-auto text-body-2-regular text-text-secondary">
+            <span className="text-body-2-regular text-text-secondary">
               {`${suggestions.length} 组`}
             </span>
+            </div>
+            <div data-toolbar-actions="">
             <Button variant="primary" size="small" disabled={readOnly} {...busy}
               onClick={() => mergeSome(suggestions, true)}>{`全部合并（${suggestions.length}）`}</Button>
             <DataTableSort label="待合并创作者别名" sorting={sorting}
               options={[{ id: 'canonical', label: '统一名称' }, { id: 'alias', label: '平台别名' }, { id: 'evidence', label: '依据' }]}
               onChange={(next) => { setSorting(next); setPagination((now) => ({ ...now, pageIndex: 0 })); }} />
             <TableColumnControls preferences={suggestionView} label="待合并创作者别名" />
+            </div>
           </div>
           <SelectionDock label="待合并别名批量操作" visible={chosen.length > 0} count={`已选 ${chosen.length} 组`}>
             <Button variant="secondary" size="small" disabled={readOnly} {...busy}
@@ -340,13 +344,17 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
       ) : null}
 
       <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
+        <div data-responsive-toolbar="">
+          <div data-toolbar-heading="">
           <FieldLabel>已保存别名</FieldLabel>
-          <span className="mr-auto text-body-2-regular text-text-secondary">{`${groups.length} 组`}</span>
+          <span className="text-body-2-regular text-text-secondary">{`${groups.length} 组`}</span>
+          </div>
+          <div data-toolbar-actions="">
           <DataTableSort label="已保存创作者别名" sorting={savedSorting}
             options={[{ id: 'canonical', label: '统一名称' }, { id: 'aliases', label: '平台别名' }]}
             onChange={(next) => { setSavedSorting(next); setSavedPagination((now) => ({ ...now, pageIndex: 0 })); }} />
           <TableColumnControls preferences={savedView} label="已保存创作者别名" />
+          </div>
         </div>
         <SelectionDock label="已保存别名批量操作" visible={savedNames.length > 0} count={`已选 ${savedNames.length} 个别名`}>
           <Button variant="secondary" size="small" disabled={readOnly} {...busyProps(drop.isPending)}

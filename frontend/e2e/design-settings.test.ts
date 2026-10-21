@@ -344,6 +344,7 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
           head: [top.left, top.width, top.bottom], body: [body.left, body.width, body.top],
           z: getComputedStyle(head).zIndex, shadow: getComputedStyle(head).boxShadow, clip: getComputedStyle(head).clipPath,
           overflow: style.overflowY, overscroll: style.overscrollBehaviorY, gap: style.paddingTop,
+          navigationClip: getComputedStyle(panel.querySelector('[data-settings-nav]')!).clipPath,
         };
       });
       const resting = await read();
@@ -353,6 +354,7 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
       assert.equal(resting.overflow, 'auto');
       assert.equal(resting.overscroll, 'contain', '滚到底之后滚动会漏给背后的页面');
       assert.equal(resting.shadow, 'none', '还没滚动标题栏就投了影');
+      assert.equal(resting.navigationClip, 'inset(0px)', '玻璃导航的外部投影越过列边界');
       // 影子只要往下那一半：往上会糊在标题自己头上、往左会糊到左栏上。
       assert.equal(resting.clip, 'inset(0px 0px -96px)');
 
@@ -362,6 +364,11 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
       await page.locator(`${PANEL} [data-settings-scroll]`).evaluate((scroll) => { scroll.scrollTop = 80 });
       await page.waitForFunction((want) => getComputedStyle(
         document.querySelector('#settingsPanel [data-settings-head]')!).boxShadow === want, shadow);
+      await page.locator(`${PANEL} [data-settings-scroll]`).evaluate((scroll) => { scroll.scrollTop = 0 });
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('#settingsPanel [data-settings-head]')!).boxShadow === 'none');
+      await page.locator(`${PANEL} [data-settings-scroll]`).evaluate((scroll) => { scroll.scrollTop = 80 });
+      await page.locator(PANEL).getByRole('tab', { name: '浏览与播放', exact: true }).click();
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('#settingsPanel [data-settings-head]')!).boxShadow === 'none');
       assert.deepEqual(opened.problems, []);
     } finally {
       await opened.close();
@@ -415,7 +422,7 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
             const rect = node.getBoundingClientRect();
             return [Math.round(rect.width), Math.round(rect.height)];
           };
-          const group = getComputedStyle(panel.querySelector('[data-setting-group]:not([hidden])')!);
+          const group = getComputedStyle(panel.querySelector('[data-setting-group]:not([hidden]) [data-setting-card]')!);
           const toggles = [...panel.querySelectorAll('[data-setting-group]:not([hidden]) [data-toggle]')];
           const on = panel.querySelector('#uiSoundsSetting')!, row = on.closest('[data-setting-row]')!;
           const title = row.querySelector('b')!.getBoundingClientRect(), knob = on.getBoundingClientRect();
@@ -450,6 +457,12 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
         await openPanel(opened.page);
         for (const section of ['外观与导航', '浏览与播放', 'JAV 与新作', '搜索与推荐', '内容显示']) {
           await opened.page.locator(PANEL).getByRole('tab', { name: section, exact: true }).click();
+          if (section === 'JAV 与新作') {
+            const headings = await opened.page.locator(`${PANEL} [data-setting-group]:not([hidden]) [data-settings-subheading]`)
+              .evaluateAll((nodes) => nodes.map((node) => ({ text: node.textContent, padding: getComputedStyle(node).padding,
+                left: node.getBoundingClientRect().left - node.parentElement!.getBoundingClientRect().left })));
+            assert.deepEqual(headings, ['作品显示', '新作显示'].map((text) => ({ text, padding: '16px 0px 6px', left: 12 })));
+          }
           const rows = await opened.page.locator(`${PANEL} [data-setting-group]:not([hidden]) [data-setting-row]`)
           .evaluateAll((nodes) => nodes.map((row) => {
             const title = row.querySelector('b')!;
@@ -572,7 +585,7 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
     }
   });
 
-  it('光晕参数块自己让出分组右侧的留白、下边距与设置行同一档；「玻璃原色」那一档只留漂移速度', { timeout: 60_000 }, async () => {
+  it('光晕配色与自定义颜色使用独立卡片；「玻璃原色」只留漂移速度', { timeout: 60_000 }, async () => {
     for (const viewport of [DESKTOP, MOBILE]) {
       const opened = await openHome(browser, viewport);
       const { page } = opened;
@@ -582,22 +595,77 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
         await block.waitFor({ state: 'visible', timeout: 10_000 });
         const shown = await block.evaluate((node) => {
           const group = node.closest('[data-setting-group]')!.getBoundingClientRect(), rect = node.getBoundingClientRect();
-          const row = node.parentElement!.querySelector('[data-setting-row]')!;
+          const cards = [...node.querySelectorAll('[data-setting-card]')];
           return {
             right: Math.round(group.right - rect.right), left: rect.left >= group.left,
             overflow: node.scrollWidth > node.clientWidth,
-            pad: getComputedStyle(node).paddingBottom, rowPad: getComputedStyle(row).paddingBottom,
+            cards: cards.map((card) => ({ radius: getComputedStyle(card).borderTopLeftRadius,
+              left: card.getBoundingClientRect().left - group.left, right: group.right - card.getBoundingClientRect().right })),
+            headings: [...node.querySelectorAll('h4')].map((heading) => heading.textContent),
           };
         });
-        assert.ok(shown.right >= 16 && shown.left, `${viewport.name}：参数块压到了分组的圆角上（右侧只剩 ${shown.right}px）`);
+        assert.equal(shown.right, 0);
+        assert.ok(shown.left);
         assert.equal(shown.overflow, false, `${viewport.name}：参数块被内容顶宽`);
-        assert.equal(shown.pad, shown.rowPad, `${viewport.name}：参数块的下边距和上面每一行不是同一档`);
+        assert.deepEqual(shown.headings, ['光晕配色', '自定义颜色']);
+        assert.equal(shown.cards.length, 2);
+        for (const card of shown.cards) {
+          assert.equal(card.radius, '16px');
+          assert.ok(Math.abs(card.left) <= .5 && Math.abs(card.right) <= .5, JSON.stringify(card));
+        }
+
+        const colorRow = block.locator('[data-glow-stop="spot1"] [data-glow-stop-toggle]');
+        await colorRow.hover();
+        assert.equal(await colorRow.evaluate((node) => getComputedStyle(node).backgroundColor),
+          await tokenColor(page, PANEL, '--control-hover'));
+        assert.equal(await colorRow.evaluate((node) => getComputedStyle(node).borderRadius), '0px');
+        const hoverEdges = await colorRow.evaluate((node) => {
+          const card = node.closest('[data-glow-colour-card]')!.getBoundingClientRect();
+          const button = node.getBoundingClientRect();
+          const stop = node.closest('[data-glow-stop]')!.getBoundingClientRect();
+          const dot = node.querySelector('[data-glow-stop-dot]')!.getBoundingClientRect();
+          return { left: button.left - card.left, right: card.right - button.right,
+            contentLeft: dot.left - card.left, separatorLeft: stop.left - card.left };
+        });
+        assert.ok(Math.abs(hoverEdges.left) <= .5 && Math.abs(hoverEdges.right) <= .5, JSON.stringify(hoverEdges));
+        assert.equal(hoverEdges.contentLeft, 12);
+        assert.equal(hoverEdges.separatorLeft, 12);
+        const middleRow = block.locator('[data-glow-stop="spot2"] [data-glow-stop-toggle]');
+        await middleRow.hover();
+        const seam = await middleRow.evaluate((node) => {
+          const style = getComputedStyle(node), row = node.closest('[data-glow-stop]')!;
+          const button = node.getBoundingClientRect(), bounds = row.getBoundingClientRect();
+          return { shadow: style.boxShadow, zIndex: style.zIndex,
+            above: getComputedStyle(row.previousElementSibling!).borderBottomWidth,
+            below: getComputedStyle(row).borderBottomWidth, gap: bounds.bottom - button.bottom };
+        });
+        assert.match(seam.shadow, /0px -1px 0px 0px/);
+        assert.match(seam.shadow, /0px 1px 0px 0px/);
+        assert.equal(seam.zIndex, '1');
+        assert.equal(seam.above, '1px');
+        assert.equal(seam.below, '1px');
+        assert.equal(seam.gap, 1);
+        await colorRow.click();
+        const palette = block.locator('[data-glow-stop="spot1"] [data-glow-palette]');
+        await palette.waitFor({ state: 'visible' });
+        const scrolling = await palette.evaluate((node) => ({
+          native: getComputedStyle(node).scrollbarWidth, overlay: node.getAttribute('data-overlay-scrollbar'),
+          tracks: node.parentElement!.querySelectorAll('[data-overlay-track]').length,
+          popupWidth: node.closest('[data-glow-stop-pop]')!.getBoundingClientRect().width,
+          rowWidth: node.closest('[data-glow-stop]')!.querySelector('[data-glow-stop-toggle]')!.getBoundingClientRect().width,
+        }));
+        assert.equal(scrolling.native, 'none');
+        assert.equal(scrolling.overlay, 'true');
+        assert.equal(scrolling.tracks, 2);
+        assert.ok(Math.abs(scrolling.popupWidth - scrolling.rowWidth) <= 1, JSON.stringify(scrolling));
+        await colorRow.click();
 
         await block.locator('[data-glow-preset="native"]').click();
         await block.locator('[data-glow-native-note]').waitFor({ state: 'visible', timeout: 5_000 });
         const fields = await block.locator('[data-glow-field]').evaluateAll((nodes) => nodes
           .filter((node) => node.getClientRects().length > 0).map((node) => (node as HTMLElement).dataset.glowField));
         assert.deepEqual(fields, ['speed'], `${viewport.name}：「玻璃原色」下还摆着管不着任何东西的拉条`);
+        assert.equal(await block.locator('[data-glow-colours]').isVisible(), false);
         assert.deepEqual(opened.problems, []);
       } finally {
         await opened.close();

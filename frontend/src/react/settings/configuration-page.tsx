@@ -12,6 +12,7 @@ import { peachHistory, shellNavigate, settingsPath } from '@peach/history';
 import { errorMessage } from '../../api';
 import type { ConfigurationData, ConfigurationPanel, ConfigurationProps } from '../bundle';
 import { Note } from '../components/note';
+import { PillTabList } from '../components/pill-tabs';
 import { CONFIGURATION_KEY, fetchConfiguration } from './configuration';
 import { DownloadGroup } from './download-settings';
 import { GeneralSettings } from './general-settings';
@@ -114,16 +115,17 @@ function ConfigurationGroups(
   };
   return (
     <div ref={workspace} className="ui-configpage">
-      <div className="ui-board-local-nav" role="tablist" aria-label="配置分区" data-section-nav="" data-section-items=""
+      <PillTabList className="ui-board-local-nav" role="tablist" aria-label="配置分区" data-section-nav="" data-section-items="" data-pill-nav=""
         aria-orientation={narrow ? 'horizontal' : 'vertical'}>
         {groups.map(({ title }, i) => (
           <button key={title} ref={(node) => { buttons.current[i] = node }} type="button" role="tab"
             id={`${prefix}-tab-${i}`} aria-controls={`${prefix}-panel-${i}-0`} aria-selected={i === at}
+            data-pill-selected={i === at ? '' : undefined} data-pill-variant="gray"
             tabIndex={i === at ? 0 : -1} onClick={() => choose(title)} onKeyDown={(event) => move(event, i)}>
             {title}
           </button>
         ))}
-      </div>
+      </PillTabList>
       {groups.map(({ title, body }, i) => (
         <Fragment key={title}>
           <h2 className="ui-configgroup">{title}</h2>

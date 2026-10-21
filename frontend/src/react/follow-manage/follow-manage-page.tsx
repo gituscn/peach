@@ -16,14 +16,14 @@
  * 行之间也只用分隔线，不各自套框；字号只取 BoardUI 排好的那几档 token。 */
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
+import { Tab, TabPanel, Tabs } from 'react-aria-components';
 
 import { resolveFollowSort } from '../../follow-sort';
 import type { FollowManageProps } from '../bundle';
 import { cardClass } from '../components/card';
 import { Note } from '../components/note';
 import { Page } from '../components/page';
-import { useHorizontalScroller } from '../components/use-horizontal-scroller';
+import { PillAriaTabList } from '../components/pill-aria-tab-list';
 import { STAT_STRIP_SIX } from '../components/stat-card';
 import { AddSource } from './add-source';
 import { AliasManager } from './alias-manager';
@@ -59,7 +59,6 @@ function Reading({ term, figure, unit }: { term: string; figure: number; unit: s
 }
 
 export function FollowManagePage(props: FollowManageProps) {
-  const sectionScroll = useHorizontalScroller<HTMLDivElement>();
   const {
     route, savePreference, toast, openFollow, openServiceConfiguration, readOnly, readOnlyMessage, writerUrl,
   } = props;
@@ -144,12 +143,13 @@ export function FollowManagePage(props: FollowManageProps) {
         setTab(next);
         go({ tab: next });
       }} className="flex flex-col gap-6">
-        <TabList ref={sectionScroll} aria-label="关注管理区域" data-section-nav data-section-items
+        <PillAriaTabList aria-label="关注管理区域" data-section-nav data-section-items
           className="flex max-w-full flex-nowrap overflow-x-auto">
           {TABS.map(([key, name]) => (
-            <Tab key={key} id={key} className="cursor-pointer whitespace-nowrap">{name}</Tab>
+            <Tab key={key} id={key} data-pill-selected={tab === key ? '' : undefined} data-pill-variant="gray"
+              className="cursor-pointer whitespace-nowrap">{name}</Tab>
           ))}
-        </TabList>
+        </PillAriaTabList>
 
         <TabPanel id="list" className="flex flex-col gap-4">
           <SourceList data={data} sort={sort} dir={dir} page={page} layout={layout}

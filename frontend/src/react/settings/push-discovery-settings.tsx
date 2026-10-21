@@ -77,8 +77,10 @@ export function PushDiscoveryForm({ initial, receipt }: {
 
   return (
     <Section title="自动发现新文件" onSubmit={submit}>
-      <div className="flex flex-wrap items-center gap-2"><span className="text-body-regular text-text-secondary">本机监视</span>
-        <StatusLabel tone={!live.enabled || !live.watch_local ? 'neutral' : live.local_running ? 'progress' : 'warning'}>{!live.enabled || !live.watch_local ? '未启用' : live.local_running ? '运行中' : '未运行'}</StatusLabel></div>
+      <Stack>
+        <div className="flex flex-wrap items-center gap-2"><span className="text-body-regular text-text-secondary">本机监视</span>
+          <StatusLabel tone={!live.enabled || !live.watch_local ? 'neutral' : live.local_running ? 'progress' : 'warning'}>{!live.enabled || !live.watch_local ? '未启用' : live.local_running ? '运行中' : '未运行'}</StatusLabel></div>
+      </Stack>
       <Rows>
         <SettingsRow label="发现新文件后自动入库" description={live.enabled ? ingested : undefined}>
           <Switch aria-label="发现新文件后自动入库" isSelected={state.enabled} isDisabled={!state.available}

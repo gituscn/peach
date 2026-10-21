@@ -19,7 +19,7 @@ export function MediaProcessingSettings({ receipt }: { receipt(message: string):
   const action = useAction();
   const playbackAction = useAction();
   const error = action.error || (policy.error ? errorMessage(policy.error) : '');
-  const acceleration = (key: 'preview_acceleration' | 'playback_acceleration', label: string, description: string) => {
+  const codecModeRow = (key: 'preview_acceleration' | 'playback_acceleration', label: string, description: string) => {
     const save = key === 'playback_acceleration' ? playbackAction : action;
     return <SettingsRow label={label} description={description}>
         <div id={key === 'playback_acceleration' ? 'playbackAccelerationSetting' : 'previewAccelerationSetting'}>
@@ -33,8 +33,8 @@ export function MediaProcessingSettings({ receipt }: { receipt(message: string):
               receipt(`已保存${label}`);
             });
           }}>
-          <SelectItem id="auto">自动（推荐）</SelectItem>
-          <SelectItem id="software">仅软件</SelectItem>
+          <SelectItem id="auto">自动（硬件优先）</SelectItem>
+          <SelectItem id="software">{key === 'preview_acceleration' ? '软件解码' : '软件编解码'}</SelectItem>
         </Select>
         </div>
       </SettingsRow>;
@@ -42,7 +42,7 @@ export function MediaProcessingSettings({ receipt }: { receipt(message: string):
   return <>
     <Section title="视频预览">
     <Rows>
-      {acceleration('preview_acceleration', '抽帧加速', '用于封面、九宫格与时间轴预览；自动模式失败后回退软件。保存后用于新任务。')}
+      {codecModeRow('preview_acceleration', '抽帧解码方式', '用于生成封面、九宫格和时间轴。')}
       <SettingsRow label="生成视频预览" description="为本地视频生成九宫格与时间轴预览；关闭后仍按入库规则探测时长与分辨率。">
         <Switch aria-label="生成视频预览" isSelected={!!policy.data && !policy.data.metadata_only}
           isDisabled={!policy.data || policy.isFetching || !!action.busy}
@@ -60,7 +60,7 @@ export function MediaProcessingSettings({ receipt }: { receipt(message: string):
     {error ? <Stack divided><ErrorText>{error}</ErrorText></Stack> : null}
     </Section>
     <Section title="视频播放">
-      <Rows>{acceleration('playback_acceleration', '播放转码加速', '仅控制 Peach 服务端转码，不改变浏览器自身解码。保存后用于新任务，正在运行的任务继续完成。')}</Rows>
+      <Rows>{codecModeRow('playback_acceleration', '播放编解码方式', '用于播放时的视频转码。')}</Rows>
       {playbackAction.busy ? <Stack divided><Help role="status">正在保存…</Help></Stack> : null}
       {playbackAction.error ? <Stack divided><ErrorText>{playbackAction.error}</ErrorText></Stack> : null}
     </Section>

@@ -146,7 +146,13 @@ describe('馆藏卡片与列表', () => {
         await pageSizeButton.scrollIntoViewIfNeeded();
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         await pageSizeButton.click();
-        await page.getByRole('option', { name: '每页 10 部', exact: true }).click();
+        try { await page.getByRole('option', { name: '每页 10 部', exact: true }).click({ timeout: 5000 }) }
+        catch (error) {
+          console.info('分页菜单', await pageSizeButton.getAttribute('aria-expanded'),
+            await page.locator('[role="option"]').allTextContents(), await pageSizeButton.boundingBox());
+          await page.screenshot({ path: `../build/agent-verification/pagination-menu-${viewport.name}.png` });
+          throw error;
+        }
         await page.waitForFunction(() => document.querySelectorAll('[data-catalog-row]').length === 10);
         assert.equal(requests.at(-1)!.get('limit'), '10');
         if (!viewport.mobile) {

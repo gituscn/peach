@@ -13,6 +13,58 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
   let browser: Browser;
   installDesignBrowser((next) => { browser = next; });
 
+  it('关注列表操作区按整组换行，并在窄屏内继续排布控件', { timeout: 60_000 }, async () => {
+    const opened = await openFollowManage(browser, DESKTOP, {
+      counts: { new: 17_097 }, extra: [
+        followSource(4, 'kou', 'Fanbox', 'kou · Fanbox'),
+        followSource(5, 'kou', 'Patreon', 'kou · Patreon'),
+        followSource(6, 'kou', 'Rule34Video', 'kou · Rule34Video'),
+      ],
+    });
+    try {
+      const { page } = opened;
+      for (const width of [1698, 1000, 820, 760, 650, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        await settle(page);
+        const geometry = await page.locator('[data-follow-toolbar]').evaluate((root) => {
+          const box = (element: Element) => {
+            const r = element.getBoundingClientRect();
+            return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+          };
+          const actions = root.querySelector('[data-follow-toolbar-actions]')!;
+          return {
+            toolbar: box(root), heading: box(root.querySelector('[data-follow-toolbar-heading]')!),
+            actions: box(actions), buttons: [...actions.querySelectorAll('button')].map(box),
+          };
+        });
+        const { toolbar, heading, actions, buttons } = geometry;
+        assert.ok(actions.left >= toolbar.left - 1 && actions.right <= toolbar.right + 1,
+          `${width}px 操作区越出工具栏`);
+        for (const button of buttons) {
+          assert.ok(button.left >= actions.left - 1 && button.right <= actions.right + 1,
+            `${width}px 控件越出操作区`);
+        }
+        const below = actions.top >= heading.bottom - 1;
+        if (below) {
+          assert.ok(Math.abs(actions.left - toolbar.left) < 1, `${width}px 换行操作区未左对齐`);
+        } else {
+          assert.ok(actions.left >= heading.right, `${width}px 操作区与标题重叠`);
+          assert.ok(Math.max(...buttons.map((b) => b.top)) - Math.min(...buttons.map((b) => b.top)) < 2,
+            `${width}px 与标题同行时只有部分控件换行`);
+        }
+        if (width === 1698) assert.equal(below, false);
+        if (width <= 650) assert.equal(below, true);
+        const authorButtons = await page.locator('[data-follow-author-controls]').evaluateAll(groups => groups.map(group =>
+          [...group.querySelectorAll(':scope > span:last-child > button')].map(button => button.getBoundingClientRect().top)));
+        assert.ok(authorButtons.every(tops => tops.length === 2 && Math.abs(tops[0]! - tops[1]!) < 1),
+          `${width}px 创作者卡的全选与收起按钮被拆行`);
+      }
+      assert.deepEqual(opened.problems, []);
+    } finally {
+      await opened.close();
+    }
+  });
+
   for (const viewport of [DESKTOP, MOBILE]) {
     it(`数据管理骨架与内容卡共用外框、内边距和操作区布局（${viewport.name}）`, { timeout: 60_000 }, async () => {
       const opened = await visit(browser, '/data-cleanup', viewport);
@@ -483,7 +535,7 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
     } finally { await opened.close(); }
   });
 
-  it('标签多选坞出现时页底让出 96px；在线词表的类型色走上游 tag_type 那一套', { timeout: 60_000 }, async () => {
+  it('标签多选坞出现时页底按实际高度留白；在线词表的类型色走上游 tag_type 那一套', { timeout: 60_000 }, async () => {
     const opened = await openIndexPage(browser, '/tags');
     try {
       const page = opened.page;
@@ -492,14 +544,17 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
       await page.locator('#index [data-alpha-tag]').nth(1).click({ timeout: 5_000 });
       const dock = page.locator('[data-selection-dock]');
       await dock.waitFor({ timeout: 5_000 });
-      const padding = await page.evaluate(() =>
-        getComputedStyle(document.querySelector('#index .peach-react')!).paddingBottom);
-      assert.equal(padding, '96px', '选择坞盖住了最后一行标签');
+      const clearance = await dock.evaluate((element) => ({
+        padding: parseFloat(getComputedStyle(document.querySelector('#index .peach-react')!).paddingBottom),
+        required: (element as HTMLElement).offsetHeight + parseFloat(getComputedStyle(element).bottom) + 16,
+      }));
+      assert.ok(clearance.padding >= clearance.required, `选择坞下方留白不足：${JSON.stringify(clearance)}`);
       await page.locator('#index [role="tab"][data-tab="online"]').click({ timeout: 5_000 });
       const dot = page.locator('#index [data-alpha-tag][data-tag-cat="r34-artist"] [data-tag-dot]');
       await dot.waitFor({ timeout: 5_000 });
       assert.equal(await dot.evaluate((element) => getComputedStyle(element).backgroundColor), 'rgb(227, 108, 108)');
       assert.equal(await dock.count(), 0, '在线词表不给多选坞');
+      assert.equal(await page.evaluate(() => document.documentElement.style.getPropertyValue('--selection-dock-space')), '');
       assert.deepEqual(opened.problems, []);
     } finally {
       await opened.close();
@@ -702,8 +757,8 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
       { path: '/follow', ready: '.followauthors .avskeleton',
         targets: ['.followauthors .avskeleton', '.followworks .brandskeleton', '[data-skeleton^="cards/"] > div > *'] },
       { path: '/subscriptions', ready: '[data-skeleton="board/subscriptions"] .ui-follow-skeleton-toolbar',
-        targets: ['[data-skeleton] .ui-follow-skeleton-toolbar [data-follow-toolbar-controls] > button:nth-of-type(1)',
-          '[data-skeleton] .ui-follow-skeleton-toolbar > button:nth-of-type(1)'] },
+        targets: ['[data-skeleton] .ui-follow-skeleton-toolbar [data-follow-toolbar-controls] button',
+          '[data-skeleton] .ui-follow-skeleton-toolbar [data-follow-toolbar-actions] > button:nth-of-type(1)'] },
     ];
     for (const { path, ready, targets, prepare } of pages) {
       const opened = await visit(browser, '/', DESKTOP);
@@ -741,6 +796,43 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
           assert.ok(['auto', 'default', 'not-allowed'].includes(hit.cursor), `${path} ${target} 悬停换了光标：${hit.cursor}`);
           assert.ok(!hit.inside || hit.disabled, `${path} ${target} 在骨架里还能点中`);
         }
+      } finally {
+        await opened.close();
+      }
+    }
+  });
+
+  it('暂停来源的标签使用主文字色；卡片末行的反馈面与外框同心', { timeout: 60_000 }, async () => {
+    for (const viewport of [DESKTOP, MOBILE]) {
+      const opened = await openFollowManage(browser, viewport, {
+        extra: [{ ...followSource(4, 'paused', 'Kemono', 'paused · Kemono'), enabled: false }],
+      });
+      try {
+        const { page } = opened;
+        for (const theme of ['light', 'dark']) {
+          await page.evaluate((value) => {
+            document.documentElement.dataset.theme = value;
+            document.documentElement.classList.toggle('dark', value === 'dark');
+          }, theme);
+          const card = page.getByRole('region', { name: 'paused 的关注来源', exact: true });
+          const badge = card.getByText('已暂停', { exact: true });
+          assert.equal(await badge.evaluate((node) => getComputedStyle(node).color),
+            await tokenColor(page, '.peach-react', '--color-text-primary'));
+          assert.notEqual(await badge.evaluate((node) => getComputedStyle(node).backgroundColor),
+            await card.evaluate((node) => getComputedStyle(node).backgroundColor));
+          const row = card.locator('[data-follow-source-row]').last();
+          await row.hover();
+          const corners = await row.evaluate((node) => {
+            const parent = node.closest('section')!, outer = getComputedStyle(parent), inner = getComputedStyle(node);
+            return { outer: parseFloat(outer.borderBottomLeftRadius), inset: parseFloat(outer.paddingBottom),
+              left: parseFloat(inner.borderBottomLeftRadius), right: parseFloat(inner.borderBottomRightRadius),
+              top: parseFloat(inner.borderTopLeftRadius) };
+          });
+          assert.equal(corners.left + corners.inset, corners.outer);
+          assert.equal(corners.right, corners.left);
+          assert.equal(corners.top, 0);
+        }
+        assert.deepEqual(opened.problems, []);
       } finally {
         await opened.close();
       }

@@ -44,9 +44,9 @@ export function Section({ title, icon, id, aside, onSubmit, children }: SectionP
     : <section id={id} aria-label={title} className="flex w-full flex-col gap-2 wrap-anywhere">{body}</section>;
 }
 
-/** 一组 `SettingsRow`。行自己画下边线、最后一行不画，所以要有一层只装行的父元素。 */
+/** 设置行组：内部由行画线，相邻行组由共享样式补齐边界。 */
 export function Rows({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col empty:hidden">{children}</div>;
+  return <div className="ui-settings-rows flex flex-col empty:hidden">{children}</div>;
 }
 
 /** 卡片只管左内边距和底色；不是 `SettingsRow` 的内容由这一层给行距和上下右内边距。
@@ -99,7 +99,7 @@ export function ExternalLink({ href, children, leadingIcon }: {
 
 /** 只读的名目与读数，一行一对，行距与分隔线同 `SettingsRow`。 */
 export function FactList({ children }: { children: ReactNode }) {
-  return <dl className="flex flex-col empty:hidden">{children}</dl>;
+  return <dl className="ui-settings-facts flex flex-col empty:hidden">{children}</dl>;
 }
 
 /* 名目按内容宽，最多占一半，再长就在自己那一半里折行；读数靠右，折成多行时行内文字左对齐，

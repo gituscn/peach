@@ -1,5 +1,6 @@
 /* 页面分区 Tabs：中性填充选中态，支持方向键与窄屏横向滚动。 */
 import { useLayoutEffect, useRef, type KeyboardEvent } from 'react';
+import { PillTabList } from './pill-tabs';
 
 import { spriteGlyph } from './sprite-glyph';
 import { useHorizontalScroller } from './use-horizontal-scroller';
@@ -63,13 +64,14 @@ export function BoardTabs<V extends string>(
   };
 
   return (
-    <div ref={scrollRef} role="tablist" aria-label={label} data-board-tab-list="" onKeyDown={onKeyDown}
+    <PillTabList ref={scrollRef} role="tablist" aria-label={label} data-board-tab-list="" data-pill-nav="" onKeyDown={onKeyDown}
       className={`relative flex flex-none gap-1 overflow-x-auto max-board-narrow:gap-0 ${className}`}>
       {tabs.map((tab) => {
         const Glyph = tab.symbol ? spriteGlyph(tab.symbol) : null;
         const selected = tab.value === value;
         return (
           <button key={tab.value} type="button" role="tab" data-tab={tab.value} aria-selected={selected}
+            data-pill-selected={selected ? '' : undefined} data-pill-variant="gray"
             tabIndex={selected ? 0 : -1} className={TAB}
             onClick={() => { if (!selected) onChange(tab.value) }}>
             {Glyph ? <Glyph className="mr-1.5 size-4" /> : null}
@@ -77,6 +79,6 @@ export function BoardTabs<V extends string>(
           </button>
         );
       })}
-    </div>
+    </PillTabList>
   );
 }

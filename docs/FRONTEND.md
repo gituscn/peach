@@ -276,8 +276,8 @@ Detailed 加上 class 与附近文字；Forensic 再加上带 id 的完整 DOM �
 npm --prefix frontend run build:agentation   # 在要用它的那份检出里构建一次
 ```
 
-然后在页面地址后加 `?agentation=on`（关闭用 `?agentation=off`），开关存在这台设备的
-`localStorage` 里，之后每次开页都会带上右下角的工具栏。
+然后在页面地址后加 `?agentation=on`，仅在当前页面加载标注工具。刷新或重新打开页面时不会
+自动加载；`?agentation=off` 也可用于关闭。浏览器中的持久开启标记在页面初始化时清理。
 
 - 产物写到 `build/agentation/peach-agentation.js`，由 `/dev/agentation.js` 提供，口令同 `/dist/`。
   它不进 Git、不进独立包：Agentation 是 PolyForm Shield 许可，只许自用，不随 Peach 分发，

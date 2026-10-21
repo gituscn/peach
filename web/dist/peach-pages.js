@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "b817e2a3-bb25-4e2d-a40f-f2176d12689a", e._sentryDebugIdIdentifier = "sentry-dbid-b817e2a3-bb25-4e2d-a40f-f2176d12689a");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "addb177d-6ee3-43fe-84a4-4e8bafa17440", e._sentryDebugIdIdentifier = "sentry-dbid-addb177d-6ee3-43fe-84a4-4e8bafa17440");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, i, o, s) => {
@@ -19523,7 +19523,7 @@ function ym({ variant: e = "primary", size: t = "medium", leadingIcon: n, traili
 //#region src/react/settings/section.tsx
 function bm({ children: e }) {
 	return /* @__PURE__ */ (0, B.jsx)("div", {
-		className: "flex flex-col empty:hidden",
+		className: "ui-settings-rows flex flex-col empty:hidden",
 		children: e
 	});
 }
@@ -19567,7 +19567,7 @@ function wm({ href: e, children: t, leadingIcon: n }) {
 }
 function Tm({ children: e }) {
 	return /* @__PURE__ */ (0, B.jsx)("dl", {
-		className: "flex flex-col empty:hidden",
+		className: "ui-settings-facts flex flex-col empty:hidden",
 		children: e
 	});
 }
@@ -21428,4 +21428,4 @@ var Vg = document.getElementById("peach-page"), Hg = Vg ? Bg[Vg.dataset.page ?? 
 Vg && Hg && (0, w.createRoot)(Vg).render(/* @__PURE__ */ (0, B.jsx)(Hg, { data: { ...Vg.dataset } }));
 //#endregion
 
-//# debugId=b817e2a3-bb25-4e2d-a40f-f2176d12689a
+//# debugId=addb177d-6ee3-43fe-84a4-4e8bafa17440

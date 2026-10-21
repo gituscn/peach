@@ -104,9 +104,8 @@ effects.own(()=>toggleHome.remove());
 const boardFoot=document.createElement('div');boardFoot.className='board-sidebar-foot';
 effects.own(()=>boardFoot.remove());
 boardFoot.innerHTML=`<div class="board-theme-toggle" role="group" aria-label="明暗主题"><span class="board-theme-thumb" aria-hidden="true"></span><button type="button" data-board-theme="light" aria-label="浅色主题">${icon('sun')}</button><button type="button" data-board-theme="dark" aria-label="深色主题">${icon('moon')}</button></div>`;
-/* 光晕配色钮和设置钮归一组，明暗键单独一组：侧栏收窄到 60px 时这一列竖着排，明暗键
-   落在最下面（boardui.com 右下角那一对就是配色在上、明暗在下）。展开态横排：明暗在左、
-   这一组在右。
+/* 光晕配色钮和设置钮归一组，明暗键单独一组。展开时从左到右、收起时从上到下
+   均按明暗、配色、设置排列，键盘焦点也沿用同一顺序。
    字形直接引 `#ri-palette-line`，不走 `icon()`：那一枚是 Remix 的实心路径，`icon()` 拼的是
    `#i-` 前缀的线条件。它和设置分区「界面」那一枚是同一个意思——这枚钮的弹层底部「详细
    设置」开的正是那一页，两处说的都是外观，同一个意思本来就只该有一枚字形。 */

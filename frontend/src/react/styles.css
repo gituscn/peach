@@ -354,8 +354,9 @@
 }
 
 .peach-react:has([data-selection-dock]) {
-  padding-bottom: 96px;
+  padding-bottom: var(--selection-dock-space, 96px);
 }
+html:has([data-selection-dock]) { scroll-padding-bottom: var(--selection-dock-space, 96px); }
 
 /* 岛里的危险键（批量条的「移入回收站」「彻底删除」、回收站说明行的「清空回收站」）挂 `data-danger`，
  * 红色只在这里定义一份，与壳的 `button.danger`（`web/board.css`）读同一组 `--board-red` 三档渐变：
@@ -389,6 +390,10 @@
 
 /* 页面分区使用与遗留导航相同的中性填充。 */
 .peach-react [data-board-tab-list] > button[aria-selected="true"] { background: var(--hover); color: var(--ink); }
+/* 错误详情是次要文本动作，使用中性悬停面与常规字重。 */
+.peach-react [data-error-details-toggle]{font:var(--board-compact);color:var(--ink-2);background:transparent}
+.peach-react [data-error-details-toggle]:hover:not(:disabled,[aria-disabled="true"]){background:var(--control-hover);color:var(--ink)}
+.peach-react [data-error-details-toggle]:active:not(:disabled,[aria-disabled="true"]){background:var(--hover);color:var(--ink)}
 
 /* 玻璃浮层上分段控件选中的那一格（`components/segmented.tsx` 的 `SEGMENT_GLASS`）：
  * 白填充垫底、斜光一道、整圈 rim 描边，与浮层上其余「当前在哪儿」的那块同一副料。 */
@@ -773,6 +778,31 @@
   border-bottom: 1px solid var(--color-separator-border);
   transition: padding 200ms ease, font-size 200ms ease;
 }
+/* 工具栏按操作组换行；组内仍可适应比自身固有宽度更窄的容器。 */
+[data-responsive-toolbar] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+[data-toolbar-heading] {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  margin-inline-end: auto;
+}
+[data-toolbar-actions] {
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+[data-pagination-layout] { grid-template-columns: auto minmax(0, 1fr) auto; }
+
 .bui-table td {
   @apply px-3 py-2.5 align-middle text-body-medium text-text-primary outline-none;
   transition: padding 200ms ease, font-size 200ms ease;

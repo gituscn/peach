@@ -76,7 +76,7 @@ describe('Board 页面骨架', () => {
   });
   it('关注骨架的工具行按 Board UI 最终变体画：检查全部是主按钮，视图切换是按版式选中的按钮组', () => {
     const toolbar = follow().querySelector('.ui-follow-skeleton-toolbar')!;
-    const check = toolbar.querySelector(':scope > button')!;
+    const check = toolbar.querySelector('[data-follow-toolbar-actions] > button')!;
     expect(check.textContent).toBe('检查全部');
     expect(check.classList.contains('bg-button-primary')).toBe(true);
     const group = [...toolbar.querySelectorAll('[data-button-group][role="group"] > button')];

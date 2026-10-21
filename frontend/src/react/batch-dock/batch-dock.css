@@ -20,7 +20,7 @@
 [data-batch-scope] [data-selection-dock]>button[data-danger] svg{margin-right:0}
 
 /* 浮条出来时，作品详情那一层（`<dialog data-stage>`）的底部让出它的高度。 */
-body:has([data-batch-dock] [data-selection-dock]) [data-stage]{padding-bottom:180px}
+body:has([data-batch-dock] [data-selection-dock]) :is(#grid,[data-stage]){padding-bottom:var(--selection-dock-space,180px)}
 
 /* 窄屏垃圾文件：三颗键一行等分、计数单占一行居中，横跨整行贴底。浮条的水平居中靠 SelectionDock 自己
    内联的 `translate(-50%)`，所以这里用「宽 = 视口减两边 12px」配 `left: 50%`，落点与贴边写法一样。 */

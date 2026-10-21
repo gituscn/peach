@@ -138,9 +138,11 @@ export function CatalogListPage(props: CatalogGridProps) {
   });
   return <div data-catalog-view-mode="list" data-catalog-table="" aria-busy={result.isFetching || undefined} className="flex min-w-0 flex-col gap-4">
     <div className="flex flex-wrap justify-end gap-2" role="toolbar" aria-label="作品列表工具栏">
+      <div data-toolbar-actions="">
       <TableColumnControls preferences={preferences} />
       <DataTableSort label="作品列表" options={sortOptions} sorting={sorting}
         onChange={next => table.setSorting(next)} />
+      </div>
     </div>
     <LibraryCompletionPrompt assetIds={props.filters?.state === 'trash' ? [] : missingPreviewIds(items, props.layout.javImage)} />
     {result.isError ? <RetryNote message={requestErrorMessage(result.error)} onRetry={() => void result.refetch()} /> : null}

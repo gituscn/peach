@@ -101,7 +101,7 @@ Test builds are unsigned. If Windows says “Windows protected your PC”, confi
 
 Build a self-contained `.app` and DMG locally on macOS, including FFmpeg, ffprobe, untrunc and cloudflared. Running it requires neither Homebrew, Python, a source checkout, nor another computer. Complete corresponding media tool sources accompany each release. See [the macOS build guide](docs/OPERATIONS.md#macos-独立测试包).
 
-The release workflow generates separate Apple Silicon (`macos-arm64.dmg`) and Intel (`macos-x86_64.dmg`) test packages. Check the actual assets in the [website download section](https://peach.video/#download) for availability. Check your chip in About This Mac, open the matching image, and drag Peach into Applications. Test packages are not notarized; media tools must be installed separately.
+The release workflow generates separate Apple Silicon (`macos-arm64.dmg`) and Intel (`macos-x86_64.dmg`) test packages. Check the actual assets in the [website download section](https://peach.video/#download) for availability. Check your chip in About This Mac, open the matching image, and drag Peach into Applications. Test packages are not notarized.
 
 ### Run from source (Windows, macOS)
 
