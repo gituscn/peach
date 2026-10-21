@@ -6,6 +6,8 @@ Windows 构建路径解析复用 PowerShell 7 的原生 [`GetUnresolvedProviderP
 
 GitLab API、CI 认证和 Release 创建复用官方 [glab 1.124.0](https://gitlab.com/gitlab-org/cli)（MIT，维护中）；GitLab CI 的发布写入使用短期 `CI_JOB_TOKEN` 与官方 CI 自动登录。R2 的 S3 上传复用 [rclone 1.75.2](https://rclone.org/)（MIT，维护中），使用单桶对象读写凭据；版本文件不可覆盖，并由独立 HTTPS 下载校验 SHA-256。两者都是构建期 CLI，不进入应用运行时依赖。
 
+GitGud 双存储副本复用同一版 glab 的原生 `packages upload` 与官方 [Packages API](https://docs.gitlab.com/api/packages/)，不另写认证或上传协议。Peach 只核对版本、文件名、大小与 `file_sha256`，复用相同内容并拒绝覆盖冲突；登记未完成最多检查三次。R2 下载表与 GitGud 备用资产链接使用不同的 Release 路径。未新增运行时依赖，离线回归覆盖首次上传、重复执行、内容冲突、未登记终止与双来源链接。
+
 轻量安装器的 R2 优先与 GitHub 同版本回退复用 `standalone_update.download`、既有 HTTPX 和内置工具清单；每个来源分别验证大小与 SHA-256。发布后空缓存验收复用 `smoke_split_update.py` 与实际冻结程序的 `--installer-tools` 入口，不新增下载器或依赖。
 
 `fetch_release_tools.py` 从固定版本官方发行站读取 SHA-256 清单，仅提取指定二进制。Python 标准库负责制品清单、版本与提交判据，不另实现 GitLab 认证、S3 签名或多段上传协议。Windows 与 macOS 的 CI 入口复用既有测试、构建和独立制品验收脚本。下载后端及费用边界见[运维说明](OPERATIONS.md#gitlab-发布与下载后端)。

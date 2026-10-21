@@ -5008,6 +5008,94 @@ class ReleaseDownloadNotesTests(unittest.TestCase):
         self.assertIn('https://downloads.peach.video/v1.0.0/Peach-1.0.0-macos-x86_64.dmg', links)
 
 
+class GitGudPackageMirrorTests(unittest.TestCase):
+    def fixture(self, root):
+        path = root / 'app.zip'
+        path.write_bytes(b'public release bytes')
+        asset = {'name': path.name, 'size': path.stat().st_size,
+                 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+        return {'tag_name': 'v1.2.3', 'assets': [asset]}, {
+            'file_name': path.name, 'size': asset['size'], 'file_sha256': asset['sha256']}
+
+    def test_upload_uses_official_packages_command_and_checks_server_digest(self):
+        from scripts import publish_gitlab_release as module, release_forge
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            release, row = self.fixture(root)
+            packages = [{'id': 7, 'name': 'peach-release', 'version': 'v1.2.3'}]
+            with mock.patch.object(release_forge.GitLabForge, 'api', side_effect=[[], packages, [row]]), \
+                    mock.patch.object(module.subprocess, 'run') as run:
+                links = module.gitgud_package_links(root, release, 'https://gitgud.io/owner/repo')
+            args = run.call_args.args[0]
+            self.assertEqual(args[1:4], ['packages', 'upload', str(root / 'app.zip')])
+            self.assertEqual(args[-4:], ['--name', 'peach-release', '--version', 'v1.2.3'])
+            self.assertEqual(links[0]['direct_asset_path'], '/gitgud/app.zip')
+            self.assertEqual(links[0]['url'],
+                             'https://gitgud.io/api/v4/projects/owner%2Frepo/packages/generic/peach-release/v1.2.3/app.zip')
+
+    def test_identical_files_are_reused_and_conflicts_stop_before_upload(self):
+        from scripts import publish_gitlab_release as module, release_forge
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            release, row = self.fixture(root)
+            packages = [{'id': 7, 'name': 'peach-release', 'version': 'v1.2.3'}]
+            with mock.patch.object(release_forge.GitLabForge, 'api', side_effect=[packages, [row], packages, [row]]), \
+                    mock.patch.object(module.subprocess, 'run') as run:
+                module.gitgud_package_links(root, release, 'https://gitgud.io/owner/repo')
+            run.assert_not_called()
+            with mock.patch.object(release_forge.GitLabForge, 'api', side_effect=[packages, [{**row, 'file_sha256': '0' * 64}]]), \
+                    mock.patch.object(module.subprocess, 'run') as run, self.assertRaisesRegex(ValueError, '保留原文件'):
+                module.gitgud_package_links(root, release, 'https://gitgud.io/owner/repo')
+            run.assert_not_called()
+            (root / 'app.zip').write_bytes(b'changed local data')
+            with mock.patch.object(release_forge.GitLabForge, 'api') as api, self.assertRaises(ValueError):
+                module.gitgud_package_links(root, release, 'https://gitgud.io/owner/repo')
+            api.assert_not_called()
+
+    def test_incomplete_registration_is_bounded_and_not_reported_as_published(self):
+        from scripts import publish_gitlab_release as module, release_forge
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            release, _row = self.fixture(root)
+            with mock.patch.object(release_forge.GitLabForge, 'api', return_value=[]), \
+                    mock.patch.object(module.subprocess, 'run') as run, \
+                    mock.patch.object(module.time, 'sleep') as sleep, self.assertRaisesRegex(ValueError, '尚未全部登记'):
+                module.gitgud_package_links(root, release, 'https://gitgud.io/owner/repo')
+            self.assertEqual(run.call_count, 1)
+            self.assertEqual(sleep.call_count, 2)
+
+    def test_dual_publication_keeps_cloudflare_primary_and_includes_gitgud_links(self):
+        from scripts import publish_gitlab_release as module
+        sha = '1' * 40
+        asset = {'name': 'app.zip', 'size': 3, 'sha256': 'a' * 64, 'state': 'uploaded',
+                 'browser_download_url': 'https://downloads.example/v1.2.3/app.zip'}
+        release = {'tag_name': 'v1.2.3', 'commit_sha': sha, 'assets': [asset]}
+        backup = {'name': 'app.zip · GitGud', 'url': 'https://gitgud.io/package/app.zip',
+                  'link_type': 'package', 'direct_asset_path': '/gitgud/app.zip'}
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps(release).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / 'RELEASE_NOTES.md').write_text('### 新增\n\n- 下载。\n', encoding='utf-8')
+            with mock.patch.dict(os.environ, {'CI_COMMIT_TAG': 'v1.2.3', 'CI_COMMIT_SHA': sha,
+                    'CI_PROJECT_URL': 'https://gitgud.io/owner/repo', 'PEACH_DOWNLOAD_BACKEND': 'both',
+                    'PEACH_R2_PUBLIC_BASE': 'https://downloads.example'}), \
+                    mock.patch.object(module.subprocess, 'check_output', return_value=sha), \
+                    mock.patch.object(module.subprocess, 'run') as run, \
+                    mock.patch.object(module, 'urlopen', return_value=response), \
+                    mock.patch('scripts.release_r2.inventory', return_value=[asset]), \
+                    mock.patch.object(module, 'gitgud_package_links', return_value=[backup]) as mirror:
+                module.publish(root)
+            mirror.assert_called_once_with(root, release, 'https://gitgud.io/owner/repo')
+            command = run.call_args.args[0]
+            links = json.loads(command[command.index('--assets-links') + 1])
+            self.assertEqual(links[0]['url'], asset['browser_download_url'])
+            self.assertEqual(links[0]['direct_asset_path'], '/app.zip')
+            self.assertEqual(links[1], backup)
+            self.assertIn('https://downloads.example/v1.2.3/',
+                          (root / 'RELEASE_NOTES.md').read_text(encoding='utf-8'))
+
+
 class GitLabReleaseTests(unittest.TestCase):
     SHA = "1" * 40
 
