@@ -3,20 +3,68 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
+import os
 from pathlib import Path
 import shutil
+import sys
 import tarfile
+import time
+import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 import zipfile
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR.parent / "src"))
+from peach.user_agent import USER_AGENT
+
 LOCK_PATH = SCRIPT_DIR / "ffmpeg-sources.json"
 
 
 def digest(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def download_source(source: dict, archive: Path) -> None:
+    """限次重试源码传输，完整校验后才登记缓存。"""
+    temporary = archive.with_suffix(archive.suffix + ".part")
+    request = urllib.request.Request(source["url"], headers={"User-Agent": USER_AGENT})
+    for attempt in range(3):
+        try:
+            print(f"下载固定源码：{source['name']}，第 {attempt + 1}/3 次", flush=True)
+            with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as stream:
+                shutil.copyfileobj(response, stream)
+            if digest(temporary) != source["sha256"]:
+                raise ValueError(f"源码 SHA256 不匹配: {source['name']}")
+            temporary.replace(archive)
+            return
+        except (TimeoutError, ConnectionError, http.client.IncompleteRead, urllib.error.URLError) as error:
+            retryable = not isinstance(error, urllib.error.HTTPError) or error.code in {408, 429, 500, 502, 503, 504}
+            if not retryable or attempt == 2:
+                raise
+            time.sleep(2 ** (attempt + 1))
+        finally:
+            temporary.unlink(missing_ok=True)
+
+
+def obtain_source(source: dict, archive: Path) -> None:
+    """从可选源码缓存或固定上游获取同一份已锁定字节。"""
+    base = os.environ.get("PEACH_SOURCE_CACHE_BASE", "").rstrip("/")
+    if base:
+        parsed = urlsplit(base)
+        if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
+                or parsed.query or parsed.fragment):
+            raise ValueError("源码缓存须为无凭据的 HTTPS 地址")
+        cached = {**source, "url": f"{base}/{source['sha256']}/{source['archive']}"}
+        try:
+            download_source(cached, archive)
+            return
+        except (TimeoutError, ConnectionError, http.client.IncompleteRead, urllib.error.URLError):
+            print(f"源码缓存未取得，尝试固定上游：{source['name']}", flush=True)
+    download_source(source, archive)
 
 
 def load_sources(path: Path = LOCK_PATH) -> dict:
@@ -39,12 +87,7 @@ def prepare(output: Path, lock: dict) -> None:
     for source in lock["sources"]:
         archive = sources / source["archive"]
         if not archive.exists():
-            temporary = archive.with_suffix(archive.suffix + ".part")
-            with urllib.request.urlopen(source["url"], timeout=60) as response, temporary.open("wb") as stream:
-                shutil.copyfileobj(response, stream)
-            if digest(temporary) != source["sha256"]:
-                raise ValueError(f"源码 SHA256 不匹配: {source['name']}")
-            temporary.replace(archive)
+            obtain_source(source, archive)
         if digest(archive) != source["sha256"]:
             raise ValueError(f"源码 SHA256 不匹配: {source['name']}")
         destination = work / source["name"]
@@ -105,6 +148,9 @@ def finish(output: Path, lock: dict) -> dict:
             package.write(path, f"sources/{path.name}")
         for name in ("build_ffmpeg_windows.sh", "fetch_ffmpeg_sources.py", "ffmpeg-sources.json", "dav1d-mingw64.ini"):
             package.write(SCRIPT_DIR / name, f"scripts/{name}")
+        for name in ("__init__.py", "user_agent.py"):
+            package.write(SCRIPT_DIR.parent / "src/peach" / name, f"src/peach/{name}")
+        package.write(SCRIPT_DIR.parent / "LICENSE", "licenses/Peach-LICENSE.txt")
         for license_file in sorted(bundle.glob("LICENSE*")):
             package.write(license_file, f"licenses/{license_file.name}")
         package.writestr("README.md", instructions)

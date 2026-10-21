@@ -22,6 +22,8 @@ variables:
   npm_config_fetch_retry_mintimeout: "10000"
   npm_config_fetch_retry_maxtimeout: "60000"
   PEACH_DOWNLOAD_BACKEND: r2
+  PEACH_R2_BUCKET: peach-releases
+  PEACH_R2_PUBLIC_BASE: https://downloads.peach.video
 
 verify-linux:
   stage: verify
@@ -121,49 +123,74 @@ validate-release:
 windows-media:
   extends: .release-linux
   stage: media
+  variables:
+    PEACH_SOURCE_CACHE_BASE: "${PEACH_R2_PUBLIC_BASE}/_sources"
+  environment:
+    name: release
+    action: prepare
   script:
     - apt-get install -y build-essential gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config clang meson ninja-build curl xz-utils
     - bash scripts/build_ffmpeg_windows.sh build/ffmpeg-windows
     - bash scripts/build_untrunc_windows.sh build/untrunc-windows
+    - python3 scripts/ci_r2_artifacts.py push windows-media
   artifacts:
     expire_in: 14 days
     paths:
-      - build/ffmpeg-windows/ffmpeg/
-      - build/ffmpeg-windows/ffmpeg-corresponding-source.zip
-      - build/untrunc-windows/untrunc/
-      - build/untrunc-windows/untrunc-corresponding-source.zip
+      - build/ci-artifacts/windows-media.json
 
 build-windows:
   stage: build
   tags: [peach-windows]
   rules: !reference [.release-linux, rules]
   needs: [windows-media]
+  environment:
+    name: release
+    action: prepare
+  before_script:
+    - python scripts/fetch_release_tools.py --rclone-only
+    - if ($LASTEXITCODE -ne 0) { throw 'R2 传输工具校验失败' }
+    - python scripts/ci_r2_artifacts.py pull windows-media
+    - if ($LASTEXITCODE -ne 0) { throw '媒体构建产物校验失败' }
   script:
     - '& ./scripts/ci_windows.ps1 build'
     - if ($LASTEXITCODE -ne 0) { throw 'Windows 构建失败' }
+    - python scripts/ci_r2_artifacts.py push windows-release
+    - if ($LASTEXITCODE -ne 0) { throw 'Windows 产物暂存失败' }
   artifacts:
     expire_in: 14 days
-    paths: [release/]
+    paths: [build/ci-artifacts/windows-release.json]
 
 build-macos:
   stage: build
   tags: [peach-macos]
   rules: !reference [.release-linux, rules]
   needs: [validate-release]
+  environment:
+    name: release
+    action: prepare
+  before_script:
+    - python3 scripts/fetch_release_tools.py --rclone-only
   script:
     - bash scripts/ci_macos.sh build arm64
     - bash scripts/ci_macos.sh build x86_64
+    - python3 scripts/ci_r2_artifacts.py push macos-release
   artifacts:
     expire_in: 14 days
-    paths: [dist/macos.noindex/]
+    paths: [build/ci-artifacts/macos-release.json]
 
 smoke-windows:
   stage: smoke
   tags: [peach-windows]
   rules: !reference [.release-linux, rules]
   needs: [build-windows]
-  variables:
-    GIT_STRATEGY: empty
+  environment:
+    name: release
+    action: verify
+  before_script:
+    - python scripts/fetch_release_tools.py --rclone-only
+    - if ($LASTEXITCODE -ne 0) { throw 'R2 传输工具校验失败' }
+    - python scripts/ci_r2_artifacts.py pull windows-release
+    - if ($LASTEXITCODE -ne 0) { throw 'Windows 产物下载校验失败' }
   script:
     - '& ./release/ci_windows.ps1 smoke'
     - if ($LASTEXITCODE -ne 0) { throw 'Windows 独立制品验收失败' }
@@ -180,5 +207,8 @@ publish-release:
     PEACH_R2_BUCKET: peach-releases
     PEACH_R2_PUBLIC_BASE: https://downloads.peach.video
   script:
+    - python3 scripts/ci_r2_artifacts.py pull windows-release
+    - python3 scripts/ci_r2_artifacts.py pull macos-release
     - cp dist/macos.noindex/arm64/*.dmg dist/macos.noindex/x86_64/*.dmg release/
     - python3 scripts/publish_gitlab_release.py
+    - python3 scripts/ci_r2_artifacts.py cleanup
