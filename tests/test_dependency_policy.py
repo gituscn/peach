@@ -53,6 +53,45 @@ class NpmInstallTests(unittest.TestCase):
                 sleep.assert_not_called()
 
 
+def _docker_context_includes(rules, relative):
+    """按 .dockerignore 末条命中者为准判定路径是否进入构建上下文，父目录命中也算。"""
+    parts = relative.split('/')
+    included = True
+    for negated, pattern in rules:
+        if any(pattern.fullmatch('/'.join(parts[:depth])) for depth in range(1, len(parts) + 1)):
+            included = negated
+    return included
+
+
+class DockerBuildContextTests(unittest.TestCase):
+    def test_build_stage_receives_every_bundled_runtime_resource(self):
+        from peach.bundle_resources import data_files
+        rules = []
+        for line in (ROOT / '.dockerignore').read_text(encoding='utf-8').splitlines():
+            if line.strip() and not line.startswith('#'):
+                negated, pattern = line.startswith('!'), line.lstrip('!').rstrip('/')
+                regex = re.escape(pattern).replace(r'\*\*', '.*').replace(r'\*', '[^/]*')
+                rules.append((negated, re.compile(regex)))
+        stage = (ROOT / 'Dockerfile').read_text(encoding='utf-8').split(' AS build\n', 1)[1].split('\nFROM ', 1)[0]
+        with tempfile.TemporaryDirectory() as folder:
+            app = Path(folder)
+            for line in stage.splitlines():
+                words = line.split()
+                if not words or words[0] != 'COPY' or words[1].startswith('--'):
+                    continue
+                *sources, destination = words[1:]
+                for source in sources:
+                    origin = ROOT / source
+                    files = [origin] if origin.is_file() else [p for p in origin.rglob('*') if p.is_file()]
+                    for path in files:
+                        if not _docker_context_includes(rules, path.relative_to(ROOT).as_posix()):
+                            continue
+                        target = app / destination / (path.name if origin.is_file() else path.relative_to(origin))
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_bytes(b'')
+            data_files(app)
+
+
 class NpmAuditTests(unittest.TestCase):
     def test_docker_dependency_updates_have_a_takeover_recipe(self):
         for manifest in ('Dockerfile', '.github/actions/actionlint/Dockerfile'):
