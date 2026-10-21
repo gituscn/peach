@@ -136,7 +136,8 @@ def proxy_flags(*, direct: bool, proxy: str) -> tuple[str, ...] | None:
     parsed = urlsplit(proxy)
     if parsed.username or parsed.password:
         return None
-    return (f"--proxy-server={urlunsplit((parsed.scheme, parsed.netloc, '', '', ''))}",)
+    scheme = 'socks5' if parsed.scheme == 'socks5h' else parsed.scheme
+    return (f"--proxy-server={urlunsplit((scheme, parsed.netloc, '', '', ''))}",)
 
 
 class _WebSocket:

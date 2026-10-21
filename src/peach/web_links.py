@@ -54,7 +54,8 @@ def _probe(url: str, timeout: float = CHECK_TIMEOUT) -> tuple[int, str]:
     连不上，而失败的连接会在共享池里漏掉槽位，几十个请求之后一切都变成 PoolTimeout。
     """
     def get(target: str) -> httpx.Response:
-        with httpx.Client(follow_redirects=True, timeout=timeout,
+        from .peach_proxy import http_client
+        with http_client(follow_redirects=True, timeout=timeout,
                           limits=httpx.Limits(max_connections=4,
                                               max_keepalive_connections=0)) as client:
             return client.get(target, headers={"User-Agent": USER_AGENT})

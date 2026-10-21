@@ -12,10 +12,10 @@ import subprocess
 import sys
 import tempfile
 from urllib.parse import quote, urlsplit
-from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from peach.user_agent import USER_AGENT
+from peach.peach_proxy import http_client
 
 
 def inventory(root: Path, version: str) -> list[dict]:
@@ -40,10 +40,10 @@ def inventory(root: Path, version: str) -> list[dict]:
 def verify_download(url: str, item: dict) -> None:
     checksum = hashlib.sha256()
     size = 0
-    with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=120) as response:
-        if response.status != 200:
+    with http_client(follow_redirects=True, timeout=120) as client, client.stream("GET", url, headers={"User-Agent": USER_AGENT}) as response:
+        if response.status_code != 200:
             raise ValueError(f"公开下载未返回完整文件：{item['name']}")
-        while chunk := response.read(1024 * 1024):
+        for chunk in response.iter_bytes(1024 * 1024):
             size += len(chunk)
             checksum.update(chunk)
     if size != item["size"] or checksum.hexdigest() != item["sha256"]:

@@ -11,6 +11,7 @@ from .user_agent import USER_AGENT
 import ipaddress
 import re
 import socket
+import threading
 import urllib.parse
 from dataclasses import dataclass
 from typing import Mapping, Protocol
@@ -18,6 +19,7 @@ from typing import Mapping, Protocol
 import httpx
 from curl_cffi import requests as curl_requests
 from curl_cffi.requests.exceptions import CurlError
+from . import peach_proxy
 
 #: 只在本机或局域网里有意义的名字后缀。外面递进来的地址落到它们上，只可能是想让
 #: Peach 替人去探内网。
@@ -188,11 +190,27 @@ class HttpxTransport:
     MAX_REDIRECTS = 5
 
     def __init__(self, client: httpx.Client | None = None, *, owns_client: bool = False):
-        self.client = client or httpx.Client(
-            limits=httpx.Limits(max_connections=32, max_keepalive_connections=16),
-            headers={"User-Agent": USER_AGENT},
-        )
+        self._client = client
+        self._client_lock = threading.Lock()
+        self._closed = False
         self._owns_client = client is None or owns_client
+
+    @property
+    def client(self):
+        with self._client_lock:
+            if self._closed and self._client is None:
+                raise RuntimeError("HTTP 客户端已关闭")
+            if self._client is None:
+                self._client = httpx.Client(
+                    **peach_proxy.client_options(),
+                    limits=httpx.Limits(max_connections=32, max_keepalive_connections=16),
+                    headers={"User-Agent": USER_AGENT})
+            return self._client
+
+    @client.setter
+    def client(self, value):
+        with self._client_lock:
+            self._client = value
 
     def __call__(
         self,
@@ -238,7 +256,10 @@ class HttpxTransport:
 
     def close(self) -> None:
         if self._owns_client:
-            self.client.close()
+            with self._client_lock:
+                self._closed = True
+                if self._client is not None:
+                    self._client.close()
 
 
 def _download_chunks(response):
@@ -277,8 +298,21 @@ class CurlCffiTransport:
 
     def __init__(self, *, impersonate: str,
                  session: curl_requests.Session | None = None):
-        self.session = session or curl_requests.Session(impersonate=impersonate)
+        self._session = session
+        self._impersonate = impersonate
+        self._session_lock = threading.Lock()
+        self._closed = False
         self._owns_session = session is None
+
+    @property
+    def session(self):
+        with self._session_lock:
+            if self._closed and self._session is None:
+                raise RuntimeError("浏览器指纹客户端已关闭")
+            if self._session is None:
+                self._session = curl_requests.Session(impersonate=self._impersonate,
+                                                      **peach_proxy.curl_options())
+            return self._session
 
     def __call__(
         self,
@@ -321,4 +355,7 @@ class CurlCffiTransport:
 
     def close(self) -> None:
         if self._owns_session:
-            self.session.close()
+            with self._session_lock:
+                self._closed = True
+                if self._session is not None:
+                    self._session.close()

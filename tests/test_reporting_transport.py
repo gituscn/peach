@@ -43,16 +43,18 @@ class ReportingTransportTests(unittest.TestCase):
             with self.subTest(status=status, headers=headers):
                 outcomes = []
                 client = self.client(outcomes)
-                response = SimpleNamespace(status=status, headers=headers, close=mock.Mock(), data=b"private")
-                with mock.patch('urllib3.PoolManager.request', return_value=response) as request:
+                response = SimpleNamespace(status_code=status, headers=headers, close=mock.Mock(), content=b"private")
+                with mock.patch('peach.reporting_transport.http_client') as factory:
+                    request = factory.return_value.__enter__.return_value.request
+                    request.return_value = response
                     client.transport._send_envelope(self.envelope())
-                self.assertIs(request.call_args.kwargs['retries'], False)
-                self.assertIs(request.call_args.kwargs['redirect'], False)
+                self.assertFalse(factory.call_args.kwargs['follow_redirects'])
+                self.assertEqual(request.call_count, 1)
                 self.assertEqual(outcomes[-1]["status"], expected)
                 self.assertEqual(outcomes[-1]["status_code"], status)
                 self.assertNotIn("private", str(outcomes))
         outcomes = []
-        with mock.patch('urllib3.PoolManager.request', side_effect=OSError("private proxy")):
+        with mock.patch('peach.reporting_transport.http_client', side_effect=OSError("private proxy")):
             with self.assertRaises(OSError):
                 self.client(outcomes).transport._send_envelope(self.envelope())
         self.assertEqual(outcomes, [{"status": "unknown", "reason": "network"}])
@@ -61,7 +63,7 @@ class ReportingTransportTests(unittest.TestCase):
         outcomes = []
         client = self.client(outcomes)
         with mock.patch.dict(os.environ, {"PEACH_REPORTING_TEST_MODE": "1"}), \
-                mock.patch('urllib3.PoolManager.request') as network:
+                mock.patch('peach.reporting_transport.http_client') as network:
             with self.assertRaises(OSError):
                 client.transport._send_envelope(self.envelope())
             network.assert_not_called()
@@ -127,7 +129,7 @@ class ReportingTransportTests(unittest.TestCase):
         outcomes = []
         client = self.client(outcomes)
         client.transport._disabled_until[None] = datetime.now(timezone.utc) + timedelta(seconds=60)
-        with mock.patch('urllib3.PoolManager.request') as network:
+        with mock.patch('peach.reporting_transport.http_client') as network:
             client.transport._send_envelope(self.envelope())
             network.assert_not_called()
         self.assertEqual(outcomes, [{'status': 'failed', 'reason': 'rate_limit'}])

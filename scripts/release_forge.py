@@ -9,10 +9,11 @@ import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import quote, urlencode
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from peach.user_agent import USER_AGENT
+from peach.peach_proxy import read_url
 
 
 REQUIRED_TEST_JOBS = frozenset({"verify-linux", "verify-windows", "verify-macos", "wheel-smoke"})
@@ -40,8 +41,7 @@ class GitLabForge:
             # 公开项目的只读元数据可匿名取得，不扩大本机细粒度凭据权限。
             request = Request(f"https://{self.host}/api/v4/{path}",
                               headers={"Accept": "application/json", "User-Agent": USER_AGENT})
-            with urlopen(request, timeout=60) as response:
-                return json.load(response)
+            return json.loads(read_url(request.full_url, headers=dict(request.header_items()), timeout=60))
 
     def remote_url(self, repo: str) -> str:
         # 使用已配置的 Git 认证；PAT 和 Runner token 不进入命令参数。
