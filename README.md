@@ -99,7 +99,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 ### macOS 本机构建
 
-macOS 可在本机构建独立 `.app` 与 DMG，运行不需要 Python、源码或另一台电脑。构建与安装见 [macOS 独立测试包](docs/OPERATIONS.md#macos-独立测试包)。
+macOS 可在本机构建独立 `.app` 与 DMG，内含 FFmpeg、ffprobe、untrunc 和 cloudflared，安装后不需要 Homebrew、Python、源码或另一台电脑。媒体工具的完整对应源码随同版本制品提供。构建与安装见 [macOS 独立测试包](docs/OPERATIONS.md#macos-独立测试包)。
 
 发版流程分别生成 Apple Silicon（`macos-arm64.dmg`）与 Intel（`macos-x86_64.dmg`）测试包；可下载版本以[官网下载区](https://peach.video/#download)的实际资产为准。在「关于本机」确认芯片，打开对应镜像并将 Peach 拖入「应用程序」。测试包未完成 Apple 公证，媒体工具需另行准备。
 

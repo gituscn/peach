@@ -79,6 +79,12 @@ JS/TS 文案复用 [Oxc parser](https://oxc.rs/docs/guide/usage/parser)，开发
 
 ## macOS 独立构建
 
+macOS 发行包复用 Windows 固定的 FFmpeg 9.0.2、x264、dav1d 1.5.4 和 untrunc `9d86ec9` 源码锁、下载 SHA-256 校验与 `media_tool_bundle.validate`。untrunc 单独静态链接兼容的 FFmpeg 8.1.3；其 [上游 Makefile](https://github.com/anthwlock/untrunc/blob/9d86ec9ef2ffed1bf8131abe80742c0574db52b6/Makefile)提供 macOS 编译依据。头文件用 `-idirafter` 保留 C++ 标准头 `version` 的优先级。FFmpeg/x264 按 GPL-3.0-or-later、dav1d 按 BSD-2-Clause、untrunc 按 GPL-2.0-or-later 分发；完整对应源码归档包含全部上游源码、构建脚本和许可。Peach 仅维护目标架构、静态库组合、清单与拒收判据，不复制 Homebrew dylib。macOS 编译启用 VideoToolbox、AudioToolbox 与 Secure Transport，硬件转码选择仍服从已有产品策略。
+
+编译工具复用 Meson 1.12.1（Apache-2.0）、Ninja 1.13.2（Apache-2.0）、pkgconf 3.0.7.post0（ISC）和 NASM 3.02（BSD-2-Clause），由 `setup_macos_media_tools.py` 安装到构建目录，应用运行无需这些工具。源码提供完整配置，两个架构分别编译；Intel 二进制可在 Rosetta 下验收，但不能视为 Intel 真机测试。对应源码与二进制的体积、架构和系统最低版本由实际产物核对。
+
+cloudflared 采用 [Cloudflare 官方 2026.9.0 发行](https://github.com/cloudflare/cloudflared/releases/tag/2026.9.0)的双架构归档（Apache-2.0）；固定资产 SHA-256 读取官方 Release API 的 `digest`，与发布正文中的旧摘要分别核对。Peach 保留下载校验、包内查找、ad-hoc 签名与进程归属，不新增隧道协议。原生验收运行 `--version`，不因此宣称已连通公网隧道。没有新增 Python 应用运行依赖；合成媒体验收与临时目录不接触真实 ledger。
+
 Windows、macOS 与 wheel 通过 `bundle_resources.data_files` 共用运行资源清单，amane 桥只收集脚本、依赖清单和锁文件，运行环境仍位于用户数据目录。资源定位复用 `settings_file.PROJECT_ROOT`，覆盖源码、wheel 的 `_resources` 和 PyInstaller 的资源根，不按模块目录深度猜测。打包机制沿用官方 [PyInstaller 数据文件约定](https://www.pyinstaller.org/en/stable/runtime-information.html)与 setuptools 的资源复制，无新增依赖。
 
 独立应用复用项目已有的 PyInstaller 6.22.3（GPL-2.0-or-later，带发行例外），由 macOS 原生 bootloader 承载 Python 3.14 与 Cocoa 菜单栏，资源与 CLI 入口沿用现有桌面实现。镜像使用系统自带的 `hdiutil`，无需新增运行时依赖。构建与签名依据 [PyInstaller macOS 文档](https://www.pyinstaller.org/en/stable/usage.html)和 [Apple 分发文档](https://developer.apple.com/documentation/xcode/packaging-mac-software-for-distribution)。

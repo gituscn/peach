@@ -27,13 +27,27 @@ macOS 安装依赖：`uv sync --locked --python 3.14 --extra macos`。完成后�
 MACOSX_DEPLOYMENT_TARGET=11.0 uv sync --locked --extra build --extra macos
 ```
 
-构建包含 Python、页面、迁移和资源的应用与 DMG：
+先在构建目录安装固定工具链；下面以 Apple Silicon 为例，Intel 将 `arm64` 换成 `x86_64`：
+
+```sh
+./.venv/bin/python -X utf8 scripts/setup_macos_media_tools.py --root "$PWD/build/macos-media-toolchain"
+export PATH="$PWD/build/macos-media-toolchain/env/bin:$PATH"
+./.venv/bin/python -X utf8 scripts/build_macos_media.py --tool ffmpeg --arch arm64 --output build/media-macos/arm64/ffmpeg
+./.venv/bin/python -X utf8 scripts/build_macos_media.py --tool untrunc --arch arm64 --output build/media-macos/arm64/untrunc
+./.venv/bin/python -X utf8 scripts/fetch_cloudflared_macos.py --arch arm64 --destination build/media-macos/arm64/cloudflared
+```
+
+构建包含 Python、页面、迁移、资源和自包含工具的应用与 DMG：
 
 ```sh
 ./.venv/bin/python -X utf8 scripts/build_macos_standalone.py
 ```
 
 产物在 `dist/macos.noindex/<架构>/`，构建副本避开 Spotlight 索引；日常使用只保留 Applications 里的应用，测试结束卸载已挂载的安装镜像。Apple Silicon 使用 `arm64`，Intel 使用 `x86_64`；分别用对应架构的 Python 与依赖构建。`--target-arch` 显式指定目标，解释器架构不匹配会停止，两个包不混合原生扩展，也不直接合并成 universal2。Intel 构建可在 Intel Mac 或 Rosetta 下的 x86_64 Python 环境完成；Rosetta 验收不能代替 Intel 真机和较旧 macOS 的验收。
+
+随包工具位于 `Contents/MacOS/tools/ffmpeg/bin`、`Contents/MacOS/tools/untrunc`，cloudflared 位于 `Contents/MacOS`。它们不依赖 Homebrew；FFmpeg、x264、dav1d 和修复用 FFmpeg 库静态链接，动态依赖仅允许 macOS 系统库。`scripts/smoke_macos_media.py` 在系统 PATH 下使用合成 H.264/AAC 与 AV1 样片验证工具查找、探测、抽帧、转码、缺 `moov` 修复和完整解码。该修复验收覆盖同编码参照样片，不代表任意损坏媒体都能恢复。
+
+每种架构同时生成 `ffmpeg-macos-<架构>-corresponding-source.zip` 与 `untrunc-macos-<架构>-corresponding-source.zip`，必须与 DMG 同版本发布；归档包含完整上游源码、固定哈希、许可证、构建脚本、配置和环境记录。构建拒绝缺失、哈希不符、架构不符或依赖开发机动态库的工具。cloudflared 固定官方 2026.9.0，归档 SHA-256 采用 GitHub Release 资产 API 的 `digest`，来源登记在 `scripts/cloudflared-macos.json`；发布正文的旧校验值不作为这两个 macOS 归档的锁。
 
 源码开发外壳 `build_macos_app.py` 默认输出到 `dist/macos-source.noindex/`，依赖本机 venv 与 LaunchAgent；不要把它当作独立应用安装。
 

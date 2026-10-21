@@ -52,7 +52,8 @@ def allowed_path(name: str, group: str) -> bool:
         return False
     if group == "macos-release":
         return (len(parts) == 4 and "/".join(parts[:3]) in GROUPS[group]
-                and (parts[-1] in {"build-info.json", "SHA256SUMS.txt"} or parts[-1].endswith(".dmg")))
+                and (parts[-1] in {"build-info.json", "SHA256SUMS.txt"} or parts[-1].endswith(".dmg")
+                     or bool(re.fullmatch(r"(?:ffmpeg|untrunc)-macos-(?:arm64|x86_64)-corresponding-source.zip", parts[-1]))))
     if group == "windows-release":
         return len(parts) == 2 and parts[0] == "release" and (
             bool(re.fullmatch(r"Peach-[0-9]+\.[0-9]+\.[0-9]+-windows-x64[-A-Za-z0-9.]*\.(zip|exe)", parts[-1]))

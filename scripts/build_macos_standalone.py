@@ -79,6 +79,19 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
     if architecture not in {"arm64", "x86_64"} or architecture != platform.machine():
         raise SystemExit("目标架构必须与当前 Python 一致；请使用 arm64 或 x86_64 Python 及对应依赖构建")
     from build_macos_app import build_frontend_bundles
+    from media_tool_bundle import validate
+    from build_macos_media import audit_binary
+    from fetch_cloudflared_macos import validate as validate_cloudflared
+
+    media_root = ROOT / "build/media-macos" / architecture
+    sources = []
+    for tool in ("ffmpeg", "untrunc"):
+        _manifest, archive = validate(media_root / tool / tool, tool, architecture=architecture)
+        sources.append(archive)
+        for name in (("bin/ffmpeg", "bin/ffprobe") if tool == "ffmpeg" else ("untrunc",)):
+            audit_binary(media_root / tool / tool / name, architecture)
+    cloudflared = media_root / "cloudflared"
+    validate_cloudflared(cloudflared, architecture)
 
     build_frontend_bundles()
     destination = destination.resolve()
@@ -101,6 +114,17 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
     ], check=True, cwd=ROOT, env={**os.environ, "PEACH_MACOS_BUILD_INFO": str(work / "build-info.json"),
                                 "PEACH_MACOS_TARGET_ARCH": architecture})
     app = destination / "Peach.app"
+    tools = app / "Contents/MacOS/tools"
+    tools.mkdir()
+    for tool in ("ffmpeg", "untrunc"):
+        shutil.copytree(media_root / tool / tool, tools / tool)
+    shutil.copyfile(cloudflared / "cloudflared", app / "Contents/MacOS/cloudflared")
+    (app / "Contents/MacOS/cloudflared").chmod(0o755)
+    for name in ("LICENSE-cloudflared.txt", "NOTICE-cloudflared.md"):
+        shutil.copyfile(cloudflared / name, app / "Contents/Resources" / name)
+    shutil.copyfile(cloudflared / "manifest.json", app / "Contents/Resources/cloudflared-manifest.json")
+    for archive in sources:
+        shutil.copyfile(archive, destination / archive.name)
     minimum = minimum_system_version(app)
     info_path = app / "Contents" / "Info.plist"
     info = plistlib.loads(info_path.read_bytes())

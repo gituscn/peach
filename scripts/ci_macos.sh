@@ -84,6 +84,14 @@ uv sync --locked --all-extras --python "$python" --no-cache \
     --reinstall-package zeroconf --no-binary-package zeroconf
 uv pip check --python "$python"
 output="${PEACH_MACOS_OUTPUT_DIR:-$root/dist/macos.noindex/$architecture}"
+"$python" scripts/setup_macos_media_tools.py --root "$root/build/macos-media-toolchain"
+export PATH="$root/build/macos-media-toolchain/env/bin:$PATH"
+for tool in ffmpeg untrunc; do
+    "$python" scripts/build_macos_media.py --tool "$tool" --arch "$architecture" \
+        --output "$root/build/media-macos/$architecture/$tool"
+done
+"$python" scripts/fetch_cloudflared_macos.py --arch "$architecture" \
+    --destination "$root/build/media-macos/$architecture/cloudflared"
 "$python" scripts/build_macos_standalone.py --target-arch "$architecture" --destination "$output"
 "$python" -c 'import json,subprocess,sys; from pathlib import Path; info=json.loads(Path("build/macos-standalone",sys.argv[1],"build-info.json").read_text()); head=subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(); assert info["commit"]==head and not info["dirty"], info' "$architecture"
 cp "build/macos-standalone/$architecture/build-info.json" "$output/build-info.json"
@@ -110,5 +118,6 @@ test -s "$mountpoint/Peach.app/Contents/Resources/LICENSE"
 codesign --verify --deep --strict "$mountpoint/Peach.app"
 lipo -verify_arch "$architecture" "$mountpoint/Peach.app/Contents/MacOS/Peach"
 "$python" scripts/smoke_macos.py "$mountpoint/Peach.app"
-(cd "$output"; shasum -a 256 "${image##*/}" > SHA256SUMS.txt)
+"$python" scripts/smoke_macos_media.py "$mountpoint/Peach.app" --arch "$architecture"
+(cd "$output"; shasum -a 256 "${image##*/}" *-corresponding-source.zip > SHA256SUMS.txt)
 printf 'macOS %s 安装镜像验收通过：%s\n' "$architecture" "$image"
