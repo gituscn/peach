@@ -38,11 +38,11 @@ _NOT_MODIFIED = 304
 
 def _transport(contract):
     from .jav_cover_fetch import HostLimitedTransport
-    from .library_processing import SOURCE_INTERVALS
+    from .library_processing import SOURCE_LIMITER
     from .scraping_access import SourceTransport
 
     return HostLimitedTransport(
-        SourceTransport(contract.follow_secrets_root), 2.0, intervals=SOURCE_INTERVALS)
+        SourceTransport(contract.follow_secrets_root), 2.0, limiter=SOURCE_LIMITER)
 
 
 def fetch(transport, url: str, *, etag: str | None = None,
@@ -201,16 +201,15 @@ def _execute_check(contract, body, job_id: str) -> dict:
         if close:
             close()
     contract.cache_bust()
-    # 取资料：新发现的先排，余下名额给没取到资料的旧壳，同一批一条后继。只缺封面的另成一批
+    # 取资料：新发现的先排，没取到资料的旧壳留着保底名额，同一批一条后继。只缺封面的另成一批
     # 补封面。定时那一轮只带到了重试时间的，手动点的那一轮全带；已在队里的番号都不再带。
     retry_after = feed_followup.RETRY_AFTER if body.get("automatic") else timedelta(0)
     hidden = web_settings.hidden_compilations(contract.database)
     busy = feed_followup.in_flight(contract.task_runs)
     fresh = [code for code in dict.fromkeys(codes) if normalise_code_key(code) not in busy]
     with contract.database.read_connection() as connection:
-        batch = fresh + feed_followup.backlog(
-            connection, contract.cover_root, exclude=[*codes, *busy], retry_after=retry_after,
-            limit=max(0, feed_followup.MAX_BATCH - len(fresh)), hidden=hidden)
+        batch = feed_followup.scrape_batch(
+            connection, fresh, exclude=[*codes, *busy], retry_after=retry_after, hidden=hidden)
         covers = feed_followup.cover_backlog(
             connection, contract.cover_root, exclude=[*codes, *batch, *busy],
             retry_after=retry_after, hidden=hidden)

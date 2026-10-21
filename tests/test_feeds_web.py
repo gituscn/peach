@@ -409,7 +409,7 @@ class FeedWebTest(FeedWebFixture):
     def _backlog(self) -> list[str]:
         hidden = web_settings.hidden_compilations(self.contract.database)
         with self.contract.database.read_connection() as connection:
-            return feed_followup.backlog(connection, self.contract.cover_root, hidden=hidden)
+            return feed_followup.scrape_batch(connection, hidden=hidden)
 
     def test_a_group_compilation_is_neither_listed_counted_nor_rescheduled(self):
         self._compilation("波多野結衣、篠田ゆう")
@@ -656,8 +656,45 @@ class FeedWebTest(FeedWebFixture):
             connection.execute("UPDATE feed_discovery SET scrape_error='来源连接未取得' WHERE code='HMN-071'")
         self.assertEqual(self._cover_backlog(), ['SSIS-950'])
         with self.contract.database.read_connection() as connection:
-            self.assertEqual(feed_followup.backlog(connection, self.contract.cover_root, hidden=frozenset(),
-                                                   retry_after=timedelta(0)), ['HMN-071'])
+            self.assertEqual(feed_followup.scrape_batch(connection, hidden=frozenset(),
+                                                        retry_after=timedelta(0)), ['HMN-071'])
+
+    def test_failed_old_rows_keep_a_share_of_a_batch_full_of_new_codes(self):
+        """一轮发现的新番号比一批还多时，上次没取到资料的旧壳仍有保底名额，不被挤到轮不上。"""
+        fresh = [f"NEW-{number:03d}" for number in range(feed_followup.MAX_BATCH + 10)]
+        self._add()
+        with self.contract.database.write_transaction() as connection:
+            for number in range(feed_followup.RETRY_SHARE + 2):
+                connection.execute(
+                    "INSERT INTO feed_discovery(code,source_id,title,link,release_date,discovered_at,"
+                    "scraped_at,scrape_error) VALUES(?,1,'',NULL,'2026-09-22',?,?,'来源连接未取得')",
+                    (f"OLD-{number:03d}", feeds.stamp(), f"2026-01-{number + 1:02d}T00:00:00Z"))
+        with self.contract.database.read_connection() as connection:
+            batch = feed_followup.scrape_batch(connection, fresh, hidden=frozenset(),
+                                               retry_after=timedelta(0))
+        self.assertEqual(len(batch), feed_followup.MAX_BATCH)
+        self.assertEqual(batch[:feed_followup.MAX_BATCH - feed_followup.RETRY_SHARE],
+                         fresh[:feed_followup.MAX_BATCH - feed_followup.RETRY_SHARE])
+        # 保底名额给最久没试过的那几部。
+        self.assertEqual(batch[-feed_followup.RETRY_SHARE:],
+                         [f"OLD-{number:03d}" for number in range(feed_followup.RETRY_SHARE)])
+
+    def test_scraping_one_code_stops_at_the_metadata_budget(self):
+        """来源连不上时一部最多问到资料预算为止，原因写成哪几家在多少秒内没答复。"""
+        from peach.jav_cover_fetch import DeadlineExceeded
+        from peach.library_processing import ACTION_BUDGETS
+
+        seen = {}
+
+        class Silent:
+            def community(self, code, *, deadline=None, route=None):
+                seen["remaining"] = float(deadline) - time.monotonic()
+                raise DeadlineExceeded("动作预算已用尽")
+
+        with self.assertRaisesRegex(DeadlineExceeded, "秒内没有答复"):
+            self._collect(Silent(), "SSIS-950")
+        self.assertLessEqual(seen["remaining"], ACTION_BUDGETS["querying_metadata"])
+        self.assertGreater(seen["remaining"], ACTION_BUDGETS["querying_metadata"] - 5)
 
     def test_codes_already_queued_are_not_planned_again(self):
         """在队里的那一批还没跑完，下一轮检查只带新的番号，不把同一批换个组合再派一条。"""

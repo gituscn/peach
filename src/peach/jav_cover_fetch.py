@@ -191,17 +191,21 @@ class CoverConnectError(Unavailable):
 
 
 class HostLimitedTransport:
-    """把请求间隔按主机分别计算；不同官方站点互不阻塞。"""
+    """把请求间隔按主机分别计算；不同官方站点互不阻塞。
+
+    给了 `limiter` 就按它等：几个传输共用一份间隔，同时跑的任务问同一主机也不会叠在一起。
+    """
 
     def __init__(self, inner: HttpxTransport, interval: float, *,
                  intervals: dict[str, float] | None = None,
-                 clock=time.monotonic, sleeper=time.sleep) -> None:
+                 clock=time.monotonic, sleeper=time.sleep,
+                 limiter: HostLimiter | None = None) -> None:
         self.inner = inner
         self.interval = max(0.0, interval)
         self.clock = clock
         self.sleeper = sleeper
-        self.limiter = HostLimiter(dict(intervals or {}), default_interval=self.interval,
-                                   clock=clock, sleeper=sleeper)
+        self.limiter = limiter or HostLimiter(dict(intervals or {}), default_interval=self.interval,
+                                              clock=clock, sleeper=sleeper)
 
     def __call__(self, request: HttpRequest, timeout: float, limit: int):
         self.limiter.wait(request.url)
