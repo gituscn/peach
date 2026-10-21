@@ -399,10 +399,12 @@ class LibrarySharingTests(unittest.TestCase):
                 (200, {'x-sentry-rate-limits': '60:error:organization'}, 'unknown'), (None, {}, 'unknown')):
             with self.subTest(status=status, headers=headers):
                 sharing._state_path(self.config).unlink(missing_ok=True)
-                response = SimpleNamespace(status=status, headers=headers, close=mock.Mock(), data=b'private')
+                response = SimpleNamespace(status_code=status, headers=headers, close=mock.Mock(), content=b'private')
                 with mock.patch.dict(os.environ, {'PEACH_REPORTING_TEST_MODE': '0'}), \
-                        mock.patch('urllib3.PoolManager.request', return_value=response,
-                            side_effect=OSError('private proxy') if status is None else None) as request:
+                        mock.patch('peach.reporting_transport.http_client') as factory:
+                    request = factory.return_value.__enter__.return_value.request
+                    request.return_value = response
+                    request.side_effect = OSError('private proxy') if status is None else None
                     self.service.attempt()
                     self.service.attempt()
                     request.assert_called_once()

@@ -4943,14 +4943,17 @@ class R2ReleaseTests(unittest.TestCase):
         data = b"Peach public artifact"
         response = mock.MagicMock()
         response.__enter__.return_value = response
-        response.status = 200
-        response.read.side_effect = [data[:5], data[5:], b""]
+        response.status_code = 200
+        response.iter_bytes.return_value = iter([data[:5], data[5:]])
         expected = {"name": "Peach.zip", "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
-        with mock.patch.object(module, "urlopen", return_value=response):
+        with mock.patch.object(module, "http_client") as factory:
+            factory.return_value.__enter__.return_value.stream.return_value = response
             module.verify_download("https://downloads.example/Peach.zip", expected)
-        response.read.side_effect = [data[:-1], b""]
-        with mock.patch.object(module, "urlopen", return_value=response), self.assertRaisesRegex(ValueError, "SHA-256"):
-            module.verify_download("https://downloads.example/Peach.zip", expected)
+        response.iter_bytes.return_value = iter([data[:-1]])
+        with mock.patch.object(module, "http_client") as factory:
+            factory.return_value.__enter__.return_value.stream.return_value = response
+            with self.assertRaisesRegex(ValueError, "SHA-256"):
+                module.verify_download("https://downloads.example/Peach.zip", expected)
 
     def test_inventory_requires_complete_platforms_and_does_not_upload_helpers(self):
         module = load_script("release_r2")
@@ -5082,7 +5085,7 @@ class GitGudPackageMirrorTests(unittest.TestCase):
                     'PEACH_R2_PUBLIC_BASE': 'https://downloads.example'}), \
                     mock.patch.object(module.subprocess, 'check_output', return_value=sha), \
                     mock.patch.object(module.subprocess, 'run') as run, \
-                    mock.patch.object(module, 'urlopen', return_value=response), \
+                    mock.patch.object(module, 'read_url', return_value=json.dumps(release).encode()), \
                     mock.patch('scripts.release_r2.inventory', return_value=[asset]), \
                     mock.patch.object(module, 'gitgud_package_links', return_value=[backup]) as mirror:
                 module.publish(root)
@@ -5107,15 +5110,15 @@ class GitLabReleaseTests(unittest.TestCase):
         for status in (401, 403):
             forge.command.side_effect = subprocess.CalledProcessError(1, ["glab"], stderr=f"glab: HTTP {status}")
             with self.subTest(status=status), mock.patch.dict(os.environ, {"PEACH_GLAB": "glab"}), \
-                    mock.patch.object(release_forge, "urlopen", return_value=response) as fetch:
+                    mock.patch.object(release_forge, "read_url", return_value=b'[{"id":7}]') as fetch:
                 self.assertEqual(forge.api("owner/repo", "pipelines"), [{"id": 7}])
-            request = fetch.call_args.args[0]
-            self.assertEqual(request.full_url, "https://gitgud.io/api/v4/projects/owner%2Frepo/pipelines")
-            self.assertNotIn("Private-token", request.headers)
-            self.assertNotIn("Authorization", request.headers)
+            self.assertEqual(fetch.call_args.args[0], "https://gitgud.io/api/v4/projects/owner%2Frepo/pipelines")
+            headers = {key.lower(): value for key, value in fetch.call_args.kwargs['headers'].items()}
+            self.assertNotIn("private-token", headers)
+            self.assertNotIn("authorization", headers)
         forge.command.side_effect = subprocess.CalledProcessError(1, ["glab"], stderr="network unavailable")
         with mock.patch.dict(os.environ, {"PEACH_GLAB": "glab"}), \
-                mock.patch.object(release_forge, "urlopen") as fetch, self.assertRaises(subprocess.CalledProcessError):
+                mock.patch.object(release_forge, "read_url") as fetch, self.assertRaises(subprocess.CalledProcessError):
             forge.api("owner/repo", "pipelines")
         fetch.assert_not_called()
 

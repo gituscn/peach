@@ -10,7 +10,6 @@ import subprocess
 import sys
 import time
 from urllib.parse import quote, urlencode, urlsplit
-from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -18,6 +17,7 @@ if not __package__:
     sys.path.insert(0, str(ROOT))
     __package__ = "scripts"
 from peach.user_agent import USER_AGENT
+from peach.peach_proxy import read_url
 
 
 def verify_local_assets(root: Path, assets: list[dict]) -> None:
@@ -117,8 +117,7 @@ def publish(root: Path = Path('release')) -> None:
     if backend in {"r2", "both"}:
         subprocess.run([sys.executable, "scripts/release_r2.py", "--root", str(root), "--version", tag[1:], "--apply"], check=True)
         base = os.environ["PEACH_R2_PUBLIC_BASE"].rstrip("/")
-        with urlopen(Request(f"{base}/{tag}/release.json", headers={"User-Agent": USER_AGENT}), timeout=60) as response:
-            release = json.load(response)
+        release = json.loads(read_url(f"{base}/{tag}/release.json", headers={"User-Agent": USER_AGENT}, timeout=60))
         if (release["tag_name"] != tag or release.get("commit_sha") != sha or not release["assets"]
                 or any(item["state"] != "uploaded" or not item["browser_download_url"].startswith(f"{base}/{tag}/")
                        for item in release["assets"])):

@@ -19,6 +19,14 @@ import zipfile
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR.parent / "src"))
 from peach.user_agent import USER_AGENT
+if (SCRIPT_DIR.parent / "src/peach/peach_proxy.py").is_file():
+    import httpx
+    from peach.peach_proxy import http_client
+    HTTP_ERRORS = (httpx.HTTPError,)
+else:
+    # 对应源码归档可独立构建，归档不包含 Peach 应用或它的代理配置。
+    http_client = None
+    HTTP_ERRORS = ()
 
 LOCK_PATH = SCRIPT_DIR / "ffmpeg-sources.json"
 
@@ -35,14 +43,22 @@ def download_source(source: dict, archive: Path) -> None:
     for attempt in range(3):
         try:
             print(f"下载固定源码：{source['name']}，第 {attempt + 1}/3 次", flush=True)
-            with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as stream:
-                shutil.copyfileobj(response, stream)
+            if http_client is None:
+                with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as stream:
+                    shutil.copyfileobj(response, stream)
+            else:
+                with http_client(follow_redirects=True, timeout=60) as client, client.stream(
+                        "GET", request.full_url, headers=dict(request.header_items())) as response, temporary.open("wb") as stream:
+                    response.raise_for_status()
+                    for chunk in response.iter_bytes(256 * 1024):
+                        stream.write(chunk)
             if digest(temporary) != source["sha256"]:
                 raise ValueError(f"源码 SHA256 不匹配: {source['name']}")
             temporary.replace(archive)
             return
-        except (TimeoutError, ConnectionError, http.client.IncompleteRead, urllib.error.URLError) as error:
-            retryable = not isinstance(error, urllib.error.HTTPError) or error.code in {408, 429, 500, 502, 503, 504}
+        except (TimeoutError, ConnectionError, http.client.IncompleteRead, urllib.error.URLError, *HTTP_ERRORS) as error:
+            status = getattr(getattr(error, "response", None), "status_code", getattr(error, "code", None))
+            retryable = status is None or status in {408, 429, 500, 502, 503, 504}
             if not retryable or attempt == 2:
                 raise
             time.sleep(2 ** (attempt + 1))
@@ -62,7 +78,7 @@ def obtain_source(source: dict, archive: Path) -> None:
         try:
             download_source(cached, archive)
             return
-        except (TimeoutError, ConnectionError, http.client.IncompleteRead, urllib.error.URLError):
+        except (TimeoutError, ConnectionError, http.client.IncompleteRead, urllib.error.URLError, *HTTP_ERRORS):
             print(f"源码缓存未取得，尝试固定上游：{source['name']}", flush=True)
     download_source(source, archive)
 

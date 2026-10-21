@@ -8,7 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -31,8 +31,8 @@ def public_github_api(endpoint: str):
     """公开上游元数据使用匿名官方 API，不携带本机账号凭据。"""
     request = Request(f"https://api.github.com/{endpoint}",
                       headers={"Accept": "application/vnd.github+json", "User-Agent": references.USER_AGENT})
-    with urlopen(request, timeout=60) as response:
-        return json.load(response)
+    from peach.peach_proxy import read_url
+    return json.loads(read_url(request.full_url, headers=dict(request.header_items()), timeout=60))
 
 
 def public_dependabot(repo: str) -> list[dict]:

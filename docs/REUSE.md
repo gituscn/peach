@@ -12,9 +12,11 @@ GitGud 双存储副本复用同一版 glab 的原生 `packages upload` 与官方
 
 `fetch_release_tools.py` 从固定版本官方发行站读取 SHA-256 清单，仅提取指定二进制。Python 标准库负责制品清单、版本与提交判据，不另实现 GitLab 认证、S3 签名或多段上传协议。Windows 与 macOS 的 CI 入口复用既有测试、构建和独立制品验收脚本。下载后端及费用边界见[运维说明](OPERATIONS.md#gitlab-发布与下载后端)。
 
-CI 大产物中转复用相同的 rclone 1.75.2 与官方 [R2 S3 适配](https://developers.cloudflare.com/r2/examples/rclone/)，覆盖 Linux amd64、macOS arm64/x86_64 与 Windows amd64；MIT 许可，仅构建期使用。传输、校验和多段上传由 rclone 负责，Peach 只维护流水线身份、输出路径白名单、SHA-256 清单与桶容量预算。macOS 只传 DMG 和构建清单，展开应用保留在构建机器。GitLab job artifacts 只传 JSON 清单；Generic Package 的单文件配额不能保证前置代理接受同等大小的请求。官方 rclone 归档名称与校验清单按实际输入核验，大文件往返使用独立临时仓库验证，不将传输测试当作正式制品验收。无新增 Python 依赖。源码获取复用共享 User-Agent 与标准库 urllib，针对连接中断、超时及暂时性 HTTP 错误最多尝试三次，完成 SHA-256 校验后才登记缓存；对应源码包包含共享请求标识及其许可证，可脱离开发环境执行。
+CI 大产物中转复用相同的 rclone 1.75.2 与官方 [R2 S3 适配](https://developers.cloudflare.com/r2/examples/rclone/)，覆盖 Linux amd64、macOS arm64/x86_64 与 Windows amd64；MIT 许可，仅构建期使用。传输、校验和多段上传由 rclone 负责，Peach 只维护流水线身份、输出路径白名单、SHA-256 清单与桶容量预算。macOS 只传 DMG 和构建清单，展开应用保留在构建机器。GitLab job artifacts 只传 JSON 清单；Generic Package 的单文件配额不能保证前置代理接受同等大小的请求。官方 rclone 归档名称与校验清单按实际输入核验，大文件往返使用独立临时仓库验证，不将传输测试当作正式制品验收。无新增 Python 依赖。源码获取复用共享 User-Agent 与 Peach HTTPX 客户端，针对连接中断、超时及暂时性 HTTP 错误最多尝试三次，完成 SHA-256 校验后才登记缓存；可独立构建的对应源码包使用标准库 urllib，包含共享请求标识及其许可证。
 
-细粒度凭据缺少公开 CI 元数据的读取权限时，发版查询可在官方 API 上进行一次匿名 GET，使用标准库 HTTPS 与项目共用 User-Agent；不扩大凭据权限，也不携带本机认证头。私有资源仍须通过服务端权限检查。
+细粒度凭据缺少公开 CI 元数据的读取权限时，发版查询可在官方 API 上进行一次匿名 GET，复用 HTTPX、Peach 代理与项目共用 User-Agent；不扩大凭据权限，也不携带本机认证头。私有资源仍须通过服务端权限检查。
+
+外部 HTTP 请求的连接策略复用 `peach_proxy.client_options`，客户端使用固定的 HTTPX 0.28.1（BSD-3-Clause）与 curl_cffi 0.16.3（MIT），没有新增依赖。共享 `HttpxTransport`、浏览器指纹传输、字幕、PikPak、更新、模型与维护脚本使用同一策略；libcurl 通过 `NOPROXY` 明确表达直连及自定义代理，避免继承相反的环境例外。Sentry 2.72.0 的事件、限流与回执仍由 SDK 维护，最终请求复用 HTTPX，保持测试禁发、无重试和无重定向。临时本机代理验证两种传输的实际请求路径；下载大小、SHA-256、重试次数和独立源码归档继续由行为回归核对。无需引入额外代理库或全局改写第三方网络函数。来源显式直连、网盘挂载、本机控制接口和独立工具的边界见[来源连接设置](SOURCING.md)。
 
 npm 安装沿用 Node.js 24 LTS 附带的官方 [`npm ci`](https://docs.npmjs.com/cli/v11/commands/npm-ci/)，锁文件与完整性校验由 npm 维护。`npm_ci.py` 复用既有 `npm_audit.py` 的有限重试方式及 Python 3.14 标准库 `subprocess`（PSF 许可，无额外安装体积），只为明确的 `ECONNRESET`、`ETIMEDOUT`、`EAI_AGAIN` 下载错误重试，最多三次；锁文件、完整性与生命周期错误保留失败。Linux、Windows、macOS CI 和 Windows 打包入口共用此策略，不重试测试失败、不变更包版本。真实锁定安装与注入失败回归覆盖成功、重试耗尽和非网络错误，无新增应用依赖、生产入口或账本改动。
 

@@ -23,7 +23,8 @@ YuNet 给的是框 + 5 个关键点 + 置信度，可以按分数卡，不必靠
 from __future__ import annotations
 
 import hashlib
-import urllib.request
+import httpx
+from .peach_proxy import read_url
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -177,9 +178,8 @@ def fetch_model(target: Path, url: str, sha256: str, *, allow_download: bool,
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(".part")
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:
-            payload = response.read()
-    except OSError as error:
+        payload = read_url(url, timeout=timeout)
+    except (OSError, httpx.HTTPError) as error:
         raise FaceModelUnavailable(f"取{label}失败：{error}") from error
     digest = hashlib.sha256(payload).hexdigest()
     if digest != sha256:

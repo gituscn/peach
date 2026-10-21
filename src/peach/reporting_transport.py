@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import os
 import threading
+from types import SimpleNamespace
+
+from .peach_proxy import http_client
 
 
 def transport_class(gate, callback):
@@ -43,8 +46,11 @@ def transport_class(gate, callback):
         def _request(self, method, endpoint_type, body, headers):
             if os.environ.get("PEACH_REPORTING_TEST_MODE") == "1":
                 raise OSError("测试进程禁止远程诊断外发")
-            return self._pool.request(method, self._auth.get_api_url(endpoint_type), body=body,
-                                      headers=headers, retries=False, redirect=False)
+            with http_client(timeout=self.TIMEOUT, follow_redirects=False) as client:
+                response = client.request(method, self._auth.get_api_url(endpoint_type),
+                                          content=body, headers=headers)
+            return SimpleNamespace(status=response.status_code, headers=response.headers,
+                                   data=response.content, close=response.close)
 
         def _send_envelope(self, envelope):
             self._context(envelope)

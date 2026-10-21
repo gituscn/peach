@@ -5,11 +5,14 @@ import argparse
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tarfile
-import urllib.request
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from fetch_ffmpeg_sources import digest, download_source
 from build_macos_media import audit_binary
+from peach.peach_proxy import read_url
 
 
 def fetch(destination: Path, architecture: str) -> Path:
@@ -31,8 +34,7 @@ def fetch(destination: Path, architecture: str) -> Path:
     version = subprocess.check_output([str(binary), "--version"], text=True, encoding="utf-8")
     if lock["version"] not in version:
         raise ValueError("cloudflared 版本不符")
-    with urllib.request.urlopen(lock["license_url"], timeout=60) as response:
-        license_text = response.read().decode("utf-8")
+    license_text = read_url(lock["license_url"], timeout=60).decode("utf-8")
     if "Apache License" not in license_text:
         raise ValueError("cloudflared 许可证未取得")
     (destination / "LICENSE-cloudflared.txt").write_text(license_text, encoding="utf-8")

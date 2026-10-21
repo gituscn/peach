@@ -1,4 +1,4 @@
-"""采集来源共用的 Peach 连接策略与本机代理凭据。"""
+"""外部请求共用的 Peach 连接策略与本机代理凭据。"""
 from __future__ import annotations
 
 import json
@@ -55,7 +55,13 @@ def save(root: Path, body: dict) -> dict:
     return describe(root)
 
 
-def client_options(root: Path) -> dict:
+def secrets_root() -> Path:
+    from .settings_file import active
+    return active().directory("secrets")
+
+
+def client_options(root: Path | None = None) -> dict:
+    root = secrets_root() if root is None else root
     saved = values(root)
     if saved.get("conflict"):
         raise ValueError("来源代理设置不同，请先在配置页选择 Peach 代理")
@@ -63,3 +69,32 @@ def client_options(root: Path) -> dict:
     if mode == "proxy":
         return {"trust_env": False, "proxy": saved["proxy"]}
     return {"trust_env": mode == "environment"}
+
+
+def http_client(*, root: Path | None = None, **kwargs):
+    """外网 HTTPX 客户端；注入的传输独占请求，不额外挂载代理。"""
+    import httpx
+    options = {"trust_env": False} if kwargs.get("transport") is not None else client_options(root)
+    return httpx.Client(**{**options, **kwargs})
+
+
+def curl_options(root: Path | None = None) -> dict:
+    """libcurl 的直连与自定义代理显式覆盖环境 NO_PROXY。"""
+    from curl_cffi import CurlOpt
+    options = client_options(root)
+    if not options.get("trust_env"):
+        options["curl_options"] = {CurlOpt.NOPROXY: "" if options.get("proxy") else "*"}
+    return options
+
+
+def read_url(url: str, *, timeout: float = 60, headers=None, max_bytes: int | None = None) -> bytes:
+    """读取模型、清单等完整响应，沿用 Peach 的 HTTP 与 SOCKS 代理。"""
+    import httpx
+    from .http import _bounded_body
+    try:
+        with http_client(follow_redirects=True, timeout=timeout) as client, client.stream("GET", url, headers=headers) as response:
+            response.raise_for_status()
+            return response.read() if max_bytes is None else _bounded_body(response.iter_bytes(), max_bytes)
+    except httpx.HTTPError as error:
+        kind = f"HTTP {error.response.status_code}" if isinstance(error, httpx.HTTPStatusError) else type(error).__name__
+        raise OSError(f"外部请求未取得（{kind}）") from error

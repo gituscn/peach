@@ -22,7 +22,7 @@ class EnsureModelTests(unittest.TestCase):
             target.write_bytes(payload)
             with patch.object(face_detect, "MODEL_SHA256",
                               hashlib.sha256(payload).hexdigest()), \
-                 patch.object(face_detect.urllib.request, "urlopen") as opener:
+                 patch.object(face_detect, "read_url") as opener:
                 self.assertEqual(ensure_model(target), target)
             opener.assert_not_called()
 
@@ -40,20 +40,9 @@ class EnsureModelTests(unittest.TestCase):
             self.assertFalse(target.exists(), "校验不过的文件必须删掉，不能留着下次再骗一次")
 
     def test_a_download_whose_digest_differs_is_refused(self):
-        class _Response:
-            def read(self):
-                return b"not-the-model"
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *_exc):
-                return False
-
         with tempfile.TemporaryDirectory() as temp:
             target = Path(temp).resolve() / "yunet.onnx"
-            with patch.object(face_detect.urllib.request, "urlopen",
-                              return_value=_Response()):
+            with patch.object(face_detect, "read_url", return_value=b"not-the-model"):
                 with self.assertRaises(FaceModelUnavailable) as caught:
                     ensure_model(target)
             self.assertIn("校验不符", str(caught.exception))

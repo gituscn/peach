@@ -194,7 +194,7 @@ class StandaloneUpdateTests(unittest.TestCase):
         with patch.object(update.sys, "executable", str(target / "Peach.exe")), patch.object(
                 update.release_updates, "check", return_value=release), patch.object(
                 update.httpx, "Client", side_effect=lambda **kwargs: client_type(
-                    **kwargs, transport=update.httpx.MockTransport(response))):
+                    **{**kwargs, 'transport': update.httpx.MockTransport(response), 'trust_env': False, 'proxy': None})):
             update.prepare({"id": "split-fixture"}, lock)
         lock.release.assert_called_once()
         return update.read(), requests
@@ -273,7 +273,7 @@ class StandaloneUpdateTests(unittest.TestCase):
             return httpx.Response(200, content=(output / name).read_bytes())
 
         def client(*args, **kwargs):
-            return original_client(*args, **kwargs, transport=httpx.MockTransport(respond), trust_env=False)
+            return original_client(*args, **{**kwargs, 'transport': httpx.MockTransport(respond), 'trust_env': False, 'proxy': None})
 
         with patch('peach.__version__', '1.0.0'), patch.object(update.httpx, 'Client', side_effect=client):
             self.assertEqual(prepare_install_tools(target, self.root / 'empty-cache', error, stage=stage), 0)
@@ -301,7 +301,7 @@ class StandaloneUpdateTests(unittest.TestCase):
             return httpx.Response(200, content=b'corrupt' if bad else (output / name).read_bytes())
 
         with patch('peach.__version__', '1.0.0'), patch.object(update.httpx, 'Client', side_effect=lambda **kwargs:
-                original_client(**kwargs, transport=httpx.MockTransport(respond), trust_env=False)):
+                original_client(**{**kwargs, 'transport': httpx.MockTransport(respond), 'trust_env': False, 'proxy': None})):
             result = prepare_install_tools(target, self.root / 'empty-cache', error, stage=stage)
         self.assertFalse(target.exists())
         return result, requests, manifest, stage, error

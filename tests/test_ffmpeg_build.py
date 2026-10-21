@@ -14,6 +14,8 @@ import unittest
 from unittest import mock
 import urllib.error
 import zipfile
+from contextlib import nullcontext
+import httpx
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/fetch_ffmpeg_sources.py"
@@ -24,23 +26,33 @@ SPEC.loader.exec_module(builder)
 
 
 class FFmpegSourceBuildTests(unittest.TestCase):
+    def setUp(self):
+        self.opened = mock.Mock()
+        client = mock.MagicMock()
+        client.__enter__.return_value = client
+        def stream(method, url, **kwargs):
+            result = self.opened(method, url, **kwargs)
+            return nullcontext(httpx.Response(200, content=result.read(), request=httpx.Request(method, url)))
+        client.stream.side_effect = stream
+        self.enterContext(mock.patch.object(builder, "http_client", return_value=client))
+
     def test_source_cache_falls_back_to_pinned_upstream_on_transport_failure(self):
         import hashlib
         data = b"pinned source bytes"
         source = {"name": "ffmpeg", "url": "https://upstream.example/source.tar.xz", "archive": "source.tar.xz",
                   "sha256": hashlib.sha256(data).hexdigest()}
         with tempfile.TemporaryDirectory() as temporary, mock.patch.dict(os.environ, {"PEACH_SOURCE_CACHE_BASE": "https://cache.example/_sources"}), \
-                mock.patch.object(builder.urllib.request, "urlopen", side_effect=[
+                mock.patch.object(self, "opened", side_effect=[
                     urllib.error.HTTPError("https://cache.example", 404, "missing", {}, None), io.BytesIO(data)]) as opened:
             archive = Path(temporary).resolve() / "source.tar.xz"
             builder.obtain_source(source, archive)
             self.assertEqual(archive.read_bytes(), data)
-            self.assertEqual([call.args[0].full_url for call in opened.call_args_list],
+            self.assertEqual([call.args[1] for call in opened.call_args_list],
                              [f"https://cache.example/_sources/{source['sha256']}/source.tar.xz", source["url"]])
 
     def test_source_cache_hash_mismatch_is_fatal(self):
         with tempfile.TemporaryDirectory() as temporary, mock.patch.dict(os.environ, {"PEACH_SOURCE_CACHE_BASE": "https://cache.example/_sources"}), \
-                mock.patch.object(builder.urllib.request, "urlopen", return_value=io.BytesIO(b"corrupt")) as opened:
+                mock.patch.object(self, "opened", return_value=io.BytesIO(b"corrupt")) as opened:
             archive = Path(temporary).resolve() / "source.tar.xz"
             with self.assertRaisesRegex(ValueError, "SHA256"):
                 builder.obtain_source({"name": "ffmpeg", "url": "https://upstream.example/source.tar.xz",
@@ -55,7 +67,7 @@ class FFmpegSourceBuildTests(unittest.TestCase):
                   "sha256": hashlib.sha256(data).hexdigest()}
         with tempfile.TemporaryDirectory() as temporary:
             archive = Path(temporary).resolve() / "source.tar.xz"
-            with mock.patch.object(builder.urllib.request, "urlopen", side_effect=[TimeoutError(), io.BytesIO(data)]) as opened, \
+            with mock.patch.object(self, "opened", side_effect=[TimeoutError(), io.BytesIO(data)]) as opened, \
                     mock.patch.object(builder.time, "sleep") as sleep:
                 builder.download_source(source, archive)
             self.assertEqual(archive.read_bytes(), data)
@@ -67,7 +79,7 @@ class FFmpegSourceBuildTests(unittest.TestCase):
         for failure in (None, urllib.error.HTTPError("https://upstream.example", 403, "Forbidden", {}, None)):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary:
                 archive = Path(temporary).resolve() / "source.tar.xz"
-                with mock.patch.object(builder.urllib.request, "urlopen", side_effect=failure,
+                with mock.patch.object(self, "opened", side_effect=failure,
                                        return_value=io.BytesIO(b"corrupt")) as opened, \
                         mock.patch.object(builder.time, "sleep") as sleep:
                     with self.assertRaises((ValueError, urllib.error.HTTPError)):
@@ -81,7 +93,7 @@ class FFmpegSourceBuildTests(unittest.TestCase):
     def test_download_stops_after_three_transport_attempts(self):
         with tempfile.TemporaryDirectory() as temporary:
             archive = Path(temporary).resolve() / "source.tar.xz"
-            with mock.patch.object(builder.urllib.request, "urlopen", side_effect=TimeoutError()) as opened, \
+            with mock.patch.object(self, "opened", side_effect=TimeoutError()) as opened, \
                     mock.patch.object(builder.time, "sleep") as sleep:
                 with self.assertRaises(TimeoutError):
                     builder.download_source({"name": "ffmpeg", "url": "https://upstream.example/source.tar.xz",

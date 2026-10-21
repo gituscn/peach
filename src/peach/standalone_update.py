@@ -102,9 +102,10 @@ def extract(archive: Path, destination: Path, progress, *, tool_files: set[str] 
 
 
 def download(url: str, archive: Path, size: int, digest: str, progress) -> None:
+    from .peach_proxy import http_client
     checksum = hashlib.sha256()
     received = 0
-    with httpx.Client(follow_redirects=True, timeout=30) as client, client.stream("GET", url) as response:
+    with http_client(follow_redirects=True, timeout=30) as client, client.stream("GET", url) as response:
         response.raise_for_status()
         with archive.open("wb") as output:
             for chunk in response.iter_bytes(256 * 1024):

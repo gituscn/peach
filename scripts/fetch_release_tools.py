@@ -9,11 +9,11 @@ import re
 import platform
 import sys
 import tarfile
-from urllib.request import Request, urlopen
 import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from peach.user_agent import USER_AGENT
+from peach.peach_proxy import read_url
 
 
 TOOLS = (
@@ -23,8 +23,7 @@ TOOLS = (
 
 
 def download(url: str) -> bytes:
-    with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=120) as response:
-        return response.read()
+    return read_url(url, headers={"User-Agent": USER_AGENT}, timeout=120)
 
 
 def tool_specs(*, rclone_only: bool = False, system: str | None = None,
