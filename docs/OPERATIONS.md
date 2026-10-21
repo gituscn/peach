@@ -73,6 +73,8 @@ Linux 发布任务使用官方 uv Python 3.14 容器，并在获取制品工具�
 
 Windows 安装覆盖与任务恢复验收允许 GitHub Actions，以及受保护版本标签上的 GitLab `smoke-windows` 作业；主机已有 Peach 安装登记时拒绝执行。所有程序、账本与任务夹具均放在临时目录，安装与卸载完成后核对登记清理。`fetch_cloudflared.ps1` 的相对输出路径按 PowerShell 当前工作位置解析，下载仍须通过固定 SHA-256 校验。
 
+GitGud 的 Linux 平台 Runner 不提供 Docker 守护进程，Docker 镜像由受保护标签上的 `publish-docker` 作业在 Windows 原生 Runner 构建，宿主须运行 Docker Desktop。作业核对标签与版本，用 `smoke_docker.py` 验收临时容器，再推送版本号与 `edge` 两个标签。`DOCKERHUB_USERNAME` 与 `DOCKERHUB_TOKEN` 放入受保护且隐藏的 CI 变量，环境作用域为 `release`；令牌只授予仓库读写。登录写入作业专用的临时 `DOCKER_CONFIG`，结束时登出并删除，不改动宿主用户的 Docker 登录。
+
 媒体工具源码可通过 `PEACH_SOURCE_CACHE_BASE` 指定 HTTPS 缓存入口，按 `<SHA-256>/<归档名>` 定位文件。标签流水线使用发布桶的 `_sources/` 前缀；维护者填充缓存前须核对锁文件的原始 SHA-256，缓存同样计入桶容量预算。下载缓存失败时尝试锁定的上游地址；任一来源的哈希不符立即拒绝，不能放宽清单。未配置缓存的对应源码包直接使用上游。
 
 可选的 `r2` 后端使用独立 Standard 桶与 HTTPS 自定义域名。`PEACH_R2_ACCESS_KEY_ID`、`PEACH_R2_SECRET_ACCESS_KEY`、`PEACH_R2_ENDPOINT` 放入受保护且隐藏的 CI 变量，环境作用域为 `release`；`PEACH_R2_BUCKET` 和 `PEACH_R2_PUBLIC_BASE` 指定发布目标。S3 传输复用 rclone，版本文件禁止覆盖；每份文件必须从公开入口完整下载并核对大小及 SHA-256 后，才更新公开版本索引和 Release 链接。

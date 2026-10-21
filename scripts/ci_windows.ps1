@@ -1,4 +1,4 @@
-﻿param([ValidateSet('verify', 'build', 'smoke')][string]$Mode = 'verify')
+﻿param([ValidateSet('verify', 'build', 'smoke', 'docker')][string]$Mode = 'verify')
 $ErrorActionPreference = 'Stop'
 
 function Assert-Exit([string]$Message) {
@@ -48,6 +48,45 @@ if ($Mode -eq 'build') {
     Assert-Exit '缺少发布说明'
     Add-Content -LiteralPath release/RELEASE_NOTES.md -Value (Get-Content -LiteralPath release/DOWNLOADS.md -Raw -Encoding utf8) -Encoding utf8
     $Version | Set-Content -LiteralPath release/version.txt -Encoding utf8
+    exit 0
+}
+
+if ($Mode -eq 'docker') {
+    # Linux 平台 Runner 不提供 Docker 守护进程；镜像在本机 Docker Desktop 构建、验收后发布。
+    $Match = Select-String -LiteralPath src/peach/__init__.py -Pattern '^__version__ = "([^"]+)"'
+    if (-not $Match) { throw '无法读取发布版本' }
+    $Version = $Match.Matches[0].Groups[1].Value
+    if ($env:CI_COMMIT_TAG -ne "v$Version") { throw 'Tag 与版本不一致' }
+    if (-not $env:DOCKERHUB_USERNAME -or -not $env:DOCKERHUB_TOKEN) { throw '缺少 Docker Hub 发布变量' }
+    $Endpoint = (docker context inspect --format '{{.Endpoints.docker.Host}}')
+    Assert-Exit '需要运行 Docker Desktop'
+    $Candidate = "peach-ci:$Version-$env:CI_PIPELINE_ID"
+    $Revision = (git rev-parse HEAD).Trim()
+    Assert-Exit '无法读取提交'
+    docker build --pull --label "org.opencontainers.image.version=$Version" --label "org.opencontainers.image.revision=$Revision" -t $Candidate .
+    Assert-Exit '镜像构建失败'
+    & (Get-Command python.exe).Source -X utf8 scripts/smoke_docker.py $Candidate
+    Assert-Exit '镜像验收失败'
+    # 登录写进作业专用配置目录，不改动宿主用户的 Docker 登录。
+    $SavedConfig, $SavedHost = $env:DOCKER_CONFIG, $env:DOCKER_HOST
+    $env:DOCKER_HOST = $Endpoint
+    $env:DOCKER_CONFIG = Join-Path ([IO.Path]::GetTempPath()) ('peach-docker-config-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $env:DOCKER_CONFIG | Out-Null
+    try {
+        $env:DOCKERHUB_TOKEN | docker login --username $env:DOCKERHUB_USERNAME --password-stdin
+        Assert-Exit 'Docker Hub 登录失败'
+        foreach ($Tag in @($Version, 'edge')) {
+            docker tag $Candidate "longmeidao/peach:$Tag"
+            Assert-Exit '镜像标签失败'
+            docker push "longmeidao/peach:$Tag"
+            Assert-Exit "推送 longmeidao/peach:$Tag 失败"
+        }
+    } finally {
+        docker logout | Out-Null
+        Remove-Item -LiteralPath $env:DOCKER_CONFIG -Recurse -Force -ErrorAction SilentlyContinue
+        $env:DOCKER_CONFIG, $env:DOCKER_HOST = $SavedConfig, $SavedHost
+        docker image rm $Candidate | Out-Null
+    }
     exit 0
 }
 
