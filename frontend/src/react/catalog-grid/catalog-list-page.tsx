@@ -161,7 +161,7 @@ export function CatalogListPage(props: CatalogGridProps) {
             <TableColumnResizer preferences={preferences} id={header.id} />
             </>}
           </TableColumn>)}
-          <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width="1fr" minWidth={0} />
+          <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width={preferences.spaceWidth} minWidth={0} />
         </TableHeader>
         <TableBody renderEmptyState={() => result.isPending
           ? <div data-skeleton="" data-table-skeleton="" aria-busy="true" role="status" aria-label="正在读取作品列表">

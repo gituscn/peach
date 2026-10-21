@@ -86,11 +86,44 @@ export async function verifyTablePreferences(page: Page, table: Locator, label: 
   await table.waitFor();
   assert.ok(Math.abs(await width() - resized) <= 1, label);
   assert.equal(await table.locator(`th[data-key="${optional.id}"]`).count(), 0);
-  await controls.getByRole('button', { name: '重置列宽', exact: true }).click();
-  assert.ok(Math.abs(await width() - initial) <= 1, label);
   await controls.getByRole('button', { name: '显示列', exact: true }).click();
   await menu.getByRole('button', { name: '恢复默认显示', exact: true }).click();
   await page.keyboard.press('Escape');
   await table.locator(`th[data-key="${optional.id}"]`).waitFor();
+  await controls.getByRole('button', { name: '重置列宽', exact: true }).click();
+  await page.waitForFunction(({ node, initial }) => node && Math.abs(node.getBoundingClientRect().width - initial) <= 1,
+    { node: await header.elementHandle(), initial }, { timeout: 5000 });
+  assert.ok(Math.abs(await width() - initial) <= 1, label);
+  assert.ok(await table.locator('th[data-table-space]').evaluate(node => node.getBoundingClientRect().width) <= 1,
+    `${label} 默认剩余空间由名称列承接`);
   await scroll.evaluate(node => { node.scrollLeft = 0 });
+}
+
+/** 内容的可用宽度跟随列变化，文字完整保留在 DOM 中。 */
+export async function verifyColumnContentWidth(table: Locator, id: string, selector: string) {
+  const header = table.locator(`th[data-key="${id}"]`);
+  const index = await header.evaluate(node => [...node.parentElement!.children].indexOf(node));
+  const cell = table.locator('tbody tr').first().locator('td').nth(index);
+  const content = cell.locator(selector).first();
+  const measure = () => content.evaluate(node => ({ width: node.getBoundingClientRect().width,
+    cell: node.closest('td')!.getBoundingClientRect().width,
+    text: node.getAttribute('title') || node.getAttribute('aria-label') || node.textContent }));
+  const initial = await measure();
+  // 用户按住列边拖动；键盘调整时表格的方向键导航会抢走焦点，测不出内容宽度。
+  const resizer = header.locator('.react-aria-ColumnResizer');
+  // 滚到视口中间，避开右下角弹出的提示。
+  await resizer.evaluate(node => node.scrollIntoView({ block: 'center', inline: 'nearest' }));
+  const box = (await resizer.boundingBox())!;
+  const page = content.page(), x = box.x + box.width / 2, y = box.y + box.height / 2;
+  await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 100, y, { steps: 10 }); await page.mouse.up();
+  await page.waitForFunction(({ node, initial }) => node && node.closest('td')!.getBoundingClientRect().width > initial + 70,
+    { node: await content.elementHandle(), initial: initial.cell }, { timeout: 5000 }).catch(() => undefined);
+  const resized = await measure();
+  assert.ok(resized.cell > initial.cell + 70, `${id} 列没有拉宽：${JSON.stringify({ initial, resized })}`);
+  assert.ok(Math.abs((resized.width - initial.width) - (resized.cell - initial.cell)) <= 2,
+    `${id} 内容没有随列拉宽：${JSON.stringify({ initial, resized })}`);
+  assert.equal(resized.text, initial.text);
+  const geometry = await content.evaluate(node => ({ content: node.getBoundingClientRect().right,
+    cell: node.closest('td')!.getBoundingClientRect().right }));
+  assert.ok(geometry.content <= geometry.cell, JSON.stringify(geometry));
 }

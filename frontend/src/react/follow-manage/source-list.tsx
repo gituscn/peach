@@ -103,7 +103,8 @@ const COLUMN_LABELS: Record<string, string> = {
 };
 const preferenceColumns = Object.entries(COLUMN_LABELS).map(([id, label]) => ({ id, label,
   width: id === 'select' ? 48 : id === 'source' ? 320 : id === 'author' ? 240 : id === 'actions' ? 208 : 184,
-  min: id === 'select' ? 48 : id === 'actions' ? 200 : 112, max: id === 'select' ? 48 : 800,
+  min: id === 'select' ? 48 : id === 'actions' ? 200 : id === 'source' ? 320 : 112, max: id === 'select' ? 48 : id === 'source' ? 2000 : 800,
+  flex: id === 'source',
   required: id === 'select' || id === 'source',
 }));
 
@@ -640,7 +641,7 @@ export function SourceList(props: SourceListProps) {
                   </TableColumn>
                 );
               })}
-              <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width="1fr" minWidth={0} />
+              <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width={preferences.spaceWidth} minWidth={0} />
             </TableHeader>
             <TableBody renderEmptyState={() => '这一页没有来源'}>
               {pageRows.map((row) => (

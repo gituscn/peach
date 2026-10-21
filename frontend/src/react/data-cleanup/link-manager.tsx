@@ -87,7 +87,7 @@ function LinkTable(
       render: (item) => <span className="flex min-w-24 items-center gap-2" data-link-name="">
         <span className="min-w-0 wrap-anywhere">{item.label || new URL(item.url).hostname}</span></span> },
     { id: 'note', label: '结果', width: 320, min: 192, value: (item) => item.note,
-      render: (item) => <div className="min-w-40 max-w-80" data-link-result={confirmed ? 'gone' : 'unclear'}>
+      render: (item) => <div className="min-w-0 w-full" data-link-result={confirmed ? 'gone' : 'unclear'}>
         {/^(?:HTTP\s+)?[1-5]\d{2}$/.test(item.note.trim())
           ? <StatusLabel tone={confirmed || /^(?:HTTP\s+)?5\d{2}$/.test(item.note.trim()) ? 'error' : 'warning'} data-link-code="">{item.note.trim()}</StatusLabel>
           : <div className="flex flex-col items-start gap-1"><StatusLabel tone={confirmed ? 'error' : 'warning'}>{confirmed ? '地址已失效' : '未取得结论'}</StatusLabel>
@@ -95,7 +95,7 @@ function LinkTable(
       </div> },
     { id: 'url', label: '地址', width: 360, min: 180, value: (item) => item.url,
       render: (item) => <a href={item.url} target="_blank" rel="noreferrer" title={item.url} data-link-address=""
-        className="flex max-w-90 min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary">
+        className="flex min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary">
         <SiteMark linkId={item.id} />
         <span data-middle-truncate className="min-w-0 truncate">{item.url}</span>
         <RiExternalLinkLine aria-hidden className="size-3.5 shrink-0" />

@@ -30,6 +30,7 @@ export interface DataColumn<T> {
   width?: number;
   min?: number;
   max?: number;
+  flex?: boolean;
 }
 
 interface DataTableProps<T> {
@@ -55,7 +56,8 @@ export function DataTable<T extends RowData>({ label, items, columns, rowId, row
   const [sorting, setSorting] = useState<SortingState>([]);
   const preferenceColumns = useMemo(() => [
     { id: 'select', label: '选择', width: 48, min: 48, max: 48, required: true },
-    ...columns.map((column, index) => ({ ...column, width: column.width ?? (index === 0 ? 320 : 200), required: index === 0 })),
+    ...columns.map((column, index) => ({ ...column, width: column.width ?? (index === 0 ? 320 : 160),
+      min: column.min ?? (index === 0 ? 320 : 96), flex: column.flex ?? index === 0, required: index === 0 })),
   ], [columns]);
   const preferences = useTablePreferences(`data:${label}`, preferenceColumns);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
@@ -131,7 +133,7 @@ export function DataTable<T extends RowData>({ label, items, columns, rowId, row
                 </span><TableColumnResizer preferences={preferences} id={header.id} /></>}
               </TableColumn>
             ))}
-            <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width="1fr" minWidth={0} />
+            <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width={preferences.spaceWidth} minWidth={0} />
           </TableHeader>
           <TableBody renderEmptyState={() => '没有记录'}>
             {table.getRowModel().rows.map((row) => (

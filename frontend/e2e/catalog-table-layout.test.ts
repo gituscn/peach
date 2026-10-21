@@ -70,13 +70,16 @@ describe('馆藏表格宽屏与选择操作', () => {
         const row = node.querySelector('[data-catalog-row]')!.getBoundingClientRect();
         const header = node.querySelector('thead')!.getBoundingClientRect();
         const heights = [...node.querySelectorAll('[role="toolbar"] button')].map(button => button.getBoundingClientRect().height);
+        const others = [...node.querySelectorAll('thead th:not([data-key="name"])')]
+          .reduce((sum, cell) => sum + cell.getBoundingClientRect().width, 0);
         return { available: scroll.clientWidth, table: table.width, row: row.width, header: header.width,
-          name: node.querySelector('th[data-key="name"]')!.getBoundingClientRect().width, heights };
+          name: node.querySelector('th[data-key="name"]')!.getBoundingClientRect().width, others, heights };
       });
       assert.ok(Math.abs(geometry.table - geometry.available) <= 1, JSON.stringify(geometry));
       assert.ok(Math.abs(geometry.row - geometry.available) <= 1, JSON.stringify(geometry));
       assert.ok(Math.abs(geometry.header - geometry.available) <= 1, JSON.stringify(geometry));
-      assert.ok(Math.abs(geometry.name - 400) <= 1, JSON.stringify(geometry));
+      assert.ok(geometry.name > 400, JSON.stringify(geometry));
+      assert.ok(Math.abs(geometry.name + geometry.others - geometry.available) <= 2, JSON.stringify(geometry));
       assert.ok(Math.max(...geometry.heights) - Math.min(...geometry.heights) <= 1, JSON.stringify(geometry));
       const stars = await page.locator('[data-catalog-row]').first().locator('[data-catalog-rating]').evaluate(node => {
         const icon = node.querySelector('svg')!;

@@ -58,7 +58,7 @@ function OrphanActions({ item, toast }: { item: OrphanRecord; toast(message: str
   };
   const busy = attach.isPending || purge.isPending;
   return (
-    <span className="flex min-w-48 flex-wrap items-center gap-2">
+    <span className="flex min-w-0 flex-wrap items-center gap-2">
         {item.candidates.length
           ? <Select aria-label={`选择接收 ${item.name} 个人记录的文件`} className="w-52" selectedKey={target}
               onSelectionChange={(key) => { if (key !== null) setTarget(Number(key)) }}>
@@ -91,9 +91,9 @@ function OrphanIdentity({ item }: { item: OrphanRecord }) {
                   className="absolute inset-0 size-full object-contain" />
               : null}
           </span>
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span title={item.name} className="max-w-56 truncate text-body-regular text-text-primary">{item.name}</span>
-            <small className="max-w-56 truncate text-caption-1-regular text-text-secondary">
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span title={item.name} className="truncate text-body-regular text-text-primary">{item.name}</span>
+            <small className="truncate text-caption-1-regular text-text-secondary">
               {[item.code, LOC[item.location] || item.location].filter(Boolean).join(' · ')}
             </small>
           </span>
@@ -120,10 +120,10 @@ export function OrphanRecordsCard({ toast }: { toast(message: string): void }) {
     onConfirm: () => purge.mutateAsync(chosen.map((item) => item.id)),
   });
   const columns: DataColumn<OrphanRecord>[] = [
-    { id: 'item', label: '作品', value: (item) => item.name, render: (item) => <OrphanIdentity item={item} /> },
-    { id: 'records', label: '个人记录', min: 144, value: (item) => recordsText(item.records),
-      render: (item) => <span className="block min-w-28">{recordsText(item.records) || '无'}</span> },
-    { id: 'target', label: '操作', width: 360, min: 240, value: (item) => item.candidates.length,
+    { id: 'item', label: '作品', width: 480, min: 320, value: (item) => item.name, render: (item) => <OrphanIdentity item={item} /> },
+    { id: 'records', label: '个人记录', width: 176, min: 144, value: (item) => recordsText(item.records),
+      render: (item) => <span className="block min-w-0 whitespace-normal wrap-anywhere">{recordsText(item.records) || '无'}</span> },
+    { id: 'target', label: '操作', width: items.some(item => item.candidates.length) ? 360 : 128, min: 128, value: (item) => item.candidates.length,
       render: (item) => <OrphanActions item={item} toast={toast} /> },
   ];
   if (!query.isError && !items.length) return null;

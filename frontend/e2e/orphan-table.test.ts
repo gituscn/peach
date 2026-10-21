@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { after, before, describe, it } from 'node:test';
 import type { Browser } from 'playwright-core';
 import { launch, layout, settle, VIEWPORTS, visit } from './harness.ts';
-import { verifyTablePreferences } from './table-preferences-fixture.ts';
+import { verifyTablePreferences, verifyColumnContentWidth } from './table-preferences-fixture.ts';
 
 describe('孤儿记录数据表', () => {
   let browser: Browser;
@@ -32,6 +32,11 @@ describe('孤儿记录数据表', () => {
       await table.waitFor();
       await settle(page);
       await verifyTablePreferences(page, table, '文件已消失的作品', 'item', { id: 'records', label: '个人记录' });
+      await verifyColumnContentWidth(table, 'item', 'span[title]');
+      const widths = await table.locator('th').evaluateAll(nodes => Object.fromEntries(nodes.map(node =>
+        [node.getAttribute('data-key'), node.getBoundingClientRect().width])));
+      assert.ok(widths.item! > widths.target! * 2, JSON.stringify(widths));
+      assert.ok(widths.target! <= 144, JSON.stringify(widths));
       const faces = await page.evaluate(() => {
         const read = (node: Element) => {
           const style = getComputedStyle(node);
