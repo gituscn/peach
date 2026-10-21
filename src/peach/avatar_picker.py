@@ -35,7 +35,7 @@ from .entity_classification import work_portrait_predicate
 from .western_artwork import artwork_cast_size, artwork_key
 from .kanji import fold_glyphs
 from .avatar_provider import (
-    AvatarCandidateCache, InspectedAvatar, POLICY_VERSION, inspect_avatar,
+    AvatarCandidateCache, AvatarImageError, InspectedAvatar, POLICY_VERSION, inspect_avatar, prepare_avatar,
     install_entity_avatar, provenance_now,
 )
 from .http import HttpRequest, HttpTransport, public_https_url, resolves_publicly
@@ -409,7 +409,7 @@ def framed(ref: str, body: bytes, probe: Callable[[bytes], dict | None], *,
     默认框和批处理从封面截头像是同一块（`face_square`）；检不出脸时 `focus` 是 None，
     页面居中落框。`crop` 保持 False：这几路的图整张装也成立，框选是可选的那一步。
     """
-    accept_image(body)
+    body = prepare_image(body)
     body = images.upright(body)
     size = images.measure_image_size(body)
     if size is None:
@@ -425,10 +425,21 @@ def typed_address(url: str, providers_root: Path, fetch: Callable[[str], bytes],
     地址必须已经过 `allowed_source`。取到的字节按地址存：框选时页面看的预览、探针检的
     脸和确认时切的都是这一份，不会因为两次取图之间站点换了图而对不上。
     """
-    body = fetch(url)
+    try:
+        body = prepare_image(fetch(url))
+    except PickerError as error:
+        raise PickerError(f"这个地址未取得可用图片：{error}") from error
     AvatarCandidateCache(providers_root / ADDRESS_CACHE).store(url, body, accept_image(body))
     host = urllib.parse.urlsplit(url).hostname or url
     return framed(f"url:{url}", body, probe, source="url", label=host)
+
+
+def uploaded(body: bytes, providers_root: Path, probe: Callable[[bytes], dict | None], *, label: str) -> Choice:
+    """本机图片转换后留作预览候选；安装头像由用户确认触发。"""
+    body = prepare_image(body)
+    inspected = accept_image(body)
+    AvatarCandidateCache(providers_root / "upload").store(f"peach:upload/{inspected.sha256}", body, inspected)
+    return framed(f"sha256:{inspected.sha256}", body, probe, source="upload", label=label)
 
 
 def choices(connection: sqlite3.Connection, providers_root: Path,
@@ -596,13 +607,26 @@ def allowed_source(url: str) -> bool:
     return resolves_publicly(urllib.parse.urlsplit(url).hostname or "")
 
 
+def prepare_image(body: bytes) -> bytes:
+    """对头像各入口执行相同的格式转换与大小检查。"""
+    if len(body) > MAX_IMAGE_BYTES:
+        raise PickerError("图片超过 16 MiB，请缩小后重新选择")
+    try:
+        prepared = prepare_avatar(body)
+    except AvatarImageError as error:
+        raise PickerError(str(error)) from error
+    if len(prepared) > MAX_IMAGE_BYTES:
+        raise PickerError("图片转换后超过 16 MiB，请缩小后重新选择")
+    return prepared
+
+
 def accept_image(body: bytes) -> InspectedAvatar:
     """确认这堆字节真是一张能用的图。格式由解码结果定，不看扩展名也不信响应头。"""
     if len(body) > MAX_IMAGE_BYTES:
         raise PickerError("图太大了")
     inspected = inspect_avatar(body)
     if inspected is None:
-        raise PickerError("这不是一张能识别的 JPEG 或 PNG 图片")
+        raise PickerError("图片无法完整读取，请重新选择图片")
     return inspected
 
 

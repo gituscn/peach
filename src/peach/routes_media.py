@@ -1401,6 +1401,7 @@ def avatar_choice(request: Request, kind: str = "performer", id: int = 0,
                 ref, connection, providers_root, id,
                 request.app.state.http_transport, _picker_artwork(request),
                 online=_picker_online(request, connection, id))
+            body = avatar_picker.prepare_image(body)
         except avatar_picker.PickerError as error:
             return JSONResponse({"error": str(error)}, status_code=404)
     inspected = avatar_provider.inspect_avatar(body)
@@ -1448,7 +1449,7 @@ async def avatar_frame(request: Request, args: dict[str, str] = Depends(require_
     - `ref`：候选网格里的那一格。图库图还没取过就像预览那样取一次、留进缓存
     - `url`：手填的地址。过公网判据后取一次、按地址留进缓存，交回一格 `url:` 候选，
       框选、确认都读这一份
-    - 请求体直接是图片字节：本机选的文件。只量不存，确认时浏览器再发一次原字节
+    - 请求体直接是图片字节：本机图片转换后留作预览候选，确认时浏览器提交原字节
     """
     state = request.app.state.web_contract
     providers_root, _ = _picker_roots(state)
@@ -1464,6 +1465,7 @@ async def avatar_frame(request: Request, args: dict[str, str] = Depends(require_
                 ref, connection, providers_root, entity_id, transport,
                 _picker_artwork(request), online=_picker_online(request, connection, entity_id))
             listed = avatar_online.choices(connection, entity_id, project=_picker_online_projection) if ref.startswith("follow:") else []
+        found = avatar_picker.prepare_image(found)
         _remember_library(providers_root, found, origin, avatar_picker.accept_image(found))
         choice = avatar_picker.framed(ref, found, probe, source="", label="")
         if ref.startswith("follow:"):
@@ -1484,8 +1486,8 @@ async def avatar_frame(request: Request, args: dict[str, str] = Depends(require_
                 partial(avatar_picker.fetch_image, transport), probe)
         elif body:
             choice = await asyncio.to_thread(
-                avatar_picker.framed, "", body, probe,
-                source="upload", label=str(payload.get("name") or ""))
+                avatar_picker.uploaded, body, providers_root, probe,
+                label=str(payload.get("name") or ""))
         else:
             return JSONResponse({"error": "没有可用的图片"}, status_code=400)
     except avatar_picker.PickerError as error:
@@ -1525,8 +1527,10 @@ async def avatar_pick(request: Request, args: dict[str, str] = Depends(require_a
                     request.app.state.http_transport, _picker_artwork(request),
                     version=version if isinstance(version, str) else None,
                     online=_picker_online(request, connection, entity_id))
+            body = avatar_picker.prepare_image(body)
             _remember_library(providers_root, body, origin, avatar_picker.accept_image(body))
         elif body:
+            body = await asyncio.to_thread(avatar_picker.prepare_image, body)
             origin = {"source": "avatar picker", "provider": "upload",
                       "external_id": str(payload.get("name") or "")}
         else:
