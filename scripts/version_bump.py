@@ -31,6 +31,8 @@ RUNTIME_INPUTS = (
     "resources/",
     "scripts/build_app_entry.py",
     "scripts/build_windows.ps1",
+    "scripts/fetch_cloudflared.ps1",
+    "scripts/cloudflared-windows.json",
     "scripts/build_macos_app.py",
     "scripts/build_macos_standalone.py",
     "scripts/peach_macos.spec",
