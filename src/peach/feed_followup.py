@@ -52,6 +52,10 @@ WANTED = ("title", "performers", "studio", "release_date")
 #: 旧壳；补封面那一批按上次尝试由远到近排。
 MAX_BATCH = 24
 
+#: 取资料那一批至少留给重试旧壳的名额。订阅一轮能发现几十部新番号，不留就一部旧壳也
+#: 轮不到：没取到资料的那些会一直停在页面上没有标题。
+RETRY_SHARE = 6
+
 #: 缺封面或上次没取到资料的壳，定时拉取隔多久再试一次。新片的封面常常晚于番号出现，
 #: 所以不是试一次就放弃；但也不该每拉一轮源就把同一批再问一遍。人手点的那一次不等：
 #: 点「检查」本身就是要现在取。
@@ -111,11 +115,12 @@ def has_local_cover(cover_root: Path, code: str) -> bool:
     return bool(key) and cover_settled(Path(cover_root) / f"{key}.jpg")
 
 
-def backlog(connection, cover_root: Path, *, exclude=(), now: datetime | None = None,
-            limit: int = MAX_BATCH, retry_after: timedelta = RETRY_AFTER,
-            hidden: frozenset[str] = feeds.DEFAULT_HIDDEN_COMPILATIONS) -> list[str]:
-    """还没取过资料，或上次没取到、已经过了 `retry_after` 的壳。资料齐了只缺封面的归
-    `cover_backlog`。
+def scrape_batch(connection, fresh=(), *, exclude=(), now: datetime | None = None,
+                 retry_after: timedelta = RETRY_AFTER,
+                 hidden: frozenset[str] = feeds.DEFAULT_HIDDEN_COMPILATIONS) -> list[str]:
+    """下一批取资料的番号：这一轮新发现的 `fresh` 与还没取过资料的壳在前，上次没取到、
+    已经过了 `retry_after` 的壳在后，并且至少留 `RETRY_SHARE` 个名额给后者。资料齐了只缺
+    封面的归 `cover_backlog`。
 
     已忽略的不算：人说了不想看，就不再替它花配额。已经入库的壳本来就不在表里
     （入库即从列表里消失，ADR-0042 第三条），这里同样用番号键排除掉。取回标题后认出是
@@ -124,9 +129,17 @@ def backlog(connection, cover_root: Path, *, exclude=(), now: datetime | None = 
     """
     moment = now or datetime.now(timezone.utc)
     cutoff = feeds.stamp(moment - retry_after)
-    rows = _candidates(connection,
-                       "(d.scraped_at IS NULL OR (d.scrape_error IS NOT NULL AND d.scraped_at<?))",
-                       (cutoff,), "COALESCE(d.scraped_at,''), ")
+    fresh = list(dict.fromkeys(code for code in fresh if code))
+    skip = [*exclude, *fresh]
+    untried = _first(_candidates(connection, "d.scraped_at IS NULL", (), ""),
+                     skip, hidden, MAX_BATCH)
+    retries = _first(_candidates(connection, "d.scrape_error IS NOT NULL AND d.scraped_at<?",
+                                 (cutoff,), "d.scraped_at, "), skip, hidden, MAX_BATCH)
+    head = [*fresh, *untried][:MAX_BATCH - min(len(retries), RETRY_SHARE)]
+    return head + retries[:MAX_BATCH - len(head)]
+
+
+def _first(rows, exclude, hidden, limit: int) -> list[str]:
     found: list[str] = []
     for row in _visible(rows, exclude, hidden):
         found.append(row["code"])
@@ -141,7 +154,7 @@ def cover_backlog(connection, cover_root: Path, *, exclude=(), now: datetime | N
     """资料已经齐、本机还没有封面、上次取图已经过了 `retry_after` 的壳。
 
     上次取图的时间读逐番号的取图记录（`record_cover_attempt`），没试过的排最前，其余由远到近；
-    同样远的新片在前。排除规则与 `backlog` 相同。
+    同样远的新片在前。排除规则与 `scrape_batch` 相同。
     """
     from .catalog_rules import is_korean_mib_code
 
@@ -202,10 +215,24 @@ def collect(provider, code: str) -> tuple[dict, str | None]:
     问哪几家由 `metadata_routes` 决定，与刮削链同一份判据；这里没有本机证据可给，
     所以只传番号本身。一家都没给就抛——调用方把原因写进壳的 `scrape_error`，
     页面上那一行因此能说清是「还没取」还是「取不到」。
+
+    一部最多问多久与媒体库资料处理同一份预算（`ACTION_BUDGETS['querying_metadata']`）：
+    来源连不上时每家要等满超时再退避重试，不设上限一部能耗掉几分钟，整批和排在后面的
+    后继都跟着等。
     """
+    from .jav_cover_fetch import DeadlineExceeded
+    from .library_processing import ACTION_BUDGETS
+    from .processing_control import deadline_after
+
     chain = metadata_routes.route_for_code(code)
-    found = provider.community(
-        code, route=metadata_routes.community_route(code))
+    budget = ACTION_BUDGETS["querying_metadata"]
+    try:
+        found = provider.community(
+            code, deadline=deadline_after(budget),
+            route=metadata_routes.community_route(code))
+    except DeadlineExceeded as error:
+        raise DeadlineExceeded(
+            f"来源链 {'、'.join(chain)} 在 {budget:g} 秒内没有答复") from error
     fields: dict[str, object] = {}
     cover: str | None = None
     for _source, payload in found:
@@ -395,7 +422,7 @@ def run(contract, key: str, handle) -> dict:
             unreachable += 1
         except Exception:  # noqa: BLE001 - 取不到封面这一部照样有资料，下一轮再试
             pass
-        # 记下这一次尝试，没取到资料的 `backlog` 按它隔 `RETRY_AFTER` 再试；封面的重试另看取图记录。
+        # 记下这一次尝试，没取到资料的由 `scrape_batch` 按它隔 `RETRY_AFTER` 再试；封面的重试另看取图记录。
         with contract.database.write_transaction() as connection:
             connection.execute("UPDATE feed_discovery SET scraped_at=? WHERE id=?",
                                (feeds.stamp(), int(row["id"])))

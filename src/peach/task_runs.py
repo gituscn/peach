@@ -521,30 +521,32 @@ class TaskRunStore:
                 return None
         return int(cursor.lastrowid)
 
-    def claim_followup(self, task_keys) -> TaskRun | None:
+    def claim_followup(self, task_keys, first=()) -> TaskRun | None:
         from .update_tasks import admission, UpdateBusy
         try:
             with admission(self.database.db_path):
-                return self._claim_followup(task_keys)
+                return self._claim_followup(task_keys, first)
         except UpdateBusy:
             return None
 
-    def _claim_followup(self, task_keys) -> TaskRun | None:
+    def _claim_followup(self, task_keys, first=()) -> TaskRun | None:
         """领走这几类里最早的一条待跑后继并标 `running`；没有就返回 None。
 
-        `task_keys` 是调用方这条通道负责的任务种类。按 id 升序领：后继之间没有优先级
-        （ADR-0040 未决），先声明的先跑是唯一说得清的顺序。
+        `task_keys` 是调用方这条通道负责的任务种类，`first` 是其中插队先领的那几类
+        （ADR-0114）。同一档里按 id 升序领，先声明的先跑。
         """
         keys = tuple(dict.fromkeys(str(key) for key in task_keys or ()))
         if not self.enabled or not keys:
             return None
+        ahead = tuple(dict.fromkeys(str(key) for key in first or ())) or ("",)
         marks = ",".join("?" * len(keys))
         moment = stamp()
         with self.database.write_transaction(notify=False) as connection:
             row = connection.execute(
                 f"SELECT id FROM task_run WHERE followup_key IS NOT NULL "
-                f"AND status='pending' AND task_key IN ({marks}) ORDER BY id LIMIT 1",
-                keys).fetchone()
+                f"AND status='pending' AND task_key IN ({marks}) "
+                f"ORDER BY task_key IN ({','.join('?' * len(ahead))}) DESC, id LIMIT 1",
+                (*keys, *ahead)).fetchone()
             if row is None:
                 return None
             run_id = int(row["id"])

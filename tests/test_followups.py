@@ -210,6 +210,29 @@ class RunnerTests(LedgerTestCase):
         self.assertEqual(
             {row.status for row in self.store.children(parent.id)}, {"succeeded"})
 
+    def test_a_type_that_jumps_the_queue_is_claimed_before_earlier_ones_in_its_lane(self):
+        """下载后处理这类人在等的后继，排在已经在排的后台批次前面；同一档里仍是先排先跑。"""
+        order = []
+
+        def record(_contract, key, _handle):
+            order.append(key)
+            return {"outcome": key}
+
+        urgent = FollowupType(task_key="urgent", label="urgent", writes_ledger=True,
+                              run=record, jumps_queue=True)
+        parent = self.parent()
+        with registered(echo_type("backlog", run=record), urgent):
+            self.store.enqueue_followups(parent.id, [
+                ("backlog:1", "backlog", "甲"), ("backlog:2", "backlog", "乙"),
+                ("urgent:1", "urgent", "丙"), ("urgent:2", "urgent", "丁")])
+            self.assertEqual(FollowupRunner(self.contract()).drain(), 4)
+        self.assertEqual(order, ["urgent:1", "urgent:2", "backlog:1", "backlog:2"])
+
+    def test_the_download_postprocess_jumps_the_ledger_lane(self):
+        from peach import download_postprocess
+        self.assertTrue(download_postprocess.TYPE.writes_ledger)
+        self.assertTrue(download_postprocess.TYPE.jumps_queue)
+
     def test_types_that_do_not_write_the_ledger_get_their_own_lane(self):
         with registered(echo_type("ledger-a"), echo_type("cheap", writes_ledger=False)):
             self.assertEqual(sorted(lanes()), ["cheap", followups_module.LEDGER_LANE])

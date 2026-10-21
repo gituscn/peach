@@ -203,4 +203,4 @@ def run(contract, key: str, handle) -> dict:
 
 
 TYPE = register(FollowupType(task_key=TASK_KEY, label=TASK_LABEL,
-                             writes_ledger=True, run=run))
+                             writes_ledger=True, run=run, jumps_queue=True))

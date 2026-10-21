@@ -1312,6 +1312,17 @@ class LibraryNfoTests(unittest.TestCase):
         from peach.library_processing import SOURCE_INTERVALS
         self.assertEqual(SOURCE_INTERVALS, {'javdb.com': 3.0, 'jdbstatic.com': 3.0})
 
+    def test_every_provider_waits_on_one_shared_host_interval(self):
+        """取想要的资料、取新作资料与资料处理各起一个 provider；同时跑时问 javdb 也要排同一条队。"""
+        from peach.library_processing import SOURCE_LIMITER, LibraryMetadataProvider
+        from peach.web_feeds import _transport
+        with tempfile.TemporaryDirectory() as root:
+            first, second = LibraryMetadataProvider(root), LibraryMetadataProvider(root)
+            feed = _transport(SimpleNamespace(follow_secrets_root=Path(root)))
+        self.assertIs(first.transport.limiter, SOURCE_LIMITER)
+        self.assertIs(second.transport.limiter, SOURCE_LIMITER)
+        self.assertIs(feed.limiter, SOURCE_LIMITER)
+
     def test_community_sources_are_asked_once_per_code_and_say_why_they_failed(self):
         """资料和封面两步都要社区来源的结果，javdb 的配额经不起同一部片问两遍。"""
         from peach.jav_cover_fetch import NotFound, Unavailable

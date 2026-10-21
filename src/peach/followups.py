@@ -100,12 +100,16 @@ class FollowupType:
 
     `run(contract, key, handle)` 返回一份摘要字典，异常一律算这一条失败——后继失败
     不回滚也不改判父任务（ADR-0040 第四条），所以这里不往上抛。
+
+    `jumps_queue` 的后继在自己的通道里先于别的种类领取（ADR-0114）：给人刚做完的那件事
+    收尾的后继，人在等它；补资料、补头像这类后台存量不急。
     """
 
     task_key: str
     label: str
     writes_ledger: bool
     run: Callable[[object, str, TaskRunHandle], dict]
+    jumps_queue: bool = False
 
     @property
     def lane(self) -> str:
@@ -131,6 +135,11 @@ def lanes() -> dict[str, tuple[str, ...]]:
     for followup_type in REGISTRY.values():
         grouped.setdefault(followup_type.lane, []).append(followup_type.task_key)
     return {lane: tuple(sorted(keys)) for lane, keys in grouped.items()}
+
+
+def _ahead(keys) -> tuple[str, ...]:
+    """这几类里插队先领的那些（`FollowupType.jumps_queue`）。"""
+    return tuple(key for key in keys if key in REGISTRY and REGISTRY[key].jumps_queue)
 
 
 class FollowupRunner:
@@ -198,7 +207,7 @@ class FollowupRunner:
         done = 0
         for keys in lanes().values():
             while True:
-                run = self.store.claim_followup(keys)
+                run = self.store.claim_followup(keys, first=_ahead(keys))
                 if run is None:
                     break
                 self._execute(run)
@@ -209,7 +218,7 @@ class FollowupRunner:
 
     def _work(self, keys: tuple[str, ...]) -> None:
         while not self._stopping:
-            run = self.store.claim_followup(keys)
+            run = self.store.claim_followup(keys, first=_ahead(keys))
             if run is None:
                 from .update_tasks import is_pausing
                 db = getattr(getattr(self.store, 'database', None), 'db_path', None)

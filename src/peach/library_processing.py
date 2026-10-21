@@ -42,6 +42,7 @@ from .jobs import DiskGuard
 from .media_probe import probe_unmeasured
 from .media_sources import cost_for
 from .media_processing_policy import metadata_only
+from .scripting import HostLimiter
 from .strm import skip_background_read
 from .record_rehome import reattach_in
 from .processing_traffic import ProcessingTraffic
@@ -78,6 +79,10 @@ MISS_TTL_SECONDS = 7 * 24 * 3600
 #: 那条批量线仍按 5 秒跑。撞上 403 不再是盲等 24 小时——`scraping_access.FIRST_BLOCKED_PAUSE`
 #: 先停 15 分钟，连着再撞才翻倍，所以这一档收紧的代价是有限且可观测的（docs/SOURCING.md）。
 SOURCE_INTERVALS = {'javdb.com': 3.0, 'jdbstatic.com': 3.0}
+#: 按 `SOURCE_INTERVALS` 等的那一份间隔，整个进程共用。取想要的资料、取新作资料、资料处理
+#: 各起各的 provider，间隔若各算各的，几条同时跑时问同一主机的请求就叠在一起，配额照样按
+#: 出口 IP 一份算。
+SOURCE_LIMITER = HostLimiter(SOURCE_INTERVALS, default_interval=2.0)
 SOURCE_LABELS = {'r18dev': 'r18.dev', 'dmm': 'DMM / FANZA', 'avbase': 'AVBase', 'javbus': 'JavBus', 'javdb': 'javdb',
                  'fc2': 'FC2', 'fc2cmadb': 'FC2CMADB', 'fc2ppvdb': 'FC2PPV-DB', 'javten': 'JAVten',
                  'javarchive': 'JavArchive',
@@ -316,7 +321,7 @@ class LibraryMetadataProvider:
         self.transport = HostLimitedTransport(
             SourceTransport(secrets_root, max_requests=MAX_SOURCE_REQUESTS,
                             max_bytes=MAX_SOURCE_BYTES, max_seconds=MAX_SOURCE_SECONDS),
-            2.0, intervals=SOURCE_INTERVALS)
+            2.0, limiter=SOURCE_LIMITER)
 
     #: 由本机浏览器过验证的来源累计等人点验证的秒数（`_excuse`）。调用方拿它前后相减，把这段时间
     #: 从单项动作预算里扣掉：一个站第一次弹验证窗口时，那一问要等 `min(40, timeout) + 120` 秒，
