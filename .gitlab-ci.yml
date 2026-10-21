@@ -99,12 +99,13 @@ wheel-smoke:
     paths: [build/wheelhouse/]
 
 .release-linux:
-  image: node:24-bookworm
+  image: ghcr.io/astral-sh/uv:0.13.3-python3.14-trixie-slim
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/ && $CI_COMMIT_REF_PROTECTED == "true"'
   before_script:
     - apt-get update
     - apt-get install -y --no-install-recommends python3 ca-certificates git
+    - python3 -c 'import sys; assert sys.version_info[:2] == (3, 14), sys.version'
     - python3 scripts/fetch_release_tools.py
     - export PATH="$CI_PROJECT_DIR/build/release-tools:$PATH"
     - export GLAB_ENABLE_CI_AUTOLOGIN=true
