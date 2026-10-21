@@ -17,6 +17,8 @@ LOG_NAMES = ("tray.log", "tray-lifecycle.log", "tray-setup.err.log", "tray-setup
 STATE_NAMES = ('library-processing.json', 'runtime-prepare.json', 'standalone-update.json',
                'automatic-updates.json', 'windows-source-sync.json', 'cloudflare-tunnel.json',
                'remote-reporting-delivery.json', 'library-sharing-attempt.json')
+#: 发现页封面逐番号处理结果的份数上限；每份只有几十字节，排查缺封面靠它们。
+COVER_ATTEMPT_LIMIT = 500
 TAIL_BYTES = 96 * 1024
 
 
@@ -106,10 +108,16 @@ def _archive_state(archive, directory, entries):
     _archive_files(archive, directory, migrations, 'updates', entries)
 
 
+def _archive_covers(archive, directory, entries):
+    candidates = [directory / 'jav-discovery-metadata.job.json']
+    candidates += _recent(directory, 'feed-cover-attempts/*.json', COVER_ATTEMPT_LIMIT, entries)
+    _archive_files(archive, directory, candidates, 'covers', entries, structured=True)
+
+
 def bundle_bytes(*, report: dict | None = None, config=None) -> bytes:
     facts = {"created_at": datetime.now(timezone.utc).isoformat(), "system": error_reporting.system_facts()}
     directories = error_reporting.log_directories()
-    processing_directory = None
+    processing_directory = generated_directory = None
     try:
         from . import settings_file
         config = config or settings_file.load_config()
@@ -117,6 +125,7 @@ def bundle_bytes(*, report: dict | None = None, config=None) -> bytes:
                                   "port": config.server.port}
         directories.insert(0, config.directory("logs"))
         processing_directory = config.directory('state')
+        generated_directory = config.directory('generated')
         from .ffmpeg import FFmpegResolver, binary_diagnostics
         resolver = FFmpegResolver(config.directory('tools') / 'ffmpeg')
         facts['media_tools'] = {'ffmpeg': binary_diagnostics(resolver.ffmpeg(), decoders=True),
@@ -125,7 +134,7 @@ def bundle_bytes(*, report: dict | None = None, config=None) -> bytes:
         facts["configuration"] = {"status": "unavailable", **error_reporting.exception_facts(error)}
         try:
             root, _ = settings_file.discover_data_root()
-            processing_directory = root / 'state'
+            processing_directory, generated_directory = root / 'state', root / 'generated'
         except Exception:
             pass
     if report:
@@ -151,6 +160,11 @@ def bundle_bytes(*, report: dict | None = None, config=None) -> bytes:
                 _archive_state(archive, processing_directory, entries)
             except OSError as error:
                 entries.append({'name': '<state>', 'status': type(error).__name__})
+        if generated_directory is not None:
+            try:
+                _archive_covers(archive, generated_directory, entries)
+            except OSError as error:
+                entries.append({'name': '<covers>', 'status': type(error).__name__})
         facts["logs"] = entries
         archive.writestr("report.json", json.dumps(error_reporting.scrub(facts), ensure_ascii=False, indent=2))
     return output.getvalue()
