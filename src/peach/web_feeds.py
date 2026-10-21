@@ -201,15 +201,20 @@ def _execute_check(contract, body, job_id: str) -> dict:
         if close:
             close()
     contract.cache_bust()
-    # 新发现的先排，余下名额给还缺资料或封面的旧壳：同一批一条后继。定时那一轮只带
-    # 到了重试时间的，手动点的那一轮全带。
+    # 取资料：新发现的先排，余下名额给没取到资料的旧壳，同一批一条后继。只缺封面的另成一批
+    # 补封面。定时那一轮只带到了重试时间的，手动点的那一轮全带；已在队里的番号都不再带。
     retry_after = feed_followup.RETRY_AFTER if body.get("automatic") else timedelta(0)
     hidden = web_settings.hidden_compilations(contract.database)
+    busy = feed_followup.in_flight(contract.task_runs)
+    fresh = [code for code in dict.fromkeys(codes) if normalise_code_key(code) not in busy]
     with contract.database.read_connection() as connection:
-        batch = codes + feed_followup.backlog(
-            connection, contract.cover_root, exclude=codes, retry_after=retry_after,
-            limit=max(0, feed_followup.MAX_BATCH - len(codes)), hidden=hidden)
-        planned = feed_followup.plan(batch)
+        batch = fresh + feed_followup.backlog(
+            connection, contract.cover_root, exclude=[*codes, *busy], retry_after=retry_after,
+            limit=max(0, feed_followup.MAX_BATCH - len(fresh)), hidden=hidden)
+        covers = feed_followup.cover_backlog(
+            connection, contract.cover_root, exclude=[*codes, *batch, *busy],
+            retry_after=retry_after, hidden=hidden)
+        planned = feed_followup.plan(batch) + feed_followup.plan_covers(covers)
         # 余下的名额给缺头像的存量女优（ADR-0097）。资料处理收尾也派这一份，但没有新片
         # 入库的日子它一轮都不跑，存量就一直停在原地；定时拉取每天都跑。
         planned += avatar_followup.stock(
@@ -556,16 +561,13 @@ def q_feed_discoveries(contract, args) -> dict:
         wanted = wants.wanted_keys(connection, (normalise_code_key(row["code"]) for row in rows[:limit]))
         performers = _discovery_performers(connection, contract, rows[:limit])
     more = len(rows) > limit
-    # 最近一轮取新作资料里封面断在连接上的部数。只看最近这一轮：换了线路之后下一轮取到，
-    # 提示就该跟着消失，而不是让一次旧故障一直挂在页面上。
-    last = contract.task_runs.query(status="succeeded", task_key=feed_followup.TASK_KEY, limit=1)
-    cover_network = int(last[0].result_summary.get("cover_network") or 0) if last else 0
-    fetching = set()
-    for run in contract.task_runs.query(status="active", task_key=feed_followup.TASK_KEY, limit=500):
-        try:
-            fetching.update(normalise_code_key(code) for code in feed_followup.parse_key(run.followup_key))
-        except ValueError:
-            continue
+    # 最近一轮取新作资料或补新作封面里封面断在连接上的部数。只看最近这一轮：换了线路之后
+    # 下一轮取到，提示就该跟着消失，而不是让一次旧故障一直挂在页面上。
+    last = [run for task_key in (feed_followup.TASK_KEY, feed_followup.COVER_TASK_KEY)
+            for run in contract.task_runs.query(status="succeeded", task_key=task_key, limit=1)]
+    latest = max(last, key=lambda run: run.finished_at or "", default=None)
+    cover_network = int(latest.result_summary.get("cover_network") or 0) if latest else 0
+    fetching = feed_followup.in_flight(contract.task_runs)
     return {"ok": True, "more": more, "cover_network": cover_network, "items": [{
         "id": int(row["id"]),
         "code": row["code"],
