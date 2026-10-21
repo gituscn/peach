@@ -213,6 +213,36 @@ class ProjectBoardTests(unittest.TestCase):
 
 
 class UpdateTaskSmokeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with mock.patch.dict(sys.modules, {'smoke_desktop': load_script('smoke_desktop')}):
+            cls.script = load_script('smoke_update_tasks')
+
+    def test_protected_gitlab_release_and_actions_require_an_unregistered_host(self):
+        gitlab = {'GITLAB_CI': 'true', 'CI_JOB_NAME': 'smoke-windows',
+                  'CI_COMMIT_REF_PROTECTED': 'true', 'CI_COMMIT_TAG': 'v1.2.3'}
+        for environment in ({'GITHUB_ACTIONS': 'true'}, gitlab):
+            with self.subTest(environment=environment), mock.patch.dict(os.environ, environment, clear=True):
+                registry = SimpleNamespace(HKEY_CURRENT_USER=object(),
+                                           OpenKey=mock.Mock(side_effect=FileNotFoundError))
+                with mock.patch.dict(sys.modules, {'winreg': registry}):
+                    self.script.validate_installer_host()
+                registry.OpenKey.assert_called_once()
+                registry.OpenKey = mock.MagicMock()
+                with mock.patch.dict(sys.modules, {'winreg': registry}), \
+                        self.assertRaisesRegex(AssertionError, '已有 Peach 安装登记'):
+                    self.script.validate_installer_host()
+
+    def test_unprotected_or_unrecognized_jobs_cannot_run_installer_acceptance(self):
+        gitlab = {'GITLAB_CI': 'true', 'CI_JOB_NAME': 'smoke-windows',
+                  'CI_COMMIT_REF_PROTECTED': 'true', 'CI_COMMIT_TAG': 'v1.2.3'}
+        for environment in ({}, {**gitlab, 'CI_COMMIT_REF_PROTECTED': 'false'},
+                            {**gitlab, 'CI_JOB_NAME': 'verify-windows'},
+                            {**gitlab, 'CI_COMMIT_TAG': ''}):
+            with self.subTest(environment=environment), mock.patch.dict(os.environ, environment, clear=True), \
+                    self.assertRaisesRegex(AssertionError, '安装包验收仅允许'):
+                self.script.validate_installer_host()
+
     def test_dry_run_does_not_open_artifacts_or_create_installation_data(self):
         with mock.patch.dict(sys.modules, {'smoke_desktop': load_script('smoke_desktop')}):
             script = load_script('smoke_update_tasks')

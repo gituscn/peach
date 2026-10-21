@@ -2,6 +2,8 @@
 
 ## GitLab 与 R2 发布
 
+Windows 构建路径解析复用 PowerShell 7 的原生 [`GetUnresolvedProviderPathFromPSPath`](https://learn.microsoft.com/en-us/dotnet/api/system.management.automation.pathintrinsics.getunresolvedproviderpathfrompspath)；以当前 PowerShell 工作位置解析尚未创建的文件，无新增依赖或安装体积。安装更新验收使用 GitLab 官方[预定义变量](https://docs.gitlab.com/ci/variables/predefined_variables/)识别受保护版本标签及指定作业，沿用 Windows 注册表的既有安装检查。离线 PowerShell 回归覆盖进程工作目录与脚本工作位置不同的输入；主机检查覆盖受保护作业、未知作业与既有安装登记。
+
 GitLab API、CI 认证和 Release 创建复用官方 [glab 1.124.0](https://gitlab.com/gitlab-org/cli)（MIT，维护中）；GitLab CI 的发布写入使用短期 `CI_JOB_TOKEN` 与官方 CI 自动登录。R2 的 S3 上传复用 [rclone 1.75.2](https://rclone.org/)（MIT，维护中），使用单桶对象读写凭据；版本文件不可覆盖，并由独立 HTTPS 下载校验 SHA-256。两者都是构建期 CLI，不进入应用运行时依赖。
 
 轻量安装器的 R2 优先与 GitHub 同版本回退复用 `standalone_update.download`、既有 HTTPX 和内置工具清单；每个来源分别验证大小与 SHA-256。发布后空缓存验收复用 `smoke_split_update.py` 与实际冻结程序的 `--installer-tools` 入口，不新增下载器或依赖。
