@@ -90,6 +90,28 @@ class ErrorReportingTests(unittest.TestCase):
             self.assertEqual(json.loads(archive.read('processing/library-sharing-attempt.json'))['status'], 'unknown')
             self.assertNotIn('processing/remote-reporting-frequency.json', archive.namelist())
 
+    def test_support_bundle_contains_recent_cover_attempts_and_discovery_job(self):
+        from peach.settings_file import PeachConfig
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True)
+        attempts = config.directory('generated') / 'feed-cover-attempts'
+        attempts.mkdir(parents=True)
+        for index in range(3):
+            path = attempts / f'ABC-00{index}.json'
+            path.write_text(json.dumps({'code': f'ABC-00{index}', 'ok': False, 'error_type': 'Unavailable',
+                                        'reason': '来源地址 返回 403'}), encoding='utf-8')
+            os.utime(path, (100 + index, 100 + index))
+        (attempts.parent / 'jav-discovery-metadata.job.json').write_text(json.dumps({
+            'status': 'complete', 'total': 3, 'failed_codes': ['ABC-002']}), encoding='utf-8')
+        (attempts.parent / 'jav-discovery-metadata.json').write_text('private-metadata-cache', encoding='utf-8')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                mock.patch.object(support_bundle, 'COVER_ATTEMPT_LIMIT', 2), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes(config=config))) as archive:
+            names = sorted(name for name in archive.namelist() if name.startswith('covers/'))
+            self.assertEqual(names, ['covers/feed-cover-attempts/ABC-001.json', 'covers/feed-cover-attempts/ABC-002.json',
+                                     'covers/jav-discovery-metadata.job.json'])
+            self.assertEqual(json.loads(archive.read('covers/feed-cover-attempts/ABC-002.json'))['error_type'], 'Unavailable')
+            self.assertEqual(json.loads(archive.read('covers/jav-discovery-metadata.job.json'))['failed_codes'], ['ABC-002'])
+
     def test_bundle_contains_update_tunnel_rotated_and_startup_evidence_with_invalid_config(self):
         from peach import settings_file
         self.logs.mkdir()
