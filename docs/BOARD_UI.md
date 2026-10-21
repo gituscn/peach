@@ -230,6 +230,8 @@ Radial Chart Card、Bar List Card、Heatmap 与 Sankey 的 Pro 源码**未取得
 
 ### 关注列表的表格视图（2026-09-08）
 
+共享数据表的主要名称列默认承接剩余宽度；馆藏、关注来源、JAV 订阅、创作者别名、文件已丢失的记录、链接检查与诊断清单共用这套列宽偏好。手动调整后保存像素宽度，重置列宽恢复自适应，列显示独立保存。名称、路径、地址与结果正文以单元格可用宽度折行或省略；路径与地址随列宽重算中间省略，完整原文保留在提示和无障碍名称中。文件已丢失的记录根据有无替代文件给操作列分配默认宽度；窄屏在表格内横向滚动。
+
 取证来源是 https://www.boardui.com/components/data-table 的实时 DOM 与样式表：`_next/static/chunks/0n0ugaibgw__p.css`（SHA-256 `a856db5e9e1a58b2e32b7bfa6d7f1cab69dd09e4bd7ac22fc455dd10b525cf27`）里的 `.bui-table` 规则，以及公开注册表 `r/table.json`（`fc12a8f2f4012d9e983e0b9bbb10f9fe3288d74046566d2623d60e7056c50d88`）和 `r/data-table.json`（`613299eca0f448460a546f7959feab8dab19fbfd6e18670f7216ff304a1e3574`）。
 
 2026-09-16 重取这三份：`r/table.json` 与 `r/pagination.json` 逐字节未变，`r/data-table.json` 已是 `7bb73a6cd099b9b16390e5fe00f8ba2d55b5ef96c1e8f90a056168cd2e3235e6`（24531 字节），上游自己改过。Peach 复制进树的是 `table` 条目，`data-table` 只读不抄（原因见 `frontend/src/react/boardui/ORIGIN.md`），所以这次漂移不影响已复制文件的哈希。

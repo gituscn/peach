@@ -10,11 +10,11 @@ function Probe() { sizing = useCatalogTablePreferences(); visibility = sizing; r
 beforeEach(() => localStorage.clear());
 
 it('损坏或超限偏好不会破坏列宽，选择列保持固定', async () => {
-  for (const saved of ['broken', 'null', '[]', '{"name":99999,"select":200,"dur":-10,"size":"wide"}']) {
+  for (const [saved, name] of [['broken', '1fr'], ['null', '1fr'], ['[]', '1fr'],
+    ['{"name":99999,"select":200,"dur":-10,"size":"wide"}', 2000]] as const) {
     localStorage.setItem(key, saved);
     const root = await mountRoot(<Probe />);
-    expect(sizing.widths.name).toBeGreaterThanOrEqual(260);
-    expect(sizing.widths.name).toBeLessThanOrEqual(800);
+    expect(sizing.widths.name).toBe(name);
     expect(sizing.widths.select).toBe(48);
     expect(sizing.widths.dur).toBeGreaterThanOrEqual(80);
     expect(sizing.widths.size).toBe(112);
@@ -45,7 +45,7 @@ it('调整结束保存列宽，重置清除偏好，存储被禁用时仍可调�
   await mountRoot(<Probe />);
   expect(sizing.widths.name).toBe(512);
   await act(() => sizing.reset());
-  expect(sizing.widths.name).toBe(400);
+  expect(sizing.widths.name).toBe('1fr');
   expect(localStorage.getItem(key)).toBeNull();
   const blocked = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('存储未允许') });
   try {

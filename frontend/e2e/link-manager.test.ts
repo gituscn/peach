@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import type { Browser } from 'playwright-core';
 import { launch, visit, settle, VIEWPORTS, layout } from './harness.ts';
+import { verifyColumnContentWidth } from './table-preferences-fixture.ts';
 
 describe('链接检查身份与断链动效', () => {
   let browser: Browser;
@@ -14,7 +15,7 @@ describe('链接检查身份与断链动效', () => {
         await page.emulateMedia({ reducedMotion: 'no-preference' });
         const row = { id: 1, entity: '示例作者', entity_id: 31, entity_kind: 'performer',
           face: { id: 31, name: '示例作者', has_image: true }, link_kind: 'official', label: '示例事务所',
-          url: 'https://example.com/profile', note: 'HTTP 404' };
+          url: `https://example.com/profile/${'long-address-'.repeat(30)}`, note: 'HTTP 404' };
         await page.route('**/api/links/check', route => {
           if (!route.request().postDataJSON()?.status_only) phase = 'running';
           return route.fulfill({ json: {
@@ -38,6 +39,8 @@ describe('链接检查身份与断链动效', () => {
           assert.equal(await table.locator('[data-link-name] img').count(), 0);
           assert.ok((await table.innerText()).includes('Peach 资料'));
           assert.ok((await table.innerText()).includes('链接名称'));
+          await verifyColumnContentWidth(table, 'url', '[data-link-address]');
+          await verifyColumnContentWidth(table, 'note', '[data-link-result]');
         }
         const sections = await page.evaluate(() => {
           const gone = document.querySelector('[data-link-results="gone"]')!;

@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "a05147ee-0541-411c-971d-ebfb53844611", e._sentryDebugIdIdentifier = "sentry-dbid-a05147ee-0541-411c-971d-ebfb53844611");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "17267fa8-4774-47d7-9b2f-92aabe1f10d1", e._sentryDebugIdIdentifier = "sentry-dbid-17267fa8-4774-47d7-9b2f-92aabe1f10d1");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -57504,8 +57504,12 @@ function Bke(e, t) {
 function Vke(e, t) {
 	let n = (e) => Object.fromEntries(Object.entries(t).map(([t, n]) => {
 		let r = e[t];
-		return [t, typeof r == "number" && Number.isFinite(r) ? Math.max(n.min, Math.min(n.max, r)) : n.width];
-	})), [r, i] = (0, E.useState)(() => n(zke(e)));
+		return [t, typeof r == "number" && Number.isFinite(r) ? Math.max(n.min, Math.min(n.max, r)) : n.flex ? "1fr" : n.width];
+	})), [r, i] = (0, E.useState)(() => {
+		let r = zke(e);
+		for (let [e, n] of Object.entries(t)) n.flex && r[e] === n.width && delete r[e];
+		return n(r);
+	});
 	return {
 		widths: n(r),
 		resize: (e) => {
@@ -57546,17 +57550,23 @@ function uL(e, t, n) {
 	let r = (0, E.useMemo)(() => Object.fromEntries(t.map((e) => [e.id, {
 		width: e.width ?? 180,
 		min: e.min ?? 96,
-		max: e.max ?? 800
-	}])), [t]), i = Vke(n?.widths ?? `peach.table.${e}.widths.v1`, r), a = Hke(n?.visibility ?? `peach.table.${e}.visibility.v1`, t.map((e) => e.id), t.filter((e) => e.required).map((e) => e.id), Object.fromEntries(t.filter((e) => e.visible === !1).map((e) => [e.id, !1])));
+		max: e.max ?? (e.flex ? 2e3 : 800),
+		flex: e.flex
+	}])), [t]), i = Vke(n?.widths ?? `peach.table.${e}.widths.v1`, r), a = Hke(n?.visibility ?? `peach.table.${e}.visibility.v1`, t.map((e) => e.id), t.filter((e) => e.required).map((e) => e.id), Object.fromEntries(t.filter((e) => e.visible === !1).map((e) => [e.id, !1]))), o = t.some((e) => e.flex && a.visibility[e.id] !== !1 && i.widths[e.id] === "1fr");
 	return {
 		...i,
 		...a,
 		columns: t,
-		columnProps: (e) => ({
+		spaceWidth: o ? 0 : "1fr",
+		columnProps: (e) => i.widths[e] === "1fr" ? {
+			width: "1fr",
+			minWidth: r[e].width,
+			maxWidth: void 0
+		} : {
 			width: i.widths[e],
 			minWidth: r[e].min,
 			maxWidth: r[e].max
-		}),
+		},
 		canResize: (e) => r[e].max > r[e].min
 	};
 }
@@ -57570,8 +57580,8 @@ var Uke = "peach.catalog-column-widths.v1", Wke = {
 	},
 	name: {
 		width: 400,
-		min: 260,
-		max: 800
+		min: 320,
+		max: 2e3
 	},
 	dur: {
 		width: 96,
@@ -57659,6 +57669,7 @@ var Uke = "peach.catalog-column-widths.v1", Wke = {
 	id: e,
 	label: qke[e],
 	...Wke[e],
+	flex: e === "name",
 	required: e === "select" || e === "name",
 	visible: Kke[e] !== !1
 }));
@@ -58150,7 +58161,7 @@ function nAe(e) {
 						id: "remaining-space",
 						"aria-label": "行空白区域",
 						"data-table-space": "",
-						width: "1fr",
+						width: t.spaceWidth,
 						minWidth: 0
 					})] }), /* @__PURE__ */ (0, D.jsx)(FM, {
 						renderEmptyState: () => u.isPending ? /* @__PURE__ */ (0, D.jsx)("div", {
@@ -59642,7 +59653,9 @@ function dR({ label: e, items: t, columns: n, rowId: r, rowLabel: i, selected: a
 		required: !0
 	}, ...n.map((e, t) => ({
 		...e,
-		width: e.width ?? (t === 0 ? 320 : 200),
+		width: e.width ?? (t === 0 ? 320 : 160),
+		min: e.min ?? (t === 0 ? 320 : 96),
+		flex: e.flex ?? t === 0,
 		required: t === 0
 	}))], [n]), _ = uL(`data:${e}`, g), [v, y] = (0, E.useState)({
 		pageIndex: 0,
@@ -59793,7 +59806,7 @@ function dR({ label: e, items: t, columns: n, rowId: r, rowLabel: i, selected: a
 						id: "remaining-space",
 						"aria-label": "行空白区域",
 						"data-table-space": "",
-						width: "1fr",
+						width: _.spaceWidth,
 						minWidth: 0
 					})] }), /* @__PURE__ */ (0, D.jsx)(FM, {
 						renderEmptyState: () => "没有记录",
@@ -59973,7 +59986,7 @@ function bNe({ title: e, items: t, hint: n, picked: r, onPick: i, children: a, f
 					min: 192,
 					value: (e) => e.note,
 					render: (e) => /* @__PURE__ */ (0, D.jsx)("div", {
-						className: "min-w-40 max-w-80",
+						className: "min-w-0 w-full",
 						"data-link-result": s ? "gone" : "unclear",
 						children: /^(?:HTTP\s+)?[1-5]\d{2}$/.test(e.note.trim()) ? /* @__PURE__ */ (0, D.jsx)(oR, {
 							tone: s || /^(?:HTTP\s+)?5\d{2}$/.test(e.note.trim()) ? "error" : "warning",
@@ -60003,7 +60016,7 @@ function bNe({ title: e, items: t, hint: n, picked: r, onPick: i, children: a, f
 						rel: "noreferrer",
 						title: e.url,
 						"data-link-address": "",
-						className: "flex max-w-90 min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary",
+						className: "flex min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary",
 						children: [
 							/* @__PURE__ */ (0, D.jsx)(fR, { linkId: e.id }),
 							/* @__PURE__ */ (0, D.jsx)("span", {
@@ -60825,7 +60838,7 @@ function FNe({ item: e, toast: t }) {
 		});
 	}, s = i.isPending || a.isPending;
 	return /* @__PURE__ */ (0, D.jsxs)("span", {
-		className: "flex min-w-48 flex-wrap items-center gap-2",
+		className: "flex min-w-0 flex-wrap items-center gap-2",
 		children: [
 			e.candidates.length ? /* @__PURE__ */ (0, D.jsx)(EP, {
 				"aria-label": `选择接收 ${e.name} 个人记录的文件`,
@@ -60873,13 +60886,13 @@ function INe({ item: e }) {
 				className: "absolute inset-0 size-full object-contain"
 			}) : null]
 		}), /* @__PURE__ */ (0, D.jsxs)("span", {
-			className: "flex min-w-0 flex-col gap-0.5",
+			className: "flex min-w-0 flex-1 flex-col gap-0.5",
 			children: [/* @__PURE__ */ (0, D.jsx)("span", {
 				title: e.name,
-				className: "max-w-56 truncate text-body-regular text-text-primary",
+				className: "truncate text-body-regular text-text-primary",
 				children: e.name
 			}), /* @__PURE__ */ (0, D.jsx)("small", {
-				className: "max-w-56 truncate text-caption-1-regular text-text-secondary",
+				className: "truncate text-caption-1-regular text-text-secondary",
 				children: [e.code, bn[e.location] || e.location].filter(Boolean).join(" · ")
 			})]
 		})]
@@ -60901,7 +60914,38 @@ function LNe({ toast: e }) {
 		confirmLabel: "删除所选记录",
 		danger: !0,
 		onConfirm: () => a.mutateAsync(e.map((e) => e.id))
-	});
+	}), s = [
+		{
+			id: "item",
+			label: "作品",
+			width: 480,
+			min: 320,
+			value: (e) => e.name,
+			render: (e) => /* @__PURE__ */ (0, D.jsx)(INe, { item: e })
+		},
+		{
+			id: "records",
+			label: "个人记录",
+			width: 176,
+			min: 144,
+			value: (e) => UL(e.records),
+			render: (e) => /* @__PURE__ */ (0, D.jsx)("span", {
+				className: "block min-w-0 whitespace-normal wrap-anywhere",
+				children: UL(e.records) || "无"
+			})
+		},
+		{
+			id: "target",
+			label: "操作",
+			width: i.some((e) => e.candidates.length) ? 360 : 128,
+			min: 128,
+			value: (e) => e.candidates.length,
+			render: (t) => /* @__PURE__ */ (0, D.jsx)(FNe, {
+				item: t,
+				toast: e
+			})
+		}
+	];
 	return !r.isError && !i.length ? null : /* @__PURE__ */ (0, D.jsx)("section", {
 		id: "orphan-records",
 		"aria-labelledby": "orphan-records-title",
@@ -60920,35 +60964,7 @@ function LNe({ toast: e }) {
 		}) : /* @__PURE__ */ (0, D.jsx)(dR, {
 			label: "文件已消失的作品",
 			items: i,
-			columns: [
-				{
-					id: "item",
-					label: "作品",
-					value: (e) => e.name,
-					render: (e) => /* @__PURE__ */ (0, D.jsx)(INe, { item: e })
-				},
-				{
-					id: "records",
-					label: "个人记录",
-					min: 144,
-					value: (e) => UL(e.records),
-					render: (e) => /* @__PURE__ */ (0, D.jsx)("span", {
-						className: "block min-w-28",
-						children: UL(e.records) || "无"
-					})
-				},
-				{
-					id: "target",
-					label: "操作",
-					width: 360,
-					min: 240,
-					value: (e) => e.candidates.length,
-					render: (t) => /* @__PURE__ */ (0, D.jsx)(FNe, {
-						item: t,
-						toast: e
-					})
-				}
-			],
+			columns: s,
 			title: "文件已丢失的记录",
 			titleId: "orphan-records-title",
 			unit: "条作品",
@@ -66242,7 +66258,7 @@ function hLe({ group: e, openItem: t, receipt: n }) {
 			label: "作品",
 			value: zz,
 			render: (e) => /* @__PURE__ */ (0, D.jsxs)("span", {
-				className: "flex min-w-48 max-w-72 flex-col gap-1",
+				className: "flex min-w-0 flex-col gap-1",
 				children: [/* @__PURE__ */ (0, D.jsx)(Rk, {
 					variant: "primary",
 					className: "justify-start whitespace-normal text-left",
@@ -66259,6 +66275,7 @@ function hLe({ group: e, openItem: t, receipt: n }) {
 		{
 			id: "code",
 			label: "番号",
+			width: 144,
 			value: (e) => e.code || "",
 			render: (e) => /* @__PURE__ */ (0, D.jsx)("span", {
 				className: "whitespace-nowrap",
@@ -66268,29 +66285,34 @@ function hLe({ group: e, openItem: t, receipt: n }) {
 		{
 			id: "location",
 			label: "媒体库",
+			width: 128,
 			value: (e) => bn[e.location] || e.location,
 			render: (e) => bn[e.location] || e.location || "未取得"
 		},
 		{
 			id: "path",
 			label: "文件路径",
+			width: 320,
+			min: 180,
 			value: (e) => e.path,
 			render: (e) => /* @__PURE__ */ (0, D.jsx)("span", {
 				"data-middle-truncate": !0,
 				title: e.path,
-				className: "block w-64 text-body-2-regular text-text-secondary",
+				className: "block min-w-0 w-full text-body-2-regular text-text-secondary",
 				children: e.path || "未取得"
 			})
 		},
 		{
 			id: "duration",
 			label: "时长",
+			width: 112,
 			value: (e) => e.duration ?? 0,
 			render: (e) => e.duration && e.duration > 0 ? fn(e.duration) : "未取得"
 		},
 		{
 			id: "size",
 			label: "大小",
+			width: 112,
 			value: (e) => e.size ?? 0,
 			render: (e) => e.size === null ? "未取得" : mn(e.size)
 		}
@@ -67177,8 +67199,9 @@ var jLe = (e) => `将移除别名「${e}」，对应来源恢复为独立创作�
 	id: "canonical",
 	label: "统一名称",
 	width: 280,
-	min: 180,
-	required: !0
+	min: 240,
+	required: !0,
+	flex: !0
 }, NLe = [
 	$z,
 	eB,
@@ -67612,7 +67635,7 @@ function LLe({ groups: e, suggestions: t, sources: n = [], readOnly: r, toast: i
 								id: "remaining-space",
 								"aria-label": "行空白区域",
 								"data-table-space": "",
-								width: "1fr",
+								width: a.spaceWidth,
 								minWidth: 0
 							})] }), /* @__PURE__ */ (0, D.jsx)(FM, { children: re.getRowModel().rows.map((e) => /* @__PURE__ */ (0, D.jsxs)(RM, {
 								id: e.id,
@@ -67721,7 +67744,7 @@ function LLe({ groups: e, suggestions: t, sources: n = [], readOnly: r, toast: i
 								id: "remaining-space",
 								"aria-label": "行空白区域",
 								"data-table-space": "",
-								width: "1fr",
+								width: o.spaceWidth,
 								minWidth: 0
 							})] }), /* @__PURE__ */ (0, D.jsx)(FM, { children: ie.getRowModel().rows.map((e) => /* @__PURE__ */ (0, D.jsxs)(RM, {
 								id: e.id,
@@ -68009,8 +68032,9 @@ var WLe = kI({
 	id: e,
 	label: t,
 	width: e === "select" ? 48 : e === "name" ? 300 : e === "actions" ? 208 : e === "fetched" ? 200 : 160,
-	min: e === "select" ? 48 : e === "actions" ? 200 : 112,
-	max: e === "select" ? 48 : 800,
+	min: e === "select" ? 48 : e === "actions" ? 200 : e === "name" ? 300 : 112,
+	max: e === "select" ? 48 : e === "name" ? 2e3 : 800,
+	flex: e === "name",
 	required: e === "select" || e === "name"
 })), iB = () => W.invalidateQueries({
 	queryKey: rr,
@@ -68432,7 +68456,7 @@ function ZLe({ readOnly: e, toast: t }) {
 							id: "remaining-space",
 							"aria-label": "行空白区域",
 							"data-table-space": "",
-							width: "1fr",
+							width: i.spaceWidth,
 							minWidth: 0
 						})] }), /* @__PURE__ */ (0, D.jsx)(FM, { children: x.getRowModel().rows.map((e) => /* @__PURE__ */ (0, D.jsxs)(RM, {
 							id: e.id,
@@ -68506,8 +68530,9 @@ var uB = {
 	id: e,
 	label: t,
 	width: e === "select" ? 48 : e === "source" ? 320 : e === "author" ? 240 : e === "actions" ? 208 : 184,
-	min: e === "select" ? 48 : e === "actions" ? 200 : 112,
-	max: e === "select" ? 48 : 800,
+	min: e === "select" ? 48 : e === "actions" ? 200 : e === "source" ? 320 : 112,
+	max: e === "select" ? 48 : e === "source" ? 2e3 : 800,
+	flex: e === "source",
 	required: e === "select" || e === "source"
 }));
 function nRe({ source: e, selected: t, onToggle: n, handlers: r }) {
@@ -69125,7 +69150,7 @@ function iRe(e) {
 						id: "remaining-space",
 						"aria-label": "行空白区域",
 						"data-table-space": "",
-						width: "1fr",
+						width: de.spaceWidth,
 						minWidth: 0
 					})] }), /* @__PURE__ */ (0, D.jsx)(FM, {
 						renderEmptyState: () => "这一页没有来源",
@@ -115439,4 +115464,4 @@ Gbt(Kbt);
 //#endregion
 export { cw as applyTheme, ik as peachHistory, Xo as popCount, ygt as showToast };
 
-//# debugId=a05147ee-0541-411c-971d-ebfb53844611
+//# debugId=17267fa8-4774-47d7-9b2f-92aabe1f10d1

@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import type { Browser } from 'playwright-core';
 import { installDesignBrowser } from './design-fixture.ts';
 import { layout, settle, visit, VIEWPORTS } from './harness.ts';
+import { verifyColumnContentWidth } from './table-preferences-fixture.ts';
 
 describe('配置中的系统诊断', () => {
   let browser: Browser;
@@ -35,6 +36,7 @@ describe('配置中的系统诊断', () => {
         assert.equal(await table.getByRole('row').count(), 21);
         assert.ok((await table.innerText()).includes('演示文件 1.mp4'));
         assert.ok((await table.innerText()).includes('R:\\Media\\演示文件 1.mp4'));
+        await verifyColumnContentWidth(table, 'path', '[data-middle-truncate]');
         const pagination = page.getByRole('navigation', { name: '缺封面分页' });
         await pagination.getByRole('button', { name: '下一页', exact: true }).click();
         assert.equal(await table.getByRole('row').count(), 12);

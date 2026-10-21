@@ -43,7 +43,7 @@ const suggestionFeatures = tableFeatures({ rowSelectionFeature, rowSortingFeatur
   sortedRowModel: createSortedRowModel(), paginatedRowModel: createPaginatedRowModel() });
 const savedFeatures = suggestionFeatures;
 const selectColumn = { id: 'select', label: '选择', width: 48, min: 48, max: 48, required: true };
-const identityColumn = { id: 'canonical', label: '统一名称', width: 280, min: 180, required: true };
+const identityColumn = { id: 'canonical', label: '统一名称', width: 280, min: 240, required: true, flex: true };
 const suggestionPreferences = [selectColumn, identityColumn, { id: 'alias', label: '平台别名', width: 240 },
   { id: 'evidence', label: '依据', width: 320 }, { id: 'actions', label: '操作', width: 112 }];
 const savedPreferences = [selectColumn, identityColumn, { id: 'aliases', label: '平台别名', width: 400 }, { id: 'actions', label: '操作', width: 184, min: 168 }];
@@ -325,7 +325,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
                   </span><TableColumnResizer preferences={suggestionView} id={header.id} /></>}
                 </TableColumn>
               ))}
-              <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width="1fr" minWidth={0} />
+              <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width={suggestionView.spaceWidth} minWidth={0} />
             </TableHeader>
             <TableBody>
               {suggestionTable.getRowModel().rows.map((row) => (
@@ -381,7 +381,7 @@ export function AliasManager({ groups, suggestions, sources = [], readOnly, toas
                   </span><TableColumnResizer preferences={savedView} id={header.id} /></>}
                 </TableColumn>
               ))}
-              <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width="1fr" minWidth={0} />
+              <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width={savedView.spaceWidth} minWidth={0} />
             </TableHeader>
             <TableBody>
               {savedTable.getRowModel().rows.map((row) => (

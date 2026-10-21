@@ -78,7 +78,8 @@ const COLUMN_LABELS: Record<string, string> = {
 const SILENT_COLUMNS = new Set(['actions']);
 const preferenceColumns = Object.entries(COLUMN_LABELS).map(([id, label]) => ({ id, label,
   width: id === 'select' ? 48 : id === 'name' ? 300 : id === 'actions' ? 208 : id === 'fetched' ? 200 : 160,
-  min: id === 'select' ? 48 : id === 'actions' ? 200 : 112, max: id === 'select' ? 48 : 800,
+  min: id === 'select' ? 48 : id === 'actions' ? 200 : id === 'name' ? 300 : 112, max: id === 'select' ? 48 : id === 'name' ? 2000 : 800,
+  flex: id === 'name',
   required: id === 'select' || id === 'name',
 }));
 
@@ -424,7 +425,7 @@ export function FeedSources({ readOnly, toast }: {
                   </TableColumn>
                 );
               })}
-              <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width="1fr" minWidth={0} />
+              <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width={preferences.spaceWidth} minWidth={0} />
             </TableHeader>
             <TableBody>
               {table.getRowModel().rows.map((row) => (

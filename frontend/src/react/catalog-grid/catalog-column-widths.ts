@@ -4,7 +4,7 @@ import { useTablePreferences } from '../components/table-column-preferences';
 const KEY = 'peach.catalog-column-widths.v1';
 export const columnSizes: Record<string, { width: number; min: number; max: number }> = {
   select: { width: 48, min: 48, max: 48 },
-  name: { width: 400, min: 260, max: 800 },
+  name: { width: 400, min: 320, max: 2000 },
   dur: { width: 96, min: 80, max: 240 },
   size: { width: 112, min: 96, max: 240 },
   resolution: { width: 144, min: 128, max: 320 },
@@ -22,7 +22,7 @@ export const defaultColumnVisibility: ColumnVisibilityState = { code: false, o: 
 const labels: Record<string, string> = { select: '选择', name: '名称', dur: '时长', size: '体积', resolution: '分辨率',
   rating: '评分', o: '高潮计数', plays: '观看次数', new: '入库时间', played: '观看时间', release: '发行时间', code: '番号' };
 const columns = ['select', 'name', 'code', 'dur', 'resolution', 'size', 'rating', 'plays', 'o', 'played', 'new', 'release']
-  .map(id => ({ id, label: labels[id]!, ...columnSizes[id]!, required: id === 'select' || id === 'name', visible: defaultColumnVisibility[id] !== false }));
+  .map(id => ({ id, label: labels[id]!, ...columnSizes[id]!, flex: id === 'name', required: id === 'select' || id === 'name', visible: defaultColumnVisibility[id] !== false }));
 export function useCatalogTablePreferences() {
   return useTablePreferences('catalog', columns, { widths: KEY, visibility: VISIBLE_KEY });
 }
