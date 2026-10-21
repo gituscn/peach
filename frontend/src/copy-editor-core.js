@@ -4,6 +4,32 @@
   const INTERACT = '[role="tab"],[role="switch"],[role="radio"],[role="radiogroup"],[role="slider"],[role="checkbox"],[role="combobox"],[data-platform-option],[aria-expanded],[aria-pressed],[aria-haspopup],summary,input,select,label,[data-copy-interact]';
   const spacing = new WeakMap();
 
+  // 连续文字共用输入框，未改动的前后片段留在各自的行内元素里。
+  function replaceTextParts(parts, text) {
+    const before = parts.join('');
+    let start = 0, suffix = 0;
+    while (start < before.length && start < text.length && before[start] === text[start]) start++;
+    while (suffix < before.length - start && suffix < text.length - start
+      && before.at(-suffix - 1) === text.at(-suffix - 1)) suffix++;
+    const end = before.length - suffix, insert = text.slice(start, text.length - suffix);
+    let offset = 0, inserted = false;
+    return parts.map((part, i) => {
+      const from = offset; offset += part.length;
+      const add = !inserted && start >= from && (start < offset || i === parts.length - 1);
+      if (add) inserted = true;
+      return part.slice(0, Math.max(0, Math.min(part.length, start - from)))
+        + (add ? insert : '') + part.slice(Math.max(0, Math.min(part.length, end - from)));
+    });
+  }
+
+  function cleanInline(element) {
+    for (const child of [...element.querySelectorAll('span,code,b,strong,em,i,small,s,mark')].reverse()) {
+      if (!child.textContent.trim() && !child.children.length
+        && ![...child.attributes].some(attr => !['class', 'style'].includes(attr.name))) child.remove();
+    }
+    element.normalize();
+  }
+
   async function readJson(response) {
     const raw = await response.text();
     let result;
@@ -77,7 +103,7 @@
       if (!event.altKey && event.target.closest?.(INTERACT)) { hideHighlight(); return; }
       const node = textAt(event.clientX, event.clientY);
       if (!node || !resolve(node)) { hideHighlight(); return; }
-      const rects = rectsOf(node), left = Math.min(...rects.map(rect => rect.left)), top = Math.min(...rects.map(rect => rect.top));
+      const rects = rectsOf(resolve(node)?.element || node), left = Math.min(...rects.map(rect => rect.left)), top = Math.min(...rects.map(rect => rect.top));
       Object.assign(highlight.style, { position: 'fixed', display: 'block', left: left + 'px', top: top + 'px',
         width: Math.max(...rects.map(rect => rect.right)) - left + 'px', height: Math.max(...rects.map(rect => rect.bottom)) - top + 'px' });
     }
@@ -100,17 +126,18 @@
       const viewport = window.visualViewport, width = viewport?.width ?? innerWidth, height = viewport?.height ?? innerHeight;
       const x = viewport?.offsetLeft ?? 0, y = viewport?.offsetTop ?? 0;
       const inputWidth = Math.min(Math.max(140, rect.width + 60), Math.max(1, width - 32));
+      const inputHeight = editing.box.getBoundingClientRect().height;
       Object.assign(editing.box.style, { left: Math.max(x + 16, Math.min(rect.left - 6, x + width - inputWidth - 16)) + 'px',
-        top: Math.max(y + 16, Math.min(rect.top - 2, y + height - editing.box.getBoundingClientRect().height - 16)) + 'px', width: inputWidth + 'px' });
+        top: Math.max(y + 2, Math.min(rect.top + (rect.height - inputHeight) / 2, y + height - inputHeight - 2)) + 'px', width: inputWidth + 'px' });
     }
     async function begin(node, target) {
-      const before = node.data, originalText = before.trim();
+      const before = target.element ? target.element.textContent : node.data, originalText = before.trim();
       let ed = { node, before, originalText, lead: /^\s*/.exec(before)[0], trail: /\s*$/.exec(before)[0],
         core: originalText, multiline: !!node.parentElement.closest('pre,code'), ...target };
       setBusy(true);
       try {
         const prepared = await options.prepare?.(ed);
-        if (prepared === null || destroyed || !node.isConnected || node.data !== before) { say('已取消'); return; }
+        if (prepared === null || destroyed || !node.isConnected || (ed.element ? ed.element.textContent : node.data) !== before) { say('已取消'); return; }
         ed = { ...ed, ...prepared };
         const input = !!node.parentElement.closest('button,a,[role="button"]');
         const box = document.createElement(input ? 'input' : 'span');
@@ -121,12 +148,21 @@
           box.value = ed.core;
           const style = getComputedStyle(node.parentElement);
           Object.assign(box.style, { position: 'fixed', boxSizing: 'border-box', font: style.font, letterSpacing: style.letterSpacing });
-          (node.parentElement.closest('dialog[open]') || document.body).append(box);
+          const host = node.parentElement.closest('dialog[open]') || document.body;
+          ed.placeholder = document.createElement('span'); ed.placeholder.dataset.copyEditor = '';
+          ed.placeholder.style.visibility = 'hidden';
+          node.replaceWith(ed.placeholder); ed.placeholder.append(node);
+          host.append(box);
         } else {
           box.dataset.copyInline = '';
           if (options.inlineClass) box.className = options.inlineClass;
           box.contentEditable = 'plaintext-only'; box.spellcheck = false; box.textContent = ed.core;
-          node.replaceWith(...[ed.lead, box, ed.trail].filter(Boolean));
+          if (ed.element) {
+            ed.parts = ed.nodes.map(node => node.data);
+            ed.fragment = document.createDocumentFragment();
+            ed.fragment.append(...ed.element.childNodes);
+            ed.element.append(box);
+          } else node.replaceWith(...[ed.lead, box, ed.trail].filter(Boolean));
         }
         box.setAttribute('aria-label', '修改文字'); editing = ed; positionInput(); box.focus();
         if (input) box.select();
@@ -138,11 +174,16 @@
           else if (event.key === 'Escape') { event.preventDefault(); commit(true); }
         });
         box.addEventListener('blur', () => commit());
+        if (ed.element) box.addEventListener('input', () => {
+          const text = box.textContent.replace(/\s*\n\s*/g, ' ').trim();
+          ed.parts = replaceTextParts(ed.parts, ed.lead + text + ed.trail);
+        });
       } catch (error) { say(error.message, 'err'); }
       finally { setBusy(false); }
     }
     function putBack(ed) {
-      if (ed.box.tagName === 'INPUT') { ed.box.remove(); return; }
+      if (ed.box.tagName === 'INPUT') { ed.placeholder.replaceWith(ed.node); ed.box.remove(); return; }
+      if (ed.element) { ed.box.replaceWith(ed.fragment); return; }
       const a = ed.box.previousSibling, c = ed.box.nextSibling;
       if (ed.lead && a?.nodeType === 3) a.remove();
       if (ed.trail && c?.nodeType === 3) c.remove();
@@ -162,11 +203,15 @@
         const result = await options.save(ed, text) ?? {};
         persisted = true;
         const rendered = result.text ?? text;
-        if (result.remove) ed.node.remove(); else ed.node.data = ed.lead + rendered + ed.trail;
+        if (ed.element) {
+          const parts = replaceTextParts(ed.parts, ed.lead + rendered + ed.trail);
+          ed.nodes.forEach((node, i) => { node.data = parts[i]; });
+          cleanInline(ed.element);
+        } else if (result.remove) ed.node.remove(); else ed.node.data = ed.lead + rendered + ed.trail;
         say(result.message || (rendered ? '已保存修改' : '已删除文字'), 'ok');
         await options.onSaved?.(ed, { ...result, text: rendered });
       } catch (error) {
-        if (!persisted) ed.node.data = ed.before;
+        if (!persisted && !ed.element) ed.node.data = ed.before;
         say((persisted ? '已保存，界面更新未完成：' : error.unconfirmed ? '未确认保存：' : '没保存：') + error.message, 'err');
       } finally { setBusy(false); }
     }
@@ -191,5 +236,5 @@
       },
     };
   }
-  globalThis.PeachCopyEditorCore = Object.freeze({ version: 1, create, readJson, resolveDraft, applyDrafts });
+  globalThis.PeachCopyEditorCore = Object.freeze({ version: 1, create, readJson, resolveDraft, applyDrafts, replaceTextParts });
 })();
