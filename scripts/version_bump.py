@@ -31,9 +31,17 @@ RUNTIME_INPUTS = (
     "resources/",
     "scripts/build_app_entry.py",
     "scripts/build_windows.ps1",
+    "scripts/build_macos_app.py",
+    "scripts/build_macos_standalone.py",
+    "scripts/peach_macos.spec",
+    "scripts/package_windows_release.py",
+    "scripts/installer/",
+    "scripts/ci_windows.ps1",
+    "scripts/ci_macos.sh",
     "pyproject.toml",
     "uv.lock",
     ".github/workflows/release.yml",
+    ".gitlab-ci.yml",
 )
 
 #: Conventional Commits 的功能类型；`!` 是破坏性标记。pre-1.0 阶段两者都只推 minor。
