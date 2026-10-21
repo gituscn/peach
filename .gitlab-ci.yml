@@ -21,7 +21,7 @@ variables:
   npm_config_fetch_retries: "5"
   npm_config_fetch_retry_mintimeout: "10000"
   npm_config_fetch_retry_maxtimeout: "60000"
-  PEACH_DOWNLOAD_BACKEND: r2
+  PEACH_DOWNLOAD_BACKEND: both
   PEACH_R2_BUCKET: peach-releases
   PEACH_R2_PUBLIC_BASE: https://downloads.peach.video
 

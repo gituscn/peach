@@ -53,7 +53,7 @@ GitLab 兼容平台使用 `.gitlab-ci.yml`。唯一版本入口支持 `--gitlab-
 
 Windows 原生 Runner 在深目录中检出项目时，需为 Git 启用 `core.longpaths=true`，供检出与清理阶段处理 npm 缓存。设置可限定到 Runner 的任务环境，通过 `GIT_CONFIG_COUNT` 与对应的 `GIT_CONFIG_KEY_<索引>`、`GIT_CONFIG_VALUE_<索引>` 条目传递；已有条目按索引追加。宿主系统的长路径开关与 Git 设置分别核对。
 
-版本标签须受保护。标签流水线重新核对提交与版本，构建固定来源的媒体工具、Windows 完整包与拆分包、macOS 双架构 DMG，并进行独立制品验收。只有全部成功后才创建 GitLab Release。`PEACH_DOWNLOAD_BACKEND` 默认 `gitgud`，通过 Generic Package Registry 保存制品；不把会过期的 job artifacts 当作永久下载地址。
+版本标签须受保护。标签流水线重新核对提交与版本，构建固定来源的媒体工具、Windows 完整包与拆分包、macOS 双架构 DMG，并进行独立制品验收。只有全部成功后才创建 GitLab Release。项目流水线使用 `PEACH_DOWNLOAD_BACKEND=both`，将同一份制品分别保存到 R2 与 GitGud Generic Package Registry；不把会过期的 job artifacts 当作永久下载地址。独立部署可明确选用 `r2` 或 `gitgud` 单后端。
 
 Linux 发布任务使用官方 uv Python 3.14 容器，并在获取制品工具前核对解释器版本；源码归档使用 `tarfile` 的 `data` 过滤器解压。CI 的 `.npm/` 与 `.uv-cache/` 属于生成缓存，不计入源码工作区变化。
 
@@ -67,7 +67,9 @@ GitLab 标签流水线通过 R2 暂存传递媒体工具、Windows 发行目录�
 
 暂存对象位于 `_ci/<项目 ID>/<流水线 ID>/<提交 SHA>/<产物组>/<作业 ID>/`，纳入同一桶的容量预算。每次重试使用自己的作业 ID，构建时间等元数据变化不会覆盖其他尝试的文件。下载任务先核对清单的版本、提交和流水线身份，再校验每份文件的大小与 SHA-256；产物路径限定在对应构建输出目录，不接收软链接或路径穿越。macOS 仅上传两种架构的 DMG、`build-info.json` 与 `SHA256SUMS.txt`，不传递展开应用。所有构建与独立制品验收成功后，发布任务才写入正式版本目录和公开版本索引；GitLab Release 创建成功后，只回收当前流水线的暂存前缀。失败流水线保留暂存以便排障和重试，不覆盖已有公开版本。
 
-Windows 轻量安装器缺少本地工具包时，先从 R2 下载当前版本的工具；连接失败或内容校验失败时，尝试 GitHub 的同版本文件。两个来源均须匹配安装器内置清单的大小与 SHA-256，不能混用其他版本。发布完成后，用 `scripts/smoke_split_update.py` 的 `--prepare-with-app --online` 在空缓存中运行实际制品，核对联网取得的工具能否重建完整程序。GitLab Release 的下载表指向当前后端，文档链接指向对应版本标签。
+Windows 轻量安装器缺少本地工具包时，先从 R2 下载当前版本的工具；连接失败或内容校验失败时，尝试 GitHub 的同版本文件。两个来源均须匹配安装器内置清单的大小与 SHA-256，不能混用其他版本。发布完成后，用 `scripts/smoke_split_update.py` 的 `--prepare-with-app --online` 在空缓存中运行实际制品，核对联网取得的工具能否重建完整程序。GitLab Release 的下载表使用 R2，资产区另列 GitGud 副本，文档链接指向对应版本标签。
+
+双后端发布复用官方 `glab packages upload`，将安装包、工具包、对应源码与 SHA-256 清单保存在 `peach-release/<版本标签>/`。上传前验证本地文件与 R2 发行清单一致，上传后检查 GitGud 服务端记录的大小与 SHA-256；同版本同名同内容直接复用，内容不同则保留原文件并停止。R2 保留原下载路径，GitGud Release 的备用直链使用 `/gitgud/<文件名>`，避免与主要下载入口冲突。两份存储均就绪后才登记 Release；官网继续优先从 Cloudflare 下载。
 
 R2 公网下载流量免费，存储与请求按账户共享额度计费。预算告警只通知，不会停止服务；R2 后端不提供零费用硬封顶。要求绝不产生按量费用的部署应使用不绑定按量计费的下载服务，不启用 R2 自动发布。
 
