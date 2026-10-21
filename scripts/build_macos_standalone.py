@@ -114,7 +114,7 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
     ], check=True, cwd=ROOT, env={**os.environ, "PEACH_MACOS_BUILD_INFO": str(work / "build-info.json"),
                                 "PEACH_MACOS_TARGET_ARCH": architecture})
     app = destination / "Peach.app"
-    tools = app / "Contents/MacOS/tools"
+    tools = app / "Contents/Resources/tools"
     tools.mkdir()
     for tool in ("ffmpeg", "untrunc"):
         shutil.copytree(media_root / tool / tool, tools / tool)

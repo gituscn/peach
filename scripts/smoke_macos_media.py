@@ -34,10 +34,10 @@ def smoke(app: Path, architecture: str) -> dict:
         assert ffmpeg.source == ffprobe.source == "peach-bundled"
         paths = [ffmpeg.path, ffprobe.path, repair, tunnel]
         for path in paths:
-            assert path.is_relative_to(executable.parent), path
+            assert path.is_relative_to(executable.parent.parent), path
             audit_binary(path, architecture)
         for tool in ("ffmpeg", "untrunc"):
-            bundle = executable.parent / "tools" / tool
+            bundle = executable.parent.parent / "Resources/tools" / tool
             manifest = json.loads((bundle / "manifest.json").read_text())
             assert manifest["platform"] == "darwin" and manifest["architecture"] == architecture
             from media_tool_bundle import checked_file

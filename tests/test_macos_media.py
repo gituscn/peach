@@ -99,13 +99,14 @@ class MacMediaBundleTests(unittest.TestCase):
         from peach.tunnel import resolve_binary
         executable = self.root / "Peach.app/Contents/MacOS/Peach"
         for name in ("tools/ffmpeg/bin/ffmpeg", "tools/ffmpeg/bin/ffprobe", "tools/untrunc/untrunc", "cloudflared"):
-            path = executable.parent / name
+            path = (executable.parent.parent / "Resources" / name if name.startswith("tools/")
+                    else executable.parent / name)
             path.parent.mkdir(exist_ok=True, parents=True)
             path.write_bytes(b"fixture")
         with patch.object(sys, "executable", str(executable)), patch.object(sys, "frozen", True, create=True), \
                 patch.dict("os.environ", {"PATH": ""}, clear=True):
             resolver = FFmpegResolver(self.root / "missing")
             self.assertEqual(resolver.ffmpeg().source, "peach-bundled")
-            self.assertEqual(resolver.ffprobe().path, executable.parent / "tools/ffmpeg/bin/ffprobe")
-            self.assertEqual(untrunc_path(self.root / "missing"), executable.parent / "tools/untrunc/untrunc")
+            self.assertEqual(resolver.ffprobe().path, executable.parent.parent / "Resources/tools/ffmpeg/bin/ffprobe")
+            self.assertEqual(untrunc_path(self.root / "missing"), executable.parent.parent / "Resources/tools/untrunc/untrunc")
             self.assertEqual(resolve_binary(), executable.parent / "cloudflared")
