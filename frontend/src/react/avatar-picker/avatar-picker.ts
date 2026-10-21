@@ -2,7 +2,7 @@
  *
  * 候选图走 `/avatar-choice?ref=`：页面只递服务端自己列出来的 ref，地址由服务端按索引拼。
  * 手填地址先交给 `/api/avatar-frame`，过了服务端的公网判据、取回来留在缓存里，才变成
- * 一个 `url:` ref；本机文件只在浏览器里预览，确认时按原字节发出去。 */
+ * 一个 `url:` ref；本机文件使用服务端转换后的候选预览，确认时按原字节发出去。 */
 import { ApiError, apiGet, apiSend } from '../../api';
 import {
   centeredBox, frameWithin, isUsableSize, type CropBox, type CropSize,
@@ -81,7 +81,7 @@ export async function frameChoice(kind: string, id: number, choice: AvatarChoice
 export const frameAddress = (kind: string, id: number, url: string) =>
   apiSend<AvatarChoice>(AVATAR_FRAME_URL, { kind, id, url });
 
-/** 本机文件：按原字节发过去量尺寸、检脸，服务端不留。 */
+/** 本机文件：按原字节提交，服务端转换为静态预览并交回候选引用。 */
 export const frameFile = (kind: string, id: number, file: File) =>
   sendBytes<AvatarChoice>(`${AVATAR_FRAME_URL}${query(kind, id)}&name=${encodeURIComponent(file.name)}`, file);
 

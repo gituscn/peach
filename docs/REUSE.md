@@ -675,6 +675,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 | 文件系统事件 | `watchdog`（Apache-2.0）加定期对账，只订阅 `local` 来源的根；网盘挂载不订阅，递归 watcher 在网络挂载上就是轮询。CloudDrive2 的 webhook 请求形态与「云端路径不进 pathlib」取自 `sqzw-x/amane`（GPL，只借设计，见 [docs/reference-snapshots/amane-watcher.md](reference-snapshots/amane-watcher.md)） | `src/peach/push_discovery.py` 负责去抖、大小稳定的写完判定、前缀表映射、共享密钥与来源校验；登记本身调 `scan.ingest_path`，与全量扫描同一条 upsert（ADR-0041） |
 | HTML 适配器 | Beautiful Soup 4.15.0（MIT） | 来源专用选择器和来源记录 |
 | 位图 | Pillow | 头像/Logo 质量和来源策略 |
+| 头像手动选择 | Pillow 12.3.0（HPND）的格式插件、`verify`、`load` 和 `ImageOps.exif_transpose`；[官方格式说明](https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html) | 按实际内容读取 JPEG、PNG、WebP、AVIF、GIF、BMP、TIFF、ICO 与 JPEG 2000。第一帧完整解码并转正，透明图片编码为 PNG，其余使用现有头像 JPEG 质量。候选缓存、内容哈希、裁剪与安装沿用 `AvatarCandidateCache`、`images.crop_to_box` 和实体头像入口。浏览器读取静态转换预览，本机确认仍提交原字节。无新增依赖、原图改写或真实 ledger 写入；HEIF 插件增加编解码依赖，SVG 光栅化不属于头像位图入口，当前不引入二者 |
 | SVG 光栅化 | `resvg-py`（resvg，MPL-2.0 绑定） | 只把站点自己的矢量图标转成位图交给 Pillow（threads 的 app 图标只有 SVG，2026-09-02 核对）。不选 cairosvg：它在 Windows 要另装 cairo 原生库，resvg-py 是 abi3 轮子，win_amd64 / macosx_11_0_arm64 / macosx_10_12_x86_64 都有官方预编译。候选发现、比例判定、缓存与回退在 Peach。`images.bake_square_vector` 用标准库 ElementTree 包一层外层 SVG 做方形归一，产物仍是矢量，栅格化只用来判配白底还是深底 |
 | 搜索 | SQLite FTS5 | 索引字段、排序、profile 感知筛选 |
 | 相关推荐 | OpenAver `8cc17e50453d9f69a81f5fee1a072df80f7aab73` 的 Tag IDF + 系列／片商／出演者规则只作固定算法参考（MIT） | 独立实现规范实体评分、MMR 多样性、稳定 seed、解释原因与负反馈边界；不复制上游 UI／源码 |
