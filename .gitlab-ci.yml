@@ -195,6 +195,19 @@ smoke-windows:
     - '& ./release/ci_windows.ps1 smoke'
     - if ($LASTEXITCODE -ne 0) { throw 'Windows 独立制品验收失败' }
 
+publish-docker:
+  stage: publish
+  tags: [peach-windows]
+  rules: !reference [.release-linux, rules]
+  needs: [validate-release]
+  resource_group: peach-docker-publication
+  environment:
+    name: release
+    action: prepare
+  script:
+    - '& ./scripts/ci_windows.ps1 docker'
+    - if ($LASTEXITCODE -ne 0) { throw 'Docker 镜像发布失败' }
+
 publish-release:
   extends: .release-linux
   stage: publish
