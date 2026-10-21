@@ -115,7 +115,7 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
                                 "PEACH_MACOS_TARGET_ARCH": architecture})
     app = destination / "Peach.app"
     tools = app / "Contents/Resources/tools"
-    tools.mkdir()
+    tools.mkdir(exist_ok=True)
     for tool in ("ffmpeg", "untrunc"):
         shutil.copytree(media_root / tool / tool, tools / tool)
     shutil.copyfile(cloudflared / "cloudflared", app / "Contents/MacOS/cloudflared")
