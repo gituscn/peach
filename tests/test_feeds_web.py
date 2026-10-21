@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sys
 import tempfile
 import time
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -629,15 +630,66 @@ class FeedWebTest(FeedWebFixture):
         target.write_text(json.dumps({'layout': 'still', 'face': None}), encoding='utf-8')
         self.assertEqual(self.contract._cover_focus(str(target)), {'layout': 'still'})
 
+    def _attempted(self, code: str, seconds_ago: float) -> None:
+        path = feed_followup.cover_attempt_path(self.contract.cover_root, code)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"code": code, "ok": False}), encoding="utf-8")
+        moment = time.time() - seconds_ago
+        os.utime(path, (moment, moment))
+
+    def _cover_backlog(self, **options) -> list[str]:
+        with self.contract.database.read_connection() as connection:
+            return feed_followup.cover_backlog(connection, self.contract.cover_root, hidden=frozenset(),
+                                               retry_after=timedelta(0), **options)
+
     def test_cover_backlog_prioritises_the_least_recent_attempt(self):
         self._add()
         self._check()
         with self.contract.database.write_transaction() as connection:
             connection.execute("UPDATE feed_discovery SET scraped_at='2026-01-01T00:00:00Z',release_date='2026-10-01' WHERE code='SSIS-950'")
-            connection.execute("UPDATE feed_discovery SET scraped_at='2025-01-01T00:00:00Z',release_date='2025-01-01' WHERE code='HMN-071'")
+            connection.execute("UPDATE feed_discovery SET scraped_at='2026-01-01T00:00:00Z',release_date='2025-01-01' WHERE code='HMN-071'")
+        self._attempted('SSIS-950', 3600)
+        self._attempted('HMN-071', 86400)
+        self.assertEqual(self._cover_backlog(limit=1), ['HMN-071'])
+        # 资料没取到的壳归取资料那一批，不进补封面。
+        with self.contract.database.write_transaction() as connection:
+            connection.execute("UPDATE feed_discovery SET scrape_error='来源连接未取得' WHERE code='HMN-071'")
+        self.assertEqual(self._cover_backlog(), ['SSIS-950'])
         with self.contract.database.read_connection() as connection:
-            result = feed_followup.backlog(connection, self.contract.cover_root, hidden=frozenset(), limit=1)
-        self.assertEqual(result, ['HMN-071'])
+            self.assertEqual(feed_followup.backlog(connection, self.contract.cover_root, hidden=frozenset(),
+                                                   retry_after=timedelta(0)), ['HMN-071'])
+
+    def test_codes_already_queued_are_not_planned_again(self):
+        """在队里的那一批还没跑完，下一轮检查只带新的番号，不把同一批换个组合再派一条。"""
+        self._add()
+        self.assertEqual([item["key"] for item in self._check()["followups"]],
+                         ["feed-scrape:SSIS-950,HMN-071"])
+        with self.contract.database.write_transaction() as connection:
+            connection.execute("INSERT INTO feed_discovery(code,source_id,title,link,release_date,discovered_at)"
+                               " VALUES('ABP-123',1,'',NULL,'2026-09-22',?)", (feeds.stamp(),))
+        self.transport.responses[self.url] = HttpResponse(304, {}, b"", self.url)
+        thread = self.contract.feed_job.thread
+        if thread is not None:
+            thread.join(5)
+        self.assertEqual([item["key"] for item in self._check()["followups"]], ["feed-scrape:ABP-123"])
+
+    def test_a_missing_cover_gets_its_own_batch_outside_the_ledger_lane(self):
+        """资料齐了只缺封面的壳另派补封面：只取图，不再问资料来源，也不排在写账本的后继后面。"""
+        self.cover_misses.add("HMN-071")
+        self._add()
+        self._check()
+        self._drain(1)
+        self.cover_misses.clear()
+        self.transport.responses[self.url] = HttpResponse(304, {}, b"", self.url)
+        asked = []
+        feed_followup.collect = lambda provider, code: asked.append(code)
+        self.assertEqual([item["key"] for item in self._check()["followups"]], ["feed-cover:HMN-071"])
+        self.assertFalse(feed_followup.COVER_TYPE.writes_ledger)
+        self._drain(1)
+        self.assertEqual(asked, [])
+        self.assertTrue(feed_followup.has_local_cover(self.contract.cover_root, "HMN-071"))
+        [run] = self.contract.task_runs.query(task_key=feed_followup.COVER_TASK_KEY)
+        self.assertEqual(run.result_summary, {"total": 1, "covers": 1})
 
     def test_covers_cut_off_at_the_connection_are_counted_for_the_new_release_row(self):
         """连不上图片主机的几部单独记数，列表把最近一轮的数带给页面去提示换线路；
@@ -670,12 +722,9 @@ class FeedWebTest(FeedWebFixture):
         self.transport.responses[self.url] = HttpResponse(304, {}, b"", self.url)
         # 定时那一轮：刚试过的不再排；已经有封面、资料也齐的那部永远不再排。
         self.assertEqual(self._check(automatic=True)["followups"], [])
-        earlier = feeds.stamp(datetime.now(timezone.utc)
-                              - feed_followup.RETRY_AFTER - timedelta(minutes=1))
-        with self.contract.database.write_transaction() as connection:
-            connection.execute("UPDATE feed_discovery SET scraped_at=?", (earlier,))
+        self._attempted("HMN-071", feed_followup.RETRY_AFTER.total_seconds() + 60)
         self.assertEqual([item["key"] for item in self._check(automatic=True)["followups"]],
-                         ["feed-scrape:HMN-071"])
+                         ["feed-cover:HMN-071"])
         # 人说了不想看的，不再替它花配额。
         first = {row["code"]: row for row in dispatch_api_get(
             self.contract, "/api/feeds/discoveries", {})["items"]}["HMN-071"]
@@ -694,7 +743,7 @@ class FeedWebTest(FeedWebFixture):
                         attempt.read_text(encoding='utf-8') if attempt.exists() else '未取得封面处理记录')
         self.transport.responses[self.url] = HttpResponse(304, {}, b"", self.url)
         self.assertEqual([item["key"] for item in self._check()["followups"]],
-                         ["feed-scrape:HMN-071"])
+                         ["feed-cover:HMN-071"])
 
     def test_every_check_carries_performers_still_missing_an_avatar(self):
         """资料处理不跑的日子，缺头像的存量女优跟着定时拉取补（ADR-0097）。试过的不再带。"""
