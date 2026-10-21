@@ -67,11 +67,26 @@ class HardwareDetectionTests(unittest.TestCase):
                 self.assertEqual(HardwareTranscoder(enabled=enabled).encoders(Path("ffmpeg")), ())
                 run.assert_not_called()
 
-    def test_linux_without_devices_and_macos_have_no_automatic_candidates(self):
-        for platform in ("linux", "darwin"):
+    def test_linux_without_devices_has_no_automatic_candidates(self):
+        for platform in ("linux",):
             with self.subTest(platform=platform), patch("peach.hardware_transcode.sys.platform", platform), \
                     patch.object(Path, "exists", return_value=False), patch.object(Path, "glob", return_value=[]):
                 self.assertEqual(HardwareTranscoder()._candidates(), ())
+
+    def test_macos_probes_videotoolbox_and_uses_no_software_encoder_in_probe(self):
+        with patch("peach.hardware_transcode.sys.platform", "darwin"), \
+                patch("peach.hardware_transcode.subprocess.run", return_value=Mock(returncode=0)) as run:
+            self.assertEqual(HardwareTranscoder().encoders(Path("ffmpeg")), (HardwareEncoder("videotoolbox"),))
+        command = run.call_args.args[0]
+        self.assertIn("h264_videotoolbox", command)
+        self.assertEqual(command[command.index("-allow_sw") + 1], "0")
+
+    def test_macos_av1_selects_native_decoder_for_hardware_and_keeps_software_decode_fallback(self):
+        attempts = HardwareEncoder("videotoolbox").attempts("av1")
+        self.assertEqual([attempt.name for attempt in attempts], ["videotoolbox", "videotoolbox-encode"])
+        self.assertEqual(attempts[0].before_input, ("-hwaccel", "videotoolbox", "-c:v", "av1"))
+        self.assertEqual(attempts[1].before_input, ())
+        self.assertEqual(len(HardwareEncoder("videotoolbox").attempts("vc1")), 1)
 
     def test_linux_nvidia_device_enables_nvenc_probe(self):
         with patch("peach.hardware_transcode.sys.platform", "linux"), \
@@ -84,6 +99,69 @@ class HardwareDetectionTests(unittest.TestCase):
         with patch.dict(os.environ, {"PEACH_TRANSCODE_BACKEND": "typo"}):
             with self.assertRaisesRegex(ValueError, "PEACH_TRANSCODE_BACKEND"):
                 HardwareTranscoder()
+
+    def test_device_preference_can_switch_without_recreating_the_hardware_service(self):
+        from peach.media_processing_policy import save_preferences
+        with tempfile.TemporaryDirectory() as directory, \
+                patch("peach.hardware_transcode.sys.platform", "darwin"), \
+                patch("peach.hardware_transcode.subprocess.run", return_value=Mock(returncode=0)) as run:
+            root = Path(directory).resolve()
+            hardware = HardwareTranscoder(state_root=root)
+            self.assertTrue(hardware.encoders(Path("ffmpeg")))
+            save_preferences(root, {'playback_acceleration': 'software'})
+            self.assertEqual(hardware.encoders(Path("ffmpeg")), ())
+            save_preferences(root, {'preview_acceleration': 'software'})
+            self.assertEqual(hardware.encoders(Path("ffmpeg")), ())
+            save_preferences(root, {'playback_acceleration': 'auto'})
+            self.assertTrue(hardware.encoders(Path("ffmpeg")))
+            self.assertEqual(run.call_count, 1)
+
+
+class VideoToolboxConsumerTests(unittest.TestCase):
+    def test_full_file_and_hls_fall_back_from_decode_to_encode_to_software(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.dict(os.environ, {"PEACH_TRANSCODE_BACKEND": "videotoolbox"}), \
+                patch.object(HardwareTranscoder, "_probe", return_value=True):
+            root = Path(directory).resolve()
+            source = root / "sample.mkv"
+            source.write_bytes(b"fixture")
+            resolver = Mock(ffmpeg=lambda: BinaryChoice(Path("ffmpeg"), "test"), ffprobe=lambda: None)
+            for failures in (0, 1, 2):
+                with self.subTest(failures=failures):
+                    service = TranscodeService(resolver, root / f"full-{failures}")
+                    captured = []
+                    def execute(command, *, captured=captured, failures=failures, **kwargs):
+                        captured.append((kwargs['label'], command))
+                        if len(captured) <= failures:
+                            return 1, b"", b"unavailable"
+                        Path(command[-1]).write_bytes(b"result")
+                        return 0, b"", b""
+                    with patch.object(service, "_probe", return_value=_MediaProfile("av1", "yuv420p", "aac")), \
+                            patch.object(service, "_execute", side_effect=execute):
+                        service.browser_path(1, source)
+                    self.assertEqual([name for name, _ in captured],
+                                     ["videotoolbox", "videotoolbox-encode", "libx264"][:failures + 1])
+                    self.assertIn("av1", captured[0][1])
+                    if failures:
+                        self.assertNotIn("-hwaccel", captured[1][1])
+
+                    async def drive(failures=failures):
+                        hls = HlsSegmentService(resolver, root / f"hls-{failures}", hardware=HardwareTranscoder())
+                        commands = []
+                        async def run(command, session, registry):
+                            commands.append(command)
+                            if len(commands) <= failures:
+                                return 1, b"unavailable"
+                            Path(command[-1]).write_bytes(b"segment")
+                            return 0, b""
+                        with patch.object(hls, "video_codec", return_value="av1"), patch.object(hls, "_run", side_effect=run):
+                            await hls.generate(source, 12, 6, asset_id=1, index=2,
+                                               session="test", registry=StreamSessionRegistry(), transcode=True)
+                        self.assertEqual(len(commands), failures + 1)
+                        for command in commands:
+                            self.assertEqual(command[command.index("-output_ts_offset") + 1], "12.000")
+                            self.assertIn("aac", command)
+                    asyncio.run(drive())
 
 
 class VaapiConsumerTests(unittest.TestCase):

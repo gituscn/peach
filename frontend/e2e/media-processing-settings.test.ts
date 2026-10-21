@@ -13,16 +13,23 @@ describe('视频预览设置', () => {
     it(`${viewport.name}：总开关持久化并控制时间轴设置，重新开启后时间轴由用户选择`, async () => {
       let disabled = false;
       let timeline = 'coarse';
+      let previewAcceleration = 'auto';
+      let playbackAcceleration = 'auto';
       const writes: unknown[] = [];
       const opened = await visit(browser, '/settings/library', viewport, async page => {
         await page.route('**/api/media-processing', async route => {
           if (route.request().method() === 'POST') {
             const body = route.request().postDataJSON();
             writes.push(body);
-            disabled = body.metadata_only;
-            if (disabled) timeline = 'off';
+            if ('metadata_only' in body) {
+              disabled = body.metadata_only;
+              if (disabled) timeline = 'off';
+            }
+            if ('preview_acceleration' in body) previewAcceleration = body.preview_acceleration;
+            if ('playback_acceleration' in body) playbackAcceleration = body.playback_acceleration;
           }
-          await route.fulfill({ json: { metadata_only: disabled } });
+          await route.fulfill({ json: { metadata_only: disabled,
+            preview_acceleration: previewAcceleration, playback_acceleration: playbackAcceleration } });
         });
         await page.route('**/api/thumbnail-jobs', route => route.fulfill({ json: { mode: timeline, status: 'idle' } }));
       });
@@ -50,6 +57,24 @@ describe('视频预览设置', () => {
         assert.equal(await interval.isDisabled(), false);
         assert.match(await interval.innerText(), /关闭/);
         assert.deepEqual(writes, [{ metadata_only: true }, { metadata_only: false }]);
+        const preview = page.locator('#previewAccelerationSetting button');
+        const playback = page.locator('#playbackAccelerationSetting button');
+        await preview.click();
+        await page.getByRole('option', { name: '仅软件', exact: true }).click();
+        await page.getByText('已保存抽帧加速', { exact: true }).waitFor();
+        assert.equal(previewAcceleration, 'software');
+        assert.equal(playbackAcceleration, 'auto');
+        assert.match(await playback.innerText(), /自动/);
+        await playback.click();
+        await page.getByRole('option', { name: '仅软件', exact: true }).click();
+        await page.getByText('已保存播放转码加速', { exact: true }).waitFor();
+        assert.equal(playbackAcceleration, 'software');
+        assert.deepEqual(writes.slice(-2), [{ preview_acceleration: 'software' }, { playback_acceleration: 'software' }]);
+        await page.reload();
+        await preview.waitFor();
+        await settle(page);
+        assert.match(await preview.innerText(), /仅软件/);
+        assert.match(await playback.innerText(), /仅软件/);
         const measured = await layout(page);
         assert.ok(measured.scrollWidth <= measured.viewportWidth, JSON.stringify(measured));
         assert.deepEqual(measured.offenders, []);

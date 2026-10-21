@@ -289,7 +289,7 @@ def create_app(
     entity_thumb_service = DerivedImageService(entity_thumb_root(settings.avatar_root))
     cover_thumb_service = DerivedImageService(cover_thumb_root(settings.cover_root),
                                               edge=COVER_THUMB_EDGE, quality=COVER_THUMB_QUALITY)
-    transcode_service = TranscodeService(resolver, settings.transcode_root)
+    transcode_service = TranscodeService(resolver, settings.transcode_root, state_root=settings.follow_state_root)
     header_repairs = HeaderRepairStore(settings.transcode_root, resolver)
     hls_plan_executor = ThreadPoolExecutor(
         max_workers=2, thread_name_prefix="PeachHlsPlan",

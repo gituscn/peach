@@ -18,8 +18,10 @@ const media = () => section('媒体目录', stack(`<div class="flex flex-col gap
     <div class="flex flex-wrap items-end gap-2">${islandSelect(text('6em'), { className: 'w-full @lg:w-60' })}<span class="w-full @lg:w-32">${input()}</span><span class="w-full min-w-32 @lg:w-auto @lg:flex-1">${input()}</span>${islandButton({ glyph: 'hard-drive', attrs: wait })}</div>
   </div><div class="self-start">${button('添加文件夹', 'secondary')}</div></div><span class="text-body-medium text-text-primary">${text('15em')}</span>`),
   `<span class="mr-auto min-w-0 text-body-2-regular text-text-secondary">保存后 Peach 会重新启动。</span>${button('保存配置')}`)
-  + section('视频预览', row('生成视频预览', '为本地视频生成九宫格与时间轴预览；关闭后仍按入库规则探测时长与分辨率。')
-    + row('时间轴预览', '按所选间隔抽帧，仅处理本机磁盘上的视频。', 'ui-configuration-skeleton-select'));
+  + section('视频预览', row('抽帧加速', '用于封面、九宫格与时间轴预览；自动模式失败后回退软件。保存后用于新任务。', 'ui-configuration-skeleton-select')
+    + row('生成视频预览', '为本地视频生成九宫格与时间轴预览；关闭后仍按入库规则探测时长与分辨率。')
+    + row('时间轴预览', '按所选间隔抽帧，仅处理本机磁盘上的视频。', 'ui-configuration-skeleton-select'))
+  + section('视频播放', row('播放转码加速', '仅控制 Peach 服务端转码，不改变浏览器自身解码。保存后用于新任务，正在运行的任务继续完成。', 'ui-configuration-skeleton-select'));
 
 /** 各分区复用正式表单的 Section、Stack 与 SettingsRow 几何。 */
 export function configurationContentSkeleton(chosen: string): string {

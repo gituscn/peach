@@ -64,11 +64,12 @@ class TranscodeService:
         *,
         max_concurrent: int = 2,
         prefer_hardware: bool | None = None,
+        state_root: Path | None = None,
     ):
         self.resolver = resolver
         self.cache_root = cache_root
         self.prefer_hardware = prefer_hardware is not False
-        self.hardware = HardwareTranscoder(enabled=self.prefer_hardware)
+        self.hardware = HardwareTranscoder(enabled=self.prefer_hardware, state_root=state_root)
         self._locks: dict[int, list] = {}
         self._locks_guard = threading.Lock()
         self._slots = threading.Semaphore(max(1, max_concurrent))

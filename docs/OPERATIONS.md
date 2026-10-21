@@ -45,7 +45,7 @@ export PATH="$PWD/build/macos-media-toolchain/env/bin:$PATH"
 
 产物在 `dist/macos.noindex/<架构>/`，构建副本避开 Spotlight 索引；日常使用只保留 Applications 里的应用，测试结束卸载已挂载的安装镜像。Apple Silicon 使用 `arm64`，Intel 使用 `x86_64`；分别用对应架构的 Python 与依赖构建。`--target-arch` 显式指定目标，解释器架构不匹配会停止，两个包不混合原生扩展，也不直接合并成 universal2。Intel 构建可在 Intel Mac 或 Rosetta 下的 x86_64 Python 环境完成；Rosetta 验收不能代替 Intel 真机和较旧 macOS 的验收。
 
-随包工具位于 `Contents/MacOS/tools/ffmpeg/bin`、`Contents/MacOS/tools/untrunc`，cloudflared 位于 `Contents/MacOS`。它们不依赖 Homebrew；FFmpeg、x264、dav1d 和修复用 FFmpeg 库静态链接，动态依赖仅允许 macOS 系统库。`scripts/smoke_macos_media.py` 在系统 PATH 下使用合成 H.264/AAC 与 AV1 样片验证工具查找、探测、抽帧、转码、缺 `moov` 修复和完整解码。该修复验收覆盖同编码参照样片，不代表任意损坏媒体都能恢复。
+随包工具与许可证位于 `Contents/Resources/tools/ffmpeg/bin`、`Contents/Resources/tools/untrunc`，cloudflared 位于 `Contents/MacOS`。工具先独立签名，再签整个应用，资源目录允许同时保存工具清单和说明。它们不依赖 Homebrew；FFmpeg、x264、dav1d 和修复用 FFmpeg 库静态链接，动态依赖仅允许 macOS 系统库。`scripts/smoke_macos_media.py` 在系统 PATH 下使用合成 H.264/AAC 与 AV1 样片验证工具查找、探测、抽帧、转码、缺 `moov` 修复和完整解码。该修复验收覆盖同编码参照样片，不代表任意损坏媒体都能恢复。
 
 每种架构同时生成 `ffmpeg-macos-<架构>-corresponding-source.zip` 与 `untrunc-macos-<架构>-corresponding-source.zip`，必须与 DMG 同版本发布；归档包含完整上游源码、固定哈希、许可证、构建脚本、配置和环境记录。构建拒绝缺失、哈希不符、架构不符或依赖开发机动态库的工具。cloudflared 固定官方 2026.9.0，归档 SHA-256 采用 GitHub Release 资产 API 的 `digest`，来源登记在 `scripts/cloudflared-macos.json`；发布正文的旧校验值不作为这两个 macOS 归档的锁。
 
@@ -397,7 +397,7 @@ Windows 上 TLS 私钥禁用了权限继承，只允许实际运行服务的账�
 Peach 按下面的顺序找 FFmpeg 和 ffprobe：
 
 1. 显式设置的环境变量。
-2. 独立程序目录下的 `tools/ffmpeg/bin`。
+2. Windows 独立程序目录下的 `tools/ffmpeg/bin`，或 macOS 应用的 `Contents/Resources/tools/ffmpeg/bin`。
 3. 数据目录下的 `tools/ffmpeg/bin`。
 4. PATH。
 
@@ -406,9 +406,11 @@ untrunc 按相同顺序查找，对应目录为 `tools/untrunc`。独立程序�
 播放时：
 
 - 浏览器不支持的 AVI、MKV 等格式，Peach 会转成兼容的 MP4 缓存起来再播放，**不会改动原始文件**。第一次播放前会先探测文件，最长 20 秒。
-- 能保留的码流尽量保留：H.264（`yuv420p`／`yuvj420p`）视频不重新编码，AAC 音频直接复制，其他音频转成 AAC。需要重新编码视频时，Windows 优先用 NVIDIA 显卡（`scale_cuda` + NVENC），失败才改用 CPU（`libx264 veryfast`）；macOS 直接用 CPU。
+- 能保留的码流尽量保留：H.264（`yuv420p`／`yuvj420p`）视频不重新编码，AAC 音频直接复制，其他音频转成 AAC。需要重新编码视频时，自动模式依次尝试硬解加硬编、软解加硬编、全软件；Windows 使用 NVIDIA（`scale_cuda` + NVENC），Linux 使用可用 VAAPI 节点，macOS 使用 VideoToolbox。macOS 硬件编码通过实际合成帧探测，并禁止系统软件编码冒充硬件；H.264 输出采用 6 Mbit/s。AV1 硬解显式使用 FFmpeg 原生 `av1` 解码器，设备不支持时回退 dav1d 软件解码。
 - 同时最多进行 2 个转码或探测，单次最长 1 小时，关掉播放页会取消对应的任务。
 - 115 和 PikPak 的视频通过 CloudDrive2 挂载的 `B:`、`A:` 播放。能不能播，以在 Peach 里实际打开一个已知视频为准。
+
+「设置 → 媒体库与入库」中的「抽帧加速」与「播放转码加速」分别保存为本机偏好，两者互不影响，均可选择「自动（推荐）」或「仅软件」。抽帧设置控制封面、九宫格与时间轴；扫描、读 NFO 和时长探测不依赖 GPU。播放设置只控制 Peach 服务端的整片与 HLS 转码，浏览器直接播放时自行选择解码方式。保存无需重启，对新任务生效；已生成的有效缓存继续使用，运行中的 FFmpeg 不被强行中断。macOS 抽帧在同一超时预算内尝试 VideoToolbox，失败后回退软件；视频编码格式探测按文件大小和修改时间缓存。偏好通过 `/api/media-processing` 的 GET/POST 读写，`preview_acceleration` 和 `playback_acceleration` 分别接受 `auto/software`；省略的字段保持现值。`PEACH_TRANSCODE_BACKEND` 可用于管理员诊断，支持 `auto/software/nvenc/vaapi/videotoolbox`，显式 `software` 会保持禁用硬件。
 
 ## 文件整理
 
