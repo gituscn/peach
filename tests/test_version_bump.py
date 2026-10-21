@@ -149,6 +149,16 @@ class ReleasePlanTests(unittest.TestCase):
         self.commit("fix(desktop): 固定构建依赖", self.write("uv.lock"))
         self.assertEqual(plan_bump(self.root)["version"], "0.7.15")
 
+    def test_bundled_sidecar_fetch_changes_plan_a_patch(self):
+        self.tag()
+        self.commit('fix(desktop): 获取随包工具', self.write('scripts/fetch_cloudflared.ps1'))
+        self.assertEqual(plan_bump(self.root)['version'], '0.7.15')
+
+    def test_bundled_sidecar_lock_changes_plan_a_patch(self):
+        self.tag()
+        self.commit('fix(desktop): 固定随包工具版本', self.write('scripts/cloudflared-windows.json'))
+        self.assertEqual(plan_bump(self.root)['version'], '0.7.15')
+
     def test_macos_disk_image_changes_plan_a_patch(self):
         self.tag()
         self.commit("fix(macos): 保留镜像资源签名", self.write("scripts/build_macos_standalone.py"))
