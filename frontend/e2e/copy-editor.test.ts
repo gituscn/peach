@@ -14,6 +14,44 @@ describe('原位改字', () => {
   before(async () => { browser = await launch(); });
   after(async () => { await browser?.close(); });
   for (const viewport of VIEWPORTS) {
+    it(`连续行内文字整段编辑、取消与保存失败保留样式（${viewport.name}）`, async () => {
+      const context = await browser.newContext({ viewport });
+      try {
+        const page = await context.newPage();
+        await page.setContent('<meta charset="utf-8"><style>[data-copy-highlight]{pointer-events:none}</style><p id="copy" style="margin:80px 20px">配置保存在 <code>/data</code>，媒体在 <code>/media</code>。</p>');
+        await page.addScriptTag({ content: await readFile(new URL('../src/copy-editor-core.js', import.meta.url), 'utf8') });
+        await page.evaluate(() => {
+          const core = (globalThis as any).PeachCopyEditorCore;
+          core.create({ resolve(node: Text) {
+            const element = node.parentElement!.closest('#copy');
+            if (!element) return null;
+            const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT), nodes = [];
+            for (let part = walker.nextNode(); part; part = walker.nextNode()) nodes.push(part);
+            return { element, nodes };
+          }, save(_edit: unknown, text: string) {
+            if (text === '保存失败') throw Error('临时失败');
+            return {};
+          } });
+        });
+        const box = page.locator('[contenteditable]');
+        await page.locator('#copy code').first().click();
+        assert.equal(await box.innerText(), '配置保存在 /data，媒体在 /media。');
+        await box.fill('取消修改'); await box.press('Escape');
+        assert.equal(await page.locator('#copy code').count(), 2);
+        await page.locator('#copy code').first().click();
+        await box.fill('保存失败'); await box.press('Enter');
+        assert.equal(await page.locator('#copy').innerText(), '配置保存在 /data，媒体在 /media。');
+        assert.equal(await page.locator('#copy code').count(), 2);
+        await page.locator('#copy code').first().click();
+        await box.fill('配置保存在 ，媒体在 /media。'); await box.press('Enter');
+        assert.equal(await page.locator('#copy code').count(), 1);
+        assert.equal(await page.locator('#copy code').innerText(), '/media');
+        await page.locator('#copy code').click();
+        await box.fill(''); await box.press('Enter');
+        assert.equal(await page.locator('#copy').innerText(), '');
+        assert.equal(await page.locator('#copy code').count(), 0);
+      } finally { await context.close(); }
+    });
     it(`切换控件可操作、Alt 改字与清空草稿可保存（${viewport.name}）`, async () => {
       const context = await browser.newContext({ viewport });
       try {

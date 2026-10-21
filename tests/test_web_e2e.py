@@ -228,6 +228,11 @@ class WebE2ESmokeTests(unittest.TestCase):
             if cached is None:
                 raise AssertionError(f"采集来源没有可缓存的主机：{spec['login']}")
             cached.write_bytes(mark)
+        # 浏览器添加页的示例域名与采集来源分别取站标。
+        browser_example = link_marks.cached_path(mark_root, 'https://missav.com/')
+        if browser_example is None:
+            raise AssertionError('浏览器示例域名没有可缓存的主机')
+        browser_example.write_bytes(mark)
         icon_root = generated / follow_assets.ROOT_NAME
         for provider in follow_assets.SOURCE_ICON_URLS:
             cached = follow_assets.cache_path(icon_root, "icons", provider)
