@@ -57,7 +57,13 @@ Windows 原生 Runner 在深目录中检出项目时，需为 Git 启用 `core.l
 
 Linux 发布任务使用官方 uv Python 3.14 容器，并在获取制品工具前核对解释器版本；源码归档使用 `tarfile` 的 `data` 过滤器解压。CI 的 `.npm/` 与 `.uv-cache/` 属于生成缓存，不计入源码工作区变化。
 
+媒体工具源码可通过 `PEACH_SOURCE_CACHE_BASE` 指定 HTTPS 缓存入口，按 `<SHA-256>/<归档名>` 定位文件。标签流水线使用发布桶的 `_sources/` 前缀；维护者填充缓存前须核对锁文件的原始 SHA-256，缓存同样计入桶容量预算。下载缓存失败时尝试锁定的上游地址；任一来源的哈希不符立即拒绝，不能放宽清单。未配置缓存的对应源码包直接使用上游。
+
 可选的 `r2` 后端使用独立 Standard 桶与 HTTPS 自定义域名。`PEACH_R2_ACCESS_KEY_ID`、`PEACH_R2_SECRET_ACCESS_KEY`、`PEACH_R2_ENDPOINT` 放入受保护且隐藏的 CI 变量，环境作用域为 `release`；`PEACH_R2_BUCKET` 和 `PEACH_R2_PUBLIC_BASE` 指定发布目标。S3 传输复用 rclone，版本文件禁止覆盖；每份文件必须从公开入口完整下载并核对大小及 SHA-256 后，才更新公开版本索引和 Release 链接。
+
+GitLab 标签流水线通过 R2 暂存传递媒体工具、Windows 发行目录与 macOS 镜像，job artifacts 只保存 JSON 清单。中转需要上述 R2 变量；构建与验收任务使用 `release` 环境的 `prepare` 或 `verify` 动作，仅受保护标签能够取得凭据，普通分支回归不使用这些变量。构建期 rclone 按当前操作系统和 CPU 架构从官方固定版本归档安装并核对 SHA-256。
+
+暂存对象位于 `_ci/<项目 ID>/<流水线 ID>/<提交 SHA>/<产物组>/<作业 ID>/`，纳入同一桶的容量预算。每次重试使用自己的作业 ID，构建时间等元数据变化不会覆盖其他尝试的文件。下载任务先核对清单的版本、提交和流水线身份，再校验每份文件的大小与 SHA-256；产物路径限定在对应构建输出目录，不接收软链接或路径穿越。macOS 仅上传两种架构的 DMG、`build-info.json` 与 `SHA256SUMS.txt`，不传递展开应用。所有构建与独立制品验收成功后，发布任务才写入正式版本目录和公开版本索引；GitLab Release 创建成功后，只回收当前流水线的暂存前缀。失败流水线保留暂存以便排障和重试，不覆盖已有公开版本。
 
 Windows 轻量安装器缺少本地工具包时，先从 R2 下载当前版本的工具；连接失败或内容校验失败时，尝试 GitHub 的同版本文件。两个来源均须匹配安装器内置清单的大小与 SHA-256，不能混用其他版本。发布完成后，用 `scripts/smoke_split_update.py` 的 `--prepare-with-app --online` 在空缓存中运行实际制品，核对联网取得的工具能否重建完整程序。GitLab Release 的下载表指向当前后端，文档链接指向对应版本标签。
 

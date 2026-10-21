@@ -4695,6 +4695,167 @@ class ScriptingConventionTests(unittest.TestCase):
         self.assertFalse(scripting.host_under("", ("x.com",)))
 
 
+class R2ArtifactTransferTests(unittest.TestCase):
+    def tools(self, root):
+        path = root / "build/release-tools" / ("rclone.exe" if os.name == "nt" else "rclone")
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"test double; subprocess calls are mocked")
+
+    def environment(self):
+        return {"CI_PROJECT_ID": "123", "CI_PIPELINE_ID": "456", "CI_COMMIT_SHA": "a" * 40,
+                "CI_COMMIT_TAG": "v1.2.3", "CI_COMMIT_REF_PROTECTED": "true", "CI_JOB_ID": "789"}
+
+    def rclone_environment(self):
+        return {"PEACH_RCLONE": "rclone", "PEACH_R2_BUCKET": "peach-releases"}
+
+    def test_platform_cli_archives_use_native_architecture_and_binary(self):
+        module = load_script("fetch_release_tools")
+        for system, machine, archive, member in (
+                ("Windows", "AMD64", "windows-amd64", "rclone.exe"),
+                ("Darwin", "arm64", "osx-arm64", "rclone"),
+                ("Darwin", "x86_64", "osx-amd64", "rclone"),
+                ("Linux", "x86_64", "linux-amd64", "rclone")):
+            with self.subTest(system=system, machine=machine):
+                tool, = module.tool_specs(rclone_only=True, system=system, machine=machine)
+                self.assertEqual(tool[0], member)
+                self.assertEqual(tool[1], f"rclone-v1.75.2-{archive}.zip")
+                self.assertEqual(tool[4], f"rclone-v1.75.2-{archive}/{member}")
+
+    def test_round_trip_restores_only_verified_files_from_current_pipeline(self):
+        module = load_script("ci_r2_artifacts")
+        objects = {}
+
+        def run(command, **_kwargs):
+            self.assertEqual(command[1], "copy")
+            names = Path(command[command.index("--files-from-raw") + 1]).read_text().splitlines()
+            source, destination = command[2:4]
+            if destination.startswith("peach:"):
+                for name in names:
+                    objects[destination + "/" + name] = (Path(source) / name).read_bytes()
+            else:
+                for name in names:
+                    path = Path(destination) / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(objects[source + "/" + name])
+
+        def read(command, **_kwargs):
+            if command[0] == "git":
+                return "a" * 40 if "rev-parse" in command else ""
+            return json.dumps([{"Path": key.split("peach:peach-releases/", 1)[1], "Size": len(value)}
+                               for key, value in objects.items()])
+
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.dict(os.environ, self.environment(), clear=True), \
+                mock.patch.object(module, "rclone_environment", side_effect=self.rclone_environment), \
+                mock.patch.object(module.subprocess, "check_output", side_effect=read), \
+                mock.patch.object(module.subprocess, "run", side_effect=run):
+            root = Path(temporary).resolve()
+            self.tools(root)
+            (root / "release").mkdir()
+            artifact = root / "release/Peach-1.2.3-windows-x64.zip"
+            artifact.write_bytes(b"verified executable archive")
+            result = module.transfer(root, "windows-release", "push")
+            self.assertEqual(result["files"], 1)
+            manifest_path = root / "build/ci-artifacts/windows-release.json"
+            self.assertLess(manifest_path.stat().st_size, 2000)
+            artifact.unlink()
+            module.transfer(root, "windows-release", "pull")
+            self.assertEqual(artifact.read_bytes(), b"verified executable archive")
+            key, = objects
+            self.assertTrue(key.startswith("peach:peach-releases/_ci/123/456/" + "a" * 40 + "/"))
+            objects[key] = b"corrupted"
+            with self.assertRaisesRegex(ValueError, "SHA-256"):
+                module.transfer(root, "windows-release", "pull")
+            self.assertEqual(artifact.read_bytes(), b"verified executable archive")
+
+    def test_manifest_rejects_other_pipeline_path_traversal_and_duplicates(self):
+        module = load_script("ci_r2_artifacts")
+        with mock.patch.dict(os.environ, self.environment(), clear=True):
+            build = module.identity()
+        item = {"path": "release/version.txt", "size": 5, "sha256": "b" * 64}
+        manifest = {"format": 1, "identity": build, "group": "windows-release", "producer_job": "789", "files": [item]}
+        self.assertEqual(module.validate_manifest(manifest, "windows-release", build), [item])
+        with self.assertRaises(ValueError):
+            module.validate_manifest(manifest, "windows-release", {**build, "pipeline": "789"})
+        with self.assertRaises(ValueError):
+            module.validate_manifest({**manifest, "producer_job": "../other"}, "windows-release", build)
+        self.assertNotEqual(module.prefix(build, "windows-release", "789"),
+                            module.prefix(build, "windows-release", "790"))
+        for name in ("release/../../secrets/token", "release/Peach.exe:token", "release\\version.txt",
+                     "/release/version.txt", "release/private-config.toml", "src/peach/__init__.py"):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                module.validate_manifest({**manifest, "files": [{**item, "path": name}]}, "windows-release", build)
+        with self.assertRaises(ValueError):
+            module.validate_manifest({**manifest, "files": [item, {**item, "path": "release/VERSION.txt"}]},
+                                     "windows-release", build)
+
+    def test_macos_inventory_keeps_signed_images_and_checks_build_identity(self):
+        module = load_script("ci_r2_artifacts")
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.dict(os.environ, self.environment(), clear=True):
+            root = Path(temporary).resolve()
+            for arch in ("arm64", "x86_64"):
+                folder = root / "dist/macos.noindex" / arch
+                folder.mkdir(parents=True)
+                image = folder / f"Peach-1.2.3-macos-{arch}.dmg"
+                image.write_bytes(b"signed application image")
+                (folder / "Peach.app").mkdir()
+                (folder / "Peach.app/app").write_bytes(b"expanded application")
+                (folder / "build-info.json").write_text(json.dumps({"version": "1.2.3", "commit": "a" * 40,
+                                                                    "architecture": arch, "dirty": False}))
+                (folder / "SHA256SUMS.txt").write_text(f"{module.checksum(image)}  {image.name}\n")
+            items = module.inventory(root, "macos-release")
+            self.assertEqual(len(items), 6)
+            self.assertFalse(any(".app/" in item["path"] for item in items))
+            image.write_bytes(b"tampered application")
+            with self.assertRaisesRegex(ValueError, "SHA-256"):
+                module.inventory(root, "macos-release")
+
+    def test_rclone_path_requires_installed_project_tool(self):
+        module = load_script("ci_r2_artifacts")
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.dict(os.environ, {"PEACH_RCLONE": "arbitrary-cli"}):
+            root = Path(temporary).resolve()
+            with self.assertRaisesRegex(ValueError, "项目内"):
+                module.rclone_executable(root)
+            self.tools(root)
+            self.assertTrue(module.rclone_executable(root).startswith(str(root)))
+
+    def test_capacity_failure_prevents_upload_and_manifest_creation(self):
+        module = load_script("ci_r2_artifacts")
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.dict(os.environ, self.environment(), clear=True), \
+                mock.patch.object(module, "rclone_environment", side_effect=self.rclone_environment), \
+                mock.patch.object(module.subprocess, "check_output", side_effect=["a" * 40, "", '[{"Path":"v1.0.0/a.zip","Size":8000000000}]']), \
+                mock.patch.object(module.subprocess, "run") as upload:
+            root = Path(temporary).resolve()
+            self.tools(root)
+            (root / "release").mkdir()
+            (root / "release/version.txt").write_text("1.2.3")
+            with self.assertRaisesRegex(ValueError, "停止上传"):
+                module.transfer(root, "windows-release", "push")
+            upload.assert_not_called()
+            self.assertFalse((root / "build/ci-artifacts/windows-release.json").exists())
+
+    def test_cleanup_requires_published_commit_and_only_purges_own_prefix(self):
+        module = load_script("ci_r2_artifacts")
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.dict(os.environ, self.environment(), clear=True), \
+                mock.patch.object(module, "rclone_environment", side_effect=self.rclone_environment), \
+                mock.patch.object(module.subprocess, "check_output", return_value="[]") as read, \
+                mock.patch.object(module.subprocess, "run") as purge:
+            root = Path(temporary).resolve()
+            self.tools(root)
+            with self.assertRaisesRegex(ValueError, "保留暂存"):
+                module.cleanup(root)
+            purge.assert_not_called()
+            read.return_value = json.dumps([{"tag_name": "v1.2.3", "commit_sha": "a" * 40}])
+            module.cleanup(root)
+            command = purge.call_args.args[0]
+            self.assertEqual(command[1:3], ["purge", "peach:peach-releases/_ci/123/456/" + "a" * 40])
+
+    def test_unprotected_or_incomplete_build_identity_is_rejected(self):
+        module = load_script("ci_r2_artifacts")
+        for patch in ({"CI_COMMIT_REF_PROTECTED": "false"}, {"CI_PIPELINE_ID": "../other"}, {"CI_COMMIT_TAG": "master"}):
+            with mock.patch.dict(os.environ, {**self.environment(), **patch}, clear=True), self.assertRaises(ValueError):
+                module.identity()
+
+
 class R2ReleaseTests(unittest.TestCase):
     def test_publication_preserves_existing_index_and_verifies_published_metadata(self):
         module = load_script("release_r2")

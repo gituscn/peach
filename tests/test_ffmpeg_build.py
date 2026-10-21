@@ -4,10 +4,15 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import tarfile
 import tempfile
+import subprocess
+import sys
 import unittest
+from unittest import mock
+import urllib.error
 import zipfile
 
 
@@ -19,6 +24,72 @@ SPEC.loader.exec_module(builder)
 
 
 class FFmpegSourceBuildTests(unittest.TestCase):
+    def test_source_cache_falls_back_to_pinned_upstream_on_transport_failure(self):
+        import hashlib
+        data = b"pinned source bytes"
+        source = {"name": "ffmpeg", "url": "https://upstream.example/source.tar.xz", "archive": "source.tar.xz",
+                  "sha256": hashlib.sha256(data).hexdigest()}
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.dict(os.environ, {"PEACH_SOURCE_CACHE_BASE": "https://cache.example/_sources"}), \
+                mock.patch.object(builder.urllib.request, "urlopen", side_effect=[
+                    urllib.error.HTTPError("https://cache.example", 404, "missing", {}, None), io.BytesIO(data)]) as opened:
+            archive = Path(temporary).resolve() / "source.tar.xz"
+            builder.obtain_source(source, archive)
+            self.assertEqual(archive.read_bytes(), data)
+            self.assertEqual([call.args[0].full_url for call in opened.call_args_list],
+                             [f"https://cache.example/_sources/{source['sha256']}/source.tar.xz", source["url"]])
+
+    def test_source_cache_hash_mismatch_is_fatal(self):
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.dict(os.environ, {"PEACH_SOURCE_CACHE_BASE": "https://cache.example/_sources"}), \
+                mock.patch.object(builder.urllib.request, "urlopen", return_value=io.BytesIO(b"corrupt")) as opened:
+            archive = Path(temporary).resolve() / "source.tar.xz"
+            with self.assertRaisesRegex(ValueError, "SHA256"):
+                builder.obtain_source({"name": "ffmpeg", "url": "https://upstream.example/source.tar.xz",
+                                       "archive": "source.tar.xz", "sha256": "a" * 64}, archive)
+            self.assertEqual(opened.call_count, 1)
+            self.assertFalse(archive.exists())
+
+    def test_download_retries_transport_failure_and_keeps_only_verified_archive(self):
+        data = b"fixed upstream source"
+        import hashlib
+        source = {"name": "ffmpeg", "url": "https://upstream.example/source.tar.xz",
+                  "sha256": hashlib.sha256(data).hexdigest()}
+        with tempfile.TemporaryDirectory() as temporary:
+            archive = Path(temporary).resolve() / "source.tar.xz"
+            with mock.patch.object(builder.urllib.request, "urlopen", side_effect=[TimeoutError(), io.BytesIO(data)]) as opened, \
+                    mock.patch.object(builder.time, "sleep") as sleep:
+                builder.download_source(source, archive)
+            self.assertEqual(archive.read_bytes(), data)
+            self.assertEqual(opened.call_count, 2)
+            sleep.assert_called_once_with(2)
+            self.assertFalse(archive.with_suffix(".xz.part").exists())
+
+    def test_download_integrity_or_permanent_http_error_is_not_retried(self):
+        for failure in (None, urllib.error.HTTPError("https://upstream.example", 403, "Forbidden", {}, None)):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary:
+                archive = Path(temporary).resolve() / "source.tar.xz"
+                with mock.patch.object(builder.urllib.request, "urlopen", side_effect=failure,
+                                       return_value=io.BytesIO(b"corrupt")) as opened, \
+                        mock.patch.object(builder.time, "sleep") as sleep:
+                    with self.assertRaises((ValueError, urllib.error.HTTPError)):
+                        builder.download_source({"name": "ffmpeg", "url": "https://upstream.example/source.tar.xz",
+                                                 "sha256": "a" * 64}, archive)
+                self.assertEqual(opened.call_count, 1)
+                sleep.assert_not_called()
+                self.assertFalse(archive.exists())
+                self.assertFalse(archive.with_suffix(".xz.part").exists())
+
+    def test_download_stops_after_three_transport_attempts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            archive = Path(temporary).resolve() / "source.tar.xz"
+            with mock.patch.object(builder.urllib.request, "urlopen", side_effect=TimeoutError()) as opened, \
+                    mock.patch.object(builder.time, "sleep") as sleep:
+                with self.assertRaises(TimeoutError):
+                    builder.download_source({"name": "ffmpeg", "url": "https://upstream.example/source.tar.xz",
+                                             "sha256": "a" * 64}, archive)
+            self.assertEqual(opened.call_count, 3)
+            self.assertEqual(sleep.call_args_list, [mock.call(2), mock.call(4)])
+            self.assertFalse(archive.exists())
+
     def test_source_lock_pins_all_linked_external_dependencies(self):
         lock = builder.load_sources()
         self.assertEqual(lock["version"], "9.0.2")
@@ -85,6 +156,12 @@ class FFmpegSourceBuildTests(unittest.TestCase):
                 self.assertTrue({"scripts/build_ffmpeg_windows.sh", "scripts/fetch_ffmpeg_sources.py",
                                  "scripts/ffmpeg-sources.json", "README.md", "buildconf.txt"} <= names)
                 self.assertFalse(any("manifest.json" in name for name in names))
+                independent = output / "independent-source"
+                package.extractall(independent)
+            help_result = subprocess.run([sys.executable, "-S", str(independent / "scripts/fetch_ffmpeg_sources.py"), "--help"],
+                                         cwd=independent, env={**os.environ, "PYTHONPATH": ""},
+                                         capture_output=True, text=True, encoding="utf-8", check=True)
+            self.assertIn("prepare", help_result.stdout)
             stored = json.loads((output / "ffmpeg/manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(stored, manifest)
 

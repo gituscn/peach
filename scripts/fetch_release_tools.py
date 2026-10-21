@@ -1,10 +1,12 @@
 """从官方发行站下载固定版本 CLI，校验 SHA-256 后提取指定二进制。"""
 from __future__ import annotations
 
+import argparse
 import hashlib
 import io
 from pathlib import Path
 import re
+import platform
 import sys
 import tarfile
 from urllib.request import Request, urlopen
@@ -25,9 +27,26 @@ def download(url: str) -> bytes:
         return response.read()
 
 
-def install(destination: Path) -> None:
+def tool_specs(*, rclone_only: bool = False, system: str | None = None,
+               machine: str | None = None) -> tuple:
+    system = system or platform.system()
+    machine = (machine or platform.machine()).lower()
+    arch = {"amd64": "amd64", "x86_64": "amd64", "arm64": "arm64", "aarch64": "arm64"}.get(machine)
+    operating = {"Linux": "linux", "Darwin": "osx", "Windows": "windows"}.get(system)
+    if not arch or not operating or (not rclone_only and system != "Linux"):
+        raise ValueError("此平台仅支持通过 --rclone-only 安装 rclone，且架构须为 amd64 或 arm64")
+    suffix = ".exe" if system == "Windows" else ""
+    stem = f"rclone-v1.75.2-{operating}-{arch}"
+    rclone = ("rclone" + suffix, stem + ".zip", TOOLS[1][2], "SHA256SUMS", stem + "/rclone" + suffix)
+    glab = TOOLS[0]
+    if arch == "arm64":
+        glab = tuple(value.replace("amd64", "arm64") for value in glab)
+    return (rclone,) if rclone_only else (glab, rclone)
+
+
+def install(destination: Path, *, rclone_only: bool = False) -> None:
     destination.mkdir(parents=True, exist_ok=True)
-    for name, archive, base, checksums, member in TOOLS:
+    for name, archive, base, checksums, member in tool_specs(rclone_only=rclone_only):
         document = download(f"{base}/{checksums}").decode("utf-8")
         expected = re.search(rf"^([0-9a-fA-F]{{64}})\s+\*?{re.escape(archive)}$", document, re.MULTILINE)
         content = download(f"{base}/{archive}")
@@ -49,4 +68,7 @@ def install(destination: Path) -> None:
 
 
 if __name__ == "__main__":
-    install(Path("build/release-tools").resolve())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--rclone-only", action="store_true")
+    args = parser.parse_args()
+    install(Path("build/release-tools").resolve(), rclone_only=args.rclone_only)
