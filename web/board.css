@@ -483,11 +483,9 @@ button,input,select,textarea{font-family:inherit}
    缓动跟滑板同一条弹簧：这一列上会动的东西只有一种手感。 */
 .board-theme-thumb{position:absolute;z-index:-1;left:4px;top:4px;width:32px;height:32px;background:var(--ground);border-radius:50%;box-shadow:0 1px 3px light-dark(#0001,#0008);will-change:transform;transition:transform calc(var(--spring-pane-ms) * 1ms) var(--spring-pane)}
 .board-theme-toggle.is-dark .board-theme-thumb{transform:translateX(36px)}
-/* 侧栏收到 60px 时这一列竖着排。`column-reverse` 而不是 `column`：DOM 里明暗键在前，
-   是为了展开态那一横排仍是「明暗在左、配色与设置在右」；竖排时要的顺序正好相反，
-   boardui.com 那一对就是配色在上、明暗在下。配色钮与设置钮都是 36px，左右各留 10px
-   内边距后在 60px 的侧栏里居中，两枚圆心落在同一条竖线上。 */
-@media(min-width:761px){[data-sidebar-drawer]:not(.open) .board-sidebar-foot{flex-direction:column-reverse;padding:12px 10px}[data-sidebar-drawer]:not(.open) .board-foot-actions{flex-direction:column}[data-sidebar-drawer]:not(.open) .board-theme-toggle{padding:2px;background:transparent}[data-sidebar-drawer]:not(.open) .board-theme-toggle button[aria-pressed=true],[data-sidebar-drawer]:not(.open) .board-theme-thumb{display:none}}
+/* 侧栏收到 60px 时按 DOM 顺序竖排。配色钮与设置钮都是 36px，左右各留 10px
+   内边距后在侧栏里居中，两枚圆心落在同一条竖线上。 */
+@media(min-width:761px){[data-sidebar-drawer]:not(.open) .board-sidebar-foot{flex-direction:column;padding:12px 10px}[data-sidebar-drawer]:not(.open) .board-foot-actions{flex-direction:column}[data-sidebar-drawer]:not(.open) .board-theme-toggle{padding:2px;background:transparent}[data-sidebar-drawer]:not(.open) .board-theme-toggle button[aria-pressed=true],[data-sidebar-drawer]:not(.open) .board-theme-thumb{display:none}}
 @media(prefers-reduced-motion:reduce){.board-theme-thumb{transition:none}}
 .board-library-avatar svg{width:20px;height:20px;stroke-width:2}.board-library-avatar{background:none;border-radius:0}
 .metricstrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-flow:row;gap:16px;overflow:visible;border:0;background:none}

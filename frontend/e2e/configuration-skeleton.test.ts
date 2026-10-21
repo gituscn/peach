@@ -136,12 +136,13 @@ describe('配置页等待态', () => {
           }, dark);
           const colors = await nav.evaluate(node => {
             const selected = getComputedStyle(node.querySelector('[aria-selected=true]')!);
+            const selection = getComputedStyle(node.querySelector('[data-pill-thumb]')!);
             const inactive = getComputedStyle(node.querySelector('[aria-selected=false]')!);
             return {
               surface: getComputedStyle(node).backgroundColor,
-              selected: selected.backgroundColor,
+              selected: selection.backgroundColor,
               border: selected.borderWidth,
-              radius: selected.borderRadius,
+              radius: selection.borderRadius,
               text: selected.color,
               inactive: inactive.color,
               inactiveBackground: inactive.backgroundColor,

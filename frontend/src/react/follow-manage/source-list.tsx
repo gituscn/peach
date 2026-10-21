@@ -148,7 +148,7 @@ function SourceRow(
      窄屏固定两行：上一行勾选、名字、站标与状态，下一行上次检查、开关与两枚动作键。 */
   return (
     <div data-selected={selected || undefined} data-follow-source-row=""
-      className="flex min-h-16 flex-wrap items-center gap-3 px-2 py-3 max-sm:gap-x-2"
+      className="flex min-h-16 flex-wrap items-center gap-3 px-2 py-3 last:rounded-b-lg max-sm:gap-x-2"
       onClick={(event) => { if (clickedBlank(event, event.currentTarget)) onToggle(!selected) }}>
       <span data-follow-leading-site="" className="flex shrink-0 items-center gap-2">
         <SourceIcon provider={source.provider} />
@@ -162,7 +162,7 @@ function SourceRow(
       {/* 行首显示站点图标，站名同时供读屏使用。 */}
       <VisuallyHidden>{source.provider_label}</VisuallyHidden>
       <StatusBadge source={source} />
-      <span data-follow-source-controls="" className="contents max-sm:flex max-sm:w-full max-sm:flex-wrap max-sm:items-center max-sm:gap-1.5">
+      <span data-follow-source-controls="" className="flex w-max max-w-full flex-none flex-wrap items-center gap-1.5 max-sm:w-full">
         <span className="shrink-0 text-body-2-regular whitespace-nowrap text-text-secondary max-sm:mr-auto max-sm:text-caption-1-regular">
           {checkedText(source)}
         </span>
@@ -208,11 +208,11 @@ function AuthorCard(
         className="flex flex-wrap items-center gap-3 px-2 py-2.5">
         <AuthorAvatar group={group} name={name} />
         <b className="min-w-0 grow text-body-medium wrap-anywhere text-text-primary max-sm:basis-0">{name}</b>
+        <span data-follow-author-controls="" className="flex w-max max-w-full flex-none flex-wrap items-center gap-2 max-sm:w-full">
         <Button variant="secondary" size="small" iconOnly leadingIcon={RiRefreshLine}
           aria-label={`检查 ${name} 的全部来源`} disabled={!enabled.length || handlers.readOnly}
           {...busyProps(handlers.busy)} onClick={() => handlers.check(enabled)} />
-        {/* 窄屏固定两行：上一行头像、名字与检查键，下一行站标、失败数与全选、收起。 */}
-        <span data-follow-author-controls="" className="contents max-sm:flex max-sm:w-full max-sm:items-center max-sm:gap-2">
+        {/* 站标与操作键整体排列，窄屏在头像与名字下方占一行。 */}
           <span className="flex shrink-0 items-center gap-1 max-sm:mr-auto max-sm:min-w-0 max-sm:shrink max-sm:flex-wrap" title={providers}>
             {group.map((source) => <SourceIcon key={source.id} provider={source.provider} />)}
             {/* 只读屏用的文字走 `VisuallyHidden`：它把样式写在元素上，不会生成一个和旧
@@ -222,6 +222,7 @@ function AuthorCard(
           {bad
             ? <span className="shrink-0 text-body-2-regular text-text-error-primary">{`${bad} 个失败`}</span>
             : null}
+          <span className="flex flex-none items-center gap-2">
           <Button variant="secondary" size="small" leadingIcon={RiCheckDoubleLine}
             aria-pressed={state.all ? 'true' : state.some ? 'mixed' : 'false'}
             aria-label={`${state.all ? '取消全选' : '全选'} ${name} 的来源`}
@@ -230,6 +231,7 @@ function AuthorCard(
             leadingIcon={CollapseChevron}
             aria-label={`${open ? '收起' : '展开'} ${name} 的来源`}
             onClick={() => onOpen(!open)}>{open ? '收起' : '展开'}</Button>
+          </span>
         </span>
       </div>
       <CollapseRegion id={panel} open={open} data-source-divider>
@@ -517,21 +519,21 @@ export function SourceList(props: SourceListProps) {
       padding: 'none',
       className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4',
     })}>
-      {/* 放不下时带字的按钮先收成图标，再让整行换行。收起后名字由 `aria-label` 接着说。
-          窄屏固定两行：上一行标题、读数与检查全部，下一行版式、排序与全部收起。 */}
-      <div ref={toolbar} data-follow-toolbar="" className="flex flex-wrap items-center gap-2">
-        <span className="contents max-sm:flex max-sm:min-w-0 max-sm:flex-1 max-sm:flex-col">
-          <h3 className="mr-auto text-title-2-medium text-text-primary">关注列表</h3>
+      {/* 操作区作为一组换行；独占一行仍放不下时，组内控件继续按顺序换行。 */}
+      <div ref={toolbar} data-follow-toolbar="" data-responsive-toolbar="">
+        <span data-follow-toolbar-heading="" data-toolbar-heading="">
+          <h3 className="text-title-2-medium text-text-primary">关注列表</h3>
           <span className="text-body-2-regular text-text-secondary">
             {`${sources.length.toLocaleString()} 个来源${counts.new ? ` · ${count(counts.new)} 条未看` : ''}`}
           </span>
         </span>
+        <div data-follow-toolbar-actions="" data-toolbar-actions="">
         <Button variant="primary" leadingIcon={RiRefreshLine} disabled={readOnly}
           aria-label="检查全部" iconOnly={compact}
           {...busyProps(rowHandlers.busy)} onClick={() => startChecking([])}>检查全部</Button>
         {failedSourceIds.length ? <Button variant="secondary" disabled={readOnly}
           {...busyProps(rowHandlers.busy)} onClick={() => startChecking(failedSourceIds)}>检查失败项</Button> : null}
-        <span data-follow-toolbar-controls="" className="contents max-sm:flex max-sm:w-full max-sm:flex-wrap max-sm:items-center max-sm:gap-2">
+        <span data-follow-toolbar-controls="" className="contents">
           <span data-button-group role="group" aria-label="关注列表版式">
             <Button variant="ghost" iconOnly
               leadingIcon={RiLayoutGridLine} aria-label={LAYOUTS[0][1]} aria-pressed={!asTable}
@@ -541,6 +543,7 @@ export function SourceList(props: SourceListProps) {
               onClick={() => onLayout('table')} />
           </span>
           {asTable ? <TableColumnControls preferences={preferences} label="关注来源" /> : null}
+          <span className="flex flex-none items-center gap-2">
           <Select aria-label="关注列表排序" selectedKey={sort}
             onSelectionChange={(key) => {
               if (key === null) return;
@@ -554,6 +557,7 @@ export function SourceList(props: SourceListProps) {
             leadingIcon={SortDirectionIcon} data-icon-state={dir === 'asc' ? 'a' : 'b'}
             aria-label={sortLabel(sort, dir)}
             onClick={() => onSort(sort, dir === 'asc' ? 'desc' : 'asc')} />
+          </span>
           {asTable ? null : (
             <Button variant="secondary" iconOnly={compact}
               leadingIcon={CollapseChevron} aria-expanded={!allCollapsed}
@@ -565,6 +569,7 @@ export function SourceList(props: SourceListProps) {
             </Button>
           )}
         </span>
+        </div>
       </div>
 
       {/* 这一趟在后台跑，关掉页面还在继续，所以状态留在页面上而不是只让按钮转一下。 */}

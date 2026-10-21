@@ -1039,8 +1039,15 @@ describe('设计决定：人物与厂牌资料页', () => {
             document.documentElement.classList.toggle('dark', value === 'dark');
           }, theme);
           await tabs.getByRole('tab', { name: 'JAV 订阅源', exact: true }).click();
+          await page.waitForFunction(() => {
+            const host = document.querySelector('[role="tablist"][aria-label="关注管理区域"]')!;
+            const selected = host.querySelector('[aria-selected=true]')!.getBoundingClientRect();
+            const surface = host.querySelector('[data-pill-thumb]')?.getBoundingClientRect();
+            return surface && Math.abs(selected.left - surface.left) <= 1
+              && Math.abs(selected.width - surface.width) <= 1;
+          });
           const face = await tabs.evaluate((element) => {
-            const selected = element.querySelector('[aria-selected=true]')!;
+            const selected = element.querySelector('[data-pill-thumb]')!;
             return { track: getComputedStyle(element).backgroundColor,
               selected: getComputedStyle(selected).backgroundColor,
               shadow: getComputedStyle(selected).boxShadow };

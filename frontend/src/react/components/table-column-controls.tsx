@@ -10,7 +10,7 @@ export function TableColumnControls({ preferences, label = '表格' }: { prefere
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const columns = preferences.columns.filter(column => !column.required);
-  return <div role="group" aria-label={`${label}列设置`} className="flex flex-wrap gap-2">
+  return <div role="group" aria-label={`${label}列设置`} className="flex flex-none gap-2">
     <Button ref={trigger} variant="secondary" size="medium" aria-haspopup="dialog" aria-expanded={open}
       onClick={() => setOpen(true)}>显示列</Button>
     <Popover triggerRef={trigger} isOpen={open} onOpenChange={setOpen} placement="bottom end" offset={4}

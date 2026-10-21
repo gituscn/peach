@@ -147,11 +147,13 @@ describe('换手', () => {
     expect(r.managedEntry(host.root)?.path).toBe('manage-header');
     expect(host.root.childNodes.length, '骨架清掉了，首帧没有 props、画成空').toBe(0);
 
-    act(() => { api!.render(first) });
+    await act(async () => { api!.render(first) });
     const shape = (node: ParentNode) => [...node.querySelectorAll('*')]
+      .filter(el => !el.hasAttribute('data-pill-thumb'))
       .map((el) => [el.tagName, ...[...el.attributes].map((a) => a.name).filter((name) => name.startsWith('data-') || name.startsWith('aria-')).sort()].join(' '))
       .filter((line) => !line.startsWith('USE'));
     expect(shape(host.root)).toEqual(shape(skeleton));
+    expect(host.root.querySelector('[data-pill-thumb]')).not.toBeNull();
     expect(title(host.root)).toBe('垃圾文件');
   });
 
@@ -236,7 +238,10 @@ describe('管理条与面包屑', () => {
     const { root, render } = await setup(first);
     const pressed = () => [...root.querySelectorAll('[data-manage][aria-pressed="true"]')].map((node) => node.getAttribute('data-manage'));
     expect(pressed()).toEqual(['cleanup']);
-    expect(manageHeaderSkeletonHtml(first)).toContain('data-manage="cleanup" aria-pressed="true"');
+    const skeleton = document.createElement('div');
+    skeleton.innerHTML = manageHeaderSkeletonHtml(first);
+    expect([...skeleton.querySelectorAll('[data-manage][aria-pressed="true"]')]
+      .map((node) => node.getAttribute('data-manage'))).toEqual(pressed());
     render(props('cleanup', '/quality-goals'));
     expect(pressed()).toEqual(['cleanup']);
     render(props('stats', '/stats'));

@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import time
 from pathlib import Path
 from .processing_control import checkpoint, ffmpeg_options
 
@@ -40,7 +41,8 @@ COLOR_METADATA_ERROR = re.compile(
 
 def capture_frame(ffmpeg: str, path: str, timestamp: float, destination: Path, *,
                   width: int = 480, color_override: bool = False,
-                  timeout: float = 45, diagnostics: dict | None = None) -> tuple[bool, str]:
+                  timeout: float = 45, diagnostics: dict | None = None,
+                  input_options: tuple[str, ...] = ()) -> tuple[bool, str]:
     """抽一帧，返回（是否成功, stderr）。stderr 用于判断值不值得重试。
 
     `-ss` 在 `-i` 之前：那是输入端 seek，只解目标附近的帧。放到后面就是从头解码到
@@ -53,6 +55,7 @@ def capture_frame(ffmpeg: str, path: str, timestamp: float, destination: Path, *
     command += ffmpeg_options(filter_option='-filter_threads')
     if color_override:
         command += COLOR_OVERRIDE
+    command += input_options
     command += [
         "-ss", f"{timestamp:.2f}", "-i", path, "-frames:v", "1",
         "-vf", f"scale={int(width)}:-1", "-q:v", "4",
@@ -84,16 +87,26 @@ def capture_with_retry(ffmpeg: str, path: str, timestamp: float, destination: Pa
                        *, width: int = 480, timeout: float = 45,
                        diagnostics: dict | None = None) -> bool:
     """抽一帧；只在错误明说色彩元数据不合法时，带 bt709 声明重试一次。"""
-    attempts = []
-    detail = {}
-    ok, stderr = capture_frame(ffmpeg, path, timestamp, destination,
-                               width=width, timeout=timeout, diagnostics=detail)
-    attempts.append(dict(detail, color_override=False))
-    if not ok and COLOR_METADATA_ERROR.search(stderr):
+    from .hardware_transcode import frame_decode_options
+    deadline = time.monotonic() + timeout
+    hardware = frame_decode_options(ffmpeg, path)
+    attempts, detail, ok = [], {}, False
+    for options in ((hardware, ()) if hardware else ((),)):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
         detail = {}
-        ok, _ = capture_frame(ffmpeg, path, timestamp, destination,
-                              width=width, color_override=True, timeout=timeout, diagnostics=detail)
-        attempts.append(dict(detail, color_override=True))
+        ok, stderr = capture_frame(ffmpeg, path, timestamp, destination, width=width,
+                                   timeout=min(10, remaining) if options else remaining,
+                                   diagnostics=detail, input_options=options)
+        attempts.append(dict(detail, color_override=False, hardware_decode=bool(options)))
+        if not ok and COLOR_METADATA_ERROR.search(stderr) and deadline > time.monotonic():
+            detail = {}
+            ok, _ = capture_frame(ffmpeg, path, timestamp, destination, width=width, color_override=True,
+                                  timeout=deadline - time.monotonic(), diagnostics=detail, input_options=options)
+            attempts.append(dict(detail, color_override=True, hardware_decode=bool(options)))
+        if ok:
+            break
     if diagnostics is not None:
         diagnostics.update(detail, timestamp_seconds=timestamp, timeout_seconds=timeout,
                            attempts=attempts)

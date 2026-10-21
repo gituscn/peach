@@ -98,9 +98,9 @@ function originHost(url: string): string {
 
 /** 启用状态与已取得的拉取结果共同决定当前标签。 */
 function StatusChip({ source }: { source: FeedSource }) {
-  if (!source.enabled) return <Chip variant="caption" color="neutral">已暂停</Chip>;
+  if (!source.enabled) return <Chip variant="caption" color="gray">已暂停</Chip>;
   if (source.last_error) return <Chip variant="caption" color="rose">拉取失败</Chip>;
-  if (!source.last_fetched_at) return <Chip variant="caption" color="neutral">未检查</Chip>;
+  if (!source.last_fetched_at) return <Chip variant="caption" color="gray">未检查</Chip>;
   return <Chip variant="caption" color="lime">正常</Chip>;
 }
 
@@ -363,13 +363,17 @@ export function FeedSources({ readOnly, toast }: {
       <AddFeed readOnly={readOnly} toast={toast} onAdded={() => void reload()} />
       <section aria-label="JAV 订阅列表"
         className={cardClass({ padding: 'none', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })}>
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="mr-auto text-title-2-medium text-text-primary">JAV 订阅源</h3>
+      <div data-responsive-toolbar="">
+        <div data-toolbar-heading="">
+        <h3 className="text-title-2-medium text-text-primary">JAV 订阅源</h3>
         <span className="text-body-2-regular text-text-secondary">{`${sources.length.toLocaleString()} 个订阅源 · ${(Number(data.unread) || 0).toLocaleString()} 条未看`}</span>
+        </div>
+        <div data-toolbar-actions="">
         <Button onClick={check} disabled={readOnly} {...busyProps(action.busy === 'check')}>立即拉取</Button>
         <TableColumnControls preferences={preferences} label="JAV 订阅源" />
         <DataTableSort label="JAV 订阅源" sorting={sorting} onChange={(next) => { setSorting(next); setPage(1); }}
           options={['name', 'kind', 'origin', 'status', 'interval', 'fetched', 'fresh'].map((id) => ({ id, label: COLUMN_LABELS[id]! }))} />
+        </div>
       </div>
 
       {failing.length || action.error ? (

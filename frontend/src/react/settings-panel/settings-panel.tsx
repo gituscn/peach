@@ -244,9 +244,10 @@ function SettingsNav({ tab, epoch, configurable, openConfiguration, onSelect }: 
   );
 }
 
-function Group({ index, tab, children }: { index: number; tab: number; children: ReactNode }) {
+function Group({ index, tab, children, cards = false }: { index: number; tab: number; children: ReactNode; cards?: boolean }) {
   return (
-    <section data-setting-group="" id={groupId(index)} role="tabpanel" aria-labelledby={tabId(index)} hidden={index !== tab}>
+    <section data-setting-group="" data-setting-layout={cards ? 'cards' : undefined}
+      id={groupId(index)} role="tabpanel" aria-labelledby={tabId(index)} hidden={index !== tab}>
       <h3>{SECTIONS[index][0]}</h3>
       {children}
     </section>
@@ -337,7 +338,8 @@ function SettingsPanel({ host: current, view: shown }: { host: SettingsPanelHost
         <SettingsNav tab={shown.tab} epoch={epoch} configurable={shown.configurable} onSelect={select}
           openConfiguration={() => { close(false); current.openConfiguration() }} />
         <div data-settings-scroll="" ref={scroll}>
-          <Group index={0} tab={shown.tab}>
+          <Group index={0} tab={shown.tab} cards>
+            <div data-setting-card="">
             <Row title="主题">
               <IconSwitch id="themeSetting" name="theme" legend="主题" options={current.themeOptions} value={settings.theme}
                 attr="data-theme-choice" variant="themeswitch" epoch={epoch}
@@ -352,10 +354,13 @@ function SettingsPanel({ host: current, view: shown }: { host: SettingsPanelHost
               onToggle={(on) => { settings.uiSounds = on; save(); current.changed('uiSounds') }} />
             <ToggleRow id="homeGlowSetting" title="侧栏光晕" checked={settings.homeGlow.on}
               onToggle={(on) => { settings.homeGlow.on = on; save(); current.changed('glow') }} />
+            </div>
             <GlowSettings host={current} />
-            <section data-sidebar-setting="" aria-labelledby="sidebarOrderTitle">
-              <span><b id="sidebarOrderTitle">导航入口与顺序</b></span>
-              <SidebarOrder host={current} />
+            <section data-setting-block="" aria-labelledby="sidebarOrderTitle">
+              <h4 data-settings-subheading="" id="sidebarOrderTitle">导航入口与顺序</h4>
+              <div data-setting-card="">
+                <section data-sidebar-setting=""><SidebarOrder host={current} /></section>
+              </div>
             </section>
           </Group>
           <BrowseGroup host={current} tab={shown.tab} epoch={epoch} />

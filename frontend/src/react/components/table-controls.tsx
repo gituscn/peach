@@ -9,7 +9,7 @@ export function DataTableSort({ label, options, sorting, onChange }: {
   onChange(next: SortingState): void;
 }) {
   const current = sorting[0];
-  return <span className="flex items-center gap-2">
+  return <span className="flex flex-none items-center gap-2">
     <Select aria-label={`${label}排序`} selectedKey={current?.id ?? 'default'}
       onSelectionChange={(key) => {
         if (key !== null) onChange(key === 'default' ? [] : [{ id: String(key), desc: current?.desc ?? false }]);
@@ -35,14 +35,16 @@ export function DataTableFooter({ label, total, pagination, onChange, unit = '�
   const start = total ? pageIndex * pagination.pageSize + 1 : 0;
   const end = Math.min((pageIndex + 1) * pagination.pageSize, total);
   return <div data-table-pagination className="flex flex-wrap items-center justify-between gap-3">
-    <span className="text-body-2-regular tabular-nums text-text-secondary">
+    <span className="mr-auto text-body-2-regular tabular-nums text-text-secondary">
       {`${start.toLocaleString()}–${end.toLocaleString()} / ${total.toLocaleString()} ${unit}`}
     </span>
+    <div data-toolbar-actions="">
     <Select aria-label="每页显示数量" size="sm" selectedKey={String(pagination.pageSize)}
       onSelectionChange={(key) => { if (key !== null) onChange({ pageIndex: 0, pageSize: Number(key) }); }}>
       {[10, 20, 50, 100].map((size) => <SelectItem key={size} id={String(size)}>{`每页 ${size} ${pageUnit}`}</SelectItem>)}
     </Select>
     <Pagination label={`${label}分页`} page={pageIndex + 1} pages={pages}
       onPage={(page) => onChange({ ...pagination, pageIndex: page - 1 })} />
+    </div>
   </div>;
 }

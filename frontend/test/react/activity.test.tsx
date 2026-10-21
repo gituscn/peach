@@ -92,6 +92,7 @@ it('追更检查的问题详情绑定任务快照并提供来源入口', async (
   const host = await mount(page());
   expect(host.querySelector('[data-task-issues]')?.textContent).toContain('示例作者 · 示例站点 · 检查失败');
   expect(host.querySelector('[data-task-issues]')?.textContent).toContain('HTTP 403');
+  expect(host.querySelector('[data-task-issues]')?.closest('details')?.open).toBe(false);
   expect(host.querySelector('a[href="/subscriptions"]')?.textContent).toContain('查看关注来源');
 });
 
@@ -230,14 +231,14 @@ it('完成的任务明细默认收起，展开和收起不丢失后继结果', a
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
 });
 
-it('进行中和失败的后继明细默认展开', async () => {
+it('进行中的后继明细默认展开，失败的后继明细默认收起', async () => {
   for (const status of ['running', 'failed']) {
     queryClient.clear();
     const parent = run({ id: 4, status: 'succeeded', finished_at: '2026-09-11T10:03:00Z' });
     const child = followup(parent.id, { status });
     const { host } = await open(payload({ finished: [parent, child] }));
-    expect(host.querySelector('details')?.open).toBe(true);
-    expect(host.querySelector('summary')?.getAttribute('aria-expanded')).toBe('true');
+    expect(host.querySelector('details')?.open).toBe(status === 'running');
+    expect(host.querySelector('summary')?.getAttribute('aria-expanded')).toBe(String(status === 'running'));
   }
 });
 
@@ -490,6 +491,7 @@ it('报错摘要平时只露一行，「查看详情」展开全文、再点收�
   expect(host.textContent).toBe('坏了查看详情');
   await click(buttonNamed('查看详情', host));
   expect(host.textContent).toContain('File "x.py", line 1');
+  expect(host.querySelector('[data-error-details] [role="region"]')?.getAttribute('aria-label')).toBe('完整错误详情');
   expect(buttonNamed('收起详情', host)?.getAttribute('aria-expanded')).toBe('true');
   await click(buttonNamed('收起详情', host));
   expect(host.textContent).toBe('坏了查看详情');

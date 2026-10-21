@@ -58,9 +58,9 @@ export function AuthorAvatar({ group, name }: { group: FollowSource[]; name: str
 
 /** 状态徽章。三档颜色对应三件事：要处理的、正常的、还没有结论的。 */
 export function StatusBadge({ source }: { source: FollowSource }) {
-  const color = !source.enabled || source.history_exhausted ? 'neutral' : isBroken(source) ? 'rose'
+  const color = !source.enabled || source.history_exhausted ? 'gray' : isBroken(source) ? 'rose'
     : source.enabled && source.last_status === 'ok' ? 'lime'
-    : source.enabled ? 'yellow' : 'neutral';
+    : source.enabled ? 'yellow' : 'gray';
   return <Chip variant="caption" color={color}>{statusText(source)}</Chip>;
 }
 
@@ -98,7 +98,7 @@ export function ErrorLine({ text, prefix = '', tone = 'error' }: { text: string;
         {prefix}{open ? text : head}
       </small>
       {more ? (
-        <Button variant="ghost" size="xs" data-error-line-toggle="" aria-expanded={open} className="-ml-2"
+        <Button variant="ghost" size="xs" data-error-line-toggle="" data-error-details-toggle="" aria-expanded={open} className="-ml-2"
           onClick={() => setOpen(!open)}>
           {open ? '收起详情' : '查看详情'}
         </Button>

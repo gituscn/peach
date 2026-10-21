@@ -12,8 +12,9 @@ describe('任务页云下载布局', () => {
       await page.route('**/api/tasks*', route => route.fulfill({ json: {
         available: true, running: [], skipped: [], finished: [{ id: 4038, task_key: 'follow-check',
           task_label: '追更检查', trigger: 'scheduled', status: 'succeeded',
-          finished_at: '2026-10-20T00:00:00Z', result_summary: { source_failed: 1,
-            issues: [{ source: 12, label: '示例作者', provider: '示例站点', kind: '检查失败', error: 'HTTP 403：站点拒绝访问' }] },
+          finished_at: '2026-10-20T00:00:00Z', result_summary: { source_failed: 51,
+            issues: Array.from({ length: 51 }, (_, index) => ({ source: 12 + index, label: `示例作者 ${index + 1}`,
+              provider: '示例站点', kind: '检查失败', error: 'HTTP 403：站点拒绝访问' })) },
           error: '', parent_run_id: null, followup_key: '',
         }],
       } }));
@@ -21,8 +22,24 @@ describe('任务页云下载布局', () => {
     try {
       const card = opened.page.locator('[data-run-id="4038"]');
       await card.getByText('发现问题', { exact: true }).waitFor();
+      const disclosure = card.locator('summary').filter({ hasText: '问题详情 · 51 项' });
+      assert.equal(await disclosure.getAttribute('aria-expanded'), 'false');
+      assert.equal(await card.locator('[data-task-issues]').isVisible(), false);
+      await disclosure.click();
+      const errors = card.getByRole('region', { name: '任务问题详情' });
+      await errors.waitFor();
+      const geometry = await errors.evaluate((node) => ({ height: node.getBoundingClientRect().height,
+        scrollable: node.scrollHeight > node.clientHeight, overlay: node.getAttribute('data-overlay-scrollbar') }));
+      assert.ok(geometry.height > 0 && geometry.height <= 320, JSON.stringify(geometry));
+      assert.equal(geometry.scrollable, true);
+      assert.equal(geometry.overlay, 'true');
+      await card.locator('summary').filter({ hasText: '技术详情' }).click();
+      const background = await card.locator('[data-code-block]').first().evaluate((node) => getComputedStyle(node).backgroundColor);
+      assert.equal(await errors.evaluate((node) => getComputedStyle(node.parentElement!).backgroundColor), background);
       assert.match(await card.locator('[data-task-issues]').innerText(), /示例作者.*示例站点.*检查失败/s);
       assert.match(await card.locator('[data-task-issues]').innerText(), /HTTP 403：站点拒绝访问/);
+      assert.equal(await card.getByText('示例作者 1 · 示例站点 · 检查失败', { exact: true })
+        .evaluate((node) => getComputedStyle(node).fontWeight), '400');
       const link = card.getByRole('link', { name: '查看关注来源', exact: true });
       assert.equal(await link.getAttribute('href'), '/subscriptions');
       await link.click();

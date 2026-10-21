@@ -14,6 +14,13 @@ class BinaryChoice:
     source: str
 
 
+def bundled_tools_root() -> Path:
+    executable = Path(sys.executable).resolve()
+    if sys.platform == "darwin" and executable.parent.name == "MacOS":
+        return executable.parent.parent / "Resources/tools"
+    return executable.parent / "tools"
+
+
 def binary_diagnostics(choice: BinaryChoice | None, *, decoders=False) -> dict:
     """检查实际工具版本与 AV1 软件解码器；路径存在和可执行分别报告。"""
     facts = {'available': choice is not None, 'source': choice.source if choice else None,
@@ -62,7 +69,7 @@ class FFmpegResolver:
                 return BinaryChoice(path.resolve(), "environment")
 
         if getattr(sys, "frozen", False):
-            bundled = Path(sys.executable).parent / "tools" / "ffmpeg" / "bin" / f"{executable}{suffix}"
+            bundled = bundled_tools_root() / "ffmpeg" / "bin" / f"{executable}{suffix}"
             if bundled.is_file():
                 return BinaryChoice(bundled.resolve(), "peach-bundled")
 

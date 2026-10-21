@@ -13,6 +13,7 @@ import { avatarInner } from '@peach/card-art';
 
 import { apiGet, apiSend } from '../../api';
 import { TabCount } from '../components/board-tabs';
+import { PillTabList } from '../components/pill-tabs';
 import {
   menuModel, shufflePicks, SUGGEST_DEBOUNCE, SUGGEST_EACH, SUGGEST_ONE_KIND, SUGGEST_PROFILE_KINDS, fold,
   type MenuModel, type MenuSection, type SearchApi, type SearchOption, type SearchProps, type SuggestCard,
@@ -362,16 +363,17 @@ function Tabs({ tabs, kind, onPick, wire }: {
   useLayoutEffect(() => { wire(row.current) }, [wire, tabs]);
   const tab = (k: string, label: string, total?: number) => (
     <button key={k || 'all'} type="button" role="tab" data-suggest-kind={k} aria-selected={kind === k}
+      data-pill-selected={kind === k ? '' : undefined} data-pill-variant="gray"
       // 页签选择保留输入焦点，便于继续输入与使用方向键。
       onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(k)}>
       {label}{total ? <TabCount value={total} /> : null}
     </button>
   );
   return (
-    <div ref={row} data-search-tabs="" role="tablist" aria-label="按种类看补全">
+    <PillTabList ref={row} data-search-tabs="" data-pill-nav="" role="tablist" aria-label="按种类看补全">
       {tab('', '全部')}
       {tabs.map((t) => tab(t.kind, t.label, t.total))}
-    </div>
+    </PillTabList>
   );
 }
 

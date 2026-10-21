@@ -102,13 +102,12 @@ if(cameFromSetup){
 }
 {
   const clean=new URL(location.href),flag=clean.searchParams.get('agentation');
-  if(flag==='on')localStorage.setItem('peach.agentation','on');
-  if(flag==='off')localStorage.removeItem('peach.agentation');
+  localStorage.removeItem('peach.agentation');
   if(flag!==null){
     clean.searchParams.delete('agentation');
     shellNavigate(clean,{replace:true,state:peachHistory.navigation.location.state});
   }
-  if(localStorage.getItem('peach.agentation')==='on')import('/dev/agentation.js').catch(()=>{});
+  if(flag==='on')import('/dev/agentation.js').catch(()=>{});
 }
 tutorialState.postSetupTutorialTasks = async()=>{
   const {library,scraping,taste,follow,credentials,review}=await api('/api/post-setup-tutorial');
