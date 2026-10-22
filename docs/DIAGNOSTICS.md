@@ -31,8 +31,8 @@
 
 | 类别 | 发送内容与筛选 |
 | --- | --- |
-| 版本统计 | Peach 版本、操作系统类型、运行环境、源码／独立包形态与公开构建提交号，每机 UTC 自然日最多一次；在进程启动时尝试，没有安装标识，不能据此统计独立用户 |
-| Python 错误 | 版本、平台、Python、CPU 架构、故障环节、分层异常链、Peach 与白名单框架文件名／函数名／行号、结构化错误码；错误文本、变量、源码上下文与用户目录不发送 |
+| 版本统计 | Peach 版本、分发方式（`windows-app`、`macos-app`、`docker`、`wheel`、`source`）、操作系统类型与版本、CPU 架构与逻辑核数、内存档位、Python 版本、运行环境、源码／独立包形态与公开构建提交号，每机 UTC 自然日最多一次；在进程启动时尝试，没有安装标识，不能据此统计独立用户。内存取最近的常见容量档；Docker 内的系统版本是宿主内核，Docker Desktop 的宿主系统由内核名称区分 |
+| Python 错误 | 版本、分发方式、平台、Python、CPU 架构、故障环节、分层异常链、Peach 与白名单框架文件名／函数名／行号、结构化错误码；错误文本、变量、源码上下文与用户目录不发送 |
 | HTTP 5xx | 追加方法、路由模板与关联错误编号；不含实例参数、查询参数、正文、鉴权头或用户网址 |
 | 媒体工具 | 退出码，以及确定匹配的 AV1 解码器缺失、非法媒体、权限、磁盘空间或未知解码器类别；stderr 与媒体名称留在本机 |
 | 浏览器错误 | 白名单异常类型、Peach 正式脚本的行列位置与公开构建映射 ID；没有可定位堆栈的错误与扩展脚本不发送 |
@@ -57,7 +57,7 @@
 
 两项均通过公开 DSN 发送到 Sentry 托管服务，接收服务会接触连接 IP。客户端不发送 IP 字段、用户身份、设备标识、观看记录、媒体信息、凭据、完整日志或诊断 ZIP。SDK 发送队列不落盘，本机聚合文件仅存技术投影和次数；后台发送前复查本机同意版本。关闭或重新选择会清除未提交聚合，并让排队旧事件失效；已在途或已接收的请求无法撤回。本机 ZIP 导出独立可用。
 
-接收端由维护者配置：源码与 Docker 使用 `PEACH_SENTRY_DSN`；Windows 与 macOS 打包由 `scripts/write_reporting_config.py` 从同名环境变量写入包根 `sentry.json`。发行流水线从 GitGud 项目 CI/CD 变量 `PEACH_SENTRY_DSN` 与 `PEACH_LIBRARY_SENTRY_DSN` 读取，两者为受保护变量、环境作用域 `release`；缺失或不合法时发行构建失败，本地构建写空值，安装后显示上传服务未配置。只接受 Sentry 的公开 HTTPS DSN（含 US / DE 区域），不需要 API token。没有 DSN 时不会创建 SDK 客户端。SDK 自动框架集成、日志、性能追踪和指标均关闭；版本统计作为普通事件计入 Sentry 错误事件额度。账号套餐和总量以 [Sentry 订阅页](https://sentry.io/settings/) 为准。
+接收端由维护者配置：源码运行使用 `PEACH_SENTRY_DSN` 或检出根的 `sentry.json`；Windows、macOS 打包与 Docker 镜像由 `scripts/write_reporting_config.py` 从同名环境变量（Docker 为同名构建参数）写入包根 `sentry.json`，镜像里位于 wheel 的 `peach/_resources/`，容器运行时设置的同名环境变量优先。发行流水线从 GitGud 项目 CI/CD 变量 `PEACH_SENTRY_DSN` 与 `PEACH_LIBRARY_SENTRY_DSN` 读取，两者为受保护变量、环境作用域 `release`；缺失或不合法时发行构建失败，本地构建写空值，安装后显示上传服务未配置。只接受 Sentry 的公开 HTTPS DSN（含 US / DE 区域），不需要 API token。没有 DSN 时不会创建 SDK 客户端。SDK 自动框架集成、日志、性能追踪和指标均关闭；版本统计作为普通事件计入 Sentry 错误事件额度。账号套餐和总量以 [Sentry 订阅页](https://sentry.io/settings/) 为准。
 
 回归验收使用临时 Peach 数据目录和 SDK 内存接收端。实际接收与发行制品的验收记录保存在仓库外。技术诊断选择见 [ADR-0110](adr/0110-recommended-diagnostics-choice.md)。安装辅助进程只在本机取证，不初始化远程客户端或发送事件；应用进程按用户选择发送。
 

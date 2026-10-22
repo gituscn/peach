@@ -117,6 +117,43 @@ class RemoteReportingTests(unittest.TestCase):
         self.assertEqual(len(payload["records"]), 20)
         self.assertTrue(all(row['total'] == 2 for row in payload['records'].values()))
 
+    def test_usage_counts_distribution_and_coarse_machine_facts(self):
+        from peach import reporting_identity as identity
+        reporting.save({"usage": True, "errors": True})
+        client = mock.Mock()
+        with mock.patch.object(reporting, "_new_client", return_value=client), \
+                mock.patch.object(identity, "_memory_bytes", return_value=15.8 * 2 ** 30):
+            reporting.usage()
+        tags = client.capture_event.call_args.args[0]["tags"]
+        self.assertEqual(tags["distribution"], "source")
+        self.assertEqual(tags["memory_gb"], "16")
+        self.assertEqual(tags["cpu_cores"], str(os.cpu_count()))
+        for key in ("os", "os_version", "architecture", "python"):
+            self.assertTrue(tags[key], key)
+
+    def test_distribution_tells_desktop_apps_docker_wheel_and_source_apart(self):
+        from peach import reporting_identity as identity
+        cases = (
+            ("windows-app", {"frozen": True, "system": "Windows"}),
+            ("macos-app", {"frozen": True, "system": "Darwin"}),
+            ("docker", {"environ": {"PEACH_DISTRIBUTION": "docker"}}),
+            ("wheel", {"root": Path("site-packages/peach/_resources")}),
+            ("source", {"root": Path("peach-app")}),
+        )
+        for expected, case in cases:
+            with self.subTest(expected), \
+                    mock.patch.object(identity.sys, "frozen", case.get("frozen", False), create=True), \
+                    mock.patch.object(identity.platform, "system", return_value=case.get("system", "Linux")), \
+                    mock.patch.dict(os.environ, case.get("environ", {"PEACH_DISTRIBUTION": ""})), \
+                    mock.patch("peach.settings_file.PROJECT_ROOT", case.get("root", Path("peach-app"))):
+                self.assertEqual(identity.distribution(), expected)
+
+    def test_memory_is_reported_as_the_nearest_common_capacity(self):
+        from peach.reporting_identity import memory_bucket
+        for gigabytes, bucket in ((7.6, "8"), (15.8, "16"), (23.4, "24"), (31.9, "32"), (0.9, "2"), (1024, "256+")):
+            with self.subTest(gigabytes=gigabytes):
+                self.assertEqual(memory_bucket(gigabytes * 2 ** 30), bucket)
+
     def test_frequency_batches_send_disjoint_counts_and_keep_group_identity(self):
         from peach import diagnostic_frequency as frequency
         reporting.save({"usage": True, "errors": True})

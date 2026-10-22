@@ -15,11 +15,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from .reporting_identity import event_metadata
+from .reporting_identity import event_metadata, machine_facts
 
 FIELDS = {
-    "usage": "Peach 版本、操作系统类型、运行环境与公开构建编号；每天最多一次，不含安装标识。",
-    "errors": "Peach 版本、运行环境与公开构建编号、系统类型、Python 版本、CPU 架构、故障环节、异常链、Peach 与白名单框架的代码文件名/函数名/行号、结构化错误码、媒体工具故障类别、浏览器白名单异常类型与正式脚本构建映射、HTTP 方法/路由模板/关联错误编号、同类故障次数与统计日期；首次立即上传，重复次数每小时或退出时合并，每天最多 20 批。",
+    "usage": "Peach 版本、分发方式（Windows／macOS 应用、Docker、wheel 或源码）、操作系统类型与版本、CPU 架构与核数、内存档位、Python 版本、运行环境与公开构建编号；每天最多一次，不含安装标识。",
+    "errors": "Peach 版本、分发方式、运行环境与公开构建编号、系统类型、Python 版本、CPU 架构、故障环节、异常链、Peach 与白名单框架的代码文件名/函数名/行号、结构化错误码、媒体工具故障类别、浏览器白名单异常类型与正式脚本构建映射、HTTP 方法/路由模板/关联错误编号、同类故障次数与统计日期；首次立即上传，重复次数每小时或退出时合并，每天最多 20 批。",
 }
 NOTICE = "发送至 Sentry。不上报错误原文、完整日志、诊断 ZIP、媒体名称、路径、网址、观看记录或凭据。接收服务会接触连接 IP；关闭后停止新发送，已发送的信息无法撤回。"
 _lock = threading.RLock()
@@ -265,7 +265,8 @@ def send(kind, event, config=None):
 
 
 def usage(config=None):
-    send("usage", {"message": "Peach started", "level": "info", "tags": {"os": platform.system()}}, config)
+    send("usage", {"message": "Peach started", "level": "info",
+                   "tags": {"os": platform.system(), **machine_facts()}}, config)
     flush_counts(config)
     try:
         if not _disabled and consent(config)["errors"] and dsn():
