@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path, PureWindowsPath
@@ -19,7 +20,7 @@ from peach.genre_taxonomy import map_genres
 from peach.jav_cover_fetch import NotFound
 from peach.http import HttpResponse
 from peach.library_nfo import read_nfo, sidecars, local_art
-from peach.library_processing import (STALL_AFTER_SECONDS, _candidate_identity, decorate,
+from peach.library_processing import (STALL_AFTER_SECONDS, _candidate_identity, _save, decorate,
                                       issues_path, _merge_local_performer_profiles,
                                       process_library, snapshot, state_path, _fields)
 from peach.metadata_auto_apply import _apply_metadata_candidate
@@ -2310,6 +2311,20 @@ class LibraryWatchdogTests(unittest.TestCase):
         provider.query.return_value = {'id': 'code', 'maker': 'Studio', 'source_url': ''}
         provider.cover.return_value = False
         return provider
+
+    def test_state_save_waits_for_a_reader_holding_the_file(self):
+        # 进度条轮询读状态时，Windows 上替换被占着的目标会报 WinError 5，任务随之中断。
+        config = self._config(self.root / 'media')
+        path = state_path(config)
+        _save(path, {'status': 'running', 'checked': 1})
+        reader = path.open(encoding='utf-8')
+        release = threading.Timer(0.5, reader.close)
+        release.start()
+        self.addCleanup(release.cancel)
+        self.addCleanup(reader.close)
+        _save(path, {'status': 'running', 'checked': 2})
+        self.assertEqual(json.loads(path.read_text(encoding='utf-8'))['checked'], 2)
+        self.assertEqual(sorted(item.name for item in path.parent.iterdir()), [path.name])
 
     @windows_ledger_roots
     def test_reports_carry_current_asset_action_and_rising_sequence(self):
