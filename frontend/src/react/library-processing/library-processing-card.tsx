@@ -67,6 +67,9 @@ function Outcome(
   const details = issueDetails(state);
   const retryable = state.status === 'failed' && !!state.retryable_asset_ids?.length;
   const notes = notesLine(state.notes || {});
+  const failed = !!problem || state.status === 'failed';
+  /* 同一份日志只印一处：失败提示带着问题清单时归清单，跑完只剩「7 天内不再问」时归那条提示。 */
+  const logInList = failed && !!details?.log;
   /* 清单是这一页唯一自己滚的块，原生滚动条在这儿就是一条系统灰柱子。 */
   const list = useOverlayScrollbar<HTMLUListElement>();
   return (
@@ -75,7 +78,7 @@ function Outcome(
       {state.status === 'running' && state.stalled
         ? <Note tone="warning" title="处理较慢">{STALLED_TEXT}</Note>
         : null}
-      {problem || state.status === 'failed'
+      {failed
         ? <Note tone="error" className="gap-0 p-3"
             action={retryable
               ? <Button variant="primary" size="small" onClick={onRetry}>重试未完成项</Button>
@@ -121,10 +124,11 @@ function Outcome(
         ? <Note tone="success" title="处理完成">{receiptText(settled)}</Note>
         : null}
       {!processingActive(state) && notes
-        ? <Note tone="neutral"
-            extra={state.issues_log
+        /* 内边距与分隔节奏和上面的失败提示同一组：两块常常叠着出现，留白不一样一眼就看得出。 */
+        ? <Note tone="neutral" className="gap-0 p-3"
+            extra={state.issues_log && !logInList
               /* 中性提示的分隔线跟随次级文字色。 */
-              ? <div className="mt-1.5 border-t border-current/20 pt-1.5 text-text-secondary">
+              ? <div className="mt-3 border-t border-current/20 pt-3 text-text-secondary">
                   <PathLine path={state.issues_log} prefix="完整记录：" className="text-caption-1-regular"
                     onRevealed={toast} />
                 </div>
