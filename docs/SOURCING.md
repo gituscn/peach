@@ -26,7 +26,7 @@
 「同步媒体库」与 `scripts/scrape_codes.py` 共用正式来源链。来源设为「直连」时使用直连客户端；设为跟随 Peach 代理时，使用配置页保存的直连、自定义代理或跟随环境设置。在线封面使用同一来源传输，amane 桥把代理及逐站直连设置传给子进程。浏览器取页也遵循显式直连和自定义代理；代理地址带用户名时退回 HTTP 客户端。
 
 默认外网 HTTP 请求共用「Peach 代理」，覆盖发现页与作品详情资料、关注媒体、封面与头像、字幕搜索、PikPak API、更新检查与下载、模型下载和远程诊断。独立采集、链接检查、参考资料与发行下载脚本也复用这份设置。来源显式选择「直接连接」、自定义元数据的独立连接策略和注入的传输继续优先。
-`tests/test_outbound_proxy_policy.py` 扫描 `src/peach` 的每个客户端构造：要么展开 Peach 代理设置，要么写明 `trust_env=False`（回环、局域网服务与注入的传输）；裸 `urlopen` 和不带 `ProxyHandler` 的 `build_opener` 一律拒收。
+`tests/test_outbound_proxy_policy.py` 扫描 `src/peach` 的每个客户端构造：要么展开 Peach 代理设置，要么写明 `trust_env=False`（回环、局域网服务与注入的传输）；裸 `urlopen`、不带 `ProxyHandler` 的 `build_opener` 和裸名导入的客户端一律拒收。`trust_env=False` 指向的是不是本机或局域网，扫描器判断不了，由评审核对。
 
 连不上外网时，每个页面顶部出现一条横幅，指向「网络与访问 → Peach 代理」。判定来自服务端：有页面读取 `/api/network-status` 后，后台按 Peach 代理设置访问 `www.msftconnecttest.com` 与 `captive.apple.com` 两个系统联网检测地址，任一个返回预期正文就算联网；正常十分钟、断网时一分钟复查一次，保存代理设置后立即重探。
 

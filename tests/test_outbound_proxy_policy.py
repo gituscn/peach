@@ -22,11 +22,17 @@ SOURCE = ROOT / "src" / "peach"
 #: 会读环境代理的客户端构造：httpx 的 Client 与模块级快捷函数、curl_cffi 的 Session。
 CLIENTS = {"Client", "AsyncClient", "Session", "get", "post", "put", "delete", "head", "stream", "request"}
 OWNERS = {"httpx", "requests", "curl_requests"}
+IMPORT_SOURCES = {"httpx", "curl_cffi", "curl_cffi.requests", "urllib.request"}
 
 
 def violations(tree: ast.AST) -> list[tuple[int, str]]:
     found = []
     for node in ast.walk(tree):
+        # 裸名导入后的调用看不出归属，扫描器无从判断，直接拒收。
+        if isinstance(node, ast.ImportFrom) and node.module in IMPORT_SOURCES:
+            found += [(node.lineno, f"from {node.module} import {alias.name} 绕过扫描")
+                      for alias in node.names if alias.name in CLIENTS | {"urlopen"}]
+            continue
         if not isinstance(node, ast.Call):
             continue
         name = ast.unparse(node.func)
@@ -61,8 +67,10 @@ class OutboundProxyPolicyTest(unittest.TestCase):
                          "urllib.request.build_opener()\n"
                          "httpx.Client(**options)\n"
                          "httpx.get('http://127.0.0.1', trust_env=False)\n"
-                         "urllib.request.build_opener(urllib.request.ProxyHandler({}))\n")
-        self.assertEqual([line for line, _ in violations(tree)], [2, 3, 4, 5])
+                         "urllib.request.build_opener(urllib.request.ProxyHandler({}))\n"
+                         "from httpx import Client\n"
+                         "from urllib.request import urlopen, Request\n")
+        self.assertEqual(sorted(line for line, _ in violations(tree)), [2, 3, 4, 5, 9, 10])
 
 
 if __name__ == "__main__":
