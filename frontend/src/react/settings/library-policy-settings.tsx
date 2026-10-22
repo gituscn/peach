@@ -1,7 +1,6 @@
-/* 媒体库一级的来源色与处理方式（第 2、4、5 条的推荐版原型），由「媒体库与目录」按媒体库分组时
- * 放在每个媒体库的标题行里。三档处理方式的说明在分组上方只写一次；只有选了「自定义」的媒体库
- * 才展开五个步骤。来源色默认不上色，点开色球选一档强调色。
- * 原型阶段处理方式只在本页演示，不随「保存配置」提交；来源色记在本浏览器。 */
+/* 媒体库一级的来源色与处理方式，由「媒体库与目录」按媒体库分组时放在每个媒体库的标题行里，
+ * 随「保存配置」写进 `media.library_catalog`（ADR-0116）。三档处理方式的说明在分组上方只写一次；
+ * 只有选了「自定义」的媒体库才展开五个步骤。来源色默认不上色，点开色球选一档强调色。 */
 import { useRef, useState } from 'react';
 import { Dialog, Popover, VisuallyHidden } from 'react-aria-components';
 import { UNSAFE_PortalProvider } from 'react-aria';
@@ -10,7 +9,7 @@ import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { MENU_POPOVER_SURFACE } from '@/components/base/dropdown/menu-styles';
 import { Select, SelectItem } from '../components/select';
 import { ACCENT_CHOICES } from '@peach/appearance';
-import { setLibraryColor, useLibraryTints } from '../components/library-tint';
+import { previewLibraryColor } from '../components/library-tint';
 import { overlayHost } from '../components/overlay-host';
 import { Disclosure, Help } from './section';
 import { POLICY_COLUMNS, POLICY_COVER_NOTE, POLICY_MATRIX, POLICY_SUMMARY } from './library-policy-copy';
@@ -86,13 +85,13 @@ export function StageChooser({ name, value, onChange }: { name: string; value: r
 }
 
 /** 一颗显示当前来源色的球；点开是「无颜色」加十二档强调色。 */
-export function LibraryColorPicker({ id, name }: { id: string; name: string }) {
-  const tints = useLibraryTints();
-  const color = tints.get(id)?.color || '';
+export function LibraryColorPicker({ id, name, value: color, onChange }: {
+  id: string; name: string; value: string; onChange(color: string): void;
+}) {
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const label = ACCENT_CHOICES.find(([key]) => key === color)?.[1] || '无颜色';
-  const choose = (next: string) => { setLibraryColor(id, next); setOpen(false) };
+  const choose = (next: string) => { onChange(next); previewLibraryColor(id, next); setOpen(false) };
   return <>
     <button ref={trigger} type="button" data-glow-chip="" data-library-color-trigger="" aria-haspopup="dialog"
       aria-expanded={open} aria-label={`${name || '未命名媒体库'} 来源色：${label}`} title={label} onClick={() => setOpen(true)}>

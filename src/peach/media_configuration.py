@@ -65,6 +65,9 @@ def rows(config, *, windows: bool, probe: bool = False) -> list[dict[str, Any]]:
             result.append({"location": location, "root": root, "path": mount,
                            "root_id": root_id, "library_id": value["library_id"],
                            "library": library["name"], "library_icon": library.get("icon", ""),
+                           "library_color": library.get("color", ""),
+                           "library_policy": library.get("policy", "") or "auto",
+                           "library_stages": library.get("stages", ""),
                            "cost": cost_for(location, root, config),
                            "online": platform.root_online(Path(mount)) if probe and mount else False})
     return result

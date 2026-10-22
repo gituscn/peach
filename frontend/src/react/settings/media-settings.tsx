@@ -48,17 +48,31 @@ const libraryMark = (row: { library_icon: string; location: string }) => row.lib
 const pickFolder = async (initial: string) =>
   (await apiSend<{ path: string | null }>(PICK_FOLDER_URL, { initial })).path;
 
-interface MediaRow { path: string; location: string; root: string; root_id?: string; library_id: string; library: string; library_icon: string; cost: SourceCost | ''; change_mode?: string }
+interface MediaRow {
+  path: string; location: string; root: string; root_id?: string; library_id: string; library: string; library_icon: string;
+  library_color: string; library_policy: Preset; library_stages: string; cost: SourceCost | ''; change_mode?: string;
+}
+/** 媒体库这一级的字段：同一媒体库的各行一起改、一起跟随。 */
+const libraryFields = (row: MediaRow) => ({
+  library_id: row.library_id, library: row.library, library_icon: row.library_icon,
+  library_color: row.library_color, library_policy: row.library_policy, library_stages: row.library_stages,
+});
+const stagesOf = (row: MediaRow): readonly Stage[] =>
+  row.library_stages ? AUTO_STAGES.filter(stage => row.library_stages.split(',').includes(stage)) : [];
 interface FieldErrors { media_dirs?: string[]; port?: string }
 interface SaveResult { saved: boolean; url: string; revision: string }
 
-const blankRow = (path = ''): MediaRow => ({ path, location: 'local', root: '', library_id: crypto.randomUUID(), library: '', library_icon: '', cost: 'free' });
+const blankRow = (path = ''): MediaRow => ({
+  path, location: 'local', root: '', library_id: crypto.randomUUID(), library: '', library_icon: '',
+  library_color: '', library_policy: 'auto', library_stages: '', cost: 'free',
+});
 
 function initialRows(data: ConfigurationData): MediaRow[] {
   const known = data.media_sources?.filter((row) => MEDIA_SOURCES.some(([kind]) => kind === row.location));
   if (known?.length) {
     return known.map((row) => ({
       path: row.path, location: row.location, root: row.root, library: row.library || '', library_icon: row.library_icon || '',
+      library_color: row.library_color || '', library_policy: row.library_policy || 'auto', library_stages: row.library_stages || '',
       root_id: row.root_id, library_id: row.library_id || crypto.randomUUID(),
       cost: row.cost ?? sourceDefaultCost(row.location),
     }));
@@ -108,9 +122,8 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
   const [saved, setSaved] = useState<SaveResult | null>(null);
   const revision = useRef(data.revision);
   const action = useAction();
-  const [presets, setPresets] = useState<Record<string, Preset>>({});
-  const [stages, setStages] = useState<Record<string, readonly Stage[]>>({});
-  const tints = useLibraryTints();
+  // 订阅来源色样式表：改色时卡片当场试色，保存后服务端的颜色接替。
+  useLibraryTints();
   const editLibrary = (index: number, patch: Partial<MediaRow>) => {
     rows.forEach((row, i) => { if (row.library_id === rows[index]!.library_id) edit(i, patch); });
   };
@@ -129,11 +142,11 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
   const chooseLibrary = (index: number, key: string) => {
     const chosen = rows.find(row => row.library_id === key);
     if (chosen) {
-      edit(index, { library_id: chosen.library_id, library: chosen.library, library_icon: chosen.library_icon });
+      edit(index, libraryFields(chosen));
       return;
     }
     const created = crypto.randomUUID();
-    edit(index, { library_id: created, library: '', library_icon: '' });
+    edit(index, { library_id: created, library: '', library_icon: '', library_color: '', library_policy: 'auto', library_stages: '' });
     setNamed(created);
   };
 
@@ -197,26 +210,31 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
           {libraries.map((library) => {
             const first = rows.findIndex(row => row.library_id === library.library_id);
             const members = rows.map((row, index) => ({ row, index })).filter(({ row }) => row.library_id === library.library_id);
-            const preset = presets[library.library_id] ?? 'auto';
+            const preset = library.library_policy;
             const name = library.library || '未命名媒体库';
             return (
               /* 一个媒体库一张卡，照关注页「作者 → 来源」的结构：标题行在上、下面一道分隔线，
                  文件夹一行一行用通栏细线分开。 */
               <div key={library.library_id} data-library-block="" data-library-key={library.library_id}
                 className={cardClass({ variant: 'raised', padding: 'none', className: 'flex flex-col p-2' })}
-                data-library={tints.get(library.library_id)?.color ? library.library_id : undefined}>
+                data-library={library.library_color ? library.library_id : undefined}>
                 <div data-library-head="">
                   <LibraryIconPicker label={`${name} 图标`} value={library.library_icon} kind={library.location}
                     onChange={(library_icon) => editLibrary(first, { library_icon })} />
                   <Input className="w-full" aria-label={`${name} 名称`} maxLength={80} placeholder="媒体库名称"
                     value={library.library} onChange={(value) => editLibrary(first, { library: value })} />
-                  <LibraryColorPicker id={library.library_id} name={library.library} />
+                  <LibraryColorPicker id={library.library_id} name={library.library} value={library.library_color}
+                    onChange={(library_color) => editLibrary(first, { library_color })} />
+                  {/* 第一次切到自定义时先勾上全部步骤，用户再去掉不要的。 */}
                   <PresetSelect name={name} value={preset}
-                    onChange={(value) => setPresets(current => ({ ...current, [library.library_id]: value }))} />
+                    onChange={(value) => editLibrary(first, {
+                      library_policy: value,
+                      library_stages: value !== 'custom' ? '' : library.library_stages || AUTO_STAGES.join(','),
+                    })} />
                 </div>
                 {preset === 'custom'
-                  ? <StageChooser name={name} value={stages[library.library_id] ?? AUTO_STAGES}
-                    onChange={(value) => setStages(current => ({ ...current, [library.library_id]: value }))} />
+                  ? <StageChooser name={name} value={stagesOf(library)}
+                    onChange={(value) => editLibrary(first, { library_stages: AUTO_STAGES.filter(stage => value.includes(stage)).join(',') })} />
                   : null}
                 <div data-library-folders="" role="group" aria-label={`${name} 的文件夹`}>
                 {members.map(({ row, index }) => (
@@ -261,8 +279,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                 <div className="flex">
                   <Button variant="secondary" aria-label={`给 ${name} 添加文件夹`} onClick={() => {
                     add();
-                    edit(rows.length, { library_id: library.library_id, library: library.library, library_icon: library.library_icon,
-                      location: library.location, cost: library.cost });
+                    edit(rows.length, { ...libraryFields(library), location: library.location, cost: library.cost });
                   }}>添加文件夹</Button>
                 </div>
                 </div>

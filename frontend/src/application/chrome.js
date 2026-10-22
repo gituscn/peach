@@ -2,6 +2,7 @@
 import { applicationEffects } from './effects';
 import { MEDIA_SOURCE_ICONS, moveGlidePane, wireAnchoredMenu } from '../ui-kit';
 import { api, esc, icon } from '../core';
+import { publishLibraries } from '../library-catalog';
 import { narrowShell, openDrawer, openSettings } from './layout.js';
 import { openConfigurationSection } from './playlists.js';
 import { transitionTheme } from './../theme-transition';
@@ -73,6 +74,7 @@ effects.listen(libraryPicker, 'toggle', event=>{if(event.newState==='open'){
 effects.listen(libraryPicker, 'keydown', event=>{if(event.key==='Escape'){event.stopPropagation();libraryFloating.setOpen(false);boardBrand.focus()}});
 api('/api/libraries',{signal:effects.signal}).then(data=>{
   if(!effects.isActive)return;
+  publishLibraries(data.libraries);
   const choices=[['','全部媒体库','database'],...data.libraries.map(row=>[row.id,row.name,row.icon||'database'])];
   const selected=sessionStorage.getItem('peach.library')||'';
   if(!choices.some(row=>row[0]===selected)){

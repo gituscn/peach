@@ -30,6 +30,7 @@ from .library_nfo import directory_files, read_nfo, sidecars, local_art, Sidecar
 from .genre_decisions import load_genre_decisions
 from .metadata import extract_catalog_evidence, extract_peach_fields, validate_provider_code
 from . import metadata_routes
+from . import media_identity
 from . import junk
 from . import sample_followup
 from .metadata_policy import SOURCE_SPECS, preferred_tag_source
@@ -1316,8 +1317,11 @@ class _RemoteSession:
         if self._provider is not None and hasattr(self._provider, 'close'):
             self._provider.close()
 
-    def collect(self, row, code, missing, cover_root, *, update, issue, answered=(), received=lambda entries: None):
+    def collect(self, row, code, missing, cover_root, *, update, issue, answered=(), received=lambda entries: None,
+                fetch_cover=True):
         """给这一行补外部资料与封面；返回 (证据条目, 新落盘的封面数)。
+
+        `missing` 为空时不问资料，`fetch_cover` 为假时不找封面：媒体库处理方式关掉的那一步不联网。
 
         文件名被读成番号的创作者作品一家都不问，判据见 `catalog_rules.scrapes_as_jav`；
         本地海报在调用方那一步已经登记过，这里跳过的只是外部来源。`answered` 是在这一行
@@ -1333,7 +1337,7 @@ class _RemoteSession:
                                   or not set(answered).intersection(chain)):
             entries = self._metadata(row, code, missing, update=update, issue=issue, answered=answered,
                                      received=received)
-        if _asks_cover(code, *_studio_evidence(row)) and not cover_settled(cover_root / (code + '.jpg')):
+        if fetch_cover and _asks_cover(code, *_studio_evidence(row)) and not cover_settled(cover_root / (code + '.jpg')):
             snapshots, absent = self._cover_inputs(code, chain, entries)
             covers = self._cover(row, code, cover_root, update=update, issue=issue,
                                  snapshots=snapshots, absent=absent)
@@ -1800,15 +1804,18 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
 
 def _probe_sources(config, db_path, locations, online_roots, asset_ids, update, *, total_pending=0,
                    initial_probed=0, protected_ids=(), on_junk=lambda result: None):
-    """已登记视频按可访问来源逐项读取媒体属性。"""
+    """已登记视频按可访问来源逐项读取媒体属性；媒体库处理方式不读视频信息的根目录跳过。"""
     probed = initial_probed
     checked = initial_probed
     ffprobe = _ffprobe_path(config)
+    stages = media_identity.stages_by_root(config)
     def report(done, total):
         update(stage='读取时长与分辨率', checked=checked + done, probed=checked + done,
                total=max(initial_probed + total_pending, checked + total))
     for source, roots in locations.items():
         for root in roots:
+            if 'probe' not in stages.get(media_identity.path_key(root), media_identity.STAGES):
+                continue
             if translate_ledger_path(root) in online_roots:
                 probed += probe_unmeasured(
                     db_path, ffprobe, source, root, asset_ids=asset_ids, config=config,
@@ -1816,6 +1823,20 @@ def _probe_sources(config, db_path, locations, online_roots, asset_ids, update, 
                 checked = probed
     update(probed=probed)
     return probed
+
+
+def _library_stages(config):
+    """按作品账本路径查所属媒体库要做的处理步骤（ADR-0116）；不在已配置根目录下的按自动补全。"""
+    from .platform import resolve_root
+    by_root = media_identity.stages_by_root(config)
+    every = frozenset(media_identity.STAGES)
+
+    def stages_of(path):
+        location, index, _tail = resolve_root(path, config.locations)
+        if location is None:
+            return every
+        return by_root.get(media_identity.path_key(config.locations[location][index]), every)
+    return stages_of
 
 
 def _check_processing_junk(database, locations, online_roots, asset_ids, protected_ids, state, update):
@@ -1896,13 +1917,17 @@ def _candidate_scope(groups, asset_ids):
 
 
 def _finish_collection(config, database, candidate_root, cover_root, groups, remote, *,
-                       asset_ids, active, update, issue, watermark, covered):
-    """结算本趟候选并补人物资料，全库任务同时推进存量后继。"""
+                       asset_ids, active, update, issue, watermark, covered, people=True):
+    """结算本趟候选并补人物资料，全库任务同时推进存量后继。
+
+    `people` 为假（没有哪个媒体库的处理方式联网补人物图片）时不补人物资料，也不派实体后继。"""
     auto_apply = _apply_finished_candidates(database, candidate_root, active, asset_ids)
-    profiles = _enrich_finished_performers(
+    profiles = (_enrich_finished_performers(
         database, _candidate_scope(groups, asset_ids), config, candidate_root, remote, active, update, issue)
+        if people else dict(aliases=0, avatars=0, conflicts=0, failed=0))
     followups = [] if asset_ids is not None else sample_followup.plan(database, config, cover_root)
-    followups += _entity_followups(database, config, watermark, covered, include_stock=asset_ids is None)
+    if people:
+        followups += _entity_followups(database, config, watermark, covered, include_stock=asset_ids is None)
     return dict(followups=followups, auto_applied=auto_apply['applied'],
                 auto_rejected=auto_apply['auto_rejected'], performer_aliases=profiles['aliases'],
                 performer_avatars=profiles['avatars'], performer_profile_conflicts=profiles['conflicts'],
@@ -2007,11 +2032,13 @@ def _generate_preview(config, row, database, resolver, *, progress):
 
 def _generate_previews(config, rows, database, *, update, issue, guard,
                        completed=(), checkpoint=lambda row: None, initial_made=0):
-    """只读本机视频；来源失败与抽帧失败各自保留可重试项目。"""
+    """只读本机视频；来源失败与抽帧失败各自保留可重试项目。媒体库处理方式不生成九宫格的作品跳过。"""
     from .previews import PreviewUnavailable
     if database is None:
         return 0
-    rows = [row for row in rows if row['location'] == 'local' and not skip_background_read(row['path'])]
+    stages_of = _library_stages(config)
+    rows = [row for row in rows if row['location'] == 'local' and not skip_background_read(row['path'])
+            and 'preview' in stages_of(row['path'])]
     base_done = sum(_checkpoint_key(row) in completed for row in rows)
     rows = [row for row in rows if _checkpoint_key(row) not in completed]
     resolver = FFmpegResolver(config.directory('tools') / 'ffmpeg')
@@ -2322,6 +2349,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
         entity_watermark = checkpoints.entity_watermark
         # 每行这一轮换上了几张封面，`(asset_id, 张数)`：换上了的作品，女优可能截得出更清楚的脸。
         covered = []
+        stages_of = _library_stages(config)
         log_path = _processing_issue_log(config, path, state['job_id'], state_file is not None,
                                          resume=bool(resume_state))
         # 界面只展示前 20 条，完整清单在这个文件里；地址跟着状态一起给出，
@@ -2514,15 +2542,22 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                        total=completed_count + len(prepared), current_asset_id=row['id'],
                        current_asset_name=Path(str(row['name'] or '')).name)
                 target_key = f"asset:{row['id']}"
-                missing = list(COLLECTED_FIELDS) if verify_existing else _missing_fields(row, local_fields)
-                traffic.start_metadata(code)
-                found, covers = remote.collect(row, code, missing, cover_root, update=update, issue=issue,
-                    answered=() if verify_existing else _answered_sources(groups, target_key, missing),
-                    received=lambda entries, row=row, code=code, fields=local_fields, verify=verify_existing:
-                        publish(row, code, fields, verify, entries))
-                traffic.finish_work('metadata', code, successful=state['issue_count'] == issues_before)
+                # 媒体库处理方式关掉的联网步骤不问外部来源（ADR-0116）；本地读到的证据照常保存。
+                allowed = stages_of(row['path'])
+                missing = ((list(COLLECTED_FIELDS) if verify_existing else _missing_fields(row, local_fields))
+                           if 'metadata' in allowed else [])
+                found, covers = [], 0
+                if allowed & {'metadata', 'cover'}:
+                    traffic.start_metadata(code)
+                    found, covers = remote.collect(row, code, missing, cover_root, update=update, issue=issue,
+                        answered=() if verify_existing else _answered_sources(groups, target_key, missing),
+                        received=lambda entries, row=row, code=code, fields=local_fields, verify=verify_existing:
+                            publish(row, code, fields, verify, entries),
+                        fetch_cover='cover' in allowed)
+                    traffic.finish_work('metadata', code, successful=state['issue_count'] == issues_before)
                 state['covers'] += covers
-                covered.append((row['id'], covers))
+                if 'people' in allowed:
+                    covered.append((row['id'], covers))
                 update(stage='保存待确认资料', current_action='writing_candidates',
                        current_started_at=time.time(), current_deadline_at=None)
                 checkpoints.queue_metadata(row, local_entries + found if local_ok else [], issues_before)
@@ -2536,7 +2571,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             # 核心处理层不反向依赖 Web 复核层；CLI 与 Web 两个组装入口都传入同一实现。
             summary = _finish_collection(
                 config, database, candidate_root, cover_root, groups, remote, asset_ids=scope_ids,
-                active=active, update=update, issue=issue, watermark=entity_watermark, covered=covered)
+                active=active, update=update, issue=issue, watermark=entity_watermark, covered=covered,
+                people=any('people' in stages for stages in media_identity.stages_by_root(config).values()))
             summary['auto_applied'] = summary.get('auto_applied', 0) + state['auto_applied']
             summary['auto_rejected'] = summary.get('auto_rejected', 0) + state['auto_rejected']
             finish_step('collect')

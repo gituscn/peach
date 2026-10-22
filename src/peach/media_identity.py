@@ -1,13 +1,39 @@
 """媒体库与存储根目录的持久身份；路径表是兼容投影。"""
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from pathlib import PureWindowsPath, PurePosixPath
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
+#: 媒体库处理方式（ADR-0116）。`auto` 是默认值，配置里不写；`custom` 另存所选步骤。
+POLICIES = ("auto", "local", "custom")
+#: 处理步骤：读取视频信息、联网补资料、联网补封面、联网补人物图片、生成九宫格预览。
+STAGES = ("probe", "metadata", "cover", "people", "preview")
+_LOCAL_STAGES = frozenset({"probe", "preview"})
+#: 来源色取界面强调色的键名；具体色值由界面按键名取，这里只校验写法。
+_COLOR = re.compile(r"[a-z]{2,16}")
+
 
 def path_key(path):
     return str(PureWindowsPath(path)).casefold()
+
+
+def library_stages(library):
+    """一个媒体库在处理时要做的步骤。自动补全全做，仅使用本地资料不联网，自定义按所选。"""
+    policy = library.get("policy") or "auto"
+    if policy == "local":
+        return _LOCAL_STAGES
+    if policy == "custom":
+        return frozenset(stage for stage in library.get("stages", "").split(",") if stage in STAGES)
+    return frozenset(STAGES)
+
+
+def stages_by_root(config):
+    """`{规范化账本前缀: 允许的步骤}`，处理流程按作品路径所属的根目录查。"""
+    libraries, roots = catalog(config)
+    return {path_key(value["root"]): library_stages(libraries.get(value["library_id"], {}))
+            for value in roots.values()}
 
 
 def _legacy_value(mapping, root, default=""):
@@ -77,6 +103,15 @@ def _validate_library(value):
         raise ValueError("媒体库名称请使用 1 到 80 个可见字符")
     if value.get("icon", "") not in ("", *LIBRARY_ICONS):
         raise ValueError("请选择列表中的媒体库图标")
+    color = value.get("color", "")
+    if color and not _COLOR.fullmatch(color):
+        raise ValueError("请选择列表中的来源色")
+    policy = value.get("policy", "")
+    if policy not in ("", *POLICIES):
+        raise ValueError("请选择列表中的处理方式")
+    stages = [stage for stage in value.get("stages", "").split(",") if stage]
+    if any(stage not in STAGES for stage in stages) or (stages and policy != "custom"):
+        raise ValueError("处理步骤无效")
 
 
 def validate_catalog(libraries, roots):
@@ -150,10 +185,23 @@ def configure_sources(config, sources, *, windows):
         library_id = str(row.get("library_id") or (old or {}).get("library_id") or uuid4())
         UUID(library_id)
         name = str(row.get("library") or libraries.get(library_id, {}).get("name") or PureWindowsPath(root).name or root).strip()
-        icon = str(row.get("library_icon", libraries.get(library_id, {}).get("icon", "")))
+        known = libraries.get(library_id, {})
+        icon = str(row.get("library_icon", known.get("icon", "")))
         value = dict(name=name, icon=icon)
+        # 来源色与处理方式只在设了时写进配置；表单没带这几项时沿用已保存的值。
+        color = str(row.get("library_color", known.get("color", "")))
+        policy = str(row.get("library_policy", known.get("policy", "")))
+        if color:
+            value["color"] = color
+        if policy and policy != "auto":
+            value["policy"] = policy
+        if policy == "custom":
+            chosen = str(row.get("library_stages", known.get("stages", ""))).split(",")
+            if any(stage and stage not in STAGES for stage in chosen):
+                raise ValueError("处理步骤无效")
+            value["stages"] = ",".join(stage for stage in STAGES if stage in chosen)
         if library_id in declared_libraries and declared_libraries[library_id] != value:
-            raise ValueError("同一媒体库的名称和图标必须一致")
+            raise ValueError("同一媒体库的名称、图标、来源色和处理方式必须一致")
         declared_libraries[library_id] = value
         libraries[library_id] = value
         roots[root_id] = dict(root=root, location=row["location"], library_id=library_id,

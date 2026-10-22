@@ -240,6 +240,39 @@ class LibraryNfoTests(unittest.TestCase):
         provider.query.assert_not_called()
 
     @windows_ledger_roots
+    def test_library_policy_decides_which_network_steps_run(self):
+        from dataclasses import replace
+        from peach import media_identity
+        media = self.root / 'media'
+        media.mkdir()
+        (media / 'ABW-358.mp4').write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        with closing(sqlite3.connect(db)) as connection, connection:
+            connection.execute("INSERT INTO asset(path,name,location,medium,code) VALUES(?,?,'local','video','ABW-358')",
+                               (str(media / 'ABW-358.mp4'), 'ABW-358.mp4'))
+        base = PeachConfig(self.root, self.root / 'config.toml', present=True, locations={'local': (str(media),)})
+        libraries, roots = media_identity.catalog(base)
+
+        def run(**policy):
+            for value in libraries.values():
+                value.update(policy)
+            provider = stub_provider()
+            provider.query.return_value = {'id': 'ABW-358', 'title': '外部资料'}
+            provider.cover.return_value = False
+            config = media_identity.project(replace(base), libraries, roots)
+            process_library(config, db, self.root / 'generated', self.root / 'covers', stage='metadata',
+                            provider_factory=lambda: provider)
+            return provider
+
+        local = run(policy='local')
+        local.query.assert_not_called()
+        local.cover.assert_not_called()
+        metadata_only = run(policy='custom', stages='metadata')
+        metadata_only.query.assert_called()
+        metadata_only.cover.assert_not_called()
+        run(policy='', stages='').cover.assert_called()
+
+    @windows_ledger_roots
     def test_user_pause_keeps_published_fields_and_resumes_the_same_collection(self):
         import threading
         from peach.processing_control import control_for
