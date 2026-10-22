@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "bc580cd5-ef33-42c5-b955-c8e1e665cbf1", e._sentryDebugIdIdentifier = "sentry-dbid-bc580cd5-ef33-42c5-b955-c8e1e665cbf1");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "bdb69905-0674-46f9-a674-353d321fef0c", e._sentryDebugIdIdentifier = "sentry-dbid-bdb69905-0674-46f9-a674-353d321fef0c");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -76710,7 +76710,11 @@ function lLe({ receipt: e }) {
 					})
 				]
 			}) : null,
-			t?.accounts.length === 0 && !t.unlinked?.length ? /* @__PURE__ */ (0, D.jsx)(dA, { children: "还没有使用 CloudDrive 的媒体库。" }) : null,
+			t?.configured === !1 ? /* @__PURE__ */ (0, D.jsxs)(dA, { children: ["填写 CloudDrive2 地址和 API 令牌后，在这里设置各网盘账号的代理。 ", /* @__PURE__ */ (0, D.jsx)(qk, {
+				href: "/settings/downloads",
+				size: "small",
+				children: "下载设置"
+			})] }) : t?.accounts.length === 0 && !t.unlinked?.length ? /* @__PURE__ */ (0, D.jsx)(dA, { children: "还没有使用 CloudDrive 的媒体库。" }) : null,
 			t?.unlinked?.map((e) => /* @__PURE__ */ (0, D.jsxs)("div", {
 				className: "flex min-w-0 flex-col gap-1",
 				children: [/* @__PURE__ */ (0, D.jsx)(pA, { children: /* @__PURE__ */ (0, D.jsxs)("span", {
@@ -115619,4 +115623,4 @@ nxt(rxt);
 //#endregion
 export { HT as applyTheme, yk as peachHistory, Go as popCount, Agt as showToast };
 
-//# debugId=bc580cd5-ef33-42c5-b955-c8e1e665cbf1
+//# debugId=bdb69905-0674-46f9-a674-353d321fef0c
