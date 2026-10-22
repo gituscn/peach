@@ -60,6 +60,34 @@ describe('库外 JAV 作品详情', () => {
       await page.screenshot({ path: '../build/jav-comments-expanded.png' });
     } finally { await context.close() }
   });
+  /* 详情浮窗是 `showModal()` 开的顶层 dialog：挂在 body 上的弹层和 Toast 再大的 z-index 也压不过它，
+     看起来就是「点了没反应」。命中测试取弹层与回执自己的中心点。 */
+  it('查找资源弹层与操作回执盖在详情浮窗之上', { timeout: 60000 }, async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, reducedMotion: 'reduce' });
+    try {
+      const page = await context.newPage();
+      await mockJavDetail(page);
+      await page.goto(requiredEnv('PEACH_E2E_ORIGIN') + '/works/EXM-001');
+      await page.locator('[data-jav-info] h1').waitFor();
+      const hit = (selector: string) => page.locator(selector).first().evaluate(node => {
+        const box = node.getBoundingClientRect();
+        const target = document.elementFromPoint(box.left + box.width / 2, box.top + Math.min(24, box.height / 2));
+        return { onTop: !!target && node.contains(target), inStage: !!node.closest('#stage') };
+      });
+      await page.locator('[data-jav-actions]').getByRole('button', { name: '查找资源', exact: true }).click();
+      await page.getByRole('heading', { name: '查找资源', exact: true }).waitFor();
+      assert.deepEqual(await hit('[data-modal-surface]'), { onTop: true, inStage: true }, '查找资源弹层被详情浮窗盖住');
+      await page.keyboard.press('Escape');
+      await page.locator('[data-modal-surface]').waitFor({ state: 'detached' });
+      assert.equal(await page.locator('#stage[open]').count(), 1, 'Escape 只关掉里层弹层');
+      await page.locator('[data-jav-actions]').getByRole('button', { name: '想要', exact: true }).click();
+      await page.locator('#toasts [data-sonner-toast]').filter({ hasText: '已加入想要' }).waitFor();
+      assert.deepEqual(await hit('#toasts [data-sonner-toast]'), { onTop: true, inStage: true }, '操作回执被详情浮窗盖住');
+      await page.locator('#closeStage').click();
+      await page.locator('#stage').waitFor({ state: 'detached' });
+      assert.equal(await page.locator('#toasts').evaluate(node => node.parentElement?.tagName), 'BODY', '浮窗收起后 Toast 栈没回到 body');
+    } finally { await context.close() }
+  });
   for (const viewport of VIEWPORTS) {
     it(`${viewport.name}：页面重建后评论与资源复用成功快照`, async () => {
       const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: 'reduce' });
