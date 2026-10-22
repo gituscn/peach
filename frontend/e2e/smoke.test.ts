@@ -325,7 +325,7 @@ describe('路由冒烟', () => {
     try {
       await expectBody(opened.page, '/stats', [statsInventoryTab(opened.page)]);
       const remote = 'https://covers.example.test/sleeve.svg';
-      await opened.page.route(remote, (route) => route.fulfill({
+      await opened.page.route('**/cover-image?code=ABF-348', (route) => route.fulfill({
         contentType: 'image/svg+xml',
         body: '<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1000">'
           + '<rect width="1500" height="1000" fill="#888"/></svg>',
