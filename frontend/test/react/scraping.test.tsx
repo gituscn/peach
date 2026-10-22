@@ -80,7 +80,7 @@ async function open(handlers: Record<string, (body: never) => Reply | Promise<Re
 
 /** amane 桥那张卡的事实：已装好、没有在跑的重建。 */
 const BRIDGE: AmaneBridge = {
-  repository: 'https://github.com/sqzw-x/amane', license: 'GPL-3.0',
+  repository: 'https://github.com/sqzw-x/amane', license: 'GPL-3.0', bundled: true, problem: '',
   revision: '79ecfa763cc786318e1964a3d7f4e244a7d5c96d', version: '0.16.1', installed: true,
   installed_version: '0.16.1',
   python: 'T:/tools/amane-bridge/.venv/Scripts/python.exe',
@@ -321,6 +321,20 @@ it('amane 桥：检查上游只填「上游最新版本」那一行，重建跟�
   expect(bridge.textContent).toContain('amane 桥已按 79ecfa763cc7 重建');
   expect(toast).toHaveBeenCalledTimes(1);
   expect(toast).toHaveBeenCalledWith('amane 桥已按 79ecfa763cc7 重建');
+});
+
+it('amane 桥：安装包缺桥文件时卡片写出原因，安装键停用', async () => {
+  const problem = '安装包里缺少 amane 桥的文件：C:/Peach/_internal/tools/amane-bridge/pyproject.toml；重新安装 Peach 后可用';
+  const { host } = await open({
+    ...quiet(),
+    'GET /api/scraping/amane-bridge': () => ({ body: {
+      ...BRIDGE, bundled: false, problem, revision: '', version: '', installed: false, installed_version: '',
+    } }),
+  });
+  const bridge = section(host, 'amane')!;
+  expect(bridge.textContent).toContain(problem);
+  expect(bridge.textContent).not.toContain('Peach 内置的');
+  expect(buttonNamed('安装', bridge)?.disabled).toBe(true);
 });
 
 it('登录外链只写主机名；数据库里认不出的连接方式原样列成一项，下拉框不落到空占位', () => {

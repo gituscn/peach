@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "bc580cd5-ef33-42c5-b955-c8e1e665cbf1", e._sentryDebugIdIdentifier = "sentry-dbid-bc580cd5-ef33-42c5-b955-c8e1e665cbf1");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "8b8e4b93-9e10-4378-8219-d6d04862732b", e._sentryDebugIdIdentifier = "sentry-dbid-8b8e4b93-9e10-4378-8219-d6d04862732b");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -74747,7 +74747,10 @@ function bIe({ toast: e }) {
 							children: o.sites.map((e) => e.label).join("、")
 						})
 					}) : null,
-					/* @__PURE__ */ (0, D.jsxs)(dA, { children: [
+					o.problem ? /* @__PURE__ */ (0, D.jsx)(J, {
+						tone: "error",
+						children: o.problem
+					}) : /* @__PURE__ */ (0, D.jsxs)(dA, { children: [
 						"已安装版本：",
 						o.installed_version || "未安装",
 						"。amane（",
@@ -74775,6 +74778,7 @@ function bIe({ toast: e }) {
 				...Y(a.isPending),
 				children: "检查上游版本"
 			}), /* @__PURE__ */ (0, D.jsx)(q, {
+				disabled: !!o.problem,
 				onClick: () => {
 					s || i.mutate();
 				},
@@ -115619,4 +115623,4 @@ nxt(rxt);
 //#endregion
 export { HT as applyTheme, yk as peachHistory, Go as popCount, Agt as showToast };
 
-//# debugId=bc580cd5-ef33-42c5-b955-c8e1e665cbf1
+//# debugId=8b8e4b93-9e10-4378-8219-d6d04862732b
