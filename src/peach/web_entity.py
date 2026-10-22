@@ -641,8 +641,34 @@ def _attach_index_favorites(connection, rows: list[dict]) -> None:
         row["favorite"] = row.get("entity_id") in favorites
 
 
+#: 索引页账本那一段读到的表：计数与代表作、分类、事务所成员与官网、片商旗下 label、
+#: 订阅状态，以及收藏（存在 `profile` 里，按别名与重定向解析成规范实体）。
+INDEX_TABLES = ("asset", "asset_entity", "asset_tag", "asset_tag_preference", "entity",
+                "entity_alias", "entity_redirect", "entity_classification", "entity_external_ref",
+                "entity_identity_link", "entity_link", "entity_membership", "label_maker",
+                "feed_source", "follow_source", "profile")
+
+
 def q_index(contract: WebContract, kind, q="", limit=600, offset=0, category=""):
-    """全部艺人 / 创作者 / 厂牌 / 事务所 / 标签的索引页数据。"""
+    """全部艺人 / 创作者 / 厂牌 / 事务所 / 标签的索引页数据。
+
+    账本那一段十来条 SQL，名册页合计三四百毫秒；没有搜索词时按 `INDEX_TABLES` 的版本缓存。
+    搜索词的键空间不封闭，带搜索词照旧现算。读目录索引的头像与标识标志在缓存之外现做。
+    """
+    def read():
+        return _index_rows(contract, kind, q, limit, offset, category)
+    if q or kind not in {"agencies", "tags", *INDEX_ENTITY_KINDS}:
+        rows, has_more, category_counts = read()
+    else:
+        rows, has_more, category_counts = contract.cached_until_changed(
+            repr(("index", kind, limit, offset, category)), read, tables=INDEX_TABLES)
+    # 下面还要往每行补目录索引的标志，不能写进缓存里那一份。
+    rows = [dict(row) for row in rows]
+    return _decorate_index(contract, kind, rows, has_more, category_counts)
+
+
+def _index_rows(contract: WebContract, kind, q, limit, offset, category):
+    category_counts = None
     with contract.read_connection() as c:
         if kind == "agencies":
             # 事务所自己不挂作品，所以它排的是人：一家有多少艺人是它的规模，作品数是
@@ -735,6 +761,10 @@ def q_index(contract: WebContract, kind, q="", limit=600, offset=0, category="")
             rows = all_rows[offset:offset + limit]
             has_more = offset + limit < len(all_rows)
         _attach_index_favorites(c, rows)
+    return rows, has_more, category_counts
+
+
+def _decorate_index(contract: WebContract, kind, rows, has_more, category_counts):
     if kind in INDEX_ENTITY_KINDS:
         entity_kind = INDEX_ENTITY_KINDS[kind]
         # 索引页一屏几十个圆头像，走的是和顶栏那排同一条两级链：规范实体图优先，

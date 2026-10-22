@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+from . import media_libraries, settings_file
 from .follow_discovery import MAX_SUGGESTIONS, MAX_TERM_LENGTH
 from .review_csv import candidate_root_version
 from .web_activity import (
@@ -24,6 +25,7 @@ from .web_batch import q_ads, q_duplicates, w_batch, w_empty_trash
 from .web_tags import q_tag_management, w_tag_management, w_tag_preview
 from .taste_history import history_source_count
 from .web_catalog import (
+    FACETS_TABLES,
     catalog_filter,
     q_editions,
     q_facets,
@@ -142,7 +144,8 @@ def _get_index(contract, args):
 
 
 def _get_stats(contract, _args):
-    return contract.cached("stats", lambda: q_stats(contract))
+    # 账本那一段在 `q_stats` 里按版本缓存，存储卷每次现量。
+    return q_stats(contract)
 
 
 def _get_tops(contract, args):
@@ -183,6 +186,11 @@ def _get_related(contract, args):
         f"related:{asset_id}:{limit}", lambda: q_related(contract, asset_id, limit))
 
 
+#: 按账本版本缓存的筛选项口径：状态页与取值有限的几组筛选。
+FACET_STATES = frozenset({"", "fresh", "played", "flagged", "later"})
+FACET_ENUM_FILTERS = frozenset({"loc", "len", "orient", "region", "exclude_vertical", "thumb", "library"})
+
+
 def _get_facets(contract, args):
     jav = args.get("jav") == "1"
     scope_kind = str(args.get("scope_kind", ""))
@@ -196,14 +204,20 @@ def _get_facets(contract, args):
         'library', 'folder', 'folder_recursive',
     ) if args.get(key)}
     scope_key += repr(sorted(filters.items()))
-    return contract.cached(
-        f"facets{'-jav' if jav else ''}:{scope_key}",
-        lambda: q_facets(
-            contract,
-            jav=jav, scope_kind=scope_kind, scope_name=scope_name, asset_id=asset_id,
-            state=state, filters=filters or None,
-        ),
+    compute = lambda: q_facets(  # noqa: E731
+        contract,
+        jav=jav, scope_kind=scope_kind, scope_name=scope_name, asset_id=asset_id,
+        state=state, filters=filters or None,
     )
+    # 首页与侧栏几组枚举筛选（来源、时长、画幅、产地、媒体库）的组合有限，按账本版本缓存；
+    # 实体、详情、搜索词、标签与时长区间的键空间不封闭，照旧走 TTL 缓存。
+    if (not (scope_kind or scope_name or asset_id is not None) and state in FACET_STATES
+            and set(filters) <= FACET_ENUM_FILTERS):
+        library = (repr(media_libraries.predicate(settings_file.active(), filters['library']))
+                   if 'library' in filters else '')
+        return contract.cached_until_changed(
+            f"facets{'-jav' if jav else ''}:{scope_key}", compute, library, tables=FACETS_TABLES)
+    return contract.cached(f"facets{'-jav' if jav else ''}:{scope_key}", compute)
 
 
 def _get_suggest(contract, args):
