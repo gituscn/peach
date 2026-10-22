@@ -775,8 +775,8 @@ def source_icon(request: Request, provider: str = "", args: dict[str, str] = Dep
 
 
 #: 人脸探针，题材头像与换头像按番号取的封面共用。YuNet 的模型是个 232 KB 的 ONNX，
-#: 首次用到时才去取；取不到就一直回 None，那时圆标退回样式表里的默认取景、封面退回
-#: 正封取景——没网不该等于这一排一张图都没有。
+#: 首次用到时才去取；取不到时回 None，圆标退回样式表里的默认取景、封面退回正封取景
+#: ——没网不该等于这一排一张图都没有。取不到之后隔 `avatar_face.RETRY_SECONDS` 再试。
 _WORK_FACE_PROBE = avatar_face.FaceProbe()
 
 
@@ -1141,6 +1141,10 @@ def _site_mark_response(state, url: str, root: Path):
 
     地址一律由服务端自己从某张表或账本解析，函数本身不判断来路——但它是唯一会
     真的去连对方站点的地方，所以每个调用方都得先说清自己的地址从哪来。
+
+    取不到时留一个 `.failed` 标记，`follow_assets.RETRY_SECONDS` 内不再出网：一次
+    取图要试首页、manifest 和几个候选，各等 8 秒，断网时资料页每枚外链都重跑一遍，
+    图标区就一直卡着。标记期间有旧图发旧图，没有就 404 露出地球图标。
     """
     # 存档链接按快照保存的原站找图标，缓存也按原站存：缓存键只看主机，按存档地址存，
     # 所有存档链接就共用 web.archive.org 那一枚。
@@ -1148,7 +1152,9 @@ def _site_mark_response(state, url: str, root: Path):
     cached = link_marks.cached_path(root, page)
     if cached is None:
         return JSONResponse({"error": "unavailable"}, status_code=404)
-    if not link_marks.is_fresh(cached, ttl=FAVICON_REFRESH_SECONDS):
+    marker = cached.with_suffix(".failed")
+    if (not link_marks.is_fresh(cached, ttl=FAVICON_REFRESH_SECONDS)
+            and not follow_assets.is_fresh(marker, follow_assets.RETRY_SECONDS)):
         def fetch(target: str):
             try:
                 upstream = state.http_transport.client.get(
@@ -1169,12 +1175,15 @@ def _site_mark_response(state, url: str, root: Path):
         if made is None and archived:
             made = site_icons.best_mark(url, fetch, link_marks.render_mark,
                                         fallback=link_marks.plain_mark)
+        root.mkdir(parents=True, exist_ok=True)
         if made:
-            root.mkdir(parents=True, exist_ok=True)
             cached.write_bytes(made)
-        elif not cached.exists():
-            # 取不到就让前端露出下面的地球图标，不要留一个空白圆。
-            return JSONResponse({"error": "unavailable"}, status_code=404)
+            marker.unlink(missing_ok=True)
+        else:
+            marker.write_bytes(b"")
+    if not cached.exists():
+        # 取不到就让前端露出下面的地球图标，不要留一个空白圆。
+        return JSONResponse({"error": "unavailable"}, status_code=404)
     result = FileResponse(cached, media_type="image/png")
     result.headers["Cache-Control"] = "public, no-cache"
     return result

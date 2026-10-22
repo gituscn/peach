@@ -97,6 +97,26 @@ class FaceProbeTests(unittest.TestCase):
             self.assertIsNone(probe(Path("/tmp/a.img")))
         self.assertEqual(probe.unavailable, "模型未取得")
 
+    def test_a_failed_model_load_waits_out_the_retry_window_then_recovers(self):
+        """服务启动时恰好没网，联网后圆标要自己恢复取景；窗口内不在请求线程里反复重下。"""
+        from peach import avatar_face
+
+        now = [1000.0]
+        probe = FaceProbe(clock=lambda: now[0])
+        with unittest.mock.patch(
+                "peach.avatar_face.FaceDetector",
+                side_effect=[RuntimeError("模型未取得"), unittest.mock.MagicMock()]) as detector, \
+                unittest.mock.patch("peach.avatar_face.face_record", return_value=record()):
+            self.assertIsNone(probe(Path("/tmp/a.img")))
+            self.assertEqual(probe.unavailable, "模型未取得")
+            now[0] += avatar_face.RETRY_SECONDS - 1
+            self.assertIsNone(probe(Path("/tmp/a.img")))
+            self.assertEqual(detector.call_count, 1)
+            now[0] += 1
+            self.assertEqual(probe(Path("/tmp/a.img")), record())
+            self.assertEqual(detector.call_count, 2)
+        self.assertEqual(probe.unavailable, "")
+
     def test_one_undecodable_image_does_not_take_down_the_batch(self):
         probe = FaceProbe()
         with unittest.mock.patch("peach.avatar_face.FaceDetector"):
