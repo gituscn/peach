@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "a72ea81e-f138-4141-adef-8ebc42c57757", e._sentryDebugIdIdentifier = "sentry-dbid-a72ea81e-f138-4141-adef-8ebc42c57757");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "5404afa1-250f-4b35-8ab2-35e8d5da076d", e._sentryDebugIdIdentifier = "sentry-dbid-5404afa1-250f-4b35-8ab2-35e8d5da076d");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -72196,7 +72196,7 @@ function SV(e, t, n) {
 	}, t, !1, n);
 	if (r.html || !e.cover_url || !e.code) return r.html;
 	let i = B(Sa(e));
-	return Ma(e, t).replace(/ src="[^"]*"/, ` src="${i}" data-jav-image="${e.id}" data-jav-cover="${i}" data-jav-thumb="" data-jav-image-layout="${t}"${t === "big" ? " data-panel-prior=\"1\"" : ""}`);
+	return Ma(e, t).replace(/ src="[^"]*"/, ` src="${i}" data-jav-image="${e.id}" data-jav-cover="${i}" data-jav-thumb="" data-jav-image-layout="${t}"${t === "big" ? " data-panel-prior=\"1\"" : ""}`).replace("data-drop=\"self\"", "data-drop=\"initial\" data-initial=\"封面未取得\" data-drop-class=\"nopic\"");
 }
 async function Tze(e, t) {
 	e === "wants" ? await W.ensureQueryData({
@@ -115605,4 +115605,4 @@ $bt(ext);
 //#endregion
 export { PT as applyTheme, dk as peachHistory, Zo as popCount, Dgt as showToast };
 
-//# debugId=a72ea81e-f138-4141-adef-8ebc42c57757
+//# debugId=5404afa1-250f-4b35-8ab2-35e8d5da076d
