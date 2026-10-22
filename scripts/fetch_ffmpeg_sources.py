@@ -20,12 +20,12 @@ import zipfile
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR.parent / "src"))
 from peach.user_agent import USER_AGENT
-if (SCRIPT_DIR.parent / "src/peach/peach_proxy.py").is_file():
+try:
     import httpx
     from peach.peach_proxy import http_client
     HTTP_ERRORS = (httpx.HTTPError,)
-else:
-    # 对应源码归档可独立构建，归档不包含 Peach 应用或它的代理配置。
+except ImportError:
+    # 对应源码归档不含 Peach 代理配置，发布流程的系统 python3 也没有 httpx，都用标准库下载。
     http_client = None
     HTTP_ERRORS = ()
 
