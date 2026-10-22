@@ -121,8 +121,8 @@ class FetchObserverTests(FaceModelsCase):
         self.assertEqual(face_detect.downloads, before + 1)
 
 
-class RetryEndpointTests(FaceModelsCase):
-    """任务卡上的「重新下载」：一轮普通的后台任务，记录只有它自己那一行。"""
+class ModelFilesCase(FaceModelsCase):
+    """两个模型落在临时目录，重新下载走真实路由与后台任务，只有取字节那一步换掉。"""
 
     def setUp(self):
         super().setUp()
@@ -143,6 +143,10 @@ class RetryEndpointTests(FaceModelsCase):
             web_router.dispatch_api_post(self.contract, "/api/face-models", {})
             self.contract.face_models_job.thread.join(5)
 
+
+class RetryEndpointTests(ModelFilesCase):
+    """任务卡上的「重新下载」：一轮普通的后台任务，记录只有它自己那一行。"""
+
     def test_a_failed_retry_is_one_failed_manual_row(self):
         self.retry(side_effect=OSError("断网"))
         [run] = self.rows()
@@ -158,6 +162,40 @@ class RetryEndpointTests(FaceModelsCase):
 
     def test_the_route_is_open_on_a_read_only_machine(self):
         self.assertIn("/api/face-models", web_router.READ_ONLY_POST_ROUTES)
+
+
+class StatusTests(ModelFilesCase):
+    """活动中心总控块读的那一份：和任务卡同一个来源，读的时候不联网。"""
+
+    def status(self):
+        with mock.patch.object(face_detect, "read_url",
+                               side_effect=AssertionError("读状态不该联网")):
+            return face_models.status(self.store)
+
+    def test_never_fetched_is_missing_not_a_problem(self):
+        self.assertEqual(self.status(), {
+            "task_key": TASK, "state": "missing", "available": False, "failed_at": None,
+            "error": "", "run_id": None, "retry_url": face_models.RETRY_URL})
+
+    def test_the_latest_failure_is_reported_with_its_card(self):
+        self.retry(side_effect=OSError("断网"))
+        [run] = self.rows()
+        current = self.status()
+        self.assertEqual((current["state"], current["available"]), ("failed", False))
+        self.assertEqual((current["failed_at"], current["error"], current["run_id"]),
+                         (run.finished_at, run.error, run.id))
+        self.assertEqual(current["retry_url"], "/api/face-models")
+
+    def test_a_retry_in_progress_is_downloading(self):
+        run = self.store.start(TASK, trigger="manual", mutex_key=TASK)
+        self.assertEqual((self.status()["state"], self.status()["run_id"]), ("downloading", run.id))
+
+    def test_both_models_on_disk_after_a_recovery_is_ready(self):
+        self.retry(side_effect=OSError("断网"))
+        self.retry(return_value=self.payload)
+        current = self.status()
+        self.assertEqual((current["state"], current["available"], current["error"]),
+                         ("ready", True, ""))
 
 
 class LabelTests(unittest.TestCase):

@@ -66,6 +66,45 @@ def attach(runs) -> None:
     face_detect.observer = Reporter(runs)
 
 
+#: 「重新下载」的地址。任务卡和活动中心的总控块都用这一个。
+RETRY_URL = "/api/face-models"
+
+
+def status(runs) -> dict:
+    """人脸模型此刻的状态，给活动中心的总控块读。不联网、不算哈希，读一次就是一条查询。
+
+    判据和任务卡同一个来源：最新那条 `face-models` 记录。`state` 取四个值：
+
+    - `downloading`：重新下载那一轮在跑。
+    - `failed`：最新一条是失败，`failed_at`／`error`／`run_id` 指向那张卡。
+    - `ready`：两个模型文件都在本机。哈希留到用的时候由 `fetch_model` 核对。
+    - `missing`：还没取过，下次用到时自动去取；这不是问题，不必提示。
+
+    详细原因只在任务卡上写，这里的 `error` 供总控判断与排查，不另起一套说法。
+    """
+    from . import face_match
+
+    latest = runs.query(task_key=TASK_KEY, limit=1)
+    last = latest[0] if latest else None
+    present = face_detect.MODEL_PATH.is_file() and face_match.MODEL_PATH.is_file()
+    if last is not None and last.active:
+        state = "downloading"
+    elif last is not None and last.status == "failed":
+        state = "failed"
+    else:
+        state = "ready" if present else "missing"
+    failed = state == "failed"
+    return {
+        "task_key": TASK_KEY,
+        "state": state,
+        "available": state == "ready",
+        "failed_at": last.finished_at if failed else None,
+        "error": last.error if failed else "",
+        "run_id": last.id if last is not None and state in ("failed", "downloading") else None,
+        "retry_url": RETRY_URL,
+    }
+
+
 def download_all() -> dict:
     """重新下载那一轮：两个模型各取一次，本地已有且校验对得上的直接算取到。
 
