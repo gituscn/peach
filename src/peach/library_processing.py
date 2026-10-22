@@ -712,10 +712,9 @@ def misses_path(config):
 
 
 def _save(path, payload):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix('.tmp')
-    temporary.write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
-    temporary.replace(path)
+    # 进度条轮询会在写入间隙打开这份状态，Windows 上替换被占着的目标会拒绝访问，
+    # 交给 fsutil 等读者放手。
+    atomic_write_text(path, json.dumps(payload, ensure_ascii=False))
 
 
 def decorate(state, *, now=None):
