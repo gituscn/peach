@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "887b9ab3-7e7f-438e-9d30-d19bb683eace", e._sentryDebugIdIdentifier = "sentry-dbid-887b9ab3-7e7f-438e-9d30-d19bb683eace");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "78ba88d3-4026-4c43-92f5-21c0e99edd13", e._sentryDebugIdIdentifier = "sentry-dbid-78ba88d3-4026-4c43-92f5-21c0e99edd13");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -38469,7 +38469,7 @@ function Jve({ issue: e }) {
 				href: e.href,
 				size: "small",
 				trailingIcon: aA,
-				children: "去处理"
+				children: e.link_label
 			})]
 		}),
 		children: n.error ? `${r}\n没有重试：${V(n.error)}` : r
@@ -115761,4 +115761,4 @@ pxt(mxt);
 //#endregion
 export { $w as applyTheme, Zk as peachHistory, Jo as popCount, Vgt as showToast };
 
-//# debugId=887b9ab3-7e7f-438e-9d30-d19bb683eace
+//# debugId=78ba88d3-4026-4c43-92f5-21c0e99edd13

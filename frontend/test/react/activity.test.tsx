@@ -149,27 +149,30 @@ it('首屏用 prefetch 落进缓存的那一份画出来，挂载时不再请求
 });
 
 const issue = (overrides: Partial<BackgroundIssue> = {}): BackgroundIssue => ({
-  key: 'network', title: '网络不通', href: '/settings/network#peachProxy', since: null,
-  noticed_at: '2026-10-22T07:00:00Z', retry: null, retry_available: false, ...overrides,
+  key: 'tunnel', title: '公网入口连接失败', href: '/settings/network#tunnel', link_label: '打开公网入口设置',
+  since: null, noticed_at: '2026-10-22T07:00:00Z', retry: null, retry_available: false, ...overrides,
 });
 
-it('后台问题排在最前，每项只写是什么、从什么时候起和去处理的入口', async () => {
+it('后台问题排在最前，每项只写是什么、从什么时候起和写明去处的链接，能原地修的另给立即重试', async () => {
   issues = [
     issue(),
     issue({ key: 'follow-schedule', title: '关注自动检查失败', href: '/settings/subscriptions#followScheduleSetting',
-      since: '2026-10-22T06:00:00Z', retry: '/api/follow/schedule/run', retry_available: true }),
+      link_label: '打开关注调度', since: '2026-10-22T06:00:00Z', retry: '/api/follow/schedule/run', retry_available: true }),
   ];
   const { host } = await open(payload({ running: [run()] }));
   await vi.waitFor(() => { if (!host.querySelector('[role="alert"]')) throw new Error('需要处理还没画出来') });
   expect(sections(host)).toEqual(['需要处理', '正在进行']);
-  const [network, follow] = [...host.querySelectorAll('[role="alert"]')];
-  expect(network?.textContent).toContain('网络不通');
-  expect(network?.textContent).toContain('发现于');
-  expect(network?.querySelector('a')?.getAttribute('href')).toBe('/settings/network#peachProxy');
-  expect(buttonNamed('立即重试', network!)).toBeNull();
+  const [tunnel, follow] = [...host.querySelectorAll('[role="alert"]')];
+  expect(tunnel?.textContent).toContain('公网入口连接失败');
+  expect(tunnel?.textContent).toContain('发现于');
+  expect(tunnel?.querySelector('a')?.getAttribute('href')).toBe('/settings/network#tunnel');
+  expect(tunnel?.querySelector('a')?.textContent).toContain('打开公网入口设置');
+  expect(buttonNamed('立即重试', tunnel!)).toBeNull();
   expect(follow?.textContent).toContain('自 ');
   expect(follow?.textContent).toContain(' 起');
-  expect(follow?.querySelector('a')?.textContent).toContain('去处理');
+  // 按钮在左、链接在右。
+  const [first, second] = [...follow!.querySelectorAll('[data-note-action] a, [data-note-action] button')];
+  expect([first?.textContent, second?.textContent]).toEqual(['立即重试', expect.stringContaining('打开关注调度')]);
 
   await click(buttonNamed('立即重试', follow!));
   await vi.waitFor(() => { if (host.querySelectorAll('[role="alert"]').length !== 1) throw new Error('重试后那一项还在') });

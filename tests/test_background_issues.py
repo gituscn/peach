@@ -64,9 +64,9 @@ class BackgroundIssueTests(unittest.TestCase):
         scheduler._run()
         scheduler._run()
         [row] = self.collect()
-        self.assertEqual({key: row[key] for key in ("key", "href", "retry", "retry_available")}, {
+        self.assertEqual({key: row[key] for key in ("key", "href", "link_label", "retry", "retry_available")}, {
             "key": "follow-schedule", "href": "/settings/subscriptions#followScheduleSetting",
-            "retry": "/api/follow/schedule/run", "retry_available": True})
+            "link_label": "打开关注调度", "retry": "/api/follow/schedule/run", "retry_available": True})
         self.assertEqual(row["since"], scheduler.status()["failing_since"])
         self.assertNotIn("1 个来源检查失败", json.dumps(row, ensure_ascii=False))
 
@@ -78,8 +78,9 @@ class BackgroundIssueTests(unittest.TestCase):
         self.state.network_reachability = SimpleNamespace(summary=lambda: {"state": "offline"})
         self.state.automatic_updates = SimpleNamespace(snapshot=lambda: {"error": "下载没有启动"})
         [network, updates] = self.collect()
-        self.assertEqual((network["key"], network["href"], network["since"]),
-                         ("network", "/settings/network#peachProxy", None))
+        self.assertEqual((network["key"], network["href"], network["link_label"], network["retry"], network["since"]),
+                         ("network", "/settings/network#peachProxy", "打开 Peach 代理设置",
+                          "/api/network-status/check", None))
         noticed = network["noticed_at"]
         self.clock.now += 600
         self.assertEqual([row["noticed_at"] for row in self.collect()], [noticed, noticed])
@@ -89,7 +90,8 @@ class BackgroundIssueTests(unittest.TestCase):
         self.clock.now += 60
         self.state.network_reachability = SimpleNamespace(summary=lambda: {"state": "offline"})
         self.assertNotEqual(self.collect()[0]["noticed_at"], noticed)
-        self.assertEqual(updates["retry"], None)
+        # 要改设置才修得好的只给链接，不给重试。
+        self.assertEqual((updates["retry"], updates["link_label"]), (None, "打开自动更新设置"))
 
     def test_a_disabled_tunnel_with_a_leftover_error_is_not_a_problem(self):
         self.state.tunnel = SimpleNamespace(snapshot=lambda: TunnelSnapshot(state="stopped", error="上一次没有正常收尾"))
@@ -134,10 +136,19 @@ class BackgroundIssueTests(unittest.TestCase):
             self.assertEqual(keys(self.log.collect(self.state, self.contract, config)), ["library-sharing"])
             self.assertEqual(self.log.collect(self.state, self.contract, config), [])
 
-    def test_a_missing_amane_bridge_links_to_the_sources_page(self):
+    def test_a_missing_amane_bridge_can_be_rebuilt_in_place_unless_a_rebuild_is_running(self):
         self.contract.tools_root = self.root / "empty-tools"
+        job = {"status": "idle"}
+        self.contract.amane_bridge_job = SimpleNamespace(snapshot=lambda: job)
         [row] = self.collect()
-        self.assertEqual((row["key"], row["href"]), ("amane-bridge", "/sources#amane"))
+        self.assertEqual((row["key"], row["href"], row["link_label"], row["retry"], row["retry_available"]),
+                         ("amane-bridge", "/sources#amane", "打开 amane 设置",
+                          "/api/scraping/amane-bridge/rebuild", True))
+        job["status"] = "running"
+        self.assertFalse(self.collect()[0]["retry_available"])
+        job["status"] = "idle"
+        self.state.sync = SimpleNamespace(read_only=True)
+        self.assertFalse(self.collect()[0]["retry_available"])
 
     def test_one_broken_service_does_not_hide_the_others(self):
         def broken():

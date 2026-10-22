@@ -8,6 +8,9 @@
 这里不再复述一遍。高频逐条的失败（站点圆标、头像、单个推送文件）不进来：它们各自有
 任务记录，汇总在这里只会刷屏。
 
+动作按能不能原地修好分：网络、调度、amane 桥这类重跑一次就可能好的给 `retry`（界面上
+一律叫「立即重试」）；要改设置、填凭据的只给链接。每项都带链接，`link_label` 写具体去处。
+
 时间分两种：`since` 是服务自己记下的起点，只有两个调度有（连续失败里第一轮的开始）；
 其余服务不记失败时刻，`noticed_at` 是这个进程第一次读到这一项的时间，会晚于实际发生，
 重启后重新计。两者不互相顶替。
@@ -32,6 +35,8 @@ class Issue:
     key: str
     title: str
     href: str
+    #: 链接文案写具体去处（「打开推送设置」），界面直接用。
+    link_label: str
     since: str | None = None
     #: 能一键重试时的 POST 地址；只给自成一体、不需要表单与修订号的动作。
     retry: str | None = None
@@ -53,9 +58,9 @@ def _push_discovery(state, _contract, _config) -> list[Issue]:
     href = "/settings/library#pushDiscovery"
     issues = []
     if snapshot["queue"].get("last_error"):
-        issues.append(Issue("push-discovery", "自动发现新文件入库失败", href))
+        issues.append(Issue("push-discovery", "自动发现新文件入库失败", href, "打开推送设置"))
     if snapshot.get("watch_local") and not snapshot.get("local_running") and snapshot.get("local_message"):
-        issues.append(Issue("push-discovery-watch", "本机文件夹监视没有运行", href))
+        issues.append(Issue("push-discovery-watch", "本机文件夹监视没有运行", href, "打开推送设置"))
     return issues
 
 
@@ -71,10 +76,10 @@ def _downloads(_state, contract, _config) -> list[Issue]:
             "AND coalesce(failure_detail, '') <> ''", tuple(TRACKED_STATES)).fetchone()
     if not count:
         return []
-    return [Issue("downloads", f"{count} 个云下载任务对账暂时失败", "/tasks#cloudDownloads")]
+    return [Issue("downloads", f"{count} 个云下载任务对账暂时失败", "/tasks#cloudDownloads", "查看云下载")]
 
 
-def _scheduler(attribute: str, key: str, title: str, href: str, retry: str):
+def _scheduler(attribute: str, key: str, title: str, href: str, link_label: str, retry: str):
     def provider(_state, contract, _config) -> list[Issue]:
         scheduler = getattr(contract, attribute, None)
         if scheduler is None:
@@ -82,7 +87,7 @@ def _scheduler(attribute: str, key: str, title: str, href: str, retry: str):
         status = scheduler.status()
         if not status.get("enabled") or status.get("running") or not status.get("last_error"):
             return []
-        return [Issue(key, title, href, since=status.get("failing_since"), retry=retry,
+        return [Issue(key, title, href, link_label, since=status.get("failing_since"), retry=retry,
                       retry_available=bool(status.get("available")))]
     return provider
 
@@ -94,7 +99,7 @@ def _tunnel(state, _contract, config) -> list[Issue]:
         return []
     if not manager.snapshot().error:
         return []
-    return [Issue("tunnel", "公网入口连接失败", "/settings/network#tunnel")]
+    return [Issue("tunnel", "公网入口连接失败", "/settings/network#tunnel", "打开公网入口设置")]
 
 
 def _library_sharing(_state, _contract, config) -> list[Issue]:
@@ -103,24 +108,30 @@ def _library_sharing(_state, _contract, config) -> list[Issue]:
     from . import library_sharing
     if library_sharing.snapshot(config)["last_attempt"].get("status") != "failed":
         return []
-    return [Issue("library-sharing", "馆藏分享上传失败", "/settings/maintenance#librarySharing")]
+    return [Issue("library-sharing", "馆藏分享上传失败", "/settings/maintenance#librarySharing", "打开数据上传设置")]
 
 
 def _automatic_updates(state, _contract, _config) -> list[Issue]:
     service = getattr(state, "automatic_updates", None)
     if service is None or not service.snapshot().get("error"):
         return []
-    return [Issue("automatic-updates", "自动更新出错", "/settings/maintenance#automaticUpdates")]
+    return [Issue("automatic-updates", "自动更新出错", "/settings/maintenance#automaticUpdates", "打开自动更新设置")]
 
 
-def _amane_bridge(_state, contract, _config) -> list[Issue]:
+def _amane_bridge(state, contract, _config) -> list[Issue]:
     tools_root = getattr(contract, "tools_root", None)
     if tools_root is None:
         return []
     from .metadata_amane import bridge_python
     if bridge_python(tools_root).is_file():
         return []
-    return [Issue("amane-bridge", "amane 桥未安装", "/sources#amane")]
+    # 重建是后台任务，跑着的时候再点只会撞上 409；只读端的写入闸门同样会挡。
+    job = getattr(contract, "amane_bridge_job", None)
+    building = bool(job and (job.snapshot() or {}).get("status") == "running")
+    sync = getattr(state, "sync", None)
+    writer = sync is None or not sync.read_only
+    return [Issue("amane-bridge", "amane 桥未安装", "/sources#amane", "打开 amane 设置",
+                  retry="/api/scraping/amane-bridge/rebuild", retry_available=writer and not building)]
 
 
 def _network(state, _contract, _config) -> list[Issue]:
@@ -128,7 +139,8 @@ def _network(state, _contract, _config) -> list[Issue]:
     # 只读快照，不在这里启动探测：探测线程由页面读 `/api/network-status` 时拉起。
     if monitor is None or monitor.summary().get("state") != "offline":
         return []
-    return [Issue("network", "网络不通", "/settings/network#peachProxy")]
+    return [Issue("network", "网络不通", "/settings/network#peachProxy", "打开 Peach 代理设置",
+                  retry="/api/network-status/check", retry_available=True)]
 
 
 Provider = Callable[[Any, Any, Any], Iterable[Issue]]
@@ -137,9 +149,9 @@ PROVIDERS: tuple[Provider, ...] = (
     _network,
     _tunnel,
     _scheduler("follow_scheduler", "follow-schedule", "关注自动检查失败",
-               "/settings/subscriptions#followScheduleSetting", "/api/follow/schedule/run"),
+               "/settings/subscriptions#followScheduleSetting", "打开关注调度", "/api/follow/schedule/run"),
     _scheduler("feed_scheduler", "feed-schedule", "订阅源自动拉取失败",
-               "/settings/subscriptions#feedScheduleSetting", "/api/feeds/schedule/run"),
+               "/settings/subscriptions#feedScheduleSetting", "打开订阅源调度", "/api/feeds/schedule/run"),
     _push_discovery,
     _downloads,
     _automatic_updates,

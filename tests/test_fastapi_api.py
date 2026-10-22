@@ -393,9 +393,22 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             response = await self.client.get("/api/background-issues?t=secret")
         self.assertEqual(response.status_code, 200)
         [issue] = response.json()["issues"]
-        self.assertEqual((issue["key"], issue["href"], issue["since"]),
-                         ("network", "/settings/network#peachProxy", None))
+        self.assertEqual((issue["key"], issue["href"], issue["since"], issue["retry"]),
+                         ("network", "/settings/network#peachProxy", None, "/api/network-status/check"))
         self.assertTrue(issue["noticed_at"])
+
+    async def test_network_check_probes_once_on_the_spot_and_returns_the_fresh_state(self):
+        from peach.network_reachability import NetworkReachability
+        monitor = NetworkReachability(check=lambda: True)
+        monitor.start = lambda: None
+        self.app.state.network_reachability = monitor
+        self.assertEqual(monitor.summary()["state"], "checking")
+        refused = await self.client.post("/api/network-status/check?t=secret",
+                                          headers={"Origin": "https://evil.example"})
+        self.assertEqual(refused.status_code, 403)
+        response = await self.client.post("/api/network-status/check?t=secret")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["state"], "online")
 
     async def test_sources_and_public_health_read_unknown_mount_snapshot_without_io(self):
         from peach.mount_reachability import MountReachability, MountRoot

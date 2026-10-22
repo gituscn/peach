@@ -2,8 +2,9 @@
  *
  * 这些是持续状态（调度连续失败、公网入口断开、网络不通），不是跑过的一轮，所以不进任务表；
  * 数据来自 `/api/background-issues`，服务端每次现读各服务的快照，问题消失这一行就不在了。
- * 一行只写是什么、从什么时候开始，加一个去处理的入口；原因只在入口指向的那个设置位置讲，
- * 这里不复述。能一键重试的（两个调度）多给一个「立即重试」。
+ * 一行只写是什么、从什么时候开始，加一个写明去处的链接（文案由服务端给）；原因只在链接
+ * 指向的那个设置位置讲，这里不复述。原地重跑就可能修好的（网络、调度、amane 桥）多给一个
+ * 「立即重试」，排在链接左边；要改设置、填凭据的只有链接。
  *
  * 时间分两种：服务自己记下的起点写「自 … 起」；服务不记失败时刻的，写这一次运行里第一次
  * 读到它的时刻「发现于 …」，两者不混用。没有问题时整段不画，取数失败也不画：服务连不上时
@@ -27,6 +28,8 @@ export interface BackgroundIssue {
   key: string;
   title: string;
   href: string;
+  /** 链接文案，写具体去处，例如「打开推送设置」。 */
+  link_label: string;
   /** 服务自己记下的起点；不记的服务是 null。 */
   since: string | null;
   /** 这一次运行里第一次读到这一项的时刻。 */
@@ -68,7 +71,7 @@ function IssueRow({ issue }: { issue: BackgroundIssue }) {
           ? <Button variant="secondary" size="small" disabled={!issue.retry_available}
               {...busyProps(retry.isPending)} onClick={() => retry.mutate()}>立即重试</Button>
           : null}
-        <LinkButton href={issue.href} size="small" trailingIcon={RiArrowRightLine}>去处理</LinkButton>
+        <LinkButton href={issue.href} size="small" trailingIcon={RiArrowRightLine}>{issue.link_label}</LinkButton>
       </div>
     }>
       {retry.error ? `${moment}\n没有重试：${errorMessage(retry.error)}` : moment}
