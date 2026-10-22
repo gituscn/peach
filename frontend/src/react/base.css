@@ -11,6 +11,13 @@
   --font-inter: "Inter Variable", "Inter";
 }
 
+/* 与文字同行的图标画框，按所在文字字号缩放。雪碧图字形在 24 画框里笔画约占 75%，1.2em 让它和
+ * 同排汉字的墨迹一样大。遗留壳 `web/css/01-base.css` 的 `:root` 同名同值。写在这里而不进
+ * `styles.css` 的 `@theme`：独立页面包也用 `SourceMark` 与带字按键，而 `@theme` 变量按用量裁剪。 */
+:root {
+  --icon-inline: 1.2em;
+}
+
 /* 阴影 token 改由 `--elevation-*` 给值。Tailwind v4 为了让 `shadow-<颜色>` 能换色，把
  * `--shadow-*` 的字面值抄进工具类，`theme.css` 在 `.dark` 里重定的 `--shadow-*` 于是够不着
  * `shadow-card` 这类工具类，暗色下全站卡片还是浅色那一档 5% 的黑影。这里把 token 接到

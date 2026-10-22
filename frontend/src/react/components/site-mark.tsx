@@ -6,10 +6,10 @@ import { siteMarkUrl } from '@peach/legacy/core';
 export function SiteMark({ source, linkId }: { source: string; linkId?: never } | { linkId: number | undefined; source?: never }) {
   const [failed, setFailed] = useState('');
   const mark = String(linkId ?? source);
-  if (linkId === undefined && !source) return <RiGlobalLine aria-hidden className="size-4 shrink-0" />;
-  if (source === 'makers') return <RiBuildingLine aria-hidden className="size-4 shrink-0" />;
-  if (failed === mark) return <RiGlobalLine aria-hidden className="size-4 shrink-0" />;
+  if (linkId === undefined && !source) return <RiGlobalLine aria-hidden className="size-(--icon-inline) shrink-0" />;
+  if (source === 'makers') return <RiBuildingLine aria-hidden className="size-(--icon-inline) shrink-0" />;
+  if (failed === mark) return <RiGlobalLine aria-hidden className="size-(--icon-inline) shrink-0" />;
   const bundled = source && ['javten', 'fc2ppvdb', 'avwikidb', 'minnano-av', 'github'].includes(source);
   return <img src={linkId !== undefined ? `/link-mark?id=${linkId}` : bundled ? `/site-icon/${source}.png` : siteMarkUrl({ source: source! })} alt="" width={16} height={16}
-    loading="lazy" onError={() => setFailed(mark)} className="size-4 shrink-0 rounded-none object-contain" />;
+    loading="lazy" onError={() => setFailed(mark)} className="size-(--icon-inline) shrink-0 rounded-none object-contain" />;
 }

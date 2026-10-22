@@ -240,8 +240,8 @@
 }
 .peach-react [data-entity-sort] svg {
   flex: none;
-  width: 14px;
-  height: 14px;
+  width: var(--icon-inline);
+  height: var(--icon-inline);
   margin-left: 5px;
 }
 .peach-react [data-entity-sort] [data-icon-swap] { margin-left: 5px; }
@@ -273,8 +273,8 @@
 }
 .peach-react [data-photo-back]:hover { background: var(--overlay-5); }
 .peach-react [data-photo-back] svg {
-  width: 15px;
-  height: 15px;
+  width: var(--icon-inline);
+  height: var(--icon-inline);
   fill: none;
   stroke: currentColor;
   stroke-width: 2;

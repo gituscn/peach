@@ -48,7 +48,7 @@
   background:var(--ground);color:var(--ink-2);display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;
   transition:color .15s ease-in-out,background-color .15s ease-in-out}
 .cleanupfieldset button:where(:not(.gselectfield)):hover{background:color-mix(in srgb,var(--ink) 8%,var(--ground));color:var(--ink)}
-.cleanupfieldset button:where(:not(.gselectfield)) svg{width:16px;height:16px;stroke:currentColor;fill:none}
+.cleanupfieldset button:where(:not(.gselectfield)) svg{width:var(--icon-inline);height:var(--icon-inline);stroke:currentColor;fill:none}
 .stats h2{margin:0 0 4px;font-size:var(--fs-2xl)}
 .stats .sub{color:var(--muted);margin:0}
 /* 来源和凭证页的正文归 React 子树（ADR-0031）。这两条只服务遗留骨架：那一句静态说明

@@ -130,7 +130,7 @@ function ShortcutContents({ currentHref, kind, close }: { currentHref?: () => st
           const count = value === 'filters' ? data?.filters.length || 0 : (data?.favorites || []).filter(row => value === 'all' || row.kind === value).length;
           return <button key={value} type="button" role="tab" id={`${id}-${value}`} aria-controls={`${id}-content`}
             aria-label={label} aria-selected={scope === value} tabIndex={scope === value ? 0 : -1} onPointerEnter={glide.hover} onClick={() => setScope(value)}>
-            <Glyph aria-hidden className="size-5" /><span>{label}</span><span data-shortcuts-count="">{count}</span>
+            <Glyph aria-hidden className="size-(--icon-inline)" /><span>{label}</span><span data-shortcuts-count="">{count}</span>
           </button>;
         })}
       </div>

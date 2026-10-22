@@ -21,7 +21,8 @@ import { cx, sortCx } from "@/utils/cx";
  *                       Medium                    Small                     Xs
  *   container          h=36, p=8,   r=10         h=32, px=8 py=6, r=8      h=24, px=8, r=4
  *   gap                 2px                       2px                      1.33px→1
- *   icon                20×20                     18×18                    14×14
+ *   icon (icon-only)    20×20                     18×18                    14×14
+ *   icon (labelled)     1.2em（`--icon-inline`，随文字字号缩放）
  *   label wrapper       px=4                      px=2                     px=2
  *   text style          Body 1/Medium             Body 1/Medium            Caption 1/Semibold
  *   icon-only square    36×36 (content-derived)   32×32 (forced size)      24×24 (forced size)
@@ -101,10 +102,18 @@ const styles = sortCx({
     xs:     "size-6 p-0",      // hard 24×24, content-centered
   },
 
+  // 纯图标键的字形跟按键档位走。
   icon: {
     medium: "size-5 shrink-0",        // 20px
     small:  "size-[18px] shrink-0",   // 18px
     xs:     "size-3.5 shrink-0",      // 14px
+  },
+
+  // 带字按键的前置、后置字形与文字同行，画框按所在文字字号缩放（`--icon-inline`）。
+  iconInline: {
+    medium: "size-(--icon-inline) shrink-0",
+    small:  "size-(--icon-inline) shrink-0",
+    xs:     "size-(--icon-inline) shrink-0",
   },
 
   label: {
@@ -141,6 +150,12 @@ const styles = sortCx({
   },
 });
 
+/** 有可见文字时字形与文字同行，取 `iconInline`；纯图标键取按档位的 `icon`。 */
+function iconGlyph(iconOnly: boolean, children: ReactNode, size: ButtonSize): string {
+  const labelled = !iconOnly && children !== undefined && children !== null;
+  return labelled ? styles.iconInline[size] : styles.icon[size];
+}
+
 export function Button({
   variant = "primary",
   size = "medium",
@@ -153,6 +168,7 @@ export function Button({
   ref,
   ...props
 }: ButtonProps) {
+  const glyph = iconGlyph(iconOnly, children, size);
   return (
     <button
       ref={ref}
@@ -166,12 +182,12 @@ export function Button({
       )}
       {...props}
     >
-      {Leading ? <Leading className={styles.icon[size]} aria-hidden /> : null}
+      {Leading ? <Leading className={glyph} aria-hidden /> : null}
       {!iconOnly && children !== undefined && children !== null && (
         <span className={styles.label[size]}>{children}</span>
       )}
       {!iconOnly && Trailing ? (
-        <Trailing className={styles.icon[size]} aria-hidden />
+        <Trailing className={glyph} aria-hidden />
       ) : null}
     </button>
   );
@@ -189,6 +205,7 @@ export function ButtonLink({
   ref,
   ...props
 }: ButtonLinkProps) {
+  const glyph = iconGlyph(iconOnly, children, size);
   return (
     <a
       ref={ref}
@@ -201,12 +218,12 @@ export function ButtonLink({
       )}
       {...props}
     >
-      {Leading ? <Leading className={styles.icon[size]} aria-hidden /> : null}
+      {Leading ? <Leading className={glyph} aria-hidden /> : null}
       {!iconOnly && children !== undefined && children !== null && (
         <span className={styles.label[size]}>{children}</span>
       )}
       {!iconOnly && Trailing ? (
-        <Trailing className={styles.icon[size]} aria-hidden />
+        <Trailing className={glyph} aria-hidden />
       ) : null}
     </a>
   );

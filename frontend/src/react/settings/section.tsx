@@ -149,9 +149,9 @@ export function Disclosure(
     <details ref={attach}>
       <summary aria-expanded={open} aria-controls={id} onClick={toggle}
         className={`${trailing ? 'w-full' : 'w-fit'} flex cursor-pointer list-none items-center gap-1 rounded-sm text-body-2-medium text-text-secondary outline-none select-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring`}>
-        {!trailing ? <RiArrowRightSLine aria-hidden className={open ? 'size-4 shrink-0 rotate-90 transition-transform' : 'size-4 shrink-0 transition-transform'} /> : null}
+        {!trailing ? <RiArrowRightSLine aria-hidden className={open ? 'size-(--icon-inline) shrink-0 rotate-90 transition-transform' : 'size-(--icon-inline) shrink-0 transition-transform'} /> : null}
         {summary}
-        {trailing ? <RiArrowRightSLine aria-hidden className={open ? 'ml-auto size-4 shrink-0 -rotate-90 transition-transform' : 'ml-auto size-4 shrink-0 rotate-90 transition-transform'} /> : null}
+        {trailing ? <RiArrowRightSLine aria-hidden className={open ? 'ml-auto size-(--icon-inline) shrink-0 -rotate-90 transition-transform' : 'ml-auto size-(--icon-inline) shrink-0 rotate-90 transition-transform'} /> : null}
       </summary>
       <div ref={body} id={id} inert={!open}>
         <div className={cx('flex flex-col gap-2 pt-3', contentClassName)}>{children}</div>
@@ -163,7 +163,7 @@ export function Disclosure(
 /** 遗留雪碧图（`web/index.html` 的 `#i-*` symbol）里的字形。媒体库图标的取值就是这些名字。 */
 export function SpriteIcon({ name }: { name: string }) {
   return (
-      <svg aria-hidden data-source-mark={name} viewBox="0 0 24 24" fill="none" className="size-4 shrink-0 stroke-current stroke-2">
+      <svg aria-hidden data-source-mark={name} viewBox="0 0 24 24" fill="none" className="size-(--icon-inline) shrink-0 stroke-current stroke-2">
       <use href={`#i-${name}`} />
     </svg>
   );
@@ -172,6 +172,6 @@ export function SpriteIcon({ name }: { name: string }) {
 /** 来源标识：网盘站标是内嵌 PNG，其余是雪碧图字形（`src/ui-kit/media-source-icons.ts`）。 */
 export function SourceMark({ mark }: { mark: string }) {
   return mark.startsWith('data:image/png;base64,')
-    ? <img src={mark} alt="" width={16} height={16} className="size-4 shrink-0" />
+    ? <img src={mark} alt="" width={16} height={16} className="size-(--icon-inline) shrink-0" />
     : <SpriteIcon name={mark} />;
 }

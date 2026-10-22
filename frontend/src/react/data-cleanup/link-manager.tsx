@@ -98,7 +98,7 @@ function LinkTable(
         className="flex min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary">
         <SiteMark linkId={item.id} />
         <span data-middle-truncate className="min-w-0 truncate">{item.url}</span>
-        <RiExternalLinkLine aria-hidden className="size-3.5 shrink-0" />
+        <RiExternalLinkLine aria-hidden className="size-(--icon-inline) shrink-0" />
       </a> },
   ];
   return (
@@ -251,7 +251,7 @@ export function LinkManager() {
                           <a href={`https://${host}`} target="_blank" rel="noopener noreferrer"
                             className="inline-flex min-w-0 items-center gap-1.5 text-body-2-medium text-text-primary">
                             <SiteMark linkId={info.top_host_link_ids?.[host]} /><span className="min-w-0 wrap-anywhere">{host}</span>
-                            <RiExternalLinkLine aria-hidden className="size-3.5 shrink-0" />
+                            <RiExternalLinkLine aria-hidden className="size-(--icon-inline) shrink-0" />
                           </a>
                           <Chip variant="caption" color="neutral"><span className="tabular-nums">{count(n)}</span></Chip>
                         </span>)}

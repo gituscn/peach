@@ -14,9 +14,10 @@ import { cx, sortCx } from "@/utils/cx";
  *
  * Variant / size matrix (mirrors Button's structure):
  *   Variant = primary (blue/600 text) | secondary (text/secondary)
- *   Size    = medium (Body 1/Medium, 20px icons)
- *           | small  (Body 1/Medium, 18px icons)
- *           | xs     (Caption 1/Semibold, 14px icons)
+ *   Size    = medium (Body 1/Medium)
+ *           | small  (Body 1/Medium)
+ *           | xs     (Caption 1/Semibold)
+ *   字形画框是 `--icon-inline`（1.2em），随该档文字字号缩放。
  *
  * Renders an `<a>` when `href` is passed, otherwise a `<button>` — the same
  * action can live in copy ("Learn more →") or trigger a handler. Icons are
@@ -74,10 +75,11 @@ const styles = sortCx({
     xs: "text-caption-1-semibold",
   },
 
+  // 链接键总带字，字形与文字同行，画框按所在文字字号缩放（`--icon-inline`）。
   icon: {
-    medium: "size-5 shrink-0",
-    small: "size-[18px] shrink-0",
-    xs: "size-3.5 shrink-0",
+    medium: "size-(--icon-inline) shrink-0",
+    small: "size-(--icon-inline) shrink-0",
+    xs: "size-(--icon-inline) shrink-0",
   },
 
   variant: {

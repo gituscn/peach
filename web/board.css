@@ -782,7 +782,7 @@ html.board-high-contrast :is(.card .badge,[data-glass-pane]){background:var(--gr
    肉眼可见地淡出。页码格的规则在 frontend/src/pagination.css。 ── */
 .board-pagination{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin-top:16px}
 .board-pagination>ul{display:flex;align-items:center;gap:2px;margin:0;padding:0;list-style:none}
-.board-pagination>.geist-button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.board-pagination>.geist-button svg{width:var(--icon-inline);height:var(--icon-inline);fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 /* ── 口味页三个面板的标题同一档：Heading 20/26、上 24 左 24 下 12；面板页头那两条在 frontend/src/board-skeleton.css ── */
 .insightcopy>span{margin:0;font:var(--board-heading);color:var(--color-text-primary)}
 .insightcopy{padding:24px;gap:0}
@@ -841,7 +841,7 @@ html.board-high-contrast :is(.card .badge,[data-glass-pane]){background:var(--gr
 .post-setup-task:has(>a:hover)::before,.post-setup-task:has(>a:hover)+.post-setup-task::before{opacity:0}
 .post-setup-task>a{position:relative;display:grid;grid-template-columns:24px minmax(0,1fr) 16px;align-items:center;gap:12px;min-width:0;min-height:62px;padding:10px 8px 10px 12px;border-radius:8px;color:var(--ink);text-decoration:none}
 .post-setup-task>a:hover{background:var(--hover)}
-.post-setup-task>a>svg{width:16px;height:16px;color:var(--color-text-secondary);fill:none;stroke:currentColor;stroke-width:2}
+.post-setup-task>a>svg{width:var(--icon-inline);height:var(--icon-inline);color:var(--color-text-secondary);fill:none;stroke:currentColor;stroke-width:2}
 .post-setup-task>a:hover>svg{color:var(--color-text-primary)}
 .post-setup-skip{position:relative;margin-right:8px;padding:6px 8px;border:0;border-radius:var(--control-radius);background:transparent;color:var(--color-text-secondary);font:var(--board-body-2-regular);transition:background-color .15s ease,color .15s ease}
 .post-setup-skip:hover{background:var(--color-background-primary-hover);color:var(--color-text-primary)}

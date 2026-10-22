@@ -91,8 +91,8 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
           aria-current={step.status === 'current' ? 'step' : undefined}
           className={cx('flex min-h-8 items-center gap-2 text-body-2-regular',
             step.status === 'current' ? 'text-text-primary' : 'text-text-tertiary')}>
-          {step.status === 'complete' ? <RiCheckLine aria-hidden className="size-4 shrink-0" />
-            : <RiCheckboxBlankCircleLine aria-hidden className={cx('size-4 shrink-0', step.status === 'current' && 'text-border-focus-ring')} />}
+          {step.status === 'complete' ? <RiCheckLine aria-hidden className="size-(--icon-inline) shrink-0" />
+            : <RiCheckboxBlankCircleLine aria-hidden className={cx('size-(--icon-inline) shrink-0', step.status === 'current' && 'text-border-focus-ring')} />}
           <VisuallyHidden>{step.status === 'complete' ? '已完成：' : step.status === 'current' ? '当前：' : '待处理：'}</VisuallyHidden>
           {step.status === 'complete' ? <s className="wrap-anywhere">{step.label}</s> : <span className="wrap-anywhere">{step.label}</span>}
         </li>)}

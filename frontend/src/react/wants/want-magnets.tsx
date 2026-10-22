@@ -33,7 +33,7 @@ export interface MagnetResult {
 }
 
 function ResourceFact({ icon: Icon, children, title }: { icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>; children: ReactNode; title?: string }) {
-  return <span title={title} className="inline-flex items-center gap-1"><Icon aria-hidden className="size-3.5 shrink-0" />{children}</span>;
+  return <span title={title} className="inline-flex items-center gap-1"><Icon aria-hidden className="size-(--icon-inline) shrink-0" />{children}</span>;
 }
 
 export function WantMagnets({ want, readOnly, downloads, provider, toast, onSource, queryUrl }: {

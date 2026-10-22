@@ -26,9 +26,9 @@
   .peach-react [data-follow-title] { font: var(--board-figure); }
 }
 .peach-react [data-follow-head-actions] { display: inline-flex; flex: none; align-items: center; gap: 8px; }
-/* 「管理关注」「抓更早的一页」同遗留层 `.fbtn`：左边留 12px，图标 14px，与文字隔 4px（文字自带的内边距）。 */
+/* 「管理关注」「抓更早的一页」同遗留层 `.fbtn`：左边留 12px，图标与文字同行、随字号缩放，与文字隔 4px（文字自带的内边距）。 */
 .peach-react button:is([data-follow-manage], [data-follow-older]):has(> svg) { gap: 0; padding-left: 12px; }
-.peach-react button:is([data-follow-manage], [data-follow-older]) > svg { width: 14px; height: 14px; }
+.peach-react button:is([data-follow-manage], [data-follow-older]) > svg { width: var(--icon-inline); height: var(--icon-inline); }
 
 /* ── 创作者行与题材行 ──
  * 同首页那两排（`catalog-filter.css` 的 `[data-tier-performer]`、`[data-tier-studio]`）：圆头像 48px、名字一行 Caption；题材是 40px 高的
@@ -428,7 +428,7 @@ body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-follo
   -webkit-backdrop-filter: blur(10px);
   transition: opacity .15s ease;
 }
-.peach-react [data-follow-collection] svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; }
+.peach-react [data-follow-collection] svg { width: var(--icon-inline); height: var(--icon-inline); fill: none; stroke: currentColor; stroke-width: 2; }
 .peach-react [data-follow-actions] {
   display: flex;
   align-items: center;
@@ -532,8 +532,8 @@ body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-follo
 /* 卡片、两排与详情共用的几处字样，HTML 由 `follow-marks.ts` 拼。站点图标在角标、来源条那几格里
    另有尺寸，这里是行内默认的那一档。SFW 模式下它不跟着内容图一起糊，豁免写在 `17-overlay.css`。 */
 .peach-react [data-follow-site-icon] {
-  width: 14px;
-  height: 14px;
+  width: var(--icon-inline);
+  height: var(--icon-inline);
   margin-right: 5px;
   border-radius: 0;
   object-fit: contain;

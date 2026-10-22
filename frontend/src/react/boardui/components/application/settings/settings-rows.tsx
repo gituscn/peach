@@ -89,11 +89,11 @@ export function SettingsValueField({
   return (
     <div
       className={cx(
-        "flex h-8 w-[202px] shrink-0 items-center gap-0.5 rounded-2lg bg-background-tertiary-default px-1.5",
+        "flex h-8 w-[202px] shrink-0 items-center gap-0.5 rounded-2lg bg-background-tertiary-default px-1.5 text-body-regular",
         className,
       )}
     >
-      {Icon && <Icon className="size-5 shrink-0 text-foreground-icon-secondary" aria-hidden />}
+      {Icon && <Icon className="size-(--icon-inline) shrink-0 text-foreground-icon-secondary" aria-hidden />}
       <span
         className={cx(
           "truncate pl-1 text-body-regular",

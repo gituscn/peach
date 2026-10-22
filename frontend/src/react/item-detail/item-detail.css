@@ -199,8 +199,8 @@
    同一套，两者在同一行上不能高低不齐。 */
 .peach-react [data-item-detail] [data-spec-item] { display: inline-flex; align-items: center; gap: 5px; }
 .peach-react [data-item-detail] [data-spec-item] svg {
-  width: 15px;
-  height: 15px;
+  width: var(--icon-inline);
+  height: var(--icon-inline);
   flex: none;
   stroke: currentColor;
   fill: none;
@@ -316,8 +316,8 @@
   cursor: default;
 }
 .peach-react [data-item-detail] [data-series-link] svg {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-inline);
+  height: var(--icon-inline);
   margin-top: 1px;
   flex: none;
   stroke: currentColor;
@@ -442,7 +442,7 @@
 .peach-react [data-item-detail] [data-pick]:is(:hover, [data-active], [aria-pressed="true"]) { background: var(--hover); color: var(--ink); }
 .peach-react [data-item-detail] [data-pick-name] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .peach-react [data-item-detail] [data-pick-count] { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); }
-.peach-react [data-item-detail] [data-pick] svg { width: 14px; height: 14px; flex: none; }
+.peach-react [data-item-detail] [data-pick] svg { width: var(--icon-inline); height: var(--icon-inline); flex: none; }
 @media (max-width: 760px) {
   .peach-react [data-item-detail] [data-tag-picker] { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; }
   .peach-react [data-item-detail] [data-tag-grid] { grid-template-columns: 1fr; }
@@ -560,7 +560,7 @@
   cursor: pointer;
   transition: background-color .14s ease;
 }
-.peach-react [data-item-detail] [data-kind="o"] svg { width: 20px; height: 20px; fill: currentColor; color: #ff669d; }
+.peach-react [data-item-detail] [data-kind="o"] svg { width: var(--icon-inline); height: var(--icon-inline); fill: currentColor; color: #ff669d; }
 .peach-react [data-item-detail] [data-kind="o"] b {
   font-size: 12px;
   line-height: 18px;
