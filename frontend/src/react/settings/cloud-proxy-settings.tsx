@@ -1,5 +1,5 @@
 /* CloudDrive 是代理配置的保存方；页面进入、重新聚焦和手动刷新时读取。 */
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { Select, SelectItem } from '@/components/base/select/select';
@@ -56,8 +56,8 @@ export function CloudProxySettings({ receipt }: { receipt(message: string): void
     <Stack>
       <Help>{CLOUD_PROXY_HELP}</Help>
       <div ref={body} className="flex min-w-0 flex-col gap-4">
-      {loading ? <div data-skeleton aria-busy="true" aria-label="正在读取网盘代理"><div className="w-full rounded-2lg bg-background-tertiary-default"
-        style={{ height: rememberedSectionHeight('cloud-proxy', 96) }} /></div> : null}
+      {loading ? <div data-skeleton aria-busy="true" aria-label="正在读取网盘代理"><div className="h-(--remembered-h) w-full rounded-2lg bg-background-tertiary-default"
+        style={{ '--remembered-h': `${rememberedSectionHeight('cloud-proxy', 96)}px` } as CSSProperties} /></div> : null}
       {action.error ? <Note tone="error" title="没有读取配置">{action.error} <LinkButton href="/settings/downloads" size="small">下载设置</LinkButton></Note> : null}
       {state?.accounts.length === 0 && !state.unlinked?.length ? <Help>还没有使用 CloudDrive 的媒体库。</Help> : null}
       {state?.unlinked?.map(library => <div key={library.root} className="flex min-w-0 flex-col gap-1">

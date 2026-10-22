@@ -18,7 +18,7 @@ import { RiDeleteBinLine } from '@remixicon/react';
 import { SettingsRow } from '@/components/application/settings/settings-rows';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
-import { Select, SelectItem } from '@/components/base/select/select';
+import { Select, SelectItem } from '../components/select';
 import { Switch } from '@/components/base/switch/switch';
 import { StatusLabel } from '../components/status-label';
 

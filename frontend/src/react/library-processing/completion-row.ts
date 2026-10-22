@@ -1,4 +1,4 @@
-/* 缺图提示要等数据才知道出不出现。本机记住上次列表是否带这一行，等待态按它预留同样高度，数据到达时表格不再下移。 */
+/* 缺图提示要等数据才知道出不出现。本机记住上次列表是否带这一行，等待态按它预留同样高度，数据到达时表格位置不变。 */
 const KEY = 'peach.catalog.completion-row';
 
 export function completionRowRemembered(): boolean {

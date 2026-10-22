@@ -6,7 +6,7 @@
 import { RiCheckDoubleLine } from '@remixicon/react';
 
 import { Button } from '@/components/base/buttons/button';
-import { Select, SelectItem } from '@/components/base/select/select';
+import { Select, SelectItem } from '../components/select';
 import { SelectionDock } from '../components/selection-dock';
 import type { DecisionStatus, ReviewGroup, ReviewGrouping, ReviewRow } from './review';
 import { commonReviewSources } from './review';

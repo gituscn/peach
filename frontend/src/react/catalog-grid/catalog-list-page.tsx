@@ -221,7 +221,7 @@ function ListIdentity({ item, props, disabled }: { item: MediaItem; props: Catal
   const { avatar, who } = identityParts(item);
   const watched = !parts && Number(item.play_seconds) > 0 && Number(item.duration) > 0
     ? Math.min(Number(item.play_seconds) / Number(item.duration), 1) : 0;
-  const tints = useLibraryTints();
+  const tints = useLibraryTints({ names: true });
   const tint = item.library_id ? tints.get(item.library_id) : undefined;
   const flaggedBy = [Number(item.liked) > 0 ? '喜欢' : '', Number(item.o_count) > 0 ? '有高潮记录' : ''].filter(Boolean);
   const glyph = (name: string) => <svg viewBox="0 0 24 24" aria-hidden="true"><use href={`#i-${name}`} /></svg>;
@@ -265,7 +265,7 @@ function ListIdentity({ item, props, disabled }: { item: MediaItem; props: Catal
       <button type="button" data-list-name="" disabled={disabled} title={name} aria-label={`打开 ${name}`} onClick={open}
         dangerouslySetInnerHTML={{ __html: titleHtml }} />
       <span data-list-byline="">
-        {tint ? <span data-list-library="" title={`媒体库：${tint.name}`}>
+        {tint?.name ? <span data-list-library="" title={`媒体库：${tint.name}`}>
           <SourceMark mark={tint.icon} />{tint.name}
         </span> : null}
         {who}

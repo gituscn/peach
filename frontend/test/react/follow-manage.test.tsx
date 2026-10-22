@@ -1497,7 +1497,7 @@ it('每个站说清自己的处境：需要、已配置、接不进来、不需�
 it('缺什么、为什么要、去哪儿取都写在那一行上，非配不可的一进来就展开', async () => {
   const { host } = await open({ creds: CREDENTIAL_CAST }, { tab: 'source' });
   const fanbox = credentialRow(host, 'Fanbox');
-  expect(fanbox.textContent).toContain('缺 FANBOXSESSID、cf_clearance');
+  expect(fanbox.textContent).toContain('缺 FANBOXSESSID缺 cf_clearance');
   expect(fanbox.textContent).toContain('会员内容要登录后才看得到。');
   expect(fanbox.textContent).toContain('从浏览器开发者工具里复制。');
   expect([...fanbox.querySelectorAll('a')].find((a) => a.textContent?.includes('获取凭据'))?.getAttribute('href'))

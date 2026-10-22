@@ -3,12 +3,12 @@
  * 才展开五个步骤。来源色默认不上色，点开色球选一档强调色。
  * 原型阶段处理方式只在本页演示，不随「保存配置」提交；来源色记在本浏览器。 */
 import { useRef, useState } from 'react';
-import { Dialog, Popover } from 'react-aria-components';
+import { Dialog, Popover, VisuallyHidden } from 'react-aria-components';
 import { UNSAFE_PortalProvider } from 'react-aria';
 
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { MENU_POPOVER_SURFACE } from '@/components/base/dropdown/menu-styles';
-import { Select, SelectItem } from '@/components/base/select/select';
+import { Select, SelectItem } from '../components/select';
 import { ACCENT_CHOICES } from '@peach/appearance';
 import { setLibraryColor, useLibraryTints } from '../components/library-tint';
 import { overlayHost } from '../components/overlay-host';
@@ -40,7 +40,7 @@ export function PolicyLegend() {
       <Help>{POLICY_SUMMARY}</Help>
       <Disclosure summary="三种处理方式对比">
         <table data-policy-matrix="" className="text-body-2-regular">
-          <thead><tr><th scope="col"><span className="sr-only">步骤</span></th>
+          <thead><tr><th scope="col"><VisuallyHidden>步骤</VisuallyHidden></th>
             {POLICY_COLUMNS.map(name => <th key={name} scope="col">{name}</th>)}</tr></thead>
           <tbody>{POLICY_MATRIX.map(([step, ...cells]) => <tr key={step}><th scope="row">{step}</th>
             {cells.map((cell, index) => <td key={POLICY_COLUMNS[index]} data-policy-cell={cell === '✓' ? 'on' : cell === '—' ? 'off' : 'choice'}>

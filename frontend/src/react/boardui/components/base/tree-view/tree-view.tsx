@@ -192,7 +192,7 @@ export function TreeViewItem<T extends object = object>({
                   <span aria-hidden className={cx("h-5 shrink-0", level > 1 ? "w-2" : "w-5")} />
                 )}
                 {Icon && <Icon aria-hidden className={cx(
-                  "size-(--icon-inline) shrink-0 opacity-50",
+                  "size-4 shrink-0 opacity-50",
                   hasChildItems ? "text-foreground-icon-primary" : "text-foreground-icon-secondary",
                   iconClassName,
                 )} />}

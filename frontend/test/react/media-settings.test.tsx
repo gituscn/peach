@@ -67,15 +67,18 @@ it('不能编辑时只说原因，不画表单', async () => {
 });
 
 describe('媒体目录', () => {
-  it('同一媒体库的名称同步到全部目录，保存保留根目录身份', async () => {
+  it('同一媒体库的文件夹归在一张卡里，名称只填一次，保存时写进全部目录并保留根目录身份', async () => {
     const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
     vi.stubGlobal('fetch', fetcher);
     const host = await open({ windows: true, media_sources: [
       { location: 'local', root: 'D:\\JAV', path: 'D:\\JAV', root_id: 'root-one', library_id: 'library-one', library: 'JAV', cost: 'free' },
       { location: 'local', root: 'E:\\JAV', path: 'E:\\JAV', root_id: 'root-two', library_id: 'library-one', library: 'JAV', cost: 'free' },
     ] });
-    await type(host.querySelector<HTMLInputElement>('[aria-label="媒体库名称 1"]'), '私人馆藏');
-    expect(host.querySelector<HTMLInputElement>('[aria-label="媒体库名称 2"]')?.value).toBe('私人馆藏');
+    const blocks = [...host.querySelectorAll('[data-library-block]')];
+    expect(blocks).toHaveLength(1);
+    expect(rows(blocks[0]!)).toHaveLength(2);
+    await type(host.querySelector<HTMLInputElement>('[aria-label="JAV 名称"]'), '私人馆藏');
+    expect(host.querySelectorAll('input[aria-label$=" 名称"]')).toHaveLength(1);
     await submit(host.querySelector('form'));
     expect(sentBody(fetcher).media_sources).toMatchObject([
       { root_id: 'root-one', library_id: 'library-one', library: '私人馆藏' },

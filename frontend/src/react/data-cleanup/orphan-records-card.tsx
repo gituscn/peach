@@ -9,7 +9,7 @@ import { confirmModal } from '@peach/legacy/ui';
 import { LOC } from '@peach/legacy/core';
 
 import { Button } from '@/components/base/buttons/button';
-import { Select, SelectItem } from '@/components/base/select/select';
+import { Select, SelectItem } from '../components/select';
 
 import { errorMessage } from '../../api';
 import { DataTable, type DataColumn } from '../components/data-table';

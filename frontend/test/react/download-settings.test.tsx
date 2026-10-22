@@ -110,7 +110,7 @@ it('检查报出缺的权限、目标目录与剩余配额，保存与登录使�
   expect(buttonNamed('检查连接', host)?.className).not.toContain('bg-button-primary');
   await click(buttonNamed('检查连接', host));
   await settle();
-  expect(host.textContent).toContain('缺少：取消离线任务');
+  expect(host.textContent).toContain('缺 取消离线任务');
   expect(host.textContent).toContain('/115/云下载 可以离线下载');
   expect(host.textContent).toContain('本月还剩 1497 条，共 1500 条');
   expect(host.textContent).not.toContain('探测到');

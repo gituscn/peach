@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { confirmModal, formModal } from '@peach/legacy/ui';
 import { Input } from '@/components/base/input/input';
-import { Select, SelectItem } from '@/components/base/select/select';
+import { Select, SelectItem } from '../components/select';
 import { apiSend } from '../../api';
 import { queryClient } from '../query';
 import { showToast } from '../toaster';

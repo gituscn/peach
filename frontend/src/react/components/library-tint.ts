@@ -34,7 +34,7 @@ function accentValue(key: string): string {
   return value;
 }
 
-function publish(next: ReadonlyMap<string, LibraryTint>) {
+function paint(next: ReadonlyMap<string, LibraryTint>) {
   tints = next;
   let sheet = document.getElementById('peach-library-tints');
   if (!sheet) {
@@ -44,7 +44,20 @@ function publish(next: ReadonlyMap<string, LibraryTint>) {
   }
   sheet.textContent = [...tints.values()].filter(tint => tint.color)
     .map(tint => `[data-library="${CSS.escape(tint.id)}"]{--library-color:${accentValue(tint.color)}}`).join('\n');
+}
+
+function publish(next: ReadonlyMap<string, LibraryTint>) {
+  paint(next);
   listeners.forEach(listener => listener());
+}
+
+let seeded = false;
+/** 颜色全在本浏览器里，卡片着色不等接口：第一次读时按 localStorage 铺好，页面挂上后不再补请求。 */
+function seed() {
+  if (seeded) return;
+  seeded = true;
+  const colors = Object.entries(stored()).filter(([, color]) => color);
+  if (colors.length) paint(new Map(colors.map(([id, color]) => [id, { id, name: '', icon: 'database', location: '', color }])));
 }
 
 function load() {
@@ -76,7 +89,9 @@ function subscribe(listener: () => void) {
   return () => { listeners.delete(listener) };
 }
 
-export function useLibraryTints(): ReadonlyMap<string, LibraryTint> {
-  load();
+/** 按 `library_id` 读来源色。要显示媒体库名与站标的地方传 `names`，这时才向 `/api/libraries` 取一次。 */
+export function useLibraryTints({ names = false }: { names?: boolean } = {}): ReadonlyMap<string, LibraryTint> {
+  seed();
+  if (names) load();
   return useSyncExternalStore(subscribe, () => tints, () => tints);
 }

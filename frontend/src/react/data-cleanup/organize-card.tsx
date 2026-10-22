@@ -11,7 +11,7 @@ import { LOC } from '@peach/legacy/core';
 import { Button } from '@/components/base/buttons/button';
 import { IconButton } from '@/components/base/buttons/icon-button';
 import { Input } from '@/components/base/input/input';
-import { Select, SelectItem } from '@/components/base/select/select';
+import { Select, SelectItem } from '../components/select';
 
 import { errorMessage } from '../../api';
 import { useBackgroundJob } from '../background-job';

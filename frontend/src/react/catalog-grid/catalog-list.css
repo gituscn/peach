@@ -45,7 +45,8 @@
 .peach-react [data-list-skeleton-name] > span > i { display: block; width: 72%; height: 14px; border-radius: 6px; }
 .peach-react [data-list-skeleton-name] > span > i + i { width: 44%; height: 12px; }
 .peach-react [data-list-skeleton-bar] { display: block; width: min(72%, 96px); height: 14px; border-radius: 6px; }
-.grid > [data-skeleton="catalog/list"] { grid-column: 1 / -1; }
+/* 列表骨架挂在卡片网格容器里时占满整行；不按网格的类名写，免得和旧样式表同名。 */
+[data-skeleton="catalog/list"] { grid-column: 1 / -1; }
 @media(max-width:760px) {
   .peach-react [data-catalog-table] .bui-table :is(th,td):first-child { padding-inline: 8px; }
   .peach-react [data-catalog-table] .bui-table :is(th,td):nth-child(2) { padding-inline: 8px; }

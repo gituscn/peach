@@ -61,10 +61,6 @@ export interface SelectProps<T extends object>
   /** Customise the trigger's rendered value (e.g. a compact flag + dial code).
    *  Falls back to the selected item's own content when omitted. */
   renderValue?: ReactNode | ((values: AriaSelectValueRenderProps<T>) => ReactNode);
-  /** Muted name shown inside the trigger before the value (e.g. 「排序」「处理方式」), for selects
-   *  that sit in a toolbar or a repeated row without a field label and whose value alone does
-   *  not say what is being chosen. */
-  prefix?: ReactNode;
   ref?: Ref<HTMLDivElement>;
 }
 
@@ -76,7 +72,6 @@ export function Select<T extends object>({
   children,
   items,
   renderValue,
-  prefix,
   ref,
   ...props
 }: SelectProps<T>) {
@@ -121,17 +116,14 @@ export function Select<T extends object>({
               triggerClassName,
             )}
           >
-            <span className={cx("flex min-w-0 items-center", size === "sm" ? "gap-1.5" : "gap-2")}>
-              {prefix ? <span aria-hidden className="shrink-0 text-text-tertiary">{prefix}</span> : null}
-              <AriaSelectValue
-                className={cx(
-                  "flex min-w-0 items-center truncate",
-                  size === "sm" ? "gap-1" : "gap-[5px]",
-                )}
-              >
-                {renderValue as never /* RAC accepts node or render-prop */}
-              </AriaSelectValue>
-            </span>
+            <AriaSelectValue
+              className={cx(
+                "flex min-w-0 items-center truncate",
+                size === "sm" ? "gap-1" : "gap-[5px]",
+              )}
+            >
+              {renderValue as never /* RAC accepts node or render-prop */}
+            </AriaSelectValue>
             <ChevronDownSmall
               className={cx(
                 "shrink-0 text-text-secondary transition-transform duration-200 ease",

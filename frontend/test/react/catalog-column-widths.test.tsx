@@ -17,7 +17,7 @@ it('损坏或超限偏好不会破坏列宽，选择列保持固定', async () =
     expect(sizing.widths.name).toBe(name);
     expect(sizing.widths.select).toBe(48);
     expect(sizing.widths.dur).toBeGreaterThanOrEqual(80);
-    expect(sizing.widths.size).toBe(112);
+    expect(sizing.widths.size).toBe(96);
     await root.unmount();
   }
 });

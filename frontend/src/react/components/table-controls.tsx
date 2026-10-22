@@ -1,6 +1,6 @@
 import type { SortingState } from '@tanstack/react-table';
 import { Button } from '@/components/base/buttons/button';
-import { Select, SelectItem } from '@/components/base/select/select';
+import { Select, SelectItem } from './select';
 import { Pagination } from './table-pagination';
 import { SortDirectionIcon } from './icon-swap';
 
