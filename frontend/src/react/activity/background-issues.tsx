@@ -4,7 +4,8 @@
  * 数据来自 `/api/background-issues`，服务端每次现读各服务的快照，问题消失这一行就不在了。
  * 一行只写是什么、从什么时候开始，加一个写明去处的链接（文案由服务端给）；原因只在链接
  * 指向的那个设置位置讲，这里不复述。原地重跑就可能修好的（网络、调度、amane 桥）多给一个
- * 「立即重试」，排在链接左边；要改设置、填凭据的只有链接。
+ * 「立即重试」；要改设置、填凭据的只有链接。链接在左、重试在右：原地修好的那个动作是这一行
+ * 的主动作，和分区底部操作条一样排在最右；没有重试的行，链接也落在同一个位置。
  *
  * 时间分两种：服务自己记下的起点写「自 … 起」；服务不记失败时刻的，写这一次运行里第一次
  * 读到它的时刻「发现于 …」，两者不混用。没有问题时整段不画，取数失败也不画：服务连不上时
@@ -67,11 +68,11 @@ function IssueRow({ issue }: { issue: BackgroundIssue }) {
   return (
     <Note tone="error" title={issue.title} action={
       <div className="flex flex-wrap items-center gap-2">
+        <LinkButton href={issue.href} size="small" trailingIcon={RiArrowRightLine}>{issue.link_label}</LinkButton>
         {issue.retry
           ? <Button variant="secondary" size="small" disabled={!issue.retry_available}
               {...busyProps(retry.isPending)} onClick={() => retry.mutate()}>立即重试</Button>
           : null}
-        <LinkButton href={issue.href} size="small" trailingIcon={RiArrowRightLine}>{issue.link_label}</LinkButton>
       </div>
     }>
       {retry.error ? `${moment}\n没有重试：${errorMessage(retry.error)}` : moment}

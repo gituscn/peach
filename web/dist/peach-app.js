@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "78ba88d3-4026-4c43-92f5-21c0e99edd13", e._sentryDebugIdIdentifier = "sentry-dbid-78ba88d3-4026-4c43-92f5-21c0e99edd13");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "846ceca9-5b00-4c94-a82e-dce20d3a86ab", e._sentryDebugIdIdentifier = "sentry-dbid-846ceca9-5b00-4c94-a82e-dce20d3a86ab");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -38458,19 +38458,19 @@ function Jve({ issue: e }) {
 		title: e.title,
 		action: /* @__PURE__ */ (0, D.jsxs)("div", {
 			className: "flex flex-wrap items-center gap-2",
-			children: [e.retry ? /* @__PURE__ */ (0, D.jsx)(q, {
+			children: [/* @__PURE__ */ (0, D.jsx)(IA, {
+				href: e.href,
+				size: "small",
+				trailingIcon: aA,
+				children: e.link_label
+			}), e.retry ? /* @__PURE__ */ (0, D.jsx)(q, {
 				variant: "secondary",
 				size: "small",
 				disabled: !e.retry_available,
 				...Y(n.isPending),
 				onClick: () => n.mutate(),
 				children: "立即重试"
-			}) : null, /* @__PURE__ */ (0, D.jsx)(IA, {
-				href: e.href,
-				size: "small",
-				trailingIcon: aA,
-				children: e.link_label
-			})]
+			}) : null]
 		}),
 		children: n.error ? `${r}\n没有重试：${V(n.error)}` : r
 	});
@@ -38722,6 +38722,7 @@ function nye({ task: e, writable: t }) {
 						}) : null,
 						r.error ? /* @__PURE__ */ (0, D.jsx)(tj, { children: r.error }) : null,
 						/* @__PURE__ */ (0, D.jsxs)("div", {
+							"data-download-actions": "",
 							className: "flex flex-wrap items-center gap-2 pt-1 sm:mt-auto",
 							children: [
 								/* @__PURE__ */ (0, D.jsx)(q, {
@@ -38732,33 +38733,38 @@ function nye({ task: e, writable: t }) {
 									onClick: () => s(!o),
 									children: o ? "收起标题" : "展开标题"
 								}),
-								t && e.cancellable ? /* @__PURE__ */ (0, D.jsx)(q, {
-									variant: "secondary",
-									size: "small",
-									...Y(r.busy === "cancel"),
-									onClick: g,
-									children: "取消"
-								}) : null,
-								t && e.resubmittable ? /* @__PURE__ */ (0, D.jsx)(q, {
-									variant: "secondary",
-									size: "small",
-									...Y(r.busy === "resubmit"),
-									onClick: _,
-									children: "重新提交"
-								}) : null,
-								t && e.postprocess_retryable ? /* @__PURE__ */ (0, D.jsx)(q, {
-									variant: "secondary",
-									size: "small",
-									...Y(r.busy === "postprocess"),
-									onClick: y,
-									children: "重试入库后整理"
-								}) : null,
 								/* @__PURE__ */ (0, D.jsx)(q, {
 									variant: "ghost",
 									size: "small",
 									onClick: v,
 									children: i ? "已复制磁力" : "复制磁力"
-								})
+								}),
+								t && (e.cancellable || e.resubmittable || e.postprocess_retryable) ? /* @__PURE__ */ (0, D.jsxs)("div", {
+									className: "ml-auto flex flex-wrap items-center gap-2",
+									children: [
+										e.cancellable ? /* @__PURE__ */ (0, D.jsx)(q, {
+											variant: "secondary",
+											size: "small",
+											...Y(r.busy === "cancel"),
+											onClick: g,
+											children: "取消"
+										}) : null,
+										e.resubmittable ? /* @__PURE__ */ (0, D.jsx)(q, {
+											variant: "secondary",
+											size: "small",
+											...Y(r.busy === "resubmit"),
+											onClick: _,
+											children: "重新提交"
+										}) : null,
+										e.postprocess_retryable ? /* @__PURE__ */ (0, D.jsx)(q, {
+											variant: "secondary",
+											size: "small",
+											...Y(r.busy === "postprocess"),
+											onClick: y,
+											children: "重试入库后整理"
+										}) : null
+									]
+								}) : null
 							]
 						})
 					]
@@ -115761,4 +115767,4 @@ pxt(mxt);
 //#endregion
 export { $w as applyTheme, Zk as peachHistory, Jo as popCount, Vgt as showToast };
 
-//# debugId=78ba88d3-4026-4c43-92f5-21c0e99edd13
+//# debugId=846ceca9-5b00-4c94-a82e-dce20d3a86ab

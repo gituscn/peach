@@ -110,6 +110,9 @@ it('远端在跑的任务给进度与取消键，取消发到取消接口', asyn
   expect(card.querySelector('[role=progressbar]')?.getAttribute('aria-valuenow')).toBe('42');
   expect(card.textContent).toContain('远端下载中');
   expect(buttonNamed('重新提交', card)).toBeNull();
+  // 辅助的两个在前，改动任务的取消排在最后。
+  expect([...card.querySelectorAll('[data-download-actions] button')].map((node) => node.textContent))
+    .toEqual(['展开标题', '复制磁力', '取消']);
   await click(buttonNamed('取消', card));
   await settle();
   expect(posts()).toEqual([['/api/downloads/cancel', { id: 1 }]]);

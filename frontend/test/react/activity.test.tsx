@@ -170,9 +170,9 @@ it('后台问题排在最前，每项只写是什么、从什么时候起和写�
   expect(buttonNamed('立即重试', tunnel!)).toBeNull();
   expect(follow?.textContent).toContain('自 ');
   expect(follow?.textContent).toContain(' 起');
-  // 按钮在左、链接在右。
+  // 链接在左、重试在右。
   const [first, second] = [...follow!.querySelectorAll('[data-note-action] a, [data-note-action] button')];
-  expect([first?.textContent, second?.textContent]).toEqual(['立即重试', expect.stringContaining('打开关注调度')]);
+  expect([first?.textContent, second?.textContent]).toEqual([expect.stringContaining('打开关注调度'), '立即重试']);
 
   await click(buttonNamed('立即重试', follow!));
   await vi.waitFor(() => { if (host.querySelectorAll('[role="alert"]').length !== 1) throw new Error('重试后那一项还在') });
