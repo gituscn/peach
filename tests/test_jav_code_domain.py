@@ -35,6 +35,7 @@ from peach.catalog_rules import (
     REPOST_SITE_LABELS,
     code_query_variants,
     compact_label,
+    compile_code_patterns,
     is_code_body_stopword,
     is_jav_asset,
     is_jav_code,
@@ -367,6 +368,22 @@ class TitledFilenameTests(unittest.TestCase):
                      "photo_83439@14-09-2021_07-01-18.jpg", "片名@yszl_0107.mp4",
                      "片名....vip1129.mp4"):
             self.assertIsNone(release_code_from_filename(name), name)
+
+    def test_user_rules_run_before_the_built_in_ones(self):
+        """内置规则认不出的命名，由用户在设置里写一条正则补上。"""
+        rules = compile_code_patterns([r"^\d{4}-(?<code>[a-z]+\d+)_", r"\{(\w+-\d+)\}"])
+        self.assertEqual(release_code_from_filename("2024-abc123_片名.mp4", patterns=rules), "ABC-123")
+        self.assertEqual(release_code_from_filename("片名 {SSIS-001}.mp4", patterns=rules), "SSIS-001")
+        self.assertIsNone(release_code_from_filename("2024-abc123_片名.mp4"))
+        # 抓到的那段不像番号时这条规则不算数，照常走下一条和内置规则。
+        loose = compile_code_patterns([r"^(\S+)"])
+        self.assertEqual(release_code_from_filename("片名 CAWD-987.mp4", patterns=loose), "CAWD-987")
+
+    def test_a_broken_user_rule_says_which_one(self):
+        with self.assertRaisesRegex(ValueError, "第 2 条"):
+            compile_code_patterns([r"(\w+-\d+)", "(unclosed"])
+        self.assertEqual(compile_code_patterns(None), ())
+        self.assertEqual(compile_code_patterns(["", "  "]), ())
 
     def test_a_short_episode_or_a_date_after_a_name_is_not_a_code(self):
         for name in ("ShinoAoi-15-1080p.mp4", "miru-10--Vccd67yz.mp4",

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Iterable
 from pathlib import PureWindowsPath
 
 
@@ -402,6 +403,11 @@ _QUALITY_TOKEN = re.compile(r"^(?:hd|fhd|sd|uhd|4k|2160p?|1080p?|720p?)$", re.I)
 #: （`TG-2025-01-27`）是日期。只取词元开头这一段，紧跟的版次和分卷（`-C`、`-CD1`、
 #: `_part1`）不影响番号。
 _HYPHENATED_CODE = re.compile(r"^(?:\d{3})?[A-Za-z]{2,8}-\d{3,5}(?![0-9]|-\d{2}-\d)")
+#: 用户番号识别规则的上限。每条规则要对库里每个文件名跑一遍，条数和长度都设个顶。
+CODE_PATTERN_LIMIT = 20
+CODE_PATTERN_MAX_LENGTH = 200
+#: `(?<name>`（不是 `(?<=`、`(?<!` 这两种后视断言）换成 Python 的 `(?P<name>`。
+_PCRE_NAMED_GROUP = re.compile(r"\(\?<(?![=!])")
 #: 名字中段的 FC2 商品号：`FC2` 前面不能紧贴字母数字，商品号后面不能再接数字。
 _FC2_IN_TITLE = re.compile(r"(?i)(?<![A-Z0-9])FC2[-_ ]*(?:PPV[-_ ]*)?(\d{5,8})(?!\d)")
 
@@ -801,13 +807,58 @@ def _tokyo_hot_from_text(text: str) -> str:
     return ""
 
 
-def release_code_from_filename(name: str | None) -> str | None:
+def compile_code_patterns(raw) -> tuple[re.Pattern, ...]:
+    """把用户写的番号识别规则编译成正则；写错的规则抛 `ValueError`，消息给用户看。
+
+    每条规则是一个对完整文件名做搜索的正则。番号取命名组 `code`，没有就取第一个
+    括号，再没有就取整段匹配。`(?<code>…)` 是多数在线正则工具的写法，Python 写作
+    `(?P<code>…)`，两种都收。
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, (list, tuple)):
+        raise ValueError("番号识别规则要写成一组正则表达式")
+    rules = [str(rule).strip() for rule in raw if str(rule or "").strip()]
+    if len(rules) > CODE_PATTERN_LIMIT:
+        raise ValueError(f"番号识别规则最多 {CODE_PATTERN_LIMIT} 条")
+    compiled = []
+    for index, rule in enumerate(rules, 1):
+        if len(rule) > CODE_PATTERN_MAX_LENGTH:
+            raise ValueError(f"第 {index} 条规则超过 {CODE_PATTERN_MAX_LENGTH} 个字符")
+        try:
+            compiled.append(re.compile(_PCRE_NAMED_GROUP.sub("(?P<", rule), re.I))
+        except re.error as error:
+            raise ValueError(f"第 {index} 条规则不是有效的正则表达式：{error}") from None
+    return tuple(compiled)
+
+
+def _code_from_patterns(name: str, patterns: Iterable[re.Pattern]) -> str | None:
+    """按用户规则取番号；取出来的那段仍要是番号的样子，否则交给下一条规则。"""
+    for pattern in patterns:
+        match = pattern.search(name)
+        if not match:
+            continue
+        captured = (match.group("code") if "code" in pattern.groupindex
+                    else match.group(1) if pattern.groups else match.group(0))
+        code = release_code_from_text(captured)
+        if code:
+            return code
+    return None
+
+
+def release_code_from_filename(name: str | None, *, patterns: Iterable[re.Pattern] = ()) -> str | None:
     r"""文件名带分卷、画质和重复计数，剥掉噪声后再解析。
+
+    `patterns` 是用户在设置里写的番号识别规则（`compile_code_patterns`），先于内置
+    规则试。
 
     剥完噪声剩下的主干要自己站得住：带分隔符，或序号至少三位。论坛合集包
     `[mtfdz.club]WX17.3` 摘掉域名、再把 `.3` 当分卷剥掉，只剩 `WX17`，补零才凑成
     `WX-017`；真番号的分卷（`abp762-1`、`ABW-358-2`）剥完仍是完整番号。
     """
+    custom = _code_from_patterns(str(name or "").strip(), patterns)
+    if custom:
+        return custom
     stem = _ASSET_EXTENSION.sub("", str(name or "").strip())
     if western_release_identity(stem):
         return None
