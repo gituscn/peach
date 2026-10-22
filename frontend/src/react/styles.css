@@ -402,10 +402,12 @@ html:has([data-selection-dock]) { scroll-padding-bottom: var(--selection-dock-sp
   box-shadow: inset 0 0 0 1px var(--glass-rim), var(--glass-pick-shadow);
 }
 
-.peach-react [data-filter-glass] :is(button, a[aria-pressed], [data-glass-segment]) { height: 30px; min-height: 30px; }
+/* 玻璃筛选条整条取紧凑档：页签、药丸、排序、分段与图标键同高。实体页标题右侧那一行有默认档的
+ * 过滤输入框与分段器外框，同一枚收藏键和管理标签键在那里取默认档。 */
+.peach-react [data-filter-glass] :is(button, a[aria-pressed], [data-glass-segment]) { height: var(--control-h-compact); min-height: var(--control-h-compact); }
 .peach-react button[data-filter-action] {
   display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center;
-  width: 30px; min-width: 30px; height: 30px; min-height: 30px; padding: 0; border: 0;
+  width: var(--control-h-compact); min-width: var(--control-h-compact); height: var(--control-h-compact); min-height: var(--control-h-compact); padding: 0; border: 0;
   border-radius: var(--control-radius);
   background: var(--board-blue);
   box-shadow: var(--elevation-xs);
@@ -414,8 +416,8 @@ html:has([data-selection-dock]) { scroll-padding-bottom: var(--selection-dock-sp
 .peach-react button[data-filter-action]:hover { background: var(--board-blue-hover); color: #fff; }
 .peach-react button[data-filter-action] svg { width: 16px; height: 16px; }
 .peach-react button[data-filter-action][aria-busy="true"] { cursor: wait; }
-.peach-react button[data-tag-mode] {
-  width: 30px; min-width: 30px; height: 30px; min-height: 30px; padding: 0;
+:is(.peach-react [data-index-head], .peach-react[data-index-head]) button:is([data-filter-action], [data-tag-mode]) {
+  width: var(--control-h); min-width: var(--control-h); height: var(--control-h); min-height: var(--control-h); padding: 0;
   border-radius: var(--control-radius);
 }
 .peach-react button[data-tag-mode] svg { width: 16px; height: 16px; }

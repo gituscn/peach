@@ -86,10 +86,10 @@ function CredentialForm({ row, readOnly, toast }:
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="primary" size="small" disabled={readOnly} {...busyProps(write.isPending)}
+        <Button variant="primary" disabled={readOnly} {...busyProps(write.isPending)}
           onClick={save}>保存配置</Button>
         {done ? (
-          <Button variant="danger" size="small" disabled={readOnly} {...busyProps(write.isPending)}
+          <Button variant="danger" disabled={readOnly} {...busyProps(write.isPending)}
             onClick={() => void confirmModal({
               title: '清除来源凭据', body: CLEAR_BODY, confirmLabel: '清除来源凭据', danger: true,
               onConfirm: () => write.mutateAsync({}),

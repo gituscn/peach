@@ -28,8 +28,10 @@
 .peach-react [data-catalog-table] [data-list-picture] [data-media-status] { left: 4px; bottom: 4px; gap: 4px; }
 .peach-react [data-catalog-table] [data-list-picture] [data-media-status] > span { width: 20px; height: 20px; }
 .peach-react [data-catalog-table] [data-list-picture] [data-media-status] svg { width: 11px; height: 11px; }
-/* 标签列：最多两行，放不下的收进行尾，不撑高整行。 */
-.peach-react [data-catalog-table] [data-list-tags] { height: auto; max-height: calc((var(--fs-xs) * 1.45 + var(--tag-pad-y) * 2 + 2px) * 2 + 13px); white-space: normal; }
+/* 标签列：最多两行，放不下的收进行尾，不撑高整行。行里的标签取行内档，与同行评分、详情层标签同高；
+ * 两行上限按这一档算，13px 是行间 5px 加上下各 4px 的焦点环余量。 */
+.peach-react [data-catalog-table] [data-list-tags] { height: auto; max-height: calc(var(--control-h-inline) * 2 + 13px); white-space: normal; }
+.peach-react [data-catalog-table] [data-list-tags] [data-media-tag] { box-sizing: border-box; height: var(--control-h-inline); padding-block: 0; line-height: calc(var(--control-h-inline) - 2px); }
 /* 列表骨架：壳的首屏与列表岛等数据时同一份格子，尺寸照真实行（缩略图 112×63、头像 38、标题署名两行）。 */
 .peach-react [data-list-skeleton] { display: flex; flex-direction: column; gap: 16px; }
 .peach-react [data-list-skeleton-tools] { display: flex; justify-content: flex-end; }

@@ -159,7 +159,7 @@
 [data-settings-panel] [data-sidebar-setting]>span small{margin-top:3px;color:var(--muted);line-height:1.45}
 [data-settings-panel] [data-sidebar-order]{display:grid;gap:6px}
 /* 这一列的行、下面那个下拉和「添加」按钮同高：它们是同一张清单的三段，差几像素就
-   看得出是两拨控件。34px 的图标钮加上下 1px 内边距和 1px 边框正好是 --control-h。 */
+   看得出是两拨控件。紧凑档的图标钮加上下 1px 内边距和 1px 边框正好是 --control-h。 */
 [data-settings-panel] [data-sidebar-row]{position:relative;display:flex;align-items:center;justify-content:space-between;min-height:var(--control-h);padding:1px 5px;border:1px solid var(--line-soft);border-radius:var(--surface-radius);background:var(--surface);cursor:grab}
 [data-settings-panel] [data-sidebar-row]:active{cursor:grabbing}
 [data-settings-panel] [data-sidebar-row][data-dragging]{opacity:.42}
@@ -175,7 +175,7 @@
 [data-settings-panel] [data-sidebar-grip]{display:grid;place-items:center;width:24px;color:var(--muted)}
 [data-settings-panel] [data-sidebar-grip] svg{width:20px;height:20px}
 [data-settings-panel] [data-sidebar-actions]{flex:none}
-[data-settings-panel] [data-sidebar-row] button,[data-settings-panel] [data-sidebar-add-menu] button{display:grid;place-items:center;min-width:34px;height:34px;border:0;border-radius:var(--control-radius);background:transparent;color:var(--muted);cursor:pointer}
+[data-settings-panel] [data-sidebar-row] button,[data-settings-panel] [data-sidebar-add-menu] button{display:grid;place-items:center;min-width:var(--control-h-compact);height:var(--control-h-compact);border:0;border-radius:var(--control-radius);background:transparent;color:var(--muted);cursor:pointer}
 [data-settings-panel] [data-sidebar-row] button:hover:not(:disabled),[data-settings-panel] [data-sidebar-add-menu] button:hover:not(:disabled){background:var(--hover);color:var(--ink)}
 [data-settings-panel] [data-sidebar-row] button:disabled,[data-settings-panel] [data-sidebar-add-menu] button:disabled{opacity:.25;cursor:not-allowed}
 [data-settings-panel] [data-sidebar-add-row]{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:5px}

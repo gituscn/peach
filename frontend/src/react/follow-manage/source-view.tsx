@@ -98,7 +98,7 @@ export function ErrorLine({ text, prefix = '', tone = 'error' }: { text: string;
         {prefix}{open ? text : head}
       </small>
       {more ? (
-        <Button variant="ghost" size="xs" data-error-line-toggle="" data-error-details-toggle="" aria-expanded={open} className="-ml-2"
+        <Button variant="ghost" size="small" data-error-line-toggle="" data-error-details-toggle="" aria-expanded={open} className="-ml-2"
           onClick={() => setOpen(!open)}>
           {open ? '收起详情' : '查看详情'}
         </Button>

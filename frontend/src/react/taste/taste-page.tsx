@@ -482,8 +482,8 @@ export function TastePage(props: TasteProps) {
     : '';
 
   const browserActions = <div className="flex flex-wrap justify-center gap-2">
-            <Button size="small" variant="secondary" {...busyProps(running || refresh.isPending || load.isPending)} onClick={startRefresh}>读取浏览器记录</Button>
-            <Button size="small" variant="secondary" {...busyProps(load.isPending)} onClick={() => file.current?.click()}>导入历史文件</Button>
+            <Button variant="secondary" {...busyProps(running || refresh.isPending || load.isPending)} onClick={startRefresh}>读取浏览器记录</Button>
+            <Button variant="secondary" {...busyProps(load.isPending)} onClick={() => file.current?.click()}>导入历史文件</Button>
           </div>;
   return (
     <Page>

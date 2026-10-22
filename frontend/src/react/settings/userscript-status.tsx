@@ -41,7 +41,7 @@ export function UserscriptStatus({ enabled, release }: {
         : '生成令牌后复制配对信息，在用户脚本设置中粘贴并保存。'}</p>
       <div className="flex flex-wrap items-center gap-2">
         {status === 'missing' || update ? <ExternalLink href={release.install_url}>{update ? '更新用户脚本' : '安装 Peach 用户脚本'}</ExternalLink> : null}
-        <Button variant="secondary" size="small" type="button" {...busyProps(status === 'checking')}
+        <Button variant="secondary" type="button" {...busyProps(status === 'checking')}
           onClick={retry}>重新检测</Button>
       </div>
     </div>

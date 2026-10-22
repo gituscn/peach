@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "92891fae-2499-4184-afd8-6cf6050174aa", e._sentryDebugIdIdentifier = "sentry-dbid-92891fae-2499-4184-afd8-6cf6050174aa");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "a823e086-079f-4cba-9e76-bbfccbe6820e", e._sentryDebugIdIdentifier = "sentry-dbid-a823e086-079f-4cba-9e76-bbfccbe6820e");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -12795,8 +12795,8 @@ var _o = {
 	secondary: "bg-background-primary-default text-text-primary border border-border-button-default shadow-xs",
 	ghost: "bg-button-ghost-background text-button-ghost-foreground"
 }, Eo = (e, t) => `<svg class="${t}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-${e}"/></svg>`;
-function Do() {
-	return `<span data-shortcuts-entry class="inline-flex flex-none"><button type="button" data-shortcuts-trigger data-filter-action data-skeleton-action disabled tabindex="-1" aria-label="我的收藏" title="我的收藏" class="inline-grid size-7.5 flex-none place-items-center rounded-(--control-radius) border border-(--border-10) bg-(--surface) text-(--muted)">${Eo("star", "size-4")}</button></span>`;
+function Do(e = "compact") {
+	return `<span data-shortcuts-entry class="inline-flex flex-none"><button type="button" data-shortcuts-trigger data-filter-action data-skeleton-action disabled tabindex="-1" aria-label="我的收藏" title="我的收藏" class="inline-grid ${e === "default" ? "size-9" : "size-8"} flex-none place-items-center rounded-(--control-radius) border border-(--border-10) bg-(--surface) text-(--muted)">${Eo("star", "size-4")}</button></span>`;
 }
 function Oo(e, t = "", n = e) {
 	return `<div data-input-size="medium" class="group flex h-max w-full flex-col items-start gap-1"><div data-rac class="relative flex w-full items-center rounded-2lg bg-background-tertiary-default text-foreground-icon-tertiary ring-2 ring-inset ring-transparent p-2"><div class="flex w-full items-center gap-2 min-w-0"><div class="flex flex-1 items-center gap-0.5 min-w-0">${Eo("search", "size-5 shrink-0")}<input type="search" enterkeyhint="search" readonly tabindex="-1" aria-label="${B(n)}" value="${B(t)}" placeholder="${B(e)}" class="min-w-0 flex-1 bg-transparent border-0 outline-none p-0 m-0 font-sans text-body-regular text-text-primary pl-1 placeholder:text-text-tertiary"></div></div></div></div>`;
@@ -13006,7 +13006,7 @@ var ns = {
 	av: () => "<span class=\"av avskeleton\"><span class=\"ring\"></span><span class=\"nm\">&nbsp;</span></span>",
 	brandpill: (e) => `<span class="brandpill brandskeleton" style="width:${e}px"><span class="mk"></span></span>`,
 	pill: (e) => `<span class="pill tagskeleton" style="width:${e}px"></span>`,
-	"filter-pill": (e) => `<span class="skeleton" style="width:${e}px;height:30px;border-radius:8px;flex:none"></span>`
+	"filter-pill": (e) => `<span class="skeleton" style="width:${e}px;height:var(--control-h-compact);border-radius:8px;flex:none"></span>`
 }, rs = {
 	av: [0],
 	brandpill: [
@@ -38756,7 +38756,7 @@ function UA({ text: e, className: t = "" }) {
 			children: o
 		}), s ? /* @__PURE__ */ (0, D.jsx)(q, {
 			variant: "ghost",
-			size: "xs",
+			size: "small",
 			"data-error-details-toggle": "",
 			className: "-ml-2",
 			"aria-expanded": n,
@@ -39205,7 +39205,7 @@ function ej({ label: e, topLabel: t, top: n, bottom: r, className: i, topClassNa
 		]
 	});
 }
-var Xye = "flex h-7.5 flex-none cursor-pointer items-center gap-1.75 rounded-lg border border-dashed border-(--glass-low) bg-transparent px-2.5 text-body-2-regular leading-5 whitespace-nowrap text-inherit outline-none hover:border-solid focus-visible:ring-2 focus-visible:ring-border-focus-ring";
+var Xye = "flex h-8 flex-none cursor-pointer items-center gap-1.75 rounded-lg border border-dashed border-(--glass-low) bg-transparent px-2.5 text-body-2-regular leading-5 whitespace-nowrap text-inherit outline-none hover:border-solid focus-visible:ring-2 focus-visible:ring-border-focus-ring";
 function tj({ children: e, pressed: t, onPress: n, className: r, ...i }) {
 	return /* @__PURE__ */ (0, D.jsx)("button", {
 		type: "button",
@@ -39216,7 +39216,7 @@ function tj({ children: e, pressed: t, onPress: n, className: r, ...i }) {
 		children: e
 	});
 }
-var Zye = "h-7.5 cursor-pointer rounded-full border border-(--glass-low) bg-transparent px-3 text-body-2-regular leading-none whitespace-nowrap text-inherit outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring aria-busy:cursor-wait aria-busy:opacity-55";
+var Zye = "h-8 cursor-pointer rounded-full border border-(--glass-low) bg-transparent px-3 text-body-2-regular leading-none whitespace-nowrap text-inherit outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring aria-busy:cursor-wait aria-busy:opacity-55";
 function nj({ children: e, onPress: t, busy: n = !1 }) {
 	return /* @__PURE__ */ (0, D.jsx)("button", {
 		type: "button",
@@ -47943,7 +47943,7 @@ function HF(e) {
 		ref: t
 	});
 }
-var UF = "inline-flex w-max max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-2lg bg-background-tertiary-default p-1", WF = "flex min-h-7 flex-none cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 max-sm:px-2 text-body-medium whitespace-nowrap text-text-secondary outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring data-focus-visible:ring-2 data-focus-visible:ring-border-focus-ring data-selected:bg-background-primary-default data-selected:text-text-primary data-selected:shadow-card dark:data-selected:bg-background-primary-hover", KCe = "flex size-7 flex-none cursor-pointer items-center justify-center rounded-md text-text-secondary outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring data-focus-visible:ring-2 data-focus-visible:ring-border-focus-ring data-selected:bg-background-primary-default data-selected:text-text-primary data-selected:shadow-card dark:data-selected:bg-background-primary-hover", GF = "inline-flex w-max max-w-full flex-none items-center gap-0.5 rounded-lg", KF = "relative flex size-7.5 flex-none cursor-pointer items-center justify-center rounded-lg text-(--glass-text)/62 outline-none transition-colors hover:text-(--glass-text) focus-visible:ring-2 focus-visible:ring-border-focus-ring data-selected:text-(--glass-text)";
+var UF = "inline-flex w-max max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-2lg bg-background-tertiary-default p-1", WF = "flex min-h-7 flex-none cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 max-sm:px-2 text-body-medium whitespace-nowrap text-text-secondary outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring data-focus-visible:ring-2 data-focus-visible:ring-border-focus-ring data-selected:bg-background-primary-default data-selected:text-text-primary data-selected:shadow-card dark:data-selected:bg-background-primary-hover", KCe = "flex size-7 flex-none cursor-pointer items-center justify-center rounded-md text-text-secondary outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring data-focus-visible:ring-2 data-focus-visible:ring-border-focus-ring data-selected:bg-background-primary-default data-selected:text-text-primary data-selected:shadow-card dark:data-selected:bg-background-primary-hover", GF = "inline-flex w-max max-w-full flex-none items-center gap-0.5 rounded-lg", KF = "relative flex size-8 flex-none cursor-pointer items-center justify-center rounded-lg text-(--glass-text)/62 outline-none transition-colors hover:text-(--glass-text) focus-visible:ring-2 focus-visible:ring-border-focus-ring data-selected:text-(--glass-text)";
 //#endregion
 //#region src/react/catalog-grid/catalog-view-toggle.tsx
 function qF() {
@@ -66955,7 +66955,7 @@ function yW({ text: e, prefix: t = "", tone: n = "error" }) {
 			children: [t, i ? e : c]
 		}), l ? /* @__PURE__ */ (0, D.jsx)(q, {
 			variant: "ghost",
-			size: "xs",
+			size: "small",
 			"data-error-line-toggle": "",
 			"data-error-details-toggle": "",
 			"aria-expanded": i,
@@ -68492,7 +68492,7 @@ function qNe({ readOnly: e, toast: t }) {
 						}),
 						/* @__PURE__ */ (0, D.jsx)(q, {
 							variant: "secondary",
-							size: "xs",
+							size: "small",
 							iconOnly: !0,
 							leadingIcon: Bk,
 							"aria-label": `拉取 ${kW(e.row.original)}`,
@@ -68502,7 +68502,7 @@ function qNe({ readOnly: e, toast: t }) {
 						}),
 						/* @__PURE__ */ (0, D.jsx)(q, {
 							variant: "secondary",
-							size: "xs",
+							size: "small",
 							iconOnly: !0,
 							leadingIcon: Mk,
 							"aria-label": `移除 ${kW(e.row.original)}`,
@@ -69910,7 +69910,7 @@ function GW({ categories: e, category: t, online: n, readout: r, letters: i, vie
 				children: i.map((e, t) => /* @__PURE__ */ (0, D.jsx)("button", {
 					type: "button",
 					onClick: () => s(t),
-					className: "h-7.5 min-w-7.5 flex-none cursor-pointer rounded-glass-key px-1.5 text-caption-1-regular leading-5 text-(--glass-text)/60 outline-none hover:text-(--glass-text) focus-visible:ring-2 focus-visible:ring-border-focus-ring",
+					className: "h-8 min-w-8 flex-none cursor-pointer rounded-glass-key px-1.5 text-caption-1-regular leading-5 text-(--glass-text)/60 outline-none hover:text-(--glass-text) focus-visible:ring-2 focus-visible:ring-border-focus-ring",
 					children: e
 				}, e))
 			}) : null,
@@ -70525,7 +70525,6 @@ function vPe(e) {
 					/* @__PURE__ */ (0, D.jsx)(OP, { kind: f === "tags" ? "tag" : f === "studios" ? "studio" : f === "agencies" ? "agency" : f === "creators" ? "creator" : "performer" }),
 					f === "tags" ? /* @__PURE__ */ (0, D.jsx)(q, {
 						variant: t ? "primary" : "ghost",
-						size: "small",
 						iconOnly: !0,
 						className: "flex-none",
 						"data-tag-mode": "",
@@ -71263,7 +71262,7 @@ function bG() {
 		"w-20",
 		"w-16",
 		"w-24"
-	].map((e) => `<span data-skeleton="tag" aria-hidden="true" class="skeleton-sheen relative block h-7.5 flex-none rounded-(--tag-radius) ${e}"></span>`).join("");
+	].map((e) => `<span data-skeleton="tag" aria-hidden="true" class="skeleton-sheen relative block h-8 flex-none rounded-(--tag-radius) ${e}"></span>`).join("");
 }
 function xG(e, t = KT()) {
 	if (e === "wants") return `<div class="flex w-full flex-col gap-8" data-skeleton="jav-wants">${vG("5em")}${Array.from({ length: 3 }, () => `<div class="flex min-w-0 gap-4 rounded-2lg bg-background-secondary-default p-6">${VPe("block w-card-cover shrink-0 aspect-card-cover rounded-2lg max-sm:w-24")}<div class="flex min-w-0 flex-1 flex-col gap-3">${vG("80%")}${vG("60%")}${vG("40%")}</div></div>`).join("")}</div>`;
@@ -71297,7 +71296,7 @@ function HPe(e) {
     ${e === "wants" ? `<div class="rounded-2lg bg-background-secondary-default px-6 py-5"><h3 class="mb-4 text-title-2-medium text-text-primary">按番号添加</h3>${vG("100%")}</div>${xG(e)}` : `<section class="flex min-w-0 flex-col gap-4">${UPe()}${xG(e)}</section>`}</div></div>`;
 }
 function UPe() {
-	let e = (e, t) => `<button type="button" data-entity-tag="${e}" data-entity-press="" aria-pressed="${e === "external"}" class="flex h-7.5 flex-none items-center gap-1.75 rounded-lg border border-dashed border-(--glass-low) bg-transparent px-2.5 text-body-2-regular leading-5 whitespace-nowrap text-inherit">${t}</button>`, t = (e, t) => `<span data-glass-segment="" ${KT() === e ? "data-selected=\"true\"" : ""} class="flex size-7.5 flex-none items-center justify-center rounded-lg text-(--glass-text)/62">${Eo(t, "size-4")}</span>`;
+	let e = (e, t) => `<button type="button" data-entity-tag="${e}" data-entity-press="" aria-pressed="${e === "external"}" class="flex h-8 flex-none items-center gap-1.75 rounded-lg border border-dashed border-(--glass-low) bg-transparent px-2.5 text-body-2-regular leading-5 whitespace-nowrap text-inherit">${t}</button>`, t = (e, t) => `<span data-glass-segment="" ${KT() === e ? "data-selected=\"true\"" : ""} class="flex size-8 flex-none items-center justify-center rounded-lg text-(--glass-text)/62">${Eo(t, "size-4")}</span>`;
 	return `<div data-filter-glass data-glass-pane data-filter-frame data-jav-filter data-catalog-frame class="sticky top-topbar z-10 mb-5.5 flex flex-col">
     <div data-filter-row="top" class="flex h-12 min-w-0 items-center overscroll-x-contain px-3 py-2 gap-1.5 overflow-visible">
       <div data-catalog-scroll><div data-catalog-views>${e("external", "库外发现")}${e("library", "馆藏探索")}<span data-entity-sep aria-hidden="true"></span></div><div data-catalog-tags>${bG()}</div></div>
@@ -75624,7 +75623,6 @@ function MIe({ enabled: e, release: t }) {
 					children: s ? "更新用户脚本" : "安装 Peach 用户脚本"
 				}) : null, /* @__PURE__ */ (0, D.jsx)(q, {
 					variant: "secondary",
-					size: "small",
 					type: "button",
 					...Y(i === "checking"),
 					onClick: a,
@@ -77631,7 +77629,6 @@ function kLe({ initial: e, receipt: t }) {
 						}),
 						/* @__PURE__ */ (0, D.jsx)("div", { children: /* @__PURE__ */ (0, D.jsx)(q, {
 							variant: "secondary",
-							size: "small",
 							onClick: () => a((e) => [...e, {
 								prefix: "",
 								root: l[0] ?? ""
@@ -78171,7 +78168,6 @@ function zLe() {
 						name: "follow-interval",
 						autoComplete: "off",
 						"aria-label": "自动检查间隔",
-						size: "small",
 						className: "w-24",
 						value: i,
 						onChange: (e) => {
@@ -78710,14 +78706,12 @@ function nRe({ row: e, readOnly: t, toast: n }) {
 				className: "flex flex-wrap items-center gap-2",
 				children: [/* @__PURE__ */ (0, D.jsx)(q, {
 					variant: "primary",
-					size: "small",
 					disabled: t,
 					...Y(c.isPending),
 					onClick: l,
 					children: "保存配置"
 				}), s ? /* @__PURE__ */ (0, D.jsx)(q, {
 					variant: "danger",
-					size: "small",
 					disabled: t,
 					...Y(c.isPending),
 					onClick: () => void Ks({
@@ -81034,7 +81028,7 @@ function aze() {
     <div data-collection-summary class="mb-5 flex items-end justify-between gap-4 rounded-surface bg-background-secondary-default px-6 py-5 max-compact:flex-col max-compact:items-start max-compact:gap-3 max-compact:p-4 dark:bg-background-primary-default">
       <div class="flex min-w-0 flex-col gap-2"><span class="text-body-regular text-text-secondary">重复内容</span><strong class="text-display-4-medium">${nJ("4em")}</strong></div><p class="text-body-regular text-text-secondary">${nJ("12em")}</p>
     </div>
-    <div data-filter-glass data-glass-pane class="mb-5.5 flex flex-wrap items-center gap-x-2.5 gap-y-2 px-4 py-2.5"><h3 class="mr-1 text-body-medium">批量保留</h3>${["全部保留最大", "全部保留最长"].map((e) => `<button ${rJ} class="h-7.5 rounded-full border border-separator-border px-3 text-body-2-medium">${e}</button>`).join("")}</div>
+    <div data-filter-glass data-glass-pane class="mb-5.5 flex flex-wrap items-center gap-x-2.5 gap-y-2 px-4 py-2.5"><h3 class="mr-1 text-body-medium">批量保留</h3>${["全部保留最大", "全部保留最长"].map((e) => `<button ${rJ} class="h-8 rounded-full border border-separator-border px-3 text-body-2-medium">${e}</button>`).join("")}</div>
     ${t.repeat(2)}
   </div></div>`;
 }
@@ -109260,7 +109254,6 @@ function aht({ browsers: e, sources: t, range: n, children: r }) {
 					children: "数据源"
 				}), /* @__PURE__ */ (0, D.jsx)(q, {
 					variant: "secondary",
-					size: "small",
 					onClick: () => a(!0),
 					disabled: i,
 					children: "添加浏览器"
@@ -109880,13 +109873,11 @@ function Nht(e) {
 	let b = y.summary || {}, x = y.coverage || {}, S = y.rankings || {}, C = y.storage || {}, w = cmt(S.browser_categories || []), T = pmt(w).length > 0, O = y.gaps || [], k = x.tagged || 0, A = x.identified || 0, j = h.error ? V(h.error) : g.error ? V(g.error) : m?.status === "failed" ? m.error || "读取未取得" : "", M = /* @__PURE__ */ (0, D.jsxs)("div", {
 		className: "flex flex-wrap justify-center gap-2",
 		children: [/* @__PURE__ */ (0, D.jsx)(q, {
-			size: "small",
 			variant: "secondary",
 			...Y(p || h.isPending || g.isPending),
 			onClick: v,
 			children: "读取浏览器记录"
 		}), /* @__PURE__ */ (0, D.jsx)(q, {
-			size: "small",
 			variant: "secondary",
 			...Y(g.isPending),
 			onClick: () => l.current?.click(),
@@ -110363,10 +110354,9 @@ function Wht({ kind: e, q: t, scope: n, view: r, category: i }, a) {
 	return `<div class="ihead peach-react" data-index-head>
       <h2 class="disp indexheading">${o}</h2>
       ${s ? "<span class=\"mono\" id=\"indexCount\"><span class=\"countskeleton\"></span></span>" : ""}${l}
-      ${Do()}
+      ${Do("default")}
       ${e === "tags" ? ko({
 		variant: "ghost",
-		size: "small",
 		glyph: "pencil",
 		attrs: "data-tag-mode data-skeleton-action disabled tabindex=\"-1\" aria-label=\"管理标签\""
 	}) : ""}
@@ -116224,4 +116214,4 @@ Bxt(Vxt);
 //#endregion
 export { HT as applyTheme, yk as peachHistory, Jo as popCount, p_t as showToast };
 
-//# debugId=92891fae-2499-4184-afd8-6cf6050174aa
+//# debugId=a823e086-079f-4cba-9e76-bbfccbe6820e

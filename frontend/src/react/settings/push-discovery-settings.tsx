@@ -139,7 +139,7 @@ export function PushDiscoveryForm({ initial, receipt }: {
               ))}
             </div>
             <div>
-              <Button variant="secondary" size="small"
+              <Button variant="secondary"
                 onClick={() => setRows((list) => [...list, { prefix: '', root: roots[0] ?? '' }])}>
                 添加前缀
               </Button>

@@ -37,7 +37,7 @@
   flex: none;
   align-items: center;
   gap: 6px;
-  height: 30px;
+  height: var(--control-h-compact);
   padding: 0 10px;
   border-radius: 8px;
   color: color-mix(in srgb, var(--glass-text) 60%, transparent);

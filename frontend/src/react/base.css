@@ -18,6 +18,14 @@
   --icon-inline: 1.2em;
 }
 
+/* 控件高度四档，用法见 `docs/DESIGN_GUIDELINES.md` 第 11 节；遗留壳 `web/css/01-base.css` 的 `:root` 同名同值。 */
+:root {
+  --control-h-inline: 28px; /* 行内档：标签、标签删除、标题旁的小工具 */
+  --control-h-compact: 32px; /* 紧凑档：行操作、卡片悬浮动作、卡内次级操作、筛选条 */
+  --control-h: 36px; /* 默认档：表单字段与同组按钮、页面与分区操作、页签外框、导航 */
+  --control-h-large: 40px; /* 大档：顶栏搜索与图标键、播放器控制条、首页厂牌胶囊 */
+}
+
 /* 阴影 token 改由 `--elevation-*` 给值。Tailwind v4 为了让 `shadow-<颜色>` 能换色，把
  * `--shadow-*` 的字面值抄进工具类，`theme.css` 在 `.dark` 里重定的 `--shadow-*` 于是够不着
  * `shadow-card` 这类工具类，暗色下全站卡片还是浅色那一档 5% 的黑影。这里把 token 接到

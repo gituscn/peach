@@ -163,8 +163,8 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: var(--control-h-compact);
+  height: var(--control-h-compact);
   padding: 0;
   border: 1px dashed var(--glass-low);
   border-radius: var(--tag-radius);
@@ -197,14 +197,14 @@
   font-family: "Cascadia Mono", Consolas, ui-monospace, "Microsoft YaHei UI", "PingFang SC", monospace;
   font-size: 11px;
 }
-/* 「仅显示图片」：一枚 30px 的方键，按下时垫一块滑动玻璃那种料。 */
+/* 「仅显示图片」：一枚紧凑档的方键，按下时垫一块滑动玻璃那种料。 */
 .peach-react button[data-follow-images-only] {
   position: relative;
   display: grid;
   flex: none;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: var(--control-h-compact);
+  height: var(--control-h-compact);
   padding: 0;
   border: 0;
   border-radius: 7px;
@@ -437,11 +437,12 @@ body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-follo
   pointer-events: none;
   transition: opacity .15s ease;
 }
+/* 卡片悬浮动作取紧凑档，与首页卡片上的稍后看、未入库卡的动作键同高。 */
 .peach-react [data-follow-actions] button {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: var(--control-h-compact);
+  height: var(--control-h-compact);
   padding: 0;
   border: 1px solid rgb(255 255 255 / .16);
   border-radius: 50%;

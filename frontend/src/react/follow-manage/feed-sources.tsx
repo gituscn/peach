@@ -312,12 +312,12 @@ export function FeedSources({ readOnly, toast }: {
             <Switch aria-label={`启用 ${feedName(context.row.original)}`}
               isSelected={context.row.original.enabled} isDisabled={handlers.current.readOnly}
               onChange={(enabled) => handlers.current.toggle(context.row.original, enabled)} />
-            <Button variant="secondary" size="xs" iconOnly leadingIcon={RiRefreshLine}
+            <Button variant="secondary" size="small" iconOnly leadingIcon={RiRefreshLine}
               aria-label={`拉取 ${feedName(context.row.original)}`}
               disabled={handlers.current.readOnly}
               {...busyProps(handlers.current.busy === `check-${context.row.original.id}`)}
               onClick={() => handlers.current.fetch(context.row.original)} />
-            <Button variant="secondary" size="xs" iconOnly leadingIcon={RiDeleteBinLine}
+            <Button variant="secondary" size="small" iconOnly leadingIcon={RiDeleteBinLine}
               aria-label={`移除 ${feedName(context.row.original)}`}
               disabled={handlers.current.readOnly}
               onClick={() => handlers.current.remove(context.row.original)} />

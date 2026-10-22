@@ -497,8 +497,9 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
 .peach-react :is([data-longhover] [data-media-seek], [data-media-card]:is(:hover, :has(:focus-visible)) [data-media-later]) button { pointer-events: auto; }
 .peach-react :is([data-media-preview], :is([data-media-later], [data-media-seek]) button):hover { background: rgb(0 0 0 / .34); }
 .peach-react [data-media-seek] svg { width: 34px; height: 34px; }
-.peach-react [data-media-later] button { width: 36px; height: 36px; padding: 0; }
-.peach-react [data-media-later] svg { width: 21px; height: 21px; }
+/* 稍后看是卡片悬浮动作，取紧凑档。 */
+.peach-react [data-media-later] button { width: var(--control-h-compact); height: var(--control-h-compact); padding: 0; }
+.peach-react [data-media-later] svg { width: 18px; height: 18px; }
 .peach-react [data-media-later] button[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
 
 /* ── 元信息区 ── */
@@ -806,7 +807,7 @@ body[data-surface="/trash"] .peach-react [data-media-tags] {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 32px;
+  min-height: var(--control-h-compact);
   padding: 0 10px;
   border: 1px solid rgb(255 255 255 / .25);
   border-radius: var(--control-radius);
