@@ -4,6 +4,7 @@
  * 同一条来源在两种视图里的状态写法一旦分开写，就会出现同一行在卡片里说「未检查」、
  * 在表格里说「正常」。 */
 import { useLayoutEffect, useRef, useState } from 'react';
+import { RiExternalLinkLine } from '@remixicon/react';
 
 import { Chip } from '@/components/base/badges/chip';
 import { Button } from '@/components/base/buttons/button';
@@ -51,12 +52,13 @@ export function StatusBadge({ source }: { source: FollowSource }) {
   return <Chip variant="caption" color={color}>{statusText(source)}</Chip>;
 }
 
-/** 来源名连到站上的原页面。新标签页不继承这一页的会话，来源地址也不带走 Peach 自己的地址。 */
+/** 来源名连到站上的原页面，名字后跟外链字形。新标签页不继承这一页的会话，来源地址也不带走 Peach 自己的地址。 */
 export function SourceLink({ source }: { source: FollowSource }) {
   return (
-    <a href={source.url} target="_blank" rel="noreferrer noopener" title="打开原来源"
+    <a href={source.url} target="_blank" rel="noopener noreferrer" title="打开原来源"
       className="max-w-full min-w-0 self-start text-body-medium wrap-anywhere text-text-primary underline-offset-2 hover:underline">
       {source.label}
+      <RiExternalLinkLine aria-hidden className="size-(--icon-inline) shrink-0" />
     </a>
   );
 }

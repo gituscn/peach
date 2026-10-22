@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "d1a48566-fdf1-463e-8248-6c96e1af758c", e._sentryDebugIdIdentifier = "sentry-dbid-d1a48566-fdf1-463e-8248-6c96e1af758c");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "2ad8ad3f-443b-49a3-b582-98ff2b70bdf2", e._sentryDebugIdIdentifier = "sentry-dbid-2ad8ad3f-443b-49a3-b582-98ff2b70bdf2");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -31442,7 +31442,7 @@ var kT = /* @__PURE__ */ new Map(), Kfe = class {
 		this.request?.abort(), this.page = "search";
 		let e = this.player.peachItem, t = String(e?.code || e?.title || String(e?.name || "").replace(/\.(mp4|mkv|avi|mov|webm|m4v|ts|wmv)$/i, "")).trim().slice(0, 200);
 		t !== this.query && (this.query = t, this.offset = 0, this.results = [], this.searched = !1);
-		let n = this.panel(this.header("搜索中文字幕") + "<div class=\"vjs-peach-subtitle-search\"><p class=\"vjs-peach-subtitle-status\" data-subtitle-status role=\"status\" hidden></p><div data-subtitle-results></div><a href=\"https://www.subtitlecat.com\" target=\"_blank\" rel=\"noopener noreferrer\">中文字幕由 SubtitleCat 提供，可能包含机翻</a></div>", () => {
+		let n = this.panel(this.header("搜索中文字幕") + "<div class=\"vjs-peach-subtitle-search\"><p class=\"vjs-peach-subtitle-status\" data-subtitle-status role=\"status\" hidden></p><div data-subtitle-results></div><a href=\"https://www.subtitlecat.com\" target=\"_blank\" rel=\"noopener noreferrer\">中文字幕由 SubtitleCat 提供，可能包含机翻" + z("external-link", "ui-externalmark") + "</a></div>", () => {
 			this.request?.abort(), this.show(-1);
 		});
 		t.length < 3 ? this.status("当前作品没有可用于搜索的番号或片名") : this.searched ? this.searchResults(n) : this.runSearch(n, 0);
@@ -54035,7 +54035,7 @@ function vEe({ item: e, playing: t, frame: n, starting: r, pendingGroup: i, grou
 					children: /* @__PURE__ */ (0, D.jsx)("svg", {
 						viewBox: "0 0 24 24",
 						"aria-hidden": "true",
-						children: /* @__PURE__ */ (0, D.jsx)("use", { href: "#i-external-link" })
+						children: /* @__PURE__ */ (0, D.jsx)("use", { href: "#i-info" })
 					})
 				})
 			]
@@ -60275,7 +60275,7 @@ function JNe({ title: e, items: t, hint: n, picked: r, onPick: i, children: a, f
 					render: (e) => /* @__PURE__ */ (0, D.jsxs)("a", {
 						href: e.url,
 						target: "_blank",
-						rel: "noreferrer",
+						rel: "noopener noreferrer",
 						title: e.url,
 						"data-link-address": "",
 						className: "flex min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary",
@@ -65540,7 +65540,7 @@ function ELe({ link: e }) {
 			"data-link": "icon",
 			href: e.url,
 			target: "_blank",
-			rel: "noreferrer",
+			rel: "noopener noreferrer",
 			title: e.title,
 			"aria-label": e.title,
 			children: /* @__PURE__ */ (0, D.jsx)(Az, { mark: e.mark })
@@ -65564,12 +65564,21 @@ function ELe({ link: e }) {
 			"data-link": "url",
 			href: e.url,
 			target: "_blank",
-			rel: "noreferrer",
+			rel: "noopener noreferrer",
 			title: e.title,
-			children: [/* @__PURE__ */ (0, D.jsx)(Az, { mark: e.mark }), /* @__PURE__ */ (0, D.jsx)("span", {
-				"data-link-label": "",
-				children: e.text
-			})]
+			children: [
+				/* @__PURE__ */ (0, D.jsx)(Az, { mark: e.mark }),
+				/* @__PURE__ */ (0, D.jsx)("span", {
+					"data-link-label": "",
+					children: e.text
+				}),
+				/* @__PURE__ */ (0, D.jsx)("svg", {
+					className: "ui-externalmark",
+					viewBox: "0 0 24 24",
+					"aria-hidden": "true",
+					children: /* @__PURE__ */ (0, D.jsx)("use", { href: "#i-external-link" })
+				})
+			]
 		});
 	}
 }
@@ -65595,7 +65604,7 @@ function DLe({ entity: e, actions: t, helpers: n }) {
 			"data-entry-mark": "",
 			href: e.url,
 			target: "_blank",
-			rel: "noreferrer",
+			rel: "noopener noreferrer",
 			title: e.label,
 			"aria-label": e.label,
 			children: [e.mark ? /* @__PURE__ */ (0, D.jsx)(_z, { name: e.mark }) : /* @__PURE__ */ (0, D.jsxs)("span", {
@@ -66960,13 +66969,16 @@ function Jz({ source: e }) {
 	});
 }
 function Yz({ source: e }) {
-	return /* @__PURE__ */ (0, D.jsx)("a", {
+	return /* @__PURE__ */ (0, D.jsxs)("a", {
 		href: e.url,
 		target: "_blank",
-		rel: "noreferrer noopener",
+		rel: "noopener noreferrer",
 		title: "打开原来源",
 		className: "max-w-full min-w-0 self-start text-body-medium wrap-anywhere text-text-primary underline-offset-2 hover:underline",
-		children: e.label
+		children: [e.label, /* @__PURE__ */ (0, D.jsx)(cA, {
+			"aria-hidden": !0,
+			className: "size-(--icon-inline) shrink-0"
+		})]
 	});
 }
 function Xz({ text: e, prefix: t = "", tone: n = "error" }) {
@@ -68471,16 +68483,19 @@ function TRe({ readOnly: e, toast: t }) {
 			e.accessor((e) => e.url, {
 				id: "origin",
 				header: t("origin"),
-				cell: (e) => /* @__PURE__ */ (0, D.jsx)("a", {
+				cell: (e) => /* @__PURE__ */ (0, D.jsxs)("a", {
 					href: e.getValue(),
 					target: "_blank",
-					rel: "noreferrer noopener",
+					rel: "noopener noreferrer",
 					title: "打开来源页面",
 					className: "text-text-primary underline-offset-2 hover:underline",
-					children: /* @__PURE__ */ (0, D.jsx)(bj, {
+					children: [/* @__PURE__ */ (0, D.jsx)(bj, {
 						site: e.row.original.kind.startsWith("javdb") ? "javdb" : sB(e.getValue()),
 						label: sB(e.getValue())
-					})
+					}), /* @__PURE__ */ (0, D.jsx)(cA, {
+						"aria-hidden": !0,
+						className: "size-(--icon-inline) shrink-0"
+					})]
 				})
 			}),
 			e.accessor((e) => e.last_error ? "拉取失败" : e.enabled ? "已启用" : "已暂停", {
@@ -69601,9 +69616,8 @@ function NRe(e) {
 			title: "本机只能浏览",
 			extra: c ? /* @__PURE__ */ (0, D.jsx)("p", {
 				className: "text-body-2-regular",
-				children: /* @__PURE__ */ (0, D.jsx)("a", {
+				children: /* @__PURE__ */ (0, D.jsx)(QA, {
 					href: c,
-					className: "text-text-primary underline underline-offset-2",
 					children: "前往写入端管理关注"
 				})
 			}) : void 0,
@@ -74158,9 +74172,8 @@ function jBe(e) {
 				title: "本机只能浏览",
 				extra: u ? /* @__PURE__ */ (0, D.jsx)("p", {
 					className: "text-body-2-regular",
-					children: /* @__PURE__ */ (0, D.jsx)("a", {
+					children: /* @__PURE__ */ (0, D.jsx)(QA, {
 						href: u,
-						className: "text-text-primary underline underline-offset-2",
 						children: "前往写入端复核"
 					})
 				}) : void 0,
@@ -84143,10 +84156,12 @@ function lGe({ code: e, item: t, actions: n, readOnly: r, retry: i, retrying: a 
 								onClick: m,
 								children: d ? "取消想要" : "想要"
 							}),
-							t.source_url ? /* @__PURE__ */ (0, D.jsx)(q, {
+							t.source_url ? /* @__PURE__ */ (0, D.jsx)(kA, {
 								variant: "secondary",
 								trailingIcon: cA,
-								onClick: () => window.open(t.source_url, "_blank", "noopener,noreferrer"),
+								href: t.source_url,
+								target: "_blank",
+								rel: "noopener noreferrer",
 								children: "作品来源"
 							}) : null
 						]
@@ -109695,23 +109710,29 @@ function Bht({ onboarding: e, done: t }) {
 					className: "flex list-disc flex-col gap-1 pl-5 text-body-2-regular text-text-secondary",
 					children: [/* @__PURE__ */ (0, D.jsxs)("li", { children: [
 						"Chrome：在 ",
-						/* @__PURE__ */ (0, D.jsx)("a", {
+						/* @__PURE__ */ (0, D.jsxs)("a", {
 							href: "https://takeout.google.com/",
 							target: "_blank",
 							rel: "noopener noreferrer",
 							className: "text-text-primary underline-offset-4 hover:underline",
-							children: "Google Takeout"
+							children: ["Google Takeout", /* @__PURE__ */ (0, D.jsx)(cA, {
+								"aria-hidden": !0,
+								className: "size-(--icon-inline) shrink-0"
+							})]
 						}),
 						" ",
 						"选择 Chrome 历史记录，下载 ZIP 后直接导入。"
 					] }), /* @__PURE__ */ (0, D.jsxs)("li", { children: [
 						"其他浏览器：用 ",
-						/* @__PURE__ */ (0, D.jsx)("a", {
+						/* @__PURE__ */ (0, D.jsxs)("a", {
 							href: "https://github.com/purarue/browserexport",
 							target: "_blank",
 							rel: "noopener noreferrer",
 							className: "text-text-primary underline-offset-4 hover:underline",
-							children: "browserexport"
+							children: ["browserexport", /* @__PURE__ */ (0, D.jsx)(cA, {
+								"aria-hidden": !0,
+								className: "size-(--icon-inline) shrink-0"
+							})]
 						}),
 						" ",
 						"导出历史记录，再导入导出文件。"
@@ -116248,4 +116269,4 @@ Yxt(Xxt);
 //#endregion
 export { Qw as applyTheme, Kk as peachHistory, Yo as popCount, S_t as showToast };
 
-//# debugId=d1a48566-fdf1-463e-8248-6c96e1af758c
+//# debugId=2ad8ad3f-443b-49a3-b582-98ff2b70bdf2

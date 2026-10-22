@@ -94,7 +94,7 @@ function LinkTable(
               <ErrorExcerpt text={item.note} className="tabular-nums text-text-secondary" /></div>}
       </div> },
     { id: 'url', label: '地址', width: 360, min: 180, value: (item) => item.url,
-      render: (item) => <a href={item.url} target="_blank" rel="noreferrer" title={item.url} data-link-address=""
+      render: (item) => <a href={item.url} target="_blank" rel="noopener noreferrer" title={item.url} data-link-address=""
         className="flex min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary">
         <SiteMark linkId={item.id} />
         <span data-middle-truncate className="min-w-0 truncate">{item.url}</span>

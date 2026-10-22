@@ -17,7 +17,7 @@ import type { ChangeEvent } from 'react';
 import {
   RiArrowDownSLine, RiArrowRightSLine, RiCompassLine, RiDatabase2Line, RiDeleteBinLine,
   RiEyeLine, RiHistoryLine, RiPriceTag3Line, RiSearchLine, RiThumbDownLine,
-  RiThumbUpLine, RiUploadLine, RiBookmarkLine,
+  RiThumbUpLine, RiUploadLine, RiBookmarkLine, RiExternalLinkLine,
 } from '@remixicon/react';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { Popover, Tab, TabPanel, Tabs } from 'react-aria-components';
@@ -299,12 +299,12 @@ function HistoryGuide({ onboarding, done }: { onboarding: boolean; done: boolean
         <ul className="flex list-disc flex-col gap-1 pl-5 text-body-2-regular text-text-secondary">
           <li>
             Chrome：在 <a href="https://takeout.google.com/" target="_blank" rel="noopener noreferrer"
-              className="text-text-primary underline-offset-4 hover:underline">Google Takeout</a>
+              className="text-text-primary underline-offset-4 hover:underline">Google Takeout<RiExternalLinkLine aria-hidden className="size-(--icon-inline) shrink-0" /></a>
             {' '}选择 Chrome 历史记录，下载 ZIP 后直接导入。
           </li>
           <li>
             其他浏览器：用 <a href="https://github.com/purarue/browserexport" target="_blank" rel="noopener noreferrer"
-              className="text-text-primary underline-offset-4 hover:underline">browserexport</a>
+              className="text-text-primary underline-offset-4 hover:underline">browserexport<RiExternalLinkLine aria-hidden className="size-(--icon-inline) shrink-0" /></a>
             {' '}导出历史记录，再导入导出文件。
           </li>
         </ul>

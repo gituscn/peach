@@ -5,7 +5,7 @@ import { entityPath, icon } from '@peach/legacy/core';
 import { tagLabel } from '@peach/legacy/tags';
 import { mountPreviewPlayer } from '../../player';
 import { apiGet, errorMessage } from '../../api';
-import { Button } from '@/components/base/buttons/button';
+import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
 import { Note } from '../components/note';
 import { RetryNote } from '../components/grid-reveal';
@@ -96,8 +96,8 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
         <Button variant="primary" onClick={() => setDownload({ code: item.code, title: item.title, performers: item.performers,
           studio: item.studio, release_date: item.release_date, origin: `jav:${item.code}` })}>查找资源</Button>
         <Button variant="secondary" disabled={readOnly} aria-pressed={!!wantId} {...busyProps(!!want.busy)} onClick={toggleWant}>{wantId ? '取消想要' : '想要'}</Button>
-        {item.source_url ? <Button variant="secondary" trailingIcon={RiExternalLinkLine}
-          onClick={() => window.open(item.source_url, '_blank', 'noopener,noreferrer')}>作品来源</Button> : null}
+        {item.source_url ? <ButtonLink variant="secondary" trailingIcon={RiExternalLinkLine}
+          href={item.source_url} target="_blank" rel="noopener noreferrer">作品来源</ButtonLink> : null}
       </div>
       {want.error ? <Note tone="error">{want.error}</Note> : null}
       <Reviews code={item.code} count={item.comments_count} released={item.release_date} />
