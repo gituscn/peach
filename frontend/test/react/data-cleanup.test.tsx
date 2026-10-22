@@ -22,7 +22,7 @@ import { hasResourceRoots, RESOURCE_SCAN_KEY, type ResourceScanState } from '../
 import { IDLE_REPAIR } from '../../src/react/media-repair/media-repair';
 import type { MediaSourcesData } from '../../src/react/media-sources';
 import { queryClient } from '../../src/react/query';
-import { buttonNamed, choose, click, mount, settle, type } from './render';
+import { actionOrder, buttonNamed, choose, click, mount, settle, type } from './render';
 
 afterEach(() => {
   queryClient.clear();
@@ -441,7 +441,7 @@ describe('链接管理', () => {
     expect(server.posts('/api/links/prune')).toEqual([]);
   });
 
-  it('「全部重试」只重验未访问成功的那几条，带上这一趟的检查号', async () => {
+  it('「立即重试全部」只重验未访问成功的那几条，带上这一趟的检查号', async () => {
     const server = serve({
       '/api/links': stats,
       '/api/links/check': (body: { status_only?: boolean }) => (body.status_only
@@ -451,7 +451,7 @@ describe('链接管理', () => {
     });
     const host = await wrap(<LinkManager />);
     await settle();
-    await click(buttonNamed('全部重试（2）', host));
+    await click(buttonNamed('立即重试全部（2）', host));
     await settle();
     expect(server.posts('/api/links/check').filter((body) => !(body as { status_only?: boolean }).status_only))
       .toEqual([{ retry: [2, 3], check_id: 'check-3' }]);
@@ -511,6 +511,17 @@ describe('孤儿记录', () => {
     expect(rows[1]!.querySelector('[role="combobox"]')).toBeNull();
     expect(buttonNamed('转移记录', rows[1]!)).toBeFalsy();
     expect(buttonNamed('删除记录', rows[1]!)).toBeTruthy();
+  });
+
+  it('删除记录在最左，转移记录是这一行的主动作、排在最右', async () => {
+    serve({ '/api/orphan-records': orphans });
+    const host = await wrap(<OrphanRecordsCard toast={vi.fn()} />);
+    await settle();
+    const row = host.querySelector('[aria-label="文件已消失的作品"] tbody tr')!;
+    const order = actionOrder(buttonNamed('删除记录', row)!.parentElement);
+    expect(order[0]).toBe('删除记录');
+    expect(order.at(-1)).toBe('转移记录');
+    expect(buttonNamed('转移记录', row)!.className).toContain('bg-button-primary');
   });
 
   it('转移记录直接发，目标默认是时长最接近的那个', async () => {
@@ -712,6 +723,20 @@ describe('整理', () => {
     await choose(host.querySelector('[aria-label="整理哪个来源"]'), '115');
     expect(path?.value).toBe('');
     expect(buttonNamed('执行整理', host)).toBeNull();
+  });
+
+  it('底栏回滚在左、预览居中、执行整理在最右；只有执行整理在场时预览才退成次级', async () => {
+    organizeServer({ ...organizeIdle, last_batch: 'batch-9' });
+    queryClient.setQueryData(['organize'], { ...organizeIdle, last_batch: 'batch-9' });
+    const host = await wrap(<OrganizeCard toast={vi.fn()} failure={vi.fn()} />);
+    const footer = () => host.querySelector('[data-cleanup-organize] footer');
+    expect(actionOrder(footer())).toEqual(['回滚上一批', '预览']);
+    expect(buttonNamed('预览', host)!.className).toContain('bg-button-primary');
+    await click(buttonNamed('预览', host));
+    await settle();
+    expect(actionOrder(footer())).toEqual(['回滚上一批', '预览', '执行整理']);
+    expect(buttonNamed('预览', host)!.className).not.toContain('bg-button-primary');
+    expect(buttonNamed('执行整理', host)!.className).toContain('bg-button-primary');
   });
 
   it('有上一批才给回滚；回滚也先确认，取消就不发', async () => {

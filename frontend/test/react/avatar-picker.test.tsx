@@ -188,6 +188,7 @@ it('地址栏填了才允许取图，取回来的那一份进框选，交的是�
   });
   await openPicker();
   expect(buttonNamed('用这个地址')?.disabled).toBe(true);
+  expect(buttonNamed('用这个地址')?.className).not.toContain('bg-button-primary');
   await type(document.querySelector<HTMLInputElement>('input[aria-label="图片地址"]'), '  https://example.com/a.jpg  ');
   expect(buttonNamed('用这个地址')?.disabled).toBe(false);
   await click(buttonNamed('用这个地址'));
@@ -316,7 +317,7 @@ it('候选没取到时原因旁边有「重试」，点了再取一遍', async (
   expect(dialog()?.querySelector('[role="alert"]')?.textContent).toContain('候选读不出来');
   expect(document.querySelector('[role="listbox"]')).toBeNull();
   fail = false;
-  await click(buttonNamed('重试'));
+  await click(buttonNamed('立即重试'));
   await settle();
   expect(fetched).toHaveBeenCalledTimes(2);
   expect(cells()).toHaveLength(1);
@@ -333,7 +334,7 @@ it('提交失败的原因旁边不给「重试」：重来的是那颗提交键�
   await click(cells()[0]);
   await settle();
   expect(dialog()?.querySelector('[role="alert"]')).not.toBeNull();
-  expect(buttonNamed('重试')).toBeNull();
+  expect(buttonNamed('立即重试')).toBeNull();
 });
 
 it('保存失败返回候选并重新选图时只显示当前操作的错误', async () => {

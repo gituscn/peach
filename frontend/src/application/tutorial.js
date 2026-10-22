@@ -1,6 +1,6 @@
 /* tutorial 域控制器：本域状态与动作，启动由 Application 的生命周期统一安装。 */
 import { cameFromSetup, writeShell } from './../shell/index';
-import { isCurrentPostSetupTutorialRequest, nextPostSetupTutorialRequest, postSetupTutorialCollapsed, postSetupTutorialMarker, postSetupTutorialSignature, postSetupTutorialSkipped, resetPostSetupTutorialState, setCollapseRegionOpen, setPostSetupTutorialCollapsed, setPostSetupTutorialMarker, setPostSetupTutorialSkipped } from '../ui-kit';
+import { isCurrentPostSetupTutorialRequest, nextPostSetupTutorialRequest, postSetupTutorialCollapsed, postSetupTutorialMarker, postSetupTutorialErrorHtml, postSetupTutorialSignature, postSetupTutorialSkipped, resetPostSetupTutorialState, setCollapseRegionOpen, setPostSetupTutorialCollapsed, setPostSetupTutorialMarker, setPostSetupTutorialSkipped } from '../ui-kit';
 import { peachHistory, shellNavigate } from './../history/index';
 import { $, api, icon } from '../core';
 import { navigationState } from './navigation.js';
@@ -77,10 +77,7 @@ export async function syncPostSetupTutorial(){
     if(!isCurrentPostSetupTutorialRequest(request))return;
     /* 取数失败时这张卡是死的：没有清单，也没有下一步。给一条重试和一个关闭，
        不然它只能一直杵在右下角占着地方。 */
-    root.innerHTML=`<article class="post-setup-notification post-setup-error">${icon('alert')}
-      <div><h2>暂时无法检查安装进度</h2><p>切换页面或重新打开后会再检查一次。</p>
-      <div class="post-setup-error-actions"><button class="geist-button" type="button" data-tutorial-retry>重试</button>
-      <button class="geist-button" type="button" data-tutorial-dismiss>关闭</button></div></div></article>`;
+    root.innerHTML=postSetupTutorialErrorHtml(icon('alert'));
     root.removeAttribute('aria-busy');
     applicationEffects.handler(root.querySelector('[data-tutorial-retry]'), 'onclick', ()=>{
       delete root.dataset.tutorialSignature;root.innerHTML='';void syncPostSetupTutorial();

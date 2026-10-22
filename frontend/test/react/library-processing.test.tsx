@@ -16,7 +16,7 @@ import { LibraryProcessingCard } from '../../src/react/library-processing/librar
 import { LibraryProcessingNotice } from '../../src/react/library-processing/library-processing-notice';
 import type { LibraryProcessingProps } from '../../src/react/bundle';
 
-import { buttonNamed as textButtonNamed, click, mount, mountRoot, submit } from './render';
+import { actionOrder, buttonNamed as textButtonNamed, click, mount, mountRoot, submit } from './render';
 
 const buttonNamed = (name: string, root: ParentNode = document) =>
   [...root.querySelectorAll('button')].find(button => button.getAttribute('aria-label') === name)
@@ -106,7 +106,7 @@ it('来源说没有只报一个数，不算问题也不提供失败重试', asyn
   expect(record.closest('.text-text-secondary')).not.toBeNull();
   expect(record.closest('.border-t')!.className).toContain('border-current/20');
   expect(host.querySelector('[role="alert"]')).toBeNull();
-  expect(buttonNamed('重试未完成项')).toBeNull();
+  expect(buttonNamed('立即重试未完成项')).toBeNull();
   expect(host.querySelector('details')).toBeNull();
 });
 
@@ -230,9 +230,10 @@ it('失败时把问题清单折叠进错误提示，重试只交失败的那些�
   // 补上没做完的那些是这一趟的事，重新跑一整批是下一趟的事：页脚那颗留着，各答各的问题。
   expect(buttonNamed('同步媒体库', host)?.textContent).toBe('同步媒体库');
 
-  // 重试键属于错误提示，问题清单收起时仍可操作。
-  const retry = buttonNamed('重试未完成项')!;
-  expect(retry.className).toContain('bg-button-primary');
+  // 重试键属于错误提示，和别处 Note 的恢复动作一样是次级键；问题清单收起时仍可操作。
+  const retry = buttonNamed('立即重试未完成项')!;
+  expect(retry.textContent).toBe('立即重试');
+  expect(retry.className).not.toContain('bg-button-primary');
   expect(alert!.contains(retry)).toBe(true);
   expect(details.contains(retry)).toBe(false);
 
@@ -259,7 +260,7 @@ it('失败项都不可重试时仍能重新发起整批任务', async () => {
     retryable_asset_ids: [], issue_preview: [{ asset_id: 1, message: '未识别到番号' }],
   });
   const host = await mount(card({ toast: vi.fn() }));
-  expect(buttonNamed('重试未完成项')).toBeNull();
+  expect(buttonNamed('立即重试未完成项')).toBeNull();
   expect(buttonNamed('同步媒体库', host)?.textContent).toBe('同步媒体库');
 });
 
@@ -434,6 +435,10 @@ it('暂停与继续使用同一个任务号，暂停不是完成，暂停时仍�
   });
   const host = await mount(notice({ toast, onComplete, mode: 'notice' }));
   expect(host.textContent).toContain('预计剩余约 20–40 分钟（粗估）');
+  // 去任务详情的链接在左，暂停这类原地控制在右。
+  const bar = actionOrder(host.querySelector('a[href="/data-cleanup#libraryProcessing"]')!.parentElement);
+  expect(bar[0]).toBe('任务详情');
+  expect(bar.indexOf('暂停')).toBeGreaterThan(0);
   await click(buttonNamed('暂停', host));
   expect(host.textContent).toContain('正在暂停，当前步骤结束后暂停');
   state = { ...state, status: 'paused' };

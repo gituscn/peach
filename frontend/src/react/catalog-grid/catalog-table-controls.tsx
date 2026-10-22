@@ -24,7 +24,7 @@ export function CatalogRating({ item, actions }: { item: MediaItem; actions: Pic
   };
   return <div data-catalog-rating="" role="group" aria-label={label} title={label}>
     <RatingStars value={score} onRate={rate} busyStar={action.busy ? Number(action.busy) : undefined} />
-    {action.error ? <Note tone="error" action={<Button variant="secondary" size="small" onClick={() => rate(lastStar.current)}>重试评分</Button>}>
+    {action.error ? <Note tone="error" action={<Button variant="secondary" size="small" aria-label="立即重试评分" onClick={() => rate(lastStar.current)}>立即重试</Button>}>
       {action.error}
     </Note> : null}
   </div>;

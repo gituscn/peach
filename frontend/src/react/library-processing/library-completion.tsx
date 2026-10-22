@@ -73,7 +73,7 @@ function Completion({ assetIds, onComplete, className }: { assetIds: number[]; o
       start.mutate(command);
     }} /></div>}>
       {message}{' '}<LinkButton href="/data-cleanup#libraryProcessing" size="small" trailingIcon={RiArrowRightLine}>
-      {problem ? '查看并处理' : '查看处理详情'}
+      {problem ? '打开扫描与采集' : '查看处理详情'}
     </LinkButton></Note>
   </section>;
 }

@@ -175,6 +175,7 @@ export function OrganizeCard(
 
   /* 这张卡上的结论只有一句：跑着的那一趟、这次跟完的那一趟、刚出的预览，按新旧取最新。 */
   let state = null;
+  const applicable = !!changes && !running && !job.outcome;
   const current = job.job;
   const outcome = job.outcome;
   if (current?.status === 'running') {
@@ -200,13 +201,12 @@ export function OrganizeCard(
       attributes={{ 'data-cleanup-organize': '' }}
       footer={
         <>
-          <Button disabled={!locations.length || running} {...busyProps(preview.isPending)} onClick={runPreview}>预览</Button>
-          {changes && !running && !job.outcome
-            ? <Button onClick={runApply}>执行整理</Button>
-            : null}
           {data?.last_batch
             ? <Button variant="secondary" {...busyProps(running)} onClick={runRollback}>回滚上一批</Button>
             : null}
+          <Button variant={applicable ? 'secondary' : 'primary'} disabled={!locations.length || running}
+            {...busyProps(preview.isPending)} onClick={runPreview}>预览</Button>
+          {applicable ? <Button variant="primary" onClick={runApply}>执行整理</Button> : null}
         </>
       }>
       <FieldsetTitle id="cleanup-organize-title" gap="medium">整理</FieldsetTitle>

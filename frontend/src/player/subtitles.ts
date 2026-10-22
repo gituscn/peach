@@ -99,7 +99,7 @@ export class SubtitleControls {
     });
     if (this.session.error) {
       this.status(this.session.error, true);
-      panel.querySelector('[data-subtitle-status]')!.insertAdjacentHTML('beforeend', '<button type="button" class="vjs-peach-caption-action" data-subtitle-memory-retry>重试</button>');
+      panel.querySelector('[data-subtitle-status]')!.insertAdjacentHTML('beforeend', '<button type="button" class="vjs-peach-caption-action" data-subtitle-memory-retry>立即重试</button>');
       panel.querySelector<HTMLButtonElement>('[data-subtitle-memory-retry]')!.onclick = () => { void this.session.retry() };
     }
   }
@@ -192,7 +192,7 @@ export class SubtitleControls {
         this.status(error instanceof Error ? error.message : '字幕搜索失败', true);
         list.querySelector('[data-subtitle-more]')?.remove();
         list.querySelector('[data-subtitle-retry]')?.remove();
-        list.insertAdjacentHTML('beforeend', '<button type="button" class="vjs-peach-caption-action" data-subtitle-retry>重试</button>');
+        list.insertAdjacentHTML('beforeend', '<button type="button" class="vjs-peach-caption-action" data-subtitle-retry>立即重试</button>');
         list.querySelector<HTMLButtonElement>('[data-subtitle-retry]')!.onclick = () => { void this.runSearch(panel, offset) };
       }
     } finally { panel.removeAttribute('aria-busy'); if (trigger) setActionBusy(trigger, false); list.inert = false }

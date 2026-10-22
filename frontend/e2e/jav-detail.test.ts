@@ -288,8 +288,8 @@ describe('库外 JAV 作品详情', () => {
           assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
           assert.equal(await toggle.locator('svg').count(), 2, '对象图标和展开箭头齐备');
         }
-        const sourceButton = page.getByRole('button', { name: '作品来源', exact: true });
-        assert.deepEqual(await page.locator('[data-jav-actions] button').allTextContents(), ['查找资源', '想要', '作品来源']);
+        const sourceButton = page.getByRole('link', { name: '作品来源', exact: true });
+        assert.deepEqual(await page.locator('[data-jav-actions] :is(button, a)').allTextContents(), ['作品来源', '想要', '查找资源']);
         assert.ok(await sourceButton.evaluate(el => parseFloat(getComputedStyle(el).borderWidth) > 0));
         const side = page.locator('[data-jav-info]');
         const before = await page.locator('#stage').boundingBox();
@@ -359,7 +359,7 @@ describe('库外 JAV 作品详情', () => {
         }));
         assert.ok(lines.every(line => line.width === '1px' && line.color === line.expected), JSON.stringify(lines));
         assert.ok(await page.locator('[data-jav-resources]').getByRole('button', { name: '添加下载', exact: true }).first().isDisabled());
-        assert.deepEqual(await page.locator('[data-resource-actions]').first().locator('button, a').allTextContents(), ['添加下载', '复制链接', '链接来源']);
+        assert.deepEqual(await page.locator('[data-resource-actions]').first().locator('button, a').allTextContents(), ['链接来源', '复制链接', '添加下载']);
         assert.equal(await page.locator('[data-resource-facts]').first().getByText('高清', { exact: true }).count(), 0);
         const facts = await page.locator('[data-resource-facts]').first().evaluate(node => {
           const boxes = [...node.children].map(child => child.getBoundingClientRect());

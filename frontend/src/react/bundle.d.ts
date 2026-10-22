@@ -324,8 +324,6 @@ export interface StatsProps {
   tagLabel(key: string): string;
   /** 点一个内容标签：回目录并按它筛选。整页换成目录由遗留壳做。 */
   onTag(key: string): void;
-  /** 打开配置页的「媒体」页签。没有视频或没有存储来源时空态里的那个去处。 */
-  openMediaSettings(): void;
 }
 
 /** 口味页仍由遗留层提供的能力。都是导航、查表或回执，页面不持有它们的状态。 */
@@ -368,7 +366,6 @@ export interface FollowManageProps {
   toast(message: string): void;
   /** 去「看更新」那一页（`/follow`）。整页换成哪一屏仍归遗留壳。 */
   openFollow(): void;
-  openServiceConfiguration(): void;
   /** 数据库只读：这台机器只能浏览，写操作全部不给点。 */
   readOnly: boolean;
   readOnlyMessage: string;

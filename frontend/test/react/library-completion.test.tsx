@@ -110,6 +110,6 @@ it('启动失败保留入口与处理详情，不显示完成回执', async () =
   await click(buttonNamed('同步这些影片', host));
   expect(host.textContent).toContain('请先添加媒体目录');
   expect(host.textContent).not.toContain('补全完成');
-  expect(host.querySelector('a[href="/data-cleanup#libraryProcessing"]')?.textContent).toBe('查看并处理');
+  expect(host.querySelector('a[href="/data-cleanup#libraryProcessing"]')?.textContent).toBe('打开扫描与采集');
   expect(buttonNamed('同步这些影片', host)?.disabled).toBe(false);
 });

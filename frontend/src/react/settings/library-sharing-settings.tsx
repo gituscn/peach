@@ -66,15 +66,15 @@ export function LibrarySharingSettings({ initial, receipt }: {
     </Stack> : null}
     {action.error ? <Stack divided><ErrorText>{action.error}</ErrorText></Stack> : null}
     <Footer>
+      {reviewing && !value.enabled ? <Button variant="secondary" onClick={() => {
+        setReviewing(false); setPreview(null); setAccepted(false);
+      }}>取消</Button> : null}
       <Button variant="secondary" onClick={() => { setReviewing(true); void action.run('preview',
         (signal) => apiGet<Preview>('/api/configuration/library-sharing/preview', signal),
         (data) => { setPreview(data); setAccepted(false) }) }}
         {...busyProps(action.busy === 'preview')}>预览上传内容</Button>
-      {!value.enabled && preview ? <Button disabled={!accepted} onClick={() => save(true)}
+      {!value.enabled && preview ? <Button variant="primary" disabled={!accepted} onClick={() => save(true)}
         {...busyProps(action.busy === 'save')}>同意并开启上传</Button> : null}
-      {reviewing && !value.enabled ? <Button variant="secondary" onClick={() => {
-        setReviewing(false); setPreview(null); setAccepted(false);
-      }}>取消</Button> : null}
     </Footer>
   </>;
 }

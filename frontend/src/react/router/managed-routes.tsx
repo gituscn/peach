@@ -11,7 +11,7 @@
  * 四张表的页面不走 `go`：它们在页内写地址一律由壳认领（`routeIndex`、资料页与关注页的 `actions.route`、
  * 目录的换筛选、垃圾队列的换分类），跨页也交壳，打开次数同壳自己打开。 */
 import type { ReactElement } from 'react';
-import { settingsPath, type ConfigurationPath } from '@peach/history';
+import type { ConfigurationPath } from '@peach/history';
 
 import { javDisplayName, javTitleHtml } from '@peach/legacy/jav-title';
 import { tagLabel } from '@peach/legacy/tags';
@@ -110,10 +110,9 @@ const configurationRoute = (path: ConfigurationPath): ManagedRoute<ManagedOpenPr
   prefetch: async (_open, signal) => {
     await Promise.all([prefetchConfiguration(signal), ...(path === '/settings/diagnostics' ? [prefetchDiagnostics(signal)] : [])]);
   },
-  page: (open, actions, go) => <ConfigurationPage receipt={message => actions.receipt(message)}
+  page: (open, actions) => <ConfigurationPage receipt={message => actions.receipt(message)}
     reopenTutorial={actions.reopenTutorial} section={path === '/settings/diagnostics' ? '系统诊断' : open.section ?? ''}
-    diagnostics={<DiagnosticsPage navigate={go} openItem={actions.openItem} receipt={message => actions.receipt(message)}
-      configure={section => { actions.requestConfigurationSection(section); go(settingsPath(section)) }} />} />,
+    diagnostics={<DiagnosticsPage openItem={actions.openItem} receipt={message => actions.receipt(message)} />} />,
 });
 
 export const MANAGED_ROUTES: ManagedRouteTable = {
@@ -126,10 +125,7 @@ export const MANAGED_ROUTES: ManagedRouteTable = {
     element: <ManagedMatch path="/stats" />,
     prefetch: (_open, signal) => prefetchStats(signal),
     /* 点一个内容标签是「回目录并按它筛选」，整页换成目录仍归壳。 */
-    page: (_open, actions, go) => (
-      <StatsPage tagLabel={tagLabel} onTag={actions.openTag}
-        openMediaSettings={() => { actions.requestConfigurationSection('媒体库与入库'); go('/settings/library') }} />
-    ),
+    page: (_open, actions) => <StatsPage tagLabel={tagLabel} onTag={actions.openTag} />,
   },
   '/taste': {
     element: <ManagedMatch path="/taste" />,
@@ -199,8 +195,7 @@ export const MANAGED_ROUTES: ManagedRouteTable = {
     prefetch: (open, signal) => prefetchFollowManage(signal, open.tab),
     page: (open, actions) => (
       <FollowManagePage {...open} route={actions.routeFollowManage} savePreference={actions.saveFollowPreference}
-        toast={(message) => actions.receipt(message)} openFollow={actions.openFollow}
-        openServiceConfiguration={() => actions.navigate('/settings/subscriptions')} />
+        toast={(message) => actions.receipt(message)} openFollow={actions.openFollow} />
     ),
   },
 };

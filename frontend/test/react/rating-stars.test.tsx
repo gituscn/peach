@@ -44,7 +44,7 @@ it('表格评分成功同步列表与详情缓存，失败保留原因并支持�
   await click(root.host.querySelector('button[aria-label="评为 5 星"]'));
   await settle();
   expect(root.host.textContent).toContain('示例评分失败');
-  const retry = [...root.host.querySelectorAll('button')].find(button => button.textContent === '重试评分')!;
+  const retry = [...root.host.querySelectorAll('button')].find(button => button.getAttribute('aria-label') === '立即重试评分')!;
   await act(async () => retry.click());
   await settle();
   expect(rate).toHaveBeenCalledTimes(3);

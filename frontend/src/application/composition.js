@@ -73,7 +73,6 @@ compositionState.shellActions = {
   failure:receiptsState.actionFailure,
   revealSource:revealForIsland,
   reopenTutorial:reopenPostSetupTutorial,
-  requestConfigurationSection:section=>{writeShell({configurationRequestedSection:section})},
   routeReview,
   routeFollowManage,
   saveFollowPreference:patch=>{

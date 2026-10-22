@@ -41,7 +41,7 @@ export function CustomSources({ receipt }: { receipt(message: string): void }) {
           (result) => { changed(result); receipt(source.enabled ? '已停用来源' : '已启用来源') })}>
           {source.enabled ? '停用' : '启用'}</Button>
         <Button variant="danger" onClick={() => confirmModal({ title: '删除自定义来源',
-          body: `删除「${esc(source.name)}」后，采集将不再查询这个来源。`, confirmLabel: '删除来源',
+          body: `删除「${esc(source.name)}」后，采集将不再查询这个来源。`, confirmLabel: '删除来源', danger: true,
           onConfirm: async () => { changed(await apiSend<{ items: Source[] }>(URL, { action: 'delete', id: source.id }));
             setEditing(null); receipt('已删除来源') } })}>删除</Button>
       </div>)}
