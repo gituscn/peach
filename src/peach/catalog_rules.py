@@ -387,9 +387,9 @@ KOREAN_MIB_PREFIXES = frozenset({
     "MOSA", "MOSY", "NOAH", "SJSK",
 })
 _KOREAN_MIB_CODE = re.compile(r"^([A-Z]{2,4})-\d+$")
-#: MIB 文件名是「番号 + 空格 + 演员名与片名」（`YUJ-103 Ain Do you wanna be my slave`），
-#: 或带站名方括号与括号注记（`[K-MIB]NOAH-101(NOAH)(1)`），整段不是纯番号，
-#: `_CODE_BODY` 认不出。只对 MIB 前缀开这条路，前缀之外的仍走通用规则。
+#: MIB 文件名常带站名方括号（`[K-MIB]NOAH-101(NOAH)(1)`）或用 `_` 分隔（`YUJ_103 片名`）。
+#: `_titled_release_code` 只看第一段、只认 `-`，第一段又是 `K-MIB`，两种都接不住，
+#: 所以 MIB 前缀单独开这条路，前缀之外的仍走通用规则。
 _KOREAN_MIB_FILENAME = re.compile(
     r"^(?:\[K-?MIB\]\s*)?([A-Za-z]{2,4})[-_](\d{3,4})(?=$|[\s(\[._-])", re.I)
 #: 带片名的文件名里，番号是一段连续的半角字母数字，中间只夹 `-`、`_`、`.`。

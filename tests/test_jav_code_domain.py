@@ -337,8 +337,7 @@ class TitledFilenameTests(unittest.TestCase):
     """片库自有的命名：番号后面跟片名、女优、字幕说明，前面可能有装饰符号。
 
     2026-10-22 用本机账本 78520 段文件名对比：新认出且与已有 code 一致 463 段、冲突 0 段；
-    code 为空的新认出 233 段，按前缀逐类核过未见误识别。两位序号与连写形态放进来时，
-    `ShinoAoi-15`、`Nanshu969` 这类创作者名占了新增的三成。
+    code 为空的新认出 233 段，按前缀逐类核过未见误识别。
     """
 
     def test_a_title_after_the_code_does_not_hide_it(self):
