@@ -210,7 +210,7 @@ export function FollowFeedPage(props: FollowFeedProps) {
                   aria-busy={job.busy || undefined}
                   onClick={() => void job.start(true)}>
                   {job.olderBusy
-                    ? <><span className="contents" dangerouslySetInnerHTML={{ __html: spinnerHtml('抓取中') }} /><span>抓取中…</span></>
+                    ? <><span className="contents" dangerouslySetInnerHTML={{ __html: spinnerHtml('抓取中') }} /><span>抓取中</span></>
                     : '抓更早的一页'}
                 </Button>
                 <span data-follow-backfill="">{backfillState(facets.sources)}</span>

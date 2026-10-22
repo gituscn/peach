@@ -37,8 +37,8 @@ import { SourceIcon } from './source-view';
 const MENU_ROW = cx(MENU_ITEM, MENU_ITEM_INTERACTIVE, 'text-body-2-medium');
 const PLACEHOLDER = '粘贴来源链接，或输入创作者名、id…';
 // 索引下载的提醒只在真按名字查时出现；常驻成一句说明就是噪音。
-const BY_NAME_HINT = '查找中…（首次按名字查要下载创作者索引，可能几十秒）';
-const BY_LINK_HINT = '识别中…';
+const BY_NAME_HINT = '查找中（首次按名字查要下载创作者索引，可能几十秒）';
+const BY_LINK_HINT = '识别中';
 const NO_CANDIDATE = '站内没有查到来源';
 
 export interface AddSourceProps {

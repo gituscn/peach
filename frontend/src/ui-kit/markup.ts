@@ -123,7 +123,14 @@ export function searchInputHtml({label,id='',name='',value='',placeholder='',att
     <input ${parts}></div>`;
 }
 
-/** Geist Loading Dots: indeterminate work continuing in the background. */
+/**
+ * 列表续页时 Loading Dots 旁那一句：目录哨兵、垃圾文件队列等无限滚动列表共用。三颗点已经在动，
+ * 字不带省略号。
+ */
+export const LOAD_MORE_STATUS = '载入中';
+
+/** Geist Loading Dots: indeterminate work continuing in the background. The dots already say
+ *  "still going", so the label never ends in an ellipsis. */
 export function loadingDotsHtml(label='正在处理', {className=''}={}):string{
   return `<span class="ui-geist-loading${className?` ${esc(className)}`:''}" role="status">
     <span class="ui-geist-loading-dots" aria-hidden="true"><i></i><i></i><i></i></span>

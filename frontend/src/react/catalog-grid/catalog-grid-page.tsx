@@ -5,16 +5,16 @@
  * 起来（同遗留层 `revealSkeleton`），骨架还没到显示门槛就取完的直接落内容。
  *
  * 网格每接一页经 `onCount` 报一次总数与显示的卡数，读数画在首页筛选条（`catalog-filter` 岛）的
- * 下排。无限滚动见下面的 `LoadMore`：哨兵进入视口 320px
+ * 下排。无限滚动见下面的 `LoadMore`：哨兵进入视口下方一屏
  * 内自动取下一页，点它等于手动取；失败在哨兵后面留一条可重试的 Note，之后只有手动才重试。 */
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useInfiniteQuery, type InfiniteData, type QueryKey } from '@tanstack/react-query';
 import { mixFace as mixArtwork, mixLabel, relayoutCovers, type Artwork } from '@peach/card-art';
 import { requestErrorMessage } from '@peach/legacy/core';
-import { loadingDotsHtml } from '@peach/legacy/ui';
+import { LOAD_MORE_STATUS, loadingDotsHtml } from '@peach/legacy/ui';
 
 import { apiGet } from '../../api';
-import { RetryNote, useSkeletonReveal } from '../components/grid-reveal';
+import { LOAD_MORE_MARGIN, RetryNote, useSkeletonReveal } from '../components/grid-reveal';
 import { cardRatio, MediaCard, type MediaCardVariant } from '../components/media-card';
 import { MIX_FLIP_FACES, MixCard } from '../components/mix-card';
 import {
@@ -138,8 +138,11 @@ function GridBody(props: CatalogGridProps) {
     (item: MediaItem, anchor: HTMLElement) => actions.openResource(item, anchor), [actions]);
   const openShort = useCallback((item: MediaItem) => actions.openShort(item), [actions]);
 
+  /* 续页压过后台重读：结果版本一变，壳会作废这份查询，无限查询随即把已接上的每一页按顺序重取
+     一遍。续页若搭这一趟的车，就得等它取完全部 N 页，而且等完也不会多出一页。所以续页先停掉
+     路上的重读、直接取下一页；被停掉的那次刷新等下一次结果版本变化再补。 */
   const loadNext = useCallback(async () => {
-    const next = await result.fetchNextPage({ cancelRefetch: false });
+    const next = await result.fetchNextPage();
     if (next.isFetchNextPageError) throw next.error;
   }, [result.fetchNextPage]);
 
@@ -207,6 +210,7 @@ export function LoadMore({ entity, load, enabled, children }: {
   entity: boolean; load: () => Promise<void>; enabled: () => boolean; children?: ReactNode;
 }) {
   const node = useRef<HTMLElement | null>(null);
+  const observer = useRef<IntersectionObserver | null>(null);
   const busy = useRef(false);
   const failed = useRef(false);
   const [state, setState] = useState<{ busy: boolean; error: string }>({ busy: false, error: '' });
@@ -227,16 +231,24 @@ export function LoadMore({ entity, load, enabled, children }: {
     } finally {
       busy.current = false;
     }
+    /* 这一趟没接上新页（例如被并进别的取数）时哨兵不会重挂，而一直待在视口里的哨兵不会再收到
+       相交通知：重新观察一次，让观察器按当前位置再判一遍。 */
+    const watching = observer.current;
+    if (!failed.current && watching && node.current?.isConnected) {
+      watching.unobserve(node.current);
+      watching.observe(node.current);
+    }
   }, []);
   const attach = useCallback((el: HTMLElement | null) => { node.current = el }, []);
   useEffect(() => {
     const el = node.current;
     if (!el) return undefined;
-    const observer = new IntersectionObserver((entries) => {
+    const watching = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) void run(false);
-    }, { rootMargin: '320px' });
-    observer.observe(el);
-    return () => observer.disconnect();
+    }, { rootMargin: LOAD_MORE_MARGIN });
+    observer.current = watching;
+    watching.observe(el);
+    return () => { watching.disconnect(); observer.current = null };
   }, [run]);
   const aria = state.busy ? { 'aria-busy': true, 'aria-disabled': true } as const : {};
   return (
@@ -245,7 +257,7 @@ export function LoadMore({ entity, load, enabled, children }: {
         ? <button ref={attach} type="button" data-entity-more="" {...aria} onClick={() => void run(true)}>{children ?? '载入更多'}</button>
         /* 失败时只留下面那条重试：哨兵收起但不卸下，重试接上之后照旧由它续页。 */
         : <div ref={attach} data-load-more="" {...aria} hidden={Boolean(state.error)} onClick={() => void run(true)}
-          dangerouslySetInnerHTML={{ __html: loadingDotsHtml('继续载入中…') }} />}
+          dangerouslySetInnerHTML={{ __html: loadingDotsHtml(LOAD_MORE_STATUS) }} />}
       {state.error ? <RetryNote message={state.error} onRetry={() => void run(true)} /> : null}
     </>
   );

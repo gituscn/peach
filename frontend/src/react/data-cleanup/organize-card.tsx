@@ -179,7 +179,7 @@ export function OrganizeCard(
   const current = job.job;
   const outcome = job.outcome;
   if (current?.status === 'running') {
-    const line = current.message || current.stage || '正在整理文件…';
+    const line = current.message || current.stage || '正在整理文件';
     state = <TaskProgress embedded label={line} value={Math.min(current.checked || 0, current.total || 0)} total={current.total} />;
   } else if (outcome?.status === 'failed') {
     state = <Note tone="error" title="文件整理未完成">{outcome.error || '请查看任务记录，核对已处理的文件。'}</Note>;
@@ -189,7 +189,7 @@ export function OrganizeCard(
   } else if (job.start.isError) {
     state = <Note tone="error" title="整理失败">{errorMessage(job.start.error)}</Note>;
   } else if (preview.isPending) {
-    state = <TaskProgress embedded label="正在核对整理计划…" />;
+    state = <TaskProgress embedded label="正在核对整理计划" />;
   } else if (preview.isError && previewMatches) {
     state = <Note tone="error" title="整理预览失败">{errorMessage(preview.error)}</Note>;
   } else if (plan) {
