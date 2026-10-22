@@ -22,7 +22,12 @@ describe('作品卡片署名信息行', () => {
           assert.equal(await card.locator(`[data-media-${field}] svg use`).getAttribute('href'), `#i-${glyph}`);
           const icon = card.locator(`[data-media-${field}] svg`);
           if (viewport.mobile && field === 'release') assert.equal(await icon.isVisible(), false);
-          else assert.equal(await icon.evaluate(node => node.getBoundingClientRect().width), 14);
+          // 与文字同行的图标取 `--icon-inline`（1.2em），按所在文字字号算出应有的边长。
+          else {
+            const [width, inline] = await icon.evaluate(node => [node.getBoundingClientRect().width,
+              parseFloat(getComputedStyle(node).fontSize) * 1.2]);
+            assert.ok(Math.abs(width - inline) < 0.5, `${field} 图标 ${width}px，应为 ${inline}px`);
+          }
         }
         const geometry = await card.evaluate(element => {
           const who = element.querySelector('[data-media-who]')!;

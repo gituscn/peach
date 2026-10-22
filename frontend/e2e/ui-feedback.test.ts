@@ -4,7 +4,7 @@ import type { Browser } from 'playwright-core';
 import { launch, layout, settle, VIEWPORTS, visit } from './harness.ts';
 
 const sections = [
-  ['library', '媒体库与入库', '媒体目录'], ['subscriptions', '来源与订阅', '作品资料站点'],
+  ['library', '媒体库与入库', '媒体库与目录'], ['subscriptions', '来源与订阅', '作品资料站点'],
   ['downloads', '下载渠道', '云下载'], ['network', '网络与访问', 'Peach 代理'],
   ['maintenance', '应用与维护', '开机自启'], ['diagnostics', '系统诊断', '库健康'],
 ] as const;
@@ -26,7 +26,7 @@ describe('等待反馈与文件夹模式', () => {
         await root.waitFor();
         assert.equal((await root.locator('.ui-board-local-nav [aria-selected="true"]').innerText()).trim(), name);
         assert.ok(await root.locator(`[aria-label="${title}"]`).count());
-        if (key !== 'library') assert.equal(await root.locator('[aria-label="媒体目录"]').count(), 0);
+        if (key !== 'library') assert.equal(await root.locator('[aria-label="媒体库与目录"]').count(), 0);
         if (key === 'library') assert.equal(await root.locator('[data-folder-row]').count(), 1);
         const geometry = await layout(page);
         assert.ok(geometry.scrollWidth <= geometry.viewportWidth, JSON.stringify(geometry));
