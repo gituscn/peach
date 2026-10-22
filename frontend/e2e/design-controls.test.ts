@@ -434,6 +434,57 @@ describe('设计决定：控件、状态与首页顶部', () => {
     }
   });
 
+  it('同一份问题日志只印一处，「7 天内不再问」与失败提示同一组留白', { timeout: 60_000 }, async () => {
+    const notes = { fetching_cover: 84, querying_metadata: 18 };
+    const button = '[aria-label="在资源管理器中显示"]';
+    const reveal = `#libraryProcessing ${button}`;
+    const failed = await openProcessing(browser, '/data-cleanup', { ...FAILED_JOB, notes });
+    try {
+      const alert = failed.page.locator('#libraryProcessing [role="alert"]');
+      await expectBody(failed.page, '/data-cleanup 失败提示与不再问提示', [alert], failed.problems);
+      await alert.locator('summary').click();
+      await alert.locator('ul').waitFor({ state: 'visible', timeout: 5_000 });
+      assert.equal(await failed.page.locator(reveal).count(), 1, '完整记录在两块提示里各印了一遍');
+      assert.equal(await alert.locator(button).count(), 1, '完整记录该跟着问题清单');
+      const spacing = await failed.page.evaluate(() => {
+        const box = (element: Element) => {
+          const style = getComputedStyle(element);
+          return { top: style.paddingTop, bottom: style.paddingBottom, left: style.paddingLeft };
+        };
+        const alert = document.querySelector('#libraryProcessing [role="alert"]')!;
+        const note = [...document.querySelectorAll('#libraryProcessing [role="note"]')]
+          .find((element) => element.textContent!.includes('7 天内不再问'))!;
+        return { alert: box(alert), note: box(note) };
+      });
+      assert.equal(spacing.note.top, spacing.note.bottom, '不再问提示的上下留白不一样');
+      assert.deepEqual(spacing.note, spacing.alert, '不再问提示和失败提示的内边距对不上');
+      assert.deepEqual(failed.problems, []);
+    } finally {
+      await failed.close();
+    }
+    /* 跑完的一趟没有失败提示，这条提示就是日志唯一的入口；分隔线上下的留白与内边距相同。 */
+    const complete = await openProcessing(browser, '/data-cleanup', {
+      status: 'complete', job_id: 'two', issue_count: 3, issues_log: FAILED_JOB.issues_log, notes,
+    });
+    try {
+      const note = complete.page.locator('#libraryProcessing [role="note"]', { hasText: '7 天内不再问' });
+      await expectBody(complete.page, '/data-cleanup 不再问提示', [note], complete.problems);
+      assert.equal(await complete.page.locator(reveal).count(), 1, '跑完的一趟丢了完整记录');
+      const rhythm = await note.evaluate((element, selector) => {
+        const bar = element.querySelector(selector)!.closest('.border-t')!;
+        const note = getComputedStyle(element);
+        const style = getComputedStyle(bar);
+        return { padding: note.paddingTop, gap: note.rowGap, above: style.marginTop, below: style.paddingTop };
+      }, button);
+      assert.equal(rhythm.above, rhythm.padding, '分隔线上方的留白和提示内边距不一样');
+      assert.equal(rhythm.below, rhythm.padding, '分隔线下方的留白和提示内边距不一样');
+      assert.ok(rhythm.gap === 'normal' || rhythm.gap === '0px', '正文与分隔线之间还多垫了一段间距');
+      assert.deepEqual(complete.problems, []);
+    } finally {
+      await complete.close();
+    }
+  });
+
   it('新窗口打开的来源地址两项 rel 都写：不带走会话，也不带走来处', { timeout: 60_000 }, async () => {
     const opened = await openScraping(browser);
     try {

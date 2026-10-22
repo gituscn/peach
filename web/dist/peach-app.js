@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "828749ba-91c4-47d7-acb3-9c003e9c4a5a", e._sentryDebugIdIdentifier = "sentry-dbid-828749ba-91c4-47d7-acb3-9c003e9c4a5a");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "89299eae-a3d0-42fa-a86a-2bceed532b06", e._sentryDebugIdIdentifier = "sentry-dbid-89299eae-a3d0-42fa-a86a-2bceed532b06");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -59371,7 +59371,7 @@ var cNe = "这一项耗时较长，暂时没有新进展。任务结束后可以
 	return r && a.push(`${r} 项同名人物资料需要确认是否为同一人`), i && a.push(`${i} 张头像未取得`), `${a.join("，")}。`;
 }, uNe = (e) => e.requested_stage === "previews" ? `已生成 ${e.previews || 0} 部视频预览。` : `已扫描 ${e.scanned || 0} 个文件，识别 ${e.identified || 0} 个番号，取得 ${e.candidates || 0} 组作品资料，自动保存 ${e.auto_applied || 0} 条。` + (e.previews ? `已生成 ${e.previews} 部视频预览。` : "") + lNe(e);
 function dNe({ state: e, problem: t, settled: n, onRetry: r, toast: i }) {
-	let a = mCe(e), o = e.status === "failed" && !!e.retryable_asset_ids?.length, s = dCe(e.notes || {}), c = HA();
+	let a = mCe(e), o = e.status === "failed" && !!e.retryable_asset_ids?.length, s = dCe(e.notes || {}), c = !!t || e.status === "failed", l = c && !!a?.log, u = HA();
 	return /* @__PURE__ */ (0, D.jsxs)("div", {
 		"aria-live": "polite",
 		className: "flex flex-col gap-4 empty:hidden",
@@ -59381,7 +59381,7 @@ function dNe({ state: e, problem: t, settled: n, onRetry: r, toast: i }) {
 				title: "处理较慢",
 				children: cNe
 			}) : null,
-			t || e.status === "failed" ? /* @__PURE__ */ (0, D.jsx)(J, {
+			c ? /* @__PURE__ */ (0, D.jsx)(J, {
 				tone: "error",
 				className: "gap-0 p-3",
 				action: o ? /* @__PURE__ */ (0, D.jsx)(q, {
@@ -59398,7 +59398,7 @@ function dNe({ state: e, problem: t, settled: n, onRetry: r, toast: i }) {
 						children: [/* @__PURE__ */ (0, D.jsx)("div", {
 							className: "relative",
 							children: /* @__PURE__ */ (0, D.jsx)("ul", {
-								ref: c,
+								ref: u,
 								className: "max-h-96 overflow-y-auto pr-3",
 								children: a.items.map((e) => /* @__PURE__ */ (0, D.jsxs)("li", {
 									className: "flex flex-col gap-1 border-b border-current/15 py-2 wrap-anywhere first:pt-0 last:border-b-0 last:pb-0",
@@ -59442,8 +59442,9 @@ function dNe({ state: e, problem: t, settled: n, onRetry: r, toast: i }) {
 			}) : null,
 			!JP(e) && s ? /* @__PURE__ */ (0, D.jsx)(J, {
 				tone: "neutral",
-				extra: e.issues_log ? /* @__PURE__ */ (0, D.jsx)("div", {
-					className: "mt-1.5 border-t border-current/20 pt-1.5 text-text-secondary",
+				className: "gap-0 p-3",
+				extra: e.issues_log && !l ? /* @__PURE__ */ (0, D.jsx)("div", {
+					className: "mt-3 border-t border-current/20 pt-3 text-text-secondary",
 					children: /* @__PURE__ */ (0, D.jsx)(aR, {
 						path: e.issues_log,
 						prefix: "完整记录：",
@@ -115603,4 +115604,4 @@ Qbt($bt);
 //#endregion
 export { nT as applyTheme, tA as peachHistory, Yo as popCount, Egt as showToast };
 
-//# debugId=828749ba-91c4-47d7-acb3-9c003e9c4a5a
+//# debugId=89299eae-a3d0-42fa-a86a-2bceed532b06
