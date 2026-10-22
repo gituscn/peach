@@ -22,6 +22,7 @@ from .downloads_clouddrive import CloudDriveClient, SERVICE, discover
 from .downloads import CLOUDDRIVE_CREDENTIAL, DownloadSettings
 from .follow_secrets import CredentialStore
 from .config import DATABASE_PATH, SECRETS_DIR, STATE_DIR
+from .peach_proxy import http_client
 from .scripting import open_readonly
 
 MAX_RESPONSE = 2 * 1024 * 1024
@@ -378,7 +379,7 @@ def pikpak_renames(sample_path: str, roots):
         if info is None or info.CloudAPI.name.casefold() != 'webdav':
             raise ValueError('既有 PikPak WebDAV 来源未取得')
         headers = _download_headers(cloud, sample_path)
-        with httpx.Client(headers=headers, timeout=20, follow_redirects=False) as http:
+        with http_client(root=SECRETS_DIR, headers=headers, timeout=20, follow_redirects=False) as http:
             dav = PikPakDav(http, 'A:\\', lambda path: _refresh_listing(cloud, path),
                             listing=lambda path: _cloud_listing(cloud, path),
                             rename=lambda source, target: _rename_remote(cloud, source, target),
