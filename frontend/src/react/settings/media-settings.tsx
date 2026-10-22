@@ -28,6 +28,7 @@ import {
   useFolderRows,
 } from './folder-rows';
 import { sourceDefaultCost, type SourceCost } from '../../core/media-sources';
+import { randomId } from '../../core/random-id';
 import { libraryAutoChoice, LibraryIconPicker } from './library-icon-picker';
 import { PushDiscoveryForm } from './push-discovery-settings';
 import {
@@ -43,14 +44,14 @@ interface MediaRow { path: string; location: string; root: string; root_id?: str
 interface FieldErrors { media_dirs?: string[]; port?: string }
 interface SaveResult { saved: boolean; url: string; revision: string }
 
-const blankRow = (path = ''): MediaRow => ({ path, location: 'local', root: '', library_id: crypto.randomUUID(), library: '', library_icon: '', cost: 'free' });
+const blankRow = (path = ''): MediaRow => ({ path, location: 'local', root: '', library_id: randomId(), library: '', library_icon: '', cost: 'free' });
 
 function initialRows(data: ConfigurationData): MediaRow[] {
   const known = data.media_sources?.filter((row) => MEDIA_SOURCES.some(([kind]) => kind === row.location));
   if (known?.length) {
     return known.map((row) => ({
       path: row.path, location: row.location, root: row.root, library: row.library || '', library_icon: row.library_icon || '',
-      root_id: row.root_id, library_id: row.library_id || crypto.randomUUID(),
+      root_id: row.root_id, library_id: row.library_id || randomId(),
       cost: row.cost ?? sourceDefaultCost(row.location),
     }));
   }
@@ -93,7 +94,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
   const chooseLibrary = (index: number, key: string) => {
     const chosen = rows.find(row => row.library_id === key);
     edit(index, chosen ? { library_id: chosen.library_id, library: chosen.library, library_icon: chosen.library_icon }
-      : { library_id: crypto.randomUUID(), library: '', library_icon: '' });
+      : { library_id: randomId(), library: '', library_icon: '' });
   };
 
   useEffect(() => {

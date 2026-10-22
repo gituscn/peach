@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { randomId } from '../../core/random-id';
+
 export type UserscriptProbeStatus = 'checking' | 'missing' | { version: string; paired: boolean };
 
 /** 通过同源桥接页核对当前浏览器中的用户脚本与配对状态。 */
@@ -8,7 +10,7 @@ export function useUserscriptProbe() {
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<UserscriptProbeStatus>('checking');
   useEffect(() => {
-    const nonce = crypto.randomUUID();
+    const nonce = randomId();
     let settled = false;
     const probe = () => frame.current?.contentWindow?.postMessage({ type: 'peach-userscript:probe', nonce }, window.location.origin);
     const receive = (event: MessageEvent) => {
