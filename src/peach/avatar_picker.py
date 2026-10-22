@@ -20,7 +20,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import sqlite3
+import threading
+import time
 import urllib.parse
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -86,8 +89,65 @@ ADDRESS_CACHE = "url"
 STAND_IN_NOTE = "代表作画面，非本人"
 
 
+#: 图库索引取失败后，隔这么久才再试。头像框一天能开几十次，离线时每开一次就出网
+#: 一回只会白等超时；失败只记一行日志，不进任务中心——下次过期照样会再排。
+INDEX_RETRY_SECONDS = 15 * 60
+
+LOGGER = logging.getLogger(__name__)
+
+
 class PickerError(RuntimeError):
     """这一次换不成，原因可以直接给用户看。"""
+
+
+class IndexRefresher:
+    """图库索引缺失或过期时，在后台补一份。
+
+    `request` 只排一轮、立刻返回，页面照旧读本地缓存（`gfriends.load_index`）；
+    取到的索引下次打开头像框时生效。同一时刻最多一轮在跑。`transport` 每轮新建、
+    用完关掉：一天取一次，用不着常驻连接池。
+    """
+
+    def __init__(self, cache_dir: Path, transport: Callable[[], HttpTransport]):
+        self.cache_dir = Path(cache_dir)
+        self._transport = transport
+        self._lock = threading.Lock()
+        self._thread: threading.Thread | None = None
+        self._failed_at: float | None = None
+
+    def request(self) -> bool:
+        """需要的话在后台排一轮，返回是否排上了。"""
+        with self._lock:
+            if not gfriends.index_stale(self.cache_dir):
+                return False
+            if self._thread is not None and self._thread.is_alive():
+                return False
+            if (self._failed_at is not None
+                    and time.monotonic() - self._failed_at < INDEX_RETRY_SECONDS):
+                return False
+            self._thread = threading.Thread(target=self.refresh, daemon=True,
+                                            name="PeachGfriendsIndex")
+            self._thread.start()
+            return True
+
+    def refresh(self) -> bool:
+        """在当前线程里取一次。失败不抛，旧缓存原样留着。"""
+        try:
+            transport = self._transport()
+            try:
+                gfriends.fetch_index(transport, self.cache_dir)
+            finally:
+                close = getattr(transport, "close", None)
+                if close is not None:
+                    close()
+        except Exception as error:
+            LOGGER.warning("图库索引未取得：%s", error)
+            with self._lock:
+                self._failed_at = time.monotonic()
+            return False
+        with self._lock:
+            self._failed_at = None
+        return True
 
 
 @dataclass(frozen=True)
@@ -447,8 +507,8 @@ def choices(connection: sqlite3.Connection, providers_root: Path,
             cover_root: Path | None = None, *, deduplicate: bool = True) -> dict:
     """页面要展示的一切：图库同名候选、取过的历史、当前装着的是哪一张。
 
-    索引只读本地缓存。联网补索引是批处理的事——为一次点击同步拉 6 MB，页面会卡在
-    那里，而卡住的理由用户完全看不见。
+    索引只读本地缓存，过期了由 `IndexRefresher` 在后台补——为一次点击同步拉 6 MB，
+    页面会卡在那里，而卡住的理由用户完全看不见。
     """
     index_dir = providers_root / GFRIENDS_CACHE
     names = name_chain(connection, entity_id)
@@ -496,7 +556,7 @@ def choices(connection: sqlite3.Connection, providers_root: Path,
         "names": names, "matched_names": list(match.names),
         "choices": [choice.as_dict() for choice in listed],
         "index_age_hours": round(age / 3600, 1) if age is not None else None,
-        "index_stale": age is None or age > gfriends.INDEX_MAX_AGE_SECONDS,
+        "index_stale": gfriends.index_stale(index_dir),
     }
 
 

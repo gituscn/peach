@@ -1379,7 +1379,10 @@ def _picker_online(request: Request, connection, entity_id: int):
 @router.get("/api/avatar-choices")
 def avatar_choices(request: Request, kind: str = "performer", id: int = 0,
                    args: dict[str, str] = Depends(require_auth)):
-    """这个人还能换成哪些图。只读，不联网，不写盘。"""
+    """这个人还能换成哪些图。只读本地缓存，不等联网。
+
+    图库索引缺失或过期时顺手在后台排一轮刷新；这一次照旧按旧缓存列，下次打开生效。
+    """
     state = request.app.state.web_contract
     providers_root, avatar_root = _picker_roots(state)
     id = current_entity_id(state, id)
@@ -1390,7 +1393,8 @@ def avatar_choices(request: Request, kind: str = "performer", id: int = 0,
         if kind == "creator":
             listing["choices"] += [choice.as_dict() for choice in avatar_online.choices(
                 connection, id, project=_picker_online_projection)]
-        return JSONResponse(listing)
+    request.app.state.gfriends_index.request()
+    return JSONResponse(listing)
 
 
 @router.api_route("/avatar-choice", methods=["GET", "HEAD"])
