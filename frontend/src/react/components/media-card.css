@@ -45,15 +45,16 @@ body[data-surface="/trash"] .peach-react [data-media-grid] {
   transform-origin: center;
   transition: transform .18s ease, filter .18s ease, background-color .15s ease, box-shadow .15s ease;
 }
+/* 稍后看是常驻状态，一排里常有好几张：底色只铺在卡片盒自己的圆角里，相邻两张之间留出整段
+ * 列距的页面底色，不连成一片。 */
 .peach-react [data-media-card][data-watch-later]:not([data-pending-delete]) {
   background: var(--picked);
-  box-shadow: 0 0 0 8px var(--picked);
 }
 .peach-react [data-media-card][data-variant="short"] { flex: none; width: 214px; }
 .peach-react [data-media-card][data-variant="next"] { flex: none; width: 216px; }
 body[data-density="dense"] .peach-react [data-media-card][data-variant="short"] { width: calc(214px * 168 / 336); }
-/* 悬停面往卡片盒外多铺 8px：不动网格尺寸、不挤相邻卡，只让命中反馈比内容大一圈。回收站的资源卡
- * 与垃圾卡是有边的面，不铺。 */
+/* 悬停面往卡片盒外多铺 8px：不动网格尺寸、不挤相邻卡，只让命中反馈比内容大一圈；同一时刻
+ * 只有一张卡在铺，列距另一半留给邻卡。回收站的资源卡与垃圾卡是有边的面，不铺。 */
 .peach-react [data-media-card]:not([data-variant="resource"], [data-variant="junk"]):is(:hover, :focus-within) {
   background: var(--hover);
   box-shadow: 0 0 0 8px var(--hover);
