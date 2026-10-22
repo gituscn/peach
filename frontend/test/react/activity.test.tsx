@@ -96,6 +96,23 @@ it('追更检查的问题详情绑定任务快照并提供来源入口', async (
   expect(host.querySelector('a[href="/subscriptions"]')?.textContent).toContain('查看关注来源');
 });
 
+it('扫描与采集只有最新那一轮失败才去卡片上重试未完成项', async () => {
+  const scan = (overrides: Partial<TaskRunPayload>) => run({ task_key: 'library-processing', task_label: '扫描与采集',
+    status: 'failed', progress_total: null, error: '768 项需要处理，其中 533 项是来源限流，等一会儿再跑；其余可重试未完成的部分。',
+    ...overrides });
+  // 卡片上的失败集合只属于最新那一轮：更早的失败点过去对不上任何东西。
+  serve(payload({ finished: [
+    scan({ id: 5, finished_at: '2026-09-11T10:05:00Z' }),
+    scan({ id: 4, status: 'succeeded', error: '', finished_at: '2026-09-11T09:05:00Z' }),
+    scan({ id: 3, finished_at: '2026-09-11T08:05:00Z' }),
+  ] }));
+  await prefetchTasks(new AbortController().signal);
+  const host = await mount(page());
+  const links = [...host.querySelectorAll('[data-task-key=library-processing] a')];
+  expect(links.map((link) => [link.closest('[data-run-id]')?.getAttribute('data-run-id'),
+    link.getAttribute('href'), link.textContent])).toEqual([['5', '/data-cleanup#libraryProcessing', '查看并处理']]);
+});
+
 /** 走完真实的首屏路径：先 prefetch 落进缓存，再挂载。 */
 async function open(...responses: (ActivityData | null)[]) {
   const fetcher = serve(...responses);

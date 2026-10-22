@@ -151,10 +151,19 @@ export function taskIssues(run: TaskRunPayload): TaskIssue[] {
     && typeof item === 'object' && typeof item.error === 'string' && typeof item.label === 'string') : [];
 }
 
-export function problemDestination(run: TaskRunPayload): { href: string; label: string } | null {
+/** 处理入口只对同一种任务最新那一轮有意义的任务：目标页只显示最新一轮，更早的失败已经被后来的结果取代。
+ *  扫描与采集卡片上的「重试未完成项」只认最新一轮的失败集合；amane 桥重建成功一次，之前的失败就不用再管。 */
+const LATEST_ONLY = new Set(['face-models', 'library-processing', 'amane-bridge']);
+
+export function problemDestination(run: TaskRunPayload, latest = true): { href: string; label: string } | null {
   if (!hasResultProblems(run) && run.status !== 'failed') return null;
+  if (LATEST_ONLY.has(run.task_key) && !latest) return null;
   const targets: Record<string, [string, string]> = {
     'link-check': ['/data-cleanup#link-manager', '查看有问题的链接'],
+    'link-prune': ['/data-cleanup#link-manager', '查看有问题的链接'],
+    'library-processing': ['/data-cleanup#libraryProcessing', '查看并处理'],
+    // 重建键在来源和凭证页的 amane 那一段。
+    'amane-bridge': ['/sources', '查看并处理'],
     'follow-check': ['/subscriptions', '查看关注来源'],
     'feed-check': ['/subscriptions?tab=feeds', '查看订阅源'],
     'follow-resolve': ['/subscriptions?tab=add', '查看来源查找'],
@@ -172,17 +181,18 @@ const RETRY_ACTIONS: Record<string, [string, string]> = {
   'face-models': ['/api/face-models', '重新下载'],
 };
 
-/** 失败的这一轮能不能在卡上重跑。只给同一种任务最新的那一轮：更早的失败已经被后来的结果取代。 */
+/** 失败的这一轮能不能在卡上重跑。和处理入口一样只给最新那一轮（`LATEST_ONLY`）。 */
 export function retryAction(run: TaskRunPayload, latest: boolean): { url: string; label: string } | null {
   const action = RETRY_ACTIONS[run.task_key];
   return action && latest && run.status === 'failed' ? { url: action[0], label: action[1] } : null;
 }
 
-/** 每种可重跑任务最新那一轮的 id。 */
-export function latestRetryable(rows: TaskRunPayload[]): Set<number> {
+/** `LATEST_ONLY` 里每种任务最新那一轮的 id。后继不算：它们挂在父任务下，不是这种任务的一轮。 */
+export function latestOfKind(rows: TaskRunPayload[]): Set<number> {
   const newest = new Map<string, number>();
   for (const row of rows) {
-    if (row.task_key in RETRY_ACTIONS && row.id > (newest.get(row.task_key) ?? 0)) newest.set(row.task_key, row.id);
+    if (LATEST_ONLY.has(row.task_key) && !row.followup_key
+        && row.id > (newest.get(row.task_key) ?? 0)) newest.set(row.task_key, row.id);
   }
   return new Set(newest.values());
 }
