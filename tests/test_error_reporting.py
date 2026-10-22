@@ -59,6 +59,33 @@ class ErrorReportingTests(unittest.TestCase):
         for private in ('private-movie', 'private-token', 'private-credentials', r'D:\private'):
             self.assertNotIn(private, contents)
 
+    def test_processing_export_redacts_path_keys_and_keeps_them_unique(self):
+        from peach.settings_file import PeachConfig
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True)
+        state = config.directory('state')
+        state.mkdir(parents=True)
+        items = r'C:\Users\runner\peach-data\state\library-processing-items'
+        (state / 'library-processing.json').write_text(json.dumps({
+            'status': 'running',
+            'local_metadata': {r"7:C:\Users\runner\Videos\owner's ABC-123 owner-movie.mp4": items + r'\7-a.json',
+                               '8:/home/runner/Movies/DEF-456 owner-movie.mp4': items + r'\8-b.json'},
+            'scan_checkpoints': {r'local:c:\users\runner\videos': {'directories': 3},
+                                 r'local:d:\owner-library': {'directories': 5}}}), encoding='utf-8')
+        (state / 'library-processing-1.issues.jsonl').write_text(json.dumps({
+            'asset_id': 9, 'path': r"D:\owner's]\owner-movie.mp4", 'message': 'probe failed'}) + '\n',
+            encoding='utf-8')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes(config=config))) as archive:
+            exported = json.loads(archive.read('processing/library-processing.json'))
+            issue = json.loads(archive.read('processing/library-processing-1.issues.jsonl'))
+            contents = '\n'.join(archive.read(name).decode() for name in archive.namelist())
+        self.assertEqual(exported['local_metadata'], {'7:<path>': '<path>', '8:<path>': '<path>'})
+        self.assertEqual(sorted(exported['scan_checkpoints']), ['local:<path>', 'local:<path>#2'])
+        self.assertEqual(sorted(row['directories'] for row in exported['scan_checkpoints'].values()), [3, 5])
+        self.assertEqual((issue['asset_id'], issue['path']), (9, '<path>'))
+        for private in ('runner', 'owner', '.mp4'):
+            self.assertNotIn(private, contents)
+
     def test_processing_export_omits_partial_rows_and_limits_large_files(self):
         from peach.settings_file import PeachConfig
         config = PeachConfig(self.root, self.root / 'config.toml', present=True)
