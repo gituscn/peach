@@ -347,19 +347,26 @@ class TranscodeService:
             if profile is not None and profile.audio_codec in {"", "aac"}
             else ("-c:a", "aac", "-b:a", "160k")
         )
+        codec = profile.video_codec if profile else ""
         for encoder in self.hardware.encoders(ffmpeg):
-            for attempt in encoder.attempts(profile.video_codec if profile else ""):
+            for attempt in encoder.attempts(codec):
                 yield _TranscodeAttempt(
                     attempt.name, prefix + attempt.before_input + ("-i", str(source))
                     + mapping + attempt.output + fast_audio + finish,
                 )
 
+        software = (
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
+            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+        )
+        decode = self.hardware.decode_options(ffmpeg, codec)
+        if decode:
+            yield _TranscodeAttempt(
+                "d3d11va-libx264",
+                prefix + decode + ("-i", str(source)) + mapping + software + finish,
+            )
         yield _TranscodeAttempt(
-            "libx264",
-            prefix + ("-i", str(source)) + mapping + (
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
-                "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
-            ) + finish,
+            "libx264", prefix + ("-i", str(source)) + mapping + software + finish,
         )
 
     def _execute(

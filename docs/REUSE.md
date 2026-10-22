@@ -101,6 +101,10 @@ macOS 复用 FFmpeg 的 VideoToolbox H.264 编码及 H.264、HEVC、AV1 解码�
 
 Peach 只保留设备选择、一次性合成帧探测、命令尝试顺序与失败回退；探测结果由两个服务共享。复用检索覆盖当前 NVENC 链、媒体工具解析器与 Git 历史，没有独立 VAAPI 路径。FFmpeg 已覆盖编解码与滤镜，ffmpeg-python 一类包装层不提供设备驱动或硬件可用性判定，因此沿用项目 subprocess 入口，不新增 Python 依赖。回归用合成输入与进程替身验证 Linux 节点选择、权限和超时、10-bit 转 NV12、整片及分片回退。2026-10-19 的 Windows NVENC 实测使用 640×360 合成帧完成探测，合成 10-bit HEVC 经整片 MP4 与 HLS 两条 CUDA / NVENC 路径输出 H.264 `yuv420p`；128×128 不满足该编码器的最低尺寸，因此探测统一用 640×360。目标 AMD GPU 的驱动初始化、解码与播放验收未取得。无生产入口或真实 ledger 写入。
 
+Windows 复用 FFmpeg 的 D3D11VA 解码与 `h264_amf`、`h264_qsv` 编码，沿用同一套合成帧探测与回退顺序，不新增依赖。D3D11VA 不指定 `-hwaccel_output_format`，解出的帧回到内存，能接任意编码器，只对 H.264、HEVC、VP9、AV1 开启，名单与 CUDA 相同。AMF 从 D3D11 设备派生上下文，只认 AMD 显卡；混合显卡机器的默认序号常是另一块卡，所以用 `-init_hw_device d3d11va=peach:N` 加 `hwupload` 按序号探测，派生失败时退回软件解码加 AMF。Media Foundation 的 `h264_mf` 在 NVIDIA 加 AMD 的实测机器上无论软硬解码都报 `MF_E_UNSUPPORTED_D3D_TYPE`，未接入。QSV 从 D3D11 派生的写法没有 Intel 显卡可验，只接软件解码加 QSV 编码，探测通过才使用。随包 FFmpeg 未编入 AMF 与 QSV，这两条只对 PATH 上带它们的构建生效；D3D11VA 与 NVENC 随包可用。
+
+2026-10-23 在 NVIDIA 独显加 AMD 核显的 Windows 机器上，用 gyan FFmpeg 9.0.1 对 20 秒 1080p 10 位 HEVC 合成片测进程 CPU 时间：纯软件解码 21.9 秒、D3D11VA 解码 1.6 秒；libx264 转码 62.0 秒、D3D11VA 解码加 libx264 41.9 秒；软件解码加 AMF 23.3 秒、AMD 序号上的 D3D11VA 加 AMF 3.4 秒；CUDA 加 NVENC 0.7 秒。单帧抽帧在同一片源上从 7.7 秒降到 0.7 秒。整片与 HLS 经自动、AMF、仅 D3D11VA、软件四种配置输出的都是 H.264，时长与片源一致。
+
 ## 文件名噪声清理
 
 整理模板与 `scripts/clean_names.py` 共用 `organize_templates.clean_name_symbols` 和 `clean_filename`。字符分类复用 Python 标准库 `unicodedata`，按 Unicode 类别清除装饰图形、emoji、替代字符、控制字符和私用区噪声；Peach 保留常用标点、文字组合音标、单位、算术符号、扩展名与空名称保护。不新增依赖。
