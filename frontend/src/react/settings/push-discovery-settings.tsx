@@ -129,7 +129,7 @@ export function PushDiscoveryForm({ initial, receipt }: {
                   <Input className="min-w-0 flex-1" aria-label={`云端路径前缀 ${index + 1}`}
                     placeholder="/115" autoComplete="off" maxLength={200} value={row.prefix}
                     onChange={(prefix) => edit(index, { prefix })} />
-                  <Select aria-label={`前缀 ${index + 1} 对应的媒体根`} selectedKey={row.root}
+                  <Select aria-label={`前缀 ${index + 1} 对应的媒体根`} prefix="对应目录" selectedKey={row.root}
                     onSelectionChange={(key) => { if (key !== null) edit(index, { root: String(key) }); }}>
                     {roots.map((root) => <SelectItem key={root} id={root}>{root}</SelectItem>)}
                   </Select>

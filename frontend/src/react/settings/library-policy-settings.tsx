@@ -55,7 +55,7 @@ export function PolicyLegend() {
 /** 标题行里的处理方式下拉：弹层顶部写明在选什么，每档带一句话；收起时只显示档名。 */
 export function PresetSelect({ name, value, onChange }: { name: string; value: Preset; onChange(value: Preset): void }) {
   return (
-    <Select className="w-full" aria-label={`${name} 处理方式`} selectedKey={value} title="选择处理方式"
+    <Select className="w-full" aria-label={`${name} 处理方式`} selectedKey={value} prefix="处理方式"
       renderValue={<span className="truncate">{PRESETS.find(([key]) => key === value)?.[1]}</span>}
       onSelectionChange={key => onChange(String(key) as Preset)}>
       {PRESETS.map(([key, label, hint]) => (
@@ -96,6 +96,7 @@ export function LibraryColorPicker({ id, name }: { id: string; name: string }) {
   return <>
     <button ref={trigger} type="button" data-glow-chip="" data-library-color-trigger="" aria-haspopup="dialog"
       aria-expanded={open} aria-label={`${name || '未命名媒体库'} 来源色：${label}`} title={label} onClick={() => setOpen(true)}>
+      <span aria-hidden className="text-text-tertiary">来源色</span>
       {color
         ? <span data-glow-ball="" aria-hidden="true" data-accent-ball={color} />
         : <span data-glow-ball="" data-library-none="" aria-hidden="true" />}

@@ -70,7 +70,7 @@ export function MediaRepairCard({ toast = () => {} }: { toast?(message: string):
     <div className="flex flex-col gap-4">
       <Fieldset layout="split" label="媒体修复" footer={
         <>
-          <Select aria-label="媒体库" className="w-48" selectedKey={selected?.id ?? null}
+          <Select aria-label="媒体库" prefix="媒体库" className="w-48" selectedKey={selected?.id ?? null}
             isDisabled={running || !libraries.length}
             onSelectionChange={(key) => { if (key !== null) setChosen(String(key)); }}>
             {libraries.map((row) => (

@@ -81,7 +81,7 @@ function TagFields({ operation, selected, dialog, update }: {
     dialog.confirmButton.disabled = operation === 'rename' && (!name.trim() || name.trim() === selected[0]?.k);
   }, [name, target, dialog, operation, selected, update]);
   return operation === 'rename' ? <Input autoFocus aria-label="标签名称" value={name} onChange={setName} maxLength={80} />
-    : <Select aria-label="保留的标签" selectedKey={String(target)} onSelectionChange={key => {
+    : <Select aria-label="保留的标签" prefix="保留" selectedKey={String(target)} onSelectionChange={key => {
       const row = selected.find(tag => String(managedTagId(tag)) === String(key)); if (row) setTarget(managedTagId(row));
     }}>
       {selected.map(row => <SelectItem key={managedTagId(row)} id={String(managedTagId(row))}>{row.k}</SelectItem>)}

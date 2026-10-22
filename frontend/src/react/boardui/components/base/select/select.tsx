@@ -61,9 +61,10 @@ export interface SelectProps<T extends object>
   /** Customise the trigger's rendered value (e.g. a compact flag + dial code).
    *  Falls back to the selected item's own content when omitted. */
   renderValue?: ReactNode | ((values: AriaSelectValueRenderProps<T>) => ReactNode);
-  /** Heading shown at the top of the open menu (e.g. 「选择处理方式」), for triggers whose
-   *  value alone does not say what is being chosen. */
-  title?: ReactNode;
+  /** Muted name shown inside the trigger before the value (e.g. 「排序」「处理方式」), for selects
+   *  that sit in a toolbar or a repeated row without a field label and whose value alone does
+   *  not say what is being chosen. */
+  prefix?: ReactNode;
   ref?: Ref<HTMLDivElement>;
 }
 
@@ -75,7 +76,7 @@ export function Select<T extends object>({
   children,
   items,
   renderValue,
-  title,
+  prefix,
   ref,
   ...props
 }: SelectProps<T>) {
@@ -120,14 +121,17 @@ export function Select<T extends object>({
               triggerClassName,
             )}
           >
-            <AriaSelectValue
-              className={cx(
-                "flex min-w-0 items-center truncate",
-                size === "sm" ? "gap-1" : "gap-[5px]",
-              )}
-            >
-              {renderValue as never /* RAC accepts node or render-prop */}
-            </AriaSelectValue>
+            <span className={cx("flex min-w-0 items-center", size === "sm" ? "gap-1.5" : "gap-2")}>
+              {prefix ? <span aria-hidden className="shrink-0 text-text-tertiary">{prefix}</span> : null}
+              <AriaSelectValue
+                className={cx(
+                  "flex min-w-0 items-center truncate",
+                  size === "sm" ? "gap-1" : "gap-[5px]",
+                )}
+              >
+                {renderValue as never /* RAC accepts node or render-prop */}
+              </AriaSelectValue>
+            </span>
             <ChevronDownSmall
               className={cx(
                 "shrink-0 text-text-secondary transition-transform duration-200 ease",
@@ -149,7 +153,6 @@ export function Select<T extends object>({
               popoverClassName,
             )}
           >
-            {title ? <p className="px-1 pt-1 pb-2 text-body-medium text-text-primary">{title}</p> : null}
             <AriaListBox
               items={items}
               className={cx(MENU_ITEMS_CONTAINER, "max-h-[240px] overflow-auto")}

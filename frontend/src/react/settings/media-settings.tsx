@@ -242,7 +242,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                         </Select>
                       </FolderField> : null}
                       {libraries.length > 1 ? <FolderField label="移到媒体库" className="w-full @lg:w-48">
-                        <Select className="w-full" aria-label={`目录所属媒体库 ${index + 1}`} selectedKey={row.library_id} title="移到哪个媒体库"
+                        <Select className="w-full" aria-label={`目录所属媒体库 ${index + 1}`} selectedKey={row.library_id}
                           renderValue={<span className="flex min-w-0 items-center gap-2"><SourceMark mark={libraryMark(library)} /><span className="truncate">{name}</span></span>}
                           onSelectionChange={key => { if (key) chooseLibrary(index, String(key)); }}>
                           {libraries.map(other => <SelectItem key={other.library_id} id={other.library_id} textValue={other.library || '未命名媒体库'}>

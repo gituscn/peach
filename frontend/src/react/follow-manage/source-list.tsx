@@ -545,7 +545,7 @@ export function SourceList(props: SourceListProps) {
           </span>
           {asTable ? <TableColumnControls preferences={preferences} label="关注来源" /> : null}
           <span className="flex flex-none items-center gap-2">
-          <Select aria-label="关注列表排序" selectedKey={sort}
+          <Select aria-label="关注列表排序" prefix="排序" selectedKey={sort}
             onSelectionChange={(key) => {
               if (key === null) return;
               const next = String(key) as SortKey;

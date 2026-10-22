@@ -56,7 +56,7 @@ const folderRow = (libraries: number) => `<div data-folder-row class="@container
   </div>`;
 /* 媒体库卡与 `cardClass({ variant: 'raised', padding: 'none' })` 同一组类名。 */
 const libraryBlock = (folders: number, libraries: number) => `<div data-library-block class="min-w-0 bg-background-primary-default rounded-2xl shadow-card flex flex-col p-2">
-    <div data-library-head>${islandButton({ label: '自动识别', variant: 'secondary', attrs: wait })}${input()}<span class="skeleton ui-configuration-skeleton-input" style="width:96px"></span>${islandSelect(text('4em'))}</div>
+    <div data-library-head>${islandButton({ label: '自动识别', variant: 'secondary', attrs: wait })}${input()}<span class="skeleton ui-configuration-skeleton-input" style="width:136px"></span>${islandSelect(text('4em'), { prefix: '处理方式' })}</div>
     <div data-library-folders>${folderRow(libraries).repeat(folders)}<div class="flex">${islandButton({ label: '添加文件夹', variant: 'secondary', attrs: wait })}</div></div></div>`;
 /* 说明区是固定文字：常显那一句照原文写，对比表收着，只画它的展开行。 */
 const legend = `<div data-policy-legend class="flex flex-col gap-1"><p class="text-body-2-regular text-text-secondary">${POLICY_SUMMARY}</p>`
