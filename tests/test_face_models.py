@@ -197,6 +197,18 @@ class StatusTests(ModelFilesCase):
         self.assertEqual((current["state"], current["available"], current["error"]),
                          ("ready", True, ""))
 
+    def test_models_shipped_with_the_package_are_ready_without_any_download(self):
+        bundle = self.root / "program" / "tools" / "face-models"
+        bundle.mkdir(parents=True)
+        for module in (face_detect, face_match):
+            (bundle / module.MODEL_PATH.name).write_bytes(self.payload)
+        with mock.patch.dict(face_detect.os.environ, {face_detect.BUNDLE_ENV: str(bundle)}), \
+                mock.patch.object(face_detect, "_verified", {}):
+            self.assertEqual(self.status()["state"], "ready")
+            self.retry(side_effect=AssertionError("随包有模型时立即重试也不联网"))
+        self.assertEqual([run.status for run in self.rows()], ["succeeded"])
+        self.assertFalse((self.root / "tools").exists(), "随包那份不往数据根复制")
+
 
 class LabelTests(unittest.TestCase):
     def test_every_task_written_by_the_service_has_a_chinese_name(self):

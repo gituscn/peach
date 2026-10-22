@@ -124,7 +124,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
                 "test_copy_final_state.py", "test_demo_dataset.py",
                 "test_cloudflared_packaging.py", "test_tunnel.py", "test_process_job.py",
                 "test_ffmpeg_build.py", "test_ffmpeg_bundle.py", "test_untrunc_build.py", "test_macos_media.py",
-                "test_media_tool_import.py", "test_seed_corrections.py"),
+                "test_media_tool_import.py", "test_seed_corrections.py", "test_face_models_bundle.py"),
     # 前端 island 层（ADR-0022）。产物与源码的断言不需要 Node；vitest 那部分在没有
     # npm 时自己跳过，所以这个域在任何机器上都能跑，`full` 也就自动包含它。
     # `test_web_perf.py` 两个域都登记：压缩与 ETag 是 API 交付（catalog），
@@ -152,7 +152,8 @@ SCOPES: dict[str, tuple[str, ...]] = {
     "packaging": ("test_dependency_policy.py", "test_buildinfo.py", "test_onboarding.py", "test_macos_standalone.py",
                   "test_cli.py", "test_server.py", "test_versioning.py", "test_frontend_build.py",
                   "test_cloudflared_packaging.py", "test_desktop_installer.py",
-                  "test_ffmpeg_build.py", "test_ffmpeg_bundle.py", "test_untrunc_build.py", "test_macos_media.py"),
+                  "test_ffmpeg_build.py", "test_ffmpeg_bundle.py", "test_untrunc_build.py", "test_macos_media.py",
+                  "test_face_models_bundle.py"),
 }
 
 SCOPE_TEST_IDS: dict[str, tuple[str, ...]] = {
@@ -175,6 +176,7 @@ AUTO_SCOPE_FILES: dict[str, tuple[str, ...]] = {
     "scripts/setup_macos_media_tools.py": ("tooling", "packaging"),
     "scripts/smoke_macos_media.py": ("tooling", "packaging"),
     "scripts/fetch_cloudflared_macos.py": ("tooling", "packaging"),
+    "scripts/fetch_face_models.py": ("tooling", "packaging"),
     "scripts/cloudflared-macos.json": ("tooling", "packaging"),
     "scripts/fetch_ffmpeg_sources.py": ("tooling", "packaging"),
     "scripts/ffmpeg-sources.json": ("tooling", "packaging"),

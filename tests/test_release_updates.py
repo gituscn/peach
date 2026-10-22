@@ -74,6 +74,8 @@ class ReleaseUpdateTests(unittest.TestCase):
         self.assertEqual(self.check([row])["package_kind"], "full")
         row["assets"] += [{"name": f"Peach-1.0.0-windows-x64-tools-{tool}.zip", "state": "uploaded"}
                           for tool in ("ffmpeg", "untrunc", "cloudflared")]
+        self.assertEqual(self.check([row])["package_kind"], "full", "缺人脸模型工具包时不能只下应用更新包")
+        row["assets"].append({"name": "Peach-1.0.0-windows-x64-tools-face-models.zip", "state": "uploaded"})
         result = self.check([row])
         self.assertEqual(result["package_kind"], "update")
         self.assertTrue(result["asset_url"].endswith("-update.zip"))

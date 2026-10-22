@@ -82,6 +82,7 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
     from media_tool_bundle import validate
     from build_macos_media import audit_binary
     from fetch_cloudflared_macos import validate as validate_cloudflared
+    from fetch_face_models import install as install_face_models
 
     media_root = ROOT / "build/media-macos" / architecture
     sources = []
@@ -92,10 +93,14 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
             audit_binary(media_root / tool / tool / name, architecture)
     cloudflared = media_root / "cloudflared"
     validate_cloudflared(cloudflared, architecture)
+    work = ROOT / "build" / "macos-standalone" / architecture
+    # 人脸模型在 PyInstaller 之前取齐并校验，网络不通时尽早失败。
+    face_models = work / "face-models"
+    shutil.rmtree(face_models, ignore_errors=True)
+    install_face_models(face_models)
 
     build_frontend_bundles()
     destination = destination.resolve()
-    work = ROOT / "build" / "macos-standalone" / architecture
     work.mkdir(parents=True, exist_ok=True)
     commit = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
                             capture_output=True, text=True, encoding="utf-8", check=True).stdout.strip()
@@ -118,6 +123,7 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
     tools.mkdir(exist_ok=True)
     for tool in ("ffmpeg", "untrunc"):
         shutil.copytree(media_root / tool / tool, tools / tool)
+    shutil.copytree(face_models, tools / "face-models")
     shutil.copyfile(cloudflared / "cloudflared", app / "Contents/MacOS/cloudflared")
     (app / "Contents/MacOS/cloudflared").chmod(0o755)
     for name in ("LICENSE-cloudflared.txt", "NOTICE-cloudflared.md"):
