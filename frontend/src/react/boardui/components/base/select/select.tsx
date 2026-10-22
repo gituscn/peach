@@ -61,6 +61,9 @@ export interface SelectProps<T extends object>
   /** Customise the trigger's rendered value (e.g. a compact flag + dial code).
    *  Falls back to the selected item's own content when omitted. */
   renderValue?: ReactNode | ((values: AriaSelectValueRenderProps<T>) => ReactNode);
+  /** Heading shown at the top of the open menu (e.g. 「选择处理方式」), for triggers whose
+   *  value alone does not say what is being chosen. */
+  title?: ReactNode;
   ref?: Ref<HTMLDivElement>;
 }
 
@@ -72,6 +75,7 @@ export function Select<T extends object>({
   children,
   items,
   renderValue,
+  title,
   ref,
   ...props
 }: SelectProps<T>) {
@@ -145,6 +149,7 @@ export function Select<T extends object>({
               popoverClassName,
             )}
           >
+            {title ? <p className="px-1 pt-1 pb-2 text-body-medium text-text-primary">{title}</p> : null}
             <AriaListBox
               items={items}
               className={cx(MENU_ITEMS_CONTAINER, "max-h-[240px] overflow-auto")}

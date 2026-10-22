@@ -27,6 +27,11 @@ export const STAGES = [
 ] as const;
 export type Stage = (typeof STAGES)[number][0];
 export const AUTO_STAGES: readonly Stage[] = ['probe', 'metadata', 'cover', 'people', 'preview'];
+const PRESETS: readonly (readonly [Preset, string, string])[] = [
+  ['auto', '自动补全', '缺什么联网补什么'],
+  ['local', '仅使用本地资料', '不联网，只用本地 NFO 和图片'],
+  ['custom', '自定义', '逐项选择要做的步骤'],
+];
 
 /** 三档处理方式的说明，分组上方只放一份：常显一句话，三档的差别收在可展开的对比表里。 */
 export function PolicyLegend() {
@@ -47,13 +52,20 @@ export function PolicyLegend() {
   );
 }
 
+/** 标题行里的处理方式下拉：弹层顶部写明在选什么，每档带一句话；收起时只显示档名。 */
 export function PresetSelect({ name, value, onChange }: { name: string; value: Preset; onChange(value: Preset): void }) {
   return (
-    <Select className="w-full" aria-label={`${name} 处理方式`} selectedKey={value}
+    <Select className="w-full" aria-label={`${name} 处理方式`} selectedKey={value} title="选择处理方式"
+      renderValue={<span className="truncate">{PRESETS.find(([key]) => key === value)?.[1]}</span>}
       onSelectionChange={key => onChange(String(key) as Preset)}>
-      <SelectItem id="auto">自动补全</SelectItem>
-      <SelectItem id="local">仅使用本地资料</SelectItem>
-      <SelectItem id="custom">自定义</SelectItem>
+      {PRESETS.map(([key, label, hint]) => (
+        <SelectItem key={key} id={key} textValue={label}>
+          <span className="flex min-w-0 flex-col">
+            <span>{label}</span>
+            <span className="text-body-2-regular text-text-secondary whitespace-normal">{hint}</span>
+          </span>
+        </SelectItem>
+      ))}
     </Select>
   );
 }
@@ -93,6 +105,7 @@ export function LibraryColorPicker({ id, name }: { id: string; name: string }) {
       <Popover triggerRef={trigger} isOpen={open} onOpenChange={setOpen} placement="bottom start" offset={8}
         containerPadding={12} className={MENU_POPOVER_SURFACE}>
         <Dialog aria-label={`${name || '未命名媒体库'} 来源色`} className="outline-none">
+          <p className="px-1 pb-2 text-body-medium text-text-primary">选择来源色</p>
           <div data-accent-grid="" data-library-colors="" role="group">
             <button type="button" data-glow-chip="" aria-pressed={!color} title="无颜色" aria-label="无颜色"
               onClick={() => choose('')}>

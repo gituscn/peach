@@ -43,6 +43,8 @@ import {
 import { busyProps, useAction } from './use-action';
 
 const sourceName = (location: string) => MEDIA_SOURCES.find(([kind]) => kind === location)?.[1] ?? location;
+/** 媒体库在下拉里的图标：选过就用选的，否则按来源自动识别，和标题行的图标键一致。 */
+const libraryMark = (row: { library_icon: string; location: string }) => row.library_icon || libraryAutoChoice(row.location)[0];
 const pickFolder = async (initial: string) =>
   (await apiSend<{ path: string | null }>(PICK_FOLDER_URL, { initial })).path;
 
@@ -112,7 +114,9 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
   const editLibrary = (index: number, patch: Partial<MediaRow>) => {
     rows.forEach((row, i) => { if (row.library_id === rows[index]!.library_id) edit(i, patch); });
   };
-  const libraries = [...new Map(rows.map(row => [row.library_id, row])).values()];
+  // 每个媒体库取它的第一行作代表：新加的空文件夹排在后面，不改动这一库的图标与来源。
+  const libraries = [...rows.reduce((found, row) => found.has(row.library_id) ? found : found.set(row.library_id, row),
+    new Map<string, MediaRow>()).values()];
   const chooseLibrary = (index: number, key: string) => {
     const chosen = rows.find(row => row.library_id === key);
     edit(index, chosen ? { library_id: chosen.library_id, library: chosen.library, library_icon: chosen.library_icon }
@@ -221,30 +225,33 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                         </Select>
                       </FolderField> : null}
                       {libraries.length > 1 ? <FolderField label="移到媒体库" className="w-full @lg:w-48">
-                        <Select className="w-full" aria-label={`目录所属媒体库 ${index + 1}`} selectedKey={row.library_id}
+                        <Select className="w-full" aria-label={`目录所属媒体库 ${index + 1}`} selectedKey={row.library_id} title="移到哪个媒体库"
+                          renderValue={<span className="flex min-w-0 items-center gap-2"><SourceMark mark={libraryMark(library)} /><span className="truncate">{name}</span></span>}
                           onSelectionChange={key => { if (key) chooseLibrary(index, String(key)); }}>
-                          {libraries.map(other => <SelectItem key={other.library_id} id={other.library_id}>{other.library || '未命名媒体库'}</SelectItem>)}
-                          <SelectItem id="new">新建媒体库</SelectItem>
+                          {libraries.map(other => <SelectItem key={other.library_id} id={other.library_id} textValue={other.library || '未命名媒体库'}>
+                            <span className="flex min-w-0 items-center gap-2"><SourceMark mark={libraryMark(other)} /><span className="truncate">{other.library || '未命名媒体库'}</span></span>
+                          </SelectItem>)}
+                          <SelectItem id="new" textValue="新建媒体库">
+                            <span className="flex min-w-0 items-center gap-2"><SourceMark mark="plus" /><span>新建媒体库</span></span>
+                          </SelectItem>
                         </Select>
                       </FolderField> : null}
                     </FolderFieldLine>
                   </FolderRow>
                 ))}
+                {/* 每个媒体库自己的「添加文件夹」：新文件夹直接挂进这一库，共用它的名称、颜色与处理方式，来源与读取策略先沿用这一库第一个文件夹。 */}
+                <Button variant="secondary" size="small" className="self-start" aria-label={`给 ${name} 添加文件夹`} onClick={() => {
+                  add();
+                  edit(rows.length, { library_id: library.library_id, library: library.library, library_icon: library.library_icon,
+                    location: library.location, cost: library.cost });
+                }}>添加文件夹</Button>
                 </div>
               </div>
             );
           })}
         </div>
-        {/* 「添加文件夹」给最后那个媒体库多加一个目录，新行就排在这两颗键上方，之后可用「移到媒体库」换组；
-            「添加媒体库」新建一组，名称、图标、来源色与处理方式都单独设。 */}
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => {
-            const last = libraries[libraries.length - 1];
-            add();
-            if (last) edit(rows.length, { library_id: last.library_id, library: last.library, library_icon: last.library_icon });
-          }}>添加文件夹</Button>
-          <Button variant="secondary" onClick={add}>添加媒体库</Button>
-        </div>
+        {/* 「添加媒体库」新建一组，名称、图标、来源色与处理方式都单独设。 */}
+        <Button variant="secondary" className="self-start" onClick={add}>添加媒体库</Button>
         <Help>{LIBRARY_FOLDER_HELP}</Help>
         {cloud ? <><MediaReadPolicyHelp /><CloudDriveGuide /></> : null}
         {missing.map((dependency) => (

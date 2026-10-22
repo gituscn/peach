@@ -56,18 +56,18 @@ const folderRow = (libraries: number) => `<div data-folder-row class="@container
   </div>`;
 const libraryBlock = (folders: number, libraries: number) => `<div data-library-block class="flex flex-col gap-3">
     <div data-library-head>${islandButton({ label: '自动识别', variant: 'secondary', attrs: wait })}${input()}<span class="skeleton ui-configuration-skeleton-toggle"></span>${islandSelect(text('4em'))}</div>
-    <div data-library-folders>${folderRow(libraries).repeat(folders)}</div></div>`;
+    <div data-library-folders>${folderRow(libraries).repeat(folders)}<div class="self-start">${islandButton({ label: '添加文件夹', variant: 'secondary', size: 'small', attrs: wait })}</div></div></div>`;
 /* 说明区是固定文字：常显那一句照原文写，对比表收着，只画它的展开行。 */
 const legend = `<div data-policy-legend class="flex flex-col gap-1"><p class="text-body-2-regular text-text-secondary">${POLICY_SUMMARY}</p>`
   + '<span class="flex items-center gap-1 text-body-2-medium text-text-secondary">三种处理方式对比</span></div>';
 const cloudHelp = '<p class="text-body-2-regular text-text-secondary">读取策略选「代理保护」时，会限制自动读取视频。</p>'
   + '<div class="flex flex-col gap-3"><span class="flex items-center gap-1 text-body-2-medium text-text-secondary">CloudDrive 设置帮助</span></div>';
 
-/** 媒体库与目录：图例、每个媒体库的标题行与文件夹行、两颗添加键与底部动作。 */
+/** 媒体库与目录：图例、每个媒体库的标题行、文件夹行与它自己的添加键，最下面添加媒体库与底部动作。 */
 const media = () => {
   const shape = mediaShape();
   return section('媒体库与目录', stack(`${legend}<div class="flex flex-col gap-4">${shape.folders.map(count => libraryBlock(count, shape.folders.length)).join('')}</div>
-  <div class="flex flex-wrap gap-2">${button('添加文件夹', 'secondary')}${button('添加媒体库', 'secondary')}</div>
+  <div class="self-start">${button('添加媒体库', 'secondary')}</div>
   <p class="text-body-2-regular text-text-secondary">${LIBRARY_FOLDER_HELP}</p>
   ${shape.cloud ? cloudHelp : ''}<span class="text-body-medium text-text-primary">${text('15em')}</span>`),
   `<span class="mr-auto min-w-0 text-body-2-regular text-text-secondary">保存后 Peach 会重新启动。</span>${button('保存配置')}`)
