@@ -436,7 +436,7 @@ it('卡片里点来源那一行的空白处同样选中整行，点勾选框仍�
   const { host } = await open();
   const row = () => checkboxNamed(host, '选择 甲 · Pawchive')!.closest('[data-source-divider] > div')!;
 
-  await click(row().querySelector('[data-follow-leading-site]'));
+  await click(row().querySelector('[data-follow-source-site]'));
   expect(row().hasAttribute('data-selected')).toBe(true);
   expect(host.textContent).toContain('已选 1 个来源');
 

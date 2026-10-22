@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "204229b6-30ba-4af0-a802-a940d460847a", e._sentryDebugIdIdentifier = "sentry-dbid-204229b6-30ba-4af0-a802-a940d460847a");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "d1a48566-fdf1-463e-8248-6c96e1af758c", e._sentryDebugIdIdentifier = "sentry-dbid-d1a48566-fdf1-463e-8248-6c96e1af758c");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -68824,18 +68824,21 @@ function ARe({ source: e, selected: t, onToggle: n, handlers: r }) {
 			bTe(e, e.currentTarget) && n(!t);
 		},
 		children: [
-			/* @__PURE__ */ (0, D.jsxs)("span", {
-				"data-follow-leading-site": "",
-				className: "flex shrink-0 items-center gap-2",
-				children: [/* @__PURE__ */ (0, D.jsx)(Kz, { provider: e.provider }), /* @__PURE__ */ (0, D.jsx)(jP, {
-					isSelected: t,
-					onChange: n,
-					"aria-label": `选择 ${e.label}`
-				})]
+			/* @__PURE__ */ (0, D.jsx)(jP, {
+				isSelected: t,
+				onChange: n,
+				"aria-label": `选择 ${e.label}`
 			}),
 			/* @__PURE__ */ (0, D.jsxs)("span", {
-				className: "flex min-w-0 grow basis-0 flex-col gap-0.5",
-				children: [/* @__PURE__ */ (0, D.jsx)(Yz, { source: e }), e.last_error ? /* @__PURE__ */ (0, D.jsx)(Xz, { text: e.last_error }) : null]
+				className: "flex min-w-0 grow basis-0 items-start gap-1.5",
+				children: [/* @__PURE__ */ (0, D.jsx)("span", {
+					"data-follow-source-site": "",
+					className: "flex h-lh shrink-0 items-center text-body-medium",
+					children: /* @__PURE__ */ (0, D.jsx)(Kz, { provider: e.provider })
+				}), /* @__PURE__ */ (0, D.jsxs)("span", {
+					className: "flex min-w-0 grow flex-col gap-0.5",
+					children: [/* @__PURE__ */ (0, D.jsx)(Yz, { source: e }), e.last_error ? /* @__PURE__ */ (0, D.jsx)(Xz, { text: e.last_error }) : null]
+				})]
 			}),
 			/* @__PURE__ */ (0, D.jsx)(nx, { children: e.provider_label }),
 			/* @__PURE__ */ (0, D.jsx)(Jz, { source: e }),
@@ -116245,4 +116248,4 @@ Yxt(Xxt);
 //#endregion
 export { Qw as applyTheme, Kk as peachHistory, Yo as popCount, S_t as showToast };
 
-//# debugId=204229b6-30ba-4af0-a802-a940d460847a
+//# debugId=d1a48566-fdf1-463e-8248-6c96e1af758c

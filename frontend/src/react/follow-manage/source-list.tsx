@@ -140,27 +140,30 @@ export interface SourceListProps {
 /** 页码。上一页／下一页在两端，页码居中，页数多时两侧折成「…」。 */
 export { Pagination } from '../components/table-pagination';
 
-/** 一条来源在创作者卡里的那一行：勾选、名字、站点、状态、上次检查、动作。 */
+/** 一条来源在创作者卡里的那一行：勾选、站标与名字、状态、上次检查、动作。 */
 function SourceRow(
   { source, selected, onToggle, handlers }:
   { source: FollowSource; selected: boolean; onToggle(on: boolean): void; handlers: RowHandlers },
 ) {
   /* 点这一行的空白处就是勾上或取消：勾选框只有 16px，一行里其余的地方点了没反应的话，选几条要瞄几次。
-     窄屏固定两行：上一行勾选、名字、站标与状态，下一行上次检查、开关与两枚动作键。 */
+     窄屏固定两行：上一行勾选、站标与名字、状态，下一行上次检查、开关与两枚动作键。 */
   return (
     <div data-selected={selected || undefined} data-follow-source-row=""
       className="flex min-h-16 flex-wrap items-center gap-3 px-2 py-3 last:rounded-b-lg max-sm:gap-x-2"
       onClick={(event) => { if (clickedBlank(event, event.currentTarget)) onToggle(!selected) }}>
-      <span data-follow-leading-site="" className="flex shrink-0 items-center gap-2">
-        <SourceIcon provider={source.provider} />
-        <Checkbox isSelected={selected} onChange={onToggle} aria-label={`选择 ${source.label}`} />
+      <Checkbox isSelected={selected} onChange={onToggle} aria-label={`选择 ${source.label}`} />
+      {/* 名字列从零宽起长：长名字和报错在列内折行或截断，不把状态和操作键挤到下一行。
+          站标贴在名字前，占一行字高、在第一行里垂直居中；名字与报错同一列，左边对齐。 */}
+      <span className="flex min-w-0 grow basis-0 items-start gap-1.5">
+        <span data-follow-source-site="" className="flex h-lh shrink-0 items-center text-body-medium">
+          <SourceIcon provider={source.provider} />
+        </span>
+        <span className="flex min-w-0 grow flex-col gap-0.5">
+          <SourceLink source={source} />
+          {source.last_error ? <ErrorLine text={source.last_error} /> : null}
+        </span>
       </span>
-      {/* 名字列从零宽起长：长名字和报错在列内折行或截断，不把站标、状态和操作键挤到下一行。 */}
-      <span className="flex min-w-0 grow basis-0 flex-col gap-0.5">
-        <SourceLink source={source} />
-        {source.last_error ? <ErrorLine text={source.last_error} /> : null}
-      </span>
-      {/* 行首显示站点图标，站名同时供读屏使用。 */}
+      {/* 站标只画字形，站名给读屏。 */}
       <VisuallyHidden>{source.provider_label}</VisuallyHidden>
       <StatusBadge source={source} />
       <span data-follow-source-controls="" className="flex w-max max-w-full flex-none flex-wrap items-center gap-1.5 max-sm:w-full">
