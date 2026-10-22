@@ -1,7 +1,7 @@
 import { islandButton, islandSelect } from './island-skeleton';
 import { CONFIGURATION_SECTIONS } from './history/settings-route';
 import { diagnosticsSkeleton } from './diagnostics-skeleton';
-import { POLICY_LEGEND } from './react/settings/library-policy-copy';
+import { LIBRARY_FOLDER_HELP, POLICY_SUMMARY } from './react/settings/library-policy-copy';
 
 const wait = 'disabled data-skeleton-action';
 const text = (width = '60%') => `<span class="skeleton skeleton-text" style="width:${width}"></span>`;
@@ -15,10 +15,27 @@ const row = (label: string, description = '', control = 'ui-configuration-skelet
 /* 「媒体库与目录」按媒体库分组，组数和每组文件夹数各家不同：上次画出来的形状记在本机，
  * 骨架照着它排，第一次打开按一组一个文件夹。CloudDrive 代理与自动发现两块也按上次有没有决定。 */
 const MEDIA_SHAPE_KEY = 'peach.configuration.media-shape.v1';
+export const CLOUD_PROXY_HELP = 'API 代理用于列目录和查询文件信息，数据代理用于读取视频及配套文件。保存后，同一网盘账号在 CloudDrive 中的其他读取也会使用此设置。';
 export interface MediaShape { folders: number[]; cloud: boolean; discovery: boolean }
 
 export function rememberMediaShape(shape: MediaShape): void {
   try { localStorage.setItem(MEDIA_SHAPE_KEY, JSON.stringify(shape)) } catch { /* 下次按默认形状。 */ }
+}
+
+/* 自己另取数据、高度随内容变的分区（CloudDrive 代理按账号数与代理方式变高），记下上次画好时的内容高度，
+ * 首屏骨架与分区自己的等待块都按它占位。 */
+const SECTION_HEIGHTS_KEY = 'peach.configuration.section-heights.v1';
+export function rememberSectionHeight(key: string, height: number): void {
+  try {
+    const value = JSON.parse(localStorage.getItem(SECTION_HEIGHTS_KEY) || '{}') as Record<string, number>;
+    localStorage.setItem(SECTION_HEIGHTS_KEY, JSON.stringify({ ...value, [key]: Math.round(height) }));
+  } catch { /* 下次按默认高度。 */ }
+}
+export function rememberedSectionHeight(key: string, fallback: number): number {
+  try {
+    const value = (JSON.parse(localStorage.getItem(SECTION_HEIGHTS_KEY) || '{}') as Record<string, unknown>)[key];
+    return typeof value === 'number' && value > 0 && value < 4000 ? value : fallback;
+  } catch { return fallback }
 }
 
 function mediaShape(): MediaShape {
@@ -39,10 +56,10 @@ const folderRow = (libraries: number) => `<div data-folder-row class="@container
   </div>`;
 const libraryBlock = (folders: number, libraries: number) => `<div data-library-block class="flex flex-col gap-3">
     <div data-library-head>${islandButton({ label: '自动识别', variant: 'secondary', attrs: wait })}${input()}<span class="skeleton ui-configuration-skeleton-toggle"></span>${islandSelect(text('4em'))}</div>
-    ${folderRow(libraries).repeat(folders)}</div>`;
-/* 图例是固定文字，照原文写出来，折行与真实页面一致。 */
-const legend = `<dl data-policy-legend class="text-body-2-regular text-text-secondary">${POLICY_LEGEND
-  .map(([name, description]) => `<dt>${name}</dt><dd>${description}</dd>`).join('')}</dl>`;
+    <div data-library-folders>${folderRow(libraries).repeat(folders)}</div></div>`;
+/* 说明区是固定文字：常显那一句照原文写，对比表收着，只画它的展开行。 */
+const legend = `<div data-policy-legend class="flex flex-col gap-1"><p class="text-body-2-regular text-text-secondary">${POLICY_SUMMARY}</p>`
+  + '<span class="flex items-center gap-1 text-body-2-medium text-text-secondary">三种处理方式对比</span></div>';
 const cloudHelp = '<p class="text-body-2-regular text-text-secondary">读取策略选「代理保护」时，会限制自动读取视频。</p>'
   + '<div class="flex flex-col gap-3"><span class="flex items-center gap-1 text-body-2-medium text-text-secondary">CloudDrive 设置帮助</span></div>';
 
@@ -51,11 +68,12 @@ const media = () => {
   const shape = mediaShape();
   return section('媒体库与目录', stack(`${legend}<div class="flex flex-col gap-4">${shape.folders.map(count => libraryBlock(count, shape.folders.length)).join('')}</div>
   <div class="flex flex-wrap gap-2">${button('添加文件夹', 'secondary')}${button('添加媒体库', 'secondary')}</div>
+  <p class="text-body-2-regular text-text-secondary">${LIBRARY_FOLDER_HELP}</p>
   ${shape.cloud ? cloudHelp : ''}<span class="text-body-medium text-text-primary">${text('15em')}</span>`),
   `<span class="mr-auto min-w-0 text-body-2-regular text-text-secondary">保存后 Peach 会重新启动。</span>${button('保存配置')}`)
-  + (shape.cloud ? section('CloudDrive 代理', stack(`${text('90%')}<span class="skeleton ui-configuration-skeleton-input" style="width:100%;height:62px"></span>`), button('重新读取', 'secondary')) : '')
-  + (shape.discovery ? section('自动发现新文件', stack(`<span class="flex min-h-6 items-center text-body-regular text-text-secondary">${text('8em')}</span>`)
-    + row('发现新文件后自动入库') + row('监视本机文件夹') + row('接收 CloudDrive2 通知'), button('保存配置')) : '')
+  + (shape.cloud ? section('CloudDrive 代理', stack(`<p class="text-body-2-regular text-text-secondary">${CLOUD_PROXY_HELP}</p><span class="skeleton ui-configuration-skeleton-input" style="width:100%;height:${rememberedSectionHeight('cloud-proxy', 96)}px"></span>`), button('重新读取', 'secondary')) : '')
+  + (shape.discovery ? `<div class="overflow-hidden" style="height:${rememberedSectionHeight('push-discovery', 323)}px">${section('自动发现新文件', stack(`<span class="flex min-h-6 items-center text-body-regular text-text-secondary">${text('8em')}</span>`)
+    + row('发现新文件后自动入库') + row('监视本机文件夹') + row('接收 CloudDrive2 通知'), button('保存配置'))}</div>` : '')
   + section('视频预览', row('抽帧解码方式', '用于生成封面、九宫格和时间轴。', 'ui-configuration-skeleton-select')
     + row('生成视频预览', '为本地视频生成九宫格与时间轴预览；关闭后仍按入库规则探测时长与分辨率。')
     + row('时间轴预览', '按所选间隔抽帧，仅处理本机磁盘上的视频。', 'ui-configuration-skeleton-select'))

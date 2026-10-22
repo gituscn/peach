@@ -13,7 +13,8 @@
 .peach-react [data-catalog-table] [data-list-picture] :is(img,video) { width: 100%; height: 100%; }
 .peach-react [data-catalog-table] [data-list-picture] :is(img:not([data-jav-image]),video) { object-fit: cover; }
 .peach-react [data-catalog-table] [data-list-text] { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
-.peach-react [data-catalog-table] [data-list-name] { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 标题最多两行再截断：行高按缩略图定，两行标题加一行署名放得下，作品列窄时少截一半。 */
+.peach-react [data-catalog-table] [data-list-name] { display: -webkit-box; min-width: 0; overflow: hidden; white-space: normal; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.4; }
 .peach-react [data-catalog-table] [data-list-identity]:has([data-list-open]:hover, [data-list-name]:hover) [data-list-name] { text-decoration: underline; }
 .peach-react [data-catalog-table] [data-list-byline] { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; white-space: nowrap; color: var(--muted); font-size: var(--fs-sm); }
 .peach-react [data-catalog-table] [data-list-byline] > * { flex: none; }
@@ -41,8 +42,6 @@
 .peach-react [data-list-skeleton-name] > span > i + i { width: 44%; height: 12px; }
 .peach-react [data-list-skeleton-bar] { display: block; width: min(72%, 96px); height: 14px; border-radius: 6px; }
 .grid > [data-skeleton="catalog/list"] { grid-column: 1 / -1; }
-/* 列表模式不显示「未入库的新作」那一行，骨架阶段也不先画它的卡片骨架。 */
-body:has([data-catalog-table], [data-skeleton="catalog/list"]) #feedNew { display: none; }
 @media(max-width:760px) {
   .peach-react [data-catalog-table] .bui-table :is(th,td):first-child { padding-inline: 8px; }
   .peach-react [data-catalog-table] .bui-table :is(th,td):nth-child(2) { padding-inline: 8px; }

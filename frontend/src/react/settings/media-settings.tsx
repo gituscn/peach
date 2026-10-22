@@ -4,7 +4,7 @@
  * 保存成功后显示持久提示和访问地址，等待服务就绪后跳转。
  *
  * 校验原因由服务端按字段给（400 的 `errors`），页面写回原位，不在前端复制一份路径与端口的判定。 */
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 
 import { Button } from '@/components/base/buttons/button';
 import { LinkButton } from '@/components/base/buttons/link-button';
@@ -34,7 +34,9 @@ import {
   AUTO_STAGES, LibraryColorPicker, PolicyLegend, PresetSelect, StageChooser, type Preset, type Stage,
 } from './library-policy-settings';
 import { PushDiscoveryForm } from './push-discovery-settings';
-import { rememberMediaShape } from '../../configuration-skeleton';
+import { rememberMediaShape, rememberSectionHeight } from '../../configuration-skeleton';
+import { useLibraryTints } from '../components/library-tint';
+import { LIBRARY_FOLDER_HELP } from './library-policy-copy';
 import {
   ErrorText, ExternalLink, Fact, FactList, Footer, Help, Section, SourceMark, Stack,
 } from './section';
@@ -77,13 +79,18 @@ export function MediaSettings({ data, receipt, panel }: ConfigurationGroupProps)
     for (const row of initialRows(data)) counts.set(row.library_id, (counts.get(row.library_id) ?? 0) + 1);
     rememberMediaShape({ folders: [...counts.values()], cloud, discovery: !!data.push_discovery });
   }, [data, cloud]);
+  // 自动发现那块的高度随前缀行数与 Webhook 配置变化，记下来给首屏骨架占位。
+  const discovery = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (discovery.current) rememberSectionHeight('push-discovery', discovery.current.offsetHeight);
+  });
   return (
     <div {...groupRoot(panel)}>
       {data.editable ? <MediaForm data={data} receipt={receipt} /> : <Note tone="neutral" title="只读">{data.notice}</Note>}
       {data.editable ? null : <MountStatus data={data} />}
       {cloud ? <CloudProxySettings receipt={receipt} /> : null}
       {data.push_discovery
-        ? <PushDiscoveryForm initial={data.push_discovery} receipt={receipt} />
+        ? <div ref={discovery}><PushDiscoveryForm initial={data.push_discovery} receipt={receipt} /></div>
         : null}
     </div>
   );
@@ -101,6 +108,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
   const action = useAction();
   const [presets, setPresets] = useState<Record<string, Preset>>({});
   const [stages, setStages] = useState<Record<string, readonly Stage[]>>({});
+  const tints = useLibraryTints();
   const editLibrary = (index: number, patch: Partial<MediaRow>) => {
     rows.forEach((row, i) => { if (row.library_id === rows[index]!.library_id) edit(i, patch); });
   };
@@ -174,7 +182,8 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
             const preset = presets[library.library_id] ?? 'auto';
             const name = library.library || '未命名媒体库';
             return (
-              <div key={library.library_id} data-library-block="" className="flex flex-col gap-3">
+              <div key={library.library_id} data-library-block="" className="flex flex-col gap-3"
+                data-library={tints.get(library.library_id)?.color ? library.library_id : undefined}>
                 <div data-library-head="">
                   <LibraryIconPicker label={`${name} 图标`} value={library.library_icon} kind={library.location}
                     onChange={(library_icon) => editLibrary(first, { library_icon })} />
@@ -188,6 +197,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                   ? <StageChooser name={name} value={stages[library.library_id] ?? AUTO_STAGES}
                     onChange={(value) => setStages(current => ({ ...current, [library.library_id]: value }))} />
                   : null}
+                <div data-library-folders="" role="group" aria-label={`${name} 的文件夹`}>
                 {members.map(({ row, index }) => (
                   <FolderRow key={index} label={`媒体目录 ${index + 1}`} path={row.path}
                     onPath={(path) => edit(index, { path })} error={rowErrors[index]} inputRef={inputRef(index)}
@@ -220,6 +230,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                     </FolderFieldLine>
                   </FolderRow>
                 ))}
+                </div>
               </div>
             );
           })}
@@ -234,6 +245,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
           }}>添加文件夹</Button>
           <Button variant="secondary" onClick={add}>添加媒体库</Button>
         </div>
+        <Help>{LIBRARY_FOLDER_HELP}</Help>
         {cloud ? <><MediaReadPolicyHelp /><CloudDriveGuide /></> : null}
         {missing.map((dependency) => (
           <Help key={dependency.name}>

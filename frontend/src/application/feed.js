@@ -64,10 +64,21 @@ export async function loadEntityShapes(){
     feedState.entityShapesComplete=true;
     feedState.entityShapes=new Map((data.entities||[])
       .flatMap(entity=>[String(entity.id),...entity.names].map(name=>[`${entity.kind}/${foldName(name)}`,entity.parts])));
-    if(typeof data.home?.feed==='boolean')catalogState.homeHasFeed=data.home.feed;
+    if(typeof data.home?.feed==='boolean')rememberHomeFeed(data.home.feed);
     if(isFeedNewPath(location.pathname))prepareHomeFeed($('#feedNew'));
   }
   return feedState.entityShapes;
+}
+
+/* 首页有没有「未入库的新作」记在本机：首屏骨架就按上次的结论铺这一行，不等形状接口回来再插进来，
+   把下面的目录往下推一跳。接口或那一行画完后改记新的结论。 */
+const HOME_FEED_KEY='peach.home-feed.v1';
+export function rememberHomeFeed(has){
+  catalogState.homeHasFeed=has;
+  try{localStorage.setItem(HOME_FEED_KEY,has?'1':'0')}catch{/* 下次照旧等接口。 */}
+}
+export function recalledHomeFeed(){
+  try{const value=localStorage.getItem(HOME_FEED_KEY);return value==='1'?true:value==='0'?false:null}catch{return null}
 }
 
 export function prepareHomeFeed(host){
@@ -152,7 +163,7 @@ feedState.factsSkeleton = ()=>`<dl class="entityfacts" data-entity-facts>${
   '<dt><span class="skeleton"></span></dt><dd><span class="skeleton"></span></dd>'.repeat(5)}</dl>`;
 feedState.feedRevision = 0;
 feedState.feedNewHelpers = {feedRowHtml,wireFeedRow:row=>wireFeedNewRow(row)};
-feedState.feedNewActions = {settled:hasItems=>{catalogState.homeHasFeed=hasItems}};
+feedState.feedNewActions = {settled:hasItems=>rememberHomeFeed(hasItems)};
 feedState.HERO_WIDE_PX = 900;
 applicationEffects.resize(syncHeroWide).observe($('#index'));
 }

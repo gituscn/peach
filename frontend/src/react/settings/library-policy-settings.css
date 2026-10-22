@@ -1,17 +1,39 @@
-/* 三档处理方式的说明：档名一列，说明一列。 */
-.peach-react [data-policy-legend] { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; }
-.peach-react [data-policy-legend] dt { color: var(--ink-2); }
-/* 「媒体库与目录」按媒体库分组：组间一道分隔线；标题行是图标、名称、来源色、处理方式，
- * 窄屏时来源色与处理方式换到名称下一行。 */
-.peach-react [data-library-block] + [data-library-block] { border-top: 1px solid var(--line-soft); padding-top: 16px; }
+/* 三种处理方式对比表：步骤一列，三档各一列，做与不做用符号，不靠颜色单独分辨。 */
+.peach-react [data-policy-matrix] { width: 100%; max-width: 560px; margin-top: 4px; border-collapse: collapse; color: var(--ink-2); }
+.peach-react [data-policy-matrix] :is(th, td) { padding: 6px 8px; border-bottom: 1px solid var(--line-soft); text-align: center; font-weight: 400; }
+.peach-react [data-policy-matrix] thead th { color: var(--muted); }
+.peach-react [data-policy-matrix] tbody th { text-align: left; color: var(--ink-2); }
+.peach-react [data-policy-matrix] [data-policy-cell="on"] { color: var(--ink); }
+.peach-react [data-policy-matrix] [data-policy-cell="off"] { color: var(--muted); }
+.peach-react [data-policy-matrix] tr:last-child > * { border-bottom: 0; }
+/* 「媒体库与目录」按媒体库分组：一个媒体库一张卡，标题行在上；同一库的文件夹挂在标题行下方的一道竖线上，
+ * 表示它们共用这一库的名称、颜色与处理方式。选了来源色的媒体库，竖线用它的颜色。 */
+.peach-react [data-library-block] {
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--surface-radius);
+  background: var(--color-background-primary-default);
+}
 .peach-react [data-library-head] {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto minmax(160px, 200px);
   align-items: center;
   gap: 12px;
 }
+.peach-react [data-library-folders] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: 18px;
+  padding-left: 14px;
+  border-left: 2px solid var(--line);
+}
+.peach-react [data-library-block][data-library] [data-library-folders] { border-left-color: var(--library-color); }
+.peach-react [data-library-folders] > [data-folder-row] { padding: 8px 0 0; border: 0; border-radius: 0; background: none; }
+.peach-react [data-library-folders] > [data-folder-row] + [data-folder-row] { padding-top: 12px; border-top: 1px solid var(--line-soft); }
 @media (max-width: 640px) {
   .peach-react [data-library-head] { grid-template-columns: auto minmax(0, 1fr); }
+  .peach-react [data-library-folders] { margin-left: 4px; padding-left: 10px; }
 }
 /* 来源色的触发键：一颗当前色的球加色名；「无颜色」是一颗中性球加一道斜线。 */
 .peach-react [data-library-color-trigger] { display: inline-flex; width: auto; gap: 8px; padding: 2px 8px 2px 2px; border-radius: 999px; color: var(--ink-2); font-size: var(--fs-sm); white-space: nowrap; }

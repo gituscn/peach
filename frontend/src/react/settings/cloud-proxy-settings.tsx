@@ -1,5 +1,5 @@
 /* CloudDrive 是代理配置的保存方；页面进入、重新聚焦和手动刷新时读取。 */
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { Select, SelectItem } from '@/components/base/select/select';
@@ -10,6 +10,7 @@ import { Note } from '../components/note';
 import { Disclosure, FieldLabel, Footer, Help, Section, Stack, SourceMark } from './section';
 import { sourceMark } from './folder-rows';
 import { busyProps, useAction } from './use-action';
+import { CLOUD_PROXY_HELP, rememberSectionHeight, rememberedSectionHeight } from '../../configuration-skeleton';
 
 export const CLOUD_PROXIES_URL = '/api/configuration/cloud-proxies';
 type Mode = 'direct' | 'system' | 'http' | 'socks5' | 'unknown';
@@ -46,10 +47,17 @@ export function CloudProxySettings({ receipt }: { receipt(message: string): void
     window.addEventListener('focus', focus);
     return () => window.removeEventListener('focus', focus);
   }, []);
+  // 等待块按上次画好时的内容高度占位，首屏骨架用同一个值：账号读回来时整页不再往下推。
+  const body = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!loading && body.current) rememberSectionHeight('cloud-proxy', body.current.offsetHeight);
+  }, [loading, state]);
   return <Section title="CloudDrive 代理">
     <Stack>
-      <Help>API 代理用于列目录和查询文件信息，数据代理用于读取视频及配套文件。保存后，同一网盘账号在 CloudDrive 中的其他读取也会使用此设置。</Help>
-      {loading ? <div data-skeleton aria-busy="true" aria-label="正在读取网盘代理"><div className="h-24 w-full rounded-2lg bg-background-tertiary-default" /></div> : null}
+      <Help>{CLOUD_PROXY_HELP}</Help>
+      <div ref={body} className="flex min-w-0 flex-col gap-4">
+      {loading ? <div data-skeleton aria-busy="true" aria-label="正在读取网盘代理"><div className="w-full rounded-2lg bg-background-tertiary-default"
+        style={{ height: rememberedSectionHeight('cloud-proxy', 96) }} /></div> : null}
       {action.error ? <Note tone="error" title="没有读取配置">{action.error} <LinkButton href="/settings/downloads" size="small">下载设置</LinkButton></Note> : null}
       {state?.accounts.length === 0 && !state.unlinked?.length ? <Help>还没有使用 CloudDrive 的媒体库。</Help> : null}
       {state?.unlinked?.map(library => <div key={library.root} className="flex min-w-0 flex-col gap-1">
@@ -62,6 +70,7 @@ export function CloudProxySettings({ receipt }: { receipt(message: string): void
           setWriting(Boolean(saving.current.size));
         }}
         onSaved={next => { dirty.current.delete(next.id); setState(current => current ? { ...current, accounts: current.accounts.map(row => row.id === next.id ? next : row) } : current); }} />)}
+      </div>
     </Stack>
     <Footer><Button variant="secondary" disabled={writing} onClick={refresh} {...busyProps(action.busy === 'refresh')}>重新读取</Button></Footer>
   </Section>;

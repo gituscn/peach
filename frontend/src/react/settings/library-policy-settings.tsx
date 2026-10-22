@@ -2,7 +2,7 @@
  * 放在每个媒体库的标题行里。三档处理方式的说明在分组上方只写一次；只有选了「自定义」的媒体库
  * 才展开五个步骤。来源色默认不上色，点开色球选一档强调色。
  * 原型阶段处理方式只在本页演示，不随「保存配置」提交；来源色记在本浏览器。 */
-import { Fragment, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Dialog, Popover } from 'react-aria-components';
 import { UNSAFE_PortalProvider } from 'react-aria';
 
@@ -12,8 +12,8 @@ import { Select, SelectItem } from '@/components/base/select/select';
 import { ACCENT_CHOICES } from '@peach/appearance';
 import { setLibraryColor, useLibraryTints } from '../components/library-tint';
 import { overlayHost } from '../components/overlay-host';
-import { Disclosure } from './section';
-import { POLICY_LEGEND } from './library-policy-copy';
+import { Disclosure, Help } from './section';
+import { POLICY_COLUMNS, POLICY_COVER_NOTE, POLICY_MATRIX, POLICY_SUMMARY } from './library-policy-copy';
 import '../components/glow-preset-grid.css';
 import './library-policy-settings.css';
 
@@ -28,12 +28,22 @@ export const STAGES = [
 export type Stage = (typeof STAGES)[number][0];
 export const AUTO_STAGES: readonly Stage[] = ['probe', 'metadata', 'cover', 'people', 'preview'];
 
-/** 三档处理方式的说明，分组上方只放一份。 */
+/** 三档处理方式的说明，分组上方只放一份：常显一句话，三档的差别收在可展开的对比表里。 */
 export function PolicyLegend() {
   return (
-    <dl data-policy-legend="" className="text-body-2-regular text-text-secondary">
-      {POLICY_LEGEND.map(([name, description]) => <Fragment key={name}><dt>{name}</dt><dd>{description}</dd></Fragment>)}
-    </dl>
+    <div data-policy-legend="" className="flex flex-col gap-1">
+      <Help>{POLICY_SUMMARY}</Help>
+      <Disclosure summary="三种处理方式对比">
+        <table data-policy-matrix="" className="text-body-2-regular">
+          <thead><tr><th scope="col"><span className="sr-only">步骤</span></th>
+            {POLICY_COLUMNS.map(name => <th key={name} scope="col">{name}</th>)}</tr></thead>
+          <tbody>{POLICY_MATRIX.map(([step, ...cells]) => <tr key={step}><th scope="row">{step}</th>
+            {cells.map((cell, index) => <td key={POLICY_COLUMNS[index]} data-policy-cell={cell === '✓' ? 'on' : cell === '—' ? 'off' : 'choice'}>
+              {cell === '✓' ? <span aria-label="做">✓</span> : cell === '—' ? <span aria-label="不做">—</span> : cell}</td>)}</tr>)}</tbody>
+        </table>
+        <Help>{POLICY_COVER_NOTE}</Help>
+      </Disclosure>
+    </div>
   );
 }
 

@@ -97,7 +97,7 @@ export function CatalogListPage(props: CatalogGridProps) {
       cell: ({ row }) => <Checkbox slot={null} aria-label={`选择 ${props.helpers.displayName(row.original, row.original.name || '')}`}
         isDisabled={result.isPlaceholderData}
         isSelected={row.getIsSelected()} onChange={on => row.toggleSelected(on)} /> }),
-      helper.accessor(item => item.name || '', { id: 'name', header: '名称', enableSorting: true,
+      helper.accessor(item => item.name || '', { id: 'name', header: '作品', enableSorting: true,
         cell: ({ row }) => <ListIdentity item={row.original} props={props} disabled={result.isPlaceholderData} /> }),
       /* 标签与卡片同一套：关注条目的标签不可点，其余点一下按这个标签筛选。 */
       helper.display({ id: 'tags', header: '标签', cell: ({ row }) => {
@@ -156,14 +156,15 @@ export function CatalogListPage(props: CatalogGridProps) {
     },
   });
   return <div data-catalog-view-mode="list" data-catalog-table="" aria-busy={result.isFetching || undefined} className="flex min-w-0 flex-col gap-4">
-    <div className="flex flex-wrap justify-end gap-2" role="toolbar" aria-label="作品列表工具栏">
+    {/* 缺图提示与工具按钮同一行：提示要等数据才知道出不出现，单占一行会在数据到达时把表格往下推。 */}
+    <div className="flex flex-wrap items-center justify-end gap-2" role="toolbar" aria-label="作品列表工具栏">
+      <LibraryCompletionPrompt inline assetIds={props.filters?.state === 'trash' ? [] : missingPreviewIds(items, props.layout.javImage)} />
       <div data-toolbar-actions="">
       <TableColumnControls preferences={preferences} />
       <DataTableSort label="作品列表" options={sortOptions} sorting={sorting}
         onChange={next => table.setSorting(next)} />
       </div>
     </div>
-    <LibraryCompletionPrompt assetIds={props.filters?.state === 'trash' ? [] : missingPreviewIds(items, props.layout.javImage)} />
     {result.isError ? <RetryNote message={requestErrorMessage(result.error)} onRetry={() => void result.refetch()} /> : null}
     <DataTableFrame follow preferences={preferences} onRowClick={props.selectMode ? id => { if (!result.isPlaceholderData) props.actions.toggleSelection(Number(id), false) } : undefined}>
       <Table aria-label="作品列表" size="sm"
