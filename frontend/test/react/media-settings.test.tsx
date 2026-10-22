@@ -45,6 +45,21 @@ it('网盘来源缺依赖时给新窗口下载链接，已装的不提示', asyn
   expect(host.textContent).not.toContain('下载 WinFsp');
 });
 
+it('局域网 HTTP 页面没有 randomUUID 时，旧目录补上媒体库身份并照常打开', async () => {
+  const real = globalThis.crypto;
+  vi.stubGlobal('crypto', { getRandomValues: real.getRandomValues.bind(real) });
+  const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
+  vi.stubGlobal('fetch', fetcher);
+  try {
+    const host = await open({ media_sources: [{ location: 'local', root: '/media', path: '/media', cost: 'free' }] });
+    expect(host.querySelector('form')).not.toBeNull();
+    await submit(host.querySelector('form'));
+    expect(sentBody(fetcher).media_sources[0].library_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 it('不能编辑时只说原因，不画表单', async () => {
   const host = await open({ editable: false, notice: '请在运行 Peach 的电脑上打开配置' });
   expect(host.querySelector('form')).toBeNull();

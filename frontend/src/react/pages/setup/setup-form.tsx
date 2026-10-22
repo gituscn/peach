@@ -15,6 +15,7 @@ import { Label } from '@/components/base/input/label';
 import { Switch } from '@/components/base/switch/switch';
 import { Select, SelectItem } from '@/components/base/select/select';
 
+import { randomId } from '../../../core/random-id';
 import { SEGMENT, SEGMENTED_TRACK, SegmentedRadioGroup } from '../../components/segmented';
 import { busyProps } from '../../settings/busy-props';
 import {
@@ -53,7 +54,7 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
   const media = setup.questions.find((question) => question.input === 'folders');
   const others = setup.questions.filter((question) => question.input !== 'folders');
   const sources = setup.media_sources.map(({ value, label }) => [value, label] as const);
-  const blank = (path = ''): SetupFolder => ({ path, location: setup.media_source_default, root: '', library_id: crypto.randomUUID(), library: '', cost: setup.media_source_default === 'local' ? 'free' : '' });
+  const blank = (path = ''): SetupFolder => ({ path, location: setup.media_source_default, root: '', library_id: randomId(), library: '', cost: setup.media_source_default === 'local' ? 'free' : '' });
   const folders = useFolderRows<SetupFolder>({
     initial: () => [blank(media?.default ?? '')], blank: () => blank(), pickFolder, describe: describeFailure,
     focusAfterPick: true,
@@ -192,7 +193,7 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
                       renderValue={<span className="flex min-w-0 items-center gap-2"><SourceMark mark={libraryAutoChoice(row.location)[0]} /><span className="truncate">{row.library || '未命名媒体库'}</span></span>}
                       onSelectionChange={key => {
                         const other = folders.rows.find(value => value.library_id === key);
-                        folders.edit(index, { library_id: other?.library_id || crypto.randomUUID(), library: other?.library || '' });
+                        folders.edit(index, { library_id: other?.library_id || randomId(), library: other?.library || '' });
                       }}>
                       {[...new Map(folders.rows.map(value => [value.library_id, value])).values()].map(value => (
                         <SelectItem key={value.library_id} id={value.library_id}>{value.library || '未命名媒体库'}</SelectItem>
