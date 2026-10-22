@@ -14,6 +14,7 @@ import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 import { apiGet } from '../../api';
 import { ArtSlot } from '../components/art-slot';
 import { useLibraryTints } from '../components/library-tint';
+import { SourceMark } from '../settings/section';
 import { DataTableFrame } from '../components/data-table-frame';
 import { DataTableFooter, DataTableSort } from '../components/table-controls';
 import { RetryNote } from '../components/grid-reveal';
@@ -40,6 +41,7 @@ const positions = new Map<string, ListState>();
 /** 服务端对完整筛选结果排序、分页；选择集及批量栏归现有馆藏控制器。 */
 export function CatalogListPage(props: CatalogGridProps) {
   const preferences = useCatalogTablePreferences();
+  const tints = useLibraryTints();
   const params = catalogParams(props.filters || {}, false);
   const [scope] = useState(() => {
     const position = new URLSearchParams(params);
@@ -169,6 +171,7 @@ export function CatalogListPage(props: CatalogGridProps) {
             {Array.from({ length: 6 }, (_, index) => <div key={index}><i className="skeleton-sheen" /><span className="skeleton-sheen" /></div>)}
           </div> : result.isError ? '作品列表未取得' : '没有符合的作品'}>
           {table.getRowModel().rows.map(row => <TableRow key={row.id} id={row.id} data-catalog-row="" data-id={row.original.id}
+            data-library={tints.get(row.original.library_id || '')?.color ? row.original.library_id : undefined}
             data-board-selected={row.getIsSelected() || undefined}>
             {row.getVisibleCells().map(cell => <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}
             <TableCell data-table-space="" />
@@ -187,7 +190,6 @@ function ListIdentity({ item, props, disabled }: { item: MediaItem; props: Catal
   const who = item.creator || item.performers?.join('、') || item.studio;
   const tints = useLibraryTints();
   const tint = item.library_id ? tints.get(item.library_id) : undefined;
-  const tinted = tint?.color ? tint.id : undefined;
   const flaggedBy = [Number(item.liked) > 0 ? '喜欢' : '', Number(item.o_count) > 0 ? '有高潮记录' : ''].filter(Boolean);
   const glyph = (name: string) => <svg viewBox="0 0 24 24" aria-hidden="true"><use href={`#i-${name}`} /></svg>;
   return <div data-list-identity="">
@@ -209,7 +211,9 @@ function ListIdentity({ item, props, disabled }: { item: MediaItem; props: Catal
           : null}</span>
       <span data-list-text=""><span data-list-name="" title={name}>{name}</span>
         <span data-list-byline="">
-          {tint ? <span data-list-library="" data-library={tinted}>{tint.name}</span> : null}
+          {tint ? <span data-list-library="" title={`媒体库：${tint.name}`}>
+            <SourceMark mark={tint.icon} />{tint.name}
+          </span> : null}
           {who || '未归属'}
         </span>
       </span>

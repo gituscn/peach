@@ -69,7 +69,7 @@ export function MediaSettings({ data, receipt, panel }: ConfigurationGroupProps)
   return (
     <div {...groupRoot(panel)}>
       {data.editable ? <MediaForm data={data} receipt={receipt} /> : <Note tone="neutral" title="只读">{data.notice}</Note>}
-      <LibraryPolicySettings data={data} />
+      <LibraryPolicySettings />
       {data.editable ? null : <MountStatus data={data} />}
       {data.media_sources?.some(row => isCloudSource(row.location)) ? <CloudProxySettings receipt={receipt} /> : null}
       {data.push_discovery

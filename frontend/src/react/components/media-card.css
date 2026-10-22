@@ -16,7 +16,7 @@
 .peach-react [data-media-grid] {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile)), 1fr));
-  gap: 24px 16px;
+  gap: 24px;
 }
 /* 同一网格行里的卡片共享完整高度。 */
 .peach-react [data-media-grid] > [data-media-card] { align-self: stretch; }
@@ -45,12 +45,14 @@ body[data-surface="/trash"] .peach-react [data-media-grid] {
   transform-origin: center;
   transition: transform .18s ease, filter .18s ease, background-color .15s ease, box-shadow .15s ease;
 }
-/* 媒体库来源色是常驻底色，同一媒体库的卡常常整排相邻：淡色只铺在卡片盒自己的圆角里，
- * 相邻两张之间留出整段列距的页面底色，不连成一片。颜色由 `library-tint.ts` 按 `library_id` 给。 */
+/* 媒体库来源色是常驻底色，同一媒体库的卡常常整排相邻。淡色和悬停面一样往卡片盒外铺 8px，
+ * 头像、标签离色块边留出 8px；网格行距、列距都是 24px，相邻两张有色卡之间仍隔 8px 页面底色，
+ * 不连成一片。颜色由 `library-tint.ts` 按 `library_id` 给，用户没选颜色的媒体库不上色。 */
 .peach-react [data-media-card][data-library]:not([data-pending-delete], [data-variant="resource"], [data-variant="junk"]) {
   --library-surface: color-mix(in oklab, var(--library-color) 9%, transparent);
   --library-hover: color-mix(in oklab, var(--library-color) 15%, transparent);
   background: var(--library-surface);
+  box-shadow: 0 0 0 8px var(--library-surface);
 }
 [data-theme="dark"] .peach-react [data-media-card][data-library] {
   --library-surface: color-mix(in oklab, var(--library-color) 13%, transparent);
