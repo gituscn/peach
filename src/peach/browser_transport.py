@@ -222,7 +222,9 @@ class _WebSocket:
 
 
 def _targets(port: int) -> list[dict]:
-    with urllib.request.urlopen(f"http://127.0.0.1:{port}/json", timeout=10) as response:
+    # 回环 DevTools 端口不经任何代理；裸 urlopen 读系统代理，绕过名单没列 127.0.0.1 时会被代理接走。
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(f"http://127.0.0.1:{port}/json", timeout=10) as response:
         return json.load(response)
 
 

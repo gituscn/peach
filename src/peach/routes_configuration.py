@@ -328,9 +328,22 @@ def save_peach_proxy(request: Request, body: dict = Body(...), _args=Depends(req
     local_only(request)
     same_origin(request)
     try:
-        return peach_proxy.save(settings_file.load_config().directory("secrets"), body)
+        saved = peach_proxy.save(settings_file.load_config().directory("secrets"), body)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+    request.app.state.network_reachability.refresh()
+    return saved
+
+
+@router.get("/api/network-status")
+def network_status(request: Request, _args=Depends(require_auth)):
+    """外网连通的后台快照；探测按 Peach 代理设置出网，请求本身不出网。
+
+    探测线程在第一次有页面来读时才启动：没人打开界面的实例不出这份流量。
+    """
+    monitor = request.app.state.network_reachability
+    monitor.start()
+    return monitor.summary()
 
 
 @router.post("/api/configuration/entry-links")

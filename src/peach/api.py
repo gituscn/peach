@@ -264,6 +264,8 @@ def create_app(
     repository = LedgerRepository(database)
     from .mount_reachability import source_roots
     mount_reachability = MountReachability(source_roots())
+    from .network_reachability import NetworkReachability
+    network_reachability = NetworkReachability()
     resolver = FFmpegResolver(settings.ffmpeg_root)
     http_transport = HttpxTransport()
     follow_media_resolver = FollowMediaResolver(http_transport).with_credential_loader(
@@ -430,6 +432,7 @@ def create_app(
             await asyncio.to_thread(jav_browser.stop)
             downloads.stop()
             mount_reachability.stop()
+            await asyncio.to_thread(network_reachability.stop)
             # to_thread 的查询在线程内释放连接后才算结束。
             await aggregate_warmup
             # 死链检查和资源对账的后台线程是 daemon，本来挡不住进程退出；这里显式收
@@ -477,6 +480,7 @@ def create_app(
     app.state.downloads = downloads
     app.state.jav_browser = jav_browser
     app.state.mount_reachability = mount_reachability
+    app.state.network_reachability = network_reachability
     app.state.stream_sessions = StreamSessionRegistry()
     from .strm_stream import StrmResources
     app.state.strm_resources = StrmResources()

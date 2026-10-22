@@ -237,6 +237,9 @@ if(location.pathname==='/wall')document.documentElement.setAttribute('data-wall-
 
 </header>
 
+<!-- 外网连不上时的通栏横幅（`react/network-banner.tsx`），由路由树画进这个节点；联网时它是空的。 -->
+<div data-network-banner></div>
+
 <!-- 首页筛选条（`catalog-filter` 岛）：两排头像与筛选浮层。宿主不生成盒子，里面那几块直接当 body 的孩子排。 -->
 <div id="catalogPageHeading" hidden><h2 class="disp" data-page-title>首页</h2></div>
 <div id="javLibraryHeader" class="peach-react" hidden></div>
