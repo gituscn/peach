@@ -1047,6 +1047,31 @@ def follow_image(request: Request, id: int, media: int | None = None,
         return Response(status_code=404, headers={"cache-control": "no-store"})
 
 
+@router.api_route("/cover-image", methods=["GET", "HEAD"])
+def cover_image(request: Request, code: str, args: dict[str, str] = Depends(require_auth)):
+    """库外作品的官方封面：按番号在服务端查地址，经 Peach 的出网设置取图并落盘缓存。
+
+    取不到一律回 404 且不缓存：卡片按 `data-drop` 换成占位，网络恢复后下一次加载重取。
+    """
+    from .jav_cover_fetch import COVER_PROXY_HOSTS, candidate_for
+    from .web_jav_detail import detail_code, stored_cover_url
+    state = request.app.state
+    try:
+        url = stored_cover_url(state.web_contract, detail_code({"code": code}))
+        if not url:
+            raise ValueError("封面未取得")
+        cache = cache_for(state.web_contract)
+        key = f"cover:{url}"
+        hit = cache.response(key, request)
+        if hit is not None:
+            return hit
+        target = ResolvedFollowMedia(url, candidate_for(url).referer, allowed_hosts=COVER_PROXY_HOSTS)
+        return cache.stream(key, request, lambda: open_upstream(
+            state.http_transport.client, request.method, target, incoming=request.headers))
+    except (ValueError, FollowProxyError, OSError, httpx.HTTPError):
+        return Response(status_code=404, headers={"cache-control": "no-store"})
+
+
 def _jav_preview_target(url: str) -> ResolvedFollowMedia:
     """已验证的预览来源使用固定主机范围，其他 CDN 逐跳核对公网解析。"""
     return ResolvedFollowMedia(url, allowed_hosts=("www.prestige-av.com", "jdforrepam.com", "cc3001.dmm.co.jp"), public_hosts=True)

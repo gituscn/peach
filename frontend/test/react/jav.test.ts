@@ -34,15 +34,19 @@ it('发现查询隔离排序缓存，并在同一资料任务上轮询、停止�
   } finally { vi.unstubAllGlobals() }
 });
 
-it('发现封面优先本机缓存，远程封面保留原地大小图取景身份', () => {
-  const item = { id: 1, code: 'ABC-001', has_cover: true, cover_url: 'https://example.test/cover.jpg' } as Discovery;
+it('发现封面优先本机缓存，远程封面经 Peach 代理并保留原地大小图取景身份', () => {
+  const item = { id: 1, code: 'ABC-001', has_cover: true, cover_url: 'https://pics.dmm.co.jp/digital/video/abc00001/abc00001pl.jpg' } as Discovery;
   const local = document.createElement('div');
   local.innerHTML = discoveryArtwork(item, 'big', 'cover');
   expect(local.querySelector('img')?.getAttribute('src')).toContain('/cover?code=ABC-001');
   local.innerHTML = discoveryArtwork({ ...item, has_cover: false }, 'small', 'cover');
-  expect(local.querySelector('img')?.getAttribute('src')).toBe(item.cover_url);
-  expect(local.querySelector('img')?.dataset.javImageLayout).toBe('small');
-  expect(local.querySelector('img')?.dataset.javCover).toBe(item.cover_url);
+  const image = local.querySelector('img')!;
+  expect(image.getAttribute('src')).toBe('/cover-image?code=ABC-001');
+  expect(image.dataset.javImageLayout).toBe('small');
+  expect(image.dataset.javCover).toBe('/cover-image?code=ABC-001');
+  expect(image.dataset.drop).toBe('self');
+  expect(local.innerHTML).not.toContain('dmm.co.jp');
+  expect(discoveryArtwork({ ...item, has_cover: false, code: '' }, 'small', 'cover')).toBe('');
 });
 it('JAV 分区从深链恢复，未知分区落在馆藏', () => {
   expect(javTab('discover')).toBe('discover'); expect(javTab('wants')).toBe('wants'); expect(javTab('other')).toBe('library');

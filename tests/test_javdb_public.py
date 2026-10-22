@@ -304,7 +304,14 @@ class DetailProjectionTests(unittest.TestCase):
         self.assertIsNone(item['cover_url'])
         self.assertEqual(discovery_cover_url({**item, 'cover_url': 'https://c0.jdbstatic.com/a.jpg'}, {}), '')
         self.assertEqual(discovery_cover_url({**item, 'link': ''}, {'id': 'Exact'}), '')
-        self.assertEqual(discovery_cover_url({**item, 'cover_url': 'https://pics.dmm.co.jp/a.jpg'}, {}), 'https://pics.dmm.co.jp/a.jpg')
+        official = 'https://pics.dmm.co.jp/digital/video/mida00085/mida00085pl.jpg'
+        self.assertEqual(discovery_cover_url({**item, 'cover_url': official}, {}), official)
+        self.assertEqual(discovery_cover_url(item, {'cover_url': 'https://image.mgstage.com/images/a/pb_e_a.jpg'}),
+                         'https://image.mgstage.com/images/a/pb_e_a.jpg')
+        for url in ('https://pics.dmm.co.jp/a.jpg', 'https://www.javbus.com/pics/cover/a_b.jpg',
+                    official.replace('https:', 'http:'), 'https://evil.example/digital/video/mida00085/mida00085pl.jpg'):
+            with self.subTest(url=url):
+                self.assertEqual(discovery_cover_url({**item, 'cover_url': url}, {}), '')
         self.assertEqual(discovery_cover_url({**item, 'link': 'https://private.invalid/'}, {}), '')
 
     def test_saved_identity_fetches_actor_portrait_without_code_search(self):

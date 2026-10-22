@@ -27,12 +27,21 @@ def detail_code(args) -> str:
 
 
 def discovery_cover_url(item, source) -> str:
-    """卡片只显示合格图源的封面地址。"""
-    from .jav_cover_fetch import is_javdb_image
+    """卡片只显示 `/cover-image` 能代理的官方封面地址。"""
+    from .jav_cover_fetch import proxyable_cover_url
     for value in (item.get('cover_url'), source.get('cover_url')):
-        if value and not is_javdb_image(value):
+        if proxyable_cover_url(value):
             return value
     return ''
+
+
+def stored_cover_url(contract, code) -> str:
+    """`/cover-image` 按番号取的上游地址；只读账本与已缓存的来源资料，不联网。"""
+    from .web_jav_discovery import _cached_movie
+    with contract.database.read_connection() as connection:
+        row = connection.execute("SELECT cover_url FROM feed_discovery WHERE code=? COLLATE NOCASE LIMIT 1",
+                                 (code,)).fetchone()
+    return discovery_cover_url(dict(row) if row else {}, _cached_movie(code, contract))
 
 
 def _refs(contract, connection, kind, names):

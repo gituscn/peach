@@ -1,5 +1,5 @@
 /* feed 域控制器：本域状态与动作，启动由 Application 的生命周期统一安装。 */
-import { coverImage } from './../card-art/markup';
+import { coverImage, remoteCoverUrl } from './../card-art/markup';
 import { feedIdentity } from './../card-art/feed-identity';
 import { $, api, esc, foldName, icon, isCatalogPath } from '../core';
 import { javTitleHtml } from '../core/jav-title';
@@ -14,12 +14,13 @@ export const feedState = { FEED_SKELETON_CARDS: undefined, feedNewSkeletonHtml: 
 
 export function feedNewCoverHtml(item){
   if(item.has_cover)return coverImage(item,'big');
-  if(!item.cover_url)return item.cover_fetching
+  if(!item.cover_url||!item.code)return item.cover_fetching
     ?`<span class="nopic" data-feed-cover-state="fetching">${loadingDotsHtml('抓取中')}</span>`
     :'<span class="nopic" data-feed-cover-state="missing">无封面</span>';
+  // 官方图经 Peach 代理取，断网或上游失败时换成「封面未取得」占位。
   return coverImage(item,'big').replace(/ src="[^"]*"/,
-    ` src="${esc(item.cover_url)}" referrerpolicy="no-referrer" data-panel-prior="1"`)
-    .replace('data-drop="self"', 'data-drop="initial" data-initial="无封面" data-drop-class="nopic"');
+    ` src="${esc(remoteCoverUrl(item))}" data-panel-prior="1"`)
+    .replace('data-drop="self"', 'data-drop="initial" data-initial="封面未取得" data-drop-class="nopic"');
 }
 
 export function feedNewCardHtml(item){
