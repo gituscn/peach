@@ -29,6 +29,7 @@ import {
   useFolderRows,
 } from './folder-rows';
 import { sourceDefaultCost, type SourceCost } from '../../core/media-sources';
+import { randomId } from '../../core/random-id';
 import { libraryAutoChoice, LibraryIconPicker } from './library-icon-picker';
 import {
   AUTO_STAGES, LibraryColorPicker, PolicyLegend, PresetSelect, StageChooser, type Preset, type Stage,
@@ -63,7 +64,7 @@ interface FieldErrors { media_dirs?: string[]; port?: string }
 interface SaveResult { saved: boolean; url: string; revision: string }
 
 const blankRow = (path = ''): MediaRow => ({
-  path, location: 'local', root: '', library_id: crypto.randomUUID(), library: '', library_icon: '',
+  path, location: 'local', root: '', library_id: randomId(), library: '', library_icon: '',
   library_color: '', library_policy: 'auto', library_stages: '', cost: 'free',
 });
 
@@ -73,7 +74,7 @@ function initialRows(data: ConfigurationData): MediaRow[] {
     return known.map((row) => ({
       path: row.path, location: row.location, root: row.root, library: row.library || '', library_icon: row.library_icon || '',
       library_color: row.library_color || '', library_policy: row.library_policy || 'auto', library_stages: row.library_stages || '',
-      root_id: row.root_id, library_id: row.library_id || crypto.randomUUID(),
+      root_id: row.root_id, library_id: row.library_id || randomId(),
       cost: row.cost ?? sourceDefaultCost(row.location),
     }));
   }
@@ -145,7 +146,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
       edit(index, libraryFields(chosen));
       return;
     }
-    const created = crypto.randomUUID();
+    const created = randomId();
     edit(index, { library_id: created, library: '', library_icon: '', library_color: '', library_policy: 'auto', library_stages: '' });
     setNamed(created);
   };
