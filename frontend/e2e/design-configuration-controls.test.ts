@@ -108,10 +108,11 @@ describe('设计决定：配置控件', () => {
             })),
           }));
         });
-        assert.equal(measured.length, 2);
-        assert.deepEqual(measured.map((group) => group.rows.length), [2, 1]);
-        assert.deepEqual(measured.map((group) => group.top), [0, 1]);
-        assert.deepEqual(measured.flatMap((group) => group.rows.map((row) => row.bottom)), [1, 0, 0]);
+        // 总开关、时间轴档位、抽帧解码方式各占一个行组，组与组之间由下一组的上边线分开。
+        assert.equal(measured.length, 3);
+        assert.deepEqual(measured.map((group) => group.rows.length), [1, 1, 1]);
+        assert.deepEqual(measured.map((group) => group.top), [0, 1, 1]);
+        assert.deepEqual(measured.flatMap((group) => group.rows.map((row) => row.bottom)), [0, 0, 0]);
         for (const row of measured.flatMap((group) => group.rows)) {
           assert.ok(Math.abs(row.left - 12) <= .5 && Math.abs(row.right) <= .5, JSON.stringify(row));
         }

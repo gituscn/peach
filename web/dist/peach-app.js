@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "95cfe51b-810a-455e-9ee9-1e47141b4a01", e._sentryDebugIdIdentifier = "sentry-dbid-95cfe51b-810a-455e-9ee9-1e47141b4a01");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "9056bcfe-beeb-467d-ae9b-3705f826fc8f", e._sentryDebugIdIdentifier = "sentry-dbid-9056bcfe-beeb-467d-ae9b-3705f826fc8f");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -80794,7 +80794,9 @@ function $Ue(e, t) {
 	r && (r.textContent = t ? "升序" : "降序");
 }
 function eWe({ host: e, tab: t, epoch: n, configurable: r }) {
-	let i = e.store.value, a = () => e.store.save(), o = i.defaultSort === "seed", s = i.defaultSortDirection === "asc";
+	let i = e.store.value, a = () => e.store.save(), [o, s] = (0, E.useState)(null);
+	r !== null && r !== o && s(r);
+	let c = i.defaultSort === "seed", l = i.defaultSortDirection === "asc";
 	return /* @__PURE__ */ (0, D.jsxs)(AU, {
 		index: 1,
 		tab: t,
@@ -80835,14 +80837,14 @@ function eWe({ host: e, tab: t, epoch: n, configurable: r }) {
 						id: "defaultSortDirectionSetting",
 						label: "默认排序方向",
 						options: zUe,
-						value: s ? "asc" : "desc",
-						hidden: o,
-						disabled: o,
+						value: l ? "asc" : "desc",
+						hidden: c,
+						disabled: c,
 						epoch: n,
 						onPick: (t) => {
 							i.defaultSortDirection = t, a(), e.changed("sortDirection");
 						},
-						decorate: (e) => $Ue(e, s)
+						decorate: (e) => $Ue(e, l)
 					})]
 				})
 			}),
@@ -80896,11 +80898,10 @@ function eWe({ host: e, tab: t, epoch: n, configurable: r }) {
 				host: e,
 				epoch: n
 			}),
-			r === !1 ? null : /* @__PURE__ */ (0, D.jsx)(aWe, {
+			(r ?? o) === !0 ? /* @__PURE__ */ (0, D.jsx)(aWe, {
 				host: e,
-				epoch: n,
-				ready: r === !0
-			})
+				epoch: n
+			}) : null
 		]
 	});
 }
@@ -81028,30 +81029,32 @@ function rWe({ host: e, epoch: t }) {
 	] });
 }
 var iWe = [["auto", "自动（硬件优先）"], ["software", "软件编解码"]];
-function aWe({ host: e, epoch: t, ready: n }) {
-	let r = vt({
+function aWe({ host: e, epoch: t }) {
+	let n = vt({
 		queryKey: NL,
-		queryFn: ({ signal: e }) => kMe(e),
-		enabled: n
-	}), i = yt({
+		queryFn: ({ signal: e }) => kMe(e)
+	}), r = n.refetch, i = (0, E.useRef)(t);
+	(0, E.useEffect)(() => {
+		i.current !== t && (i.current = t, r());
+	}, [t, r]);
+	let a = yt({
 		mutationFn: (e) => U(ML, { playback_acceleration: e }),
 		onSuccess: (t) => {
-			W.setQueryData(NL, t), e.receipt("已保存播放编解码方式");
+			W.setQueryData(NL, t), e.receipt("已保存转码方式");
 		},
-		onError: (t) => e.failure("保存播放编解码方式", t)
-	}), a = i.isPending ? i.variables : r.data?.playback_acceleration || "auto";
+		onError: (t) => e.failure("保存转码方式", t)
+	}), o = a.isPending ? a.variables : n.data?.playback_acceleration || "auto";
 	return /* @__PURE__ */ (0, D.jsx)(MU, {
-		title: "编解码方式",
-		description: "用于播放时的视频转码。",
+		title: "转码方式",
 		children: /* @__PURE__ */ (0, D.jsx)(cH, {
 			id: "playbackAccelerationSetting",
-			label: "播放编解码方式",
+			label: "转码方式",
 			options: iWe,
-			value: a,
-			disabled: !n || !r.data,
-			busy: i.isPending,
+			value: o,
+			disabled: !n.data,
+			busy: a.isPending,
 			epoch: t,
-			onPick: (e) => i.mutate(e)
+			onPick: (e) => a.mutate(e)
 		})
 	});
 }
@@ -116860,4 +116863,4 @@ KSt(qSt);
 //#endregion
 export { vT as applyTheme, mN as peachHistory, qo as popCount, wvt as showToast };
 
-//# debugId=95cfe51b-810a-455e-9ee9-1e47141b4a01
+//# debugId=9056bcfe-beeb-467d-ae9b-3705f826fc8f

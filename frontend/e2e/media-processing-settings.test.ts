@@ -68,7 +68,7 @@ describe('视频预览设置', () => {
         assert.equal(state.previewAcceleration, 'software');
         assert.equal(state.playbackAcceleration, 'auto');
         assert.deepEqual(writes.slice(-1), [{ preview_acceleration: 'software' }]);
-        // 播放转码与其它播放设置同在设置弹窗，配置页上不再出现。
+        // 播放转码只在设置弹窗「浏览与播放」里，与其它播放设置同处。
         assert.equal(await page.locator('#playbackAccelerationSetting').count(), 0);
         await page.reload();
         await preview.waitFor();
@@ -84,7 +84,7 @@ describe('视频预览设置', () => {
       } finally { await opened.close() }
     });
 
-    it(`${viewport.name}：设置弹窗「浏览与播放」里改播放编解码方式，只写这一项，重新打开读回`, async () => {
+    it(`${viewport.name}：设置弹窗「浏览与播放」里改转码方式，只写这一项，重新打开读回`, async () => {
       const { state, writes, route } = mediaProcessing();
       const opened = await visit(browser, '/settings/playback', viewport, route);
       const { page } = opened;
@@ -97,7 +97,7 @@ describe('视频预览设置', () => {
         assert.match(await trigger.innerText(), /自动/);
         await trigger.click();
         await field.locator('[data-select-option="software"]').click();
-        await page.getByText('已保存播放编解码方式', { exact: true }).waitFor();
+        await page.getByText('已保存转码方式', { exact: true }).waitFor();
         assert.equal(state.playbackAcceleration, 'software');
         assert.equal(state.previewAcceleration, 'auto');
         assert.deepEqual(writes, [{ playback_acceleration: 'software' }]);

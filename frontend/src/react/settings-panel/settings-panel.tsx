@@ -13,7 +13,7 @@
  * 每次打开时共用控件重画、数值框回到当前值，并重取共享设置。
  * 焦点先交给关闭钮，Tab 在面板里转圈，关掉后还给打开前那一枚。 */
 import {
-  useLayoutEffect, useRef, useState, useSyncExternalStore,
+  useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore,
   type KeyboardEvent, type ReactNode,
 } from 'react';
 import { flushSync } from 'react-dom';
@@ -409,10 +409,13 @@ function decorateDirection(field: HTMLElement, ascending: boolean): void {
 }
 
 /* 「浏览与播放」分两段：作品列表（网格、排序、卡片与悬停）在前，播放在后。转码方式写的是运行 Peach
-   那台电脑的配置，只在能改配置的设备上出现，排在播放段最后。 */
+   那台电脑的配置，只在确认能改配置的设备上出现，排在播放段最后。每次打开面板时权限先回 null 再查，
+   查的这一段沿用上一次的结论：这一行不在能改的设备上先消失再出现，也不在别的设备上先出现再消失。 */
 function BrowseGroup({ host: current, tab, epoch, configurable }: GroupProps & { configurable: boolean | null }) {
   const settings = current.store.value;
   const save = () => current.store.save();
+  const [known, setKnown] = useState<boolean | null>(null);
+  if (configurable !== null && configurable !== known) setKnown(configurable);
   const random = settings.defaultSort === 'seed';
   const ascending = settings.defaultSortDirection === 'asc';
   return (
@@ -453,7 +456,7 @@ function BrowseGroup({ host: current, tab, epoch, configurable }: GroupProps & {
       </Row>
       <h4 data-settings-subheading="">播放</h4>
       <PlaybackRows host={current} epoch={epoch} />
-      {configurable === false ? null : <TranscodeRow host={current} epoch={epoch} ready={configurable === true} />}
+      {(configurable ?? known) === true ? <TranscodeRow host={current} epoch={epoch} /> : null}
     </Group>
   );
 }
@@ -537,21 +540,28 @@ function PlaybackRows({ host: current, epoch }: Omit<GroupProps, 'tab'>) {
 
 const TRANSCODE_OPTIONS: readonly Choice[] = [['auto', '自动（硬件优先）'], ['software', '软件编解码']];
 
-/* 编解码方式跟着运行 Peach 的那台电脑走（`/api/media-processing`），和配置页「视频预览」同一个查询键。
-   打开面板时能不能改配置先回 null，确认能改才取数：每次打开都这样走一遍，取回的就是那台电脑此刻的值。
+/* 转码方式跟着运行 Peach 的那台电脑走（`/api/media-processing`），和配置页「视频预览」同一个查询键。
+   挂上时取一次，之后每次打开面板（`epoch` 换代）再取一次，读到的是那台电脑此刻的值。
    改完先存到服务端，往返期间下拉停在新值、挂忙态，失败退回原值。 */
-function TranscodeRow({ host: current, epoch, ready }: { host: SettingsPanelHost; epoch: number; ready: boolean }) {
-  const policy = useQuery({ queryKey: MEDIA_PROCESSING_KEY, queryFn: ({ signal }) => fetchMediaProcessing(signal), enabled: ready });
+function TranscodeRow({ host: current, epoch }: { host: SettingsPanelHost; epoch: number }) {
+  const policy = useQuery({ queryKey: MEDIA_PROCESSING_KEY, queryFn: ({ signal }) => fetchMediaProcessing(signal) });
+  const refetch = policy.refetch;
+  const opened = useRef(epoch);
+  useEffect(() => {
+    if (opened.current === epoch) return;
+    opened.current = epoch;
+    void refetch();
+  }, [epoch, refetch]);
   const save = useMutation({
     mutationFn: (mode: string) => apiSend<MediaProcessingPolicy>(MEDIA_PROCESSING_URL, { playback_acceleration: mode }),
-    onSuccess: (saved) => { queryClient.setQueryData(MEDIA_PROCESSING_KEY, saved); current.receipt('已保存播放编解码方式') },
-    onError: (error) => current.failure('保存播放编解码方式', error),
+    onSuccess: (saved) => { queryClient.setQueryData(MEDIA_PROCESSING_KEY, saved); current.receipt('已保存转码方式') },
+    onError: (error) => current.failure('保存转码方式', error),
   });
   const value = save.isPending ? save.variables : policy.data?.playback_acceleration || 'auto';
   return (
-    <Row title="编解码方式" description="用于播放时的视频转码。">
-      <SelectField id="playbackAccelerationSetting" label="播放编解码方式" options={TRANSCODE_OPTIONS} value={value}
-        disabled={!ready || !policy.data} busy={save.isPending} epoch={epoch} onPick={(mode) => save.mutate(mode)} />
+    <Row title="转码方式">
+      <SelectField id="playbackAccelerationSetting" label="转码方式" options={TRANSCODE_OPTIONS} value={value}
+        disabled={!policy.data} busy={save.isPending} epoch={epoch} onPick={(mode) => save.mutate(mode)} />
     </Row>
   );
 }

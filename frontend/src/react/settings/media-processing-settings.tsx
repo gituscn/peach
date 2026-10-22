@@ -1,5 +1,5 @@
 /* 「视频预览」：这台机器为本地视频生成九宫格与时间轴预览的总开关、时间轴档位与抽帧解码方式。
- * 总开关在前，依赖它的档位次之，少改的解码方式最后。播放转码的编解码方式与其它播放设置同在
+ * 总开关在前，依赖它的档位次之，少改的解码方式最后。播放时的转码方式与其它播放设置同在
  * 设置弹窗的「浏览与播放」，两处读写同一个 `['media-processing']` 键。 */
 import { useQuery } from '@tanstack/react-query';
 import { SettingsRow } from '@/components/application/settings/settings-rows';

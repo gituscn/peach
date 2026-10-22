@@ -189,7 +189,7 @@ describe('设置面板与壳的接缝', () => {
     const headings = (index: number) => [...panel.querySelectorAll(`#settings-group-${index} [data-settings-subheading]`)]
       .map((node) => node.textContent);
     expect([headings(1), headings(2)]).toEqual([['作品列表', '播放'], ['作品显示', '新作显示']]);
-    /* 编解码方式写运行 Peach 那台电脑的配置：不能改配置的设备上不出现。 */
+    /* 转码方式写运行 Peach 那台电脑的配置：不能改配置的设备上不出现。 */
     expect(panel.querySelector('#playbackAccelerationSetting')).toBeNull();
     const entry = panel.querySelector<HTMLButtonElement>('[data-settings-service] button')!;
     expect(entry.disabled).toBe(true);
@@ -249,10 +249,12 @@ describe('设置面板与壳的接缝', () => {
     await close(current);
   });
 
-  it('编解码方式：读写 /api/media-processing，成功后回执，不落浏览器那一份偏好', async () => {
+  it('转码方式：读写 /api/media-processing，成功后回执，不落浏览器那一份偏好；再打开面板重取', async () => {
     const sent: unknown[] = [];
+    let reads = 0;
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       if (init?.method === 'POST') sent.push([url, JSON.parse(String(init.body))]);
+      else if (String(url).startsWith('/api/media-processing')) reads += 1;
       const body = String(url).startsWith('/api/media-processing')
         ? { metadata_only: false, preview_acceleration: 'auto', playback_acceleration: init?.method === 'POST' ? 'software' : 'auto' }
         : {};
@@ -270,8 +272,14 @@ describe('设置面板与壳的接缝', () => {
     await click(field.querySelector('[data-select-option="software"]'));
     await settle();
     expect(sent).toEqual([['/api/media-processing', { playback_acceleration: 'software' }]]);
-    expect(receipt).toHaveBeenCalledWith('已保存播放编解码方式');
+    expect(receipt).toHaveBeenCalledWith('已保存转码方式');
     expect(current.save).not.toHaveBeenCalled();
+    await close(current);
+    const before = reads;
+    await open(current);
+    await settle();
+    expect(reads).toBe(before + 1);
+    expect(panel.querySelector('#playbackAccelerationSetting')).toBe(field);
     await close(current);
   });
 
