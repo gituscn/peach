@@ -178,7 +178,7 @@ function PickerBody({ kind, entityId, name, onPicked, close }: AvatarPickerProps
           {problem ? (
             <Note tone="error" action={listingFailed ? (
               <Button variant="secondary" size="small" {...busyProps(listing.isFetching)}
-                onClick={() => { if (!listing.isFetching) void listing.refetch() }}>重试</Button>
+                onClick={() => { if (!listing.isFetching) void listing.refetch() }}>立即重试</Button>
             ) : undefined}>{problem}</Note>
           ) : null}
         </div>
@@ -258,7 +258,7 @@ function PickerBody({ kind, entityId, name, onPicked, close }: AvatarPickerProps
             <div className="min-w-0 flex-1">
               <Input type="url" aria-label="图片地址" placeholder="https://…" value={url} onChange={setUrl} />
             </div>
-            <Button disabled={!url.trim()} {...busyProps(opens('url'))}
+            <Button variant="secondary" disabled={!url.trim()} {...busyProps(opens('url'))}
               onClick={() => { if (!busy) opening.mutate({ via: 'url', url: url.trim() }) }}>用这个地址</Button>
           </div>
         </div>

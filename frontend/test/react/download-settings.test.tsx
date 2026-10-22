@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest';
 
 import { DownloadSettings } from '../../src/react/settings/download-settings';
 import type { DownloadCheckReport, DownloadSettingsState } from '../../src/react/bundle';
-import { buttonNamed, click, fetchMock, mount, pending, section, sentBody, settle, submit, type } from './render';
+import { actionOrder, buttonNamed, click, fetchMock, mount, pending, section, sentBody, settle, submit, type } from './render';
 
 vi.mock('../../src/react/settings/jav-browser-settings', () => ({ JavBrowserSettings: () => null }));
 
@@ -96,7 +96,7 @@ it('保存时令牌随表单交给服务端，回来后清空，提示改成已�
   expect(field(host, 'CloudDrive2 API 令牌')?.placeholder).toBe('已保存，留空不改');
 });
 
-it('检查报出缺的权限、目标目录与剩余配额，保存与登录使用主按钮', async () => {
+it('检查报出缺的权限、目标目录与剩余配额，保存与账号密码登录使用主按钮', async () => {
   vi.stubGlobal('fetch', fetchMock(200, {
     ok: true, address: 'http://127.0.0.1:19798', permissions: [{ name: 'a', label: '提交离线任务', granted: true },
       { name: 'b', label: '取消离线任务', granted: false }],
@@ -104,13 +104,14 @@ it('检查报出缺的权限、目标目录与剩余配额，保存与登录使�
     quota: { total: 1500, used: 3, left: 1497 }, problems: [],
   }));
   const host = await mount(<DownloadSettings initial={state()} receipt={vi.fn()} />);
-  for (const name of ['保存配置', '用浏览器登录', '登录']) {
+  for (const name of ['保存配置', '登录']) {
     expect(buttonNamed(name, host)?.className, name).toContain('bg-button-primary');
   }
+  expect(buttonNamed('用浏览器登录', host)?.className).not.toContain('bg-button-primary');
   expect(buttonNamed('检查连接', host)?.className).not.toContain('bg-button-primary');
   await click(buttonNamed('检查连接', host));
   await settle();
-  expect(host.textContent).toContain('缺少：取消离线任务');
+  expect(host.textContent).toContain('缺 取消离线任务');
   expect(host.textContent).toContain('/115/云下载 可以离线下载');
   expect(host.textContent).toContain('本月还剩 1497 条，共 1500 条');
   expect(host.textContent).not.toContain('探测到');
@@ -375,6 +376,7 @@ it('账号密码表单直接显示，两种登录方式共用底栏', async () =
   expect(field(host, '账号')).not.toBeNull();
   expect(buttonNamed('登录', host)?.parentElement).toBe(buttonNamed('用浏览器登录', host)?.parentElement);
   expect(buttonNamed('用浏览器登录', host)?.type).toBe('button');
+  expect(actionOrder(buttonNamed('登录', host)?.parentElement)).toEqual(['用浏览器登录', '登录']);
 });
 
 it('这台电脑没有浏览器时只剩账号密码登录，直接摊开', async () => {
@@ -421,6 +423,7 @@ it('刷新页面时登录窗口还开着就接着轮询，点取消回到可以�
   vi.stubGlobal('fetch', fetcher);
   const host = await mount(<DownloadSettings initial={browserAt('waiting')} receipt={vi.fn()} />);
   expect(host.querySelector('[role="status"]')?.textContent).toContain('等你在浏览器窗口里登录 PikPak');
+  expect(actionOrder(buttonNamed('取消', host)?.parentElement)).toEqual(['取消', '登录']);
   await click(buttonNamed('取消', host));
   await settle();
   expect(fetcher.mock.calls[0]?.[0]).toBe(`${BROWSER_URL}/cancel`);

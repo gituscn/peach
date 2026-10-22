@@ -16,5 +16,6 @@
 !tools/amane-bridge/bridge.py
 !tools/amane-bridge/pyproject.toml
 !tools/amane-bridge/uv.lock
+!scripts/write_reporting_config.py
 **/__pycache__/
 **/*.pyc

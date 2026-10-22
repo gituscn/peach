@@ -168,8 +168,9 @@ describe('设计决定：作品卡、管理页与复核', () => {
       assert.equal(catalog.progress?.background, catalog.tungsten.background, '观看进度条不是钨丝蓝');
       assert.deepEqual([catalog.mixGlyph?.background, catalog.mixGlyph?.borderWidth, catalog.mixGlyph?.borderColor],
         [catalog.overlay.background, '1px', catalog.overlay.borderColor], 'Mix 署名位那枚字形不是半透明底加细边');
-      /* 居中的快退快进和右下角「稍后看」是同一种控件，只是尺寸不同：58px 配 34px 图标，36px 配 21px。 */
-      assert.deepEqual([catalog.seekGlyph?.width, catalog.laterButton?.width, catalog.laterGlyph?.width], ['34px', '36px', '21px'],
+      /* 居中的快退快进和右下角「稍后看」是同一种控件，只是尺寸不同：58px 配 34px 图标；稍后看是卡片悬浮动作，
+         取紧凑档 32px 配 18px 图标。 */
+      assert.deepEqual([catalog.seekGlyph?.width, catalog.laterButton?.width, catalog.laterGlyph?.width], ['34px', '32px', '18px'],
         '悬停控件的尺寸和图标比例变了');
       const denseShort = await page.evaluate(() => {
         document.body.dataset.density = 'dense';
@@ -329,7 +330,7 @@ describe('设计决定：作品卡、管理页与复核', () => {
     }
   });
 
-  it('批量条的键是 17px 字形、计数是 --ink-2；批量条与清空回收站两颗危险键读同一组红', { timeout: 90_000 }, async () => {
+  it('批量条的键是行内字形、计数是 --ink-2；批量条与清空回收站两颗危险键读同一组红', { timeout: 90_000 }, async () => {
     const opened = await openCatalogFixture(browser, (payload, url) => {
       if (url.searchParams.get('state') !== 'trash') return;
       for (const item of payload.items) Object.assign(item, { disposal: 'trash' });
@@ -356,9 +357,11 @@ describe('设计决定：作品卡、管理页与复核', () => {
         };
         const paint = (key: Element) => [getComputedStyle(key).backgroundImage, getComputedStyle(key, '::before').backgroundImage];
         return {
+          // 与文字同行的字形取 `--icon-inline`（1.2em），按所在文字字号算出应有的边长。
           glyphs: [...dock.querySelectorAll('button svg')].map((svg) => {
             const box = svg.getBoundingClientRect();
-            return [box.width, box.height];
+            const inline = parseFloat(getComputedStyle(svg).fontSize) * 1.2;
+            return [Math.abs(box.width - inline) < 0.5, Math.abs(box.height - inline) < 0.5];
           }),
           count: getComputedStyle(dock.querySelector('[role="status"]')!).color,
           batch: paint(dock.querySelector('[data-batch-action="delete"]')!),
@@ -366,7 +369,7 @@ describe('设计决定：作品卡、管理页与复核', () => {
           tokens: [probe('--board-red'), probe('--board-red-hover')],
         };
       });
-      assert.deepEqual(read.glyphs, [[17, 17], [17, 17], [17, 17]], `批量条的字形不是 17px：${JSON.stringify(read.glyphs)}`);
+      assert.deepEqual(read.glyphs, [[true, true], [true, true], [true, true]], `批量条的字形没按行内字号缩放：${JSON.stringify(read.glyphs)}`);
       assert.equal(read.count, await tokenColor(page, 'body', '--ink-2'), '批量条的计数不是次级墨色');
       assert.match(read.tokens[0], /^linear-gradient/, `--board-red 没解析成渐变：${read.tokens[0]}`);
       assert.deepEqual(read.batch, read.tokens, `批量条「彻底删除」的红不是 --board-red 那一组：${JSON.stringify(read)}`);

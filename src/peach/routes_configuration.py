@@ -346,6 +346,15 @@ def network_status(request: Request, _args=Depends(require_auth)):
     return monitor.summary()
 
 
+@router.post("/api/network-status/check")
+def network_status_check(request: Request, _args=Depends(require_auth)):
+    """当场再探一次外网，回探完的快照。任务中心「网络不通」那一行的「立即重试」走这里。"""
+    monitor = request.app.state.network_reachability
+    monitor.start()
+    monitor.tick()
+    return monitor.summary()
+
+
 @router.post("/api/configuration/entry-links")
 def save_entry_links(request: Request, body: dict = Body(...), _args=Depends(require_auth)):
     local_only(request)

@@ -44,7 +44,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 - **Add JAV from your browser**: detect or select a video code on DMM, MGS, JavDB, MissAV, Jable and other sites, then send it to Peach for cloud download and library ingestion. The [userscript](https://github.com/peach-mitao/peach-userscript) is maintained independently; see [installation and pairing](docs/JAV_BROWSER.md).
 - **Taste preferences**: combine viewing, feedback, your library, browser history, bookmarks and follows to understand your preferences. Read history and bookmarks from supported local browsers in one action, or import HTML bookmarks and Chromium Bookmarks JSON. Stop reading a source or remove it when needed. See [taste data sources](docs/TASTE_SOURCES.md).
 
-Watch history, favorites and settings stay on your computer. Scanning leaves original files untouched; manual organization offers a preview and an undo for the last batch.
+Watch history, favorites and settings stay on your computer. Scanning leaves original files untouched; manual organization offers a preview and an undo for the last batch. Release codes are recognized even when the file name carries a title; for other naming schemes, add [recognition rules](docs/OPERATIONS.md#配置页) on the configuration page instead of renaming files.
 
 Scanning, cloud downloads and media processing share junk checks. Attachments with sufficient evidence go to the recoverable trash; uncertain items await review. You can restore an item and mark it as “not junk”. See [junk files](docs/OPERATIONS.md#垃圾文件) for processing order and protections.
 
@@ -99,7 +99,7 @@ Test builds are unsigned. If Windows says “Windows protected your PC”, confi
 
 ### Build on macOS
 
-Build a self-contained `.app` and DMG locally on macOS, including FFmpeg, ffprobe, untrunc and cloudflared. Running it requires neither Homebrew, Python, a source checkout, nor another computer. Complete corresponding media tool sources accompany each release. See [the macOS build guide](docs/OPERATIONS.md#macos-独立测试包).
+Build a self-contained `.app` and DMG locally on macOS, including FFmpeg, ffprobe, untrunc, cloudflared and the face detection and recognition models. Running it requires neither Homebrew, Python, a source checkout, nor another computer. Complete corresponding media tool sources accompany each release. See [the macOS build guide](docs/OPERATIONS.md#macos-独立测试包).
 
 The release workflow generates separate Apple Silicon (`macos-arm64.dmg`) and Intel (`macos-x86_64.dmg`) test packages. Check the actual assets in the [website download section](https://peach.video/#download) for availability. Check your chip in About This Mac, open the matching image, and drag Peach into Applications. Test packages are not notarized.
 

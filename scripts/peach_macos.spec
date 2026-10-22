@@ -17,6 +17,7 @@ version = json.loads(identity.read_text(encoding="utf-8"))["version"]
 resource_manifest = runpy.run_path(str(root / 'src/peach/bundle_resources.py'))
 datas = [(str(source), target) for source, target in resource_manifest['data_files'](root)]
 datas += [(str(identity), "."), (str(root / "scripts" / "standalone.txt"), ".")]
+datas += [(os.environ["PEACH_MACOS_REPORTING_CONFIG"], ".")]
 datas += [(str(root / "LICENSE"), ".")]
 datas += copy_metadata("sentry-sdk")
 binaries = []

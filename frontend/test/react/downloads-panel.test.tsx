@@ -110,6 +110,9 @@ it('远端在跑的任务给进度与取消键，取消发到取消接口', asyn
   expect(card.querySelector('[role=progressbar]')?.getAttribute('aria-valuenow')).toBe('42');
   expect(card.textContent).toContain('远端下载中');
   expect(buttonNamed('重新提交', card)).toBeNull();
+  // 辅助的两个在前，改动任务的取消排在最后。
+  expect([...card.querySelectorAll('[data-download-actions] button')].map((node) => node.textContent))
+    .toEqual(['展开标题', '复制磁力', '取消']);
   await click(buttonNamed('取消', card));
   await settle();
   expect(posts()).toEqual([['/api/downloads/cancel', { id: 1 }]]);
@@ -133,6 +136,16 @@ it('失败的任务写中文原因，可以重新提交；被判违规的只剩�
   expect(posts()).toEqual([['/api/downloads', {
     magnet: failed.source_uri, provider: '115', target: '/115/云下载', code: 'ABC-123', title: null, origin: 'paste',
   }]]);
+});
+
+it('对账遇到暂时性故障退避重排时，底栏写出原因，卡片不算失败', async () => {
+  serve(snapshot({ tasks: [task({ failure_detail: '查询进度时连不上 CloudDrive2：timeout' })] }));
+  const host = await show();
+  const card = host.querySelector<HTMLElement>('[data-download-state=remote_running]')!;
+  expect(card.textContent).toContain('稍后自动重试 · 查询进度时连不上 CloudDrive2：timeout');
+  expect(card.className).not.toContain('border-border-error-default');
+  expect(buttonNamed('重新提交', card)).toBeNull();
+  expect(buttonNamed('取消', card)).not.toBeNull();
 });
 
 it('只读端任务照常列出，但没有取消键', async () => {

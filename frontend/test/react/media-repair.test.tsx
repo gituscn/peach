@@ -41,7 +41,7 @@ it('首屏一次取回任务快照和媒体库，卡片挂上去不再补取', a
   const host = await card();
   expect(fetcher.mock.calls.map((call) => call[0]).sort()).toEqual(['/api/libraries', '/api/media-repair']);
   expect(host.querySelector('section[aria-label="媒体修复"] h3')?.textContent).toBe('媒体修复');
-  expect(host.querySelector('[aria-haspopup="listbox"]')?.textContent).toBe('网盘');
+  expect(host.querySelector('[aria-haspopup="listbox"]')?.textContent).toBe('媒体库网盘');
 });
 
 it('下拉框里每个库都带着它的媒体库图标，选中的那个连图标一起显示在框里', async () => {
@@ -55,7 +55,7 @@ it('下拉框里每个库都带着它的媒体库图标，选中的那个连图�
     .toEqual(['#i-fixture-115', '#i-heart', '#i-hard-drive']);
   await click(options[1]);
   expect(trigger.querySelector('use')?.getAttribute('href')).toBe('#i-heart');
-  expect(trigger.textContent).toBe('PikPak');
+  expect(trigger.textContent).toBe('媒体库PikPak');
 });
 
 type Confirmation = Parameters<typeof legacyUi.confirmModal>[0];

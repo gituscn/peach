@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import re
+import threading
 import time
 from functools import partial
 from dataclasses import replace
@@ -1047,6 +1048,31 @@ def follow_image(request: Request, id: int, media: int | None = None,
         return Response(status_code=404, headers={"cache-control": "no-store"})
 
 
+@router.api_route("/cover-image", methods=["GET", "HEAD"])
+def cover_image(request: Request, code: str, args: dict[str, str] = Depends(require_auth)):
+    """库外作品的官方封面：按番号在服务端查地址，经 Peach 的出网设置取图并落盘缓存。
+
+    取不到一律回 404 且不缓存：卡片按 `data-drop` 换成占位，网络恢复后下一次加载重取。
+    """
+    from .jav_cover_fetch import COVER_PROXY_HOSTS, candidate_for
+    from .web_jav_detail import detail_code, stored_cover_url
+    state = request.app.state
+    try:
+        url = stored_cover_url(state.web_contract, detail_code({"code": code}))
+        if not url:
+            raise ValueError("封面未取得")
+        cache = cache_for(state.web_contract)
+        key = f"cover:{url}"
+        hit = cache.response(key, request)
+        if hit is not None:
+            return hit
+        target = ResolvedFollowMedia(url, candidate_for(url).referer, allowed_hosts=COVER_PROXY_HOSTS)
+        return cache.stream(key, request, lambda: open_upstream(
+            state.http_transport.client, request.method, target, incoming=request.headers))
+    except (ValueError, FollowProxyError, OSError, httpx.HTTPError):
+        return Response(status_code=404, headers={"cache-control": "no-store"})
+
+
 def _jav_preview_target(url: str) -> ResolvedFollowMedia:
     """已验证的预览来源使用固定主机范围，其他 CDN 逐跳核对公网解析。"""
     return ResolvedFollowMedia(url, allowed_hosts=("www.prestige-av.com", "jdforrepam.com", "cc3001.dmm.co.jp"), public_hosts=True)
@@ -1290,6 +1316,29 @@ def _picker_kind(kind: str) -> str:
     return kind if kind in {"performer", "creator"} else "performer"
 
 
+_INDEX_REFRESHER_LOCK = threading.Lock()
+
+
+def _index_refresher(app) -> avatar_picker.IndexRefresher:
+    """这个应用的图库索引刷新器，第一次用到时建，之后一直是同一个。
+
+    出网走采集统一出口：Peach 代理设置与按站冷却都在那里。
+    """
+    with _INDEX_REFRESHER_LOCK:
+        refresher = getattr(app.state, "gfriends_index", None)
+        if refresher is None:
+            contract = app.state.web_contract
+
+            def transport():
+                from .scraping_access import SourceTransport
+                return SourceTransport(contract.follow_secrets_root)
+
+            refresher = avatar_picker.IndexRefresher(
+                _picker_roots(contract)[0] / avatar_picker.GFRIENDS_CACHE, transport)
+            app.state.gfriends_index = refresher
+        return refresher
+
+
 def _picker_artwork(request: Request) -> avatar_picker.ArtworkSource:
     """作品画面的取图口。九宫格没铺过就现抽一格，和 `/poster` 走同一条路。"""
     state = request.app.state
@@ -1379,7 +1428,10 @@ def _picker_online(request: Request, connection, entity_id: int):
 @router.get("/api/avatar-choices")
 def avatar_choices(request: Request, kind: str = "performer", id: int = 0,
                    args: dict[str, str] = Depends(require_auth)):
-    """这个人还能换成哪些图。只读，不联网，不写盘。"""
+    """这个人还能换成哪些图。只读本地缓存，不等联网。
+
+    图库索引缺失或过期时顺手在后台排一轮刷新；这一次照旧按旧缓存列，下次打开生效。
+    """
     state = request.app.state.web_contract
     providers_root, avatar_root = _picker_roots(state)
     id = current_entity_id(state, id)
@@ -1390,7 +1442,8 @@ def avatar_choices(request: Request, kind: str = "performer", id: int = 0,
         if kind == "creator":
             listing["choices"] += [choice.as_dict() for choice in avatar_online.choices(
                 connection, id, project=_picker_online_projection)]
-        return JSONResponse(listing)
+    _index_refresher(request.app).request()
+    return JSONResponse(listing)
 
 
 @router.api_route("/avatar-choice", methods=["GET", "HEAD"])

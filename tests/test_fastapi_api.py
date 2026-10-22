@@ -378,6 +378,38 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             served = (await self.client.get("/healthz")).json()
         self.assertEqual(served["build_commit"], "c0ffee1234")
 
+    async def test_background_issues_reads_app_and_contract_services_behind_auth(self):
+        from peach.metadata_amane import bridge_python
+        python = bridge_python(self.root / "tools")
+        python.parent.mkdir(parents=True)
+        python.write_bytes(b"")
+        self.app.state.web_contract.tools_root = self.root / "tools"
+        # 夹具账本没有云下载那张表；云下载的判据由 test_background_issues 单独覆盖。
+        self.app.state.web_contract.downloads = None
+        self.app.state.network_reachability = SimpleNamespace(
+            summary=lambda: {"state": "offline"}, start=lambda: self.fail("汇总不该启动探测"))
+        with patch("peach.settings_file.load_config", return_value=SimpleNamespace(present=False)):
+            self.assertEqual((await self.client.get("/api/background-issues")).status_code, 401)
+            response = await self.client.get("/api/background-issues?t=secret")
+        self.assertEqual(response.status_code, 200)
+        [issue] = response.json()["issues"]
+        self.assertEqual((issue["key"], issue["href"], issue["since"], issue["retry"]),
+                         ("network", "/settings/network#peachProxy", None, "/api/network-status/check"))
+        self.assertTrue(issue["noticed_at"])
+
+    async def test_network_check_probes_once_on_the_spot_and_returns_the_fresh_state(self):
+        from peach.network_reachability import NetworkReachability
+        monitor = NetworkReachability(check=lambda: True)
+        monitor.start = lambda: None
+        self.app.state.network_reachability = monitor
+        self.assertEqual(monitor.summary()["state"], "checking")
+        refused = await self.client.post("/api/network-status/check?t=secret",
+                                          headers={"Origin": "https://evil.example"})
+        self.assertEqual(refused.status_code, 403)
+        response = await self.client.post("/api/network-status/check?t=secret")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["state"], "online")
+
     async def test_sources_and_public_health_read_unknown_mount_snapshot_without_io(self):
         from peach.mount_reachability import MountReachability, MountRoot
         monitor = MountReachability([MountRoot("local", "本地磁盘", "R:/private", self.media_root)],
@@ -1175,6 +1207,22 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
 
         listed = await self.client.get("/api/items?t=secret")
         self.assertEqual([item["id"] for item in listed.json()["items"]], [])
+
+    async def test_rejected_post_reason_is_logged_locally_without_remote_report(self):
+        """页面只看到 400 时，诊断包里的错误日志要能说出拒收原因。"""
+        from peach import error_reporting, remote_reporting
+        logs = self.root / "error-logs"
+        with patch.object(error_reporting, "_log_dir", logs), \
+                patch.object(remote_reporting, "send") as send:
+            refused = await self.client.post("/api/scraping/cover?t=secret", json={"code": "ZZZ-999"})
+        self.assertEqual(refused.status_code, 400, refused.text)
+        send.assert_not_called()
+        records = [json.loads(line) for line in
+                   (logs / f"errors-{os.getpid()}.log").read_text(encoding="utf-8").splitlines()]
+        record = next(row for row in records if row["stage"] == "http-request")
+        self.assertEqual((record["method"], record["route"], record["status_code"]),
+                         ("POST", "api/scraping/cover", 400))
+        self.assertEqual(record["exception"][0]["message"], "馆藏未找到这个番号")
 
     async def test_recycle_bin_route_and_batch_delete_are_reachable(self):
         legacy = await self.client.get("/trash?t=secret")
@@ -2550,6 +2598,56 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                 item.thumb_url = 'https://api-cdn.rule34.xxx/redirect.jpg'
                 self.assertEqual((await self.client.get('/follow-image?id=29&t=secret')).status_code, 404)
                 self.assertEqual(calls, ['/poster.jpg', '/redirect.jpg'])
+        finally:
+            self.app.state.http_transport.client = original
+            fake.close()
+
+    async def test_cover_image_proxies_official_hosts_by_code_and_replays_from_disk(self):
+        official = 'https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/abc00001/abc00001pl.jpg'
+        rows = {'ABC-001': official,
+                'ABC-002': 'https://www.javbus.com/pics/cover/abc_b.jpg',
+                'ABC-003': 'http://pics.dmm.co.jp/digital/video/abc00003/abc00003pl.jpg',
+                'ABC-004': 'https://evil.example/digital/video/abc00004/abc00004pl.jpg',
+                'ABC-005': 'https://c0.jdbstatic.com/covers/ab/abc.jpg',
+                'ABC-006': 'https://pics.dmm.co.jp/digital/video/abc00006/abc00006pl.jpg'}
+        connection = sqlite3.connect(self.db)
+        connection.executemany("INSERT INTO feed_discovery(code,cover_url,discovered_at) VALUES(?,?,'2026-10-22')",
+                               rows.items())
+        connection.commit()
+        connection.close()
+        calls, failing = [], {'connect': True}
+        def upstream(request):
+            calls.append((request.url.host, request.url.path, request.headers.get('referer')))
+            if request.url.path.endswith('abc00006pl.jpg'):
+                if failing['connect']:
+                    raise httpx.ConnectError('offline', request=request)
+                return httpx.Response(302, headers={'location': 'https://cdn.example/elsewhere.jpg'}, request=request)
+            return httpx.Response(200, headers={'content-type': 'image/jpeg', 'content-length': '5'},
+                                  stream=httpx.ByteStream(b'cover'), request=request)
+        original = self.app.state.http_transport.client
+        fake = httpx.Client(transport=httpx.MockTransport(upstream))
+        self.app.state.http_transport.client = fake
+        try:
+            with patch('peach.web_jav_discovery._cached_movie', return_value={}):
+                first = await self.client.get('/cover-image?code=ABC-001&t=secret')
+                self.assertEqual((first.status_code, first.content), (200, b'cover'))
+                replay = await self.client.get('/cover-image?code=abc-001&t=secret')
+                self.assertEqual(replay.content, b'cover')
+                self.assertEqual(calls, [('awsimgsrc.dmm.co.jp', '/pics_dig/digital/video/abc00001/abc00001pl.jpg',
+                                          'https://www.dmm.co.jp/')])
+                for code in ('ABC-002', 'ABC-003', 'ABC-004', 'ABC-005', 'ABC-404', 'bad code'):
+                    with self.subTest(code=code):
+                        refused = await self.client.get(f'/cover-image?code={code}&t=secret')
+                        self.assertEqual(refused.status_code, 404)
+                        self.assertEqual(refused.headers['cache-control'], 'no-store')
+                self.assertEqual(len(calls), 1, '白名单外的地址不应发出请求')
+                offline = await self.client.get('/cover-image?code=ABC-006&t=secret')
+                self.assertEqual((offline.status_code, offline.content), (404, b''))
+                self.assertEqual(offline.headers['cache-control'], 'no-store')
+                failing['connect'] = False
+                redirected = await self.client.get('/cover-image?code=ABC-006&t=secret')
+                self.assertEqual(redirected.status_code, 404)
+                self.assertNotIn('cdn.example', {host for host, _, _ in calls})
         finally:
             self.app.state.http_transport.client = original
             fake.close()

@@ -68,6 +68,7 @@ def media_library_list(request: Request, args: dict[str, str] = Depends(require_
     from .media_sources import cost_for
     config = settings_file.active()
     return {"libraries": [{"id": row["id"], "name": row["name"], "icon": row["icon"], "folders": len(row["roots"]),
+                           "color": row["color"], "policy": row["policy"], "stages": row["stages"],
                            "roots": [{"root_id": root["root_id"], "location": root["location"]} for root in row["roots"]],
                            "metered": any(cost_for(root['location'], root['root'], config) == 'metered'
                                           for root in row['roots'])}
@@ -278,6 +279,21 @@ def clouddrive_inbox(request: Request, body: dict[str, Any] = Body(default_facto
     return Response(status_code=204)
 
 
+@router.get("/api/background-issues")
+def background_issues(request: Request, _args: dict[str, str] = Depends(require_auth)):
+    """任务中心「需要处理」：各后台服务此刻存在的问题。只读，不出网，不启动任何服务。"""
+    from . import settings_file
+    state = request.app.state
+    try:
+        config = settings_file.load_config()
+    except settings_file.SettingsFileError:
+        # 设置文件本身坏了由配置页报；依赖它的几项这一次读不出来，其余照常。
+        config = None
+    if config is not None and not config.present:
+        config = None
+    return {"issues": state.background_issues.collect(state, state.web_contract, config)}
+
+
 def _conflict(error: TaskRunConflict) -> JSONResponse:
     """手动触发撞上在跑的那一轮：409，并带上挡路那一轮的 id。
 
@@ -363,6 +379,9 @@ def api_post(
             status_code=409,
         )
     except (TypeError, ValueError) as exc:
+        # 拒收原因只落本机错误日志，诊断包据此解释页面上的 400；4xx 不远程上报。
+        from .error_reporting import event
+        event('http-request', exc, method='POST', route=route_path.lstrip('/'), status_code=400)
         return JSONResponse({"error": f"{type(exc).__name__}: {exc}"}, status_code=400)
     except Exception:
         LOGGER.exception("unhandled POST contract error for /api/%s", route)

@@ -36,7 +36,7 @@ if ($Mode -eq 'build') {
     Assert-Exit 'cloudflared 校验失败'
     & ./scripts/test.ps1 -Scope packaging -Focus test_desktop_installer
     Assert-Exit '安装目录保护回归失败'
-    & ./scripts/build_windows.ps1 -Installer -CloudflaredPath build/cloudflared.exe -FFmpegPath build/ffmpeg-windows/ffmpeg -UntruncPath build/untrunc-windows/untrunc
+    & ./scripts/build_windows.ps1 -Installer -RequireReporting -CloudflaredPath build/cloudflared.exe -FFmpegPath build/ffmpeg-windows/ffmpeg -UntruncPath build/untrunc-windows/untrunc
     Assert-Exit 'Windows 构建失败'
     New-Item -ItemType Directory -Path release -Force | Out-Null
     & .venv/Scripts/python.exe scripts/package_windows_release.py --source dist/Peach --output release --version $Version --lite-installer
@@ -63,10 +63,13 @@ if ($Mode -eq 'docker') {
     $Candidate = "peach-ci:$Version-$env:CI_PIPELINE_ID"
     $Revision = (git rev-parse HEAD).Trim()
     Assert-Exit '无法读取提交'
-    docker build --pull --label "org.opencontainers.image.version=$Version" --label "org.opencontainers.image.revision=$Revision" -t $Candidate .
+    docker build --pull --label "org.opencontainers.image.version=$Version" --label "org.opencontainers.image.revision=$Revision" `
+        --build-arg PEACH_SENTRY_DSN --build-arg PEACH_LIBRARY_SENTRY_DSN --build-arg PEACH_REQUIRE_REPORTING=1 -t $Candidate .
     Assert-Exit '镜像构建失败'
     & (Get-Command python.exe).Source -X utf8 scripts/smoke_docker.py $Candidate
     Assert-Exit '镜像验收失败'
+    docker run --rm --entrypoint python $Candidate -c 'from peach import library_sharing, remote_reporting, reporting_identity; assert remote_reporting.dsn() and library_sharing.target() and reporting_identity.distribution() == ''docker'''
+    Assert-Exit '镜像内 Sentry DSN 或分发标记缺失'
     # 登录写进作业专用配置目录，不改动宿主用户的 Docker 登录。
     $SavedConfig, $SavedHost = $env:DOCKER_CONFIG, $env:DOCKER_HOST
     $env:DOCKER_HOST = $Endpoint

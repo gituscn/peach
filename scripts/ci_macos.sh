@@ -84,6 +84,8 @@ uv sync --locked --all-extras --python "$python" --no-cache \
     --reinstall-package zeroconf --no-binary-package zeroconf
 uv pip check --python "$python"
 output="${PEACH_MACOS_OUTPUT_DIR:-$root/dist/macos.noindex/$architecture}"
+# 媒体工具编译耗时长；缺 Sentry DSN 的发行构建在此之前失败。
+"$python" scripts/write_reporting_config.py --require --output "$root/build/macos-standalone/$architecture/sentry.json"
 "$python" scripts/setup_macos_media_tools.py --root "$root/build/macos-media-toolchain"
 export PATH="$root/build/macos-media-toolchain/env/bin:$PATH"
 for tool in ffmpeg untrunc; do
@@ -92,7 +94,7 @@ for tool in ffmpeg untrunc; do
 done
 "$python" scripts/fetch_cloudflared_macos.py --arch "$architecture" \
     --destination "$root/build/media-macos/$architecture/cloudflared"
-"$python" scripts/build_macos_standalone.py --target-arch "$architecture" --destination "$output"
+"$python" scripts/build_macos_standalone.py --target-arch "$architecture" --destination "$output" --require-reporting
 "$python" -c 'import json,subprocess,sys; from pathlib import Path; info=json.loads(Path("build/macos-standalone",sys.argv[1],"build-info.json").read_text()); head=subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(); assert info["commit"]==head and not info["dirty"], info' "$architecture"
 cp "build/macos-standalone/$architecture/build-info.json" "$output/build-info.json"
 version="$("$python" -c 'from peach import __version__; print(__version__)')"
@@ -115,6 +117,8 @@ hdiutil attach "$image" -readonly -nobrowse -mountpoint "$mountpoint"
 mounted=1
 test "$(readlink "$mountpoint/Applications")" = /Applications
 test -s "$mountpoint/Peach.app/Contents/Resources/LICENSE"
+"$python" -c 'import json,sys; config=json.load(open(sys.argv[1],encoding="utf-8")); assert config["dsn"] and config["library_dsn"], "包内 sentry.json 缺 DSN"' \
+    "$mountpoint/Peach.app/Contents/Resources/sentry.json"
 codesign --verify --deep --strict "$mountpoint/Peach.app"
 lipo -verify_arch "$architecture" "$mountpoint/Peach.app/Contents/MacOS/Peach"
 "$python" scripts/smoke_macos.py "$mountpoint/Peach.app"

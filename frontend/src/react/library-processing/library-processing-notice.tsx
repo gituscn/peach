@@ -79,7 +79,7 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
         <p className="text-body-medium">{title}</p>
         {active ? <p data-processing-eta="" className="text-caption-1-regular text-text-secondary tabular-nums wrap-anywhere">{remainingTime(state!)}</p> : null}
       </div>
-      <Button size="small" variant="secondary" iconOnly leadingIcon={CollapseChevron} data-processing-toggle=""
+      <Button size="small" variant="secondary" iconOnly leadingIcon={CollapseChevron} data-processing-toggle="" data-collapse-upward=""
         aria-label={expanded ? '收起任务详情' : '展开任务详情'} aria-expanded={expanded} aria-controls={bodyId} onClick={toggle} />
     </div>
     <TrafficProgress traffic={state?.traffic} detailsOpen={trafficExpanded} onDetailsChange={setTrafficExpanded} />
@@ -91,8 +91,8 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
           aria-current={step.status === 'current' ? 'step' : undefined}
           className={cx('flex min-h-8 items-center gap-2 text-body-2-regular',
             step.status === 'current' ? 'text-text-primary' : 'text-text-tertiary')}>
-          {step.status === 'complete' ? <RiCheckLine aria-hidden className="size-4 shrink-0" />
-            : <RiCheckboxBlankCircleLine aria-hidden className={cx('size-4 shrink-0', step.status === 'current' && 'text-border-focus-ring')} />}
+          {step.status === 'complete' ? <RiCheckLine aria-hidden className="size-(--icon-inline) shrink-0" />
+            : <RiCheckboxBlankCircleLine aria-hidden className={cx('size-(--icon-inline) shrink-0', step.status === 'current' && 'text-border-focus-ring')} />}
           <VisuallyHidden>{step.status === 'complete' ? '已完成：' : step.status === 'current' ? '当前：' : '待处理：'}</VisuallyHidden>
           {step.status === 'complete' ? <s className="wrap-anywhere">{step.label}</s> : <span className="wrap-anywhere">{step.label}</span>}
         </li>)}
@@ -102,10 +102,10 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
       {state?.stalled && !problem ? <p className="text-caption-1-regular">当前步骤耗时较长，正在等待进展</p> : null}
     </div></div></CollapseRegion>
     <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
-      {active ? <ProcessingControls state={state!} disabled={!!problem} /> : null}
       <LinkButton href="/data-cleanup#libraryProcessing" variant="secondary" size="small" trailingIcon={RiArrowRightLine}>
-        {problem || failed ? '查看并处理' : '任务详情'}
+        {problem || failed ? '打开扫描与采集' : '任务详情'}
       </LinkButton>
+      {active ? <ProcessingControls state={state!} disabled={!!problem} /> : null}
     </div>
   </aside>;
 }

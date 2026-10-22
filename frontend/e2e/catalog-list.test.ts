@@ -160,7 +160,7 @@ describe('馆藏卡片与列表', () => {
             const url = new URL(response.url());
             return url.pathname === '/api/items' && url.searchParams.get('sort') === 'name';
           });
-          await page.getByRole('columnheader', { name: /名称/ }).click();
+          await page.getByRole('columnheader', { name: /^作品/ }).click();
           await namedResponse;
           await page.waitForFunction(() => document.querySelector('[data-catalog-row]')?.getAttribute('data-id') === '9000');
           assert.equal(requests.at(-1)!.get('dir'), 'asc');

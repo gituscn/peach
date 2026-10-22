@@ -94,11 +94,11 @@ function LinkTable(
               <ErrorExcerpt text={item.note} className="tabular-nums text-text-secondary" /></div>}
       </div> },
     { id: 'url', label: '地址', width: 360, min: 180, value: (item) => item.url,
-      render: (item) => <a href={item.url} target="_blank" rel="noreferrer" title={item.url} data-link-address=""
+      render: (item) => <a href={item.url} target="_blank" rel="noopener noreferrer" title={item.url} data-link-address=""
         className="flex min-w-0 items-center gap-1 text-text-secondary hover:text-text-primary">
         <SiteMark linkId={item.id} />
         <span data-middle-truncate className="min-w-0 truncate">{item.url}</span>
-        <RiExternalLinkLine aria-hidden className="size-3.5 shrink-0" />
+        <RiExternalLinkLine aria-hidden className="size-(--icon-inline) shrink-0" />
       </a> },
   ];
   return (
@@ -189,7 +189,7 @@ export function LinkManager() {
             value={Math.min(prune.job?.checked || 0, prune.job?.total || 0)} total={prune.job?.total} />
         : null}
     </>;
-    const pickedLabel = selectedRetryable.length ? `重试选中的 ${selectedRetryable.length} 条` : '重试选中的链接';
+    const pickedLabel = `立即重试所选（${selectedRetryable.length}）`;
     result = done || gone.length || unclear.length ? (
       <div className={RESULT_PANEL}>
         {pruned?.status === 'complete' ? <Note tone="success" title="完成">{pruneText(pruned)}</Note> : null}
@@ -207,12 +207,12 @@ export function LinkManager() {
         </LinkTable>
         <LinkTable title="本次未访问成功" items={unclear} hint={UNCLEAR_HINT}
           picked={picked} onPick={setPicked} footer={retryable.length
-            ? <Button leadingIcon={RETRY} {...busyProps(running)}
-                onClick={() => run(retryable.map((item) => item.id))}>{`全部重试（${retryable.length}）`}</Button>
+            ? <Button variant="primary" leadingIcon={RETRY} {...busyProps(running)}
+                onClick={() => run(retryable.map((item) => item.id))}>{`立即重试全部（${retryable.length}）`}</Button>
             : null}>
           {retryable.length
             ? <>
-                  <Button leadingIcon={RETRY} disabled={!selectedRetryable.length} {...busyProps(running)}
+                  <Button variant="secondary" leadingIcon={RETRY} disabled={!selectedRetryable.length} {...busyProps(running)}
                     onClick={() => run(selectedRetryable)}>{pickedLabel}</Button>
               </>
             : null}
@@ -251,7 +251,7 @@ export function LinkManager() {
                           <a href={`https://${host}`} target="_blank" rel="noopener noreferrer"
                             className="inline-flex min-w-0 items-center gap-1.5 text-body-2-medium text-text-primary">
                             <SiteMark linkId={info.top_host_link_ids?.[host]} /><span className="min-w-0 wrap-anywhere">{host}</span>
-                            <RiExternalLinkLine aria-hidden className="size-3.5 shrink-0" />
+                            <RiExternalLinkLine aria-hidden className="size-(--icon-inline) shrink-0" />
                           </a>
                           <Chip variant="caption" color="neutral"><span className="tabular-nums">{count(n)}</span></Chip>
                         </span>)}

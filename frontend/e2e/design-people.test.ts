@@ -528,13 +528,15 @@ describe('设计决定：人物与厂牌资料页', () => {
           const count = classification.nextElementSibling!;
           const label = classification.getBoundingClientRect(), video = count.getBoundingClientRect();
           const glyph = classification.querySelector('svg')!.getBoundingClientRect();
+          // 行内字形取 `--icon-inline`，是所在文字字号的 1.2 倍。
+          const inline = parseFloat(getComputedStyle(classification.querySelector('svg')!).fontSize) * 1.2;
           return { first: element.firstElementChild === classification, top: [label.top, video.top],
-            edges: [label.right, video.left], glyph: [glyph.width, glyph.height] };
+            edges: [label.right, video.left], glyph: [glyph.width, glyph.height].map(side => Math.abs(side - inline) < 0.5) };
         });
         assert.equal(geometry.first, true);
         assert.ok(Math.abs(geometry.top[0]! - geometry.top[1]!) < 1, '分类与视频数量另起了行');
         assert.ok(geometry.edges[0]! <= geometry.edges[1]!, '分类没有排在视频数量左侧');
-        assert.deepEqual(geometry.glyph, [16, 16]);
+        assert.deepEqual(geometry.glyph, [true, true]);
         const measured = await layout(opened.page);
         assert.ok(measured.scrollWidth <= measured.viewportWidth + 1);
         assert.deepEqual(measured.offenders, []);
@@ -1118,7 +1120,7 @@ describe('设计决定：人物与厂牌资料页', () => {
       const opened = await openFollowManage(browser, viewport);
       try {
         const page = opened.page;
-        await page.getByRole('button', { name: /^来源与订阅设置/ }).click();
+        await page.getByRole('link', { name: /^来源与订阅设置/ }).click();
         await page.getByRole('tab', { name: '来源与订阅', exact: true, selected: true }).waitFor();
         await page.getByRole('region', { name: '可配置凭据', exact: true }).waitFor();
         await settle(page);

@@ -44,7 +44,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 - **浏览器添加 JAV**：在 DMM、MGS、JavDB、MissAV、Jable 等站点识别或选中番号，一键交给 Peach 云下载入库。[用户脚本](https://github.com/peach-mitao/peach-userscript)独立维护，见[安装与配对](docs/JAV_BROWSER.md)。
 - **口味**：结合观看、反馈、馆藏、浏览历史、书签与关注关系分析偏好。一次读取本机浏览器的历史和书签，也可导入 HTML 书签或 Chromium Bookmarks JSON；来源可停止读取或删除。见[口味数据来源](docs/TASTE_SOURCES.md)。
 
-观看记录、收藏和设置保存在本机。扫描不动原文件；手动整理先预览，可撤回上一批。
+观看记录、收藏和设置保存在本机。扫描不动原文件；手动整理先预览，可撤回上一批。文件名带片名也能识别番号，特殊命名可在配置页补写[识别规则](docs/OPERATIONS.md#配置页)，不必为 Peach 改名。
 
 扫描、云下载和媒体处理共用垃圾检查：证据充分的附件自动进回收站，疑似项留待复核；可还原，也可标记「不是垃圾」。处理顺序和保护条件见[垃圾文件](docs/OPERATIONS.md#垃圾文件)。
 
@@ -99,7 +99,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 ### macOS 本机构建
 
-macOS 可在本机构建独立 `.app` 与 DMG，内含 FFmpeg、ffprobe、untrunc 和 cloudflared，安装后不需要 Homebrew、Python、源码或另一台电脑。媒体工具的完整对应源码随同版本制品提供。构建与安装见 [macOS 独立测试包](docs/OPERATIONS.md#macos-独立测试包)。
+macOS 可在本机构建独立 `.app` 与 DMG，内含 FFmpeg、ffprobe、untrunc、cloudflared 和人脸检出与比对模型，安装后不需要 Homebrew、Python、源码或另一台电脑。媒体工具的完整对应源码随同版本制品提供。构建与安装见 [macOS 独立测试包](docs/OPERATIONS.md#macos-独立测试包)。
 
 发版流程分别生成 Apple Silicon（`macos-arm64.dmg`）与 Intel（`macos-x86_64.dmg`）测试包；可下载版本以[官网下载区](https://peach.video/#download)的实际资产为准。在「关于本机」确认芯片，打开对应镜像并将 Peach 拖入「应用程序」。测试包未完成 Apple 公证。
 

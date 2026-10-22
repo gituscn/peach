@@ -38,7 +38,7 @@ it('自动查询，展示来源、大小、日期与属性，直接添加到选�
   expect(fetcher.mock.calls[0]?.[0]).toBe('/api/wants/magnets?id=1');
   for (const text of ['4 GB', '2 个文件', '2026-10-01', '字幕', 'JavDB']) expect(host.textContent).toContain(text);
   expect(host.querySelector('[data-resource-facts]')?.textContent).not.toContain('高清');
-  expect([...host.querySelectorAll('[data-resource-actions] button, [data-resource-actions] a')].map(node => node.textContent)).toEqual(['添加下载', '复制链接', '链接来源']);
+  expect([...host.querySelectorAll('[data-resource-actions] button, [data-resource-actions] a')].map(node => node.textContent)).toEqual(['链接来源', '复制链接', '添加下载']);
   await click(buttonNamed('添加下载', host));
   await settle();
   const writes = fetcher.mock.calls.filter(([, init]) => init?.method === 'POST');
@@ -53,6 +53,7 @@ it('ed2k 与网页链接可复制，不能作为磁链提交', async () => {
   const ed2k = { ...candidate, id: 'ed2k:abc:12', protocol: 'ed2k' as const, uri: 'ed2k://|file|demo|12|abc|/' };
   const { host } = await open([ed2k]);
   expect(buttonNamed('添加下载', host)).toBeNull();
+  expect(buttonNamed('复制链接', host)?.className).not.toContain('bg-button-primary');
   await click(buttonNamed('复制链接', host));
   expect(writeText).toHaveBeenCalledWith(ed2k.uri);
 });

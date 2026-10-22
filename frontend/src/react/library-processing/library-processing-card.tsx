@@ -81,7 +81,7 @@ function Outcome(
       {failed
         ? <Note tone="error" className="gap-0 p-3"
             action={retryable
-              ? <Button variant="primary" size="small" onClick={onRetry}>重试未完成项</Button>
+              ? <Button variant="secondary" size="small" aria-label="立即重试未完成项" onClick={onRetry}>立即重试</Button>
               : null}
             extra={details
               /* 三层东西叠在同一块红底上：一句结论、一份清单、一条日志地址。各自之间
@@ -181,7 +181,7 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
             ? <LinkButton href="/review" size="small" trailingIcon={RiArrowRightLine}>复核资料</LinkButton>
             : null}
           {/* 两个入口并存，各自答的不是一个问题：这里是「重新跑一整批」，下面那条错误提示里
-              的「重试未完成项」只补上一趟没做完的那些。采集里网络超时几乎每趟都留下几项可
+              的「立即重试」只补上一趟没做完的那些。采集里网络超时几乎每趟都留下几项可
               重试的，页脚要是让位给重试键，新入库的片子就再也没有入口被扫到。 */}
           <ProcessingActions scan busy={busy} metadataOnly={state?.metadata_only} speedMode={state.speed_mode} onRun={run} />
         </>

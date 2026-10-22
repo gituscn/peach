@@ -398,9 +398,9 @@ def create_app(
         loop = asyncio.get_running_loop()
         previous_error_handler = loop.get_exception_handler()
         loop.set_exception_handler(asyncio_handler)
-        # 启动握手要等 cloudflared 连上边缘，可以占到几十秒；和 mDNS 一样交给线程，
-        # 不要在事件循环里卡住整条服务的启动。
-        await asyncio.to_thread(_start_tunnel, settings, tunnel_manager)
+        # 握手要等 cloudflared 连上边缘，断网时会等满 `wait_timeout`；放在后台，本机访问
+        # 不等公网入口。连接进度由 `tunnel_manager.snapshot()` 报告。
+        tunnel_startup = asyncio.create_task(asyncio.to_thread(_start_tunnel, settings, tunnel_manager))
         ledger_ready = False
         if settings.configured:
             ledger_ready = _start_ledger_services(settings, contract,
@@ -443,6 +443,10 @@ def create_app(
             contract.stop_background_jobs()
             if mdns is not None:
                 await asyncio.to_thread(mdns.stop)
+            # stop 让还在等边缘的握手当场返回；握手若刚好在 stop 之后才拉起子进程，
+            # 第二次 stop 把它收掉。
+            await asyncio.to_thread(tunnel_manager.stop)
+            await tunnel_startup
             await asyncio.to_thread(tunnel_manager.stop)
             http_transport.close()
             hls_plan_executor.shutdown(wait=False, cancel_futures=True)
@@ -484,6 +488,8 @@ def create_app(
     app.state.jav_browser = jav_browser
     app.state.mount_reachability = mount_reachability
     app.state.network_reachability = network_reachability
+    from .background_issues import IssueLog
+    app.state.background_issues = IssueLog()
     app.state.stream_sessions = StreamSessionRegistry()
     from .strm_stream import StrmResources
     app.state.strm_resources = StrmResources()

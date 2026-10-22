@@ -22,6 +22,7 @@ import { EmptyState } from '../components/empty-state';
 import { Note } from '../components/note';
 import { Page } from '../components/page';
 import { PillAriaTabList } from '../components/pill-aria-tab-list';
+import { ExternalLink } from '../settings/section';
 import { BulkToolbar } from './bulk-toolbar';
 import { GenreTagList } from './candidate-form';
 import { ReviewCard } from './review-card';
@@ -230,9 +231,7 @@ export function ReviewPage(props: ReviewProps) {
         <Note tone="warning" title="本机只能浏览"
           extra={writerUrl
             ? <p className="text-body-2-regular">
-                <a href={writerUrl} className="text-text-primary underline underline-offset-2">
-                  前往写入端复核
-                </a>
+                <ExternalLink href={writerUrl}>前往写入端复核</ExternalLink>
               </p>
             : undefined}>
           {mirror}
@@ -328,7 +327,7 @@ export function ReviewPage(props: ReviewProps) {
           )) : review.isError && !review.data ? (
             /* 读不到队列和队列是空的不是一回事：说清楚是读取失败，给一颗重试键。 */
             <Note tone="error" title="复核队列读取失败" action={
-              <Button variant="secondary" size="small" disabled={review.isFetching} onClick={() => void review.refetch()}>重试</Button>
+              <Button variant="secondary" size="small" disabled={review.isFetching} onClick={() => void review.refetch()}>立即重试</Button>
             }>
               {errorMessage(review.error)}
             </Note>

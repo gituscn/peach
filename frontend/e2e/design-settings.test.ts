@@ -386,12 +386,15 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
         .evaluate((node) => Math.round(node.getBoundingClientRect().top));
       const selected = await nav.getByRole('tab', { name: '外观与导航', exact: true }).evaluate((node) => {
         const style = getComputedStyle(node), icon = getComputedStyle(node.querySelector('svg')!);
-        return { face: style.backgroundColor, ring: style.boxShadow, icon: [icon.width, icon.height, icon.fill === style.color, icon.stroke] };
+        // 与文字同行的图标取 `--icon-inline`（1.2em），按所在文字字号算出应有的边长。
+        const side = (value: string) => `${Math.round(parseFloat(value) * 10) / 10}px`;
+        return { face: style.backgroundColor, ring: style.boxShadow, inline: side(String(parseFloat(style.fontSize) * 1.2)),
+          icon: [side(icon.width), side(icon.height), icon.fill === style.color, icon.stroke] };
       });
       assert.equal(selected.face, 'rgba(0, 0, 0, 0)', '当前项自己铺了底，滑动的那块玻璃被盖住');
       assert.equal(selected.ring, 'none');
       // Remix 的线条是 `fill` 画出的轮廓，全站默认的 `stroke:currentColor;fill:none` 会让它整枚消失。
-      assert.deepEqual(selected.icon, ['20px', '20px', true, 'none']);
+      assert.deepEqual(selected.icon, [selected.inline, selected.inline, true, 'none']);
       assert.equal(await glide(), await top('外观与导航'), '玻璃没有落在当前项上');
 
       await nav.getByRole('tab', { name: '浏览与播放', exact: true }).hover();

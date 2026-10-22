@@ -4989,7 +4989,7 @@ class ReleaseDownloadNotesTests(unittest.TestCase):
     def test_default_download_notes_use_the_github_version_directory(self):
         from scripts.package_windows_release import download_notes
         links = re.findall(r'https://[^\s)]+', download_notes('1.0.0', lite_installer=True))
-        self.assertEqual(len(links), 7)
+        self.assertEqual(len(links), 8)
         self.assertTrue(all(url.startswith('https://github.com/peach-mitao/peach/releases/download/v1.0.0/')
                             for url in links))
 
@@ -5005,7 +5005,7 @@ class ReleaseDownloadNotesTests(unittest.TestCase):
         self.assertIn('### 新增\n\n- **更新**：支持公开下载。', result)
         self.assertEqual(result.count('## 下载选择'), 1)
         self.assertEqual(links[0], 'https://gitgud.io/peach-mitao/peach/-/blob/v1.0.0/docs/OPERATIONS.md')
-        self.assertEqual(len(links[1:]), 9)
+        self.assertEqual(len(links[1:]), 10)
         self.assertTrue(all(url.startswith('https://downloads.peach.video/v1.0.0/') for url in links[1:]))
         self.assertIn('https://downloads.peach.video/v1.0.0/Peach-1.0.0-macos-arm64.dmg', links)
         self.assertIn('https://downloads.peach.video/v1.0.0/Peach-1.0.0-macos-x86_64.dmg', links)

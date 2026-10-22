@@ -45,7 +45,7 @@ export PATH="$PWD/build/macos-media-toolchain/env/bin:$PATH"
 
 产物在 `dist/macos.noindex/<架构>/`，构建副本避开 Spotlight 索引；日常使用只保留 Applications 里的应用，测试结束卸载已挂载的安装镜像。Apple Silicon 使用 `arm64`，Intel 使用 `x86_64`；分别用对应架构的 Python 与依赖构建。`--target-arch` 显式指定目标，解释器架构不匹配会停止，两个包不混合原生扩展，也不直接合并成 universal2。Intel 构建可在 Intel Mac 或 Rosetta 下的 x86_64 Python 环境完成；Rosetta 验收不能代替 Intel 真机和较旧 macOS 的验收。
 
-随包工具与许可证位于 `Contents/Resources/tools/ffmpeg/bin`、`Contents/Resources/tools/untrunc`，cloudflared 位于 `Contents/MacOS`。工具先独立签名，再签整个应用，资源目录允许同时保存工具清单和说明。它们不依赖 Homebrew；FFmpeg、x264、dav1d 和修复用 FFmpeg 库静态链接，动态依赖仅允许 macOS 系统库。`scripts/smoke_macos_media.py` 在系统 PATH 下使用合成 H.264/AAC 与 AV1 样片验证工具查找、探测、抽帧、转码、缺 `moov` 修复和完整解码。该修复验收覆盖同编码参照样片，不代表任意损坏媒体都能恢复。
+随包工具与许可证位于 `Contents/Resources/tools/ffmpeg/bin`、`Contents/Resources/tools/untrunc`，人脸检出与比对模型位于 `Contents/Resources/tools/face-models`，cloudflared 位于 `Contents/MacOS`。构建时 `scripts/fetch_face_models.py` 按固定提交下载两个模型与许可证并逐个校验 SHA-256，缓存在 `build/face-models`。工具先独立签名，再签整个应用，资源目录允许同时保存工具清单和说明。它们不依赖 Homebrew；FFmpeg、x264、dav1d 和修复用 FFmpeg 库静态链接，动态依赖仅允许 macOS 系统库。`scripts/smoke_macos_media.py` 在系统 PATH 下使用合成 H.264/AAC 与 AV1 样片验证工具查找、探测、抽帧、转码、缺 `moov` 修复和完整解码。该修复验收覆盖同编码参照样片，不代表任意损坏媒体都能恢复。
 
 每种架构同时生成 `ffmpeg-macos-<架构>-corresponding-source.zip` 与 `untrunc-macos-<架构>-corresponding-source.zip`，必须与 DMG 同版本发布；归档包含完整上游源码、固定哈希、许可证、构建脚本、配置和环境记录。构建拒绝缺失、哈希不符、架构不符或依赖开发机动态库的工具。cloudflared 固定官方 2026.9.0，归档 SHA-256 采用 GitHub Release 资产 API 的 `digest`，来源登记在 `scripts/cloudflared-macos.json`；发布正文的旧校验值不作为这两个 macOS 归档的锁。
 
@@ -54,6 +54,10 @@ export PATH="$PWD/build/macos-media-toolchain/env/bin:$PATH"
 构建脚本读取随包 Mach-O 的系统版本下限，填入 `LSMinimumSystemVersion` 并重新签名。构建解释器也必须支持目标系统；Homebrew Python 可能要求构建机的系统版本。`watchdog` 等本机编译扩展若命中旧缓存，需带部署目标和对应的 `ARCHFLAGS`，通过 `uv sync --locked --extra build --extra macos --no-cache --reinstall-package watchdog --no-binary-package watchdog` 重编，再核对产物报告的 `minimum_macos`。
 
 打开匹配架构的 DMG，把 `Peach.app` 拖入 Applications，再打开应用完成首次设置。菜单栏提供打开页面、重启和退出入口；数据默认保存在 `~/Library/Application Support/Peach/peach-data`，可用 `PEACH_DATA_ROOT` 指定独立目录。
+
+测试包没有公证，从浏览器或聊天软件下载后带有隔离属性，较新的 macOS 会提示「Peach 已损坏，无法打开」，「隐私与安全性」里也不出现「仍要打开」。拖入 Applications 后在终端执行一次 `xattr -dr com.apple.quarantine /Applications/Peach.app` 再打开；应用归当前用户所有时不需要 `sudo`。
+
+首次设置页只在数据目录里没有 `config.toml` 时出现。这台 Mac 之前装过 Peach 时，应用会沿用原有设置直接打开首页；要重新设置，先退出 Peach，把整个 `peach-data` 目录移到别处再打开。
 
 安装镜像使用 APFS 文件系统，保留已签名资源的 Unicode 文件名及应用扩展属性。浅桃色背景固定左侧 Peach、右侧 Applications 的拖放布局，隐藏工具栏与边栏，背景同时提供标准与 Retina 分辨率。许可证保留在应用的 `Contents/Resources/LICENSE`，安装窗口只显示两个入口。
 
@@ -204,6 +208,8 @@ Windows 测试包默认使用 `%LOCALAPPDATA%\Peach\peach-data`。首次设置�
 
 `media.library_catalog.<library_id>` 和 `media.storage_roots.<root_id>` 持久保存身份。路径、挂载、来源及读取策略归根目录，名称与图标归媒体库。`media.locations` 等路径表是兼容投影，手动配置以身份表为准，字段与升级依据见 [ADR-0115](adr/0115-library-and-storage-root-identity.md)。
 
+每个媒体库还可以设来源色和处理方式。来源色给这个库的卡片和列表行铺一层淡色，默认不上色。处理方式有三档：「自动补全」缺什么联网补什么；「仅使用本地资料」只读本地 NFO 和同目录图片，仍读取视频信息、生成九宫格，不联网补资料、封面和人物图片；「自定义」逐项选择步骤。配置里写作 `color`、`policy`（`auto` 不写）和自定义时的 `stages`，定时扫描、增量入库和重试都按作品所属媒体库遵守，依据见 [ADR-0116](adr/0116-library-processing-policy.md)。
+
 路径配置首次保存时按原同名分组写入稳定身份，写入前把原文件留成 `config.pre-media-identity.toml`，以后的保存不覆盖它。也可用 `scripts/upgrade_media_identity.py --data-root <数据根>` 预演，核对后加 `--apply` 显式升级；脚本备份配置并原子写入，不打开 ledger。重复执行保留身份。真实配置升级按部署授权执行，先在隔离配置验证。
 
 已有目录更换位置时，选择「重定位此目录，保留文件记录」；它保留账本前缀并更新本机挂载位置。选择「添加另一目录」创建独立根目录。移除目录声明保留文件及个人记录，文件删除仍使用各自的确认入口。目录重定位应指向同一批文件，不能用已有 ID 接管另一批内容。
@@ -263,6 +269,8 @@ Peach 配置页地址是 `/configuration`。从管理菜单或设置弹窗的「
 媒体库设置中的「CloudDrive 代理」只显示已添加媒体库对应的账号，按精确挂载点或推送路径前缀绑定；多个媒体库共用同一账号时放在同组。API 代理用于列目录和查询文件信息，数据代理用于读取视频及配套文件。先在下载设置中保存 CloudDrive2 地址与 API 令牌；令牌需要“查看云盘”权限，保存还需要“修改云盘”权限，自动识别挂载点需要“查看挂载点”权限。页面进入、重新聚焦和点击「重新读取」时取得 CD 当前配置；有未保存编辑时，聚焦不覆盖表单。保存会立即写入 CloudDrive 并读回确认，影响该账号的其他消费者。代理密码不回显，留空保留，勾选后可清除。保存前检查整个账号配置的修订号；官方接口没有原子条件写入，其他客户端恰好在检查与保存之间修改仍有竞争窗口。请求超时或回读失败时，先重新读取核对，不自动重发。HTTP／SOCKS5 表示配置了代理入口，具体节点计费仍取决于代理工具的规则和 TUN。更多接口的适用性见 [CloudDrive 官方 API 接入](CLOUDDRIVE_API.md)。
 
 启动弹窗同时显示视频文件数、文件名或已有资料可识别的 JAV 文件数与去重后的部数。尚无登记视频的目录分批列出，只识别名称、不打开媒体内容、不写入账本；统计过程中可直接开始扫描，关闭弹窗后不再请求后续批次。新任务沿用同进程 5 分钟内该范围的预检结果，随后用实际扫描更新；账本中已有的记录优先。首次网盘预检的耗时取决于挂载工具列目录的速度；文件名没有番号的 JAV 要在读取配套资料后补充识别。明细里的每部平均预估只针对本次待补资料，缓存齐全的影片不进入这个均值。右下「管理媒体库」链接关闭弹窗并进入媒体库设置，可在那里调整各目录的读取选项。
+
+文件名不必只写番号。番号后面跟片名、女优或字幕说明（`CAWD-987 片名`、`GVH-520【中文字幕】片名`）时，取文件名里第一段「厂牌-至少三位序号」；FC2 商品号（`+++ FC2-PPV-1234567 片名 前編`）写在文件名任意位置都能识别。内置规则认不出的命名，在「媒体库与入库 → 番号识别规则」里每行写一条正则表达式：对完整文件名搜索、不分大小写，番号写在命名组 `(?<code>…)` 里，没有命名组时取第一个括号；取出的部分仍须符合番号格式。规则保存在账本里，各设备共用，保存时检查语法。「处理」时对还没有番号的视频先按这些规则识别，再按内置规则识别；已有番号不会被改写。启动弹窗的预检只按内置规则统计。
 
 本机的 `state/library-processing-traffic.json` 保存近期同类用量。视频探测和单帧读取按媒体目录分开积累；资料采集按待访问来源、封面需求和直连／代理分组。至少取得 3 个有效样本后采用最近 50 次的平均值，后续同类工作随之校准；失败、零下载及计量不完整的资料采集不作为正常样本。首次使用无历史时仍采用默认计划值。
 
@@ -416,6 +424,8 @@ Peach 按下面的顺序找 FFmpeg 和 ffprobe：
 4. PATH。
 
 untrunc 按相同顺序查找，对应目录为 `tools/untrunc`。独立程序优先使用随包验证的版本；环境变量仍可显式指定工具路径。
+
+人脸检出（YuNet）与比对（SFace）模型随 Windows 完整安装包、完整免安装 ZIP、macOS 应用和 Docker 镜像分发，离线即可用。Peach 先读 `PEACH_FACE_MODELS` 指向的目录（Docker 镜像设为 `/app/tools/face-models`），再读独立程序的 `tools/face-models`，两处都按 SHA-256 校验；不在或校验不符时改用数据目录 `tools/yunet`、`tools/sface` 里的那份，再没有才联网下载。随包那份不会复制到数据目录。轻量安装包和应用更新包不带模型，由安装器或更新器按需下载 `tools-face-models.zip`。
 
 播放时：
 
@@ -647,6 +657,7 @@ Windows 托盘在取得单实例锁后启动独立监视器。监视器用 Win32
 - 真实迁移前依次执行：SQLite 备份、asset/tag 计数、`PRAGMA integrity_check`、迁移版本检查、服务冒烟测试。已应用与待应用的迁移只认 `peach migrate status` 的输出。
 - 已应用的迁移文件不能修改，任何后续变更都要新增一个版本。已应用的迁移被改写会造成校验和漂移，只能用迁移前备份重放、逐条比对差异为 0 后再校正 `schema_migration`。
 - 数据库备份自动清退：`ledger.pre-*.db` 由 `peach.ledger_backups` 管理，「最近 5 份」「24 小时内」「比 `ledger.db` 新」三类全部保留，其余连同 `-wal`／`-shm` 删除。Windows 托盘每次启动自动执行；`scripts/prune_ledger_backups.py` 手动运行时默认只列计划，`--apply` 才删除；数据库 `integrity_check` 不是 ok 时拒绝清退，退出码 2。每份备份一百多 MB，5 天不清就是 7 GB。
+- 整理备份自动清退：下载后整理与手动整理写入前各留一份整库备份，放在 `<Peach 数据目录>/generated/organize-backups/`，文件名是 `ledger.pre-download-<任务>-<时间>.db` 与 `ledger.pre-organize-<时间>-<任务>.db`。每次写备份后按同一套规则清退这个目录，只留最近 5 份（`ORGANIZE_KEEP_RECENT`），不按年龄保留（`ORGANIZE_MIN_AGE` 为零）：一波下载一小时能整理四十个文件，24 小时窗口会攒下几十 GB。正在被整理引用的那份由 `ledger_backups.holding` 登记，Web 服务进程里的清退都跳过；目录里的其他文件名不动。手动查看或清理用 `scripts/prune_ledger_backups.py --organize`，同样默认只列计划，`--apply` 才删除；登记不跨进程，整理进行中不要给 `--keep 0`。
 - `<Peach 数据目录>/logs` 里的 `*.log` 统一保留半年，不限大小（`peach.log_retention.sweep`，托盘在启动任何子进程之前运行）：半年没写过的文件整份删除；还在写的文件按自然月分段，上次写入在更早月份的改名成 `<名字>.until-<最后写入日期>.log`，再过半年删除。子进程直接追加 stdout，不经过 `logging`，所以按文件处理，不按行处理。
 - 更新与打包产物自动清退：托盘每次启动只保留最近 2 份 `dist/Peach/Peach.pre-source-sync-*.exe` 备份，并删掉 `<Peach 数据目录>/state/source-sync-build/` 里不属于待应用记录的暂存构建（`WindowsUpdateInstaller.sweep_artifacts`）；`build_windows.ps1` 成功后删掉 PyInstaller 工作目录 `build/windows/app`；单文件托盘每次启动删掉 `%TEMP%` 里超过一天、不属于自己的 `_MEI*` 解压残留（`sweep_onefile_extractions`，托盘被结束进程时 PyInstaller 不会自己清理，每份 40–80 MB）。自动清理只认这几种命名：`Peach.exe` 本体、手工放进 `dist/` 的目录、`build/release-*`、`attic/` 都不碰，手工构建的残留要自己删。
 - 可重建缓存的删除范围由当前数据库路径决定：生产库只能清理同一个 `peach-data` 下的缓存，临时库只能清理它的临时目录，范围之外一律跳过。测试里的清空回收站必须用临时 Peach 数据目录，漏配会删到真实封面。

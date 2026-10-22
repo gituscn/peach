@@ -171,7 +171,7 @@ describe('馆藏 JAV 官方预览', () => {
       await page.route('**/api/jav/image?*', route => route.fulfill({ json: { ok: false, image: '', message: '图片未取得' } }));
       await page.goto(new URL(`/assets/${COVER_ONLY_ITEM.id}`, page.url()).href);
       const frame = page.locator('[data-item-gallery]');
-      const retry = frame.getByRole('button', { name: '重试样图', exact: true });
+      const retry = frame.getByRole('button', { name: '立即重试样图', exact: true });
       await retry.waitFor();
       assert.equal(await retry.getAttribute('title'), '来源暂不可用');
       assert.ok(await page.locator('[data-stage-side-content]').isVisible());

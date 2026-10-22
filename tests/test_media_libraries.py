@@ -111,6 +111,44 @@ class MediaIdentityTests(unittest.TestCase):
         self.assertEqual(media_libraries.libraries(loaded)[0]["name"], "私人馆藏")
         self.assertEqual(media_libraries.libraries(loaded)[0]["icon"], "star")
 
+    def test_color_and_policy_persist_per_library_and_defaults_stay_out_of_the_file(self):
+        config = settings_file.upgrade_media_identity(self.config)
+        rows = media_configuration.rows(config, windows=True)
+        self.assertEqual({(row["library_color"], row["library_policy"]) for row in rows}, {("", "auto")})
+        for row in rows:
+            row.update(library_color="sky", library_policy="custom", library_stages="preview,metadata")
+        settings_file.write(media_identity.configure_sources(config, rows, windows=True), force=True)
+        loaded = settings_file.load_config(environ=self.env)
+        [library] = media_libraries.libraries(loaded)
+        self.assertEqual((library["color"], library["policy"], library["stages"]), ("sky", "custom", ["metadata", "preview"]))
+        self.assertEqual(media_identity.stages_by_root(loaded),
+                         {media_identity.path_key(root): frozenset({"metadata", "preview"}) for root in ("D:\\JAV", "E:\\收藏\\JAV")})
+        rows = media_configuration.rows(loaded, windows=True)
+        for row in rows:
+            row.update(library_color="", library_policy="auto", library_stages="")
+        settings_file.write(media_identity.configure_sources(loaded, rows, windows=True), force=True)
+        text = self.path.read_text(encoding="utf-8")
+        self.assertNotIn("policy", text)
+        self.assertNotIn("color", text)
+        self.assertEqual(media_libraries.libraries(settings_file.load_config(environ=self.env))[0]["policy"], "auto")
+
+    def test_local_policy_keeps_probe_and_previews_and_drops_network_steps(self):
+        self.assertEqual(media_identity.library_stages({"policy": "local"}), frozenset({"probe", "preview"}))
+        self.assertEqual(media_identity.library_stages({}), frozenset(media_identity.STAGES))
+        self.assertEqual(media_identity.library_stages({"policy": "custom", "stages": ""}), frozenset())
+
+    def test_invalid_color_policy_or_stages_are_rejected(self):
+        config = settings_file.upgrade_media_identity(self.config)
+        for change in ({"library_color": "#ff0000"}, {"library_policy": "sometimes"},
+                       {"library_policy": "custom", "library_stages": "download"}):
+            rows = media_configuration.rows(config, windows=True)
+            for row in rows:
+                row.update(change)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                media_identity.configure_sources(config, rows, windows=True)
+        with self.assertRaises(ValueError):
+            media_identity.validate_catalog({str(uuid4()): {"name": "JAV", "stages": "probe"}}, {})
+
     def test_same_names_are_independent_and_assignment_uses_library_id(self):
         empty = replace(self.config, locations={}, library_names={})
         first, second = str(uuid4()), str(uuid4())

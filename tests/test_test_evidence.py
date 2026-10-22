@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import io
 import os
+import stat
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr, redirect_stdout
@@ -118,6 +120,14 @@ class VerificationTests(unittest.TestCase):
                 self.assertNotEqual(evidence.key(worker), state)
                 with self.assertRaisesRegex(coordinator.WorkspaceError, "有效测试记录"):
                     coordinator.ready(worker)
+
+    def test_the_run_scoped_temp_folder_does_not_enter_the_environment_fingerprint(self):
+        worker, _ = self.worker()
+        with mock.patch.dict(os.environ, {"PEACH_TEST_RUN_TEMP": str(self.root / "peach-test-run-1")}):
+            state = self.certify(worker)
+        os.environ.pop("PEACH_TEST_RUN_TEMP", None)
+        self.assertEqual(evidence.key(worker), state)
+        coordinator.ready(worker)
 
     def test_target_change_during_verification_prevents_merge(self):
         worker, branch = self.worker()
@@ -769,6 +779,97 @@ class VerificationTests(unittest.TestCase):
             with self.subTest(selector=selector), self.assertRaises(ValueError):
                 test_focus.selection(self.repo, [selector])
 
+
+class EvidenceExpiryTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.folder = Path(temporary.name)
+        self.old, self.live = "a" * 64, "b" * 64
+        self.stale = time.time() - evidence.VALID_SECONDS - 60
+
+    def place(self, name: str, *, stale: bool) -> Path:
+        path = self.folder / name
+        path.write_text("{}", encoding="utf-8")
+        if stale:
+            os.utime(path, (self.stale, self.stale))
+        return path
+
+    def test_expired_records_notes_and_partial_writes_go_while_live_records_and_locks_stay(self):
+        gone = [self.place(name, stale=True) for name in
+                (f"{self.old}.json", f"{self.old}.lock.holder.json", f"{self.old}.4242.tmp")]
+        kept = [self.place(f"{self.live}.json", stale=False),
+                self.place(f"{self.old}.lock", stale=True),
+                self.place(f"{self.old}.lock.holder.lock", stale=True),
+                self.place("full-suite.lock", stale=True),
+                self.place("release-notes.json", stale=True)]
+        task_folder = self.folder / f"{'c' * 64}.json"
+        task_folder.mkdir()
+        os.utime(task_folder, (self.stale, self.stale))
+
+        self.assertEqual(evidence.prune_expired(self.folder), 3)
+
+        self.assertEqual([path for path in gone if path.exists()], [])
+        self.assertEqual([path for path in kept if not path.exists()], [])
+        self.assertTrue(task_folder.is_dir())
+
+    def test_signing_a_record_prunes_expired_ones_and_keeps_a_fresh_failure(self):
+        expired = self.place(f"{self.old}.json", stale=True)
+        context = {"manifest": {}, "environment": "fixture"}
+        with mock.patch.object(evidence, "evidence_dir", return_value=self.folder):
+            evidence.write(self.folder, self.live, ("checks",), success=False, elapsed=0,
+                           slowest=[], count=0, previous={}, context=context)
+            record = evidence.read(self.folder, self.live)
+
+        self.assertFalse(expired.exists())
+        self.assertEqual(record["failed_scopes"], ["checks"])
+
+
+class RunTemporaryFolderTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.base = Path(temporary.name).resolve()
+        # 运行本文件的测试进程自己就在一个运行目录里；这里要验证的是新开一个。
+        self.enterContext(mock.patch.dict(os.environ))
+        os.environ.pop(runner.RUN_TEMP, None)
+
+    def test_temporary_files_of_the_run_and_its_children_are_removed_with_it(self):
+        previous = tempfile.tempdir
+        with runner.isolated_temp(self.base) as folder:
+            leaked = Path(tempfile.mkdtemp(prefix="peach-seed-"))
+            (leaked / "ledger.db").write_bytes(b"x")
+            (leaked / "ledger.db").chmod(stat.S_IREAD)
+            child = subprocess.run([sys.executable, "-c", "import tempfile; print(tempfile.gettempdir())"],
+                                   capture_output=True, text=True, encoding="utf-8", check=True)
+            self.assertEqual(leaked.parent, folder)
+            self.assertEqual(Path(child.stdout.strip()).resolve(), folder.resolve())
+
+        self.assertEqual(list(self.base.iterdir()), [])
+        self.assertEqual(tempfile.tempdir, previous)
+        self.assertNotIn(runner.RUN_TEMP, os.environ)
+
+    def test_shard_children_share_the_parent_folder(self):
+        with runner.isolated_temp(self.base) as folder, runner.isolated_temp(self.base) as nested:
+            self.assertEqual(nested, folder)
+            self.assertEqual(len(list(self.base.iterdir())), 1)
+        self.assertEqual(list(self.base.iterdir()), [])
+
+    def test_folders_left_by_killed_runs_are_swept_after_a_day(self):
+        now = time.time()
+        stale = self.base / f"{runner.RUN_TEMP_PREFIX}{int(now) - 2 * 86400}-abc"
+        recent = self.base / f"{runner.RUN_TEMP_PREFIX}{int(now) - 3600}-def"
+        unrelated = self.base / "peach-seed-old"
+        for folder in (stale / "repo", recent, unrelated):
+            folder.mkdir(parents=True)
+        (stale / "repo" / "object").write_bytes(b"x")
+        (stale / "repo" / "object").chmod(stat.S_IREAD)
+
+        runner.sweep_stale_runs(self.base, now)
+
+        self.assertFalse(stale.exists())
+        self.assertTrue(recent.is_dir())
+        self.assertTrue(unrelated.is_dir())
 
 
 if __name__ == "__main__":

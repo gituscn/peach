@@ -71,7 +71,7 @@ export function DownloadsPanel() {
   const tasks = [...new Map(pages.flatMap((page) => page.tasks).map((task) => [task.id, task])).values()];
   if (!tasks.length && !query.error) return null;
   return (
-    <section aria-labelledby={id} className="flex min-w-0 flex-col gap-3">
+    <section id="cloudDownloads" aria-labelledby={id} className="flex min-w-0 flex-col gap-3">
       <h3 id={id} className="text-title-2-medium text-text-primary">云下载</h3>
       {query.error ? <Note tone="error">{errorMessage(query.error)}</Note> : null}
       {tasks.length
@@ -93,7 +93,9 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
   const [copied, setCopied] = useState(false);
   const [fullTitle, setFullTitle] = useState(false);
   const titleId = useId();
-  const reason = failureText(task);
+  /* 还在对账的任务没有失败分类：暂时性故障只记下原因、退避后再查，底栏照样把它读出来。 */
+  const reason = failureText(task)
+    || (task.cancellable && task.failure_detail ? `稍后自动重试 · ${task.failure_detail}` : '');
   const artwork = task.artwork;
   const people = artwork?.performer_entities || [];
   const detailHref = task.state === 'ingested' && task.asset_id ? `/assets/${task.asset_id}` : undefined;
@@ -165,20 +167,25 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
           ? <p className="min-w-0 truncate text-caption-1-regular text-text-secondary" title={task.ledger_path}>{task.ledger_path}</p>
           : null}
         {action.error ? <ErrorText>{action.error}</ErrorText> : null}
-        <div className="flex flex-wrap items-center gap-2 pt-1 sm:mt-auto">
+        {/* 辅助的（看标题、抄磁力）靠左，改动这条任务的靠右，最右是这张卡此刻的主动作。 */}
+        <div data-download-actions="" className="flex flex-wrap items-center gap-2 pt-1 sm:mt-auto">
           <Button variant="ghost" size="small" aria-expanded={fullTitle} aria-controls={fullTitle ? titleId : undefined}
             onClick={() => setFullTitle(!fullTitle)}>{fullTitle ? '收起标题' : '展开标题'}</Button>
-          {writable && task.cancellable
-            ? <Button variant="secondary" size="small" {...busyProps(action.busy === 'cancel')} onClick={cancel}>取消</Button>
-            : null}
-          {writable && task.resubmittable
-            ? <Button variant="secondary" size="small" {...busyProps(action.busy === 'resubmit')} onClick={resubmit}>重新提交</Button>
-            : null}
-          {writable && task.postprocess_retryable
-            ? <Button variant="secondary" size="small" {...busyProps(action.busy === 'postprocess')}
-                onClick={retryPostprocess}>重试入库后整理</Button>
-            : null}
           <Button variant="ghost" size="small" onClick={copy}>{copied ? '已复制磁力' : '复制磁力'}</Button>
+          {writable && (task.cancellable || task.resubmittable || task.postprocess_retryable)
+            ? <div className="ml-auto flex flex-wrap items-center gap-2">
+                {task.cancellable
+                  ? <Button variant="secondary" size="small" {...busyProps(action.busy === 'cancel')} onClick={cancel}>取消</Button>
+                  : null}
+                {task.resubmittable
+                  ? <Button variant="secondary" size="small" {...busyProps(action.busy === 'resubmit')} onClick={resubmit}>重新提交</Button>
+                  : null}
+                {task.postprocess_retryable
+                  ? <Button variant="secondary" size="small" {...busyProps(action.busy === 'postprocess')}
+                      onClick={retryPostprocess}>重试入库后整理</Button>
+                  : null}
+              </div>
+            : null}
         </div>
         </div>
       </div>

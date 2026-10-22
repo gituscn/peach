@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "39f747ac-f39b-4523-a31c-93f5a2536310", e._sentryDebugIdIdentifier = "sentry-dbid-39f747ac-f39b-4523-a31c-93f5a2536310");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "fc9b3421-b747-4af4-b9d4-34508708da23", e._sentryDebugIdIdentifier = "sentry-dbid-fc9b3421-b747-4af4-b9d4-34508708da23");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, i, o, s) => {
@@ -19601,12 +19601,12 @@ function Dm({ summary: e, defaultOpen: t = !1, isOpen: n, children: r, trailing:
 			children: [
 				i ? null : /* @__PURE__ */ (0, B.jsx)(Fp, {
 					"aria-hidden": !0,
-					className: d ? "size-4 shrink-0 rotate-90 transition-transform" : "size-4 shrink-0 transition-transform"
+					className: d ? "size-(--icon-inline) shrink-0 rotate-90 transition-transform" : "size-(--icon-inline) shrink-0 transition-transform"
 				}),
 				e,
 				i ? /* @__PURE__ */ (0, B.jsx)(Fp, {
 					"aria-hidden": !0,
-					className: d ? "ml-auto size-4 shrink-0 -rotate-90 transition-transform" : "ml-auto size-4 shrink-0 rotate-90 transition-transform"
+					className: d ? "ml-auto size-(--icon-inline) shrink-0 -rotate-90 transition-transform" : "ml-auto size-(--icon-inline) shrink-0 rotate-90 transition-transform"
 				}) : null
 			]
 		}), /* @__PURE__ */ (0, B.jsx)("div", {
@@ -19626,7 +19626,7 @@ function Om({ name: e }) {
 		"data-source-mark": e,
 		viewBox: "0 0 24 24",
 		fill: "none",
-		className: "size-4 shrink-0 stroke-current stroke-2",
+		className: "size-(--icon-inline) shrink-0 stroke-current stroke-2",
 		children: /* @__PURE__ */ (0, B.jsx)("use", { href: `#i-${e}` })
 	});
 }
@@ -19636,7 +19636,7 @@ function km({ mark: e }) {
 		alt: "",
 		width: 16,
 		height: 16,
-		className: "size-4 shrink-0"
+		className: "size-(--icon-inline) shrink-0"
 	}) : /* @__PURE__ */ (0, B.jsx)(Om, { name: e });
 }
 //#endregion
@@ -21481,7 +21481,7 @@ function Ug() {
 					onClick: () => {
 						t({ kind: "loading" }), r((e) => e + 1);
 					},
-					children: "重试"
+					children: "立即重试"
 				}),
 				children: e.message
 			}) : null,
@@ -21515,4 +21515,4 @@ var Gg = document.getElementById("peach-page"), Kg = Gg ? Wg[Gg.dataset.page ?? 
 Gg && Kg && (0, w.createRoot)(Gg).render(/* @__PURE__ */ (0, B.jsx)(Kg, { data: { ...Gg.dataset } }));
 //#endregion
 
-//# debugId=39f747ac-f39b-4523-a31c-93f5a2536310
+//# debugId=fc9b3421-b747-4af4-b9d4-34508708da23

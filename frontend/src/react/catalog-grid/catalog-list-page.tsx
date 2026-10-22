@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties, type MouseEvent } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   createColumnHelper, flexRender, rowPaginationFeature, rowSelectionFeature, rowSortingFeature,
@@ -13,10 +13,15 @@ import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from 
 import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 import { apiGet } from '../../api';
 import { ArtSlot } from '../components/art-slot';
+import { useLibraryTints } from '../components/library-tint';
+import { catalogListSkeletonCellHtml } from '../../catalog-content-skeleton';
+import { identityParts } from '../components/media-card';
+import { SourceMark } from '../settings/section';
 import { DataTableFrame } from '../components/data-table-frame';
 import { DataTableFooter, DataTableSort } from '../components/table-controls';
 import { RetryNote } from '../components/grid-reveal';
 import { LibraryCompletionPrompt, missingPreviewIds } from '../library-processing/library-completion';
+import { completionRowRemembered, rememberCompletionRow } from '../library-processing/completion-row';
 import { catalogParams } from './catalog-grid';
 import type { CatalogGridProps, MediaItem, MediaPage } from './types';
 import { useCatalogTablePreferences } from './catalog-column-widths';
@@ -39,6 +44,7 @@ const positions = new Map<string, ListState>();
 /** 服务端对完整筛选结果排序、分页；选择集及批量栏归现有馆藏控制器。 */
 export function CatalogListPage(props: CatalogGridProps) {
   const preferences = useCatalogTablePreferences();
+  const tints = useLibraryTints();
   const params = catalogParams(props.filters || {}, false);
   const [scope] = useState(() => {
     const position = new URLSearchParams(params);
@@ -69,6 +75,10 @@ export function CatalogListPage(props: CatalogGridProps) {
   });
   const items = result.data?.items || [];
   const total = Number(result.data?.total || 0);
+  const missing = props.filters?.state === 'trash' ? [] : missingPreviewIds(items, props.layout.javImage);
+  const [completionReserved] = useState(completionRowRemembered);
+  useEffect(() => { if (result.data && !result.isPlaceholderData) rememberCompletionRow(missing.length > 0) },
+    [result.data, result.isPlaceholderData, missing.length]);
   useLayoutEffect(() => {
     if (result.isFetching) return;
     let live = true;
@@ -92,8 +102,22 @@ export function CatalogListPage(props: CatalogGridProps) {
       cell: ({ row }) => <Checkbox slot={null} aria-label={`选择 ${props.helpers.displayName(row.original, row.original.name || '')}`}
         isDisabled={result.isPlaceholderData}
         isSelected={row.getIsSelected()} onChange={on => row.toggleSelected(on)} /> }),
-      helper.accessor(item => item.name || '', { id: 'name', header: '名称', enableSorting: true,
+      helper.accessor(item => item.name || '', { id: 'name', header: '作品', enableSorting: true,
         cell: ({ row }) => <ListIdentity item={row.original} props={props} disabled={result.isPlaceholderData} /> }),
+      /* 标签与卡片同一套：关注条目的标签不可点，其余点一下按这个标签筛选。 */
+      helper.display({ id: 'tags', header: '标签', cell: ({ row }) => {
+        const item = row.original;
+        const tags = item.follow_tags || item.tags || [];
+        return tags.length
+          ? <div data-media-tags="" data-list-tags="" onClick={event => {
+            const tag = (event.target as HTMLElement).closest<HTMLElement>('[data-tag]');
+            if (tag && !props.selectMode) props.actions.toggleTag(tag.dataset.tag || '');
+          }}>
+            {tags.map(tag => <button key={tag} type="button" data-media-tag="" disabled={!!item.follow_item_id}
+              data-tag={item.follow_item_id ? undefined : tag}>{props.helpers.tagLabel(tag)}</button>)}
+          </div>
+          : '—';
+      } }),
       helper.display({ id: 'code', header: '番号', cell: ({ row }) => row.original.code || '—' }),
       helper.accessor(item => item.duration, { id: 'dur', header: '时长', enableSorting: true,
         cell: ({ row }) => fmtDur(row.original.duration) || '—' }),
@@ -144,7 +168,9 @@ export function CatalogListPage(props: CatalogGridProps) {
         onChange={next => table.setSorting(next)} />
       </div>
     </div>
-    <LibraryCompletionPrompt assetIds={props.filters?.state === 'trash' ? [] : missingPreviewIds(items, props.layout.javImage)} />
+    {result.isPending
+      ? completionReserved ? <i data-completion-skeleton="" aria-hidden="true" className="skeleton-sheen" /> : null
+      : <LibraryCompletionPrompt className="" assetIds={missing} />}
     {result.isError ? <RetryNote message={requestErrorMessage(result.error)} onRetry={() => void result.refetch()} /> : null}
     <DataTableFrame follow preferences={preferences} onRowClick={props.selectMode ? id => { if (!result.isPlaceholderData) props.actions.toggleSelection(Number(id), false) } : undefined}>
       <Table aria-label="作品列表" size="sm"
@@ -163,11 +189,16 @@ export function CatalogListPage(props: CatalogGridProps) {
           </TableColumn>)}
           <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width={preferences.spaceWidth} minWidth={0} />
         </TableHeader>
-        <TableBody renderEmptyState={() => result.isPending
-          ? <div data-skeleton="" data-table-skeleton="" aria-busy="true" role="status" aria-label="正在读取作品列表">
-            {Array.from({ length: 6 }, (_, index) => <div key={index}><i className="skeleton-sheen" /><span className="skeleton-sheen" /></div>)}
-          </div> : result.isError ? '作品列表未取得' : '没有符合的作品'}>
-          {table.getRowModel().rows.map(row => <TableRow key={row.id} id={row.id} data-catalog-row="" data-id={row.original.id}
+        <TableBody renderEmptyState={() => result.isError ? '作品列表未取得' : '没有符合的作品'}>
+          {/* 等数据时在真实表格里画骨架行，格子内容与壳的首屏骨架同一份，接管时不换结构。 */}
+          {result.isPending ? Array.from({ length: 6 }, (_, index) => <TableRow key={`skeleton-${index}`} id={`skeleton-${index}`}
+            data-list-skeleton-row="" aria-hidden="true">
+            {table.getHeaderGroups()[0]!.headers.map(header => <TableCell key={header.id}>
+              <span dangerouslySetInnerHTML={{ __html: catalogListSkeletonCellHtml(header.id) }} />
+            </TableCell>)}
+            <TableCell data-table-space="" />
+          </TableRow>) : table.getRowModel().rows.map(row => <TableRow key={row.id} id={row.id} data-catalog-row="" data-id={row.original.id}
+            data-library={tints.get(row.original.library_id || '')?.color ? row.original.library_id : undefined}
             data-board-selected={row.getIsSelected() || undefined}>
             {row.getVisibleCells().map(cell => <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}
             <TableCell data-table-space="" />
@@ -182,21 +213,63 @@ export function CatalogListPage(props: CatalogGridProps) {
 
 function ListIdentity({ item, props, disabled }: { item: MediaItem; props: CatalogGridProps; disabled: boolean }) {
   const artwork = cardArtwork(item, 'small', false, props.layout.javImage);
-  const name = props.helpers.displayName(item, item.name || '').trim() || '未命名作品';
-  const who = item.creator || item.performers?.join('、') || item.studio;
-  return <div data-list-identity="">
-    <button type="button" data-list-open="" disabled={disabled} aria-label={`打开 ${name}`} onClick={event => {
-      if (props.selectMode) {
-        props.actions.toggleSelection(item.id, event.shiftKey); return;
-      }
-      const open = props.filters?.state === 'trash' ? props.actions.openResource : props.actions.open;
-      open(item, event.currentTarget);
-    }}>
+  const parts = item.part_group || null;
+  const editions = item.edition_group || null;
+  const rawName = parts?.title || item.name || '';
+  const name = props.helpers.displayName(item, rawName).trim() || '未命名作品';
+  const titleHtml = props.helpers.titleHtml(item, rawName).trim() || '未命名作品';
+  const { avatar, who } = identityParts(item);
+  const watched = !parts && Number(item.play_seconds) > 0 && Number(item.duration) > 0
+    ? Math.min(Number(item.play_seconds) / Number(item.duration), 1) : 0;
+  const tints = useLibraryTints({ names: true });
+  const tint = item.library_id ? tints.get(item.library_id) : undefined;
+  const flaggedBy = [Number(item.liked) > 0 ? '喜欢' : '', Number(item.o_count) > 0 ? '有高潮记录' : ''].filter(Boolean);
+  const glyph = (name: string) => <svg viewBox="0 0 24 24" aria-hidden="true"><use href={`#i-${name}`} /></svg>;
+  const open = (event: MouseEvent<HTMLElement>) => {
+    if (props.selectMode) {
+      props.actions.toggleSelection(item.id, event.shiftKey); return;
+    }
+    const opener = props.filters?.state === 'trash' ? props.actions.openResource : props.actions.open;
+    opener(item, event.currentTarget);
+  };
+  /* 头像与署名和卡片同一套：点头像或人名打开人物、厂牌页，没有署名的那批打开「未归属」。 */
+  const openOwner = (event: MouseEvent<HTMLElement>) => {
+    if (props.selectMode) return;
+    const target = event.target as HTMLElement;
+    const entity = target.closest<HTMLElement>('[data-entity-kind]');
+    if (entity) { props.actions.openEntity(entity.dataset.entityKind || '', entity.dataset.entityName || ''); return }
+    if (target.closest('[data-open-unowned]')) props.actions.openUnowned();
+  };
+  return <div data-list-identity="" onClick={openOwner}>
+    <button type="button" data-list-open="" disabled={disabled} tabIndex={-1} aria-hidden="true" onClick={open}>
       <span data-list-picture="">{artwork.html
-        ? <ArtSlot artwork={artwork} relayout={root => relayoutCovers(root, 'small')} /> : <span>无预览</span>}</span>
-      <span data-list-text=""><span data-list-name="" title={name}>{name}</span>
-        <span data-list-byline="">{who || '未归属'}</span>
-      </span>
+        ? <ArtSlot artwork={artwork} relayout={root => relayoutCovers(root, 'small')} /> : <span>无预览</span>}
+        {parts && !editions ? <span data-media-group="">{`${Number(parts.count).toLocaleString()} 卷`}</span> : null}
+        {editions ? <span data-media-group="" title={editions.editions.join(' · ')}>{`${Number(editions.count).toLocaleString()} 个版本`}</span> : null}
+        {watched > 0
+          ? <span data-media-progress="" role="progressbar" aria-label="观看进度" aria-valuemin={0} aria-valuemax={100}
+            aria-valuenow={Math.round(watched * 100)}>
+            <i style={{ '--media-fill': `${(watched * 100).toFixed(1)}%` } as CSSProperties} />
+          </span>
+          : null}
+        {item.watch_later || flaggedBy.length
+          ? <span data-media-status="">
+            {item.watch_later ? <span data-status="later" title="稍后看" aria-label="稍后看">{glyph('bookmark')}</span> : null}
+            {flaggedBy.length ? <span data-status="flagged" title={`已标记：${flaggedBy.join('、')}`}
+              aria-label={`已标记：${flaggedBy.join('、')}`}>{glyph('heart')}</span> : null}
+          </span>
+          : null}</span>
     </button>
+    {avatar}
+    <span data-list-text="">
+      <button type="button" data-list-name="" disabled={disabled} title={name} aria-label={`打开 ${name}`} onClick={open}
+        dangerouslySetInnerHTML={{ __html: titleHtml }} />
+      <span data-list-byline="">
+        {tint?.name ? <span data-list-library="" title={`媒体库：${tint.name}`}>
+          <SourceMark mark={tint.icon} />{tint.name}
+        </span> : null}
+        {who}
+      </span>
+    </span>
   </div>;
 }

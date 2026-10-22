@@ -93,7 +93,7 @@ const SKELETON_SLOT:Record<string,(width:number)=>string>={
   av:()=>`<span class="av avskeleton"><span class="ring"></span><span class="nm">&nbsp;</span></span>`,
   brandpill:width=>`<span class="brandpill brandskeleton" style="width:${width}px"><span class="mk"></span></span>`,
   pill:width=>`<span class="pill tagskeleton" style="width:${width}px"></span>`,
-  'filter-pill':width=>`<span class="skeleton" style="width:${width}px;height:30px;border-radius:8px;flex:none"></span>`,
+  'filter-pill':width=>`<span class="skeleton" style="width:${width}px;height:var(--control-h-compact);border-radius:8px;flex:none"></span>`,
 };
 const SKELETON_SLOT_WIDTHS:Record<string,number[]>={
   av:[0],

@@ -14,7 +14,7 @@ describe('Board 页面骨架', () => {
     const root = document.createElement('div');
     root.innerHTML = boardPageSkeleton(`/settings/${key}`);
     expect(root.querySelector('.ui-board-local-nav [aria-selected="true"]')?.textContent).toBe(label);
-    expect(root.querySelector('[aria-label="媒体目录"]')).toBeNull();
+    expect(root.querySelector('[aria-label="媒体库与目录"]')).toBeNull();
   });
   it.each(['/stats', '/taste', '/subscriptions', '/settings/library', '/settings/diagnostics', '/tasks', '/duplicates', '/quality-goals', '/playlists'])('为 %s 提供单一等待语义', path => {
     const root = document.createElement('div');
@@ -38,7 +38,7 @@ describe('Board 页面骨架', () => {
     ['/duplicates', '[data-duplicate-group] .duplicate-row', 4],
     ['/quality-goals', '.peach-react .card-grid-cover > li', 6],
     ['/subscriptions', '.peach-react .ui-follow-skeleton-surface .follow-skeleton-author', 3],
-    ['/settings/library', '.peach-react .ui-configpage section[aria-label="媒体目录"]', 1],
+    ['/settings/library', '.peach-react .ui-configpage section[aria-label="媒体库与目录"]', 1],
     ['/playlists', '.ui-playlistcards > .playlistcard', 6],
   ] as const)('%s 复用最终内容容器', (path, selector, count) => {
     const root = document.createElement('div');
@@ -83,7 +83,7 @@ describe('Board 页面骨架', () => {
     expect(group.map((button) => button.querySelector('use')?.getAttribute('href'))).toEqual(['#i-layout-grid', '#i-table']);
     expect(group.map((button) => button.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
     expect(group.every((button) => button.classList.contains('bg-button-ghost-background'))).toBe(true);
-    expect(toolbar.querySelector('button[aria-haspopup="listbox"]')?.textContent).toBe('检查时间');
+    expect(toolbar.querySelector('button[aria-haspopup="listbox"]')?.textContent).toBe('排序检查时间');
     expect([...toolbar.querySelectorAll('button')].at(-1)?.textContent).toBe('全部收起');
     const tableGroup = follow({ followLayout: 'table' }).querySelectorAll('[data-button-group] > button');
     expect([...tableGroup].map((button) => button.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
@@ -95,7 +95,7 @@ describe('Board 页面骨架', () => {
       .nextElementSibling!.querySelector('use')?.getAttribute('href');
     expect(arrow(toolbar({}))).toBe('#i-arrow-down');
     const byName = toolbar({ followSort: 'name' });
-    expect(byName.querySelector('button[aria-haspopup]')?.textContent).toBe('创作者名称');
+    expect(byName.querySelector('button[aria-haspopup]')?.textContent).toBe('排序创作者名称');
     expect(arrow(byName)).toBe('#i-arrow-up');
     expect(arrow(toolbar({ followSort: 'name', followDir: 'desc' }))).toBe('#i-arrow-down');
   });

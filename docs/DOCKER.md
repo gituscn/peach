@@ -68,6 +68,8 @@ local = '/media'
 
 Linux 首次重编码时会探测实际可用的硬件编码器，整片 MP4 与 HLS 分片共享探测结果。AMD / Intel 使用 VAAPI；存在 NVIDIA 设备时探测 NVENC。探测失败的后端在当前服务进程内不再尝试，重启服务后重新探测。封装复制不需要硬件探测。
 
+镜像自带 OpenCV（`vision` 依赖组）和头像取景与比对用的人脸模型（YuNet 为 MIT，SFace 为 Apache-2.0，许可证在同一目录），位于 `/app/tools/face-models`，由 `PEACH_FACE_MODELS` 指向，容器不联网也能用。构建镜像时按固定地址下载并校验 SHA-256。
+
 镜像包含 Debian FFmpeg、Mesa VAAPI 驱动与 `vainfo`。AMD 宿主机需加载 `amdgpu` 和对应固件，并提供 `/dev/dri/renderD*`。Intel 需在自定义镜像内安装适配设备的 VAAPI 驱动；Mesa 驱动不代表已覆盖全部 Intel GPU。将下面的条目合入 Compose 的 `services.peach`，设备路径按宿主机调整：
 
 ```yaml
@@ -93,6 +95,12 @@ VAAPI 尝试顺序为硬件解码加 `scale_vaapi` / `h264_vaapi`、软件解码
 
 `ffmpeg -hwaccels` 列出构建支持的硬件加速方式，`ffmpeg -h decoder=h264` 等列出对应解码器支持的硬件设备。VAAPI 解码通过普通解码器的硬件加速接口启用，`ffmpeg -decoders` 中没有名为 `vaapi` 的解码器不代表缺少 VAAPI 解码支持。参数含义见 [FFmpeg 官方文档](https://ffmpeg.org/ffmpeg.html#Advanced-Video-options)。目标 GPU 的实际解码、GPU 占用与播放效果需要在部署机器上验证。
 
+## amane 刮削站点
+
+镜像带 uv 与 Git，不带 amane 本体（[ADR-0043](adr/0043-amane-sites-via-thin-bridge-subprocess.md)）。在「来源和凭证」的 amane 卡片点重建，或在任务中心「需要处理」点「立即重试」，Peach 按 `tools/amane-bridge/uv.lock` 下载 amane 及其依赖，首次约 98 MB。运行环境建在 `/data/tools/amane-bridge/.venv`，随 `/data` 卷保留，重启容器后无需重建。
+
+重建时容器要能访问 `github.com` 与 PyPI。解释器使用镜像自带的 Python 3.14；镜像设置了 `UV_PYTHON_DOWNLOADS=never`，uv 不会把另一份 Python 下载到不在卷上的家目录。uv 的下载缓存在家目录，重建容器后清空，不影响已建好的环境。镜像的 Python 次版本变化后，需要重新点一次重建。
+
 ## 更新与范围
 
 更新镜像并重建容器时保留 `/data`。数据库有待执行迁移时，先备份并按 [运行与配置](OPERATIONS.md) 的迁移流程处理；Docker 启动入口不会自动迁移已有数据库。健康检查使用 `/healthz?ready=1`。
@@ -101,6 +109,6 @@ Linux 容器不读取用户电脑上的浏览历史，也不包含交互式浏�
 
 ## 镜像发布
 
-构建使用官方 Python `3.14.8-slim-trixie` 与 uv `0.13.1`，依赖由 `uv.lock` 锁定，应用以非 editable 包安装，包含 Web 与迁移资源。镜像以 UID/GID 1000 运行，内置 FFmpeg、FFprobe 和 OpenSSL。构建上下文只允许代码与资源，不包含工作树、媒体、真实 Peach 数据库或凭据。
+构建使用官方 Python `3.14.8-slim-trixie` 与 uv `0.13.1`，依赖由 `uv.lock` 锁定，应用以非 editable 包安装，包含 Web 与迁移资源。镜像以 UID/GID 1000 运行，内置 FFmpeg、FFprobe、OpenSSL，以及重建 amane 桥用的 uv 与 Git。构建上下文只允许代码与资源，不包含工作树、媒体、真实 Peach 数据库或凭据。
 
 GitHub Actions 的 `Docker` 工作流先构建并运行临时卷验收，通过后发布。仓库变量 `DOCKERHUB_USERNAME` 和机密 `DOCKERHUB_TOKEN` 用于 Docker Hub 发布；机密只保存在 GitHub，不进入项目文件。未配置发布身份时仍执行构建验收。ARM 镜像需通过同等运行验收后再加入发布。

@@ -5,7 +5,7 @@ description: 在新增、修改、预览或复核 Peach 页面、控件、提示
 
 # Peach Web UI 复用门槛
 
-最后复核：2026-10-21
+最后复核：2026-10-22
 证据来源：现有 UI 契约、`docs/TESTING.md`、本机重复文案与异步轮询回归记录、jakubkrehel/skills 与 emilkowalski/skills 摘录、`docs/reference-snapshots/open-claude-ui.md`、用户真实小样本预览与明确确认后测试的约定。
 
 ## 开工顺序
@@ -48,6 +48,7 @@ description: 在新增、修改、预览或复核 Peach 页面、控件、提示
 - 优先扩展 `frontend/src/ui-kit/`，不要为同一语义复制一次性 class 和模板。
 - 数据表统一用 TanStack Table 驱动 BoardUI `Table`，具备全集排序、分页、跨页选择与批量操作；工具栏、分页和批量栏按关注列表复用 `data-table.tsx`、`table-controls.tsx`、`DataTableFrame` 与 `SelectionDock`，默认每页 20 条，同页只保留当前表格的选择。
 - 管理页单面板分区的标题放在面板内，不在框外重复；多卡片分组可用框外标题。同级分区标题用 `text-title-2-medium`，加载态与内容态共用 500 字重、20px 字号和 26px 行高。
+- 控件高度只取 `--control-h-inline`／`-compact`／`--control-h`／`-large` 四档，同一行的同类控件同档；与文字同行的图标用 `--icon-inline`，单独图标按控件档取固定值；下拉不点开也要看得出在选什么（上方标签、触发键前缀或格子选择器的弹层标题三选一）。判据与坏例见 `docs/DESIGN_GUIDELINES.md` 第 2、10、11 节。
 - 颜色、字号、圆角、浮层层级只用 `:root` 已有 token；新 token 必须证明现有词汇无法表达。
 - 字重只有 400／500／600 三档，标题按既定层级选择 medium 或 semibold；圆角只用 `--badge-radius`／`--control-radius`／`--surface-radius`／`--floating-radius`／`--pill-radius` 加 `50%` 与 `0`，带边框容器里的头尾条用 `calc(… - 1px)` 保持同心。两者的字面值由 `tests/test_web_ui.py` 拒绝，归属判据见 `:root` 注释。
 - 单色优先：`--tungsten` 只给焦点环、链接、进度／数据与 Toggle 开态。主动作用 `--ink` 底 `--ground` 字且每屏最多一个。标题悬停下划线不变蓝，计数徽章中性灰。其它选择器引用 `--tungsten` 由 `tests/test_web_ui.py` 拒绝；实测见 `vercel-geist-semantics-measured.md`「选中态与开关色」「Button 全变体与状态」。

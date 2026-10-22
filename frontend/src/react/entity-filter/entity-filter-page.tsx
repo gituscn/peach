@@ -297,7 +297,7 @@ export function SortKeys({ sorts, onSort }: { sorts: readonly EntitySortKey[]; o
         return (
           <button key={sort.key} type="button" data-entity-sort={sort.key} data-entity-press=""
             aria-pressed={sort.pressed} aria-label={sort.ariaLabel || undefined} onClick={() => onSort(sort.key)}>
-            {sort.label}{sort.pressed && sort.dir ? <IconSwap a={SortUpIcon} b={SortDownIcon} state={sort.dir === 'asc' ? 'a' : 'b'} className="size-3.5" /> : null}
+            {sort.label}{sort.pressed && sort.dir ? <IconSwap a={SortUpIcon} b={SortDownIcon} state={sort.dir === 'asc' ? 'a' : 'b'} className="size-(--icon-inline)" /> : null}
           </button>
         );
       })}

@@ -10,7 +10,7 @@
  * `helpers.jobProgress` 盯着，跑完失效这一页的查询重取。 */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, type InfiniteData } from '@tanstack/react-query';
-import { icon, leadingGraphemes, requestErrorMessage } from '@peach/legacy/core';
+import { esc, icon, leadingGraphemes, requestErrorMessage } from '@peach/legacy/core';
 import { tagLabel } from '@peach/legacy/tags';
 import { spinnerHtml } from '@peach/legacy/ui';
 
@@ -29,6 +29,7 @@ import { useMasonryGrid } from '../components/use-masonry-grid';
 import { Segments, Shuffle } from '../entity-filter/entity-filter-page';
 import type { SegmentOption } from '../entity-filter/entity-filter';
 import { checkSummary, FOLLOW_CHECK_URL, FOLLOW_STATUS_URL, sourceIconUrl } from '../follow-manage/follow-manage';
+import { followManageEntry } from '../follow-manage/manage-route';
 import { Note } from '../components/note';
 import { sidebarTagCounts } from '../../sidebar';
 import { queryClient } from '../query';
@@ -143,7 +144,7 @@ export function FollowFeedPage(props: FollowFeedProps) {
     if (result.isError) {
       return (
         <div data-follow-feed="">
-          <Head onManage={actions.openManage} />
+          <Head />
           <RetryNote message={requestErrorMessage(result.error)} onRetry={() => void result.refetch()} />
         </div>
       );
@@ -165,7 +166,7 @@ export function FollowFeedPage(props: FollowFeedProps) {
       <div key={job.generation} ref={job.host} data-follow-progress="" />
       {!job.busy && job.report ? <Note tone="neutral" title="检查结果">{job.report}</Note> : null}
       <div data-follow-feed="" data-select-mode={props.selectMode ? '' : undefined}>
-        <Head onManage={actions.openManage}>
+        <Head>
           {facets.sources.length ? (
             <Button variant="primary" data-follow-recheck="" aria-label="检查每个来源的更新"
               aria-busy={job.busy || undefined}
@@ -183,7 +184,7 @@ export function FollowFeedPage(props: FollowFeedProps) {
         <Glass facets={facets} view={view} total={total} busy={listPending} props={props} route={route} />
         <Combo conditions={conditions} onDrop={(row) => actions.route(dropCondition(view, row))}
           onClear={() => route({ author: '', provider: '', work: '', tags: [], durMin: 0, durMax: 0 })} />
-        {facets.broken.length ? <BrokenNote count={facets.broken.length} onManage={actions.openManage} /> : null}
+        {facets.broken.length ? <BrokenNote count={facets.broken.length} /> : null}
         <List key={query.queryKey.join('\u0000')} retryKey={result.dataUpdatedAt} pending={listPending} facets={facets} data={data} context={context}
           props={props} checkAction={<Button size="small" variant="secondary" aria-label="检查每个来源的更新" aria-busy={job.busy || undefined}
             aria-disabled={job.busy || undefined} onClick={() => { if (!job.busy) void job.start(false) }}>检查更新</Button>} />
@@ -194,7 +195,7 @@ export function FollowFeedPage(props: FollowFeedProps) {
                 {data.groups.length < FOLLOW_AUTO_LOAD_LIMIT ? (
                   <LoadMore key={result.data?.pages.length} entity enabled={() => !job.busyRef.current}
                     load={async () => { await result.fetchNextPage({ throwOnError: true }) }}>
-                    <CHEVRON_DOWN className="size-3.5" />加载更多
+                    <CHEVRON_DOWN className="size-(--icon-inline)" />加载更多
                   </LoadMore>
                 ) : (
                   <ManualMore busy={result.isFetchingNextPage}
@@ -223,14 +224,14 @@ export function FollowFeedPage(props: FollowFeedProps) {
 }
 
 /** 页头：标题与「管理关注」恒在，检查更新那枚键要等来源读到才摆（`children`）。 */
-function Head({ onManage, children }: { onManage(): void; children?: ReactNode }) {
+function Head({ children }: { children?: ReactNode }) {
   return (
     <div data-follow-head="">
       <h2 data-follow-title="">关注</h2>
       <span data-follow-head-actions="">
-        <Button variant="secondary" leadingIcon={SETTINGS} data-follow-manage="" onClick={onManage}>
+        <ButtonLink variant="secondary" leadingIcon={SETTINGS} data-follow-manage="" href={manageHref()}>
           管理关注
-        </Button>
+        </ButtonLink>
         {children}
       </span>
     </div>
@@ -243,7 +244,7 @@ function ManualMore({ busy, error, load }: { busy: boolean; error: string; load(
   return (
     <>
       <button type="button" data-entity-more="" aria-busy={busy || undefined} aria-disabled={busy || undefined} onClick={load}>
-        <CHEVRON_DOWN className="size-3.5" />加载更多
+        <CHEVRON_DOWN className="size-(--icon-inline)" />加载更多
       </button>
       {error ? <RetryNote message={error} onRetry={load} /> : null}
     </>
@@ -490,7 +491,7 @@ function Glass({ facets, view, total, busy, props, route }: {
                   const next = nextSort(key, view.sort, view.dir);
                   if (next) route(next);
                 }}>
-                {label}{pressed ? <IconSwap a={SortUpIcon} b={SortDownIcon} state={view.dir === 'asc' ? 'a' : 'b'} className="size-3.5" /> : null}
+                {label}{pressed ? <IconSwap a={SortUpIcon} b={SortDownIcon} state={view.dir === 'asc' ? 'a' : 'b'} className="size-(--icon-inline)" /> : null}
               </button>
             );
           })}
@@ -528,15 +529,16 @@ function Combo({ conditions, onDrop, onClear }: {
 }
 
 /** 有来源上次检查失败：这一页不摊原因，指到管理页去看。Note 的边界与图标取全站那一份。 */
-function BrokenNote({ count, onManage }: { count: number; onManage(): void }) {
+function BrokenNote({ count }: { count: number }) {
   return (
-    <div data-follow-broken="" onClick={(event) => {
-      if ((event.target as HTMLElement).closest('[data-follow-manage]')) onManage();
-    }} dangerouslySetInnerHTML={{
-      __html: `<div class="geist-note geist-note-error fwarn" role="alert">${icon('alert')}<span>${count} 个来源上次检查失败，去<button type="button" class="flink" data-follow-manage>管理关注</button>看原因。</span></div>`,
+    <div data-follow-broken="" dangerouslySetInnerHTML={{
+      __html: `<div class="geist-note geist-note-error fwarn" role="alert">${icon('alert')}<span>${count} 个来源上次检查失败，去<a class="flink" href="${esc(manageHref())}" data-follow-manage>管理关注</a>看原因。</span></div>`,
     }} />
   );
 }
+
+/** 管理页入口随当前地址算：旧地址上的 `tab` 仍按 `followManageEntry` 的约定改道。 */
+const manageHref = () => followManageEntry(window.location.search);
 
 /* ── 列表 ── */
 

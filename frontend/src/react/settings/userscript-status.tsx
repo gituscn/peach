@@ -28,7 +28,7 @@ export function UserscriptStatus({ enabled, release }: {
     : update ? '需更新' : status.paired ? '已连接' : '待配对';
   return <>
     <iframe ref={frame} key={attempt} title="Peach 用户脚本检测" hidden src="/integrations/peach-userscript-bridge" />
-    <div aria-live="polite" data-userscript-status="" className={cardClass({ bordered: 'line', className: 'flex flex-col gap-3' })}>
+    <div aria-live="polite" data-userscript-status="" className={cardClass({ variant: 'raised', bordered: 'line', className: 'flex flex-col gap-3' })}>
       <div className="flex flex-wrap items-center justify-between gap-3"><span className="text-body-medium text-text-primary">Peach 用户脚本</span>
         <ConnectionStatus tone={tone}>{label}</ConnectionStatus></div>
       {installed ? <p className="text-body-regular text-text-secondary">用户脚本 v{status.version}</p> : null}
@@ -41,7 +41,7 @@ export function UserscriptStatus({ enabled, release }: {
         : '生成令牌后复制配对信息，在用户脚本设置中粘贴并保存。'}</p>
       <div className="flex flex-wrap items-center gap-2">
         {status === 'missing' || update ? <ExternalLink href={release.install_url}>{update ? '更新用户脚本' : '安装 Peach 用户脚本'}</ExternalLink> : null}
-        <Button variant="secondary" size="small" type="button" {...busyProps(status === 'checking')}
+        <Button variant="secondary" type="button" {...busyProps(status === 'checking')}
           onClick={retry}>重新检测</Button>
       </div>
     </div>

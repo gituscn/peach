@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Iterable
 from pathlib import PureWindowsPath
 
 
@@ -386,11 +387,29 @@ KOREAN_MIB_PREFIXES = frozenset({
     "MOSA", "MOSY", "NOAH", "SJSK",
 })
 _KOREAN_MIB_CODE = re.compile(r"^([A-Z]{2,4})-\d+$")
-#: MIB 文件名是「番号 + 空格 + 演员名与片名」（`YUJ-103 Ain Do you wanna be my slave`），
-#: 或带站名方括号与括号注记（`[K-MIB]NOAH-101(NOAH)(1)`），整段不是纯番号，
-#: `_CODE_BODY` 认不出。只对 MIB 前缀开这条路，前缀之外的仍走通用规则。
+#: MIB 文件名常带站名方括号（`[K-MIB]NOAH-101(NOAH)(1)`）或用 `_` 分隔（`YUJ_103 片名`）。
+#: `_titled_release_code` 只看第一段、只认 `-`，第一段又是 `K-MIB`，两种都接不住，
+#: 所以 MIB 前缀单独开这条路，前缀之外的仍走通用规则。
 _KOREAN_MIB_FILENAME = re.compile(
     r"^(?:\[K-?MIB\]\s*)?([A-Za-z]{2,4})[-_](\d{3,4})(?=$|[\s(\[._-])", re.I)
+#: 带片名的文件名里，番号是一段连续的半角字母数字，中间只夹 `-`、`_`、`.`。
+#: 中日文、空白、括号和 `+` 都是边界：`CAWD-987いいなり`、`GVH-520【中文字幕】`
+#: 切出来就是番号本身。
+_TITLE_TOKEN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?")
+_QUALITY_TOKEN = re.compile(r"^(?:hd|fhd|sd|uhd|4k|2160p?|1080p?|720p?)$", re.I)
+#: 片名前的番号必须用 `-` 把厂牌和序号隔开。连写（`Nanshu969`、`LOOKS199`）和下划线
+#: （`photo_83439`、`@yszl_0107`）在片名里多半是创作者账号或相机编号，不是番号。
+#: 序号至少三位：两位的（`ShinoAoi-15`、`miru-10`）是创作者的分集号；后面紧跟月日的
+#: （`TG-2025-01-27`）是日期。只取词元开头这一段，紧跟的版次和分卷（`-C`、`-CD1`、
+#: `_part1`）不影响番号。
+_HYPHENATED_CODE = re.compile(r"^(?:\d{3})?[A-Za-z]{2,8}-\d{3,5}(?![0-9]|-\d{2}-\d)")
+#: 用户番号识别规则的上限。每条规则要对库里每个文件名跑一遍，条数和长度都设个顶。
+CODE_PATTERN_LIMIT = 20
+CODE_PATTERN_MAX_LENGTH = 200
+#: `(?<name>`（不是 `(?<=`、`(?<!` 这两种后视断言）换成 Python 的 `(?P<name>`。
+_PCRE_NAMED_GROUP = re.compile(r"\(\?<(?![=!])")
+#: 名字中段的 FC2 商品号：`FC2` 前面不能紧贴字母数字，商品号后面不能再接数字。
+_FC2_IN_TITLE = re.compile(r"(?i)(?<![A-Z0-9])FC2[-_ ]*(?:PPV[-_ ]*)?(\d{5,8})(?!\d)")
 
 DUPLICATE_TOLERANCE = 0.005
 DUPLICATE_FLOOR_SECONDS = 15.0
@@ -788,13 +807,58 @@ def _tokyo_hot_from_text(text: str) -> str:
     return ""
 
 
-def release_code_from_filename(name: str | None) -> str | None:
+def compile_code_patterns(raw) -> tuple[re.Pattern, ...]:
+    """把用户写的番号识别规则编译成正则；写错的规则抛 `ValueError`，消息给用户看。
+
+    每条规则是一个对完整文件名做搜索的正则。番号取命名组 `code`，没有就取第一个
+    括号，再没有就取整段匹配。`(?<code>…)` 是多数在线正则工具的写法，Python 写作
+    `(?P<code>…)`，两种都收。
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, (list, tuple)):
+        raise ValueError("番号识别规则要写成一组正则表达式")
+    rules = [str(rule).strip() for rule in raw if str(rule or "").strip()]
+    if len(rules) > CODE_PATTERN_LIMIT:
+        raise ValueError(f"番号识别规则最多 {CODE_PATTERN_LIMIT} 条")
+    compiled = []
+    for index, rule in enumerate(rules, 1):
+        if len(rule) > CODE_PATTERN_MAX_LENGTH:
+            raise ValueError(f"第 {index} 条规则超过 {CODE_PATTERN_MAX_LENGTH} 个字符")
+        try:
+            compiled.append(re.compile(_PCRE_NAMED_GROUP.sub("(?P<", rule), re.I))
+        except re.error as error:
+            raise ValueError(f"第 {index} 条规则不是有效的正则表达式：{error}") from None
+    return tuple(compiled)
+
+
+def _code_from_patterns(name: str, patterns: Iterable[re.Pattern]) -> str | None:
+    """按用户规则取番号；取出来的那段仍要是番号的样子，否则交给下一条规则。"""
+    for pattern in patterns:
+        match = pattern.search(name)
+        if not match:
+            continue
+        captured = (match.group("code") if "code" in pattern.groupindex
+                    else match.group(1) if pattern.groups else match.group(0))
+        code = release_code_from_text(captured)
+        if code:
+            return code
+    return None
+
+
+def release_code_from_filename(name: str | None, *, patterns: Iterable[re.Pattern] = ()) -> str | None:
     r"""文件名带分卷、画质和重复计数，剥掉噪声后再解析。
+
+    `patterns` 是用户在设置里写的番号识别规则（`compile_code_patterns`），先于内置
+    规则试。
 
     剥完噪声剩下的主干要自己站得住：带分隔符，或序号至少三位。论坛合集包
     `[mtfdz.club]WX17.3` 摘掉域名、再把 `.3` 当分卷剥掉，只剩 `WX17`，补零才凑成
     `WX-017`；真番号的分卷（`abp762-1`、`ABW-358-2`）剥完仍是完整番号。
     """
+    custom = _code_from_patterns(str(name or "").strip(), patterns)
+    if custom:
+        return custom
     stem = _ASSET_EXTENSION.sub("", str(name or "").strip())
     if western_release_identity(stem):
         return None
@@ -813,6 +877,24 @@ def release_code_from_filename(name: str | None) -> str | None:
     mib = _KOREAN_MIB_FILENAME.match(stem)
     if mib and mib.group(1).upper() in KOREAN_MIB_PREFIXES:
         return normalise_code_key(f"{mib.group(1)}-{mib.group(2)}")
+    return _titled_release_code(stem)
+
+
+def _titled_release_code(stem: str) -> str | None:
+    """「番号 + 片名」：番号是名字里第一段半角字母数字，后面跟片名、女优或说明。
+
+    `FC2` 商品号自带站名，写在名字哪里都认。其余番号只看第一段：再往后就是片名，
+    片名里的 `Rena n1042 clip`、`Part 18` 不是番号。中日文（`【中文字幕】`、女优名）
+    不成段，画质词跳过去接着看。
+    """
+    fc2 = _FC2_IN_TITLE.search(stem)
+    if fc2:
+        return normalise_code_key(f"FC2-PPV-{fc2.group(1)}")
+    for token in _TITLE_TOKEN.findall(strip_promo_markers(stem)):
+        if _QUALITY_TOKEN.match(token):
+            continue
+        head = _HYPHENATED_CODE.match(token)
+        return release_code_from_text(head.group(0)) if head else None
     return None
 
 

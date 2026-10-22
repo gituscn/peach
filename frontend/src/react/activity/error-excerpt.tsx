@@ -35,7 +35,7 @@ export function ErrorExcerpt({ text, className = '' }: { text: string; className
         ? <ErrorDetails id={id} label="完整错误详情">{full}</ErrorDetails>
         : <p className="w-full wrap-anywhere">{head}</p>}
       {more
-        ? <Button variant="ghost" size="xs" data-error-details-toggle="" className="-ml-2" aria-expanded={open} aria-controls={open ? id : undefined}
+        ? <Button variant="ghost" size="small" data-error-details-toggle="" className="-ml-2" aria-expanded={open} aria-controls={open ? id : undefined}
             onClick={() => setOpen(!open)}>
             {open ? '收起详情' : '查看详情'}
           </Button>

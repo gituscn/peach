@@ -53,7 +53,7 @@ export function TagManager({ search = '', category = 'all', view = 'cloud', onCa
         {picked.size ? <GlassPill onPress={() => setPicked(new Set())}>清空选择</GlassPill> : null}
       </>} />
     {inventory.isPending ? <div aria-busy="true" data-skeleton="" className="h-24 rounded-lg bg-background-tertiary-default"><VisuallyHidden>正在读取标签</VisuallyHidden></div>
-      : inventory.isError ? <Note tone="error" action={<Button variant="secondary" onClick={() => void inventory.refetch()}>重试</Button>}>无法读取标签</Note>
+      : inventory.isError ? <Note tone="error" action={<Button variant="secondary" onClick={() => void inventory.refetch()}>立即重试</Button>}>无法读取标签</Note>
         : visible.length ? (view === 'alphabet' ? <TagAlphabet groups={groups} actions={actions} /> : <TagCloud tags={tags} actions={actions} />)
           : <Note tone="neutral">没有符合条件的标签。</Note>}
     {action.error ? <Note tone="error">{action.error}</Note> : null}

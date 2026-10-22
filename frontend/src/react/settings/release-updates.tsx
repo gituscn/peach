@@ -119,12 +119,12 @@ export function ReleaseUpdates({ initial, initialJob }: { initial: ReleaseState;
         ) : null}
       </Stack>}
       <Footer status={<ExternalLink href={data.release_url}>查看发布页</ExternalLink>}>
-        {job.state === 'ready' ? <Button onClick={confirmRestart}>重启安装</Button> : null}
-        {data.state === 'available' && data.installation === '独立测试包' && job.state !== 'ready'
-          ? <Button onClick={download} {...busyProps(running || action.busy === 'download')}>下载并安装</Button>
-          : null}
         <Button variant={job.state === 'ready' || (data.state === 'available' && data.installation === '独立测试包') ? 'secondary' : 'primary'}
           disabled={running} onClick={check} {...busyProps(action.busy === 'check')}>检查更新</Button>
+        {data.state === 'available' && data.installation === '独立测试包' && job.state !== 'ready'
+          ? <Button variant="primary" onClick={download} {...busyProps(running || action.busy === 'download')}>下载并安装</Button>
+          : null}
+        {job.state === 'ready' ? <Button variant="primary" onClick={confirmRestart}>重启安装</Button> : null}
       </Footer>
     </Section>
   );

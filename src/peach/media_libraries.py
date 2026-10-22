@@ -16,7 +16,9 @@ def libraries(config):
         groups.setdefault(root["library_id"], []).append({**root, "root_id": root_id})
     return [{"id": key, "name": catalog[key]["name"], "roots": roots,
              "icon": catalog[key].get("icon") if catalog[key].get("icon") in LIBRARY_ICONS else (
-                 roots[0]["location"] if len({item["location"] for item in roots}) == 1 else "database")}
+                 roots[0]["location"] if len({item["location"] for item in roots}) == 1 else "database"),
+             "color": catalog[key].get("color", ""), "policy": catalog[key].get("policy", "") or "auto",
+             "stages": sorted(media_identity.library_stages(catalog[key]), key=media_identity.STAGES.index)}
             for key, roots in groups.items()]
 
 

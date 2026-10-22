@@ -235,7 +235,7 @@ function helpers(): FollowFeedHelpers {
 
 function actions(): FollowFeedActions {
   return {
-    route: vi.fn(), shuffle: vi.fn(), loaded: vi.fn(), openDetail: vi.fn(), openAuthor: vi.fn(), openManage: vi.fn(), toggleSelection: vi.fn(),
+    route: vi.fn(), shuffle: vi.fn(), loaded: vi.fn(), openDetail: vi.fn(), openAuthor: vi.fn(), toggleSelection: vi.fn(),
     setImagesOnly: vi.fn(), setPhotoLayout: vi.fn(), canFlip: () => false, toast: vi.fn(), failure: vi.fn(), checkReport: vi.fn(),
   };
 }
@@ -358,9 +358,10 @@ describe('页面', () => {
     const given = props();
     const host = await open(given);
     expect(host.querySelector('[data-follow-title]')?.textContent).toBe('关注');
-    await click(host.querySelector('[data-follow-manage]'));
-    expect(given.actions.openManage).toHaveBeenCalled();
-    expect(host.querySelector('[data-media-error] [data-note-action]')?.textContent).toBe('重试');
+    const manage = host.querySelector('[data-follow-manage]');
+    expect(manage?.tagName).toBe('A');
+    expect(manage?.getAttribute('href')).toBe('/subscriptions');
+    expect(host.querySelector('[data-media-error] [data-note-action]')?.textContent).toBe('立即重试');
   });
 
   it('有来源、一条更新都还没有：没设筛选时说还没有更新，设了筛选才叫人换筛选', async () => {

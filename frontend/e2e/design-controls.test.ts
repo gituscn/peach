@@ -703,18 +703,38 @@ describe('设计决定：控件、状态与首页顶部', () => {
       });
       assert.ok(await input.evaluate((element) => (element as HTMLInputElement).scrollLeft) > 0,
         '测试内容没有真正让搜索框横向滚动');
+      /* 残影最多活一秒（动画结束或兜底计时器就摘掉），负载重时测试的几次往返之间它就没了。
+         清空前在页面里挂好观察者：残影一挂上就记下文字与位移，再在同一个页面循环里逐帧等
+         placeholder 淡到完全透明；残影先被摘掉而 placeholder 还没透明，才算真失败。 */
+      type DissolveSeen = { text: string | null; transform: string; hidden: boolean };
+      type DissolveWindow = Window & { dissolveSeen?: Promise<DissolveSeen> };
+      await input.evaluate((element) => {
+        const host = element.parentElement!;
+        (window as DissolveWindow).dissolveSeen = new Promise<DissolveSeen>((resolve) => {
+          const seen: DissolveSeen = { text: null, transform: '', hidden: false };
+          const finish = () => { observer.disconnect(); resolve(seen) };
+          const poll = () => {
+            if (!host.querySelector(':scope > .cleardissolve')) { finish(); return }
+            if (getComputedStyle(element, '::placeholder').opacity === '0') { seen.hidden = true; finish(); return }
+            requestAnimationFrame(poll);
+          };
+          const observer = new MutationObserver(() => {
+            const value = host.querySelector<HTMLElement>(':scope > .cleardissolve [data-dissolve-value]');
+            if (!value || seen.text !== null) return;
+            seen.text = value.textContent;
+            seen.transform = value.style.transform;
+            poll();
+          });
+          observer.observe(host, { childList: true });
+        });
+      });
       await input.fill('');
-      const ghost = opened.page.locator('.search > .cleardissolve');
-      await ghost.waitFor({ timeout: 1_000 });
       assert.equal(await input.inputValue(), '', '动画阻塞了真实输入框清空');
-      assert.equal(await ghost.locator('[data-dissolve-value]').textContent(), text);
-      // 残影节点先挂载，placeholder 再经 CSS transition 淡出；慢速 Windows runner 上
-      // 两件事可能跨帧。等待过渡的最终状态，仍然守住 placeholder 必须完全不可见。
-      await opened.page.waitForFunction(() => {
-        const field = document.querySelector('#q');
-        return field !== null && getComputedStyle(field, '::placeholder').opacity === '0';
-      }, undefined, { timeout: 1_000 });
-      assert.match(await ghost.locator('[data-dissolve-value]').getAttribute('style') || '', /translateX\(-\d+px\)/);
+      const seen = await opened.page.evaluate(() => (window as DissolveWindow).dissolveSeen!);
+      assert.equal(seen.text, text, '清空时没有挂上带原内容的残影');
+      assert.match(seen.transform, /translateX\(-\d+px\)/);
+      assert.ok(seen.hidden, '残影在场时 placeholder 没有完全透明');
+      const ghost = opened.page.locator('.search > .cleardissolve');
       await ghost.waitFor({ state: 'detached', timeout: 2_000 });
       assert.equal(await input.evaluate((element) => element.classList.contains('dissolving')), false,
         '动画结束后仍压着输入框的溶解状态');
@@ -792,7 +812,7 @@ describe('设计决定：控件、状态与首页顶部', () => {
     }
   });
 
-  it('首页标签：没加上去是 --field-ring-hover 的虚线，加上去是玻璃上那圈实线，视图不画虚线；触屏上排 48、视图与标签 30', { timeout: 60_000 }, async () => {
+  it('首页标签：没加上去是 --field-ring-hover 的虚线，加上去是玻璃上那圈实线，视图不画虚线；触屏上排 48、视图与标签取紧凑档', { timeout: 60_000 }, async () => {
     /* 虚线只说「这条筛选可加、此刻没加」，取 Vercel 筛选令牌未生效那一档；四枚视图恒有一枚生效，不画。
        圆角同卡片、详情与交集条那一颗（`--tag-radius`）。触屏控件共用 30px 高度。 */
     const opened = await openCatalogBars(browser);
@@ -829,9 +849,11 @@ describe('设计决定：控件、状态与首页顶部', () => {
           return element ? Math.round(element.getBoundingClientRect().height) : null;
         };
         return { coarse: matchMedia('(pointer: coarse)').matches, row: height('[data-filter-row="top"]'),
-          view: height('[data-catalog-view]'), tag: height('[data-catalog-tag]') };
+          view: height('[data-catalog-view]'), tag: height('[data-catalog-tag]'),
+          compact: parseFloat(getComputedStyle(document.querySelector('[data-catalog-filter]')!).getPropertyValue('--control-h-compact')) };
       });
-      assert.deepEqual(heights, { coarse: true, row: 48, view: 30, tag: 30 }, '触屏筛选按钮高度不一致');
+      assert.equal(heights.compact, 32);
+      assert.deepEqual(heights, { coarse: true, row: 48, view: heights.compact, tag: heights.compact, compact: heights.compact }, '触屏筛选按钮高度不一致');
     } finally {
       await phone.close();
     }

@@ -15,7 +15,7 @@ import {
   rowSelectionFeature, rowSortingFeature, columnVisibilityFeature, tableFeatures, useTable,
   type RowSelectionState, type SortingState,
 } from '@tanstack/react-table';
-import { RiDeleteBinLine, RiRefreshLine, RiRssLine } from '@remixicon/react';
+import { RiDeleteBinLine, RiExternalLinkLine, RiRefreshLine, RiRssLine } from '@remixicon/react';
 import { VisuallyHidden } from 'react-aria-components';
 
 import { avatarInner } from '@peach/card-art';
@@ -275,10 +275,11 @@ export function FeedSources({ readOnly, toast }: {
         id: 'origin',
         header: label('origin'),
         cell: (context) => (
-          <a href={context.getValue()} target="_blank" rel="noreferrer noopener" title="打开来源页面"
+          <a href={context.getValue()} target="_blank" rel="noopener noreferrer" title="打开来源页面"
             className="text-text-primary underline-offset-2 hover:underline">
             <SiteLabel site={context.row.original.kind.startsWith('javdb') ? 'javdb' : originHost(context.getValue())}
               label={originHost(context.getValue())} />
+            <RiExternalLinkLine aria-hidden className="size-(--icon-inline) shrink-0" />
           </a>
         ),
       }),
@@ -312,12 +313,12 @@ export function FeedSources({ readOnly, toast }: {
             <Switch aria-label={`启用 ${feedName(context.row.original)}`}
               isSelected={context.row.original.enabled} isDisabled={handlers.current.readOnly}
               onChange={(enabled) => handlers.current.toggle(context.row.original, enabled)} />
-            <Button variant="secondary" size="xs" iconOnly leadingIcon={RiRefreshLine}
+            <Button variant="secondary" size="small" iconOnly leadingIcon={RiRefreshLine}
               aria-label={`拉取 ${feedName(context.row.original)}`}
               disabled={handlers.current.readOnly}
               {...busyProps(handlers.current.busy === `check-${context.row.original.id}`)}
               onClick={() => handlers.current.fetch(context.row.original)} />
-            <Button variant="secondary" size="xs" iconOnly leadingIcon={RiDeleteBinLine}
+            <Button variant="secondary" size="small" iconOnly leadingIcon={RiDeleteBinLine}
               aria-label={`移除 ${feedName(context.row.original)}`}
               disabled={handlers.current.readOnly}
               onClick={() => handlers.current.remove(context.row.original)} />

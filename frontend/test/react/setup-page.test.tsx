@@ -317,7 +317,7 @@ it('读题失败时给原因和重试', async () => {
   const host = await mount(<SetupPage />);
   await settle();
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('服务出错了');
-  await click(buttonNamed('重试', host));
+  await click(buttonNamed('立即重试', host));
   await settle();
   expect(fetcher).toHaveBeenCalledTimes(2);
   expect(paths(host)).toHaveLength(1);

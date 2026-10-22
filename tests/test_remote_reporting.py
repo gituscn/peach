@@ -117,6 +117,43 @@ class RemoteReportingTests(unittest.TestCase):
         self.assertEqual(len(payload["records"]), 20)
         self.assertTrue(all(row['total'] == 2 for row in payload['records'].values()))
 
+    def test_usage_counts_distribution_and_coarse_machine_facts(self):
+        from peach import reporting_identity as identity
+        reporting.save({"usage": True, "errors": True})
+        client = mock.Mock()
+        with mock.patch.object(reporting, "_new_client", return_value=client), \
+                mock.patch.object(identity, "_memory_bytes", return_value=15.8 * 2 ** 30):
+            reporting.usage()
+        tags = client.capture_event.call_args.args[0]["tags"]
+        self.assertEqual(tags["distribution"], "source")
+        self.assertEqual(tags["memory_gb"], "16")
+        self.assertEqual(tags["cpu_cores"], str(os.cpu_count()))
+        for key in ("os", "os_version", "architecture", "python"):
+            self.assertTrue(tags[key], key)
+
+    def test_distribution_tells_desktop_apps_docker_wheel_and_source_apart(self):
+        from peach import reporting_identity as identity
+        cases = (
+            ("windows-app", {"frozen": True, "system": "Windows"}),
+            ("macos-app", {"frozen": True, "system": "Darwin"}),
+            ("docker", {"environ": {"PEACH_DISTRIBUTION": "docker"}}),
+            ("wheel", {"root": Path("site-packages/peach/_resources")}),
+            ("source", {"root": Path("peach-app")}),
+        )
+        for expected, case in cases:
+            with self.subTest(expected), \
+                    mock.patch.object(identity.sys, "frozen", case.get("frozen", False), create=True), \
+                    mock.patch.object(identity.platform, "system", return_value=case.get("system", "Linux")), \
+                    mock.patch.dict(os.environ, case.get("environ", {"PEACH_DISTRIBUTION": ""})), \
+                    mock.patch("peach.settings_file.PROJECT_ROOT", case.get("root", Path("peach-app"))):
+                self.assertEqual(identity.distribution(), expected)
+
+    def test_memory_is_reported_as_the_nearest_common_capacity(self):
+        from peach.reporting_identity import memory_bucket
+        for gigabytes, bucket in ((7.6, "8"), (15.8, "16"), (23.4, "24"), (31.9, "32"), (0.9, "2"), (1024, "256+")):
+            with self.subTest(gigabytes=gigabytes):
+                self.assertEqual(memory_bucket(gigabytes * 2 ** 30), bucket)
+
     def test_frequency_batches_send_disjoint_counts_and_keep_group_identity(self):
         from peach import diagnostic_frequency as frequency
         reporting.save({"usage": True, "errors": True})
@@ -535,6 +572,53 @@ class RemoteReportingTests(unittest.TestCase):
                     entry["main"](["Peach.exe", mode])
             tray.assert_not_called()
             client.assert_not_called()
+
+
+class PackagedReportingConfigTests(unittest.TestCase):
+    """两端打包共用的 `sentry.json` 写入；发行构建缺 DSN 必须失败，而不是产出静默的安装包。"""
+
+    LIBRARY_DSN = "https://public@o123.ingest.us.sentry.io/789"
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.root = Path(folder.name).resolve()
+        self.output = self.root / "bundle" / "sentry.json"
+
+    def write(self, *flags, **targets):
+        env = {key: value for key, value in os.environ.items()
+               if key not in {"PEACH_SENTRY_DSN", "PEACH_LIBRARY_SENTRY_DSN"}}
+        env.update(targets, PYTHONIOENCODING="utf-8")
+        script = Path(__file__).resolve().parents[1] / "scripts/write_reporting_config.py"
+        return subprocess.run([sys.executable, "-X", "utf8", str(script), "--output", str(self.output), *flags],
+                              capture_output=True, text=True, encoding="utf-8", env=env, timeout=60)
+
+    def test_release_config_is_read_back_by_the_packaged_runtime(self):
+        result = self.write("--require", PEACH_SENTRY_DSN=DSN, PEACH_LIBRARY_SENTRY_DSN=self.LIBRARY_DSN)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        from peach import library_sharing
+        with mock.patch.dict(os.environ, {"PEACH_SENTRY_DSN": "", "PEACH_LIBRARY_SENTRY_DSN": ""}), \
+                mock.patch("peach.settings_file.PROJECT_ROOT", self.output.parent):
+            self.assertEqual(reporting.dsn(), DSN)
+            self.assertEqual(library_sharing.target(), self.LIBRARY_DSN)
+
+    def test_local_build_without_targets_ships_an_unconfigured_bundle(self):
+        result = self.write()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(self.output.read_text(encoding="utf-8")), {"dsn": "", "library_dsn": ""})
+
+    def test_release_build_rejects_missing_invalid_or_shared_targets(self):
+        cases = {
+            "缺共享馆藏": {"PEACH_SENTRY_DSN": DSN},
+            "非 Sentry 托管": {"PEACH_SENTRY_DSN": "https://public@sentry.example.com/456",
+                              "PEACH_LIBRARY_SENTRY_DSN": self.LIBRARY_DSN},
+            "同一项目": {"PEACH_SENTRY_DSN": DSN, "PEACH_LIBRARY_SENTRY_DSN": DSN},
+        }
+        for name, targets in cases.items():
+            with self.subTest(name):
+                result = self.write("--require", **targets)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(self.output.exists())
 
 
 class RemoteReportingApiTests(unittest.TestCase):

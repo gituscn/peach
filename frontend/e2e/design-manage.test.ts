@@ -608,7 +608,8 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
         const header = getComputedStyle(head);
         const code = getComputedStyle(head.querySelector('b')!);
         return {
-          glass: { filter: glass.backdropFilter, padding: glass.padding, height: glass.height },
+          glass: { filter: glass.backdropFilter, padding: glass.padding, height: glass.height,
+            compact: parseFloat(glass.getPropertyValue('--control-h-compact')) },
           card: { radius: card.borderRadius, overflow: card.overflow, face: card.backgroundColor },
           head: { padding: header.padding, face: header.backgroundColor, size: code.fontSize, weight: code.fontWeight },
           rows: [...group.querySelectorAll('.duplicate-row')].map((row) => {
@@ -618,7 +619,8 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
         };
       });
       assert.match(faces.glass.filter, /blur\(/, '汇总条没有背景模糊，不是玻璃面');
-      assert.deepEqual([faces.glass.padding, faces.glass.height], ['10px 16px', '50px']);
+      // 汇总条里的控件取紧凑档，条高是上下各 10px 内边距加一档紧凑控件。
+      assert.deepEqual([faces.glass.padding, faces.glass.height], ['10px 16px', `${20 + faces.glass.compact}px`]);
       assert.deepEqual([faces.card.radius, faces.card.overflow], ['14px', 'hidden'], '组卡圆角或裁切不对');
       assert.notEqual(faces.head.face, faces.card.face, '组头和组卡同色，番号那一行分不出来');
       assert.deepEqual([faces.head.padding, faces.head.size, faces.head.weight], ['20px', '20px', '500']);
@@ -992,7 +994,7 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
   it('凭据的四种处境四副底色：待办和完成一眼分得开', { timeout: 60_000 }, async () => {
     const opened = await openFollowManage(browser);
     try {
-      await opened.page.getByRole('button', { name: /^来源与订阅设置/ }).click();
+      await opened.page.getByRole('link', { name: /^来源与订阅设置/ }).click();
       await opened.page.getByRole('tab', { name: '来源与订阅', exact: true, selected: true }).waitFor();
       await opened.page.getByRole('region', { name: '可配置凭据', exact: true }).waitFor();
       await settle(opened.page);

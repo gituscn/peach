@@ -33,7 +33,7 @@ export interface MagnetResult {
 }
 
 function ResourceFact({ icon: Icon, children, title }: { icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>; children: ReactNode; title?: string }) {
-  return <span title={title} className="inline-flex items-center gap-1"><Icon aria-hidden className="size-3.5 shrink-0" />{children}</span>;
+  return <span title={title} className="inline-flex items-center gap-1"><Icon aria-hidden className="size-(--icon-inline) shrink-0" />{children}</span>;
 }
 
 export function WantMagnets({ want, readOnly, downloads, provider, toast, onSource, queryUrl }: {
@@ -144,14 +144,14 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
               </div>
             </div>
             <div data-resource-actions="" className="flex flex-wrap gap-2">
+              <ButtonLink data-button-link="" variant="secondary" size="small" trailingIcon={RiExternalLinkLine} href={candidate.source_url} target="_blank" rel="noopener noreferrer">链接来源</ButtonLink>
+              <Button variant="secondary" size="small" leadingIcon={RiFileCopyLine} {...busyProps(action.busy === `copy:${candidate.id}`)}
+                onClick={() => copy(candidate)}>复制链接</Button>
               {candidate.protocol === 'magnet' ?
               <Button variant="primary" size="small" leadingIcon={configured ? providerIcon(configured.key) : RiCloudLine} title={configured ? `下载到 ${configured.label}` : undefined} disabled={readOnly || !downloads?.available || !configured || added}
                 {...busyProps(action.busy === candidate.id)} onClick={() => add(candidate)}>
                 {added ? '已添加' : '添加下载'}
               </Button> : null}
-              <Button variant={candidate.protocol === 'magnet' ? 'secondary' : 'primary'} size="small" leadingIcon={RiFileCopyLine} {...busyProps(action.busy === `copy:${candidate.id}`)}
-                onClick={() => copy(candidate)}>复制链接</Button>
-              <ButtonLink data-button-link="" variant="secondary" size="small" trailingIcon={RiExternalLinkLine} href={candidate.source_url} target="_blank" rel="noopener noreferrer">链接来源</ButtonLink>
             </div>
           </li>;
         });

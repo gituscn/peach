@@ -67,7 +67,7 @@ h2[data-page-title]{margin:0;font:var(--board-title);letter-spacing:0}
 .gridstack{display:flex;flex-direction:column;gap:16px}
 /* 列距 16px 是给悬停面留的：卡片悬停时底色往盒外多铺 8px（见下方 `:hover`），列距再窄，
    两张卡的悬停面就顶到邻卡上。 */
-.grid{gap:24px 16px}
+.grid{gap:24px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--tile)),1fr))}
 .card{cursor:pointer;display:flex;flex-direction:column;gap:8px;min-width:0;border-radius:var(--surface-radius);
   position:relative;transition:transform .18s ease,filter .18s ease,background-color .15s ease,box-shadow .15s ease;transform-origin:center}

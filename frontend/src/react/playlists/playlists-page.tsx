@@ -151,10 +151,10 @@ function PlaylistMenu({ name, onRename, onDelete }: { name: string; onRename(): 
         {/* 面板外宽 172px，同旧卡片菜单：外框再加 10px 内边距与 1px 描边。 */}
         <Dialog aria-label={`播放列表操作：${name}`} className="flex w-37.5 flex-col gap-0.5 outline-none">
           <button type="button" className={MENU_ROW} onClick={() => run(onRename)}>
-            <PENCIL aria-hidden className="size-4 shrink-0" />编辑名称
+            <PENCIL aria-hidden className="size-(--icon-inline) shrink-0" />编辑名称
           </button>
           <button type="button" className={MENU_ROW} onClick={() => run(onDelete)}>
-            <TRASH aria-hidden className="size-4 shrink-0" />删除播放列表
+            <TRASH aria-hidden className="size-(--icon-inline) shrink-0" />删除播放列表
           </button>
         </Dialog>
       </Popover>

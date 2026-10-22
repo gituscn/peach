@@ -224,12 +224,12 @@ describe('实体页筛选浮层', () => {
     try {
       const { page } = opened;
       assert.equal(await page.locator('[data-entity-combo] [data-combo-chip]').count(), 0);
-      // 标签跟首页筛选条上那枚同一张脸：30px 高、`--tag-radius` 那一档 8px 圆角、一圈 1px 实线。
+      // 标签跟首页筛选条上那枚同一张脸：`--control-h-compact` 那一档 32px 高、`--tag-radius` 那一档 8px 圆角、一圈 1px 实线。
       const face = await page.locator('[data-entity-tag="中出"]').evaluate((el) => {
         const css = getComputedStyle(el);
         return [el.getBoundingClientRect().height, css.borderTopLeftRadius, css.borderTopWidth, css.borderTopStyle];
       });
-      assert.deepEqual(face, [30, '8px', '1px', 'solid']);
+      assert.deepEqual(face, [32, '8px', '1px', 'solid']);
       await page.locator('[data-entity-tag="中出"]').click();
       assert.equal(await page.locator('[data-entity-tag="中出"]').getAttribute('aria-pressed'), 'true');
       await page.locator('[data-entity-combo] [data-combo-chip]', { hasText: '中出' }).waitFor();

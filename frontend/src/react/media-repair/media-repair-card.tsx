@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { confirmModal, MEDIA_SOURCE_ICONS } from '@peach/legacy/ui';
 
 import { Button } from '@/components/base/buttons/button';
-import { Select, SelectItem } from '@/components/base/select/select';
+import { Select, SelectItem } from '../components/select';
 
 import { apiSend } from '../../api';
 import { REPAIR_CARD_TEXT } from '../../management';
@@ -70,7 +70,7 @@ export function MediaRepairCard({ toast = () => {} }: { toast?(message: string):
     <div className="flex flex-col gap-4">
       <Fieldset layout="split" label="媒体修复" footer={
         <>
-          <Select aria-label="媒体库" className="w-48" selectedKey={selected?.id ?? null}
+          <Select aria-label="媒体库" prefix="媒体库" className="w-48" selectedKey={selected?.id ?? null}
             isDisabled={running || !libraries.length}
             onSelectionChange={(key) => { if (key !== null) setChosen(String(key)); }}>
             {libraries.map((row) => (

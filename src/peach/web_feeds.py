@@ -259,6 +259,23 @@ def q_feed_check(contract, args) -> dict:
     return contract.feed_job.snapshot() or {"status": "idle"}
 
 
+def q_feed_schedule(contract, _args) -> dict:
+    """订阅源定时拉取的档位与上次运行状态，形状与 `/api/follow/schedule` 相同。"""
+    scheduler = contract.feed_scheduler
+    if scheduler is None:
+        return {"ok": True, "available": False, "enabled": False,
+                "interval_minutes": feeds.DEFAULT_INTERVAL_MINUTES, "running": False, "next_run_at": None}
+    return scheduler.status()
+
+
+def w_feed_schedule_run(contract, _body) -> dict:
+    """让订阅源定时拉取立刻跑一轮，结果照常记进调度状态。"""
+    scheduler = contract.feed_scheduler
+    if scheduler is None:
+        raise ValueError("订阅源拉取没有启用")
+    return scheduler.run_now()
+
+
 def q_feeds(contract, args) -> dict:
     """设置页「订阅源」小节的首屏。"""
     hidden = web_settings.hidden_compilations(contract.database)

@@ -25,9 +25,10 @@ import { Note } from '../components/note';
 import { Page } from '../components/page';
 import { PillAriaTabList } from '../components/pill-aria-tab-list';
 import { STAT_STRIP_SIX } from '../components/stat-card';
+import { ExternalLink } from '../settings/section';
 import { AddSource } from './add-source';
 import { AliasManager } from './alias-manager';
-import { Button } from '@/components/base/buttons/button';
+import { ButtonLink } from '@/components/base/buttons/button';
 import { FeedSources } from './feed-sources';
 import {
   credentialDone, DEFAULT_SORT, FEEDS_KEY, fetchCredentials, fetchFeeds, fetchFollow, FOLLOW_CREDENTIALS_KEY,
@@ -60,7 +61,7 @@ function Reading({ term, figure, unit }: { term: string; figure: number; unit: s
 
 export function FollowManagePage(props: FollowManageProps) {
   const {
-    route, savePreference, toast, openFollow, openServiceConfiguration, readOnly, readOnlyMessage, writerUrl,
+    route, savePreference, toast, openFollow, readOnly, readOnlyMessage, writerUrl,
   } = props;
   const [tab, setTab] = useState<TabKey>(isTab(props.tab) ? props.tab : 'list');
   const [page, setPage] = useState(Math.max(1, Math.floor(props.page) || 1));
@@ -118,9 +119,7 @@ export function FollowManagePage(props: FollowManageProps) {
         <Note tone="warning" title="本机只能浏览"
           extra={writerUrl
             ? <p className="text-body-2-regular">
-                <a href={writerUrl} className="text-text-primary underline underline-offset-2">
-                  前往写入端管理关注
-                </a>
+                <ExternalLink href={writerUrl}>前往写入端管理关注</ExternalLink>
               </p>
             : undefined}>
           {readOnlyMessage}
@@ -179,8 +178,7 @@ export function FollowManagePage(props: FollowManageProps) {
         </TabPanel>
 
         <TabPanel id="add" className="flex flex-col gap-8">
-          <AddSource data={data} credentials={creds} readOnly={readOnly} toast={toast}
-            openCredentials={openServiceConfiguration} />
+          <AddSource data={data} credentials={creds} readOnly={readOnly} toast={toast} />
           <AliasManager groups={data.author_aliases || []} readOnly={readOnly} toast={toast}
             suggestions={data.alias_suggestions || []} sources={data.sources} />
         </TabPanel>
@@ -190,7 +188,7 @@ export function FollowManagePage(props: FollowManageProps) {
         </TabPanel>
 
       </Tabs>
-      <div><Button variant="secondary" onClick={openServiceConfiguration}>来源与订阅设置{pending ? `（${pending}）` : ''}</Button></div>
+      <div><ButtonLink variant="secondary" href="/settings/subscriptions">来源与订阅设置{pending ? `（${pending}）` : ''}</ButtonLink></div>
     </Page>
   );
 }

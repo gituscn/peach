@@ -25,7 +25,7 @@ import { confirmModal } from '@peach/legacy/ui';
 
 import { Button } from '@/components/base/buttons/button';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
-import { Select, SelectItem } from '@/components/base/select/select';
+import { Select, SelectItem } from '../components/select';
 import { Switch } from '@/components/base/switch/switch';
 import {
   Table, TableBody, TableCell, TableColumn, TableHeader, TableRow,
@@ -140,29 +140,38 @@ export interface SourceListProps {
 /** 页码。上一页／下一页在两端，页码居中，页数多时两侧折成「…」。 */
 export { Pagination } from '../components/table-pagination';
 
-/** 一条来源在创作者卡里的那一行：勾选、名字、站点、状态、上次检查、动作。 */
+/** 一条来源在创作者卡里的那一行：勾选、站标与名字、状态、上次检查、动作。 */
 function SourceRow(
   { source, selected, onToggle, handlers }:
   { source: FollowSource; selected: boolean; onToggle(on: boolean): void; handlers: RowHandlers },
 ) {
   /* 点这一行的空白处就是勾上或取消：勾选框只有 16px，一行里其余的地方点了没反应的话，选几条要瞄几次。
-     窄屏固定两行：上一行勾选、名字、站标与状态，下一行上次检查、开关与两枚动作键。 */
+     第一行是勾选、站标与名字、状态，宽屏时上次检查、开关与动作键也在这一行；报错单独占一整行，
+     左边让出勾选框与站标的宽度，和名字对齐。窄屏依次是第一行、报错、操作行。 */
   return (
     <div data-selected={selected || undefined} data-follow-source-row=""
       className="flex min-h-16 flex-wrap items-center gap-3 px-2 py-3 last:rounded-b-lg max-sm:gap-x-2"
       onClick={(event) => { if (clickedBlank(event, event.currentTarget)) onToggle(!selected) }}>
-      <span data-follow-leading-site="" className="flex shrink-0 items-center gap-2">
-        <SourceIcon provider={source.provider} />
-        <Checkbox isSelected={selected} onChange={onToggle} aria-label={`选择 ${source.label}`} />
-      </span>
-      {/* 名字列从零宽起长：长名字和报错在列内折行或截断，不把站标、状态和操作键挤到下一行。 */}
-      <span className="flex min-w-0 grow basis-0 flex-col gap-0.5">
+      <Checkbox isSelected={selected} onChange={onToggle} aria-label={`选择 ${source.label}`} />
+      {/* 名字从零宽起长：长名字在列内折行，不把状态和操作键挤到下一行。站标贴在名字前。 */}
+      <span className="flex min-w-0 grow basis-0 items-center gap-1.5">
+        <span data-follow-source-site="" className="flex shrink-0 items-center text-body-medium">
+          <SourceIcon provider={source.provider} />
+        </span>
         <SourceLink source={source} />
-        {source.last_error ? <ErrorLine text={source.last_error} /> : null}
       </span>
-      {/* 行首显示站点图标，站名同时供读屏使用。 */}
+      {/* 站标只画字形，站名给读屏。 */}
       <VisuallyHidden>{source.provider_label}</VisuallyHidden>
       <StatusBadge source={source} />
+      {source.last_error ? (
+        <span data-follow-source-error="" className="flex min-w-0 basis-full gap-3 max-sm:gap-x-2 sm:order-last">
+          <span aria-hidden className="w-4 shrink-0" />
+          <span className="flex min-w-0 grow gap-1.5">
+            <span aria-hidden className="w-(--icon-inline) shrink-0 text-body-medium" />
+            <span className="min-w-0 grow"><ErrorLine text={source.last_error} /></span>
+          </span>
+        </span>
+      ) : null}
       <span data-follow-source-controls="" className="flex w-max max-w-full flex-none flex-wrap items-center gap-1.5 max-sm:w-full">
         <span className="shrink-0 text-body-2-regular whitespace-nowrap text-text-secondary max-sm:mr-auto max-sm:text-caption-1-regular">
           {checkedText(source)}
@@ -208,21 +217,23 @@ function AuthorCard(
       <div data-follow-author-header data-open={open || undefined}
         className="flex flex-wrap items-center gap-3 px-2 py-2.5">
         <AuthorAvatar group={group} name={name} />
-        <b className="min-w-0 grow text-body-medium wrap-anywhere text-text-primary max-sm:basis-0">{name}</b>
-        <span data-follow-author-controls="" className="flex w-max max-w-full flex-none flex-wrap items-center gap-2 max-sm:w-full">
-        <Button variant="secondary" size="small" iconOnly leadingIcon={RiRefreshLine}
-          aria-label={`检查 ${name} 的全部来源`} disabled={!enabled.length || handlers.readOnly}
-          {...busyProps(handlers.busy)} onClick={() => handlers.check(enabled)} />
-        {/* 站标与操作键整体排列，窄屏在头像与名字下方占一行。 */}
-          <span className="flex shrink-0 items-center gap-1 max-sm:mr-auto max-sm:min-w-0 max-sm:shrink max-sm:flex-wrap" title={providers}>
+        {/* 名字下面一行说这个人的来源：各站站标与失败数。窄屏时操作键另起一行靠右。 */}
+        <span className="flex min-w-0 grow basis-0 flex-col gap-1">
+          <b className="min-w-0 text-body-medium wrap-anywhere text-text-primary">{name}</b>
+          <span data-follow-author-sites="" className="flex min-w-0 flex-wrap items-center gap-1 text-body-2-regular" title={providers}>
             {group.map((source) => <SourceIcon key={source.id} provider={source.provider} />)}
             {/* 只读屏用的文字走 `VisuallyHidden`：它把样式写在元素上，不会生成一个和旧
                 样式表同名的工具类（`web/css/01-base.css` 里那条 `.sr-only` 带 !important）。 */}
             <VisuallyHidden>{`来源：${providers}`}</VisuallyHidden>
+            {bad
+              ? <span className="ml-1 shrink-0 text-text-error-primary">{`${bad} 个失败`}</span>
+              : null}
           </span>
-          {bad
-            ? <span className="shrink-0 text-body-2-regular text-text-error-primary">{`${bad} 个失败`}</span>
-            : null}
+        </span>
+        <span data-follow-author-controls="" className="flex flex-none items-center gap-2 max-sm:w-full max-sm:justify-end">
+          <Button variant="secondary" size="small" iconOnly leadingIcon={RiRefreshLine}
+            aria-label={`检查 ${name} 的全部来源`} disabled={!enabled.length || handlers.readOnly}
+            {...busyProps(handlers.busy)} onClick={() => handlers.check(enabled)} />
           <span className="flex flex-none items-center gap-2">
           <Button variant="secondary" size="small" leadingIcon={RiCheckDoubleLine}
             aria-pressed={state.all ? 'true' : state.some ? 'mixed' : 'false'}
@@ -529,11 +540,11 @@ export function SourceList(props: SourceListProps) {
           </span>
         </span>
         <div data-follow-toolbar-actions="" data-toolbar-actions="">
+        {failedSourceIds.length ? <Button variant="secondary" disabled={readOnly}
+          {...busyProps(rowHandlers.busy)} onClick={() => startChecking(failedSourceIds)}>检查失败项</Button> : null}
         <Button variant="primary" leadingIcon={RiRefreshLine} disabled={readOnly}
           aria-label="检查全部" iconOnly={compact}
           {...busyProps(rowHandlers.busy)} onClick={() => startChecking([])}>检查全部</Button>
-        {failedSourceIds.length ? <Button variant="secondary" disabled={readOnly}
-          {...busyProps(rowHandlers.busy)} onClick={() => startChecking(failedSourceIds)}>检查失败项</Button> : null}
         <span data-follow-toolbar-controls="" className="contents">
           <span data-button-group role="group" aria-label="关注列表版式">
             <Button variant="ghost" iconOnly
@@ -545,7 +556,7 @@ export function SourceList(props: SourceListProps) {
           </span>
           {asTable ? <TableColumnControls preferences={preferences} label="关注来源" /> : null}
           <span className="flex flex-none items-center gap-2">
-          <Select aria-label="关注列表排序" selectedKey={sort}
+          <Select aria-label="关注列表排序" prefix="排序" selectedKey={sort}
             onSelectionChange={(key) => {
               if (key === null) return;
               const next = String(key) as SortKey;

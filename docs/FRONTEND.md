@@ -74,7 +74,7 @@ Peach 按 [ADR-0031](adr/0031-frontend-react-boardui-tailwind.md) 接入 React +
 - 结构：一条窄列里排「通用 / 媒体 / 下载 / 网络与访问 / 维护」五组，每组一个 `h2.ui-configgroup` 小标题，没有内容的组连标题一起省略。页面自己画顶上那排页签（`.ui-board-local-nav`，`role="tablist"`，方向键与 Home／End 在整排里走），一组一格，一次只显示选中的那一组；页签条和整页同一次提交画出，第一帧就在。
 - 数据契约是 `/api/configuration`（`src/peach/routes_configuration.py`）。端点字符串只在 `frontend/src/configuration-endpoints.ts` 声明一次，整页和设置弹层的摘要卡读同一个 `queryKey`。
 - 第一帧必须同步：壳挂完这一页紧接着按地址里的 `#peachProxy` 滚到那一块，所以路由树用 `flushSync` 画第一帧，往后的更新照常异步。`.ui-configpage` 的第一层依次是页签条、各组的小标题与面板；每组的根节点就是那一格 `role="tabpanel"`，选中的那一组带 `ui-board-group-active`。
-- 跳到某一组：别处（统计页「添加媒体目录」、空库提示、媒体库选单「管理媒体库」、诊断页）把组名记进壳单例 `configurationRequestedSection`（路由树里的页面经 `actions.requestConfigurationSection`），壳打开这一页时作为 `open.section` 交进去、页面画上之后清空；页面只拿它定第一帧选中哪一格。
+- 跳到某一组：React 页面（统计页「添加媒体」、诊断页、关注管理的凭据入口）直接链到这一组的地址 `/settings/<组>`，页面按地址定第一帧选中哪一格；遗留层的空库提示与媒体库选单「管理媒体库」把组名记进壳单例 `configurationRequestedSection`，壳打开这一页时作为 `open.section` 交进去、页面画上之后清空。
 - 设置弹层「这台电脑」一格只挂 `configuration-summary`（`configuration-summary.tsx`）：媒体库数、端口、更新状态和「打开配置页」，不放可编辑的控件（ADR-0050）。媒体库数取 `/api/configuration` 的 `library_count`，由服务端按 `media_libraries.libraries` 分组数好，页面不自己归并。
 - 相邻的两处不在这页：媒体修复是数据管理页 React 子树里的一张卡（`frontend/src/react/media-repair/`），订阅源是关注管理页的「订阅源」页签（`follow-manage/feed-sources.tsx`，读 `/api/feeds`）。
 - 服务端检查部署方式和请求来源：桌面服务由托盘管理且请求来自本机；Docker 服务由容器入口管理，允许经过登录验证的本机或私有网络请求，拒绝携带代理转发头的管理请求。`/healthz` 按调用方返回 `configurable`，页面据此显示配置入口；入口隐藏不能替代服务端访问检查。
@@ -127,7 +127,7 @@ Peach 按 [ADR-0031](adr/0031-frontend-react-boardui-tailwind.md) 接入 React +
 - `entity` 由资料页正文 `entity-body`（`frontend/src/react/entity-body/`）直接渲染在它的作品视图里，不另挂岛：第一页随资料页首屏一起取来，续页由资料页按查询键取。同一块的另两个视图是名册（索引页的 `PeopleGrid`）与照片墙（样张分段在前、本地图片在后；直接打开 React 灯箱（`photo-lightbox/`），定位源文件调 `actions.revealSource`）。
 - `items` 挂在 `#nrow` 上：壳手上已有那一批，岛只画卡。
 - 馆藏表格由 `catalog-list-page.tsx` 渲染，默认依次显示名称、时长、分辨率、体积、星级评分和观看次数。「显示列」可开启番号、高潮计数、观看时间、入库时间和发行时间；全部列按身份、媒体规格、个人记录、时间信息排列。隐藏某列仍可按该字段排序。名称过长时省略显示，悬停可查看全文。拖动表头分隔线调整列宽；键盘操作时聚焦分隔线，按 Enter 进入调整，再用左右方向键改变宽度，按 Enter 或 Tab 结束。列宽与显示选择保存在当前浏览器；「重置列宽」恢复默认宽度，「恢复默认显示」恢复默认列。桌面和手机均在表格内横向滚动，不扩大页面宽度。
-- 表格的表头和行分隔线铺满外框，右侧余量由独立空白列承接，保存的列宽保持不变。鼠标按住非控件区域可左右拖动所有数据表格，滚轮维持浏览器行为。馆藏表格只在手动开启多选后显示勾选框，底部「取消」清空选择并退出多选。评分与详情页共用 `RatingStars`：点击星星保存，再点当前星级取消；保存失败时在原单元格显示原因和「重试评分」，成功回执提供撤销。
+- 表格的表头和行分隔线铺满外框，右侧余量由独立空白列承接，保存的列宽保持不变。鼠标按住非控件区域可左右拖动所有数据表格，滚轮维持浏览器行为。馆藏表格只在手动开启多选后显示勾选框，底部「取消」清空选择并退出多选。评分与详情页共用 `RatingStars`：点击星星保存，再点当前星级取消；保存失败时在原单元格显示原因和「立即重试」（无障碍名称「立即重试评分」），成功回执提供撤销。
 - 所有数据表格共用 `TableColumnControls`、`useTablePreferences` 和 `DataTableFrame`，提供显示列、恢复默认显示、重置列宽及鼠标／键盘调整列宽。各表单独保存浏览器偏好；身份列与勾选列保留，其余列可隐藏，排序菜单继续列出可排序字段。馆藏、关注来源、JAV 订阅源、两张别名表和数据管理表均使用这套组件。
 - 关注来源与 JAV 订阅源的表头提供「全选本页」，再次点击取消本页选择。表格链接只占文字或图标本身的范围；管理表空白处用于选择行。关注卡片每条来源的站点图标放在行首，JAV 订阅源站点复用缓存的 `SiteLabel` 图标。
 - 已保存别名的「修改统一名称」打开改名对话框，可输入名称或直接选用已有别名。`POST /api/follow/author-alias` 接受 `action: "rename"`、`canonical_key` 和 `canonical`；原名称保留为别名，关联的创作者名称及作品创作者字段在同一事务中同步。名称冲突或关联多个创作者档案时返回错误并回滚。

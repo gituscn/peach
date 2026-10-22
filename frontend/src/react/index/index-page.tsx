@@ -221,7 +221,7 @@ export function IndexPage(props: IndexProps) {
     if (result.isError) {
       return (
         <EmptyState icon={spriteGlyph('alert')} title={`没能读取${title}`}
-          actions={<Button variant="secondary" onClick={() => void result.refetch()}>重试</Button>}>
+          actions={<Button variant="secondary" onClick={() => void result.refetch()}>立即重试</Button>}>
           {requestErrorMessage(result.error)}
         </EmptyState>
       );
@@ -248,7 +248,7 @@ export function IndexPage(props: IndexProps) {
         ) : null}
         {isPeople(kind) ? <LayoutSwitch kind={kind} layout={layout} onChange={changeLayout} /> : null}
         <LibraryShortcuts kind={kind === 'tags' ? 'tag' : kind === 'studios' ? 'studio' : kind === 'agencies' ? 'agency' : kind === 'creators' ? 'creator' : 'performer'} />
-        {kind === 'tags' ? <Button variant={managing ? 'primary' : 'ghost'} size="small" iconOnly className="flex-none" data-tag-mode=""
+        {kind === 'tags' ? <Button variant={managing ? 'primary' : 'ghost'} iconOnly className="flex-none" data-tag-mode=""
           leadingIcon={spriteGlyph('pencil')} aria-label={managing ? '返回标签浏览' : '管理标签'} title={managing ? '返回标签浏览' : '管理标签'} aria-pressed={managing}
           onClick={() => { props.exitSelectMode(); setPicked(new Set()); setManaging(!managing) }} /> : null}
         <IndexSearch label={`过滤${title}`} value={q} onQuery={(next) => { if (next !== q) go({ q: next }, !!next) }} />

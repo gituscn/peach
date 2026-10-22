@@ -432,6 +432,21 @@ def official_image_candidates(url: str) -> list[Candidate]:
     return []
 
 
+#: 库外卡片经 `/cover-image` 取图时放行的主机后缀，与 `official_image_candidates` 认的两家一致；
+#: 代理跟重定向的每一跳也按它核对。
+COVER_PROXY_HOSTS = ("dmm.co.jp", "dmm.com", "mgstage.com")
+
+
+def proxyable_cover_url(url: str) -> bool:
+    """能经 Peach 代理显示的封面地址：https、官方图片主机、官方图路径。"""
+    clean = str(url or "").strip()
+    parsed = urlparse(clean)
+    host = (parsed.hostname or "").casefold()
+    return (parsed.scheme == "https" and not parsed.username and not parsed.password
+            and any(host == suffix or host.endswith("." + suffix) for suffix in COVER_PROXY_HOSTS)
+            and bool(official_image_candidates(clean)))
+
+
 def content_id_images(content_id: str) -> list[Candidate]:
     candidates: list[Candidate] = []
     for cid in cid_variants(content_id):

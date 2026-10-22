@@ -42,8 +42,9 @@ function RequestedSourceImage({ source }: { source: string }) {
             onError={() => setStatus('failed')} />
         : source ? <div className="flex flex-col items-center gap-2">
             {status === 'failed' ? <span className="text-body-2-regular text-text-secondary">未取得来源图片</span> : null}
-            <Button variant="secondary" size="small" onClick={() => setStatus('loading')}>
-              {status === 'failed' ? '重新加载图片' : '查看来源图片'}
+            <Button variant="secondary" size="small" aria-label={status === 'failed' ? '立即重试加载来源图片' : undefined}
+              onClick={() => setStatus('loading')}>
+              {status === 'failed' ? '立即重试' : '查看来源图片'}
             </Button>
           </div> : <span className="text-body-2-regular text-text-secondary">未取得来源图片</span>}
     </div>

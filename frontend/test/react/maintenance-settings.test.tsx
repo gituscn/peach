@@ -7,7 +7,7 @@ import {
   AutomaticUpdates, MaintenanceSettings, TutorialSettings, UninstallSettings,
 } from '../../src/react/settings/maintenance-settings';
 import { ReleaseUpdates } from '../../src/react/settings/release-updates';
-import { buttonNamed, choose, click, fetchMock, mount, section, sentBody, settle, submit, switches } from './render';
+import { actionOrder, buttonNamed, choose, click, fetchMock, mount, section, sentBody, settle, submit, switches } from './render';
 
 const automatic = { mode: 'off', interval_hours: 24, available: true, download_available: true };
 const release: ReleaseState = {
@@ -118,6 +118,7 @@ describe('检查更新', () => {
     expect(updates.textContent).toContain('最新版本0.10.0');
     expect(updates.querySelector('[role="status"]')?.textContent).toContain('有可用更新');
     expect(buttonNamed('下载并安装', updates)).not.toBeNull();
+    expect(actionOrder(check.parentElement)).toEqual(['查看发布页', '检查更新', '下载并安装']);
     expect(document.activeElement).toBe(check);
     vi.stubGlobal('fetch', fetchMock(503, { detail: '连接失败' }));
     await click(check);

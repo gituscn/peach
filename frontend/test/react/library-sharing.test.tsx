@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { LibrarySharingSettings, type LibrarySharingState } from '../../src/react/settings/library-sharing-settings';
-import { buttonNamed, click, mount, settle, switches } from './render';
+import { actionOrder, buttonNamed, click, mount, settle, switches } from './render';
 
 const initial: LibrarySharingState = { enabled: false, available: true, schema: 4,
   fields: ['作品编号、标签、评分与全部偏好维度'], notice: '匿名处理后上传馆藏与各类偏好明细。' };
@@ -37,6 +37,7 @@ describe('馆藏与口味分享的明确同意', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(host.textContent).toContain('KiB。不含账号、设备、文件路径和浏览器历史记录等个人数据。');
     expect((buttonNamed('同意并开启上传', host) as HTMLButtonElement).disabled).toBe(true);
+    expect(actionOrder(buttonNamed('同意并开启上传', host)!.parentElement)).toEqual(['取消', '预览上传内容', '同意并开启上传']);
     await click(host.querySelector('input[type="checkbox"]:not([role="switch"])'));
     await click(buttonNamed('同意并开启上传', host));
     await settle();

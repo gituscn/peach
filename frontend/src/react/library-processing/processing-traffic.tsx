@@ -38,14 +38,14 @@ export function TrafficProgress({ traffic, initial = false, detailsOpen, onDetai
     {traffic.inventory?.errors ? <p role="status">部分目录无法读取，数量和预估不完整</p> : null}
     <div className="inline-grid grid-cols-2 gap-6 py-2">
       <section aria-label="流量预估" className="flex min-w-0 flex-col gap-1">
-        <p className="inline-flex items-center gap-1.5"><RiGlobalLine aria-hidden className="size-4 shrink-0" />
+        <p className="inline-flex items-center gap-1.5"><RiGlobalLine aria-hidden className="size-(--icon-inline) shrink-0" />
           {traffic.inventory && !traffic.inventory.complete ? '已识别流量' : '预计流量'}</p>
         <p className="text-title-3-semibold text-text-primary">{forecast(traffic.estimated_bytes, traffic.estimated_min_bytes, traffic.estimated_max_bytes)}</p>
         <p>{traffic.unknown_route_estimated_bytes ? '已确认代理' : '代理'} {forecast(traffic.metered_estimated_bytes, traffic.metered_estimated_min_bytes, traffic.metered_estimated_max_bytes)}</p>
         {!initial ? <p>已用 <span>{traffic.partial ? '约 ' : ''}{size(traffic.used_bytes)}</span> · 代理 {size(traffic.metered_used_bytes)}</p> : null}
       </section>
       {traffic.disk ? <section aria-label="磁盘预估" className="flex min-w-0 flex-col gap-1">
-        <p className="inline-flex items-center gap-1.5"><RiHardDrive3Line aria-hidden className="size-4 shrink-0" />
+        <p className="inline-flex items-center gap-1.5"><RiHardDrive3Line aria-hidden className="size-(--icon-inline) shrink-0" />
           {traffic.inventory && !traffic.inventory.complete ? '已识别占用' : '预计占用'}</p>
         <p className="text-title-3-semibold text-text-primary">约 {size(traffic.disk.estimated_bytes)}</p>
         {traffic.disk.temporary_bytes > 0 ? <p>抽帧临时文件约 {averageSize(traffic.disk.temporary_bytes)}</p> : null}

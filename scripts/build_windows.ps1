@@ -5,7 +5,9 @@
     [switch]$Installer,
     [string]$CloudflaredPath = '',
     [string]$FFmpegPath = '',
-    [string]$UntruncPath = ''
+    [string]$UntruncPath = '',
+    # 发行构建：两项 Sentry DSN 必须齐全且合法，否则不产出安装包。
+    [switch]$RequireReporting
 )
 
 $ErrorActionPreference = 'Stop'
@@ -83,9 +85,10 @@ $BuildInfo = [ordered]@{
 }
 Set-Content -LiteralPath $BuildInfoPath -Value (ConvertTo-Json $BuildInfo) -Encoding utf8
 $SentryConfigPath = Join-Path $BuildPath 'sentry.json'
-Set-Content -LiteralPath $SentryConfigPath -Value (ConvertTo-Json @{
-    dsn = "$env:PEACH_SENTRY_DSN"; library_dsn = "$env:PEACH_LIBRARY_SENTRY_DSN"
-}) -Encoding utf8
+$ReportingArguments = @('--output', $SentryConfigPath)
+if ($RequireReporting) { $ReportingArguments += '--require' }
+& $Python -X utf8 (Join-Path $PSScriptRoot 'write_reporting_config.py') @ReportingArguments
+if ($LASTEXITCODE -ne 0) { throw 'Sentry reporting config is missing or invalid.' }
 
 $BuildMode = @('--onefile')
 $BuildDestination = $OutputPath
@@ -108,6 +111,13 @@ if ($Standalone) {
     & $Python -X utf8 (Join-Path $PSScriptRoot 'media_tool_bundle.py') --tool untrunc --source $UntruncPath --validate-only
     if ($LASTEXITCODE -ne 0) {
         throw 'Standalone build requires verified untrunc and corresponding source. Run scripts/build_untrunc_windows.sh first or pass -UntruncPath.'
+    }
+    # 人脸模型在 PyInstaller 之前取齐并校验，网络不通时尽早失败；缓存在 build\face-models。
+    $FaceModelsStage = Join-Path $BuildPath 'face-models'
+    if (Test-Path -LiteralPath $FaceModelsStage) { Remove-Item -LiteralPath $FaceModelsStage -Recurse -Force }
+    & $Python -X utf8 (Join-Path $PSScriptRoot 'fetch_face_models.py') --destination $FaceModelsStage
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Standalone build requires verified face models. Check access to media.githubusercontent.com or fill build\face-models.'
     }
     $CloudflaredCandidates = @()
     if ($CloudflaredPath) { $CloudflaredCandidates += $CloudflaredPath }
@@ -167,6 +177,12 @@ if ($Standalone) {
     if (Test-Path -LiteralPath $PackagedUntrunc) { Remove-Item -LiteralPath $PackagedUntrunc -Recurse -Force }
     & $Python -X utf8 (Join-Path $PSScriptRoot 'media_tool_bundle.py') --tool untrunc --source $UntruncPath --destination $PackagedUntrunc
     if ($LASTEXITCODE -ne 0) { throw 'untrunc packaging failed.' }
+    $PackagedFaceModels = [IO.Path]::GetFullPath((Join-Path $OutputPath 'tools\face-models'))
+    if (-not $PackagedFaceModels.StartsWith($OutputPath.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Face model packaging destination must stay inside the application output directory.'
+    }
+    if (Test-Path -LiteralPath $PackagedFaceModels) { Remove-Item -LiteralPath $PackagedFaceModels -Recurse -Force }
+    Copy-Item -LiteralPath $FaceModelsStage -Destination $PackagedFaceModels -Recurse
 }
 
 # 工作目录只服务这一次构建：`--clean` 已让下一次不复用它，留着只是几十 MB 的中间产物。
