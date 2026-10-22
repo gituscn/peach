@@ -20,9 +20,10 @@ from urllib.parse import urlparse
 from filelock import FileLock, Timeout
 from PIL import Image
 
-from .catalog_rules import (is_jav_code, normalise_code_key,
+from .catalog_rules import (compile_code_patterns, is_jav_code, normalise_code_key,
                             release_code_from_filename, same_release_code, scrapes_as_jav)
 from .field_owners import SCAN_FILENAME, write_owned_fields
+from .profiles import read_settings
 from .images import measure_image_file
 from .jav_cover_fetch import MIN_WIDTH, DeadlineExceeded, NotFound
 from .sources.base import SourceFailure
@@ -2114,8 +2115,11 @@ def _candidate_baseline(database, row, code, verify_existing):
     return {**row, **{COLUMN_OF.get(value['field'], value['field']): value['current_value'] for value in values}}
 
 
-def _read_local_metadata(config, db_path, row, cover_root, listing, state, update, issue, poster_jobs):
-    """读取一部影片的本地证据，返回可独立发布的资料与在线核查范围。"""
+def _read_local_metadata(config, db_path, row, cover_root, listing, state, update, issue, poster_jobs,
+                         code_patterns=()):
+    """读取一部影片的本地证据，返回可独立发布的资料与在线核查范围。
+
+    `code_patterns` 是用户在设置里写的番号识别规则，已编译，先于内置规则试。"""
     video = translate_ledger_path(row['path'])
     try:
         files = listing.files(video.parent)
@@ -2124,7 +2128,7 @@ def _read_local_metadata(config, db_path, row, cover_root, listing, state, updat
     if video.name.casefold() not in files:
         issue(row, '媒体文件不可访问', action='reading_local', retryable=True)
         return None
-    code = _provider_code(row['code']) or release_code_from_filename(row['name'])
+    code = _provider_code(row['code']) or release_code_from_filename(row['name'], patterns=code_patterns)
     payload = None
     entries = []
     nfo, posters = listing.sidecars(video)
@@ -2222,6 +2226,13 @@ class _LocalEvidenceCache:
     def __init__(self, config, db_path, cover_root, listing, state, path):
         self.config, self.db_path, self.cover_root = config, db_path, cover_root
         self.listing, self.state, self.path = listing, state, path
+        with closing(sqlite3.connect(db_path, timeout=30)) as connection:
+            stored = read_settings(connection).get('codePatterns')
+        try:
+            self.code_patterns = compile_code_patterns(stored)
+        except ValueError:
+            # 保存时已经校验过；被手改坏的规则当没设置过，不让整轮处理失败。
+            self.code_patterns = ()
 
     def read(self, row, update, issue, poster_jobs):
         key = _checkpoint_key(row)
@@ -2237,7 +2248,7 @@ class _LocalEvidenceCache:
             return code, verify, payload, [(source, document, Path(path)) for source, document, path in entries]
         offset, issues_before = len(poster_jobs), self.state['issue_count']
         local = _read_local_metadata(self.config, self.db_path, row, self.cover_root, self.listing,
-                                     self.state, update, issue, poster_jobs)
+                                     self.state, update, issue, poster_jobs, self.code_patterns)
         if local is not None and self.state['issue_count'] == issues_before:
             code, verify, payload, entries = local
             record = dict(local=[code, verify, payload, [(source, document, str(path)) for source, document, path in entries]],
