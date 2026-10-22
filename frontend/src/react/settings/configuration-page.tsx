@@ -84,8 +84,8 @@ function ConfigurationGroups(
   const downloads = data.downloads;
   const groups: Group[] = [
     { title: '媒体库与入库', body: (panel) => <div {...groupRoot(panel)}>
-      <MediaSettings {...group} /><MediaProcessingSettings receipt={receipt} />
-      <CodePatternSettings receipt={receipt} />
+      <MediaSettings {...group} /><CodePatternSettings receipt={receipt} />
+      <MediaProcessingSettings receipt={receipt} />
     </div> },
     { title: '来源与订阅', body: (panel) => <SourceSettings {...group} panel={panel} /> },
     ...(downloads ? [{

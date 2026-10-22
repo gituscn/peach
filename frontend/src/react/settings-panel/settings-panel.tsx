@@ -17,20 +17,26 @@ import {
   type KeyboardEvent, type ReactNode,
 } from 'react';
 import { flushSync } from 'react-dom';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { ButtonLink } from '@/components/base/buttons/button';
 import {
   attachOverlayScrollbar, closeAnchoredMenu, iconSwapHtml, moveGlidePane, revealTexts,
   setActionBusy, setIconSwap, wireHorizontalScroller,
 } from '@peach/legacy/ui';
 
+import { apiSend } from '../../api';
 import { normalizeJavImage } from '../../jav-artwork';
 import { boundedPreference } from '../../number-setting';
+import { queryClient } from '../query';
 import { GlowSettings } from './glow-settings';
 import { Icon, RemixIcon } from './icon';
 import { IconSwitch, SelectField } from './legacy-controls';
 import { NumberSetting } from './number-setting';
 import type { Choice, PanelSettings, SettingsPanelApi, SettingsPanelHost } from './settings-panel-api';
-import { refreshPanelData, useSaveSettings } from './settings-data';
+import {
+  MEDIA_PROCESSING_KEY, MEDIA_PROCESSING_URL, fetchMediaProcessing, refreshPanelData, useSaveSettings,
+  type MediaProcessingPolicy,
+} from './settings-data';
 import { SidebarOrder } from './sidebar-order';
 import { SettingsDialogClose } from '../components/settings-dialog-close';
 
@@ -363,7 +369,7 @@ function SettingsPanel({ host: current, view: shown }: { host: SettingsPanelHost
               </div>
             </section>
           </Group>
-          <BrowseGroup host={current} tab={shown.tab} epoch={epoch} />
+          <BrowseGroup host={current} tab={shown.tab} epoch={epoch} configurable={shown.configurable} />
           <JavGroup host={current} tab={shown.tab} epoch={epoch} />
           <Group index={3} tab={shown.tab}>
             <SearchHistoryRow host={current} epoch={epoch} />
@@ -402,13 +408,16 @@ function decorateDirection(field: HTMLElement, ascending: boolean): void {
   if (label) label.textContent = ascending ? '升序' : '降序';
 }
 
-function BrowseGroup({ host: current, tab, epoch }: GroupProps) {
+/* 「浏览与播放」分两段：作品列表（网格、排序、卡片与悬停）在前，播放在后。转码方式写的是运行 Peach
+   那台电脑的配置，只在能改配置的设备上出现，排在播放段最后。 */
+function BrowseGroup({ host: current, tab, epoch, configurable }: GroupProps & { configurable: boolean | null }) {
   const settings = current.store.value;
   const save = () => current.store.save();
   const random = settings.defaultSort === 'seed';
   const ascending = settings.defaultSortDirection === 'asc';
   return (
     <Group index={1} tab={tab}>
+      <h4 data-settings-subheading="">作品列表</h4>
       <Row title="每批加载作品">
         <div id="batchSizeSetting">
           <NumberSetting key={epoch} id="batchSizeSetting" label="每批作品" value={settings.batchSize}
@@ -430,7 +439,21 @@ function BrowseGroup({ host: current, tab, epoch }: GroupProps) {
           value={current.videoLayout()} attr="data-video-layout" variant="javimageswitch" text epoch={epoch}
           onChoose={(layout) => current.setVideoLayout(layout)} />
       </Row>
+      <label data-setting-row=""><span><b>合并分卷与版本</b></span>
+        <input type="checkbox" id="groupCollapseSetting" data-toggle="" role="switch" checked={settings.groupCollapse}
+          onChange={(event) => { settings.groupCollapse = event.target.checked; save(); current.changed('groupCollapse') }} />
+      </label>
+      <Row title="悬停预览延迟">
+        <div id="hoverDelaySetting">
+          <NumberSetting key={epoch} id="hoverDelaySetting" label="悬停预览延迟" value={settings.hoverDelaySeconds}
+            onApply={(value) => {
+              settings.hoverDelaySeconds = boundedPreference(value, 0, 60, 5); save(); current.changed('hoverDelay');
+            }} />
+        </div>
+      </Row>
+      <h4 data-settings-subheading="">播放</h4>
       <PlaybackRows host={current} epoch={epoch} />
+      {configurable === false ? null : <TranscodeRow host={current} epoch={epoch} ready={configurable === true} />}
     </Group>
   );
 }
@@ -446,12 +469,14 @@ function JavGroup({ host: current, tab, epoch }: GroupProps) {
           value={settings.javImage} attr="data-jav-image-choice" variant="javimageswitch" text epoch={epoch}
           onChoose={(choice) => { settings.javImage = normalizeJavImage(choice); save(); current.changed('javImage') }} />
       </Row>
-      <label data-setting-row=""><span><b>合并分卷与版本</b></span>
-        <input type="checkbox" id="groupCollapseSetting" data-toggle="" role="switch" checked={settings.groupCollapse}
-          onChange={(event) => { settings.groupCollapse = event.target.checked; save(); current.changed('groupCollapse') }} />
-      </label>
       <h4 data-settings-subheading="">新作显示</h4>
-      <ToggleRow id="feedAutoScrollSetting" title="新作自动滚动" checked={settings.feedAutoScroll}
+      <Row title="显示数量">
+        <div id="feedLimitSetting">
+          <NumberSetting key={epoch} id="feedLimitSetting" label="新作显示数量" value={settings.feedLimit}
+            onApply={(value) => { settings.feedLimit = boundedPreference(value, 1, 100, 12); save(); current.changed('feedLimit') }} />
+        </div>
+      </Row>
+      <ToggleRow id="feedAutoScrollSetting" title="自动滚动" checked={settings.feedAutoScroll}
         onToggle={(on) => { settings.feedAutoScroll = on; save(); current.changed('feedAutoScroll') }} />
       {FEED_COMPILATIONS.map(([id, key, label, title]) => (
         <CompilationToggle key={id} host={current} id={id} settingKey={key} label={label} title={title} />
@@ -496,14 +521,6 @@ function PlaybackRows({ host: current, epoch }: Omit<GroupProps, 'tab'>) {
   const save = () => current.store.save();
   return (
     <>
-      <Row title="悬停预览延迟">
-        <div id="hoverDelaySetting">
-          <NumberSetting key={epoch} id="hoverDelaySetting" label="悬停预览延迟" value={settings.hoverDelaySeconds}
-            onApply={(value) => {
-              settings.hoverDelaySeconds = boundedPreference(value, 0, 60, 5); save(); current.changed('hoverDelay');
-            }} />
-        </div>
-      </Row>
       <ToggleRow id="detailAutoplaySetting" title="打开详情自动播放" checked={settings.detailAutoplay}
         onToggle={(on) => { settings.detailAutoplay = on; save() }} />
       <ToggleRow id="miniplayerSetting" title="离开详情后小窗播放" checked={settings.miniplayer}
@@ -515,6 +532,27 @@ function PlaybackRows({ host: current, epoch }: Omit<GroupProps, 'tab'>) {
         </div>
       </Row>
     </>
+  );
+}
+
+const TRANSCODE_OPTIONS: readonly Choice[] = [['auto', '自动（硬件优先）'], ['software', '软件编解码']];
+
+/* 编解码方式跟着运行 Peach 的那台电脑走（`/api/media-processing`），和配置页「视频预览」同一个查询键。
+   打开面板时能不能改配置先回 null，确认能改才取数：每次打开都这样走一遍，取回的就是那台电脑此刻的值。
+   改完先存到服务端，往返期间下拉停在新值、挂忙态，失败退回原值。 */
+function TranscodeRow({ host: current, epoch, ready }: { host: SettingsPanelHost; epoch: number; ready: boolean }) {
+  const policy = useQuery({ queryKey: MEDIA_PROCESSING_KEY, queryFn: ({ signal }) => fetchMediaProcessing(signal), enabled: ready });
+  const save = useMutation({
+    mutationFn: (mode: string) => apiSend<MediaProcessingPolicy>(MEDIA_PROCESSING_URL, { playback_acceleration: mode }),
+    onSuccess: (saved) => { queryClient.setQueryData(MEDIA_PROCESSING_KEY, saved); current.receipt('已保存播放编解码方式') },
+    onError: (error) => current.failure('保存播放编解码方式', error),
+  });
+  const value = save.isPending ? save.variables : policy.data?.playback_acceleration || 'auto';
+  return (
+    <Row title="编解码方式" description="用于播放时的视频转码。">
+      <SelectField id="playbackAccelerationSetting" label="播放编解码方式" options={TRANSCODE_OPTIONS} value={value}
+        disabled={!ready || !policy.data} busy={save.isPending} epoch={epoch} onPick={(mode) => save.mutate(mode)} />
+    </Row>
   );
 }
 

@@ -183,6 +183,7 @@ preferencesState.settingsEffects = {
   /* 折叠是在渲染时做的，不重取的话已经被跳过的那些卡不会自己冒出来。 */
   groupCollapse:()=>reloadCurrentSurface(),
   feedAutoScroll:()=>syncFeedAutoScroll(),
+  feedLimit:()=>refreshFeedRows(),
   feedCompilations:()=>refreshFeedRows(),
   /* 设置说的是「离开详情不再进小窗」，已经开着的那个小窗留着反而像没生效。 */
   miniplayer:()=>{if(!preferencesState.appSettings.miniplayer)stageApi()?.closeMiniplayer()},

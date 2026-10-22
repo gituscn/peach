@@ -258,7 +258,8 @@
 [data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-row]+[data-sidebar-setting]{border-top:0}
 [data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-row] b{font-size:14px;line-height:20px;font-weight:400}
 [data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-row] small{font-size:12px;line-height:18px;margin-top:2px;max-width:none}
-[data-settings-panel] [data-settings-card] [data-settings-scroll] [class~=ui-gselect]{min-width:90px;min-height:32px;height:32px;padding:6px 8px;font-size:13px;border-radius:8px}
+/* 下拉外层只是容器，框线与内边距都在里面的触发器上；外层再垫一圈内边距，触发器的右沿就比同列的数值框与开关缩进一截。 */
+[data-settings-panel] [data-settings-card] [data-settings-scroll] [class~=ui-gselect]{min-width:90px;min-height:32px;height:32px;padding:0;font-size:13px;border-radius:8px}
 [data-settings-panel] [data-settings-card] [data-number-control]{gap:5px;font-size:12px}
 [data-settings-panel] [data-settings-card] [data-number-control] input{width:64px;height:32px;padding:6px;border-radius:8px;font-size:13px}
 [data-settings-panel] [data-settings-card] [data-number-control] button{min-height:32px;padding:4px 8px;font-size:12px}
@@ -313,7 +314,7 @@ html[data-theme-snapshot] [data-settings-panel] :is([data-settings-glide],[data-
 [data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-row][data-setting-sort]{grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding-block:12px}
 [data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-sort-controls]{display:flex;gap:8px;justify-content:end}
 [data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-sort-controls]>div{flex:0 1 112px;min-width:0}
-[data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-sort-controls] [class~=ui-gselect]{width:112px;min-width:0;padding:0}
+[data-settings-panel] [data-settings-card] [data-settings-scroll] [data-setting-sort-controls] [class~=ui-gselect]{width:112px;min-width:0}
 [data-settings-panel] [data-settings-card] [data-settings-scroll] [class~=gselectfield]{height:32px;padding:0 8px;border-radius:8px;font-size:13px;gap:6px}
 [data-settings-panel] [data-settings-card] [data-settings-scroll] [data-number-help]{display:none}
 [data-settings-panel] [data-number-fields]{position:relative}

@@ -1,4 +1,4 @@
-/* 设置偏好与 Peach 配置的四份服务端数据，各一个 Query 键。
+/* 设置偏好与 Peach 配置的五份服务端数据，各一个 Query 键。
  *
  * - `['settings']`：跟数据库走、所有访问端同一份的那几项（`/api/settings`，`src/peach/web_settings.py`）。
  *   面板每次打开都重取一次，取回来交给壳对账（`host.syncRemote`）：界面偏好的真相仍是壳里那一份
@@ -6,6 +6,8 @@
  * - `['follow-schedule']`：这台机器上关注自动更新的档位与上次运行状态。
  * - `['feed-schedule']`：订阅源定时拉取的档位与上次运行状态，形状同上，只读。
  * - `['thumbnail-jobs']`：视频缩略图采集的档位与状态。档位跟着机器走，不存在浏览器里。
+ * - `['media-processing']`：这台机器生成预览的开关与抽帧、转码的编解码方式。面板「播放」里的转码方式
+ *   与配置页「视频预览」读写同一份。
  *
  * 面板常驻不卸载，每次打开重取设置；Peach 配置在挂载时重取各自的数据。 */
 import { useMutation, type QueryClient } from '@tanstack/react-query';
@@ -22,6 +24,17 @@ export const SETTINGS_KEY = ['settings'] as const;
 export const FOLLOW_SCHEDULE_KEY = ['follow-schedule'] as const;
 export const FEED_SCHEDULE_KEY = ['feed-schedule'] as const;
 export const THUMBNAIL_JOBS_KEY = ['thumbnail-jobs'] as const;
+export const MEDIA_PROCESSING_URL = '/api/media-processing';
+export const MEDIA_PROCESSING_KEY = ['media-processing'] as const;
+
+/** `/api/media-processing` 的整份；写入只送改了的那一项，回来的仍是整份。 */
+export interface MediaProcessingPolicy {
+  metadata_only: boolean;
+  preview_acceleration?: 'auto' | 'software';
+  playback_acceleration?: 'auto' | 'software';
+}
+export const fetchMediaProcessing = (signal?: AbortSignal) =>
+  apiGet<MediaProcessingPolicy>(MEDIA_PROCESSING_URL, signal);
 
 /** `q_settings` 返回的整份；写入时只送改了的那几个键，回来的仍是整份。 */
 export interface SyncedSettings {

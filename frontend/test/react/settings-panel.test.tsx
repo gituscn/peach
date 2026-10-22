@@ -109,7 +109,7 @@ async function connect(r: Loaded) {
 const settings = (): PanelSettings => ({
   theme: 'system', uiSounds: true, homeGlow: { ...normalizeHomeGlow(null), on: true, preset: 'ash' }, accent: 'blue',
   sidebarOrder: [''], batchSize: 60, defaultSort: 'seed', defaultSortDirection: '', groupCollapse: true,
-  javImage: 'cover', feedAutoScroll: true, feedHideGroupCompilations: true, feedHideSoloCompilations: false,
+  javImage: 'cover', feedAutoScroll: true, feedLimit: 12, feedHideGroupCompilations: true, feedHideSoloCompilations: false,
   feedHideExcerpts: true, hoverDelaySeconds: 5, detailAutoplay: false, miniplayer: true, seekSeconds: 10,
   relatedLimit: 24, searchHistoryLimit: 10, followInitialDays: 30, avatarRefreshDays: 90, faviconRefreshDays: 365,
 });
@@ -182,6 +182,15 @@ describe('设置面板与壳的接缝', () => {
     expect(panel.querySelector('#detailAutoplaySetting')?.closest('section')?.hidden).toBe(true);
     expect(panel.querySelector('#videoThumbnailSetting')).toBeNull();
     expect(panel.querySelector('#followScheduleSetting')).toBeNull();
+    /* 分卷与版次折叠在首页和资料页网格上都生效，归「浏览与播放」；新作数量归「JAV 与新作」。 */
+    const group = (selector: string) => panel.querySelector(selector)?.closest('[data-setting-group]')?.id;
+    expect([group('#groupCollapseSetting'), group('#hoverDelaySetting'), group('#feedLimitSetting')])
+      .toEqual(['settings-group-1', 'settings-group-1', 'settings-group-2']);
+    const headings = (index: number) => [...panel.querySelectorAll(`#settings-group-${index} [data-settings-subheading]`)]
+      .map((node) => node.textContent);
+    expect([headings(1), headings(2)]).toEqual([['作品列表', '播放'], ['作品显示', '新作显示']]);
+    /* 编解码方式写运行 Peach 那台电脑的配置：不能改配置的设备上不出现。 */
+    expect(panel.querySelector('#playbackAccelerationSetting')).toBeNull();
     const entry = panel.querySelector<HTMLButtonElement>('[data-settings-service] button')!;
     expect(entry.disabled).toBe(true);
     await click(entry);
@@ -190,6 +199,7 @@ describe('设置面板与壳的接缝', () => {
     current.host.configurable = async () => true;
     await open(current);
     await settle();
+    expect(group('#playbackAccelerationSetting')).toBe('settings-group-1');
     expect(entry.disabled).toBe(false);
     await click(entry);
     await settle();
@@ -218,6 +228,50 @@ describe('设置面板与壳的接缝', () => {
     current.changed.mockClear();
     await click(panel.querySelector('#themeSetting input[value="dark"]'));
     expect([current.value.theme, effects(current.changed)]).toEqual(['dark', ['theme']]);
+    await close(current);
+  });
+
+  it('新作显示数量：失焦提交后落盘一次、报 feedLimit，越界不提交', async () => {
+    const current = await setup();
+    const panel = await open(current, 'JAV 与新作');
+    const input = panel.querySelector<HTMLInputElement>('#feedLimitSetting input[type=number]')!;
+    const commit = (value: string) => act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    current.changed.mockClear();
+    current.save.mockClear();
+    await commit('101');
+    expect([current.value.feedLimit, current.save.mock.calls.length, effects(current.changed)]).toEqual([12, 0, []]);
+    await commit('30');
+    expect([current.value.feedLimit, current.save.mock.calls.length, effects(current.changed)]).toEqual([30, 1, ['feedLimit']]);
+    await close(current);
+  });
+
+  it('编解码方式：读写 /api/media-processing，成功后回执，不落浏览器那一份偏好', async () => {
+    const sent: unknown[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') sent.push([url, JSON.parse(String(init.body))]);
+      const body = String(url).startsWith('/api/media-processing')
+        ? { metadata_only: false, preview_acceleration: 'auto', playback_acceleration: init?.method === 'POST' ? 'software' : 'auto' }
+        : {};
+      return { ok: true, status: 200, json: async () => body };
+    }));
+    const current = await setup();
+    current.host.configurable = async () => true;
+    const receipt = vi.fn();
+    current.host.receipt = receipt;
+    const panel = await open(current, '浏览与播放');
+    await settle();
+    const field = panel.querySelector<HTMLElement>('#playbackAccelerationSetting')!;
+    expect(field.querySelector('[data-select-trigger]')?.hasAttribute('disabled')).toBe(false);
+    current.save.mockClear();
+    await click(field.querySelector('[data-select-option="software"]'));
+    await settle();
+    expect(sent).toEqual([['/api/media-processing', { playback_acceleration: 'software' }]]);
+    expect(receipt).toHaveBeenCalledWith('已保存播放编解码方式');
+    expect(current.save).not.toHaveBeenCalled();
     await close(current);
   });
 
