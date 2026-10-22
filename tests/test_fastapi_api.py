@@ -379,10 +379,14 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(served["build_commit"], "c0ffee1234")
 
     async def test_background_issues_reads_app_and_contract_services_behind_auth(self):
-        from peach.metadata_amane import bridge_python
+        from peach.metadata_amane import bridge_home, bridge_python
+        # amane 桥装好的样子：解释器与包元数据都在，「需要处理」里才不会多出未安装那一项。
         python = bridge_python(self.root / "tools")
         python.parent.mkdir(parents=True)
         python.write_bytes(b"")
+        package = bridge_home(self.root / "tools") / ".venv" / "Lib" / "site-packages" / "amane-0.20.0.dist-info"
+        package.mkdir(parents=True)
+        (package / "METADATA").write_text("Metadata-Version: 2.1\nName: amane\nVersion: 0.20.0\n", encoding="utf-8")
         self.app.state.web_contract.tools_root = self.root / "tools"
         # 夹具账本没有云下载那张表；云下载的判据由 test_background_issues 单独覆盖。
         self.app.state.web_contract.downloads = None
