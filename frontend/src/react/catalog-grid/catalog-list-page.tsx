@@ -21,6 +21,7 @@ import { DataTableFrame } from '../components/data-table-frame';
 import { DataTableFooter, DataTableSort } from '../components/table-controls';
 import { RetryNote } from '../components/grid-reveal';
 import { LibraryCompletionPrompt, missingPreviewIds } from '../library-processing/library-completion';
+import { completionRowRemembered, rememberCompletionRow } from '../library-processing/completion-row';
 import { catalogParams } from './catalog-grid';
 import type { CatalogGridProps, MediaItem, MediaPage } from './types';
 import { useCatalogTablePreferences } from './catalog-column-widths';
@@ -74,6 +75,10 @@ export function CatalogListPage(props: CatalogGridProps) {
   });
   const items = result.data?.items || [];
   const total = Number(result.data?.total || 0);
+  const missing = props.filters?.state === 'trash' ? [] : missingPreviewIds(items, props.layout.javImage);
+  const [completionReserved] = useState(completionRowRemembered);
+  useEffect(() => { if (result.data && !result.isPlaceholderData) rememberCompletionRow(missing.length > 0) },
+    [result.data, result.isPlaceholderData, missing.length]);
   useLayoutEffect(() => {
     if (result.isFetching) return;
     let live = true;
@@ -156,15 +161,16 @@ export function CatalogListPage(props: CatalogGridProps) {
     },
   });
   return <div data-catalog-view-mode="list" data-catalog-table="" aria-busy={result.isFetching || undefined} className="flex min-w-0 flex-col gap-4">
-    {/* 缺图提示与工具按钮同一行：提示要等数据才知道出不出现，单占一行会在数据到达时把表格往下推。 */}
-    <div className="flex flex-wrap items-center justify-end gap-2" role="toolbar" aria-label="作品列表工具栏">
-      <LibraryCompletionPrompt inline assetIds={props.filters?.state === 'trash' ? [] : missingPreviewIds(items, props.layout.javImage)} />
+    <div className="flex flex-wrap justify-end gap-2" role="toolbar" aria-label="作品列表工具栏">
       <div data-toolbar-actions="">
       <TableColumnControls preferences={preferences} />
       <DataTableSort label="作品列表" options={sortOptions} sorting={sorting}
         onChange={next => table.setSorting(next)} />
       </div>
     </div>
+    {result.isPending
+      ? completionReserved ? <i data-completion-skeleton="" aria-hidden="true" className="skeleton-sheen" /> : null
+      : <LibraryCompletionPrompt className="" assetIds={missing} />}
     {result.isError ? <RetryNote message={requestErrorMessage(result.error)} onRetry={() => void result.refetch()} /> : null}
     <DataTableFrame follow preferences={preferences} onRowClick={props.selectMode ? id => { if (!result.isPlaceholderData) props.actions.toggleSelection(Number(id), false) } : undefined}>
       <Table aria-label="作品列表" size="sm"

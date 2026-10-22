@@ -4,6 +4,7 @@ import { cardArtwork } from '@peach/card-art';
 
 import { LinkButton } from '@/components/base/buttons/link-button';
 import { RiArrowRightLine } from '@remixicon/react';
+import { cx } from '@/utils/cx';
 
 import { apiSend, errorMessage } from '../../api';
 import type { MediaItem } from '../catalog-grid/types';
@@ -26,12 +27,12 @@ export function missingPreviewIds(items: PreviewItem[], javImage: string): numbe
     && !cardArtwork(item, 'small', false, javImage).html).map(item => item.id))];
 }
 
-/** `inline`：放进列表工具栏左侧，高度与工具按钮一致，数据到达时不把表格往下推。 */
-export function LibraryCompletionPrompt({ assetIds, onComplete, inline = false }: { assetIds: number[]; onComplete?(): void; inline?: boolean }) {
-  return assetIds.length ? <Completion assetIds={assetIds} onComplete={onComplete} inline={inline} /> : null;
+/** 单独一行；`className` 交给所在布局定外边距，列表页由父级间距负责。 */
+export function LibraryCompletionPrompt({ assetIds, onComplete, className = 'mb-4' }: { assetIds: number[]; onComplete?(): void; className?: string }) {
+  return assetIds.length ? <Completion assetIds={assetIds} onComplete={onComplete} className={className} /> : null;
 }
 
-function Completion({ assetIds, onComplete, inline }: { assetIds: number[]; onComplete?(): void; inline: boolean }) {
+function Completion({ assetIds, onComplete, className }: { assetIds: number[]; onComplete?(): void; className: string }) {
   const job = useQuery({ queryKey: LIBRARY_PROCESSING_KEY,
     queryFn: ({ signal }) => fetchLibraryProcessing(signal),
     refetchInterval: query => pollInterval(query.state.data, true) });
@@ -65,8 +66,8 @@ function Completion({ assetIds, onComplete, inline }: { assetIds: number[]; onCo
     : started && state?.job_id === started && state.status === 'failed' ? state.error || '补全未完成' : '';
   const message = problem || (start.isPending ? '正在启动补全…'
     : outcome || `这批影片中有 ${assetIds.length.toLocaleString()} 部暂无预览，可补全资料与图片。`);
-  return <section aria-label="补全预览" aria-live="polite" data-library-completion="" className={inline ? '@container min-w-0 flex-1' : '@container mb-4'}>
-    <Note tone={problem ? 'warning' : 'neutral'} className={inline ? 'min-h-9 justify-center py-0' : undefined} action={<div className="flex flex-wrap items-center gap-2"><ProcessingActions busy={busy} metadataOnly={state?.metadata_only} onRun={command => {
+  return <section aria-label="补全预览" aria-live="polite" data-library-completion="" className={cx('@container', className)}>
+    <Note tone={problem ? 'warning' : 'neutral'} action={<div className="flex flex-wrap items-center gap-2"><ProcessingActions busy={busy} metadataOnly={state?.metadata_only} onRun={command => {
       if (busy) return;
       setOutcome('');
       start.mutate(command);

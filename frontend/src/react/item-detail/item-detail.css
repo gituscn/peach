@@ -337,20 +337,22 @@
   border-radius: var(--tag-radius);
   background: var(--tag-fill);
   overflow: hidden;
-  min-height: 30px;
+  box-sizing: border-box;
+  height: var(--control-h-inline);
   max-width: 100%;
 }
-.peach-react [data-item-detail] [data-detail-tag] button { border: 0; background: transparent; color: var(--ink-2); cursor: pointer; height: 28px; }
-/* 长标签单行省略：按钮高度定死 28px，折成两行时第二行会被切掉一半。全名在 title 上。 */
+/* 外框连边线取行内档，与旁边的添加键同高；里面的按钮撑满框内。 */
+.peach-react [data-item-detail] [data-detail-tag] button { border: 0; background: transparent; color: var(--ink-2); cursor: pointer; height: 100%; }
+/* 长标签单行省略：按钮高度随外框定死，折成两行时第二行会被切掉一半。全名在 title 上。 */
 .peach-react [data-item-detail] [data-detail-tag] [data-tag] { min-width: 0; padding: 3px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.peach-react [data-item-detail] [data-detail-tag] [data-remove-tag] { width: 28px; padding: 0; display: grid; place-items: center; color: var(--muted); }
+.peach-react [data-item-detail] [data-detail-tag] [data-remove-tag] { width: calc(var(--control-h-inline) - 2px); padding: 0; display: grid; place-items: center; color: var(--muted); }
 .peach-react [data-item-detail] [data-detail-tag] [data-tag]:hover { background: var(--hover); color: var(--ink); }
 .peach-react [data-item-detail] [data-detail-tag] [data-remove-tag]:hover {
   color: var(--drop);
   background: color-mix(in srgb, var(--drop) 12%, transparent);
 }
 .peach-react [data-item-detail] [data-detail-tag] svg,
-.peach-react [data-item-detail] [data-tag-plus] svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; }
+.peach-react [data-item-detail] [data-tag-plus] svg { width: var(--icon-inline); height: var(--icon-inline); stroke: currentColor; fill: none; stroke-width: 2; }
 .peach-react [data-item-detail] [data-tag-plus] {
   width: var(--control-h-inline);
   height: var(--control-h-inline);

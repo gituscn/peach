@@ -4,33 +4,20 @@
  * 同一条来源在两种视图里的状态写法一旦分开写，就会出现同一行在卡片里说「未检查」、
  * 在表格里说「正常」。 */
 import { useLayoutEffect, useRef, useState } from 'react';
-import { VisuallyHidden } from 'react-aria-components';
-import { RiGlobalLine } from '@remixicon/react';
 
 import { Chip } from '@/components/base/badges/chip';
 import { Button } from '@/components/base/buttons/button';
+
+import { MarkImage } from '../components/site-mark';
 
 import {
   authorAvatar, authorInitial, errorHeadline, isBroken, sourceIconUrl, statusText,
   type FollowSource,
 } from './follow-manage';
 
-/** 站点圆标。
- *
- * 给了 `label` 就是「画得出图标就只画图标」：图标在时名字交给读屏，没登记图标或者那一枚
- * 取不下来时显示地球与名字。 */
-export function SourceIcon({ provider, label }: { provider: string; label?: string }) {
-  const src = sourceIconUrl(provider);
-  const [broken, setBroken] = useState('');
-  if (!src || broken === provider) return <><RiGlobalLine aria-hidden className="size-3.5 shrink-0" />{label || null}</>;
-  return (
-    <>
-      <img src={src} alt="" width={14} height={14} loading="lazy"
-        onError={() => setBroken(provider)}
-        className="size-3.5 shrink-0 rounded-sm object-contain" />
-      {label ? <VisuallyHidden>{label}</VisuallyHidden> : null}
-    </>
-  );
+/** 关注来源的站标，尺寸与回退和采集来源站标同一枚；站名由旁边的文字或外层的读屏文字说。 */
+export function SourceIcon({ provider }: { provider: string }) {
+  return <MarkImage src={sourceIconUrl(provider)} />;
 }
 
 /** 创作者圆标：官方来源的头像优先，归档来源回退，都取不到就用首字母。

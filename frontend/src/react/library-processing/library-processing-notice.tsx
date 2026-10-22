@@ -79,7 +79,7 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
         <p className="text-body-medium">{title}</p>
         {active ? <p data-processing-eta="" className="text-caption-1-regular text-text-secondary tabular-nums wrap-anywhere">{remainingTime(state!)}</p> : null}
       </div>
-      <Button size="small" variant="secondary" iconOnly leadingIcon={CollapseChevron} data-processing-toggle=""
+      <Button size="small" variant="secondary" iconOnly leadingIcon={CollapseChevron} data-processing-toggle="" data-collapse-upward=""
         aria-label={expanded ? '收起任务详情' : '展开任务详情'} aria-expanded={expanded} aria-controls={bodyId} onClick={toggle} />
     </div>
     <TrafficProgress traffic={state?.traffic} detailsOpen={trafficExpanded} onDetailsChange={setTrafficExpanded} />

@@ -2,6 +2,7 @@ import { skeletonHtml } from './ui-kit/skeleton';
 import { catalogView } from './react/catalog-grid/catalog-view';
 import { catalogTableSnapshot } from './react/catalog-grid/catalog-table-columns';
 import { esc } from './core';
+import { COMPLETION_ROW_SKELETON_HTML, completionRowRemembered } from './react/library-processing/completion-row';
 
 /** 列表骨架一格的内容，壳与列表岛共用：名称格是缩略图、头像和标题署名两行，其余列一条短条。 */
 export function catalogListSkeletonCellHtml(column: string): string {
@@ -22,6 +23,7 @@ function catalogListSkeletonHtml(label: string): string {
   const row = `<tr>${columns.map(column => `<td>${catalogListSkeletonCellHtml(column.id)}</td>`).join('')}${flexible ? '' : '<td></td>'}</tr>`;
   return `<div class="peach-react catalog-skeleton" data-skeleton="catalog/list" role="status" aria-busy="true" aria-label="${esc(label)}">`
     + '<div data-list-skeleton aria-hidden="true"><div data-list-skeleton-tools><i class="skeleton-sheen"></i></div>'
+    + (completionRowRemembered() ? COMPLETION_ROW_SKELETON_HTML : '')
     + `<div data-board-data-table><div class="w-full overflow-x-auto"><table class="bui-table bui-table-sm" style="table-layout:fixed;min-width:${minimum}px">`
     + `<colgroup>${cols}</colgroup><thead><tr>${head}</tr></thead><tbody>${row.repeat(6)}</tbody></table></div></div></div></div>`;
 }

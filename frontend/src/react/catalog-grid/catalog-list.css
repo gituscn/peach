@@ -36,6 +36,8 @@
 .peach-react [data-list-skeleton] { display: flex; flex-direction: column; gap: 16px; }
 .peach-react [data-list-skeleton-tools] { display: flex; justify-content: flex-end; }
 .peach-react [data-list-skeleton-tools] > i { display: block; width: 312px; max-width: 100%; height: 36px; border-radius: var(--control-radius); }
+/* 缺图提示行的预留：一行正文加默认档按钮，上下各 8px，与提示条同高。 */
+.peach-react [data-completion-skeleton] { display: block; height: calc(var(--control-h) + 16px); border-radius: var(--radius-2lg, 10px); }
 .peach-react [data-list-skeleton-name] { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
 .peach-react [data-list-skeleton-name] > i { flex: none; width: 112px; height: 63px; margin-right: 4px; border-radius: var(--control-radius); }
 .peach-react [data-list-skeleton-name] > b { flex: none; width: 38px; height: 38px; border-radius: 50%; }
