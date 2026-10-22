@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "846ceca9-5b00-4c94-a82e-dce20d3a86ab", e._sentryDebugIdIdentifier = "sentry-dbid-846ceca9-5b00-4c94-a82e-dce20d3a86ab");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "aa9656ee-f849-486f-897c-f9bfccbd9deb", e._sentryDebugIdIdentifier = "sentry-dbid-aa9656ee-f849-486f-897c-f9bfccbd9deb");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -38890,6 +38890,7 @@ function iye({ rows: e }) {
 }
 function Rj({ run: e, meta: t, children: n, footer: r, followups: i }) {
 	return /* @__PURE__ */ (0, D.jsxs)("li", {
+		id: `run-${e.id}`,
 		"data-status": e.status,
 		"data-task-key": e.task_key,
 		"data-run-id": e.id,
@@ -115767,4 +115768,4 @@ pxt(mxt);
 //#endregion
 export { $w as applyTheme, Zk as peachHistory, Jo as popCount, Vgt as showToast };
 
-//# debugId=846ceca9-5b00-4c94-a82e-dce20d3a86ab
+//# debugId=aa9656ee-f849-486f-897c-f9bfccbd9deb

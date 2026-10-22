@@ -93,7 +93,8 @@ function RunCard(
     followups?: TaskRunPayload[] },
 ) {
   return (
-    <li data-status={run.status} data-task-key={run.task_key} data-run-id={run.id}
+    // `id` 让「需要处理」那一行的「查看失败记录」能直接滚到这张卡。
+    <li id={`run-${run.id}`} data-status={run.status} data-task-key={run.task_key} data-run-id={run.id}
       className={cardClass({
         padding: 'none',
         bordered: 'line',

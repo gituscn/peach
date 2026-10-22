@@ -8,12 +8,12 @@
 这里不再复述一遍。高频逐条的失败（站点圆标、头像、单个推送文件）不进来：它们各自有
 任务记录，汇总在这里只会刷屏。
 
-动作按能不能原地修好分：网络、调度、amane 桥这类重跑一次就可能好的给 `retry`（界面上
-一律叫「立即重试」）；要改设置、填凭据的只给链接。每项都带链接，`link_label` 写具体去处。
+动作按能不能原地修好分：网络、调度、amane 桥、人脸模型这类重跑一次就可能好的给 `retry`
+（界面上一律叫「立即重试」）；要改设置、填凭据的只给链接。每项都带链接，`link_label` 写具体去处。
 
-时间分两种：`since` 是服务自己记下的起点，只有两个调度有（连续失败里第一轮的开始）；
-其余服务不记失败时刻，`noticed_at` 是这个进程第一次读到这一项的时间，会晚于实际发生，
-重启后重新计。两者不互相顶替。
+时间分两种：`since` 是服务自己记下的起点，两个调度（连续失败里第一轮的开始）和人脸模型
+（那条失败记录的结束时刻）有；其余服务不记失败时刻，`noticed_at` 是这个进程第一次读到
+这一项的时间，会晚于实际发生，重启后重新计。两者不互相顶替。
 
 加一类问题就是往 `PROVIDERS` 里加一个函数：读 `(app_state, contract, config)`，
 返回零到多条 `Issue`。服务没装配时 `getattr` 拿到 None，函数照样返回空。
@@ -143,6 +143,22 @@ def _network(state, _contract, _config) -> list[Issue]:
                   retry="/api/network-status/check", retry_available=True)]
 
 
+def _face_models(_state, contract, _config) -> list[Issue]:
+    runs = getattr(contract, "task_runs", None)
+    # 账本还没迁移出任务记录表时任务中心整个是关着的，这一行跟着不报。
+    if runs is None or not runs.available():
+        return []
+    from . import face_models
+    status = face_models.status(runs)
+    # 只有最新一条记录是失败才报：还没取过（`missing`）下次用到时会自己去取，不算问题；
+    # 重新下载在跑时这一行先收起。失败原因只在那张任务卡上写，链接指过去。
+    if status["state"] != "failed":
+        return []
+    # 模型存在本机工具目录、不碰账本，只读端同样可以重取。
+    return [Issue("face-models", "人脸模型下载失败", f"/tasks#run-{status['run_id']}", "查看失败记录",
+                  since=status["failed_at"], retry=status["retry_url"], retry_available=True)]
+
+
 Provider = Callable[[Any, Any, Any], Iterable[Issue]]
 
 PROVIDERS: tuple[Provider, ...] = (
@@ -157,6 +173,7 @@ PROVIDERS: tuple[Provider, ...] = (
     _automatic_updates,
     _library_sharing,
     _amane_bridge,
+    _face_models,
 )
 
 

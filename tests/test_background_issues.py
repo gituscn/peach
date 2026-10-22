@@ -150,6 +150,22 @@ class BackgroundIssueTests(unittest.TestCase):
         self.state.sync = SimpleNamespace(read_only=True)
         self.assertFalse(self.collect()[0]["retry_available"])
 
+    def test_a_failed_face_model_download_points_at_its_card_and_can_be_retried(self):
+        latest: list = []
+        self.contract.task_runs = SimpleNamespace(query=lambda **_: list(latest), available=lambda: True)
+        # 还没取过：下次用到时会自己去取，不算问题。
+        self.assertEqual(self.collect(), [])
+        latest.append(SimpleNamespace(id=42, active=False, status="failed",
+                                      finished_at="2026-10-22T08:00:00Z", error="连不上 GitHub"))
+        [row] = self.collect()
+        self.assertEqual({key: row[key] for key in ("key", "href", "link_label", "since", "retry", "retry_available")}, {
+            "key": "face-models", "href": "/tasks#run-42", "link_label": "查看失败记录",
+            "since": "2026-10-22T08:00:00Z", "retry": "/api/face-models", "retry_available": True})
+        self.assertNotIn("连不上 GitHub", json.dumps(row, ensure_ascii=False))
+        # 重新下载在跑时这一行先收起。
+        latest[0] = SimpleNamespace(id=43, active=True, status="running", finished_at=None, error="")
+        self.assertEqual(self.collect(), [])
+
     def test_one_broken_service_does_not_hide_the_others(self):
         def broken():
             raise RuntimeError("状态文件读坏了")
