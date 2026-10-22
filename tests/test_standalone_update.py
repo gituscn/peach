@@ -203,12 +203,14 @@ class StandaloneUpdateTests(unittest.TestCase):
         source, output, manifest, target, archive, release = self.release_fixture()
         rebuilt = self.root / "rebuilt"
         report = verify_split(output, "1.0.0", rebuilt)
-        self.assertEqual(report["tools"], 3)
+        self.assertEqual(report["tools"], 4)
         self.assertEqual((rebuilt / "Peach/Peach.exe").read_bytes(), (source / "Peach.exe").read_bytes())
         with zipfile.ZipFile(archive) as thin, zipfile.ZipFile(output / "Peach-1.0.0-windows-x64.zip") as full:
             self.assertNotIn("Peach/tools/ffmpeg/bin/ffmpeg.exe", thin.namelist())
             self.assertNotIn("Peach/cloudflared.exe", thin.namelist())
+            self.assertFalse([name for name in thin.namelist() if name.startswith("Peach/tools/face-models/")])
             self.assertIn("Peach/tools/ffmpeg/bin/ffmpeg.exe", full.namelist())
+            self.assertIn("Peach/tools/face-models/face_recognition_sface_2021dec.onnx", full.namelist())
             self.assertNotIn("Peach/" + update_packages.MANIFEST, full.namelist())
         state, requests = self.prepare_fixture(target, output, release)
         self.assertEqual(state["state"], "ready", state)
@@ -309,7 +311,7 @@ class StandaloneUpdateTests(unittest.TestCase):
     def test_lite_installer_prepares_from_r2_with_no_github_or_adjacent_archives(self):
         result, requests, manifest, stage, error = self.prepare_online_lite()
         self.assertEqual(result, 0, error.read_text(encoding='utf-8') if error.exists() else '')
-        self.assertEqual(len(requests), 3)
+        self.assertEqual(len(requests), len(update_packages.TOOL_PATHS))
         self.assertTrue(all(url.startswith('https://downloads.peach.video/v1.0.0/') for url in requests))
         for bundle in manifest['tools'].values():
             self.assertTrue(update_packages.matches(stage, bundle['files']))
@@ -317,7 +319,7 @@ class StandaloneUpdateTests(unittest.TestCase):
     def test_lite_installer_uses_same_version_github_when_r2_is_unavailable(self):
         result, requests, manifest, stage, _ = self.prepare_online_lite('unavailable')
         self.assertEqual(result, 0)
-        self.assertEqual(len(requests), 6)
+        self.assertEqual(len(requests), 2 * len(update_packages.TOOL_PATHS))
         self.assertTrue(all(url.startswith('https://github.com/peach-mitao/peach/releases/download/v1.0.0/')
                             for url in requests[1::2]))
         for bundle in manifest['tools'].values():
@@ -326,7 +328,7 @@ class StandaloneUpdateTests(unittest.TestCase):
     def test_lite_installer_accepts_only_the_embedded_manifest_digest_across_sources(self):
         result, requests, manifest, stage, _ = self.prepare_online_lite('mismatch')
         self.assertEqual(result, 0)
-        self.assertEqual(len(requests), 6)
+        self.assertEqual(len(requests), 2 * len(update_packages.TOOL_PATHS))
         for bundle in manifest['tools'].values():
             self.assertTrue(update_packages.matches(stage, bundle['files']))
 
@@ -387,6 +389,15 @@ class StandaloneUpdateTests(unittest.TestCase):
         (source / update_packages.MANIFEST).write_text(json.dumps(manifest), encoding="utf-8")
         with self.assertRaises(ValueError):
             update_packages.read_manifest(source, "1.0.0")
+
+    def test_a_tool_this_version_does_not_know_is_left_out_not_refused(self):
+        """更新版本新增的工具包这一版不认得：照常更新，只是不下载它。"""
+        source, output, manifest, target, archive, release = self.release_fixture()
+        future = json.loads(json.dumps(manifest))
+        future["tools"]["future-tool"] = {"files": {"tools/future/x.bin": "a" * 64}, "asset": {}}
+        (source / update_packages.MANIFEST).write_text(json.dumps(future), encoding="utf-8")
+        self.assertEqual(set(update_packages.read_manifest(source, "1.0.0")["tools"]),
+                         set(update_packages.TOOL_PATHS))
 
     def test_tool_archive_cannot_replace_application_files(self):
         archive = self.archive(["Peach/tools/ffmpeg/bin/ffmpeg.exe", "Peach/Peach.exe"])

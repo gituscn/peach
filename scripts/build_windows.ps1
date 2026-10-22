@@ -109,6 +109,13 @@ if ($Standalone) {
     if ($LASTEXITCODE -ne 0) {
         throw 'Standalone build requires verified untrunc and corresponding source. Run scripts/build_untrunc_windows.sh first or pass -UntruncPath.'
     }
+    # 人脸模型在 PyInstaller 之前取齐并校验，网络不通时尽早失败；缓存在 build\face-models。
+    $FaceModelsStage = Join-Path $BuildPath 'face-models'
+    if (Test-Path -LiteralPath $FaceModelsStage) { Remove-Item -LiteralPath $FaceModelsStage -Recurse -Force }
+    & $Python -X utf8 (Join-Path $PSScriptRoot 'fetch_face_models.py') --destination $FaceModelsStage
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Standalone build requires verified face models. Check access to media.githubusercontent.com or fill build\face-models.'
+    }
     $CloudflaredCandidates = @()
     if ($CloudflaredPath) { $CloudflaredCandidates += $CloudflaredPath }
     if ($env:PEACH_CLOUDFLARED_BUILD) { $CloudflaredCandidates += $env:PEACH_CLOUDFLARED_BUILD }
@@ -167,6 +174,12 @@ if ($Standalone) {
     if (Test-Path -LiteralPath $PackagedUntrunc) { Remove-Item -LiteralPath $PackagedUntrunc -Recurse -Force }
     & $Python -X utf8 (Join-Path $PSScriptRoot 'media_tool_bundle.py') --tool untrunc --source $UntruncPath --destination $PackagedUntrunc
     if ($LASTEXITCODE -ne 0) { throw 'untrunc packaging failed.' }
+    $PackagedFaceModels = [IO.Path]::GetFullPath((Join-Path $OutputPath 'tools\face-models'))
+    if (-not $PackagedFaceModels.StartsWith($OutputPath.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Face model packaging destination must stay inside the application output directory.'
+    }
+    if (Test-Path -LiteralPath $PackagedFaceModels) { Remove-Item -LiteralPath $PackagedFaceModels -Recurse -Force }
+    Copy-Item -LiteralPath $FaceModelsStage -Destination $PackagedFaceModels -Recurse
 }
 
 # 工作目录只服务这一次构建：`--clean` 已让下一次不复用它，留着只是几十 MB 的中间产物。

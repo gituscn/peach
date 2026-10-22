@@ -56,6 +56,8 @@ Windows 第一次询问防火墙权限时，只勾选「专用网络」。
 
 完整安装包和完整免安装 ZIP 均包含 FFmpeg 与 ffprobe，位于程序目录的 `tools\ffmpeg\bin`；轻量安装包会在安装时备齐工具。转码、媒体信息探测与缩略图无需额外配置。`*-update.zip` 由 Peach 更新器校验和安装，不提供手动导入入口；首次安装使用任一安装包或完整免安装包。`tools-*.zip` 由更新器或轻量安装包按需处理。
 
+完整安装包和完整免安装 ZIP 还包含头像取景与比对用的人脸模型，位于 `tools\face-models`，连同两个模型的许可证（YuNet 为 MIT，SFace 为 Apache-2.0）；没有网络也能用。这份模型被删除、被安全软件隔离或校验不符时，Peach 会改为联网下载到数据目录，失败时在活动中心「需要处理」里提示并可立即重试。
+
 缺索引 MP4 修复使用随包的 `tools\untrunc\untrunc.exe`，需要同编码参数的完整片作为参照。该工具与其兼容的 FFmpeg 库独立构建，按 GPL-2.0-or-later 分发；完整对应源码制品为同一 Release 中的 `untrunc-corresponding-source.zip`。显式 `PEACH_UNTRUNC` 优先于随包工具，其后查数据目录与 PATH。
 
 工具以独立进程调用，按 GPL-3.0-or-later 分发；工具目录包含许可证、构建配置、来源清单和 SHA-256。完整对应源码制品 `ffmpeg-corresponding-source.zip` 与应用放在同一个 Release，包含 FFmpeg、x264、nv-codec-headers 的固定源码和构建脚本。发行构建会校验工具及对应源码，任何一项缺失或哈希不符都停止打包。

@@ -3,8 +3,8 @@
 任务卡只记历史：取不到时留一条失败记录和原因。此刻是否可用由 `status` 回答，活动中心页顶
 「需要处理」那一行读它，「立即重试」调 `RETRY_URL`。
 
-YuNet 与 SFace 两个模型是全进程共用的一次性能力：第一次用到时联网取一次，之后一直用本地
-那份。取不到不让任何一轮任务停下（`avatar_face.FaceProbe`、`face_match.FaceMatcher` 都退回
+YuNet 与 SFace 两个模型是全进程共用的一次性能力：完整安装包、macOS 应用与 Docker 镜像随包
+带着；没带或那份对不上时，第一次用到时联网取一次，之后一直用本地那份。取不到不让任何一轮任务停下（`avatar_face.FaceProbe`、`face_match.FaceMatcher` 都退回
 不看脸的旧判据），代价是这件事在界面上没有位置——补头像的后继照样显示跑完了。
 
 这里补的就是那个位置。回报点只有一个：`face_detect.fetch_model` 每次联网取模型的结果经
@@ -74,13 +74,14 @@ RETRY_URL = "/api/face-models"
 
 
 def status(runs) -> dict:
-    """人脸模型此刻的状态，给活动中心页顶「需要处理」那一行读。不联网、不算哈希，读一次就是一条查询。
+    """人脸模型此刻的状态，给活动中心页顶「需要处理」那一行读。不联网，读一次就是一条查询。
 
     判据和任务卡同一个来源：最新那条 `face-models` 记录。`state` 取四个值：
 
     - `downloading`：立即重试那一轮在跑。
     - `failed`：最新一条是失败，`failed_at`／`error`／`run_id` 指向那张卡。
-    - `ready`：两个模型文件都在本机。哈希留到用的时候由 `fetch_model` 核对。
+    - `ready`：两个模型都在本机，随包那份或数据目录里那份。随包那份按 `bundled_model`
+      核对哈希，进程里只算一次；数据目录那份的哈希留到用的时候由 `fetch_model` 核对。
     - `missing`：还没取过，下次用到时自动去取；这不是问题，不必提示。
 
     详细原因只在任务卡上写，这里的 `error` 供「需要处理」判断与排查，不另起一套说法。
@@ -89,7 +90,8 @@ def status(runs) -> dict:
 
     latest = runs.query(task_key=TASK_KEY, limit=1)
     last = latest[0] if latest else None
-    present = face_detect.MODEL_PATH.is_file() and face_match.MODEL_PATH.is_file()
+    present = all(face_detect.bundled_model(module.MODEL_PATH.name, module.MODEL_SHA256) is not None
+                  or module.MODEL_PATH.is_file() for module in (face_detect, face_match))
     if last is not None and last.active:
         state = "downloading"
     elif last is not None and last.status == "failed":

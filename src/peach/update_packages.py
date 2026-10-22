@@ -11,6 +11,8 @@ TOOL_PATHS = {
     "ffmpeg": ("tools/ffmpeg", {"bin/ffmpeg.exe", "bin/ffprobe.exe", "manifest.json", "LICENSE.txt", "NOTICE.md", "buildconf.txt"}),
     "untrunc": ("tools/untrunc", {"untrunc.exe", "manifest.json", "LICENSE.txt", "NOTICE.md", "buildconf.txt"}),
     "cloudflared": ("", {"cloudflared.exe", "cloudflared-manifest.json"}),
+    "face-models": ("tools/face-models", {"face_detection_yunet_2023mar.onnx", "face_recognition_sface_2021dec.onnx",
+                                          "LICENSE-yunet.txt", "LICENSE-sface.txt", "manifest.json"}),
 }
 
 
@@ -40,11 +42,17 @@ def matches(root: Path, files: dict[str, str]) -> bool:
 
 
 def read_manifest(stage: Path, version: str) -> dict:
+    """读更新包的工具清单，只留本版认得的工具。
+
+    清单可以多出本版不认得的工具：那是更新版本新增的工具包，这一版不下载，装好后由那个
+    工具自己的运行时兜底补齐。认得的工具一个都不能少。
+    """
     manifest = json.loads((stage / MANIFEST).read_text(encoding="utf-8"))
     if (not isinstance(manifest, dict) or manifest.get("format") != 1 or manifest.get("version") != version
             or not isinstance(manifest.get("tools"), dict)
-            or set(manifest.get("tools", {})) != set(TOOL_PATHS)):
+            or not set(TOOL_PATHS) <= set(manifest.get("tools", {}))):
         raise ValueError("更新包工具清单无效")
+    manifest["tools"] = {tool: manifest["tools"][tool] for tool in TOOL_PATHS}
     all_names: set[str] = set()
     for tool, bundle in manifest["tools"].items():
         if not isinstance(bundle, dict):
