@@ -81,6 +81,16 @@ class MediaIdentityTests(unittest.TestCase):
         self.assertEqual(self.path.read_bytes(), before)
         self.assertFalse((self.root / "database").exists())
 
+    def test_first_save_with_ids_keeps_the_pre_identity_file_once(self):
+        original = self.path.read_bytes()
+        backup = self.path.with_suffix(".pre-media-identity.toml")
+        settings_file.write(self.config, force=True)
+        self.assertEqual(backup.read_bytes(), original)
+        loaded = settings_file.load_config(environ=self.env)
+        self.assertTrue(loaded.storage_roots)
+        settings_file.write(replace(loaded, library_names={"D:\\JAV": "改名"}), force=True)
+        self.assertEqual(backup.read_bytes(), original)
+
     def test_legacy_upgrade_is_independent_of_order_and_path_spelling(self):
         expected = media_identity.catalog(self.config)
         reordered = replace(self.config, locations={"local": ("e:/收藏/JAV/", "d:/jav/")})

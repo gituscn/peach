@@ -819,6 +819,30 @@ describe('设计决定：人物与厂牌资料页', () => {
     }
   });
 
+  it('相邻两张稍后看卡的底色之间隔着整段列距', { timeout: 60_000 }, async () => {
+    const opened = await openCatalogFixture(browser, (payload) => {
+      if (payload.items.length < 2) throw new Error('演示目录不足两张卡');
+      for (const item of payload.items.slice(0, 2)) item.watch_later = true;
+    });
+    try {
+      await opened.page.mouse.move(0, 0);
+      const geometry = await opened.page.evaluate(() => {
+        const [first, second] = [...document.querySelectorAll<HTMLElement>('#grid [data-media-grid] > [data-media-card][data-watch-later]')];
+        const spread = (element: HTMLElement) => Number(/0px 0px 0px (\d+(?:\.\d+)?)px/.exec(getComputedStyle(element).boxShadow)?.[1] ?? 0);
+        return {
+          sameRow: Math.abs(first!.getBoundingClientRect().top - second!.getBoundingClientRect().top) < 1,
+          clearance: second!.getBoundingClientRect().left - spread(second!) - (first!.getBoundingClientRect().right + spread(first!)),
+          columnGap: parseFloat(getComputedStyle(first!.parentElement!).columnGap),
+        };
+      });
+      assert.ok(geometry.sameRow, '前两张稍后看卡不在同一排');
+      assert.equal(geometry.clearance, geometry.columnGap, `两张稍后看卡的底色之间只剩 ${geometry.clearance}px`);
+      assert.deepEqual(opened.problems, []);
+    } finally {
+      await opened.close();
+    }
+  });
+
   it('跳过渲染的元信息区不裁掉贴着边的头像悬停描边和焦点环', { timeout: 60_000 }, async () => {
     /* 演示库的作品都未归属，头像是不可聚焦的 `<span>`；首张卡归给一位女优，头像才是按钮。 */
     const opened = await openCatalogFixture(browser, (payload) => {
