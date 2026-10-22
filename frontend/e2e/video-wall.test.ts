@@ -576,7 +576,7 @@ describe('播放墙的浏览与详情', () => {
       await page.locator('[data-wall-error]').waitFor();
       assert.equal(await page.getByRole('button', { name:'退出播放墙' }).isVisible(), true);
       fail = false;
-      await page.getByRole('button', { name:'重试', exact:true }).click();
+      await page.getByRole('button', { name:'立即重试', exact:true }).click();
       await page.locator('[data-wall-empty]').waitFor();
       assert.equal(await page.locator('[data-wall-error]').count(), 0);
     } finally { await opened.close() }
