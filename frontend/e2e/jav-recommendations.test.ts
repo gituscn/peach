@@ -98,14 +98,14 @@ describe('JAV 推荐与加载结构', () => {
       const pendingBottom = await page.locator('[data-jav-filter] [data-filter-row="bottom"]').boundingBox();
       const pendingSize = await page.locator('[data-jav-filter] [data-entity-layout]').boundingBox();
       const pendingShortcut = await page.locator('[data-jav-filter] [data-shortcuts-trigger]').boundingBox();
-      assert.ok(pendingShortcut && pendingShortcut.width === 30 && pendingShortcut.height === 30, JSON.stringify(pendingShortcut));
+      assert.ok(pendingShortcut && pendingShortcut.width === 32 && pendingShortcut.height === 32, JSON.stringify(pendingShortcut));
       const tagPlaceholders = page.locator('[data-jav-filter] [data-catalog-tags] [data-skeleton="tag"]');
       assert.equal(await tagPlaceholders.count(), 6);
       const pendingTags = await tagPlaceholders.evaluateAll(nodes => nodes.map(node => {
         const style = getComputedStyle(node), box = node.getBoundingClientRect();
         return { height: box.height, y: box.y, pointer: style.pointerEvents, position: style.position, overflow: style.overflow };
       }));
-      assert.ok(pendingTags.every(chip => chip.height === 30 && chip.y === pendingTags[0].y && chip.pointer === 'none'), JSON.stringify(pendingTags));
+      assert.ok(pendingTags.every(chip => chip.height === 32 && chip.y === pendingTags[0].y && chip.pointer === 'none'), JSON.stringify(pendingTags));
       assert.ok(pendingTags.every(chip => chip.position === 'relative' && chip.overflow === 'hidden'), '标签光效在各自占位内定位和裁切');
       const avatarShape = await page.locator('[data-jav-skeleton-avatar]').first().evaluate(node => {
         const style = getComputedStyle(node); return { width: style.width, height: style.height, radius: style.borderRadius };
