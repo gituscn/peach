@@ -169,6 +169,23 @@ def _match_root(row, root, previous, by_path, *, windows):
     return supplied or matched or str(uuid4()), old
 
 
+def _library_value(row, known, name):
+    """表单行里媒体库这一级的字段。来源色与处理方式只在设了时写进配置；表单没带的项沿用已保存的值。"""
+    value = dict(name=name, icon=str(row.get("library_icon", known.get("icon", ""))))
+    color = str(row.get("library_color", known.get("color", "")))
+    policy = str(row.get("library_policy", known.get("policy", "")))
+    if color:
+        value["color"] = color
+    if policy and policy != "auto":
+        value["policy"] = policy
+    if policy == "custom":
+        chosen = str(row.get("library_stages", known.get("stages", ""))).split(",")
+        if any(stage and stage not in STAGES for stage in chosen):
+            raise ValueError("处理步骤无效")
+        value["stages"] = ",".join(stage for stage in STAGES if stage in chosen)
+    return value
+
+
 def configure_sources(config, sources, *, windows):
     """更新根目录与媒体库；既有根的来源和账本前缀保持稳定。"""
     from .media_sources import cost_for
@@ -185,21 +202,7 @@ def configure_sources(config, sources, *, windows):
         library_id = str(row.get("library_id") or (old or {}).get("library_id") or uuid4())
         UUID(library_id)
         name = str(row.get("library") or libraries.get(library_id, {}).get("name") or PureWindowsPath(root).name or root).strip()
-        known = libraries.get(library_id, {})
-        icon = str(row.get("library_icon", known.get("icon", "")))
-        value = dict(name=name, icon=icon)
-        # 来源色与处理方式只在设了时写进配置；表单没带这几项时沿用已保存的值。
-        color = str(row.get("library_color", known.get("color", "")))
-        policy = str(row.get("library_policy", known.get("policy", "")))
-        if color:
-            value["color"] = color
-        if policy and policy != "auto":
-            value["policy"] = policy
-        if policy == "custom":
-            chosen = str(row.get("library_stages", known.get("stages", ""))).split(",")
-            if any(stage and stage not in STAGES for stage in chosen):
-                raise ValueError("处理步骤无效")
-            value["stages"] = ",".join(stage for stage in STAGES if stage in chosen)
+        value = _library_value(row, libraries.get(library_id, {}), name)
         if library_id in declared_libraries and declared_libraries[library_id] != value:
             raise ValueError("同一媒体库的名称、图标、来源色和处理方式必须一致")
         declared_libraries[library_id] = value

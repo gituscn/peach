@@ -1839,6 +1839,29 @@ def _library_stages(config):
     return stages_of
 
 
+def _people_allowed(config):
+    """有没有哪个媒体库的处理方式联网补人物图片；都没有时整轮不补人物资料、不派实体后继。"""
+    return any('people' in stages for stages in media_identity.stages_by_root(config).values())
+
+
+def _collect_allowed(remote, traffic, row, code, missing, allowed, cover_root, covered, *,
+                     update, issue, answered, received, succeeded):
+    """按这一行所属媒体库的处理方式问外部来源（ADR-0116），返回 (证据条目, 新落盘的封面数)。
+
+    关掉的联网步骤不问：不补资料时不带缺失字段，不补封面时不找封面，两样都关就整行不联网。
+    不补人物图片的媒体库，这一行换上的封面不记进 `covered`，不因此派补头像后继。"""
+    found, covers = [], 0
+    if allowed & {'metadata', 'cover'}:
+        traffic.start_metadata(code)
+        found, covers = remote.collect(row, code, missing if 'metadata' in allowed else [], cover_root,
+                                       update=update, issue=issue, answered=answered, received=received,
+                                       fetch_cover='cover' in allowed)
+        traffic.finish_work('metadata', code, successful=succeeded())
+    if 'people' in allowed:
+        covered.append((row['id'], covers))
+    return found, covers
+
+
 def _check_processing_junk(database, locations, online_roots, asset_ids, protected_ids, state, update):
     """只检查本趟可访问目录或显式选择，并把隔离与复核计数记进可恢复状态。"""
     roots = [(source, root) for source, paths in locations.items() for root in paths
@@ -2542,22 +2565,15 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                        total=completed_count + len(prepared), current_asset_id=row['id'],
                        current_asset_name=Path(str(row['name'] or '')).name)
                 target_key = f"asset:{row['id']}"
-                # 媒体库处理方式关掉的联网步骤不问外部来源（ADR-0116）；本地读到的证据照常保存。
-                allowed = stages_of(row['path'])
-                missing = ((list(COLLECTED_FIELDS) if verify_existing else _missing_fields(row, local_fields))
-                           if 'metadata' in allowed else [])
-                found, covers = [], 0
-                if allowed & {'metadata', 'cover'}:
-                    traffic.start_metadata(code)
-                    found, covers = remote.collect(row, code, missing, cover_root, update=update, issue=issue,
-                        answered=() if verify_existing else _answered_sources(groups, target_key, missing),
-                        received=lambda entries, row=row, code=code, fields=local_fields, verify=verify_existing:
-                            publish(row, code, fields, verify, entries),
-                        fetch_cover='cover' in allowed)
-                    traffic.finish_work('metadata', code, successful=state['issue_count'] == issues_before)
+                missing = list(COLLECTED_FIELDS) if verify_existing else _missing_fields(row, local_fields)
+                found, covers = _collect_allowed(
+                    remote, traffic, row, code, missing, stages_of(row['path']), cover_root, covered,
+                    update=update, issue=issue,
+                    answered=() if verify_existing else _answered_sources(groups, target_key, missing),
+                    received=lambda entries, row=row, code=code, fields=local_fields, verify=verify_existing:
+                        publish(row, code, fields, verify, entries),
+                    succeeded=lambda before=issues_before: state['issue_count'] == before)
                 state['covers'] += covers
-                if 'people' in allowed:
-                    covered.append((row['id'], covers))
                 update(stage='保存待确认资料', current_action='writing_candidates',
                        current_started_at=time.time(), current_deadline_at=None)
                 checkpoints.queue_metadata(row, local_entries + found if local_ok else [], issues_before)
@@ -2572,7 +2588,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             summary = _finish_collection(
                 config, database, candidate_root, cover_root, groups, remote, asset_ids=scope_ids,
                 active=active, update=update, issue=issue, watermark=entity_watermark, covered=covered,
-                people=any('people' in stages for stages in media_identity.stages_by_root(config).values()))
+                people=_people_allowed(config))
             summary['auto_applied'] = summary.get('auto_applied', 0) + state['auto_applied']
             summary['auto_rejected'] = summary.get('auto_rejected', 0) + state['auto_rejected']
             finish_step('collect')
