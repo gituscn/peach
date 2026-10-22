@@ -73,7 +73,8 @@ def finish(output: Path, lock: dict, tool: str, architecture: str) -> dict:
                          "先建立 rebuilt/sources 并复制本包 sources/ 中的全部归档，再执行：\n\n"
                          f"`python3 scripts/build_macos_media.py --tool {tool} --arch {architecture} --output rebuilt`\n\n"
                          "每种架构分别编译；x86_64 可在 Apple Silicon 的 Rosetta 环境执行。\n"
-                         "FFmpeg 源码锁与 Windows 共用；nv-codec-headers 仅存档，macOS 不编入 NVIDIA 接口。\n")
+                         "FFmpeg 源码锁与 Windows 共用；nv-codec-headers、AMF 头文件与 libvpl 仅存档，"
+                         "macOS 不编入 NVIDIA、AMD 与 Intel 接口。\n")
     manifest = {"version": lock["version"], "license": lock["license"],
                 "platform": "darwin", "architecture": architecture,
                 "files": {path.relative_to(bundle).as_posix(): digest(path)

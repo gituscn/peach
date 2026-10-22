@@ -106,8 +106,8 @@ class FFmpegSourceBuildTests(unittest.TestCase):
         lock = builder.load_sources()
         self.assertEqual(lock["version"], "9.0.2")
         self.assertEqual(lock["license"], "GPL-3.0-or-later")
-        self.assertEqual(len(lock["sources"]), 4)
-        self.assertIn('dav1d', {source['name'] for source in lock['sources']})
+        self.assertEqual({source["name"] for source in lock["sources"]},
+                         {"ffmpeg", "x264", "nv-codec-headers", "dav1d", "amf-headers", "libvpl"})
 
     def make_sources(self, output):
         lock = builder.load_sources()
@@ -148,11 +148,16 @@ class FFmpegSourceBuildTests(unittest.TestCase):
             lock = self.make_sources(output)
             builder.prepare(output, lock)
             for path in ("ffmpeg/COPYING.GPLv3", "ffmpeg/COPYING.LGPLv2.1",
-                         "ffmpeg/COPYING.LGPLv3", "x264/COPYING", "dav1d/COPYING"):
+                         "ffmpeg/COPYING.LGPLv3", "x264/COPYING", "dav1d/COPYING",
+                         "libvpl/LICENSE", "libvpl/third-party-programs.txt"):
                 (output / "work" / path).write_text("license", encoding="utf-8")
             headers = output / "work/nv-codec-headers/include/ffnvcodec"
             headers.mkdir(parents=True)
             (headers / "test.h").write_text("/* MIT license */\ncode", encoding="utf-8")
+            amf = output / "work/amf-headers/AMF/core"
+            amf.mkdir(parents=True)
+            for name in ("Version.h", "Platform.h"):
+                (amf / name).write_text("// MIT license\n// Copyright AMD\n#pragma once\n", encoding="utf-8")
             (output / "ffmpeg/bin").mkdir(parents=True)
             for name in ("ffmpeg", "ffprobe"):
                 (output / f"ffmpeg/bin/{name}.exe").write_bytes(b"MZ fixture")
@@ -162,6 +167,10 @@ class FFmpegSourceBuildTests(unittest.TestCase):
             self.assertEqual(builder.digest(source_zip), manifest["source_archive"]["sha256"])
             for path, expected in manifest["files"].items():
                 self.assertEqual(builder.digest(output / "ffmpeg" / path), expected)
+            self.assertEqual((output / "ffmpeg/LICENSE-amf-headers.txt").read_text(encoding="utf-8"),
+                             "// MIT license\n// Copyright AMD\n")
+            self.assertTrue({"LICENSE-libvpl-LICENSE.txt", "LICENSE-libvpl-third-party-programs.txt"}
+                            <= set(manifest["files"]))
             with zipfile.ZipFile(source_zip) as package:
                 names = set(package.namelist())
                 self.assertTrue({f"sources/{s['archive']}" for s in lock["sources"]} <= names)
