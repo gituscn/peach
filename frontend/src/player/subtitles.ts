@@ -161,7 +161,7 @@ export class SubtitleControls {
     const item = this.player.peachItem;
     const query = String(item?.code || item?.title || String(item?.name || '').replace(/\.(mp4|mkv|avi|mov|webm|m4v|ts|wmv)$/i, '')).trim().slice(0, 200);
     if (query !== this.query) { this.query = query; this.offset = 0; this.results = []; this.searched = false }
-    const panel = this.panel(this.header('搜索中文字幕') + '<div class="vjs-peach-subtitle-search"><p class="vjs-peach-subtitle-status" data-subtitle-status role="status" hidden></p><div data-subtitle-results></div><a href="https://www.subtitlecat.com" target="_blank" rel="noopener noreferrer">中文字幕由 SubtitleCat 提供，可能包含机翻</a></div>', () => { this.request?.abort(); this.show(-1) });
+    const panel = this.panel(this.header('搜索中文字幕') + '<div class="vjs-peach-subtitle-search"><p class="vjs-peach-subtitle-status" data-subtitle-status role="status" hidden></p><div data-subtitle-results></div><a href="https://www.subtitlecat.com" target="_blank" rel="noopener noreferrer">中文字幕由 SubtitleCat 提供，可能包含机翻' + icon('external-link', 'ui-externalmark') + '</a></div>', () => { this.request?.abort(); this.show(-1) });
     if (query.length < 3) { this.status('当前作品没有可用于搜索的番号或片名'); return }
     if (this.searched) this.searchResults(panel);
     else void this.runSearch(panel, 0);

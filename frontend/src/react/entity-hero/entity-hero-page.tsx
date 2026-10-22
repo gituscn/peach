@@ -327,7 +327,7 @@ function HeroLinkView({ link }: { link: LinkView }) {
   switch (link.type) {
     case 'icon':
       return (
-        <a data-link="icon" href={link.url} target="_blank" rel="noreferrer" title={link.title} aria-label={link.title}>
+        <a data-link="icon" href={link.url} target="_blank" rel="noopener noreferrer" title={link.title} aria-label={link.title}>
           <LinkIcon mark={link.mark} />
         </a>
       );
@@ -347,8 +347,9 @@ function HeroLinkView({ link }: { link: LinkView }) {
       );
     default:
       return (
-        <a data-link="url" href={link.url} target="_blank" rel="noreferrer" title={link.title}>
+        <a data-link="url" href={link.url} target="_blank" rel="noopener noreferrer" title={link.title}>
           <LinkIcon mark={link.mark} /><span data-link-label="">{link.text}</span>
+          <svg className="ui-externalmark" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-external-link" /></svg>
         </a>
       );
   }
@@ -388,7 +389,7 @@ function EntryMarks({ entity, actions, helpers }: {
   return (
     <div data-entry-marks="">
       {entryMarks(entity).map((mark, at) => (
-        <a key={at} data-entry-mark="" href={mark.url} target="_blank" rel="noreferrer" title={mark.label} aria-label={mark.label}>
+        <a key={at} data-entry-mark="" href={mark.url} target="_blank" rel="noopener noreferrer" title={mark.label} aria-label={mark.label}>
           {mark.mark ? <Glyph name={mark.mark} /> : <span data-missav-mark=""><span>MISS</span><span>AV</span></span>}
           {mark.ordinal ? <span data-entry-ordinal="">{mark.ordinal}</span> : null}
         </a>

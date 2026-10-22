@@ -133,11 +133,14 @@ describe('首页筛选条', () => {
               color: style.color, border: style.border, shadow: style.boxShadow, radius: style.borderRadius };
           });
           return { heights: candidates.map(node => ({ label: node.getAttribute('aria-label') || node.textContent,
-            height: node.getBoundingClientRect().height })), actions };
+            height: node.getBoundingClientRect().height })), actions,
+            compact: parseFloat(getComputedStyle(frame).getPropertyValue('--control-h-compact')) };
         });
-        for (const control of controls.heights) assert.equal(control.height, 30, JSON.stringify(control));
+        // 筛选条整条取紧凑档：页签、药丸、分段与两枚动作键同高。
+        assert.equal(controls.compact, 32);
+        for (const control of controls.heights) assert.equal(control.height, controls.compact, JSON.stringify(control));
         assert.deepEqual(controls.actions[0], controls.actions[1]);
-        assert.equal(controls.actions[0].width, 30);
+        assert.equal(controls.actions[0].width, controls.compact);
         assert.equal(controls.actions[0].color, 'rgb(255, 255, 255)');
         assert.match(controls.actions[0].background, /^linear-gradient\(/);
         const gap = await opened.page.evaluate(() => document.querySelector('#grid [data-media-card]')!.getBoundingClientRect().top

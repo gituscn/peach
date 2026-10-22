@@ -1,6 +1,6 @@
 import type { SortingState } from '@tanstack/react-table';
 import { Button } from '@/components/base/buttons/button';
-import { Select, SelectItem } from '@/components/base/select/select';
+import { Select, SelectItem } from './select';
 import { Pagination } from './table-pagination';
 import { SortDirectionIcon } from './icon-swap';
 
@@ -10,7 +10,7 @@ export function DataTableSort({ label, options, sorting, onChange }: {
 }) {
   const current = sorting[0];
   return <span className="flex flex-none items-center gap-2">
-    <Select aria-label={`${label}排序`} selectedKey={current?.id ?? 'default'}
+    <Select aria-label={`${label}排序`} prefix="排序" selectedKey={current?.id ?? 'default'}
       onSelectionChange={(key) => {
         if (key !== null) onChange(key === 'default' ? [] : [{ id: String(key), desc: current?.desc ?? false }]);
       }}>

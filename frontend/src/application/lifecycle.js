@@ -5,6 +5,7 @@ import { $ } from '../core';
 import { applicationEffects } from './effects';
 import { wireImageFallbacks } from './../card-art/image-fallback';
 import { catalogState } from './catalog.js';
+import { recalledHomeFeed } from './feed.js';
 import { layoutState } from './layout.js';
 import { followState } from './follow.js';
 export const lifecycleState = { overlayScan: undefined };
@@ -23,7 +24,7 @@ applicationEffects.mutation(()=>{
 }).observe(document.body,{childList:true,subtree:true});
 wireOverlayScrollbars();
 wireImageFallbacks(document.body);
-catalogState.homeHasFeed = null;
+catalogState.homeHasFeed = recalledHomeFeed();
 catalogState.barsRequestSeq = 0;
 catalogState.barsRendered = '';
 catalogState.catalogFilterProps = null;

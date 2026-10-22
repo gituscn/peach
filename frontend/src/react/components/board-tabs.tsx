@@ -74,7 +74,7 @@ export function BoardTabs<V extends string>(
             data-pill-selected={selected ? '' : undefined} data-pill-variant="gray"
             tabIndex={selected ? 0 : -1} className={TAB}
             onClick={() => { if (!selected) onChange(tab.value) }}>
-            {Glyph ? <Glyph className="mr-1.5 size-4" /> : null}
+            {Glyph ? <Glyph className="mr-1.5 size-(--icon-inline)" /> : null}
             {tab.label}
           </button>
         );

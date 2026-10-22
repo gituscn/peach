@@ -25,7 +25,7 @@ const cardText = (title: string, text: string, layout: FieldsetLayout) => `<div 
 export function scanCardSkeletonHtml(): string {
   return island(`<section aria-label="扫描与采集" class="${fieldsetClass('stack')}" data-cleanup-task data-cleanup-processing>
         ${cardText('扫描与采集', SCAN_CARD_TEXT, 'stack')}
-        <footer class="${FIELDSET_FOOT.stack}"><a href="/sources" class="inline-flex items-center justify-center gap-1 whitespace-nowrap font-sans rounded-sm text-body-medium text-accent-600"><span>来源和凭证</span>${islandGlyph('arrow-up', 'size-[18px] shrink-0 rotate-90')}</a><span data-button-group data-split-button data-variant="primary">${islandButton({ label: '同步媒体库', attrs: waitingAction })}${islandButton({ glyph: 'chevron-down', attrs: `${waitingAction} aria-label="更多同步方式"` })}</span></footer>
+        <footer class="${FIELDSET_FOOT.stack}"><a href="/sources" class="inline-flex items-center justify-center gap-1 whitespace-nowrap font-sans rounded-sm text-body-medium text-accent-600"><span>来源和凭证</span>${islandGlyph('arrow-up', 'size-(--icon-inline) shrink-0 rotate-90')}</a><span data-button-group data-split-button data-variant="primary">${islandButton({ label: '同步媒体库', attrs: waitingAction })}${islandButton({ glyph: 'chevron-down', attrs: `${waitingAction} aria-label="更多同步方式"` })}</span></footer>
       </section>`);
 }
 

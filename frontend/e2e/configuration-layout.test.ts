@@ -94,44 +94,47 @@ describe('配置表单与行间距', () => {
           ] } });
         });
         await page.reload();
-        const form = page.getByRole('form', { name: '媒体目录', exact: true });
+        const form = page.getByRole('form', { name: '媒体库与目录', exact: true });
         const protectedFolder = form.locator('[data-media-read-policy="0"] [aria-haspopup="listbox"]');
         await protectedFolder.waitFor();
-        // 带品牌图的四行，来源、所属媒体库与图标各显示一枚站标。
+        // 带品牌图的四个媒体库，标题行的图标、文件夹行的来源与所属媒体库各显示一枚站标。
         await page.waitForFunction(() => {
-          const marks = [...document.querySelectorAll<HTMLImageElement>('[data-folder-row] img')];
+          const marks = [...document.querySelectorAll<HTMLImageElement>('[data-library-block] img')];
           return marks.length === 12 &&marks.every(image => image.complete && image.naturalWidth > 0);
         });
-        const marks = await form.locator('[data-folder-row] img').evaluateAll(images => images.map(image => {
+        const marks = await form.locator('[data-library-block] img').evaluateAll(images => images.map(image => {
+          // 站标是行内字形，画框取 `--icon-inline`（所在文字字号的 1.2 倍）。
           const box = image.getBoundingClientRect();
+          const glyph = parseFloat(getComputedStyle(image).fontSize) * 1.2;
           return { inline: image.getAttribute('src')?.startsWith('data:image/png;base64,'),
-            width: box.width, height: box.height };
+            sized: Math.abs(box.width - glyph) < 0.5 && Math.abs(box.height - glyph) < 0.5 };
         }));
-        assert.deepEqual(marks, Array.from({ length: 12 }, () => ({ inline: true, width: 16, height: 16 })));
+        assert.deepEqual(marks, Array.from({ length: 12 }, () => ({ inline: true, sized: true })));
         assert.ok(!(await form.innerText()).includes('（只读）'));
         assert.ok((await protectedFolder.textContent())?.includes('代理保护'));
         assert.ok((await form.locator('[data-media-read-policy="1"]').textContent())?.includes('正常读取'));
         if (!viewport.mobile) {
+          const spread = (boxes: { y: number; height: number }[]) => {
+            const centers = boxes.map(box => box.y + box.height / 2);
+            return Math.max(...centers) - Math.min(...centers);
+          };
           for (let index = 0; index < 5; index++) {
-            const row = form.locator('[data-folder-row]').nth(index);
+            const block = form.locator('[data-library-block]').nth(index);
+            const head = block.locator('[data-library-head]');
+            const icon = await head.getByRole('button').first().boundingBox();
+            const name = await head.getByRole('textbox').boundingBox();
+            const preset = await head.locator('[aria-haspopup="listbox"]').last().boundingBox();
+            const row = block.locator('[data-folder-row]');
             const source = await row.locator('[aria-haspopup="listbox"]').first().boundingBox();
             const policy = await row.locator('[data-media-read-policy] [aria-haspopup="listbox"]').boundingBox();
             const library = await row.getByRole('button', { name: new RegExp(`目录所属媒体库 ${index + 1}`) }).boundingBox();
-            const name = await row.getByRole('textbox', { name: `媒体库名称 ${index + 1}`, exact: true }).boundingBox();
-            const icon = await row.getByRole('button', { name: `媒体库图标 ${index + 1}`, exact: true }).boundingBox();
-            assert.ok(source && policy && library && name && icon);
-            // 两排：来源与读取策略一排，所属媒体库、名称、图标一排；同排控件中线对齐，所属媒体库与来源同列。
-            const spread = (boxes: { y: number; height: number }[]) => {
-              const centers = boxes.map(box => box.y + box.height / 2);
-              return Math.max(...centers) - Math.min(...centers);
-            };
-            assert.ok(spread([source, policy]) <= 3, JSON.stringify({ index, source, policy }));
-            assert.ok(spread([library, name, icon]) <= 3, JSON.stringify({ index, library, name, icon }));
-            assert.ok(library.y >= source.y + source.height, JSON.stringify({ index, source, library }));
-            assert.ok(Math.abs(library.x - source.x) <= 1 && Math.abs(library.width - source.width) <= 1);
+            assert.ok(icon && name && preset && source && policy && library);
+            // 媒体库的图标、名称与处理方式一排写在卡头；文件夹行的来源、读取策略与所属媒体库一排，同排控件中线对齐。
+            assert.ok(spread([icon, name, preset]) <= 3, JSON.stringify({ index, icon, name, preset }));
+            assert.ok(spread([source, policy, library]) <= 3, JSON.stringify({ index, source, policy, library }));
+            assert.ok(source.y >= name.y + name.height, JSON.stringify({ index, name, source }));
+            assert.ok(policy.x > source.x && library.x > policy.x);
             assert.ok(policy.width <= 132);
-            const bounds = await row.boundingBox();
-            assert.ok(bounds && bounds.x + bounds.width - (icon.x + icon.width) <= 14);
           }
         }
         await protectedFolder.click();

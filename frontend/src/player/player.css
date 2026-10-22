@@ -430,7 +430,7 @@ video.video-js{vertical-align:top;font-size:10px;line-height:1;font-family:Arial
 /* 徽标里的图标必须自己声明描边：sprite 里的仪表盘是描边图形，不声明就按 SVG 默认的
    fill 画成黑色实心块，压在 rgba(0,0,0,.6) 的底上等于没有。速率也要按整体不换行，
    否则「640 KB/s」会在这条 flex 行里断成两行，把 40px 的胶囊顶破。 */
-[data-player-net] svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+[data-player-net] svg{width:var(--icon-inline);height:var(--icon-inline);flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
 [data-player-net][hidden]{display:none}
 /* 被门挡住的 <video> 只带 hidden 属性，而 `.video-js{display:block}` 是作者样式，
    压得住 UA 的 `[hidden]`。原先靠内联 `style="display:none"` 顶住，三个门里

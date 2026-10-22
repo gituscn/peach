@@ -9,7 +9,7 @@ import { confirmModal } from '@peach/legacy/ui';
 import { LOC } from '@peach/legacy/core';
 
 import { Button } from '@/components/base/buttons/button';
-import { Select, SelectItem } from '@/components/base/select/select';
+import { Select, SelectItem } from '../components/select';
 
 import { errorMessage } from '../../api';
 import { DataTable, type DataColumn } from '../components/data-table';
@@ -60,7 +60,7 @@ function OrphanActions({ item, toast }: { item: OrphanRecord; toast(message: str
   return (
     <span className="flex min-w-0 flex-wrap items-center gap-2">
         {item.candidates.length
-          ? <Select aria-label={`选择接收 ${item.name} 个人记录的文件`} className="w-52" selectedKey={target}
+          ? <Select aria-label={`选择接收 ${item.name} 个人记录的文件`} prefix="接收" className="w-52" selectedKey={target}
               onSelectionChange={(key) => { if (key !== null) setTarget(Number(key)) }}>
               {item.candidates.map((candidate) => (
                 <SelectItem key={candidate.id} id={candidate.id} textValue={candidateText(candidate)}>

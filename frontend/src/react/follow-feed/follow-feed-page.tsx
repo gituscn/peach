@@ -194,7 +194,7 @@ export function FollowFeedPage(props: FollowFeedProps) {
                 {data.groups.length < FOLLOW_AUTO_LOAD_LIMIT ? (
                   <LoadMore key={result.data?.pages.length} entity enabled={() => !job.busyRef.current}
                     load={async () => { await result.fetchNextPage({ throwOnError: true }) }}>
-                    <CHEVRON_DOWN className="size-3.5" />加载更多
+                    <CHEVRON_DOWN className="size-(--icon-inline)" />加载更多
                   </LoadMore>
                 ) : (
                   <ManualMore busy={result.isFetchingNextPage}
@@ -243,7 +243,7 @@ function ManualMore({ busy, error, load }: { busy: boolean; error: string; load(
   return (
     <>
       <button type="button" data-entity-more="" aria-busy={busy || undefined} aria-disabled={busy || undefined} onClick={load}>
-        <CHEVRON_DOWN className="size-3.5" />加载更多
+        <CHEVRON_DOWN className="size-(--icon-inline)" />加载更多
       </button>
       {error ? <RetryNote message={error} onRetry={load} /> : null}
     </>
@@ -490,7 +490,7 @@ function Glass({ facets, view, total, busy, props, route }: {
                   const next = nextSort(key, view.sort, view.dir);
                   if (next) route(next);
                 }}>
-                {label}{pressed ? <IconSwap a={SortUpIcon} b={SortDownIcon} state={view.dir === 'asc' ? 'a' : 'b'} className="size-3.5" /> : null}
+                {label}{pressed ? <IconSwap a={SortUpIcon} b={SortDownIcon} state={view.dir === 'asc' ? 'a' : 'b'} className="size-(--icon-inline)" /> : null}
               </button>
             );
           })}

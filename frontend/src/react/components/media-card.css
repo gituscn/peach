@@ -16,7 +16,7 @@
 .peach-react [data-media-grid] {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile)), 1fr));
-  gap: 24px 16px;
+  gap: 24px;
 }
 /* 同一网格行里的卡片共享完整高度。 */
 .peach-react [data-media-grid] > [data-media-card] { align-self: stretch; }
@@ -45,10 +45,24 @@ body[data-surface="/trash"] .peach-react [data-media-grid] {
   transform-origin: center;
   transition: transform .18s ease, filter .18s ease, background-color .15s ease, box-shadow .15s ease;
 }
-/* 稍后看是常驻状态，一排里常有好几张：底色只铺在卡片盒自己的圆角里，相邻两张之间留出整段
- * 列距的页面底色，不连成一片。 */
-.peach-react [data-media-card][data-watch-later]:not([data-pending-delete]) {
-  background: var(--picked);
+/* 媒体库来源色是常驻底色，同一媒体库的卡常常整排相邻。淡色和悬停面一样往卡片盒外铺 8px，
+ * 头像、标签离色块边留出 8px；网格行距、列距都是 24px，相邻两张有色卡之间仍隔 8px 页面底色，
+ * 不连成一片。颜色由 `library-tint.ts` 按 `library_id` 给，用户没选颜色的媒体库不上色。 */
+.peach-react [data-media-card][data-library]:not([data-pending-delete], [data-variant="resource"], [data-variant="junk"]) {
+  --library-surface: color-mix(in oklab, var(--library-color) 9%, transparent);
+  --library-hover: color-mix(in oklab, var(--library-color) 15%, transparent);
+  background: var(--library-surface);
+  box-shadow: 0 0 0 8px var(--library-surface);
+}
+[data-theme="dark"] .peach-react [data-media-card][data-library] {
+  --library-surface: color-mix(in oklab, var(--library-color) 13%, transparent);
+  --library-hover: color-mix(in oklab, var(--library-color) 20%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .peach-react [data-media-card][data-library] {
+    --library-surface: color-mix(in oklab, var(--library-color) 13%, transparent);
+    --library-hover: color-mix(in oklab, var(--library-color) 20%, transparent);
+  }
 }
 .peach-react [data-media-card][data-variant="short"] { flex: none; width: 214px; }
 .peach-react [data-media-card][data-variant="next"] { flex: none; width: 216px; }
@@ -59,10 +73,36 @@ body[data-density="dense"] .peach-react [data-media-card][data-variant="short"] 
   background: var(--hover);
   box-shadow: 0 0 0 8px var(--hover);
 }
-.peach-react [data-media-card][data-watch-later]:not([data-pending-delete]):is(:hover, :focus-within) {
-  background: color-mix(in srgb, var(--picked) 96%, var(--ink));
-  box-shadow: 0 0 0 8px color-mix(in srgb, var(--picked) 96%, var(--ink));
+.peach-react [data-media-card][data-library]:not([data-pending-delete], [data-variant="resource"], [data-variant="junk"]):is(:hover, :focus-within) {
+  background: var(--library-hover);
+  box-shadow: 0 0 0 8px var(--library-hover);
 }
+/* 稍后看与已标记是个人状态，和来源色分开：封面左下角各一枚带色图标，两枚可以同时出现。
+ * 鼠标不在卡上时也一直显示；颜色之外还有字形，不靠颜色单独分辨。 */
+.peach-react [data-media-status] {
+  position: absolute;
+  z-index: 3;
+  left: 10px;
+  bottom: 12px;
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+}
+.peach-react [data-media-status] > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgb(255 255 255 / .12);
+  border-radius: 50%;
+  background: rgb(0 0 0 / .42);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+}
+.peach-react [data-media-status] svg { width: 15px; height: 15px; fill: currentColor; stroke: currentColor; stroke-width: 1.5; }
+.peach-react [data-media-status] [data-status="later"] { color: var(--color-sky-500); }
+.peach-react [data-media-status] [data-status="flagged"] { color: var(--color-rose-500); }
 .peach-react [data-media-card]:not([data-variant="resource"], [data-variant="junk"]):hover [data-media-pic] { filter: saturate(.9) brightness(.94); }
 .peach-react [data-select-mode] [data-media-card] { cursor: default; user-select: none; }
 .peach-react [data-select-mode] :is([data-media-open], [data-media-preview], [data-media-later], [data-media-seek]),
@@ -457,8 +497,9 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
 .peach-react :is([data-longhover] [data-media-seek], [data-media-card]:is(:hover, :has(:focus-visible)) [data-media-later]) button { pointer-events: auto; }
 .peach-react :is([data-media-preview], :is([data-media-later], [data-media-seek]) button):hover { background: rgb(0 0 0 / .34); }
 .peach-react [data-media-seek] svg { width: 34px; height: 34px; }
-.peach-react [data-media-later] button { width: 36px; height: 36px; padding: 0; }
-.peach-react [data-media-later] svg { width: 21px; height: 21px; }
+/* 稍后看是卡片悬浮动作，取紧凑档。 */
+.peach-react [data-media-later] button { width: var(--control-h-compact); height: var(--control-h-compact); padding: 0; }
+.peach-react [data-media-later] svg { width: 18px; height: 18px; }
 .peach-react [data-media-later] button[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
 
 /* ── 元信息区 ── */
@@ -609,7 +650,7 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
 .peach-react button[data-media-who] { cursor: pointer; }
 .peach-react [data-media-who] > span { overflow: hidden; text-overflow: ellipsis; }
 .peach-react :is([data-media-release], [data-media-size]) { display: inline-flex; flex: none; align-items: center; gap: 4px; white-space: nowrap; }
-.peach-react [data-media-byline] svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.peach-react [data-media-byline] svg { width: var(--icon-inline); height: var(--icon-inline); flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .peach-react span[data-media-who] { cursor: default; }
 .peach-react [data-media-who-more] { flex: none; color: var(--muted); white-space: nowrap; }
 .peach-react [data-media-why] { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -766,7 +807,7 @@ body[data-surface="/trash"] .peach-react [data-media-tags] {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 32px;
+  min-height: var(--control-h-compact);
   padding: 0 10px;
   border: 1px solid rgb(255 255 255 / .25);
   border-radius: var(--control-radius);
@@ -825,7 +866,7 @@ body[data-surface="/trash"] .peach-react [data-media-tags] {
   transition: background .14s;
 }
 .peach-react [data-shorts-enter]:hover { background: var(--hover); }
-.peach-react [data-shorts-enter] svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
+.peach-react [data-shorts-enter] svg { width: var(--icon-inline); height: var(--icon-inline); fill: none; stroke: currentColor; stroke-width: 2; }
 .peach-react [data-shorts-row] {
   display: flex;
   gap: 13px;

@@ -86,10 +86,10 @@ function CredentialForm({ row, readOnly, toast }:
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="primary" size="small" disabled={readOnly} {...busyProps(write.isPending)}
+        <Button variant="primary" disabled={readOnly} {...busyProps(write.isPending)}
           onClick={save}>保存配置</Button>
         {done ? (
-          <Button variant="danger" size="small" disabled={readOnly} {...busyProps(write.isPending)}
+          <Button variant="danger" disabled={readOnly} {...busyProps(write.isPending)}
             onClick={() => void confirmModal({
               title: '清除来源凭据', body: CLEAR_BODY, confirmLabel: '清除来源凭据', danger: true,
               onConfirm: () => write.mutateAsync({}),
@@ -116,9 +116,8 @@ function CredentialSection({ row, readOnly, toast }:
       </span>
       <b className="min-w-0 text-body-medium wrap-anywhere text-text-primary">{row.provider_label}</b>
       <StateChip row={row} />
-      {row.missing.length
-        ? <Chip variant="caption" color="rose">{`缺 ${row.missing.join('、')}`}</Chip>
-        : null}
+      {/* 每个缺的字段一枚标签：缺两项就是两枚，填上一项消掉一枚。 */}
+      {row.missing.map(field => <Chip key={field} variant="caption" color="rose">{`缺 ${field}`}</Chip>)}
     </span>
   );
   if (row.requirement === 'none' || row.requirement === 'blocked') {

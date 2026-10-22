@@ -25,6 +25,7 @@ import { Note } from '../components/note';
 import { Page } from '../components/page';
 import { PillAriaTabList } from '../components/pill-aria-tab-list';
 import { STAT_STRIP_SIX } from '../components/stat-card';
+import { ExternalLink } from '../settings/section';
 import { AddSource } from './add-source';
 import { AliasManager } from './alias-manager';
 import { Button } from '@/components/base/buttons/button';
@@ -118,9 +119,7 @@ export function FollowManagePage(props: FollowManageProps) {
         <Note tone="warning" title="本机只能浏览"
           extra={writerUrl
             ? <p className="text-body-2-regular">
-                <a href={writerUrl} className="text-text-primary underline underline-offset-2">
-                  前往写入端管理关注
-                </a>
+                <ExternalLink href={writerUrl}>前往写入端管理关注</ExternalLink>
               </p>
             : undefined}>
           {readOnlyMessage}

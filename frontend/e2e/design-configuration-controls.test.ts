@@ -67,12 +67,13 @@ describe('设计决定：配置控件', () => {
         await tabs.getByRole('tab', { name: '事务所', exact: true }).click();
         await page.waitForURL((url) => url.pathname === '/agencies');
         await tabs.getByRole('tab', { name: '事务所', selected: true }).waitFor();
-        await page.waitForFunction(() => {
-          const host = document.querySelector('[role="tablist"][aria-label="公司类型"]')!;
-          const selected = host.querySelector('[aria-selected="true"]')!.getBoundingClientRect();
-          const pane = host.querySelector('[data-pill-thumb]')!.getBoundingClientRect();
-          return Math.abs(selected.left - pane.left) <= 1 && Math.abs(selected.width - pane.width) <= 1;
-        });
+        // 等的就是开头取到的那一块选中层滑到位并停下：读它自己的父元素，不按标签名另找一排。
+        await page.waitForFunction((thumb) => {
+          const selected = thumb.parentElement!.querySelector('[aria-selected="true"]')!.getBoundingClientRect();
+          const pane = thumb.getBoundingClientRect();
+          return thumb.getAnimations().length === 0
+            && Math.abs(selected.left - pane.left) <= 1 && Math.abs(selected.width - pane.width) <= 1;
+        }, original);
         assert.equal(await original.evaluate((node) => node.isConnected), true);
         const selected = await tabs.getByRole('tab', { selected: true }).boundingBox();
         const pane = await surface.boundingBox();
@@ -185,8 +186,8 @@ describe('设计决定：配置控件', () => {
         }));
         assert.equal(centers.length, 3);
         for (const delta of centers) assert.ok(delta <= 1, `状态偏离输入框中线 ${delta}px`);
-        const media = page.getByRole('form', { name: '媒体目录', exact: true });
-        assert.notEqual(await media.getByRole('button', { name: '添加文件夹', exact: true }).evaluate((node) => getComputedStyle(node).backgroundImage),
+        const media = page.getByRole('form', { name: '媒体库与目录', exact: true });
+        assert.notEqual(await media.getByRole('button', { name: '添加媒体库', exact: true }).evaluate((node) => getComputedStyle(node).backgroundImage),
           await media.getByRole('button', { name: '保存配置', exact: true }).evaluate((node) => getComputedStyle(node).backgroundImage));
         await page.getByRole('tab', { name: '应用与维护', exact: true }).click();
         const tutorial = page.getByRole('region', { name: '安装教程', exact: true });

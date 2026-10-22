@@ -29,7 +29,7 @@ export function BrowserSources({ browsers, sources, range, children }:
   return <section className={`${cardClass()} flex flex-col gap-4`} aria-label="数据源">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h3 className="text-title-2-medium text-text-primary">数据源</h3>
-      <Button variant="secondary" size="small" onClick={() => setAdding(true)} disabled={adding}>添加浏览器</Button>
+      <Button variant="secondary" onClick={() => setAdding(true)} disabled={adding}>添加浏览器</Button>
     </div>
     {change.error ? <Note tone="error">{errorMessage(change.error)}</Note> : null}
     {adding ? <form className="flex flex-col gap-3" onSubmit={event => {

@@ -249,6 +249,10 @@ describe('扫描与采集控制', () => {
         await dock.getByRole('button', { name: '展开任务详情' }).click();
         assert.equal(await dock.getByRole('button', { name: '查看明细', exact: true }).getAttribute('aria-expanded'), 'false');
         await dock.getByRole('button', { name: '收起任务详情' }).click();
+        assert.equal(await dock.locator('[data-processing-toggle] > svg').evaluate(el => {
+          el.getAnimations().forEach(animation => animation.finish());
+          return getComputedStyle(el).transform;
+        }), 'matrix(-1, 0, 0, -1, 0, 0)', '贴底任务面向上展开，收起时箭头朝上');
         await page.emulateMedia({ reducedMotion: 'reduce' });
         assert.equal(await dock.locator('[data-processing-body]').evaluate(el => getComputedStyle(el).transitionProperty), 'none');
         assert.equal(await dock.locator('[data-processing-traffic]').isVisible(), true);

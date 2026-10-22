@@ -11,7 +11,7 @@ import { LOC } from '@peach/legacy/core';
 import { Button } from '@/components/base/buttons/button';
 import { IconButton } from '@/components/base/buttons/icon-button';
 import { Input } from '@/components/base/input/input';
-import { Select, SelectItem } from '@/components/base/select/select';
+import { Select, SelectItem } from '../components/select';
 
 import { errorMessage } from '../../api';
 import { useBackgroundJob } from '../background-job';
@@ -219,7 +219,7 @@ export function OrganizeCard(
       <div className="mt-3 flex flex-col gap-3">
         <div data-organize-scope className="flex min-w-0 flex-wrap items-start gap-2">
         {locations.length
-          ? <Select aria-label="整理哪个来源" className="w-fit min-w-25" selectedKey={location || null}
+          ? <Select aria-label="整理哪个来源" prefix="来源" className="w-fit min-w-25" selectedKey={location || null}
               onSelectionChange={(key) => {
                 if (key === null) return;
                 setChosen(String(key)); setScope({ location: String(key), path: '' });

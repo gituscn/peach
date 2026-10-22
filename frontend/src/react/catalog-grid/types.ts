@@ -22,6 +22,8 @@ export interface MediaItem {
   height?: number | null;
   rating?: number | null;
   o_count?: number | null;
+  /** 当前档案点过「喜欢」：列表接口给 1，详情页写回的同一条是 `true`。 */
+  liked?: boolean | number | null;
   first_seen?: string | null;
   last_played?: string | number | null;
   release_date?: string | null;
