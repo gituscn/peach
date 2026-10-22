@@ -77,9 +77,12 @@ def _accounts(client):
 
 
 def read(config):
+    """没填 CloudDrive2 地址是全新部署的常态，回空结果并标 `configured=False`，不当成错误。"""
     from .media_sources import CLOUD_LOCATIONS
     if not any(config.locations.get(key) for key in CLOUD_LOCATIONS):
         return dict(accounts=[], unlinked=[])
+    if not DownloadSettings(config.directory('state')).load().clouddrive_address:
+        return dict(accounts=[], unlinked=[], configured=False)
     with client_for(config) as client:
         permissions, apis = _accounts(client)
         bindings = _bindings(config, client, permissions, apis)

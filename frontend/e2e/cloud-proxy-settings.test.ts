@@ -66,4 +66,23 @@ describe('CloudDrive 代理设置', () => {
       } finally { await opened.close() }
     });
   }
+  it('未填 CloudDrive2 地址时显示设置入口，不报错', async () => {
+    const opened = await visit(browser, '/settings/library', VIEWPORTS[0], async page => {
+      await page.route('**/api/configuration', async route => {
+        const data = await (await route.fetch()).json();
+        await route.fulfill({ json: { ...data, media_sources: [{ location: '115', root: 'B:/', path: '', cost: 'metered' }] } });
+      });
+      await page.route('**/api/configuration/cloud-proxies', route =>
+        route.fulfill({ json: { accounts: [], unlinked: [], configured: false } }));
+    });
+    const { page } = opened;
+    try {
+      const section = page.getByRole('region', { name: 'CloudDrive 代理', exact: true });
+      await section.getByText('填写 CloudDrive2 地址和 API 令牌后，在这里设置各网盘账号的代理。').waitFor();
+      assert.equal(await section.getByRole('link', { name: '下载设置', exact: true }).getAttribute('href'), '/settings/downloads');
+      assert.equal(await section.getByText('没有读取配置').count(), 0);
+      assert.equal(await section.getByText('还没有使用 CloudDrive 的媒体库。').count(), 0);
+      assert.deepEqual(opened.problems, []);
+    } finally { await opened.close() }
+  });
 });

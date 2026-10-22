@@ -54,7 +54,7 @@ from .preview_cache import PreviewCache
 from .routes_auth import require_auth
 from .segments import SegmentCancelled, SegmentUnavailable, build_hls_playlist
 from .streaming import BufferedFileResponse, CancellableFileResponse, SplicedMp4Response
-from .transcodes import TranscodeCancelled, TranscodeUnavailable
+from .transcodes import TranscodeCancelled, TranscodeNeedsSession, TranscodeUnavailable
 
 router = APIRouter()
 
@@ -253,11 +253,15 @@ def stream(request: Request, id: int, session: str = "", args: dict[str, str] = 
             path, header, session=session, registry=state.stream_sessions,
         )
     try:
+        # 不带会话的只有卡片悬停预览：取消不了，也看不到浏览器断开，不能为它起整片转码。
         path, transcoded = state.transcode_service.browser_path(
-            id, path, session=session, registry=state.stream_sessions,
+            id, path, session=session, registry=state.stream_sessions, convert=bool(session),
         )
     except TranscodeCancelled:
         return Response(status_code=410, headers={"Cache-Control": "no-store"})
+    except TranscodeNeedsSession:
+        return JSONResponse({"error": "conversion needs a stream session"}, status_code=415,
+                            headers={"Cache-Control": "no-store"})
     except TranscodeUnavailable:
         LOGGER.exception("browser transcode failed for asset %s", id)
         return JSONResponse({"error": "transcode unavailable"}, status_code=503)

@@ -379,10 +379,14 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(served["build_commit"], "c0ffee1234")
 
     async def test_background_issues_reads_app_and_contract_services_behind_auth(self):
-        from peach.metadata_amane import bridge_python
+        from peach.metadata_amane import bridge_home, bridge_python
+        # amane 桥装好的样子：解释器与包元数据都在，「需要处理」里才不会多出未安装那一项。
         python = bridge_python(self.root / "tools")
         python.parent.mkdir(parents=True)
         python.write_bytes(b"")
+        package = bridge_home(self.root / "tools") / ".venv" / "Lib" / "site-packages" / "amane-0.20.0.dist-info"
+        package.mkdir(parents=True)
+        (package / "METADATA").write_text("Metadata-Version: 2.1\nName: amane\nVersion: 0.20.0\n", encoding="utf-8")
         self.app.state.web_contract.tools_root = self.root / "tools"
         # 夹具账本没有云下载那张表；云下载的判据由 test_background_issues 单独覆盖。
         self.app.state.web_contract.downloads = None
@@ -3025,6 +3029,30 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.content, b"mp4")
         self.assertEqual(response.headers["content-type"], "video/mp4")
         self.assertEqual(response.headers["x-peach-transcoded"], "1")
+
+    async def test_sessionless_stream_never_starts_a_whole_file_conversion(self):
+        """悬停预览不带会话：取消不了、看不到断开，缺缓存就直接拒绝，不起 FFmpeg。"""
+        avi = self.media_root / "hover.avi"
+        avi.write_bytes(b"avi-source")
+        con = sqlite3.connect(self.db)
+        con.execute(
+            "INSERT INTO asset(id,location,path,name,medium,size,first_seen) "
+            "VALUES(3,'local',?,'hover.avi','video',10,'2026-08-15')",
+            (str(avi),),
+        )
+        con.commit()
+        con.close()
+        from peach.ffmpeg import BinaryChoice
+        service = self.app.state.transcode_service
+
+        with patch.object(service.resolver, "ffmpeg",
+                          return_value=BinaryChoice(Path("ffmpeg"), "test")), \
+                patch.object(service, "_execute",
+                             side_effect=AssertionError("悬停预览起了整片转码")):
+            response = await self.client.get("/stream?id=3", headers={"X-Token": "secret"})
+
+        self.assertEqual(response.status_code, 415)
+        self.assertEqual(response.headers["cache-control"], "no-store")
 
     async def test_cached_visual_assets_and_thumbnail(self):
         headers = {"X-Token": "secret"}

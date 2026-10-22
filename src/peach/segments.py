@@ -247,7 +247,8 @@ class HlsSegmentService:
                   transcode: bool, codec: str = ""):
         """依次尝试的命令，每项是 (名字, 接收临时文件路径的构造函数)。
 
-        封装复制只有一种。重编码与整片转码共享可用硬件后端，最后回退 libx264。
+        封装复制只有一种。重编码与整片转码共享可用硬件后端，最后回退 libx264；Windows 上
+        libx264 前先试一次 D3D11VA 解码。
 
         NVDEC 解得出来的编码才走 CUDA 解码，`codec` 空或不在名单里就从软件解码起。
         判据要在开跑前定，因为坏结果不会自报：实测 `MIAD573_02.wmv`（vc1、1080p）经
@@ -274,9 +275,12 @@ class HlsSegmentService:
                 attempts.append((attempt.name, lambda out, attempt=attempt:
                                  prefix + list(attempt.before_input) + window + mapping
                                  + list(attempt.output) + audio + mux + [str(out)]))
-        attempts.append(("libx264", lambda out: prefix + window + mapping + [
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", "-threads", "2",
-        ] + audio + mux + [str(out)]))
+        software = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", "-threads", "2"]
+        decode = list(self.hardware.decode_options(ffmpeg, codec))
+        if decode:
+            attempts.append(("d3d11va-libx264", lambda out: prefix + decode + window + mapping
+                             + software + audio + mux + [str(out)]))
+        attempts.append(("libx264", lambda out: prefix + window + mapping + software + audio + mux + [str(out)]))
         return attempts
 
     async def _run(self, command: list[str], session: str, registry: StreamSessionRegistry) -> tuple[int, bytes]:

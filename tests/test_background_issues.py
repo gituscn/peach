@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from peach import background_issues  # noqa: E402
 from peach.background_issues import IssueLog  # noqa: E402
 from peach.follow_scheduler import FollowUpdateScheduler  # noqa: E402
-from peach.metadata_amane import bridge_python  # noqa: E402
+from peach.metadata_amane import bridge_home, bridge_python  # noqa: E402
 from peach.tunnel import TunnelSnapshot  # noqa: E402
 
 
@@ -33,6 +33,18 @@ def keys(rows):
     return [row["key"] for row in rows]
 
 
+def write_bridge_python(tools):
+    python = bridge_python(tools)
+    python.parent.mkdir(parents=True)
+    python.write_bytes(b"")
+
+
+def write_amane_metadata(tools):
+    package = bridge_home(tools) / ".venv" / "Lib" / "site-packages" / "amane-0.20.0.dist-info"
+    package.mkdir(parents=True)
+    (package / "METADATA").write_text("Metadata-Version: 2.1\nName: amane\nVersion: 0.20.0\n", encoding="utf-8")
+
+
 class BackgroundIssueTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -42,9 +54,8 @@ class BackgroundIssueTests(unittest.TestCase):
         self.log = IssueLog(self.clock)
         # amane 桥装好的样子，其余用例才不会被它多出来的一项干扰。
         self.tools = self.root / "tools"
-        python = bridge_python(self.tools)
-        python.parent.mkdir(parents=True)
-        python.write_bytes(b"")
+        write_bridge_python(self.tools)
+        write_amane_metadata(self.tools)
         self.contract = SimpleNamespace(tools_root=self.tools, follow_scheduler=None,
                                         feed_scheduler=None, downloads=None)
         self.state = SimpleNamespace()
@@ -149,6 +160,11 @@ class BackgroundIssueTests(unittest.TestCase):
         job["status"] = "idle"
         self.state.sync = SimpleNamespace(read_only=True)
         self.assertFalse(self.collect()[0]["retry_available"])
+
+    def test_a_venv_left_by_a_failed_rebuild_still_needs_the_bridge(self):
+        self.contract.tools_root = self.root / "half-built-tools"
+        write_bridge_python(self.contract.tools_root)
+        self.assertEqual(keys(self.collect()), ["amane-bridge"])
 
     def test_a_failed_face_model_download_points_at_its_card_and_can_be_retried(self):
         latest: list = []

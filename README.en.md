@@ -116,7 +116,7 @@ See [Docker deployment](docs/DOCKER.md) for setup and supported configurations.
 - **Will it change my files?** Scanning and filling in details leave originals untouched. Manual organization renames or moves files; emptying the trash deletes files, and resource-sync cleanup removes empty folders. Each requires confirmation.
 - **Which cloud drives work?** Drives mounted as local folders through tools such as CloudDrive2; see [cloud drive mounts](docs/CLOUDDRIVE.md). Cloud download follows the connected provider's reported capabilities, with direct PikPak connections also supported and sign-in tokens stored locally.
 - **How do I watch on my phone?** Allow devices on the same network during setup, connect your phone to that network, open the address shown and set an access password.
-- **Where is my data?** In the local `peach-data` folder. The Windows build defaults to `%LOCALAPPDATA%\Peach\peach-data`.
+- **Where is my data?** In the local `peach-data` folder. The Windows build defaults to `%LOCALAPPDATA%\Peach\peach-data`; first-run setup lets you pick another drive. Later, **App & maintenance → Storage** shows usage, cleans caches and old backups, and moves the folder elsewhere; see [storage and moving the data directory](docs/OPERATIONS.md#存储空间与迁移数据目录).
 
 ## Reporting problems
 
