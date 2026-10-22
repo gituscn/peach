@@ -198,11 +198,20 @@ def describe(tools_root: Path, *, root: Path = BRIDGE_ROOT) -> dict:
         "license": AMANE_LICENSE,
         "revision": pinned_revision(root),
         "version": locked_version(root),
-        "installed": python.is_file(),
+        "installed": installed(tools_root),
         "installed_version": installed_version(tools_root),
         "python": str(python),
         "sites": [{"source": name, "label": label} for name, label in SITES.items()],
     }
+
+
+def installed(tools_root: Path) -> bool:
+    """解释器和 amane 的包元数据都在才算装好。
+
+    `uv sync` 先建 venv 再下载依赖，拉不到 GitHub 时会留下一个只有解释器的空壳；
+    只看解释器在不在，这种半截环境会被当成已安装。
+    """
+    return bridge_python(tools_root).is_file() and bool(installed_version(tools_root))
 
 
 def installed_version(tools_root: Path) -> str:

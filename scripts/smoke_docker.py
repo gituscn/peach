@@ -83,6 +83,16 @@ def transcode_checks(name: str) -> None:
         assert report["streams"][0] == {"codec_name": "h264", "pix_fmt": "yuv420p"}, report
 
 
+def amane_checks(name: str) -> None:
+    """断网容器核对 amane 桥的重建前提：uv 与 Git 在 PATH，uv 不下载就找得到 3.14，venv 落在卷上。"""
+    assert docker("exec", name, "uv", "--version").startswith("uv ")
+    assert docker("exec", name, "git", "--version").startswith("git version ")
+    docker("exec", name, "uv", "python", "find", "--no-python-downloads", "3.14")
+    bridge = json.loads(request(name, "/api/scraping/amane-bridge"))
+    assert bridge["python"] == "/data/tools/amane-bridge/.venv/bin/python", bridge
+    assert bridge["installed"] is False and bridge["revision"], bridge
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("image")
@@ -122,6 +132,7 @@ def main() -> None:
         media = json.loads(request(name, f"/stream?id={asset}", headers={"Range": "bytes=0-63"}))
         assert media == {"status": 206, "size": 64}, media
         transcode_checks(name)
+        amane_checks(name)
         config_path = "/data/config.toml"
         original = docker("exec", name, "cat", config_path)
         docker("exec", name, "python", "-c",
@@ -140,7 +151,7 @@ def main() -> None:
         assert docker("exec", name, "cat", config_path) == original
         print(json.dumps({"image": args.image, "checks": ["non-root", "ready", "auth", "configuration",
                                                          "scan", "range", "vaapi-stack", "transcode-fallback",
-                                                         "reload", "restart", "persistence"]}))
+                                                         "amane-prerequisites", "reload", "restart", "persistence"]}))
     finally:
         docker("rm", "--force", name, check=False)
         docker("volume", "rm", volume, check=False)
