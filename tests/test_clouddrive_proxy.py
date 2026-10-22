@@ -75,6 +75,20 @@ class ProxyTests(_Server):
             self.assertEqual(proxy.read(config), {'accounts': [], 'unlinked': []})
             create_client.assert_not_called()
 
+    def test_cloud_libraries_without_clouddrive_address_read_as_not_configured(self):
+        DownloadSettings(self.config.directory('state')).save({'clouddrive_address': ''}, {})
+        with patch.object(proxy, 'client_for') as create_client:
+            self.assertEqual(proxy.read(self.config), {'accounts': [], 'unlinked': [], 'configured': False})
+            create_client.assert_not_called()
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[require_auth] = lambda: {}
+        with patch('peach.routes_configuration.settings_file.load_config', return_value=self.config), TestClient(
+                app, base_url='http://127.0.0.1', client=('127.0.0.1', 8000)) as client:
+            response = client.get('/api/configuration/cloud-proxies')
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIs(response.json()['configured'], False)
+
     def test_reads_are_fresh_and_passwords_are_not_exposed(self):
         state = proxy.read(self.config)
         self.assertEqual(len(state['accounts']), 2)
