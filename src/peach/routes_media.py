@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import re
+import threading
 import time
 from functools import partial
 from dataclasses import replace
@@ -1290,6 +1291,29 @@ def _picker_kind(kind: str) -> str:
     return kind if kind in {"performer", "creator"} else "performer"
 
 
+_INDEX_REFRESHER_LOCK = threading.Lock()
+
+
+def _index_refresher(app) -> avatar_picker.IndexRefresher:
+    """这个应用的图库索引刷新器，第一次用到时建，之后一直是同一个。
+
+    出网走采集统一出口：Peach 代理设置与按站冷却都在那里。
+    """
+    with _INDEX_REFRESHER_LOCK:
+        refresher = getattr(app.state, "gfriends_index", None)
+        if refresher is None:
+            contract = app.state.web_contract
+
+            def transport():
+                from .scraping_access import SourceTransport
+                return SourceTransport(contract.follow_secrets_root)
+
+            refresher = avatar_picker.IndexRefresher(
+                _picker_roots(contract)[0] / avatar_picker.GFRIENDS_CACHE, transport)
+            app.state.gfriends_index = refresher
+        return refresher
+
+
 def _picker_artwork(request: Request) -> avatar_picker.ArtworkSource:
     """作品画面的取图口。九宫格没铺过就现抽一格，和 `/poster` 走同一条路。"""
     state = request.app.state
@@ -1393,7 +1417,7 @@ def avatar_choices(request: Request, kind: str = "performer", id: int = 0,
         if kind == "creator":
             listing["choices"] += [choice.as_dict() for choice in avatar_online.choices(
                 connection, id, project=_picker_online_projection)]
-    request.app.state.gfriends_index.request()
+    _index_refresher(request.app).request()
     return JSONResponse(listing)
 
 

@@ -998,7 +998,9 @@ class AvatarPickerRouteTests(unittest.TestCase):
 
     def test_opening_the_picker_on_a_stale_index_queues_a_refresh(self):
         """这一次照旧按旧缓存列，刷新只排进后台，不挡住这次回应。"""
-        refresher = self.app.state.gfriends_index
+        from peach.routes_media import _index_refresher
+        refresher = _index_refresher(self.app)
+        self.assertIs(_index_refresher(self.app), refresher)
         self.assertEqual(refresher.cache_dir, self.providers / avatar_picker.GFRIENDS_CACHE)
         # 出网走采集统一出口，Peach 代理设置在那里生效。
         from peach.scraping_access import SourceTransport

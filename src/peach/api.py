@@ -45,7 +45,6 @@ from .follow_scheduler import FEED_JOB_ID, FollowScheduleConfig, FollowUpdateSch
 from .follow_covers import FollowCoverService
 from .follow_faces import FollowFaceIndex
 from .follow_stream import FollowMediaResolver
-from .avatar_picker import GFRIENDS_CACHE, IndexRefresher
 from .http import HttpxTransport
 from .health import inspect_database
 from .media import (
@@ -272,15 +271,7 @@ def create_app(
     network_reachability = NetworkReachability()
     resolver = FFmpegResolver(settings.ffmpeg_root)
     http_transport = HttpxTransport()
-
-    def gfriends_transport():
-        # 图库索引走采集统一出口：Peach 代理设置与按站冷却都在那里。
-        from .scraping_access import SourceTransport
-        return SourceTransport(contract.follow_secrets_root)
-
-    gfriends_index = IndexRefresher(
-        routes_media._picker_roots(contract)[0] / GFRIENDS_CACHE, gfriends_transport)
-    follow_media_resolver =FollowMediaResolver(http_transport).with_credential_loader(
+    follow_media_resolver = FollowMediaResolver(http_transport).with_credential_loader(
         lambda provider: web_follow._credential_store(contract).load(provider))
     # 检查更新、浏览与画面签名的取图共用这一份按站冷却：同一个站被限流，几处都得停。
     contract.follow_media_resolver = follow_media_resolver
@@ -484,7 +475,6 @@ def create_app(
     app.state.opencode_go = opencode_go
     app.state.review_mirror = review_mirror
     app.state.http_transport = http_transport
-    app.state.gfriends_index = gfriends_index
     app.state.follow_media_resolver = follow_media_resolver
     app.state.follow_cover_service = follow_cover_service
     app.state.follow_scheduler = follow_scheduler
