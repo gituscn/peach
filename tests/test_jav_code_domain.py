@@ -332,6 +332,48 @@ class DeliveryFilenameTests(unittest.TestCase):
         self.assertIsNone(release_code_from_filename("heyzo.mp4"))
 
 
+class TitledFilenameTests(unittest.TestCase):
+    """片库自有的命名：番号后面跟片名、女优、字幕说明，前面可能有装饰符号。
+
+    2026-10-22 用本机账本 78520 段文件名对比：新认出且与已有 code 一致 463 段、冲突 0 段；
+    code 为空的新认出 233 段，按前缀逐类核过未见误识别。两位序号与连写形态放进来时，
+    `ShinoAoi-15`、`Nanshu969` 这类创作者名占了新增的三成。
+    """
+
+    def test_a_title_after_the_code_does_not_hide_it(self):
+        for name, code in (("CAWD-987 片名と女優名.mp4", "CAWD-987"),
+                           ("GVH-520【中文字幕】片名.mp4", "GVH-520"),
+                           ("SSIS-001-C 片名.mp4", "SSIS-001"),
+                           ("ABW-358-CD1 片名.mp4", "ABW-358"),
+                           ("[FHD] MIDV-999 片名.mp4", "MIDV-999"),
+                           ("女優名 @DASD-409.mp4", "DASD-409"),
+                           ("300MIUM-1239 片名.mp4", "300MIUM-1239")):
+            self.assertEqual(release_code_from_filename(name), code, name)
+
+    def test_an_fc2_number_is_read_anywhere_in_the_name(self):
+        for name in ("+++ FC2-PPV-1234567 片名 前編.mp4",
+                     "+++ FC2-PPV-1234567_part1.mp4",
+                     "【個人撮影】FC2PPV 1234567 片名.mp4",
+                     "片名 fc2-ppv-1234567.mp4"):
+            self.assertEqual(release_code_from_filename(name), "FC2-PPV-1234567", name)
+
+    def test_only_the_first_ascii_run_may_be_the_code(self):
+        # 第一段之后就是片名：片名里的字母数字不是番号。
+        self.assertIsNone(release_code_from_filename("Rena n1042 clip.mp4"))
+        self.assertIsNone(release_code_from_filename("Morning ABP-123 talk.mp4"))
+
+    def test_a_glued_or_underscored_handle_in_a_title_is_not_a_code(self):
+        for name in ("南叔(Nanshu969)片名.zip", "推特网黄「LOOKS199」片名.mp4",
+                     "photo_83439@14-09-2021_07-01-18.jpg", "片名@yszl_0107.mp4",
+                     "片名....vip1129.mp4"):
+            self.assertIsNone(release_code_from_filename(name), name)
+
+    def test_a_short_episode_or_a_date_after_a_name_is_not_a_code(self):
+        for name in ("ShinoAoi-15-1080p.mp4", "miru-10--Vccd67yz.mp4",
+                     "美女【Daidai-77】片名.mp4", "TG-2025-01-27-232751475.mp4"):
+            self.assertIsNone(release_code_from_filename(name), name)
+
+
 class WesternDateShapeTests(unittest.TestCase):
     """西片是「厂牌／系列 + 发行日」，没有番号。
 

@@ -391,6 +391,19 @@ _KOREAN_MIB_CODE = re.compile(r"^([A-Z]{2,4})-\d+$")
 #: `_CODE_BODY` 认不出。只对 MIB 前缀开这条路，前缀之外的仍走通用规则。
 _KOREAN_MIB_FILENAME = re.compile(
     r"^(?:\[K-?MIB\]\s*)?([A-Za-z]{2,4})[-_](\d{3,4})(?=$|[\s(\[._-])", re.I)
+#: 带片名的文件名里，番号是一段连续的半角字母数字，中间只夹 `-`、`_`、`.`。
+#: 中日文、空白、括号和 `+` 都是边界：`CAWD-987いいなり`、`GVH-520【中文字幕】`
+#: 切出来就是番号本身。
+_TITLE_TOKEN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?")
+_QUALITY_TOKEN = re.compile(r"^(?:hd|fhd|sd|uhd|4k|2160p?|1080p?|720p?)$", re.I)
+#: 片名前的番号必须用 `-` 把厂牌和序号隔开。连写（`Nanshu969`、`LOOKS199`）和下划线
+#: （`photo_83439`、`@yszl_0107`）在片名里多半是创作者账号或相机编号，不是番号。
+#: 序号至少三位：两位的（`ShinoAoi-15`、`miru-10`）是创作者的分集号；后面紧跟月日的
+#: （`TG-2025-01-27`）是日期。只取词元开头这一段，紧跟的版次和分卷（`-C`、`-CD1`、
+#: `_part1`）不影响番号。
+_HYPHENATED_CODE = re.compile(r"^(?:\d{3})?[A-Za-z]{2,8}-\d{3,5}(?![0-9]|-\d{2}-\d)")
+#: 名字中段的 FC2 商品号：`FC2` 前面不能紧贴字母数字，商品号后面不能再接数字。
+_FC2_IN_TITLE = re.compile(r"(?i)(?<![A-Z0-9])FC2[-_ ]*(?:PPV[-_ ]*)?(\d{5,8})(?!\d)")
 
 DUPLICATE_TOLERANCE = 0.005
 DUPLICATE_FLOOR_SECONDS = 15.0
@@ -813,6 +826,24 @@ def release_code_from_filename(name: str | None) -> str | None:
     mib = _KOREAN_MIB_FILENAME.match(stem)
     if mib and mib.group(1).upper() in KOREAN_MIB_PREFIXES:
         return normalise_code_key(f"{mib.group(1)}-{mib.group(2)}")
+    return _titled_release_code(stem)
+
+
+def _titled_release_code(stem: str) -> str | None:
+    """「番号 + 片名」：番号是名字里第一段半角字母数字，后面跟片名、女优或说明。
+
+    `FC2` 商品号自带站名，写在名字哪里都认。其余番号只看第一段：再往后就是片名，
+    片名里的 `Rena n1042 clip`、`Part 18` 不是番号。中日文（`【中文字幕】`、女优名）
+    不成段，画质词跳过去接着看。
+    """
+    fc2 = _FC2_IN_TITLE.search(stem)
+    if fc2:
+        return normalise_code_key(f"FC2-PPV-{fc2.group(1)}")
+    for token in _TITLE_TOKEN.findall(strip_promo_markers(stem)):
+        if _QUALITY_TOKEN.match(token):
+            continue
+        head = _HYPHENATED_CODE.match(token)
+        return release_code_from_text(head.group(0)) if head else None
     return None
 
 
