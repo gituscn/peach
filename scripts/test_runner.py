@@ -59,7 +59,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
     # 任务中心的两个文件跟着 `test_jobs.py` 走：`jobs.py` 与 `task_runs.py` 是同一条
     # 接线的两端，改哪一端都要两边一起验。
     "media": ("test_external_playback.py", "test_runtime_consistency.py", "test_endcard.py", "test_fastapi_api.py", "test_jobs.py",
-              "test_task_runs.py", "test_followups.py", "test_task_center_integration.py",
+              "test_task_runs.py", "test_followups.py", "test_task_center_integration.py", "test_face_models.py",
               "test_frame_capture.py", "test_timeline_sheets.py", "test_processing_control.py", "test_processing_traffic.py", "test_processing_inventory.py",
               "test_web_timeline_thumbnails.py",
               "test_interaction.py", "test_media.py", "test_mp4repair.py",
@@ -81,7 +81,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
                  "test_reproject_snapshot_tags.py",
                  "test_stale_candidates.py", "test_logo_provider.py",
                  "test_avatar_provider.py", "test_avatar_face.py",
-                 "test_face_detect.py", "test_face_match.py", "test_performer*.py",
+                 "test_face_detect.py", "test_face_match.py", "test_face_models.py", "test_performer*.py",
                  "test_avatar_watermark.py", "test_avatar_picker.py",
                  "test_portrait_gaps.py", "test_portrait_artwork.py",
                  "test_r18_machine_translation_repair.py",
