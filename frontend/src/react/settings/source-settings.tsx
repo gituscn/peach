@@ -1,4 +1,5 @@
-/* 来源凭据、资源搜索与订阅采集共用一个 Peach 配置分区。 */
+/* 来源凭据、订阅采集、资源搜索与作品资料站点共用一个 Peach 配置分区。凭据与关注采集是这一组的本体，
+ * 排在前面；资源搜索与只换镜像地址的资料站点少改，排在后面。 */
 import { useQuery } from '@tanstack/react-query';
 import { ButtonLink } from '@/components/base/buttons/button';
 import type { ConfigurationGroupProps } from '../bundle';
@@ -22,8 +23,8 @@ export function SourceSettings({ data, receipt, panel }: ConfigurationGroupProps
       : credentials.error
         ? <Note tone="error" title="来源凭据未取得">{errorMessage(credentials.error)}</Note>
         : panel?.active !== false ? <LoadingDots label="正在读取来源凭据" /> : null}
-    {data.entry_links ? <EntryLinksForm initial={data.entry_links} receipt={receipt} /> : null}
-    <IndexerSettings receipt={receipt} />
     <FollowPreferenceRows receipt={receipt} />
+    <IndexerSettings receipt={receipt} />
+    {data.entry_links ? <EntryLinksForm initial={data.entry_links} receipt={receipt} /> : null}
   </div>;
 }

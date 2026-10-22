@@ -34,6 +34,7 @@ from .update_tasks import UpdateBusy
 from .platform import is_unmapped, translate_ledger_path
 from .providers import ProviderUnavailable
 from .routes_auth import require_auth
+from .routes_configuration import local_only
 from .task_runs import task_label
 from .taste_history import analyze_history, import_history_exports, write_manifest
 
@@ -310,8 +311,15 @@ def _conflict(error: TaskRunConflict) -> JSONResponse:
         status_code=409)
 
 
+#: 走通用契约入口、却是运行 Peach 那台电脑的配置：生成预览与编解码方式、时间轴缩略图档位。
+#: 只有配置页读写它们，读写都按 `/api/configuration/*` 的本机判据放行，非本机一律 403。
+LOCAL_ONLY_ROUTES = frozenset({"/api/media-processing", "/api/thumbnail-jobs"})
+
+
 @router.get("/api/{route:path}")
 def api_get(request: Request, route: str, args: dict[str, str] = Depends(require_auth)):
+    if f"/api/{route}" in LOCAL_ONLY_ROUTES:
+        local_only(request)
     state = request.app.state
     sync = state.sync
     try:
@@ -344,6 +352,8 @@ def api_post(
 ):
     sync = request.app.state.sync
     route_path = f"/api/{route}"
+    if route_path in LOCAL_ONLY_ROUTES:
+        local_only(request)
     if (sync is not None and sync.read_only
             and route_path not in web_contract.READ_ONLY_POST_ROUTES):
         # 非写入端或冲突状态都只读；继续写只会产生无法自动合并的分叉。

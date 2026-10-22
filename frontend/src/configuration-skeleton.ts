@@ -75,10 +75,10 @@ const media = () => {
   + (shape.cloud ? section('CloudDrive 代理', stack(`<p class="text-body-2-regular text-text-secondary">${CLOUD_PROXY_HELP}</p><span class="skeleton ui-configuration-skeleton-input" style="width:100%;height:${rememberedSectionHeight('cloud-proxy', 96)}px"></span>`), button('重新读取', 'secondary')) : '')
   + (shape.discovery ? `<div class="overflow-hidden" style="height:${rememberedSectionHeight('push-discovery', 323)}px">${section('自动发现新文件', stack(`<span class="flex min-h-6 items-center text-body-regular text-text-secondary">${text('8em')}</span>`)
     + row('发现新文件后自动入库') + row('监视本机文件夹') + row('接收 CloudDrive2 通知'), button('保存配置'))}</div>` : '')
-  + section('视频预览', row('抽帧解码方式', '用于生成封面、九宫格和时间轴。', 'ui-configuration-skeleton-select')
-    + row('生成视频预览', '为本地视频生成九宫格与时间轴预览；关闭后仍按入库规则探测时长与分辨率。')
-    + row('时间轴预览', '按所选间隔抽帧，仅处理本机磁盘上的视频。', 'ui-configuration-skeleton-select'))
-  + section('视频播放', row('播放编解码方式', '用于播放时的视频转码。', 'ui-configuration-skeleton-select'));
+  + section('番号识别规则', stack(`${text('90%')}${text('60%')}<span class="skeleton ui-configuration-skeleton-input" style="width:100%;height:88px"></span>`), button('保存配置'))
+  + section('视频预览', row('生成视频预览', '为本地视频生成九宫格与时间轴预览；关闭后仍按入库规则探测时长与分辨率。')
+    + row('时间轴预览', '按所选间隔抽帧，仅处理本机磁盘上的视频。', 'ui-configuration-skeleton-select')
+    + row('抽帧解码方式', '用于生成封面、九宫格和时间轴。', 'ui-configuration-skeleton-select'));
 };
 
 /** 各分区复用正式表单的 Section、Stack 与 SettingsRow 几何。 */
@@ -88,17 +88,20 @@ export function configurationContentSkeleton(chosen: string): string {
     case '媒体库与入库': return media();
     case '来源与订阅': return `<div>${button('采集来源与登录状态', 'secondary')}</div>`
       + section('来源凭据', stack(`${text('40%')}${input()}${text('70%')}`))
-      + section('作品资料站点', stack(`${input()}${input()}`), button('保存配置'))
+      + section('关注采集', row('首次采集范围', '', 'ui-configuration-skeleton-select') + row('头像刷新') + row('favicon 刷新'))
       + section('资源搜索', stack(`${text('40%')}${input()}`))
-      + section('关注采集', row('首次采集范围', '', 'ui-configuration-skeleton-select') + row('头像刷新') + row('favicon 刷新'));
+      + section('作品资料站点', stack(`${input()}${input()}`), button('保存配置'));
     case '下载渠道': return section('云下载', stack(`${text('35%')}${input()}${input()}${input()}${input()}`), button('保存配置'))
       + section('PikPak 账号', stack(`${input()}${input()}`), button('登录账号'));
     case '网络与访问': return section('本机访问端口', stack(input('128px')), button('保存配置'))
       + section('Peach 代理', row('连接方式', '', 'ui-configuration-skeleton-select'), button('保存配置'))
       + section('访问密码', stack(input()), button('保存配置'))
       + section('公网访问', stack(`${text('60%')}${input()}`));
-    case '应用与维护': return section('数据上传', row('发送版本统计与错误诊断（推荐）') + row('馆藏与口味明细上传'))
+    case '应用与维护': return section('检查更新', stack(`${text('40%')}${text('40%')}${text('40%')}${text('40%')}`), button('检查更新'))
+      + section('自动更新', row('自动检查新版本') + row('自动下载更新') + row('检查频率', '', 'ui-configuration-skeleton-select'), button('保存配置'))
       + section('开机自启', row('开机后启动 Peach') + row('只启动托盘，不打开网页') + row('在桌面创建快捷方式'), button('保存配置'))
+      + section('视频播放', row('转码方式', '用于播放时的视频转码。', 'ui-configuration-skeleton-select'))
+      + section('数据上传', row('发送版本统计与错误诊断（推荐）') + row('馆藏与口味明细上传'))
       + section('运行信息', stack(`${text('80%')}${text('60%')}${text('40%')}`));
     default: return media();
   }

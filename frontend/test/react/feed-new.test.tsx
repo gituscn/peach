@@ -6,6 +6,7 @@ import { act, useState } from 'react';
 import { notifyManager, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { appSettingsStore } from '@peach/appearance';
 import { feedNewKey, prefetchFeedNew, type FeedDiscoveries, type FeedNewProps } from '../../src/react/feed-new/feed-new';
 import { FeedNewPage } from '../../src/react/feed-new/feed-new-page';
 import { queryClient } from '../../src/react/query';
@@ -79,6 +80,17 @@ describe('取数', () => {
     expect(reads(fetcher)).toEqual(['/api/feeds/discoveries?limit=12']);
     expect(feedNewKey(null)).toEqual(['feed-new', 'home']);
     expect(feedNewKey(7)).toEqual(['feed-new', 7]);
+  });
+
+  it('条数跟着设置弹窗的「新作显示数量」走', async () => {
+    const store = appSettingsStore();
+    const before = store.value.feedLimit;
+    store.value.feedLimit = 30;
+    try {
+      const fetcher = serve([1]);
+      await open(props());
+      expect(reads(fetcher)).toEqual(['/api/feeds/discoveries?limit=30']);
+    } finally { store.value.feedLimit = before }
   });
 
   it('每次挂上都是新的一趟，不读上一次留下的缓存', async () => {
