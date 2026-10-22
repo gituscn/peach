@@ -249,6 +249,18 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
 }
 .peach-react [data-media-pic] > video { opacity: 0; transition: opacity .2s; }
 .peach-react [data-media-pic] > video[data-playing] { opacity: 1; }
+/* 竖屏格一律 9:16（`media-card.tsx` 的 `PORTRAIT_RATIO`），而九宫格切出来的视频海报是 480×850～876，
+ * 比例差 0.5%～3%。contain 会沿短的那一轴留下 0.5–3px 的黑底，落点又随竖屏带插在哪一行而带小数，
+ * 读起来就是贴在框边、时有时无的一条色线；有的海报自己最外一列还是九宫格切缝的暗像素。
+ * 竖屏格里的视频画面一律铺满，四边各外扩 1px 让切缝落到圆角裁切之外。JAV 封面（`.cover`）
+ * 归共享取景（`framing.ts`），接触印相扫视图要整格看全，都不在此列。 */
+.peach-react [data-media-pic][data-pic-portrait] :is(img.poster:not(.cover), video) {
+  inset: -1px;
+  width: calc(100% + 2px);
+  max-width: none;
+  height: calc(100% + 2px);
+  object-fit: cover;
+}
 .peach-react [data-media-pic] > img.ui-hvframes[hidden] { display: none; }
 
 /* 叠层纸边：这张卡代表不止一条（分卷或版次）。叠层往上溢出到行间距里，卡片盒不为它留白，
@@ -828,15 +840,21 @@ body[data-surface="/trash"] .peach-react [data-media-tags] {
 
 /* ── 竖屏带 ──
  * 短片带是这一叠卡里的一张，和上下两段视频平级：同一张面、同一圈发丝边、同一个圆角。
- * 宽屏上整块往左铺过侧栏轨道，面板铺到视口边上，左边两个圆角也就去掉了。 */
+ * 宽屏上整块往左铺过侧栏轨道，面板铺到视口边上，左边两个圆角也就去掉了。
+ * 带子的面是 `--ground`，浅色下与全站悬停面 `--hover` 同为 #F7F7F7：卡片和「进入」键的悬停在这里
+ * 铺出去等于没铺。带内的悬停面按次级按钮那一档在带子底色上压一层，两种主题都比底色深一档。 */
 .peach-react [data-shorts-strip] {
+  --hover: color-mix(in srgb, var(--ink) 8%, var(--ground));
   padding: 16px;
   border: 0;
   border-radius: var(--floating-radius);
   background: var(--ground);
   font: var(--board-body);
 }
+/* 标题行压在横滚行往上垫出的那一截之上，「进入」键照样点得到。 */
 .peach-react [data-shorts-strip] > h2 {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -870,11 +888,14 @@ body[data-surface="/trash"] .peach-react [data-media-tags] {
 }
 .peach-react [data-shorts-enter]:hover { background: var(--hover); }
 .peach-react [data-shorts-enter] svg { width: var(--icon-inline); height: var(--icon-inline); fill: none; stroke: currentColor; stroke-width: 2; }
+/* 横滚行是滚动容器，`overflow-x:auto` 连带把纵向也裁在内边距框上。长悬停的卡上移 7px 再放大 6.5%，
+ * 外面还铺着 8px 悬停面：一张 214×486 的卡往上要 31px、往下 17px、左右 16px 才不被切。内边距按这个
+ * 留足，再用等量负外边距抵掉，卡片位置不动。 */
 .peach-react [data-shorts-row] {
   display: flex;
   gap: 13px;
-  padding: 8px;
-  margin: -8px;
+  padding: 32px 16px 20px;
+  margin: -32px -16px -20px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -886,8 +907,8 @@ body[data-surface="/trash"] .peach-react [data-media-tags] {
     border-radius: 0 var(--floating-radius) var(--floating-radius) 0;
   }
   .peach-react [data-shorts-row] {
-    margin-left: calc(-1 * (var(--railW) + 32px + 8px));
-    padding-left: calc(var(--railW) + 32px + 8px);
+    margin-left: calc(-1 * (var(--railW) + 32px + 16px));
+    padding-left: calc(var(--railW) + 32px + 16px);
   }
 }
 

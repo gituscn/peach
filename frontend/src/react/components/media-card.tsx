@@ -20,7 +20,6 @@
  * 标签，其余落到整张卡上就是打开。 */
 import { memo, useCallback, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import { Dialog, Popover } from 'react-aria-components';
-import { UNSAFE_PortalProvider } from 'react-aria';
 import { MENU_POPOVER_SURFACE } from '@/components/base/dropdown/menu-styles';
 import { cardRatio as layoutRatio } from '@peach/appearance';
 import {
@@ -32,7 +31,6 @@ import { spinnerHtml } from '@peach/legacy/ui';
 import type { MediaCardActions, MediaCardHelpers, MediaCardLayout, MediaItem } from '../catalog-grid/types';
 import { ArtSlot } from './art-slot';
 import { useLibraryTints } from './library-tint';
-import { overlayHost } from './overlay-host';
 import { suppressShiftTextSelection } from './row-click';
 
 /** 竖屏一律同一个比例，不按每条视频的实际宽高：竖屏条与竖屏网格才高低一致。 */
@@ -181,7 +179,6 @@ function RecommendationReason({ reason }: { reason: string }) {
     <button ref={trigger} type="button" data-media-next-reason="" title={reason}
       aria-label={`查看推荐理由：${reason}`} aria-haspopup="dialog" aria-expanded={open}
       onClick={event => { event.stopPropagation(); setOpen(true) }}>{reason}</button>
-    <UNSAFE_PortalProvider getContainer={() => overlayHost(trigger.current)}>
     <Popover triggerRef={trigger} isOpen={open} onOpenChange={setOpen} placement="top" offset={8}
       containerPadding={12} className={MENU_POPOVER_SURFACE}>
       <Dialog data-media-reason-dialog="" aria-label="推荐理由"
@@ -189,7 +186,6 @@ function RecommendationReason({ reason }: { reason: string }) {
         {reason}
       </Dialog>
     </Popover>
-    </UNSAFE_PortalProvider>
   </>;
 }
 
@@ -259,8 +255,10 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
     onOpen(item, el);
   };
 
+  const ratio = cardRatio(item, variant, layout);
   const pic = (
-    <div data-media-pic="" style={{ '--card-ratio': String(cardRatio(item, variant, layout)) } as CSSProperties}>
+    <div data-media-pic="" data-pic-portrait={ratio === PORTRAIT_RATIO ? '' : undefined}
+      style={{ '--card-ratio': String(ratio) } as CSSProperties}>
       {artwork.html
         ? <ArtSlot artwork={artwork} identity={identity} relayout={(root) => relayoutCovers(root, size)} />
         : <span data-media-nopic="">无预览</span>}
