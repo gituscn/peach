@@ -32,21 +32,22 @@ describe('馆藏表格列宽与占位图', () => {
         return { picture: getComputedStyle(picture).backgroundColor,
           expected: getComputedStyle(picture).getPropertyValue('--sunk').trim(),
           centerDelta: Math.abs(a.top + a.height / 2 - b.top - b.height / 2),
-          titleWidth: title.clientWidth, fullWidth: title.scrollWidth,
-          overflow: getComputedStyle(title).textOverflow };
+          titleWidth: title.clientWidth, titleHeight: title.clientHeight, fullHeight: title.scrollHeight,
+          lineHeight: parseFloat(getComputedStyle(title).lineHeight), clamp: getComputedStyle(title).webkitLineClamp };
       });
       assert.ok(geometry.centerDelta <= 1, JSON.stringify(geometry));
       assert.notEqual(geometry.picture, 'rgb(255, 255, 255)');
-      assert.ok(geometry.titleWidth < 320 && geometry.fullWidth > geometry.titleWidth, JSON.stringify(geometry));
-      assert.equal(geometry.overflow, 'ellipsis');
+      // 长标题在「作品」列里最多两行，多出的截掉。
+      assert.ok(geometry.titleWidth < 320 && geometry.clamp === '2' && geometry.fullHeight > geometry.titleHeight
+        && geometry.titleHeight <= geometry.lineHeight * 2 + 1, JSON.stringify(geometry));
       assert.equal(await row.locator('[data-list-name]').getAttribute('title'), name);
-      const defaultLabels = ['名称', '时长', '分辨率', '体积', '评分', '观看次数'];
+      const defaultLabels = ['作品', '标签', '时长', '分辨率', '体积', '评分', '观看次数'];
       const visibleLabels = () => page.locator('[data-catalog-table] th:not([data-table-space]) > span').allTextContents();
       assert.deepEqual(await visibleLabels(), defaultLabels);
       await page.getByRole('button', { name: '显示列', exact: true }).click();
       await page.getByRole('button', { name: '显示全部列', exact: true }).click();
       await page.keyboard.press('Escape');
-      assert.deepEqual(await visibleLabels(), ['名称', '番号', '时长', '分辨率', '体积', '评分', '观看次数', '高潮计数', '观看时间', '入库时间', '发行时间']);
+      assert.deepEqual(await visibleLabels(), ['作品', '标签', '番号', '时长', '分辨率', '体积', '评分', '观看次数', '高潮计数', '观看时间', '入库时间', '发行时间']);
       for (const label of ['分辨率', '评分', '高潮计数', '观看次数', '时长', '体积', '入库时间', '观看时间', '发行时间', '番号']) {
         await page.getByRole('columnheader', { name: label, exact: false }).waitFor();
       }
@@ -55,7 +56,7 @@ describe('馆藏表格列宽与占位图', () => {
       assert.equal(await row.locator('[data-rating-stars] [data-rate]').count(), 5);
       assert.equal(await row.locator('[data-rating-stars] [data-rate][data-on="true"]').count(), 4);
       assert.ok((await row.textContent())?.includes('2026-01-03'));
-      const header = page.getByRole('columnheader', { name: /^名称/ });
+      const header = page.getByRole('columnheader', { name: /^作品/ });
       const initialWidth = (await header.boundingBox())!.width;
       if (!viewport.mobile) {
         const sort = await header.getAttribute('aria-sort');

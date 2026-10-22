@@ -72,7 +72,8 @@ describe('混排作品的画面框',()=>{
    }finally{await context.close()}
   });
  }
- for(const theme of ['light','dark'])it(`${theme} 稍后看底色与按钮及撤销同步`,async()=>{
+ // 稍后看由卡上的状态图标表示，卡面底色留给媒体库来源色，不随稍后看变化。
+ for(const theme of ['light','dark'])it(`${theme} 稍后看状态图标与按钮及撤销同步`,async()=>{
   const context=await browser.newContext({viewport:{width:1280,height:800},colorScheme:theme,reducedMotion:'reduce'});
   try{
    const page=await context.newPage();let later=false;
@@ -84,10 +85,11 @@ describe('混排作品的画面框',()=>{
    await page.locator('#filterBtn').focus();await page.mouse.move(0,0);const base=await background();
    await card.hover();await button.click();await page.locator('#filterBtn').focus();await page.mouse.move(0,0);
    await page.waitForFunction(()=>document.querySelector('#grid [data-media-card]')?.hasAttribute('data-watch-later'));
-   assert.equal(await button.getAttribute('aria-pressed'),'true');assert.notEqual(await background(),base);
+   const status=card.locator('[data-media-status] [data-status="later"]');
+   assert.equal(await button.getAttribute('aria-pressed'),'true');assert.equal(await status.count(),1);assert.ok(await status.isVisible());assert.equal(await background(),base);
    await page.getByRole('button',{name:'撤销',exact:true}).last().click();await page.locator('#filterBtn').focus();await page.mouse.move(0,0);
    await page.waitForFunction(()=>!document.querySelector('#grid [data-media-card]')?.hasAttribute('data-watch-later'));
-   assert.equal(await button.getAttribute('aria-pressed'),'false');assert.equal(await background(),base);
+   assert.equal(await button.getAttribute('aria-pressed'),'false');assert.equal(await status.count(),0);assert.equal(await background(),base);
   }finally{await context.close()}
  });
  for(const viewport of VIEWPORTS)it(`${viewport.name} 接着看理由独占两行并可打开完整文本`,async()=>{
