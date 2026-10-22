@@ -54,6 +54,10 @@ class TranscodeCancelled(TranscodeUnavailable):
     pass
 
 
+class TranscodeNeedsSession(TranscodeUnavailable):
+    """片源要整片转码，但请求没带可取消的流会话，也没有现成缓存。"""
+
+
 class TranscodeService:
     """Create immutable browser-playable MP4 cache entries without touching sources."""
 
@@ -128,7 +132,13 @@ class TranscodeService:
 
     def browser_path(
         self, asset_id: int, source: Path, *, session: str = "", registry=None,
+        convert: bool = True,
     ) -> tuple[Path, bool]:
+        """浏览器能直接放的路径，以及它是不是转码产物。
+
+        `convert=False` 时只交现成的整片缓存，缺缓存就抛 `TranscodeNeedsSession`。
+        没有会话的请求取消不了，浏览器断开后整片 FFmpeg 还会跑到结束。
+        """
         profile = None
         if not self.needs_transcode(source):
             if self.resolver.ffprobe() is None:
@@ -152,6 +162,8 @@ class TranscodeService:
         target = self.cache_root / f"{asset_id}-{stat.st_size}-{stat.st_mtime_ns}.mp4"
         if target.is_file() and target.stat().st_size:
             return target, True
+        if not convert:
+            raise TranscodeNeedsSession("conversion needs a stream session")
 
         with self._lock_for(asset_id):
             if target.is_file() and target.stat().st_size:
@@ -278,7 +290,7 @@ class TranscodeService:
 
         整片转码要占满一个编码位、写一份和原片同量级的缓存，只有编码本身不被支持才值得。
         缺 `ctts` 的片源画面解得出来，错的只是容器写的显示顺序，交给 HLS 转码分片按需修
-        就够。卡片悬停预览直接打 `/stream`，鼠标划过一张卡片不能启动一次整片转码。
+        就够。卡片悬停预览直接打不带会话的 `/stream`，那条路只交现成缓存，见 `browser_path`。
         """
         return TranscodeService._browser_compatible(
             source, replace(profile, decode_order_timestamps=False),
@@ -335,19 +347,26 @@ class TranscodeService:
             if profile is not None and profile.audio_codec in {"", "aac"}
             else ("-c:a", "aac", "-b:a", "160k")
         )
+        codec = profile.video_codec if profile else ""
         for encoder in self.hardware.encoders(ffmpeg):
-            for attempt in encoder.attempts(profile.video_codec if profile else ""):
+            for attempt in encoder.attempts(codec):
                 yield _TranscodeAttempt(
                     attempt.name, prefix + attempt.before_input + ("-i", str(source))
                     + mapping + attempt.output + fast_audio + finish,
                 )
 
+        software = (
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
+            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+        )
+        decode = self.hardware.decode_options(ffmpeg, codec)
+        if decode:
+            yield _TranscodeAttempt(
+                "d3d11va-libx264",
+                prefix + decode + ("-i", str(source)) + mapping + software + finish,
+            )
         yield _TranscodeAttempt(
-            "libx264",
-            prefix + ("-i", str(source)) + mapping + (
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
-                "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
-            ) + finish,
+            "libx264", prefix + ("-i", str(source)) + mapping + software + finish,
         )
 
     def _execute(

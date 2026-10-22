@@ -117,6 +117,99 @@ class HardwareDetectionTests(unittest.TestCase):
             self.assertEqual(run.call_count, 1)
 
 
+class WindowsBackendTests(unittest.TestCase):
+    def setUp(self):
+        for active in (patch.dict(os.environ, {"PEACH_TRANSCODE_BACKEND": "auto"}),
+                       patch("peach.hardware_transcode.sys.platform", "win32")):
+            active.start()
+            self.addCleanup(active.stop)
+
+    @staticmethod
+    def _machine(working):
+        """按命令里的编码器或设备判定成败，模拟一台 NVIDIA 默认、AMD 在第二个序号的机器。"""
+        def run(command, **kwargs):
+            joined = " ".join(command)
+            return subprocess.CompletedProcess(command, 0 if any(item in joined for item in working) else 1,
+                                               stderr=b"unavailable")
+        return run
+
+    def test_automatic_mode_probes_every_windows_encoder_and_d3d11_decode(self):
+        self.assertEqual(HardwareTranscoder()._candidates(), (
+            HardwareEncoder("nvenc"), HardwareEncoder("amf"), HardwareEncoder("qsv"),
+            HardwareEncoder("d3d11va")))
+        with patch.dict(os.environ, {"PEACH_TRANSCODE_BACKEND": "amf"}):
+            self.assertEqual(HardwareTranscoder()._candidates(), (HardwareEncoder("amf"),))
+
+    def test_amf_binds_to_the_adapter_it_can_derive_and_keeps_software_decode(self):
+        working = ("-pix_fmt nv12", "d3d11va=peach:1", "-init_hw_device d3d11va -f")
+        hardware = HardwareTranscoder()
+        with patch("peach.hardware_transcode.subprocess.run", side_effect=self._machine(working)) as run:
+            encoders = hardware.encoders(Path("ffmpeg"))
+            self.assertEqual(hardware.decode_options(Path("ffmpeg"), "hevc"), ("-hwaccel", "d3d11va"))
+        self.assertIn(HardwareEncoder("amf", "1"), encoders)
+        self.assertNotIn(HardwareEncoder("d3d11va"), encoders)
+        self.assertFalse(any("d3d11va=peach:2" in " ".join(call.args[0]) for call in run.call_args_list))
+        attempts = HardwareEncoder("amf", "1").attempts("hevc")
+        self.assertEqual([attempt.name for attempt in attempts], ["d3d11va-amf", "amf"])
+        self.assertEqual(attempts[0].before_input, ("-hwaccel", "d3d11va", "-hwaccel_device", "1"))
+        self.assertEqual(attempts[1].before_input, ())
+        self.assertEqual([attempt.name for attempt in HardwareEncoder("amf", "1").attempts("vc1")], ["amf"])
+
+    def test_d3d11_decode_feeds_libx264_when_no_encoder_works(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch("peach.hardware_transcode.subprocess.run",
+                      side_effect=self._machine(("-init_hw_device d3d11va -f",))):
+            root = Path(directory).resolve()
+            source = root / "clip.mkv"
+            source.write_bytes(b"fixture")
+            resolver = Mock(ffmpeg=lambda: BinaryChoice(Path("ffmpeg"), "test"), ffprobe=lambda: None)
+            service = TranscodeService(resolver, root / "full")
+            for codec, expected in (("hevc", ["d3d11va-libx264", "libx264"]), ("vc1", ["libx264"])):
+                with self.subTest(codec=codec):
+                    attempts = list(service._attempts(Path("ffmpeg"), source, root / "out.mp4",
+                                                      _MediaProfile(codec, "yuv420p", "aac")))
+                    self.assertEqual([attempt.name for attempt in attempts], expected)
+                    command = attempts[0].command
+                    self.assertEqual("-hwaccel" in command, codec == "hevc")
+                    self.assertNotIn("-hwaccel_output_format", command)
+                    self.assertIn("libx264", command)
+            hls = HlsSegmentService(resolver, root / "hls", hardware=service.hardware)
+            names = [name for name, _ in hls._attempts(Path("ffmpeg"), source, 12, 6, True, "hevc")]
+            self.assertEqual(names, ["d3d11va-libx264", "libx264"])
+            command = hls._attempts(Path("ffmpeg"), source, 12, 6, True, "hevc")[0][1](root / "seg.ts")
+            self.assertLess(command.index("d3d11va"), command.index("-i"))
+            self.assertEqual(command[command.index("-threads") + 1], "2")
+
+    def test_software_playback_setting_turns_off_d3d11_decode_too(self):
+        from peach.media_processing_policy import save_preferences
+        with tempfile.TemporaryDirectory() as directory, \
+                patch("peach.hardware_transcode.subprocess.run", return_value=Mock(returncode=0)) as run:
+            root = Path(directory).resolve()
+            save_preferences(root, {"playback_acceleration": "software"})
+            hardware = HardwareTranscoder(state_root=root)
+            self.assertEqual(hardware.decode_options(Path("ffmpeg"), "hevc"), ())
+            self.assertEqual(hardware.encoders(Path("ffmpeg")), ())
+            run.assert_not_called()
+
+    def test_frame_capture_uses_d3d11_only_for_listed_codecs_and_follows_preview_setting(self):
+        from peach import hardware_transcode
+        with tempfile.TemporaryDirectory() as directory:
+            ffmpeg = Path(directory) / "ffmpeg.exe"
+            ffmpeg.write_bytes(b"")
+            ffmpeg.with_name("ffprobe.exe").write_bytes(b"")
+            source = Path(directory) / "clip.mkv"
+            source.write_bytes(b"fixture")
+            for codec, preview, expected in (("hevc", "auto", ("-hwaccel", "d3d11va")),
+                                             ("vc1", "auto", ()), ("hevc", "software", ())):
+                with self.subTest(codec=codec, preview=preview), \
+                        patch.object(hardware_transcode, "_d3d11va_ready", return_value=True), \
+                        patch.object(hardware_transcode, "_frame_codec", return_value=codec) as probe, \
+                        patch("peach.media_processing_policy.acceleration", return_value=preview):
+                    self.assertEqual(hardware_transcode.frame_decode_options(str(ffmpeg), str(source)), expected)
+                    if preview == "auto":
+                        self.assertEqual(Path(probe.call_args.args[0]).name, "ffprobe.exe")
+
+
 class VideoToolboxConsumerTests(unittest.TestCase):
     def test_full_file_and_hls_fall_back_from_decode_to_encode_to_software(self):
         with tempfile.TemporaryDirectory() as directory, \
