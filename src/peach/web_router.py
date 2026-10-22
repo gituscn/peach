@@ -317,6 +317,12 @@ def _post_empty_trash(contract, _body):
     return w_empty_trash(contract)
 
 
+def _post_face_models(contract, _body):
+    """任务中心「重新下载」：后台开一轮取人脸模型，进度与结果看 `/api/tasks`。"""
+    from . import face_models
+    return contract.face_models_job.start_result(face_models.download_all)
+
+
 GET_HANDLERS = {
     "/api/tag-management": q_tag_management,
     "/api/media-processing": q_media_processing,
@@ -449,6 +455,7 @@ POST_HANDLERS = {
     "/api/library-shortcuts": w_library_shortcuts,
     "/api/entity-name": w_entity_name,
     "/api/entity-alias": w_entity_alias,
+    "/api/face-models": _post_face_models,
 }
 
 
@@ -468,6 +475,8 @@ READ_ONLY_POST_ROUTES = frozenset({
     "/api/media-repair",
     # 整理的预览只出一份计划 CSV，不动文件也不改账本；执行与回滚不在这里。
     "/api/organize/preview",
+    # 人脸模型存在本机 tools 目录，取一次不碰账本。
+    "/api/face-models",
 })
 # `/api/resource-sync/apply` 不在上面：它永久删除文件已不在盘上的账本行，走的是
 # `purge_assets`。检查那一步只读盘，候选留在进程内存里；它在任务中心的那一行

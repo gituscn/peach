@@ -1,0 +1,84 @@
+"""人脸模型在任务中心的那张卡：取不到时留一条失败记录，页面上一键重新下载。
+
+YuNet 与 SFace 两个模型是全进程共用的一次性能力：第一次用到时联网取一次，之后一直用本地
+那份。取不到不让任何一轮任务停下（`avatar_face.FaceProbe`、`face_match.FaceMatcher` 都退回
+不看脸的旧判据），代价是这件事在界面上没有位置——补头像的后继照样显示跑完了。
+
+这里补的就是那个位置。回报点只有一个：`face_detect.fetch_model` 每次联网取模型的结果经
+`face_detect.observer` 报到 `Reporter`，它把「从能用变成取不到」和「从取不到变回能用」两次
+转变各写成一条 `face-models` 终态记录。同一次失败反复撞上不再写：断网时每条补头像后继都会
+试一次，逐条记下来就是满屏同一张卡。
+
+重新下载是一轮普通的 `BackgroundJob`（`WebContract.face_models_job`），它自己开的那一行
+就是记录；它在跑时回报一律跳过，免得同一件事写两行。
+"""
+from __future__ import annotations
+
+import logging
+import threading
+
+from . import face_detect
+
+LOGGER = logging.getLogger(__name__)
+
+TASK_KEY = "face-models"
+
+
+class Reporter:
+    """`face_detect.observer` 的服务端实现：按转变写 `task_run`，不按次数写。"""
+
+    def __init__(self, runs):
+        self.runs = runs
+        #: 查最新一条与写下一条之间不许插进别的线程：两条后继同时取不到模型，只该留一行。
+        self._lock = threading.Lock()
+
+    def __call__(self, label: str, error: Exception | None) -> None:
+        try:
+            self._record(label, error)
+        except Exception:                       # 记录失败不能拖垮取模型的那一方
+            LOGGER.warning("人脸模型的任务记录没写进去", exc_info=True)
+
+    def _record(self, label: str, error: Exception | None) -> None:
+        if not self.runs.enabled:
+            return
+        with self._lock:
+            latest = self.runs.query(task_key=TASK_KEY, limit=1)
+            last = latest[0] if latest else None
+            if last is not None and last.active:
+                return                          # 重新下载那一轮自己会结算
+            if error is None:
+                if last is None or last.status != "failed":
+                    return
+                status, summary, message = "succeeded", {"outcome": f"已取得{label}"}, ""
+            else:
+                if last is not None and last.status == "failed":
+                    return
+                status, summary, message = "failed", {}, str(error)
+            run = self.runs.start(TASK_KEY, trigger="scheduled")
+            if run is None:
+                return
+            self.runs.finish(run.id, status, summary=summary, error=message)
+            self.runs.prune(TASK_KEY)
+
+
+def attach(runs) -> None:
+    """把这个进程里联网取模型的结果接进任务中心。服务装配时调一次。"""
+    face_detect.observer = Reporter(runs)
+
+
+def download_all() -> dict:
+    """重新下载那一轮：两个模型各取一次，本地已有且校验对得上的直接算取到。
+
+    一个取不到不挡另一个：检出模型取到了，题材圆标的取景就能先恢复。
+    """
+    from . import face_match
+
+    failures = []
+    for ensure in (face_detect.ensure_model, face_match.ensure_model):
+        try:
+            ensure()
+        except face_detect.FaceModelUnavailable as error:
+            failures.append(str(error))
+    if failures:
+        return {"ok": False, "error": "；".join(failures)}
+    return {"ok": True, "outcome": "人脸模型已就绪"}

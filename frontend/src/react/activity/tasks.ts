@@ -133,9 +133,13 @@ const PROBLEM_COUNTS = [
   'performer_profile_conflicts', 'conflicts', 'paused_count', 'miss', 'incomplete',
 ];
 
+/** 这一轮缺了一项能力，结论按退回的旧判据得出。数字为 0 也算问题：没做成的不是那几件，是整件。 */
+const PROBLEM_FLAGS = ['face_match_unavailable'];
+
 /** 完成检查与检查结果有问题是两件事，问题不能被例行折叠隐藏。 */
 export const hasResultProblems = (run: TaskRunPayload): boolean => run.result_summary?.ok === false
   || Boolean(run.result_summary?.error)
+  || PROBLEM_FLAGS.some((key) => run.result_summary?.[key] === true)
   || PROBLEM_COUNTS.some((key) => Number(run.result_summary?.[key]) > 0);
 
 export interface TaskIssue { source: number; label: string; provider: string; kind: string; error: string }
@@ -161,6 +165,26 @@ export function problemDestination(run: TaskRunPayload): { href: string; label: 
   };
   const target = targets[run.task_key];
   return target ? { href: target[0], label: target[1] } : null;
+}
+
+/** 没有自己的管理页、在任务卡上原地重跑的任务：POST 地址与按钮文字。 */
+const RETRY_ACTIONS: Record<string, [string, string]> = {
+  'face-models': ['/api/face-models', '重新下载'],
+};
+
+/** 失败的这一轮能不能在卡上重跑。只给同一种任务最新的那一轮：更早的失败已经被后来的结果取代。 */
+export function retryAction(run: TaskRunPayload, latest: boolean): { url: string; label: string } | null {
+  const action = RETRY_ACTIONS[run.task_key];
+  return action && latest && run.status === 'failed' ? { url: action[0], label: action[1] } : null;
+}
+
+/** 每种可重跑任务最新那一轮的 id。 */
+export function latestRetryable(rows: TaskRunPayload[]): Set<number> {
+  const newest = new Map<string, number>();
+  for (const row of rows) {
+    if (row.task_key in RETRY_ACTIONS && row.id > (newest.get(row.task_key) ?? 0)) newest.set(row.task_key, row.id);
+  }
+  return new Set(newest.values());
 }
 
 /** 把一批任务按 `parent_run_id` 归到各自的父任务下。没有父的那些留在外面。 */
@@ -279,8 +303,7 @@ const OPERATION_LABELS: Record<string, string> = {
 const outcomeText = (text: string): string => OUTCOME_LABELS[text] || text
   .replace(/(avwikidb|javdb|minnano-av) (绑定|写入)/gi, (_, site: string, action: string) =>
     action === '绑定' ? `已关联 ${SOURCE_NAMES[site.toLowerCase()]} 资料页`
-      : `已保存来自 ${SOURCE_NAMES[site.toLowerCase()]} 的资料`)
-  .replace(/^探针不可用：/, '无法读取媒体信息：');
+      : `已保存来自 ${SOURCE_NAMES[site.toLowerCase()]} 的资料`);
 
 /** 时间戳说成本地的「月-日 时:分」。数据库里存的是 UTC，界面上一律按本机时区读。 */
 export function momentText(stamp: string | null | undefined): string {
@@ -300,6 +323,15 @@ const SUMMARY_HIDDEN = new Set([
 
 /** 任务结果只展示面向使用者的字段。 */
 export function summaryItems(summary: Record<string, unknown>): string[] {
+  const items = fieldItems(summary);
+  // 「发现问题」要说得出是什么问题。原因已写进结论（「人脸模型不可用：…」「人像闸未生效…」）时不再说一遍。
+  if (summary?.face_match_unavailable === true && !items.some((line) => /不可用|未生效/.test(line))) {
+    items.push('人脸模型不可用，未做人脸核对');
+  }
+  return items;
+}
+
+function fieldItems(summary: Record<string, unknown>): string[] {
   return Object.entries(summary || {})
     .filter(([key, value]) => !SUMMARY_HIDDEN.has(key)
       && (key in SUMMARY_LABELS || key === 'outcome' || key === 'followups' || key === 'error')

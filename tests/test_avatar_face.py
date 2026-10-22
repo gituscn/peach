@@ -117,6 +117,22 @@ class FaceProbeTests(unittest.TestCase):
             self.assertEqual(detector.call_count, 2)
         self.assertEqual(probe.unavailable, "")
 
+    def test_a_model_fetched_elsewhere_ends_the_retry_window_early(self):
+        """任务中心「重新下载」取到了模型，题材圆标的探针不必再等满一小时。"""
+        from peach import face_detect
+
+        probe = FaceProbe(clock=lambda: 1000.0)
+        with unittest.mock.patch(
+                "peach.avatar_face.FaceDetector",
+                side_effect=[RuntimeError("模型未取得"), unittest.mock.MagicMock()]) as detector, \
+                unittest.mock.patch("peach.avatar_face.face_record", return_value=record()):
+            self.assertIsNone(probe(Path("/tmp/a.img")))
+            self.assertIsNone(probe(Path("/tmp/a.img")))
+            self.assertEqual(detector.call_count, 1)
+            with unittest.mock.patch.object(face_detect, "downloads", face_detect.downloads + 1):
+                self.assertEqual(probe(Path("/tmp/a.img")), record())
+            self.assertEqual(detector.call_count, 2)
+
     def test_one_undecodable_image_does_not_take_down_the_batch(self):
         probe = FaceProbe()
         with unittest.mock.patch("peach.avatar_face.FaceDetector"):

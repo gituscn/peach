@@ -177,6 +177,9 @@ def _restore_task_center(contract) -> None:
     recovered = contract.task_runs.recover_interrupted()
     if recovered:
         LOGGER.info("task center recovered %s interrupted run(s)", len(recovered))
+    # 先接上再叫醒后继：排着的补头像后继一跑就可能去取人脸模型。
+    from . import face_models
+    face_models.attach(contract.task_runs)
     requeued = contract.task_runs.enabled and contract.followups.resume()
     if requeued:
         LOGGER.info("task center requeued %s followup(s)", len(requeued))

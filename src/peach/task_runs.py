@@ -110,6 +110,9 @@ TASK_LABELS = {
     "timeline-thumbnails": "视频缩略图采集",
     "download-postprocess": "云下载后处理",
     "seed-import": "导入初始资料",
+    "follow-creator": "关注作者建档",
+    "amane-bridge": "重建 amane 桥",
+    "face-models": "下载人脸模型",
 }
 
 

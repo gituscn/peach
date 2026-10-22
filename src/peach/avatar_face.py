@@ -178,12 +178,14 @@ class FaceProbe:
     让整轮停下——那会把「今天没网」变成「所有人都没有头像」——但要把原因记进 `unavailable`
     让调用方报出来，不然一次下载失败会静悄悄地把整批退回不看脸的旧判据。
     取不到之后 `RETRY_SECONDS` 内直接回 None，过了这段再试一次；取到了 `unavailable` 清空。
+    窗口内别处取到了模型（任务中心的「重新下载」）就不再等，下一张图当场重试。
     """
 
     def __init__(self, clock=time.monotonic):
         self._detector: FaceDetector | None = None
         self._unavailable = ""
         self._failed_at: float | None = None
+        self._failed_generation = 0
         self._clock = clock
 
     @property
@@ -193,13 +195,15 @@ class FaceProbe:
     def _ready(self) -> FaceDetector | None:
         if self._detector is not None:
             return self._detector
-        if self._failed_at is not None and self._clock() - self._failed_at < RETRY_SECONDS:
+        if (self._failed_at is not None and self._failed_generation == face_detect.downloads
+                and self._clock() - self._failed_at < RETRY_SECONDS):
             return None
         try:
             self._detector = FaceDetector()
         except Exception as error:              # 缺模型、缺 OpenCV、下载失败
             self._unavailable = str(error)
             self._failed_at = self._clock()
+            self._failed_generation = face_detect.downloads
             return None
         self._unavailable = ""
         self._failed_at = None

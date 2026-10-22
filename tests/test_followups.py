@@ -583,6 +583,23 @@ class CoverFaceFollowupTests(LedgerTestCase):
         self.assertEqual(summary["outcome"], "图库里没有这个名字，封面上没有能截的脸")
         self.assertFalse((self.avatars / f"performer-{self.person}.img").exists())
 
+    def test_a_missing_face_model_is_flagged_and_not_recorded_as_tried(self):
+        """检不了与检不出是两件事：前者在任务中心标成问题，模型回来之后还要再派到她。"""
+        self.work(1, "FC2-PPV-1", (1800, 1000))
+
+        class Down:
+            unavailable = "取人脸模型失败：断网"
+
+            def on_bytes(self, _body):
+                return None
+
+        with mock.patch("peach.avatar_face.FaceProbe", Down):
+            summary = self.run_followup()
+        self.assertEqual(summary["outcome"], "图库里没有这个名字，人脸模型不可用：取人脸模型失败：断网")
+        self.assertIs(summary["face_match_unavailable"], True)
+        from peach.followups import attempts_root
+        self.assertFalse(any(attempts_root(self.root / "generated").glob("*")))
+
     def test_a_new_cover_plans_her_again_only_while_her_picture_is_a_crop(self):
         self.work(2, "FC2-PPV-2", (276, 154))
         chosen = self.entity("performer", "人挑过")
