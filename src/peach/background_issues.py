@@ -122,8 +122,8 @@ def _amane_bridge(state, contract, _config) -> list[Issue]:
     tools_root = getattr(contract, "tools_root", None)
     if tools_root is None:
         return []
-    from .metadata_amane import bridge_python
-    if bridge_python(tools_root).is_file():
+    from .metadata_amane import installed
+    if installed(tools_root):
         return []
     # 重建是后台任务，跑着的时候再点只会撞上 409；只读端的写入闸门同样会挡。
     job = getattr(contract, "amane_bridge_job", None)
