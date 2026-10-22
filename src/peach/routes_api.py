@@ -363,6 +363,9 @@ def api_post(
             status_code=409,
         )
     except (TypeError, ValueError) as exc:
+        # 拒收原因只落本机错误日志，诊断包据此解释页面上的 400；4xx 不远程上报。
+        from .error_reporting import event
+        event('http-request', exc, method='POST', route=route_path.lstrip('/'), status_code=400)
         return JSONResponse({"error": f"{type(exc).__name__}: {exc}"}, status_code=400)
     except Exception:
         LOGGER.exception("unhandled POST contract error for /api/%s", route)

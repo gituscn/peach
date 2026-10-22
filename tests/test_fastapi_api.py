@@ -1176,6 +1176,22 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         listed = await self.client.get("/api/items?t=secret")
         self.assertEqual([item["id"] for item in listed.json()["items"]], [])
 
+    async def test_rejected_post_reason_is_logged_locally_without_remote_report(self):
+        """页面只看到 400 时，诊断包里的错误日志要能说出拒收原因。"""
+        from peach import error_reporting, remote_reporting
+        logs = self.root / "error-logs"
+        with patch.object(error_reporting, "_log_dir", logs), \
+                patch.object(remote_reporting, "send") as send:
+            refused = await self.client.post("/api/scraping/cover?t=secret", json={"code": "ZZZ-999"})
+        self.assertEqual(refused.status_code, 400, refused.text)
+        send.assert_not_called()
+        records = [json.loads(line) for line in
+                   (logs / f"errors-{os.getpid()}.log").read_text(encoding="utf-8").splitlines()]
+        record = next(row for row in records if row["stage"] == "http-request")
+        self.assertEqual((record["method"], record["route"], record["status_code"]),
+                         ("POST", "api/scraping/cover", 400))
+        self.assertEqual(record["exception"][0]["message"], "馆藏未找到这个番号")
+
     async def test_recycle_bin_route_and_batch_delete_are_reachable(self):
         legacy = await self.client.get("/trash?t=secret")
         self.assertEqual(legacy.status_code, 303)

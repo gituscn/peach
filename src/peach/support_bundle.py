@@ -23,10 +23,12 @@ TAIL_BYTES = 96 * 1024
 
 
 def _processing_log(text: str) -> str:
-    """处理证据保留资产编号和错误，媒体名称留在本机。"""
+    """处理证据保留资产编号和错误，媒体名称与路径留在本机。"""
     def hide_names(value):
         if isinstance(value, dict):
-            return {key: '<media>' if key in ('title', 'current_asset_name') else hide_names(item)
+            # 路径字段整值替换：文件名里的引号会截断文本脱敏的路径匹配。
+            return {key: '<media>' if key in ('title', 'current_asset_name')
+                    else '<path>' if key == 'path' else hide_names(item)
                     for key, item in value.items()}
         if isinstance(value, list):
             return [hide_names(item) for item in value]

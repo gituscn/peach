@@ -70,13 +70,35 @@ def log_directories() -> list[Path]:
     return list(dict.fromkeys(result))
 
 
+def _redact_key(key):
+    """字典键同样脱敏；`编号:路径` 形态保留编号前缀。键是标识而非正文，路径起头就整段替换，
+    文件名里的引号不会截断替换。"""
+    if not isinstance(key, str):
+        return key
+    prefix, colon, rest = key.partition(":")
+    if colon and not re.search(r"[\\/]", prefix) and redact(rest).startswith("<path>"):
+        return f"{prefix}:<path>"
+    hidden = redact(key)
+    return "<path>" if hidden.startswith("<path>") else hidden
+
+
 def scrub(value):
     if isinstance(value, str):
         return redact(value)
     if isinstance(value, dict):
-        return {key: "<redacted>" if re.search(
-            r"(?i)password|passwd|token|api.?key|secret|cookie|authorization|credential|access.?key", str(key))
-                else scrub(item) for key, item in value.items()}
+        result = {}
+        for key, item in value.items():
+            name = _redact_key(key)
+            if name != key:
+                # 多个路径键脱敏后可能同名，按出现顺序编号保持唯一。
+                base, count = name, 1
+                while name in result or name in value:
+                    count += 1
+                    name = f"{base}#{count}"
+            result[name] = "<redacted>" if re.search(
+                r"(?i)password|passwd|token|api.?key|secret|cookie|authorization|credential|access.?key",
+                str(key)) else scrub(item)
+        return result
     if isinstance(value, (tuple, list)):
         return [scrub(item) for item in value]
     return value
