@@ -189,7 +189,7 @@ export function LinkManager() {
             value={Math.min(prune.job?.checked || 0, prune.job?.total || 0)} total={prune.job?.total} />
         : null}
     </>;
-    const pickedLabel = selectedRetryable.length ? `重试选中的 ${selectedRetryable.length} 条` : '重试选中的链接';
+    const pickedLabel = `立即重试所选（${selectedRetryable.length}）`;
     result = done || gone.length || unclear.length ? (
       <div className={RESULT_PANEL}>
         {pruned?.status === 'complete' ? <Note tone="success" title="完成">{pruneText(pruned)}</Note> : null}
@@ -207,12 +207,12 @@ export function LinkManager() {
         </LinkTable>
         <LinkTable title="本次未访问成功" items={unclear} hint={UNCLEAR_HINT}
           picked={picked} onPick={setPicked} footer={retryable.length
-            ? <Button leadingIcon={RETRY} {...busyProps(running)}
-                onClick={() => run(retryable.map((item) => item.id))}>{`全部重试（${retryable.length}）`}</Button>
+            ? <Button variant="primary" leadingIcon={RETRY} {...busyProps(running)}
+                onClick={() => run(retryable.map((item) => item.id))}>{`立即重试全部（${retryable.length}）`}</Button>
             : null}>
           {retryable.length
             ? <>
-                  <Button leadingIcon={RETRY} disabled={!selectedRetryable.length} {...busyProps(running)}
+                  <Button variant="secondary" leadingIcon={RETRY} disabled={!selectedRetryable.length} {...busyProps(running)}
                     onClick={() => run(selectedRetryable)}>{pickedLabel}</Button>
               </>
             : null}

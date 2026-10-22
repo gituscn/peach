@@ -44,7 +44,7 @@ function FavoriteChoice({ item }: { item: Favorite }) {
         if (!write.isPending) write.mutate({ action: 'favorite', ...item, on: !selected });
       }}>{write.isPending ? <span aria-hidden dangerouslySetInnerHTML={{ __html: spinnerHtml('') }} /> : <Star />}</EntityActionButton>
     {write.isError ? <Note tone="error">{errorMessage(write.error)}</Note> : null}
-    {query.isError ? <Button variant="secondary" size="small" onClick={() => void query.refetch()}>重试读取收藏</Button> : null}
+    {query.isError ? <Button variant="secondary" size="small" aria-label="立即重试读取收藏" onClick={() => void query.refetch()}>立即重试</Button> : null}
   </span>;
 }
 

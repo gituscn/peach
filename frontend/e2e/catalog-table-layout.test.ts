@@ -49,7 +49,7 @@ describe('馆藏表格宽屏与选择操作', () => {
       await row.getByRole('group', { name: '未评分', exact: true }).waitFor();
       await row.getByRole('button', { name: '评为 2 星', exact: true }).click();
       await row.getByText('示例评分失败', { exact: true }).waitFor();
-      await row.getByRole('button', { name: '重试评分', exact: true }).click();
+      await row.getByRole('button', { name: '立即重试评分', exact: true }).click();
       await row.getByRole('group', { name: '评分 2 / 5', exact: true }).waitFor();
       await page.locator('[data-sonner-toast]').filter({ hasText: '已评 2 星' }).getByRole('button', { name: '撤销', exact: true }).click();
       await row.getByRole('group', { name: '未评分', exact: true }).waitFor();

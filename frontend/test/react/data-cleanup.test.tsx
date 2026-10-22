@@ -441,7 +441,7 @@ describe('链接管理', () => {
     expect(server.posts('/api/links/prune')).toEqual([]);
   });
 
-  it('「全部重试」只重验未访问成功的那几条，带上这一趟的检查号', async () => {
+  it('「立即重试全部」只重验未访问成功的那几条，带上这一趟的检查号', async () => {
     const server = serve({
       '/api/links': stats,
       '/api/links/check': (body: { status_only?: boolean }) => (body.status_only
@@ -451,7 +451,7 @@ describe('链接管理', () => {
     });
     const host = await wrap(<LinkManager />);
     await settle();
-    await click(buttonNamed('全部重试（2）', host));
+    await click(buttonNamed('立即重试全部（2）', host));
     await settle();
     expect(server.posts('/api/links/check').filter((body) => !(body as { status_only?: boolean }).status_only))
       .toEqual([{ retry: [2, 3], check_id: 'check-3' }]);
