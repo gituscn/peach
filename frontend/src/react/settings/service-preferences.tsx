@@ -11,9 +11,12 @@ import { Input } from '@/components/base/input/input';
 import { FOLLOW_INITIAL_RANGE_OPTIONS } from '../../application/initial-follow-ranges';
 import { errorMessage } from '../../api';
 import { boundedPreference } from '../../number-setting';
+import { momentText } from '../activity/tasks';
+import { Note } from '../components/note';
 import {
-  FOLLOW_SCHEDULE_KEY, SETTINGS_KEY, THUMBNAIL_JOBS_KEY, fetchFollowSchedule, fetchSettings, fetchThumbnailJobs,
-  useSaveFollowSchedule, useSaveSettings, useSaveThumbnailMode,
+  FEED_SCHEDULE_KEY, FOLLOW_SCHEDULE_KEY, SETTINGS_KEY, THUMBNAIL_JOBS_KEY, fetchFeedSchedule, fetchFollowSchedule,
+  fetchSettings, fetchThumbnailJobs, useSaveFollowSchedule, useSaveSettings, useSaveThumbnailMode,
+  type FollowScheduleStatus,
 } from '../settings-panel/settings-data';
 import { ErrorText, Help, Rows, Section, Stack } from './section';
 
@@ -62,6 +65,7 @@ export function FollowPreferenceRows({ receipt }: { receipt(message: string): vo
     <Section title="关注采集">
       <Rows>
         <FollowScheduleRow />
+        <FeedScheduleRow />
         <SettingsRow label="首次采集范围">
           <div id="followInitialDaysSetting">
             <Select aria-label="首次采集范围" selectedKey={String(initialDays)}
@@ -132,7 +136,37 @@ function FollowScheduleRow() {
       {invalid ? <Stack><ErrorText>请输入 15–10080 的整数（分钟）。</ErrorText></Stack> : null}
       {save.isPending || data?.running
         ? <Stack><Help role="status">{save.isPending ? '正在保存…' : '正在检查来源更新…'}</Help></Stack> : null}
+      <ScheduleFailure status={data} title="上次自动检查失败" />
       {error ? <Stack><ErrorText>{errorMessage(error)}</ErrorText></Stack> : null}
     </>
+  );
+}
+
+/* 订阅源定时拉取没有可调的档位，这一行只读出间隔与上一轮的失败。 */
+function FeedScheduleRow() {
+  const status = useQuery({ queryKey: FEED_SCHEDULE_KEY, queryFn: ({ signal }) => fetchFeedSchedule(signal), refetchOnMount: 'always' });
+  const data = status.data;
+  if (!data) return null;
+  const minutes = data.interval_minutes;
+  const interval = minutes % 60 ? `每 ${minutes} 分钟` : `每 ${minutes / 60} 小时`;
+  return (
+    <>
+      <SettingsRow label="订阅源拉取">{!data.available ? '只在写入端可用' : data.enabled ? interval : '已关闭'}</SettingsRow>
+      <ScheduleFailure status={data} title="上次自动拉取失败" />
+    </>
+  );
+}
+
+/* 每轮开始时服务端清空上一轮的原因，所以正在跑的那一轮不显示；下一轮成功同样清空。 */
+function ScheduleFailure({ status, title }: { status: FollowScheduleStatus | undefined; title: string }) {
+  if (!status?.enabled || status.running || !status.last_error) return null;
+  const failures = status.consecutive_failures ?? 0;
+  const next = momentText(status.next_run_at);
+  const detail = [failures > 1 ? `已连续失败 ${failures} 次` : '', next ? `下一轮 ${next}` : '']
+    .filter(Boolean).join('，');
+  return (
+    <Stack>
+      <Note tone="error" title={title}>{[status.last_error, detail].filter(Boolean).join('\n')}</Note>
+    </Stack>
   );
 }

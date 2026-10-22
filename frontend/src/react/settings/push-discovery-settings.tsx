@@ -25,6 +25,7 @@ import { StatusLabel } from '../components/status-label';
 import { apiSend, errorMessage } from '../../api';
 import type { PushDiscoveryPrefix, PushDiscoveryState } from '../bundle';
 import { CodeBlock } from '../components/code-block';
+import { Note } from '../components/note';
 import { Disclosure, ErrorText, FieldLabel, Footer, Help, Rows, Section, Stack } from './section';
 import { busyProps, useAction } from './use-action';
 
@@ -71,6 +72,7 @@ export function PushDiscoveryForm({ initial, receipt }: {
   };
 
   const ingested = `已入库 ${live.queue.ingested} 个文件`
+    + (live.queue.failed ? `，${live.queue.failed} 个入库失败` : '')
     + (live.queue.pending ? `，队列里还有 ${live.queue.pending} 条` : '');
   const watching = live.local_running
     ? `正在监视 ${live.local_roots.join('、')}` : live.local_message || '没有运行';
@@ -105,6 +107,13 @@ export function PushDiscoveryForm({ initial, receipt }: {
           </SettingsRow>
         ) : null}
       </Rows>
+      {/* 原因是服务端记下的最近一次入库异常，下一个文件入库成功时清空；漏掉的那个文件由
+          定期全量扫描补上，所以这里只报原因，不给重试。 */}
+      {live.enabled && live.queue.last_error ? (
+        <Stack divided>
+          <Note tone="error" title="最近一次入库失败">{live.queue.last_error}</Note>
+        </Stack>
+      ) : null}
       {live.enabled && live.cloud && live.config_toml ? (
         <Stack divided>
           <div className="flex flex-col gap-3">

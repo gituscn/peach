@@ -93,7 +93,9 @@ function TaskCard({ task, writable }: { task: DownloadTask; writable: boolean })
   const [copied, setCopied] = useState(false);
   const [fullTitle, setFullTitle] = useState(false);
   const titleId = useId();
-  const reason = failureText(task);
+  /* 还在对账的任务没有失败分类：暂时性故障只记下原因、退避后再查，底栏照样把它读出来。 */
+  const reason = failureText(task)
+    || (task.cancellable && task.failure_detail ? `稍后自动重试 · ${task.failure_detail}` : '');
   const artwork = task.artwork;
   const people = artwork?.performer_entities || [];
   const detailHref = task.state === 'ingested' && task.asset_id ? `/assets/${task.asset_id}` : undefined;

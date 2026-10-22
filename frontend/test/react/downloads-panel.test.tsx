@@ -135,6 +135,16 @@ it('失败的任务写中文原因，可以重新提交；被判违规的只剩�
   }]]);
 });
 
+it('对账遇到暂时性故障退避重排时，底栏写出原因，卡片不算失败', async () => {
+  serve(snapshot({ tasks: [task({ failure_detail: '查询进度时连不上 CloudDrive2：timeout' })] }));
+  const host = await show();
+  const card = host.querySelector<HTMLElement>('[data-download-state=remote_running]')!;
+  expect(card.textContent).toContain('稍后自动重试 · 查询进度时连不上 CloudDrive2：timeout');
+  expect(card.className).not.toContain('border-border-error-default');
+  expect(buttonNamed('重新提交', card)).toBeNull();
+  expect(buttonNamed('取消', card)).not.toBeNull();
+});
+
 it('只读端任务照常列出，但没有取消键', async () => {
   serve(snapshot({ available: false, tasks: [task()] }));
   const host = await show();

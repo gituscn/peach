@@ -1182,6 +1182,7 @@ class WebDataTests(unittest.TestCase):
             "/api/follow/tags", "/api/follow/authors",
             "/api/taste", "/api/settings", "/api/links", "/api/organize", "/api/organize/example", "/api/orphan-records",
             "/api/feeds", "/api/feeds/check", "/api/feeds/discoveries", "/api/feeds/lookup",
+            "/api/feeds/schedule",
             "/api/downloads", "/api/resources/search",
             "/api/wants", "/api/wants/magnets",
             "/api/jav/detail", "/api/jav/reviews", "/api/jav/image", "/api/jav/resources", "/api/jav/discoveries",

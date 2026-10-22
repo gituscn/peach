@@ -13,11 +13,17 @@ afterEach(() => { queryClient.clear(); localStorage.removeItem('peach.number.fol
 
 function server() {
   const settings = { followInitialDays: 30, avatarRefreshDays: 90, faviconRefreshDays: 365 };
-  const schedule = { available: true, enabled: true, interval_minutes: 180 };
+  const schedule: Record<string, unknown> = { available: true, enabled: true, interval_minutes: 180 };
+  const feedSchedule: Record<string, unknown> = { available: true, enabled: true, interval_minutes: 360 };
   const thumbnails = { mode: 'precise', status: 'idle' };
+  const routes: Record<string, object> = {
+    '/api/settings': settings, '/api/follow/schedule': schedule,
+    '/api/feeds/schedule': feedSchedule, '/api/thumbnail-jobs': thumbnails,
+  };
   const posts: { url: string; body: Record<string, unknown> }[] = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-    const data = url === '/api/settings' ? settings : url === '/api/follow/schedule' ? schedule : thumbnails;
+    const data = routes[url];
+    if (!data) throw new Error(`没有登记的地址：${url}`);
     if (init?.method === 'POST') {
       const body = JSON.parse(String(init.body));
       posts.push({ url, body });
@@ -25,8 +31,51 @@ function server() {
     }
     return { ok: true, status: 200, json: async () => ({ ...data }) };
   }));
-  return { posts, settings, schedule, thumbnails };
+  return { posts, settings, schedule, feedSchedule, thumbnails };
 }
+
+const mountFollowRows = async () => {
+  const host = await mount(<QueryClientProvider client={queryClient}><FollowPreferenceRows receipt={vi.fn()} /></QueryClientProvider>);
+  await settle();
+  return host;
+};
+
+it('订阅源拉取读出间隔，没有失败时两个调度都不出提示', async () => {
+  server();
+  const host = await mountFollowRows();
+  expect(host.textContent).toContain('订阅源拉取');
+  expect(host.textContent).toContain('每 6 小时');
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+});
+
+it('关注检查失败时在它那一行下面写出原因与连续失败次数', async () => {
+  const { schedule } = server();
+  Object.assign(schedule, { last_error: '3 个来源检查失败', consecutive_failures: 2 });
+  const host = await mountFollowRows();
+  const alerts = [...host.querySelectorAll('[role="alert"]')].map((node) => node.textContent);
+  expect(alerts).toHaveLength(1);
+  expect(alerts[0]).toContain('上次自动检查失败');
+  expect(alerts[0]).toContain('3 个来源检查失败');
+  expect(alerts[0]).toContain('已连续失败 2 次');
+});
+
+it('订阅源拉取失败时写出原因；正在跑的一轮与关闭的调度不显示旧原因', async () => {
+  const { schedule, feedSchedule } = server();
+  Object.assign(feedSchedule, { last_error: 'JavDB 返回 429', consecutive_failures: 1 });
+  const failing = await mountFollowRows();
+  const alerts = [...failing.querySelectorAll('[role="alert"]')].map((node) => node.textContent);
+  expect(alerts).toHaveLength(1);
+  expect(alerts[0]).toContain('上次自动拉取失败');
+  expect(alerts[0]).toContain('JavDB 返回 429');
+  expect(alerts[0]).not.toContain('连续失败');
+  queryClient.clear();
+
+  Object.assign(schedule, { last_error: '1 个来源检查失败', running: true });
+  Object.assign(feedSchedule, { enabled: false });
+  const quiet = await mountFollowRows();
+  expect(quiet.querySelector('[role="alert"]')).toBeNull();
+  expect(quiet.textContent).toContain('已关闭');
+});
 
 it('首次采集范围写入服务端，头像和 favicon 使用固定刷新周期', async () => {
   const { posts } = server();
