@@ -211,15 +211,20 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                     </FolderFieldLine>
                   </FolderRow>
                 ))}
-                <Button variant="secondary" size="small" className="self-start" onClick={() => {
-                  add();
-                  edit(rows.length, { library_id: library.library_id, library: library.library, library_icon: library.library_icon });
-                }}>添加文件夹</Button>
               </div>
             );
           })}
         </div>
-        <Button variant="secondary" className="self-start" onClick={add}>添加媒体库</Button>
+        {/* 「添加文件夹」给最后那个媒体库多加一个目录，新行就排在这两颗键上方，之后可用「移到媒体库」换组；
+            「添加媒体库」新建一组，名称、图标、来源色与处理方式都单独设。 */}
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => {
+            const last = libraries[libraries.length - 1];
+            add();
+            if (last) edit(rows.length, { library_id: last.library_id, library: last.library, library_icon: last.library_icon });
+          }}>添加文件夹</Button>
+          <Button variant="secondary" onClick={add}>添加媒体库</Button>
+        </div>
         {cloud ? <><MediaReadPolicyHelp /><CloudDriveGuide /></> : null}
         {missing.map((dependency) => (
           <Help key={dependency.name}>

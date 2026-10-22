@@ -27,6 +27,8 @@
 .peach-react [data-catalog-table] [data-list-picture] [data-media-status] { left: 4px; bottom: 4px; gap: 4px; }
 .peach-react [data-catalog-table] [data-list-picture] [data-media-status] > span { width: 20px; height: 20px; }
 .peach-react [data-catalog-table] [data-list-picture] [data-media-status] svg { width: 11px; height: 11px; }
+/* 标签列：最多两行，放不下的收进行尾，不撑高整行。 */
+.peach-react [data-catalog-table] [data-list-tags] { height: auto; max-height: calc((var(--fs-xs) * 1.45 + var(--tag-pad-y) * 2 + 2px) * 2 + 13px); white-space: normal; }
 [data-table-skeleton] > div { display: flex; align-items: center; gap: 16px; height: 88px; }
 [data-table-skeleton] i { display: block; flex: none; width: 112px; height: 63px; border-radius: var(--control-radius); }
 [data-table-skeleton] span { display: block; width: 40%; height: 20px; border-radius: var(--control-radius); }

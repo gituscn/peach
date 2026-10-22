@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties, type MouseEvent } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   createColumnHelper, flexRender, rowPaginationFeature, rowSelectionFeature, rowSortingFeature,
@@ -98,6 +98,20 @@ export function CatalogListPage(props: CatalogGridProps) {
         isSelected={row.getIsSelected()} onChange={on => row.toggleSelected(on)} /> }),
       helper.accessor(item => item.name || '', { id: 'name', header: '名称', enableSorting: true,
         cell: ({ row }) => <ListIdentity item={row.original} props={props} disabled={result.isPlaceholderData} /> }),
+      /* 标签与卡片同一套：关注条目的标签不可点，其余点一下按这个标签筛选。 */
+      helper.display({ id: 'tags', header: '标签', cell: ({ row }) => {
+        const item = row.original;
+        const tags = item.follow_tags || item.tags || [];
+        return tags.length
+          ? <div data-media-tags="" data-list-tags="" onClick={event => {
+            const tag = (event.target as HTMLElement).closest<HTMLElement>('[data-tag]');
+            if (tag && !props.selectMode) props.actions.toggleTag(tag.dataset.tag || '');
+          }}>
+            {tags.map(tag => <button key={tag} type="button" data-media-tag="" disabled={!!item.follow_item_id}
+              data-tag={item.follow_item_id ? undefined : tag}>{props.helpers.tagLabel(tag)}</button>)}
+          </div>
+          : '—';
+      } }),
       helper.display({ id: 'code', header: '番号', cell: ({ row }) => row.original.code || '—' }),
       helper.accessor(item => item.duration, { id: 'dur', header: '时长', enableSorting: true,
         cell: ({ row }) => fmtDur(row.original.duration) || '—' }),
@@ -193,6 +207,8 @@ function ListIdentity({ item, props, disabled }: { item: MediaItem; props: Catal
   const name = props.helpers.displayName(item, rawName).trim() || '未命名作品';
   const titleHtml = props.helpers.titleHtml(item, rawName).trim() || '未命名作品';
   const { avatar, who } = identityParts(item);
+  const watched = !parts && Number(item.play_seconds) > 0 && Number(item.duration) > 0
+    ? Math.min(Number(item.play_seconds) / Number(item.duration), 1) : 0;
   const tints = useLibraryTints();
   const tint = item.library_id ? tints.get(item.library_id) : undefined;
   const flaggedBy = [Number(item.liked) > 0 ? '喜欢' : '', Number(item.o_count) > 0 ? '有高潮记录' : ''].filter(Boolean);
@@ -218,6 +234,12 @@ function ListIdentity({ item, props, disabled }: { item: MediaItem; props: Catal
         ? <ArtSlot artwork={artwork} relayout={root => relayoutCovers(root, 'small')} /> : <span>无预览</span>}
         {parts && !editions ? <span data-media-group="">{`${Number(parts.count).toLocaleString()} 卷`}</span> : null}
         {editions ? <span data-media-group="" title={editions.editions.join(' · ')}>{`${Number(editions.count).toLocaleString()} 个版本`}</span> : null}
+        {watched > 0
+          ? <span data-media-progress="" role="progressbar" aria-label="观看进度" aria-valuemin={0} aria-valuemax={100}
+            aria-valuenow={Math.round(watched * 100)}>
+            <i style={{ '--media-fill': `${(watched * 100).toFixed(1)}%` } as CSSProperties} />
+          </span>
+          : null}
         {item.watch_later || flaggedBy.length
           ? <span data-media-status="">
             {item.watch_later ? <span data-status="later" title="稍后看" aria-label="稍后看">{glyph('bookmark')}</span> : null}

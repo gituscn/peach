@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "7269d70b-8a65-402b-a266-024c7ab4abea", e._sentryDebugIdIdentifier = "sentry-dbid-7269d70b-8a65-402b-a266-024c7ab4abea");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "7a282e64-4a38-4fb0-ae42-1f4eaa6c42dd", e._sentryDebugIdIdentifier = "sentry-dbid-7a282e64-4a38-4fb0-ae42-1f4eaa6c42dd");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -57703,8 +57703,14 @@ var tAe = "peach.catalog-column-widths.v1", nAe = {
 		width: 144,
 		min: 112,
 		max: 400
+	},
+	tags: {
+		width: 200,
+		min: 144,
+		max: 560
 	}
 }, rAe = "peach.catalog-column-visibility.v1", iAe = {
+	tags: !1,
 	code: !1,
 	o: !1,
 	new: !1,
@@ -57722,10 +57728,12 @@ var tAe = "peach.catalog-column-widths.v1", nAe = {
 	new: "入库时间",
 	played: "观看时间",
 	release: "发行时间",
-	code: "番号"
+	code: "番号",
+	tags: "标签"
 }, oAe = [
 	"select",
 	"name",
+	"tags",
 	"code",
 	"dur",
 	"resolution",
@@ -58067,6 +58075,28 @@ function mAe(e) {
 					})
 				}),
 				t.display({
+					id: "tags",
+					header: "标签",
+					cell: ({ row: t }) => {
+						let n = t.original, r = n.follow_tags || n.tags || [];
+						return r.length ? /* @__PURE__ */ (0, D.jsx)("div", {
+							"data-media-tags": "",
+							"data-list-tags": "",
+							onClick: (t) => {
+								let n = t.target.closest("[data-tag]");
+								n && !e.selectMode && e.actions.toggleTag(n.dataset.tag || "");
+							},
+							children: r.map((t) => /* @__PURE__ */ (0, D.jsx)("button", {
+								type: "button",
+								"data-media-tag": "",
+								disabled: !!n.follow_item_id,
+								"data-tag": n.follow_item_id ? void 0 : t,
+								children: e.helpers.tagLabel(t)
+							}, t))
+						}) : "—";
+					}
+				}),
+				t.display({
 					id: "code",
 					header: "番号",
 					cell: ({ row: e }) => e.original.code || "—"
@@ -58266,11 +58296,11 @@ function mAe(e) {
 	});
 }
 function hAe({ item: e, props: t, disabled: n }) {
-	let r = Ma(e, "small", !1, t.layout.javImage), i = e.part_group || null, a = e.edition_group || null, o = i?.title || e.name || "", s = t.helpers.displayName(e, o).trim() || "未命名作品", c = t.helpers.titleHtml(e, o).trim() || "未命名作品", { avatar: l, who: u } = bTe(e), d = VF(), f = e.library_id ? d.get(e.library_id) : void 0, p = [Number(e.liked) > 0 ? "喜欢" : "", Number(e.o_count) > 0 ? "有高潮记录" : ""].filter(Boolean), m = (e) => /* @__PURE__ */ (0, D.jsx)("svg", {
+	let r = Ma(e, "small", !1, t.layout.javImage), i = e.part_group || null, a = e.edition_group || null, o = i?.title || e.name || "", s = t.helpers.displayName(e, o).trim() || "未命名作品", c = t.helpers.titleHtml(e, o).trim() || "未命名作品", { avatar: l, who: u } = bTe(e), d = !i && Number(e.play_seconds) > 0 && Number(e.duration) > 0 ? Math.min(Number(e.play_seconds) / Number(e.duration), 1) : 0, f = VF(), p = e.library_id ? f.get(e.library_id) : void 0, m = [Number(e.liked) > 0 ? "喜欢" : "", Number(e.o_count) > 0 ? "有高潮记录" : ""].filter(Boolean), h = (e) => /* @__PURE__ */ (0, D.jsx)("svg", {
 		viewBox: "0 0 24 24",
 		"aria-hidden": "true",
 		children: /* @__PURE__ */ (0, D.jsx)("use", { href: `#i-${e}` })
-	}), h = (n) => {
+	}), g = (n) => {
 		t.selectMode ? t.actions.toggleSelection(e.id, n.shiftKey) : (t.filters?.state === "trash" ? t.actions.openResource : t.actions.open)(e, n.currentTarget);
 	};
 	return /* @__PURE__ */ (0, D.jsxs)("div", {
@@ -58287,7 +58317,7 @@ function hAe({ item: e, props: t, disabled: n }) {
 				disabled: n,
 				tabIndex: -1,
 				"aria-hidden": "true",
-				onClick: h,
+				onClick: g,
 				children: /* @__PURE__ */ (0, D.jsxs)("span", {
 					"data-list-picture": "",
 					children: [
@@ -58304,18 +58334,27 @@ function hAe({ item: e, props: t, disabled: n }) {
 							title: a.editions.join(" · "),
 							children: `${Number(a.count).toLocaleString()} 个版本`
 						}) : null,
-						e.watch_later || p.length ? /* @__PURE__ */ (0, D.jsxs)("span", {
+						d > 0 ? /* @__PURE__ */ (0, D.jsx)("span", {
+							"data-media-progress": "",
+							role: "progressbar",
+							"aria-label": "观看进度",
+							"aria-valuemin": 0,
+							"aria-valuemax": 100,
+							"aria-valuenow": Math.round(d * 100),
+							children: /* @__PURE__ */ (0, D.jsx)("i", { style: { "--media-fill": `${(d * 100).toFixed(1)}%` } })
+						}) : null,
+						e.watch_later || m.length ? /* @__PURE__ */ (0, D.jsxs)("span", {
 							"data-media-status": "",
 							children: [e.watch_later ? /* @__PURE__ */ (0, D.jsx)("span", {
 								"data-status": "later",
 								title: "稍后看",
 								"aria-label": "稍后看",
-								children: m("bookmark")
-							}) : null, p.length ? /* @__PURE__ */ (0, D.jsx)("span", {
+								children: h("bookmark")
+							}) : null, m.length ? /* @__PURE__ */ (0, D.jsx)("span", {
 								"data-status": "flagged",
-								title: `已标记：${p.join("、")}`,
-								"aria-label": `已标记：${p.join("、")}`,
-								children: m("heart")
+								title: `已标记：${m.join("、")}`,
+								"aria-label": `已标记：${m.join("、")}`,
+								children: h("heart")
 							}) : null]
 						}) : null
 					]
@@ -58330,14 +58369,14 @@ function hAe({ item: e, props: t, disabled: n }) {
 					disabled: n,
 					title: s,
 					"aria-label": `打开 ${s}`,
-					onClick: h,
+					onClick: g,
 					dangerouslySetInnerHTML: { __html: c }
 				}), /* @__PURE__ */ (0, D.jsxs)("span", {
 					"data-list-byline": "",
-					children: [f ? /* @__PURE__ */ (0, D.jsxs)("span", {
+					children: [p ? /* @__PURE__ */ (0, D.jsxs)("span", {
 						"data-list-library": "",
-						title: `媒体库：${f.name}`,
-						children: [/* @__PURE__ */ (0, D.jsx)(sj, { mark: f.icon }), f.name]
+						title: `媒体库：${p.name}`,
+						children: [/* @__PURE__ */ (0, D.jsx)(sj, { mark: p.icon }), p.name]
 					}) : null, u]
 				})]
 			})
@@ -75482,6 +75521,7 @@ function JBe({ enabled: e, release: t }) {
 		"aria-live": "polite",
 		"data-userscript-status": "",
 		className: LA({
+			variant: "raised",
 			bordered: "line",
 			className: "flex flex-col gap-3"
 		}),
@@ -77498,10 +77538,10 @@ function VVe({ data: e, receipt: t }) {
 				"aria-label": "媒体库与目录",
 				className: "flex flex-col gap-4",
 				children: O.map((e) => {
-					let t = n.findIndex((t) => t.library_id === e.library_id), s = n.map((e, t) => ({
+					let t = n.findIndex((t) => t.library_id === e.library_id), i = n.map((e, t) => ({
 						row: e,
 						index: t
-					})).filter(({ row: t }) => t.library_id === e.library_id), d = x[e.library_id] ?? "auto", f = e.library || "未命名媒体库";
+					})).filter(({ row: t }) => t.library_id === e.library_id), s = x[e.library_id] ?? "auto", d = e.library || "未命名媒体库";
 					return /* @__PURE__ */ (0, D.jsxs)("div", {
 						"data-library-block": "",
 						className: "flex flex-col gap-3",
@@ -77510,14 +77550,14 @@ function VVe({ data: e, receipt: t }) {
 								"data-library-head": "",
 								children: [
 									/* @__PURE__ */ (0, D.jsx)(DVe, {
-										label: `${f} 图标`,
+										label: `${d} 图标`,
 										value: e.library_icon,
 										kind: e.location,
 										onChange: (e) => T(t, { library_icon: e })
 									}),
 									/* @__PURE__ */ (0, D.jsx)(CP, {
 										className: "w-full",
-										"aria-label": `${f} 名称`,
+										"aria-label": `${d} 名称`,
 										maxLength: 80,
 										placeholder: "媒体库名称",
 										value: e.library,
@@ -77528,8 +77568,8 @@ function VVe({ data: e, receipt: t }) {
 										name: e.library
 									}),
 									/* @__PURE__ */ (0, D.jsx)(AVe, {
-										name: f,
-										value: d,
+										name: d,
+										value: s,
 										onChange: (t) => S((n) => ({
 											...n,
 											[e.library_id]: t
@@ -77537,15 +77577,15 @@ function VVe({ data: e, receipt: t }) {
 									})
 								]
 							}),
-							d === "custom" ? /* @__PURE__ */ (0, D.jsx)(jVe, {
-								name: f,
+							s === "custom" ? /* @__PURE__ */ (0, D.jsx)(jVe, {
+								name: d,
 								value: C[e.library_id] ?? OVe,
 								onChange: (t) => w((n) => ({
 									...n,
 									[e.library_id]: t
 								}))
 							}) : null,
-							s.map(({ row: e, index: t }) => /* @__PURE__ */ (0, D.jsx)(BNe, {
+							i.map(({ row: e, index: t }) => /* @__PURE__ */ (0, D.jsx)(BNe, {
 								label: `媒体目录 ${t + 1}`,
 								path: e.path,
 								onPath: (e) => r(t, { path: e }),
@@ -77614,29 +77654,29 @@ function VVe({ data: e, receipt: t }) {
 										})
 									}) : null
 								] })
-							}, t)),
-							/* @__PURE__ */ (0, D.jsx)(q, {
-								variant: "secondary",
-								size: "small",
-								className: "self-start",
-								onClick: () => {
-									i(), r(n.length, {
-										library_id: e.library_id,
-										library: e.library,
-										library_icon: e.library_icon
-									});
-								},
-								children: "添加文件夹"
-							})
+							}, t))
 						]
 					}, e.library_id);
 				})
 			}),
-			/* @__PURE__ */ (0, D.jsx)(q, {
-				variant: "secondary",
-				className: "self-start",
-				onClick: i,
-				children: "添加媒体库"
+			/* @__PURE__ */ (0, D.jsxs)("div", {
+				className: "flex flex-wrap gap-2",
+				children: [/* @__PURE__ */ (0, D.jsx)(q, {
+					variant: "secondary",
+					onClick: () => {
+						let e = O[O.length - 1];
+						i(), e && r(n.length, {
+							library_id: e.library_id,
+							library: e.library,
+							library_icon: e.library_icon
+						});
+					},
+					children: "添加文件夹"
+				}), /* @__PURE__ */ (0, D.jsx)(q, {
+					variant: "secondary",
+					onClick: i,
+					children: "添加媒体库"
+				})]
 			}),
 			M ? /* @__PURE__ */ (0, D.jsxs)(D.Fragment, { children: [/* @__PURE__ */ (0, D.jsx)(RNe, {}), /* @__PURE__ */ (0, D.jsx)(SVe, {})] }) : null,
 			N.map((e) => /* @__PURE__ */ (0, D.jsxs)(ej, { children: [
@@ -115904,4 +115944,4 @@ fxt(pxt);
 //#endregion
 export { tT as applyTheme, Zk as peachHistory, Yo as popCount, Bgt as showToast };
 
-//# debugId=7269d70b-8a65-402b-a266-024c7ab4abea
+//# debugId=7a282e64-4a38-4fb0-ae42-1f4eaa6c42dd
