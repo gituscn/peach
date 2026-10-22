@@ -100,6 +100,7 @@ export function configurationContentSkeleton(chosen: string): string {
     case '应用与维护': return section('检查更新', stack(`${text('40%')}${text('40%')}${text('40%')}${text('40%')}`), button('检查更新'))
       + section('自动更新', row('自动检查新版本') + row('自动下载更新') + row('检查频率', '', 'ui-configuration-skeleton-select'), button('保存配置'))
       + section('开机自启', row('开机后启动 Peach') + row('只启动托盘，不打开网页') + row('在桌面创建快捷方式'), button('保存配置'))
+      + section('视频播放', row('转码方式', '用于播放时的视频转码。', 'ui-configuration-skeleton-select'))
       + section('数据上传', row('发送版本统计与错误诊断（推荐）') + row('馆藏与口味明细上传'))
       + section('运行信息', stack(`${text('80%')}${text('60%')}${text('40%')}`));
     default: return media();

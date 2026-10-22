@@ -6,8 +6,8 @@
  * - `['follow-schedule']`：这台机器上关注自动更新的档位与上次运行状态。
  * - `['feed-schedule']`：订阅源定时拉取的档位与上次运行状态，形状同上，只读。
  * - `['thumbnail-jobs']`：视频缩略图采集的档位与状态。档位跟着机器走，不存在浏览器里。
- * - `['media-processing']`：这台机器生成预览的开关与抽帧、转码的编解码方式。面板「播放」里的转码方式
- *   与配置页「视频预览」读写同一份。
+ * - `['media-processing']`：这台机器生成预览的开关与抽帧、转码的编解码方式。配置页「视频预览」与
+ *   「视频播放」两张卡读写同一份。
  *
  * 面板常驻不卸载，每次打开重取设置；Peach 配置在挂载时重取各自的数据。 */
 import { useMutation, type QueryClient } from '@tanstack/react-query';

@@ -18,7 +18,7 @@ import { DownloadGroup } from './download-settings';
 import { GeneralSettings } from './general-settings';
 import { MaintenanceSettings } from './maintenance-settings';
 import { MediaSettings } from './media-settings';
-import { MediaProcessingSettings } from './media-processing-settings';
+import { MediaProcessingSettings, PlaybackTranscodeSettings } from './media-processing-settings';
 import { CodePatternSettings } from './code-pattern-settings';
 import { NetworkSettings } from './network-settings';
 import { SourceSettings } from './source-settings';
@@ -97,6 +97,7 @@ function ConfigurationGroups(
       title: '应用与维护',
       body: (panel) => <div {...groupRoot(panel)}>
         <GeneralSettings {...group} />
+        <PlaybackTranscodeSettings receipt={receipt} />
         <MaintenanceSettings {...group} reopenTutorial={reopenTutorial} />
       </div>,
     },

@@ -189,7 +189,7 @@ describe('设置面板与壳的接缝', () => {
     const headings = (index: number) => [...panel.querySelectorAll(`#settings-group-${index} [data-settings-subheading]`)]
       .map((node) => node.textContent);
     expect([headings(1), headings(2)]).toEqual([['作品列表', '播放'], ['作品显示', '新作显示']]);
-    /* 转码方式写运行 Peach 那台电脑的配置：不能改配置的设备上不出现。 */
+    /* 转码方式是运行 Peach 那台电脑的服务配置，在 Peach 配置里，弹窗里没有这一行（ADR-0103）。 */
     expect(panel.querySelector('#playbackAccelerationSetting')).toBeNull();
     const entry = panel.querySelector<HTMLButtonElement>('[data-settings-service] button')!;
     expect(entry.disabled).toBe(true);
@@ -199,7 +199,7 @@ describe('设置面板与壳的接缝', () => {
     current.host.configurable = async () => true;
     await open(current);
     await settle();
-    expect(group('#playbackAccelerationSetting')).toBe('settings-group-1');
+    expect(panel.querySelector('#playbackAccelerationSetting')).toBeNull();
     expect(entry.disabled).toBe(false);
     await click(entry);
     await settle();
@@ -246,40 +246,6 @@ describe('设置面板与壳的接缝', () => {
     expect([current.value.feedLimit, current.save.mock.calls.length, effects(current.changed)]).toEqual([12, 0, []]);
     await commit('30');
     expect([current.value.feedLimit, current.save.mock.calls.length, effects(current.changed)]).toEqual([30, 1, ['feedLimit']]);
-    await close(current);
-  });
-
-  it('转码方式：读写 /api/media-processing，成功后回执，不落浏览器那一份偏好；再打开面板重取', async () => {
-    const sent: unknown[] = [];
-    let reads = 0;
-    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-      if (init?.method === 'POST') sent.push([url, JSON.parse(String(init.body))]);
-      else if (String(url).startsWith('/api/media-processing')) reads += 1;
-      const body = String(url).startsWith('/api/media-processing')
-        ? { metadata_only: false, preview_acceleration: 'auto', playback_acceleration: init?.method === 'POST' ? 'software' : 'auto' }
-        : {};
-      return { ok: true, status: 200, json: async () => body };
-    }));
-    const current = await setup();
-    current.host.configurable = async () => true;
-    const receipt = vi.fn();
-    current.host.receipt = receipt;
-    const panel = await open(current, '浏览与播放');
-    await settle();
-    const field = panel.querySelector<HTMLElement>('#playbackAccelerationSetting')!;
-    expect(field.querySelector('[data-select-trigger]')?.hasAttribute('disabled')).toBe(false);
-    current.save.mockClear();
-    await click(field.querySelector('[data-select-option="software"]'));
-    await settle();
-    expect(sent).toEqual([['/api/media-processing', { playback_acceleration: 'software' }]]);
-    expect(receipt).toHaveBeenCalledWith('已保存转码方式');
-    expect(current.save).not.toHaveBeenCalled();
-    await close(current);
-    const before = reads;
-    await open(current);
-    await settle();
-    expect(reads).toBe(before + 1);
-    expect(panel.querySelector('#playbackAccelerationSetting')).toBe(field);
     await close(current);
   });
 
