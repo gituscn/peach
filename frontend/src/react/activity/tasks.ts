@@ -152,8 +152,8 @@ export function taskIssues(run: TaskRunPayload): TaskIssue[] {
 }
 
 /** 处理入口只对同一种任务最新那一轮有意义的任务：目标页只显示最新一轮，更早的失败已经被后来的结果取代。
- *  扫描与采集卡片上的「重试未完成项」只认最新一轮的失败集合；amane 桥重建成功一次，之前的失败就不用再管。 */
-const LATEST_ONLY = new Set(['library-processing', 'amane-bridge']);
+ *  扫描与采集卡片上的问题清单与「重试未完成项」只认最新一轮的失败集合。 */
+const LATEST_ONLY = new Set(['library-processing']);
 
 export function problemDestination(run: TaskRunPayload, latest = true): { href: string; label: string } | null {
   if (!hasResultProblems(run) && run.status !== 'failed') return null;
@@ -161,9 +161,8 @@ export function problemDestination(run: TaskRunPayload, latest = true): { href: 
   const targets: Record<string, [string, string]> = {
     'link-check': ['/data-cleanup#link-manager', '查看有问题的链接'],
     'link-prune': ['/data-cleanup#link-manager', '查看有问题的链接'],
-    'library-processing': ['/data-cleanup#libraryProcessing', '查看并处理'],
-    // 重建键在来源和凭证页的 amane 那一段。
-    'amane-bridge': ['/sources', '查看并处理'],
+    // 「需要处理」不收这里的可重试项：问题清单有几百项，先看清单再在那张卡上重试。
+    'library-processing': ['/data-cleanup#libraryProcessing', '查看未完成项'],
     'follow-check': ['/subscriptions', '查看关注来源'],
     'feed-check': ['/subscriptions?tab=feeds', '查看订阅源'],
     'follow-resolve': ['/subscriptions?tab=add', '查看来源查找'],

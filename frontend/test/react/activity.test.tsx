@@ -105,12 +105,15 @@ it('扫描与采集只有最新那一轮失败才去卡片上重试未完成项'
     scan({ id: 5, finished_at: '2026-09-11T10:05:00Z' }),
     scan({ id: 4, status: 'succeeded', error: '', finished_at: '2026-09-11T09:05:00Z' }),
     scan({ id: 3, finished_at: '2026-09-11T08:05:00Z' }),
+    // amane 桥的处理入口在页顶「需要处理」那一行，卡上不放。
+    run({ id: 2, task_key: 'amane-bridge', task_label: '重建 amane 桥', status: 'failed',
+          progress_total: null, finished_at: '2026-09-11T07:05:00Z', error: '重建未完成' }),
   ] }));
   await prefetchTasks(new AbortController().signal);
   const host = await mount(page());
-  const links = [...host.querySelectorAll('[data-task-key=library-processing] a')];
+  const links = [...host.querySelectorAll('[data-task-key=library-processing] a, [data-task-key=amane-bridge] a')];
   expect(links.map((link) => [link.closest('[data-run-id]')?.getAttribute('data-run-id'),
-    link.getAttribute('href'), link.textContent])).toEqual([['5', '/data-cleanup#libraryProcessing', '查看并处理']]);
+    link.getAttribute('href'), link.textContent])).toEqual([['5', '/data-cleanup#libraryProcessing', '查看未完成项']]);
 });
 
 /** 走完真实的首屏路径：先 prefetch 落进缓存，再挂载。 */

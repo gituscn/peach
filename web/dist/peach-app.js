@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "dd58f46a-3594-43e5-a7ba-11d1b86ba074", e._sentryDebugIdIdentifier = "sentry-dbid-dd58f46a-3594-43e5-a7ba-11d1b86ba074");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "9cbee1d2-ac87-4ef0-b901-5c1a9f2645f6", e._sentryDebugIdIdentifier = "sentry-dbid-9cbee1d2-ac87-4ef0-b901-5c1a9f2645f6");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -38288,14 +38288,13 @@ function Sye(e) {
 	let t = e.result_summary?.issues;
 	return Array.isArray(t) ? t.filter((e) => !!e && typeof e == "object" && typeof e.error == "string" && typeof e.label == "string") : [];
 }
-var DA = /* @__PURE__ */ new Set(["library-processing", "amane-bridge"]);
+var DA = /* @__PURE__ */ new Set(["library-processing"]);
 function Cye(e, t = !0) {
 	if (!EA(e) && e.status !== "failed" || DA.has(e.task_key) && !t) return null;
 	let n = {
 		"link-check": ["/data-cleanup#link-manager", "查看有问题的链接"],
 		"link-prune": ["/data-cleanup#link-manager", "查看有问题的链接"],
-		"library-processing": ["/data-cleanup#libraryProcessing", "查看并处理"],
-		"amane-bridge": ["/sources", "查看并处理"],
+		"library-processing": ["/data-cleanup#libraryProcessing", "查看未完成项"],
 		"follow-check": ["/subscriptions", "查看关注来源"],
 		"feed-check": ["/subscriptions?tab=feeds", "查看订阅源"],
 		"follow-resolve": ["/subscriptions?tab=add", "查看来源查找"],
@@ -115619,4 +115618,4 @@ nxt(rxt);
 //#endregion
 export { HT as applyTheme, yk as peachHistory, Go as popCount, Agt as showToast };
 
-//# debugId=dd58f46a-3594-43e5-a7ba-11d1b86ba074
+//# debugId=9cbee1d2-ac87-4ef0-b901-5c1a9f2645f6
