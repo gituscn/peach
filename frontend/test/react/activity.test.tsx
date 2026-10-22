@@ -96,6 +96,26 @@ it('追更检查的问题详情绑定任务快照并提供来源入口', async (
   expect(host.querySelector('a[href="/subscriptions"]')?.textContent).toContain('查看关注来源');
 });
 
+it('扫描与采集只有最新那一轮失败才去卡片上重试未完成项', async () => {
+  const scan = (overrides: Partial<TaskRunPayload>) => run({ task_key: 'library-processing', task_label: '扫描与采集',
+    status: 'failed', progress_total: null, error: '768 项需要处理，其中 533 项是来源限流，等一会儿再跑；其余可重试未完成的部分。',
+    ...overrides });
+  // 卡片上的失败集合只属于最新那一轮：更早的失败点过去对不上任何东西。
+  serve(payload({ finished: [
+    scan({ id: 5, finished_at: '2026-09-11T10:05:00Z' }),
+    scan({ id: 4, status: 'succeeded', error: '', finished_at: '2026-09-11T09:05:00Z' }),
+    scan({ id: 3, finished_at: '2026-09-11T08:05:00Z' }),
+    // amane 桥的处理入口在页顶「需要处理」那一行，卡上不放。
+    run({ id: 2, task_key: 'amane-bridge', task_label: '重建 amane 桥', status: 'failed',
+          progress_total: null, finished_at: '2026-09-11T07:05:00Z', error: '重建未完成' }),
+  ] }));
+  await prefetchTasks(new AbortController().signal);
+  const host = await mount(page());
+  const links = [...host.querySelectorAll('[data-task-key=library-processing] a, [data-task-key=amane-bridge] a')];
+  expect(links.map((link) => [link.closest('[data-run-id]')?.getAttribute('data-run-id'),
+    link.getAttribute('href'), link.textContent])).toEqual([['5', '/data-cleanup#libraryProcessing', '查看未完成项']]);
+});
+
 /** 走完真实的首屏路径：先 prefetch 落进缓存，再挂载。 */
 async function open(...responses: (ActivityData | null)[]) {
   const fetcher = serve(...responses);
@@ -499,4 +519,33 @@ it('报错摘要平时只露一行，「查看详情」展开全文、再点收�
   const single = await mount(<ErrorExcerpt text="只有一行" />);
   expect(single.textContent).toBe('只有一行');
   expect(buttonNamed('查看详情', single)).toBeNull();
+});
+
+it('缺人脸模型跑完的后继标成发现问题，不是已完成', async () => {
+  const down = { outcome: '图库里没有这个名字，人脸模型不可用：取人脸模型失败：断网', face_match_unavailable: true };
+  const settled = followup(4, { result_summary: down });
+  expect(hasResultProblems(settled)).toBe(true);
+  expect(isRoutine(run({ status: 'succeeded', trigger: 'scheduled', result_summary: down }))).toBe(false);
+  expect(hasResultProblems(followup(4, { result_summary: { face_match_unavailable: false } }))).toBe(false);
+  // 结论本身没写原因时补一句，写了就不重复。
+  expect(summaryItems({ outcome: '图库 2 张彼此认不出同一个人', face_match_unavailable: true }))
+    .toEqual(['图库 2 张彼此认不出同一个人', '人脸模型不可用，未做人脸核对']);
+  expect(summaryItems(down)).toEqual([down.outcome]);
+  const parent = run({ id: 4, status: 'succeeded', task_label: '扫描与采集', progress_total: null,
+                       finished_at: '2026-09-11T10:03:00Z', result_summary: { followups: 1 } });
+  const { host } = await open(payload({ finished: [parent, settled] }));
+  expect([...host.querySelectorAll('[data-followup-key] > span')].map((node) => node.textContent))
+    .toEqual(['补全资料图片', '发现问题', `涼森れむ · ${down.outcome}`]);
+});
+
+it('人脸模型取不到的那一轮只记失败与原因，重试在页顶「需要处理」', async () => {
+  const { host } = await open(payload({ finished: [run({
+    id: 9, task_key: 'face-models', task_label: '下载人脸模型', trigger: 'scheduled', status: 'failed',
+    progress_total: null, progress_current: null, finished_at: '2026-09-11T10:05:00Z',
+    error: '取人脸模型失败：getaddrinfo failed' })] }));
+  const card = host.querySelector('[data-task-key=face-models]')!;
+  expect(card.getAttribute('data-status')).toBe('failed');
+  expect(card.textContent).toContain('取人脸模型失败：getaddrinfo failed');
+  expect(card.querySelectorAll('a')).toHaveLength(0);
+  expect([...card.querySelectorAll('button')].some((button) => /重试|下载/.test(button.textContent || ''))).toBe(false);
 });

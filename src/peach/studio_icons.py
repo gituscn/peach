@@ -1363,7 +1363,7 @@ def land_one(name: str, entries: list[dict[str, str]], logo_root: Path,
     verdicts = [str(item["verdict"]) for item in rows]
     if faces.unavailable:
         return {"outcome": f"人像闸未生效，不自动装（{faces.unavailable}）",
-                "verdicts": verdicts, "rows": rows}
+                "face_match_unavailable": True, "verdicts": verdicts, "rows": rows}
     written = install(rows, logo_root, source=source, batch=batch)
     return {"outcome": "已装上" if written else next(iter(verdicts), MISSING),
             "verdicts": verdicts, "installed": written, "rows": rows}

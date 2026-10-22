@@ -161,6 +161,21 @@ def ensure_model(path: Path | None = None, *, allow_download: bool = True) -> Pa
                        allow_download=allow_download, label="人脸模型")
 
 
+#: 每联网取到一份模型加一。进程里活得久的探针按它判断「失败之后有没有人把模型取回来了」，
+#: 不必等满自己的重试窗口（`avatar_face.FaceProbe`）。
+downloads = 0
+
+#: 联网取模型的结果回报给谁：`observer(label, error)`，取到时 `error` 为 None。服务装配时
+#: 由 `face_models.attach` 接上，把失败写进任务中心；命令行里没人接，就是空操作。
+#: 本地已有、`allow_download=False` 两条路不算联网，不回报。
+observer = None
+
+
+def _observe(label: str, error: Exception | None) -> None:
+    if observer is not None:
+        observer(label, error)
+
+
 def fetch_model(target: Path, url: str, sha256: str, *, allow_download: bool,
                 label: str, timeout: float = 60) -> Path:
     """按固定地址与 sha256 取一个 opencv_zoo 模型，检出与比对两个模型共用这一条。
@@ -168,6 +183,7 @@ def fetch_model(target: Path, url: str, sha256: str, *, allow_download: bool,
     本地那份哈希对得上就直接用；对不上先删掉，再按 `allow_download` 决定取不取。
     取不到、校验不符一律抛 `FaceModelUnavailable`，由调用方决定跳过还是停下。
     """
+    global downloads
     target = Path(target)
     if target.is_file() and _digest(target) == sha256:
         return target
@@ -180,13 +196,18 @@ def fetch_model(target: Path, url: str, sha256: str, *, allow_download: bool,
     try:
         payload = read_url(url, timeout=timeout)
     except (OSError, httpx.HTTPError) as error:
-        raise FaceModelUnavailable(f"取{label}失败：{error}") from error
+        failure = FaceModelUnavailable(f"取{label}失败：{error}")
+        _observe(label, failure)
+        raise failure from error
     digest = hashlib.sha256(payload).hexdigest()
     if digest != sha256:
-        raise FaceModelUnavailable(
-            f"{label}校验不符：期望 {sha256}，实际 {digest}")
+        failure = FaceModelUnavailable(f"{label}校验不符：期望 {sha256}，实际 {digest}")
+        _observe(label, failure)
+        raise failure
     temporary.write_bytes(payload)
     temporary.replace(target)
+    downloads += 1
+    _observe(label, None)
     return target
 
 

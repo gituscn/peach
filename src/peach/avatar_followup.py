@@ -673,8 +673,10 @@ def _install_cover_face(contract, providers_root, avatar_root, kind: str,
     """
     summary = {"name": name, "matched": matched}
     if not found:
-        reason = f"探针不可用：{probe.unavailable}" if probe.unavailable else "封面上没有能截的脸"
-        return {**summary, "outcome": f"{gallery}，{reason}"}
+        if probe.unavailable:
+            return {**summary, "outcome": f"{gallery}，人脸模型不可用：{probe.unavailable}",
+                    "face_match_unavailable": True}
+        return {**summary, "outcome": f"{gallery}，封面上没有能截的脸"}
     face = found[0]
     # 装的只有脸最宽那一张；其余几张也截好留进候选缓存，挑图弹层里一点就能换，
     # 不必再去整张封面上手框。
@@ -771,7 +773,7 @@ def _install_account_face(contract, connection, providers_root, avatar_root, ent
     faces = avatar_cover_face.sheet_faces(connection, contract.cover_root, entity_id, probe,
                                           contract.snapshot_file)
     if probe.unavailable:
-        return {**summary, "outcome": f"探针不可用：{probe.unavailable}",
+        return {**summary, "outcome": f"人脸模型不可用：{probe.unavailable}",
                 "face_match_unavailable": True}
     if not faces:
         return {**summary, "outcome": "作品画面上没有能截的脸"}

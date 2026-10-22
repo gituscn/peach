@@ -34,7 +34,8 @@ import { DownloadsPanel } from './downloads-panel';
 import { ErrorDetails, ErrorExcerpt } from './error-excerpt';
 import {
   elapsedText, fetchEarlier, fetchTasks, foldRoutine, followupDetail, groupFollowups, isActive,
-  hasResultProblems, isRoutine, mergeFinished, momentText, pollInterval, problemDestination, progressText, statusLabel, summaryItems, taskIssues, TASKS_KEY, TRIGGER_LABELS, type TaskRunPayload,
+  hasResultProblems, isRoutine, latestOfKind, mergeFinished, momentText, pollInterval, problemDestination, progressText,
+  statusLabel, summaryItems, taskIssues, TASKS_KEY, TRIGGER_LABELS, type TaskRunPayload,
 } from './tasks';
 
 /* 完成绿、失败红、进行中蓝、意外中断黄，主动取消和排队为中性。 */
@@ -146,13 +147,16 @@ function RunningRun({ run, followups }: { run: TaskRunPayload; followups?: TaskR
 }
 
 /** 跑完的一轮。`runs` 多于一条时是折叠起来的几轮例行任务：时间写成从最早到最新那一段，
- *  摘要取最新那一轮——例行轮次的摘要本来就一样，逐条列出来只是同一行抄 N 遍。 */
+ *  摘要取最新那一轮——例行轮次的摘要本来就一样，逐条列出来只是同一行抄 N 遍。
+ *  任务卡只记这一轮的历史：此刻还没解决的问题和「立即重试」在页顶「需要处理」那一块。
+ *  `latest` 说它是不是同一种任务最新的那一轮：有些任务只有那一轮还有处理入口。 */
 function SettledRun(
-  { run, followups, runs }: { run: TaskRunPayload; followups?: TaskRunPayload[]; runs?: TaskRunPayload[] },
+  { run, followups, runs, latest }:
+  { run: TaskRunPayload; followups?: TaskRunPayload[]; runs?: TaskRunPayload[]; latest: boolean },
 ) {
   const summary = summaryItems(run.result_summary).filter((line) => line !== run.error);
   const issues = taskIssues(run);
-  const destination = problemDestination(run);
+  const destination = problemDestination(run, latest);
   const elapsed = elapsedText(run.elapsed_seconds);
   const oldest = runs && runs.length > 1 ? runs[runs.length - 1] : undefined;
   const meta = (oldest
@@ -255,6 +259,7 @@ export function ActivityPage() {
     && !skipped.some((row) => row.id === run.id));
   // 每小时一轮的定时检查什么也没发生时一条条摆出来，一页就被同一句「已检查 83」占满。
   const folds = foldRoutine(finished, (run) => isRoutine(run) && !byParent.get(run.id)?.length);
+  const newest = latestOfKind(allRuns);
   const quiet = !running.length && !working.length && !skipped.length && !finished.length;
   return (
     <Page>
@@ -273,7 +278,7 @@ export function ActivityPage() {
                     {running.map((run) => (
                       <RunningRun key={run.id} run={run} followups={byParent.get(run.id)} />))}
                     {working.map((run) => (
-                      <SettledRun key={run.id} run={run} followups={byParent.get(run.id)} />))}
+                      <SettledRun key={run.id} run={run} latest={newest.has(run.id)} followups={byParent.get(run.id)} />))}
                   </RunList>
                 : <Note tone="neutral">没有任务在跑。</Note>}
             </Section>
@@ -282,14 +287,14 @@ export function ActivityPage() {
             {skipped.length
               ? <Section title="本次未执行">
                   <RunList>{skipped.map((run) => (
-                    <SettledRun key={run.id} run={run} followups={byParent.get(run.id)} />))}</RunList>
+                    <SettledRun key={run.id} run={run} latest={newest.has(run.id)} followups={byParent.get(run.id)} />))}</RunList>
                 </Section>
               : null}
             {finished.length || hasEarlier
               ? <Section title="最近完成">
                   {finished.length
                     ? <RunList>{folds.map(({ run, runs }) => (
-                        <SettledRun key={run.id} run={run} runs={runs}
+                        <SettledRun key={run.id} run={run} runs={runs} latest={newest.has(run.id)}
                           followups={byParent.get(run.id)} />))}</RunList>
                     : null}
                   {more.error ? <Note tone="error">{errorMessage(more.error)}</Note> : null}

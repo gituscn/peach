@@ -3,9 +3,11 @@ import csv
 import importlib.util
 import io
 import json
+import os
 import sqlite3
 import tempfile
 import threading
+import time
 import unittest
 from collections import OrderedDict
 from contextlib import asynccontextmanager, closing
@@ -1102,6 +1104,35 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         # 单色透明的图标做成品牌色圆底白字，圆底那一圈就是存档站给的绿。
         red, green, blue, _alpha = Image.open(io.BytesIO(answer.content)).convert("RGBA").getpixel((64, 6))
         self.assertGreater(green, max(red, blue))
+
+    async def test_an_unreachable_site_is_not_asked_again_until_the_retry_window_passes(self):
+        """断网时资料页每枚外链都要试首页、manifest 和几个候选；失败一次就先记下，过了窗口再问。"""
+        from peach import follow_assets
+
+        asked = self._archive_links(lambda url: "red")
+        serving = self.app.state.http_transport.client
+
+        def offline(request):
+            asked.append(str(request.url))
+            raise httpx.ConnectError("offline", request=request)
+        self._swap_http_client(offline)
+
+        first = await self.client.get("/link-mark?t=secret&id=901")
+        self.assertEqual(first.status_code, 404)
+        self.assertTrue(asked)
+        reached = len(asked)
+        again = await self.client.get("/link-mark?t=secret&id=901")
+        self.assertEqual(again.status_code, 404)
+        self.assertEqual(len(asked), reached, "失败窗口内不再出网")
+
+        marker, = (self.root / "generated" / "link-marks").glob("*.failed")
+        past = time.time() - follow_assets.RETRY_SECONDS - 1
+        os.utime(marker, (past, past))
+        self.app.state.http_transport.client = serving
+        recovered = await self.client.get("/link-mark?t=secret&id=901")
+        self.assertEqual(recovered.status_code, 200)
+        self.assertGreater(len(asked), reached)
+        self.assertFalse(marker.exists())
 
     async def test_unauthorized_keeps_three_shapes_grouped_by_route_class(self):
         """401 三种形态按路由类分组，收敛到 Depends 之后也不许并成一种。
