@@ -52,6 +52,10 @@ describe('首次运行页', { skip: origin && media && dataRoot ? false : '只�
       await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), undefined, { timeout: 15_000 });
       const host = page.getByRole('radiogroup');
       assert.equal(await host.count(), 0, '局域网单选收在高级设置里，首屏不露出');
+      // 数据目录决定占用哪块磁盘，首屏就露出，并带选择文件夹的键。
+      // 落盘位置跟着服务进程的 PEACH_DATA_ROOT 走；不是临时 Peach 数据目录就不往下提交。
+      assert.equal(await page.locator('#f-data_root').inputValue(), dataRoot);
+      await page.getByRole('button', { name: '选择数据目录' }).waitFor({ state: 'visible' });
       assert.deepEqual((await layout(page)).offenders, []);
 
       // React Aria 的原生 input 是视觉隐藏的，点击落在外面那层画出来的开关上，所以按状态设值。
@@ -65,8 +69,6 @@ describe('首次运行页', { skip: origin && media && dataRoot ? false : '只�
       const port = page.locator('#f-port');
       await port.waitFor({ state: 'visible' });
       const defaultPort = await port.inputValue();
-      // 落盘位置跟着服务进程的 PEACH_DATA_ROOT 走；不是临时 Peach 数据目录就不往下提交。
-      assert.equal(await page.locator('#f-data_root').inputValue(), dataRoot);
       await port.fill('70000');
       // 折叠关上，验证出错时它自己展开。
       await page.getByText('高级设置', { exact: true }).click();

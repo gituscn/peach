@@ -60,6 +60,24 @@ export interface UninstallState {
   available: boolean; full_available: boolean; message: string; data_root: string; directories: string[];
 }
 
+/** 数据目录里的一类数据。`reclaimable` 是清理这一类能腾出的字节。 */
+export interface StorageCategory {
+  key: string; label: string; description: string; cleanable: boolean;
+  bytes: number; files: number; reclaimable: number;
+}
+
+export interface StorageRelocation { state: 'done' | 'error'; message: string; notes?: string[]; finished_at: number }
+
+export interface StorageState {
+  data_root: string;
+  free_bytes: number | null;
+  total_bytes: number | null;
+  system_drive: boolean;
+  usage: { measured_at: number; total_bytes: number; total_files: number; categories: StorageCategory[] } | null;
+  job: { state: 'idle' | 'measuring' | 'cleaning'; category?: string; message: string; error?: boolean };
+  relocation: { available: boolean; message: string; last: StorageRelocation | null };
+}
+
 export interface PeachProxyState { mode: string; proxy_saved: boolean; needs_selection: boolean }
 
 /** 一个能换镜像域名的外部入口站点。`host` 为空串就是没换过，走 `default_host`。 */
@@ -254,6 +272,7 @@ export interface ConfigurationData {
   ledger_read_only?: boolean;
   startup?: StartupState;
   uninstall?: UninstallState;
+  storage?: StorageState;
   peach_proxy?: PeachProxyState;
   entry_links?: EntryLinksState;
   push_discovery?: PushDiscoveryState;
