@@ -85,6 +85,23 @@ export function useSaveFollowSchedule() {
   });
 }
 
+/** 两个调度各自的「立即重跑」：服务端把下一轮提前到此刻，回来的状态已标成运行中。 */
+export const SCHEDULE_RUNS = {
+  follow: { url: `${FOLLOW_SCHEDULE_URL}/run`, key: FOLLOW_SCHEDULE_KEY },
+  feed: { url: `${FEED_SCHEDULE_URL}/run`, key: FEED_SCHEDULE_KEY },
+} as const;
+
+export function useRunSchedule(kind: keyof typeof SCHEDULE_RUNS) {
+  const { url, key } = SCHEDULE_RUNS[kind];
+  return useMutation({
+    mutationFn: () => apiSend<FollowScheduleStatus>(url, {}),
+    onSuccess: (status) => queryClient.setQueryData(key, status),
+  });
+}
+
+/** 调度正在跑时三秒重取一次，跑完就停，失败原因随之出现或消失。 */
+export const schedulePollInterval = (data: FollowScheduleStatus | undefined) => data?.running ? 3_000 : false;
+
 export function useSaveThumbnailMode() {
   return useMutation({
     mutationFn: (mode: string) => apiSend<ThumbnailJobStatus>(THUMBNAIL_JOBS_URL, { mode }),

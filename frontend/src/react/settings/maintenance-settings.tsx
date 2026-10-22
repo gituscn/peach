@@ -63,7 +63,7 @@ export function AutomaticUpdates({ initial, receipt }: { initial: AutomaticUpdat
       ? '下载完成后在这里确认重启安装。'
       : undefined;
   return (
-    <Section title="自动更新" onSubmit={submit}>
+    <Section id="automaticUpdates" title="自动更新" onSubmit={submit}>
       <Rows>
         <SettingsRow label="自动检查新版本">
           <Switch aria-label="自动检查新版本" isSelected={mode !== 'off'} isDisabled={!initial.available}

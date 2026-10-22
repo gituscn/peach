@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { appSettingsStore } from '../../src/appearance/settings';
 import { queryClient } from '../../src/react/query';
 import { FollowPreferenceRows, VideoThumbnailRow } from '../../src/react/settings/service-preferences';
-import { choose, click, mount, mountRoot, settle, type } from './render';
+import { buttonNamed, choose, click, mount, mountRoot, settle, type } from './render';
 
 notifyManager.setScheduler((notify) => notify());
 
@@ -22,12 +22,14 @@ function server() {
   };
   const posts: { url: string; body: Record<string, unknown> }[] = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-    const data = routes[url];
+    // 「立即重试」回来的是同一份调度状态，服务端已把它标成运行中。
+    const rerun = url.endsWith('/run');
+    const data = routes[rerun ? url.slice(0, -'/run'.length) : url];
     if (!data) throw new Error(`没有登记的地址：${url}`);
     if (init?.method === 'POST') {
       const body = JSON.parse(String(init.body));
       posts.push({ url, body });
-      Object.assign(data, body);
+      Object.assign(data, rerun ? { running: true, last_error: null } : body);
     }
     return { ok: true, status: 200, json: async () => ({ ...data }) };
   }));
@@ -75,6 +77,20 @@ it('订阅源拉取失败时写出原因；正在跑的一轮与关闭的调度�
   const quiet = await mountFollowRows();
   expect(quiet.querySelector('[role="alert"]')).toBeNull();
   expect(quiet.textContent).toContain('已关闭');
+});
+
+it.each([
+  ['follow', '/api/follow/schedule/run', '正在检查来源更新…'],
+  ['feed', '/api/feeds/schedule/run', '正在拉取订阅源…'],
+] as const)('%s 调度失败后立即重试走调度自己的重跑接口，跑起来后原因收起', async (kind, url, running) => {
+  const { posts, schedule, feedSchedule } = server();
+  Object.assign(kind === 'follow' ? schedule : feedSchedule, { last_error: '上游断了', consecutive_failures: 1 });
+  const host = await mountFollowRows();
+  await click(buttonNamed('立即重试', host.querySelector('[role="alert"]')!));
+  await settle();
+  expect(posts).toEqual([{ url, body: {} }]);
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(host.querySelector('[role="status"]')?.textContent).toContain(running);
 });
 
 it('首次采集范围写入服务端，头像和 favicon 使用固定刷新周期', async () => {

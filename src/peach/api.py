@@ -484,6 +484,8 @@ def create_app(
     app.state.jav_browser = jav_browser
     app.state.mount_reachability = mount_reachability
     app.state.network_reachability = network_reachability
+    from .background_issues import IssueLog
+    app.state.background_issues = IssueLog()
     app.state.stream_sessions = StreamSessionRegistry()
     from .strm_stream import StrmResources
     app.state.strm_resources = StrmResources()

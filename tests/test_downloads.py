@@ -241,6 +241,17 @@ class PollingTests(_Deployment):
         task = self.service.store.get(task_id)
         self.assertEqual((task.state, task.failure), (dl.FAILED, "rejected"))
 
+    def test_a_network_blip_reason_lasts_only_until_the_next_good_poll(self):
+        task_id = self.submit()["task"]["id"]
+        self.provider.statuses = [dl.DownloadError("network", "连不上"), dl.RemoteStatus(dl.MISSING)]
+        self.tick(10)
+        task = self.service.store.get(task_id)
+        self.assertEqual((task.state, task.failure, task.failure_detail), (dl.SUBMITTED, None, "连不上"))
+        # 远端列表里暂时没有、还在宽限期里：这一次查通了，上一次的连不上不再是现状。
+        self.tick(30)
+        task = self.service.store.get(task_id)
+        self.assertEqual((task.state, task.failure_detail), (dl.SUBMITTED, None))
+
     def test_a_block_seen_while_polling_also_blacklists(self):
         task_id = self.submit()["task"]["id"]
         self.provider.statuses = [dl.RemoteStatus(dl.ERROR, "r1", "", None, "50038")]

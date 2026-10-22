@@ -268,6 +268,14 @@ def q_feed_schedule(contract, _args) -> dict:
     return scheduler.status()
 
 
+def w_feed_schedule_run(contract, _body) -> dict:
+    """让订阅源定时拉取立刻跑一轮，结果照常记进调度状态。"""
+    scheduler = contract.feed_scheduler
+    if scheduler is None:
+        raise ValueError("订阅源拉取没有启用")
+    return scheduler.run_now()
+
+
 def q_feeds(contract, args) -> dict:
     """设置页「订阅源」小节的首屏。"""
     hidden = web_settings.hidden_compilations(contract.database)

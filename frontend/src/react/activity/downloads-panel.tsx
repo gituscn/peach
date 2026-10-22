@@ -71,7 +71,7 @@ export function DownloadsPanel() {
   const tasks = [...new Map(pages.flatMap((page) => page.tasks).map((task) => [task.id, task])).values()];
   if (!tasks.length && !query.error) return null;
   return (
-    <section aria-labelledby={id} className="flex min-w-0 flex-col gap-3">
+    <section id="cloudDownloads" aria-labelledby={id} className="flex min-w-0 flex-col gap-3">
       <h3 id={id} className="text-title-2-medium text-text-primary">云下载</h3>
       {query.error ? <Note tone="error">{errorMessage(query.error)}</Note> : null}
       {tasks.length

@@ -861,11 +861,11 @@ class DownloadService:
         return now - started > self.config.wait_hours * 3600.0
 
     def _reschedule(self, task: DownloadTask, now: float, detail: str | None = None) -> None:
+        """隔一段再查。`detail` 是这一次暂时性故障的原因；没带就是这一次查通了，旧原因作废。"""
         task.checks += 1
         task.updated_at = iso(now)
         task.next_check_at = iso(now + poll_delay(task.checks))
-        if detail is not None:
-            task.failure_detail = detail
+        task.failure_detail = detail
         self.store.save(task)
 
     def _follow_remote(self, task: DownloadTask, now: float) -> None:
