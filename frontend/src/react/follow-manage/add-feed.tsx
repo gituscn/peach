@@ -121,11 +121,11 @@ export function AddFeed({ readOnly, toast, onAdded }: AddFeedProps) {
             <Help role="status">{picked.size ? where!.text : '勾选她的演员卡；有碼与無碼两条记录都是她的话，两张都勾。'}</Help>
           ) : null}
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="small" onClick={close}>关闭</Button>
             {result.candidates.length ? (
               <Button variant="primary" size="small" disabled={readOnly || !picked.size || where!.blocked}
                 {...busyProps(action.busy === 'follow')} onClick={add}>{`添加订阅（${picked.size}）`}</Button>
             ) : null}
-            <Button variant="secondary" size="small" onClick={close}>关闭</Button>
           </div>
         </div>
       ) : null}

@@ -102,10 +102,10 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
       {state?.stalled && !problem ? <p className="text-caption-1-regular">当前步骤耗时较长，正在等待进展</p> : null}
     </div></div></CollapseRegion>
     <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
-      {active ? <ProcessingControls state={state!} disabled={!!problem} /> : null}
       <LinkButton href="/data-cleanup#libraryProcessing" variant="secondary" size="small" trailingIcon={RiArrowRightLine}>
-        {problem || failed ? '查看并处理' : '任务详情'}
+        {problem || failed ? '打开扫描与采集' : '任务详情'}
       </LinkButton>
+      {active ? <ProcessingControls state={state!} disabled={!!problem} /> : null}
     </div>
   </aside>;
 }

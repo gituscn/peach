@@ -529,11 +529,11 @@ export function SourceList(props: SourceListProps) {
           </span>
         </span>
         <div data-follow-toolbar-actions="" data-toolbar-actions="">
+        {failedSourceIds.length ? <Button variant="secondary" disabled={readOnly}
+          {...busyProps(rowHandlers.busy)} onClick={() => startChecking(failedSourceIds)}>检查失败项</Button> : null}
         <Button variant="primary" leadingIcon={RiRefreshLine} disabled={readOnly}
           aria-label="检查全部" iconOnly={compact}
           {...busyProps(rowHandlers.busy)} onClick={() => startChecking([])}>检查全部</Button>
-        {failedSourceIds.length ? <Button variant="secondary" disabled={readOnly}
-          {...busyProps(rowHandlers.busy)} onClick={() => startChecking(failedSourceIds)}>检查失败项</Button> : null}
         <span data-follow-toolbar-controls="" className="contents">
           <span data-button-group role="group" aria-label="关注列表版式">
             <Button variant="ghost" iconOnly

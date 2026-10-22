@@ -27,6 +27,7 @@ export { confirmModal, formModal } from './modal';
 export {
   isCurrentPostSetupTutorialRequest, nextPostSetupTutorialRequest, POST_SETUP_TUTORIAL_COLLAPSED_KEY,
   POST_SETUP_TUTORIAL_KEY, POST_SETUP_TUTORIAL_SKIPPED_KEY, postSetupTutorialCollapsed, postSetupTutorialMarker,
-  postSetupTutorialSignature, postSetupTutorialSkipped, resetPostSetupTutorialState, setPostSetupTutorialCollapsed,
+  postSetupTutorialErrorHtml, postSetupTutorialSignature, postSetupTutorialSkipped, resetPostSetupTutorialState,
+  setPostSetupTutorialCollapsed,
   setPostSetupTutorialMarker, setPostSetupTutorialSkipped,
 } from '../onboarding/post-setup-tutorial';

@@ -328,7 +328,7 @@ export function ReviewPage(props: ReviewProps) {
           )) : review.isError && !review.data ? (
             /* 读不到队列和队列是空的不是一回事：说清楚是读取失败，给一颗重试键。 */
             <Note tone="error" title="复核队列读取失败" action={
-              <Button variant="secondary" size="small" disabled={review.isFetching} onClick={() => void review.refetch()}>重试</Button>
+              <Button variant="secondary" size="small" disabled={review.isFetching} onClick={() => void review.refetch()}>立即重试</Button>
             }>
               {errorMessage(review.error)}
             </Note>

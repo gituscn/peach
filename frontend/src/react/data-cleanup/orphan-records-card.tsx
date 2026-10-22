@@ -59,6 +59,7 @@ function OrphanActions({ item, toast }: { item: OrphanRecord; toast(message: str
   const busy = attach.isPending || purge.isPending;
   return (
     <span className="flex min-w-0 flex-wrap items-center gap-2">
+        <Button variant="danger" size="small" {...busyProps(busy)} onClick={remove}>删除记录</Button>
         {item.candidates.length
           ? <Select aria-label={`选择接收 ${item.name} 个人记录的文件`} className="w-52" selectedKey={target}
               onSelectionChange={(key) => { if (key !== null) setTarget(Number(key)) }}>
@@ -70,10 +71,9 @@ function OrphanActions({ item, toast }: { item: OrphanRecord; toast(message: str
             </Select>
           : null}
         {item.candidates.length
-          ? <Button size="small" disabled={target === null} {...busyProps(busy)}
+          ? <Button variant="primary" size="small" disabled={target === null} {...busyProps(busy)}
               onClick={() => attach.mutate()}>转移记录</Button>
           : null}
-        <Button variant="danger" size="small" {...busyProps(busy)} onClick={remove}>删除记录</Button>
     </span>
   );
 }

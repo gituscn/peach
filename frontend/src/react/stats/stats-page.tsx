@@ -17,7 +17,8 @@ import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 import { fmtSize, LOC } from '@peach/legacy/core';
 import { MEDIA_SOURCE_ICONS } from '@peach/legacy/ui';
 
-import { Button, ButtonLink } from '@/components/base/buttons/button';
+import { settingsPath } from '@peach/history';
+import { ButtonLink } from '@/components/base/buttons/button';
 
 import { errorMessage } from '../../api';
 import type { StatsProps } from '../bundle';
@@ -40,6 +41,9 @@ import {
   reachedShare, replayRows, STATS_KEY, watchedShare, watchNote,
   type Attribution, type Count, type RecentPlay, type StatsData, type StorageVolume, type TagSource, type TopTag,
 } from './stats';
+
+/** 空馆藏与没有存储来源时「添加媒体」去的那一栏设置。 */
+const MEDIA_SETTINGS = settingsPath('媒体库与入库');
 
 /** 收起时露这么多条排行。三十条一次铺开会把下面两个面板整个顶到屏外。 */
 const RANKING_PREVIEW = 10;
@@ -119,14 +123,14 @@ function Detail({ headline, children }: { headline: ReactNode; children: ReactNo
   );
 }
 
-function InventoryDetail({ data, openMediaSettings }: { data: StatsData } & StatsProps) {
+function InventoryDetail({ data }: { data: StatsData } & StatsProps) {
   const videos = data.by_loc.reduce((sum, row) => sum + row.videos, 0);
   if (!videos) {
     return (
       <EmptyState icon={RiVideoLine} title="还没有视频" actions={
         <>
-          <Button size="small" onClick={openMediaSettings}>添加媒体</Button>
           <ButtonLink variant="secondary" href="/subscriptions?tab=add" size="small">添加关注</ButtonLink>
+          <ButtonLink variant="primary" href={MEDIA_SETTINGS} size="small">添加媒体</ButtonLink>
         </>
       }>{NO_VIDEO_HINT}</EmptyState>
     );
@@ -205,11 +209,11 @@ function VolumeRow({ volume }: { volume: StorageVolume }) {
   );
 }
 
-function StorageDetail({ volumes, openMediaSettings }: { volumes: StorageVolume[] } & StatsProps) {
+function StorageDetail({ volumes }: { volumes: StorageVolume[] } & StatsProps) {
   if (!volumes.length) {
     return (
       <EmptyState icon={RiHardDrive2Line} title="还没有存储来源" actions={
-        <Button size="small" onClick={openMediaSettings}>添加媒体</Button>
+        <ButtonLink variant="primary" href={MEDIA_SETTINGS} size="small">添加媒体</ButtonLink>
       }>{NO_VOLUME_HINT}</EmptyState>
     );
   }

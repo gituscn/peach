@@ -392,7 +392,7 @@ function PikPakAccount({ state, settle, receipt, username, setUsername }: CardPr
     </>
   );
   const passwordLogin = (
-    <Button type="submit" disabled={!state.available || waiting} {...busyProps(action.busy === 'login')}>登录</Button>
+    <Button type="submit" variant="primary" disabled={!state.available || waiting} {...busyProps(action.busy === 'login')}>登录</Button>
   );
   const outcomeFailed = browser.state === 'timeout' || browser.state === 'failed';
 
@@ -420,12 +420,12 @@ function PikPakAccount({ state, settle, receipt, username, setUsername }: CardPr
         ? <LoadingDots label={browser.message || '等你在浏览器窗口里登录 PikPak'} /> : null}>
         {account.logged_in ? (
           <Button variant="secondary" onClick={logout} disabled={!state.available} {...busyProps(action.busy === 'logout')}>登出</Button>
-        ) : <>{passwordLogin}{!browser.available ? null : waiting ? (
+        ) : <>{!browser.available ? null : waiting ? (
           <Button variant="secondary" type="button" onClick={cancelBrowser} {...busyProps(action.busy === 'cancel')}>取消</Button>
         ) : (
-          <Button type="button" onClick={openBrowser} disabled={!state.available}
+          <Button variant="secondary" type="button" onClick={openBrowser} disabled={!state.available}
             {...busyProps(action.busy === 'browser')}>用浏览器登录</Button>
-        )}</>}
+        )}{passwordLogin}</>}
       </Footer>
     </Section>
   );

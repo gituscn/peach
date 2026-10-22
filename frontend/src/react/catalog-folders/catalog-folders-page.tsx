@@ -102,7 +102,7 @@ export function CatalogFolders({ treeTarget, headerTarget, enabled = true }: {
         {data?.selected ? <IconButton aria-label="设置目录用途" icon={RiFolderSettingsLine} size="small"
           onClick={() => setEditing(true)} /> : null}
       </div>
-      {query.error && !drawer ? <Note tone="error" action={<Button variant="secondary" size="small" onClick={() => { void query.refetch() }}>重试</Button>}>{errorMessage(query.error)}</Note> : null}
+      {query.error && !drawer ? <Note tone="error" action={<Button variant="secondary" size="small" onClick={() => { void query.refetch() }}>立即重试</Button>}>{errorMessage(query.error)}</Note> : null}
       {data?.conflicts?.length ? <Note tone="warning" action={<Button variant="secondary" size="small" onClick={() => setEditing(true)}>查看归属冲突</Button>}>{data.conflicts.length} 项保留现有归属</Note> : null}
       {data?.selected ? <div className="folder-scope-row">
         <Checkbox size="sm" isSelected={params.get('folder_recursive') !== '0'}
@@ -168,7 +168,7 @@ function FolderTree({ scope, selected, current, go, reportedError }: {
   return <section aria-label="文件夹导航" className="catalog-folder-navigation flex min-h-0 min-w-0 flex-col gap-3">
     <Input aria-label="查找文件夹" placeholder="查找文件夹" leadingIcon={RiSearchLine} value={search}
       onChange={setSearch} size="small" />
-    {failed ? <Note tone="error" action={<Button variant="secondary" size="small" onClick={() => { void roots.refetch(); branches.forEach(branch => { if (branch.error) void branch.refetch() }) }}>重试</Button>}>{errorMessage(failed)}</Note> : null}
+    {failed ? <Note tone="error" action={<Button variant="secondary" size="small" onClick={() => { void roots.refetch(); branches.forEach(branch => { if (branch.error) void branch.refetch() }) }}>立即重试</Button>}>{errorMessage(failed)}</Note> : null}
     <div className="folder-tree-frame relative flex min-h-0 flex-col overflow-hidden rounded-3xl"><div ref={scroll} className="folder-tree-scroller">
       {roots.error ? null : roots.isPending ? <div data-skeleton="" aria-busy="true" aria-label="正在读取目录树" className="flex flex-col gap-2">{Array.from({ length: 8 }, (_, i) => <div key={i} className="flex h-8 items-center gap-2 px-3"><span className="skeleton-sheen size-4" /><span className="skeleton-sheen h-4 flex-1" /></div>)}</div>
         : deferredSearch ? <div className="flex flex-col gap-1">{searchQuery.isPending ? <div data-skeleton="" aria-busy="true" className="h-8 skeleton-sheen" aria-label="正在查找文件夹" />

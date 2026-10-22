@@ -221,7 +221,7 @@ export function IndexPage(props: IndexProps) {
     if (result.isError) {
       return (
         <EmptyState icon={spriteGlyph('alert')} title={`没能读取${title}`}
-          actions={<Button variant="secondary" onClick={() => void result.refetch()}>重试</Button>}>
+          actions={<Button variant="secondary" onClick={() => void result.refetch()}>立即重试</Button>}>
           {requestErrorMessage(result.error)}
         </EmptyState>
       );

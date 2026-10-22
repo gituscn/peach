@@ -11,7 +11,7 @@ import { RiFilter3Line, RiSearchLine } from '@remixicon/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Dialog, Popover } from 'react-aria-components';
 
-import { Button } from '@/components/base/buttons/button';
+import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import {
   MENU_ITEM, MENU_ITEM_INTERACTIVE, MENU_POPOVER_SURFACE,
@@ -46,9 +46,10 @@ export interface AddSourceProps {
   credentials: CredentialData;
   readOnly: boolean;
   toast(message: string): void;
-  /** 去凭据那一栏配这个站。候选里的「需要配置凭据」按下去就是换页签。 */
-  openCredentials(): void;
 }
+
+/** 凭据配在「来源与订阅」设置里；候选行的凭据链接指到那里。 */
+const CREDENTIALS_PATH = '/settings/subscriptions';
 
 /** 候选的身份是它的地址：同一次查找里同一个地址只会出现一次。 */
 const candidateKey = (row: number, candidate: ResolveCandidate) => `${row}:${candidate.url}`;
@@ -116,10 +117,10 @@ function SuggestMenu(
 /** 来源筛选：列出全部可关注的站，默认全选。取消勾选的站，其查找结果行不显示、也不进
  *  「添加选中」。 */
 function SourceFilter(
-  { credentials, hidden, onHidden, openCredentials }:
+  { credentials, hidden, onHidden }:
   {
     credentials: CredentialData; hidden: ReadonlySet<string>;
-    onHidden(next: Set<string>): void; openCredentials(): void;
+    onHidden(next: Set<string>): void;
   },
 ) {
   const trigger = useRef<HTMLButtonElement>(null);
@@ -160,8 +161,8 @@ function SourceFilter(
                   </span>
                 </Checkbox>
                 {needsCredential ? (
-                  <Button variant="ghost" size="xs" className="ml-auto"
-                    onClick={() => { setOpen(false); openCredentials() }}>需要配置凭据</Button>
+                  <ButtonLink variant="ghost" size="xs" className="ml-auto" href={CREDENTIALS_PATH}
+                    onClick={() => setOpen(false)}>打开凭据设置</ButtonLink>
                 ) : null}
               </div>
             );
@@ -219,7 +220,7 @@ function PickRow(
   );
 }
 
-export function AddSource({ data, credentials, readOnly, toast, openCredentials }: AddSourceProps) {
+export function AddSource({ data, credentials, readOnly, toast }: AddSourceProps) {
   const [line, setLine] = useState('');
   const [composing, setComposing] = useState(false);
   /** 这一趟查的是什么。等待提示使用已提交的词，输入框可继续编辑并保留重试内容。 */
@@ -371,8 +372,7 @@ export function AddSource({ data, credentials, readOnly, toast, openCredentials 
               busy={suggesting} onPick={search} onClose={closeMenu} />
           ) : null}
         </div>
-        <SourceFilter credentials={credentials} hidden={hidden} onHidden={setHidden}
-          openCredentials={openCredentials} />
+        <SourceFilter credentials={credentials} hidden={hidden} onHidden={setHidden} />
         <Button variant="primary" disabled={readOnly || !line.trim()}
           {...busyProps(running || resolve.isPending)} onClick={() => search(line)}>查找</Button>
       </div>
@@ -396,11 +396,11 @@ export function AddSource({ data, credentials, readOnly, toast, openCredentials 
               }} />
           ))}
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="small"
+              onClick={() => dismiss()}>关闭</Button>
             <Button variant="primary" size="small" disabled={readOnly || !picked.length}
               {...busyProps(register.isPending)}
               onClick={() => register.mutate(picked)}>{`添加选中（${picked.length}）`}</Button>
-            <Button variant="secondary" size="small"
-              onClick={() => dismiss()}>关闭</Button>
             {register.isPending ? (
               <span role="status" className="text-body-2-regular text-text-secondary">
                 {`添加中… ${added}/${picked.length}`}

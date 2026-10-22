@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { queryClient } from '../../src/react/query';
 import { DiagnosticsPage } from '../../src/react/diagnostics/diagnostics-page';
 import { DIAGNOSTICS_KEY, type DiagnosticReport } from '../../src/react/diagnostics/diagnostics';
-import { buttonNamed, click, fetchMock, mount, settle } from './render';
+import { buttonNamed, click, fetchMock, linkNamed, mount, settle } from './render';
 
 notifyManager.setScheduler(notify => notify());
 afterEach(() => queryClient.clear());
@@ -20,18 +20,18 @@ const data = (): DiagnosticReport => ({ version: 'test', status: 'warning', chec
 } }, sources: [{ source: 'javdb', label: 'javdb', status: 'unknown', reason: '当前解析状态未取得', last_success_at: null, cooldown_until: null }] });
 async function open(report = data()) {
   queryClient.setQueryData(DIAGNOSTICS_KEY, report);
-  const props = { navigate: vi.fn(), configure: vi.fn(), openItem: vi.fn(), receipt: vi.fn() };
+  const props = { openItem: vi.fn(), receipt: vi.fn() };
   const host = await mount(<QueryClientProvider client={queryClient}><DiagnosticsPage {...props} /></QueryClientProvider>);
   return { host, props };
 }
 it('诊断跳到具体配置分栏，系统权限项只显示动作', async () => {
-  const { host, props } = await open();
-  await click(buttonNamed('打开媒体库与入库', host));
-  await click(buttonNamed('打开网络与访问', host));
-  expect(props.configure.mock.calls).toEqual([['媒体库与入库'], ['网络与访问']]);
+  const { host } = await open();
+  expect(linkNamed('打开媒体库与入库', host)?.getAttribute('href')).toBe('/settings/library');
+  expect(linkNamed('打开网络与访问', host)?.getAttribute('href')).toBe('/settings/network');
+  expect(buttonNamed('打开媒体库与入库', host)).toBeNull();
   const root = [...host.querySelectorAll('h3')].find(node => node.textContent === '数据目录')!.parentElement!.parentElement!;
   expect(root.textContent).toContain('调整权限');
-  expect(root.querySelector('button')).toBeNull();
+  expect(root.querySelector('button, a')).toBeNull();
   expect(host.textContent).toContain('当前解析状态未取得');
 });
 it('展开作品表格并复制可识别信息；零结果有独立空态', async () => {
@@ -51,7 +51,7 @@ it('展开作品表格并复制可识别信息；零结果有独立空态', asyn
 });
 it('请求失败保留原因和重试入口', async () => {
   vi.stubGlobal('fetch', fetchMock(403, { detail: '请在运行 Peach 的电脑上打开系统诊断' }));
-  const props = { navigate: vi.fn(), configure: vi.fn(), openItem: vi.fn(), receipt: vi.fn() };
+  const props = { openItem: vi.fn(), receipt: vi.fn() };
   const host = await mount(<QueryClientProvider client={queryClient}><DiagnosticsPage {...props} /></QueryClientProvider>);
   await settle();
   expect(host.textContent).toContain('诊断读取失败');
@@ -79,11 +79,11 @@ it('恢复动作的名称与实际目标一致', async () => {
   report.checks.security.target = '/settings/network';
   report.checks.ffmpeg = { label: '媒体工具', status: 'warning', reason: '缺少 FFmpeg', action: '安装工具', target: '/settings/maintenance', details: {} };
   report.checks.tasks = { label: '后台任务', status: 'warning', reason: '有任务失败', action: '查看原因', target: '/tasks', details: {} };
-  const { host, props } = await open(report);
-  await click(buttonNamed('打开网络与访问', host));
-  await click(buttonNamed('打开维护与更新', host));
-  await click(buttonNamed('查看任务', host));
-  expect(props.navigate.mock.calls).toEqual([['/settings/network'], ['/settings/maintenance'], ['/tasks']]);
+  const { host } = await open(report);
+  expect(linkNamed('打开网络与访问', host)?.getAttribute('href')).toBe('/settings/network');
+  expect(linkNamed('打开应用与维护', host)?.getAttribute('href')).toBe('/settings/maintenance');
+  expect(linkNamed('查看任务', host)?.getAttribute('href')).toBe('/tasks');
+  expect(linkNamed('打开来源和凭证', host)?.getAttribute('href')).toBe('/sources');
 });
 
 it('诊断报告下载成功生成文件；失败原因保留在入口旁', async () => {

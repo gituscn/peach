@@ -16,7 +16,7 @@ import { LibraryProcessingCard } from '../../src/react/library-processing/librar
 import { LibraryProcessingNotice } from '../../src/react/library-processing/library-processing-notice';
 import type { LibraryProcessingProps } from '../../src/react/bundle';
 
-import { buttonNamed as textButtonNamed, click, mount, mountRoot, submit } from './render';
+import { actionOrder, buttonNamed as textButtonNamed, click, mount, mountRoot, submit } from './render';
 
 const buttonNamed = (name: string, root: ParentNode = document) =>
   [...root.querySelectorAll('button')].find(button => button.getAttribute('aria-label') === name)
@@ -434,6 +434,10 @@ it('暂停与继续使用同一个任务号，暂停不是完成，暂停时仍�
   });
   const host = await mount(notice({ toast, onComplete, mode: 'notice' }));
   expect(host.textContent).toContain('预计剩余约 20–40 分钟（粗估）');
+  // 去任务详情的链接在左，暂停这类原地控制在右。
+  const bar = actionOrder(host.querySelector('a[href="/data-cleanup#libraryProcessing"]')!.parentElement);
+  expect(bar[0]).toBe('任务详情');
+  expect(bar.indexOf('暂停')).toBeGreaterThan(0);
   await click(buttonNamed('暂停', host));
   expect(host.textContent).toContain('正在暂停，当前步骤结束后暂停');
   state = { ...state, status: 'paused' };

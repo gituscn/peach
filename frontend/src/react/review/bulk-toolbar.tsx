@@ -86,10 +86,10 @@ export function BulkToolbar(props: BulkToolbarProps) {
               {sources.map((source) => <SelectItem key={source} id={source}>{source}</SelectItem>)}
             </Select>
           ) : null}
-          <Button variant="primary" size="small" disabled={busy || !selected.size || !approvable}
-            onClick={() => onRun('approved')}>通过所选</Button>
           <Button variant="danger" size="small" disabled={busy || !selected.size}
             onClick={() => onRun('rejected')}>拒绝所选</Button>
+          <Button variant="primary" size="small" disabled={busy || !selected.size || !approvable}
+            onClick={() => onRun('approved')}>通过所选</Button>
           <Button variant="ghost" size="small" disabled={busy}
             onClick={() => onSelected(new Set())}>取消选择</Button>
           {feedback

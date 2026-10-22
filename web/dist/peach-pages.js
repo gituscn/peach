@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "39f747ac-f39b-4523-a31c-93f5a2536310", e._sentryDebugIdIdentifier = "sentry-dbid-39f747ac-f39b-4523-a31c-93f5a2536310");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "561b1e10-0b5f-4162-bd1b-8cbad11f6521", e._sentryDebugIdIdentifier = "sentry-dbid-561b1e10-0b5f-4162-bd1b-8cbad11f6521");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, i, o, s) => {
@@ -21481,7 +21481,7 @@ function Ug() {
 					onClick: () => {
 						t({ kind: "loading" }), r((e) => e + 1);
 					},
-					children: "重试"
+					children: "立即重试"
 				}),
 				children: e.message
 			}) : null,
@@ -21515,4 +21515,4 @@ var Gg = document.getElementById("peach-page"), Kg = Gg ? Wg[Gg.dataset.page ?? 
 Gg && Kg && (0, w.createRoot)(Gg).render(/* @__PURE__ */ (0, B.jsx)(Kg, { data: { ...Gg.dataset } }));
 //#endregion
 
-//# debugId=39f747ac-f39b-4523-a31c-93f5a2536310
+//# debugId=561b1e10-0b5f-4162-bd1b-8cbad11f6521

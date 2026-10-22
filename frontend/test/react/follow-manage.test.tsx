@@ -22,7 +22,7 @@ import {
 import { FollowManagePage } from '../../src/react/follow-manage/follow-manage-page';
 import { Credentials } from '../../src/react/follow-manage/credentials';
 
-import { buttonNamed, choose, click, mountRoot, settle, type } from './render';
+import { actionOrder, buttonNamed, choose, click, linkNamed, mountRoot, settle, type } from './render';
 
 // 客户端是模块级的单例（所有 React 根共用一个），用例之间不清就互相喂数据。
 afterEach(() => queryClient.clear());
@@ -145,6 +145,7 @@ it('只检查已启用的失败来源，并随清单隐藏入口', async () => {
   const data = follow({ sources: [source({ id: 1 }), source({ id: 2, last_status: 'error' }),
     source({ id: 3, last_status: 'unauthorized' }), source({ id: 4, enabled: false, last_status: 'error' })] });
   const { host, fetcher } = await open({ data });
+  expect(actionOrder(host.querySelector('[data-follow-toolbar-actions]')).slice(0, 2)).toEqual(['检查失败项', '检查全部']);
   await click(buttonNamed('检查失败项', host)!);
   const request = fetcher.mock.calls.find(([url, init]) => url === FOLLOW_CHECK_URL && init?.method);
   expect(JSON.parse(String(request?.[1]?.body)).sources).toEqual([2, 3]);
@@ -162,7 +163,6 @@ const shellProps = (over: Partial<Props> = {}): Props => ({
   savePreference: vi.fn(),
   toast: vi.fn(),
   openFollow: vi.fn(),
-  openServiceConfiguration: vi.fn(),
   readOnly: false, readOnlyMessage: '', writerUrl: '',
   ...over,
 });
@@ -713,7 +713,7 @@ it('各栏按做事的先后排，缺凭据的数挂在最后一栏上', async (
   const { host } = await open({ creds: { root: 'C:\\creds', providers: [credential({ provider: 'fanbox' })] } });
   expect([...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent))
     .toEqual(['关注列表', '添加关注', 'JAV 订阅源']);
-  expect(buttonNamed('来源与订阅设置（1）', host)).not.toBeNull();
+  expect(linkNamed('来源与订阅设置（1）', host)?.getAttribute('href')).toBe('/settings/subscriptions');
 });
 
 const FEEDS: FeedsData = {
@@ -1008,6 +1008,7 @@ it('按名字查找列出每张演员卡，同一个人的两张先勾上；说�
 
   await click(boxNamed(host, '無碼'));
   expect(buttonNamed('添加订阅（1）', host)).not.toBeNull();
+  expect(actionOrder(buttonNamed('添加订阅（1）', host)!.parentElement)).toEqual(['关闭', '添加订阅（1）']);
   await click(buttonNamed('添加订阅（1）', host));
   await settle();
   expect(feedWrite).toHaveBeenCalledWith({ action: 'follow-name', name: '瀬戸環奈', ids: ['Kn01'] });
@@ -1288,14 +1289,15 @@ it('来源筛选按钮写着筛到哪几个站，筛掉的站既不显示也不�
   await click(buttonNamed('全选'));
   expect(buttonLabelled(host, '全部来源')).not.toBeNull();
   expect(buttonNamed('添加选中（2）', host)).not.toBeNull();
+  expect(actionOrder(buttonNamed('添加选中（2）', host)!.parentElement)).toEqual(['关闭', '添加选中（2）']);
 });
 
-it('筛选里撞见缺凭据的站，一步跳到凭据那一栏', async () => {
+it('筛选里撞见缺凭据的站，凭据入口是指到来源与订阅设置的链接', async () => {
   const creds = { root: 'C:\\creds', providers: [credential({ provider: 'fanbox', provider_label: 'Fanbox' })] };
-  const { host, props } = await open({ creds }, { tab: 'add' });
+  const { host } = await open({ creds }, { tab: 'add' });
   await click(buttonLabelled(host, '全部来源'));
-  await click(buttonNamed('需要配置凭据'));
-  expect(props.openServiceConfiguration).toHaveBeenCalledOnce();
+  expect(buttonNamed('打开凭据设置')).toBeNull();
+  expect(linkNamed('打开凭据设置')?.getAttribute('href')).toBe('/settings/subscriptions');
 });
 
 it('「猜你喜欢」点一下就拿那个名字去查', async () => {
@@ -1534,6 +1536,7 @@ it('凭据填在页面上，保存后输入框清空，空着点保存会被拦�
   // 已经配好的那一行才给「清除」。
   expect(buttonNamed('清除', fanbox)).toBeNull();
   expect(buttonNamed('清除', credentialRow(host, 'Patreon'))).not.toBeNull();
+  expect(actionOrder(buttonNamed('清除', credentialRow(host, 'Patreon'))!.parentElement)).toEqual(['清除', '保存配置']);
 });
 
 it('凭据文件路径可展开，权限过宽警告在凭据收起时可见', async () => {

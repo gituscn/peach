@@ -150,10 +150,10 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         onClick={() => updateMetadata('retry')}>重新读取资料</Button>}>{metadata.message || `作品资料 ${metadata.completed} / ${metadata.total} 部`}</Note> : null}
     {metadataAction.error ? <Note tone="error">{metadataAction.error}</Note> : null}
     {!waiting && !discoveries.error && !items.length ? <EmptyState icon={RiCompassLine} title={query || tag ? '没有符合条件的推荐' : '暂无匹配口味的作品'}
-      actions={<>{query || tag ? <Button size="small" onClick={() => { clearText(); changeTag(''); writeJavQuery({ q: '', tag: '' }) }}>清除筛选</Button>
-        : scope === 'library' ? <ButtonLink size="small" href="/">浏览馆藏</ButtonLink>
-        : <Button size="small" onClick={() => resource({})}>查找作品</Button>}
-        <ButtonLink size="small" href="/taste" variant="secondary">查看口味</ButtonLink></>}>
+      actions={<><ButtonLink size="small" href="/taste" variant="secondary">查看口味</ButtonLink>
+        {query || tag ? <Button variant="primary" size="small" onClick={() => { clearText(); changeTag(''); writeJavQuery({ q: '', tag: '' }) }}>清除筛选</Button>
+        : scope === 'library' ? <ButtonLink variant="primary" size="small" href="/">浏览馆藏</ButtonLink>
+        : <Button variant="primary" size="small" onClick={() => resource({})}>查找作品</Button>}</>}>
       {query || tag ? '清除筛选后查看其他作品。' : scope === 'library' ? '观看或标记作品后，可以探索少看的馆藏。' : '可以查找番号，或更新关注来源。'}
     </EmptyState> : null}
     {action.error ? <Note tone="error">{action.error}</Note> : null}
@@ -195,13 +195,13 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
           </div>
         </div>
         <div data-jav-actions="" className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => resource({ ...item, cover: item.has_cover ? coverUrl(item, true) : item.cover_url, origin: `${item.asset_id ? 'asset' : 'feed'}:${item.id}` })}>查找资源</Button>
+          {item.link ? <ButtonLink data-button-link="" variant="secondary" trailingIcon={RiExternalLinkLine} href={item.link} target="_blank" rel="noopener noreferrer">作品来源</ButtonLink> : null}
           <Button variant="ghost" disabled={readOnly || item.wanted || !!item.asset_id} {...busyProps(action.busy === String(item.id))} onClick={() => {
             void action.run(String(item.id), signal => addWant({ code: item.code }, signal), () => {
               receipt('已加入想要'); void invalidateWants(); void discoveries.refetch();
             });
           }}>{item.asset_id ? '已入库' : item.wanted ? '已加入想要' : '想要'}</Button>
-          {item.link ? <ButtonLink data-button-link="" variant="secondary" trailingIcon={RiExternalLinkLine} href={item.link} target="_blank" rel="noopener noreferrer">作品来源</ButtonLink> : null}
+          <Button variant="secondary" onClick={() => resource({ ...item, cover: item.has_cover ? coverUrl(item, true) : item.cover_url, origin: `${item.asset_id ? 'asset' : 'feed'}:${item.id}` })}>查找资源</Button>
         </div>
       </article>})}
     </div>
