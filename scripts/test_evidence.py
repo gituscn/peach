@@ -38,6 +38,7 @@ def digest(value: object) -> str:
 
 
 _STATE = re.compile(r"[0-9a-f]{64}")
+VALID_SECONDS = 86400
 
 
 def manifest(root: Path) -> dict:
@@ -218,6 +219,27 @@ def baselines(root: Path, current: dict, *, partial: bool = False):
         yield record, changed, version_only
 
 
+def prune_expired(folder: Path, now: float | None = None) -> int:
+    """清退过期的记录、持锁说明和写到一半的临时文件，返回删掉的个数。
+
+    判据是文件修改时间超过有效期。记录里的每个时间戳都不晚于写盘时刻，所以这样的记录已经
+    没有可复用的域或文件结果，失败记录的 `failed_scopes` 也照样保留满一个有效期。
+    `<state>.lock` 不在此列：POSIX 加锁不刷新修改时间，删掉一把正被持有的旧锁会破坏互斥。
+    """
+    now = time.time() if now is None else now
+    removed = 0
+    for path in folder.glob("*"):
+        if path.suffix not in {".json", ".tmp"} or not _STATE.fullmatch(path.name.partition(".")[0]):
+            continue
+        try:
+            if path.is_file() and now - path.stat().st_mtime >= VALID_SECONDS:
+                path.unlink()
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
 def read(root: Path, state: str) -> dict:
     try:
         record = json.loads((evidence_dir(root) / f"{state}.json").read_text(encoding="utf-8"))
@@ -225,9 +247,9 @@ def read(root: Path, state: str) -> dict:
             return {}
         if record.get("state") == state:
             record["passed"] = [scope for scope, stamp in record["validated"].items()
-                                if isinstance(stamp, (float, int)) and 0 <= time.time() - stamp < 86400]
+                                if isinstance(stamp, (float, int)) and 0 <= time.time() - stamp < VALID_SECONDS]
             record["coverage"] = {name: stamp for name, stamp in record.get("coverage", {}).items()
-                                  if isinstance(stamp, (float, int)) and 0 <= time.time() - stamp < 86400}
+                                  if isinstance(stamp, (float, int)) and 0 <= time.time() - stamp < VALID_SECONDS}
             return record
     except (OSError, ValueError, KeyError, TypeError):
         pass
@@ -267,6 +289,7 @@ def write(root: Path, state: str, scopes: tuple[str, ...], *, success: bool,
     temporary = folder / f"{state}.{os.getpid()}.tmp"
     temporary.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
     temporary.replace(folder / f"{state}.json")
+    prune_expired(folder)
 
 
 def holder_path(lock_path: Path) -> Path:

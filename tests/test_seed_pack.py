@@ -81,7 +81,9 @@ PROFILE = {"kana": "あまかわそら", "birth_date": "1998-10-10", "height_cm"
 
 class SeedPackCase(unittest.TestCase):
     def setUp(self):
-        self.root = Path(tempfile.mkdtemp(prefix="peach-seed-"))
+        # 目录先登记回收：清理按后进先出执行，两个连接关掉之后才删目录。
+        self.root = Path(self.enterContext(
+            tempfile.TemporaryDirectory(prefix="peach-seed-", ignore_cleanup_errors=True)))
         self.source = connect(fresh_ledger(self.root, "source.db"))
         self.target = connect(fresh_ledger(self.root, "target.db"))
         self.addCleanup(self.source.close)
