@@ -57,7 +57,7 @@
 
 两项均通过公开 DSN 发送到 Sentry 托管服务，接收服务会接触连接 IP。客户端不发送 IP 字段、用户身份、设备标识、观看记录、媒体信息、凭据、完整日志或诊断 ZIP。SDK 发送队列不落盘，本机聚合文件仅存技术投影和次数；后台发送前复查本机同意版本。关闭或重新选择会清除未提交聚合，并让排队旧事件失效；已在途或已接收的请求无法撤回。本机 ZIP 导出独立可用。
 
-接收端由维护者配置：源码与 Docker 使用 `PEACH_SENTRY_DSN`；Windows 发行构建从同名环境变量写入包内 `sentry.json`，GitHub Release 使用仓库变量 `PEACH_SENTRY_DSN`。只接受 Sentry 的公开 HTTPS DSN（含 US / DE 区域），不需要 API token。没有 DSN 时不会创建 SDK 客户端。SDK 自动框架集成、日志、性能追踪和指标均关闭；版本统计作为普通事件计入 Sentry 错误事件额度。账号套餐和总量以 [Sentry 订阅页](https://sentry.io/settings/) 为准。
+接收端由维护者配置：源码与 Docker 使用 `PEACH_SENTRY_DSN`；Windows 与 macOS 打包由 `scripts/write_reporting_config.py` 从同名环境变量写入包根 `sentry.json`。发行流水线从 GitGud 项目 CI/CD 变量 `PEACH_SENTRY_DSN` 与 `PEACH_LIBRARY_SENTRY_DSN` 读取，两者为受保护变量、环境作用域 `release`；缺失或不合法时发行构建失败，本地构建写空值，安装后显示上传服务未配置。只接受 Sentry 的公开 HTTPS DSN（含 US / DE 区域），不需要 API token。没有 DSN 时不会创建 SDK 客户端。SDK 自动框架集成、日志、性能追踪和指标均关闭；版本统计作为普通事件计入 Sentry 错误事件额度。账号套餐和总量以 [Sentry 订阅页](https://sentry.io/settings/) 为准。
 
 回归验收使用临时 Peach 数据目录和 SDK 内存接收端。实际接收与发行制品的验收记录保存在仓库外。技术诊断选择见 [ADR-0110](adr/0110-recommended-diagnostics-choice.md)。安装辅助进程只在本机取证，不初始化远程客户端或发送事件；应用进程按用户选择发送。
 
@@ -110,7 +110,7 @@
 
 原始 JSON 上限 100 MiB，gzip 附件上限 18 MiB；任一超限均整份拒绝，不发送截断数据。gzip 头不含源文件名和生成时间。传输只接受固定用途事件、固定文件名附件与字段白名单，后台真正发送前复查同意版本。关闭让排队记录失效，已发送数据无法经本机开关撤回。
 
-维护者另设 `PEACH_LIBRARY_SENTRY_DSN`，Windows Release 读取同名仓库变量并写入包内 `library_dsn`。该 DSN 的项目必须与错误诊断项目不同，同项目配置视为未配置。研究快照作为 Sentry 附件接收，每次也产生一条事件；组织内的事件和附件额度仍共享。见 [Sentry 附件说明](https://docs.sentry.io/platforms/python/enriching-events/attachments/)。
+维护者另设 `PEACH_LIBRARY_SENTRY_DSN`，两端打包按上文写入包内 `library_dsn`。该 DSN 的项目必须与错误诊断项目不同，同项目配置视为未配置。研究快照作为 Sentry 附件接收，每次也产生一条事件；组织内的事件和附件额度仍共享。见 [Sentry 附件说明](https://docs.sentry.io/platforms/python/enriching-events/attachments/)。
 
 群体分析按 `period` 分开汇总作品持有率、作品评分分布、人物及系列偏好和手动标签；每份快照每部作品只贡献一次持有，实体的 `favorite` 表示主动收藏，`collected` 表示持有相关作品，不能混用。评分使用有效评分人数或数量作分母，不能把未评分当作 0 分，也不能把文件数量当用户数量。每周快照是累计状态，不能跨周累加成新增收藏或播放。没有跨周期标识，但不能据此宣称明细无法关联；每机每周一次也不能识别同一人多安装。结果只代表自愿参与样本，须说明安装覆盖与选择偏差。接收端分析看板不属于客户端上传功能。
 

@@ -537,6 +537,53 @@ class RemoteReportingTests(unittest.TestCase):
             client.assert_not_called()
 
 
+class PackagedReportingConfigTests(unittest.TestCase):
+    """两端打包共用的 `sentry.json` 写入；发行构建缺 DSN 必须失败，而不是产出静默的安装包。"""
+
+    LIBRARY_DSN = "https://public@o123.ingest.us.sentry.io/789"
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.root = Path(folder.name).resolve()
+        self.output = self.root / "bundle" / "sentry.json"
+
+    def write(self, *flags, **targets):
+        env = {key: value for key, value in os.environ.items()
+               if key not in {"PEACH_SENTRY_DSN", "PEACH_LIBRARY_SENTRY_DSN"}}
+        env.update(targets, PYTHONIOENCODING="utf-8")
+        script = Path(__file__).resolve().parents[1] / "scripts/write_reporting_config.py"
+        return subprocess.run([sys.executable, "-X", "utf8", str(script), "--output", str(self.output), *flags],
+                              capture_output=True, text=True, encoding="utf-8", env=env, timeout=60)
+
+    def test_release_config_is_read_back_by_the_packaged_runtime(self):
+        result = self.write("--require", PEACH_SENTRY_DSN=DSN, PEACH_LIBRARY_SENTRY_DSN=self.LIBRARY_DSN)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        from peach import library_sharing
+        with mock.patch.dict(os.environ, {"PEACH_SENTRY_DSN": "", "PEACH_LIBRARY_SENTRY_DSN": ""}), \
+                mock.patch("peach.settings_file.PROJECT_ROOT", self.output.parent):
+            self.assertEqual(reporting.dsn(), DSN)
+            self.assertEqual(library_sharing.target(), self.LIBRARY_DSN)
+
+    def test_local_build_without_targets_ships_an_unconfigured_bundle(self):
+        result = self.write()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(self.output.read_text(encoding="utf-8")), {"dsn": "", "library_dsn": ""})
+
+    def test_release_build_rejects_missing_invalid_or_shared_targets(self):
+        cases = {
+            "缺共享馆藏": {"PEACH_SENTRY_DSN": DSN},
+            "非 Sentry 托管": {"PEACH_SENTRY_DSN": "https://public@sentry.example.com/456",
+                              "PEACH_LIBRARY_SENTRY_DSN": self.LIBRARY_DSN},
+            "同一项目": {"PEACH_SENTRY_DSN": DSN, "PEACH_LIBRARY_SENTRY_DSN": DSN},
+        }
+        for name, targets in cases.items():
+            with self.subTest(name):
+                result = self.write("--require", **targets)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(self.output.exists())
+
+
 class RemoteReportingApiTests(unittest.TestCase):
     setUp = RemoteReportingTests.setUp
 

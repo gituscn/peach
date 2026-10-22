@@ -36,7 +36,7 @@ if ($Mode -eq 'build') {
     Assert-Exit 'cloudflared 校验失败'
     & ./scripts/test.ps1 -Scope packaging -Focus test_desktop_installer
     Assert-Exit '安装目录保护回归失败'
-    & ./scripts/build_windows.ps1 -Installer -CloudflaredPath build/cloudflared.exe -FFmpegPath build/ffmpeg-windows/ffmpeg -UntruncPath build/untrunc-windows/untrunc
+    & ./scripts/build_windows.ps1 -Installer -RequireReporting -CloudflaredPath build/cloudflared.exe -FFmpegPath build/ffmpeg-windows/ffmpeg -UntruncPath build/untrunc-windows/untrunc
     Assert-Exit 'Windows 构建失败'
     New-Item -ItemType Directory -Path release -Force | Out-Null
     & .venv/Scripts/python.exe scripts/package_windows_release.py --source dist/Peach --output release --version $Version --lite-installer
