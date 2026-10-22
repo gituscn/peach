@@ -114,8 +114,7 @@ from .web_stats import (
     q_quality_goals,
     q_search_history,
     q_stats,
-    q_taste,
-    taste_inputs,
+    taste_snapshot,
     w_search_history,
     w_taste_refresh,
     w_taste_source,
@@ -246,10 +245,7 @@ def _get_search_history(contract, args):
 
 
 def _get_taste(contract, args):
-    window = str(args.get("window") or "all")
-    return contract.cached_until_changed(
-        f"taste:{window}", lambda: q_taste(contract, {"window": window}),
-        *taste_inputs(contract, window))
+    return taste_snapshot(contract, str(args.get("window") or "all"))
 
 
 def _get_review(contract, args):

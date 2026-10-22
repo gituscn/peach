@@ -509,6 +509,50 @@ class TasteHistoryTests(unittest.TestCase):
         self.assertTrue(all(row["items"] > 0 for row in analysis["explore"]))
         self.assertIn("不合口味", analysis["next_steps"][-1]["detail"])
 
+    def test_identity_signals_are_judged_once_per_url_and_survive_unrelated_ledger_writes(self):
+        """同一网址重复访问只判一次身份、计数照样按次；账本里与身份无关的写入不触发重判。"""
+        exported = self.root / "history.json"
+        exported.write_text(json.dumps([
+            {"url": "https://onlyfans.com/alice", "dt": 1_700_000_000, "metadata": None},
+            {"url": "https://onlyfans.com/alice", "dt": 1_700_000_100, "metadata": None},
+            {"url": "https://fansly.com/bob", "dt": 1_700_000_200, "metadata": None},
+        ]), encoding="utf-8")
+        store = self.root / "sources" / "history.sqlite"
+        import_history_exports([exported], store, host="test-host")
+        ledger = self.root / "ledger.db"
+        from peach import taste_evidence
+        judged = []
+        original = taste_evidence.browser_entities
+
+        def counted(url, *args, **kwargs):
+            judged.append(url)
+            return original(url, *args, **kwargs)
+
+        with closing(sqlite3.connect(ledger)) as db, \
+                mock.patch.object(taste_evidence, "browser_entities", side_effect=counted):
+            db.row_factory = sqlite3.Row
+            db.executescript(
+                "CREATE TABLE asset(id INTEGER PRIMARY KEY,creator TEXT,studio TEXT,play_count INTEGER,"
+                "play_seconds REAL,o_count INTEGER,rating INTEGER,feedback TEXT,last_played REAL);"
+                "CREATE TABLE asset_preference(profile_id TEXT,asset_id INTEGER,liked INTEGER);"
+                "CREATE TABLE entity(id INTEGER PRIMARY KEY,kind TEXT,canonical_name TEXT,normalized_name TEXT);"
+                "CREATE TABLE entity_alias(entity_id INTEGER,alias TEXT);"
+                "CREATE TABLE asset_entity(asset_id INTEGER,entity_id INTEGER);"
+                "INSERT INTO asset VALUES(1,NULL,NULL,0,0,0,0,NULL,NULL);"
+                "INSERT INTO entity VALUES(2,'creator','Alice Canonical','alice canonical');"
+                "INSERT INTO entity_alias VALUES(2,'alice');")
+            first = build_taste_dashboard(store, db)
+            self.assertEqual(sorted(judged), ["https://fansly.com/bob", "https://onlyfans.com/alice"])
+            db.execute("UPDATE asset SET play_count=5 WHERE id=1")
+            unrelated = build_taste_dashboard(store, db)
+            self.assertEqual(len(judged), 2)
+            db.execute("INSERT INTO entity VALUES(3,'performer','Bob','bob')")
+            build_taste_dashboard(store, db)
+            self.assertEqual(len(judged), 4)
+        visits = {row["name"]: row["web_visits"] for row in first["rankings"]["browser_creators"]}
+        self.assertEqual(visits["Alice Canonical"], 2)
+        self.assertEqual(unrelated["rankings"]["browser_creators"], first["rankings"]["browser_creators"])
+
     def test_history_is_parsed_once_per_store_version(self):
         def export(name, url, moment):
             path = self.root / name

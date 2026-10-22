@@ -809,6 +809,57 @@ class WebDataTests(unittest.TestCase):
         tags = rm_web.q_taste(contract, {"window": "all"})["rankings"]["tags"]
         self.assertNotIn("has_image", tags[0])
 
+    def test_taste_dashboard_serves_its_snapshot_while_a_slow_rebuild_runs(self):
+        """口味看板按输入版本留一份快照：没变直接回，变了后台重算，算得慢先回上一份。
+
+        进程重启后从磁盘接上同一份快照，输入没变就不重算。
+        """
+        store_root = Path(self.tmp.name).resolve() / "taste-history"
+        store_root.mkdir()
+        contract = rm_web.WebContract(
+            Path(self.db_path), avatar_root=self.avatars, logo_root=self.logos,
+            taste_history_store=store_root / "history.sqlite",
+            taste_history_import_root=store_root / "imports",
+            taste_history_manifest=store_root / "manifest.json")
+        self.addCleanup(web_stats._TASTE_SNAPSHOTS.clear)
+        real = web_stats.q_taste
+
+        def marked(label):
+            return lambda contract, args: {**real(contract, args), "marker": label}
+
+        def get():
+            return rm_web.dispatch_api_get(contract, "/api/taste", {"window": "all"})
+
+        with mock.patch.object(web_stats, "q_taste", side_effect=marked("first")):
+            first = get()
+        self.assertEqual((first["marker"], first["stale"]), ("first", False))
+        self.assertTrue((store_root / "dashboard-cache-all.json").is_file())
+        with mock.patch.object(web_stats, "q_taste", side_effect=AssertionError("输入没变不该重算")):
+            self.assertEqual(get()["marker"], "first")
+
+        release = threading.Event()
+
+        def slow(contract, args):
+            release.wait(5)
+            return marked("second")(contract, args)
+
+        with contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET play_count=3 WHERE id=1")
+        with mock.patch.object(web_stats, "TASTE_FRESH_WAIT", 0.01), \
+                mock.patch.object(web_stats, "q_taste", side_effect=slow):
+            pending = get()
+            self.assertEqual((pending["marker"], pending["stale"]), ("first", True))
+            self.assertEqual(pending["computed_at"], first["computed_at"])
+            release.set()
+            web_stats._TASTE_SNAPSHOTS[str(contract.db_path), str(contract.taste_history_store), "all"].worker.join(5)
+            fresh = get()
+        self.assertEqual((fresh["marker"], fresh["stale"]), ("second", False))
+
+        web_stats._TASTE_SNAPSHOTS.clear()
+        with mock.patch.object(web_stats, "q_taste", side_effect=AssertionError("重启后输入没变不该重算")):
+            restarted = get()
+        self.assertEqual((restarted["marker"], restarted["stale"]), ("second", False))
+
     def test_items_can_skip_repeated_total_count_on_later_pages(self):
         result = rm_web.q_items(
             self.contract, {"limit": "1", "offset": "0", "count": "0"},

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import threading
 import time
 
 from datetime import UTC, datetime, timedelta
@@ -19,6 +20,7 @@ from datetime import UTC, datetime, timedelta
 from .catalog_rules import tag_cat
 from . import media_libraries, settings_file
 from .config import LOCATION_ROOT_DECLARATIONS
+from .fsutil import atomic_write_text
 from .platform import is_unmapped, root_online, system_volume, translate_ledger_path
 from .taste_history import (
     analyze_history,
@@ -31,7 +33,7 @@ from .taste_history import (
 from .web_activity import DEFAULT_PROFILE_ID
 from .web_catalog import attach_avatar_availability, tag_is_not_a_performer_name, tag_not_hidden
 from .media_sources import cost_for
-from .web_state import WebContract, path_version
+from .web_state import CACHE_TTL, WebContract, path_version
 from .taste_browsers import browser_sources, configure_browser, enabled_history_sources, enabled_bookmark_sources
 from .taste_bookmarks import refresh_bookmarks
 
@@ -56,7 +58,7 @@ def _taste_since(window: str) -> str | None:
 
 
 def taste_inputs(contract: WebContract, window: str) -> tuple:
-    """`q_taste` 读到的账本之外的东西的版本，给 `cached_until_changed` 当键。
+    """`q_taste` 读到的账本之外的东西的版本，与账本版本号一起构成看板快照的版本。
 
     浏览历史库、分析清单与导入目录由 `scripts/taste_history.py` 在进程外写；榜单上的
     圆头像读头像目录。有时间窗的视图起点每天滑一格，按日期重算一次。
@@ -66,6 +68,101 @@ def taste_inputs(contract: WebContract, window: str) -> tuple:
             path_version(contract.taste_history_import_root),
             path_version(contract.avatar_root),
             (_taste_since(window) or "")[:10])
+
+
+#: 看板重算最多等这么久。账本里与口味无关的写入（播放、关注检查）之后重算不到一秒，
+#: 照常等新结果；身份输入变了或进程刚起时要十几秒，就先回上一份并标 `stale`，后台
+#: 算完再换，不让一个页面占住整个服务。
+TASTE_FRESH_WAIT = 1.0
+
+
+class _TasteSnapshot:
+    """一个范围最近算出的看板、它对应的输入版本，以及正在后台重算的那一趟。"""
+
+    def __init__(self):
+        self.version = None
+        self.payload: dict | None = None
+        self.computed_at: str | None = None
+        self.worker: threading.Thread | None = None
+        self.error: Exception | None = None
+
+
+_TASTE_SNAPSHOTS: dict[tuple[str, str, str], _TasteSnapshot] = {}
+_TASTE_LOCK = threading.Lock()
+
+
+def _taste_version(contract: WebContract, window: str):
+    """账本版本号加 `taste_inputs`，转成 JSON 再读回，内存与磁盘上的版本才能直接比。"""
+    revision = contract.ledger_revision()
+    if revision is None:
+        # 账本还没有版本号时按缓存时效分段，同 `cached_until_changed` 的退路。
+        revision = f"ttl:{int(time.time() // CACHE_TTL)}"
+    return json.loads(json.dumps([revision, *taste_inputs(contract, window)], default=str))
+
+
+def _taste_snapshot_path(contract: WebContract, window: str):
+    return contract.taste_history_store.with_name(f"dashboard-cache-{window}.json")
+
+
+def _load_taste_snapshot(contract: WebContract, window: str, snapshot: _TasteSnapshot) -> None:
+    """进程重启后先接上一次的看板：输入没变就是现成结果，变了也有一份可以先显示。"""
+    try:
+        saved = json.loads(_taste_snapshot_path(contract, window).read_text(encoding="utf-8"))
+        snapshot.version, snapshot.payload, snapshot.computed_at = (
+            saved["version"], saved["payload"], saved["computed_at"])
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+
+
+def _compute_taste_snapshot(contract: WebContract, window: str, version, snapshot: _TasteSnapshot) -> None:
+    try:
+        payload = q_taste(contract, {"window": window})
+    except Exception as error:  # 请求线程会把它原样抛给调用方
+        with _TASTE_LOCK:
+            snapshot.error = error
+        return
+    computed_at = datetime.now(UTC).isoformat()
+    with _TASTE_LOCK:
+        snapshot.version, snapshot.payload, snapshot.computed_at, snapshot.error = (
+            version, payload, computed_at, None)
+    if contract.taste_history_store.parent.is_dir():
+        try:
+            atomic_write_text(_taste_snapshot_path(contract, window), json.dumps(
+                {"version": version, "computed_at": computed_at, "payload": payload},
+                ensure_ascii=False, default=str), mode=0o600)
+        except OSError:
+            pass
+
+
+def taste_snapshot(contract: WebContract, window: str) -> dict:
+    """`/api/taste`：输入版本没变就回现成的看板，变了就在后台重算。
+
+    重算在 `TASTE_FRESH_WAIT` 内完成就回新结果；没完成先回上一份，带上 `stale` 与
+    `computed_at`，页面据此标出数据时间并稍后再问。一份都没有时等到算完。同一范围同时
+    只有一趟在算。
+    """
+    _taste_since(window)
+    version = _taste_version(contract, window)
+    key = (str(contract.db_path), str(contract.taste_history_store), window)
+    with _TASTE_LOCK:
+        snapshot = _TASTE_SNAPSHOTS.get(key)
+        if snapshot is None:
+            snapshot = _TASTE_SNAPSHOTS[key] = _TasteSnapshot()
+            _load_taste_snapshot(contract, window, snapshot)
+        if snapshot.version != version and not (snapshot.worker and snapshot.worker.is_alive()):
+            snapshot.worker = threading.Thread(
+                target=_compute_taste_snapshot, args=(contract, window, version, snapshot),
+                name=f"peach-taste-{window}", daemon=True)
+            snapshot.worker.start()
+        worker, waiting = snapshot.worker, snapshot.version != version
+        empty = snapshot.payload is None
+    if waiting:
+        worker.join(None if empty else TASTE_FRESH_WAIT)
+    with _TASTE_LOCK:
+        if snapshot.payload is None:
+            raise snapshot.error or RuntimeError("口味分析未取得")
+        return {**snapshot.payload, "computed_at": snapshot.computed_at,
+                "stale": snapshot.version != version}
 
 
 #: 口味榜里会出圆头像的两排，以及页面上读得到它们的那几个榜单键。标签榜和网站榜
