@@ -211,7 +211,8 @@ Wiki 与视频作品资料无关。
 ### 经 amane 桥的站
 
 有些站不是 Peach 自己的解析器，由 amane 经 `tools/amane-bridge/` 的子进程回答（ADR-0043）。桥的 venv 在
-「来源和凭证」页那张卡上重建，钉住的版本只由人改。
+「来源和凭证」页那张卡上重建，钉住的版本只由人改。venv 里读到 amane 的包元数据才算已安装，重建中途失败留下的
+半截环境照旧显示未安装。Docker 部署见 [Docker 部署](DOCKER.md#amane-刮削站点)。
 
 - **社区档 `amane`**：avsox，以及只能由覆盖点名的 fc2club、freejavbt、airav。链上合成一档，一次子进程并发
   问完。上游报的 `rate_limited` 按 429 那一档、`cloudflare_*` 与 `ip_banned` 按 403 那一档写进同一份冷却记录；

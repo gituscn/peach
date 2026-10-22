@@ -24,7 +24,9 @@ FROM python:3.14.8-slim-trixie
 LABEL org.opencontainers.image.title="Peach" \
       org.opencontainers.image.source="https://github.com/peach-mitao/peach" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later"
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg openssl ca-certificates mesa-va-drivers vainfo \
+# uv 与 git 留给运行时按锁重建 amane 桥（ADR-0043）：venv 落在卷上的 /data/tools，
+# 解释器用镜像自带的 3.14，禁止 uv 另下一份托管 Python 到不在卷上的家目录。
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg openssl ca-certificates mesa-va-drivers vainfo git \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 1000 peach && useradd --uid 1000 --gid 1000 --create-home peach \
     && mkdir /data && chown peach:peach /data
@@ -41,9 +43,11 @@ ADD --chmod=a+rX --checksum=sha256:c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e922
 ADD --chmod=a+rX --checksum=sha256:cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30 \
     https://raw.githubusercontent.com/opencv/opencv_zoo/48b10fa505aeb51fbd127fc60a5c660040e823b7/models/face_recognition_sface/LICENSE \
     /app/tools/face-models/LICENSE-sface.txt
+COPY --from=uv /uv /usr/local/bin/uv
 COPY --from=build /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" PEACH_DATA_ROOT=/data PYTHONUNBUFFERED=1 \
-    PYTHONIOENCODING=utf-8 PYTHONUTF8=1 PEACH_FACE_MODELS=/app/tools/face-models PEACH_DISTRIBUTION=docker
+    PYTHONIOENCODING=utf-8 PYTHONUTF8=1 PEACH_FACE_MODELS=/app/tools/face-models PEACH_DISTRIBUTION=docker \
+    UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy
 WORKDIR /data
 USER peach
 EXPOSE 8900

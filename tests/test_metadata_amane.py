@@ -28,6 +28,12 @@ def completed(stdout, returncode=0, stderr=""):
     return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr=stderr)
 
 
+def write_amane_metadata(tools, version):
+    package = metadata_amane.bridge_home(tools) / ".venv" / "Lib" / "site-packages" / f"amane-{version}.dist-info"
+    package.mkdir(parents=True)
+    (package / "METADATA").write_text(f"Metadata-Version: 2.1\nName: amane\nVersion: {version}\n", encoding="utf-8")
+
+
 def report(**sites):
     return json.dumps({"number": "FC2-PPV-1234567", "language": "jp", "sites": sites,
                        "amane": {"version": "0.16.1"}}, ensure_ascii=False)
@@ -141,6 +147,7 @@ class RebuildTests(unittest.TestCase):
                 def build(*args, **kwargs):
                     python.parent.mkdir(parents=True, exist_ok=True)
                     python.write_text("", encoding="utf-8")
+                    write_amane_metadata(tools, "0.20.0")
                     return completed("")
 
                 done = metadata_amane.rebuild(tools, runner=build)
@@ -161,10 +168,19 @@ class RebuildTests(unittest.TestCase):
     def test_installed_version_reads_the_isolated_package_metadata(self):
         with tempfile.TemporaryDirectory() as tmp:
             tools = Path(tmp)
-            package = metadata_amane.bridge_home(tools) / ".venv" / "Lib" / "site-packages" / "amane-0.17.0.dist-info"
-            package.mkdir(parents=True)
-            (package / "METADATA").write_text("Metadata-Version: 2.1\nName: amane\nVersion: 0.17.0\n", encoding="utf-8")
+            write_amane_metadata(tools, "0.17.0")
             self.assertEqual(metadata_amane.describe(tools)["installed_version"], "0.17.0")
+
+    def test_a_venv_left_by_a_failed_sync_is_not_installed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tools = Path(tmp)
+            python = metadata_amane.bridge_python(tools)
+            python.parent.mkdir(parents=True)
+            python.write_text("", encoding="utf-8")
+            self.assertFalse(metadata_amane.describe(tools)["installed"])
+            write_amane_metadata(tools, "0.20.0")
+            self.assertTrue(metadata_amane.describe(tools)["installed"])
+
     def test_the_upstream_tag_is_never_guessed(self):
         class Client:
             def __init__(self, status, body):
