@@ -2,19 +2,26 @@
 .peach-react [data-catalog-table] .bui-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .peach-react [data-catalog-rating] { display: flex; flex-direction: column; align-items: stretch; gap: 8px; white-space: normal; }
 .peach-react [data-catalog-rating] [data-rating-stars] { align-self: flex-start; }
-.peach-react [data-catalog-table] [data-list-identity] { position: relative; min-width: 0; padding: 12px 0; }
-.peach-react [data-catalog-table] [data-list-open] { display: flex; align-items: center; gap: 16px; width: 100%; min-width: 0; text-align: left; }
+/* 名称格：缩略图、头像、标题与署名横排；头像和署名与卡片同一套，点得开人物与厂牌页。 */
+.peach-react [data-catalog-table] [data-list-identity] { position: relative; display: flex; align-items: center; gap: 12px; min-width: 0; padding: 12px 0; }
+.peach-react [data-catalog-table] [data-list-open] { display: flex; flex: none; margin-right: 4px; padding: 0; border: 0; background: none; cursor: pointer; }
+.peach-react [data-catalog-table] [data-list-identity] > [data-media-avatar] { margin-top: 0; }
+.peach-react [data-catalog-table] button[data-list-name] { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.peach-react [data-catalog-table] [data-list-picture] [data-media-group] { top: 4px; right: 4px; min-height: 0; padding: 1px 6px; border-radius: 6px; font-size: 11px; }
 .peach-react [data-catalog-table] [data-list-picture] { position: relative; display: flex; align-items: center; justify-content: center; flex: none; width: 112px; height: 63px; overflow: hidden; border-radius: var(--control-radius); background: var(--sunk); color: var(--muted); font-size: var(--fs-sm); }
 .peach-react [data-catalog-table] [data-list-picture] [data-media-art] { position: absolute; inset: 0; display: block; }
 .peach-react [data-catalog-table] [data-list-picture] :is(img,video) { width: 100%; height: 100%; }
 .peach-react [data-catalog-table] [data-list-picture] :is(img:not([data-jav-image]),video) { object-fit: cover; }
 .peach-react [data-catalog-table] [data-list-text] { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
 .peach-react [data-catalog-table] [data-list-name] { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.peach-react [data-catalog-table] [data-list-open]:hover [data-list-name] { text-decoration: underline; }
-.peach-react [data-catalog-table] [data-list-byline] { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--fs-sm); }
+.peach-react [data-catalog-table] [data-list-identity]:has([data-list-open]:hover, [data-list-name]:hover) [data-list-name] { text-decoration: underline; }
+.peach-react [data-catalog-table] [data-list-byline] { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; white-space: nowrap; color: var(--muted); font-size: var(--fs-sm); }
+.peach-react [data-catalog-table] [data-list-byline] > * { flex: none; }
+.peach-react [data-catalog-table] [data-list-byline] > [data-media-who] { flex: 0 1 auto; min-width: 0; }
+.peach-react [data-catalog-table] [data-list-byline] [data-media-who] svg { flex: none; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; }
 /* 列表行的来源：署名前是媒体库图标加名称；用户给这个媒体库选了来源色时整行铺淡色。
  * 个人状态图标缩小后贴在预览图左下角。 */
-.peach-react [data-catalog-table] [data-list-library] { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; color: var(--ink-2); vertical-align: bottom; }
+.peach-react [data-catalog-table] [data-list-library] { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-2); }
 .peach-react [data-catalog-table] [data-catalog-row][data-library] > td { background: color-mix(in oklab, var(--library-color) 9%, transparent); }
 [data-theme="dark"] .peach-react [data-catalog-table] [data-catalog-row][data-library] > td { background: color-mix(in oklab, var(--library-color) 13%, transparent); }
 .peach-react [data-catalog-table] [data-list-picture] [data-media-status] { left: 4px; bottom: 4px; gap: 4px; }

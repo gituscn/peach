@@ -281,9 +281,9 @@ function CheckReport({ report, detected, suggested, create, creating }: {
         {suggested.root ? <Fact term={<SourceLabel source="pikpak" label="PikPak 根目录" />}>{`根据媒体库目录填入 ${suggested.root}，保存配置后生效`}</Fact> : null}
         {report.permissions.length ? (
           <Fact term="离线权限">
-            <Chip variant="caption" color={report.missing.length ? 'yellow' : 'lime'}>
-              {report.missing.length ? `缺少：${report.missing.join('、')}` : '齐全'}
-            </Chip>
+            {report.missing.length
+              ? report.missing.map(permission => <Chip key={permission} variant="caption" color="yellow">{`缺 ${permission}`}</Chip>)
+              : <Chip variant="caption" color="lime">齐全</Chip>}
           </Fact>
         ) : null}
         {report.folder ? (

@@ -63,8 +63,7 @@ function load() {
 
 /** 改一个媒体库的来源色；空串表示不上色。 */
 export function setLibraryColor(id: string, color: string) {
-  const current = tints.get(id);
-  if (!current) return;
+  const current = tints.get(id) ?? { id, name: '', icon: 'database', location: '', color: '' };
   const colors = stored();
   if (color) colors[id] = color;
   else delete colors[id];

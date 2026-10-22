@@ -1,23 +1,20 @@
-/* 一库一行：名称、来源色、处理方式三列，窄屏时来源色与处理方式换到名称下一行。 */
+/* 三档处理方式的说明：档名一列，说明一列。 */
 .peach-react [data-policy-legend] { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; }
 .peach-react [data-policy-legend] dt { color: var(--ink-2); }
-.peach-react [data-policy-table] { display: flex; flex-direction: column; }
-.peach-react :is([data-policy-head], [data-policy-row]) {
+/* 「媒体库与目录」按媒体库分组：组间一道分隔线；标题行是图标、名称、来源色、处理方式，
+ * 窄屏时来源色与处理方式换到名称下一行。 */
+.peach-react [data-library-block] + [data-library-block] { border-top: 1px solid var(--line-soft); padding-top: 16px; }
+.peach-react [data-library-head] {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 136px minmax(160px, 220px);
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(160px, 200px);
   align-items: center;
   gap: 12px;
 }
-.peach-react [data-policy-head] { padding-bottom: 8px; color: var(--muted); font-size: var(--fs-sm); }
-.peach-react [data-policy-group] { border-top: 1px solid var(--line-soft); padding: 10px 0; }
-.peach-react [data-policy-group] > :not([data-policy-row]) { margin-top: 8px; }
 @media (max-width: 640px) {
-  .peach-react [data-policy-head] { display: none; }
-  .peach-react [data-policy-row] { grid-template-columns: auto minmax(0, 1fr); }
-  .peach-react [data-policy-row] > :first-child { grid-column: 1 / -1; }
+  .peach-react [data-library-head] { grid-template-columns: auto minmax(0, 1fr); }
 }
 /* 来源色的触发键：一颗当前色的球加色名；「无颜色」是一颗中性球加一道斜线。 */
-.peach-react [data-library-color-trigger] { display: inline-flex; width: auto; gap: 8px; padding: 2px 8px 2px 2px; border-radius: 999px; color: var(--ink-2); font-size: var(--fs-sm); }
+.peach-react [data-library-color-trigger] { display: inline-flex; width: auto; gap: 8px; padding: 2px 8px 2px 2px; border-radius: 999px; color: var(--ink-2); font-size: var(--fs-sm); white-space: nowrap; }
 .peach-react [data-library-color-trigger] [data-glow-ball] { width: 22px; height: 22px; }
 .peach-react [data-library-colors] { grid-template-columns: repeat(7, 28px); padding: 0; }
 .peach-react [data-glow-ball][data-library-none] {

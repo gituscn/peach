@@ -30,7 +30,9 @@ import {
 import { sourceDefaultCost, type SourceCost } from '../../core/media-sources';
 import { randomId } from '../../core/random-id';
 import { libraryAutoChoice, LibraryIconPicker } from './library-icon-picker';
-import { LibraryPolicySettings } from './library-policy-settings';
+import {
+  AUTO_STAGES, LibraryColorPicker, PolicyLegend, PresetSelect, StageChooser, type Preset, type Stage,
+} from './library-policy-settings';
 import { PushDiscoveryForm } from './push-discovery-settings';
 import {
   ErrorText, ExternalLink, Fact, FactList, Footer, Help, Section, SourceMark, Stack,
@@ -69,7 +71,6 @@ export function MediaSettings({ data, receipt, panel }: ConfigurationGroupProps)
   return (
     <div {...groupRoot(panel)}>
       {data.editable ? <MediaForm data={data} receipt={receipt} /> : <Note tone="neutral" title="只读">{data.notice}</Note>}
-      <LibraryPolicySettings />
       {data.editable ? null : <MountStatus data={data} />}
       {data.media_sources?.some(row => isCloudSource(row.location)) ? <CloudProxySettings receipt={receipt} /> : null}
       {data.push_discovery
@@ -89,6 +90,8 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
   const [saved, setSaved] = useState<SaveResult | null>(null);
   const revision = useRef(data.revision);
   const action = useAction();
+  const [presets, setPresets] = useState<Record<string, Preset>>({});
+  const [stages, setStages] = useState<Record<string, readonly Stage[]>>({});
   const editLibrary = (index: number, patch: Partial<MediaRow>) => {
     rows.forEach((row, i) => { if (row.library_id === rows[index]!.library_id) edit(i, patch); });
   };
@@ -150,57 +153,73 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
   const cloud = rows.some((row) => isCloudSource(row.location));
   const missing = cloud ? (data.mount_dependencies ?? []).filter((dependency) => !dependency.available) : [];
   return (
-    <Section title="媒体目录" onSubmit={submit}>
+    <Section title="媒体库与目录" onSubmit={submit}>
       <Stack>
-        <div className="flex flex-col gap-3">
-          <div role="group" aria-label="媒体目录" className="flex flex-col gap-3">
-            {rows.map((row, index) => (
-              <FolderRow key={index} label={`媒体目录 ${index + 1}`} path={row.path}
-                onPath={(path) => edit(index, { path })} error={rowErrors[index]} inputRef={inputRef(index)}
-                picking={picking === index} onPick={() => void pick(index)}
-                onRemove={rows.length > 1 ? () => remove(index) : undefined}
-                status={mountOf(row) ? <MountBadge online={mountOf(row)?.online} /> : null}>
-                <FolderFieldLine>
-                  <SourceSelect index={index} value={row.location}
-                    onChange={(location) => edit(index, { location, cost: location === 'local' ? 'free' : '' })} />
-                  <MediaReadPolicy index={index} cost={row.cost} onChange={(cost) => edit(index, { cost })}
-                    error={requireReadPolicy && !row.cost ? '请选择媒体读取策略' : undefined} />
-                  {row.root_id && !mountOf(row) ? <FolderField label="变更方式" className="w-full @lg:w-auto @lg:flex-1">
-                    <Select className="w-full" aria-label={`目录变更方式 ${index + 1}`}
-                      placeholder="选择目录变更方式" selectedKey={row.change_mode || null}
-                      onSelectionChange={key => {
-                        if (key === 'add') edit(index, { root_id: undefined, root: '', change_mode: '' });
-                        else edit(index, { change_mode: 'relocate' });
-                      }}>
-                      <SelectItem id="relocate">重定位此目录，保留文件记录</SelectItem>
-                      <SelectItem id="add">添加另一目录</SelectItem>
-                    </Select>
-                  </FolderField> : null}
-                </FolderFieldLine>
-                <FolderFieldLine>
-                  <FolderField label="所属媒体库" className="w-full @lg:w-60">
-                    <Select className="w-full" aria-label={`目录所属媒体库 ${index + 1}`} selectedKey={row.library_id}
-                      renderValue={<span className="flex min-w-0 items-center gap-2"><SourceMark mark={row.library_icon || libraryAutoChoice(row.location)[0]} /><span className="truncate">{row.library || '未命名媒体库'}</span></span>}
-                      onSelectionChange={key => { if (key) chooseLibrary(index, String(key)); }}>
-                      {libraries.map(library => <SelectItem key={library.library_id} id={library.library_id}>{library.library || '未命名媒体库'}</SelectItem>)}
-                      <SelectItem id="new">新建媒体库</SelectItem>
-                    </Select>
-                  </FolderField>
-                  <FolderField label="媒体库名称" className="w-full min-w-32 @lg:w-auto @lg:flex-1">
-                    <Input className="w-full" aria-label={`媒体库名称 ${index + 1}`} maxLength={80}
-                      placeholder="媒体库名称"
-                      value={row.library} onChange={(library) => editLibrary(index, { library })} />
-                  </FolderField>
-                  <FolderField label="图标">
-                    <LibraryIconPicker label={`媒体库图标 ${index + 1}`} value={row.library_icon} kind={row.location}
-                      onChange={(library_icon) => editLibrary(index, { library_icon })} />
-                  </FolderField>
-                </FolderFieldLine>
-              </FolderRow>
-            ))}
-          </div>
-          <Button variant="secondary" className="self-start" onClick={add}>添加文件夹</Button>
+        {/* 按媒体库分组：名称、图标、来源色、处理方式属于媒体库，每组只写一次；
+            下面列这个媒体库的文件夹，文件夹只管路径、来源与读取策略。 */}
+        <PolicyLegend />
+        <div role="group" aria-label="媒体库与目录" className="flex flex-col gap-4">
+          {libraries.map((library) => {
+            const first = rows.findIndex(row => row.library_id === library.library_id);
+            const members = rows.map((row, index) => ({ row, index })).filter(({ row }) => row.library_id === library.library_id);
+            const preset = presets[library.library_id] ?? 'auto';
+            const name = library.library || '未命名媒体库';
+            return (
+              <div key={library.library_id} data-library-block="" className="flex flex-col gap-3">
+                <div data-library-head="">
+                  <LibraryIconPicker label={`${name} 图标`} value={library.library_icon} kind={library.location}
+                    onChange={(library_icon) => editLibrary(first, { library_icon })} />
+                  <Input className="w-full" aria-label={`${name} 名称`} maxLength={80} placeholder="媒体库名称"
+                    value={library.library} onChange={(value) => editLibrary(first, { library: value })} />
+                  <LibraryColorPicker id={library.library_id} name={library.library} />
+                  <PresetSelect name={name} value={preset}
+                    onChange={(value) => setPresets(current => ({ ...current, [library.library_id]: value }))} />
+                </div>
+                {preset === 'custom'
+                  ? <StageChooser name={name} value={stages[library.library_id] ?? AUTO_STAGES}
+                    onChange={(value) => setStages(current => ({ ...current, [library.library_id]: value }))} />
+                  : null}
+                {members.map(({ row, index }) => (
+                  <FolderRow key={index} label={`媒体目录 ${index + 1}`} path={row.path}
+                    onPath={(path) => edit(index, { path })} error={rowErrors[index]} inputRef={inputRef(index)}
+                    picking={picking === index} onPick={() => void pick(index)}
+                    onRemove={rows.length > 1 ? () => remove(index) : undefined}
+                    status={mountOf(row) ? <MountBadge online={mountOf(row)?.online} /> : null}>
+                    <FolderFieldLine>
+                      <SourceSelect index={index} value={row.location}
+                        onChange={(location) => edit(index, { location, cost: location === 'local' ? 'free' : '' })} />
+                      <MediaReadPolicy index={index} cost={row.cost} onChange={(cost) => edit(index, { cost })}
+                        error={requireReadPolicy && !row.cost ? '请选择媒体读取策略' : undefined} />
+                      {row.root_id && !mountOf(row) ? <FolderField label="变更方式" className="w-full @lg:w-auto @lg:flex-1">
+                        <Select className="w-full" aria-label={`目录变更方式 ${index + 1}`}
+                          placeholder="选择目录变更方式" selectedKey={row.change_mode || null}
+                          onSelectionChange={key => {
+                            if (key === 'add') edit(index, { root_id: undefined, root: '', change_mode: '' });
+                            else edit(index, { change_mode: 'relocate' });
+                          }}>
+                          <SelectItem id="relocate">重定位此目录，保留文件记录</SelectItem>
+                          <SelectItem id="add">添加另一目录</SelectItem>
+                        </Select>
+                      </FolderField> : null}
+                      {libraries.length > 1 ? <FolderField label="移到媒体库" className="w-full @lg:w-48">
+                        <Select className="w-full" aria-label={`目录所属媒体库 ${index + 1}`} selectedKey={row.library_id}
+                          onSelectionChange={key => { if (key) chooseLibrary(index, String(key)); }}>
+                          {libraries.map(other => <SelectItem key={other.library_id} id={other.library_id}>{other.library || '未命名媒体库'}</SelectItem>)}
+                          <SelectItem id="new">新建媒体库</SelectItem>
+                        </Select>
+                      </FolderField> : null}
+                    </FolderFieldLine>
+                  </FolderRow>
+                ))}
+                <Button variant="secondary" size="small" className="self-start" onClick={() => {
+                  add();
+                  edit(rows.length, { library_id: library.library_id, library: library.library, library_icon: library.library_icon });
+                }}>添加文件夹</Button>
+              </div>
+            );
+          })}
         </div>
+        <Button variant="secondary" className="self-start" onClick={add}>添加媒体库</Button>
         {cloud ? <><MediaReadPolicyHelp /><CloudDriveGuide /></> : null}
         {missing.map((dependency) => (
           <Help key={dependency.name}>

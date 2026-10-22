@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState, type MouseEvent } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   createColumnHelper, flexRender, rowPaginationFeature, rowSelectionFeature, rowSortingFeature,
@@ -14,6 +14,7 @@ import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 import { apiGet } from '../../api';
 import { ArtSlot } from '../components/art-slot';
 import { useLibraryTints } from '../components/library-tint';
+import { identityParts } from '../components/media-card';
 import { SourceMark } from '../settings/section';
 import { DataTableFrame } from '../components/data-table-frame';
 import { DataTableFooter, DataTableSort } from '../components/table-controls';
@@ -186,22 +187,37 @@ export function CatalogListPage(props: CatalogGridProps) {
 
 function ListIdentity({ item, props, disabled }: { item: MediaItem; props: CatalogGridProps; disabled: boolean }) {
   const artwork = cardArtwork(item, 'small', false, props.layout.javImage);
-  const name = props.helpers.displayName(item, item.name || '').trim() || '未命名作品';
-  const who = item.creator || item.performers?.join('、') || item.studio;
+  const parts = item.part_group || null;
+  const editions = item.edition_group || null;
+  const rawName = parts?.title || item.name || '';
+  const name = props.helpers.displayName(item, rawName).trim() || '未命名作品';
+  const titleHtml = props.helpers.titleHtml(item, rawName).trim() || '未命名作品';
+  const { avatar, who } = identityParts(item);
   const tints = useLibraryTints();
   const tint = item.library_id ? tints.get(item.library_id) : undefined;
   const flaggedBy = [Number(item.liked) > 0 ? '喜欢' : '', Number(item.o_count) > 0 ? '有高潮记录' : ''].filter(Boolean);
   const glyph = (name: string) => <svg viewBox="0 0 24 24" aria-hidden="true"><use href={`#i-${name}`} /></svg>;
-  return <div data-list-identity="">
-    <button type="button" data-list-open="" disabled={disabled} aria-label={`打开 ${name}`} onClick={event => {
-      if (props.selectMode) {
-        props.actions.toggleSelection(item.id, event.shiftKey); return;
-      }
-      const open = props.filters?.state === 'trash' ? props.actions.openResource : props.actions.open;
-      open(item, event.currentTarget);
-    }}>
+  const open = (event: MouseEvent<HTMLElement>) => {
+    if (props.selectMode) {
+      props.actions.toggleSelection(item.id, event.shiftKey); return;
+    }
+    const opener = props.filters?.state === 'trash' ? props.actions.openResource : props.actions.open;
+    opener(item, event.currentTarget);
+  };
+  /* 头像与署名和卡片同一套：点头像或人名打开人物、厂牌页，没有署名的那批打开「未归属」。 */
+  const openOwner = (event: MouseEvent<HTMLElement>) => {
+    if (props.selectMode) return;
+    const target = event.target as HTMLElement;
+    const entity = target.closest<HTMLElement>('[data-entity-kind]');
+    if (entity) { props.actions.openEntity(entity.dataset.entityKind || '', entity.dataset.entityName || ''); return }
+    if (target.closest('[data-open-unowned]')) props.actions.openUnowned();
+  };
+  return <div data-list-identity="" onClick={openOwner}>
+    <button type="button" data-list-open="" disabled={disabled} tabIndex={-1} aria-hidden="true" onClick={open}>
       <span data-list-picture="">{artwork.html
         ? <ArtSlot artwork={artwork} relayout={root => relayoutCovers(root, 'small')} /> : <span>无预览</span>}
+        {parts && !editions ? <span data-media-group="">{`${Number(parts.count).toLocaleString()} 卷`}</span> : null}
+        {editions ? <span data-media-group="" title={editions.editions.join(' · ')}>{`${Number(editions.count).toLocaleString()} 个版本`}</span> : null}
         {item.watch_later || flaggedBy.length
           ? <span data-media-status="">
             {item.watch_later ? <span data-status="later" title="稍后看" aria-label="稍后看">{glyph('bookmark')}</span> : null}
@@ -209,14 +225,17 @@ function ListIdentity({ item, props, disabled }: { item: MediaItem; props: Catal
               aria-label={`已标记：${flaggedBy.join('、')}`}>{glyph('heart')}</span> : null}
           </span>
           : null}</span>
-      <span data-list-text=""><span data-list-name="" title={name}>{name}</span>
-        <span data-list-byline="">
-          {tint ? <span data-list-library="" title={`媒体库：${tint.name}`}>
-            <SourceMark mark={tint.icon} />{tint.name}
-          </span> : null}
-          {who || '未归属'}
-        </span>
-      </span>
     </button>
+    {avatar}
+    <span data-list-text="">
+      <button type="button" data-list-name="" disabled={disabled} title={name} aria-label={`打开 ${name}`} onClick={open}
+        dangerouslySetInnerHTML={{ __html: titleHtml }} />
+      <span data-list-byline="">
+        {tint ? <span data-list-library="" title={`媒体库：${tint.name}`}>
+          <SourceMark mark={tint.icon} />{tint.name}
+        </span> : null}
+        {who}
+      </span>
+    </span>
   </div>;
 }

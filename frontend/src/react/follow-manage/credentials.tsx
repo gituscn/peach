@@ -116,9 +116,8 @@ function CredentialSection({ row, readOnly, toast }:
       </span>
       <b className="min-w-0 text-body-medium wrap-anywhere text-text-primary">{row.provider_label}</b>
       <StateChip row={row} />
-      {row.missing.length
-        ? <Chip variant="caption" color="rose">{`缺 ${row.missing.join('、')}`}</Chip>
-        : null}
+      {/* 每个缺的字段一枚标签：缺两项就是两枚，填上一项消掉一枚。 */}
+      {row.missing.map(field => <Chip key={field} variant="caption" color="rose">{`缺 ${field}`}</Chip>)}
     </span>
   );
   if (row.requirement === 'none' || row.requirement === 'blocked') {

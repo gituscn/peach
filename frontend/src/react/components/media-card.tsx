@@ -103,7 +103,7 @@ export interface MediaCardProps {
 }
 
 /** 署名：头像和名字落到同一个身份上（`cardIdentity`）。共演只写第一位再给总人数。 */
-function identityParts(item: MediaItem): { avatar: ReactNode; who: ReactNode } {
+export function identityParts(item: MediaItem): { avatar: ReactNode; who: ReactNode } {
   const { kind, name, coStarred, performers, refs, total } = cardIdentity(item);
   const performer = performers[0] || '';
   const label = performerLabel(item);
