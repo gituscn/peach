@@ -58,7 +58,7 @@ Windows 第一次询问防火墙权限时，只勾选「专用网络」。
 
 缺索引 MP4 修复使用随包的 `tools\untrunc\untrunc.exe`，需要同编码参数的完整片作为参照。该工具与其兼容的 FFmpeg 库独立构建，按 GPL-2.0-or-later 分发；完整对应源码制品为同一 Release 中的 `untrunc-corresponding-source.zip`。显式 `PEACH_UNTRUNC` 优先于随包工具，其后查数据目录与 PATH。
 
-工具以独立进程调用，按 GPL-3.0-or-later 分发；工具目录包含许可证、构建配置、来源清单和 SHA-256。完整对应源码制品 `ffmpeg-corresponding-source.zip` 与应用放在同一个 Release，包含 FFmpeg、x264、nv-codec-headers 的固定源码和构建脚本。发行构建会校验工具及对应源码，任何一项缺失或哈希不符都停止打包。
+工具以独立进程调用，按 GPL-3.0-or-later 分发；工具目录包含许可证、构建配置、来源清单和 SHA-256。完整对应源码制品 `ffmpeg-corresponding-source.zip` 与应用放在同一个 Release，包含 FFmpeg、x264、dav1d、nv-codec-headers、AMF 头文件与 libvpl 的固定源码和构建脚本。发行构建会校验工具及对应源码，任何一项缺失或哈希不符都停止打包。
 
 源码运行可将 FFmpeg、ffprobe 加入 PATH，或放在数据目录的 `tools\ffmpeg\bin`。显式指定的 `PEACH_FFMPEG`、`PEACH_FFPROBE` 优先；独立包随后使用随包工具，再查数据目录和 PATH。
 

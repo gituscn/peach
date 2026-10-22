@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import http.client
+import itertools
 import json
 import os
 from pathlib import Path
@@ -29,6 +30,7 @@ else:
     HTTP_ERRORS = ()
 
 LOCK_PATH = SCRIPT_DIR / "ffmpeg-sources.json"
+SOURCE_NAMES = {"ffmpeg", "x264", "nv-codec-headers", "dav1d", "amf-headers", "libvpl"}
 
 
 def digest(path: Path) -> str:
@@ -85,8 +87,8 @@ def obtain_source(source: dict, archive: Path) -> None:
 
 def load_sources(path: Path = LOCK_PATH) -> dict:
     lock = json.loads(path.read_text(encoding="utf-8"))
-    if {source["name"] for source in lock["sources"]} != {"ffmpeg", "x264", "nv-codec-headers", "dav1d"}:
-        raise ValueError("源码清单必须包含全部四个依赖")
+    if {source["name"] for source in lock["sources"]} != SOURCE_NAMES:
+        raise ValueError("源码清单必须恰好包含全部链接依赖：" + "、".join(sorted(SOURCE_NAMES)))
     for source in lock["sources"]:
         if len(source["sha256"]) != 64 or any(c not in "0123456789abcdef" for c in source["sha256"]):
             raise ValueError(f"无效源码 SHA256: {source['name']}")
@@ -123,8 +125,20 @@ def finish(output: Path, lock: dict) -> dict:
     work = output / "work"
     shutil.copyfile(work / "ffmpeg/COPYING.GPLv3", bundle / "LICENSE.txt")
     for source, license_name in (("ffmpeg", "COPYING.LGPLv2.1"), ("ffmpeg", "COPYING.LGPLv3"),
-                                 ("x264", "COPYING"), ("dav1d", "COPYING")):
+                                 ("x264", "COPYING"), ("dav1d", "COPYING"), ("libvpl", "LICENSE")):
         shutil.copyfile(work / source / license_name, bundle / f"LICENSE-{source}-{license_name}.txt")
+    shutil.copyfile(work / "libvpl/third-party-programs.txt", bundle / "LICENSE-libvpl-third-party-programs.txt")
+    amf_notices = []
+    for header in sorted((work / "amf-headers/AMF").rglob("*.h")):
+        lines = header.read_text(encoding="utf-8").lstrip("﻿").splitlines()
+        notice = "\n".join(line.rstrip() for line in itertools.takewhile(lambda line: line.startswith("//"), lines))
+        if "MIT" not in notice:
+            raise ValueError(f"未取得 AMF 头文件许可证: {header.name}")
+        if notice not in amf_notices:
+            amf_notices.append(notice)
+    if not amf_notices:
+        raise ValueError("未取得 AMF 头文件许可证")
+    (bundle / "LICENSE-amf-headers.txt").write_text("\n\n".join(amf_notices) + "\n", encoding="utf-8")
     header_notices = []
     for header in sorted((work / "nv-codec-headers/include/ffnvcodec").glob("*.h")):
         text = header.read_text(encoding="utf-8")
@@ -137,9 +151,10 @@ def finish(output: Path, lock: dict) -> dict:
         "FFmpeg 9.0.2 与 libx264 按 GPL-3.0-or-later 分发。\n"
         "版权与完整许可证见本目录 LICENSE 文件及对应源码归档。\n"
         "编解码使用 FFmpeg 内置实现、静态 libx264 与 BSD-2-Clause 许可的 dav1d AV1 软件解码器；NVIDIA 接口使用 nv-codec-headers。\n"
-        "Windows 系统库由操作系统提供；NVIDIA 驱动由用户环境提供。\n"
-        "支持 NVENC、CUVID、NVDEC、D3D11VA、DXVA2 与 Schannel HTTPS。\n"
-        "包含 CUDA LLVM 与 scale_cuda；CUDA 解码和 NVENC 可用性取决于本机驱动。\n"
+        "AMD AMF 接口使用 MIT 许可的 AMF 头文件；Intel QSV 接口静态链接 MIT 许可的 libvpl 调度器。\n"
+        "Windows 系统库由操作系统提供；NVIDIA、AMD 与 Intel 驱动及其运行时由用户环境提供。\n"
+        "支持 NVENC、CUVID、NVDEC、AMF、QSV、D3D11VA、DXVA2 与 Schannel HTTPS。\n"
+        "包含 CUDA LLVM 与 scale_cuda；NVENC、AMF 与 QSV 可用性取决于本机显卡与驱动。\n"
         "完整对应源码、固定 revision、SHA256 与构建步骤见同版本 ffmpeg-corresponding-source.zip。\n"
         "本目录的 manifest.json 记录二进制、许可证、构建配置及源码归档的 SHA256。\n"
     )
@@ -148,9 +163,10 @@ def finish(output: Path, lock: dict) -> dict:
     archive = output / "ffmpeg-corresponding-source.zip"
     instructions = (
         "# Windows x64 FFmpeg 对应源码\n\n"
-        "包含四份未经修改的上游源码归档和构建脚本。\n"
+        f"包含 {len(lock['sources'])} 份未经修改的上游源码归档和构建脚本。\n"
         "Linux/Ubuntu 安装：sudo apt-get install build-essential gcc-mingw-w64-x86-64-posix "
-        "mingw-w64-x86-64-dev nasm pkg-config python3 clang meson ninja-build ca-certificates xz-utils\n\n"
+        "g++-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config python3 clang meson "
+        "ninja-build cmake ca-certificates xz-utils\n\n"
         '在此目录执行：bash scripts/build_ffmpeg_windows.sh "$PWD/rebuilt"\n'
         "离线重建：先建立 rebuilt/sources，再将 sources/ 内全部归档复制进去，再执行上述命令。\n"
         "产物为 rebuilt/ffmpeg 与 rebuilt/ffmpeg-corresponding-source.zip。\n"
