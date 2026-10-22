@@ -583,24 +583,30 @@ class MissingPrerequisiteTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "不存在"):
                 e2e_batches(frontend, 1, ("e2e/missing.test.ts",))
 
-    def test_failed_browser_batch_stops_following_batches_and_keeps_its_log(self):
+    def test_failed_browser_batch_still_runs_later_batches_and_reports_every_failure(self):
         with tempfile.TemporaryDirectory() as folder:
             log_root = Path(folder).resolve()
             case = WebE2ESmokeTests("test_every_route_holds_the_layout_and_runtime_invariants")
             case.origin, case.item, case.chrome, case.node = "http://fixture", 1, "chrome", "node"
             case.ffmpeg = "ffmpeg"
             failed = subprocess.CompletedProcess([], 1, "# pass 1\n# fail 1\n", "failure")
-            batches = ((("e2e/first.test.ts",), 1), (("e2e/second.test.ts",), 1))
+            passed = subprocess.CompletedProcess([], 0, "# pass 2\n# fail 0\n", "")
+            batches = ((("e2e/first.test.ts",), 1), (("e2e/second.test.ts",), 1), (("e2e/third.test.ts",), 1))
             with mock.patch.dict(os.environ, {"PEACH_E2E_FILES": "[]"}), \
                     mock.patch(__name__ + ".BROWSER_LOGS", log_root), \
                     mock.patch(__name__ + ".e2e_batches", return_value=batches), \
                     mock.patch.object(case, "_server_log", return_value="serve fixture"), \
-                    mock.patch("subprocess.run", return_value=failed) as run:
-                with self.assertRaises(AssertionError):
+                    mock.patch("subprocess.run", side_effect=[failed, passed, failed]) as run:
+                with self.assertRaises(AssertionError) as raised:
                     case.test_every_route_holds_the_layout_and_runtime_invariants()
-            self.assertEqual(run.call_count, 1)
-            self.assertIn("# fail 1", (log_root / "batch-1.tap").read_text(encoding="utf-8"))
-            self.assertFalse((log_root / "batch-2.tap").exists())
+            self.assertEqual(run.call_count, 3)
+            for index in (1, 2, 3):
+                self.assertTrue((log_root / f"batch-{index}.tap").is_file())
+            report = str(raised.exception)
+            self.assertIn("e2e/first.test.ts", report)
+            self.assertIn("e2e/third.test.ts", report)
+            self.assertNotIn("e2e/second.test.ts", report)
+            self.assertIn("serve fixture", report)
 
     def test_concurrency_is_serial_on_ci_bounded_locally_and_overridable(self):
         local = {key: value for key, value in os.environ.items() if key != "GITHUB_ACTIONS"}
