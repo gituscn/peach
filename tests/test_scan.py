@@ -21,6 +21,7 @@ from unittest.mock import patch
 
 from peach import scan
 from peach.migrations import upgrade
+from support.web import route_client
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / "migrations"
@@ -91,7 +92,6 @@ class WindowsShapeTests(_ScanCase):
                                                (str(video),)).fetchone(), (None,))
 
     def test_scanned_video_is_visible_without_a_thumbnail_filter(self):
-        from support.web import route_client
         from peach.api import create_app
         from peach.config import PeachSettings
         self._scan(str(self.media), declared_roots={"local": (str(self.media),)}, windows=True)
@@ -122,6 +122,44 @@ class WindowsShapeTests(_ScanCase):
 
 class PosixShapeTests(_ScanCase):
     """macOS：账本里写 `R:\\media\\...`，遍历的是挂载点，读取侧按挂载表翻回去。"""
+
+    def test_windows_mount_mapping_has_the_same_ledger_path_contract(self):
+        options = dict(declared_roots={'local': ('R:\\media',)}, mounts={'local': (self.media,)}, windows=True)
+        self.assertEqual(scan.walk_root_for('local', 'R:\\media\\创作者', **options), self.media / '创作者')
+        self.assertEqual(scan.ledger_root_for('local', self.media / '创作者', **options), 'R:\\media\\创作者')
+
+    def test_root_case_changes_preserve_asset_identity_and_personal_records(self):
+        options = dict(declared_roots={'local': ('R:\\media',)}, mounts={'local': (self.media,)}, windows=False)
+        self._scan('R:\\media', **options)
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("UPDATE asset SET rating=4,play_count=7")
+            before = list(connection.execute("SELECT id,path,rating,play_count FROM asset ORDER BY id"))
+        self._scan('r:\\MEDIA', **options)
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            self.assertEqual(list(connection.execute("SELECT id,path,rating,play_count FROM asset ORDER BY id")), before)
+
+    def test_relocated_mount_restarts_traversal_and_preserves_file_id(self):
+        saved = []
+        options = dict(declared_roots={'local': ('R:\\media',)}, mounts={'local': (self.media,)}, windows=False)
+        self._scan('R:\\media', save_checkpoint=lambda value: saved.append(value), **options)
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            before = list(connection.execute("SELECT id,path FROM asset ORDER BY id"))
+        moved = self.root / 'moved'
+        self.media.rename(moved)
+        (moved / 'new.mp4').write_bytes(b'new')
+        self._scan('R:\\media', resume_state=saved[-1], **{**options, 'mounts': {'local': (moved,)}})
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            self.assertEqual(list(connection.execute("SELECT id,path FROM asset ORDER BY id LIMIT 3")), before)
+            self.assertEqual(connection.execute('SELECT count(*) FROM asset').fetchone()[0], 4)
+
+    def test_scanning_one_root_does_not_count_other_roots_as_missing(self):
+        options = dict(declared_roots={'local': ('R:\\media', 'S:\\other')},
+                       mounts={'local': (self.media, self.root / 'other')}, windows=False)
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("INSERT INTO asset(location,path,name,medium,last_seen) VALUES('local','S:\\other\\copy.mp4','copy.mp4','video','2000-01-01')")
+        result, _ = self._scan('R:\\media', **options)
+        self.assertEqual(result.gone, 0)
+        self.assertEqual(len(result.new_ids), 3)
 
     def test_resume_skips_committed_directories_and_retains_subtitles_and_new_ids(self):
         (self.media / '创作者/sub/a.srt').write_text('subtitle', encoding='utf-8')

@@ -274,7 +274,7 @@ if(location.pathname==='/wall')document.documentElement.setAttribute('data-wall-
   const brand=document.querySelector('#brandHome'),toggle=document.querySelector('#filterBtn');
   const narrow=matchMedia('(max-width:760px)').matches;
   let expanded=!narrow,library='';
-  try{expanded=!narrow&&sessionStorage.getItem('board.sidebar')!=='closed';library=sessionStorage.getItem('peach.library')||''}catch(_e){}
+  try{expanded=!narrow&&sessionStorage.getItem('board.sidebar')!=='closed';library=sessionStorage.getItem('peach.library')?(sessionStorage.getItem('peach.library-label')||'媒体库'):''}catch(_e){}
   brand.querySelector('h1').textContent=library||'全部媒体库';head.append(brand);
   if(!narrow)head.append(toggle);
   drawer.classList.toggle('open',expanded);drawer.inert=narrow;

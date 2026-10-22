@@ -14,7 +14,7 @@ from contextlib import closing
 from contextvars import copy_context
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from urllib.parse import urlparse
 
 from filelock import FileLock, Timeout
@@ -1774,7 +1774,7 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
                 continue
             result.online_roots.append(translated_root)
             if scan:
-                key = f'{source}:{root}'
+                key = f'{source}:{PureWindowsPath(root)}'.casefold()
                 def remember(value, key=key):
                     scan_checkpoints[key] = value
                     save_checkpoint()

@@ -199,8 +199,7 @@ def snapshot(config) -> dict[str, Any]:
         "revision": revision(config),
         "media_dirs": list(media),
         "media_sources": media_configuration.rows(config, windows=os.name == "nt", probe=True),
-        # 媒体库按 `media_libraries.libraries` 数：同名的几个数据库路径前缀是一个库，和侧栏切换器、
-        # `/api/libraries` 同一份分组，页面不自己再归并一遍。
+        # 媒体库按持久身份计数，与侧栏切换器和 `/api/libraries` 共用分组。
         "library_count": len(media_libraries.libraries(config)),
         "mount_dependencies": media_configuration.mount_dependencies(),
         "windows": os.name == "nt",
@@ -584,6 +583,7 @@ def _validate(body: dict[str, Any], config) -> tuple[dict[str, Any], dict[str, A
     """逐项校验，错误按字段归位：文件夹按行、端口一句。全对时第一个返回值为空。"""
     errors: dict[str, Any] = {}
     validated: dict[str, Any] = {}
+    from . import media_identity
     raws = body.get("media_dirs")
     rows = [str(item) for item in raws] if isinstance(raws, list) else [str(raws or "")]
     if "media_sources" in body:
@@ -593,6 +593,13 @@ def _validate(body: dict[str, Any], config) -> tuple[dict[str, Any], dict[str, A
         validated.update(locations=locations, mounts=mounts)
         if not problems:
             validated["media_costs"] = media_configuration.costs(sources, config, windows=os.name == "nt")
+            try:
+                prepared = media_identity.configure_sources(config, sources, windows=os.name == "nt")
+                validated.update(library_catalog=prepared.library_catalog, storage_roots=prepared.storage_roots,
+                                 locations=prepared.locations, mounts=prepared.mounts,
+                                 media_costs=prepared.media_costs)
+            except ValueError as exc:
+                problems = [str(exc)] * len(sources)
         names, icons = {}, {}
         if not problems:
             for index, row in enumerate(sources):
@@ -617,6 +624,16 @@ def _validate(body: dict[str, Any], config) -> tuple[dict[str, Any], dict[str, A
     else:
         paths, problems = onboarding.read_media_dirs(
             rows, validate=onboarding.media_dir_validator(windows=os.name == "nt"))
+        if not problems:
+            sources = media_identity.sources_for_paths(config, paths, windows=os.name == "nt", keep_other_sources=True)
+            try:
+                prepared = media_identity.configure_sources(config, sources, windows=os.name == "nt")
+                validated.update(locations=prepared.locations, mounts=prepared.mounts,
+                                 library_catalog=prepared.library_catalog, storage_roots=prepared.storage_roots,
+                                 library_names=prepared.library_names, library_icons=prepared.library_icons,
+                                 media_costs=prepared.media_costs)
+            except ValueError as exc:
+                problems = [str(exc)] * max(1, len(rows))
     if problems:
         errors["media_dirs"] = problems
     else:
@@ -854,10 +871,15 @@ def save_configuration(request: Request, body: dict[str, Any] = Body(default_fac
             validated["library_names"] = {**config.library_names, **{
                 row["root"]: row["library"] for row in sources if row.get("library")}}
         prepared = replace(config, locations=locations, mounts=mounts,
+                           library_catalog=validated.get("library_catalog", config.library_catalog),
+                           storage_roots=validated.get("storage_roots", config.storage_roots),
                            library_names=validated.get("library_names", config.library_names),
                            library_icons=validated.get("library_icons", config.library_icons),
                            media_costs=validated.get("media_costs", config.media_costs),
                            server=replace(config.server, port=validated["port"]))
+        if prepared.storage_roots:
+            from . import media_identity
+            prepared = media_identity.project(prepared)
         temporary = config.path.with_suffix(".pending.toml")
         try:
             shutil.copy2(config.path, config.path.with_suffix(".previous.toml"))

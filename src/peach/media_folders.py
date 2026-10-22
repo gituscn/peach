@@ -21,10 +21,11 @@ def within(path: str, directory: str, recursive: bool = True) -> bool:
 def path_predicate(location: str, path: str, recursive: bool = True, alias: str = 'a'):
     """按完整目录组件匹配，目录名中的 SQL 通配符保持字面含义。"""
     prefix = str(PureWindowsPath(path)).rstrip('\\') + '\\'
-    clause = f'({alias}.location=? AND substr({alias}.path,1,?)=? COLLATE NOCASE'
+    normalized = f"replace({alias}.path,'/',char(92))"
+    clause = f'({alias}.location=? AND substr({normalized},1,?)=? COLLATE NOCASE'
     params: list = [location, len(prefix), prefix]
     if not recursive:
-        clause += f" AND instr(substr({alias}.path,?),char(92))=0"
+        clause += f" AND instr(substr({normalized},?),char(92))=0"
         params.append(len(prefix) + 1)
     return clause + ')', params
 
@@ -50,6 +51,7 @@ def directory_index(connection, config, *, locations: str = '', library: str = '
 
     for location, root in declared:
         node = add(location, root, None, folder_id(location, root))
+        node.update(media_libraries.media_identity.ownership(config, root))
         node['name'] = getattr(config, 'library_names', {}).get(root) or node['name']
     rows = connection.execute(
         "SELECT location,path,medium FROM asset WHERE path IS NOT NULL AND path<>'' "

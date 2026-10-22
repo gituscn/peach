@@ -13,13 +13,17 @@ import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
 import { Label } from '@/components/base/input/label';
 import { Switch } from '@/components/base/switch/switch';
+import { Select, SelectItem } from '@/components/base/select/select';
 
 import { SEGMENT, SEGMENTED_TRACK, SegmentedRadioGroup } from '../../components/segmented';
 import { busyProps } from '../../settings/busy-props';
-import { FolderRow, isCloudSource, MediaReadPolicy, MediaReadPolicyHelp, SourceSelect, useFolderRows } from '../../settings/folder-rows';
+import {
+  FolderField, FolderFieldLine, FolderRow, isCloudSource, MediaReadPolicy, MediaReadPolicyHelp, SourceSelect, useFolderRows,
+} from '../../settings/folder-rows';
+import { libraryAutoChoice } from '../../settings/library-icon-picker';
 import { PasswordPair } from '../../settings/password-pair';
 import { ReportingChoices } from '../../settings/remote-reporting-settings';
-import { Disclosure, ErrorText, ExternalLink, Help } from '../../settings/section';
+import { Disclosure, ErrorText, ExternalLink, Help, SourceMark } from '../../settings/section';
 import { CardGroup, GroupTitle } from '../auth-card';
 import {
   describeFailure, pickFolder, SetupRequestError, submitSetup,
@@ -49,7 +53,7 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
   const media = setup.questions.find((question) => question.input === 'folders');
   const others = setup.questions.filter((question) => question.input !== 'folders');
   const sources = setup.media_sources.map(({ value, label }) => [value, label] as const);
-  const blank = (path = ''): SetupFolder => ({ path, location: setup.media_source_default, root: '', cost: setup.media_source_default === 'local' ? 'free' : '' });
+  const blank = (path = ''): SetupFolder => ({ path, location: setup.media_source_default, root: '', library_id: crypto.randomUUID(), library: '', cost: setup.media_source_default === 'local' ? 'free' : '' });
   const folders = useFolderRows<SetupFolder>({
     initial: () => [blank(media?.default ?? '')], blank: () => blank(), pickFolder, describe: describeFailure,
     focusAfterPick: true,
@@ -175,16 +179,39 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
                 inputRef={folders.inputRef(index)} picking={folders.picking === index}
                 onPick={() => void folders.pick(index)}
                 onRemove={folders.rows.length > 1 ? () => { folders.remove(index); addButton.current?.focus(); } : undefined}>
-                <SourceSelect index={index} value={row.location} options={sources}
-                  onChange={(location) => folders.edit(index, { location, cost: location === 'local' ? 'free' : '' })} />
-                <MediaReadPolicy index={index} cost={row.cost ?? ''}
-                  error={requireReadPolicy && !row.cost ? '请选择媒体读取策略' : undefined}
-                  onChange={(cost) => folders.edit(index, { cost })} />
+                <FolderFieldLine>
+                  <SourceSelect index={index} value={row.location} options={sources}
+                    onChange={(location) => folders.edit(index, { location, cost: location === 'local' ? 'free' : '' })} />
+                  <MediaReadPolicy index={index} cost={row.cost ?? ''}
+                    error={requireReadPolicy && !row.cost ? '请选择媒体读取策略' : undefined}
+                    onChange={(cost) => folders.edit(index, { cost })} />
+                </FolderFieldLine>
+                <FolderFieldLine>
+                  <FolderField label="所属媒体库" className="w-full @lg:w-60">
+                    <Select className="w-full" aria-label={`目录所属媒体库 ${index + 1}`} selectedKey={row.library_id}
+                      renderValue={<span className="flex min-w-0 items-center gap-2"><SourceMark mark={libraryAutoChoice(row.location)[0]} /><span className="truncate">{row.library || '未命名媒体库'}</span></span>}
+                      onSelectionChange={key => {
+                        const other = folders.rows.find(value => value.library_id === key);
+                        folders.edit(index, { library_id: other?.library_id || crypto.randomUUID(), library: other?.library || '' });
+                      }}>
+                      {[...new Map(folders.rows.map(value => [value.library_id, value])).values()].map(value => (
+                        <SelectItem key={value.library_id} id={value.library_id}>{value.library || '未命名媒体库'}</SelectItem>
+                      ))}
+                      <SelectItem id="new">新建媒体库</SelectItem>
+                    </Select>
+                  </FolderField>
+                  <FolderField label="媒体库名称" className="w-full min-w-32 @lg:w-auto @lg:flex-1">
+                    <Input className="w-full" aria-label={`媒体库名称 ${index + 1}`} placeholder="媒体库名称" maxLength={80}
+                      value={row.library || ''} onChange={library => folders.rows.forEach((other, i) => {
+                        if (other.library_id === row.library_id) folders.edit(i, { library });
+                      })} />
+                  </FolderField>
+                </FolderFieldLine>
               </FolderRow>
             ))}
           </div>
           <Button ref={addButton} variant="secondary" leadingIcon={RiAddLine} className="self-start" onClick={folders.add}>
-            添加媒体库
+            添加文件夹
           </Button>
           {cloud ? (
             <>

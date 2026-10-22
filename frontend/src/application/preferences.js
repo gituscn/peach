@@ -31,8 +31,9 @@ export async function loadSourceStatus(){
   try{
     const d=await loadMediaSources(effects.signal);
     if(!effects.isActive)return preferencesState.sourceOnline;
-    preferencesState.sourceOnline=Object.fromEntries((d.sources||[]).map(s=>[s.location,s.online]));
-    preferencesState.sourceProblems=Object.fromEntries((d.sources||[]).map(s=>[s.location,s.message||'']));
+    const roots=(d.sources||[]).flatMap(s=>s.roots||[]).filter(r=>r.root_id);
+    preferencesState.sourceOnline=Object.fromEntries([...(d.sources||[]).map(s=>[s.location,s.online]),...roots.map(r=>[r.root_id,r.online])]);
+    preferencesState.sourceProblems=Object.fromEntries([...(d.sources||[]).map(s=>[s.location,s.message||'']),...roots.map(r=>[r.root_id,r.message||''])]);
   }catch{if(!effects.isActive)return preferencesState.sourceOnline;preferencesState.sourceOnline={};preferencesState.sourceProblems={}}
   document.body.classList.toggle('offline-source',Object.values(preferencesState.sourceOnline).includes(false));
   dropOfflineFromDefaultLoc();

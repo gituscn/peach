@@ -51,6 +51,8 @@ CARD_PERFORMERS = 6
 def attach_artwork_fields(contract: WebContract, item: dict) -> None:
     """列表、详情与推荐共用本地官方封面和版本投影。"""
     from .strm import is_pointer
+    from .media_identity import ownership
+    item.update(ownership(settings_file.active(), item.get('path') or ''))
     if is_pointer(item.get('path') or item.get('name') or ''):
         item['size'] = None
         item['is_strm'] = True

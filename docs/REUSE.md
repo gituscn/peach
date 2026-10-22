@@ -860,3 +860,9 @@ Python 源文件纳入 `src/peach/library_sharing.py` 与 `src/peach/library_pro
 任务中心复用 `CodeBlock` 展示可复制的 JSON 技术详情。`task_results.result_counts` 将链接检查、资源扫描、追更、订阅、来源查找及浏览记录分析的明细折算为领域数量，供后台结算与读取投影共用；读取投影只补同一轮已结束的恢复检查点，不写 ledger。想要资料任务按作品保存未完整取得的结果，续跑时逐项更新数量。页面保留失败、访问失败、未能清理等结果，有问题的完成任务显示“发现问题”并独立展示；原始任务执行状态仍由任务服务维护。未新增依赖。
 
 普通 Toast 与扫描任务卡共用 Agent Progress 外框，16px 半径由通知栈内的既有 token 解析，细边框与接触阴影分别复用 `border-button-default`、`elevation-xs`，不改变内容排版。浏览器回归核对桌面、手机和明暗主题下的外框一致性，并以同一任务、同一内容回放外框基线生成对比图。
+
+## 媒体库与根目录身份
+
+身份生成复用 Python 3.14 标准库 [`uuid`](https://docs.python.org/3.14/library/uuid.html) 的 UUIDv4、UUIDv5（PSF 许可，随运行时维护，Windows/macOS/Linux，无新增安装体积）；路径归属复用 `platform.resolve_root`、`PureWindowsPath`，配置写入复用 `fsutil.atomic_write_text`，扫描沿用 SQLite upsert 与现有断点。当前树与 Git 中的媒体库分组、目录索引、来源探测和下载渠道共同消费这些身份。
+
+媒体库与根目录的归属是 Peach 的领域模型，不引入 Jellyfin/Emby 等独立媒体服务器或数据库 ORM：这些方案不能直接维护现有账本、个人记录和 Windows 账本路径契约。只读旧配置使用确定性升级，显式保存持久化身份；新增实体的随机 UUID 与显示名称无关。隔离用例覆盖配置往返、同名库、重排、重定位、根目录离线及扫描个人记录保护；实现与验收边界见 [ADR-0115](adr/0115-library-and-storage-root-identity.md)。未新增依赖，不自动写真实 ledger。

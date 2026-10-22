@@ -218,8 +218,8 @@ export async function mountDetailPlayer(
     // 播到一半掉盘时 video 元素只报通用错误；来源状态才分得清脱盘和文件损坏。
     if (options.checkSourceStatus === false) return;
     void host.loadSourceStatus().then((status) => {
-      if (status[String(item.location)] !== false || player.isDisposed()) return;
-      player.error({ code: 2, message: `媒体目录无法访问 · ${host.offlineReason(String(item.location))}` });
+      if (status[String(item.root_id || item.location)] !== false || player.isDisposed()) return;
+      player.error({ code: 2, message: `媒体目录无法访问 · ${host.offlineReason(String(item.root_id || item.location))}` });
     });
   });
   player.ready(() => {

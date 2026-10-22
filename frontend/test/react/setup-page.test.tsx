@@ -158,14 +158,14 @@ describe('媒体库', () => {
     expect(host.textContent).toContain('请选择媒体读取策略');
     await choose(policy, '正常读取');
     await submitForm(host);
-    expect(sent(SETUP_URL).media_dir).toEqual([
+    expect(sent(SETUP_URL).media_dir).toMatchObject([
       { path: 'D:\\Videos', location: 'onedrive', root: '', cost: 'free' },
     ]);
   });
 
   it('加一行、删一行，扫描说明跟着行数走，提交按行带上来源', async () => {
     const { host, sent } = await open({}, { [SETUP_URL]: { status: 200, body: done() } });
-    await click(buttonNamed('添加媒体库', host));
+    await click(buttonNamed('添加文件夹', host));
     expect(rows(host)).toHaveLength(2);
     expect(document.activeElement).toBe(paths(host)[1]);
     await type(paths(host)[1], 'E:\\More');
@@ -174,7 +174,7 @@ describe('媒体库', () => {
     expect(paths(host).map((input) => input.value)).toEqual(['E:\\More']);
     expect(rows(host)[0]!.querySelector('button[aria-label="移除这个文件夹"]')).toBeNull();
     await submitForm(host);
-    expect(sent(SETUP_URL).media_dir).toEqual([{ path: 'E:\\More', location: 'local', root: '', cost: 'free' }]);
+    expect(sent(SETUP_URL).media_dir).toMatchObject([{ path: 'E:\\More', location: 'local', root: '', cost: 'free' }]);
   });
 
   it('选择文件夹让这台电脑弹对话框，选中的路径填回这一行', async () => {
@@ -228,7 +228,7 @@ describe('填错时原位标错', () => {
   it('整表不成立的那一句写在目录区上方，不挂到某一行', async () => {
     const { host } = await open({}, { [SETUP_URL]: { status: 400, body: {
       error: '有几项需要修改', errors: { media_dir: ['请添加 1 到 100 个媒体目录'] } } } });
-    await click(buttonNamed('添加媒体库', host));
+    await click(buttonNamed('添加文件夹', host));
     await submitForm(host);
     const [alert, ...more] = alertsWith(host, '请添加 1 到 100 个媒体目录');
     expect(alert).toBeDefined();

@@ -8,6 +8,8 @@ export interface MediaEntityRef extends FaceRef { id: number }
 /** `/api/items` 的一条。只列卡片读到的字段，其余原样带着，壳的缓存要的是整条。 */
 export interface MediaItem {
   id: number;
+  root_id?: string;
+  library_id?: string;
   name?: string;
   code?: string;
   is_jav?: boolean;

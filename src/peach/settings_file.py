@@ -230,6 +230,8 @@ class PeachConfig:
     library_names: dict[str, str] = field(default_factory=dict)
     library_icons: dict[str, str] = field(default_factory=dict)
     media_costs: dict[str, str] = field(default_factory=dict)
+    library_catalog: dict[str, dict[str, str]] = field(default_factory=dict)
+    storage_roots: dict[str, dict[str, str]] = field(default_factory=dict)
     #: `asset.location` -> 数据库中的目录前缀，至少一个。
     locations: dict[str, tuple[str, ...]] = field(
         default_factory=lambda: dict(DEFAULT_LOCATION_ROOTS))
@@ -324,7 +326,7 @@ def _string_map(table: dict, path: Path, prefix: str) -> dict[str, str]:
     return result
 
 
-def _root_map(table: dict, path: Path, prefix: str) -> dict[str, tuple[str, ...]]:
+def _root_map(table: dict, path: Path, prefix: str, *, allow_empty: bool = False) -> dict[str, tuple[str, ...]]:
     """`[media.locations]` / `[media.mounts]` 的值：一个字符串，或一个字符串数组。
 
     单个来源常常只有一个目录，写成字符串最好读；第二块硬盘加进来时改成数组即可。
@@ -337,9 +339,10 @@ def _root_map(table: dict, path: Path, prefix: str) -> dict[str, tuple[str, ...]
             continue
         if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
             raise _fail(path, f"`{prefix}{key}` 必须是字符串，或者字符串数组")
-        if any(not item for item in value):
+        if not allow_empty and any(not item for item in value):
             raise _fail(path, f"`{prefix}{key}` 的数组里不能有空串")
-        if len(set(value)) != len(value):
+        filled = [item for item in value if item] if allow_empty else value
+        if len(set(filled)) != len(filled):
             raise _fail(path, f"`{prefix}{key}` 的数组里有重复的路径")
         result[key] = tuple(value)
     return result
@@ -356,7 +359,7 @@ def _merge(
         raise _fail(path, "`directories` 里有不认识的键：" + "、".join(unknown))
 
     media = _table(document, "media", path)
-    stray = sorted(set(media) - {_LOCATIONS_KEY, _MOUNTS_KEY, "libraries", "library_icons", "costs"})
+    stray = sorted(set(media) - {_LOCATIONS_KEY, _MOUNTS_KEY, "libraries", "library_icons", "costs", "library_catalog", "storage_roots"})
     if stray:
         # 第一阶段的 `[media] R = '/Volumes/Media'`。键空间从盘符换成了 location ID，
         # 把它当未知键忽略等于「所有来源都没挂」——整台机器安静地进脱盘模式。
@@ -377,7 +380,7 @@ def _merge(
             raise _fail(path, "`[media.locations]` 中这些媒体来源没有配置目录前缀：" + "、".join(empty))
     else:
         locations = dict(DEFAULT_LOCATION_ROOTS)
-    mounts = _root_map(_table(media, _MOUNTS_KEY, path), path, "media.mounts.")
+    mounts = _root_map(_table(media, _MOUNTS_KEY, path), path, "media.mounts.", allow_empty="storage_roots" in media)
     unknown_mounts = sorted(set(mounts) - set(locations))
     if unknown_mounts:
         # 打错一个 ID 却静默忽略，同样是安静地脱盘。
@@ -450,6 +453,17 @@ def _merge(
         media_costs=media_costs,
         server=server, replication=replication, tunnel=tunnel,
     )
+    from . import media_identity
+    if "storage_roots" in media or "library_catalog" in media:
+        try:
+            libraries = {key: _string_map(value, path, "media.library_catalog.")
+                         for key, value in _table(media, "library_catalog", path).items()}
+            roots = {key: _string_map(value, path, "media.storage_roots.")
+                     for key, value in _table(media, "storage_roots", path).items()}
+            media_identity.validate_catalog(libraries, roots)
+            config = media_identity.project(config, libraries, roots)
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise _fail(path, f"媒体库身份配置无效：{exc}") from exc
     return _apply_environment(config, environ)
 
 
@@ -585,6 +599,13 @@ def _render_pairs(pairs: dict[str, object]) -> list[str]:
 
 def render(config: PeachConfig) -> str:
     """把设置渲染成带注释的 TOML。注释是给人读的，`load_config` 不依赖它们。"""
+    from . import media_identity
+    libraries, roots = media_identity.catalog(config)
+    # 读取时会拒绝的身份不写出，免得一次保存让下次启动读不回配置。
+    try:
+        media_identity.validate_catalog(libraries, roots)
+    except ValueError as exc:
+        raise SettingsFileError(f"媒体库身份配置无效：{exc}") from exc
     lines = [
         "# Peach 设置文件。优先级：环境变量 > 本文件 > 程序默认值；手动修改后重启服务生效。",
         "# 本文件保存在 Peach 数据目录中；该目录由 PEACH_DATA_ROOT 或项目旁的 peach-data 决定。",
@@ -617,7 +638,7 @@ def render(config: PeachConfig) -> str:
         "",
         "[media.libraries]",
         "# [media.locations] 中的目录前缀 -> 界面显示的媒体库名称；不写时取目录名。",
-        "# 多个目录使用相同名称时，在界面中显示为同一个媒体库。",
+        "# 名称与路径表是身份配置的兼容投影；媒体库归属以 library_catalog 和 storage_roots 为准。",
     ]
     lines += [f"{_render_value(root)} = {_render_value(name)}" for root, name in config.library_names.items()]
     lines += [
@@ -640,6 +661,10 @@ def render(config: PeachConfig) -> str:
         "# Windows 直接读取 [media.locations] 中的目录，无需填写本表。",
     ]
     lines += _render_roots(dict(config.mounts))
+    for key, value in libraries.items():
+        lines += ["", f"[media.library_catalog.{_render_key(key)}]", *_render_pairs(value)]
+    for key, value in roots.items():
+        lines += ["", f"[media.storage_roots.{_render_key(key)}]", *_render_pairs(value)]
     lines += [
         "",
         "[server]",
@@ -701,6 +726,23 @@ def write(config: PeachConfig, *, force: bool = False) -> Path:
     return path
 
 
+def upgrade_media_identity(config: PeachConfig, *, apply: bool = False) -> PeachConfig:
+    """显式升级配置身份；预演不写文件，不访问账本。"""
+    from . import media_identity
+    from .fsutil import atomic_write_text
+    prepared = media_identity.project(config)
+    media_identity.validate_catalog(prepared.library_catalog, prepared.storage_roots)
+    if apply and not config.storage_roots:
+        if not config.present:
+            raise SettingsFileError("请先完成首次设置")
+        backup = config.path.with_suffix(".pre-media-identity.toml")
+        # 排他备份防止覆盖上一次升级前的配置。
+        with backup.open("xb") as target:
+            target.write(config.path.read_bytes())
+        atomic_write_text(config.path, render(prepared))
+    return prepared
+
+
 def capture_existing(
     config: PeachConfig, *, replication_enabled: bool = True,
     overrides: dict[str, object] | None = None,
@@ -730,8 +772,19 @@ def capture_existing(
         replication = replace(replication, shared_root=str(config.shared_root))
     if not replication.smb_share:
         replication = replace(replication, smb_share=config.smb_share)
-    return replace(
+    prepared = replace(
         config, server=server, replication=replication,
         directories={key: config.directories.get(key, key) for key in DIRECTORY_KEYS},
         mounts=dict(mounts) if mounts is not None else dict(config.mounts),
     )
+    if config.storage_roots and mounts is not None:
+        from . import media_identity
+        libraries, roots = media_identity.catalog(config)
+        for value in roots.values():
+            location = value["location"]
+            index = config.locations[location].index(value["root"])
+            points = mounts.get(location, ())
+            value["mount"] = str(points[index]) if index < len(points) else ""
+        media_identity.validate_catalog(libraries, roots)
+        return media_identity.project(prepared, libraries, roots)
+    return prepared

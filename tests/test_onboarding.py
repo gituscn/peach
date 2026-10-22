@@ -1047,7 +1047,7 @@ class StandaloneConfigurationTests(_Case):
         from peach import media_libraries
         first, second, third = (str(self.media / name) for name in ("a", "b", "c"))
         self.config = replace(self.config, locations={"local": (first, second), "115": (third,)},
-                              library_names={first: "电影", third: "电影"})
+                              library_names={first: "电影", third: "电影"}, library_catalog={}, storage_roots={})
         settings_file.write(self.config, force=True)
         with self.client() as client:
             snapshot = client.get("/api/configuration", headers={"X-Token": "test-token"}).json()

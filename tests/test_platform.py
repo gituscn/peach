@@ -108,6 +108,19 @@ class LocationResolutionTests(unittest.TestCase):
 
 
 class MountSourceTests(unittest.TestCase):
+    def test_mixed_mount_mapping_keeps_each_roots_position(self):
+        declared = {'local': ('R:\\one', 'S:\\two')}
+        with tempfile.TemporaryDirectory() as temporary:
+            mounted = Path(temporary).resolve()
+            with with_media({'local': ('', str(mounted))}, declared), patch.dict(os.environ, {MOUNTS_ENV: ''}):
+                self.assertEqual(location_mounts()['local'][1], mounted)
+                first = translate_ledger_path('R:\\one\\a.mp4')
+                if os.name == 'nt':
+                    self.assertEqual(first, Path('R:\\one\\a.mp4'))
+                else:
+                    self.assertTrue(is_unmapped(first))
+                self.assertEqual(translate_ledger_path('S:\\two\\b.mp4'), mounted / 'b.mp4')
+
     """挂载表按来源 ID 取自设置文件；`PEACH_MEDIA_MOUNTS` 仍然压过它。"""
 
     def test_empty_source_uses_the_settings_parser_shape(self):
@@ -250,6 +263,20 @@ class OfflineModeTests(unittest.TestCase):
 
 
 class MountReachabilityTests(unittest.TestCase):
+    def test_an_offline_root_does_not_disable_other_roots_of_the_same_source(self):
+        from peach.mount_reachability import MountReachability, MountRoot
+        monitor = MountReachability([
+            MountRoot('local', '本地磁盘', 'D:/JAV', self.root, 'root-one', 'library-one'),
+            MountRoot('local', '本地磁盘', 'E:/JAV', None, 'root-two', 'library-one'),
+        ], probe=lambda _path: 'ok', retry_delay=0)
+        self.addCleanup(monitor.stop)
+        monitor._states[self.root].state = 'ok'
+        row = monitor.sources()[0]
+        self.assertTrue(row['online'])
+        self.assertEqual([(root['root_id'], root['online']) for root in row['roots']],
+                         [('root-one', True), ('root-two', False)])
+        self.assertEqual(monitor.summary()['state'], 'degraded')
+
     def setUp(self):
         from peach.mount_reachability import MountReachability, MountRoot
         self.tmp = tempfile.TemporaryDirectory()
