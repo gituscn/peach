@@ -22,7 +22,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from filelock import FileLock, Timeout
 
-from . import (access, distribution, entry_links, folder_picker, media_libraries, onboarding,
+from . import (access, data_storage, distribution, entry_links, folder_picker, media_libraries, onboarding,
                push_discovery, settings_file, media_configuration, tunnel, web_downloads)
 from .routes_auth import require_auth, require_authenticated_client, same_origin
 from .web_entry import runtime_fact_entries
@@ -189,6 +189,7 @@ def snapshot(config) -> dict[str, Any]:
         "library_sharing": library_sharing.snapshot(config),
         "startup": desktop_startup.snapshot(config),
         "uninstall": desktop_uninstall.snapshot(config),
+        "storage": data_storage.snapshot(config),
         "peach_proxy": peach_proxy.describe(config.directory("secrets")),
         "entry_links": entry_links.snapshot(config.directory("state")),
         "updates": release_updates.snapshot(),
@@ -558,6 +559,63 @@ def uninstall(request: Request, body: dict = Body(...), _args=Depends(require_au
         return desktop_uninstall.request(settings_file.load_config(), body.get("delete_data"))
     except (ValueError, Timeout) as exc:
         raise HTTPException(409, str(exc)) from exc
+
+
+def _storage_config():
+    config = settings_file.load_config()
+    if not config.present:
+        raise HTTPException(409, "请先完成首次设置")
+    return config
+
+
+@router.get("/api/configuration/storage")
+def read_storage(request: Request, _args=Depends(require_auth)):
+    """「存储空间」：数据目录位置、磁盘余量、上次统计的分类占用与迁移状态。"""
+    local_only(request)
+    return data_storage.snapshot(_storage_config())
+
+
+@router.post("/api/configuration/storage/measure")
+def measure_storage(request: Request, _args=Depends(require_auth)):
+    local_only(request)
+    same_origin(request)
+    config = _storage_config()
+    try:
+        data_storage.JOBS.start(config, "measure")
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return data_storage.snapshot(config)
+
+
+@router.post("/api/configuration/storage/clean")
+def clean_storage(request: Request, body: dict[str, Any] = Body(default_factory=dict),
+                  _args=Depends(require_auth)):
+    local_only(request)
+    same_origin(request)
+    config = _storage_config()
+    category = body.get("category")
+    if category not in data_storage.CLEANABLE:
+        raise HTTPException(400, "这一类不能在这里清理")
+    try:
+        data_storage.JOBS.start(config, category)
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return data_storage.snapshot(config)
+
+
+@router.post("/api/configuration/storage/relocate")
+def relocate_storage(request: Request, body: dict[str, Any] = Body(default_factory=dict),
+                     _args=Depends(require_auth)):
+    """校验新位置并写下迁移请求；托盘接手后停服务、退出，由迁移助手搬家并重新打开。"""
+    local_only(request)
+    same_origin(request)
+    config = _storage_config()
+    try:
+        return data_storage.request(config, body.get("target"))
+    except ValueError as exc:
+        raise HTTPException(400, {"message": "无法迁移到这个位置", "errors": {"target": str(exc)}}) from exc
+    except Timeout as exc:
+        raise HTTPException(409, "迁移请求正在处理") from exc
 
 
 @router.get("/api/configuration/updates")

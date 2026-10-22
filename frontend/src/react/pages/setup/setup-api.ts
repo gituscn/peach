@@ -17,7 +17,7 @@ export interface SetupQuestion {
   default: string;
   required: boolean;
   advanced: boolean;
-  input: 'folders' | 'choice' | 'text' | 'number';
+  input: 'folders' | 'folder' | 'choice' | 'text' | 'number';
   prefix: string;
   suffix: string;
   options?: SetupOption[];

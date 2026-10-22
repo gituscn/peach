@@ -1407,6 +1407,8 @@ class PeachTray:
             poll_uninstall(self)
             from .dev_copy_runtime import poll as poll_copy
             poll_copy(self, PROJECT_ROOT)
+            from .data_storage import poll as poll_relocation
+            poll_relocation(self)
             if self._stop_event.is_set():
                 return
             # 先看首次设置有没有完成：切换会换掉 `manager.specs`，采样必须落在换完之后。

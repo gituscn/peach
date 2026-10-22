@@ -630,7 +630,8 @@ class SetupJsonContractTests(_SetupHttpCase):
         self.assertEqual([item["label"] for item in questions], ["数据目录", "媒体库", "谁可以访问", "端口", "局域网访问地址"])
         by_key = {item["key"]: item for item in questions}
         self.assertEqual([key for key, item in by_key.items() if not item["required"]], ["host"])
-        self.assertEqual([key for key, item in by_key.items() if not item["advanced"]], ["media_dir"])
+        self.assertEqual([key for key, item in by_key.items() if not item["advanced"]], ["data_root", "media_dir"])
+        self.assertEqual(by_key["data_root"]["input"], "folder")
         self.assertEqual(by_key["host"]["options"], [{"value": "2", "label": "同一局域网的设备"},
                                                      {"value": "1", "label": "只有这台电脑"}])
         self.assertEqual((by_key["port"]["input"], by_key["port"]["prefix"]), ("number", "localhost:"))

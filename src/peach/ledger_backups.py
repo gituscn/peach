@@ -9,6 +9,10 @@
 主文件已经不在的 `-wal`／`-shm` 另外扫一遍。清退按 `.db` 列举，边车只跟着主文件走，所以
 主文件删掉而边车没删掉的那一刻，这几个文件就再没有人会看它们一眼：下一轮列不到，只会
 一直留在账本目录里。2026-09-13 在真实数据目录数到 20 个，最早的来自 08-21。
+
+备份不只在账本目录：文件整理与云下载后处理把整库备份写进 `<generated>/organize-backups/`
+（`organize_dir`）。`directory` 指定要清退的目录，「最近几份」按那个目录计算，当前账本
+仍是判断依据。
 """
 from __future__ import annotations
 
@@ -26,6 +30,11 @@ SIDECAR_SUFFIXES = ("-wal", "-shm")
 SIDECAR_PATTERN = re.compile(r"^ledger\.pre-.+\.db(?:" + "|".join(SIDECAR_SUFFIXES) + r")$")
 KEEP_RECENT = 5
 MIN_AGE = timedelta(hours=24)
+ORGANIZE_DIRNAME = "organize-backups"
+
+
+def organize_dir(generated_root: Path | str) -> Path:
+    return Path(generated_root) / ORGANIZE_DIRNAME
 
 
 @dataclass(frozen=True)
@@ -47,23 +56,25 @@ def _size_with_sidecars(path: Path) -> int:
     return total
 
 
-def list_backups(live: Path) -> list[Path]:
-    """同目录下所有备份，按修改时间从旧到新。"""
-    if not live.parent.is_dir():
+def list_backups(live: Path, directory: Path | None = None) -> list[Path]:
+    """`directory`（缺省为账本所在目录）下所有备份，按修改时间从旧到新。"""
+    folder = live.parent if directory is None else directory
+    if not folder.is_dir():
         return []
     found = [
-        path for path in live.parent.iterdir()
+        path for path in folder.iterdir()
         if path.is_file() and BACKUP_PATTERN.match(path.name)
     ]
     return sorted(found, key=lambda path: path.stat().st_mtime)
 
 
-def orphan_sidecars(live: Path) -> list[Path]:
+def orphan_sidecars(live: Path, directory: Path | None = None) -> list[Path]:
     """主文件已经不在的备份边车，按名字排序。"""
-    if not live.parent.is_dir():
+    folder = live.parent if directory is None else directory
+    if not folder.is_dir():
         return []
     found = []
-    for path in live.parent.iterdir():
+    for path in folder.iterdir():
         if not path.is_file() or not SIDECAR_PATTERN.match(path.name):
             continue
         base = path.with_name(path.name.rsplit("-", 1)[0])
@@ -100,9 +111,10 @@ def plan(
     keep_recent: int = KEEP_RECENT,
     min_age: timedelta = MIN_AGE,
     now: datetime | None = None,
+    directory: Path | None = None,
 ) -> BackupPlan:
-    backups = list_backups(live)
-    orphans = tuple(orphan_sidecars(live))
+    backups = list_backups(live, directory)
+    orphans = tuple(orphan_sidecars(live, directory))
     if not backups and not orphans:
         return BackupPlan((), ())
     if not live.is_file():
@@ -135,9 +147,10 @@ def prune(
     keep_recent: int = KEEP_RECENT,
     min_age: timedelta = MIN_AGE,
     now: datetime | None = None,
+    directory: Path | None = None,
 ) -> BackupPlan:
     """算出计划；`apply` 为真且没有拒绝理由时真的删。删不掉的记日志、继续。"""
-    decided = plan(live, keep_recent=keep_recent, min_age=min_age, now=now)
+    decided = plan(live, keep_recent=keep_recent, min_age=min_age, now=now, directory=directory)
     if not apply or decided.refused:
         return decided
     doomed = [target for backup in decided.remove

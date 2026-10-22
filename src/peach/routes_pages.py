@@ -58,7 +58,8 @@ _SETUP_SYMBOLS = re.compile(r'<symbol id="i-(?:folder-search|hard-drive|database
 #: 键 -> 页面上的题目与一句说明。顺序、默认值与校验仍然来自 `onboarding.questions()`，
 #: 这里只决定同一道题在浏览器里怎么称呼：命令行那份题面要把可选值写进去，页面用控件表达。
 _SETUP_COPY = {
-    "data_root": ("数据目录", "Peach 数据库、缓存和设置文件都放在这里。"),
+    "data_root": ("数据目录", "Peach 数据库、封面、预览图和缓存都放在这里，馆藏较大时会占用数十 GB。"
+                              "系统盘空间紧张时，请选择其他磁盘上的文件夹；之后也可在设置页迁移。"),
     "media_dir": ("媒体库", "Peach 从媒体库读取视频和图片。请选择已存在的文件夹，也可以使用外置硬盘。"),
     "host": ("谁可以访问", ""),
     "port": ("端口", "浏览器地址里冒号后面的数字，一般不用改。"),
@@ -122,6 +123,8 @@ def _question_view(question) -> dict[str, str]:
     view = {"label": title, "help": help_text, "input": "text", "prefix": "", "suffix": ""}
     if question.key == "media_dir":
         view["input"] = "folders"
+    elif question.key == "data_root":
+        view["input"] = "folder"
     elif question.key == "host":
         view["input"] = "choice"
     elif question.key == "port":
@@ -377,8 +380,9 @@ def setup_questions(request: Request):
             "default": question.default,
             # 星号与 `required` 跟着输入框走：两段式单选总有一项选中，不标。
             "required": question.key != "host",
-            # 只有媒体库露在外面，其余四项都有能直接用的默认值，折进「高级设置」。
-            "advanced": question.key != "media_dir",
+            # 媒体库和数据目录露在外面：数据目录决定占用哪块磁盘，装完再改要整体迁移。
+            # 其余三项都有能直接用的默认值，折进「高级设置」。
+            "advanced": question.key not in {"media_dir", "data_root"},
             "input": view["input"], "prefix": view["prefix"], "suffix": view["suffix"],
         }
         if question.key == "host":

@@ -1,4 +1,4 @@
-/* 「应用与维护」中的运行信息、安装教程与卸载。 */
+/* 「应用与维护」中的运行信息、存储空间、安装教程与卸载。 */
 import { useState, type FormEvent } from 'react';
 import { confirmModal } from '@peach/legacy/ui';
 
@@ -14,6 +14,7 @@ import type {
 import { PathLine } from '../components/path-line';
 import { groupRoot } from './configuration-panel';
 import { Disclosure, ErrorText, ExternalLink, Fact, FactList, Footer, Help, Rows, Section, Stack } from './section';
+import { StorageSettings } from './storage-settings';
 import { busyProps, useAction } from './use-action';
 
 const INTERVALS = [['6', '每 6 小时'], ['24', '每天'], ['168', '每周']] as const;
@@ -24,6 +25,7 @@ export function MaintenanceSettings(
   return (
     <div {...groupRoot(panel)}>
       <Facts facts={data.facts} />
+      {data.storage ? <StorageSettings initial={data.storage} receipt={receipt} /> : null}
       <TutorialSettings receipt={receipt} reopenTutorial={reopenTutorial} />
       {data.uninstall ? <UninstallSettings uninstall={data.uninstall} receipt={receipt} /> : null}
     </div>

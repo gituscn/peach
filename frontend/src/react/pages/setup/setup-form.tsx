@@ -9,6 +9,7 @@ import { Radio } from 'react-aria-components';
 import { RiAddLine } from '@remixicon/react';
 
 import { Button } from '@/components/base/buttons/button';
+import { IconButton } from '@/components/base/buttons/icon-button';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
 import { Label } from '@/components/base/input/label';
@@ -19,7 +20,8 @@ import { randomId } from '../../../core/random-id';
 import { SEGMENT, SEGMENTED_TRACK, SegmentedRadioGroup } from '../../components/segmented';
 import { busyProps } from '../../settings/busy-props';
 import {
-  FolderField, FolderFieldLine, FolderRow, isCloudSource, MediaReadPolicy, MediaReadPolicyHelp, SourceSelect, useFolderRows,
+  FolderField, FolderFieldLine, FolderRow, FolderSearchIcon, isCloudSource, MediaReadPolicy, MediaReadPolicyHelp,
+  SourceSelect, useFolderRows,
 } from '../../settings/folder-rows';
 import { libraryAutoChoice } from '../../settings/library-icon-picker';
 import { PasswordPair } from '../../settings/password-pair';
@@ -32,7 +34,7 @@ import {
 } from './setup-api';
 
 /** 这几项出错时「高级设置」自己展开：错在折叠里的框，人看不见。 */
-const ADVANCED_KEYS = ['data_root', 'host', 'port', 'mdns_name'];
+const ADVANCED_KEYS = ['host', 'port', 'mdns_name'];
 
 /** 媒体目录那一项的错误：与行数对得上就按行写回，否则是整表一句。 */
 function folderErrors(value: SetupErrors[string], count: number): { rows: string[]; table: string } {
@@ -52,7 +54,9 @@ const text = (value: SetupErrors[string]) => (Array.isArray(value) ? value.filte
 
 export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (done: SetupDone) => void }) {
   const media = setup.questions.find((question) => question.input === 'folders');
-  const others = setup.questions.filter((question) => question.input !== 'folders');
+  const dataRoot = setup.questions.find((question) => question.input === 'folder');
+  const fields = setup.questions.filter((question) => question.input !== 'folders');
+  const others = fields.filter((question) => question.input !== 'folder');
   const sources = setup.media_sources.map(({ value, label }) => [value, label] as const);
   const blank = (path = ''): SetupFolder => ({ path, location: setup.media_source_default, root: '', library_id: randomId(), library: '', cost: setup.media_source_default === 'local' ? 'free' : '' });
   const folders = useFolderRows<SetupFolder>({
@@ -60,7 +64,9 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
     focusAfterPick: true,
   });
   const [values, setValues] = useState<Record<string, string>>(
-    () => Object.fromEntries(others.map((question) => [question.key, question.default])));
+    () => Object.fromEntries(fields.map((question) => [question.key, question.default])));
+  const [pickingData, setPickingData] = useState(false);
+  const [pickError, setPickError] = useState('');
   const [accessOn, setAccessOn] = useState(setup.access_enabled);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -108,7 +114,7 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
       ...(reporting ? { remote_reporting: { usage: reporting.usage, errors: reporting.errors } } : {}),
     };
     // 隐藏的题不提交，服务端按题目默认值补上。
-    for (const question of others) if (visible(question)) submission[question.key] = values[question.key] ?? '';
+    for (const question of fields) if (visible(question)) submission[question.key] = values[question.key] ?? '';
     if (accessOn) Object.assign(submission, { access_password: password, access_confirm: confirmation });
     try {
       onDone(await submitSetup(submission));
@@ -161,6 +167,21 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
         validationBehavior="aria" isInvalid={Boolean(error)} hint={announce(error) ?? (help || undefined)} />
     );
   };
+
+  const pickDataRoot = async () => {
+    if (!dataRoot || pickingData) return;
+    setPickingData(true);
+    setPickError('');
+    try {
+      const path = await pickFolder(values[dataRoot.key] ?? '');
+      if (path) setValue(dataRoot.key, path);
+    } catch (cause) {
+      setPickError(describeFailure(cause));
+    } finally {
+      setPickingData(false);
+    }
+  };
+  const dataRootError = dataRoot ? text(errors[dataRoot.key]) || pickError : '';
 
   const filled = folders.rows.map((row) => row.path.trim()).filter(Boolean);
   const cloud = folders.rows.some((row) => isCloudSource(row.location));
@@ -226,6 +247,23 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
             </>
           ) : null}
           {media.help.map((line) => <Help key={line}>{line}</Help>)}
+        </CardGroup>
+      ) : null}
+
+      {dataRoot ? (
+        <CardGroup labelledBy="setup-data-title">
+          <GroupTitle id="setup-data-title">
+            {dataRoot.label}<span aria-hidden className="ml-0.5 text-text-error-primary">*</span>
+          </GroupTitle>
+          <div className="flex items-start gap-2">
+            <Input className="min-w-0 flex-1" id={`f-${dataRoot.key}`} aria-label={dataRoot.label} isRequired
+              autoComplete="off" spellCheck="false" value={values[dataRoot.key] ?? ''}
+              onChange={(value) => setValue(dataRoot.key, value)}
+              validationBehavior="aria" isInvalid={Boolean(dataRootError)} hint={announce(dataRootError)} />
+            <IconButton icon={FolderSearchIcon} aria-label="选择数据目录" onClick={() => void pickDataRoot()}
+              {...busyProps(pickingData)} />
+          </div>
+          {dataRoot.help.map((line) => <Help key={line}>{line}</Help>)}
         </CardGroup>
       ) : null}
 
