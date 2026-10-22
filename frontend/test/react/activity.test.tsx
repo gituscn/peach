@@ -7,6 +7,7 @@ import { notifyManager, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, expect, it, vi } from 'vitest';
 
 import { ActivityPage } from '../../src/react/activity/activity-page';
+import { BACKGROUND_ISSUES_URL, type BackgroundIssue } from '../../src/react/activity/background-issues';
 import { DOWNLOADS_URL } from '../../src/react/activity/downloads-panel';
 import { ErrorExcerpt } from '../../src/react/activity/error-excerpt';
 import {
@@ -61,12 +62,23 @@ const payload = (overrides: Partial<ActivityData> = {}): ActivityData => ({
   available: true, running: [], skipped: [], finished: [], ...overrides,
 });
 
-/* 云下载段自己取 `/api/downloads`。这里的用例只数任务中心的请求，云下载那一路另答一份空表，那一段就不画。 */
+/* 云下载段自己取 `/api/downloads`，「需要处理」自己取 `/api/background-issues`。这里的用例只数
+   任务中心的请求，那两路另答：云下载回空表、后台问题回 `issues` 当前那一份（默认没有），两段就不画。 */
 const DOWNLOADS_IDLE: DownloadsSnapshot = { available: true, providers: [], tasks: [] };
+let issues: BackgroundIssue[] = [];
+const issuePosts: string[] = [];
+afterEach(() => { issues = []; issuePosts.length = 0 });
 function stubFetch(tasks: (input: string, init?: RequestInit) => Promise<unknown>) {
-  vi.stubGlobal('fetch', (input: string, init?: RequestInit) => (input.startsWith(DOWNLOADS_URL)
-    ? Promise.resolve({ ok: true, status: 200, json: async () => DOWNLOADS_IDLE })
-    : tasks(input, init)));
+  vi.stubGlobal('fetch', (input: string, init?: RequestInit) => {
+    if (input.startsWith(DOWNLOADS_URL)) return Promise.resolve({ ok: true, status: 200, json: async () => DOWNLOADS_IDLE });
+    if (input.startsWith(BACKGROUND_ISSUES_URL)) return Promise.resolve({ ok: true, status: 200, json: async () => ({ issues }) });
+    if (input.endsWith('/schedule/run')) {
+      issuePosts.push(input);
+      issues = issues.filter((issue) => issue.retry !== input);
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ running: true }) });
+    }
+    return tasks(input, init);
+  });
 }
 
 /** 依次回这几份数据，最后一份之后一直回它。`null` 那一份回 500。 */
@@ -134,6 +146,46 @@ it('首屏用 prefetch 落进缓存的那一份画出来，挂载时不再请求
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect(fetcher.mock.calls[0]?.[0]).toBe(TASKS_URL);
   expect(host.querySelector('[data-task-key=follow-check]')).not.toBeNull();
+});
+
+const issue = (overrides: Partial<BackgroundIssue> = {}): BackgroundIssue => ({
+  key: 'tunnel', title: '公网入口连接失败', href: '/settings/network#tunnel', link_label: '打开公网入口设置',
+  since: null, noticed_at: '2026-10-22T07:00:00Z', retry: null, retry_available: false, ...overrides,
+});
+
+it('后台问题排在最前，每项只写是什么、从什么时候起和写明去处的链接，能原地修的另给立即重试', async () => {
+  issues = [
+    issue(),
+    issue({ key: 'follow-schedule', title: '关注自动检查失败', href: '/settings/subscriptions#followScheduleSetting',
+      link_label: '打开关注调度', since: '2026-10-22T06:00:00Z', retry: '/api/follow/schedule/run', retry_available: true }),
+  ];
+  const { host } = await open(payload({ running: [run()] }));
+  await vi.waitFor(() => { if (!host.querySelector('[role="alert"]')) throw new Error('需要处理还没画出来') });
+  expect(sections(host)).toEqual(['需要处理', '正在进行']);
+  const [tunnel, follow] = [...host.querySelectorAll('[role="alert"]')];
+  expect(tunnel?.textContent).toContain('公网入口连接失败');
+  expect(tunnel?.textContent).toContain('发现于');
+  expect(tunnel?.querySelector('a')?.getAttribute('href')).toBe('/settings/network#tunnel');
+  expect(tunnel?.querySelector('a')?.textContent).toContain('打开公网入口设置');
+  expect(buttonNamed('立即重试', tunnel!)).toBeNull();
+  expect(follow?.textContent).toContain('自 ');
+  expect(follow?.textContent).toContain(' 起');
+  // 任务卡带锚点，「查看失败记录」这类链接能滚到那张卡。
+  expect(host.querySelector('#run-1')?.getAttribute('data-run-id')).toBe('1');
+  // 链接在左、重试在右。
+  const [first, second] = [...follow!.querySelectorAll('[data-note-action] a, [data-note-action] button')];
+  expect([first?.textContent, second?.textContent]).toEqual([expect.stringContaining('打开关注调度'), '立即重试']);
+
+  await click(buttonNamed('立即重试', follow!));
+  await vi.waitFor(() => { if (host.querySelectorAll('[role="alert"]').length !== 1) throw new Error('重试后那一项还在') });
+  expect(issuePosts).toEqual(['/api/follow/schedule/run']);
+});
+
+it('没有后台问题时不画「需要处理」', async () => {
+  const { host } = await open(payload());
+  await settle();
+  expect(host.textContent).not.toContain('需要处理');
+  expect(host.querySelector('[role="alert"]')).toBeNull();
 });
 
 it('在跑的那一轮给出真实计数的进度条与已跑时长', async () => {

@@ -378,6 +378,38 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             served = (await self.client.get("/healthz")).json()
         self.assertEqual(served["build_commit"], "c0ffee1234")
 
+    async def test_background_issues_reads_app_and_contract_services_behind_auth(self):
+        from peach.metadata_amane import bridge_python
+        python = bridge_python(self.root / "tools")
+        python.parent.mkdir(parents=True)
+        python.write_bytes(b"")
+        self.app.state.web_contract.tools_root = self.root / "tools"
+        # 夹具账本没有云下载那张表；云下载的判据由 test_background_issues 单独覆盖。
+        self.app.state.web_contract.downloads = None
+        self.app.state.network_reachability = SimpleNamespace(
+            summary=lambda: {"state": "offline"}, start=lambda: self.fail("汇总不该启动探测"))
+        with patch("peach.settings_file.load_config", return_value=SimpleNamespace(present=False)):
+            self.assertEqual((await self.client.get("/api/background-issues")).status_code, 401)
+            response = await self.client.get("/api/background-issues?t=secret")
+        self.assertEqual(response.status_code, 200)
+        [issue] = response.json()["issues"]
+        self.assertEqual((issue["key"], issue["href"], issue["since"], issue["retry"]),
+                         ("network", "/settings/network#peachProxy", None, "/api/network-status/check"))
+        self.assertTrue(issue["noticed_at"])
+
+    async def test_network_check_probes_once_on_the_spot_and_returns_the_fresh_state(self):
+        from peach.network_reachability import NetworkReachability
+        monitor = NetworkReachability(check=lambda: True)
+        monitor.start = lambda: None
+        self.app.state.network_reachability = monitor
+        self.assertEqual(monitor.summary()["state"], "checking")
+        refused = await self.client.post("/api/network-status/check?t=secret",
+                                          headers={"Origin": "https://evil.example"})
+        self.assertEqual(refused.status_code, 403)
+        response = await self.client.post("/api/network-status/check?t=secret")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["state"], "online")
+
     async def test_sources_and_public_health_read_unknown_mount_snapshot_without_io(self):
         from peach.mount_reachability import MountReachability, MountRoot
         monitor = MountReachability([MountRoot("local", "本地磁盘", "R:/private", self.media_root)],

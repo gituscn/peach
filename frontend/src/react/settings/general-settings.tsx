@@ -18,7 +18,7 @@ import { busyProps, useAction } from './use-action';
 export function GeneralSettings({ data, receipt, panel }: ConfigurationGroupProps) {
   return (
     <div {...groupRoot(panel)}>
-      {data.remote_reporting || data.library_sharing ? <Section title="数据上传">
+      {data.remote_reporting || data.library_sharing ? <Section id="librarySharing" title="数据上传">
         {data.remote_reporting ? <RemoteReportingSettings initial={data.remote_reporting} receipt={receipt} /> : null}
         {data.library_sharing ? <div className="border-t border-separator-border">
           <LibrarySharingSettings initial={data.library_sharing} receipt={receipt} />

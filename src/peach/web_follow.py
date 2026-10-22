@@ -2287,6 +2287,14 @@ def w_follow_schedule(contract, body) -> dict:
     )
 
 
+def w_follow_schedule_run(contract, _body) -> dict:
+    """让自动检查立刻跑一轮，结果照常记进调度状态。"""
+    scheduler = contract.follow_scheduler
+    if scheduler is None:
+        raise ValueError("automatic follow updates are unavailable")
+    return scheduler.run_now()
+
+
 def _resolve_label(contract, parsed, credential) -> str:
     """尽量把标签换成人看得懂的名字。
 

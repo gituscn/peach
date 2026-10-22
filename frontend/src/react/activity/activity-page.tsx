@@ -1,8 +1,9 @@
 /* 活动页：任务中心那张表的唯一界面。
  *
  * 这一屏要回答三个问题，顺序就是它们的紧迫程度：现在有什么在跑、有哪一轮被挡下了、
- * 刚跑完的那些怎么样。三段共用 `/api/tasks` 一次请求的结果。末尾的「云下载」段是网盘离线
- * 任务，取数与轮询都在 `downloads-panel.tsx` 里，和这三段互不牵连。
+ * 刚跑完的那些怎么样。三段共用 `/api/tasks` 一次请求的结果。最前面的「需要处理」是后台服务
+ * 此刻的问题，末尾的「云下载」段是网盘离线任务，两者各自取数与轮询（`background-issues.tsx`、
+ * `downloads-panel.tsx`），和这三段互不牵连。
  *
  * 轮询交给 Query 的 `refetchInterval`：间隔按上一次拿到的内容算，有东西在跑两秒一次，
  * 全是终态十秒一次。它是后台刷新，不写 `aria-busy`——页面上的内容一直是完整的，写了
@@ -30,6 +31,7 @@ import { Page } from '../components/page';
 import { Progress } from '../components/progress';
 import { busyProps } from '../settings/use-action';
 import { Disclosure } from '../settings/section';
+import { BackgroundIssues } from './background-issues';
 import { DownloadsPanel } from './downloads-panel';
 import { ErrorDetails, ErrorExcerpt } from './error-excerpt';
 import {
@@ -91,7 +93,8 @@ function RunCard(
     followups?: TaskRunPayload[] },
 ) {
   return (
-    <li data-status={run.status} data-task-key={run.task_key} data-run-id={run.id}
+    // `id` 让「需要处理」那一行的「查看失败记录」能直接滚到这张卡。
+    <li id={`run-${run.id}`} data-status={run.status} data-task-key={run.task_key} data-run-id={run.id}
       className={cardClass({
         padding: 'none',
         bordered: 'line',
@@ -267,6 +270,8 @@ export function ActivityPage() {
       {data.available === false
         ? <Note tone="warning">{data.message || '数据库尚未准备好任务记录表'}</Note>
         : null}
+      {/* 后台服务此刻的问题排在最前：它们不会自己跑完，要人去处理。 */}
+      <BackgroundIssues />
       {quiet
         ? <EmptyState icon={RiHistoryLine} title="还没有任务记录">
             扫描、追更检查、批量操作和命令行批处理跑起来之后，这里会显示它们的进度与结果。

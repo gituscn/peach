@@ -131,6 +131,25 @@ class FeedWebFixture(unittest.TestCase):
 
 
 class FeedWebTest(FeedWebFixture):
+    def test_schedule_route_reports_feed_scheduler_failures(self):
+        from peach.follow_scheduler import FEED_JOB_ID, FollowScheduleConfig, FollowUpdateScheduler
+        idle = dispatch_api_get(self.contract, "/api/feeds/schedule", {})
+        self.assertEqual((idle["available"], idle["interval_minutes"]),
+                         (False, feeds.DEFAULT_INTERVAL_MINUTES))
+
+        def failing():
+            return {"ok": True, "checked": 2, "results": [{"ok": False}, {"ok": True, "added": 1}]}
+        self.contract.feed_scheduler = FollowUpdateScheduler(
+            Path(self.temporary.name) / "schedule", failing, available=True, job_id=FEED_JOB_ID,
+            filename="feed-schedule.json",
+            default=FollowScheduleConfig(enabled=True, interval_minutes=feeds.DEFAULT_INTERVAL_MINUTES))
+        self.contract.feed_scheduler._run()
+        self.contract.feed_scheduler._run()
+        status = dispatch_api_get(self.contract, "/api/feeds/schedule", {})
+        self.assertEqual((status["available"], status["enabled"], status["interval_minutes"]),
+                         (True, True, feeds.DEFAULT_INTERVAL_MINUTES))
+        self.assertEqual((status["last_error"], status["consecutive_failures"]), ("1 个来源检查失败", 2))
+
     def test_recovery_keeps_source_selection_progress_and_discovered_codes(self):
         from peach import job_recovery
         first = self._add()

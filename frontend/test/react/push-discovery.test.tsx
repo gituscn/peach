@@ -77,3 +77,19 @@ it('换过密钥之后配置块换成新的那一段', async () => {
   await settle();
   expect(host.querySelector('pre')?.textContent).toBe(next.config_toml);
 });
+
+it('入库失败时给出服务端记下的原因与失败数，没有失败时不出现', async () => {
+  const queue = { ...state().queue, failed: 2, last_error: 'database is locked' };
+  const failing = await mount(<PushDiscoveryForm initial={state({ queue })} receipt={vi.fn()} />);
+  const alert = failing.querySelector('[role="alert"]');
+  expect(alert?.textContent).toContain('最近一次入库失败');
+  expect(alert?.textContent).toContain('database is locked');
+  expect(failing.textContent).toContain('已入库 3 个文件，2 个入库失败');
+
+  const healthy = await mount(<PushDiscoveryForm initial={state()} receipt={vi.fn()} />);
+  expect(healthy.querySelector('[role="alert"]')).toBeNull();
+  expect(healthy.textContent).not.toContain('入库失败');
+
+  const disabled = await mount(<PushDiscoveryForm initial={state({ enabled: false, queue })} receipt={vi.fn()} />);
+  expect(disabled.querySelector('[role="alert"]')).toBeNull();
+});

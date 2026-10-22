@@ -301,7 +301,7 @@ function AmaneBridgeCard({ toast }: ScrapingProps) {
 
   if (!data) {
     return bridge.error
-      ? <Section title="amane"><Stack><Note tone="error">{errorMessage(bridge.error)}</Note></Stack></Section>
+      ? <Section id="amane" title="amane"><Stack><Note tone="error">{errorMessage(bridge.error)}</Note></Stack></Section>
       : null;
   }
   const busy = running || rebuild.isPending || check.isPending;
@@ -309,7 +309,7 @@ function AmaneBridgeCard({ toast }: ScrapingProps) {
     : check.error ? errorMessage(check.error)
     : outcome?.status === 'failed' ? (outcome.error || '重建未完成') : '';
   return (
-    <Section title="amane" aside={<ExternalLink href={data.repository} leadingIcon={GitHubMark}>{data.repository}</ExternalLink>}>
+    <Section id="amane" title="amane" aside={<ExternalLink href={data.repository} leadingIcon={GitHubMark}>{data.repository}</ExternalLink>}>
       <FactList>
         <Fact term="已安装版本">{data.installed_version || '未安装'}</Fact>
         <Fact term="上游最新版本">{check.data?.latest ?? '尚未检查'}</Fact>
