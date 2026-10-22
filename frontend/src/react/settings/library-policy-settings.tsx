@@ -2,7 +2,7 @@
  * 放在每个媒体库的标题行里。三档处理方式的说明在分组上方只写一次；只有选了「自定义」的媒体库
  * 才展开五个步骤。来源色默认不上色，点开色球选一档强调色。
  * 原型阶段处理方式只在本页演示，不随「保存配置」提交；来源色记在本浏览器。 */
-import { useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { Dialog, Popover } from 'react-aria-components';
 import { UNSAFE_PortalProvider } from 'react-aria';
 
@@ -13,6 +13,7 @@ import { ACCENT_CHOICES } from '@peach/appearance';
 import { setLibraryColor, useLibraryTints } from '../components/library-tint';
 import { overlayHost } from '../components/overlay-host';
 import { Disclosure } from './section';
+import { POLICY_LEGEND } from './library-policy-copy';
 import '../components/glow-preset-grid.css';
 import './library-policy-settings.css';
 
@@ -31,9 +32,7 @@ export const AUTO_STAGES: readonly Stage[] = ['probe', 'metadata', 'cover', 'peo
 export function PolicyLegend() {
   return (
     <dl data-policy-legend="" className="text-body-2-regular text-text-secondary">
-      <dt>自动补全</dt><dd>先读本地 NFO 和同目录图片，缺什么联网补什么。本地只有竖版海报时联网找完整封套，找不到就用竖版；FC2 商品图本来就是竖版，不另找。</dd>
-      <dt>仅使用本地资料</dt><dd>只读本地 NFO 和同目录图片，不联网补资料、封面和人物图片；只有竖版海报时直接用它。仍读取视频信息、生成九宫格预览。</dd>
-      <dt>自定义</dt><dd>逐项选择。关掉的步骤显示为「已跳过」，不算失败也不自动重试，以后打开会补跑。</dd>
+      {POLICY_LEGEND.map(([name, description]) => <Fragment key={name}><dt>{name}</dt><dd>{description}</dd></Fragment>)}
     </dl>
   );
 }

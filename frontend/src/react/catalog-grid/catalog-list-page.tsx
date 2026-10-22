@@ -14,6 +14,7 @@ import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 import { apiGet } from '../../api';
 import { ArtSlot } from '../components/art-slot';
 import { useLibraryTints } from '../components/library-tint';
+import { catalogListSkeletonCellHtml } from '../../catalog-content-skeleton';
 import { identityParts } from '../components/media-card';
 import { SourceMark } from '../settings/section';
 import { DataTableFrame } from '../components/data-table-frame';
@@ -181,11 +182,15 @@ export function CatalogListPage(props: CatalogGridProps) {
           </TableColumn>)}
           <TableColumn id="remaining-space" aria-label="行空白区域" data-table-space="" width={preferences.spaceWidth} minWidth={0} />
         </TableHeader>
-        <TableBody renderEmptyState={() => result.isPending
-          ? <div data-skeleton="" data-table-skeleton="" aria-busy="true" role="status" aria-label="正在读取作品列表">
-            {Array.from({ length: 6 }, (_, index) => <div key={index}><i className="skeleton-sheen" /><span className="skeleton-sheen" /></div>)}
-          </div> : result.isError ? '作品列表未取得' : '没有符合的作品'}>
-          {table.getRowModel().rows.map(row => <TableRow key={row.id} id={row.id} data-catalog-row="" data-id={row.original.id}
+        <TableBody renderEmptyState={() => result.isError ? '作品列表未取得' : '没有符合的作品'}>
+          {/* 等数据时在真实表格里画骨架行，格子内容与壳的首屏骨架同一份，接管时不换结构。 */}
+          {result.isPending ? Array.from({ length: 6 }, (_, index) => <TableRow key={`skeleton-${index}`} id={`skeleton-${index}`}
+            data-list-skeleton-row="" aria-hidden="true">
+            {table.getHeaderGroups()[0]!.headers.map(header => <TableCell key={header.id}>
+              <span dangerouslySetInnerHTML={{ __html: catalogListSkeletonCellHtml(header.id) }} />
+            </TableCell>)}
+            <TableCell data-table-space="" />
+          </TableRow>) : table.getRowModel().rows.map(row => <TableRow key={row.id} id={row.id} data-catalog-row="" data-id={row.original.id}
             data-library={tints.get(row.original.library_id || '')?.color ? row.original.library_id : undefined}
             data-board-selected={row.getIsSelected() || undefined}>
             {row.getVisibleCells().map(cell => <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}

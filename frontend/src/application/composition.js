@@ -38,6 +38,11 @@ const openOverlayTarget=target=>{
 installEntityShapeBootstrap();
 loadingState.entityShapesReady=loadEntityShapes();
 renderInitialSurfaceLoading();
+/* 首页标题随首屏骨架一起出现：等路由打开目录后再显示，会把骨架整页往下推一跳。其余状态页的标题仍由 `paintListTitle` 定。 */
+if(location.pathname==='/'){
+  const query=new URLSearchParams(location.search);
+  if(!query.has('state')&&query.get('jav')!=='1')$('#catalogPageHeading').hidden=false;
+}
 mountSidebar();
 compositionState.shellActions = {
   openSettings:section=>openSettings(section,true),

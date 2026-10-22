@@ -34,6 +34,7 @@ import {
   AUTO_STAGES, LibraryColorPicker, PolicyLegend, PresetSelect, StageChooser, type Preset, type Stage,
 } from './library-policy-settings';
 import { PushDiscoveryForm } from './push-discovery-settings';
+import { rememberMediaShape } from '../../configuration-skeleton';
 import {
   ErrorText, ExternalLink, Fact, FactList, Footer, Help, Section, SourceMark, Stack,
 } from './section';
@@ -68,11 +69,19 @@ const fieldErrorsOf = (cause: unknown): FieldErrors | null => {
 
 /* 能编辑时挂载状态标在每个文件夹行上；只读时没有那张表，单列一块。 */
 export function MediaSettings({ data, receipt, panel }: ConfigurationGroupProps) {
+  const cloud = !!data.media_sources?.some(row => isCloudSource(row.location));
+  // 首屏骨架照这一屏的形状排：每个媒体库几个文件夹、有没有 CloudDrive 代理与自动发现。
+  useEffect(() => {
+    if (!data.editable) return;
+    const counts = new Map<string, number>();
+    for (const row of initialRows(data)) counts.set(row.library_id, (counts.get(row.library_id) ?? 0) + 1);
+    rememberMediaShape({ folders: [...counts.values()], cloud, discovery: !!data.push_discovery });
+  }, [data, cloud]);
   return (
     <div {...groupRoot(panel)}>
       {data.editable ? <MediaForm data={data} receipt={receipt} /> : <Note tone="neutral" title="只读">{data.notice}</Note>}
       {data.editable ? null : <MountStatus data={data} />}
-      {data.media_sources?.some(row => isCloudSource(row.location)) ? <CloudProxySettings receipt={receipt} /> : null}
+      {cloud ? <CloudProxySettings receipt={receipt} /> : null}
       {data.push_discovery
         ? <PushDiscoveryForm initial={data.push_discovery} receipt={receipt} />
         : null}
