@@ -118,7 +118,7 @@ class FaceProbeTests(unittest.TestCase):
         self.assertEqual(probe.unavailable, "")
 
     def test_a_model_fetched_elsewhere_ends_the_retry_window_early(self):
-        """任务中心「重新下载」取到了模型，题材圆标的探针不必再等满一小时。"""
+        """活动中心「立即重试」取到了模型，题材圆标的探针不必再等满一小时。"""
         from peach import face_detect
 
         probe = FaceProbe(clock=lambda: 1000.0)

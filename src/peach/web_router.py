@@ -318,7 +318,7 @@ def _post_empty_trash(contract, _body):
 
 
 def _post_face_models(contract, _body):
-    """任务中心「重新下载」：后台开一轮取人脸模型，进度与结果看 `/api/tasks`。"""
+    """活动中心「立即重试」：后台开一轮取人脸模型，进度与结果看 `/api/tasks`。"""
     from . import face_models
     return contract.face_models_job.start_result(face_models.download_all)
 

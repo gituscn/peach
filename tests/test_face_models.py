@@ -1,4 +1,4 @@
-"""人脸模型在任务中心的那张卡：按转变留记录、原地重新下载。"""
+"""人脸模型在任务中心的那张卡：按转变留记录、当前状态与立即重试。"""
 import hashlib
 import tempfile
 import unittest
@@ -122,7 +122,7 @@ class FetchObserverTests(FaceModelsCase):
 
 
 class ModelFilesCase(FaceModelsCase):
-    """两个模型落在临时目录，重新下载走真实路由与后台任务，只有取字节那一步换掉。"""
+    """两个模型落在临时目录，立即重试走真实路由与后台任务，只有取字节那一步换掉。"""
 
     def setUp(self):
         super().setUp()
@@ -145,7 +145,7 @@ class ModelFilesCase(FaceModelsCase):
 
 
 class RetryEndpointTests(ModelFilesCase):
-    """任务卡上的「重新下载」：一轮普通的后台任务，记录只有它自己那一行。"""
+    """「立即重试」：一轮普通的后台任务，记录只有它自己那一行。"""
 
     def test_a_failed_retry_is_one_failed_manual_row(self):
         self.retry(side_effect=OSError("断网"))
@@ -165,7 +165,7 @@ class RetryEndpointTests(ModelFilesCase):
 
 
 class StatusTests(ModelFilesCase):
-    """活动中心总控块读的那一份：和任务卡同一个来源，读的时候不联网。"""
+    """活动中心「需要处理」读的那一份：和任务卡同一个来源，读的时候不联网。"""
 
     def status(self):
         with mock.patch.object(face_detect, "read_url",

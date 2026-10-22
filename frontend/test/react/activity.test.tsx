@@ -535,57 +535,14 @@ it('缺人脸模型跑完的后继标成发现问题，不是已完成', async (
     .toEqual(['补全资料图片', '发现问题', `涼森れむ · ${down.outcome}`]);
 });
 
-/** 人脸模型取不到时自动留下的那一轮。 */
-const modelsDown = (overrides: Partial<TaskRunPayload> = {}) => run({
-  id: 9, task_key: 'face-models', task_label: '下载人脸模型', trigger: 'scheduled', status: 'failed',
-  progress_total: null, progress_current: null, finished_at: '2026-09-11T10:05:00Z',
-  error: '取人脸模型失败：getaddrinfo failed', ...overrides,
-});
-
-/** 任务列表回 `data`；重新下载的 POST 按 `retry` 回。 */
-async function openWithRetry(data: ActivityData, retry: { ok: boolean; status: number; body: unknown }) {
-  const calls: [string, RequestInit | undefined][] = [];
-  stubFetch(async (input, init) => {
-    calls.push([input, init]);
-    const body = input === '/api/face-models' ? retry : { ok: true, status: 200, body: data };
-    return { ok: body.ok, status: body.status, json: async () => body.body };
-  });
-  await prefetchTasks(new AbortController().signal);
-  return { calls, host: await mount(page()) };
-}
-
-it('人脸模型取不到的那一轮能原地重新下载，开了新一轮就去刷新列表', async () => {
-  const { calls, host } = await openWithRetry(payload({ finished: [modelsDown()] }),
-    { ok: true, status: 200, body: { job_id: 'a', status: 'running' } });
+it('人脸模型取不到的那一轮只记失败与原因，重试在页顶「需要处理」', async () => {
+  const { host } = await open(payload({ finished: [run({
+    id: 9, task_key: 'face-models', task_label: '下载人脸模型', trigger: 'scheduled', status: 'failed',
+    progress_total: null, progress_current: null, finished_at: '2026-09-11T10:05:00Z',
+    error: '取人脸模型失败：getaddrinfo failed' })] }));
   const card = host.querySelector('[data-task-key=face-models]')!;
+  expect(card.getAttribute('data-status')).toBe('failed');
   expect(card.textContent).toContain('取人脸模型失败：getaddrinfo failed');
-  await click(buttonNamed('重新下载', card));
-  await settle();
-  const post = calls.findIndex(([url]) => url === '/api/face-models');
-  expect(calls[post]?.[1]?.method).toBe('POST');
-  expect(calls.slice(post + 1).some(([url]) => url === TASKS_URL)).toBe(true);
-});
-
-it('请求没送到时原因留在按钮下面，按钮还在', async () => {
-  const { host } = await openWithRetry(payload({ finished: [modelsDown()] }),
-    { ok: false, status: 409, body: { message: '下载人脸模型已有一轮在进行，等它跑完再试' } });
-  const card = host.querySelector('[data-task-key=face-models]')!;
-  await click(buttonNamed('重新下载', card));
-  await settle();
-  expect(card.textContent).toContain('下载人脸模型已有一轮在进行，等它跑完再试');
-  expect(buttonNamed('重新下载', card)).not.toBeNull();
-});
-
-it('只有最新那一轮失败才给重新下载：后来已经取到了，旧的失败卡上没有按钮', async () => {
-  const recovered = modelsDown({ id: 10, status: 'succeeded', error: '', finished_at: '2026-09-11T11:00:00Z',
-                                 result_summary: { outcome: '已取得人脸模型' } });
-  const { host } = await openWithRetry(payload({ finished: [recovered, modelsDown()] }),
-    { ok: true, status: 200, body: {} });
-  expect(host.querySelectorAll('[data-task-key=face-models]')).toHaveLength(2);
-  expect(buttonNamed('重新下载', host)).toBeNull();
-  // 别的任务失败了也不长这颗键：它们有自己的管理页。
-  queryClient.clear();
-  const other = await openWithRetry(payload({ finished: [run({ id: 3, status: 'failed', finished_at: '2026-09-11T10:00:00Z' })] }),
-    { ok: true, status: 200, body: {} });
-  expect(buttonNamed('重新下载', other.host)).toBeNull();
+  expect(card.querySelectorAll('a')).toHaveLength(0);
+  expect([...card.querySelectorAll('button')].some((button) => /重试|下载/.test(button.textContent || ''))).toBe(false);
 });

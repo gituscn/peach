@@ -129,7 +129,7 @@ def run(contract, key: str, handle) -> dict:
     """跑一条补厂牌后继，再把厂牌当时的指纹记进 `Attempts`，存量补派按它判。
 
     人像闸取不到模型的那一次不记：结论取决于那天有没有网，记下来就要等到这家多一部
-    作品或多一条链接才会再试，任务中心里「重新下载」之后也补不回来。
+    作品或多一条链接才会再试，活动中心「立即重试」取回模型之后也补不回来。
     """
     summary = _run(contract, key, handle)
     if summary.get("face_match_unavailable"):

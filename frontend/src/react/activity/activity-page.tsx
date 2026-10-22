@@ -11,7 +11,7 @@
  *
  * 「最近完成」末尾的「加载更早」往前接一页，接上的行留在组件里，与轮询那一份按 id 合并：
  * 轮询只管第一页，翻过的那些不会被下一次刷新冲掉。 */
-import { useContext, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { RiArrowDownSLine, RiArrowRightLine, RiHistoryLine } from '@remixicon/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -20,9 +20,7 @@ import { Chip } from '@/components/base/badges/chip';
 import { Button } from '@/components/base/buttons/button';
 import { LinkButton } from '@/components/base/buttons/link-button';
 
-import { apiSend, errorMessage } from '../../api';
-import { queryClient } from '../query';
-import { ShellActionsContext } from '../router/router';
+import { errorMessage } from '../../api';
 import { cardClass } from '../components/card';
 import { CodeBlock } from '../components/code-block';
 import { EmptyState } from '../components/empty-state';
@@ -37,7 +35,7 @@ import { ErrorDetails, ErrorExcerpt } from './error-excerpt';
 import {
   elapsedText, fetchEarlier, fetchTasks, foldRoutine, followupDetail, groupFollowups, isActive,
   hasResultProblems, isRoutine, latestOfKind, mergeFinished, momentText, pollInterval, problemDestination, progressText,
-  retryAction, statusLabel, summaryItems, taskIssues, TASKS_KEY, TRIGGER_LABELS, type TaskRunPayload,
+  statusLabel, summaryItems, taskIssues, TASKS_KEY, TRIGGER_LABELS, type TaskRunPayload,
 } from './tasks';
 
 /* 完成绿、失败红、进行中蓝、意外中断黄，主动取消和排队为中性。 */
@@ -148,29 +146,10 @@ function RunningRun({ run, followups }: { run: TaskRunPayload; followups?: TaskR
   );
 }
 
-/** 失败卡上原地重跑：POST 只是开一轮后台任务，不是终态，所以成功不发回执——新的那一轮
- *  马上出现在「正在进行」里就是回执。请求本身失败时原因留在按钮下面，按钮还在，再点就是重试。 */
-function RetryButton({ url, label, task }: { url: string; label: string; task: string }) {
-  const actions = useContext(ShellActionsContext);
-  const retry = useMutation({
-    mutationFn: () => apiSend(url, {}),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
-    onError: (error) => actions?.failure(task, error),
-  });
-  return (
-    <div className="flex min-w-0 flex-col items-start gap-2">
-      <Button variant="secondary" size="small" {...busyProps(retry.isPending)}
-        onClick={() => { if (!retry.isPending) retry.mutate(); }}>
-        {label}
-      </Button>
-      {retry.error ? <Note tone="error">{errorMessage(retry.error)}</Note> : null}
-    </div>
-  );
-}
-
 /** 跑完的一轮。`runs` 多于一条时是折叠起来的几轮例行任务：时间写成从最早到最新那一段，
  *  摘要取最新那一轮——例行轮次的摘要本来就一样，逐条列出来只是同一行抄 N 遍。
- *  `latest` 说它是不是同一种任务最新的那一轮：有些任务只有那一轮还有处理入口或能原地重跑。 */
+ *  任务卡只记这一轮的历史：此刻还没解决的问题和「立即重试」在页顶「需要处理」那一块。
+ *  `latest` 说它是不是同一种任务最新的那一轮：有些任务只有那一轮还有处理入口。 */
 function SettledRun(
   { run, followups, runs, latest }:
   { run: TaskRunPayload; followups?: TaskRunPayload[]; runs?: TaskRunPayload[]; latest: boolean },
@@ -178,7 +157,6 @@ function SettledRun(
   const summary = summaryItems(run.result_summary).filter((line) => line !== run.error);
   const issues = taskIssues(run);
   const destination = problemDestination(run, latest);
-  const retry = retryAction(run, latest);
   const elapsed = elapsedText(run.elapsed_seconds);
   const oldest = runs && runs.length > 1 ? runs[runs.length - 1] : undefined;
   const meta = (oldest
@@ -207,7 +185,6 @@ function SettledRun(
             className="self-start">
             {destination.label}
           </LinkButton> : null}
-      {retry ? <RetryButton url={retry.url} label={retry.label} task={run.task_label} /> : null}
     </RunCard>
   );
 }

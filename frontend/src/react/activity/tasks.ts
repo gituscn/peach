@@ -153,7 +153,7 @@ export function taskIssues(run: TaskRunPayload): TaskIssue[] {
 
 /** 处理入口只对同一种任务最新那一轮有意义的任务：目标页只显示最新一轮，更早的失败已经被后来的结果取代。
  *  扫描与采集卡片上的「重试未完成项」只认最新一轮的失败集合；amane 桥重建成功一次，之前的失败就不用再管。 */
-const LATEST_ONLY = new Set(['face-models', 'library-processing', 'amane-bridge']);
+const LATEST_ONLY = new Set(['library-processing', 'amane-bridge']);
 
 export function problemDestination(run: TaskRunPayload, latest = true): { href: string; label: string } | null {
   if (!hasResultProblems(run) && run.status !== 'failed') return null;
@@ -174,17 +174,6 @@ export function problemDestination(run: TaskRunPayload, latest = true): { href: 
   };
   const target = targets[run.task_key];
   return target ? { href: target[0], label: target[1] } : null;
-}
-
-/** 没有自己的管理页、在任务卡上原地重跑的任务：POST 地址与按钮文字。 */
-const RETRY_ACTIONS: Record<string, [string, string]> = {
-  'face-models': ['/api/face-models', '重新下载'],
-};
-
-/** 失败的这一轮能不能在卡上重跑。和处理入口一样只给最新那一轮（`LATEST_ONLY`）。 */
-export function retryAction(run: TaskRunPayload, latest: boolean): { url: string; label: string } | null {
-  const action = RETRY_ACTIONS[run.task_key];
-  return action && latest && run.status === 'failed' ? { url: action[0], label: action[1] } : null;
 }
 
 /** `LATEST_ONLY` 里每种任务最新那一轮的 id。后继不算：它们挂在父任务下，不是这种任务的一轮。 */

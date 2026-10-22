@@ -1,4 +1,7 @@
-"""人脸模型在任务中心的那张卡：取不到时留一条失败记录，页面上一键重新下载。
+"""人脸模型在任务中心的记录、当前状态与「立即重试」。
+
+任务卡只记历史：取不到时留一条失败记录和原因。此刻是否可用由 `status` 回答，活动中心页顶
+「需要处理」那一行读它，「立即重试」调 `RETRY_URL`。
 
 YuNet 与 SFace 两个模型是全进程共用的一次性能力：第一次用到时联网取一次，之后一直用本地
 那份。取不到不让任何一轮任务停下（`avatar_face.FaceProbe`、`face_match.FaceMatcher` 都退回
@@ -9,7 +12,7 @@ YuNet 与 SFace 两个模型是全进程共用的一次性能力：第一次用�
 转变各写成一条 `face-models` 终态记录。同一次失败反复撞上不再写：断网时每条补头像后继都会
 试一次，逐条记下来就是满屏同一张卡。
 
-重新下载是一轮普通的 `BackgroundJob`（`WebContract.face_models_job`），它自己开的那一行
+立即重试是一轮普通的 `BackgroundJob`（`WebContract.face_models_job`），它自己开的那一行
 就是记录；它在跑时回报一律跳过，免得同一件事写两行。
 """
 from __future__ import annotations
@@ -45,7 +48,7 @@ class Reporter:
             latest = self.runs.query(task_key=TASK_KEY, limit=1)
             last = latest[0] if latest else None
             if last is not None and last.active:
-                return                          # 重新下载那一轮自己会结算
+                return                          # 立即重试那一轮自己会结算
             if error is None:
                 if last is None or last.status != "failed":
                     return
@@ -66,21 +69,21 @@ def attach(runs) -> None:
     face_detect.observer = Reporter(runs)
 
 
-#: 「重新下载」的地址。任务卡和活动中心的总控块都用这一个。
+#: 「立即重试」的地址：活动中心页顶「需要处理」那一行调它，请求体 `{}`。
 RETRY_URL = "/api/face-models"
 
 
 def status(runs) -> dict:
-    """人脸模型此刻的状态，给活动中心的总控块读。不联网、不算哈希，读一次就是一条查询。
+    """人脸模型此刻的状态，给活动中心页顶「需要处理」那一行读。不联网、不算哈希，读一次就是一条查询。
 
     判据和任务卡同一个来源：最新那条 `face-models` 记录。`state` 取四个值：
 
-    - `downloading`：重新下载那一轮在跑。
+    - `downloading`：立即重试那一轮在跑。
     - `failed`：最新一条是失败，`failed_at`／`error`／`run_id` 指向那张卡。
     - `ready`：两个模型文件都在本机。哈希留到用的时候由 `fetch_model` 核对。
     - `missing`：还没取过，下次用到时自动去取；这不是问题，不必提示。
 
-    详细原因只在任务卡上写，这里的 `error` 供总控判断与排查，不另起一套说法。
+    详细原因只在任务卡上写，这里的 `error` 供「需要处理」判断与排查，不另起一套说法。
     """
     from . import face_match
 
@@ -106,7 +109,7 @@ def status(runs) -> dict:
 
 
 def download_all() -> dict:
-    """重新下载那一轮：两个模型各取一次，本地已有且校验对得上的直接算取到。
+    """立即重试那一轮：两个模型各取一次，本地已有且校验对得上的直接算取到。
 
     一个取不到不挡另一个：检出模型取到了，题材圆标的取景就能先恢复。
     """

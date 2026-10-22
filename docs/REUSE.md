@@ -859,7 +859,7 @@ Python 源文件纳入 `src/peach/library_sharing.py` 与 `src/peach/library_pro
 
 任务中心复用 `CodeBlock` 展示可复制的 JSON 技术详情。`task_results.result_counts` 将链接检查、资源扫描、追更、订阅、来源查找及浏览记录分析的明细折算为领域数量，供后台结算与读取投影共用；读取投影只补同一轮已结束的恢复检查点，不写 ledger。想要资料任务按作品保存未完整取得的结果，续跑时逐项更新数量。页面保留失败、访问失败、未能清理等结果，有问题的完成任务显示“发现问题”并独立展示；摘要里的能力缺失标记（`face_match_unavailable`，人脸模型取不到时退回旧判据的那一轮）同样算问题。原始任务执行状态仍由任务服务维护。未新增依赖。
 
-人脸模型（YuNet、SFace）是全进程共用的一次性能力。`face_detect.fetch_model` 每次联网取模型的结果经 `face_detect.observer` 报给 `face_models.Reporter`，它只按转变写 `face-models` 任务记录：从能用到取不到一条失败，取回来一条成功，同一次失败反复撞上不再写。失败卡上的「重新下载」调 `POST /api/face-models`，走普通 `BackgroundJob`；取到后 `face_detect.downloads` 加一，常驻的 `avatar_face.FaceProbe` 据此提前结束重试窗口。活动中心总控块读 `face_models.status(contract.task_runs)`：只查最新一条记录和两个模型文件在不在，不联网，返回 `state`（`ready`／`missing`／`failed`／`downloading`）、失败时刻与原因、对应任务卡的 `run_id` 和 `retry_url`。未新增依赖。
+人脸模型（YuNet、SFace）是全进程共用的一次性能力。`face_detect.fetch_model` 每次联网取模型的结果经 `face_detect.observer` 报给 `face_models.Reporter`，它只按转变写 `face-models` 任务记录：从能用到取不到一条失败，取回来一条成功，同一次失败反复撞上只留一条。任务卡只记历史；活动中心页顶「需要处理」读 `face_models.status(contract.task_runs)`：只查最新一条记录和两个模型文件在不在，不联网，返回 `state`（`ready`／`missing`／`failed`／`downloading`）、失败时刻与原因、对应任务卡的 `run_id` 和 `retry_url`。那一行的「立即重试」调 `POST /api/face-models`，走普通 `BackgroundJob`；取到后 `face_detect.downloads` 加一，常驻的 `avatar_face.FaceProbe` 据此提前结束重试窗口。未新增依赖。
 
 普通 Toast 与扫描任务卡共用 Agent Progress 外框，16px 半径由通知栈内的既有 token 解析，细边框与接触阴影分别复用 `border-button-default`、`elevation-xs`，不改变内容排版。浏览器回归核对桌面、手机和明暗主题下的外框一致性，并以同一任务、同一内容回放外框基线生成对比图。
 
