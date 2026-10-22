@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import re
+import threading
 import time
 from functools import partial
 from dataclasses import replace
@@ -1290,6 +1291,29 @@ def _picker_kind(kind: str) -> str:
     return kind if kind in {"performer", "creator"} else "performer"
 
 
+_INDEX_REFRESHER_LOCK = threading.Lock()
+
+
+def _index_refresher(app) -> avatar_picker.IndexRefresher:
+    """这个应用的图库索引刷新器，第一次用到时建，之后一直是同一个。
+
+    出网走采集统一出口：Peach 代理设置与按站冷却都在那里。
+    """
+    with _INDEX_REFRESHER_LOCK:
+        refresher = getattr(app.state, "gfriends_index", None)
+        if refresher is None:
+            contract = app.state.web_contract
+
+            def transport():
+                from .scraping_access import SourceTransport
+                return SourceTransport(contract.follow_secrets_root)
+
+            refresher = avatar_picker.IndexRefresher(
+                _picker_roots(contract)[0] / avatar_picker.GFRIENDS_CACHE, transport)
+            app.state.gfriends_index = refresher
+        return refresher
+
+
 def _picker_artwork(request: Request) -> avatar_picker.ArtworkSource:
     """作品画面的取图口。九宫格没铺过就现抽一格，和 `/poster` 走同一条路。"""
     state = request.app.state
@@ -1379,7 +1403,10 @@ def _picker_online(request: Request, connection, entity_id: int):
 @router.get("/api/avatar-choices")
 def avatar_choices(request: Request, kind: str = "performer", id: int = 0,
                    args: dict[str, str] = Depends(require_auth)):
-    """这个人还能换成哪些图。只读，不联网，不写盘。"""
+    """这个人还能换成哪些图。只读本地缓存，不等联网。
+
+    图库索引缺失或过期时顺手在后台排一轮刷新；这一次照旧按旧缓存列，下次打开生效。
+    """
     state = request.app.state.web_contract
     providers_root, avatar_root = _picker_roots(state)
     id = current_entity_id(state, id)
@@ -1390,7 +1417,8 @@ def avatar_choices(request: Request, kind: str = "performer", id: int = 0,
         if kind == "creator":
             listing["choices"] += [choice.as_dict() for choice in avatar_online.choices(
                 connection, id, project=_picker_online_projection)]
-        return JSONResponse(listing)
+    _index_refresher(request.app).request()
+    return JSONResponse(listing)
 
 
 @router.api_route("/avatar-choice", methods=["GET", "HEAD"])
