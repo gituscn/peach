@@ -55,6 +55,10 @@ export PATH="$PWD/build/macos-media-toolchain/env/bin:$PATH"
 
 打开匹配架构的 DMG，把 `Peach.app` 拖入 Applications，再打开应用完成首次设置。菜单栏提供打开页面、重启和退出入口；数据默认保存在 `~/Library/Application Support/Peach/peach-data`，可用 `PEACH_DATA_ROOT` 指定独立目录。
 
+测试包没有公证，从浏览器或聊天软件下载后带有隔离属性，较新的 macOS 会提示「Peach 已损坏，无法打开」，「隐私与安全性」里也不出现「仍要打开」。拖入 Applications 后在终端执行一次 `xattr -dr com.apple.quarantine /Applications/Peach.app` 再打开；应用归当前用户所有时不需要 `sudo`。
+
+首次设置页只在数据目录里没有 `config.toml` 时出现。这台 Mac 之前装过 Peach 时，应用会沿用原有设置直接打开首页；要重新设置，先退出 Peach，把整个 `peach-data` 目录移到别处再打开。
+
 安装镜像使用 APFS 文件系统，保留已签名资源的 Unicode 文件名及应用扩展属性。浅桃色背景固定左侧 Peach、右侧 Applications 的拖放布局，隐藏工具栏与边栏，背景同时提供标准与 Retina 分辨率。许可证保留在应用的 `Contents/Resources/LICENSE`，安装窗口只显示两个入口。
 
 版本标签触发 Release 工作流，在 Apple Silicon 与 Intel 原生 runner 分别构建，再由干净 runner 下载并挂载 DMG，验证签名、架构和独立运行。两种 DMG 与 Windows 安装包全部通过后，才一同上传到 GitHub 预发布，统一生成 SHA-256 清单。手动运行工作流只验收候选制品，不创建 Release；推送普通提交不会触发安装包构建。发版检查见[测试与依赖](TESTING.md#每次发版检查)，打标签统一使用 `scripts/release_tag.py`。
