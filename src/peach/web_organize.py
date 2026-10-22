@@ -12,8 +12,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-from . import junk, organize
-from .migrations import sqlite_backup
+from . import junk, ledger_backups, organize
 from .media_sources import SCANNABLE_LOCATIONS
 from .organize_templates import PLACEHOLDERS, TemplateError, example_path, validate_template
 from .platform import location_roots
@@ -86,22 +85,21 @@ def _run_write(contract, job_id: str, work) -> dict:
     中心的进度也要拿同一把锁，同一个线程里就是死锁。逐条提交让每个事务都很短，
     并发的普通写入照常进行。
     """
-    backup = Path(contract.candidate_root) / "organize-backups" / (
-        f"ledger.pre-organize-{time.strftime('%Y%m%d-%H%M%S')}-{job_id}.db")
-    backup.parent.mkdir(parents=True, exist_ok=True)
-    sqlite_backup(Path(contract.db_path), backup)
-    connection = sqlite3.connect(str(contract.db_path), timeout=30)
-    connection.row_factory = sqlite3.Row
-    try:
-        before, _ = verify_after_write(connection)
-        if before != 'ok':
-            raise RuntimeError(f'写入前 ledger 校验失败：integrity={before}')
-        baseline = {tuple(row) for row in connection.execute('PRAGMA foreign_key_check')}
-        result = work(connection)
-        integrity, _ = verify_after_write(connection)
-        introduced = {tuple(row) for row in connection.execute('PRAGMA foreign_key_check')} - baseline
-    finally:
-        connection.close()
+    name = f"ledger.pre-organize-{time.strftime('%Y%m%d-%H%M%S')}-{job_id}.db"
+    with ledger_backups.organize_backup(Path(contract.db_path), contract.candidate_root,
+                                        name) as backup:
+        connection = sqlite3.connect(str(contract.db_path), timeout=30)
+        connection.row_factory = sqlite3.Row
+        try:
+            before, _ = verify_after_write(connection)
+            if before != 'ok':
+                raise RuntimeError(f'写入前 ledger 校验失败：integrity={before}')
+            baseline = {tuple(row) for row in connection.execute('PRAGMA foreign_key_check')}
+            result = work(connection)
+            integrity, _ = verify_after_write(connection)
+            introduced = {tuple(row) for row in connection.execute('PRAGMA foreign_key_check')} - baseline
+        finally:
+            connection.close()
     contract.cache_bust()
     if integrity != "ok" or introduced:
         raise RuntimeError(

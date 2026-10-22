@@ -1,11 +1,14 @@
 """下载后处理在独立账本和临时媒体上的失败与重试。"""
+import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from peach import download_postprocess as post
+from peach import ledger_backups
 from peach.downloads import DownloadStore, DownloadTask, INGESTED, POSTPROCESS_PENDING
 from peach.repository import LedgerDatabase
 from support.ledger import fresh_ledger
@@ -67,6 +70,22 @@ class DownloadPostprocessTests(unittest.TestCase):
         self.assertEqual((result['moved'], result['existing_foreign_keys']), (1, 1))
         self.assertEqual(self.store.get(self.task.id).postprocess_state, 'complete')
         self.assertTrue(self.target.exists())
+
+    def test_organize_backup_lands_in_the_organize_folder_and_old_ones_are_pruned(self):
+        folder = ledger_backups.organize_dir(self.contract.candidate_root)
+        folder.mkdir(parents=True)
+        old = []
+        for index in range(ledger_backups.ORGANIZE_KEEP_RECENT + 2):
+            path = folder / f'ledger.pre-download-{index}-20260801-000000.db'
+            path.write_bytes(b'backup')
+            moment = time.time() - 30 * 86400 + index
+            os.utime(path, (moment, moment))
+            old.append(path)
+        result = post._organize(self.contract, self.task, self.asset_id)
+        backup = Path(result['backup'])
+        self.assertEqual(backup.parent, folder)
+        self.assertEqual(ledger_backups.list_backups(folder, ledger_backups.ORGANIZE_PATTERN),
+                         [*old[3:], backup])
 
     def test_retry_uses_the_bound_asset_after_a_move(self):
         post._organize(self.contract, self.task, self.asset_id)

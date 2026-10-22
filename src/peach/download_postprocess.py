@@ -5,7 +5,7 @@ import time
 import json
 from pathlib import Path
 
-from . import junk, organize, settings_file
+from . import junk, ledger_backups, organize, settings_file
 from .catalog_rules import same_release_code
 from .downloads import (INGESTED, POSTPROCESS_COMPLETE, POSTPROCESS_FAILED,
                         POSTPROCESS_PENDING, POSTPROCESS_QUEUED, POSTPROCESS_RUNNING,
@@ -14,7 +14,6 @@ from .field_owners import SCAN_FILENAME, write_owned_fields
 from .followups import FollowupType, register
 from .library_processing import COLLECT_STAGE, _ffprobe_path, process_library
 from .media_probe import probe_unmeasured
-from .migrations import sqlite_backup
 from .task_runs import declared_rows
 
 TASK_KEY = "download-postprocess"
@@ -138,11 +137,10 @@ def _organize(contract, task, main: int) -> dict:
         raise RuntimeError('文件整理未完成：' + '；'.join(str(row['reason']) for row in blocked))
     if not movable:
         return {"moved": 0, "skipped": next(iter(plan["reasons"]), "无需整理")}
-    backup = Path(contract.candidate_root) / "organize-backups" / (
-        f"ledger.pre-download-{task.id}-{time.strftime('%Y%m%d-%H%M%S')}.db")
-    backup.parent.mkdir(parents=True, exist_ok=True)
-    sqlite_backup(Path(contract.db_path), backup)
-    with contract.database.write_transaction() as connection:
+    name = f"ledger.pre-download-{task.id}-{time.strftime('%Y%m%d-%H%M%S')}.db"
+    with ledger_backups.organize_backup(Path(contract.db_path), contract.candidate_root,
+                                        name) as backup, \
+            contract.database.write_transaction() as connection:
         integrity = connection.execute('PRAGMA integrity_check').fetchone()[0]
         if integrity != 'ok':
             raise RuntimeError(f'整理前 ledger 校验失败：integrity={integrity}')
