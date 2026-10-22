@@ -6,38 +6,36 @@
 .peach-react [data-policy-matrix] [data-policy-cell="on"] { color: var(--ink); }
 .peach-react [data-policy-matrix] [data-policy-cell="off"] { color: var(--muted); }
 .peach-react [data-policy-matrix] tr:last-child > * { border-bottom: 0; }
-/* 「媒体库与目录」按媒体库分组：一个媒体库一张卡，标题行在上；同一库的文件夹挂在标题行下方的一道竖线上，
- * 表示它们共用这一库的名称、颜色与处理方式。选了来源色的媒体库，竖线用它的颜色。 */
-.peach-react [data-library-block] {
-  padding: 12px;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--surface-radius);
-  background: var(--color-background-primary-default);
-}
+/* 「媒体库与目录」按媒体库分组，照关注页「作者卡 → 来源行」的结构：一个媒体库一张白卡，标题行在上、
+ * 下面一道分隔线；同一库的文件夹在卡里一行一行排，行与行之间是通栏细线，「添加文件夹」在最后一行。
+ * 分隔线取 button border：Peach 暗色 primary 与 separator 同为 neutral-800，用 separator 会看不见。 */
 .peach-react [data-library-head] {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto minmax(160px, 200px);
   align-items: center;
   gap: 12px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--color-border-button-default);
 }
-.peach-react [data-library-folders] {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-left: 18px;
-  padding-left: 14px;
-  border-left: 2px solid var(--line);
-}
-.peach-react [data-library-block][data-library] [data-library-folders] { border-left-color: var(--library-color); }
-.peach-react [data-library-folders] > [data-folder-row] { padding: 8px 0 0; border: 0; border-radius: 0; background: none; }
-.peach-react [data-library-folders] > [data-folder-row] + [data-folder-row] { padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.peach-react [data-library-block] > :not([data-library-head], [data-library-folders]) { padding: 10px 8px 0; }
+.peach-react [data-library-folders] { display: flex; flex-direction: column; }
+.peach-react [data-library-folders] > * { padding: 12px 8px; }
+.peach-react [data-library-folders] > * + * { border-top: 1px solid var(--color-border-button-default); }
+.peach-react [data-library-folders] > [data-folder-row] { border-width: 0; border-radius: 0; background: none; }
+.peach-react [data-library-folders] > [data-folder-row] + * { border-top-width: 1px; }
 @media (max-width: 640px) {
   .peach-react [data-library-head] { grid-template-columns: auto minmax(0, 1fr); }
-  .peach-react [data-library-folders] { margin-left: 4px; padding-left: 10px; }
 }
 /* 来源色的触发键：一颗当前色的球加色名；「无颜色」是一颗中性球加一道斜线。 */
-.peach-react [data-library-color-trigger] { display: inline-flex; width: auto; gap: 8px; padding: 2px 8px 2px 2px; border-radius: 999px; color: var(--ink-2); font-size: var(--fs-sm); white-space: nowrap; }
-.peach-react [data-library-color-trigger] [data-glow-ball] { width: 22px; height: 22px; }
+/* 和同一行的图标键、下拉框同档：36px 高、同样的边框与圆角。 */
+.peach-react [data-library-color-trigger] {
+  display: inline-flex; width: auto; height: 36px; gap: 8px; padding: 0 10px 0 7px;
+  border: 1px solid var(--color-border-button-default); border-radius: 10px;
+  background: var(--color-background-primary-default); box-shadow: var(--shadow-xs);
+  color: var(--color-text-primary); font-size: var(--fs-md); white-space: nowrap;
+}
+.peach-react [data-library-color-trigger]:hover { background: var(--color-background-primary-hover); }
+.peach-react [data-library-color-trigger] [data-glow-ball] { width: 20px; height: 20px; }
 .peach-react [data-library-colors] { grid-template-columns: repeat(7, 28px); padding: 0; }
 .peach-react [data-glow-ball][data-library-none] {
   --glow-chip: linear-gradient(135deg, transparent 46%, var(--muted) 46% 54%, transparent 54%), var(--sunk);

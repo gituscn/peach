@@ -17,6 +17,7 @@ import { ApiError, apiSend, errorMessage } from '../../api';
 import { CONFIGURATION_URL, PICK_FOLDER_URL } from '../../configuration-endpoints';
 import type { ConfigurationData, ConfigurationGroupProps } from '../bundle';
 import { Note } from '../components/note';
+import { cardClass } from '../components/card';
 import { queryClient } from '../query';
 import { RESTART_REDIRECT_MS } from '../restart-redirect';
 import { CloudDriveGuide } from './clouddrive-guide';
@@ -28,7 +29,6 @@ import {
   useFolderRows,
 } from './folder-rows';
 import { sourceDefaultCost, type SourceCost } from '../../core/media-sources';
-import { randomId } from '../../core/random-id';
 import { libraryAutoChoice, LibraryIconPicker } from './library-icon-picker';
 import {
   AUTO_STAGES, LibraryColorPicker, PolicyLegend, PresetSelect, StageChooser, type Preset, type Stage,
@@ -52,14 +52,14 @@ interface MediaRow { path: string; location: string; root: string; root_id?: str
 interface FieldErrors { media_dirs?: string[]; port?: string }
 interface SaveResult { saved: boolean; url: string; revision: string }
 
-const blankRow = (path = ''): MediaRow => ({ path, location: 'local', root: '', library_id: randomId(), library: '', library_icon: '', cost: 'free' });
+const blankRow = (path = ''): MediaRow => ({ path, location: 'local', root: '', library_id: crypto.randomUUID(), library: '', library_icon: '', cost: 'free' });
 
 function initialRows(data: ConfigurationData): MediaRow[] {
   const known = data.media_sources?.filter((row) => MEDIA_SOURCES.some(([kind]) => kind === row.location));
   if (known?.length) {
     return known.map((row) => ({
       path: row.path, location: row.location, root: row.root, library: row.library || '', library_icon: row.library_icon || '',
-      root_id: row.root_id, library_id: row.library_id || randomId(),
+      root_id: row.root_id, library_id: row.library_id || crypto.randomUUID(),
       cost: row.cost ?? sourceDefaultCost(row.location),
     }));
   }
@@ -117,10 +117,24 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
   // 每个媒体库取它的第一行作代表：新加的空文件夹排在后面，不改动这一库的图标与来源。
   const libraries = [...rows.reduce((found, row) => found.has(row.library_id) ? found : found.set(row.library_id, row),
     new Map<string, MediaRow>()).values()];
+  // 「新建媒体库」把这个文件夹拆成新的一组，焦点交给新组的名称框，接着就能起名。
+  const [named, setNamed] = useState<string | null>(null);
+  useEffect(() => {
+    if (!named) return;
+    const input = document.querySelector<HTMLInputElement>(`[data-library-key="${CSS.escape(named)}"] [data-library-head] input`);
+    input?.scrollIntoView({ block: 'center' });
+    input?.focus();
+    setNamed(null);
+  }, [named]);
   const chooseLibrary = (index: number, key: string) => {
     const chosen = rows.find(row => row.library_id === key);
-    edit(index, chosen ? { library_id: chosen.library_id, library: chosen.library, library_icon: chosen.library_icon }
-      : { library_id: randomId(), library: '', library_icon: '' });
+    if (chosen) {
+      edit(index, { library_id: chosen.library_id, library: chosen.library, library_icon: chosen.library_icon });
+      return;
+    }
+    const created = crypto.randomUUID();
+    edit(index, { library_id: created, library: '', library_icon: '' });
+    setNamed(created);
   };
 
   useEffect(() => {
@@ -186,7 +200,10 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
             const preset = presets[library.library_id] ?? 'auto';
             const name = library.library || '未命名媒体库';
             return (
-              <div key={library.library_id} data-library-block="" className="flex flex-col gap-3"
+              /* 一个媒体库一张卡，照关注页「作者 → 来源」的结构：标题行在上、下面一道分隔线，
+                 文件夹一行一行用通栏细线分开。 */
+              <div key={library.library_id} data-library-block="" data-library-key={library.library_id}
+                className={cardClass({ variant: 'raised', padding: 'none', className: 'flex flex-col p-2' })}
                 data-library={tints.get(library.library_id)?.color ? library.library_id : undefined}>
                 <div data-library-head="">
                   <LibraryIconPicker label={`${name} 图标`} value={library.library_icon} kind={library.location}
@@ -231,20 +248,23 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                           {libraries.map(other => <SelectItem key={other.library_id} id={other.library_id} textValue={other.library || '未命名媒体库'}>
                             <span className="flex min-w-0 items-center gap-2"><SourceMark mark={libraryMark(other)} /><span className="truncate">{other.library || '未命名媒体库'}</span></span>
                           </SelectItem>)}
-                          <SelectItem id="new" textValue="新建媒体库">
+                          {/* 库里只有这一个文件夹时，拆出去等于原库改名，不给这一项。 */}
+                          {members.length > 1 ? <SelectItem id="new" textValue="新建媒体库">
                             <span className="flex min-w-0 items-center gap-2"><SourceMark mark="plus" /><span>新建媒体库</span></span>
-                          </SelectItem>
+                          </SelectItem> : null}
                         </Select>
                       </FolderField> : null}
                     </FolderFieldLine>
                   </FolderRow>
                 ))}
                 {/* 每个媒体库自己的「添加文件夹」：新文件夹直接挂进这一库，共用它的名称、颜色与处理方式，来源与读取策略先沿用这一库第一个文件夹。 */}
-                <Button variant="secondary" size="small" className="self-start" aria-label={`给 ${name} 添加文件夹`} onClick={() => {
-                  add();
-                  edit(rows.length, { library_id: library.library_id, library: library.library, library_icon: library.library_icon,
-                    location: library.location, cost: library.cost });
-                }}>添加文件夹</Button>
+                <div className="flex">
+                  <Button variant="secondary" aria-label={`给 ${name} 添加文件夹`} onClick={() => {
+                    add();
+                    edit(rows.length, { library_id: library.library_id, library: library.library, library_icon: library.library_icon,
+                      location: library.location, cost: library.cost });
+                  }}>添加文件夹</Button>
+                </div>
                 </div>
               </div>
             );

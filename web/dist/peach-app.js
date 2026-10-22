@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "11b03193-b2eb-4ae8-a521-1e1b24236ea8", e._sentryDebugIdIdentifier = "sentry-dbid-11b03193-b2eb-4ae8-a521-1e1b24236ea8");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "1826700d-ac33-4213-b3d0-f6c8e9da846d", e._sentryDebugIdIdentifier = "sentry-dbid-1826700d-ac33-4213-b3d0-f6c8e9da846d");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -76904,16 +76904,15 @@ var NH = (e, t, n) => `<div class="flex min-w-0 flex-col gap-1 ${n}"><span class
 	attrs: xH
 })}</div>
     <div class="flex flex-wrap items-end gap-2"><div class="flex w-full flex-wrap items-start gap-2">${NH("来源", To(SH("6em")), "w-full @lg:w-60")}${NH("读取策略", To(SH("4em")), "w-full @lg:w-32")}${e > 1 ? NH("移到媒体库", To(SH("4em")), "w-full @lg:w-48") : ""}</div></div>
-  </div>`, zVe = (e, t) => `<div data-library-block class="flex flex-col gap-3">
+  </div>`, zVe = (e, t) => `<div data-library-block class="min-w-0 bg-background-primary-default rounded-2xl shadow-card flex flex-col p-2">
     <div data-library-head>${Co({
 	label: "自动识别",
 	variant: "secondary",
 	attrs: xH
-})}${CH()}<span class="skeleton ui-configuration-skeleton-toggle"></span>${To(SH("4em"))}</div>
-    <div data-library-folders>${RVe(t).repeat(e)}<div class="self-start">${Co({
+})}${CH()}<span class="skeleton ui-configuration-skeleton-input" style="width:96px"></span>${To(SH("4em"))}</div>
+    <div data-library-folders>${RVe(t).repeat(e)}<div class="flex">${Co({
 	label: "添加文件夹",
 	variant: "secondary",
-	size: "small",
 	attrs: xH
 })}</div></div></div>`, BVe = `<div data-policy-legend class="flex flex-col gap-1"><p class="text-body-2-regular text-text-secondary">${vH}</p><span class="flex items-center gap-1 text-body-2-medium text-text-secondary">三种处理方式对比</span></div>`, VVe = "<p class=\"text-body-2-regular text-text-secondary\">读取策略选「代理保护」时，会限制自动读取视频。</p><div class=\"flex flex-col gap-3\"><span class=\"flex items-center gap-1 text-body-2-medium text-text-secondary\">CloudDrive 设置帮助</span></div>", PH = () => {
 	let e = LVe();
@@ -77704,24 +77703,35 @@ function oHe({ data: e, receipt: t }) {
 		n.forEach((i, a) => {
 			i.library_id === n[e].library_id && r(a, t);
 		});
-	}, k = [...n.reduce((e, t) => e.has(t.library_id) ? e : e.set(t.library_id, t), /* @__PURE__ */ new Map()).values()], A = (e, t) => {
+	}, k = [...n.reduce((e, t) => e.has(t.library_id) ? e : e.set(t.library_id, t), /* @__PURE__ */ new Map()).values()], [A, j] = (0, E.useState)(null);
+	(0, E.useEffect)(() => {
+		if (!A) return;
+		let e = document.querySelector(`[data-library-key="${CSS.escape(A)}"] [data-library-head] input`);
+		e?.scrollIntoView({ block: "center" }), e?.focus(), j(null);
+	}, [A]);
+	let M = (e, t) => {
 		let i = n.find((e) => e.library_id === t);
-		r(e, i ? {
-			library_id: i.library_id,
-			library: i.library,
-			library_icon: i.library_icon
-		} : {
-			library_id: crypto.randomUUID(),
+		if (i) {
+			r(e, {
+				library_id: i.library_id,
+				library: i.library,
+				library_icon: i.library_icon
+			});
+			return;
+		}
+		let a = crypto.randomUUID();
+		r(e, {
+			library_id: a,
 			library: "",
 			library_icon: ""
-		});
+		}), j(a);
 	};
 	(0, E.useEffect)(() => {
 		if (!_) return;
 		let e = setTimeout(() => location.assign(_.url), _H);
 		return () => clearTimeout(e);
 	}, [_]);
-	let j = (r) => {
+	let N = (r) => {
 		r.preventDefault();
 		let i = n.findIndex((e) => !e.cost);
 		if (i >= 0) {
@@ -77757,10 +77767,10 @@ function oHe({ data: e, receipt: t }) {
 			]
 		}) })
 	});
-	let M = (t) => e.media_sources?.find((e) => e.root_id === t.root_id && e.path === t.path), N = n.some((e) => qNe(e.location)), P = N ? (e.mount_dependencies ?? []).filter((e) => !e.available) : [];
+	let P = (t) => e.media_sources?.find((e) => e.root_id === t.root_id && e.path === t.path), F = n.some((e) => qNe(e.location)), I = F ? (e.mount_dependencies ?? []).filter((e) => !e.available) : [];
 	return /* @__PURE__ */ (0, D.jsxs)(zk, {
 		title: "媒体库与目录",
-		onSubmit: j,
+		onSubmit: N,
 		children: [/* @__PURE__ */ (0, D.jsxs)(Vk, { children: [
 			/* @__PURE__ */ (0, D.jsx)(YVe, {}),
 			/* @__PURE__ */ (0, D.jsx)("div", {
@@ -77774,7 +77784,12 @@ function oHe({ data: e, receipt: t }) {
 					})).filter(({ row: t }) => t.library_id === e.library_id), d = x[e.library_id] ?? "auto", f = e.library || "未命名媒体库";
 					return /* @__PURE__ */ (0, D.jsxs)("div", {
 						"data-library-block": "",
-						className: "flex flex-col gap-3",
+						"data-library-key": e.library_id,
+						className: Ek({
+							variant: "raised",
+							padding: "none",
+							className: "flex flex-col p-2"
+						}),
 						"data-library": T.get(e.library_id)?.color ? e.library_id : void 0,
 						children: [
 							/* @__PURE__ */ (0, D.jsxs)("div", {
@@ -77829,7 +77844,7 @@ function oHe({ data: e, receipt: t }) {
 									picking: c === i,
 									onPick: () => void l(i),
 									onRemove: n.length > 1 ? () => a(i) : void 0,
-									status: M(t) ? /* @__PURE__ */ (0, D.jsx)(GH, { online: M(t)?.online }) : null,
+									status: P(t) ? /* @__PURE__ */ (0, D.jsx)(GH, { online: P(t)?.online }) : null,
 									children: /* @__PURE__ */ (0, D.jsxs)(JNe, { children: [
 										/* @__PURE__ */ (0, D.jsx)($Ne, {
 											index: i,
@@ -77845,7 +77860,7 @@ function oHe({ data: e, receipt: t }) {
 											onChange: (e) => r(i, { cost: e }),
 											error: p && !t.cost ? "请选择媒体读取策略" : void 0
 										}),
-										t.root_id && !M(t) ? /* @__PURE__ */ (0, D.jsx)(lR, {
+										t.root_id && !P(t) ? /* @__PURE__ */ (0, D.jsx)(lR, {
 											label: "变更方式",
 											className: "w-full @lg:w-auto @lg:flex-1",
 											children: /* @__PURE__ */ (0, D.jsxs)(pP, {
@@ -77885,7 +77900,7 @@ function oHe({ data: e, receipt: t }) {
 													})]
 												}),
 												onSelectionChange: (e) => {
-													e && A(i, String(e));
+													e && M(i, String(e));
 												},
 												children: [k.map((e) => /* @__PURE__ */ (0, D.jsx)(mP, {
 													id: e.library_id,
@@ -77897,32 +77912,33 @@ function oHe({ data: e, receipt: t }) {
 															children: e.library || "未命名媒体库"
 														})]
 													})
-												}, e.library_id)), /* @__PURE__ */ (0, D.jsx)(mP, {
+												}, e.library_id)), s.length > 1 ? /* @__PURE__ */ (0, D.jsx)(mP, {
 													id: "new",
 													textValue: "新建媒体库",
 													children: /* @__PURE__ */ (0, D.jsxs)("span", {
 														className: "flex min-w-0 items-center gap-2",
 														children: [/* @__PURE__ */ (0, D.jsx)(Xk, { mark: "plus" }), /* @__PURE__ */ (0, D.jsx)("span", { children: "新建媒体库" })]
 													})
-												})]
+												}) : null]
 											})
 										}) : null
 									] })
-								}, i)), /* @__PURE__ */ (0, D.jsx)(q, {
-									variant: "secondary",
-									size: "small",
-									className: "self-start",
-									"aria-label": `给 ${f} 添加文件夹`,
-									onClick: () => {
-										i(), r(n.length, {
-											library_id: e.library_id,
-											library: e.library,
-											library_icon: e.library_icon,
-											location: e.location,
-											cost: e.cost
-										});
-									},
-									children: "添加文件夹"
+								}, i)), /* @__PURE__ */ (0, D.jsx)("div", {
+									className: "flex",
+									children: /* @__PURE__ */ (0, D.jsx)(q, {
+										variant: "secondary",
+										"aria-label": `给 ${f} 添加文件夹`,
+										onClick: () => {
+											i(), r(n.length, {
+												library_id: e.library_id,
+												library: e.library,
+												library_icon: e.library_icon,
+												location: e.location,
+												cost: e.cost
+											});
+										},
+										children: "添加文件夹"
+									})
 								})]
 							})
 						]
@@ -77936,8 +77952,8 @@ function oHe({ data: e, receipt: t }) {
 				children: "添加媒体库"
 			}),
 			/* @__PURE__ */ (0, D.jsx)(Uk, { children: bH }),
-			N ? /* @__PURE__ */ (0, D.jsxs)(D.Fragment, { children: [/* @__PURE__ */ (0, D.jsx)(XNe, {}), /* @__PURE__ */ (0, D.jsx)(MVe, {})] }) : null,
-			P.map((e) => /* @__PURE__ */ (0, D.jsxs)(Uk, { children: [
+			F ? /* @__PURE__ */ (0, D.jsxs)(D.Fragment, { children: [/* @__PURE__ */ (0, D.jsx)(XNe, {}), /* @__PURE__ */ (0, D.jsx)(MVe, {})] }) : null,
+			I.map((e) => /* @__PURE__ */ (0, D.jsxs)(Uk, { children: [
 				"未检测到 ",
 				e.name,
 				"。",
@@ -116179,4 +116195,4 @@ Rxt(zxt);
 //#endregion
 export { vT as applyTheme, YO as peachHistory, Ho as popCount, f_t as showToast };
 
-//# debugId=11b03193-b2eb-4ae8-a521-1e1b24236ea8
+//# debugId=1826700d-ac33-4213-b3d0-f6c8e9da846d

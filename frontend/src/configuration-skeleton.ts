@@ -54,9 +54,10 @@ const folderRow = (libraries: number) => `<div data-folder-row class="@container
     <div class="flex items-start gap-2"><span class="min-w-0 flex-1">${input()}</span>${islandButton({ glyph: 'folder-search', variant: 'secondary', attrs: wait })}</div>
     <div class="flex flex-wrap items-end gap-2"><div class="flex w-full flex-wrap items-start gap-2">${field('来源', islandSelect(text('6em')), 'w-full @lg:w-60')}${field('读取策略', islandSelect(text('4em')), 'w-full @lg:w-32')}${libraries > 1 ? field('移到媒体库', islandSelect(text('4em')), 'w-full @lg:w-48') : ''}</div></div>
   </div>`;
-const libraryBlock = (folders: number, libraries: number) => `<div data-library-block class="flex flex-col gap-3">
-    <div data-library-head>${islandButton({ label: '自动识别', variant: 'secondary', attrs: wait })}${input()}<span class="skeleton ui-configuration-skeleton-toggle"></span>${islandSelect(text('4em'))}</div>
-    <div data-library-folders>${folderRow(libraries).repeat(folders)}<div class="self-start">${islandButton({ label: '添加文件夹', variant: 'secondary', size: 'small', attrs: wait })}</div></div></div>`;
+/* 媒体库卡与 `cardClass({ variant: 'raised', padding: 'none' })` 同一组类名。 */
+const libraryBlock = (folders: number, libraries: number) => `<div data-library-block class="min-w-0 bg-background-primary-default rounded-2xl shadow-card flex flex-col p-2">
+    <div data-library-head>${islandButton({ label: '自动识别', variant: 'secondary', attrs: wait })}${input()}<span class="skeleton ui-configuration-skeleton-input" style="width:96px"></span>${islandSelect(text('4em'))}</div>
+    <div data-library-folders>${folderRow(libraries).repeat(folders)}<div class="flex">${islandButton({ label: '添加文件夹', variant: 'secondary', attrs: wait })}</div></div></div>`;
 /* 说明区是固定文字：常显那一句照原文写，对比表收着，只画它的展开行。 */
 const legend = `<div data-policy-legend class="flex flex-col gap-1"><p class="text-body-2-regular text-text-secondary">${POLICY_SUMMARY}</p>`
   + '<span class="flex items-center gap-1 text-body-2-medium text-text-secondary">三种处理方式对比</span></div>';
