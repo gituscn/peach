@@ -357,7 +357,7 @@ function element<P>(path: keyof Loaded['MANAGED_ROUTES'], r: Loaded, open: objec
     open, actions, go).props;
 }
 
-it('诊断页的作品交给共享入口，去处是页内链接不再经过 go', async () => {
+it('诊断页的作品交给共享入口，各项去处由页内链接承担、不调用 go', async () => {
   const r = await load();
   const actions = shellActions();
   const go = vi.fn();
