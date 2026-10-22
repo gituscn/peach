@@ -178,13 +178,13 @@ class FeedWebTest(FeedWebFixture):
         target = self.contract.cover_root / 'SSIS-950.jpg'
         target.parent.mkdir(parents=True, exist_ok=True)
         Image.new('RGB', (800, 538)).save(target)
+        from peach.fsutil import atomic_write_text
+        # 来源边车与 `install_cover` 一样换名写入：封面索引只认封面目录的修改时间。
         evidence = target.with_suffix('.scraping.json')
-        evidence.write_text(json.dumps({'source_url': 'https://c0.jdbstatic.com/covers/a.jpg'}), encoding='utf-8')
-        self.contract.cache_bust()
+        atomic_write_text(evidence, json.dumps({'source_url': 'https://c0.jdbstatic.com/covers/a.jpg'}))
         self.assertFalse(self.contract.has_cover('SSIS-950'))
         self.assertIsNone(self.contract.cover_path('SSIS-950'))
-        evidence.write_text(json.dumps({'source_url': 'https://pics.dmm.co.jp/a.jpg'}), encoding='utf-8')
-        self.contract.cache_bust()
+        atomic_write_text(evidence, json.dumps({'source_url': 'https://pics.dmm.co.jp/a.jpg'}))
         self.assertTrue(self.contract.has_cover('SSIS-950'))
         self.assertEqual(self.contract.cover_path('SSIS-950'), target)
 
