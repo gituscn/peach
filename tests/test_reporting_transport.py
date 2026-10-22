@@ -107,7 +107,8 @@ class ReportingTransportTests(unittest.TestCase):
             metadata = reporting_identity.event_metadata("errors")
         self.assertEqual(metadata["environment"], "development")
         self.assertEqual(metadata["dist"], "a" * 40)
-        self.assertEqual(metadata["tags"], {"purpose": "technical-diagnostics", "runtime": "source"})
+        self.assertEqual(metadata["tags"], {"purpose": "technical-diagnostics", "runtime": "source",
+                                            "distribution": "source"})
         self.assertNotIn("private", str(metadata))
         with mock.patch.object(reporting_identity.sys, "frozen", True, create=True), \
                 mock.patch.object(reporting_identity, "frozen_build", return_value=SimpleNamespace(commit="bad")), \

@@ -12,8 +12,13 @@ COPY migrations ./migrations
 COPY web ./web
 COPY resources ./resources
 COPY tools/amane-bridge ./tools/amane-bridge
+COPY scripts/write_reporting_config.py ./scripts/
 # vision 带上 OpenCV：镜像里随附的人脸模型要靠它才能检出与比对。
 RUN uv sync --locked --no-dev --no-editable --extra vision
+# 公开 DSN 写进 wheel 的资源目录；发行流水线传 PEACH_REQUIRE_REPORTING=1，缺失时构建失败。
+ARG PEACH_SENTRY_DSN="" PEACH_LIBRARY_SENTRY_DSN="" PEACH_REQUIRE_REPORTING=""
+RUN target="$(.venv/bin/python -c 'import pathlib, peach; print(pathlib.Path(peach.__file__).parent / "_resources" / "sentry.json")')" \
+    && .venv/bin/python scripts/write_reporting_config.py --output "$target" ${PEACH_REQUIRE_REPORTING:+--require}
 
 FROM python:3.14.8-slim-trixie
 LABEL org.opencontainers.image.title="Peach" \
@@ -38,7 +43,7 @@ ADD --chmod=a+rX --checksum=sha256:cfc7749b96f63bd31c3c42b5c471bf756814053e847c1
     /app/tools/face-models/LICENSE-sface.txt
 COPY --from=build /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" PEACH_DATA_ROOT=/data PYTHONUNBUFFERED=1 \
-    PYTHONIOENCODING=utf-8 PYTHONUTF8=1 PEACH_FACE_MODELS=/app/tools/face-models
+    PYTHONIOENCODING=utf-8 PYTHONUTF8=1 PEACH_FACE_MODELS=/app/tools/face-models PEACH_DISTRIBUTION=docker
 WORKDIR /data
 USER peach
 EXPOSE 8900

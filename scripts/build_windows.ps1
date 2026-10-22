@@ -5,7 +5,9 @@
     [switch]$Installer,
     [string]$CloudflaredPath = '',
     [string]$FFmpegPath = '',
-    [string]$UntruncPath = ''
+    [string]$UntruncPath = '',
+    # 发行构建：两项 Sentry DSN 必须齐全且合法，否则不产出安装包。
+    [switch]$RequireReporting
 )
 
 $ErrorActionPreference = 'Stop'
@@ -83,9 +85,10 @@ $BuildInfo = [ordered]@{
 }
 Set-Content -LiteralPath $BuildInfoPath -Value (ConvertTo-Json $BuildInfo) -Encoding utf8
 $SentryConfigPath = Join-Path $BuildPath 'sentry.json'
-Set-Content -LiteralPath $SentryConfigPath -Value (ConvertTo-Json @{
-    dsn = "$env:PEACH_SENTRY_DSN"; library_dsn = "$env:PEACH_LIBRARY_SENTRY_DSN"
-}) -Encoding utf8
+$ReportingArguments = @('--output', $SentryConfigPath)
+if ($RequireReporting) { $ReportingArguments += '--require' }
+& $Python -X utf8 (Join-Path $PSScriptRoot 'write_reporting_config.py') @ReportingArguments
+if ($LASTEXITCODE -ne 0) { throw 'Sentry reporting config is missing or invalid.' }
 
 $BuildMode = @('--onefile')
 $BuildDestination = $OutputPath

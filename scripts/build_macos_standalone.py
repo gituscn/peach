@@ -70,7 +70,8 @@ def package_dmg(app: Path, destination: Path) -> Path:
     return destination
 
 
-def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None) -> dict[str, str]:
+def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None,
+          require_reporting: bool = False) -> dict[str, str]:
     if sys.platform != "darwin":
         raise SystemExit("macOS 应用必须在 macOS 上构建")
     if (ROOT / "resources" / "seed").exists():
@@ -78,6 +79,8 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
     architecture = target_arch or platform.machine()
     if architecture not in {"arm64", "x86_64"} or architecture != platform.machine():
         raise SystemExit("目标架构必须与当前 Python 一致；请使用 arm64 或 x86_64 Python 及对应依赖构建")
+    from write_reporting_config import reporting_config, write as write_reporting_config
+    reporting_config(require=require_reporting)
     from build_macos_app import build_frontend_bundles
     from media_tool_bundle import validate
     from build_macos_media import audit_binary
@@ -112,11 +115,13 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
             capture_output=True, text=True, encoding="utf-8", check=True).stdout.strip()),
     }
     (work / "build-info.json").write_text(json.dumps(identity), encoding="utf-8")
+    reporting = write_reporting_config(work / "sentry.json", require=require_reporting)
     subprocess.run([
         sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean",
         "--distpath", str(destination), "--workpath", str(work / "app"),
         str(ROOT / "scripts" / "peach_macos.spec"),
     ], check=True, cwd=ROOT, env={**os.environ, "PEACH_MACOS_BUILD_INFO": str(work / "build-info.json"),
+                                "PEACH_MACOS_REPORTING_CONFIG": str(reporting),
                                 "PEACH_MACOS_TARGET_ARCH": architecture})
     app = destination / "Peach.app"
     tools = app / "Contents/Resources/tools"
@@ -153,9 +158,11 @@ def main() -> int:
     parser.add_argument("--destination", type=Path)
     parser.add_argument("--target-arch", choices=("arm64", "x86_64"), default=platform.machine())
     parser.add_argument("--no-dmg", action="store_true", help="只生成独立应用")
+    parser.add_argument("--require-reporting", action="store_true", help="发行构建：缺 Sentry DSN 时失败")
     args = parser.parse_args()
     destination = args.destination or ROOT / "dist" / "macos.noindex" / args.target_arch
-    print(json.dumps(build(destination, dmg=not args.no_dmg, target_arch=args.target_arch), ensure_ascii=False))
+    print(json.dumps(build(destination, dmg=not args.no_dmg, target_arch=args.target_arch,
+                           require_reporting=args.require_reporting), ensure_ascii=False))
     return 0
 
 
