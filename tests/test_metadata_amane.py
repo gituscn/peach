@@ -160,10 +160,50 @@ class RebuildTests(unittest.TestCase):
     def test_describe_lists_the_facts_the_settings_card_shows(self):
         with tempfile.TemporaryDirectory() as tmp:
             facts = metadata_amane.describe(Path(tmp))
-        self.assertEqual(set(facts), {"repository", "license", "revision", "version", "installed", "installed_version", "python", "sites"})
+        self.assertEqual(set(facts), {"repository", "license", "bundled", "problem", "revision", "version",
+                                      "installed", "installed_version", "python", "sites"})
+        self.assertTrue(facts["bundled"])
+        self.assertEqual(facts["problem"], "")
         self.assertFalse(facts["installed"])
         self.assertEqual(facts["installed_version"], "")
         self.assertEqual([site["source"] for site in facts["sites"]], list(metadata_amane.SITES))
+
+    def test_a_package_without_the_bridge_files_is_reported_not_raised(self):
+        """打包产物漏带 `tools/amane-bridge` 时，卡片拿到原因，重建不起 uv。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            empty, tools = Path(tmp) / "_internal" / "tools" / "amane-bridge", Path(tmp) / "tools"
+            facts = metadata_amane.describe(tools, root=empty)
+            self.assertFalse(facts["bundled"])
+            self.assertIn(str(empty / "pyproject.toml"), facts["problem"])
+            self.assertEqual((facts["revision"], facts["version"]), ("", ""))
+            self.assertEqual(len(facts["sites"]), len(metadata_amane.SITES))
+            calls = []
+            with patch.object(metadata_amane, "find_uv", return_value=Path("uv.exe")):
+                rebuilt = metadata_amane.rebuild(tools, runner=lambda *a, **k: calls.append(a) or completed(""), root=empty)
+            self.assertEqual(rebuilt, {"ok": False, "error": facts["problem"]})
+            self.assertEqual(calls, [])
+
+    def test_an_unreadable_or_unpinned_manifest_is_a_problem_too(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "bridge.py").write_text("", encoding="utf-8")
+            for manifest in ("[project", '[project]\ndependencies = ["amane @ git+https://x/amane@main"]\n'):
+                with self.subTest(manifest=manifest):
+                    (root / "pyproject.toml").write_text(manifest, encoding="utf-8")
+                    facts = metadata_amane.describe(root / "tools", root=root)
+                    self.assertFalse(facts["bundled"])
+                    self.assertTrue(facts["problem"].startswith("amane 桥的清单读不出来"))
+
+    def test_the_settings_route_answers_with_the_problem_instead_of_failing(self):
+        from types import SimpleNamespace
+        from peach.web_scraping import q_scraping_amane_bridge
+        with tempfile.TemporaryDirectory() as tmp:
+            contract = SimpleNamespace(tools_root=Path(tmp) / "tools",
+                                       amane_bridge_job=SimpleNamespace(snapshot=lambda: None))
+            with patch.dict(metadata_amane.describe.__kwdefaults__, {"root": Path(tmp) / "missing"}):
+                card = q_scraping_amane_bridge(contract, {})
+        self.assertFalse(card["bundled"])
+        self.assertEqual(card["job"], {"status": "idle"})
 
     def test_installed_version_reads_the_isolated_package_metadata(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -443,6 +483,14 @@ class ProviderStageTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         return provider
+
+    def test_a_missing_bridge_script_leaves_this_tier_unavailable(self):
+        provider = LibraryMetadataProvider(self.secrets, tools_root=self.tools)
+        self.addCleanup(provider.transport.close)
+        missing = Path(self.temporary.name) / "missing" / "bridge.py"
+        with patch.object(metadata_amane, "BRIDGE_SCRIPT", missing), self.assertRaises(Unavailable) as caught:
+            provider.amane("FC2-PPV-1234567", route=("fc2club",))
+        self.assertIn("amane 桥脚本缺失", str(caught.exception))
 
     def test_a_hit_comes_back_as_source_payload_pairs_and_is_cached(self):
         provider = self.provider(report(fc2club=FOUND, avsox={"status": "not_found", "reason": "not_found"}))

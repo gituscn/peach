@@ -322,10 +322,12 @@ function AmaneBridgeCard({ toast }: ScrapingProps) {
               <p className="text-body-2-regular text-text-secondary">{data.sites.map((site) => site.label).join('、')}</p>
             </Disclosure>
           : null}
-        <Help>
-          已安装版本：{data.installed_version || '未安装'}。amane（{data.license}）提供这些内置站点的解析能力。
-          重新安装会使用 Peach 内置的 {data.version} 版本，不随上游自动升级。
-        </Help>
+        {data.problem
+          ? <Note tone="error">{data.problem}</Note>
+          : <Help>
+              已安装版本：{data.installed_version || '未安装'}。amane（{data.license}）提供这些内置站点的解析能力。
+              重新安装会使用 Peach 内置的 {data.version} 版本，不随上游自动升级。
+            </Help>}
         {running ? <LoadingDots label="正在重建运行环境" /> : null}
         {problem ? <Note tone="error">{problem}</Note> : null}
         {outcome?.status === 'complete' ? <Note tone="success">{outcome.result || 'amane 桥已重建'}</Note> : null}
@@ -334,7 +336,8 @@ function AmaneBridgeCard({ toast }: ScrapingProps) {
         <Button variant="secondary" onClick={() => { if (!busy) check.mutate() }} {...busyProps(check.isPending)}>
           检查上游版本
         </Button>
-        <Button onClick={() => { if (!busy) rebuild.mutate() }} {...busyProps(running || rebuild.isPending)}>
+        <Button disabled={Boolean(data.problem)} onClick={() => { if (!busy) rebuild.mutate() }}
+          {...busyProps(running || rebuild.isPending)}>
           {data.installed ? '重新安装' : '安装'}
         </Button>
       </Footer>

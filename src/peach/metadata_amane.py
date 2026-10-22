@@ -168,9 +168,27 @@ def rebuild_command(tools_root: Path, *, uv: Path, root: Path = BRIDGE_ROOT) -> 
     return command, env
 
 
+def bundle_problem(root: Path = BRIDGE_ROOT) -> str:
+    """桥的清单与脚本读不全时给人看的原因；齐全返回空串。
+
+    打包产物漏带 `tools/amane-bridge` 时三个文件都不在，设置页那张卡和重建都靠这句话说明，
+    不把 `FileNotFoundError` 抛成读接口的 500。
+    """
+    missing = [path for path in (root / "pyproject.toml", root / "bridge.py") if not path.is_file()]
+    if missing:
+        return f"安装包里缺少 amane 桥的文件：{missing[0]}；重新安装 Peach 后可用"
+    try:
+        pinned_revision(root)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return f"amane 桥的清单读不出来：{exc}"
+    return ""
+
+
 def rebuild(tools_root: Path, *, runner: Runner = subprocess.run, timeout: int = 900,
             root: Path = BRIDGE_ROOT) -> dict:
     """重建桥 venv，返回给设置页的回执。首次要下载约 98 MB，之后只校验。"""
+    if problem := bundle_problem(root):
+        return {"ok": False, "error": problem}
     uv = find_uv()
     if uv is None:
         return {"ok": False, "error": "未找到 uv，请先安装 uv 再重建 amane 桥"}
@@ -191,13 +209,19 @@ def rebuild(tools_root: Path, *, runner: Runner = subprocess.run, timeout: int =
 
 
 def describe(tools_root: Path, *, root: Path = BRIDGE_ROOT) -> dict:
-    """设置页那张卡要的事实：钉的 sha、锁里的版本、venv 建没建、桥开了哪几站。"""
+    """设置页那张卡要的事实：钉的 sha、锁里的版本、venv 建没建、桥开了哪几站。
+
+    清单读不全时 `bundled` 为假、`problem` 写原因，sha 与锁版本留空，卡片据此停用安装。
+    """
     python = bridge_python(tools_root)
+    problem = bundle_problem(root)
     return {
         "repository": AMANE_REPOSITORY,
         "license": AMANE_LICENSE,
-        "revision": pinned_revision(root),
-        "version": locked_version(root),
+        "bundled": not problem,
+        "problem": problem,
+        "revision": "" if problem else pinned_revision(root),
+        "version": "" if problem else locked_version(root),
         "installed": installed(tools_root),
         "installed_version": installed_version(tools_root),
         "python": str(python),
