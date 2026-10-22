@@ -12,7 +12,8 @@ COPY migrations ./migrations
 COPY web ./web
 COPY resources ./resources
 COPY tools/amane-bridge ./tools/amane-bridge
-RUN uv sync --locked --no-dev --no-editable
+# vision 带上 OpenCV：镜像里随附的人脸模型要靠它才能检出与比对。
+RUN uv sync --locked --no-dev --no-editable --extra vision
 
 FROM python:3.14.8-slim-trixie
 LABEL org.opencontainers.image.title="Peach" \

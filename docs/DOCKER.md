@@ -68,7 +68,7 @@ local = '/media'
 
 Linux 首次重编码时会探测实际可用的硬件编码器，整片 MP4 与 HLS 分片共享探测结果。AMD / Intel 使用 VAAPI；存在 NVIDIA 设备时探测 NVENC。探测失败的后端在当前服务进程内不再尝试，重启服务后重新探测。封装复制不需要硬件探测。
 
-镜像自带头像取景与比对用的人脸模型（YuNet 为 MIT，SFace 为 Apache-2.0，许可证在同一目录），位于 `/app/tools/face-models`，由 `PEACH_FACE_MODELS` 指向，容器不联网也能用。构建镜像时按固定地址下载并校验 SHA-256。
+镜像自带 OpenCV（`vision` 依赖组）和头像取景与比对用的人脸模型（YuNet 为 MIT，SFace 为 Apache-2.0，许可证在同一目录），位于 `/app/tools/face-models`，由 `PEACH_FACE_MODELS` 指向，容器不联网也能用。构建镜像时按固定地址下载并校验 SHA-256。
 
 镜像包含 Debian FFmpeg、Mesa VAAPI 驱动与 `vainfo`。AMD 宿主机需加载 `amdgpu` 和对应固件，并提供 `/dev/dri/renderD*`。Intel 需在自定义镜像内安装适配设备的 VAAPI 驱动；Mesa 驱动不代表已覆盖全部 Intel GPU。将下面的条目合入 Compose 的 `services.peach`，设备路径按宿主机调整：
 
