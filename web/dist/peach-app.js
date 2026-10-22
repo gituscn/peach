@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "2ad8ad3f-443b-49a3-b582-98ff2b70bdf2", e._sentryDebugIdIdentifier = "sentry-dbid-2ad8ad3f-443b-49a3-b582-98ff2b70bdf2");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "f898e39a-dd85-4a44-82d7-11e2e90468dc", e._sentryDebugIdIdentifier = "sentry-dbid-f898e39a-dd85-4a44-82d7-11e2e90468dc");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -68845,18 +68845,32 @@ function ARe({ source: e, selected: t, onToggle: n, handlers: r }) {
 				"aria-label": `选择 ${e.label}`
 			}),
 			/* @__PURE__ */ (0, D.jsxs)("span", {
-				className: "flex min-w-0 grow basis-0 items-start gap-1.5",
+				className: "flex min-w-0 grow basis-0 items-center gap-1.5",
 				children: [/* @__PURE__ */ (0, D.jsx)("span", {
 					"data-follow-source-site": "",
-					className: "flex h-lh shrink-0 items-center text-body-medium",
+					className: "flex shrink-0 items-center text-body-medium",
 					children: /* @__PURE__ */ (0, D.jsx)(Kz, { provider: e.provider })
-				}), /* @__PURE__ */ (0, D.jsxs)("span", {
-					className: "flex min-w-0 grow flex-col gap-0.5",
-					children: [/* @__PURE__ */ (0, D.jsx)(Yz, { source: e }), e.last_error ? /* @__PURE__ */ (0, D.jsx)(Xz, { text: e.last_error }) : null]
-				})]
+				}), /* @__PURE__ */ (0, D.jsx)(Yz, { source: e })]
 			}),
 			/* @__PURE__ */ (0, D.jsx)(nx, { children: e.provider_label }),
 			/* @__PURE__ */ (0, D.jsx)(Jz, { source: e }),
+			e.last_error ? /* @__PURE__ */ (0, D.jsxs)("span", {
+				"data-follow-source-error": "",
+				className: "flex min-w-0 basis-full gap-3 max-sm:gap-x-2 sm:order-last",
+				children: [/* @__PURE__ */ (0, D.jsx)("span", {
+					"aria-hidden": !0,
+					className: "w-4 shrink-0"
+				}), /* @__PURE__ */ (0, D.jsxs)("span", {
+					className: "flex min-w-0 grow gap-1.5",
+					children: [/* @__PURE__ */ (0, D.jsx)("span", {
+						"aria-hidden": !0,
+						className: "w-(--icon-inline) shrink-0 text-body-medium"
+					}), /* @__PURE__ */ (0, D.jsx)("span", {
+						className: "min-w-0 grow",
+						children: /* @__PURE__ */ (0, D.jsx)(Xz, { text: e.last_error })
+					})]
+				})]
+			}) : null,
 			/* @__PURE__ */ (0, D.jsxs)("span", {
 				"data-follow-source-controls": "",
 				className: "flex w-max max-w-full flex-none flex-wrap items-center gap-1.5 max-sm:w-full",
@@ -68915,55 +68929,58 @@ function jRe({ group: e, name: t, open: n, selected: r, handlers: i, onOpen: a, 
 					group: e,
 					name: t
 				}),
-				/* @__PURE__ */ (0, D.jsx)("b", {
-					className: "min-w-0 grow text-body-medium wrap-anywhere text-text-primary max-sm:basis-0",
-					children: t
+				/* @__PURE__ */ (0, D.jsxs)("span", {
+					className: "flex min-w-0 grow basis-0 flex-col gap-1",
+					children: [/* @__PURE__ */ (0, D.jsx)("b", {
+						className: "min-w-0 text-body-medium wrap-anywhere text-text-primary",
+						children: t
+					}), /* @__PURE__ */ (0, D.jsxs)("span", {
+						"data-follow-author-sites": "",
+						className: "flex min-w-0 flex-wrap items-center gap-1 text-body-2-regular",
+						title: d,
+						children: [
+							e.map((e) => /* @__PURE__ */ (0, D.jsx)(Kz, { provider: e.provider }, e.id)),
+							/* @__PURE__ */ (0, D.jsx)(nx, { children: `来源：${d}` }),
+							u ? /* @__PURE__ */ (0, D.jsx)("span", {
+								className: "ml-1 shrink-0 text-text-error-primary",
+								children: `${u} 个失败`
+							}) : null
+						]
+					})]
 				}),
 				/* @__PURE__ */ (0, D.jsxs)("span", {
 					"data-follow-author-controls": "",
-					className: "flex w-max max-w-full flex-none flex-wrap items-center gap-2 max-sm:w-full",
-					children: [
-						/* @__PURE__ */ (0, D.jsx)(q, {
+					className: "flex flex-none items-center gap-2 max-sm:w-full max-sm:justify-end",
+					children: [/* @__PURE__ */ (0, D.jsx)(q, {
+						variant: "secondary",
+						size: "small",
+						iconOnly: !0,
+						leadingIcon: yA,
+						"aria-label": `检查 ${t} 的全部来源`,
+						disabled: !l.length || i.readOnly,
+						...Y(i.busy),
+						onClick: () => i.check(l)
+					}), /* @__PURE__ */ (0, D.jsxs)("span", {
+						className: "flex flex-none items-center gap-2",
+						children: [/* @__PURE__ */ (0, D.jsx)(q, {
 							variant: "secondary",
 							size: "small",
-							iconOnly: !0,
-							leadingIcon: yA,
-							"aria-label": `检查 ${t} 的全部来源`,
-							disabled: !l.length || i.readOnly,
-							...Y(i.busy),
-							onClick: () => i.check(l)
-						}),
-						/* @__PURE__ */ (0, D.jsxs)("span", {
-							className: "flex shrink-0 items-center gap-1 max-sm:mr-auto max-sm:min-w-0 max-sm:shrink max-sm:flex-wrap",
-							title: d,
-							children: [e.map((e) => /* @__PURE__ */ (0, D.jsx)(Kz, { provider: e.provider }, e.id)), /* @__PURE__ */ (0, D.jsx)(nx, { children: `来源：${d}` })]
-						}),
-						u ? /* @__PURE__ */ (0, D.jsx)("span", {
-							className: "shrink-0 text-body-2-regular text-text-error-primary",
-							children: `${u} 个失败`
-						}) : null,
-						/* @__PURE__ */ (0, D.jsxs)("span", {
-							className: "flex flex-none items-center gap-2",
-							children: [/* @__PURE__ */ (0, D.jsx)(q, {
-								variant: "secondary",
-								size: "small",
-								leadingIcon: rA,
-								"aria-pressed": p.all ? "true" : p.some ? "mixed" : "false",
-								"aria-label": `${p.all ? "取消全选" : "全选"} ${t} 的来源`,
-								onClick: () => o(!p.all),
-								children: p.all ? "取消全选" : "全选"
-							}), /* @__PURE__ */ (0, D.jsx)(q, {
-								variant: "secondary",
-								size: "small",
-								"aria-expanded": n,
-								"aria-controls": f,
-								leadingIcon: JP,
-								"aria-label": `${n ? "收起" : "展开"} ${t} 的来源`,
-								onClick: () => a(!n),
-								children: n ? "收起" : "展开"
-							})]
-						})
-					]
+							leadingIcon: rA,
+							"aria-pressed": p.all ? "true" : p.some ? "mixed" : "false",
+							"aria-label": `${p.all ? "取消全选" : "全选"} ${t} 的来源`,
+							onClick: () => o(!p.all),
+							children: p.all ? "取消全选" : "全选"
+						}), /* @__PURE__ */ (0, D.jsx)(q, {
+							variant: "secondary",
+							size: "small",
+							"aria-expanded": n,
+							"aria-controls": f,
+							leadingIcon: JP,
+							"aria-label": `${n ? "收起" : "展开"} ${t} 的来源`,
+							onClick: () => a(!n),
+							children: n ? "收起" : "展开"
+						})]
+					})]
 				})
 			]
 		}), /* @__PURE__ */ (0, D.jsx)(BCe, {
@@ -116269,4 +116286,4 @@ Yxt(Xxt);
 //#endregion
 export { Qw as applyTheme, Kk as peachHistory, Yo as popCount, S_t as showToast };
 
-//# debugId=2ad8ad3f-443b-49a3-b582-98ff2b70bdf2
+//# debugId=f898e39a-dd85-4a44-82d7-11e2e90468dc
