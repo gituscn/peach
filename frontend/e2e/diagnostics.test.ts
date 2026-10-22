@@ -126,7 +126,7 @@ describe('配置中的系统诊断', () => {
           const shown = await row.evaluate(element => {
             const title = element.querySelector('h3')!;
             const reason = element.querySelector('[data-check-reason]')!;
-            const button = element.querySelector('button')!;
+            const button = element.querySelector('a[href]')!;
             const box = element.getBoundingClientRect();
             const action = button.getBoundingClientRect();
             return { titleWeight: getComputedStyle(title).fontWeight, reasonWeight: getComputedStyle(reason).fontWeight,
