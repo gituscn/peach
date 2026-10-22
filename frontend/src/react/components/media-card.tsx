@@ -31,6 +31,7 @@ import { spinnerHtml } from '@peach/legacy/ui';
 
 import type { MediaCardActions, MediaCardHelpers, MediaCardLayout, MediaItem } from '../catalog-grid/types';
 import { ArtSlot } from './art-slot';
+import { useLibraryTints } from './library-tint';
 import { overlayHost } from './overlay-host';
 import { suppressShiftTextSelection } from './row-click';
 
@@ -204,6 +205,9 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
   const card = useRef<HTMLElement | null>(null);
   const [written, setWritten] = useState<{ id: number; on: boolean } | null>(null);
   const later = written?.id === item.id ? written.on : !!item.watch_later;
+  const tints = useLibraryTints();
+  const library = item.library_id && tints.get(item.library_id)?.color ? item.library_id : undefined;
+  const flaggedBy = [Number(item.liked) > 0 ? '喜欢' : '', Number(item.o_count) > 0 ? '有高潮记录' : ''].filter(Boolean);
   const latest = useRef(item);
   latest.current = item;
   /* 悬停预览只接一次：`wireHover` 往卡上挂监听，ref 回调换了身份 React 就会先卸后挂，
@@ -284,6 +288,16 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
           )
           : null}
       <PreviewCounter />
+      {later || flaggedBy.length
+        ? (
+          <div data-media-status="">
+            {later ? <span data-status="later" title="稍后看" aria-label="稍后看"><Icon name="bookmark" /></span> : null}
+            {flaggedBy.length
+              ? <span data-status="flagged" title={`已标记：${flaggedBy.join('、')}`} aria-label={`已标记：${flaggedBy.join('、')}`}><Icon name="heart" /></span>
+              : null}
+          </div>
+        )
+        : null}
       {!selectMode ? <LaterButton item={item} actions={actions} on={later} onChange={on => setWritten({ id: item.id, on })} /> : null}
       {!selectMode ? <div data-media-seek="">
         <button type="button" onClick={(event) => { event.stopPropagation(); seekPreview(card.current, -seekSeconds) }}
@@ -297,7 +311,7 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
 
   return (
     <article ref={attach} data-media-card="" data-id={item.id} data-variant={variant}
-      data-watch-later={later ? '' : undefined}
+      data-watch-later={later ? '' : undefined} data-library={library}
       data-jav-item={item.is_jav ? '' : undefined}
       data-part-seed={parts ? parts.seed_id : undefined} data-stacked={stacked ? '' : undefined}
       data-pending-delete={item.disposal === 'trash' ? '' : undefined} data-selected={selected ? '' : undefined}

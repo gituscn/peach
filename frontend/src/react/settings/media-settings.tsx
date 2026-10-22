@@ -30,6 +30,7 @@ import {
 import { sourceDefaultCost, type SourceCost } from '../../core/media-sources';
 import { randomId } from '../../core/random-id';
 import { libraryAutoChoice, LibraryIconPicker } from './library-icon-picker';
+import { LibraryPolicySettings } from './library-policy-settings';
 import { PushDiscoveryForm } from './push-discovery-settings';
 import {
   ErrorText, ExternalLink, Fact, FactList, Footer, Help, Section, SourceMark, Stack,
@@ -68,6 +69,7 @@ export function MediaSettings({ data, receipt, panel }: ConfigurationGroupProps)
   return (
     <div {...groupRoot(panel)}>
       {data.editable ? <MediaForm data={data} receipt={receipt} /> : <Note tone="neutral" title="只读">{data.notice}</Note>}
+      <LibraryPolicySettings data={data} />
       {data.editable ? null : <MountStatus data={data} />}
       {data.media_sources?.some(row => isCloudSource(row.location)) ? <CloudProxySettings receipt={receipt} /> : null}
       {data.push_discovery

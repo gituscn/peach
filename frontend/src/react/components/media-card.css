@@ -45,10 +45,22 @@ body[data-surface="/trash"] .peach-react [data-media-grid] {
   transform-origin: center;
   transition: transform .18s ease, filter .18s ease, background-color .15s ease, box-shadow .15s ease;
 }
-/* 稍后看是常驻状态，一排里常有好几张：底色只铺在卡片盒自己的圆角里，相邻两张之间留出整段
- * 列距的页面底色，不连成一片。 */
-.peach-react [data-media-card][data-watch-later]:not([data-pending-delete]) {
-  background: var(--picked);
+/* 媒体库来源色是常驻底色，同一媒体库的卡常常整排相邻：淡色只铺在卡片盒自己的圆角里，
+ * 相邻两张之间留出整段列距的页面底色，不连成一片。颜色由 `library-tint.ts` 按 `library_id` 给。 */
+.peach-react [data-media-card][data-library]:not([data-pending-delete], [data-variant="resource"], [data-variant="junk"]) {
+  --library-surface: color-mix(in oklab, var(--library-color) 9%, transparent);
+  --library-hover: color-mix(in oklab, var(--library-color) 15%, transparent);
+  background: var(--library-surface);
+}
+[data-theme="dark"] .peach-react [data-media-card][data-library] {
+  --library-surface: color-mix(in oklab, var(--library-color) 13%, transparent);
+  --library-hover: color-mix(in oklab, var(--library-color) 20%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .peach-react [data-media-card][data-library] {
+    --library-surface: color-mix(in oklab, var(--library-color) 13%, transparent);
+    --library-hover: color-mix(in oklab, var(--library-color) 20%, transparent);
+  }
 }
 .peach-react [data-media-card][data-variant="short"] { flex: none; width: 214px; }
 .peach-react [data-media-card][data-variant="next"] { flex: none; width: 216px; }
@@ -59,10 +71,36 @@ body[data-density="dense"] .peach-react [data-media-card][data-variant="short"] 
   background: var(--hover);
   box-shadow: 0 0 0 8px var(--hover);
 }
-.peach-react [data-media-card][data-watch-later]:not([data-pending-delete]):is(:hover, :focus-within) {
-  background: color-mix(in srgb, var(--picked) 96%, var(--ink));
-  box-shadow: 0 0 0 8px color-mix(in srgb, var(--picked) 96%, var(--ink));
+.peach-react [data-media-card][data-library]:not([data-pending-delete], [data-variant="resource"], [data-variant="junk"]):is(:hover, :focus-within) {
+  background: var(--library-hover);
+  box-shadow: 0 0 0 8px var(--library-hover);
 }
+/* 稍后看与已标记是个人状态，和来源色分开：封面左下角各一枚带色图标，两枚可以同时出现。
+ * 鼠标不在卡上时也一直显示；颜色之外还有字形，不靠颜色单独分辨。 */
+.peach-react [data-media-status] {
+  position: absolute;
+  z-index: 3;
+  left: 10px;
+  bottom: 12px;
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+}
+.peach-react [data-media-status] > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgb(255 255 255 / .12);
+  border-radius: 50%;
+  background: rgb(0 0 0 / .42);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+}
+.peach-react [data-media-status] svg { width: 15px; height: 15px; fill: currentColor; stroke: currentColor; stroke-width: 1.5; }
+.peach-react [data-media-status] [data-status="later"] { color: var(--color-sky-500); }
+.peach-react [data-media-status] [data-status="flagged"] { color: var(--color-rose-500); }
 .peach-react [data-media-card]:not([data-variant="resource"], [data-variant="junk"]):hover [data-media-pic] { filter: saturate(.9) brightness(.94); }
 .peach-react [data-select-mode] [data-media-card] { cursor: default; user-select: none; }
 .peach-react [data-select-mode] :is([data-media-open], [data-media-preview], [data-media-later], [data-media-seek]),

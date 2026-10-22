@@ -12,6 +12,12 @@
 .peach-react [data-catalog-table] [data-list-name] { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .peach-react [data-catalog-table] [data-list-open]:hover [data-list-name] { text-decoration: underline; }
 .peach-react [data-catalog-table] [data-list-byline] { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--fs-sm); }
+/* 列表行的来源：色点加媒体库名，排在署名前；个人状态图标缩小后贴在预览图左下角。 */
+.peach-react [data-catalog-table] [data-list-library] { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; color: var(--ink-2); }
+.peach-react [data-catalog-table] [data-list-library][data-library]::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--library-color); }
+.peach-react [data-catalog-table] [data-list-picture] [data-media-status] { left: 4px; bottom: 4px; gap: 4px; }
+.peach-react [data-catalog-table] [data-list-picture] [data-media-status] > span { width: 20px; height: 20px; }
+.peach-react [data-catalog-table] [data-list-picture] [data-media-status] svg { width: 11px; height: 11px; }
 [data-table-skeleton] > div { display: flex; align-items: center; gap: 16px; height: 88px; }
 [data-table-skeleton] i { display: block; flex: none; width: 112px; height: 63px; border-radius: var(--control-radius); }
 [data-table-skeleton] span { display: block; width: 40%; height: 20px; border-radius: var(--control-radius); }

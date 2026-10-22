@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from 
 import { ChevronSortDown } from '@/components/foundations/icons/chevrons';
 import { apiGet } from '../../api';
 import { ArtSlot } from '../components/art-slot';
+import { useLibraryTints } from '../components/library-tint';
 import { DataTableFrame } from '../components/data-table-frame';
 import { DataTableFooter, DataTableSort } from '../components/table-controls';
 import { RetryNote } from '../components/grid-reveal';
@@ -184,6 +185,11 @@ function ListIdentity({ item, props, disabled }: { item: MediaItem; props: Catal
   const artwork = cardArtwork(item, 'small', false, props.layout.javImage);
   const name = props.helpers.displayName(item, item.name || '').trim() || '未命名作品';
   const who = item.creator || item.performers?.join('、') || item.studio;
+  const tints = useLibraryTints();
+  const tint = item.library_id ? tints.get(item.library_id) : undefined;
+  const tinted = tint?.color ? tint.id : undefined;
+  const flaggedBy = [Number(item.liked) > 0 ? '喜欢' : '', Number(item.o_count) > 0 ? '有高潮记录' : ''].filter(Boolean);
+  const glyph = (name: string) => <svg viewBox="0 0 24 24" aria-hidden="true"><use href={`#i-${name}`} /></svg>;
   return <div data-list-identity="">
     <button type="button" data-list-open="" disabled={disabled} aria-label={`打开 ${name}`} onClick={event => {
       if (props.selectMode) {
@@ -193,9 +199,19 @@ function ListIdentity({ item, props, disabled }: { item: MediaItem; props: Catal
       open(item, event.currentTarget);
     }}>
       <span data-list-picture="">{artwork.html
-        ? <ArtSlot artwork={artwork} relayout={root => relayoutCovers(root, 'small')} /> : <span>无预览</span>}</span>
+        ? <ArtSlot artwork={artwork} relayout={root => relayoutCovers(root, 'small')} /> : <span>无预览</span>}
+        {item.watch_later || flaggedBy.length
+          ? <span data-media-status="">
+            {item.watch_later ? <span data-status="later" title="稍后看" aria-label="稍后看">{glyph('bookmark')}</span> : null}
+            {flaggedBy.length ? <span data-status="flagged" title={`已标记：${flaggedBy.join('、')}`}
+              aria-label={`已标记：${flaggedBy.join('、')}`}>{glyph('heart')}</span> : null}
+          </span>
+          : null}</span>
       <span data-list-text=""><span data-list-name="" title={name}>{name}</span>
-        <span data-list-byline="">{who || '未归属'}</span>
+        <span data-list-byline="">
+          {tint ? <span data-list-library="" data-library={tinted}>{tint.name}</span> : null}
+          {who || '未归属'}
+        </span>
       </span>
     </button>
   </div>;
