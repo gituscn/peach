@@ -7,8 +7,8 @@ export { closeAnchoredMenu, dismissMenu, presentMenu, scrollMovesAnchor, wireAnc
 export { selectFieldHtml, selectOptionIconHtml, wireSelectField } from './select-field';
 export { MEDIA_SOURCE_ICONS } from './media-source-icons';
 export {
-  badgeHtml, boardTabsHtml, checkboxHtml, collectionHeaderHtml, emptyStateHtml, gaugeHtml, loadingDotsHtml, noteHtml,
-  progressHtml, projectBannerHtml, searchInputHtml, spinnerHtml,
+  badgeHtml, boardTabsHtml, checkboxHtml, collectionHeaderHtml, emptyStateHtml, gaugeHtml, LOAD_MORE_STATUS,
+  loadingDotsHtml, noteHtml, progressHtml, projectBannerHtml, searchInputHtml, spinnerHtml,
 } from './markup';
 export { dissolveValue, iconSwapHtml, popBadges, popCount, revealTexts, setIconSwap, swapText } from './motion';
 export {

@@ -115,7 +115,7 @@ export function WantMagnets({ want, readOnly, downloads, provider, toast, onSour
           if (!waiting) { refresh.current = true; void query.refetch() }
         }}>重新查询</Button>
       </div>
-      {waiting ? <LoadingDots label="正在查找资源链接…" /> : null}
+      {waiting ? <LoadingDots label="正在查找资源链接" /> : null}
       {failure ? <Note tone="error" title="资源链接未取得">{failure}</Note> : null}
       {query.data?.warnings?.map((warning) => <Note key={warning} tone="neutral">{resourceNotice(warning)}</Note>)}
       {query.data?.warnings?.length && query.data.source_url ? <ButtonLink variant="secondary" size="small" className="self-start"

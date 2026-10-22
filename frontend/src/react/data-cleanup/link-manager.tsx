@@ -185,7 +185,7 @@ export function LinkManager() {
         ? <TaskProgress embedded label={checkLine(state)} value={Math.min(state.checked || 0, state.total || 0)} total={state.total} />
         : null}
       {removing
-        ? <TaskProgress embedded label={prune.job?.message || '正在重验并删除失效链接…'}
+        ? <TaskProgress embedded label={prune.job?.message || '正在重验并删除失效链接'}
             value={Math.min(prune.job?.checked || 0, prune.job?.total || 0)} total={prune.job?.total} />
         : null}
     </>;

@@ -22,6 +22,7 @@ export {configurationSkeletonHtml, revealSkeleton, SKELETON_REVEAL_DELAY, skelet
 /* 测试环境没有布局，骨架补齐量不出东西，这里什么都不做。 */
 export const fitSkeleton = (_root: Element | null): void => {};
 export const loadingDotsHtml = (label: string): string => `<span>${label}</span>`;
+export {LOAD_MORE_STATUS} from '../../src/ui-kit';
 export const spinnerHtml = (label: string): string => `<span role="status" aria-label="${label}"></span>`;
 export const checkboxHtml = (attrs = ''): string => `<span class="ui-pcheck"><input type="checkbox" ${attrs}></span>`;
 export const progressHtml = (label: string, value: number, max = 100): string =>

@@ -100,7 +100,7 @@ function SourceForm({ initial, cancel, saved }: {
             if (current === revision.current) setPreview(JSON.stringify(result.record, null, 2));
           }, (cause) => { if (current === revision.current) action.setError(errorMessage(cause)) });
       }} />
-      {action.busy === 'preview' ? <Help role="status"><span dangerouslySetInnerHTML={{ __html: spinnerHtml('正在试查来源') }} />正在试查来源…</Help> : null}
+      {action.busy === 'preview' ? <Help role="status"><span dangerouslySetInnerHTML={{ __html: spinnerHtml('正在试查来源') }} />正在试查来源</Help> : null}
       {preview ? <CodeBlock code={preview} language="json" label="元数据接口返回" /> : null}
       {action.error ? <ErrorText>{action.error}</ErrorText> : null}
     </Stack>

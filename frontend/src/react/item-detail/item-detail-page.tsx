@@ -719,7 +719,7 @@ function Preference({ item, open, write }: { item: DetailItem; open: boolean; wr
         <span id="preferenceState" aria-live="polite">{write.preferenceState}</span>
         <button type="button" className="geist-button primary" id="savePreference" data-save-preference="" title="提交喜爱理由" aria-label="提交喜爱理由"
           {...write.busyAttrs('preference')} onClick={() => write.preference({ reason })}
-          dangerouslySetInnerHTML={{ __html: saving ? `${spinnerHtml('正在提交喜爱理由')}<span>提交中…</span>` : '<span>提交</span>' }} />
+          dangerouslySetInnerHTML={{ __html: saving ? `${spinnerHtml('正在提交喜爱理由')}<span>提交中</span>` : '<span>提交</span>' }} />
       </div>
     </div>
   );

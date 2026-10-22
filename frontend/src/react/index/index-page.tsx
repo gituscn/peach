@@ -12,7 +12,7 @@ import { Radio } from 'react-aria-components';
 
 import { refitNativeImages } from '@peach/card-art';
 import { requestErrorMessage } from '@peach/legacy/core';
-import { indexSkeletonHtml } from '@peach/legacy/ui';
+import { indexSkeletonHtml, spinnerHtml } from '@peach/legacy/ui';
 
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { InputBase, TextField } from '@/components/base/input/input';
@@ -22,7 +22,6 @@ import { IDENTITY_ROW_CLASS } from '../../identity-filter';
 import { BoardTabs, type BoardTab } from '../components/board-tabs';
 import { EmptyState } from '../components/empty-state';
 import { LibraryShortcuts } from '../library-shortcuts/shortcut-controls';
-import { LoadingDots } from '../components/loading-dots';
 import { SEGMENTED_TRACK, SEGMENT_ICON, SegmentedRadioGroup as RadioGroup } from '../components/segmented';
 import { spriteGlyph } from '../components/sprite-glyph';
 import type { OnlineAuthor, OnlineTag } from '../follow/online-vocab';
@@ -285,11 +284,13 @@ export function IndexPage(props: IndexProps) {
       {more ? (
         <div className="mt-5 flex justify-center">
           {/* 按下去到下一批画出来之间要有东西在动：这一段是一次网络往返加一屏头像，光把键按灰了
-              说不出「还在走」和「点了没反应」的区别。字留在键里，键宽不变、下面的内容不跟着跳。 */}
+              说不出「还在走」和「点了没反应」的区别。用户按下的键走 Spinner（同播放墙的「载入更多」），
+              键上的字不变，键宽留够放下转圈，下面的内容不跟着跳。 */}
           <Button variant="secondary" data-index-more="" className="min-w-31"
             disabled={result.isFetchingNextPage} aria-busy={result.isFetchingNextPage || undefined}
             onClick={() => void result.fetchNextPage()}>
-            {result.isFetchingNextPage ? <LoadingDots inline label="继续载入中…" /> : '载入更多'}
+            {result.isFetchingNextPage ? <span className="contents" dangerouslySetInnerHTML={{ __html: spinnerHtml('正在载入下一批') }} /> : null}
+            载入更多
           </Button>
         </div>
       ) : null}

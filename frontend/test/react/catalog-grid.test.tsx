@@ -1,16 +1,19 @@
 /* 馆藏卡片网格：一屏卡片怎么排（取数的查询串、折叠、Mix 落位、竖屏带落点），以及一张卡
  * 画出什么、点哪里去哪里。 */
 import { act, useState } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
 import { MediaCard, cardRatio, type MediaCardVariant } from '../../src/react/components/media-card';
+import { CatalogGridPage, LoadMore } from '../../src/react/catalog-grid/catalog-grid-page';
+import type { CatalogGridProps } from '../../src/react/catalog-grid/types';
 import {
   MIX_SLOT, SHORTS_BATCH, arrangeTiles, catalogParams, collapseGroups, fetchCatalogPage, latestCatalogPages, mixSeed, nextOffset,
   shortsBoundaries, shortsParams, replaceCatalogItem, type GridPage,
 } from '../../src/react/catalog-grid/catalog-grid';
 import type { MediaCardActions, MediaCardHelpers, MediaCardLayout, MediaItem } from '../../src/react/catalog-grid/types';
 
-import { click, mount } from './render';
+import { click, mount, settle } from './render';
 import { queryClient } from '../../src/react/query';
 
 const SMALL: MediaCardLayout = { active: false, size: 'small', portrait: false, javImage: 'cover' };
@@ -83,6 +86,106 @@ describe('目录取数', () => {
   it('竖屏带跟着主列表的筛选走，一条取一批竖屏', () => {
     const params = new URLSearchParams(shortsParams({ sort: 'seed', tag: '' }, 36));
     expect(Object.fromEntries(params)).toEqual({ sort: 'seed', orient: '竖屏', limit: String(SHORTS_BATCH), offset: '36' });
+  });
+});
+
+/** 测试环境没有相交观察：记下每个观察器和它正看着的元素，由用例决定哨兵此刻在不在视口附近。 */
+class FakeObserver {
+  static all: FakeObserver[] = [];
+  readonly watched = new Set<Element>();
+  observations = 0;
+  constructor(private readonly callback: IntersectionObserverCallback) { FakeObserver.all.push(this) }
+  observe(target: Element) { this.watched.add(target); this.observations += 1 }
+  unobserve(target: Element) { this.watched.delete(target) }
+  disconnect() { this.watched.clear() }
+  takeRecords() { return [] }
+  /** 哨兵在视口附近：照真观察器的样子，对正看着的每个元素报一次相交。 */
+  near() {
+    const entries = [...this.watched].map((target) => ({ target, isIntersecting: true }) as unknown as IntersectionObserverEntry);
+    return act(async () => { this.callback(entries, this as unknown as IntersectionObserver) });
+  }
+  static latest() { return FakeObserver.all[FakeObserver.all.length - 1]! }
+}
+
+describe('续页', () => {
+  type Reply = { ok: boolean; status: number; json(): Promise<unknown> };
+  const reply = (body: unknown): Reply => ({ ok: true, status: 200, json: async () => body });
+
+  /** 每页 3 张、共 9 张的目录；`hold` 打开后第一页那一问停在路上，模拟结果版本变化触发的整列重读。 */
+  function catalogServer() {
+    const held: Array<() => void> = [];
+    let hold = false;
+    const fetcher = vi.fn((input: string, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://peach.test');
+      const offset = Number(url.searchParams.get('offset') || 0);
+      const body = { items: [1, 2, 3].map((n) => item(offset + n)), total: 9, has_more: offset + 3 < 9 };
+      if (!hold || offset !== 0) return Promise.resolve(reply(body));
+      return new Promise<Reply>((resolve, reject) => {
+        held.push(() => resolve(reply(body)));
+        init?.signal?.addEventListener('abort', () => { reject(new DOMException('已中止', 'AbortError')) });
+      });
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const offsets = () => fetcher.mock.calls.map(([input]) => new URL(String(input), 'http://peach.test').searchParams.get('offset'));
+    return { offsets, holdFirstPage: () => { hold = true }, release: () => { for (const settle of held.splice(0)) settle() } };
+  }
+
+  const props = (filters: Record<string, string>): CatalogGridProps => ({
+    mode: 'catalog', layout: SMALL, selectMode: false, selected: new Set(), seekSeconds: 10, revision: 0,
+    helpers: { badgeHtml: () => '', titleHtml: (_it, raw) => raw, displayName: (_it, raw) => raw, tagLabel: (tag) => tag },
+    actions: {
+      open: vi.fn(), openResource: vi.fn(), openShort: vi.fn(), openShorts: vi.fn(), openMix: vi.fn(),
+      openEntity: vi.fn(), openUnowned: vi.fn(), toggleTag: vi.fn(), toggleSelection: vi.fn(),
+      watchLater: vi.fn(async () => {}), rate: vi.fn(async () => {}), resourceOperation: vi.fn(async () => {}),
+      mixRelated: vi.fn(async () => []), canFlip: () => true,
+    },
+    skeletonHtml: () => '', wireDrag: vi.fn(), settled: vi.fn(), filters, batchSize: 3, groupCollapse: true,
+    excludeVertical: false, mix: false, shorts: false, onCount: vi.fn(), emptyHtml: () => '', canLoadMore: () => true,
+  });
+  const cards = (host: ParentNode) => host.querySelectorAll('[data-media-grid] > [data-media-card]').length;
+  /** 请求链上有 fetch、json、查询缓存与重画几段：一拍一拍放行，直到条件成立。 */
+  async function until(ok: () => boolean, what: string) {
+    for (let step = 0; step < 200; step += 1) {
+      if (ok()) return;
+      await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 0) }) });
+    }
+    throw new Error(`一直没等到：${what}`);
+  }
+
+  it('结果版本变化引起的整列重读还在路上时滚到底：续页先停掉重读、当场取下一页', async () => {
+    vi.stubGlobal('IntersectionObserver', FakeObserver);
+    const server = catalogServer();
+    const filters = { sort: 'seed', q: '续页压过重读' };
+    const host = await mount(<QueryClientProvider client={queryClient}><CatalogGridPage {...props(filters)} /></QueryClientProvider>);
+    await until(() => cards(host) === 3, '第一页');
+    expect(host.querySelector('[data-load-more]')?.textContent, '三颗点已经在动，字不带省略号').toBe('载入中');
+    await FakeObserver.latest().near();
+    await until(() => cards(host) === 6, '第二页');
+
+    server.holdFirstPage();
+    await act(async () => { void queryClient.invalidateQueries({ queryKey: ['catalog-grid'] }, { cancelRefetch: false }) });
+    await until(() => server.offsets().at(-1) === '0', '整列重读从第一页取起，停在路上');
+    await FakeObserver.latest().near();
+    await until(() => cards(host) === 9, '续页不等整列重读取完，当场接上第三页');
+    expect(server.offsets().filter((offset) => offset === '6')).toHaveLength(1);
+    server.release();
+    await settle();
+    queryClient.removeQueries({ queryKey: ['catalog-grid'] });
+  });
+
+  it('一趟续页没接上新页时，哨兵按它此刻的位置再判一遍，还在视口附近就接着取', async () => {
+    vi.stubGlobal('IntersectionObserver', FakeObserver);
+    const load = vi.fn(async () => {});
+    await mount(<LoadMore entity={false} load={load} enabled={() => true} />);
+    const observer = FakeObserver.latest();
+    expect(observer.observations).toBe(1);
+    await observer.near();
+    await settle();
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(observer.observations, '取完重新观察一次，真观察器会就此再报一次相交').toBe(2);
+    await observer.near();
+    await settle();
+    expect(load).toHaveBeenCalledTimes(2);
   });
 });
 

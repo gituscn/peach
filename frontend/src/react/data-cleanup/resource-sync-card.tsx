@@ -135,7 +135,7 @@ export function ResourceSyncCard(
   } else if (done) {
     result = receipt(done);
   } else if (apply.running) {
-    progress = <TaskProgress embedded label={apply.job?.message || '正在复核并清理失效条目…'} />;
+    progress = <TaskProgress embedded label={apply.job?.message || '正在复核并清理失效条目'} />;
   } else if (scan.start.isError) {
     result = <Note tone="error" title="扫描失败">{errorMessage(scan.start.error)}</Note>;
   } else if (scan.query.isError && state) {
