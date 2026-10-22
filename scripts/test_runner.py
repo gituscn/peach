@@ -8,13 +8,14 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
 from collections.abc import Iterable
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
 
@@ -922,11 +923,65 @@ def retain_inflight(context, scopes, passed, previous, baseline, count):
           "请运行 auto 补齐验证，本次不签发完整通过记录。", flush=True)
 
 
+RUN_TEMP = "PEACH_TEST_RUN_TEMP"
+RUN_TEMP_PREFIX = "peach-test-run-"
+TEMP_VARIABLES = ("TEMP", "TMP", "TMPDIR")
+
+
+def _force_remove(function, path, _error) -> None:
+    """Windows 上 Git 对象是只读文件，去掉只读再删一次；仍删不掉就留给下一次清扫。"""
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        function(path)
+    except OSError:
+        pass
+
+
+def sweep_stale_runs(base: Path, now: float | None = None) -> None:
+    """被强行结束的运行来不及删自己的目录；目录名里记着创建时刻，超过一天的整个删掉。"""
+    now = time.time() if now is None else now
+    for path in base.glob(f"{RUN_TEMP_PREFIX}*"):
+        stamp = re.match(rf"{RUN_TEMP_PREFIX}(\d+)-", path.name)
+        if stamp and path.is_dir() and now - int(stamp.group(1)) > 86400:
+            shutil.rmtree(path, onexc=_force_remove)
+
+
+@contextmanager
+def isolated_temp(base: Path | None = None):
+    """本次运行专用的临时目录，结束时整个删掉。
+
+    TEMP、TMP、TMPDIR 与 `tempfile.tempdir` 都指向它，用例和它们起的子进程（含本机分片）
+    建的临时文件全落在里面，个别用例漏了回收也不会堆进系统 Temp。分片子进程继承父进程的
+    目录，不再套一层。
+    """
+    inherited = os.environ.get(RUN_TEMP)
+    if inherited and Path(inherited).is_dir():
+        yield Path(inherited)
+        return
+    base = Path(tempfile.gettempdir()) if base is None else base
+    sweep_stale_runs(base)
+    saved = {name: os.environ.get(name) for name in (RUN_TEMP, *TEMP_VARIABLES)}
+    previous = tempfile.tempdir
+    with tempfile.TemporaryDirectory(prefix=f"{RUN_TEMP_PREFIX}{int(time.time())}-", dir=base,
+                                     ignore_cleanup_errors=True) as folder:
+        os.environ.update(dict.fromkeys((RUN_TEMP, *TEMP_VARIABLES), folder))
+        tempfile.tempdir = folder
+        try:
+            yield Path(folder)
+        finally:
+            tempfile.tempdir = previous
+            for name, value in saved.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
+
 if __name__ == "__main__":
     # 故障注入的默认错误日志属于当前测试进程，不能写进真实数据目录。
     os.environ["PEACH_REPORTING_TEST_MODE"] = "1"
     from peach import error_reporting, remote_reporting
     remote_reporting.disable_for_process()
-    with tempfile.TemporaryDirectory(prefix='peach-test-errors-') as error_logs:
+    with isolated_temp(), tempfile.TemporaryDirectory(prefix='peach-test-errors-') as error_logs:
         error_reporting._log_dir = Path(error_logs)
         raise SystemExit(main())
