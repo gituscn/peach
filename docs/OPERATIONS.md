@@ -204,7 +204,7 @@ Windows 测试包默认使用 `%LOCALAPPDATA%\Peach\peach-data`。首次设置�
 
 `media.library_catalog.<library_id>` 和 `media.storage_roots.<root_id>` 持久保存身份。路径、挂载、来源及读取策略归根目录，名称与图标归媒体库。`media.locations` 等路径表是兼容投影，手动配置以身份表为准，字段与升级依据见 [ADR-0115](adr/0115-library-and-storage-root-identity.md)。
 
-路径配置首次保存时按原同名分组写入稳定身份。也可用 `scripts/upgrade_media_identity.py --data-root <数据根>` 预演，核对后加 `--apply` 显式升级；脚本备份配置并原子写入，不打开 ledger。重复执行保留身份。真实配置升级按部署授权执行，先在隔离配置验证。
+路径配置首次保存时按原同名分组写入稳定身份，写入前把原文件留成 `config.pre-media-identity.toml`，以后的保存不覆盖它。也可用 `scripts/upgrade_media_identity.py --data-root <数据根>` 预演，核对后加 `--apply` 显式升级；脚本备份配置并原子写入，不打开 ledger。重复执行保留身份。真实配置升级按部署授权执行，先在隔离配置验证。
 
 已有目录更换位置时，选择「重定位此目录，保留文件记录」；它保留账本前缀并更新本机挂载位置。选择「添加另一目录」创建独立根目录。移除目录声明保留文件及个人记录，文件删除仍使用各自的确认入口。目录重定位应指向同一批文件，不能用已有 ID 接管另一批内容。
 
@@ -286,7 +286,7 @@ Windows 测试包在 Peach 配置「应用与维护 → 卸载 Peach」里卸载
 
 - 原始媒体文件，任何情况下都保留。
 - 手工复制的 `config.toml.bak` 和其他 Peach 不认识的文件。
-- 完全卸载删除的是设置文件、Peach 自己生成的设置备份（`config.previous.toml`，以及 `config.toml.<说明>-<日期>-<时刻>` 形式的备份）和列出的数据库、缓存、凭据等目录。数据目录放在别处、用了目录链接，或者和媒体目录重叠时，需要自己手动检查和清理。
+- 完全卸载删除的是设置文件、Peach 自己生成的设置备份（`config.previous.toml`、`config.pre-media-identity.toml`，以及 `config.toml.<说明>-<日期>-<时刻>` 形式的备份）和列出的数据库、缓存、凭据等目录。数据目录放在别处、用了目录链接，或者和媒体目录重叠时，需要自己手动检查和清理。
 
 文件被占用而删除失败时，弹窗会给出日志位置：临时目录里的 `peach-uninstall.log`，里面写着原因和失败的路径。
 

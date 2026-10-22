@@ -883,6 +883,7 @@ def save_configuration(request: Request, body: dict[str, Any] = Body(default_fac
         temporary = config.path.with_suffix(".pending.toml")
         try:
             shutil.copy2(config.path, config.path.with_suffix(".previous.toml"))
+            settings_file.keep_pre_identity_backup(config.path)
             temporary.write_text(settings_file.render(prepared), encoding="utf-8")
             os.replace(temporary, config.path)
             if body.get("scan_now"):

@@ -722,8 +722,30 @@ def write(config: PeachConfig, *, force: bool = False) -> Path:
     if path.exists() and not force:
         raise SettingsFileError(f"设置文件已存在，加 --force 才覆盖：{path}")
     path.parent.mkdir(parents=True, exist_ok=True)
+    keep_pre_identity_backup(path)
     path.write_text(render(config), encoding="utf-8")
     return path
+
+
+def keep_pre_identity_backup(path: Path) -> None:
+    """身份表第一次落盘前留下原文件，与显式升级同名；已有备份不覆盖。
+
+    `render` 总会写出身份表（ADR-0115：首次保存即持久化），所以任何一次保存都可能是那次升级；
+    `config.previous.toml` 每次保存都被覆盖，留不住升级前的样子。
+    """
+    if not path.is_file():
+        return
+    original = path.read_bytes()
+    try:
+        if tomllib.loads(original.decode("utf-8")).get("media", {}).get("storage_roots"):
+            return
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError):
+        return
+    try:
+        with path.with_suffix(".pre-media-identity.toml").open("xb") as target:
+            target.write(original)
+    except FileExistsError:
+        pass
 
 
 def upgrade_media_identity(config: PeachConfig, *, apply: bool = False) -> PeachConfig:
