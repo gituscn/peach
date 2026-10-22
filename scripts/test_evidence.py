@@ -168,10 +168,11 @@ def environment(root: Path) -> str:
         "schema": 7, "python": identity["version"], "executable": str(python),
         "platform": platform.platform(), "packages": installed, "tools": tools,
         "node_modules": hashlib.sha256(node_lock.read_bytes()).hexdigest() if node_lock.exists() else None,
-        # 测试入口强制设置防外发标记；入口源码已进快照，它不是调用方选择的运行环境。
+        # 测试入口强制设置防外发标记与本次运行独占的临时目录；入口源码已进快照，它们不是调用方
+        # 选择的运行环境。临时目录每次都是新路径，算进来的话签出的记录键在 ready 时永远对不上。
         "flags": {k: v for k, v in os.environ.items()
                   if k.startswith(("PEACH_", "CI", "GITHUB_", "PYTHON"))
-                  and k not in {"PYTHONPATH", "PEACH_REPORTING_TEST_MODE"}},
+                  and k not in {"PYTHONPATH", "PEACH_REPORTING_TEST_MODE", "PEACH_TEST_RUN_TEMP"}},
     })
 
 

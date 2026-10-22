@@ -121,6 +121,14 @@ class VerificationTests(unittest.TestCase):
                 with self.assertRaisesRegex(coordinator.WorkspaceError, "有效测试记录"):
                     coordinator.ready(worker)
 
+    def test_the_run_scoped_temp_folder_does_not_enter_the_environment_fingerprint(self):
+        worker, _ = self.worker()
+        with mock.patch.dict(os.environ, {"PEACH_TEST_RUN_TEMP": str(self.root / "peach-test-run-1")}):
+            state = self.certify(worker)
+        os.environ.pop("PEACH_TEST_RUN_TEMP", None)
+        self.assertEqual(evidence.key(worker), state)
+        coordinator.ready(worker)
+
     def test_target_change_during_verification_prevents_merge(self):
         worker, branch = self.worker()
         self.certify(worker)
