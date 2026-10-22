@@ -260,12 +260,13 @@
     },
     {
       "id": "fiu758-studio-logo-discovery",
-      "cadence": "monthly",
+      "cadence": "manual",
+      "volatile": true,
       "name": "AV研究所厂牌分类与 Logo 发现证据",
       "url": "https://fiu758.com/?cat=37",
       "snapshot": "docs/reference-snapshots/fiu758-studio-logo-discovery.md",
       "checked_on": "2026-08-27",
-      "sha256": "18c384344c0889885ba236081d75db5675902f78d88859230290b57c8ed3d427",
+      "sha256": "30c61c9894e465badf897451248d1103cffdcac6d2c8b4dcab6bdced2b721c1f",
       "role": "只作厂牌日文分类名和 Logo 候选发现；第三方博客不直接升级为 Peach 真相或已安装素材。",
       "consumers": [
         "scripts/normalize_studio_logos.py"
@@ -292,12 +293,12 @@
     },
     {
       "id": "f95-masked-gofile-media",
-      "cadence": "monthly",
+      "cadence": "manual",
       "name": "F95 掩码链接与 Gofile 文件列表证据",
       "url": "https://f95zone.to/assets/js/masked.js",
       "snapshot": "docs/reference-snapshots/f95-masked-gofile-media.md",
       "checked_on": "2026-08-28",
-      "sha256": "b4fa8a7c397f330ed2f2880fe0dbc1bc7a34e47bb91d935e5f42f2c9502f206d",
+      "sha256": "0bcd972cb7c89880151d84d976c4c29ffaa5b5b8122c8aa6ac41111afdc37911",
       "role": "F95 Cookie 解掩码、文件站目标校验、Gofile 文件列表未取得说明与 Mix 计数边界。",
       "consumers": [
         "src/peach/follow_sources.py",
