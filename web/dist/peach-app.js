@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "9cbee1d2-ac87-4ef0-b901-5c1a9f2645f6", e._sentryDebugIdIdentifier = "sentry-dbid-9cbee1d2-ac87-4ef0-b901-5c1a9f2645f6");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "bc580cd5-ef33-42c5-b955-c8e1e665cbf1", e._sentryDebugIdIdentifier = "sentry-dbid-bc580cd5-ef33-42c5-b955-c8e1e665cbf1");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -59386,7 +59386,7 @@ var Uke = "这一项耗时较长，暂时没有新进展。任务结束后可以
 	return r && a.push(`${r} 项同名人物资料需要确认是否为同一人`), i && a.push(`${i} 张头像未取得`), `${a.join("，")}。`;
 }, Gke = (e) => e.requested_stage === "previews" ? `已生成 ${e.previews || 0} 部视频预览。` : `已扫描 ${e.scanned || 0} 个文件，识别 ${e.identified || 0} 个番号，取得 ${e.candidates || 0} 组作品资料，自动保存 ${e.auto_applied || 0} 条。` + (e.previews ? `已生成 ${e.previews} 部视频预览。` : "") + Wke(e);
 function Kke({ state: e, problem: t, settled: n, onRetry: r, toast: i }) {
-	let a = sCe(e), o = e.status === "failed" && !!e.retryable_asset_ids?.length, s = iCe(e.notes || {}), c = Yk();
+	let a = sCe(e), o = e.status === "failed" && !!e.retryable_asset_ids?.length, s = iCe(e.notes || {}), c = !!t || e.status === "failed", l = c && !!a?.log, u = Yk();
 	return /* @__PURE__ */ (0, D.jsxs)("div", {
 		"aria-live": "polite",
 		className: "flex flex-col gap-4 empty:hidden",
@@ -59396,7 +59396,7 @@ function Kke({ state: e, problem: t, settled: n, onRetry: r, toast: i }) {
 				title: "处理较慢",
 				children: Uke
 			}) : null,
-			t || e.status === "failed" ? /* @__PURE__ */ (0, D.jsx)(J, {
+			c ? /* @__PURE__ */ (0, D.jsx)(J, {
 				tone: "error",
 				className: "gap-0 p-3",
 				action: o ? /* @__PURE__ */ (0, D.jsx)(q, {
@@ -59457,8 +59457,9 @@ function Kke({ state: e, problem: t, settled: n, onRetry: r, toast: i }) {
 			}) : null,
 			!tF(e) && s ? /* @__PURE__ */ (0, D.jsx)(J, {
 				tone: "neutral",
-				extra: e.issues_log ? /* @__PURE__ */ (0, D.jsx)("div", {
-					className: "mt-1.5 border-t border-current/20 pt-1.5 text-text-secondary",
+				className: "gap-0 p-3",
+				extra: e.issues_log && !l ? /* @__PURE__ */ (0, D.jsx)("div", {
+					className: "mt-3 border-t border-current/20 pt-3 text-text-secondary",
 					children: /* @__PURE__ */ (0, D.jsx)(OV, {
 						path: e.issues_log,
 						prefix: "完整记录：",
@@ -115618,4 +115619,4 @@ nxt(rxt);
 //#endregion
 export { HT as applyTheme, yk as peachHistory, Go as popCount, Agt as showToast };
 
-//# debugId=9cbee1d2-ac87-4ef0-b901-5c1a9f2645f6
+//# debugId=bc580cd5-ef33-42c5-b955-c8e1e665cbf1
