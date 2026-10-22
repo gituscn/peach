@@ -83,7 +83,7 @@ describe('JAV 推荐与加载结构', () => {
       });
       const sleeve = '<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1000"><rect width="1480" height="1000" fill="#135590"/><rect x="800" y="50" width="660" height="900" fill="#f4ad43"/><text x="1050" y="500" font-size="100">FRONT</text></svg>';
       await page.route('**/cover?*', route => route.fulfill({ contentType: 'image/svg+xml', body: sleeve }));
-      await page.route('https://example.com/sleeve.svg', route => route.fulfill({ contentType: 'image/svg+xml', body: sleeve }));
+      await page.route('**/cover-image?code=*', route => route.fulfill({ contentType: 'image/svg+xml', body: sleeve }));
       await page.goto(new URL('/jav?tab=discover', page.url()).href, { waitUntil: 'load' });
       await page.locator('[data-jav-skeleton-cover]').first().waitFor();
       const cover = await page.locator('[data-jav-skeleton-cover]').first().boundingBox();

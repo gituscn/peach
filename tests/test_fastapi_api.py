@@ -2602,6 +2602,56 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             self.app.state.http_transport.client = original
             fake.close()
 
+    async def test_cover_image_proxies_official_hosts_by_code_and_replays_from_disk(self):
+        official = 'https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/abc00001/abc00001pl.jpg'
+        rows = {'ABC-001': official,
+                'ABC-002': 'https://www.javbus.com/pics/cover/abc_b.jpg',
+                'ABC-003': 'http://pics.dmm.co.jp/digital/video/abc00003/abc00003pl.jpg',
+                'ABC-004': 'https://evil.example/digital/video/abc00004/abc00004pl.jpg',
+                'ABC-005': 'https://c0.jdbstatic.com/covers/ab/abc.jpg',
+                'ABC-006': 'https://pics.dmm.co.jp/digital/video/abc00006/abc00006pl.jpg'}
+        connection = sqlite3.connect(self.db)
+        connection.executemany("INSERT INTO feed_discovery(code,cover_url,discovered_at) VALUES(?,?,'2026-10-22')",
+                               rows.items())
+        connection.commit()
+        connection.close()
+        calls, failing = [], {'connect': True}
+        def upstream(request):
+            calls.append((request.url.host, request.url.path, request.headers.get('referer')))
+            if request.url.path.endswith('abc00006pl.jpg'):
+                if failing['connect']:
+                    raise httpx.ConnectError('offline', request=request)
+                return httpx.Response(302, headers={'location': 'https://cdn.example/elsewhere.jpg'}, request=request)
+            return httpx.Response(200, headers={'content-type': 'image/jpeg', 'content-length': '5'},
+                                  stream=httpx.ByteStream(b'cover'), request=request)
+        original = self.app.state.http_transport.client
+        fake = httpx.Client(transport=httpx.MockTransport(upstream))
+        self.app.state.http_transport.client = fake
+        try:
+            with patch('peach.web_jav_discovery._cached_movie', return_value={}):
+                first = await self.client.get('/cover-image?code=ABC-001&t=secret')
+                self.assertEqual((first.status_code, first.content), (200, b'cover'))
+                replay = await self.client.get('/cover-image?code=abc-001&t=secret')
+                self.assertEqual(replay.content, b'cover')
+                self.assertEqual(calls, [('awsimgsrc.dmm.co.jp', '/pics_dig/digital/video/abc00001/abc00001pl.jpg',
+                                          'https://www.dmm.co.jp/')])
+                for code in ('ABC-002', 'ABC-003', 'ABC-004', 'ABC-005', 'ABC-404', 'bad code'):
+                    with self.subTest(code=code):
+                        refused = await self.client.get(f'/cover-image?code={code}&t=secret')
+                        self.assertEqual(refused.status_code, 404)
+                        self.assertEqual(refused.headers['cache-control'], 'no-store')
+                self.assertEqual(len(calls), 1, '白名单外的地址不应发出请求')
+                offline = await self.client.get('/cover-image?code=ABC-006&t=secret')
+                self.assertEqual((offline.status_code, offline.content), (404, b''))
+                self.assertEqual(offline.headers['cache-control'], 'no-store')
+                failing['connect'] = False
+                redirected = await self.client.get('/cover-image?code=ABC-006&t=secret')
+                self.assertEqual(redirected.status_code, 404)
+                self.assertNotIn('cdn.example', {host for host, _, _ in calls})
+        finally:
+            self.app.state.http_transport.client = original
+            fake.close()
+
     async def test_follow_cover_serves_cached_frame_and_reports_retryable_failure(self):
         connection = sqlite3.connect(self.db)
         connection.executescript((ROOT / "migrations" / "0018_online_follow.sql").read_text(

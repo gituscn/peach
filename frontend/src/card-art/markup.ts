@@ -42,6 +42,10 @@ export const withVersion = (url: string, version: string | null | undefined): st
 export const coverUrl = (item: { code?: string | null; cover_key?: string; cover_version?: string }, thumb = false): string =>
   withVersion(`/cover?code=${encodeURIComponent(item.cover_key || item.code || '')}${thumb ? '&thumb=1' : ''}`, item.cover_version);
 
+/** 库外作品的官方封面：`/cover-image` 按番号在服务端查地址，经 Peach 的出网设置取图，浏览器不直连图床。 */
+export const remoteCoverUrl = (item: { code?: string | null }): string =>
+  `/cover-image?code=${encodeURIComponent(item.code || '')}`;
+
 /** 厂牌标识地址，`variant` 跟着位置走：大位要字标、小位要方形图标。 */
 export const logoUrl = (studio: string, variant: string, version?: string | null): string =>
   withVersion(`/logo?studio=${encodeURIComponent(studio)}&variant=${variant}`, version);

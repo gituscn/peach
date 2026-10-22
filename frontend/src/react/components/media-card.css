@@ -227,12 +227,15 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
 }
 /* 封面那一层铺满格子，图本身的几何归旧样式表的 `.poster`。 */
 .peach-react [data-media-art] { position: absolute; inset: 0; display: block; }
-.peach-react [data-media-nopic] {
+.peach-react [data-media-nopic],
+.peach-react [data-media-art] > .media-nopic {
   color: var(--ink-2);
   font-size: var(--fs-xs);
   letter-spacing: .12em;
   text-transform: uppercase;
 }
+/* 远程封面取不到时由 `data-drop` 换上的占位字，与「无封面」一样排在格子正中。 */
+.peach-react [data-media-art] > .media-nopic { position: absolute; inset: 0; display: grid; place-items: center; }
 /* 悬停预览：本地源是分段跳播的视频，远端源是接触印相格子的扫视图，都由壳插进封面格，
  * 不透明黑底盖掉下面的封面。 */
 .peach-react [data-media-pic] > :is(video, img) {
