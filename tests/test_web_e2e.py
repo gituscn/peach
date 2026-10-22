@@ -19,6 +19,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import shutil
 import socket
 import sqlite3
@@ -327,6 +328,9 @@ class WebE2ESmokeTests(unittest.TestCase):
         concurrency = e2e_concurrency(os.environ.get("PEACH_E2E_CONCURRENCY", "").strip())
         selected = tuple(json.loads(os.environ.get("PEACH_E2E_FILES", "[]")))
         batches = e2e_batches(FRONTEND, concurrency, selected)
+        # 一批红了也接着跑完后面的批次，最后一起报：停在第一批的话，一轮全量只露出一处失败，
+        # 修一处、再等一轮全量才看见下一处。
+        failures = []
         for index, (batch, lanes) in enumerate(batches, 1):
             print(f"浏览器批次 {index}/{len(batches)}：{', '.join(batch)}", flush=True)
             log_path = BROWSER_LOGS / f"batch-{index}.tap"
@@ -340,12 +344,15 @@ class WebE2ESmokeTests(unittest.TestCase):
                 if isinstance(partial, bytes):
                     partial = partial.decode("utf-8", errors="replace")
                 log_path.write_text(partial, encoding="utf-8")
-                self.fail(f"本批 {E2E_SECONDS} 秒内没跑完，完整日志：{log_path}\n{partial[-4000:]}")
+                failures.append(f"批次 {index} 在 {E2E_SECONDS} 秒内没跑完，完整日志：{log_path}\n{partial[-4000:]}")
+                continue
             output = f"{completed.stdout}\n{completed.stderr}"
             log_path.write_text(output, encoding="utf-8")
-            self.assertEqual(completed.returncode, 0, f"{output}\n--- serve.log ---\n{self._server_log()}")
-            self.assertRegex(output, r"# pass [1-9]\d*", output)
-            self.assertRegex(output, r"# fail 0\b", output)
+            if (completed.returncode != 0 or not re.search(r"# pass [1-9]\d*", output)
+                    or not re.search(r"# fail 0\b", output)):
+                failures.append(f"批次 {index}（{', '.join(batch)}）退出码 {completed.returncode}，日志：{log_path}\n{output}")
+        if failures:
+            self.fail("\n\n".join(failures) + f"\n--- serve.log ---\n{self._server_log()}")
 
 
 class SetupE2ETests(unittest.TestCase):
