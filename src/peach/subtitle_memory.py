@@ -24,6 +24,27 @@ CAPTION_VALUES = {
 PREFERENCES = {"rotation", "rate", "caption_style"}
 
 
+def _validate_patch(patch: dict) -> None:
+    """校验补丁字段与播放设置取值，字幕内容单独检查。"""
+    if not isinstance(patch, dict) or not patch or patch.keys() - (PREFERENCES | {"selected", "track"}):
+        raise ValueError("播放记忆字段无效")
+    if "track" in patch and "selected" not in patch:
+        raise ValueError("请选择字幕或关闭字幕")
+    if "rotation" in patch and (type(patch["rotation"]) is not int or patch["rotation"] not in (0, 90, 180, 270)):
+        raise ValueError("旋转角度无效")
+    if "rate" in patch and (type(patch["rate"]) not in (int, float) or not .25 <= patch["rate"] <= 3):
+        raise ValueError("播放速度无效")
+    if "caption_style" in patch:
+        style = patch["caption_style"]
+        if not isinstance(style, dict) or any(
+                key not in CAPTION_VALUES or not isinstance(value, str) or value not in CAPTION_VALUES[key]
+                for key, value in style.items()):
+            raise ValueError("字幕外观无效")
+    selected = patch.get("selected")
+    if selected is not None and (not isinstance(selected, str) or len(selected) > 1024):
+        raise ValueError("字幕选择无效")
+
+
 class SubtitleMemory:
     """偏好按视频隔离，字幕内容与播放设置共用一份原子提交的清单。"""
 
@@ -44,23 +65,8 @@ class SubtitleMemory:
         return self.patch({"selected": selected, **({"track": track} if track is not None else {})})
 
     def patch(self, patch: dict) -> dict:
-        if not isinstance(patch, dict) or not patch or patch.keys() - (PREFERENCES | {"selected", "track"}):
-            raise ValueError("播放记忆字段无效")
-        if "track" in patch and "selected" not in patch:
-            raise ValueError("请选择字幕或关闭字幕")
-        if "rotation" in patch and (type(patch["rotation"]) is not int or patch["rotation"] not in (0, 90, 180, 270)):
-            raise ValueError("旋转角度无效")
-        if "rate" in patch and (type(patch["rate"]) not in (int, float) or not .25 <= patch["rate"] <= 3):
-            raise ValueError("播放速度无效")
-        if "caption_style" in patch:
-            style = patch["caption_style"]
-            if not isinstance(style, dict) or any(
-                    key not in CAPTION_VALUES or not isinstance(value, str) or value not in CAPTION_VALUES[key]
-                    for key, value in style.items()):
-                raise ValueError("字幕外观无效")
+        _validate_patch(patch)
         selected, track = patch.get("selected"), patch.get("track")
-        if selected is not None and (not isinstance(selected, str) or len(selected) > 1024):
-            raise ValueError("字幕选择无效")
         if track is not None:
             if not isinstance(track, dict):
                 raise ValueError("字幕轨道无效")
