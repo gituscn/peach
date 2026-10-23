@@ -178,7 +178,7 @@ def asset_response(request: Request, path: Path, media: str, *, immutable: bool 
     文本类资产在浏览器接受 gzip 时发压缩体，压缩结果按文件版本记住，见 `_gzipped()`。
     压缩体与原文是两个表示，ETag 各不相同。
 
-    `immutable` 给名字里带内容哈希的主包 chunk（ADR-0117）：内容一变名字就变，浏览器一年内
+    `immutable` 给名字里带内容哈希的主包 chunk（ADR-0118）：内容一变名字就变，浏览器一年内
     不再回源。它们要会话才能取，所以只许浏览器自己缓存（`private`），不许共享缓存转给别人。
     """
     stat = path.stat()

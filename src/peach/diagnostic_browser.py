@@ -5,7 +5,7 @@ import uuid
 NAMES = frozenset({"Error", "TypeError", "ReferenceError", "SyntaxError", "RangeError", "URIError",
     "EvalError", "AggregateError", "DOMException", "SecurityError", "NotAllowedError", "InvalidStateError",
     "QuotaExceededError", "NotSupportedError", "TimeoutError", "NetworkError", "DataError", "OperationError"})
-#: 主包按页拆出的 chunk（ADR-0117）：`peach-app.<名字>-<内容哈希>.js`，由
+#: 主包按页拆出的 chunk（ADR-0118）：`peach-app.<名字>-<内容哈希>.js`，由
 #: `frontend/scripts/sentry-build.ts` 的 `chunkPattern` 产出。名字里只有字母、数字、`_` 与 `-`，
 #: 不含路径分隔符与 `..`；是否存在以 `web/dist/` 里的实际文件为准。服务端放行、开发文案热替换
 #: 与构建检查都按它认 chunk。

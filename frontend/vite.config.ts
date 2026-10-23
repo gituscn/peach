@@ -1,7 +1,7 @@
 /* 主界面构建：Application、路由、常驻组件、首屏页面与共享状态打进入口 peach-app.js。
  * 入口用固定文件名，由 index.html 引用；服务端以 ETag 校验内容并要求每次重新验证缓存。
  * 低频页面由路由的 `routeChunk` 动态导入，拆成带内容哈希的 `peach-app.<名字>-<哈希>.js`，服务端按长期不变缓存
- * （ADR-0117）。首屏用得到的模块留在入口，chunk 从入口导入它们，同一模块只有一份实例。
+ * （ADR-0118）。首屏用得到的模块留在入口，chunk 从入口导入它们，同一模块只有一份实例。
  * 模块别名直接指向唯一源码，浏览器仅在启用开发取证时请求独立的 agentation 模块。 */
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';

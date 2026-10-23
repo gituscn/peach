@@ -1,7 +1,7 @@
 /* 浏览器异常只记录到当前 Peach 主机。失败不再生成新的错误请求。 */
 let installed = false;
 const errorNames = new Set(['Error', 'TypeError', 'RangeError', 'ReferenceError', 'SyntaxError', 'URIError', 'EvalError', 'AggregateError', 'DOMException']);
-/* 正式包的文件名：主包入口、页面包与主包按页拆出的 chunk（ADR-0117），与服务端 `diagnostic_browser.SHIPPED` 同一口径。 */
+/* 正式包的文件名：主包入口、页面包与主包按页拆出的 chunk（ADR-0118），与服务端 `diagnostic_browser.SHIPPED` 同一口径。 */
 const shippedName = /^(?:peach-pages\.js|peach-app(?:\.[A-Za-z0-9_-]+)?\.js)$/;
 const shippedInStack = /(?:^|[/\\])(peach-pages\.js|peach-app(?:\.[A-Za-z0-9_-]+)?\.js)(?=[:?#)\s]|$)/m;
 const debugIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;

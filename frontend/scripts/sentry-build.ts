@@ -8,7 +8,7 @@ export const browserArtifacts = fileURLToPath(new URL('../../build/sentry/browse
 const publicDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
 const debugIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
-/** 入口固定名之外的 chunk：`<产物名>.<名字>-<哈希>.js`，与服务端放行的形态一致（ADR-0117）。 */
+/** 入口固定名之外的 chunk：`<产物名>.<名字>-<哈希>.js`，与服务端放行的形态一致（ADR-0118）。 */
 const chunkPattern = (bundleName: string) => new RegExp(`^${bundleName}\\.[A-Za-z0-9_-]+\\.js$`);
 
 /** 一份 JavaScript 与它的 map 共用官方注入的 Debug ID。 */

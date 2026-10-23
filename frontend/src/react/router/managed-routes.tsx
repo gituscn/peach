@@ -83,7 +83,7 @@ type ResidentRouteTable = { [Name in ResidentName]: ManagedRoute<ResidentOpenPro
 export type RoutedPath =
   ManagedPath | BrowseRoutePath | IndexRoutePath | EntityRoutePath | CatalogPagePath | SurfaceName | ResidentName;
 
-/* 低频页的代码不在入口里（ADR-0117）：首屏取数与 chunk 并行装载，两样都落地才画页。数据先回来时等代码，
+/* 低频页的代码不在入口里（ADR-0118）：首屏取数与 chunk 并行装载，两样都落地才画页。数据先回来时等代码，
  * 代码先到时等数据；任何一样失败照旧交给 `openManagedRoute`，中止就是用户已经走开。 */
 async function withPage(chunk: RouteChunk<unknown>, data: Promise<void>): Promise<void> {
   const [code, first] = await Promise.allSettled([chunk.preload(), data]);

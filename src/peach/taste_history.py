@@ -17,7 +17,8 @@ from contextlib import closing, contextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta, timezone
 from html.parser import HTMLParser
-from itertools import chain, count
+import itertools
+from itertools import chain
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -751,7 +752,7 @@ class _HistoryRows:
 _HISTORY_ROWS: dict[tuple, _HistoryRows] = {}
 _PREFERENCE_VISITS: dict[tuple, tuple[tuple[str, str, str], ...]] = {}
 #: 读的途中历史库被写过的那几次读，各领一个序号作版本，见 `_history_rows`。
-_UNSETTLED_READS = count()
+_UNSETTLED_READS = itertools.count()
 
 
 def store_version(store_path: Path) -> tuple:

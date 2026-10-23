@@ -36,7 +36,7 @@ BUNDLE = DIST / "peach-app.js"
 APP_STYLES = DIST / "peach-app.css"
 PAGES_BUNDLE = DIST / "peach-pages.js"
 PAGES_STYLES = DIST / "peach-pages.css"
-#: 主包按页拆出的 chunk（ADR-0117），形态由服务端放行规则定义。
+#: 主包按页拆出的 chunk（ADR-0118），形态由服务端放行规则定义。
 CHUNKS = sorted(path for path in DIST.glob("*.js") if BUNDLE_CHUNK_NAME.fullmatch(path.name))
 #: 主界面的全部 JavaScript：入口加 chunk。文案与写法落在哪一份由构建决定，扫产物时要一起扫。
 APP_SCRIPTS = (BUNDLE, *CHUNKS)

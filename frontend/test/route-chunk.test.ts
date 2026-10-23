@@ -1,4 +1,4 @@
-/* 低频页 chunk 的装载（ADR-0117）：打开页面时装不上而服务还在，说明旧入口指着已删除的 chunk，整页重载一次；
+/* 低频页 chunk 的装载（ADR-0118）：打开页面时装不上而服务还在，说明旧入口指着已删除的 chunk，整页重载一次；
  * 同一会话 30 秒内不重载第二次，服务连不上不重载，空闲预热失败不重载。 */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 

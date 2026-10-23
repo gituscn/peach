@@ -117,7 +117,7 @@ class DevCopyTests(unittest.TestCase):
             self.assertEqual((root / 'web/dist/peach-app.js').read_text(encoding='utf-8'), '有效产物')
 
     def test_frontend_copy_publishes_new_chunks_and_drops_the_previous_ones(self):
-        """主包按页拆出的 chunk 名字带哈希（ADR-0117）：新的一批跟入口一起发出，上一批随后删掉。"""
+        """主包按页拆出的 chunk 名字带哈希（ADR-0118）：新的一批跟入口一起发出，上一批随后删掉。"""
         from peach import dev_copy_runtime
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()

@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const artifacts = fileURLToPath(new URL('../../build/sentry/browser', import.meta.url));
 const publicDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
-/* 正式 JavaScript：两个固定名入口加主包按页拆出的 chunk（ADR-0117）。 */
+/* 正式 JavaScript：两个固定名入口加主包按页拆出的 chunk（ADR-0118）。 */
 const shippedScript = /^(?:peach-pages\.js|peach-app(?:\.[A-Za-z0-9_-]+)?\.js)$/;
 
 /** 校验待上传文件与分发文件逐字节一致、一一对应；配置缺失时不会启动 CLI。 */

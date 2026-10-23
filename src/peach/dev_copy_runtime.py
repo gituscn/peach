@@ -91,7 +91,7 @@ def submit(root: Path, body: dict, *, retry: bool = False) -> dict:
 
 
 def _chunks(folder: Path) -> list[str]:
-    """主包按页拆出的 chunk（ADR-0117），名字带内容哈希，不在 `BUNDLES` 的固定名单里。"""
+    """主包按页拆出的 chunk（ADR-0118），名字带内容哈希，不在 `BUNDLES` 的固定名单里。"""
     return sorted(path.name for path in folder.glob('*.js') if BUNDLE_CHUNK_NAME.fullmatch(path.name))
 
 

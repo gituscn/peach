@@ -627,7 +627,7 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(original.headers["etag"], served.headers["etag"])
 
     async def test_main_bundle_chunks_need_the_session_and_stay_cached_for_good(self):
-        """按页拆出的 chunk 名字带内容哈希（ADR-0117）：要会话，取到后浏览器一年内不回源，共享缓存不许留。"""
+        """按页拆出的 chunk 名字带内容哈希（ADR-0118）：要会话，取到后浏览器一年内不回源，共享缓存不许留。"""
         name = "peach-app.stats-page-Ab1_x-Y9.js"
         (self.root / "dist" / name).write_text("export const page = 1;", encoding="utf-8")
         self.assertEqual((await self.client.get(f"/dist/{name}")).status_code, 401)
