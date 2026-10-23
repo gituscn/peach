@@ -111,9 +111,10 @@ def main() -> None:
         docker("exec", name, "ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=64x64:r=1",
                "-t", "2", "-c:v", "libx264", "/data/smoke-media/fixture.mp4")
         configuration = json.loads(request(name, "/api/configuration"))
+        assert configuration['media_sources'] == [], configuration['media_sources']
         saved = json.loads(request(name, "/api/configuration", body={
             "revision": configuration["revision"], "port": configuration["port"], "scan_now": True,
-            "media_sources": [{"location": "local", "root": "R:\\media", "path": "/data/smoke-media"}],
+            "media_sources": [{"location": "local", "path": "/data/smoke-media"}],
         }))
         assert saved.get("saved"), saved
         time.sleep(2)

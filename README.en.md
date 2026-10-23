@@ -112,6 +112,8 @@ Requires Git, uv and Python 3.14 or newer. See [running from source](docs/OPERAT
 
 See [Docker deployment](docs/DOCKER.md) for setup and supported configurations.
 
+For LAN access on fnOS or another NAS, set Compose's `PEACH_BIND` to the NAS LAN IP; the default accepts connections only from the host. Run `peach token` in the container terminal to view the initial login token. Enter the actual container media path; no specific drive letters are required. See [NAS first run](docs/DOCKER.md#飞牛其他-nas-与局域网访问).
+
 ## FAQ
 
 - **Will it change my files?** Scanning and filling in details leave originals untouched. Manual organization renames or moves files; emptying the trash deletes files, and resource-sync cleanup removes empty folders. Each requires confirmation.

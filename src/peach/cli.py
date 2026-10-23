@@ -314,10 +314,10 @@ def _parse_mounts(
         key = key.strip()
         if not separator or not key:
             raise SystemExit(f"--mount 要写成 来源ID=路径，收到：{chunk}")
-        if known and key not in known:
+        if key not in known:
             raise SystemExit(
                 f"--mount 的来源 ID 未在 [media.locations] 声明：{key}"
-                f"（已知：{'、'.join(sorted(known))}）"
+                f"（已知：{'、'.join(sorted(known)) or '尚未声明媒体来源'}）"
             )
         mounts.setdefault(key, []).append(value.strip())
     return {key: tuple(item for item in values if item) for key, values in mounts.items()}
@@ -643,9 +643,9 @@ def _report_blanks(config: settings_file.PeachConfig) -> None:
         table, _, name = dotted.partition(".")
         if not getattr(getattr(config, table), name):
             blanks.append(f"  {dotted} 留空 → {effect}；要填就重跑并加 {flag}")
-    if not config.mounts and os.name != "nt":
+    if config.locations and not config.mounts and os.name != "nt":
         # Windows 上盘符本身就是挂载点，空表是正常的，提示它只会让人去填没用的值。
-        known = "、".join(sorted(config.locations)) or "local"
+        known = "、".join(sorted(config.locations))
         blanks.append(
             f"  [media.mounts] 为空 → 无法读取媒体来源的目录；"
             f"可用 --mount <媒体来源ID>=<媒体目录> 指定目录（已知来源：{known}）"

@@ -203,7 +203,7 @@ def _quarantine_media(original: Path, *, location: str | None = None) -> Path:
     """同目录改名不支持时，小文件先保留本地完整备份再删除原文件。"""
     key = uuid.uuid4().hex
     name = (f'peach-purge-{key}.peach-quarantine'
-            if location == 'pikpak' or PureWindowsPath(str(original)).drive.casefold() == 'a:'
+            if location == 'pikpak'
             else f'.{original.name}.peach-purge-{key}.tmp')
     quarantine = original.with_name(name)
     try:

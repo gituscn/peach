@@ -47,11 +47,7 @@ DIRECTORY_KEYS = (
 #: 值是数据库 asset.path 中保存的目录前缀；各系统均使用 Windows 格式。
 #: 一个来源有多个目录时写数组；[media.mounts] 按同一顺序保存本机实际目录。
 #: peach.platform 在读取文件前转换路径（ADR-0023 勘误）。
-DEFAULT_LOCATION_ROOTS: dict[str, tuple[str, ...]] = {
-    "local": (r"R:\media",),
-    "115": ("B:/",),
-    "pikpak": ("A:/",),
-}
+DEFAULT_LOCATION_ROOTS: dict[str, tuple[str, ...]] = {}
 
 #: `[media]` 下按子表保存路径、媒体库与读取策略，没有标量键。第一阶段的 `[media] R = '...'` 是盘符键，
 #: 键空间和 location ID 不同，静默接受只会让整台机器脱盘，所以要显式报升级提示。
@@ -232,7 +228,7 @@ class PeachConfig:
     media_costs: dict[str, str] = field(default_factory=dict)
     library_catalog: dict[str, dict[str, str]] = field(default_factory=dict)
     storage_roots: dict[str, dict[str, str]] = field(default_factory=dict)
-    #: `asset.location` -> 数据库中的目录前缀，至少一个。
+    #: `asset.location` -> 用户声明的数据库目录前缀；未添加媒体目录时为空。
     locations: dict[str, tuple[str, ...]] = field(
         default_factory=lambda: dict(DEFAULT_LOCATION_ROOTS))
     server: ServerSettings = ServerSettings()
@@ -370,9 +366,7 @@ def _merge(
             "路径填写该来源的本机媒体目录，例如 "
             "`local = '/mnt/media'`"
         ))
-    # 文件里写了 `[media.locations]` 就以它为准：`peach init` 的问答只声明用户给过的
-    # 来源，内建默认那三个示例盘符不能从旁边混进来，否则陌生人的机器上会多出两个
-    # 永远脱盘的来源。没写这张表才退回内建默认。
+    # 来源只取用户声明；未填写路径表时没有媒体目录。
     if _LOCATIONS_KEY in media:
         locations = _root_map(_table(media, _LOCATIONS_KEY, path), path, "media.locations.")
         empty = sorted(key for key, roots in locations.items() if not roots)

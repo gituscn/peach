@@ -1,5 +1,11 @@
 # 复用清单
 
+## 媒体目录与整理路径映射
+
+PikPak 整理复用项目已有 `PushDiscoverySettings`、`CloudPrefix` 与 `map_cloud_path`，与推送发现共用配置，不引入第二份盘符或 CloudDrive 路径表。CloudDrive RPC 继续使用现有固定版本的 gRPC／protobuf；路径归属与账号内 WebDAV 目录核验属于 Peach 的写入边界。不同盘符、子目录、云端名称、越界与冲突由临时夹具和模拟 RPC 验证，不触碰真实账号或账本。
+
+Windows 系统卷通过系统原生 `GetWindowsDirectoryW` 获取，其他平台使用根卷。此改动没有新增第三方依赖；现有依赖版本与许可继续以 `pyproject.toml`、`uv.lock` 和下文登记为准。
+
 ## 文件名包装与补充回归
 
 论坛 URL 包装与明确 BD Remux 尾部番号参考 [PR #123](https://github.com/peach-mitao/peach/pull/123)，固定 revision 为 `edde1fffb2c4690b7b78224dbd70dd7dfed786b3`，沿用本仓库 AGPL-3.0-or-later 许可。包装只解开一层，内部重用现有文件名与用户识别规则；Remux 的括号番号必须是唯一发行身份。普通处理后缀、日期分隔符和「番号＋片名」继续由既有解析器处理，不增加另一套处理词表或递归解析。

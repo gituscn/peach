@@ -112,6 +112,8 @@ macOS 可在本机构建独立 `.app` 与 DMG，内含 FFmpeg、ffprobe、untrun
 
 部署步骤与支持范围见 [Docker 部署](docs/DOCKER.md)。
 
+飞牛或其他 NAS 从局域网访问时，需将 Compose 的 `PEACH_BIND` 设为 NAS 的局域网 IP；默认只接受宿主机访问。初始口令在容器终端运行 `peach token` 查看，媒体目录填写容器内实际路径，无需使用指定盘符。见 [NAS 首次运行](docs/DOCKER.md#飞牛其他-nas-与局域网访问)。
+
 ## 常见问题
 
 - **会改我的文件吗？** 扫描、补资料不碰原文件。手动整理会改名或移动；清空回收站会删除文件，资源同步中的清理会删除空目录，均需确认。

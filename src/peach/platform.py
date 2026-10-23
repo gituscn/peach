@@ -1,7 +1,7 @@
 """把数据库中的媒体路径转换为当前系统可以读取的文件路径。
 
-账本里的 `asset.path` 一律是 Windows 形态的绝对路径：`R:\\media\\...`（本地硬盘）、
-`A:\\...`（PikPak）、`B:\\...`（115）。这是不变量，不随平台改写。
+账本里的 `asset.path` 一律是 Windows 形态的绝对路径，前缀取自媒体目录配置。
+来源由配置声明，与具体盘符无关；读取时按本机挂载目录转换。
 
 `asset.location` 保存媒体来源的键，例如 local、115、pikpak（见 `media_sources.SOURCE_REGISTRY`）。
 `[media.locations]` 保存每个来源在数据库中的目录前缀；`[media.mounts]` 保存本机实际目录。
@@ -153,9 +153,16 @@ def within_root(path: Path, root: Path) -> bool:
 def system_volume() -> Path:
     """磁盘闸门看的那块盘。
 
-    CloudDrive 会把下载块缓存到系统盘：Windows 是 `C:`，macOS 是根卷。
+    Windows 读取系统目录所在卷，其他平台使用根卷。
     """
-    return Path("C:/") if os.name == "nt" else Path("/")
+    if os.name != "nt":
+        return Path("/")
+    import ctypes
+    buffer = ctypes.create_unicode_buffer(32768)
+    length = ctypes.windll.kernel32.GetWindowsDirectoryW(buffer, len(buffer))
+    if not 0 < length < len(buffer):
+        raise OSError("未取得 Windows 系统目录")
+    return Path(PureWindowsPath(buffer.value).anchor)
 
 
 def is_windows_path(raw: str | os.PathLike[str]) -> bool:
