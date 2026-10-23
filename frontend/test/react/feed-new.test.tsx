@@ -37,9 +37,9 @@ function serve(...rounds: number[][]) {
 const reads = (fetcher: ReturnType<typeof serve>) =>
   fetcher.mock.calls.map(([url]) => String(url)).filter((url) => url.startsWith('/api/feeds/discoveries'));
 
-it('新作来源共演头像经详情同一查询加载并在忽略后可卸载', async () => {
+it('新作来源共演头像直接按来源图片地址加载并在忽略后可卸载', async () => {
   vi.stubGlobal('IntersectionObserver', undefined);
-  const fetcher = vi.fn(async (_url: string) => ({ ok: true, status: 200, json: async () => ({ ok: true, image: 'data:image/jpeg;base64,cGl4ZWxz' }) }));
+  const fetcher = vi.fn(async (_url: string) => ({ ok: true, status: 200, json: async () => ({ ok: true }) }));
   vi.stubGlobal('fetch', fetcher);
   const host = document.createElement('section');
   document.body.append(host);
@@ -49,9 +49,9 @@ it('新作来源共演头像经详情同一查询加载并在忽略后可卸载'
   const mounted = await mountRoot(<QueryClientProvider client={queryClient}><FeedNewRow host={host} feedNew={{ items: [{ id: 1 }], html }}
     wire={() => {}} act={async () => {}} /></QueryClientProvider>);
   await settle();
-  expect(mounted.host.querySelectorAll('.mav img')).toHaveLength(2);
-  expect(fetcher.mock.calls.map(([url]) => url).sort()).toEqual([
-    '/api/jav/image?code=EXM-001&image=actor%3AA', '/api/jav/image?code=EXM-001&image=actor%3AB']);
+  const avatars = [...mounted.host.querySelectorAll<HTMLImageElement>('.mav img')].map((img) => img.getAttribute('src')).sort();
+  expect(avatars).toEqual(['/jav-image?code=EXM-001&image=actor%3AA', '/jav-image?code=EXM-001&image=actor%3AB']);
+  expect(fetcher).not.toHaveBeenCalled();
   await click(mounted.host.querySelector('[data-feed-action]'));
   await settle();
   expect(mounted.host.querySelector('[data-feed-id]')).toBeNull();
