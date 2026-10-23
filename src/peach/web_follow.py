@@ -1467,6 +1467,7 @@ def q_follow_tags(contract, args) -> dict:
             and (not query or any(query in word.casefold() for word in [row['k'], *row.get('aliases', [])]))]
     return {"kind": "tags", "scope": "online",
             "items": rows[offset:offset + limit],
+            "total": len(rows),
             "has_more": offset + limit < len(rows),
             "categories": categories}
 

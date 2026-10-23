@@ -664,7 +664,11 @@ def q_index(contract: WebContract, kind, q="", limit=600, offset=0, category="")
             repr(("index", kind, limit, offset, category)), read, tables=INDEX_TABLES)
     # 下面还要往每行补目录索引的标志，不能写进缓存里那一份。
     rows = [dict(row) for row in rows]
-    return _decorate_index(contract, kind, rows, has_more, category_counts)
+    result = _decorate_index(contract, kind, rows, has_more, category_counts)
+    if kind == 'tags':
+        result['total'] = (category_counts.get(category, 0) if category and category != 'all'
+                           else sum(category_counts.values()))
+    return result
 
 
 def _index_rows(contract: WebContract, kind, q, limit, offset, category):
