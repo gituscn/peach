@@ -128,6 +128,11 @@ class WebDataTests(unittest.TestCase):
 
     def test_home_aggregates_recompute_only_when_the_tables_they_read_change(self):
         """顶栏候选池、统计、名册、筛选项各按自己读的表缓存：换种子、搜一次不重算，作品变了就重算。"""
+        # 存储卷一节读真实挂载的根目录，与这里要验的缓存无关。
+        volumes = mock.patch.object(web_stats, "_storage_volumes", return_value=[])
+        volumes.start()
+        self.addCleanup(volumes.stop)
+
         def entries():
             return {key: id(entry) for key, entry in self.contract.cache.items()
                     if key == "stats-ledger" or key.startswith(("('tops-pool'", "('index'", "facets:"))}
