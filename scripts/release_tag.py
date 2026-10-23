@@ -142,7 +142,8 @@ def _stalled(queued: list[dict], first_seen: dict, now: float) -> list[str]:
                          "带这些 tags 的 runner 都不在线或已暂停")
         elif waited >= STALL_SECONDS:
             lines.append(f"{job['name']}（tags：{tags}）排队 {waited / 60:.0f} 分钟未开始；"
-                         "读不到 runner 列表，runner 不在线或一直被占着都会这样")
+                         "确认不了有没有带这些 tags 的在线 runner（列表要维护者权限，"
+                         "共享 runner 也未必列出），runner 不在线或一直被占着都会这样")
     return lines
 
 
