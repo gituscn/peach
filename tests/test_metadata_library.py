@@ -420,6 +420,37 @@ class LibraryNfoTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
 
+    @windows_ledger_roots
+    def test_filename_code_families_enter_metadata_collection(self):
+        media = self.root / 'media'
+        media.mkdir()
+        codes = {'LAF-41.mpg': 'LAF-041', 'MKBD-S94.mkv': 'MKBD-S94',
+                 'MKD-S118.iso': 'MKD-S118', '040221_0012.flv': '040221_0012'}
+        for name in codes:
+            (media / name).write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        process_library(config, db, self.root / 'generated', self.root / 'covers', stage='scan')
+        provider = stub_provider()
+        provider.query.side_effect = lambda code, *args, **kwargs: {
+            'id': code, 'title': f'测试作品 {code}', 'maker': '测试厂牌',
+            'release_date': '2026-01-01', 'actresses': [{'japanese_name': '测试演员'}]}
+        with patch('peach.library_processing._asks_cover', return_value=False), \
+                patch('peach.library_processing._enrich_finished_performers',
+                      return_value={'aliases': 0, 'avatars': 0, 'conflicts': 0, 'failed': 0}):
+            result = process_library(config, db, self.root / 'generated', self.root / 'covers',
+                stage='metadata', provider_factory=lambda: provider, database=LedgerDatabase(db),
+                route_overrides='censored=r18dev;uncensored=r18dev')
+        self.assertEqual(result['status'], 'complete')
+        self.assertEqual(result['identified'], len(codes))
+        self.assertEqual({call.args[0] for call in provider.query.call_args_list}, set(codes.values()))
+        with closing(sqlite3.connect(db)) as connection:
+            rows = connection.execute('SELECT name,code,catalog_title FROM asset').fetchall()
+        self.assertEqual({name: code for name, code, _ in rows}, codes)
+        self.assertEqual({code: title for _, code, title in rows},
+                         {code: f'测试作品 {code}' for code in codes.values()})
+
     def test_javboss_fields_and_original_tags(self):
         path = self.root / 'sample.nfo'
         path.write_text('<movie><generator>JavBoss</generator><uniqueid type="javboss">ABW-358</uniqueid>'

@@ -41,6 +41,7 @@ from peach.catalog_rules import (
     is_jav_code,
     is_repost_site_label,
     is_uncensored_code,
+    jav_display_metadata,
     jav_fallback_title,
     normalise_code_key,
     release_code_from_filename,
@@ -154,6 +155,25 @@ class ScrapeGateTests(unittest.TestCase):
 
 
 class ExtractionTests(unittest.TestCase):
+    def test_scannable_media_suffixes_preserve_short_release_codes(self):
+        from peach.scan import IMAGE, VIDEO
+        for suffix in sorted(VIDEO | IMAGE):
+            for name, code in ((f'LAF-41{suffix}', 'LAF-041'),
+                               (f'MEYD911{suffix.upper()}', 'MEYD-911')):
+                with self.subTest(name=name):
+                    self.assertEqual(release_code_from_filename(name), code)
+                    if suffix in VIDEO:
+                        self.assertEqual(jav_fallback_title(name, code), '')
+
+    def test_media_suffixes_preserve_volumes_and_exclude_camera_names(self):
+        for suffix in ('.mpg', '.flv', '.rmvb', '.m2ts', '.iso', '.strm'):
+            with self.subTest(suffix=suffix):
+                self.assertEqual(release_code_from_filename(f'LAF-41-CD2{suffix}'), 'LAF-041')
+                self.assertEqual(release_code_from_filename(f'LAF-41-HD{suffix}'), 'LAF-041')
+                self.assertEqual(release_code_from_filename(f'ABW-358-C{suffix}'), 'ABW-358')
+                for stem in ('IMG_3092', 'VIDEO-2022', 'no0037_01', '[mtfdz.club]WX17.3'):
+                    self.assertIsNone(release_code_from_filename(stem + suffix))
+
     def test_named_volume_suffix_preserves_the_release_code(self):
         for suffix in ('CD1', 'disc02', 'Part-3', 'DVD4', 'Vol_5'):
             with self.subTest(suffix=suffix):
@@ -203,6 +223,17 @@ class DatedCodeSeparatorTests(unittest.TestCase):
         self.assertEqual(normalise_code_key("092415_001"), "092415_001")
         self.assertEqual(normalise_code_key("092415-001"), "092415-001")
         self.assertEqual(normalise_code_key(" 092415_001 "), "092415_001")
+
+    def test_each_supported_serial_length_reaches_filename_extraction(self):
+        for separator in ('-', '_'):
+            for number in ('01', '001', '0012'):
+                code = f'040221{separator}{number}'
+                with self.subTest(code=code):
+                    self.assertEqual(release_code_from_text(code), code)
+                    self.assertEqual(release_code_from_filename(f'{code}.mpg'), code)
+                    self.assertEqual(release_code_from_filename(f'{code}-CD2.mkv'), code)
+        for code in ('040221-1', '040221-00123', '135735_0012'):
+            self.assertIsNone(release_code_from_filename(f'{code}.mpg'), code)
 
     def test_the_two_separators_are_two_different_releases(self):
         self.assertFalse(same_release_code("092415_001", "092415-001"))
@@ -274,6 +305,32 @@ class TokyoHotShapeTests(unittest.TestCase):
             self.assertTrue(is_jav_code(normalise_code_key(value)), value)
         for value in ("ABC-S12", "MKBD-S1", "MKBD-89S"):
             self.assertFalse(is_jav_code(normalise_code_key(value)), value)
+
+    def test_kirari_codes_reach_text_filename_and_custom_rule_entrypoints(self):
+        from peach.metadata_routes import classify
+        rules = compile_code_patterns([r'番号\{(?P<code>[^}]+)\}'])
+        for code in ('MKBD-S94', 'MKD-S94', 'MKBD-S118', 'MKD-S1234'):
+            self.assertTrue(is_uncensored_code(code.lower()), code)
+            self.assertEqual(classify(code), 'uncensored')
+            for suffix in ('', '-C', '-CD2', '_part1'):
+                name = f'{code.lower()}{suffix}.mkv'
+                with self.subTest(name=name):
+                    self.assertEqual(release_code_from_filename(name), code)
+            self.assertEqual(release_code_from_text(code.lower()), code)
+            self.assertEqual(release_code_from_text(code.replace('-', '_')), code)
+            self.assertEqual(release_code_from_filename(f'{code} 片名.mpg'), code)
+            self.assertEqual(release_code_from_filename(f'番号{{{code}}}.mp4', patterns=rules), code)
+        for code in ('ABC-S12', 'MKBD-S1', 'MKBD-S12345', 'MKBD-89S'):
+            for suffix in ('.mkv', ' 片名.mp4'):
+                self.assertIsNone(release_code_from_filename(code + suffix), code)
+
+    def test_kirari_display_projects_titles_and_edition_badges(self):
+        for separator in ('-', '_'):
+            name = f'MKBD{separator}S94-C 作品标题.mkv'
+            self.assertEqual(jav_display_metadata(name, 'MKBD-S94'), {
+                'display_code': 'MKBD-S94', 'display_title': '作品标题',
+                'edition_badges': ['中字', '无码']})
+        self.assertEqual(jav_fallback_title('MKD-S118.mp4', 'MKD-S118'), '')
 
     def test_a_bare_number_is_read_only_at_the_head_of_the_name(self):
         self.assertEqual(release_code_from_filename("n1032.mkv"), "n1032")
@@ -349,6 +406,12 @@ class TitledFilenameTests(unittest.TestCase):
                            ("女優名 @DASD-409.mp4", "DASD-409"),
                            ("300MIUM-1239 片名.mp4", "300MIUM-1239")):
             self.assertEqual(release_code_from_filename(name), code, name)
+
+    def test_an_edition_marker_between_code_and_title_is_not_title_text(self):
+        for code in ('ABW-358', 'MKBD-S94'):
+            for edition in ('C', 'CH', 'SUB', 'UC', 'U'):
+                self.assertEqual(jav_fallback_title(f'{code}-{edition} 作品标题.mkv', code), '作品标题')
+            self.assertEqual(jav_fallback_title(f'{code} Club 标题.mkv', code), 'Club 标题')
 
     def test_an_fc2_number_is_read_anywhere_in_the_name(self):
         for name in ("+++ FC2-PPV-1234567 片名 前編.mp4",
