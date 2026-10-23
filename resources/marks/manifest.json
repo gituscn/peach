@@ -850,39 +850,6 @@
       "imported_at": "2026-09-23T08:53:28Z"
     },
     {
-      "file": "Life_Promotion.icon.png",
-      "studio": "Life_Promotion",
-      "variant": "icon",
-      "source": "studio icon harvest",
-      "source_url": "https://pbs.twimg.com/profile_images/1269895774516592642/K8Dbc4uF.png",
-      "sha256": "8cd93df426b17edd1b95b7cc1628c980ee81fa6c3f5a5ca83f88cb2ed31326f4",
-      "bytes": 15717,
-      "content_type": "image/png",
-      "imported_at": "2026-09-05T07:17:37Z"
-    },
-    {
-      "file": "Life_Promotion.logo.png",
-      "studio": "Life_Promotion",
-      "variant": "logo",
-      "source": "studio icon harvest",
-      "source_url": "https://pbs.twimg.com/profile_images/1269895774516592642/K8Dbc4uF.png",
-      "sha256": "8cd93df426b17edd1b95b7cc1628c980ee81fa6c3f5a5ca83f88cb2ed31326f4",
-      "bytes": 15717,
-      "content_type": "image/png",
-      "imported_at": "2026-09-05T07:17:37Z"
-    },
-    {
-      "file": "Life_Promotion.png",
-      "studio": "Life_Promotion",
-      "variant": "",
-      "source": "studio icon harvest",
-      "source_url": "https://life-promotion.com/",
-      "sha256": "f8fb22416679dbd29f48f4fe2740d3892019556c24407ab6a3eefd71f54b6d98",
-      "bytes": 12750,
-      "content_type": "image/png",
-      "imported_at": "2026-09-05T00:57:33Z"
-    },
-    {
       "file": "Luminous_Promotion.png",
       "studio": "Luminous_Promotion",
       "variant": "",
