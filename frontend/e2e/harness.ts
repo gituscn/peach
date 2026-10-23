@@ -67,24 +67,27 @@ export async function launch(): Promise<Browser> {
  * 两个标记由页面自己写：island、遗留模板和 React 子树都得发出，这里才等得到。
  *
  * 它只证明「没有东西在等」，证明不了页面画出来了：主体完全没渲染时同样立刻成立。
- * 所以调用方先等到目标页面自己的主体出现，再调它。 */
-export async function settle(page: Page, scope = 'body'): Promise<void> {
+ * 所以调用方先等到目标页面自己的主体出现，再调它。
+ *
+ * `except` 是用例自己压住、永远不会结束的那一处等待（例如故意不回的下一页），按选择器排除。 */
+export async function settle(page: Page, scope = 'body', { except = '' }: { except?: string } = {}): Promise<void> {
   /* 活动页和馆藏页会持续轮询任务状态，本来就不保证进入 `networkidle`。页面导航由
      `visit()` 等到 load，主体由调用方的 `expectBody()` 验证；这里只等 Peach 自己公开的
      等待态结束。 */
   try {
     await page.waitForFunction(
-      (selector) => {
+      ({ selector, except }) => {
         const root = document.querySelector(selector);
-        return !!root && !root.matches('[aria-busy="true"],[data-skeleton]')
-          && !root.querySelector('[aria-busy="true"],[data-skeleton]');
+        const waiting = (node: Element) => node.matches('[aria-busy="true"],[data-skeleton]') && !(except && node.matches(except));
+        return !!root && !waiting(root) && ![...root.querySelectorAll('[aria-busy="true"],[data-skeleton]')].some(waiting);
       },
-      scope, { timeout: 15_000 });
+      { selector: scope, except }, { timeout: 15_000 });
   } catch (error) {
-    const pending = await page.evaluate((selector) => {
+    const pending = await page.evaluate(({ selector, except }) => {
       const root = document.querySelector(selector);
       if (!root) return { missing_scope: selector };
-      const nodes = [...root.querySelectorAll('[aria-busy="true"],[data-skeleton]')];
+      const nodes = [...root.querySelectorAll('[aria-busy="true"],[data-skeleton]')]
+        .filter(node => !(except && node.matches(except)));
       if (root.matches('[aria-busy="true"],[data-skeleton]')) nodes.unshift(root);
       return nodes.slice(0, 12).map(node => {
         const box = node.getBoundingClientRect();
@@ -92,7 +95,7 @@ export async function settle(page: Page, scope = 'body'): Promise<void> {
           label: node.getAttribute('aria-label'), scope: node.closest('dialog')?.id || 'page',
           width: box.width, height: box.height };
       });
-    }, scope).catch(() => '未取得');
+    }, { selector: scope, except }).catch(() => '未取得');
     throw new Error(`页面等待态未结束：${JSON.stringify(pending)}\n${(error as Error).message}`);
   }
 }

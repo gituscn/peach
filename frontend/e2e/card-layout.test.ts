@@ -191,9 +191,11 @@ describe('混排作品的画面框',()=>{
    }finally{await context.close()}
   });
   /* 竖屏格一律 9:16，九宫格切出来的海报却是 480×850（略宽）或 480×876（略高）。按 contain 放，
-   * 沿短的那一轴会留下不到一像素到几像素的黑底，随落点的小数时有时无。白图浅色页面上量四条边的中段。 */
+   * 沿短的那一轴会留下不到一像素到几像素的黑底，随落点的小数时有时无。白图浅色页面上量四条边的中段。
+   * 默认大图密度下 1280 宽排两列，一格 470×836：视口给到 1200 高，第一行整格都在截图范围里。 */
   it(`竖屏格的视频海报铺满，四边不留黑线（${scale} 倍像素）`,async()=>{
-   const context=await browser.newContext({viewport:{width:1280,height:800},deviceScaleFactor:scale,colorScheme:'light'});
+   const viewport={width:1280,height:1200};
+   const context=await browser.newContext({viewport,deviceScaleFactor:scale,colorScheme:'light'});
    try{
     const page=await context.newPage();
     await page.addInitScript(()=>localStorage.setItem('peach.settings.v1',JSON.stringify({detailAutoplay:false})));
@@ -219,6 +221,7 @@ describe('混排作品的画面框',()=>{
       return node.getBoundingClientRect().toJSON();
      });
      await page.mouse.move(0,0);
+     assert.ok(box.width>40&&box.height>80&&box.top>=0&&box.bottom<=viewport.height,`第 ${index+1} 格不在截图范围里：${JSON.stringify(box)}`);
      for(const [side,clip] of Object.entries({
       top:{x:box.left+20,y:box.top,width:box.width-40,height:2},
       bottom:{x:box.left+20,y:box.bottom-2,width:box.width-40,height:2},

@@ -95,6 +95,10 @@ describe('视频预览设置', () => {
         await page.waitForFunction(() => document.querySelector('#playbackAccelerationSetting button')?.hasAttribute('disabled') === false);
         await settle(page);
         assert.match(await trigger.innerText(), /自动/);
+        /* 这张卡排在首屏以下。先滚到位、等两帧让滚动事件派发完：下拉打开之后再收到触发框所在页面的
+           滚动，React Aria 会把它合上。 */
+        await trigger.scrollIntoViewIfNeeded();
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         await trigger.click();
         await page.getByRole('option', { name: '软件编解码', exact: true }).click();
         await page.getByText('已保存转码方式', { exact: true }).waitFor();
