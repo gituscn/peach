@@ -10,6 +10,19 @@
 
 错误发生时必须实际记录底层证据。完整问题清单位于 `state/library-processing-<job_id>.issues.jsonl`。通用问题清单不能还原被丢弃的 FFmpeg 错误；没有原始记录的历史失败需要重试取证。
 
+诊断 ZIP 对 JSON 状态文件最多读取完整的 16 MiB，解析后按字段脱敏。每个状态文件的导出内容最多 96 KiB；需要缩减时，先保留任务标识、状态、阶段和计数，再纳入步骤、问题预览与其他字段。缩减后的集合最多保留前 20 项，文本最多保留 4000 字符，嵌套最多 8 层；字段放不下时继续减少集合项数。JSONL 问题清单读取尾部 96 KiB，只导出可完整解析的近期记录；截断的首条记录、损坏记录和超出脱敏后大小上限的记录不导出。媒体名称、路径及凭据沿用字段脱敏。
+
+`report.json` 的 `logs` 清单记录各文件的 `source_bytes`、`exported_bytes`、`status` 与 `truncated`。JSON 字段缩减会标记 `projected`，并记录未纳入的顶层字段数 `omitted_fields`、前 64 个顶层字段中集合的原始数量 `collection_counts`；顶层数组使用 `collection_count`。JSONL 使用 `skipped_records` 记录读取范围内未导出的记录数，截断的首条记录不计入该数。空 JSON、损坏 JSON、超出读取上限、无有效记录等情况只记录清单状态，不生成空文件。
+
+| 清单状态 | 含义 |
+| --- | --- |
+| `included` | 已导出有效内容；是否缩减另见 `truncated` 和 `projected` |
+| `empty_json` / `empty_jsonl` | JSON 为空白内容，或 JSONL 为零字节 |
+| `unreadable_json` / `invalid_json_shape` | JSON 无法解析，或顶层不是对象、数组 |
+| `json_size_limit` / `json_depth_limit` | JSON 超出完整读取上限，或解析、脱敏时嵌套过深 |
+| `json_projection_limit` | JSON 字段缩减后仍无法在大小上限内保留有效内容 |
+| `no_complete_records` | JSONL 读取范围内没有可导出的完整记录 |
+
 ## 证据链
 
 | 链路 | 持久证据与核验 |
