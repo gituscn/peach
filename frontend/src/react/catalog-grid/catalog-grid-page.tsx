@@ -18,7 +18,7 @@ import { LOAD_MORE_MARGIN, RetryNote, useSkeletonReveal } from '../components/gr
 import { cardRatio, MediaCard, type MediaCardVariant } from '../components/media-card';
 import { MIX_FLIP_FACES, MixCard } from '../components/mix-card';
 import {
-  SHORTS_BATCH, arrangeTiles, catalogParams, catalogQuery, entityQuery, latestCatalogPages, mixHasPicture,
+  SHORTS_BATCH, arrangeTiles, catalogParams, catalogQuery, collapseGroups, entityQuery, latestCatalogPages, mixHasPicture,
   shortsBoundaries, shortsParams, splitSections, type GridPage, type ShortsCut, type Tile,
 } from './catalog-grid';
 import type { CatalogGridProps, MediaCardLayout, MediaCardHelpers, MediaItem, MediaPage } from './types';
@@ -149,7 +149,7 @@ function GridBody(props: CatalogGridProps) {
   const card = (tile: Tile) => tile.kind === 'mix'
     ? <HomeMix key={`mix:${tile.seed.id}`} seed={tile.seed} layout={layout} helpers={helpers} actions={actions} />
     : (
-      <MediaCard key={tile.item.id} item={tile.item}
+      <MediaCard key={tile.item.id} item={tile.item} grouped={props.groupCollapse !== false}
         variant={trash && tile.item.medium && tile.item.medium !== 'video' ? 'resource' : 'grid'} layout={layout}
         selected={props.selected.has(tile.item.id)} selectMode={props.selectMode} seekSeconds={props.seekSeconds}
         helpers={helpers} actions={actions} onOpen={trash ? openResource : open} />
@@ -264,7 +264,8 @@ export function LoadMore({ entity, load, enabled, children }: {
 }
 
 /** 竖屏带：每接一页请求一条，落点在这一页新增的那几行之间的行边界上随机取一个。
- *  请求跟着主列表的筛选与排序走；一条都没有、或这一页剪不出行边界，偏移量按遗留层归零或不动。 */
+ *  请求跟着主列表的筛选与排序走；一条都没有、或这一页剪不出行边界，偏移量按遗留层归零或不动。
+ *  分卷与版本按主网格同一个开关折叠（`collapseGroups`），一组跨几条带也只留第一次出现的那一张。 */
 function useShortsStrips(
   props: CatalogGridProps, data: InfiniteData<GridPage, number> | undefined,
   tiles: readonly Tile[], pageStarts: readonly number[], body: RefObject<HTMLElement | null>,
@@ -273,6 +274,7 @@ function useShortsStrips(
   const [arrived, setArrived] = useState<{ page: number; total: number; items: MediaItem[]; more: boolean } | null>(null);
   const offset = useRef(0);
   const handled = useRef(0);
+  const seen = useRef({ parts: new Set<string>(), editions: new Set<string>() });
   const controllers = useRef<AbortController[]>([]);
   useEffect(() => () => controllers.current.forEach((controller) => controller.abort()), []);
   useEffect(() => {
@@ -301,9 +303,12 @@ function useShortsStrips(
     const addedFrom = Math.max(0, (pageStarts[arrived.page] ?? 0) - start);
     const boundaries = shortsBoundaries(tiles.length - start, addedFrom, columns);
     if (!boundaries.length) return;
-    const at = start + (boundaries[Math.floor(Math.random() * boundaries.length)] ?? 0);
+    /* 落点定了才折叠：剪不出落点的这一批下次照原偏移量重取，不能先记成已出现。 */
+    const items = collapseGroups(arrived.items, seen.current, props.groupCollapse !== false);
     offset.current = arrived.more ? offset.current + SHORTS_BATCH : 0;
-    setCuts((current) => [...current, { at, total: arrived.total, items: arrived.items }]);
+    if (!items.length) return;
+    const at = start + (boundaries[Math.floor(Math.random() * boundaries.length)] ?? 0);
+    setCuts((current) => [...current, { at, total: arrived.total, items }]);
   }, [arrived]);
   return cuts;
 }
@@ -324,7 +329,7 @@ function ShortsStrip({ cut, props, onOpen }: {
       </h2>
       <div ref={row} data-shorts-row="">
         {cut.items.map((item) => (
-          <MediaCard key={item.id} item={item} variant="short" layout={props.layout}
+          <MediaCard key={item.id} item={item} variant="short" layout={props.layout} grouped={props.groupCollapse !== false}
             selected={props.selected.has(item.id)} selectMode={props.selectMode} seekSeconds={props.seekSeconds}
             helpers={props.helpers} actions={props.actions} onOpen={onOpen} />
         ))}

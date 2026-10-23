@@ -22,7 +22,7 @@ export function SourceSettings({ data, receipt, panel }: ConfigurationGroupProps
       ? <Credentials data={credentials.data} readOnly={Boolean(data.ledger_read_only)} toast={receipt} embedded />
       : credentials.error
         ? <Note tone="error" title="来源凭据未取得">{errorMessage(credentials.error)}</Note>
-        : panel?.active !== false ? <SectionSkeleton title="来源凭据" label="正在读取来源凭据" height={100} /> : null}
+        : panel?.active !== false ? <SectionSkeleton title="来源凭据" label="正在读取来源凭据" body="credentials" /> : null}
     <FollowPreferenceRows receipt={receipt} />
     <IndexerSettings receipt={receipt} />
     {data.entry_links ? <EntryLinksForm initial={data.entry_links} receipt={receipt} /> : null}

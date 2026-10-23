@@ -21,3 +21,25 @@ it('进入资源搜索设置时先读取当前值，再创建表单草稿', asyn
   expect(host.querySelector<HTMLInputElement>('input')?.value).toBe('当前名称');
   expect(host.querySelector('[data-skeleton]')).toBeNull();
 });
+
+it('骨架照终态画底栏两颗禁用的键，正文按上次画好的高度占位', async () => {
+  const state = { indexers: [], max_indexers: 4 };
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => state })));
+  const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(86);
+  const first = await mount(<QueryClientProvider client={queryClient}><IndexerSettings receipt={vi.fn()} /></QueryClientProvider>);
+  await settle();
+  expect(first.querySelector('form[aria-label="资源搜索"]')).not.toBeNull();
+  height.mockRestore();
+
+  const hold = pending<unknown>();
+  vi.stubGlobal('fetch', vi.fn(() => hold.answer));
+  const host = await mount(<QueryClientProvider client={queryClient}><IndexerSettings receipt={vi.fn()} /></QueryClientProvider>);
+  const keys = [...host.querySelectorAll<HTMLButtonElement>('section[aria-label="资源搜索"] button')];
+  expect(keys.map((key) => [key.textContent, key.disabled])).toEqual([['添加索引器', true], ['保存配置', true]]);
+  const block = host.querySelector<HTMLElement>('[data-skeleton] > div');
+  expect(block?.style.getPropertyValue('--skeleton-h')).toBe('86px');
+  await hold.release({ ok: true, status: 200, json: async () => state });
+  await settle();
+  expect(host.querySelector('[data-skeleton]')).toBeNull();
+  localStorage.removeItem('peach.configuration.section-heights.v1');
+});

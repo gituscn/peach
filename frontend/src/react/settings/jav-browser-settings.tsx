@@ -6,7 +6,7 @@ import { Input } from '@/components/base/input/input';
 import { Select, SelectItem } from '@/components/base/select/select';
 import { apiGet, apiSend, errorMessage } from '../../api';
 import { SourceLabel } from '../components/source-label';
-import { ErrorText, FieldLabel, Footer, Help, Section, SectionSkeleton, Stack } from './section';
+import { ErrorText, FieldLabel, Footer, Help, Section, SectionSkeleton, Stack, useRememberedBody } from './section';
 import { busyProps, useAction } from './use-action';
 import { UserscriptStatus } from './userscript-status';
 
@@ -22,7 +22,9 @@ export function JavBrowserSettings({ receipt, refreshKey }: { receipt(message: s
   const query = useQuery({ queryKey: ['jav-browser-settings', refreshKey],
     queryFn: ({ signal }) => apiGet<State>(URL, signal), refetchOnMount: 'always', refetchOnWindowFocus: 'always' });
   if (query.error && !query.data) return <ErrorText>{errorMessage(query.error)}</ErrorText>;
-  if (query.isFetching && !query.data) return <SectionSkeleton title="浏览器添加 JAV" label="正在读取浏览器添加设置" height={100} />;
+  /* 底栏键的字随启用与否变，高度不变：等待时先画没启用时的那一颗。 */
+  if (query.isFetching && !query.data) return <SectionSkeleton title="浏览器添加 JAV" label="正在读取浏览器添加设置"
+    body="javBrowser" actions={<Button type="button" disabled>启用并生成令牌</Button>} />;
   return query.data ? <BrowserForm initial={query.data} receipt={receipt} /> : null;
 }
 
@@ -31,6 +33,7 @@ function BrowserForm({ initial, receipt }: { initial: State; receipt(message: st
   const [provider, setProvider] = useState(initial.provider);
   const [token, setToken] = useState('');
   const action = useAction();
+  const body = useRememberedBody<HTMLDivElement>('javBrowser', [initial]);
   useEffect(() => {
     setState(initial);
     setProvider(current => initial.providers.some(item => item.key === current) ? current : initial.provider);
@@ -48,6 +51,7 @@ function BrowserForm({ initial, receipt }: { initial: State; receipt(message: st
   const ready = state.providers.some(item => item.key === provider && item.configured && item.target);
   return <Section title="浏览器添加 JAV">
     <Stack>
+      <div ref={body} className="flex min-w-0 flex-col gap-4">
       <UserscriptStatus enabled={state.enabled} release={state.userscript} />
       <div className="flex flex-col gap-1"><FieldLabel>浏览器添加的下载渠道</FieldLabel>
       <Select aria-label="浏览器添加的下载渠道" selectedKey={provider || null} placeholder="暂无可用渠道"
@@ -71,6 +75,7 @@ function BrowserForm({ initial, receipt }: { initial: State; receipt(message: st
         }} {...busyProps(action.busy === 'copy')}>复制配对信息</Button></div>
         <Help>在用户脚本设置的「Peach 地址」中粘贴配对信息，即可填好地址与令牌。</Help>
       </> : null}
+      </div>
       {action.error ? <ErrorText>{action.error}</ErrorText> : null}
     </Stack>
     <Footer>

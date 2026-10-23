@@ -77,6 +77,16 @@ describe('库外 JAV 作品详情', () => {
       await page.locator('[data-jav-actions]').getByRole('button', { name: '查找资源', exact: true }).click();
       await page.getByRole('heading', { name: '查找资源', exact: true }).waitFor();
       assert.deepEqual(await hit('[data-modal-surface]'), { onTop: true, inStage: true }, '查找资源弹层被详情浮窗盖住');
+      /* 表单里通栏的下拉：展开的选项面板与触发框同宽，不是共用菜单的 266px。 */
+      const goal = page.locator('[data-modal-surface]').getByRole('button', { name: /优先寻找/ });
+      await goal.click();
+      const panel = page.locator('[data-trigger="Select"]');
+      await panel.waitFor();
+      const [goalBox, panelBox] = [await goal.boundingBox(), await panel.boundingBox()];
+      assert.ok(goalBox && panelBox && goalBox.width > 266 && Math.abs(goalBox.width - panelBox.width) <= 1,
+        `选项面板 ${panelBox?.width}px，触发框 ${goalBox?.width}px`);
+      await panel.getByRole('option', { name: '高清', exact: true }).click();
+      await panel.waitFor({ state: 'detached' });
       await page.keyboard.press('Escape');
       await page.locator('[data-modal-surface]').waitFor({ state: 'detached' });
       assert.equal(await page.locator('#stage[open]').count(), 1, 'Escape 只关掉里层弹层');

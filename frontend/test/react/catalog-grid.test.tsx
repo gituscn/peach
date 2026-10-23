@@ -173,6 +173,37 @@ describe('续页', () => {
     queryClient.removeQueries({ queryKey: ['catalog-grid'] });
   });
 
+  it('竖屏带与主网格同一个「合并分卷与版本」：开着一组分卷只出一张整组卡，关着各卷各自成卡、不标卷数', async () => {
+    vi.stubGlobal('IntersectionObserver', FakeObserver);
+    const group = { key: 'FC2-PPV-3189161', seed_id: 41, count: 2, title: 'FC2-PPV-3189161', total_duration: 1200 };
+    const strip = [item(41, { part_group: group, duration: 600 }), item(43), item(42, { part_group: group, duration: 600 })];
+    vi.stubGlobal('fetch', vi.fn((input: string) => {
+      const url = new URL(String(input), 'http://peach.test');
+      const body = url.searchParams.get('orient') === '竖屏'
+        ? { items: strip, total: strip.length, has_more: false }
+        : { items: [1, 2, 3].map((n) => item(n)), total: 3, has_more: false };
+      return Promise.resolve(reply(body));
+    }));
+    const shorts = (host: ParentNode) => [...host.querySelectorAll<HTMLElement>('[data-shorts-row] [data-media-card]')];
+    for (const collapse of [true, false]) {
+      const host = await mount(<QueryClientProvider client={queryClient}>
+        <CatalogGridPage {...props({ sort: 'seed', q: `竖屏带折叠 ${collapse}` })} shorts groupCollapse={collapse} />
+      </QueryClientProvider>);
+      await until(() => shorts(host).length > 0, '竖屏带插进网格');
+      const cardsInStrip = shorts(host);
+      const badges = cardsInStrip.map((card) => card.querySelector('[data-media-group]')?.textContent || '');
+      if (collapse) {
+        expect(cardsInStrip.map((card) => card.dataset.id)).toEqual(['41', '43']);
+        expect(badges).toEqual(['2 卷', '']);
+      } else {
+        expect(cardsInStrip.map((card) => card.dataset.id)).toEqual(['41', '43', '42']);
+        expect(badges.every((text) => !text), '各卷各自成卡，卡上不标整组卷数').toBe(true);
+        expect(cardsInStrip[0]!.querySelector('[data-media-duration]')?.textContent, '时长是这一卷自己的').toBe('10:00');
+      }
+    }
+    queryClient.removeQueries({ queryKey: ['catalog-grid'] });
+  });
+
   it('一趟续页没接上新页时，哨兵按它此刻的位置再判一遍，还在视口附近就接着取', async () => {
     vi.stubGlobal('IntersectionObserver', FakeObserver);
     const load = vi.fn(async () => {});
@@ -350,6 +381,21 @@ describe('作品卡', () => {
     }));
     expect([...versions.host.querySelectorAll('[data-media-group]')].map((node) => node.textContent)).toEqual(['2 个版本']);
     expect(versions.host.querySelector('[data-media-open]')?.getAttribute('aria-label')).toMatch(/版本$/);
+  });
+
+  it('不合并分卷时一卷一张卡：名字、时长写这一卷自己的，不叠纸边、不标卷数，打开时条目原样交出', async () => {
+    const actions = actionsFor();
+    const onOpen = vi.fn();
+    const part = item(18, { name: 'FC2-PPV-1 part2', duration: 600, part_group: { key: 'P', seed_id: 17, count: 3, title: 'FC2-PPV-1', total_duration: 1800 } });
+    const host = await mount(<MediaCard item={part} variant="grid" layout={SMALL} selected={false} selectMode={false}
+      seekSeconds={10} helpers={helpers} actions={actions} onOpen={onOpen} grouped={false} />);
+    const card = host.querySelector<HTMLElement>('[data-media-card]')!;
+    expect(host.querySelector('[data-media-group]')).toBeNull();
+    expect([card.hasAttribute('data-stacked'), card.dataset.partSeed]).toEqual([false, undefined]);
+    expect(host.querySelector('[data-media-title]')?.textContent).toBe('FC2-PPV-1 part2');
+    expect(host.querySelector('[data-media-duration]')?.textContent).toBe('10:00');
+    await click(host.querySelector('[data-media-title]'));
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 18, part_group: expect.objectContaining({ seed_id: 17 }) }), card);
   });
 
   it('待删的作品留在原位，标上回收站', async () => {
