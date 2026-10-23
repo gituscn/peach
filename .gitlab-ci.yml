@@ -279,5 +279,6 @@ publish-release:
     - python3 scripts/ci_r2_artifacts.py pull windows-release
     - python3 scripts/ci_r2_artifacts.py pull macos-release
     - cp dist/macos.noindex/arm64/*.dmg dist/macos.noindex/x86_64/*.dmg release/
+    - cp dist/macos.noindex/arm64/*-corresponding-source.zip dist/macos.noindex/x86_64/*-corresponding-source.zip release/
     - python3 scripts/publish_gitlab_release.py
     - python3 scripts/ci_r2_artifacts.py cleanup
