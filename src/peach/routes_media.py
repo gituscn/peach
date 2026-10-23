@@ -615,14 +615,17 @@ def cover(request: Request, code: str = "", thumb: int = 0,
           args: dict[str, str] = Depends(require_auth)):
     """官方封套原图。存原图不裁：4:3 与 16:9 两种版式在界面上按比例取景。
 
-    `thumb=1` 要的是卡片网格那一档派生件（`COVER_THUMB_EDGE`），详情与裁切取原件。
-    开关是布尔而不是像素数，理由同 `/entity-image`。
+    `thumb` 是派生档的档次：`1` 是长边 1600 那一档（`COVER_THUMB_EDGE`），`2` 是卡片网格
+    的起始档、长边 800（`COVER_SMALL_THUMB_EDGE`）；不带就是原件，详情与裁切取原件。
+    档次而不是像素数，理由同 `/entity-image`：尺寸由服务端定死，页面只挑档。
     """
     path = request.app.state.web_contract.cover_path(code)
     if path is None:
         return JSONResponse({"error": "no cover"}, status_code=404)
     if thumb:
-        derived = request.app.state.cover_thumb_service.thumbnail(path.stem, path)
+        state = request.app.state
+        service = state.cover_small_thumb_service if thumb == 2 else state.cover_thumb_service
+        derived = service.thumbnail(path.stem, path)
         if derived is not None:
             return _image_response(request, derived, media_type=ENTITY_THUMB_TYPE)
     return _image_response(request, path, media_type="image/jpeg")

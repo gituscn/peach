@@ -496,7 +496,7 @@ describe('作者与标题', () => {
     const author = q<HTMLAnchorElement>('[data-immerse-author]>a')!;
     expect(author.textContent).toBe('甲、乙、丙 等 4 人');
     expect(q('[data-immerse-avatar] .ini')!.textContent).toBe('甲');
-    expect(q('[data-immerse-avatar] img')!.getAttribute('src')).toBe('/entity-image?kind=performer&id=91');
+    expect(q('[data-immerse-avatar] img')!.getAttribute('src')).toBe('/entity-image?kind=performer&id=91&thumb=1');
     await click(author);
     expect(host.closed).toHaveBeenCalledTimes(1);
     expect(host.openEntity).toHaveBeenCalledWith('performer', '甲');
