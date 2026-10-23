@@ -585,17 +585,67 @@ def build_suite(*scopes: str, shard_index: int = 0, shard_count: int = 1) -> uni
 
 
 class TimedResult(unittest.TextTestResult):
+    """逐用例耗时，外加逐文件墙钟。
+
+    文件墙钟按「本条结束距上一条结束」累计：类级 `setUpClass` 发生在首条用例开始之前，
+    只量用例本身会漏掉建库、起服务那一段，而分片均衡要的正是整份文件占多久。
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.timings = []
+        self.files: dict[str, float] = {}
+        self.last = time.monotonic()
+
+    def startTestRun(self):
+        self.last = time.monotonic()
+        super().startTestRun()
 
     def startTest(self, test):
         self.started = time.monotonic()
         super().startTest(test)
 
     def stopTest(self, test):
-        self.timings.append((round(time.monotonic() - self.started, 3), test.id()))
+        now = time.monotonic()
+        self.timings.append((round(now - self.started, 3), test.id()))
+        module = type(test).__module__
+        self.files[module] = round(self.files.get(module, 0.0) + now - self.last, 3)
+        self.last = now
         super().stopTest(test)
+
+
+TIMINGS_FILE = "test-timings.json"
+
+
+def file_seconds_path() -> Path:
+    """本机各测试文件的实测墙钟，存在共享记录目录：不进 Git，也不进代码快照。"""
+    return test_evidence.evidence_dir(ROOT) / TIMINGS_FILE
+
+
+def load_file_seconds(path: Path | None = None) -> dict[str, float]:
+    try:
+        path = file_seconds_path() if path is None else path
+        seconds = json.loads(path.read_text(encoding="utf-8")).get("seconds", {})
+    except (OSError, ValueError, AttributeError, subprocess.CalledProcessError):
+        return {}
+    return {name: float(value) for name, value in seconds.items()
+            if isinstance(name, str) and isinstance(value, (int, float)) and value >= 0}
+
+
+def save_file_seconds(measured: dict[str, float], path: Path | None = None) -> None:
+    """把本次实测并进表里；没跑到的文件保留旧值。几个会话同时写时后到的覆盖，只影响排序。"""
+    if not measured:
+        return
+    try:
+        path = file_seconds_path() if path is None else path
+        merged = {**load_file_seconds(path), **{name: round(value, 3) for name, value in measured.items()}}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        temporary.write_text(json.dumps({"seconds": dict(sorted(merged.items()))}, indent=1),
+                             encoding="utf-8")
+        temporary.replace(path)
+    except (OSError, subprocess.CalledProcessError):
+        pass
 
 
 DEFAULT_JOBS = 4
@@ -631,8 +681,11 @@ def shard_command(scopes: tuple[str, ...], index: int, count: int, timings: Path
 
 
 def run_shards(scopes: tuple[str, ...], *, jobs: int, shard_count: int,
-               spawn=subprocess.Popen) -> tuple[bool, int, list]:
-    """运行独立分片并汇总证明；并发取调用方的 jobs，取消时清理自己的子进程。"""
+               spawn=subprocess.Popen, measured: dict | None = None) -> tuple[bool, int, list]:
+    """运行独立分片并汇总证明；并发取调用方的 jobs，取消时清理自己的子进程。
+
+    `measured` 收各片报回的逐文件墙钟。
+    """
     folder = Path(tempfile.mkdtemp(prefix="peach-shards-"))
     pending = list(range(shard_count))
     running = {}
@@ -666,6 +719,8 @@ def run_shards(scopes: tuple[str, ...], *, jobs: int, shard_count: int,
                 passed = passed and ok
                 count += int(report.get("count", 0))
                 timings.extend(tuple(item) for item in report.get("timings", []))
+                if measured is not None:
+                    measured.update(report.get("files", {}))
                 print(f"分片 {index + 1}/{shard_count} {'通过' if ok else '失败'}"
                       f"（{report.get('count', 0)} 个用例）", flush=True)
     finally:
@@ -742,8 +797,12 @@ def run_local_suite(scopes: tuple[str, ...], jobs: int) -> tuple[bool, int, list
     if (jobs > 1 or "full" in scopes) and len(chosen) > 1:
         shard_count = min(len(chosen), 4 * jobs)
         print(f"本机分片：{shard_count} 片、同时 {min(jobs, shard_count)} 个子进程", flush=True)
-        return run_shards(scopes, jobs=jobs, shard_count=shard_count)
+        measured: dict[str, float] = {}
+        outcome = run_shards(scopes, jobs=jobs, shard_count=shard_count, measured=measured)
+        save_file_seconds(measured)
+        return outcome
     result = unittest.TextTestRunner(verbosity=2, resultclass=TimedResult).run(build_suite(*scopes))
+    save_file_seconds(result.files)
     return result.wasSuccessful() and result.testsRun > 0, result.testsRun, result.timings
 
 
@@ -800,7 +859,8 @@ def main(argv: list[str] | None = None) -> int:
         success = result.wasSuccessful() and result.testsRun > 0
         if args.timings is not None:
             args.timings.write_text(json.dumps({"success": success, "count": result.testsRun,
-                                                "timings": result.timings}), encoding="utf-8")
+                                                "timings": result.timings, "files": result.files}),
+                                    encoding="utf-8")
         return 0 if success else 1
     if ci_frontend_delegated():
         print("CI 前端工具检查由 web-bundle 验证；本次不签发本机测试记录。", flush=True)

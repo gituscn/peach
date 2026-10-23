@@ -380,7 +380,8 @@ class TestPlanningTests(unittest.TestCase):
                 index = int(command[command.index('--shard-index') + 1])
                 report = Path(command[command.index('--timings') + 1])
                 report.write_text(json.dumps({'success': index != failing, 'count': 10 + index,
-                                              'timings': [[0.5, f'test_{index}']]}), encoding='utf-8')
+                                              'timings': [[0.5, f'test_{index}']],
+                                              'files': {f'test_{index}': 1.0 + index}}), encoding='utf-8')
                 stdout.write(f'分片 {index} 的输出\n')
                 return Done(0 if index != failing else 1)
             return launched, spawn
@@ -388,10 +389,12 @@ class TestPlanningTests(unittest.TestCase):
         slots = tempfile.TemporaryDirectory()
         self.addCleanup(slots.cleanup)
         launched, spawn = launcher(failing=None)
+        measured = {}
         with contextlib.redirect_stdout(io.StringIO()) as output:
             passed, count, timings = runner.run_shards(('follow', 'tooling'), jobs=2, shard_count=3,
-                                                       spawn=spawn)
+                                                       spawn=spawn, measured=measured)
         self.assertTrue(passed)
+        self.assertEqual(measured, {'test_0': 1.0, 'test_1': 2.0, 'test_2': 3.0})
         self.assertEqual(count, 10 + 11 + 12)
         self.assertEqual(sorted(name for _, name in timings), ['test_0', 'test_1', 'test_2'])
         self.assertEqual(sorted(int(c[c.index('--shard-index') + 1]) for c in launched), [0, 1, 2])
@@ -408,6 +411,29 @@ class TestPlanningTests(unittest.TestCase):
                                                  spawn=spawn)
         self.assertFalse(passed)
         self.assertEqual(count, 10 + 11 + 12, '失败那片的用例数也要算进总数，记录里的 count 才是实跑数')
+
+    def test_file_wall_time_includes_class_setup_and_merges_into_the_table(self):
+        """分片均衡按整份文件占多久排：类级准备发生在首条用例开始前，也要算进它的文件。"""
+        def case(module):
+            return type('Case', (unittest.TestCase,), {'__module__': module, 'test_x': lambda self: None})('test_x')
+        first, second = case('test_alpha'), case('test_beta')
+        # 构造 0；开跑 0；alpha 的类准备到 5 才开始首条，6 结束；beta 的类准备 6→9，10 结束。
+        clock = iter([0.0, 0.0, 5.0, 6.0, 9.0, 10.0])
+        with patch.object(runner.time, 'monotonic', side_effect=lambda: next(clock)):
+            result = runner.TimedResult(unittest.runner._WritelnDecorator(io.StringIO()), True, 0)
+            result.startTestRun()
+            for test in (first, second):
+                result.startTest(test)
+                result.stopTest(test)
+        self.assertEqual(result.files, {'test_alpha': 6.0, 'test_beta': 4.0})
+        self.assertEqual([seconds for seconds, _ in result.timings], [1.0, 1.0])
+        with tempfile.TemporaryDirectory() as directory:
+            table = Path(directory) / 'timings.json'
+            runner.save_file_seconds({'test_alpha': 6.0, 'test_beta': 4.0}, table)
+            runner.save_file_seconds({'test_alpha': 2.5}, table)
+            self.assertEqual(runner.load_file_seconds(table), {'test_alpha': 2.5, 'test_beta': 4.0})
+            table.write_text('不是 JSON', encoding='utf-8')
+            self.assertEqual(runner.load_file_seconds(table), {})
 
     def test_jobs_accepts_auto_or_a_positive_integer(self):
         self.assertEqual(runner.resolve_jobs('3'), 3)
