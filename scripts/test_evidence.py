@@ -298,7 +298,7 @@ def holder_path(lock_path: Path) -> Path:
     return lock_path.with_name(lock_path.name + ".holder.json")
 
 
-QUEUE_POLL_SECONDS = 0.5
+QUEUE_POLL_SECONDS = 0.1
 #: 没有 psutil 判不了票主是否还活着时，票的最长寿命。
 QUEUE_TICKET_SECONDS = 7200
 
@@ -363,14 +363,22 @@ def held(lock_path: Path, *, wait_seconds: float = 0, **note: object):
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock = FileLock(lock_path)
     queue = queue_path(lock_path)
-    queue.mkdir(parents=True, exist_ok=True)
     ticket = queue / f"{time.time_ns():020d}-{os.getpid()}-{uuid.uuid4().hex[:8]}.json"
     pending = ticket.with_suffix(".tmp")
-    pending.write_text(json.dumps({"pid": os.getpid(), "created": time.time(),
-                                   "process_started": _process_started(os.getpid()),
-                                   "started_at": time.strftime("%Y-%m-%d %H:%M:%S"), **note},
-                                  ensure_ascii=False, default=str), encoding="utf-8")
-    pending.replace(ticket)
+    content = json.dumps({"pid": os.getpid(), "created": time.time(),
+                          "process_started": _process_started(os.getpid()),
+                          "started_at": time.strftime("%Y-%m-%d %H:%M:%S"), **note},
+                         ensure_ascii=False, default=str)
+    for attempt in range(3):
+        # 队列空了的那一刻，撤票的人会顺手删掉目录；碰上就重建再写。
+        queue.mkdir(parents=True, exist_ok=True)
+        try:
+            pending.write_text(content, encoding="utf-8")
+            pending.replace(ticket)
+            break
+        except FileNotFoundError:
+            if attempt == 2:
+                raise
     deadline = time.monotonic() + max(wait_seconds, 0)
     announced = None
     try:
@@ -392,6 +400,11 @@ def held(lock_path: Path, *, wait_seconds: float = 0, **note: object):
             time.sleep(min(QUEUE_POLL_SECONDS, max(0.0, deadline - time.monotonic())))
     finally:
         ticket.unlink(missing_ok=True)
+        try:
+            queue.rmdir()
+        except OSError:
+            # 还有别人在排队，目录留给他们。
+            pass
     try:
         record = holder_path(lock_path)
         record_lock = FileLock(record.with_suffix(".lock"), timeout=5)

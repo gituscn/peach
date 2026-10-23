@@ -404,6 +404,7 @@ class VerificationTests(unittest.TestCase):
         self.assertEqual(order, ["first", "second"])
         self.assertIn("前面还有 1 个在排队", errors.getvalue())
         self.assertEqual(list(queue.glob("*.json")), [], "拿到锁或放弃等待都要撤票")
+        self.assertFalse(queue.exists(), "最后一位撤票后不留空的排队目录，每次验证的状态锁也走这里")
 
     def test_a_live_ticket_ahead_keeps_newcomers_out_and_a_dead_one_is_cleared(self):
         lock = evidence.evidence_dir(self.repo) / "full-suite.lock"
