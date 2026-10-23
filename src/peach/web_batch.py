@@ -331,6 +331,20 @@ def _finish_purge(outcome):
     return outcome
 
 
+def _purge_media_path(row, online_roots: dict[str, tuple[Path, ...]]) -> Path:
+    """核对永久删除目标的路径映射和来源可读性，失败时拒绝删除。"""
+    media = row["path"]
+    translated = translate_ledger_path(media)
+    if is_unmapped(translated):
+        raise OSError("媒体路径未映射到可访问的挂载目录")
+    if PureWindowsPath(str(media)).drive:
+        location = row["location"] if "location" in row.keys() else None
+        if not any(within_root(translated, root) and root_online(root)
+                   for root in online_roots.get(location, ())):
+            raise OSError("媒体来源未挂载或不可读取")
+    return translated
+
+
 def purge_assets(connection, rows, *, missing_only: bool = False):
     """删除媒体和账本行，调用方提交后清理隔离文件。
 
@@ -346,24 +360,13 @@ def purge_assets(connection, rows, *, missing_only: bool = False):
         translated = None
         if media:
             try:
-                translated = translate_ledger_path(media)
+                if online_roots is None and PureWindowsPath(str(media)).drive:
+                    online_roots = _online_source_roots()
+                translated = _purge_media_path(row, online_roots or {})
             except OSError as error:
                 blocked.append({"id": row["id"], "path": media,
                                 "reason": error.strerror or str(error)})
                 continue
-            if is_unmapped(translated):
-                blocked.append({"id": row["id"], "path": media,
-                                "reason": "媒体路径未映射到可访问的挂载目录"})
-                continue
-            if PureWindowsPath(str(media)).drive:
-                if online_roots is None:
-                    online_roots = _online_source_roots()
-                location = row["location"] if "location" in row.keys() else None
-                if not any(within_root(translated, root) and root_online(root)
-                           for root in online_roots.get(location, ())):
-                    blocked.append({"id": row["id"], "path": media,
-                                    "reason": "媒体来源未挂载或不可读取"})
-                    continue
         media_stat = None
         if media:
             try:
