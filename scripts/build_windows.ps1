@@ -138,6 +138,11 @@ if ($Standalone) {
     }
 }
 $ResourceArguments = @()
+$AmaneRuntime = Join-Path $BuildPath 'amane-runtime'
+& $Python -X utf8 (Join-Path $PSScriptRoot 'build_amane_runtime.py') --destination $AmaneRuntime `
+    --work (Join-Path $BuildPath 'amane-build')
+if ($LASTEXITCODE -ne 0) { throw 'amane runtime build or offline self-check failed.' }
+$ResourceArguments += @('--add-data', "${AmaneRuntime};tools/amane-runtime")
 $ResourceEntries = & $Python -X utf8 (Join-Path $ProjectRoot 'src/peach/bundle_resources.py') --root $ProjectRoot
 if ($LASTEXITCODE -ne 0) { throw 'Runtime resource manifest is incomplete.' }
 foreach ($ResourceEntry in $ResourceEntries) {
