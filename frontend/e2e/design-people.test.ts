@@ -94,7 +94,6 @@ describe('设计决定：人物与厂牌资料页', () => {
         // 人名那一行点开的是资料页，不是按名字再搜一遍。
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('Enter');
-        await page.waitForURL(/\/performers\//, { timeout: 5_000 });
         await page.waitForURL('**/performers/90301');
         assert.deepEqual(opened.problems, []);
       } finally {
