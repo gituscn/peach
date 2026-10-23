@@ -24,9 +24,11 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import tempfile
 import unittest
 
 from peach.diagnostic_browser import BUNDLE_CHUNK_NAME
+from scripts import test_history
 from support.conditions import missing_prerequisite
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -408,10 +410,17 @@ class VitestTests(unittest.TestCase):
 
     def test_the_island_suite_passes(self):
         npm = self._npm("vitest", "vitest")
-        completed = subprocess.run(
-            [npm, "--prefix", str(FRONTEND), "test", "--silent"],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-            cwd=str(FRONTEND), check=False)
+        # 另挂一个 JSON 报告器，把逐条结果交给测试结果历史；控制台输出与判据不变。
+        with tempfile.TemporaryDirectory() as folder:
+            report = Path(folder) / "vitest.json"
+            completed = subprocess.run(
+                [npm, "--prefix", str(FRONTEND), "test", "--silent", "--",
+                 "--reporter=default", "--reporter=json", f"--outputFile.json={report}"],
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
+                cwd=str(FRONTEND), check=False)
+            if report.is_file():
+                test_history.record_external(test_history.vitest_rows(
+                    json.loads(report.read_text(encoding="utf-8")), FRONTEND))
         output = f"{completed.stdout}\n{completed.stderr}"
         # vitest 的着色随宿主终端能力漂移，计数断言只认去码后的纯文本；
         # 退出码与用例数两道判据不受着色影响。

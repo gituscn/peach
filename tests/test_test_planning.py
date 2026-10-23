@@ -380,6 +380,81 @@ class TestPlanningTests(unittest.TestCase):
             self.assertEqual(runner._imported_modules(nested / 'example.py'), {'beta', 'gamma'})
             self.assertEqual(runner._imported_modules(runner.ROOT / 'src' / 'peach' / 'example.py'), {'alpha'})
 
+    def test_timed_shard_plan_covers_every_file_once_and_starts_with_the_longest(self):
+        names = [f'test_{letter}.py' for letter in 'abcdefg'] + ['test_web_e2e.py']
+        seconds = {'test_a': 300.0, 'test_b': 120.0, 'test_c': 100.0, 'test_d': 90.0, 'test_e': 10.0,
+                   'test_f': 10.0, 'test_g': 50.0, 'test_web_e2e': 1000.0}
+        plan = runner.shard_plan(names, 4, seconds)
+        self.assertEqual(len(plan), 4)
+        self.assertCountEqual([name for shard in plan for name in shard], names)
+        self.assertEqual(plan[0], ['test_web_e2e.py'], '最重的文件独占一片并第一个派发')
+
+        def total(shard):
+            return sum(seconds[name.removesuffix('.py')] for name in shard)
+        totals = [total(shard) for shard in plan]
+        self.assertEqual(totals, sorted(totals, reverse=True))
+        self.assertLessEqual(max(totals[1:]) - min(totals[1:]), 120.0)
+        # 本机还没有实测表：按个数均分，浏览器冒烟照样独占首片。
+        empty = runner.shard_plan(names, 4, {})
+        self.assertEqual(empty[0], ['test_web_e2e.py'])
+        self.assertEqual(sorted(len(shard) for shard in empty[1:]), [2, 2, 3])
+
+    def test_planned_shards_cover_every_case_once_and_reject_foreign_files(self):
+        def ids(suite):
+            for case in suite:
+                if isinstance(case, unittest.TestSuite):
+                    yield from ids(case)
+                else:
+                    yield case.id()
+        scopes = ('follow', 'tooling')
+        serial = list(ids(runner.build_suite(*scopes)))
+        names = {path.name for scope in scopes for path in runner.selected_files(scope)}
+        plan = runner.shard_plan(names, 3, {'test_scripts': 500.0})
+        shards = [list(ids(runner.build_suite(*scopes, shard_index=index, shard_count=3,
+                                              assigned_names=plan[index]))) for index in range(3)]
+        self.assertCountEqual(serial, [case for shard in shards for case in shard])
+        with self.assertRaisesRegex(ValueError, '范围以外'):
+            runner.build_suite('checks', assigned_names=['test_scripts.py'])
+
+    def test_a_planned_shard_runs_the_files_its_parent_assigned(self):
+        with tempfile.TemporaryDirectory() as directory:
+            plan = Path(directory) / 'plan.json'
+            plan.write_text(json.dumps([['test_scripts.py'], ['test_http.py', 'test_follow_web.py']]),
+                            encoding='utf-8')
+            report = Path(directory) / 'shard.json'
+            suite = unittest.TestSuite([unittest.FunctionTestCase(lambda: None)])
+            with patch.object(runner, 'build_suite', return_value=suite) as build, \
+                 contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(runner.main(['--scope', 'follow', '--scope', 'tooling',
+                                              '--shard-index', '1', '--shard-count', '2',
+                                              '--timings', str(report), '--shard-plan', str(plan)]), 0)
+            build.assert_called_once_with('follow', 'tooling', shard_index=1, shard_count=2,
+                                          assigned_names=['test_http.py', 'test_follow_web.py'])
+
+    def test_parallel_shards_hand_every_child_the_same_plan_in_dispatch_order(self):
+        class Done:
+            returncode = 0
+
+            def poll(self):
+                return 0
+
+        seen = []
+
+        def spawn(command, *, stdout, stderr, cwd):
+            index = int(command[command.index('--shard-index') + 1])
+            plan = json.loads(Path(command[command.index('--shard-plan') + 1]).read_text(encoding='utf-8'))
+            seen.append((index, plan[index]))
+            Path(command[command.index('--timings') + 1]).write_text(
+                json.dumps({'success': True, 'count': 1, 'timings': []}), encoding='utf-8')
+            return Done()
+
+        plan = [['test_web_e2e.py'], ['test_a.py', 'test_b.py'], ['test_c.py']]
+        with contextlib.redirect_stdout(io.StringIO()):
+            runner.run_shards(('full',), jobs=1, shard_count=3, spawn=spawn, plan=plan)
+        self.assertEqual(seen, list(enumerate(plan)))
+        with self.assertRaisesRegex(ValueError, '片数'):
+            runner.run_shards(('full',), jobs=1, shard_count=2, spawn=spawn, plan=plan)
+
     def test_partial_run_does_not_issue_verification_record(self):
         with patch.object(runner, 'build_suite', return_value=unittest.TestSuite([unittest.FunctionTestCase(lambda: None)])), \
              patch.object(runner.test_evidence, 'inputs', side_effect=AssertionError('分片不能签发证据')):

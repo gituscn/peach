@@ -94,11 +94,11 @@ GitGud 流水线（`.gitlab-ci.yml`）的 `verify-linux`、`verify-windows`、`v
 
 Release 在媒体工具编译前核对同 SHA 主线 CI，缓存键绑定媒体工具源码清单与构建脚本，缓存内容同时含二进制和对应源码包；制品与独立开箱验收仍是发布前置。Docker 只在镜像相关主线改动、匹配 PR、版本标签或手动请求时运行，验收后推送同一个本地镜像。版本发布与覆盖升级验收不取消进行中的同目标运行；覆盖升级需明确选择目标版本及完整构建提交。
 
-浏览器用例覆盖 `frontend/e2e` 下全部 `*.test.ts`，包括子目录。`setup.test.ts` 由 `SetupE2ETests` 在首次设置服务上执行，其余文件在已配置的演示库服务上按文件并发、文件内串行。并发数取 `PEACH_E2E_CONCURRENCY`；未设时本机取逻辑核数的四分之一、上限 4，CI（`GITHUB_ACTIONS=true`）为 1。并发批最多 12 个文件，串行批每批一个文件，各自取得完整 TAP 结果。测量动画、密度切换与等待态替换的文件（`tests/test_web_e2e.py` 的 `TIMING_SENSITIVE_SUITES`）在并发批之后串行；并发为 1 时按设计决定、交互回归和路由冒烟排序。每批限时 600 秒，任一批失败，整轮验证失败。并发的文件共用一个服务和演示库：用例触发的写请求只能落在别的用例不断言的状态上，否则用 `page.route` 拦下或归进串行批。控制台逐批输出文件名；完整 TAP 日志与服务访问日志 `serve.log` 保存在 `build/agent-verification/browser/`，CI 在测试结束后上传其中的 TAP 日志。
+浏览器用例覆盖 `frontend/e2e` 下全部 `*.test.ts`，包括子目录。`setup.test.ts` 由 `SetupE2ETests` 在首次设置服务上执行，其余文件在已配置的演示库服务上按文件并发、文件内串行。并发数取 `PEACH_E2E_CONCURRENCY`；未设时本机取逻辑核数的四分之一、上限 4，CI（`GITHUB_ACTIONS=true`）为 1。每个文件单独起一次 Node，限时 600 秒，取得自己的完整 TAP；空出的通道马上领下一个文件，没有批与批之间的等待。并发时文件按 `scripts/ci-browser-timings.json` 的实测秒数先长后短排队（没测过的按 30 秒算），测量动画、密度切换与等待态替换的文件（`tests/test_web_e2e.py` 的 `TIMING_SENSITIVE_SUITES`）在并发文件全部结束后逐个串行；并发为 1 时按设计决定、交互回归和路由冒烟的顺序逐个执行。任一文件失败或超时，整轮验证失败。并发的文件共用一个服务和演示库：用例触发的写请求只能落在别的用例不断言的状态上，否则用 `page.route` 拦下或归进时序敏感的串行文件。控制台在每个文件结束时输出成败与耗时；每个文件的 TAP 日志 `e2e-<文件名>.tap`、首启的 `setup.tap` 与服务访问日志 `serve.log` 保存在 `build/agent-verification/browser/`，CI 在测试结束后上传其中的 TAP 日志。
 
 需要外部前置条件（Node、ffmpeg、Chrome 等）的用例，本机缺条件时跳过，在 CI（`GITHUB_ACTIONS=true`）里判失败，判定集中在 `tests/support/conditions.py` 的 `missing_prerequisite`。所以 `python` 矩阵里 `core` 以外的行也装 Node，Windows 行另装 ffmpeg 与 Chrome。
 
-本机默认并行：入口传 `--jobs auto`（Windows `-Jobs`），运行器按同一套稳定分片切成并发数四倍的片，每个子进程各领一片、先完成的接着领下一片，父进程汇总成败、用例数与逐用例耗时后按原口径签发一份记录，一片红整轮红。`-Jobs 1` 退回串行。测试之间没有共享的端口或全局目录，账本与仓库夹具都在各自的临时目录里，并行才是安全的；新增测试保持这一点。运行器给每次运行建一个 `peach-test-run-<时间戳>-*` 目录，把 `TEMP`、`TMP`、`TMPDIR` 与 `tempfile.tempdir` 指向它，分片子进程沿用同一个，结束时整个删除；被强行结束的运行留下的目录，在下一次运行开始时超过一天就清扫。用例仍应回收自己的临时目录，运行目录只兜底。
+本机默认并行：入口传 `--jobs auto`（Windows `-Jobs`），运行器切成并发数四倍的片，每个子进程各领一片、先完成的接着领下一片，父进程汇总成败、用例数与逐用例耗时后按原口径签发一份记录，一片红整轮红。`-Jobs 1` 退回串行。分片按实测耗时划分：每次运行把各测试文件的墙钟（含类级准备）并进共享记录目录的 `test-timings.json`，下一次按它先长后短把文件装进当前最空的一片（没测过的文件取中位数），总时长最长的片先派发；浏览器冒烟所在的 `test_web_e2e.py` 没有实测时也独占首片。父进程把划分写成文件交给子进程，父子用同一份；CI 的分片不带划分，仍按文件名轮转。测试之间没有共享的端口或全局目录，账本与仓库夹具都在各自的临时目录里，并行才是安全的；新增测试保持这一点。运行器给每次运行建一个 `peach-test-run-<时间戳>-*` 目录，把 `TEMP`、`TMP`、`TMPDIR` 与 `tempfile.tempdir` 指向它，分片子进程沿用同一个，结束时整个删除；被强行结束的运行留下的目录，在下一次运行开始时超过一天就清扫。用例仍应回收自己的临时目录，运行目录只兜底。
 
 Windows 的路径、挂载、托盘、证书、进程编码、更新、认证及迁移属于 `core`。构建和工作流修改选择 `packaging` 与 `tooling`；测试调度自身仍全量。仅 uv 工具版本或项目展示字段变化不算依赖图变化；无法解析时全量。
 
@@ -170,7 +170,7 @@ ffmpeg 起不来是事实，但它不该挡住一次只改文档的 `checks`。�
 
 Windows 的 `-Focus` 接受 Python 模块、类、方法或仓库相对路径，可传数组；macOS/Linux 对每个选择器重复传 `--focus`。入口准备隔离依赖并核对源码。选择器不存在、浏览器路径超出 `frontend/e2e` 或与分片混用时拒绝执行。浏览器用例只收单个 `frontend/e2e/*.test.ts` 文件，不收目录；要跑全部 e2e 时把文件逐个列进数组。
 
-浏览器冒烟把 e2e 文件分成若干批，一批失败仍跑完其余批次，最后把各失败批次的输出与日志路径一起报出；一轮全量就能看到所有 e2e 失败，修完再起下一轮。
+浏览器冒烟逐个文件执行，一个文件失败仍跑完其余文件，最后把各失败文件的输出与日志路径一起报出；一轮全量就能看到所有 e2e 失败，修完再起下一轮。
 
 定向调试 Python 回归：
 
@@ -190,7 +190,7 @@ macOS/Linux 的相同入口：
 ./scripts/test.sh auto --focus frontend/e2e/jav-detail.test.ts
 ```
 
-定向调试不签发记录，不能作为 `ready` / `integrate` 的验收证明。浏览器文件选择只在调试环境生效；正式入口拒绝残留的 `PEACH_TEST_FOCUS` / `PEACH_E2E_FILES`，防止局部运行被签成整域。某个浏览器批次失败或超时后立即结束该轮浏览器检查，保留完整 TAP 与服务日志。
+定向调试不签发记录，不能作为 `ready` / `integrate` 的验收证明。浏览器文件选择只在调试环境生效；正式入口拒绝残留的 `PEACH_TEST_FOCUS` / `PEACH_E2E_FILES`，防止局部运行被签成整域。浏览器文件失败或超时时保留它的完整 TAP 与服务日志。
 
 浏览器沿用 Playwright 的默认进程模型与静音设置，不限制渲染进程数，也不把 GPU 或音频服务强制并入浏览器进程。原生浏览器启动限时 60 秒，页面主体等待限时 15 秒，每批限时 600 秒；进程启动与页面行为分别验收。需要任务状态桩的页面通过 `visit` 的准备回调在首次导航前安装响应，等对应的 React 主体出现后再检查任务状态；进行中的任务不作为主体等待态。页面主体等待失败时保留 URL、关闭状态、已收集的运行期问题与无障碍树，夹具关闭本次浏览器上下文。
 
@@ -237,3 +237,28 @@ PowerShell 里解析到 `Git\cmd\git.exe`、在 Git Bash 里解析到 `Git\mingw
 & .\.venv\Scripts\python.exe -X utf8 <工作树>\scripts\agent_worktree.py `
   --repo <主检出> integrate --branch <分支>
 ```
+
+## 测试结果历史
+
+正式入口与定向调试每次运行都把逐条结果追加进测试结果历史，用来统计每条测试抓到回归的比率，并区分抖动、期望过时与环境失败。实现在 `scripts/test_history.py`。
+
+文件是 Git common directory 上一级的 `build/test-history/YYYY-MM.jsonl`：本机落在主检出的 `build/` 下，与测试记录 `build/agent-verification/` 同级，所有工作树共用；CI 上就是作业目录的 `build/test-history/`，由流水线作为 artifact 上传。JSON Lines 按月分文件、只追加，多个进程同时写时由旁边的 `.lock` 串行。
+
+每次运行先写一行运行头：
+
+| 字段 | 含义 |
+| --- | --- |
+| `type` | 固定为 `run` |
+| `run` | 本次运行的编号，逐条结果用它关联 |
+| `time` | 写入时刻 |
+| `scope` | 请求与实际范围，如 `auto:catalog web`、`full:full`、`focus:<选择器>`；CI 独立分片带 `shard i/n` |
+| `platform`、`python` | 平台与解释器版本 |
+| `head`、`branch`、`worktree` | 提交、分支（分离头指针时取 CI 的分支变量）与工作树路径 |
+| `ci` | `CI`、`GITLAB_CI`、`GITHUB_ACTIONS` 任一非空即为真 |
+| `files`、`count` | 本次跑到的测试文件模块名与用例总数 |
+
+之后逐条写 `type` 为 `test` 的行：`run`、`id`、`outcome`（`pass`、`fail`、`error`、`skip`）与 `seconds`，失败与报错另有 `message`，取最后一行异常，遮掉 `token=`、`password=` 一类的值，截断到 200 字。Python 用例名为 `模块.类.方法`，vitest 为 `vitest:文件 > 分组 > 标题`，浏览器用例为 `e2e:文件 > 分组 > 标题`。
+
+为控制体积，只逐条写非通过的用例与耗时不少于 1 秒的通过用例。某条用例跑了几次，用运行头的 `files` 推算：文件在场、没被记成 `skip` 的用例都跑过。
+
+写历史失败只打印一行告警，不改变测试判定。历史不经环境变量传递，也不在被快照的工作树里，测试记录的环境指纹与有效期不受影响。用例里调用运行器的那些测试不写真实历史，也不取走外层运行收集中的 vitest 与浏览器结果。

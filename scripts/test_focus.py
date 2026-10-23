@@ -48,5 +48,9 @@ def run(runner, args) -> int:
     print("定向调试：只运行指定用例，不签发正式记录；提交前仍需 auto。", flush=True)
     flags = {"PEACH_TEST_FOCUS": "1", "PEACH_E2E_FILES": json.dumps(browsers)} if browsers else {}
     with mock.patch.dict(os.environ, flags):
-        result = unittest.TextTestRunner(verbosity=2, resultclass=runner.TimedResult).run(suite)
+        with runner.test_history.running():
+            result = unittest.TextTestRunner(verbosity=2, resultclass=runner.TimedResult).run(suite)
+    runner.test_history.append(runner.ROOT, scope="focus:" + " ".join(args.focus),
+                               rows=result.results + runner.test_history.take_external(),
+                               files=sorted(result.files))
     return 0 if result.wasSuccessful() and result.testsRun > 0 else 1
