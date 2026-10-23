@@ -4760,6 +4760,57 @@ class R2ArtifactTransferTests(unittest.TestCase):
                 self.assertEqual(tool[1], f"rclone-v1.75.2-{archive}.zip")
                 self.assertEqual(tool[4], f"rclone-v1.75.2-{archive}/{member}")
 
+    def test_release_tools_without_httpx_follow_the_peach_proxy_and_check_the_digest(self):
+        """发布 runner 的系统 Python 没有 httpx：标准库下载照样校验 SHA-256，代理仍按 Peach 代理设置。"""
+        import zipfile
+        original = sys.modules.get("httpx")
+        sys.modules["httpx"] = None  # 导入 httpx 即失败，与系统 Python 相同
+        try:
+            module = load_script("fetch_release_tools")
+        finally:
+            if original is None:
+                sys.modules.pop("httpx", None)
+            else:
+                sys.modules["httpx"] = original
+        self.assertIsNone(module.httpx)
+        name, archive, base, checksums, member = module.tool_specs(rclone_only=True)[0]
+        package = io.BytesIO()
+        with zipfile.ZipFile(package, "w") as writer:
+            writer.writestr(member, b"rclone binary")
+        files = {f"{base}/{archive}": package.getvalue()}
+        handlers, requests = [], []
+
+        def build_opener(*given):
+            handlers.append(given)
+
+            def open_(request, timeout):
+                requests.append(request)
+                return io.BytesIO(files[request.full_url])
+            return SimpleNamespace(open=open_)
+
+        def install(options, digest):
+            files[f"{base}/{checksums}"] = f"{digest}  {archive}\n".encode()
+            with tempfile.TemporaryDirectory() as temporary, \
+                    mock.patch.object(module, "client_options", return_value=options), \
+                    mock.patch.object(module.urllib.request, "build_opener", side_effect=build_opener), \
+                    redirect_stdout(io.StringIO()):
+                module.install(Path(temporary), rclone_only=True)
+                return (Path(temporary) / name).read_bytes()
+
+        good = hashlib.sha256(files[f"{base}/{archive}"]).hexdigest()
+        proxy = "http://127.0.0.1:7890"
+        self.assertEqual(install({"trust_env": False, "proxy": proxy}, good), b"rclone binary")
+        self.assertEqual(handlers[-1][0].proxies, {"http": proxy, "https": proxy})
+        self.assertTrue(all(request.get_header("User-agent") for request in requests))
+        install({"trust_env": False}, good)
+        self.assertEqual(handlers[-1][0].proxies, {}, "直连模式不得落回环境代理")
+        install({"trust_env": True}, good)
+        self.assertEqual(handlers[-1], (), "环境模式用标准库默认的环境代理")
+        with self.assertRaisesRegex(ValueError, "SHA-256 不符"):
+            install({"trust_env": True}, "0" * 64)
+        with self.assertRaisesRegex(ValueError, "SOCKS"):
+            install({"trust_env": False, "proxy": "socks5://127.0.0.1:1080"}, good)
+
     def test_round_trip_restores_only_verified_files_from_current_pipeline(self):
         module = load_script("ci_r2_artifacts")
         objects = {}
@@ -5175,6 +5226,80 @@ class GitLabReleaseTests(unittest.TestCase):
         with mock.patch.object(forge, "api", side_effect=[[self.pipeline()], jobs]), \
                 self.assertRaisesRegex(ValueError, "verify-macos"):
             forge.test_runs("owner/repo", self.SHA)
+
+    def running(self, jobs, runners):
+        """流水线还在跑；`runners` 按 tag 组合给出 runner 列表，异常就当读不到。"""
+        forge = self.forge()
+        calls = []
+
+        def answer(_repo, endpoint, **options):
+            calls.append((endpoint, options))
+            if endpoint.startswith("pipelines?"):
+                return [self.pipeline(status="running")]
+            if endpoint.startswith("pipelines/7/jobs"):
+                return jobs
+            if endpoint.startswith("runners?"):
+                tags = endpoint.split("tag_list=")[1].split("&")[0].replace("%2C", ",")
+                answer_for = runners[tags]
+                if isinstance(answer_for, Exception):
+                    raise answer_for
+                return answer_for
+            raise AssertionError(f"没预料到的调用：{endpoint}")
+        with mock.patch.object(forge, "api", side_effect=answer):
+            run = forge.test_runs("owner/repo", self.SHA)[0]
+        return run, calls
+
+    def job(self, index, name, status, tags=("docker",), **changes):
+        return {"id": index, "name": name, "status": status, "tag_list": list(tags),
+                "started_at": None, "runner": None, "allow_failure": False,
+                "queued_duration": 400.0, "commit": {"id": self.SHA}, **changes}
+
+    def test_pending_jobs_report_whether_any_runner_with_their_tags_is_online(self):
+        jobs = [self.job(1, "verify-linux", "running", started_at="t", runner={"id": 1}),
+                self.job(2, "verify-windows", "pending", ("peach-windows",)),
+                self.job(3, "verify-macos", "pending", ("peach-macos",))]
+        run, calls = self.running(jobs, {
+            "peach-windows": [{"status": "offline", "paused": False}],
+            "peach-macos": [{"status": "online", "paused": False}],
+        })
+        self.assertEqual(run["status"], "in_progress")
+        self.assertEqual(run["failed_jobs"], [])
+        self.assertEqual(run["queued_jobs"], [{"id": 2, "name": "verify-windows", "tags": ["peach-windows"],
+                                               "queued": 400.0, "runners": "offline"}])
+        runner_calls = [options for endpoint, options in calls if endpoint.startswith("runners?")]
+        self.assertEqual(runner_calls, [{"public": False}] * 2, "runner 列表不走匿名回退")
+
+    def test_paused_runners_and_unreadable_lists_are_told_apart(self):
+        jobs = [self.job(2, "verify-windows", "pending", ("peach-windows",)),
+                self.job(3, "verify-macos", "pending", ("peach-macos",)),
+                self.job(4, "wheel-smoke", "pending")]
+        run, _ = self.running(jobs, {
+            "peach-windows": [{"status": "online", "paused": True}],
+            "peach-macos": subprocess.CalledProcessError(1, ["glab"], stderr="glab: 401 Unauthorized"),
+            "docker": [],
+        })
+        self.assertEqual({job["name"]: job["runners"] for job in run["queued_jobs"]},
+                         {"verify-windows": "offline", "verify-macos": "unknown", "wheel-smoke": "unknown"})
+
+    def test_jobs_waiting_on_people_or_earlier_stages_are_not_queued(self):
+        jobs = [self.job(1, "verify-linux", "running", started_at="t", runner={"id": 1}),
+                self.job(2, "verify-windows", "manual", ("peach-windows",)),
+                self.job(3, "verify-macos", "waiting_for_resource", ("peach-macos",)),
+                self.job(4, "wheel-smoke", "created"),
+                self.job(5, "later", "scheduled"),
+                self.job(6, "skipped", "skipped")]
+        run, calls = self.running(jobs, {})
+        self.assertEqual(run["queued_jobs"], [])
+        self.assertFalse([endpoint for endpoint, _ in calls if endpoint.startswith("runners?")])
+
+    def test_a_failed_required_job_is_reported_while_others_still_run(self):
+        jobs = [self.job(1, "verify-linux", "failed"),
+                self.job(2, "verify-windows", "running", ("peach-windows",), started_at="t", runner={"id": 2}),
+                self.job(3, "verify-macos", "failed", ("peach-macos",), allow_failure=True),
+                self.job(4, "wheel-smoke", "canceled"),
+                self.job(5, "wheel-smoke", "running", started_at="t", runner={"id": 1})]
+        run, _ = self.running(jobs, {})
+        self.assertEqual(run["failed_jobs"], ["verify-linux"], "重试过的以最新一次为准")
 
     def test_mainline_membership_uses_the_git_commit_graph(self):
         forge = self.forge()
@@ -5592,6 +5717,107 @@ class AwaitTestTests(unittest.TestCase):
                 self.assertRaisesRegex(ValueError, "--ship --apply"):
             self.release.await_test("owner/repo", "abc", timeout=30, poll=30,
                                     sleep=lambda _: None, clock=iter([0, 30, 60]).__next__)
+
+    @staticmethod
+    def _queued(runners, queued=None):
+        return {"id": 5, "name": "verify-windows", "tags": ["peach-windows"],
+                "queued": queued, "runners": runners}
+
+    def _wait(self, *rounds, step=60):
+        naps = []
+        with self._runs(*rounds):
+            try:
+                self.release.await_test("owner/repo", "abc", timeout=1800, poll=step,
+                                        sleep=naps.append, clock=lambda: len(naps) * step)
+            except ValueError as error:
+                return str(error), naps
+        self.fail("应当判定等不到结果")
+
+    def test_a_job_whose_runners_are_offline_fails_at_once_naming_job_and_tags(self):
+        stuck = {**self.RUNNING, "queued_jobs": [self._queued("offline")]}
+        message, naps = self._wait((stuck,))
+        self.assertEqual(naps, [])
+        for part in ("verify-windows", "peach-windows", "不在线", "--ship --apply"):
+            self.assertIn(part, message)
+
+    def test_unreadable_runners_fail_once_the_job_has_queued_past_the_stall_window(self):
+        stuck = {**self.RUNNING, "queued_jobs": [self._queued("unknown")]}
+        message, naps = self._wait(*[(stuck,)] * 10)
+        self.assertEqual(len(naps) * 60, self.release.STALL_SECONDS)
+        self.assertIn("排队 5 分钟未开始", message)
+        self.assertIn("一直被占着", message)
+
+    def test_queue_time_reported_by_the_forge_counts_from_the_first_look(self):
+        stuck = {**self.RUNNING, "queued_jobs": [self._queued("unknown", queued=2254.0)]}
+        message, naps = self._wait((stuck,))
+        self.assertEqual(naps, [])
+        self.assertIn("排队 38 分钟", message)
+
+    def test_a_short_queue_with_unreadable_runners_keeps_waiting(self):
+        queued = {**self.RUNNING, "queued_jobs": [self._queued("unknown", queued=60.0)]}
+        done = {**self.RUNNING, "status": "completed", "conclusion": "success"}
+        naps = []
+        with self._runs((queued,), (queued,), (done,)):
+            checked = self.release.await_test("owner/repo", "abc", timeout=1800, poll=30,
+                                              sleep=naps.append, clock=lambda: len(naps) * 30)
+        self.assertEqual(checked["html_url"], "test-url")
+
+    def test_a_failed_required_job_fails_before_the_rest_of_the_pipeline_finishes(self):
+        red = {**self.RUNNING, "failed_jobs": ["verify-linux"]}
+        message, naps = self._wait((red,))
+        self.assertEqual(naps, [])
+        self.assertIn("verify-linux", message)
+        self.assertIn("test-url", message)
+
+    def test_a_push_that_never_starts_a_test_run_fails_after_the_stall_window(self):
+        message, naps = self._wait(*[()] * 10)
+        self.assertEqual(len(naps) * 60, self.release.STALL_SECONDS)
+        self.assertIn("没有被触发", message)
+
+    def _github(self, jobs, runners):
+        run = {**self.RUNNING, "id": 9, "status": "queued"}
+
+        def answer(_repo, endpoint):
+            if endpoint.startswith("actions/workflows/test.yml/runs"):
+                return {"workflow_runs": [dict(run)]}
+            if endpoint.startswith("actions/runs/9/jobs"):
+                return {"jobs": jobs}
+            if endpoint.startswith("actions/runners"):
+                if isinstance(runners, Exception):
+                    raise runners
+                return {"runners": runners}
+            raise AssertionError(f"没预料到的调用：{endpoint}")
+        with mock.patch.object(self.release, "GITLAB", None), \
+                mock.patch.object(self.release, "api", side_effect=answer) as api:
+            latest = self.release.latest_run(self.release.test_runs("owner/repo", "abc"), "abc")
+        return latest["queued_jobs"], [call.args[1] for call in api.call_args_list]
+
+    GITHUB_JOBS = [
+        {"id": 3, "name": "verify-windows", "status": "queued", "runner_id": None,
+         "labels": ["self-hosted", "peach-windows"]},
+        {"id": 4, "name": "hosted", "status": "queued", "runner_id": None, "labels": ["windows-latest"]},
+        {"id": 6, "name": "approval", "status": "waiting", "runner_id": None,
+         "labels": ["self-hosted", "peach-windows"]},
+    ]
+
+    @staticmethod
+    def _github_runner(status):
+        return {"status": status, "labels": [{"name": "self-hosted"}, {"name": "Peach-Windows"}]}
+
+    def test_github_self_hosted_jobs_queue_like_gitlab_ones(self):
+        queued, _ = self._github(self.GITHUB_JOBS, [self._github_runner("offline")])
+        self.assertEqual(queued, [{"id": 3, "name": "verify-windows", "tags": ["peach-windows", "self-hosted"],
+                                   "queued": None, "runners": "offline"}])
+        queued, _ = self._github(self.GITHUB_JOBS, [self._github_runner("online")])
+        self.assertEqual(queued, [], "有在线 runner 只是在排队")
+        denied = subprocess.CalledProcessError(1, ["gh"], stderr="HTTP 403")
+        queued, _ = self._github(self.GITHUB_JOBS, denied)
+        self.assertEqual([job["runners"] for job in queued], ["unknown"])
+
+    def test_github_hosted_queues_never_look_up_runners(self):
+        queued, endpoints = self._github(self.GITHUB_JOBS[1:], AssertionError("不该查 runner"))
+        self.assertEqual(queued, [])
+        self.assertFalse([endpoint for endpoint in endpoints if endpoint.startswith("actions/runners")])
 
 
 class Fc2SellerAndDescriptiveNameRepairTests(unittest.TestCase):

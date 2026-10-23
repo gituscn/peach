@@ -108,6 +108,9 @@ wheel-smoke:
     - apt-get update
     - apt-get install -y --no-install-recommends python3 ca-certificates git
     - python3 -c 'import sys; assert sys.version_info[:2] == (3, 14), sys.version'
+    # 取工具、查发行与下载校验经 peach.peach_proxy 使用 httpx，按锁文件装运行依赖。
+    - uv sync --locked --python 3.14
+    - export PATH="$CI_PROJECT_DIR/.venv/bin:$PATH"
     - python3 scripts/fetch_release_tools.py
     - export PATH="$CI_PROJECT_DIR/build/release-tools:$PATH"
     - export GLAB_ENABLE_CI_AUTOLOGIN=true
@@ -129,7 +132,7 @@ windows-media:
     name: release
     action: prepare
   script:
-    - apt-get install -y build-essential gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config clang meson ninja-build curl xz-utils
+    - apt-get install -y build-essential gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config clang meson ninja-build cmake curl xz-utils
     - bash scripts/build_ffmpeg_windows.sh build/ffmpeg-windows
     - bash scripts/build_untrunc_windows.sh build/untrunc-windows
     - python3 scripts/ci_r2_artifacts.py push windows-media

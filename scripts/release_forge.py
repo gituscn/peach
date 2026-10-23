@@ -18,6 +18,8 @@ from peach.peach_proxy import read_url
 
 REQUIRED_TEST_JOBS = frozenset({"verify-linux", "verify-windows", "verify-macos", "wheel-smoke"})
 TERMINAL_STATUSES = frozenset({"success", "failed", "canceled", "skipped"})
+#: 必需任务落在这些状态时，整条流水线等多久都不会转绿；重试会生成同名的新任务。
+RED_JOB_STATUSES = frozenset({"failed", "canceled"})
 
 
 class GitLabForge:
@@ -27,7 +29,8 @@ class GitLabForge:
         self.host = host
         self.command = command
 
-    def api(self, repo: str, endpoint: str):
+    def api(self, repo: str, endpoint: str, *, public: bool = True):
+        """`public=False` 给只有维护者凭据才读得到的端点：匿名重试注定再被拒，直接抛出。"""
         executable = os.environ.get("PEACH_GLAB") or shutil.which("glab")
         if not executable:
             raise ValueError("GitLab 发布需要官方 glab；可用 PEACH_GLAB 指定其路径")
@@ -36,7 +39,7 @@ class GitLabForge:
             return json.loads(self.command(executable, "api", "--hostname", self.host,
                                            "--method", "GET", path))
         except subprocess.CalledProcessError as error:
-            if not any(status in (error.stderr or "") for status in ("401", "403")):
+            if not public or not any(status in (error.stderr or "") for status in ("401", "403")):
                 raise
             # 公开项目的只读元数据可匿名取得，不扩大本机细粒度凭据权限。
             request = Request(f"https://{self.host}/api/v4/{path}",
@@ -80,12 +83,22 @@ class GitLabForge:
         if status == "success":
             self.require_test_jobs(repo, pipeline["id"], sha)
         # 统一 CI 结果字段供唯一发布入口消费，保留真实流水线 ID 与链接。
-        return [{"id": pipeline["id"], "head_sha": sha, "head_branch": "master", "event": "push",
-                 "status": "completed" if status in TERMINAL_STATUSES else "in_progress",
-                 "conclusion": "success" if status == "success" else status,
-                 "html_url": pipeline["web_url"]}]
+        run = {"id": pipeline["id"], "head_sha": sha, "head_branch": "master", "event": "push",
+               "status": "completed" if status in TERMINAL_STATUSES else "in_progress",
+               "conclusion": "success" if status == "success" else status,
+               "html_url": pipeline["web_url"]}
+        if status not in TERMINAL_STATUSES:
+            # 流水线整体是 running 时也可能有任务排着没人接，所以只要没结束就看任务。
+            jobs = self.jobs(repo, pipeline["id"])
+            run["failed_jobs"] = sorted(
+                name for name in REQUIRED_TEST_JOBS
+                if name in jobs and jobs[name]["status"] in RED_JOB_STATUSES
+                and not jobs[name].get("allow_failure"))
+            run["queued_jobs"] = self.queued_jobs(repo, jobs.values())
+        return [run]
 
-    def require_test_jobs(self, repo: str, pipeline: int, sha: str) -> None:
+    def jobs(self, repo: str, pipeline: int) -> dict[str, dict]:
+        """流水线里每个任务名最新的一次；重试过的任务以最后一次为准。"""
         jobs = []
         for page in range(1, 11):
             batch = self.api(repo, f"pipelines/{pipeline}/jobs?per_page=100&page={page}")
@@ -98,6 +111,51 @@ class GitLabForge:
         for job in jobs:
             if job["name"] not in selected or job["id"] > selected[job["name"]]["id"]:
                 selected[job["name"]] = job
+        return selected
+
+    def queued_jobs(self, repo: str, jobs) -> list[dict]:
+        """排着队、还没有 runner 接走的任务，附带 runner 侧能确定的事实。
+
+        只看 `pending`：`created` 在等前一阶段，`manual`、`scheduled`、`waiting_for_resource`
+        都在等人或等别的条件，不是没人接。确有在线 runner 带齐这些 tags 的任务不列出，
+        它只是在排队，交给总超时。`runners` 是 `offline`（带这些 tags 的 runner 都已登记但
+        不在线）或 `unknown`（runner 列表读不到，或一个带这些 tags 的都查不到——项目接口
+        未必列出共享 runner，查不到不能当成没有）。
+        """
+        result = []
+        states: dict[tuple[str, ...], str] = {}
+        for job in jobs:
+            if job.get("status") != "pending" or job.get("started_at") or job.get("runner"):
+                continue
+            tags = tuple(sorted(job.get("tag_list") or ()))
+            if tags not in states:
+                states[tags] = self.runner_state(repo, tags)
+            if states[tags] == "online":
+                continue
+            queued = job.get("queued_duration")
+            result.append({"id": job["id"], "name": job["name"], "tags": list(tags),
+                           "queued": float(queued) if isinstance(queued, (int, float)) else None,
+                           "runners": states[tags]})
+        return result
+
+    def runner_state(self, repo: str, tags: tuple[str, ...]) -> str:
+        """`online`、`offline` 或 `unknown`；读 runner 要维护者权限，读不到就不下结论。"""
+        if not tags:
+            return "unknown"
+        query = urlencode({"tag_list": ",".join(tags), "per_page": 100})
+        try:
+            runners = self.api(repo, f"runners?{query}", public=False)
+        except (subprocess.CalledProcessError, OSError, ValueError):
+            return "unknown"
+        if not isinstance(runners, list) or not runners:
+            return "unknown"
+        if any(runner.get("status") == "online" and not runner.get("paused")
+               and runner.get("active", True) for runner in runners):
+            return "online"
+        return "offline"
+
+    def require_test_jobs(self, repo: str, pipeline: int, sha: str) -> None:
+        selected = self.jobs(repo, pipeline)
         bad = [name for name in sorted(REQUIRED_TEST_JOBS)
                if name not in selected or selected[name]["status"] != "success"
                or selected[name].get("allow_failure")
