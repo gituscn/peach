@@ -10,6 +10,7 @@ from unittest import mock
 from pathlib import Path
 
 from support.ledger import fresh_ledger
+from peach import web_batch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -149,7 +150,8 @@ class TrashJunkTests(unittest.TestCase):
         self.addCleanup(connection.close)
         if candidates is None:
             candidates = {int(row["id"]) for row in rows}
-        with mock.patch.object(self.trash_junk, "LOCATION_ROOT_DECLARATIONS", {"local": (str(self.root),)}):
+        with mock.patch.object(self.trash_junk, "LOCATION_ROOT_DECLARATIONS", {"local": (str(self.root),)}), \
+                mock.patch.object(web_batch, "LOCATION_ROOT_DECLARATIONS", {"local": (str(self.root),)}):
             return self.trash_junk.purge_reviewed(connection, rows, candidates)
 
     def execute(self, sql, *params):

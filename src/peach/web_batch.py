@@ -3,14 +3,16 @@
 `junk` 提供各流程共用的证据与隔离规则；本模块将评分转成页面数据，并执行用户的
 批量决定。自动隔离只进入回收站，永久删除需要独立的确认与取证流程。
 
-物理删除要清的引用表只写在 `personal_records.ASSET_REFERENCE_TABLES` 一处；文件隔离加数据库失败回滚
-（`_restore_staged_media`）是这个模块最不能出错的部分：删错的文件找不回来。
+物理删除要清的引用表只写在 `personal_records.ASSET_REFERENCE_TABLES` 一处。本地文件先隔离，
+账本失败时可以恢复；rclone FUSE 挂载直接删除，账本失败时保留回收站行供重试。
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import os
+import re
+import stat
 import shutil
 import tempfile
 import time
@@ -55,6 +57,8 @@ from .junk import (
     promo_residue as promo_residue,
 )
 
+# Linux 容器可从 mountinfo 识别媒体实际所在的 FUSE 文件系统。
+MOUNTINFO_PATH = Path("/proc/self/mountinfo")
 
 #: 批量操作在活动页上的名字。表里存 `operation`，人看的是这一列。
 BATCH_LABELS = {
@@ -152,6 +156,47 @@ def _restore_staged_media(staged):
                 quarantine.parent.rmdir()
             else:
                 os.rename(quarantine, original)
+
+
+def _mountinfo_field(value: str) -> str:
+    """解码 mountinfo 中空白字符和反斜杠的八进制转义。"""
+    return re.sub(r"\\([0-7]{3})", lambda match: chr(int(match.group(1), 8)), value)
+
+
+def _is_rclone_mount(path: Path) -> bool:
+    """按最深挂载点与覆盖关系识别 rclone 文件系统；不确定时保留隔离流程。"""
+    try:
+        lines = MOUNTINFO_PATH.read_text(encoding="utf-8", errors="surrogateescape").splitlines()
+    except OSError:
+        return False
+
+    target = Path(os.path.abspath(path))
+    matches = []
+    for line in lines:
+        before, separator, after = line.partition(" - ")
+        if not separator:
+            continue
+        fields = before.split()
+        filesystem = after.split(maxsplit=1)
+        if len(fields) < 5 or not filesystem:
+            continue
+        try:
+            mount_id, parent_id = int(fields[0]), int(fields[1])
+        except ValueError:
+            continue
+        mountpoint = Path(os.path.abspath(_mountinfo_field(fields[4])))
+        try:
+            target.relative_to(mountpoint)
+        except ValueError:
+            continue
+        matches.append((len(mountpoint.parts), mount_id, parent_id, filesystem[0]))
+    if not matches:
+        return False
+    depth = max(item[0] for item in matches)
+    deepest = [item for item in matches if item[0] == depth]
+    covered = {item[2] for item in deepest if item[1] != item[2]}
+    visible = [item for item in deepest if item[1] not in covered]
+    return len(visible) == 1 and visible[0][3] == "fuse.rclone"
 
 
 def _quarantine_media(original: Path, *, location: str | None = None) -> Path:
@@ -286,35 +331,67 @@ def _finish_purge(outcome):
     return outcome
 
 
-def purge_assets(connection, rows, *, missing_only: bool = False):
-    """Quarantine media, delete ledger rows, and leave final removal to the caller.
+def _purge_media_path(row, online_roots: dict[str, tuple[Path, ...]]) -> Path:
+    """核对永久删除目标的路径映射和来源可读性，失败时拒绝删除。"""
+    media = row["path"]
+    translated = translate_ledger_path(media)
+    if is_unmapped(translated):
+        raise OSError("媒体路径未映射到可访问的挂载目录")
+    if PureWindowsPath(str(media)).drive:
+        location = row["location"] if "location" in row.keys() else None
+        if not any(within_root(translated, root) and root_online(root)
+                   for root in online_roots.get(location, ())):
+            raise OSError("媒体来源未挂载或不可读取")
+    return translated
 
-    Renaming beside the source is reversible and stays on the same filesystem. The
-    caller restores the quarantined names if commit fails, then permanently removes
-    them only after the SQLite transaction has committed.
+
+def purge_assets(connection, rows, *, missing_only: bool = False):
+    """删除媒体和账本行，调用方提交后清理隔离文件。
+
+    本地文件同目录隔离，账本事务失败时恢复。rclone FUSE 直接删除，避免远端改名
+    触发复制；账本事务失败时保留记录供重试，已经删除的远端媒体无法恢复。
 
     ``missing_only`` 删的只是账本行：文件还在（或答不上在不在）的行进 ``blocked``。
     """
     purged, blocked, staged, snapshots, parents = [], [], [], [], []
+    online_roots = None
     for row in rows:
         media = row["path"]
-        if media and missing_only:
+        translated = None
+        if media:
             try:
-                present = translate_ledger_path(media).exists()
-                reason = "文件仍在盘上"
+                if online_roots is None and PureWindowsPath(str(media)).drive:
+                    online_roots = _online_source_roots()
+                translated = _purge_media_path(row, online_roots or {})
             except OSError as error:
-                present, reason = True, error.strerror or str(error)
-            if present:
-                blocked.append({"id": row["id"], "path": media, "reason": reason})
+                blocked.append({"id": row["id"], "path": media,
+                                "reason": error.strerror or str(error)})
+                continue
+        media_stat = None
+        if media:
+            try:
+                media_stat = translated.stat()
+            except FileNotFoundError:
+                pass
+            except OSError as error:
+                blocked.append({"id": row["id"], "path": media,
+                                "reason": error.strerror or str(error)})
+                continue
+        if media and missing_only:
+            if media_stat is not None:
+                blocked.append({"id": row["id"], "path": media, "reason": "文件仍在盘上"})
                 continue
         elif media:
-            original = Path(media)
+            original = translated
             try:
-                if original.exists() and not original.is_file():
+                if media_stat is not None and not stat.S_ISREG(media_stat.st_mode):
                     raise OSError("not a regular file")
-                if original.is_file():
-                    quarantine = _quarantine_media(original, location=row['location'] if 'location' in row.keys() else None)
-                    staged.append((original, quarantine))
+                if media_stat is not None:
+                    if _is_rclone_mount(original):
+                        original.unlink()
+                    else:
+                        quarantine = _quarantine_media(original, location=row['location'] if 'location' in row.keys() else None)
+                        staged.append((original, quarantine))
             except OSError as error:
                 blocked.append({"id": row["id"], "path": media,
                                 "reason": error.strerror or str(error)})
@@ -323,7 +400,7 @@ def purge_assets(connection, rows, *, missing_only: bool = False):
         if snapshot:
             snapshots.append(Path(snapshot))
         if media:
-            parents.append(Path(media).parent)
+            parents.append(translated.parent)
         purged.append(row["id"])
     try:
         if purged:

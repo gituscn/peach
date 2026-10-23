@@ -157,7 +157,9 @@ DMM / MGS 的只读商品号识别复用 `code_key`、`release_code_from_text`�
 
 STRM 采用文本指针、播放时解析的通用行为，参考 SmartStrm 文档、OpenList 的 `drivers/strm` 与 Jellyfin 的 STRM 探测入口；固定 revision、许可证与实际读取位置见 [取证记录](reference-snapshots/strm-source-evidence.md)。SmartStrm 核心闭源，源码未取得。Peach 独立实现受限 HTTP(S) 指针，复用 HTTPX、现有 Range 传输、`m3u8` 解析与播放器计划；无新增运行依赖，也不复制上游应用代码。
 
-光鸭、OneDrive 与其他网盘复用声明挂载根、路径翻译、扫描、文件整理与回滚、隔离删除和空目录清理。所有挂载来源统一开放读写，底层权限或不支持的操作由挂载工具报错；网盘登录与平台 API 由 CloudDrive2 或 OpenList 等挂载工具提供，不新增 SDK 或依赖。临时文件与账本回归覆盖三个来源的整理、回滚、删除、权限拒绝和空目录清理；真实账号兼容性见待办。挂载目录可单独设置代理流量保护，成本投影与批处理使用同一规则。STRM、ISO 跳过后台媒体读取，普通媒体保留按来源策略执行的探测；九宫格和时间轴共用本机视频预览开关。
+光鸭、OneDrive 与其他网盘复用声明挂载根、路径翻译、扫描、文件整理与回滚、隔离删除和空目录清理。所有挂载来源统一开放读写，底层权限或不支持的操作由挂载工具报错；网盘登录与平台 API 由飞牛 OS 原生远程挂载、CloudDrive2 或 OpenList 等挂载工具提供，不新增 SDK 或依赖。本地文件先隔离再提交账本；rclone FUSE 通过挂载表识别并直接删除，避免部分后端的远端改名触发复制，账本事务失败时保留可重试的回收站记录。飞牛 OS 原生挂载 115 的实际文件系统可报告为 `fuse.rclone`，不等于用户单独部署 rclone；其他挂载方式仍须分别验证。临时文件与账本回归覆盖三个来源的整理、回滚、删除、权限拒绝和空目录清理；真实账号兼容性见待办。挂载目录可单独设置代理流量保护，成本投影与批处理使用同一规则。STRM、ISO 跳过后台媒体读取，普通媒体保留按来源策略执行的探测；九宫格和时间轴共用本机视频预览开关。
+
+回收站复用 `platform.translate_ledger_path`、声明来源根与 Python 标准库 `stat`，只将 `FileNotFoundError` 视为文件缺失，权限或 I/O 错误保留记录。Linux 挂载判定读取原生 `/proc/self/mountinfo`，字段、父挂载关系与文件系统类型按 [Linux man-pages 6.19](https://man7.org/linux/man-pages/man5/proc_pid_mountinfo.5.html)；采用最深挂载点，覆盖挂载按父子关系选择，不依赖文本行顺序。转义解码与路径比较属于 Peach 的删除策略，没有复制外部实现。rclone 挂载能力参考其[官方文档](https://rclone.org/commands/rclone_mount/)，不新增 rclone 运行服务；现有 psutil 7.2.2 仅是开发依赖，不为读取一份 Linux 原生挂载表增加运行依赖。未知挂载信息保留本地隔离流程，临时文件回归覆盖带空格挂载点、父目录路径、覆盖挂载、删除失败与混合批次事务失败。
 
 Actions 工作流静态检查复用 actionlint 1.7.12（MIT，`rhysd/actionlint:1.7.12` 官方 Docker 镜像），由本地 Docker action 使用，独立 Docker 目录纳入 Dependabot 与接管入口。GitHub Actions 生态不更新 `docker://` 镜像引用。Windows 官方二进制按发布校验和完成本地 POC；CI 在 Linux 容器检查语法、表达式、任务依赖与脚本。Python 与浏览器回归继续使用现有统一入口及 Playwright；六片浏览器权重来自 [已通过的 CI](https://github.com/peach-mitao/peach/actions/runs/38981261189) 的 69 份 TAP，记录在 `scripts/ci-browser-timings.json`，没有新增应用运行依赖。
 
