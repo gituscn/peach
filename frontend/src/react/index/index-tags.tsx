@@ -122,7 +122,7 @@ export function TagFilters(
     onCategory(key: string): void;
     onJump(at: number): void;
     onView(view: TagView): void;
-    status?: { hidden: boolean; onChange(hidden: boolean): void };
+    status?: { hidden: boolean; blocked?: boolean; onChange(hidden: boolean): void; onBlocked?(): void };
     actions?: ReactNode;
   },
 ) {
@@ -132,7 +132,9 @@ export function TagFilters(
       top={<>
         {status ? <div role="group" aria-label="标签状态" className="flex flex-none items-center gap-1.75 border-r border-(--glass-low) pr-3">
           {[[false, '使用中'], [true, '已隐藏']].map(([hidden, label]) => <FilterPill key={String(hidden)}
-            data-tag-pill="" data-tag-cat="all" pressed={status.hidden === hidden} onPress={() => status.onChange(Boolean(hidden))}>{label}</FilterPill>)}
+            data-tag-pill="" data-tag-cat="all" pressed={!status.blocked && status.hidden === hidden} onPress={() => status.onChange(Boolean(hidden))}>{label}</FilterPill>)}
+          {status.onBlocked ? <FilterPill data-tag-pill="" data-tag-cat="all" pressed={!!status.blocked}
+            onPress={status.onBlocked}>已屏蔽内容</FilterPill> : null}
         </div> : null}
         {categories.map(([key, label]) => (
         <FilterPill key={key} data-tag-pill="" data-tag-cat={key === 'all' ? 'all' : tagColorKey(online, key)}

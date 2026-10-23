@@ -79,6 +79,8 @@ React 页面复用 `EmptyState`，HTML 页面复用 `emptyStateHtml`。图标统
 
 在线标签收藏复用 `FavoriteButton`、`libraryShortcuts` 设置和既有读写端点，以 `scope=online` 与稳定来源词键区分本地实体；收藏快照经在线归类解析并去重。收藏面板沿用标签分类，以「在线标签」标明去处，链接打开 `/follow` 标签筛选；馆藏实体收藏快照继续供研究和实体标注使用。未新增依赖或存储表。
 
+在线手动标签与内容屏蔽复用 `OnlineTagPolicy`、`profile.settings_json`、`FollowStore.group`、现有标签预览确认端点及账本版本缓存。手动标签以来源和内容编号定位，在读取副本中叠加；来源 metadata 保持独立。内容屏蔽在分页、计数及来源筛选前按完整作品组执行，任一版本命中就隐藏整组；直接详情保留标签管理入口。当前树、标签偏好与 Git 历史已有身份和事务能力；新增部分只定义 Peach 的用户选择与影响范围，无需外部规则引擎或模糊匹配依赖。界面沿用 BoardUI Input／Button、`useAction`、标签云和 `SelectionDock`，无新增依赖、存储表或迁移。
+
 ## 检查输入与源码文案
 
 测试差异复用 Git 文件快照、Python AST、标准库 TOML/JSON 解析器及现有 filelock。Python 注释和清单说明字段通过有效内容比较识别；真实依赖、执行模式和无法解析的输入保留完整验证。完整批次按测试文件保存结果，仅补齐受影响范围，不延长结果有效期。

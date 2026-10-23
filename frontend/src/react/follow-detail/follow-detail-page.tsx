@@ -35,11 +35,12 @@ import { queryClient } from '../query';
 import { addWant, fetchFollowWant, invalidateWants, removeWants, wantFollowKey, type Want } from '../wants/wants';
 import {
   FOLLOW_MEDIA_HIDE_URL, FOLLOW_SAVE_URL, FollowItemGone, authorSources, collectionCopy, detailContext, detailMedia, detailSlides,
-  detailTags, fetchFollowItem, followItemKey, groupedMediaOwner, mediaName, resourceLabel, statusReceipt, tagCategory,
+  fetchFollowItem, followItemKey, groupedMediaOwner, mediaName, resourceLabel, statusReceipt,
   type DetailMedia, type FollowDetailActions, type FollowDetailData, type FollowDetailItem, type FollowDetailMedia,
   type FollowDetailProps,
 } from './follow-detail';
 import { fetchFollowRelated, followRelatedGroups, followRelatedKey } from './follow-related';
+import { FollowTags } from './follow-tags';
 
 const realDuration = (value: unknown) => Number(value) > 0;
 
@@ -321,7 +322,6 @@ function Side({ item, data, context, media, write, issue, helpers, actions }: {
   const postedBy = identity.credited ? ''
     : item.author && foldName(item.author) !== foldName(identity.author) ? item.author : '';
   const mediaIssue = followMediaIssue(item, context);
-  const tags = detailTags(item, helpers.tagLabel);
   const saved = item.status === 'saved';
   const { busy } = write;
   const busyAttrs = (key: string) => (busy.has(key) ? { 'aria-busy': true, 'aria-disabled': true } as const : {});
@@ -427,14 +427,7 @@ function Side({ item, data, context, media, write, issue, helpers, actions }: {
           </div>
         ) : null}
         <span data-follow-state="" aria-live="polite">{write.failure}</span>
-        {tags.length ? (
-          <div data-stage-tags="" data-follow-detail-tags="">
-            {tags.map((tag) => (
-              <button type="button" key={tag} data-tag-cat={tagCategory(item, tag)} data-follow-tag={tag}
-                onClick={() => actions.openTag(tag)}>{helpers.tagLabel(tag)}</button>
-            ))}
-          </div>
-        ) : null}
+        <FollowTags key={item.id} item={item} label={helpers.tagLabel} actions={actions} />
       </div>
     </div>
   );

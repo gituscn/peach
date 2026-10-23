@@ -20,12 +20,13 @@ export function TagManager({ search = '', category = 'all', view = 'cloud', onCa
   const online = scope === 'online';
   const inventory = useQuery({ queryKey: ['tag-management', scope], queryFn: ({ signal }) => apiGet<TagInventory>(`/api/tag-management${online ? '?scope=online' : ''}`, signal) });
   const [hidden, setHidden] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<'rename' | 'merge' | null>(null);
   const action = useAction();
   const rows = inventory.data?.items || [];
-  const matching = rows.filter(row => row.hidden === hidden
-    && [row.k, ...row.aliases].some(name => name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())));
+  const matching = rows.filter(row => blocked ? row.blocked : row.hidden === hidden && (!online || !row.blocked))
+    .filter(row => [row.k, ...row.aliases].some(name => name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())));
   const visible = matching.filter(row => category === 'all' || (row.cat || 'general') === category);
   const categories = (online ? ONLINE_TAG_CATEGORIES : TAG_CATEGORIES).filter(([key]) => key === 'all' || key === category || inventory.isPending || matching.some(row => (row.cat || 'general') === key));
   const tags = visible.map(row => ({ ...row, label: row.k }));
@@ -46,7 +47,9 @@ export function TagManager({ search = '', category = 'all', view = 'cloud', onCa
   return <section aria-label="标签管理" data-tag-manager="" className="flex min-w-0 flex-col">
     <TagFilters categories={categories} category={category} online={online} readout={`${visible.length.toLocaleString()} 个标签`}
       letters={groups.map(([letter]) => letter)} view={view} onCategory={next => { setPicked(new Set()); onCategory?.(next) }}
-      onView={next => onView?.(next)} onJump={at => onJump?.(at)} status={{ hidden, onChange: value => { setHidden(value); setPicked(new Set()) } }}
+      onView={next => onView?.(next)} onJump={at => onJump?.(at)} status={{ hidden, blocked,
+        onChange: value => { setHidden(value); setBlocked(false); setPicked(new Set()) },
+        ...(online ? { onBlocked: () => { setBlocked(true); setHidden(false); setPicked(new Set()) } } : {}) }}
       actions={<>
         {inventory.data?.duplicate_groups.length ? <GlassPill busy={action.busy === 'repair'} onPress={() => run({ operation: 'repair', ids: [] })}>整理重复标签</GlassPill> : null}
         {visible.length ? <GlassPill onPress={() => setPicked(new Set(visible.map(row => row.k)))}>选择当前结果</GlassPill> : null}
@@ -62,6 +65,8 @@ export function TagManager({ search = '', category = 'all', view = 'cloud', onCa
       <Button variant="secondary" size="small" disabled={selected.length < 2 || (online && new Set(selected.map(row => row.cat)).size > 1)} onClick={() => setEditing('merge')}>合并</Button>
       <Button variant="secondary" size="small" {...busyProps(Boolean(action.busy))}
         onClick={() => run({ operation: hidden ? 'restore' : 'hide', ids })}>{hidden ? '恢复' : '隐藏'}</Button>
+      {online ? <Button variant="secondary" size="small" {...busyProps(Boolean(action.busy))}
+        onClick={() => run({ operation: blocked ? 'unblock' : 'block', ids })}>{blocked ? '恢复内容' : '屏蔽内容'}</Button> : null}
     </SelectionDock>
     {editing ? <TagEditor key={editing} operation={editing} selected={selected} scope={scope}
       close={() => setEditing(null)} done={() => setPicked(new Set())} /> : null}

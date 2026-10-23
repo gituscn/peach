@@ -10,13 +10,14 @@ import { showToast } from '../toaster';
 
 export type TagId = number | string;
 export type TagScope = 'local' | 'online';
-export interface ManagedTag { entity_id?: number; id?: string; k: string; n: number; hidden: boolean; aliases: string[]; cat?: string; favorite?: boolean }
+export interface ManagedTag { entity_id?: number; id?: string; k: string; n: number; hidden: boolean; blocked?: boolean; aliases: string[]; cat?: string; favorite?: boolean }
 export const managedTagId = (tag: ManagedTag): TagId => tag.id ?? tag.entity_id!;
-export type Operation = 'rename' | 'merge' | 'hide' | 'restore' | 'repair';
+export type Operation = 'rename' | 'merge' | 'hide' | 'restore' | 'repair' | 'block' | 'unblock';
 export interface Command { operation: Operation; ids: TagId[]; name?: string; target_id?: TagId; scope?: TagScope }
 interface Plan { token: string; name?: string; assets: number; overlap: number; tags: ManagedTag[] }
 export const TAG_ACTION_LABELS: Record<Operation, string> = {
   rename: '重命名标签', merge: '合并标签', hide: '隐藏标签', restore: '恢复标签', repair: '整理重复标签',
+  block: '屏蔽内容', unblock: '恢复内容',
 };
 
 export const previewTagOperation = (command: Command, signal?: AbortSignal) =>
@@ -28,7 +29,9 @@ export async function confirmTagOperation(command: Command, plan: Plan, signal?:
   const consequence = command.operation === 'merge' || command.operation === 'repair'
     ? `合并 ${plan.tags.length} 个标签，涉及 ${plan.assets} 个资源，重叠关联 ${plan.overlap} 个。旧名称保留为别名。此操作无法直接撤销。`
     : command.operation === 'rename' ? `${names}将更名为「${plan.name || command.name}」，涉及 ${plan.assets} 个资源。旧名称保留为别名。`
-      : `${command.operation === 'hide' ? '隐藏' : '恢复'} ${plan.tags.length} 个标签，涉及 ${plan.assets} 个资源。${command.operation === 'hide' ? '可在“已隐藏”中恢复。' : ''}`;
+      : command.operation === 'block' ? `屏蔽带有${names}任一标签的内容及其其它版本，涉及 ${plan.assets} 个资源。可在「已屏蔽内容」中恢复。`
+        : command.operation === 'unblock' ? `解除${names}的内容屏蔽，涉及 ${plan.assets} 个资源。`
+          : `${command.operation === 'hide' ? '隐藏' : '恢复'} ${plan.tags.length} 个标签，涉及 ${plan.assets} 个资源。${command.operation === 'hide' ? '可在“已隐藏”中恢复。' : ''}`;
   const done = await confirmModal({ title: TAG_ACTION_LABELS[command.operation], body: consequence,
     confirmLabel: TAG_ACTION_LABELS[command.operation], onConfirm: () => apiSend('/api/tag-management', { ...command, token: plan.token }, 'POST', signal) });
   if (!done.confirmed || signal?.aborted) return false;

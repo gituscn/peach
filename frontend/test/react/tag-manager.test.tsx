@@ -40,6 +40,34 @@ async function open() {
 }
 
 describe('标签管理', () => {
+  it('在线内容屏蔽与标签隐藏各有状态并使用预览计划恢复', async () => {
+    let blocked = false;
+    const commands: Record<string, unknown>[] = [];
+    const row = () => ({ id: 'outdoors', k: 'outdoors', n: 2, aliases: [], hidden: false, blocked, cat: 'general' });
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const command = init?.body ? JSON.parse(String(init.body)) : null;
+      if (command) commands.push(command);
+      if (url.endsWith('/preview')) return { ok: true, json: async () => ({ token: 'content-plan', assets: 2, overlap: 0, tags: [row()] }) };
+      if (command) blocked = command.operation === 'block';
+      return { ok: true, json: async () => command ? { ok: true } : { items: [row()], duplicate_groups: [] } };
+    }));
+    const host = await mount(<QueryClientProvider client={queryClient}><TagManager scope="online" /></QueryClientProvider>);
+    await settle();
+    await click(host.querySelector('[data-tag-chip]'));
+    await click(buttonNamed('屏蔽内容', host)); await settle();
+    expect(commands).toEqual([{ operation: 'block', ids: ['outdoors'], scope: 'online' },
+      { operation: 'block', ids: ['outdoors'], scope: 'online', token: 'content-plan' }]);
+    expect(host.querySelectorAll('[data-tag-chip]')).toHaveLength(0);
+    await click(buttonNamed('已隐藏', host));
+    expect(host.querySelectorAll('[data-tag-chip]')).toHaveLength(0);
+    await click(buttonNamed('已屏蔽内容', host));
+    await click(host.querySelector('[data-tag-chip]'));
+    await click(buttonNamed('恢复内容', host)); await settle();
+    expect(commands.at(-1)).toEqual({ operation: 'unblock', ids: ['outdoors'], scope: 'online', token: 'content-plan' });
+    await click(buttonNamed('使用中', host));
+    expect(host.querySelectorAll('[data-tag-chip]')).toHaveLength(1);
+  });
+
   it('搜索登记别名并区分使用中与已隐藏标签', async () => {
     backend();
     const view = await mountRoot(<QueryClientProvider client={queryClient}><TagManager search="眼镜娘" /></QueryClientProvider>);

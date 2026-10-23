@@ -5,11 +5,13 @@ import hashlib
 import html
 import json
 import unicodedata
+from dataclasses import replace
 from datetime import datetime, timezone
 
 from .profiles import DEFAULT_PROFILE_ID, read_settings
 
 SETTINGS_KEY = 'online_tag_management'
+ITEM_TAGS_KEY = 'online_item_tags'
 TYPE_RANK = {'general': 0, 'metadata': 1, 'copyright': 2, 'character': 3, 'artist': 4}
 
 
@@ -19,9 +21,28 @@ def tag_key(value: str) -> str:
 
 class OnlineTagPolicy:
     def __init__(self, connection=None):
-        self.groups = read_settings(connection).get(SETTINGS_KEY, {}) if connection is not None else {}
+        settings = read_settings(connection) if connection is not None else {}
+        self.groups = settings.get(SETTINGS_KEY, {})
+        self.item_tags = settings.get(ITEM_TAGS_KEY, {})
         self.members = {tag_key(member): group_id for group_id, group in self.groups.items()
                         for member in [*group['members'], *group['aliases'], group['name']]}
+
+    @staticmethod
+    def item_key(item) -> str:
+        return f'{item.provider}:{item.external_id}'
+
+    def custom_tags(self, item) -> list[str]:
+        return self.item_tags.get(self.item_key(item), [])
+
+    def with_custom_tags(self, item):
+        """在读取副本中叠加用户标签，来源 metadata 保持独立。"""
+        custom = self.custom_tags(item)
+        if not custom:
+            return item
+        return replace(item, metadata={**item.metadata, '_user_tags': custom})
+
+    def blocked(self, tags) -> bool:
+        return any(self.groups.get(self.identity(tag)[0], {}).get('blocked', False) for tag in tags)
 
     def identity(self, tag: str) -> tuple[str, str, bool]:
         key = tag_key(tag)
@@ -68,7 +89,7 @@ def _validate_rename(connection, rows, ids, name):
 
 def preview(connection, body, rows):
     operation = body.get('operation')
-    if operation not in {'rename', 'merge', 'hide', 'restore'}:
+    if operation not in {'rename', 'merge', 'hide', 'restore', 'block', 'unblock'}:
         raise ValueError('未知的在线标签操作')
     ids = body.get('ids')
     if not isinstance(ids, list) or not 0 < len(ids) <= 2000 or any(not isinstance(value, str) or not value for value in ids):
@@ -102,7 +123,7 @@ def apply_plan(connection, body, rows):
     groups = settings.setdefault(SETTINGS_KEY, {})
     rows = {row['id']: row for row in plan['tags']}
     for group_id, row in rows.items():
-        groups.setdefault(group_id, {'name': row['k'], 'hidden': row['hidden'], 'members': row['members'], 'aliases': row['aliases']})
+        groups.setdefault(group_id, {'name': row['k'], 'hidden': row['hidden'], 'members': row['members'], 'aliases': row['aliases'], 'cat': row['cat'], 'blocked': row.get('blocked', False)})
     if plan['operation'] == 'rename':
         group = groups[plan['ids'][0]]
         group['aliases'] = sorted(set([*group['aliases'], group['name']]))
@@ -115,11 +136,45 @@ def apply_plan(connection, body, rows):
             source = groups.pop(group_id)
             target['members'] = sorted(set([*target['members'], *source['members']]))
             target['aliases'] = sorted(set([*target['aliases'], source['name'], *source['aliases']]))
+            target['blocked'] = target.get('blocked', False) or source.get('blocked', False)
+    elif plan['operation'] in {'block', 'unblock'}:
+        for group_id in plan['ids']:
+            groups[group_id]['blocked'] = plan['operation'] == 'block'
     else:
         for group_id in plan['ids']:
             groups[group_id]['hidden'] = plan['operation'] == 'hide'
+    _save_settings(connection, settings)
+    return {'ok': True, 'operation': plan['operation'], 'assets': plan['assets']}
+
+
+def _save_settings(connection, settings):
     changed = connection.execute('UPDATE profile SET settings_json=?,updated_at=? WHERE id=?',
         (json.dumps(settings, ensure_ascii=False), datetime.now(timezone.utc).isoformat(), DEFAULT_PROFILE_ID)).rowcount
     if not changed:
         raise ValueError('当前用户设置不存在')
-    return {'ok': True, 'operation': plan['operation'], 'assets': plan['assets']}
+
+
+def write_item_tag(connection, item, body):
+    """给在线条目添加或移除手动标签。"""
+    operation = body.get('operation')
+    name = unicodedata.normalize('NFKC', str(body.get('tag') or '')).strip()
+    if operation not in {'add', 'remove'}:
+        raise ValueError('未知的手动标签操作')
+    if not 0 < len(name) <= 80 or ',' in name or any(ord(char) < 32 for char in name):
+        raise ValueError('标签名须为 1 至 80 个字符，不含逗号或控制字符')
+    settings = read_settings(connection)
+    policy = OnlineTagPolicy(connection)
+    canonical = policy.query_name(name)
+    key = policy.identity(canonical)[0]
+    all_tags = settings.setdefault(ITEM_TAGS_KEY, {})
+    tags = list(all_tags.get(policy.item_key(item), []))
+    tags = [tag for tag in tags if policy.identity(tag)[0] != key]
+    if operation == 'add':
+        if len(tags) >= 100:
+            raise ValueError('每条内容最多添加 100 个手动标签')
+        tags.append(canonical)
+    if tags:
+        all_tags[policy.item_key(item)] = tags
+    else:
+        all_tags.pop(policy.item_key(item), None)
+    _save_settings(connection, settings)

@@ -119,6 +119,7 @@ def _item_all_tags(item) -> list[str]:
         recorded = item.metadata.get(field)
         if isinstance(recorded, list):
             values.extend(str(value).strip() for value in recorded if str(value).strip())
+    values.extend(item.metadata.get('_user_tags', []))
     seen, result = set(), []
     for value in values:
         tag = html.unescape(value)
@@ -133,7 +134,7 @@ def _item_all_tags(item) -> list[str]:
 def _recorded_tag_type(item, tag: str) -> str:
     raw = item.metadata.get("tag_types")
     if not isinstance(raw, dict):
-        return ""
+        raw = {}
     value = raw.get(tag)
     if value is None:
         key = tag.casefold()
@@ -142,7 +143,7 @@ def _recorded_tag_type(item, tag: str) -> str:
     tag_type = str(value or "").casefold()
     return tag_type if tag_type in {
         "artist", "character", "copyright", "metadata", "general"
-    } else ""
+    } else 'general' if tag in item.metadata.get('_user_tags', []) else ''
 
 
 def _item_tags(item) -> list[str]:
@@ -162,8 +163,9 @@ def _item_tags(item) -> list[str]:
     seen, tags = set(), []
     for tag in values:
         key = tag.casefold()
+        custom = tag in item.metadata.get('_user_tags', [])
         # 来源没给类型时宁可暂不放进卡片，也不把 unknown 猜成 general。
-        if (_recorded_tag_type(item, tag) != "general"
+        if not custom and (_recorded_tag_type(item, tag) != "general"
                 or key == subject or key in seen or key in LOW_VALUE_GENERAL_TAGS
                 or _NON_CONTENT_FOLLOW_TAG_RE.fullmatch(tag.strip())):
             continue
@@ -1077,14 +1079,21 @@ def _item_payload(item, credential_providers: frozenset[str] = frozenset(), tag_
         "tags": policy.project(tags),
         "detail_tags": policy.project(detail_tags),
         "tag_types": tag_types,
+        "custom_tags": policy.project(policy.custom_tags(item), include_hidden=True),
+        "blocked_tags": [tag for tag in policy.project(detail_tags, include_hidden=True) if policy.blocked([tag])],
     }
 
 
 def _group_payload(group: ReleaseGroup,
                    credential_providers: frozenset[str] = frozenset(), tag_policy=None) -> dict:
+    policy = tag_policy or OnlineTagPolicy()
+    primary = _item_payload(group.primary, credential_providers, policy)
+    custom = [tag for item in (group.primary, *group.variants, *group.duplicates)
+              for tag in policy.custom_tags(item)]
+    primary['tags'] = policy.project([*primary['tags'], *custom])
     return {
         "release_key": group.release_key,
-        "primary": _item_payload(group.primary, credential_providers, tag_policy),
+        "primary": primary,
         "variants": [_item_payload(item, credential_providers, tag_policy)
                      for item in group.variants],
         "duplicates": [_item_payload(item, credential_providers, tag_policy)
@@ -1306,7 +1315,10 @@ def _follow_facets(store, items, by_source, alias_map, icon_root=None, tag_polic
             if key:
                 authors.add(key)
             providers.add(str(row["provider"] or ""))
-        for tag in (tag_policy or OnlineTagPolicy()).project(_item_tags(group.primary)):
+        policy = tag_policy or OnlineTagPolicy()
+        custom = [tag for member in (group.primary, *group.variants, *group.duplicates)
+                  for tag in policy.custom_tags(member)]
+        for tag in policy.project([*_item_tags(group.primary), *custom]):
             tags[tag] = tags.get(tag, 0) + 1
         # 末位是「这个题材挑得出代表图吗」。页面据它决定出不出 `<img>`：无条件出图、
         # 靠 `/work-icon` 回 404 换回字母的话，那条响应不可缓存，每次重绘再打一轮。
@@ -1365,7 +1377,8 @@ def _follow_tag_index(store, items, tag_policy=None, *, evidence=False) -> list[
                     continue
                 key, name, hidden = policy.identity(tag)
                 row = rows.setdefault(key, {"id": key, "k": name, "n": 0, "cat": tag_type,
-                                           'hidden': hidden, 'aliases': set(), 'members': set(), '_releases': set()})
+                                           'hidden': hidden, 'blocked': policy.groups.get(key, {}).get('blocked', False),
+                                           'aliases': set(), 'members': set(), '_releases': set()})
                 row['members'].add(tag_key(tag))
                 row['aliases'].add(tag)
                 saved = policy.groups.get(key, {})
@@ -1381,6 +1394,11 @@ def _follow_tag_index(store, items, tag_policy=None, *, evidence=False) -> list[
             row['_releases'].add(group.release_key)
             if type_rank[tag_type] > type_rank[row["cat"]]:
                 row["cat"] = tag_type
+    for key, saved in policy.groups.items():
+        if key not in rows:
+            rows[key] = {'id': key, 'k': saved['name'], 'n': 0, 'cat': saved.get('cat', 'general'),
+                         'hidden': saved['hidden'], 'blocked': saved.get('blocked', False),
+                         'aliases': set(saved['aliases']), 'members': set(saved['members']), '_releases': set()}
     return sorted(({key: sorted(value) if isinstance(value, set) else value for key, value in row.items()
                     if evidence or key != '_releases'} for row in rows.values()), key=lambda row: (-row['n'], row['k']))
 
@@ -1390,10 +1408,12 @@ def online_tag_inventory(connection):
     from .library_favorites import online_tag_ids
     store = FollowStore(lambda: connection)
     enabled = {row['id'] for row in store.sources() if row['enabled']}
-    items = tuple(item for item in store.items(limit=_ALL_ITEMS) if item.source_id in enabled and not _excluded_item(item))
+    policy = OnlineTagPolicy(connection)
+    items = tuple(policy.with_custom_tags(item) for item in store.items(limit=_ALL_ITEMS)
+                  if item.source_id in enabled and not _excluded_item(item))
     favorites = online_tag_ids(connection)
     return [{**row, 'favorite': row['id'] in favorites}
-            for row in _follow_tag_index(store, items, OnlineTagPolicy(connection), evidence=True)]
+            for row in _follow_tag_index(store, items, policy, evidence=True)]
 
 
 def q_follow_tags(contract, args) -> dict:
@@ -1426,11 +1446,12 @@ def q_follow_tags(contract, args) -> dict:
         alias_map, _aliases = store.author_aliases()
         enabled = {int(row["id"]) for row in source_rows if row["enabled"]}
         by_source = {int(row["id"]): row for row in source_rows}
-        items = tuple(item for item in store.items(limit=_ALL_ITEMS)
+        items = tuple(tag_policy.with_custom_tags(item) for item in store.items(limit=_ALL_ITEMS)
                       if item.source_id in enabled and not _excluded_item(item))
+        items = _unblocked_items(store, items, tag_policy, group_authors(source_rows, alias_map))
         facets = _follow_facets(store, items, by_source, alias_map,
                                 work_icon_root(contract), tag_policy)
-        rows = ([row for row in _follow_tag_index(store, items, tag_policy) if not row['hidden']] if include_types else
+        rows = (_visible_online_tag_rows(store, items, tag_policy) if include_types else
                 [{"k": tag, "n": count, "cat": "general"}
                  for tag, count in facets["tags"]])
         if include_types:
@@ -1447,6 +1468,12 @@ def q_follow_tags(contract, args) -> dict:
             "items": rows[offset:offset + limit],
             "has_more": offset + limit < len(rows),
             "categories": categories}
+
+
+def _visible_online_tag_rows(store, items, policy):
+    """浏览词表只返回有可见内容的标签，管理词表保留全部保存的选择。"""
+    return [row for row in _follow_tag_index(store, items, policy)
+            if not row['hidden'] and not row['blocked'] and row['n']]
 
 
 def q_follow_authors(contract, args) -> dict:
@@ -1480,8 +1507,10 @@ def q_follow_authors(contract, args) -> dict:
                      for row in aliases}
         enabled = {int(row["id"]) for row in source_rows if row["enabled"]}
         by_source = {int(row["id"]): row for row in source_rows}
-        items = tuple(item for item in store.items(limit=_ALL_ITEMS)
+        policy = OnlineTagPolicy(connection)
+        items = tuple(policy.with_custom_tags(item) for item in store.items(limit=_ALL_ITEMS)
                       if item.source_id in enabled and not _excluded_item(item))
+        items = _unblocked_items(store, items, policy, group_authors(source_rows, alias_map))
         counts: dict[str, int] = {}
         for item in items:
             row = by_source.get(item.source_id)
@@ -1748,9 +1777,29 @@ def _enabled_items(contract, inputs, source_id) -> tuple:
     enabled = {int(row["id"]) for row in inputs.sources if row["enabled"]}
     return contract.cached_until_changed(
         f"follow-items:{source_id}",
-        lambda: tuple(item for item in inputs.store.items(source_id=source_id, limit=_ALL_ITEMS)
+        lambda: tuple(inputs.tag_policy.with_custom_tags(item) for item in inputs.store.items(source_id=source_id, limit=_ALL_ITEMS)
                       if item.source_id in enabled and not _excluded_item(item)),
         inputs.revision, tables=FOLLOW_GROUP_TABLES)
+
+
+def _unblocked_items(store, items, policy, by_author=None) -> tuple:
+    """任一版本命中屏蔽标签时，整组内容从浏览列表中隐藏。"""
+    if not any(group.get('blocked') for group in policy.groups.values()):
+        return items
+    blocked_ids = {member.id for group in store.group(items, by_author)
+                   if any(policy.blocked(_item_all_tags(member))
+                          for member in (group.primary, *group.variants, *group.duplicates))
+                   for member in (group.primary, *group.variants, *group.duplicates)}
+    return tuple(item for item in items if item.id not in blocked_ids)
+
+
+def _browsable_items(contract, inputs, source_id, by_author):
+    """在完整作品组的屏蔽结果中选择来源，供列表、数量和筛选项共用。"""
+    def build():
+        visible = _unblocked_items(inputs.store, _enabled_items(contract, inputs, None), inputs.tag_policy, by_author)
+        return tuple(item for item in visible if source_id is None or item.source_id == source_id)
+    return contract.cached_until_changed(f'follow-unblocked:{source_id}', build,
+                                         inputs.revision, tables=FOLLOW_GROUP_TABLES)
 
 
 def _item_groups(contract, inputs, everything, by_author, source_id) -> dict:
@@ -1929,6 +1978,7 @@ def q_follow(contract, args) -> dict:
         if item_id is not None:
             return _item_page(_item_groups(contract, inputs, everything, by_author, source_id).get(item_id),
                               payload, sources, author_aliases)
+        everything = _browsable_items(contract, inputs, source_id, by_author)
         counted = _sorted_items(
             tuple(item for item in everything if _matches(item)), sort, direction, seed)
         ranked, has_more = _page_groups(
@@ -2007,6 +2057,24 @@ def _write_item_ids(body) -> list[int]:
             raise ValueError("items must contain only integer follow item ids")
         return list(dict.fromkeys(item_ids))
     raise ValueError("item must be an integer follow item id or items a non-empty list")
+
+
+def w_follow_tag(contract, body) -> dict:
+    """在线条目的用户标签写入本机设置，返回当前条目投影。"""
+    from .online_tag_management import write_item_tag
+    with contract.write_transaction() as connection:
+        item = _store(contract, connection).item(int(body['id']))
+        enabled = {row['id'] for row in _store(contract, connection).sources() if row['enabled']}
+        if item is None or item.source_id not in enabled or _excluded_item(item):
+            raise ValueError('关注内容不存在')
+        write_item_tag(connection, item, body)
+    contract.cache_bust()
+    page = q_follow(contract, {'item': item.id})
+    for group in page['groups']:
+        for projected in (group['primary'], *group['variants'], *group['duplicates']):
+            if projected['id'] == item.id:
+                return {'ok': True, 'item': projected, 'group': group}
+    raise ValueError('关注内容已不可用')
 
 
 def w_follow_status(contract, body) -> dict:

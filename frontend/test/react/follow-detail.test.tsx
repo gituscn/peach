@@ -16,7 +16,7 @@ import { FOLLOW_CREDENTIALS_KEY, setFollowItemStatus, type FollowFeedHelpers, ty
 import { openPhotoLightbox } from '../../src/react/photo-lightbox/photo-lightbox-dialog';
 import { queryClient } from '../../src/react/query';
 import { wantFollowKey } from '../../src/react/wants/wants';
-import { click, mount, settle } from './render';
+import { buttonNamed, click, mount, pending, settle, submit, type } from './render';
 
 /* 灯箱自己的开合与翻页在 `photo-lightbox.test.tsx`；这里只看详情把哪一组、从第几张交给它。 */
 vi.mock('../../src/react/photo-lightbox/photo-lightbox-dialog', () => ({ openPhotoLightbox: vi.fn(async () => {}) }));
@@ -84,6 +84,50 @@ async function show(given: FollowDetailData, patch: Partial<FollowDetailProps> =
 }
 
 describe('取数', () => {
+  it('手动标签提交保持输入和忙态，成功后更新详情并可移除', async () => {
+    const original = item(8, { tags: ['source'], detail_tags: ['source'], custom_tags: [] });
+    const updated = item(8, { tags: ['source', '精选'], detail_tags: ['source', '精选'], custom_tags: ['精选'] });
+    const waiting = pending<{ ok: boolean; json(): Promise<unknown> }>();
+    const fallback = serve();
+    const fetcher = vi.fn((url: string, init?: RequestInit) => url === '/api/follow/tag'
+      ? JSON.parse(String(init?.body)).operation === 'add' ? waiting.answer
+        : Promise.resolve({ ok: true, json: async () => ({ item: original, group: group(original) }) })
+      : fallback(url, init));
+    vi.stubGlobal('fetch', fetcher);
+    const { host, actions: receipts } = await show(data(original));
+    await click(buttonNamed('管理标签', host));
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="新标签名称"]')!;
+    await type(input, '精选');
+    await submit(host.querySelector('form[aria-label="添加手动标签"]'));
+    await submit(host.querySelector('form[aria-label="添加手动标签"]'));
+    expect(fetcher.mock.calls.filter(([url]) => url === '/api/follow/tag')).toHaveLength(1);
+    expect(input.value).toBe('精选');
+    expect(buttonNamed('添加标签', host)?.getAttribute('aria-busy')).toBe('true');
+    expect(receipts.toast).not.toHaveBeenCalled();
+    await waiting.release({ ok: true, json: async () => ({ item: updated, group: group(updated) }) });
+    await settle();
+    expect(host.querySelector('[data-follow-tag="精选"]')).not.toBeNull();
+    expect(input.value).toBe('');
+    expect(receipts.toast).toHaveBeenCalledWith('已添加标签「精选」', expect.objectContaining({ undo: expect.any(Function) }));
+    await click(host.querySelector('[aria-label="移除手动标签 精选"]')); await settle();
+    expect(host.querySelector('[data-follow-tag="精选"]')).toBeNull();
+    expect(host.querySelector('[data-follow-tag="source"]')).not.toBeNull();
+  });
+
+  it('手动标签失败保留输入并在表单旁显示原因', async () => {
+    const fallback = serve();
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => url === '/api/follow/tag'
+      ? Promise.resolve({ ok: false, status: 400, json: async () => ({ error: '标签名不含逗号' }) }) : fallback(url, init)));
+    const { host, actions: receipts } = await show(data(item(8)));
+    await click(buttonNamed('管理标签', host));
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="新标签名称"]')!;
+    await type(input, 'a,b');
+    await submit(host.querySelector('form[aria-label="添加手动标签"]')); await settle();
+    expect(input.value).toBe('a,b');
+    expect(host.textContent).toContain('标签名不含逗号');
+    expect(receipts.toast).not.toHaveBeenCalled();
+  });
+
   it('缓存里没有这一条就单条取 `/api/follow?item=`，取回的组里找不到这一条就报出来', async () => {
     const fetcher = serve({ page: { groups: [group(item(8))], sources: [], author_aliases: [] } });
     const props: FollowDetailProps = { id: 8, mediaIndex: null, mediaView: 'videos', relatedLimit: 0, helpers: helpers(), actions: actions() };
