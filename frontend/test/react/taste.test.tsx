@@ -15,7 +15,7 @@ import { JOB_RUNNING_POLL_MS } from '../../src/react/background-job';
 import { queryClient } from '../../src/react/query';
 import {
   DEFAULT_WINDOW, FLOW_VIEWBOX, flowGraph, historySpan, prefetchTaste, radarRows, RANK_MAX, rankDetail,
-  TASTE_IMPORT_URL, TASTE_REFRESH_URL, TASTE_SOURCE_URL, TASTE_URL, tasteDimensions, topScores,
+  STALE_POLL_MS, TASTE_IMPORT_URL, TASTE_REFRESH_URL, TASTE_SOURCE_URL, TASTE_URL, tasteDimensions, topScores,
   type TasteData, type TasteJob,
 } from '../../src/react/taste/taste';
 import { TasteRadar } from '../../src/react/taste/charts';
@@ -265,6 +265,35 @@ it('换分析范围时留住上一份：这一屏不退回等待态，只等新�
   expect(host.textContent).toContain('900');
   expect(rowNamed(host, '标签甲')).not.toBeNull();
   expect(host.querySelector('[role=alert]')).toBeNull();
+});
+
+it('后台重算时隔一会儿再问，算完换上新结果就停', async () => {
+  vi.useFakeTimers();
+  const { fetcher, host } = await open({ taste: [payload({ stale: true }), payload()] });
+  expect(host.textContent).toContain('正在更新口味分析');
+  await tick(STALE_POLL_MS);
+  await settle();
+  expect(tasteGets(fetcher)).toHaveLength(2);
+  expect(host.textContent).not.toContain('正在更新口味分析');
+  await tick(STALE_POLL_MS * 3);
+  expect(tasteGets(fetcher)).toHaveLength(2);
+});
+
+it('重算失败时不再轮询，提示条说明更新失败，「立即重试」让服务端跳过等待再算一次', async () => {
+  vi.useFakeTimers();
+  const failed = payload({ stale: true, error: '账本读取失败', computed_at: '2026-09-10T00:00:00Z' });
+  const fresh = payload({ summary: { history_visits: 4321, history_sources: 2 } });
+  const { fetcher, host } = await open({ taste: [failed, fresh] });
+  expect(host.textContent).toContain('口味分析更新失败');
+  expect(host.textContent).toContain('账本读取失败');
+  expect(host.textContent).not.toContain('正在更新口味分析');
+  await tick(STALE_POLL_MS * 3);
+  expect(tasteGets(fetcher), '失败之后还在轮询').toHaveLength(1);
+  await click(rowNamed(host, '立即重试'));
+  await settle();
+  expect(String(tasteGets(fetcher).at(-1)?.[0])).toBe(`${TASTE_URL}?window=all&retry=1`);
+  expect(host.textContent).not.toContain('口味分析更新失败');
+  expect(host.textContent).toContain('4,321');
 });
 
 it('首屏读到的旧终态不冒充新结果：不发回执，也不重取 dashboard', async () => {

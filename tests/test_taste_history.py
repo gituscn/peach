@@ -553,6 +553,51 @@ class TasteHistoryTests(unittest.TestCase):
         self.assertEqual(visits["Alice Canonical"], 2)
         self.assertEqual(unrelated["rankings"]["browser_creators"], first["rankings"]["browser_creators"])
 
+    def test_identity_signals_follow_the_rows_they_were_judged_from(self):
+        """口味刷新逐个来源提交历史库：读完行之后、判身份之前又写进一批，判出的信号仍记在
+        读出那批行的版本下，下一次用新行算时不会命中旧信号、按位置错配丢掉新访问。"""
+        def export(name, url, moment):
+            path = self.root / name
+            path.write_text(json.dumps([{"url": url, "dt": moment, "metadata": None}]), encoding="utf-8")
+            return path
+
+        store = self.root / "sources" / "history.sqlite"
+        import_history_exports([export("a.json", "https://onlyfans.com/alice", 1_700_000_000)],
+                               store, host="test-host")
+        original = taste_history._linked_signals
+        writes = []
+
+        def commit_then_judge(history_store, cached, ledger_connection):
+            if not writes:
+                writes.append(import_history_exports(
+                    [export("b.json", "https://fansly.com/bob", 1_700_000_100)], store, host="test-host"))
+            return original(history_store, cached, ledger_connection)
+
+        with closing(sqlite3.connect(self.root / "ledger.db")) as db:
+            db.row_factory = sqlite3.Row
+            db.executescript(
+                "CREATE TABLE asset(id INTEGER PRIMARY KEY,creator TEXT,studio TEXT,play_count INTEGER,"
+                "play_seconds REAL,o_count INTEGER,rating INTEGER,feedback TEXT,last_played REAL);"
+                "CREATE TABLE asset_preference(profile_id TEXT,asset_id INTEGER,liked INTEGER);"
+                "CREATE TABLE entity(id INTEGER PRIMARY KEY,kind TEXT,canonical_name TEXT,normalized_name TEXT);"
+                "CREATE TABLE entity_alias(entity_id INTEGER,alias TEXT);"
+                "CREATE TABLE asset_entity(asset_id INTEGER,entity_id INTEGER);"
+                "INSERT INTO entity VALUES(2,'creator','Alice Canonical','alice canonical');"
+                "INSERT INTO entity VALUES(3,'creator','Bob Canonical','bob canonical');"
+                "INSERT INTO entity_alias VALUES(2,'alice');"
+                "INSERT INTO entity_alias VALUES(3,'bob');")
+            with mock.patch.object(taste_history, "_linked_signals", side_effect=commit_then_judge):
+                first = build_taste_dashboard(store, db)
+            second = build_taste_dashboard(store, db)
+        self.assertEqual(len(writes), 1)
+
+        def canonical(dashboard):
+            return {row["name"]: row["web_visits"] for row in dashboard["rankings"]["browser_creators"]
+                    if row["name"].endswith("Canonical")}
+
+        self.assertEqual(canonical(first), {"Alice Canonical": 1})
+        self.assertEqual(canonical(second), {"Alice Canonical": 1, "Bob Canonical": 1})
+
     def test_history_is_parsed_once_per_store_version(self):
         def export(name, url, moment):
             path = self.root / name

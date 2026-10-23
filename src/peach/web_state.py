@@ -66,6 +66,11 @@ FAVICON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect wi
 
 CACHE_TTL = 90
 
+#: 封面目录时间距今不足这么久算「还在写」，那时扫出的索引只缓存 `COVER_SETTLE_TTL` 秒。
+#: 见 `WebContract.cover_index`。
+COVER_SETTLE_SECONDS = 2
+COVER_SETTLE_TTL = 1.0
+
 
 def path_version(path: Path) -> int | None:
     """文件或目录的修改时间，缓存键拿它认「变了没有」；不存在就是 None。
@@ -402,13 +407,20 @@ class WebContract:
         边车，约一秒。封面与边车的写入方（`cover_artwork.install_cover`、
         `jav_poster_crop.write_sidecar`）都先写临时文件再换名，新增、替换、删除都会改
         目录时间。目录不存在时退回 `CACHE_TTL`。
+
+        目录时间取自文件系统的时钟刻度（NTFS 约 15 ms），`install_cover` 的一连串换名可能
+        落在同一刻度里：读者在两次换名之间扫到的半成品，和换完之后的目录时间相同。所以照
+        Git 判「新近修改」的做法，目录时间距今不足 `COVER_SETTLE_SECONDS` 时扫出的结果只按
+        短时效缓存，版本里另记一档，目录静下来之后重扫一次才无限期缓存。
         """
         version = path_version(self.cover_root)
         if version is None:
             return self.cached("cover-index", self._scan_cover_root, version=None)
         with self.cache_lock:
             self.revision_cache_keys.add("cover-index")
-        return self.cached("cover-index", self._scan_cover_root, ttl=math.inf, version=version)
+        settling = time.time_ns() - version < COVER_SETTLE_SECONDS * 1_000_000_000
+        return self.cached("cover-index", self._scan_cover_root,
+                           ttl=COVER_SETTLE_TTL if settling else math.inf, version=(version, settling))
 
     def _scan_cover_root(self) -> dict[str, dict]:
         """一次目录扫描同时收集封面存在性和两份 sidecar。目录不存在就是空索引。"""
