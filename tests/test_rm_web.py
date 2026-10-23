@@ -64,6 +64,12 @@ class WebDataTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.db_path = str(fresh_ledger(self.tmp.name))
+        declared = mock.patch.object(web_batch, "LOCATION_ROOT_DECLARATIONS", {
+            "local": (str(Path(self.tmp.name).resolve()),),
+            "115": (str(Path(self.tmp.name).resolve()),),
+        })
+        declared.start()
+        self.addCleanup(declared.stop)
         con = sqlite3.connect(self.db_path)
         con.executemany(
             """INSERT INTO asset(
@@ -1635,6 +1641,95 @@ class WebDataTests(unittest.TestCase):
             "SELECT source_seed_asset_id FROM playlist WHERE id=?", (playlist["id"],),
         ).fetchone()[0])
         con.close()
+
+    def test_recycle_bin_delete_translates_windows_ledger_path_to_mounted_media(self):
+        source_root = (Path(self.tmp.name) / "mounted-media").resolve()
+        source_root.mkdir()
+        path = source_root / "one.mp4"
+        path.write_bytes(b"test media")
+        ledger_path = r"R:\Media\one.mp4"
+        with closing(sqlite3.connect(self.db_path)) as con:
+            con.execute("UPDATE asset SET path=?,snapshot_path=NULL WHERE id=1", (ledger_path,))
+            con.commit()
+        rm_web.w_feedback(self.contract, {"id": 1, "kind": "dispose"})
+
+        def translate(raw):
+            if str(raw).casefold() == r"r:\media".casefold():
+                return source_root
+            if str(raw).casefold() == ledger_path.casefold():
+                return path
+            return Path(raw)
+
+        with mock.patch.object(web_batch, "LOCATION_ROOT_DECLARATIONS",
+                               {"local": (r"R:\Media",)}), \
+                mock.patch.object(web_batch, "translate_ledger_path", side_effect=translate):
+            result = rm_web.w_batch(self.contract, {"ids": [1], "operation": "delete"})
+
+        self.assertEqual((result["purged"], result["blocked"]), (1, []))
+        self.assertFalse(path.exists(), "永久删除要删除路径映射后的实际媒体文件")
+        self.assertIsNone(self.row(1))
+
+    def test_recycle_bin_delete_keeps_windows_asset_when_its_source_is_unavailable(self):
+        source_root = Path(self.tmp.name).resolve() / "offline-media"
+        path = source_root / "one.mp4"
+        path.parent.mkdir()
+        path.write_bytes(b"test media")
+        ledger_path = r"R:\Media\one.mp4"
+        with closing(sqlite3.connect(self.db_path)) as con:
+            con.execute("UPDATE asset SET path=?,snapshot_path=NULL WHERE id=1", (ledger_path,))
+            con.commit()
+        rm_web.w_feedback(self.contract, {"id": 1, "kind": "dispose"})
+
+        def translate(raw):
+            if str(raw).casefold() == r"r:\media".casefold():
+                return source_root / "not-mounted"
+            if str(raw).casefold() == ledger_path.casefold():
+                return path
+            return Path(raw)
+
+        with mock.patch.object(web_batch, "LOCATION_ROOT_DECLARATIONS",
+                               {"local": (r"R:\Media",)}), \
+                mock.patch.object(web_batch, "translate_ledger_path", side_effect=translate):
+            result = rm_web.w_batch(self.contract, {"ids": [1], "operation": "delete"})
+
+        self.assertEqual(result["purged"], 0)
+        self.assertEqual([item["id"] for item in result["blocked"]], [1])
+        self.assertTrue(path.is_file())
+        self.assertEqual(self.row(1)["disposal"], "trash")
+
+    def test_unmapped_paths_keep_media_and_rows_for_delete_and_missing_cleanup(self):
+        from peach.platform import UNMAPPED_ROOT
+
+        media = self.stage_media(1)
+        rm_web.w_feedback(self.contract, {"id": 1, "kind": "dispose"})
+        for missing_only in (False, True):
+            with self.subTest(missing_only=missing_only), \
+                    mock.patch.object(web_batch, "translate_ledger_path", return_value=UNMAPPED_ROOT / "one.mp4"):
+                with self.contract.write_transaction() as connection:
+                    result = web_batch.purge_assets(connection, [self.row(1)], missing_only=missing_only)
+            self.assertEqual(result["purged"], 0)
+            self.assertEqual([item["id"] for item in result["blocked"]], [1])
+            self.assertTrue(media.is_file())
+            self.assertEqual(self.row(1)["disposal"], "trash")
+
+    def test_unreadable_media_keeps_rows_for_delete_and_missing_cleanup(self):
+        media = self.stage_media(1)
+        rm_web.w_feedback(self.contract, {"id": 1, "kind": "dispose"})
+        original_stat = Path.stat
+
+        def stat(path, *args, **kwargs):
+            if path == media:
+                raise PermissionError("media unavailable")
+            return original_stat(path, *args, **kwargs)
+
+        for missing_only in (False, True):
+            with self.subTest(missing_only=missing_only), mock.patch.object(Path, "stat", stat):
+                with self.contract.write_transaction() as connection:
+                    result = web_batch.purge_assets(connection, [self.row(1)], missing_only=missing_only)
+            self.assertEqual(result["purged"], 0)
+            self.assertEqual([item["id"] for item in result["blocked"]], [1])
+            self.assertTrue(media.is_file())
+            self.assertEqual(self.row(1)["disposal"], "trash")
 
     def test_permanent_delete_removes_newly_empty_parents_but_keeps_the_source_root(self):
         source_root = Path(self.tmp.name) / "source"

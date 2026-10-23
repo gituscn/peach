@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 import shutil
 import tempfile
 import time
@@ -296,23 +297,50 @@ def purge_assets(connection, rows, *, missing_only: bool = False):
     ``missing_only`` 删的只是账本行：文件还在（或答不上在不在）的行进 ``blocked``。
     """
     purged, blocked, staged, snapshots, parents = [], [], [], [], []
+    online_roots = None
     for row in rows:
         media = row["path"]
-        if media and missing_only:
+        translated = None
+        if media:
             try:
-                present = translate_ledger_path(media).exists()
-                reason = "文件仍在盘上"
+                translated = translate_ledger_path(media)
             except OSError as error:
-                present, reason = True, error.strerror or str(error)
-            if present:
-                blocked.append({"id": row["id"], "path": media, "reason": reason})
+                blocked.append({"id": row["id"], "path": media,
+                                "reason": error.strerror or str(error)})
+                continue
+            if is_unmapped(translated):
+                blocked.append({"id": row["id"], "path": media,
+                                "reason": "媒体路径未映射到可访问的挂载目录"})
+                continue
+            if PureWindowsPath(str(media)).drive:
+                if online_roots is None:
+                    online_roots = _online_source_roots()
+                location = row["location"] if "location" in row.keys() else None
+                if not any(within_root(translated, root) and root_online(root)
+                           for root in online_roots.get(location, ())):
+                    blocked.append({"id": row["id"], "path": media,
+                                    "reason": "媒体来源未挂载或不可读取"})
+                    continue
+        media_stat = None
+        if media:
+            try:
+                media_stat = translated.stat()
+            except FileNotFoundError:
+                pass
+            except OSError as error:
+                blocked.append({"id": row["id"], "path": media,
+                                "reason": error.strerror or str(error)})
+                continue
+        if media and missing_only:
+            if media_stat is not None:
+                blocked.append({"id": row["id"], "path": media, "reason": "文件仍在盘上"})
                 continue
         elif media:
-            original = Path(media)
+            original = translated
             try:
-                if original.exists() and not original.is_file():
+                if media_stat is not None and not stat.S_ISREG(media_stat.st_mode):
                     raise OSError("not a regular file")
-                if original.is_file():
+                if media_stat is not None:
                     quarantine = _quarantine_media(original, location=row['location'] if 'location' in row.keys() else None)
                     staged.append((original, quarantine))
             except OSError as error:
@@ -323,7 +351,7 @@ def purge_assets(connection, rows, *, missing_only: bool = False):
         if snapshot:
             snapshots.append(Path(snapshot))
         if media:
-            parents.append(Path(media).parent)
+            parents.append(translated.parent)
         purged.append(row["id"])
     try:
         if purged:
