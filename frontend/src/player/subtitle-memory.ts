@@ -1,23 +1,19 @@
 /* 每部视频的字幕会话；详情、小窗和沉浸播放共享服务端记忆。 */
-import { api } from '@peach/legacy/core';
 import type { VjsPlayer } from './types';
+import { playerMemory } from './memory';
 
-interface RememberedTrack { key: string; name: string; src: string }
-interface Memory { selected: string | null; tracks: RememberedTrack[] }
 interface SavedTrack { key: string; name: string; text: string }
-const pending = new Map<string, Promise<unknown>>();
 
 export class SubtitleSession {
   private cleanup = new AbortController();
   private imported = new Map<string, { node: HTMLTrackElement; url: string }>();
   private selected: string | null | undefined;
-  private url: string;
+  private memory;
   readonly ready: Promise<void>;
   error = '';
 
   constructor(private player: VjsPlayer, private video: HTMLVideoElement, private changed = () => {}) {
-    const identity = player.peachPlaybackKey || (player.peachItem?.id ? `item:${player.peachItem.id}` : '');
-    this.url = identity ? `/api/subtitles/memory?video=${encodeURIComponent(identity)}` : '';
+    this.memory = playerMemory(player);
     const signal = this.cleanup.signal;
     video.textTracks.addEventListener('addtrack', () => { this.apply(); this.changed() }, { signal });
     video.addEventListener('loadedmetadata', () => this.apply(), { signal });
@@ -53,28 +49,15 @@ export class SubtitleSession {
     this.changed();
   }
   private save(value: { selected: string | null; track?: SavedTrack }) {
-    if (!this.url) return Promise.resolve();
-    const task = (pending.get(this.url) || Promise.resolve()).catch(() => {}).then(async () => {
-      const response = await fetch(this.url, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(value), keepalive: !value.track });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error || payload?.detail || '字幕记忆未保存，请重试');
-      }
+    return this.memory.save(value).then(() => {
       const hadError = !!this.error;
       this.error = ''; if (hadError && !this.cleanup.signal.aborted) this.changed();
     });
-    pending.set(this.url, task);
-    void task.finally(() => { if (pending.get(this.url) === task) pending.delete(this.url) }).catch(() => {});
-    return task;
   }
   private async restore() {
-    if (!this.url) return;
     const signal = this.cleanup.signal;
     try {
-      await pending.get(this.url)?.catch(() => {});
-      if (signal.aborted) return;
-      const saved = await api(this.url, { signal }) as Memory;
+      const saved = await this.memory.load();
       if (signal.aborted) return;
       if (this.selected === undefined) this.selected = saved.selected;
       this.apply();

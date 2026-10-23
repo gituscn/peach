@@ -2861,6 +2861,38 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                                              headers={'X-Token': 'secret'})
             self.assertEqual(removed.json(), {'items': []})
 
+    async def test_local_players_require_local_access_and_authorized_media(self):
+        from peach import local_playback
+        headers = {'X-Token': 'secret'}
+        self.assertEqual((await self.client.get('/api/local-players')).status_code, 401)
+        with patch.object(local_playback, 'available', return_value=True), \
+                patch.object(local_playback, 'installed', return_value={'vlc': ('VLC', '/private/vlc')}), \
+                patch('peach.routes_configuration.local_client', return_value=True), \
+                patch.object(local_playback, 'open_media') as launch:
+            options = await self.client.get('/api/local-players', headers=headers)
+            self.assertEqual(options.json(), {'players': [
+                {'id': 'default', 'label': '系统默认播放器'}, {'id': 'vlc', 'label': 'VLC'}]})
+            result = await self.client.post('/api/local-playback?id=1&player=vlc', json={}, headers=headers)
+            self.assertEqual(result.status_code, 200, result.text)
+            self.assertEqual(launch.call_args.args[1], 'vlc')
+            launch.reset_mock()
+            missing = await self.client.post('/api/local-playback?id=999999', json={}, headers=headers)
+            self.assertEqual(missing.status_code, 404)
+            launch.assert_not_called()
+            forwarded = {**headers, 'X-Forwarded-For': '192.0.2.1'}
+            self.assertEqual((await self.client.get('/api/local-players', headers=forwarded)).json(), {'players': []})
+            self.assertEqual((await self.client.post('/api/local-playback?id=1', json={}, headers=forwarded)).status_code, 403)
+            remote = {**headers, 'Origin': 'https://attacker.example'}
+            self.assertEqual((await self.client.post('/api/local-playback?id=1', json={}, headers=remote)).status_code, 403)
+            launch.assert_not_called()
+            with patch.object(local_playback, 'available', return_value=False):
+                self.assertEqual((await self.client.get('/api/local-players', headers=headers)).json(), {'players': []})
+                self.assertEqual((await self.client.post('/api/local-playback?id=1', json={}, headers=headers)).status_code, 403)
+            with patch.object(local_playback, 'open_media', side_effect=OSError('private path')):
+                failed = await self.client.post('/api/local-playback?id=1', json={}, headers=headers)
+                self.assertEqual(failed.status_code, 503)
+                self.assertNotIn('private path', failed.text)
+
     async def test_external_player_links_authorize_only_one_asset_and_support_ranges(self):
         denied = await self.client.post('/api/external-playback?id=1', json={})
         self.assertEqual(denied.status_code, 401)

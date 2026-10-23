@@ -4,6 +4,7 @@ import { setActionBusy, spinnerHtml } from '@peach/legacy/ui';
 import { CAPTION_OPTIONS, mountCaptionStyle, type CaptionKey } from './subtitle-style';
 import type { VjsPlayer } from './types';
 import { SubtitleSession } from './subtitle-memory';
+import { playerMemory } from './memory';
 
 interface Panels {
   render(html: string, direction: number): HTMLElement;
@@ -34,7 +35,7 @@ export class SubtitleControls {
   private searched = false;
 
   constructor(private player: VjsPlayer, private video: HTMLVideoElement, private panels: Panels) {
-    this.styles = mountCaptionStyle(player.el(), video, this.cleanup.signal);
+    this.styles = mountCaptionStyle(player.el(), video, this.cleanup.signal, playerMemory(player));
     this.cc = player.el().querySelector<HTMLButtonElement>('.vjs-subtitles-control > button')!;
     this.cc.innerHTML = subtitleIcon();
     this.cc.onclick = () => {

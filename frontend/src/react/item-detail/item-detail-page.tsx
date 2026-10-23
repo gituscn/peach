@@ -33,7 +33,7 @@ import { MediaCarousel } from '../components/media-carousel';
 import { CatalogPicture } from './catalog-picture';
 import { fetchJavDetail, javDetailKey } from '../jav-detail/jav-detail';
 import { busyProps } from '../settings/use-action';
-import { ExternalPlayback } from './external-playback';
+import { ExternalPlayback, LocalPlayback } from './external-playback';
 import { CoverCrop } from '../cover-crop/cover-crop-page';
 import { queryClient } from '../query';
 import { LibraryCompletionPrompt, missingPreviewIds } from '../library-processing/library-completion';
@@ -191,7 +191,8 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
           <div role="status" data-item-gate="disc">
             <b>ISO 原盘</b>
             <span>请使用支持原盘的外部播放器打开。</span>
-            <ExternalPlayback id={item.id} />
+            <LocalPlayback key={item.id} id={item.id} onOpened={() => actions.toast('已请求打开本地播放器')} />
+            <ExternalPlayback key={`external-${item.id}`} id={item.id} />
           </div>
         ) : gate === 'online' ? (
           <div id="onlineGate" role="status" data-item-gate="online">
@@ -390,12 +391,15 @@ function Side({ item, queue, write, helpers, actions }: {
             </button>
           ) : null}
         </div>
+        {(item.medium || 'video') === 'video' && !online && !String(item.name || '').toLowerCase().endsWith('.iso')
+          ? <LocalPlayback key={item.id} id={item.id} onOpened={() => actions.toast('已请求打开本地播放器')} /> : null}
         <Identity item={item} helpers={helpers} actions={actions} />
         <Tags item={item} write={write} helpers={helpers} actions={actions} />
         <LibraryCompletionPrompt assetIds={missingPreviewIds([item], helpers.javImage())}
           onComplete={() => { void queryClient.invalidateQueries({ queryKey: itemKey(item.id) }) }} />
         <Trace item={item} />
-        {item.medium === 'video' && item.location !== 'online' ? <ExternalPlayback key={item.id} id={item.id} /> : null}
+        {(item.medium || 'video') === 'video' && item.location !== 'online' && !String(item.name || '').toLowerCase().endsWith('.iso')
+          ? <ExternalPlayback key={item.id} id={item.id} /> : null}
         <div data-stage-actions="" data-item-feedback="">
           <button type="button" id="likeBtn" data-fb="like" aria-label={item.liked ? '取消喜欢' : '喜欢'} title="喜欢 · 记录口味偏好"
             aria-pressed={!!item.liked} {...busy('like')} onClick={() => write.preference({ liked: !item.liked })}><Glyph name="thumbs-up" /></button>

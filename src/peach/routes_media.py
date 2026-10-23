@@ -209,6 +209,44 @@ def external_playback(request: Request, id: int, args: dict[str, str] = Depends(
                         headers={"Cache-Control": "no-store"})
 
 
+@router.get('/api/local-players')
+def local_players(request: Request, args=Depends(require_auth)):
+    from . import local_playback
+    players = []
+    if local_playback.available() and _local_playback_client(request):
+        players = [{'id': 'default', 'label': '系统默认播放器'}, *[
+            {'id': key, 'label': value[0]} for key, value in local_playback.installed().items()]]
+    return JSONResponse({'players': players}, headers={'Cache-Control': 'no-store'})
+
+
+def _local_playback_client(request: Request) -> bool:
+    from .routes_configuration import local_client
+    return local_client(request) and not any(
+        key.startswith('x-forwarded-') or key in {'forwarded', 'cf-connecting-ip'} for key in request.headers)
+
+
+@router.post('/api/local-playback')
+def local_playback(request: Request, id: int, player: str = 'default', args=Depends(require_auth)):
+    from . import local_playback as launcher
+    from .routes_auth import same_origin
+    from fastapi import HTTPException
+    import subprocess
+    same_origin(request)
+    if not launcher.available() or not _local_playback_client(request):
+        raise HTTPException(403, '请使用网络播放地址或 M3U 播放列表在此设备打开')
+    asset = request.app.state.media_engine.asset(id)
+    path = request.app.state.media_engine.filesystem.file_for(asset, thumbnail=False)
+    try:
+        launcher.open_media(path, player)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+    except (OSError, subprocess.SubprocessError) as exc:
+        LOGGER.warning('本地播放器启动失败：player=%s type=%s errno=%s winerror=%s',
+                       player, type(exc).__name__, getattr(exc, 'errno', None), getattr(exc, 'winerror', None))
+        raise HTTPException(503, '无法打开播放器，请检查系统文件关联或选择其他播放器') from None
+    return {'opened': True}
+
+
 def _external_asset(request: Request, asset_id: int, ticket: str, origin: str):
     from .external_playback import valid
     from fastapi import HTTPException

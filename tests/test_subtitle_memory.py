@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
@@ -57,6 +58,36 @@ class SubtitleMemoryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             store.update("file:invalid", {"key": "file:invalid", "name": "a.srt", "text": "invalid"})
 
+    def test_playback_preferences_share_subtitle_file_and_survive_partial_writes(self):
+        store = SubtitleMemory(self.root, "item:1")
+        store.update("file:local", {"key": "file:local", "name": "字幕.srt", "text": VTT})
+        with ThreadPoolExecutor() as executor:
+            list(executor.map(store.patch, [{"rotation": 90}, {"rate": 1.75},
+                                           {"caption_style": {"size": "150"}},
+                                           {"caption_style": {"color": "yellow"}}]))
+        saved = SubtitleMemory(self.root, "item:1").read()
+        self.assertEqual((saved["rotation"], saved["rate"]), (90, 1.75))
+        self.assertEqual(saved["caption_style"], {"size": "150", "color": "yellow"})
+        self.assertEqual(saved["selected"], "file:local")
+        self.assertEqual(store.track_path(saved["tracks"][0]["file"]).read_text(encoding="utf-8"), VTT)
+        store.update(None)
+        self.assertEqual(store.read()["rotation"], 90)
+        self.assertNotIn("rotation", SubtitleMemory(self.root, "item:2").read())
+        store.patch({"rotation": 0, "rate": 1})
+        self.assertEqual((store.read()["rotation"], store.read()["rate"]), (0, 1))
+
+    def test_invalid_preferences_cannot_change_saved_memory(self):
+        store = SubtitleMemory(self.root, "item:1")
+        store.patch({"rotation": 180, "rate": 1.5})
+        saved = store.manifest.read_bytes()
+        for patch in ({}, {"rotation": True}, {"rotation": 45}, {"rate": True}, {"rate": 0},
+                      {"rate": float("nan")}, {"rate": float("inf")}, {"rate": 3.1},
+                      {"caption_style": {"color": "url(private)"}}, {"caption_style": {"size": []}},
+                      {"caption_style": {"unknown": "white"}}, {"tracks": []}):
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                store.patch(patch)
+            self.assertEqual(store.manifest.read_bytes(), saved)
+
 
 class SubtitleMemoryApiTests(unittest.TestCase):
     def setUp(self):
@@ -100,3 +131,18 @@ class SubtitleMemoryApiTests(unittest.TestCase):
             url = "/api/subtitles/memory?video=item:1"
             self.assertEqual(client.put(url, json={"selected": "file:missing"}).status_code, 400)
             self.assertEqual(client.put(url, json=[]).status_code, 400)
+
+    def test_player_memory_and_subtitle_routes_share_preferences_and_authorization(self):
+        with self.client as client:
+            url = "/api/player/memory?video=item:1"
+            self.assertEqual(client.put(url, json={"rotation": 270, "rate": 2}).status_code, 200)
+            subtitle_url = "/api/subtitles/memory?video=item:1"
+            self.assertEqual(client.put(subtitle_url, json={"selected": "native:subtitles:zh:1"}).status_code, 200)
+            self.assertEqual(client.get(url).json(), {"rotation": 270, "rate": 2,
+                             "selected": "native:subtitles:zh:1", "tracks": []})
+            self.assertEqual(client.put(url, json={"rotation": 360}).status_code, 400)
+            self.assertNotIn("rotation", client.get("/api/player/memory?video=item:2").json())
+            self.assertEqual(client.put("/api/player/memory?video=item:999", json={"rate": 1}).status_code, 404)
+            self.app.state.settings = replace(self.app.state.settings, token="private")
+            self.assertEqual(client.get(url).status_code, 401)
+            self.assertEqual(client.put(url, json={"rate": 1}).status_code, 401)
