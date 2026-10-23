@@ -220,7 +220,7 @@ def local_players(request: Request, args=Depends(require_auth)):
 
 
 def _local_playback_client(request: Request) -> bool:
-    from .routes_configuration import local_client
+    from .web_local_access import local_client
     return local_client(request) and not any(
         key.startswith('x-forwarded-') or key in {'forwarded', 'cf-connecting-ip'} for key in request.headers)
 

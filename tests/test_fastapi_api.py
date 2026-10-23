@@ -2869,7 +2869,7 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.get('/api/local-players')).status_code, 401)
         with patch.object(local_playback, 'available', return_value=True), \
                 patch.object(local_playback, 'installed', return_value={'vlc': ('VLC', '/private/vlc')}), \
-                patch('peach.routes_configuration.local_client', return_value=True), \
+                patch('peach.web_local_access.local_client', return_value=True), \
                 patch.object(local_playback, 'open_media') as launch:
             options = await self.client.get('/api/local-players', headers=headers)
             self.assertEqual(options.json(), {'players': [

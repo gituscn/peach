@@ -283,7 +283,7 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 清晰度控件复用 Video.js 10.1.0 官方 `@videojs/hlsjs-video` 的 hls.js 引擎。多档播放从实际轨道读取分辨率，自动码率和固定轨道通过引擎选择；单档 HLS 缺少尺寸时读取原生视频元素的实际尺寸，并响应 `loadedmetadata`、`resize`。尺寸未取得时显示「当前画质」，轨道 ID 不作界面名称。来源各自独立的 MP4 档位由 Peach 保留播放位置后切换片源。
 
-画面旋转复用浏览器 CSS `transform` 与 `ResizeObserver`；Peach 仅计算保持比例的显示尺寸、设置菜单及会话释放。采用现有 Video.js 10.1.0，不增加依赖；依赖旧版组件接口的旋转插件不进入运行时。本地播放器复用 Python 标准库 `os.startfile`、`subprocess` 和 macOS `/usr/bin/open`，保留固定播放器名单、媒体根授权、本机直连与 Docker 边界。媒体路径复用 `media.normalized_path`，Windows 保留可直接读取的挂载盘盘符，不向虚拟文件系统请求最终路径。系统能力随 Python／操作系统发布，无额外许可证或包体积；真实桌面应用唤起与浏览器协议支持分别验收，不能由进程请求成功推断解码成功。用法与上游依据见[外部播放器](EXTERNAL_PLAYERS.md)。
+画面旋转复用浏览器 CSS `transform` 与 `ResizeObserver`；Peach 仅计算保持比例的显示尺寸、设置菜单及会话释放。采用现有 Video.js 10.1.0，不增加依赖；依赖旧版组件接口的旋转插件不进入运行时。本地播放器复用 Python 标准库 `os.startfile`、`subprocess` 和 macOS `/usr/bin/open`，保留固定播放器名单、媒体根授权、本机直连与 Docker 边界。本机请求判断由 `web_local_access` 供配置与媒体路由共用。媒体路径复用 `media.normalized_path`，Windows 保留可直接读取的挂载盘盘符，不向虚拟文件系统请求最终路径。系统能力随 Python／操作系统发布，无额外许可证或包体积；真实桌面应用唤起与浏览器协议支持分别验收，不能由进程请求成功推断解码成功。用法与上游依据见[外部播放器](EXTERNAL_PLAYERS.md)。
 
 播放器按 [Video.js 10 官方迁移指南](https://videojs.org/docs/framework/html/guides/migrate-from-video-js-8) 和 [10.1.0 源码](https://github.com/videojs/video.js/tree/919ad955a9baf2433c68aba8151654dde0e58b5d/packages)接入 `video-player`、`media-container`、官方按钮／滑条与 HLS／DASH 媒体组件。`@videojs/cdn` 10.1.0（Apache-2.0）提供固定 ESM 模块，构建脚本按静态与字面量动态导入闭包分发并登记哈希；浏览器支持沿用项目目标。Peach 保留片源授权、时长口径、统计、字幕菜单和舞台生命周期，原生视频经 `media` 插槽携带字幕与观看上报。`video.js` 10.1.0 包的旧入口只有带错误码的 shim，不作为运行依赖；v8 的组件和 VHS 不进入产物。真实短片回归覆盖 MP4、HLS 和 DASH 解码，质量档位选择按 HLS 引擎验证，DASH 不声明手动档位能力。生产切换与 ledger 不属于依赖接管工作树。
 
