@@ -2859,7 +2859,9 @@ class LibraryWatchdogTests(unittest.TestCase):
             (media / name).write_bytes(b'video')
         db = fresh_ledger(self.root)
         provider = self._provider()
-        with patch('peach.library_processing.write_rows', wraps=review_csv.write_rows) as written:
+        with patch('peach.library_processing.time', wraps=time) as clock, \
+                patch('peach.library_processing.write_rows', wraps=review_csv.write_rows) as written:
+            clock.monotonic.return_value = 100.0
             state = process_library(self._config(media), db, self.root / 'generated', self.root / 'covers',
                                     provider_factory=lambda: provider)
         self.assertEqual(state['status'], 'complete')
