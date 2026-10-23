@@ -768,7 +768,7 @@ it('地址栏指着订阅源时首屏就带着清单，开关、移除与立即�
   expect(first.querySelector('a')?.getAttribute('href')).toBe('https://feeds.test/a');
   // 名字前的圆框由 `card-art` 的回落链拼：身份引用带着有没有图，图有了才叠上去。
   expect(first.querySelector('[role="rowheader"] img')?.getAttribute('src'))
-    .toBe('/entity-image?kind=performer&id=41');
+    .toBe('/entity-image?kind=performer&id=41&thumb=1');
   const second = checkboxNamed(host, '选择 乙 的新作')!.closest('[role="row"]')!;
   expect(second.querySelector('[role="rowheader"] img')).toBeNull();
   expect(second.querySelector('[role="rowheader"] [aria-hidden]')?.textContent).toBe('乙');

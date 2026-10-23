@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "728ce482-6293-4c81-988a-83f40d0d4b2f", e._sentryDebugIdIdentifier = "sentry-dbid-728ce482-6293-4c81-988a-83f40d0d4b2f");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "e6b5625f-a3a3-4796-9d15-1c06f0619e01", e._sentryDebugIdIdentifier = "sentry-dbid-e6b5625f-a3a3-4796-9d15-1c06f0619e01");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, i, o, s) => {
@@ -11032,10 +11032,13 @@ function Dt({ title: e, lede: t, busy: n = !1, children: r }) {
 				className: "flex flex-col gap-1",
 				children: [
 					/* @__PURE__ */ (0, B.jsx)("img", {
-						src: "/peach-logo.png",
+						src: "/peach-logo-128.png",
+						srcSet: "/peach-logo-64.png 64w, /peach-logo-128.png 128w",
+						sizes: "40px",
 						alt: "",
 						width: 40,
 						height: 40,
+						decoding: "async",
 						className: "mb-4 size-10"
 					}),
 					/* @__PURE__ */ (0, B.jsx)("h1", {
@@ -21561,4 +21564,4 @@ var Gg = document.getElementById("peach-page"), Kg = Gg ? Wg[Gg.dataset.page ?? 
 Gg && Kg && (0, w.createRoot)(Gg).render(/* @__PURE__ */ (0, B.jsx)(Kg, { data: { ...Gg.dataset } }));
 //#endregion
 
-//# debugId=728ce482-6293-4c81-988a-83f40d0d4b2f
+//# debugId=e6b5625f-a3a3-4796-9d15-1c06f0619e01

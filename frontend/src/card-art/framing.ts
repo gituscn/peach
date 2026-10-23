@@ -149,18 +149,23 @@ function wideSleeve(img: HTMLImageElement): boolean {
     && ratio >= WIDE_SLEEVE_RATIO_MIN && ratio < WIDE_SLEEVE_RATIO_MAX;
 }
 
-/* 卡片先取封面的派生档（`/cover?thumb=1`）：高清原件一张解码 38 MB，一页几十张挤爆
-   解码缓存，来回滚动时滚走的被清掉、滚回来现解，那一段是空白。取景落定之后量这张图在
-   屏幕上铺开多大：一个源像素要占不止一个设备像素，就是派生档不够清楚，换回原件。
-   单列、大图这些真用得上像素的地方照旧是原件，多列时屏幕本来就放不下那么多像素。 */
+/* 卡片先取封面的派生档（`/cover?thumb=2` 或 `thumb=1`，见 `cardCoverUrl`）：高清原件一张
+   解码 38 MB，一页几十张挤爆解码缓存，来回滚动时滚走的被清掉、滚回来现解，那一段是空白。
+   取景落定之后量这张图在屏幕上铺开多大：一个源像素要占不止一个设备像素，就是这一档不够
+   清楚，往上换一档——800 那档换 1600 那档，1600 那档换原件。换上的那张加载完会再量一次。
+   单列、大图这些真用得上像素的地方最后落到原件，多列时屏幕本来就放不下那么多像素。
+   `thumbSrc` 只记第一张派生档：模糊补底复用已经到手的那张小图。 */
 export function upgradeCover(img: HTMLImageElement): void {
-  if (!/[?&]thumb=1(&|$)/.test(img.src) || !img.naturalWidth) return;
+  const tier = /[?&]thumb=([12])(?=&|$)/.exec(img.src)?.[1];
+  if (!tier || !img.naturalWidth) return;
   const { width, height } = img.getBoundingClientRect();
   const pick = getComputedStyle(img).objectFit === 'contain' ? Math.min : Math.max;
   const scale = pick(width / img.naturalWidth, height / img.naturalHeight) * devicePixels();
   if (!(scale > 1.01)) return;
-  img.dataset.thumbSrc = img.src;
-  img.src = img.src.replace(/[?&]thumb=1(?=&|$)/, '');
+  img.dataset.thumbSrc ||= img.src;
+  img.src = tier === '2'
+    ? img.src.replace(/([?&])thumb=2(?=&|$)/, '$1thumb=1')
+    : img.src.replace(/[?&]thumb=1(?=&|$)/, '');
 }
 
 /* 容器比例只有 `.pic` 的 `--card-ratio` 知道：竖屏开关、JAV 大图和普通卡片各写一个

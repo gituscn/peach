@@ -710,6 +710,18 @@ def peach_logo(request: Request):
     return asset_response(request, PROJECT_ROOT / "resources" / "peach-logo.png", "image/png")
 
 
+@router.api_route("/peach-logo-64.png", methods=["GET", "HEAD"])
+@router.api_route("/peach-logo-128.png", methods=["GET", "HEAD"])
+def peach_logo_small(request: Request):
+    """侧栏与登录卡那枚站标：页面按 `srcset` 挑 64 或 128 px，不为 24 px 的图标下 1024 px 的原图。
+
+    和原图一样不设防：登录页在拿到会话之前就要画它。文件由
+    `scripts/generate_brand_assets.py` 从同一张原图缩出。
+    """
+    name = request.url.path.rsplit("/", 1)[-1]
+    return asset_response(request, PROJECT_ROOT / "resources" / name, "image/png")
+
+
 @router.api_route("/performers/", methods=["GET", "HEAD"])
 @router.api_route("/creators/", methods=["GET", "HEAD"])
 @router.api_route("/studios/", methods=["GET", "HEAD"])

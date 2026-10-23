@@ -171,7 +171,7 @@ function StudioMark({ studio }: { studio: TierStudio }) {
   return (
     <span data-tier-mark="">
       {studio.logo && !broken ? (
-        <img src={studio.logo} alt="" onError={() => setBroken(true)}
+        <img src={studio.logo} alt="" width={28} height={28} loading="lazy" decoding="async" onError={() => setBroken(true)}
           onLoad={(event) => { if (event.currentTarget.naturalWidth < 32) setBroken(true) }} />
       ) : studio.fallback}
     </span>

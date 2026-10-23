@@ -317,7 +317,7 @@ function FactTags({ tags }: { tags: string[] }) {
 function LinkIcon({ mark }: { mark: LinkMark }) {
   if ('brand' in mark) return <span data-link-icon="brand"><Glyph name={mark.brand} /></span>;
   const html = icon('globe') + ('site' in mark
-    ? `<img src="${esc(mark.site)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-drop="self">` : '');
+    ? `<img src="${esc(mark.site)}" alt="" width="20" height="20" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-drop="self">` : '');
   return <span data-link-icon="" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 

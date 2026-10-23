@@ -435,6 +435,15 @@ def entity_thumb_root(avatar_root: Path) -> Path:
 COVER_THUMB_EDGE = 1600
 COVER_THUMB_QUALITY = 90
 
+#: 卡片网格的起始档（`/cover?thumb=2`）。首页、资料页与 JAV 页的卡片实测在 1440 宽桌面上
+#: 铺开 168–360 CSS px（大图版式的整张封套按两倍卡宽摆，正封那半露在卡里），一倍屏要不到
+#: 400 设备像素，800 盖得住。这一档实测均 100 KB、上一档均 319 KB（同一组 24 张抽样）。
+#: 页面量过显示尺寸不够清楚就往上换：这一档 → 1600 那一档 → 原件（`framing.ts` 的
+#: `upgradeCover`），所以这里只管常见的小格，不为大位留余量。和上一档同一个目录、
+#: 按长边分文件名（`DerivedImageService.path_for`），按需生成，不批量预生成。
+COVER_SMALL_THUMB_EDGE = 800
+COVER_SMALL_THUMB_QUALITY = 85
+
 
 def cover_thumb_root(cover_root: Path) -> Path:
     """封面派生件的目录：封面目录旁边那一个，理由同 `entity_thumb_root`。

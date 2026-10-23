@@ -85,7 +85,7 @@ it('入库资料随轮询补上本机封面和女优头像，不发起来源取�
   await act(async () => { await queryClient.invalidateQueries({ queryKey: ['downloads'] }); });
   await vi.waitFor(async () => {
     await settle();
-    expect(host.querySelector('[data-download-cover] img')?.getAttribute('src')).toBe('/cover?code=ABC-123&thumb=1&v=v2');
+    expect(host.querySelector('[data-download-cover] img')?.getAttribute('src')).toBe('/cover?code=ABC-123&thumb=2&v=v2');
   });
   expect(host.querySelector('[data-media-avatar] img')?.getAttribute('src')).toContain('/entity-image?');
   expect(host.querySelector('[data-media-avatar]')?.getAttribute('aria-label')).toBe('打开女优页：测试女优');
