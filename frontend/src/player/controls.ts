@@ -9,6 +9,7 @@ import { detailPlayer, resizeSoon } from './registry';
 import { PLAYER_PANEL_EVENT } from './stats';
 import type { PlayerItem, SourceQuality, VjsPlayer } from './types';
 import { SubtitleControls, subtitleIcon } from './subtitles';
+import { timelineFrame, type TimelineSheets } from './timeline';
 
 type TooltipSync = (label?: string, aria?: string) => void;
 
@@ -529,8 +530,6 @@ function mountPlayerChromeLayout(player: VjsPlayer): void {
   setExpanded(false); syncWidthMode();
 }
 
-interface TimelineSheets { frames: number; interval: number; columns?: number; rows?: number }
-
 /** 进度条上的拖动预览：时间与那一秒的画面。
  *
  *  采集任务铺好了时间轴接触印相就按它走：每 10 或 30 秒一帧，指到哪一秒看到的就是那一秒。
@@ -546,19 +545,21 @@ export function mountPlayerSeekPreview(player: VjsPlayer, item: PlayerItem | nul
   progress.append(preview);
   const frame = preview.querySelector<HTMLElement>('.vjs-peach-seek-frame');
   const image = preview.querySelector('img'), label = preview.querySelector('span')!;
-  let sheets: TimelineSheets | null = null, shown = '';
+  let sheets: TimelineSheets | null = null, shown = '', indexedImage = false;
   if (frame && item?.id) {
     (api(`/api/timeline?id=${encodeURIComponent(item.id)}`) as Promise<TimelineSheets | null>)
-      .then((meta) => { if (meta && meta.frames > 0 && meta.interval > 0) sheets = meta }).catch(() => {});
+      .then((meta) => { if (meta && meta.frames > 0 && (meta.interval > 0 || meta.cues?.length)) sheets = meta }).catch(() => {});
   }
   const showSheetFrame = (seconds: number, sheet: TimelineSheets, box: HTMLElement, img: HTMLImageElement) => {
     if (!item) return;
     const columns = sheet.columns || 10, per = columns * (sheet.rows || 10);
-    const index = Math.min(sheet.frames - 1, Math.max(0, Math.floor(seconds / sheet.interval)));
+    const index = timelineFrame(seconds, sheet);
+    if (index === null) return false;
     const page = Math.floor(index / per), slot = index % per;
     // 末张通常不满 10 行，行数按它自己那几帧反算：按满行去铺，格子会落到图外面的空白上。
     const rows = Math.ceil(Math.min(per, sheet.frames - page * per) / columns);
-    const source = `/timeline?id=${encodeURIComponent(item.id)}&s=${page}`;
+    indexedImage = !!sheet.cues;
+    const source = `/timeline?id=${encodeURIComponent(item.id)}&s=${page}&source=${encodeURIComponent(sheet.source || 'peach')}`;
     if (source !== shown) { shown = source; img.src = source }
     box.hidden = false;
     // 取景框按片源比例，图按格子铺满：两边比例一致，`fill` 才既不裁也不拉。
@@ -566,6 +567,7 @@ export function mountPlayerSeekPreview(player: VjsPlayer, item: PlayerItem | nul
     img.style.objectFit = 'fill';
     img.style.width = `${columns * 100}%`; img.style.height = `${rows * 100}%`;
     img.style.left = `${-(slot % columns) * 100}%`; img.style.top = `${-Math.floor(slot / columns) * 100}%`;
+    return true;
   };
   let cell = -1;
   const move = (event: PointerEvent) => {
@@ -578,14 +580,24 @@ export function mountPlayerSeekPreview(player: VjsPlayer, item: PlayerItem | nul
     const x = Math.min(rect.width - width / 2, Math.max(width / 2, event.clientX - rect.left));
     preview.style.left = `${x}px`; preview.hidden = false; label.textContent = fmtClock(duration * ratio);
     if (!frame || !image || !item) return;
-    if (sheets) { showSheetFrame(duration * ratio, sheets, frame, image); return }
+    if (sheets && showSheetFrame(duration * ratio, sheets, frame, image)) return;
+    if (sheets?.fallback && showSheetFrame(duration * ratio, sheets.fallback, frame, image)) return;
     const nextCell = Math.min(8, Math.floor(ratio * 9));
-    if (nextCell === cell) return;
+    if (nextCell === cell && shown === `poster:${nextCell}`) return;
     cell = nextCell; frame.hidden = false; image.removeAttribute('style');
+    indexedImage = false;
+    shown = `poster:${nextCell}`;
     image.src = `/poster?id=${encodeURIComponent(item.id)}&c=${nextCell}`;
   };
   const hide = () => { preview.hidden = true };
-  if (image && frame) image.onerror = () => { frame.hidden = true };
+  if (image && frame) {
+    image.onerror = () => { frame.hidden = true; sheets = indexedImage ? sheets?.fallback || null : null; shown = ''; cell = -1 };
+    image.onload = () => {
+      if (indexedImage && image.naturalWidth && image.naturalHeight) {
+        frame.style.aspectRatio = `${image.naturalWidth} / ${image.naturalHeight}`;
+      }
+    };
+  }
   progress.addEventListener('pointermove', move); progress.addEventListener('pointerleave', hide);
   player.on('dispose', () => { progress.removeEventListener('pointermove', move); progress.removeEventListener('pointerleave', hide) });
 }

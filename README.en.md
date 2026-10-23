@@ -37,6 +37,7 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 - **Pick from the video wall**: drag through a full-screen cover wall and play in place, with versions and parts of the same title grouped together.
 - **Player subtitles**: load local subtitles, search SubtitleCat for simplified and traditional Chinese subtitles by video code, then adjust fonts, size, colors and backgrounds. Each video keeps its loaded subtitles and last selection, including turning subtitles off, and restores them when played again. No API key is required; results may include machine translations.
 - **Bring your existing collection**: read NFO files and posters, then fill missing titles, performers, studios and covers from multiple sources while keeping your edits.
+- **Preview while seeking**: reuse Jellyfin Trickplay, Emby/Plex BIF exports, WebVTT, HLS and DASH image previews beside your videos to avoid extracting the same frames again. See [formats and naming](docs/VIDEO_PREVIEWS.md).
 - **Reduce repeated scraping**: public textual metadata ships with each version. After scanning, Peach supplements recognized performers and studios with aliases, source IDs and profiles while keeping your edits. See [seed data and updates](docs/SEED.md).
 - **Follow across sites**: combine a creator's updates from FANBOX, Patreon, Kemono and other sites, with matching posts grouped into one card.
 - **Manage tags**: rename, merge and hide tags in batches, preserve aliases and restore hidden tags. See [tag management](docs/TAG_MANAGEMENT.md).

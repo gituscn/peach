@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -33,7 +34,7 @@ from starlette.staticfiles import StaticFiles
 from . import (
     avatar_face, avatar_online, avatar_picker, avatar_provider, follow_assets, follow_providers, images,
     jav_poster_crop, link_marks, link_status, scraping_access, site_icons, social_links, subtitles,
-    taste_history, timeline_sheets, web_follow,
+    taste_history, timeline_sheets, web_follow, web_timeline_thumbnails,
 )
 from .config import GENERATED_DIR, PROJECT_ROOT
 from .entities import resolve_entity_id
@@ -597,13 +598,30 @@ def poster(request: Request, id: int, c: int = 4, args: dict[str, str] = Depends
 
 
 @router.api_route("/timeline", methods=["GET", "HEAD"])
-def timeline(request: Request, id: int, s: int = 0, args: dict[str, str] = Depends(require_auth)):
+def timeline(request: Request, id: int, s: int = 0, source: str = '', args: dict[str, str] = Depends(require_auth)):
     """时间轴预览的一张接触印相。只发已经铺好的，这里不现抽。
 
     `/poster` 那条取不到会当场抽一帧，因为九宫格只要九张。这里一张图是一百帧，现抽要
     几分钟，悬停的人早走了；没铺到就回 404，页面退回九宫格。
     """
     contract = request.app.state.web_contract
+    if id <= 0 or s < 0:
+        return JSONResponse({"error": "unavailable"}, status_code=404)
+    if source not in ('', 'peach', 'bif', 'webvtt', 'hls', 'dash', 'jellyfin'):
+        return JSONResponse({"error": "unavailable"}, status_code=404)
+    external = None if source == 'peach' else web_timeline_thumbnails.external_timeline(contract, id)
+    if source and source != 'peach' and (external is None or external.source != source):
+        return JSONResponse({"error": "unavailable"}, status_code=404)
+    if external is not None:
+        data = web_timeline_thumbnails.external_frame(contract, external, s)
+        if data is None:
+            return JSONResponse({"error": "unavailable"}, status_code=404)
+        etag = '"' + hashlib.sha256(data).hexdigest() + '"'
+        headers = {'Cache-Control': 'private, no-cache', 'ETag': etag}
+        response = Response(data, media_type='image/jpeg', headers=headers)
+        if StaticFiles().is_not_modified(response.headers, request.headers):
+            return Response(status_code=304, headers=headers)
+        return response
     path = timeline_sheets.sheet_path(contract.timeline_root, id, s)
     if id <= 0 or s < 0 or not path.is_file():
         return JSONResponse({"error": "unavailable"}, status_code=404)
