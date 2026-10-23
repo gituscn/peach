@@ -1801,6 +1801,110 @@ class WebDataTests(unittest.TestCase):
         self.assertTrue(kept.exists(), "不在回收站的媒体一个都不能碰")
         self.assertIsNotNone(self.row(2))
 
+    def test_rclone_mount_detection_uses_the_most_specific_mountpoint(self):
+        mountinfo = Path(self.tmp.name) / "mountinfo"
+        mountinfo.write_text(
+            "36 25 0:41 / /media rw - ext4 /dev/root rw\n"
+            "37 36 0:62 / /media/115 rw - fuse.rclone remote:library rw\n"
+            "38 37 0:63 / /media/115/local rw - ext4 /dev/data rw\n",
+            encoding="utf-8",
+        )
+
+        with mock.patch.object(web_batch, "MOUNTINFO_PATH", mountinfo):
+            self.assertTrue(web_batch._is_rclone_mount(Path("/media/115/movie.mp4")))
+            self.assertFalse(web_batch._is_rclone_mount(Path("/media/115-old/movie.mp4")))
+            self.assertFalse(web_batch._is_rclone_mount(Path("/media/115/local/movie.mp4")))
+
+    def test_rclone_mount_detection_handles_escapes_and_normalizes_parent_segments(self):
+        mountinfo = Path(self.tmp.name).resolve() / "mountinfo"
+        mountinfo.write_text(
+            "36 25 0:41 / /media rw - ext4 /dev/root rw\n"
+            "37 36 0:62 / /media/cloud\\040drive rw - fuse.rclone remote:library rw\n",
+            encoding="utf-8")
+        with mock.patch.object(web_batch, "MOUNTINFO_PATH", mountinfo):
+            self.assertTrue(web_batch._is_rclone_mount(Path("/media/cloud drive/movie.mp4")))
+            self.assertFalse(web_batch._is_rclone_mount(Path("/media/cloud drive/../local/movie.mp4")))
+
+    def test_rclone_mount_detection_uses_mount_parents_for_stacked_mounts(self):
+        mountinfo = Path(self.tmp.name).resolve() / "mountinfo"
+        rows = ["36 25 0:41 / /media rw - ext4 /dev/root rw\n",
+                "38 37 0:63 / /media/115 rw - ext4 /dev/data rw\n",
+                "37 36 0:62 / /media/115 rw - fuse.rclone remote:library rw\n"]
+        for lines in (rows, list(reversed(rows))):
+            mountinfo.write_text("".join(lines), encoding="utf-8")
+            with mock.patch.object(web_batch, "MOUNTINFO_PATH", mountinfo):
+                self.assertFalse(web_batch._is_rclone_mount(Path("/media/115/movie.mp4")))
+
+    def test_unknown_mount_information_keeps_the_local_isolation_policy(self):
+        mountinfo = Path(self.tmp.name).resolve() / "mountinfo"
+        with mock.patch.object(web_batch, "MOUNTINFO_PATH", mountinfo):
+            self.assertFalse(web_batch._is_rclone_mount(Path("/media/115/movie.mp4")))
+            mountinfo.write_text("invalid mount entry\n", encoding="utf-8")
+            self.assertFalse(web_batch._is_rclone_mount(Path("/media/115/movie.mp4")))
+
+    def test_empty_trash_unlinks_115_rclone_media_without_remote_rename(self):
+        media = self.stage_media(2, "rclone-115.mp4")
+        media.write_bytes(b"x" * (1024 * 1024 + 1))
+        rm_web.w_feedback(self.contract, {"id": 2, "kind": "dispose"})
+
+        with mock.patch.object(web_batch, "_is_rclone_mount", return_value=True), \
+                mock.patch.object(web_batch.os, "rename") as rename:
+            result = rm_web.w_empty_trash(self.contract)
+
+        self.assertEqual((result["purged"], result["blocked"]), (1, []))
+        self.assertFalse(media.exists())
+        self.assertIsNone(self.row(2))
+        rename.assert_not_called()
+
+    def test_rclone_unlink_database_failure_leaves_a_retryable_trash_row(self):
+        local = self.stage_media(1, "local-commit-failure.mp4")
+        media = self.stage_media(2, "rclone-commit-failure.mp4")
+        rm_web.w_feedback(self.contract, {"id": 1, "kind": "dispose"})
+        rm_web.w_feedback(self.contract, {"id": 2, "kind": "dispose"})
+
+        @contextmanager
+        def fail_after_body():
+            connection = self.contract.database.connect(write=True)
+            try:
+                yield connection
+                connection.rollback()
+                raise sqlite3.OperationalError("simulated commit failure")
+            finally:
+                connection.close()
+
+        with mock.patch.object(web_batch, "_is_rclone_mount", side_effect=lambda path: path == media), \
+                mock.patch.object(self.contract, "write_transaction", fail_after_body):
+            with self.assertRaisesRegex(sqlite3.OperationalError, "commit failure"):
+                rm_web.w_empty_trash(self.contract)
+
+        self.assertFalse(media.exists(), "远端删除已完成，数据库失败时不能假称文件已恢复")
+        self.assertTrue(local.is_file())
+        self.assertEqual(self.row(1)["disposal"], "trash")
+        self.assertEqual(self.row(2)["disposal"], "trash")
+
+        retry = rm_web.w_empty_trash(self.contract)
+        self.assertEqual((retry["purged"], retry["blocked"]), (2, []))
+        self.assertFalse(local.exists())
+        self.assertIsNone(self.row(2), "重试应只清理已不存在媒体对应的回收站记录")
+
+    def test_rclone_delete_failure_keeps_media_and_a_retryable_trash_row(self):
+        media = self.stage_media(2, "rclone-delete-failure.mp4")
+        rm_web.w_feedback(self.contract, {"id": 2, "kind": "dispose"})
+        original_unlink = Path.unlink
+
+        def unlink(path, *args, **kwargs):
+            if path == media:
+                raise PermissionError("remote delete denied")
+            return original_unlink(path, *args, **kwargs)
+
+        with mock.patch.object(web_batch, "_is_rclone_mount", return_value=True), \
+                mock.patch.object(Path, "unlink", unlink):
+            result = rm_web.w_empty_trash(self.contract)
+        self.assertEqual(result["purged"], 0)
+        self.assertEqual([item["id"] for item in result["blocked"]], [2])
+        self.assertTrue(media.is_file())
+        self.assertEqual(self.row(2)["disposal"], "trash")
+
     def test_undeletable_media_keeps_its_row_in_the_bin_instead_of_orphaning_the_file(self):
         """文件删不掉时保留账本行：留一条能重试的回收站条目，好过留一个没人认领的文件。"""
         blocked_path = Path(self.tmp.name) / "locked"
