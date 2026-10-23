@@ -184,7 +184,7 @@ export function wireAutoScroll(el:any):void{
   if(!el||autoScrollers.has(el))return;
   if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
   const abort=new AbortController();
-  let pos=el.scrollLeft,dir=1,last=0,frame=0,hovered=false,focused=false,onscreen=true,holdUntil=0;
+  let pos=el.scrollLeft,dir=1,last=0,frame=0,hovered=false,focused=false,onscreen=true,holdUntil=0,max=-1,resync=false;
   const listen=(target:EventTarget,type:string,fn:()=>void)=>target.addEventListener(type,fn,{passive:true,signal:abort.signal});
   /* 在不在屏幕上交给共用的交叉观察器，回调里叫醒；循环里只读自己记下的状态。每帧量
      `getBoundingClientRect()` 会在上一帧写完 `scrollLeft` 之后把整棵样式树当场重算。
@@ -199,7 +199,10 @@ export function wireAutoScroll(el:any):void{
     frame=requestAnimationFrame(tick);
     const dt=last?Math.min(now-last,64):0;last=now;
     if(now<holdUntil)return;
-    const max=el.scrollWidth-el.clientWidth;
+    /* 循环里只写不读：可滚距离等尺寸变了才重量，人动过之后才回读一次位置。每帧读一次
+       `scrollWidth`，赶上别处刚改过样式（换主题、悬停、滚页面）就是一次整树重算。 */
+    if(max<0)max=el.scrollWidth-el.clientWidth;
+    if(resync){resync=false;pos=el.scrollLeft}
     if(max<=1)return;
     /* 位置自己记一份小数：一帧只走零点几个像素，`scrollLeft` 读回来是取整后的值，
        拿它接着加会一直原地不动。 */
@@ -210,15 +213,19 @@ export function wireAutoScroll(el:any):void{
   // 重画换掉了这一排时，挂在 document 上的监听要在下一次叫醒时跟着撤掉。
   const wake=()=>{if(!el.isConnected)stop();else if(!frame&&running()){last=0;frame=requestAnimationFrame(tick)}};
   const hold=()=>{holdUntil=performance.now()+AUTO_SCROLL_RESUME};
-  // 读回来和自己记的差不到一个像素就是自己那一帧；差得多是人滚的，从人停下的地方接着走。
-  listen(el,'scroll',()=>{if(Math.abs(el.scrollLeft-pos)>1){pos=el.scrollLeft;hold()}});
+  /* 人能滚这一排的时候指针一定在上面或焦点在里面（滚轮、拖动、触摸、方向键），那时循环已经停了；
+     离开时记下要回读位置，下一帧从人停下的地方接着走。 */
   listen(el,'pointerenter',()=>{hovered=true});
-  listen(el,'pointerleave',()=>{hovered=false;hold();wake()});
+  listen(el,'pointerleave',()=>{hovered=false;resync=true;hold();wake()});
   listen(el,'focusin',()=>{focused=true});
-  listen(el,'focusout',()=>setTimeout(()=>{focused=el.contains(document.activeElement);wake()},0));
+  listen(el,'focusout',()=>setTimeout(()=>{focused=el.contains(document.activeElement);resync=true;wake()},0));
+  const sizes=new ResizeObserver(()=>{max=-1});
+  sizes.observe(el);
+  const contents=new MutationObserver(()=>{max=-1});
+  contents.observe(el,{childList:true});
   listen(document,'visibilitychange',wake);
   wake();
-  function stop(){cancelAnimationFrame(frame);frame=0;abort.abort();autoScrollers.delete(el);autoScrollWakeups.delete(wake);
+  function stop(){cancelAnimationFrame(frame);frame=0;abort.abort();sizes.disconnect();contents.disconnect();autoScrollers.delete(el);autoScrollWakeups.delete(wake);
     autoScrollSight?.unobserve(el);autoScrollSightings.delete(el);
     if(!autoScrollers.size){autoScrollVisibility?.disconnect();autoScrollVisibility=null;autoScrollSight?.disconnect();autoScrollSight=null}}
   autoScrollers.set(el,stop);

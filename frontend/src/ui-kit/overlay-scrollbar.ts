@@ -155,8 +155,8 @@ export function attachOverlayScrollbar(
     });
     paintPosition(g.scrollTop,g.scrollLeft);
   };
-  /* 尺寸观察器的回调落在本帧布局之后，量的时候不必提前重排；内容增删、图片到手、
-     过渡结束这些零散的触发合到下一帧算一次。挂上时不当场量：第一次回调就在同一帧
+  /* 尺寸观察器的回调落在本帧布局之后，量的时候不必提前重排；内容增删、图片到手
+     这些零散的触发合到下一帧算一次。挂上时不当场量：第一次回调就在同一帧
      绘制之前，轨道在那之前藏着。 */
   let pendingSync:number|null=null;
   const scheduleSync=()=>{if(pendingSync===null)pendingSync=requestAnimationFrame(()=>{pendingSync=null;sync()})};

@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "d91220e0-71b7-4e4c-8443-dc08bcd3a00b", e._sentryDebugIdIdentifier = "sentry-dbid-d91220e0-71b7-4e4c-8443-dc08bcd3a00b");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "aaaf3806-0667-4a38-8810-603f659c5fc1", e._sentryDebugIdIdentifier = "sentry-dbid-aaaf3806-0667-4a38-8810-603f659c5fc1");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -13298,46 +13298,50 @@ function Ds(e) {
 var fee = 24, Os = 2e3, ks = 3e3, As = /* @__PURE__ */ new Map(), js = /* @__PURE__ */ new Set(), Ms = null, Ns = null, Ps = /* @__PURE__ */ new Map();
 function Fs(e) {
 	if (!e || As.has(e) || matchMedia("(prefers-reduced-motion:reduce)").matches) return;
-	let t = new AbortController(), n = e.scrollLeft, r = 1, i = 0, a = 0, o = !1, s = !1, c = !0, l = 0, u = (e, n, r) => e.addEventListener(n, r, {
+	let t = new AbortController(), n = e.scrollLeft, r = 1, i = 0, a = 0, o = !1, s = !1, c = !0, l = 0, u = -1, d = !1, f = (e, n, r) => e.addEventListener(n, r, {
 		passive: !0,
 		signal: t.signal
-	}), d = () => document.body.hasAttribute("data-detail-open") && !e.closest("#stage") || document.body.hasAttribute("data-wall-open") && !e.closest("[data-video-wall]"), f = () => e.isConnected && c && !o && !s && !document.hidden && !d(), p = (t) => {
+	}), p = () => document.body.hasAttribute("data-detail-open") && !e.closest("#stage") || document.body.hasAttribute("data-wall-open") && !e.closest("[data-video-wall]"), m = () => e.isConnected && c && !o && !s && !document.hidden && !p(), h = (t) => {
 		if (a = 0, !e.isConnected) {
-			g();
+			b();
 			return;
 		}
-		if (!f()) return;
-		a = requestAnimationFrame(p);
+		if (!m()) return;
+		a = requestAnimationFrame(h);
 		let o = i ? Math.min(t - i, 64) : 0;
-		if (i = t, t < l) return;
-		let s = e.scrollWidth - e.clientWidth;
-		s <= 1 || (n = Math.min(s, Math.max(0, n + r * fee * o / 1e3)), e.scrollLeft = n, (n >= s || n <= 0) && (r = n >= s ? -1 : 1, l = t + Os));
-	}, m = () => {
-		e.isConnected ? !a && f() && (i = 0, a = requestAnimationFrame(p)) : g();
-	}, h = () => {
+		i = t, !(t < l) && (u < 0 && (u = e.scrollWidth - e.clientWidth), d && (d = !1, n = e.scrollLeft), !(u <= 1) && (n = Math.min(u, Math.max(0, n + r * fee * o / 1e3)), e.scrollLeft = n, (n >= u || n <= 0) && (r = n >= u ? -1 : 1, l = t + Os)));
+	}, g = () => {
+		e.isConnected ? !a && m() && (i = 0, a = requestAnimationFrame(h)) : b();
+	}, _ = () => {
 		l = performance.now() + ks;
 	};
-	u(e, "scroll", () => {
-		Math.abs(e.scrollLeft - n) > 1 && (n = e.scrollLeft, h());
-	}), u(e, "pointerenter", () => {
+	f(e, "pointerenter", () => {
 		o = !0;
-	}), u(e, "pointerleave", () => {
-		o = !1, h(), m();
-	}), u(e, "focusin", () => {
+	}), f(e, "pointerleave", () => {
+		o = !1, d = !0, _(), g();
+	}), f(e, "focusin", () => {
 		s = !0;
-	}), u(e, "focusout", () => setTimeout(() => {
-		s = e.contains(document.activeElement), m();
-	}, 0)), u(document, "visibilitychange", m), m();
-	function g() {
-		cancelAnimationFrame(a), a = 0, t.abort(), As.delete(e), js.delete(m), Ns?.unobserve(e), Ps.delete(e), As.size || (Ms?.disconnect(), Ms = null, Ns?.disconnect(), Ns = null);
+	}), f(e, "focusout", () => setTimeout(() => {
+		s = e.contains(document.activeElement), d = !0, g();
+	}, 0));
+	let v = new ResizeObserver(() => {
+		u = -1;
+	});
+	v.observe(e);
+	let y = new MutationObserver(() => {
+		u = -1;
+	});
+	y.observe(e, { childList: !0 }), f(document, "visibilitychange", g), g();
+	function b() {
+		cancelAnimationFrame(a), a = 0, t.abort(), v.disconnect(), y.disconnect(), As.delete(e), js.delete(g), Ns?.unobserve(e), Ps.delete(e), As.size || (Ms?.disconnect(), Ms = null, Ns?.disconnect(), Ns = null);
 	}
-	As.set(e, g), js.add(m), Ms || (Ms = new MutationObserver(() => js.forEach((e) => e())), Ms.observe(document.body, {
+	As.set(e, b), js.add(g), Ms || (Ms = new MutationObserver(() => js.forEach((e) => e())), Ms.observe(document.body, {
 		attributes: !0,
 		attributeFilter: ["data-detail-open", "data-wall-open"]
 	})), typeof IntersectionObserver == "function" && (Ns ??= new IntersectionObserver((e) => {
 		for (let t of e) Ps.get(t.target)?.(t.isIntersecting);
 	}), Ps.set(e, (e) => {
-		c = e, m();
+		c = e, g();
 	}), Ns.observe(e));
 }
 function Is(e) {
@@ -117010,4 +117014,4 @@ sCt(cCt);
 //#endregion
 export { DT as applyTheme, yN as peachHistory, Zo as popCount, Rvt as showToast };
 
-//# debugId=d91220e0-71b7-4e4c-8443-dc08bcd3a00b
+//# debugId=aaaf3806-0667-4a38-8810-603f659c5fc1
