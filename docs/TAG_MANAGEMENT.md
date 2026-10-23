@@ -48,6 +48,21 @@ kind: howto
 
 `GET /api/tag-management` 返回标签 ID、名称、分类、别名、资源数量、隐藏状态和重复组。`POST /api/tag-management/preview` 只读预览；`POST /api/tag-management` 收到预览的 `token` 才执行写入。数据变化后计划失效，须重新预览。接口沿用登录验证和 ledger 写入角色门槛。
 
+`GET /api/tag-management` 不带 `limit` 时返回完整的 `items` 和 `duplicate_groups`；带 `limit` 时启用分页，支持以下参数：
+
+| 参数 | 含义 |
+| --- | --- |
+| `scope` | `local` 或 `online`，默认 `local` |
+| `limit` / `offset` | 每页条数和起始位置；条数限制为 1 至 600，格式无效时使用 20；起始位置至少为 0，格式无效时使用 0 |
+| `q` | 搜索名称和别名，统一字符宽度、空白和大小写 |
+| `category` | 分类键；空值或 `all` 表示全部分类 |
+| `state` | `active`、`hidden` 或 `blocked`，默认 `active`；屏蔽状态优先于隐藏状态 |
+| `view` | `cloud` 按资源数量倒序，`alphabet` 按归一化名称排序；默认 `cloud`，同值时按名称和标签身份稳定排序 |
+
+分页响应包含当前页 `items`、筛选后的 `total`、`has_more`、实际 `limit` 和 `offset`。`categories` 是当前搜索和状态下的分类计数，不随选中的分类缩小；`duplicate_groups` 保留本地完整重复组，在线为空列表。搜索、状态、分类和排序均先于分页，超出末页时 `items` 为空且保留 `total`。完整词表复用查询缓存，按本地与在线分别保存；账本版本变化或写入触发缓存失效后重新读取。
+
+浏览接口 `GET /api/index?kind=tags` 与 `GET /api/follow/tags?types=all` 返回 `total`，分别表示搜索及分类筛选后、搜索及来源类型筛选后的完整标签数。
+
 写入会检查外键变化并拒绝本次操作新增的关联违规；已有的历史引用记录保持独立。
 
 在线词表的读取参数和操作请求使用 `scope=online`；在线标签 ID 是稳定的来源词键，本地标签 ID 是实体 ID。
