@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import errno
 import io
+import logging
 import math
 import ntpath
 import threading
@@ -25,6 +26,11 @@ from smbprotocol.open import (
     ImpersonationLevel, Open, QueryDirectoryFlags, ShareAccess,
 )
 from smbprotocol.tree import TreeConnect
+
+
+# SDK 的 INFO/DEBUG 记录包含会话用户名与认证报文。
+for _namespace in ("smbprotocol", "smbclient"):
+    logging.getLogger(_namespace).setLevel(logging.WARNING)
 
 
 @dataclass(frozen=True)

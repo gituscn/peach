@@ -2,6 +2,7 @@
 
 import errno
 import io
+import logging
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -272,6 +273,29 @@ class SmbDeadlineTests(unittest.TestCase):
                 conn.receive(request)
         request.cancel.assert_called_once()
         conn.disconnect.assert_called_once_with(close=False)
+
+    def test_authentication_uses_deadline_before_tree_connect(self):
+        conn, request = self.connection(), self.request()
+        conn.transport = SimpleNamespace(connected=True)
+        config = SmbConnection("files.invalid", "media", "reader", "secret", timeout=.05)
+        transport = SmbTransport(config)
+        with patch("peach.smb_transport._DeadlineConnection", return_value=conn), \
+                patch.object(conn, "connect"), \
+                patch("smbclient._pool.Session.connect", autospec=True,
+                      side_effect=lambda session: session.connection.receive(request)), \
+                patch("peach.smb_transport.TreeConnect") as tree:
+            with self.assertRaises(TimeoutError):
+                transport.stat(())
+        request.cancel.assert_called_once()
+        tree.assert_not_called()
+        self.assertTrue(transport._closed)
+        self.assertEqual(transport._cache, {})
+
+    def test_sdk_authentication_details_are_below_logging_threshold(self):
+        for namespace in ("smbprotocol.session", "smbprotocol.connection", "smbclient._pool"):
+            with self.subTest(namespace=namespace):
+                self.assertFalse(logging.getLogger(namespace).isEnabledFor(logging.INFO))
+                self.assertFalse(logging.getLogger(namespace).isEnabledFor(logging.DEBUG))
 
     def test_response_parser_never_resolves_symlinks(self):
         conn, request = self.connection(), self.request()
