@@ -98,6 +98,9 @@ export interface MediaCardProps {
   actions: MediaCardActions;
   /** 点这张卡打开什么。竖屏带点进沉浸模式，回收站里的资源按类型分流，其余打开详情。 */
   onOpen(item: MediaItem, anchor: HTMLElement): void;
+  /** 这张卡代表整组分卷或版本（「合并分卷与版本」开着）。关着时一卷一张卡，卡面只写这一个文件的
+   *  名字、时长与大小，不标整组卷数；打开时照旧按条目上的分组进分卷或版本队列。默认开。 */
+  grouped?: boolean;
 }
 
 /** 署名：头像和名字落到同一个身份上（`cardIdentity`）。共演只写第一位再给总人数。 */
@@ -197,7 +200,7 @@ function seekPreview(card: HTMLElement | null, delta: number) {
   video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + delta));
 }
 
-function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, helpers, actions, onOpen }: MediaCardProps) {
+function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, helpers, actions, onOpen, grouped = true }: MediaCardProps) {
   const card = useRef<HTMLElement | null>(null);
   const [written, setWritten] = useState<{ id: number; on: boolean } | null>(null);
   const later = written?.id === item.id ? written.on : !!item.watch_later;
@@ -215,8 +218,8 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
     if (el && (!current.medium || current.medium === 'video')) wireHover(el, current);
   }, []);
 
-  const parts = item.part_group || null;
-  const editions = item.edition_group || null;
+  const parts = grouped ? item.part_group || null : null;
+  const editions = grouped ? item.edition_group || null : null;
   const stacked = !!(parts || editions);
   const jav = layout.active && !!item.is_jav;
   const size = jav ? layout.size : 'small';
