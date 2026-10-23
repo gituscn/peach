@@ -435,6 +435,40 @@ class LibraryNfoTests(unittest.TestCase):
         self.root = Path(temporary.name).resolve()
 
     @windows_ledger_roots
+    def test_amane_preparation_failure_preserves_the_unprocessed_selection_for_retry(self):
+        from peach import metadata_amane
+        media = self.root / 'media'
+        media.mkdir()
+        for code in ('SSIS-057', 'SSIS-058', 'FC2-PPV-1234567'):
+            (media / f'{code}.mp4').write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        generated, covers = self.root / 'generated', self.root / 'covers'
+        process_library(config, db, generated, covers, stage='scan')
+        with closing(sqlite3.connect(db)) as connection:
+            expected = {row[0] for row in connection.execute("SELECT id FROM asset WHERE name LIKE 'SSIS%'")}
+        with patch.object(metadata_amane, 'ensure',
+                          side_effect=metadata_amane.PreparationError('下载未完成')) as prepare, \
+                patch('peach.library_processing._RemoteSession.collect', return_value=([], 0)) as collect:
+            result = process_library(config, db, generated, covers, stage='metadata')
+        self.assertEqual(prepare.call_count, 1)
+        self.assertEqual(result['status'], 'failed')
+        self.assertEqual(result['issue_count'], 1)
+        self.assertEqual(set(result['retryable_asset_ids']), expected)
+        self.assertEqual(collect.call_count, 1)
+        self.assertEqual(collect.call_args.args[1], 'FC2-PPV-1234567')
+        self.assertIn('下载未完成', result['issue_preview'][0]['message'])
+        provider = stub_provider()
+        provider.query.return_value = {'id': 'SSIS-057', 'title': '作品资料'}
+        provider.cover.return_value = False
+        retried = process_library(config, db, generated, covers, stage='metadata',
+            retry_ids=result['retryable_asset_ids'], provider_factory=lambda: provider,
+            route_overrides='censored=r18dev')
+        self.assertEqual(retried['checked'], 2)
+        self.assertTrue(provider.query.called)
+
+    @windows_ledger_roots
     def test_filename_code_families_enter_metadata_collection(self):
         media = self.root / 'media'
         media.mkdir()
@@ -3047,6 +3081,7 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
         with patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
                 patch('peach.frame_capture.capture_with_retry', return_value=True), \
                 patch('peach.frame_capture.tile_frames', side_effect=self.make_tile), \
+                patch('peach.metadata_amane.ensure'), \
                 patch('peach.library_processing._RemoteSession.collect', side_effect=collect) as online, \
                 patch('peach.library_processing._finish_collection', return_value={}):
             result = self.run_processing(stage='collect', asset_ids=[1])
@@ -3077,6 +3112,7 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
                 patch('peach.media_probe.resolve_case_insensitive', str), \
                 patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
                 patch('peach.library_processing._generate_previews', side_effect=previews), \
+                patch('peach.metadata_amane.ensure'), \
                 patch('peach.library_processing._RemoteSession.collect', side_effect=collect), \
                 patch('peach.library_processing._finish_collection', return_value={}):
             result = self.run_processing(stage='collect', asset_ids=[1, 5])

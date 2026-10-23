@@ -1,8 +1,8 @@
 """amane 刮削站点的 Peach 侧接入：起桥子进程、读一行 JSON、把结果翻成 Peach 候选（ADR-0043）。
 
 桥本体在 `tools/amane-bridge/bridge.py`，运行环境由同目录的 `pyproject.toml` / `uv.lock`
-钉死，venv 建在数据目录 `<tools>/amane-bridge/.venv`，不进 Peach 主 venv。这里只做三件事：
-找到 venv 里的解释器并起子进程；把 amane 的 `MediaMetadata` 套进 `peach.sources` 契约的
+钉死。桌面与 Docker 使用随包独立运行环境；源码与 wheel 在数据目录的工具区自动准备 venv。
+本模块准备并启动桥子进程，把 amane 的 `MediaMetadata` 套进 `peach.sources` 契约的
 `SiteRecord`，再投影成 `extract_peach_fields` 认得的 payload；把 amane 的 `FailureReason` 一对一映到
 契约的 `FailureReason`，由它翻成 `MetadataProviderError` 现有的 `auth` / `unavailable` / `not_found`
 三档，上游原样的 reason 留在 `detail` 里给冷却与快照回溯用。链上 `LibraryMetadataProvider` 拿到的
@@ -25,6 +25,8 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
+
+from filelock import FileLock, Timeout
 
 from .metadata import MetadataProviderError, identifies_code, validate_provider_code
 from .sources.base import (COOLDOWN_ACTIONS, REASON_KINDS, FailureReason, SiteConfig, SiteRecord,
@@ -147,6 +149,48 @@ def bridge_python(tools_root: Path) -> Path:
     return home / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
+class PreparationError(MetadataProviderError):
+    """采集工具未就绪，保留任务范围供安装成功后重试。"""
+
+    asset_ids: tuple[int, ...] = ()
+
+
+class BridgeMissing(PreparationError):
+    """没有可启动的桥解释器或随包运行环境。"""
+
+
+def packaged_runtime() -> tuple[Path, str] | None:
+    """只使用与 Peach 清单完全匹配的随包独立运行环境。"""
+    root = Path(os.environ.get("PEACH_AMANE_RUNTIME") or BRIDGE_ROOT.parent / "amane-runtime")
+    try:
+        data = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+        relative = Path(data["executable"])
+        if (data.get("revision") != pinned_revision() or data.get("version") != locked_version()
+                or data.get("kind") not in {"python", "executable"} or relative.is_absolute()
+                or ".." in relative.parts):
+            return None
+        program = root / relative
+        # venv 的 python 可以是指向系统解释器的标准软链，父目录必须在运行环境内。
+        if program.parent.resolve().is_relative_to(root.resolve()) and program.is_file():
+            return program, data["kind"]
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    return None
+
+
+def _ready(tools_root: Path) -> bool:
+    if packaged_runtime():
+        return True
+    if not bridge_python(tools_root).is_file() or installed_version(tools_root) != locked_version():
+        return False
+    try:
+        data = json.loads((bridge_home(tools_root) / "installed.json").read_text(encoding="utf-8"))
+        return data.get("revision") == pinned_revision()
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    return False
+
+
 def find_uv() -> Path | None:
     """建 venv 用的 uv。托盘进程的 PATH 未必带 WinGet 的 Links 目录，所以多看一眼那里。"""
     explicit = os.environ.get("PEACH_UV", "").strip()
@@ -160,11 +204,26 @@ def find_uv() -> Path | None:
     return next((path for path in candidates if path.is_file()), None)
 
 
-def rebuild_command(tools_root: Path, *, uv: Path, root: Path = BRIDGE_ROOT) -> tuple[list[str], dict]:
+def rebuild_command(tools_root: Path, *, uv: Path, root: Path = BRIDGE_ROOT,
+                    proxy_options: Mapping[str, object] | None = None) -> tuple[list[str], dict]:
     """按锁重建桥 venv 的命令与环境。`--locked` 让锁和清单不一致时直接失败，不悄悄改锁。"""
     command = [str(uv), "sync", "--locked", "--no-dev", "--python", "3.14",
                "--project", str(root)]
     env = {**os.environ, "UV_PROJECT_ENVIRONMENT": str(bridge_home(tools_root) / ".venv")}
+    if proxy_options is None:
+        from . import peach_proxy
+        proxy_options = peach_proxy.client_options()
+    if not proxy_options.get("trust_env", True):
+        for key in list(env):
+            if key.upper().endswith("_PROXY"):
+                env.pop(key)
+        address = str(proxy_options.get("proxy") or "")
+        if address:
+            env.update(HTTP_PROXY=address, HTTPS_PROXY=address, ALL_PROXY=address)
+        # Git 配置可以覆盖环境代理；只给本次子进程增加一项，不改用户配置文件。
+        count = int(env.get("GIT_CONFIG_COUNT", "0"))
+        env.update({"GIT_CONFIG_COUNT": str(count + 1), f"GIT_CONFIG_KEY_{count}": "http.proxy",
+                    f"GIT_CONFIG_VALUE_{count}": address})
     return command, env
 
 
@@ -185,27 +244,80 @@ def bundle_problem(root: Path = BRIDGE_ROOT) -> str:
 
 
 def rebuild(tools_root: Path, *, runner: Runner = subprocess.run, timeout: int = 900,
-            root: Path = BRIDGE_ROOT) -> dict:
+            root: Path = BRIDGE_ROOT, proxy_options: Mapping[str, object] | None = None,
+            force: bool = True) -> dict:
     """重建桥 venv，返回给设置页的回执。首次要下载约 98 MB，之后只校验。"""
+    home = bridge_home(tools_root)
+    try:
+        home.mkdir(parents=True, exist_ok=True)
+        with FileLock(str(home / "install.lock"), timeout=timeout):
+            if packaged_runtime() or (not force and _ready(tools_root)):
+                return {"ok": True, "result": "amane 运行环境已就绪", **describe(tools_root, root=root)}
+            return _rebuild(tools_root, runner=runner, timeout=timeout, root=root,
+                            proxy_options=proxy_options)
+    except Timeout:
+        return {"ok": False, "error": "amane 运行环境正在准备，请稍后重试"}
+    except OSError as error:
+        from .error_reporting import redact
+        return {"ok": False, "error": f"amane 安装目录无法读写：{redact(str(error))}"}
+
+
+def _rebuild(tools_root, *, runner, timeout, root, proxy_options):
+    from .error_reporting import redact
     if problem := bundle_problem(root):
         return {"ok": False, "error": problem}
     uv = find_uv()
     if uv is None:
         return {"ok": False, "error": "未找到 uv，请先安装 uv 再重建 amane 桥"}
-    command, env = rebuild_command(tools_root, uv=uv, root=root)
+    command, env = rebuild_command(tools_root, uv=uv, root=root, proxy_options=proxy_options)
     bridge_home(tools_root).mkdir(parents=True, exist_ok=True)
+    (bridge_home(tools_root) / "installed.json").unlink(missing_ok=True)
     try:
         completed = runner(command, capture_output=True, text=True, encoding="utf-8",
                            errors="replace", timeout=timeout, check=False, shell=False, env=env)
     except subprocess.TimeoutExpired:
         return {"ok": False, "error": f"重建 amane 桥超过 {timeout} 秒未完成"}
     except OSError as exc:
-        return {"ok": False, "error": f"无法启动 uv：{exc}"}
+        return {"ok": False, "error": f"无法启动 uv：{redact(str(exc))}"}
     if completed.returncode:
         detail = (completed.stderr or completed.stdout or "").strip()[-800:]
-        return {"ok": False, "error": f"uv sync 失败（exit {completed.returncode}）：{detail}"}
+        return {"ok": False, "error": f"uv sync 失败（exit {completed.returncode}）：{redact(detail)}"}
+    if not bridge_python(tools_root).is_file() or installed_version(tools_root) != locked_version(root):
+        return {"ok": False, "error": "amane 安装未完成：运行环境中没有可用的包元数据"}
+    try:
+        checked = runner([str(bridge_python(tools_root)), "-X", "utf8", str(root / "bridge.py"), "--self-check"],
+                         capture_output=True, text=True, encoding="utf-8", errors="replace",
+                         timeout=60, check=False, shell=False, env=env)
+        check = json.loads(checked.stdout)
+        if (checked.returncode or check.get("ok") is not True
+                or check.get("amane", {}).get("version") != locked_version(root)
+                or not set(SITES).issubset(check.get("sites", []))):
+            return {"ok": False, "error": "amane 运行环境自检失败，请在来源和凭证中重新安装"}
+    except (OSError, subprocess.TimeoutExpired, ValueError, TypeError, AttributeError):
+        return {"ok": False, "error": "amane 运行环境自检未完成，请在来源和凭证中重试"}
+    from .fsutil import atomic_write_text
+    atomic_write_text(bridge_home(tools_root) / "installed.json", json.dumps({
+        "revision": pinned_revision(root), "version": installed_version(tools_root)}))
     return {"ok": True, "result": f"amane 桥已按 {pinned_revision(root)[:12]} 重建",
             **describe(tools_root, root=root)}
+
+
+def ensure(tools_root: Path, *, runner: Runner = subprocess.run,
+           proxy_options: Mapping[str, object] | None = None, secrets_root: Path | None = None,
+           progress=lambda: None) -> None:
+    """按锁准备一次独立运行环境；安装失败由调用方保留尚未处理的范围。"""
+    if _ready(tools_root):
+        return
+    progress()
+    if proxy_options is None and secrets_root is not None:
+        from . import peach_proxy
+        try:
+            proxy_options = peach_proxy.client_options(secrets_root)
+        except ValueError as error:
+            raise PreparationError(str(error)) from error
+    result = rebuild(tools_root, runner=runner, proxy_options=proxy_options, force=False)
+    if not result.get("ok"):
+        raise PreparationError(result.get("error") or "amane 运行环境未取得")
 
 
 def describe(tools_root: Path, *, root: Path = BRIDGE_ROOT) -> dict:
@@ -213,7 +325,8 @@ def describe(tools_root: Path, *, root: Path = BRIDGE_ROOT) -> dict:
 
     清单读不全时 `bundled` 为假、`problem` 写原因，sha 与锁版本留空，卡片据此停用安装。
     """
-    python = bridge_python(tools_root)
+    packaged = packaged_runtime()
+    python = packaged[0] if packaged else bridge_python(tools_root)
     problem = bundle_problem(root)
     return {
         "repository": AMANE_REPOSITORY,
@@ -230,21 +343,22 @@ def describe(tools_root: Path, *, root: Path = BRIDGE_ROOT) -> dict:
 
 
 def installed(tools_root: Path) -> bool:
-    """解释器和 amane 的包元数据都在才算装好。
+    """随包清单须匹配；本地环境须有解释器、固定版本与自检成功回执。"""
+    return _ready(tools_root)
 
-    `uv sync` 先建 venv 再下载依赖，拉不到 GitHub 时会留下一个只有解释器的空壳；
-    只看解释器在不在，这种半截环境会被当成已安装。
-    """
-    return bridge_python(tools_root).is_file() and bool(installed_version(tools_root))
+
+def _site_paths(tools_root):
+    venv = bridge_home(tools_root) / ".venv"
+    return [path for path in [venv / "Lib" / "site-packages", *venv.glob("lib/python*/site-packages")]
+            if path.is_dir()]
 
 
 def installed_version(tools_root: Path) -> str:
     """从独立运行环境的包元数据读取版本，不导入上游或启动子进程。"""
     from importlib.metadata import distributions
-
-    venv = bridge_home(tools_root) / ".venv"
-    paths = [venv / "Lib" / "site-packages", *venv.glob("lib/python*/site-packages")]
-    for distribution in distributions(path=[str(path) for path in paths if path.is_dir()]):
+    if packaged_runtime():
+        return locked_version()
+    for distribution in distributions(path=[str(path) for path in _site_paths(tools_root)]):
         if distribution.metadata.get("Name", "").casefold() == "amane":
             return distribution.version
     return ""
@@ -292,16 +406,20 @@ class AmaneBridge:
     """起一次桥子进程：一次 `--output json`、stdout 一行 JSON；可注入 runner，单测不起真进程。"""
 
     python: Path
-    script: Path = BRIDGE_SCRIPT
+    script: Path | None = BRIDGE_SCRIPT
     timeout: int = DEFAULT_TIMEOUT
     runner: Runner = subprocess.run
 
     @classmethod
     def create(cls, tools_root: Path, *, timeout: int = DEFAULT_TIMEOUT,
                runner: Runner = subprocess.run) -> "AmaneBridge":
+        packaged = packaged_runtime()
+        if packaged:
+            return cls(packaged[0], script=None if packaged[1] == "executable" else BRIDGE_SCRIPT,
+                       timeout=timeout, runner=runner)
         python = bridge_python(tools_root)
-        if not python.is_file():
-            raise MetadataProviderError(
+        if not _ready(tools_root):
+            raise BridgeMissing(
                 f"amane 桥未安装：在「来源和凭证」页重建，或放到 {python}")
         if not BRIDGE_SCRIPT.is_file():
             raise MetadataProviderError(f"amane 桥脚本缺失：{BRIDGE_SCRIPT}")
@@ -327,8 +445,13 @@ class AmaneBridge:
                                       direct_sites=direct_sites, timeout=timeout)
         checkpoint('network')
         proxy_args, env = proxy_argument(proxy_options or {"trust_env": True})
+        for key in list(env):
+            if key.startswith('_PYI_') or key in {'PYTHONHOME', 'PYTHONPATH'}:
+                env.pop(key)
+        if self.script is None:
+            env['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
         env["PYTHONIOENCODING"] = "utf-8"
-        command = [str(self.python), "-X", "utf8", str(self.script), "--number", number,
+        command = [str(self.python), *(["-X", "utf8", str(self.script)] if self.script else []), "--number", number,
                    "--sites", ",".join(names), "--language", language, "--output", "json",
                    *proxy_args]
         if direct_sites:

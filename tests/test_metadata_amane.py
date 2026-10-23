@@ -11,6 +11,8 @@ import tempfile
 import time
 import unittest
 from unittest.mock import patch
+from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 
 from peach import metadata_amane
 from peach.jav_cover_fetch import NotFound, Unavailable
@@ -28,10 +30,15 @@ def completed(stdout, returncode=0, stderr=""):
     return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr=stderr)
 
 
-def write_amane_metadata(tools, version):
+def write_amane_metadata(tools, version, *, ready=False):
     package = metadata_amane.bridge_home(tools) / ".venv" / "Lib" / "site-packages" / f"amane-{version}.dist-info"
-    package.mkdir(parents=True)
+    package.mkdir(parents=True, exist_ok=True)
     (package / "METADATA").write_text(f"Metadata-Version: 2.1\nName: amane\nVersion: {version}\n", encoding="utf-8")
+    (package / "direct_url.json").write_text(json.dumps({
+        "vcs_info": {"commit_id": metadata_amane.pinned_revision()}}), encoding="utf-8")
+    if ready:
+        (metadata_amane.bridge_home(tools) / 'installed.json').write_text(json.dumps({
+            'revision': metadata_amane.pinned_revision(), 'version': version}), encoding='utf-8')
 
 
 def report(**sites):
@@ -148,7 +155,8 @@ class RebuildTests(unittest.TestCase):
                     python.parent.mkdir(parents=True, exist_ok=True)
                     python.write_text("", encoding="utf-8")
                     write_amane_metadata(tools, "0.20.0")
-                    return completed("")
+                    return completed(json.dumps({"ok": True, "amane": {"version": "0.20.0"},
+                                                 "sites": list(metadata_amane.SITES)}))
 
                 done = metadata_amane.rebuild(tools, runner=build)
             self.assertTrue(done["ok"])
@@ -167,6 +175,150 @@ class RebuildTests(unittest.TestCase):
         self.assertFalse(facts["installed"])
         self.assertEqual(facts["installed_version"], "")
         self.assertEqual([site["source"] for site in facts["sites"]], list(metadata_amane.SITES))
+
+
+class PreparationTests(unittest.TestCase):
+    def test_concurrent_preparation_uses_one_installation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tools, calls = Path(tmp).resolve(), []
+            def build(command, **kwargs):
+                if 'sync' in command:
+                    calls.append(command)
+                time.sleep(0.05)
+                python = metadata_amane.bridge_python(tools)
+                python.parent.mkdir(parents=True, exist_ok=True)
+                python.write_text("", encoding="utf-8")
+                write_amane_metadata(tools, metadata_amane.locked_version())
+                return completed(json.dumps({"ok": True, "amane": {"version": metadata_amane.locked_version()},
+                                             "sites": list(metadata_amane.SITES)}))
+            with patch.object(metadata_amane, "find_uv", return_value=Path("uv.exe")):
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    futures = [pool.submit(metadata_amane.ensure, tools, runner=build,
+                                           proxy_options={"trust_env": False}) for _ in range(2)]
+                    for future in futures:
+                        future.result()
+            self.assertEqual(len(calls), 1)
+
+    def test_preflight_only_prepares_tools_for_sources_used_by_the_task(self):
+        from peach.library_processing import _RemoteSession, _MissCache
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            config = SimpleNamespace(directory=lambda name: root / name)
+            remote = _RemoteSession(config, None, _MissCache(root / 'misses.json'), retrying=False)
+            states = []
+            with patch.object(metadata_amane, 'ensure') as prepare:
+                remote.prepare([({'id': 1, 'path': 'R:/media/a.strm'}, 'FC2-PPV-1234567', False, {})],
+                               lambda path: {'metadata'}, lambda **state: states.append(state))
+                self.assertEqual(prepare.call_count, 0)
+                remote.prepare([({'id': 2, 'path': 'R:/media/b.strm'}, 'SSIS-057', False, {})],
+                               lambda path: {'metadata'}, lambda **state: states.append(state))
+                self.assertEqual(prepare.call_count, 1)
+                prepare.call_args.kwargs['progress']()
+            self.assertEqual(states[0]['current_action'], 'preparing_sources')
+
+    def test_package_metadata_without_a_successful_self_check_is_not_ready(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tools = Path(tmp).resolve()
+            python = metadata_amane.bridge_python(tools)
+            python.parent.mkdir(parents=True)
+            python.write_text('', encoding='utf-8')
+            write_amane_metadata(tools, metadata_amane.locked_version())
+            with patch.object(metadata_amane, 'rebuild', return_value={'ok': False, 'error': '安装失败'}) as build:
+                for _ in range(2):
+                    with self.assertRaises(metadata_amane.PreparationError):
+                        metadata_amane.ensure(tools)
+            self.assertEqual(build.call_count, 2)
+
+    def test_unwritable_install_directory_is_a_preparation_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tools = Path(tmp).resolve()
+            with patch.object(Path, 'mkdir', side_effect=PermissionError('blocked')):
+                with self.assertRaises(metadata_amane.PreparationError) as caught:
+                    metadata_amane.ensure(tools, proxy_options={'trust_env': False})
+            self.assertIn('安装目录无法读写', str(caught.exception))
+
+    def test_local_and_non_jav_rows_do_not_require_a_bridge(self):
+        from peach.library_processing import _RemoteSession, _MissCache, COLLECTED_FIELDS
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            remote = _RemoteSession(SimpleNamespace(directory=lambda name: root / name),
+                                    None, _MissCache(root / 'misses.json'), retrying=False)
+            rows = [({'id': 1, 'path': 'R:/a.mp4', 'region': 'US'}, 'SSIS-057', False, {}),
+                    ({'id': 2, 'path': 'R:/b.mp4'}, 'SSIS-058', False,
+                     {field: '已有资料' for field in COLLECTED_FIELDS})]
+            with patch.object(metadata_amane, 'ensure', side_effect=AssertionError('不应安装')):
+                remote.prepare(rows, lambda path: {'metadata'}, lambda **state: None)
+
+    def test_install_download_uses_explicit_proxy_and_overrides_git_configuration(self):
+        with patch.dict(os.environ, {"HTTPS_PROXY": "http://old:1", "NO_PROXY": "*"}):
+            _, env = metadata_amane.rebuild_command(Path("T:/tools"), uv=Path("uv.exe"),
+                proxy_options={"trust_env": False, "proxy": "http://user:secret@proxy:8888"})
+        self.assertEqual(env["HTTPS_PROXY"], "http://user:secret@proxy:8888")
+        self.assertNotIn("NO_PROXY", env)
+        count = int(env["GIT_CONFIG_COUNT"])
+        self.assertEqual(env[f"GIT_CONFIG_KEY_{count - 1}"], "http.proxy")
+        self.assertEqual(env[f"GIT_CONFIG_VALUE_{count - 1}"], env["HTTPS_PROXY"])
+
+    def test_direct_install_removes_environment_proxies(self):
+        with patch.dict(os.environ, {"HTTPS_PROXY": "http://old:1", "all_proxy": "socks5://old:2"}):
+            _, env = metadata_amane.rebuild_command(Path("T:/tools"), uv=Path("uv.exe"),
+                                                   proxy_options={"trust_env": False})
+        self.assertFalse(any(key.upper().endswith("_PROXY") for key in env))
+        count = int(env["GIT_CONFIG_COUNT"])
+        self.assertEqual(env[f"GIT_CONFIG_VALUE_{count - 1}"], "")
+
+    def test_automatic_preparation_installs_once_and_reuses_the_locked_environment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tools, calls = Path(tmp).resolve(), []
+            def build(command, **kwargs):
+                if 'sync' in command:
+                    calls.append(command)
+                python = metadata_amane.bridge_python(tools)
+                python.parent.mkdir(parents=True, exist_ok=True)
+                python.write_text("", encoding="utf-8")
+                write_amane_metadata(tools, metadata_amane.locked_version())
+                return completed(json.dumps({"ok": True, "amane": {"version": metadata_amane.locked_version()},
+                                             "sites": list(metadata_amane.SITES)}))
+            with patch.object(metadata_amane, "find_uv", return_value=Path("uv.exe")):
+                for _ in range(2):
+                    metadata_amane.ensure(tools, runner=build, proxy_options={"trust_env": False})
+            self.assertEqual(len(calls), 1)
+            self.assertTrue(metadata_amane.installed(tools))
+
+    def test_failed_preparation_redacts_proxy_credentials(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(metadata_amane, "find_uv", return_value=Path("uv.exe")):
+                result = metadata_amane.rebuild(Path(tmp).resolve(),
+                    runner=lambda *a, **k: completed("", 1, "cannot fetch http://user:secret@proxy:8888/repo"),
+                    proxy_options={"trust_env": False})
+        self.assertFalse(result["ok"])
+        self.assertNotIn("secret", result["error"])
+
+    def test_matching_packaged_runtime_needs_no_installer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp).resolve() / "runtime"
+            runtime.mkdir()
+            binary = runtime / "bridge.exe"
+            binary.write_bytes(b"test")
+            (runtime / "manifest.json").write_text(json.dumps({
+                "revision": metadata_amane.pinned_revision(), "version": metadata_amane.locked_version(),
+                "kind": "executable", "executable": "bridge.exe"}), encoding="utf-8")
+            with patch.dict(os.environ, {"PEACH_AMANE_RUNTIME": str(runtime)}):
+                with patch.object(metadata_amane, "rebuild", side_effect=AssertionError("must use bundled runtime")):
+                    metadata_amane.ensure(Path(tmp).resolve() / "tools")
+                calls = []
+                bridge = metadata_amane.AmaneBridge.create(Path(tmp) / "tools",
+                    runner=lambda command, **kw: calls.append((command, kw)) or
+                        completed(report(avsox={"status": "not_found"})))
+                self.assertEqual(bridge.python, binary)
+                self.assertIsNone(bridge.script)
+                self.assertTrue(metadata_amane.installed(Path(tmp) / "tools"))
+                with patch.dict(os.environ, {'_PYI_ARCHIVE_FILE': 'parent', 'PYTHONHOME': 'parent', 'PYTHONPATH': 'parent'}):
+                    bridge.query('HEYZO-1380', ['avsox'], proxy_options={'trust_env': False})
+                command, kwargs = calls[0]
+                self.assertNotIn('-X', command)
+                self.assertEqual(kwargs['env']['PYINSTALLER_RESET_ENVIRONMENT'], '1')
+                self.assertFalse({'_PYI_ARCHIVE_FILE', 'PYTHONHOME', 'PYTHONPATH'} & kwargs['env'].keys())
 
     def test_a_package_without_the_bridge_files_is_reported_not_raised(self):
         """打包产物漏带 `tools/amane-bridge` 时，卡片拿到原因，重建不起 uv。"""
@@ -218,7 +370,7 @@ class RebuildTests(unittest.TestCase):
             python.parent.mkdir(parents=True)
             python.write_text("", encoding="utf-8")
             self.assertFalse(metadata_amane.describe(tools)["installed"])
-            write_amane_metadata(tools, "0.20.0")
+            write_amane_metadata(tools, "0.20.0", ready=True)
             self.assertTrue(metadata_amane.describe(tools)["installed"])
 
     def test_the_upstream_tag_is_never_guessed(self):
@@ -270,6 +422,7 @@ class BridgeQueryTests(unittest.TestCase):
         self.python = metadata_amane.bridge_python(self.tools)
         self.python.parent.mkdir(parents=True)
         self.python.write_text("", encoding="utf-8")
+        write_amane_metadata(self.tools, metadata_amane.locked_version(), ready=True)
 
     def test_create_refuses_when_the_venv_is_missing(self):
         with tempfile.TemporaryDirectory() as empty:
@@ -468,6 +621,7 @@ class ProviderStageTests(unittest.TestCase):
         python = metadata_amane.bridge_python(self.tools)
         python.parent.mkdir(parents=True)
         python.write_text("", encoding="utf-8")
+        write_amane_metadata(self.tools, metadata_amane.locked_version(), ready=True)
         self.calls = []
 
     def provider(self, stdout, returncode=0):
@@ -550,9 +704,13 @@ class ProviderStageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as empty:
             provider = LibraryMetadataProvider(self.secrets, tools_root=Path(empty))
             self.addCleanup(provider.transport.close)
-            with self.assertRaises(Unavailable) as caught:
-                provider.amane("HEYZO-1380", route=("avsox",))
-        self.assertIn("amane 桥未安装", str(caught.exception))
+            failure = metadata_amane.PreparationError("amane 运行环境下载失败")
+            with patch.object(metadata_amane, "ensure", side_effect=failure) as prepare:
+                for code in ("HEYZO-1380", "HEYZO-1381"):
+                    with self.assertRaises(Unavailable) as caught:
+                        provider.amane(code, route=("avsox",))
+                self.assertEqual(prepare.call_count, 1)
+        self.assertIn("amane 运行环境下载失败", str(caught.exception))
 
     def test_a_route_without_bridge_sites_is_not_found_without_a_subprocess(self):
         provider = self.provider(report())

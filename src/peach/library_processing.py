@@ -377,8 +377,22 @@ class LibraryMetadataProvider:
             if timeout <= 1.0:
                 raise DeadlineExceeded('外部资料在预算时间内未取得')
         try:
-            bridge = metadata_amane.AmaneBridge.create(
-                self.tools_root if self.tools_root is not None else TOOLS_DIR)
+            tools = self.tools_root if self.tools_root is not None else TOOLS_DIR
+            try:
+                bridge = metadata_amane.AmaneBridge.create(tools)
+            except metadata_amane.BridgeMissing:
+                if previous := self.__dict__.get('_amane_preparation_error'):
+                    raise previous
+                started = time.monotonic()
+                try:
+                    metadata_amane.ensure(tools, secrets_root=self.secrets_root)
+                except metadata_amane.PreparationError as error:
+                    self._amane_preparation_error = error
+                    raise
+                finally:
+                    elapsed = time.monotonic() - started
+                    self.excused += elapsed
+                bridge = metadata_amane.AmaneBridge.create(tools)
             direct_sites = [site for site in sites if values_for(self.secrets_root, site).get('network') == 'direct']
             report = bridge.query(code, sites, timeout=timeout,
                                   proxy_options={'trust_env': False} if len(direct_sites) == len(sites)
@@ -1317,6 +1331,42 @@ class _RemoteSession:
     def close(self):
         if self._provider is not None and hasattr(self._provider, 'close'):
             self._provider.close()
+
+    def prepare(self, prepared, stages_of, update, *, cover_root=None, groups=None):
+        """只为本趟实际需要的来源准备工具，不消费单片查询预算。"""
+        if self._factory:
+            return
+        from . import metadata_amane
+        from .scraping_access import paused_until
+        required = []
+        for row, code, verify, local_fields, *_rest in prepared:
+            if not _scrapes_as_jav(row, code):
+                continue
+            allowed = stages_of(row['path'])
+            missing = list(COLLECTED_FIELDS) if verify else _missing_fields(row, local_fields)
+            chain = self._chain(code, *_studio_evidence(row))
+            metadata = 'metadata' in allowed and bool(missing)
+            cover = ('cover' in allowed and _asks_cover(code, *_studio_evidence(row))
+                     and (cover_root is None or not cover_settled(cover_root / (code + '.jpg')))
+                     and not self._fresh_miss('cover', code, chain))
+            if not (metadata or cover):
+                continue
+            answered = () if verify or cover else _answered_sources(groups or {}, f"asset:{row['id']}", missing)
+            members = self._askable([name for name in chain if name in metadata_amane.SITES], code, answered)
+            cached = {name for name, *_ in self._cached_evidence(members, code)}
+            if any(name not in cached and not paused_until(self._config.directory('secrets'), name)
+                   for name in members):
+                required.append(row['id'])
+        if required:
+            try:
+                metadata_amane.ensure(self._config.directory('tools'),
+                    secrets_root=self._config.directory('secrets'),
+                    progress=lambda: update(stage='准备采集工具', current_action='preparing_sources',
+                                            current_asset_id=None, current_asset_name='',
+                                            current_started_at=time.time(), current_deadline_at=None))
+            except metadata_amane.PreparationError as error:
+                error.asset_ids = tuple(required)
+                raise
 
     def collect(self, row, code, missing, cover_root, *, update, issue, answered=(), received=lambda entries: None,
                 fetch_cover=True):
@@ -2568,6 +2618,17 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             _check_processing_junk(judgement_database, locations, sources.online_roots,
                                    scope_ids, protected_ids, state, update)
             prepared = _active_prepared(judgement_database, prepared)
+            from .metadata_amane import PreparationError
+            try:
+                remote.prepare(prepared, stages_of, update, cover_root=cover_root, groups=groups)
+            except PreparationError as error:
+                message = f'采集工具准备失败：{error}'
+                issue(None, message, action='preparing_sources')
+                blocked = set(error.asset_ids)
+                state['retryable_asset_ids'] = sorted(set(state['retryable_asset_ids'])
+                                                     | blocked)
+                prepared = [entry for entry in prepared if entry[0]['id'] not in blocked]
+                update(current_action='', current_started_at=None, current_deadline_at=None)
             for position, (row, code, verify_existing, local_fields, local_entries, local_ok) in enumerate(prepared):
                 local_ok = local_ok and row['id'] not in poster_failed
                 guard.check()
