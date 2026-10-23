@@ -353,7 +353,8 @@ class ScriptTests(SeedPackCase):
         seed.parent.mkdir()
         seed.write_text(seed_pack.dump(self.seeded_source()), encoding="utf-8")
         entries = data_files(self.root)
-        self.assertIn((self.root / "resources", "resources"), entries)
+        # data_files 给的是解析过链接的真实路径；macOS 的临时目录 /var 指向 /private/var。
+        self.assertIn((self.root.resolve() / "resources", "resources"), entries)
         seed.unlink()
         with self.assertRaises(FileNotFoundError):
             data_files(self.root)
