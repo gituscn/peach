@@ -97,9 +97,11 @@ VAAPI 尝试顺序为硬件解码加 `scale_vaapi` / `h264_vaapi`、软件解码
 
 ## amane 刮削站点
 
-镜像带 uv 与 Git，不带 amane 本体（[ADR-0043](adr/0043-amane-sites-via-thin-bridge-subprocess.md)）。在「来源和凭证」的 amane 卡片点重建，或在任务中心「需要处理」点「立即重试」，Peach 按 `tools/amane-bridge/uv.lock` 下载 amane 及其依赖，首次约 98 MB。运行环境建在 `/data/tools/amane-bridge/.venv`，随 `/data` 卷保留，重启容器后无需重建。
+镜像随附按 `tools/amane-bridge/uv.lock` 构建的 amane `0.20.0` 独立环境，位于 `/app/amane-runtime`，通过 `PEACH_AMANE_RUNTIME` 定位。全新 `/data` 卷可直接调用刮削站点，无需在首次运行时安装依赖。桥通过独立子进程调用，站点请求仍使用所选连接方式。
 
-重建时容器要能访问 `github.com` 与 PyPI。解释器使用镜像自带的 Python 3.14；镜像设置了 `UV_PYTHON_DOWNLOADS=never`，uv 不会把另一份 Python 下载到不在卷上的家目录。uv 的下载缓存在家目录，重建容器后清空，不影响已建好的环境。镜像的 Python 次版本变化后，需要重新点一次重建。
+运行环境与镜像一起更新，`manifest.json` 记录固定 revision、版本和解释器相对路径。镜像构建阶段与最终运行阶段都会执行 `bridge.py --self-check`，离线载入运行时与全部 Peach 开放站点类。此检查不发站点请求；来源网络是否可达需在部署环境验证。环境损坏时重新拉取并创建对应镜像，保留 `/data` 卷。
+
+`/app/amane-runtime` 同时包含 GPL-3.0 许可证、来源说明和 `amane-corresponding-source.zip`；归档包含固定 revision 的完整 amane 源码、Peach 桥、锁文件、构建入口，以及 zhconv 和 certifi 的固定源码。依赖许可证保留在独立环境内。
 
 ## 更新与范围
 
@@ -109,6 +111,6 @@ Linux 容器不读取用户电脑上的浏览历史，也不包含交互式浏�
 
 ## 镜像发布
 
-构建使用官方 Python `3.14.8-slim-trixie` 与 uv `0.13.1`，依赖由 `uv.lock` 锁定，应用以非 editable 包安装，包含 Web 与迁移资源。镜像以 UID/GID 1000 运行，内置 FFmpeg、FFprobe、OpenSSL，以及重建 amane 桥用的 uv 与 Git。构建上下文只允许代码与资源，不包含工作树、媒体、真实 Peach 数据库或凭据。
+构建使用官方 Python `3.14.8-slim-trixie` 与 uv `0.13.1`，应用依赖与 amane 独立依赖分别由各自的 `uv.lock` 锁定。应用以非 editable 包安装，包含 Web 与迁移资源。镜像以 UID/GID 1000 运行，内置 FFmpeg、FFprobe、OpenSSL 和 amane 独立环境。uv 与 Git 只用于构建阶段。构建上下文只允许代码与资源，不包含工作树、媒体、真实 Peach 数据库或凭据。
 
 GitHub Actions 的 `Docker` 工作流先构建并运行临时卷验收，通过后发布。仓库变量 `DOCKERHUB_USERNAME` 和机密 `DOCKERHUB_TOKEN` 用于 Docker Hub 发布；机密只保存在 GitHub，不进入项目文件。未配置发布身份时仍执行构建验收。ARM 镜像需通过同等运行验收后再加入发布。
