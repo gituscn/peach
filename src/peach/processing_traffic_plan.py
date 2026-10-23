@@ -7,6 +7,8 @@ import sqlite3
 from statistics import median
 from contextlib import closing
 
+from .catalog_rules import is_local_trailer
+
 MIB = 1024 ** 2
 
 
@@ -30,7 +32,8 @@ def ledger_rows(db_path, asset_ids=None):
         parameters = asset_ids
     with closing(sqlite3.connect(db_path, timeout=30)) as connection:
         connection.row_factory = sqlite3.Row
-        return [dict(row) for row in connection.execute(query, parameters)]
+        return [dict(row) for row in connection.execute(query, parameters)
+                if not is_local_trailer(row['name'])]
 
 
 def typical_size(directory, pattern, fallback):

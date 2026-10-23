@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 from filelock import FileLock, Timeout
 from PIL import Image
 
-from .catalog_rules import (compile_code_patterns, is_jav_code, normalise_code_key,
+from .catalog_rules import (compile_code_patterns, is_jav_code, is_local_trailer, normalise_code_key,
                             release_code_from_filename, same_release_code, scrapes_as_jav)
 from .field_owners import SCAN_FILENAME, write_owned_fields
 from .profiles import read_settings
@@ -1917,7 +1917,7 @@ def _collection_rows(db_path, *, locations, online_roots, asset_ids):
         connection.row_factory = sqlite3.Row
         # 路径归属只比字面，避免逐行 resolve() 访问挂载服务。
         rows = [dict(row) for row in connection.execute(query, parameters)
-                if row['location'] in locations
+                if not is_local_trailer(row['name']) and row['location'] in locations
                 and any(translate_ledger_path(row['path']).is_relative_to(root) for root in online_roots)]
         genre_decisions = load_genre_decisions(connection)
     return rows, genre_decisions

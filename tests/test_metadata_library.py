@@ -88,6 +88,19 @@ def _archive_pages(url):
 
 
 class LibraryNfoTests(unittest.TestCase):
+    def test_collection_selects_main_video_and_preserves_registered_trailer(self):
+        from peach.library_processing import _collection_rows
+        db = fresh_ledger(self.root)
+        with closing(sqlite3.connect(db)) as connection, connection:
+            for name in ('ABC-123.mp4', 'ABC-123-trailer.mp4'):
+                connection.execute('INSERT INTO asset(location,path,name,medium) VALUES(?,?,?,?)',
+                                   ('local', str(self.root / name), name, 'video'))
+        before = db.read_bytes()
+        rows, _ = _collection_rows(db, locations={'local': (str(self.root),)},
+                                    online_roots=[self.root], asset_ids=None)
+        self.assertEqual([row['name'] for row in rows], ['ABC-123.mp4'])
+        self.assertEqual(db.read_bytes(), before)
+
     def test_task_sidecar_index_does_not_walk_the_folder_for_each_video(self):
         from peach.library_nfo import SidecarIndex
         class CountedFiles(dict):

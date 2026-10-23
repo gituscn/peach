@@ -20,7 +20,7 @@
 字幕 sidecar 顺带在这里登记：遍历时每个目录的文件名已经在手上，配对判据只看同目录，
 `subtitles.py` 负责判定，本模块只负责把结论落进 `asset_subtitle`。
 
-刮削器与播放器写在正片旁边的附属文件不登记（`is_sidecar`）：NFO、Kodi 命名的海报与背景图、
+刮削器与播放器写在正片旁边的附属文件不登记（`is_sidecar`）：本地预告片、NFO、Kodi 命名的海报与背景图、
 `extrafanart/` 里的剧照、截图工具拼出的缩略图。它们描述一部片，本身不是作品，登记进来就会在
 馆藏里冒出成百张「图片」，把真正的图集淹掉。
 
@@ -45,9 +45,9 @@ from . import folder_rules, junk, record_rehome, subtitles, wants
 from .platform import is_windows_path, is_unmapped, resolve_location, resolve_root
 from .processing_control import checkpoint
 from .fsutil import atomic_write_text
+from .catalog_rules import VIDEO_EXTENSIONS, is_local_trailer
 
-VIDEO = {".mp4", ".m4v", ".mkv", ".avi", ".wmv", ".mov", ".ts", ".flv", ".rmvb", ".mpg",
-         ".m2ts", ".strm", ".iso"}
+VIDEO = VIDEO_EXTENSIONS
 IMAGE = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
 AUDIO = {".mp3", ".flac", ".wav", ".m4a", ".ogg", ".opus"}
 ARCHIVE = {".zip", ".rar", ".7z", ".tar", ".gz"}
@@ -123,7 +123,7 @@ def medium_of(name: str) -> str:
 def video_stems(names) -> frozenset[str]:
     """一个目录里视频文件的片名（casefold），`is_sidecar` 拿它判同目录有没有正片。"""
     return frozenset(os.path.splitext(name)[0].casefold() for name in names
-                     if medium_of(name) == "video")
+                     if medium_of(name) == "video" and not is_local_trailer(name))
 
 
 def is_sidecar(name: str, videos: frozenset[str], *, artwork_dir: bool = False) -> bool:
@@ -136,6 +136,8 @@ def is_sidecar(name: str, videos: frozenset[str], *, artwork_dir: bool = False) 
         return True
     stem, suffix = os.path.splitext(name)
     if suffix.lower() == ".nfo":
+        return True
+    if is_local_trailer(name):
         return True
     if medium_of(name) != "image":
         return False

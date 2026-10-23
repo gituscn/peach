@@ -83,6 +83,14 @@ class ProbeUnmeasuredTests(unittest.TestCase):
         self.assertEqual(self.probed, [])
         self.assertIsNone(self.row(pending)[0])
 
+    def test_registered_trailer_is_not_read_or_changed_by_background_probe(self):
+        main = self.add(ROOT + r'\ABC-123.mp4')
+        trailer = self.add(ROOT + r'\ABC-123-trailer.mp4')
+        self.assertEqual(self.probe(), 1)
+        self.assertEqual(self.probed, ['ABC-123.mp4'])
+        self.assertEqual(self.row(main)[0], 1800)
+        self.assertIsNone(self.row(trailer)[0])
+
     def test_without_ffprobe_the_scan_still_finishes_and_leaves_rows_pending(self):
         pending = self.add(ROOT + r"\a.mp4")
         self.assertEqual(self.probe(ffprobe=None), 0)

@@ -307,6 +307,29 @@ class SidecarTests(_ScanCase):
             r"R:\media\写真\cover.jpg", r"R:\media\写真\extrafanart\1.jpg",
             r"R:\media\写真\poster-1.jpg"})
 
+    def test_movie_trailers_are_sidecars_and_short_main_features_are_kept(self):
+        self._layout(['ABC-123/ABC-123.mp4', 'ABC-123/ABC-123-trailer.mp4',
+                      'ABC-123/ABC-123.nfo', 'ABC-123/ABC-123-poster.jpg',
+                      'ABC-123/extrafanart/1.jpg', 'ABC-123/ABC-123-short.mp4'])
+        result, _ = self._scan(r'R:\media\ABC-123', declared_roots=self.DECLARED,
+                               mounts={'local': (self.media,)}, windows=False)
+        self.assertEqual((result.files, result.sidecars), (2, 4))
+        self.assertEqual(set(self._paths()), {
+            r'R:\media\ABC-123\ABC-123.mp4', r'R:\media\ABC-123\ABC-123-short.mp4'})
+        self.assertTrue((self.media / 'ABC-123/ABC-123-trailer.mp4').is_file())
+
+    def test_trailer_names_use_an_explicit_terminal_marker(self):
+        self.assertEqual(scan.video_stems(['ABC-123.mp4', 'ABC-123-trailer.mp4']),
+                         frozenset({'abc-123'}))
+        for name in ('ABC-123-trailer.mp4', 'ABC-123.TRAILER.MKV', 'ABC-123_trailer.mov',
+                     'ABC-123 trailer.m4v', 'trailer.mp4'):
+            with self.subTest(name=name):
+                self.assertTrue(scan.is_sidecar(name, frozenset()))
+        for name in ('ABC-123.mp4', 'Trailer Park.mp4', 'ABC-123-trailer-park.mp4',
+                     'ABC-123trailer.mp4', 'ABC-123-trailer.mp4.bak', 'trailer.jpg'):
+            with self.subTest(name=name):
+                self.assertFalse(scan.is_sidecar(name, frozenset()))
+
     def test_the_rule_reads_names_only(self):
         videos = scan.video_stems(["ABC-1.mp4", "notes.txt"])
         self.assertEqual(videos, frozenset({"abc-1"}))

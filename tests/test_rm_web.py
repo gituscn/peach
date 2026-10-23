@@ -25,6 +25,24 @@ from support.ledger import fresh_ledger
 
 
 class WebDataTests(unittest.TestCase):
+    def test_registered_trailers_stay_out_of_catalog_and_counts_without_changing_records(self):
+        with self.contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET name='ABC-001.mp4',duration=7200 WHERE id=1")
+            connection.execute("UPDATE asset SET name='ABC-001-trailer.mp4',code='ABC-001',"
+                               "duration=90,play_count=3,rating=4 WHERE id=2")
+        with self.contract.read_connection() as connection:
+            before = [tuple(row) for row in connection.execute('SELECT * FROM asset ORDER BY id')]
+        self.assertEqual([row['id'] for row in q_items(self.contract, {})['items']], [1])
+        self.assertEqual(q_items(self.contract, {'q': 'trailer'})['total'], 0)
+        groups = rm_web.q_suggest(self.contract, 'trailer')['groups']
+        self.assertEqual([row['id'] for group in groups if group['kind'] == 'asset'
+                          for row in group['items']], [])
+        self.assertEqual(rm_web.q_facets(self.contract)['stats']['total'], 1)
+        self.assertEqual(rm_web.q_stats(self.contract)['attribution']['videos'], 1)
+        self.assertEqual([row['id'] for row in web_catalog._catalog_group_rows(self.contract)], [1])
+        with self.contract.read_connection() as connection:
+            self.assertEqual([tuple(row) for row in connection.execute('SELECT * FROM asset ORDER BY id')], before)
+
     def test_catalog_projects_dates_and_counts_used_for_table_sorting(self):
         with self.contract.write_transaction() as connection:
             connection.execute("UPDATE asset SET first_seen=?,last_played=?,o_count=2,rating=80 WHERE id=1",

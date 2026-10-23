@@ -27,6 +27,7 @@ from .media import resolve_case_insensitive
 from .media_sources import cost_for
 from .strm import skip_background_read
 from .processing_control import CURRENT, checkpoint
+from .catalog_rules import is_local_trailer
 from . import junk, record_rehome
 
 #: 一次探测最多等多久。ffprobe 只读文件头，网盘上实测一两秒。
@@ -156,7 +157,8 @@ def probe_path(db_path, ffprobe: str | None, location: str, path: str, *, config
 def _record(db_path, ffprobe: str, rows: Sequence, report: Callable[[int, int], None], *,
             protected_ids=(), on_junk=lambda result: None) -> int:
     """探完一条写一条。`report` 抛出来（任务被停）时，还没开始的那些不再探。"""
-    rows = [row for row in rows if not skip_background_read(row[1])]
+    rows = [row for row in rows if not skip_background_read(row[1])
+            and not is_local_trailer(PureWindowsPath(row[1]).name)]
     if not rows:
         return 0
     done = 0
