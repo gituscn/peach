@@ -13,7 +13,11 @@ it('进入资源搜索设置时先读取当前值，再创建表单草稿', asyn
   vi.stubGlobal('fetch', vi.fn(() => hold.answer));
   const host = await mount(<QueryClientProvider client={queryClient}><IndexerSettings receipt={vi.fn()} /></QueryClientProvider>);
   expect(host.querySelector('form')).toBeNull();
+  // 等待期间分区标题照画，正文是骨架；状态名只给辅助技术。
+  expect(host.querySelector('section')?.getAttribute('aria-label')).toBe('资源搜索');
+  expect(host.querySelector('[data-skeleton][aria-busy="true"]')?.getAttribute('aria-label')).toBe('正在读取资源搜索设置');
   await hold.release({ ok: true, status: 200, json: async () => ({ indexers: [{ ...row, name: '当前名称' }], max_indexers: 4 }) });
   await settle();
   expect(host.querySelector<HTMLInputElement>('input')?.value).toBe('当前名称');
+  expect(host.querySelector('[data-skeleton]')).toBeNull();
 });

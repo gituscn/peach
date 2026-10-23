@@ -4,7 +4,7 @@
  * 注册表里没有折叠，它用 BoardUI token 组合，差异登记在 `boardui/ORIGIN.md`。
  * 提示与进度条另有页面共用的一份，在 `../components/`。 */
 import { useId, useLayoutEffect, useRef, useState } from 'react';
-import type { ComponentType, FormEvent, MouseEvent, ReactNode } from 'react';
+import type { ComponentType, CSSProperties, FormEvent, MouseEvent, ReactNode } from 'react';
 import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 import { setCollapseOpen } from '@peach/legacy/ui';
 
@@ -55,6 +55,18 @@ export function Stack({ divided = false, children }: { divided?: boolean; childr
   return divided
     ? <div className="flex flex-col gap-4 border-t border-separator-border py-4 pr-3 empty:hidden">{children}</div>
     : <div className="flex flex-col gap-4 py-4 pr-3 empty:hidden">{children}</div>;
+}
+
+/** 分区首次取数：标题与外框照最终样子先画，正文按 `height` 占一块骨架；状态名只给辅助技术。 */
+export function SectionSkeleton({ title, label, height }: { title: string; label: string; height: number }) {
+  return <Section title={title}>
+    <Stack>
+      <div data-skeleton aria-busy="true" aria-label={label}>
+        <div className="h-(--skeleton-h) w-full rounded-2lg bg-background-tertiary-default"
+          style={{ '--skeleton-h': `${height}px` } as CSSProperties} />
+      </div>
+    </Stack>
+  </Section>;
 }
 
 /** 底栏：左边一句说这颗按钮此刻意味着什么，右边是按钮。
