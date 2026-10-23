@@ -200,9 +200,10 @@ mountManageHeader();
 mountBatchDock();
 buildManageBar();
 Promise.all([loadSourceStatus(),loadSyncedSettings(),loadingState.entityShapesReady])
-  .then(()=>effects.isActive&&loadingState.wantsDiscoveryBars()?buildBars():null)
   .then(()=>{
     if(!effects.isActive)return;
+    /* 顶部两排与筛选栏的两个聚合自带骨架、取回后自己落位，页面打开不等它们：作品列表与它们同时去取。 */
+    if(loadingState.wantsDiscoveryBars())buildBars().catch(error=>console.error('首页横条装载失败',error));
     syncNavigation();wireAllDrag();
     // 路由树里按匹配打开的页面等这一下才开始打开：壳的状态到这时才齐。
     compositionState.routing=true;writeShell({pageOpens:1});syncRouteChrome();

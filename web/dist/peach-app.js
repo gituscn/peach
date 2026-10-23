@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "5b8ec9f1-41d8-4128-8f95-555ca3931b53", e._sentryDebugIdIdentifier = "sentry-dbid-5b8ec9f1-41d8-4128-8f95-555ca3931b53");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "1d51c903-9e86-4830-9e32-834523c3443d", e._sentryDebugIdIdentifier = "sentry-dbid-1d51c903-9e86-4830-9e32-834523c3443d");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -116399,8 +116399,8 @@ function ESt() {
 		p9(),
 		Ibt(),
 		w7.entityShapesReady
-	]).then(() => e.isActive && w7.wantsDiscoveryBars() ? n9() : null).then(() => {
-		e.isActive && (T9(), Rxt(), U9.routing = !0, wl({ pageOpens: 1 }), O9(), q7());
+	]).then(() => {
+		e.isActive && (w7.wantsDiscoveryBars() && n9().catch((e) => console.error("首页横条装载失败", e)), T9(), Rxt(), U9.routing = !0, wl({ pageOpens: 1 }), O9(), q7());
 	}).catch((t) => {
 		e.isActive && console.error("应用启动失败", t);
 	});
@@ -116878,4 +116878,4 @@ JSt(YSt);
 //#endregion
 export { JT as applyTheme, hP as peachHistory, Zo as popCount, Tvt as showToast };
 
-//# debugId=5b8ec9f1-41d8-4128-8f95-555ca3931b53
+//# debugId=1d51c903-9e86-4830-9e32-834523c3443d
