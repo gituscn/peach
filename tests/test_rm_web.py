@@ -126,6 +126,41 @@ class WebDataTests(unittest.TestCase):
         con.close()
         return row
 
+    def test_home_aggregates_recompute_only_when_the_tables_they_read_change(self):
+        """顶栏候选池、统计、名册、筛选项各按自己读的表缓存：换种子、搜一次不重算，作品变了就重算。"""
+        # 存储卷一节读真实挂载的根目录，与这里要验的缓存无关。
+        volumes = mock.patch.object(web_stats, "_storage_volumes", return_value=[])
+        volumes.start()
+        self.addCleanup(volumes.stop)
+
+        def entries():
+            return {key: id(entry) for key, entry in self.contract.cache.items()
+                    if key == "stats-ledger" or key.startswith(("('tops-pool'", "('index'", "facets:"))}
+
+        def load(seed):
+            return (rm_web.q_tops(self.contract, 28, seed=seed),
+                    rm_web.dispatch_api_get(self.contract, "/api/stats", {}),
+                    rm_web.dispatch_api_get(self.contract, "/api/index", {"kind": "performers"}),
+                    rm_web.dispatch_api_get(self.contract, "/api/facets", {"loc": "local,115"}))
+
+        load("first")
+        cached = entries()
+        # 两排候选池、统计、名册、筛选项各一份。
+        self.assertEqual(len(cached), 5)
+        rm_web.w_search_history(self.contract, {"query": "Alice"})
+        load("second")
+        self.assertEqual(entries(), cached)
+        with self.contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET o_count=3 WHERE id=1")
+            connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) "
+                               "VALUES(2,11,'performer','test',1.0)")
+        tops, stats, index, facets = load("second")
+        self.assertFalse(set(entries().items()) & set(cached.items()))
+        self.assertEqual(stats["consumption"]["o_total"], 3)
+        self.assertEqual([(row["k"], row["n"]) for row in tops["performers"]], [("Canonical Alice", 2)])
+        self.assertEqual(next(row["n"] for row in index["items"] if row["k"] == "Canonical Alice"), 2)
+        self.assertEqual([(row["k"], row["n"]) for row in facets["tagperformers"]], [("Canonical Alice", 2)])
+
     def test_creator_card_and_detail_share_available_entity_image(self):
         (self.avatars / f"{entity_image_key('creator', 12)}.img").write_bytes(b"image")
         row = rm_web.q_items(self.contract, {"limit": "10"})["items"][0]
@@ -809,6 +844,131 @@ class WebDataTests(unittest.TestCase):
         tags = rm_web.q_taste(contract, {"window": "all"})["rankings"]["tags"]
         self.assertNotIn("has_image", tags[0])
 
+    def test_taste_dashboard_serves_its_snapshot_while_a_slow_rebuild_runs(self):
+        """口味看板按输入版本留一份快照：没变直接回，变了后台重算，算得慢先回上一份。
+
+        进程重启后从磁盘接上同一份快照，输入没变就不重算。
+        """
+        store_root = Path(self.tmp.name).resolve() / "taste-history"
+        store_root.mkdir()
+        contract = rm_web.WebContract(
+            Path(self.db_path), avatar_root=self.avatars, logo_root=self.logos,
+            taste_history_store=store_root / "history.sqlite",
+            taste_history_import_root=store_root / "imports",
+            taste_history_manifest=store_root / "manifest.json")
+        self.addCleanup(web_stats._TASTE_SNAPSHOTS.clear)
+        real = web_stats.q_taste
+
+        def marked(label):
+            return lambda contract, args: {**real(contract, args), "marker": label}
+
+        def get():
+            return rm_web.dispatch_api_get(contract, "/api/taste", {"window": "all"})
+
+        with mock.patch.object(web_stats, "q_taste", side_effect=marked("first")):
+            first = get()
+        self.assertEqual((first["marker"], first["stale"]), ("first", False))
+        self.assertTrue((store_root / "dashboard-cache-all.json").is_file())
+        with mock.patch.object(web_stats, "q_taste", side_effect=AssertionError("输入没变不该重算")):
+            self.assertEqual(get()["marker"], "first")
+
+        release = threading.Event()
+
+        def slow(contract, args):
+            release.wait(5)
+            return marked("second")(contract, args)
+
+        with contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET play_count=3 WHERE id=1")
+        with mock.patch.object(web_stats, "TASTE_FRESH_WAIT", 0.01), \
+                mock.patch.object(web_stats, "q_taste", side_effect=slow):
+            pending = get()
+            self.assertEqual((pending["marker"], pending["stale"]), ("first", True))
+            self.assertEqual(pending["computed_at"], first["computed_at"])
+            release.set()
+            web_stats._TASTE_SNAPSHOTS[str(contract.db_path), str(contract.taste_history_store), "all"].worker.join(5)
+            fresh = get()
+        self.assertEqual((fresh["marker"], fresh["stale"]), ("second", False))
+
+        web_stats._TASTE_SNAPSHOTS.clear()
+        with mock.patch.object(web_stats, "q_taste", side_effect=AssertionError("重启后输入没变不该重算")):
+            restarted = get()
+        self.assertEqual((restarted["marker"], restarted["stale"]), ("second", False))
+
+    def _taste_contract(self):
+        store_root = Path(self.tmp.name).resolve() / "taste-history"
+        store_root.mkdir()
+        self.addCleanup(web_stats._TASTE_SNAPSHOTS.clear)
+        return rm_web.WebContract(
+            Path(self.db_path), avatar_root=self.avatars, logo_root=self.logos,
+            taste_history_store=store_root / "history.sqlite",
+            taste_history_import_root=store_root / "imports",
+            taste_history_manifest=store_root / "manifest.json")
+
+    def test_a_failed_taste_rebuild_backs_off_and_says_so_until_retried(self):
+        """重算失败后同一份输入不再每次请求都重算：回上一份并带上失败原因，页面据此停止
+        轮询；点重试或输入再变才重算。一份结果都没有时照旧抛出那次的错误。"""
+        contract = self._taste_contract()
+        real = web_stats.q_taste
+
+        def get(**args):
+            return rm_web.dispatch_api_get(contract, "/api/taste", {"window": "all", **args})
+
+        first = get()
+        self.assertNotIn("error", first)
+        with contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET play_count=3 WHERE id=1")
+        failing = mock.Mock(side_effect=RuntimeError("账本读取失败"))
+        with mock.patch.object(web_stats, "q_taste", failing):
+            failed = get()
+            self.assertEqual((failed["stale"], failed["error"], failed["computed_at"]),
+                             (True, "账本读取失败", first["computed_at"]))
+            self.assertEqual(get()["error"], "账本读取失败")
+            self.assertEqual(failing.call_count, 1, "退避期内同一份输入不再重算")
+            later = web_stats.time.monotonic() + web_stats.TASTE_RETRY_AFTER + 1
+            with mock.patch.object(web_stats.time, "monotonic", return_value=later):
+                get()
+            self.assertEqual(failing.call_count, 2)
+        with mock.patch.object(web_stats, "q_taste", side_effect=real):
+            retried = get(retry="1")
+        self.assertEqual(retried["stale"], False)
+        self.assertNotIn("error", retried)
+
+        web_stats._TASTE_SNAPSHOTS.clear()
+        web_stats._taste_snapshot_path(contract, "all").unlink()
+        failing = mock.Mock(side_effect=RuntimeError("账本读取失败"))
+        with mock.patch.object(web_stats, "q_taste", failing):
+            for _ in range(2):
+                with self.assertRaisesRegex(RuntimeError, "账本读取失败"):
+                    get()
+        self.assertEqual(failing.call_count, 1)
+
+    def test_a_taste_snapshot_saved_by_older_code_is_rebuilt_after_an_upgrade(self):
+        """落盘快照的版本带代码指纹：升级之后、账本还没写过之前，旧代码算的那份不算新鲜。"""
+        from peach import taste_preferences
+        contract = self._taste_contract()
+        real = web_stats.q_taste
+        get = lambda: rm_web.dispatch_api_get(contract, "/api/taste", {"window": "all"})  # noqa: E731
+        with mock.patch.object(web_stats, "q_taste",
+                               side_effect=lambda c, a: {**real(c, a), "marker": "old"}):
+            self.assertEqual(get()["marker"], "old")
+        web_stats._TASTE_SNAPSHOTS.clear()
+        with mock.patch.object(taste_preferences, "_policy_fingerprint", return_value="upgraded"), \
+                mock.patch.object(web_stats, "q_taste",
+                                  side_effect=lambda c, a: {**real(c, a), "marker": "new"}):
+            upgraded = get()
+        self.assertEqual((upgraded["marker"], upgraded["stale"]), ("new", False))
+
+    def test_taste_snapshot_ignores_ledger_writes_outside_its_tables(self):
+        """看板只认它读的那几张表：关注检查、任务状态这类写入不让它重算。"""
+        contract = self._taste_contract()
+        get = lambda: rm_web.dispatch_api_get(contract, "/api/taste", {"window": "all"})  # noqa: E731
+        get()
+        with contract.write_transaction() as connection:
+            connection.execute("INSERT INTO search_history(query,last_used_at) VALUES('足交','2026-08-20')")
+        with mock.patch.object(web_stats, "q_taste", side_effect=AssertionError("无关写入不该重算")):
+            self.assertFalse(get()["stale"])
+
     def test_items_can_skip_repeated_total_count_on_later_pages(self):
         result = rm_web.q_items(
             self.contract, {"limit": "1", "offset": "0", "count": "0"},
@@ -1185,7 +1345,7 @@ class WebDataTests(unittest.TestCase):
             "/api/feeds/schedule",
             "/api/downloads", "/api/resources/search",
             "/api/wants", "/api/wants/magnets",
-            "/api/jav/detail", "/api/jav/reviews", "/api/jav/image", "/api/jav/resources", "/api/jav/discoveries",
+            "/api/jav/detail", "/api/jav/reviews", "/api/jav/resources", "/api/jav/discoveries",
         })
         self.assertEqual(set(rm_web.POST_HANDLERS), {
             "/api/tag-management", "/api/tag-management/preview",
@@ -3085,6 +3245,37 @@ class DuplicateDetectionTests(unittest.TestCase):
         self.assertEqual(result["work_total"], 1)
         self.assertEqual({row["part_group"]["count"] for row in result["items"]}, {2})
 
+    def test_orientation_filtered_list_counts_only_volumes_of_that_orientation(self):
+        """FC2-PPV-3189161 前三卷横屏、后两卷竖屏：竖屏列表只算两卷竖屏，排除竖屏的首页主网格
+        只算三卷横屏，队列仍是整部作品。"""
+        ids = [self.add("FC2-PPV-3189161", 600 + n, 1_000 * n, name=f"FC2-3189161-{n}.mp4") for n in range(1, 6)]
+        lone = [self.add("FC2-PPV-4028828", 1000 + n, 2_000, name=f"FC2-4028828-{n}.mp4") for n in (1, 2)]
+        for asset_id, orient in zip(ids + lone, ["横屏"] * 3 + ["竖屏"] * 2 + ["横屏", "竖屏"]):
+            self.con.execute("UPDATE asset SET ctx_orient=? WHERE id=?", (orient, asset_id))
+        self.con.commit()
+
+        portrait = rm_web.q_items(self.contract, {"orient": "竖屏", "limit": "10"})["items"]
+        groups = {row["id"]: row["part_group"] for row in portrait}
+        self.assertEqual(set(groups), {ids[3], ids[4], lone[1]})
+        self.assertEqual(groups[ids[3]], {
+            "key": "FC2-PPV-3189161", "title": "FC2-PPV-3189161", "count": 2, "seed_id": ids[0],
+            "item_ids": [ids[3], ids[4]], "total_duration": 604 + 605, "total_size": 4_000 + 5_000,
+        })
+        self.assertEqual((groups[lone[1]]["count"], groups[lone[1]]["item_ids"]), (1, [lone[1]]))
+
+        landscape = rm_web.q_items(self.contract, {"exclude_vertical": "1", "limit": "10"})["items"]
+        groups = {row["id"]: row["part_group"] for row in landscape}
+        self.assertEqual(set(groups), {*ids[:3], lone[0]})
+        self.assertEqual(groups[ids[0]], {
+            "key": "FC2-PPV-3189161", "title": "FC2-PPV-3189161", "count": 3, "seed_id": ids[0],
+            "item_ids": ids[:3], "total_duration": 601 + 602 + 603, "total_size": 1_000 + 2_000 + 3_000,
+        })
+        self.assertEqual(groups[lone[0]]["count"], 1)
+
+        everything = rm_web.q_items(self.contract, {"q": "FC2-PPV-3189161", "limit": "10"})["items"]
+        self.assertEqual({row["part_group"]["count"] for row in everything}, {5}, "不按画幅筛时仍是整组")
+        self.assertEqual(len(rm_web.q_parts(self.contract, {"id": str(ids[3])})["items"]), 5)
+
     def test_a_lone_live_volume_is_a_single_card_and_queue(self):
         """FC2 合集第 3 卷进了回收站，在库的只剩第 1 卷：照单个文件摆，队列不收回收站那卷。"""
         first = self.add("FC2-PPV-3312576", 1800, 1_000_000_000, name="FC2-PPV-3312576-1.mp4")
@@ -3588,6 +3779,22 @@ class CatalogVersionTests(unittest.TestCase):
         self.assertEqual({row['edition_group']['count'] for row in result['items']}, {2})
         self.assertEqual([row['id'] for row in q_parts(self.contract, {'id': 2})['items']], [1, 2])
         self.assertEqual([row['id'] for row in q_parts(self.contract, {'id': 4})['items']], [3, 4])
+
+    def test_orientation_filtered_list_counts_only_versions_of_that_orientation(self):
+        """整片横屏、4K 修复分卷竖屏：按画幅筛的列表只数同画幅的版本，只剩一个就是 1。"""
+        self.add(1, 'FC-1110408.mp4', 3213)
+        self.add(2, 'FC2-PPV-1110408-1-4K修复.mp4', 3013, 2160)
+        self.add(3, 'FC2-PPV-1110408-2-4K修复.mp4', 200, 2160)
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.executemany('UPDATE asset SET ctx_orient=? WHERE id=?', [('横屏', 1), ('竖屏', 2), ('竖屏', 3)])
+        editions = lambda args: {row['id']: row['edition_group'] for row in q_items(self.contract, args)['items']}
+        portrait = editions({'orient': '竖屏'})
+        self.assertEqual(set(portrait), {2, 3})
+        self.assertEqual((portrait[2]['count'], portrait[2]['item_ids'], portrait[2]['seed_id']), (1, [2, 3], 1))
+        self.assertEqual(len(portrait[2]['editions']), 1)
+        landscape = editions({'exclude_vertical': '1'})
+        self.assertEqual((set(landscape), landscape[1]['count'], landscape[1]['item_ids']), ({1}, 1, [1]))
+        self.assertEqual({group['count'] for group in editions({'q': '1110408'}).values()}, {2})
 
     def test_full_file_and_same_quality_parts_have_two_playable_forms(self):
         self.add(1, 'FC-1110408.mp4', 3213)

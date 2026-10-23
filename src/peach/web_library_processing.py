@@ -9,6 +9,26 @@ from .processing_control import control_for, initial_estimate, valid_mode, mode_
 
 ACTIVE = ('running', 'pausing', 'paused')
 
+#: 回给页面的状态字段：`frontend/src/react/library-processing/library-processing.ts` 的
+#: `LibraryProcessingData`，加上对应任务中心那一行的 `run_id`。状态文件里另有续跑用的 `local_metadata`（带完整媒体路径）、
+#: `asset_ids`、`completed_metadata` 等大字段，页面一个都不读；照发的话每页每 10 秒轮询一次
+#: 就是两兆多，还把媒体路径交给了浏览器。续跑与重试读的是 `_current()`，不经过这里。
+PUBLIC_FIELDS = frozenset({
+    'run_id', 'metadata_only', 'status', 'speed_mode', 'eta_seconds_min', 'eta_seconds_max', 'eta_kind',
+    'eta_scope', 'eta_initial', 'job_id', 'stage', 'requested_stage', 'steps', 'checked', 'total',
+    'scanned', 'scanned_bytes', 'identified', 'candidates', 'auto_applied', 'covers', 'previews',
+    'performer_aliases', 'performer_avatars', 'performer_profile_conflicts',
+    'performer_profile_failed', 'error', 'issue_count', 'paused_count', 'issue_preview',
+    'issues_log', 'issues_truncated', 'retryable_asset_ids', 'notes', 'current_asset_id',
+    'current_asset_name', 'current_action', 'current_started_at', 'last_progress_at', 'stalled',
+    'waited_seconds', 'completed_at',
+})
+
+
+def public_state(state):
+    """任务状态的页面投影：只留 `PUBLIC_FIELDS`。"""
+    return {key: value for key, value in state.items() if key in PUBLIC_FIELDS}
+
 
 def _current(contract):
     live = contract.library_processing_job.snapshot()
@@ -40,7 +60,7 @@ def q_library_processing(contract, _args):
         path = issues_path(settings_file.active(), str(state['job_id']))
         if path.is_file():
             state['issues_log'] = str(path)
-    return state
+    return public_state(state)
 
 
 def _control_action(contract, config, body):
@@ -183,10 +203,10 @@ def w_library_processing(contract, body, *, resume=False):
         return _control_action(contract, config, body)
     previous = _current(contract)
     if previous.get('status') in ACTIVE and not resume:
-        return previous
+        return public_state(previous)
     retry_ids, asset_ids, stage = _processing_request(contract, config, previous, body)
     if retry_ids is not None and not retry_ids:
-        return previous
+        return public_state(previous)
     mode = valid_mode(control_for(config).mode if resume else
                       (body or {}).get('speed_mode') or control_for(config).mode)
     control_for(config).request('set_speed', mode=mode)
@@ -209,8 +229,8 @@ def w_library_processing(contract, body, *, resume=False):
     # 人会以为点错了。
     labels = {ALL_STAGES: '准备处理', SCAN_STAGE: '准备扫描文件', COLLECT_STAGE: '准备采集资料',
               METADATA_STAGE: '准备采集资料', PREVIEWS_STAGE: '准备生成预览图'}
-    return contract.library_processing_job.start(
+    return public_state(contract.library_processing_job.start(
         work, restart=True, initial={'stage': labels[stage], 'requested_stage': stage,
                                     **initial_estimate(config, contract.db_path, stage, asset_ids or retry_ids, mode)},
         recovery={'stage': stage, 'speed_mode': mode, **({'asset_ids': asset_ids or retry_ids}
-                                    if asset_ids is not None or retry_ids is not None else {})})
+                                    if asset_ids is not None or retry_ids is not None else {})}))

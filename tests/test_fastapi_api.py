@@ -515,6 +515,18 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(response.content.startswith(b"\x89PNG\r\n\x1a\n"))
         self.assertEqual(response.headers["cache-control"], "no-cache")
 
+    async def test_the_small_logos_are_the_sizes_their_names_say(self):
+        """侧栏与登录卡按 `srcset` 取的两张小站标：文件名写的边长就是图的边长。"""
+        from PIL import Image
+
+        for size in (64, 128):
+            with self.subTest(size=size):
+                response = await self.client.get(f"/peach-logo-{size}.png")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers["content-type"], "image/png")
+                with Image.open(io.BytesIO(response.content)) as logo:
+                    self.assertEqual(logo.size, (size, size))
+
     async def test_the_favicon_is_served_without_a_session_and_revalidates(self):
         """浏览器取图标时手里没有会话，这条路径因此不设防，也不跳登录页。
 
@@ -580,6 +592,57 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                        "..%2fapp.js", "peach-app.js.map", "peach-app.mjs", "Peach-App.js", "other.js"):
             denied = await self.client.get(f"/dist/{escape}?t=secret")
             self.assertEqual(denied.status_code, 404, f"{escape} 不该被提供")
+
+    async def test_main_bundle_is_compressed_once_per_file_version(self):
+        import gzip
+        from peach import routes_pages
+        bundle = self.root / "dist" / "peach-app.js"
+        bundle.write_text("export const filler = '" + "peach " * 2000 + "';", encoding="utf-8")
+        path, params = "/dist/peach-app.js", {"t": "secret"}
+        packed, plain = {"Accept-Encoding": "gzip"}, {"Accept-Encoding": "identity"}
+        with patch.object(routes_pages.gzip, "compress", wraps=gzip.compress) as compress:
+            served = await self.client.get(path, params=params, headers=packed)
+            again = await self.client.get(path, params=params, headers=packed)
+            self.assertEqual(compress.call_count, 1)
+            head = await self.client.head(path, params=params, headers=packed)
+            original = await self.client.get(path, params=params, headers=plain)
+            for etag, headers in ((served.headers["etag"], packed), (original.headers["etag"], plain)):
+                cached = await self.client.get(path, params=params, headers={**headers, "If-None-Match": etag})
+                self.assertEqual(cached.status_code, 304)
+            bundle.write_text("export const filler = '" + "pêche " * 2000 + "';", encoding="utf-8")
+            changed = await self.client.get(path, params=params,
+                                            headers={**packed, "If-None-Match": served.headers["etag"]})
+            self.assertEqual(compress.call_count, 2)
+        self.assertEqual(changed.status_code, 200)
+        self.assertIn("pêche".encode(), changed.content)
+        for response in (served, again):
+            self.assertEqual(response.headers["content-encoding"], "gzip")
+            self.assertEqual(response.headers["vary"], "Accept-Encoding")
+            self.assertEqual(response.content, "export const filler = '{}';".format("peach " * 2000).encode())
+            self.assertLess(int(response.headers["content-length"]), 1000)
+        self.assertEqual((head.content, head.headers["content-length"], head.headers["etag"]),
+                         (b"", served.headers["content-length"], served.headers["etag"]))
+        self.assertNotIn("content-encoding", original.headers)
+        self.assertEqual(original.content, served.content)
+        self.assertNotEqual(original.headers["etag"], served.headers["etag"])
+
+    async def test_main_bundle_chunks_need_the_session_and_stay_cached_for_good(self):
+        """按页拆出的 chunk 名字带内容哈希（ADR-0118）：要会话，取到后浏览器一年内不回源，共享缓存不许留。"""
+        name = "peach-app.stats-page-Ab1_x-Y9.js"
+        (self.root / "dist" / name).write_text("export const page = 1;", encoding="utf-8")
+        self.assertEqual((await self.client.get(f"/dist/{name}")).status_code, 401)
+        for method in ("GET", "HEAD"):
+            served = await self.client.request(method, f"/dist/{name}", params={"t": "secret"})
+            self.assertEqual(served.status_code, 200, method)
+            self.assertEqual(served.headers["content-type"], "text/javascript; charset=utf-8")
+            self.assertEqual(served.headers["cache-control"], "private, max-age=31536000, immutable")
+        self.assertEqual((await self.client.get(f"/dist/{name}", params={"t": "secret"})).content,
+                         b"export const page = 1;")
+        for missing in ("peach-app.gone-Zz99Zz99.js", "peach-app.stats-page-Ab1_x-Y9.js.map", "peach-app..js",
+                        "peach-app.a.b.js", "peach-pages.chunk-Ab12Cd34.js", "peach-app.%2e%2e%2fapp.js",
+                        "peach-app.stats-page-Ab1_x-Y9.mjs"):
+            denied = await self.client.get(f"/dist/{missing}?t=secret")
+            self.assertEqual(denied.status_code, 404, f"{missing} 不该被提供")
 
     async def test_page_bundle_is_public_with_only_its_literal_names(self):
         for name, media in (("peach-pages.js", "text/javascript"), ("peach-pages.css", "text/css")):
@@ -2656,6 +2719,31 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             self.app.state.http_transport.client = original
             fake.close()
 
+    async def test_jav_image_serves_source_bytes_with_etag_and_drops_failures(self):
+        """库外作品的样张与来源头像以图片本身下发：带 ETag 与私有缓存时效，取不到回 404 不缓存。"""
+        from peach.javdb_public import PublicSourceUnavailable
+        jpeg = b'\xff\xd8\xff\xe0' + b'sample-bytes' * 400
+        with patch('peach.web_jav_detail.jav_image', return_value=(jpeg, 600)) as source:
+            first = await self.client.get('/jav-image?code=EXM-001&image=3&t=secret',
+                                          headers={'Accept-Encoding': 'gzip'})
+            self.assertEqual((first.status_code, first.content), (200, jpeg))
+            self.assertEqual(first.headers['content-type'], 'image/jpeg')
+            # 已压缩的图片不再过一遍 gzip。
+            self.assertNotIn('content-encoding', first.headers)
+            self.assertEqual(first.headers['cache-control'], 'private, max-age=600')
+            revalidated = await self.client.get('/jav-image?code=EXM-001&image=3&t=secret',
+                                                headers={'If-None-Match': first.headers['etag']})
+            self.assertEqual((revalidated.status_code, revalidated.content), (304, b''))
+        self.assertEqual(source.call_args.args[1], {'code': 'EXM-001', 'image': '3'})
+        for failure in (PublicSourceUnavailable('offline'), ValueError('预览图不存在')):
+            with self.subTest(failure=failure), patch('peach.web_jav_detail.jav_image', side_effect=failure):
+                missing = await self.client.get('/jav-image?code=EXM-001&image=3&t=secret')
+                self.assertEqual((missing.status_code, missing.headers['cache-control']), (404, 'no-store'))
+        # 来源回来的不是位图（例如 SVG）就不下发：同源的 SVG 能执行脚本。
+        with patch('peach.web_jav_detail.jav_image', return_value=(b'<svg xmlns="http://www.w3.org/2000/svg"/>', 600)):
+            refused = await self.client.get('/jav-image?code=EXM-001&image=3&t=secret')
+        self.assertEqual(refused.status_code, 404)
+
     async def test_follow_cover_serves_cached_frame_and_reports_retryable_failure(self):
         connection = sqlite3.connect(self.db)
         connection.executescript((ROOT / "migrations" / "0018_online_follow.sql").read_text(
@@ -3241,6 +3329,32 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         full = await self.client.get("/cover?code=ABC-123", headers=headers)
         self.assertEqual(full.content, source.read_bytes())
 
+    async def test_the_card_start_tier_is_an_800_edge_webp_next_to_the_grid_tier(self):
+        """卡片起始档 `/cover?thumb=2` 长边 800，和 1600 那一档同目录、按长边各成一个文件。
+
+        两档共用一个文件名会让先到的那一档顶替另一档：取 800 的拿到 1600 那份就白省了，
+        量过尺寸往上换的拿到 800 那份就永远糊着。
+        """
+        from PIL import Image
+
+        self.cover_root.mkdir(parents=True, exist_ok=True)
+        source = self.cover_root / "ABC-124.jpg"
+        Image.new("RGB", (2400, 1620), (200, 120, 90)).save(source, "JPEG", quality=95)
+        headers = {"X-Token": "secret"}
+        small = await self.client.get("/cover?code=ABC-124&thumb=2", headers=headers)
+        grid = await self.client.get("/cover?code=ABC-124&thumb=1", headers=headers)
+        again = await self.client.get("/cover?code=ABC-124&thumb=2", headers=headers)
+        self.assertEqual([small.status_code, grid.status_code], [200, 200])
+        self.assertEqual(small.headers["content-type"], "image/webp")
+        with Image.open(io.BytesIO(small.content)) as derived:
+            self.assertEqual(derived.size, (800, 540))
+        with Image.open(io.BytesIO(grid.content)) as derived:
+            self.assertEqual(derived.size, (1600, 1080))
+        self.assertEqual(again.content, small.content)
+        self.assertEqual(sorted(path.name for path in (self.cover_root.parent / "cover-thumbs").iterdir()
+                                if path.name.startswith("ABC-124")),
+                         ["ABC-124.1600.webp", "ABC-124.800.webp"])
+
     async def test_a_warm_photo_thumbnail_answers_without_resolving_the_original(self):
         """缩略图已经躺在本地时，这条路径不再去解析原图。
 
@@ -3666,6 +3780,8 @@ PUBLIC_ROUTES = {
     ("GET,HEAD", "/favicon.ico"),
     ("GET,HEAD", "/favicon.svg"),
     ("GET,HEAD", "/peach-logo.png"),
+    ("GET,HEAD", "/peach-logo-64.png"),
+    ("GET,HEAD", "/peach-logo-128.png"),
     # 入口页的页面包（ADR-0094）。登录页在拿到会话之前就要画出来，首启、登录与错误三页都由它画。
     # 只放这两个文件：它们提交进 Git、随仓库分发，不读账本、不含配置与凭据，内容不随登录与否
     # 变化，也不 import 别的产物；其余 `/dist/*` 仍走要会话的 `/dist/{name}`。
@@ -3776,7 +3892,7 @@ class LoginPageWithoutSessionTests(unittest.IsolatedAsyncioTestCase):
     """设了访问密码的实例上，没有会话也画得出登录页：它要的资源都能取，别的产物照旧要会话。"""
 
     PAGE_ASSETS = ("/dist/peach-pages.css", "/dist/peach-pages.js", "/vendor/inter/5.3.0/index.css",
-                   "/peach-logo.png", "/favicon.ico")
+                   "/peach-logo.png", "/peach-logo-64.png", "/peach-logo-128.png", "/favicon.ico")
     SESSION_ASSETS = ("/dist/peach-app.js", "/dist/peach-app.css", "/app.css", "/board.css")
 
     async def asyncSetUp(self):

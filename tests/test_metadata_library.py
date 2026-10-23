@@ -2454,6 +2454,30 @@ class LibraryWatchdogTests(unittest.TestCase):
         with patch('peach.web_library_processing.settings_file.active', return_value=config):
             self.assertEqual(q_library_processing(contract, {})['issues_log'], str(log))
 
+    def test_status_responses_leave_resume_fields_and_media_paths_on_the_server(self):
+        """状态文件里续跑用的大字段（含完整媒体路径）不随每 10 秒一次的轮询发给页面。"""
+        from peach.web_library_processing import q_library_processing, w_library_processing
+        config = self._config(self.root / 'media')
+        state = {'status': 'failed', 'job_id': 'old', 'requested_stage': 'all', 'checked': 2,
+                 'retryable_asset_ids': [7], 'asset_ids': [7, 8], 'completed_metadata': [8],
+                 'local_metadata': {'7': {'path': 'R:\\media\\secret\\a.mp4'}}, 'progress_seq': 3}
+        state_path(config).parent.mkdir(parents=True, exist_ok=True)
+        state_path(config).write_text(json.dumps(state), encoding='utf-8')
+        contract = Mock()
+        contract.db_path = self.root / 'database/ledger.db'
+        contract.library_processing_job.snapshot.return_value = None
+        with patch('peach.web_library_processing.settings_file.active', return_value=config):
+            read = q_library_processing(contract, {})
+            # 正在跑时再点一次开始，回的是当前任务，同样只回投影。
+            contract.library_processing_job.snapshot.return_value = {**state, 'status': 'running'}
+            again = w_library_processing(contract, {})
+        self.assertEqual((read['status'], read['checked'], read['retryable_asset_ids']), ('failed', 2, [7]))
+        self.assertEqual((again['status'], again['requested_stage']), ('running', 'all'))
+        for response in (read, again):
+            for field in ('asset_ids', 'completed_metadata', 'local_metadata', 'progress_seq'):
+                self.assertNotIn(field, response)
+            self.assertNotIn('secret', json.dumps(response))
+
     @windows_ledger_roots
     def test_each_issue_names_the_item_its_path_and_where_the_full_log_is(self):
         """一句「NFO 无法解析」加一个链接，是哪个文件得逐个点开才知道；改名或去磁盘上

@@ -56,7 +56,8 @@ import { BrowserSources, SOURCE_TILE } from './browser-sources';
 import {
   DEFAULT_WINDOW, fetchTaste, fetchTasteJob, historySpan, IDLE_POLL_MS, importTasteExport, radarRows,
   rankDetail, rankShares, removeTasteSource, startTasteRefresh, tasteDate, tasteDimensions, tasteHours,
-  tasteKey, TASTE_REFRESH_KEY, TASTE_WINDOWS, type RankRow, type TasteData, type TasteJob,
+  tasteKey, tasteRefetchInterval, tasteTime, TASTE_REFRESH_KEY, TASTE_WINDOWS, type RankRow, type TasteData,
+  type TasteJob,
 } from './taste';
 
 /** 收起时露这么多条名次。二十条一次铺开会把下面几块整个顶到屏外。 */
@@ -418,6 +419,7 @@ export function TastePage(props: TasteProps) {
     /* 换范围时留住上一份：这一屏的结构不变，只有数在变。退回骨架就是把已经读到的东西
        收走再放回来，而服务端那一层缓存多半立刻就回来了。 */
     placeholderData: keepPreviousData,
+    refetchInterval: (query) => tasteRefetchInterval(query.state.data),
   });
   const { job, running, outcome, start: refresh } = useBackgroundJob<TasteJob>({
     queryKey: TASTE_REFRESH_KEY,
@@ -430,6 +432,12 @@ export function TastePage(props: TasteProps) {
       void queryClient.invalidateQueries({ queryKey: ['taste'] });
       toast(state.warnings?.length ? '部分浏览记录未取得' : '已更新口味分析');
     },
+  });
+  /* 重算失败后服务端暂不再算，页面也停了轮询。「立即重试」让服务端跳过等待再算一次，回来的
+     那一份换进它所属范围的缓存：算完就是新结果，还在算就带着 `stale` 接着轮询。 */
+  const retry = useMutation({
+    mutationFn: (window: string) => fetchTaste(window, undefined, true),
+    onSuccess: (result, window) => { queryClient.setQueryData(tasteKey(window), result) },
   });
   const load = useMutation({
     mutationFn: (chosen: File) => importTasteExport(chosen),
@@ -478,6 +486,7 @@ export function TastePage(props: TasteProps) {
   const identified = coverage.identified || 0;
   const problem = refresh.error ? errorMessage(refresh.error)
     : load.error ? errorMessage(load.error)
+    : retry.error ? errorMessage(retry.error)
     : outcome?.status === 'failed' ? (outcome.error || '读取未取得')
     : '';
 
@@ -520,6 +529,12 @@ export function TastePage(props: TasteProps) {
           {running ? <TaskProgress label={job?.message || '正在读取浏览记录并更新口味分析'}
             value={job?.checked} total={job?.total} /> : null}
           {load.isPending ? <TaskProgress label="正在导入口味数据" /> : null}
+          {data.stale && data.error ? (
+            <Note tone="error" action={<Button variant="secondary" size="small"
+              {...busyProps(retry.isPending)} onClick={() => retry.mutate(range)}>立即重试</Button>}>
+              {`口味分析更新失败，当前显示 ${tasteTime(data.computed_at)} 的结果。${data.error}`}
+            </Note>
+          ) : data.stale ? <TaskProgress label={`正在更新口味分析，当前显示 ${tasteTime(data.computed_at)} 的结果`} /> : null}
           {problem ? <Note tone="error">{problem}</Note> : null}
           {outcome?.warnings?.length ? <Note tone="warning">{outcome.warnings.join('；')}</Note> : null}
         </div>

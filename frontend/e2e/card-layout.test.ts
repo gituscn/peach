@@ -190,6 +190,49 @@ describe('混排作品的画面框',()=>{
     assert.deepEqual(dark,[],`${corners.length} 个角里有 ${dark.length} 个透出了黑`);
    }finally{await context.close()}
   });
+  /* 竖屏格一律 9:16，九宫格切出来的海报却是 480×850（略宽）或 480×876（略高）。按 contain 放，
+   * 沿短的那一轴会留下不到一像素到几像素的黑底，随落点的小数时有时无。白图浅色页面上量四条边的中段。
+   * 默认大图密度下 1280 宽排两列，一格 470×836：视口给到 1200 高，第一行整格都在截图范围里。 */
+  it(`竖屏格的视频海报铺满，四边不留黑线（${scale} 倍像素）`,async()=>{
+   const viewport={width:1280,height:1200};
+   const context=await browser.newContext({viewport,deviceScaleFactor:scale,colorScheme:'light'});
+   try{
+    const page=await context.newPage();
+    await page.addInitScript(()=>localStorage.setItem('peach.settings.v1',JSON.stringify({detailAutoplay:false})));
+    await page.route('**/api/items?*',route=>route.fulfill({json:{items:Array.from({length:6},(_,i)=>({
+     id:92000+i,name:`竖屏示例 ${i}`,creator:'示例创作者',is_jav:false,has_thumb:true,has_cover:false,
+     width:1080,height:1920,location:'local',duration:120,
+    })),total:6,has_more:false}}));
+    await page.route('**/poster?*',route=>{
+     const tall=Number(new URL(route.request().url()).searchParams.get('id'))%2===1;
+     const [w,h]=tall?[480,876]:[480,850];
+     return route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="white"/></svg>`});
+    });
+    await page.goto(requiredEnv('PEACH_E2E_ORIGIN')+'/?orient='+encodeURIComponent('竖屏'),{waitUntil:'load'});
+    await page.evaluate(()=>{document.documentElement.dataset.theme='light';document.documentElement.classList.remove('dark')});
+    const frames=page.locator('#grid [data-media-pic][data-pic-portrait]');
+    await frames.first().waitFor();
+    const edges=[];
+    for(const index of [0,1]){
+     const box=await frames.nth(index).evaluate(async node=>{
+      const img=node.querySelector('img')!;
+      if(!img.complete)await new Promise(done=>img.addEventListener('load',done,{once:true}));
+      await new Promise(requestAnimationFrame);
+      return node.getBoundingClientRect().toJSON();
+     });
+     await page.mouse.move(0,0);
+     assert.ok(box.width>40&&box.height>80&&box.top>=0&&box.bottom<=viewport.height,`第 ${index+1} 格不在截图范围里：${JSON.stringify(box)}`);
+     for(const [side,clip] of Object.entries({
+      top:{x:box.left+20,y:box.top,width:box.width-40,height:2},
+      bottom:{x:box.left+20,y:box.bottom-2,width:box.width-40,height:2},
+      left:{x:box.left,y:box.top+40,width:2,height:box.height-80},
+      right:{x:box.right-2,y:box.top+40,width:2,height:box.height-80},
+     }))edges.push({index,side,min:await darkest(page,clip)});
+    }
+    const dark=edges.filter(edge=>edge.min<230);
+    assert.deepEqual(dark,[],`竖屏格的边上露出了黑底：${JSON.stringify(edges)}`);
+   }finally{await context.close()}
+  });
  }
  /* 大图档一格的模块宽 336px，比 320 的手机屏还宽：网格的最小列宽要让给视口，整张卡留在屏内。 */
  for(const size of ['big','small']){

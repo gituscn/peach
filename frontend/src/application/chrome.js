@@ -191,7 +191,8 @@ if(/Chrome|Chromium|Edg\//.test(navigator.userAgent)){
   effects.listen(document, 'transitionrun', event=>{if(sizingEvent(event))sizing++}, true);
   const settleSizing=event=>{
     if(!sizingEvent(event)||!sizing||--sizing)return;
-    const nodes=[...stale];stale.clear();nodes.forEach(node=>attached.get(node)?.draw());
+    // 过渡刚停，补画不等空闲：终态那一帧就该是终态尺寸的贴图。
+    stale.forEach(node=>pendingOptics.add(node));stale.clear();flushOptics(null);
   };
   effects.listen(document, 'transitionend', settleSizing, true);effects.listen(document, 'transitioncancel', settleSizing, true);
   function attach(node){
@@ -200,34 +201,69 @@ if(/Chrome|Chromium|Edg\//.test(navigator.userAgent)){
     const map=document.createElementNS(ns,'feImage');map.setAttribute('result','edge-map');map.setAttribute('preserveAspectRatio','none');
     const displacement=document.createElementNS(ns,'feDisplacementMap');displacement.setAttribute('in','SourceGraphic');displacement.setAttribute('in2','edge-map');displacement.setAttribute('xChannelSelector','R');displacement.setAttribute('yChannelSelector','G');displacement.setAttribute('scale','24');filter.append(map,displacement);defs.append(filter);
     let previous='';
-    const draw=()=>{
-      const width=Math.round(node.clientWidth),height=Math.round(node.clientHeight);if(!width||!height)return;
-      const radius=Math.min(parseFloat(getComputedStyle(node).borderRadius)||22,width/2,height/2);const key=`${width}:${height}:${radius}`;if(previous===key)return;
-      if(sizing){
-        if(node.dataset.opticGlass&&node.style.getPropertyValue('--glass-optic')!=='blur(14px)')node.style.setProperty('--glass-optic','blur(14px)');
-        previous='';stale.add(node);return;
-      }
+    const fallback=()=>{
+      if(node.dataset.opticGlass&&node.style.getPropertyValue('--glass-optic')!=='blur(14px)')node.style.setProperty('--glass-optic','blur(14px)');
+      previous='';stale.add(node);
+    };
+    const draw=()=>{if(sizing)fallback();else{pendingOptics.add(node);scheduleOptics()}};
+    const paint=(width,height,radius)=>{
+      const key=`${width}:${height}:${radius}`;if(previous===key)return;
       previous=key;
-      const ratio=Math.min(1,600/width,600/height);const w=Math.max(2,Math.round(width*ratio)),h=Math.max(2,Math.round(height*ratio));
-      /* 画布只拿来写一次像素、读一次 PNG，走 CPU 那一种：默认的 GPU 画布在 toDataURL 时要把
-         像素读回来，第一次还得先建 GPU 上下文，冷启动实测单这一下就是一百毫秒上下，之后的
-         重画也时不时要和合成抢 GPU 等几十毫秒。 */
-      const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d',{willReadFrequently:true});const pixels=ctx.createImageData(w,h);
-      const distance=(x,y)=>{const qx=Math.abs(x-width/2)-(width/2-radius),qy=Math.abs(y-height/2)-(height/2-radius);return Math.hypot(Math.max(qx,0),Math.max(qy,0))+Math.min(Math.max(qx,qy),0)-radius};
-      const depth=Math.min(24,Math.min(width,height)/3);
-      for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-        const px=(x+.5)/ratio,py=(y+.5)/ratio,inside=-distance(px,py);let dx=0,dy=0;
-        if(inside>0&&inside<depth){const gx=distance(px+.5,py)-distance(px-.5,py),gy=distance(px,py+.5)-distance(px,py-.5),length=Math.hypot(gx,gy)||1;const bend=Math.sin(Math.PI*inside/depth);dx=gx/length*bend;dy=gy/length*bend}
-        const i=(y*w+x)*4;pixels.data[i]=128+dx*116;pixels.data[i+1]=128+dy*116;pixels.data[i+2]=128;pixels.data[i+3]=255;
-      }
-      ctx.putImageData(pixels,0,0);map.setAttribute('href',canvas.toDataURL());map.setAttribute('width',width);map.setAttribute('height',height);filter.setAttribute('x','0');filter.setAttribute('y','0');filter.setAttribute('width',width);filter.setAttribute('height',height);
+      map.setAttribute('href',edgeMap(width,height,radius));map.setAttribute('width',width);map.setAttribute('height',height);filter.setAttribute('x','0');filter.setAttribute('y','0');filter.setAttribute('width',width);filter.setAttribute('height',height);
       /* 模糊排在位移前面：backdrop-filter 是一条流水线，先糊的是身后那片内容，
          再由边缘法线场把已经糊掉的像素往外挤，边上那圈拉伸就带着颜色一起走。
          反过来先位移再糊，折射出来的亮边会被第二步抹平，只剩一块均匀磨砂。 */
       node.style.setProperty('--glass-optic',`blur(14px) url("#${id}")`);node.dataset.opticGlass='true';
     };
     const observer=effects.resize(draw);observer.observe(node);
-    attached.set(node,{observer,filter,draw,optic:node.style.getPropertyValue('--glass-optic'),priority:node.style.getPropertyPriority('--glass-optic'),flag:node.dataset.opticGlass});draw();
+    attached.set(node,{observer,filter,draw,paint,fallback,optic:node.style.getPropertyValue('--glass-optic'),priority:node.style.getPropertyPriority('--glass-optic'),flag:node.dataset.opticGlass});draw();
+  }
+  /* 位移贴图只由宽、高、圆角决定：顶栏那几枚圆钮同一个尺寸，侧栏开合来回也只在两档之间换，
+     画过的按这三个数留着直接复用。 */
+  const edgeMaps=new Map();
+  function edgeMap(width,height,radius){
+    const key=`${width}:${height}:${radius}`;const cached=edgeMaps.get(key);
+    if(cached){edgeMaps.delete(key);edgeMaps.set(key,cached);return cached}
+    const ratio=Math.min(1,600/width,600/height);const w=Math.max(2,Math.round(width*ratio)),h=Math.max(2,Math.round(height*ratio));
+    /* 画布只拿来写一次像素、读一次 PNG，走 CPU 那一种：默认的 GPU 画布在 toDataURL 时要把
+       像素读回来，第一次还得先建 GPU 上下文，冷启动实测单这一下就是一百毫秒上下，之后的
+       重画也时不时要和合成抢 GPU 等几十毫秒。 */
+    const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d',{willReadFrequently:true});const pixels=ctx.createImageData(w,h);
+    const distance=(x,y)=>{const qx=Math.abs(x-width/2)-(width/2-radius),qy=Math.abs(y-height/2)-(height/2-radius);return Math.hypot(Math.max(qx,0),Math.max(qy,0))+Math.min(Math.max(qx,qy),0)-radius};
+    const depth=Math.min(24,Math.min(width,height)/3);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const px=(x+.5)/ratio,py=(y+.5)/ratio,inside=-distance(px,py);let dx=0,dy=0;
+      if(inside>0&&inside<depth){const gx=distance(px+.5,py)-distance(px-.5,py),gy=distance(px,py+.5)-distance(px,py-.5),length=Math.hypot(gx,gy)||1;const bend=Math.sin(Math.PI*inside/depth);dx=gx/length*bend;dy=gy/length*bend}
+      const i=(y*w+x)*4;pixels.data[i]=128+dx*116;pixels.data[i+1]=128+dy*116;pixels.data[i+2]=128;pixels.data[i+3]=255;
+    }
+    ctx.putImageData(pixels,0,0);const href=canvas.toDataURL();
+    edgeMaps.set(key,href);if(edgeMaps.size>24)edgeMaps.delete(edgeMaps.keys().next().value);
+    return href;
+  }
+  /* 贴图放到空闲时画，先把排队的几块玻璃的尺寸一起量完再统一写：边量边写的话，前一块写进
+     `--glass-optic` 弄脏的样式会让后一块读圆角时当场整树重算。空闲时间用完就把剩下的
+     留到下一段空闲；最多等 300ms，在那之前玻璃用样式表里的纯模糊。 */
+  const pendingOptics=new Set();let opticsHandle=0;
+  const idle=typeof requestIdleCallback==='function';
+  function scheduleOptics(){
+    if(!opticsHandle)opticsHandle=idle?requestIdleCallback(flushOptics,{timeout:300}):setTimeout(flushOptics,50);
+  }
+  effects.own(()=>{if(opticsHandle){if(idle)cancelIdleCallback(opticsHandle);else clearTimeout(opticsHandle)}opticsHandle=0;pendingOptics.clear()});
+  function flushOptics(deadline){
+    if(deadline!==null)opticsHandle=0;
+    if(!effects.isActive)return;
+    const nodes=[...pendingOptics].filter(node=>node.isConnected&&attached.has(node));pendingOptics.clear();
+    if(sizing){nodes.forEach(node=>attached.get(node).fallback());return}
+    const sizes=nodes.map(node=>{
+      const width=Math.round(node.clientWidth),height=Math.round(node.clientHeight);
+      return {node,width,height,radius:width&&height?Math.min(parseFloat(getComputedStyle(node).borderRadius)||22,width/2,height/2):0};
+    });
+    for(const [index,{node,width,height,radius}] of sizes.entries()){
+      if(index&&deadline&&!deadline.didTimeout&&deadline.timeRemaining()<=0){
+        sizes.slice(index).forEach(rest=>pendingOptics.add(rest.node));scheduleOptics();return;
+      }
+      if(width&&height)attached.get(node).paint(width,height,radius);
+    }
   }
   const sync=()=>{
     if(!effects.isActive)return;

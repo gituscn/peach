@@ -144,7 +144,7 @@ export class SubtitleControls {
   private async importFile(file: File) {
     this.show(0);
     if (!/\.(srt|ass|ssa|vtt)$/i.test(file.name) || file.size > 4 * 1024 * 1024) { this.status('请选择 4 MiB 以内的 SRT、ASS、SSA 或 VTT 文件', true); return }
-    const signal = this.busy(); this.status('正在加载字幕…', false, true);
+    const signal = this.busy(); this.status('正在加载字幕', false, true);
     try {
       await this.session.ready;
       if (signal.aborted) return;
@@ -181,7 +181,7 @@ export class SubtitleControls {
     const signal = this.busy(), generation = this.generation;
     const trigger = panel.querySelector<HTMLButtonElement>('[data-subtitle-more],[data-subtitle-retry]');
     const list = panel.querySelector<HTMLElement>('[data-subtitle-results]')!;
-    panel.setAttribute('aria-busy', 'true'); if (trigger) setActionBusy(trigger); list.inert = true; this.status('正在搜索字幕…', false, true);
+    panel.setAttribute('aria-busy', 'true'); if (trigger) setActionBusy(trigger); list.inert = true; this.status('正在搜索字幕', false, true);
     try {
       const payload = await api(`/api/subtitles/search?q=${encodeURIComponent(this.query)}&offset=${offset}`, { signal }) as { results: SearchResult[]; more: boolean };
       if (signal.aborted || generation !== this.generation) return;
@@ -201,7 +201,7 @@ export class SubtitleControls {
   private async showFiles(result: SearchResult) {
     this.page = 'files';
     const panel = this.panel(this.header('选择字幕文件') + '<div class="vjs-peach-panel-menu" data-subtitle-files></div><p class="vjs-peach-subtitle-status" data-subtitle-status role="status"></p>', () => { void this.searchPanel() });
-    const signal = this.busy(), generation = this.generation; this.status('正在读取字幕文件…', false, true);
+    const signal = this.busy(), generation = this.generation; this.status('正在读取字幕文件', false, true);
     try {
       const payload = await api(`/api/subtitles/subtitlecat/${result.id}`, { signal }) as { files: SubtitleFile[] };
       if (signal.aborted || generation !== this.generation) return;
@@ -215,7 +215,7 @@ export class SubtitleControls {
   }
 
   private async loadOnline(id: string, file: SubtitleFile) {
-    const signal = this.busy(); this.status('正在加载字幕…', false, true);
+    const signal = this.busy(); this.status('正在加载字幕', false, true);
     try {
       await this.session.ready;
       if (signal.aborted) return;

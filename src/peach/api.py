@@ -59,6 +59,8 @@ from .mount_reachability import MountReachability
 from .mp4repair import HeaderRepairStore
 from .platform import location_mounts
 from .previews import (
+    COVER_SMALL_THUMB_EDGE,
+    COVER_SMALL_THUMB_QUALITY,
     COVER_THUMB_EDGE,
     COVER_THUMB_QUALITY,
     DerivedImageService,
@@ -294,6 +296,9 @@ def create_app(
     entity_thumb_service = DerivedImageService(entity_thumb_root(settings.avatar_root))
     cover_thumb_service = DerivedImageService(cover_thumb_root(settings.cover_root),
                                               edge=COVER_THUMB_EDGE, quality=COVER_THUMB_QUALITY)
+    cover_small_thumb_service = DerivedImageService(cover_thumb_root(settings.cover_root),
+                                                    edge=COVER_SMALL_THUMB_EDGE,
+                                                    quality=COVER_SMALL_THUMB_QUALITY)
     transcode_service = TranscodeService(resolver, settings.transcode_root, state_root=settings.follow_state_root)
     header_repairs = HeaderRepairStore(settings.transcode_root, resolver)
     hls_plan_executor = ThreadPoolExecutor(
@@ -470,6 +475,7 @@ def create_app(
     app.state.sample_cache = sample_cache
     app.state.entity_thumb_service = entity_thumb_service
     app.state.cover_thumb_service = cover_thumb_service
+    app.state.cover_small_thumb_service = cover_small_thumb_service
     app.state.transcode_service = transcode_service
     app.state.header_repairs = header_repairs
     app.state.hls_plan_executor = hls_plan_executor
@@ -619,6 +625,7 @@ def create_app(
     app.include_router(routes_pages.router)
     app.include_router(routes_configuration.router)
     app.include_router(routes_jav_browser.create_router(routes_configuration.local_only))
+    app.state.local_only = routes_configuration.local_only
     app.include_router(routes_media.router)
     app.include_router(routes_subtitles.router)
     app.include_router(routes_api.router)

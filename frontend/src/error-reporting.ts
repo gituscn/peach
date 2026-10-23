@@ -1,18 +1,19 @@
 /* 浏览器异常只记录到当前 Peach 主机。失败不再生成新的错误请求。 */
 let installed = false;
 const errorNames = new Set(['Error', 'TypeError', 'RangeError', 'ReferenceError', 'SyntaxError', 'URIError', 'EvalError', 'AggregateError', 'DOMException']);
-const bundleNames = ['peach-app.js', 'peach-pages.js'] as const;
+/* 正式包的文件名：主包入口、页面包与主包按页拆出的 chunk（ADR-0118），与服务端 `diagnostic_browser.SHIPPED` 同一口径。 */
+const shippedName = /^(?:peach-pages\.js|peach-app(?:\.[A-Za-z0-9_-]+)?\.js)$/;
+const shippedInStack = /(?:^|[/\\])(peach-pages\.js|peach-app(?:\.[A-Za-z0-9_-]+)?\.js)(?=[:?#)\s]|$)/m;
 const debugIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
-function bundleDebugIds(): Partial<Record<typeof bundleNames[number], string>> {
+function bundleDebugIds(): Record<string, string> {
   const globals = globalThis as typeof globalThis & { _sentryDebugIds?: Record<string, unknown> };
-  const ids: Partial<Record<typeof bundleNames[number], string>> = {};
-  // 官方注入的 stack 只在本机用于识别固定文件名；请求不携带这份 stack 或其中的 URL。
+  const ids: Record<string, string> = {};
+  // 官方注入的 stack 只在本机用于识别文件名；请求不携带这份 stack 或其中的 URL。最上面那一帧就是注入它的文件。
   for (const [stack, id] of Object.entries(globals._sentryDebugIds ?? {})) {
     if (typeof id !== 'string' || !debugIdPattern.test(id)) continue;
-    for (const name of bundleNames) {
-      if (new RegExp(`(?:^|[/\\\\])${name.replace('.', '\\.')}(?=[:?#)\\s]|$)`).test(stack)) ids[name] = id;
-    }
+    const name = stack.match(shippedInStack)?.[1];
+    if (name) ids[name] = id;
   }
   return ids;
 }
@@ -41,7 +42,7 @@ export function installErrorReporting(): void {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind, message, stack, error_name: errorName, page: window.location.pathname,
         bundle_debug_ids: bundleDebugIds(),
-        source_file: bundleNames.find(name => name === source?.filename?.split('/').pop()?.split(/[?#]/)[0]),
+        source_file: [source?.filename?.split('/').pop()?.split(/[?#]/)[0] ?? ''].find(name => shippedName.test(name)),
         line: source?.lineno, column: source?.colno }), credentials: 'same-origin', keepalive: true,
     }).catch(() => {});
   };

@@ -768,7 +768,7 @@ it('地址栏指着订阅源时首屏就带着清单，开关、移除与立即�
   expect(first.querySelector('a')?.getAttribute('href')).toBe('https://feeds.test/a');
   // 名字前的圆框由 `card-art` 的回落链拼：身份引用带着有没有图，图有了才叠上去。
   expect(first.querySelector('[role="rowheader"] img')?.getAttribute('src'))
-    .toBe('/entity-image?kind=performer&id=41');
+    .toBe('/entity-image?kind=performer&id=41&thumb=1');
   const second = checkboxNamed(host, '选择 乙 的新作')!.closest('[role="row"]')!;
   expect(second.querySelector('[role="rowheader"] img')).toBeNull();
   expect(second.querySelector('[role="rowheader"] [aria-hidden]')?.textContent).toBe('乙');
@@ -1189,7 +1189,7 @@ it('等待时说的话跟着这一趟查的是名字还是链接走', async () =
   };
   // 按名字查的第一趟要下载创作者索引，几十秒没有动静得先说一声；贴链接不走索引。
   expect(await hint('kou')).toContain('首次按名字查要下载创作者索引');
-  expect(await hint('https://kemono.test/kou')).toBe('识别中…');
+  expect(await hint('https://kemono.test/kou')).toBe('识别中');
 });
 
 it('说得出进度的查找画进度条', async () => {

@@ -18,11 +18,13 @@ import { DownloadGroup } from './download-settings';
 import { GeneralSettings } from './general-settings';
 import { MaintenanceSettings } from './maintenance-settings';
 import { MediaSettings } from './media-settings';
-import { MediaProcessingSettings } from './media-processing-settings';
+import { MediaProcessingSettings, PlaybackTranscodeSettings } from './media-processing-settings';
 import { CodePatternSettings } from './code-pattern-settings';
 import { NetworkSettings } from './network-settings';
 import { SourceSettings } from './source-settings';
 import { groupRoot } from './configuration-panel';
+import { downloadsShape, maintenanceShape, networkShape } from './configuration-shape';
+import { rememberShape } from '../../configuration-skeleton';
 
 export function ConfigurationPage({ receipt, reopenTutorial, section = '', diagnostics }: ConfigurationProps & { diagnostics?: ReactElement }) {
   const config = useQuery({
@@ -56,6 +58,13 @@ function ConfigurationGroups(
   const workspace = useRef<HTMLDivElement>(null);
   const previous = useRef(chosen);
   useEffect(() => { setChosen(section) }, [section]);
+  /* 下载渠道、网络与访问、应用与维护随这份配置一次画齐：记下结构，下次整页骨架照它排。 */
+  useEffect(() => {
+    const downloads = downloadsShape(data);
+    if (downloads) rememberShape('downloads', downloads);
+    rememberShape('network', networkShape(data));
+    rememberShape('maintenance', maintenanceShape(data));
+  }, [data]);
   useLayoutEffect(() => {
     if (previous.current === chosen) return;
     previous.current = chosen;
@@ -84,8 +93,8 @@ function ConfigurationGroups(
   const downloads = data.downloads;
   const groups: Group[] = [
     { title: '媒体库与入库', body: (panel) => <div {...groupRoot(panel)}>
-      <MediaSettings {...group} /><MediaProcessingSettings receipt={receipt} />
-      <CodePatternSettings receipt={receipt} />
+      <MediaSettings {...group} /><CodePatternSettings receipt={receipt} />
+      <MediaProcessingSettings receipt={receipt} />
     </div> },
     { title: '来源与订阅', body: (panel) => <SourceSettings {...group} panel={panel} /> },
     ...(downloads ? [{
@@ -97,6 +106,7 @@ function ConfigurationGroups(
       title: '应用与维护',
       body: (panel) => <div {...groupRoot(panel)}>
         <GeneralSettings {...group} />
+        <PlaybackTranscodeSettings receipt={receipt} />
         <MaintenanceSettings {...group} reopenTutorial={reopenTutorial} />
       </div>,
     },

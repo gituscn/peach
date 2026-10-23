@@ -15,11 +15,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { requestErrorMessage } from '@peach/legacy/core';
-import { loadingDotsHtml, popBadges } from '@peach/legacy/ui';
+import { LOAD_MORE_STATUS, loadingDotsHtml, popBadges } from '@peach/legacy/ui';
 import { ButtonLink } from '@/components/base/buttons/button';
 
 import { EmptyState } from '../components/empty-state';
-import { RetryNote, useSkeletonReveal } from '../components/grid-reveal';
+import { LOAD_MORE_MARGIN, RetryNote, useSkeletonReveal } from '../components/grid-reveal';
 import { spriteGlyph } from '../components/sprite-glyph';
 import { JunkCard } from './junk-card';
 import { JunkCount } from './junk-count';
@@ -137,7 +137,7 @@ function JunkBody({ props, data, pending, error, retry }: {
   );
 }
 
-/** 往下露下一段。数据已经整批在手上，不发请求：哨兵进入视口 320px 内就露，点它也露，
+/** 往下露下一段。数据已经整批在手上，不发请求：哨兵进入视口下方一屏内就露，点它也露，
  *  判据同目录网格的续页。每露一段按新键重挂，还在视口里就接着露。 */
 function RevealMore({ onMore }: { onMore(): void }) {
   const node = useRef<HTMLDivElement | null>(null);
@@ -146,9 +146,9 @@ function RevealMore({ onMore }: { onMore(): void }) {
     if (!el || typeof IntersectionObserver === 'undefined') return undefined;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) onMore();
-    }, { rootMargin: '320px' });
+    }, { rootMargin: LOAD_MORE_MARGIN });
     observer.observe(el);
     return () => observer.disconnect();
   }, [onMore]);
-  return <div ref={node} data-load-more="" onClick={onMore} dangerouslySetInnerHTML={{ __html: loadingDotsHtml('继续载入中…') }} />;
+  return <div ref={node} data-load-more="" onClick={onMore} dangerouslySetInnerHTML={{ __html: loadingDotsHtml(LOAD_MORE_STATUS) }} />;
 }

@@ -12,6 +12,8 @@ from __future__ import annotations
 import hashlib
 import random
 import time
+from collections.abc import Callable
+
 from . import entities, media_libraries, sample_images, settings_file
 
 from .catalog_rules import (
@@ -334,6 +336,23 @@ def catalog_filter(contract: WebContract, args):
     return where, par
 
 
+def orientation_member(args) -> Callable[[dict], bool] | None:
+    """列表按画幅筛时，分卷、版本组里哪些成员算进这张卡。
+
+    条件与 `catalog_filter` 的画幅那两条逐字对应：显式 `orient` 只算同画幅，首页主网格的
+    `exclude_vertical` 只算非竖屏（未测出画幅的也算）。回收站不按画幅筛，也不收窄。
+    不按画幅筛时返回 None，组照整部作品算。
+    """
+    if args.get("state") == "trash":
+        return None
+    if args.get("orient"):
+        orient = args["orient"]
+        return lambda member: member.get("ctx_orient") == orient
+    if args.get("exclude_vertical") == "1":
+        return lambda member: member.get("ctx_orient") != "竖屏"
+    return None
+
+
 def seeded_order(seed) -> str:
     """按种子打散的 ORDER BY 片段，列名固定是 `a.id`。
 
@@ -437,8 +456,9 @@ def q_items(contract: WebContract, args):
         r.pop("snapshot_path", None)
         r.pop("path", None)                     # 路径不外发，串流走 id
     attach_saved_follow_cards(contract, rows)
-    attach_multipart_groups(contract, rows)
-    attach_edition_groups(contract, rows)
+    shown = orientation_member(args)
+    attach_multipart_groups(contract, rows, shown)
+    attach_edition_groups(contract, rows, shown)
     return {"total": cnt, "work_total": work_total, "bytes": total_bytes, "items": rows, "has_more": has_more}
 
 def con_tags(contract: WebContract, ids, qm):
@@ -653,7 +673,8 @@ def _catalog_group_rows(contract: WebContract) -> list[dict]:
 def _read_group_rows(contract: WebContract) -> list[dict]:
     with contract.read_connection() as connection:
         rows = [dict(row) for row in connection.execute(
-            "SELECT id,name,path,code,size,duration,width,height,disposal,catalog_title,field_owners FROM asset "
+            "SELECT id,name,path,code,size,duration,width,height,ctx_orient,disposal,catalog_title,field_owners "
+            "FROM asset "
             "WHERE medium='video' "
             "AND COALESCE(disposal,'')<>'vanished' ORDER BY id",
         )]
@@ -707,11 +728,14 @@ def _derive_edition_groups(contract: WebContract) -> dict[str, list[dict]]:
     return groups
 
 
-def attach_edition_groups(contract: WebContract, rows) -> None:
+def attach_edition_groups(contract: WebContract, rows,
+                          shown: Callable[[dict], bool] | None = None) -> None:
     """给列表卡挂上同番号的版次组，不写账本。
 
     用户实测：`ABF-234` 与 `ABF-234 UN` 是两张并排的卡，`ABF-216` 也是。它们是同一部
     片的两个版次，占两个格子只是让人多滚一屏，还得自己认哪个是无码。
+    按画幅筛的列表里版本数与版本名只算同画幅的文件，口径同 `attach_multipart_groups`；
+    只剩一个版本时 `count` 为 1，卡片不标版本数。`key` 与 `seed_id` 仍是整组的。
     """
     if not rows:
         return
@@ -721,13 +745,15 @@ def attach_edition_groups(contract: WebContract, rows) -> None:
         group = groups.get(code)
         if not group or not any(item["id"] == row["id"] for item in group):
             continue
+        members = [item for item in group if shown(item)] if shown else group
+        members = members or group
         row["edition_group"] = {
             "key": code,
             "title": code or str(row.get("code") or "多版本作品"),
-            "count": len({item['version_id'] for item in group}),
+            "count": len({item['version_id'] for item in members}),
             "seed_id": group[0]["id"],
-            "item_ids": [item["id"] for item in group],
-            "editions": list(dict.fromkeys(item['version_label'] for item in group)),
+            "item_ids": [item["id"] for item in members],
+            "editions": list(dict.fromkeys(item['version_label'] for item in members)),
         }
 
 
@@ -809,8 +835,15 @@ def video_work_key(contract: WebContract, connection) -> str:
     return 'peach_video_work_key(a.id)'
 
 
-def attach_multipart_groups(contract: WebContract, rows) -> None:
-    """Annotate list cards with one derived multipart release, without ledger writes."""
+def attach_multipart_groups(contract: WebContract, rows,
+                            shown: Callable[[dict], bool] | None = None) -> None:
+    """Annotate list cards with one derived multipart release, without ledger writes.
+
+    按画幅筛的列表（`shown` 见 `orientation_member`）里，卷数、成员与合计只算同画幅的
+    那几卷：FC2-PPV-3189161 前三卷横屏、后两卷竖屏，竖屏带里的卡写「2 卷」和两卷的合计，
+    首页主网格（排除竖屏）写「3 卷」和三卷的合计。只剩一卷时 `count` 为 1，卡片按单卷画。
+    `key` 与 `seed_id` 仍是整部作品的，折叠去重与分卷队列认同一部作品。
+    """
     if not rows:
         return
     groups = _parts_by_asset(contract)
@@ -820,14 +853,16 @@ def attach_multipart_groups(contract: WebContract, rows) -> None:
         group = _live_parts(all_parts)
         if not any(item["id"] == row["id"] for item in group):
             continue
+        members = [item for item in group if shown(item)] if shown else group
+        members = members or group
         row["part_group"] = {
             "key": key,
             "title": code or str(row.get("code") or "分卷作品"),
-            "count": len(group),
+            "count": len(members),
             "seed_id": group[0]["id"],
-            "item_ids": [item["id"] for item in group],
-            "total_duration": sum(float(item.get("duration") or 0) for item in group),
-            "total_size": sum(int(item.get("size") or 0) for item in group),
+            "item_ids": [item["id"] for item in members],
+            "total_duration": sum(float(item.get("duration") or 0) for item in members),
+            "total_size": sum(int(item.get("size") or 0) for item in members),
         }
 
 
@@ -1205,6 +1240,9 @@ def state_clause(state: str) -> str:
 #: 又能真的换一批。倍数太大就会开始出现只有一两部作品的冷门项。
 TOPS_POOL_FACTOR = 4
 
+#: 顶部两排候选池读到的账本表：作品与实体三张、「已标记」读的偏好、「稍后看」读的队列。
+TOPS_TABLES = GROUP_TABLES + ("asset_preference", "watch_queue")
+
 
 def q_tops(contract: WebContract, n=28, jav=False, seed="", state="", page=0, filters=None):
     """顶部三层用的数据：女优圆头像 / 厂牌 / 内容标签。
@@ -1216,48 +1254,58 @@ def q_tops(contract: WebContract, n=28, jav=False, seed="", state="", page=0, fi
 
     `page` 给横滚续接用。第一页那 n 个是从数量前 `n * TOPS_POOL_FACTOR` 里抽的，
     续页要是再回到那一段就会把同一个人给两次，所以那一段归第一页独占，续页从它的
-    末尾往后按数量数下去。库里六百多位女优，一排给到头才是「滚到底还能接着滚」。"""
-    with contract.read_connection() as c:
-        scope = PRESENT_ASSET_CLAUSE + (JAV_ASSET_CLAUSE if jav else "") + state_clause(state)
-        folder_params = []
-        if filters and filters.get('folder'):
-            conditions, folder_params = catalog_filter(contract, filters)
-            scope += ' AND ' + ' AND '.join(conditions)
-        base = (
-            "SELECT e.id,e.canonical_name,count(DISTINCT ae.asset_id) n,"
-            "(SELECT a2.id FROM asset_entity ae2 JOIN asset a2 ON a2.id=ae2.asset_id "
-            " WHERE ae2.entity_id=e.id AND a2.medium='video' AND a2.snapshot_path IS NOT NULL "
-            " AND (e.kind<>'performer' OR " + solo_performer_clause("a2.id", "e.id") + ") "
-            " ORDER BY (a2.play_count IS NULL),a2.size DESC LIMIT 1) rep "
-            "FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id "
-            "JOIN asset a ON a.id=ae.asset_id "
-            "WHERE a.medium='video' AND e.kind=? " + scope +
-            "GROUP BY e.id,e.canonical_name ORDER BY n DESC LIMIT ? OFFSET ?"
-        )
-        first_page_span = n * TOPS_POOL_FACTOR if seed else n
+    末尾往后按数量数下去。库里六百多位女优，一排给到头才是「滚到底还能接着滚」。
 
-        def read(kind, limit, skip):
-            return [{"id": entity_id, "k": k, "n": cnt, "rep": representative}
-                    for entity_id, k, cnt, representative
-                    in c.execute(base, (kind, *folder_params, limit, skip))]
+    两条分组 SQL 各要三百毫秒上下，结果只取决于账本与口径，与种子无关：候选池按
+    `TOPS_TABLES` 的版本缓存，种子抽样和读目录索引的那几个标志都在缓存之外现做。"""
+    state = state if state_predicate(state) else ""
+    scope = PRESENT_ASSET_CLAUSE + (JAV_ASSET_CLAUSE if jav else "") + state_clause(state)
+    folder_params = []
+    if filters and filters.get('folder'):
+        conditions, folder_params = catalog_filter(contract, filters)
+        scope += ' AND ' + ' AND '.join(conditions)
+    base = (
+        "SELECT e.id,e.canonical_name,count(DISTINCT ae.asset_id) n,"
+        "(SELECT a2.id FROM asset_entity ae2 JOIN asset a2 ON a2.id=ae2.asset_id "
+        " WHERE ae2.entity_id=e.id AND a2.medium='video' AND a2.snapshot_path IS NOT NULL "
+        " AND (e.kind<>'performer' OR " + solo_performer_clause("a2.id", "e.id") + ") "
+        " ORDER BY (a2.play_count IS NULL),a2.size DESC LIMIT 1) rep "
+        "FROM asset_entity ae JOIN entity e ON e.id=ae.entity_id "
+        "JOIN asset a ON a.id=ae.asset_id "
+        "WHERE a.medium='video' AND e.kind=? " + scope +
+        "GROUP BY e.id,e.canonical_name ORDER BY n DESC LIMIT ? OFFSET ?"
+    )
+    first_page_span = n * TOPS_POOL_FACTOR if seed else n
 
-        def pick(kind):
-            """按数量取候选池，再按种子确定性抽样。种子为空时退回严格前 N。"""
-            if page:
-                return read(kind, n, first_page_span + (page - 1) * n)
-            pool = read(kind, first_page_span, 0)
-            if not seed or len(pool) <= n:
-                return pool[:n]
-            # 同一个种子必须给出同一批人：翻页和重绘之间不能抖动。
-            digest = hashlib.blake2b(f"{seed}:{kind}".encode(), digest_size=8).digest()
-            rng = random.Random(int.from_bytes(digest, "big"))
-            chosen = rng.sample(pool, n)
-            # 抽完仍按数量排序，免得常见身份被排到末尾。
-            return sorted(chosen, key=lambda row: -row["n"])
+    def read(kind, limit, skip):
+        def compute():
+            with contract.read_connection() as c:
+                return [{"id": entity_id, "k": k, "n": cnt, "rep": representative}
+                        for entity_id, k, cnt, representative
+                        in c.execute(base, (kind, *folder_params, limit, skip))]
+        # 目录筛选的条件已在上面按目录索引展开成 SQL，键里带上它，口径就完整了。
+        key = repr(("tops-pool", kind, jav, state, scope, tuple(folder_params), limit, skip))
+        rows = contract.cached_until_changed(key, compute, tables=TOPS_TABLES)
+        # 下面还要往每行补目录索引的标志，不能写进缓存里那一份。
+        return [dict(row) for row in rows]
 
-        out = {}
-        out["performers"] = pick("performer")
-        out["studios"] = pick("studio")
+    def pick(kind):
+        """按数量取候选池，再按种子确定性抽样。种子为空时退回严格前 N。"""
+        if page:
+            return read(kind, n, first_page_span + (page - 1) * n)
+        pool = read(kind, first_page_span, 0)
+        if not seed or len(pool) <= n:
+            return pool[:n]
+        # 同一个种子必须给出同一批人：翻页和重绘之间不能抖动。
+        digest = hashlib.blake2b(f"{seed}:{kind}".encode(), digest_size=8).digest()
+        rng = random.Random(int.from_bytes(digest, "big"))
+        chosen = rng.sample(pool, n)
+        # 抽完仍按数量排序，免得常见身份被排到末尾。
+        return sorted(chosen, key=lambda row: -row["n"])
+
+    out = {}
+    out["performers"] = pick("performer")
+    out["studios"] = pick("studio")
     # 顶栏那排厂牌小圆片据此决定要不要输出 `<img>`：没装标识就直接首字母垫底。
     # 判定在库连接之外做，它读的是目录索引而不是账本。
     for studio in out["studios"]:
@@ -1277,6 +1325,13 @@ def q_tops(contract: WebContract, n=28, jav=False, seed="", state="", page=0, fi
     return out
 
 
+
+
+#: 筛选项读到的账本表（不含实体范围与搜索词那几条分支，它们不走按版本的缓存）：
+#: 作品与实体、标签隐藏偏好与标签实体的别名（`tag_not_hidden`）、「已标记」「稍后看」两种
+#: 状态，以及在线卡片的关注标签。
+FACETS_TABLES = GROUP_TABLES + ("entity_alias", "asset_tag_preference", "asset_preference",
+                                "watch_queue", "follow_item", "follow_source")
 
 
 def q_facets(

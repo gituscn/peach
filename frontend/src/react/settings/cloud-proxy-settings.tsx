@@ -1,5 +1,5 @@
 /* CloudDrive 是代理配置的保存方；页面进入、重新聚焦和手动刷新时读取。 */
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { Select, SelectItem } from '@/components/base/select/select';
@@ -7,10 +7,10 @@ import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { LinkButton } from '@/components/base/buttons/link-button';
 import { apiGet, apiSend } from '../../api';
 import { Note } from '../components/note';
-import { Disclosure, FieldLabel, Footer, Help, Section, Stack, SourceMark } from './section';
+import { Disclosure, FieldLabel, Footer, Help, Section, SectionSkeleton, Stack, SourceMark } from './section';
 import { sourceMark } from './folder-rows';
 import { busyProps, useAction } from './use-action';
-import { CLOUD_PROXY_HELP, rememberSectionHeight, rememberedSectionHeight } from '../../configuration-skeleton';
+import { CLOUD_PROXY_HELP, cloudProxySkeleton, rememberShape } from '../../configuration-skeleton';
 
 export const CLOUD_PROXIES_URL = '/api/configuration/cloud-proxies';
 type Mode = 'direct' | 'system' | 'http' | 'socks5' | 'unknown';
@@ -47,17 +47,18 @@ export function CloudProxySettings({ receipt }: { receipt(message: string): void
     window.addEventListener('focus', focus);
     return () => window.removeEventListener('focus', focus);
   }, []);
-  // 等待块按上次画好时的内容高度占位，首屏骨架用同一个值：账号读回来时整页不再往下推。
-  const body = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (!loading && body.current) rememberSectionHeight('cloud-proxy', body.current.offsetHeight);
-  }, [loading, state]);
+  // 记下账号几个、哪一路走代理（走代理时多出地址、端口与认证），下次骨架照这个结构画。
+  useEffect(() => {
+    if (!state) return;
+    const proxied = (value: ProxyValue) => value.mode === 'http' || value.mode === 'socks5';
+    rememberShape('cloudProxy', { configured: state.configured !== false, unlinked: state.unlinked?.length ?? 0,
+      accounts: state.accounts.map(account => [proxied(account.data), proxied(account.api)]) });
+  }, [state]);
+  if (loading) return <SectionSkeleton label="正在读取网盘代理" html={cloudProxySkeleton} />;
   return <Section title="CloudDrive 代理">
     <Stack>
       <Help>{CLOUD_PROXY_HELP}</Help>
-      <div ref={body} className="flex min-w-0 flex-col gap-4">
-      {loading ? <div data-skeleton aria-busy="true" aria-label="正在读取网盘代理"><div className="h-(--remembered-h) w-full rounded-2lg bg-background-tertiary-default"
-        style={{ '--remembered-h': `${rememberedSectionHeight('cloud-proxy', 96)}px` } as CSSProperties} /></div> : null}
+      <div className="flex min-w-0 flex-col gap-4">
       {action.error ? <Note tone="error" title="没有读取配置">{action.error} <LinkButton href="/settings/downloads" size="small">下载设置</LinkButton></Note> : null}
       {state?.configured === false ? <Help>填写 CloudDrive2 地址和 API 令牌后，在这里设置各网盘账号的代理。 <LinkButton href="/settings/downloads" size="small">下载设置</LinkButton></Help>
         : state?.accounts.length === 0 && !state.unlinked?.length ? <Help>还没有使用 CloudDrive 的媒体库。</Help> : null}

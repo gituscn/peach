@@ -159,11 +159,23 @@ describe('设计决定：作品卡、管理页与复核', () => {
         const card = node.getBoundingClientRect(), row = node.closest('[data-shorts-row]')!.getBoundingClientRect();
         const style = getComputedStyle(node);
         return { background: style.backgroundColor, shadow: style.boxShadow, top: card.top - row.top,
-          bottom: row.bottom - card.bottom };
+          bottom: row.bottom - card.bottom, strip: getComputedStyle(node.closest('[data-shorts-strip]')!).backgroundColor };
       });
       assert.notEqual(feedback.background, 'rgba(0, 0, 0, 0)');
       assert.notEqual(feedback.shadow, 'none');
+      /* 浅色下全站悬停面与带子底色同为 #F7F7F7，铺出去等于没铺。 */
+      assert.notEqual(feedback.background, feedback.strip, '竖屏带里卡片的悬停面和带子底色同色');
       assert.ok(feedback.top >= 8 && feedback.bottom >= 8, JSON.stringify(feedback));
+      /* 长悬停上移再放大，连同外铺的悬停面都要落在横滚行的裁切框里。 */
+      const lifted = await shortCard.evaluate(async node => {
+        node.setAttribute('data-longhover', '');
+        await Promise.all(node.getAnimations().map(animation => { animation.finish(); return animation.finished }));
+        const card = node.getBoundingClientRect(), row = node.closest('[data-shorts-row]')!.getBoundingClientRect();
+        const spread = parseFloat(getComputedStyle(node).boxShadow.split(' ').at(-1)!) * 1.065;
+        node.removeAttribute('data-longhover');
+        return { top: card.top - spread - row.top, bottom: row.bottom - card.bottom - spread };
+      });
+      assert.ok(lifted.top >= 0 && lifted.bottom >= 0, `放大的竖屏卡被横滚行裁掉：${JSON.stringify(lifted)}`);
       await page.mouse.move(0, 0);
       assert.equal(catalog.progress?.background, catalog.tungsten.background, '观看进度条不是钨丝蓝');
       assert.deepEqual([catalog.mixGlyph?.background, catalog.mixGlyph?.borderWidth, catalog.mixGlyph?.borderColor],

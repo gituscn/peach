@@ -140,8 +140,14 @@ export function syncFeedAutoScroll(){
     preferencesState.appSettings.feedAutoScroll?wireAutoScroll(row):stopAutoScroll(row));
 }
 
+/* 开关挪到下一帧写：它一翻，资料卡换栏、页面变高，而整页那条覆盖滚动条正观察着 `<body>`。在尺寸观察
+   回调里当场写，`<body>` 这一层浅的变化本轮送不出去，浏览器就报一次 ResizeObserver 循环错误，
+   每开一次资料页都进错误上报。 */
+let heroWideFrame=0;
 export function syncHeroWide([entry]){
-  $('#index').toggleAttribute('data-hero-wide',entry.contentRect.width>=feedState.HERO_WIDE_PX);
+  const wide=entry.contentRect.width>=feedState.HERO_WIDE_PX;
+  cancelAnimationFrame(heroWideFrame);
+  heroWideFrame=requestAnimationFrame(()=>{heroWideFrame=0;$('#index')?.toggleAttribute('data-hero-wide',wide)});
 }
 
 export function installFeed13() {

@@ -15,10 +15,13 @@
 """
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import os
 import sys
+import threading
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 import re
 
@@ -37,6 +40,7 @@ from fastapi.responses import (
 
 from . import distribution, onboarding, settings_file
 from .config import PROJECT_ROOT
+from .diagnostic_browser import BUNDLE_CHUNK_NAME
 from .entities import resolve_entity, resolve_entity_id
 from .routes_auth import query_auth_redirect, require_asset_auth, require_page_auth, set_auth_cookie
 from .web_entry import page_shell, runtime_fact_entries
@@ -161,7 +165,7 @@ def _normal_url(config) -> str:
     return f"https://{config.server.mdns_name}.local/"
 
 
-def asset_response(request: Request, path: Path, media: str) -> Response:
+def asset_response(request: Request, path: Path, media: str, *, immutable: bool = False) -> Response:
     """页面资产与图标用 ETag 复验，`/board.css`、`/dist/`、图标共用。
 
     `/app.css` 拼多份分区，ETag 口径见 `stylesheet_response()`，其余照这里。
@@ -170,19 +174,78 @@ def asset_response(request: Request, path: Path, media: str) -> Response:
 
     ETag 取 mtime_ns 加字节数，不读文件内容：这几个文件都由 Git 检出或 `frontend/`
     构建产生，改一次就换一次 mtime，不需要为了强校验去算全文哈希。
+
+    文本类资产在浏览器接受 gzip 时发压缩体，压缩结果按文件版本记住，见 `_gzipped()`。
+    压缩体与原文是两个表示，ETag 各不相同。
+
+    `immutable` 给名字里带内容哈希的主包 chunk（ADR-0118）：内容一变名字就变，浏览器一年内
+    不再回源。它们要会话才能取，所以只许浏览器自己缓存（`private`），不许共享缓存转给别人。
     """
     stat = path.stat()
-    etag = f'"peach-{stat.st_mtime_ns:x}-{stat.st_size:x}"'
+    compress = (media.startswith(_COMPRESSIBLE_MEDIA) and stat.st_size >= _GZIP_MINIMUM
+                and _accepts_gzip(request.headers.get("accept-encoding", "")))
+    etag = f'"peach-{stat.st_mtime_ns:x}-{stat.st_size:x}{"-gz" if compress else ""}"'
+    # charset 只对文本类型成立。图标是字节流，声明里挂一个字符集，在全站的
+    # `X-Content-Type-Options: nosniff` 之下就是让浏览器照一个自相矛盾的类型解码。
+    media_type = f"{media}; charset=utf-8" if media.startswith("text/") else media
     if request.headers.get("if-none-match") == etag:
         response: Response = Response(status_code=304)
+    elif compress:
+        body = _gzipped(path, stat)
+        response = Response(b"" if request.method == "HEAD" else body, media_type=media_type,
+                            headers={"Content-Encoding": "gzip"})
+        response.headers["Content-Length"] = str(len(body))
     else:
-        # charset 只对文本类型成立。图标是字节流，声明里挂一个字符集，在全站的
-        # `X-Content-Type-Options: nosniff` 之下就是让浏览器照一个自相矛盾的类型解码。
-        media_type = f"{media}; charset=utf-8" if media.startswith("text/") else media
         response = FileResponse(path, media_type=media_type)
+    if media.startswith(_COMPRESSIBLE_MEDIA):
+        response.headers["Vary"] = "Accept-Encoding"
     response.headers["ETag"] = etag
-    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Cache-Control"] = "private, max-age=31536000, immutable" if immutable else "no-cache"
     return response
+
+
+#: 值得压缩的页面资产类型；图标等位图本身已压缩。
+_COMPRESSIBLE_MEDIA = ("text/", "image/svg+xml")
+#: 小于它的文件压缩后省不下几个字节，与 `GZipMiddleware` 的默认门槛相同。
+_GZIP_MINIMUM = 500
+#: 路径 → (修改时间, 字节数, 压缩体)。主包 3.8 MB，每次冷请求现压要一百多毫秒；同一版本只压一次。
+#: 每个路径只留当前版本，换了版本就替换；路径数按最近使用限界，带哈希的分包每次构建都换名。
+_GZIPPED: OrderedDict[str, tuple[int, int, bytes]] = OrderedDict()
+_GZIPPED_PATHS = 64
+_GZIP_LOCK = threading.Lock()
+
+
+def _accepts_gzip(header: str) -> bool:
+    """`Accept-Encoding` 里有没有 gzip（或 `*`），且没有用 `q=0` 拒绝。"""
+    for item in header.split(","):
+        token, _, params = item.strip().partition(";")
+        if token.strip().lower() not in ("gzip", "*"):
+            continue
+        quality = params.strip().lower()
+        if quality.startswith("q="):
+            try:
+                return float(quality[2:]) > 0
+            except ValueError:
+                return False
+        return True
+    return False
+
+
+def _gzipped(path: Path, stat: os.stat_result) -> bytes:
+    """这一版文件的 gzip 压缩体。压缩在锁外做：并发的首个请求各压一次，结果相同。"""
+    key = str(path)
+    with _GZIP_LOCK:
+        hit = _GZIPPED.get(key)
+        if hit and hit[:2] == (stat.st_mtime_ns, stat.st_size):
+            _GZIPPED.move_to_end(key)
+            return hit[2]
+    body = gzip.compress(path.read_bytes(), compresslevel=9, mtime=0)
+    with _GZIP_LOCK:
+        _GZIPPED[key] = (stat.st_mtime_ns, stat.st_size, body)
+        _GZIPPED.move_to_end(key)
+        while len(_GZIPPED) > _GZIPPED_PATHS:
+            _GZIPPED.popitem(last=False)
+    return body
 
 
 #: 拆分后的样式表分区。层叠顺序就是文件名顺序，所以每份都带两位数前缀；
@@ -618,14 +681,19 @@ _BUNDLE_NAMES = frozenset({"peach-app.js", "peach-app.css", "peach-pages.js", "p
 
 
 def _bundle_response(request: Request, name: str) -> Response:
-    """`web/dist/` 下的一份产物。名字不合法或文件不在都是 404，浏览器直接打开时由错误页说。"""
-    if name not in _BUNDLE_NAMES:
+    """`web/dist/` 下的一份产物。名字不合法或文件不在都是 404，浏览器直接打开时由错误页说。
+
+    固定名的入口每次复验；带哈希的 chunk 内容不变，长期缓存。压缩协商若要按文件挑预压缩副本，
+    包在这里返回的响应外面即可，名字校验与缓存头不随之改变。
+    """
+    chunk = BUNDLE_CHUNK_NAME.fullmatch(name) is not None
+    if name not in _BUNDLE_NAMES and not chunk:
         raise HTTPException(404)
     path = request.app.state.settings.page_path.parent / "dist" / name
     if not path.is_file():
         raise HTTPException(404)
     media = "text/css" if name.endswith(".css") else "text/javascript"
-    return asset_response(request, path, media)
+    return asset_response(request, path, media, immutable=chunk)
 
 
 # 两条字面量路由必须注册在 `/dist/{name}` 之前：路由按注册顺序匹配。
@@ -643,9 +711,9 @@ def page_bundle(request: Request):
 @router.api_route("/dist/{name}", methods=["GET", "HEAD"])
 def app_bundle(request: Request, name: str,
                args: dict[str, str] = Depends(require_asset_auth)):
-    """`frontend/` 的主包使用固定文件名、会话认证与 ETag 复验。
+    """`frontend/` 的主包入口使用固定文件名、会话认证与 ETag 复验，按页拆出的 chunk 带内容哈希、长期缓存。
 
-    产物提交进 Git；只提供主包与页面包的 JS/CSS，文件名不接受路径分隔符或附带扩展名。
+    产物提交进 Git；只提供主包、主包 chunk 与页面包的 JS/CSS，文件名不接受路径分隔符或附带扩展名。
     """
     return _bundle_response(request, name)
 
@@ -708,6 +776,18 @@ def favicon_ico(request: Request):
 @router.api_route("/peach-logo.png", methods=["GET", "HEAD"])
 def peach_logo(request: Request):
     return asset_response(request, PROJECT_ROOT / "resources" / "peach-logo.png", "image/png")
+
+
+@router.api_route("/peach-logo-64.png", methods=["GET", "HEAD"])
+@router.api_route("/peach-logo-128.png", methods=["GET", "HEAD"])
+def peach_logo_small(request: Request):
+    """侧栏与登录卡那枚站标：页面按 `srcset` 挑 64 或 128 px，不为 24 px 的图标下 1024 px 的原图。
+
+    和原图一样不设防：登录页在拿到会话之前就要画它。文件由
+    `scripts/generate_brand_assets.py` 从同一张原图缩出。
+    """
+    name = request.url.path.rsplit("/", 1)[-1]
+    return asset_response(request, PROJECT_ROOT / "resources" / name, "image/png")
 
 
 @router.api_route("/performers/", methods=["GET", "HEAD"])

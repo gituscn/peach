@@ -5,11 +5,14 @@
 """
 import json
 import os
+import sqlite3
 import stat
 import tempfile
 import threading
+import time
 import unittest
 import urllib.parse
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -536,6 +539,46 @@ class FollowContractTests(unittest.TestCase):
         payload = self._get(item=str(item_id), limit="1")
         self.assertEqual(payload["groups"][0]["primary"]["id"], item_id)
         self.assertEqual(len(payload["groups"][0]["variants"]), 1)
+        # 详情只读这一组和署名要的来源、别名；整库筛选项不随单条下发。
+        self.assertNotIn("facets", payload)
+        self.assertEqual(payload["sources"][0]["label"], "LazyProcrastinator")
+        self.assertEqual(self._get(item=str(item_id + 999))["groups"], [])
+
+    def test_feed_groups_once_per_ledger_version_and_ignores_playback_heartbeats(self):
+        """整库分组按账本版本缓存：翻页、直达详情与播放心跳都不再分组，条目状态变了才重分。"""
+        self._seed(candidates=(
+            FollowCandidate(provider="rule34video", external_id="1", title="First Work",
+                            url="https://rule34video.com/video/1/x/", published_at="2026-08-18T00:00:00Z"),
+            FollowCandidate(provider="rule34video", external_id="2", title="Second Work",
+                            url="https://rule34video.com/video/2/x/", published_at="2026-08-17T00:00:00Z"),
+        ))
+        grouped = []
+        original = FollowStore.group
+
+        def counted(*args, **kwargs):
+            grouped.append(1)
+            return original(*args, **kwargs)
+
+        with mock.patch.object(FollowStore, "group", side_effect=counted):
+            first = self._get(limit="1")
+            item = first["groups"][0]["primary"]["id"]
+            self.assertIn("facets", first)
+            second = self._get(limit="1", offset="1")
+            # 翻页只接组，筛选项沿用首页那份。
+            self.assertNotIn("facets", second)
+            self.assertNotEqual(second["groups"][0]["primary"]["id"], item)
+            self.assertEqual(self._get(item=str(item))["groups"][0]["primary"]["id"], item)
+            settled = len(grouped)
+            self._get(limit="1")
+            self._get(item=str(item))
+            self._post("/api/follow/activity", {"item": item, "position": 5, "duration": 20, "delta": 5})
+            self._get(limit="1")
+            self._get(item=str(item))
+            self.assertEqual(len(grouped), settled)
+            self._post("/api/follow/status", {"item": item, "to": "ignored"})
+            relisted = self._get(limit="1")
+        self.assertGreater(len(grouped), settled)
+        self.assertEqual(relisted["counts"]["ignored"], 1)
 
     def test_feed_never_exposes_the_raw_media_url(self):
         # 界面只需要知道有没有媒体；直链是来源层的事，不进公共 JSON。
@@ -1568,6 +1611,46 @@ class FollowContractTests(unittest.TestCase):
               {"axis": "y", "pct": 17,
                "box": {"cx": 0.5, "cy": 0.2, "faceW": 29, "imgW": 144, "imgH": 256}}]])
 
+    def test_a_work_cover_framed_after_the_first_page_shows_up_on_the_next(self):
+        """题材图与取景记录落在 `works/` 子目录里，往里新增文件不改上一级目录的时间；
+        筛选项缓存认的是这一层，取完图下一次请求就带上取景。"""
+        self._seed(provider="rule34xxx", ref="typed", candidates=(
+            self._typed("1", {"stellar blade": "copyright"},
+                        preview="https://api-cdn.rule34.xxx/thumbnails/9/s.jpg"),
+        ))
+        cached = follow_assets.cache_path(
+            self.contract.candidate_root / follow_assets.ROOT_NAME, "works", "stellar blade")
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        # 两级目录都定在一分钟前，下面那次写入必然换一个时间。
+        settled = time.time_ns() - 60 * 1_000_000_000
+        for directory in (cached.parent, cached.parent.parent):
+            os.utime(directory, ns=(settled, settled))
+        self.assertIsNone(self._get()["facets"]["works"][0][4])
+        avatar_face.write_sidecar(cached, {
+            "ratio": 0.563, "px": [144, 256],
+            "face": {"cx": 0.5, "cy": 0.2, "w": 0.2, "h": 0.18, "score": 0.9},
+            "focus": {"axis": "y", "pct": 17}})
+        self.assertEqual(self._get()["facets"]["works"][0][4]["pct"], 17)
+
+    def test_sources_read_before_a_concurrent_write_are_not_kept_under_the_new_version(self):
+        """来源、别名先于缓存读出，再被带进缓存的计算。两次读之间来源被停用的话，旧来源
+        算出的条目不能记在新版本下一直命中：停用之后的下一次请求就不再列出它的条目。"""
+        self._seed()
+        real = FollowStore.sources
+        writes = []
+
+        def sources_then_disable(store):
+            rows = real(store)
+            if not writes:
+                with closing(sqlite3.connect(self.db)) as connection, connection:
+                    writes.append(connection.execute("UPDATE follow_source SET enabled=0").rowcount)
+            return rows
+
+        with mock.patch.object(FollowStore, "sources", sources_then_disable):
+            self.assertTrue(self._get()["groups"])
+            self.assertEqual(writes, [1])
+            self.assertEqual(self._get()["groups"], [])
+
     def test_one_series_is_one_pill_however_the_source_spells_each_installment(self):
         """一个系列在那一排上只占一枚。
 
@@ -2164,6 +2247,19 @@ class FollowContractTests(unittest.TestCase):
         self.assertEqual(by_provider["simpcity"]["needs"], ["cookie"])
         self.assertIn("游客", by_provider["simpcity"]["why"])
         self.assertTrue(by_provider["rule34xxx"]["path"].endswith("rule34xxx.json"))
+
+    def test_skeleton_registry_matches_the_credentials_endpoint(self):
+        # 配置页的来源凭据骨架在数据回来之前就按这份登记画行；登记与接口的静态部分必须一致。
+        registry = json.loads((ROOT / "frontend" / "src" / "react" / "follow-manage" / "credential-providers.json").read_text(encoding="utf-8"))
+        expected = []
+        for row in self._get("/api/follow/credentials")["providers"]:
+            entry = {"provider": row["provider"], "label": row["provider_label"], "requirement": row["requirement"]}
+            if row["needs"]:
+                entry.update(fields=row["needs"], why=row["why"], where=row["where"], howto=row["howto"])
+            elif row["requirement"] == "blocked":
+                entry.update(why=row["why"])
+            expected.append(entry)
+        self.assertEqual(registry, expected)
 
     def test_a_configured_credential_reports_nothing_missing(self):
         secrets = self.root / "secrets" / "follow"

@@ -747,6 +747,13 @@ html:has([data-selection-dock]) { scroll-padding-bottom: var(--selection-dock-sp
   outline: none;
 }
 
+/* BoardUI 下拉的选项面板定宽 266px，表单里通栏的触发框（查找资源的「优先寻找」）展开后只剩
+ * 半截。React Aria 给每个下拉面板写了 `--trigger-width`：面板至少与触发框同宽，比 266px 窄的
+ * 触发框（工具栏、设置行里的短下拉）仍按 266px 展开，长选项不会被挤断。 */
+.peach-react [data-trigger='Select'] {
+  min-width: var(--trigger-width);
+}
+
 /* 构建器会把 SVG 的 unitless stroke-dashoffset 改写成 px，破坏 pathLength=1 的归一化，
  * 勾会在浏览器重算路径长度时来回跳。改成只动 opacity/transform 的单次出现动画。 */
 @keyframes checkbox-mark-enter {

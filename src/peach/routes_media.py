@@ -615,14 +615,17 @@ def cover(request: Request, code: str = "", thumb: int = 0,
           args: dict[str, str] = Depends(require_auth)):
     """官方封套原图。存原图不裁：4:3 与 16:9 两种版式在界面上按比例取景。
 
-    `thumb=1` 要的是卡片网格那一档派生件（`COVER_THUMB_EDGE`），详情与裁切取原件。
-    开关是布尔而不是像素数，理由同 `/entity-image`。
+    `thumb` 是派生档的档次：`1` 是长边 1600 那一档（`COVER_THUMB_EDGE`），`2` 是卡片网格
+    的起始档、长边 800（`COVER_SMALL_THUMB_EDGE`）；不带就是原件，详情与裁切取原件。
+    档次而不是像素数，理由同 `/entity-image`：尺寸由服务端定死，页面只挑档。
     """
     path = request.app.state.web_contract.cover_path(code)
     if path is None:
         return JSONResponse({"error": "no cover"}, status_code=404)
     if thumb:
-        derived = request.app.state.cover_thumb_service.thumbnail(path.stem, path)
+        state = request.app.state
+        service = state.cover_small_thumb_service if thumb == 2 else state.cover_thumb_service
+        derived = service.thumbnail(path.stem, path)
         if derived is not None:
             return _image_response(request, derived, media_type=ENTITY_THUMB_TYPE)
     return _image_response(request, path, media_type="image/jpeg")
@@ -1075,6 +1078,35 @@ def cover_image(request: Request, code: str, args: dict[str, str] = Depends(requ
             state.http_transport.client, request.method, target, incoming=request.headers))
     except (ValueError, FollowProxyError, OSError, httpx.HTTPError):
         return Response(status_code=404, headers={"cache-control": "no-store"})
+
+
+#: 来源图片只按位图回给浏览器：同源下发 SVG 等于让来源在 Peach 的源里跑脚本。
+_JAV_IMAGE_TYPES = frozenset({"image/jpeg", "image/png", "image/gif", "image/webp", "image/avif"})
+
+
+@router.api_route("/jav-image", methods=["GET", "HEAD"])
+def jav_image(request: Request, code: str, image: str = "cover", args: dict[str, str] = Depends(require_auth)):
+    """库外作品的来源图片（样张、来源封面、来源头像），以图片本身回给 `<img>`。
+
+    字节来自远程媒体缓存，取过一次不再出网；带内容摘要的 ETag 与 `private, max-age`，
+    再开同一部作品由浏览器缓存直接给。取不到回 404 且不缓存，页面换成「未取得」并可重试。
+    """
+    import hashlib
+    from .follow_assets import sniff
+    from .web_jav_detail import jav_image as source_image
+    try:
+        body, max_age = source_image(request.app.state.web_contract, {"code": code, "image": image})
+    except (ValueError, OSError):
+        return Response(status_code=404, headers={"cache-control": "no-store"})
+    media_type = sniff(body)
+    if media_type not in _JAV_IMAGE_TYPES:
+        return Response(status_code=404, headers={"cache-control": "no-store"})
+    headers = {"etag": f'"{hashlib.sha256(body).hexdigest()[:32]}"',
+               "cache-control": f"private, max-age={max_age}"}
+    if headers["etag"] in request.headers.get("if-none-match", ""):
+        return Response(status_code=304, headers=headers)
+    return Response(b"" if request.method == "HEAD" else body, media_type=media_type,
+                    headers={**headers, "content-length": str(len(body))})
 
 
 def _jav_preview_target(url: str) -> ResolvedFollowMedia:

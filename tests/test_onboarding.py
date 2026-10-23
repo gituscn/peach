@@ -507,7 +507,7 @@ class SetupJsonContractTests(_SetupHttpCase):
         self.assertNotIn("<form", body)
         # 首启服务没有口令，页面包、Inter 与站标得放行。
         for path in ("/dist/peach-pages.js", "/dist/peach-pages.css", "/vendor/inter/5.3.0/index.css",
-                     "/peach-logo.png"):
+                     "/peach-logo.png", "/peach-logo-64.png", "/peach-logo-128.png"):
             with self.subTest(path):
                 self.assertEqual(self._get(path).status_code, 200)
 

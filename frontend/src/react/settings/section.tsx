@@ -57,6 +57,13 @@ export function Stack({ divided = false, children }: { divided?: boolean; childr
     : <div className="flex flex-col gap-4 py-4 pr-3 empty:hidden">{children}</div>;
 }
 
+/** 分区首次取数：画 `configuration-skeleton.ts` 里这个分区的那一份骨架，与整页骨架里这一块是同一段
+ *  结构，整页骨架交给 React 时位置不动。挂载时取一次，读回之前不随渲染重算。状态名只给辅助技术。 */
+export function SectionSkeleton({ label, html }: { label: string; html: () => string }) {
+  const [markup] = useState(html);
+  return <div className="contents" data-skeleton="" aria-busy="true" aria-label={label} dangerouslySetInnerHTML={{ __html: markup }} />;
+}
+
 /** 底栏：左边一句说这颗按钮此刻意味着什么，右边是按钮。
  *
  *  底色比卡面暗一点点，通到卡片左右两沿（旧 `.geist-fieldset-footer` 的 `--board-card-foot`）：

@@ -576,7 +576,8 @@ export async function openPhotoWall(browser: Browser, viewport = DESKTOP): Promi
   }));
   await page.goto(new URL(`/performers/${encodeURIComponent(name)}?media=photos`, page.url()).href, { waitUntil: 'load' });
   await page.locator('[data-local-wall] [data-photo-cell] img').first().waitFor({ timeout: 15_000 });
-  await settle(page);
+  // 续页哨兵提前一屏开始取，这面短墙一出来就会去取那一页；它被上面压着，那枚键的忙态不算页面在等。
+  await settle(page, 'body', { except: '[data-entity-more]' });
   return opened;
 }
 

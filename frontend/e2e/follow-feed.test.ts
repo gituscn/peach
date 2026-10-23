@@ -153,13 +153,23 @@ describe('关注页岛', () => {
             assert.ok(Math.abs(pair.glass[side] - pair.key[side]) <= 1, JSON.stringify(pair));
           }
         }
-        const animations = await page.locator('[data-follow-filter-glass] [data-view-glide=""]').evaluate(async (node) => {
-          node.animate([{ translate: '0px 0px' }, { translate: '100px 0px' }], { duration: 10_000 });
+        /* 在跑的位移由玻璃自己的滑动发起：指针移到相邻那一枚键上，玻璃滑过去。滑动动画由
+           `moveGlidePane` 自己记着撤，所以要走真的悬停，不在节点上另挂动画。窗口改尺寸后重量，
+           那段位移得被掐掉，不能继续把玻璃从新落点拽走。用例的浏览器默认减少动态，滑动不起，这里放开。 */
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        const animations = await page.locator('[data-follow-filter-glass]').evaluate(async (host) => {
+          const glass = host.querySelector<HTMLElement>('[data-view-glide=""]')!;
+          const keys = [...host.querySelectorAll<HTMLElement>('[data-follow-filter]')];
+          const at = keys.findIndex((key) => key.getAttribute('aria-pressed') === 'true');
+          const neighbour = keys[at + 1] ?? keys[at - 1]!;
+          neighbour.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
+          const moving = glass.getAnimations().length;
           window.dispatchEvent(new Event('resize'));
           await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-          return node.getAnimations().length;
+          return { moving, left: glass.getAnimations().length };
         });
-        assert.equal(animations, 0, '重新落位后仍有动画覆盖玻璃位置');
+        assert.ok(animations.moving > 0, `悬停相邻的键没有起滑动：${JSON.stringify(animations)}`);
+        assert.equal(animations.left, 0, '重新落位后仍有动画覆盖玻璃位置');
         assert.deepEqual(opened.problems, []);
       } finally { await opened.close(); }
     });

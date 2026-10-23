@@ -163,8 +163,9 @@ async def client_error(request: Request):
                    if type(value := data.get(key)) is int and value >= 0})
     identities = data.get('bundle_debug_ids')
     if isinstance(identities, dict):
+        from .diagnostic_browser import shipped
         fields['bundle_debug_ids'] = {key: value for key, value in identities.items()
-            if key in {'peach-app.js', 'peach-pages.js'} and isinstance(value, str) and len(value) == 36}
+            if shipped(key) and isinstance(value, str) and len(value) == 36}
     fields['user_agent'] = request.headers.get('user-agent', '')[:512]
     if error_reporting.event("browser", **fields) is None:
         raise HTTPException(503, "错误日志无法写入")
