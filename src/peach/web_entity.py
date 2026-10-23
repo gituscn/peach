@@ -101,7 +101,9 @@ def _missing_entity_result(connection, kind: str, name: str, entity_id: int | No
 
 #: 资料页与索引页数作品的口径：视频，且没有标「已消失」（ADR-0087）。回收站里的照旧算；
 #: 代表作的取图不套这一条。
-COUNTED_VIDEO = "a.medium='video' AND COALESCE(a.disposal,'')<>'vanished'"
+COUNTED_VIDEO = (
+    "a.medium='video' AND COALESCE(a.disposal,'')<>'vanished' AND NOT peach_is_local_trailer(a.name)"
+)
 
 
 def scope_predicate(kind: str, column: str, subject: str = "?") -> str:

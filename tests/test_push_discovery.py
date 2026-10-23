@@ -387,10 +387,10 @@ class IngestPathTests(_ServiceCase):
     def test_a_scraper_sidecar_is_found_but_not_registered(self):
         folder = self.media / "ABC-123"
         (folder / "extrafanart").mkdir(parents=True)
-        for name in ("ABC-123.mp4", "ABC-123.nfo", "poster.jpg", "extrafanart/1.jpg"):
+        for name in ("ABC-123.mp4", "ABC-123.nfo", "poster.jpg", "extrafanart/1.jpg", "ABC-123-trailer.mp4"):
             (folder / name).write_bytes(b"0" * 4)
         kwargs = {"declared_roots": self.declared, "mounts": self.mounts}
-        for parts in (("ABC-123.nfo",), ("poster.jpg",), ("extrafanart", "1.jpg")):
+        for parts in (("ABC-123.nfo",), ("poster.jpg",), ("extrafanart", "1.jpg"), ("ABC-123-trailer.mp4",)):
             result = scan.ingest_path(self.db, "local", self.ledger("local", "ABC-123", *parts),
                                       **kwargs)
             self.assertEqual((result.found, result.sidecar), (True, True), parts)

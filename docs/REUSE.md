@@ -898,6 +898,10 @@ Python 源文件纳入 `src/peach/library_sharing.py` 与 `src/peach/library_pro
 
 普通 Toast 与扫描任务卡共用 Agent Progress 外框，16px 半径由通知栈内的既有 token 解析，细边框与接触阴影分别复用 `border-button-default`、`elevation-xs`，不改变内容排版。浏览器回归核对桌面、手机和明暗主题下的外框一致性，并以同一任务、同一内容回放外框基线生成对比图。
 
+## 本地预告片识别
+
+本地预告片识别复用 `catalog_rules.is_local_trailer` 与现有 `scan.is_sidecar`，行为约定来自 [Kodi 本地预告片](https://kodi.wiki/view/Trailers)与 [Jellyfin 附属文件命名](https://jellyfin.org/docs/general/server/media/movies/#file-suffix)（2026-10-23 核对）。仅参照公开命名规则，不复制上游源码或引入媒体服务器依赖。`trailer` 裸名及 `-trailer`、`.trailer`、`_trailer`、空格加 `trailer` 的末尾标记不区分大小写，扩展名沿用现有视频集合。扫描、推送发现、首次预检、后台探测、资料采集和馆藏查询使用同一判据；已登记记录只在作品列表、版本组与库存计数中排除，保留媒体和个人记录，不按时长猜测。隔离回归复现正片与预告片共存的目录，并验证短正片、普通片名和账本只读性。Python 3.14 标准库 `re`（PSF 许可）已随运行时提供，无新增依赖与安装体积；不采用额外视频解析库，因为本项只需读取文件名。取证范围见[本地预告片证据](reference-snapshots/local-trailer-evidence.md)。
+
 ## 媒体库与根目录身份
 
 身份生成复用 Python 3.14 标准库 [`uuid`](https://docs.python.org/3.14/library/uuid.html) 的 UUIDv4、UUIDv5（PSF 许可，随运行时维护，Windows/macOS/Linux，无新增安装体积）；路径归属复用 `platform.resolve_root`、`PureWindowsPath`，配置写入复用 `fsutil.atomic_write_text`，扫描沿用 SQLite upsert 与现有断点。当前树与 Git 中的媒体库分组、目录索引、来源探测和下载渠道共同消费这些身份。

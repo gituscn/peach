@@ -168,11 +168,13 @@ AGENCY_SEARCH_CLAUSE = (
 )
 
 
-#: 「这条资源在普通馆藏里看得见」的判据：是视频，且在库——不在回收站，也没有标「已消失」
+#: 普通馆藏展示在库正片，排除预告片、回收站和标「已消失」的资源。
 #: （`disposal` 为空，ADR-0087）。列表、搜索和补全
 #: 共用这一份。各写各的后果是补全会补出回收站里的作品——那一条点开是已经删掉的片，
 #: 而列表本身从来不显示它，所以只会在补全这一个表面上露出来。
-VISIBLE_CATALOG_ASSET = "a.medium='video' AND a.disposal IS NULL"
+VISIBLE_CATALOG_ASSET = (
+    "a.medium='video' AND a.disposal IS NULL AND NOT peach_is_local_trailer(a.name)"
+)
 
 
 def region_filter(value, trash: bool) -> tuple[list[str], list[str]]:
@@ -676,7 +678,7 @@ def _read_group_rows(contract: WebContract) -> list[dict]:
             "SELECT id,name,path,code,size,duration,width,height,ctx_orient,disposal,catalog_title,field_owners "
             "FROM asset "
             "WHERE medium='video' "
-            "AND COALESCE(disposal,'')<>'vanished' ORDER BY id",
+            "AND COALESCE(disposal,'')<>'vanished' AND NOT peach_is_local_trailer(name) ORDER BY id",
         )]
         if not rows:
             return []
@@ -1114,6 +1116,7 @@ def q_related(contract: WebContract, aid, limit=24):
             "FROM asset a JOIN asset_entity shared "
             "ON shared.asset_id=a.id WHERE a.medium='video' AND a.id<>? "
             "AND (a.feedback IS NULL OR a.feedback<>'dislike') AND a.disposal IS NULL "
+            "AND NOT peach_is_local_trailer(a.name) "
             f"AND shared.entity_id IN ({source_marks}) GROUP BY a.id "
             "ORDER BY count(DISTINCT shared.entity_id) DESC,a.id LIMIT 4000",
             (aid, *source_entity_ids),
@@ -1209,7 +1212,9 @@ JAV_ASSET_PREDICATE = (
 )
 JAV_ASSET_CLAUSE = "AND " + JAV_ASSET_PREDICATE + " "
 #: 筛选项、侧栏读数与顶部三层排掉标「已消失」的行；回收站里的照旧算（`q_facets`、`q_tops`）。
-PRESENT_ASSET_CLAUSE = "AND COALESCE(a.disposal,'')<>'vanished' "
+PRESENT_ASSET_CLAUSE = (
+    "AND COALESCE(a.disposal,'')<>'vanished' AND NOT peach_is_local_trailer(a.name) "
+)
 
 
 #: 首页的状态筛选（新鲜 / 看过 / 已标记 / 稍后看）。作品列表、顶部三层和筛选面板

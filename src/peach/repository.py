@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from .catalog_rules import is_jav_code, normalise_code_key
+from .catalog_rules import is_jav_code, is_local_trailer, normalise_code_key
 from .entities import normalize_entity_name
 from .regions import infer_region
 
@@ -30,6 +30,8 @@ class LedgerDatabase:
         )
         connection.row_factory = sqlite3.Row
         connection.create_function("is_jav_code", 1, is_jav_code, deterministic=True)
+        connection.create_function(
+            "peach_is_local_trailer", 1, is_local_trailer, deterministic=True)
         connection.create_function(
             "normalise_code_key", 1, normalise_code_key, deterministic=True)
         # 产地推断要和 Python 侧同一份实现。SQL 里重写一遍前缀名单的话，账本筛出来的

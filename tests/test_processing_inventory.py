@@ -61,6 +61,23 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(result['workload']['jav_titles'], 4)
         self.assertEqual(self.db.read_bytes(), before)
 
+    def test_trailers_are_excluded_from_discovered_and_registered_workloads(self):
+        for name in ('ABC-123.mp4', 'ABC-123-trailer.mp4', 'ABC-123.TRAILER.MKV', 'short.mp4'):
+            (self.media / name).touch()
+        before = self.db.read_bytes()
+        discovered = preview(self.config, self.db, 'all', None)
+        self.assertEqual(discovered['workload']['video_files'], 2)
+        self.assertEqual(discovered['workload']['jav_files'], 1)
+        self.assertEqual(self.db.read_bytes(), before)
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            for name in ('ABC-123.mp4', 'ABC-123-trailer.mp4'):
+                connection.execute('INSERT INTO asset(location,path,name,medium) VALUES(?,?,?,?)',
+                                   ('mounted', 'A:\\Cloud\\' + name, name, 'video'))
+        before = self.db.read_bytes()
+        registered = preview(self.config, self.db, 'all', None)
+        self.assertEqual(registered['workload']['video_files'], 1)
+        self.assertEqual(self.db.read_bytes(), before)
+
     def test_each_query_advances_a_batch_and_preserves_deduplication(self):
         for number in range(1100):
             (self.media / f'ABW-001-CD{number}.mp4').touch()

@@ -15,6 +15,21 @@ from collections.abc import Iterable
 from pathlib import PureWindowsPath
 
 
+VIDEO_EXTENSIONS = frozenset({
+    '.mp4', '.m4v', '.mkv', '.avi', '.wmv', '.mov', '.ts', '.flv', '.rmvb', '.mpg',
+    '.m2ts', '.strm', '.iso',
+})
+_LOCAL_TRAILER = re.compile(
+    r'(?:^|[-._ ])trailer(?:' + '|'.join(re.escape(ext) for ext in sorted(VIDEO_EXTENSIONS)) + r')\Z',
+    re.IGNORECASE,
+)
+
+
+def is_local_trailer(name: str | None) -> bool:
+    """Kodi／Jellyfin 的裸名或末尾 trailer 标记；时长不参与判定。"""
+    return bool(_LOCAL_TRAILER.search(name or ''))
+
+
 LENGTH_TAGS = {"短片-2分内", "中片-10分内", "长片-30分内", "超长片-30分上"}
 TECH_TAGS = {
     "1080P", "720P", "4K", "2K", "2160P", "480P", "低画质", "高帧率",
