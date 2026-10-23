@@ -13,7 +13,8 @@ from PIL import Image
 from peach.http import HttpResponse
 from peach.javdb_public import PublicAPI, PublicSourceUnavailable, decode_image, preview_video_url
 from peach.javdb_public import PublicBudgetExceeded, PublicRequestBudget, actor_gender
-from peach.web_jav_detail import q_jav_detail, q_jav_image, q_jav_reviews, q_jav_resources
+from peach.web_jav_detail import (JAV_ACTOR_IMAGE_MAX_AGE, JAV_IMAGE_MAX_AGE, jav_image, q_jav_detail,
+                                  q_jav_reviews, q_jav_resources)
 from peach.web_state import WebContract
 from peach.web_router import dispatch_api_get
 from support.ledger import fresh_ledger
@@ -291,10 +292,10 @@ class DetailProjectionTests(unittest.TestCase):
         Image.new('RGB', (800, 438), '#777').save(original, 'JPEG')
         data_url = 'data:image/jpeg;base64,' + base64.b64encode(original.getvalue()).decode('ascii')
         with patch('peach.web_jav_detail.PUBLIC_API.image', return_value=data_url) as fetch:
-            detail = q_jav_image(self.contract, {'code': 'MIDA-085'})
+            detail, _max_age = jav_image(self.contract, {'code': 'MIDA-085'})
         with patch('peach.web_jav_detail.PUBLIC_API.image', side_effect=AssertionError('缓存命中不请求来源')):
-            self.assertEqual(q_jav_image(self.contract, {'code': 'MIDA-085'})['image'], data_url)
-        self.assertTrue(detail['ok'])
+            self.assertEqual(jav_image(self.contract, {'code': 'MIDA-085'})[0], original.getvalue())
+        self.assertEqual(detail, original.getvalue())
         fetch.assert_called_once()
 
     def test_source_cover_url_projects_known_work_without_changing_source_fields(self):
@@ -340,10 +341,10 @@ class DetailProjectionTests(unittest.TestCase):
             return HttpResponse(200, {}, body)
         api = PublicAPI(transport, sleeper=lambda _: None)
         with patch('peach.web_jav_detail.PUBLIC_API', api):
-            first = q_jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Person'})
-            second = q_jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Person'})
-        self.assertTrue(first['ok'])
-        self.assertTrue(first['image'].startswith('data:image/jpeg;base64,'))
+            first = jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Person'})
+            second = jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Person'})
+        self.assertTrue(first[0].startswith(b'\xff\xd8\xff'))
+        self.assertEqual(first[1], JAV_ACTOR_IMAGE_MAX_AGE)
         self.assertEqual(second, first)
         self.assertEqual(sum('/movies/Exact' in url for url in requests), 1)
         self.assertEqual(sum(url.startswith('https://tp.spfcas.com/') for url in requests), 1)
@@ -355,8 +356,8 @@ class DetailProjectionTests(unittest.TestCase):
                                                'avatar_url': 'https://tp.spfcas.com/actor.jpg'}]})
         with patch('peach.web_jav_detail.PUBLIC_API.image_from_url', return_value='data:image/jpeg;base64,c2FtcGxl') as image, \
                 patch('peach.web_jav_detail.PUBLIC_API.movie') as movie:
-            result = q_jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Actor1'})
-        self.assertTrue(result['ok'])
+            result = jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Actor1'})
+        self.assertEqual(result[0], b'sample')
         movie.assert_not_called()
         image.assert_called_once_with('https://tp.spfcas.com/actor.jpg')
 
@@ -449,7 +450,7 @@ class DetailProjectionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 q_jav_detail(self.contract, {'code': '../secret'})
             with self.assertRaises(ValueError):
-                q_jav_image(self.contract, {'code': 'EXM-001', 'image': '-1'})
+                jav_image(self.contract, {'code': 'EXM-001', 'image': '-1'})
             movie.assert_not_called()
 
     def test_resources_normalize_and_deduplicate_valid_magnets(self):
@@ -528,15 +529,16 @@ class DetailProjectionTests(unittest.TestCase):
         self.assertEqual(result['studio_refs'][0]['has_logo'], True)
         self.assertEqual(result['studio_refs'][0]['logo_version'], 'logo-version')
         with patch('peach.web_jav_detail.PUBLIC_API.image_from_url', return_value='data:image/jpeg;base64,c2FtcGxl') as image:
-            self.assertTrue(q_jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Unknown'})['ok'])
+            self.assertEqual(jav_image(self.contract, {'code': 'EXM-001', 'image': 'actor:Unknown'})[0], b'sample')
         image.assert_called_once_with('https://tp.spfcas.com/b.jpg')
 
     def test_image_bytes_are_reused_without_querying_source_again(self):
         with patch('peach.web_jav_detail.PUBLIC_API.image', return_value='data:image/jpeg;base64,c2FtcGxl') as image:
-            first = q_jav_image(self.contract, {'code': 'EXM-001'})
+            first = jav_image(self.contract, {'code': 'EXM-001'})
         image.assert_called_once()
+        self.assertEqual(first, (b'sample', JAV_IMAGE_MAX_AGE))
         with patch('peach.web_jav_detail.PUBLIC_API.image', side_effect=PublicSourceUnavailable('offline')) as offline:
-            replay = q_jav_image(self.contract, {'code': 'EXM-001'})
+            replay = jav_image(self.contract, {'code': 'EXM-001'})
         self.assertEqual(replay, first)
         offline.assert_not_called()
 

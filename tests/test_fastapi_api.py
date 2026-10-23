@@ -2656,6 +2656,31 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             self.app.state.http_transport.client = original
             fake.close()
 
+    async def test_jav_image_serves_source_bytes_with_etag_and_drops_failures(self):
+        """库外作品的样张与来源头像以图片本身下发：带 ETag 与私有缓存时效，取不到回 404 不缓存。"""
+        from peach.javdb_public import PublicSourceUnavailable
+        jpeg = b'\xff\xd8\xff\xe0' + b'sample-bytes' * 400
+        with patch('peach.web_jav_detail.jav_image', return_value=(jpeg, 600)) as source:
+            first = await self.client.get('/jav-image?code=EXM-001&image=3&t=secret',
+                                          headers={'Accept-Encoding': 'gzip'})
+            self.assertEqual((first.status_code, first.content), (200, jpeg))
+            self.assertEqual(first.headers['content-type'], 'image/jpeg')
+            # 已压缩的图片不再过一遍 gzip。
+            self.assertNotIn('content-encoding', first.headers)
+            self.assertEqual(first.headers['cache-control'], 'private, max-age=600')
+            revalidated = await self.client.get('/jav-image?code=EXM-001&image=3&t=secret',
+                                                headers={'If-None-Match': first.headers['etag']})
+            self.assertEqual((revalidated.status_code, revalidated.content), (304, b''))
+        self.assertEqual(source.call_args.args[1], {'code': 'EXM-001', 'image': '3'})
+        for failure in (PublicSourceUnavailable('offline'), ValueError('预览图不存在')):
+            with self.subTest(failure=failure), patch('peach.web_jav_detail.jav_image', side_effect=failure):
+                missing = await self.client.get('/jav-image?code=EXM-001&image=3&t=secret')
+                self.assertEqual((missing.status_code, missing.headers['cache-control']), (404, 'no-store'))
+        # 来源回来的不是位图（例如 SVG）就不下发：同源的 SVG 能执行脚本。
+        with patch('peach.web_jav_detail.jav_image', return_value=(b'<svg xmlns="http://www.w3.org/2000/svg"/>', 600)):
+            refused = await self.client.get('/jav-image?code=EXM-001&image=3&t=secret')
+        self.assertEqual(refused.status_code, 404)
+
     async def test_follow_cover_serves_cached_frame_and_reports_retryable_failure(self):
         connection = sqlite3.connect(self.db)
         connection.executescript((ROOT / "migrations" / "0018_online_follow.sql").read_text(

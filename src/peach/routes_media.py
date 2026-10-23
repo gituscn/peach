@@ -1077,6 +1077,35 @@ def cover_image(request: Request, code: str, args: dict[str, str] = Depends(requ
         return Response(status_code=404, headers={"cache-control": "no-store"})
 
 
+#: 来源图片只按位图回给浏览器：同源下发 SVG 等于让来源在 Peach 的源里跑脚本。
+_JAV_IMAGE_TYPES = frozenset({"image/jpeg", "image/png", "image/gif", "image/webp", "image/avif"})
+
+
+@router.api_route("/jav-image", methods=["GET", "HEAD"])
+def jav_image(request: Request, code: str, image: str = "cover", args: dict[str, str] = Depends(require_auth)):
+    """库外作品的来源图片（样张、来源封面、来源头像），以图片本身回给 `<img>`。
+
+    字节来自远程媒体缓存，取过一次不再出网；带内容摘要的 ETag 与 `private, max-age`，
+    再开同一部作品由浏览器缓存直接给。取不到回 404 且不缓存，页面换成「未取得」并可重试。
+    """
+    import hashlib
+    from .follow_assets import sniff
+    from .web_jav_detail import jav_image as source_image
+    try:
+        body, max_age = source_image(request.app.state.web_contract, {"code": code, "image": image})
+    except (ValueError, OSError):
+        return Response(status_code=404, headers={"cache-control": "no-store"})
+    media_type = sniff(body)
+    if media_type not in _JAV_IMAGE_TYPES:
+        return Response(status_code=404, headers={"cache-control": "no-store"})
+    headers = {"etag": f'"{hashlib.sha256(body).hexdigest()[:32]}"',
+               "cache-control": f"private, max-age={max_age}"}
+    if headers["etag"] in request.headers.get("if-none-match", ""):
+        return Response(status_code=304, headers=headers)
+    return Response(b"" if request.method == "HEAD" else body, media_type=media_type,
+                    headers={**headers, "content-length": str(len(body))})
+
+
 def _jav_preview_target(url: str) -> ResolvedFollowMedia:
     """已验证的预览来源使用固定主机范围，其他 CDN 逐跳核对公网解析。"""
     return ResolvedFollowMedia(url, allowed_hosts=("www.prestige-av.com", "jdforrepam.com", "cc3001.dmm.co.jp"), public_hosts=True)

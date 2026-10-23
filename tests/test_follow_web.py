@@ -536,6 +536,46 @@ class FollowContractTests(unittest.TestCase):
         payload = self._get(item=str(item_id), limit="1")
         self.assertEqual(payload["groups"][0]["primary"]["id"], item_id)
         self.assertEqual(len(payload["groups"][0]["variants"]), 1)
+        # 详情只读这一组和署名要的来源、别名；整库筛选项不随单条下发。
+        self.assertNotIn("facets", payload)
+        self.assertEqual(payload["sources"][0]["label"], "LazyProcrastinator")
+        self.assertEqual(self._get(item=str(item_id + 999))["groups"], [])
+
+    def test_feed_groups_once_per_ledger_version_and_ignores_playback_heartbeats(self):
+        """整库分组按账本版本缓存：翻页、直达详情与播放心跳都不再分组，条目状态变了才重分。"""
+        self._seed(candidates=(
+            FollowCandidate(provider="rule34video", external_id="1", title="First Work",
+                            url="https://rule34video.com/video/1/x/", published_at="2026-08-18T00:00:00Z"),
+            FollowCandidate(provider="rule34video", external_id="2", title="Second Work",
+                            url="https://rule34video.com/video/2/x/", published_at="2026-08-17T00:00:00Z"),
+        ))
+        grouped = []
+        original = FollowStore.group
+
+        def counted(*args, **kwargs):
+            grouped.append(1)
+            return original(*args, **kwargs)
+
+        with mock.patch.object(FollowStore, "group", side_effect=counted):
+            first = self._get(limit="1")
+            item = first["groups"][0]["primary"]["id"]
+            self.assertIn("facets", first)
+            second = self._get(limit="1", offset="1")
+            # 翻页只接组，筛选项沿用首页那份。
+            self.assertNotIn("facets", second)
+            self.assertNotEqual(second["groups"][0]["primary"]["id"], item)
+            self.assertEqual(self._get(item=str(item))["groups"][0]["primary"]["id"], item)
+            settled = len(grouped)
+            self._get(limit="1")
+            self._get(item=str(item))
+            self._post("/api/follow/activity", {"item": item, "position": 5, "duration": 20, "delta": 5})
+            self._get(limit="1")
+            self._get(item=str(item))
+            self.assertEqual(len(grouped), settled)
+            self._post("/api/follow/status", {"item": item, "to": "ignored"})
+            relisted = self._get(limit="1")
+        self.assertGreater(len(grouped), settled)
+        self.assertEqual(relisted["counts"]["ignored"], 1)
 
     def test_feed_never_exposes_the_raw_media_url(self):
         # 界面只需要知道有没有媒体；直链是来源层的事，不进公共 JSON。

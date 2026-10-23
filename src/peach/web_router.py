@@ -50,7 +50,7 @@ from .web_entity import (
 from .web_downloads import (q_downloads, w_download_cancel, w_download_postprocess,
                             w_download_submit)
 from .web_resource_search import q_resource_search
-from .web_jav_detail import q_jav_detail, q_jav_image, q_jav_resources, q_jav_reviews
+from .web_jav_detail import q_jav_detail, q_jav_resources, q_jav_reviews
 from .web_jav_discovery import q_jav_discoveries
 from .web_feeds import (
     q_feed_check,
@@ -114,8 +114,7 @@ from .web_stats import (
     q_quality_goals,
     q_search_history,
     q_stats,
-    q_taste,
-    taste_inputs,
+    taste_snapshot,
     w_search_history,
     w_taste_refresh,
     w_taste_source,
@@ -246,10 +245,7 @@ def _get_search_history(contract, args):
 
 
 def _get_taste(contract, args):
-    window = str(args.get("window") or "all")
-    return contract.cached_until_changed(
-        f"taste:{window}", lambda: q_taste(contract, {"window": window}),
-        *taste_inputs(contract, window))
+    return taste_snapshot(contract, str(args.get("window") or "all"))
 
 
 def _get_review(contract, args):
@@ -335,7 +331,6 @@ GET_HANDLERS = {
     "/api/resources/search": q_resource_search,
     "/api/jav/detail": q_jav_detail,
     "/api/jav/reviews": q_jav_reviews,
-    "/api/jav/image": q_jav_image,
     "/api/jav/resources": q_jav_resources,
     "/api/jav/discoveries": q_jav_discoveries,
     "/api/library-processing": q_library_processing,

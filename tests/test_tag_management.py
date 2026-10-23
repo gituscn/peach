@@ -242,9 +242,12 @@ class OnlineTagManagementTests(unittest.TestCase):
         feed = web_follow.q_follow(self.contract, {})
         self.assertNotIn('outdoors', dict(feed['facets']['tags']))
         self.assertTrue(all('outdoors' not in group['primary']['detail_tags'] for group in feed['groups']))
-        self.assertTrue(any('outdoors' in group['primary']['source_tags'] for group in feed['groups']))
+        self.assertTrue(any('outdoors' in metadata for (metadata,) in self.c.execute('SELECT metadata_json FROM follow_item')))
         self.execute('restore', ['outdoors'])
         self.assertIn('outdoors', [row['k'] for row in web_follow.q_follow_tags(self.contract, {'types': 'all'})['items']])
+        restored = web_follow.q_follow(self.contract, {})
+        self.assertIn('outdoors', dict(restored['facets']['tags']))
+        self.assertTrue(any('outdoors' in group['primary']['detail_tags'] for group in restored['groups']))
 
     def test_online_conflicts_types_and_stale_plans_are_rejected(self):
         self.seed()

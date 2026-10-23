@@ -15,7 +15,7 @@ from .javdb_public import (MAX_REVIEW_PAGES, PAGE_SIZE, PUBLIC_API, PublicSource
                           actor_gender, preview_video_url, public_image_url, public_cache_scope, cache_checked_at, cache_error)
 from .jav_discovery_metadata import discovery_metadata
 from .sources.javdb import maker_writing
-from .remote_media_cache import AVATAR_REFRESH_SECONDS, RemoteMediaUnavailable, cache_for
+from .remote_media_cache import AVATAR_REFRESH_SECONDS, cache_for
 from .preview_cache import PreviewCache
 
 
@@ -67,9 +67,7 @@ def _source_cache(handler):
     def read(contract, args):
         with public_cache_scope(contract.cover_root.parent / 'jav-public') as reads:
             payload = handler(contract, args)
-            if handler.__name__ == 'q_jav_image':
-                return payload
-            prefix = {'q_jav_reviews': ('reviews:',), 'q_jav_resources': ('reviews:', 'magnets:')}.get(
+            prefix ={'q_jav_reviews': ('reviews:',), 'q_jav_resources': ('reviews:', 'magnets:')}.get(
                 handler.__name__, ('movie:',))
             selected = [row for row in reads if row['key'].startswith(prefix)]
             if selected:
@@ -225,22 +223,30 @@ def q_jav_reviews(contract, args) -> dict:
             "message": ""}
 
 
-@_source_cache
-def q_jav_image(contract, args) -> dict:
+#: 来源图片在浏览器里留多久。样张与来源封面落盘后不再刷新；来源头像在服务端按
+#: `AVATAR_REFRESH_SECONDS` 换新，浏览器只留一天，换过的图第二天就看得到。
+JAV_IMAGE_MAX_AGE = 30 * 86400
+JAV_ACTOR_IMAGE_MAX_AGE = 86400
+
+
+def jav_image(contract, args) -> tuple[bytes, int]:
+    """来源图片（样张、来源封面、来源头像）的字节，以及浏览器可以缓存的秒数。
+
+    取过一次就落进远程媒体缓存，再取不出网。取不到抛 `PublicSourceUnavailable` 或
+    `RemoteMediaUnavailable`；番号或图号不合法抛 `ValueError`，都在联网之前。
+    """
     code = detail_code(args)
     index = str(args.get("image") or "cover")
     if (index != "cover" and not re.fullmatch(r"actor:[A-Za-z0-9]{1,64}", index)
             and (not index.isdigit() or not 0 <= int(index) < 30)):
         raise ValueError("预览图不存在")
-    try:
-        key = f"jav:actor:{index.removeprefix('actor:')}" if index.startswith("actor:") else f"jav:{code}:image:{index}"
+    actor = index.startswith("actor:")
+    key = f"jav:actor:{index.removeprefix('actor:')}" if actor else f"jav:{code}:image:{index}"
+    with public_cache_scope(contract.cover_root.parent / 'jav-public'):
         body = cache_for(contract).bytes(key,
             lambda: base64.b64decode(_fetch_image(contract, code, index).partition(',')[2], validate=True),
-            ttl=AVATAR_REFRESH_SECONDS if index.startswith("actor:") else None)
-        image = "data:image/jpeg;base64," + base64.b64encode(body).decode("ascii")
-    except (PublicSourceUnavailable, RemoteMediaUnavailable) as error:
-        return {"ok": False, "image": "", "message": str(error)}
-    return {"ok": True, "image": image}
+            ttl=AVATAR_REFRESH_SECONDS if actor else None)
+    return body, JAV_ACTOR_IMAGE_MAX_AGE if actor else JAV_IMAGE_MAX_AGE
 
 
 def _fetch_image(contract, code, index):
