@@ -33,9 +33,12 @@ def describe(root: Path) -> dict:
             "needs_selection": bool(saved.get("conflict"))}
 
 
-def save(root: Path, body: dict) -> dict:
+def validate(root: Path, body: object) -> dict:
+    """校验连接方式与地址；凭据只留在返回给保存流程的值中。"""
+    if not isinstance(body, dict):
+        raise ValueError("请选择 Peach 代理的连接方式")
     mode = body.get("mode")
-    if mode not in {"environment", "direct", "proxy"}:
+    if not isinstance(mode, str) or mode not in {"environment", "direct", "proxy"}:
         raise ValueError("请选择 Peach 代理的连接方式")
     address = body.get("proxy") or values(root).get("proxy", "")
     if not isinstance(address, str):
@@ -50,8 +53,13 @@ def save(root: Path, body: dict) -> dict:
             valid = False
         if not valid or any(char.isspace() for char in address):
             raise ValueError("请填写带端口的 HTTP 或 SOCKS 代理地址")
+    return {"mode": mode, "proxy": address if mode == "proxy" else ""}
+
+
+def save(root: Path, body: dict) -> dict:
+    checked = validate(root, body)
     path = CredentialStore(root).path_for("peach-proxy")
-    atomic_write_text(path, json.dumps({"mode": mode, "proxy": address if mode == "proxy" else ""}), mode=0o600)
+    atomic_write_text(path, json.dumps(checked), mode=0o600)
     return describe(root)
 
 

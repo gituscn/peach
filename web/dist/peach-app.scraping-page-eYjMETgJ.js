@@ -1,7 +1,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "daaf4ee8-3af3-47e9-ac67-d3b9a7c2692e", e._sentryDebugIdIdentifier = "sentry-dbid-daaf4ee8-3af3-47e9-ac67-d3b9a7c2692e");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "c85d4030-96e3-4a13-b134-db65a7bb63d5", e._sentryDebugIdIdentifier = "sentry-dbid-c85d4030-96e3-4a13-b134-db65a7bb63d5");
 	} catch {}
 })();
 import { $fe21c36db05242bb$export$d7b12c4107be0d61 as e, AMANE_BRIDGE_CHECK_URL as t, AMANE_BRIDGE_KEY as n, AMANE_BRIDGE_REBUILD_URL as r, Button as i, COVER_JOB_KEY as a, CUSTOM_SOURCES_KEY as o, CUSTOM_SOURCES_URL as s, Checkbox as c, Disclosure as l, ErrorText as u, ExternalLink as d, Fact as f, FactList as p, FieldLabel as m, Footer as h, Help as g, Input as _, LinkButton as v, LoadingDots as y, Note as b, Rows as ee, SCRAPING_CHECK_URL as te, SCRAPING_COVER_URL as x, SCRAPING_KEY as S, SCRAPING_SETTINGS_URL as ne, SEGMENT as re, SEGMENTED_TRACK as ie, Section as C, SegmentedRadioGroup as ae, Select$1 as oe, SelectField as w, SelectItem as se, SettingsRow as ce, Stack as T, StatusLabel as E, __toESM as D, apiSend as O, busyProps as k, checkText as le, confirmModal as A, errorMessage as j, esc as M, fetchAmaneBridge as N, fetchCoverJob as P, fetchCustomSources as F, fetchSources as I, i2 as ue, queryClient as L, require_jsx_runtime as R, require_react as z, spinnerHtml as B, useAction as V, useBackgroundJob as H, useMutation as U, useQuery as W } from "./peach-app.js";
@@ -556,13 +556,11 @@ function be({ toast: e }) {
 						tone: "error",
 						children: m.problem
 					}) : /* @__PURE__ */ (0, J.jsxs)(g, { children: [
-						"已安装版本：",
-						m.installed_version || "未安装",
-						"。amane（",
+						"amane（",
 						m.license,
-						"）提供这些内置站点的解析能力。 重新安装会使用 Peach 内置的 ",
+						"）提供这些内置站点的解析能力。首次需要时，Peach 会自动准备锁定的 ",
 						m.version,
-						" 版本，不随上游自动升级。"
+						" 版本；安装包内已有可用环境时直接使用。 手动安装也使用此版本，不随上游自动升级。"
 					] }),
 					o ? /* @__PURE__ */ (0, J.jsx)(y, { label: "正在重建运行环境" }) : null,
 					v ? /* @__PURE__ */ (0, J.jsx)(b, {
@@ -619,4 +617,4 @@ function xe({ toast: e }) {
 //#endregion
 export { xe as ScrapingPage, Q as linkHost, Z as networkOptions };
 
-//# debugId=daaf4ee8-3af3-47e9-ac67-d3b9a7c2692e
+//# debugId=c85d4030-96e3-4a13-b134-db65a7bb63d5
