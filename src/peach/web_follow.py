@@ -1733,12 +1733,44 @@ def _item_groups(contract, store, everything, by_author, source_id) -> dict:
         f"follow-item-groups:{source_id}", build, tables=FOLLOW_GROUP_TABLES)
 
 
-def _page_groups(contract, store, everything, counted, by_author, *, statuses, order, window, cache_key):
-    """这一次要回的作品组，以及后面还有没有。
+def _item_page(group, payload, sources, author_aliases) -> dict:
+    """直达详情（`fetchFollowItem`）只读这一组和署名要的来源、别名；筛选项、计数与
+    「猜你喜欢」都不算，也不随响应下发。条目不存在时组为空。"""
+    return {"ok": True, "sources": sources, "author_aliases": author_aliases,
+            "groups": [payload(group)] if group is not None else [], "has_more": False}
+
+
+def _ranked_cache_key(args, source_id, statuses, sort, direction) -> str | None:
+    """无筛选、非随机排序的列表按这把键缓存排好的整批组；带筛选的子集与随机排序现算。"""
+    if sort == "rand" or any(args.get(key) for key in FOLLOW_FILTER_ARGS):
+        return None
+    return f"follow-ranked:{source_id}:{','.join(statuses)}:{sort}:{direction}"
+
+
+def _page_facets(contract, store, everything, by_source, alias_map, args, scope, tag_policy, offset) -> dict:
+    """筛选项按全库算，只随首页下发：页面把几页并成一份时缺的键沿用首页那份
+    （`mergedPage`），每翻一页再带一遍就是几十 KB 的重复。"""
+    if offset:
+        return {}
+    source_id, summary = scope
+    # 题材圆标的有无与取景读题材头像目录，目录版本进键。
+    icon_root = work_icon_root(contract)
+    facets = {} if summary else contract.cached_until_changed(
+        f"follow-facets:{source_id}",
+        lambda: _follow_facets(store, everything, by_source, alias_map, icon_root, tag_policy),
+        path_version(icon_root), tables=FOLLOW_GROUP_TABLES)
+    return {"facets": facets, "author_facets": _author_facets(
+        contract, store, everything, by_source, alias_map, args, scope, tag_policy)}
+
+
+def _page_groups(contract, store, everything, counted, by_author, *, statuses, order, window, summary, cache_key):
+    """这一次要回的作品组，以及后面还有没有。管理页的摘要请求不分组。
 
     `cache_key` 不为空时整批排好的组按账本版本缓存，翻页、回到列表都不再重新分组；
     带作者、来源、标签等筛选或随机排序的请求传空，现算。
     """
+    if summary:
+        return (), False
     # 分页在筛选与分组之后：SQL 先分页、前端再筛的话，选个冷门作者会看到一页里
     # 只剩两三条，得反复点「加载更多」才凑出一屏；按条目切页再分组的话，同一作品
     # 的几份上传落在相邻两页，页面上就是两张卡。所以整批分组，`limit` 数的是组。
@@ -1865,33 +1897,17 @@ def q_follow(contract, args) -> dict:
                                   _content_hashes(group))
 
         if item_id is not None:
-            # 直达详情（`fetchFollowItem`）只读这一组和署名要的来源、别名；筛选项、计数与
-            # 「猜你喜欢」都不算，也不随响应下发。
-            group = _item_groups(contract, store, everything, by_author, source_id).get(item_id)
-            return {"ok": True, "sources": sources, "author_aliases": author_aliases,
-                    "groups": [payload(group)] if group is not None else [], "has_more": False}
+            return _item_page(_item_groups(contract, store, everything, by_author, source_id).get(item_id),
+                              payload, sources, author_aliases)
         counted = _sorted_items(
             tuple(item for item in everything if _matches(item)), sort, direction, seed)
-        filtered = any(args.get(key) for key in FOLLOW_FILTER_ARGS)
-        ranked, has_more = ((), False) if summary else _page_groups(
+        ranked, has_more = _page_groups(
             contract, store, everything, counted, by_author, statuses=statuses,
-            order=(sort, direction, seed), window=(offset, limit),
-            cache_key=None if filtered or sort == "rand"
-            else f"follow-ranked:{source_id}:{','.join(statuses)}:{sort}:{direction}")
+            order=(sort, direction, seed), window=(offset, limit), summary=summary,
+            cache_key=_ranked_cache_key(args, source_id, statuses, sort, direction))
         groups = [payload(group) for group in ranked]
-        # 筛选项按全库算，只随首页下发：页面把几页并成一份时缺的键沿用首页那份
-        # （`mergedPage`），每翻一页再带一遍就是几十 KB 的重复。
-        facet_args = {} if offset else {"facets": {}, "author_facets": {}}
-        # 题材圆标的有无与取景读题材头像目录，目录版本进键。
-        icon_root = work_icon_root(contract)
-        if facet_args and not summary:
-            facet_args["facets"] = contract.cached_until_changed(
-                f"follow-facets:{source_id}",
-                lambda: _follow_facets(store, everything, by_source, alias_map, icon_root, tag_policy),
-                path_version(icon_root), tables=FOLLOW_GROUP_TABLES)
-        if facet_args:
-            facet_args["author_facets"] = _author_facets(
-                contract, store, everything, by_source, alias_map, args, (source_id, summary), tag_policy)
+        facet_args = _page_facets(contract, store, everything, by_source, alias_map, args,
+                                  (source_id, summary), tag_policy, offset)
         # counts 与列表同源，两边都从 `counted` 出发：筛选怎么变，数字就怎么变，
         # 扣减逻辑也只写一份。写成一句全库 SQL 再逐条减掉被隐藏的 rule34video 和
         # 无资源的 f95zone 的话，同一套排除规则要维护两份，而且它不看作者、来源和
