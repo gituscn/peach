@@ -71,7 +71,7 @@ sudo /usr/bin/xattr -rd com.apple.quarantine "/Applications/Peach.app"
 
 ### GitLab 发布与下载后端
 
-GitLab 兼容平台使用 `.gitlab-ci.yml`。唯一版本入口支持 `--gitlab-host` 指定主机，默认入口使用 GitHub。主线发布判据要求同一提交最新的 push 流水线成功，且 Linux、Windows、macOS 和 wheel 验收任务全部成功；缺少原生系统任务时拒绝打标签。CLI 传输复用官方 glab，不在仓库或命令参数里存访问令牌。
+GitLab 兼容平台使用 `.gitlab-ci.yml`。唯一版本入口支持 `--gitlab-host` 指定主机，默认入口使用 GitHub。主线发布判据要求同一提交最新的 push 流水线成功，且 Linux、Windows、macOS 和 wheel 验收任务全部成功；缺少原生系统任务时拒绝打标签。主线上的三个平台验收只跑改动域与平台敏感用例，三平台全量在版本标签流水线上运行，Windows、macOS 构建与 Docker、Release 发布都依赖它（[ADR-0119](adr/0119-mainline-changed-scope-release-full-suite.md)）。CLI 传输复用官方 glab，不在仓库或命令参数里存访问令牌。
 
 平台共享 Runner 的系统由管理员提供。注册页面列出 Windows 和 macOS，表示可以接入这些系统上的 Runner；不能据此判断平台提供相应云主机。临时原生 Runner 只接入受保护主线和版本标签，使用项目专属标签，验收后停止并注销。Mac 的 Intel 构建需要真实 x86_64 Python 和依赖；在 Apple Silicon 上通过 Rosetta 验收时，应明确记录未覆盖 Intel 真机。
 
