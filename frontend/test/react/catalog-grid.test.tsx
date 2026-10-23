@@ -432,13 +432,18 @@ describe('作品卡', () => {
     expect([...oneVersion.host.querySelectorAll('[data-media-group]')].map((node) => node.textContent)).toEqual(['2 卷']);
   });
 
-  it('竖屏格里的番号封面按大图取景铺满，横格小图版式照旧整张放进去', async () => {
+  it('竖屏格的番号作品只用视频帧图，不用番号封面：没有帧图就是「无预览」；横格照旧按封面设置出图', async () => {
     const cover = { is_jav: true, code: 'FC2-PPV-3189161', has_cover: true, has_thumb: false };
-    const classes = (host: ParentNode) => host.querySelector('[data-media-art] img')?.className.split(/\s+/).sort();
-    expect(classes((await render(item(20, cover), { variant: 'short' })).host)).toEqual(['cover', 'front', 'poster']);
-    expect(classes((await render(item(21, cover), { layout: { ...SMALL, portrait: true } })).host),
-      '显式筛竖屏的网格也是竖屏格').toEqual(['cover', 'front', 'poster']);
-    expect(classes((await render(item(22, cover))).host)).toEqual(['cover', 'poster', 'whole']);
+    const pictureOf = (host: ParentNode) => {
+      const img = host.querySelector('[data-media-art] img');
+      return img ? img.getAttribute('src') : host.querySelector('[data-media-nopic]')?.textContent;
+    };
+    const portraitGrid = { ...SMALL, portrait: true };
+    expect(pictureOf((await render(item(20, cover), { variant: 'short' })).host)).toBe('无预览');
+    expect(pictureOf((await render(item(21, cover), { layout: portraitGrid })).host), '显式筛竖屏的网格也是竖屏格').toBe('无预览');
+    expect(pictureOf((await render(item(23, { ...cover, has_thumb: true }), { variant: 'short' })).host),
+      '封面设置为官方封面时竖屏格照样用帧图').toBe('/poster?id=23&c=4');
+    expect(pictureOf((await render(item(22, cover))).host)).toMatch(/^\/cover\?code=FC2-PPV-3189161/);
   });
 
   it('不合并分卷时一卷一张卡：名字、时长写这一卷自己的，不叠纸边、不标卷数，打开时条目原样交出', async () => {
