@@ -581,6 +581,39 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             denied = await self.client.get(f"/dist/{escape}?t=secret")
             self.assertEqual(denied.status_code, 404, f"{escape} 不该被提供")
 
+    async def test_main_bundle_is_compressed_once_per_file_version(self):
+        import gzip
+        from peach import routes_pages
+        bundle = self.root / "dist" / "peach-app.js"
+        bundle.write_text("export const filler = '" + "peach " * 2000 + "';", encoding="utf-8")
+        path, params = "/dist/peach-app.js", {"t": "secret"}
+        packed, plain = {"Accept-Encoding": "gzip"}, {"Accept-Encoding": "identity"}
+        with patch.object(routes_pages.gzip, "compress", wraps=gzip.compress) as compress:
+            served = await self.client.get(path, params=params, headers=packed)
+            again = await self.client.get(path, params=params, headers=packed)
+            self.assertEqual(compress.call_count, 1)
+            head = await self.client.head(path, params=params, headers=packed)
+            original = await self.client.get(path, params=params, headers=plain)
+            for etag, headers in ((served.headers["etag"], packed), (original.headers["etag"], plain)):
+                cached = await self.client.get(path, params=params, headers={**headers, "If-None-Match": etag})
+                self.assertEqual(cached.status_code, 304)
+            bundle.write_text("export const filler = '" + "pêche " * 2000 + "';", encoding="utf-8")
+            changed = await self.client.get(path, params=params,
+                                            headers={**packed, "If-None-Match": served.headers["etag"]})
+            self.assertEqual(compress.call_count, 2)
+        self.assertEqual(changed.status_code, 200)
+        self.assertIn("pêche".encode(), changed.content)
+        for response in (served, again):
+            self.assertEqual(response.headers["content-encoding"], "gzip")
+            self.assertEqual(response.headers["vary"], "Accept-Encoding")
+            self.assertEqual(response.content, "export const filler = '{}';".format("peach " * 2000).encode())
+            self.assertLess(int(response.headers["content-length"]), 1000)
+        self.assertEqual((head.content, head.headers["content-length"], head.headers["etag"]),
+                         (b"", served.headers["content-length"], served.headers["etag"]))
+        self.assertNotIn("content-encoding", original.headers)
+        self.assertEqual(original.content, served.content)
+        self.assertNotEqual(original.headers["etag"], served.headers["etag"])
+
     async def test_page_bundle_is_public_with_only_its_literal_names(self):
         for name, media in (("peach-pages.js", "text/javascript"), ("peach-pages.css", "text/css")):
             path = f"/dist/{name}"
