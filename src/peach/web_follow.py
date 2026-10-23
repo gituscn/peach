@@ -1081,7 +1081,6 @@ def _item_payload(item, credential_providers: frozenset[str] = frozenset(), tag_
         "tags": policy.project(tags),
         "detail_tags": policy.project(detail_tags),
         "tag_types": tag_types,
-        "source_tags": detail_tags,
     }
 
 
@@ -1715,21 +1714,39 @@ def q_follow_suggest(contract, q: str, limit: int = MAX_SUGGESTIONS,
     ]}
 
 
-def _page_groups(store, everything, counted, by_author, *, item_id, statuses, order, window):
-    """这一次要回的作品组，以及后面还有没有。"""
-    if item_id is not None:
-        # 直达详情取这一条所在的整组。组是读时拼的（剥作者名、相似标题），只按库里
-        # 同键去捞会漏掉别的站上那几份，详情就比列表里的卡片少。
-        ranked = tuple(group for group in store.group(everything, by_author)
-                       if item_id in {member.id for member in
-                                      (group.primary, *group.variants, *group.duplicates)})
-        return ranked, False   # 直达详情只取这一组，没有下一页
+#: 关注条目、分组与筛选项读到的账本表：条目与来源、作者别名、来源绑定的实体名，以及
+#: 在线标签归类所在的 profile 设置。播放心跳只写 `follow_playback`，不在其中：看片时
+#: 每十秒一次的上报不让这几份整库结果重算。
+FOLLOW_GROUP_TABLES = ("follow_item", "follow_source", "follow_author_alias", "entity", "profile")
+
+
+def _item_groups(contract, store, everything, by_author, source_id) -> dict:
+    """条目 id → 它所在的整组。直达详情查这一份，整库只分一次组，按账本版本缓存。
+
+    组是读时拼的（剥作者名、相似标题），只按库里同键去捞会漏掉别的站上那几份，详情
+    就比列表里的卡片少，所以还是整库分组。
+    """
+    def build():
+        return {member.id: group for group in store.group(everything, by_author)
+                for member in (group.primary, *group.variants, *group.duplicates)}
+    return contract.cached_until_changed(
+        f"follow-item-groups:{source_id}", build, tables=FOLLOW_GROUP_TABLES)
+
+
+def _page_groups(contract, store, everything, counted, by_author, *, statuses, order, window, cache_key):
+    """这一次要回的作品组，以及后面还有没有。
+
+    `cache_key` 不为空时整批排好的组按账本版本缓存，翻页、回到列表都不再重新分组；
+    带作者、来源、标签等筛选或随机排序的请求传空，现算。
+    """
     # 分页在筛选与分组之后：SQL 先分页、前端再筛的话，选个冷门作者会看到一页里
     # 只剩两三条，得反复点「加载更多」才凑出一屏；按条目切页再分组的话，同一作品
     # 的几份上传落在相邻两页，页面上就是两张卡。所以整批分组，`limit` 数的是组。
+    def rank():
+        page = tuple(item for item in counted if not statuses or item.status in statuses)
+        return _sorted_groups(store.group(page, by_author, everything), *order)
+    ranked = contract.cached_until_changed(cache_key, rank, tables=FOLLOW_GROUP_TABLES) if cache_key else rank()
     offset, limit = window
-    page = tuple(item for item in counted if not statuses or item.status in statuses)
-    ranked = _sorted_groups(store.group(page, by_author, everything), *order)
     return ranked[offset:offset + limit], len(ranked) > offset + limit
 
 
@@ -1740,6 +1757,10 @@ def _duration_arg(raw) -> float:
     except (TypeError, ValueError):
         return 0.0
     return value if value > 0 else 0.0
+
+
+#: `_follow_matcher` 读的筛选参数。带了任一个，列表就是全库的一个子集。
+FOLLOW_FILTER_ARGS = ("author", "provider", "tag", "work", "dur_min", "dur_max")
 
 
 def _follow_matcher(args, by_source, alias_map, tag_policy=None):
@@ -1833,26 +1854,44 @@ def q_follow(contract, args) -> dict:
         everything = contract.cached_until_changed(
             f"follow-items:{source_id}",
             lambda: tuple(item for item in store.items(source_id=source_id, limit=_ALL_ITEMS)
-                          if item.source_id in enabled_source_ids and not _excluded_item(item)))
-        counted = _sorted_items(
-            tuple(item for item in everything if _matches(item)), sort, direction, seed)
+                          if item.source_id in enabled_source_ids and not _excluded_item(item)),
+            tables=FOLLOW_GROUP_TABLES)
         by_author = group_authors(source_rows, alias_map)
-        ranked, has_more = ((), False) if summary else _page_groups(
-            store, everything, counted, by_author, item_id=item_id, statuses=statuses,
-            order=(sort, direction, seed), window=(offset, limit))
         # 翻卡与封面计数要知道组里哪几张是同一个画面，判据与缓存见 `follow_faces`。
         faces = getattr(contract, "follow_faces", None)
-        groups = [annotate_group(_group_payload(group, credential_providers, tag_policy), faces,
-                                 _content_hashes(group))
-                  for group in ranked]
+
+        def payload(group):
+            return annotate_group(_group_payload(group, credential_providers, tag_policy), faces,
+                                  _content_hashes(group))
+
+        if item_id is not None:
+            # 直达详情（`fetchFollowItem`）只读这一组和署名要的来源、别名；筛选项、计数与
+            # 「猜你喜欢」都不算，也不随响应下发。
+            group = _item_groups(contract, store, everything, by_author, source_id).get(item_id)
+            return {"ok": True, "sources": sources, "author_aliases": author_aliases,
+                    "groups": [payload(group)] if group is not None else [], "has_more": False}
+        counted = _sorted_items(
+            tuple(item for item in everything if _matches(item)), sort, direction, seed)
+        filtered = any(args.get(key) for key in FOLLOW_FILTER_ARGS)
+        ranked, has_more = ((), False) if summary else _page_groups(
+            contract, store, everything, counted, by_author, statuses=statuses,
+            order=(sort, direction, seed), window=(offset, limit),
+            cache_key=None if filtered or sort == "rand"
+            else f"follow-ranked:{source_id}:{','.join(statuses)}:{sort}:{direction}")
+        groups = [payload(group) for group in ranked]
+        # 筛选项按全库算，只随首页下发：页面把几页并成一份时缺的键沿用首页那份
+        # （`mergedPage`），每翻一页再带一遍就是几十 KB 的重复。
+        facet_args = {} if offset else {"facets": {}, "author_facets": {}}
         # 题材圆标的有无与取景读题材头像目录，目录版本进键。
         icon_root = work_icon_root(contract)
-        facets = {} if summary else contract.cached_until_changed(
-            f"follow-facets:{source_id}",
-            lambda: _follow_facets(store, everything, by_source, alias_map, icon_root, tag_policy),
-            path_version(icon_root))
-        author_facets = _author_facets(contract, store, everything, by_source, alias_map, args,
-                                       (source_id, summary), tag_policy)
+        if facet_args and not summary:
+            facet_args["facets"] = contract.cached_until_changed(
+                f"follow-facets:{source_id}",
+                lambda: _follow_facets(store, everything, by_source, alias_map, icon_root, tag_policy),
+                path_version(icon_root), tables=FOLLOW_GROUP_TABLES)
+        if facet_args:
+            facet_args["author_facets"] = _author_facets(
+                contract, store, everything, by_source, alias_map, args, (source_id, summary), tag_policy)
         # counts 与列表同源，两边都从 `counted` 出发：筛选怎么变，数字就怎么变，
         # 扣减逻辑也只写一份。写成一句全库 SQL 再逐条减掉被隐藏的 rule34video 和
         # 无资源的 f95zone 的话，同一套排除规则要维护两份，而且它不看作者、来源和
@@ -1874,8 +1913,7 @@ def q_follow(contract, args) -> dict:
         "sort": sort,
         "dir": direction,
         "seed": seed,
-        "facets": facets,
-        "author_facets": author_facets,
+        **facet_args,
         # counts 是全库口径，groups 只是这一页——两个数并排显示过，看起来像自相矛盾。
         "offset": offset,
         "limit": limit,
