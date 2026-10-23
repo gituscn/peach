@@ -60,8 +60,10 @@ class HlsDisconnectTests(unittest.IsolatedAsyncioTestCase):
                 return registered
 
         self.registry = Registry()
+        # 子进程只用标准库；直接运行解释器，退出与管道均属于被登记的同一个进程。
+        self.python = sys._base_executable
         self.service = HlsSegmentService(
-            Mock(ffmpeg=lambda: SimpleNamespace(path=Path(sys.executable))),
+            Mock(ffmpeg=lambda: SimpleNamespace(path=Path(self.python))),
             self.root / "cache", max_concurrent=1,
         )
         executor = ThreadPoolExecutor(max_workers=1)
@@ -74,7 +76,7 @@ class HlsDisconnectTests(unittest.IsolatedAsyncioTestCase):
 
         def command(target):
             target.write_bytes(b"segment")
-            return [sys.executable, "-c", self.child_code]
+            return [self.python, "-c", self.child_code]
 
         for patcher in (
             patch("peach.routes_media._hls_plan", return_value=(
@@ -134,7 +136,7 @@ class HlsDisconnectTests(unittest.IsolatedAsyncioTestCase):
             self.service.resolver, self.root / "parallel", max_concurrent=2,
         )
         with patch.object(self.service, "_attempts", return_value=[(
-            "process", lambda target: [sys.executable, "-c", self.child_code],
+            "process", lambda target: [self.python, "-c", self.child_code],
         )]):
             first, disconnected = self.request(0)
             first_process = await self.process()
