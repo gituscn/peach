@@ -63,6 +63,8 @@ verify-linux:
 verify-windows:
   stage: verify
   tags: [peach-windows]
+  # 全量回归连同依赖安装约 20–25 分钟；runner 与本机开发会话共用 CPU，并发全量时会翻倍。
+  timeout: 1h 30m
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
   script:
@@ -72,6 +74,8 @@ verify-windows:
 verify-macos:
   stage: verify
   tags: [peach-macos]
+  # 全量回归约 3 分钟，冷缓存安装依赖约 15 分钟；依赖下载卡住时提前结束。
+  timeout: 45m
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
   script:

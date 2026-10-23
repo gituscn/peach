@@ -77,6 +77,8 @@ GitLab 兼容平台使用 `.gitlab-ci.yml`。唯一版本入口支持 `--gitlab-
 
 Windows 原生 Runner 在深目录中检出项目时，需为 Git 启用 `core.longpaths=true`，供检出与清理阶段处理 npm 缓存。设置可限定到 Runner 的任务环境，通过 `GIT_CONFIG_COUNT` 与对应的 `GIT_CONFIG_KEY_<索引>`、`GIT_CONFIG_VALUE_<索引>` 条目传递；已有条目按索引追加。宿主系统的长路径开关与 Git 设置分别核对。
 
+用计划任务常驻 Windows 原生 Runner 时，任务设置的 `Priority` 取 `4`，例如 `New-ScheduledTaskSettingsSet -Priority 4`；已注册的任务可以读出对象，把 `Settings.Priority` 改成 `4`，再用 `Set-ScheduledTask -InputObject` 写回。省略时默认 `7`，`gitlab-runner` 与所有作业子进程以 BelowNormal 的 CPU 优先级、Low 的 I/O 优先级和 2 级内存优先级运行。Runner 与开发会话共用这台机器，别的会话跑全量测试时，作业里的 vitest 工作进程、首次设置后的服务就绪探测和快捷方式 COM 调用拿不到 CPU 与磁盘，因等待超时失败，全量回归也会超过作业时限。设置只对新启动的进程生效：在没有作业运行时重启该任务，再核对 `gitlab-runner` 进程的优先级类为 `Normal`。
+
 版本标签须受保护。标签流水线重新核对提交与版本，构建固定来源的媒体工具、Windows 完整包与拆分包、macOS 双架构 DMG，并进行独立制品验收。只有全部成功后才创建 GitLab Release。项目流水线使用 `PEACH_DOWNLOAD_BACKEND=both`，将同一份制品分别保存到 R2 与 GitGud Generic Package Registry；不把会过期的 job artifacts 当作永久下载地址。独立部署可明确选用 `r2` 或 `gitgud` 单后端。
 
 Linux 发布任务使用官方 uv Python 3.14 容器，并在获取制品工具前核对解释器版本；源码归档使用 `tarfile` 的 `data` 过滤器解压。CI 的 `.npm/` 与 `.uv-cache/` 属于生成缓存，不计入源码工作区变化。
