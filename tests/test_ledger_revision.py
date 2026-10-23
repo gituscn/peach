@@ -17,6 +17,7 @@ from unittest import mock
 from peach import taste_history, taste_preferences, web_follow, web_state, web_stats
 from peach.follow_sources import FollowCandidate, SourceFetch
 from peach.follow_store import FollowStore
+from peach.previews import entity_image_key, logo_key
 from peach.repository import LedgerDatabase
 from peach.web_catalog import FACETS_TABLES, GROUP_TABLES, TOPS_TABLES
 from peach.web_contract import dispatch_api_get
@@ -126,6 +127,18 @@ class LedgerRevisionTests(unittest.TestCase):
         with mock.patch.object(web_state.time, "monotonic",
                                return_value=1000.0 + web_state.CACHE_TTL):
             self.assertEqual(self.contract.cached_until_changed("ads", self.compute), 2)
+
+    def test_evicted_aggregates_take_their_locks_and_registrations_with_them(self):
+        """按作者、按筛选口径的聚合键空间不封闭；结果被淘汰时锁与登记一起摘掉，两份不再增长。"""
+        for index in range(3 * web_state.CACHE_KEYS):
+            self.contract.cached_until_changed(f"author:{index}", self.compute, tables=("asset",))
+        self.assertEqual(len(self.contract.cache), web_state.CACHE_KEYS)
+        self.assertLessEqual(set(self.contract.aggregate_locks), set(self.contract.cache))
+        self.assertLessEqual(self.contract.revision_cache_keys, set(self.contract.cache))
+        # 被淘汰的键再来照常重算并重新登记。
+        self.assertEqual(self.contract.cached_until_changed("author:0", self.compute, tables=("asset",)),
+                         3 * web_state.CACHE_KEYS + 1)
+        self.assertIn("author:0", self.contract.revision_cache_keys)
 
     def test_a_commit_during_a_versioned_computation_keeps_the_result(self):
         def derive():
@@ -404,8 +417,8 @@ class CoverIndexTests(unittest.TestCase):
         self.covers.mkdir()
         (self.covers / "ABC-001.jpg").write_bytes(b"jpg")
         # 目录一分钟前就写完了：刚写过的目录只给短时效，见下面的「还在写」用例。
-        settled = web_state.time.time_ns() - 60 * 1_000_000_000
-        os.utime(self.covers, ns=(settled, settled))
+        self.settled = web_state.time.time_ns() - 60 * 1_000_000_000
+        os.utime(self.covers, ns=(self.settled, self.settled))
         self.contract = WebContract(self.db_path, cover_root=self.covers)
         self.scans = mock.patch.object(
             self.contract, "_scan_cover_root", wraps=self.contract._scan_cover_root).start()
@@ -422,17 +435,29 @@ class CoverIndexTests(unittest.TestCase):
 
     def test_rewritten_sidecars_and_added_or_removed_covers_show_up_at_once(self):
         from peach import jav_poster_crop
+        moments = iter(range(1, 100))
+
+        def changed():
+            # 换名会改目录时间；连着几次写入可能落在同一个时钟刻度里，那是下一条用例的
+            # 场景。这里每次都钉到一个新的时间，只看「目录时间变了就重扫」。
+            stamp = self.settled + next(moments) * 1_000_000
+            os.utime(self.covers, ns=(stamp, stamp))
+
         self.assertIsNone(self.contract.poster_box("ABC-001"))
         jav_poster_crop.write_sidecar(self.covers / "ABC-001.jpg", jav_poster_crop.manual_record(
             800, 538, {"x0": 420, "y0": 0, "x1": 800, "y1": 538}))
+        changed()
         self.assertEqual(self.contract.poster_box("ABC-001")["x0"], 420)
         jav_poster_crop.write_sidecar(self.covers / "ABC-001.jpg", jav_poster_crop.manual_record(
             800, 538, {"x0": 400, "y0": 0, "x1": 800, "y1": 538}))
+        changed()
         self.assertEqual(self.contract.poster_box("ABC-001")["x0"], 400)
         self.assertFalse(self.contract.has_cover("XYZ-002"))
         (self.covers / "XYZ-002.jpg").write_bytes(b"jpg")
+        changed()
         self.assertTrue(self.contract.has_cover("XYZ-002"))
         (self.covers / "XYZ-002.jpg").unlink()
+        changed()
         self.assertFalse(self.contract.has_cover("XYZ-002"))
 
     def test_a_scan_of_a_directory_still_being_written_is_not_kept(self):
@@ -447,17 +472,101 @@ class CoverIndexTests(unittest.TestCase):
         same_tick_install("XYZ-002.jpg")
         self.assertTrue(self.contract.has_cover("XYZ-002"))
         same_tick_install("XYZ-003.jpg")
-        later = web_state.time.monotonic() + web_state.COVER_SETTLE_TTL + 1
+        later = web_state.time.monotonic() + web_state.SETTLE_TTL + 1
         with mock.patch.object(web_state.time, "monotonic", return_value=later):
             self.assertTrue(self.contract.has_cover("XYZ-003"))
         same_tick_install("XYZ-004.jpg")
-        settled = tick + (web_state.COVER_SETTLE_SECONDS + 1) * 1_000_000_000
+        settled = tick + (web_state.SETTLE_SECONDS + 1) * 1_000_000_000
         with mock.patch.object(web_state.time, "time_ns", return_value=settled):
             self.assertTrue(self.contract.has_cover("XYZ-004"))
             scans = self.scans.call_count
             with mock.patch.object(web_state.time, "monotonic", return_value=later + 10 * web_state.CACHE_TTL):
                 self.assertTrue(self.contract.has_cover("XYZ-004"))
         self.assertEqual(self.scans.call_count, scans, "目录静下来之后的那一份一直用到目录再变")
+
+
+class ArtworkIndexTests(unittest.TestCase):
+    """标识、实体图与头像索引同样只认目录时间：刚写过的目录扫出的结果只按短时效缓存。"""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        root = Path(self.directory.name)
+        self.logos, self.avatars = root / "logos", root / "avatars"
+        self.logos.mkdir()
+        self.avatars.mkdir()
+        self.contract = WebContract(fresh_ledger(root), logo_root=self.logos, avatar_root=self.avatars,
+                                    marks_root=root / "marks")
+
+    def test_an_install_in_the_same_clock_tick_as_the_last_scan_shows_up_shortly(self):
+        tick = web_state.time.time_ns()
+        later = web_state.time.monotonic() + web_state.SETTLE_TTL + 1
+        cases = (
+            (self.logos, logo_key("Studio A") + ".img", lambda: self.contract.has_logo("Studio A")),
+            (self.avatars, entity_image_key("performer", 11) + ".img",
+             lambda: self.contract.has_entity_image("performer", 11)),
+            (self.avatars, "42.jpg", lambda: 42 in self.contract.avatar_root_index().generated),
+        )
+        for root, name, present in cases:
+            with self.subTest(name=name):
+                # 上一格在推后的时钟下存的那份不能留给这一格。
+                self.contract.cache.clear()
+                os.utime(root, ns=(tick, tick))
+                self.assertFalse(present())
+                (root / name).write_bytes(b"img")
+                os.utime(root, ns=(tick, tick))
+                with mock.patch.object(web_state.time, "monotonic", return_value=later):
+                    self.assertTrue(present())
+
+    def test_a_settled_directory_keeps_its_index_until_the_time_limit(self):
+        settled = web_state.time.time_ns() - 60 * 1_000_000_000
+        os.utime(self.logos, ns=(settled, settled))
+        scans = mock.patch.object(self.contract, "_scan_logo_root",
+                                  wraps=self.contract._scan_logo_root).start()
+        self.addCleanup(mock.patch.stopall)
+        self.contract.has_logo("Studio A")
+        self.contract.has_logo("Studio B")
+        self.assertEqual(scans.call_count, 1)
+        with mock.patch.object(web_state.time, "monotonic",
+                               return_value=web_state.time.monotonic() + web_state.CACHE_TTL + 1):
+            self.contract.has_logo("Studio A")
+        self.assertEqual(scans.call_count, 2)
+
+
+class ResultVersionTablesTests(unittest.TestCase):
+    """页面按结果版本键刷新（`frontend/src/react/result-updates.tsx` 的 `READINGS`）。
+
+    服务端按表缓存的那几页，实际读到的表（`DeclaredTablesTests` 实测核对过的声明）必须
+    落在刷新这一页的某个版本键里：漏了，服务端已经换了新结果，页面却不来取。
+    """
+
+    #: 由按表缓存供数的页面 → 刷新它的版本键。与 `READINGS` 对应，前端那一半由
+    #: `frontend/test/react/result-updates.test.tsx` 核对。
+    REFRESHED_BY = {
+        "catalog-grid": ("catalog",),
+        "index": ("catalog", "follow", "discoveries"),
+        "stats": ("catalog", "follow"),
+        "taste": ("catalog", "follow"),
+        "follow-feed": ("catalog", "follow"),
+    }
+    #: 刻意不刷新的组合：在线播放每十秒写一次 `follow_playback`，跟着它刷新的话，看片
+    #: 期间整组页面每次心跳重取一遍；统计页的在线播放读数等下一次别的写入再更新。
+    EXEMPT = {("stats", "follow_playback")}
+
+    def test_every_cached_page_is_refreshed_by_the_tables_it_reads(self):
+        from peach.web_result_versions import RESULT_TABLES
+        declared = {
+            "catalog-grid": GROUP_TABLES, "index": INDEX_TABLES, "stats": web_stats.STATS_TABLES,
+            "taste": web_stats.TASTE_TABLES, "follow-feed": web_follow.FOLLOW_GROUP_TABLES,
+        }
+        missing = {}
+        for page, keys in self.REFRESHED_BY.items():
+            covered = set().union(*(RESULT_TABLES[key] for key in keys))
+            gap = {table for table in declared[page] if table not in covered
+                   and (page, table) not in self.EXEMPT}
+            if gap:
+                missing[page] = sorted(gap)
+        self.assertEqual(missing, {}, "这些页面读到的表变了，结果版本却不变")
 
 
 if __name__ == "__main__":
