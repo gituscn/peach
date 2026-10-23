@@ -43,6 +43,10 @@ RELEASE_FILES = (version_bump.VERSION_FILE, changelog.CHANGELOG)
 #: `--ship` 等 Test 工作流的默认秒数上限，以及两次查询之间的间隔。
 TEST_TIMEOUT = 1800.0
 TEST_POLL = 30.0
+#: 任务排队多久仍没开始就判定等不到。空闲 runner 几秒内轮询接单，GitLab Runner 默认
+#: 3 秒一轮，平台创建流水线也只要几秒；五分钟还没动静就不是正常排队，而是 runner
+#: 不在线或一直被占着，继续等只会把总超时耗完。推送后迟迟没有 Test 记录也按这个数判。
+STALL_SECONDS = 300.0
 
 
 def command(*args: str, strip: bool = True) -> str:
@@ -91,23 +95,96 @@ def test_runs(repo: str, sha: str) -> list[dict]:
     if GITLAB:
         return GITLAB.test_runs(repo, sha)
     endpoint = f"actions/workflows/test.yml/runs?head_sha={sha}&event=push&per_page=100"
-    return api(repo, endpoint)["workflow_runs"]
+    runs = api(repo, endpoint)["workflow_runs"]
+    latest = latest_run(runs, sha)
+    if latest is not None and latest.get("status") != "completed":
+        latest["queued_jobs"] = github_queued_jobs(repo, latest["id"])
+    return runs
+
+
+def github_queued_jobs(repo: str, run_id: int) -> list[dict]:
+    """GitHub 上排着队、没有 runner 接走的自建 runner 任务，字段与 GitLab 一侧一致。
+
+    只看 `queued` 且没有 `runner_id` 的；`waiting` 是在等环境审批。托管 runner
+    （`ubuntu-latest`、`macos-15` 这类）排队是平台容量问题，迟早会接，不在这里下结论。
+    """
+    jobs = api(repo, f"actions/runs/{run_id}/jobs?per_page=100")["jobs"]
+    waiting = [job for job in jobs if job.get("status") == "queued" and not job.get("runner_id")
+               and "self-hosted" in {label.lower() for label in job.get("labels") or ()}]
+    if not waiting:
+        return []
+    try:
+        # 列 runner 要仓库管理员权限；读不到就只按排队时长判断。
+        runners = api(repo, "actions/runners?per_page=100")["runners"]
+    except (subprocess.CalledProcessError, OSError, ValueError, KeyError):
+        runners = None
+    result = []
+    for job in waiting:
+        labels = {label.lower() for label in job["labels"]}
+        matching = [runner for runner in runners or ()
+                    if labels <= {item["name"].lower() for item in runner.get("labels") or ()}]
+        if any(runner.get("status") == "online" for runner in matching):
+            continue
+        result.append({"id": job["id"], "name": job["name"], "tags": sorted(job["labels"]),
+                       "queued": None, "runners": "offline" if matching else "unknown"})
+    return result
+
+
+def _stalled(queued: list[dict], first_seen: dict, now: float) -> list[str]:
+    """排队任务里已经可以判定等不到的，每项一句说明。"""
+    lines = []
+    for job in queued:
+        seen = first_seen.setdefault(job["id"], now)
+        waited = max(job.get("queued") or 0.0, now - seen)
+        tags = "、".join(job["tags"]) or "无"
+        if job["runners"] == "offline":
+            lines.append(f"{job['name']}（tags：{tags}）排队 {waited / 60:.0f} 分钟未开始，"
+                         "带这些 tags 的 runner 都不在线或已暂停")
+        elif waited >= STALL_SECONDS:
+            lines.append(f"{job['name']}（tags：{tags}）排队 {waited / 60:.0f} 分钟未开始；"
+                         "确认不了有没有带这些 tags 的在线 runner（列表要维护者权限，"
+                         "共享 runner 也未必列出），runner 不在线或一直被占着都会这样")
+    return lines
 
 
 def await_test(repo: str, sha: str, *, timeout: float = TEST_TIMEOUT, poll: float = TEST_POLL,
                sleep=time.sleep, clock=time.monotonic) -> dict:
     """等这个提交的 Test 出结果。
 
-    跑完了但不是绿的立刻抛，不耗到超时——红的等多久都不会变绿。超时也抛，那时版本
-    提交已经在 master 上，等 CI 自己跑完再跑一次 `--ship --apply` 就接着走。
+    能确定等不到结果的立刻抛，不耗到超时：跑完了但不是绿的、必需任务已经失败的、
+    任务排着队却没有 runner 能接的、推送后迟迟没有 Test 记录的。正常运行中的继续等，
+    超时也抛。无论哪种，版本提交都已经在 master 上，处理好之后再跑一次
+    `--ship --apply` 就接着走。
     """
-    deadline = clock() + timeout
+    start = clock()
+    deadline = start + timeout
+    first_seen: dict = {}
     while True:
         runs = test_runs(repo, sha)
         latest = latest_run(runs, sha)
-        if latest is not None and latest.get("status") == "completed":
+        now = clock()
+        if latest is None:
+            if now - start >= STALL_SECONDS:
+                raise ValueError(
+                    f"推送后 {(now - start) / 60:.0f} 分钟仍没有 {sha[:8]} 的 master Test 记录，"
+                    "CI 没有被触发；检查流水线触发规则与项目的 CI 开关，"
+                    "Test 跑起来后再跑一次 --ship --apply")
+        elif latest.get("status") == "completed":
             return require_success(runs, sha)
-        if clock() >= deadline:
+        else:
+            url = latest.get("html_url", "")
+            if latest.get("failed_jobs"):
+                raise ValueError(
+                    f"{sha[:8]} 的 Test 必需任务已失败：{'、'.join(latest['failed_jobs'])}，"
+                    f"整条流水线不会转绿：{url}；版本提交已在 master 上，"
+                    "修好或重试这些任务、Test 转绿后再跑一次 --ship --apply")
+            stalled = _stalled(latest.get("queued_jobs") or [], first_seen, now)
+            if stalled:
+                raise ValueError(
+                    f"已等 {(now - start) / 60:.0f} 分钟，{sha[:8]} 的 Test 等不到结果：{'；'.join(stalled)}。"
+                    f"{url}\n版本提交已在 master 上：启动对应 runner（或等它空出来）、"
+                    "这些任务开始运行后，再跑一次 --ship --apply")
+        if now >= deadline:
             raise ValueError(
                 f"等了 {timeout / 60:.0f} 分钟，{sha[:8]} 的 Test 还没有结果；"
                 "版本提交已在 master 上，等它跑完再跑一次 --ship --apply")

@@ -81,8 +81,11 @@ def stop(program: Path, *, timeout: float = 60) -> bool:
     托盘管，只能按镜像路径清场，否则覆盖安装写不进被占用的 DLL。
     """
     from .windows_restart import find_tray_windows, post_stop
-    for window in find_tray_windows(program / "Peach.exe"):
-        post_stop(window.handle)
+    windows = find_tray_windows(program / "Peach.exe")
+    # 每个窗口都投递一次；一条都没投出去、窗口又还在，托盘收不到停止消息，等也不会退。
+    sent = [post_stop(window.handle) for window in windows]
+    if windows and not any(sent) and find_tray_windows(program / "Peach.exe"):
+        return False
     deadline = time.monotonic() + timeout
     while find_tray_windows(program / "Peach.exe"):
         if time.monotonic() > deadline:
