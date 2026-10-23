@@ -215,6 +215,28 @@ class SyncScriptTests(unittest.TestCase):
                 found, _type = service.logo("Baked", variant)
                 self.assertEqual(target / "studios" / "Baked.png", found)
 
+    def test_distribution_exclusions_preserve_local_files(self):
+        """发行排除项的各变体留在本机，普通标识照常收录。"""
+        png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+        with tempfile.TemporaryDirectory() as raw:
+            base = pathlib.Path(raw).resolve()
+            source, target = base / "logos", base / "marks"
+            source.mkdir()
+            names = ("Life_Promotion", "life_promotion.icon", "LIFE_PROMOTION.logo", "Other")
+            for name in names:
+                self._fixture(source, name, png, {"source_url": "https://x.test/a.png"})
+            result = self._run(source, target, "--apply")
+            self.assertEqual(1, result["taken"])
+            self.assertEqual(3, result["skipped"])
+            self.assertEqual(["distribution_excluded"], result["reasons"])
+            self.assertEqual({"Other.png"}, {p.name for p in (target / "studios").iterdir()})
+            self.assertTrue(all((source / f"{name}.img").is_file() for name in names))
+            service = PreviewService.__new__(PreviewService)
+            service.logo_root = source
+            service.marks_root = target / "studios"
+            found, _type = service.logo("Life Promotion", "icon")
+            self.assertTrue(found.samefile(source / "life_promotion.icon.img"))
+
     def test_dry_run_writes_nothing(self):
         png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
         with tempfile.TemporaryDirectory() as raw:

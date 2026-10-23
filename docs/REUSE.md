@@ -1,5 +1,11 @@
 # 复用清单
 
+## 第三方标识的发行边界
+
+`resources/marks/` 保存用于实体身份展示的内置标识，来源记录与文件哈希见同目录 `manifest.json`。来源可追溯不等于取得图片版权或商标授权，图片也不因与应用同仓库就自动适用 AGPL。
+
+Life Promotion 标识的公开分发授权依据未取得，发行资源不收录其图片。`scripts/sync_brand_marks.py` 的发行排除项同时覆盖裸文件、`icon` 和 `logo`，保留用户本机已有图片及实体来源链接；缺少本机图片时沿用界面的文字／首字回退。此项不改变 ADR-0026 对其他实体标识的收录边界。
+
 ## GitLab 与 R2 发布
 
 Windows 构建路径解析复用 PowerShell 7 的原生 [`GetUnresolvedProviderPathFromPSPath`](https://learn.microsoft.com/en-us/dotnet/api/system.management.automation.pathintrinsics.getunresolvedproviderpathfrompspath)；以当前 PowerShell 工作位置解析尚未创建的文件，无新增依赖或安装体积。安装更新验收使用 GitLab 官方[预定义变量](https://docs.gitlab.com/ci/variables/predefined_variables/)识别受保护版本标签及指定作业，沿用 Windows 注册表的既有安装检查。离线 PowerShell 回归覆盖进程工作目录与脚本工作位置不同的输入；主机检查覆盖受保护作业、未知作业与既有安装登记。

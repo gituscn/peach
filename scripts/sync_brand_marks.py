@@ -42,6 +42,9 @@ from peach.previews import LOGO_VARIANTS
 #: 一一对应，否则收得进去、运行时认不出类型。
 EXTENSIONS = {mime: ext for ext, mime in brand_marks.CONTENT_TYPES.items()}
 
+# 发行排除项只限制随仓库分发，不删除用户的本机缓存。
+DISTRIBUTION_EXCLUSIONS = {"life_promotion": "标识公开分发的授权依据未取得"}
+
 
 def variant_of(stem: str) -> str:
     """`Attackers.icon` → `icon`；裸文件返回空串。"""
@@ -57,6 +60,10 @@ def collect(source: Path) -> tuple[list[dict], list[dict]]:
     skipped: list[dict] = []
     for path in sorted(source.glob("*.img")):
         stem = path.name[:-len(".img")]
+        studio = stem.rsplit(".", 1)[0] if variant_of(stem) else stem
+        if studio.casefold() in DISTRIBUTION_EXCLUSIONS:
+            skipped.append({"name": stem, "reason": "distribution_excluded"})
+            continue
         sidecar = path.with_name(f"{path.name}.provenance.json")
         meta = {}
         if sidecar.is_file():
@@ -79,7 +86,7 @@ def collect(source: Path) -> tuple[list[dict], list[dict]]:
             continue
         taken.append({
             "file": f"{stem}{extension}",
-            "studio": stem.rsplit(".", 1)[0] if variant_of(stem) else stem,
+            "studio": studio,
             "variant": variant_of(stem),
             "source": meta.get("source", ""),
             "source_url": url,
