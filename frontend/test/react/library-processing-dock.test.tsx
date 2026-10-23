@@ -22,7 +22,18 @@ it('页面打开时历史失败留在数据管理，不自动弹出任务卡', a
   await open({ status: 'failed', job_id: 'old', issue_count: 7276,
     completed_at: Date.now() / 1000 - 4 * 86400, error: '7276 项需要处理' });
   expect(sonner.custom).not.toHaveBeenCalled();
-  expect(sonner.dismiss).toHaveBeenCalled();
+  expect(sonner.dismiss).not.toHaveBeenCalled();
+});
+
+it('任务状态回来之前不发收起；画出过的任务卡在任务结束时才收', async () => {
+  vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+  await mount(<QueryClientProvider client={queryClient}><LibraryProcessingDock toast={vi.fn()} /></QueryClientProvider>);
+  expect(sonner.dismiss).not.toHaveBeenCalled();
+  await act(async () => { queryClient.setQueryData(LIBRARY_PROCESSING_KEY, { status: 'paused', job_id: 'current' }) });
+  expect(sonner.custom).toHaveBeenCalled();
+  expect(sonner.dismiss).not.toHaveBeenCalled();
+  await act(async () => { queryClient.setQueryData(LIBRARY_PROCESSING_KEY, { status: 'complete', job_id: 'current' }) });
+  expect(sonner.dismiss).toHaveBeenCalledWith('peach-library-processing');
 });
 
 it('本次观察到的任务失败持续显示，关闭后保持收起', async () => {
