@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "aaaf3806-0667-4a38-8810-603f659c5fc1", e._sentryDebugIdIdentifier = "sentry-dbid-aaaf3806-0667-4a38-8810-603f659c5fc1");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "491250c3-7411-495b-b35c-0c7ebab14e3b", e._sentryDebugIdIdentifier = "sentry-dbid-491250c3-7411-495b-b35c-0c7ebab14e3b");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -29552,7 +29552,12 @@ function que() {
 	}) : null;
 }
 function Jue({ host: e, props: t }) {
-	return /* @__PURE__ */ (0, D.jsx)("div", {
+	let n = t.count > 0;
+	return (0, E.useLayoutEffect)(() => {
+		document.body.toggleAttribute("data-batch-dock-open", n);
+	}, [n]), (0, E.useLayoutEffect)(() => () => {
+		document.body.removeAttribute("data-batch-dock-open");
+	}, []), /* @__PURE__ */ (0, D.jsx)("div", {
 		className: "peach-react",
 		"data-batch-scope": "",
 		"data-context": t.context,
@@ -117014,4 +117019,4 @@ sCt(cCt);
 //#endregion
 export { DT as applyTheme, yN as peachHistory, Zo as popCount, Rvt as showToast };
 
-//# debugId=aaaf3806-0667-4a38-8810-603f659c5fc1
+//# debugId=491250c3-7411-495b-b35c-0c7ebab14e3b
