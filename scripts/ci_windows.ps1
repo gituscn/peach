@@ -1,4 +1,6 @@
-﻿param([ValidateSet('verify', 'build', 'smoke', 'docker')][string]$Mode = 'verify')
+﻿param([ValidateSet('verify', 'build', 'smoke', 'docker')][string]$Mode = 'verify',
+      # verify 默认全量；changed 只跑改动域与平台敏感用例，供主线推送使用（ADR-0119）。
+      [ValidateSet('full', 'changed')][string]$Coverage = 'full')
 $ErrorActionPreference = 'Stop'
 
 function Assert-Exit([string]$Message) {
@@ -18,8 +20,20 @@ if ($Mode -eq 'verify' -or $Mode -eq 'build') {
 
 if ($Mode -eq 'verify') {
     $env:PEACH_E2E_CHROME = Join-Path $env:ProgramFiles 'Google/Chrome/Application/chrome.exe'
-    & ./scripts/test.ps1 -Scope full -Fresh
-    Assert-Exit 'Windows 全量回归未通过'
+    $Plan = @('full')
+    if ($Coverage -eq 'changed') {
+        $Plan = @(& .venv/Scripts/python.exe -X utf8 scripts/ci_scope.py --platform windows)
+        Assert-Exit '无法判定主线选测范围'
+    }
+    if ($Plan[0] -eq 'full') {
+        & ./scripts/test.ps1 -Scope full -Fresh
+        Assert-Exit 'Windows 全量回归未通过'
+        exit 0
+    }
+    & ./scripts/test.ps1 -Scope auto -Base $Plan[0] -Fresh
+    Assert-Exit 'Windows 改动域回归未通过'
+    & ./scripts/test.ps1 -Focus @($Plan | Select-Object -Skip 1)
+    Assert-Exit 'Windows 平台敏感用例未通过'
     exit 0
 }
 

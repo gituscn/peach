@@ -90,6 +90,8 @@ PR 计划按改动选择前端、vendor、wheel 与浏览器任务，文档 PR �
 
 Python 分片上传完整测试输出；浏览器分片上传 TAP、服务日志及已脱敏网络日志，保留 14 天。npm 审计遇到 high 或 critical 漏洞直接失败；只有临时网络错误最多请求三次，在前两次失败后分别等待 15 与 30 秒，未知响应不当成通过。
 
+GitGud 流水线（`.gitlab-ci.yml`）的 `verify-linux`、`verify-windows`、`verify-macos` 在分支与合并请求上跑改动域加本平台的平台敏感用例：基线是最近一条成功的主线流水线里、作为本提交祖先的那个提交，由 `scripts/ci_scope.py` 判定；先用正式入口跑 `auto --base <基线>`，选域与退回全量的规则同本机 `auto`，再用 `-Focus` 跑 `PLATFORM_TESTS` 里本平台的用例。取不到基线（首次推送、强推、接口不可达）或改动落到必须全量的面时只跑一次全量。版本标签上的 `release-verify-*` 三平台各跑一次全量，构建与发布作业依赖它们。口径与平台集合的理由见 [ADR-0119](adr/0119-mainline-changed-scope-release-full-suite.md)。
+
 Release 在媒体工具编译前核对同 SHA 主线 CI，缓存键绑定媒体工具源码清单与构建脚本，缓存内容同时含二进制和对应源码包；制品与独立开箱验收仍是发布前置。Docker 只在镜像相关主线改动、匹配 PR、版本标签或手动请求时运行，验收后推送同一个本地镜像。版本发布与覆盖升级验收不取消进行中的同目标运行；覆盖升级需明确选择目标版本及完整构建提交。
 
 浏览器用例覆盖 `frontend/e2e` 下全部 `*.test.ts`，包括子目录。`setup.test.ts` 由 `SetupE2ETests` 在首次设置服务上执行，其余文件在已配置的演示库服务上按文件并发、文件内串行。并发数取 `PEACH_E2E_CONCURRENCY`；未设时本机取逻辑核数的四分之一、上限 4，CI（`GITHUB_ACTIONS=true`）为 1。并发批最多 12 个文件，串行批每批一个文件，各自取得完整 TAP 结果。测量动画、密度切换与等待态替换的文件（`tests/test_web_e2e.py` 的 `TIMING_SENSITIVE_SUITES`）在并发批之后串行；并发为 1 时按设计决定、交互回归和路由冒烟排序。每批限时 600 秒，任一批失败，整轮验证失败。并发的文件共用一个服务和演示库：用例触发的写请求只能落在别的用例不断言的状态上，否则用 `page.route` 拦下或归进串行批。控制台逐批输出文件名；完整 TAP 日志与服务访问日志 `serve.log` 保存在 `build/agent-verification/browser/`，CI 在测试结束后上传其中的 TAP 日志。
