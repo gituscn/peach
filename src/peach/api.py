@@ -454,6 +454,7 @@ def create_app(
             await tunnel_startup
             await asyncio.to_thread(tunnel_manager.stop)
             http_transport.close()
+            follow_media_resolver.close()
             hls_plan_executor.shutdown(wait=False, cancel_futures=True)
 
     app = FastAPI(

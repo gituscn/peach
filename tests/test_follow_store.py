@@ -1087,6 +1087,13 @@ class AuthorIdentityTests(_StoreCase):
             "kemono", "fanbox/30917150",
             (_candidate("1", "a", provider="kemono", author="Initiala"),)))
 
+    def test_iwara_author_profile_provides_a_trusted_handle_alias(self):
+        learned = self.store.learn_official_author_alias(
+            "iwara", "user_creator",
+            (_candidate("1", "Work", provider="iwara", author="Test Creator"),))
+        self.assertEqual(learned["alias"], "user_creator")
+        self.assertEqual(learned["source"], "official:iwara")
+
 
 class SourceRemovalTests(_StoreCase):
     def test_removing_a_source_takes_it_out_of_the_listing(self):
