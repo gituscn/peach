@@ -119,6 +119,11 @@
 .imgwait::after{opacity:1;filter:none;visibility:visible;transition-delay:180ms;
   animation:skeleton-sweep 1.5s ease-in-out infinite reverse}
 @starting-style{.imgwait::after{opacity:0;filter:blur(2px)}}
+/* 微光只在看得见时扫（`frontend/src/ui-kit/sweep-gate.ts` 标 `data-sweep`）：框在视口外是
+   `idle`，动画停在原处；露面后等了十秒图还没来是 `stalled`，换成不动的占位面。 */
+.imgwait[data-sweep="idle"]::after{animation-play-state:paused}
+.imgwait[data-sweep="stalled"]::after{animation:none;
+  background:linear-gradient(var(--hover),var(--hover)),var(--ground)}
 /* 封面和带脸框的头像取景完才露面：大图边下边画，取景要等 `load`，之前画出来的是几何居中，
    取景那一下画面会跳。缓存图在插入时就取景（`frameCachedImages`）；回落图摘掉脸框后不再等。 */
 img.cover:not([data-frame]),img[data-facebox]:not([data-face-framed]){visibility:hidden}

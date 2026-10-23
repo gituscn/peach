@@ -4,7 +4,7 @@
  * 这些图都是模板字符串拼出来的（`./markup.ts`），没法逐张挂监听，所以由 `installCardArt`
  * 在 document 上挂一组捕获监听和一个 MutationObserver 统一接管。监听只能有一份：这个模块
  * 由 Application 与 React 页面共享源码，启动时只安装一次。 */
-import { SKELETON_REVEAL_DELAY } from '@peach/legacy/ui';
+import { gateSweep, releaseSweep, SKELETON_REVEAL_DELAY } from '@peach/legacy/ui';
 
 import { PANEL_ASPECT, WIDE_PANEL_ASPECT, WIDE_SLEEVE_RATIO_MIN, WIDE_SLEEVE_RATIO_MAX, panelFrame, relayoutJavImages, type JavLayout } from '../jav-artwork';
 import { faceFrame } from './face-frame';
@@ -72,9 +72,12 @@ export function avatarFrame(img: HTMLImageElement): void {
    按它自己的宽高比分流——服务端没存这个比例，也不该为此再存一份。
    剧照必须自成一档：把 1.78 归进 front 就会按写死的 50% 取横向中段，人偏在一侧
    就整个被切掉，而大图容器比所有封面都竖、纵向锚点在那里根本不生效。 */
-export function coverAnchor(img: HTMLImageElement): void {
-  img.closest<HTMLElement>('.pic,[data-media-pic]')?.style.removeProperty('--cover-blur');
+export function coverAnchor(img: HTMLImageElement, ratio?: number): void {
   const r = img.naturalWidth / img.naturalHeight;
+  /* 容器比例在写任何样式之前读：先写再读，`getComputedStyle` 就得把刚弄脏的样式当场重算。
+     调用方手里已经有这个数（播放墙每格自己写 `--card-ratio`）就直接传进来，一次也不读。 */
+  const car = r ? ratio ?? coverRatio(img) : 0;
+  img.closest<HTMLElement>('.pic,[data-media-pic]')?.style.removeProperty('--cover-blur');
   if (!r) return;
   img.classList.remove('panel');
   ['--panel-aspect', '--panel-clip', '--panel-left', '--panel-top', '--panel-height', '--cover-x', '--cover-y']
@@ -87,7 +90,6 @@ export function coverAnchor(img: HTMLImageElement): void {
      那种偏右的脸会贴着窗口右缘，图片右边还剩一截永远露不出来。可见窗口占图片 w 时，
      让人脸落到正中的锚点是 (face - w/2) / (1 - w)。夹回 0–1 是因为脸离图片边缘不足
      半个窗口时窗口已经顶到边，再往外推只会把图片外面推进来。 */
-  const car = coverRatio(img);
   const center = (name: string, face: number | null, visible: number) => {
     // 只给被裁的那个轴算。`object-fit:cover` 一次只裁一个轴，另一个轴整幅可见
     // （visible>=1），那里的 object-position 是死值，算了也不生效。
@@ -165,9 +167,13 @@ export function upgradeCover(img: HTMLImageElement): void {
 
 /* 容器比例只有 `.pic` 的 `--card-ratio` 知道：竖屏开关、JAV 大图和普通卡片各写一个
    值，在这里按 layout 重算迟早会和它分叉。自定义属性会继承，直接从图片上读；
-   `aspect-ratio` 允许 `16/9` 这种写法，所以两种形式都得认。 */
+   `aspect-ratio` 允许 `16/9` 这种写法，所以两种形式都得认。
+   卡片框自己的行内样式写着这个值时直接读行内：框与图之间那一层不另设比例，读到的就是计算值，
+   而 `getComputedStyle` 赶上刚插进来的一批卡片会先把整棵样式树重算一遍。框上没写的（比例
+   写在更外层的网格上）才读计算样式。 */
 export function coverRatio(img: HTMLImageElement): number {
-  const parts = getComputedStyle(img).getPropertyValue('--card-ratio').trim().split('/').map(Number);
+  const inline = img.closest<HTMLElement>('.pic,[data-media-pic]')?.style.getPropertyValue('--card-ratio').trim();
+  const parts = (inline || getComputedStyle(img).getPropertyValue('--card-ratio').trim()).split('/').map(Number);
   const r = parts.length === 2 ? Number(parts[0]) / Number(parts[1]) : Number(parts[0]);
   return Number.isFinite(r) && r > 0 ? r : 16 / 9;
 }
@@ -195,6 +201,7 @@ export function watchPendingImages(node: Element): void {
   for (const img of found) {
     if (!(img as HTMLImageElement).complete && img.parentElement) {
       img.parentElement.classList.add('imgwait'); pendingSince.set(img.parentElement, performance.now());
+      gateSweep(img.parentElement);
     }
   }
 }
@@ -203,6 +210,7 @@ export function watchPendingImages(node: Element): void {
 export function settleImage(img: HTMLImageElement): void {
   const box = img.parentElement;
   if (!box?.classList.contains('imgwait')) return;
+  releaseSweep(box);
   if (performance.now() - (pendingSince.get(box) ?? NaN) < SKELETON_REVEAL_DELAY) { box.classList.remove('imgwait'); return; }
   box.classList.replace('imgwait', 'ui-imgdone');
   let timer: ReturnType<typeof setTimeout> | undefined;

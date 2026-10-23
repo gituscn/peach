@@ -79,10 +79,16 @@ export function wireHorizontalScroller(el:any,{drag=false,fade=true,wheel=true,e
   let start:{x:number;left:number}|null=null,moved=0,heldUntil=0,target=0,kicked=false,glide=0,glideAt=0,pos=0,pending=0;
   /* 值没变就不写：自动滚动每一帧都触发一次 `scroll`，同值重写属性照样让样式重算一遍。 */
   const mark=(key:string,value:string)=>{if(el.dataset[key]!==value)el.dataset[key]=value};
-  const scrollable=()=>['auto','scroll','hidden'].includes(getComputedStyle(el).overflowX);
+  /* `overflow-x` 只在尺寸观察器回调里重新读：那一刻样式和布局刚算完，读它不触发重算。
+     滚动、滚轮里每次现读，会把上一次写进 `data-overflow-*` 弄脏的整棵样式树当场重算一遍。 */
+  let overflowX='';
+  const scrollable=()=>{if(!overflowX)overflowX=getComputedStyle(el).overflowX;return ['auto','scroll','hidden'].includes(overflowX)};
   const update=()=>{if(options.fade){const active=scrollable();mark('overflowLeft',String(active&&el.scrollLeft>1));mark('overflowRight',String(active&&el.scrollLeft+el.clientWidth<el.scrollWidth-1))}};
+  /* 滚动事件一帧可能来好几次，渐隐标记合到下一帧写一次。 */
+  let marking=0;
+  const scheduleUpdate=()=>{if(!marking)marking=requestAnimationFrame(()=>{marking=0;update()})};
   const listen=(target:EventTarget,event:string,handler:(event:any)=>void,extra={})=>target.addEventListener(event,handler,{...extra,signal:abort.signal});
-  listen(el,'scroll',update,{passive:true});
+  listen(el,'scroll',scheduleUpdate,{passive:true});
   const kick=(delta:number)=>{if(options.elastic&&!kicked){kicked=true;bounce.kick(delta)}};
   const stopGlide=()=>{cancelAnimationFrame(glide);glide=0;pending=0};
   /* 位置自己记一份小数：一帧只走零点几个像素时，`scrollLeft` 读回来是取整后的值。
@@ -139,14 +145,18 @@ export function wireHorizontalScroller(el:any,{drag=false,fade=true,wheel=true,e
   listen(window,'blur',endDrag);
   listen(el,'keydown',()=>{moved=0});
   listen(el,'click',event=>{if(moved>6){event.stopPropagation();event.preventDefault();moved=0}},{capture:true});
-  const resize=new ResizeObserver(update);
-  const observe=()=>{resize.observe(el);for(const child of el.children)resize.observe(child);update()};
-  const contents=new MutationObserver(()=>{resize.disconnect();observe()});
+  /* 尺寸观察器第一次回调就在本帧布局之后，初次的渐隐标记也由它写：挂上的那一刻页面多半
+     刚插完一批节点，当场量会把整棵样式树提前重算一遍。内容增删时重挂观察器，新挂上的
+     子元素会再回调一次；只删不增的那种由下一帧补写。 */
+  const resize=new ResizeObserver(()=>{overflowX='';update()});
+  const observe=()=>{resize.observe(el);for(const child of el.children)resize.observe(child)};
+  const contents=new MutationObserver(()=>{resize.disconnect();observe();scheduleUpdate()});
   contents.observe(el,{childList:true,characterData:true,subtree:true});observe();
-  const control={options,update,destroy(){abort.abort();stopGlide();resize.disconnect();contents.disconnect();horizontalControls.delete(el);el.style.cursor='';if(!horizontalControls.size){horizontalCleanup?.disconnect();horizontalCleanup=null}}};
+  // 外面手动叫的重算（换了版式、改了内容）连 `overflow-x` 一起重读。
+  const control={options,update(){overflowX='';update()},destroy(){abort.abort();stopGlide();cancelAnimationFrame(marking);marking=0;resize.disconnect();contents.disconnect();horizontalControls.delete(el);el.style.cursor='';if(!horizontalControls.size){horizontalCleanup?.disconnect();horizontalCleanup=null}}};
   horizontalControls.set(el,control);
   if(!horizontalCleanup){horizontalCleanup=new MutationObserver(()=>{for(const [node,item] of horizontalControls)if(!node.isConnected)item.destroy()});horizontalCleanup.observe(document.body,{childList:true,subtree:true})}
-  update();return control;
+  return control;
 }
 
 /** 表格使用横向拖动；滚轮维持浏览器行为，控件与列宽手柄独立处理指针。 */
@@ -164,6 +174,8 @@ const AUTO_SCROLL_RESUME=3000;
 const autoScrollers=new Map<Element,()=>void>();
 const autoScrollWakeups=new Set<()=>void>();
 let autoScrollVisibility:MutationObserver|null=null;
+let autoScrollSight:IntersectionObserver|null=null;
+const autoScrollSightings=new Map<Element,(visible:boolean)=>void>();
 /**
  * 横排自动滚动。指针停在上面、焦点在里面、这一排不在屏幕上、页面切到后台时都停；
  * 人滚过或拖过之后从人停下的位置接着走。系统要求减少动态效果时不动。
@@ -172,21 +184,23 @@ export function wireAutoScroll(el:any):void{
   if(!el||autoScrollers.has(el))return;
   if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
   const abort=new AbortController();
-  let pos=el.scrollLeft,dir=1,last=0,frame=0,hovered=false,holdUntil=0;
+  let pos=el.scrollLeft,dir=1,last=0,frame=0,hovered=false,focused=false,onscreen=true,holdUntil=0;
   const listen=(target:EventTarget,type:string,fn:()=>void)=>target.addEventListener(type,fn,{passive:true,signal:abort.signal});
-  /* 在不在屏幕上每帧量一次，不另挂观察器：页面观察器只留给「载入更多」那一份。
-     滚出屏幕后循环停下，页面再滚动时由下面的捕获监听叫醒。 */
-  const onscreen=()=>{const r=el.getBoundingClientRect();return r.width>0&&r.bottom>0&&r.top<innerHeight};
-  const running=()=>el.isConnected&&!hovered&&!document.hidden&&
-    (!document.body.hasAttribute('data-detail-open')||!!el.closest('#stage'))&&!el.matches(':focus-within')&&onscreen();
+  /* 在不在屏幕上交给共用的交叉观察器，回调里叫醒；循环里只读自己记下的状态。每帧量
+     `getBoundingClientRect()` 会在上一帧写完 `scrollLeft` 之后把整棵样式树当场重算。
+     交叉观察器不看 `visibility`：播放墙盖住页面时这一排几何上仍在屏幕里，按页面标记停。 */
+  const covered=()=>(document.body.hasAttribute('data-detail-open')&&!el.closest('#stage'))
+    ||(document.body.hasAttribute('data-wall-open')&&!el.closest('[data-video-wall]'));
+  const running=()=>el.isConnected&&onscreen&&!hovered&&!focused&&!document.hidden&&!covered();
   const tick=(now:number)=>{
     frame=0;
     if(!el.isConnected){stop();return}
     if(!running())return;
     frame=requestAnimationFrame(tick);
     const dt=last?Math.min(now-last,64):0;last=now;
+    if(now<holdUntil)return;
     const max=el.scrollWidth-el.clientWidth;
-    if(now<holdUntil||max<=1)return;
+    if(max<=1)return;
     /* 位置自己记一份小数：一帧只走零点几个像素，`scrollLeft` 读回来是取整后的值，
        拿它接着加会一直原地不动。 */
     pos=Math.min(max,Math.max(0,pos+dir*AUTO_SCROLL_SPEED*dt/1000));
@@ -200,16 +214,22 @@ export function wireAutoScroll(el:any):void{
   listen(el,'scroll',()=>{if(Math.abs(el.scrollLeft-pos)>1){pos=el.scrollLeft;hold()}});
   listen(el,'pointerenter',()=>{hovered=true});
   listen(el,'pointerleave',()=>{hovered=false;hold();wake()});
-  listen(el,'focusout',()=>setTimeout(wake,0));
+  listen(el,'focusin',()=>{focused=true});
+  listen(el,'focusout',()=>setTimeout(()=>{focused=el.contains(document.activeElement);wake()},0));
   listen(document,'visibilitychange',wake);
-  document.addEventListener('scroll',wake,{capture:true,passive:true,signal:abort.signal});
   wake();
   function stop(){cancelAnimationFrame(frame);frame=0;abort.abort();autoScrollers.delete(el);autoScrollWakeups.delete(wake);
-    if(!autoScrollers.size){autoScrollVisibility?.disconnect();autoScrollVisibility=null}}
+    autoScrollSight?.unobserve(el);autoScrollSightings.delete(el);
+    if(!autoScrollers.size){autoScrollVisibility?.disconnect();autoScrollVisibility=null;autoScrollSight?.disconnect();autoScrollSight=null}}
   autoScrollers.set(el,stop);
   autoScrollWakeups.add(wake);
   if(!autoScrollVisibility){autoScrollVisibility=new MutationObserver(()=>autoScrollWakeups.forEach(resume=>resume()));
-    autoScrollVisibility.observe(document.body,{attributes:true,attributeFilter:['data-detail-open']})}
+    autoScrollVisibility.observe(document.body,{attributes:true,attributeFilter:['data-detail-open','data-wall-open']})}
+  if(typeof IntersectionObserver==='function'){
+    autoScrollSight??=new IntersectionObserver(entries=>{for(const entry of entries)autoScrollSightings.get(entry.target)?.(entry.isIntersecting)});
+    autoScrollSightings.set(el,visible=>{onscreen=visible;wake()});
+    autoScrollSight.observe(el);
+  }
 }
 export function stopAutoScroll(el:Element):void{autoScrollers.get(el)?.()}
 
@@ -240,25 +260,34 @@ export function moveGlidePane(
   axis:'x'|'y'='x',
 ):void{
   /* 原地重量也要撤掉还在跑的位移与形变，动画不能继续覆盖新落点。 */
-  pane.getAnimations().forEach(a=>a.cancel());
+  cancelGlide(pane);
   pane.style.width=`${box.w}px`;pane.style.height=`${box.h}px`;
   const span=axis==='y'?'h':'w',head=axis==='y'?'y':'x';
   const settled=`${box.x}px ${box.y}px`;
   if(from&&from[head]!==box[head]&&!matchMedia('(prefers-reduced-motion:reduce)').matches){
     const ease=glideEase();
-    pane.animate([{translate:axis==='y'?`${box.x}px ${from.y}px`:`${from.x}px ${box.y}px`},
-      {translate:settled}],{duration:ease.duration,easing:ease.easing,fill:'none'});
+    const moving=[pane.animate([{translate:axis==='y'?`${box.x}px ${from.y}px`:`${from.x}px ${box.y}px`},
+      {translate:settled}],{duration:ease.duration,easing:ease.easing,fill:'none'})];
+    glides.set(pane,moving);
     /* 一块被拽着走的软东西，跑起来在跑的方向上抻开，停下来收回去。抻多少按这一跳跨了
        自己几个身位算，封在一个半身位：再远也不该更长，那时候读起来不是被拉长的同一
        块，是换上来的另一块。峰值压在前三成——加速那一段才拉得动它。
        形变只在这一排排布的方向上：另一根轴的尺寸是这一排给定的，在那儿拉扯会让它看
        起来不是这一排里的东西。 */
     const reach=Math.min(Math.abs(box[head]-from[head])/box[span],1.5),grow=1+reach*.12;
-    pane.animate([{scale:'1 1',offset:0},
+    moving.push(pane.animate([{scale:'1 1',offset:0},
       {scale:axis==='y'?`1 ${grow}`:`${grow} 1`,offset:.3},{scale:'1 1',offset:1}],
-      {duration:ease.duration,easing:'ease-in-out',fill:'none'});
+      {duration:ease.duration,easing:'ease-in-out',fill:'none'}));
   }
   pane.style.translate=settled;
+}
+/* 底板上跑的只有上面这两段，自己记着撤：`getAnimations()` 要先把整份样式算到最新才答得上来，
+   侧栏开合那一下正好整页样式都脏着，读一次就是一次整树重算。 */
+const glides=new WeakMap<HTMLElement,Animation[]>();
+export function cancelGlide(pane:HTMLElement|null|undefined):void{
+  if(!pane)return;
+  glides.get(pane)?.forEach(a=>a.cancel());
+  glides.delete(pane);
 }
 
 /** Geist Scroller: one-axis overflow with edge fades as the scroll affordance. */

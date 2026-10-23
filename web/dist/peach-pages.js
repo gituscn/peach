@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "728ce482-6293-4c81-988a-83f40d0d4b2f", e._sentryDebugIdIdentifier = "sentry-dbid-728ce482-6293-4c81-988a-83f40d0d4b2f");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "00b647fe-b28f-4d03-93a0-1ebc23bc7f08", e._sentryDebugIdIdentifier = "sentry-dbid-00b647fe-b28f-4d03-93a0-1ebc23bc7f08");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, i, o, s) => {
@@ -20632,86 +20632,93 @@ function dg(e, { drag: t = !1, fade: n = !0, wheel: r = !0, elastic: i = !0, dra
 		dragIgnore: a
 	}, c = new AbortController(), l = ug(e), u = null, d = 0, f = 0, p = 0, m = !1, h = 0, g = 0, _ = 0, v = 0, y = (t, n) => {
 		e.dataset[t] !== n && (e.dataset[t] = n);
-	}, b = () => [
+	}, b = "", x = () => (b ||= getComputedStyle(e).overflowX, [
 		"auto",
 		"scroll",
 		"hidden"
-	].includes(getComputedStyle(e).overflowX), x = () => {
+	].includes(b)), S = () => {
 		if (s.fade) {
-			let t = b();
+			let t = x();
 			y("overflowLeft", String(t && e.scrollLeft > 1)), y("overflowRight", String(t && e.scrollLeft + e.clientWidth < e.scrollWidth - 1));
 		}
-	}, S = (e, t, n, r = {}) => e.addEventListener(t, n, {
+	}, C = 0, w = () => {
+		C ||= requestAnimationFrame(() => {
+			C = 0, S();
+		});
+	}, T = (e, t, n, r = {}) => e.addEventListener(t, n, {
 		...r,
 		signal: c.signal
 	});
-	S(e, "scroll", x, { passive: !0 });
-	let C = (e) => {
+	T(e, "scroll", w, { passive: !0 });
+	let E = (e) => {
 		s.elastic && !m && (m = !0, l.kick(e));
-	}, w = () => {
+	}, D = () => {
 		cancelAnimationFrame(h), h = 0, v = 0;
-	}, T = (t) => {
+	}, O = (t) => {
 		let n = Math.min(Math.max(t - g, 0), 64);
-		if (g = t, _ += (p - _) * (1 - Math.exp(-n / ag)), Math.abs(p - _) < .5 && (_ = p), e.scrollLeft = _, _ !== p) h = requestAnimationFrame(T);
+		if (g = t, _ += (p - _) * (1 - Math.exp(-n / ag)), Math.abs(p - _) < .5 && (_ = p), e.scrollLeft = _, _ !== p) h = requestAnimationFrame(O);
 		else if (h = 0, v) {
 			let e = v;
-			v = 0, C(e);
+			v = 0, E(e);
 		}
 	};
-	S(e, "wheel", (t) => {
+	T(e, "wheel", (t) => {
 		if (!s.wheel) return;
 		let n = e.scrollWidth - e.clientWidth;
-		if (t.defaultPrevented || !t.cancelable || Math.abs(t.deltaY) <= Math.abs(t.deltaX) || n <= 0 || !b()) return;
+		if (t.defaultPrevented || !t.cancelable || Math.abs(t.deltaY) <= Math.abs(t.deltaX) || n <= 0 || !x()) return;
 		t.preventDefault();
 		let r = performance.now(), i = Math.abs(t.deltaY);
 		r > f && (m = !1), f = r + rg;
 		let a = h ? p : e.scrollLeft, o = a + t.deltaY;
 		p = Math.min(n, Math.max(0, o));
 		let c = o === p ? 0 : t.deltaY;
-		i < ig || p === a ? (p !== a && (w(), e.scrollLeft = p), c && !h ? C(c) : c && (v = c)) : (c && (v = c), h ||= (_ = e.scrollLeft, g = performance.now(), requestAnimationFrame(T)));
-	}, { passive: !1 }), S(e, "mousedown", (t) => {
-		d = 0, !(!s.drag || t.button !== 0 || e.scrollWidth - e.clientWidth <= 1) && (s.dragIgnore && (t.shiftKey || t.ctrlKey || t.metaKey || t.altKey || t.target.closest?.(s.dragIgnore)) || (t.stopPropagation(), w(), u = {
+		i < ig || p === a ? (p !== a && (D(), e.scrollLeft = p), c && !h ? E(c) : c && (v = c)) : (c && (v = c), h ||= (_ = e.scrollLeft, g = performance.now(), requestAnimationFrame(O)));
+	}, { passive: !1 }), T(e, "mousedown", (t) => {
+		d = 0, !(!s.drag || t.button !== 0 || e.scrollWidth - e.clientWidth <= 1) && (s.dragIgnore && (t.shiftKey || t.ctrlKey || t.metaKey || t.altKey || t.target.closest?.(s.dragIgnore)) || (t.stopPropagation(), D(), u = {
 			x: t.pageX,
 			left: e.scrollLeft
 		}, d = 0, e.style.cursor = "grabbing"));
-	}), S(window, "mousemove", (t) => {
+	}), T(window, "mousemove", (t) => {
 		if (!u) return;
 		let n = t.pageX - u.x, r = u.left - n, i = e.scrollWidth - e.clientWidth;
 		d = Math.max(d, Math.abs(n)), e.scrollLeft = r, s.elastic && l.drag(r < 0 ? r : r > i ? r - i : 0), t.preventDefault();
 	});
-	let E = () => {
+	let k = () => {
 		u && s.elastic && l.release(), u = null, e.style.cursor = "";
 	};
-	S(window, "mouseup", E), S(window, "blur", E), S(e, "keydown", () => {
+	T(window, "mouseup", k), T(window, "blur", k), T(e, "keydown", () => {
 		d = 0;
-	}), S(e, "click", (e) => {
+	}), T(e, "click", (e) => {
 		d > 6 && (e.stopPropagation(), e.preventDefault(), d = 0);
 	}, { capture: !0 });
-	let D = new ResizeObserver(x), O = () => {
-		D.observe(e);
-		for (let t of e.children) D.observe(t);
-		x();
-	}, k = new MutationObserver(() => {
-		D.disconnect(), O();
+	let A = new ResizeObserver(() => {
+		b = "", S();
+	}), j = () => {
+		A.observe(e);
+		for (let t of e.children) A.observe(t);
+	}, M = new MutationObserver(() => {
+		A.disconnect(), j(), w();
 	});
-	k.observe(e, {
+	M.observe(e, {
 		childList: !0,
 		characterData: !0,
 		subtree: !0
-	}), O();
-	let A = {
+	}), j();
+	let ee = {
 		options: s,
-		update: x,
+		update() {
+			b = "", S();
+		},
 		destroy() {
-			c.abort(), w(), D.disconnect(), k.disconnect(), tg.delete(e), e.style.cursor = "", tg.size || (ng?.disconnect(), ng = null);
+			c.abort(), D(), cancelAnimationFrame(C), C = 0, A.disconnect(), M.disconnect(), tg.delete(e), e.style.cursor = "", tg.size || (ng?.disconnect(), ng = null);
 		}
 	};
-	return tg.set(e, A), ng || (ng = new MutationObserver(() => {
+	return tg.set(e, ee), ng || (ng = new MutationObserver(() => {
 		for (let [e, t] of tg) e.isConnected || t.destroy();
 	}), ng.observe(document.body, {
 		childList: !0,
 		subtree: !0
-	})), x(), A;
+	})), ee;
 }
 var fg = null;
 function pg() {
@@ -21561,4 +21568,4 @@ var Gg = document.getElementById("peach-page"), Kg = Gg ? Wg[Gg.dataset.page ?? 
 Gg && Kg && (0, w.createRoot)(Gg).render(/* @__PURE__ */ (0, B.jsx)(Kg, { data: { ...Gg.dataset } }));
 //#endregion
 
-//# debugId=728ce482-6293-4c81-988a-83f40d0d4b2f
+//# debugId=00b647fe-b28f-4d03-93a0-1ebc23bc7f08
