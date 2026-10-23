@@ -1236,7 +1236,7 @@ class WebDataTests(unittest.TestCase):
             "/api/feeds/schedule",
             "/api/downloads", "/api/resources/search",
             "/api/wants", "/api/wants/magnets",
-            "/api/jav/detail", "/api/jav/reviews", "/api/jav/image", "/api/jav/resources", "/api/jav/discoveries",
+            "/api/jav/detail", "/api/jav/reviews", "/api/jav/resources", "/api/jav/discoveries",
         })
         self.assertEqual(set(rm_web.POST_HANDLERS), {
             "/api/tag-management", "/api/tag-management/preview",
