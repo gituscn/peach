@@ -16,6 +16,7 @@ import uuid
 from filelock import FileLock, Timeout
 
 from . import dev_copy
+from .diagnostic_browser import BUNDLE_CHUNK_NAME
 from .fsutil import atomic_write_bytes, atomic_write_text
 from .jobs import process_alive
 
@@ -91,7 +92,6 @@ def submit(root: Path, body: dict, *, retry: bool = False) -> dict:
 
 def _chunks(folder: Path) -> list[str]:
     """主包按页拆出的 chunk（ADR-0117），名字带内容哈希，不在 `BUNDLES` 的固定名单里。"""
-    from .routes_pages import BUNDLE_CHUNK_NAME
     return sorted(path.name for path in folder.glob('*.js') if BUNDLE_CHUNK_NAME.fullmatch(path.name))
 
 

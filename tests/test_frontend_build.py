@@ -26,7 +26,7 @@ import shutil
 import subprocess
 import unittest
 
-from peach.routes_pages import BUNDLE_CHUNK_NAME
+from peach.diagnostic_browser import BUNDLE_CHUNK_NAME
 from support.conditions import missing_prerequisite
 
 ROOT = Path(__file__).resolve().parents[1]

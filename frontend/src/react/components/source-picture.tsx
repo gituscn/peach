@@ -9,8 +9,6 @@ import type { JavDetail } from '../jav-detail/jav-detail';
 export const javImageUrl = (code: string, image: string, attempt = 0): string =>
   `/jav-image?code=${encodeURIComponent(code)}&image=${encodeURIComponent(image)}${attempt ? `&attempt=${attempt}` : ''}`;
 
-const LOADING_STYLE = { display: 'none' } as const;
-
 /** 来源图片：本地有封面用本地那张，否则经 `/jav-image` 取。 */
 export function SourcePicture({ item, image, thumbnail = false }: {
   item: Pick<JavDetail, 'code' | 'has_cover' | 'source_image' | 'cover_url' | 'cover_version'>;
@@ -37,12 +35,13 @@ export function SourcePicture({ item, image, thumbnail = false }: {
   }
   const ready = loaded === src;
   /* 图片一直挂在同一个位置上：读取中只是藏着，读完揭开，不因换占位而重新请求。
-     大图与缩略图条的样式都给 img 写了 display，会压过 `hidden`，藏要用内联样式。 */
+     大图与缩略图条的样式都给 img 写了 display，会压过 `hidden`，藏由 `jav-detail.css` 的
+     `[data-source-picture][hidden]` 兜住。 */
   return <>
     {ready ? null : thumbnail
       ? <span className="relative block h-full w-full skeleton-sheen" aria-label="正在读取预览" />
       : <div data-jav-picture-wait="" data-skeleton="image" role="status" aria-label="正在读取图片"><span className="relative skeleton-sheen" /></div>}
-    <img data-jav-picture={thumbnail ? undefined : ''} src={src} alt={alt} referrerPolicy="no-referrer"
-      hidden={!ready} style={ready ? undefined : LOADING_STYLE} onLoad={() => setLoaded(src)} onError={() => setFailed(src)} />
+    <img data-jav-picture={thumbnail ? undefined : ''} data-source-picture="" src={src} alt={alt} referrerPolicy="no-referrer"
+      hidden={!ready} onLoad={() => setLoaded(src)} onError={() => setFailed(src)} />
   </>;
 }

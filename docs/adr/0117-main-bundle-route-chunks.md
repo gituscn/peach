@@ -18,7 +18,7 @@
 
 **三、页面的代码与首屏数据并行取，取齐后同步画。** 路由的 `prefetch` 同时等 chunk 与接口，两样都落地才进入 `openManagedRoute` 的同步画页；不用 `React.lazy`，它第一次渲染总要挂起一次，等于多画一帧空白。首屏稳定后浏览器空闲时逐个预热全部 chunk，第一次进入低频页不再等代码。
 
-**四、服务端放行形态，不放行名单。** `/dist/{name}` 在四个固定名之外只认 `peach-app\.[A-Za-z0-9_-]+\.js`（`routes_pages.BUNDLE_CHUNK_NAME`），文件不在就 404；chunk 回 `Cache-Control: private, max-age=31536000, immutable`。它们要会话才能取，所以只许浏览器自己缓存。页面包 `peach-pages.js` 免登录，仍是单文件。
+**四、服务端放行形态，不放行名单。** `/dist/{name}` 在四个固定名之外只认 `peach-app\.[A-Za-z0-9_-]+\.js`（`diagnostic_browser.BUNDLE_CHUNK_NAME`），文件不在就 404；chunk 回 `Cache-Control: private, max-age=31536000, immutable`。它们要会话才能取，所以只许浏览器自己缓存。页面包 `peach-pages.js` 免登录，仍是单文件。
 
 **五、旧入口指着已删除的 chunk 时重载一次。** 生产站实时读主检出的 `web/`，合入新构建后旧 chunk 就不在了。打开页面时 chunk 取不到、而 `/healthz` 可达，整页重载一次拿新入口；同一会话 30 秒内只重载一次，空闲预热失败不重载。
 

@@ -40,6 +40,7 @@ from fastapi.responses import (
 
 from . import distribution, onboarding, settings_file
 from .config import PROJECT_ROOT
+from .diagnostic_browser import BUNDLE_CHUNK_NAME
 from .entities import resolve_entity, resolve_entity_id
 from .routes_auth import query_auth_redirect, require_asset_auth, require_page_auth, set_auth_cookie
 from .web_entry import page_shell, runtime_fact_entries
@@ -677,10 +678,6 @@ def app_asset(request: Request, args: dict[str, str] = Depends(require_asset_aut
 
 
 _BUNDLE_NAMES = frozenset({"peach-app.js", "peach-app.css", "peach-pages.js", "peach-pages.css"})
-#: 主包按页拆出的 chunk（ADR-0117）：`peach-app.<名字>-<内容哈希>.js`，由
-#: `frontend/scripts/sentry-build.ts` 的 `chunkPattern` 产出。名字里只有字母、数字、`_` 与 `-`，
-#: 不含路径分隔符与 `..`；是否存在以 `web/dist/` 里的实际文件为准。
-BUNDLE_CHUNK_NAME = re.compile(r"peach-app\.[A-Za-z0-9_-]+\.js")
 
 
 def _bundle_response(request: Request, name: str) -> Response:

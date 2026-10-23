@@ -5,7 +5,12 @@ import uuid
 NAMES = frozenset({"Error", "TypeError", "ReferenceError", "SyntaxError", "RangeError", "URIError",
     "EvalError", "AggregateError", "DOMException", "SecurityError", "NotAllowedError", "InvalidStateError",
     "QuotaExceededError", "NotSupportedError", "TimeoutError", "NetworkError", "DataError", "OperationError"})
-#: 正式包的文件名：主包入口、页面包，以及主包按页拆出的 chunk（ADR-0117，形态同 `routes_pages.BUNDLE_CHUNK_NAME`）。
+#: 主包按页拆出的 chunk（ADR-0117）：`peach-app.<名字>-<内容哈希>.js`，由
+#: `frontend/scripts/sentry-build.ts` 的 `chunkPattern` 产出。名字里只有字母、数字、`_` 与 `-`，
+#: 不含路径分隔符与 `..`；是否存在以 `web/dist/` 里的实际文件为准。服务端放行、开发文案热替换
+#: 与构建检查都按它认 chunk。
+BUNDLE_CHUNK_NAME = re.compile(r"peach-app\.[A-Za-z0-9_-]+\.js")
+#: 正式包的文件名：主包入口、页面包，以及主包按页拆出的 chunk（形态同 `BUNDLE_CHUNK_NAME`）。
 SHIPPED = r"peach-pages\.js|peach-app(?:\.[A-Za-z0-9_-]+)?\.js"
 _SHIPPED = re.compile(SHIPPED)
 _FRAME = re.compile(rf"(?<![\w.-])({SHIPPED})(?:\?[^\s):]*)?:(\d+):(\d+)")

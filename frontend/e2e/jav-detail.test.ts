@@ -191,12 +191,12 @@ describe('库外 JAV 作品详情', () => {
         const errors: string[] = [];
         page.on('pageerror', error => errors.push(error.message));
         await mockJavDetail(page);
-        await page.route(/\/api\/jav\/image\?/, async route => {
+        await page.route(/\/jav-image\?/, async route => {
           const portrait = new URL(route.request().url()).searchParams.get('image') === '1';
           if (portrait) await new Promise(resolve => setTimeout(resolve, 350));
           const [width, height] = portrait ? [600, 900] : [900, 600];
-          await route.fulfill({ json: { ok: true, image: 'data:image/svg+xml,' + encodeURIComponent(
-            `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#777"/></svg>`) } });
+          await route.fulfill({ contentType: 'image/svg+xml',
+            body: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#777"/></svg>` });
         });
         await page.route(/\/api\/entity\/shapes/, route => route.fulfill({ json: { home: { feed: true }, entities: [] } }));
         await page.route(/\/api\/feeds\/discoveries\?/, route => route.fulfill({ json: { ok: true, items: [
