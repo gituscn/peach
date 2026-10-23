@@ -74,7 +74,7 @@ verify-windows:
 verify-macos:
   stage: verify
   tags: [peach-macos]
-  # 全量回归约 3 分钟，冷缓存安装依赖约 15 分钟；依赖下载卡住时提前结束。
+  # 作业脚本约 3 分钟，新 runner 首次检出完整历史约 16 分钟；下载卡住时提前结束。
   timeout: 45m
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
@@ -170,6 +170,8 @@ build-windows:
 build-macos:
   stage: build
   tags: [peach-macos]
+  # 两个架构各自从源码编译 x264、ffmpeg 与 untrunc，不走缓存；windows-media 单架构交叉编译 ffmpeg 与 untrunc 约 17 分钟。
+  timeout: 2h
   rules: !reference [.release-linux, rules]
   needs: [validate-release]
   environment:
