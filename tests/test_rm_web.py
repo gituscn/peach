@@ -126,6 +126,41 @@ class WebDataTests(unittest.TestCase):
         con.close()
         return row
 
+    def test_home_aggregates_recompute_only_when_the_tables_they_read_change(self):
+        """顶栏候选池、统计、名册、筛选项各按自己读的表缓存：换种子、搜一次不重算，作品变了就重算。"""
+        # 存储卷一节读真实挂载的根目录，与这里要验的缓存无关。
+        volumes = mock.patch.object(web_stats, "_storage_volumes", return_value=[])
+        volumes.start()
+        self.addCleanup(volumes.stop)
+
+        def entries():
+            return {key: id(entry) for key, entry in self.contract.cache.items()
+                    if key == "stats-ledger" or key.startswith(("('tops-pool'", "('index'", "facets:"))}
+
+        def load(seed):
+            return (rm_web.q_tops(self.contract, 28, seed=seed),
+                    rm_web.dispatch_api_get(self.contract, "/api/stats", {}),
+                    rm_web.dispatch_api_get(self.contract, "/api/index", {"kind": "performers"}),
+                    rm_web.dispatch_api_get(self.contract, "/api/facets", {"loc": "local,115"}))
+
+        load("first")
+        cached = entries()
+        # 两排候选池、统计、名册、筛选项各一份。
+        self.assertEqual(len(cached), 5)
+        rm_web.w_search_history(self.contract, {"query": "Alice"})
+        load("second")
+        self.assertEqual(entries(), cached)
+        with self.contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET o_count=3 WHERE id=1")
+            connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) "
+                               "VALUES(2,11,'performer','test',1.0)")
+        tops, stats, index, facets = load("second")
+        self.assertFalse(set(entries().items()) & set(cached.items()))
+        self.assertEqual(stats["consumption"]["o_total"], 3)
+        self.assertEqual([(row["k"], row["n"]) for row in tops["performers"]], [("Canonical Alice", 2)])
+        self.assertEqual(next(row["n"] for row in index["items"] if row["k"] == "Canonical Alice"), 2)
+        self.assertEqual([(row["k"], row["n"]) for row in facets["tagperformers"]], [("Canonical Alice", 2)])
+
     def test_creator_card_and_detail_share_available_entity_image(self):
         (self.avatars / f"{entity_image_key('creator', 12)}.img").write_bytes(b"image")
         row = rm_web.q_items(self.contract, {"limit": "10"})["items"][0]

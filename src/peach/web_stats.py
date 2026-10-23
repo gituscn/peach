@@ -445,8 +445,30 @@ def _replays(c, has_follow: bool) -> list[dict[str, int]]:
     return [{"k": plays, "n": n} for plays, n in sorted(counts.items())]
 
 
+#: 统计页账本那一段读到的表。`tag_not_hidden` 读标签偏好，`tag_is_not_a_performer_name` 读实体，
+#: 在线播放读关注三张表。
+STATS_TABLES = ("asset", "asset_entity", "entity", "asset_tag", "asset_tag_preference",
+                "asset_preference", "follow_playback", "follow_item", "follow_source")
+
+
 def q_stats(contract: WebContract):
-    """统计页：库存 / 归属 / 标签 / 本地与在线播放 / 各存储卷。"""
+    """统计页：库存 / 归属 / 标签 / 本地与在线播放 / 各存储卷。
+
+    账本那一段三十多条聚合 SQL 合计一秒多，按 `STATS_TABLES` 的版本缓存；媒体库划分取自设置，
+    热力图按本机时区分桶，两样作为输入进版本。存储卷读的是磁盘余量，与账本无关，按时间过期。
+    """
+    config = settings_file.active()
+    libraries = [(library, media_libraries.predicate(config, library["id"]))
+                 for library in media_libraries.libraries(config)]
+    out = dict(contract.cached_until_changed(
+        "stats-ledger", lambda: _ledger_stats(contract, libraries),
+        repr(libraries), _utc_offset(datetime.now().astimezone()), tables=STATS_TABLES))
+    # 判定在线要读一次各挂载根的首条目录项，网盘挂载上不便宜，沿用 TTL 缓存。
+    out.update(contract.cached("stats-storage", _storage_stats))
+    return out
+
+
+def _ledger_stats(contract: WebContract, libraries) -> dict:
     with contract.read_connection() as c:
         out = {}
         out["by_loc"] = [dict(r) for r in c.execute(
@@ -458,10 +480,8 @@ def q_stats(contract: WebContract):
             f"FROM asset WHERE {PRESENT} GROUP BY medium ORDER BY bytes DESC")]
         out["by_length"] = _bands(c, "ctx_length", LENGTH_BANDS)
         out["by_quality"] = _bands(c, "ctx_quality", QUALITY_BANDS)
-        config = settings_file.active()
         out["by_library"] = []
-        for library in media_libraries.libraries(config):
-            clause, params = media_libraries.predicate(config, library["id"])
+        for library, (clause, params) in libraries:
             counts = c.execute(
                 "SELECT count(*) videos,COALESCE(sum(a.size),0) bytes FROM asset a "
                 f"WHERE a.medium='video' AND {PRESENT_A} AND " + clause, params,
@@ -551,7 +571,11 @@ def q_stats(contract: WebContract):
         )[:12]
         out["play_activity"] = _play_activity(c, has_follow)
         out["replays"] = _replays(c, has_follow)
-    out["storage_volumes"] = _storage_volumes()
+    return out
+
+
+def _storage_stats() -> dict:
+    out = {"storage_volumes": _storage_volumes()}
     measured = [row for row in out["storage_volumes"] if row["total"] is not None]
     out["storage_summary"] = {
         "volumes": len(out["storage_volumes"]),

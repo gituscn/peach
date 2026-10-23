@@ -247,7 +247,9 @@ class WebContract:
         `w_review_decision` 调 `cache_bust`；旧实现照样把批准前的快照写回去，
         于是用户批准完刷新，看到的还是批准前的列表，而且持续整整一个 TTL。
 
-        用代次挡住：写回前确认这期间没有失效过，否则丢弃这次结果。
+        用代次挡住：写回前确认这期间没有失效过，否则丢弃这次结果。按版本核验的键
+        （`revision_cache_keys`）不挡：版本在计算前读好，期间有写入，下一次读到新版本
+        照样重算；挡掉它们只会让长任务频繁提交时上秒的计算永远存不进去，每个读者各算一遍。
         """
         now = time.monotonic()
         with self.cache_lock:
@@ -258,7 +260,7 @@ class WebContract:
             generation = self.cache_generation
         value = fn()
         with self.cache_lock:
-            if generation == self.cache_generation:
+            if generation == self.cache_generation or key in self.revision_cache_keys:
                 # 时间戳沿用进入时的 now：算得比 TTL 还久的结果直接算过期，
                 # 宁可下次重算，也不要把一份已经旧了的数据当新的用。
                 self.cache[key] = (now, version, value)
@@ -393,14 +395,20 @@ class WebContract:
         `.poster.json` 说正封那一块在哪。版本见 `cover_version`。
 
         卡片列表逐行问「有封面吗」「取景是多少」，一页 60 行就是 120+ 次 stat 加
-        读文件；封面目录一次 scandir 就覆盖全部番号，结果走 `cached()` 的 TTL。
-        `/cover` 端点仍走 `cover_path()` 直读，取图不受索引影响。
+        读文件；封面目录一次 scandir 就覆盖全部番号。`/cover` 端点仍走 `cover_path()`
+        直读，取图不受索引影响。
 
-        键里带目录的修改时间：新落盘或换名替换的封面立刻进索引，按版本缓存的聚合
-        （复核）重算时拿到的也是这一份。原地覆写的边车最多一个 TTL 后生效。
+        索引只认封面目录的修改时间，不随账本提交失效，也不按时间过期：重建要读两千多份
+        边车，约一秒。封面与边车的写入方（`cover_artwork.install_cover`、
+        `jav_poster_crop.write_sidecar`）都先写临时文件再换名，新增、替换、删除都会改
+        目录时间。目录不存在时退回 `CACHE_TTL`。
         """
-        return self.cached("cover-index", self._scan_cover_root,
-                           version=path_version(self.cover_root))
+        version = path_version(self.cover_root)
+        if version is None:
+            return self.cached("cover-index", self._scan_cover_root, version=None)
+        with self.cache_lock:
+            self.revision_cache_keys.add("cover-index")
+        return self.cached("cover-index", self._scan_cover_root, ttl=math.inf, version=version)
 
     def _scan_cover_root(self) -> dict[str, dict]:
         """一次目录扫描同时收集封面存在性和两份 sidecar。目录不存在就是空索引。"""

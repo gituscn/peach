@@ -118,6 +118,54 @@ class LedgerRevisionTests(unittest.TestCase):
                                return_value=1000.0 + web_state.CACHE_TTL):
             self.assertEqual(self.contract.cached_until_changed("ads", self.compute), 2)
 
+    def test_a_commit_during_a_versioned_computation_keeps_the_result(self):
+        def derive():
+            self.calls += 1
+            self.contract.cache_bust()
+            return self.calls
+        self.assertEqual(self.contract.cached_until_changed("catalog", derive, tables=("asset",)), 1)
+        self.assertEqual(self.contract.cached_until_changed("catalog", derive, tables=("asset",)), 1)
+
+
+class CoverIndexTests(unittest.TestCase):
+    """封面索引只认封面目录：账本提交与时间都不让它重扫，换名写入的封面与边车立刻生效。"""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.db_path = fresh_ledger(self.directory.name)
+        self.covers = Path(self.directory.name) / "covers"
+        self.covers.mkdir()
+        (self.covers / "ABC-001.jpg").write_bytes(b"jpg")
+        self.contract = WebContract(self.db_path, cover_root=self.covers)
+        self.scans = mock.patch.object(
+            self.contract, "_scan_cover_root", wraps=self.contract._scan_cover_root).start()
+        self.addCleanup(mock.patch.stopall)
+
+    def test_commits_and_elapsed_time_keep_the_index(self):
+        self.assertTrue(self.contract.has_cover("ABC-001"))
+        self.contract.cache_bust()
+        insert_asset(self.db_path, 1)
+        with mock.patch.object(web_state.time, "monotonic",
+                               return_value=web_state.time.monotonic() + 10 * web_state.CACHE_TTL):
+            self.assertTrue(self.contract.has_cover("ABC-001"))
+        self.assertEqual(self.scans.call_count, 1)
+
+    def test_rewritten_sidecars_and_added_or_removed_covers_show_up_at_once(self):
+        from peach import jav_poster_crop
+        self.assertIsNone(self.contract.poster_box("ABC-001"))
+        jav_poster_crop.write_sidecar(self.covers / "ABC-001.jpg", jav_poster_crop.manual_record(
+            800, 538, {"x0": 420, "y0": 0, "x1": 800, "y1": 538}))
+        self.assertEqual(self.contract.poster_box("ABC-001")["x0"], 420)
+        jav_poster_crop.write_sidecar(self.covers / "ABC-001.jpg", jav_poster_crop.manual_record(
+            800, 538, {"x0": 400, "y0": 0, "x1": 800, "y1": 538}))
+        self.assertEqual(self.contract.poster_box("ABC-001")["x0"], 400)
+        self.assertFalse(self.contract.has_cover("XYZ-002"))
+        (self.covers / "XYZ-002.jpg").write_bytes(b"jpg")
+        self.assertTrue(self.contract.has_cover("XYZ-002"))
+        (self.covers / "XYZ-002.jpg").unlink()
+        self.assertFalse(self.contract.has_cover("XYZ-002"))
+
 
 if __name__ == "__main__":
     unittest.main()
