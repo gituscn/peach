@@ -218,6 +218,17 @@ def _require_free_tag(repo: str, tag: str) -> None:
         raise ValueError(f"{tag} 已存在，不覆盖；发布新版本请先推进 __version__")
 
 
+def require_clean_dependencies(root: Path = None) -> None:
+    """标签前复核依赖审计：标签流水线第一件事就是同一套 npm 审计，新公布的高危漏洞
+    会让已经打出去的标签什么也发不出。在打标签之前先查，有漏洞就不定版、不打标签。"""
+    from . import npm_audit
+    root = root or ROOT
+    failed = [str(project.relative_to(root)) or "." for project in (root, root / "frontend")
+              if npm_audit.audit(project) != 0]
+    if failed:
+        raise ValueError("依赖审计发现高危漏洞（" + "、".join(failed) + "）；先升级依赖再发布")
+
+
 def prepare(repo: str, part: str, *, apply: bool,
             reference_evidence: dict[str, Path] | None = None) -> dict:
     """为下一次发布推进版本号并起草变更日志。
@@ -232,6 +243,7 @@ def prepare(repo: str, part: str, *, apply: bool,
     result = {**planned, "tag": tag, "repo": repo, "applied": apply}
     if not apply:
         return result
+    require_clean_dependencies()
     from .release_review import review
     options = {"public_github": True} if GITLAB else {}
     if reference_evidence:
@@ -305,6 +317,7 @@ def ship(repo: str, *, apply: bool, timeout: float = TEST_TIMEOUT) -> dict:
     if master_sha(repo) != sha:
         command("git", "push", remote_url(repo), "refs/heads/master")
     checked = await_test(repo, sha, timeout=timeout)
+    require_clean_dependencies()
     command("git", "tag", "-a", tag, sha, "-m", f"Peach {tag} Windows 测试版")
     command("git", "push", remote_url(repo), f"refs/tags/{tag}")
     return {**result, "sha": sha, "test": checked["html_url"],

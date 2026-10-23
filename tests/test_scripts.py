@@ -5414,6 +5414,37 @@ class ReleaseTagTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.release = load_script("release_tag")
+        cls.audit_dependencies = staticmethod(cls.release.require_clean_dependencies)
+
+    def setUp(self):
+        # 定版前的依赖审计要联网跑 npm；用例默认它通过，专门的用例单独让它拦下。
+        audit = mock.patch.object(self.release, "require_clean_dependencies")
+        audit.start()
+        self.addCleanup(audit.stop)
+
+    def test_dependency_audit_covers_both_npm_projects_and_names_the_failing_one(self):
+        """标签流水线第一步就是这两份 npm 审计；有一份不干净就不能定版或打标签。"""
+        root = Path("C:/repo")
+        verdicts = {root: 0, root / "frontend": 1}
+        with mock.patch("scripts.npm_audit.audit", side_effect=lambda project: verdicts[project]) as audit, \
+                self.assertRaisesRegex(ValueError, "frontend"):
+            self.audit_dependencies(root)
+        self.assertEqual([call.args[0] for call in audit.call_args_list], [root, root / "frontend"])
+        with mock.patch("scripts.npm_audit.audit", return_value=0):
+            self.audit_dependencies(root)
+
+    def test_a_vulnerable_dependency_keeps_version_files_untouched(self):
+        with self._shell(), mock.patch.object(self.release, "api", return_value=[]), \
+                mock.patch.object(self.release.version_bump, "plan_bump",
+                                  return_value=self._planned_bump()), \
+                mock.patch.object(self.release, "require_clean_dependencies",
+                                  side_effect=ValueError("依赖审计发现高危漏洞（frontend）")), \
+                mock.patch.object(self.release.version_bump, "write_version") as write, \
+                mock.patch.object(self.release.changelog, "release") as promote, \
+                self.assertRaisesRegex(ValueError, "高危漏洞"):
+            self.release.prepare("owner/repo", "auto", apply=True)
+        write.assert_not_called()
+        promote.assert_not_called()
 
     def test_latest_matching_master_run_must_finish_successfully(self):
         success = dict(id=1, head_sha="abc", head_branch="master", event="push",
@@ -5649,6 +5680,20 @@ class ShipTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.release = load_script("release_tag")
+
+    def setUp(self):
+        audit = mock.patch.object(self.release, "require_clean_dependencies")
+        self.audit = audit.start()
+        self.addCleanup(audit.stop)
+
+    def test_a_vulnerable_dependency_found_after_the_test_turns_green_stops_before_the_tag(self):
+        """Test 绿了到打标签之间可能刚好公布了新漏洞：标签打出去就什么也发不了，所以标签前再查一次。"""
+        self.audit.side_effect = ValueError("依赖审计发现高危漏洞（frontend）")
+        with self._shell() as command, self._api(remote="abc"), self._version(), self._document(), \
+                self.assertRaisesRegex(ValueError, "高危漏洞"):
+            self.release.ship("owner/repo", apply=True)
+        self.assertFalse([args for args in self._writes(command) if args[:3] == ("git", "tag", "-a")
+                          or (args[:2] == ("git", "push") and any("refs/tags/" in part for part in args))])
 
     #: 一次干净的起点：在 master 上，工作区正好是那两份定版文件，本地没有这个标签。
     SHELL = {("git", "branch", "--show-current"): "master",
