@@ -86,6 +86,7 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
     from build_macos_media import audit_binary
     from fetch_cloudflared_macos import validate as validate_cloudflared
     from fetch_face_models import install as install_face_models
+    from build_amane_runtime import build as build_amane_runtime, verify as verify_amane_runtime
 
     media_root = ROOT / "build/media-macos" / architecture
     sources = []
@@ -97,6 +98,8 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
     cloudflared = media_root / "cloudflared"
     validate_cloudflared(cloudflared, architecture)
     work = ROOT / "build" / "macos-standalone" / architecture
+    amane_runtime = work / "amane-runtime"
+    build_amane_runtime(amane_runtime, work=work / "amane-build")
     # 人脸模型在 PyInstaller 之前取齐并校验，网络不通时尽早失败。
     face_models = work / "face-models"
     shutil.rmtree(face_models, ignore_errors=True)
@@ -122,8 +125,10 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
         str(ROOT / "scripts" / "peach_macos.spec"),
     ], check=True, cwd=ROOT, env={**os.environ, "PEACH_MACOS_BUILD_INFO": str(work / "build-info.json"),
                                 "PEACH_MACOS_REPORTING_CONFIG": str(reporting),
+                                "PEACH_MACOS_AMANE_RUNTIME": str(amane_runtime),
                                 "PEACH_MACOS_TARGET_ARCH": architecture})
     app = destination / "Peach.app"
+    verify_amane_runtime(app / "Contents/Frameworks/tools/amane-runtime")
     tools = app / "Contents/Resources/tools"
     tools.mkdir(exist_ok=True)
     for tool in ("ffmpeg", "untrunc"):
