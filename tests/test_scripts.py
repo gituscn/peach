@@ -5159,6 +5159,90 @@ class GitGudPackageMirrorTests(unittest.TestCase):
                           (root / 'RELEASE_NOTES.md').read_text(encoding='utf-8'))
 
 
+class MainlineScopeTests(unittest.TestCase):
+    """主线推送只跑改动域与平台敏感用例；基线取不稳就退回全量（ADR-0119）。"""
+
+    @staticmethod
+    def git(root, *args):
+        command = ["git", "-c", "user.name=Peach", "-c", "user.email=peach@example.invalid",
+                   "-c", "commit.gpgsign=false", "-C", str(root), *args]
+        return subprocess.run(command, capture_output=True, text=True, encoding="utf-8", check=True).stdout.strip()
+
+    def repository(self):
+        """三个只改文档的提交；返回仓库根和提交列表（旧到新）。"""
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name).resolve()
+        self.git(root, "init", "-q", "-b", "master")
+        (root / "docs").mkdir()
+        commits = []
+        for index in range(3):
+            (root / "docs" / "guide.md").write_text(f"第 {index} 版\n", encoding="utf-8")
+            self.git(root, "add", "docs/guide.md")
+            self.git(root, "commit", "-q", "-m", f"docs: 第 {index} 版")
+            commits.append(self.git(root, "rev-parse", "HEAD"))
+        return root, commits
+
+    def plan(self, root, pipelines, current):
+        from scripts import ci_scope
+        source = pipelines if callable(pipelines) else (lambda _environ: pipelines)
+        return ci_scope.plan("linux", root, {"CI_COMMIT_SHA": current}, pipelines=source)[0]
+
+    def test_the_base_is_the_newest_verified_ancestor_so_a_red_push_is_retested(self):
+        from scripts import ci_scope
+        root, (first, second, head) = self.repository()
+        pipelines = [{"sha": head, "status": "success"}, {"sha": second, "status": "failed"},
+                     {"sha": first, "status": "success"}]
+        self.assertEqual(self.plan(root, pipelines, head), [first, *ci_scope.PLATFORM_TESTS["linux"]])
+
+    def test_without_a_reachable_verified_base_the_suite_is_full(self):
+        root, (first, _second, head) = self.repository()
+        self.git(root, "checkout", "-q", "-b", "rewritten", first)
+        (root / "docs" / "other.md").write_text("强推前的提交\n", encoding="utf-8")
+        self.git(root, "add", "docs/other.md")
+        self.git(root, "commit", "-q", "-m", "docs: 被改写的历史")
+        rewritten = self.git(root, "rev-parse", "HEAD")
+        self.git(root, "checkout", "-q", "master")
+
+        def unavailable(_environ):
+            raise OSError("外部请求未取得（ConnectError）")
+        for name, pipelines in (("首次推送", []), ("强推后旧提交不是祖先", [{"sha": rewritten, "status": "success"}]),
+                                ("克隆里没有这个提交", [{"sha": "f" * 40, "status": "success"}]),
+                                ("只有本提交自己", [{"sha": head, "status": "success"}]),
+                                ("接口取不到", unavailable)):
+            with self.subTest(name):
+                self.assertEqual(self.plan(root, pipelines, head), ["full"])
+
+    def test_changes_that_need_the_full_suite_skip_the_platform_subset(self):
+        root, (_first, _second, base) = self.repository()
+        (root / ".gitlab-ci.yml").write_text("stages: [verify]\n", encoding="utf-8")
+        self.git(root, "add", ".gitlab-ci.yml")
+        self.git(root, "commit", "-q", "-m", "ci: 新流水线")
+        head = self.git(root, "rev-parse", "HEAD")
+        self.assertEqual(self.plan(root, [{"sha": base, "status": "success"}], head), ["full"])
+
+    def test_every_platform_subset_resolves_through_the_focus_entry(self):
+        from scripts import ci_scope, test_focus
+        for platform, selectors in ci_scope.PLATFORM_TESTS.items():
+            with self.subTest(platform=platform):
+                suite, browsers = test_focus.selection(ROOT, list(selectors))
+                self.assertGreater(suite.countTestCases(), 0)
+                self.assertIn("e2e/setup.test.ts", browsers)
+                self.assertEqual(len(selectors), len(set(selectors)))
+
+    def test_the_pipeline_list_is_read_anonymously(self):
+        from scripts import ci_scope
+        environ = {"CI_API_V4_URL": "https://gitgud.io/api/v4", "CI_PROJECT_ID": "42", "CI_JOB_TOKEN": "不该被带上"}
+        with mock.patch("peach.peach_proxy.read_url", return_value=b'[{"sha": "a", "status": "success"}]') as fetch:
+            self.assertEqual(ci_scope.successful_pipelines(environ), [{"sha": "a", "status": "success"}])
+        url = fetch.call_args.args[0]
+        self.assertTrue(url.startswith("https://gitgud.io/api/v4/projects/42/pipelines?"), url)
+        self.assertIn("ref=master", url)
+        self.assertIn("status=success", url)
+        headers = {key.lower(): value for key, value in fetch.call_args.kwargs["headers"].items()}
+        self.assertFalse({"job-token", "private-token", "authorization"} & headers.keys())
+
+
 class GitLabReleaseTests(unittest.TestCase):
     SHA = "1" * 40
 

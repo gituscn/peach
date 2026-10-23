@@ -25,11 +25,14 @@ variables:
   PEACH_R2_BUCKET: peach-releases
   PEACH_R2_PUBLIC_BASE: https://downloads.peach.video
 
-verify-linux:
+# 回归口径（ADR-0119）：分支与合并请求跑相对上一次已验证主线的改动域，加上本平台的平台敏感用例，
+# 取不到基线或改动落到必须全量的面时退回全量；版本标签上三个平台都跑全量，构建与发布依赖它们。
+# 改动域随时可能退成全量，所以两种作业的时限都按全量定。
+.verify-linux:
   stage: verify
   image: node:24-bookworm
-  rules:
-    - if: '$CI_COMMIT_BRANCH || $CI_PIPELINE_SOURCE == "merge_request_event"'
+  # 全量回归连同装依赖 13–20 分钟。
+  timeout: 45m
   cache:
     when: always
     key:
@@ -51,7 +54,7 @@ verify-linux:
     - test -z "$(git status --porcelain --untracked-files=all -- web/dist)"
     - uv run --locked python scripts/npm_audit.py
     - uv run --locked python scripts/npm_audit.py --prefix frontend
-    - xvfb-run -a ./scripts/test.sh full --fresh
+    - xvfb-run -a bash scripts/ci_verify.sh linux "$PEACH_CI_COVERAGE"
   artifacts:
     when: always
     expire_in: 14 days
@@ -59,27 +62,71 @@ verify-linux:
       - build/agent-verification/browser/*.tap
       - build/agent-verification/browser/serve.log
       - build/agent-verification/browser/setup-serve.log
+      - build/test-history/
 
-verify-windows:
+verify-linux:
+  extends: .verify-linux
+  rules:
+    - if: '$CI_COMMIT_BRANCH || $CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    PEACH_CI_COVERAGE: changed
+
+release-verify-linux:
+  extends: .verify-linux
+  rules: !reference [.release-linux, rules]
+  variables:
+    PEACH_CI_COVERAGE: full
+
+.verify-windows:
   stage: verify
   tags: [peach-windows]
   # 全量回归连同依赖安装约 20–25 分钟；runner 与本机开发会话共用 CPU，并发全量时会翻倍。
   timeout: 1h 30m
+  script:
+    - '& ./scripts/ci_windows.ps1 verify -Coverage $env:PEACH_CI_COVERAGE'
+    - if ($LASTEXITCODE -ne 0) { throw 'Windows 回归未通过' }
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths: [build/test-history/]
+
+verify-windows:
+  extends: .verify-windows
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
-  script:
-    - '& ./scripts/ci_windows.ps1 verify'
-    - if ($LASTEXITCODE -ne 0) { throw 'Windows 全量回归未通过' }
+  variables:
+    PEACH_CI_COVERAGE: changed
 
-verify-macos:
+release-verify-windows:
+  extends: .verify-windows
+  rules: !reference [.release-linux, rules]
+  variables:
+    PEACH_CI_COVERAGE: full
+
+.verify-macos:
   stage: verify
   tags: [peach-macos]
   # 作业脚本约 3 分钟，新 runner 首次检出完整历史约 16 分钟；下载卡住时提前结束。
   timeout: 45m
+  script:
+    - bash scripts/ci_macos.sh verify arm64 "$PEACH_CI_COVERAGE"
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths: [build/test-history/]
+
+verify-macos:
+  extends: .verify-macos
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
-  script:
-    - bash scripts/ci_macos.sh verify arm64
+  variables:
+    PEACH_CI_COVERAGE: changed
+
+release-verify-macos:
+  extends: .verify-macos
+  rules: !reference [.release-linux, rules]
+  variables:
+    PEACH_CI_COVERAGE: full
 
 wheel-smoke:
   stage: package
@@ -149,7 +196,7 @@ build-windows:
   stage: build
   tags: [peach-windows]
   rules: !reference [.release-linux, rules]
-  needs: [windows-media]
+  needs: [windows-media, {job: release-verify-windows, artifacts: false}]
   environment:
     name: release
     action: prepare
@@ -173,7 +220,7 @@ build-macos:
   # 两个架构各自从源码编译 x264、ffmpeg 与 untrunc，不走缓存；windows-media 单架构交叉编译 ffmpeg 与 untrunc 约 17 分钟。
   timeout: 2h
   rules: !reference [.release-linux, rules]
-  needs: [validate-release]
+  needs: [validate-release, {job: release-verify-macos, artifacts: false}]
   environment:
     name: release
     action: prepare
@@ -208,7 +255,7 @@ publish-docker:
   stage: publish
   tags: [peach-windows]
   rules: !reference [.release-linux, rules]
-  needs: [validate-release]
+  needs: [validate-release, {job: release-verify-linux, artifacts: false}]
   resource_group: peach-docker-publication
   environment:
     name: release
@@ -220,7 +267,7 @@ publish-docker:
 publish-release:
   extends: .release-linux
   stage: publish
-  needs: [build-windows, smoke-windows, build-macos]
+  needs: [build-windows, smoke-windows, build-macos, {job: release-verify-linux, artifacts: false}]
   resource_group: peach-release-publication
   environment:
     name: release

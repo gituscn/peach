@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
-# macOS CI：原生架构依赖、统一全量回归与独立安装镜像验收。
+# macOS CI：原生架构依赖、回归验证与独立安装镜像验收。
+# verify 默认全量；第三个参数 changed 只跑改动域与平台敏感用例，供主线推送使用。
 set -euo pipefail
 
 usage() {
-    printf '%s\n' '用法：bash scripts/ci_macos.sh <verify|build> <arm64|x86_64>'
+    printf '%s\n' '用法：bash scripts/ci_macos.sh <verify|build> <arm64|x86_64> [full|changed]'
 }
 
 if [[ "${1:-}" == --help ]]; then
     usage
     exit 0
 fi
-if [[ $# -ne 2 ]]; then
+if [[ $# -lt 2 || $# -gt 3 ]]; then
     usage >&2
     exit 2
 fi
 mode="$1"
 architecture="$2"
+coverage="${3:-full}"
 case "$mode" in verify|build) ;; *) usage >&2; exit 2 ;; esac
 case "$architecture" in arm64|x86_64) ;; *) usage >&2; exit 2 ;; esac
+case "$coverage" in full|changed) ;; *) usage >&2; exit 2 ;; esac
 if [[ "$(uname -s)" != Darwin ]]; then
     printf '%s\n' 'macOS 验证与构建必须在 Mac 上运行。' >&2
     exit 1
@@ -74,7 +77,7 @@ uv pip check --python "$python"
 
 if [[ "$mode" == verify ]]; then
     npm run build --prefix frontend
-    ./scripts/test.sh full
+    bash scripts/ci_verify.sh macos "$coverage"
     exit 0
 fi
 
