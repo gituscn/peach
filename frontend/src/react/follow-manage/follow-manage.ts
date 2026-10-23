@@ -668,7 +668,7 @@ export const checkedText = (source: FollowSource): string =>
 /** 有站点图标的来源。图标由服务端按 `follow_assets.SOURCE_ICON_URLS` 取回并存在本机，
  *  页面只认这份名单：没登记的来源直接不出 `<img>`。 */
 export const SOURCE_ICON_PROVIDERS = new Set([
-  'fanbox', 'patreon', 'subscribestar', 'kemono', 'coomer', 'pawchive',
+  'fanbox', 'patreon', 'subscribestar', 'iwara', 'kemono', 'coomer', 'pawchive',
   'rule34video', 'rule34xxx', 'rule34paheal', 'gofile', 'f95zone', 'simpcity',
 ]);
 
