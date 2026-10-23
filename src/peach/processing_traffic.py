@@ -140,7 +140,8 @@ class ProcessingTraffic:
         """账本统计不访问媒体目录；保护开启的目录不预估自动探测。"""
         if rows is None:
             from .processing_traffic_plan import ledger_rows
-            rows = ledger_rows(self.db_path, self.asset_ids)
+            roots = tuple(root for values in self.config.locations.values() for root in values)
+            rows = ledger_rows(self.db_path, self.asset_ids, library_roots=roots)
         with self.lock:
             self.plan.refresh(rows)
             for row in self.rows.values():

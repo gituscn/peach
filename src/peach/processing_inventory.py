@@ -38,6 +38,7 @@ class InventoryPreview:
     def _files(self, config):
         from .scan import _walk, is_sidecar, medium_of, walk_root_for
         known = {self.meter._media_key(row['path'], row['location']) for row in self.rows}
+        library_roots = tuple(root for roots in config.locations.values() for root in roots)
         seen = set()
         for key, source in self.meter.rows.items():
             if not source['root'] or key in known:
@@ -54,8 +55,9 @@ class InventoryPreview:
                 relative = Path(directory).relative_to(top).parts
                 for entry in entries:
                     row = None
-                    if medium_of(entry.name) == 'video' and not is_sidecar(entry.name, frozenset()):
-                        path = str(PureWindowsPath(root, *relative, entry.name))
+                    path = str(PureWindowsPath(root, *relative, entry.name))
+                    if medium_of(entry.name) == 'video' and not is_sidecar(
+                            entry.name, frozenset(), path=path, library_roots=library_roots):
                         owner = self.meter._media_key(path, location)
                         identity = location, path.casefold()
                         if owner not in known and identity not in seen:

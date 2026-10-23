@@ -898,9 +898,13 @@ Python 源文件纳入 `src/peach/library_sharing.py` 与 `src/peach/library_pro
 
 普通 Toast 与扫描任务卡共用 Agent Progress 外框，16px 半径由通知栈内的既有 token 解析，细边框与接触阴影分别复用 `border-button-default`、`elevation-xs`，不改变内容排版。浏览器回归核对桌面、手机和明暗主题下的外框一致性，并以同一任务、同一内容回放外框基线生成对比图。
 
-## 本地预告片识别
+## 本地附属媒体识别
 
-本地预告片识别复用 `catalog_rules.is_local_trailer` 与现有 `scan.is_sidecar`，行为约定来自 [Kodi 本地预告片](https://kodi.wiki/view/Trailers)与 [Jellyfin 附属文件命名](https://jellyfin.org/docs/general/server/media/movies/#file-suffix)（2026-10-23 核对）。仅参照公开命名规则，不复制上游源码或引入媒体服务器依赖。`trailer` 裸名及 `-trailer`、`.trailer`、`_trailer`、空格加 `trailer` 的末尾标记不区分大小写，扩展名沿用现有视频集合。扫描、推送发现、首次预检、后台探测、资料采集和馆藏查询使用同一判据；已登记记录只在作品列表、版本组与库存计数中排除，保留媒体和个人记录，不按时长猜测。隔离回归复现正片与预告片共存的目录，并验证短正片、普通片名和账本只读性。Python 3.14 标准库 `re`（PSF 许可）已随运行时提供，无新增依赖与安装体积；不采用额外视频解析库，因为本项只需读取文件名。取证范围见[本地预告片证据](reference-snapshots/local-trailer-evidence.md)。
+附属媒体识别复用 `catalog_rules.local_extra_type`、`is_local_extra` 与现有 `scan.is_sidecar`，兼容 Plex、Kodi、Emby、Jellyfin 的显式文件标记和专用目录。规则来源、完整标记及边界见[附属媒体命名证据](reference-snapshots/local-trailer-evidence.md)。
+
+分类模型和末尾数字处理参照 Jellyfin 的 `Emby.Naming`，固定提交 [`c7ce6a1b56ee7dcc1896250df0f2f9deaa828a81`](https://github.com/jellyfin/jellyfin/tree/c7ce6a1b56ee7dcc1896250df0f2f9deaa828a81/Emby.Naming)，项目为持续维护的媒体服务器；该模块声明 GPL-3.0-only，目标框架为 .NET 10，并依赖 `MediaBrowser.Common` 和 `MediaBrowser.Model`。已通过 opensrc 阅读规则与解析实现，并将三个缓存文件与固定提交的上游原始文件逐字节核对。Peach 参照规则事实与解析边界，用 Python 3.14 标准库 `pathlib`、字串操作及 `functools` 实现自身策略，不复制上游源文件或引入 .NET 服务、运行时和媒体服务器依赖；没有新增 Python 依赖及安装体积。
+
+同一分类器用于扫描、推送发现、首次预检、后台探测、资料采集、馆藏列表、版本组、实体数量与库存统计。专用目录支持嵌套，按最长已声明媒体库根截断路径；媒体库根本身即使叫 `Shorts` 或 `Extras`，其中的普通影片也不按附属目录处理。明确文件名标记照常生效；不根据时长、分辨率或片名中间的单词推测。旧记录在普通馆藏与后台工作量中排除，单项详情、媒体、评分和播放历史保留；不增加迁移或清理真实 ledger。临时目录和账本回归覆盖四家命名、编号、嵌套目录、库根保护、跨平台路径和只读性。
 
 ## 媒体库与根目录身份
 

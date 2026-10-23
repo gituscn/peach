@@ -91,6 +91,15 @@ class ProbeUnmeasuredTests(unittest.TestCase):
         self.assertEqual(self.row(main)[0], 1800)
         self.assertIsNone(self.row(trailer)[0])
 
+    def test_directory_extras_and_numbered_suffixes_are_not_probed(self):
+        main = self.add(ROOT + r'\Film\Film.mp4')
+        extras = [self.add(ROOT + relative) for relative in (
+            r'\Film\Trailers\Teaser.mp4', r'\Film\Extras\Disc 1\Making of.mkv',
+            r'\Film\Actor-interview2.mp4', r'\Film\sample2.mp4')]
+        self.assertEqual(self.probe(), 1)
+        self.assertEqual(self.row(main)[0], 1800)
+        self.assertTrue(all(self.row(aid)[0] is None for aid in extras))
+
     def test_without_ffprobe_the_scan_still_finishes_and_leaves_rows_pending(self):
         pending = self.add(ROOT + r"\a.mp4")
         self.assertEqual(self.probe(ffprobe=None), 0)
