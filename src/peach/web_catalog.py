@@ -437,7 +437,9 @@ def q_items(contract: WebContract, args):
         r.pop("snapshot_path", None)
         r.pop("path", None)                     # 路径不外发，串流走 id
     attach_saved_follow_cards(contract, rows)
-    attach_multipart_groups(contract, rows)
+    # 画幅条件和 `catalog_filter` 同一口径：回收站不按画幅筛，卷数也不按画幅收窄。
+    orient = None if args.get("state") == "trash" else args.get("orient") or None
+    attach_multipart_groups(contract, rows, orient=orient)
     attach_edition_groups(contract, rows)
     return {"total": cnt, "work_total": work_total, "bytes": total_bytes, "items": rows, "has_more": has_more}
 
@@ -653,7 +655,8 @@ def _catalog_group_rows(contract: WebContract) -> list[dict]:
 def _read_group_rows(contract: WebContract) -> list[dict]:
     with contract.read_connection() as connection:
         rows = [dict(row) for row in connection.execute(
-            "SELECT id,name,path,code,size,duration,width,height,disposal,catalog_title,field_owners FROM asset "
+            "SELECT id,name,path,code,size,duration,width,height,ctx_orient,disposal,catalog_title,field_owners "
+            "FROM asset "
             "WHERE medium='video' "
             "AND COALESCE(disposal,'')<>'vanished' ORDER BY id",
         )]
@@ -809,8 +812,14 @@ def video_work_key(contract: WebContract, connection) -> str:
     return 'peach_video_work_key(a.id)'
 
 
-def attach_multipart_groups(contract: WebContract, rows) -> None:
-    """Annotate list cards with one derived multipart release, without ledger writes."""
+def attach_multipart_groups(contract: WebContract, rows, orient: str | None = None) -> None:
+    """Annotate list cards with one derived multipart release, without ledger writes.
+
+    按画幅筛的列表（`orient`，首页竖屏带与显式筛竖屏）里，卷数、成员与合计只算同画幅的
+    那几卷：FC2-PPV-3189161 前三卷横屏、后两卷竖屏，竖屏列表里的卡写「2 卷」和两卷的合计。
+    只剩一卷同画幅时 `count` 为 1，卡片按单卷画。`key` 与 `seed_id` 仍是整部作品的，
+    折叠去重与分卷队列认同一部作品。
+    """
     if not rows:
         return
     groups = _parts_by_asset(contract)
@@ -820,14 +829,16 @@ def attach_multipart_groups(contract: WebContract, rows) -> None:
         group = _live_parts(all_parts)
         if not any(item["id"] == row["id"] for item in group):
             continue
+        shown = [item for item in group if item.get("ctx_orient") == orient] if orient else group
+        shown = shown or group
         row["part_group"] = {
             "key": key,
             "title": code or str(row.get("code") or "分卷作品"),
-            "count": len(group),
+            "count": len(shown),
             "seed_id": group[0]["id"],
-            "item_ids": [item["id"] for item in group],
-            "total_duration": sum(float(item.get("duration") or 0) for item in group),
-            "total_size": sum(int(item.get("size") or 0) for item in group),
+            "item_ids": [item["id"] for item in shown],
+            "total_duration": sum(float(item.get("duration") or 0) for item in shown),
+            "total_size": sum(int(item.get("size") or 0) for item in shown),
         }
 
 

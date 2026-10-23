@@ -213,7 +213,8 @@ export function CatalogListPage(props: CatalogGridProps) {
 
 function ListIdentity({ item, props, disabled }: { item: MediaItem; props: CatalogGridProps; disabled: boolean }) {
   const artwork = cardArtwork(item, 'small', false, props.layout.javImage);
-  const parts = item.part_group || null;
+  /* 与卡片同一判据：按画幅筛时组里只剩这一卷，就按单个文件写。 */
+  const parts = Number(item.part_group?.count) > 1 ? item.part_group || null : null;
   const editions = item.edition_group || null;
   const rawName = parts?.title || item.name || '';
   const name = props.helpers.displayName(item, rawName).trim() || '未命名作品';

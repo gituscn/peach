@@ -3245,6 +3245,27 @@ class DuplicateDetectionTests(unittest.TestCase):
         self.assertEqual(result["work_total"], 1)
         self.assertEqual({row["part_group"]["count"] for row in result["items"]}, {2})
 
+    def test_orientation_filtered_list_counts_only_volumes_of_that_orientation(self):
+        """FC2-PPV-3189161 前三卷横屏、后两卷竖屏：竖屏列表的卡只算两卷竖屏，队列仍是整部作品。"""
+        ids = [self.add("FC2-PPV-3189161", 600 + n, 1_000 * n, name=f"FC2-3189161-{n}.mp4") for n in range(1, 6)]
+        lone = [self.add("FC2-PPV-4028828", 1000 + n, 2_000, name=f"FC2-4028828-{n}.mp4") for n in (1, 2)]
+        for asset_id, orient in zip(ids + lone, ["横屏"] * 3 + ["竖屏"] * 2 + ["横屏", "竖屏"]):
+            self.con.execute("UPDATE asset SET ctx_orient=? WHERE id=?", (orient, asset_id))
+        self.con.commit()
+
+        portrait = rm_web.q_items(self.contract, {"orient": "竖屏", "limit": "10"})["items"]
+        groups = {row["id"]: row["part_group"] for row in portrait}
+        self.assertEqual(set(groups), {ids[3], ids[4], lone[1]})
+        self.assertEqual(groups[ids[3]], {
+            "key": "FC2-PPV-3189161", "title": "FC2-PPV-3189161", "count": 2, "seed_id": ids[0],
+            "item_ids": [ids[3], ids[4]], "total_duration": 604 + 605, "total_size": 4_000 + 5_000,
+        })
+        self.assertEqual((groups[lone[1]]["count"], groups[lone[1]]["item_ids"]), (1, [lone[1]]))
+
+        everything = rm_web.q_items(self.contract, {"q": "FC2-PPV-3189161", "limit": "10"})["items"]
+        self.assertEqual({row["part_group"]["count"] for row in everything}, {5}, "不按画幅筛时仍是整组")
+        self.assertEqual(len(rm_web.q_parts(self.contract, {"id": str(ids[3])})["items"]), 5)
+
     def test_a_lone_live_volume_is_a_single_card_and_queue(self):
         """FC2 合集第 3 卷进了回收站，在库的只剩第 1 卷：照单个文件摆，队列不收回收站那卷。"""
         first = self.add("FC2-PPV-3312576", 1800, 1_000_000_000, name="FC2-PPV-3312576-1.mp4")

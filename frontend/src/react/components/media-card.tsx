@@ -218,7 +218,8 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
     if (el && (!current.medium || current.medium === 'video')) wireHover(el, current);
   }, []);
 
-  const parts = grouped ? item.part_group || null : null;
+  /* 按画幅筛的列表里，接口只算同画幅的卷，组可能只剩一卷：那张卡就是这一卷自己，不叠纸边、不标卷数。 */
+  const parts = grouped && Number(item.part_group?.count) > 1 ? item.part_group || null : null;
   const editions = grouped ? item.edition_group || null : null;
   const stacked = !!(parts || editions);
   const jav = layout.active && !!item.is_jav;
