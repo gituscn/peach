@@ -45,6 +45,7 @@ export interface OnlineTag {
 export interface OnlineTagsPage {
   items: OnlineTag[];
   has_more: boolean;
+  total?: number;
   categories?: Record<string, number>;
 }
 

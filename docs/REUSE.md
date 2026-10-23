@@ -71,6 +71,8 @@ React 页面复用 `EmptyState`，HTML 页面复用 `emptyStateHtml`。图标统
 
 ## 标签身份与管理
 
+标签浏览与管理复用 `DataTableFooter` 和既有页码算法，每页默认 100 个，可选 50、100、200 个；`useTagPagination` 统一筛选重置与页码边界。搜索输入复用 `IndexSearch`，标签正文与页脚的占位复用 `tagSkeletonHtml`。本地和在线详情的选择器通过 `useOverlayScrollbar` 接入既有覆盖轨道，搜索标题与滚动正文分层，不新增依赖。
+
 标签复用 `entities.merge_entity`、实体别名、兼容投影、SQLite 事务及在线备份。字符宽度归一使用 Python 标准库 `unicodedata.normalize('NFKC', ...)`；同义词和用户别名属于 Peach 的身份规则。当前树、标签改名脚本与 Git 历史提供了关系迁移能力，无需引入通用模糊匹配库；语义近似不足以自动合并。隔离用例覆盖重叠关系、来源证据、隐藏偏好、旧名入库、过期计划和备份。
 
 页面复用已安装的 React Aria 1.22.1、BoardUI Button/Input/Select、标签云和选择操作条。编辑字段沿用同步任务表单的 React portal 接法，外壳共用 `formModal` 与 `confirmModal`，按顺序打开。没有新增依赖。

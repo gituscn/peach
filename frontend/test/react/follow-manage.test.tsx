@@ -134,7 +134,7 @@ function serve(plan: Plan = {}) {
       const q = new URL(url, 'http://peach.test').searchParams.get('q') || '';
       return ok(await (plan.suggest ? plan.suggest(q) : { q, groups: [] }));
     }
-    if (url.startsWith('/api/tag-management')) return ok({ items: [], duplicate_groups: [] });
+    if (url.startsWith('/api/tag-management')) return ok({ items: [], total:0, categories:{}, duplicate_groups: [] });
     if (url.startsWith(FOLLOW_URL)) return ok(plan.data ?? follow());
     throw new Error(`没有安排这个端点：${url}`);
   });

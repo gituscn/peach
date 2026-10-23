@@ -20,6 +20,8 @@ describe('标签管理的完整操作', () => {
         assert.equal((await page.request.post(`${origin}/api/item-tag`, { data: { id, operation: 'add', tag } })).status(), 200);
       }
       await page.reload();
+      await page.locator('[data-index-head] input[type="search"]').fill(suffix);
+      await page.locator('[data-index-head] input[type="search"]').press('Enter');
       await page.getByRole('button', { name: '管理标签', exact: true }).click();
       assert.equal(await page.locator('[data-index-head] input[type="search"]').count(), 1);
       assert.equal(await page.locator('[data-tag-manager] input[type="search"]').count(), 0);

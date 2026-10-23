@@ -753,7 +753,7 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
       }));
       const release = await holdApi(page);
       await page.reload({ waitUntil: 'load' });
-      await page.locator('#index [data-skeleton^="index/tags/"]').waitFor({ timeout: 15_000 });
+      await page.locator('#index [data-skeleton^="tags/"]').waitFor({ timeout: 15_000 });
       const measure = (glass: string, group: string, view: string) => page.evaluate(([glassSelector, groupSelector, viewSelector]) => {
         const rect = (selector: string) => {
           const box = document.querySelector(selector)?.getBoundingClientRect();
@@ -765,7 +765,7 @@ describe('设计决定：设置、口味、统计与筛选玻璃', () => {
           pills: document.querySelectorAll(`${glassSelector} [data-filter-row="top"] > *`).length,
           view: rect(`${glassSelector} [data-filter-row="bottom"] ${viewSelector}`) };
       }, [glass, group, view] as const);
-      const skeleton = await measure('#index .board-filter-frame', '#index [data-skeleton] .ui-alphagroup', '.iconswitch');
+      const skeleton = await measure('#index [data-filter-glass]', '#index [data-skeleton] section', '.iconswitch');
       release();
       await page.locator('#index [data-alphabet]').waitFor({ timeout: 15_000 });
       await settle(page);

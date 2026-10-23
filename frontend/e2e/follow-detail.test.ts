@@ -90,6 +90,14 @@ describe('关注详情岛', () => {
         assert.equal(appearance.background, appearance.expected);
         assert.equal(appearance.blur, 'none');
         assert.ok(appearance.icons.every(icon => icon.fill === 'none' && icon.stroke !== 'none'));
+        const scrollbar = await menu.locator('[data-tag-body]').evaluate(node => ({
+          hidden:getComputedStyle(node).scrollbarWidth,
+          track:!!node.parentElement?.querySelector('.ovtrack.ov-y'),
+          positioned:getComputedStyle(node.parentElement!).position,
+        }));
+        assert.equal(scrollbar.hidden, 'none');
+        assert.equal(scrollbar.track, true);
+        assert.equal(scrollbar.positioned, 'relative');
       } finally { await opened.close(); }
     });
 

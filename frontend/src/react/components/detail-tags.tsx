@@ -8,6 +8,7 @@ import { apiGet } from '../../api';
 import { pickerSections, recentTags, type DetailTag, type TagCount } from '../item-detail/item-detail';
 import { TagEditor, type ManagedTag, type TagScope } from '../index/tag-operations';
 import { Note } from './note';
+import { useOverlayScrollbar } from './overlay-scrollbar';
 import { useAction, busyProps } from '../settings/use-action';
 import { queryClient } from '../query';
 
@@ -59,6 +60,7 @@ export function DetailTags({ tags, candidates, scope = 'local', id, adding, labe
 function TagPicker({ tags, candidates, label, onAdd, adding, scope, onOpen, loading }: Pick<DetailTagsProps, 'tags' | 'candidates' | 'label' | 'onAdd' | 'adding' | 'scope'> & { onOpen():void; loading:boolean }) {
   const plus = useRef<HTMLButtonElement>(null);
   const picker = useRef<HTMLDivElement>(null);
+  const body = useOverlayScrollbar<HTMLDivElement>();
   const search = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
   const [open, setOpen] = useState(false);
@@ -86,7 +88,7 @@ function TagPicker({ tags, candidates, label, onAdd, adding, scope, onOpen, load
       current.onOpen();
       if (!current.query.trim() || current.tags.some(tag => foldName(tag.k) === foldName(current.query.trim()))) { setQuery(''); setTerm('') }
       setActive(-1);
-      requestAnimationFrame(() => search.current?.focus());
+      requestAnimationFrame(() => search.current?.focus({ preventScroll:true }));
     };
     button.addEventListener('click', opened);
     const observer = new MutationObserver(() => setOpen(control.isOpen()));
@@ -152,7 +154,7 @@ function TagPicker({ tags, candidates, label, onAdd, adding, scope, onOpen, load
             onCompositionStart={() => { composing.current = true }}
             onCompositionEnd={(event) => { composing.current = false; setTerm(event.currentTarget.value) }} onKeyDown={keydown} />
         </label>
-        <div id="tagPickBody" data-tag-body="">
+        <div data-tag-scroll-frame=""><div ref={body} id="tagPickBody" data-tag-body="">
           {open && sections.recent.length ? (
             <section data-tag-section=""><h4>最近使用</h4><div data-tag-grid="">{sections.recent.map(button)}</div></section>
           ) : null}
@@ -174,7 +176,7 @@ function TagPicker({ tags, candidates, label, onAdd, adding, scope, onOpen, load
               </div>
             </section>
           ) : null}
-        </div>
+        </div></div>
       </div>
     </>
   );
