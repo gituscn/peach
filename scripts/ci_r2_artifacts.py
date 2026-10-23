@@ -106,17 +106,25 @@ def inventory(root: Path, group: str) -> list[dict]:
     if not items or len({item["path"].casefold() for item in items}) != len(items):
         raise ValueError("产物清单为空或包含跨平台同名文件")
     if group == "macos-release":
+        build = identity()
         for arch in ("arm64", "x86_64"):
-            if sum(item["path"].startswith(f"dist/macos.noindex/{arch}/") for item in items) != 3:
-                raise ValueError("每种 macOS 架构须包含 DMG、构建身份与 SHA-256 清单")
             folder = root / "dist/macos.noindex" / arch
-            info = json.loads((folder / "build-info.json").read_text(encoding="utf-8"))
-            build = identity()
             image = folder / f"Peach-{build['tag'][1:]}-macos-{arch}.dmg"
+            # 镜像随包带 FFmpeg 与 untrunc，许可证要求同时提供对应源码；清单逐个列出这三份。
+            listed = {image.name} | {f"{tool}-macos-{arch}-corresponding-source.zip" for tool in ("ffmpeg", "untrunc")}
+            present = {PurePosixPath(item["path"]).name for item in items
+                       if item["path"].startswith(f"dist/macos.noindex/{arch}/")}
+            if present != listed | {"build-info.json", "SHA256SUMS.txt"}:
+                raise ValueError("每种 macOS 架构须包含 DMG、两份对应源码、构建身份与 SHA-256 清单")
+            info = json.loads((folder / "build-info.json").read_text(encoding="utf-8"))
+            sums = {}
+            for line in (folder / "SHA256SUMS.txt").read_text(encoding="utf-8").splitlines():
+                digest, _, name = line.partition("  ")
+                sums[name] = digest
             if (info.get("commit") != build["commit"] or info.get("version") != build["tag"][1:]
                     or info.get("architecture") != arch or info.get("dirty") is not False
-                    or not image.is_file()
-                    or (folder / "SHA256SUMS.txt").read_text(encoding="utf-8").strip() != f"{checksum(image)}  {image.name}"):
+                    or set(sums) != listed
+                    or any(sums[name] != checksum(folder / name) for name in listed)):
                 raise ValueError("macOS 构建身份或镜像 SHA-256 不符")
     return items
 

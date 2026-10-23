@@ -4891,12 +4891,20 @@ class R2ArtifactTransferTests(unittest.TestCase):
                 (folder / "Peach.app/app").write_bytes(b"expanded application")
                 (folder / "build-info.json").write_text(json.dumps({"version": "1.2.3", "commit": "a" * 40,
                                                                     "architecture": arch, "dirty": False}))
-                (folder / "SHA256SUMS.txt").write_text(f"{module.checksum(image)}  {image.name}\n")
+                sources = [folder / f"{tool}-macos-{arch}-corresponding-source.zip" for tool in ("ffmpeg", "untrunc")]
+                for source in sources:
+                    source.write_bytes(b"corresponding source " + source.name.encode())
+                # 与 `ci_macos.sh` 写出的清单同形：镜像一行，对应源码各一行。
+                (folder / "SHA256SUMS.txt").write_text(
+                    "".join(f"{module.checksum(path)}  {path.name}\n" for path in (image, *sources)))
             items = module.inventory(root, "macos-release")
-            self.assertEqual(len(items), 6)
+            self.assertEqual(len(items), 10)
             self.assertFalse(any(".app/" in item["path"] for item in items))
-            image.write_bytes(b"tampered application")
+            sources[0].write_bytes(b"tampered source")
             with self.assertRaisesRegex(ValueError, "SHA-256"):
+                module.inventory(root, "macos-release")
+            sources[0].unlink()
+            with self.assertRaisesRegex(ValueError, "对应源码"):
                 module.inventory(root, "macos-release")
 
     def test_rclone_path_requires_installed_project_tool(self):
