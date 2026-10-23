@@ -895,6 +895,80 @@ class WebDataTests(unittest.TestCase):
             restarted = get()
         self.assertEqual((restarted["marker"], restarted["stale"]), ("second", False))
 
+    def _taste_contract(self):
+        store_root = Path(self.tmp.name).resolve() / "taste-history"
+        store_root.mkdir()
+        self.addCleanup(web_stats._TASTE_SNAPSHOTS.clear)
+        return rm_web.WebContract(
+            Path(self.db_path), avatar_root=self.avatars, logo_root=self.logos,
+            taste_history_store=store_root / "history.sqlite",
+            taste_history_import_root=store_root / "imports",
+            taste_history_manifest=store_root / "manifest.json")
+
+    def test_a_failed_taste_rebuild_backs_off_and_says_so_until_retried(self):
+        """重算失败后同一份输入不再每次请求都重算：回上一份并带上失败原因，页面据此停止
+        轮询；点重试或输入再变才重算。一份结果都没有时照旧抛出那次的错误。"""
+        contract = self._taste_contract()
+        real = web_stats.q_taste
+
+        def get(**args):
+            return rm_web.dispatch_api_get(contract, "/api/taste", {"window": "all", **args})
+
+        first = get()
+        self.assertNotIn("error", first)
+        with contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET play_count=3 WHERE id=1")
+        failing = mock.Mock(side_effect=RuntimeError("账本读取失败"))
+        with mock.patch.object(web_stats, "q_taste", failing):
+            failed = get()
+            self.assertEqual((failed["stale"], failed["error"], failed["computed_at"]),
+                             (True, "账本读取失败", first["computed_at"]))
+            self.assertEqual(get()["error"], "账本读取失败")
+            self.assertEqual(failing.call_count, 1, "退避期内同一份输入不再重算")
+            later = web_stats.time.monotonic() + web_stats.TASTE_RETRY_AFTER + 1
+            with mock.patch.object(web_stats.time, "monotonic", return_value=later):
+                get()
+            self.assertEqual(failing.call_count, 2)
+        with mock.patch.object(web_stats, "q_taste", side_effect=real):
+            retried = get(retry="1")
+        self.assertEqual(retried["stale"], False)
+        self.assertNotIn("error", retried)
+
+        web_stats._TASTE_SNAPSHOTS.clear()
+        web_stats._taste_snapshot_path(contract, "all").unlink()
+        failing = mock.Mock(side_effect=RuntimeError("账本读取失败"))
+        with mock.patch.object(web_stats, "q_taste", failing):
+            for _ in range(2):
+                with self.assertRaisesRegex(RuntimeError, "账本读取失败"):
+                    get()
+        self.assertEqual(failing.call_count, 1)
+
+    def test_a_taste_snapshot_saved_by_older_code_is_rebuilt_after_an_upgrade(self):
+        """落盘快照的版本带代码指纹：升级之后、账本还没写过之前，旧代码算的那份不算新鲜。"""
+        from peach import taste_preferences
+        contract = self._taste_contract()
+        real = web_stats.q_taste
+        get = lambda: rm_web.dispatch_api_get(contract, "/api/taste", {"window": "all"})  # noqa: E731
+        with mock.patch.object(web_stats, "q_taste",
+                               side_effect=lambda c, a: {**real(c, a), "marker": "old"}):
+            self.assertEqual(get()["marker"], "old")
+        web_stats._TASTE_SNAPSHOTS.clear()
+        with mock.patch.object(taste_preferences, "_policy_fingerprint", return_value="upgraded"), \
+                mock.patch.object(web_stats, "q_taste",
+                                  side_effect=lambda c, a: {**real(c, a), "marker": "new"}):
+            upgraded = get()
+        self.assertEqual((upgraded["marker"], upgraded["stale"]), ("new", False))
+
+    def test_taste_snapshot_ignores_ledger_writes_outside_its_tables(self):
+        """看板只认它读的那几张表：关注检查、任务状态这类写入不让它重算。"""
+        contract = self._taste_contract()
+        get = lambda: rm_web.dispatch_api_get(contract, "/api/taste", {"window": "all"})  # noqa: E731
+        get()
+        with contract.write_transaction() as connection:
+            connection.execute("INSERT INTO search_history(query,last_used_at) VALUES('足交','2026-08-20')")
+        with mock.patch.object(web_stats, "q_taste", side_effect=AssertionError("无关写入不该重算")):
+            self.assertFalse(get()["stale"])
+
     def test_items_can_skip_repeated_total_count_on_later_pages(self):
         result = rm_web.q_items(
             self.contract, {"limit": "1", "offset": "0", "count": "0"},

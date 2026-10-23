@@ -66,6 +66,14 @@ FAVICON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect wi
 
 CACHE_TTL = 90
 
+#: 目录时间距今不足这么久算「还在写」，那时扫出的目录索引只缓存 `SETTLE_TTL` 秒。
+#: 见 `WebContract._directory_index`。
+SETTLE_SECONDS = 2
+SETTLE_TTL = 1.0
+
+#: `cached()` 的聚合缓存最多留这么多个键，最久没用的先淘汰。
+CACHE_KEYS = 192
+
 
 def path_version(path: Path) -> int | None:
     """文件或目录的修改时间，缓存键拿它认「变了没有」；不存在就是 None。
@@ -265,8 +273,13 @@ class WebContract:
                 # 宁可下次重算，也不要把一份已经旧了的数据当新的用。
                 self.cache[key] = (now, version, value)
                 self.cache.move_to_end(key)
-                while len(self.cache) > 192:
-                    self.cache.popitem(last=False)
+                while len(self.cache) > CACHE_KEYS:
+                    evicted, _ = self.cache.popitem(last=False)
+                    # 键空间不封闭的聚合（按作者、按筛选口径）的锁和登记跟着结果一起走，
+                    # 否则这两份只增不减。正被别的线程拿着的锁摘掉也无妨，持有者手里还有它；
+                    # 同键再来时 `cached_until_changed` 会重新登记。
+                    self.revision_cache_keys.discard(evicted)
+                    self.aggregate_locks.pop(evicted, None)
         return value
 
     def cached_lru(self, key, fn, *, maxsize: int = 192, ttl: float = CACHE_TTL):
@@ -401,14 +414,29 @@ class WebContract:
         索引只认封面目录的修改时间，不随账本提交失效，也不按时间过期：重建要读两千多份
         边车，约一秒。封面与边车的写入方（`cover_artwork.install_cover`、
         `jav_poster_crop.write_sidecar`）都先写临时文件再换名，新增、替换、删除都会改
-        目录时间。目录不存在时退回 `CACHE_TTL`。
+        目录时间。目录不存在时退回 `CACHE_TTL`。刚写过的目录见 `_directory_index`。
         """
-        version = path_version(self.cover_root)
+        return self._directory_index("cover-index", self.cover_root, self._scan_cover_root,
+                                     ttl=math.inf)
+
+    def _directory_index(self, key: str, root: Path, scan, *, ttl: float):
+        """按目录修改时间缓存的一次目录扫描；目录不存在时退回 `CACHE_TTL`。
+
+        目录时间取自文件系统的时钟刻度（NTFS 约 15 ms），装图的一连串换名可能落在同一
+        刻度里：读者在两次换名之间扫到的半成品，和换完之后的目录时间相同。所以照 Git 判
+        「新近修改」的做法，目录时间距今不足 `SETTLE_SECONDS` 时扫出的结果只按
+        `SETTLE_TTL` 缓存，版本里另记一档，目录静下来之后重扫一次才按 `ttl` 缓存。
+        `ttl` 为无穷时这一份不随提交通知清掉。
+        """
+        version = path_version(root)
         if version is None:
-            return self.cached("cover-index", self._scan_cover_root, version=None)
-        with self.cache_lock:
-            self.revision_cache_keys.add("cover-index")
-        return self.cached("cover-index", self._scan_cover_root, ttl=math.inf, version=version)
+            return self.cached(key, scan, version=None)
+        if ttl == math.inf:
+            with self.cache_lock:
+                self.revision_cache_keys.add(key)
+        settling = time.time_ns() - version < SETTLE_SECONDS * 1_000_000_000
+        return self.cached(key, scan, ttl=SETTLE_TTL if settling else ttl,
+                           version=(version, settling))
 
     def _scan_cover_root(self) -> dict[str, dict]:
         """一次目录扫描同时收集封面存在性和两份 sidecar。目录不存在就是空索引。"""
@@ -490,10 +518,11 @@ class WebContract:
         敏感、同样把 `.icon` / `.logo` 变体算作这个厂牌有图。松一格就是页面说有图却
         取回 404（碎图），紧一格就是明明装了却永远只显示首字母。
 
-        键里和 `cover_index()` 一样带目录的修改时间，刚装上的标识立刻进索引。
+        键里和 `cover_index()` 一样带目录的修改时间，刚装上的标识立刻进索引；刚写过的
+        目录见 `_directory_index`。
         """
-        return self.cached("logo-index", self._scan_logo_root,
-                           version=path_version(self.logo_root))
+        return self._directory_index("logo-index", self.logo_root, self._scan_logo_root,
+                                     ttl=CACHE_TTL)
 
     def _scan_logo_root(self) -> Mapping[str, str]:
         """一次目录扫描收齐已装标识，并入随仓库分发的那批（ADR-0026）。
@@ -550,10 +579,10 @@ class WebContract:
         所以一次 `os.scandir` 一起收；分成两个缓存键就是同一个目录连扫两遍。
 
         键里和 `cover_index()` 一样带目录的修改时间，刚装上的实体图立刻进索引，
-        口味与复核按头像目录版本重算时拿到的也是这一份。
+        口味与复核按头像目录版本重算时拿到的也是这一份；刚写过的目录见 `_directory_index`。
         """
-        return self.cached("avatar-root-index", self._scan_avatar_root,
-                           version=path_version(self.avatar_root))
+        return self._directory_index("avatar-root-index", self.avatar_root, self._scan_avatar_root,
+                                     ttl=CACHE_TTL)
 
     def _scan_avatar_root(self) -> AvatarRootIndex:
         """一次目录扫描同时收齐实体图和已裁头像。目录不存在就是两个空集合。

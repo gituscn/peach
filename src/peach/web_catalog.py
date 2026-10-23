@@ -1293,9 +1293,10 @@ def q_tops(contract: WebContract, n=28, jav=False, seed="", state="", page=0, fi
 
 
 #: 筛选项读到的账本表（不含实体范围与搜索词那几条分支，它们不走按版本的缓存）：
-#: 作品与实体、标签隐藏偏好、「已标记」「稍后看」两种状态，以及在线卡片的关注标签。
-FACETS_TABLES = GROUP_TABLES + ("asset_tag_preference", "asset_preference", "watch_queue",
-                                "follow_item", "follow_source")
+#: 作品与实体、标签隐藏偏好与标签实体的别名（`tag_not_hidden`）、「已标记」「稍后看」两种
+#: 状态，以及在线卡片的关注标签。
+FACETS_TABLES = GROUP_TABLES + ("entity_alias", "asset_tag_preference", "asset_preference",
+                                "watch_queue", "follow_item", "follow_source")
 
 
 def q_facets(

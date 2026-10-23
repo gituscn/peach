@@ -259,7 +259,8 @@ def _get_search_history(contract, args):
 
 
 def _get_taste(contract, args):
-    return taste_snapshot(contract, str(args.get("window") or "all"))
+    return taste_snapshot(contract, str(args.get("window") or "all"),
+                          retry=str(args.get("retry") or "") == "1")
 
 
 def _get_review(contract, args):

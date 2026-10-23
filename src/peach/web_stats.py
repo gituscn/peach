@@ -76,8 +76,18 @@ def taste_inputs(contract: WebContract, window: str) -> tuple:
 TASTE_FRESH_WAIT = 1.0
 
 
+#: 重算失败后，同一份输入在这段时间内不再重算：失败多半是确定性的（库损坏、代码错误），
+#: 页面每两秒一问就每两秒起一趟必然失败的计算。输入变了、或页面点「立即重试」照常重算。
+TASTE_RETRY_AFTER = 300.0
+
+#: 口味看板实际读到的账本表，`test_ledger_revision.DeclaredTablesTests` 用 SQLite 授权回调
+#: 实测核对。长任务写别的表（关注检查、资料处理的状态与任务心跳）不让看板重算。
+TASTE_TABLES = ("asset", "asset_entity", "asset_preference", "entity", "entity_alias",
+                "entity_classification", "entity_link", "follow_source")
+
+
 class _TasteSnapshot:
-    """一个范围最近算出的看板、它对应的输入版本，以及正在后台重算的那一趟。"""
+    """一个范围最近算出的看板、它对应的输入版本、正在后台重算的那一趟，以及最近一次失败。"""
 
     def __init__(self):
         self.version = None
@@ -85,6 +95,9 @@ class _TasteSnapshot:
         self.computed_at: str | None = None
         self.worker: threading.Thread | None = None
         self.error: Exception | None = None
+        #: 最近一次失败对应的输入版本与时刻（`time.monotonic()`）。
+        self.failed_version = None
+        self.failed_at = 0.0
 
 
 _TASTE_SNAPSHOTS: dict[tuple[str, str, str], _TasteSnapshot] = {}
@@ -92,12 +105,15 @@ _TASTE_LOCK = threading.Lock()
 
 
 def _taste_version(contract: WebContract, window: str):
-    """账本版本号加 `taste_inputs`，转成 JSON 再读回，内存与磁盘上的版本才能直接比。"""
-    revision = contract.ledger_revision()
+    """口味依赖表的版本号、代码指纹加 `taste_inputs`，转成 JSON 再读回，内存与磁盘上的
+    版本才能直接比。代码指纹含版本号与口味各模块的源码，升级后落盘的旧快照不算新鲜。"""
+    from .taste_preferences import _policy_fingerprint
+    revision = contract.ledger_revision(TASTE_TABLES)
     if revision is None:
         # 账本还没有版本号时按缓存时效分段，同 `cached_until_changed` 的退路。
         revision = f"ttl:{int(time.time() // CACHE_TTL)}"
-    return json.loads(json.dumps([revision, *taste_inputs(contract, window)], default=str))
+    return json.loads(json.dumps([revision, _policy_fingerprint(), *taste_inputs(contract, window)],
+                                 default=str))
 
 
 def _taste_snapshot_path(contract: WebContract, window: str):
@@ -117,14 +133,15 @@ def _load_taste_snapshot(contract: WebContract, window: str, snapshot: _TasteSna
 def _compute_taste_snapshot(contract: WebContract, window: str, version, snapshot: _TasteSnapshot) -> None:
     try:
         payload = q_taste(contract, {"window": window})
-    except Exception as error:  # 请求线程会把它原样抛给调用方
+    except Exception as error:  # 没有旧结果时请求线程原样抛给调用方，有旧结果时随 stale 下发
         with _TASTE_LOCK:
-            snapshot.error = error
+            snapshot.error, snapshot.failed_version, snapshot.failed_at = (
+                error, version, time.monotonic())
         return
     computed_at = datetime.now(UTC).isoformat()
     with _TASTE_LOCK:
-        snapshot.version, snapshot.payload, snapshot.computed_at, snapshot.error = (
-            version, payload, computed_at, None)
+        snapshot.version, snapshot.payload, snapshot.computed_at = version, payload, computed_at
+        snapshot.error, snapshot.failed_version = None, None
     if contract.taste_history_store.parent.is_dir():
         try:
             atomic_write_text(_taste_snapshot_path(contract, window), json.dumps(
@@ -134,12 +151,15 @@ def _compute_taste_snapshot(contract: WebContract, window: str, version, snapsho
             pass
 
 
-def taste_snapshot(contract: WebContract, window: str) -> dict:
+def taste_snapshot(contract: WebContract, window: str, *, retry: bool = False) -> dict:
     """`/api/taste`：输入版本没变就回现成的看板，变了就在后台重算。
 
     重算在 `TASTE_FRESH_WAIT` 内完成就回新结果；没完成先回上一份，带上 `stale` 与
     `computed_at`，页面据此标出数据时间并稍后再问。一份都没有时等到算完。同一范围同时
     只有一趟在算。
+
+    同一份输入算失败后，`TASTE_RETRY_AFTER` 内不再重算：有旧结果时回旧结果并带 `error`，
+    页面据此停止轮询、给出重试入口；没有旧结果时抛出那次的错误。`retry` 跳过这段等待。
     """
     _taste_since(window)
     version = _taste_version(contract, window)
@@ -149,20 +169,27 @@ def taste_snapshot(contract: WebContract, window: str) -> dict:
         if snapshot is None:
             snapshot = _TASTE_SNAPSHOTS[key] = _TasteSnapshot()
             _load_taste_snapshot(contract, window, snapshot)
-        if snapshot.version != version and not (snapshot.worker and snapshot.worker.is_alive()):
+        if retry:
+            snapshot.failed_version = None
+        failed = (snapshot.failed_version == version
+                  and time.monotonic() - snapshot.failed_at < TASTE_RETRY_AFTER)
+        waiting = snapshot.version != version and not failed
+        if waiting and not (snapshot.worker and snapshot.worker.is_alive()):
             snapshot.worker = threading.Thread(
                 target=_compute_taste_snapshot, args=(contract, window, version, snapshot),
                 name=f"peach-taste-{window}", daemon=True)
             snapshot.worker.start()
-        worker, waiting = snapshot.worker, snapshot.version != version
-        empty = snapshot.payload is None
+        worker, empty = snapshot.worker, snapshot.payload is None
     if waiting:
         worker.join(None if empty else TASTE_FRESH_WAIT)
     with _TASTE_LOCK:
         if snapshot.payload is None:
             raise snapshot.error or RuntimeError("口味分析未取得")
-        return {**snapshot.payload, "computed_at": snapshot.computed_at,
-                "stale": snapshot.version != version}
+        stale = snapshot.version != version
+        result = {**snapshot.payload, "computed_at": snapshot.computed_at, "stale": stale}
+        if stale and snapshot.failed_version == version and snapshot.error is not None:
+            result["error"] = str(snapshot.error) or type(snapshot.error).__name__
+        return result
 
 
 #: 口味榜里会出圆头像的两排，以及页面上读得到它们的那几个榜单键。标签榜和网站榜
@@ -445,9 +472,9 @@ def _replays(c, has_follow: bool) -> list[dict[str, int]]:
     return [{"k": plays, "n": n} for plays, n in sorted(counts.items())]
 
 
-#: 统计页账本那一段读到的表。`tag_not_hidden` 读标签偏好，`tag_is_not_a_performer_name` 读实体，
-#: 在线播放读关注三张表。
-STATS_TABLES = ("asset", "asset_entity", "entity", "asset_tag", "asset_tag_preference",
+#: 统计页账本那一段读到的表。`tag_not_hidden` 读标签偏好与标签实体的别名，
+#: `tag_is_not_a_performer_name` 读实体，在线播放读关注三张表。
+STATS_TABLES = ("asset", "asset_entity", "entity", "entity_alias", "asset_tag", "asset_tag_preference",
                 "asset_preference", "follow_playback", "follow_item", "follow_source")
 
 
