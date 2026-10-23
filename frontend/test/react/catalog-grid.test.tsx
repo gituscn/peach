@@ -423,6 +423,22 @@ describe('作品卡', () => {
     }));
     expect([...versions.host.querySelectorAll('[data-media-group]')].map((node) => node.textContent)).toEqual(['2 个版本']);
     expect(versions.host.querySelector('[data-media-open]')?.getAttribute('aria-label')).toMatch(/版本$/);
+
+    /* 按画幅筛时版本组只剩同画幅的那一个版本：照它的分卷组画，不标版本数。 */
+    const oneVersion = await render(item(17, {
+      part_group: { key: 'P', seed_id: 14, count: 2 },
+      edition_group: { key: 'E', seed_id: 13, count: 1, editions: ['4K 修复'] },
+    }));
+    expect([...oneVersion.host.querySelectorAll('[data-media-group]')].map((node) => node.textContent)).toEqual(['2 卷']);
+  });
+
+  it('竖屏格里的番号封面按大图取景铺满，横格小图版式照旧整张放进去', async () => {
+    const cover = { is_jav: true, code: 'FC2-PPV-3189161', has_cover: true, has_thumb: false };
+    const classes = (host: ParentNode) => host.querySelector('[data-media-art] img')?.className.split(/\s+/).sort();
+    expect(classes((await render(item(20, cover), { variant: 'short' })).host)).toEqual(['cover', 'front', 'poster']);
+    expect(classes((await render(item(21, cover), { layout: { ...SMALL, portrait: true } })).host),
+      '显式筛竖屏的网格也是竖屏格').toEqual(['cover', 'front', 'poster']);
+    expect(classes((await render(item(22, cover))).host)).toEqual(['cover', 'poster', 'whole']);
   });
 
   it('不合并分卷时一卷一张卡：名字、时长写这一卷自己的，不叠纸边、不标卷数，打开时条目原样交出', async () => {

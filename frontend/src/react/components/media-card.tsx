@@ -218,12 +218,17 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
     if (el && (!current.medium || current.medium === 'video')) wireHover(el, current);
   }, []);
 
-  /* 按画幅筛的列表里，接口只算同画幅的卷，组可能只剩一卷：那张卡就是这一卷自己，不叠纸边、不标卷数。 */
+  /* 按画幅筛的列表里，接口只算同画幅的卷与版本，组可能只剩一卷或一个版本：那张卡就是这一个
+     文件自己，不叠纸边、不标卷数或版本数。 */
   const parts = grouped && Number(item.part_group?.count) > 1 ? item.part_group || null : null;
-  const editions = grouped ? item.edition_group || null : null;
+  const editions = grouped && Number(item.edition_group?.count) > 1 ? item.edition_group || null : null;
   const stacked = !!(parts || editions);
   const jav = layout.active && !!item.is_jav;
-  const size = jav ? layout.size : 'small';
+  const ratio = cardRatio(item, variant, layout);
+  /* 竖屏格（竖屏带与筛竖屏的网格）没有竖屏海报时只剩番号官方封面，多是横图。按小图整张放进
+     9:16 会上下各空出一大块底，所以这里一律按大图取景（`front`）：剧照与 FC2 整幅封面按人脸
+     铺满、没检出人脸就居中裁，双页封套只取右侧正封（`coverAnchor`、`posterPanel`）。 */
+  const size = item.is_jav && ratio === PORTRAIT_RATIO ? 'big' : jav ? layout.size : 'small';
   const artwork = cardArtwork(item, size, false, layout.javImage);
   const identity = size === 'small' ? artwork.html : cardArtwork(item, 'small', false, layout.javImage).html;
   const rawName = parts?.title || item.name || '';
@@ -259,7 +264,6 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
     onOpen(item, el);
   };
 
-  const ratio = cardRatio(item, variant, layout);
   const pic = (
     <div data-media-pic="" data-pic-portrait={ratio === PORTRAIT_RATIO ? '' : undefined}
       style={{ '--card-ratio': String(ratio) } as CSSProperties}>

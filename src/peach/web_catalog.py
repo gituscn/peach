@@ -12,6 +12,8 @@ from __future__ import annotations
 import hashlib
 import random
 import time
+from collections.abc import Callable
+
 from . import entities, media_libraries, sample_images, settings_file
 
 from .catalog_rules import (
@@ -334,6 +336,23 @@ def catalog_filter(contract: WebContract, args):
     return where, par
 
 
+def orientation_member(args) -> Callable[[dict], bool] | None:
+    """列表按画幅筛时，分卷、版本组里哪些成员算进这张卡。
+
+    条件与 `catalog_filter` 的画幅那两条逐字对应：显式 `orient` 只算同画幅，首页主网格的
+    `exclude_vertical` 只算非竖屏（未测出画幅的也算）。回收站不按画幅筛，也不收窄。
+    不按画幅筛时返回 None，组照整部作品算。
+    """
+    if args.get("state") == "trash":
+        return None
+    if args.get("orient"):
+        orient = args["orient"]
+        return lambda member: member.get("ctx_orient") == orient
+    if args.get("exclude_vertical") == "1":
+        return lambda member: member.get("ctx_orient") != "竖屏"
+    return None
+
+
 def seeded_order(seed) -> str:
     """按种子打散的 ORDER BY 片段，列名固定是 `a.id`。
 
@@ -437,10 +456,9 @@ def q_items(contract: WebContract, args):
         r.pop("snapshot_path", None)
         r.pop("path", None)                     # 路径不外发，串流走 id
     attach_saved_follow_cards(contract, rows)
-    # 画幅条件和 `catalog_filter` 同一口径：回收站不按画幅筛，卷数也不按画幅收窄。
-    orient = None if args.get("state") == "trash" else args.get("orient") or None
-    attach_multipart_groups(contract, rows, orient=orient)
-    attach_edition_groups(contract, rows)
+    shown = orientation_member(args)
+    attach_multipart_groups(contract, rows, shown)
+    attach_edition_groups(contract, rows, shown)
     return {"total": cnt, "work_total": work_total, "bytes": total_bytes, "items": rows, "has_more": has_more}
 
 def con_tags(contract: WebContract, ids, qm):
@@ -710,11 +728,14 @@ def _derive_edition_groups(contract: WebContract) -> dict[str, list[dict]]:
     return groups
 
 
-def attach_edition_groups(contract: WebContract, rows) -> None:
+def attach_edition_groups(contract: WebContract, rows,
+                          shown: Callable[[dict], bool] | None = None) -> None:
     """给列表卡挂上同番号的版次组，不写账本。
 
     用户实测：`ABF-234` 与 `ABF-234 UN` 是两张并排的卡，`ABF-216` 也是。它们是同一部
     片的两个版次，占两个格子只是让人多滚一屏，还得自己认哪个是无码。
+    按画幅筛的列表里版本数与版本名只算同画幅的文件，口径同 `attach_multipart_groups`；
+    只剩一个版本时 `count` 为 1，卡片不标版本数。`key` 与 `seed_id` 仍是整组的。
     """
     if not rows:
         return
@@ -724,13 +745,15 @@ def attach_edition_groups(contract: WebContract, rows) -> None:
         group = groups.get(code)
         if not group or not any(item["id"] == row["id"] for item in group):
             continue
+        members = [item for item in group if shown(item)] if shown else group
+        members = members or group
         row["edition_group"] = {
             "key": code,
             "title": code or str(row.get("code") or "多版本作品"),
-            "count": len({item['version_id'] for item in group}),
+            "count": len({item['version_id'] for item in members}),
             "seed_id": group[0]["id"],
-            "item_ids": [item["id"] for item in group],
-            "editions": list(dict.fromkeys(item['version_label'] for item in group)),
+            "item_ids": [item["id"] for item in members],
+            "editions": list(dict.fromkeys(item['version_label'] for item in members)),
         }
 
 
@@ -812,13 +835,14 @@ def video_work_key(contract: WebContract, connection) -> str:
     return 'peach_video_work_key(a.id)'
 
 
-def attach_multipart_groups(contract: WebContract, rows, orient: str | None = None) -> None:
+def attach_multipart_groups(contract: WebContract, rows,
+                            shown: Callable[[dict], bool] | None = None) -> None:
     """Annotate list cards with one derived multipart release, without ledger writes.
 
-    按画幅筛的列表（`orient`，首页竖屏带与显式筛竖屏）里，卷数、成员与合计只算同画幅的
-    那几卷：FC2-PPV-3189161 前三卷横屏、后两卷竖屏，竖屏列表里的卡写「2 卷」和两卷的合计。
-    只剩一卷同画幅时 `count` 为 1，卡片按单卷画。`key` 与 `seed_id` 仍是整部作品的，
-    折叠去重与分卷队列认同一部作品。
+    按画幅筛的列表（`shown` 见 `orientation_member`）里，卷数、成员与合计只算同画幅的
+    那几卷：FC2-PPV-3189161 前三卷横屏、后两卷竖屏，竖屏带里的卡写「2 卷」和两卷的合计，
+    首页主网格（排除竖屏）写「3 卷」和三卷的合计。只剩一卷时 `count` 为 1，卡片按单卷画。
+    `key` 与 `seed_id` 仍是整部作品的，折叠去重与分卷队列认同一部作品。
     """
     if not rows:
         return
@@ -829,16 +853,16 @@ def attach_multipart_groups(contract: WebContract, rows, orient: str | None = No
         group = _live_parts(all_parts)
         if not any(item["id"] == row["id"] for item in group):
             continue
-        shown = [item for item in group if item.get("ctx_orient") == orient] if orient else group
-        shown = shown or group
+        members = [item for item in group if shown(item)] if shown else group
+        members = members or group
         row["part_group"] = {
             "key": key,
             "title": code or str(row.get("code") or "分卷作品"),
-            "count": len(shown),
+            "count": len(members),
             "seed_id": group[0]["id"],
-            "item_ids": [item["id"] for item in shown],
-            "total_duration": sum(float(item.get("duration") or 0) for item in shown),
-            "total_size": sum(int(item.get("size") or 0) for item in shown),
+            "item_ids": [item["id"] for item in members],
+            "total_duration": sum(float(item.get("duration") or 0) for item in members),
+            "total_size": sum(int(item.get("size") or 0) for item in members),
         }
 
 
