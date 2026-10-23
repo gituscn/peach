@@ -23,7 +23,7 @@ import { Dialog, Popover } from 'react-aria-components';
 import { MENU_POPOVER_SURFACE } from '@/components/base/dropdown/menu-styles';
 import { cardRatio as layoutRatio } from '@peach/appearance';
 import {
-  cardArtwork, cardIdentity, entityAvatar, performerLabel, relayoutCovers, releaseHover, wireHover,
+  cardArtwork, cardIdentity, entityAvatar, frameArtwork, performerLabel, relayoutCovers, releaseHover, wireHover,
 } from '@peach/card-art';
 import { esc, fmtDur, fmtSize } from '@peach/legacy/core';
 import { spinnerHtml } from '@peach/legacy/ui';
@@ -218,13 +218,20 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
     if (el && (!current.medium || current.medium === 'video')) wireHover(el, current);
   }, []);
 
-  const parts = grouped ? item.part_group || null : null;
-  const editions = grouped ? item.edition_group || null : null;
+  /* 按画幅筛的列表里，接口只算同画幅的卷与版本，组可能只剩一卷或一个版本：那张卡就是这一个
+     文件自己，不叠纸边、不标卷数或版本数。 */
+  const parts = grouped && Number(item.part_group?.count) > 1 ? item.part_group || null : null;
+  const editions = grouped && Number(item.edition_group?.count) > 1 ? item.edition_group || null : null;
   const stacked = !!(parts || editions);
   const jav = layout.active && !!item.is_jav;
+  const ratio = cardRatio(item, variant, layout);
   const size = jav ? layout.size : 'small';
-  const artwork = cardArtwork(item, size, false, layout.javImage);
-  const identity = size === 'small' ? artwork.html : cardArtwork(item, 'small', false, layout.javImage).html;
+  /* 竖屏格（竖屏带与筛竖屏的网格）只展示竖屏比例的视频，卡面只用视频自己的帧图；番号作品也
+     不走官方封面，「JAV 默认封面」设置在这里不起作用：那张封面是整部作品的宣传图，多是横图，
+     和这一卷竖屏视频不是同一个画面。没有帧图就是「无预览」。 */
+  const frameOnly = ratio === PORTRAIT_RATIO && !!item.is_jav;
+  const artwork = frameOnly ? frameArtwork(item, false) : cardArtwork(item, size, false, layout.javImage);
+  const identity = frameOnly || size === 'small' ? artwork.html : cardArtwork(item, 'small', false, layout.javImage).html;
   const rawName = parts?.title || item.name || '';
   const shownName = helpers.displayName(item, rawName).trim() || UNNAMED;
   const titleHtml = helpers.titleHtml(item, rawName).trim() || esc(UNNAMED);
@@ -258,7 +265,6 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
     onOpen(item, el);
   };
 
-  const ratio = cardRatio(item, variant, layout);
   const pic = (
     <div data-media-pic="" data-pic-portrait={ratio === PORTRAIT_RATIO ? '' : undefined}
       style={{ '--card-ratio': String(ratio) } as CSSProperties}>

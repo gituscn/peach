@@ -298,6 +298,13 @@ export function cardArtwork(item: CoverItem & { follow_thumb_url?: string | null
 export function mixFace(item: CoverItem, size: 'big' | 'small', eager: boolean, javImage: unknown): Artwork {
   if (item.is_jav) return javArtwork(item, size, eager, javImage);
   if (item.has_cover && item.cover_key) return { kind: 'cover', html: coverImage(item, size, eager) };
+  return frameArtwork(item, eager);
+}
+
+/** 视频自己的画面：本地预览格切出的帧图。没有帧图就是空，卡片写「无预览」。
+ *  竖屏格（竖屏带与筛竖屏的网格）只展示竖屏比例的视频，番号作品在那里也只用它，不借番号官方
+ *  封面：封面是整部作品的宣传图，多是横图，和这一卷竖屏视频不是同一个画面。 */
+export function frameArtwork(item: CoverItem, eager: boolean): Artwork {
   if (!item.has_thumb && !item.has_local_poster) return NO_ARTWORK;
   return { kind: 'thumb', html: `<img class="poster" src="/poster?id=${item.id}&c=4" width="640" height="360" alt="" loading="${eager ? 'eager' : 'lazy'}" decoding="async">` };
 }

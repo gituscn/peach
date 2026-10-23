@@ -204,6 +204,48 @@ describe('续页', () => {
     queryClient.removeQueries({ queryKey: ['catalog-grid'] });
   });
 
+  /* `orient=竖屏` 的接口形状（`attach_multipart_groups` 按画幅收窄）：FC2-PPV-3189161 五卷里只有
+     后两卷竖屏，组写 2 卷与两卷的合计；FC2-PPV-9 三卷里只有一卷竖屏，组只剩这一卷。 */
+  const mixedGroup = { key: 'FC2-PPV-3189161', seed_id: 1, count: 2, title: 'FC2-PPV-3189161', total_duration: 1500, total_size: 2500 };
+  const loneGroup = { key: 'FC2-PPV-9', seed_id: 7, count: 1, title: 'FC2-PPV-9', total_duration: 300, total_size: 700 };
+  const portraitParts = [
+    item(4, { part_group: mixedGroup, duration: 600, size: 1000 }), item(43),
+    item(5, { part_group: mixedGroup, duration: 900, size: 1500 }),
+    item(9, { name: 'FC2-PPV-9 part3', part_group: loneGroup, duration: 300, size: 700 }),
+  ];
+  const groupBadges = (cards: HTMLElement[]) => cards.map((card) => [
+    card.dataset.id, card.querySelector('[data-media-group]')?.textContent || '',
+    card.querySelector('[data-media-duration]')?.textContent || '', card.hasAttribute('data-stacked'),
+  ]);
+
+  it('竖屏带的整组卡照接口按竖屏卷计卷数与时长；组里只剩一卷竖屏就是普通单卷卡', async () => {
+    vi.stubGlobal('IntersectionObserver', FakeObserver);
+    vi.stubGlobal('fetch', vi.fn((input: string) => {
+      const url = new URL(String(input), 'http://peach.test');
+      const body = url.searchParams.get('orient') === '竖屏'
+        ? { items: portraitParts, total: portraitParts.length, has_more: false }
+        : { items: [1, 2, 3].map((n) => item(n)), total: 3, has_more: false };
+      return Promise.resolve(reply(body));
+    }));
+    const shorts = (host: ParentNode) => [...host.querySelectorAll<HTMLElement>('[data-shorts-row] [data-media-card]')];
+    for (const collapse of [true, false]) {
+      const host = await mount(<QueryClientProvider client={queryClient}>
+        <CatalogGridPage {...props({ sort: 'seed', q: `竖屏带只算竖屏卷 ${collapse}` })} shorts groupCollapse={collapse} />
+      </QueryClientProvider>);
+      await until(() => shorts(host).length > 0, '竖屏带插进网格');
+      if (collapse) {
+        expect(groupBadges(shorts(host))).toEqual([
+          ['4', '2 卷', '25:00', true], ['43', '', '—', false], ['9', '', '5:00', false],
+        ]);
+      } else {
+        expect(groupBadges(shorts(host)), '合并关着各竖屏卷各自成卡').toEqual([
+          ['4', '', '10:00', false], ['43', '', '—', false], ['5', '', '15:00', false], ['9', '', '5:00', false],
+        ]);
+      }
+    }
+    queryClient.removeQueries({ queryKey: ['catalog-grid'] });
+  });
+
   it('一趟续页没接上新页时，哨兵按它此刻的位置再判一遍，还在视口附近就接着取', async () => {
     vi.stubGlobal('IntersectionObserver', FakeObserver);
     const load = vi.fn(async () => {});
@@ -381,6 +423,27 @@ describe('作品卡', () => {
     }));
     expect([...versions.host.querySelectorAll('[data-media-group]')].map((node) => node.textContent)).toEqual(['2 个版本']);
     expect(versions.host.querySelector('[data-media-open]')?.getAttribute('aria-label')).toMatch(/版本$/);
+
+    /* 按画幅筛时版本组只剩同画幅的那一个版本：照它的分卷组画，不标版本数。 */
+    const oneVersion = await render(item(17, {
+      part_group: { key: 'P', seed_id: 14, count: 2 },
+      edition_group: { key: 'E', seed_id: 13, count: 1, editions: ['4K 修复'] },
+    }));
+    expect([...oneVersion.host.querySelectorAll('[data-media-group]')].map((node) => node.textContent)).toEqual(['2 卷']);
+  });
+
+  it('竖屏格的番号作品只用视频帧图，不用番号封面：没有帧图就是「无预览」；横格照旧按封面设置出图', async () => {
+    const cover = { is_jav: true, code: 'FC2-PPV-3189161', has_cover: true, has_thumb: false };
+    const pictureOf = (host: ParentNode) => {
+      const img = host.querySelector('[data-media-art] img');
+      return img ? img.getAttribute('src') : host.querySelector('[data-media-nopic]')?.textContent;
+    };
+    const portraitGrid = { ...SMALL, portrait: true };
+    expect(pictureOf((await render(item(20, cover), { variant: 'short' })).host)).toBe('无预览');
+    expect(pictureOf((await render(item(21, cover), { layout: portraitGrid })).host), '显式筛竖屏的网格也是竖屏格').toBe('无预览');
+    expect(pictureOf((await render(item(23, { ...cover, has_thumb: true }), { variant: 'short' })).host),
+      '封面设置为官方封面时竖屏格照样用帧图').toBe('/poster?id=23&c=4');
+    expect(pictureOf((await render(item(22, cover))).host)).toMatch(/^\/cover\?code=FC2-PPV-3189161/);
   });
 
   it('不合并分卷时一卷一张卡：名字、时长写这一卷自己的，不叠纸边、不标卷数，打开时条目原样交出', async () => {

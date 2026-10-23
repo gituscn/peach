@@ -3245,6 +3245,37 @@ class DuplicateDetectionTests(unittest.TestCase):
         self.assertEqual(result["work_total"], 1)
         self.assertEqual({row["part_group"]["count"] for row in result["items"]}, {2})
 
+    def test_orientation_filtered_list_counts_only_volumes_of_that_orientation(self):
+        """FC2-PPV-3189161 前三卷横屏、后两卷竖屏：竖屏列表只算两卷竖屏，排除竖屏的首页主网格
+        只算三卷横屏，队列仍是整部作品。"""
+        ids = [self.add("FC2-PPV-3189161", 600 + n, 1_000 * n, name=f"FC2-3189161-{n}.mp4") for n in range(1, 6)]
+        lone = [self.add("FC2-PPV-4028828", 1000 + n, 2_000, name=f"FC2-4028828-{n}.mp4") for n in (1, 2)]
+        for asset_id, orient in zip(ids + lone, ["横屏"] * 3 + ["竖屏"] * 2 + ["横屏", "竖屏"]):
+            self.con.execute("UPDATE asset SET ctx_orient=? WHERE id=?", (orient, asset_id))
+        self.con.commit()
+
+        portrait = rm_web.q_items(self.contract, {"orient": "竖屏", "limit": "10"})["items"]
+        groups = {row["id"]: row["part_group"] for row in portrait}
+        self.assertEqual(set(groups), {ids[3], ids[4], lone[1]})
+        self.assertEqual(groups[ids[3]], {
+            "key": "FC2-PPV-3189161", "title": "FC2-PPV-3189161", "count": 2, "seed_id": ids[0],
+            "item_ids": [ids[3], ids[4]], "total_duration": 604 + 605, "total_size": 4_000 + 5_000,
+        })
+        self.assertEqual((groups[lone[1]]["count"], groups[lone[1]]["item_ids"]), (1, [lone[1]]))
+
+        landscape = rm_web.q_items(self.contract, {"exclude_vertical": "1", "limit": "10"})["items"]
+        groups = {row["id"]: row["part_group"] for row in landscape}
+        self.assertEqual(set(groups), {*ids[:3], lone[0]})
+        self.assertEqual(groups[ids[0]], {
+            "key": "FC2-PPV-3189161", "title": "FC2-PPV-3189161", "count": 3, "seed_id": ids[0],
+            "item_ids": ids[:3], "total_duration": 601 + 602 + 603, "total_size": 1_000 + 2_000 + 3_000,
+        })
+        self.assertEqual(groups[lone[0]]["count"], 1)
+
+        everything = rm_web.q_items(self.contract, {"q": "FC2-PPV-3189161", "limit": "10"})["items"]
+        self.assertEqual({row["part_group"]["count"] for row in everything}, {5}, "不按画幅筛时仍是整组")
+        self.assertEqual(len(rm_web.q_parts(self.contract, {"id": str(ids[3])})["items"]), 5)
+
     def test_a_lone_live_volume_is_a_single_card_and_queue(self):
         """FC2 合集第 3 卷进了回收站，在库的只剩第 1 卷：照单个文件摆，队列不收回收站那卷。"""
         first = self.add("FC2-PPV-3312576", 1800, 1_000_000_000, name="FC2-PPV-3312576-1.mp4")
@@ -3748,6 +3779,22 @@ class CatalogVersionTests(unittest.TestCase):
         self.assertEqual({row['edition_group']['count'] for row in result['items']}, {2})
         self.assertEqual([row['id'] for row in q_parts(self.contract, {'id': 2})['items']], [1, 2])
         self.assertEqual([row['id'] for row in q_parts(self.contract, {'id': 4})['items']], [3, 4])
+
+    def test_orientation_filtered_list_counts_only_versions_of_that_orientation(self):
+        """整片横屏、4K 修复分卷竖屏：按画幅筛的列表只数同画幅的版本，只剩一个就是 1。"""
+        self.add(1, 'FC-1110408.mp4', 3213)
+        self.add(2, 'FC2-PPV-1110408-1-4K修复.mp4', 3013, 2160)
+        self.add(3, 'FC2-PPV-1110408-2-4K修复.mp4', 200, 2160)
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.executemany('UPDATE asset SET ctx_orient=? WHERE id=?', [('横屏', 1), ('竖屏', 2), ('竖屏', 3)])
+        editions = lambda args: {row['id']: row['edition_group'] for row in q_items(self.contract, args)['items']}
+        portrait = editions({'orient': '竖屏'})
+        self.assertEqual(set(portrait), {2, 3})
+        self.assertEqual((portrait[2]['count'], portrait[2]['item_ids'], portrait[2]['seed_id']), (1, [2, 3], 1))
+        self.assertEqual(len(portrait[2]['editions']), 1)
+        landscape = editions({'exclude_vertical': '1'})
+        self.assertEqual((set(landscape), landscape[1]['count'], landscape[1]['item_ids']), ({1}, 1, [1]))
+        self.assertEqual({group['count'] for group in editions({'q': '1110408'}).values()}, {2})
 
     def test_full_file_and_same_quality_parts_have_two_playable_forms(self):
         self.add(1, 'FC-1110408.mp4', 3213)
