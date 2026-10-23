@@ -1,5 +1,11 @@
 # 复用清单
 
+## 文件名包装与补充回归
+
+论坛 URL 包装与明确 BD Remux 尾部番号参考 [PR #123](https://github.com/peach-mitao/peach/pull/123)，固定 revision 为 `edde1fffb2c4690b7b78224dbd70dd7dfed786b3`，沿用本仓库 AGPL-3.0-or-later 许可。包装只解开一层，内部重用现有文件名与用户识别规则；Remux 的括号番号必须是唯一发行身份。普通处理后缀、日期分隔符和「番号＋片名」继续由既有解析器处理，不增加另一套处理词表或递归解析。
+
+普通 HTTP 的浏览器和组件回归采用 [PR #119](https://github.com/peach-mitao/peach/pull/119) 的 `90d4972f9edf8b84dd866869a1a562cc7d1d24eb`；状态保存的短暂拒绝、持续拒绝和并发完整性回归采用 [PR #120](https://github.com/peach-mitao/peach/pull/120) 的 `b586ff907aa01b48432e51b6101b7ce4bc7f8126`。两者保留原作者署名，沿用同一仓库许可。正式随机标识继续复用 `core/random-id`；状态写入继续复用 `fsutil.atomic_write_text` 的同目录随机临时文件、十秒重试与失败清理，不新增依赖或真实 ledger 写入。
+
 ## 第三方标识的发行边界
 
 `resources/marks/` 保存用于实体身份展示的内置标识，来源记录与文件哈希见同目录 `manifest.json`。来源可追溯不等于取得图片版权或商标授权，图片也不因与应用同仓库就自动适用 AGPL。
@@ -102,6 +108,16 @@ Peach 负责独立数据目录、首启、构建身份和资源清单。arm64 �
 ## 硬件转码后端
 
 macOS 复用 FFmpeg 的 VideoToolbox H.264 编码及 H.264、HEVC、AV1 解码，沿用现有 `HardwareTranscoder` 的合成帧探测、命令尝试顺序和软件回退；不新增视频框架或 Python 运行依赖。`-allow_sw 0` 要求编码器实际使用硬件，AV1 硬解显式选择 FFmpeg 原生解码器，软件回退继续使用 dav1d。依据 [FFmpeg 硬件解码选项](https://ffmpeg.org/ffmpeg.html#Advanced-Video-options)和当前固定源码中的 `videotoolbox_av1.c`、`videotoolboxenc.c`；具体可用能力依赖设备与系统，不按 Intel 或 M 系列名称推断。抽帧的编码格式探测复用 `media_probe.probe_file`，按文件世代有界缓存，失败后在同一超时预算内软解。两种加速偏好复用 `media-processing.json`、`FileLock` 与原子写入，抽帧与播放各自保存；服务端新任务读取本机偏好，不调整浏览器解码器，不更改 ledger。桌面和手机自动化回归验证独立切换与保存恢复，合成片分别验收硬件可用路径及失败回退。
+
+## HLS 请求断开清理
+
+断开监听与子进程回归采用 [PR #122](https://github.com/peach-mitao/peach/pull/122) 的固定提交 `b49806a8685e128088a3c4825891fd425e279db1`，沿用本仓库 AGPL-3.0-or-later 许可与原作者署名。Peach 保留主线的会话校验、硬件后端和转码异常契约。
+
+HLS 分片请求复用 Range 传输的 ASGI 断开监听、Python 3.14 的 `asyncio.wait` 与既有 `HlsSegmentService._run` 清理：请求断开时取消该请求的生成任务，终止并等待子进程退出，再移除临时分片。取消以单个请求为单位，同一播放会话的其他请求可继续生成；排队请求退出后不启动转码。
+
+进程管理沿用标准库的 [`asyncio.subprocess`](https://docs.python.org/3.14/library/asyncio-subprocess.html)（PSF 许可，无新增安装体积），不引入进程扫描库或 FFmpeg 命令包装层。当前树、REUSE 与 Git 历史的复用检索确认，分片和整片已具备会话取消，断开监听由传输层提供。临时文件与真实 Python 子进程回归覆盖断开退出、并发隔离、排队取消及同会话重试；macOS 的临时 HTTP 服务用合成 HEVC 和 FFmpeg 8.1.1 实测，断连后子进程退出、临时分片与登记清理完成。Windows 报告环境与真实 GPU 播放验收未取得。无新增依赖、生产入口或真实 ledger 写入。
+
+## 播放转码的硬件选择
 
 整片 MP4 与 HLS 复用现有 FFmpeg 的 CUDA / NVENC、VAAPI、`scale_vaapi` 与 `hwupload`，不引入 Python 命令包装库。Windows 发行工具固定为 FFmpeg 9.0.2（GPL-3.0-or-later，来源清单见 `scripts/ffmpeg-sources.json`）；Linux 镜像使用 Debian trixie 的 FFmpeg、`mesa-va-drivers` 与 `vainfo`，随 Debian 安全更新取得版本，不另行复制驱动代码。Mesa 按上游各组件许可证分发，驱动增加的镜像体积由构建决定，AMD 需要宿主机 amdgpu 与固件。设备参数和硬件解码接口依据 [FFmpeg 官方文档](https://ffmpeg.org/ffmpeg.html#Advanced-Video-options)，驱动范围依据 [Debian VAAPI 说明](https://wiki.debian.org/HardwareVideoAcceleration)。
 

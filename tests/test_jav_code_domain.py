@@ -155,6 +155,47 @@ class ScrapeGateTests(unittest.TestCase):
 
 
 class ExtractionTests(unittest.TestCase):
+    def test_forum_url_wrapper_preserves_filename_and_custom_rules(self):
+        for ending in ('[|url]', '[/url]'):
+            for extension in ('', '.mp4'):
+                with self.subTest(ending=ending, extension=extension):
+                    name = '[url]www.98t.la@JUR-615.restored2.mp4' + ending + extension
+                    self.assertEqual(release_code_from_filename(name), 'JUR-615')
+        patterns = compile_code_patterns([r'^2024-(?<code>[a-z]+\d+)_'])
+        self.assertEqual(release_code_from_filename(
+            '[url]2024-abc123_片名.mp4[/url].mp4', patterns=patterns), 'ABC-123')
+        self.assertEqual(release_code_from_filename(
+            '[url]2024-abc123_片名.mp4[/url]', patterns=iter(patterns)), 'ABC-123')
+        for name in ('[url]holiday.restored.mp4[/url]', '[url]ABW-358.mp4',
+                     '[url][url]ABW-358.mp4[/url][/url]'):
+            self.assertIsNone(release_code_from_filename(name), name)
+
+    def test_explicit_remux_tail_identifies_one_release(self):
+        self.assertEqual(release_code_from_filename(
+            'LaForet Girl 41 Angel and Devil (LAFBD-41)[BD Remux].mkv'), 'LAFBD-041')
+        for name in ('ABW-358 (ABW-359)[BD Remux].mkv',
+                     'MKBD-S50 (ABW-358)[BD Remux].mkv',
+                     'title (ABW-358) commentary.mkv'):
+            self.assertIsNone(release_code_from_filename(name), name)
+
+    def test_processing_labels_preserve_titles_and_date_separators(self):
+        samples = {
+            'SONE-852_^WM_iris3.mp4': 'SONE-852',
+            'MIDA-574.restored_prob4.mp4': 'MIDA-574',
+            'JUR-096_restored-S_2_prob4.mp4': 'JUR-096',
+            'MIDA-234_WM_apo8_iris2.mp4': 'MIDA-234',
+            'MIDA-590.restored_apf2_prob4.mp4': 'MIDA-590',
+            'hhd800.com@SSIS-549-C_X1080X.mp4': 'SSIS-549',
+            '169bbs.com@MEYD-951_[4K].mkv': 'MEYD-951',
+            'SONE-054_000.mp4': 'SONE-054',
+            '092415_001.restored.mp4': '092415_001',
+            '092415-001.restored.mp4': '092415-001',
+            'ABW-358_restored-notes.mp4': 'ABW-358',
+        }
+        for name, code in samples.items():
+            with self.subTest(name=name):
+                self.assertEqual(release_code_from_filename(name), code)
+
     def test_scannable_media_suffixes_preserve_short_release_codes(self):
         from peach.scan import IMAGE, VIDEO
         for suffix in sorted(VIDEO | IMAGE):
