@@ -2659,11 +2659,14 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
     async def test_jav_image_serves_source_bytes_with_etag_and_drops_failures(self):
         """库外作品的样张与来源头像以图片本身下发：带 ETag 与私有缓存时效，取不到回 404 不缓存。"""
         from peach.javdb_public import PublicSourceUnavailable
-        jpeg = b'\xff\xd8\xff\xe0' + b'sample-bytes'
+        jpeg = b'\xff\xd8\xff\xe0' + b'sample-bytes' * 400
         with patch('peach.web_jav_detail.jav_image', return_value=(jpeg, 600)) as source:
-            first = await self.client.get('/jav-image?code=EXM-001&image=3&t=secret')
+            first = await self.client.get('/jav-image?code=EXM-001&image=3&t=secret',
+                                          headers={'Accept-Encoding': 'gzip'})
             self.assertEqual((first.status_code, first.content), (200, jpeg))
             self.assertEqual(first.headers['content-type'], 'image/jpeg')
+            # 已压缩的图片不再过一遍 gzip。
+            self.assertNotIn('content-encoding', first.headers)
             self.assertEqual(first.headers['cache-control'], 'private, max-age=600')
             revalidated = await self.client.get('/jav-image?code=EXM-001&image=3&t=secret',
                                                 headers={'If-None-Match': first.headers['etag']})
