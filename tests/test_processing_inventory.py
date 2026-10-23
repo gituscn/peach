@@ -50,6 +50,17 @@ class InventoryTests(unittest.TestCase):
         self.assertGreater(result['estimated_bytes'], 0)
         self.assertEqual(self.db.read_bytes(), before)
 
+    def test_release_code_families_count_as_jav_during_inventory(self):
+        for name in ('LAF-41.mpg', 'MKBD-S94.mkv', 'MKD-S118.iso', '040221_0012.flv',
+                     'IMG_3092.mpg', 'VIDEO-2022.rmvb'):
+            (self.media / name).touch()
+        before = self.db.read_bytes()
+        result = preview(self.config, self.db, 'all', None)
+        self.assertEqual(result['workload']['video_files'], 6)
+        self.assertEqual(result['workload']['jav_files'], 4)
+        self.assertEqual(result['workload']['jav_titles'], 4)
+        self.assertEqual(self.db.read_bytes(), before)
+
     def test_each_query_advances_a_batch_and_preserves_deduplication(self):
         for number in range(1100):
             (self.media / f'ABW-001-CD{number}.mp4').touch()
