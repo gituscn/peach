@@ -7,6 +7,7 @@ import { Credentials } from '../follow-manage/credentials';
 import { fetchCredentials, FOLLOW_CREDENTIALS_KEY } from '../follow-manage/follow-manage';
 import { Note } from '../components/note';
 import { errorMessage } from '../../api';
+import { credentialsSkeleton } from '../../configuration-skeleton';
 import { groupRoot } from './configuration-panel';
 import { EntryLinksForm } from './entry-links-settings';
 import { IndexerSettings } from './indexer-settings';
@@ -22,7 +23,7 @@ export function SourceSettings({ data, receipt, panel }: ConfigurationGroupProps
       ? <Credentials data={credentials.data} readOnly={Boolean(data.ledger_read_only)} toast={receipt} embedded />
       : credentials.error
         ? <Note tone="error" title="来源凭据未取得">{errorMessage(credentials.error)}</Note>
-        : panel?.active !== false ? <SectionSkeleton title="来源凭据" label="正在读取来源凭据" body="credentials" /> : null}
+        : panel?.active !== false ? <SectionSkeleton label="正在读取来源凭据" html={credentialsSkeleton} /> : null}
     <FollowPreferenceRows receipt={receipt} />
     <IndexerSettings receipt={receipt} />
     {data.entry_links ? <EntryLinksForm initial={data.entry_links} receipt={receipt} /> : null}

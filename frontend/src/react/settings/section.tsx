@@ -4,11 +4,9 @@
  * 注册表里没有折叠，它用 BoardUI token 组合，差异登记在 `boardui/ORIGIN.md`。
  * 提示与进度条另有页面共用的一份，在 `../components/`。 */
 import { useId, useLayoutEffect, useRef, useState } from 'react';
-import type { ComponentType, CSSProperties, FormEvent, MouseEvent, ReactNode } from 'react';
+import type { ComponentType, FormEvent, MouseEvent, ReactNode } from 'react';
 import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 import { setCollapseOpen } from '@peach/legacy/ui';
-
-import { rememberSectionHeight, SECTION_BODY, sectionBodyHeight, type SectionBody } from '../../configuration-skeleton';
 
 import { SettingsCard, SettingsSectionLabel } from '@/components/application/settings/settings-rows';
 import { LinkButton } from '@/components/base/buttons/link-button';
@@ -59,30 +57,11 @@ export function Stack({ divided = false, children }: { divided?: boolean; childr
     : <div className="flex flex-col gap-4 py-4 pr-3 empty:hidden">{children}</div>;
 }
 
-/** 分区首次取数：标题、外框与底栏照最终样子先画，正文按 `body` 记下的上次高度占一块骨架；
- *  底栏的按钮由调用方给，等待时一律禁用。状态名只给辅助技术。 */
-export function SectionSkeleton({ title, label, body, actions }: {
-  title: string; label: string; body: SectionBody; actions?: ReactNode;
-}) {
-  return <Section title={title}>
-    <Stack>
-      <div data-skeleton aria-busy="true" aria-label={label}>
-        <div className="h-(--skeleton-h) w-full rounded-2lg bg-background-tertiary-default"
-          style={{ '--skeleton-h': `${sectionBodyHeight(body)}px` } as CSSProperties} />
-      </div>
-    </Stack>
-    {actions ? <Footer>{actions}</Footer> : null}
-  </Section>;
-}
-
-/** 分区正文画好后记下高度，下次首屏骨架（整页的与分区的）按它占位。只在 `deps` 变化时量：
- *  使用者展开、收起之后的高度不算，那不是下一次打开时的样子。 */
-export function useRememberedBody<T extends HTMLElement>(body: SectionBody, deps: readonly unknown[]) {
-  const node = useRef<T>(null);
-  useLayoutEffect(() => {
-    if (node.current) rememberSectionHeight(SECTION_BODY[body].key, node.current.offsetHeight);
-  }, deps);
-  return node;
+/** 分区首次取数：画 `configuration-skeleton.ts` 里这个分区的那一份骨架，与整页骨架里这一块是同一段
+ *  结构，整页骨架交给 React 时位置不动。挂载时取一次，读回之前不随渲染重算。状态名只给辅助技术。 */
+export function SectionSkeleton({ label, html }: { label: string; html: () => string }) {
+  const [markup] = useState(html);
+  return <div className="contents" data-skeleton="" aria-busy="true" aria-label={label} dangerouslySetInnerHTML={{ __html: markup }} />;
 }
 
 /** 底栏：左边一句说这颗按钮此刻意味着什么，右边是按钮。
