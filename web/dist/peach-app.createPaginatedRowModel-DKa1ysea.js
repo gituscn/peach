@@ -1,10 +1,10 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "c2cd8a96-f733-48f4-9393-d6b33a85c822", e._sentryDebugIdIdentifier = "sentry-dbid-c2cd8a96-f733-48f4-9393-d6b33a85c822");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "af9818fa-f789-428f-ac24-fa4d47de4752", e._sentryDebugIdIdentifier = "sentry-dbid-af9818fa-f789-428f-ac24-fa4d47de4752");
 	} catch {}
 })();
-import { Ki as e, Zi as t, ea as n } from "./peach-app.js";
+import { expandRowModel as e, getDefaultPaginationState as t, tableMemo as n } from "./peach-app.js";
 //#region node_modules/@tanstack/table-core/dist/features/row-pagination/createPaginatedRowModel.js
 function r() {
 	return (e) => {
@@ -25,7 +25,7 @@ function r() {
 function i(n) {
 	let r = n.getPrePaginatedRowModel(), i = n.atoms.pagination?.get();
 	if (!r.rows.length) return r;
-	let { pageSize: a, pageIndex: o } = i ?? e(), { rows: s, flatRows: c, rowsById: l } = r, u = s;
+	let { pageSize: a, pageIndex: o } = i ?? t(), { rows: s, flatRows: c, rowsById: l } = r, u = s;
 	if (a !== Infinity || o !== 0) {
 		let e = a * o, t = e + a;
 		u = s.slice(e, t);
@@ -35,7 +35,7 @@ function i(n) {
 		rows: u,
 		flatRows: c,
 		rowsById: l
-	} : t(n, {
+	} : e(n, {
 		rows: u,
 		flatRows: c,
 		rowsById: l
@@ -46,6 +46,6 @@ function i(n) {
 	return d.rows.forEach(p), d;
 }
 //#endregion
-export { r as t };
+export { r as createPaginatedRowModel };
 
-//# debugId=c2cd8a96-f733-48f4-9393-d6b33a85c822
+//# debugId=af9818fa-f789-428f-ac24-fa4d47de4752

@@ -49,6 +49,9 @@ export default defineConfig({
         // chunk 与入口同前缀、平铺在 `web/dist/`：服务端只认这一种形态，名字里没有路径分隔符。
         chunkFileNames: 'peach-app.[name]-[hash].js',
         codeSplitting: { groups: [{ name: 'main', tags: ['$initial'] }] },
+        // 入口给 chunk 的导出用源码里的名字：压缩成单字母的话，入口里任何改动都会让导出名整体错位，
+        // 每个 chunk 的内容与哈希跟着变，一次小改动换掉 `web/dist/` 里全部 chunk。
+        minifyInternalExports: false,
         assetFileNames: 'peach-app.[ext]',
       },
     },

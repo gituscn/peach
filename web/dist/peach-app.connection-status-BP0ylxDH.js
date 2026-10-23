@@ -1,12 +1,12 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "a1249e59-a8fc-43da-9cbd-e2f7e55934b1", e._sentryDebugIdIdentifier = "sentry-dbid-a1249e59-a8fc-43da-9cbd-e2f7e55934b1");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "923ff459-a6a5-4c91-8bdc-7904555ea4f5", e._sentryDebugIdIdentifier = "sentry-dbid-923ff459-a6a5-4c91-8bdc-7904555ea4f5");
 	} catch {}
 })();
-import { Us as e, Ws as t, cu as n } from "./peach-app.js";
+import { cx as e, require_jsx_runtime as t, sortCx as n } from "./peach-app.js";
 //#region src/react/boardui/components/base/badges/status-dot.tsx
-var r = n(), i = t({
+var r = t(), i = n({
 	base: "inline-flex size-3 shrink-0 items-center justify-center rounded-full",
 	halo: {
 		green: "bg-status-dot-green-halo",
@@ -47,6 +47,6 @@ function s({ online: t, tone: n, children: i }) {
 	});
 }
 //#endregion
-export { s as t };
+export { s as ConnectionStatus };
 
-//# debugId=a1249e59-a8fc-43da-9cbd-e2f7e55934b1
+//# debugId=923ff459-a6a5-4c91-8bdc-7904555ea4f5

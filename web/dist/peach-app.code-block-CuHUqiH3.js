@@ -1,26 +1,26 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "6bd418e4-bdbb-4d7e-9c83-560d8bbc4b23", e._sentryDebugIdIdentifier = "sentry-dbid-6bd418e4-bdbb-4d7e-9c83-560d8bbc4b23");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "4ea303b0-591f-40ff-9a9a-dd95b540d85a", e._sentryDebugIdIdentifier = "sentry-dbid-4ea303b0-591f-40ff-9a9a-dd95b540d85a");
 	} catch {}
 })();
-import { Us as e, Va as t, Ya as n, cu as r, fs as i, pu as a, uu as o } from "./peach-app.js";
+import { Button as e, __toESM as t, cardClass as n, cx as r, require_jsx_runtime as i, require_react as a, useOverlayScrollbar as o } from "./peach-app.js";
 //#region src/react/components/code-block.tsx
-var s = /* @__PURE__ */ a(o(), 1), c = r();
-function l({ code: r, language: a, label: o, maxCharacters: l, bounded: u = !0, copyLabel: d, onCopy: f }) {
-	let p = n(), [m, h] = (0, s.useState)(""), [g, _] = (0, s.useState)(!1);
+var s = /* @__PURE__ */ t(a(), 1), c = i();
+function l({ code: t, language: i, label: a, maxCharacters: l, bounded: u = !0, copyLabel: d, onCopy: f }) {
+	let p = o(), [m, h] = (0, s.useState)(""), [g, _] = (0, s.useState)(!1);
 	(0, s.useEffect)(() => {
 		h(""), _(!1);
-	}, [r]);
-	let v = l !== void 0 && r.length > l, y = async () => {
+	}, [t]);
+	let v = l !== void 0 && t.length > l, y = async () => {
 		try {
-			await navigator.clipboard.writeText(r), _(!1), h("已复制"), f?.();
+			await navigator.clipboard.writeText(t), _(!1), h("已复制"), f?.();
 		} catch {
 			_(!0), h("复制失败，请选中文本复制。");
 		}
 	};
 	return /* @__PURE__ */ (0, c.jsxs)("div", {
-		className: e(t({
+		className: r(n({
 			bordered: "soft",
 			radius: "plain",
 			padding: "none"
@@ -31,8 +31,8 @@ function l({ code: r, language: a, label: o, maxCharacters: l, bounded: u = !0, 
 				className: "flex min-w-0 items-center justify-between gap-3 border-b border-separator-border px-3 py-2",
 				children: [/* @__PURE__ */ (0, c.jsx)("span", {
 					className: "text-caption-1-medium text-text-secondary",
-					children: a.toUpperCase()
-				}), /* @__PURE__ */ (0, c.jsx)(i, {
+					children: i.toUpperCase()
+				}), /* @__PURE__ */ (0, c.jsx)(e, {
 					variant: "secondary",
 					size: "small",
 					onClick: () => void y(),
@@ -44,9 +44,9 @@ function l({ code: r, language: a, label: o, maxCharacters: l, bounded: u = !0, 
 				children: /* @__PURE__ */ (0, c.jsx)("pre", {
 					ref: p,
 					tabIndex: 0,
-					"aria-label": o,
-					className: e("m-0 overflow-auto overscroll-contain p-3 font-mono text-caption-1-regular whitespace-pre text-text-primary", u && "max-h-80"),
-					children: /* @__PURE__ */ (0, c.jsx)("code", { children: l === void 0 ? r : r.slice(0, l) })
+					"aria-label": a,
+					className: r("m-0 overflow-auto overscroll-contain p-3 font-mono text-caption-1-regular whitespace-pre text-text-primary", u && "max-h-80"),
+					children: /* @__PURE__ */ (0, c.jsx)("code", { children: l === void 0 ? t : t.slice(0, l) })
 				})
 			}),
 			m ? /* @__PURE__ */ (0, c.jsx)("p", {
@@ -58,6 +58,6 @@ function l({ code: r, language: a, label: o, maxCharacters: l, bounded: u = !0, 
 	});
 }
 //#endregion
-export { l as t };
+export { l as CodeBlock };
 
-//# debugId=6bd418e4-bdbb-4d7e-9c83-560d8bbc4b23
+//# debugId=4ea303b0-591f-40ff-9a9a-dd95b540d85a

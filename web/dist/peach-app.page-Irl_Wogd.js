@@ -1,10 +1,10 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "b472ea20-7041-4802-aeaa-52cf4e5083a9", e._sentryDebugIdIdentifier = "sentry-dbid-b472ea20-7041-4802-aeaa-52cf4e5083a9");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "9cfdcf22-0388-4139-90eb-3626f6d70fb8", e._sentryDebugIdIdentifier = "sentry-dbid-9cfdcf22-0388-4139-90eb-3626f6d70fb8");
 	} catch {}
 })();
-import { cu as e } from "./peach-app.js";
+import { require_jsx_runtime as e } from "./peach-app.js";
 //#region src/react/components/page.tsx
 var t = e();
 function n({ children: e }) {
@@ -14,6 +14,6 @@ function n({ children: e }) {
 	});
 }
 //#endregion
-export { n as t };
+export { n as Page };
 
-//# debugId=b472ea20-7041-4802-aeaa-52cf4e5083a9
+//# debugId=9cfdcf22-0388-4139-90eb-3626f6d70fb8

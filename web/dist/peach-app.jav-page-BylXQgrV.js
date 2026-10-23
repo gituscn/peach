@@ -1,24 +1,24 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "bf2b789d-c4be-451a-b7be-708b13e02049", e._sentryDebugIdIdentifier = "sentry-dbid-bf2b789d-c4be-451a-b7be-708b13e02049");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "20badbcf-9132-4b41-940d-efbdbbc086ee", e._sentryDebugIdIdentifier = "sentry-dbid-20badbcf-9132-4b41-940d-efbdbbc086ee");
 	} catch {}
 })();
-import { $ as e, $t as t, Cc as n, Dc as r, Do as i, Ec as a, G as o, Gl as s, Go as c, Ha as l, Ii as u, J as d, Js as f, K as p, Ka as m, Oa as h, Qs as ee, Qt as g, Ra as te, Ul as ne, Va as _, Xs as v, Y as y, Ys as b, Zs as x, _o as S, _s as C, an as w, ao as T, au as E, bo as re, cn as D, cu as ie, en as ae, et as oe, fa as se, fs as O, gs as ce, hl as k, hn as le, hs as ue, in as de, io as A, it as fe, la as pe, ln as j, lo as M, ma as N, n as me, nn as P, no as he, nt as ge, on as F, oo as I, pa as L, peachHistory as R, pn as z, ps as B, pu as V, q as H, ql as _e, qs as ve, rn as ye, ro as U, rt as be, sa as xe, sn as W, so as G, ss as K, tn as q, tt as Se, ua as Ce, uu as we, vs as Te, xc as Ee } from "./peach-app.js";
-import { n as J } from "./peach-app.source-view-DaRl5mr9.js";
-import "./peach-app.source-list-E8TH3X9X.js";
+import { $fe21c36db05242bb$export$d7b12c4107be0d61 as e, ArtSlot as t, Button as n, ButtonLink as r, Chip as i, CloudDownloadDialog as a, DISCOVERY_SORTS as o, DOWNLOADS_KEY as s, DOWNLOADS_URL as c, E3 as l, EmptyFocusButton as u, EmptyState as d, FilterGlassRows as f, FilterIconButton as p, FilterPill as m, GlassPill as h, Help as g, Input as _, JAV_LAYOUTS as v, JAV_RECOMMENDATION_GRID as ee, JavHeader as y, LibraryShortcuts as te, M6 as b, Note as x, PHASES as S, Pagination as C, SEGMENT as w, SEGMENTED_TRACK as T, SegmentedRadioGroup as E, Segments as ne, SortKeys as re, SourceAvatar as ie, TaskProgress as ae, WANTS_KEY as oe, WantMagnets as D, Wt as se, __toESM as ce, addWant as le, apiGet as O, appSettingsStore as ue, avatarInner as k, busyProps as A, cachedMagnetStates as j, cardClass as M, cardRatio as de, coverUrl as fe, discoveryArtwork as pe, discoveryKey as me, discoveryScore as he, entityPath as ge, errorMessage as N, fetchDiscoveries as _e, fetchWants as ve, gridLayout as ye, invalidateWants as P, javContentSkeleton as be, javLayout as xe, javTagSkeleton as Se, pageWindow as F, peachHistory$1 as I, qE as L, recommendationScore as Ce, relayoutCovers as we, removeWants as R, require_jsx_runtime as z, require_react as B, resetWants as V, searchNote as H, shellNavigate as U, spriteGlyph as W, storeJavLayout as Te, useAction as G, useQuery as K, wantName as q, wireHorizontalScroller as Ee } from "./peach-app.js";
+import { ErrorLine as J } from "./peach-app.source-view-Bk_L5GHG.js";
+import "./peach-app.source-list-B2yIEqVl.js";
 //#region src/react/jav/discovery-faces.tsx
-var Y = /* @__PURE__ */ V(we(), 1), X = ie();
+var Y = /* @__PURE__ */ ce(B(), 1), X = z();
 function De({ item: e }) {
 	let t = e.performer_refs?.length ? e.performer_refs : [...new Set(e.performers.split(/[,，、;/]/).filter(Boolean))].map((e) => ({ name: e })), n = t.slice(0, 5).map((t, n) => {
-		let r = { "--media-avatar-index": n }, i = t.source_avatar && t.source_actor_id && !t.has_image ? { children: /* @__PURE__ */ (0, X.jsx)(z, {
+		let r = { "--media-avatar-index": n }, i = t.source_avatar && t.source_actor_id && !t.has_image ? { children: /* @__PURE__ */ (0, X.jsx)(ie, {
 			code: e.code,
 			person: t
-		}) } : { dangerouslySetInnerHTML: { __html: a(t.name, t, null) } };
+		}) } : { dangerouslySetInnerHTML: { __html: k(t.name, t, null) } };
 		return t.id ? /* @__PURE__ */ (0, X.jsx)("a", {
 			"data-media-avatar": "",
 			style: r,
-			href: _e("performer", t.name, t.id),
+			href: ge("performer", t.name, t.id),
 			"aria-label": `打开女优页：${t.name}`,
 			...i
 		}, t.name) : /* @__PURE__ */ (0, X.jsx)("span", {
@@ -66,11 +66,11 @@ function ke({ want: e }) {
 		}) : null]
 	});
 }
-function Ae({ want: e, readOnly: t, busy: n, onReset: r, onRemove: a, onCloudDownload: s, downloads: c, provider: l, toast: u }) {
+function Ae({ want: e, readOnly: t, busy: i, onReset: a, onRemove: o, onCloudDownload: s, downloads: c, provider: l, toast: u }) {
 	let [d, f] = (0, Y.useState)(""), p = e.link || d || (e.code ? `https://javdb.com/search?q=${encodeURIComponent(e.code)}&f=all` : "");
 	return /* @__PURE__ */ (0, X.jsxs)("li", {
 		"data-want-id": e.id,
-		className: _({
+		className: M({
 			bordered: "soft",
 			className: "flex flex-col gap-4 max-sm:p-4"
 		}),
@@ -83,7 +83,7 @@ function Ae({ want: e, readOnly: t, busy: n, onReset: r, onRemove: a, onCloudDow
 						className: "flex min-w-0 flex-wrap items-baseline gap-x-2",
 						children: [/* @__PURE__ */ (0, X.jsx)("b", {
 							className: "min-w-0 text-headline-medium wrap-anywhere text-text-primary",
-							children: j(e)
+							children: q(e)
 						}), e.code && e.title ? /* @__PURE__ */ (0, X.jsx)("span", {
 							className: "min-w-0 truncate text-body-2-regular text-text-secondary",
 							children: e.title
@@ -96,7 +96,7 @@ function Ae({ want: e, readOnly: t, busy: n, onReset: r, onRemove: a, onCloudDow
 					!e.code || e.phase === "unreleased" || e.phase === "acquired" ? /* @__PURE__ */ (0, X.jsx)("p", {
 						"data-want-note": "",
 						className: "text-caption-1-regular text-text-secondary",
-						children: D(e)
+						children: H(e)
 					}) : null,
 					e.scrape_error ? /* @__PURE__ */ (0, X.jsx)(J, {
 						text: e.scrape_error,
@@ -106,34 +106,34 @@ function Ae({ want: e, readOnly: t, busy: n, onReset: r, onRemove: a, onCloudDow
 					/* @__PURE__ */ (0, X.jsxs)("div", {
 						className: "mt-1 flex flex-wrap items-center gap-2",
 						children: [
-							p ? /* @__PURE__ */ (0, X.jsx)(B, {
+							p ? /* @__PURE__ */ (0, X.jsx)(r, {
 								"data-button-link": "",
 								variant: "secondary",
 								size: "small",
-								trailingIcon: i,
+								trailingIcon: se,
 								href: p,
 								target: "_blank",
 								rel: "noopener noreferrer",
 								children: "来源页"
 							}) : null,
-							/* @__PURE__ */ (0, X.jsx)(O, {
+							/* @__PURE__ */ (0, X.jsx)(n, {
 								variant: "secondary",
 								size: "small",
-								leadingIcon: re,
+								leadingIcon: b,
 								disabled: t,
-								...U(n === `remove:${e.id}`),
-								onClick: a,
+								...A(i === `remove:${e.id}`),
+								onClick: o,
 								children: "移除"
 							}),
-							e.phase === "given_up" ? /* @__PURE__ */ (0, X.jsx)(O, {
+							e.phase === "given_up" ? /* @__PURE__ */ (0, X.jsx)(n, {
 								variant: "secondary",
 								size: "small",
 								disabled: t,
-								...U(n === `reset:${e.id}`),
-								onClick: r,
+								...A(i === `reset:${e.id}`),
+								onClick: a,
 								children: "重新查找"
 							}) : null,
-							e.phase === "searching" || e.phase === "given_up" ? /* @__PURE__ */ (0, X.jsx)(O, {
+							e.phase === "searching" || e.phase === "given_up" ? /* @__PURE__ */ (0, X.jsx)(n, {
 								variant: "secondary",
 								size: "small",
 								onClick: s,
@@ -143,7 +143,7 @@ function Ae({ want: e, readOnly: t, busy: n, onReset: r, onRemove: a, onCloudDow
 					})
 				]
 			})]
-		}), e.code && (e.phase === "searching" || e.phase === "given_up") ? /* @__PURE__ */ (0, X.jsx)(o, {
+		}), e.code && (e.phase === "searching" || e.phase === "given_up") ? /* @__PURE__ */ (0, X.jsx)(D, {
 			want: e,
 			readOnly: t,
 			downloads: c,
@@ -153,49 +153,49 @@ function Ae({ want: e, readOnly: t, busy: n, onReset: r, onRemove: a, onCloudDow
 		}) : null]
 	});
 }
-function je({ phase: e, label: t, rows: n, row: r }) {
-	let [i, a] = (0, Y.useState)(1), [o, s] = (0, Y.useState)("all"), l = p(n), d = (e) => e.has_magnets ?? l.get(e.code || "") ?? !1, f = n.filter(d), m = e !== "searching" || o === "all" ? n : n.filter((e) => d(e) === (o === "available")), h = k(m.length, 20, i);
+function je({ phase: t, label: r, rows: i, row: a }) {
+	let [o, s] = (0, Y.useState)(1), [c, l] = (0, Y.useState)("all"), u = j(i), f = (e) => e.has_magnets ?? u.get(e.code || "") ?? !1, p = i.filter(f), m = t !== "searching" || c === "all" ? i : i.filter((e) => f(e) === (c === "available")), h = F(m.length, 20, o);
 	return /* @__PURE__ */ (0, X.jsxs)("section", {
-		"aria-label": t,
-		"data-want-phase": e,
+		"aria-label": r,
+		"data-want-phase": t,
 		className: "flex flex-col gap-4",
 		children: [
 			/* @__PURE__ */ (0, X.jsxs)("div", {
 				className: "flex flex-wrap items-center justify-between gap-3",
 				children: [/* @__PURE__ */ (0, X.jsxs)("h3", {
 					className: "flex items-baseline gap-2 text-title-2-medium text-text-primary",
-					children: [t, /* @__PURE__ */ (0, X.jsx)("span", {
+					children: [r, /* @__PURE__ */ (0, X.jsx)("span", {
 						className: "text-body-2-regular tabular-nums text-text-secondary",
-						children: n.length.toLocaleString()
+						children: i.length.toLocaleString()
 					})]
-				}), e === "searching" ? /* @__PURE__ */ (0, X.jsx)(N, {
+				}), t === "searching" ? /* @__PURE__ */ (0, X.jsx)(E, {
 					name: "want-magnet-filter",
 					"aria-label": "待找磁链筛选",
 					orientation: "horizontal",
-					value: o,
-					className: L,
+					value: c,
+					className: T,
 					onChange: (e) => {
-						s(e), a(1);
+						l(e), s(1);
 					},
-					children: Oe.map(([e, t]) => /* @__PURE__ */ (0, X.jsxs)(K, {
-						value: e,
-						"aria-label": t,
-						className: se,
-						children: [t, /* @__PURE__ */ (0, X.jsx)("span", {
+					children: Oe.map(([t, n]) => /* @__PURE__ */ (0, X.jsxs)(e, {
+						value: t,
+						"aria-label": n,
+						className: w,
+						children: [n, /* @__PURE__ */ (0, X.jsx)("span", {
 							className: "text-caption-1-regular tabular-nums text-text-tertiary",
-							children: (e === "all" ? n.length : e === "available" ? f.length : n.length - f.length).toLocaleString()
+							children: (t === "all" ? i.length : t === "available" ? p.length : i.length - p.length).toLocaleString()
 						})]
-					}, e))
+					}, t))
 				}) : null]
 			}),
-			m.length ? null : /* @__PURE__ */ (0, X.jsx)(I, {
+			m.length ? null : /* @__PURE__ */ (0, X.jsx)(d, {
 				size: "compact",
-				icon: c,
+				icon: L,
 				title: "暂无符合条件的作品",
-				actions: /* @__PURE__ */ (0, X.jsx)(O, {
+				actions: /* @__PURE__ */ (0, X.jsx)(n, {
 					size: "small",
 					onClick: () => {
-						s("all"), a(1);
+						l("all"), s(1);
 					},
 					children: "查看全部"
 				}),
@@ -203,7 +203,7 @@ function je({ phase: e, label: t, rows: n, row: r }) {
 			}),
 			/* @__PURE__ */ (0, X.jsx)("ul", {
 				className: "flex flex-col gap-4",
-				children: m.slice(h.start, h.end).map(r)
+				children: m.slice(h.start, h.end).map(a)
 			}),
 			h.pages > 1 ? /* @__PURE__ */ (0, X.jsxs)("div", {
 				"data-want-pager": "",
@@ -211,52 +211,52 @@ function je({ phase: e, label: t, rows: n, row: r }) {
 				children: [/* @__PURE__ */ (0, X.jsx)("span", {
 					className: "text-body-2-regular tabular-nums text-text-secondary",
 					children: `${(h.start + 1).toLocaleString()}–${h.end.toLocaleString()} / ${h.total.toLocaleString()} 条`
-				}), /* @__PURE__ */ (0, X.jsx)(u, {
-					label: `${t}分页`,
+				}), /* @__PURE__ */ (0, X.jsx)(C, {
+					label: `${r}分页`,
 					page: h.page,
 					pages: h.pages,
-					onPage: a
+					onPage: s
 				})]
 			}) : null
 		]
 	});
 }
-function Me({ readOnly: e, toast: t, query: n = "", clearQuery: r }) {
-	let [i, a] = (0, Y.useState)(""), [o, u] = (0, Y.useState)(null), f = l(), p = E({
-		queryKey: P,
-		queryFn: ({ signal: e }) => de(e),
+function Me({ readOnly: e, toast: t, query: r = "", clearQuery: i }) {
+	let [o, l] = (0, Y.useState)(""), [f, p] = (0, Y.useState)(null), m = G(), h = K({
+		queryKey: oe,
+		queryFn: ({ signal: e }) => ve(e),
 		staleTime: 3e4,
 		refetchInterval: (e) => e.state.data?.scraping ? 3e3 : !1
-	}), m = () => {
-		let n = i.trim();
-		n && !e && f.run("add", (e) => ye({ code: n }, e), (e) => {
-			t(e.created ? `已加入想要：${j(e.want)}` : `${j(e.want)} 已经在想要里`), a(""), w();
+	}), v = () => {
+		let n = o.trim();
+		n && !e && m.run("add", (e) => le({ code: n }, e), (e) => {
+			t(e.created ? `已加入想要：${q(e.want)}` : `${q(e.want)} 已经在想要里`), l(""), P();
 		});
 	}, ee = (e) => {
-		e.key === "Enter" && !e.nativeEvent.isComposing && (e.preventDefault(), m());
-	}, g = (e) => {
-		f.run(`remove:${e.id}`, (t) => F([e.id], t), () => {
-			t(`已移除：${j(e)}`), w();
+		e.key === "Enter" && !e.nativeEvent.isComposing && (e.preventDefault(), v());
+	}, y = (e) => {
+		m.run(`remove:${e.id}`, (t) => R([e.id], t), () => {
+			t(`已移除：${q(e)}`), P();
 		});
 	}, te = (e) => {
-		f.run(`reset:${e.id}`, (t) => W([e.id], t), () => {
-			t(`${j(e)} 回到待找`), w();
+		m.run(`reset:${e.id}`, (t) => V([e.id], t), () => {
+			t(`${q(e)} 回到待找`), P();
 		});
-	}, v = p.data, b = (v?.items || []).filter((e) => !n || [
+	}, b = h.data, C = (b?.items || []).filter((e) => !r || [
 		e.code,
 		e.title,
 		e.performers
-	].join(" ").toLocaleLowerCase().includes(n.toLocaleLowerCase())), x = E({
-		queryKey: d,
-		queryFn: ({ signal: e }) => ne(`${y}?limit=100`, e),
-		enabled: b.some((e) => e.code && (e.phase === "searching" || e.phase === "given_up"))
-	}), S = x.data?.providers.filter((e) => e.configured) || [], C = S[0]?.key || "";
+	].join(" ").toLocaleLowerCase().includes(r.toLocaleLowerCase())), w = K({
+		queryKey: s,
+		queryFn: ({ signal: e }) => O(`${c}?limit=100`, e),
+		enabled: C.some((e) => e.code && (e.phase === "searching" || e.phase === "given_up"))
+	}), T = w.data?.providers.filter((e) => e.configured) || [], E = T[0]?.key || "";
 	return /* @__PURE__ */ (0, X.jsxs)("div", {
-		"aria-busy": p.isPending,
+		"aria-busy": h.isPending,
 		className: "flex flex-col gap-8",
 		children: [
 			/* @__PURE__ */ (0, X.jsxs)("div", {
-				className: _({
+				className: M({
 					padding: "none",
 					className: "flex flex-col gap-4 px-6 py-5 max-sm:px-4"
 				}),
@@ -269,75 +269,75 @@ function Me({ readOnly: e, toast: t, query: n = "", clearQuery: r }) {
 						className: "flex flex-wrap items-end gap-2",
 						children: [/* @__PURE__ */ (0, X.jsx)("div", {
 							className: "min-w-64 grow max-sm:min-w-0",
-							children: /* @__PURE__ */ (0, X.jsx)(M, {
+							children: /* @__PURE__ */ (0, X.jsx)(_, {
 								"aria-label": "番号",
 								placeholder: "输入番号，例如 SSIS-950",
-								value: i,
+								value: o,
 								isDisabled: e,
-								onChange: a,
+								onChange: l,
 								onKeyDown: ee
 							})
-						}), /* @__PURE__ */ (0, X.jsx)(O, {
+						}), /* @__PURE__ */ (0, X.jsx)(n, {
 							variant: "primary",
-							disabled: e || !i.trim(),
-							...U(f.busy === "add"),
-							onClick: m,
+							disabled: e || !o.trim(),
+							...A(m.busy === "add"),
+							onClick: v,
 							children: "添加"
 						})]
 					}),
-					f.error ? /* @__PURE__ */ (0, X.jsx)(G, {
+					m.error ? /* @__PURE__ */ (0, X.jsx)(x, {
 						tone: "error",
 						title: "这一次没有完成",
-						children: f.error
+						children: m.error
 					}) : null
 				]
 			}),
-			p.error ? /* @__PURE__ */ (0, X.jsx)(G, {
+			h.error ? /* @__PURE__ */ (0, X.jsx)(x, {
 				tone: "error",
 				title: "想要清单读取失败",
-				children: s(p.error)
+				children: N(h.error)
 			}) : null,
-			p.isPending ? /* @__PURE__ */ (0, X.jsx)("div", {
+			h.isPending ? /* @__PURE__ */ (0, X.jsx)("div", {
 				role: "status",
 				"aria-label": "正在读取想要",
-				dangerouslySetInnerHTML: { __html: oe("wants") }
+				dangerouslySetInnerHTML: { __html: be("wants") }
 			}) : null,
-			v?.scraping ? /* @__PURE__ */ (0, X.jsx)(h, {
+			b?.scraping ? /* @__PURE__ */ (0, X.jsx)(g, {
 				role: "status",
 				children: "正在给刚加入的番号取资料与封面。"
 			}) : null,
-			x.error ? /* @__PURE__ */ (0, X.jsx)(G, {
+			w.error ? /* @__PURE__ */ (0, X.jsx)(x, {
 				tone: "error",
 				title: "下载配置未取得",
-				children: s(x.error)
+				children: N(w.error)
 			}) : null,
-			x.data && !S.length ? /* @__PURE__ */ (0, X.jsxs)(G, {
+			w.data && !T.length ? /* @__PURE__ */ (0, X.jsxs)(x, {
 				tone: "neutral",
 				children: ["尚未配置下载渠道。", /* @__PURE__ */ (0, X.jsx)("a", {
 					href: "/settings/library?section=%E4%B8%8B%E8%BD%BD%E6%B8%A0%E9%81%93",
 					children: "下载渠道设置"
 				})]
 			}) : null,
-			x.data && !x.data.available ? /* @__PURE__ */ (0, X.jsx)(G, {
+			w.data && !w.data.available ? /* @__PURE__ */ (0, X.jsx)(x, {
 				tone: "neutral",
 				children: "云下载只在允许修改数据库的设备上可用。"
 			}) : null,
-			v && !b.length ? /* @__PURE__ */ (0, X.jsx)(I, {
+			b && !C.length ? /* @__PURE__ */ (0, X.jsx)(d, {
 				size: "compact",
-				icon: c,
-				title: n ? "没有符合条件的作品" : "还没有想要的作品",
-				actions: n && r ? /* @__PURE__ */ (0, X.jsx)(O, {
+				icon: L,
+				title: r ? "没有符合条件的作品" : "还没有想要的作品",
+				actions: r && i ? /* @__PURE__ */ (0, X.jsx)(n, {
 					size: "small",
-					onClick: r,
+					onClick: i,
 					children: "清除搜索"
-				}) : !n && !e ? /* @__PURE__ */ (0, X.jsx)(T, {
+				}) : !r && !e ? /* @__PURE__ */ (0, X.jsx)(u, {
 					target: "input[aria-label=\"番号\"]",
 					children: "添加作品"
 				}) : void 0,
-				children: n ? "试试其他番号、女优或标题。" : "输入番号，添加想看的作品。"
+				children: r ? "试试其他番号、女优或标题。" : "输入番号，添加想看的作品。"
 			}) : null,
-			q.map(([n, r]) => {
-				let i = b.filter((e) => e.phase === n);
+			S.map(([n, r]) => {
+				let i = C.filter((e) => e.phase === n);
 				return i.length ? /* @__PURE__ */ (0, X.jsx)(je, {
 					phase: n,
 					label: r,
@@ -345,13 +345,13 @@ function Me({ readOnly: e, toast: t, query: n = "", clearQuery: r }) {
 					row: (n) => /* @__PURE__ */ (0, X.jsx)(Ae, {
 						want: n,
 						readOnly: e,
-						busy: f.busy,
-						downloads: x.data,
-						provider: C,
+						busy: m.busy,
+						downloads: w.data,
+						provider: E,
 						toast: t,
 						onReset: () => te(n),
-						onRemove: () => g(n),
-						onCloudDownload: () => u({
+						onRemove: () => y(n),
+						onCloudDownload: () => p({
 							code: n.code || "",
 							title: n.title || "",
 							origin: `wishlist:${n.id}`,
@@ -363,133 +363,133 @@ function Me({ readOnly: e, toast: t, query: n = "", clearQuery: r }) {
 					}, n.id)
 				}, n) : null;
 			}),
-			/* @__PURE__ */ (0, X.jsx)(H, {
-				prefill: o,
-				close: () => u(null),
+			/* @__PURE__ */ (0, X.jsx)(a, {
+				prefill: f,
+				close: () => p(null),
 				receipt: t,
-				provider: C
+				provider: E
 			})
 		]
 	});
 }
 //#endregion
 //#region src/react/jav/jav-page.tsx
-var Ne = A("search"), Pe = A("x"), Fe = A("refresh-cw");
+var Ne = W("search"), Pe = W("x"), Fe = W("refresh-cw");
 function $(e) {
 	let t = new URLSearchParams(location.search);
 	for (let [n, r] of Object.entries(e)) r ? t.set(n, r) : t.delete(n);
-	m(location.pathname + (t.size ? `?${t}` : ""), {
+	U(location.pathname + (t.size ? `?${t}` : ""), {
 		replace: !0,
-		state: R.navigation.location.state
+		state: I.navigation.location.state
 	});
 }
 function Ie({ tab: e, readOnly: t, navigate: n, receipt: r }) {
-	let [i, a] = (0, Y.useState)(null), [o, s] = (0, Y.useState)(() => new URLSearchParams(location.search).get("q") || ""), c = (e) => {
-		s(e), $({ q: e });
+	let [i, o] = (0, Y.useState)(null), [s, c] = (0, Y.useState)(() => new URLSearchParams(location.search).get("q") || ""), l = (e) => {
+		c(e), $({ q: e });
 	};
 	return /* @__PURE__ */ (0, X.jsxs)("div", {
 		className: "flex w-full flex-col gap-6",
 		children: [
-			/* @__PURE__ */ (0, X.jsx)(me, {
+			/* @__PURE__ */ (0, X.jsx)(y, {
 				tab: e,
 				navigate: n,
-				find: () => a({})
+				find: () => o({})
 			}),
 			/* @__PURE__ */ (0, X.jsx)("form", {
 				"aria-label": e === "discover" ? "筛选推荐" : "筛选想要",
 				onSubmit: (e) => {
 					e.preventDefault();
 				},
-				children: /* @__PURE__ */ (0, X.jsx)(M, {
+				children: /* @__PURE__ */ (0, X.jsx)(_, {
 					type: "search",
 					"aria-label": e === "discover" ? "筛选推荐" : "筛选想要",
 					placeholder: "筛选番号、女优或标题",
 					leadingIcon: Ne,
-					value: o,
-					onChange: c,
+					value: s,
+					onChange: l,
 					enterKeyHint: "search"
 				})
 			}),
 			e === "discover" ? /* @__PURE__ */ (0, X.jsx)(Le, {
 				readOnly: t,
 				receipt: r,
-				resource: a,
-				query: o.trim(),
+				resource: o,
+				query: s.trim(),
 				navigate: n,
-				clearText: () => c("")
+				clearText: () => l("")
 			}) : /* @__PURE__ */ (0, X.jsx)(Me, {
 				readOnly: t,
 				toast: r,
-				query: o.trim(),
-				clearQuery: () => c("")
+				query: s.trim(),
+				clearQuery: () => l("")
 			}),
-			/* @__PURE__ */ (0, X.jsx)(H, {
+			/* @__PURE__ */ (0, X.jsx)(a, {
 				prefill: i,
-				close: () => a(null),
+				close: () => o(null),
 				receipt: r
 			})
 		]
 	});
 }
-function Le({ readOnly: a, receipt: o, resource: c, query: u, navigate: d, clearText: p }) {
-	let m = new URLSearchParams(location.search), [h, ne] = (0, Y.useState)(() => m.get("scope") === "library" ? "library" : "external"), [_, y] = (0, Y.useState)(() => m.get("tag") || ""), [T, re] = (0, Y.useState)(() => ge.some(([e]) => e === m.get("sort")) ? m.get("sort") : "taste"), [D, ie] = (0, Y.useState)(() => m.get("dir") === "asc"), se = (e) => {
-		ne(e), $({ scope: e === "external" ? "" : e });
-	}, k = (e) => {
-		y(e), $({ tag: e });
-	}, de = (e) => {
-		re(e), $({ sort: e === "taste" ? "" : e });
-	}, A = (e) => {
+function Le({ readOnly: e, receipt: a, resource: s, query: c, navigate: u, clearText: g }) {
+	let _ = new URLSearchParams(location.search), [y, b] = (0, Y.useState)(() => _.get("scope") === "library" ? "library" : "external"), [S, C] = (0, Y.useState)(() => _.get("tag") || ""), [w, T] = (0, Y.useState)(() => o.some(([e]) => e === _.get("sort")) ? _.get("sort") : "taste"), [E, ie] = (0, Y.useState)(() => _.get("dir") === "asc"), oe = (e) => {
+		b(e), $({ scope: e === "external" ? "" : e });
+	}, D = (e) => {
+		C(e), $({ tag: e });
+	}, ce = (e) => {
+		T(e), $({ sort: e === "taste" ? "" : e });
+	}, O = (e) => {
 		ie(e), $({ dir: e ? "asc" : "" });
-	}, j = (0, Y.useRef)(null);
+	}, k = (0, Y.useRef)(null);
 	(0, Y.useEffect)(() => {
-		let e = [...j.current?.querySelectorAll("[data-catalog-scroll],[data-catalog-tags],[data-filter-row=\"bottom\"]") || []].map((e) => n(e, { drag: !0 }));
+		let e = [...k.current?.querySelectorAll("[data-catalog-scroll],[data-catalog-tags],[data-filter-row=\"bottom\"]") || []].map((e) => Ee(e, { drag: !0 }));
 		return () => e.forEach((e) => e.destroy());
 	}, []);
-	let M = ee();
-	(0, Y.useSyncExternalStore)(M.subscribe, M.version, M.version);
-	let N = v(), me = f(b({
+	let j = ue();
+	(0, Y.useSyncExternalStore)(j.subscribe, j.version, j.version);
+	let M = xe(), ve = de(ye({
 		active: !0,
 		home: !1,
 		portrait: !1
-	})), P = (0, Y.useRef)({}), F = (0, Y.useRef)(!1), L = (0, Y.useRef)(!1), R = D ? "asc" : "desc", z = E({
-		queryKey: t(h, T, R),
+	})), F = (0, Y.useRef)({}), I = (0, Y.useRef)(!1), L = (0, Y.useRef)(!1), R = E ? "asc" : "desc", z = K({
+		queryKey: me(y, w, R),
 		retry: !1,
 		refetchOnWindowFocus: !1,
 		queryFn: ({ signal: e }) => {
-			let t = F.current, n = L.current;
-			return F.current = !1, L.current = !1, ae(h, e, {
-				sort: T,
+			let t = I.current, n = L.current;
+			return I.current = !1, L.current = !1, _e(y, e, {
+				sort: w,
 				direction: R,
-				jobId: t ? void 0 : P.current[h],
+				jobId: t ? void 0 : F.current[y],
 				refreshMetadata: t,
 				cancelMetadata: n
 			});
 		},
 		refetchInterval: (e) => e.state.data?.metadata_job?.status === "running" && Math.max(1e3, e.state.data.poll_after_ms || 3e3)
-	}), V = z.data?.metadata_job;
+	}), B = z.data?.metadata_job;
 	(0, Y.useEffect)(() => {
-		V?.job_id && (P.current[h] = V.job_id);
-	}, [h, V?.job_id]);
-	let H = l(), W = l(), K = (e) => {
-		W.run(e, async () => (L.current = e === "stop", F.current = e !== "stop", z.refetch({
+		B?.job_id && (F.current[y] = B.job_id);
+	}, [y, B?.job_id]);
+	let V = G(), H = G(), U = (e) => {
+		H.run(e, async () => (L.current = e === "stop", I.current = e !== "stop", z.refetch({
 			cancelRefetch: !0,
 			throwOnError: !0
 		})), () => {});
-	}, q = z.data?.items || [], we = [...new Set(q.flatMap((e) => e.tags || []))], J = q.filter((e) => (!_ || e.tags?.includes(_)) && (!u || [
+	}, W = z.data?.items || [], q = [...new Set(W.flatMap((e) => e.tags || []))], J = W.filter((e) => (!S || e.tags?.includes(S)) && (!c || [
 		e.code,
 		e.title,
 		e.performers,
 		e.studio,
 		...e.tags || [],
 		...(e.performer_refs || []).map((e) => e.name)
-	].join(" ").toLocaleLowerCase().includes(u.toLocaleLowerCase()))), Z = z.isPending;
+	].join(" ").toLocaleLowerCase().includes(c.toLocaleLowerCase()))), Z = z.isPending;
 	return /* @__PURE__ */ (0, X.jsxs)("section", {
-		ref: j,
+		ref: k,
 		"aria-label": "为你推荐",
 		"aria-busy": Z,
 		className: "flex min-w-0 flex-col gap-4",
 		children: [
-			/* @__PURE__ */ (0, X.jsx)(ue, {
+			/* @__PURE__ */ (0, X.jsx)(f, {
 				label: "发现筛选与排序",
 				topLabel: "发现范围与标签",
 				attrs: {
@@ -504,12 +504,12 @@ function Le({ readOnly: a, receipt: o, resource: c, query: u, navigate: d, clear
 					"data-catalog-scroll": "",
 					children: [/* @__PURE__ */ (0, X.jsxs)("div", {
 						"data-catalog-views": "",
-						children: [[["external", "库外发现"], ["library", "馆藏探索"]].map(([e, t]) => /* @__PURE__ */ (0, X.jsx)(C, {
+						children: [[["external", "库外发现"], ["library", "馆藏探索"]].map(([e, t]) => /* @__PURE__ */ (0, X.jsx)(m, {
 							"data-entity-tag": e,
 							"data-entity-press": "",
-							pressed: h === e,
+							pressed: y === e,
 							onPress: () => {
-								se(e), k("");
+								oe(e), D("");
 							},
 							children: t
 						}, e)), /* @__PURE__ */ (0, X.jsx)("span", {
@@ -519,14 +519,14 @@ function Le({ readOnly: a, receipt: o, resource: c, query: u, navigate: d, clear
 					}), /* @__PURE__ */ (0, X.jsx)("div", {
 						"data-catalog-tags": "",
 						dangerouslySetInnerHTML: Z ? { __html: Se() } : void 0,
-						children: Z ? null : we.map((e) => /* @__PURE__ */ (0, X.jsxs)(C, {
+						children: Z ? null : q.map((e) => /* @__PURE__ */ (0, X.jsxs)(m, {
 							"data-catalog-tag": e,
 							"data-entity-press": "",
-							pressed: _ === e,
-							onPress: () => k(_ === e ? "" : e),
+							pressed: S === e,
+							onPress: () => D(S === e ? "" : e),
 							children: [e, /* @__PURE__ */ (0, X.jsx)("span", {
 								"data-count-badge": "",
-								children: q.filter((t) => t.tags?.includes(e)).length
+								children: W.filter((t) => t.tags?.includes(e)).length
 							})]
 						}, e))
 					})]
@@ -540,42 +540,42 @@ function Le({ readOnly: a, receipt: o, resource: c, query: u, navigate: d, clear
 							className: "relative inline-block h-3.5 w-37.5 rounded-md align-middle skeleton-sheen"
 						}) : `${J.length} 部`
 					}),
-					/* @__PURE__ */ (0, X.jsx)(he, { currentHref: () => location.pathname + location.search }),
-					u || _ ? /* @__PURE__ */ (0, X.jsx)(Te, {
+					/* @__PURE__ */ (0, X.jsx)(te, { currentHref: () => location.pathname + location.search }),
+					c || S ? /* @__PURE__ */ (0, X.jsx)(h, {
 						onPress: () => {
-							k(""), p();
+							D(""), g();
 						},
 						children: "清除筛选"
 					}) : null,
 					/* @__PURE__ */ (0, X.jsxs)("span", {
 						"data-entity-sorts": "",
 						children: [
-							h === "external" ? /* @__PURE__ */ (0, X.jsx)(ce, {
+							y === "external" ? /* @__PURE__ */ (0, X.jsx)(p, {
 								"data-entity-batch": "",
 								"data-jav-metadata-update": "",
-								label: V?.status === "running" ? "停止读取" : "更新资料",
+								label: B?.status === "running" ? "停止读取" : "更新资料",
 								disabled: Z,
 								"data-skeleton-action": Z ? "" : void 0,
-								busy: !!W.busy,
-								icon: V?.status === "running" ? Pe : Fe,
-								onPress: () => K(V?.status === "running" ? "stop" : "update")
+								busy: !!H.busy,
+								icon: B?.status === "running" ? Pe : Fe,
+								onPress: () => U(B?.status === "running" ? "stop" : "update")
 							}) : null,
-							/* @__PURE__ */ (0, X.jsx)(pe, {
+							/* @__PURE__ */ (0, X.jsx)(ne, {
 								label: "JAV 卡片版式",
-								value: N,
-								options: ve,
-								onChange: x
+								value: M,
+								options: v,
+								onChange: Te
 							}),
-							/* @__PURE__ */ (0, X.jsx)(Ce, {
-								sorts: ge.map(([e, t, n]) => ({
+							/* @__PURE__ */ (0, X.jsx)(re, {
+								sorts: o.map(([e, t, n]) => ({
 									key: e,
 									label: t,
 									ariaLabel: n,
-									pressed: e === T,
+									pressed: e === w,
 									dir: R
 								})),
 								onSort: (e) => {
-									e === T ? A(!D) : (de(e), A(e === "code"));
+									e === w ? O(!E) : (ce(e), O(e === "code"));
 								}
 							})
 						]
@@ -585,108 +585,108 @@ function Le({ readOnly: a, receipt: o, resource: c, query: u, navigate: d, clear
 			Z ? /* @__PURE__ */ (0, X.jsx)("div", {
 				role: "status",
 				"aria-label": "正在读取推荐",
-				dangerouslySetInnerHTML: { __html: oe("discover", N) }
+				dangerouslySetInnerHTML: { __html: be("discover", M) }
 			}) : null,
-			z.error ? /* @__PURE__ */ (0, X.jsx)(G, {
+			z.error ? /* @__PURE__ */ (0, X.jsx)(x, {
 				tone: "error",
 				title: "推荐未取得",
-				children: s(z.error)
+				children: N(z.error)
 			}) : null,
-			h === "external" && V?.status === "running" ? /* @__PURE__ */ (0, X.jsx)("div", {
+			y === "external" && B?.status === "running" ? /* @__PURE__ */ (0, X.jsx)("div", {
 				"data-jav-metadata": "",
 				className: "min-w-0",
-				children: /* @__PURE__ */ (0, X.jsx)(te, {
+				children: /* @__PURE__ */ (0, X.jsx)(ae, {
 					embedded: !0,
-					label: `正在读取作品资料 · ${V.completed} / ${V.total} 部`,
-					value: V.completed,
-					total: V.total
+					label: `正在读取作品资料 · ${B.completed} / ${B.total} 部`,
+					value: B.completed,
+					total: B.total
 				})
 			}) : null,
-			V && V.status !== "running" && (V.status !== "complete" || V.failed > 0) ? /* @__PURE__ */ (0, X.jsx)(G, {
+			B && B.status !== "running" && (B.status !== "complete" || B.failed > 0) ? /* @__PURE__ */ (0, X.jsx)(x, {
 				tone: "neutral",
-				action: /* @__PURE__ */ (0, X.jsx)(O, {
+				action: /* @__PURE__ */ (0, X.jsx)(n, {
 					variant: "secondary",
-					...U(W.busy === "retry"),
+					...A(H.busy === "retry"),
 					"aria-label": "立即重试读取作品资料",
-					onClick: () => K("retry"),
+					onClick: () => U("retry"),
 					children: "立即重试"
 				}),
-				children: V.message || `作品资料 ${V.completed} / ${V.total} 部`
+				children: B.message || `作品资料 ${B.completed} / ${B.total} 部`
 			}) : null,
-			W.error ? /* @__PURE__ */ (0, X.jsx)(G, {
+			H.error ? /* @__PURE__ */ (0, X.jsx)(x, {
 				tone: "error",
-				children: W.error
+				children: H.error
 			}) : null,
-			!Z && !z.error && !J.length ? /* @__PURE__ */ (0, X.jsx)(I, {
-				icon: S,
-				title: u || _ ? "没有符合条件的推荐" : "暂无匹配口味的作品",
-				actions: /* @__PURE__ */ (0, X.jsxs)(X.Fragment, { children: [/* @__PURE__ */ (0, X.jsx)(B, {
+			!Z && !z.error && !J.length ? /* @__PURE__ */ (0, X.jsx)(d, {
+				icon: l,
+				title: c || S ? "没有符合条件的推荐" : "暂无匹配口味的作品",
+				actions: /* @__PURE__ */ (0, X.jsxs)(X.Fragment, { children: [/* @__PURE__ */ (0, X.jsx)(r, {
 					size: "small",
 					href: "/taste",
 					variant: "secondary",
 					children: "查看口味"
-				}), u || _ ? /* @__PURE__ */ (0, X.jsx)(O, {
+				}), c || S ? /* @__PURE__ */ (0, X.jsx)(n, {
 					variant: "primary",
 					size: "small",
 					onClick: () => {
-						p(), y(""), $({
+						g(), C(""), $({
 							q: "",
 							tag: ""
 						});
 					},
 					children: "清除筛选"
-				}) : h === "library" ? /* @__PURE__ */ (0, X.jsx)(B, {
+				}) : y === "library" ? /* @__PURE__ */ (0, X.jsx)(r, {
 					variant: "primary",
 					size: "small",
 					href: "/",
 					children: "浏览馆藏"
-				}) : /* @__PURE__ */ (0, X.jsx)(O, {
+				}) : /* @__PURE__ */ (0, X.jsx)(n, {
 					variant: "primary",
 					size: "small",
-					onClick: () => c({}),
+					onClick: () => s({}),
 					children: "查找作品"
 				})] }),
-				children: u || _ ? "清除筛选后查看其他作品。" : h === "library" ? "观看或标记作品后，可以探索少看的馆藏。" : "可以查找番号，或更新关注来源。"
+				children: c || S ? "清除筛选后查看其他作品。" : y === "library" ? "观看或标记作品后，可以探索少看的馆藏。" : "可以查找番号，或更新关注来源。"
 			}) : null,
-			H.error ? /* @__PURE__ */ (0, X.jsx)(G, {
+			V.error ? /* @__PURE__ */ (0, X.jsx)(x, {
 				tone: "error",
-				children: H.error
+				children: V.error
 			}) : null,
 			/* @__PURE__ */ (0, X.jsx)("div", {
 				"data-media-grid": "",
-				className: e,
-				style: { "--card-ratio": me },
-				children: J.map((e) => {
-					let t = e.performer_refs?.length ? e.performer_refs.map((e) => e.name).join("、") : e.performers, n = g(e, N, M.value.javImage), s = fe(e.taste_score ?? e.score), l = [
-						s.label,
-						`口味 ${be(e.taste_score ?? e.score)}`,
-						z.data?.ranking_method === "mmr" && e.ranking_score != null ? `排序 ${be(e.ranking_score)}` : "",
-						e.source_score == null ? "" : `来源评分 ${e.source_score.toFixed(1)} / 5`,
-						...e.reasons || []
+				className: ee,
+				style: { "--card-ratio": ve },
+				children: J.map((o) => {
+					let c = o.performer_refs?.length ? o.performer_refs.map((e) => e.name).join("、") : o.performers, l = pe(o, M, j.value.javImage), d = Ce(o.taste_score ?? o.score), f = [
+						d.label,
+						`口味 ${he(o.taste_score ?? o.score)}`,
+						z.data?.ranking_method === "mmr" && o.ranking_score != null ? `排序 ${he(o.ranking_score)}` : "",
+						o.source_score == null ? "" : `来源评分 ${o.source_score.toFixed(1)} / 5`,
+						...o.reasons || []
 					].filter(Boolean).join(" · ");
 					return /* @__PURE__ */ (0, X.jsxs)("article", {
 						"data-media-card": "",
 						"data-jav-card": "",
-						onClick: (t) => {
-							t.target.closest("a,button,input") || d(e.asset_id ? `/assets/${e.asset_id}` : `/works/${encodeURIComponent(e.code)}`);
+						onClick: (e) => {
+							e.target.closest("a,button,input") || u(o.asset_id ? `/assets/${o.asset_id}` : `/works/${encodeURIComponent(o.code)}`);
 						},
 						children: [
 							/* @__PURE__ */ (0, X.jsx)("a", {
-								href: e.asset_id ? `/assets/${e.asset_id}` : `/works/${encodeURIComponent(e.code)}`,
-								"aria-label": `查看 ${e.code} 详情`,
+								href: o.asset_id ? `/assets/${o.asset_id}` : `/works/${encodeURIComponent(o.code)}`,
+								"aria-label": `查看 ${o.code} 详情`,
 								onClick: (e) => {
-									!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0 && (e.preventDefault(), d(e.currentTarget.getAttribute("href")));
+									!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0 && (e.preventDefault(), u(e.currentTarget.getAttribute("href")));
 								},
 								"data-media-pic": "",
 								"data-jav-cover-box": "",
 								className: "relative inline-grid place-items-center overflow-hidden rounded-2lg bg-background-tertiary-default",
-								children: n ? /* @__PURE__ */ (0, X.jsx)(xe, {
+								children: l ? /* @__PURE__ */ (0, X.jsx)(t, {
 									artwork: {
 										kind: "cover",
-										html: n
+										html: l
 									},
-									identity: g(e, "small", M.value.javImage),
-									relayout: (e) => Ee(e, N)
+									identity: pe(o, "small", j.value.javImage),
+									relayout: (e) => we(e, M)
 								}) : /* @__PURE__ */ (0, X.jsx)("span", {
 									"data-media-nopic": "",
 									children: "无封面"
@@ -694,56 +694,56 @@ function Le({ readOnly: a, receipt: o, resource: c, query: u, navigate: d, clear
 							}),
 							/* @__PURE__ */ (0, X.jsxs)("div", {
 								"data-media-meta": "",
-								children: [/* @__PURE__ */ (0, X.jsx)(De, { item: e }), /* @__PURE__ */ (0, X.jsxs)("div", {
+								children: [/* @__PURE__ */ (0, X.jsx)(De, { item: o }), /* @__PURE__ */ (0, X.jsxs)("div", {
 									"data-media-text": "",
 									children: [
 										/* @__PURE__ */ (0, X.jsxs)("h3", {
 											"data-jav-title": "",
 											"data-media-title": "",
-											title: `${e.code} · ${e.title || "标题未取得"}`,
+											title: `${o.code} · ${o.title || "标题未取得"}`,
 											children: [
-												/* @__PURE__ */ (0, X.jsx)("b", { children: e.code }),
+												/* @__PURE__ */ (0, X.jsx)("b", { children: o.code }),
 												" ",
-												e.title || "标题未取得"
+												o.title || "标题未取得"
 											]
 										}),
 										/* @__PURE__ */ (0, X.jsxs)("div", {
 											"data-media-byline": "",
 											children: [
-												e.performer_refs?.[0]?.id ? /* @__PURE__ */ (0, X.jsxs)("a", {
+												o.performer_refs?.[0]?.id ? /* @__PURE__ */ (0, X.jsxs)("a", {
 													"data-media-who": "",
-													href: _e("performer", e.performer_refs[0].name),
-													title: t,
+													href: ge("performer", o.performer_refs[0].name),
+													title: c,
 													children: [/* @__PURE__ */ (0, X.jsx)("svg", {
 														viewBox: "0 0 24 24",
 														"aria-hidden": "true",
 														children: /* @__PURE__ */ (0, X.jsx)("use", { href: "#i-user-round" })
-													}), /* @__PURE__ */ (0, X.jsx)("span", { children: e.performer_refs[0].name })]
+													}), /* @__PURE__ */ (0, X.jsx)("span", { children: o.performer_refs[0].name })]
 												}) : /* @__PURE__ */ (0, X.jsxs)("span", {
 													"data-media-who": "",
-													title: t,
+													title: c,
 													children: [/* @__PURE__ */ (0, X.jsx)("svg", {
 														viewBox: "0 0 24 24",
 														"aria-hidden": "true",
 														children: /* @__PURE__ */ (0, X.jsx)("use", { href: "#i-user-round" })
-													}), /* @__PURE__ */ (0, X.jsx)("span", { children: e.performer_refs?.[0]?.name || t })]
+													}), /* @__PURE__ */ (0, X.jsx)("span", { children: o.performer_refs?.[0]?.name || c })]
 												}),
-												(e.performer_refs?.length || 0) > 1 ? /* @__PURE__ */ (0, X.jsxs)("span", {
+												(o.performer_refs?.length || 0) > 1 ? /* @__PURE__ */ (0, X.jsxs)("span", {
 													"data-media-who-more": "",
 													children: [
 														"等 ",
-														e.performer_refs.length,
+														o.performer_refs.length,
 														" 人"
 													]
 												}) : null,
-												e.release_date ? /* @__PURE__ */ (0, X.jsxs)("time", {
+												o.release_date ? /* @__PURE__ */ (0, X.jsxs)("time", {
 													"data-media-release": "",
-													dateTime: e.release_date,
+													dateTime: o.release_date,
 													children: [/* @__PURE__ */ (0, X.jsx)("svg", {
 														viewBox: "0 0 24 24",
 														"aria-hidden": "true",
 														children: /* @__PURE__ */ (0, X.jsx)("use", { href: "#i-calendar" })
-													}), e.release_date]
+													}), o.release_date]
 												}) : null
 											]
 										}),
@@ -753,18 +753,18 @@ function Le({ readOnly: a, receipt: o, resource: c, query: u, navigate: d, clear
 											children: [/* @__PURE__ */ (0, X.jsx)("button", {
 												"data-jav-taste-score": "",
 												type: "button",
-												title: l,
-												"aria-label": `推荐分 ${s.score}，${s.label}`,
+												title: f,
+												"aria-label": `推荐分 ${d.score}，${d.label}`,
 												className: "rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring",
-												children: /* @__PURE__ */ (0, X.jsx)(le, {
-													color: s.color,
-													children: s.label
+												children: /* @__PURE__ */ (0, X.jsx)(i, {
+													color: d.color,
+													children: d.label
 												})
-											}), (e.tags || []).slice(0, 4).map((e) => /* @__PURE__ */ (0, X.jsx)("button", {
+											}), (o.tags || []).slice(0, 4).map((e) => /* @__PURE__ */ (0, X.jsx)("button", {
 												type: "button",
 												"data-media-tag": "",
-												"aria-pressed": _ === e,
-												onClick: () => k(_ === e ? "" : e),
+												"aria-pressed": S === e,
+												onClick: () => D(S === e ? "" : e),
 												children: e
 											}, e))]
 										})
@@ -775,39 +775,39 @@ function Le({ readOnly: a, receipt: o, resource: c, query: u, navigate: d, clear
 								"data-jav-actions": "",
 								className: "flex flex-wrap gap-2",
 								children: [
-									e.link ? /* @__PURE__ */ (0, X.jsx)(B, {
+									o.link ? /* @__PURE__ */ (0, X.jsx)(r, {
 										"data-button-link": "",
 										variant: "secondary",
-										trailingIcon: i,
-										href: e.link,
+										trailingIcon: se,
+										href: o.link,
 										target: "_blank",
 										rel: "noopener noreferrer",
 										children: "作品来源"
 									}) : null,
-									/* @__PURE__ */ (0, X.jsx)(O, {
+									/* @__PURE__ */ (0, X.jsx)(n, {
 										variant: "ghost",
-										disabled: a || e.wanted || !!e.asset_id,
-										...U(H.busy === String(e.id)),
+										disabled: e || o.wanted || !!o.asset_id,
+										...A(V.busy === String(o.id)),
 										onClick: () => {
-											H.run(String(e.id), (t) => ye({ code: e.code }, t), () => {
-												o("已加入想要"), w(), z.refetch();
+											V.run(String(o.id), (e) => le({ code: o.code }, e), () => {
+												a("已加入想要"), P(), z.refetch();
 											});
 										},
-										children: e.asset_id ? "已入库" : e.wanted ? "已加入想要" : "想要"
+										children: o.asset_id ? "已入库" : o.wanted ? "已加入想要" : "想要"
 									}),
-									/* @__PURE__ */ (0, X.jsx)(O, {
+									/* @__PURE__ */ (0, X.jsx)(n, {
 										variant: "secondary",
-										onClick: () => c({
-											...e,
-											cover: e.has_cover ? r(e, !0) : e.cover_url,
-											origin: `${e.asset_id ? "asset" : "feed"}:${e.id}`
+										onClick: () => s({
+											...o,
+											cover: o.has_cover ? fe(o, !0) : o.cover_url,
+											origin: `${o.asset_id ? "asset" : "feed"}:${o.id}`
 										}),
 										children: "查找资源"
 									})
 								]
 							})
 						]
-					}, e.id);
+					}, o.id);
 				})
 			})
 		]
@@ -816,4 +816,4 @@ function Le({ readOnly: a, receipt: o, resource: c, query: u, navigate: d, clear
 //#endregion
 export { Ie as JavPage };
 
-//# debugId=bf2b789d-c4be-451a-b7be-708b13e02049
+//# debugId=20badbcf-9132-4b41-940d-efbdbbc086ee

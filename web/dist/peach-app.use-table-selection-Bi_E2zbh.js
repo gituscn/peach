@@ -1,32 +1,32 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "2e2dcca0-a664-496a-a593-937ecc2fd209", e._sentryDebugIdIdentifier = "sentry-dbid-2e2dcca0-a664-496a-a593-937ecc2fd209");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "cf2bed7a-b623-4d5c-9660-b1e6d3b0412a", e._sentryDebugIdIdentifier = "sentry-dbid-cf2bed7a-b623-4d5c-9660-b1e6d3b0412a");
 	} catch {}
 })();
-import { $i as e, Hi as t, Qi as n, Ui as r, Xi as i, ea as a, pu as o, uu as s } from "./peach-app.js";
+import { __toESM as e, autoResetPageIndex as t, column_getCanSort as n, column_getSortFn as r, copyInstancePropertiesWithoutMemos as i, require_react as a, skipFirstRun as o, tableMemo as s } from "./peach-app.js";
 //#region node_modules/@tanstack/table-core/dist/features/row-sorting/createSortedRowModel.js
 function c() {
-	return (t) => {
-		let n = t;
-		return a({
+	return (e) => {
+		let n = e;
+		return s({
 			feature: "rowSortingFeature",
 			table: n,
 			fnName: "table.getSortedRowModel",
 			memoDeps: () => [n.atoms.sorting?.get(), n.getPreSortedRowModel()],
 			fn: () => l(n),
-			onAfterUpdate: e(() => i(n))
+			onAfterUpdate: o(() => t(n))
 		});
 	};
 }
 function l(e) {
-	let i = e.getPreSortedRowModel(), a = e.atoms.sorting?.get();
-	if (!i.rows.length || !a?.length) return i;
-	let o = [], s = a.filter((n) => {
-		let r = e.getColumn(n.id);
-		return r ? t(r) : !1;
+	let t = e.getPreSortedRowModel(), a = e.atoms.sorting?.get();
+	if (!t.rows.length || !a?.length) return t;
+	let o = [], s = a.filter((t) => {
+		let r = e.getColumn(t.id);
+		return r ? n(r) : !1;
 	});
-	if (!s.length) return i;
+	if (!s.length) return t;
 	let c = [];
 	for (let t = 0; t < s.length; t++) {
 		let n = s[t], i = e.getColumn(n.id);
@@ -56,33 +56,33 @@ function l(e) {
 	}, u = (e) => {
 		let t = e.slice();
 		t.sort(l);
-		let r = !1;
-		for (let i = 0; i < t.length; i++) {
-			let a = t[i];
-			a !== e[i] && (r = !0);
+		let n = !1;
+		for (let r = 0; r < t.length; r++) {
+			let a = t[r];
+			a !== e[r] && (n = !0);
 			let s = o.length;
 			if (o.push(a), a.subRows.length) {
 				let e = u(a.subRows);
 				if (e.changed) {
 					let c = Object.create(Object.getPrototypeOf(a));
-					n(c, a), c.subRows = e.rows, t[i] = c, o[s] = c, r = !0;
+					i(c, a), c.subRows = e.rows, t[r] = c, o[s] = c, n = !0;
 				}
 			}
 		}
 		return {
 			rows: t,
-			changed: r
+			changed: n
 		};
 	};
 	return {
-		rows: u(i.rows).rows,
+		rows: u(t.rows).rows,
 		flatRows: o,
-		rowsById: i.rowsById
+		rowsById: t.rowsById
 	};
 }
 //#endregion
 //#region src/react/components/use-table-selection.ts
-var u = /* @__PURE__ */ o(s(), 1), d = /* @__PURE__ */ new Map();
+var u = /* @__PURE__ */ e(a(), 1), d = /* @__PURE__ */ new Map();
 function f(e) {
 	let t = (0, u.useId)(), n = (0, u.useRef)(e);
 	return n.current = e, (0, u.useEffect)(() => (d.set(t, () => n.current()), () => {
@@ -92,6 +92,6 @@ function f(e) {
 	}, [t]);
 }
 //#endregion
-export { c as n, f as t };
+export { c as createSortedRowModel, f as useTableSelection };
 
-//# debugId=2e2dcca0-a664-496a-a593-937ecc2fd209
+//# debugId=cf2bed7a-b623-4d5c-9660-b1e6d3b0412a

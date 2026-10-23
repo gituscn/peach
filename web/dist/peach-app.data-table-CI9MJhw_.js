@@ -1,22 +1,22 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "74a05bab-3494-45f9-ba22-a1fde6a6c540", e._sentryDebugIdIdentifier = "sentry-dbid-74a05bab-3494-45f9-ba22-a1fde6a6c540");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "021f7b59-d6d4-46a2-932a-369d52f583a9", e._sentryDebugIdIdentifier = "sentry-dbid-021f7b59-d6d4-46a2-932a-369d52f583a9");
 	} catch {}
 })();
-import { t as e } from "./peach-app.createPaginatedRowModel-Cb5ojTIu.js";
-import { n as t, t as n } from "./peach-app.use-table-selection-KrR-g6fk.js";
-import { Ai as r, Bi as i, Fi as a, Gi as o, Ji as s, Mi as c, Ni as l, Pi as u, Ri as d, Va as f, Vi as p, Wi as m, Xa as h, Yi as g, as as _, cu as v, ec as y, fs as b, is as x, ji as S, na as C, ns as w, pu as T, qi as E, rs as D, to as O, ts as k, uu as A, zi as j } from "./peach-app.js";
+import { createPaginatedRowModel as e } from "./peach-app.createPaginatedRowModel-DKa1ysea.js";
+import { createSortedRowModel as t, useTableSelection as n } from "./peach-app.use-table-selection-Bi_E2zbh.js";
+import { $76d00c5a4edb230a$export$76ccd210b9029917 as r, $76d00c5a4edb230a$export$816b5d811295e6bc as i, $76d00c5a4edb230a$export$b59bdbef9ce70de2 as a, $76d00c5a4edb230a$export$f6f0c3fe4ec306ea as o, $76d00c5a4edb230a$export$f850895b287ef28e as s, Button as c, Checkbox as l, ChevronSortDown as u, DataTableFooter as d, DataTableFrame as f, DataTableSort as p, SelectionDock as m, Table as h, TableColumnControls as g, TableColumnResizer as _, TableSelectionHeader as v, __toESM as y, cardClass as b, columnVisibilityFeature as x, createColumnHelper as S, flexRender as C, require_jsx_runtime as w, require_react as T, rowPaginationFeature as E, rowSelectionFeature as D, rowSortingFeature as O, tableFeatures as k, useTable as A, useTablePreferences as j } from "./peach-app.js";
 //#region src/react/components/data-table.tsx
-var M = /* @__PURE__ */ T(A(), 1), N = v(), P = s({
-	rowSortingFeature: p,
-	rowSelectionFeature: m,
-	rowPaginationFeature: o,
-	columnVisibilityFeature: E,
+var M = /* @__PURE__ */ y(T(), 1), N = w(), P = k({
+	rowSortingFeature: O,
+	rowSelectionFeature: D,
+	rowPaginationFeature: E,
+	columnVisibilityFeature: x,
 	sortedRowModel: t(),
 	paginatedRowModel: e()
 });
-function F({ label: e, items: t, columns: o, rowId: s, rowLabel: p, selected: m, onSelected: v, actions: T, title: E = e, titleId: A, description: F, footerActions: I, panel: L = !0, unit: R = "条记录" }) {
+function F({ label: e, items: t, columns: y, rowId: x, rowLabel: w, selected: T, onSelected: E, actions: D, title: O = e, titleId: k, description: F, footerActions: I, panel: L = !0, unit: R = "条记录" }) {
 	let [z, B] = (0, M.useState)([]), V = (0, M.useMemo)(() => [{
 		id: "select",
 		label: "选择",
@@ -24,30 +24,30 @@ function F({ label: e, items: t, columns: o, rowId: s, rowLabel: p, selected: m,
 		min: 48,
 		max: 48,
 		required: !0
-	}, ...o.map((e, t) => ({
+	}, ...y.map((e, t) => ({
 		...e,
 		width: e.width ?? (t === 0 ? 320 : 160),
 		min: e.min ?? (t === 0 ? 320 : 96),
 		flex: e.flex ?? t === 0,
 		required: t === 0
-	}))], [o]), H = l(`data:${e}`, V), [U, W] = (0, M.useState)({
+	}))], [y]), H = j(`data:${e}`, V), [U, W] = (0, M.useState)({
 		pageIndex: 0,
 		pageSize: 20
-	}), G = n(() => v([])), K = Math.max(1, Math.ceil(t.length / U.pageSize)), q = Math.min(U.pageIndex, K - 1), J = Object.fromEntries(m.map((e) => [e, !0])), Y = (0, M.useMemo)(() => {
-		let t = g();
+	}), G = n(() => E([])), K = Math.max(1, Math.ceil(t.length / U.pageSize)), q = Math.min(U.pageIndex, K - 1), J = Object.fromEntries(T.map((e) => [e, !0])), Y = (0, M.useMemo)(() => {
+		let t = S();
 		return t.columns([t.display({
 			id: "select",
-			header: ({ table: t }) => /* @__PURE__ */ (0, N.jsx)(r, {
+			header: ({ table: t }) => /* @__PURE__ */ (0, N.jsx)(v, {
 				table: t,
 				label: `全选${e}`
 			}),
-			cell: ({ row: e }) => /* @__PURE__ */ (0, N.jsx)(h, {
+			cell: ({ row: e }) => /* @__PURE__ */ (0, N.jsx)(l, {
 				slot: null,
-				"aria-label": `选择 ${p(e.original)}`,
+				"aria-label": `选择 ${w(e.original)}`,
 				isSelected: e.getIsSelected(),
 				onChange: (t) => e.toggleSelected(t)
 			})
-		}), ...o.map((e) => t.accessor((t) => e.value?.(t) ?? "", {
+		}), ...y.map((e) => t.accessor((t) => e.value?.(t) ?? "", {
 			id: e.id,
 			header: e.label,
 			enableSorting: !!e.value,
@@ -58,14 +58,14 @@ function F({ label: e, items: t, columns: o, rowId: s, rowLabel: p, selected: m,
 			cell: ({ row: t }) => e.render(t.original)
 		}))]);
 	}, [
-		o,
+		y,
 		e,
-		p
-	]), X = i({
+		w
+	]), X = A({
 		features: P,
 		data: t,
 		columns: Y,
-		getRowId: s,
+		getRowId: x,
 		state: {
 			sorting: z,
 			rowSelection: J,
@@ -86,12 +86,12 @@ function F({ label: e, items: t, columns: o, rowId: s, rowLabel: p, selected: m,
 		enableRowSelection: !0,
 		onRowSelectionChange: (e) => {
 			let n = typeof e == "function" ? e(J) : e;
-			Object.values(n).some(Boolean) && G(), v(t.filter((e) => n[s(e)]).map(s));
+			Object.values(n).some(Boolean) && G(), E(t.filter((e) => n[x(e)]).map(x));
 		}
 	}), Z = X.getSelectedRowModel().rows.map((e) => e.original);
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		"data-data-table-panel": L || void 0,
-		className: L ? f({
+		className: L ? b({
 			padding: "none",
 			bordered: "line",
 			className: "flex flex-col gap-4 px-6 py-5 max-sm:px-4"
@@ -104,21 +104,21 @@ function F({ label: e, items: t, columns: o, rowId: s, rowLabel: p, selected: m,
 				children: [/* @__PURE__ */ (0, N.jsxs)("div", {
 					"data-toolbar-heading": "",
 					children: [/* @__PURE__ */ (0, N.jsx)("h3", {
-						id: A,
+						id: k,
 						className: "text-title-2-medium text-text-primary",
-						children: E
+						children: O
 					}), /* @__PURE__ */ (0, N.jsx)("span", {
 						className: "text-body-2-regular tabular-nums text-text-secondary",
 						children: `${t.length.toLocaleString()} ${R}`
 					})]
 				}), /* @__PURE__ */ (0, N.jsxs)("div", {
 					"data-toolbar-actions": "",
-					children: [/* @__PURE__ */ (0, N.jsx)(S, {
+					children: [/* @__PURE__ */ (0, N.jsx)(g, {
 						preferences: H,
 						label: e
-					}), /* @__PURE__ */ (0, N.jsx)(a, {
+					}), /* @__PURE__ */ (0, N.jsx)(p, {
 						label: e,
-						options: o.filter((e) => e.value).map((e) => ({
+						options: y.filter((e) => e.value).map((e) => ({
 							id: e.id,
 							label: e.label
 						})),
@@ -136,22 +136,22 @@ function F({ label: e, items: t, columns: o, rowId: s, rowLabel: p, selected: m,
 				className: "text-body-2-regular text-text-secondary",
 				children: F
 			}) : null,
-			/* @__PURE__ */ (0, N.jsxs)(y, {
+			/* @__PURE__ */ (0, N.jsxs)(m, {
 				label: `${e}批量操作`,
 				visible: Z.length > 0,
 				count: `已选 ${Z.length.toLocaleString()} ${R}`,
-				children: [T(Z, () => v([])), /* @__PURE__ */ (0, N.jsx)(b, {
+				children: [D(Z, () => E([])), /* @__PURE__ */ (0, N.jsx)(c, {
 					variant: "ghost",
 					size: "small",
-					onClick: () => v([]),
+					onClick: () => E([]),
 					children: "取消选择"
 				})]
 			}),
-			/* @__PURE__ */ (0, N.jsx)(d, {
+			/* @__PURE__ */ (0, N.jsx)(f, {
 				follow: !0,
 				preferences: H,
 				onRowClick: (e) => X.getRow(e)?.toggleSelected(),
-				children: /* @__PURE__ */ (0, N.jsxs)(j, {
+				children: /* @__PURE__ */ (0, N.jsxs)(h, {
 					"aria-label": e,
 					size: "sm",
 					sortDescriptor: z[0] ? {
@@ -159,9 +159,9 @@ function F({ label: e, items: t, columns: o, rowId: s, rowLabel: p, selected: m,
 						direction: z[0].desc ? "descending" : "ascending"
 					} : void 0,
 					onSortChange: (e) => X.getColumn(String(e.column))?.toggleSorting(e.direction === "descending"),
-					children: [/* @__PURE__ */ (0, N.jsxs)(_, { children: [X.getHeaderGroups()[0].headers.map((e) => /* @__PURE__ */ (0, N.jsx)(w, {
+					children: [/* @__PURE__ */ (0, N.jsxs)(s, { children: [X.getHeaderGroups()[0].headers.map((e) => /* @__PURE__ */ (0, N.jsx)(i, {
 						id: e.id,
-						isRowHeader: e.id === o[0].id,
+						isRowHeader: e.id === y[0].id,
 						allowsSorting: e.column.getCanSort(),
 						...H.columnProps(e.id),
 						children: ({ sortDirection: t }) => /* @__PURE__ */ (0, N.jsxs)(N.Fragment, { children: [/* @__PURE__ */ (0, N.jsxs)("span", {
@@ -169,29 +169,29 @@ function F({ label: e, items: t, columns: o, rowId: s, rowLabel: p, selected: m,
 							children: [C(e.column.columnDef.header, e.getContext()), e.column.getCanSort() ? /* @__PURE__ */ (0, N.jsx)("span", {
 								"data-sort-indicator": !0,
 								"data-direction": t || void 0,
-								children: /* @__PURE__ */ (0, N.jsx)(O, {})
+								children: /* @__PURE__ */ (0, N.jsx)(u, {})
 							}) : null]
-						}), /* @__PURE__ */ (0, N.jsx)(c, {
+						}), /* @__PURE__ */ (0, N.jsx)(_, {
 							preferences: H,
 							id: e.id
 						})] })
-					}, e.id)), /* @__PURE__ */ (0, N.jsx)(w, {
+					}, e.id)), /* @__PURE__ */ (0, N.jsx)(i, {
 						id: "remaining-space",
 						"aria-label": "行空白区域",
 						"data-table-space": "",
 						width: H.spaceWidth,
 						minWidth: 0
-					})] }), /* @__PURE__ */ (0, N.jsx)(k, {
+					})] }), /* @__PURE__ */ (0, N.jsx)(r, {
 						renderEmptyState: () => "没有记录",
-						children: X.getRowModel().rows.map((e) => /* @__PURE__ */ (0, N.jsxs)(D, {
+						children: X.getRowModel().rows.map((e) => /* @__PURE__ */ (0, N.jsxs)(a, {
 							id: e.id,
 							"data-board-selected": e.getIsSelected() || void 0,
-							children: [e.getVisibleCells().map((e) => /* @__PURE__ */ (0, N.jsx)(x, { children: C(e.column.columnDef.cell, e.getContext()) }, e.id)), /* @__PURE__ */ (0, N.jsx)(x, { "data-table-space": "" })]
+							children: [e.getVisibleCells().map((e) => /* @__PURE__ */ (0, N.jsx)(o, { children: C(e.column.columnDef.cell, e.getContext()) }, e.id)), /* @__PURE__ */ (0, N.jsx)(o, { "data-table-space": "" })]
 						}, e.id))
 					})]
 				})
 			}),
-			/* @__PURE__ */ (0, N.jsx)(u, {
+			/* @__PURE__ */ (0, N.jsx)(d, {
 				label: e,
 				total: t.length,
 				pagination: {
@@ -209,6 +209,6 @@ function F({ label: e, items: t, columns: o, rowId: s, rowLabel: p, selected: m,
 	});
 }
 //#endregion
-export { F as t };
+export { F as DataTable };
 
-//# debugId=74a05bab-3494-45f9-ba22-a1fde6a6c540
+//# debugId=021f7b59-d6d4-46a2-932a-369d52f583a9
