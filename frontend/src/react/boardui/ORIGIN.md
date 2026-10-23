@@ -56,6 +56,7 @@
 | 焦点环 | 输入框只画 BoardUI 外框上的 `ring`；`web/css/01-base.css` 的全局 `:focus-visible` 排除 `.peach-react` 子树 | 旧样式表排在后面，同特指度时会盖过 `outline-none`，内层输入框多出一圈 |
 | 与旧样式表同名的类 | 网格容器放在 flex 父元素里写 `inline-grid`，块级化后按 `display:grid` 计算，类名不和卡片网格撞，也不触发任意值 lint；`../styles.css` 用 `@source not inline("ring")` 不生成注释里扫到的 `ring`；`frontend/test/legacy-class-names.test.ts` 核对产物与旧样式表无同名类 | 旧样式表排在后面，卡片网格那条同名规则会把 `grid-cols-*` 压成一列，生成的 `.ring` 也会落到旧页面的 `.ring` 元素上 |
 | 下拉框内前缀 | `../components/select.tsx` 的 `Select` 收一个 `prefix`，经上游的 `renderValue` 在值前面画一段 `text-tertiary` 名称（`aria-hidden`），再补 3px（`sm` 2px）让它与值隔开 8px（`sm` 6px）；`SelectItem` 原样转出 | 工具栏与重复块里的下拉没有字段标签，只看值说不清在选什么；上游 `select` 条目没有前缀槽 |
+| 下拉面板宽度 | `../styles.css` 给 `[data-trigger='Select']` 加 `min-width: var(--trigger-width)`；上游的 `w-[266px]` 不动 | 上游面板定宽 266px，表单里通栏的触发框展开后只剩半截；React Aria 的惯例是面板跟触发框同宽，取下限是为了让比 266px 窄的触发框照旧展开到 266px |
 | 行内字形 | 带字的 `Button`、`ButtonLink` 与 `LinkButton` 的字形由 `../styles.css` 按结构改取 `--icon-inline`（1.2em）；目录树的文件夹字形经 `TreeViewItem` 的 `iconClassName` 传 `size-(--icon-inline)` | 字形与同行文字按字号一起缩放，各档文字字号不同，上游按档位写死的 20、18、14px 在小字号上显大 |
 | 提交键忙态 | 写 `aria-busy` 与 `aria-disabled`，不画 Spinner | `button` 条目没有加载态 |
 | 行内提示 | `../components/note.tsx` 的 `Note` 按语气取 `status-yellow`、`background-tertiary-error`、`notification-*` token 组合；正文与动作按内容宽度换行，`below` 将动作固定在下方 | 注册表里没有行内 Note 组件；`notification` 条目是带关闭键和动效的浮动通知 |
