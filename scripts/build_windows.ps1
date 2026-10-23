@@ -37,9 +37,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $ProjectRoot 'resources\peach.ico') 
     throw 'Brand assets are missing. Run scripts/generate_brand_assets.py first.'
 }
 
-if (Test-Path -LiteralPath (Join-Path $ProjectRoot 'resources\seed')) {
-    throw 'Private entity exports must stay outside the application resources directory.'
-}
+& $Python -X utf8 (Join-Path $ProjectRoot 'scripts/seed_pack.py') validate --pack (Join-Path $ProjectRoot 'resources\seed\entities.json')
+if ($LASTEXITCODE -ne 0) { throw 'Public entity seed validation failed.' }
 
 # Frontend bundles ship inside `--add-data web;web` and the runtime has no Node, so they
 # must be rebuilt here: web/dist is committed to Git, but packaging reads the working tree,

@@ -4,7 +4,7 @@
 
 `resources/marks/` 保存用于实体身份展示的内置标识，来源记录与文件哈希见同目录 `manifest.json`。来源可追溯不等于取得图片版权或商标授权，图片也不因与应用同仓库就自动适用 AGPL。
 
-Life Promotion 标识的公开分发授权依据未取得，发行资源不收录其图片。`scripts/sync_brand_marks.py` 的发行排除项同时覆盖裸文件、`icon` 和 `logo`，保留用户本机已有图片及实体来源链接；缺少本机图片时沿用界面的文字／首字回退。此项不改变 ADR-0026 对其他实体标识的收录边界。
+厂牌与事务所标识按 ADR-0026 随应用分发，包括裸文件、`icon` 和 `logo` 变体；`scripts/sync_brand_marks.py` 同步文件与来源记录。本机缓存、实体来源链接和缺图时的文字／首字回退由既有预览服务处理。
 
 ## GitLab 与 R2 发布
 
@@ -674,7 +674,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 - macOS Ledger 同步在共享根判为 `offline` 时先经 NetFS 挂载 `peach-sync` 再重判，挂载失败才保留离线结果，不弹阻塞认证框。
 - 浏览历史增量采集使用 SQLite backup API 与 `browserexport`，也接受 Google Takeout ZIP；原始 URL 与标题只留本机私有目录，聚合候选不写 ledger。
 - 首次设置的可选历史引导转到 `/taste?onboarding=1`，用现有读取与导入入口；指南链接按 [Google 导出说明](https://support.google.com/accounts/answer/3024190?hl=zh-Hans) 与 [browserexport](https://github.com/purarue/browserexport) 核验（2026-09-06）。
-- 实体事实包默认保存在私有 Peach 数据目录：`scripts/seed_pack.py export` 只读账本生成 `state/seed/entities.json`，不随仓库或发行包分发（ADR-0111）。Windows 构建与制品验收均拒绝发行资源中的 `seed` 目录。已有私有包由扫描结算后的种子后继导入，幂等键绑定内容摘要。v2 结构校验复用已固定的 Pydantic，SQLite 历史表记录版本、修订与累计精确撤销，防止旧包回放；别名保留源 confidence，用户资料由归属保护。种子不含图片；包中缺席不视为错误撤销。分发边界、复核与纠错见 ADR-0073、ADR-0075、[ADR-0106](adr/0106-seed-correction-history-and-explicit-withdrawals.md)。
+- 实体事实包位于 `resources/seed/entities.json`，维护者显式导出、复核并随应用版本分发。`scripts/seed_pack.py export` 只读账本，继承累计撤销；用户升级后，扫描与采集结算后的种子后继按内容摘要派发导入。wheel、Docker 和桌面构建共用资源清单，缺包即拒绝打包；桌面制品验收核对 v2 格式和摘要。结构校验复用已固定的 Pydantic 2.14.1（MIT），摘要使用 Python 标准库 SHA-256，持久导入历史和纠错复用既有 SQLite 实现，无新增依赖；不引入远端更新器或加密容器。别名保留源 confidence，用户资料由归属保护，种子不含图片，包中缺席不视为错误撤销。维护流程见[实体事实种子](SEED.md)，分发边界见 [ADR-0117](adr/0117-public-entity-seed-distribution.md)，纠错见 [ADR-0106](adr/0106-seed-correction-history-and-explicit-withdrawals.md)。
 - 数据管理首屏直接复用实际 `cleanupfieldset` 正文和操作条，只有计数等待取数；资源同步与重复文件网盘操作根据 `/api/sources` 已配置来源显示，离线来源保留入口。资源同步的检查与执行覆盖已配置的 local、115、PikPak，一次检查同时报失效记录、空文件夹与孤儿缓存；按目录清理也支持本地磁盘。
 
 ## 必须复用的成熟实现

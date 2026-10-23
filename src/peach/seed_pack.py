@@ -1,4 +1,4 @@
-"""实体事实的私有种子包：只给已有实体填空（ADR-0073、ADR-0075、ADR-0111）。
+"""随应用分发的实体事实种子包（ADR-0073、ADR-0075、ADR-0117）。
 
 导出的是女优、厂牌与事务所名下**能在公开站点上重新查到**的文字事实：别名、站上编号、
 官网与社媒链接、女优资料表、所属事务所、label 归哪家片商。不导任何图像字节、本机路径、
@@ -25,12 +25,12 @@ from . import seed_corrections, seed_validation
 from .entities import _ref_is_free, normalize_entity_name
 from .minnano_av import PROFILE_COLUMNS
 from .performer_profiles import read_profile, write_profile
-from .config import STATE_DIR
+from .config import PROJECT_ROOT
 from .social_links import canonical_url
 
 FORMAT = 1
 SOURCE = "auto:seed"
-DEFAULT_PACK = STATE_DIR / "seed" / "entities.json"
+DEFAULT_PACK = PROJECT_ROOT / "resources" / "seed" / "entities.json"
 #: 导出的实体种类。创作者、系列与标签是本机馆藏的投影，不在这里。
 KINDS = ("performer", "studio", "agency")
 #: 不导的站上编号：Stash 的 id 是那台机器上另一份数据库的行号。

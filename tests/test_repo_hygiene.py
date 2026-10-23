@@ -33,7 +33,6 @@ PRIVATE_CONTEXT_DOCUMENTS = frozenset({
 })
 PRIVATE_CONTEXT_PATHS = frozenset({
     "docs/reference-snapshots/tag-vocabulary-audit.md", "docs/scraping-audit.csv",
-    "resources/seed/entities.json",
 })
 PRIVATE_ARTIFACT_ROOTS = frozenset({
     "peach-data", "peach-sync", "peach-worktrees", "secrets", "generated", "review", "attic", "build",
@@ -71,7 +70,8 @@ class PrivateArtifactTests(unittest.TestCase):
             with self.subTest(path=name):
                 self.assertTrue(_private_artifact(name))
         for name in ("docs/REUSE.md", "docs/OPERATIONS.md", "docs/TESTING.md",
-                     "tests/test_job_status.py", "web/dist/peach-app.js", ".env.example"):
+                     "tests/test_job_status.py", "web/dist/peach-app.js", ".env.example",
+                     "resources/seed/entities.json"):
             with self.subTest(path=name):
                 self.assertFalse(_private_artifact(name))
 
@@ -86,7 +86,7 @@ class PrivateArtifactTests(unittest.TestCase):
         names += sorted(PRIVATE_CONTEXT_PATHS)
         names += ["peach-data/review/catalog.csv", "secrets/access.json", "review/catalog.csv",
                   "attic/evidence/session.json"]
-        public_sources = ["frontend/src/react/review/review-page.tsx"]
+        public_sources = ["frontend/src/react/review/review-page.tsx", "resources/seed/entities.json"]
         done = subprocess.run(["git", "check-ignore", "--no-index", "-z", "--stdin"], cwd=REPO,
                               input=("\0".join([*names, *public_sources]) + "\0").encode("utf-8"),
                               capture_output=True, check=False)
