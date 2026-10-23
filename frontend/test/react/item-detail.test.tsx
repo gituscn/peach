@@ -618,7 +618,7 @@ describe('侧栏怎么读', () => {
     expect(document.activeElement).toBe(host.querySelector('#tagPlus'));
     await click(host.querySelector('#tagPlus'));
     await act(async () => { await new Promise((done) => setTimeout(done, 0)) });
-    await act(async () => { document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })) });
+    await act(async () => { document.body.dispatchEvent(new MouseEvent('click', { bubbles: true })) });
     expect(picker.hidden).toBe(true);
   });
 });

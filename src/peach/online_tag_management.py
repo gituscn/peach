@@ -12,6 +12,7 @@ from .profiles import DEFAULT_PROFILE_ID, read_settings
 
 SETTINGS_KEY = 'online_tag_management'
 ITEM_TAGS_KEY = 'online_item_tags'
+ITEM_HIDDEN_TAGS_KEY = 'online_item_hidden_tags'
 TYPE_RANK = {'general': 0, 'metadata': 1, 'copyright': 2, 'character': 3, 'artist': 4}
 
 
@@ -24,6 +25,7 @@ class OnlineTagPolicy:
         settings = read_settings(connection) if connection is not None else {}
         self.groups = settings.get(SETTINGS_KEY, {})
         self.item_tags = settings.get(ITEM_TAGS_KEY, {})
+        self.item_hidden_tags = settings.get(ITEM_HIDDEN_TAGS_KEY, {})
         self.members = {tag_key(member): group_id for group_id, group in self.groups.items()
                         for member in [*group['members'], *group['aliases'], group['name']]}
 
@@ -37,9 +39,14 @@ class OnlineTagPolicy:
     def with_custom_tags(self, item):
         """在读取副本中叠加用户标签，来源 metadata 保持独立。"""
         custom = self.custom_tags(item)
-        if not custom:
+        hidden = self.item_hidden_tags.get(self.item_key(item), [])
+        if not custom and not hidden:
             return item
-        return replace(item, metadata={**item.metadata, '_user_tags': custom})
+        excluded = set()
+        for tag in hidden:
+            group = self.groups.get(self.identity(tag)[0], {})
+            excluded.update(tag_key(word) for word in [tag, group.get('name', tag), *group.get('members', []), *group.get('aliases', [])])
+        return replace(item, metadata={**item.metadata, '_user_tags': custom, '_user_hidden_tags': sorted(excluded)})
 
     def blocked(self, tags) -> bool:
         return any(self.groups.get(self.identity(tag)[0], {}).get('blocked', False) for tag in tags)
@@ -155,10 +162,10 @@ def _save_settings(connection, settings):
 
 
 def write_item_tag(connection, item, body):
-    """给在线条目添加或移除手动标签。"""
+    """保存在线条目的手动标签与单条隐藏决定，保留来源证据。"""
     operation = body.get('operation')
     name = unicodedata.normalize('NFKC', str(body.get('tag') or '')).strip()
-    if operation not in {'add', 'remove'}:
+    if operation not in {'add', 'remove', 'restore'}:
         raise ValueError('未知的手动标签操作')
     if not 0 < len(name) <= 80 or ',' in name or any(ord(char) < 32 for char in name):
         raise ValueError('标签名须为 1 至 80 个字符，不含逗号或控制字符')
@@ -167,14 +174,22 @@ def write_item_tag(connection, item, body):
     canonical = policy.query_name(name)
     key = policy.identity(canonical)[0]
     all_tags = settings.setdefault(ITEM_TAGS_KEY, {})
+    all_hidden = settings.setdefault(ITEM_HIDDEN_TAGS_KEY, {})
     tags = list(all_tags.get(policy.item_key(item), []))
+    hidden = [tag for tag in all_hidden.get(policy.item_key(item), []) if policy.identity(tag)[0] != key]
     tags = [tag for tag in tags if policy.identity(tag)[0] != key]
     if operation == 'add':
         if len(tags) >= 100:
             raise ValueError('每条内容最多添加 100 个手动标签')
         tags.append(canonical)
+    elif operation == 'remove':
+        hidden.append(canonical)
     if tags:
         all_tags[policy.item_key(item)] = tags
     else:
         all_tags.pop(policy.item_key(item), None)
+    if hidden:
+        all_hidden[policy.item_key(item)] = hidden
+    else:
+        all_hidden.pop(policy.item_key(item), None)
     _save_settings(connection, settings)

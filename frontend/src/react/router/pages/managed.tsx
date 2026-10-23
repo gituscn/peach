@@ -15,6 +15,7 @@ import { useContext, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useLocation } from 'react-router';
 
 import { appSettingsStore } from '@peach/appearance';
+import { followManageParams } from '../../follow-manage/manage-route';
 import {
   isOverlayPath, managedEntry, openManagedRoute, peachHistory, releaseManagedRoute, shellNavigate,
   configurationSection, updateManagedRoute,
@@ -47,7 +48,6 @@ interface Runtime {
   ledger_writer_origin?: string;
 }
 
-const FOLLOW_MANAGE_TABS = ['list', 'add', 'feeds'];
 
 const readStarted = () => pageOpens > 0;
 /** 壳开始路由没有（`pageOpens` 大于 0）。 */
@@ -103,12 +103,7 @@ async function openProps(path: ManagedPath, run: Run): Promise<object | null> {
     return { category: isReviewCategory(category) ? category : '', ...writerProps(runtime, '/review') } satisfies ManagedOpenProps['/review'];
   }
   if (path === '/subscriptions') {
-    const params = search(), tab = params.get('tab') || '';
-    const route = {
-      tab: FOLLOW_MANAGE_TABS.includes(tab) ? tab : 'list',
-      page: Math.max(1, Math.floor(Number(params.get('page'))) || 1),
-      sort: params.get('sort') || '', dir: params.get('dir') || '',
-    };
+    const route = followManageParams('?' + search().toString());
     const runtime = await readRuntime(run);
     if (!run.live) return null;
     const preferences = appSettingsStore().value;

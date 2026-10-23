@@ -23,6 +23,7 @@ import type { FollowManageProps } from '../bundle';
 import { cardClass } from '../components/card';
 import { Note } from '../components/note';
 import { Page } from '../components/page';
+import { TagManager } from '../index/tag-manager';
 import { PillAriaTabList } from '../components/pill-aria-tab-list';
 import { STAT_STRIP_SIX } from '../components/stat-card';
 import { ExternalLink } from '../settings/section';
@@ -36,10 +37,8 @@ import {
   SORT_DEFAULT_DIR, type CredentialData, type FollowData, type Layout, type SortDir, type SortKey,
 } from './follow-manage';
 import { SourceList } from './source-list';
+import { FOLLOW_MANAGE_TAB_ITEMS as TABS } from './manage-route';
 
-const TABS = [
-  ['list', '关注列表'], ['add', '添加关注'], ['feeds', 'JAV 订阅源'],
-] as const;
 type TabKey = (typeof TABS)[number][0];
 
 const isTab = (value: unknown): value is TabKey => TABS.some(([key]) => key === value);
@@ -185,6 +184,10 @@ export function FollowManagePage(props: FollowManageProps) {
 
         <TabPanel id="feeds" className="flex flex-col gap-4">
           <FeedSources readOnly={readOnly} toast={toast} />
+        </TabPanel>
+
+        <TabPanel id="tags" className="flex flex-col gap-4">
+          <TagManager scope="online" />
         </TabPanel>
 
       </Tabs>

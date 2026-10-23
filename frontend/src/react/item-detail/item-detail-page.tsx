@@ -7,13 +7,13 @@
  *
  * 写操作（评分、标签、反馈、稍后看、高清目标、偏好、播放列表排序与移出）都在岛里发，成功后
  * 把服务端回的那几个字段换进 `['item', id]`，目录网格缓存里的同一张卡一起换，不重读列表。 */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { fmtDur, fmtSize, icon, requestErrorMessage } from '@peach/legacy/core';
 import {
   coverUrl, mixLabel, performerLabel, queueAvatarHtml, queueThumbHtml,
 } from '@peach/card-art';
-import { confirmModal, dismissMenu, presentMenu, spinnerHtml } from '@peach/legacy/ui';
+import { confirmModal, spinnerHtml } from '@peach/legacy/ui';
 
 import { apiGet, apiSend } from '../../api';
 import { Button } from '@/components/base/buttons/button';
@@ -25,6 +25,7 @@ import { RetryNote } from '../components/grid-reveal';
 import { MixQueue, MixQueueRow } from '../components/mix-queue';
 import { RelatedSection } from '../components/related-section';
 import { DetailContinuation } from '../components/detail-continuation';
+import { DetailTags } from '../components/detail-tags';
 import { RatingStars } from '../components/rating-stars';
 import { CollapseChevron } from '../components/collapse-region';
 import { IdentityCell, IdentitySeries } from '../components/identity-cell';
@@ -40,11 +41,11 @@ import { LibraryCompletionPrompt, missingPreviewIds } from '../library-processin
 import {
   CAST_SHOWN, EDITION_TONE, FEEDBACK_URL, ITEM_TAG_URL, PLAYLIST_URL, PREFERENCE_URL, QUALITY_GOAL_URL,
   RELATED_URL, WATCH_LATER_URL, chooseItem, clampRating, detailTags, feedbackReceipt, fetchItem, fetchQueue,
-  hasTag, identityGroups, isVanished, itemKey, mediaGate, movedOrder, nextPart, nextRating, partLabel, partLabelHtml, pickerSections, playlistQueue,
-  queueCopy, queueKey, ratingStars, ratingText, realWatched, recentTags, relatedKey, rememberTag, sameOrder,
+  hasTag, identityGroups, isVanished, itemKey, mediaGate, movedOrder, nextPart, nextRating, partLabel, partLabelHtml, playlistQueue,
+  queueCopy, queueKey, ratingStars, ratingText, realWatched, relatedKey, rememberTag, sameOrder,
   withPartLabel, withTag, withoutTag,
   type DetailEntityRef, type DetailItem, type DetailQueue, type DetailTag, type ItemDetailActions,
-  type ItemDetailHelpers, type ItemDetailProps, type MediaGate, type PlaylistPayload, type TagCount,
+  type ItemDetailHelpers, type ItemDetailProps, type MediaGate, type PlaylistPayload,
 } from './item-detail';
 
 /** 字形原样取壳那一份 `icon()`：骨架与遗留详情画的就是它，换成别的字形接管那一拍会跳。 */
@@ -559,129 +560,11 @@ function Identity({ item, actions }: { item: DetailItem; helpers: ItemDetailHelp
 function Tags({ item, write, helpers, actions }: {
   item: DetailItem; write: DetailWrite; helpers: ItemDetailHelpers; actions: ItemDetailActions;
 }) {
-  const tags = detailTags(item, helpers);
-  return (
-    <div data-stage-tags="" id="detailTags" data-item-tags="">
-      {tags.map((tag) => (
-        <span key={tag.k} data-detail-tag="">
-          <button type="button" data-tag={tag.k} title={helpers.tagLabel(tag.k)} onClick={() => actions.openTag(tag.k)}>{helpers.tagLabel(tag.k)}</button>
-          <button type="button" data-remove-tag={tag.k} title="从此视频隐藏该标签"
-            aria-label={`删除标签 ${helpers.tagLabel(tag.k)}`} {...write.busyAttrs(`tag:${tag.k}`)}
-            onClick={() => write.removeTag(tag)}><Glyph name="x" /></button>
-        </span>
-      ))}
-      <TagPicker item={item} write={write} helpers={helpers} />
-    </div>
-  );
-}
-
-/* 标签选择器：最近使用 + 全部（或搜索结果），上下键挑、回车加，输入的词没有完全命中就多一格
-   「新建」。开合走全站菜单那一对口（`presentMenu`／`dismissMenu`），`hidden` 由它们管。
-   选字过程中框里是半截拼音，筛选按 `term` 走、组完字才跟上，不拿「zhon」去筛。 */
-function TagPicker({ item, write, helpers }: { item: DetailItem; write: DetailWrite; helpers: ItemDetailHelpers }) {
-  const plus = useRef<HTMLButtonElement>(null);
-  const picker = useRef<HTMLDivElement>(null);
-  const search = useRef<HTMLInputElement>(null);
-  const composing = useRef(false);
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [term, setTerm] = useState('');
-  const [active, setActive] = useState(-1);
-  const close = useCallback(() => {
-    if (picker.current) dismissMenu(picker.current);
-    setOpen(false);
-  }, []);
-  /* 点外面就收起。延一拍再挂：打开它的这一次 pointerdown 还在冒泡，立刻挂上会自己把自己关掉。 */
-  useEffect(() => {
-    if (!open) return undefined;
-    const handler = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!picker.current?.contains(target) && target !== plus.current) close();
-    };
-    const timer = setTimeout(() => document.addEventListener('pointerdown', handler, true), 0);
-    return () => { clearTimeout(timer); document.removeEventListener('pointerdown', handler, true) };
-  }, [open, close]);
-  const sections = open ? pickerSections(term, helpers.tagCandidates(), recentTags()) : { recent: [], results: [], create: '' };
-  const options = [...sections.recent, ...sections.results, ...(sections.create ? [{ k: sections.create, n: -1 }] : [])];
-  const pick = (tag: TagCount, selected: boolean) => {
-    close();
-    if (!selected) write.addTag(tag.k);
-  };
-  const keydown = (event: KeyboardEvent<HTMLInputElement>) => {
-    /* 选字那一下的回车是定字，不是「新建这个标签」——半截拼音会真的建成标签。 */
-    if (event.nativeEvent.isComposing) return;
-    if (event.key === 'Escape') { event.preventDefault(); close(); plus.current?.focus(); return }
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      if (!options.length) return;
-      const next = (active + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
-      setActive(next);
-      picker.current?.querySelectorAll('[data-pick]')[next]?.scrollIntoView({ block: 'nearest' });
-      return;
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      const chosen = active >= 0 ? options[active] : null;
-      if (chosen) pick(chosen, chosen.n !== -1 && hasTag(item, chosen.k));
-      else if (query.trim()) { close(); write.addTag(query.trim()) }
-    }
-  };
-  let index = -1;
-  const button = (tag: TagCount) => {
-    index += 1;
-    const at = index;
-    const selected = hasTag(item, tag.k);
-    return (
-      <button key={`${at}:${tag.k}`} type="button" data-pick={tag.k} data-active={at === active ? '' : undefined}
-        aria-pressed={selected} onClick={() => pick(tag, selected)}>
-        <Glyph name={selected ? 'check' : 'tags'} /><span data-pick-name="">{helpers.tagLabel(tag.k)}</span>
-        <span data-pick-count="">{(tag.n || 0).toLocaleString()}</span>
-      </button>
-    );
-  };
-  return (
-    <>
-      <button ref={plus} type="button" id="tagPlus" data-tag-plus="" title="添加标签" aria-label="添加标签" aria-expanded={open}
-        onClick={() => {
-          if (!picker.current) return;
-          presentMenu(picker.current);
-          setOpen(true); setQuery(''); setTerm(''); setActive(-1);
-          requestAnimationFrame(() => search.current?.focus());
-        }}><Glyph name="plus" /></button>
-      <div ref={picker} id="tagPicker" data-tag-picker="" role="dialog" aria-label="添加标签" hidden>
-        <label data-tag-search="">
-          <Glyph name="search" />
-          <input ref={search} id="tagPickSearch" maxLength={80} placeholder="搜索或输入新标签" autoComplete="off" value={query}
-            onChange={(event) => { setQuery(event.target.value); setActive(-1); if (!composing.current) setTerm(event.target.value) }}
-            onCompositionStart={() => { composing.current = true }}
-            onCompositionEnd={(event) => { composing.current = false; setTerm(event.currentTarget.value) }} onKeyDown={keydown} />
-        </label>
-        <div id="tagPickBody" data-tag-body="">
-          {open && sections.recent.length ? (
-            <section data-tag-section=""><h4>最近使用</h4><div data-tag-grid="">{sections.recent.map(button)}</div></section>
-          ) : null}
-          {open ? (
-            <section data-tag-section="">
-              <h4>{term.trim() ? '搜索结果' : '全部标签'}</h4>
-              <div data-tag-grid="">
-                {sections.results.map(button)}
-                {sections.create ? (() => {
-                  index += 1;
-                  const at = index;
-                  return (
-                    <button key="create" type="button" data-pick={sections.create} data-active={at === active ? '' : undefined}
-                      onClick={() => { close(); write.addTag(sections.create) }}>
-                      <Glyph name="plus" /><span data-pick-name="">新建“{sections.create}”</span>
-                    </button>
-                  );
-                })() : null}
-              </div>
-            </section>
-          ) : null}
-        </div>
-      </div>
-    </>
-  );
+  return <div data-item-tags="">
+    <DetailTags id="detailTags" tags={detailTags(item, helpers)} candidates={helpers.tagCandidates()} label={helpers.tagLabel}
+      adding={[...write.busy].some(key => key.startsWith('add:'))}
+      onOpen={actions.openTag} onAdd={write.addTag} onRemove={write.removeTag} busyAttrs={tag => write.busyAttrs(`tag:${tag}`)} />
+  </div>;
 }
 
 /* ── 观看轨迹 ──

@@ -120,11 +120,12 @@ def _item_all_tags(item) -> list[str]:
         if isinstance(recorded, list):
             values.extend(str(value).strip() for value in recorded if str(value).strip())
     values.extend(item.metadata.get('_user_tags', []))
+    excluded = set(item.metadata.get('_user_hidden_tags', []))
     seen, result = set(), []
     for value in values:
         tag = html.unescape(value)
         key = tag.casefold()
-        if not tag or key in seen:
+        if not tag or key in seen or tag_key(tag) in excluded:
             continue
         seen.add(key)
         result.append(tag)

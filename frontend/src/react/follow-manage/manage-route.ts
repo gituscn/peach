@@ -1,5 +1,6 @@
-export const FOLLOW_MANAGE_TABS = ['list', 'add', 'feeds'] as const;
-export type FollowManageTab = (typeof FOLLOW_MANAGE_TABS)[number];
+export const FOLLOW_MANAGE_TAB_ITEMS = [['list', '关注列表'], ['add', '添加关注'], ['tags', '标签管理'], ['feeds', 'JAV 订阅源']] as const;
+export const FOLLOW_MANAGE_TABS = FOLLOW_MANAGE_TAB_ITEMS.map(([key]) => key);
+export type FollowManageTab = (typeof FOLLOW_MANAGE_TAB_ITEMS)[number][0];
 export interface FollowManageRoute { tab: FollowManageTab; page: number; sort: string; dir: string }
 
 export function followManageParams(search: string): FollowManageRoute {

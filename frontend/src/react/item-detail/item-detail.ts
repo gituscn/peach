@@ -220,7 +220,7 @@ export async function prefetchItemDetail(props: ItemDetailProps, signal: AbortSi
 /* ── 壳递进来的那几样 ── */
 
 /** 标签选择器的一个候选：馆藏里带这枚标签的作品数。 */
-export interface TagCount { k: string; n?: number }
+export interface TagCount { k: string; n?: number; cat?: string }
 
 /** 详情里仍由遗留层拼的几段 HTML 与读数。都是全站语义契约的唯一实现，这里不另写一份。
  *  身份格与队列行的图、头像和署名直接取 `@peach/card-art`。 */

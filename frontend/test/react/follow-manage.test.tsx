@@ -134,6 +134,7 @@ function serve(plan: Plan = {}) {
       const q = new URL(url, 'http://peach.test').searchParams.get('q') || '';
       return ok(await (plan.suggest ? plan.suggest(q) : { q, groups: [] }));
     }
+    if (url.startsWith('/api/tag-management')) return ok({ items: [], duplicate_groups: [] });
     if (url.startsWith(FOLLOW_URL)) return ok(plan.data ?? follow());
     throw new Error(`没有安排这个端点：${url}`);
   });
@@ -712,7 +713,7 @@ it('关注列表空状态直接切换添加页签并保留页面宿主', async (
 it('各栏按做事的先后排，缺凭据的数挂在最后一栏上', async () => {
   const { host } = await open({ creds: { root: 'C:\\creds', providers: [credential({ provider: 'fanbox' })] } });
   expect([...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent))
-    .toEqual(['关注列表', '添加关注', 'JAV 订阅源']);
+    .toEqual(['关注列表', '添加关注', '标签管理', 'JAV 订阅源']);
   expect(linkNamed('来源与订阅设置（1）', host)?.getAttribute('href')).toBe('/settings/subscriptions');
 });
 

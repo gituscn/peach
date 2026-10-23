@@ -4,6 +4,7 @@ import { configurationSkeleton } from './configuration-skeleton';
 import { javPageSkeleton } from './jav-skeleton';
 import { duplicatesSkeleton, qualityGoalsSkeleton, statsSkeleton, tasteSkeleton } from './management-skeletons';
 import { CONFIGURATION_SECTIONS } from './history/settings-route';
+import { FOLLOW_MANAGE_TAB_ITEMS as FOLLOW_TABS } from './react/follow-manage/manage-route';
 
 /** 等待态复用页面容器，只有异步内容使用占位。 */
 const line = (width = '60%') => `<span class="skeleton" style="width:${width}"></span>`;
@@ -22,7 +23,6 @@ const block = (width: number, height: number, round = false) =>
 const STAT = 'min-w-0 bg-background-secondary-default rounded-2xl shadow-card flex flex-col gap-3 px-6 py-5 max-sm:gap-2 max-sm:p-4';
 const followReadings = () => `<div class="inline-grid w-full grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6">${['关注创作者', '启用来源', '检查失败', '未看更新', 'JAV 订阅', '未看新作'].map(term => `<div class="${STAT}"><span class="text-body-medium text-text-secondary">${term}</span><b class="text-title-1-medium tabular-nums text-text-primary">${text('3em')}</b></div>`).join('')}</div>`;
 /** 页签与 React `follow-manage-page.tsx` 的 `TABS` 同名同序；选中的是地址栏 `?tab=` 那一枚，认不出时是第一枚。 */
-const FOLLOW_TABS = [['list', '关注列表'], ['add', '添加关注'], ['feeds', 'JAV 订阅源']] as const;
 const followTabKey = (tab = '') => (FOLLOW_TABS.some(([key]) => key === tab) ? tab : 'list');
 const followTabs = (tab: string) => `<div data-section-nav data-section-items class="flex max-w-full flex-nowrap overflow-x-auto">${FOLLOW_TABS.map(([key, name]) => `<span class="whitespace-nowrap" aria-selected="${key === tab}">${name}</span>`).join('')}</div>`;
 /** Board UI `Checkbox` 的未勾静止态；给了字就是「全选本页」那种带标签的一枚。 */

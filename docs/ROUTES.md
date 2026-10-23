@@ -86,7 +86,7 @@
 | `/settings/network` | 网络与访问 |
 | `/settings/maintenance` | 应用与维护 |
 | `/settings/diagnostics` | 系统诊断：系统检查、库健康与来源会话 |
-| `/subscriptions` | 关注管理：关注列表、添加关注、JAV 订阅源 |
+| `/subscriptions` | 关注管理：关注列表、添加关注、标签管理、JAV 订阅源 |
 | `/sources` | 来源和凭证：采集来源、访问方式与凭据状态 |
 | `/tasks` | 任务中心与云下载进度 |
 | `/stats` | 统计 |

@@ -306,14 +306,23 @@ class OnlineTagManagementTests(unittest.TestCase):
         self.assertEqual(web_follow.q_follow(self.contract, {})['groups'], [])
         self.assertEqual(sum(web_follow.q_follow(self.contract, {})['counts'].values()), 0)
 
-    def test_custom_tags_validate_input_and_removal_preserves_source_tags(self):
+    def test_item_tag_removal_and_restore_preserve_source_evidence(self):
         self.seed()
         item_id = self.c.execute("SELECT id FROM follow_item WHERE external_id='2'").fetchone()[0]
         for tag in ['', ' ', 'a,b', 'a\nb', 'x' * 81]:
             with self.subTest(tag=repr(tag)), self.assertRaisesRegex(ValueError, '标签名'):
                 web_follow.w_follow_tag(self.contract, dict(id=item_id, operation='add', tag=tag))
+        original = self.c.execute('SELECT metadata_json FROM follow_item WHERE id=?', (item_id,)).fetchone()[0]
         removed = web_follow.w_follow_tag(self.contract, dict(id=item_id, operation='remove', tag='outdoors'))
-        self.assertIn('outdoors', removed['item']['tags'])
+        self.assertNotIn('outdoors', removed['item']['tags'])
+        self.assertEqual(self.c.execute('SELECT metadata_json FROM follow_item WHERE id=?', (item_id,)).fetchone()[0], original)
+        self.assertNotIn(item_id, [row['primary']['id'] for row in web_follow.q_follow(self.contract, {'tag': 'outdoors'})['groups']])
+        self.execute('rename', ['outdoors'], name='户外')
+        renamed = web_follow.q_follow(self.contract, {'item': item_id})['groups'][0]['primary']
+        self.assertNotIn('户外', renamed['tags'])
+        restored = web_follow.w_follow_tag(self.contract, dict(id=item_id, operation='restore', tag='户外'))
+        self.assertIn('户外', restored['item']['tags'])
+        self.assertEqual(restored['item']['custom_tags'], [])
         with self.assertRaisesRegex(ValueError, '不存在'):
             web_follow.w_follow_tag(self.contract, dict(id=987654, operation='add', tag='精选'))
 
