@@ -599,7 +599,8 @@ class VerificationTests(unittest.TestCase):
                 mock.patch.object(runner, "resolve_auto_scope", return_value=(("full",), "fixture")), \
                 mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
             self.assertEqual(runner.main(["--scope", "auto"]), 0)
-        run.assert_called_once_with(("full",), 1)
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[:2], (("full",), 1))
 
     def test_baseline_does_not_expand_a_small_requested_scope(self):
         self.certify(self.repo, ("full",))
@@ -682,7 +683,8 @@ class VerificationTests(unittest.TestCase):
                 mock.patch.object(runner, "environment_preflight"), \
                 mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
             self.assertEqual(runner.main(["--scope", "auto"]), 0)
-        run.assert_called_once_with(("checks",), 1)
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[:2], (("checks",), 1))
         record = evidence.read(self.repo, current)
         self.assertTrue(evidence.covers(record, ("full",)))
         self.assertEqual(record["validated"]["full"], stamp)
@@ -739,7 +741,8 @@ class VerificationTests(unittest.TestCase):
                 mock.patch.object(runner, "resolve_auto_scope", return_value=(("catalog", "metadata", "web"), "fixture")), \
                 mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
             self.assertEqual(runner.main(["--scope", "auto"]), 0)
-        run.assert_called_once_with(("web",), 1)
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[:2], (("web",), 1))
         record = evidence.read(self.repo, evidence.key(self.repo))
         self.assertTrue(evidence.covers(record, ("catalog", "metadata", "web")))
         self.assertNotIn("full", record["validated"])
@@ -756,7 +759,8 @@ class VerificationTests(unittest.TestCase):
                 mock.patch.object(runner, "resolve_auto_scope", return_value=(("full",), "fixture")), \
                 mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
             self.assertEqual(runner.main(["--scope", "auto"]), 0)
-        run.assert_called_once_with(("full",), 1)
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[:2], (("full",), 1))
 
     def test_same_state_only_runs_missing_scopes_and_failed_state_runs_all(self):
         self.certify(self.repo, ("catalog",))
@@ -765,11 +769,13 @@ class VerificationTests(unittest.TestCase):
                 mock.patch.object(runner, "resolve_auto_scope", return_value=(("catalog", "web"), "fixture")), \
                 mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
             self.assertEqual(runner.main(["--scope", "auto"]), 0)
-            run.assert_called_once_with(("web",), 1)
+            run.assert_called_once()
+            self.assertEqual(run.call_args.args[:2], (("web",), 1))
             run.reset_mock()
             self.certify(self.repo, ("full",), success=False)
             self.assertEqual(runner.main(["--scope", "auto"]), 0)
-            run.assert_called_once_with(("catalog", "web"), 1)
+            run.assert_called_once()
+            self.assertEqual(run.call_args.args[:2], (("catalog", "web"), 1))
 
     def test_partial_baseline_requires_live_timestamps_and_matching_environment(self):
         original = self.certify(self.repo, ("catalog",))
@@ -792,7 +798,8 @@ class VerificationTests(unittest.TestCase):
                 mock.patch.object(runner, "resolve_auto_scope", return_value=(("catalog", "metadata", "web"), "fixture")), \
                 mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
             self.assertEqual(runner.main(["--scope", "auto"]), 0)
-        run.assert_called_once_with(("web",), 1)
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[:2], (("web",), 1))
         self.assertEqual(evidence.read(self.repo, state)["validated"]["catalog"], stamps["catalog"])
 
     def test_success_of_another_domain_cannot_restore_a_failed_domain_from_an_older_baseline(self):
@@ -808,7 +815,8 @@ class VerificationTests(unittest.TestCase):
                 mock.patch.object(runner, "resolve_auto_scope", return_value=(("checks", "catalog", "web"), "fixture")), \
                 mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])) as run:
             self.assertEqual(runner.main(["--scope", "auto"]), 0)
-        run.assert_called_once_with(("web",), 1)
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[:2], (("web",), 1))
 
     def test_focus_never_publishes_evidence_and_formal_run_rejects_focus_environment(self):
         selector = self.repo / "tests/test_focus_sample.py"

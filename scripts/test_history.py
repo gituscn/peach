@@ -22,7 +22,7 @@ from pathlib import Path
 
 from filelock import FileLock, Timeout
 
-SLOW_SECONDS = 1.0
+SLOW_SECONDS = 5.0
 SUMMARY_CHARS = 200
 OUTCOMES = frozenset({"pass", "fail", "error", "skip"})
 
