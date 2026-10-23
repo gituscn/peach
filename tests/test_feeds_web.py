@@ -49,12 +49,29 @@ class FakeTransport:
         return self.responses[request.url]
 
 
+def remove_when_released(temporary: tempfile.TemporaryDirectory, timeout: float = 15.0) -> None:
+    """删临时目录；Windows 上文件还被占用（WinError 32）时等它放手再删。
+
+    `stop_background_jobs` 只等每个线程 2 秒（关停不该被外部请求拖住），满载时取资料、拉取
+    线程可能还拿着 `update-tasks/admission.lock`。等到时限仍被占用就照常报错，真泄漏的线程不会被掩盖。
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            temporary.cleanup()
+            return
+        except PermissionError as error:
+            if getattr(error, "winerror", None) != 32 or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.2)
+
+
 class FeedWebFixture(unittest.TestCase):
     """临时账本、本地 feed 字节和替掉的取资料一步。不带用例，两个套件共用。"""
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temporary.cleanup)
+        self.addCleanup(remove_when_released, self.temporary)
         self.db_path = fresh_ledger(self.temporary.name)
         self.contract = WebContract(self.db_path)
         self.addCleanup(self.contract.stop_background_jobs)
