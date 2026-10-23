@@ -70,8 +70,8 @@ describe('普通 HTTP 的配置与播放', () => {
         await page.locator('#stage .video-js video.vjs-tech').waitFor();
         assert.deepEqual(problems, []);
       } finally {
-        await page.goto('about:blank');
         await page.unrouteAll({ behavior: 'wait' });
+        await page.goto('about:blank');
         await opened.close();
       }
     });

@@ -60,6 +60,7 @@ describe('首次运行页', { skip: origin && media && dataRoot ? false : '只�
 
       await page.locator('[aria-labelledby="setup-proxy-title"] button[aria-haspopup="listbox"]').click();
       await page.getByRole('option', { name: '自定义', exact: true }).click();
+      await page.locator('[data-trigger="Select"]').waitFor({ state: 'detached' });
       const proxy = page.getByLabel('代理地址', { exact: true });
       await proxy.fill('http://proxy.invalid');
       const mobileForm = VIEWPORTS.find((candidate) => candidate.name === 'mobile')!;
