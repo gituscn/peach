@@ -253,8 +253,9 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
  * 比例差 0.5%～3%。contain 会沿短的那一轴留下 0.5–3px 的黑底，落点又随竖屏带插在哪一行而带小数，
  * 读起来就是贴在框边、时有时无的一条色线；有的海报自己最外一列还是九宫格切缝的暗像素。
  * 竖屏格里的视频画面一律铺满，四边各外扩 1px 让切缝落到圆角裁切之外。JAV 封面（`.cover`）
- * 归共享取景（`framing.ts`），接触印相扫视图要整格看全，都不在此列。 */
-.peach-react [data-media-pic][data-pic-portrait] :is(img.poster:not(.cover), video) {
+ * 归共享取景（`framing.ts`），接触印相扫视图要整格看全，都不在此列。旧样式表的类名按属性读，
+ * 不在 React 样式产物里另立同名类规则（`legacy-class-names.test.ts`）。 */
+.peach-react [data-media-pic][data-pic-portrait] :is(img[class~="poster"]:not([class~="cover"]), video) {
   inset: -1px;
   width: calc(100% + 2px);
   max-width: none;
