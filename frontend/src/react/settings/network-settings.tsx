@@ -3,8 +3,6 @@ import { useState, type FormEvent } from 'react';
 
 import { SettingsRow } from '@/components/application/settings/settings-rows';
 import { Button } from '@/components/base/buttons/button';
-import { Input } from '@/components/base/input/input';
-import { Select, SelectItem } from '@/components/base/select/select';
 
 import { apiSend } from '../../api';
 import type { ConfigurationGroupProps, PeachProxyState } from '../bundle';
@@ -12,11 +10,10 @@ import { Note } from '../components/note';
 import { AccessSettings } from './access-settings';
 import { groupRoot } from './configuration-panel';
 import { PortSettings } from './port-settings';
+import { ProxyAddressField, ProxyModeSelect } from './peach-proxy-fields';
 import { TunnelSettings } from './tunnel-settings';
 import { ErrorText, Footer, Rows, Section, Stack } from './section';
 import { busyProps, useAction } from './use-action';
-
-const PROXY_MODES = [['environment', '系统代理'], ['direct', '直连'], ['proxy', '自定义']] as const;
 
 export function NetworkSettings({ data, receipt, panel }: ConfigurationGroupProps) {
   return (
@@ -45,16 +42,13 @@ export function PeachProxy({ initial, receipt }: { initial: PeachProxyState; rec
     <Section id="peachProxy" title="Peach 代理" onSubmit={submit}>
       <Rows>
         <SettingsRow label="连接方式">
-          <Select aria-label="连接方式" selectedKey={mode} onSelectionChange={(key) => { if (key !== null) setMode(String(key)); }}>
-            {PROXY_MODES.map(([key, name]) => <SelectItem key={key} id={key}>{name}</SelectItem>)}
-          </Select>
+          <ProxyModeSelect mode={mode} onChange={setMode} />
         </SettingsRow>
       </Rows>
       {mode === 'proxy' || saved.needs_selection || action.error ? (
         <Stack divided>
           {mode === 'proxy'
-            ? <Input id="peachProxyAddress" type="password" label="代理地址" autoComplete="off" value={address} onChange={setAddress}
-                placeholder={saved.proxy_saved ? '已保存，留空保留' : 'http://127.0.0.1:7890'} />
+            ? <ProxyAddressField id="peachProxyAddress" value={address} onChange={setAddress} saved={saved.proxy_saved} />
             : null}
           {saved.needs_selection ? <Note tone="warning" title="需要选择连接方式">已有来源的代理地址不同，请选择公共连接方式。</Note> : null}
           {action.error ? <ErrorText>{action.error}</ErrorText> : null}

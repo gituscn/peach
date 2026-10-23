@@ -297,7 +297,10 @@ def index(request: Request, args: dict[str, str] = Depends(require_page_auth)):
         return response
     if not settings.configured:
         # 未配置不是错误状态：服务照常起，首页（和任何前端路由的深链）变成首次运行页。
-        response = HTMLResponse(setup_shell())
+        html = setup_shell()
+        if "edit" in request.query_params and _copy_editor_available():
+            html = _with_copy_editor(html)
+        response = HTMLResponse(html)
         response.headers["Cache-Control"] = "no-store"
         return response
     if not settings.page_path.is_file():
@@ -311,8 +314,7 @@ def index(request: Request, args: dict[str, str] = Depends(require_page_auth)):
             script = f'<script type="application/json" id="peach-entity-shape">{payload}</script>'
             html = html.replace("</head>", script + "</head>", 1) if "</head>" in html else html + script
         if editor:
-            html = html.replace("<body", '<body data-peach-copy-mode="source"', 1)
-            html = html.replace("</body>", '<script src="/dev/copy-editor-core.js" defer></script><script src="/dev/copy-editor.js" defer></script></body>')
+            html = _with_copy_editor(html)
         response = HTMLResponse(html)
     else:
         response = FileResponse(settings.page_path, media_type="text/html")
@@ -324,6 +326,11 @@ def index(request: Request, args: dict[str, str] = Depends(require_page_auth)):
 def _copy_editor_available() -> bool:
     return not getattr(sys, "frozen", False) and all((PROJECT_ROOT / path).is_file() for path in (
         "scripts/dev/copy-editor.js", "frontend/src/copy-editor-core.js"))
+
+
+def _with_copy_editor(html: str) -> str:
+    html = html.replace("<body", '<body data-peach-copy-mode="source"', 1)
+    return html.replace("</body>", '<script src="/dev/copy-editor-core.js" defer></script><script src="/dev/copy-editor.js" defer></script></body>')
 
 
 def _require_copy_editor():
@@ -428,7 +435,7 @@ def setup_questions(request: Request):
     只是不看 Origin：配置完成后这里 404，运行事实不再对外。
     """
     _setup_guard(request, submit=False)
-    from . import remote_reporting
+    from . import peach_proxy, remote_reporting
     windows = os.name == "nt"
     asked = onboarding.questions(settings_file.active(), windows=windows)
     host_labels = dict(onboarding.HOST_OPTIONS)
@@ -466,6 +473,8 @@ def setup_questions(request: Request):
         "access_enabled": _access_on_by_default(asked),
         "scan_now": True,
         "history_guide": False,
+        "peach_proxy": peach_proxy.describe(settings_file.active().directory("secrets")),
+        "docker": os.environ.get("PEACH_DISTRIBUTION") == "docker",
         "remote_reporting": remote_reporting.snapshot(),
     })
 
@@ -531,6 +540,16 @@ async def setup_submit_json(request: Request):
     except ValueError as exc:
         errors["access_password"] = str(exc)
     standalone = distribution.standalone()
+    from . import peach_proxy
+    proxy_values = None
+    proxy_root = settings_file.active().directory("secrets")
+    if answers is not None:
+        resolved, _broken = onboarding.resolve_config(answers.data_root)
+        proxy_root = resolved.directory("secrets")
+    try:
+        proxy_values = peach_proxy.validate(proxy_root, body.get("peach_proxy", {"mode": "environment"}))
+    except ValueError as exc:
+        errors["peach_proxy"] = str(exc)
     if standalone and answers is not None:
         try:
             onboarding.check_available_port(answers.port, request.url.port or 80)
@@ -543,7 +562,8 @@ async def setup_submit_json(request: Request):
         if resolved.path.exists():
             raise HTTPException(status_code=409, detail="settings file already exists")
         try:
-            applied = onboarding.apply(resolved, answers, windows=windows, access_password=password)
+            applied = onboarding.apply(resolved, answers, windows=windows, access_password=password,
+                                       peach_proxy_values=proxy_values)
             settings_file.remember_data_root(settings_file.active(), applied.config)
         except (OSError, RuntimeError) as exc:
             errors = {"data_root": str(exc)}

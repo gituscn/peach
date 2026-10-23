@@ -445,7 +445,7 @@ def create_data_tree(config: PeachConfig) -> DataTree:
 
 def apply(
     config: PeachConfig, answers: Answers, *, windows: bool, force: bool = False,
-    access_password: str = "",
+    access_password: str = "", peach_proxy_values: dict | None = None,
 ) -> Applied:
     """把答案变成一台可以直接起服务的机器：目录、账本、CA、口令、设置文件。
 
@@ -458,6 +458,9 @@ def apply(
     access_path = prepared.directory("secrets") / "access.json"
     if not config.present and not access_path.exists():
         access.save(access_path, access_password)
+    if peach_proxy_values is not None:
+        from . import peach_proxy
+        peach_proxy.save(prepared.directory("secrets"), peach_proxy_values)
     path = settings_file.write(prepared, force=force)
     return Applied(config=prepared, settings_path=path, tree=tree)
 

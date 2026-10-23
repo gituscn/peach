@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "dc5896a3-4b3d-442d-8d1d-89106f5ea16c", e._sentryDebugIdIdentifier = "sentry-dbid-dc5896a3-4b3d-442d-8d1d-89106f5ea16c");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "09a4a8f3-a34b-4be4-ba4c-29b73db498f1", e._sentryDebugIdIdentifier = "sentry-dbid-09a4a8f3-a34b-4be4-ba4c-29b73db498f1");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, i, o, s) => {
@@ -21010,8 +21010,56 @@ function Mg({ label: e, password: t, confirmation: n, onPassword: r, onConfirmat
 	})] });
 }
 //#endregion
+//#region src/react/settings/peach-proxy-fields.tsx
+var Ng = [
+	["environment", "跟随环境"],
+	["direct", "直连"],
+	["proxy", "自定义"]
+];
+function Pg({ mode: e, onChange: t, labelledBy: n }) {
+	return /* @__PURE__ */ (0, z.jsx)(Gm, {
+		"aria-label": n ? void 0 : "连接方式",
+		"aria-labelledby": n,
+		selectedKey: e,
+		onSelectionChange: (e) => {
+			e !== null && t(String(e));
+		},
+		children: Ng.map(([e, t]) => /* @__PURE__ */ (0, z.jsx)(Km, {
+			id: e,
+			children: t
+		}, e))
+	});
+}
+function Fg({ id: e, value: t, onChange: n, saved: r = !1, error: i }) {
+	return /* @__PURE__ */ (0, z.jsx)(Kp, {
+		id: e,
+		type: "password",
+		label: "代理地址",
+		autoComplete: "off",
+		spellCheck: "false",
+		value: t,
+		onChange: n,
+		placeholder: r ? "已保存，留空保留" : "http://127.0.0.1:7890",
+		validationBehavior: "aria",
+		isInvalid: !!i,
+		hint: i
+	});
+}
+function Ig(e) {
+	try {
+		let t = new URL(e).hostname;
+		return [
+			"localhost",
+			"[::1]",
+			"::1"
+		].includes(t) || /^127\./.test(t);
+	} catch {
+		return !1;
+	}
+}
+//#endregion
 //#region src/react/boardui/components/base/badges/chip.tsx
-var Ng = wt({
+var Lg = wt({
 	base: "inline-flex items-center justify-center rounded-md px-1.5 whitespace-nowrap transition-[padding,font-size] duration-200 ease",
 	variant: {
 		bold: "py-0.5 text-body-medium",
@@ -21030,33 +21078,33 @@ var Ng = wt({
 		soft: "bg-background-secondary-default text-text-secondary"
 	}
 });
-function Pg({ variant: e = "bold", color: t = "neutral", className: n, ref: r, ...i }) {
+function Rg({ variant: e = "bold", color: t = "neutral", className: n, ref: r, ...i }) {
 	return /* @__PURE__ */ (0, z.jsx)("span", {
 		ref: r,
-		className: R(Ng.base, Ng.variant[e], Ng.color[t], n),
+		className: R(Lg.base, Lg.variant[e], Lg.color[t], n),
 		...i
 	});
 }
 //#endregion
 //#region src/react/components/status-label.tsx
-var Fg = {
+var zg = {
 	success: "lime",
 	progress: "blue",
 	warning: "yellow",
 	error: "rose",
 	neutral: "neutral"
 };
-function Ig({ tone: e = "neutral", ...t }) {
-	return /* @__PURE__ */ (0, z.jsx)(Pg, {
+function Bg({ tone: e = "neutral", ...t }) {
+	return /* @__PURE__ */ (0, z.jsx)(Rg, {
 		"data-status-tone": e,
 		variant: "caption",
-		color: Fg[e],
+		color: zg[e],
 		...t
 	});
 }
 //#endregion
 //#region src/react/settings/remote-reporting-settings.tsx
-function Lg({ value: e, onChange: t, busy: n = !1 }) {
+function Vg({ value: e, onChange: t, busy: n = !1 }) {
 	return /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsx)(xm, { children: /* @__PURE__ */ (0, z.jsx)(vm, {
 		label: "发送版本统计与错误诊断（推荐）",
 		description: "上传版本、系统信息、故障类型、代码位置与发生次数。",
@@ -21074,18 +21122,18 @@ function Lg({ value: e, onChange: t, busy: n = !1 }) {
 		divided: !0,
 		children: /* @__PURE__ */ (0, z.jsx)("span", {
 			className: "self-start",
-			children: /* @__PURE__ */ (0, z.jsx)(Ig, { children: "上传服务未配置" })
+			children: /* @__PURE__ */ (0, z.jsx)(Bg, { children: "上传服务未配置" })
 		})
 	})] });
 }
 //#endregion
 //#region src/react/pages/setup/setup-form.tsx
-var Rg = [
+var Hg = [
 	"host",
 	"port",
 	"mdns_name"
 ];
-function zg(e, t) {
+function Ug(e, t) {
 	return Array.isArray(e) ? e.length === t ? {
 		rows: e,
 		table: ""
@@ -21097,11 +21145,11 @@ function zg(e, t) {
 		table: e ?? ""
 	};
 }
-function Bg(e) {
+function Wg(e) {
 	return e.length ? e.length === 1 ? `完成设置后扫描并补全资料：${e[0]}` : `完成设置后扫描这 ${e.length} 个文件夹并补全资料` : "完成设置后扫描并补全资料";
 }
-var Vg = (e) => Array.isArray(e) ? e.filter(Boolean).join(" ") : e ?? "";
-function Hg({ setup: e, onDone: t }) {
+var Gg = (e) => Array.isArray(e) ? e.filter(Boolean).join(" ") : e ?? "";
+function Kg({ setup: e, onDone: t }) {
 	let n = e.questions.find((e) => e.input === "folders"), r = e.questions.find((e) => e.input === "folder"), i = e.questions.filter((e) => e.input !== "folders"), a = i.filter((e) => e.input !== "folder"), o = e.media_sources.map(({ value: e, label: t }) => [e, t]), s = (t = "") => ({
 		path: t,
 		location: e.media_source_default,
@@ -21115,35 +21163,39 @@ function Hg({ setup: e, onDone: t }) {
 		pickFolder: rm,
 		describe: im,
 		focusAfterPick: !0
-	}), [l, u] = (0, w.useState)(() => Object.fromEntries(i.map((e) => [e.key, e.default]))), [d, f] = (0, w.useState)(!1), [p, m] = (0, w.useState)(""), [h, g] = (0, w.useState)(e.access_enabled), [_, v] = (0, w.useState)(""), [y, b] = (0, w.useState)(""), [x, S] = (0, w.useState)(e.scan_now), [C, T] = (0, w.useState)(e.history_guide), [E, D] = (0, w.useState)(e.remote_reporting), [O, k] = (0, w.useState)({}), [A, j] = (0, w.useState)(""), [M, ee] = (0, w.useState)(""), [te, ne] = (0, w.useState)(!1), [N, re] = (0, w.useState)(!1), [ie, ae] = (0, w.useState)(0), oe = (0, w.useRef)(null), se = (0, w.useRef)(null), [ce, le] = (0, w.useState)(0);
+	}), [l, u] = (0, w.useState)(() => Object.fromEntries(i.map((e) => [e.key, e.default]))), [d, f] = (0, w.useState)(!1), [p, m] = (0, w.useState)(""), [h, g] = (0, w.useState)(e.access_enabled), [_, v] = (0, w.useState)(""), [y, b] = (0, w.useState)(""), [x, S] = (0, w.useState)(e.scan_now), [C, T] = (0, w.useState)(e.history_guide), [E, D] = (0, w.useState)(e.remote_reporting), [O, k] = (0, w.useState)(e.peach_proxy?.mode ?? "environment"), [A, j] = (0, w.useState)(""), [M, ee] = (0, w.useState)({}), [te, ne] = (0, w.useState)(""), [N, re] = (0, w.useState)(""), [ie, ae] = (0, w.useState)(!1), [oe, se] = (0, w.useState)(!1), [ce, le] = (0, w.useState)(0), ue = (0, w.useRef)(null), de = (0, w.useRef)(null), [fe, pe] = (0, w.useState)(0);
 	(0, w.useEffect)(() => {
-		ce && oe.current?.querySelector("input[aria-invalid=\"true\"]")?.focus();
-	}, [ce]);
-	let ue = (e) => e ? /* @__PURE__ */ (0, z.jsx)("span", {
+		fe && ue.current?.querySelector("input[aria-invalid=\"true\"]")?.focus();
+	}, [fe]);
+	let me = (e) => e ? /* @__PURE__ */ (0, z.jsx)("span", {
 		role: "alert",
 		children: e
-	}, ce) : void 0, de = (e) => !e.visible_when || Object.entries(e.visible_when).every(([e, t]) => l[e] === t), fe = (e, t) => u((n) => ({
+	}, fe) : void 0, he = (e) => !e.visible_when || Object.entries(e.visible_when).every(([e, t]) => l[e] === t), ge = (e, t) => u((n) => ({
 		...n,
 		[e]: t
-	})), pe = async (e) => {
-		if (e.preventDefault(), te) return;
+	})), P = async (e) => {
+		if (e.preventDefault(), ie) return;
 		let n = c.rows.findIndex((e) => !e.cost);
 		if (n >= 0) {
-			re(!0), requestAnimationFrame(() => oe.current?.querySelector(`[data-media-read-policy="${n}"] button`)?.focus());
+			se(!0), requestAnimationFrame(() => ue.current?.querySelector(`[data-media-read-policy="${n}"] button`)?.focus());
 			return;
 		}
-		ne(!0), ee("");
+		ae(!0), re("");
 		let r = {
 			media_dir: c.rows,
 			access_enabled: h,
 			scan_now: x,
 			history_guide: C,
+			peach_proxy: {
+				mode: O,
+				proxy: O === "proxy" ? A : ""
+			},
 			...E ? { remote_reporting: {
 				usage: E.usage,
 				errors: E.errors
 			} } : {}
 		};
-		for (let e of i) de(e) && (r[e.key] = l[e.key] ?? "");
+		for (let e of i) he(e) && (r[e.key] = l[e.key] ?? "");
 		h && Object.assign(r, {
 			access_password: _,
 			access_confirm: y
@@ -21152,14 +21204,14 @@ function Hg({ setup: e, onDone: t }) {
 			t(await tm(r));
 		} catch (e) {
 			if (e instanceof Qp && e.status === 400 && e.errors) {
-				let t = e.errors, { rows: n, table: r } = zg(t.media_dir, c.rows.length);
-				c.setErrors(n), j(r), k(t), Rg.some((e) => t[e]) && ae((e) => e + 1), t.access_password && g(!0), le((e) => e + 1);
-			} else ee(im(e));
+				let t = e.errors, { rows: n, table: r } = Ug(t.media_dir, c.rows.length);
+				c.setErrors(n), ne(r), ee(t), Hg.some((e) => t[e]) && le((e) => e + 1), t.access_password && g(!0), pe((e) => e + 1);
+			} else re(im(e));
 		} finally {
-			ne(!1);
+			ae(!1);
 		}
-	}, me = (e) => {
-		let t = Vg(O[e.key]), n = e.help.join("");
+	}, _e = (e) => {
+		let t = Gg(M[e.key]), n = e.help.join("");
 		if (e.input === "choice") {
 			let r = `setup-${e.key}-label`;
 			return /* @__PURE__ */ (0, z.jsxs)("div", {
@@ -21175,7 +21227,7 @@ function Hg({ setup: e, onDone: t }) {
 						orientation: "horizontal",
 						className: _g,
 						value: l[e.key] ?? e.default,
-						onChange: (t) => fe(e.key, t),
+						onChange: (t) => ge(e.key, t),
 						children: (e.options ?? []).map((e) => /* @__PURE__ */ (0, z.jsx)(op, {
 							value: e.value,
 							className: vg,
@@ -21183,7 +21235,7 @@ function Hg({ setup: e, onDone: t }) {
 						}, e.value))
 					}),
 					n ? /* @__PURE__ */ (0, z.jsx)(Cm, { children: n }) : null,
-					t ? /* @__PURE__ */ (0, z.jsx)(wm, { children: t }, ce) : null
+					t ? /* @__PURE__ */ (0, z.jsx)(wm, { children: t }, fe) : null
 				]
 			}, e.key);
 		}
@@ -21195,7 +21247,7 @@ function Hg({ setup: e, onDone: t }) {
 			autoComplete: "off",
 			spellCheck: "false",
 			value: l[e.key] ?? "",
-			onChange: (t) => fe(e.key, t),
+			onChange: (t) => ge(e.key, t),
 			leadingAddon: e.prefix ? /* @__PURE__ */ (0, z.jsx)("span", {
 				className: "shrink-0 pl-1 text-body-regular text-text-secondary",
 				children: e.prefix
@@ -21206,25 +21258,25 @@ function Hg({ setup: e, onDone: t }) {
 			}) : void 0,
 			validationBehavior: "aria",
 			isInvalid: !!t,
-			hint: ue(t) ?? (n || void 0)
+			hint: me(t) ?? (n || void 0)
 		}, e.key);
-	}, he = async () => {
+	}, ve = async () => {
 		if (r && !d) {
 			f(!0), m("");
 			try {
 				let e = await rm(l[r.key] ?? "");
-				e && fe(r.key, e);
+				e && ge(r.key, e);
 			} catch (e) {
 				m(im(e));
 			} finally {
 				f(!1);
 			}
 		}
-	}, ge = r ? Vg(O[r.key]) || p : "", P = c.rows.map((e) => e.path.trim()).filter(Boolean), _e = c.rows.some((e) => Cg(e.location));
+	}, ye = r ? Gg(M[r.key]) || p : "", be = c.rows.map((e) => e.path.trim()).filter(Boolean), xe = c.rows.some((e) => Cg(e.location));
 	return /* @__PURE__ */ (0, z.jsxs)("form", {
-		ref: oe,
+		ref: ue,
 		noValidate: !0,
-		onSubmit: (e) => void pe(e),
+		onSubmit: (e) => void P(e),
 		"aria-labelledby": "auth-card-title",
 		className: "flex flex-col gap-6",
 		children: [
@@ -21240,7 +21292,7 @@ function Hg({ setup: e, onDone: t }) {
 							children: "*"
 						})]
 					}),
-					A ? /* @__PURE__ */ (0, z.jsx)(wm, { children: A }, ce) : null,
+					te ? /* @__PURE__ */ (0, z.jsx)(wm, { children: te }, fe) : null,
 					/* @__PURE__ */ (0, z.jsx)("div", {
 						role: "group",
 						"aria-labelledby": "setup-media-title",
@@ -21249,12 +21301,12 @@ function Hg({ setup: e, onDone: t }) {
 							label: `${n.label} ${t + 1}`,
 							path: e.path,
 							onPath: (e) => c.edit(t, { path: e }),
-							error: ue(c.errors[t]),
+							error: me(c.errors[t]),
 							inputRef: c.inputRef(t),
 							picking: c.picking === t,
 							onPick: () => void c.pick(t),
 							onRemove: c.rows.length > 1 ? () => {
-								c.remove(t), se.current?.focus();
+								c.remove(t), de.current?.focus();
 							} : void 0,
 							children: [/* @__PURE__ */ (0, z.jsxs)(Tg, { children: [/* @__PURE__ */ (0, z.jsx)(Ag, {
 								index: t,
@@ -21267,7 +21319,7 @@ function Hg({ setup: e, onDone: t }) {
 							}), /* @__PURE__ */ (0, z.jsx)(Eg, {
 								index: t,
 								cost: e.cost ?? "",
-								error: N && !e.cost ? "请选择媒体读取策略" : void 0,
+								error: oe && !e.cost ? "请选择媒体读取策略" : void 0,
 								onChange: (e) => c.edit(t, { cost: e })
 							})] }), /* @__PURE__ */ (0, z.jsxs)(Tg, { children: [/* @__PURE__ */ (0, z.jsx)(wg, {
 								label: "所属媒体库",
@@ -21315,14 +21367,14 @@ function Hg({ setup: e, onDone: t }) {
 						}, t))
 					}),
 					/* @__PURE__ */ (0, z.jsx)(Dt, {
-						ref: se,
+						ref: de,
 						variant: "secondary",
 						leadingIcon: Fp,
 						className: "self-start",
 						onClick: c.add,
 						children: "添加文件夹"
 					}),
-					_e ? /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [
+					xe ? /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [
 						/* @__PURE__ */ (0, z.jsx)(Dg, {}),
 						/* @__PURE__ */ (0, z.jsxs)(Cm, { children: [e.cloud.help, /* @__PURE__ */ (0, z.jsx)(Tm, {
 							href: e.cloud.link.url,
@@ -21357,14 +21409,14 @@ function Hg({ setup: e, onDone: t }) {
 							autoComplete: "off",
 							spellCheck: "false",
 							value: l[r.key] ?? "",
-							onChange: (e) => fe(r.key, e),
+							onChange: (e) => ge(r.key, e),
 							validationBehavior: "aria",
-							isInvalid: !!ge,
-							hint: ue(ge)
+							isInvalid: !!ye,
+							hint: me(ye)
 						}), /* @__PURE__ */ (0, z.jsx)(Nm, {
 							icon: bg,
 							"aria-label": "选择数据目录",
-							onClick: () => void he(),
+							onClick: () => void ve(),
 							...yg(d)
 						})]
 					}),
@@ -21400,20 +21452,59 @@ function Hg({ setup: e, onDone: t }) {
 						confirmation: y,
 						onPassword: v,
 						onConfirmation: b,
-						passwordError: ue(Vg(O.access_password)),
+						passwordError: me(Gg(M.access_password)),
 						passwordHint: "请输入 8–256 个字符。",
-						confirmationInvalid: !!O.access_password
+						confirmationInvalid: !!M.access_password
+					}) : null
+				]
+			}),
+			/* @__PURE__ */ (0, z.jsxs)(At, {
+				labelledBy: "setup-proxy-title",
+				children: [
+					/* @__PURE__ */ (0, z.jsx)(jt, {
+						id: "setup-proxy-title",
+						children: "Peach 代理"
+					}),
+					/* @__PURE__ */ (0, z.jsx)(Cm, { children: "用于资料采集、封面和工具下载，可在配置页修改。" }),
+					/* @__PURE__ */ (0, z.jsxs)("div", {
+						className: "flex flex-col items-start gap-1.5",
+						children: [/* @__PURE__ */ (0, z.jsx)(Bp, {
+							elementType: "span",
+							id: "setup-proxy-mode-label",
+							children: "连接方式"
+						}), /* @__PURE__ */ (0, z.jsx)(Pg, {
+							mode: O,
+							onChange: k,
+							labelledBy: "setup-proxy-mode-label"
+						})]
+					}),
+					O === "proxy" ? /* @__PURE__ */ (0, z.jsx)(Fg, {
+						id: "setupProxyAddress",
+						value: A,
+						onChange: j,
+						saved: e.peach_proxy?.proxy_saved,
+						error: me(Gg(M.peach_proxy))
+					}) : M.peach_proxy ? /* @__PURE__ */ (0, z.jsx)(wm, { children: Gg(M.peach_proxy) }, fe) : null,
+					e.docker && O === "proxy" && Ig(A) ? /* @__PURE__ */ (0, z.jsx)(Jp, {
+						tone: "warning",
+						title: "请填写容器可访问的代理地址",
+						children: "回环地址指向容器自身；宿主机代理需使用容器可访问的宿主机地址。"
+					}) : null,
+					e.peach_proxy?.needs_selection ? /* @__PURE__ */ (0, z.jsx)(Jp, {
+						tone: "warning",
+						title: "需要选择连接方式",
+						children: "已有来源的代理地址不同，请选择公共连接方式。"
 					}) : null
 				]
 			}),
 			/* @__PURE__ */ (0, z.jsx)(At, { children: /* @__PURE__ */ (0, z.jsx)(Om, {
 				summary: "高级设置",
-				defaultOpen: ie > 0,
+				defaultOpen: ce > 0,
 				children: /* @__PURE__ */ (0, z.jsx)("div", {
 					className: "flex flex-col gap-4",
-					children: a.filter(de).map(me)
+					children: a.filter(he).map(_e)
 				})
-			}, ie) }),
+			}, ce) }),
 			/* @__PURE__ */ (0, z.jsxs)(At, {
 				labelledBy: "setup-options-title",
 				children: [
@@ -21426,7 +21517,7 @@ function Hg({ setup: e, onDone: t }) {
 						children: [/* @__PURE__ */ (0, z.jsx)(Pp, {
 							isSelected: x,
 							onChange: S,
-							children: Bg(P)
+							children: Wg(be)
 						}), /* @__PURE__ */ (0, z.jsx)(Cm, { children: "读取已有 NFO 和封面，采集缺失资料。符合自动规则的资料会在处理完成后保存到数据库，其余资料留待确认。" })]
 					}),
 					/* @__PURE__ */ (0, z.jsxs)("section", {
@@ -21451,10 +21542,10 @@ function Hg({ setup: e, onDone: t }) {
 					})
 				]
 			}),
-			M ? /* @__PURE__ */ (0, z.jsx)(wm, { children: M }) : null,
+			N ? /* @__PURE__ */ (0, z.jsx)(wm, { children: N }) : null,
 			E ? /* @__PURE__ */ (0, z.jsxs)(At, { children: [
 				/* @__PURE__ */ (0, z.jsx)(jt, { children: "版本统计与错误诊断" }),
-				/* @__PURE__ */ (0, z.jsx)(Lg, {
+				/* @__PURE__ */ (0, z.jsx)(Vg, {
 					value: E,
 					onChange: D
 				}),
@@ -21463,7 +21554,7 @@ function Hg({ setup: e, onDone: t }) {
 			/* @__PURE__ */ (0, z.jsx)(Dt, {
 				type: "submit",
 				className: "self-start",
-				...yg(te),
+				...yg(ie),
 				children: "完成设置"
 			})
 		]
@@ -21471,7 +21562,7 @@ function Hg({ setup: e, onDone: t }) {
 }
 //#endregion
 //#region src/react/pages/setup/setup-restore.tsx
-function Ug({ onDone: e }) {
+function qg({ onDone: e }) {
 	let [t, n] = (0, w.useState)(""), [r, i] = (0, w.useState)(""), [a, o] = (0, w.useState)(!1);
 	return /* @__PURE__ */ (0, z.jsxs)("form", {
 		className: "flex flex-col gap-4",
@@ -21512,7 +21603,7 @@ function Ug({ onDone: e }) {
 }
 //#endregion
 //#region src/react/pages/setup/setup-page.tsx
-function Wg() {
+function Jg() {
 	let [e, t] = (0, w.useState)({ kind: "loading" }), [n, r] = (0, w.useState)(0), [i, a] = (0, w.useState)(!1);
 	return (0, w.useEffect)(() => {
 		let e = new AbortController();
@@ -21550,10 +21641,10 @@ function Wg() {
 				className: "self-start",
 				onClick: () => a((e) => !e),
 				children: i ? "返回首次设置" : "使用已有数据目录"
-			}), i ? /* @__PURE__ */ (0, z.jsx)(Ug, { onDone: (e) => t({
+			}), i ? /* @__PURE__ */ (0, z.jsx)(qg, { onDone: (e) => t({
 				kind: "done",
 				done: e
-			}) }) : /* @__PURE__ */ (0, z.jsx)(Hg, {
+			}) }) : /* @__PURE__ */ (0, z.jsx)(Kg, {
 				setup: e.setup,
 				onDone: (e) => t({
 					kind: "done",
@@ -21565,14 +21656,14 @@ function Wg() {
 }
 //#endregion
 //#region src/react/pages/index.tsx
-var Gg = {
-	setup: Wg,
+var Yg = {
+	setup: Jg,
 	login: qp,
 	error: Pt
 };
 h();
-var Kg = document.getElementById("peach-page"), qg = Kg ? Gg[Kg.dataset.page ?? ""] : void 0;
-Kg && qg && (0, T.createRoot)(Kg).render(/* @__PURE__ */ (0, z.jsx)(qg, { data: { ...Kg.dataset } }));
+var Xg = document.getElementById("peach-page"), Zg = Xg ? Yg[Xg.dataset.page ?? ""] : void 0;
+Xg && Zg && (0, T.createRoot)(Xg).render(/* @__PURE__ */ (0, z.jsx)(Zg, { data: { ...Xg.dataset } }));
 //#endregion
 
-//# debugId=dc5896a3-4b3d-442d-8d1d-89106f5ea16c
+//# debugId=09a4a8f3-a34b-4be4-ba4c-29b73db498f1

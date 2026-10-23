@@ -545,6 +545,8 @@ Peach 配置「媒体库与入库 → 视频预览」中的「抽帧解码方式
 
 ### 首次设置的内部流程
 
+- 首次设置的「Peach 代理」支持跟随环境、直连和自定义 HTTP／SOCKS 代理。自定义地址与端口沿用配置页校验，凭据存于所选数据目录的本机 secrets；读题接口只返回连接方式和是否已保存地址。Docker 中填写回环代理地址时提示改用容器可访问的宿主机地址。配置页「网络与访问」可随时修改。
+- `GET /api/setup/questions` 的 `peach_proxy` 包含 `mode`、`proxy_saved`、`needs_selection`；`docker` 表示部署是否为 Docker。`POST /api/setup` 的 `peach_proxy` 接收 `{mode, proxy}`，`mode` 为 `environment`、`direct` 或 `proxy`，缺省为 `environment`。校验错误放在 `errors.peach_proxy`。代理先于 `config.toml` 和首扫请求落盘，保证托盘切换后使用所选连接方式。
 - 托盘启动时读一次设置文件，由 `tray.needs_setup()` 判断：**没有 `config.toml` 且没有数据库**才算需要首次设置。不用 `PeachConfig.configured` 判断：托盘的单实例锁一启动就会在 Peach 数据目录下建出 `state/`，一次失败的启动就可能让下一次误判成已配置；反过来，没有 `config.toml` 的老部署数据库还在，不能被拖进首次设置。
 - 需要设置时，托盘不构建正常的服务规格（全新机器上 `build_service_specs()` 会因为缺 TLS 材料抛 `FileNotFoundError`），而是启动 `peach serve --setup --host 127.0.0.1 --port <设置里的端口，默认 8900> --no-mdns --no-ledger-sync`，再把浏览器打开到 `http://127.0.0.1:<端口>/`。这条引导服务没有 TLS，口令强制为空，安全边界就是回环绑定地址。
 - 首页是首次设置表单：`GET /` 回一张薄壳（`routes_pages.setup_shell()`），表单由页面包 `/dist/peach-pages.js` 画出，题目与提交都走下面两条 JSON 接口。完成态的入口带 `/?onboarding=1`；选了导入浏览器历史则先去 `/taste?onboarding=1`。安装教程通过专用状态接口读取各项的实际状态。

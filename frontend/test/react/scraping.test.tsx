@@ -112,6 +112,8 @@ it('首屏用 prefetch 缓存画出来源与任务，挂载时不重复请求', 
   expect(bridge).not.toBeNull();
   expect(bridge?.textContent).toContain('已安装版本0.16.1');
   expect(bridge?.textContent).toContain('FC2PPVDB、AVSOX');
+  expect(bridge?.textContent).toContain('首次需要时，Peach 会自动准备锁定的 0.16.1 版本');
+  expect(bridge?.textContent).toContain('安装包内已有可用环境时直接使用');
   expect(buttonNamed('重新安装', bridge!)).not.toBeNull();
   // 连接方式是 BoardUI 的 Select，画出来的是按钮；原生 select 是 React Aria 藏在后面
   // 供表单取值的那一个，不是这一行的长相。
