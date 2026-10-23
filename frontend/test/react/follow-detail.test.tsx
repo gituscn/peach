@@ -87,14 +87,16 @@ describe('取数', () => {
   it('手动标签提交保持输入和忙态，成功后更新详情并可移除', async () => {
     const original = item(8, { tags: ['source'], detail_tags: ['source'], custom_tags: [] });
     const updated = item(8, { tags: ['source', '精选'], detail_tags: ['source', '精选'], custom_tags: ['精选'] });
+    const sibling = item(9);
     const waiting = pending<{ ok: boolean; json(): Promise<unknown> }>();
     const fallback = serve();
     const fetcher = vi.fn((url: string, init?: RequestInit) => url === '/api/follow/tag'
       ? JSON.parse(String(init?.body)).operation === 'add' ? waiting.answer
-        : Promise.resolve({ ok: true, json: async () => ({ item: original, group: group(original) }) })
+        : Promise.resolve({ ok: true, json: async () => ({ item: original, group: group(original, { variants: [sibling] }) }) })
       : fallback(url, init));
     vi.stubGlobal('fetch', fetcher);
     const { host, actions: receipts } = await show(data(original));
+    queryClient.setQueryData(followItemKey(sibling.id), data(sibling, group(original, { variants: [sibling] })));
     await click(buttonNamed('管理标签', host));
     const input = host.querySelector<HTMLInputElement>('input[aria-label="新标签名称"]')!;
     await type(input, '精选');
@@ -104,10 +106,11 @@ describe('取数', () => {
     expect(input.value).toBe('精选');
     expect(buttonNamed('添加标签', host)?.getAttribute('aria-busy')).toBe('true');
     expect(receipts.toast).not.toHaveBeenCalled();
-    await waiting.release({ ok: true, json: async () => ({ item: updated, group: group(updated) }) });
+    await waiting.release({ ok: true, json: async () => ({ item: updated, group: group(updated, { variants: [sibling] }) }) });
     await settle();
     expect(host.querySelector('[data-follow-tag="精选"]')).not.toBeNull();
     expect(input.value).toBe('');
+    expect(queryClient.getQueryData<FollowDetailData>(followItemKey(sibling.id))?.group?.primary.tags).toContain('精选');
     expect(receipts.toast).toHaveBeenCalledWith('已添加标签「精选」', expect.objectContaining({ undo: expect.any(Function) }));
     await click(host.querySelector('[aria-label="移除手动标签 精选"]')); await settle();
     expect(host.querySelector('[data-follow-tag="精选"]')).toBeNull();

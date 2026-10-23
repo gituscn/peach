@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { apiGet, apiSend } from '../../api';
-import { replaceFollowItem } from '../follow-feed/follow-feed';
+import { collectionItems, replaceFollowItem } from '../follow-feed/follow-feed';
 import type { FollowGroup } from '../follow-feed/follow-feed';
 import { confirmTagOperation, managedTagId, previewTagOperation, type ManagedTag } from '../index/tag-operations';
 import { Note } from '../components/note';
@@ -21,15 +21,21 @@ export function FollowTags({ item, label, actions }: { item: FollowDetailItem; l
   const custom = item.custom_tags || [];
   const choices = [...new Set([...tags, ...custom, ...(item.blocked_tags || [])])];
   const selectedTag = choices.includes(pickedTag) ? pickedTag : choices[0] || '';
+  const refresh = () => queryClient.invalidateQueries({
+    predicate: query => ['follow-feed', 'follow', 'tag-management'].includes(String(query.queryKey[0])),
+  });
   const apply = (result: { item: FollowDetailItem; group: FollowGroup }) => {
     replaceFollowItem(result.item);
-    queryClient.setQueriesData<FollowDetailData>({ queryKey: ['follow-item'] }, current => current
-      ? { ...current, ...(current.item.id === item.id ? { item: result.item, group: result.group } : {}) } : current);
+    queryClient.setQueriesData<FollowDetailData>({ queryKey: ['follow-item'] }, current => {
+      if (!current) return current;
+      const member = collectionItems(result.group).find(value => value.id === current.item.id);
+      return member ? { ...current, item: member as FollowDetailItem, group: result.group } : current;
+    });
   };
   const write = (operation: 'add' | 'remove', tag: string) => { void action.run(`${operation}:${tag}`, async signal => {
     const result = await apiSend<{ item: FollowDetailItem; group: FollowGroup }>('/api/follow/tag', { id: item.id, operation, tag }, 'POST', signal);
     apply(result);
-    await queryClient.invalidateQueries({ predicate: query => query.queryKey[0] !== 'follow-item' });
+    await refresh();
     return result.item;
   }, () => {
     setName('');
@@ -37,7 +43,7 @@ export function FollowTags({ item, label, actions }: { item: FollowDetailItem; l
       undo: async () => {
         const result = await apiSend<{ item: FollowDetailItem; group: FollowGroup }>('/api/follow/tag', { id: item.id, operation: operation === 'add' ? 'remove' : 'add', tag });
         apply(result);
-        await queryClient.invalidateQueries();
+        await refresh();
       },
     });
   }) };

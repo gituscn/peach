@@ -11,12 +11,14 @@
     [data-copy-inline]{outline:2px solid var(--tungsten);outline-offset:3px;border-radius:var(--badge-radius);background:var(--hover);user-select:text;cursor:text}
     [data-copy-input]{position:fixed;z-index:2147483647;padding:2px 6px;border:0;border-radius:var(--badge-radius);outline:2px solid var(--tungsten);background:var(--ground);color:var(--ink)}
     [data-copy-bar]>[role=status]{max-width:min(360px,calc(100vw - 64px));white-space:normal;overflow-wrap:anywhere}
+    [data-copy-bar][data-selection-dock]{bottom:max(16px,var(--selection-dock-space,0px))}
     @media(max-width:600px){[data-copy-bar]>[role=status]{flex-basis:100%;text-align:center}}
     [data-copy-choice]{position:fixed;z-index:2147483647;background:var(--ground);color:var(--ink);border:1px solid var(--border-15);border-radius:var(--control-radius);padding:8px;max-width:calc(100vw - 32px)}
   `;
   document.head.append(css);
   const highlight = document.createElement('div'); highlight.dataset.copyEditor = ''; highlight.dataset.copyHighlight = '';
   const host = document.createElement('div'); host.className = 'peach-react'; host.dataset.copyEditor = ''; host.dataset.batchScope = '';
+  for (const type of ['pointerdown', 'click']) host.addEventListener(type, event => event.stopPropagation());
   const bar = document.createElement('div'); bar.dataset.copyEditor = ''; bar.dataset.copyBar = '';
   bar.dataset.selectionDock = ''; bar.dataset.glassPane = ''; bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', '文案编辑');
   const hint = document.createElement('span'); hint.id = 'peach-copy-hint'; hint.hidden = true; hint.textContent = '点击文字修改，回车或点别处保存，Esc 取消；暂停编辑后可操作页面。';
@@ -77,6 +79,13 @@
   });
   button('退出编辑', () => { if (saving) return; editor.commit(true); const url = new URL(location.href); url.searchParams.delete('edit'); location.href = url; });
   host.append(hint, bar); document.body.append(highlight, host);
+  const modalHost = () => [...document.querySelectorAll('dialog:modal')].at(-1) || document.body;
+  function placeTools() {
+    const parent = modalHost();
+    for (const node of [highlight, host]) if (node.parentElement !== parent) parent.append(node);
+  }
+  new MutationObserver(placeTools).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['open'] });
+  placeTools();
   if (source) {
     const position = sessionStorage.getItem('peach.copy-scroll');
     if (position !== null) { sessionStorage.removeItem('peach.copy-scroll'); requestAnimationFrame(() => scrollTo(0, Number(position))); }
@@ -133,7 +142,7 @@
     const select = document.createElement('select'); select.dataset.copyEditor = ''; select.dataset.copyChoice = ''; select.setAttribute('aria-label', '文案来源');
     select.add(new Option('请选择文案来源', '')); candidates.forEach((x, i) => select.add(new Option(`${x.file}:${x.line}`, String(i))));
     Object.assign(select.style, { left: Math.max(16, Math.min(rect.left, innerWidth - 300)) + 'px', top: Math.max(16, Math.min(rect.bottom + 8, innerHeight - 60)) + 'px' });
-    document.body.append(select); select.focus(); say('这段文案有多个来源，请选择要修改的位置');
+    modalHost().append(select); select.focus(); say('这段文案有多个来源，请选择要修改的位置');
     return new Promise(resolve => {
       const finish = value => { select.remove(); document.removeEventListener('keydown', cancel, true); resolve(value); };
       const cancel = event => { if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); finish(null); } };

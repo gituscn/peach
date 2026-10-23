@@ -14,6 +14,38 @@ describe('原位改字', () => {
   before(async () => { browser = await launch(); });
   after(async () => { await browser?.close(); });
   for (const viewport of VIEWPORTS) {
+    it(`模态弹层中的工具栏可暂停编辑并随关闭返回页面（${viewport.name}）`, async () => {
+      const context = await browser.newContext({ viewport });
+      try {
+        const page = await context.newPage();
+        await page.route('https://copy.example/**', route => route.fulfill({ contentType: 'text/html; charset=utf-8',
+          body: '<meta charset="utf-8"><body><dialog id="first"><p id="copy">弹层说明</p></dialog><dialog id="second"><p>确认说明</p></dialog></body>' }));
+        await page.goto('https://copy.example/?edit');
+        await page.addScriptTag({ content: await editorScripts() });
+        await page.evaluate(() => {
+          const dialog = document.querySelector<HTMLDialogElement>('#first')!;
+          document.body.dataset.dialogClicks = '0';
+          dialog.addEventListener('click', () => { document.body.dataset.dialogClicks = String(Number(document.body.dataset.dialogClicks) + 1) });
+          dialog.showModal();
+        });
+        await page.locator('#first [data-copy-bar]').waitFor();
+        await page.getByRole('button', { name: '暂停编辑', exact: true }).click();
+        await page.getByRole('button', { name: '继续编辑', exact: true }).click();
+        assert.equal(await page.locator('body').getAttribute('data-dialog-clicks'), '0');
+        await page.locator('#copy').click();
+        const input = page.locator('#copy [contenteditable]');
+        await input.fill('临时修改'); await input.press('Escape');
+        assert.equal(await page.locator('#copy').innerText(), '弹层说明');
+        await page.evaluate(() => document.querySelector<HTMLDialogElement>('#second')!.showModal());
+        await page.locator('#second [data-copy-bar]').waitFor();
+        await page.getByRole('button', { name: '暂停编辑', exact: true }).click();
+        await page.evaluate(() => document.querySelector<HTMLDialogElement>('#second')!.close());
+        await page.locator('#first [data-copy-bar]').waitFor();
+        await page.evaluate(() => document.querySelector<HTMLDialogElement>('#first')!.close());
+        assert.equal(await page.locator('[data-copy-bar]').evaluate(node => node.closest('dialog') === null), true);
+      } finally { await context.close(); }
+    });
+
     it(`链接和按钮输入框独占文字位置并恢复原文（${viewport.name}）`, async () => {
       const context = await browser.newContext({ viewport });
       try {
