@@ -2,6 +2,7 @@ import { islandButton, islandSelect } from './island-skeleton';
 import { CONFIGURATION_SECTIONS } from './history/settings-route';
 import { diagnosticsSkeleton } from './diagnostics-skeleton';
 import { LIBRARY_FOLDER_HELP, POLICY_SUMMARY } from './react/settings/library-policy-copy';
+import { ENTRY_LINKS_HELP, ENTRY_LINKS_HINT } from './configuration-copy';
 
 const wait = 'disabled data-skeleton-action';
 const text = (width = '60%') => `<span class="skeleton skeleton-text" style="width:${width}"></span>`;
@@ -10,7 +11,12 @@ const button = (label: string, variant: 'primary' | 'secondary' = 'primary') => 
 const footer = (content: string) => `<div class="-ml-3 flex flex-wrap items-center justify-end gap-3 rounded-b-2xl border-t border-separator-border bg-card-footer px-3 py-3">${content}</div>`;
 const stack = (content: string) => `<div class="flex flex-col gap-4 py-4 pr-3">${content}</div>`;
 const section = (title: string, content: string, actions = '') => `<section aria-label="${title}" class="flex w-full flex-col gap-2 wrap-anywhere"><p class="w-full px-3 text-body-2-medium text-text-secondary">${title}</p><div class="flex w-full flex-col rounded-2xl bg-background-secondary-default pl-3">${content}${actions ? footer(actions) : ''}</div></section>`;
-const row = (label: string, description = '', control = 'ui-configuration-skeleton-toggle') => `<div class="flex min-h-[52px] w-full items-center justify-between gap-4 py-2.5 pr-2.5 border-b border-separator-border last:border-b-0"><div class="flex min-w-0 flex-col"><p class="text-body-regular text-text-primary">${label}</p>${description ? `<p class="text-body-2-regular text-text-secondary">${description}</p>` : ''}</div><span class="skeleton ${control}"></span></div>`;
+const controlRow = (label: string, description: string, control: string) => `<div class="flex min-h-[52px] w-full items-center justify-between gap-4 py-2.5 pr-2.5 border-b border-separator-border last:border-b-0"><div class="flex min-w-0 flex-col"><p class="text-body-regular text-text-primary">${label}</p>${description ? `<p class="text-body-2-regular text-text-secondary">${description}</p>` : ''}</div>${control}</div>`;
+const row = (label: string, description = '', control = 'ui-configuration-skeleton-toggle') => controlRow(label, description, `<span class="skeleton ${control}"></span>`);
+/* 只读一句读数的行（「每 3 个月」）：右边是一段文字宽的占位，行高同开关行。 */
+const valueRow = (label: string, width = '4em') => controlRow(label, '', text(width));
+const block = (height: number) => `<span class="skeleton ui-configuration-skeleton-input" style="width:100%;height:${height}px"></span>`;
+const hostField = (label: string, hint: string) => `<div class="flex w-full flex-col items-start gap-1"><span class="text-body-medium text-text-primary">${label}</span>${input()}<span class="pt-px text-caption-1-medium text-text-secondary">${hint}</span></div>`;
 
 /* 「媒体库与目录」按媒体库分组，组数和每组文件夹数各家不同：上次画出来的形状记在本机，
  * 骨架照着它排，第一次打开按一组一个文件夹。CloudDrive 代理与自动发现两块也按上次有没有决定。 */
@@ -37,6 +43,17 @@ export function rememberedSectionHeight(key: string, fallback: number): number {
     return typeof value === 'number' && value > 0 && value < 4000 ? value : fallback;
   } catch { return fallback }
 }
+
+/* 来源与订阅里另取数据的分区：正文高度的记忆键与第一次打开时的默认值。来源凭据的站点清单由
+ * Peach 自己定，默认值取全部站点收起时的高度；资源搜索默认没有索引器，只有帮助那一行。 */
+export const SECTION_BODY = {
+  credentials: { key: 'source-credentials', fallback: 1498 },
+  indexers: { key: 'indexers', fallback: 18 },
+  javBrowser: { key: 'jav-browser', fallback: 100 },
+} as const;
+export type SectionBody = keyof typeof SECTION_BODY;
+export const sectionBodyHeight = (name: SectionBody): number =>
+  rememberedSectionHeight(SECTION_BODY[name].key, SECTION_BODY[name].fallback);
 
 function mediaShape(): MediaShape {
   try {
@@ -87,10 +104,11 @@ export function configurationContentSkeleton(chosen: string): string {
     case '系统诊断': return diagnosticsSkeleton();
     case '媒体库与入库': return media();
     case '来源与订阅': return `<div>${button('采集来源与登录状态', 'secondary')}</div>`
-      + section('来源凭据', stack(`${text('40%')}${input()}${text('70%')}`))
-      + section('关注采集', row('首次采集范围', '', 'ui-configuration-skeleton-select') + row('头像刷新') + row('favicon 刷新'))
-      + section('资源搜索', stack(`${text('40%')}${input()}`))
-      + section('作品资料站点', stack(`${input()}${input()}`), button('保存配置'));
+      + section('来源凭据', stack(block(sectionBodyHeight('credentials'))))
+      + section('关注采集', controlRow('自动检查更新', '', `<span class="flex items-center gap-2"><span class="skeleton ui-configuration-skeleton-toggle"></span><span class="skeleton ui-configuration-skeleton-input" style="width:96px"></span></span>`)
+        + valueRow('订阅源拉取') + row('首次采集范围', '', 'ui-configuration-skeleton-select') + valueRow('头像刷新') + valueRow('favicon 刷新'))
+      + section('资源搜索', stack(block(sectionBodyHeight('indexers'))), button('添加索引器', 'secondary') + button('保存配置'))
+      + section('作品资料站点', stack(`<p class="text-body-2-regular text-text-secondary">${ENTRY_LINKS_HELP}</p>${hostField('JavDB 地址', ENTRY_LINKS_HINT)}${hostField('MISSAV 地址', ENTRY_LINKS_HINT)}`), button('保存配置'));
     case '下载渠道': return section('云下载', stack(`${text('35%')}${input()}${input()}${input()}${input()}`), button('保存配置'))
       + section('PikPak 账号', stack(`${input()}${input()}`), button('登录账号'));
     case '网络与访问': return section('本机访问端口', stack(input('128px')), button('保存配置'))

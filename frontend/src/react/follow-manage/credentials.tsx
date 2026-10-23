@@ -17,7 +17,7 @@ import { Note } from '../components/note';
 import { PathLine } from '../components/path-line';
 import { queryClient } from '../query';
 import { busyProps } from '../settings/use-action';
-import { Disclosure, ErrorText, ExternalLink, Help, Section, Stack } from '../settings/section';
+import { Disclosure, ErrorText, ExternalLink, Help, Section, Stack, useRememberedBody } from '../settings/section';
 import {
   CREDENTIAL_STATE, credentialDone, FOLLOW_CREDENTIALS_KEY, saveCredential,
   type CredentialData, type CredentialRow,
@@ -146,6 +146,8 @@ export function Credentials(
 ) {
   const rows = data.providers || [];
   const pending = rows.filter((row) => row.requirement === 'required' && !credentialDone(row));
+  /* 配置页里那一份记下正文高度，配置页首屏的整页骨架与分区骨架按它占位。 */
+  const body = useRememberedBody<HTMLDivElement>('credentials', [data]);
   if (!rows.length) {
     return <EmptyState size="compact" icon={RiKey2Line} title="没有可配置的来源">已接入的站点及其凭据状态会显示在这里。</EmptyState>;
   }
@@ -164,7 +166,9 @@ export function Credentials(
           </div>
         </section>
       ))}</>;
-  return embedded ? <Section title="来源凭据" aside={pendingLabel || undefined}><Stack>{groups}</Stack></Section> :
+  return embedded ? <Section title="来源凭据" aside={pendingLabel || undefined}>
+    <Stack><div ref={body} className="flex flex-col gap-4">{groups}</div></Stack>
+  </Section> :
     <div className={cardClass({ padding: 'none', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })}>
       <div className="flex flex-wrap items-center gap-2"><h3 className="mr-auto text-title-2-medium text-text-primary">来源凭据</h3>{pendingLabel}</div>
       {groups}

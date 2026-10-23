@@ -120,7 +120,8 @@ function FollowScheduleRow() {
   return (
     <>
       <SettingsRow label="自动检查更新">
-        <div id="followScheduleSetting" className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+        {/* 间隔框只在开着时出现；这一行按有框的高度留位，读回状态时下面几行不跟着动。 */}
+        <div id="followScheduleSetting" className="flex min-h-9 min-w-0 flex-wrap items-center justify-end gap-2">
           <Switch aria-label="自动检查更新" isSelected={data?.enabled === true} isDisabled={blocked}
             onChange={(on) => {
               localStorage.setItem('peach.number.followScheduleSetting', String(remembered.current));
@@ -150,7 +151,13 @@ function FeedScheduleRow() {
   const status = useQuery({ queryKey: FEED_SCHEDULE_KEY, queryFn: ({ signal }) => fetchFeedSchedule(signal),
     refetchOnMount: 'always', refetchInterval: (query) => schedulePollInterval(query.state.data) });
   const data = status.data;
-  if (!data) return null;
+  /* 首次读取时先占住这一行：读数回来再填字，下面的行不往下跳。 */
+  if (!data) {
+    return status.isPending ? <SettingsRow label="订阅源拉取">
+      <span data-skeleton aria-busy="true" aria-label="正在读取订阅源拉取间隔"
+        className="block h-4 w-16 rounded-2lg bg-background-tertiary-default" />
+    </SettingsRow> : null;
+  }
   const minutes = data.interval_minutes;
   const interval = minutes % 60 ? `每 ${minutes} 分钟` : `每 ${minutes / 60} 小时`;
   return (

@@ -117,6 +117,57 @@ describe('配置页等待态', () => {
       }
     });
   }
+  /* 来源与订阅有四块另取数据的分区：整页骨架、分区骨架与读回后的终态，每块的标题与卡片都在
+     同一位置、同样高，下面的分区不跟着跳。正文高度按上一次画好时记下的值占位，所以先正常打开一次。 */
+  it('来源与订阅的整页骨架、分区骨架与读回的分区同位同高', { timeout: 90_000 }, async () => {
+    const opened = await visit(browser, '/settings/subscriptions', VIEWPORTS[0]);
+    let release = () => {};
+    let mount = () => {};
+    try {
+      const { page } = opened;
+      const names = ['来源凭据', '关注采集', '资源搜索', '作品资料站点'];
+      /* 骨架淡出时新旧两份 `.ui-configpage` 可能同时在：取最后挂上的那一份。 */
+      const sections = () => page.locator('.ui-configpage').last().evaluate((root, names) => names.map((name) => {
+        const section = root.querySelector(`[aria-label="${name}"]`);
+        if (!section) return null;
+        const r = section.getBoundingClientRect();
+        return { name, y: r.y, height: r.height };
+      }), names);
+      const done = () => page.waitForFunction(() => document.querySelector('.ui-configpage section[aria-label="来源凭据"]')
+        && !document.querySelector('.ui-configpage [data-skeleton]'), null, { timeout: 30_000 });
+      await done();
+      await settle(page);
+      /* 两道门：配置读回之前是整页骨架；配置放行、分区自己的数据还压着时是分区骨架。 */
+      const configuration = new Promise<void>((resolve) => { mount = resolve });
+      const held = new Promise<void>((resolve) => { release = resolve });
+      await page.route('**/api/configuration', async (route) => { await configuration; await route.continue() });
+      for (const url of ['**/api/follow/credentials', '**/api/configuration/indexers', '**/api/follow/schedule', '**/api/feeds/schedule']) {
+        await page.route(url, async (route) => { await held; await route.continue() });
+      }
+      await page.reload({ waitUntil: 'commit' });
+      await page.locator('[data-skeleton="board/settings/subscriptions"]').waitFor();
+      const pageSkeleton = await sections();
+      mount();
+      await page.getByLabel('正在读取来源凭据', { exact: true }).waitFor();
+      const sectionSkeleton = await sections();
+      release();
+      await done();
+      await settle(page);
+      const live = await sections();
+      for (const [phase, shape] of [['整页骨架', pageSkeleton], ['分区骨架', sectionSkeleton]] as const) {
+        shape.forEach((section, i) => {
+          const end = live[i]!;
+          assert.ok(section && Math.abs(section.y - end.y) <= 1 && Math.abs(section.height - end.height) <= 1,
+            `${phase}「${names[i]}」${JSON.stringify(section)}，读回后 ${JSON.stringify(end)}`);
+        });
+      }
+      assert.deepEqual(opened.problems, []);
+    } finally {
+      mount();
+      release();
+      await opened.close();
+    }
+  });
   for (const path of ['/settings/library', '/review']) {
     it(`${path} 的明暗主题使用透明容器与灰色 Pills 选中底色`, { timeout: 60_000 }, async () => {
       const opened = await visit(browser, path, VIEWPORTS[0]);
