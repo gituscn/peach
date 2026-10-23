@@ -873,10 +873,7 @@ class IwaraConnector(_BaseConnector):
         if re.fullmatch(r"[A-Za-z0-9-]{1,80}", file_id):
             thumbnail = f"https://files.iwara.tv/image/thumbnail/{file_id}/thumbnail-00.jpg"
         url = f"https://www.iwara.tv/video/{video_id}"
-        tags = row.get("tags") if isinstance(row.get("tags"), list) else []
-        extra = {"media_kind": "video", "tags": [
-            tag["id"] for tag in tags
-            if isinstance(tag, dict) and isinstance(tag.get("id"), str)]}
+        extra = {"media_kind": "video", **self._tag_metadata(row.get("tags"))}
         if row.get("embedUrl"):
             extra["media_error"] = "Iwara 此条目使用外部播放器，请打开来源页面观看"
         return FollowCandidate(
@@ -887,6 +884,18 @@ class IwaraConnector(_BaseConnector):
             duration=self._duration(file.get("duration")),
             author=plain_text(str(user.get("name") or handle)),
             summary=plain_text(str(row.get("body") or "")) or None, extra=extra)
+
+    @staticmethod
+    def _tag_metadata(value):
+        """仅接纳上游明确的 general 类型，其他类型保留原值。"""
+        rows = value if isinstance(value, list) else []
+        tags = [tag for tag in rows if isinstance(tag, dict)
+                and isinstance(tag.get("id"), str)]
+        source_types = {tag["id"]: tag["type"] for tag in tags
+                        if isinstance(tag.get("type"), str) and tag["type"]}
+        return {"tags": [tag["id"] for tag in tags], "source_tag_types": source_types,
+                "tag_types": {name: "general" for name, kind in source_types.items()
+                              if kind == "general"}}
 
     @staticmethod
     def _duration(value):

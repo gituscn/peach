@@ -67,6 +67,25 @@ class FollowMediaResolverTests(unittest.TestCase):
         self.assertEqual(transport.call_count, 1)
         self.assertEqual(resolver.cooling("iwara"), 30)
 
+    def test_iwara_unknown_original_height_preserves_default_and_explicit_selection(self):
+        transport = mock.Mock(side_effect=[
+            HttpResponse(200, {}, json.dumps({
+                "fileUrl": "https://files.iwara.tv/file/id?expires=2000000000",
+                "file": {"height": 0}}).encode()),
+            HttpResponse(200, {}, json.dumps([
+                {"name": "540", "src": {"view": "//hime.iwara.tv/540.mp4"}},
+                {"name": "Source", "src": {"view": "//mikoto.iwara.tv/original.mp4"}}]).encode())])
+        resolver = FollowMediaResolver(transport)
+        item = SimpleNamespace(id=91, provider="iwara", external_id="Video123",
+                               url="https://www.iwara.tv/video/Video123", metadata={})
+        original = resolver.resolve(item)
+        self.assertEqual(original.url, "https://mikoto.iwara.tv/original.mp4")
+        self.assertEqual(original.qualities[0][0], 0)
+        self.assertEqual(resolver.resolve(item, height=540).url, "https://hime.iwara.tv/540.mp4")
+        self.assertEqual(resolver.resolve(item, height=0), original)
+        self.assertEqual(resolver.resolve(item, height=9999), original)
+        self.assertEqual(transport.call_count, 2)
+
     def test_rule34video_resolves_the_current_signed_url_and_caches_it(self):
         requests = []
 

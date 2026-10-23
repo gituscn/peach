@@ -2066,7 +2066,7 @@ class ParseSourceUrlTests(unittest.TestCase):
 class IwaraConnectorTests(unittest.TestCase):
     PROFILE = {"user": {"id": "user-id", "name": "Test Creator", "username": "creator"}}
     VIDEO = {"id": "Video123", "title": "Test animation", "body": "Description",
-             "createdAt": "2026-10-01T12:00:00Z", "tags": [{"id": "animation"}],
+             "createdAt": "2026-10-01T12:00:00Z", "tags": [{"id": "animation", "type": "general"}],
              "file": {"id": "file-id", "height": 1080, "duration": 20.5}}
 
     def connector(self, payloads, **kwargs):
@@ -2104,7 +2104,9 @@ class IwaraConnectorTests(unittest.TestCase):
                          "https://files.iwara.tv/image/thumbnail/file-id/thumbnail-00.jpg")
         self.assertEqual((item.author, item.duration), ("Test Creator", 20.5))
         self.assertEqual(item.published_at, "2026-10-01T12:00:00Z")
-        self.assertEqual(item.extra, {"media_kind": "video", "tags": ["animation"]})
+        self.assertEqual(item.extra, {"media_kind": "video", "tags": ["animation"],
+                                     "tag_types": {"animation": "general"},
+                                     "source_tag_types": {"animation": "general"}})
         self.assertNotIn("If-None-Match", requests[0].headers)
         self.assertEqual(requests[1].headers["If-None-Match"], "old-version")
         query = urllib.parse.parse_qs(urllib.parse.urlsplit(requests[1].url).query)
