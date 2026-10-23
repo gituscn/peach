@@ -54,8 +54,14 @@ def assert_av1_decoder(ffmpeg: Path, root: Path) -> None:
 
 
 def assert_public_resources(application: Path) -> None:
-    """发行资源不包含本机实体导出。"""
-    assert not (application / "_internal/resources/seed").exists(), "发行包包含私有实体导出"
+    """发行资源包含完整的公共实体种子包。"""
+    path = application / "_internal/resources/seed/entities.json"
+    assert path.is_file(), "发行包缺少公共实体种子"
+    pack = json.loads(path.read_text(encoding="utf-8"))
+    assert pack.get("format") == 2 and pack.get("source") == "auto:seed", "公共实体种子格式无效"
+    expected = pack.pop("content_sha256", None)
+    content = json.dumps(pack, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)
+    assert expected == hashlib.sha256(content.encode('utf-8')).hexdigest(), "公共实体种子摘要不一致"
 
 
 def assert_bundled_media_tools(application: Path) -> None:

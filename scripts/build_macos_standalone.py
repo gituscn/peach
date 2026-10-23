@@ -74,8 +74,8 @@ def build(destination: Path, *, dmg: bool = True, target_arch: str | None = None
           require_reporting: bool = False) -> dict[str, str]:
     if sys.platform != "darwin":
         raise SystemExit("macOS 应用必须在 macOS 上构建")
-    if (ROOT / "resources" / "seed").exists():
-        raise SystemExit("本机实体导出不能进入发行资源")
+    from peach import seed_pack
+    seed_pack.load(ROOT / "resources/seed/entities.json")
     architecture = target_arch or platform.machine()
     if architecture not in {"arm64", "x86_64"} or architecture != platform.machine():
         raise SystemExit("目标架构必须与当前 Python 一致；请使用 arm64 或 x86_64 Python 及对应依赖构建")
