@@ -19,6 +19,10 @@ it('连续滚动按帧更新位置，内容尺寸变化后刷新滑块比例', a
     return this.classList.contains('ov-y')?84:0;
   });
   const sync=attachOverlayScrollbar(container)!;
+  // 挂上时不量，第一次尺寸观察回调才量；这里直接走同一个函数。
+  expect(host.querySelector<HTMLElement>('.ov-y')!.hidden).toBe(true);
+  expect(measure).not.toHaveBeenCalled();expect(measureContent).not.toHaveBeenCalled();
+  sync();
   const thumb=host.querySelector<HTMLElement>('.ov-y .ovthumb')!;
   expect(thumb.style.height).toBe('24px');
   measure.mockClear();measureContent.mockClear();
@@ -55,7 +59,7 @@ it('短轨道的滑块保持在可见范围内', () => {
     return this.classList.contains('ov-x')?16:0;
   });
   container.scrollTop=468;container.scrollLeft=468;
-  attachOverlayScrollbar(container);
+  attachOverlayScrollbar(container)!();
   const vertical=host.querySelector<HTMLElement>('.ov-y .ovthumb')!;
   const horizontal=host.querySelector<HTMLElement>('.ov-x .ovthumb')!;
   expect(vertical.style.height).toBe('16px');

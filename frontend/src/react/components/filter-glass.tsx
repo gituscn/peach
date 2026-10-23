@@ -10,6 +10,7 @@ import { cx } from '@/utils/cx';
 import { IconButton, type IconButtonProps } from '@/components/base/buttons/icon-button';
 import { spinnerHtml } from '@peach/legacy/ui';
 
+import { GlassDrift } from './glass-drift';
 import { useStuck } from './use-stuck';
 import { useHorizontalScroller } from './use-horizontal-scroller';
 import './filter-glass.css';
@@ -33,6 +34,7 @@ export function FilterGlass({ title, children }: { title: string; children: Reac
       className="sticky top-topbar z-10 mb-5.5 flex flex-wrap items-center gap-x-2.5 gap-y-2 px-4 py-2.5">
       <h3 className="mr-1 text-body-medium">{title}</h3>
       {children}
+      <GlassDrift />
     </div>
   );
 }
@@ -81,6 +83,7 @@ export function FilterGlassRows(
         className={cx('flex min-h-11.5 min-w-0 items-center gap-3 px-3 py-2', bottomClassName)}>
         {bottom}
       </div>
+      <GlassDrift />
     </div>
   );
 }

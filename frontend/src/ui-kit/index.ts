@@ -15,8 +15,9 @@ export {
   configurationSkeletonHtml, fillSkeletonTier, fitSkeleton, indexSkeletonHtml, revealSkeleton, SKELETON_REVEAL_DELAY,
   skeletonHtml,
 } from './skeleton';
+export { gateSweep, releaseSweep } from './sweep-gate';
 export {
-  glideEase, moveGlidePane, rubberBand, scrollerHtml, stopAutoScroll, wireAutoScroll, wireHorizontalScroller,
+  cancelGlide, glideEase, moveGlidePane, rubberBand, scrollerHtml, stopAutoScroll, wireAutoScroll, wireHorizontalScroller,
   wireOverlayScrollbars, wireScrollers,
 } from './scroll';
 export {

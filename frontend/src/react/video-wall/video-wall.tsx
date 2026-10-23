@@ -49,12 +49,13 @@ const WallArtwork = memo(function WallArtwork({ item, image, big = false, ratio 
   const pic = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
     pic.current?.querySelectorAll<HTMLImageElement>('img.cover').forEach(img => {
-      if (img.complete && img.naturalWidth) coverAnchor(img);
+      if (img.complete && img.naturalWidth) coverAnchor(img, ratio);
     });
   }, [ratio, artwork.html]);
+  // 比例就是下面写进 `--card-ratio` 的那个数，直接交给取景，免得每格提交后各读一次计算样式。
   return <span ref={pic} data-media-pic="" style={{ '--card-ratio':String(ratio) } as CSSProperties}>
     <ArtSlot artwork={artwork} relayout={node => node.querySelectorAll<HTMLImageElement>('img.cover').forEach(img => {
-      if (img.complete && img.naturalWidth) coverAnchor(img);
+      if (img.complete && img.naturalWidth) coverAnchor(img, ratio);
     })} />
   </span>;
 });
@@ -377,7 +378,10 @@ export function VideoWall({ items, finite, hasMore, busy, loading = false, error
           const landing = !entranceDone && !focused;
           const delay = landing ? Math.min(.34, (Math.max(0, tile.x + camera.view.camera.x / camera.view.camera.scale)
             + Math.max(0, tile.y + camera.view.camera.y / camera.view.camera.scale)) / 103.36 * .03) : 0;
-          return <motion.article key={tile.key} layout data-wall-tile={tile.key} data-wall-id={item.id}
+          /* 投影只在这一格自己的几何变了的那次提交里量：拖动、平移时整面墙每次重渲染都量一遍
+             全部磁贴和页面滚动位置，量的那一下正赶上刚写完的样式，逐次整树重算。 */
+          return <motion.article key={tile.key} layout layoutDependency={`${rect.x}:${rect.y}:${rect.width}:${rect.height}`}
+            data-wall-tile={tile.key} data-wall-id={item.id}
             data-wall-focus={focused ? '' : undefined} data-playing={focused && (playing || starting) ? '' : undefined}
             role={focused ? 'group' : 'button'} tabIndex={focused ? -1 : 0}
             aria-label={focused ? label(item) : `展开 ${label(item)}`} aria-expanded={focused ? undefined : false}

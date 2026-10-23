@@ -295,11 +295,18 @@ function usePaged<T>(row: RefObject<HTMLElement | null>, items: T[], key: string
       });
     });
   }, [row]);
-  useLayoutEffect(fill);
+  /* 量宽度合到下一帧：提交后当场量、每个 `scroll` 事件当场量，都赶在刚写完的样式后面，
+   * 一次就是一遍整树重算；横滚时一帧来好几个 `scroll`，也只需要量一次。 */
+  const frame = useRef(0);
+  const schedule = useCallback(() => {
+    if (!frame.current) frame.current = requestAnimationFrame(() => { frame.current = 0; fill() });
+  }, [fill]);
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  useLayoutEffect(schedule);
   useEffect(() => {
     const el = row.current;
-    el?.addEventListener('scroll', fill, { passive: true });
-    return () => el?.removeEventListener('scroll', fill);
+    el?.addEventListener('scroll', schedule, { passive: true });
+    return () => el?.removeEventListener('scroll', schedule);
   });
   return all.slice(0, current.limit);
 }

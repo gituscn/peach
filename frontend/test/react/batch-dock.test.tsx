@@ -140,6 +140,15 @@ describe('浮条', () => {
     expect(root.querySelector('[data-batch-scope]')!.getAttribute('data-context')).toBe('junk');
   });
 
+  it('浮条在的时候 body 挂 data-batch-dock-open 给网格让位，选空就摘', async () => {
+    const { render } = await setup();
+    expect(document.body.hasAttribute('data-batch-dock-open')).toBe(false);
+    await render({ count: 2, context: 'catalog', junkDismissed: false });
+    expect(document.body.hasAttribute('data-batch-dock-open')).toBe(true);
+    await render({ count: 0, context: 'catalog', junkDismissed: false });
+    expect(document.body.hasAttribute('data-batch-dock-open')).toBe(false);
+  });
+
   it('上千项的计数带千分位', async () => {
     const { root, render } = await setup();
     await render({ count: 12345, context: 'catalog', junkDismissed: false });
