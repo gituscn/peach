@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "29c35afc-10f2-4aac-904b-3ba00c5fd100", e._sentryDebugIdIdentifier = "sentry-dbid-29c35afc-10f2-4aac-904b-3ba00c5fd100");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "dc5896a3-4b3d-442d-8d1d-89106f5ea16c", e._sentryDebugIdIdentifier = "sentry-dbid-dc5896a3-4b3d-442d-8d1d-89106f5ea16c");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, i, o, s) => {
@@ -19450,21 +19450,6 @@ var mm = dm.filter((e) => e.cloud).map((e) => e.id), hm = Object.fromEntries(dm.
 	...Object.fromEntries(fm.map((e) => [e.id, gm[e.id] || e.icon])),
 	online: "rss"
 };
-Object.fromEntries(Object.entries({
-	fresh: "/unseen",
-	later: "/watch-later",
-	flagged: "/flagged",
-	ads: "/junk-files"
-}).map(([e, t]) => [t, e])), typeof Intl < "u" && typeof Intl.Segmenter == "function" && new Intl.Segmenter(void 0, { granularity: "grapheme" }), { ...hm }, {
-	medium: "h-9 rounded-2lg p-2 text-body-medium",
-	small: "h-8 rounded-lg px-2 py-1.5 text-body-medium"
-}.medium, [...Object.keys({
-	appearance: "外观与导航",
-	playback: "浏览与播放",
-	jav: "JAV 与新作",
-	search: "搜索与推荐",
-	content: "内容显示"
-}).map((e) => `/settings/${e}`)];
 //#endregion
 //#region src/react/boardui/components/application/settings/settings-rows.tsx
 function vm({ label: e, description: t, children: n }) {
@@ -21590,4 +21575,4 @@ var Kg = document.getElementById("peach-page"), qg = Kg ? Gg[Kg.dataset.page ?? 
 Kg && qg && (0, T.createRoot)(Kg).render(/* @__PURE__ */ (0, z.jsx)(qg, { data: { ...Kg.dataset } }));
 //#endregion
 
-//# debugId=29c35afc-10f2-4aac-904b-3ba00c5fd100
+//# debugId=dc5896a3-4b3d-442d-8d1d-89106f5ea16c

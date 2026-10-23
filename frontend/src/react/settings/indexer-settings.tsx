@@ -1,13 +1,14 @@
 /* 用户自配索引器；地址和 API key 分开保存，读取时只返回凭据是否存在。 */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/base/buttons/button';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
 import { apiGet, apiSend, errorMessage } from '../../api';
+import { indexersSkeleton, rememberShape } from '../../configuration-skeleton';
 import { randomId } from '../../core/random-id';
-import { Disclosure, ErrorText, ExternalLink, Footer, Help, Section, SectionSkeleton, Stack, useRememberedBody } from './section';
+import { Disclosure, ErrorText, ExternalLink, Footer, Help, Section, SectionSkeleton, Stack } from './section';
 import { busyProps, useAction } from './use-action';
 
 const URL = '/api/configuration/indexers';
@@ -20,10 +21,7 @@ interface State { indexers: Indexer[]; max_indexers: number }
 export function IndexerSettings({ receipt }: { receipt(message: string): void }) {
   const query = useQuery({ queryKey: ['indexers'], queryFn: ({ signal }) => apiGet<State>(URL, signal), refetchOnMount: 'always' });
   if (query.error) return <ErrorText>{errorMessage(query.error)}</ErrorText>;
-  if (query.isFetching) return <SectionSkeleton title="资源搜索" label="正在读取资源搜索设置" body="indexers" actions={<>
-    <Button variant="secondary" type="button" disabled>添加索引器</Button>
-    <Button type="button" disabled>保存配置</Button>
-  </>} />;
+  if (query.isFetching) return <SectionSkeleton label="正在读取资源搜索设置" html={indexersSkeleton} />;
   return query.data ? <IndexerForm initial={query.data} receipt={receipt} /> : null;
 }
 
@@ -47,7 +45,8 @@ function IndexerSummary({ row, index }: { row: Indexer; index: number }) {
 function IndexerForm({ initial, receipt }: { initial: State; receipt(message: string): void }) {
   const [rows, setRows] = useState(initial.indexers);
   const action = useAction();
-  const body = useRememberedBody<HTMLDivElement>('indexers', [initial]);
+  /* 记下几条索引器、哪条展开，下次骨架照这个结构画。 */
+  useEffect(() => { rememberShape('indexers', { open: initial.indexers.map(row => !row.url) }) }, [initial]);
   const update = (key: string, fields: Partial<Indexer>) =>
     setRows((current) => current.map((row) => row.key === key ? { ...row, ...fields } : row));
   const save = (event: FormEvent<HTMLFormElement>) => {
@@ -60,7 +59,7 @@ function IndexerForm({ initial, receipt }: { initial: State; receipt(message: st
   return (
     <Section title="资源搜索" onSubmit={save}>
       <Stack>
-        <div ref={body} className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
         <Disclosure summary="索引器连接帮助"><Help>填写 Prowlarr 或 Jackett 提供的 Torznab 地址和 API key。{' '}
           <ExternalLink href="https://github.com/peach-mitao/peach/blob/master/docs/RESOURCE_SEARCH.md">详细配置说明</ExternalLink></Help>
         </Disclosure>

@@ -2248,6 +2248,19 @@ class FollowContractTests(unittest.TestCase):
         self.assertIn("游客", by_provider["simpcity"]["why"])
         self.assertTrue(by_provider["rule34xxx"]["path"].endswith("rule34xxx.json"))
 
+    def test_skeleton_registry_matches_the_credentials_endpoint(self):
+        # 配置页的来源凭据骨架在数据回来之前就按这份登记画行；登记与接口的静态部分必须一致。
+        registry = json.loads((ROOT / "frontend" / "src" / "react" / "follow-manage" / "credential-providers.json").read_text(encoding="utf-8"))
+        expected = []
+        for row in self._get("/api/follow/credentials")["providers"]:
+            entry = {"provider": row["provider"], "label": row["provider_label"], "requirement": row["requirement"]}
+            if row["needs"]:
+                entry.update(fields=row["needs"], why=row["why"], where=row["where"], howto=row["howto"])
+            elif row["requirement"] == "blocked":
+                entry.update(why=row["why"])
+            expected.append(entry)
+        self.assertEqual(registry, expected)
+
     def test_a_configured_credential_reports_nothing_missing(self):
         secrets = self.root / "secrets" / "follow"
         secrets.mkdir(parents=True)

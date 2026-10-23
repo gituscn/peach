@@ -2,7 +2,7 @@
  *
  * 值不回显。服务端只报存在性，保存成功之后这一栏清空，看得到的只有字段名——凭据回到
  * 浏览器里就等于又多一处会被翻出来的副本。 */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { confirmModal } from '@peach/legacy/ui';
 
@@ -11,13 +11,14 @@ import { Chip } from '@/components/base/badges/chip';
 import { Input } from '@/components/base/input/input';
 
 import { errorMessage } from '../../api';
+import { rememberShape } from '../../configuration-skeleton';
 import { cardClass } from '../components/card';
 import { EmptyState } from '../components/empty-state';
 import { Note } from '../components/note';
 import { PathLine } from '../components/path-line';
 import { queryClient } from '../query';
 import { busyProps } from '../settings/use-action';
-import { Disclosure, ErrorText, ExternalLink, Help, Section, Stack, useRememberedBody } from '../settings/section';
+import { Disclosure, ErrorText, ExternalLink, Help, Section, Stack } from '../settings/section';
 import {
   CREDENTIAL_STATE, credentialDone, FOLLOW_CREDENTIALS_KEY, saveCredential,
   type CredentialData, type CredentialRow,
@@ -146,8 +147,8 @@ export function Credentials(
 ) {
   const rows = data.providers || [];
   const pending = rows.filter((row) => row.requirement === 'required' && !credentialDone(row));
-  /* 配置页里那一份记下正文高度，配置页首屏的整页骨架与分区骨架按它占位。 */
-  const body = useRememberedBody<HTMLDivElement>('credentials', [data]);
+  /* 记下哪些来源已配好：配置页骨架据此画每行的徽章位与展开态（站点清单本身是静态登记）。 */
+  useEffect(() => { rememberShape('credentials', { done: rows.filter(credentialDone).map(row => row.provider) }) }, [data]);
   if (!rows.length) {
     return <EmptyState size="compact" icon={RiKey2Line} title="没有可配置的来源">已接入的站点及其凭据状态会显示在这里。</EmptyState>;
   }
@@ -167,7 +168,7 @@ export function Credentials(
         </section>
       ))}</>;
   return embedded ? <Section title="来源凭据" aside={pendingLabel || undefined}>
-    <Stack><div ref={body} className="flex flex-col gap-4">{groups}</div></Stack>
+    <Stack><div className="flex flex-col gap-4">{groups}</div></Stack>
   </Section> :
     <div className={cardClass({ padding: 'none', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })}>
       <div className="flex flex-wrap items-center gap-2"><h3 className="mr-auto text-title-2-medium text-text-primary">来源凭据</h3>{pendingLabel}</div>

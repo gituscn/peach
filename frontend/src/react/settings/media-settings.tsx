@@ -4,7 +4,7 @@
  * 保存成功后显示持久提示和访问地址，等待服务就绪后跳转。
  *
  * 校验原因由服务端按字段给（400 的 `errors`），页面写回原位，不在前端复制一份路径与端口的判定。 */
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { Button } from '@/components/base/buttons/button';
 import { LinkButton } from '@/components/base/buttons/link-button';
@@ -35,7 +35,7 @@ import {
   AUTO_STAGES, LibraryColorPicker, PolicyLegend, PresetSelect, StageChooser, type Preset, type Stage,
 } from './library-policy-settings';
 import { PushDiscoveryForm } from './push-discovery-settings';
-import { rememberMediaShape, rememberSectionHeight } from '../../configuration-skeleton';
+import { rememberShape } from '../../configuration-skeleton';
 import { useLibraryTints } from '../components/library-tint';
 import { LIBRARY_FOLDER_HELP } from './library-policy-copy';
 import {
@@ -89,25 +89,26 @@ const fieldErrorsOf = (cause: unknown): FieldErrors | null => {
 /* 能编辑时挂载状态标在每个文件夹行上；只读时没有那张表，单列一块。 */
 export function MediaSettings({ data, receipt, panel }: ConfigurationGroupProps) {
   const cloud = !!data.media_sources?.some(row => isCloudSource(row.location));
-  // 首屏骨架照这一屏的形状排：每个媒体库几个文件夹、有没有 CloudDrive 代理与自动发现。
+  // 首屏骨架照这一屏的结构排：每个媒体库几个文件夹、有没有 CloudDrive 代理，自动发现开了哪几项、几条前缀。
   useEffect(() => {
-    if (!data.editable) return;
-    const counts = new Map<string, number>();
-    for (const row of initialRows(data)) counts.set(row.library_id, (counts.get(row.library_id) ?? 0) + 1);
-    rememberMediaShape({ folders: [...counts.values()], cloud, discovery: !!data.push_discovery });
+    if (data.editable) {
+      const counts = new Map<string, number>();
+      for (const row of initialRows(data)) counts.set(row.library_id, (counts.get(row.library_id) ?? 0) + 1);
+      rememberShape('media', { folders: [...counts.values()], cloud });
+    }
+    const discovery = data.push_discovery;
+    if (discovery) {
+      rememberShape('discovery', { enabled: discovery.enabled, watchLocal: discovery.watch_local, cloud: discovery.cloud,
+        webhook: discovery.enabled && discovery.cloud && Boolean(discovery.config_toml), prefixes: discovery.prefixes.length });
+    }
   }, [data, cloud]);
-  // 自动发现那块的高度随前缀行数与 Webhook 配置变化，记下来给首屏骨架占位。
-  const discovery = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (discovery.current) rememberSectionHeight('push-discovery', discovery.current.offsetHeight);
-  });
   return (
     <div {...groupRoot(panel)}>
       {data.editable ? <MediaForm data={data} receipt={receipt} /> : <Note tone="neutral" title="只读">{data.notice}</Note>}
       {data.editable ? null : <MountStatus data={data} />}
       {cloud ? <CloudProxySettings receipt={receipt} /> : null}
       {data.push_discovery
-        ? <div ref={discovery}><PushDiscoveryForm initial={data.push_discovery} receipt={receipt} /></div>
+        ? <PushDiscoveryForm initial={data.push_discovery} receipt={receipt} />
         : null}
     </div>
   );
