@@ -140,7 +140,10 @@ class DataStorageTests(unittest.TestCase):
     def test_rename_moves_everything_rewrites_ledger_paths_and_points_both_locators(self):
         snapshot = str(self.data / "generated" / "snapshots" / "local" / "aa" / "x.jpg")
         evidence = str(self.data / "sources" / "follow" / "page.html")
-        make_ledger(self.data / "database" / "ledger.db", snapshot=snapshot.upper(), evidence=evidence)
+        # 路径比较按本机 normcase：折叠大小写的系统上，账本里换了大小写的旧路径也要认出来。
+        folds_case = os.path.normcase("A") == "a"
+        make_ledger(self.data / "database" / "ledger.db",
+                    snapshot=snapshot.upper() if folds_case else snapshot, evidence=evidence)
         write(self.data / "generated" / "covers" / "ABC-001.jpg")
         bootstrap = self.base / "default" / "peach-data"
         target = self.base / "new" / "peach-data"

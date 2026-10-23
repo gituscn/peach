@@ -103,8 +103,9 @@ class MacMediaBundleTests(unittest.TestCase):
                     else executable.parent / name)
             path.parent.mkdir(exist_ok=True, parents=True)
             path.write_bytes(b"fixture")
+        # 应用包布局只在 macOS 生效，Linux runner 上按 macOS 解析同一套 POSIX 文件名。
         with patch.object(sys, "executable", str(executable)), patch.object(sys, "frozen", True, create=True), \
-                patch.dict("os.environ", {"PATH": ""}, clear=True):
+                patch.object(sys, "platform", "darwin"), patch.dict("os.environ", {"PATH": ""}, clear=True):
             resolver = FFmpegResolver(self.root / "missing")
             self.assertEqual(resolver.ffmpeg().source, "peach-bundled")
             self.assertEqual(resolver.ffprobe().path, executable.parent.parent / "Resources/tools/ffmpeg/bin/ffprobe")

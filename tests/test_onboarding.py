@@ -1,8 +1,9 @@
 """`peach.onboarding`：首次运行问答的题目、校验与落盘，纯逻辑、可注入。
 
 CLI 与将来的托盘设置页共用这一层，所以这里只用脚本化答案驱动，不碰 stdin；平台由
-`windows=` 注入。只有一处例外：媒体目录题要收一个真实存在的目录，而那个目录是不是盘符
-路径由测试机决定，所以走到这道题的用例按 `NATIVE_WINDOWS` 用本机形态。
+`windows=` 注入。例外是真实目录：媒体目录题要收一个真实存在的目录，写回设置文件的
+真实目录要配上账本口径的声明根，而那个目录是不是盘符路径由测试机决定，所以这些用例
+按 `NATIVE_WINDOWS` 用本机形态。
 """
 from __future__ import annotations
 
@@ -21,6 +22,18 @@ from peach import distribution, onboarding, settings_file
 
 NATIVE_WINDOWS = os.name == "nt"
 HAS_HTTP_DEPS = all(importlib.util.find_spec(name) for name in ("fastapi", "httpx"))
+
+
+def local_media(*directories: Path) -> tuple[dict, dict]:
+    """本机真实目录对应的 `[media.locations]` 与 `[media.mounts]`。
+
+    声明根在所有系统上都是账本口径的 Windows 路径：Windows 直接用这些目录；
+    其他系统按 `peach init` 的写法用 `R:\\media` 起的声明根，真实目录按顺序进 `[media.mounts]`。
+    """
+    actual = tuple(str(directory) for directory in directories)
+    if NATIVE_WINDOWS:
+        return {"local": actual}, {}
+    return {"local": onboarding.posix_declared_roots(len(actual))}, {"local": actual}
 
 
 def scripted(*answers: str):
@@ -245,13 +258,12 @@ class ConfigureTests(_Case):
 
     def test_the_written_file_reads_back_with_only_the_declared_source(self):
         """`[media.locations]` 里只有 local：内建默认的示例盘符不得从旁边混进来。"""
-        prepared = onboarding.configure(self.config, self._answers(), windows=True)
+        prepared = onboarding.configure(self.config, self._answers(), windows=NATIVE_WINDOWS)
         settings_file.write(prepared)
         loaded = settings_file.load_config(
             project_root=self.root / "app", environ={"PEACH_DATA_ROOT": str(self.root / "peach-data")})
         self.assertTrue(loaded.present)
-        self.assertEqual(loaded.locations, {"local": (str(self.media),)})
-        self.assertEqual(loaded.mounts, {})
+        self.assertEqual((loaded.locations, loaded.mounts), local_media(self.media))
         self.assertFalse(loaded.replication.enabled)
 
 
@@ -910,8 +922,9 @@ class StandaloneConfigurationTests(_Case):
     def setUp(self):
         super().setUp()
         from dataclasses import replace
-        self.config = replace(self.config, locations={"local": (str(self.media),)},
-                              mounts={}, server=settings_file.ServerSettings(port=9123))
+        locations, mounts = local_media(self.media)
+        self.config = replace(self.config, locations=locations, mounts=mounts,
+                              server=settings_file.ServerSettings(port=9123))
         settings_file.write(self.config)
         self.config = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(self.config.data_root)})
         self.addCleanup(mock.patch.stopall)
@@ -1046,8 +1059,10 @@ class StandaloneConfigurationTests(_Case):
         """摘要卡的媒体库数量由服务端给出：库名相同的目录算一个库，跨来源也一样。"""
         from dataclasses import replace
         from peach import media_libraries
-        first, second, third = (str(self.media / name) for name in ("a", "b", "c"))
-        self.config = replace(self.config, locations={"local": (first, second), "115": (third,)},
+        # 只数媒体库，声明根不必有实际目录；非 Windows 照样用账本口径的 Windows 路径。
+        first, second, third = (str(self.media / name) if NATIVE_WINDOWS else ntpath.join("R:\\media", name)
+                                for name in ("a", "b", "c"))
+        self.config = replace(self.config, locations={"local": (first, second), "115": (third,)}, mounts={},
                               library_names={first: "电影", third: "电影"}, library_catalog={}, storage_roots={})
         settings_file.write(self.config, force=True)
         with self.client() as client:

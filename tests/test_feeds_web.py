@@ -16,7 +16,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from peach import feed_followup, feeds, web_feeds, web_settings  # noqa: E402
+from peach import feed_followup, feeds, web_feeds, web_settings, web_state  # noqa: E402
 from peach.http import HttpResponse  # noqa: E402
 from peach.web_contract import WebContract  # noqa: E402
 from peach.web_router import dispatch_api_get, dispatch_api_post  # noqa: E402
@@ -185,7 +185,10 @@ class FeedWebTest(FeedWebFixture):
         self.assertFalse(self.contract.has_cover('SSIS-950'))
         self.assertIsNone(self.contract.cover_path('SSIS-950'))
         atomic_write_text(evidence, json.dumps({'source_url': 'https://pics.dmm.co.jp/a.jpg'}))
-        self.assertTrue(self.contract.has_cover('SSIS-950'))
+        # 两次换名可能落在同一个时钟刻度，目录时间不变；刚写过的目录索引过了静置时效才重扫。
+        later = web_state.time.monotonic() + web_state.SETTLE_TTL + 1
+        with patch.object(web_state.time, 'monotonic', return_value=later):
+            self.assertTrue(self.contract.has_cover('SSIS-950'))
         self.assertEqual(self.contract.cover_path('SSIS-950'), target)
 
     def test_known_discovery_without_cover_address_has_no_javdb_image_fallback(self):
