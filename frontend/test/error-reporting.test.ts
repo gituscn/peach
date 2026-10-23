@@ -75,6 +75,29 @@ it('正式 bundle 只上报固定文件名与有效 Debug ID，异常类型不�
   for (const secret of ['private-host', 'private-token', 'other.js', 'private-name', 'private-value']) expect(body).not.toContain(secret);
 });
 
+it('按页拆出的 chunk 也带文件名与 Debug ID 上报，查询串与主机不出本机', async () => {
+  const listeners = new Map<string, (event: unknown) => void>();
+  vi.spyOn(window, 'addEventListener').mockImplementation((name, callback) => {
+    listeners.set(name, callback as (event: unknown) => void);
+  });
+  const chunk = 'peach-app.stats-page-Ab1_x-Y9.js';
+  const chunkId = '45678901-1234-4123-8123-123456789abc';
+  vi.stubGlobal('_sentryDebugIds', {
+    [`Error\n at https://private-host/dist/${chunk}:1:9\n at https://private-host/dist/peach-app.js:1:2`]: chunkId,
+    'Error\n at https://private-host/dist/peach-app.a.b.js:1:2': '56789012-1234-4123-8123-123456789abc',
+  });
+  const fetch = vi.fn().mockResolvedValue({ ok: true });
+  vi.stubGlobal('fetch', fetch);
+  const { installErrorReporting } = await import('../src/error-reporting');
+  installErrorReporting();
+  const error = new TypeError('chunk failure');
+  listeners.get('error')!({ error, filename: `https://private-host/dist/${chunk}?token=private-token`, lineno: 3, colno: 4 });
+  const body = fetch.mock.calls[0]![1].body;
+  expect(JSON.parse(body)).toMatchObject({ source_file: chunk, line: 3, column: 4 });
+  expect(JSON.parse(body).bundle_debug_ids).toEqual({ [chunk]: chunkId });
+  for (const secret of ['private-host', 'private-token']) expect(body).not.toContain(secret);
+});
+
 it('每分钟窗口恢复上报额度', async () => {
   let callback: ((event: unknown) => void) | undefined;
   vi.spyOn(window, 'addEventListener').mockImplementation((name, listener) => {

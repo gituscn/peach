@@ -116,6 +116,28 @@ class DevCopyTests(unittest.TestCase):
                 dev_copy_runtime.build_frontend(root)
             self.assertEqual((root / 'web/dist/peach-app.js').read_text(encoding='utf-8'), '有效产物')
 
+    def test_frontend_copy_publishes_new_chunks_and_drops_the_previous_ones(self):
+        """主包按页拆出的 chunk 名字带哈希（ADR-0117）：新的一批跟入口一起发出，上一批随后删掉。"""
+        from peach import dev_copy_runtime
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            dist = root / 'web/dist'
+            dist.mkdir(parents=True)
+            (dist / 'peach-app.stats-page-Old00000.js').write_text('旧 chunk', encoding='utf-8')
+            def build(argv, **kwargs):
+                from subprocess import CompletedProcess
+                stage = Path(kwargs['env']['PEACH_FRONTEND_OUT_DIR'])
+                for name in (*dev_copy_runtime.BUNDLES, 'peach-app.stats-page-New11111.js'):
+                    (stage / name).write_text(name, encoding='utf-8')
+                (stage / 'peach-app.stats-page-New11111.js.map').write_text('{}', encoding='utf-8')
+                return CompletedProcess(argv, 0, stdout='构建完成', stderr='')
+            with patch('peach.dev_copy_runtime.subprocess.run', side_effect=build):
+                dev_copy_runtime.build_frontend(root)
+            self.assertEqual(sorted(path.name for path in dist.iterdir()),
+                             sorted([*dev_copy_runtime.BUNDLES, 'peach-app.stats-page-New11111.js']))
+            self.assertEqual((dist / 'peach-app.stats-page-New11111.js').read_text(encoding='utf-8'),
+                             'peach-app.stats-page-New11111.js')
+
     def test_processing_template_keeps_live_values_and_validates_placeholders(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()

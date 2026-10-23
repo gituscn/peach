@@ -159,6 +159,8 @@ it('播放列表页就地推刷新代次：代次不变、不重挂，只重取�
 it('播放列表页：进舞台、去资料页、翻页门槛与回执都接到壳的那一组上', async () => {
   const r = await load();
   const actions = shellActions();
+  // 直接读 `page()` 的 props，不经首屏取数：播放列表页的代码先装上。
+  await (await import('../../src/react/router/route-chunk')).loadRouteChunks();
   const props = (r.BROWSE_ROUTES['/playlists'].page({ revision: 3 }, actions, vi.fn()) as ReactElement<PlaylistsProps>).props;
   expect([props.openPlaylist, props.openEntity, props.canFlip]).toEqual([actions.openPlaylist, actions.openEntity, actions.canFlip]);
   expect(props.revision).toBe(3);

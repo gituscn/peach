@@ -164,7 +164,7 @@ def _normal_url(config) -> str:
     return f"https://{config.server.mdns_name}.local/"
 
 
-def asset_response(request: Request, path: Path, media: str) -> Response:
+def asset_response(request: Request, path: Path, media: str, *, immutable: bool = False) -> Response:
     """页面资产与图标用 ETag 复验，`/board.css`、`/dist/`、图标共用。
 
     `/app.css` 拼多份分区，ETag 口径见 `stylesheet_response()`，其余照这里。
@@ -176,6 +176,9 @@ def asset_response(request: Request, path: Path, media: str) -> Response:
 
     文本类资产在浏览器接受 gzip 时发压缩体，压缩结果按文件版本记住，见 `_gzipped()`。
     压缩体与原文是两个表示，ETag 各不相同。
+
+    `immutable` 给名字里带内容哈希的主包 chunk（ADR-0117）：内容一变名字就变，浏览器一年内
+    不再回源。它们要会话才能取，所以只许浏览器自己缓存（`private`），不许共享缓存转给别人。
     """
     stat = path.stat()
     compress = (media.startswith(_COMPRESSIBLE_MEDIA) and stat.st_size >= _GZIP_MINIMUM
@@ -196,7 +199,7 @@ def asset_response(request: Request, path: Path, media: str) -> Response:
     if media.startswith(_COMPRESSIBLE_MEDIA):
         response.headers["Vary"] = "Accept-Encoding"
     response.headers["ETag"] = etag
-    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Cache-Control"] = "private, max-age=31536000, immutable" if immutable else "no-cache"
     return response
 
 
@@ -674,17 +677,26 @@ def app_asset(request: Request, args: dict[str, str] = Depends(require_asset_aut
 
 
 _BUNDLE_NAMES = frozenset({"peach-app.js", "peach-app.css", "peach-pages.js", "peach-pages.css"})
+#: 主包按页拆出的 chunk（ADR-0117）：`peach-app.<名字>-<内容哈希>.js`，由
+#: `frontend/scripts/sentry-build.ts` 的 `chunkPattern` 产出。名字里只有字母、数字、`_` 与 `-`，
+#: 不含路径分隔符与 `..`；是否存在以 `web/dist/` 里的实际文件为准。
+BUNDLE_CHUNK_NAME = re.compile(r"peach-app\.[A-Za-z0-9_-]+\.js")
 
 
 def _bundle_response(request: Request, name: str) -> Response:
-    """`web/dist/` 下的一份产物。名字不合法或文件不在都是 404，浏览器直接打开时由错误页说。"""
-    if name not in _BUNDLE_NAMES:
+    """`web/dist/` 下的一份产物。名字不合法或文件不在都是 404，浏览器直接打开时由错误页说。
+
+    固定名的入口每次复验；带哈希的 chunk 内容不变，长期缓存。压缩协商若要按文件挑预压缩副本，
+    包在这里返回的响应外面即可，名字校验与缓存头不随之改变。
+    """
+    chunk = BUNDLE_CHUNK_NAME.fullmatch(name) is not None
+    if name not in _BUNDLE_NAMES and not chunk:
         raise HTTPException(404)
     path = request.app.state.settings.page_path.parent / "dist" / name
     if not path.is_file():
         raise HTTPException(404)
     media = "text/css" if name.endswith(".css") else "text/javascript"
-    return asset_response(request, path, media)
+    return asset_response(request, path, media, immutable=chunk)
 
 
 # 两条字面量路由必须注册在 `/dist/{name}` 之前：路由按注册顺序匹配。
@@ -702,9 +714,9 @@ def page_bundle(request: Request):
 @router.api_route("/dist/{name}", methods=["GET", "HEAD"])
 def app_bundle(request: Request, name: str,
                args: dict[str, str] = Depends(require_asset_auth)):
-    """`frontend/` 的主包使用固定文件名、会话认证与 ETag 复验。
+    """`frontend/` 的主包入口使用固定文件名、会话认证与 ETag 复验，按页拆出的 chunk 带内容哈希、长期缓存。
 
-    产物提交进 Git；只提供主包与页面包的 JS/CSS，文件名不接受路径分隔符或附带扩展名。
+    产物提交进 Git；只提供主包、主包 chunk 与页面包的 JS/CSS，文件名不接受路径分隔符或附带扩展名。
     """
     return _bundle_response(request, name)
 

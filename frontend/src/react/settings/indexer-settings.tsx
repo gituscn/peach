@@ -7,8 +7,7 @@ import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
 import { apiGet, apiSend, errorMessage } from '../../api';
 import { randomId } from '../../core/random-id';
-import { LoadingDots } from '../components/loading-dots';
-import { Disclosure, ErrorText, ExternalLink, Footer, Help, Section, Stack } from './section';
+import { Disclosure, ErrorText, ExternalLink, Footer, Help, Section, SectionSkeleton, Stack } from './section';
 import { busyProps, useAction } from './use-action';
 
 const URL = '/api/configuration/indexers';
@@ -21,7 +20,7 @@ interface State { indexers: Indexer[]; max_indexers: number }
 export function IndexerSettings({ receipt }: { receipt(message: string): void }) {
   const query = useQuery({ queryKey: ['indexers'], queryFn: ({ signal }) => apiGet<State>(URL, signal), refetchOnMount: 'always' });
   if (query.error) return <ErrorText>{errorMessage(query.error)}</ErrorText>;
-  if (query.isFetching) return <LoadingDots label="正在读取资源搜索设置" />;
+  if (query.isFetching) return <SectionSkeleton title="资源搜索" label="正在读取资源搜索设置" height={68} />;
   return query.data ? <IndexerForm initial={query.data} receipt={receipt} /> : null;
 }
 

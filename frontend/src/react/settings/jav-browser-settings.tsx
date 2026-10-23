@@ -5,9 +5,8 @@ import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { Select, SelectItem } from '@/components/base/select/select';
 import { apiGet, apiSend, errorMessage } from '../../api';
-import { LoadingDots } from '../components/loading-dots';
 import { SourceLabel } from '../components/source-label';
-import { ErrorText, FieldLabel, Footer, Help, Section, Stack } from './section';
+import { ErrorText, FieldLabel, Footer, Help, Section, SectionSkeleton, Stack } from './section';
 import { busyProps, useAction } from './use-action';
 import { UserscriptStatus } from './userscript-status';
 
@@ -23,7 +22,7 @@ export function JavBrowserSettings({ receipt, refreshKey }: { receipt(message: s
   const query = useQuery({ queryKey: ['jav-browser-settings', refreshKey],
     queryFn: ({ signal }) => apiGet<State>(URL, signal), refetchOnMount: 'always', refetchOnWindowFocus: 'always' });
   if (query.error && !query.data) return <ErrorText>{errorMessage(query.error)}</ErrorText>;
-  if (query.isFetching && !query.data) return <LoadingDots label="正在读取浏览器添加设置" />;
+  if (query.isFetching && !query.data) return <SectionSkeleton title="浏览器添加 JAV" label="正在读取浏览器添加设置" height={100} />;
   return query.data ? <BrowserForm initial={query.data} receipt={receipt} /> : null;
 }
 
