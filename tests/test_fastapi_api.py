@@ -205,9 +205,11 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.enterContext(patch.object(routes_auth, "_ATTEMPTS", OrderedDict()))
         self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
+        self.root = Path(self.tmp.name).resolve()
         self.db = self.root / "ledger.db"
         self.media_root = self.root / "media"
+        self.enterContext(patch("peach.web_batch.LOCATION_ROOT_DECLARATIONS",
+                                {"local": (str(self.media_root),)}))
         self.snapshot_root = self.root / "snapshots"
         self.poster_root = self.root / "posters"
         self.avatar_root = self.root / "avatars"
