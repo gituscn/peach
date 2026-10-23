@@ -4760,6 +4760,57 @@ class R2ArtifactTransferTests(unittest.TestCase):
                 self.assertEqual(tool[1], f"rclone-v1.75.2-{archive}.zip")
                 self.assertEqual(tool[4], f"rclone-v1.75.2-{archive}/{member}")
 
+    def test_release_tools_without_httpx_follow_the_peach_proxy_and_check_the_digest(self):
+        """发布 runner 的系统 Python 没有 httpx：标准库下载照样校验 SHA-256，代理仍按 Peach 代理设置。"""
+        import zipfile
+        original = sys.modules.get("httpx")
+        sys.modules["httpx"] = None  # 导入 httpx 即失败，与系统 Python 相同
+        try:
+            module = load_script("fetch_release_tools")
+        finally:
+            if original is None:
+                sys.modules.pop("httpx", None)
+            else:
+                sys.modules["httpx"] = original
+        self.assertIsNone(module.httpx)
+        name, archive, base, checksums, member = module.tool_specs(rclone_only=True)[0]
+        package = io.BytesIO()
+        with zipfile.ZipFile(package, "w") as writer:
+            writer.writestr(member, b"rclone binary")
+        files = {f"{base}/{archive}": package.getvalue()}
+        handlers, requests = [], []
+
+        def build_opener(*given):
+            handlers.append(given)
+
+            def open_(request, timeout):
+                requests.append(request)
+                return io.BytesIO(files[request.full_url])
+            return SimpleNamespace(open=open_)
+
+        def install(options, digest):
+            files[f"{base}/{checksums}"] = f"{digest}  {archive}\n".encode()
+            with tempfile.TemporaryDirectory() as temporary, \
+                    mock.patch.object(module, "client_options", return_value=options), \
+                    mock.patch.object(module.urllib.request, "build_opener", side_effect=build_opener), \
+                    redirect_stdout(io.StringIO()):
+                module.install(Path(temporary), rclone_only=True)
+                return (Path(temporary) / name).read_bytes()
+
+        good = hashlib.sha256(files[f"{base}/{archive}"]).hexdigest()
+        proxy = "http://127.0.0.1:7890"
+        self.assertEqual(install({"trust_env": False, "proxy": proxy}, good), b"rclone binary")
+        self.assertEqual(handlers[-1][0].proxies, {"http": proxy, "https": proxy})
+        self.assertTrue(all(request.get_header("User-agent") for request in requests))
+        install({"trust_env": False}, good)
+        self.assertEqual(handlers[-1][0].proxies, {}, "直连模式不得落回环境代理")
+        install({"trust_env": True}, good)
+        self.assertEqual(handlers[-1], (), "环境模式用标准库默认的环境代理")
+        with self.assertRaisesRegex(ValueError, "SHA-256 不符"):
+            install({"trust_env": True}, "0" * 64)
+        with self.assertRaisesRegex(ValueError, "SOCKS"):
+            install({"trust_env": False, "proxy": "socks5://127.0.0.1:1080"}, good)
+
     def test_round_trip_restores_only_verified_files_from_current_pipeline(self):
         module = load_script("ci_r2_artifacts")
         objects = {}

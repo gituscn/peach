@@ -9,11 +9,18 @@ import re
 import platform
 import sys
 import tarfile
+import urllib.request
+from urllib.parse import urlsplit
 import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from peach.user_agent import USER_AGENT
-from peach.peach_proxy import read_url
+from peach.peach_proxy import client_options, read_url
+try:
+    import httpx
+except ImportError:
+    # 发布 runner 用系统 Python 取工具，那里没有 httpx：改用标准库下载，代理仍按 Peach 代理设置。
+    httpx = None
 
 
 TOOLS = (
@@ -22,8 +29,23 @@ TOOLS = (
 )
 
 
+def standard_opener(options: dict) -> urllib.request.OpenerDirector:
+    """按 `peach_proxy.client_options` 的结果建标准库打开器：环境代理、直连或指定的 HTTP 代理。"""
+    if options.get("trust_env"):
+        return urllib.request.build_opener()
+    proxy = options.get("proxy", "")
+    if proxy and urlsplit(proxy).scheme not in {"http", "https"}:
+        raise ValueError("标准库下载不支持 SOCKS 代理；请改用 HTTP 代理，或在装有 httpx 的环境中运行")
+    return urllib.request.build_opener(urllib.request.ProxyHandler({"http": proxy, "https": proxy} if proxy else {}))
+
+
 def download(url: str) -> bytes:
-    return read_url(url, headers={"User-Agent": USER_AGENT}, timeout=120)
+    headers = {"User-Agent": USER_AGENT}
+    if httpx is not None:
+        return read_url(url, headers=headers, timeout=120)
+    request = urllib.request.Request(url, headers=headers)
+    with standard_opener(client_options()).open(request, timeout=120) as response:
+        return response.read()
 
 
 def tool_specs(*, rclone_only: bool = False, system: str | None = None,
