@@ -14,12 +14,17 @@ describe('普通 HTTP 的配置与播放', () => {
       const origin = 'http://peach-http.test';
       const opened = await visit(browser, '/', viewport, async page => {
         // 只将临时演示服务映射到普通 HTTP 来源；浏览器自行决定 Web Crypto 的可用性。
+        // 跳转与关页会取消还在转发的请求（播放器的拉流尤其如此），那一趟落空不算失败；其余错误照常抛出。
         await page.route(`${origin}/**`, async route => {
           const request = route.request();
           const url = new URL(request.url());
-          const response = await route.fetch({ url: service + url.pathname + url.search, maxRedirects: 0,
-            headers: { ...request.headers(), host: new URL(service).host, origin: service } });
-          await route.fulfill({ response });
+          try {
+            const response = await route.fetch({ url: service + url.pathname + url.search, maxRedirects: 0,
+              headers: { ...request.headers(), host: new URL(service).host, origin: service } });
+            await route.fulfill({ response });
+          } catch (error) {
+            if (!/already handled|disposed|closed/i.test(String(error))) throw error;
+          }
         });
       });
       const { page, problems } = opened;
@@ -70,8 +75,7 @@ describe('普通 HTTP 的配置与播放', () => {
         await page.locator('#stage .video-js video.vjs-tech').waitFor();
         assert.deepEqual(problems, []);
       } finally {
-        await page.goto('about:blank');
-        await page.unrouteAll({ behavior: 'wait' });
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
         await opened.close();
       }
     });
