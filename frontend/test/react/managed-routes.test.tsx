@@ -22,14 +22,20 @@ const REACT_IMPORT_TIMEOUT_MS = 30_000;
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-beforeAll(async () => { await import('../../src/react/router/router') }, REACT_IMPORT_TIMEOUT_MS);
+beforeAll(async () => {
+  await import('../../src/react/router/router');
+  await (await import('../../src/react/router/route-chunk')).loadRouteChunks();
+}, REACT_IMPORT_TIMEOUT_MS);
 
 async function load(path = '/') {
   vi.resetModules();
   window.history.replaceState(null, '', path);
-  const [history, router, routes] = await Promise.all([
+  const [history, router, routes, chunks] = await Promise.all([
     import('../../src/history'), import('../../src/react/router/router'), import('../../src/react/router/managed-routes'),
+    import('../../src/react/router/route-chunk'),
   ]);
+  // 下面有用例直接调 `page()` 读 props，不经首屏取数；低频页的代码先装上。
+  await chunks.loadRouteChunks();
   return { ...history, ...router, ...routes };
 }
 type Loaded = Awaited<ReturnType<typeof load>>;

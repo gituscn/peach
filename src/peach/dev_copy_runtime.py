@@ -89,6 +89,12 @@ def submit(root: Path, body: dict, *, retry: bool = False) -> dict:
         raise ValueError('正在保存其他文案，请稍后重试') from exc
 
 
+def _chunks(folder: Path) -> list[str]:
+    """主包按页拆出的 chunk（ADR-0117），名字带内容哈希，不在 `BUNDLES` 的固定名单里。"""
+    from .routes_pages import BUNDLE_CHUNK_NAME
+    return sorted(path.name for path in folder.glob('*.js') if BUNDLE_CHUNK_NAME.fullmatch(path.name))
+
+
 def build_frontend(root: Path) -> None:
     npm = shutil.which('npm.cmd' if os.name == 'nt' else 'npm')
     if not npm:
@@ -107,9 +113,13 @@ def build_frontend(root: Path) -> None:
         if any(not (stage / name).is_file() for name in BUNDLES):
             raise ValueError('构建产物不完整，详情见 build/copy-editor/build.log')
         destination = root / 'web/dist'
-        previous = {name: (destination / name).read_bytes() if (destination / name).exists() else None for name in BUNDLES}
+        fresh = _chunks(stage)
+        stale = [name for name in _chunks(destination) if name not in fresh]
+        # chunk 先于入口写入：新入口一生效就能取到它指着的 chunk；旧 chunk 等全部写完再删。
+        published = [*fresh, *BUNDLES]
+        previous = {name: (destination / name).read_bytes() if (destination / name).exists() else None for name in published}
         try:
-            for name in BUNDLES:
+            for name in published:
                 atomic_write_bytes(destination / name, (stage / name).read_bytes())
         except OSError:
             for name, content in previous.items():
@@ -118,6 +128,8 @@ def build_frontend(root: Path) -> None:
                 else:
                     (destination / name).unlink(missing_ok=True)
             raise
+        for name in stale:
+            (destination / name).unlink(missing_ok=True)
 
 
 def _build(root: Path, job: dict) -> None:

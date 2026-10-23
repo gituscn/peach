@@ -58,6 +58,21 @@ class ReportingProjectionTests(unittest.TestCase):
             {'type': 'sourcemap', 'code_file': 'app:///peach-app.js', 'debug_id': identity}])
         self.assertNotIn('private', json.dumps(event))
 
+    def test_browser_chunk_frames_keep_their_hashed_names_and_debug_ids(self):
+        chunk, identity, entry = ('peach-app.stats-page-Ab1_x-Y9.js', 'fe664ca7-794e-4b41-841a-3106ec80fb1f',
+                                  '0b8a7c55-2f0e-4c4a-9d6e-6a1f5f3f4e21')
+        value, meta = diagnostic_browser.project({'error_name': 'TypeError',
+            'stack': f'at https://private/dist/{chunk}:3:7\nat https://private/dist/peach-app.js?v=1:9:1',
+            'bundle_debug_ids': {chunk: identity, 'peach-app.js': entry, 'peach-app.a.b.js': identity}})
+        self.assertEqual([(frame['filename'], frame['abs_path']) for frame in value['stacktrace']['frames']],
+                         [('peach-app.js', 'app:///peach-app.js'), (chunk, f'app:///{chunk}')])
+        self.assertEqual(meta['images'], [
+            {'type': 'sourcemap', 'code_file': 'app:///peach-app.js', 'debug_id': entry},
+            {'type': 'sourcemap', 'code_file': f'app:///{chunk}', 'debug_id': identity}])
+        self.assertEqual(diagnostic_browser.clean_debug_meta(meta), meta)
+        value, _ = diagnostic_browser.project({'source_file': chunk, 'line': 2, 'column': 5})
+        self.assertEqual(value['stacktrace']['frames'][0]['filename'], chunk)
+
     def test_browser_untrusted_names_urls_ids_and_file_suffixes_are_rejected(self):
         value, meta = diagnostic_browser.project({'error_name': 'private title',
             'stack': 'at https://private/not-peach-app.js:1:1\nat peach-pages.js:4:5',

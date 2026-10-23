@@ -581,6 +581,24 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             denied = await self.client.get(f"/dist/{escape}?t=secret")
             self.assertEqual(denied.status_code, 404, f"{escape} 不该被提供")
 
+    async def test_main_bundle_chunks_need_the_session_and_stay_cached_for_good(self):
+        """按页拆出的 chunk 名字带内容哈希（ADR-0117）：要会话，取到后浏览器一年内不回源，共享缓存不许留。"""
+        name = "peach-app.stats-page-Ab1_x-Y9.js"
+        (self.root / "dist" / name).write_text("export const page = 1;", encoding="utf-8")
+        self.assertEqual((await self.client.get(f"/dist/{name}")).status_code, 401)
+        for method in ("GET", "HEAD"):
+            served = await self.client.request(method, f"/dist/{name}", params={"t": "secret"})
+            self.assertEqual(served.status_code, 200, method)
+            self.assertEqual(served.headers["content-type"], "text/javascript; charset=utf-8")
+            self.assertEqual(served.headers["cache-control"], "private, max-age=31536000, immutable")
+        self.assertEqual((await self.client.get(f"/dist/{name}", params={"t": "secret"})).content,
+                         b"export const page = 1;")
+        for missing in ("peach-app.gone-Zz99Zz99.js", "peach-app.stats-page-Ab1_x-Y9.js.map", "peach-app..js",
+                        "peach-app.a.b.js", "peach-pages.chunk-Ab12Cd34.js", "peach-app.%2e%2e%2fapp.js",
+                        "peach-app.stats-page-Ab1_x-Y9.mjs"):
+            denied = await self.client.get(f"/dist/{missing}?t=secret")
+            self.assertEqual(denied.status_code, 404, f"{missing} 不该被提供")
+
     async def test_page_bundle_is_public_with_only_its_literal_names(self):
         for name, media in (("peach-pages.js", "text/javascript"), ("peach-pages.css", "text/css")):
             path = f"/dist/{name}"
