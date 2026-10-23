@@ -5,36 +5,21 @@
   let edits = {}, active = true, saving = false, editor;
   try { edits = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
   const originals = new WeakMap();
-  const css = document.createElement('style'); css.dataset.copyEditor = '';
-  css.textContent = `
-    [data-copy-highlight]{position:fixed;pointer-events:none;z-index:2147483646;outline:1.5px dashed var(--tungsten);outline-offset:3px;border-radius:var(--badge-radius);display:none}
-    [data-copy-inline]{outline:2px solid var(--tungsten);outline-offset:3px;border-radius:var(--badge-radius);background:var(--hover);user-select:text;cursor:text}
-    [data-copy-input]{position:fixed;z-index:2147483647;padding:2px 6px;border:0;border-radius:var(--badge-radius);outline:2px solid var(--tungsten);background:var(--ground);color:var(--ink)}
-    [data-copy-bar]>[role=status]{max-width:min(360px,calc(100vw - 64px));white-space:normal;overflow-wrap:anywhere}
-    [data-copy-bar][data-selection-dock]{bottom:max(16px,var(--selection-dock-space,0px))}
-    @media(max-width:600px){[data-copy-bar]>[role=status]{flex-basis:100%;text-align:center}}
-    [data-copy-choice]{position:fixed;z-index:2147483647;background:var(--ground);color:var(--ink);border:1px solid var(--border-15);border-radius:var(--control-radius);padding:8px;max-width:calc(100vw - 32px)}
-  `;
-  document.head.append(css);
-  const highlight = document.createElement('div'); highlight.dataset.copyEditor = ''; highlight.dataset.copyHighlight = '';
-  const host = document.createElement('div'); host.className = 'peach-react'; host.dataset.copyEditor = ''; host.dataset.batchScope = '';
-  for (const type of ['pointerdown', 'click']) host.addEventListener(type, event => event.stopPropagation());
-  const bar = document.createElement('div'); bar.dataset.copyEditor = ''; bar.dataset.copyBar = '';
-  bar.dataset.selectionDock = ''; bar.dataset.glassPane = ''; bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', '文案编辑');
-  const hint = document.createElement('span'); hint.id = 'peach-copy-hint'; hint.hidden = true; hint.textContent = '点击文字修改，回车或点别处保存，Esc 取消；暂停编辑后可操作页面。';
-  bar.setAttribute('aria-describedby', hint.id);
-  const status = document.createElement('span'); status.setAttribute('role', 'status'); status.textContent = '编辑文案'; bar.append(status);
-  const say = text => { status.textContent = text; };
+  const tools = core.createTools({
+    onToggle(value) { editor.commit(); active = value; editor.hideHighlight(); },
+    onExport() {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(edits, null, 2)], { type: 'application/json' }));
+      const a = document.createElement('a'); a.href = url; a.download = 'peach-copy-edits.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+    onExit() { editor.commit(true); const url = new URL(location.href); url.searchParams.delete('edit'); location.href = url; },
+  });
+  const say = tools.say;
   const pendingKey = 'peach.copy-apply.v1';
-  let applyButton;
-  function recovery(text, action) {
-    applyButton?.remove();
-    applyButton = button(text, () => { applyButton.remove(); applyButton = null; action(); });
-  }
+  const recovery = tools.setRecovery;
   async function watchApply(job) {
-    applyButton?.remove(); applyButton = null;
+    tools.setRecovery();
     sessionStorage.setItem(pendingKey, JSON.stringify(job));
-    saving = true; bar.setAttribute('aria-busy', 'true');
+    saving = true; tools.setBusy(true);
     const deadline = Date.now() + 300000;
     try {
       while (Date.now() < deadline) {
@@ -66,26 +51,8 @@
       }
       say('已保存，生效仍在处理中');
       recovery('继续等待', () => watchApply(job));
-    } finally { saving = false; bar.removeAttribute('aria-busy'); }
+    } finally { saving = false; tools.setBusy(false); }
   }
-  const button = (text, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.onclick = fn; bar.append(b); return b; };
-  const toggle = button('暂停编辑', () => {
-    if (saving) return;
-    editor.commit(); active = !active; editor.hideHighlight(); toggle.textContent = active ? '暂停编辑' : '继续编辑';
-  });
-  button('导出修改', () => {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(edits, null, 2)], { type: 'application/json' }));
-    const a = document.createElement('a'); a.href = url; a.download = 'peach-copy-edits.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-  });
-  button('退出编辑', () => { if (saving) return; editor.commit(true); const url = new URL(location.href); url.searchParams.delete('edit'); location.href = url; });
-  host.append(hint, bar); document.body.append(highlight, host);
-  const modalHost = () => [...document.querySelectorAll('dialog:modal')].at(-1) || document.body;
-  function placeTools() {
-    const parent = modalHost();
-    for (const node of [highlight, host]) if (node.parentElement !== parent) parent.append(node);
-  }
-  new MutationObserver(placeTools).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['open'] });
-  placeTools();
   if (source) {
     const position = sessionStorage.getItem('peach.copy-scroll');
     if (position !== null) { sessionStorage.removeItem('peach.copy-scroll'); requestAnimationFrame(() => scrollTo(0, Number(position))); }
@@ -103,12 +70,12 @@
   new MutationObserver(apply).observe(document.body, { childList: true, subtree: true, characterData: true }); apply();
   if (source) fetch('/dev/copy-edits').then(r => r.ok ? r.json() : {}).then(saved => { edits = { ...edits, ...saved }; apply(); }).catch(() => say('暂时无法读取修改记录'));
   editor = core.create({
-    highlight, isActive: () => active, isBusy: () => saving,
+    highlight: tools.highlight, isActive: () => active, isBusy: () => saving,
     resolve: node => ({ original: originals.get(node) ?? node.data.trim() }),
     onStatus: say,
     onBusy(value) {
       saving = value;
-      if (value) bar.setAttribute('aria-busy', 'true'); else bar.removeAttribute('aria-busy');
+      tools.setBusy(value);
       if (!value) apply();
     },
     async prepare(ed) {
@@ -139,14 +106,7 @@
     },
   });
   async function choose(candidates, rect) {
-    const select = document.createElement('select'); select.dataset.copyEditor = ''; select.dataset.copyChoice = ''; select.setAttribute('aria-label', '文案来源');
-    select.add(new Option('请选择文案来源', '')); candidates.forEach((x, i) => select.add(new Option(`${x.file}:${x.line}`, String(i))));
-    Object.assign(select.style, { left: Math.max(16, Math.min(rect.left, innerWidth - 300)) + 'px', top: Math.max(16, Math.min(rect.bottom + 8, innerHeight - 60)) + 'px' });
-    modalHost().append(select); select.focus(); say('这段文案有多个来源，请选择要修改的位置');
-    return new Promise(resolve => {
-      const finish = value => { select.remove(); document.removeEventListener('keydown', cancel, true); resolve(value); };
-      const cancel = event => { if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); finish(null); } };
-      select.onchange = () => { if (select.value !== '') finish(candidates[Number(select.value)]); }; document.addEventListener('keydown', cancel, true);
-    });
+    return tools.choose(candidates.map(candidate => ({ label: `${candidate.file}:${candidate.line}`, value: candidate })), rect,
+      { label: '文案来源', message: '这段文案有多个来源，请选择要修改的位置' });
   }
 })();

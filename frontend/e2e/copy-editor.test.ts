@@ -14,6 +14,62 @@ describe('原位改字', () => {
   before(async () => { browser = await launch(); });
   after(async () => { await browser?.close(); });
   for (const viewport of VIEWPORTS) {
+    it(`核心工具栏通过回调处理动作并清理未完成选择（${viewport.name}）`, async () => {
+      const context = await browser.newContext({ viewport });
+      try {
+        const page = await context.newPage();
+        await page.setContent('<meta charset="utf-8"><body><p>预览说明</p></body>');
+        await page.addScriptTag({ content: await readFile(new URL('../src/copy-editor-core.js', import.meta.url), 'utf8') });
+        await page.evaluate(() => {
+          const tools = (globalThis as any).PeachCopyEditorCore.createTools({
+            onToggle(active: boolean) { document.body.dataset.active = String(active); },
+            onExport() { document.body.dataset.exported = 'true'; },
+            onExit() { document.body.dataset.exited = 'true'; },
+          });
+          (globalThis as any).copyTools = tools;
+          tools.say('编辑就绪');
+        });
+        assert.equal(await page.getByRole('status').innerText(), '编辑就绪');
+        await page.getByRole('button', { name: '暂停编辑', exact: true }).click();
+        assert.equal(await page.locator('body').getAttribute('data-active'), 'false');
+        await page.getByRole('button', { name: '继续编辑', exact: true }).click();
+        assert.equal(await page.locator('body').getAttribute('data-active'), 'true');
+        await page.evaluate(() => (globalThis as any).copyTools.setBusy(true));
+        await page.getByRole('button', { name: '暂停编辑', exact: true }).click();
+        await page.getByRole('button', { name: '退出编辑', exact: true }).click();
+        assert.equal(await page.locator('body').getAttribute('data-active'), 'true');
+        assert.equal(await page.locator('body').getAttribute('data-exited'), null);
+        await page.evaluate(() => (globalThis as any).copyTools.setBusy(false));
+        await page.getByRole('button', { name: '导出修改', exact: true }).click();
+        await page.getByRole('button', { name: '退出编辑', exact: true }).click();
+        assert.equal(await page.locator('body').getAttribute('data-exported'), 'true');
+        assert.equal(await page.locator('body').getAttribute('data-exited'), 'true');
+        await page.evaluate(() => {
+          const tools = (globalThis as any).copyTools;
+          tools.setRecovery('继续等待', () => { document.body.dataset.recovery = 'wait'; });
+          tools.setRecovery('重试生效', () => { document.body.dataset.recovery = 'retry'; });
+        });
+        assert.equal(await page.getByRole('button', { name: '继续等待', exact: true }).count(), 0);
+        await page.getByRole('button', { name: '重试生效', exact: true }).click();
+        assert.equal(await page.locator('body').getAttribute('data-recovery'), 'retry');
+        assert.equal(await page.getByRole('button', { name: '重试生效', exact: true }).count(), 0);
+        await page.evaluate(() => {
+          (globalThis as any).copyTools.choose([{ label: '文案位置', value: 'source-1' }], { left: 20, bottom: 80 }, { label: '文案来源' })
+            .then((value: unknown) => { document.body.dataset.choice = JSON.stringify(value); });
+        });
+        await page.getByRole('combobox', { name: '文案来源' }).selectOption('0');
+        assert.equal(await page.locator('body').getAttribute('data-choice'), '"source-1"');
+        await page.evaluate(() => {
+          const tools = (globalThis as any).copyTools;
+          tools.choose([{ label: '文案位置', value: 'source-2' }], { left: 20, bottom: 80 })
+            .then((value: unknown) => { document.body.dataset.choice = JSON.stringify(value); });
+          tools.destroy();
+        });
+        assert.equal(await page.locator('body').getAttribute('data-choice'), 'null');
+        assert.equal(await page.locator('[data-copy-editor]').count(), 0);
+      } finally { await context.close(); }
+    });
+
     it(`模态弹层中的工具栏可暂停编辑并随关闭返回页面（${viewport.name}）`, async () => {
       const context = await browser.newContext({ viewport });
       try {
@@ -276,6 +332,9 @@ describe('原位改字', () => {
         assert.equal(measured.buttons.length, 3);
         for (const button of measured.buttons) assert.deepEqual(button,
           { height: 36, radius: '10px', fontSize: '14px', lineHeight: '20px', weight: '500' });
+        await page.evaluate(() => document.documentElement.style.setProperty('--selection-dock-space', '120px'));
+        assert.equal(await dock.evaluate(node => getComputedStyle(node).bottom), '120px');
+        assert.ok(await dock.evaluate(node => node.getBoundingClientRect().bottom <= innerHeight - 119));
         assert.deepEqual(opened.problems, []);
       } finally { await opened.close(); }
     });
