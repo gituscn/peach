@@ -375,6 +375,56 @@ class VerificationTests(unittest.TestCase):
         self.assertFalse(note.exists())
 
 
+    def test_waiters_get_the_lock_in_arrival_order_and_see_their_place(self):
+        lock = evidence.evidence_dir(self.repo) / "full-suite.lock"
+        queue = evidence.queue_path(lock)
+        order, errors = [], io.StringIO()
+
+        def wait(name):
+            with evidence.held(lock, wait_seconds=20, scope=name):
+                order.append(name)
+                time.sleep(0.3)
+
+        def queued(count):
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                if len(list(queue.glob("*.json"))) == count:
+                    return True
+                time.sleep(0.05)
+            return False
+
+        with redirect_stderr(errors), ThreadPoolExecutor(max_workers=2) as pool:
+            with evidence.held(lock, scope="holder"):
+                first = pool.submit(wait, "first")
+                self.assertTrue(queued(1))
+                second = pool.submit(wait, "second")
+                self.assertTrue(queued(2))
+            first.result(timeout=20)
+            second.result(timeout=20)
+        self.assertEqual(order, ["first", "second"])
+        self.assertIn("前面还有 1 个在排队", errors.getvalue())
+        self.assertEqual(list(queue.glob("*.json")), [], "拿到锁或放弃等待都要撤票")
+
+    def test_a_live_ticket_ahead_keeps_newcomers_out_and_a_dead_one_is_cleared(self):
+        lock = evidence.evidence_dir(self.repo) / "full-suite.lock"
+        queue = evidence.queue_path(lock)
+        queue.mkdir(parents=True, exist_ok=True)
+        live = queue / "00000000000000000001-live.json"
+        live.write_text(json.dumps({"pid": os.getpid(), "created": time.time(),
+                                    "process_started": evidence._process_started(os.getpid())}),
+                        encoding="utf-8")
+        with self.assertRaises(evidence.Timeout):
+            with evidence.held(lock, wait_seconds=0):
+                pass
+        live.unlink()
+        finished = subprocess.run([sys.executable, "-c", "import os; print(os.getpid())"],
+                                  capture_output=True, text=True, encoding="utf-8", check=True)
+        dead = queue / "00000000000000000001-dead.json"
+        dead.write_text(json.dumps({"pid": int(finished.stdout), "created": time.time() - 60,
+                                    "process_started": time.time() - 60}), encoding="utf-8")
+        with evidence.held(lock, wait_seconds=0, scope="after-dead"):
+            self.assertFalse(dead.exists())
+
     def test_the_waiting_runner_names_the_holder_of_the_full_suite_lock(self):
         lock = evidence.evidence_dir(self.repo) / "full-suite.lock"
         output = io.StringIO()
