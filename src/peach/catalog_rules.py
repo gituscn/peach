@@ -194,7 +194,8 @@ _CODE_DATE = re.compile(rf"^{_MMDDYY}[-_]\d{{2,4}}$")
 #: `MKBD-S` 是 Blu-ray 版。javbus 上 `MKBD-S118`／`MKD-S118`／`MKBD-S89`／`MKD-S89`
 #: 四页都认这个写法、都给封面（2026-09-25 实测）。通用的「字母-S数字」不放开：
 #: 没有实证的形态放进来，素材编号和文件计数都会被当成番号。
-_KIRARI_CODE = re.compile(r"^MKB?D-S\d{2,4}$")
+_KIRARI_BODY = r"MKB?D-S\d{2,4}"
+_KIRARI_CODE = re.compile(rf"^{_KIRARI_BODY}$", re.I)
 
 #: Tokyo-Hot 的编号没有厂牌字母段：`n1234`／`k1234` 是本编，`red-123` 是 Red Hot 支线。
 #: 规范写法取小写，不跟着别的番号大写——javbus 的作品页地址就是 `/n1234`，NeoAVDC
@@ -242,7 +243,7 @@ _RELEASE_PREFIX_ALIASES = {
 }
 _DMM_LABEL_PREFIX = re.compile(r"^H_(?=\d)")
 _MEDIA_EXTENSION = re.compile(
-    r"\.(?:mp4|mkv|avi|wmv|mov|m4v|webm|ts|m2ts|mts|mpg|mpeg|flv|rm|rmvb|iso)$",
+    r"\.(?:mp4|mkv|avi|wmv|mov|m4v|webm|ts|m2ts|mts|mpg|mpeg|flv|rm|rmvb|iso|strm)$",
     re.I,
 )
 _PROMO_DOMAIN = re.compile(
@@ -289,13 +290,13 @@ _QUALITY_HEAD = re.compile(r"^(?:hd|fhd|sd|uhd|4k|2160p?|1080p?|720p?)[-_. ]+", 
 VERSION_TAIL_TOKENS = ("ch", "sub", "uc", "fhd", "4k", "hd", "c", "u")
 VERSION_TAIL = re.compile(r"[-_. ]?(?:" + "|".join(VERSION_TAIL_TOKENS) + r")$", re.I)
 #: 一本道、加勒比是「日期+序号」体系，没有字母番号主体。分隔符进捕获组，原样带出去。
-_DATE_CODE = re.compile(rf"(?<!\d)({_MMDDYY})([-_])(\d{{3}})(?!\d)")
+_DATE_CODE = re.compile(rf"(?<!\d)({_MMDDYY})([-_])(\d{{2,4}})(?!\d)")
 #: UUID 首段长得像番号（`DCE7230C-730E-…` 会被拆成 `DCE`+`7230`），按整串形态排除。
 _UUID_LIKE = re.compile(
     r"[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}", re.I)
-#: 目录名和文件名都可能带扩展名，图片也算：缩略图 `BNST033(2).jpg` 与正片同番号。
+#: 媒体、串流入口和图片共用番号提取；视频容器沿用展示层的后缀判据。
 _ASSET_EXTENSION = re.compile(
-    r"\.(?:mp4|mkv|avi|wmv|ts|mov|m4v|jpg|jpeg|png|webp)$", re.I)
+    rf"(?:{_MEDIA_EXTENSION.pattern}|\.(?:jpg|jpeg|png|webp|gif|bmp)$)", re.I)
 #: 文件名尾部的分卷、画质和重复计数；剥掉才能和目录名对齐。
 _FILE_NOISE = re.compile(
     r"(?:[-_. ]?(?:1080p?|720p?|2160p?|4k|fhd|hd|uc|sub|ch|c|u)"
@@ -402,7 +403,10 @@ _QUALITY_TOKEN = re.compile(r"^(?:hd|fhd|sd|uhd|4k|2160p?|1080p?|720p?)$", re.I)
 #: 序号至少三位：两位的（`ShinoAoi-15`、`miru-10`）是创作者的分集号；后面紧跟月日的
 #: （`TG-2025-01-27`）是日期。只取词元开头这一段，紧跟的版次和分卷（`-C`、`-CD1`、
 #: `_part1`）不影响番号。
-_HYPHENATED_CODE = re.compile(r"^(?:\d{3})?[A-Za-z]{2,8}-\d{3,5}(?![0-9]|-\d{2}-\d)")
+_HYPHENATED_CODE = re.compile(
+    rf"^(?:{_KIRARI_BODY}(?![0-9])|(?:\d{{3}})?[A-Z]{{2,8}}-\d{{3,5}}(?![0-9]|-\d{{2}}-\d))",
+    re.I,
+)
 #: 用户番号识别规则的上限。每条规则要对库里每个文件名跑一遍，条数和长度都设个顶。
 CODE_PATTERN_LIMIT = 20
 CODE_PATTERN_MAX_LENGTH = 200
@@ -789,9 +793,9 @@ def release_code_from_text(value: str | None) -> str | None:
     if date:
         return f"{date.group(1)}{date.group(2)}{date.group(3)}"
     body = VERSION_TAIL.sub("", _QUALITY_HEAD.sub("", text))
-    if not _CODE_BODY.match(body) or is_code_body_stopword(body):
-        return None
     canonical = normalise_code_key(body)
+    if not (_CODE_BODY.fullmatch(body) or _KIRARI_CODE.fullmatch(canonical)) or is_code_body_stopword(body):
+        return None
     return canonical if is_jav_code(canonical) else None
 
 
@@ -864,7 +868,9 @@ def release_code_from_filename(name: str | None, *, patterns: Iterable[re.Patter
         return None
     partless = _ASSET_EXTENSION.sub("", _PART_MARKER.sub("", str(name or "").strip()))
     stripped = _FILE_NOISE.sub("", strip_promo_markers(partless))
+    # 明确卷标摘掉后先核对番号主体，两位序号也属于完整番号。
     code = release_code_from_text(stem) or (
+        release_code_from_text(partless) if _STANDS_ALONE.search(partless) else None) or (
         release_code_from_text(stripped) if _STANDS_ALONE.search(stripped) else None)
     if code:
         return code
@@ -901,6 +907,9 @@ def _titled_release_code(stem: str) -> str | None:
 def _jav_code_pattern(code: str | None) -> str:
     """Return one regex fragment matching compact and separated forms of a canonical code."""
     canonical = normalise_code_key(code)
+    if _KIRARI_CODE.fullmatch(canonical):
+        letters, serial = canonical.split('-', 1)
+        return rf"{re.escape(letters)}[-_ ]{re.escape(serial)}"
     fc2 = re.fullmatch(r"FC2-PPV-(\d+)", canonical)
     if fc2:
         return rf"FC2(?:[-_ ]?PPV)?[-_ ]*0*{re.escape(fc2.group(1))}"
@@ -927,9 +936,10 @@ def _jav_code_pattern(code: str | None) -> str:
 
 #: 无码片商自己的编号法：Caribbeancom／1Pondo／10musume／Pacopacomama 走日期式
 #: （形状与分隔符含义见 `_CODE_DATE`，同一份实现），HEYZO 用 `HEYZO-1380`，
-#: Tokyo-Hot 用 `n1234`（见 `_TOKYO_HOT_BODY`）。有码片商不用这三种形状。
+#: Tokyo-Hot 用 `n1234`（见 `_TOKYO_HOT_BODY`），KIRARI 用 `MKBD-S`／`MKD-S`。
 UNCENSORED_CODE_SHAPES = (
     _CODE_DATE,
+    _KIRARI_CODE,
     re.compile(r"^HEYZO-\d{2,5}$", re.I),
     _TOKYO_HOT_BODY,
 )
@@ -1096,12 +1106,12 @@ def jav_fallback_title(name: str | None, code: str | None) -> str:
     code_pattern = _jav_code_pattern(code)
     if code_pattern:
         repeated = re.compile(
-            rf"^[\s._\-—]*(?:{code_pattern})(?:{_GLUED_EDITION})?(?=$|[\s._\-—\[])", re.I)
+            rf"^[\s._\-—]*(?:{code_pattern})(?:[-_.]?{_GLUED_EDITION})?(?=$|[\s._\-—\[])", re.I)
         while repeated.search(text):
             text = repeated.sub("", text, count=1)
         # 番号不总在开头：`1pon-092415-001-fhd1_(new).mp4` 把发行站放在了前面。
         # 只认前缀，整个番号就会留在「标题」里显示出来。
-        text = re.sub(rf"(?<![A-Z0-9])(?:{code_pattern})(?:{_GLUED_EDITION})?(?![A-Z0-9])",
+        text = re.sub(rf"(?<![A-Z0-9])(?:{code_pattern})(?:[-_.]?{_GLUED_EDITION})?(?![A-Z0-9])",
                       " ", text, flags=re.I)
     text = _EDITION_TAIL.sub("", text)
     text = _RELEASE_NOISE.sub(" ", text)
