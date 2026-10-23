@@ -1,6 +1,6 @@
 """导入实体种子后继：扫描结算后把私有种子包补进账本（ADR-0075、ADR-0111）。
 
-种子包位于 Peach 数据目录的 `state/seed/entities.json`（`seed_pack.DEFAULT_PACK`），导入只给本机已有实体填空、换掉种子
+种子包位于应用资源的 `resources/seed/entities.json`（`seed_pack.DEFAULT_PACK`），导入只给本机已有实体填空、换掉种子
 自己写过的旧行（`seed_pack.land`）。这条后继由扫描与采集在结算时声明（ADR-0040 第一条），
 派的条件是两个里有一个：这一轮登记了新的女优、厂牌或事务所，或这个版本的包还没有成功导入过。
 同一版本因此会跑多次；`land` 幂等，多跑一次只是没有东西可补。
@@ -100,7 +100,7 @@ def outcome(report: dict) -> str:
 
 
 def run(contract, key: str, handle) -> dict:
-    """将私有种子包补进账本；测试使用临时种子包。"""
+    """将随应用分发的种子包补进账本；测试使用临时种子包。"""
     pack = seed_pack.load(seed_pack.DEFAULT_PACK)
     if key != followup_key(pack["version"], seed_validation.digest(pack)):
         raise ValueError("种子内容与排队任务的摘要不一致，请重新派发")

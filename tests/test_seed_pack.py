@@ -331,11 +331,32 @@ class ImportTests(SeedPackCase):
 
 
 class ScriptTests(SeedPackCase):
-    def test_default_pack_and_export_destination_stay_outside_the_repository(self):
+    def test_default_pack_is_a_valid_bundled_public_resource(self):
         script = load_script("seed_pack")
         export = script.build_parser().parse_args(["export"])
         self.assertEqual(export.out, seed_pack.DEFAULT_PACK)
-        self.assertNotIn(ROOT, export.out.resolve().parents)
+        self.assertEqual(export.out, ROOT / "resources/seed/entities.json")
+        pack = seed_pack.load(export.out)
+        self.assertEqual(pack["format"], 2)
+        self.assertGreater(pack["counts"]["entities"], 0)
+        self.assertGreater(pack["revision"], 0)
+
+    def test_pack_is_required_in_each_packaging_layout(self):
+        from peach.bundle_resources import data_files
+        with self.assertRaises(FileNotFoundError):
+            data_files(self.root)
+        for name in ("web", "migrations", "resources", "tools/amane-bridge"):
+            (self.root / name).mkdir(parents=True, exist_ok=True)
+        for name in ("bridge.py", "pyproject.toml", "uv.lock"):
+            (self.root / "tools/amane-bridge" / name).touch()
+        seed = self.root / "resources/seed/entities.json"
+        seed.parent.mkdir()
+        seed.write_text(seed_pack.dump(self.seeded_source()), encoding="utf-8")
+        entries = data_files(self.root)
+        self.assertIn((self.root / "resources", "resources"), entries)
+        seed.unlink()
+        with self.assertRaises(FileNotFoundError):
+            data_files(self.root)
 
     def test_validate_checks_package_without_opening_a_database(self):
         pack = self.root / "package.json"

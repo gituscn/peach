@@ -275,19 +275,28 @@ class DesktopSmokeTests(unittest.TestCase):
                 remote_reporting.send('errors', {'level': 'error'}, config)
             client.assert_not_called()
 
-    def test_distribution_resources_accept_an_application_without_private_exports(self):
+    def test_distribution_resources_accept_the_bundled_public_seed(self):
         with tempfile.TemporaryDirectory() as directory:
             application = Path(directory).resolve()
-            (application / '_internal/resources').mkdir(parents=True)
+            seed = application / '_internal/resources/seed/entities.json'
+            seed.parent.mkdir(parents=True)
+            seed.write_bytes((ROOT / 'resources/seed/entities.json').read_bytes())
             self.script.assert_public_resources(application)
+            pack = json.loads(seed.read_text(encoding='utf-8'))
+            pack['version'] += '.tampered'
+            seed.write_text(json.dumps(pack), encoding='utf-8')
+            with self.assertRaisesRegex(AssertionError, '摘要不一致'):
+                self.script.assert_public_resources(application)
 
-    def test_distribution_resources_reject_private_entity_exports(self):
+    def test_distribution_resources_require_a_public_seed(self):
         with tempfile.TemporaryDirectory() as directory:
             application = Path(directory).resolve()
+            with self.assertRaisesRegex(AssertionError, '缺少公共实体种子'):
+                self.script.assert_public_resources(application)
             seed = application / '_internal/resources/seed'
             seed.mkdir(parents=True)
             (seed / 'entities.json').write_text('{}', encoding='utf-8')
-            with self.assertRaisesRegex(AssertionError, '私有实体导出'):
+            with self.assertRaisesRegex(AssertionError, '格式无效'):
                 self.script.assert_public_resources(application)
 
     def test_cleanup_waits_for_a_released_windows_directory(self):
