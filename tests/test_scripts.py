@@ -1984,7 +1984,7 @@ class OperationalScriptTests(unittest.TestCase):
                                 (["package-lock.json"], "必须 full"),
                                 (["frontend/package.json"], "必须 full"),
                                 (["LICENSE"], "映射不到"),
-                                (["src/peach/kanji.py", "web/app.js"], "映射不到")):
+                                (["src/peach/not_a_module.py", "web/app.js"], "映射不到")):
             scopes, why = pick(paths)
             self.assertEqual(scopes, ("full",), paths)
             self.assertTrue(why.startswith("Peach auto scope: full <- "), why)

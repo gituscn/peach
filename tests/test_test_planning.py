@@ -341,6 +341,45 @@ class TestPlanningTests(unittest.TestCase):
         self.assertFalse(set(shards[0]) & set(shards[1]))
         self.assertCountEqual(serial, shards[0] + shards[1])
 
+    def test_modules_without_a_namesake_test_run_where_their_importers_are_tested(self):
+        """按名字推不出测试的模块，跟着直接导入它的测试与源码文件选域；推不出时仍是 full。"""
+        index = (
+            {'test_follow_web.py': frozenset({'hub', 'ring_b'})},
+            {'src/peach/hub.py': frozenset(), 'src/peach/web_reader.py': frozenset({'hub'}),
+             'src/peach/lonely.py': frozenset(), 'src/peach/orphan_user.py': frozenset({'lonely'}),
+             'src/peach/ring_a.py': frozenset({'ring_b'}), 'src/peach/ring_b.py': frozenset({'ring_a'}),
+             'src/peach/shared.py': frozenset(), 'src/peach/web_ring.py': frozenset({'ring_a'})},
+            frozenset({'shared'}),
+        )
+
+        def scopes(path):
+            return runner.scopes_for_changes([path])[0]
+        with patch.object(runner, '_import_index', return_value=index):
+            # 测试 test_follow_web（follow、web）直接导入；源码 web_reader 按前缀归 catalog。
+            self.assertEqual(scopes('src/peach/hub.py'), ('follow', 'catalog', 'web'))
+            # 唯一的导入者自己也推不出域：未知面。
+            self.assertEqual(scopes('src/peach/lonely.py'), ('full',))
+            # 互相导入的一组合起来算：ring_b 的测试与 ring_a 的外部导入者都算进来。
+            self.assertEqual(scopes('src/peach/ring_a.py'), ('follow', 'catalog', 'web'))
+            self.assertEqual(scopes('src/peach/ring_b.py'), ('follow', 'catalog', 'web'))
+            # 共享测试设施导入的模块影响所有用例。
+            self.assertEqual(scopes('src/peach/shared.py'), ('full',))
+        self.assertEqual(scopes('tests/test_ledger_revision.py'), ('core',))
+        self.assertEqual(scopes('.gitlab-ci.yml'), ('tooling', 'packaging'))
+        self.assertEqual(scopes('src/peach/not_a_module.py'), ('full',))
+
+    def test_relative_and_absolute_imports_name_the_peach_module(self):
+        with tempfile.TemporaryDirectory() as directory:
+            nested = runner.ROOT / 'src' / 'peach' / 'sources'
+            path = Path(directory) / 'sample.py'
+            path.write_text('from peach import alpha, beta\nimport peach.gamma.sub\n'
+                            'def later():\n    from peach.delta import thing\n', encoding='utf-8')
+            self.assertEqual(runner._imported_modules(path), {'alpha', 'beta', 'gamma', 'delta'})
+        # 包内相对导入按文件深度回到 `peach`；子包里的单点相对导入指子包自己，不算。
+        with patch.object(Path, 'read_text', return_value='from . import alpha\nfrom .. import beta\nfrom ..gamma import x\n'):
+            self.assertEqual(runner._imported_modules(nested / 'example.py'), {'beta', 'gamma'})
+            self.assertEqual(runner._imported_modules(runner.ROOT / 'src' / 'peach' / 'example.py'), {'alpha'})
+
     def test_partial_run_does_not_issue_verification_record(self):
         with patch.object(runner, 'build_suite', return_value=unittest.TestSuite([unittest.FunctionTestCase(lambda: None)])), \
              patch.object(runner.test_evidence, 'inputs', side_effect=AssertionError('分片不能签发证据')):

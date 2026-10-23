@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import fnmatch
 import importlib
 import json
@@ -16,6 +17,7 @@ import time
 import unittest
 from collections.abc import Iterable
 from contextlib import contextmanager, nullcontext
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -271,6 +273,13 @@ AUTO_SCOPE_FILES: dict[str, tuple[str, ...]] = {
     "compose.yaml": ("packaging", "tooling"),
     "src/peach/server.py": ("packaging", "tooling"),
     "scripts/smoke_docker.py": ("packaging", "tooling"),
+    # GitLab 流水线：构建、发布与 CI 验证的编排，本机测试不执行它；`test_version_bump.py`
+    # 读它判补丁版本。CI 自己每次推送都跑全量，与发布工作流同口径。
+    ".gitlab-ci.yml": ("packaging", "tooling"),
+    # 源码分发包的文件清单，由打包测试与发布脚本使用。
+    "MANIFEST.in": ("packaging", "tooling"),
+    # 浏览器文件的实测秒数：CI 浏览器矩阵（tooling）与本机浏览器冒烟的排队顺序（web）共用。
+    "scripts/ci-browser-timings.json": ("tooling", "web"),
 }
 
 # 脚本默认归 tooling；有自己领域测试的脚本两边都跑：领域测试验它的判据，
@@ -337,6 +346,18 @@ AUTO_SCOPE_PREFIXES: tuple[tuple[str, str | tuple[str, ...]], ...] = (
     ("src/peach/regions.py", "catalog"),
     ("src/peach/web_", "catalog"),
     ("src/peach/routes_", "catalog"),
+    # 随应用分发的资源由加载它们的模块与打包脚本使用，按加载者登记。
+    # 命名词表由 `classification.py` 读，那份判据的测试在目录与元数据两个域。
+    ("resources/naming/", ("catalog", "metadata")),
+    ("resources/media-sources.json", ("media", "web")),
+    ("resources/seed/", ("metadata", "tooling")),
+    ("resources/junk/", ("catalog", "tooling")),
+    ("resources/marks/", ("catalog", "web")),
+    ("resources/site-marks/", ("catalog", "web")),
+    ("resources/licenses/", ("packaging", "tooling")),
+    # 应用图标：页面站标（web）、托盘与菜单栏（sync）、安装包与 DMG（packaging），
+    # `test_scripts.py` 读 `peach-logo.png`（tooling）。
+    ("resources/", ("sync", "tooling", "web", "packaging")),
     ("web/", "web"),
     ("frontend/", "web"),
     ("scripts/", "tooling"),
@@ -375,6 +396,10 @@ def scopes_of_test_file(name: str) -> tuple[str, ...]:
                    if any(fnmatch.fnmatch(name, pattern) for pattern in patterns))
     if not scopes and any(fnmatch.fnmatch(name, pattern) for pattern in COMMON_PATTERNS):
         return ("tooling",)
+    if not scopes:
+        # 只登记在 core 或 packaging 的文件（如 `test_ledger_revision.py`）跑登记它的那个域。
+        return tuple(scope for scope in ("core", "packaging")
+                     if any(fnmatch.fnmatch(name, pattern) for pattern in SCOPES[scope]))
     return scopes
 
 
@@ -384,6 +409,72 @@ def scopes_of_module(stem: str) -> tuple[str, ...]:
     return tuple(scope for scope, patterns in SCOPES.items() if scope not in {"core", "packaging"}
                  if any(fnmatch.fnmatch(exact, pattern) or pattern.startswith(prefix)
                         for pattern in patterns))
+
+
+def _imported_modules(path: Path) -> frozenset[str]:
+    """一个 Python 文件导入了 `peach` 下哪些顶层模块（含函数里的延迟导入）。"""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, UnicodeError, ValueError):
+        return frozenset()
+    source = ROOT / "src" / "peach"
+    depth = len(path.relative_to(source).parts) if path.is_relative_to(source) else None
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found.update(alias.name.split(".")[1] for alias in node.names
+                         if alias.name.startswith("peach."))
+        elif isinstance(node, ast.ImportFrom):
+            parts = (node.module or "").split(".") if node.module else []
+            if node.level:
+                # 相对导入回到 `peach` 包根要退的层数等于文件在包里的深度。
+                if depth is None or node.level != depth:
+                    continue
+                parts = ["peach", *parts]
+            if parts[:1] != ["peach"]:
+                continue
+            found.update([parts[1]] if len(parts) > 1 else (alias.name for alias in node.names))
+    return frozenset(found)
+
+
+@lru_cache(maxsize=1)
+def _import_index() -> tuple[dict[str, frozenset[str]], dict[str, frozenset[str]], frozenset[str]]:
+    """测试文件、`src/peach` 下的文件与 `tests/support` 各自导入的 `peach` 模块。"""
+    tests = {path.name: _imported_modules(path) for path in TESTS.glob("test_*.py")}
+    sources = {path.relative_to(ROOT).as_posix(): _imported_modules(path)
+               for path in (ROOT / "src" / "peach").rglob("*.py")}
+    support = frozenset(name for path in (TESTS / "support").glob("*.py") for name in _imported_modules(path))
+    return tests, sources, support
+
+
+def scopes_of_importers(stem: str, seen: frozenset[str] = frozenset()) -> tuple[str, ...]:
+    """按名字推不出测试的 `src/peach/<stem>.py`：取直接导入它的测试所在的域，加上直接导入它
+    的源码文件按本表推出的域。
+
+    和按名字推断同一层级：认的是「谁直接用它」，不沿导入链一路扩散——函数里的延迟导入把几乎
+    所有模块连成一团，传递闭包等于全量。导入者自己也推不出域时，按同一规则继续往上取，
+    互相导入的一组模块合起来算。
+    共享测试设施 `tests/support` 用到它、或者谁都不直接导入它，返回空，由调用方按未知面跑 full。
+    """
+    tests, sources, support = _import_index()
+    if stem in support:
+        return ()
+    found: set[str] = set()
+    for name, modules in tests.items():
+        if stem in modules:
+            found.update(scopes_of_test_file(name))
+    for path, modules in sources.items():
+        if stem in modules and path != f"src/peach/{stem}.py":
+            importer = path.rsplit("/", 1)[-1].removesuffix(".py")
+            nested = "/" in path.removeprefix("src/peach/")
+            if not nested and importer in seen:
+                # 互相导入的一组模块：正在求值的那一层已经在收它自己的导入者。
+                continue
+            scopes = mapped_scopes(path, seen | {stem}) if nested or importer != "__init__" else ()
+            if not scopes:
+                return ()
+            found.update(scopes)
+    return tuple(scope for scope in SCOPES if scope in found)
 
 
 #: `<某个 Path> / "a" / "b/c.js"` 这种拼接。要求左边有个 `/`，是为了把「路径当字符串
@@ -463,8 +554,8 @@ def special_scopes(path: str, kind: str) -> tuple[str, ...] | None:
     return None
 
 
-def mapped_scopes(path: str) -> tuple[str, ...]:
-    """按显式映射、测试归属和模块测试名定位功能域。"""
+def mapped_scopes(path: str, seen: frozenset[str] = frozenset()) -> tuple[str, ...]:
+    """按显式映射、测试归属、模块测试名和直接导入者定位功能域。"""
     name = path.rsplit("/", 1)[-1]
     if path in AUTO_SCOPE_FILES:
         return AUTO_SCOPE_FILES[path]
@@ -474,7 +565,11 @@ def mapped_scopes(path: str) -> tuple[str, ...]:
         if path.startswith(prefix):
             return (scope,) if isinstance(scope, str) else scope
     if path.startswith("src/peach/") and path.endswith(".py"):
-        return scopes_of_module(name.removesuffix(".py"))
+        stem = name.removesuffix(".py")
+        by_name = scopes_of_module(stem)
+        if by_name or "/" in path.removeprefix("src/peach/") or stem == "__init__":
+            return by_name
+        return scopes_of_importers(stem, seen)
     return ()
 
 
