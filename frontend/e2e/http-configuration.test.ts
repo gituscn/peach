@@ -69,7 +69,11 @@ describe('普通 HTTP 的配置与播放', () => {
         await page.goto(`${origin}/assets/${requiredEnv('PEACH_E2E_ITEM')}`, { waitUntil: 'load' });
         await page.locator('#stage .video-js video.vjs-tech').waitFor();
         assert.deepEqual(problems, []);
-      } finally { await opened.close() }
+      } finally {
+        await page.goto('about:blank');
+        await page.unrouteAll({ behavior: 'wait' });
+        await opened.close();
+      }
     });
   }
 });

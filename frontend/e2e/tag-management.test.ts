@@ -52,11 +52,13 @@ describe('标签管理的完整操作', () => {
       await page.getByRole('button', { name: '隐藏', exact: true }).click();
       await page.getByRole('button', { name: '隐藏标签', exact: true }).click();
       await chip(survivor.k).waitFor({ state: 'detached' });
+      await page.getByRole('group', { name: '标签管理操作', exact: true }).waitFor({ state: 'detached' });
       await page.getByRole('button', { name: '已隐藏', exact: true }).click();
       await chip(survivor.k).click();
       await page.getByRole('button', { name: '恢复', exact: true }).click();
       await page.getByRole('button', { name: '恢复标签', exact: true }).click();
       await chip(survivor.k).waitFor({ state: 'detached' });
+      await page.getByRole('group', { name: '标签管理操作', exact: true }).waitFor({ state: 'detached' });
       await page.getByRole('button', { name: '使用中', exact: true }).click();
       await chip(survivor.k).waitFor();
       const edit = page.getByRole('button', { name: `编辑标签 ${survivor.k}`, exact: true });
