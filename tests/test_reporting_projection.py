@@ -7,6 +7,21 @@ from peach import diagnostic_browser, diagnostic_exceptions, remote_reporting
 
 
 class ReportingProjectionTests(unittest.TestCase):
+    def test_media_categories_survive_preview_scrubbing_and_read_subprocess_stderr(self):
+        import subprocess
+        from peach.library_processing import _PreviewCaptureError
+        error = _PreviewCaptureError({'reason': 'ffmpeg_error', 'returncode': 1,
+                                     'stderr': '/private/media/movie.mp4: Invalid data found when processing input'})
+        self.assertEqual(error.diagnostics['failure_category'], 'invalid_media')
+        self.assertNotIn('private', json.dumps(error.diagnostics))
+        with mock.patch.object(remote_reporting, 'send') as send:
+            remote_reporting.capture('library-preview', error)
+            send.assert_not_called()
+            failed = subprocess.CalledProcessError(1, 'ffprobe', stderr=b'Unknown decoder private-decoder')
+            remote_reporting.capture('media-probe', failed)
+            self.assertEqual(send.call_args.args[1]['tags']['media_failure'], 'decoder_unavailable')
+            self.assertNotIn('private', json.dumps(send.call_args.args[1]))
+
     def test_python_chain_has_separate_frames_and_sqlite_error_identity(self):
         code = compile('def fail():\n    import sqlite3\n    connection = sqlite3.connect(":memory:")\n'
                        '    try:\n        connection.execute("SELECT private_column")\n'
@@ -21,8 +36,22 @@ class ReportingProjectionTests(unittest.TestCase):
         self.assertEqual(chain, ['RuntimeError', 'OperationalError'])
         self.assertEqual([value['type'] for value in values], ['OperationalError', 'RuntimeError'])
         self.assertEqual(codes['sqlite_errorname'], 'SQLITE_ERROR')
+        self.assertEqual(codes['sqlite_failure'], 'missing_column')
         self.assertTrue(all(value['stacktrace']['frames'] for value in values))
         self.assertNotIn('private', json.dumps(values))
+
+    def test_sqlite_categories_are_shared_with_local_evidence_without_query_names(self):
+        import sqlite3
+        from peach import error_reporting
+        with sqlite3.connect(':memory:') as connection:
+            try:
+                connection.execute('SELECT * FROM private_table')
+            except sqlite3.OperationalError as error:
+                codes = diagnostic_exceptions.structured_codes(error)
+                local = error_reporting.exception_facts(error)
+        self.assertEqual(codes['sqlite_failure'], 'missing_table')
+        self.assertEqual(local['exception'][0]['codes'], codes)
+        self.assertNotIn('private', json.dumps(codes))
 
     def test_framework_frames_and_nested_peach_modules_are_locatable(self):
         namespace = {'__name__': 'starlette.middleware.base'}

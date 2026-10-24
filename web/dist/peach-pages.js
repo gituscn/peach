@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "0a93752e-4280-4eac-abf6-4113044e3a89", e._sentryDebugIdIdentifier = "sentry-dbid-0a93752e-4280-4eac-abf6-4113044e3a89");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "0fb74f82-3237-4738-985c-ee5234b69319", e._sentryDebugIdIdentifier = "sentry-dbid-0fb74f82-3237-4738-985c-ee5234b69319");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, i, o, s) => {
@@ -49,12 +49,8 @@ async function g() {
 				t = setTimeout(() => e(null), 1e3);
 			})]);
 			m = n ? {
-				status: n.fullVersionList ? "available" : "restricted",
-				fullVersionList: n.fullVersionList,
-				architecture: n.architecture,
-				bitness: n.bitness,
-				platformVersion: n.platformVersion,
-				wow64: n.wow64
+				...n,
+				status: n.fullVersionList ? "available" : "restricted"
 			} : { status: "timeout" };
 		} catch {
 			m = { status: "unavailable" };
@@ -21737,4 +21733,4 @@ var r_ = document.getElementById("peach-page"), i_ = r_ ? n_[r_.dataset.page ?? 
 r_ && i_ && (0, M.createRoot)(r_).render(/* @__PURE__ */ (0, z.jsx)(i_, { data: { ...r_.dataset } }));
 //#endregion
 
-//# debugId=0a93752e-4280-4eac-abf6-4113044e3a89
+//# debugId=0fb74f82-3237-4738-985c-ee5234b69319

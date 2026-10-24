@@ -5,6 +5,7 @@ import io
 import argparse
 import json
 import os
+import re
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +21,19 @@ STATE_NAMES = ('library-processing.json', 'runtime-prepare.json', 'standalone-up
 #: 发现页封面逐番号处理结果的份数上限；每份只有几十字节，排查缺封面靠它们。
 COVER_ATTEMPT_LIMIT = 500
 TAIL_BYTES = 96 * 1024
+ACCESS_REQUEST = re.compile(r'^(.*?"(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS) )([^"\s]+)( HTTP/\d(?:\.\d)?" \d{3}[^\r\n]*)$')
+MEDIA_ROUTE = re.compile(r'/(?:stream|follow-stream|preview-stream|stream/hls/\d+/(?:index\.m3u8|\d+\.ts))')
+
+
+def _access_log(line: str) -> str:
+    """访问日志只保留技术路由、HTTP 版本与状态码，查询串整体移除。"""
+    match = ACCESS_REQUEST.fullmatch(line)
+    if not match:
+        return error_reporting.redact(line)
+    prefix, target, suffix = match.groups()
+    path = target.split('?', 1)[0].split('#', 1)[0]
+    route = path if MEDIA_ROUTE.fullmatch(path) or re.fullmatch(r'/api/[a-zA-Z0-9_/{}/:-]{1,180}', path) or path == '/healthz' else '<path>'
+    return error_reporting.redact(prefix) + route + error_reporting.redact(suffix)
 
 
 def _processing_log(text: str) -> str:
@@ -55,7 +69,7 @@ def redact_log(text: str) -> str:
         try:
             value = json.loads(line)
         except ValueError:
-            lines.append(error_reporting.redact(line))
+            lines.append(_access_log(line))
         else:
             lines.append(json.dumps(error_reporting.scrub(value), ensure_ascii=False))
     return "\n".join(lines) + ("\n" if text.endswith("\n") else "")

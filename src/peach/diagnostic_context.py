@@ -164,7 +164,7 @@ def archived_context(archive):
                     browsers.append({'at': row.get('at'), **context})
                 if isinstance(row.get('playback'), dict):
                     media.append({'at': row.get('at'), 'stage': 'browser', **playback(row['playback'])})
-            if row.get('stage') in ('playback-request', 'playback-plan'):
+            if row.get('stage') in ('playback-request', 'playback-plan', 'playback-source'):
                 media.append(row)
     return {'recent_browsers': sorted(browsers, key=lambda row: str(row.get('at') or ''))[-8:],
             'recent_playback': sorted(media, key=lambda row: str(row.get('at') or ''))[-20:]}

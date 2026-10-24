@@ -24,9 +24,7 @@ export async function detailedBrowserDiagnostics() {
     try {
       const result = await Promise.race([data.getHighEntropyValues(['fullVersionList', 'architecture', 'bitness', 'platformVersion', 'wow64']),
         new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 1000) })]);
-      hints = result ? { status: result.fullVersionList ? 'available' : 'restricted',
-        fullVersionList: result.fullVersionList, architecture: result.architecture, bitness: result.bitness,
-        platformVersion: result.platformVersion, wow64: result.wow64 } : { status: 'timeout' };
+      hints = result ? { ...result, status: result.fullVersionList ? 'available' : 'restricted' } : { status: 'timeout' };
     } catch { hints = { status: 'unavailable' } }
     finally { if (timer) clearTimeout(timer) }
   })();

@@ -16,6 +16,16 @@ from peach.transcodes import TranscodeService, TranscodeUnavailable
 
 
 class FaultFixTests(unittest.TestCase):
+    def test_recovery_scheduler_works_without_local_timezone_data(self):
+        from datetime import timezone
+        from zoneinfo import ZoneInfoNotFoundError
+        from peach.web_job_recovery import RecoveryService
+        with mock.patch('apscheduler.schedulers.base.get_localzone', side_effect=ZoneInfoNotFoundError('synthetic')):
+            service = RecoveryService(mock.Mock(), available=True)
+            self.assertEqual(service.scheduler.timezone, timezone.utc)
+            service.scheduler.add_job(service.tick, 'interval', seconds=1)
+            self.assertEqual(len(service.scheduler.get_jobs()), 1)
+
     def test_early_disconnect_returns_without_a_server_exception(self):
         async def exercise(path):
             async def inner(scope, receive, send):

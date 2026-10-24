@@ -17,6 +17,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ErrorReportingTests(unittest.TestCase):
+    def test_access_export_keeps_media_response_evidence_and_removes_queries(self):
+        for target in ('/stream?id=9&session=private-session', '/follow-stream?ticket=private-ticket',
+                       '/api/stream-plan?id=9&t=private-token', '/stream/hls/9/index.m3u8?token=private-token'):
+            with self.subTest(target=target):
+                exported = support_bundle.redact_log(f'INFO: 192.168.1.2:3456 - "GET {target} HTTP/1.1" 206 Partial Content\n')
+                self.assertIn(f'GET {target.split("?")[0]} HTTP/1.1" 206 Partial Content', exported)
+                for private in ('192.168.1.2', 'private-', '?', 'session=', 'ticket='):
+                    self.assertNotIn(private, exported)
+        exported = support_bundle.redact_log('INFO: "GET /home/private/movie.mp4?token=secret HTTP/1.1" 404 Not Found\n')
+        self.assertIn('GET <path> HTTP/1.1" 404 Not Found', exported)
+        self.assertNotIn('private', exported)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

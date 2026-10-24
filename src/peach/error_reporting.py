@@ -121,6 +121,7 @@ def system_facts() -> dict:
 
 
 def exception_facts(error: BaseException) -> dict:
+    from .diagnostic_exceptions import structured_codes
     frames = []
     seen = set()
     current = error
@@ -130,6 +131,7 @@ def exception_facts(error: BaseException) -> dict:
         chain.append({"type": type(current).__name__, "message": redact(str(current))[:4000],
                       "winerror": getattr(current, "winerror", None), "errno": getattr(current, "errno", None),
                       "operation": getattr(current, "peach_operation", None),
+                      "codes": structured_codes(current),
                       "context": getattr(current, "peach_context", None)})
         for frame in traceback.extract_tb(current.__traceback__)[-40:]:
             frames.append({"file": Path(frame.filename).name, "line": frame.lineno, "function": frame.name})
@@ -171,8 +173,8 @@ def subprocess_failure(stage: str, *, tool: str, error: BaseException | None = N
     """媒体子进程仅保留工具名、错误码和有界错误输出，不记录完整命令。"""
     raw = stderr or getattr(error, 'stderr', b'') or b''
     text = raw.decode('utf-8', 'replace') if isinstance(raw, bytes) else str(raw)
-    from .remote_reporting import _media_details
-    reason = _media_details(error, {'stderr': text}, {})
+    from .diagnostic_exceptions import media_details
+    reason = media_details(error, {'stderr': text}, {})
     return event(stage, error, tool=Path(tool).name, returncode=returncode,
                  stderr=text[-4000:], local_fields={'reason_code': reason or 'unclassified'}, **fields)
 

@@ -169,6 +169,10 @@ DMM / MGS 的只读商品号识别复用 `code_key`、`release_code_from_text`�
 
 ## STRM 与挂载来源
 
+诊断输出共用 `reporting_identity` 的环境身份和 `diagnostic_exceptions` 的有限错误分类。媒体 stderr 在通用路径脱敏前归类，SQLite 使用结构化错误码与固定原因类别；本机日志、支持包和远程投影按各自字段契约消费，不引入另一套错误监控 SDK。访问日志只放行固定技术路由与协议状态，查询串整体移除；其余路径继续复用通用脱敏。
+
+任务恢复复用固定版 APScheduler 3.11.3（MIT）和标准库 `datetime.timezone.utc`，与现有关注调度器使用同一时区选择方式。一秒间隔检查不依赖本地 IANA 时区数据库；隔离回归令系统时区读取抛错，仍能创建调度器并注册任务。未新增依赖。
+
 响应头策略复用 Starlette 1.8.0（BSD-3-Clause，项目已有固定依赖）的 `MutableHeaders` 与官方 [ASGI 中间件模式](https://www.starlette.io/middleware/#pure-asgi-middleware)，只在 `http.response.start` 阶段设置缓存、安全及机器人策略。文件响应继续使用同一 `receive` 的断连消息，真实异常直接传播，不维护异常文本匹配或统一忽略网络错误的分支。整片转码继续复用 FFmpeg 和现有回退链，Peach 只保留有界本机证据与隐私投影，无新增依赖。
 
 本机诊断继续复用项目的脱敏日志与 ZIP 导出，浏览器使用标准 `canPlayType()`、MSE、Resource Timing 和有界的 [UA Client Hints](https://developer.mozilla.org/en-US/docs/Web/API/NavigatorUAData/getHighEntropyValues)，服务端复用 Python 3.14 标准库的依赖元数据、磁盘余量、系统信息以及现有媒体探测缓存。字段白名单和本机证据汇总属于 Peach 的诊断边界；浏览器监控 SDK 会扩大依赖与采集范围，不承担这条本机导出链路。依赖沿用 Video.js 10.1.0 与现有 FFmpeg，不增加运行时依赖，不为导出执行媒体读取或硬件压力探测。能力声明与真实播放的区别按 [MDN `canPlayType()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/canPlayType) 和 [Video.js 媒体来源契约](https://videojs.org/docs/framework/html/guides/media-sources)核对，隔离回归覆盖无视频请求、编码能力缺失、错误状态、脱敏和仅本机写入。

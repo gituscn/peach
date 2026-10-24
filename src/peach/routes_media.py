@@ -282,6 +282,8 @@ def stream(request: Request, id: int, session: str = "", args: dict[str, str] = 
     if transcoded:
         response.headers["X-Peach-Transcoded"] = "1"
     response.headers["Cache-Control"] = "no-store"
+    local_event('playback-source', asset_id=id, mime_type=response.headers.get('content-type', ''),
+                transcoded=transcoded, session_present=bool(session))
     return response
 
 

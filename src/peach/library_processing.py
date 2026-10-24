@@ -1988,7 +1988,9 @@ class _PreviewCaptureError(ValueError):
 
     def __init__(self, diagnostics):
         from .error_reporting import scrub
-        self.diagnostics = scrub(diagnostics)
+        from .diagnostic_exceptions import media_details
+        category = media_details(None, diagnostics, {})
+        self.diagnostics = {**scrub(diagnostics), 'failure_category': category or 'unclassified'}
         message = {
             'timeout': '视频抽帧超时，可重试；反馈问题请导出诊断报告',
             'ffmpeg_error': 'FFmpeg 抽帧失败，反馈问题请导出诊断报告',

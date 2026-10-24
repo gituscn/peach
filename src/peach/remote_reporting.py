@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from .reporting_identity import event_metadata, machine_facts
+from .diagnostic_exceptions import media_details
 
 FIELDS = {
     "usage": "Peach 版本、分发方式（Windows／macOS 应用、Docker、wheel 或源码）、操作系统类型与版本、CPU 架构与核数、内存档位、Python 版本、运行环境与公开构建编号；每天最多一次，不含安装标识。",
@@ -290,27 +291,19 @@ def _exception_details(error):
     return project(error, _http_status)
 
 
-def _media_details(error, fields, codes):
-    detail = getattr(error, "diagnostics", {}) if error is not None else {}
-    detail = detail if isinstance(detail, dict) else {}
-    if type(detail.get("returncode")) is int:
-        codes["returncode"] = detail["returncode"]
-    raw = str(fields.get("stderr", "")) + str(detail.get("stderr", ""))
-    for marker, code in (("Your platform doesn't support hardware accelerated AV1 decoding", "av1_decoder_unavailable"),
-                         ("Unknown decoder", "decoder_unavailable"),
-                         ("Invalid data found", "invalid_media"), ("Permission denied", "permission_denied"),
-                         ("No space left", "disk_full"), ("No such file or directory", "missing_media")):
-        if marker in raw:
-            return code
-    return ""
-
-
 def _media_failure(stage, error):
     return stage in MEDIA_STAGES or any(cls.__module__ == 'peach.transcodes'
         and cls.__name__ == 'TranscodeUnavailable' for cls in type(error).__mro__)
 
 
 def _expected_failure(stage, error, fields):
+    current, visited = error, set()
+    while current is not None and id(current) not in visited and len(visited) < 8:
+        visited.add(id(current))
+        if any((cls.__module__, cls.__name__) == ('peach.folder_picker', 'PickerUnsupported')
+               for cls in type(current).__mro__):
+            return True
+        current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
     if stage == "logging" and fields.get("level", "ERROR") not in {"ERROR", "CRITICAL"}:
         return True
     if stage == "browser" and fields.get("error_name") == "AbortError":
@@ -394,7 +387,7 @@ def _technical_projection(stage, error, fields):
             codes[key] = fields[key]
     reason = ""
     if media_stage:
-        reason = _media_details(error, fields, codes)
+        reason = media_details(error, fields, codes)
         if reason in {"invalid_media", "permission_denied", "disk_full", "missing_media"}:
             return
         if not reason and not codes and error is None:
