@@ -137,6 +137,22 @@ describe('配置表单与行间距', () => {
             assert.ok(policy.width <= 132);
           }
         }
+        await form.locator('[data-library-head]').first().getByRole('button').first().click();
+        const icons = page.getByRole('radiogroup', { name: '可选图标', exact: true });
+        await icons.waitFor();
+        const inputBounds = await icons.locator('input[type="radio"]').evaluateAll(inputs => inputs.map(input => {
+          const native = input.getBoundingClientRect();
+          const label = input.closest('label')!.getBoundingClientRect();
+          return native.top >= label.top - 1 && native.bottom <= label.bottom + 1
+            && native.left >= label.left - 1 && native.right <= label.right + 1;
+        }));
+        assert.ok(inputBounds.length > 7 && inputBounds.every(Boolean), '图标网格的隐藏单选输入框越出所属格子');
+        await icons.getByRole('radio', { name: '磁盘', exact: true }).focus();
+        const iconScroll = await page.evaluate(() => window.scrollY);
+        await page.keyboard.press('ArrowRight');
+        assert.equal(await icons.getByRole('radio', { name: '资料库', exact: true }).isChecked(), true);
+        assert.equal(await page.evaluate(() => window.scrollY), iconScroll, '选择图标移动了页面');
+        await page.getByRole('dialog').filter({ has: icons }).getByRole('button', { name: '取消', exact: true }).click();
         await protectedFolder.click();
         await page.getByRole('option', { name: '正常读取', exact: true }).click();
         await settle(page);

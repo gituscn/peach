@@ -140,21 +140,30 @@ def settings_payload(service: DownloadService, declared_roots) -> dict:
     """设置页那一块的形状。读接口和每条写接口都回这一份，页面整块替换本地状态。"""
     from .downloads_pikpak import account
     credentials = service.credentials
+    problems = list(getattr(service.config, "problems", ()))
     try:
         pikpak = account(_values(credentials, PIKPAK_CREDENTIAL))
     except DownloadError:
         pikpak = account(None)
+        problems.append("PikPak 登录信息无法读取，请重新登录。")
+    try:
+        token_set = "token" in credentials.describe(CLOUDDRIVE_CREDENTIAL)["fields"]
+    except CredentialError:
+        token_set = False
+        problems.append("CloudDrive2 令牌无法读取，请重新填写。")
     login = _browser_login(service)
+    channels = service.channel_snapshot()
     return {
         "available": service.available,
         "media_sources": [key for key, roots in declared_roots.items() if roots],
         "config": service.config.payload(),
-        "token_set": "token" in credentials.describe(CLOUDDRIVE_CREDENTIAL)["fields"],
+        "token_set": token_set,
         "pikpak": pikpak,
         "pikpak_browser": {"available": login is not None and login.available(),
                            **(login.status() if login is not None else {"state": "idle", "message": ""})},
         "pikpak_roots": list(declared_roots.get("pikpak", ())),
-        "providers": service.channel_snapshot()["providers"],
+        "providers": channels["providers"],
+        "problems": list(dict.fromkeys((*problems, *channels.get("problems", ())))),
         "max_wait_hours": MAX_WAIT_HOURS,
     }
 

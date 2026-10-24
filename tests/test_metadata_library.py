@@ -101,6 +101,20 @@ class LibraryNfoTests(unittest.TestCase):
         self.assertEqual([row['name'] for row in rows], ['ABC-123.mp4'])
         self.assertEqual(db.read_bytes(), before)
 
+    def test_collection_preserves_directory_extras_and_selects_only_the_feature(self):
+        from peach.library_processing import _collection_rows
+        db = fresh_ledger(self.root)
+        names = ('Film/Film.mp4', 'Film/Extras/Disc 1/Making of.mkv', 'Film/Actor-interview2.mp4')
+        with closing(sqlite3.connect(db)) as connection, connection:
+            for name in names:
+                connection.execute('INSERT INTO asset(location,path,name,medium) VALUES(?,?,?,?)',
+                                   ('local', str(self.root / name), Path(name).name, 'video'))
+        before = db.read_bytes()
+        rows, _ = _collection_rows(db, locations={'local': (str(self.root),)},
+                                    online_roots=[self.root], asset_ids=None)
+        self.assertEqual([row['name'] for row in rows], ['Film.mp4'])
+        self.assertEqual(db.read_bytes(), before)
+
     def test_task_sidecar_index_does_not_walk_the_folder_for_each_video(self):
         from peach.library_nfo import SidecarIndex
         class CountedFiles(dict):
@@ -433,6 +447,40 @@ class LibraryNfoTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
+
+    @windows_ledger_roots
+    def test_amane_preparation_failure_preserves_the_unprocessed_selection_for_retry(self):
+        from peach import metadata_amane
+        media = self.root / 'media'
+        media.mkdir()
+        for code in ('SSIS-057', 'SSIS-058', 'FC2-PPV-1234567'):
+            (media / f'{code}.mp4').write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        generated, covers = self.root / 'generated', self.root / 'covers'
+        process_library(config, db, generated, covers, stage='scan')
+        with closing(sqlite3.connect(db)) as connection:
+            expected = {row[0] for row in connection.execute("SELECT id FROM asset WHERE name LIKE 'SSIS%'")}
+        with patch.object(metadata_amane, 'ensure',
+                          side_effect=metadata_amane.PreparationError('下载未完成')) as prepare, \
+                patch('peach.library_processing._RemoteSession.collect', return_value=([], 0)) as collect:
+            result = process_library(config, db, generated, covers, stage='metadata')
+        self.assertEqual(prepare.call_count, 1)
+        self.assertEqual(result['status'], 'failed')
+        self.assertEqual(result['issue_count'], 1)
+        self.assertEqual(set(result['retryable_asset_ids']), expected)
+        self.assertEqual(collect.call_count, 1)
+        self.assertEqual(collect.call_args.args[1], 'FC2-PPV-1234567')
+        self.assertIn('下载未完成', result['issue_preview'][0]['message'])
+        provider = stub_provider()
+        provider.query.return_value = {'id': 'SSIS-057', 'title': '作品资料'}
+        provider.cover.return_value = False
+        retried = process_library(config, db, generated, covers, stage='metadata',
+            retry_ids=result['retryable_asset_ids'], provider_factory=lambda: provider,
+            route_overrides='censored=r18dev')
+        self.assertEqual(retried['checked'], 2)
+        self.assertTrue(provider.query.called)
 
     @windows_ledger_roots
     def test_filename_code_families_enter_metadata_collection(self):
@@ -2648,6 +2696,21 @@ class LibraryWatchdogTests(unittest.TestCase):
                          {'asset_id': 1, 'title': '', 'path': '', 'message': '未识别到番号'})
         self.assertTrue(state['issues_truncated'])
 
+    def test_finished_issues_and_interruption_have_distinct_outcomes(self):
+        finished = dict(status='failed', stage='处理结束', completed_at=123,
+                        issue_count=14, retryable_asset_ids=[1, 2])
+        self.assertEqual(decorate(finished)['outcome'], 'partial')
+        self.assertNotIn('outcome', finished)
+        for state in ({**finished, 'stage': '生成预览图'},
+                      {**finished, 'outcome': 'interrupted'},
+                      {**finished, 'completed_at': None}):
+            self.assertEqual(decorate(state)['outcome'], 'interrupted')
+        from peach.web_library_processing import public_state
+        self.assertEqual(public_state(decorate(finished))['outcome'], 'partial')
+        legacy = dict(status='failed', stage='处理结束', completed_at=123,
+                      issues=[{'asset_id': 1, 'message': '视频抽帧超时'}])
+        self.assertEqual(decorate(legacy)['outcome'], 'partial')
+
     @windows_ledger_roots
     def test_deadline_skips_one_asset_and_keeps_processing(self):
         from peach.jav_cover_fetch import DeadlineExceeded
@@ -2666,6 +2729,7 @@ class LibraryWatchdogTests(unittest.TestCase):
             ids = {name: row_id for name, row_id in connection.execute('SELECT name, id FROM asset')}
         self.assertEqual(result['retryable_asset_ids'], [ids['ABW-101.mp4']])
         self.assertEqual(result['status'], 'failed')
+        self.assertEqual(result['outcome'], 'partial')
         self.assertEqual([item.args for item in provider.query.call_args_list],
                          [('ABW-101', 'r18dev'), ('ABW-102', 'r18dev'), ('ABW-102', 'dmm')])
         self.assertEqual(provider.reset.call_count, 1)
@@ -2845,7 +2909,9 @@ class LibraryWatchdogTests(unittest.TestCase):
             (media / name).write_bytes(b'video')
         db = fresh_ledger(self.root)
         provider = self._provider()
-        with patch('peach.library_processing.write_rows', wraps=review_csv.write_rows) as written:
+        with patch('peach.library_processing.time', wraps=time) as clock, \
+                patch('peach.library_processing.write_rows', wraps=review_csv.write_rows) as written:
+            clock.monotonic.return_value = 100.0
             state = process_library(self._config(media), db, self.root / 'generated', self.root / 'covers',
                                     provider_factory=lambda: provider)
         self.assertEqual(state['status'], 'complete')
@@ -2956,7 +3022,7 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
                                database=self.database, **options)
 
     @staticmethod
-    def make_tile(_ffmpeg, _pattern, _columns, _rows, destination):
+    def make_tile(_ffmpeg, _pattern, _columns, _rows, destination, **_options):
         Image.new('RGB', (1440, 810), 'green').save(destination, format='JPEG')
         return True
 
@@ -3047,6 +3113,7 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
         with patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
                 patch('peach.frame_capture.capture_with_retry', return_value=True), \
                 patch('peach.frame_capture.tile_frames', side_effect=self.make_tile), \
+                patch('peach.metadata_amane.ensure'), \
                 patch('peach.library_processing._RemoteSession.collect', side_effect=collect) as online, \
                 patch('peach.library_processing._finish_collection', return_value={}):
             result = self.run_processing(stage='collect', asset_ids=[1])
@@ -3077,6 +3144,7 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
                 patch('peach.media_probe.resolve_case_insensitive', str), \
                 patch('peach.library_processing.FFmpegResolver', return_value=self.resolver), \
                 patch('peach.library_processing._generate_previews', side_effect=previews), \
+                patch('peach.metadata_amane.ensure'), \
                 patch('peach.library_processing._RemoteSession.collect', side_effect=collect), \
                 patch('peach.library_processing._finish_collection', return_value={}):
             result = self.run_processing(stage='collect', asset_ids=[1, 5])
@@ -3116,9 +3184,11 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
         import zipfile
         from peach import support_bundle
 
-        def fail(_ffmpeg, video, _timestamp, _destination, *, diagnostics):
+        def fail(_ffmpeg, video, _timestamp, _destination, *, diagnostics, timeout):
+            self.assertGreater(timeout, 0)
+            self.assertLessEqual(timeout, 45)
             diagnostics.update(reason='ffmpeg_error', returncode=69, timestamp_seconds=2.4667,
-                               timeout_seconds=45, attempts=[],
+                               timeout_seconds=timeout, attempts=[],
                                stderr=f'Error decoding {video}\nInvalid data token=private-token')
             return False
 

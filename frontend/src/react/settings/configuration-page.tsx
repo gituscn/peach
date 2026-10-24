@@ -10,6 +10,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEv
 import { peachHistory, shellNavigate, settingsPath } from '@peach/history';
 
 import { errorMessage } from '../../api';
+import { Button } from '@/components/base/buttons/button';
 import type { ConfigurationData, ConfigurationPanel, ConfigurationProps } from '../bundle';
 import { Note } from '../components/note';
 import { PillTabList } from '../components/pill-tabs';
@@ -25,6 +26,7 @@ import { SourceSettings } from './source-settings';
 import { groupRoot } from './configuration-panel';
 import { downloadsShape, maintenanceShape, networkShape } from './configuration-shape';
 import { rememberShape } from '../../configuration-skeleton';
+import { busyProps } from './use-action';
 
 export function ConfigurationPage({ receipt, reopenTutorial, section = '', diagnostics }: ConfigurationProps & { diagnostics?: ReactElement }) {
   const config = useQuery({
@@ -40,7 +42,18 @@ export function ConfigurationPage({ receipt, reopenTutorial, section = '', diagn
       </div>
     );
   }
-  return <ConfigurationGroups data={data} receipt={receipt} reopenTutorial={reopenTutorial} section={section} diagnostics={diagnostics} />;
+  return <ConfigurationGroups data={data} receipt={receipt} reopenTutorial={reopenTutorial} section={section} diagnostics={diagnostics}
+    refreshing={config.isFetching} reload={() => { void config.refetch({ cancelRefetch: false }); }} />;
+}
+
+function ConfigurationIssues({ data, sections, reload, refreshing }: {
+  data: ConfigurationData; sections: string[]; reload(): void; refreshing: boolean;
+}) {
+  return <>{sections.map(key => {
+    const issue = data.section_errors?.[key];
+    return issue ? <Note key={key} tone="error" title={issue.title}
+      action={<Button variant="secondary" size="small" onClick={reload} {...busyProps(refreshing)}>重新读取</Button>}>{issue.message}</Note> : null;
+  })}</>;
 }
 
 interface Group { title: string; body(panel: ConfigurationPanel): ReactElement }
@@ -51,7 +64,9 @@ let tabSequence = 0;
 /* 页签条是一个 tablist，方向键在整排里走、首尾相接，Home／End 到两头，挪到哪一格就选中哪一格、焦点跟过去。
    分区地址与选中项同步，表单保持挂载。 */
 function ConfigurationGroups(
-  { data, receipt, reopenTutorial, section, diagnostics }: Required<ConfigurationProps> & { data: ConfigurationData; diagnostics?: ReactElement },
+  { data, receipt, reopenTutorial, section, diagnostics, reload, refreshing }: Required<ConfigurationProps> & {
+    data: ConfigurationData; diagnostics?: ReactElement; reload(): void; refreshing: boolean;
+  },
 ) {
   const [prefix] = useState(() => `board-tabs-${++tabSequence}`);
   const [chosen, setChosen] = useState(section);
@@ -89,22 +104,29 @@ function ConfigurationGroups(
   }, []);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const group = { data, receipt };
-  const network = Boolean(data.peach_proxy || data.access || data.tunnel || (data.editable && data.port_editable !== false));
+  const issues = (sections: string[]) => <ConfigurationIssues data={data} sections={sections} reload={reload} refreshing={refreshing} />;
+  const networkKeys = ['peach_proxy', 'access', 'tunnel', 'push_discovery',
+    ...(data.editable && data.port_editable !== false ? ['media_sources'] : [])];
+  const network = Boolean(data.peach_proxy || data.access || data.tunnel || (data.editable && data.port_editable !== false)
+    || networkKeys.some(key => data.section_errors?.[key]));
   const downloads = data.downloads;
   const groups: Group[] = [
     { title: '媒体库与入库', body: (panel) => <div {...groupRoot(panel)}>
-      <MediaSettings {...group} /><CodePatternSettings receipt={receipt} />
+      {issues(['media_sources', 'library_count', 'mount_dependencies'])}
+      {!data.section_errors?.media_sources && !data.section_errors?.library_count ? <MediaSettings {...group} /> : null}
+      <CodePatternSettings receipt={receipt} />
       <MediaProcessingSettings receipt={receipt} />
     </div> },
-    { title: '来源与订阅', body: (panel) => <SourceSettings {...group} panel={panel} /> },
-    ...(downloads ? [{
+    { title: '来源与订阅', body: (panel) => <SourceSettings {...group} panel={panel} issues={issues(['entry_links'])} /> },
+    ...(downloads || data.section_errors?.downloads ? [{
       title: '下载渠道',
-      body: (panel: ConfigurationPanel) => <DownloadGroup initial={downloads} receipt={receipt} panel={panel} />,
+      body: (panel: ConfigurationPanel) => <DownloadGroup initial={downloads} receipt={receipt} panel={panel} issues={issues(['downloads'])} />,
     }] : []),
-    ...(network ? [{ title: '网络与访问', body: (panel: ConfigurationPanel) => <NetworkSettings {...group} panel={panel} /> }] : []),
+    ...(network ? [{ title: '网络与访问', body: (panel: ConfigurationPanel) => <NetworkSettings {...group} panel={panel} issues={issues(networkKeys)} /> }] : []),
     {
       title: '应用与维护',
       body: (panel) => <div {...groupRoot(panel)}>
+        {issues(['startup', 'uninstall', 'storage', 'remote_reporting', 'library_sharing', 'updates', 'update_job', 'automatic_updates', 'facts'])}
         <GeneralSettings {...group} />
         <PlaybackTranscodeSettings receipt={receipt} />
         <MaintenanceSettings {...group} reopenTutorial={reopenTutorial} />

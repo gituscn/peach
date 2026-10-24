@@ -1,9 +1,9 @@
 /* 滚动那一组：横排的滚轮转向、拖动与橡皮筋、横排自动滚动、选中底板的滑动、Geist Scroller，
-   以及按名单批量挂覆盖式滚动条。由共享源码直接引用，随 `peach-app.js` 发出；
+   以及自动接管滚动区的覆盖式滚动条。由共享源码直接引用，随 `peach-app.js` 发出；
    已绑定的横排、自动滚动的那几排与弹簧取值都是模块级状态，只有一份。 */
 import { esc } from '../core';
 
-import { attachOverlayScrollbar } from './overlay-scrollbar';
+import { attachOverlayScrollbar, detachOverlayScrollbar, pruneOverlayScrollbars, releaseOverlayScrollbars } from './overlay-scrollbar';
 
 const horizontalControls=new Map<Element,any>();
 let horizontalCleanup:MutationObserver|null|undefined;
@@ -73,6 +73,7 @@ function edgeBounce(el:HTMLElement){
 /** 会超宽的横向滚动层：两端按滚动位置渐隐，竖向滚轮转成横向，`drag` 为真时可拖。 */
 export function wireHorizontalScroller(el:any,{drag=false,fade=true,wheel=true,elastic=true,dragIgnore=''}={}):any{
   if(!el)return;
+  if(fade)el.dataset.scrollGesture='';
   const existing=horizontalControls.get(el);
   if(existing){existing.options.drag ||= drag;existing.options.fade ||= fade;existing.update();return existing}
   const options={drag,fade,wheel,elastic,dragIgnore},abort=new AbortController(),bounce=edgeBounce(el);
@@ -153,7 +154,7 @@ export function wireHorizontalScroller(el:any,{drag=false,fade=true,wheel=true,e
   const contents=new MutationObserver(()=>{resize.disconnect();observe();scheduleUpdate()});
   contents.observe(el,{childList:true,characterData:true,subtree:true});observe();
   // 外面手动叫的重算（换了版式、改了内容）连 `overflow-x` 一起重读。
-  const control={options,update(){overflowX='';update()},destroy(){abort.abort();stopGlide();cancelAnimationFrame(marking);marking=0;resize.disconnect();contents.disconnect();horizontalControls.delete(el);el.style.cursor='';if(!horizontalControls.size){horizontalCleanup?.disconnect();horizontalCleanup=null}}};
+  const control={options,update(){overflowX='';update()},destroy(){abort.abort();stopGlide();cancelAnimationFrame(marking);marking=0;resize.disconnect();contents.disconnect();horizontalControls.delete(el);delete el.dataset.scrollGesture;el.style.cursor='';if(!horizontalControls.size){horizontalCleanup?.disconnect();horizontalCleanup=null}}};
   horizontalControls.set(el,control);
   if(!horizontalCleanup){horizontalCleanup=new MutationObserver(()=>{for(const [node,item] of horizontalControls)if(!node.isConnected)item.destroy()});horizontalCleanup.observe(document.body,{childList:true,subtree:true})}
   return control;
@@ -330,19 +331,6 @@ export function wireScrollers(root:ParentNode=document):void{
   });
 }
 
-/** 挂覆盖式滚动条的滚动容器。列表只写在这一处，样式那边认的是挂上之后的属性。
- *
- * `[data-stage-scroll]` 是详情浮窗里所有内容的外层。窄屏下整块内容自己纵向滚，滚的得是它而不是
- * `<dialog data-stage>` 本身：轨道必须是滚动容器的兄弟，而 dialog 在顶层，挂在它
- * 父级上的轨道会落到遮罩底下。宽屏下它不溢出，组件自己量得出来，轨道不显示。 */
-const OVERLAY_SCROLLERS=[
-  '[data-stage-side-content]','[data-stage-scroll]','.tagpickbody','[data-mix-list]','.playlistpicklist',
-  '[data-player-stats]',
-  '.vjs-peach-settings-menu','.ui-geist-scroller-container','.metricstrip','.ui-tastesummaries',
-  '.ui-skeletondashstrip','.followpagination',
-  '.reviewtabs','.ftablewrap','.ui-board-local-nav','[data-manage-menu]',
-  '.follow-workspace-switch','.fmanagenav','[role="listbox"]',
-].join(',');
 /* Board 层里会超宽的横向滚动层：两端按滚动位置渐隐说明「那边还有」，鼠标停在上面时竖向
    滚轮转成横向。边线留给外层框，渐隐只落在这一层。
    这里登记的都是 `frontend/` 或 board.css 画出来的层，它们不经过 `wireAllDrag` 那份按 id
@@ -352,12 +340,56 @@ const OVERLAY_SCROLLERS=[
 const BOARD_EDGE_SCROLLERS='.reviewtabs,.ftablewrap,.ui-board-local-nav,[data-manage-menu],'
   +'.follow-workspace-switch,.fmanagenav';
 
-/** 把这一批 DOM 里所有该有覆盖式滚动条的容器接上；重复调用只接新出现的那些。 */
-export function wireOverlayScrollbars(root:ParentNode=document):void{
-  root.querySelectorAll<HTMLElement>(OVERLAY_SCROLLERS).forEach(el=>{
-    if(el.matches(BOARD_EDGE_SCROLLERS)){
-      wireHorizontalScroller(el);return;
-    }
-    attachOverlayScrollbar(el);
+/** 按实际 overflow 接管滚动容器；横向手势导航保留现有渐隐反馈。 */
+export function wireOverlayScrollbars(root:ParentNode=document,subtree=true):void{
+  const nodes=[...(root instanceof HTMLElement?[root]:[]),...(subtree?root.querySelectorAll<HTMLElement>('*'):[])];
+  nodes.filter(el=>el instanceof HTMLElement&&el.matches(BOARD_EDGE_SCROLLERS)).forEach(el=>wireHorizontalScroller(el));
+  const gesture=(el:HTMLElement)=>el.hasAttribute('data-horizontal-scroll')
+    ||(horizontalControls.has(el)&&horizontalControls.get(el).options.fade!==false);
+  // 样式读取与轨道挂载分两段，避免每插入一条轨道就重新计算后面所有节点的样式。
+  const candidates=nodes.flatMap<{el:HTMLElement;axes:readonly ('x'|'y')[]}>(el=>{
+    if(!(el instanceof HTMLElement)||el===document.body||el===document.documentElement
+      ||el.closest('.ovtrack,.ui-ov-edges,[data-skeleton],[inert]'))return [];
+    const horizontalGesture=gesture(el),axes=horizontalGesture?['y'] as const:['y','x'] as const;
+    if(el.dataset.overlayScrollbar&&el.dataset.overlayAxes===axes.join(''))return [];
+    const style=getComputedStyle(el);
+    const vertical=/^(auto|scroll)$/.test(style.overflowY);
+    if(vertical||(!horizontalGesture&&/^(auto|scroll)$/.test(style.overflowX)))return [{el,axes}];
+    return horizontalGesture&&el.dataset.overlayScrollbar?[{el,axes:[] as const}]:[];
   });
+  candidates.forEach(({el,axes})=>axes.length?attachOverlayScrollbar(el,{axes}):detachOverlayScrollbar(el));
+}
+
+/** 按新增子树及样式变化增量接管滚动区；响应式布局改变时刷新整棵树。 */
+export function observeScrollRegions(root:HTMLElement=document.body):()=>void{
+  let frame=0;
+  const pending=new Map<HTMLElement,boolean>();
+  const decorative=(node:Element)=>!!node.closest('.ovtrack,.ui-ov-edges');
+  const flush=()=>{
+    frame=0;
+    const trees=[...pending].filter(([node])=>node.isConnected);
+    pending.clear();
+    for(const [node,subtree] of trees)if(!trees.some(([parent,deep])=>deep&&parent!==node&&parent.contains(node)))wireOverlayScrollbars(node,subtree);
+    pruneOverlayScrollbars();
+  };
+  const queue=(node:HTMLElement,subtree=true)=>{
+    if(decorative(node))return;
+    pending.set(node,(pending.get(node)??false)||subtree);
+    if(!frame)frame=requestAnimationFrame(flush);
+  };
+  const observer=new MutationObserver(records=>{
+    for(const record of records){
+      if(record.type==='attributes'){
+        if(record.target instanceof HTMLElement)queue(record.target,record.attributeName!=='style');
+      }else{
+        for(const node of record.addedNodes)if(node instanceof HTMLElement)queue(node);
+        if(record.removedNodes.length&&!frame)frame=requestAnimationFrame(flush);
+      }
+    }
+  });
+  observer.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style','hidden','open','inert','data-skeleton','data-horizontal-scroll']});
+  const resize=()=>queue(root);
+  window.addEventListener('resize',resize,{passive:true});
+  queue(root);
+  return ()=>{observer.disconnect();window.removeEventListener('resize',resize);cancelAnimationFrame(frame);pending.clear();releaseOverlayScrollbars(root);pruneOverlayScrollbars()};
 }

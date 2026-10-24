@@ -128,8 +128,11 @@ class InitCommandTests(unittest.TestCase):
         self.assertIn("下一步", output)
         self.certs.assert_called_once()
 
-    def test_fresh_init_output_is_readable_by_the_settings_layer(self):
-        self._init("--mdns-name", "peach-two", "--port", "9443",
+    def test_declared_mount_output_is_readable_by_the_settings_layer(self):
+        self.root.mkdir()
+        (self.root / "config.toml").write_text(
+            "[media.locations]\nlocal = ['P:\\Library']\n", encoding="utf-8")
+        self._init("--force", "--mdns-name", "peach-two", "--port", "9443",
                    "--mount", "local=/mnt/media")
         loaded = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(self.root)})
         self.assertTrue(loaded.present)
@@ -145,7 +148,7 @@ class InitCommandTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as caught:
             self._init("--mount", "locla=/mnt/media")
         self.assertIn("locla", str(caught.exception))
-        self.assertIn("local", str(caught.exception))
+        self.assertIn("尚未声明媒体来源", str(caught.exception))
 
     def test_mount_without_an_equals_sign_is_refused(self):
         with self.assertRaises(SystemExit) as caught:
@@ -441,8 +444,7 @@ class InitDispatchTests(unittest.TestCase):
             self._run(["init", "--data-root", str(self.root), "--no-input", "--force"], tty=True), 0)
         self.interactive.assert_not_called()
         loaded = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(self.root)})
-        # 非交互设置写出三个来源的默认数据库路径前缀。
-        self.assertEqual(set(loaded.locations), {"local", "115", "pikpak"})
+        self.assertEqual(loaded.locations, {})
 
 
 class ScanCommandTests(unittest.TestCase):

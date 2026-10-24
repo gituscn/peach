@@ -64,13 +64,14 @@ describe('Board 页面骨架', () => {
     expect(root.querySelector('.board-segment-thumb')).toBeNull();
     expect(root.querySelector('[data-section-items] [aria-selected=true]')?.textContent).toBe('关注列表');
     const track = root.querySelector('[data-section-items]')!;
-    expect([...track.children].map((span) => span.textContent)).toEqual(['关注列表', '添加关注', 'JAV 订阅源']);
+    expect([...track.children].map((span) => span.textContent)).toEqual(['关注列表', '添加关注', '标签管理']);
   });
   it('关注骨架选中地址栏 `?tab=` 那一枚页签，列表以外的页签不画关注列表的工具行', () => {
-    const feeds = follow({ followTab: 'feeds' });
-    expect(feeds.querySelector('[data-section-items] [aria-selected=true]')?.textContent).toBe('JAV 订阅源');
-    expect(feeds.querySelector('.ui-follow-skeleton-toolbar')).toBeNull();
-    expect(feeds.querySelector('.ui-follow-skeleton-surface')).not.toBeNull();
+    const tags = follow({ followTab: 'tags' });
+    expect(tags.querySelector('[data-section-items] [aria-selected=true]')?.textContent).toBe('标签管理');
+    expect(tags.querySelector('.ui-follow-skeleton-toolbar')).toBeNull();
+    expect(tags.querySelector('.ui-follow-skeleton-surface')).not.toBeNull();
+    expect(follow({ followTab: 'feeds' }).querySelector('[data-section-items] [aria-selected=true]')?.textContent).toBe('关注列表');
     expect(follow({ followTab: 'wants' }).querySelector('[data-section-items] [aria-selected=true]')?.textContent).toBe('关注列表');
     expect(follow({ followTab: 'nope' }).querySelector('[data-section-items] [aria-selected=true]')?.textContent).toBe('关注列表');
   });

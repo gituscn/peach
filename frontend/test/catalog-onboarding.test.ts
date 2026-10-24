@@ -30,6 +30,10 @@ describe('馆藏与资料空状态', () => {
   it('JAV 与筛选无结果可查看未筛选内容', () => {
     expect(catalogEmptyHtml({ jav: true })).toContain('尚未补充发行资料');
     expect(catalogEmptyHtml({ filtered: true })).toContain('清除筛选');
+    const page = document.createElement('div');
+    page.innerHTML = catalogEmptyHtml({ jav: true, filtered: true });
+    expect([...page.querySelectorAll('a')].map(link => link.getAttribute('href')))
+      .toEqual(['/?loc=&thumb=0', '/data-cleanup#libraryProcessing']);
   });
   it('标签和各类实体没有资料时显示说明', () => {
     for (const kind of ['tags', 'performers', 'creators', 'studios', 'agencies', 'series']) {

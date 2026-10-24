@@ -1,7 +1,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "cd935c10-0d1c-4516-b106-7e429c6ec869", e._sentryDebugIdIdentifier = "sentry-dbid-cd935c10-0d1c-4516-b106-7e429c6ec869");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "4ef4db2f-ac8c-4921-9877-33825cf6f62f", e._sentryDebugIdIdentifier = "sentry-dbid-4ef4db2f-ac8c-4921-9877-33825cf6f62f");
 	} catch {}
 })();
 import { Button as e, Chip as t, Disclosure as n, DownloadsPanel as r, EmptyState as i, LinkButton as a, LoadingDots as o, Note as s, Progress as c, TASKS_KEY as l, TRIGGER_LABELS as u, __toESM as d, apiGet as f, apiSend as p, busyProps as m, cardClass as h, elapsedText as g, errorMessage as _, f1 as v, fetchEarlier as y, fetchTasks as b, foldRoutine as x, followupDetail as S, groupFollowups as C, hasResultProblems as w, i2 as T, isActive as E, isRoutine as D, latestOfKind as ee, mergeFinished as O, momentText as k, pollInterval as A, problemDestination as j, progressText as M, require_jsx_runtime as N, require_react as P, statusLabel as F, summaryItems as I, taskIssues as L, uo as R, useMutation as z, useQuery as B, useQueryClient as V } from "./peach-app.js";
@@ -69,10 +69,10 @@ var re = {
 	pending: "neutral"
 };
 function Y({ run: e }) {
-	let n = e.status === "succeeded" && w(e);
+	let n = e.status === "failed" && e.task_key === "library-processing" && e.result_summary?.outcome === "partial", r = n || e.status === "succeeded" && w(e);
 	return /* @__PURE__ */ (0, q.jsx)(t, {
-		color: n ? "yellow" : re[e.status] ?? "neutral",
-		children: n ? "发现问题" : F(e.status)
+		color: r ? "yellow" : re[e.status] ?? "neutral",
+		children: n ? "部分项目需处理" : r ? "发现问题" : F(e.status)
 	});
 }
 function ie({ rows: e }) {
@@ -370,4 +370,4 @@ function oe() {
 //#endregion
 export { oe as ActivityPage };
 
-//# debugId=cd935c10-0d1c-4516-b106-7e429c6ec869
+//# debugId=4ef4db2f-ac8c-4921-9877-33825cf6f62f

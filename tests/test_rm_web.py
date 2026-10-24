@@ -25,6 +25,34 @@ from support.ledger import fresh_ledger
 
 
 class WebDataTests(unittest.TestCase):
+    def test_registered_directory_extras_are_excluded_and_personal_records_remain_accessible(self):
+        self.contract.database.media_roots = (r'R:\Media',)
+        with self.contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET name='Film.mp4',path=? WHERE id=1", (r'R:\Media\Film\Film.mp4',))
+            connection.execute("UPDATE asset SET name='Featurette.mp4',path=?,location='local',rating=4,"
+                               "play_count=3 WHERE id=2", (r'R:\Media\Film\Extras\Disc 1\Featurette.mp4',))
+            connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) "
+                               "VALUES(2,11,'performer','test',1.0)")
+        with self.contract.read_connection() as connection:
+            before = [tuple(row) for row in connection.execute('SELECT * FROM asset ORDER BY id')]
+        self.assertEqual([row['id'] for row in q_items(self.contract, {})['items']], [1])
+        self.assertEqual(rm_web.q_related(self.contract, 1)['items'], [])
+        self.assertEqual(rm_web.q_facets(self.contract)['stats']['total'], 1)
+        self.assertEqual(rm_web.q_stats(self.contract)['attribution']['videos'], 1)
+        self.assertEqual([row['id'] for row in web_catalog._catalog_group_rows(self.contract)], [1])
+        self.assertEqual(rm_web.q_item(self.contract, 2)['rating'], 4)
+        people = rm_web.q_index(self.contract, 'performers')['items']
+        self.assertEqual(next(row['n'] for row in people if row['k'] == 'Canonical Alice'), 1)
+        with self.contract.read_connection() as connection:
+            self.assertEqual([tuple(row) for row in connection.execute('SELECT * FROM asset ORDER BY id')], before)
+
+    def test_named_extra_directory_can_be_an_independent_library_root(self):
+        self.contract.database.media_roots = ('R:/Media/Shorts',)
+        with self.contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET path='R:/Media/Shorts/one.mp4' WHERE id=1")
+            connection.execute("UPDATE asset SET path='R:/Media/Shorts/Film/extras/two.mp4' WHERE id=2")
+        self.assertEqual([row['id'] for row in q_items(self.contract, {})['items']], [1])
+
     def test_registered_trailers_stay_out_of_catalog_and_counts_without_changing_records(self):
         with self.contract.write_transaction() as connection:
             connection.execute("UPDATE asset SET name='ABC-001.mp4',duration=7200 WHERE id=1")
@@ -1372,7 +1400,7 @@ class WebDataTests(unittest.TestCase):
             "/api/jav/detail", "/api/jav/reviews", "/api/jav/resources", "/api/jav/discoveries",
         })
         self.assertEqual(set(rm_web.POST_HANDLERS), {
-            "/api/tag-management", "/api/tag-management/preview",
+            "/api/tag-management", "/api/tag-management/preview", "/api/follow/tag",
             "/api/downloads", "/api/downloads/cancel", "/api/downloads/postprocess",
             "/api/library-processing", "/api/thumbnail-jobs", "/api/media-repair",
             "/api/media-processing",

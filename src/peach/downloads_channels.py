@@ -13,6 +13,7 @@ from .downloads_clouddrive import CloudDriveClient, PROBE_TIMEOUT
 from .media_sources import SOURCES
 from .clouddrive_proxy import media_remote_path
 from .push_discovery import normalise_prefix
+from .follow_secrets import CredentialError
 
 
 def root_key(value):
@@ -35,18 +36,28 @@ class LibraryChannels:
                  if location in SOURCES and SOURCES[location].cloud}
         prefixes = tuple(getattr(getattr(service.landing.push_discovery, "config", None), "prefixes", ()))
         names = {root_key(root): name for root, name in self.names().items()}
-        cloud = service.credentials.load(CLOUDDRIVE_CREDENTIAL)
+        problems = []
+        try:
+            cloud = service.credentials.load(CLOUDDRIVE_CREDENTIAL)
+        except CredentialError:
+            cloud = None
+            problems.append("CloudDrive2 令牌无法读取，请重新填写。")
         token = str(cloud.values.get("token", "")) if cloud else ""
-        pikpak = service.credentials.describe(PIKPAK_CREDENTIAL)
+        try:
+            pikpak = service.credentials.describe(PIKPAK_CREDENTIAL)
+        except CredentialError:
+            pikpak = {"fields": []}
+            problems.append("PikPak 登录信息无法读取，请重新登录。")
         logged_in = "refresh_token" in pikpak["fields"]
         fingerprint = (repr(config.payload()), repr(roots), repr(prefixes), repr(names),
                        repr(getattr(service.landing, "mounts", {})), logged_in,
-                       hashlib.sha256(token.encode()).digest())
+                       hashlib.sha256(token.encode()).digest(), tuple(problems))
         with self._lock:
             now = self.clock()
             if self._cached and self._cached[0] == fingerprint and now - self._cached[1] < 30:
                 return self._cached[2]
             result = self._discover(roots, prefixes, names, token, logged_in)
+            result["problems"] = list(dict.fromkeys((*problems, *result["problems"])))
             self._cached = fingerprint, now, result
             return result
 

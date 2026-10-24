@@ -174,6 +174,7 @@ async function stub(page: Page, bindAuthors = false): Promise<FollowStub> {
     return route.fulfill({ json: payload(url, statuses, bindAuthors) });
   });
   await page.route('**/api/follow/credentials', (route) => route.fulfill({ json: { providers: [] } }));
+  await page.route('**/api/tag-management**', route => route.fulfill({ json: { items: [], total:0, categories:{}, duplicate_groups: [] } }));
   // 起过一趟之后 GET 一直报「在跑」：画面停在忙态，量得到两枚键一起忙。
   let started = false;
   await page.route('**/api/follow/check', (route) => {

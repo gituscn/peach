@@ -314,10 +314,10 @@ def _parse_mounts(
         key = key.strip()
         if not separator or not key:
             raise SystemExit(f"--mount 要写成 来源ID=路径，收到：{chunk}")
-        if known and key not in known:
+        if key not in known:
             raise SystemExit(
                 f"--mount 的来源 ID 未在 [media.locations] 声明：{key}"
-                f"（已知：{'、'.join(sorted(known))}）"
+                f"（已知：{'、'.join(sorted(known)) or '尚未声明媒体来源'}）"
             )
         mounts.setdefault(key, []).append(value.strip())
     return {key: tuple(item for item in values if item) for key, values in mounts.items()}
@@ -643,9 +643,9 @@ def _report_blanks(config: settings_file.PeachConfig) -> None:
         table, _, name = dotted.partition(".")
         if not getattr(getattr(config, table), name):
             blanks.append(f"  {dotted} 留空 → {effect}；要填就重跑并加 {flag}")
-    if not config.mounts and os.name != "nt":
+    if config.locations and not config.mounts and os.name != "nt":
         # Windows 上盘符本身就是挂载点，空表是正常的，提示它只会让人去填没用的值。
-        known = "、".join(sorted(config.locations)) or "local"
+        known = "、".join(sorted(config.locations))
         blanks.append(
             f"  [media.mounts] 为空 → 无法读取媒体来源的目录；"
             f"可用 --mount <媒体来源ID>=<媒体目录> 指定目录（已知来源：{known}）"
@@ -706,6 +706,13 @@ def build_parser() -> argparse.ArgumentParser:
     local_image.add_argument('source', type=Path)
     local_image.add_argument('output', type=Path)
     local_image.set_defaults(handler=lambda args: local_image_main([str(args.source), str(args.output)]))
+
+    from .media_io import main as media_read_main, OPERATIONS
+    media_read = commands.add_parser('media-read', help='限时读取媒体目录与配套文件')
+    media_read.add_argument('operation', choices=OPERATIONS)
+    media_read.add_argument('path')
+    media_read.add_argument('value', nargs='?', default='')
+    media_read.set_defaults(handler=lambda args: media_read_main([args.operation, args.path, args.value]))
 
     init = commands.add_parser(
         "init", help="首次运行：不带参数在终端里问答；带任何参数或 --no-input 走非交互")

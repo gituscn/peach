@@ -4,10 +4,11 @@
 时要看到的是「这台机器正在按 10 秒一帧采集」，不是那台设备自己的上一次选择。
 """
 import json
+import sqlite3
 import time
 from pathlib import Path
 
-from . import timeline_sheets
+from . import timeline_sheets, timeline_sources
 from .config import FFMPEG_DIR, STATE_DIR
 from .ffmpeg import FFmpegResolver
 from .fsutil import atomic_path
@@ -68,7 +69,44 @@ def q_timeline(contract, args):
     asset_id = int((args or {}).get('id') or 0)
     if asset_id <= 0:
         return {}
-    return timeline_sheets.read_meta(contract.timeline_root, asset_id) or {}
+    cached = timeline_sheets.read_meta(contract.timeline_root, asset_id)
+    if cached:
+        cached = {**cached, 'source': 'peach'}
+    external = external_timeline(contract, asset_id)
+    if external is not None:
+        return {**external.metadata(), **({'fallback': cached} if cached else {})}
+    return cached or {}
+
+
+def external_timeline(contract, asset_id: int) -> timeline_sources.Timeline | None:
+    """已有预览只读配对到具体资产；短时缓存索引，不读取视频内容。"""
+    def read():
+        try:
+            with contract.read_connection() as connection:
+                row = connection.execute(
+                    "SELECT path, duration FROM asset WHERE id=? AND medium='video' AND disposal IS NULL",
+                    (asset_id,)).fetchone()
+            if row is None:
+                return None
+            from .media import resolve_case_insensitive
+            source = Path(resolve_case_insensitive(row[0]))
+            return timeline_sources.discover(source, float(row[1] or 0))
+        except (OSError, sqlite3.Error, TypeError, ValueError):
+            return None
+    result = contract.cached_lru(f'timeline-sidecar:{asset_id}', read, ttl=15)
+    return result if isinstance(result, timeline_sources.Timeline) else None
+
+
+def external_frame(contract, timeline: timeline_sources.Timeline, number: int) -> bytes | None:
+    if not 0 <= number < len(timeline.frames):
+        return None
+    frame = timeline.frames[number]
+    try:
+        stat = frame.path.stat()
+    except OSError:
+        return None
+    key = ('timeline-frame', str(frame.path), stat.st_mtime_ns, stat.st_size, frame.box, frame.bif_number)
+    return contract.cached_lru(key, lambda: timeline_sources.frame_bytes(timeline, number), ttl=15)
 
 
 def q_thumbnail_jobs(contract, _args):

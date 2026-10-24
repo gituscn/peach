@@ -396,8 +396,8 @@ def _storage_volumes() -> list[dict[str, object]]:
 
 #: 库存一节只数盘上还在的：标「已消失」的行留着只为个人记录（ADR-0087），不算库存。
 #: 回收站里的照旧算进来。播放与消费一节是个人记录本身，不套这一条。
-PRESENT = "COALESCE(disposal,'')<>'vanished' AND NOT peach_is_local_trailer(name)"
-PRESENT_A = "COALESCE(a.disposal,'')<>'vanished' AND NOT peach_is_local_trailer(a.name)"
+PRESENT = "COALESCE(disposal,'')<>'vanished' AND NOT peach_is_local_extra(name,path)"
+PRESENT_A = "COALESCE(a.disposal,'')<>'vanished' AND NOT peach_is_local_extra(a.name,a.path)"
 
 
 #: 视频的时长与画质分档，顺序同 `media_probe.context_fields` 的判据：由短到长、由高到低。

@@ -435,7 +435,8 @@ describe('写完之后', () => {
 
   it('喜爱理由：图标键开合理由框；提交时键上转圈，写完回执', async () => {
     const reply = pending<unknown>();
-    const fetcher = vi.fn(async (_url: string, _init?: RequestInit) => ({ ok: true, status: 200, json: async () => reply.answer }));
+    const fetcher = vi.fn(async (url: string, _init?: RequestInit) => ({ ok: true, status: 200,
+      json: async () => url === '/api/local-players' ? { players: [] } : reply.answer }));
     vi.stubGlobal('fetch', fetcher);
     const { host, actions: done } = await show(item(1));
     const panel = host.querySelector<HTMLElement>('#preferencePanel')!;
@@ -610,15 +611,15 @@ describe('侧栏怎么读', () => {
     await key('ArrowDown');
     await key('Enter');
     await settle();
-    expect(picker.hidden).toBe(true);
+    await vi.waitFor(() => expect(picker.hidden).toBe(true));
     expect(posts(fetcher).map(([, body]) => [body.operation, body.tag])).toEqual([['add', '中出']]);
     await click(host.querySelector('#tagPlus'));
     await key('Escape');
-    expect(picker.hidden).toBe(true);
+    await vi.waitFor(() => expect(picker.hidden).toBe(true));
     expect(document.activeElement).toBe(host.querySelector('#tagPlus'));
     await click(host.querySelector('#tagPlus'));
     await act(async () => { await new Promise((done) => setTimeout(done, 0)) });
-    await act(async () => { document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })) });
-    expect(picker.hidden).toBe(true);
+    await act(async () => { document.body.dispatchEvent(new MouseEvent('click', { bubbles: true })) });
+    await vi.waitFor(() => expect(picker.hidden).toBe(true));
   });
 });

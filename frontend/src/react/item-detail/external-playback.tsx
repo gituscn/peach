@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
-import { apiSend } from '../../api';
+import { apiGet, apiSend } from '../../api';
 import { SelectField } from '../settings-panel/legacy-controls';
 import { Disclosure, ErrorText, Help, Stack } from '../settings/section';
 import { busyProps, useAction } from '../settings/use-action';
@@ -13,6 +13,43 @@ export function playerLink(player: string, url: string, playlist: string): strin
   if (player === 'vlc-ios') return `vlc-x-callback://x-callback-url/stream?url=${encodeURIComponent(url)}`;
   if (player === 'iina') return `iina://weblink?url=${encodeURIComponent(url)}`;
   return playlist;
+}
+
+export function LocalPlayback({ id, onOpened }: { id: number; onOpened?(): void }) {
+  const [players, setPlayers] = useState<{ id: string; label: string }[]>([]);
+  const [player, setPlayer] = useState(() => {
+    try { return localStorage.getItem('peach.local-player.v1') || 'default' } catch { return 'default' }
+  });
+  const [loadError, setLoadError] = useState('');
+  const [epoch, setEpoch] = useState(0);
+  const action = useAction();
+  useEffect(() => {
+    const controller = new AbortController();
+    apiGet<{ players: { id: string; label: string }[] }>('/api/local-players', controller.signal).then(result => {
+      if (controller.signal.aborted) return;
+      setPlayers(result.players);
+      setPlayer(current => result.players.some(item => item.id === current) ? current : 'default');
+    }).catch(cause => { if (!controller.signal.aborted) setLoadError(String(cause.message || cause)) });
+    return () => controller.abort();
+  }, [epoch]);
+  if (!players.length && !loadError) return null;
+  return <div data-local-playback="">
+    {players.length ? <div data-local-playback-row="">
+      <SelectField id={`local-player-${id}`} label="本地播放器" options={players.map(item => [item.id, item.label] as const)}
+        value={player} epoch={epoch} onPick={value => {
+          setPlayer(value);
+          try { localStorage.setItem('peach.local-player.v1', value) } catch { /* 浏览器未允许保存偏好。 */ }
+        }} />
+      <Button variant="secondary" aria-label="使用本地播放器打开" {...busyProps(action.busy === 'open')}
+        onClick={() => void action.run('open', signal => apiSend(
+          `/api/local-playback?id=${id}&player=${encodeURIComponent(player)}`, {}, 'POST', signal), () => {
+            document.querySelector<HTMLVideoElement>('#stage video')?.pause();
+            onOpened?.();
+          })}>打开</Button>
+    </div> : null}
+    {loadError || action.error ? <ErrorText>{loadError || action.error}</ErrorText> : null}
+    {loadError ? <Button variant="secondary" onClick={() => { setLoadError(''); setEpoch(value => value + 1) }}>重新检测播放器</Button> : null}
+  </div>;
 }
 
 export function ExternalPlayback({ id }: { id: number }) {

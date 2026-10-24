@@ -7,7 +7,7 @@ import unittest
 from contextlib import closing
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from support.ledger import fresh_ledger
 from peach.catalog_rules import current_tags
@@ -15,7 +15,8 @@ from peach.entities import upsert_asset_entity
 from peach.repository import LedgerDatabase
 from peach.tag_management import apply_plan, duplicate_groups, preview, tag_rows
 from peach.web_catalog import con_tags, tag_not_hidden
-from peach.web_tags import w_tag_management
+from peach.web_tags import q_tag_management, w_tag_management
+from peach.web_entity import q_index
 from peach import online_tag_management, web_follow, web_library_shortcuts
 from peach.follow_sources import FollowCandidate, SourceFetch
 from peach.follow_store import FollowStore
@@ -46,6 +47,87 @@ class TagManagementTests(unittest.TestCase):
         body = dict(operation=operation, ids=ids, **fields)
         plan = preview(self.c, body)
         return apply_plan(self.c, dict(body, token=plan['token']))
+
+    def management_contract(self):
+        root = Path(self.tmp.name).resolve()
+        contract = WebContract(self.db, follow_sources_root=root / 'sources', follow_secrets_root=root / 'secrets',
+            follow_shared_root=root / 'shared', candidate_root=root / 'generated', follow_state_root=root / 'state')
+        self.addCleanup(contract.stop_background_jobs)
+        contract.followups.stop()
+        return contract
+
+    def test_management_pages_filter_aliases_width_categories_and_state_before_slicing(self):
+        original = self.tag('Original', (1, 2))
+        self.execute('rename', [original], name='Alpha')
+        self.tag('Beta')
+        self.tag('gamma', (1, 2, 3))
+        self.tag('眼镜')
+        hidden = self.tag('Dormant')
+        self.execute('hide', [hidden])
+        self.c.commit()
+        contract = self.management_contract()
+        first = q_tag_management(contract, dict(limit='2'))
+        second = q_tag_management(contract, dict(limit='2', offset='2'))
+        self.assertEqual([row['k'] for row in first['items']], ['gamma', 'Alpha'])
+        self.assertEqual([row['k'] for row in second['items']], ['Beta', '眼镜'])
+        self.assertEqual((first['total'], first['has_more'], first['limit'], first['offset']), (4, True, 2, 0))
+        self.assertEqual((second['total'], second['has_more']), (4, False))
+        alphabet = q_tag_management(contract, dict(limit='2', view='alphabet'))
+        self.assertEqual([row['k'] for row in alphabet['items']], ['Alpha', 'Beta'])
+        found = q_tag_management(contract, dict(limit='20', q='ＯＲＩＧＩＮＡＬ'))
+        self.assertEqual([row['k'] for row in found['items']], ['Alpha'])
+        self.assertEqual((found['total'], found['categories']), (1, {'general': 1}))
+        category = q_tag_management(contract, dict(limit='1', category='appearance'))
+        self.assertEqual([row['k'] for row in category['items']], ['眼镜'])
+        self.assertEqual((category['total'], category['categories']), (1, {'general': 3, 'appearance': 1}))
+        hidden_page = q_tag_management(contract, dict(limit='20', state='hidden'))
+        self.assertEqual([row['k'] for row in hidden_page['items']], ['Dormant'])
+        self.assertEqual(q_tag_management(contract, dict(limit='20', state='blocked'))['total'], 0)
+        past_end = q_tag_management(contract, dict(limit='2', offset='99'))
+        self.assertEqual((past_end['items'], past_end['total'], past_end['has_more']), ([], 4, False))
+        complete = q_tag_management(contract, dict(q='不存在', state='active'))
+        self.assertEqual(set(complete), {'items', 'duplicate_groups'})
+        self.assertEqual(len(complete['items']), 5)
+
+    def test_management_page_limits_duplicate_groups_and_cache_invalidation(self):
+        self.tag('眼镜')
+        self.c.execute("INSERT INTO entity(kind,canonical_name,normalized_name,created_at,updated_at) VALUES('tag','眼镜娘','眼镜娘','now','now')")
+        self.c.commit()
+        contract = self.management_contract()
+        with patch('peach.web_tags.tag_rows', wraps=tag_rows) as inventory:
+            complete = q_tag_management(contract, {})
+            self.assertEqual(len(complete['duplicate_groups']), 1)
+            for raw, expected in [('invalid', 20), ('0', 1), ('-5', 1), ('99999', 600)]:
+                page = q_tag_management(contract, dict(limit=raw, offset='invalid', q='不存在'))
+                self.assertEqual((page['limit'], page['offset'], page['total']), (expected, 0, 0))
+                self.assertEqual(page['duplicate_groups'], complete['duplicate_groups'])
+            self.assertEqual(inventory.call_count, 1)
+            complete['items'][0]['k'] = '客户端临时值'
+            self.assertNotIn('客户端临时值', [row['k'] for row in q_tag_management(contract, {})['items']])
+            contract.cache_bust()
+            q_tag_management(contract, dict(limit='1'))
+            self.assertEqual(inventory.call_count, 2)
+            self.tag('新标签')
+            self.c.commit()
+            self.assertEqual(q_tag_management(contract, dict(limit='20'))['total'], 3)
+            self.assertEqual(inventory.call_count, 3)
+        for args in [dict(limit='20', state='unknown'), dict(limit='20', view='unknown')]:
+            with self.subTest(args=args), self.assertRaisesRegex(ValueError, '未知的标签'):
+                q_tag_management(contract, args)
+
+    def test_local_browse_tag_total_counts_filtered_rows_on_every_page(self):
+        self.tag('Alpha')
+        self.tag('Beta')
+        self.tag('眼镜')
+        self.c.commit()
+        contract = self.management_contract()
+        first = q_index(contract, 'tags', limit=1)
+        self.assertEqual((len(first['items']), first['total'], first['has_more']), (1, 3, True))
+        category = q_index(contract, 'tags', limit=1, category='general', offset=20)
+        self.assertEqual((category['items'], category['total'], category['has_more']), ([], 2, False))
+        searched = q_index(contract, 'tags', q='Alpha', limit=1)
+        self.assertEqual((len(searched['items']), searched['total']), (1, 1))
+        self.assertNotIn('total', q_index(contract, 'performers', limit=1))
 
     def test_rename_preserves_unrelated_historical_reference_violations(self):
         entity_id = self.tag('眼镜')
@@ -215,6 +297,47 @@ class OnlineTagManagementTests(unittest.TestCase):
             command['token'] = online_tag_management.preview(connection, command, web_follow.online_tag_inventory(connection))['token']
         return w_tag_management(self.contract, command)
 
+    def test_online_management_pages_share_inventory_and_partition_blocked_hidden_active(self):
+        self.seed()
+        self.execute('rename', ['outdoors'], name='户外')
+        self.execute('hide', ['outdoors'])
+        self.execute('block', ['outdoors'])
+        args = dict(scope='online', limit='1')
+        with patch('peach.web_tags.online_tag_inventory', wraps=web_follow.online_tag_inventory) as inventory:
+            first = q_tag_management(self.contract, args)
+            second = q_tag_management(self.contract, dict(args, offset='1'))
+            self.assertEqual([row['k'] for row in first['items']], ['landscape'])
+            self.assertEqual([row['k'] for row in second['items']], ['preview_artist'])
+            self.assertEqual((first['total'], first['has_more'], second['has_more']), (2, True, False))
+            self.assertEqual(first['categories'], {'general': 1, 'artist': 1})
+            artist = q_tag_management(self.contract, dict(args, category='artist'))
+            self.assertEqual((artist['total'], artist['categories']), (1, first['categories']))
+            self.assertEqual([row['k'] for row in artist['items']], ['preview_artist'])
+            hidden = q_tag_management(self.contract, dict(args, state='hidden'))
+            self.assertEqual((hidden['items'], hidden['total']), ([], 0))
+            blocked = q_tag_management(self.contract, dict(args, state='blocked', q='ＯＵＴＤＯＯＲＳ'))
+            self.assertEqual([row['k'] for row in blocked['items']], ['户外'])
+            self.assertEqual((blocked['total'], blocked['categories'], blocked['duplicate_groups']), (1, {'general': 1}, []))
+            complete = q_tag_management(self.contract, dict(scope='online'))
+            self.assertEqual(set(complete), {'items', 'duplicate_groups'})
+            self.assertEqual(len(complete['items']), 3)
+            self.assertTrue(all(not key.startswith('_') for row in complete['items'] for key in row))
+            self.assertEqual(inventory.call_count, 1)
+            self.contract.cache_bust()
+            q_tag_management(self.contract, args)
+            self.assertEqual(inventory.call_count, 2)
+        self.execute('unblock', ['outdoors'])
+        self.assertEqual([row['k'] for row in q_tag_management(self.contract, dict(args, state='hidden'))['items']], ['户外'])
+
+    def test_online_browse_tag_total_follows_search_and_type_before_paging(self):
+        self.seed()
+        first = web_follow.q_follow_tags(self.contract, dict(types='all', limit='1'))
+        self.assertEqual((len(first['items']), first['total'], first['has_more']), (1, 3, True))
+        artist = web_follow.q_follow_tags(self.contract, dict(types='all', type='artist', limit='1', offset='10'))
+        self.assertEqual((artist['items'], artist['total'], artist['has_more']), ([], 1, False))
+        found = web_follow.q_follow_tags(self.contract, dict(types='all', q='outdoors', limit='1'))
+        self.assertEqual((len(found['items']), found['total']), (1, 1))
+
     def test_rename_merge_and_source_updates_share_one_online_identity(self):
         source = self.seed()
         originals = list(map(tuple, self.c.execute('SELECT id,metadata_json FROM follow_item ORDER BY id')))
@@ -248,6 +371,96 @@ class OnlineTagManagementTests(unittest.TestCase):
         restored = web_follow.q_follow(self.contract, {})
         self.assertIn('outdoors', dict(restored['facets']['tags']))
         self.assertTrue(any('outdoors' in group['primary']['detail_tags'] for group in restored['groups']))
+
+    def test_custom_online_tags_survive_source_updates_and_follow_aliases(self):
+        source = self.seed()
+        item_id = self.c.execute("SELECT id FROM follow_item WHERE external_id='2'").fetchone()[0]
+        originals = list(map(tuple, self.c.execute('SELECT id,metadata_json FROM follow_item ORDER BY id')))
+        command = dict(id=item_id, operation='add', tag='我的精选')
+        for _ in range(2):
+            result = web_follow.w_follow_tag(self.contract, command)
+            self.assertEqual(result['item']['custom_tags'], ['我的精选'])
+        self.assertEqual(list(map(tuple, self.c.execute('SELECT id,metadata_json FROM follow_item ORDER BY id'))), originals)
+        filtered = web_follow.q_follow(self.contract, {'tag': '我的精选,outdoors'})
+        self.assertEqual([row['primary']['id'] for row in filtered['groups']], [item_id])
+        self.assertIn('我的精选', dict(filtered['facets']['tags']))
+        self.execute('rename', ['我的精选'], name='值得重看')
+        with self.database.write_transaction() as connection:
+            self.record(FollowStore(lambda: connection), source, 2, ['outdoors'])
+        updated = web_follow.q_follow(self.contract, {'item': item_id})['groups'][0]['primary']
+        self.assertEqual(updated['custom_tags'], ['值得重看'])
+        self.assertIn('值得重看', updated['tags'])
+        self.assertEqual(len(web_follow.q_follow(self.contract, {'tag': '我的精选'})['groups']), 1)
+        removed = web_follow.w_follow_tag(self.contract, dict(id=item_id, operation='remove', tag='值得重看'))
+        self.assertEqual(removed['item']['custom_tags'], [])
+        self.assertIn('outdoors', removed['item']['tags'])
+        self.assertEqual(web_follow.q_follow(self.contract, {'tag': '值得重看'})['groups'], [])
+
+    def test_content_blocking_applies_to_counts_facets_new_items_and_restore(self):
+        source = self.seed()
+        self.execute('hide', ['outdoors'])
+        self.assertEqual(sum(web_follow.q_follow(self.contract, {})['counts'].values()), 3)
+        self.execute('block', ['outdoors'])
+        hidden = web_follow.q_follow(self.contract, {})
+        self.assertEqual([row['primary']['external_id'] for row in hidden['groups']], ['3'])
+        self.assertEqual(sum(hidden['counts'].values()), 1)
+        self.assertNotIn('outdoors', dict(hidden['facets']['tags']))
+        self.assertNotIn('outdoors', [row['k'] for row in web_follow.q_follow_tags(self.contract, {'types': 'all'})['items']])
+        blocked = next(row for row in web_follow.online_tag_inventory(self.c) if row['id'] == 'outdoors')
+        self.assertTrue(blocked['blocked'])
+        self.execute('rename', ['outdoors'], name='户外')
+        with self.database.write_transaction() as connection:
+            self.record(FollowStore(lambda: connection), source, 4, ['outdoors'])
+        self.assertEqual(sum(web_follow.q_follow(self.contract, {})['counts'].values()), 1)
+        item_id = self.c.execute("SELECT id FROM follow_item WHERE external_id='2'").fetchone()[0]
+        detail = web_follow.q_follow(self.contract, {'item': item_id})['groups'][0]['primary']
+        self.assertEqual(detail['blocked_tags'], ['户外'])
+        self.execute('unblock', ['outdoors'])
+        self.assertEqual(sum(web_follow.q_follow(self.contract, {})['counts'].values()), 4)
+        self.assertTrue(next(row for row in web_follow.online_tag_inventory(self.c) if row['id'] == 'outdoors')['hidden'])
+
+    def test_blocking_one_variant_hides_the_whole_group(self):
+        self.seed()
+        self.c.execute("UPDATE follow_item SET group_hint='shared-work' WHERE external_id IN ('2','3')")
+        self.c.commit()
+        whole = web_follow.q_follow(self.contract, {})
+        self.assertEqual(len(whole['groups']), 2)
+        self.execute('block', ['outdoors'])
+        self.assertEqual(web_follow.q_follow(self.contract, {})['groups'], [])
+        self.assertEqual(sum(web_follow.q_follow(self.contract, {})['counts'].values()), 0)
+
+    def test_item_tag_removal_and_restore_preserve_source_evidence(self):
+        self.seed()
+        item_id = self.c.execute("SELECT id FROM follow_item WHERE external_id='2'").fetchone()[0]
+        for tag in ['', ' ', 'a,b', 'a\nb', 'x' * 81]:
+            with self.subTest(tag=repr(tag)), self.assertRaisesRegex(ValueError, '标签名'):
+                web_follow.w_follow_tag(self.contract, dict(id=item_id, operation='add', tag=tag))
+        original = self.c.execute('SELECT metadata_json FROM follow_item WHERE id=?', (item_id,)).fetchone()[0]
+        removed = web_follow.w_follow_tag(self.contract, dict(id=item_id, operation='remove', tag='outdoors'))
+        self.assertNotIn('outdoors', removed['item']['tags'])
+        self.assertEqual(self.c.execute('SELECT metadata_json FROM follow_item WHERE id=?', (item_id,)).fetchone()[0], original)
+        self.assertNotIn(item_id, [row['primary']['id'] for row in web_follow.q_follow(self.contract, {'tag': 'outdoors'})['groups']])
+        self.execute('rename', ['outdoors'], name='户外')
+        renamed = web_follow.q_follow(self.contract, {'item': item_id})['groups'][0]['primary']
+        self.assertNotIn('户外', renamed['tags'])
+        restored = web_follow.w_follow_tag(self.contract, dict(id=item_id, operation='restore', tag='户外'))
+        self.assertIn('户外', restored['item']['tags'])
+        self.assertEqual(restored['item']['custom_tags'], [])
+        with self.assertRaisesRegex(ValueError, '不存在'):
+            web_follow.w_follow_tag(self.contract, dict(id=987654, operation='add', tag='精选'))
+
+    def test_merge_preserves_content_blocking_and_unblock_remains_available_without_items(self):
+        self.seed()
+        self.execute('block', ['outdoors'])
+        self.execute('merge', ['outdoors', 'landscape'], target_id='landscape')
+        self.assertEqual(web_follow.q_follow(self.contract, {})['groups'], [])
+        self.c.execute('UPDATE follow_source SET enabled=0')
+        self.c.commit()
+        row = next(row for row in web_follow.online_tag_inventory(self.c) if row['id'] == 'landscape')
+        self.assertEqual(row['n'], 0)
+        self.assertTrue(row['blocked'])
+        self.execute('unblock', ['landscape'])
+        self.assertFalse(next(row for row in web_follow.online_tag_inventory(self.c) if row['id'] == 'landscape')['blocked'])
 
     def test_online_conflicts_types_and_stale_plans_are_rejected(self):
         self.seed()

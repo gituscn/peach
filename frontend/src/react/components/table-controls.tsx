@@ -25,10 +25,11 @@ export function DataTableSort({ label, options, sorting, onChange }: {
 }
 
 /** 范围、每页条数和页码沿用关注列表的同一行布局。 */
-export function DataTableFooter({ label, total, pagination, onChange, unit = '条记录', pageUnit = '条' }: {
+export function DataTableFooter({ label, total, pagination, onChange, unit = '条记录', pageUnit = '条', pageSizes = [10, 20, 50, 100] }: {
   label: string; total: number; pagination: { pageIndex: number; pageSize: number };
   onChange(next: { pageIndex: number; pageSize: number }): void;
   unit?: string; pageUnit?: string;
+  pageSizes?: readonly number[];
 }) {
   const pages = Math.max(1, Math.ceil(total / pagination.pageSize));
   const pageIndex = Math.min(pagination.pageIndex, pages - 1);
@@ -41,7 +42,7 @@ export function DataTableFooter({ label, total, pagination, onChange, unit = '�
     <div data-toolbar-actions="">
     <Select aria-label="每页显示数量" size="sm" selectedKey={String(pagination.pageSize)}
       onSelectionChange={(key) => { if (key !== null) onChange({ pageIndex: 0, pageSize: Number(key) }); }}>
-      {[10, 20, 50, 100].map((size) => <SelectItem key={size} id={String(size)}>{`每页 ${size} ${pageUnit}`}</SelectItem>)}
+      {pageSizes.map((size) => <SelectItem key={size} id={String(size)}>{`每页 ${size} ${pageUnit}`}</SelectItem>)}
     </Select>
     <Pagination label={`${label}分页`} page={pageIndex + 1} pages={pages}
       onPage={(page) => onChange({ ...pagination, pageIndex: page - 1 })} />

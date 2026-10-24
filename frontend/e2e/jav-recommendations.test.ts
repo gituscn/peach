@@ -49,7 +49,7 @@ describe('JAV 推荐与加载结构', () => {
         assert.equal(await section.locator('[data-entity-sort="release_date"]').getAttribute('aria-pressed'), 'true');
         assert.equal(await section.getAttribute('data-return-probe'), 'kept');
         assert.equal(reads.length, count);
-        assert.ok(Math.abs(await page.evaluate(() => window.scrollY) - top) < 2);
+        await page.waitForFunction(previous => Math.abs(window.scrollY - previous) < 2, top);
       }
       assert.deepEqual(opened.problems.filter(line => !line.includes('VIDEOJS')), []);
     } finally { await opened.close() }

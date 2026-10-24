@@ -140,6 +140,7 @@ export type PikPakBrowserState = 'idle' | 'waiting' | 'done' | 'cancelled' | 'ti
 
 /** 设置页的云下载块。凭据只报存没存过，不回值。 */
 export interface DownloadSettingsState {
+  problems?: string[];
   media_sources: string[];
   available: boolean;
   config: DownloadConfig;
@@ -253,6 +254,7 @@ export interface UpdateJob {
 }
 
 export interface MediaSource {
+  transport?: 'filesystem' | 'smb'; smb_username?: string; smb_password_saved?: boolean; smb_encrypt?: boolean;
   root_id?: string; library_id?: string;
   location: string; root: string; path: string; online?: boolean; library?: string; library_icon?: string; cost?: 'free' | 'metered';
   /** 媒体库来源色（强调色键名，空串不上色）与处理方式；`library_stages` 是自定义时所选步骤，逗号分隔。 */
@@ -267,6 +269,7 @@ export interface ConfigurationFact {
 }
 
 export interface ConfigurationData {
+  section_errors?: Record<string, { title: string; message: string; error_id: string }>;
   remote_reporting?: import('./settings/remote-reporting-settings').RemoteReportingState;
   library_sharing?: import('./settings/library-sharing-settings').LibrarySharingState;
   ledger_read_only?: boolean;
@@ -321,6 +324,7 @@ export interface ConfigurationPanel {
 export interface ConfigurationGroupProps extends Pick<ConfigurationProps, 'receipt'> {
   data: ConfigurationData;
   panel?: ConfigurationPanel;
+  issues?: import('react').ReactNode;
 }
 
 /** 高清版目标页仍由遗留层提供的能力。全是纯函数或导航，页面不持有它们的状态。 */

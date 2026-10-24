@@ -14,6 +14,7 @@ import {
 } from '../../src/react/library-processing/library-processing';
 import { LibraryProcessingCard } from '../../src/react/library-processing/library-processing-card';
 import { LibraryProcessingNotice } from '../../src/react/library-processing/library-processing-notice';
+import { setProcessingNoticeVisible } from '../../src/react/library-processing/processing-notice-visibility';
 import type { LibraryProcessingProps } from '../../src/react/bundle';
 
 import { actionOrder, buttonNamed as textButtonNamed, click, mount, mountRoot, submit } from './render';
@@ -27,6 +28,7 @@ const buttonNamed = (name: string, root: ParentNode = document) =>
 afterEach(() => {
   queryClient.clear();
   localStorage.clear();
+  sessionStorage.clear();
 });
 
 /* Query 派发更新用的是它自己抓住的那个真 `setTimeout(0)`，假时钟推不动它：推完时钟
@@ -74,6 +76,15 @@ const notice = (props: LibraryProcessingProps) => (
   <QueryClientProvider client={queryClient}><LibraryProcessingNotice {...props} /></QueryClientProvider>
 );
 
+it('隐藏任务提示后卡片提供恢复入口，恢复不提交业务请求', async () => {
+  const { posts } = await open({ status: 'paused', job_id: 'restore-from-card', checked: 2, total: 10 });
+  setProcessingNoticeVisible('restore-from-card', false);
+  const host = await mount(card({ toast: vi.fn() }));
+  await click(buttonNamed('显示进度浮窗', host));
+  expect(buttonNamed('显示进度浮窗', host)).toBeNull();
+  expect(posts()).toEqual([]);
+});
+
 /** 轮询是 Query 的定时器，推进时钟会引起重画，得在 act 里推。 */
 const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) });
 
@@ -108,6 +119,28 @@ it('来源说没有只报一个数，不算问题也不提供失败重试', asyn
   expect(host.querySelector('[role="alert"]')).toBeNull();
   expect(buttonNamed('立即重试未完成项')).toBeNull();
   expect(host.querySelector('details')).toBeNull();
+});
+
+it('已结束的部分结果提供浏览与定向重试，中断保持错误提示', async () => {
+  const state: LibraryProcessingData = { status: 'failed', outcome: 'partial', job_id: 'partial',
+    issue_count: 2, error: '2 项需要处理', retryable_asset_ids: [7],
+    issue_preview: [{ asset_id: 7, message: '视频抽帧超时' }] };
+  const served = await open(state, method => method === 'POST' ? { status: 'running', job_id: 'retry' } : state);
+  const host = await mount(card({ toast: vi.fn() }));
+  const banner = await mount(notice({ toast: vi.fn(), mode: 'notice' }));
+  for (const surface of [host, banner]) {
+    expect(surface.textContent).toContain('处理已结束，部分项目需处理');
+    expect(surface.textContent).toContain('已入库的视频可在全部内容中浏览');
+    expect(surface.querySelector('a[href="/?loc=&thumb=0"]')?.textContent).toBe('查看全部内容');
+    expect(surface.querySelector('[role="alert"]')).toBeNull();
+  }
+  expect(banner.querySelector('[data-processing-tone]')?.getAttribute('data-processing-tone')).toBe('warning');
+  await click(buttonNamed('立即重试未完成项', host));
+  expect(served.posts()).toEqual([{ job_id: 'partial', retry: [7] }]);
+  await act(async () => { queryClient.setQueryData(LIBRARY_PROCESSING_KEY,
+    { ...state, outcome: 'interrupted', error: '处理被中断' }); });
+  expect(banner.querySelector('[role="alert"]')?.textContent).toContain('扫描与采集已中断');
+  expect(banner.querySelector('a[href="/?loc=&thumb=0"]')).toBeNull();
 });
 
 it('扫描与补全方式共用一颗主键加一个下拉，各自交自己的阶段', async () => {

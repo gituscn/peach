@@ -154,6 +154,112 @@ class ErrorReportingTests(unittest.TestCase):
         self.assertTrue(all(json.loads(line)['asset_id'] == 23 for line in text.splitlines()))
         self.assertTrue(next(row for row in report['logs'] if row['name'] == path.name)['truncated'])
 
+    def test_processing_export_reads_complete_large_json_and_keeps_task_evidence(self):
+        state = self.root / 'state'
+        state.mkdir()
+        path = state / 'library-processing.json'
+        payload = {'local_metadata': {str(index): r'D:\private\movie.mp4' for index in range(10000)},
+                   'job_id': 'task-23', 'status': 'running', 'stage': 'previews', 'checked': 423,
+                   'issue_count': 1, 'issue_preview': [{'asset_id': 23, 'title': 'private-movie',
+                       'diagnostics': {'reason': 'timeout', 'stderr': 'token=private-token'}}]}
+        path.write_text(json.dumps(payload, indent=2), encoding='utf-8')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes())) as archive:
+            content = archive.read('processing/library-processing.json')
+            exported = json.loads(content)
+            report = json.loads(archive.read('report.json'))
+        self.assertLessEqual(len(content), support_bundle.TAIL_BYTES)
+        self.assertEqual((exported['job_id'], exported['status'], exported['stage'], exported['checked']),
+                         ('task-23', 'running', 'previews', 423))
+        self.assertEqual(exported['issue_preview'][0]['diagnostics']['reason'], 'timeout')
+        self.assertNotIn(b'private-', content)
+        entry = next(row for row in report['logs'] if row['name'] == path.name)
+        self.assertEqual(entry['status'], 'included')
+        self.assertTrue(entry['truncated'])
+        self.assertTrue(entry['projected'])
+        self.assertEqual(entry['collection_counts']['local_metadata'], 10000)
+        self.assertEqual(len(exported['local_metadata']), 20)
+
+    def test_processing_export_keeps_large_compact_json_without_tail_loss(self):
+        state = self.root / 'state'
+        state.mkdir()
+        (state / 'library-processing.json').write_text(json.dumps({
+            'status': 'paused', 'local_metadata': {str(index): r'D:\private\movie.mp4'
+                                                for index in range(5000)}}), encoding='utf-8')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes())) as archive:
+            self.assertEqual(json.loads(archive.read('processing/library-processing.json'))['status'], 'paused')
+
+    def test_processing_export_reports_invalid_empty_and_over_limit_json_without_empty_members(self):
+        state = self.root / 'state'
+        state.mkdir()
+        for name, content in [('library-processing.json', '{"status":'),
+                              ('runtime-prepare.json', ''), ('standalone-update.json', 'x' * 200)]:
+            (state / name).write_text(content, encoding='utf-8')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                mock.patch.object(support_bundle, 'JSON_READ_BYTES', 100), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes())) as archive:
+            report = json.loads(archive.read('report.json'))
+            entries = {row['name']: row for row in report['logs']}
+            self.assertEqual(entries['library-processing.json']['status'], 'unreadable_json')
+            self.assertEqual(entries['runtime-prepare.json']['status'], 'empty_json')
+            self.assertEqual(entries['standalone-update.json']['status'], 'json_size_limit')
+            self.assertFalse(any(name.startswith('processing/') for name in archive.namelist()))
+
+    def test_processing_jsonl_export_keeps_record_at_exact_tail_boundary(self):
+        state = self.root / 'state'
+        state.mkdir()
+        first = json.dumps({'asset_id': 1}) + '\n'
+        last = json.dumps({'asset_id': 2}) + '\n'
+        path = state / 'library-processing-boundary.issues.jsonl'
+        path.write_bytes((first + last).encode('utf-8'))
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                mock.patch.object(support_bundle, 'TAIL_BYTES', len(last.encode())), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes())) as archive:
+            self.assertEqual(json.loads(archive.read('processing/' + path.name))['asset_id'], 2)
+
+    def test_processing_json_export_bounds_reads_and_rejects_scalar_or_deep_documents(self):
+        stream = io.BytesIO(b' ' * 1000)
+        with mock.patch.object(support_bundle, 'JSON_READ_BYTES', 100):
+            content, details = support_bundle._structured_json(stream)
+        self.assertEqual((content, details['status'], stream.tell()), ('', 'json_size_limit', 101))
+        for raw, expected in [(b'false', 'invalid_json_shape'), (b'{"status":"\xff"}', 'unreadable_json'),
+                              (b'[' * 2000 + b']' * 2000, 'json_depth_limit')]:
+            with self.subTest(expected=expected):
+                content, details = support_bundle._structured_json(io.BytesIO(raw))
+                self.assertEqual((content, details['status']), ('', expected))
+
+    def test_processing_jsonl_export_reports_skipped_records_and_bounds_redacted_output(self):
+        state = self.root / 'state'
+        state.mkdir()
+        path = state / 'library-processing-rows.issues.jsonl'
+        rows = [json.dumps({'asset_id': index, 'token': 'x'}) for index in range(1, 4)]
+        path.write_text('\n'.join([*rows, '{"partial":']), encoding='utf-8')
+        limit = path.stat().st_size
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                mock.patch.object(support_bundle, 'TAIL_BYTES', limit), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes())) as archive:
+            content = archive.read('processing/' + path.name)
+            records = [json.loads(line) for line in content.splitlines()]
+            entry = next(row for row in json.loads(archive.read('report.json'))['logs'] if row['name'] == path.name)
+        self.assertLessEqual(len(content), limit)
+        self.assertEqual([row['asset_id'] for row in records], [2, 3])
+        self.assertEqual(entry['skipped_records'], 2)
+        self.assertEqual(entry['status'], 'included')
+        self.assertTrue(entry['truncated'])
+
+    def test_processing_jsonl_export_omits_members_without_complete_records(self):
+        state = self.root / 'state'
+        state.mkdir()
+        (state / 'library-processing-empty.issues.jsonl').write_bytes(b'')
+        (state / 'library-processing-invalid.issues.jsonl').write_bytes(b'{"partial":')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes())) as archive:
+            entries = {row['name']: row for row in json.loads(archive.read('report.json'))['logs']}
+            self.assertFalse(any(name.startswith('processing/') for name in archive.namelist()))
+        self.assertEqual(entries['library-processing-empty.issues.jsonl']['status'], 'empty_jsonl')
+        self.assertEqual(entries['library-processing-invalid.issues.jsonl']['status'], 'no_complete_records')
+
     def test_support_bundle_contains_local_delivery_receipts_without_research_payloads(self):
         from peach.settings_file import PeachConfig
         config = PeachConfig(self.root, self.root / 'config.toml', present=True)

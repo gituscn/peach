@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "90ced43a-14c0-49bb-b0fb-e5b699d0908a", e._sentryDebugIdIdentifier = "sentry-dbid-90ced43a-14c0-49bb-b0fb-e5b699d0908a");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "a1bc8fb0-ddd8-43ba-8967-750fd648483b", e._sentryDebugIdIdentifier = "sentry-dbid-a1bc8fb0-ddd8-43ba-8967-750fd648483b");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, i, o, s) => {
@@ -19607,7 +19607,8 @@ var Tm = Sm.filter((e) => e.cloud).map((e) => e.id), Em = Object.fromEntries(Sm.
 	onedrive: "data:image/png;base64,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"
 }, Om = {
 	...Object.fromEntries(Cm.map((e) => [e.id, Dm[e.id] || e.icon])),
-	online: "rss"
+	online: "rss",
+	smb: "network"
 };
 //#endregion
 //#region src/react/boardui/components/application/settings/settings-rows.tsx
@@ -20788,6 +20789,7 @@ function Sg(e) {
 }
 function Cg(e, { drag: t = !1, fade: n = !0, wheel: r = !0, elastic: i = !0, dragIgnore: a = "" } = {}) {
 	if (!e) return;
+	n && (e.dataset.scrollGesture = "");
 	let o = pg.get(e);
 	if (o) return o.options.drag ||= t, o.options.fade ||= n, o.update(), o;
 	let s = {
@@ -20876,7 +20878,7 @@ function Cg(e, { drag: t = !1, fade: n = !0, wheel: r = !0, elastic: i = !0, dra
 			b = "", S();
 		},
 		destroy() {
-			c.abort(), D(), cancelAnimationFrame(C), C = 0, ee.disconnect(), te.disconnect(), pg.delete(e), e.style.cursor = "", pg.size || (mg?.disconnect(), mg = null);
+			c.abort(), D(), cancelAnimationFrame(C), C = 0, ee.disconnect(), te.disconnect(), pg.delete(e), delete e.dataset.scrollGesture, e.style.cursor = "", pg.size || (mg?.disconnect(), mg = null);
 		}
 	};
 	return pg.set(e, ne), mg || (mg = new MutationObserver(() => {
@@ -20897,27 +20899,6 @@ function Tg() {
 	}
 	return wg;
 }
-[
-	"[data-stage-side-content]",
-	"[data-stage-scroll]",
-	".tagpickbody",
-	"[data-mix-list]",
-	".playlistpicklist",
-	"[data-player-stats]",
-	".vjs-peach-settings-menu",
-	".ui-geist-scroller-container",
-	".metricstrip",
-	".ui-tastesummaries",
-	".ui-skeletondashstrip",
-	".followpagination",
-	".reviewtabs",
-	".ftablewrap",
-	".ui-board-local-nav",
-	"[data-manage-menu]",
-	".follow-workspace-switch",
-	".fmanagenav",
-	"[role=\"listbox\"]"
-].join(",");
 //#endregion
 //#region src/react/components/use-horizontal-scroller.ts
 function Eg(e, t = !0) {
@@ -21169,8 +21150,56 @@ function Ug({ label: e, password: t, confirmation: n, onPassword: r, onConfirmat
 	})] });
 }
 //#endregion
+//#region src/react/settings/peach-proxy-fields.tsx
+var Wg = [
+	["environment", "跟随环境"],
+	["direct", "直连"],
+	["proxy", "自定义"]
+];
+function Gg({ mode: e, onChange: t, labelledBy: n }) {
+	return /* @__PURE__ */ (0, z.jsx)(nh, {
+		"aria-label": n ? void 0 : "连接方式",
+		"aria-labelledby": n,
+		selectedKey: e,
+		onSelectionChange: (e) => {
+			e !== null && t(String(e));
+		},
+		children: Wg.map(([e, t]) => /* @__PURE__ */ (0, z.jsx)(rh, {
+			id: e,
+			children: t
+		}, e))
+	});
+}
+function Kg({ id: e, value: t, onChange: n, saved: r = !1, error: i }) {
+	return /* @__PURE__ */ (0, z.jsx)(rm, {
+		id: e,
+		type: "password",
+		label: "代理地址",
+		autoComplete: "off",
+		spellCheck: "false",
+		value: t,
+		onChange: n,
+		placeholder: r ? "已保存，留空保留" : "http://127.0.0.1:7890",
+		validationBehavior: "aria",
+		isInvalid: !!i,
+		hint: i
+	});
+}
+function qg(e) {
+	try {
+		let t = new URL(e).hostname;
+		return [
+			"localhost",
+			"[::1]",
+			"::1"
+		].includes(t) || /^127\./.test(t);
+	} catch {
+		return !1;
+	}
+}
+//#endregion
 //#region src/react/boardui/components/base/badges/chip.tsx
-var Wg = Ft({
+var Jg = Ft({
 	base: "inline-flex items-center justify-center rounded-md px-1.5 whitespace-nowrap transition-[padding,font-size] duration-200 ease",
 	variant: {
 		bold: "py-0.5 text-body-medium",
@@ -21189,33 +21218,33 @@ var Wg = Ft({
 		soft: "bg-background-secondary-default text-text-secondary"
 	}
 });
-function Gg({ variant: e = "bold", color: t = "neutral", className: n, ref: r, ...i }) {
+function Yg({ variant: e = "bold", color: t = "neutral", className: n, ref: r, ...i }) {
 	return /* @__PURE__ */ (0, z.jsx)("span", {
 		ref: r,
-		className: R(Wg.base, Wg.variant[e], Wg.color[t], n),
+		className: R(Jg.base, Jg.variant[e], Jg.color[t], n),
 		...i
 	});
 }
 //#endregion
 //#region src/react/components/status-label.tsx
-var Kg = {
+var Xg = {
 	success: "lime",
 	progress: "blue",
 	warning: "yellow",
 	error: "rose",
 	neutral: "neutral"
 };
-function qg({ tone: e = "neutral", ...t }) {
-	return /* @__PURE__ */ (0, z.jsx)(Gg, {
+function Zg({ tone: e = "neutral", ...t }) {
+	return /* @__PURE__ */ (0, z.jsx)(Yg, {
 		"data-status-tone": e,
 		variant: "caption",
-		color: Kg[e],
+		color: Xg[e],
 		...t
 	});
 }
 //#endregion
 //#region src/react/settings/remote-reporting-settings.tsx
-function Jg({ value: e, onChange: t, busy: n = !1 }) {
+function Qg({ value: e, onChange: t, busy: n = !1 }) {
 	return /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [/* @__PURE__ */ (0, z.jsx)(Mm, { children: /* @__PURE__ */ (0, z.jsx)(km, {
 		label: "发送版本统计与错误诊断（推荐）",
 		description: "上传版本、系统信息、故障类型、代码位置与发生次数。",
@@ -21233,18 +21262,18 @@ function Jg({ value: e, onChange: t, busy: n = !1 }) {
 		divided: !0,
 		children: /* @__PURE__ */ (0, z.jsx)("span", {
 			className: "self-start",
-			children: /* @__PURE__ */ (0, z.jsx)(qg, { children: "上传服务未配置" })
+			children: /* @__PURE__ */ (0, z.jsx)(Zg, { children: "上传服务未配置" })
 		})
 	})] });
 }
 //#endregion
 //#region src/react/pages/setup/setup-form.tsx
-var Yg = [
+var $g = [
 	"host",
 	"port",
 	"mdns_name"
 ];
-function Xg(e, t) {
+function e_(e, t) {
 	return Array.isArray(e) ? e.length === t ? {
 		rows: e,
 		table: ""
@@ -21256,11 +21285,11 @@ function Xg(e, t) {
 		table: e ?? ""
 	};
 }
-function Zg(e) {
+function t_(e) {
 	return e.length ? e.length === 1 ? `完成设置后扫描并补全资料：${e[0]}` : `完成设置后扫描这 ${e.length} 个文件夹并补全资料` : "完成设置后扫描并补全资料";
 }
-var Qg = (e) => Array.isArray(e) ? e.filter(Boolean).join(" ") : e ?? "";
-function $g({ setup: e, onDone: t }) {
+var n_ = (e) => Array.isArray(e) ? e.filter(Boolean).join(" ") : e ?? "";
+function r_({ setup: e, onDone: t }) {
 	let n = e.questions.find((e) => e.input === "folders"), r = e.questions.find((e) => e.input === "folder"), i = e.questions.filter((e) => e.input !== "folders"), a = i.filter((e) => e.input !== "folder"), o = e.media_sources.map(({ value: e, label: t }) => [e, t]), s = (t = "") => ({
 		path: t,
 		location: e.media_source_default,
@@ -21274,35 +21303,39 @@ function $g({ setup: e, onDone: t }) {
 		pickFolder: mm,
 		describe: hm,
 		focusAfterPick: !0
-	}), [l, u] = (0, j.useState)(() => Object.fromEntries(i.map((e) => [e.key, e.default]))), [d, f] = (0, j.useState)(!1), [p, m] = (0, j.useState)(""), [h, g] = (0, j.useState)(e.access_enabled), [_, v] = (0, j.useState)(""), [y, b] = (0, j.useState)(""), [x, S] = (0, j.useState)(e.scan_now), [C, w] = (0, j.useState)(e.history_guide), [T, E] = (0, j.useState)(e.remote_reporting), [D, O] = (0, j.useState)({}), [k, ee] = (0, j.useState)(""), [A, te] = (0, j.useState)(""), [ne, re] = (0, j.useState)(!1), [M, ie] = (0, j.useState)(!1), [ae, oe] = (0, j.useState)(0), se = (0, j.useRef)(null), ce = (0, j.useRef)(null), [le, ue] = (0, j.useState)(0);
+	}), [l, u] = (0, j.useState)(() => Object.fromEntries(i.map((e) => [e.key, e.default]))), [d, f] = (0, j.useState)(!1), [p, m] = (0, j.useState)(""), [h, g] = (0, j.useState)(e.access_enabled), [_, v] = (0, j.useState)(""), [y, b] = (0, j.useState)(""), [x, S] = (0, j.useState)(e.scan_now), [C, w] = (0, j.useState)(e.history_guide), [T, E] = (0, j.useState)(e.remote_reporting), [D, O] = (0, j.useState)(e.peach_proxy?.mode ?? "environment"), [k, ee] = (0, j.useState)(""), [A, te] = (0, j.useState)({}), [ne, re] = (0, j.useState)(""), [M, ie] = (0, j.useState)(""), [ae, oe] = (0, j.useState)(!1), [se, ce] = (0, j.useState)(!1), [le, ue] = (0, j.useState)(0), de = (0, j.useRef)(null), fe = (0, j.useRef)(null), [pe, me] = (0, j.useState)(0);
 	(0, j.useEffect)(() => {
-		le && se.current?.querySelector("input[aria-invalid=\"true\"]")?.focus();
-	}, [le]);
-	let de = (e) => e ? /* @__PURE__ */ (0, z.jsx)("span", {
+		pe && de.current?.querySelector("input[aria-invalid=\"true\"]")?.focus();
+	}, [pe]);
+	let he = (e) => e ? /* @__PURE__ */ (0, z.jsx)("span", {
 		role: "alert",
 		children: e
-	}, le) : void 0, fe = (e) => !e.visible_when || Object.entries(e.visible_when).every(([e, t]) => l[e] === t), pe = (e, t) => u((n) => ({
+	}, pe) : void 0, ge = (e) => !e.visible_when || Object.entries(e.visible_when).every(([e, t]) => l[e] === t), _e = (e, t) => u((n) => ({
 		...n,
 		[e]: t
-	})), me = async (e) => {
-		if (e.preventDefault(), ne) return;
+	})), N = async (e) => {
+		if (e.preventDefault(), ae) return;
 		let n = c.rows.findIndex((e) => !e.cost);
 		if (n >= 0) {
-			ie(!0), requestAnimationFrame(() => se.current?.querySelector(`[data-media-read-policy="${n}"] button`)?.focus());
+			ce(!0), requestAnimationFrame(() => de.current?.querySelector(`[data-media-read-policy="${n}"] button`)?.focus());
 			return;
 		}
-		re(!0), te("");
+		oe(!0), ie("");
 		let r = {
 			media_dir: c.rows,
 			access_enabled: h,
 			scan_now: x,
 			history_guide: C,
+			peach_proxy: {
+				mode: D,
+				proxy: D === "proxy" ? k : ""
+			},
 			...T ? { remote_reporting: {
 				usage: T.usage,
 				errors: T.errors
 			} } : {}
 		};
-		for (let e of i) fe(e) && (r[e.key] = l[e.key] ?? "");
+		for (let e of i) ge(e) && (r[e.key] = l[e.key] ?? "");
 		h && Object.assign(r, {
 			access_password: _,
 			access_confirm: y
@@ -21311,14 +21344,14 @@ function $g({ setup: e, onDone: t }) {
 			t(await fm(r));
 		} catch (e) {
 			if (e instanceof lm && e.status === 400 && e.errors) {
-				let t = e.errors, { rows: n, table: r } = Xg(t.media_dir, c.rows.length);
-				c.setErrors(n), ee(r), O(t), Yg.some((e) => t[e]) && oe((e) => e + 1), t.access_password && g(!0), ue((e) => e + 1);
-			} else te(hm(e));
+				let t = e.errors, { rows: n, table: r } = e_(t.media_dir, c.rows.length);
+				c.setErrors(n), re(r), te(t), $g.some((e) => t[e]) && ue((e) => e + 1), t.access_password && g(!0), me((e) => e + 1);
+			} else ie(hm(e));
 		} finally {
-			re(!1);
+			oe(!1);
 		}
-	}, he = (e) => {
-		let t = Qg(D[e.key]), n = e.help.join("");
+	}, P = (e) => {
+		let t = n_(A[e.key]), n = e.help.join("");
 		if (e.input === "choice") {
 			let r = `setup-${e.key}-label`;
 			return /* @__PURE__ */ (0, z.jsxs)("div", {
@@ -21334,7 +21367,7 @@ function $g({ setup: e, onDone: t }) {
 						orientation: "horizontal",
 						className: Og,
 						value: l[e.key] ?? e.default,
-						onChange: (t) => pe(e.key, t),
+						onChange: (t) => _e(e.key, t),
 						children: (e.options ?? []).map((e) => /* @__PURE__ */ (0, z.jsx)(_p, {
 							value: e.value,
 							className: kg,
@@ -21342,7 +21375,7 @@ function $g({ setup: e, onDone: t }) {
 						}, e.value))
 					}),
 					n ? /* @__PURE__ */ (0, z.jsx)(Pm, { children: n }) : null,
-					t ? /* @__PURE__ */ (0, z.jsx)(Fm, { children: t }, le) : null
+					t ? /* @__PURE__ */ (0, z.jsx)(Fm, { children: t }, pe) : null
 				]
 			}, e.key);
 		}
@@ -21354,7 +21387,7 @@ function $g({ setup: e, onDone: t }) {
 			autoComplete: "off",
 			spellCheck: "false",
 			value: l[e.key] ?? "",
-			onChange: (t) => pe(e.key, t),
+			onChange: (t) => _e(e.key, t),
 			leadingAddon: e.prefix ? /* @__PURE__ */ (0, z.jsx)("span", {
 				className: "shrink-0 pl-1 text-body-regular text-text-secondary",
 				children: e.prefix
@@ -21365,25 +21398,25 @@ function $g({ setup: e, onDone: t }) {
 			}) : void 0,
 			validationBehavior: "aria",
 			isInvalid: !!t,
-			hint: de(t) ?? (n || void 0)
+			hint: he(t) ?? (n || void 0)
 		}, e.key);
-	}, ge = async () => {
+	}, ve = async () => {
 		if (r && !d) {
 			f(!0), m("");
 			try {
 				let e = await mm(l[r.key] ?? "");
-				e && pe(r.key, e);
+				e && _e(r.key, e);
 			} catch (e) {
 				m(hm(e));
 			} finally {
 				f(!1);
 			}
 		}
-	}, _e = r ? Qg(D[r.key]) || p : "", N = c.rows.map((e) => e.path.trim()).filter(Boolean), P = c.rows.some((e) => Pg(e.location));
+	}, ye = r ? n_(A[r.key]) || p : "", be = c.rows.map((e) => e.path.trim()).filter(Boolean), xe = c.rows.some((e) => Pg(e.location));
 	return /* @__PURE__ */ (0, z.jsxs)("form", {
-		ref: se,
+		ref: de,
 		noValidate: !0,
-		onSubmit: (e) => void me(e),
+		onSubmit: (e) => void N(e),
 		"aria-labelledby": "auth-card-title",
 		className: "flex flex-col gap-6",
 		children: [
@@ -21399,7 +21432,7 @@ function $g({ setup: e, onDone: t }) {
 							children: "*"
 						})]
 					}),
-					k ? /* @__PURE__ */ (0, z.jsx)(Fm, { children: k }, le) : null,
+					ne ? /* @__PURE__ */ (0, z.jsx)(Fm, { children: ne }, pe) : null,
 					/* @__PURE__ */ (0, z.jsx)("div", {
 						role: "group",
 						"aria-labelledby": "setup-media-title",
@@ -21408,12 +21441,12 @@ function $g({ setup: e, onDone: t }) {
 							label: `${n.label} ${t + 1}`,
 							path: e.path,
 							onPath: (e) => c.edit(t, { path: e }),
-							error: de(c.errors[t]),
+							error: he(c.errors[t]),
 							inputRef: c.inputRef(t),
 							picking: c.picking === t,
 							onPick: () => void c.pick(t),
 							onRemove: c.rows.length > 1 ? () => {
-								c.remove(t), ce.current?.focus();
+								c.remove(t), fe.current?.focus();
 							} : void 0,
 							children: [/* @__PURE__ */ (0, z.jsxs)(Ig, { children: [/* @__PURE__ */ (0, z.jsx)(Vg, {
 								index: t,
@@ -21426,7 +21459,7 @@ function $g({ setup: e, onDone: t }) {
 							}), /* @__PURE__ */ (0, z.jsx)(Lg, {
 								index: t,
 								cost: e.cost ?? "",
-								error: M && !e.cost ? "请选择媒体读取策略" : void 0,
+								error: se && !e.cost ? "请选择媒体读取策略" : void 0,
 								onChange: (e) => c.edit(t, { cost: e })
 							})] }), /* @__PURE__ */ (0, z.jsxs)(Ig, { children: [/* @__PURE__ */ (0, z.jsx)(Fg, {
 								label: "所属媒体库",
@@ -21474,14 +21507,14 @@ function $g({ setup: e, onDone: t }) {
 						}, t))
 					}),
 					/* @__PURE__ */ (0, z.jsx)(Rt, {
-						ref: ce,
+						ref: fe,
 						variant: "secondary",
 						leadingIcon: Kp,
 						className: "self-start",
 						onClick: c.add,
 						children: "添加文件夹"
 					}),
-					P ? /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [
+					xe ? /* @__PURE__ */ (0, z.jsxs)(z.Fragment, { children: [
 						/* @__PURE__ */ (0, z.jsx)(Rg, {}),
 						/* @__PURE__ */ (0, z.jsxs)(Pm, { children: [e.cloud.help, /* @__PURE__ */ (0, z.jsx)(Im, {
 							href: e.cloud.link.url,
@@ -21516,14 +21549,14 @@ function $g({ setup: e, onDone: t }) {
 							autoComplete: "off",
 							spellCheck: "false",
 							value: l[r.key] ?? "",
-							onChange: (e) => pe(r.key, e),
+							onChange: (e) => _e(r.key, e),
 							validationBehavior: "aria",
-							isInvalid: !!_e,
-							hint: de(_e)
+							isInvalid: !!ye,
+							hint: he(ye)
 						}), /* @__PURE__ */ (0, z.jsx)(Wm, {
 							icon: jg,
 							"aria-label": "选择数据目录",
-							onClick: () => void ge(),
+							onClick: () => void ve(),
 							...Ag(d)
 						})]
 					}),
@@ -21559,20 +21592,59 @@ function $g({ setup: e, onDone: t }) {
 						confirmation: y,
 						onPassword: v,
 						onConfirmation: b,
-						passwordError: de(Qg(D.access_password)),
+						passwordError: he(n_(A.access_password)),
 						passwordHint: "请输入 8–256 个字符。",
-						confirmationInvalid: !!D.access_password
+						confirmationInvalid: !!A.access_password
+					}) : null
+				]
+			}),
+			/* @__PURE__ */ (0, z.jsxs)(Vt, {
+				labelledBy: "setup-proxy-title",
+				children: [
+					/* @__PURE__ */ (0, z.jsx)(Ht, {
+						id: "setup-proxy-title",
+						children: "Peach 代理"
+					}),
+					/* @__PURE__ */ (0, z.jsx)(Pm, { children: "用于资料采集、封面和工具下载，可在配置页修改。" }),
+					/* @__PURE__ */ (0, z.jsxs)("div", {
+						className: "flex flex-col items-start gap-1.5",
+						children: [/* @__PURE__ */ (0, z.jsx)(Zp, {
+							elementType: "span",
+							id: "setup-proxy-mode-label",
+							children: "连接方式"
+						}), /* @__PURE__ */ (0, z.jsx)(Gg, {
+							mode: D,
+							onChange: O,
+							labelledBy: "setup-proxy-mode-label"
+						})]
+					}),
+					D === "proxy" ? /* @__PURE__ */ (0, z.jsx)(Kg, {
+						id: "setupProxyAddress",
+						value: k,
+						onChange: ee,
+						saved: e.peach_proxy?.proxy_saved,
+						error: he(n_(A.peach_proxy))
+					}) : A.peach_proxy ? /* @__PURE__ */ (0, z.jsx)(Fm, { children: n_(A.peach_proxy) }, pe) : null,
+					e.docker && D === "proxy" && qg(k) ? /* @__PURE__ */ (0, z.jsx)(am, {
+						tone: "warning",
+						title: "请填写容器可访问的代理地址",
+						children: "回环地址指向容器自身；宿主机代理需使用容器可访问的宿主机地址。"
+					}) : null,
+					e.peach_proxy?.needs_selection ? /* @__PURE__ */ (0, z.jsx)(am, {
+						tone: "warning",
+						title: "需要选择连接方式",
+						children: "已有来源的代理地址不同，请选择公共连接方式。"
 					}) : null
 				]
 			}),
 			/* @__PURE__ */ (0, z.jsx)(Vt, { children: /* @__PURE__ */ (0, z.jsx)(zm, {
 				summary: "高级设置",
-				defaultOpen: ae > 0,
+				defaultOpen: le > 0,
 				children: /* @__PURE__ */ (0, z.jsx)("div", {
 					className: "flex flex-col gap-4",
-					children: a.filter(fe).map(he)
+					children: a.filter(ge).map(P)
 				})
-			}, ae) }),
+			}, le) }),
 			/* @__PURE__ */ (0, z.jsxs)(Vt, {
 				labelledBy: "setup-options-title",
 				children: [
@@ -21585,7 +21657,7 @@ function $g({ setup: e, onDone: t }) {
 						children: [/* @__PURE__ */ (0, z.jsx)(Gp, {
 							isSelected: x,
 							onChange: S,
-							children: Zg(N)
+							children: t_(be)
 						}), /* @__PURE__ */ (0, z.jsx)(Pm, { children: "读取已有 NFO 和封面，采集缺失资料。符合自动规则的资料会在处理完成后保存到数据库，其余资料留待确认。" })]
 					}),
 					/* @__PURE__ */ (0, z.jsxs)("section", {
@@ -21610,10 +21682,10 @@ function $g({ setup: e, onDone: t }) {
 					})
 				]
 			}),
-			A ? /* @__PURE__ */ (0, z.jsx)(Fm, { children: A }) : null,
+			M ? /* @__PURE__ */ (0, z.jsx)(Fm, { children: M }) : null,
 			T ? /* @__PURE__ */ (0, z.jsxs)(Vt, { children: [
 				/* @__PURE__ */ (0, z.jsx)(Ht, { children: "版本统计与错误诊断" }),
-				/* @__PURE__ */ (0, z.jsx)(Jg, {
+				/* @__PURE__ */ (0, z.jsx)(Qg, {
 					value: T,
 					onChange: E
 				}),
@@ -21622,7 +21694,7 @@ function $g({ setup: e, onDone: t }) {
 			/* @__PURE__ */ (0, z.jsx)(Rt, {
 				type: "submit",
 				className: "self-start",
-				...Ag(ne),
+				...Ag(ae),
 				children: "完成设置"
 			})
 		]
@@ -21630,7 +21702,7 @@ function $g({ setup: e, onDone: t }) {
 }
 //#endregion
 //#region src/react/pages/setup/setup-restore.tsx
-function e_({ onDone: e }) {
+function i_({ onDone: e }) {
 	let [t, n] = (0, j.useState)(""), [r, i] = (0, j.useState)(""), [a, o] = (0, j.useState)(!1);
 	return /* @__PURE__ */ (0, z.jsxs)("form", {
 		className: "flex flex-col gap-4",
@@ -21671,7 +21743,7 @@ function e_({ onDone: e }) {
 }
 //#endregion
 //#region src/react/pages/setup/setup-page.tsx
-function t_() {
+function a_() {
 	let [e, t] = (0, j.useState)({ kind: "loading" }), [n, r] = (0, j.useState)(0), [i, a] = (0, j.useState)(!1);
 	return (0, j.useEffect)(() => {
 		let e = new AbortController();
@@ -21709,10 +21781,10 @@ function t_() {
 				className: "self-start",
 				onClick: () => a((e) => !e),
 				children: i ? "返回首次设置" : "使用已有数据目录"
-			}), i ? /* @__PURE__ */ (0, z.jsx)(e_, { onDone: (e) => t({
+			}), i ? /* @__PURE__ */ (0, z.jsx)(i_, { onDone: (e) => t({
 				kind: "done",
 				done: e
-			}) }) : /* @__PURE__ */ (0, z.jsx)($g, {
+			}) }) : /* @__PURE__ */ (0, z.jsx)(r_, {
 				setup: e.setup,
 				onDone: (e) => t({
 					kind: "done",
@@ -21724,14 +21796,14 @@ function t_() {
 }
 //#endregion
 //#region src/react/pages/index.tsx
-var n_ = {
-	setup: t_,
+var o_ = {
+	setup: a_,
 	login: im,
 	error: B
 };
 E();
-var r_ = document.getElementById("peach-page"), i_ = r_ ? n_[r_.dataset.page ?? ""] : void 0;
-r_ && i_ && (0, M.createRoot)(r_).render(/* @__PURE__ */ (0, z.jsx)(i_, { data: { ...r_.dataset } }));
+var s_ = document.getElementById("peach-page"), c_ = s_ ? o_[s_.dataset.page ?? ""] : void 0;
+s_ && c_ && (0, M.createRoot)(s_).render(/* @__PURE__ */ (0, z.jsx)(c_, { data: { ...s_.dataset } }));
 //#endregion
 
-//# debugId=90ced43a-14c0-49bb-b0fb-e5b699d0908a
+//# debugId=a1bc8fb0-ddd8-43ba-8967-750fd648483b

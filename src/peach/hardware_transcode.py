@@ -88,7 +88,8 @@ def frame_decode_options(ffmpeg: str, source: str) -> tuple[str, ...]:
     codec = ""
     ffprobe = Path(ffmpeg).with_name("ffprobe" + Path(ffmpeg).suffix)
     try:
-        stat = Path(source).stat()
+        from .media_io import file_stat
+        stat = file_stat(source, timeout=5)
         if ffprobe.is_file():
             codec = _frame_codec(str(ffprobe), source, stat.st_size, stat.st_mtime_ns)
     except OSError:

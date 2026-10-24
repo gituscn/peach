@@ -87,6 +87,7 @@ from .web_follow import (
     w_follow_schedule_run,
     w_follow_source,
     w_follow_status,
+    w_follow_tag,
 )
 from .web_links import w_links, w_links_check, w_links_prune
 from .web_library_processing import q_library_processing, q_library_processing_issues, w_library_processing
@@ -435,6 +436,7 @@ POST_HANDLERS = {
     "/api/follow/resolve": w_follow_resolve,
     "/api/follow/credential": w_follow_credential,
     "/api/follow/status": w_follow_status,
+    "/api/follow/tag": w_follow_tag,
     "/api/follow/media/hide": w_follow_media_hide,
     "/api/follow/image-dims": w_follow_image_dims,
     "/api/follow/save": w_follow_save,

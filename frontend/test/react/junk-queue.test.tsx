@@ -59,7 +59,9 @@ function countShape(root: Element | null | undefined): string {
   const copy = root?.cloneNode(true) as Element | undefined;
   if (!copy) return '';
   copy.querySelectorAll('.ovtrack,.ui-ov-edges').forEach((track) => track.remove());
-  copy.querySelectorAll('[data-overlay-scrollbar]').forEach((el) => el.removeAttribute('data-overlay-scrollbar'));
+  copy.querySelectorAll('[data-overlay-scrollbar]').forEach((el) => {
+    el.removeAttribute('data-overlay-scrollbar');el.removeAttribute('data-overlay-axes');
+  });
   copy.querySelectorAll('[class]').forEach((el) => el.setAttribute('class', el.className.toString().trim().split(/\s+/).join(' ')));
   return copy.outerHTML;
 }

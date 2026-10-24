@@ -569,15 +569,15 @@ export interface FeedFollowed {
 export const followFeedByName = (name: string, ids: string[], signal?: AbortSignal) =>
   apiSend<FeedFollowed>(FEED_SOURCE_URL, { action: 'follow-name', name, ids }, 'POST', signal);
 
-/** 首屏：来源清单与凭据状态取回来才画；地址栏直接指着「订阅源」时连它一起取。
+/** 首屏：创作者来源、JAV 订阅与凭据状态取回来才画。
  *
  * 两趟后台任务不在首屏里：它们的快照常年躺着上一趟的回执，等它们只会让首屏多等一个
  * 往返，而它们自己的键挂上去就会读。中止时 `fetchQuery` 把 `AbortError` 抛回挂载方。 */
-export async function prefetchFollowManage(signal: AbortSignal, tab = ''): Promise<void> {
+export async function prefetchFollowManage(signal: AbortSignal): Promise<void> {
   await Promise.all([
     queryClient.fetchQuery({ queryKey: FOLLOW_MANAGE_KEY, queryFn: () => fetchFollow(signal) }),
     queryClient.fetchQuery({ queryKey: FOLLOW_CREDENTIALS_KEY, queryFn: () => fetchCredentials(signal) }),
-    tab === 'feeds' ? queryClient.fetchQuery({ queryKey: FEEDS_KEY, queryFn: () => fetchFeeds(signal) }) : null,
+    queryClient.fetchQuery({ queryKey: FEEDS_KEY, queryFn: () => fetchFeeds(signal) }),
   ]);
 }
 
@@ -668,7 +668,7 @@ export const checkedText = (source: FollowSource): string =>
 /** 有站点图标的来源。图标由服务端按 `follow_assets.SOURCE_ICON_URLS` 取回并存在本机，
  *  页面只认这份名单：没登记的来源直接不出 `<img>`。 */
 export const SOURCE_ICON_PROVIDERS = new Set([
-  'fanbox', 'patreon', 'subscribestar', 'kemono', 'coomer', 'pawchive',
+  'fanbox', 'patreon', 'subscribestar', 'iwara', 'kemono', 'coomer', 'pawchive',
   'rule34video', 'rule34xxx', 'rule34paheal', 'gofile', 'f95zone', 'simpcity',
 ]);
 

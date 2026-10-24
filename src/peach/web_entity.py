@@ -102,7 +102,7 @@ def _missing_entity_result(connection, kind: str, name: str, entity_id: int | No
 #: 资料页与索引页数作品的口径：视频，且没有标「已消失」（ADR-0087）。回收站里的照旧算；
 #: 代表作的取图不套这一条。
 COUNTED_VIDEO = (
-    "a.medium='video' AND COALESCE(a.disposal,'')<>'vanished' AND NOT peach_is_local_trailer(a.name)"
+    "a.medium='video' AND COALESCE(a.disposal,'')<>'vanished' AND NOT peach_is_local_extra(a.name,a.path)"
 )
 
 
@@ -666,7 +666,11 @@ def q_index(contract: WebContract, kind, q="", limit=600, offset=0, category="")
             repr(("index", kind, limit, offset, category)), read, tables=INDEX_TABLES)
     # 下面还要往每行补目录索引的标志，不能写进缓存里那一份。
     rows = [dict(row) for row in rows]
-    return _decorate_index(contract, kind, rows, has_more, category_counts)
+    result = _decorate_index(contract, kind, rows, has_more, category_counts)
+    if kind == 'tags':
+        result['total'] = (category_counts.get(category, 0) if category and category != 'all'
+                           else sum(category_counts.values()))
+    return result
 
 
 def _index_rows(contract: WebContract, kind, q, limit, offset, category):

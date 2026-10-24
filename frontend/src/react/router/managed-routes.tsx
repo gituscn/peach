@@ -224,7 +224,7 @@ export const MANAGED_ROUTES: ManagedRouteTable = {
      后台任务的快照不在首屏里：它们常年躺着上一趟的回执，等它们只会让首屏多一个往返。 */
   '/subscriptions': {
     element: <ManagedMatch path="/subscriptions" />,
-    prefetch: (open, signal) => withPage(followManagePage, prefetchFollowManage(signal, open.tab)),
+    prefetch: (_open, signal) => withPage(followManagePage, prefetchFollowManage(signal)),
     page: (open, actions) => {
       const { FollowManagePage } = followManagePage.get();
       return <FollowManagePage {...open} route={actions.routeFollowManage} savePreference={actions.saveFollowPreference}

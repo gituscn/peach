@@ -78,6 +78,26 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(registered['workload']['video_files'], 1)
         self.assertEqual(self.db.read_bytes(), before)
 
+    def test_extra_directories_have_no_discovered_or_registered_workload(self):
+        relative = ('Film/Film.mp4', 'Film/Trailers/Teaser.mp4',
+                    'Film/Extras/Disc 1/Making of.mp4', 'Film/Actor-interview2.mkv')
+        for value in relative:
+            target = self.media / value
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.touch()
+        before = self.db.read_bytes()
+        result = preview(self.config, self.db, 'all', None)
+        self.assertEqual(result['workload']['video_files'], 1)
+        self.assertEqual(self.db.read_bytes(), before)
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            for value in relative:
+                connection.execute('INSERT INTO asset(location,path,name,medium) VALUES(?,?,?,?)',
+                    ('mounted', 'A:/Cloud/' + value, Path(value).name, 'video'))
+        before = self.db.read_bytes()
+        result = preview(self.config, self.db, 'all', None)
+        self.assertEqual(result['workload']['video_files'], 1)
+        self.assertEqual(self.db.read_bytes(), before)
+
     def test_each_query_advances_a_batch_and_preserves_deduplication(self):
         for number in range(1100):
             (self.media / f'ABW-001-CD{number}.mp4').touch()

@@ -1023,7 +1023,7 @@ describe('设计决定：人物与厂牌资料页', () => {
           })),
         } }));
         await page.reload({ waitUntil: 'load' });
-        await page.getByRole('tab', { name: 'JAV 订阅源', exact: true }).click();
+        await page.getByRole('tab', { name: '关注列表', exact: true }).waitFor();
         const card = page.getByRole('region', { name: 'JAV 订阅列表', exact: true });
         await card.getByText('1–20 / 25 个订阅源', { exact: true }).waitFor();
         assert.equal(await card.locator('[role="row"][data-key]').count(), 20);
@@ -1063,7 +1063,7 @@ describe('设计决定：人物与厂牌资料页', () => {
             document.documentElement.dataset.theme = value;
             document.documentElement.classList.toggle('dark', value === 'dark');
           }, theme);
-          await tabs.getByRole('tab', { name: 'JAV 订阅源', exact: true }).click();
+          await tabs.getByRole('tab', { name: '添加关注', exact: true }).click();
           await page.waitForFunction(() => {
             const host = document.querySelector('[role="tablist"][aria-label="关注管理区域"]')!;
             const selected = host.querySelector('[aria-selected=true]')!.getBoundingClientRect();
@@ -1080,7 +1080,7 @@ describe('设计决定：人物与厂牌资料页', () => {
           assert.equal(face.track, 'rgba(0, 0, 0, 0)', 'Pills 容器应透明');
           assert.notEqual(face.selected, face.track, '当前分类应有独立底色');
           assert.equal(face.shadow, 'none', 'Pills 不使用浮起滑块');
-          await tabs.getByRole('tab', { name: 'JAV 订阅源', exact: true }).focus();
+          await tabs.getByRole('tab', { name: '添加关注', exact: true }).focus();
           await page.keyboard.press('Home');
           await page.keyboard.press('Enter');
           assert.equal(await tabs.getByRole('tab', { name: '关注列表', exact: true }).getAttribute('aria-selected'), 'true');
@@ -1096,7 +1096,7 @@ describe('设计决定：人物与厂牌资料页', () => {
         }));
         await tabs.getByRole('tab', { name: '添加关注', exact: true }).click();
         await page.getByRole('textbox', { name: '来源链接、名字或 id' }).fill('主题测试来源');
-        await page.getByRole('button', { name: '查找', exact: true }).click();
+        await page.getByRole('region', { name: '添加创作者关注', exact: true }).getByRole('button', { name: '查找', exact: true }).click();
         const result = page.getByText('主题测试来源', { exact: true }).locator('..');
         await result.waitFor();
         for (const theme of ['light', 'dark']) {

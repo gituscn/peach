@@ -59,6 +59,23 @@ describe('作品详情岛', () => {
     await browser.close();
   });
 
+  for (const viewport of VIEWPORTS) it(`本地标签选择器复用覆盖式滚动条（${viewport.name}）`, async () => {
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, viewport);
+    try {
+      const { page } = opened;
+      await page.locator('#stage [data-tag-plus]').evaluate(node => node.scrollIntoView({ block:'center', behavior:'instant' }));
+      await page.locator('#stage [data-tag-plus]').click();
+      const menu = page.locator('#stage [data-tag-picker]');
+      await menu.waitFor({ state:'visible' });
+      const scrollbar = await menu.locator('[data-tag-body]').evaluate(node => ({
+        hidden:getComputedStyle(node).scrollbarWidth,
+        track:!!node.parentElement?.querySelector('.ovtrack.ov-y'),
+        positioned:getComputedStyle(node.parentElement!).position,
+      }));
+      assert.deepEqual(scrollbar, { hidden:'none', track:true, positioned:'relative' });
+    } finally { await opened.close(); }
+  });
+
   for (const count of [1, 2, 3]) {
     it(`${count} 张版本卡按内容分配空间，推荐卡与版本卡等宽对齐`, { timeout: 60_000 }, async () => {
       const opened = await openItemPage(browser, '/', DESKTOP, { ready: '#grid [data-media-card]' });

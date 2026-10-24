@@ -1,6 +1,6 @@
 /* lifecycle 域控制器：本域状态与动作，启动由 Application 的生命周期统一安装。 */
 import { initBoardControls } from './../board-controls';
-import { attachOverlayScrollbar, wireBusyActions, wireOverlayScrollbars } from '../ui-kit';
+import { attachOverlayScrollbar, observeScrollRegions, wireBusyActions } from '../ui-kit';
 import { $ } from '../core';
 import { applicationEffects } from './effects';
 import { wireImageFallbacks } from './../card-art/image-fallback';
@@ -8,21 +8,12 @@ import { catalogState } from './catalog.js';
 import { recalledHomeFeed } from './feed.js';
 import { layoutState } from './layout.js';
 import { followState } from './follow.js';
-export const lifecycleState = { overlayScan: undefined };
-
-
-
 export function installLifecycle1() {
 initBoardControls();
 wireBusyActions(document);
 attachOverlayScrollbar(document.documentElement,{variant:'page'});
 attachOverlayScrollbar($('#drawerScroll'));
-lifecycleState.overlayScan = 0;
-applicationEffects.mutation(()=>{
-  if(lifecycleState.overlayScan)return;
-  lifecycleState.overlayScan=applicationEffects.delay(()=>{lifecycleState.overlayScan=0;wireOverlayScrollbars()});
-}).observe(document.body,{childList:true,subtree:true});
-wireOverlayScrollbars();
+applicationEffects.own(observeScrollRegions());
 wireImageFallbacks(document.body);
 catalogState.homeHasFeed = recalledHomeFeed();
 catalogState.barsRequestSeq = 0;

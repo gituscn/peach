@@ -7,9 +7,22 @@ from peach.downloads import DownloadConfig, DownloadError, DownloadTask, Landing
 from peach.downloads_channels import LibraryChannels
 from peach.downloads_clouddrive import Folder
 from peach.push_discovery import CloudPrefix
+from peach.follow_secrets import CredentialError
 
 
 class LibraryChannelTests(unittest.TestCase):
+    def test_a_broken_clouddrive_credential_keeps_a_healthy_pikpak_channel(self):
+        self.credentials.load.side_effect = CredentialError("test-only-secret-detail")
+        self.credentials.describe.return_value = {"fields": ["refresh_token"]}
+        self.service.config = DownloadConfig("http://localhost:bad-port", targets={"pikpak": "/Movies"},
+                                             pikpak_root="P:\\")
+        self.service.landing.declared_roots["pikpak"] = ("P:\\",)
+        result = self.catalog()
+        self.assertEqual([row["key"] for row in result["providers"]], ["pikpak"])
+        self.assertIn("CloudDrive2 令牌无法读取", result["problems"][0])
+        self.assertNotIn("test-only-secret-detail", str(result))
+        self.factory.assert_not_called()
+
     def setUp(self):
         self.credentials = Mock()
         self.credentials.load.return_value = SimpleNamespace(values={"token": "test-only-token"})

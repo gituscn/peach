@@ -695,6 +695,9 @@ class PushDiscoveryService:
                     "local", root, declared_roots=self.declared_roots, mounts=self.mounts)
             except ValueError:
                 continue
+            from .smb_media import SmbResource
+            if isinstance(directory, SmbResource):
+                continue
             if directory.is_dir():
                 found.append(("local", root, directory))
         return found

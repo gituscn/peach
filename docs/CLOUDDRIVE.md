@@ -102,7 +102,7 @@ CloudDrive2 有三种缓存，各自单独设置，改了一个不会影响另�
 
 ## 让网盘里的新文件自动入库
 
-Peach 不实时监视网盘目录，因为每列一次目录都是一次网络请求。如果希望 `B:`（115）和 `A:`（PikPak）里新存进去的文件立刻出现在 Peach，需要让 CloudDrive2 主动通知 Peach。
+Peach 不实时监视网盘目录，因为每列一次目录都是一次网络请求。如果希望网盘里新存进去的文件立刻出现在 Peach，需要让 CloudDrive2 主动通知 Peach。目录与来源取自媒体库配置，不要求固定盘符。
 
 这个通知（webhook）是 CloudDrive2 的会员功能。不配置也不影响其他功能，新文件仍由定期的全量扫描发现。设计说明见 [ADR-0041](adr/0041-new-files-are-pushed-in-scanning-is-the-backstop.md)。
 

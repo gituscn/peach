@@ -10,22 +10,23 @@
  * 下面一道分隔线；同一库的文件夹在卡里一行一行排，行与行之间是通栏细线，「添加文件夹」在最后一行。
  * 分隔线取 button border：Peach 暗色 primary 与 separator 同为 neutral-800，用 separator 会看不见。 */
 .peach-react [data-library-head] {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto minmax(160px, 200px);
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 10px 8px;
   border-bottom: 1px solid var(--color-border-button-default);
 }
+.peach-react [data-library-head] > * { min-width: 0; max-width: 100%; }
+.peach-react [data-library-head] > :nth-child(2) { flex: 1 1 180px; width: auto; }
+.peach-react [data-library-head] > :last-child { flex: 1 1 200px; width: auto; }
+.peach-react [data-library-head] > :is(:first-child, :nth-child(3)) { flex-shrink: 0; }
 .peach-react [data-library-block] > :not([data-library-head], [data-library-folders]) { padding: 10px 8px 0; }
 .peach-react [data-library-folders] { display: flex; flex-direction: column; }
 .peach-react [data-library-folders] > * { padding: 12px 8px; }
 .peach-react [data-library-folders] > * + * { border-top: 1px solid var(--color-border-button-default); }
 .peach-react [data-library-folders] > [data-folder-row] { border-width: 0; border-radius: 0; background: none; }
 .peach-react [data-library-folders] > [data-folder-row] + * { border-top-width: 1px; }
-@media (max-width: 640px) {
-  .peach-react [data-library-head] { grid-template-columns: auto minmax(0, 1fr); }
-}
 /* 来源色的触发键：一颗当前色的球加色名；「无颜色」是一颗中性球加一道斜线。 */
 /* 和同一行的图标键、下拉框同档：36px 高、同样的边框与圆角。 */
 .peach-react [data-library-color-trigger] {

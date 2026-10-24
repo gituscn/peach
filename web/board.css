@@ -392,7 +392,6 @@ body>.board-filter-frame{margin-inline:16px}
 .igrid[data-layout="big"] .icell .nm,.igrid[data-layout="big"] .icell .n{text-align:left}
 .igrid[data-layout="big"] .icell .nm{font-size:14px}
 /* 字母表骨架里一行一枚标签是排名行那一档（36px、圆角 8）；分组卡在 frontend/src/ui-kit/skeleton.css。 */
-.alphatag{border-radius:8px}
 #grid.gridstack{border:0;background:transparent;padding:0;box-shadow:none;border-radius:0}
 #grid.gridstack>.grid{border:0;background:transparent;padding:0;box-shadow:none;border-radius:0}
 @media(max-width:760px){
@@ -960,3 +959,7 @@ body[data-surface="/trash"] .catalog-skeleton .skeletoncard>*{background:color-m
 .follow-workspace-switch button:hover{background:none;color:var(--color-text-primary)}
 .follow-workspace-switch button[aria-selected=true]{background:none;color:var(--color-text-primary);box-shadow:none}
 .geist-note-details a{color:var(--ink)}
+/* 原生隐藏输入框随复核标签定位，不占用可见控件的布局空间。 */
+.peach-react [data-review-key] label{position:relative}
+.peach-react [data-review-key] label>span:has(>input){top:0;left:0}
+.peach-react [data-review-key] label>span>input{position:absolute;top:0;left:0}

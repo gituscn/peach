@@ -249,6 +249,7 @@ describe('常驻组件', () => {
     let finish!: (value: unknown) => void;
     vi.stubGlobal('fetch', vi.fn((url: string) => url === '/api/library-processing'
       ? Promise.resolve({ ok: true, status: 200, json: async () => ({ status: 'idle' }) })
+      : url === '/api/local-players' ? Promise.resolve({ ok: true, status: 200, json: async () => ({ players: [] }) })
       : new Promise(resolve => { finish = resolve })));
     const opening = api.open(request(1));
     const dialog = q<HTMLDialogElement>('#stage')!;

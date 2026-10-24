@@ -5,6 +5,8 @@ import re
 import subprocess
 import threading
 from pathlib import Path
+from .smb_media import input_url, SmbResource
+from contextlib import nullcontext
 
 from PIL import Image, ImageOps
 
@@ -153,7 +155,7 @@ class PreviewService:
                 return destination
             with atomic_path(destination) as temporary:
                 self._run([
-                    str(ffmpeg), "-y", "-v", "error", "-i", str(source),
+                    str(ffmpeg), "-y", "-v", "error", "-i", input_url(source),
                     "-vf", f"crop=iw/3:ih/3:iw/3*{col}:ih/3*{row},scale='min(640,iw)':-2",
                     "-q:v", "4", str(temporary),
                 ])
@@ -174,7 +176,7 @@ class PreviewService:
                 for col, row in ((1, 1), (0, 0), (1, 2), (2, 0), (0, 2), (2, 2)):
                     temporary = destination.with_name(f"{destination.stem}.{col}{row}.tmp.jpg")
                     self._run([
-                        str(ffmpeg), "-y", "-v", "error", "-i", str(source),
+                        str(ffmpeg), "-y", "-v", "error", "-i", input_url(source),
                         "-vf", f"crop=iw/3:ih/3:iw/3*{col}:ih/3*{row},"
                                "scale=160:160:force_original_aspect_ratio=increase,crop=160:160",
                         "-q:v", "4", str(temporary),
@@ -392,7 +394,7 @@ class PhotoThumbnailService:
         # 并发请求同一张图时各写各的临时文件，最后谁替换都是同一张。
         with atomic_path(destination) as temporary:
             try:
-                with Image.open(source) as opened:
+                with (source.open() if isinstance(source, SmbResource) else nullcontext(source)) as readable, Image.open(readable) as opened:
                     image = ImageOps.exif_transpose(opened)
                     if image.mode not in {"RGB", "L"}:
                         image = image.convert("RGB")
@@ -493,7 +495,7 @@ class DerivedImageService:
         try:
             # 并发请求同一张图时各写各的临时文件，最后谁替换都是同一张。
             with atomic_path(destination) as temporary:
-                with Image.open(source) as opened:
+                with (source.open() if isinstance(source, SmbResource) else nullcontext(source)) as readable, Image.open(readable) as opened:
                     image = ImageOps.exif_transpose(opened)
                     if image.mode not in {"RGB", "L"}:
                         image = image.convert("RGB")

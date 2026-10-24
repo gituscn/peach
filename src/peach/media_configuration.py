@@ -62,6 +62,14 @@ def rows(config, *, windows: bool, probe: bool = False) -> list[dict[str, Any]]:
                              if media_identity.path_key(value["root"]) == media_identity.path_key(root)), None)
             root_id, value = identity
             library = libraries[value["library_id"]]
+            smb_fields = {}
+            if value.get('transport') == 'smb':
+                from .smb_media import credential_store
+                credential = credential_store(config).load('smb-' + root_id)
+                secrets = credential.values if credential else {}
+                smb_fields = dict(smb_username=secrets.get('username', ''),
+                                  smb_password_saved=bool(secrets.get('password')),
+                                  smb_encrypt=secrets.get('encrypt') == 'true')
             result.append({"location": location, "root": root, "path": mount,
                            "root_id": root_id, "library_id": value["library_id"],
                            "library": library["name"], "library_icon": library.get("icon", ""),
@@ -69,8 +77,17 @@ def rows(config, *, windows: bool, probe: bool = False) -> list[dict[str, Any]]:
                            "library_policy": library.get("policy", "") or "auto",
                            "library_stages": library.get("stages", ""),
                            "cost": cost_for(location, root, config),
-                           "online": platform.root_online(Path(mount)) if probe and mount else False})
+                           "transport": value.get('transport', 'filesystem'),
+                           "online": _online(root, mount, probe, config), **smb_fields})
     return result
+
+
+def _online(root, mount, probe, config):
+    if not probe or not mount:
+        return False
+    from .smb_media import resolve
+    resource = resolve(root, config)
+    return platform.root_online(resource if resource is not None else Path(mount))
 
 
 def _automatic_root(location: str, path: str, used: list[PureWindowsPath]) -> str:
@@ -102,15 +119,18 @@ def _prepare_source(row: dict, existing: list[dict], used: list[PureWindowsPath]
 
 def prepare_sources(raws: object, *, windows: bool, config=None) -> object:
     """为非 Windows 表单补齐内部路径，保留已配置目录和显式填写的值；不读取或改写数据库。"""
-    if windows or not isinstance(raws, list) or not 1 <= len(raws) <= 100:
+    if not isinstance(raws, list) or not 1 <= len(raws) <= 100:
         return raws
     result = [dict(row) if isinstance(row, dict) else row for row in raws]
-    existing = rows(config, windows=False) if config is not None else []
+    existing = rows(config, windows=windows) if config is not None else []
     reserved = [row["root"] for row in existing] if config is not None and (config.present or config.mounts) else []
     reserved += [str(row.get("root", "")).strip() for row in result if isinstance(row, dict)]
     used = [PureWindowsPath(root) for root in reserved if platform.is_windows_path(root)]
     for row in result:
         if not isinstance(row, dict) or str(row.get("root", "")).strip():
+            continue
+        from .smb_media import is_address
+        if windows and not is_address(row.get('path')):
             continue
         _prepare_source(row, existing, used)
     return result
@@ -119,6 +139,20 @@ def prepare_sources(raws: object, *, windows: bool, config=None) -> object:
 def _validated_paths(row: dict, *, windows: bool) -> tuple[PureWindowsPath, PurePath]:
     """取得数据库路径前缀与本机实际目录，用于检查重复和包含关系。"""
     text = str(row.get("path", "")).strip()
+    from .smb_media import is_address, canonical
+    if row.get('transport') == 'smb' and not is_address(text):
+        raise ValueError('请填写 smb://服务器/共享/目录')
+    if is_address(text):
+        text = canonical(text)
+        row['path'] = text
+        if any(not isinstance(row.get(key, ''), str) for key in ('smb_username', 'smb_password')):
+            raise ValueError('SMB 账号和密码必须是文字')
+        if any(key in row and not isinstance(row[key], bool) for key in ('smb_encrypt', 'smb_clear')):
+            raise ValueError('SMB 连接选项无效')
+        root = str(row.get('root', ''))
+        if not platform.is_windows_path(root) or '..' in PureWindowsPath(root).parts:
+            raise ValueError('SMB 目录的内部路径无效')
+        return PureWindowsPath(root), PurePosixPath(text)
     root = str(row.get("root") or text).strip() if windows else str(row.get("root", "")).strip()
     if any(ord(char) < 32 for char in text + root):
         raise ValueError("路径不能包含控制字符")
@@ -164,7 +198,9 @@ def validate(raws: object, *, windows: bool, config=None) -> tuple[dict, dict, l
                     raise ValueError("媒体目录与另一行重复或互相包含")
             seen.append((declared, path))
             locations.setdefault(location, []).append(str(declared))
-            mounts.setdefault(location, []).append(str(path) if not windows or declared != path else "")
+            from .smb_media import is_address
+            mounts.setdefault(location, []).append(row['path'] if is_address(row['path'])
+                                                    else str(path) if not windows or declared != path else "")
         except ValueError as exc:
             errors[index] = str(exc)
     return ({key: tuple(value) for key, value in locations.items()},

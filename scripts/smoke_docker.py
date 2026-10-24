@@ -84,13 +84,18 @@ def transcode_checks(name: str) -> None:
 
 
 def amane_checks(name: str) -> None:
-    """断网容器核对 amane 桥的重建前提：uv 与 Git 在 PATH，uv 不下载就找得到 3.14，venv 落在卷上。"""
-    assert docker("exec", name, "uv", "--version").startswith("uv ")
-    assert docker("exec", name, "git", "--version").startswith("git version ")
-    docker("exec", name, "uv", "python", "find", "--no-python-downloads", "3.14")
+    """断网容器直接载入随镜像分发的独立环境与全部站点类。"""
+    runtime = "/app/amane-runtime"
+    manifest = json.loads(docker("exec", name, "python", "-c",
+        f"from pathlib import Path; print(Path('{runtime}/manifest.json').read_text())"))
+    executable = runtime + "/" + manifest["executable"]
+    report = json.loads(docker("exec", name, executable, "-X", "utf8",
+                              "/app/tools/amane-bridge/bridge.py", "--self-check"))
+    assert report["ok"] and report["amane"]["version"] == manifest["version"], report
+    assert len(report["sites"]) == 20, report
     bridge = json.loads(request(name, "/api/scraping/amane-bridge"))
-    assert bridge["python"] == "/data/tools/amane-bridge/.venv/bin/python", bridge
-    assert bridge["installed"] is False and bridge["revision"], bridge
+    assert bridge["python"] == executable, bridge
+    assert bridge["installed"] is True and bridge["revision"] == manifest["revision"], bridge
 
 
 def main() -> None:
@@ -111,9 +116,10 @@ def main() -> None:
         docker("exec", name, "ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=64x64:r=1",
                "-t", "2", "-c:v", "libx264", "/data/smoke-media/fixture.mp4")
         configuration = json.loads(request(name, "/api/configuration"))
+        assert configuration['media_sources'] == [], configuration['media_sources']
         saved = json.loads(request(name, "/api/configuration", body={
             "revision": configuration["revision"], "port": configuration["port"], "scan_now": True,
-            "media_sources": [{"location": "local", "root": "R:\\media", "path": "/data/smoke-media"}],
+            "media_sources": [{"location": "local", "path": "/data/smoke-media"}],
         }))
         assert saved.get("saved"), saved
         time.sleep(2)

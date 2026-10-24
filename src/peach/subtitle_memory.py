@@ -1,4 +1,4 @@
-"""按视频保存字幕内容与选择；文件锁和原子替换复用本机状态存储。"""
+"""按视频保存播放偏好和字幕；文件锁和原子替换复用本机状态存储。"""
 from __future__ import annotations
 
 import hashlib
@@ -12,10 +12,41 @@ from .fsutil import atomic_write_bytes, atomic_write_text
 
 MAX_BYTES = 8 * 1024 * 1024
 VIDEO_KEY = re.compile(r"(?:item:[1-9][0-9]*|follow:[1-9][0-9]*:(?:main|[0-9]+))")
+COLORS = {"white", "yellow", "green", "cyan", "blue", "magenta", "red", "black"}
+CAPTION_VALUES = {
+    "font": {"sans", "mono", "serif", "mono-serif", "casual", "cursive", "small-caps"},
+    "size": {"50", "75", "100", "150", "200", "300", "400"},
+    "color": COLORS, "opacity": {"25", "50", "75", "100"},
+    "background": COLORS, "backgroundOpacity": {"0", "25", "50", "75", "100"},
+    "window": COLORS, "windowOpacity": {"0", "25", "50", "75", "100"},
+    "edge": {"none", "raised", "depressed", "outline", "shadow"},
+}
+PREFERENCES = {"rotation", "rate", "caption_style"}
+
+
+def _validate_patch(patch: dict) -> None:
+    """校验补丁字段与播放设置取值，字幕内容单独检查。"""
+    if not isinstance(patch, dict) or not patch or patch.keys() - (PREFERENCES | {"selected", "track"}):
+        raise ValueError("播放记忆字段无效")
+    if "track" in patch and "selected" not in patch:
+        raise ValueError("请选择字幕或关闭字幕")
+    if "rotation" in patch and (type(patch["rotation"]) is not int or patch["rotation"] not in (0, 90, 180, 270)):
+        raise ValueError("旋转角度无效")
+    if "rate" in patch and (type(patch["rate"]) not in (int, float) or not .25 <= patch["rate"] <= 3):
+        raise ValueError("播放速度无效")
+    if "caption_style" in patch:
+        style = patch["caption_style"]
+        if not isinstance(style, dict) or any(
+                key not in CAPTION_VALUES or not isinstance(value, str) or value not in CAPTION_VALUES[key]
+                for key, value in style.items()):
+            raise ValueError("字幕外观无效")
+    selected = patch.get("selected")
+    if selected is not None and (not isinstance(selected, str) or len(selected) > 1024):
+        raise ValueError("字幕选择无效")
 
 
 class SubtitleMemory:
-    """字幕按视频隔离，先保存内容，再提交可读取的轨道目录。"""
+    """偏好按视频隔离，字幕内容与播放设置共用一份原子提交的清单。"""
 
     def __init__(self, root: Path, video: str):
         if not VIDEO_KEY.fullmatch(video):
@@ -27,11 +58,15 @@ class SubtitleMemory:
         if not self.manifest.exists():
             return {"selected": None, "tracks": []}
         value = json.loads(self.manifest.read_text(encoding="utf-8"))
-        return {"selected": value["selected"], "tracks": value["tracks"]}
+        return {"selected": value["selected"], "tracks": value["tracks"],
+                **{key: value[key] for key in PREFERENCES if key in value}}
 
     def update(self, selected: str | None, track: dict | None = None) -> dict:
-        if selected is not None and (not isinstance(selected, str) or len(selected) > 1024):
-            raise ValueError("字幕选择无效")
+        return self.patch({"selected": selected, **({"track": track} if track is not None else {})})
+
+    def patch(self, patch: dict) -> dict:
+        _validate_patch(patch)
+        selected, track = patch.get("selected"), patch.get("track")
         if track is not None:
             if not isinstance(track, dict):
                 raise ValueError("字幕轨道无效")
@@ -53,7 +88,13 @@ class SubtitleMemory:
                 atomic_write_bytes(self.root / filename, text.encode("utf-8"))
                 value["tracks"] = [row for row in value["tracks"] if row["key"] != key]
                 value["tracks"].append({"key": key, "name": name, "file": filename})
-            value["selected"] = selected
+            if "selected" in patch:
+                value["selected"] = selected
+            for field in PREFERENCES & patch.keys():
+                if field == "caption_style":
+                    value[field] = {**value.get(field, {}), **patch[field]}
+                else:
+                    value[field] = patch[field]
             atomic_write_text(self.manifest, json.dumps(value, ensure_ascii=False))
             return value
 

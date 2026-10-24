@@ -19,6 +19,7 @@ datas = [(str(source), target) for source, target in resource_manifest['data_fil
 datas += [(str(identity), "."), (str(root / "scripts" / "standalone.txt"), ".")]
 datas += [(os.environ["PEACH_MACOS_REPORTING_CONFIG"], ".")]
 datas += [(str(root / "LICENSE"), ".")]
+datas += [(os.environ["PEACH_MACOS_AMANE_RUNTIME"], "tools/amane-runtime")]
 datas += copy_metadata("sentry-sdk")
 binaries = []
 hiddenimports = [

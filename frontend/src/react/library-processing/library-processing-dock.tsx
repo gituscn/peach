@@ -5,6 +5,7 @@ import { errorMessage } from '../../api';
 import { DISCONNECTED_TEXT, freshProcessingResult, processingActive } from './library-processing';
 import { ProcessingNoticePanel } from './library-processing-notice';
 import { useLibraryProcessingJob } from './use-library-processing';
+import { setProcessingNoticeVisible, useProcessingNoticeVisibility } from './processing-notice-visibility';
 
 const TASK_TOAST = 'peach-library-processing';
 
@@ -15,27 +16,28 @@ const TASK_TOAST = 'peach-library-processing';
  *  落在随后画出任务卡的那次更新之后，把刚出现的任务卡一起收走，状态不变就再也不出来。 */
 export function LibraryProcessingDock({ toast: receipt }: Pick<LibraryProcessingProps, 'toast'>) {
   const { job, settled } = useLibraryProcessingJob({ toast: receipt, mode: 'notice' });
-  const dismissed = useRef('');
   const shown = useRef(false);
   const state = job.data;
+  const key = state?.job_id || 'unavailable';
+  const { hidden, requested } = useProcessingNoticeVisibility(key);
   const problem = job.isError ? state ? DISCONNECTED_TEXT : errorMessage(job.error) : '';
   useEffect(() => {
     const active = processingActive(state);
-    const key = state?.job_id || 'unavailable';
     const currentFailure = state?.status === 'failed'
       && (settled?.job_id === state.job_id || freshProcessingResult(state));
-    if (!active && ((!problem && !currentFailure) || dismissed.current === key)) {
+    if (hidden || (!active && !problem && !currentFailure && !(requested && state?.status === 'failed'))) {
       if (shown.current) toast.dismiss(TASK_TOAST);
       shown.current = false;
       return;
     }
-    toast.custom(() => <div className="peach-react"><ProcessingNoticePanel state={state} problem={problem} measure /></div>, {
-      id: TASK_TOAST, toasterId: 'processing', duration: Infinity, dismissible: !active,
-      closeButton: !active, className: 'processing-task-toast',
-      onDismiss: () => { dismissed.current = key; shown.current = false },
+    toast.custom(() => <div className="peach-react"><ProcessingNoticePanel state={state} problem={problem} measure
+      onHide={() => setProcessingNoticeVisible(key, false)} /></div>, {
+      id: TASK_TOAST, toasterId: 'processing', duration: Infinity, dismissible: true,
+      closeButton: false, className: 'processing-task-toast',
+      onDismiss: () => { setProcessingNoticeVisible(key, false); shown.current = false },
     });
     shown.current = true;
-  }, [state, problem, settled]);
+  }, [state, problem, settled, key, hidden, requested]);
   useEffect(() => () => {
     if (shown.current) toast.dismiss(TASK_TOAST);
     shown.current = false;

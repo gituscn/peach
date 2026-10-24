@@ -1,4 +1,4 @@
-/* Peach 原位改字核心。以 classic script 同步注册，保存与工具条由各端适配器提供。 */
+/* Peach 原位改字核心。以 classic script 同步注册，保存由各端适配器提供。 */
 (() => {
   const SKIP = '[data-copy-editor],script,style,textarea,input,select,svg,[contenteditable]';
   const INTERACT = '[role="tab"],[role="switch"],[role="radio"],[role="radiogroup"],[role="slider"],[role="checkbox"],[role="combobox"],[data-platform-option],[aria-expanded],[aria-pressed],[aria-haspopup],summary,input,select,label,[data-copy-interact]';
@@ -77,6 +77,77 @@
       const next = lead + text + trail;
       if (node.data !== next) node.data = next;
     }
+  }
+
+  function createTools(options = {}) {
+    const css = document.createElement('style'); css.dataset.copyEditor = '';
+    css.textContent = `
+      [data-copy-highlight]{position:fixed;pointer-events:none;z-index:2147483646;outline:1.5px dashed var(--tungsten);outline-offset:3px;border-radius:var(--badge-radius);display:none}
+      [data-copy-inline]{outline:2px solid var(--tungsten);outline-offset:3px;border-radius:var(--badge-radius);background:var(--hover);user-select:text;cursor:text}
+      [data-copy-input]{position:fixed;z-index:2147483647;padding:2px 6px;border:0;border-radius:var(--badge-radius);outline:2px solid var(--tungsten);background:var(--ground);color:var(--ink)}
+      [data-copy-bar]>[role=status]{max-width:min(360px,calc(100vw - 64px));white-space:normal;overflow-wrap:anywhere}
+      [data-copy-bar][data-selection-dock]{bottom:max(16px,var(--selection-dock-space,0px))}
+      @media(max-width:600px){[data-copy-bar]>[role=status]{flex-basis:100%;text-align:center}}
+      [data-copy-choice]{position:fixed;z-index:2147483647;background:var(--ground);color:var(--ink);border:1px solid var(--border-15);border-radius:var(--control-radius);padding:8px;max-width:calc(100vw - 32px)}
+    `;
+    document.head.append(css);
+    const highlight = document.createElement('div'); highlight.dataset.copyEditor = ''; highlight.dataset.copyHighlight = '';
+    const host = document.createElement('div'); host.className = 'peach-react'; host.dataset.copyEditor = ''; host.dataset.batchScope = '';
+    for (const type of ['pointerdown', 'click']) host.addEventListener(type, event => event.stopPropagation());
+    const bar = document.createElement('div'); bar.dataset.copyEditor = ''; bar.dataset.copyBar = '';
+    bar.dataset.selectionDock = ''; bar.dataset.glassPane = ''; bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', '文案编辑');
+    const hint = document.createElement('span'); hint.id = 'peach-copy-hint'; hint.hidden = true;
+    hint.textContent = '点击文字修改，回车或点别处保存，Esc 取消；暂停编辑后可操作页面。';
+    bar.setAttribute('aria-describedby', hint.id);
+    const status = document.createElement('span'); status.setAttribute('role', 'status'); status.textContent = '编辑文案'; bar.append(status);
+    const say = text => { status.textContent = text; };
+    const button = (text, action) => {
+      const node = document.createElement('button'); node.type = 'button'; node.textContent = text;
+      node.onclick = action; bar.append(node); return node;
+    };
+    let active = true, busy = false, recovery = null, choice = null;
+    const toggle = button('暂停编辑', () => {
+      if (busy) return;
+      active = !active; options.onToggle?.(active); toggle.textContent = active ? '暂停编辑' : '继续编辑';
+    });
+    button('导出修改', () => options.onExport?.());
+    button('退出编辑', () => { if (!busy) options.onExit?.(); });
+    host.append(hint, bar);
+    const modalHost = () => [...document.querySelectorAll('dialog:modal')].at(-1) || document.body;
+    function placeTools() {
+      const parent = modalHost();
+      for (const node of [highlight, host, choice?.node]) if (node && node.parentElement !== parent) parent.append(node);
+    }
+    const observer = new MutationObserver(placeTools);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['open'] });
+    placeTools();
+    return {
+      highlight, say,
+      setBusy(value) { busy = value; if (value) bar.setAttribute('aria-busy', 'true'); else bar.removeAttribute('aria-busy'); },
+      setRecovery(text, action) {
+        recovery?.remove(); recovery = null;
+        if (action) recovery = button(text, () => {
+          recovery.remove(); recovery = null; action();
+        });
+      },
+      choose(items, rect, { label = '选项', message = '' } = {}) {
+        choice?.cancel();
+        const select = document.createElement('select'); select.dataset.copyEditor = ''; select.dataset.copyChoice = '';
+        select.setAttribute('aria-label', label); select.add(new Option(`请选择${label}`, ''));
+        items.forEach((item, index) => select.add(new Option(item.label, String(index))));
+        Object.assign(select.style, { left: Math.max(16, Math.min(rect.left, innerWidth - 300)) + 'px',
+          top: Math.max(16, Math.min(rect.bottom + 8, innerHeight - 60)) + 'px' });
+        modalHost().append(select); select.focus(); if (message) say(message);
+        return new Promise(resolve => {
+          const finish = value => { select.remove(); document.removeEventListener('keydown', cancel, true); choice = null; resolve(value); };
+          const cancel = event => { if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); finish(null); } };
+          choice = { node: select, cancel: () => finish(null) };
+          select.onchange = () => { if (select.value !== '') finish(items[Number(select.value)].value); };
+          document.addEventListener('keydown', cancel, true);
+        });
+      },
+      destroy() { observer.disconnect(); choice?.cancel(); highlight.remove(); host.remove(); css.remove(); },
+    };
   }
 
   function create(options) {
@@ -236,5 +307,5 @@
       },
     };
   }
-  globalThis.PeachCopyEditorCore = Object.freeze({ version: 1, create, readJson, resolveDraft, applyDrafts, replaceTextParts });
+  globalThis.PeachCopyEditorCore = Object.freeze({ version: 1, create, createTools, readJson, resolveDraft, applyDrafts, replaceTextParts });
 })();

@@ -27,6 +27,8 @@ export interface LibraryProcessingData {
   metadata_only?: boolean;
   /** `idle` | `running` | `pausing` | `paused` | `complete` | `failed`。 */
   status: string;
+  /** 本轮各阶段已处理完但留有问题，或执行中断。 */
+  outcome?: 'complete' | 'partial' | 'interrupted';
   speed_mode?: ProcessingSpeed;
   eta_seconds_min?: number | null;
   eta_seconds_max?: number | null;
@@ -122,6 +124,12 @@ export type ProcessingControlCommand =
 /** 暂停中的任务仍占用同一份处理范围，可继续并持续读取状态。 */
 export const processingActive = (state?: LibraryProcessingData) =>
   !!state && ['running', 'pausing', 'paused'].includes(state.status);
+
+export const processingHasPartialResult = (state?: LibraryProcessingData) =>
+  state?.status === 'failed' && state.outcome === 'partial';
+
+export const PARTIAL_RESULT_TEXT = '已入库的视频可在全部内容中浏览，未完成项可单独重试。';
+export const ALL_CONTENT_URL = '/?loc=&thumb=0';
 
 /** 时间向分钟取整；区间两端始终使用同一单位。 */
 export function remainingTime(state: LibraryProcessingData): string {

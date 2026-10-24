@@ -26,6 +26,20 @@ const report = (patch: Partial<DownloadCheckReport> = {}): DownloadCheckReport =
   quota: null, suggested_target: null, suggested_pikpak_root: '', problems: [], ...patch,
 });
 
+it('无效的已保存地址保留在表单中，修正保存后清除配置提示', async () => {
+  vi.stubGlobal('fetch', fetchMock(200, state({ problems: [] })));
+  const host = await mount(<DownloadSettings initial={state({
+    config: { ...state().config, clouddrive_address: 'http://localhost:bad-port' },
+    problems: ['CloudDrive2 地址的端口必须是整数'],
+  })} receipt={vi.fn()} />);
+  expect(field(host, 'CloudDrive2 地址')?.value).toBe('http://localhost:bad-port');
+  expect(host.textContent).toContain('云下载配置需要检查');
+  await type(field(host, 'CloudDrive2 地址'), 'http://127.0.0.1:19798');
+  await submit(section(host, '云下载')!);
+  await settle();
+  expect(host.textContent).not.toContain('云下载配置需要检查');
+});
+
 const unfilled = () => state({
   config: { clouddrive_address: 'http://127.0.0.1:19798', targets: {}, pikpak_root: '', wait_hours: 168 },
   pikpak_roots: ['A:\\'],

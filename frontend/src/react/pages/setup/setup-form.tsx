@@ -17,6 +17,7 @@ import { Switch } from '@/components/base/switch/switch';
 import { Select, SelectItem } from '@/components/base/select/select';
 
 import { randomId } from '../../../core/random-id';
+import { Note } from '../../components/note';
 import { SEGMENT, SEGMENTED_TRACK, SegmentedRadioGroup } from '../../components/segmented';
 import { busyProps } from '../../settings/busy-props';
 import {
@@ -25,6 +26,7 @@ import {
 } from '../../settings/folder-rows';
 import { libraryAutoChoice } from '../../settings/library-icon-picker';
 import { PasswordPair } from '../../settings/password-pair';
+import { isLoopbackProxy, ProxyAddressField, ProxyModeSelect } from '../../settings/peach-proxy-fields';
 import { ReportingChoices } from '../../settings/remote-reporting-settings';
 import { Disclosure, ErrorText, ExternalLink, Help, SourceMark } from '../../settings/section';
 import { CardGroup, GroupTitle } from '../auth-card';
@@ -73,6 +75,8 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
   const [scanNow, setScanNow] = useState(setup.scan_now);
   const [historyGuide, setHistoryGuide] = useState(setup.history_guide);
   const [reporting, setReporting] = useState(setup.remote_reporting);
+  const [proxyMode, setProxyMode] = useState(setup.peach_proxy?.mode ?? 'environment');
+  const [proxyAddress, setProxyAddress] = useState('');
   const [errors, setErrors] = useState<SetupErrors>({});
   const [tableError, setTableError] = useState('');
   const [failure, setFailure] = useState('');
@@ -111,6 +115,7 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
     setFailure('');
     const submission: SetupSubmission = {
       media_dir: folders.rows, access_enabled: accessOn, scan_now: scanNow, history_guide: historyGuide,
+      peach_proxy: { mode: proxyMode, proxy: proxyMode === 'proxy' ? proxyAddress : '' },
       ...(reporting ? { remote_reporting: { usage: reporting.usage, errors: reporting.errors } } : {}),
     };
     // 隐藏的题不提交，服务端按题目默认值补上。
@@ -282,6 +287,25 @@ export function SetupForm({ setup, onDone }: { setup: SetupQuestions; onDone: (d
               onPassword={setPassword} onConfirmation={setConfirmation}
               passwordError={announce(text(errors.access_password))} passwordHint="请输入 8–256 个字符。"
               confirmationInvalid={Boolean(errors.access_password)} />
+          : null}
+      </CardGroup>
+
+      <CardGroup labelledBy="setup-proxy-title">
+        <GroupTitle id="setup-proxy-title">Peach 代理</GroupTitle>
+        <Help>用于资料采集、封面和工具下载，可在配置页修改。</Help>
+        <div className="flex flex-col items-start gap-1.5">
+          <Label elementType="span" id="setup-proxy-mode-label">连接方式</Label>
+          <ProxyModeSelect mode={proxyMode} onChange={setProxyMode} labelledBy="setup-proxy-mode-label" />
+        </div>
+        {proxyMode === 'proxy'
+          ? <ProxyAddressField id="setupProxyAddress" value={proxyAddress} onChange={setProxyAddress}
+              saved={setup.peach_proxy?.proxy_saved} error={announce(text(errors.peach_proxy))} />
+          : errors.peach_proxy ? <ErrorText key={errorRound}>{text(errors.peach_proxy)}</ErrorText> : null}
+        {setup.docker && proxyMode === 'proxy' && isLoopbackProxy(proxyAddress)
+          ? <Note tone="warning" title="请填写容器可访问的代理地址">回环地址指向容器自身；宿主机代理需使用容器可访问的宿主机地址。</Note>
+          : null}
+        {setup.peach_proxy?.needs_selection
+          ? <Note tone="warning" title="需要选择连接方式">已有来源的代理地址不同，请选择公共连接方式。</Note>
           : null}
       </CardGroup>
 

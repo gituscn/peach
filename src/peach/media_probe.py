@@ -23,11 +23,11 @@ from contextvars import copy_context
 from pathlib import PureWindowsPath
 
 from .jobs import ACTIVE_ASSET_SQL
-from .media import resolve_case_insensitive
+from .media_io import resolve_case_insensitive
 from .media_sources import cost_for
 from .strm import skip_background_read
 from .processing_control import CURRENT, checkpoint
-from .catalog_rules import is_local_trailer
+from .catalog_rules import is_local_extra
 from . import junk, record_rehome
 
 #: 一次探测最多等多久。ffprobe 只读文件头，网盘上实测一两秒。
@@ -61,6 +61,8 @@ def probe_file(ffprobe: str, path: str, timeout: float = TIMEOUT_SECONDS) -> tup
     from .processing_traffic import CURRENT as TRAFFIC, media_statistics
     if skip_background_read(path):
         raise ValueError('STRM 和 ISO 不执行视频探测')
+    from .smb_media import input_url
+    path = input_url(path)
     result = subprocess.run(
         [
             ffprobe, "-v", "verbose" if TRAFFIC.get() is not None else "error", "-rw_timeout", "8000000",
@@ -101,6 +103,8 @@ def measure(ffprobe: str, asset_id: int, path: str, timeout: float = TIMEOUT_SEC
     try:
         duration, width, height, codec, fps, audio = probe_file(
             ffprobe, resolve_case_insensitive(path), timeout)
+    except InterruptedError:
+        raise
     except Exception as error:  # 超时、文件读不到、输出不是 JSON：对这一行都是「没拿到」
         if isinstance(error, subprocess.TimeoutExpired):
             from .processing_traffic import media_statistics
@@ -139,7 +143,9 @@ def probe_unmeasured(
             f"SELECT id,path FROM asset WHERE {_UNMEASURED} AND (path=? OR substr(path,1,?)=?){selected} ORDER BY id",
             parameters).fetchall()
     rows = [row for row in rows if cost_for(location, row[1], config) == 'free']
-    return _record(db_path, ffprobe, rows, report, protected_ids=protected_ids, on_junk=on_junk)
+    roots = tuple(value for values in config.locations.values() for value in values) if config else (root,)
+    return _record(db_path, ffprobe, rows, report, protected_ids=protected_ids, on_junk=on_junk,
+                   library_roots=roots)
 
 
 def probe_path(db_path, ffprobe: str | None, location: str, path: str, *, config=None) -> int:
@@ -151,14 +157,15 @@ def probe_path(db_path, ffprobe: str | None, location: str, path: str, *, config
         rows = connection.execute(
             f"SELECT id,path FROM asset WHERE {_UNMEASURED} AND path=?",
             (location, str(PureWindowsPath(path)))).fetchall()
-    return _record(db_path, ffprobe, rows, lambda done, total: None)
+    roots = tuple(value for values in config.locations.values() for value in values) if config else ()
+    return _record(db_path, ffprobe, rows, lambda done, total: None, library_roots=roots)
 
 
 def _record(db_path, ffprobe: str, rows: Sequence, report: Callable[[int, int], None], *,
-            protected_ids=(), on_junk=lambda result: None) -> int:
+            protected_ids=(), on_junk=lambda result: None, library_roots=()) -> int:
     """探完一条写一条。`report` 抛出来（任务被停）时，还没开始的那些不再探。"""
     rows = [row for row in rows if not skip_background_read(row[1])
-            and not is_local_trailer(PureWindowsPath(row[1]).name)]
+            and not is_local_extra(PureWindowsPath(row[1]).name, row[1], library_roots=library_roots)]
     if not rows:
         return 0
     done = 0

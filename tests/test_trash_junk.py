@@ -310,17 +310,26 @@ class TrashJunkTests(unittest.TestCase):
         self.assertEqual(path.read_bytes(),b'confirmed promotion')
         self.assertFalse(quarantine.exists())
 
-    def test_a_drive_isolation_uses_a_bounded_normal_component(self):
+    def test_pikpak_isolation_uses_a_bounded_normal_component(self):
         from pathlib import PureWindowsPath
         from peach import web_batch
-        original=PureWindowsPath('a:\\作品\\'+'长'*200+'.jpg')
+        original=PureWindowsPath('p:\\作品\\'+'长'*200+'.jpg')
         with mock.patch.object(web_batch.os,'rename') as rename:
-            quarantine=web_batch._quarantine_media(original)
+            quarantine=web_batch._quarantine_media(original,location='pikpak')
         self.assertEqual(quarantine.parent,original.parent)
         self.assertLess(len(quarantine.name),80)
         self.assertFalse(quarantine.name.startswith('.'))
         self.assertEqual(quarantine.suffix,'.peach-quarantine')
         rename.assert_called_once_with(original,quarantine)
+
+    def test_local_a_drive_does_not_select_pikpak_isolation(self):
+        from pathlib import PureWindowsPath
+        from peach import web_batch
+        original = PureWindowsPath('A:\\Movies\\attachment.jpg')
+        with mock.patch.object(web_batch.os, 'rename'):
+            quarantine = web_batch._quarantine_media(original, location='local')
+        self.assertTrue(quarantine.name.startswith('.attachment.jpg.peach-purge-'))
+        self.assertEqual(quarantine.suffix, '.tmp')
 
     def test_only_exact_tool_quarantine_names_are_skipped(self):
         from peach import scan

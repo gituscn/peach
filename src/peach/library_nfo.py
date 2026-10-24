@@ -14,6 +14,10 @@ def directory_files(directory: Path) -> dict[str, Path]:
     走 `os.scandir`：Windows 的目录列表自带类型，`is_file()` 不再逐个 stat。网盘挂载上
     一次 stat 就是一趟往返，几百个文件的文件夹用 `iterdir()` 要付几百趟。
     """
+    from .smb_media import SmbResource
+    if isinstance(directory, SmbResource):
+        return {entry.name.casefold(): directory / entry.name for entry in directory.scandir()
+                if not entry.is_dir and not entry.is_symlink}
     with os.scandir(directory) as entries:
         return {entry.name.casefold(): Path(entry.path) for entry in entries if entry.is_file()}
 

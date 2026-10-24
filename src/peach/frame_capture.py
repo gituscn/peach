@@ -49,6 +49,8 @@ def capture_frame(ffmpeg: str, path: str, timestamp: float, destination: Path, *
     那个时间点，两小时的片子抽最后一帧要几分钟。
     """
     destination.unlink(missing_ok=True)
+    from .smb_media import input_url
+    path = input_url(path)
     from .processing_traffic import CURRENT as TRAFFIC, media_statistics
     command = [ffmpeg, "-y", "-v", "verbose" if TRAFFIC.get() is not None else "error", "-rw_timeout", "8000000"]
     checkpoint('frame')
@@ -87,6 +89,8 @@ def capture_with_retry(ffmpeg: str, path: str, timestamp: float, destination: Pa
                        *, width: int = 480, timeout: float = 45,
                        diagnostics: dict | None = None) -> bool:
     """抽一帧；只在错误明说色彩元数据不合法时，带 bt709 声明重试一次。"""
+    from .smb_media import input_url
+    path = input_url(path)
     from .hardware_transcode import frame_decode_options
     deadline = time.monotonic() + timeout
     hardware = frame_decode_options(ffmpeg, path)

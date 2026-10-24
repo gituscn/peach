@@ -16,6 +16,7 @@
 @import "./boardui/styles/theme.css";
 @import "./boardui/styles/typography.css";
 @import "./components/media-card.css";
+@import "./components/detail-tags.css";
 @import "./components/surface-motion.css";
 @import "./junk-queue/junk-queue.css";
 @import "./entity-hero/entity-hero.css";
@@ -71,6 +72,7 @@
 @source "../jav-skeleton.ts";
 @source "../island-skeleton.ts";
 @source "../index-skeleton.ts";
+@source "../tag-skeleton.ts";
 @source "../entity-skeleton.ts";
 @source "../filter-controls-skeleton.ts";
 .dark .peach-react [data-link-result="gone"] [data-link-code],
@@ -411,6 +413,9 @@ html:has([data-selection-dock]) { scroll-padding-bottom: var(--selection-dock-sp
 /* 玻璃筛选条整条取紧凑档：页签、药丸、排序、分段与图标键同高。实体页标题右侧那一行有默认档的
  * 过滤输入框与分段器外框，同一枚收藏键和管理标签键在那里取默认档。 */
 .peach-react [data-filter-glass] :is(button, a[aria-pressed], [data-glass-segment]) { height: var(--control-h-compact); min-height: var(--control-h-compact); }
+.peach-react [data-filter-glass] .tag-skeleton-view { padding:0;border:0;gap:2px;height:var(--control-h-compact);background:none; }
+.peach-react [data-filter-glass] .tag-skeleton-view > label { width:var(--control-h-compact);height:var(--control-h-compact);min-height:var(--control-h-compact);padding:0;border-radius:8px; }
+.peach-react [data-filter-glass] .tag-skeleton-view svg { width:16px;height:16px; }
 .peach-react button[data-filter-action] {
   display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center;
   width: var(--control-h-compact); min-width: var(--control-h-compact); height: var(--control-h-compact); min-height: var(--control-h-compact); padding: 0; border: 0;

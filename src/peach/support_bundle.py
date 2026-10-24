@@ -8,6 +8,7 @@ import os
 import re
 import zipfile
 from datetime import datetime, timezone
+from itertools import islice
 from pathlib import Path
 
 from . import error_reporting
@@ -21,6 +22,7 @@ STATE_NAMES = ('library-processing.json', 'runtime-prepare.json', 'standalone-up
 #: 发现页封面逐番号处理结果的份数上限；每份只有几十字节，排查缺封面靠它们。
 COVER_ATTEMPT_LIMIT = 500
 TAIL_BYTES = 96 * 1024
+JSON_READ_BYTES = 16 * 1024 * 1024
 ACCESS_REQUEST = re.compile(r'^(.*?"(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS) )([^"\s]+)( HTTP/\d(?:\.\d)?" \d{3}[^\r\n]*)$')
 MEDIA_ROUTE = re.compile(r'/(?:stream|follow-stream|preview-stream|stream/hls/\d+/(?:index\.m3u8|\d+\.ts))')
 
@@ -36,7 +38,7 @@ def _access_log(line: str) -> str:
     return error_reporting.redact(prefix) + route + error_reporting.redact(suffix)
 
 
-def _processing_log(text: str) -> str:
+def _processing_value(value):
     """处理证据保留资产编号和错误，媒体名称与路径留在本机。"""
     def hide_names(value):
         if isinstance(value, dict):
@@ -48,18 +50,100 @@ def _processing_log(text: str) -> str:
             return [hide_names(item) for item in value]
         return value
 
+    return error_reporting.scrub(hide_names(value))
+
+
+def _json_text(value):
+    return json.dumps(value, ensure_ascii=False) + '\n'
+
+
+def _limited_value(value, depth=0, limit=20):
+    """集合保留前 20 项、文本保留 4000 字符，嵌套最多 8 层。"""
+    if isinstance(value, (dict, list)) and depth >= 8:
+        return '<depth-limit>'
+    if isinstance(value, dict):
+        return {key: _limited_value(item, depth + 1, limit) for key, item in islice(value.items(), limit)}
+    if isinstance(value, list):
+        return [_limited_value(item, depth + 1, limit) for item in value[:limit]]
+    return value[:4000] if isinstance(value, str) else value
+
+
+def _structured_json(stream):
+    raw = stream.read(JSON_READ_BYTES + 1)
+    if len(raw) > JSON_READ_BYTES:
+        return '', {'status': 'json_size_limit', 'truncated': True}
+    if not raw.strip():
+        return '', {'status': 'empty_json', 'truncated': False}
     try:
-        values = [json.loads(text)]
-    except ValueError:
-        values = []
-        for line in text.splitlines():
-            try:
-                values.append(json.loads(line))
-            except ValueError:
-                continue
-    lines = [json.dumps(error_reporting.scrub(hide_names(value)), ensure_ascii=False)
-             for value in values if isinstance(value, (dict, list))]
-    return '\n'.join(lines) + ('\n' if lines else '')
+        value = json.loads(raw)
+        if not isinstance(value, (dict, list)):
+            return '', {'status': 'invalid_json_shape', 'truncated': False}
+        value = _processing_value(value)
+        content = _json_text(value)
+        if len(content.encode('utf-8')) <= TAIL_BYTES:
+            return content, {'status': 'included', 'truncated': False, 'projected': False}
+        if isinstance(value, dict):
+            # 任务标识、状态、阶段、计数先于续跑索引；问题与步骤先于其他集合。
+            primary = ('job_id', 'run_id', 'status', 'stage', 'requested_stage', 'checked', 'total',
+                       'issue_count', 'current_action', 'error', 'started_at', 'last_progress_at', 'completed_at')
+            fields = sorted(value, key=lambda key: (key not in primary,
+                            isinstance(value[key], (dict, list)), key not in ('steps', 'issue_preview', 'notes')))
+            projected, omitted = {}, 0
+            for key in fields:
+                for limit in (20, 10, 5, 1):
+                    candidate = {**projected, key: _limited_value(value[key], limit=limit)}
+                    if len(_json_text(candidate).encode('utf-8')) <= TAIL_BYTES:
+                        projected = candidate
+                        break
+                else:
+                    omitted += 1
+        else:
+            projected, omitted = _limited_value(value), 0
+        content = _json_text(projected)
+        if len(content.encode('utf-8')) > TAIL_BYTES or not projected:
+            return '', {'status': 'json_projection_limit', 'truncated': True}
+        details = {'status': 'included', 'truncated': True, 'projected': True, 'omitted_fields': omitted}
+        if isinstance(value, dict):
+            details['collection_counts'] = {key: len(item) for key, item in islice(value.items(), 64)
+                                            if isinstance(item, (dict, list))}
+        else:
+            details['collection_count'] = len(value)
+        return content, details
+    except (ValueError, UnicodeDecodeError):
+        return '', {'status': 'unreadable_json', 'truncated': False}
+    except RecursionError:
+        return '', {'status': 'json_depth_limit', 'truncated': False}
+
+
+def _structured_jsonl(stream, size):
+    start = max(0, size - TAIL_BYTES)
+    stream.seek(max(0, start - 1))
+    raw = stream.read(TAIL_BYTES + (1 if start else 0))
+    if start:
+        boundary, raw = raw[:1], raw[1:]
+        if boundary != b'\n':
+            raw = raw.partition(b'\n')[2]
+    lines, skipped, output_bytes = [], 0, 0
+    for line in reversed(raw.splitlines()):
+        if not line.strip():
+            continue
+        try:
+            value = json.loads(line)
+            if not isinstance(value, (dict, list)):
+                raise ValueError('invalid record shape')
+            content = _json_text(_processing_value(value))
+        except (ValueError, UnicodeDecodeError, RecursionError):
+            skipped += 1
+            continue
+        length = len(content.encode('utf-8'))
+        if output_bytes + length > TAIL_BYTES:
+            skipped += 1
+            continue
+        lines.append(content)
+        output_bytes += length
+    return ''.join(reversed(lines)), {
+        'status': 'included' if lines else 'no_complete_records' if size else 'empty_jsonl',
+        'truncated': bool(start or skipped), 'skipped_records': skipped}
 
 
 def redact_log(text: str) -> str:
@@ -102,16 +186,23 @@ def _archive_files(archive, directory, candidates, prefix, entries, *, structure
                 continue
             with path.open('rb') as stream:
                 size = stream.seek(0, os.SEEK_END)
-                stream.seek(max(0, size - TAIL_BYTES))
-                raw = stream.read(TAIL_BYTES)
-            text = raw.decode('utf-8', errors='replace')
-            if size > TAIL_BYTES:
-                text = text.partition('\n')[2]
-            content = _processing_log(text) if structured else redact_log(text)
+                if structured:
+                    stream.seek(0)
+                    content, details = (_structured_jsonl(stream, size) if path.suffix == '.jsonl'
+                                        else _structured_json(stream))
+                else:
+                    stream.seek(max(0, size - TAIL_BYTES))
+                    raw = stream.read(TAIL_BYTES)
+                    text = raw.decode('utf-8', errors='replace')
+                    if size > TAIL_BYTES:
+                        text = text.partition('\n')[2]
+                    content = redact_log(text)
+                    details = {'status': 'included', 'truncated': size > TAIL_BYTES}
             name = path.relative_to(directory).as_posix()
-            archive.writestr(f'{prefix}/{name}', content)
-            entries.append({'name': name, 'section': prefix, 'truncated': size > TAIL_BYTES,
-                            'status': 'included' if content or not raw else 'unreadable_json'})
+            if not structured or content:
+                archive.writestr(f'{prefix}/{name}', content)
+            entries.append({'name': name, 'section': prefix, 'source_bytes': size,
+                            'exported_bytes': len(content.encode('utf-8')), **details})
         except OSError as error:
             entries.append({'name': path.name, 'status': type(error).__name__})
 
