@@ -20,6 +20,7 @@ type Call = { method: string; url: string; headers: Record<string, string>; anon
 type MockRequest = Call & { onload(value: unknown): void; ontimeout(): void; onerror(): void };
 type Mock = {
   calls: Call[];
+  reports: MockRequest[];
   pending: MockRequest[];
   values: Record<string, string>;
   menu?: () => void;
@@ -47,7 +48,7 @@ async function open(browser: Browser, options: {
   }));
   await page.addInitScript(({ configured, token, base, initial, resolved }) => {
     const mock: Mock = {
-      calls: [], pending: [], automatic: true, menus: {},
+      calls: [], reports: [], pending: [], automatic: true, menus: {},
       values: configured ? { 'peach.jav.base': base, 'peach.jav.token': token } : {},
       reply(index, value, status = 200) {
         mock.pending[index]!.onload({ status, responseText: JSON.stringify(value) });
@@ -59,6 +60,7 @@ async function open(browser: Browser, options: {
       GM_setValue: (key: string, value: string) => { mock.values[key] = value; },
       GM_registerMenuCommand: (label: string, callback: () => void) => { mock.menu = callback; mock.menus[label] = callback; },
       GM_xmlhttpRequest: (request: MockRequest) => {
+        if (request.url.endsWith('/api/jav-browser/errors')) { mock.reports.push(request); return; }
         mock.calls.push({ method: request.method, url: request.url, headers: request.headers,
           anonymous: request.anonymous, ...(request.data ? { data: request.data } : {}) });
         mock.pending.push(request);
@@ -505,6 +507,7 @@ describe('JAV 用户脚本', () => {
       await ready(page, '查询 Peach 状态');
       await page.clock.fastForward(30_000);
       assert.equal(await page.evaluate(() => window.javMock.calls.length), 2);
+      assert.equal(await page.evaluate(() => window.javMock.reports.length), 1);
       await button(page).click();
       await pending(page, 3);
       await page.evaluate(() => window.javMock.pending[2]!.onerror());

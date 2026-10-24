@@ -1,4 +1,6 @@
 """JAV 用户脚本的专用权限端点与本机配对设置。"""
+import json
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
@@ -52,6 +54,19 @@ def add(body: dict = Body(...), service=Depends(browser_client)):
         raise HTTPException(400, str(error)) from None
 
 
+async def errors(request: Request, service=Depends(browser_client)):
+    body = bytearray()
+    async for part in request.stream():
+        body.extend(part)
+        if len(body) > 16 * 1024:
+            raise HTTPException(413, "错误记录过长")
+    try:
+        data = json.loads(body)
+    except (ValueError, UnicodeError):
+        raise HTTPException(400, "错误记录格式无效") from None
+    return JSONResponse(service.diagnostics.record(data), headers={"Cache-Control": "no-store"})
+
+
 def settings(request: Request):
     return JSONResponse(request.app.state.jav_browser.settings(), headers={"Cache-Control": "no-store"})
 
@@ -71,6 +86,7 @@ def create_router(local_only) -> APIRouter:
     router.add_api_route("/api/jav-browser", status, methods=["GET"])
     router.add_api_route("/api/jav-browser/identify", identify, methods=["GET"])
     router.add_api_route("/api/jav-browser", add, methods=["POST"])
+    router.add_api_route("/api/jav-browser/errors", errors, methods=["POST"])
     permissions = [Depends(require_auth), Depends(local_only)]
     router.add_api_route("/api/configuration/jav-browser", settings, methods=["GET"], dependencies=permissions)
     router.add_api_route("/api/configuration/jav-browser", configure, methods=["POST"], dependencies=permissions)

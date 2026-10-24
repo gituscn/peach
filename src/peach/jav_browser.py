@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import logging
+import math
 import re
 import secrets
 import threading
@@ -14,7 +15,10 @@ from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from .catalog_rules import is_jav_code, normalise_code_key, release_code_from_product, same_release_code
 from .config import PROJECT_ROOT
-from .downloads import INGESTED, RESUBMITTABLE_STATES, submit_offline_download, parse_magnet
+from .downloads import (
+    CLOUDDRIVE_CREDENTIAL, INGESTED, POSTPROCESS_LABELS, REMOTE_RUNNING, RESUBMITTABLE_STATES,
+    STATE_LABELS, submit_offline_download, parse_magnet,
+)
 from .follow_secrets import CredentialError
 from .feeds import scan_code
 from .fsutil import atomic_write_text
@@ -106,6 +110,21 @@ def identify_source(value: object, hint: str = "") -> str:
     return code
 
 
+def _download_candidate(items, code):
+    for item in items:
+        name = str(item.get("name") or "")
+        matches = (same_release_code(scan_code(name), code)
+                   or same_release_code(scan_code(name, product=True), code))
+        if not matches or re.search(r"(?i)\b(?:sample|trailer|preview)\b|予告|预告|預告", name):
+            continue
+        try:
+            parse_magnet(str(item.get("uri") or ""))
+        except ValueError:
+            continue
+        return item
+    return None
+
+
 class JavBrowser:
     """本机持久队列；搜索完成前退出时，下一次启动继续处理。"""
 
@@ -119,6 +138,9 @@ class JavBrowser:
         self._wake = threading.Event()
         self._stop = threading.Event()
         self._thread = None
+        self._submitting = set()
+        from .jav_browser_diagnostics import BrowserDiagnostics
+        self.diagnostics = BrowserDiagnostics()
         self.rows = self._load()
 
     def _load(self) -> dict:
@@ -163,20 +185,22 @@ class JavBrowser:
             raise ValueError("请选择启用、更新令牌或关闭")
         if not self.downloads.available:
             raise ValueError("浏览器添加只在允许修改数据库的设备上可用")
+        provider = str(body.get("provider") or "")
+        if action != "disable":
+            self._ready(provider)
+        token = None
         with self._lock:
             if action == "disable":
                 self.credentials.clear(CREDENTIAL)
-                for row in self.rows.values():
-                    if row["state"] in ACTIVE:
+                for code, row in self.rows.items():
+                    if row["state"] in ACTIVE and code not in self._submitting:
                         row.update(state="failed", message="浏览器添加已关闭")
                 self._save()
-                return self.settings()
-            provider = str(body.get("provider") or "")
-            self._ready(provider)
-            token = secrets.token_urlsafe(32)
-            self.credentials.save(CREDENTIAL, {
-                "token_hash": hashlib.sha256(token.encode()).hexdigest(), "provider": provider})
-            return {**self.settings(), "token": token}
+            else:
+                token = secrets.token_urlsafe(32)
+                self.credentials.save(CREDENTIAL, {
+                    "token_hash": hashlib.sha256(token.encode()).hexdigest(), "provider": provider})
+        return {**self.settings(), **({"token": token} if token else {})}
 
     def authorized(self, supplied: str) -> bool:
         try:
@@ -186,10 +210,17 @@ class JavBrowser:
         return bool(expected and supplied and len(supplied) <= 256 and hmac.compare_digest(
             expected, hashlib.sha256(supplied.encode()).hexdigest()))
 
-    def _ready(self, provider: str):
+    def _ready(self, provider: str, *, remote=True):
         if not self.downloads.available:
             raise ValueError("浏览器添加只在允许修改数据库的设备上可用")
-        state = next((row for row in self.downloads.channel_snapshot()["providers"] if row["key"] == provider), None)
+        if remote:
+            state = next((row for row in self.downloads.channel_snapshot()["providers"] if row["key"] == provider), None)
+        elif provider in {"115", "pikpak"}:
+            state = self.downloads._provider_state(provider)
+        else:
+            state = {"target": provider.startswith("clouddrive:"), "configured": bool(
+                self.downloads.config.clouddrive_address and "token" in
+                self.credentials.describe(CLOUDDRIVE_CREDENTIAL)["fields"])}
         if not state or not state["configured"] or not state["target"]:
             raise ValueError("请先在下载渠道配置网盘账号和目标目录")
 
@@ -212,17 +243,28 @@ class JavBrowser:
         code = code_key(value)
         with self._lock:
             row = dict(self.rows.get(code, {}))
+            if not row.get("task_id") and code not in self._submitting:
+                row.update(self._existing(code) or {})
             task = self.downloads.store.get(row["task_id"]) if row.get("task_id") else None
+            detail = {}
             if task is not None:
                 state = "ingested" if task.state == INGESTED else (
                     "failed" if task.state in RESUBMITTABLE_STATES or task.blocked_at else "submitted")
                 row.update(state=state, message=task.failure_detail or MESSAGES[state])
                 if task.asset_id:
                     row["asset_id"] = task.asset_id
-            else:
-                row.update(self._existing(code) or {})
+                progress = task.progress
+                detail["download"] = {"state": task.state, "label": STATE_LABELS.get(task.state, ""),
+                    "phase": "organize" if task.state == INGESTED else "ingest" if task.remote_done_at
+                        or task.state in {"remote_done", "landed"} else "download",
+                    "progress": min(1.0, max(0.0, progress)) if task.state in {REMOTE_RUNNING, "remote_done", "landed", INGESTED}
+                        and type(progress) in (int, float) and math.isfinite(progress) else None,
+                    "postprocess_state": task.postprocess_state,
+                    "postprocess_label": POSTPROCESS_LABELS.get(task.postprocess_state, ""),
+                    "updated_at": task.updated_at}
             state = row.get("state", "idle")
-            return {"ok": True, "code": code, **row, "state": state,
+            return {"ok": True, "code": code, **row, **detail, "state": state,
+                    "stage": "submitting" if code in self._submitting else state,
                     "message": row.get("message") or MESSAGES[state]}
 
     def add(self, body: dict) -> dict:
@@ -234,7 +276,7 @@ class JavBrowser:
             status = self.status(code)
             if status["state"] in ACTIVE | {"owned", "submitted", "ingested"}:
                 return status
-            self._ready(config.get("provider", ""))
+            self._ready(config.get("provider", ""), remote=False)
             if code not in self.rows and len(self.rows) >= 200:
                 completed = next((key for key, row in self.rows.items() if row["state"] not in ACTIVE), None)
                 if completed is None:
@@ -264,20 +306,8 @@ class JavBrowser:
         try:
             self._ready(provider)
             result = self.search(self.contract, {"code": code, "goal": "quality"})
-            candidate = None
-            for item in result.get("items", ()):
-                name = str(item.get("name") or "")
-                matches = (same_release_code(scan_code(name), code)
-                           or same_release_code(scan_code(name, product=True), code))
-                if (not matches
-                        or re.search(r"(?i)\b(?:sample|trailer|preview)\b|予告|预告|預告", name)):
-                    continue
-                try:
-                    parse_magnet(str(item.get("uri") or ""))
-                except ValueError:
-                    continue
-                candidate = item
-                break
+            candidate = _download_candidate(result.get("items", ()), code)
+            should_submit = False
             with self._lock:
                 if row["state"] != "searching" or not self._config().get("token_hash"):
                     return True
@@ -290,16 +320,26 @@ class JavBrowser:
                     row.update(state="failed" if failed else "no_match", message=(
                         "资源搜索暂不可用，请在 Peach 检查来源后重试" if failed else MESSAGES["no_match"]))
                 else:
+                    self._submitting.add(code)
+                    should_submit = True
+                self._save()
+            if should_submit:
+                try:
                     submitted = submit_offline_download(
                         self.downloads, magnet=candidate["uri"], provider=provider, code=code,
                         origin="browser:" + row["source_url"], dedupe_code=True)
                     task = submitted["task"]
-                    row.update(state="failed" if submitted["outcome"] in {"failed", "refused"} else "submitted",
-                               task_id=task["id"])
-                self._save()
+                    with self._lock:
+                        row.update(state="failed" if submitted["outcome"] in {"failed", "refused"} else "submitted",
+                                   task_id=task["id"])
+                        self._save()
+                finally:
+                    with self._lock:
+                        self._submitting.discard(code)
         except Exception as error:
             LOGGER.error("JAV 浏览器添加失败：%s (%s)", code, type(error).__name__)
             with self._lock:
+                self._submitting.discard(code)
                 if row["state"] == "searching":
                     row.update(state="failed", message="搜索或云下载提交失败，请在 Peach 检查下载渠道后重试")
                     self._save()

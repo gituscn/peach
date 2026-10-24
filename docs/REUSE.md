@@ -70,6 +70,12 @@ npm 安装沿用 Node.js 24 LTS 附带的官方 [`npm ci`](https://docs.npmjs.co
 
 持久元数据候选复用 `metadata.extract_peach_fields` 的原文取值和 `metadata_auto_apply` 的统一写入入口。r18 的纯拉丁字母标题需由同一作品快照的原文侧精确印证；缺少快照或只有英文译文时不进入自动结算，人工批准入口同样拒收。来源原文中的拉丁字母片名保留，不按字符集自动翻译。无新增依赖。
 
+## 用户脚本的本机取证与进度
+
+用户脚本的请求错误复用 Tampermonkey GM 存储与 `GM_xmlhttpRequest`，服务端复用 `error_reporting.local_event` 的脱敏与 `support_bundle` 的日志导出。独立的 `userscript` stage 仅写本机；受限字段、体积、频率和去重属于 Peach 协议策略，不接入外部遥测 SDK，不增加依赖。队列锁只保护内存与本机状态，网盘提交在锁外执行，提交幂等仍由现有 DownloadService 的共享提交锁处理。
+
+脚本进度由 DownloadStore 的真实任务投影提供，复用 `STATE_LABELS` 与 `POSTPROCESS_LABELS`，不回传磁力、路径或网盘凭据。整体进度组合生产 `frontend/src/react/components/progress.tsx` 的 SVG、6px 高度、100 份比例和刻度，与 `library-processing/library-processing-notice.tsx` 的完成标记和当前阶段语义；BoardUI 明暗主题配色为同许可快照，固定来源为 Peach `44c347573e47cdd3b2294d35719f363ee5305246`。下载段仅填充实际百分比，其他段按里程碑推进；脚本保持零运行依赖，不嵌入 React。
+
 ## 浏览器错误的构建映射
 
 前端复用官方 [`@sentry/vite-plugin` 11.8.0](https://github.com/getsentry/sentry-javascript-bundler-plugins)（MIT，维护中，Node ≥23.2，与项目 Node 24 和 Vite 8 兼容）生成确定性 Debug ID 与 hidden source maps；[`@sentry/cli` 3.8.0](https://github.com/getsentry/sentry-cli)（FSL-1.1-MIT）仅用于构建期本地定位和显式上传。两者精确固定在前端开发依赖，纳入现有 Dependabot；不进入 Python 运行时或独立包依赖。

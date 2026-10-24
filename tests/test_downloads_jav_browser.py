@@ -162,6 +162,35 @@ class BrowserTests(unittest.TestCase):
         self.downloads.store.save(task)
         self.assertEqual(self.status().json()["state"], "failed")
 
+    def test_status_projects_remote_progress_and_postprocessing_without_private_task_fields(self):
+        self.add()
+        self.service.process_one()
+        task = self.downloads.store.get(self.status().json()["task_id"])
+        for state, progress, label in ((dl.REMOTE_RUNNING, .425, "网盘下载中"),
+                                       (dl.REMOTE_RUNNING, None, "网盘下载中"),
+                                       (dl.REMOTE_DONE, 1.0, "网盘下载完成"),
+                                       (dl.LANDED, 1.0, "文件已可访问"),
+                                       (dl.INGESTED, 1.0, "已入库")):
+            task.state, task.progress = state, progress
+            task.postprocess_state = dl.POSTPROCESS_RUNNING
+            self.downloads.store.save(task)
+            status = self.status().json()
+            detail = status["download"]
+            self.assertEqual((detail["state"], detail["progress"], detail["label"]), (state, progress, label))
+            self.assertEqual(detail["postprocess_label"], "整理中")
+            self.assertEqual(detail["phase"], "organize" if state == dl.INGESTED else "ingest"
+                             if state in {dl.REMOTE_DONE, dl.LANDED} else "download")
+            self.assertEqual(set(detail), {"state", "label", "phase", "progress", "postprocess_state", "postprocess_label", "updated_at"})
+        tracked = self.service.rows.copy()
+        self.service.rows.clear()
+        task.state = dl.REMOTE_RUNNING
+        self.downloads.store.save(task)
+        self.assertEqual(self.status().json()["download"]["progress"], 1.0)
+        self.service.rows.update(tracked)
+        task.state, task.remote_done_at = dl.FAILED, "2026-10-24T13:25:00+00:00"
+        self.downloads.store.save(task)
+        self.assertEqual(self.status().json()["download"]["phase"], "ingest")
+
     def test_disable_and_rotation_revoke_tokens(self):
         rotated = self.configure("rotate").json()["token"]
         self.assertEqual(self.status().status_code, 401)
@@ -200,6 +229,96 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(self.add().status_code, 400)
         self.assertEqual(self.configure("enable").status_code, 400)
         self.service.search.assert_not_called()
+
+    def test_add_queues_without_remote_channel_probe_and_worker_validates(self):
+        self.downloads.channel_catalog = Mock(side_effect=ValueError("channel unavailable"))
+        self.assertEqual(self.add().json()["state"], "queued")
+        self.downloads.channel_catalog.assert_not_called()
+        self.service.process_one()
+        self.assertEqual(self.status().json()["state"], "failed")
+        self.service.search.assert_not_called()
+        self.remote.submit.assert_not_called()
+
+    def test_slow_submission_allows_status_and_retains_inflight_task_when_disabled(self):
+        self.add()
+        started, finish, queried = threading.Event(), threading.Event(), threading.Event()
+        states = []
+        def submit(*args):
+            started.set()
+            if not finish.wait(10):
+                raise RuntimeError("submission fixture did not finish")
+            return dl.RemoteStatus(dl.RUNNING, "remote-1", "ABC-123")
+        def query():
+            states.append(self.service.status("ABC-123")["state"])
+            queried.set()
+        self.remote.submit.side_effect = submit
+        worker = threading.Thread(target=self.service.process_one)
+        reader = threading.Thread(target=query)
+        worker.start()
+        try:
+            self.assertTrue(started.wait(5))
+            reader.start()
+            self.assertTrue(queried.wait(2), "status waited for remote submission")
+            self.assertEqual(states, ["searching"])
+            self.assertEqual(self.service.status("ABC-123")["stage"], "submitting")
+            self.assertEqual(self.add().json()["state"], "searching")
+            self.assertEqual(self.configure("disable").status_code, 200)
+        finally:
+            finish.set()
+            worker.join(5)
+            if reader.ident is not None:
+                reader.join(5)
+        self.assertFalse(worker.is_alive())
+        self.assertFalse(reader.is_alive())
+        status = self.service.status("ABC-123")
+        self.assertEqual(status["state"], "submitted")
+        self.remote.submit.assert_called_once()
+        self.assertEqual(len(self.downloads.store.submissions(status["task_id"])), 1)
+
+    def report(self, events, **kwargs):
+        return self.client.post("/api/jav-browser/errors", headers=self.script_headers,
+                                json={"events": events}, **kwargs)
+
+    def diagnostic(self, **changes):
+        return {"id": "7d58618d-b9b9-430e-bc28-1e9a81aa2e11", "at": "2026-10-24T13:25:00Z",
+                "kind": "timeout", "operation": "POST", "site": "missav", "code": "ABC-123",
+                "script_version": "0.4.1", "elapsed_ms": 60000, "status": 0, **changes}
+
+    def test_script_reports_are_scoped_bounded_deduplicated_and_use_local_logs(self):
+        import io
+        import zipfile
+        from peach import error_reporting, support_bundle
+        path = "/api/jav-browser/errors"
+        self.assertEqual(self.client.post(path, json={"events": [self.diagnostic()]}).status_code, 401)
+        self.assertEqual(self.client.post(path, headers=self.script_headers, content=b"x" * 17000).status_code, 413)
+        with patch.object(error_reporting, "_log_dir", self.root / "logs"), patch("peach.remote_reporting.capture") as remote:
+            row = self.diagnostic(message="private-message", token="private-token", source_url=PAGE)
+            self.assertEqual(self.report([row]).json(), {"recorded": 1})
+            self.assertEqual(self.report([row]).json(), {"recorded": 0})
+            remote.assert_not_called()
+            log = next((self.root / "logs").glob("errors-*.log"))
+            text = log.read_text(encoding="utf-8")
+            value = json.loads(text)
+            self.assertEqual((value["stage"], value["kind"], value["code"], value["elapsed_ms"]),
+                             ("userscript", "timeout", "ABC-123", 60000))
+            for private in ("private-message", "private-token", PAGE, self.token, "cloud-secret"):
+                self.assertNotIn(private, text)
+            with zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes())) as archive:
+                content = archive.read(next(name for name in archive.namelist() if name.endswith(log.name))).decode()
+                self.assertIn('"stage": "userscript"', content)
+        for change in ({"kind": []}, {"site": "https://private.example"}, {"code": "not a code"},
+                       {"elapsed_ms": True}, {"status": 999}, {"script_version": "secret"}, {"at": "yesterday"}):
+            self.assertEqual(self.report([self.diagnostic(**change)]).status_code, 400)
+        self.assertEqual(self.report([self.diagnostic()] * 11).status_code, 400)
+        with patch.object(error_reporting, "local_event", return_value=self.root / "log") as event:
+            for number in range(20):
+                row = self.diagnostic(id=f"00000000-0000-4000-8000-{number:012d}")
+                response = self.report([row])
+                if number < 19:
+                    self.assertEqual(response.status_code, 200)
+                else:
+                    self.assertEqual(response.status_code, 429)
+            self.assertEqual(event.call_count, 19)
 
     def test_read_only_instance_cannot_accept_jobs(self):
         self.downloads.available = False
