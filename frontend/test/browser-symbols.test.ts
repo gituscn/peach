@@ -75,7 +75,8 @@ it('官方构建生成可复现 Debug ID，私有 map 可还原源码位置，�
   writeFileSync(resolve(shipped, 'peach-app.js'), first);
   writeFileSync(mapPath, JSON.stringify({ ...map, debug_id: 'invalid' }));
   expect(() => prepareBrowserUpload(env, directory, shipped)).toThrow('匹配的 source map');
-}, 30_000);
+  // 这条用例在测试里跑一整遍正式构建：拆出 chunk 后每个都要核对 Debug ID，Linux runner 上实测 45 秒。
+}, 120_000);
 
 it('上传入口在没有明确环境配置时拒绝启动 CLI', () => {
   expect(() => prepareBrowserUpload({})).toThrow('SENTRY_AUTH_TOKEN');
