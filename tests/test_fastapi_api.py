@@ -2461,6 +2461,72 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.headers["content-range"], "bytes 2-5/10")
         self.assertNotIn("img.kemono.cr", response.text)
 
+    async def test_follow_media_failures_record_source_phase_and_status(self):
+        from peach import error_reporting
+        from peach.follow_stream import FollowMediaUnavailable, ResolvedFollowMedia
+
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.executescript((ROOT / "migrations" / "0018_online_follow.sql").read_text(
+                encoding="utf-8"))
+            connection.execute(
+                "INSERT INTO follow_source(id,provider,ref,label,url,semantics,created_at,updated_at)"
+                " VALUES(3,'fanbox','creator','Creator','https://creator.fanbox.cc/','work','x','x')")
+            connection.execute(
+                "INSERT INTO follow_item(id,source_id,external_id,title,url,release_key,metadata_json,"
+                "first_seen_at,last_seen_at) VALUES(7,3,'7','Remote',"
+                "'https://creator.fanbox.cc/posts/7','remote',?,'x','x')",
+                (json.dumps({"media_items": [{"url": "https://media.gofile.io/7.mp4",
+                                             "thumb_url": "https://media.gofile.io/7.jpg",
+                                             "resource_provider": "gofile"}]}),))
+        target = ResolvedFollowMedia("https://media.gofile.io/7.mp4", allowed_hosts=("gofile.io",))
+        original = self.app.state.http_transport.client
+        fake = httpx.Client(transport=httpx.MockTransport(
+            lambda request: httpx.Response(403, request=request, content=b"private upstream error")))
+        self.app.state.http_transport.client = fake
+        try:
+            with patch.object(self.app.state.follow_media_resolver, "resolve", return_value=target), \
+                    patch("peach.follow_stream.resolves_publicly", return_value=True), \
+                    patch.object(error_reporting, "event") as emit:
+                for path, operation, status in (
+                    ("/follow-stream?id=7&media=0&t=secret", "stream", 502),
+                    ("/follow-image?id=7&media=0&t=secret", "image", 404),
+                    ("/follow-qualities?id=7&t=secret", "size", 200),
+                ):
+                    with self.subTest(operation=operation):
+                        emit.reset_mock()
+                        response = await self.client.get(path)
+                        self.assertEqual(response.status_code, status)
+                        fields = emit.call_args.kwargs
+                        self.assertEqual(fields["provider"], "fanbox")
+                        self.assertEqual(fields["resource_provider"], "gofile")
+                        self.assertEqual(fields["item_id"], 7)
+                        self.assertEqual(fields["source_id"], 3)
+                        self.assertEqual(fields["operation"], operation)
+                        self.assertEqual(fields["phase"], "upstream")
+                        self.assertEqual(fields["upstream_status"], 403)
+                        self.assertNotIn("private upstream error", response.text)
+            with patch.object(self.app.state.follow_media_resolver, "resolve",
+                              side_effect=FollowMediaUnavailable("详情未取得", status_code=429)), \
+                    patch.object(error_reporting, "event") as emit:
+                response = await self.client.get("/follow-qualities?id=7&t=secret")
+                self.assertEqual(response.json(), {"qualities": [], "size": None})
+                self.assertEqual(emit.call_args.kwargs["operation"], "qualities")
+                self.assertEqual(emit.call_args.kwargs["phase"], "resolve")
+                self.assertEqual(emit.call_args.kwargs["upstream_status"], 429)
+            with patch.object(self.app.state.follow_media_resolver, "resolve", return_value=target), \
+                    patch("peach.routes_media.open_upstream", side_effect=httpx.ConnectError("network failure")), \
+                    patch.object(error_reporting, "event") as emit, \
+                    self.assertLogs("peach.routes_media", level="ERROR") as captured:
+                response = await self.client.get("/follow-stream?id=7&media=0&t=secret")
+                self.assertEqual(response.status_code, 502)
+                self.assertEqual(emit.call_args.kwargs["phase"], "upstream")
+                self.assertIsNone(emit.call_args.kwargs["upstream_status"])
+                self.assertIn("fanbox", captured.output[0])
+                self.assertIsNotNone(captured.records[0].exc_info)
+        finally:
+            self.app.state.http_transport.client = original
+            fake.close()
+
     async def test_follow_stream_only_offers_a_download_when_asked(self):
         """下载是显式动作，不是播放的副作用。
 

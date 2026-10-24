@@ -641,16 +641,19 @@ class FollowStore:
         key = hashlib.sha256(f"{fetch.provider}\n{fetch.ref}".encode()).hexdigest()[:20]
         directory = self.sources_root / fetch.provider / key
         stamp = reference.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-        path = directory / f"{stamp}-{digest[:12]}.raw"
+        sidecar = (json.dumps({
+            "provider": fetch.provider, "ref": fetch.ref,
+            # 脱敏后的请求 URL：凭据永不进证据目录。
+            "request_url": fetch.request_url, "sha256": digest,
+            "checked_at": _now_text(reference), "candidates": len(fetch.candidates),
+        }, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        # 快照身份包含正文摘要与说明；相同正文可来自不同游标或候选筛选。
+        snapshot_digest = hashlib.sha256(sidecar).hexdigest()
+        path = directory / f"{stamp}-{snapshot_digest}.raw"
         try:
             directory.mkdir(parents=True, exist_ok=True)
             write_immutable(path, fetch.raw_body)
-            write_immutable(path.with_suffix(".json"), (json.dumps({
-                "provider": fetch.provider, "ref": fetch.ref,
-                # 脱敏后的请求 URL：凭据永不进证据目录。
-                "request_url": fetch.request_url, "sha256": digest,
-                "checked_at": _now_text(reference), "candidates": len(fetch.candidates),
-            }, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+            write_immutable(path.with_suffix(".json"), sidecar)
         except OSError as error:
             return None, f"证据未取得（{self.sources_root} 不可写：{error.strerror or error}）"
         return str(path.relative_to(self.sources_root.parent)), None

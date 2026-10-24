@@ -410,6 +410,7 @@ class ProxyUpstreamTests(unittest.TestCase):
         with self.assertRaises(FollowProxyError) as raised:
             open_upstream(self._client(handler), "GET", target, incoming={})
         self.assertIn("403", str(raised.exception))
+        self.assertEqual(raised.exception.status_code, 403)
         self.assertNotIn("shield", str(raised.exception))
 
     def test_a_redirect_loop_is_bounded(self):
