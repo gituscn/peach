@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from peach import metadata_amane
 from peach.jav_cover_fetch import NotFound, Unavailable
@@ -302,16 +302,14 @@ class PackagedRuntimeTests(unittest.TestCase):
         for kind in ('executable', 'python'):
             with self.subTest(kind=kind):
                 executable = self.write_runtime(kind=kind)
-                calls = []
-                def run(command, **kwargs):
-                    calls.append((command, kwargs))
-                    return completed(report(fc2club=FOUND))
+                run = Mock(return_value=completed(report(fc2club=FOUND)))
                 with patch.dict(os.environ, {'PYTHONPATH': 'parent-source', 'PYTHONHOME': 'parent-python',
                                              '_PYI_PARENT_PROCESS_LEVEL': '1'}):
                     bridge = metadata_amane.AmaneBridge.create(self.tools, runner=run)
                     result = bridge.query('FC2-PPV-1234567', ['fc2club'], proxy_options={'trust_env': False})
                 self.assertEqual(result['sites']['fc2club']['status'], 'found')
-                command, kwargs = calls[0]
+                run.assert_called_once()
+                command, kwargs = run.call_args.args[0], run.call_args.kwargs
                 self.assertEqual(command[0], str(executable))
                 self.assertEqual('-X' in command, kind == 'python')
                 for key in ('PYTHONPATH', 'PYTHONHOME', '_PYI_PARENT_PROCESS_LEVEL'):
