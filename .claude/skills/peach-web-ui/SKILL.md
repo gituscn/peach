@@ -5,10 +5,12 @@ description: 在新增、修改、预览或复核 Peach 页面、控件、提示
 
 # Peach Web UI 复用门槛
 
-最后复核：2026-10-23
+最后复核：2026-10-25
 证据来源：现有 UI 契约、`docs/TESTING.md`、本机重复文案与异步轮询回归记录、jakubkrehel/skills 与 emilkowalski/skills 摘录、`docs/reference-snapshots/open-claude-ui.md`、用户真实小样本预览、明确确认后测试及所有预览默认接入 `?edit` 的约定。
 
 ## 开工顺序
+
+先完整读取用户级 `peach-ui-consistency`（`~/.codex/skills/peach-ui-consistency/SKILL.md`），统一生产应用、官网与演示站的共用能力和验收。交付每个页面时，同时提供普通预览链接与启用编辑器的链接；两者指向同一代码、数据和路由，分别核对查看与编辑能力。
 
 0. 先检索项目记忆“界面预览与真实样本”，读取已有入口及覆盖清单。用户验收预览只用真实小样本及现有缓存；来源核验与交付门槛见 `docs/UI_PREVIEW.md`、`scripts/check_ui_preview.py`。来源未取得就停止交付，合成夹具仅用于隔离自动化测试。
 1. 读取相关页面、`frontend/src/ui-kit/`、`web/css/` 与 `tests/test_web_ui.py`，先找现成控件、token 和行为；按 `docs/DESIGN_GUIDELINES.md` 对应章节核对层级、容器、输入、滚动、手势与反馈，验收参数仍以本技能和现有契约为准。
