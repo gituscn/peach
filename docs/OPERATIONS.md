@@ -79,6 +79,8 @@ Windows 原生 Runner 在深目录中检出项目时，需为 Git 启用 `core.l
 
 用计划任务常驻 Windows 原生 Runner 时，任务设置的 `Priority` 取 `4`，例如 `New-ScheduledTaskSettingsSet -Priority 4`；已注册的任务可以读出对象，把 `Settings.Priority` 改成 `4`，再用 `Set-ScheduledTask -InputObject` 写回。省略时默认 `7`，`gitlab-runner` 与所有作业子进程以 BelowNormal 的 CPU 优先级、Low 的 I/O 优先级和 2 级内存优先级运行。Runner 与开发会话共用这台机器，别的会话跑全量测试时，作业里的 vitest 工作进程、首次设置后的服务就绪探测和快捷方式 COM 调用拿不到 CPU 与磁盘，因等待超时失败，全量回归也会超过作业时限。设置只对新启动的进程生效：在没有作业运行时重启该任务，再核对 `gitlab-runner` 进程的优先级类为 `Normal`。
 
+计划任务的「失败后重启」（`RestartCount`、`RestartInterval`）只在任务启动失败时生效，`gitlab-runner` 进程自己退出后不会被拉起，主线的 Windows 作业就一直排着没人接。所以任务的动作是 runner 目录里的入口脚本 `run-runner.ps1`：它按可执行文件路径查找本目录的 `gitlab-runner.exe`，已经在跑就直接退出，没在跑才拉起，这样不会让同一个 token 跑两个 runner。触发器保留「登录时」，另加一个每 5 分钟重复、不设结束时间的时间触发器，`MultipleInstances` 设为 `IgnoreNew`。runner 退出后最多 5 分钟就会被拉回来。
+
 版本标签须受保护。标签流水线重新核对提交与版本，构建固定来源的媒体工具、Windows 完整包与拆分包、macOS 双架构 DMG，并进行独立制品验收。发布全有或全无：`publish-release` 要等全部构建、冒烟与 `docker-build` 通过才上传 R2 并创建 GitLab Release，`publish-docker` 排在它成功之后才推送镜像。任何一步没过，安装包、R2、Release、Docker Hub 一个都不动；发布作业自身失败时，重试同一个作业即可，标签不动。项目流水线使用 `PEACH_DOWNLOAD_BACKEND=both`，将同一份制品分别保存到 R2 与 GitGud Generic Package Registry；不把会过期的 job artifacts 当作永久下载地址。独立部署可明确选用 `r2` 或 `gitgud` 单后端。
 
 Linux 发布任务使用官方 uv Python 3.14 容器，并在获取制品工具前核对解释器版本；源码归档使用 `tarfile` 的 `data` 过滤器解压。CI 的 `.npm/` 与 `.uv-cache/` 属于生成缓存，不计入源码工作区变化。
