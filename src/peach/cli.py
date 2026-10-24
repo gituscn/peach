@@ -707,6 +707,13 @@ def build_parser() -> argparse.ArgumentParser:
     local_image.add_argument('output', type=Path)
     local_image.set_defaults(handler=lambda args: local_image_main([str(args.source), str(args.output)]))
 
+    from .media_io import main as media_read_main, OPERATIONS
+    media_read = commands.add_parser('media-read', help='限时读取媒体目录与配套文件')
+    media_read.add_argument('operation', choices=OPERATIONS)
+    media_read.add_argument('path')
+    media_read.add_argument('value', nargs='?', default='')
+    media_read.set_defaults(handler=lambda args: media_read_main([args.operation, args.path, args.value]))
+
     init = commands.add_parser(
         "init", help="首次运行：不带参数在终端里问答；带任何参数或 --no-input 走非交互")
     init.add_argument("--no-input", action="store_true",

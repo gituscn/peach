@@ -97,6 +97,16 @@ function serve(...responses: (ActivityData | null)[]) {
 
 const page = () => <QueryClientProvider client={queryClient}><ActivityPage /></QueryClientProvider>;
 
+it('扫描各阶段已结束且留有问题时显示部分结果状态', async () => {
+  serve(payload({ finished: [run({ task_key: 'library-processing', task_label: '扫描与采集',
+    status: 'failed', finished_at: '2026-09-11T10:04:00Z',
+    result_summary: { outcome: 'partial', issue_count: 2 }, error: '2 项需要处理' })] }));
+  const host = await mount(page());
+  expect(host.textContent).toContain('部分项目需处理');
+  expect(host.textContent).toContain('2 项需要处理');
+  expect(host.textContent).not.toContain('partial');
+});
+
 it('追更检查的问题详情绑定任务快照并提供来源入口', async () => {
   serve(payload({ finished: [run({ status: 'succeeded', result_summary: { source_failed: 1,
     issues: [{ source: 7, label: '示例作者', provider: '示例站点', kind: '检查失败', error: 'HTTP 403' }] } })] }));

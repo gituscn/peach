@@ -7,7 +7,7 @@ import { LinkButton } from '@/components/base/buttons/link-button';
 import { cx } from '@/utils/cx';
 import { errorMessage } from '../../api';
 import type { LibraryProcessingProps } from '../bundle';
-import { DISCONNECTED_TEXT, processingActive, remainingTime, type LibraryProcessingData } from './library-processing';
+import { ALL_CONTENT_URL, DISCONNECTED_TEXT, PARTIAL_RESULT_TEXT, processingActive, processingHasPartialResult, remainingTime, type LibraryProcessingData } from './library-processing';
 import { ProcessingControls } from './processing-controls';
 import { useLibraryProcessingJob } from './use-library-processing';
 import { ProcessingLine } from './processing-line';
@@ -37,7 +37,8 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
   const bodyId = useId();
   const [trafficExpanded, setTrafficExpanded] = useState(false);
   const panel = useRef<HTMLElement>(null);
-  const failed = state?.status === 'failed';
+  const partial = !problem && processingHasPartialResult(state);
+  const failed = state?.status === 'failed' && !partial;
   const active = processingActive(state);
   useEffect(() => { setExpanded(expandedFor(state?.job_id)); setTrafficExpanded(false) }, [state?.job_id]);
   const toggle = () => {
@@ -61,9 +62,9 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
     observer.observe(node);
     return () => { disposed = true; observer.disconnect(); document.documentElement.style.removeProperty('--processing-toast-space') };
   }, [measure]);
-  if (!problem && !active && !failed) return null;
-  const warning = !!problem || !!state?.stalled;
-  const title = failed ? '扫描与资料采集未完成' : state?.status === 'paused' ? '扫描与采集已暂停' : '扫描与采集';
+  if (!problem && !active && !failed && !partial) return null;
+  const warning = !!problem || !!state?.stalled || partial;
+  const title = partial ? '处理已结束，部分项目需处理' : failed ? '扫描与采集已中断' : state?.status === 'paused' ? '扫描与采集已暂停' : '扫描与采集';
   return <aside ref={panel} data-processing-dock="" data-processing-tone={failed ? 'error' : warning ? 'warning' : 'neutral'}
     aria-label="扫描任务" role={failed ? 'alert' : 'status'}
     className={cx('flex min-w-0 flex-col border bg-background-primary-default p-4',
@@ -97,14 +98,16 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
           {step.status === 'complete' ? <s className="wrap-anywhere">{step.label}</s> : <span className="wrap-anywhere">{step.label}</span>}
         </li>)}
       </ol> : null}
-      <p className="text-body-2-regular wrap-anywhere">{problem || (failed ? state?.error || '请查看并处理未完成项' : <ProcessingLine state={state!} />)}</p>
+      <p className="text-body-2-regular wrap-anywhere">{problem || (failed || partial ? state?.error || '请查看并处理未完成项' : <ProcessingLine state={state!} />)}</p>
+      {partial ? <p className="text-body-2-regular wrap-anywhere">{PARTIAL_RESULT_TEXT}</p> : null}
       {active && state?.stage && !state.steps?.length ? <p className="text-caption-1-regular text-text-tertiary">当前阶段 · {state.stage}</p> : null}
       {state?.stalled && !problem ? <p className="text-caption-1-regular">当前步骤耗时较长，正在等待进展</p> : null}
     </div></div></CollapseRegion>
     <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
       <LinkButton href="/data-cleanup#libraryProcessing" variant="secondary" size="small" trailingIcon={RiArrowRightLine}>
-        {problem || failed ? '打开扫描与采集' : '任务详情'}
+        {problem || failed || partial ? '打开扫描与采集' : '任务详情'}
       </LinkButton>
+      {partial ? <LinkButton href={ALL_CONTENT_URL} size="small" trailingIcon={RiArrowRightLine}>查看全部内容</LinkButton> : null}
       {active ? <ProcessingControls state={state!} disabled={!!problem} /> : null}
     </div>
   </aside>;

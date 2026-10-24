@@ -127,7 +127,7 @@ class LocalPosterTests(unittest.TestCase):
                 issue=lambda *_args, **_kwargs: self.fail('图片应可读取'))
         self.assertEqual((state['covers'], failed), (1, set()))
 
-    def test_mixed_sources_isolate_only_the_cloud_picture(self):
+    def test_mixed_sources_isolate_every_picture(self):
         from peach.library_processing import _read_local_posters
         jobs = [(dict(id=index, name=f'{index}.mp4', location=location), self.source, str(index),
                  self.root / 'covers' / f'{index}.jpg') for index, location in enumerate(('local', 'pikpak'))]
@@ -136,4 +136,4 @@ class LocalPosterTests(unittest.TestCase):
             failed = _read_local_posters(jobs, state, update=lambda **_: None,
                 issue=lambda *_args, **_kwargs: self.fail('图片应可读取'))
         self.assertEqual((state['covers'], failed), (2, set()))
-        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_count, 2)

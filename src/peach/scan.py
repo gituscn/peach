@@ -372,7 +372,7 @@ class ScanResult:
                 f"垃圾移入回收站 {self.junk_isolated:,} 个，待复核 {self.junk_review:,} 个")
 
 
-def _walk(top: Path, pending: list[str] | None = None, *, onerror=lambda error: None):
+def _walk(top: Path, pending: list[str] | None = None, *, onerror=lambda error: None, read_directory=None):
     """自顶向下遍历，每个目录给出它里面的非目录条目（`os.DirEntry`）。
 
     与 `os.walk` 的差别只在一处：条目的大小与时间从 `DirEntry.stat()` 拿。Windows 的目录
@@ -384,8 +384,11 @@ def _walk(top: Path, pending: list[str] | None = None, *, onerror=lambda error: 
         checkpoint('scan')
         directory = stack.pop()
         try:
-            with os.scandir(directory) as scanner:
-                entries = list(scanner)
+            if read_directory is not None:
+                entries = read_directory(directory)
+            else:
+                with os.scandir(directory) as scanner:
+                    entries = list(scanner)
         except OSError as error:
             onerror(error)
             continue
@@ -458,6 +461,7 @@ def _scan_location(
     progress: Callable[[int, int], None] = lambda files, total_bytes: None,
     resume_state: dict | None = None,
     save_checkpoint: Callable[[dict], None] = lambda state: None,
+    read_directory=None, onerror=lambda error: None,
 ) -> ScanResult:
     """遍历 `root`（数据库中的路径格式）对应的本机目录，把文件元数据 upsert 进 `asset`。
 
@@ -500,7 +504,7 @@ def _scan_location(
     try:
         connection.execute("PRAGMA journal_mode=WAL")
         registered = _registered_paths(connection, location, root)
-        for directory, entries in _walk(walk_root, pending):
+        for directory, entries in _walk(walk_root, pending, read_directory=read_directory, onerror=onerror):
             checkpoint('scan')
             relative = Path(directory).relative_to(walk_root).parts
             continuing = directory == previous.get('current_directory')
@@ -522,7 +526,8 @@ def _scan_location(
                     continue
                 try:
                     stat = entry.stat()
-                except OSError:
+                except OSError as error:
+                    onerror(error)
                     continue
                 ledger_path = str(ledger_root.joinpath(*relative, name))
                 mtime = time.strftime("%Y-%m-%d", time.localtime(stat.st_mtime))

@@ -898,6 +898,12 @@ Python 源文件纳入 `src/peach/library_sharing.py` 与 `src/peach/library_pro
 
 普通 Toast 与扫描任务卡共用 Agent Progress 外框，16px 半径由通知栈内的既有 token 解析，细边框与接触阴影分别复用 `border-button-default`、`elevation-xs`，不改变内容排版。浏览器回归核对桌面、手机和明暗主题下的外框一致性，并以同一任务、同一内容回放外框基线生成对比图。
 
+## 媒体读取与单项超时
+
+`media_io` 复用 `local_poster` 的短生命周期子进程方式，以及标准库 [`subprocess.run(timeout=…)`](https://docs.python.org/3.14/library/subprocess.html#subprocess.run)。目录枚举、NFO、图片引用、路径解析和文件属性在只读子进程中取得；超时后先终止并回收进程，再处理下一项。NFO 解析和图片引用边界仍由 `library_nfo` 维护，扫描继续使用 `scan_location` 的批量登记与检查点。任务层缓存本趟失败的目录，避免逐部影片重复等候同一故障。
+
+预览生成复用 `frame_capture` 与 `processing_control.deadline_after`，同一影片的抽帧和拼图共享截止时间；用户暂停不占活动预算。公共状态、证据和产物保存失败向任务层传播，只有媒体读取或来源取证失败进入单项问题清单。测试覆盖超时进程回收、相邻目录继续、NFO 失败后保留番号、预览总时限和公共写入中断。标准库随 Python 运行时维护，PSF 许可，支持 Windows/macOS/Linux，未新增依赖。
+
 ## 媒体库与根目录身份
 
 身份生成复用 Python 3.14 标准库 [`uuid`](https://docs.python.org/3.14/library/uuid.html) 的 UUIDv4、UUIDv5（PSF 许可，随运行时维护，Windows/macOS/Linux，无新增安装体积）；路径归属复用 `platform.resolve_root`、`PureWindowsPath`，配置写入复用 `fsutil.atomic_write_text`，扫描沿用 SQLite upsert 与现有断点。当前树与 Git 中的媒体库分组、目录索引、来源探测和下载渠道共同消费这些身份。

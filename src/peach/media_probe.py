@@ -23,7 +23,7 @@ from contextvars import copy_context
 from pathlib import PureWindowsPath
 
 from .jobs import ACTIVE_ASSET_SQL
-from .media import resolve_case_insensitive
+from .media_io import resolve_case_insensitive
 from .media_sources import cost_for
 from .strm import skip_background_read
 from .processing_control import CURRENT, checkpoint
@@ -100,6 +100,8 @@ def measure(ffprobe: str, asset_id: int, path: str, timeout: float = TIMEOUT_SEC
     try:
         duration, width, height, codec, fps, audio = probe_file(
             ffprobe, resolve_case_insensitive(path), timeout)
+    except InterruptedError:
+        raise
     except Exception as error:  # 超时、文件读不到、输出不是 JSON：对这一行都是「没拿到」
         if isinstance(error, subprocess.TimeoutExpired):
             from .processing_traffic import media_statistics

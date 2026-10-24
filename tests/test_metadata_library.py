@@ -2635,6 +2635,21 @@ class LibraryWatchdogTests(unittest.TestCase):
                          {'asset_id': 1, 'title': '', 'path': '', 'message': '未识别到番号'})
         self.assertTrue(state['issues_truncated'])
 
+    def test_finished_issues_and_interruption_have_distinct_outcomes(self):
+        finished = dict(status='failed', stage='处理结束', completed_at=123,
+                        issue_count=14, retryable_asset_ids=[1, 2])
+        self.assertEqual(decorate(finished)['outcome'], 'partial')
+        self.assertNotIn('outcome', finished)
+        for state in ({**finished, 'stage': '生成预览图'},
+                      {**finished, 'outcome': 'interrupted'},
+                      {**finished, 'completed_at': None}):
+            self.assertEqual(decorate(state)['outcome'], 'interrupted')
+        from peach.web_library_processing import public_state
+        self.assertEqual(public_state(decorate(finished))['outcome'], 'partial')
+        legacy = dict(status='failed', stage='处理结束', completed_at=123,
+                      issues=[{'asset_id': 1, 'message': '视频抽帧超时'}])
+        self.assertEqual(decorate(legacy)['outcome'], 'partial')
+
     @windows_ledger_roots
     def test_deadline_skips_one_asset_and_keeps_processing(self):
         from peach.jav_cover_fetch import DeadlineExceeded
@@ -2653,6 +2668,7 @@ class LibraryWatchdogTests(unittest.TestCase):
             ids = {name: row_id for name, row_id in connection.execute('SELECT name, id FROM asset')}
         self.assertEqual(result['retryable_asset_ids'], [ids['ABW-101.mp4']])
         self.assertEqual(result['status'], 'failed')
+        self.assertEqual(result['outcome'], 'partial')
         self.assertEqual([item.args for item in provider.query.call_args_list],
                          [('ABW-101', 'r18dev'), ('ABW-102', 'r18dev'), ('ABW-102', 'dmm')])
         self.assertEqual(provider.reset.call_count, 1)
@@ -2943,7 +2959,7 @@ class LibraryPreviewCompletionTests(unittest.TestCase):
                                database=self.database, **options)
 
     @staticmethod
-    def make_tile(_ffmpeg, _pattern, _columns, _rows, destination):
+    def make_tile(_ffmpeg, _pattern, _columns, _rows, destination, **_options):
         Image.new('RGB', (1440, 810), 'green').save(destination, format='JPEG')
         return True
 

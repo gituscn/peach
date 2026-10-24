@@ -24,8 +24,8 @@ import { PathLine } from '../components/path-line';
 import { Disclosure } from '../settings/section';
 import { queryClient } from '../query';
 import {
-  DISCONNECTED_TEXT, issueDetails, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL,
-  notesLine, processingActive, remainingTime, type LibraryProcessingCommand, type LibraryProcessingData,
+  ALL_CONTENT_URL, DISCONNECTED_TEXT, issueDetails, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL, PARTIAL_RESULT_TEXT,
+  notesLine, processingActive, processingHasPartialResult, remainingTime, type LibraryProcessingCommand, type LibraryProcessingData,
 } from './library-processing';
 import { useLibraryProcessingJob } from './use-library-processing';
 import { ProcessingActions } from './processing-actions';
@@ -68,6 +68,7 @@ function Outcome(
   const retryable = state.status === 'failed' && !!state.retryable_asset_ids?.length;
   const notes = notesLine(state.notes || {});
   const failed = !!problem || state.status === 'failed';
+  const partial = !problem && processingHasPartialResult(state);
   /* 同一份日志只印一处：失败提示带着问题清单时归清单，跑完只剩「7 天内不再问」时归那条提示。 */
   const logInList = failed && !!details?.log;
   /* 清单是这一页唯一自己滚的块，原生滚动条在这儿就是一条系统灰柱子。 */
@@ -79,12 +80,14 @@ function Outcome(
         ? <Note tone="warning" title="处理较慢">{STALLED_TEXT}</Note>
         : null}
       {failed
-        ? <Note tone="error" className="gap-0 p-3"
-            action={retryable
-              ? <Button variant="secondary" size="small" aria-label="立即重试未完成项" onClick={onRetry}>立即重试</Button>
-              : null}
+        ? <Note tone={partial ? 'warning' : 'error'} className="gap-0 p-3"
+            title={partial ? '处理已结束，部分项目需处理' : '处理未完成'}
+            action={<div className="flex flex-wrap items-center gap-2">
+              {partial ? <LinkButton href={ALL_CONTENT_URL} size="small" trailingIcon={RiArrowRightLine}>查看全部内容</LinkButton> : null}
+              {retryable ? <Button variant="secondary" size="small" aria-label="立即重试未完成项" onClick={onRetry}>立即重试</Button> : null}
+            </div>}
             extra={details
-              /* 三层东西叠在同一块红底上：一句结论、一份清单、一条日志地址。各自之间
+              /* 三层东西叠在同一块提示里：一句结论、一份清单、一条日志地址。各自之间
                  横一条自己颜色的发丝线，读的人才看得出哪一段结束了——只靠间距的话，
                  几十条同样长短的明细会连成一片。 */
               ? <div className="mt-3 border-t border-current/20 pt-3">
@@ -108,8 +111,8 @@ function Outcome(
                       </ul>
                     </div>
                     {details.log
-                      /* 日志地址使用次级文字色，分隔线沿用错误提示的红色。 */
-                      ? <div className="mt-3 border-t border-border-error-default/20 pt-3 text-text-secondary">
+                      /* 日志地址与分隔线使用次级文字色。 */
+                      ? <div className="mt-3 border-t border-current/20 pt-3 text-text-secondary">
                           <PathLine path={details.log} prefix="完整记录：" className="text-caption-1-regular"
                             onRevealed={toast} />
                         </div>
@@ -118,6 +121,7 @@ function Outcome(
                 </div>
               : null}>
             {problem || state.error || '处理未完成，请重试'}
+            {partial ? `\n${PARTIAL_RESULT_TEXT}` : null}
           </Note>
         : null}
       {settled?.status === 'complete'
