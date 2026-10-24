@@ -274,7 +274,7 @@ AUTO_SCOPE_FILES: dict[str, tuple[str, ...]] = {
     "src/peach/server.py": ("packaging", "tooling"),
     "scripts/smoke_docker.py": ("packaging", "tooling"),
     # GitLab 流水线：构建、发布与 CI 验证的编排，本机测试不执行它；`test_version_bump.py`
-    # 读它判补丁版本。CI 自己每次推送都跑全量，与发布工作流同口径。
+    # 读它判补丁版本。主线 CI 改它时由 `ci_scope` 让三个平台跑全量。
     ".gitlab-ci.yml": ("packaging", "tooling"),
     # 源码分发包的文件清单，由打包测试与发布脚本使用。
     "MANIFEST.in": ("packaging", "tooling"),

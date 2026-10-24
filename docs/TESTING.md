@@ -90,7 +90,7 @@ PR 计划按改动选择前端、vendor、wheel 与浏览器任务，文档 PR �
 
 Python 分片上传完整测试输出；浏览器分片上传 TAP、服务日志及已脱敏网络日志，保留 14 天。npm 审计遇到 high 或 critical 漏洞直接失败；只有临时网络错误最多请求三次，在前两次失败后分别等待 15 与 30 秒，未知响应不当成通过。
 
-GitGud 流水线（`.gitlab-ci.yml`）的 `verify-linux`、`verify-windows`、`verify-macos` 在分支与合并请求上跑改动域加本平台的平台敏感用例：基线是最近一条成功的主线流水线里、作为本提交祖先的那个提交，由 `scripts/ci_scope.py` 判定；先用正式入口跑 `auto --base <基线>`，选域与退回全量的规则同本机 `auto`，再用 `-Focus` 跑 `PLATFORM_TESTS` 里本平台的用例。取不到基线（首次推送、强推、接口不可达）或改动落到必须全量的面时只跑一次全量。版本标签上的 `release-verify-*` 三平台各跑一次全量，构建与发布作业依赖它们。口径与平台集合的理由见 [ADR-0119](adr/0119-mainline-changed-scope-release-full-suite.md)。
+GitGud 流水线（`.gitlab-ci.yml`）的 `verify-linux`、`verify-windows`、`verify-macos` 在分支与合并请求上跑改动域加本平台的平台敏感用例：基线是最近一条成功的主线流水线里、作为本提交祖先的那个提交，由 `scripts/ci_scope.py` 判定；先用正式入口跑 `auto --base <基线>`，选域与退回全量的规则同本机 `auto`，再用 `-Focus` 跑 `PLATFORM_TESTS` 里本平台的用例。取不到基线（首次推送、强推、接口不可达）、改了 `.gitlab-ci.yml` 本身，或改动落到必须全量的面时只跑一次全量。版本标签上的 `release-verify-*` 三平台各跑一次全量，构建与发布作业依赖它们。口径与平台集合的理由见 [ADR-0119](adr/0119-mainline-changed-scope-release-full-suite.md)。
 
 Release 在媒体工具编译前核对同 SHA 主线 CI，缓存键绑定媒体工具源码清单与构建脚本，缓存内容同时含二进制和对应源码包；制品与独立开箱验收仍是发布前置。Docker 只在镜像相关主线改动、匹配 PR、版本标签或手动请求时运行，验收后推送同一个本地镜像。版本发布与覆盖升级验收不取消进行中的同目标运行；覆盖升级需明确选择目标版本及完整构建提交。
 
@@ -204,7 +204,7 @@ macOS Release 使用 `macos-15`（Apple Silicon）和 `macos-15-intel`（Intel�
 
 新增、删除文件按所属功能域选测；已有文件的执行权限变化和符号链接保持 `full`。
 
-`src/peach/` 下按名字推不出测试文件的模块，取直接导入它的测试所在的域，并上直接导入它的源码文件按同一套规则推出的域；互相导入的一组模块合起来算。导入者推不出域、谁都不导入它，或共享测试设施 `tests/support` 用到它时仍 `full`。不沿导入链一路扩散：函数里的延迟导入把几乎所有模块连成一团，传递闭包等于全量。随应用分发的 `resources/` 按加载它的模块与打包面选域；`.gitlab-ci.yml` 与 `MANIFEST.in` 选 `packaging` 与 `tooling`；只登记在 `core` 或 `packaging` 的测试文件改动时跑登记它的那个域。
+`src/peach/` 下按名字推不出测试文件的模块，取直接导入它的测试所在的域，并上直接导入它的源码文件按同一套规则推出的域；互相导入的一组模块合起来算。导入者推不出域、谁都不导入它，或共享测试设施 `tests/support` 用到它时仍 `full`。不沿导入链一路扩散：函数里的延迟导入把几乎所有模块连成一团，传递闭包等于全量。随应用分发的 `resources/` 按加载它的模块与打包面选域；`.gitlab-ci.yml` 与 `MANIFEST.in` 在本机选 `packaging` 与 `tooling`（主线流水线改 `.gitlab-ci.yml` 时三平台仍跑全量）；只登记在 `core` 或 `packaging` 的测试文件改动时跑登记它的那个域。
 
 完整批次通过但运行中发生局部改动时，保留未受影响测试文件的结果和原时间；退出 `4`，随后 `auto` 只补缺少的域。只有同一完整批次覆盖所有测试文件才恢复 `full`，局部批次不能拼成全量证明。环境、共享逻辑或未知范围变化清空保留结果；失败和过期结果不能复用。
 
