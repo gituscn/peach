@@ -19,8 +19,8 @@ import { useCatalogView } from '../catalog-grid/catalog-view';
 import { CatalogViewToggle } from '../catalog-grid/catalog-view-toggle';
 import { Combo, Segments, Shuffle, SortKeys } from '../entity-filter/entity-filter-page';
 import {
-  EMPTY_SLOTS, ROW_AHEAD, ROW_BATCH, ROW_FIRST, type CatalogFilterProps, type CatalogTag, type TierKind,
-  type TierPerformer, type TierStudio,
+  EMPTY_SLOTS, ROW_AHEAD, ROW_BATCH, ROW_FIRST, rememberedTiers, rememberTiers, type CatalogFilterProps,
+  type CatalogTag, type TierKind, type TierPerformer, type TierStudio,
 } from './catalog-filter';
 
 /* 上一次写出去的读数。读数那一格每次取数都换成微光再建回来，靠它分清「换了个数」和「刚出现」：
@@ -123,7 +123,8 @@ function TagPill({ tag, onPress }: { tag: CatalogTag; onPress(tag: string): void
 function Tiers(props: CatalogFilterProps) {
   const { actions, helpers } = props;
   const tiers = props.tiers ?? { key: '', performers: [], studios: [] };
-  const empty = props.empty || !props.tiers;
+  const loading = !props.tiers;
+  const empty = props.empty || loading;
   const performers = useRef<HTMLDivElement>(null);
   const studios = useRef<HTMLDivElement>(null);
   const more = useCallback((kind: TierKind) => () => actions.moreTops(kind), [actions]);
@@ -131,14 +132,19 @@ function Tiers(props: CatalogFilterProps) {
   const shownPerformers = usePaged(performers, tiers.performers, tiers.key, ROW_FIRST,
     empty ? undefined : more('performers'));
   const shownStudios = usePaged(studios, tiers.studios, tiers.key, ROW_FIRST, empty ? undefined : more('studios'));
-  const hasPerformers = empty || tiers.performers.length > 0;
-  const hasStudios = empty || tiers.studios.length > 0;
+  /* 取回之前照本机上次的结构画占位，壳骨架同一份记录。 */
+  const shape = useMemo(() => loading ? rememberedTiers() : null, [loading]);
+  const hasPerformers = shape ? shape.performers : props.empty || tiers.performers.length > 0;
+  const hasStudios = shape ? shape.studios : props.empty || tiers.studios.length > 0;
+  useEffect(() => {
+    if (!loading) rememberTiers({ performers: hasPerformers, studios: hasStudios });
+  }, [loading, hasPerformers, hasStudios]);
   useEffect(() => {
     helpers.wireDrag(performers.current);
     helpers.wireDrag(studios.current);
   }, [helpers, hasPerformers, hasStudios]);
   return (
-    <div data-catalog-tiers="" hidden={!hasPerformers && !hasStudios}>
+    <div data-catalog-tiers="" hidden={!hasPerformers && !hasStudios} aria-busy={loading || undefined}>
       {hasPerformers ? (
         <div ref={performers} data-catalog-tier="performers">
           {empty ? <Placeholders kind="performer" /> : (shownPerformers as TierPerformer[]).map((person) => (

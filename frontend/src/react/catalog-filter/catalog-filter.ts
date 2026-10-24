@@ -124,3 +124,23 @@ export const ROW_BATCH = 12;
 export const ROW_AHEAD = 320;
 /** 空馆藏占位每排摆多少格，由容器裁到可用宽度。 */
 export const EMPTY_SLOTS = 64;
+
+/** 两排各画没画。取回之前的占位照本机上次画好时的这份排：没人的那排取回后会收起，先画出来
+ *  就是一整排的位移。没有记录或记录坏了时两排都画。 */
+export interface TiersShape { performers: boolean; studios: boolean }
+
+export const TIERS_SHAPE_KEY = 'peach.catalog.tiers.v1';
+
+export function rememberedTiers(): TiersShape {
+  try {
+    const value = JSON.parse(localStorage.getItem(TIERS_SHAPE_KEY) || '{}') as Partial<TiersShape> | null;
+    return { performers: value?.performers !== false, studios: value?.studios !== false };
+  } catch { return { performers: true, studios: true } }
+}
+
+export function rememberTiers(shape: TiersShape): void {
+  try {
+    const value = JSON.stringify({ performers: shape.performers, studios: shape.studios });
+    if (localStorage.getItem(TIERS_SHAPE_KEY) !== value) localStorage.setItem(TIERS_SHAPE_KEY, value);
+  } catch { /* 下次两排都画。 */ }
+}
