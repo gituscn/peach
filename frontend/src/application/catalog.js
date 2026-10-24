@@ -33,7 +33,7 @@ import { pageSkeletonHtml } from './../management-placeholder';
 import { catalogEmptyHtml } from './../catalog-onboarding';
 import { junkRoute } from './../junk-queue';
 import { wallAddress } from '../react/video-wall/wall-route';
-export const catalogState = { homeHasFeed: undefined, barsRequestSeq: undefined, barsRendered: undefined, catalogFilterProps: undefined, catalogFilterMounting: undefined, catalogTagRows: undefined, catalogTopsPages: undefined, initialParams: undefined, resolveSort: undefined, initialCatalogUrl: undefined, initialParam: undefined, HOME_QUERY_KEYS: undefined, searchValueSnapshot: undefined, cancelSearchDissolve: undefined, rememberSearchValue: undefined, clearSearchField: undefined, mixRelatedCache: undefined, reduceMotion: undefined, tagList: undefined, tagPressed: undefined, withTagToggled: undefined, gridHelpers: undefined, gridActions: undefined, topsQueryParams: undefined, facetCountsSeq: undefined, VIEW_PILLS: undefined, catalogViews: undefined, TAGS_FIRST: undefined, catalogOnScreen: undefined, COMBO_LABELS: undefined, hideCatalogCombo: undefined, junkQueueHelpers: undefined, junkQueueActions: undefined };
+export const catalogState = { homeHasFeed: undefined, barsRequestSeq: undefined, barsPendingSeq: undefined, barsRendered: undefined, catalogFilterProps: undefined, catalogFilterMounting: undefined, catalogTagRows: undefined, catalogTopsPages: undefined, initialParams: undefined, resolveSort: undefined, initialCatalogUrl: undefined, initialParam: undefined, HOME_QUERY_KEYS: undefined, searchValueSnapshot: undefined, cancelSearchDissolve: undefined, rememberSearchValue: undefined, clearSearchField: undefined, mixRelatedCache: undefined, reduceMotion: undefined, tagList: undefined, tagPressed: undefined, withTagToggled: undefined, gridHelpers: undefined, gridActions: undefined, topsQueryParams: undefined, facetCountsSeq: undefined, VIEW_PILLS: undefined, catalogViews: undefined, TAGS_FIRST: undefined, catalogOnScreen: undefined, COMBO_LABELS: undefined, hideCatalogCombo: undefined, junkQueueHelpers: undefined, junkQueueActions: undefined };
 
 export function dropOfflineFromDefaultLoc(){
   if(catalogState.initialParams.has('loc'))return;
@@ -197,7 +197,7 @@ export function commitContextFilter(mutate){
 }
 
 export function catalogFilterBase(){
-  return {tiers:null,empty:false,tags:[],tagFirst:catalogState.TAGS_FIRST,views:catalogState.catalogViews(),state:'',count:null,
+  return {tiers:null,tiersPending:false,empty:false,tags:[],tagFirst:catalogState.TAGS_FIRST,views:catalogState.catalogViews(),state:'',count:null,
     trash:false,sorts:[],layout:null,refreshing:false,offscreen:false,combo:[],comboHidden:true,comboHost:$('#combo'),
     actions:catalogFilterActions(),
     helpers:{wireDrag,wireScroller:row=>{if(row)wireHorizontalScroller(row)}}};
@@ -283,10 +283,19 @@ export function tierStudio(x){
     logo:x.has_logo?logoUrl(x.k,'icon',x.logo_version):''};
 }
 
-export function renderBarsLoading(filterState){
+export function renderBarsLoading(filterState,requestSeq){
   if(catalogState.catalogFilterProps?.tiers)return;
   catalogState.barsRendered='';
-  paintCatalogFilter({tiers:null,state:filterState.state||''});
+  catalogState.barsPendingSeq=requestSeq;
+  paintCatalogFilter({tiers:null,tiersPending:true,state:filterState.state||''});
+}
+
+/* 两排头像只在真有一趟取数在路上时挂忙态：这一趟作废（换页把序号推走了）或失败，而后来的那一趟
+   没有接着取，忙态就由它撤掉；不取头像的页面（视频墙、作品页）从不挂。 */
+function releaseBarsPending(requestSeq){
+  if(catalogState.barsPendingSeq!==requestSeq)return;
+  catalogState.barsPendingSeq=0;
+  paintCatalogFilter({tiersPending:false});
 }
 
 export async function buildBars(){
@@ -300,11 +309,13 @@ export async function buildBars(){
   if(barsContext.type==='item')return;
   const context=currentBarsContext(),filterState=entityState.activeFilterState();
   const signature=JSON.stringify([context,filterState,state.state||'',state.seed||'',javActive()]);
-  renderBarsLoading(filterState);
+  renderBarsLoading(filterState,requestSeq);
   // 两个聚合查询互不依赖。冷启动各需约 1 秒，串行会让手机首屏白等；
   // 并行取回后再一次性绘制顶部与抽屉。
-  const [facetData,tops]=await getBarsData(context);
-  if(requestSeq!==catalogState.barsRequestSeq)return;
+  let bars;
+  try{bars=await getBarsData(context)}catch(error){releaseBarsPending(requestSeq);throw error}
+  const [facetData,tops]=bars;
+  if(requestSeq!==catalogState.barsRequestSeq){releaseBarsPending(requestSeq);return}
   /* 口径和数据都和上一次一样时，画出来的是同一串 HTML。照样赋一次 innerHTML 只换来
      整排头像连 `<img>` 一起重建、重解一遍码，屏幕上就是白闪一下——这一排每一个都是
      一张图。比数据不比时间：详情看上十分钟再回来，取回的多半还是同一份。 */
@@ -340,8 +351,10 @@ export async function buildBars(){
   const pickedKeys=new Set(pickedTags.map(row=>row.k));
   catalogState.catalogTagRows=appliedTags.concat(pickedTags,tagPool.filter(row=>!pickedKeys.has(row.k)))
     .map(row=>({k:row.k,label:tagLabel(row.k),n:row.n??null}));
+  catalogState.barsPendingSeq=0;
   paintCatalogFilter({
     tiers:{key:String(catalogState.barsRequestSeq),performers:tops.performers.map(tierPerformer),studios:tops.studios.map(tierStudio)},
+    tiersPending:false,
     empty:emptyHome,tags:catalogTags(filterState),tagFirst:appliedTags.length+pickedTags.length,
     views:catalogState.catalogViews(),state:filterState.state||'',
   });
