@@ -297,6 +297,19 @@ class CheckTests(_Server):
     def test_addresses_turn_into_grpc_targets(self):
         self.assertEqual(cd.channel_target("http://127.0.0.1"), ("127.0.0.1:19798", False))
         self.assertEqual(cd.channel_target("https://192.0.2.10:8443"), ("192.0.2.10:8443", True))
+        self.assertEqual(cd.channel_target("http://[::1]:19798"), ("[::1]:19798", False))
+        for address in ("http://localhost:bad-port", "http://localhost:0", "http://localhost:65536"):
+            with self.subTest(address=address), self.assertRaises(dl.DownloadError) as raised:
+                cd.channel_target(address)
+            self.assertEqual(raised.exception.failure, "config")
+
+    def test_discovery_returns_only_validated_service_addresses(self):
+        from unittest.mock import patch
+        with patch.object(cd, "answers", return_value=True) as answers:
+            address = cd.discover(("http://localhost:bad-port", "127.0.0.1:19798"))
+        self.assertEqual(address, "http://127.0.0.1:19798")
+        answers.assert_called_once_with(address)
+        self.assertTrue(all(dl.clean_address(address) == address for address in cd.LOCAL_ADDRESSES))
         self.assertEqual(cd.split_remote("/115/云下载/"), ("/115", "云下载"))
 
 

@@ -248,7 +248,7 @@ def build_plan(connection: sqlite3.Connection, *, location: str,
 
     root_states = None
     if online is None:
-        root_states = [root_online(translate_ledger_path(root)) for root in declared.get(location, ())]
+        root_states = [root_online(_media_path(root)) for root in declared.get(location, ())]
         online = any(root_states)
     if not online:
         for row in rows:
@@ -338,6 +338,11 @@ def latest_batch(root: Path | str) -> Path | None:
     return logs[-1] if logs else None
 
 
+def _media_path(raw):
+    from .smb_media import resolve
+    return resolve(raw) or translate_ledger_path(raw)
+
+
 def _rename(source: str, target: str) -> None:
     """按账本路径改名，真正动盘时翻译成本机路径。
 
@@ -349,6 +354,14 @@ def _rename(source: str, target: str) -> None:
         if verified is None:
             raise UnverifiedRename(f"来源 {location} 的挂载改名无法核验云端结果，须经官方核验通道")
         verified(str(source), str(target))
+        return
+    from .smb_media import resolve
+    remote_source, remote_target = resolve(source), resolve(target)
+    if remote_source is not None or remote_target is not None:
+        if remote_source is None or remote_target is None:
+            raise OSError('SMB 整理仅支持同一媒体根目录')
+        remote_target.parent.mkdir(parents=True, exist_ok=True)
+        remote_source.rename(remote_target)
         return
     local_source = translate_ledger_path(source)
     local_target = translate_ledger_path(target)
@@ -376,8 +389,8 @@ def _move_one(connection: sqlite3.Connection, asset_id: int,
         # 来自命令行、来自一份被人编辑过的 CSV；跨盘「改名」在这台机器上会退化成
         # 拷贝加删除，中断就是半个文件。
         return SKIP_CROSS_VOLUME
-    local_source = translate_ledger_path(old_path)
-    local_target = translate_ledger_path(new_path)
+    local_source = _media_path(old_path)
+    local_target = _media_path(new_path)
     if not local_source.exists():
         return "源文件不存在"
     if local_target.exists():
@@ -428,7 +441,7 @@ def apply_plan(connection: sqlite3.Connection, rows: Sequence[dict], *,
             old_path, new_path = str(row["current_path"]), str(row["target_path"])
             current = connection.execute('SELECT path,disposal FROM asset WHERE id=?', (int(row['asset_id']),)).fetchone()
             landed = (current is not None and current[0] == new_path
-                      and translate_ledger_path(new_path).is_file() and not translate_ledger_path(old_path).exists())
+                      and _media_path(new_path).is_file() and not _media_path(old_path).exists())
             if current is None or current[1] is not None:
                 outcome = '资产已不在馆藏，未执行整理'
             else:
@@ -461,8 +474,8 @@ def rollback_batch(connection: sqlite3.Connection, log_path: Path | str, *,
     for index, entry in enumerate(reversed(entries), 1):
         current = connection.execute('SELECT path FROM asset WHERE id=?', (int(entry['asset_id']),)).fetchone()
         landed = (current is not None and current[0] == entry['old_path']
-                  and translate_ledger_path(entry['old_path']).is_file()
-                  and not translate_ledger_path(entry['new_path']).exists())
+                  and _media_path(entry['old_path']).is_file()
+                  and not _media_path(entry['new_path']).exists())
         outcome = 'ok' if landed else _move_one(connection, int(entry["asset_id"]),
                                                 str(entry["new_path"]), str(entry["old_path"]))
         if outcome == "ok":

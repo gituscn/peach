@@ -210,16 +210,6 @@ body .card:focus-within{background:var(--hover);box-shadow:0 0 0 8px var(--hover
 /* 归属渲染成 `<span>` 就是不可点的那一种（队列行整行本身是按钮，里面嵌不了按钮）。
    染成强调色会让人以为能点，点下去却落到卡片本身、打开的是视频详情。 */
 .meta span.who{color:var(--ink-2);cursor:default}
-/* 标签语义分级 */
-/* 卡片上那一行标签归 React 卡片（`media-card.css` 的 `[data-media-tags]`）。
-   .tg 只留 max-width:100% 这一层兜底：一颗标签自己就比整张卡还宽时，横着溢出会
-   压到卡片外面，这时候省略号是唯一的出路。 */
-.tg{padding:var(--tag-pad-y) var(--tag-pad-x);border-radius:var(--tag-radius);font:inherit;font-size:var(--fs-xs);border:1px solid var(--line);
-  line-height:1.45;white-space:nowrap;cursor:pointer;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;max-width:100%;
-  background:var(--tag-fill)}
-.tg.meta,.tg.position{color:var(--ink-2);border-color:var(--line)}
-.tg:hover{color:var(--ink);background:var(--hover)}
-.tg:disabled{cursor:not-allowed}
 /* 顶栏的密集模式固定为标题、身份、标签三行。缺少标签时第三行仍保留，
    同一网格不会再被大小、观看次数或长身份撑成四行。分卷卡已有 7px 叠层空间，
    密集网格的普通卡也保留同一高度，避免每行是否出现分卷卡决定整行高度。

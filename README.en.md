@@ -35,11 +35,13 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 - **Local and cloud together**: browse hard drives and mounted cloud drives, including 115, PikPak and OneDrive, in one library.
 - **Pick from the video wall**: drag through a full-screen cover wall and play in place, with versions and parts of the same title grouped together.
-- **Player subtitles**: load local subtitles, search SubtitleCat for simplified and traditional Chinese subtitles by video code, then adjust fonts, size, colors and backgrounds. Each video keeps its loaded subtitles and last selection, including turning subtitles off, and restores them when played again. No API key is required; results may include machine translations.
+- **Player subtitles**: automatically discover matching subtitles beside the video, load subtitle files manually, search SubtitleCat for simplified and traditional Chinese subtitles by video code, then adjust fonts, size, colors and backgrounds. Each video keeps its loaded subtitles and last selection, including turning subtitles off, and restores them when played again. No API key is required; results may include machine translations.
+- **Playback options**: rotate the picture in the web player settings. On Windows and macOS, open media with the system default or a detected installed player; Docker and remote devices can use network playback links and M3U playlists. See [External players](docs/EXTERNAL_PLAYERS.md).
 - **Bring your existing collection**: read NFO files and posters, then fill missing titles, performers, studios and covers from multiple sources while keeping your edits.
+- **Preview while seeking**: reuse Jellyfin Trickplay, Emby/Plex BIF exports, WebVTT, HLS and DASH image previews beside your videos to avoid extracting the same frames again. See [formats and naming](docs/VIDEO_PREVIEWS.md).
 - **Reduce repeated scraping**: public textual metadata ships with each version. After scanning, Peach supplements recognized performers and studios with aliases, source IDs and profiles while keeping your edits. See [seed data and updates](docs/SEED.md).
-- **Follow across sites**: combine a creator's updates from FANBOX, Patreon, Kemono and other sites, with matching posts grouped into one card.
-- **Manage tags**: rename, merge and hide tags in batches, preserve aliases and restore hidden tags. See [tag management](docs/TAG_MANAGEMENT.md).
+- **Follow across sites**: combine a creator's updates from FANBOX, Patreon, Kemono and other sites, subscribe to creators' videos on Iwara, and group matching posts into one card.
+- **Manage tags**: local and online details share controls for adding, renaming and removing tags. Follow management supports merging tags, hiding tags in batches, and blocking or restoring content by tag. Names are preserved as aliases. See [tag management](docs/TAG_MANAGEMENT.md).
 - **Find your next watch**: subscribe to performers' new releases, discover titles based on your taste and save them to your want list.
 - **Cloud download**: search by video code or paste a magnet link, send it to a library with cloud download support and organize the downloaded video automatically. Channels follow configured libraries and provider capabilities, through CloudDrive2 or a direct PikPak connection.
 - **Add JAV from your browser**: detect or select a video code on DMM, MGS, JavDB, MissAV, Jable and other sites, then send it to Peach for cloud download and library ingestion. The [userscript](https://github.com/peach-mitao/peach-userscript) is maintained independently; see [installation and pairing](docs/JAV_BROWSER.md).
@@ -50,6 +52,8 @@ Watch history, favorites and settings stay on your computer. Scanning leaves ori
 Scanning, cloud downloads and media processing share junk checks. Attachments with sufficient evidence go to the recoverable trash; uncertain items await review. You can restore an item and mark it as “not junk”. See [junk files](docs/OPERATIONS.md#垃圾文件) for processing order and protections.
 
 Scanning, follow updates and new-release metadata collection save their progress and continue unfinished items after the app restarts. See [task recovery](docs/OPERATIONS.md#长时任务断点续跑) for recovery boundaries.
+
+First-time setup lets you choose the Peach proxy for metadata requests and dependency downloads. Windows, macOS and Docker distributions include an isolated amane runtime; source and wheel installations prepare Peach's locked version automatically when first needed. If preparation fails, pending items remain available for retry after fixing the network or runtime.
 
 Scanning and collection show video and recognizable JAV counts, with incremental checks for new folders. Traffic estimates use pending work, local caches, deduplicated release codes, and local samples of similar operations. Before starting, you can also review estimated additional disk usage, temporary frame files, and free space on each output drive. Library settings read and save CloudDrive API and data proxies; traffic totals follow each linked folder's connection setting. Proxy protection limits automatic video reads. See [configuration](docs/OPERATIONS.md#配置页) for measurement coverage and estimation limits.
 
@@ -96,6 +100,8 @@ Try search, filters and profiles in the [read-only demo](https://demo.peach.vide
 
 The full installer includes media tools for offline installation. The smaller lite installer downloads tools as needed during setup.
 
+Windows and macOS packages include the scraping runtime; users do not need to install uv, Python, or Git. Reinstall Peach if the scraping tools are missing or their version does not match.
+
 Test builds are unsigned. If Windows says “Windows protected your PC”, confirm the file came from this project's Releases, then choose “More info → Run anyway”. See the [Windows guide](docs/TESTING_DESKTOP.md) for installation, updates and troubleshooting.
 
 ### Build on macOS
@@ -112,7 +118,11 @@ Requires Git, uv and Python 3.14 or newer. See [running from source](docs/OPERAT
 
 See [Docker deployment](docs/DOCKER.md) for setup and supported configurations.
 
+For LAN access on fnOS or another NAS, set Compose's `PEACH_BIND` to the NAS LAN IP; the default accepts connections only from the host. Run `peach token` in the container terminal to view the initial login token. Enter the actual container media path; no specific drive letters are required. See [NAS first run](docs/DOCKER.md#飞牛其他-nas-与局域网访问).
+
 ## FAQ
+
+- **Can I connect a NAS over SMB?** Enter `smb://server/share/folder` as a media folder, set credentials separately, and test the connection. SMB sources support scanning, playback, organization and deletion according to the account permissions; see [SMB media sources](docs/SMB.md). Compatibility with a particular NAS requires device testing.
 
 - **Will it change my files?** Scanning and filling in details leave originals untouched. Manual organization renames or moves files; emptying the trash deletes files, and resource-sync cleanup removes empty folders. Each requires confirmation.
 - **Which cloud drives work?** Drives mounted as local folders through tools such as CloudDrive2; see [cloud drive mounts](docs/CLOUDDRIVE.md). Cloud download follows the connected provider's reported capabilities, with direct PikPak connections also supported and sign-in tokens stored locally.

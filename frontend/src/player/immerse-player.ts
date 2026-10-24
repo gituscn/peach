@@ -13,6 +13,8 @@ import { mountPlayerSubtitles } from './controls';
 import { playbackKey } from './progress';
 import { SubtitleSession } from './subtitle-memory';
 import { mountCaptionStyle } from './subtitle-style';
+import { mountPlaybackRate, playerMemory } from './memory';
+import { mountPlayerRotation } from './rotation';
 
 export interface ImmersePlayerOptions {
   kind: 'immerse';
@@ -45,7 +47,9 @@ export function mountImmersePlayer(video: HTMLVideoElement, options: ImmersePlay
       mounted.peachItem = item;
       mounted.peachPlaybackKey = playbackKey('item', item);
       const captions = new AbortController();
-      mountCaptionStyle(mounted.el(), video, captions.signal);
+      mountCaptionStyle(mounted.el(), video, captions.signal, playerMemory(mounted));
+      mountPlayerRotation(mounted, video);
+      mountPlaybackRate(mounted, video);
       mounted.on('dispose', () => captions.abort());
       new SubtitleSession(mounted, video);
       mountPlayerSubtitles(mounted, item.id);

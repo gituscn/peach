@@ -505,6 +505,70 @@ class SetupJsonContractTests(_SetupHttpCase):
             self.assertEqual(response.status_code, 400)
             self.assertFalse((self.data_root / "config.toml").exists())
 
+    def test_proxy_questions_expose_status_without_credentials_and_detect_docker(self):
+        from peach import peach_proxy
+        peach_proxy.save(self.config.directory("secrets"), {
+            "mode": "proxy", "proxy": "http://user:private-password@127.0.0.1:7890"})
+        with mock.patch.dict(os.environ, {"PEACH_DISTRIBUTION": "docker"}):
+            response = self._send("GET", self.QUESTIONS)
+        self.assertEqual(response.json()["peach_proxy"], {
+            "mode": "proxy", "proxy_saved": True, "needs_selection": False})
+        self.assertTrue(response.json()["docker"])
+        self.assertNotIn("private-password", response.text)
+        with mock.patch.dict(os.environ, {"PEACH_DISTRIBUTION": "source"}):
+            self.assertFalse(self._send("GET", self.QUESTIONS).json()["docker"])
+
+    def test_proxy_validation_collects_field_errors_without_creating_data(self):
+        for proxy in ([], {"mode": []}, {"mode": "unknown"}, {"mode": "proxy", "proxy": "http://user:secret@host"},
+                      {"mode": "proxy", "proxy": "ftp://host:1234"}):
+            with self.subTest(proxy=proxy):
+                errors = self._errors(self._body(peach_proxy=proxy, port="0"))
+                self.assertEqual(set(errors), {"peach_proxy", "port"})
+                self.assertNotIn("secret", str(errors))
+                self.assertFalse(self.data_root.exists())
+
+    def test_proxy_is_saved_in_the_selected_data_root_before_settings_and_first_scan(self):
+        from peach import peach_proxy
+        selected = self.root / "selected-data"
+        address = "socks5h://user:private-password@127.0.0.1:7890"
+        original_write = settings_file.write
+        original_scan = onboarding.request_first_scan
+        seen = []
+
+        def write(config, **kwargs):
+            self.assertEqual(peach_proxy.client_options(config.directory("secrets")), {
+                "trust_env": False, "proxy": address})
+            seen.append("settings")
+            return original_write(config, **kwargs)
+
+        def scan(config, location):
+            self.assertEqual(peach_proxy.client_options(config.directory("secrets")), {
+                "trust_env": False, "proxy": address})
+            seen.append("scan")
+            return original_scan(config, location)
+
+        with mock.patch.object(settings_file, "write", side_effect=write), \
+                mock.patch.object(onboarding, "request_first_scan", side_effect=scan):
+            result = self._submit(data_root=str(selected), peach_proxy={"mode": "proxy", "proxy": address})
+        self.assertEqual(seen, ["settings", "scan"])
+        self.assertNotIn("private-password", str(result))
+        self.assertFalse((self.config.directory("secrets") / "follow/peach-proxy.json").exists())
+
+    def test_proxy_modes_and_omitted_choice_are_saved_without_an_address(self):
+        from peach import peach_proxy
+        for mode in ("environment", "direct", None):
+            with self.subTest(mode=mode):
+                selected = self.root / str(mode)
+                self._submit(data_root=str(selected), scan_now=False,
+                             peach_proxy={"mode": mode, "proxy": "http://user:unused@127.0.0.1:7890"} if mode else None)
+                self.assertEqual(peach_proxy.values(selected / "secrets"), {"mode": mode or "environment", "proxy": ""})
+
+    def test_proxy_save_failure_does_not_publish_settings_or_scan_request(self):
+        with mock.patch("peach.peach_proxy.save", side_effect=OSError("代理配置写入失败")):
+            self.assertEqual(self._errors(self._body(peach_proxy={"mode": "direct"})), {
+                "data_root": "代理配置写入失败"})
+        self.assertFalse((self.data_root / "state" / onboarding.SCAN_REQUEST_NAME).exists())
+
     def test_the_first_run_page_is_a_shell_around_the_standalone_page_bundle(self):
         """首次运行页由独立页面包画：薄壳只带主题预读、样式、脚本、借来的字形与挂载点。"""
         response = self._get("/")
@@ -522,6 +586,15 @@ class SetupJsonContractTests(_SetupHttpCase):
                      "/peach-logo.png", "/peach-logo-64.png", "/peach-logo-128.png"):
             with self.subTest(path):
                 self.assertEqual(self._get(path).status_code, 200)
+
+    def test_the_setup_edit_preview_uses_the_shared_source_editor(self):
+        plain = self._get("/").text
+        editable = self._get("/?edit").text
+        self.assertNotIn('data-peach-copy-mode="source"', plain)
+        self.assertIn('data-peach-copy-mode="source"', editable)
+        for path in ("/dev/copy-editor.js", "/dev/copy-editor-core.js"):
+            self.assertIn(path, editable)
+            self.assertEqual(self._get(path).status_code, 200)
 
     def test_invalid_values_are_reported_without_creating_anything(self):
         missing = self.root / "nope"

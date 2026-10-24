@@ -10,6 +10,39 @@ describe('扫描与采集控制', () => {
   before(async () => { browser = await launch() });
   after(async () => { await browser?.close() });
   for (const viewport of VIEWPORTS) {
+    it(`${viewport.name}：隐藏、刷新、恢复与新任务的浮窗`, async () => {
+      let state = { status: 'running', job_id: 'visibility-first', checked: 2, total: 10 };
+      const writes: string[] = [];
+      const opened = await visit(browser, '/data-cleanup', viewport, async page => {
+        await page.route('**/api/library-processing{,?*}', async route => {
+          if (route.request().method() !== 'GET') writes.push(route.request().method());
+          await route.fulfill({ json: state });
+        });
+      });
+      const { page } = opened;
+      const dock = page.locator('[data-processing-dock]');
+      const restore = page.getByRole('button', { name: '显示进度浮窗', exact: true });
+      try {
+        await dock.getByRole('button', { name: '隐藏任务提示', exact: true }).click();
+        await dock.waitFor({ state: 'hidden' });
+        await restore.waitFor();
+        state = { ...state, status: 'paused', checked: 5 };
+        await page.reload();
+        await restore.waitFor();
+        assert.equal(await dock.count(), 0);
+        await restore.click();
+        await dock.waitFor();
+        await dock.getByText('扫描与采集已暂停', { exact: true }).waitFor();
+        await dock.getByRole('button', { name: '隐藏任务提示', exact: true }).click();
+        await dock.waitFor({ state: 'hidden' });
+        state = { ...state, status: 'running', job_id: 'visibility-next' };
+        await dock.waitFor();
+        const current = await layout(page);
+        assert.ok(current.scrollWidth <= current.viewportWidth, JSON.stringify(current));
+        assert.deepEqual(writes, []);
+      } finally { await opened.close() }
+    });
+
     it(`${viewport.name}：资源提示、粗估、模式切换与暂停继续`, async () => {
       let state = { status: 'idle', job_id: '', checked: 0, total: 100, speed_mode: 'standard',
         steps: [{ id: 'sources', label: '扫描文件', status: 'complete' },

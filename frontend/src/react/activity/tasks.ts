@@ -164,7 +164,7 @@ export function problemDestination(run: TaskRunPayload, latest = true): { href: 
     // 「需要处理」不收这里的可重试项：问题清单有几百项，先看清单再在那张卡上重试。
     'library-processing': ['/data-cleanup#libraryProcessing', '查看未完成项'],
     'follow-check': ['/subscriptions', '查看关注来源'],
-    'feed-check': ['/subscriptions?tab=feeds', '查看订阅源'],
+    'feed-check': ['/subscriptions', '查看订阅源'],
     'follow-resolve': ['/subscriptions?tab=add', '查看来源查找'],
     'resource-scan': ['/data-cleanup#resource-sync', '查看资源同步'],
     'resource-apply': ['/data-cleanup#resource-sync', '查看资源同步'],
@@ -282,6 +282,7 @@ export function readableErrorHeadline(text: string | null | undefined): string {
 }
 
 const OUTCOME_LABELS: Record<string, string> = {
+  partial: '处理已结束，部分项目需处理', complete: '处理完成', interrupted: '处理已中断',
   '没有新写法': '未发现新别名', '已装上': '已保存资料图片',
   '已装着认得准的小图': '已保留身份核对通过的小尺寸图片',
   '档案已不存在': '资料记录已不存在', '资料未过期': '现有资料仍在有效期内',

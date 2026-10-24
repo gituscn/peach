@@ -325,8 +325,8 @@ function AmaneBridgeCard({ toast }: ScrapingProps) {
         {data.problem
           ? <Note tone="error">{data.problem}</Note>
           : <Help>
-              已安装版本：{data.installed_version || '未安装'}。amane（{data.license}）提供这些内置站点的解析能力。
-              重新安装会使用 Peach 内置的 {data.version} 版本，不随上游自动升级。
+              amane（{data.license}）提供这些内置站点的解析能力。首次需要时，Peach 会自动准备锁定的 {data.version} 版本；安装包内已有可用环境时直接使用。
+              手动安装也使用此版本，不随上游自动升级。
             </Help>}
         {running ? <LoadingDots label="正在重建运行环境" /> : null}
         {problem ? <Note tone="error">{problem}</Note> : null}

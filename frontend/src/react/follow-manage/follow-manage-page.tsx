@@ -23,10 +23,12 @@ import type { FollowManageProps } from '../bundle';
 import { cardClass } from '../components/card';
 import { Note } from '../components/note';
 import { Page } from '../components/page';
+import { TagManager } from '../index/tag-manager';
 import { PillAriaTabList } from '../components/pill-aria-tab-list';
 import { STAT_STRIP_SIX } from '../components/stat-card';
 import { ExternalLink } from '../settings/section';
 import { AddSource } from './add-source';
+import { AddFeed } from './add-feed';
 import { AliasManager } from './alias-manager';
 import { ButtonLink } from '@/components/base/buttons/button';
 import { FeedSources } from './feed-sources';
@@ -36,10 +38,8 @@ import {
   SORT_DEFAULT_DIR, type CredentialData, type FollowData, type Layout, type SortDir, type SortKey,
 } from './follow-manage';
 import { SourceList } from './source-list';
+import { FOLLOW_MANAGE_NAV as TABS } from './manage-route';
 
-const TABS = [
-  ['list', '关注列表'], ['add', '添加关注'], ['feeds', 'JAV 订阅源'],
-] as const;
 type TabKey = (typeof TABS)[number][0];
 
 const isTab = (value: unknown): value is TabKey => TABS.some(([key]) => key === value);
@@ -72,12 +72,13 @@ export function FollowManagePage(props: FollowManageProps) {
   /* 勾选跨页也跨视图，身份是来源 ID：换页、换排序、从卡片切到表格，选中的仍是同一批。
      它不进地址栏——那是这一刻手里的一批东西，不是这一页的身份。 */
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set<number>());
+  const [feedSelected, setFeedSelected] = useState<ReadonlySet<number>>(new Set<number>());
 
   const follow = useQuery({ queryKey: FOLLOW_MANAGE_KEY, queryFn: ({ signal }) => fetchFollow(signal) });
   const credentials = useQuery({
     queryKey: FOLLOW_CREDENTIALS_KEY, queryFn: ({ signal }) => fetchCredentials(signal),
   });
-  /* 和 JAV 订阅源页签同一份缓存：读数与表格看的是同一次读取。 */
+  /* 读数与 JAV 订阅表格共用一次读取。 */
   const feeds = useQuery({ queryKey: FEEDS_KEY, queryFn: ({ signal }) => fetchFeeds(signal) });
   const data: FollowData = follow.data || { sources: [] };
   const creds: CredentialData = credentials.data || { root: '', providers: [] };
@@ -139,6 +140,8 @@ export function FollowManagePage(props: FollowManageProps) {
       <Tabs selectedKey={tab} onSelectionChange={(key) => {
         const next = String(key);
         if (!isTab(next)) return;
+        setSelected(new Set());
+        setFeedSelected(new Set());
         setTab(next);
         go({ tab: next });
       }} className="flex flex-col gap-6">
@@ -151,6 +154,9 @@ export function FollowManagePage(props: FollowManageProps) {
         </PillAriaTabList>
 
         <TabPanel id="list" className="flex flex-col gap-4">
+          <FeedSources readOnly={readOnly} toast={toast}
+            onAdd={() => { setTab('add'); go({ tab: 'add' }) }}
+            selection={{ ids: feedSelected, onChange: setFeedSelected, onActivate: () => setSelected(new Set()) }} />
           <SourceList data={data} sort={sort} dir={dir} page={page} layout={layout}
             pageSize={pageSize} selected={selected} readOnly={readOnly} toast={toast}
             openFollow={openFollow}
@@ -162,7 +168,7 @@ export function FollowManagePage(props: FollowManageProps) {
               go({ sort: nextSort, dir: nextDir, page: 1 });
             }}
             onPage={(next) => { setPage(next); go({ page: next }) }}
-            onSelected={setSelected}
+            onSelected={(next) => { setSelected(next); setFeedSelected(new Set()) }}
             onLayout={(next) => {
               setLayout(next);
               setPage(1);
@@ -179,12 +185,14 @@ export function FollowManagePage(props: FollowManageProps) {
 
         <TabPanel id="add" className="flex flex-col gap-8">
           <AddSource data={data} credentials={creds} readOnly={readOnly} toast={toast} />
+          <AddFeed readOnly={readOnly} toast={toast}
+            onAdded={() => { void feeds.refetch(); setTab('list'); go({ tab: 'list' }) }} />
           <AliasManager groups={data.author_aliases || []} readOnly={readOnly} toast={toast}
             suggestions={data.alias_suggestions || []} sources={data.sources} />
         </TabPanel>
 
-        <TabPanel id="feeds" className="flex flex-col gap-4">
-          <FeedSources readOnly={readOnly} toast={toast} />
+        <TabPanel id="tags" className="flex flex-col gap-4">
+          <TagManager scope="online" />
         </TabPanel>
 
       </Tabs>

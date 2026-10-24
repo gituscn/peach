@@ -14,6 +14,7 @@ from .ffmpeg import FFmpegResolver
 from .hardware_transcode import HardwareTranscoder
 from .mp4index import keyframe_seconds, segment_plan
 from .streaming import StreamSessionRegistry
+from .smb_media import input_url
 
 HLS_SEGMENT_SECONDS = 6
 # 片段缓存上限。超了按最后访问时间淘汰；片段可再生，丢了只是重跑一次 FFmpeg。
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 def _probe_video_codec(ffprobe: Path, source: Path) -> str:
     """问 ffprobe 要第一条视频流的编码名。问不出来返回空串，调用方按软件解码处理。"""
     command = (str(ffprobe), "-v", "error", "-select_streams", "v:0", "-show_entries",
-               "stream=codec_name", "-of", "default=nw=1:nk=1", str(source))
+               "stream=codec_name", "-of", "default=nw=1:nk=1", input_url(source))
     try:
         result = subprocess.run(command, capture_output=True, timeout=PROBE_TIMEOUT_SECONDS,
                                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
@@ -265,9 +266,9 @@ class HlsSegmentService:
             # 退出码 0、空 stderr 写出 0 字节，服务端只能报一句没有内容的 ffmpeg failed。
             # 保留原始时间戳，让每段接着上一段走。用 -avoid_negative_ts make_zero
             # 把每段归零的话，每段都自称从 0 秒开始，拖动进度条时容易跳错位置。
-            window = ["-ss", f"{start:.3f}", "-i", str(source), "-to", f"{start + duration:.3f}"]
+            window = ["-ss", f"{start:.3f}", "-i", input_url(source), "-to", f"{start + duration:.3f}"]
             return [("copy", lambda out: prefix + window + mapping + ["-c", "copy", "-copyts"] + mux + [str(out)])]
-        window = ["-ss", f"{start:.3f}", "-i", str(source), "-t", f"{duration:.3f}"]
+        window = ["-ss", f"{start:.3f}", "-i", input_url(source), "-t", f"{duration:.3f}"]
         audio = ["-c:a", "aac", "-b:a", "160k", "-output_ts_offset", f"{start:.3f}"]
         attempts = []
         for encoder in self.hardware.encoders(ffmpeg):

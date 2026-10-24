@@ -195,6 +195,8 @@ class DependencyPolicyTests(unittest.TestCase):
             "pystray": "pystray",
             "resvg_py": "resvg-py",
             "sentry_sdk": "sentry-sdk",
+            "smbclient": "smbprotocol",
+            "smbprotocol": "smbprotocol",
             "starlette": "starlette",
             "torznab": "torznab",
             "tzlocal": "tzlocal",

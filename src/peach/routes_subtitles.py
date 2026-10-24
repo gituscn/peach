@@ -48,19 +48,22 @@ def _memory(request: Request, video: str) -> subtitle_memory.SubtitleMemory:
 
 
 def _memory_payload(video: str, value: dict) -> dict:
-    return {"selected": value["selected"], "tracks": [
+    return {**{key: value[key] for key in subtitle_memory.PREFERENCES if key in value},
+            "selected": value["selected"], "tracks": [
         {"key": row["key"], "name": row["name"],
          "src": f"/api/subtitles/memory/track/{row['file']}?video={video}"}
         for row in value["tracks"]]}
 
 
 @router.get("/api/subtitles/memory")
+@router.get("/api/player/memory")
 def remembered_subtitles(request: Request, video: str):
     return JSONResponse(_memory_payload(video, _memory(request, video).read()),
                         headers={"Cache-Control": "no-store"})
 
 
 @router.put("/api/subtitles/memory")
+@router.put("/api/player/memory")
 async def remember_subtitles(request: Request, video: str):
     memory = _memory(request, video)
     data = bytearray()
@@ -70,9 +73,7 @@ async def remember_subtitles(request: Request, video: str):
             return JSONResponse({"error": "字幕内容过大"}, status_code=413)
     try:
         value = json.loads(data)
-        if not isinstance(value, dict) or "selected" not in value:
-            raise ValueError("请选择字幕或关闭字幕")
-        saved = await run_in_threadpool(memory.update, value["selected"], value.get("track"))
+        saved = await run_in_threadpool(memory.patch, value)
         return JSONResponse(_memory_payload(video, saved), headers={"Cache-Control": "no-store"})
     except (ValueError, TypeError) as error:
         return _error(error)

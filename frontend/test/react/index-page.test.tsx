@@ -73,6 +73,30 @@ const tab = (host: ParentNode, value: string) => host.querySelector(`[role="tab"
 const alphaTag = (host: ParentNode, k: string) => host.querySelector(`[data-alpha-tag][data-k="${k}"]`);
 
 describe('地址栏上的类型', () => {
+  it('标签分页只显示当前页，搜索条件变化回到首页', async () => {
+    const all = Array.from({ length:230 }, (_, index) => tag(`tag-${index}`));
+    const fetcher = serve(url => {
+      const params = new URL(url, 'http://localhost').searchParams;
+      const offset = Number(params.get('offset')), limit = Number(params.get('limit'));
+      const rows = all.filter(row => row.k.includes(params.get('q') || ''));
+      return { items:rows.slice(offset, offset+limit), total:rows.length, has_more:offset+limit < rows.length, categories:{ role:rows.length } };
+    });
+    const host = await open(props({ kind:'tags', view:'cloud' })); await settle();
+    expect(host.querySelectorAll('[data-tag-chip]')).toHaveLength(100);
+    await click(buttonNamed('下一页', host)); await settle();
+    expect(host.querySelectorAll('[data-tag-chip]')).toHaveLength(100);
+    expect(host.querySelector('[data-tag-chip][data-k="tag-0"]')).toBeNull();
+    expect(host.querySelector('[data-tag-chip][data-k="tag-100"]')).not.toBeNull();
+    await type(search(host), 'tag-229');
+    await act(async () => search(host).dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', bubbles:true })));
+    await settle();
+    expect(host.querySelectorAll('[data-tag-chip]')).toHaveLength(1);
+    const last = new URL(urls(fetcher).at(-1)!, 'http://localhost');
+    expect(last.searchParams.get('offset')).toBe('0');
+    expect(last.searchParams.get('limit')).toBe('100');
+    expect(host.querySelector('[data-index-more]')).toBeNull();
+  });
+
   it('筛选无结果时清除条件并保留当前在线索引和版式', async () => {
     seed(onlineTagsKey('missing', 'artist'), []);
     serve(() => ({ items: [], has_more: false }));
@@ -359,7 +383,7 @@ describe('标签', () => {
       const row = { ...tag('眼镜', 'appearance'), entity_id: 4472, id: 'glasses', aliases: ['眼镜娘'], hidden: false };
       seed(indexKey('tags', '', 'all'), [row]);
       seed(onlineTagsKey('', 'all'), [row]);
-      serve(() => ({ items: [row], duplicate_groups: [], favorites: [], filters: [], has_more: false }));
+      serve(() => ({ items: [row], total:1, categories:{ appearance:1 }, duplicate_groups: [], favorites: [], filters: [], has_more: false }));
       const host = await open(props({ kind: 'tags', scope, view }));
       await settle();
       expect(host.querySelector('[data-alpha-tag], [data-tag-chip]')?.textContent).toContain('眼镜');

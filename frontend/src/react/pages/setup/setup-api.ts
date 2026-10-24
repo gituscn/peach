@@ -27,6 +27,8 @@ export interface SetupQuestion {
 export interface MountDependency { name: string; message: string; download_url: string; download_label: string }
 
 export interface SetupQuestions {
+  peach_proxy?: import('../../bundle').PeachProxyState;
+  docker?: boolean;
   remote_reporting?: import('../../settings/remote-reporting-settings').RemoteReportingState;
   windows: boolean;
   standalone: boolean;

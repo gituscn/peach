@@ -35,12 +35,13 @@ export function UserscriptStatus({ enabled, release }: {
       <div className="flex flex-wrap items-center justify-between gap-3"><span className="text-body-regular text-text-secondary">浏览器添加</span>
         <StatusLabel tone={enabled ? 'success' : 'neutral'}>{enabled ? '已启用' : '未启用'}</StatusLabel></div>
       <p className="text-caption-1-regular text-text-secondary">{status === 'checking' ? '正在检测当前浏览器的用户脚本。' : status === 'missing'
-        ? '安装或启用脚本后重新检测；旧版脚本需要更新后才能检测。'
+        ? '确认脚本已启用并更新至最新版。Chrome 还需在 Tampermonkey 扩展详情中开启「允许用户脚本」或开发者模式，并允许访问当前 Peach 站点；刷新页面后重新检测。'
         : update ? `请更新至 v${release.minimum_version} 或更高版本。`
         : status.paired ? enabled ? '可在支持的站点直接加入 Peach 馆藏。' : '启用浏览器添加后，可在支持的站点直接加入 Peach 馆藏。'
         : '生成令牌后复制配对信息，在用户脚本设置中粘贴并保存。'}</p>
       <div className="flex flex-wrap items-center gap-2">
         {status === 'missing' || update ? <ExternalLink href={release.install_url}>{update ? '更新用户脚本' : '安装 Peach 用户脚本'}</ExternalLink> : null}
+        {status === 'missing' ? <ExternalLink href="https://www.tampermonkey.net/faq.php#Q209">Tampermonkey 权限设置说明</ExternalLink> : null}
         <Button variant="secondary" type="button" {...busyProps(status === 'checking')}
           onClick={retry}>重新检测</Button>
       </div>

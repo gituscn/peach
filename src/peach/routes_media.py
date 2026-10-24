@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -35,7 +36,7 @@ from . import (
     avatar_face, avatar_online, avatar_picker, avatar_provider, error_reporting,
     follow_assets, follow_providers, images,
     jav_poster_crop, link_marks, link_status, scraping_access, site_icons, social_links, subtitles,
-    taste_history, timeline_sheets, web_follow,
+    taste_history, timeline_sheets, web_follow, web_timeline_thumbnails,
 )
 from .config import GENERATED_DIR, PROJECT_ROOT
 from .entities import resolve_entity_id
@@ -54,6 +55,7 @@ from .previews import ENTITY_THUMB_TYPE, PreviewUnavailable, entity_image_key
 from .remote_media_cache import AVATAR_REFRESH_SECONDS, FAVICON_REFRESH_SECONDS, cache_for
 from .preview_cache import PreviewCache
 from .routes_auth import require_auth
+from .scan import VIDEO
 from .segments import SegmentCancelled, SegmentUnavailable, build_hls_playlist
 from .streaming import (
     BufferedFileResponse, CancellableFileResponse, SplicedMp4Response, run_until_disconnect,
@@ -102,6 +104,10 @@ LOGGER = logging.getLogger(__name__)
 
 def _image_response(request: Request, path: Path, media_type: str | None = None):
     """固定图片 URL 使用私有缓存，并按文件 ETag 复验。"""
+    from .smb_media import SmbResource
+    if isinstance(path, SmbResource):
+        from .smb_response import SmbResponse
+        return SmbResponse(path, media_type=media_type)
     response = FileResponse(path, media_type=media_type, stat_result=path.stat())
     response.headers["Cache-Control"] = "private, no-cache"
     if StaticFiles().is_not_modified(response.headers, request.headers):
@@ -213,6 +219,44 @@ def external_playback(request: Request, id: int, args: dict[str, str] = Depends(
                         headers={"Cache-Control": "no-store"})
 
 
+@router.get('/api/local-players')
+def local_players(request: Request, args=Depends(require_auth)):
+    from . import local_playback
+    players = []
+    if local_playback.available() and _local_playback_client(request):
+        players = [{'id': 'default', 'label': '系统默认播放器'}, *[
+            {'id': key, 'label': value[0]} for key, value in local_playback.installed().items()]]
+    return JSONResponse({'players': players}, headers={'Cache-Control': 'no-store'})
+
+
+def _local_playback_client(request: Request) -> bool:
+    from .web_local_access import local_client
+    return local_client(request) and not any(
+        key.startswith('x-forwarded-') or key in {'forwarded', 'cf-connecting-ip'} for key in request.headers)
+
+
+@router.post('/api/local-playback')
+def local_playback(request: Request, id: int, player: str = 'default', args=Depends(require_auth)):
+    from . import local_playback as launcher
+    from .routes_auth import same_origin
+    from fastapi import HTTPException
+    import subprocess
+    same_origin(request)
+    if not launcher.available() or not _local_playback_client(request):
+        raise HTTPException(403, '请使用网络播放地址或 M3U 播放列表在此设备打开')
+    asset = request.app.state.media_engine.asset(id)
+    path = request.app.state.media_engine.filesystem.file_for(asset, thumbnail=False)
+    try:
+        launcher.open_media(path, player)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+    except (OSError, subprocess.SubprocessError) as exc:
+        LOGGER.warning('本地播放器启动失败：player=%s type=%s errno=%s winerror=%s',
+                       player, type(exc).__name__, getattr(exc, 'errno', None), getattr(exc, 'winerror', None))
+        raise HTTPException(503, '无法打开播放器，请检查系统文件关联或选择其他播放器') from None
+    return {'opened': True}
+
+
 def _external_asset(request: Request, asset_id: int, ticket: str, origin: str):
     from .external_playback import valid
     from fastapi import HTTPException
@@ -229,6 +273,10 @@ def external_stream(request: Request, id: int, ticket: str, origin: str = ''):
     from . import strm, strm_stream
     if strm.is_pointer(path):
         return strm_stream.proxy(request, id, path)
+    from .smb_media import SmbResource
+    if isinstance(path, SmbResource):
+        from .smb_response import SmbResponse
+        return SmbResponse(path)
     return BufferedFileResponse(path, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
@@ -273,6 +321,10 @@ def stream(request: Request, id: int, session: str = "", args: dict[str, str] = 
         LOGGER.exception("browser transcode failed for asset %s", id)
         return JSONResponse({"error": "transcode unavailable"}, status_code=503)
     media_type = "video/mp4" if transcoded else None
+    from .smb_media import SmbResource
+    if isinstance(path, SmbResource):
+        from .smb_response import SmbResponse
+        return SmbResponse(path, session=session, registry=state.stream_sessions, media_type=media_type)
     response = (
         CancellableFileResponse(
             path, session=session, registry=state.stream_sessions, media_type=media_type,
@@ -453,14 +505,20 @@ def _subtitle_rows(state, asset_id: int):
     """资产本身加它的字幕行。资产不存在时抛 `MediaNotFound`，由 `api.py` 收口。"""
     asset = state.media_engine.asset(asset_id)
     with state.database.read_connection() as connection:
-        return asset, subtitles.subtitles_for(connection, asset_id)
+        rows = [dict(row) for row in subtitles.subtitles_for(connection, asset_id)]
+    if asset.path:
+        video = normalized_path(asset.path)
+        if any(within_root(video, root) for root in state.media_engine.filesystem.allowed_roots):
+            known = {str(normalized_path(row["path"])).casefold() for row in rows}
+            rows.extend(row for row in subtitles.discover_sidecars(video, VIDEO)
+                        if row["path"].casefold() not in known)
+    return asset, rows
 
 
 def _subtitle_path(state, asset, row) -> Path | None:
     """字幕文件在本机的位置；逃出正片所在目录或授权根一律拒绝。
 
-    路径来自账本而不是前端，这一层仍然要查：`asset_subtitle.path` 由扫描写入，
-    而扫描根本身可以被改设置改掉，判据不能寄托在「写进去的那一刻是对的」。
+    路径来自账本或同目录发现，这一层仍核对当前媒体授权根。
     """
     if not asset.path:
         return None
@@ -505,7 +563,7 @@ def _subtitle_note(state, asset, row) -> str:
 def asset_subtitles(request: Request, id: int, args: dict[str, str] = Depends(require_auth)):
     """这个资产有哪些字幕轨，以及每一条能不能播。
 
-    序号就是这张表里的位置，`/api/assets/{id}/subtitles/{n}` 按同一个顺序取。
+    返回的 src 通过 track 参数绑定文件身份，序号用于无参数的按序读取。
     不能播的也列出来并说明原因：界面上「有三条字幕、只挂上两条」要能解释得清。
     """
     state = request.app.state
@@ -514,7 +572,8 @@ def asset_subtitles(request: Request, id: int, args: dict[str, str] = Depends(re
     for index, row in enumerate(rows):
         note = _subtitle_note(state, asset, row)
         tracks.append({
-            "id": f"sidecar:{row['id']}",
+            "id": f"sidecar:{subtitles.file_key(row['name'])}",
+            "legacy_id": f"sidecar:{row['id']}" if isinstance(row["id"], int) else None,
             "index": index,
             "name": row["name"],
             "format": row["format"],
@@ -523,17 +582,21 @@ def asset_subtitles(request: Request, id: int, args: dict[str, str] = Depends(re
             "pairing": row["pairing"],
             "note": note,
             "playable": not note,
-            "src": f"/api/assets/{id}/subtitles/{index}",
+            "src": f"/api/assets/{id}/subtitles/{index}?track={subtitles.file_key(row['name'])}",
         })
     return {"id": id, "subtitles": tracks}
 
 
 @router.api_route("/api/assets/{id}/subtitles/{index}", methods=["GET", "HEAD"])
 def asset_subtitle_track(request: Request, id: int, index: int,
+                         track: str = "",
                          args: dict[str, str] = Depends(require_auth)):
     """一条字幕的 WebVTT。浏览器的 text track 只认这一种格式。"""
     state = request.app.state
     asset, rows = _subtitle_rows(state, id)
+    if track:
+        index = next((n for n, row in enumerate(rows)
+                      if subtitles.file_key(row["name"]) == track), -1)
     if index < 0 or index >= len(rows):
         return JSONResponse({"error": "no such subtitle"}, status_code=404)
     row = rows[index]
@@ -626,13 +689,30 @@ def poster(request: Request, id: int, c: int = 4, args: dict[str, str] = Depends
 
 
 @router.api_route("/timeline", methods=["GET", "HEAD"])
-def timeline(request: Request, id: int, s: int = 0, args: dict[str, str] = Depends(require_auth)):
+def timeline(request: Request, id: int, s: int = 0, source: str = '', args: dict[str, str] = Depends(require_auth)):
     """时间轴预览的一张接触印相。只发已经铺好的，这里不现抽。
 
     `/poster` 那条取不到会当场抽一帧，因为九宫格只要九张。这里一张图是一百帧，现抽要
     几分钟，悬停的人早走了；没铺到就回 404，页面退回九宫格。
     """
     contract = request.app.state.web_contract
+    if id <= 0 or s < 0:
+        return JSONResponse({"error": "unavailable"}, status_code=404)
+    if source not in ('', 'peach', 'bif', 'webvtt', 'hls', 'dash', 'jellyfin'):
+        return JSONResponse({"error": "unavailable"}, status_code=404)
+    external = None if source == 'peach' else web_timeline_thumbnails.external_timeline(contract, id)
+    if source and source != 'peach' and (external is None or external.source != source):
+        return JSONResponse({"error": "unavailable"}, status_code=404)
+    if external is not None:
+        data = web_timeline_thumbnails.external_frame(contract, external, s)
+        if data is None:
+            return JSONResponse({"error": "unavailable"}, status_code=404)
+        etag = '"' + hashlib.sha256(data).hexdigest() + '"'
+        headers = {'Cache-Control': 'private, no-cache', 'ETag': etag}
+        response = Response(data, media_type='image/jpeg', headers=headers)
+        if StaticFiles().is_not_modified(response.headers, request.headers):
+            return Response(status_code=304, headers=headers)
+        return response
     path = timeline_sheets.sheet_path(contract.timeline_root, id, s)
     if id <= 0 or s < 0 or not path.is_file():
         return JSONResponse({"error": "unavailable"}, status_code=404)

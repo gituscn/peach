@@ -17,7 +17,7 @@ import { after, before, describe, it } from 'node:test';
 
 import type { Browser, Locator, Page } from 'playwright-core';
 
-import { configurationBody, expectBody, layout, launch, requiredEnv, settle, visit, VIEWPORTS } from './harness.ts';
+import { configurationBody, expectBody, layout, launch, requiredEnv, settle, unmanagedScrollers, visit, VIEWPORTS } from './harness.ts';
 import { mockJavDetail } from './jav-detail-fixture.ts';
 
 interface Route {
@@ -70,10 +70,15 @@ const ROUTES: readonly Route[] = [
       page.locator('#stats').getByRole('tab', { name: '添加关注', exact: true })],
   },
   {
-    // 订阅源页签由地址参数直达；演示库没有订阅源，等到的是那一节的页脚按钮。
+    // 订阅管理链接进入统一关注列表。
     path: '/subscriptions?tab=feeds',
-    body: (page) => [page.locator('#stats').getByRole('tab', { name: 'JAV 订阅源', exact: true, selected: true }),
+    body: (page) => [page.locator('#stats').getByRole('tab', { name: '关注列表', exact: true, selected: true }),
       page.locator('#stats').getByRole('button', { name: '立即拉取', exact: true })],
+  },
+  {
+    path: '/subscriptions?tab=add',
+    body: (page) => [page.locator('#stats').getByRole('region', { name: '添加创作者关注', exact: true }),
+      page.locator('#stats').getByRole('region', { name: '添加 JAV 订阅', exact: true })],
   },
   {
     // 骨架里那条指标带也写着「馆藏视频」，认不出画完没有；只有真页面把四张读数卡做成页签。
@@ -148,6 +153,7 @@ async function assertHolds(page: Page, problems: string[], where: string): Promi
   assert.ok(box.scrollWidth <= box.viewportWidth,
     `${where}：横向溢出，scrollWidth ${box.scrollWidth} > 视口 ${box.viewportWidth}`);
   assert.deepEqual(box.offenders, [], `${where}：有元素越出视口右边缘`);
+  assert.deepEqual(await unmanagedScrollers(page), [], `${where}：存在未接入统一实现的滚动区`);
   if (where === '/') {
     const images = await page.locator('img[loading="lazy"]').evaluateAll(nodes => ({
       count: nodes.length,

@@ -30,7 +30,7 @@ from google.protobuf import empty_pb2
 from . import downloads_clouddrive_pb2 as pb
 from .downloads import (
     DONE, ERROR, MISSING, RUNNING, DownloadError, DownloadTask, Magnet, RemoteStatus,
-    classify_remote_message, magnet_info_hash,
+    classify_remote_message, clean_address, magnet_info_hash,
 )
 from .push_discovery import CloudPrefix, normalise_prefix
 
@@ -80,8 +80,12 @@ _AUTH_CODES = {grpc.StatusCode.UNAUTHENTICATED, grpc.StatusCode.PERMISSION_DENIE
 
 
 def channel_target(address: str) -> tuple[str, bool]:
-    """`http://host:port` → (`host:port`, 不加密)。设置层已经校验过形态。"""
-    parts = urlsplit(address if "://" in address else "http://" + address)
+    """校验服务地址并生成 gRPC 目标；非法地址使用下载领域错误。"""
+    try:
+        address = clean_address(address)
+    except ValueError as error:
+        raise DownloadError("config", str(error)) from error
+    parts = urlsplit(address)
     if not parts.hostname:
         raise DownloadError("config", "CloudDrive2 地址没填")
     port = parts.port or (443 if parts.scheme == "https" else 19798)
@@ -112,8 +116,12 @@ def answers(address: str, *, timeout: float = PROBE_TIMEOUT) -> bool:
 def discover(addresses: tuple[str, ...] = LOCAL_ADDRESSES) -> str:
     """按顺序试，返回第一个应答的地址；都不应答时报错并原样列出试过的地址。"""
     for address in addresses:
-        if answers(address):
-            return address
+        try:
+            normalized = clean_address(address)
+        except ValueError:
+            continue
+        if normalized and answers(normalized):
+            return normalized
     tried = "、".join(addresses)
     raise DownloadError("network", f"没有填 CloudDrive2 地址，本机 {tried} 都没有应答。"
                                    "确认 CloudDrive2 已启动，或在地址栏填上它的实际地址")

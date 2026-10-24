@@ -7,7 +7,7 @@
  * 页头只有标题、读数、版式切换和过滤框；页面级的切换（厂牌／事务所、本地／在线）是页头
  * 下面那排 Tabs。标签页的读数住在浮层下排，页头不再重复一遍。 */
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Radio } from 'react-aria-components';
 
 import { refitNativeImages } from '@peach/card-art';
@@ -15,7 +15,10 @@ import { requestErrorMessage } from '@peach/legacy/core';
 import { indexSkeletonHtml, spinnerHtml } from '@peach/legacy/ui';
 
 import { Button, ButtonLink } from '@/components/base/buttons/button';
-import { InputBase, TextField } from '@/components/base/input/input';
+import { IndexSearch } from './index-search';
+import { DataTableFooter } from '../components/table-controls';
+import { tagSkeletonHtml, TAG_PAGE_SIZE, TAG_PAGE_SIZES } from '../../tag-skeleton';
+import { useTagPagination, useTagPageBounds } from './tag-pagination';
 
 import { IDENTITY_ROW_CLASS } from '../../identity-filter';
 
@@ -77,40 +80,6 @@ function LayoutSwitch(
   );
 }
 
-const SearchGlyph = spriteGlyph('search');
-
-/* 只读筛选不配提交按钮：停手 300ms 就查，回车是「别等了，现在就查」。中文输入法选字过程中
-   一样发 input，拿还没定型的拼音去筛，筛的是「zhon」这种半截输入；组完字由 compositionend
-   接手，组字过程中的回车是在定字，也放过去。 */
-function IndexSearch({ label, value, onQuery }: { label: string; value: string; onQuery(q: string): void }) {
-  const [text, setText] = useState(value);
-  const composing = useRef(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => { clearTimeout(timer.current); setText(value) }, [value]);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  const later = (next: string) => {
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => onQuery(next.trim()), 300);
-  };
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== 'Enter' || composing.current || event.nativeEvent.isComposing) return;
-    event.preventDefault();
-    clearTimeout(timer.current);
-    onQuery(text.trim());
-  };
-  return (
-    <div data-index-search="" className="ml-auto min-w-0 max-w-80 flex-1"
-      onCompositionStart={() => { composing.current = true }}
-      onCompositionEnd={(event) => { composing.current = false; later((event.target as HTMLInputElement).value) }}>
-      <TextField aria-label={label} value={text}
-        onChange={(next) => { setText(next); if (!composing.current) later(next) }}>
-        <InputBase type="search" leadingIcon={SearchGlyph} spellCheck={false} autoComplete="off" enterKeyHint="search"
-          onKeyDown={onKeyDown} />
-      </TextField>
-    </div>
-  );
-}
-
 type Item = IndexPerson | IndexTag | OnlineAuthor | OnlineTag;
 
 export function IndexPage(props: IndexProps) {
@@ -152,17 +121,25 @@ export function IndexPage(props: IndexProps) {
     props.route(next, { replace });
   };
 
-  const query = indexQuery(indexSource(route));
+  const { pagination, onChange: changePage } = useTagPagination(JSON.stringify(route));
+  const query = indexQuery(indexSource(route), pagination.pageSize);
+  const pagedKey = kind === 'tags' && (pagination.pageIndex || pagination.pageSize !== TAG_PAGE_SIZE)
+    ? [...query.queryKey, 'page', pagination.pageIndex, pagination.pageSize] : query.queryKey;
   const result = useInfiniteQuery<Page<Item>>({
-    queryKey: query.queryKey,
+    queryKey: pagedKey,
     queryFn: ({ pageParam, signal }) => query.queryFn({ pageParam: pageParam as number, signal }),
-    initialPageParam: 0,
-    getNextPageParam: query.getNextPageParam,
+    initialPageParam: kind === 'tags' ? pagination.pageIndex * pagination.pageSize : 0,
+    getNextPageParam: kind === 'tags' ? () => undefined : query.getNextPageParam,
+    enabled: !(managing && kind === 'tags'),
     placeholderData: refining ? keepPreviousData : undefined,
   });
   const items = flatItems(result.data);
   const more = !!result.hasNextPage && !result.isPlaceholderData;
-  const readout = countText(items.length, !!result.hasNextPage);
+  const total = result.data?.pages[0]?.total;
+  useTagPageBounds(kind === 'tags' && !result.isPlaceholderData ? total : undefined, pagination, changePage);
+  const readout = kind === 'tags'
+    ? (result.isPending || result.isError ? '' : `${(total ?? items.length).toLocaleString()} 个标签`)
+    : countText(items.length, !!result.hasNextPage);
   /* 分类计数只随名册、词表和过滤词变，与选中哪一类无关。换分类时新一页还没到，沿用同一份
      名册上一次拿到的计数：分类按钮行不先塌成「全部」加当前项、等数据回来再弹开。头一回
      还没有计数时整排都摆出来，同壳铺的骨架那一排，计数到了再收掉空的那几类。 */
@@ -215,7 +192,8 @@ export function IndexPage(props: IndexProps) {
 
   const body = () => {
     if (result.isPending) {
-      return <div aria-busy="true" dangerouslySetInnerHTML={{ __html: indexSkeletonHtml({ kind, layout, mode: view }) }} />;
+      return <div aria-busy="true" dangerouslySetInnerHTML={{ __html: kind === 'tags'
+        ? tagSkeletonHtml({ mode:view, pageSize:pagination.pageSize }) : indexSkeletonHtml({ kind, layout, mode: view }) }} />;
     }
     if (result.isError) {
       return (
@@ -281,6 +259,9 @@ export function IndexPage(props: IndexProps) {
             ?.scrollIntoView({ block: 'start', behavior: 'smooth' })} />
       ) : null}
       <div data-index-body="">{body()}</div>
+      {kind === 'tags' && !result.isPending && !result.isError ? <div className="mt-5">
+        <DataTableFooter label="标签" total={total ?? items.length} pagination={pagination} onChange={changePage} unit="个标签" pageUnit="个" pageSizes={TAG_PAGE_SIZES} />
+      </div> : null}
       {more ? (
         <div className="mt-5 flex justify-center">
           {/* 按下去到下一批画出来之间要有东西在动：这一段是一次网络往返加一屏头像，光把键按灰了

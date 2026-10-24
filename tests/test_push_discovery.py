@@ -396,6 +396,20 @@ class IngestPathTests(_ServiceCase):
             self.assertEqual((result.found, result.sidecar), (True, True), parts)
         self.assertEqual(self.rows(), {})
 
+    def test_extra_suffixes_and_nested_folders_are_found_without_ledger_writes(self):
+        relative = ('Film/Interview-interview2.mkv', 'Film/Extras/Trailers/Teaser.mp4',
+                    'Film/deleted scenes/Ending.mp4', 'Film/backdrops/Menu.mkv',
+                    'Film/theme-music/Score.flac')
+        for value in relative:
+            target = self.media / value
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b'clip')
+        for value in relative:
+            result = scan.ingest_path(self.db, 'local', self.ledger('local', *value.split('/')),
+                                     declared_roots=self.declared, mounts=self.mounts)
+            self.assertEqual((result.found, result.sidecar, result.asset_id), (True, True, None), value)
+        self.assertEqual(self.rows(), {})
+
     def test_a_slow_directory_listing_does_not_hold_the_ledger_write_lock(self):
         """挂载卡在列目录上时，同一账本的另一个写入者照样能在短超时内拿到写锁。"""
         (self.media / "a.mp4").write_bytes(b"0" * 4)

@@ -22,7 +22,7 @@
 /* 氛围色定义在这里，右侧详情栏、切换队列和「接着看」共用同一档。三块同属
    一格详情，底色差 4% 就会在整幅宽度上留下一条界线，看着像两块面板拼起来；
    分块靠留白和小标题，不靠色差。 */
-[data-stage]{--detail-surface:color-mix(in srgb,var(--video-glow,#15202a) 12%,var(--surface) 88%);
+[data-stage]{--detail-media-height:76dvh;--detail-surface:color-mix(in srgb,var(--video-glow,#15202a) 12%,var(--surface) 88%);
   position:fixed;inset:16px;margin:auto;padding:0;width:min(1440px,calc(100vw - 32px));
   max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);height:fit-content;
   color:var(--ink);border-radius:var(--floating-radius);overscroll-behavior:contain;
@@ -52,6 +52,7 @@
 [data-stage] [data-jav-video]{display:grid;place-items:center}
 [data-stage] [data-stage-scroll] :is([data-jav-video]>[class~="video-js"],[data-item-gallery]>[class~="video-js"]){width:min(100%,calc(var(--detail-gallery-height) * 16 / 9));height:auto;max-height:var(--detail-gallery-height);aspect-ratio:16/9}
 @media(max-width:1080px){
+  [data-stage][data-stage-kind="follow"]{--detail-media-height:min(56dvh,56.25vw)}
   [data-stage]:is([data-stage-kind="item"],[data-stage-kind="jav"]){--detail-media-height:min(56dvh,calc(56.25vw + 116px))}
   [data-stage]:is([data-stage-kind="item"],[data-stage-kind="jav"]):not([data-theater]) [data-stage-grid]{height:auto}
 }
@@ -186,6 +187,12 @@ body[data-detail-open] [class~=glowlayer]::before{animation-play-state:paused,pa
   flex-direction:column;overflow-y:auto;overflow-x:hidden}
 [data-stage-title]{font-size:var(--fs-lg);line-height:1.4;overflow-wrap:anywhere;margin-bottom:8px}
 [data-stage-meta]{display:flex;gap:9px;flex-wrap:wrap;color:var(--muted);margin-bottom:18px}
+[data-local-playback]{display:flex;flex-direction:column;gap:8px;margin:0 0 12px;flex:none}
+[data-local-playback-row]{display:flex;align-items:center;gap:8px;min-width:0}
+[data-local-playback-row]>div{flex:1;min-width:0}
+[data-local-playback-row] .ui-gselect{display:block;width:100%}
+[data-local-playback-row] [data-select-trigger]{width:100%;height:var(--control-h)}
+[data-local-playback-row]>button{flex:none;height:var(--control-h);white-space:nowrap}
 [data-stage-tags]{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:0 0 18px}
 [data-stage-actions]{display:flex;align-items:center;gap:0;margin:0 0 12px;padding:0;border:1px solid var(--border-10);border-radius:var(--control-radius);background:var(--overlay-5);width:max-content;overflow:hidden;flex:none}
 [data-stage-actions] button{width:44px;height:42px;padding:0;border:0;border-right:1px solid var(--border-10);background:transparent;border-radius:0;

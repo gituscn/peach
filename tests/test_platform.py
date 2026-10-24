@@ -30,7 +30,7 @@ from peach.repository import MediaAsset
 
 POSIX_ONLY = unittest.skipIf(os.name == "nt", "路径翻译只在非 Windows 上发生")
 
-#: 测试固定使用程序默认的数据库路径前缀，不依赖本机 config.toml。
+#: 测试显式声明数据库路径前缀，不依赖本机 config.toml。
 LOCATIONS = {"local": (r"R:\media",), "115": ("B:/",), "pikpak": ("A:/",)}
 
 
@@ -188,7 +188,28 @@ class TranslationTests(unittest.TestCase):
         self.assertEqual(translate_ledger_path("/tmp/one.mp4"), Path("/tmp/one.mp4"))
 
     def test_system_volume_is_the_disk_gate_target(self):
-        self.assertEqual(system_volume(), Path("C:/") if os.name == "nt" else Path("/"))
+        volume = system_volume()
+        self.assertTrue(volume.is_absolute())
+        self.assertTrue(volume.is_dir())
+        self.assertEqual(volume, Path(volume.anchor))
+
+
+class SystemVolumeTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'nt', 'Windows 系统目录 API')
+    def test_system_directory_can_be_on_another_drive(self):
+        import ctypes
+        def windows_directory(buffer, size):
+            buffer.value = 'Z:\\Windows'
+            return len(buffer.value)
+        with patch.object(ctypes.windll.kernel32, 'GetWindowsDirectoryW', side_effect=windows_directory):
+            self.assertEqual(system_volume(), Path('Z:/'))
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows 系统目录 API')
+    def test_missing_system_directory_is_reported(self):
+        import ctypes
+        with patch.object(ctypes.windll.kernel32, 'GetWindowsDirectoryW', return_value=0):
+            with self.assertRaises(OSError):
+                system_volume()
 
 
 class RootBoundaryTests(unittest.TestCase):

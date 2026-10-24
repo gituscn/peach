@@ -11,7 +11,7 @@
  * 令牌与密码只往本机凭据文件写，读接口只回「存没存过」，所以令牌框保存后清空、提示改成
  * 「已保存，留空不改」。PikPak 要人机验证时服务端回一个验证页地址，这里给出链接让用户在浏览器
  * 里完成，Peach 不替他过验证。 */
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 
 import { Button } from '@/components/base/buttons/button';
 import { Chip } from '@/components/base/badges/chip';
@@ -45,14 +45,16 @@ const POLL_MS = 2000;
 const PikPakIcon = providerIcon('pikpak');
 
 /** 「下载渠道」分组：CloudDrive2 与 PikPak 账号。 */
-export function DownloadGroup({ initial, receipt, panel }: {
-  initial: DownloadSettingsState;
+export function DownloadGroup({ initial, receipt, panel, issues }: {
+  initial?: DownloadSettingsState;
   receipt(message: string): void;
   panel?: ConfigurationPanel;
+  issues?: ReactNode;
 }) {
   return (
     <div {...groupRoot(panel)}>
-      <DownloadSettings initial={initial} receipt={receipt} />
+      {issues}
+      {initial ? <DownloadSettings initial={initial} receipt={receipt} /> : null}
     </div>
   );
 }
@@ -191,6 +193,7 @@ function DownloadForm({ state, settle, receipt, pikpakAccount }: CardProps & { p
 
   return (
     <Section title="云下载" onSubmit={submit}>
+      {state.problems?.length ? <Stack><Note tone="error" title="云下载配置需要检查">{state.problems.join('\n')}</Note></Stack> : null}
       <Stack>
         <Input label="CloudDrive2 地址" placeholder="留空自动查找" autoComplete="off" maxLength={200}
           value={config.clouddrive_address} isDisabled={!state.available}

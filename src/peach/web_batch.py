@@ -155,7 +155,7 @@ def _restore_staged_media(staged):
                 manifest.unlink()
                 quarantine.parent.rmdir()
             else:
-                os.rename(quarantine, original)
+                quarantine.rename(original)
 
 
 def _mountinfo_field(value: str) -> str:
@@ -165,6 +165,9 @@ def _mountinfo_field(value: str) -> str:
 
 def _is_rclone_mount(path: Path) -> bool:
     """按最深挂载点与覆盖关系识别 rclone 文件系统；不确定时保留隔离流程。"""
+    from .smb_media import SmbResource
+    if isinstance(path, SmbResource):
+        return False
     try:
         lines = MOUNTINFO_PATH.read_text(encoding="utf-8", errors="surrogateescape").splitlines()
     except OSError:
@@ -201,11 +204,15 @@ def _is_rclone_mount(path: Path) -> bool:
 
 def _quarantine_media(original: Path, *, location: str | None = None) -> Path:
     """同目录改名不支持时，小文件先保留本地完整备份再删除原文件。"""
+    from .smb_media import SmbResource
     key = uuid.uuid4().hex
     name = (f'peach-purge-{key}.peach-quarantine'
-            if location == 'pikpak' or PureWindowsPath(str(original)).drive.casefold() == 'a:'
+            if location == 'pikpak'
             else f'.{original.name}.peach-purge-{key}.tmp')
     quarantine = original.with_name(name)
+    if isinstance(original, SmbResource):
+        original.rename(quarantine)
+        return quarantine
     try:
         os.rename(original, quarantine)
         return quarantine
@@ -245,8 +252,10 @@ def _online_source_roots() -> dict[str, tuple[Path, ...]]:
     for location, declarations in LOCATION_ROOT_DECLARATIONS.items():
         online = []
         for declaration in declarations:
-            root = translate_ledger_path(declaration)
-            if is_unmapped(root) or not root.is_dir() or not root_online(root):
+            from .smb_media import resolve
+            remote = resolve(declaration)
+            root = remote or translate_ledger_path(declaration)
+            if (remote is None and is_unmapped(root)) or not root.is_dir() or not root_online(root):
                 continue
             online.append(root)
         if online:
@@ -334,6 +343,9 @@ def _finish_purge(outcome):
 def _purge_media_path(row, online_roots: dict[str, tuple[Path, ...]]) -> Path:
     """核对永久删除目标的路径映射和来源可读性，失败时拒绝删除。"""
     media = row["path"]
+    from .smb_media import resolve
+    if remote := resolve(media):
+        return remote
     translated = translate_ledger_path(media)
     if is_unmapped(translated):
         raise OSError("媒体路径未映射到可访问的挂载目录")

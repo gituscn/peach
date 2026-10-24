@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Iterable
+from functools import lru_cache
 from pathlib import PureWindowsPath
 
 
@@ -19,15 +20,57 @@ VIDEO_EXTENSIONS = frozenset({
     '.mp4', '.m4v', '.mkv', '.avi', '.wmv', '.mov', '.ts', '.flv', '.rmvb', '.mpg',
     '.m2ts', '.strm', '.iso',
 })
-_LOCAL_TRAILER = re.compile(
-    r'(?:^|[-._ ])trailer(?:' + '|'.join(re.escape(ext) for ext in sorted(VIDEO_EXTENSIONS)) + r')\Z',
-    re.IGNORECASE,
-)
+AUDIO_EXTENSIONS = frozenset({'.mp3', '.flac', '.wav', '.m4a', '.ogg', '.opus'})
+_EXTRA_SUFFIXES = {
+    '-behindthescenes': 'behindthescenes', '-deleted': 'deleted', '-deletedscene': 'deleted',
+    '-featurette': 'featurette', '-interview': 'interview', '-scene': 'scene',
+    '-clip': 'clip', '-short': 'short', '-extra': 'other', '-other': 'other',
+    **{separator + kind: kind for kind in ('trailer', 'sample') for separator in ('-', '.', '_', ' ')},
+}
+_EXTRA_DIRECTORIES = {
+    'trailers': 'trailer', 'behind the scenes': 'behindthescenes', 'deleted scenes': 'deleted',
+    'interviews': 'interview', 'scenes': 'scene', 'samples': 'sample', 'sample': 'sample',
+    'shorts': 'short', 'featurettes': 'featurette', 'clips': 'clip',
+    'extras': 'other', 'extra': 'other', 'other': 'other', 'specials': 'other',
+    'backdrops': 'themevideo', 'theme-music': 'themeaudio',
+}
 
 
-def is_local_trailer(name: str | None) -> bool:
-    """Kodi／Jellyfin 的裸名或末尾 trailer 标记；时长不参与判定。"""
-    return bool(_LOCAL_TRAILER.search(name or ''))
+@lru_cache(maxsize=8192)
+def _extra_directory(directory: str, library_roots: tuple[str, ...], audio: bool) -> str | None:
+    parent = PureWindowsPath(directory)
+    roots = [PureWindowsPath(root) for root in library_roots if root]
+    containing = [root for root in roots if parent.is_relative_to(root)]
+    parts = (parent.relative_to(max(containing, key=lambda root: len(root.parts))).parts
+             if containing else parent.parts)
+    kinds = (_EXTRA_DIRECTORIES.get(part.casefold()) for part in reversed(parts))
+    return next((kind for kind in kinds if kind is not None and (kind == 'themeaudio') == audio), None)
+
+
+def local_extra_type(name: str | None, path: str | None = None, *,
+                     library_roots: tuple[str, ...] = ()) -> str | None:
+    """显式文件标记或库根以下的附属目录；判定只读名字和路径。"""
+    filename = PureWindowsPath(name or path or '').name
+    suffix = PureWindowsPath(filename).suffix.casefold()
+    video, audio = suffix in VIDEO_EXTENSIONS, suffix in AUDIO_EXTENSIONS
+    if not (video or audio):
+        return None
+    stem = filename[:-len(suffix)].casefold().rstrip('0123456789')
+    if video:
+        if stem in ('trailer', 'sample'):
+            return stem
+        tagged = next((kind for token, kind in _EXTRA_SUFFIXES.items() if stem.endswith(token)), None)
+        if tagged:
+            return tagged
+    if audio and stem == 'theme':
+        return 'themeaudio'
+    return _extra_directory(str(PureWindowsPath(path).parent), tuple(library_roots), audio) if path else None
+
+
+def is_local_extra(name: str | None, path: str | None = None, *,
+                   library_roots: tuple[str, ...] = ()) -> bool:
+    """是否为本地预告片、花絮或主题媒体。"""
+    return local_extra_type(name, path, library_roots=library_roots) is not None
 
 
 LENGTH_TAGS = {"短片-2分内", "中片-10分内", "长片-30分内", "超长片-30分上"}

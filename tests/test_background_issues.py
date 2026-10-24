@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from peach import background_issues  # noqa: E402
 from peach.background_issues import IssueLog  # noqa: E402
 from peach.follow_scheduler import FollowUpdateScheduler  # noqa: E402
-from peach.metadata_amane import bridge_home, bridge_python  # noqa: E402
+from peach.metadata_amane import bridge_home, bridge_python, pinned_revision  # noqa: E402
 from peach.tunnel import TunnelSnapshot  # noqa: E402
 
 
@@ -43,6 +43,8 @@ def write_amane_metadata(tools):
     package = bridge_home(tools) / ".venv" / "Lib" / "site-packages" / "amane-0.20.0.dist-info"
     package.mkdir(parents=True)
     (package / "METADATA").write_text("Metadata-Version: 2.1\nName: amane\nVersion: 0.20.0\n", encoding="utf-8")
+    (bridge_home(tools) / 'installed.json').write_text(json.dumps({
+        'revision': pinned_revision(), 'version': '0.20.0'}), encoding='utf-8')
 
 
 class BackgroundIssueTests(unittest.TestCase):

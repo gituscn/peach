@@ -64,6 +64,19 @@ def assert_public_resources(application: Path) -> None:
     assert expected == hashlib.sha256(content.encode('utf-8')).hexdigest(), "公共实体种子摘要不一致"
 
 
+def assert_amane_runtime(opener, base: str, runtime: Path) -> None:
+    """空数据目录使用随包采集工具，实际服务返回相同的固定版本与程序路径。"""
+    from build_amane_runtime import verify
+    verify(runtime)
+    manifest = json.loads((runtime / 'manifest.json').read_text(encoding='utf-8'))
+    with opener.open(base + '/api/scraping/amane-bridge', timeout=15) as response:
+        facts = json.load(response)
+    assert facts['installed'] and not facts['problem'], facts
+    assert facts['revision'] == manifest['revision'], facts
+    assert facts['installed_version'] == manifest['version'], facts
+    assert Path(facts['python']).resolve() == (runtime / manifest['executable']).resolve(), facts
+
+
 def assert_bundled_media_tools(application: Path) -> None:
     """在没有系统媒体工具的机器上验证随包转码、探测和抽帧。"""
     tools = application / "tools" / "ffmpeg"
@@ -442,6 +455,7 @@ def main() -> int:
                     headers={"Origin": base})
                 with opener.open(login, timeout=10) as response:
                     assert response.status == 200
+                assert_amane_runtime(opener, base, executable.parent / '_internal/tools/amane-runtime')
                 for path in ("/", "/app.css", "/dist/peach-app.js", "/dist/peach-app.css", "/api/items"):
                     with opener.open(base + path, timeout=10) as response:
                         assert response.status == 200, path
@@ -465,7 +479,7 @@ def main() -> int:
                 assert (data / "config.previous.toml").is_file()
                 assert (data / "state" / "configuration-reload.request").is_file()
                 print(json.dumps({"ok": True, "version": health.get("version"),
-                                  "checks": ["oobe", "migrations", "lan-bind", "mdns", "password-login", "unauthenticated-api", "pages", "island", "items", "clouddrive-configuration", "cloudflared-sidecar", "bundled-media-tools", "public-resources"]}))
+                                  "checks": ["oobe", "migrations", "lan-bind", "mdns", "password-login", "unauthenticated-api", "pages", "island", "items", "clouddrive-configuration", "cloudflared-sidecar", "bundled-media-tools", "bundled-amane-runtime", "public-resources"]}))
             finally:
                 process.terminate()
                 process.wait(timeout=15)

@@ -11,4 +11,5 @@ const SOURCE_MARKS: Readonly<Record<string, string>> = {
 export const MEDIA_SOURCE_ICONS: Readonly<Record<string, string>> = {
   ...Object.fromEntries(MEDIA_SOURCE_REGISTRY.map((source) => [source.id, SOURCE_MARKS[source.id] || source.icon])),
   online: 'rss',
+  smb: 'network',
 };

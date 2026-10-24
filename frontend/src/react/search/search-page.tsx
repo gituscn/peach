@@ -21,6 +21,7 @@ import {
 } from './search';
 
 interface Store {
+  dismissed: boolean;
   history: string[];
   pool: string[];
   poolRequest: number;
@@ -45,7 +46,7 @@ interface Store {
 }
 
 const emptyStore = (): Store => ({
-  history: [], pool: [], poolRequest: 0, recommendations: [], recommendationRequest: 0, query: '', picks: [], suggestFor: '', groups: [], tabs: [],
+  dismissed: false, history: [], pool: [], poolRequest: 0, recommendations: [], recommendationRequest: 0, query: '', picks: [], suggestFor: '', groups: [], tabs: [],
   suggestRequest: 0, asked: '', timer: 0, kind: '', active: -1, reveal: false, rewind: false,
 });
 
@@ -80,11 +81,13 @@ export function SearchPage(props: SearchProps) {
     const onStart = () => latest.current.helpers.composing();
     const onKey = (event: KeyboardEvent) => op.key(event);
     const onFocus = () => op.focus();
+    const onClick = () => { if (s.dismissed) op.focus() };
     input.addEventListener('input', onInput);
     input.addEventListener('compositionend', onInput);
     input.addEventListener('compositionstart', onStart);
     input.addEventListener('keydown', onKey);
     input.addEventListener('focus', onFocus);
+    input.addEventListener('click', onClick);
     const api: SearchApi = { close: op.close };
     latest.current.expose(api);
     return () => {
@@ -93,6 +96,7 @@ export function SearchPage(props: SearchProps) {
       input.removeEventListener('compositionstart', onStart);
       input.removeEventListener('keydown', onKey);
       input.removeEventListener('focus', onFocus);
+      input.removeEventListener('click', onClick);
       clearTimeout(s.timer);
       s.recommendationRequest++;
       latest.current.expose(null);
@@ -215,6 +219,7 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
 
   const isOpen = () => { const el = menu(); return !!el && !el.hidden };
   const close = () => {
+    s.dismissed = true;
     s.recommendationRequest++;
     const el = menu();
     if (el) props().helpers.dismiss(el);
@@ -223,6 +228,7 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
   };
   /** 按此刻的输入与手上的数据画一遍：有东西就掀开，没有就收起。推荐每画一次洗一次。 */
   const paint = () => {
+    if (s.dismissed) return;
     s.query = input().value.trim();
     s.picks = s.query ? [] : shufflePicks(s.pool, readHistory());
     s.active = -1;
@@ -339,10 +345,12 @@ function createOps(props: () => SearchProps, s: Store, menu: () => HTMLElement |
   };
   const onInput = (event: InputEvent) => {
     if (event.isComposing) return;
+    s.dismissed = false;
     props().helpers.typed(input());
     refresh();
   };
   const focus = () => {
+    s.dismissed = false;
     void loadRecommendations();
     void Promise.all([loadHistory(), loadPool()]).then(() => {
       if (!focused()) return;

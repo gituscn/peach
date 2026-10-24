@@ -78,6 +78,34 @@ export async function verifyTablePreferences(page: Page, table: Locator, label: 
   }
   await controls.getByRole('button', { name: '显示列', exact: true }).click();
   const menu = page.getByRole('dialog', { name: `${label}显示列`, exact: true });
+  const actionLayout = await menu.evaluate(element => {
+    const actions = element.querySelector<HTMLElement>('[data-selection-actions]')!;
+    const buttons = [...actions.querySelectorAll('button')].map(button => {
+      const box = button.getBoundingClientRect();
+      const style = getComputedStyle(button);
+      const naturalWidth = button.lastElementChild!.getBoundingClientRect().width
+        + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
+        + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
+      return { width: box.width, height: box.height, top: box.top, naturalWidth,
+        scrollWidth: button.scrollWidth, clientWidth: button.clientWidth };
+    });
+    const optionBox = element.querySelector('[data-selection-options]')!.getBoundingClientRect();
+    const optionWidths = [...element.querySelectorAll('label')].map(label =>
+      label.lastElementChild!.getBoundingClientRect().right - label.getBoundingClientRect().left);
+    return { width: actions.getBoundingClientRect().width, top: actions.getBoundingClientRect().top,
+      bottom: actions.getBoundingClientRect().bottom, placement: element.getAttribute('data-selection-placement'),
+      contentWidth: element.getBoundingClientRect().width, naturalWidth: Math.max(...optionWidths, ...buttons.map(button => button.naturalWidth)),
+      optionTop: optionBox.top, optionBottom: optionBox.bottom, buttons };
+  });
+  assert.ok(actionLayout.placement === 'top' ? actionLayout.bottom <= actionLayout.optionTop
+    : actionLayout.top >= actionLayout.optionBottom, `${label} 选项应靠近触发器`);
+  assert.equal(actionLayout.buttons.length, 2);
+  assert.ok(Math.abs(actionLayout.contentWidth - actionLayout.naturalWidth) <= 1, `${label} 菜单宽度跟随内容`);
+  for (const button of actionLayout.buttons) {
+    assert.ok(Math.abs(button.width - actionLayout.width) <= 1, `${label} 长按钮铺满操作区`);
+    assert.ok(button.scrollWidth <= button.clientWidth + 1, `${label} 按钮文案应完整显示`);
+  }
+  assert.ok(actionLayout.buttons[1]!.top >= actionLayout.buttons[0]!.top + actionLayout.buttons[0]!.height);
   await menu.locator('label').filter({ has: page.getByRole('checkbox', { name: optional.label, exact: true }) }).click();
   await page.keyboard.press('Escape');
   assert.equal(await table.locator(`th[data-key="${optional.id}"]`).count(), 0);

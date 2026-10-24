@@ -29,6 +29,26 @@ async function menu(page: Page) {
   await page.locator('#stage [data-player-subtitles]').click();
 }
 
+async function nativeCaptionDisplay(page: Page) {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
+    const { root } = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#stage video.vjs-tech' });
+    type Node = { nodeId: number; attributes?: string[]; children?: Node[]; shadowRoots?: Node[] };
+    const find = (node: Node, match: (node: Node) => boolean): Node | undefined => {
+      if (match(node)) return node;
+      for (const child of [...(node.children || []), ...(node.shadowRoots || [])]) {
+        const found = find(child, match); if (found) return found;
+      }
+    };
+    const video = find(root, node => node.nodeId === nodeId)!;
+    const container = find(video, node => !!node.attributes?.includes('-webkit-media-text-track-container'))!;
+    const { computedStyle } = await cdp.send('CSS.getComputedStyleForNode', { nodeId: container.nodeId });
+    return computedStyle.find(style => style.name === 'display')?.value;
+  } finally { await cdp.detach() }
+}
+
 describe('播放器字幕', () => {
   let browser: Browser;
   before(async () => { browser = await launch() });
@@ -111,6 +131,13 @@ describe('播放器字幕', () => {
         await (await chooser).setFiles({ name: subtitleName, mimeType: 'text/plain', buffer: Buffer.from(SRT) });
         await page.waitForFunction(name => [...document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')!.textTracks].some(track => track.label === name && track.mode === 'showing'), subtitleName);
         await caption(page, '测试字幕');
+        const background = await page.locator('#stage video.vjs-tech').evaluate(() => ({
+          window: getComputedStyle(document.querySelector('.vjs-peach-caption-window')!).backgroundColor,
+          line: getComputedStyle(document.querySelector('.vjs-peach-caption-line')!).backgroundColor,
+        }));
+        assert.equal(await nativeCaptionDisplay(page), 'none');
+        assert.equal(background.window, 'rgba(0, 0, 0, 0)');
+        assert.equal(background.line, 'rgba(0, 0, 0, 0.75)');
         const selectedSpacing = await page.locator('[data-subtitle-track][aria-checked="true"]').evaluate(button => {
           const row = button.getBoundingClientRect(), label = button.querySelector('.vjs-peach-option-label')!.getBoundingClientRect();
           return { top: label.top - row.top, bottom: row.bottom - label.bottom, textHeight: label.height };
@@ -160,6 +187,33 @@ describe('播放器字幕', () => {
       } finally { await opened.close() }
     });
   }
+
+  it('同目录字幕进入选项，选择和关闭按视频恢复', { timeout: 60_000 }, async () => {
+    const key = 'sidecar:local:stable-file';
+    const opened = await visit(browser, `/assets/${requiredEnv('PEACH_E2E_ITEM')}`, VIEWPORTS[0]!, async page => {
+      await page.route(/\/api\/assets\/\d+\/subtitles$/, route => route.fulfill({ json: {
+        subtitles: [{ id: key, name: 'STARS-265.srt', label: 'SRT', language: '', playable: true, src: '/local-sidecar.vtt' }],
+      } }));
+      await page.route('**/local-sidecar.vtt', route => route.fulfill({ contentType: 'text/vtt',
+        body: 'WEBVTT\n\n00:00:00.000 --> 00:01:00.000\n同目录字幕\n' }));
+    });
+    const { page, problems } = opened;
+    try {
+      await page.locator('#stage .vjs-peach-bezel').waitFor({ state: 'attached' });
+      await page.waitForFunction(id => [...(document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')?.textTracks || [])].some(track => track.id === id), key);
+      await menu(page);
+      await page.getByRole('menuitemradio', { name: 'SRT', exact: true }).click();
+      await caption(page, '同目录字幕');
+      await page.reload();
+      await page.waitForFunction(id => [...(document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')?.textTracks || [])].some(track => track.id === id && track.mode === 'showing'), key);
+      await menu(page);
+      await page.getByRole('menuitemradio', { name: '关闭', exact: true }).click();
+      await page.reload();
+      await page.waitForFunction(id => [...(document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')?.textTracks || [])].some(track => track.id === id), key);
+      assert.equal(await page.locator('#stage video.vjs-tech').evaluate((video: HTMLVideoElement) => [...video.textTracks].some(track => track.mode === 'showing')), false);
+      assert.deepEqual(problems, []);
+    } finally { await opened.close() }
+  });
 
   for (const viewport of VIEWPORTS) {
   it(`${viewport.name}：自动搜索、返回结果与重复加载复用会话`, { timeout: 60_000 }, async () => {

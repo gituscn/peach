@@ -163,13 +163,13 @@ export const REVIEW_ROW = {
 };
 
 /** 人工复核页按一行造出来的队列打开：演示库里这一格未必正好有候选，而队列空了就没有卡。 */
-export async function openReview(browser: Browser): Promise<Visit> {
-  const opened = await visit(browser, '/review', DESKTOP);
+export async function openReview(browser: Browser, rows = [REVIEW_ROW], viewport = DESKTOP): Promise<Visit> {
+  const opened = await visit(browser, '/review', viewport);
   await opened.page.route('**/api/review', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify({
-      sections: { metadata_fields: [REVIEW_ROW] }, counts: { metadata_fields: 1 }, genre_tags: [],
+      sections: { metadata_fields: rows }, counts: { metadata_fields: rows.length }, genre_tags: [],
     }),
   }));
   await opened.page.reload({ waitUntil: 'load' });

@@ -29,6 +29,7 @@
   background:color-mix(in srgb,var(--surface) 96%,var(--ground));
   box-shadow:0 22px 56px -20px #000b;backdrop-filter:saturate(1.5) blur(26px)}
 .searchmenu[hidden]{display:none}
+.searchmenu>.ovtrack{pointer-events:auto;touch-action:none}
 /* 栏里的行、组与页签归 `search` 岛（`frontend/src/react/search/search.css`）。两栏与否看下拉栏自己
    有多宽，不看窗口，所以容器查询名挂在这块面上。 */
 .searchmenu{container:searchmenu/inline-size}

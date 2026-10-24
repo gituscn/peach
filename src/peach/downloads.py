@@ -530,6 +530,7 @@ class DownloadConfig:
     #: PikPak 根目录对应的数据库路径前缀；115 使用推送发现中配置的云端路径前缀。
     pikpak_root: str = ""
     wait_hours: int = DEFAULT_WAIT_HOURS
+    problems: tuple[str, ...] = ()
 
     def payload(self) -> dict:
         return {"clouddrive_address": self.clouddrive_address, "targets": dict(self.targets),
@@ -542,10 +543,19 @@ def clean_address(raw) -> str:
         return ""
     if "://" not in text:
         text = "http://" + text
-    parts = urlsplit(text)
+    message = "CloudDrive2 地址只写协议、主机和端口，例如 http://127.0.0.1:19798"
+    if len(text) > 2048 or "\\" in text or any(char.isspace() or ord(char) < 32 for char in text):
+        raise ValueError(message)
+    try:
+        parts = urlsplit(text)
+        port = parts.port
+    except ValueError:
+        raise ValueError("CloudDrive2 地址的端口必须是 1–65535 的整数，IPv6 地址须放在方括号内") from None
     if parts.scheme not in {"http", "https"} or not parts.hostname or parts.path not in {"", "/"} \
-            or parts.query or parts.username or parts.password:
-        raise ValueError("CloudDrive2 地址只写协议、主机和端口，例如 http://127.0.0.1:19798")
+            or parts.query or parts.fragment or parts.username is not None or parts.password is not None:
+        raise ValueError(message)
+    if port == 0 or parts.netloc.endswith(":"):
+        raise ValueError("CloudDrive2 地址的端口必须是 1–65535 的整数")
     return f"{parts.scheme}://{parts.netloc}"
 
 
@@ -562,16 +572,16 @@ class DownloadSettings:
             return DownloadConfig()
         except (OSError, ValueError):
             LOGGER.warning("云下载设置读不出来，按默认值跑：%s", self.path)
-            return DownloadConfig()
+            return DownloadConfig(problems=("云下载设置无法读取，请检查设置文件或重新填写。",))
         if not isinstance(payload, dict):
-            return DownloadConfig()
+            return DownloadConfig(problems=("云下载设置格式不符，请检查设置文件或重新填写。",))
         try:
-            return self._parse(payload, declared_roots=None)
+            return self._parse(payload, declared_roots=None, saved=True)
         except ValueError:
             LOGGER.warning("云下载设置有不合法的值，按默认值跑：%s", self.path)
-            return DownloadConfig()
+            return DownloadConfig(problems=("云下载设置含有无效值，请检查目标目录和等待上限。",))
 
-    def _parse(self, body: dict, *, declared_roots) -> DownloadConfig:
+    def _parse(self, body: dict, *, declared_roots, saved: bool = False) -> DownloadConfig:
         from .media_sources import SOURCE_REGISTRY
         targets = {}
         raw_targets = body.get("targets") if isinstance(body.get("targets"), dict) else {}
@@ -592,7 +602,15 @@ class DownloadSettings:
             raise ValueError("等待上限要写成小时数") from error
         if not 1 <= hours <= MAX_WAIT_HOURS:
             raise ValueError(f"等待上限在 1 到 {MAX_WAIT_HOURS} 小时之间")
-        return DownloadConfig(clean_address(body.get("clouddrive_address")), targets, root, hours)
+        problems = ()
+        try:
+            address = clean_address(body.get("clouddrive_address"))
+        except ValueError as error:
+            if not saved:
+                raise
+            address = str(body.get("clouddrive_address") or "").strip()
+            problems = (str(error),)
+        return DownloadConfig(address, targets, root, hours, problems)
 
     def save(self, body: dict, declared_roots) -> DownloadConfig:
         if not isinstance(body, dict):

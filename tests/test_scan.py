@@ -19,7 +19,7 @@ from contextlib import closing, redirect_stdout
 from pathlib import Path, PureWindowsPath
 from unittest.mock import patch
 
-from peach import scan
+from peach import catalog_rules, scan
 from peach.migrations import upgrade
 from support.web import route_client
 
@@ -310,12 +310,12 @@ class SidecarTests(_ScanCase):
     def test_movie_trailers_are_sidecars_and_short_main_features_are_kept(self):
         self._layout(['ABC-123/ABC-123.mp4', 'ABC-123/ABC-123-trailer.mp4',
                       'ABC-123/ABC-123.nfo', 'ABC-123/ABC-123-poster.jpg',
-                      'ABC-123/extrafanart/1.jpg', 'ABC-123/ABC-123-short.mp4'])
+                      'ABC-123/extrafanart/1.jpg', 'ABC-123/short-film.mp4'])
         result, _ = self._scan(r'R:\media\ABC-123', declared_roots=self.DECLARED,
                                mounts={'local': (self.media,)}, windows=False)
         self.assertEqual((result.files, result.sidecars), (2, 4))
         self.assertEqual(set(self._paths()), {
-            r'R:\media\ABC-123\ABC-123.mp4', r'R:\media\ABC-123\ABC-123-short.mp4'})
+            r'R:\media\ABC-123\ABC-123.mp4', r'R:\media\ABC-123\short-film.mp4'})
         self.assertTrue((self.media / 'ABC-123/ABC-123-trailer.mp4').is_file())
 
     def test_trailer_names_use_an_explicit_terminal_marker(self):
@@ -329,6 +329,96 @@ class SidecarTests(_ScanCase):
                      'ABC-123trailer.mp4', 'ABC-123-trailer.mp4.bak', 'trailer.jpg'):
             with self.subTest(name=name):
                 self.assertFalse(scan.is_sidecar(name, frozenset()))
+
+    def test_media_server_extras_and_nested_directories_are_not_registered(self):
+        paths = ['Film/Film.mkv', 'Film/Trailer 1-trailer.MP4', 'Film/Interview-interview2.mkv',
+                 'Film/trailers/Teaser.mp4', 'Film/Extras/Trailers/Trailer 2.mkv',
+                 'Film/behind the scenes/Making of.mp4', 'Film/deleted scenes/Ending.mp4',
+                 'Film/shorts/Bonus.mp4', 'Film/specials/Bonus.mp4',
+                 'Film/backdrops/Menu.mkv', 'Film/theme-music/Score.flac', 'Film/theme.mp3']
+        self._layout(paths)
+        result, _ = self._scan(r'R:\media\Film', declared_roots=self.DECLARED,
+                               mounts={'local': (self.media,)}, windows=False)
+        self.assertEqual((result.files, result.sidecars), (1, len(paths) - 1))
+        self.assertEqual(self._paths(), {r'R:\media\Film\Film.mkv': 'video'})
+        self.assertTrue(all((self.media / name).is_file() for name in paths))
+
+    def test_a_declared_shorts_root_contains_independent_features(self):
+        self._layout(['Shorts/One.mp4', 'Shorts/Film/extras/Making of.mp4'])
+        result, _ = self._scan(r'R:\media\Shorts', declared_roots={'local': (r'R:\media\Shorts',)},
+                               mounts={'local': (self.media / 'Shorts',)}, windows=False)
+        self.assertEqual((result.files, result.sidecars), (1, 1))
+        self.assertEqual(self._paths(), {r'R:\media\Shorts\One.mp4': 'video'})
+
+
+class LocalExtraNamingTests(unittest.TestCase):
+    def test_movie_and_episode_suffixes_and_numbered_bare_names(self):
+        examples = {
+            'trailer.mp4': 'trailer', 'trailer2.MKV': 'trailer', 'sample1.mp4': 'sample',
+            'Film-trailer1.mp4': 'trailer', 'Film.trailer2.mkv': 'trailer',
+            'Film_trailer3.mov': 'trailer', 'Film trailer4.m4v': 'trailer',
+            'Film- trailer5.mp4': 'trailer', 'Film-sample1.mp4': 'sample',
+            'Film.sample2.mkv': 'sample', 'Film_sample3.mov': 'sample',
+            'Film sample4.mp4': 'sample', 'Film- sample5.mp4': 'sample',
+            'Performance Capture-behindthescenes.mkv': 'behindthescenes',
+            'Ending-deleted.mp4': 'deleted', 'Ending-deletedscene2.mp4': 'deleted',
+            'Special Effects-featurette.mp4': 'featurette', 'Actor-interview.mp4': 'interview',
+            'Arrival-scene.mp4': 'scene', 'Moment-clip.mp4': 'clip',
+            'Bonus-short.mp4': 'short', 'Bonus-extra.mp4': 'other', 'Bonus-other.mp4': 'other',
+            'Show - S01E01 - Episode-deleted2.mkv': 'deleted', 'theme.flac': 'themeaudio',
+        }
+        for name, expected in examples.items():
+            with self.subTest(name=name):
+                self.assertEqual(catalog_rules.local_extra_type(name), expected)
+                self.assertTrue(scan.is_sidecar(name, frozenset()))
+
+    def test_exact_markers_preserve_titles_and_unsupported_files(self):
+        for name in ('Short Film.mp4', 'Trailer Park.mp4', 'Interview.mp4', 'Sample Story.mp4',
+                     'Filmtrailer.mp4', 'Film-short-story.mp4', 'Film-deleted-scenes.mp4',
+                     'Film-trailerA.mp4', 'Film-trailer.mp4.bak', 'Film-trailer.jpg',
+                     'Film-interview.mp3', 'theme.mp4', '', None):
+            with self.subTest(name=name):
+                self.assertIsNone(catalog_rules.local_extra_type(name))
+
+    def test_dedicated_directories_are_case_insensitive_and_allow_nesting(self):
+        directories = {'Trailers': 'trailer', 'Behind The Scenes': 'behindthescenes',
+            'Deleted Scenes': 'deleted', 'Interviews': 'interview', 'Scenes': 'scene',
+            'Samples': 'sample', 'Sample': 'sample', 'Shorts': 'short',
+            'Featurettes': 'featurette', 'Clips': 'clip', 'Other': 'other',
+            'Extras': 'other', 'Extra': 'other', 'Specials': 'other', 'Backdrops': 'themevideo'}
+        for directory, expected in directories.items():
+            for path in (f'R:/Movies/Film/{directory}/Clip.mp4',
+                         f'R:/Movies/Film/{directory}/Disc 1/Clip.mp4'):
+                with self.subTest(path=path):
+                    self.assertEqual(catalog_rules.local_extra_type('Clip.mp4', path,
+                                     library_roots=('R:/Movies',)), expected)
+        self.assertEqual(catalog_rules.local_extra_type('Score.opus', '/movies/Film/theme-music/Score.opus'),
+                         'themeaudio')
+        self.assertIsNone(catalog_rules.local_extra_type('Score.opus', '/movies/Film/trailers/Score.opus'))
+        self.assertEqual(catalog_rules.local_extra_type('Clip.mp4', '/movies/Film/Extras/theme-music/Clip.mp4'),
+                         'other')
+        self.assertEqual(catalog_rules.local_extra_type('Score.opus', '/movies/Film/theme-music/clips/Score.opus'),
+                         'themeaudio')
+
+    def test_longest_library_root_is_the_directory_boundary(self):
+        for path, roots in ((r'R:\Shorts\Film.mp4', ('R:/Shorts',)),
+                            ('/Movies/Extras/Film.mp4', ('/Movies', '/Movies/Extras')),
+                            (r'\\server\Shorts\Film.mp4', (r'\\server\Shorts',))):
+            with self.subTest(path=path):
+                self.assertIsNone(catalog_rules.local_extra_type('Film.mp4', path, library_roots=roots))
+        self.assertEqual(catalog_rules.local_extra_type('Clip.mp4', 'R:/Shorts/Film/Extras/Clip.mp4',
+                         library_roots=('r:/shorts',)), 'other')
+
+    def test_sqlite_classifier_uses_configured_library_boundaries(self):
+        from peach.repository import LedgerDatabase
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary).resolve() / 'ledger.db'
+            sqlite3.connect(path).close()
+            database = LedgerDatabase(path, media_roots=('R:/Movies', 'R:/Movies/Shorts'))
+            with database.read_connection() as connection:
+                values = [connection.execute("SELECT peach_is_local_extra('Film.mp4',?)", (value,)).fetchone()[0]
+                          for value in ('R:/Movies/Shorts/Film.mp4', 'R:/Movies/Shorts/Film/Extras/Film.mp4')]
+            self.assertEqual(values, [0, 1])
 
     def test_the_rule_reads_names_only(self):
         videos = scan.video_stems(["ABC-1.mp4", "notes.txt"])

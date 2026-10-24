@@ -9,7 +9,7 @@ from pathlib import Path
 
 from peach import follow_providers
 from peach.follow import FollowSourceError
-from peach.follow_sources import FollowCandidate, SourceFetch
+from peach.follow_sources import FollowCandidate, IwaraConnector, SourceFetch
 from peach.follow_store import (
     FollowStore, ReleaseGroup, author_display_text, f95_author_handles,
     f95_author_name, normalized_author_name,
@@ -124,6 +124,27 @@ class RegistrationTests(_StoreCase):
 
 
 class RecordTests(_StoreCase):
+    def test_iwara_general_tags_enter_the_inventory_without_guessing_other_types(self):
+        from peach.web_follow import _item_tags, online_tag_inventory
+
+        candidate = IwaraConnector()._candidate({
+            "id": "Video123", "title": "Test animation", "tags": [
+                {"id": "dance", "type": "general"},
+                {"id": "blender", "type": "category"},
+                {"id": "series_title", "type": "source"},
+                {"id": "pose", "type": "unknown"},
+                {"id": "animation"}]}, {"name": "Test Creator"}, "creator")
+        source_id = self._source(provider="iwara", ref="creator")
+        self.store.record(source_id, _fetch([candidate], provider="iwara", ref="creator"),
+                          moment=MOMENT)
+        rows = online_tag_inventory(self.connection)
+        self.assertEqual([(row["k"], row["cat"]) for row in rows], [("dance", "general")])
+        item = self.store.items()[0]
+        self.assertEqual(_item_tags(item), ["dance"])
+        self.assertEqual(item.metadata["source_tag_types"], {
+            "dance": "general", "blender": "category", "series_title": "source", "pose": "unknown"})
+        self.assertEqual(item.metadata["tags"], ["dance", "blender", "series_title", "pose", "animation"])
+
     def test_booru_source_only_becomes_a_profile_when_the_handle_matches(self):
         source_id = self._source(
             provider="rule34xxx", ref="auxtasy", label="Auxtasy",
@@ -1137,6 +1158,13 @@ class AuthorIdentityTests(_StoreCase):
         self.assertIsNone(self.store.learn_official_author_alias(
             "kemono", "fanbox/30917150",
             (_candidate("1", "a", provider="kemono", author="Initiala"),)))
+
+    def test_iwara_author_profile_provides_a_trusted_handle_alias(self):
+        learned = self.store.learn_official_author_alias(
+            "iwara", "user_creator",
+            (_candidate("1", "Work", provider="iwara", author="Test Creator"),))
+        self.assertEqual(learned["alias"], "user_creator")
+        self.assertEqual(learned["source"], "official:iwara")
 
 
 class SourceRemovalTests(_StoreCase):

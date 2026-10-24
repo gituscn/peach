@@ -46,9 +46,11 @@ const BADGE_COLORS: Record<string, 'lime' | 'rose' | 'yellow' | 'blue' | 'neutra
 };
 
 function StatusBadge({ run }: { run: TaskRunPayload }) {
-  const problems = run.status === 'succeeded' && hasResultProblems(run);
+  const partial = run.status === 'failed' && run.task_key === 'library-processing'
+    && run.result_summary?.outcome === 'partial';
+  const problems = partial || run.status === 'succeeded' && hasResultProblems(run);
   return <Chip color={problems ? 'yellow' : BADGE_COLORS[run.status] ?? 'neutral'}>
-    {problems ? '发现问题' : statusLabel(run.status)}
+    {partial ? '部分项目需处理' : problems ? '发现问题' : statusLabel(run.status)}
   </Chip>;
 }
 

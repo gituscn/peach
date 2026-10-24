@@ -1,14 +1,15 @@
-/* 关注管理页的「JAV 订阅源」页签：上面一张「添加 JAV 订阅」卡，下面一张和关注列表同一个外观的表，
+/* 关注列表里的 JAV 订阅表：
  * 一行一条源，名字前是她的资料图，列出类型、来源、状态、频率、上次拉取与新增，行尾是启用开关、
  * 拉取键与移除键（ADR-0042）。行尾这三样和关注列表那一行一一对应，两张表看起来是一回事。
  *
- * 订阅从人物页的「订阅新作」或这里按名字进，两条路都不收地址（ADR-0047、ADR-0083）。拉回来的
+ * 订阅从人物页的「订阅新作」或「添加关注」按名字进，两条路都不收地址（ADR-0047、ADR-0083）。拉回来的
  * 新作排在首页与人物页筛选栏下面那一行，不在这里列——这里再列一遍就成了第二个入口，两处的
  * 已读状态会各说各话。
  * 服务端是唯一真相：开关与移除之后重取这一份，不在前端按响应拼一份新的本地状态。
  *
  * 勾选和关注列表同一套：勾在行首，点一行的空白处也是选这一行，选中了底部浮出批量操作。 */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   createColumnHelper, createPaginatedRowModel, createSortedRowModel, flexRender, rowPaginationFeature,
@@ -38,7 +39,7 @@ import { TableColumnControls, TableColumnResizer } from '../components/table-col
 import { TableSelectionHeader } from '../components/table-selection-header';
 import { DataTableFooter, DataTableSort } from '../components/table-controls';
 import { cardClass } from '../components/card';
-import { EmptyState, EmptyFocusButton } from '../components/empty-state';
+import { EmptyState } from '../components/empty-state';
 import { LEGACY_AVATAR_IMG } from '../components/legacy-avatar';
 import { SiteLabel } from '../components/source-label';
 import { Note } from '../components/note';
@@ -47,7 +48,6 @@ import { queryClient } from '../query';
 import { ErrorText, Help } from '../settings/section';
 import { busyProps, useAction } from '../settings/use-action';
 import { localTime } from '../time';
-import { AddFeed } from './add-feed';
 import {
   checkFeeds, errorHeadline, FEEDS_KEY, feedIntervalText, fetchFeeds, removeFeed, setFeedEnabled,
   pageWindow, type FeedSource,
@@ -164,15 +164,22 @@ function confirmRemove(sources: FeedSource[], write: () => Promise<unknown>) {
   });
 }
 
-export function FeedSources({ readOnly, toast }: {
-  readOnly: boolean; toast(message: string): void;
+export function FeedSources({ readOnly, toast, onAdd, selection }: {
+  readOnly: boolean; toast(message: string): void; onAdd(): void;
+  selection?: {
+    ids: ReadonlySet<number>;
+    onChange: Dispatch<SetStateAction<ReadonlySet<number>>>;
+    onActivate(): void;
+  };
 }) {
   const feeds = useQuery({ queryKey: FEEDS_KEY, queryFn: ({ signal }) => fetchFeeds(signal) });
   const action = useAction();
   const preferences = useTablePreferences('jav-feeds', preferenceColumns);
   const data = feeds.data;
   const sources = useMemo(() => data?.sources ?? [], [data]);
-  const [selected, setSelected] = useState<ReadonlySet<number>>(new Set<number>());
+  const [ownSelected, setOwnSelected] = useState<ReadonlySet<number>>(new Set<number>());
+  const selected = selection?.ids ?? ownSelected;
+  const setSelected = selection?.onChange ?? setOwnSelected;
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -186,7 +193,7 @@ export function FeedSources({ readOnly, toast }: {
       const next = new Set([...now].filter((id) => alive.has(id)));
       return next.size === now.size ? now : next;
     });
-  }, [sources]);
+  }, [sources, setSelected]);
 
   const bulk = useMutation({
     mutationFn: async (work: { ids: number[]; action: 'enabled' | 'paused' | 'remove' }) => {
@@ -340,6 +347,7 @@ export function FeedSources({ readOnly, toast }: {
     onSortingChange: (next) => { setSorting(next); setPage(1); },
     enableRowSelection: true,
     onRowSelectionChange: (updater) => {
+      selection?.onActivate();
       const next = typeof updater === 'function' ? updater(rowSelection) : updater;
       setSelected(new Set(Object.entries(next).filter(([, on]) => on).map(([id]) => Number(id))));
     },
@@ -352,17 +360,19 @@ export function FeedSources({ readOnly, toast }: {
   }
 
   const check = () => void action.run('check', (signal) => checkFeeds(signal), () => void reload());
-  const toggleRow = (id: number) => setSelected((now) => {
-    const next = new Set(now);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
+  const toggleRow = (id: number) => {
+    selection?.onActivate();
+    setSelected((now) => {
+      const next = new Set(now);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
   const chosen = sources.filter((source) => selected.has(source.id));
   const failing = sources.filter((source) => source.last_error);
 
   return (
     <div className="flex flex-col gap-3">
-      <AddFeed readOnly={readOnly} toast={toast} onAdded={() => void reload()} />
       <section aria-label="JAV 订阅列表"
         className={cardClass({ padding: 'none', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })}>
       <div data-responsive-toolbar="">
@@ -444,8 +454,8 @@ export function FeedSources({ readOnly, toast }: {
         </DataTableFrame>
       ) : (
         <EmptyState icon={RiRssLine} title="还没有订阅源" size="compact"
-          actions={!readOnly ? <EmptyFocusButton target='input[aria-label="女优名"]'>添加订阅</EmptyFocusButton> : undefined}>
-          在上面按女优名添加，或在人物页点「订阅新作」。
+          actions={!readOnly ? <Button variant="secondary" onClick={onAdd}>添加订阅</Button> : undefined}>
+          在「添加关注」按女优名添加，或在人物页点「订阅新作」。
         </EmptyState>
       )}
       {sources.length ? (

@@ -36,6 +36,16 @@ MAX_SOURCES_PER_RUN = 20
 _NOT_MODIFIED = 304
 
 
+def _parse_source(kind: str, body: bytes, url: str):
+    """演员页受登录限制时返回可操作的原因。"""
+    if kind == feeds.KIND_JAVDB_ACTOR and javdb.LOGIN.search(body.decode("utf-8", "replace")):
+        raise ValueError("JavDB 返回登入页，请在「来源和凭证」为 JavDB 配置有效 Cookie 后重试")
+    parsed = feeds.parse(kind, body, url)
+    if parsed is None:
+        raise ValueError("这一页解不出任何条目")
+    return parsed
+
+
 def _transport(contract):
     from .jav_cover_fetch import HostLimitedTransport
     from .library_processing import SOURCE_LIMITER
@@ -91,11 +101,10 @@ def poll_source(contract, transport, source) -> dict:
         with contract.database.write_transaction() as connection:
             feeds.settle(connection, source_id, error=message, interval_minutes=interval)
         return report
-    parsed = feeds.parse(source["kind"], response.body, source["url"])
-    if parsed is None:
-        # 解不出不等于「这次没有新作」：JavDB 那种回了一份不含作品的页面也是这条路。
-        # 当成安静的源会让一个坏掉的订阅永远不报错。
-        message = "这一页解不出任何条目"
+    try:
+        parsed = _parse_source(source["kind"], response.body, source["url"])
+    except ValueError as error:
+        message = str(error)
         report.update(ok=False, error=message)
         with contract.database.write_transaction() as connection:
             feeds.settle(connection, source_id, error=message, interval_minutes=interval)
@@ -143,9 +152,7 @@ def _backfill_solo_works(contract, transport, source, report: dict) -> None:
         response = fetch(transport, url)
         if response.status != 200:
             raise ValueError(f"来源回了 HTTP {response.status}")
-        parsed = feeds.parse(source["kind"], response.body, url)
-        if parsed is None:
-            raise ValueError("这一页解不出任何条目")
+        parsed = _parse_source(source["kind"], response.body, url)
     except Exception as error:  # noqa: BLE001 - 主页已经落库，补拉只记原因
         report["backfill_error"] = str(error)
         return

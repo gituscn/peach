@@ -29,6 +29,7 @@ from .config import (
     COVER_DIR,
     DATA_ROOT,
     GENERATED_DIR,
+    MEDIA_ROOT_DECLARATIONS,
     SECRETS_DIR,
     SHARED_CREDENTIAL_ROOT,
     SOURCES_DIR,
@@ -166,7 +167,7 @@ class WebContract:
         self.taste_history_manifest = (Path(taste_history_manifest)
                                        if taste_history_manifest is not None
                                        else STATE_DIR / "taste-history" / "manifest.json")
-        self.database = database or LedgerDatabase(db_path)
+        self.database = database or LedgerDatabase(db_path, media_roots=MEDIA_ROOT_DECLARATIONS)
         self.db_path = self.database.db_path
         self.snapshot_root = Path(snapshot_root) if snapshot_root is not None else None
         #: 键 → (算出时刻, 输入版本, 结果)，见 `cached()`。

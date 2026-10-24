@@ -7,7 +7,7 @@ import sqlite3
 from statistics import median
 from contextlib import closing
 
-from .catalog_rules import is_local_trailer
+from .catalog_rules import is_local_extra
 
 MIB = 1024 ** 2
 
@@ -20,7 +20,7 @@ def cached_names(directory):
         return set()
 
 
-def ledger_rows(db_path, asset_ids=None):
+def ledger_rows(db_path, asset_ids=None, *, library_roots=()):
     query = """SELECT asset.*,
         EXISTS(SELECT 1 FROM asset_entity ae JOIN entity e ON ae.entity_id=e.id
                WHERE ae.asset_id=asset.id AND e.kind='performer') AS performers,
@@ -33,7 +33,7 @@ def ledger_rows(db_path, asset_ids=None):
     with closing(sqlite3.connect(db_path, timeout=30)) as connection:
         connection.row_factory = sqlite3.Row
         return [dict(row) for row in connection.execute(query, parameters)
-                if not is_local_trailer(row['name'])]
+                if not is_local_extra(row['name'], row['path'], library_roots=library_roots)]
 
 
 def typical_size(directory, pattern, fallback):

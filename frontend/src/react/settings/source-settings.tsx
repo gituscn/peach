@@ -14,10 +14,11 @@ import { IndexerSettings } from './indexer-settings';
 import { SectionSkeleton } from './section';
 import { FollowPreferenceRows } from './service-preferences';
 
-export function SourceSettings({ data, receipt, panel }: ConfigurationGroupProps) {
+export function SourceSettings({ data, receipt, panel, issues }: ConfigurationGroupProps) {
   const credentials = useQuery({ queryKey: FOLLOW_CREDENTIALS_KEY,
     queryFn: ({ signal }) => fetchCredentials(signal), enabled: panel?.active !== false, refetchOnMount: 'always' });
   return <div {...groupRoot(panel)}>
+    {issues}
     <div><ButtonLink href="/sources" variant="secondary">采集来源与登录状态</ButtonLink></div>
     {credentials.data
       ? <Credentials data={credentials.data} readOnly={Boolean(data.ledger_read_only)} toast={receipt} embedded />

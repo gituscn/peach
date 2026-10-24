@@ -51,6 +51,7 @@ interface View {
 
 let host: StageHost | null = null;
 let view: View | null = null;
+let pageReturn: { left:number; top:number; anchor:HTMLElement } | null = null;
 const listeners = new Set<() => void>();
 let generation = 0;
 let controller: AbortController | null = null;
@@ -240,6 +241,9 @@ function swappable(kind: StageRequest['kind']): HTMLDialogElement | null {
 }
 
 async function open(request: StageRequest): Promise<void> {
+  if (!pageReturn && document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
+    pageReturn = { left:window.scrollX, top:window.scrollY, anchor:document.activeElement };
+  }
   const current = swappable(request.kind);
   if (current) { await swap(request, current); return }
   if (view) dispose({ miniplayer: false });
@@ -374,6 +378,16 @@ function dispose({ miniplayer = true }: { miniplayer?: boolean } = {}): void {
   paint();
   player.setStageMeta(null);
   document.body.removeAttribute('data-detail-open');
+  const returning = pageReturn;
+  pageReturn = null;
+  const restorePosition = () => {
+    if (!view && returning?.anchor.isConnected && returning.anchor.getClientRects().length) {
+      window.scrollTo({ left:returning.left, top:returning.top, behavior:'instant' });
+    }
+  };
+  restorePosition();
+  // 背景列表接管布局后的滚动锚定也回到打开详情时的位置。
+  requestAnimationFrame(restorePosition);
 }
 
 function update(patch: StagePatch): void {

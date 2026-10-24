@@ -55,6 +55,7 @@ dependencies = [
   "uvicorn==0.54.0",
   "watchdog==6.0.0",
   "zeroconf==0.151.5",
+  "smbprotocol==1.17.0",
 ]
 
 [project.urls]

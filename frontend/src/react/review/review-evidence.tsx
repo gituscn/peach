@@ -10,6 +10,7 @@ import { spinnerHtml } from '@peach/legacy/ui';
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { CheckboxGlyph } from '@/components/base/checkbox/checkbox-glyph';
 import { LEGACY_AVATAR_IMG } from '../components/legacy-avatar';
+import { SelectionActions } from '../components/selection-actions';
 import { busyProps } from '../settings/use-action';
 import type { ReviewAsset, ReviewRow } from './review';
 
@@ -183,15 +184,12 @@ export function AssetPicker(
   };
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="tabular-nums text-body-2-regular text-text-secondary">
+      <SelectionActions prefix={<span className="tabular-nums text-body-2-regular text-text-secondary">
           {`已选 ${chosen.size} / ${assets.length}`}
-        </span>
-        <Button variant="ghost" size="small" disabled={locked}
-          onClick={() => onPicked(assets.map((asset) => asset.id))}>全选</Button>
-        <Button variant="ghost" size="small" disabled={locked}
-          onClick={() => onPicked([])}>清空</Button>
-      </div>
+        </span>} actions={[
+          { label: '全选', disabled: locked, onPress: () => onPicked(assets.map(asset => asset.id)) },
+          { label: '清空', disabled: locked, onPress: () => onPicked([]) },
+        ]} />
       <div className="review-asset-grid gap-1.5">
         {assets.map((asset, index) => {
           const on = chosen.has(asset.id);
