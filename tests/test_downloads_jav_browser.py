@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
+import subprocess
 import tempfile
 import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -16,6 +19,8 @@ from peach.api import create_app
 from peach.config import PROJECT_ROOT, PeachSettings
 from peach.jav_browser import CREDENTIAL, JavBrowser, code_key, identify_source, source_page, source_sites
 from support.ledger import fresh_ledger
+from support.conditions import missing_prerequisite
+from support.browser import chrome_executable
 
 HASH = "c9e15763f722f23e98a29decdfae341b98d53056"
 MAGNET = f"magnet:?xt=urn:btih:{HASH}&dn=ABC-123"
@@ -316,10 +321,17 @@ class BrowserTests(unittest.TestCase):
     def test_official_product_identification_is_read_only_and_uses_catalog_rules(self):
         cases = {
             "https://video.dmm.co.jp/av/content/?id=ssis00519": "SSIS-519",
+            "https://video.dmm.co.jp/av/content/?id=1dandy00899": "DANDY-899",
+            "https://video.dmm.co.jp/av/content/?id=1fns00061": "FNS-061",
+            "https://video.dmm.co.jp/av/content/?id=1ssis00519": "SSIS-519",
+            "https://video.dmm.co.jp/av/content/?id=118abw00220": "ABW-220",
+            "https://video.dmm.co.jp/av/content/?id=1dandy00851c": "DANDY-851C",
+            "https://video.dmm.co.jp/av/content/?id=48midv00012ai": "MIDV-012AI",
             "https://www.dmm.co.jp/digital/videoa/-/detail/=/cid=ssis00057/": "SSIS-057",
             "https://www.dmm.co.jp/mono/dvd/-/detail/=/cid=h_086iqqq00026/": "IQQQ-026",
             "https://www.mgstage.com/product/product_detail/300MIUM-1239/": "300MIUM-1239",
             "https://www.mgstage.com/product/product_detail/259LUXU-1475/": "259LUXU-1475",
+            "https://www.mgstage.com/product/product_detail/104DANDY-851C/": "104DANDY-851C",
         }
         for source, expected in cases.items():
             with self.subTest(source=source):
@@ -331,12 +343,98 @@ class BrowserTests(unittest.TestCase):
         self.service.search.assert_not_called()
         self.remote.submit.assert_not_called()
         self.assertEqual(self.service.rows, {})
-        for source in ("https://video.dmm.co.jp/av/content/?id=1ssis00519", "https://video.dmm.co.jp/av/content/?id=ssis00519&id=abw00123",
+        for source in ("https://video.dmm.co.jp/av/content/?id=opaque_cid", "https://video.dmm.co.jp/av/content/?id=ssis00519&id=abw00123",
                        "https://unrelated.invalid/av/content/?id=ssis00519", "https://www.mgstage.com/search/?q=300MIUM-1239"):
             with self.subTest(source=source):
                 result = self.client.get("/api/jav-browser/identify", params={"source_url": source}, headers=self.script_headers)
                 self.assertEqual(result.status_code, 400, result.text)
         self.assertEqual(self.client.get("/api/jav-browser/identify", params={"source_url": next(iter(cases))}).status_code, 401)
+
+    def test_product_page_number_must_agree_with_the_registered_product(self):
+        source = "https://video.dmm.co.jp/av/content/?id=1dandy00899"
+        for hint, status in (("DANDY-899", 200), ("DANDY-899C", 400), ("ABW-899", 400)):
+            result = self.client.get("/api/jav-browser/identify", headers=self.script_headers,
+                                     params={"source_url": source, "code": hint})
+            self.assertEqual(result.status_code, status, result.text)
+        self.assertFalse(self.service.rows)
+        self.service.search.assert_not_called()
+        self.remote.submit.assert_not_called()
+
+    def test_explicit_product_suffix_is_preserved_through_the_download_submission(self):
+        code = "104DANDY-851C"
+        self.service.search.return_value = {"items": [
+            {"name": "104DANDY-851 1080p", "uri": MAGNET},
+            {"name": "104DANDY-851CH 1080p", "uri": MAGNET},
+            {"name": "104DANDY-851C 1080p", "uri": MAGNET}]}
+        self.assertEqual(self.add(code).status_code, 200)
+        self.service.process_one()
+        self.assertEqual(self.service.rows[code]["state"], "submitted")
+        self.service.search.assert_called_once_with(self.app.state.web_contract, {"code": code, "goal": "quality"})
+        self.assertEqual(self.downloads.store.get(self.service.rows[code]["task_id"]).code, code)
+
+    def test_explicit_product_suffix_does_not_adopt_the_plain_release(self):
+        self.service.search.return_value = {"items": [{"name": "DANDY-851 1080p", "uri": MAGNET}]}
+        self.add("DANDY-851C")
+        self.service.process_one()
+        self.assertEqual(self.service.rows["DANDY-851C"]["state"], "no_match")
+        self.remote.submit.assert_not_called()
+
+    def test_resource_identity_keeps_the_date_separator(self):
+        self.service.search.return_value = {"items": [{"name": "092415-001 1080p", "uri": MAGNET}]}
+        self.add("092415_001")
+        self.service.process_one()
+        self.assertEqual(self.service.rows["092415_001"]["state"], "no_match")
+        self.remote.submit.assert_not_called()
+
+    def test_resource_title_does_not_override_a_conflicting_primary_number(self):
+        self.service.search.return_value = {"items": [{"name": "XYZ-999 DANDY-851C 1080p", "uri": MAGNET}]}
+        self.add("DANDY-851C")
+        self.service.process_one()
+        self.assertEqual(self.service.rows["DANDY-851C"]["state"], "no_match")
+        self.remote.submit.assert_not_called()
+
+    def test_supported_explicit_numbers_use_the_same_status_contract(self):
+        for code in ("MKBD-S123", "MKD-S123", "092415_01", "092415_0001", "DANDY-851C", "MIDV-012AI"):
+            response = self.client.get("/api/jav-browser", params={"code": code}, headers=self.script_headers)
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()["code"], code)
+
+    def test_complete_userscript_uses_the_real_identification_endpoint(self):
+        node, chrome = shutil.which("node"), chrome_executable()
+        if not node or not chrome or not (PROJECT_ROOT / "frontend/node_modules/playwright-core").is_dir():
+            missing_prerequisite("用户脚本联合验收需要 Node、Chrome 和前端锁定依赖")
+        client, headers = self.client, self.script_headers
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if not self.path.startswith("/api/jav-browser/identify?"):
+                    self.send_error(404)
+                    return
+                response = client.get(self.path, headers=headers)
+                self.send_response(response.status_code)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(response.content)
+
+            def log_message(self, *_args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            result = subprocess.run([node, str(PROJECT_ROOT / "frontend/e2e/jav-userscript-contract.mjs"),
+                                     f"http://127.0.0.1:{server.server_port}",
+                                     str(PROJECT_ROOT / "web/integrations/peach-jav.user.js"), chrome],
+                                    capture_output=True, text=True, encoding="utf-8", timeout=120)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        finally:
+            server.shutdown()
+            server.server_close()
+            worker.join(timeout=5)
+        self.assertFalse(self.service.rows)
+        self.service.search.assert_not_called()
+        self.remote.submit.assert_not_called()
 
     def test_userscript_bridge_requires_the_peach_session_and_contains_no_credential(self):
         path = "/integrations/peach-userscript-bridge"

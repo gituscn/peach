@@ -38,9 +38,9 @@ def status(code: str, service=Depends(browser_client)):
         raise HTTPException(400, str(error)) from None
 
 
-def identify(source_url: str, service=Depends(browser_client)):
+def identify(source_url: str, code: str = "", service=Depends(browser_client)):
     try:
-        return JSONResponse(service.status(identify_source(source_url)), headers={"Cache-Control": "no-store"})
+        return JSONResponse(service.status(identify_source(source_url, code)), headers={"Cache-Control": "no-store"})
     except ValueError as error:
         raise HTTPException(400, str(error)) from None
 
