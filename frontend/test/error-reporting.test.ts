@@ -13,12 +13,15 @@ it('页面启动记录一次环境，原生媒体失败带能力与状态且不�
   });
   const fetch = vi.fn().mockResolvedValue({ ok: true });
   vi.stubGlobal('fetch', fetch);
+  vi.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(-480);
   const { installErrorReporting } = await import('../src/error-reporting');
   installErrorReporting(); installErrorReporting();
   await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
   const context = JSON.parse(fetch.mock.calls[0]![1].body);
   expect(context.kind).toBe('context');
   expect(context.browser.native_codecs).toHaveProperty('h264');
+  expect(context.browser.utc_offset_minutes).toBe(480);
+  expect(context.browser.timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
   const video = document.createElement('video');
   video.src = 'https://private.example/private.mp4?token=private-token';
   Object.defineProperty(video, 'error', { value: { code: 4, message: 'unsupported source' } });

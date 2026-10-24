@@ -297,18 +297,18 @@ def _media_failure(stage, error):
 
 
 def _expected_failure(stage, error, fields):
-    current, visited = error, set()
-    while current is not None and id(current) not in visited and len(visited) < 8:
-        visited.add(id(current))
-        if any((cls.__module__, cls.__name__) == ('peach.folder_picker', 'PickerUnsupported')
-               for cls in type(current).__mro__):
+    kinds = {(cls.__module__, cls.__name__) for cls in type(error).__mro__}
+    unsupported = ('peach.folder_picker', 'PickerUnsupported')
+    if unsupported in kinds:
+        return True
+    if ('starlette.exceptions', 'HTTPException') in kinds and _http_status(error) == 501:
+        cause = getattr(error, '__cause__', None)
+        if unsupported in {(cls.__module__, cls.__name__) for cls in type(cause).__mro__}:
             return True
-        current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
     if stage == "logging" and fields.get("level", "ERROR") not in {"ERROR", "CRITICAL"}:
         return True
     if stage == "browser" and fields.get("error_name") == "AbortError":
         return True
-    kinds = {(cls.__module__, cls.__name__) for cls in type(error).__mro__}
     if kinds & LOCAL_EXCEPTION_TYPES:
         return True
     if ("peach.sources.base", "SourceFailure") in kinds:

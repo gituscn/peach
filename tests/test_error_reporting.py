@@ -17,15 +17,54 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ErrorReportingTests(unittest.TestCase):
+    def test_timezone_lookup_logging_has_a_bounded_local_record(self):
+        import logging
+        def lookup():
+            error_reporting.ErrorHandler().emit(logging.LogRecord('tzlocal', logging.WARNING, '', 0,
+                                                                   'synthetic timezone warning', (), None))
+            return 'Asia/Taipei'
+        with mock.patch('tzlocal.get_localzone_name', side_effect=lookup) as name:
+            error_reporting.local_event('synthetic')
+        self.assertEqual(name.call_count, 1)
+        rows = self.records()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]['server_timezone']['reason'], 'lookup-in-progress')
+        self.assertEqual(rows[1]['server_timezone']['name'], 'Asia/Taipei')
+
+    def test_local_timezone_and_browser_timezone_are_independent_and_survive_export(self):
+        from datetime import datetime, timedelta, timezone
+        from zoneinfo import ZoneInfoNotFoundError
+        from peach import diagnostic_context, remote_reporting
+        moment = datetime(2026, 10, 24, 21, 0, tzinfo=timezone(timedelta(hours=8)))
+        with mock.patch('tzlocal.get_localzone_name', return_value='Asia/Taipei'):
+            facts = error_reporting.timezone_facts(moment)
+        self.assertEqual(facts['name'], 'Asia/Taipei')
+        self.assertEqual(facts['utc_offset_minutes'], 480)
+        self.assertTrue(facts['local_time'].endswith('+08:00'))
+        browser = diagnostic_context.browser({'timezone': 'America/New_York', 'utc_offset_minutes': -240})
+        with mock.patch.object(error_reporting, 'timezone_facts', return_value=facts), \
+                mock.patch.object(remote_reporting, 'capture') as capture:
+            path = error_reporting.local_event('browser-context', browser=browser)
+        capture.assert_not_called()
+        record = json.loads(support_bundle.redact_log(path.read_text(encoding='utf-8')))
+        self.assertEqual(record['server_timezone'], facts)
+        self.assertEqual(record['browser']['timezone'], 'America/New_York')
+        self.assertEqual(record['browser']['utc_offset_minutes'], -240)
+        with mock.patch('tzlocal.get_localzone_name', side_effect=ZoneInfoNotFoundError('synthetic')):
+            fallback = error_reporting.timezone_facts(moment)
+        self.assertEqual(fallback['status'], 'unavailable')
+        self.assertEqual(fallback['utc_offset_minutes'], 480)
+        self.assertTrue(fallback['local_time'].endswith('+08:00'))
+
     def test_access_export_keeps_media_response_evidence_and_removes_queries(self):
         for target in ('/stream?id=9&session=private-session', '/follow-stream?ticket=private-ticket',
                        '/api/stream-plan?id=9&t=private-token', '/stream/hls/9/index.m3u8?token=private-token'):
             with self.subTest(target=target):
-                exported = support_bundle.redact_log(f'INFO: 192.168.1.2:3456 - "GET {target} HTTP/1.1" 206 Partial Content\n')
+                exported = support_bundle.redact_log(f'INFO: 198.51.100.23:3456 - "GET {target} HTTP/1.1" 206 Partial Content\n')
                 self.assertIn(f'GET {target.split("?")[0]} HTTP/1.1" 206 Partial Content', exported)
-                for private in ('192.168.1.2', 'private-', '?', 'session=', 'ticket='):
+                for private in ('198.51.100.23', 'private-', '?', 'session=', 'ticket='):
                     self.assertNotIn(private, exported)
-        exported = support_bundle.redact_log('INFO: "GET /home/private/movie.mp4?token=secret HTTP/1.1" 404 Not Found\n')
+        exported = support_bundle.redact_log('INFO: "GET /private/media/movie.mp4?token=secret HTTP/1.1" 404 Not Found\n')
         self.assertIn('GET <path> HTTP/1.1" 404 Not Found', exported)
         self.assertNotIn('private', exported)
 

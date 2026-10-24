@@ -56,6 +56,7 @@ export function browserDiagnostics() {
     brands: extended.userAgentData?.brands, mobile: extended.userAgentData?.mobile,
     client_hints: hints,
     platform_hint: extended.userAgentData?.platform, timezone: attempt(() => Intl.DateTimeFormat().resolvedOptions().timeZone),
+    utc_offset_minutes: -new Date().getTimezoneOffset(),
     secure_context: globalThis.isSecureContext, online: navigator.onLine, cookies_enabled: navigator.cookieEnabled,
     local_storage: attempt(() => { localStorage.getItem('peach.settings.v1'); return true }),
     protocol: location.protocol, viewport_width: innerWidth, viewport_height: innerHeight,

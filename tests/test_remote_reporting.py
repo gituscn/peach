@@ -340,6 +340,11 @@ class RemoteReportingTests(unittest.TestCase):
             failed.__cause__ = PickerUnavailable('private')
             reporting.capture('http-request', failed, status_code=501, route='api/pick-folder')
             send.assert_called_once()
+            send.reset_mock()
+            unexpected = HTTPException(500, 'private')
+            unexpected.__cause__ = unsupported.__cause__
+            reporting.capture('http-request', unexpected, status_code=500, route='api/pick-folder')
+            send.assert_called_once()
 
     def test_control_and_source_states_keep_local_records_without_remote_events(self):
         import asyncio

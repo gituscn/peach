@@ -21,6 +21,7 @@ _log_dir: Path | None = None
 _fault_stream = None
 _write_lock = threading.RLock()
 _hooks_installed = False
+_timezone_lookup = threading.local()
 
 
 def redact(value: str) -> str:
@@ -104,12 +105,32 @@ def scrub(value):
     return value
 
 
+def timezone_facts(moment: datetime | None = None) -> dict:
+    """本机实际时区名称、偏移及本地时间；名称读取失败不阻止取证。"""
+    local = (moment or datetime.now().astimezone())
+    offset = local.utcoffset()
+    result = {'local_time': local.isoformat(), 'abbreviation': local.tzname(),
+              'utc_offset_minutes': int(offset.total_seconds() / 60) if offset is not None else None}
+    if getattr(_timezone_lookup, 'active', False):
+        return {**result, 'status': 'unavailable', 'name': None, 'reason': 'lookup-in-progress'}
+    _timezone_lookup.active = True
+    try:
+        from tzlocal import get_localzone_name
+        name = get_localzone_name()
+        result.update(status='available' if name else 'unavailable', name=name[:200] if name else None)
+    except Exception as error:
+        result.update(status='unavailable', name=None, reason=type(error).__name__)
+    finally:
+        _timezone_lookup.active = False
+    return result
+
+
 def system_facts() -> dict:
     facts = {"peach": __version__, "python": platform.python_version(),
             "os": platform.system(), "os_release": platform.release(),
             "os_version": platform.version(),
             "architecture": platform.machine(), "frozen": bool(getattr(sys, "frozen", False)),
-            "pid": os.getpid(), "parent_pid": os.getppid()}
+            "pid": os.getpid(), "parent_pid": os.getppid(), "server_timezone": timezone_facts()}
     try:
         from .buildinfo import frozen_build
         build = frozen_build()

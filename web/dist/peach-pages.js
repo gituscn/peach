@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "0fb74f82-3237-4738-985c-ee5234b69319", e._sentryDebugIdIdentifier = "sentry-dbid-0fb74f82-3237-4738-985c-ee5234b69319");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "90ced43a-14c0-49bb-b0fb-e5b699d0908a", e._sentryDebugIdIdentifier = "sentry-dbid-90ced43a-14c0-49bb-b0fb-e5b699d0908a");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, i, o, s) => {
@@ -86,6 +86,7 @@ function v() {
 		client_hints: m,
 		platform_hint: t.userAgentData?.platform,
 		timezone: d(() => Intl.DateTimeFormat().resolvedOptions().timeZone),
+		utc_offset_minutes: -(/* @__PURE__ */ new Date()).getTimezoneOffset(),
 		secure_context: globalThis.isSecureContext,
 		online: navigator.onLine,
 		cookies_enabled: navigator.cookieEnabled,
@@ -21733,4 +21734,4 @@ var r_ = document.getElementById("peach-page"), i_ = r_ ? n_[r_.dataset.page ?? 
 r_ && i_ && (0, M.createRoot)(r_).render(/* @__PURE__ */ (0, z.jsx)(i_, { data: { ...r_.dataset } }));
 //#endregion
 
-//# debugId=0fb74f82-3237-4738-985c-ee5234b69319
+//# debugId=90ced43a-14c0-49bb-b0fb-e5b699d0908a

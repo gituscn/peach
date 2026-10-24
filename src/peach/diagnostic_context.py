@@ -17,7 +17,7 @@ CODECS = ('h264', 'h264High', 'hevc', 'av1', 'vp9', 'aac', 'ac3', 'opus')
 BROWSER_TEXT = ('user_agent', 'platform', 'platform_hint', 'language', 'timezone', 'protocol')
 BROWSER_BOOL = ('mobile', 'secure_context', 'online', 'cookies_enabled', 'local_storage', 'media_source', 'media_capabilities',
                 'web_codecs', 'fullscreen', 'picture_in_picture')
-BROWSER_NUMBERS = ('viewport_width', 'viewport_height', 'pixel_ratio', 'touch_points', 'logical_processors', 'device_memory_gb')
+BROWSER_NUMBERS = ('viewport_width', 'viewport_height', 'pixel_ratio', 'touch_points', 'logical_processors', 'device_memory_gb', 'utc_offset_minutes')
 PLAYBACK_NUMBERS = ('code', 'network_state', 'ready_state', 'current_time', 'duration', 'volume', 'playback_rate', 'video_width', 'video_height', 'asset_id')
 
 
