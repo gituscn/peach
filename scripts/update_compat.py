@@ -34,7 +34,7 @@ PROBE = r"""
 import json, sys, tempfile
 from pathlib import Path
 from types import SimpleNamespace
-sys.path.insert(0, sys.argv[1])
+sys.path[:0] = [sys.argv[1]]
 import peach
 if not Path(peach.__file__).resolve().is_relative_to(Path(sys.argv[1]).resolve()):
     raise SystemExit(f"导入的不是旧版本源码：{peach.__file__}")
@@ -47,7 +47,7 @@ def transport(request, *_):
 release = release_updates.check(transport=transport)
 result = {"state": release.get("state"), "latest": release.get("latest_version"),
           "kind": release.get("package_kind"), "tools": sorted(update_packages.TOOL_PATHS)}
-if release.get("package_kind") == "update":
+if release.get("package_kind") != "full":
     with tempfile.TemporaryDirectory() as stage:
         Path(stage, update_packages.MANIFEST).write_text(json.dumps(payload["manifest"]), encoding="utf-8")
         try:
@@ -64,7 +64,8 @@ def _version(value: str) -> tuple[int, ...]:
 
 def client_tags(root: Path, version: str, oldest: str = OLDEST_CLIENT) -> list[str]:
     """已发布、不早于 `oldest`、早于本版的版本标签。"""
-    listed = subprocess.run(["git", "-C", str(root), "tag", "--list", "v*"], capture_output=True, text=True, check=True)
+    listed = subprocess.run(["git", "-C", str(root), "tag", "--list", "v*"], capture_output=True, text=True,
+                            encoding="utf-8", check=True)
     tags = [tag for tag in listed.stdout.split() if re.fullmatch(r"v\d+\.\d+\.\d+", tag)
             and _version(oldest) <= _version(tag) < _version(version)]
     if not tags:
