@@ -21,7 +21,7 @@ Removed / Fixed / Security。
 
 ## [未发布]
 
-## [0.48.1] - 2026-10-24
+## [0.48.2] - 2026-10-24
 
 已安装的 Windows 版请手动下载并运行一次完整安装包：人脸模型改随安装包分发，旧版自动更新器跨不过这次升级，之后照常自动更新。
 
@@ -66,6 +66,10 @@ Removed / Fixed / Security。
 
 - **配置**：转码方式与缩略图档位只接受运行 Peach 的电脑修改，局域网或公网访问的设备不能改。
 - **配置**：诊断包对字段名脱敏，并记录接口拒收原因。
+
+## [0.48.1] - 2026-10-24
+
+这一版没有发布制品：标签流水线的依赖审计发现 happy-dom 的高危漏洞（只用于测试，不进安装包）；安装包与完整的变化说明见 0.48.2。
 
 ## [0.48.0] - 2026-10-23
 
@@ -693,7 +697,8 @@ Removed / Fixed / Security。
 - **桌面**：独立包使用 UTF-8 启动日志。
 - **配置**：首次设置后的跳转目标取新鲜读到的 mDNS 名。
 
-[未发布]: https://github.com/peach-mitao/peach/compare/v0.48.1...HEAD
+[未发布]: https://github.com/peach-mitao/peach/compare/v0.48.2...HEAD
+[0.48.2]: https://github.com/peach-mitao/peach/compare/v0.48.1...v0.48.2
 [0.48.1]: https://github.com/peach-mitao/peach/compare/v0.48.0...v0.48.1
 [0.48.0]: https://github.com/peach-mitao/peach/compare/v0.47.3...v0.48.0
 [0.47.3]: https://github.com/peach-mitao/peach/compare/v0.46.1...v0.47.3
