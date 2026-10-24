@@ -155,7 +155,7 @@ Windows 复用 FFmpeg 的 D3D11VA 解码与 `h264_amf`、`h264_qsv` 编码，沿
 
 Peach 保留页面粗提取与身份冲突提示，服务端复用 `catalog_rules` 的唯一番号规则、`feeds.scan_code`、`web_resource_search.q_resource_search` 的来源顺序与质量排序、`submit_offline_download` 的 infohash 幂等、现有云下载落地与后处理。浏览器添加在共享提交锁内按番号接管已有任务，覆盖其他入口同时提交不同磁力的情况。专用令牌经 `CredentialStore` 仅保存 SHA-256 摘要，不声明跨机同步字段。队列用已有 `atomic_write_text` 保存本机运行状态，关闭功能会撤销令牌并停止尚未提交的添加。
 
-DMM / MGS 的只读商品号识别复用 `code_key`、`release_code_from_text`、`normalise_code_key` 和 `release_identity`，脚本只提交已净化的详情地址，不维护独立的前缀映射。DMM 官方 GraphQL 对 `ssis00519` 返回 `makerContentId: SSIS-519`；详情 DOM 的配信品番为 `ssis00519`，厂商番号为 `SSIS-519`。MGS 详情 DOM 的品番为 `300MIUM-1239`，三位数字前缀沿用同一套编目规则，不将不同发行物的前缀直接剥掉。
+DMM / MGS 的只读商品号识别复用 `sources.dmm` 的 CID 结构与 `catalog_rules.release_code_from_product`。浏览器提交净化后的详情地址及可选厂家番号；DMM 的目录数字头按来源解释，MGS 保留三位发行前缀，尾字母和日期分隔符保留为身份。`release_code_from_text` 继续处理普通文件名的字幕与画质标记，不用文件名噪声规则改写明确商品身份。资源名称的完整商品号匹配复用同一编目模式，元数据身份校验与 DMM 搜索核对尾字母。运行时不新增 HTTP 请求或依赖；已有 DMM／OpenAver 取证与来源协议足以覆盖转换，不引入第二套外部番号库。完整脚本连接临时账本的真实识别接口，联合验证 DMM／MGS 桌面与手机场景；保留基于模拟响应的跨站交互回归。
 
 配置页继续使用 BoardUI Button / Input / Select 与共享 Note。配对信息复用当前页面 origin、签发响应和浏览器 Clipboard API，脚本在用户粘贴时填表，保存后写入 GM 存储。同源子框架桥接只回报脚本版本和当前地址的配置状态，父窗口、origin、协议版本与一次性 nonce 均须匹配，不回传令牌。未收到回报显示「未检测到」，不推断安装列表。桥接路径窄匹配与来源站顶层注入分别处理；实际脚本管理器权限和扩展联合验收未取得。无新增运行依赖、迁移或 ledger 写入。
 

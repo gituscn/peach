@@ -206,10 +206,11 @@ def identifies_code(code: str, payload: dict) -> bool:
     if not blob.strip("|"):
         return False
     value = str(code or "").upper()
-    matched = re.fullmatch(r"(?:\d{3,6})?([A-Z]{2,8})-?(\d{2,5})", value)
+    matched = re.fullmatch(r"(?:\d{3,6})?([A-Z]{2,8})-?(\d{2,5})([A-Z]{0,2})", value)
     if matched:
         letters, digits = matched.group(1).lower(), matched.group(2).lstrip("0") or "0"
-        return any(re.search(rf"(?<![a-z]){letters}[-_]?0*{digits}(?!\d)",
+        suffix = matched.group(3).lower()
+        return any(re.search(rf"(?<![a-z]){letters}[-_]?0*{digits}{suffix}(?![a-z0-9])",
                              str(payload.get(field) or "").lower()) is not None
                    for field in IDENTITY_FIELDS)
     return _compact(value) in blob

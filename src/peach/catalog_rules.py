@@ -194,8 +194,8 @@ def canonical_tag_name(name: str) -> str:
     key = value.casefold()
     return _TAG_ALIASES.get(key, _TAG_SPELLINGS.get(key, value))
 
-_CODE_STUDIO = re.compile(r"^[A-Z]{2,8}-\d{2,5}$")
-_CODE_AMATEUR = re.compile(r"^\d{3}[A-Z]{2,8}-\d{2,5}$")
+_CODE_STUDIO = re.compile(r"^[A-Z]{2,8}-\d{2,5}(?:[A-Z]{1,2})?$")
+_CODE_AMATEUR = re.compile(r"^\d{3}[A-Z]{2,8}-\d{2,5}(?:[A-Z]{1,2})?$")
 #: 素人系无码番号 `MMDDYY-NNN` / `MMDDYY_NNN`。**分隔符是片商标识，属于身份的一部分**：
 #: 一本道、パコパコママ、カリビアンコムPR 用 `_`，カリビアンコム 用 `-`，同一天同一序号
 #: 是两部不同影片。JavDB 自己也分开保存——搜 `092415-001` 首位返回的是一本道的
@@ -245,7 +245,7 @@ MAKER_NUMBER_PREFIX = {
 _DATED_COMPACT = re.compile(rf"^{_MMDDYY}\d{{2,4}}$")
 _CODE_MAKER_PREFIXED = re.compile(r"^(\d{3})([A-Z]{2,8})-(\d{2,5})$")
 #: 数字前缀单独保留；`h_` 是 DMM content_id 的 label 标记。
-_RELEASE_ID = re.compile(r"^(\d{1,4})?([A-Z]{2,8})0*(\d{1,5})([A-Z]?)$")
+_RELEASE_ID = re.compile(r"^(\d{1,4})?([A-Z]{2,8})0*(\d{1,5})([A-Z]{0,2})$")
 # 仅登记已核验的写法关系；查询扩展表不是身份等价表。
 #
 # MGStage 前缀那 9 行 2026-09-25 逐组核过：MGStage 商品页与 r18dev 快照的标题、时长、
@@ -555,10 +555,10 @@ def normalise_code_key(code: str | None) -> str:
     short_fc2 = _FC2_ID.match(value)
     if short_fc2:
         return f"FC2-PPV-{short_fc2.group(1)}"
-    shape = re.match(r"^(\d{3})?([A-Z]+)-?(\d+)$", value)
+    shape = re.fullmatch(r"(\d{3})?([A-Z]+)-?(\d+)([A-Z]{0,2})", value)
     if not shape:
         return value
-    return f"{shape.group(1) or ''}{shape.group(2)}-{int(shape.group(3)):03d}"
+    return f"{shape.group(1) or ''}{shape.group(2)}-{int(shape.group(3)):03d}{shape.group(4)}"
 
 
 def is_jav_code(code: str | None) -> bool:
@@ -571,6 +571,8 @@ def is_jav_code(code: str | None) -> bool:
     value = (code or "").upper().strip()
     if not value or is_repost_site_label(value) or is_code_body_stopword(value):
         return False
+    if value.startswith(("MKBD-", "MKD-")):
+        return bool(_KIRARI_CODE.fullmatch(value))
     if value.startswith("FC2"):
         return bool(re.search(r"\d{5,}", value))
     return bool(
@@ -660,9 +662,12 @@ def release_identity(code: str | None) -> str:
     if shape:
         prefix, letters, number, suffix = shape.groups()
         prefix = prefix or ""
+        # HA 的这一组重制写法已有来源等价证据，其余尾字母均保留。
+        if (prefix, letters, suffix) == ("49", "HA", "R"):
+            suffix = ""
         if (prefix, letters) in _RELEASE_PREFIX_ALIASES or str(code or "").upper().strip().startswith("H_"):
             prefix = ""
-        return f"{prefix}{letters}-{int(number)}"
+        return f"{prefix}{letters}-{int(number)}{suffix}"
     return value
 
 
@@ -775,6 +780,15 @@ def scrapes_as_jav(code: str | None, studio: str | None = None,
             or RELEASE_EVIDENCE_KINDS.intersection(entity_kinds)):
         return True
     return bool(_RELEASE_SYSTEM_SHAPE.match(normalise_code_key(code).upper()))
+
+
+def release_code_from_product(value: str | None) -> str | None:
+    """明确的商品番号保留尾字母；文件名中的字幕、画质标记仍由文本解析器处理。"""
+    raw = _ASSET_EXTENSION.sub("", str(value or "").strip())
+    if re.fullmatch(r"(?:\d{3})?[A-Za-z]{2,8}[-_]?\d{2,5}[A-Za-z]{1,2}", raw):
+        code = normalise_code_key(raw)
+        return code if is_jav_code(code) else None
+    return release_code_from_text(raw)
 
 
 def release_code_from_text(value: str | None) -> str | None:
@@ -948,12 +962,12 @@ def _jav_code_pattern(code: str | None) -> str:
     fc2 = re.fullmatch(r"FC2-PPV-(\d+)", canonical)
     if fc2:
         return rf"FC2(?:[-_ ]?PPV)?[-_ ]*0*{re.escape(fc2.group(1))}"
-    amateur = re.fullmatch(r"(\d{3})?([A-Z]+)-(\d+)", canonical)
+    amateur = re.fullmatch(r"(\d{3})?([A-Z]+)-(\d+)([A-Z]{0,2})", canonical)
     if amateur:
-        prefix, letters, digits = amateur.groups()
+        prefix, letters, digits, suffix = amateur.groups()
         return (
             rf"{re.escape(prefix or '')}{re.escape(letters)}"
-            rf"[-_ ]*0*{re.escape(str(int(digits)))}"
+            rf"[-_ ]*0*{re.escape(str(int(digits)))}{re.escape(suffix)}"
         )
     tokyo = _TOKYO_HOT_BODY.fullmatch(canonical)
     if tokyo:

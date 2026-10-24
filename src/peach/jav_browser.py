@@ -12,12 +12,13 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
-from .catalog_rules import is_jav_code, normalise_code_key, release_code_from_text, release_identity, same_release_code
+from .catalog_rules import is_jav_code, normalise_code_key, release_code_from_product, same_release_code
 from .config import PROJECT_ROOT
 from .downloads import INGESTED, RESUBMITTABLE_STATES, submit_offline_download, parse_magnet
 from .follow_secrets import CredentialError
 from .feeds import scan_code
 from .fsutil import atomic_write_text
+from .sources.dmm import code_from_cid
 
 LOGGER = logging.getLogger(__name__)
 CREDENTIAL = "jav-browser"
@@ -61,7 +62,7 @@ def source_site(host: str) -> dict | None:
 
 def code_key(value: object) -> str:
     raw = str(value or "").strip()
-    code = release_code_from_text(raw) if len(raw) <= 80 else None
+    code = release_code_from_product(raw) if len(raw) <= 80 else None
     if not code or not is_jav_code(code) or normalise_code_key(raw) != normalise_code_key(code):
         raise ValueError("请提供一个明确的 JAV 番号")
     return normalise_code_key(code)
@@ -86,7 +87,7 @@ def source_page(value: object) -> str:
     return parsed._replace(query=urlencode(parameters), fragment="").geturl()
 
 
-def identify_source(value: object) -> str:
+def identify_source(value: object, hint: str = "") -> str:
     """从已登记发行平台的详情地址提取商品号，复用编目规则确认番号。"""
     source = source_page(value)
     url = urlsplit(source)
@@ -99,10 +100,10 @@ def identify_source(value: object) -> str:
                 (dict(parse_qsl(url.query)).get(key, "") for key in site.get("query_keys", ())), "")
     if not product:
         raise ValueError("未识别到作品番号，请选中页面的完整番号后加入 Peach")
-    try:
-        return code_key(product)
-    except ValueError:
-        return code_key(normalise_code_key(release_identity(product)))
+    code = code_key(code_from_cid(product) if site["id"] == "dmm" else product)
+    if hint and not same_release_code(code, code_key(hint)):
+        raise ValueError("页面番号与商品号不一致，请核对作品详情")
+    return code
 
 
 class JavBrowser:
@@ -266,7 +267,9 @@ class JavBrowser:
             candidate = None
             for item in result.get("items", ()):
                 name = str(item.get("name") or "")
-                if (not same_release_code(scan_code(name), code)
+                matches = (same_release_code(scan_code(name), code)
+                           or same_release_code(scan_code(name, product=True), code))
+                if (not matches
                         or re.search(r"(?i)\b(?:sample|trailer|preview)\b|予告|预告|預告", name)):
                     continue
                 try:
