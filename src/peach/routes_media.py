@@ -52,6 +52,7 @@ from .previews import ENTITY_THUMB_TYPE, PreviewUnavailable, entity_image_key
 from .remote_media_cache import AVATAR_REFRESH_SECONDS, FAVICON_REFRESH_SECONDS, cache_for
 from .preview_cache import PreviewCache
 from .routes_auth import require_auth
+from .scan import VIDEO
 from .segments import SegmentCancelled, SegmentUnavailable, build_hls_playlist
 from .streaming import BufferedFileResponse, CancellableFileResponse, SplicedMp4Response
 from .transcodes import TranscodeCancelled, TranscodeNeedsSession, TranscodeUnavailable
@@ -462,14 +463,20 @@ def _subtitle_rows(state, asset_id: int):
     """资产本身加它的字幕行。资产不存在时抛 `MediaNotFound`，由 `api.py` 收口。"""
     asset = state.media_engine.asset(asset_id)
     with state.database.read_connection() as connection:
-        return asset, subtitles.subtitles_for(connection, asset_id)
+        rows = [dict(row) for row in subtitles.subtitles_for(connection, asset_id)]
+    if asset.path:
+        video = normalized_path(asset.path)
+        if any(within_root(video, root) for root in state.media_engine.filesystem.allowed_roots):
+            known = {str(normalized_path(row["path"])).casefold() for row in rows}
+            rows.extend(row for row in subtitles.discover_sidecars(video, VIDEO)
+                        if row["path"].casefold() not in known)
+    return asset, rows
 
 
 def _subtitle_path(state, asset, row) -> Path | None:
     """字幕文件在本机的位置；逃出正片所在目录或授权根一律拒绝。
 
-    路径来自账本而不是前端，这一层仍然要查：`asset_subtitle.path` 由扫描写入，
-    而扫描根本身可以被改设置改掉，判据不能寄托在「写进去的那一刻是对的」。
+    路径来自账本或同目录发现，这一层仍核对当前媒体授权根。
     """
     if not asset.path:
         return None
@@ -514,7 +521,7 @@ def _subtitle_note(state, asset, row) -> str:
 def asset_subtitles(request: Request, id: int, args: dict[str, str] = Depends(require_auth)):
     """这个资产有哪些字幕轨，以及每一条能不能播。
 
-    序号就是这张表里的位置，`/api/assets/{id}/subtitles/{n}` 按同一个顺序取。
+    返回的 src 通过 track 参数绑定文件身份，序号用于无参数的按序读取。
     不能播的也列出来并说明原因：界面上「有三条字幕、只挂上两条」要能解释得清。
     """
     state = request.app.state
@@ -523,7 +530,8 @@ def asset_subtitles(request: Request, id: int, args: dict[str, str] = Depends(re
     for index, row in enumerate(rows):
         note = _subtitle_note(state, asset, row)
         tracks.append({
-            "id": f"sidecar:{row['id']}",
+            "id": f"sidecar:{subtitles.file_key(row['name'])}",
+            "legacy_id": f"sidecar:{row['id']}" if isinstance(row["id"], int) else None,
             "index": index,
             "name": row["name"],
             "format": row["format"],
@@ -532,17 +540,21 @@ def asset_subtitles(request: Request, id: int, args: dict[str, str] = Depends(re
             "pairing": row["pairing"],
             "note": note,
             "playable": not note,
-            "src": f"/api/assets/{id}/subtitles/{index}",
+            "src": f"/api/assets/{id}/subtitles/{index}?track={subtitles.file_key(row['name'])}",
         })
     return {"id": id, "subtitles": tracks}
 
 
 @router.api_route("/api/assets/{id}/subtitles/{index}", methods=["GET", "HEAD"])
 def asset_subtitle_track(request: Request, id: int, index: int,
+                         track: str = "",
                          args: dict[str, str] = Depends(require_auth)):
     """一条字幕的 WebVTT。浏览器的 text track 只认这一种格式。"""
     state = request.app.state
     asset, rows = _subtitle_rows(state, id)
+    if track:
+        index = next((n for n, row in enumerate(rows)
+                      if subtitles.file_key(row["name"]) == track), -1)
     if index < 0 or index >= len(rows):
         return JSONResponse({"error": "no such subtitle"}, status_code=404)
     row = rows[index]

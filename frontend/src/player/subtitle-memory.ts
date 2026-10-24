@@ -37,7 +37,9 @@ export class SubtitleSession {
   }
   private apply() {
     if (this.selected === undefined) return;
-    const selected = this.tracks().find(track => this.key(track) === this.selected);
+    const aliases = [...this.video.querySelectorAll<HTMLTrackElement>('track[data-subtitle-alias]')];
+    const selected = this.tracks().find(track => this.key(track) === this.selected
+      || aliases.some(node => node.track === track && node.dataset.subtitleAlias === this.selected));
     this.tracks().forEach(track => {
       const mode = track === selected ? 'showing' : 'disabled';
       if (track.mode !== mode) track.mode = mode;

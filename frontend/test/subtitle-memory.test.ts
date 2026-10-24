@@ -106,6 +106,18 @@ describe('统一播放文件记忆', () => {
 });
 
 describe('每部视频的字幕选择', () => {
+  it('登记轨道的选择可通过字幕别名恢复', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ selected: 'sidecar:2', tracks: [] }))));
+    const view = mounted(), session = new SubtitleSession(view.player, view.video);
+    await session.ready;
+    const track = view.add('sidecar:local:stable');
+    const node = document.createElement('track'); node.dataset.subtitleAlias = 'sidecar:2';
+    Object.defineProperty(node, 'track', { value: track }); view.video.append(node);
+    view.video.dispatchEvent(new Event('loadedmetadata'));
+    expect(track.mode).toBe('showing');
+    view.dispose();
+  });
+
   it('按身份恢复晚到的旁挂轨道，列表顺序不参与选择', async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ selected: 'sidecar:2', tracks: [] })));
     vi.stubGlobal('fetch', fetcher);

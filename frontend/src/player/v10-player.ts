@@ -183,6 +183,7 @@ export const createV10Player: VideojsFactory = (video, options) => {
     addRemoteTextTrack: (track: Record<string, unknown>) => {
       const node = document.createElement('track');
       node.id = String(track.id || '');
+      if (track.legacyId) node.dataset.subtitleAlias = String(track.legacyId);
       node.kind = String(track.kind || 'subtitles'); node.src = String(track.src || '');
       node.srclang = String(track.srclang || ''); node.label = String(track.label || ''); video.append(node);
     },
