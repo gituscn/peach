@@ -179,6 +179,21 @@ class IndexRefreshTests(unittest.TestCase):
         self.assertIn("葵つかさ", gfriends.load_index(self.cache))
         self.assertFalse(gfriends.index_stale(self.cache))
 
+    def test_an_automatic_consumer_prepares_the_index_once(self):
+        refresher = self.refresher()
+        self.assertTrue(refresher.ensure())
+        self.assertIn("葵つかさ", gfriends.load_index(self.cache))
+        self.assertTrue(refresher.ensure())
+        self.assertEqual(self.calls, [gfriends.INDEX_URL])
+
+    def test_an_automatic_consumer_honours_the_failure_retry_window(self):
+        self.reply = lambda: HttpResponse(503, {}, b"", gfriends.INDEX_URL)
+        refresher = self.refresher()
+        with self.assertLogs(avatar_picker.LOGGER, "WARNING"):
+            self.assertFalse(refresher.ensure())
+        self.assertFalse(refresher.ensure())
+        self.assertEqual(self.calls, [gfriends.INDEX_URL])
+
     def test_a_stale_index_is_replaced(self):
         self.seed_old(gfriends.INDEX_MAX_AGE_SECONDS + 3600)
         self.assertTrue(self.run_queued(self.refresher()))

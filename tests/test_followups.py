@@ -432,6 +432,10 @@ class CoverFaceFollowupTests(LedgerTestCase):
         self.covers = self.root / "covers"
         self.covers.mkdir()
         self.person = self.entity("performer", "梨奈")
+        self.providers = self.root / "generated" / "provider-cache" / "performer-avatars"
+        index_dir = self.providers / "gfriends"
+        index_dir.mkdir(parents=True)
+        (index_dir / "gfriends-filetree.json").write_text('{"Content": {}}', encoding="utf-8")
         faces = self.FACES
 
         class Probe:
@@ -637,6 +641,9 @@ class FaceStubCase(LedgerTestCase):
         self.covers.mkdir()
         self.person = self.entity("performer", "梨奈")
         self.providers = self.root / "generated" / "provider-cache" / "performer-avatars"
+        index_dir = self.providers / "gfriends"
+        index_dir.mkdir(parents=True)
+        (index_dir / "gfriends-filetree.json").write_text('{"Content": {}}', encoding="utf-8")
         self.gallery: dict[str, dict[str, str]] = {}
         self.unavailable = ""
         vectors, test = self.VECTORS, self
@@ -749,6 +756,74 @@ class FaceMatchFollowupTests(FaceStubCase):
                          ["IPX-001", "SSIS-002"])
         self.assertTrue(all(cover["score"] >= 0.363 for cover in match["covers"]))
         self.assertEqual((match["candidates"], match["compared"]), (3, 2))
+
+    def test_a_changed_gallery_requeues_an_unresolved_person(self):
+        from peach.avatar_followup import stock
+        from peach.followups import Attempts, attempts_root
+
+        self.work(1, "IPX-001", self.BLANK)
+        self.run_followup()
+        attempts = Attempts(attempts_root(self.root / "generated"))
+        with self.database.read_connection() as connection:
+            self.assertEqual(stock(connection, self.avatars, attempts, limit=10), [])
+        self.candidate("1-S1", (400, 600), self.HER)
+        with self.database.read_connection() as connection:
+            planned = stock(connection, self.avatars, attempts, limit=10)
+        self.assertEqual([item.key for item in planned], [followup_key("performer", self.person)])
+
+    def test_an_expired_gallery_can_refresh_when_unresolved_people_are_settled(self):
+        import os
+        from peach import gfriends
+        from peach.avatar_followup import stock
+        from peach.followups import Attempts, attempts_root
+
+        self.work(1, "IPX-001", self.BLANK)
+        self.run_followup()
+        index_path = self.providers / "gfriends" / gfriends.INDEX_NAME
+        stamp = time.time() - gfriends.INDEX_MAX_AGE_SECONDS - 1
+        os.utime(index_path, (stamp, stamp))
+        attempts = Attempts(attempts_root(self.root / "generated"))
+        with self.database.read_connection() as connection:
+            found = stock(connection, self.avatars, attempts, limit=10)
+        self.assertEqual([item.key for item in found], [followup_key("performer", self.person)])
+
+    def test_a_missing_gallery_is_prepared_before_candidate_selection(self):
+        from peach import avatar_picker, gfriends
+        from peach.http import HttpResponse
+
+        self.candidate("1-S1", (400, 600), self.HER)
+        index_path = self.providers / "gfriends" / gfriends.INDEX_NAME
+        body = index_path.read_bytes()
+        index_path.unlink()
+        requests = []
+
+        def send(request, *_args):
+            requests.append(request.url)
+            return HttpResponse(200, {}, body, request.url)
+
+        contract = self.contract()
+        contract.gfriends_index = avatar_picker.IndexRefresher(index_path.parent, lambda: send)
+        from peach.avatar_followup import run
+        summary = run(contract, followup_key("performer", self.person), mock.Mock())
+        self.assertEqual(summary["outcome"], "已装上")
+        self.assertEqual(self.provenance()["provider"], "gfriends")
+        self.assertEqual(requests, [gfriends.INDEX_URL])
+
+    def test_a_failed_gallery_fetch_does_not_settle_an_absent_index(self):
+        from peach import avatar_picker, gfriends
+        from peach.followups import attempts_root
+        from peach.http import HttpResponse
+        from peach.avatar_followup import run
+
+        index_path = self.providers / "gfriends" / gfriends.INDEX_NAME
+        index_path.unlink()
+        self.work(1, "IPX-001", self.BLANK)
+        contract = self.contract()
+        contract.gfriends_index = avatar_picker.IndexRefresher(index_path.parent, lambda: lambda request, *_: HttpResponse(503, {}, b"", request.url))
+        with self.assertLogs(avatar_picker.LOGGER, "WARNING"):
+            summary = run(contract, followup_key("performer", self.person), mock.Mock())
+        self.assertTrue(summary["source_unavailable"])
+        self.assertFalse(any(attempts_root(contract.candidate_root).glob("*.json")))
 
     def test_only_her_pictures_are_eligible_when_someone_else_shares_the_name(self):
         """同名的另一个人那张更大、排得更前，照样落选；检不出脸的那张不算她。"""
@@ -1459,6 +1534,9 @@ class ProcessLibraryTests(LedgerTestCase):
             avatar_root=self.root / 'generated' / 'avatars',
             candidate_root=self.root / 'generated', cover_root=self.root / 'covers',
             cache_bust=lambda: None)
+        index_dir = contract.candidate_root / 'provider-cache' / 'performer-avatars' / 'gfriends'
+        index_dir.mkdir(parents=True, exist_ok=True)
+        (index_dir / 'gfriends-filetree.json').write_text('{"Content": {}}', encoding='utf-8')
         offline = {performer_alias_followup.MINNANO: Offline(),
                    performer_alias_followup.AV_NEME: Offline()}
         profile_offline = {performer_profile_followup.MINNANO: Offline(),

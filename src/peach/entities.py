@@ -334,14 +334,25 @@ def rewrite_flat_projection(connection: Connection, kind: str, entity_id: int,
     return rewritten
 
 
-def prefer_entity_name(connection: Connection, entity_id: int, chosen: str) -> dict:
+def prefer_entity_name(connection: Connection, entity_id: int, chosen: str, *,
+                       source: str = "user:preferred-name") -> dict:
     """把实体已有别名设为统一名称，并同步作品署名。"""
-    row = connection.execute("SELECT kind,canonical_name FROM entity WHERE id=?", (entity_id,)).fetchone()
+    row = connection.execute("SELECT kind,canonical_name,metadata_json FROM entity WHERE id=?", (entity_id,)).fetchone()
     if row is None:
         raise ValueError("entity not found")
     kind, current = str(row["kind"]), str(row["canonical_name"])
+    try:
+        metadata = json.loads(row["metadata_json"] or "{}")
+    except (TypeError, ValueError):
+        metadata = {}
+    if not isinstance(metadata, dict):
+        metadata = {}
     chosen_key = normalize_entity_name(chosen)
     if chosen_key == normalize_entity_name(current):
+        if source.startswith("user:"):
+            metadata["name_preference"] = {"name": current, "source": source}
+            connection.execute("UPDATE entity SET metadata_json=? WHERE id=?",
+                               (json.dumps(metadata, ensure_ascii=False), entity_id))
         return {"ok": True, "canonical_name": current, "changed": False}
     known = {normalize_entity_name(str(item[0])): str(item[0]) for item in connection.execute(
         "SELECT alias FROM entity_alias WHERE entity_id=?", (entity_id,))}
@@ -357,7 +368,13 @@ def prefer_entity_name(connection: Connection, entity_id: int, chosen: str) -> d
                        (known[chosen_key], chosen_key, stamp, entity_id))
     connection.execute(
         "INSERT OR IGNORE INTO entity_alias(entity_id,alias,normalized_alias,source,confidence) VALUES(?,?,?,?,1.0)",
-        (entity_id, current, normalize_entity_name(current), "user:preferred-name"))
+        (entity_id, current, normalize_entity_name(current), source))
+    previous_preference = metadata.get("name_preference")
+    metadata["name_preference"] = {"name": known[chosen_key], "previous_name": current,
+                                   "previous_preference": previous_preference,
+                                   "source": source, "at": stamp}
+    connection.execute("UPDATE entity SET metadata_json=? WHERE id=?",
+                       (json.dumps(metadata, ensure_ascii=False), entity_id))
     flat = rewrite_flat_projection(connection, kind, entity_id, current, known[chosen_key])
     return {"ok": True, "canonical_name": known[chosen_key], "changed": True,
             "previous_name": current, "flat_rewritten": flat}

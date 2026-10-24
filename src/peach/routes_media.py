@@ -1403,12 +1403,7 @@ def _index_refresher(app) -> avatar_picker.IndexRefresher:
         if refresher is None:
             contract = app.state.web_contract
 
-            def transport():
-                from .scraping_access import SourceTransport
-                return SourceTransport(contract.follow_secrets_root)
-
-            refresher = avatar_picker.IndexRefresher(
-                _picker_roots(contract)[0] / avatar_picker.GFRIENDS_CACHE, transport)
+            refresher = avatar_picker.index_refresher(contract)
             app.state.gfriends_index = refresher
         return refresher
 
@@ -1504,7 +1499,7 @@ def avatar_choices(request: Request, kind: str = "performer", id: int = 0,
                    args: dict[str, str] = Depends(require_auth)):
     """这个人还能换成哪些图。只读本地缓存，不等联网。
 
-    图库索引缺失或过期时顺手在后台排一轮刷新；这一次照旧按旧缓存列，下次打开生效。
+    图库索引缺失或过期时在后台刷新，返回刷新状态供当前窗口读取新候选。
     """
     state = request.app.state.web_contract
     providers_root, avatar_root = _picker_roots(state)
@@ -1516,7 +1511,11 @@ def avatar_choices(request: Request, kind: str = "performer", id: int = 0,
         if kind == "creator":
             listing["choices"] += [choice.as_dict() for choice in avatar_online.choices(
                 connection, id, project=_picker_online_projection)]
-    _index_refresher(request.app).request()
+    refresher = _index_refresher(request.app)
+    queued = refresher.request()
+    listing["index_refreshing"] = bool(queued or refresher.refreshing or (
+        listing["index_stale"] and not avatar_picker.gfriends.index_stale(refresher.cache_dir)))
+    listing["index_error"] = refresher.error
     return JSONResponse(listing)
 
 

@@ -14,6 +14,7 @@ Minnano、FANZA 这些大型数据库，收录量上万但原图常常只有两�
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import time
@@ -94,6 +95,16 @@ def index_stale(cache_dir: Path) -> bool:
     """没有缓存或缓存超过保鲜期。"""
     age = index_age(cache_dir)
     return age is None or age > INDEX_MAX_AGE_SECONDS
+
+
+def index_revision(cache_dir: Path | None) -> str:
+    """索引内容指纹；相同内容的保鲜刷新不触发整批头像重派。"""
+    if cache_dir is None:
+        return "missing"
+    try:
+        return hashlib.sha256((cache_dir / INDEX_NAME).read_bytes()).hexdigest()[:16]
+    except OSError:
+        return "missing"
 
 
 def load_index(cache_dir: Path) -> dict[str, list[tuple[str, str]]]:

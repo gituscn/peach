@@ -105,8 +105,10 @@ function PickerBody({ kind, entityId, name, onPicked, close }: AvatarPickerProps
   const listing = useQuery({
     queryKey: key,
     queryFn: ({ signal }) => fetchAvatarChoices(kind, entityId, signal),
-    // 上一次点开没取到就重来。取到过的那一份留着，反复开合不必每次再问一遍。
+    // 失败或索引过期时重新读取；有效候选在反复开合时复用。
     retryOnMount: true,
+    refetchOnMount: (query) => query.state.data?.index_stale ? 'always' : false,
+    refetchInterval: (query) => query.state.data?.index_refreshing && !query.state.error ? 1000 : false,
   });
   /* 换成功之后这一份候选里「在用」是哪一格已经过期，扔掉它，下次点开重新取。要等到弹层
      真的收起来再扔：这时候还有人在读这个键，当场清掉它会立刻再取一遍，白问一趟。 */
