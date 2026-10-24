@@ -14,6 +14,7 @@ import {
 } from '../../src/react/library-processing/library-processing';
 import { LibraryProcessingCard } from '../../src/react/library-processing/library-processing-card';
 import { LibraryProcessingNotice } from '../../src/react/library-processing/library-processing-notice';
+import { setProcessingNoticeVisible } from '../../src/react/library-processing/processing-notice-visibility';
 import type { LibraryProcessingProps } from '../../src/react/bundle';
 
 import { actionOrder, buttonNamed as textButtonNamed, click, mount, mountRoot, submit } from './render';
@@ -27,6 +28,7 @@ const buttonNamed = (name: string, root: ParentNode = document) =>
 afterEach(() => {
   queryClient.clear();
   localStorage.clear();
+  sessionStorage.clear();
 });
 
 /* Query 派发更新用的是它自己抓住的那个真 `setTimeout(0)`，假时钟推不动它：推完时钟
@@ -73,6 +75,15 @@ const card = (props: LibraryProcessingProps) => (
 const notice = (props: LibraryProcessingProps) => (
   <QueryClientProvider client={queryClient}><LibraryProcessingNotice {...props} /></QueryClientProvider>
 );
+
+it('隐藏任务提示后卡片提供恢复入口，恢复不提交业务请求', async () => {
+  const { posts } = await open({ status: 'paused', job_id: 'restore-from-card', checked: 2, total: 10 });
+  setProcessingNoticeVisible('restore-from-card', false);
+  const host = await mount(card({ toast: vi.fn() }));
+  await click(buttonNamed('显示进度浮窗', host));
+  expect(buttonNamed('显示进度浮窗', host)).toBeNull();
+  expect(posts()).toEqual([]);
+});
 
 /** 轮询是 Query 的定时器，推进时钟会引起重画，得在 act 里推。 */
 const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) });

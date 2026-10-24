@@ -884,6 +884,8 @@ Python 源文件纳入 `src/peach/library_sharing.py` 与 `src/peach/library_pro
 
 任务卡复用 Sonner 2.0.8（MIT）的 `toast.custom`、稳定任务 id 与无限停留时间；`processing` 和 `receipts` 两个栈按 `toasterId` 分流，普通回执按任务面板实测高度避让。任务栈启用 `expand` 保持自动高度，详情开合由卡片管理；收起只隐藏正文，暂停、速度与估时仍可见。服务端 `steps` 在实际处理边界更新，完成步骤以勾选与删除线显示。失败浮层只自动展示本次观察到的结束状态或两分钟内的结果，旧失败快照不自动弹出；用户关闭后保持关闭。React Aria 1.22.1 的 Slider、Popover 与现有 BoardUI Button 承担键盘、焦点与浮层行为，三档对应 `low/standard/high`；最高档流光使用 SVG 与 CSS，浮层关闭后卸载，暂停与后台页面停止运动。界面重建依据与差异见 [控件取证](reference-snapshots/processing-task-controls.md)。无新增依赖。问题明细沿用 `state/library-processing-<job_id>.issues.jsonl`，新任务保留其他任务的明细。
 
+任务浮窗的显示选择复用 React 19.3.1 的 `useSyncExternalStore` 与页签级 `sessionStorage`，按任务号同步隐藏和恢复；关闭按钮复用 BoardUI Button，滑动关闭沿用 Sonner。隐藏后查询和完成通知持续工作，数据管理卡片提供恢复入口。该选择仅属于浏览器界面，不写任务控制接口或账本，无新增依赖。
+
 站点强调色检查覆盖进度、焦点、选中态、操作按钮与流光：旧 `--feedback-success` 引用既有强调色色阶；RSS 订阅保留橙色，信息、成功、警告、错误、品牌与图表分类保留语义色。
 
 任务中心的摘要复用结果字段白名单和 `Disclosure`：主区域以中文列表显示处理结果，原始字段与来源报告保留在「技术详情」。云下载复用 TanStack Query 5.104.3（MIT）的 `useInfiniteQuery`，按任务 id 倒序每批读取 20 条，轮询覆盖已加载页面；`has_more` 与 `next_before_id` 指定后续页面，更新状态不改变提交顺序。展示番号复用 `catalog_rules.release_code_from_filename`，优先已保存的番号和已绑定作品的番号，缺失时只展示名称中取得的唯一番号；冲突或未识别时不推断。标题资料按页批量读取已绑定作品的 `catalog_title`／`original_title`，其次使用提交标题和 `jav_fallback_title` 清理后的资源名称；`display_code`／`display_title` 是只读投影，不写真实 ledger。卡片复用 `javTitleParts` 去除标题开头的重复番号，以「番号 · 标题」显示，缺少标题时只显示番号。标题单行截断，状态在桌面与标题同行，窄屏另起一行；完整标题可展开。未新增依赖。

@@ -1,7 +1,7 @@
 /* 常驻任务面：状态、计数与控件共用服务端快照。位置由全站通知栈管理。 */
 import { useEffect, useId, useRef, useState } from 'react';
 import { VisuallyHidden } from 'react-aria';
-import { RiArrowRightLine, RiCheckLine, RiCheckboxBlankCircleLine, RiErrorWarningLine, RiInformationLine } from '@remixicon/react';
+import { RiArrowRightLine, RiCheckLine, RiCheckboxBlankCircleLine, RiCloseLine, RiErrorWarningLine, RiInformationLine } from '@remixicon/react';
 import { Button } from '@/components/base/buttons/button';
 import { LinkButton } from '@/components/base/buttons/link-button';
 import { cx } from '@/utils/cx';
@@ -30,8 +30,8 @@ function Gauge({ value, max }: { value: number; max: number }) {
   </svg>;
 }
 
-export function ProcessingNoticePanel({ state, problem = '', measure = false }: {
-  state?: LibraryProcessingData; problem?: string; measure?: boolean;
+export function ProcessingNoticePanel({ state, problem = '', measure = false, onHide }: {
+  state?: LibraryProcessingData; problem?: string; measure?: boolean; onHide?(): void;
 }) {
   const [expanded, setExpanded] = useState(() => expandedFor(state?.job_id));
   const bodyId = useId();
@@ -81,6 +81,8 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false }: 
       </div>
       <Button size="small" variant="secondary" iconOnly leadingIcon={CollapseChevron} data-processing-toggle="" data-collapse-upward=""
         aria-label={expanded ? '收起任务详情' : '展开任务详情'} aria-expanded={expanded} aria-controls={bodyId} onClick={toggle} />
+      {onHide ? <Button size="small" variant="secondary" iconOnly leadingIcon={RiCloseLine}
+        aria-label="隐藏任务提示" onClick={onHide} /> : null}
     </div>
     <TrafficProgress traffic={state?.traffic} detailsOpen={trafficExpanded} onDetailsChange={setTrafficExpanded} />
     </div>

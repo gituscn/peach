@@ -28,6 +28,7 @@ import {
   notesLine, processingActive, remainingTime, type LibraryProcessingCommand, type LibraryProcessingData,
 } from './library-processing';
 import { useLibraryProcessingJob } from './use-library-processing';
+import { setProcessingNoticeVisible, useProcessingNoticeVisibility } from './processing-notice-visibility';
 import { ProcessingActions } from './processing-actions';
 import { ProcessingProgress } from './processing-line';
 import { TrafficProgress } from './processing-traffic';
@@ -157,6 +158,8 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
   useEffect(() => { if (settled) onComplete?.() }, [settled, onComplete]);
 
   const state = job.data ?? { status: 'idle' };
+  const noticeKey = state.job_id || 'unavailable';
+  const { hidden } = useProcessingNoticeVisibility(noticeKey);
   const problem = start.error ? errorMessage(start.error)
     : job.isError ? (job.data ? DISCONNECTED_TEXT : errorMessage(job.error))
     : '';
@@ -187,7 +190,13 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
         </>
       }>
         <div className="flex flex-col gap-2">
-          <FieldsetTitle>扫描与采集</FieldsetTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <FieldsetTitle>扫描与采集</FieldsetTitle>
+            {hidden && (processingActive(state) || state.status === 'failed' || job.isError)
+              ? <Button variant="secondary" size="small" onClick={() => setProcessingNoticeVisible(noticeKey, true)}>
+                  显示进度浮窗
+                </Button> : null}
+          </div>
           <p className="text-body-2-regular text-text-secondary">{SCAN_CARD_TEXT}</p>
           {state.status === 'paused' && !state.total
             ? <span className="self-start"><StatusLabel>已暂停</StatusLabel></span>
