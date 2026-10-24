@@ -244,6 +244,9 @@ def external_playlist(request: Request, id: int, ticket: str, origin: str = ''):
 @router.api_route("/stream", methods=["GET", "HEAD"])
 def stream(request: Request, id: int, session: str = "", args: dict[str, str] = Depends(require_auth)):
     state = request.app.state
+    from .error_reporting import local_event
+    local_event('playback-request', asset_id=id, method=request.method,
+                range=request.headers.get('range', '')[:80], user_agent=request.headers.get('user-agent', '')[:512])
     asset = state.media_engine.asset(id)
     path = state.media_engine.filesystem.file_for(asset, thumbnail=False)
     from . import strm, strm_stream
@@ -279,6 +282,8 @@ def stream(request: Request, id: int, session: str = "", args: dict[str, str] = 
     if transcoded:
         response.headers["X-Peach-Transcoded"] = "1"
     response.headers["Cache-Control"] = "no-store"
+    local_event('playback-source', asset_id=id, mime_type=response.headers.get('content-type', ''),
+                transcoded=transcoded, session_present=bool(session))
     return response
 
 
@@ -300,16 +305,16 @@ def stream_plan(request: Request, id: int, session: str = "", mode: str = "", ar
         except ValueError as error:
             return JSONResponse({'error': str(error)}, status_code=400)
         mime = strm_stream.mime_type(target)
-        return {'id': id, 'protocol': 'hls' if mime in strm_stream.PLAYLIST_TYPES else 'range',
+        return _record_stream_plan(state, id, source_path, {'id': id, 'protocol': 'hls' if mime in strm_stream.PLAYLIST_TYPES else 'range',
                 'mime_type': mime, 'duration': asset.duration,
-                'src': f'/stream?id={id}&session={quote(session, safe="")}', 'reason': 'strm-pointer'}
+                'src': f'/stream?id={id}&session={quote(session, safe="")}', 'reason': 'strm-pointer'})
     if source_path.suffix.lower() in strm.DISC_SUFFIXES:
         return JSONResponse({'error': 'ISO 原盘请使用作品详情中的外部播放器打开'}, status_code=415)
     conversion = _needs_conversion(state, id, source_path, session)
     resolved = (_hls_plan(state, id, session, conversion)
                 if conversion or plan.protocol == "hls" else None)
     if resolved and session:
-        return {
+        return _record_stream_plan(state, id, source_path, {
             "id": id,
             "protocol": "hls",
             "mime_type": "application/vnd.apple.mpegurl",
@@ -318,18 +323,30 @@ def stream_plan(request: Request, id: int, session: str = "", mode: str = "", ar
             "segments": len(resolved[2]),
             "src": f"/stream/hls/{id}/index.m3u8?session={quote(session, safe='')}",
             "reason": plan.reason,
-        }
+        })
     source = f"/stream?id={id}"
     if session:
         source += f"&session={quote(session, safe='')}"
-    return {
+    return _record_stream_plan(state, id, source_path, {
         "id": id,
         "protocol": "range",
         "mime_type": plan.mime_type,
         "duration": asset.duration,
         "src": source,
         "reason": plan.reason,
-    }
+    })
+
+
+def _record_stream_plan(state, asset_id: int, source: Path, plan: dict) -> dict:
+    from .error_reporting import local_event
+    try:
+        local_event('playback-plan', asset_id=asset_id,
+                    plan={key: plan.get(key) for key in ('protocol', 'mime_type', 'duration', 'reason', 'segments')},
+                    media_profile=state.transcode_service.diagnostic_profile(source),
+                    hardware=state.transcode_service.hardware.diagnostic_snapshot())
+    except Exception:
+        LOGGER.debug('播放诊断未取得', exc_info=True)
+    return plan
 
 
 @router.api_route('/strm-resource/{id}/{key}', methods=['GET', 'HEAD'])

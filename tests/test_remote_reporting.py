@@ -325,6 +325,27 @@ class RemoteReportingTests(unittest.TestCase):
             self.assertEqual(send.call_args.args[1]['exception']['values'][0]['stacktrace']['frames'],
                              [{'filename': 'peach-app.js', 'abs_path': 'app:///peach-app.js', 'lineno': 12, 'colno': 34}])
 
+    def test_unsupported_folder_picker_is_local_and_dialog_failures_are_reported(self):
+        from peach.folder_picker import command, PickerUnavailable
+        from fastapi import HTTPException
+        try:
+            command(None, platform='linux')
+        except PickerUnavailable as cause:
+            unsupported = HTTPException(501, 'private')
+            unsupported.__cause__ = cause
+        with mock.patch.object(reporting, 'send') as send:
+            reporting.capture('http-request', unsupported, status_code=501, route='api/pick-folder')
+            send.assert_not_called()
+            failed = HTTPException(501, 'private')
+            failed.__cause__ = PickerUnavailable('private')
+            reporting.capture('http-request', failed, status_code=501, route='api/pick-folder')
+            send.assert_called_once()
+            send.reset_mock()
+            unexpected = HTTPException(500, 'private')
+            unexpected.__cause__ = unsupported.__cause__
+            reporting.capture('http-request', unexpected, status_code=500, route='api/pick-folder')
+            send.assert_called_once()
+
     def test_control_and_source_states_keep_local_records_without_remote_events(self):
         import asyncio
         from concurrent.futures import CancelledError

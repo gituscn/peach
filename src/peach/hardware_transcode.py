@@ -197,6 +197,13 @@ class HardwareTranscoder:
             return False
         return self.enabled and self.backend != "software"
 
+    def diagnostic_snapshot(self) -> dict:
+        """读取当前硬件策略与已有探测结果，不启动新的硬件探测。"""
+        with self._lock:
+            results = [sorted({encoder.backend for encoder in encoders}) for encoders in self._encoders.values()]
+        return {'backend': self.backend, 'enabled': self.active(),
+                'probe_status': 'cached' if results else 'not-probed', 'available_backends': results}
+
     def _available(self, ffmpeg: Path) -> tuple[HardwareEncoder, ...]:
         if not self.active():
             return ()

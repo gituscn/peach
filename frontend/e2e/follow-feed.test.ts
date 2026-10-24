@@ -8,7 +8,7 @@ import { after, before, describe, it } from 'node:test';
 import type { Browser, Page } from 'playwright-core';
 
 import { FIRST, MORE, openFollowFeed } from './follow-fixture.ts';
-import { launch, layout, VIEWPORTS } from './harness.ts';
+import { launch, layout, settle, VIEWPORTS } from './harness.ts';
 
 const DESKTOP = VIEWPORTS.find((viewport) => !viewport.mobile)!;
 const MOBILE = VIEWPORTS.find((viewport) => viewport.mobile)!;
@@ -90,7 +90,8 @@ describe('关注页岛', () => {
         } }));
         await page.route((url) => url.pathname === '/api/items', (route) =>
           route.fulfill({ json: { items: [], total: 0, has_more: false } }));
-        await page.reload({ waitUntil: 'networkidle' });
+        await page.reload({ waitUntil: 'load' });
+        await settle(page);
         assert.equal(await page.getByRole('searchbox', { name: '搜索创作者' }).count(), 0);
         const author = page.locator('[data-follow-authors] a[data-follow-author="name:kou"]');
         assert.equal(await author.count(), 1);
@@ -218,7 +219,8 @@ describe('关注页岛', () => {
     });
     await page.route((url) => url.pathname === '/api/follow' && !url.searchParams.has('item'),
       (route) => route.fulfill({ json: payload }));
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load' });
+    await settle(page);
     return opened;
   };
 
@@ -488,7 +490,8 @@ describe('关注页岛', () => {
           (route) => route.fulfill({ json: payload }));
         // 只读服务拒绝尺寸回写时，当前卡片仍使用浏览器取得的尺寸。
         await page.route('**/api/follow/image-dims', (route) => route.fulfill({ status: 409, json: { ok: false } }));
-        await page.reload({ waitUntil: 'networkidle' });
+        await page.reload({ waitUntil: 'load' });
+        await settle(page);
         const image = page.locator('[data-follow-wall] [data-media-pic] > img').first();
         await image.waitFor();
         await image.evaluate(async (node: HTMLImageElement) => { await node.decode() });

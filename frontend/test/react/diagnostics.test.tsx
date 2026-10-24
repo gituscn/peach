@@ -96,7 +96,11 @@ it('诊断报告下载成功生成文件；失败原因保留在入口旁', asyn
   const { host } = await open();
   await click(buttonNamed('下载诊断报告', host));
   await settle();
-  expect(fetch).toHaveBeenCalledWith('/api/diagnostics/bundle', { credentials: 'same-origin' });
+  expect(fetch).toHaveBeenCalledWith('/api/diagnostics/bundle', expect.objectContaining({ credentials: 'same-origin',
+    headers: { 'X-Peach-Browser-Diagnostics': expect.any(String) } }));
+  const header = fetch.mock.calls[0]![1].headers['X-Peach-Browser-Diagnostics'];
+  const bytes = Uint8Array.from(atob(header), value => value.charCodeAt(0));
+  expect(JSON.parse(new TextDecoder().decode(bytes)).native_codecs).toHaveProperty('h264');
   expect(create).toHaveBeenCalledTimes(1);
   expect(clickFile).toHaveBeenCalledTimes(1);
   expect(document.querySelector('a[download]')).toBeNull();

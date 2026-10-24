@@ -197,6 +197,7 @@ class DependencyPolicyTests(unittest.TestCase):
             "sentry_sdk": "sentry-sdk",
             "starlette": "starlette",
             "torznab": "torznab",
+            "tzlocal": "tzlocal",
             "uvicorn": "uvicorn",
             "watchdog": "watchdog",
             "wordninja_enhanced": "wordninja-enhanced",

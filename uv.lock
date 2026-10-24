@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 
 [[package]]
@@ -1094,6 +1094,7 @@ dependencies = [
     { name = "starlette" },
     { name = "tldextract" },
     { name = "torznab" },
+    { name = "tzlocal" },
     { name = "uvicorn" },
     { name = "watchdog" },
     { name = "zeroconf" },
@@ -1160,6 +1161,7 @@ requires-dist = [
     { name = "starlette", specifier = "==1.8.0" },
     { name = "tldextract", specifier = "==5.4.0" },
     { name = "torznab", specifier = "==0.2.1" },
+    { name = "tzlocal", specifier = "==5.4.4" },
     { name = "uvicorn", specifier = "==0.54.0" },
     { name = "watchdog", specifier = "==6.0.0" },
     { name = "wordninja-enhanced", marker = "extra == 'naming'", specifier = "==3.2.0" },

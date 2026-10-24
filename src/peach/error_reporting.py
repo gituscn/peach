@@ -21,6 +21,7 @@ _log_dir: Path | None = None
 _fault_stream = None
 _write_lock = threading.RLock()
 _hooks_installed = False
+_timezone_lookup = threading.local()
 
 
 def redact(value: str) -> str:
@@ -104,12 +105,32 @@ def scrub(value):
     return value
 
 
+def timezone_facts(moment: datetime | None = None) -> dict:
+    """本机实际时区名称、偏移及本地时间；名称读取失败不阻止取证。"""
+    local = (moment or datetime.now().astimezone())
+    offset = local.utcoffset()
+    result = {'local_time': local.isoformat(), 'abbreviation': local.tzname(),
+              'utc_offset_minutes': int(offset.total_seconds() / 60) if offset is not None else None}
+    if getattr(_timezone_lookup, 'active', False):
+        return {**result, 'status': 'unavailable', 'name': None, 'reason': 'lookup-in-progress'}
+    _timezone_lookup.active = True
+    try:
+        from tzlocal import get_localzone_name
+        name = get_localzone_name()
+        result.update(status='available' if name else 'unavailable', name=name[:200] if name else None)
+    except Exception as error:
+        result.update(status='unavailable', name=None, reason=type(error).__name__)
+    finally:
+        _timezone_lookup.active = False
+    return result
+
+
 def system_facts() -> dict:
     facts = {"peach": __version__, "python": platform.python_version(),
             "os": platform.system(), "os_release": platform.release(),
             "os_version": platform.version(),
             "architecture": platform.machine(), "frozen": bool(getattr(sys, "frozen", False)),
-            "pid": os.getpid(), "parent_pid": os.getppid()}
+            "pid": os.getpid(), "parent_pid": os.getppid(), "server_timezone": timezone_facts()}
     try:
         from .buildinfo import frozen_build
         build = frozen_build()
@@ -121,6 +142,7 @@ def system_facts() -> dict:
 
 
 def exception_facts(error: BaseException) -> dict:
+    from .diagnostic_exceptions import structured_codes
     frames = []
     seen = set()
     current = error
@@ -130,6 +152,7 @@ def exception_facts(error: BaseException) -> dict:
         chain.append({"type": type(current).__name__, "message": redact(str(current))[:4000],
                       "winerror": getattr(current, "winerror", None), "errno": getattr(current, "errno", None),
                       "operation": getattr(current, "peach_operation", None),
+                      "codes": structured_codes(current),
                       "context": getattr(current, "peach_context", None)})
         for frame in traceback.extract_tb(current.__traceback__)[-40:]:
             frames.append({"file": Path(frame.filename).name, "line": frame.lineno, "function": frame.name})
@@ -137,12 +160,17 @@ def exception_facts(error: BaseException) -> dict:
     return {"exception": chain, "frames": frames}
 
 
-def event(stage: str, error: BaseException | None = None, **fields) -> Path | None:
+def event(stage: str, error: BaseException | None = None, *, local_fields: dict | None = None, **fields) -> Path | None:
     try:
         from . import remote_reporting
         remote_reporting.capture(stage, error, **fields)
     except Exception:
         pass
+    return local_event(stage, error, **{**fields, **(local_fields or {})})
+
+
+def local_event(stage: str, error: BaseException | None = None, **fields) -> Path | None:
+    """只写本机脱敏日志，不调用远程上报。"""
     record = {"at": datetime.now(timezone.utc).isoformat(), "stage": stage,
               **system_facts(), 'thread': threading.current_thread().name, **fields}
     if error is not None:
@@ -166,8 +194,10 @@ def subprocess_failure(stage: str, *, tool: str, error: BaseException | None = N
     """媒体子进程仅保留工具名、错误码和有界错误输出，不记录完整命令。"""
     raw = stderr or getattr(error, 'stderr', b'') or b''
     text = raw.decode('utf-8', 'replace') if isinstance(raw, bytes) else str(raw)
+    from .diagnostic_exceptions import media_details
+    reason = media_details(error, {'stderr': text}, {})
     return event(stage, error, tool=Path(tool).name, returncode=returncode,
-                 stderr=text[-4000:], **fields)
+                 stderr=text[-4000:], local_fields={'reason_code': reason or 'unclassified'}, **fields)
 
 
 class ErrorHandler(logging.Handler):
