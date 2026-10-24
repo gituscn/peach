@@ -12,6 +12,7 @@ import { wireHorizontalScroller } from '../../ui-kit/scroll';
 import { DiscoveryFaces } from './discovery-faces';
 import { javContentSkeleton, javTagSkeleton, JAV_RECOMMENDATION_GRID } from '../../jav-skeleton';
 import { errorMessage } from '../../api';
+import { textLang } from '../../core/text-lang';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
 import { Note } from '../components/note';
 import { EmptyState } from '../components/empty-state';
@@ -177,7 +178,7 @@ function Discover({ readOnly, receipt, resource, query, navigate, clearText }: {
         <div data-media-meta="">
           <DiscoveryFaces item={item} />
           <div data-media-text="">
-            <h3 data-jav-title="" data-media-title="" title={`${item.code} · ${item.title || '标题未取得'}`}><b>{item.code}</b> {item.title || '标题未取得'}</h3>
+            <h3 data-jav-title="" data-media-title="" title={`${item.code} · ${item.title || '标题未取得'}`}><b>{item.code}</b> {item.title ? <span lang={textLang(item.title)}>{item.title}</span> : '标题未取得'}</h3>
             <div data-media-byline="">
               {item.performer_refs?.[0]?.id ? <a data-media-who="" href={entityPath('performer', item.performer_refs[0].name)} title={performers}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-user-round" /></svg><span>{item.performer_refs[0].name}</span></a>

@@ -158,37 +158,58 @@ def prepare_tools(stage: Path, target: Path, transaction: Path, release: dict, d
             raise ValueError(f"{tool} 工具复用校验失败")
 
 
+def checked_asset(digest: object, size: object, label: str) -> tuple[str, int]:
+    if not isinstance(digest, str) or not digest.startswith("sha256:") or len(digest) != 71:
+        raise ValueError(f"{label}缺少 SHA-256 校验信息")
+    if not isinstance(size, int) or not 0 < size <= MAX_ARCHIVE:
+        raise ValueError(f"{label}大小无效")
+    return digest[7:], size
+
+
+def fetch_package(url: str, size: int, digest: str, transaction: Path, name: str, version: str, data: dict) -> Path:
+    """下载、校验程序包并解压到 `stage/Peach`（`apply` 只认这一处）；进度接在已下载的字节数后面。"""
+    archive, start = transaction / f"{name}.zip", data.get("downloaded", 0)
+    download(url, archive, size, digest,
+             lambda count: write(data, downloaded=start + count, progress=round((start + count) / data["total"] * 65, 1)))
+    write(data, state="verifying", progress=66, message="正在校验")
+    write(data, state="extracting", message="正在解压")
+    shutil.rmtree(transaction / "stage", ignore_errors=True)
+    stage = extract(archive, transaction / "stage", lambda done, count: write(data, progress=67 + round(done / count * 8)))
+    from .buildinfo import read_build_info
+    info = read_build_info(stage / "_internal")
+    if not info or info.version != version:
+        raise ValueError("包内版本与发布版本不符")
+    return stage
+
+
 def prepare(data: dict, lock: FileLock) -> None:
     try:
         release = release_updates.check()
         if release["state"] != "available":
             raise ValueError(release["message"])
-        digest = release.get("asset_digest") or ""
-        if not digest.startswith("sha256:") or len(digest) != 71:
-            raise ValueError("更新包缺少 SHA-256 校验信息")
-        total = release.get("asset_size", 0)
-        if not isinstance(total, int) or not 0 < total <= MAX_ARCHIVE:
-            raise ValueError("更新包大小无效")
+        digest, total = checked_asset(release.get("asset_digest"), release.get("asset_size", 0), "更新包")
         target = Path(sys.executable).resolve().parent
         if state_path().resolve().is_relative_to(target):
             raise ValueError("数据目录位于程序目录内，不能自动替换")
         transaction = target.parent / f".{target.name}-update-{data['id']}"
         transaction.mkdir()
-        write(data, transaction=str(transaction), target=str(target), version=release["latest_version"],
+        version = release["latest_version"]
+        write(data, transaction=str(transaction), target=str(target), version=version,
               total=total, downloaded=0, message="正在下载", state="downloading")
-        archive = transaction / "package.zip"
-        download(release["asset_url"], archive, total, digest[7:],
-                 lambda count: write(data, downloaded=count, progress=round(count / total * 65, 1)))
-        write(data, state="verifying", progress=66, message="正在校验")
-        write(data, state="extracting", message="正在解压")
-        stage = extract(archive, transaction / "stage", lambda done, count: write(data, progress=67 + round(done / count * 8)))
-        from .buildinfo import read_build_info
-        info = read_build_info(stage / "_internal")
-        if not info or info.version != release["latest_version"]:
-            raise ValueError("包内版本与发布版本不符")
+        stage = fetch_package(release["asset_url"], total, digest, transaction, "package", version, data)
         if release.get("package_kind") == "update":
             write(data, state="preparing", message="正在复用和校验已安装工具")
-            prepare_tools(stage, target, transaction, release, data)
+            try:
+                prepare_tools(stage, target, transaction, release, data)
+            except (ValueError, KeyError, TypeError, FileNotFoundError) as exc:
+                # 清单格式、工具集合或工具包与本版更新器对不上：完整包自带全部工具，不经清单。
+                try:
+                    full_digest, full_size = checked_asset(release.get("full_digest"), release.get("full_size", 0), "完整包")
+                except ValueError:
+                    raise exc from None
+                write(data, state="downloading", total=data["downloaded"] + full_size,
+                      message=f"应用更新包无法使用（{exc}），改为下载完整包")
+                stage = fetch_package(release["full_url"], full_size, full_digest, transaction, "full", version, data)
         write(data, state="preparing", progress=90, message="正在准备安装")
         desktop_installer.carry_uninstaller(target, stage)
         # 助手从自己的目录运行，正式目录与暂存目录都不会被它的 DLL 句柄占用。
