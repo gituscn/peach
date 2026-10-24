@@ -47,14 +47,14 @@ def _release_candidates(rows: list, endpoint: str) -> list[tuple]:
         complete_tools = all(prefix + f"-tools-{tool}.zip" in uploaded for tool in TOOL_PATHS)
         asset = uploaded.get(prefix + "-update.zip", full) if complete_tools else full
         if endpoint == DOWNLOADS_API:
-            if not re.fullmatch(r"sha256:[0-9a-f]{64}", asset.get("digest") or ""):
+            if not all(re.fullmatch(r"sha256:[0-9a-f]{64}", item.get("digest") or "") for item in (asset, full)):
                 continue
-            asset_url = f"{DOWNLOADS_BASE}/{tag}/{asset['name']}"
+            directory = f"{DOWNLOADS_BASE}/{tag}"
             release_url = f"{GITGUD_RELEASES}/{tag}"
         else:
-            asset_url = f"{RELEASES_URL}/download/{tag}/{asset['name']}"
+            directory = f"{RELEASES_URL}/download/{tag}"
             release_url = f"{RELEASES_URL}/tag/{tag}"
-        releases.append((version, tag, asset, full, asset_url, release_url))
+        releases.append((version, tag, asset, full, directory, release_url))
     return releases
 
 
@@ -82,16 +82,19 @@ def check(*, transport=None) -> dict:
         if not releases:
             return dict(result, state="empty" if obtained else "error",
                         message="暂未找到可下载的测试版。" if obtained else "未能取得版本信息，请重试。")
-        version, tag, asset, full, asset_url, release_url = max(releases, key=lambda item: item[0])
+        version, tag, asset, full, directory, release_url = max(releases, key=lambda item: item[0])
         current = _version(result["current_version"])
         if current is None:
             raise ValueError("current version required")
         state = "available" if version > current else "ahead" if version < current else "current"
         message = {"available": "有新版本可下载。", "ahead": "当前版本高于已发布测试版。", "current": "已是最新测试版。"}[state]
         return dict(result, latest_version=tag.removeprefix("v"), state=state, message=message,
-                    asset_url=asset_url,
+                    asset_url=f"{directory}/{asset['name']}",
                     asset_size=asset.get("size", 0), asset_digest=asset.get("digest"),
                     package_kind="update" if asset is not full else "full",
+                    # 应用更新包准备不下去（清单或工具包与本版更新器对不上）时改下的同版本完整包。
+                    full_url=f"{directory}/{full['name']}", full_size=full.get("size", 0),
+                    full_digest=full.get("digest"),
                     release_url=release_url)
     except (OSError, ValueError, TypeError, TimeoutError, httpx.HTTPError):
         return dict(result, state="error", message="未能取得版本信息，请重试。")

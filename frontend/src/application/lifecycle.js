@@ -26,6 +26,7 @@ wireOverlayScrollbars();
 wireImageFallbacks(document.body);
 catalogState.homeHasFeed = recalledHomeFeed();
 catalogState.barsRequestSeq = 0;
+catalogState.barsPendingSeq = 0;
 catalogState.barsRendered = '';
 catalogState.catalogFilterProps = null;
 catalogState.catalogFilterMounting = null;

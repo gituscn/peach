@@ -124,7 +124,6 @@
 }
 .peach-react [data-follow-detail] [data-follow-detail-summary] {
   margin: 0 0 16px;
-  line-height: 1.6;
   color: var(--ink-2);
   white-space: pre-line;
   overflow-wrap: anywhere;

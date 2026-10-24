@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import fnmatch
 import importlib
 import json
@@ -16,6 +17,7 @@ import time
 import unittest
 from collections.abc import Iterable
 from contextlib import contextmanager, nullcontext
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -25,7 +27,7 @@ TESTS = ROOT / "tests"
 if not __package__:
     sys.path.insert(0, str(ROOT))
     __package__ = "scripts"
-from . import change_impact, test_evidence, test_progress
+from . import change_impact, test_evidence, test_history, test_progress
 
 COMMON_PATTERNS = ("test_context_budget.py", "test_test_collection.py", "test_complexity_ratchet.py",
                    "test_source_assertion_ratchet.py", "test_python_lint.py")
@@ -108,7 +110,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
                  "test_seed_pack.py", "test_seed_followup.py", "test_seed_corrections.py"),
     "tooling": ("test_scripts.py", "test_trash_junk.py", "test_auth.py", "test_access.py", "test_cli.py", "test_server.py", "test_diagnostics.py", "test_error_reporting.py", "test_remote_reporting.py", "test_reporting_*.py", "test_library_sharing.py", "test_library_diagnostics.py", "test_script_policy.py",
                 "test_scan.py", "test_record_rehome.py", "test_wants.py", "test_push_discovery.py", "test_media_probe.py", "test_subtitles.py", "test_onboarding.py", "test_configuration_sources.py", "test_clouddrive_proxy.py", "test_folder_picker.py", "test_ledger_backups.py", "test_clear_camera_filename_codes.py",
-                "test_agent_worktree.py", "test_test_evidence.py", "test_test_environment.py", "test_dependency_policy.py",
+                "test_agent_worktree.py", "test_test_evidence.py", "test_test_history.py", "test_test_environment.py", "test_dependency_policy.py",
                 "test_version_bump.py", "test_changelog.py", "test_release_due.py",
                 "test_restart_windows_tray.py", "test_deploy_windows_tray.py", "test_runtime_prepare.py",
                 "test_buildinfo.py", "test_versioning.py", "test_macos_standalone.py",
@@ -271,6 +273,13 @@ AUTO_SCOPE_FILES: dict[str, tuple[str, ...]] = {
     "compose.yaml": ("packaging", "tooling"),
     "src/peach/server.py": ("packaging", "tooling"),
     "scripts/smoke_docker.py": ("packaging", "tooling"),
+    # GitLab 流水线：构建、发布与 CI 验证的编排，本机测试不执行它；`test_version_bump.py`
+    # 读它判补丁版本。主线 CI 改它时由 `ci_scope` 让三个平台跑全量。
+    ".gitlab-ci.yml": ("packaging", "tooling"),
+    # 源码分发包的文件清单，由打包测试与发布脚本使用。
+    "MANIFEST.in": ("packaging", "tooling"),
+    # 浏览器文件的实测秒数：CI 浏览器矩阵（tooling）与本机浏览器冒烟的排队顺序（web）共用。
+    "scripts/ci-browser-timings.json": ("tooling", "web"),
 }
 
 # 脚本默认归 tooling；有自己领域测试的脚本两边都跑：领域测试验它的判据，
@@ -337,6 +346,18 @@ AUTO_SCOPE_PREFIXES: tuple[tuple[str, str | tuple[str, ...]], ...] = (
     ("src/peach/regions.py", "catalog"),
     ("src/peach/web_", "catalog"),
     ("src/peach/routes_", "catalog"),
+    # 随应用分发的资源由加载它们的模块与打包脚本使用，按加载者登记。
+    # 命名词表由 `classification.py` 读，那份判据的测试在目录与元数据两个域。
+    ("resources/naming/", ("catalog", "metadata")),
+    ("resources/media-sources.json", ("media", "web")),
+    ("resources/seed/", ("metadata", "tooling")),
+    ("resources/junk/", ("catalog", "tooling")),
+    ("resources/marks/", ("catalog", "web")),
+    ("resources/site-marks/", ("catalog", "web")),
+    ("resources/licenses/", ("packaging", "tooling")),
+    # 应用图标：页面站标（web）、托盘与菜单栏（sync）、安装包与 DMG（packaging），
+    # `test_scripts.py` 读 `peach-logo.png`（tooling）。
+    ("resources/", ("sync", "tooling", "web", "packaging")),
     ("web/", "web"),
     ("frontend/", "web"),
     ("scripts/", "tooling"),
@@ -350,7 +371,8 @@ AUTO_SCOPE_PREFIXES: tuple[tuple[str, str | tuple[str, ...]], ...] = (
 FULL_ONLY_PREFIXES: tuple[str, ...] = (
     "pyproject.toml",
     "scripts/test_runner.py", "scripts/test_evidence.py", "scripts/test.ps1", "scripts/test.sh",
-    "scripts/ci_plan.py", "scripts/test_environment.py", "scripts/change_impact.py", "scripts/test_progress.py", "uv.lock",
+    "scripts/ci_plan.py", "scripts/test_environment.py", "scripts/change_impact.py", "scripts/test_progress.py",
+    "scripts/test_history.py", "uv.lock",
     "migrations/",
     "tests/support/",
     "package.json",
@@ -375,6 +397,10 @@ def scopes_of_test_file(name: str) -> tuple[str, ...]:
                    if any(fnmatch.fnmatch(name, pattern) for pattern in patterns))
     if not scopes and any(fnmatch.fnmatch(name, pattern) for pattern in COMMON_PATTERNS):
         return ("tooling",)
+    if not scopes:
+        # 只登记在 core 或 packaging 的文件（如 `test_ledger_revision.py`）跑登记它的那个域。
+        return tuple(scope for scope in ("core", "packaging")
+                     if any(fnmatch.fnmatch(name, pattern) for pattern in SCOPES[scope]))
     return scopes
 
 
@@ -384,6 +410,72 @@ def scopes_of_module(stem: str) -> tuple[str, ...]:
     return tuple(scope for scope, patterns in SCOPES.items() if scope not in {"core", "packaging"}
                  if any(fnmatch.fnmatch(exact, pattern) or pattern.startswith(prefix)
                         for pattern in patterns))
+
+
+def _imported_modules(path: Path) -> frozenset[str]:
+    """一个 Python 文件导入了 `peach` 下哪些顶层模块（含函数里的延迟导入）。"""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, UnicodeError, ValueError):
+        return frozenset()
+    source = ROOT / "src" / "peach"
+    depth = len(path.relative_to(source).parts) if path.is_relative_to(source) else None
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found.update(alias.name.split(".")[1] for alias in node.names
+                         if alias.name.startswith("peach."))
+        elif isinstance(node, ast.ImportFrom):
+            parts = (node.module or "").split(".") if node.module else []
+            if node.level:
+                # 相对导入回到 `peach` 包根要退的层数等于文件在包里的深度。
+                if depth is None or node.level != depth:
+                    continue
+                parts = ["peach", *parts]
+            if parts[:1] != ["peach"]:
+                continue
+            found.update([parts[1]] if len(parts) > 1 else (alias.name for alias in node.names))
+    return frozenset(found)
+
+
+@lru_cache(maxsize=1)
+def _import_index() -> tuple[dict[str, frozenset[str]], dict[str, frozenset[str]], frozenset[str]]:
+    """测试文件、`src/peach` 下的文件与 `tests/support` 各自导入的 `peach` 模块。"""
+    tests = {path.name: _imported_modules(path) for path in TESTS.glob("test_*.py")}
+    sources = {path.relative_to(ROOT).as_posix(): _imported_modules(path)
+               for path in (ROOT / "src" / "peach").rglob("*.py")}
+    support = frozenset(name for path in (TESTS / "support").glob("*.py") for name in _imported_modules(path))
+    return tests, sources, support
+
+
+def scopes_of_importers(stem: str, seen: frozenset[str] = frozenset()) -> tuple[str, ...]:
+    """按名字推不出测试的 `src/peach/<stem>.py`：取直接导入它的测试所在的域，加上直接导入它
+    的源码文件按本表推出的域。
+
+    和按名字推断同一层级：认的是「谁直接用它」，不沿导入链一路扩散——函数里的延迟导入把几乎
+    所有模块连成一团，传递闭包等于全量。导入者自己也推不出域时，按同一规则继续往上取，
+    互相导入的一组模块合起来算。
+    共享测试设施 `tests/support` 用到它、或者谁都不直接导入它，返回空，由调用方按未知面跑 full。
+    """
+    tests, sources, support = _import_index()
+    if stem in support:
+        return ()
+    found: set[str] = set()
+    for name, modules in tests.items():
+        if stem in modules:
+            found.update(scopes_of_test_file(name))
+    for path, modules in sources.items():
+        if stem in modules and path != f"src/peach/{stem}.py":
+            importer = path.rsplit("/", 1)[-1].removesuffix(".py")
+            nested = "/" in path.removeprefix("src/peach/")
+            if not nested and importer in seen:
+                # 互相导入的一组模块：正在求值的那一层已经在收它自己的导入者。
+                continue
+            scopes = mapped_scopes(path, seen | {stem}) if nested or importer != "__init__" else ()
+            if not scopes:
+                return ()
+            found.update(scopes)
+    return tuple(scope for scope in SCOPES if scope in found)
 
 
 #: `<某个 Path> / "a" / "b/c.js"` 这种拼接。要求左边有个 `/`，是为了把「路径当字符串
@@ -463,8 +555,8 @@ def special_scopes(path: str, kind: str) -> tuple[str, ...] | None:
     return None
 
 
-def mapped_scopes(path: str) -> tuple[str, ...]:
-    """按显式映射、测试归属和模块测试名定位功能域。"""
+def mapped_scopes(path: str, seen: frozenset[str] = frozenset()) -> tuple[str, ...]:
+    """按显式映射、测试归属、模块测试名和直接导入者定位功能域。"""
     name = path.rsplit("/", 1)[-1]
     if path in AUTO_SCOPE_FILES:
         return AUTO_SCOPE_FILES[path]
@@ -474,7 +566,11 @@ def mapped_scopes(path: str) -> tuple[str, ...]:
         if path.startswith(prefix):
             return (scope,) if isinstance(scope, str) else scope
     if path.startswith("src/peach/") and path.endswith(".py"):
-        return scopes_of_module(name.removesuffix(".py"))
+        stem = name.removesuffix(".py")
+        by_name = scopes_of_module(stem)
+        if by_name or "/" in path.removeprefix("src/peach/") or stem == "__init__":
+            return by_name
+        return scopes_of_importers(stem, seen)
     return ()
 
 
@@ -564,11 +660,18 @@ def without_ci_frontend_tests(suite: unittest.TestSuite) -> unittest.TestSuite:
     return selected
 
 
-def build_suite(*scopes: str, shard_index: int = 0, shard_count: int = 1) -> unittest.TestSuite:
+def build_suite(*scopes: str, shard_index: int = 0, shard_count: int = 1,
+                assigned_names: Iterable[str] | None = None) -> unittest.TestSuite:
+    """本片的用例。`assigned_names` 是父进程按耗时划好的文件名；不给时按文件名轮转（CI 分片）。"""
     loader = unittest.defaultTestLoader
     suite = unittest.TestSuite()
     files = sorted({path for scope in scopes for path in selected_files(scope)})
-    assigned = set(files[shard_index::shard_count])
+    if assigned_names is None:
+        assigned = set(files[shard_index::shard_count])
+    else:
+        assigned = {TESTS / name for name in assigned_names}
+        if not assigned <= set(files):
+            raise ValueError(f"分片划分含本次范围以外的文件：{sorted(p.name for p in assigned - set(files))}")
     sys.path[:0] = [str(ROOT), str(TESTS)]
     try:
         for path in sorted(assigned):
@@ -585,17 +688,101 @@ def build_suite(*scopes: str, shard_index: int = 0, shard_count: int = 1) -> uni
 
 
 class TimedResult(unittest.TextTestResult):
+    """逐用例耗时，外加逐文件墙钟。
+
+    文件墙钟按「本条结束距上一条结束」累计：类级 `setUpClass` 发生在首条用例开始之前，
+    只量用例本身会漏掉建库、起服务那一段，而分片均衡要的正是整份文件占多久。
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.timings = []
+        self.files: dict[str, float] = {}
+        self.results: list[dict] = []
+        self.outcome: dict[str, tuple[str, str | None]] = {}
+        self.last = time.monotonic()
+
+    def startTestRun(self):
+        self.last = time.monotonic()
+        super().startTestRun()
 
     def startTest(self, test):
         self.started = time.monotonic()
         super().startTest(test)
 
     def stopTest(self, test):
-        self.timings.append((round(time.monotonic() - self.started, 3), test.id()))
+        now = time.monotonic()
+        self.timings.append((round(now - self.started, 3), test.id()))
+        outcome, message = self.outcome.pop(test.id(), ("pass", None))
+        self.results.append(test_history.result(test.id(), outcome, now - self.started, message))
+        module = type(test).__module__
+        self.files[module] = round(self.files.get(module, 0.0) + now - self.last, 3)
+        self.last = now
         super().stopTest(test)
+
+    def _mark(self, test, outcome: str, err=None) -> None:
+        message = f"{err[0].__name__}: {err[1]}" if err else None
+        if type(test).__name__ == "_ErrorHolder":
+            # 类级或模块级准备失败：没有对应的 startTest/stopTest，直接记一条。
+            self.results.append(test_history.result(test.id(), outcome, 0.0, message))
+            return
+        if self.outcome.get(test.id(), ("pass",))[0] in {"pass", "skip"}:
+            self.outcome[test.id()] = (outcome, message)
+
+    def addFailure(self, test, err):
+        super().addFailure(test, err)
+        self._mark(test, "fail", err)
+
+    def addError(self, test, err):
+        super().addError(test, err)
+        self._mark(test, "error", err)
+
+    def addSkip(self, test, reason):
+        super().addSkip(test, reason)
+        self._mark(test, "skip")
+
+    def addUnexpectedSuccess(self, test):
+        super().addUnexpectedSuccess(test)
+        self._mark(test, "fail", (AssertionError, "预期失败的用例通过了"))
+
+    def addSubTest(self, test, subtest, err):
+        super().addSubTest(test, subtest, err)
+        if err is not None:
+            self._mark(test, "fail" if issubclass(err[0], test.failureException) else "error", err)
+
+
+TIMINGS_FILE = "test-timings.json"
+
+
+def file_seconds_path() -> Path:
+    """本机各测试文件的实测墙钟，存在共享记录目录：不进 Git，也不进代码快照。"""
+    return test_evidence.evidence_dir(ROOT) / TIMINGS_FILE
+
+
+def load_file_seconds(path: Path | None = None) -> dict[str, float]:
+    try:
+        path = file_seconds_path() if path is None else path
+        seconds = json.loads(path.read_text(encoding="utf-8")).get("seconds", {})
+    except (OSError, ValueError, AttributeError, subprocess.CalledProcessError):
+        return {}
+    return {name: float(value) for name, value in seconds.items()
+            if isinstance(name, str) and isinstance(value, (int, float)) and value >= 0}
+
+
+def save_file_seconds(measured: dict[str, float], path: Path | None = None) -> None:
+    """把本次实测并进表里；没跑到的文件保留旧值。几个会话同时写时后到的覆盖，只影响排序。"""
+    if not measured or (path is None and test_history.nested()):
+        return
+    try:
+        path = file_seconds_path() if path is None else path
+        merged = {**load_file_seconds(path), **{name: round(value, 3) for name, value in measured.items()}}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        temporary.write_text(json.dumps({"seconds": dict(sorted(merged.items()))}, indent=1),
+                             encoding="utf-8")
+        temporary.replace(path)
+    except (OSError, subprocess.CalledProcessError):
+        pass
 
 
 DEFAULT_JOBS = 4
@@ -614,12 +801,42 @@ def resolve_jobs(value: str) -> int:
     return jobs
 
 
-def shard_command(scopes: tuple[str, ...], index: int, count: int, timings: Path) -> list[str]:
+def shard_command(scopes: tuple[str, ...], index: int, count: int, timings: Path,
+                  plan: Path | None = None) -> list[str]:
     command = [sys.executable, str(ROOT / "scripts" / "test_runner.py"),
             *(item for scope in scopes for item in ("--scope", scope)),
             "--shard-index", str(index), "--shard-count", str(count),
             "--timings", str(timings)]
+    if plan is not None:
+        command += ["--shard-plan", str(plan)]
     return command
+
+
+#: 没有本机实测时的先验秒数。浏览器冒烟一条用例占十几分钟，必须独占一片并第一个派发，
+#: 否则排在中间的那片开跑时其余分片已过半，它一个人拖尾。
+PRIOR_SECONDS = {"test_web_e2e.py": 900.0}
+
+
+def shard_plan(names: Iterable[str], shard_count: int,
+               seconds: dict[str, float]) -> list[list[str]]:
+    """按预计秒数把测试文件装进分片：先长后短，每个文件放进当前最空的一片。
+
+    返回的分片按预计总时长降序排列，派发按这个顺序，最长的先开跑。实测表按模块名记，
+    没测过的文件取已测文件的中位数；表是空的时所有文件等重，相当于按个数均分。
+    """
+    names = sorted(names)
+    known = sorted(value for value in seconds.values() if value > 0)
+    default = known[len(known) // 2] if known else 1.0
+    weight = {name: max(seconds.get(name.removesuffix(".py"), default), PRIOR_SECONDS.get(name, 0.0))
+              for name in names}
+    groups: list[list[str]] = [[] for _ in range(max(1, min(shard_count, len(names))))]
+    totals = [0.0] * len(groups)
+    for name in sorted(names, key=lambda item: (-weight[item], item)):
+        slot = min(range(len(groups)), key=lambda index: (totals[index], index))
+        groups[slot].append(name)
+        totals[slot] += weight[name]
+    order = sorted(range(len(groups)), key=lambda index: (-totals[index], index))
+    return [sorted(groups[index]) for index in order]
 
 
 
@@ -631,9 +848,21 @@ def shard_command(scopes: tuple[str, ...], index: int, count: int, timings: Path
 
 
 def run_shards(scopes: tuple[str, ...], *, jobs: int, shard_count: int,
-               spawn=subprocess.Popen) -> tuple[bool, int, list]:
-    """运行独立分片并汇总证明；并发取调用方的 jobs，取消时清理自己的子进程。"""
+               spawn=subprocess.Popen, measured: dict | None = None,
+               plan: list[list[str]] | None = None,
+               outcomes: list | None = None) -> tuple[bool, int, list]:
+    """运行独立分片并汇总证明；并发取调用方的 jobs，取消时清理自己的子进程。
+
+    `plan` 是父进程定下的逐片文件名，写成文件交给每个子进程，父子用同一份划分；
+    片号即派发顺序。`measured` 收各片报回的逐文件墙钟，`outcomes` 收逐条结果。
+    """
     folder = Path(tempfile.mkdtemp(prefix="peach-shards-"))
+    plan_path = None
+    if plan is not None:
+        if len(plan) != shard_count:
+            raise ValueError("分片划分的片数与分片总数不符")
+        plan_path = folder / "plan.json"
+        plan_path.write_text(json.dumps(plan), encoding="utf-8")
     pending = list(range(shard_count))
     running = {}
     passed, count, timings = True, 0, []
@@ -643,7 +872,8 @@ def run_shards(scopes: tuple[str, ...], *, jobs: int, shard_count: int,
                 index = pending.pop(0)
                 log = open(folder / f"{index}.log", "w+", encoding="utf-8", errors="replace")
                 try:
-                    process = spawn(shard_command(scopes, index, shard_count, folder / f"{index}.json"),
+                    process = spawn(shard_command(scopes, index, shard_count, folder / f"{index}.json",
+                                                  plan_path),
                                     stdout=log, stderr=subprocess.STDOUT, cwd=str(ROOT))
                 except BaseException:
                     log.close()
@@ -666,6 +896,10 @@ def run_shards(scopes: tuple[str, ...], *, jobs: int, shard_count: int,
                 passed = passed and ok
                 count += int(report.get("count", 0))
                 timings.extend(tuple(item) for item in report.get("timings", []))
+                if measured is not None:
+                    measured.update(report.get("files", {}))
+                if outcomes is not None:
+                    outcomes.extend(report.get("results", []))
                 print(f"分片 {index + 1}/{shard_count} {'通过' if ok else '失败'}"
                       f"（{report.get('count', 0)} 个用例）", flush=True)
     finally:
@@ -736,15 +970,53 @@ def environment_preflight(scopes: tuple[str, ...], timings: Path | None = None,
     raise SystemExit(3)
 
 
-def run_local_suite(scopes: tuple[str, ...], jobs: int) -> tuple[bool, int, list]:
+def run_local_suite(scopes: tuple[str, ...], jobs: int, label: str | None = None) -> tuple[bool, int, list]:
     """按调用方选择的并发运行，串行全量通过分片释放测试缓存。"""
     chosen = {path for scope in scopes for path in selected_files(scope)}
     if (jobs > 1 or "full" in scopes) and len(chosen) > 1:
         shard_count = min(len(chosen), 4 * jobs)
-        print(f"本机分片：{shard_count} 片、同时 {min(jobs, shard_count)} 个子进程", flush=True)
-        return run_shards(scopes, jobs=jobs, shard_count=shard_count)
-    result = unittest.TextTestRunner(verbosity=2, resultclass=TimedResult).run(build_suite(*scopes))
+        print(f"本机分片：{shard_count} 片、同时 {min(jobs, shard_count)} 个子进程，按实测耗时先长后短", flush=True)
+        plan = shard_plan((path.name for path in chosen), shard_count, load_file_seconds())
+        measured: dict[str, float] = {}
+        rows: list[dict] = []
+        outcome = run_shards(scopes, jobs=jobs, shard_count=shard_count, measured=measured, plan=plan,
+                             outcomes=rows)
+        save_file_seconds(measured)
+        test_history.append(ROOT, scope=label or " ".join(scopes), rows=rows,
+                            files=[path.stem for path in sorted(chosen)])
+        return outcome
+    suite = build_suite(*scopes)
+    with test_history.running():
+        result = unittest.TextTestRunner(verbosity=2, resultclass=TimedResult).run(suite)
+    save_file_seconds(result.files)
+    test_history.append(ROOT, scope=label or " ".join(scopes), rows=result.results + test_history.take_external(),
+                        files=[path.stem for path in sorted(chosen)])
     return result.wasSuccessful() and result.testsRun > 0, result.testsRun, result.timings
+
+
+def run_shard_child(args, requested, scopes, files) -> int:
+    """分片子进程：跑父进程（或 CI）分给本片的文件，把成败、耗时与逐条结果写给父进程。"""
+    planned = {}
+    if args.shard_plan is not None:
+        planned["assigned_names"] = json.loads(
+            args.shard_plan.read_text(encoding="utf-8"))[args.shard_index]
+    suite = build_suite(*scopes, shard_index=args.shard_index, shard_count=args.shard_count, **planned)
+    with test_history.running():
+        result = unittest.TextTestRunner(verbosity=2, resultclass=TimedResult).run(suite)
+    success = result.wasSuccessful() and result.testsRun > 0
+    rows = result.results + test_history.take_external()
+    if args.timings is not None:
+        args.timings.write_text(json.dumps({"success": success, "count": result.testsRun,
+                                            "timings": result.timings, "files": result.files,
+                                            "results": rows}, ensure_ascii=False),
+                                encoding="utf-8")
+    if args.shard_plan is None:
+        # CI 的独立分片没有父进程替它汇总，自己写一次历史。
+        names = [path.name for path in sorted(files)][args.shard_index::args.shard_count]
+        test_history.append(ROOT, scope=f"{' '.join(requested)}:{' '.join(scopes)} "
+                            f"shard {args.shard_index + 1}/{args.shard_count}",
+                            rows=rows, files=[name.removesuffix(".py") for name in names])
+    return 0 if success else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -761,6 +1033,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--shard-count", type=int, default=1)
     parser.add_argument("--timings", type=Path, default=None,
                         help="分片子进程把成败与逐用例耗时写到这个文件，供父进程汇总")
+    parser.add_argument("--shard-plan", type=Path, default=None,
+                        help="父进程按耗时划好的逐片文件名；不给时按文件名轮转")
     parser.add_argument("--jobs", type=resolve_jobs, default=1,
                         help="本机同时跑几个分片子进程；auto 按核数定。默认串行，正式入口传 auto")
     parser.add_argument("--list-scopes", action="store_true")
@@ -795,16 +1069,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Peach test scope: {' '.join(scopes)} ({len(files)} files)", flush=True)
     if args.shard_count > 1:
         # CI 的每片独立 runner；局部分片绝不签发本机全量证明。
-        result = unittest.TextTestRunner(verbosity=2, resultclass=TimedResult).run(
-            build_suite(*scopes, shard_index=args.shard_index, shard_count=args.shard_count))
-        success = result.wasSuccessful() and result.testsRun > 0
-        if args.timings is not None:
-            args.timings.write_text(json.dumps({"success": success, "count": result.testsRun,
-                                                "timings": result.timings}), encoding="utf-8")
-        return 0 if success else 1
+        return run_shard_child(args, requested, scopes, files)
     if ci_frontend_delegated():
         print("CI 前端工具检查由 web-bundle 验证；本次不签发本机测试记录。", flush=True)
-        success, count, _ = run_local_suite(scopes, args.jobs)
+        success, count, _ = run_local_suite(scopes, args.jobs, f"{' '.join(requested)}:{' '.join(scopes)}")
         return 0 if success and count > 0 else 1
     try:
         guard = test_evidence.held(test_evidence.evidence_dir(ROOT) / "full-suite.lock",
@@ -891,7 +1159,7 @@ def verified_run(args, requested, scopes, files) -> int:
         folder = test_evidence.evidence_dir(ROOT)
         (folder / f"{state}.json").unlink(missing_ok=True)
         started = time.monotonic()
-        passed, count, timings = run_local_suite(scopes, args.jobs) \
+        passed, count, timings = run_local_suite(scopes, args.jobs, f"{' '.join(requested)}:{' '.join(scopes)}") \
             if scopes else (True, 0, [])
         stable = state == test_evidence.key(ROOT)
         success = passed and stable

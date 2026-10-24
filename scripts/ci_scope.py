@@ -44,6 +44,9 @@ PLATFORM_TESTS: dict[str, tuple[str, ...]] = {
 }
 #: 基线只在最近这么多条成功的主线流水线里找；更早的通过记录覆盖不到之后的改动。
 PIPELINE_WINDOW = 20
+#: 流水线定义本身：改了作业、镜像或环境，三个平台都要按新定义完整跑一遍。本机 auto 把它
+#: 归 packaging 与 tooling，主线选测在这里单独退回全量。
+PIPELINE_DEFINITIONS = frozenset({".gitlab-ci.yml"})
 
 
 def verified_base(pipelines: Iterable[dict], current: str, usable: Callable[[str], bool]) -> str | None:
@@ -95,6 +98,8 @@ def plan(platform: str, root: Path, environ: dict[str, str], *,
         scopes, explanation = runner.scopes_for_changes(paths, contents=runner.changed_contents(root, base, paths))
     except (OSError, subprocess.CalledProcessError) as error:
         return ["full"], f"无法比较 {base[:12]}（{error}）"
+    if definitions := sorted(PIPELINE_DEFINITIONS.intersection(paths)):
+        return ["full"], f"流水线定义有改动：{'、'.join(definitions)}"
     if "full" in scopes:
         return ["full"], explanation
     return [base, *PLATFORM_TESTS[platform]], f"基线 {base[:12]}；{explanation}"

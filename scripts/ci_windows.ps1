@@ -55,6 +55,8 @@ if ($Mode -eq 'build') {
     New-Item -ItemType Directory -Path release -Force | Out-Null
     & .venv/Scripts/python.exe scripts/package_windows_release.py --source dist/Peach --output release --version $Version --lite-installer
     Assert-Exit '发行包拆分失败'
+    & .venv/Scripts/python.exe scripts/update_compat.py --packages release --version $Version
+    Assert-Exit '支持范围内的旧版客户端装不上这一版'
     Copy-Item -LiteralPath "dist/Peach-$Version-windows-x64-setup.exe" -Destination release/
     Copy-Item -LiteralPath dist/ffmpeg-corresponding-source.zip, dist/untrunc-corresponding-source.zip -Destination release/
     Copy-Item -LiteralPath scripts/smoke_desktop.py, scripts/smoke_update_tasks.py, scripts/smoke_split_update.py, scripts/ci_windows.ps1 -Destination release/

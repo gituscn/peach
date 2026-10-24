@@ -375,7 +375,7 @@ class StandaloneUpdateTests(unittest.TestCase):
         self.assertEqual(binary.read_bytes(), b"old version")
         self.assertEqual((target / "Peach.exe").read_bytes(), b"old application")
 
-    def test_manifest_rejects_path_escape_tool_scope_collision_and_incomplete_tools(self):
+    def test_manifest_rejects_path_escape_tool_scope_collision_and_incomplete_tool_files(self):
         source, output, manifest, target, archive, release = self.release_fixture()
         for name in ("../escape.exe", "tools/ffmpeg/../../Peach.exe", "Peach.exe", "tools/untrunc/untrunc.exe",
                      "tools/ffmpeg/bin/FFMPEG.exe"):
@@ -385,9 +385,9 @@ class StandaloneUpdateTests(unittest.TestCase):
                 (source / update_packages.MANIFEST).write_text(json.dumps(invalid), encoding="utf-8")
                 with self.assertRaises(ValueError):
                     update_packages.read_manifest(source, "1.0.0")
-        del manifest["tools"]["untrunc"]
+        del manifest["tools"]["untrunc"]["files"]["tools/untrunc/untrunc.exe"]
         (source / update_packages.MANIFEST).write_text(json.dumps(manifest), encoding="utf-8")
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, "缺少必需文件"):
             update_packages.read_manifest(source, "1.0.0")
 
     def test_a_tool_this_version_does_not_know_is_left_out_not_refused(self):
@@ -398,6 +398,46 @@ class StandaloneUpdateTests(unittest.TestCase):
         (source / update_packages.MANIFEST).write_text(json.dumps(future), encoding="utf-8")
         self.assertEqual(set(update_packages.read_manifest(source, "1.0.0")["tools"]),
                          set(update_packages.TOOL_PATHS))
+
+    def test_a_tool_the_new_version_dropped_is_neither_prepared_nor_required(self):
+        """更新版本不再需要的工具：清单里没有它就不准备，不当成清单残缺。"""
+        source, output, manifest, target, archive, release = self.release_fixture()
+        del manifest["tools"]["untrunc"]
+        (source / update_packages.MANIFEST).write_text(json.dumps(manifest), encoding="utf-8")
+        self.assertEqual(set(update_packages.read_manifest(source, "1.0.0")["tools"]),
+                         set(update_packages.TOOL_PATHS) - {"untrunc"})
+
+    def test_an_update_package_this_updater_cannot_use_falls_back_to_the_full_package(self):
+        source, output, manifest, target, archive, release = self.release_fixture()
+        full = output / "Peach-1.0.0-windows-x64.zip"
+        release.update(full_url=release["asset_url"].rsplit("/", 1)[0] + "/" + full.name,
+                       full_size=full.stat().st_size, full_digest="sha256:" + update_packages.digest(full))
+        (target / "cloudflared.exe").unlink()
+        with patch.object(update.update_packages, "read_manifest", side_effect=ValueError("更新包工具清单无效")):
+            state, requests = self.prepare_fixture(target, output, release)
+        self.assertEqual(state["state"], "ready", state)
+        self.assertEqual(requests, [archive.name, full.name], "清单读不了时不再下单个工具包")
+        self.assertEqual(Path(state["stage"]), Path(state["transaction"]) / "stage" / "Peach")
+        for bundle in manifest["tools"].values():
+            self.assertTrue(update_packages.matches(Path(state["stage"]), bundle["files"]))
+        self.assertEqual(state["downloaded"], state["total"])
+        self.assertEqual((target / "Peach.exe").read_bytes(), b"old application")
+
+    def test_supported_older_clients_can_install_this_release(self):
+        """旧版本标签里的更新代码原样读这一版的发布条目与更新包（ADR-0120）。"""
+        from scripts import update_compat
+        source, output, manifest, target, archive, release = self.release_fixture()
+        self.assertEqual(update_compat.verify(output, "1.0.0"), {})
+        rows = [update_compat.release_row(output, "1.0.0")]
+        strict = update_compat.check_clients(update_compat.ROOT, rows, manifest, "1.0.0", oldest="0.47.3")
+        self.assertIn("更新包工具清单无效", " ".join(strict["v0.47.3"]),
+                      "0.47.x 要求工具集合完全相等，人脸模型加入后它读不了更新包")
+        future = json.loads(json.dumps(manifest))
+        future["tools"]["future-tool"] = {"files": {"tools/future/x.bin": "a" * 64}, "asset": {}}
+        orphaned = update_compat.check_clients(update_compat.ROOT, rows, future, "1.0.0")
+        self.assertTrue(orphaned)
+        for reasons in orphaned.values():
+            self.assertIn("future-tool", " ".join(reasons), "新增工具旧版不认得、又没登记为运行时补齐时拒绝发布")
 
     def test_tool_archive_cannot_replace_application_files(self):
         archive = self.archive(["Peach/tools/ffmpeg/bin/ffmpeg.exe", "Peach/Peach.exe"])
