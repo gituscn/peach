@@ -8,6 +8,39 @@ describe('馆藏 JAV 官方预览', () => {
   let browser: Browser;
   before(async () => { browser = await launch() });
   after(async () => { await browser.close() });
+  for (const viewport of VIEWPORTS) it(`${viewport.name}：样图切换在图片就绪前保留当前画面`, { timeout: 60000 }, async () => {
+    const opened = await openItemPage(browser, '/', viewport, { ready: '[data-media-grid]' });
+    const { page } = opened;
+    let release = () => {};
+    try {
+      const waiting = new Promise<void>(resolve => { release = resolve });
+      await page.route('**/api/jav/detail?*', route => route.fulfill({ json: { code: COVER_ONLY_ITEM.code, state: 'ready', preview_count: 3 } }));
+      await page.route('**/jav-image?*', async route => {
+        const image = new URL(route.request().url()).searchParams.get('image');
+        if (image === '1') await waiting;
+        return route.fulfill({ contentType: 'image/svg+xml', body: `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600"><rect width="900" height="600" fill="${image === '0' ? '#555' : '#aaa'}"/></svg>` });
+      });
+      await page.goto(new URL(`/assets/${COVER_ONLY_ITEM.id}`, page.url()).href);
+      const frame = page.locator('[data-item-gallery]');
+      await frame.getByRole('button', { name: '预览 1', exact: true }).waitFor();
+      await frame.getByRole('button', { name: '预览 1', exact: true }).click();
+      const picture = frame.locator('img[data-jav-picture]:not([hidden])');
+      await picture.waitFor();
+      const first = await picture.getAttribute('src');
+      await frame.getByRole('button', { name: '预览 2', exact: true }).click();
+      assert.equal(await picture.getAttribute('src'), first);
+      assert.equal(await frame.locator('[data-skeleton="image"]').count(), 0);
+      await frame.getByRole('button', { name: '预览 3', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('img[data-jav-picture]:not([hidden])')?.getAttribute('src')?.includes('image=2'));
+      release();
+      await frame.getByRole('button', { name: '预览 2', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('img[data-jav-picture]:not([hidden])')?.getAttribute('src')?.includes('image=1'));
+      await frame.getByRole('button', { name: '预览 1', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('img[data-jav-picture]:not([hidden])')?.getAttribute('src')?.includes('image=0'));
+      assert.equal(await frame.locator('[data-skeleton="image"]').count(), 0);
+      assert.deepEqual(opened.problems, []);
+    } finally { release(); await opened.close() }
+  });
   for (const viewport of VIEWPORTS) it(`${viewport.name}：只有封面时视频方向键控制进度，图片方向键切换媒体`, { timeout: 60000 }, async () => {
     const opened = await openItemPage(browser, '/', viewport, { ready: '[data-media-grid]', settings: { seekSeconds: 1 } });
     const { page } = opened;
@@ -127,7 +160,10 @@ describe('馆藏 JAV 官方预览', () => {
       });
       await page.goto(new URL(`/assets/${COVER_ONLY_ITEM.id}`, page.url()).href);
       const frame = page.locator('[data-item-gallery]'), player = frame.locator('.video-js');
+      assert.equal(await frame.getByRole('status', { name: '正在读取样图' }).count(), 0);
+      await frame.getByRole('button', { name: '查看图片', exact: true }).click();
       await frame.getByRole('status', { name: '正在读取样图' }).waitFor();
+      await frame.getByRole('button', { name: '播放正片', exact: true }).click();
       await page.waitForFunction(() => (document.querySelector<HTMLVideoElement>('[data-item-gallery] video')?.readyState || 0) >= 3);
       await player.evaluate(node => { (node as HTMLElement).dataset.galleryProbe = 'kept' });
       await frame.locator('video.vjs-tech').evaluate(node => { const video = node as HTMLVideoElement; video.pause(); video.currentTime = 0.5 });
@@ -169,10 +205,15 @@ describe('馆藏 JAV 官方预览', () => {
       await page.goto(new URL(`/assets/${COVER_ONLY_ITEM.id}`, page.url()).href);
       const frame = page.locator('[data-item-gallery]');
       const retry = frame.getByRole('button', { name: '立即重试样图', exact: true });
+      assert.equal(await retry.count(), 0);
+      await frame.getByRole('button', { name: '查看图片', exact: true }).click();
       await retry.waitFor();
       assert.equal(await retry.getAttribute('title'), '来源暂不可用');
       assert.ok(await page.locator('[data-stage-side-content]').isVisible());
-      assert.ok(await frame.locator('.video-js').isVisible());
+      assert.ok(await frame.locator('.video-js').isHidden());
+      await frame.getByRole('button', { name: '播放正片', exact: true }).click();
+      assert.equal(await retry.count(), 0);
+      await frame.getByRole('button', { name: '查看图片', exact: true }).click();
       await retry.click();
       await frame.getByRole('button', { name: '预览 1', exact: true }).waitFor();
       assert.equal(attempts, 2);

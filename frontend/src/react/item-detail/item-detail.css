@@ -456,9 +456,13 @@
    一档，整幅宽度上于是有一道深浅不匀的色差。分界靠 `--line-soft` 那条明确的线画出来——「接着看」
    是另一件事，同色的两块之间只留白读不出边界。横排竖向不滚，滑到头也不把手势交给外面那层浮窗，
    不画滚动条：拖动与滚轮靠壳的 `wireDrag`。 */
-.peach-react [data-item-related] { border-top: 1px solid var(--line-soft); padding: 11px 15px 12px; background: var(--detail-surface); }
+.peach-react [data-item-related] { border-top: 1px solid var(--line-soft); padding: 10px 15px 8px; background: var(--detail-surface); }
 .peach-react [data-item-related] > h3 {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--fs-xs);
   letter-spacing: .1em;
   color: var(--muted);
@@ -470,9 +474,11 @@
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-inline: contain;
-  padding: 32px 16px 16px;
-  margin: -24px -16px -4px;
+  padding: 12px 16px;
+  margin: -4px -16px 0;
+  min-height: calc(var(--detail-card-height) + 24px);
+  height: calc(var(--detail-card-height) + 24px);
   scrollbar-width: none;
 }
 .peach-react [data-item-related] [data-related-row]::-webkit-scrollbar { display: none; }
-.peach-react [data-item-related] [data-related-state] { min-width: 0; }
+.peach-react [data-item-related] [data-related-state] { min-width: 0; height: calc(var(--detail-card-height) + 20px); }
