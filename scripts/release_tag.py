@@ -40,8 +40,9 @@ MASTER_WRITER = "peach.masterWriter"
 #: 定版只该改这两份：版本号一行，变更日志一节。`--ship` 拒绝夹带别的文件。
 RELEASE_FILES = (version_bump.VERSION_FILE, changelog.CHANGELOG)
 
-#: `--ship` 等 Test 工作流的默认秒数上限，以及两次查询之间的间隔。
-TEST_TIMEOUT = 1800.0
+#: `--ship` 等 Test 工作流的默认秒数上限，以及两次查询之间的间隔。版本提交的流水线里还有发布
+#: 演练（macOS 两个架构从源码编译，作业时限 2 小时），所以按整条演练定。
+TEST_TIMEOUT = 4 * 3600.0
 TEST_POLL = 30.0
 #: 任务排队多久仍没开始就判定等不到。空闲 runner 几秒内轮询接单，GitLab Runner 默认
 #: 3 秒一轮，平台创建流水线也只要几秒；五分钟还没动静就不是正常排队，而是 runner
@@ -191,6 +192,34 @@ def await_test(repo: str, sha: str, *, timeout: float = TEST_TIMEOUT, poll: floa
         sleep(poll)
 
 
+def require_rehearsal(repo: str, sha: str, checked: dict, *, timeout: float = TEST_TIMEOUT,
+                      poll: float = TEST_POLL, sleep=time.sleep, clock=time.monotonic) -> None:
+    """版本提交的发布演练全部通过才打标签（ADR-0121）。
+
+    GitGud 上演练就在版本提交自己的主线流水线里，Test 绿了以后再核对演练作业都在、都成功；
+    GitHub 上演练是同一提交推送触发的 Release 工作流（不带标签时只构建、验收不发布），等它跑完。
+    """
+    if GITLAB:
+        GITLAB.require_rehearsal(repo, checked["id"])
+        return
+    start = clock()
+    while True:
+        runs = api(repo, f"actions/workflows/release.yml/runs?head_sha={sha}&event=push&per_page=100")["workflow_runs"]
+        latest = latest_run(runs, sha)
+        now = clock()
+        if latest is not None and latest.get("status") == "completed":
+            if latest.get("conclusion") != "success":
+                raise ValueError(f"版本提交的发布演练没有通过，不打标签：{latest.get('html_url', '')}")
+            return
+        if latest is None and now - start >= STALL_SECONDS:
+            raise ValueError(f"推送后 {(now - start) / 60:.0f} 分钟仍没有 {sha[:8]} 的 Release 演练记录；"
+                             "检查 release.yml 的触发条件，演练跑起来后再跑一次 --ship --apply")
+        if now - start >= timeout:
+            raise ValueError(f"等了 {timeout / 60:.0f} 分钟，{sha[:8]} 的发布演练还没有结果；"
+                             "版本提交已在 master 上，演练跑完后再跑一次 --ship --apply")
+        sleep(poll)
+
+
 def verify(repo: str, sha: str) -> dict:
     if GITLAB:
         GITLAB.require_ancestor(repo, sha)
@@ -317,6 +346,7 @@ def ship(repo: str, *, apply: bool, timeout: float = TEST_TIMEOUT) -> dict:
     if master_sha(repo) != sha:
         command("git", "push", remote_url(repo), "refs/heads/master")
     checked = await_test(repo, sha, timeout=timeout)
+    require_rehearsal(repo, sha, checked, timeout=timeout)
     require_clean_dependencies()
     command("git", "tag", "-a", tag, sha, "-m", f"Peach {tag} Windows 测试版")
     command("git", "push", remote_url(repo), f"refs/tags/{tag}")

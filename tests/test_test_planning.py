@@ -592,3 +592,93 @@ class TestPlanningTests(unittest.TestCase):
                         self.assertIsNone(connection.execute("SELECT name FROM sqlite_master WHERE name='isolation_probe'").fetchone())
                 finally:
                     connection.close()
+
+
+class GateAndFlakyRerunTests(unittest.TestCase):
+    """全量先过秒级门槛；全量里失败的少数文件单独重跑，过了记为偶发，并排整机锁。"""
+
+    @staticmethod
+    def fail(test_id):
+        return {'id': test_id, 'outcome': 'fail', 'seconds': 1.0, 'message': 'x'}
+
+    def test_failed_rows_name_the_files_to_rerun_and_refuse_what_cannot_be_isolated(self):
+        rows = [self.fail('e2e:e2e/folder-layout.test.ts > 目录 > 滚到底'),
+                self.fail('test_web_e2e.WebE2ESmokeTests.test_every_route_holds_the_layout_and_runtime_invariants'),
+                self.fail('vitest:test/react/follow-feed.test.tsx > 页面 > 加载更多'),
+                self.fail(runner.VITEST_CONTAINER),
+                self.fail('test_feeds_web.FeedsWebTests.test_second_round'),
+                {'id': 'test_ok.Case.test_pass', 'outcome': 'pass', 'seconds': 0.1}]
+        self.assertEqual(runner.rerun_selectors(rows), [
+            'test_feeds_web.FeedsWebTests.test_second_round', 'frontend/e2e/folder-layout.test.ts',
+            'frontend/test/react/follow-feed.test.tsx'])
+        self.assertIsNone(runner.rerun_selectors([self.fail('setUpClass (test_web_e2e.WebE2ESmokeTests)')]),
+                          '类级准备失败没有可单独重跑的那一条')
+        self.assertIsNone(runner.rerun_selectors([self.fail(
+            'test_web_e2e.WebE2ESmokeTests.test_every_route_holds_the_layout_and_runtime_invariants')]),
+            '浏览器容器失败却没有逐条结果：说不清是哪个文件')
+        many = [self.fail(f'e2e:e2e/page-{index}.test.ts > 用例') for index in range(runner.RERUN_LIMIT + 1)]
+        self.assertIsNone(runner.rerun_selectors(many), '失败面大多半是真回归，不再重跑一轮')
+        self.assertIsNone(runner.rerun_selectors([]))
+
+    def test_a_rerun_that_passes_is_recorded_as_flaky_and_one_that_fails_stays_red(self):
+        class Done:
+            def __init__(self, code):
+                self.returncode = code
+
+        rows = [self.fail('e2e:e2e/folder-layout.test.ts > 目录 > 滚到底')]
+        commands = []
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertTrue(runner.rerun_failures(rows, spawn=lambda command, **_: commands.append(command) or Done(0)))
+        self.assertEqual(runner.FLAKY, ['frontend/e2e/folder-layout.test.ts'])
+        self.assertIn('--machine-lock-held', commands[0], '父进程已持有整机锁，重跑不能再去等它')
+        self.assertEqual(commands[0][-2:], ['--focus', 'frontend/e2e/folder-layout.test.ts'])
+        runner.FLAKY.clear()
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertFalse(runner.rerun_failures(rows, spawn=lambda command, **_: Done(1)))
+        self.assertEqual(runner.FLAKY, [])
+
+    def test_the_gate_runs_first_and_a_red_gate_skips_the_other_shards(self):
+        files = [runner.TESTS / name for name in ('test_script_policy.py', 'test_media.py', 'test_scan.py')]
+        plans = []
+
+        def shards(scopes, *, jobs, shard_count, measured, plan, outcomes):
+            plans.append(plan)
+            return (False, 1, []) if plan == [['test_script_policy.py']] else (True, 2, [])
+
+        with patch.object(runner, 'selected_files', return_value=files), \
+             patch.object(runner, 'run_shards', side_effect=shards), \
+             patch.object(runner, 'save_file_seconds'), patch.object(runner.test_history, 'append'), \
+             contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(runner.run_local_suite(('full',), jobs=2), (False, 1, []))
+        self.assertEqual(plans, [[['test_script_policy.py']]], '门槛没过就不起其余分片')
+
+        plans.clear()
+        with patch.object(runner, 'selected_files', return_value=files), \
+             patch.object(runner, 'run_shards', side_effect=lambda *a, **k: plans.append(k['plan']) or (True, 2, [])), \
+             patch.object(runner, 'save_file_seconds'), patch.object(runner.test_history, 'append'), \
+             contextlib.redirect_stdout(io.StringIO()):
+            self.assertTrue(runner.run_local_suite(('full',), jobs=2)[0])
+        self.assertEqual(plans[0], [['test_script_policy.py']])
+        self.assertEqual(sorted(name for shard in plans[1] for name in shard), ['test_media.py', 'test_scan.py'],
+                         '门槛里的文件不再进后面的分片')
+
+    def test_heavy_runs_queue_on_the_machine_lock_except_nested_or_already_held(self):
+        args = runner.argparse.Namespace(machine_lock_held=False, lock_timeout=5)
+        with patch.object(runner.test_evidence, 'held') as held, \
+                patch.object(runner.test_history, 'nested', return_value=False):
+            runner.machine_guard(args, True, scope='full')
+        self.assertEqual(held.call_args.args[0], runner.test_evidence.machine_lock_path())
+        for light, nested, already in ((True, False, False), (False, True, False), (False, False, True)):
+            with self.subTest(light=light, nested=nested, already=already), \
+                    patch.object(runner.test_evidence, 'held') as held, \
+                    patch.object(runner.test_history, 'nested', return_value=nested):
+                runner.machine_guard(runner.argparse.Namespace(machine_lock_held=already, lock_timeout=5), not light)
+                held.assert_not_called()
+
+    def test_focus_accepts_vitest_files_and_hands_them_to_the_island_suite(self):
+        from scripts import test_focus
+        suite, browsers, islands = test_focus.selection(runner.ROOT, ['frontend/test/jav-card-title.test.ts'])
+        self.assertEqual((browsers, islands), ((), ('test/jav-card-title.test.ts',)))
+        self.assertEqual([test.id() for test in suite], [test_focus.VITEST_SUITE])
+        with self.assertRaises(ValueError):
+            test_focus.selection(runner.ROOT, ['frontend/test/../../scripts/test_runner.py'])

@@ -1,10 +1,16 @@
-﻿param([ValidateSet('verify', 'build', 'smoke', 'docker')][string]$Mode = 'verify',
+﻿param([ValidateSet('verify', 'build', 'smoke', 'docker-build', 'docker-push')][string]$Mode = 'verify',
       # verify 默认全量；changed 只跑改动域与平台敏感用例，供主线推送使用（ADR-0119）。
       [ValidateSet('full', 'changed')][string]$Coverage = 'full')
 $ErrorActionPreference = 'Stop'
 
 function Assert-Exit([string]$Message) {
     if ($LASTEXITCODE -ne 0) { throw $Message }
+}
+
+# 标签流水线核对标签与版本号一致；版本提交的演练（ADR-0121）还没有标签，由流水线规则保证是版本提交。
+function Assert-ReleaseRef([string]$Version) {
+    if ($env:PEACH_RELEASE_REHEARSAL -eq '1') { return }
+    if ($env:CI_COMMIT_TAG -ne "v$Version") { throw 'Tag 与版本不一致' }
 }
 
 if ($Mode -eq 'verify' -or $Mode -eq 'build') {
@@ -42,7 +48,7 @@ if ($Mode -eq 'build') {
     if (-not $env:PEACH_ISCC -and (Test-Path -LiteralPath $LocalCompiler)) { $env:PEACH_ISCC = $LocalCompiler }
     $Version = (& .venv/Scripts/python.exe -c 'from peach import __version__; print(__version__)').Trim()
     Assert-Exit '无法读取发布版本'
-    if ($env:CI_COMMIT_TAG -ne "v$Version") { throw 'Tag 与版本不一致' }
+    Assert-ReleaseRef $Version
     $Changes = git status --porcelain --untracked-files=all
     Assert-Exit '无法核对提交状态'
     if ($Changes) { throw '构建必须使用干净提交' }
@@ -67,25 +73,42 @@ if ($Mode -eq 'build') {
     exit 0
 }
 
-if ($Mode -eq 'docker') {
-    # Linux 平台 Runner 不提供 Docker 守护进程；镜像在本机 Docker Desktop 构建、验收后发布。
+if ($Mode -eq 'docker-build' -or $Mode -eq 'docker-push') {
+    # Linux 平台 Runner 不提供 Docker 守护进程；镜像在本机 Docker Desktop 构建、验收，
+    # 留在本机等 publish-release 成功后再推（同一条流水线只有这一台 Windows runner）。
     $Match = Select-String -LiteralPath src/peach/__init__.py -Pattern '^__version__ = "([^"]+)"'
     if (-not $Match) { throw '无法读取发布版本' }
     $Version = $Match.Matches[0].Groups[1].Value
-    if ($env:CI_COMMIT_TAG -ne "v$Version") { throw 'Tag 与版本不一致' }
-    if (-not $env:DOCKERHUB_USERNAME -or -not $env:DOCKERHUB_TOKEN) { throw '缺少 Docker Hub 发布变量' }
+    Assert-ReleaseRef $Version
     $Endpoint = (docker context inspect --format '{{.Endpoints.docker.Host}}')
     Assert-Exit '需要运行 Docker Desktop'
     $Candidate = "peach-ci:$Version-$env:CI_PIPELINE_ID"
+}
+
+if ($Mode -eq 'docker-build') {
     $Revision = (git rev-parse HEAD).Trim()
     Assert-Exit '无法读取提交'
     docker build --pull --label "org.opencontainers.image.version=$Version" --label "org.opencontainers.image.revision=$Revision" `
         --build-arg PEACH_SENTRY_DSN --build-arg PEACH_LIBRARY_SENTRY_DSN --build-arg PEACH_REQUIRE_REPORTING=1 -t $Candidate .
     Assert-Exit '镜像构建失败'
-    & (Get-Command python.exe).Source -X utf8 scripts/smoke_docker.py $Candidate
-    Assert-Exit '镜像验收失败'
-    docker run --rm --entrypoint python $Candidate -c 'from peach import library_sharing, remote_reporting, reporting_identity; assert remote_reporting.dsn() and library_sharing.target() and reporting_identity.distribution() == ''docker'''
-    Assert-Exit '镜像内 Sentry DSN 或分发标记缺失'
+    try {
+        & (Get-Command python.exe).Source -X utf8 scripts/smoke_docker.py $Candidate
+        Assert-Exit '镜像验收失败'
+        docker run --rm --entrypoint python $Candidate -c 'from peach import library_sharing, remote_reporting, reporting_identity; assert remote_reporting.dsn() and library_sharing.target() and reporting_identity.distribution() == ''docker'''
+        Assert-Exit '镜像内 Sentry DSN 或分发标记缺失'
+    } catch {
+        docker image rm $Candidate | Out-Null
+        throw
+    }
+    # 演练不推送，验收完就删；标签流水线留给 publish-docker 推送后再删。
+    if ($env:PEACH_RELEASE_REHEARSAL -eq '1') { docker image rm $Candidate | Out-Null }
+    exit 0
+}
+
+if ($Mode -eq 'docker-push') {
+    if (-not $env:DOCKERHUB_USERNAME -or -not $env:DOCKERHUB_TOKEN) { throw '缺少 Docker Hub 发布变量' }
+    docker image inspect $Candidate | Out-Null
+    Assert-Exit "本机没有 docker-build 验收过的 $Candidate；重试 docker-build 后再推送"
     # 登录写进作业专用配置目录，不改动宿主用户的 Docker 登录。
     $SavedConfig, $SavedHost = $env:DOCKER_CONFIG, $env:DOCKER_HOST
     $env:DOCKER_HOST = $Endpoint

@@ -25,9 +25,18 @@ GROUPS = {
 }
 
 
+def rehearsal_tag() -> str:
+    """版本提交演练（ADR-0121）还没有标签：用提交里的版本号代替，流水线规则保证它是版本提交。"""
+    source = (Path(__file__).resolve().parents[1] / "src/peach/__init__.py").read_text(encoding="utf-8")
+    found = re.search(r'^__version__ = "([0-9]+\.[0-9]+\.[0-9]+)"$', source, re.M)
+    return "v" + found.group(1) if found else ""
+
+
 def identity() -> dict:
     result = {key: os.environ.get("CI_" + variable, "") for key, variable in
               (("project", "PROJECT_ID"), ("pipeline", "PIPELINE_ID"), ("commit", "COMMIT_SHA"), ("tag", "COMMIT_TAG"))}
+    if os.environ.get("PEACH_RELEASE_REHEARSAL") == "1" and not result["tag"]:
+        result["tag"] = rehearsal_tag()
     if (not all(re.fullmatch(r"[1-9][0-9]*", result[key]) for key in ("project", "pipeline"))
             or not re.fullmatch(r"[0-9a-f]{40}", result["commit"])
             or not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", result["tag"])
@@ -205,20 +214,25 @@ def transfer(root: Path, group: str, mode: str) -> dict:
 
 
 def cleanup(root: Path) -> dict:
-    """公开发布成功后只回收当前流水线的暂存前缀。"""
+    """公开发布成功后只回收当前流水线的暂存前缀。
+
+    发布演练（ADR-0121）从不发布，暂存只是验收用的草稿，演练跑完直接回收。
+    """
     build = identity()
+    rehearsal = os.environ.get("PEACH_RELEASE_REHEARSAL") == "1" and not os.environ.get("CI_COMMIT_TAG")
     environment = rclone_environment()
     executable = rclone_executable(root.resolve(strict=True))
     remote = f"peach:{environment['PEACH_R2_BUCKET']}/{prefix(build)}"
     with tempfile.TemporaryDirectory(prefix="peach-ci-r2-cleanup-") as directory:
         configuration = Path(directory) / "rclone.conf"
         configuration.touch()
-        index = json.loads(subprocess.check_output(
-            [executable, "cat", f"peach:{environment['PEACH_R2_BUCKET']}/releases.json", "--config", str(configuration)],
-            env=environment, text=True, encoding="utf-8"))
-        if not any(item.get("tag_name") == build["tag"] and item.get("commit_sha") == build["commit"]
-                   for item in index):
-            raise ValueError("公开版本索引尚未登记当前提交，保留暂存产物")
+        if not rehearsal:
+            index = json.loads(subprocess.check_output(
+                [executable, "cat", f"peach:{environment['PEACH_R2_BUCKET']}/releases.json", "--config", str(configuration)],
+                env=environment, text=True, encoding="utf-8"))
+            if not any(item.get("tag_name") == build["tag"] and item.get("commit_sha") == build["commit"]
+                       for item in index):
+                raise ValueError("公开版本索引尚未登记当前提交，保留暂存产物")
         subprocess.run([executable, "purge", remote, "--config", str(configuration)], env=environment, check=True)
     return {"cleaned_pipeline": build["pipeline"], "commit": build["commit"]}
 

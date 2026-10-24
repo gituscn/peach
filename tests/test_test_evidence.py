@@ -547,6 +547,7 @@ class VerificationTests(unittest.TestCase):
         with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()), \
                 mock.patch.object(runner, "ROOT", self.repo), \
                 mock.patch.object(runner, "build_suite", side_effect=AssertionError("父进程不该自己跑")), \
+                mock.patch.object(runner, "GATE_TESTS", frozenset()), \
                 mock.patch.object(runner, "run_shards", return_value=(True, 3, [(0.5, "x"), (0.1, "y")])) as shards:
             self.assertEqual(runner.main(["--scope", "checks", "--jobs", "2"]), 0)
         shards.assert_called_once()
@@ -567,6 +568,7 @@ class VerificationTests(unittest.TestCase):
         with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()), \
                 mock.patch.object(runner, "ROOT", self.repo), \
                 mock.patch.object(runner, "build_suite", side_effect=AssertionError("父进程不加载全量用例")), \
+                mock.patch.object(runner, "GATE_TESTS", frozenset()), \
                 mock.patch.object(runner, "run_shards", return_value=(True, 7, [])) as shards:
             self.assertEqual(runner.main(["--scope", "full", "--jobs", "1"]), 0)
         shards.assert_called_once()
@@ -575,6 +577,28 @@ class VerificationTests(unittest.TestCase):
         record = evidence.read(self.repo, evidence.key(self.repo))
         self.assertTrue(evidence.covers(record, ("full",)))
         self.assertEqual(record["count"], 7)
+
+    def test_a_failure_that_passes_alone_signs_the_record_and_names_the_flaky_file(self):
+        """全量里挂、单独重跑过的：记录照样算通过，偶发的文件名留在记录里；单独也挂就没有记录。"""
+        def shards(*_args, outcomes, **_kwargs):
+            outcomes.append({"id": "e2e:e2e/folder-layout.test.ts > 目录 > 滚到底", "outcome": "fail",
+                             "seconds": 2.0, "message": "height 0"})
+            return False, 7, []
+
+        rerun = runner.rerun_failures
+        for code, signed in ((0, True), (1, False)):
+            spawn = mock.Mock(return_value=mock.Mock(returncode=code))
+            with self.subTest(rerun_exit=code), \
+                    redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()), \
+                    mock.patch.object(runner, "ROOT", self.repo), \
+                    mock.patch.object(runner, "GATE_TESTS", frozenset()), \
+                    mock.patch.object(runner, "run_shards", side_effect=shards), \
+                    mock.patch.object(runner, "rerun_failures", lambda rows, spawn=spawn: rerun(rows, spawn=spawn)):
+                self.assertEqual(runner.main(["--scope", "full", "--jobs", "1", "--fresh"]), 0 if signed else 1)
+            record = evidence.read(self.repo, evidence.key(self.repo))
+            self.assertEqual(evidence.covers(record, ("full",)), signed)
+            if signed:
+                self.assertEqual(record["flaky"], ["frontend/e2e/folder-layout.test.ts"])
 
     def test_full_baseline_requires_only_new_scopes_without_extending_its_age(self):
         original = self.certify(self.repo, ("full",))

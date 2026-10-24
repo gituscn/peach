@@ -1,7 +1,10 @@
 name: Release
 
+# 版本提交 `chore(release): 版本 X` 推上 master 时演练整条发布链（只构建、验收，不发布）；
+# `release_tag.py --ship` 等这次演练通过才打标签，标签上才发布（ADR-0121）。
 on:
   push:
+    branches: [master]
     tags: ["v*.*.*"]
   workflow_dispatch:
 
@@ -22,6 +25,8 @@ env:
 jobs:
   validate:
     name: 核对发布提交与版本
+    # 其余作业都依赖它：普通的 master 推送在这里就结束，只有版本提交、标签与手动运行往下走。
+    if: "${{ github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'chore(release): 版本 ') }}"
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -348,7 +353,7 @@ jobs:
   release:
     name: GitHub 预发布
     if: github.ref_type == 'tag'
-    needs: [windows, desktop-smoke, macos-smoke]
+    needs: [windows, desktop-smoke, macos-smoke, docker]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -374,6 +379,63 @@ jobs:
           tail -n +4 ../macos-candidates/scripts/MACOS_DOWNLOADS.md >> RELEASE_NOTES.md
           sha256sum ./*.zip ./*-setup.exe ./*.dmg > SHA256SUMS.txt
           gh release create "$GITHUB_REF_NAME" ./*.zip ./*-setup.exe ./*.dmg SHA256SUMS.txt --verify-tag --prerelease --title "Peach $VERSION · Windows / macOS 测试版" --notes-file RELEASE_NOTES.md
+
+  # 镜像先构建、验收（演练与标签都跑），发布排在 GitHub Release 成功之后：
+  # 桌面包任何一步没发出去，Docker Hub 的版本号与 edge 都不动（ADR-0121）。
+  docker:
+    name: Linux amd64 镜像构建与验收
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: docker/setup-buildx-action@v4
+      - name: 构建候选镜像
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: longmeidao/peach:candidate
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: 验收临时容器
+        run: python3 scripts/smoke_docker.py longmeidao/peach:candidate
+
+  docker-publish:
+    name: 发布已验收镜像
+    if: github.ref_type == 'tag' && vars.DOCKERHUB_USERNAME != ''
+    needs: [release, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: docker/setup-buildx-action@v4
+      # 作业之间不共享 Docker 守护进程：按同一提交、同一缓存重建，再验收一次才推送。
+      - name: 构建镜像
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: longmeidao/peach:candidate
+          cache-from: type=gha
+      - name: 验收临时容器
+        run: python3 scripts/smoke_docker.py longmeidao/peach:candidate
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: 推送版本号与 edge
+        run: |
+          for tag in "${GITHUB_REF_NAME#v}" edge; do
+            docker tag longmeidao/peach:candidate "longmeidao/peach:$tag"
+            docker push "longmeidao/peach:$tag"
+          done
 
   project-board:
     name: 同步已发布版本到看板

@@ -17,6 +17,10 @@ from peach.peach_proxy import read_url
 
 
 REQUIRED_TEST_JOBS = frozenset({"verify-linux", "verify-windows", "verify-macos", "wheel-smoke"})
+#: 版本提交的主线流水线里演练的标签作业（ADR-0121）：全部成功才打标签。规则没匹配上、演练没跑，
+#: 也不能当作通过。
+REHEARSAL_JOBS = frozenset({"release-verify-linux", "release-verify-windows", "release-verify-macos",
+                            "windows-media", "build-windows", "build-macos", "smoke-windows", "docker-build"})
 TERMINAL_STATUSES = frozenset({"success", "failed", "canceled", "skipped"})
 #: 必需任务落在这些状态时，整条流水线等多久都不会转绿；重试会生成同名的新任务。
 RED_JOB_STATUSES = frozenset({"failed", "canceled"})
@@ -90,10 +94,10 @@ class GitLabForge:
         if status not in TERMINAL_STATUSES:
             # 流水线整体是 running 时也可能有任务排着没人接，所以只要没结束就看任务。
             jobs = self.jobs(repo, pipeline["id"])
+            # 任何一个不许失败的任务红了，整条就不会转绿：不只看必需的四个，演练里的构建也算。
             run["failed_jobs"] = sorted(
-                name for name in REQUIRED_TEST_JOBS
-                if name in jobs and jobs[name]["status"] in RED_JOB_STATUSES
-                and not jobs[name].get("allow_failure"))
+                name for name, job in jobs.items()
+                if job["status"] in RED_JOB_STATUSES and not job.get("allow_failure"))
             run["queued_jobs"] = self.queued_jobs(repo, jobs.values())
         return [run]
 
@@ -162,3 +166,12 @@ class GitLabForge:
                or selected[name].get("commit", {}).get("id") != sha]
         if bad:
             raise ValueError("GitLab 发布验证缺少同一提交的必需成功任务：" + "、".join(bad))
+
+    def require_rehearsal(self, repo: str, pipeline: int) -> None:
+        """版本提交的流水线里，演练的标签作业必须都在且成功；缺一个都不打标签。"""
+        selected = self.jobs(repo, pipeline)
+        bad = [name for name in sorted(REHEARSAL_JOBS)
+               if name not in selected or selected[name]["status"] != "success"]
+        if bad:
+            raise ValueError("版本提交的发布演练没有全部通过，不打标签：" + "、".join(bad)
+                             + "。检查 .gitlab-ci.yml 的演练规则是否匹配版本提交，修好后再跑一次 --ship --apply")

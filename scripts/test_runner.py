@@ -970,21 +970,91 @@ def environment_preflight(scopes: tuple[str, ...], timings: Path | None = None,
     raise SystemExit(3)
 
 
+#: 分片之前单独先跑的秒级检查（合计约 1 分钟）：仓库策略、ADR 编号、复杂度与依赖清单。
+#: 这几类问题以前要等 20 分钟的全量才报出来；有一项不过就不再起其余分片。
+GATE_TESTS = frozenset({
+    "test_script_policy", "test_subprocess_encoding", "test_copy_final_state", "test_context_budget",
+    "test_source_assertion_ratchet", "test_complexity_ratchet", "test_python_lint",
+    "test_outbound_proxy_policy", "test_repo_hygiene", "test_dependency_policy",
+})
+#: 失败后单独重跑的文件数上限。失败面更大多半是真回归，重跑只会再白等一轮。
+RERUN_LIMIT = 6
+#: 浏览器与 vitest 的容器用例：它们的失败由各自的逐条结果说明，重跑只重跑那几个文件。
+E2E_CONTAINER = "test_web_e2e."
+VITEST_CONTAINER = "test_frontend_build.VitestTests.test_the_island_suite_passes"
+#: 本次运行里失败、单独重跑通过的用例；`verified_run` 写进测试记录。
+FLAKY: list[str] = []
+
+
+def rerun_selectors(rows: list[dict]) -> list[str] | None:
+    """失败的逐条结果对应的定向选择器；分不出具体文件或失败面过大时返回 None。"""
+    failed = [str(row.get("id", "")) for row in rows if row.get("outcome") in {"fail", "error"}]
+    e2e = sorted({item.split(" > ")[0].removeprefix("e2e:") for item in failed if item.startswith("e2e:")})
+    vitest = sorted({item.split(" > ")[0].removeprefix("vitest:") for item in failed if item.startswith("vitest:")})
+    python = []
+    for item in failed:
+        if item.startswith(("e2e:", "vitest:")):
+            continue
+        name = item.split(" ")[0]
+        if (name.startswith(E2E_CONTAINER) and e2e) or (name == VITEST_CONTAINER and vitest):
+            continue
+        if not re.fullmatch(r"test_\w+(?:\.\w+)+", name) or name.startswith(E2E_CONTAINER) or name == VITEST_CONTAINER:
+            # 类级准备失败、或浏览器容器整个没起来：没有可单独重跑的那一条。
+            return None
+        python.append(name)
+    if not failed or len({name.split(".")[0] for name in python}) + len(e2e) + len(vitest) > RERUN_LIMIT:
+        return None
+    return [*dict.fromkeys(python), *(f"frontend/{name}" for name in e2e), *(f"frontend/{name}" for name in vitest)]
+
+
+def rerun_failures(rows: list[dict], spawn=subprocess.run) -> bool:
+    """把全量里失败的文件单独重跑一次：通过的记为偶发，仍失败或无法隔离的照常算失败。"""
+    selectors = rerun_selectors(rows)
+    if not selectors:
+        return False
+    print(f"单独重跑失败的 {len(selectors)} 项，排除负载造成的偶发：{', '.join(selectors)}", flush=True)
+    command = [sys.executable, str(ROOT / "scripts" / "test_runner.py"), "--machine-lock-held",
+               *(item for selector in selectors for item in ("--focus", selector))]
+    if spawn(command, cwd=str(ROOT), check=False).returncode != 0:
+        print("单独重跑仍失败：按真实失败处理。", flush=True)
+        return False
+    FLAKY[:] = selectors
+    print(f"偶发通过（全量失败、单独重跑通过，已写入测试记录）：{', '.join(selectors)}", flush=True)
+    return True
+
+
 def run_local_suite(scopes: tuple[str, ...], jobs: int, label: str | None = None) -> tuple[bool, int, list]:
     """按调用方选择的并发运行，串行全量通过分片释放测试缓存。"""
     chosen = {path for scope in scopes for path in selected_files(scope)}
+    FLAKY.clear()
     if (jobs > 1 or "full" in scopes) and len(chosen) > 1:
-        shard_count = min(len(chosen), 4 * jobs)
-        print(f"本机分片：{shard_count} 片、同时 {min(jobs, shard_count)} 个子进程，按实测耗时先长后短", flush=True)
-        plan = shard_plan((path.name for path in chosen), shard_count, load_file_seconds())
+        names = sorted(path.name for path in chosen)
+        gate = [name for name in names if name.removesuffix(".py") in GATE_TESTS]
+        rest = [name for name in names if name not in gate] if gate and len(gate) < len(names) else names
         measured: dict[str, float] = {}
         rows: list[dict] = []
-        outcome = run_shards(scopes, jobs=jobs, shard_count=shard_count, measured=measured, plan=plan,
-                             outcomes=rows)
+        count, timings = 0, []
+        if rest is not names:
+            print(f"快速门槛：先跑 {len(gate)} 个秒级检查，有一项不过就不起其余分片", flush=True)
+            passed, count, timings = run_shards(scopes, jobs=1, shard_count=1, measured=measured,
+                                                plan=[gate], outcomes=rows)
+            if not passed:
+                print("快速门槛未通过，其余测试本轮不跑。", flush=True)
+                save_file_seconds(measured)
+                test_history.append(ROOT, scope=label or " ".join(scopes), rows=rows,
+                                    files=[name.removesuffix(".py") for name in gate])
+                return False, count, timings
+        shard_count = min(len(rest), 4 * jobs)
+        print(f"本机分片：{shard_count} 片、同时 {min(jobs, shard_count)} 个子进程，按实测耗时先长后短", flush=True)
+        plan = shard_plan(rest, shard_count, load_file_seconds())
+        passed, more, slow = run_shards(scopes, jobs=jobs, shard_count=shard_count, measured=measured, plan=plan,
+                                        outcomes=rows)
         save_file_seconds(measured)
         test_history.append(ROOT, scope=label or " ".join(scopes), rows=rows,
                             files=[path.stem for path in sorted(chosen)])
-        return outcome
+        if not passed:
+            passed = rerun_failures(rows)
+        return passed, count + more, [*timings, *slow]
     suite = build_suite(*scopes)
     with test_history.running():
         result = unittest.TextTestRunner(verbosity=2, resultclass=TimedResult).run(suite)
@@ -1038,6 +1108,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--jobs", type=resolve_jobs, default=1,
                         help="本机同时跑几个分片子进程；auto 按核数定。默认串行，正式入口传 auto")
     parser.add_argument("--list-scopes", action="store_true")
+    parser.add_argument("--machine-lock-held", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if not 0 <= args.lock_timeout <= 1800:
         parser.error("锁等待时间必须在 0～1800 秒之间")
@@ -1050,9 +1121,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.shard_count != 1:
             parser.error("定向调试不能与分片一起使用")
         from . import test_focus
-        return test_focus.run(sys.modules[__name__], args)
-    if os.environ.get("PEACH_TEST_FOCUS") or os.environ.get("PEACH_E2E_FILES"):
-        parser.error("定向调试环境不能签发正式记录；请清除 PEACH_TEST_FOCUS 与 PEACH_E2E_FILES")
+        heavy = any(selector.startswith("frontend/") for selector in args.focus)
+        try:
+            with machine_guard(args, heavy):
+                return test_focus.run(sys.modules[__name__], args)
+        except test_evidence.Timeout as error:
+            return busy(error)
+    if os.environ.get("PEACH_TEST_FOCUS") or os.environ.get("PEACH_E2E_FILES") or os.environ.get("PEACH_VITEST_FILES"):
+        parser.error("定向调试环境不能签发正式记录；请清除 PEACH_TEST_FOCUS、PEACH_E2E_FILES 与 PEACH_VITEST_FILES")
     requested: tuple[str, ...] = tuple(dict.fromkeys(args.scopes or ("auto",)))
     if "auto" in requested and len(requested) > 1:
         parser.error("auto 不能与别的域同时指定")
@@ -1067,26 +1143,48 @@ def main(argv: list[str] | None = None) -> int:
     environment_preflight(scopes, args.timings, shard_count=args.shard_count)
     files = {path for scope in scopes for path in selected_files(scope)}
     print(f"Peach test scope: {' '.join(scopes)} ({len(files)} files)", flush=True)
-    if args.shard_count > 1:
-        # CI 的每片独立 runner；局部分片绝不签发本机全量证明。
+    if args.shard_count > 1 or args.shard_plan is not None:
+        # CI 的每片独立 runner，或父进程派出的分片（含只有一片的快速门槛）；分片绝不签发本机记录。
         return run_shard_child(args, requested, scopes, files)
     if ci_frontend_delegated():
         print("CI 前端工具检查由 web-bundle 验证；本次不签发本机测试记录。", flush=True)
         success, count, _ = run_local_suite(scopes, args.jobs, f"{' '.join(requested)}:{' '.join(scopes)}")
         return 0 if success and count > 0 else 1
+    heavy = "full" in scopes or any(path.stem in HEAVY_FILES for path in files)
     try:
-        guard = test_evidence.held(test_evidence.evidence_dir(ROOT) / "full-suite.lock",
-                                  wait_seconds=args.lock_timeout,
-                                  scope=" ".join(scopes), root=str(ROOT)) \
-            if "full" in scopes else nullcontext()
-        with guard:
-            return verified_run(args, requested, scopes, files)
+        # 先拿整机的重负载锁，再拿仓库的全量锁；`integrate` 只拿后者，顺序固定就不会互相等死。
+        with machine_guard(args, heavy, scope=" ".join(scopes)):
+            guard = test_evidence.held(test_evidence.evidence_dir(ROOT) / "full-suite.lock",
+                                      wait_seconds=args.lock_timeout,
+                                      scope=" ".join(scopes), root=str(ROOT)) \
+                if "full" in scopes else nullcontext()
+            with guard:
+                return verified_run(args, requested, scopes, files)
     except test_evidence.Timeout as error:
-        lock = Path(error.lock_file)
-        what = "本仓库全量测试" if lock.name == "full-suite.lock" else "相同状态的验证"
-        print(f"{what}正在运行（{test_evidence.describe_holder(lock)}），请等待该次结果。",
-              flush=True)
-        return 2
+        return busy(error)
+
+
+#: 会起浏览器或整套 vitest 的测试文件。选中它们的运行与全量一样要排整机的重负载锁。
+HEAVY_FILES = frozenset({"test_web_e2e", "test_frontend_build"})
+
+
+def machine_guard(args, heavy: bool, **note):
+    """重负载运行排整机锁；父进程已持有时（全量里的隔离重跑）不再重复等待。
+
+    用例里调用运行器（测运行器自己的那些用例）时外层正式运行已持有这把锁，不能再去等它。
+    """
+    if not heavy or args.machine_lock_held or test_history.nested():
+        return nullcontext()
+    return test_evidence.held(test_evidence.machine_lock_path(), wait_seconds=args.lock_timeout,
+                              root=str(ROOT), **note)
+
+
+def busy(error) -> int:
+    lock = Path(error.lock_file)
+    what = {"full-suite.lock": "本仓库全量测试", "test-machine.lock": "本机另一项重负载测试或 CI 作业"}.get(
+        lock.name, "相同状态的验证")
+    print(f"{what}正在运行（{test_evidence.describe_holder(lock)}），请等待该次结果。", flush=True)
+    return 2
 
 
 def scoped_baseline(record, scopes, needed):
@@ -1158,6 +1256,7 @@ def verified_run(args, requested, scopes, files) -> int:
         print(f"实际运行：{' '.join(scopes) or '无需补测'}（{actual} 个测试文件）", flush=True)
         folder = test_evidence.evidence_dir(ROOT)
         (folder / f"{state}.json").unlink(missing_ok=True)
+        FLAKY.clear()
         started = time.monotonic()
         passed, count, timings = run_local_suite(scopes, args.jobs, f"{' '.join(requested)}:{' '.join(scopes)}") \
             if scopes else (True, 0, [])
@@ -1171,7 +1270,8 @@ def verified_run(args, requested, scopes, files) -> int:
         test_evidence.write(ROOT, state, scopes, success=success, previous=previous,
                             context=context, baseline=baseline,
                             cohort=cohort, coverage=coverage,
-                            elapsed=time.monotonic() - started, slowest=slowest, count=count)
+                            elapsed=time.monotonic() - started, slowest=slowest, count=count,
+                            flaky=FLAKY if success else None)
         for seconds, name in slowest[:5]:
             print(f"慢测试 {seconds:.3f}s：{name}", flush=True)
         if not stable:
