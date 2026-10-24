@@ -35,10 +35,10 @@ from .settings_file import PROJECT_ROOT
 
 AMANE_REPOSITORY = "https://github.com/sqzw-x/amane"
 AMANE_LICENSE = "GPL-3.0"
-#: 桥的源码目录：清单、锁与脚本都在仓库里，随 Peach 分发的只有这三个文件，不含 amane 源码。
+#: 桥的源码目录：清单、锁与脚本位于此处，随包独立运行环境另附固定版本对应源码归档。
 BRIDGE_ROOT = PROJECT_ROOT / "tools" / "amane-bridge"
 BRIDGE_SCRIPT = BRIDGE_ROOT / "bridge.py"
-#: 桥的 venv 建在数据目录的工具区，和 FFmpeg 同一层；名字与源码目录一致。
+#: 源码部署的桥 venv 位于数据目录的工具区，名字与源码目录一致。
 BRIDGE_TOOL_NAME = "amane-bridge"
 #: 一次子进程的总时限。单请求 30 秒，普通失败最多重试一次；403/406 可额外轮换三次指纹，
 #: 搜索与详情共用这 60 秒，超时终止子进程并报可重试失败。

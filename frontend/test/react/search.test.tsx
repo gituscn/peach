@@ -150,6 +150,45 @@ describe('输入框上的时序', () => {
     await settle();
     expect(s.menu.hidden).toBe(true);
   });
+
+  it('关闭菜单后到达的补全保持收起，继续输入可显示补全', async () => {
+    vi.useFakeTimers();
+    const answer = pending<SuggestResponse>();
+    const s = await stage({ suggest: (q) => q === '七' ? answer.answer
+      : Promise.resolve({ q, groups: [performer] }) });
+    await act(async () => s.input.focus());
+    await settle();
+    await s.typeInto('七');
+    await debounce();
+    await act(async () => s.api?.close());
+    await answer.release({ q: '七', groups: [tag] });
+    await settle();
+    expect(s.menu.hidden).toBe(true);
+    await s.typeInto('七海');
+    await debounce();
+    await settle();
+    expect(s.menu.hidden).toBe(false);
+  });
+
+  it('Escape 关闭后晚到的推荐池保持收起，再次聚焦可显示建议', async () => {
+    vi.useFakeTimers();
+    const answer = pending<string[]>();
+    const s = await stage({ loadPool: () => answer.answer,
+      suggest: async (q) => ({ q, groups: [performer] }) });
+    await act(async () => s.input.focus());
+    await s.typeInto('七海');
+    await debounce();
+    await settle();
+    expect(s.menu.hidden).toBe(false);
+    await s.key('Escape');
+    expect(s.menu.hidden).toBe(true);
+    await answer.release(['剧情']);
+    await settle();
+    expect(s.menu.hidden).toBe(true);
+    await act(async () => { s.input.blur(); s.input.focus() });
+    await settle();
+    expect(s.menu.hidden).toBe(false);
+  });
   it('选择关注图片以指定附件进入图片详情', async () => {
     const s = await stage({ recommendations: async () => [{ kind: 'photo', label: '关注图片',
       items: [{ value: '图片作品', id: 88, href: '/posts/88', followMedia: 'images', mediaIndex: 2,
