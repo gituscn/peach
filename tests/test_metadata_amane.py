@@ -145,6 +145,8 @@ class RebuildTests(unittest.TestCase):
                 python = metadata_amane.bridge_python(tools)
 
                 def build(*args, **kwargs):
+                    self.assertEqual(kwargs['creationflags'],
+                                     getattr(subprocess, 'CREATE_NO_WINDOW', 0))
                     python.parent.mkdir(parents=True, exist_ok=True)
                     python.write_text("", encoding="utf-8")
                     write_amane_metadata(tools, "0.20.0")
@@ -295,12 +297,24 @@ class BridgeQueryTests(unittest.TestCase):
         self.assertEqual(command[command.index("--proxy") + 1], "http://p:1")
         self.assertEqual(kwargs["timeout"], 42)
         self.assertFalse(kwargs["shell"])
+        self.assertEqual(kwargs['creationflags'], getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         self.assertEqual(kwargs["env"]["PYTHONIOENCODING"], "utf-8")
 
     def test_query_rejects_sites_peach_did_not_open(self):
         bridge = metadata_amane.AmaneBridge.create(self.tools, runner=lambda *a, **k: completed(""))
         with self.assertRaises(ValueError):
             bridge.query("ABW-220", ["javdb"])
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows 控制台行为')
+    def test_query_child_has_no_console_window(self):
+        script = self.tools.resolve() / 'console_probe.py'
+        script.write_text(
+            'import ctypes, json\n'
+            'print(json.dumps({"console": ctypes.windll.kernel32.GetConsoleWindow(), "sites": {}}))\n',
+            encoding='utf-8')
+        bridge = metadata_amane.AmaneBridge(Path(sys.executable), script)
+        result = bridge.query('ABW-220', ['makers'], proxy_options={'trust_env': False})
+        self.assertEqual(result['console'], 0)
 
     def test_timeouts_and_garbage_output_become_provider_errors(self):
         def slow(command, **kwargs):
