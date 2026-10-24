@@ -218,8 +218,9 @@ describe('库外 JAV 作品详情', () => {
           const stars = [...el.querySelectorAll('[data-jav-rating] [data-rate]')];
           const code = el.querySelector('[data-detail-title] b')!.getBoundingClientRect();
           const range = document.createRange();
-          const text = el.querySelector('[data-detail-title]')!.lastChild!;
-          range.setStart(text, 1); range.setEnd(text, 2);
+          // 标题文字在带语言标记的 span 里：量它的第一个字。
+          const text = el.querySelector('[data-detail-title] > span')!.firstChild!;
+          range.setStart(text, 0); range.setEnd(text, 1);
           return { faces, stars: stars.length, filled: stars.filter(star => star.getAttribute('data-on') === 'true').length,
             icons: el.querySelectorAll('[data-stage-meta] [data-spec-item] svg').length,
             codeY: code.y, titleY: range.getBoundingClientRect().y,
