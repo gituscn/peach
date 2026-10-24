@@ -1614,6 +1614,14 @@ def _enrich_finished_performers(database, groups, config, candidate_root, remote
     if database is None or not active():
         return empty
     from .metadata_performer_profiles import enrich_performer_profiles
+    from .jav_cover_fetch import HostLimitedTransport
+    from .scraping_access import SourceTransport
+
+    def profile_transport():
+        return HostLimitedTransport(
+            SourceTransport(config.directory('secrets'), max_requests=MAX_SOURCE_REQUESTS,
+                            max_bytes=MAX_SOURCE_BYTES, max_seconds=MAX_SOURCE_SECONDS),
+            2.0, limiter=SOURCE_LIMITER)
     # 问题清单要的是这条资产的 id 和路径，候选行上都有。
     rows = {int(group['asset_id']): {'id': int(group['asset_id']),
                                      'path': group.get('asset_path') or ''}
@@ -1621,7 +1629,7 @@ def _enrich_finished_performers(database, groups, config, candidate_root, remote
     return enrich_performer_profiles(
         database, groups.values(), config.directory('generated') / 'avatars',
         candidate_root / 'provider-cache' / 'performer-avatars',
-        transport_factory=lambda: getattr(remote.provider(), 'transport', None),
+        transport_factory=profile_transport,
         active=active, progress=update,
         # 头像取不到是可重试的：下一次「重试失败项」会连着这条资产一起再来一遍。
         issue=lambda asset_id, message: issue(rows.get(asset_id), message,

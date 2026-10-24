@@ -841,7 +841,7 @@ class FeedWebTest(FeedWebFixture):
                          ["feed-cover:HMN-071"])
 
     def test_every_check_carries_performers_still_missing_an_avatar(self):
-        """资料处理不跑的日子，缺头像的存量女优跟着定时拉取补（ADR-0097）。试过的不再带。"""
+        """缺头像的存量女优跟着定时拉取补；当前图库下已取证的跳过，图库变化后重新派发。"""
         from peach import avatar_followup
         from peach.followups import Attempts, attempts_root
 
@@ -857,11 +857,18 @@ class FeedWebTest(FeedWebFixture):
                 "INSERT INTO asset_entity(asset_id,entity_id,role,source)"
                 " VALUES(9001,?,'performer','test')", (entity_id,))
         key = avatar_followup.followup_key("performer", entity_id)
+        providers_root = self.contract.candidate_root / "provider-cache" / "performer-avatars"
+        index_dir = providers_root / "gfriends"
+        index_dir.mkdir(parents=True, exist_ok=True)
+        index_path = index_dir / "gfriends-filetree.json"
+        index_path.write_text('{"Content": {}}', encoding="utf-8")
         self.assertIn(key, [item["key"] for item in self._check(automatic=True)["followups"]])
         with self.contract.database.read_connection() as connection:
-            current = avatar_followup.fingerprint(connection, entity_id)
+            current = avatar_followup.fingerprint(connection, entity_id, providers_root)
         Attempts(attempts_root(self.contract.candidate_root)).record(key, current, "图库 6 张认不准")
         self.assertNotIn(key, [item["key"] for item in self._check(automatic=True)["followups"]])
+        index_path.write_text(json.dumps({"Content": {"1-S1": {"二の宮すずか.jpg": "二の宮すずか.jpg"}}}), encoding="utf-8")
+        self.assertIn(key, [item["key"] for item in self._check(automatic=True)["followups"]])
 
     def test_an_unknown_action_is_refused(self):
         with self.assertRaises(ValueError):

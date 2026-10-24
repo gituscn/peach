@@ -749,7 +749,6 @@ class LibraryNfoTests(unittest.TestCase):
                              locations={'local': (str(media),)})
         transport = Mock()
         provider = stub_provider()
-        provider.transport = transport
         provider.query.return_value = {'id': 'ABW-358'}
         # 采集跑完、收尾还没开始的那一刻按下停止。
         alive = {'value': True}
@@ -836,7 +835,8 @@ class LibraryNfoTests(unittest.TestCase):
         }
         provider.cover.return_value = False
 
-        with patch('peach.avatar_provider.FaceProbe') as face, \
+        with patch('peach.scraping_access.SourceTransport', return_value=transport), \
+                patch('peach.avatar_provider.FaceProbe') as face, \
                 patch('peach.library_processing._generate_previews', return_value=0):
             face.return_value.return_value = None
             result = process_library(

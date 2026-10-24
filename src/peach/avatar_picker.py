@@ -104,7 +104,7 @@ class IndexRefresher:
     """图库索引缺失或过期时，在后台补一份。
 
     `request` 只排一轮、立刻返回，页面照旧读本地缓存（`gfriends.load_index`）；
-    取到的索引下次打开头像框时生效。同一时刻最多一轮在跑。`transport` 每轮新建、
+    页面按刷新状态读取新候选。同一时刻最多一轮在跑。`transport` 每轮新建、
     用完关掉：一天取一次，用不着常驻连接池。
     """
 
@@ -114,6 +114,23 @@ class IndexRefresher:
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._failed_at: float | None = None
+        self._fetch_lock = threading.Lock()
+        self.error = ""
+
+    @property
+    def refreshing(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def ensure(self) -> bool:
+        """自动任务等待索引就绪；与页面共用单次下载和失败退避。"""
+        with self._fetch_lock:
+            if not gfriends.index_stale(self.cache_dir):
+                return True
+            with self._lock:
+                if (self._failed_at is not None
+                        and time.monotonic() - self._failed_at < INDEX_RETRY_SECONDS):
+                    return False
+            return self.refresh()
 
     def request(self) -> bool:
         """需要的话在后台排一轮，返回是否排上了。"""
@@ -125,7 +142,7 @@ class IndexRefresher:
             if (self._failed_at is not None
                     and time.monotonic() - self._failed_at < INDEX_RETRY_SECONDS):
                 return False
-            self._thread = threading.Thread(target=self.refresh, daemon=True,
+            self._thread = threading.Thread(target=self.ensure, daemon=True,
                                             name="PeachGfriendsIndex")
             self._thread.start()
             return True
@@ -144,10 +161,28 @@ class IndexRefresher:
             LOGGER.warning("图库索引未取得：%s", error)
             with self._lock:
                 self._failed_at = time.monotonic()
+                self.error = str(error)
             return False
         with self._lock:
             self._failed_at = None
+            self.error = ""
         return True
+
+
+_INDEX_LOCK = threading.Lock()
+
+
+def index_refresher(contract) -> IndexRefresher:
+    """应用的自动头像任务与换头像接口共用同一份索引状态。"""
+    with _INDEX_LOCK:
+        refresher = getattr(contract, "gfriends_index", None)
+        if refresher is None:
+            from .scraping_access import SourceTransport
+            refresher = IndexRefresher(
+                contract.candidate_root / "provider-cache" / "performer-avatars" / GFRIENDS_CACHE,
+                lambda: SourceTransport(contract.follow_secrets_root))
+            contract.gfriends_index = refresher
+        return refresher
 
 
 @dataclass(frozen=True)

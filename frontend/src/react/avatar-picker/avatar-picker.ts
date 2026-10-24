@@ -48,6 +48,8 @@ export interface AvatarChoices {
   choices: AvatarChoice[];
   index_age_hours: number | null;
   index_stale: boolean;
+  index_refreshing?: boolean;
+  index_error?: string;
 }
 
 /** 一个人一个键：换个人就是另一份候选，不该读到上一个人的。 */
@@ -153,6 +155,8 @@ const indexAge = (hours: number): string =>
 /** 图库索引没取过或已过期、这一次也一张图库图都没拿到时的那句提示；别的情形是空串。
  *  没取过和过期是两回事：过期的索引照样在查，只是新收的人像查不到。 */
 export function indexNote(data: AvatarChoices | undefined): string {
+  if (data?.index_refreshing) return '正在更新图库索引，候选图片会自动显示。';
+  if (data?.index_error && data.index_stale) return '图库索引未取得：' + data.index_error;
   if (!data || !data.index_stale || data.choices.some((one) => one.source === 'gfriends')) return '';
   return data.index_age_hours === null
     ? '图库索引还没取过，只能从用过的图里选。'

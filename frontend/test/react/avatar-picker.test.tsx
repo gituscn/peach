@@ -281,6 +281,55 @@ it('图库索引还没取过时只剩手填那两条路', async () => {
   expect(document.querySelector('input[type=file]')).not.toBeNull();
 });
 
+it('索引准备完成后在当前弹层自动显示图库候选', async () => {
+  let calls = 0;
+  vi.stubGlobal('fetch', vi.fn(async () => ({
+    ok: true, status: 200,
+    json: async () => ++calls === 1
+      ? listing([], { index_refreshing: true, index_age_hours: null, index_stale: true })
+      : listing([choice()], { index_refreshing: false }),
+  })));
+  await openPicker();
+  expect(dialog()?.textContent).toContain('正在更新图库索引');
+  await vi.waitFor(() => expect(cells()).toHaveLength(1), { timeout: 2500 });
+  expect(dialog()?.textContent).not.toContain('正在更新图库索引');
+  const finished = calls;
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  expect(calls).toBe(finished);
+});
+
+it('索引刷新请求失败时停止轮询并允许手动重试', async () => {
+  let calls = 0;
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    if (++calls > 1) throw new Error('服务连接中断');
+    return { ok: true, status: 200, json: async () => listing([], {
+      index_refreshing: true, index_age_hours: null, index_stale: true,
+    }) };
+  }));
+  await openPicker();
+  await vi.waitFor(() => expect(buttonNamed('立即重试')).not.toBeNull(), { timeout: 2500 });
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  expect(calls).toBe(2);
+});
+
+it('过期索引在重新打开弹层时读取当前候选', async () => {
+  let calls = 0;
+  vi.stubGlobal('fetch', vi.fn(async () => ({
+    ok: true, status: 200,
+    json: async () => ++calls === 1
+      ? listing([], { index_refreshing: false, index_error: '连接中断', index_age_hours: null, index_stale: true })
+      : listing([choice()], { index_refreshing: false }),
+  })));
+  const { host } = await openPicker();
+  expect(dialog()?.textContent).toContain('图库索引未取得');
+  await click(dialog()?.querySelector('button[aria-label="关闭"]'));
+  await settle();
+  await click(host.querySelector('button'));
+  await settle();
+  expect(calls).toBe(2);
+  expect(cells()).toHaveLength(1);
+});
+
 it('过期的图库索引说出多久没更新，不说成还没取过', async () => {
   server(listing([], { matched_names: [], index_age_hours: 124, index_stale: true }));
   await openPicker();
