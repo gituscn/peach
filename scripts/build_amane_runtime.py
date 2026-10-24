@@ -94,7 +94,7 @@ def verify(destination: Path, *, script: Path = BRIDGE / "bridge.py") -> dict:
     env = {key: value for key, value in os.environ.items()
            if key not in {"PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "_PYI_APPLICATION_HOME_DIR",
                           "_PYI_ARCHIVE_FILE", "_PYI_PARENT_PROCESS_LEVEL"}}
-    env.update(PYTHONUTF8="1", PYTHONIOENCODING="utf-8", PYINSTALLER_RESET_ENVIRONMENT="1")
+    env.update(PATH="", PYTHONUTF8="1", PYTHONIOENCODING="utf-8", PYINSTALLER_RESET_ENVIRONMENT="1")
     result = subprocess.run([*command, "--self-check"], check=True, capture_output=True,
                             text=True, encoding="utf-8", cwd=destination, env=env, timeout=120)
     report = json.loads(result.stdout)

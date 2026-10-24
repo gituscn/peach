@@ -1,8 +1,8 @@
 """amane 刮削站点的 Peach 侧接入：起桥子进程、读一行 JSON、把结果翻成 Peach 候选（ADR-0043）。
 
 桥本体在 `tools/amane-bridge/bridge.py`，运行环境由同目录的 `pyproject.toml` / `uv.lock`
-钉死，venv 建在数据目录 `<tools>/amane-bridge/.venv`，不进 Peach 主 venv。这里只做三件事：
-找到 venv 里的解释器并起子进程；把 amane 的 `MediaMetadata` 套进 `peach.sources` 契约的
+钉死。桌面与 Docker 使用随包独立运行环境；源码部署的 venv 建在数据目录的工具区。
+本模块定位运行环境并起子进程，把 amane 的 `MediaMetadata` 套进 `peach.sources` 契约的
 `SiteRecord`，再投影成 `extract_peach_fields` 认得的 payload；把 amane 的 `FailureReason` 一对一映到
 契约的 `FailureReason`，由它翻成 `MetadataProviderError` 现有的 `auth` / `unavailable` / `not_found`
 三档，上游原样的 reason 留在 `detail` 里给冷却与快照回溯用。链上 `LibraryMetadataProvider` 拿到的
@@ -20,6 +20,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 import tomllib
 from dataclasses import dataclass
@@ -147,6 +148,36 @@ def bridge_python(tools_root: Path) -> Path:
     return home / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
+def packaged_runtime(*, root: Path | None = None) -> tuple[Path, str] | None:
+    """定位与桥清单版本、revision 一致的随包运行环境。"""
+    bridge = root if root is not None else BRIDGE_ROOT
+    runtime = Path(os.environ.get("PEACH_AMANE_RUNTIME") or bridge.parent / "amane-runtime")
+    try:
+        data = json.loads((runtime / "manifest.json").read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("executable"), str):
+            return None
+        relative = Path(data["executable"])
+        if (data.get("revision") != pinned_revision(bridge) or data.get("version") != locked_version(bridge)
+                or data.get("kind") not in {"python", "executable"}
+                or relative.is_absolute() or relative.drive or ".." in relative.parts):
+            return None
+        program = runtime / relative
+        # Python venv 可以使用系统解释器软链，独立可执行文件须完全位于随包目录内。
+        boundary = program.parent.resolve() if data["kind"] == "python" else program.resolve()
+        if boundary.is_relative_to(runtime.resolve()) and program.is_file():
+            return program, data["kind"]
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    return None
+
+
+def _requires_packaged_runtime() -> bool:
+    return bool(getattr(sys, "frozen", False)) or os.environ.get("PEACH_DISTRIBUTION") == "docker"
+
+
+PACKAGED_RUNTIME_PROBLEM = "安装包中的采集工具缺失或版本不匹配，请重新安装 Peach"
+
+
 def find_uv() -> Path | None:
     """建 venv 用的 uv。托盘进程的 PATH 未必带 WinGet 的 Links 目录，所以多看一眼那里。"""
     explicit = os.environ.get("PEACH_UV", "").strip()
@@ -181,6 +212,8 @@ def bundle_problem(root: Path = BRIDGE_ROOT) -> str:
         pinned_revision(root)
     except (OSError, ValueError, KeyError, TypeError) as exc:
         return f"amane 桥的清单读不出来：{exc}"
+    if _requires_packaged_runtime() and not packaged_runtime(root=root):
+        return PACKAGED_RUNTIME_PROBLEM
     return ""
 
 
@@ -189,6 +222,9 @@ def rebuild(tools_root: Path, *, runner: Runner = subprocess.run, timeout: int =
     """重建桥 venv，返回给设置页的回执。首次要下载约 98 MB，之后只校验。"""
     if problem := bundle_problem(root):
         return {"ok": False, "error": problem}
+    if packaged_runtime(root=root):
+        return {"ok": True, "result": "采集工具已随 Peach 安装，无需另行准备",
+                **describe(tools_root, root=root)}
     uv = find_uv()
     if uv is None:
         return {"ok": False, "error": "未找到 uv，请先安装 uv 再重建 amane 桥"}
@@ -213,7 +249,8 @@ def describe(tools_root: Path, *, root: Path = BRIDGE_ROOT) -> dict:
 
     清单读不全时 `bundled` 为假、`problem` 写原因，sha 与锁版本留空，卡片据此停用安装。
     """
-    python = bridge_python(tools_root)
+    runtime = packaged_runtime(root=root)
+    python = runtime[0] if runtime else bridge_python(tools_root)
     problem = bundle_problem(root)
     return {
         "repository": AMANE_REPOSITORY,
@@ -230,18 +267,21 @@ def describe(tools_root: Path, *, root: Path = BRIDGE_ROOT) -> dict:
 
 
 def installed(tools_root: Path) -> bool:
-    """解释器和 amane 的包元数据都在才算装好。
-
-    `uv sync` 先建 venv 再下载依赖，拉不到 GitHub 时会留下一个只有解释器的空壳；
-    只看解释器在不在，这种半截环境会被当成已安装。
-    """
-    return bridge_python(tools_root).is_file() and bool(installed_version(tools_root))
+    """发行包须有匹配的独立运行环境；源码环境须有解释器和 amane 包元数据。"""
+    if packaged_runtime():
+        return True
+    return (not _requires_packaged_runtime() and bridge_python(tools_root).is_file()
+            and bool(installed_version(tools_root)))
 
 
 def installed_version(tools_root: Path) -> str:
     """从独立运行环境的包元数据读取版本，不导入上游或启动子进程。"""
     from importlib.metadata import distributions
 
+    if packaged_runtime():
+        return locked_version()
+    if _requires_packaged_runtime():
+        return ""
     venv = bridge_home(tools_root) / ".venv"
     paths = [venv / "Lib" / "site-packages", *venv.glob("lib/python*/site-packages")]
     for distribution in distributions(path=[str(path) for path in paths if path.is_dir()]):
@@ -292,13 +332,18 @@ class AmaneBridge:
     """起一次桥子进程：一次 `--output json`、stdout 一行 JSON；可注入 runner，单测不起真进程。"""
 
     python: Path
-    script: Path = BRIDGE_SCRIPT
+    script: Path | None = BRIDGE_SCRIPT
     timeout: int = DEFAULT_TIMEOUT
     runner: Runner = subprocess.run
 
     @classmethod
     def create(cls, tools_root: Path, *, timeout: int = DEFAULT_TIMEOUT,
                runner: Runner = subprocess.run) -> "AmaneBridge":
+        runtime = packaged_runtime()
+        if runtime:
+            return cls(runtime[0], BRIDGE_SCRIPT if runtime[1] == "python" else None, timeout, runner)
+        if _requires_packaged_runtime():
+            raise MetadataProviderError(PACKAGED_RUNTIME_PROBLEM)
         python = bridge_python(tools_root)
         if not python.is_file():
             raise MetadataProviderError(
@@ -327,8 +372,13 @@ class AmaneBridge:
                                       direct_sites=direct_sites, timeout=timeout)
         checkpoint('network')
         proxy_args, env = proxy_argument(proxy_options or {"trust_env": True})
+        for key in list(env):
+            if key.startswith('_PYI_') or key in {'PYTHONHOME', 'PYTHONPATH'}:
+                env.pop(key)
+        if self.script is None:
+            env['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
         env["PYTHONIOENCODING"] = "utf-8"
-        command = [str(self.python), "-X", "utf8", str(self.script), "--number", number,
+        command = [str(self.python), *(["-X", "utf8", str(self.script)] if self.script else []), "--number", number,
                    "--sites", ",".join(names), "--language", language, "--output", "json",
                    *proxy_args]
         if direct_sites:

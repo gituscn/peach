@@ -96,6 +96,8 @@ https://github.com/user-attachments/assets/a5610874-e611-41bb-be22-7d99f0d64b62
 
 完整安装包携带媒体工具，可离线安装；轻量安装包体积更小，安装时按需下载工具。
 
+Windows 与 macOS 安装包均自带采集运行环境，使用者无需另装 uv、Python 或 Git。采集工具缺失或版本不匹配时，请重新安装 Peach。
+
 测试版尚未签名。若 Windows 提示「已保护你的电脑」，确认来自本项目的 Release，再点「更多信息 → 仍要运行」。安装、更新和故障排查见 [Windows 使用说明](docs/TESTING_DESKTOP.md)。
 
 ### macOS 本机构建

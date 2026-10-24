@@ -96,6 +96,8 @@ Try search, filters and profiles in the [read-only demo](https://demo.peach.vide
 
 The full installer includes media tools for offline installation. The smaller lite installer downloads tools as needed during setup.
 
+Windows and macOS packages include the scraping runtime; users do not need to install uv, Python, or Git. Reinstall Peach if the scraping tools are missing or their version does not match.
+
 Test builds are unsigned. If Windows says “Windows protected your PC”, confirm the file came from this project's Releases, then choose “More info → Run anyway”. See the [Windows guide](docs/TESTING_DESKTOP.md) for installation, updates and troubleshooting.
 
 ### Build on macOS

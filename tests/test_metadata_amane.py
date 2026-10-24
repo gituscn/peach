@@ -262,6 +262,108 @@ class ProxyArgumentTests(unittest.TestCase):
             self.assertNotIn("HTTPS_PROXY", env)
 
 
+class PackagedRuntimeTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.runtime = self.root / 'runtime'
+        self.runtime.mkdir()
+        self.tools = self.root / 'tools'
+        self.manifest = self.runtime / 'manifest.json'
+        self.environment = patch.dict(os.environ, {'PEACH_AMANE_RUNTIME': str(self.runtime), 'PATH': ''})
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+
+    def write_runtime(self, **changes):
+        facts = {'revision': metadata_amane.pinned_revision(), 'version': metadata_amane.locked_version(),
+                 'kind': 'executable', 'executable': 'amane-bridge.exe'}
+        facts.update(changes)
+        executable = self.runtime / facts['executable']
+        if executable.is_relative_to(self.runtime) and '..' not in executable.parts:
+            executable.parent.mkdir(parents=True, exist_ok=True)
+            executable.write_bytes(b'fixture')
+        self.manifest.write_text(json.dumps(facts), encoding='utf-8')
+        return executable
+
+    def test_packaged_installation_and_rebuild_need_no_uv_or_data_environment(self):
+        executable = self.write_runtime()
+        with patch.object(sys, 'frozen', True, create=True), \
+                patch.object(metadata_amane, 'find_uv', side_effect=AssertionError('无需 uv')):
+            facts = metadata_amane.describe(self.tools)
+            rebuilt = metadata_amane.rebuild(self.tools)
+        self.assertTrue(facts['installed'])
+        self.assertEqual(facts['installed_version'], metadata_amane.locked_version())
+        self.assertEqual(facts['python'], str(executable))
+        self.assertTrue(rebuilt['ok'])
+        self.assertFalse(self.tools.exists())
+
+    def test_packaged_commands_use_the_runtime_and_clear_parent_python_environment(self):
+        for kind in ('executable', 'python'):
+            with self.subTest(kind=kind):
+                executable = self.write_runtime(kind=kind)
+                calls = []
+                def run(command, **kwargs):
+                    calls.append((command, kwargs))
+                    return completed(report(fc2club=FOUND))
+                with patch.dict(os.environ, {'PYTHONPATH': 'parent-source', 'PYTHONHOME': 'parent-python',
+                                             '_PYI_PARENT_PROCESS_LEVEL': '1'}):
+                    bridge = metadata_amane.AmaneBridge.create(self.tools, runner=run)
+                    result = bridge.query('FC2-PPV-1234567', ['fc2club'], proxy_options={'trust_env': False})
+                self.assertEqual(result['sites']['fc2club']['status'], 'found')
+                command, kwargs = calls[0]
+                self.assertEqual(command[0], str(executable))
+                self.assertEqual('-X' in command, kind == 'python')
+                for key in ('PYTHONPATH', 'PYTHONHOME', '_PYI_PARENT_PROCESS_LEVEL'):
+                    self.assertNotIn(key, kwargs['env'])
+                if kind == 'executable':
+                    self.assertEqual(kwargs['env']['PYINSTALLER_RESET_ENVIRONMENT'], '1')
+
+    def test_invalid_packaged_runtime_requests_reinstallation_without_uv_fallback(self):
+        # 数据目录的解释器不能顶替发行包要求的固定运行环境。
+        python = metadata_amane.bridge_python(self.tools)
+        python.parent.mkdir(parents=True)
+        python.touch()
+        write_amane_metadata(self.tools, metadata_amane.locked_version())
+        for change in ({'revision': '0' * 40}, {'version': 'unknown'}, {'kind': 'shell'},
+                       {'executable': '../outside.exe'}, {'executable': str(self.root / 'outside.exe')}):
+            with self.subTest(change=change):
+                self.write_runtime(**change)
+                with patch.object(sys, 'frozen', True, create=True), \
+                        patch.object(metadata_amane, 'find_uv', side_effect=AssertionError('无需 uv')):
+                    facts = metadata_amane.describe(self.tools)
+                    rebuilt = metadata_amane.rebuild(self.tools)
+                    with self.assertRaisesRegex(MetadataProviderError, '重新安装'):
+                        metadata_amane.AmaneBridge.create(self.tools)
+                self.assertFalse(facts['installed'])
+                self.assertFalse(facts['bundled'])
+                self.assertIn('重新安装', facts['problem'])
+                self.assertFalse(rebuilt['ok'])
+                self.assertIn('重新安装', rebuilt['error'])
+
+    def test_missing_or_malformed_docker_runtime_requests_reinstallation(self):
+        for content in (None, '[]', 'null', '{', '{}'):
+            with self.subTest(content=content):
+                if content is None:
+                    self.manifest.unlink(missing_ok=True)
+                else:
+                    self.manifest.write_text(content, encoding='utf-8')
+                with patch.dict(os.environ, {'PEACH_DISTRIBUTION': 'docker'}), \
+                        patch.object(metadata_amane, 'find_uv', side_effect=AssertionError('无需 uv')):
+                    result = metadata_amane.rebuild(self.tools)
+                self.assertFalse(result['ok'])
+                self.assertIn('重新安装', result['error'])
+
+    def test_desktop_runtime_is_discovered_beside_the_bridge_resources(self):
+        self.write_runtime()
+        with patch.dict(os.environ, {'PEACH_AMANE_RUNTIME': ''}), \
+                patch.object(metadata_amane, 'BRIDGE_ROOT', self.root / 'amane-bridge'):
+            self.runtime.rename(self.root / 'amane-runtime')
+            with patch.object(metadata_amane, 'pinned_revision', return_value=metadata_amane.pinned_revision()), \
+                    patch.object(metadata_amane, 'locked_version', return_value=metadata_amane.locked_version()):
+                self.assertTrue(metadata_amane.installed(self.tools))
+
+
 class BridgeQueryTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()

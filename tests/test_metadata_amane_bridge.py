@@ -266,7 +266,27 @@ class RuntimePackagingTests(unittest.TestCase):
             self.assertEqual(command[-1], "--self-check")
             self.assertEqual("-X" in command, kind == "python")
             self.assertNotIn("PYTHONPATH", run.call_args.kwargs["env"])
+            self.assertEqual(run.call_args.kwargs["env"]["PATH"], "")
             self.assertEqual(run.call_args.kwargs["env"]["PYINSTALLER_RESET_ENVIRONMENT"], "1")
+
+    def test_desktop_smoke_requires_the_service_to_use_the_bundled_runtime(self):
+        from scripts import smoke_desktop
+        manifest = self.manifest('executable')
+        facts = {'installed': True, 'problem': '', 'revision': manifest['revision'],
+                 'installed_version': manifest['version'], 'python': str(self.root / manifest['executable'])}
+        opener = mock.Mock()
+        with mock.patch.dict(sys.modules, {'build_amane_runtime': self.builder}), \
+                mock.patch.object(self.builder, 'verify') as verify:
+            opener.open.return_value = io.StringIO(json.dumps(facts))
+            smoke_desktop.assert_amane_runtime(opener, 'http://127.0.0.1:8900', self.root)
+            verify.assert_called_once_with(self.root)
+            opener.open.assert_called_once_with('http://127.0.0.1:8900/api/scraping/amane-bridge', timeout=15)
+            for change in ({'installed': False}, {'revision': 'foreign'}, {'installed_version': 'unknown'},
+                           {'python': str(self.root / 'user-python')}, {'problem': '缺少运行环境'}):
+                with self.subTest(change=change):
+                    opener.open.return_value = io.StringIO(json.dumps({**facts, **change}))
+                    with self.assertRaises(AssertionError):
+                        smoke_desktop.assert_amane_runtime(opener, 'http://127.0.0.1:8900', self.root)
 
     def test_runtime_self_check_rejects_wrong_versions_and_process_failures(self):
         self.manifest("executable")
