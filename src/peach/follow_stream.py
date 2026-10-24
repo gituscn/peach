@@ -25,7 +25,9 @@ from .http import HttpRequest, HttpResponse, HttpTransport, public_https_url, re
 LOGGER = logging.getLogger(__name__)
 
 class FollowMediaUnavailable(RuntimeError):
-    pass
+    def __init__(self, message: str = "", *, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class FollowProxyError(RuntimeError):
@@ -34,6 +36,10 @@ class FollowProxyError(RuntimeError):
     与 `FollowMediaUnavailable` 分开是因为两者的对外语义不同：条目本身没有可播
     媒体是 404，上游这一次没给出可转发的响应是 502。
     """
+
+    def __init__(self, message: str, *, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 @dataclass(frozen=True)
@@ -337,7 +343,7 @@ class FollowMediaResolver:
             LOGGER.warning("rule34video detail page for follow item %s unavailable: HTTP %s",
                            item.id, response.status)
             self._remember_miss(item.id)
-            raise FollowMediaUnavailable("Rule34Video 详情页未取得")
+            raise FollowMediaUnavailable("Rule34Video 详情页未取得", status_code=response.status)
         text = response.body.decode("utf-8", errors="replace")
         found: list[str] = []
         for matched in _VIDEO_URL_RE.finditer(text):
@@ -443,5 +449,5 @@ def open_upstream(client: httpx.Client, method: str, target: ResolvedFollowMedia
     if not 200 <= response.status_code < 300 and response.status_code not in accepted_statuses:
         status = response.status_code
         response.close()
-        raise FollowProxyError(f"上游返回 HTTP {status}")
+        raise FollowProxyError(f"上游返回 HTTP {status}", status_code=status)
     return response

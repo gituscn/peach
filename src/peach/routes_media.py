@@ -32,7 +32,8 @@ from starlette.staticfiles import StaticFiles
 from starlette.requests import ClientDisconnect
 
 from . import (
-    avatar_face, avatar_online, avatar_picker, avatar_provider, follow_assets, follow_providers, images,
+    avatar_face, avatar_online, avatar_picker, avatar_provider, error_reporting,
+    follow_assets, follow_providers, images,
     jav_poster_crop, link_marks, link_status, scraping_access, site_icons, social_links, subtitles,
     taste_history, timeline_sheets, web_follow,
 )
@@ -937,7 +938,25 @@ def work_icon(request: Request, work: str = "",
     return _asset_response(request, path)
 
 
-def _follow_media_size(state, item_id: int, target: ResolvedFollowMedia) -> int | None:
+def _report_follow_media_failure(item, error: Exception, *, operation: str, phase: str,
+                                 media_index: int | None = None) -> None:
+    """媒体失败按来源、资源来源和操作定位；地址与凭据交给统一脱敏入口。"""
+    rows = web_follow._raw_media_items(item)
+    index = media_index if media_index is not None else 0
+    resource_provider = item.provider
+    if ((operation != "image" or media_index is not None) and 0 <= index < len(rows)
+            and isinstance(rows[index], dict)):
+        resource_provider = str(rows[index].get("resource_provider") or item.provider)
+    if resource_provider not in follow_providers.PROVIDERS:
+        resource_provider = "unknown"
+    error_reporting.event(
+        "follow-media", error, provider=item.provider, source_id=getattr(item, "source_id", None),
+        item_id=item.id, resource_provider=resource_provider, operation=operation,
+        phase=phase, media_index=media_index, upstream_status=getattr(error, "status_code", None),
+    )
+
+
+def _follow_media_size(state, item, target: ResolvedFollowMedia) -> int | None:
     """正片的字节数，取不到就是 None。
 
     只能问上游：来源列表里没有这一项，账本里也只有落盘资源才有 size。一次 HEAD 就够，
@@ -950,7 +969,7 @@ def _follow_media_size(state, item_id: int, target: ResolvedFollowMedia) -> int 
     try:
         response = open_upstream(state.http_transport.client, "HEAD", target, incoming={})
     except (FollowProxyError, OSError, httpx.HTTPError) as error:
-        LOGGER.warning("follow media size unavailable for item %s: %s", item_id, error)
+        _report_follow_media_failure(item, error, operation="size", phase="upstream")
         return None
     try:
         size = int(response.headers.get("content-length") or 0)
@@ -984,7 +1003,8 @@ def follow_qualities(request: Request, id: int, args: dict[str, str] = Depends(r
         return JSONResponse({"error": "no such follow item"}, status_code=404)
     try:
         resolved = state.follow_media_resolver.resolve(item)
-    except FollowMediaUnavailable:
+    except FollowMediaUnavailable as error:
+        _report_follow_media_failure(item, error, operation="qualities", phase="resolve")
         return {"qualities": [], "size": None}
     # 档位数量不写死：正则匹配 video_url 与任意编号的 video_alt_urlN，
     # 站点给几档就是几档（实测同一作者下有 4 档也有 5 档的条目）。
@@ -992,7 +1012,7 @@ def follow_qualities(request: Request, id: int, args: dict[str, str] = Depends(r
     return {"qualities": [
         {"height": height, "label": "4K" if height >= 2160 else f"{height}p"}
         for height, _ in resolved.qualities if height
-    ], "size": _follow_media_size(state, id, resolved)}
+    ], "size": _follow_media_size(state, item, resolved)}
 
 
 @router.api_route("/follow-stream", methods=["GET", "HEAD"])
@@ -1005,6 +1025,7 @@ def follow_stream(request: Request, id: int, media: int | None = None,
         item = FollowStore(lambda: connection).item(id)
     if item is None:
         return JSONResponse({"error": "no such follow item"}, status_code=404)
+    phase = "resolve"
     try:
         key = f"follow:{item.id}:media:{media}:quality:{quality}"
         cache = cache_for(state.web_contract)
@@ -1013,6 +1034,7 @@ def follow_stream(request: Request, id: int, media: int | None = None,
         if cached is not None:
             return cached
         target = state.follow_media_resolver.resolve(item, media, quality)
+        phase = "upstream"
         # 跟重定向、逐跳过白名单、非 2xx 一律不转发，都在 follow_stream 里；
         # 这里只负责把 Peach 的请求接到那个流上。
         extra = {"content-disposition": _attachment_disposition(item.title, target.url)} if download else None
@@ -1020,14 +1042,16 @@ def follow_stream(request: Request, id: int, media: int | None = None,
             lambda: open_upstream(state.http_transport.client, request.method, target, incoming=request.headers),
             headers=extra)
     except FollowMediaUnavailable as error:
+        _report_follow_media_failure(item, error, operation="stream", phase=phase, media_index=media)
         return JSONResponse({"error": str(error)}, status_code=404)
     except FollowProxyError as error:
         # 上游的状态码与正文不转发：403 页面、限流提示、错误 JSON 交给播放器
         # 没有用处，还会把上游主机和提示语抄给浏览器。对外统一是 502。
-        LOGGER.warning("follow media proxy refused for item %s: %s", id, error)
+        _report_follow_media_failure(item, error, operation="stream", phase=phase, media_index=media)
         return JSONResponse({"error": "follow media unavailable"}, status_code=502)
-    except (OSError, httpx.HTTPError):
-        LOGGER.exception("follow media proxy failed for item %s", id)
+    except (OSError, httpx.HTTPError) as error:
+        LOGGER.exception("follow media proxy failed for provider %s item %s", item.provider, id)
+        _report_follow_media_failure(item, error, operation="stream", phase=phase, media_index=media)
         return JSONResponse({"error": "follow media unavailable"}, status_code=502)
 
 @router.api_route("/follow-image", methods=["GET", "HEAD"])
@@ -1039,6 +1063,7 @@ def follow_image(request: Request, id: int, media: int | None = None,
     if item is None:
         return Response(status_code=404)
     cache = cache_for(state.web_contract)
+    phase = "resolve"
     try:
         if media is None:
             url = web_follow._remote_thumb_url(item)
@@ -1060,9 +1085,11 @@ def follow_image(request: Request, id: int, media: int | None = None,
             resolved = state.follow_media_resolver.resolve(item, media)
             if resolved.headers:
                 target = replace(resolved, url=url)
+        phase = "upstream"
         return cache.stream(key, request, lambda: open_upstream(
             state.http_transport.client, request.method, target, incoming=request.headers))
-    except (ValueError, FollowMediaUnavailable, FollowProxyError, OSError, httpx.HTTPError):
+    except (ValueError, FollowMediaUnavailable, FollowProxyError, OSError, httpx.HTTPError) as error:
+        _report_follow_media_failure(item, error, operation="image", phase=phase, media_index=media)
         return Response(status_code=404, headers={"cache-control": "no-store"})
 
 

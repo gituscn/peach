@@ -665,6 +665,10 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 - 关注的作者头像与来源图标是元数据：`follow_assets` 取回落在 `generated/follow-assets/`，经 `/follow-avatar`、`/source-icon` 给页面；地址只从固定表或固定主机拼，字节先认成图再写盘，到期重取失败继续用旧的并退避一小时，缓存有效期与 `/link-mark` 共用 `web_settings.metadata_refresh_seconds`。视频与图片不存本机。官方头像先认 FANBOX，没有时 `follow_avatar.profile_avatar_tiers` 取名片上的 X 与 Patreon，`follow_assets.largest_image` 留像素最大的那张。
 - 厂牌标识由契约位 `has_logo` 决定出不出图：没装标识的厂牌一个 `<img>` 都不发，改用首字母底板，不靠 404 摘。标识 198 张随仓库分发（ADR-0026）。
 - 关注检查分两阶段：列表阶段落 partial 行，详情补全按 provider 额度只补新行和未补齐行。「补齐过」由连接器的 `ENRICHED_MARK` 声明、判据登记在 `follow_store._ENRICHED_PREDICATES`。
+- 关注原始证据复用 Python 标准库 `hashlib.sha256` 与既有 `write_immutable`。快照文件名由检查时间和完整说明的摘要组成；说明含正文 SHA-256、脱敏请求地址及候选数量，因此相同正文的不同游标或筛选结果各有独立证据。相同快照可重复保存，已有文件内容冲突仍拒绝覆盖；历史证据按账本保存的相对路径读取，无迁移或新增依赖。临时账本回归遍历登记表中的全部追更来源，覆盖正文、地址及候选数量的独立变化，并经 FANBOX 连接器验证相同正文的历史补足和重复检查。
+- 单来源失败边界覆盖取回、整页存储和历史补足；证据内容冲突保留错误，已提交的条目继续保留，其他来源继续检查。Web 与 CLI 共用 `follow_check.run_check` 的失败结果，不把证据冲突记成成功。
+- 关注检查失败在本机 `follow-check` 事件中保留来源、来源编号、失败阶段、请求页及异常链；只记录登记来源键与技术状态，不复制作者名称或来源地址。单来源错误仍按既有任务结果返回。
+- 关注媒体的本机诊断复用 `error_reporting.event` 与支持包脱敏入口，分别记录来源、资源来源、来源及条目编号、播放／图片／清晰度／大小操作、解析或回源阶段和上游状态码。上游响应正文不进入诊断字段；异常中的地址和凭据由统一入口脱敏，远程诊断字段范围保持既有约定。隔离 API 和支持包回归覆盖 403、429、异常链、无效媒体清单及脱敏保真，无新增依赖。
 - 存量行重抓（连接器新学到图片宽高、封面这类字段时，旧行不会自己补上）分两步：把 `ENRICHED_MARK` 换成新字段落库后才有的键并登记判据；再 `POST /api/follow/check` 发 `{"older":true,"backfill_all":true,"rewind":true,"background":true}`（可加 `"sources":[id,…]`），从第 1 页走到站点说没有更多，进度读 `GET /api/follow/check`。`backfill_all`、`rewind` 离开 `older` 被拒收、不进界面，ledger 的回填游标只进不退；长跑任务，重启前按 `peach-batch-jobs` 先查。
 - 图片的固有宽高只问文件头：`follow_image_dims.probe_image_dims` 发 `Range: bytes=0-65535`，`dims_from_header` 认 PNG／GIF／WebP（VP8、VP8L、VP8X）／JPEG（跳过 EXIF 到 SOF）；连接器、`backfill_follow_image_dims.py` 与 `/api/follow/image-dims` 落库前都经 `positive_dims` 归一，`FollowStore.set_image_dims` 只补空缺。宽高只为图片视图的卡面预留比例，回填每个条目只问卡面那张；原文件主机拦脚本（pawchive 的 `file.` 子域挂 ddos-guard）时按缩略图量，详情原图取不到也退回缩略图。
 - 归档站（kemono、coomer、pawchive）多图或视频的帖子由 `KemonoConnector._media_items` 列进 `media_items`（交付文件排第一、按路径去重），详情轮播与 `/follow-stream?media=N` 按条目自己站点的主机白名单取。

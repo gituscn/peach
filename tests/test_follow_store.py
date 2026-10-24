@@ -7,6 +7,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from peach import follow_providers
 from peach.follow import FollowSourceError
 from peach.follow_sources import FollowCandidate, SourceFetch
 from peach.follow_store import (
@@ -299,6 +300,56 @@ class RecordTests(_StoreCase):
                                     moment=MOMENT)
         self.assertIsNotNone(outcome.evidence_path)
         self.assertIsNone(outcome.evidence_error)
+
+    def test_identical_evidence_is_reused_without_overwriting_files(self):
+        source_id = self._source()
+        fetch = _fetch([_candidate("1", "A")])
+        first = self.store.record(source_id, fetch, moment=MOMENT)
+        evidence = self.root / "sources" / Path(first.evidence_path)
+        sidecar = evidence.with_suffix(".json")
+        before = [(path.read_bytes(), path.stat().st_mtime_ns) for path in (evidence, sidecar)]
+        again = self.store.record(source_id, fetch, moment=MOMENT)
+        self.assertEqual(again.evidence_path, first.evidence_path)
+        self.assertEqual(again.added, 0)
+        self.assertEqual([(path.read_bytes(), path.stat().st_mtime_ns)
+                          for path in (evidence, sidecar)], before)
+
+    def test_shared_response_body_keeps_distinct_snapshot_metadata(self):
+        for provider, spec in follow_providers.PROVIDERS.items():
+            if not spec.source_url:
+                continue
+            with self.subTest(provider=provider):
+                source_id = self._source(provider=provider, semantics=spec.semantics)
+                fetch = _fetch([_candidate("1", "A", provider=provider)],
+                               provider=provider, semantics=spec.semantics)
+                variants = (fetch, replace(fetch, request_url=fetch.request_url + "?firstId=1"),
+                            replace(fetch, candidates=()), replace(fetch, raw_body=b"different body"))
+                paths = []
+                for variant in variants:
+                    outcome = self.store.record(source_id, variant, moment=MOMENT)
+                    self.assertIsNone(outcome.evidence_error)
+                    paths.append(self.root / "sources" / Path(outcome.evidence_path))
+                self.assertEqual(len(set(paths)), 4)
+                for path, variant in zip(paths, variants):
+                    self.assertEqual(path.read_bytes(), variant.raw_body)
+                    sidecar = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
+                    self.assertEqual(sidecar["provider"], provider)
+                    self.assertEqual(sidecar["request_url"], variant.request_url)
+                    self.assertEqual(sidecar["candidates"], len(variant.candidates))
+
+    def test_conflicting_evidence_still_rejects_overwriting(self):
+        source_id = self._source()
+        fetch = _fetch([_candidate("1", "A")])
+        outcome = self.store.record(source_id, fetch, moment=MOMENT)
+        evidence = self.root / "sources" / Path(outcome.evidence_path)
+        sidecar = evidence.with_suffix(".json")
+        original = sidecar.read_bytes()
+        sidecar.write_bytes(b"conflicting evidence")
+        with self.assertRaisesRegex(FollowSourceError, "immutable follow snapshot collision"):
+            self.store.record(source_id, fetch, moment=MOMENT)
+        self.assertEqual(sidecar.read_bytes(), b"conflicting evidence")
+        self.assertEqual(evidence.read_bytes(), fetch.raw_body)
+        sidecar.write_bytes(original)
 
     def test_approximate_precision_is_carried_through_from_the_connector(self):
         source_id = self._source()

@@ -319,6 +319,53 @@ class ErrorReportingTests(unittest.TestCase):
         for secret in ("private-cookie", "private-cid", "private-token"):
             self.assertNotIn(secret, content)
 
+    def test_follow_media_report_keeps_source_context_and_redacts_upstream_details(self):
+        from types import SimpleNamespace
+        from peach.follow_stream import FollowProxyError
+        from peach.routes_media import _report_follow_media_failure
+
+        item = SimpleNamespace(provider="fanbox", source_id=3, id=7,
+                               metadata={"media_items": [{"resource_provider": "gofile"}]})
+        try:
+            raise FollowProxyError(
+                "upstream https://media.gofile.io/private-file?token=private-token "
+                "Cookie: private-cookie", status_code=403)
+        except FollowProxyError as error:
+            _report_follow_media_failure(item, error, operation="stream", phase="upstream",
+                                         media_index=0)
+        with zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes())) as archive:
+            payload = "\n".join(archive.read(name).decode() for name in archive.namelist()
+                                if "errors-" in name and name.endswith(".log"))
+        row = next(json.loads(line) for line in payload.splitlines()
+                   if json.loads(line).get("stage") == "follow-media")
+        self.assertEqual({key: row[key] for key in (
+            "provider", "source_id", "item_id", "resource_provider", "operation", "phase",
+            "media_index", "upstream_status")}, {
+                "provider": "fanbox", "source_id": 3, "item_id": 7, "resource_provider": "gofile",
+                "operation": "stream", "phase": "upstream", "media_index": 0, "upstream_status": 403})
+        self.assertEqual(row["exception"][0]["type"], "FollowProxyError")
+        self.assertTrue(row["frames"])
+        for secret in ("private-file", "private-token", "private-cookie", "media.gofile.io"):
+            self.assertNotIn(secret, payload)
+
+    def test_follow_media_report_handles_invalid_media_without_masking_the_failure(self):
+        from types import SimpleNamespace
+        from peach.routes_media import _report_follow_media_failure
+
+        item = SimpleNamespace(provider="kemono", source_id=4, id=8,
+                               metadata={"media_items": [None, {"resource_provider": "private-name"}]})
+        for index, expected in ((0, "kemono"), (1, "unknown")):
+            with self.subTest(index=index):
+                with mock.patch.object(error_reporting, "event") as emit:
+                    _report_follow_media_failure(item, ValueError("媒体条目格式不符"),
+                                                 operation="stream", phase="resolve", media_index=index)
+                self.assertEqual(emit.call_args.kwargs["resource_provider"], expected)
+        del item.source_id
+        with mock.patch.object(error_reporting, "event") as emit:
+            _report_follow_media_failure(item, ValueError("图片来源不可用"),
+                                         operation="image", phase="resolve")
+        self.assertIsNone(emit.call_args.kwargs["source_id"])
+
     def test_failure_dialog_points_to_an_existing_report_and_cli_needs_no_service(self):
         message = error_reporting.failure_details("tray-handoff", OSError("desktop unavailable"))
         self.assertIn("诊断报告", message)

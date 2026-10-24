@@ -2218,6 +2218,43 @@ class FollowContractTests(unittest.TestCase):
         self.assertIn("证据未取得", outcome["evidence_error"])
         self.assertEqual(self._get()["sources"][0]["last_status"], "ok")
 
+    def test_one_source_evidence_conflict_does_not_abort_the_other_sources(self):
+        self._seed()
+        self._seed(provider="rule34xxx", ref="lazyprocrastinator", candidates=())
+        persist = FollowStore._persist_evidence
+
+        def evidence(store, fetch, moment):
+            if fetch.provider == "rule34video":
+                raise FollowSourceError("immutable follow snapshot collision")
+            return persist(store, fetch, moment)
+
+        def factory(provider, **kwargs):
+            connector = mock.Mock()
+            connector.fetch.return_value = SourceFetch(
+                provider=provider, ref="lazyprocrastinator",
+                request_url=f"https://{provider}.test/", semantics="work", raw_body=b"page",
+                candidates=(FollowCandidate(provider=provider, external_id="999", title="作品"),))
+            return connector
+
+        with mock.patch.object(web_follow, "build_connector", factory), \
+                mock.patch.object(FollowStore, "_persist_evidence", evidence), \
+                mock.patch("peach.error_reporting.event") as report:
+            result = self._post("/api/follow/check", {})
+        failure = next(call for call in report.call_args_list if call.args[0] == "follow-check")
+        self.assertEqual(failure.kwargs["provider"], "rule34video")
+        self.assertEqual(failure.kwargs["phase"], "record")
+        self.assertEqual(failure.kwargs["status"], "error")
+        self.assertEqual(result["checked"], 2)
+        outcomes = {row["provider"]: row for row in result["results"]}
+        self.assertFalse(outcomes["rule34video"]["ok"])
+        self.assertEqual(outcomes["rule34video"]["status"], "error")
+        self.assertIn("immutable follow snapshot collision", outcomes["rule34video"]["error"])
+        self.assertTrue(outcomes["rule34xxx"]["ok"])
+        self.assertEqual(outcomes["rule34xxx"]["added"], 1)
+        sources = {row["provider"]: row for row in self._get()["sources"]}
+        self.assertEqual(sources["rule34video"]["last_status"], "error")
+        self.assertEqual(sources["rule34xxx"]["last_status"], "ok")
+
     def test_source_errors_are_recorded_for_later_inspection(self):
         self._seed()
         with mock.patch.object(web_follow, "build_connector") as factory:
