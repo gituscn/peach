@@ -16,7 +16,7 @@
 
 ## 决策
 
-**一、版本提交的主线流水线就是发布演练。** `release_tag.py --ship` 推上 master 的提交主题是 `chore(release): 版本 X`。`.gitlab-ci.yml` 的 `.release-rehearsal` 规则匹配这类提交，给作业设置 `PEACH_RELEASE_REHEARSAL=1`，然后跑完标签上除发布以外的全部作业：三平台全量（`release-verify-*`）、`windows-media`、`build-windows`、`build-macos`、`smoke-windows` 和 `docker-build`。最后由 `release-rehearsal-cleanup` 回收 R2 上的暂存产物。
+**一、版本提交的主线流水线就是发布演练。** `release_tag.py --ship` 推上 master 的提交主题是 `chore(release): 版本 X`。`.gitlab-ci.yml` 的 `.release-rehearsal` 规则匹配这类提交，给作业设置 `PEACH_RELEASE_REHEARSAL=1`，并用规则变量 `PEACH_CI_COVERAGE=full` 把主线的 `verify-linux`、`verify-windows`、`verify-macos` 改成全量。之后跑完标签上除发布以外的全部作业：`windows-media`、`build-windows`、`build-macos`、`smoke-windows` 和 `docker-build`。最后由 `release-rehearsal-cleanup` 回收 R2 上的暂存产物。
 
 需要「标签」的脚本，在演练里改用提交里的版本号：
 
@@ -51,7 +51,7 @@
 
 ## 后果
 
-- 发版多一轮演练。演练与原来的标签全量同口径；标签流水线去掉了全量，两轮合计比「标签全量失败后改版本号重来」快，而且不再作废版本号。
+- 每次发版每个平台只跑一次全量。原来版本提交改了 `src/peach/__init__.py`，主线选测已经退成全量，标签上又跑一遍；现在只在演练里跑一次。媒体、构建与冒烟在演练和标签上各跑一次，多出来的是构建时间（Windows 构建加冒烟约 30 分钟，macOS 两个架构的构建作业时限 2 小时）。代价换来的是失败挡在打标签之前，不再作废版本号：上一轮四个作废的标签，每个都要重新定版、改变更日志，再走一遍整条流水线。
 - 演练要用 `release` 环境的变量。master 是受保护分支，与版本标签同样能取得这些变量；如果项目把环境限制成只允许标签，演练的构建作业会在取凭据时失败，`--ship` 不会打标签，改环境设置后重跑即可。
 - 演练与标签各构建一次，产物不共用。两次构建来自同一个提交，标签流水线的构建失败只可能来自基础设施，重试作业即可。
 

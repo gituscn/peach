@@ -664,10 +664,13 @@ class GateAndFlakyRerunTests(unittest.TestCase):
 
     def test_heavy_runs_queue_on_the_machine_lock_except_nested_or_already_held(self):
         args = runner.argparse.Namespace(machine_lock_held=False, lock_timeout=5)
-        with patch.object(runner.test_evidence, 'held') as held, \
-                patch.object(runner.test_history, 'nested', return_value=False):
-            runner.machine_guard(args, True, scope='full')
-        self.assertEqual(held.call_args.args[0], runner.test_evidence.machine_lock_path())
+        for ci, wait in (('', 5), ('true', runner.CI_MACHINE_LOCK_SECONDS)):
+            with self.subTest(ci=ci), patch.object(runner.test_evidence, 'held') as held, \
+                    patch.object(runner.test_history, 'nested', return_value=False), \
+                    patch.dict(os.environ, {'CI': ci}):
+                runner.machine_guard(args, True, scope='full')
+            self.assertEqual(held.call_args.args[0], runner.test_evidence.machine_lock_path())
+            self.assertEqual(held.call_args.kwargs['wait_seconds'], wait, 'CI 作业按自己的时限等，本机按 --lock-timeout')
         for light, nested, already in ((True, False, False), (False, True, False), (False, False, True)):
             with self.subTest(light=light, nested=nested, already=already), \
                     patch.object(runner.test_evidence, 'held') as held, \

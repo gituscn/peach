@@ -1175,8 +1175,13 @@ def machine_guard(args, heavy: bool, **note):
     """
     if not heavy or args.machine_lock_held or test_history.nested():
         return nullcontext()
-    return test_evidence.held(test_evidence.machine_lock_path(), wait_seconds=args.lock_timeout,
-                              root=str(ROOT), **note)
+    # CI 作业（GitLab 与 GitHub 都设 CI=true）有自己的时限（Windows 验收 90 分钟），排在本机两轮全量
+    # 后面也要等得到；本机交互仍按 --lock-timeout，最长 30 分钟。
+    wait = CI_MACHINE_LOCK_SECONDS if os.environ.get("CI") == "true" else args.lock_timeout
+    return test_evidence.held(test_evidence.machine_lock_path(), wait_seconds=wait, root=str(ROOT), **note)
+
+
+CI_MACHINE_LOCK_SECONDS = 3600
 
 
 def busy(error) -> int:

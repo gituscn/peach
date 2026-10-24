@@ -64,19 +64,15 @@ variables:
       - build/agent-verification/browser/setup-serve.log
       - build/test-history/
 
+# 三平台验收在版本提交上由演练规则改成全量（规则变量 PEACH_CI_COVERAGE=full 覆盖作业变量），
+# 每个平台只跑一次全量；标签流水线由 validate-release 核对同一提交的演练已通过，不再重跑。
 verify-linux:
   extends: .verify-linux
   rules:
+    - !reference [.release-rehearsal, rules]
     - if: '$CI_COMMIT_BRANCH || $CI_PIPELINE_SOURCE == "merge_request_event"'
   variables:
     PEACH_CI_COVERAGE: changed
-
-# 三平台全量只在版本提交的演练里跑；标签流水线由 validate-release 核对同一提交的演练已通过。
-release-verify-linux:
-  extends: .verify-linux
-  rules: !reference [.release-rehearsal, rules]
-  variables:
-    PEACH_CI_COVERAGE: full
 
 .verify-windows:
   stage: verify
@@ -94,15 +90,10 @@ release-verify-linux:
 verify-windows:
   extends: .verify-windows
   rules:
+    - !reference [.release-rehearsal, rules]
     - if: '$CI_COMMIT_BRANCH == "master"'
   variables:
     PEACH_CI_COVERAGE: changed
-
-release-verify-windows:
-  extends: .verify-windows
-  rules: !reference [.release-rehearsal, rules]
-  variables:
-    PEACH_CI_COVERAGE: full
 
 .verify-macos:
   stage: verify
@@ -119,15 +110,10 @@ release-verify-windows:
 verify-macos:
   extends: .verify-macos
   rules:
+    - !reference [.release-rehearsal, rules]
     - if: '$CI_COMMIT_BRANCH == "master"'
   variables:
     PEACH_CI_COVERAGE: changed
-
-release-verify-macos:
-  extends: .verify-macos
-  rules: !reference [.release-rehearsal, rules]
-  variables:
-    PEACH_CI_COVERAGE: full
 
 wheel-smoke:
   stage: package
@@ -152,14 +138,15 @@ wheel-smoke:
     expire_in: 14 days
     paths: [build/wheelhouse/]
 
-# 发版分两步（ADR-0121）：版本提交 `chore(release): 版本 X` 推上 master 时演练整条发布链，三平台全量、
-# 媒体、构建、冒烟与镜像都跑，只是不发布；`release_tag.py --ship` 等这条流水线转绿才打标签。
+# 发版分两步（ADR-0121）：版本提交 `chore(release): 版本 X` 推上 master 时演练整条发布链，三平台验收
+# 改跑全量，媒体、构建、冒烟与镜像都跑，只是不发布；`release_tag.py --ship` 等这条流水线转绿才打标签。
 # 标签流水线核对同一提交的演练已通过，重新构建后发布，不再重跑全量；任何一步没过都不发布任何东西。
 .release-rehearsal:
   rules:
     - if: '$CI_COMMIT_BRANCH == "master" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_MESSAGE =~ /^chore\(release\): 版本 /'
       variables:
         PEACH_RELEASE_REHEARSAL: "1"
+        PEACH_CI_COVERAGE: full
 
 .release-publish:
   rules:
@@ -213,7 +200,7 @@ build-windows:
   stage: build
   tags: [peach-windows]
   rules: !reference [.release-linux, rules]
-  needs: [windows-media, {job: release-verify-windows, artifacts: false, optional: true}]
+  needs: [windows-media, {job: verify-windows, artifacts: false, optional: true}]
   environment:
     name: release
     action: prepare
@@ -240,7 +227,7 @@ build-macos:
   # 两个架构各自从源码编译 x264、ffmpeg 与 untrunc，不走缓存；windows-media 单架构交叉编译 ffmpeg 与 untrunc 约 17 分钟。
   timeout: 2h
   rules: !reference [.release-linux, rules]
-  needs: [{job: validate-release, optional: true}, {job: release-verify-macos, artifacts: false, optional: true}]
+  needs: [{job: validate-release, optional: true}, {job: verify-macos, artifacts: false, optional: true}]
   environment:
     name: release
     action: prepare
@@ -277,7 +264,7 @@ docker-build:
   stage: smoke
   tags: [peach-windows]
   rules: !reference [.release-linux, rules]
-  needs: [{job: validate-release, optional: true}, {job: release-verify-linux, artifacts: false, optional: true}]
+  needs: [{job: validate-release, optional: true}, {job: verify-linux, artifacts: false, optional: true}]
   environment:
     name: release
     action: prepare
@@ -298,12 +285,21 @@ publish-docker:
     - pwsh -NoProfile -File ./scripts/ci_windows.ps1 docker-push
     - if ($LASTEXITCODE -ne 0) { throw 'Docker 镜像发布失败' }
 
-# 演练不发布：暂存在 R2 的本流水线产物删掉，不占容量预算。
+# 演练不发布：暂存在 R2 的本流水线产物删掉，不占容量预算。演练失败也照样回收（when: always），
+# 回收本身失败不挡发版（allow_failure，不在 REHEARSAL_JOBS 里）。
 release-rehearsal-cleanup:
   extends: .release-linux
   stage: publish
-  rules: !reference [.release-rehearsal, rules]
-  needs: [smoke-windows, build-macos, docker-build]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_MESSAGE =~ /^chore\(release\): 版本 /'
+      when: always
+      allow_failure: true
+      variables:
+        PEACH_RELEASE_REHEARSAL: "1"
+  needs:
+    - {job: smoke-windows, artifacts: false}
+    - {job: build-macos, artifacts: false}
+    - {job: docker-build, artifacts: false}
   environment:
     name: release
     action: prepare

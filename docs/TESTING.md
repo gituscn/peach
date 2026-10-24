@@ -90,7 +90,7 @@ PR 计划按改动选择前端、vendor、wheel 与浏览器任务，文档 PR �
 
 Python 分片上传完整测试输出；浏览器分片上传 TAP、服务日志及已脱敏网络日志，保留 14 天。npm 审计遇到 high 或 critical 漏洞直接失败；只有临时网络错误最多请求三次，在前两次失败后分别等待 15 与 30 秒，未知响应不当成通过。
 
-GitGud 流水线（`.gitlab-ci.yml`）的 `verify-linux`、`verify-windows`、`verify-macos` 在分支与合并请求上跑改动域加本平台的平台敏感用例：基线是最近一条成功的主线流水线里、作为本提交祖先的那个提交，由 `scripts/ci_scope.py` 判定；先用正式入口跑 `auto --base <基线>`，选域与退回全量的规则同本机 `auto`，再用 `-Focus` 跑 `PLATFORM_TESTS` 里本平台的用例。取不到基线（首次推送、强推、接口不可达）、改了 `.gitlab-ci.yml` 本身，或改动落到必须全量的面时只跑一次全量。版本提交（`chore(release): 版本 X`）的主线流水线是发布演练：`release-verify-*` 三平台各跑一次全量，媒体、构建、冒烟与镜像也都跑，只是不发布；`--ship` 等它全部通过才打标签，标签流水线只构建和发布（[ADR-0121](adr/0121-release-rehearsal-and-atomic-publication.md)）。口径与平台集合的理由见 [ADR-0119](adr/0119-mainline-changed-scope-release-full-suite.md)。
+GitGud 流水线（`.gitlab-ci.yml`）的 `verify-linux`、`verify-windows`、`verify-macos` 在分支与合并请求上跑改动域加本平台的平台敏感用例：基线是最近一条成功的主线流水线里、作为本提交祖先的那个提交，由 `scripts/ci_scope.py` 判定；先用正式入口跑 `auto --base <基线>`，选域与退回全量的规则同本机 `auto`，再用 `-Focus` 跑 `PLATFORM_TESTS` 里本平台的用例。取不到基线（首次推送、强推、接口不可达）、改了 `.gitlab-ci.yml` 本身，或改动落到必须全量的面时只跑一次全量。版本提交（`chore(release): 版本 X`）的主线流水线是发布演练：演练规则把三个平台的验收改成全量，媒体、构建、冒烟与镜像也都跑，只是不发布；`--ship` 等它全部通过才打标签，标签流水线只构建和发布（[ADR-0121](adr/0121-release-rehearsal-and-atomic-publication.md)）。口径与平台集合的理由见 [ADR-0119](adr/0119-mainline-changed-scope-release-full-suite.md)。
 
 Release 在媒体工具编译前核对同 SHA 主线 CI，缓存键绑定媒体工具源码清单与构建脚本，缓存内容同时含二进制和对应源码包；制品与独立开箱验收仍是发布前置。Docker 只在镜像相关主线改动、匹配 PR、版本标签或手动请求时运行，验收后推送同一个本地镜像。版本发布与覆盖升级验收不取消进行中的同目标运行；覆盖升级需明确选择目标版本及完整构建提交。
 
@@ -145,7 +145,7 @@ macOS 按影响域验证：
 
 主检出只按 ADR-0091 只读检查依赖；缺包或检查失败时以 `3` 退出，依赖变更由重启流程执行。找不到 uv、锁文件过期或同步失败也会停止测试。前端依赖与构建仍按上文安装。完成安装和编辑后再启动最终验证；运行中发生改动时，完整批次按下述规则保留未受影响的文件结果。
 
-会起浏览器或整套 vitest 的运行（全量、选中 `test_web_e2e` 或 `test_frontend_build` 的域、含 `frontend/` 选择器的定向调试）先排整机的重负载锁 `%LOCALAPPDATA%\peach-test-locks\test-machine.lock`（macOS/Linux 在 `~/.local/state/peach-test-locks/`），再拿仓库的全量锁。所有工作树、所有会话与本机 GitGud runner 的作业都排这一把：Windows runner 就是开发机，本机测试与 CI 作业叠在一起跑时，固定时限的用例会因负载偶发超时。runner 的构建、冒烟与镜像作业用 `scripts/machine_lock.py` 包一层拿同一把锁；验证作业经测试入口，入口自己拿。
+会起浏览器或整套 vitest 的运行（全量、选中 `test_web_e2e` 或 `test_frontend_build` 的域、含 `frontend/` 选择器的定向调试）先排整机的重负载锁 `%LOCALAPPDATA%\peach-test-locks\test-machine.lock`（macOS/Linux 在 `~/.local/state/peach-test-locks/`），再拿仓库的全量锁。所有工作树、所有会话与本机 GitGud runner 的作业都排这一把：Windows runner 就是开发机，本机测试与 CI 作业叠在一起跑时，固定时限的用例会因负载偶发超时。runner 的构建、冒烟与镜像作业用 `scripts/machine_lock.py` 包一层拿同一把锁；验证作业经测试入口，入口自己拿。本机最多等 `--lock-timeout`（30 分钟），CI 作业（`CI=true`）最多等 60 分钟，排在本机两轮全量后面也等得到。只有已合入这套入口的工作树会排这把锁；还在旧 master 上的工作树要 rebase 之后才参与排队。
 
 全量先单独跑一片秒级检查（`test_runner.GATE_TESTS`：仓库策略、编码、文案终态、上下文预算、源码断言棘轮、复杂度、Python lint、外发代理、仓库整洁与依赖清单，合计约 1 分钟），有一项不过就不起其余分片。
 
