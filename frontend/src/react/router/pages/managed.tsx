@@ -28,6 +28,7 @@ import { managementSkeletonHtml, paintManagementPlaceholder } from '../../../man
 import { routeScrollBehavior, scrollToAnchor } from '../../../ui-kit/anchor-scroll';
 import { isReviewCategory } from '../../review/review';
 import { javLibraryPath, javTab } from '../../jav/jav';
+import { FOLLOW_MANAGE_TABS } from '../../follow-manage/manage-route';
 import { ShellActionsContext, useOpenEpoch } from '../router';
 import type { ManagedOpenProps, ManagedPath, ShellActions } from '../shell-actions';
 
@@ -46,8 +47,6 @@ interface Runtime {
   ledger_read_only_message?: string;
   ledger_writer_origin?: string;
 }
-
-const FOLLOW_MANAGE_TABS = ['list', 'add', 'feeds'];
 
 const readStarted = () => pageOpens > 0;
 /** 壳开始路由没有（`pageOpens` 大于 0）。 */
@@ -105,7 +104,7 @@ async function openProps(path: ManagedPath, run: Run): Promise<object | null> {
   if (path === '/subscriptions') {
     const params = search(), tab = params.get('tab') || '';
     const route = {
-      tab: FOLLOW_MANAGE_TABS.includes(tab) ? tab : 'list',
+      tab: FOLLOW_MANAGE_TABS.find(key => key === tab) || 'list',
       page: Math.max(1, Math.floor(Number(params.get('page'))) || 1),
       sort: params.get('sort') || '', dir: params.get('dir') || '',
     };
@@ -133,6 +132,11 @@ async function openPage(path: ManagedPath, actions: ShellActions, run: Run): Pro
   }
   if (path === '/subscriptions' && search().get('tab') === 'source') {
     shellNavigate('/settings/subscriptions', { replace: true }); return;
+  }
+  if (path === '/subscriptions' && search().get('tab') === 'feeds') {
+    const params = search();
+    params.delete('tab');
+    shellNavigate('/subscriptions' + (params.size ? `?${params}` : ''), { replace: true }); return;
   }
   const stats = document.getElementById('stats');
   if (!stats) return;

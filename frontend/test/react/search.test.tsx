@@ -127,12 +127,12 @@ describe('输入框上的时序', () => {
   it('空搜索推荐显示封面，键盘选择新作打开作品详情', async () => {
     const s = await stage({ recommendations: async () => [{ kind: 'release', label: '订阅新作',
       items: [{ value: 'ABW-101', href: '/works/ABW-101', card: { id: 88, code: 'ABW-101' } }],
-      href: '/subscriptions?tab=feeds', action: '管理订阅',
+      href: '/subscriptions', action: '管理订阅',
     }] });
     await act(async () => s.input.focus());
     await settle();
     expect(s.menu.querySelector('[data-search-option="work"] img')).not.toBeNull();
-    expect(s.menu.querySelector('h3 a')?.getAttribute('href')).toBe('/subscriptions?tab=feeds');
+    expect(s.menu.querySelector('h3 a')?.getAttribute('href')).toBe('/subscriptions');
     await s.key('ArrowDown');
     await s.key('Enter');
     expect(s.actions.openPath).toHaveBeenCalledWith('/works/ABW-101');

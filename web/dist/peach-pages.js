@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "dc5896a3-4b3d-442d-8d1d-89106f5ea16c", e._sentryDebugIdIdentifier = "sentry-dbid-dc5896a3-4b3d-442d-8d1d-89106f5ea16c");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "e620539a-74f9-4769-b048-9b5ceac41412", e._sentryDebugIdIdentifier = "sentry-dbid-e620539a-74f9-4769-b048-9b5ceac41412");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, i, o, s) => {
@@ -20629,6 +20629,7 @@ function dg(e) {
 }
 function fg(e, { drag: t = !1, fade: n = !0, wheel: r = !0, elastic: i = !0, dragIgnore: a = "" } = {}) {
 	if (!e) return;
+	n && (e.dataset.scrollGesture = "");
 	let o = ng.get(e);
 	if (o) return o.options.drag ||= t, o.options.fade ||= n, o.update(), o;
 	let s = {
@@ -20717,7 +20718,7 @@ function fg(e, { drag: t = !1, fade: n = !0, wheel: r = !0, elastic: i = !0, dra
 			b = "", S();
 		},
 		destroy() {
-			c.abort(), D(), cancelAnimationFrame(C), C = 0, A.disconnect(), M.disconnect(), ng.delete(e), e.style.cursor = "", ng.size || (rg?.disconnect(), rg = null);
+			c.abort(), D(), cancelAnimationFrame(C), C = 0, A.disconnect(), M.disconnect(), ng.delete(e), delete e.dataset.scrollGesture, e.style.cursor = "", ng.size || (rg?.disconnect(), rg = null);
 		}
 	};
 	return ng.set(e, ee), rg || (rg = new MutationObserver(() => {
@@ -20738,27 +20739,6 @@ function mg() {
 	}
 	return pg;
 }
-[
-	"[data-stage-side-content]",
-	"[data-stage-scroll]",
-	".tagpickbody",
-	"[data-mix-list]",
-	".playlistpicklist",
-	"[data-player-stats]",
-	".vjs-peach-settings-menu",
-	".ui-geist-scroller-container",
-	".metricstrip",
-	".ui-tastesummaries",
-	".ui-skeletondashstrip",
-	".followpagination",
-	".reviewtabs",
-	".ftablewrap",
-	".ui-board-local-nav",
-	"[data-manage-menu]",
-	".follow-workspace-switch",
-	".fmanagenav",
-	"[role=\"listbox\"]"
-].join(",");
 //#endregion
 //#region src/react/components/use-horizontal-scroller.ts
 function hg(e, t = !0) {
@@ -21575,4 +21555,4 @@ var Kg = document.getElementById("peach-page"), qg = Kg ? Gg[Kg.dataset.page ?? 
 Kg && qg && (0, T.createRoot)(Kg).render(/* @__PURE__ */ (0, z.jsx)(qg, { data: { ...Kg.dataset } }));
 //#endregion
 
-//# debugId=dc5896a3-4b3d-442d-8d1d-89106f5ea16c
+//# debugId=e620539a-74f9-4769-b048-9b5ceac41412

@@ -168,6 +168,21 @@ export async function visit(browser: Browser, path: string, viewport: Viewport,
 /* 越界名单只报根因：页面一旦被撑宽，移动视口跟着变宽，`fixed` 的顶栏、Toast 会一起
  * 伸出去，按文档顺序截前几个就只剩这些症状。所以跳过 `fixed` 及其后代，并且只留
  * 父元素自己没越界的那一层。 */
+/** 检查实际可滚动的区域是否由统一滑块或横向手势接管。 */
+export async function unmanagedScrollers(page: Page): Promise<string[]> {
+  return page.evaluate(() => [...document.querySelectorAll<HTMLElement>('body *')].flatMap(node => {
+    if (!(node instanceof HTMLElement) || node.closest('.ovtrack,.ui-ov-edges,[data-skeleton],[inert]')) return [];
+    const style = getComputedStyle(node), box = node.getBoundingClientRect();
+    if (!box.width || !box.height || style.visibility === 'hidden' || style.display === 'none') return [];
+    const vertical = /^(auto|scroll)$/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 1;
+    const horizontal = /^(auto|scroll)$/.test(style.overflowX) && node.scrollWidth > node.clientWidth + 1;
+    if (!vertical && !horizontal) return [];
+    if (node.hasAttribute('data-overlay-scrollbar')) return [];
+    if (!vertical && (node.hasAttribute('data-horizontal-scroll') || node.hasAttribute('data-scroll-gesture'))) return [];
+    return [`${node.tagName.toLowerCase()}${node.id ? '#' + node.id : ''}.${String(node.className).slice(0, 120)}`];
+  }));
+}
+
 export async function layout(page: Page): Promise<Layout> {
   return page.evaluate(() => {
     const width = document.documentElement.clientWidth;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Browser } from 'playwright-core';
 import { configurationBody, expectBody, layout, settle, visit, VIEWPORTS } from './harness.ts';
-import { installDesignBrowser, openActivity, openFollowManage, settledRun } from './design-fixture.ts';
+import { followCredential, installDesignBrowser, openActivity, openFollowManage, settledRun } from './design-fixture.ts';
 import { openHome, openPanel, PANEL } from './settings-fixture.ts';
 
 describe('设计决定：配置控件', () => {
@@ -11,6 +11,102 @@ describe('设计决定：配置控件', () => {
   installDesignBrowser((next) => { browser = next; });
 
   for (const viewport of VIEWPORTS) {
+    it(`来源菜单适应长选项并受视口宽度约束（${viewport.name}）`, async () => {
+      const opened = await openFollowManage(browser, viewport);
+      try {
+        const { page } = opened;
+        for (const name of ['Rule34 Paheal / SubscribeStar.adult',
+          'https://www.subscribestar.adult/creators/a-long-creator-display-name-without-spaces']) {
+          await page.route('**/api/follow/credentials', route => route.fulfill({ json: {
+            root: '', providers: [followCredential(name, 'none', false, [])],
+          } }));
+          await page.goto(new URL('/subscriptions?tab=add', page.url()).href, { waitUntil: 'load' });
+          await page.getByRole('button', { name: '全部来源', exact: true }).click();
+          const menu = page.getByRole('dialog', { name: '来源筛选', exact: true });
+          assert.equal(await menu.getByRole('checkbox', { name, exact: true }).count(), 1);
+          const fit = await menu.evaluate(element => {
+            const label = element.querySelector('label')!;
+            const box = element.getBoundingClientRect();
+            return { right: box.right, left: box.left, width: box.width, viewport: innerWidth,
+              scroll: label.scrollWidth, client: label.clientWidth, content: element.scrollWidth, frame: element.clientWidth };
+          });
+          assert.ok(fit.left >= 0 && fit.right <= fit.viewport, JSON.stringify(fit));
+          assert.ok(fit.scroll <= fit.client + 1 && fit.content <= fit.frame + 1, JSON.stringify(fit));
+          if (viewport.width > 1000) assert.ok(fit.width > 203, '长选项应撑开菜单');
+          await page.keyboard.press('Escape');
+        }
+        assert.deepEqual((await layout(page)).offenders, []);
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close(); }
+    });
+
+    it(`来源筛选短操作紧邻排列，选项靠近触发器（${viewport.name}）`, async () => {
+      const opened = await openFollowManage(browser, viewport);
+      try {
+        const { page } = opened;
+        await page.getByRole('tab', { name: '添加关注', exact: true }).click();
+        await page.getByRole('button', { name: '全部来源', exact: true }).click();
+        const dialog = page.getByRole('dialog', { name: '来源筛选', exact: true });
+        const geometry = await dialog.evaluate(element => {
+          const actions = element.querySelector('[data-selection-actions]')!;
+          const buttons = [...actions.querySelectorAll('button,a')].map(node => {
+            const box = node.getBoundingClientRect();
+            return { top: box.top, bottom: box.bottom, center: box.top + box.height / 2, left: box.left, right: box.right, width: box.width,
+              scrollWidth: node.scrollWidth, clientWidth: node.clientWidth };
+          });
+          const options = element.querySelector('[data-selection-options]')!.getBoundingClientRect();
+          const optionWidths = [...element.querySelectorAll('label')].map(label =>
+            label.lastElementChild!.getBoundingClientRect().right - label.getBoundingClientRect().left);
+          const actionWidth = buttons.reduce((sum, button) => sum + button.width, 0)
+            + Math.max(0, buttons.length - 1) * parseFloat(getComputedStyle(actions).columnGap);
+          return { actions: buttons, width: actions.getBoundingClientRect().width,
+            contentWidth: element.getBoundingClientRect().width, naturalWidth: Math.max(actionWidth, ...optionWidths),
+            placement: element.getAttribute('data-selection-placement'), optionTop: options.top, optionBottom: options.bottom,
+            right: element.getBoundingClientRect().right, viewport: innerWidth };
+        });
+        assert.equal(geometry.actions.length, 3);
+        assert.ok(Math.abs(geometry.contentWidth - geometry.naturalWidth) <= 1, '菜单跟随选项和操作行中较宽的一组');
+        assert.ok(geometry.actions.every(action => Math.abs(action.center - geometry.actions[0]!.center) <= 1));
+        assert.ok(geometry.actions.every(action => (geometry.placement === 'top'
+          ? action.bottom <= geometry.optionTop : action.top >= geometry.optionBottom) && action.width < geometry.width));
+        assert.ok(geometry.actions[2]!.left - geometry.actions[1]!.right <= 9, '凭据链接紧邻全不选');
+        assert.ok(geometry.actions.every(action => action.scrollWidth <= action.clientWidth + 1));
+        assert.ok(geometry.right <= geometry.viewport);
+        assert.equal(await dialog.getByRole('link', { name: '凭据设置', exact: true }).count(), 1);
+        assert.equal(await dialog.getByRole('link', { name: '凭据设置', exact: true }).getAttribute('href'), '/settings/subscriptions');
+        assert.equal(await dialog.getByRole('link', { name: '凭据设置', exact: true }).locator('svg').count(), 1);
+        await dialog.getByRole('button', { name: '全不选', exact: true }).click();
+        assert.equal(await dialog.getByRole('checkbox', { checked: true }).count(), 0);
+        await dialog.getByRole('button', { name: '全选', exact: true }).click();
+        assert.equal(await dialog.getByRole('checkbox', { checked: false }).count(), 0);
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close(); }
+    });
+
+    it(`多选菜单随视口空间翻转，键盘顺序与选项位置一致（${viewport.name}）`, async () => {
+      const opened = await openFollowManage(browser, viewport);
+      try {
+        const { page } = opened;
+        await page.setViewportSize({ width: viewport.width, height: 1200 });
+        await page.getByRole('tab', { name: '添加关注', exact: true }).click();
+        const trigger = page.getByRole('button', { name: '全部来源', exact: true });
+        await trigger.click();
+        const dialog = page.getByRole('dialog', { name: '来源筛选', exact: true });
+        await page.waitForFunction(() => document.querySelector('[data-selection-placement]')?.getAttribute('data-selection-placement') === 'bottom');
+        assert.equal(await dialog.locator('button,a,input').first().getAttribute('type'), 'checkbox');
+        await page.setViewportSize({ width: viewport.width, height: 480 });
+        await page.waitForFunction(() => document.querySelector('[data-selection-placement]')?.getAttribute('data-selection-placement') === 'top');
+        assert.equal(await dialog.locator('button,a,input').first().innerText(), '全选');
+        const ordered = await dialog.evaluate(element => {
+          const actions = element.querySelector('[data-selection-actions]')!.getBoundingClientRect();
+          const options = element.querySelector('[data-selection-options]')!.getBoundingClientRect();
+          return actions.bottom <= options.top;
+        });
+        assert.ok(ordered);
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close(); }
+    });
+
     it(`关注管理集合和跨页管理导航保留滑动层与减少动态效果（${viewport.name}）`, { timeout: 60_000 }, async () => {
       const opened = await openFollowManage(browser, viewport);
       try {
@@ -31,8 +127,8 @@ describe('设计决定：配置控件', () => {
         assert.equal(await original.evaluate((node) => node.isConnected), true);
         assert.match(await surface.evaluate((node) => getComputedStyle(node).transitionDuration), /0.3s/);
         await tabs.getByRole('tab', { name: '添加关注', exact: true }).press('ArrowRight');
-        await tabs.getByRole('tab', { name: 'JAV 订阅源', selected: true }).waitFor();
-        assert.equal(await tabs.getByRole('tab').count(), 3);
+        await tabs.getByRole('tab', { name: '关注列表', selected: true }).waitFor();
+        assert.equal(await tabs.getByRole('tab').count(), 2);
         assert.equal(await surface.count(), 1);
         await page.emulateMedia({ reducedMotion: 'reduce' });
         assert.equal(await surface.evaluate((node) => getComputedStyle(node).transitionDuration), '0s');

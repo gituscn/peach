@@ -113,7 +113,8 @@ describe('关注域地址与会话控制', () => {
 
   it('管理页非法页码和页签归默认，重新进入保持页签并清排序', () => {
     expect(followManageParams('?page=-4&tab=invalid')).toEqual({ tab: 'list', page: 1, sort: '', dir: '' });
-    expect(followManageParams('?page=3.9&tab=feeds&sort=added&dir=asc')).toEqual({ tab: 'feeds', page: 3, sort: 'added', dir: 'asc' });
+    expect(followManageParams('?page=3.9&tab=feeds&sort=added&dir=asc')).toEqual({ tab: 'list', page: 3, sort: 'added', dir: 'asc' });
+    expect(followManageEntry('?tab=feeds')).toBe('/subscriptions');
     expect(followManagePath({ tab: 'list', page: 1, sort: '', dir: '' })).toBe('/subscriptions');
     expect(followManageEntry('?tab=wants&page=4&sort=x')).toBe('/jav?tab=wants');
     expect(followManageEntry('?tab=wants', 'add')).toBe('/subscriptions?tab=add');

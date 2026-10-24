@@ -125,7 +125,7 @@ describe('浏览器添加 JAV 设置', () => {
     });
   }
 
-  it('安装状态随桥接回报切换，未知来源消息不改变检测结果', async () => {
+  it('桥接页延迟加载仍能检测脚本，未知来源消息不改变检测结果', async () => {
     const opened = await visit(browser, '/settings/library?section=' + encodeURIComponent('下载渠道'), VIEWPORTS[0]!);
     const { page } = opened;
     try {
@@ -135,6 +135,7 @@ describe('浏览器添加 JAV 设置', () => {
       } }));
       let installed = true;
       await page.route('**/integrations/peach-userscript-bridge', async route => {
+        if (installed) await new Promise(resolve => setTimeout(resolve, 3500));
         await route.fulfill({ contentType: 'text/html', body: '<!doctype html><meta name="peach-userscript-bridge" content="1">'
           + (installed ? '<script>window.GM_getValue=(key,fallback)=>({"peach.jav.base":location.origin,"peach.jav.token":"test-only-stored-token"})[key]??fallback;</script><script>'
             + SCRIPT.replaceAll('</script', '<\\/script') + '</script>' : '') });
@@ -155,6 +156,9 @@ describe('浏览器添加 JAV 设置', () => {
         version: '9.0.0', paired: true, nonce: crypto.randomUUID() }, location.origin));
       assert.equal(await connection.getByText('未检测到', { exact: true }).count(), 1);
       assert.equal(await region.getByRole('link', { name: '安装 Peach 用户脚本' }).count(), 1);
+      assert.ok((await region.innerText()).includes('允许用户脚本'));
+      assert.equal(await region.getByRole('link', { name: 'Tampermonkey 权限设置说明' }).getAttribute('href'),
+        'https://www.tampermonkey.net/faq.php#Q209');
       assert.deepEqual(opened.problems, []);
     } finally { await opened.close(); }
   });

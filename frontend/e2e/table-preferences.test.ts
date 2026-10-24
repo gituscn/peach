@@ -60,7 +60,7 @@ describe('所有数据表共用列设置', () => {
           entity_id: null, enabled: true, interval_minutes: 360, last_fetched_at: null, last_new_count: 0,
         }] } }));
         await page.reload({ waitUntil: 'load' });
-        await page.getByRole('tab', { name: 'JAV 订阅源', exact: true }).click();
+        await page.getByRole('tab', { name: '关注列表', exact: true }).waitFor();
         const table = page.getByRole('grid', { name: 'JAV 订阅源', exact: true });
         await visibleSelectAll(table);
         assert.equal(await table.locator('tbody img[src="/site-mark?source=javdb"]').count(), 1);

@@ -1,7 +1,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "78aa664a-ede9-4231-94fa-85a243e03341", e._sentryDebugIdIdentifier = "sentry-dbid-78aa664a-ede9-4231-94fa-85a243e03341");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "118216ca-ab99-4780-8f19-330738fb230a", e._sentryDebugIdIdentifier = "sentry-dbid-118216ca-ab99-4780-8f19-330738fb230a");
 	} catch {}
 })();
 import { $2ec61d1d4f780267$export$a8a3e93435678ff9 as e, $3a442827418ebe87$export$eb2fcfdbd7ba97d4 as t, $542a13ca2fa5b484$export$5b6b19405a83ff9d as n, $72abaeab4d80592f$export$78efe591171d7d45 as r, $bd263d78e9bf3c56$export$f5c9f3c2c4054eec as i, $ea3928288112382f$export$439d29a4e110a164 as a, $f2ff30fde7b014be$export$3ddf2d174ce01153 as o, $fe21c36db05242bb$export$a98f0dcb43a68a25 as s, $fe21c36db05242bb$export$d7b12c4107be0d61 as c, ACCENT_CHOICES as l, ApiError as u, Button as d, ButtonLink as f, CLOUD_LOCATIONS as p, CLOUD_PROXY_HELP as m, CONFIGURATION_KEY as h, CONFIGURATION_URL as g, CREDENTIAL_STATE as _, Checkbox as v, Chip as y, Disclosure as b, ENTRY_LINKS_HELP as x, ENTRY_LINKS_HINT as S, EmptyState as ee, ErrorText as C, ExternalLink as w, FEED_SCHEDULE_KEY as T, FOLLOW_CREDENTIALS_KEY as E, FOLLOW_INITIAL_RANGE_OPTIONS as te, FOLLOW_SCHEDULE_KEY as ne, Fact as D, FactList as O, FieldLabel as k, Footer as A, Help as j, HintText as re, Input as M, LIBRARY_FOLDER_HELP as ie, LIBRARY_PROCESSING_KEY as ae, Label as oe, LinkButton as se, LoadingDots as ce, M6 as le, MEDIA_PROCESSING_KEY as ue, MEDIA_PROCESSING_URL as de, MEDIA_SOURCE_ICONS as fe, MENU_POPOVER_SURFACE as pe, Note as N, PICK_FOLDER_URL as me, POLICY_COLUMNS as he, POLICY_COVER_NOTE as ge, POLICY_MATRIX as _e, POLICY_SUMMARY as ve, PathLine as ye, PillTabList as be, Progress as xe, Rows as P, SEGMENT as Se, SEGMENTED_TRACK as Ce, SETTINGS_KEY as we, SETTINGS_URL as Te, Section as F, SectionSkeleton as Ee, SegmentedRadioGroup as De, Select as Oe, Select$1 as I, SelectItem as L, SettingsCard as ke, SettingsRow as R, SiteLabel as Ae, SourceLabel as z, SourceMark as je, Stack as B, StatusLabel as V, Switch as H, THUMBNAIL_JOBS_KEY as Me, TextField as Ne, TextFieldContext as Pe, __toESM as Fe, apiGet as U, apiSend as W, appSettingsStore as Ie, boundedPreference as Le, busyProps as G, cardClass as Re, cloudProxySkeleton as ze, cn as Be, confirmModal as Ve, credentialDone as He, credentialsSkeleton as Ue, cx as We, errorMessage as K, fetchConfiguration as Ge, fetchCredentials as Ke, fetchFeedSchedule as qe, fetchFollowSchedule as Je, fetchMediaProcessing as Ye, fetchSettings as Xe, fetchThumbnailJobs as Ze, fmtSize as Qe, indexersSkeleton as $e, javBrowserSkeleton as et, momentText as tt, overlayHost as nt, peachHistory$1 as rt, previewLibraryColor as it, providerIcon as at, queryClient as q, randomId as ot, rememberShape as J, require_jsx_runtime as st, require_react as ct, saveCredential as lt, schedulePollInterval as ut, settingsPath as dt, shellNavigate as ft, sortCx as pt, sourceDefaultCost as mt, useAction as Y, useLibraryTints as ht, useMutation as gt, useQuery as X, useRunSchedule as _t, useSaveFollowSchedule as vt, useSaveSettings as yt, useSaveThumbnailMode as bt } from "./peach-app.js";
@@ -25,21 +25,23 @@ function Q(e) {
 function Ft() {
 	let e = (0, Z.useRef)(null), [t, n] = (0, Z.useState)(0), [r, i] = (0, Z.useState)("checking");
 	return (0, Z.useEffect)(() => {
-		let t = ot(), n = !1, r = () => e.current?.contentWindow?.postMessage({
+		let t = ot(), n = !1, r = e.current, a, o = () => {
+			n = !0, clearInterval(u), i("missing");
+		}, s = () => {
+			n || (clearTimeout(a), a = setTimeout(o, 3e3), c());
+		}, c = () => e.current?.contentWindow?.postMessage({
 			type: "peach-userscript:probe",
 			nonce: t
-		}, window.location.origin), a = (r) => {
-			!n && r.source === e.current?.contentWindow && r.origin === window.location.origin && r.data?.type === "peach-userscript:ready" && r.data.nonce === t && r.data.protocol === 1 && typeof r.data.version == "string" && /^\d{1,5}\.\d{1,5}\.\d{1,5}$/.test(r.data.version) && typeof r.data.paired == "boolean" && (n = !0, clearInterval(o), clearTimeout(s), i({
+		}, window.location.origin), l = (r) => {
+			!n && r.source === e.current?.contentWindow && r.origin === window.location.origin && r.data?.type === "peach-userscript:ready" && r.data.nonce === t && r.data.protocol === 1 && typeof r.data.version == "string" && /^\d{1,5}\.\d{1,5}\.\d{1,5}$/.test(r.data.version) && typeof r.data.paired == "boolean" && (n = !0, clearInterval(u), clearTimeout(a), i({
 				version: r.data.version,
 				paired: r.data.paired
 			}));
 		};
-		window.addEventListener("message", a);
-		let o = setInterval(r, 250), s = setTimeout(() => {
-			n = !0, clearInterval(o), i("missing");
-		}, 3e3);
-		return r(), () => {
-			clearInterval(o), clearTimeout(s), window.removeEventListener("message", a);
+		window.addEventListener("message", l);
+		let u = setInterval(c, 250);
+		return a = setTimeout(o, 15e3), r?.addEventListener("load", s), r?.contentDocument?.readyState === "complete" && r.contentDocument.URL !== "about:blank" && s(), c(), () => {
+			clearInterval(u), clearTimeout(a), r?.removeEventListener("load", s), window.removeEventListener("message", l);
 		};
 	}, [t]), {
 		frame: e,
@@ -100,20 +102,27 @@ function Lt({ enabled: e, release: t }) {
 			}),
 			/* @__PURE__ */ (0, $.jsx)("p", {
 				className: "text-caption-1-regular text-text-secondary",
-				children: i === "checking" ? "正在检测当前浏览器的用户脚本。" : i === "missing" ? "安装或启用脚本后重新检测；旧版脚本需要更新后才能检测。" : s ? `请更新至 v${t.minimum_version} 或更高版本。` : i.paired ? e ? "可在支持的站点直接加入 Peach 馆藏。" : "启用浏览器添加后，可在支持的站点直接加入 Peach 馆藏。" : "生成令牌后复制配对信息，在用户脚本设置中粘贴并保存。"
+				children: i === "checking" ? "正在检测当前浏览器的用户脚本。" : i === "missing" ? "确认脚本已启用并更新至最新版。Chrome 还需在 Tampermonkey 扩展详情中开启「允许用户脚本」或开发者模式，并允许访问当前 Peach 站点；刷新页面后重新检测。" : s ? `请更新至 v${t.minimum_version} 或更高版本。` : i.paired ? e ? "可在支持的站点直接加入 Peach 馆藏。" : "启用浏览器添加后，可在支持的站点直接加入 Peach 馆藏。" : "生成令牌后复制配对信息，在用户脚本设置中粘贴并保存。"
 			}),
 			/* @__PURE__ */ (0, $.jsxs)("div", {
 				className: "flex flex-wrap items-center gap-2",
-				children: [i === "missing" || s ? /* @__PURE__ */ (0, $.jsx)(w, {
-					href: t.install_url,
-					children: s ? "更新用户脚本" : "安装 Peach 用户脚本"
-				}) : null, /* @__PURE__ */ (0, $.jsx)(d, {
-					variant: "secondary",
-					type: "button",
-					...G(i === "checking"),
-					onClick: a,
-					children: "重新检测"
-				})]
+				children: [
+					i === "missing" || s ? /* @__PURE__ */ (0, $.jsx)(w, {
+						href: t.install_url,
+						children: s ? "更新用户脚本" : "安装 Peach 用户脚本"
+					}) : null,
+					i === "missing" ? /* @__PURE__ */ (0, $.jsx)(w, {
+						href: "https://www.tampermonkey.net/faq.php#Q209",
+						children: "Tampermonkey 权限设置说明"
+					}) : null,
+					/* @__PURE__ */ (0, $.jsx)(d, {
+						variant: "secondary",
+						type: "button",
+						...G(i === "checking"),
+						onClick: a,
+						children: "重新检测"
+					})
+				]
 			})
 		]
 	})] });
@@ -4036,4 +4045,4 @@ function Jr({ data: e, receipt: t, reopenTutorial: n, section: r, diagnostics: i
 //#endregion
 export { Kr as ConfigurationPage };
 
-//# debugId=78aa664a-ede9-4231-94fa-85a243e03341
+//# debugId=118216ca-ab99-4780-8f19-330738fb230a

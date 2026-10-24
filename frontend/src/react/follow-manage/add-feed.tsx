@@ -19,6 +19,7 @@ import { busyProps, useAction } from '../settings/use-action';
 import { followFeedByName, lookupFeedActor, type FeedCandidate, type FeedLookup } from './follow-manage';
 
 const PLACEHOLDER = '输入女优名，到 JavDB 找她的演员页';
+const TITLE = '添加 JAV 订阅';
 
 export interface AddFeedProps {
   readOnly: boolean;
@@ -93,8 +94,8 @@ export function AddFeed({ readOnly, toast, onAdded }: AddFeedProps) {
 
   return (
     /* 和「添加关注」那一块同一个形：一张填充卡，标题在卡里。 */
-    <div className={cardClass({ padding: 'none', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })}>
-      <h3 className="text-title-2-medium text-text-primary">添加 JAV 订阅</h3>
+    <section aria-label={TITLE} className={cardClass({ padding: 'none', className: 'flex flex-col gap-4 px-6 py-5 max-sm:px-4' })}>
+      <h3 className="text-title-2-medium text-text-primary">{TITLE}</h3>
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-64 grow">
           <Input aria-label="女优名" placeholder={PLACEHOLDER} value={name} leadingIcon={RiSearchLine}
@@ -129,6 +130,6 @@ export function AddFeed({ readOnly, toast, onAdded }: AddFeedProps) {
           </div>
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }

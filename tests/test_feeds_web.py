@@ -396,6 +396,25 @@ class FeedWebTest(FeedWebFixture):
         self.assertEqual((row["last_error"], row["name"], row["page_name"]),
                          (None, "森日向子", "白石アイリ"))
 
+    def test_login_page_keeps_discoveries_and_reports_cookie_action(self):
+        self._add()
+        self._check()
+        before = dispatch_api_get(self.contract, "/api/feeds/discoveries", {})["items"]
+        login = "<title>登入 | JavDB</title>".encode("utf-8")
+        self.transport.responses[self.url] = HttpResponse(200, {}, login, self.url)
+        report = self._check()["results"][0]
+        self.assertFalse(report["ok"])
+        self.assertIn("Cookie", report["error"])
+        [row] = dispatch_api_get(self.contract, "/api/feeds", {})["sources"]
+        self.assertEqual(row["last_error"], report["error"])
+        self.assertIsNotNone(row["next_fetch_at"])
+        after = dispatch_api_get(self.contract, "/api/feeds/discoveries", {})["items"]
+        self.assertEqual([item["code"] for item in after], [item["code"] for item in before])
+        self.transport.responses[self.url] = HttpResponse(200, {}, SAMPLE.encode("utf-8"), self.url)
+        self.assertTrue(self._check()["results"][0]["ok"])
+        [recovered] = dispatch_api_get(self.contract, "/api/feeds", {})["sources"]
+        self.assertIsNone(recovered["last_error"])
+
     def test_read_and_ignore_are_separate_and_idempotent(self):
         self._add()
         self._check()

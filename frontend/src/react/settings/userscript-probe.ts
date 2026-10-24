@@ -12,6 +12,19 @@ export function useUserscriptProbe() {
   useEffect(() => {
     const nonce = randomId();
     let settled = false;
+    const bridge = frame.current;
+    let timeout: ReturnType<typeof setTimeout>;
+    const missing = () => {
+      settled = true;
+      clearInterval(interval);
+      setStatus('missing');
+    };
+    const loaded = () => {
+      if (settled) return;
+      clearTimeout(timeout);
+      timeout = setTimeout(missing, 3000);
+      probe();
+    };
     const probe = () => frame.current?.contentWindow?.postMessage({ type: 'peach-userscript:probe', nonce }, window.location.origin);
     const receive = (event: MessageEvent) => {
       if (settled || event.source !== frame.current?.contentWindow || event.origin !== window.location.origin
@@ -25,15 +38,16 @@ export function useUserscriptProbe() {
     };
     window.addEventListener('message', receive);
     const interval = setInterval(probe, 250);
-    const timeout = setTimeout(() => {
-      settled = true;
-      clearInterval(interval);
-      setStatus('missing');
-    }, 3000);
+    // 桥接文档加载与脚本回报分别计时，加载过程也有终止期限。
+    timeout = setTimeout(missing, 15000);
+    bridge?.addEventListener('load', loaded);
+    if (bridge?.contentDocument?.readyState === 'complete'
+      && bridge.contentDocument.URL !== 'about:blank') loaded();
     probe();
     return () => {
       clearInterval(interval);
       clearTimeout(timeout);
+      bridge?.removeEventListener('load', loaded);
       window.removeEventListener('message', receive);
     };
   }, [attempt]);

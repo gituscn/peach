@@ -164,7 +164,7 @@ export function problemDestination(run: TaskRunPayload, latest = true): { href: 
     // 「需要处理」不收这里的可重试项：问题清单有几百项，先看清单再在那张卡上重试。
     'library-processing': ['/data-cleanup#libraryProcessing', '查看未完成项'],
     'follow-check': ['/subscriptions', '查看关注来源'],
-    'feed-check': ['/subscriptions?tab=feeds', '查看订阅源'],
+    'feed-check': ['/subscriptions', '查看订阅源'],
     'follow-resolve': ['/subscriptions?tab=add', '查看来源查找'],
     'resource-scan': ['/data-cleanup#resource-sync', '查看资源同步'],
     'resource-apply': ['/data-cleanup#resource-sync', '查看资源同步'],

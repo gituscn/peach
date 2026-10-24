@@ -18,7 +18,7 @@ export {
 export { gateSweep, releaseSweep } from './sweep-gate';
 export {
   cancelGlide, glideEase, moveGlidePane, rubberBand, scrollerHtml, stopAutoScroll, wireAutoScroll, wireHorizontalScroller,
-  wireOverlayScrollbars, wireScrollers,
+  observeScrollRegions, wireOverlayScrollbars, wireScrollers,
 } from './scroll';
 export {
   dialSliderHtml, iconSwitchHtml, setActionBusy, wireBusyActions, wireContextCard, wireDialSlider, wireDragReorder,

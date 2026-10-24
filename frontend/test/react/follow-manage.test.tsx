@@ -171,7 +171,7 @@ const shellProps = (over: Partial<Props> = {}): Props => ({
 async function open(plan: Plan = {}, over: Partial<Props> = {}) {
   const fetcher = serve(plan);
   const props = shellProps(over);
-  await prefetchFollowManage(new AbortController().signal, props.tab).catch(() => {});
+  await prefetchFollowManage(new AbortController().signal).catch(() => {});
   const mounted = await mountRoot(
     <QueryClientProvider client={queryClient}>{over.tab === 'source'
       ? <Credentials data={plan.creds || credentials()} readOnly={props.readOnly} toast={props.toast} />
@@ -694,7 +694,7 @@ it('一条来源都没有时说清这里会显示什么', async () => {
 
 it('关注列表空状态直接切换添加页签并保留页面宿主', async () => {
   const { host, props } = await open({ data: follow({ sources: [] }) });
-  const empty = host.querySelector('[data-empty-state]')!;
+  const empty = [...host.querySelectorAll('[data-empty-state]')].find(node => node.textContent?.includes('还没有关注来源'))!;
   const overview = host.querySelector('[aria-label="关注概览"]');
   const button = buttonNamed('添加关注', empty);
   expect(button).not.toBeNull();
@@ -712,7 +712,7 @@ it('关注列表空状态直接切换添加页签并保留页面宿主', async (
 it('各栏按做事的先后排，缺凭据的数挂在最后一栏上', async () => {
   const { host } = await open({ creds: { root: 'C:\\creds', providers: [credential({ provider: 'fanbox' })] } });
   expect([...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent))
-    .toEqual(['关注列表', '添加关注', 'JAV 订阅源']);
+    .toEqual(['关注列表', '添加关注']);
   expect(linkNamed('来源与订阅设置（1）', host)?.getAttribute('href')).toBe('/settings/subscriptions');
 });
 
@@ -756,10 +756,10 @@ function stubConfirm(accept: boolean) {
   return { asked, outcomes };
 }
 
-it('地址栏指着订阅源时首屏就带着清单，开关、移除与立即拉取都落到订阅源的接口上', async () => {
+it('关注列表首屏带着订阅源清单，开关、移除与立即拉取都落到订阅源的接口上', async () => {
   stubConfirm(true);
-  const { host, fetcher } = await open({ feeds: FEEDS }, { tab: 'feeds' });
-  expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('JAV 订阅源');
+  const { host, fetcher } = await open({ feeds: FEEDS }, { tab: 'list' });
+  expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('关注列表');
   expect([...host.querySelectorAll('[role="columnheader"]:not([data-table-space])')].map((cell) => cell.textContent?.trim()))
     .toEqual(['', '名称', '类型', '来源', '状态', '频率', '上次拉取', '上次新增', '操作']);
   const first = checkboxNamed(host, '选择 甲 的新作')!.closest('[role="row"]')!;
@@ -801,7 +801,7 @@ it('同一个人的两页各一行，旧艺名那页在名字旁写出站上的�
   });
   const { host } = await open({ feeds: { unread: 81, sources: [
     page(3, '白石アイリ'), page(4, '森日向子'), page(2, '涼森玲夢, 涼森れむ', '凉森玲梦', 7746),
-  ] } }, { tab: 'feeds' });
+  ] } }, { tab: 'list' });
   const names = [...host.querySelectorAll('[role="rowheader"]')].map(shown);
   // 只有一行的人不写页名：站上标题栏那串写法摆出来只是噪音。
   expect(names).toEqual(['森日向子白石アイリ', '森日向子', '凉森玲梦']);
@@ -810,7 +810,7 @@ it('同一个人的两页各一行，旧艺名那页在名字旁写出站上的�
 });
 
 it('订阅源表里点一行的空白处就是选这一行，选中了底部浮出批量操作，暂停逐条写到订阅源接口', async () => {
-  const { host, fetcher } = await open({ feeds: FEEDS }, { tab: 'feeds' });
+  const { host, fetcher } = await open({ feeds: FEEDS }, { tab: 'list' });
   const row = () => checkboxNamed(host, '选择 乙 的新作')!.closest('[role="row"]')!;
   const blank = () => [...row().querySelectorAll('[role="rowheader"],[role="gridcell"]')]
     .find((cell) => cell.textContent?.trim() === '每 30 分钟')!;
@@ -836,7 +836,7 @@ it('订阅源表里点一行的空白处就是选这一行，选中了底部浮�
 
 it('批量移除先弹确认并说清条数，确认后逐条移除、Toast 报条数', async () => {
   const { asked, outcomes } = stubConfirm(true);
-  const { host, fetcher, props } = await open({ feeds: FEEDS }, { tab: 'feeds' });
+  const { host, fetcher, props } = await open({ feeds: FEEDS }, { tab: 'list' });
   await click(checkboxNamed(host, '选择 甲 的新作'));
   await click(checkboxNamed(host, '选择 乙 的新作'));
   await click([...host.querySelectorAll('[data-selection-dock] button')].find((b) => b.textContent === '移除'));
@@ -849,7 +849,7 @@ it('批量移除先弹确认并说清条数，确认后逐条移除、Toast 报�
 
 it('点移除先弹确认：标题与主按钮同一个动词，正文点名这条源，取消就什么都不发', async () => {
   const { asked } = stubConfirm(false);
-  const { host, fetcher, props } = await open({ feeds: FEEDS }, { tab: 'feeds' });
+  const { host, fetcher, props } = await open({ feeds: FEEDS }, { tab: 'list' });
   await click(buttonLabelled(host, '移除 甲 的新作'));
   await settle();
   expect(asked).toHaveLength(1);
@@ -863,7 +863,7 @@ it('点移除先弹确认：标题与主按钮同一个动词，正文点名这�
 
 it('确认移除后才写入，Toast 与主按钮同一个动词并点名这条源，清单随后重取', async () => {
   const { outcomes } = stubConfirm(true);
-  const { host, fetcher, props } = await open({ feeds: FEEDS }, { tab: 'feeds' });
+  const { host, fetcher, props } = await open({ feeds: FEEDS }, { tab: 'list' });
   const before = feedReads(fetcher);
   await click(buttonLabelled(host, '移除 甲 的新作'));
   expect(await outcomes[0]).toBeNull();
@@ -876,7 +876,7 @@ it('确认移除后才写入，Toast 与主按钮同一个动词并点名这条�
 it('移除被服务端挡回时把原因交给弹层，不发 Toast、不重取清单', async () => {
   const { outcomes } = stubConfirm(true);
   const { host, fetcher, props } = await open(
-    { feeds: FEEDS, feedWrite: () => refuse('订阅源正在拉取') }, { tab: 'feeds' });
+    { feeds: FEEDS, feedWrite: () => refuse('订阅源正在拉取') }, { tab: 'list' });
   const before = feedReads(fetcher);
   await click(buttonLabelled(host, '移除 甲 的新作'));
   expect(await outcomes[0]).toBe('订阅源正在拉取');
@@ -886,14 +886,17 @@ it('移除被服务端挡回时把原因交给弹层，不发 Toast、不重取�
   expect(feedReads(fetcher)).toBe(before);
 });
 
-it('订阅源页签不收地址，只读的这台查找、开关、移除与拉取都停用', async () => {
-  const { host } = await open({ feeds: FEEDS }, { tab: 'feeds', readOnly: true });
+it('只读订阅管理的查找、开关、移除与拉取都停用', async () => {
+  const { host, unmount } = await open({ feeds: FEEDS }, { tab: 'list', readOnly: true });
   expect(host.querySelector('input[type="url"]')).toBeNull();
-  expect(nameField(host).disabled).toBe(true);
-  expect(buttonNamed('查找', host)?.disabled).toBe(true);
   expect(buttonNamed('立即拉取', host)?.disabled).toBe(true);
   expect(buttonLabelled(host, '移除 甲 的新作')?.disabled).toBe(true);
   expect(host.querySelector<HTMLInputElement>('input[aria-label="启用 甲 的新作"]')?.disabled).toBe(true);
+  await unmount();
+  queryClient.clear();
+  const add = await open({}, { tab: 'add', readOnly: true });
+  expect(nameField(add.host).disabled).toBe(true);
+  expect(buttonNamed('查找', actorPanel(add.host))?.disabled).toBe(true);
 });
 
 /** 刚好铺满两页的订阅源：每页 20 条起，第二页只剩一条。 */
@@ -902,7 +905,7 @@ const twoPagesOfFeeds = (unread = 0) => ({ unread, sources: Array.from({ length:
 })) });
 
 it('JAV 订阅分页保留跨页选择', FULL_PAGE, async () => {
-  const { host } = await open({ feeds: twoPagesOfFeeds() }, { tab: 'feeds' });
+  const { host } = await open({ feeds: twoPagesOfFeeds() }, { tab: 'list' });
   const rows = () => host.querySelectorAll('[role="row"][data-key]');
   expect(rows()).toHaveLength(20);
   expect(host.textContent).toContain('1–20 / 21 个订阅源');
@@ -920,7 +923,7 @@ it('JAV 订阅分页保留跨页选择', FULL_PAGE, async () => {
 it('JAV 订阅频率按分钟数对全集排序并回到首页', FULL_PAGE, async () => {
   const feeds = twoPagesOfFeeds();
   feeds.sources = feeds.sources.map((source, index) => ({ ...source, interval_minutes: (21 - index) * 15 }));
-  const { host } = await open({ feeds }, { tab: 'feeds' });
+  const { host } = await open({ feeds }, { tab: 'list' });
   await click(checkboxNamed(host, '选择 来源 1'));
   await click(buttonNamed('下一页', host));
   await click(host.querySelector('th[data-key="interval"]'));
@@ -934,7 +937,7 @@ it('JAV 订阅频率按分钟数对全集排序并回到首页', FULL_PAGE, asyn
 });
 
 it('JAV 订阅换页容量回到首页，状态栏照全集计数', FULL_PAGE, async () => {
-  const { host } = await open({ feeds: twoPagesOfFeeds(81) }, { tab: 'feeds' });
+  const { host } = await open({ feeds: twoPagesOfFeeds(81) }, { tab: 'list' });
   await click(buttonNamed('下一页', host));
   await choose(host.querySelector('button[aria-label="每页显示数量"]'), '每页 10 条');
   expect(host.querySelectorAll('[role="row"][data-key]')).toHaveLength(10);
@@ -949,7 +952,7 @@ it('移除末页的最后一个订阅源会显示有效页', FULL_PAGE, async ()
     plan.feeds = { ...feeds, sources: feeds.sources.filter(source => source.id !== id) };
     return ok({ ok: true });
   } };
-  const { host } = await open(plan, { tab: 'feeds' });
+  const { host } = await open(plan, { tab: 'list' });
   await click(buttonNamed('下一页', host));
   await click(buttonLabelled(host, '移除 来源 21'));
   await settle();
@@ -958,13 +961,15 @@ it('移除末页的最后一个订阅源会显示有效页', FULL_PAGE, async ()
 });
 
 it('订阅列表卡片包含标题、空态和状态栏', async () => {
-  const { host } = await open({}, { tab: 'feeds' });
-  const panel = host.querySelector('[role="tabpanel"]')!;
-  expect([...panel.querySelectorAll('h3')].map((h) => h.textContent)).toEqual(['添加 JAV 订阅', 'JAV 订阅源', '还没有订阅源']);
-  expect(panel.textContent).toContain('在上面按女优名添加，或在人物页点「订阅新作」。');
-  expect(panel.querySelector('section[aria-label="JAV 订阅列表"]')).not.toBeNull();
+  const { host, props } = await open({}, { tab: 'list' });
+  const panel = host.querySelector('section[aria-label="JAV 订阅列表"]')!;
+  expect([...panel.querySelectorAll('h3')].map((h) => h.textContent)).toEqual(['JAV 订阅源', '还没有订阅源']);
+  expect(panel.textContent).toContain('在「添加关注」按女优名添加，或在人物页点「订阅新作」。');
   expect(panel.querySelector('footer')?.textContent).toContain('未看 0 · 已启用 0 / 0');
   expect(buttonNamed('立即拉取', host)).not.toBeNull();
+  await click(buttonNamed('添加订阅', panel));
+  expect(props.route).toHaveBeenCalledWith(expect.objectContaining({ tab: 'add' }));
+  expect(nameField(host)).not.toBeNull();
 });
 
 // ── 添加 JAV 订阅：按名字搜演员卡、勾选、登记 ─────────────────────────────
@@ -977,6 +982,8 @@ function nameField(root: ParentNode): HTMLInputElement {
   return field;
 }
 
+const actorPanel = (root: ParentNode) => root.querySelector('section[aria-label="添加 JAV 订阅"]')!;
+
 const card = (id: string, names: string[], record = '', held_by: FeedLookup['known'] = null) =>
   ({ id, names, record, url: `https://javdb.com/actors/${id}`, held_by, matched: [] });
 
@@ -985,6 +992,55 @@ const LOOKUP: FeedLookup = {
   candidates: [card('Kn01', ['瀬戸環奈', '瀨戶環奈']), card('Kn02', ['瀬戸環奈'], '無碼'), card('Zz99', ['別人さん'])],
 };
 
+it('关注列表展示已有 JAV 订阅并沿用订阅源开关', async () => {
+  const { host, fetcher } = await open({ feeds: FEEDS });
+  expect(host.querySelector('section[aria-label="JAV 订阅列表"]')).not.toBeNull();
+  expect(host.textContent).toContain('甲 的新作');
+  expect(host.textContent).not.toContain('添加 JAV 订阅');
+  await click(host.querySelector('[aria-label="启用 甲 的新作"]'));
+  await settle();
+  expect(sentBody(fetcher, FEED_SOURCE_URL)).toEqual([{ action: 'enabled', id: 4, enabled: false }]);
+});
+
+it('关注列表的创作者与 JAV 订阅只保留当前表格的选择', async () => {
+  const { host } = await open({ feeds: FEEDS });
+  const creator = () => checkboxNamed(host, '选择 甲 · Kemono')!;
+  const feed = () => checkboxNamed(host, '选择 甲 的新作')!;
+  await click(creator());
+  expect(creator().checked).toBe(true);
+  await click(feed());
+  expect(creator().checked).toBe(false);
+  expect(feed().checked).toBe(true);
+  expect(host.querySelectorAll('[data-selection-dock]')).toHaveLength(1);
+  await click(creator());
+  expect(feed().checked).toBe(false);
+  expect(creator().checked).toBe(true);
+  expect(host.querySelectorAll('[data-selection-dock]')).toHaveLength(1);
+});
+
+it('添加关注可以查女优并订阅，成功后进入含新订阅的关注列表', async () => {
+  const lookup = vi.fn(() => LOOKUP);
+  const plan: Plan = { feeds: { sources: [], unread: 0 }, lookup };
+  plan.feedWrite = () => {
+    plan.feeds = FEEDS;
+    return ok({ ok: true, entity_id: 9, entity_name: '瀬戸環奈', created: false, sources: [4] });
+  };
+  const { host, fetcher, props } = await open(plan, { tab: 'add' });
+  await type(nameField(host), '瀬戸環奈');
+  await act(async () => {
+    nameField(host).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  });
+  await settle();
+  expect(lookup).toHaveBeenCalledWith('瀬戸環奈');
+  await click(buttonNamed('添加订阅（2）', host));
+  await settle();
+  expect(sentBody(fetcher, FEED_SOURCE_URL)).toEqual([
+    { action: 'follow-name', name: '瀬戸環奈', ids: ['Kn01', 'Kn02'] },
+  ]);
+  expect(props.route).toHaveBeenCalledWith(expect.objectContaining({ tab: 'list' }));
+  expect(host.querySelector('section[aria-label="JAV 订阅列表"]')).not.toBeNull();
+});
+
 const boxNamed = (root: ParentNode, text: string) =>
   [...root.querySelectorAll('label')].find((label) => label.textContent?.includes(text))
     ?.querySelector<HTMLInputElement>('input[type="checkbox"]');
@@ -992,11 +1048,11 @@ const boxNamed = (root: ParentNode, text: string) =>
 it('按名字查找列出每张演员卡，同一个人的两张先勾上；说清会新建，添加后送 id、Toast 点名并重取清单', async () => {
   const lookup = vi.fn(() => LOOKUP);
   const feedWrite = vi.fn(() => ok({ ok: true, entity_id: 9, entity_name: '瀬戸環奈', created: true, sources: [7, 8] }));
-  const { host, fetcher, props } = await open({ feeds: FEEDS, lookup, feedWrite }, { tab: 'feeds' });
+  const { host, fetcher, props } = await open({ feeds: FEEDS, lookup, feedWrite }, { tab: 'add' });
   const before = feedReads(fetcher);
-  expect(buttonNamed('查找', host)?.disabled).toBe(true);
+  expect(buttonNamed('查找', actorPanel(host))?.disabled).toBe(true);
   await type(nameField(host), ' 瀬戸環奈 ');
-  await click(buttonNamed('查找', host));
+  await click(buttonNamed('查找', actorPanel(host)));
   await settle();
   expect(lookup).toHaveBeenCalledWith('瀬戸環奈');
   expect(boxNamed(host, '瀬戸環奈、瀨戶環奈')?.checked).toBe(true);
@@ -1014,16 +1070,17 @@ it('按名字查找列出每张演员卡，同一个人的两张先勾上；说�
   expect(feedWrite).toHaveBeenCalledWith({ action: 'follow-name', name: '瀬戸環奈', ids: ['Kn01'] });
   expect(props.toast).toHaveBeenCalledWith('已新建「瀬戸環奈」并订阅她的新作');
   expect(feedReads(fetcher)).toBeGreaterThan(before);
-  // 候选收起，输入框清空，下一位从头来。
+  // 订阅成功回到关注列表。
   expect(boxNamed(host, '無碼')).toBeUndefined();
-  expect(nameField(host).value).toBe('');
+  expect(host.querySelector('input[aria-label="女优名"]')).toBeNull();
+  expect(host.querySelector('section[aria-label="JAV 订阅列表"]')).not.toBeNull();
 });
 
 it('回车也是查找；勾的卡已在数据库里谁名下就说会挂给谁，分属两个人时添加键停用', async () => {
   const held = { ...LOOKUP, suggested: [], candidates: [
     card('Kn01', ['瀬戸環奈'], '', { id: 3, name: '甲' }), card('Kn02', ['瀬戸環奈'], '無碼', { id: 4, name: '乙' }),
   ] };
-  const { host, fetcher } = await open({ feeds: FEEDS, lookup: () => held }, { tab: 'feeds' });
+  const { host, fetcher } = await open({ feeds: FEEDS, lookup: () => held }, { tab: 'add' });
   await type(nameField(host), '瀬戸環奈');
   await act(async () => {
     nameField(host).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
@@ -1041,17 +1098,17 @@ it('回车也是查找；勾的卡已在数据库里谁名下就说会挂给谁�
 });
 
 it('查找被服务端挡回时原因摆在卡里，没有候选时直说', async () => {
-  const first = await open({ feeds: FEEDS, lookup: () => refuse('JavDB 回的是登入页') }, { tab: 'feeds' });
+  const first = await open({ feeds: FEEDS, lookup: () => refuse('JavDB 回的是登入页') }, { tab: 'add' });
   await type(nameField(first.host), '甲');
-  await click(buttonNamed('查找', first.host));
+  await click(buttonNamed('查找', actorPanel(first.host)));
   await settle();
   expect(first.host.textContent).toContain('JavDB 回的是登入页');
   await first.unmount();
   queryClient.clear();
 
-  const none = await open({ feeds: FEEDS }, { tab: 'feeds' });
+  const none = await open({ feeds: FEEDS }, { tab: 'add' });
   await type(nameField(none.host), '乙');
-  await click(buttonNamed('查找', none.host));
+  await click(buttonNamed('查找', actorPanel(none.host)));
   await settle();
   expect(none.host.textContent).toContain('JavDB 上没有搜到这个名字。');
   expect(buttonNamed('关闭', none.host)).not.toBeNull();
@@ -1207,7 +1264,7 @@ it('查完先列候选、默认勾上，已经关注的列出来但勾不动，�
   await lookUp(host, 'kou');
 
   // 结果留在「添加关注」这一张卡里，不另起标题。
-  const panel = [...host.querySelectorAll('h3')].find((h) => h.textContent === '添加关注')!.parentElement!;
+  const panel = [...host.querySelectorAll('h3')].find((h) => h.textContent === '添加创作者关注')!.parentElement!;
   expect(panel.textContent).toContain('查找结果');
   expect(panel.querySelectorAll('h3')).toHaveLength(1);
 
@@ -1292,12 +1349,14 @@ it('来源筛选按钮写着筛到哪几个站，筛掉的站既不显示也不�
   expect(actionOrder(buttonNamed('添加选中（2）', host)!.parentElement)).toEqual(['关闭', '添加选中（2）']);
 });
 
-it('筛选里撞见缺凭据的站，凭据入口是指到来源与订阅设置的链接', async () => {
+it('来源筛选顶部统一提供凭据设置链接', async () => {
   const creds = { root: 'C:\\creds', providers: [credential({ provider: 'fanbox', provider_label: 'Fanbox' })] };
   const { host } = await open({ creds }, { tab: 'add' });
   await click(buttonLabelled(host, '全部来源'));
-  expect(buttonNamed('打开凭据设置')).toBeNull();
-  expect(linkNamed('打开凭据设置')?.getAttribute('href')).toBe('/settings/subscriptions');
+  const dialog = document.querySelector('[role="dialog"][aria-label="来源筛选"]')!;
+  expect(actionOrder(buttonNamed('全选', dialog)!.parentElement)).toEqual(['全选', '全不选', '凭据设置']);
+  expect(linkNamed('凭据设置', dialog)?.getAttribute('href')).toBe('/settings/subscriptions');
+  expect(dialog.querySelectorAll('a')).toHaveLength(1);
 });
 
 it('「猜你喜欢」点一下就拿那个名字去查', async () => {
