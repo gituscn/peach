@@ -266,7 +266,7 @@ def covers(record: dict, scopes: tuple[str, ...]) -> bool:
 def write(root: Path, state: str, scopes: tuple[str, ...], *, success: bool,
           elapsed: float, slowest: list, count: int, previous: dict | None = None,
           context: dict | None = None, baseline: dict | None = None,
-          cohort: str | None = None, coverage: dict | None = None) -> None:
+          cohort: str | None = None, coverage: dict | None = None, flaky: list | None = None) -> None:
     folder = evidence_dir(root)
     folder.mkdir(parents=True, exist_ok=True)
     prior = previous if previous is not None else read(root, state)
@@ -287,7 +287,9 @@ def write(root: Path, state: str, scopes: tuple[str, ...], *, success: bool,
               "cohort": cohort, "coverage": coverage or {},
               "baseline": baseline.get("state") if baseline else None,
               "failed_scopes": sorted(failed),
-              "elapsed": elapsed, "count": count, "slowest": slowest}
+              "elapsed": elapsed, "count": count, "slowest": slowest,
+              # 全量里失败、单独重跑通过的用例；记录照样算通过，但名字留在这里可查。
+              "flaky": list(flaky or [])}
     temporary = folder / f"{state}.{os.getpid()}.tmp"
     temporary.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
     temporary.replace(folder / f"{state}.json")
@@ -296,6 +298,17 @@ def write(root: Path, state: str, scopes: tuple[str, ...], *, success: bool,
 
 def holder_path(lock_path: Path) -> Path:
     return lock_path.with_name(lock_path.name + ".holder.json")
+
+
+def machine_lock_path() -> Path:
+    """整台机器共用的重负载锁：所有工作树、所有会话和本机 CI runner 的作业都排这一把。
+
+    放在用户目录而不是仓库里：runner 的作业检出在别处，仓库级的全量锁管不到它；
+    浏览器、vitest 与构建同时跑会把机器压满，固定时限的用例随之偶发超时。
+    """
+    base = os.environ.get("LOCALAPPDATA") or str(Path.home() / ".local" / "state")
+    # 不放进应用自己的 `%LOCALAPPDATA%\Peach`：那是已装 Peach 的目录，测试设施不往里写。
+    return Path(base) / "peach-test-locks" / "test-machine.lock"
 
 
 QUEUE_POLL_SECONDS = 0.1

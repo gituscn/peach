@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 from html.parser import HTMLParser
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -410,12 +411,14 @@ class VitestTests(unittest.TestCase):
 
     def test_the_island_suite_passes(self):
         npm = self._npm("vitest", "vitest")
+        # 定向入口（含全量失败后的单独重跑）只跑指定的几个文件，路径相对 frontend/。
+        selected = json.loads(os.environ.get("PEACH_VITEST_FILES", "[]"))
         # 另挂一个 JSON 报告器，把逐条结果交给测试结果历史；控制台输出与判据不变。
         with tempfile.TemporaryDirectory() as folder:
             report = Path(folder) / "vitest.json"
             completed = subprocess.run(
                 [npm, "--prefix", str(FRONTEND), "test", "--silent", "--",
-                 "--reporter=default", "--reporter=json", f"--outputFile.json={report}"],
+                 "--reporter=default", "--reporter=json", f"--outputFile.json={report}", *selected],
                 capture_output=True, text=True, encoding="utf-8", errors="replace",
                 cwd=str(FRONTEND), check=False)
             if report.is_file():
@@ -430,7 +433,7 @@ class VitestTests(unittest.TestCase):
         self.assertNotRegex(plain, r"Tests\s+0 passed", "vitest 一个用例都没跑")
         counted = re.search(r"Tests\s+(\d+) passed", plain)
         assert counted is not None
-        self.assertGreaterEqual(int(counted.group(1)), 10, output)
+        self.assertGreaterEqual(int(counted.group(1)), 1 if selected else 10, output)
 
 
 class BrowserSuiteWorkflowTests(unittest.TestCase):

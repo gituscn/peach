@@ -64,6 +64,7 @@ def check(*, transport=None) -> dict:
     try:
         releases = []
         obtained = False
+        downloads = False
         for endpoint in (DOWNLOADS_API, API_URL):
             try:
                 headers = {"Accept": "application/json"}
@@ -76,6 +77,7 @@ def check(*, transport=None) -> dict:
                 if not isinstance(rows, list):
                     continue
                 obtained = True
+                downloads = downloads or endpoint == DOWNLOADS_API
                 releases.extend(_release_candidates(rows, endpoint))
             except (OSError, ValueError, TypeError, TimeoutError, httpx.HTTPError):
                 continue
@@ -87,6 +89,10 @@ def check(*, transport=None) -> dict:
         if current is None:
             raise ValueError("current version required")
         state = "available" if version > current else "ahead" if version < current else "current"
+        if not downloads and state != "available":
+            # 新版本只发在 R2；GitHub 上停在旧版本。R2 没取到时，GitHub 的旧版本既说明不了
+            # 「已是最新」也说明不了「高于已发布版本」。
+            return dict(result, state="error", message="未能取得版本信息，请重试。")
         message = {"available": "有新版本可下载。", "ahead": "当前版本高于已发布测试版。", "current": "已是最新测试版。"}[state]
         return dict(result, latest_version=tag.removeprefix("v"), state=state, message=message,
                     asset_url=f"{directory}/{asset['name']}",

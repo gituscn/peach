@@ -71,7 +71,7 @@ sudo /usr/bin/xattr -rd com.apple.quarantine "/Applications/Peach.app"
 
 ### GitLab 发布与下载后端
 
-GitLab 兼容平台使用 `.gitlab-ci.yml`。唯一版本入口支持 `--gitlab-host` 指定主机，默认入口使用 GitHub。主线发布判据要求同一提交最新的 push 流水线成功，且 Linux、Windows、macOS 和 wheel 验收任务全部成功；缺少原生系统任务时拒绝打标签。主线上的三个平台验收只跑改动域与平台敏感用例，三平台全量在版本标签流水线上运行，Windows、macOS 构建与 Docker、Release 发布都依赖它（[ADR-0119](adr/0119-mainline-changed-scope-release-full-suite.md)）。CLI 传输复用官方 glab，不在仓库或命令参数里存访问令牌。
+GitLab 兼容平台使用 `.gitlab-ci.yml`。唯一版本入口支持 `--gitlab-host` 指定主机，默认入口使用 GitHub。主线发布判据要求同一提交最新的 push 流水线成功，且 Linux、Windows、macOS 和 wheel 验收任务全部成功；缺少原生系统任务时拒绝打标签。主线上的三个平台验收只跑改动域与平台敏感用例（[ADR-0119](adr/0119-mainline-changed-scope-release-full-suite.md)）。版本提交 `chore(release): 版本 X` 的主线流水线同时是发布演练：三平台全量、媒体工具、Windows 与 macOS 构建、Windows 冒烟和 Docker 镜像都跑一遍，只是不发布。`--ship` 等演练全部成功才打标签；标签流水线核对同一提交的演练已通过，只重新构建并发布（[ADR-0121](adr/0121-release-rehearsal-and-atomic-publication.md)）。GitHub 的 `release.yml` 用同一套判据，迁回 GitHub 时不用改流程。CLI 传输复用官方 glab，不在仓库或命令参数里存访问令牌。
 
 平台共享 Runner 的系统由管理员提供。注册页面列出 Windows 和 macOS，表示可以接入这些系统上的 Runner；不能据此判断平台提供相应云主机。临时原生 Runner 只接入受保护主线和版本标签，使用项目专属标签，验收后停止并注销。Mac 的 Intel 构建需要真实 x86_64 Python 和依赖；在 Apple Silicon 上通过 Rosetta 验收时，应明确记录未覆盖 Intel 真机。
 
@@ -79,19 +79,19 @@ Windows 原生 Runner 在深目录中检出项目时，需为 Git 启用 `core.l
 
 用计划任务常驻 Windows 原生 Runner 时，任务设置的 `Priority` 取 `4`，例如 `New-ScheduledTaskSettingsSet -Priority 4`；已注册的任务可以读出对象，把 `Settings.Priority` 改成 `4`，再用 `Set-ScheduledTask -InputObject` 写回。省略时默认 `7`，`gitlab-runner` 与所有作业子进程以 BelowNormal 的 CPU 优先级、Low 的 I/O 优先级和 2 级内存优先级运行。Runner 与开发会话共用这台机器，别的会话跑全量测试时，作业里的 vitest 工作进程、首次设置后的服务就绪探测和快捷方式 COM 调用拿不到 CPU 与磁盘，因等待超时失败，全量回归也会超过作业时限。设置只对新启动的进程生效：在没有作业运行时重启该任务，再核对 `gitlab-runner` 进程的优先级类为 `Normal`。
 
-版本标签须受保护。标签流水线重新核对提交与版本，构建固定来源的媒体工具、Windows 完整包与拆分包、macOS 双架构 DMG，并进行独立制品验收。只有全部成功后才创建 GitLab Release。项目流水线使用 `PEACH_DOWNLOAD_BACKEND=both`，将同一份制品分别保存到 R2 与 GitGud Generic Package Registry；不把会过期的 job artifacts 当作永久下载地址。独立部署可明确选用 `r2` 或 `gitgud` 单后端。
+版本标签须受保护。标签流水线重新核对提交与版本，构建固定来源的媒体工具、Windows 完整包与拆分包、macOS 双架构 DMG，并进行独立制品验收。发布全有或全无：`publish-release` 要等全部构建、冒烟与 `docker-build` 通过才上传 R2 并创建 GitLab Release，`publish-docker` 排在它成功之后才推送镜像。任何一步没过，安装包、R2、Release、Docker Hub 一个都不动；发布作业自身失败时，重试同一个作业即可，标签不动。项目流水线使用 `PEACH_DOWNLOAD_BACKEND=both`，将同一份制品分别保存到 R2 与 GitGud Generic Package Registry；不把会过期的 job artifacts 当作永久下载地址。独立部署可明确选用 `r2` 或 `gitgud` 单后端。
 
 Linux 发布任务使用官方 uv Python 3.14 容器，并在获取制品工具前核对解释器版本；源码归档使用 `tarfile` 的 `data` 过滤器解压。CI 的 `.npm/` 与 `.uv-cache/` 属于生成缓存，不计入源码工作区变化。
 
-Windows 安装覆盖与任务恢复验收允许 GitHub Actions，以及受保护版本标签上的 GitLab `smoke-windows` 作业；主机已有 Peach 安装登记时拒绝执行。所有程序、账本与任务夹具均放在临时目录，安装与卸载完成后核对登记清理。`fetch_cloudflared.ps1` 的相对输出路径按 PowerShell 当前工作位置解析，下载仍须通过固定 SHA-256 校验。
+Windows 安装覆盖与任务恢复验收允许 GitHub Actions，以及受保护版本标签或版本提交演练上的 GitLab `smoke-windows` 作业；主机已有 Peach 安装登记时拒绝执行。所有程序、账本与任务夹具均放在临时目录，安装与卸载完成后核对登记清理。`fetch_cloudflared.ps1` 的相对输出路径按 PowerShell 当前工作位置解析，下载仍须通过固定 SHA-256 校验。
 
-GitGud 的 Linux 平台 Runner 不提供 Docker 守护进程，Docker 镜像由受保护标签上的 `publish-docker` 作业在 Windows 原生 Runner 构建，宿主须运行 Docker Desktop。作业核对标签与版本，用 `smoke_docker.py` 验收临时容器，再推送版本号与 `edge` 两个标签。`DOCKERHUB_USERNAME` 与 `DOCKERHUB_TOKEN` 放入受保护且隐藏的 CI 变量，环境作用域为 `release`；令牌只授予仓库读写。登录写入作业专用的临时 `DOCKER_CONFIG`，结束时登出并删除，不改动宿主用户的 Docker 登录。
+GitGud 的 Linux 平台 Runner 不提供 Docker 守护进程，Docker 镜像由 `docker-build` 作业在 Windows 原生 Runner 构建，宿主须运行 Docker Desktop。作业核对标签与版本，用 `smoke_docker.py` 验收临时容器，镜像留在本机；演练里验收完就删除。标签流水线上，`publish-docker` 等 `publish-release` 成功后才推送版本号与 `edge` 两个标签，所以 `edge` 只会指向已经完整发布的版本。`DOCKERHUB_USERNAME` 与 `DOCKERHUB_TOKEN` 放入受保护且隐藏的 CI 变量，环境作用域为 `release`；令牌只授予仓库读写。登录写入作业专用的临时 `DOCKER_CONFIG`，结束时登出并删除，不改动宿主用户的 Docker 登录。
 
 媒体工具源码可通过 `PEACH_SOURCE_CACHE_BASE` 指定 HTTPS 缓存入口，按 `<SHA-256>/<归档名>` 定位文件。标签流水线使用发布桶的 `_sources/` 前缀；维护者填充缓存前须核对锁文件的原始 SHA-256，缓存同样计入桶容量预算。下载缓存失败时尝试锁定的上游地址；任一来源的哈希不符立即拒绝，不能放宽清单。未配置缓存的对应源码包直接使用上游。
 
 可选的 `r2` 后端使用独立 Standard 桶与 HTTPS 自定义域名。`PEACH_R2_ACCESS_KEY_ID`、`PEACH_R2_SECRET_ACCESS_KEY`、`PEACH_R2_ENDPOINT` 放入受保护且隐藏的 CI 变量，环境作用域为 `release`；`PEACH_R2_BUCKET` 和 `PEACH_R2_PUBLIC_BASE` 指定发布目标。S3 传输复用 rclone，版本文件禁止覆盖；每份文件必须从公开入口完整下载并核对大小及 SHA-256 后，才更新公开版本索引和 Release 链接。
 
-GitLab 标签流水线通过 R2 暂存传递媒体工具、Windows 发行目录与 macOS 镜像，job artifacts 只保存 JSON 清单。中转需要上述 R2 变量；构建与验收任务使用 `release` 环境的 `prepare` 或 `verify` 动作，仅受保护标签能够取得凭据，普通分支回归不使用这些变量。构建期 rclone 按当前操作系统和 CPU 架构从官方固定版本归档安装并核对 SHA-256。
+GitLab 标签流水线通过 R2 暂存传递媒体工具、Windows 发行目录与 macOS 镜像，job artifacts 只保存 JSON 清单。中转需要上述 R2 变量；构建与验收任务使用 `release` 环境的 `prepare` 或 `verify` 动作，只有受保护的版本标签与受保护 master 上的版本提交演练能取得凭据，普通分支回归不使用这些变量。演练的暂存产物由 `release-rehearsal-cleanup` 在验收后回收。构建期 rclone 按当前操作系统和 CPU 架构从官方固定版本归档安装并核对 SHA-256。
 
 暂存对象位于 `_ci/<项目 ID>/<流水线 ID>/<提交 SHA>/<产物组>/<作业 ID>/`，纳入同一桶的容量预算。每次重试使用自己的作业 ID，构建时间等元数据变化不会覆盖其他尝试的文件。下载任务先核对清单的版本、提交和流水线身份，再校验每份文件的大小与 SHA-256；产物路径限定在对应构建输出目录，不接收软链接或路径穿越。macOS 仅上传两种架构的 DMG、`build-info.json` 与 `SHA256SUMS.txt`，不传递展开应用。所有构建与独立制品验收成功后，发布任务才写入正式版本目录和公开版本索引；GitLab Release 创建成功后，只回收当前流水线的暂存前缀。失败流水线保留暂存以便排障和重试，不覆盖已有公开版本。
 

@@ -221,7 +221,8 @@ class UpdateTaskSmokeTests(unittest.TestCase):
     def test_protected_gitlab_release_and_actions_require_an_unregistered_host(self):
         gitlab = {'GITLAB_CI': 'true', 'CI_JOB_NAME': 'smoke-windows',
                   'CI_COMMIT_REF_PROTECTED': 'true', 'CI_COMMIT_TAG': 'v1.2.3'}
-        for environment in ({'GITHUB_ACTIONS': 'true'}, gitlab):
+        rehearsal = {**gitlab, 'CI_COMMIT_TAG': '', 'PEACH_RELEASE_REHEARSAL': '1'}
+        for environment in ({'GITHUB_ACTIONS': 'true'}, gitlab, rehearsal):
             with self.subTest(environment=environment), mock.patch.dict(os.environ, environment, clear=True):
                 registry = SimpleNamespace(HKEY_CURRENT_USER=object(),
                                            OpenKey=mock.Mock(side_effect=FileNotFoundError))
@@ -4949,9 +4950,21 @@ class R2ArtifactTransferTests(unittest.TestCase):
 
     def test_unprotected_or_incomplete_build_identity_is_rejected(self):
         module = load_script("ci_r2_artifacts")
-        for patch in ({"CI_COMMIT_REF_PROTECTED": "false"}, {"CI_PIPELINE_ID": "../other"}, {"CI_COMMIT_TAG": "master"}):
+        for patch in ({"CI_COMMIT_REF_PROTECTED": "false"}, {"CI_PIPELINE_ID": "../other"}, {"CI_COMMIT_TAG": "master"},
+                      {"CI_COMMIT_TAG": ""}):
             with mock.patch.dict(os.environ, {**self.environment(), **patch}, clear=True), self.assertRaises(ValueError):
                 module.identity()
+
+    def test_a_release_rehearsal_stages_under_the_version_of_its_commit(self):
+        """版本提交演练（ADR-0121）还没有标签：暂存身份取提交里的版本号，受保护的要求不变。"""
+        module = load_script("ci_r2_artifacts")
+        rehearsal = {**self.environment(), "CI_COMMIT_TAG": "", "PEACH_RELEASE_REHEARSAL": "1"}
+        with mock.patch.dict(os.environ, rehearsal, clear=True):
+            self.assertEqual(module.identity()["tag"], module.rehearsal_tag())
+        self.assertRegex(module.rehearsal_tag(), r"^v\d+\.\d+\.\d+$")
+        with mock.patch.dict(os.environ, {**rehearsal, "CI_COMMIT_REF_PROTECTED": "false"}, clear=True), \
+                self.assertRaises(ValueError):
+            module.identity()
 
 
 class R2ReleaseTests(unittest.TestCase):
@@ -5233,7 +5246,7 @@ class MainlineScopeTests(unittest.TestCase):
         from scripts import ci_scope, test_focus
         for platform, selectors in ci_scope.PLATFORM_TESTS.items():
             with self.subTest(platform=platform):
-                suite, browsers = test_focus.selection(ROOT, list(selectors))
+                suite, browsers, _islands = test_focus.selection(ROOT, list(selectors))
                 self.assertGreater(suite.countTestCases(), 0)
                 self.assertIn("e2e/setup.test.ts", browsers)
                 self.assertEqual(len(selectors), len(set(selectors)))
@@ -5392,6 +5405,24 @@ class GitLabReleaseTests(unittest.TestCase):
                 self.job(5, "wheel-smoke", "running", started_at="t", runner={"id": 1})]
         run, _ = self.running(jobs, {})
         self.assertEqual(run["failed_jobs"], ["verify-linux"], "重试过的以最新一次为准")
+
+    def test_a_failed_rehearsal_build_stops_the_wait_too(self):
+        """版本提交的流水线里有发布演练：构建红了整条也不会转绿，不能只盯四个必需任务。"""
+        jobs = [self.job(1, "verify-linux", "running", started_at="t", runner={"id": 1}),
+                self.job(2, "build-macos", "failed", ("peach-macos",))]
+        run, _ = self.running(jobs, {})
+        self.assertEqual(run["failed_jobs"], ["build-macos"])
+
+    def test_tagging_requires_every_rehearsal_job_to_have_passed(self):
+        from scripts.release_forge import REHEARSAL_JOBS
+        forge = self.forge()
+        passed = [self.job(index, name, "success") for index, name in enumerate(sorted(REHEARSAL_JOBS), 1)]
+        with mock.patch.object(forge, "api", return_value=passed):
+            forge.require_rehearsal("owner/repo", 7)
+        for broken in (passed[1:], [{**passed[0], "status": "failed"}, *passed[1:]]):
+            with self.subTest(jobs=len(broken)), mock.patch.object(forge, "api", return_value=broken), \
+                    self.assertRaisesRegex(ValueError, "发布演练没有全部通过"):
+                forge.require_rehearsal("owner/repo", 7)
 
     def test_mainline_membership_uses_the_git_commit_graph(self):
         forge = self.forge()
@@ -5709,7 +5740,7 @@ class ShipTests(unittest.TestCase):
         return mock.patch.object(self.release, "command",
                                  side_effect=lambda *args, **_: answers.get(args, ""))
 
-    def _api(self, *, tags=(), remote="old", runs=(SUCCESS,)):
+    def _api(self, *, tags=(), remote="old", runs=(SUCCESS,), rehearsal=(SUCCESS,)):
         def answer(_repo, endpoint):
             if endpoint.startswith("git/matching-refs/tags/"):
                 return list(tags)
@@ -5717,6 +5748,8 @@ class ShipTests(unittest.TestCase):
                 return {"object": {"sha": remote}}
             if endpoint.startswith("actions/workflows/test.yml/runs"):
                 return {"workflow_runs": list(runs)}
+            if endpoint.startswith("actions/workflows/release.yml/runs"):
+                return {"workflow_runs": list(rehearsal)}
             raise AssertionError(f"没预料到的调用：{endpoint}")
         return mock.patch.object(self.release, "api", side_effect=answer)
 
@@ -5733,6 +5766,28 @@ class ShipTests(unittest.TestCase):
         return [args for args, _ in command.call_args_list
                 if args[:2] in {("git", "add"), ("git", "commit"), ("git", "push"), ("git", "-c")}
                 or args[:3] == ("git", "tag", "-a")]
+
+    def test_an_incomplete_release_rehearsal_stops_before_the_tag(self):
+        """GitLab 上版本提交的流水线带发布演练：Test 绿了但演练缺作业或没过，不打标签。"""
+        forge = mock.Mock()
+        forge.require_rehearsal.side_effect = ValueError("版本提交的发布演练没有全部通过，不打标签：build-macos")
+        with self._shell() as command, self._version(), self._document(), \
+                mock.patch.object(self.release, "GITLAB", forge), \
+                mock.patch.object(self.release, "master_sha", return_value="abc"), \
+                mock.patch.object(self.release, "await_test", return_value={**self.SUCCESS, "id": 7}), \
+                self.assertRaisesRegex(ValueError, "发布演练"):
+            self.release.ship("owner/repo", apply=True)
+        forge.require_rehearsal.assert_called_once_with("owner/repo", 7)
+        self.assertFalse([args for args in self._writes(command) if args[:3] == ("git", "tag", "-a")])
+
+    def test_on_github_a_red_release_rehearsal_stops_before_the_tag(self):
+        """迁回 GitHub 时演练是同一提交推送触发的 Release 工作流：它没过同样不打标签。"""
+        red = {**self.SUCCESS, "conclusion": "failure", "html_url": "rehearsal-url"}
+        with self._shell() as command, self._api(remote="abc", rehearsal=(red,)), self._version(), \
+                self._document(), mock.patch.object(self.release, "GITLAB", None), \
+                self.assertRaisesRegex(ValueError, "发布演练没有通过.*rehearsal-url"):
+            self.release.ship("owner/repo", apply=True)
+        self.assertFalse([args for args in self._writes(command) if args[:3] == ("git", "tag", "-a")])
 
     def test_a_plan_without_apply_writes_nothing(self):
         with self._shell() as command, self._api(), self._version(), self._document():
