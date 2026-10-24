@@ -95,6 +95,23 @@ class ReleaseUpdateTests(unittest.TestCase):
             self.assertEqual(result["state"], "error")
             self.assertIsNone(result["latest_version"])
 
+    def test_without_r2_an_older_github_release_is_no_answer(self):
+        """新版本只发在 R2，GitHub 停在旧版本：R2 没取到时不能据 GitHub 说「已是最新」或「高于已发布版本」。"""
+        def transport(github_version):
+            def answer(request, *_args):
+                if request.url == release_updates.DOWNLOADS_API:
+                    raise httpx.ConnectError("R2 unreachable")
+                return HttpResponse(200, {}, json.dumps([release(github_version)]).encode())
+            return answer
+
+        with patch.object(release_updates, "__version__", "0.48.2"):
+            for older in ("0.46.1", "0.48.2"):
+                with self.subTest(github=older):
+                    result = release_updates.check(transport=transport(older))
+                    self.assertEqual((result["state"], result["message"]), ("error", "未能取得版本信息，请重试。"))
+            self.assertEqual(release_updates.check(transport=transport("0.49.0"))["state"], "available",
+                             "GitHub 上真有更新的版本时照样可以升")
+
     def test_standalone_tray_checks_releases_without_git(self):
         execute = Mock(side_effect=AssertionError("Git must not run"))
         with patch("peach.distribution.standalone", return_value=True), patch.object(
