@@ -48,10 +48,13 @@ release = release_updates.check(transport=transport)
 result = {"state": release.get("state"), "latest": release.get("latest_version"),
           "kind": release.get("package_kind"), "tools": sorted(update_packages.TOOL_PATHS)}
 if release.get("package_kind") != "full":
-    with tempfile.TemporaryDirectory() as stage:
-        Path(stage, update_packages.MANIFEST).write_text(json.dumps(payload["manifest"]), encoding="utf-8")
+    with tempfile.TemporaryDirectory() as folder:
+        # 旧版逐级检查暂存目录的父路径不是链接；macOS 的临时目录在 /var 这个链接下面，先解析成真实路径，
+        # 和客户端在安装目录旁建的暂存目录一样。
+        stage = Path(folder).resolve()
+        (stage / update_packages.MANIFEST).write_text(json.dumps(payload["manifest"]), encoding="utf-8")
         try:
-            update_packages.read_manifest(Path(stage), payload["version"])
+            update_packages.read_manifest(stage, payload["version"])
         except Exception as exc:
             result["error"] = f"{type(exc).__name__}: {exc}"
 print(json.dumps(result, ensure_ascii=False))
