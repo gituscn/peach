@@ -80,6 +80,8 @@ class ReleaseUpdateTests(unittest.TestCase):
         self.assertEqual(result["package_kind"], "update")
         self.assertTrue(result["asset_url"].endswith("-update.zip"))
         self.assertEqual(result["asset_size"], 123)
+        self.assertEqual(result["full_url"], release_updates.RELEASES_URL + "/download/v1.0.0/Peach-1.0.0-windows-x64.zip",
+                         "应用更新包准备不下去时改下的同版本完整包")
         row["assets"][1]["state"] = "new"
         self.assertEqual(self.check([row])["package_kind"], "full")
         row["assets"].pop(0)
