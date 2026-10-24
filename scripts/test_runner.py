@@ -1118,15 +1118,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\n".join(("full", "auto", *SCOPES)))
         return 0
     if args.focus:
-        if args.shard_count != 1:
-            parser.error("定向调试不能与分片一起使用")
-        from . import test_focus
-        heavy = any(selector.startswith("frontend/") for selector in args.focus)
-        try:
-            with machine_guard(args, heavy):
-                return test_focus.run(sys.modules[__name__], args)
-        except test_evidence.Timeout as error:
-            return busy(error)
+        return run_focus(parser, args)
     if os.environ.get("PEACH_TEST_FOCUS") or os.environ.get("PEACH_E2E_FILES") or os.environ.get("PEACH_VITEST_FILES"):
         parser.error("定向调试环境不能签发正式记录；请清除 PEACH_TEST_FOCUS、PEACH_E2E_FILES 与 PEACH_VITEST_FILES")
     requested: tuple[str, ...] = tuple(dict.fromkeys(args.scopes or ("auto",)))
@@ -1160,6 +1152,19 @@ def main(argv: list[str] | None = None) -> int:
                 if "full" in scopes else nullcontext()
             with guard:
                 return verified_run(args, requested, scopes, files)
+    except test_evidence.Timeout as error:
+        return busy(error)
+
+
+def run_focus(parser, args) -> int:
+    """定向调试：不签发记录；浏览器与 vitest 文件起浏览器或 node，同样排整机的重负载锁。"""
+    if args.shard_count != 1:
+        parser.error("定向调试不能与分片一起使用")
+    from . import test_focus
+    heavy = any(selector.startswith("frontend/") for selector in args.focus)
+    try:
+        with machine_guard(args, heavy):
+            return test_focus.run(sys.modules[__name__], args)
     except test_evidence.Timeout as error:
         return busy(error)
 
