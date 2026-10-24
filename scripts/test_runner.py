@@ -174,6 +174,8 @@ SCOPE_TEST_IDS: dict[str, tuple[str, ...]] = {
 # 一个文件可以落到多个域：读它的测试登记在哪个域，改它就得跑到哪个域。
 # `tests/test_test_planning.py` 按测试源码里真实读到的路径反查这两张表，漏一条本地就红。
 AUTO_SCOPE_FILES: dict[str, tuple[str, ...]] = {
+    "frontend/e2e/jav-userscript-contract.mjs": ("catalog", "web"),
+    "web/integrations/peach-jav.user.js": ("catalog", "web"),
     "scripts/build_macos_media.py": ("tooling", "packaging"),
     "scripts/setup_macos_media_tools.py": ("tooling", "packaging"),
     "scripts/smoke_macos_media.py": ("tooling", "packaging"),

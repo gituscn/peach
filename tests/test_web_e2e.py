@@ -44,6 +44,7 @@ from peach.config import FFMPEG_DIR
 from peach.ffmpeg import FFmpegResolver
 from peach.library_processing import process_library
 from support.conditions import missing_prerequisite, windows_ledger_roots
+from support.browser import chrome_executable
 from support.ledger import fresh_ledger
 from support.demo import seed_metadata_cache
 from scripts import test_history
@@ -57,27 +58,6 @@ SETUP_SUITE = "e2e/setup.test.ts"
 #: 浏览器文件的预计秒数，与 CI 浏览器矩阵共用同一份实测；没测过的文件按 30 秒算。
 E2E_TIMINGS = ROOT / "scripts" / "ci-browser-timings.json"
 E2E_DEFAULT_SECONDS = 30.0
-
-
-def chrome_executable() -> str | None:
-    """本机 Chrome 的可执行文件；找不到返回 None。"""
-    explicit = os.environ.get("PEACH_E2E_CHROME", "").strip()
-    if explicit:
-        return explicit if Path(explicit).is_file() else None
-    candidates: list[Path] = []
-    if os.name == "nt":
-        for variable in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
-            base = os.environ.get(variable)
-            if base:
-                candidates.append(Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe")
-    elif sys.platform == "darwin":
-        candidates.append(Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"))
-    else:
-        for name in ("google-chrome", "google-chrome-stable"):
-            found = shutil.which(name)
-            if found:
-                candidates.append(Path(found))
-    return next((str(path) for path in candidates if path.is_file()), None)
 
 
 def load_demo_script():

@@ -20,6 +20,7 @@ from peach.config import PROJECT_ROOT, PeachSettings
 from peach.jav_browser import CREDENTIAL, JavBrowser, code_key, identify_source, source_page, source_sites
 from support.ledger import fresh_ledger
 from support.conditions import missing_prerequisite
+from support.browser import chrome_executable
 
 HASH = "c9e15763f722f23e98a29decdfae341b98d53056"
 MAGNET = f"magnet:?xt=urn:btih:{HASH}&dn=ABC-123"
@@ -399,7 +400,6 @@ class BrowserTests(unittest.TestCase):
             self.assertEqual(response.json()["code"], code)
 
     def test_complete_userscript_uses_the_real_identification_endpoint(self):
-        from test_web_e2e import chrome_executable
         node, chrome = shutil.which("node"), chrome_executable()
         if not node or not chrome or not (PROJECT_ROOT / "frontend/node_modules/playwright-core").is_dir():
             missing_prerequisite("用户脚本联合验收需要 Node、Chrome 和前端锁定依赖")
