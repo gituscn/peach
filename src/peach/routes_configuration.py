@@ -16,13 +16,15 @@ import shutil
 import threading
 import json
 import time
+import uuid
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from filelock import FileLock, Timeout
 
-from . import (access, data_storage, distribution, entry_links, folder_picker, media_libraries, onboarding,
+from . import (access, data_storage, distribution, entry_links, error_reporting, folder_picker, media_libraries, onboarding,
                push_discovery, settings_file, media_configuration, tunnel, web_downloads)
 from .routes_auth import require_auth, require_authenticated_client, same_origin
 from .web_entry import runtime_fact_entries
@@ -180,35 +182,56 @@ def configurable(request: Request) -> bool:
             and local_client(request))
 
 
+def _read_section(result: dict, key: str, title: str, reader) -> None:
+    """各配置区域独立读取；故障留痕并提供重试信息。"""
+    try:
+        result[key] = reader()
+    except Exception as error:
+        error_id = uuid.uuid4().hex
+        result.setdefault("section_errors", {})[key] = {
+            "title": f"{title}未取得", "message": "请重新读取；持续失败时导出诊断报告。",
+            "error_id": error_id,
+        }
+        error_reporting.event("logging", error, logger=__name__, level="ERROR",
+                              message=f"配置区域 {key} 读取失败", section=key, error_id=error_id)
+
+
 def snapshot(config) -> dict[str, Any]:
     """配置页首屏要的一切：当前值、修订号、可写与否，以及这台机器的运行信息。"""
     editable = managed_configuration()
     from . import remote_reporting, library_sharing
     media = config.mounts.get("local") or config.locations.get("local", ())
-    return {
-        "remote_reporting": remote_reporting.snapshot(config),
-        "library_sharing": library_sharing.snapshot(config),
-        "startup": desktop_startup.snapshot(config),
-        "uninstall": desktop_uninstall.snapshot(config),
-        "storage": data_storage.snapshot(config),
-        "peach_proxy": peach_proxy.describe(config.directory("secrets")),
-        "entry_links": entry_links.snapshot(config.directory("state")),
-        "updates": release_updates.snapshot(),
-        "update_job": standalone_update.public(),
-        "access": access.public(access.load(config.directory("secrets") / "access.json")),
+    result = {
         "editable": editable,
         "notice": "" if editable else FILE_MANAGED_NOTICE,
         "revision": revision(config),
         "media_dirs": list(media),
-        "media_sources": media_configuration.rows(config, windows=os.name == "nt", probe=True),
         # 媒体库按持久身份计数，与侧栏切换器和 `/api/libraries` 共用分组。
-        "library_count": len(media_libraries.libraries(config)),
-        "mount_dependencies": media_configuration.mount_dependencies(),
+        "library_count": 0,
         "windows": os.name == "nt",
         "port": config.server.port,
         "port_editable": distribution.standalone(),
-        "facts": runtime_fact_entries(config),
+        "facts": [],
     }
+    readers = (
+        ("remote_reporting", "错误诊断设置", lambda: remote_reporting.snapshot(config)),
+        ("library_sharing", "馆藏上传设置", lambda: library_sharing.snapshot(config)),
+        ("startup", "开机启动设置", lambda: desktop_startup.snapshot(config)),
+        ("uninstall", "卸载信息", lambda: desktop_uninstall.snapshot(config)),
+        ("storage", "存储空间", lambda: data_storage.snapshot(config)),
+        ("peach_proxy", "Peach 代理", lambda: peach_proxy.describe(config.directory("secrets"))),
+        ("entry_links", "外部入口", lambda: entry_links.snapshot(config.directory("state"))),
+        ("updates", "版本更新", release_updates.snapshot),
+        ("update_job", "更新任务", standalone_update.public),
+        ("access", "访问设置", lambda: access.public(access.load(config.directory("secrets") / "access.json"))),
+        ("media_sources", "媒体目录", lambda: media_configuration.rows(config, windows=os.name == "nt", probe=True)),
+        ("library_count", "媒体库状态", lambda: len(media_libraries.libraries(config))),
+        ("mount_dependencies", "挂载依赖", media_configuration.mount_dependencies),
+        ("facts", "运行信息", lambda: runtime_fact_entries(config)),
+    )
+    for key, title, reader in readers:
+        _read_section(result, key, title, reader)
+    return result
 
 
 def tunnel_payload(config, state: tunnel.TunnelSnapshot, enabled: bool) -> dict[str, Any]:
@@ -252,7 +275,7 @@ def push_discovery_payload(request: Request, payload: dict[str, Any] | None = No
     origin = ""
     if address:
         scheme, default_port = ("https", 443) if settings.tls_enabled else ("http", 80)
-        origin = f"{scheme}://{address}" if port in (0, default_port) else f"{scheme}://{address}:{port}"
+        origin = str(httpx.URL(scheme=scheme, host=address, port=port or default_port))
     payload["origin"] = origin
     payload["config_toml"] = push_discovery.clouddrive_config(origin, payload.get("secret", ""))
     return payload
@@ -267,13 +290,13 @@ def read_configuration(request: Request, _args=Depends(require_auth)):
     result = snapshot(config)
     sync = getattr(request.app.state, "sync", None)
     result["ledger_read_only"] = bool(sync is not None and sync.read_only)
-    state = request.app.state.tunnel.snapshot()
-    result["tunnel"] = tunnel_payload(config, state, config.tunnel.enabled)
-    result["automatic_updates"] = request.app.state.automatic_updates.snapshot()
+    _read_section(result, "tunnel", "公网入口", lambda: tunnel_payload(
+        config, request.app.state.tunnel.snapshot(), config.tunnel.enabled))
+    _read_section(result, "automatic_updates", "自动更新", lambda: request.app.state.automatic_updates.snapshot())
     # 这一路已经过了 `local_only`，密钥可以给出来：用户要把它抄进 CloudDrive2。
-    result["push_discovery"] = push_discovery_payload(request)
-    result["downloads"] = web_downloads.settings_payload(*_downloads(request))
-    if result["automatic_updates"].get("result"):
+    _read_section(result, "push_discovery", "推送发现", lambda: push_discovery_payload(request))
+    _read_section(result, "downloads", "下载设置", lambda: web_downloads.settings_payload(*_downloads(request)))
+    if result.get("automatic_updates", {}).get("result"):
         result["updates"] = result["automatic_updates"]["result"]
     return result
 

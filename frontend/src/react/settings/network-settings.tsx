@@ -18,10 +18,11 @@ import { busyProps, useAction } from './use-action';
 
 const PROXY_MODES = [['environment', '系统代理'], ['direct', '直连'], ['proxy', '自定义']] as const;
 
-export function NetworkSettings({ data, receipt, panel }: ConfigurationGroupProps) {
+export function NetworkSettings({ data, receipt, panel, issues }: ConfigurationGroupProps) {
   return (
     <div {...groupRoot(panel)}>
-      {data.editable && data.port_editable !== false ? <PortSettings data={data} receipt={receipt} /> : null}
+      {issues}
+      {data.editable && data.port_editable !== false && !data.section_errors?.media_sources ? <PortSettings data={data} receipt={receipt} /> : null}
       {data.peach_proxy ? <PeachProxy initial={data.peach_proxy} receipt={receipt} /> : null}
       {data.access ? <AccessSettings initial={data.access} receipt={receipt} /> : null}
       {data.tunnel ? <TunnelSettings revision={data.revision} initial={data.tunnel} receipt={receipt} /> : null}

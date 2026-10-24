@@ -1,7 +1,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "78aa664a-ede9-4231-94fa-85a243e03341", e._sentryDebugIdIdentifier = "sentry-dbid-78aa664a-ede9-4231-94fa-85a243e03341");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "de944ccb-4459-4af8-9b8c-e6c4d4ff544a", e._sentryDebugIdIdentifier = "sentry-dbid-de944ccb-4459-4af8-9b8c-e6c4d4ff544a");
 	} catch {}
 })();
 import { $2ec61d1d4f780267$export$a8a3e93435678ff9 as e, $3a442827418ebe87$export$eb2fcfdbd7ba97d4 as t, $542a13ca2fa5b484$export$5b6b19405a83ff9d as n, $72abaeab4d80592f$export$78efe591171d7d45 as r, $bd263d78e9bf3c56$export$f5c9f3c2c4054eec as i, $ea3928288112382f$export$439d29a4e110a164 as a, $f2ff30fde7b014be$export$3ddf2d174ce01153 as o, $fe21c36db05242bb$export$a98f0dcb43a68a25 as s, $fe21c36db05242bb$export$d7b12c4107be0d61 as c, ACCENT_CHOICES as l, ApiError as u, Button as d, ButtonLink as f, CLOUD_LOCATIONS as p, CLOUD_PROXY_HELP as m, CONFIGURATION_KEY as h, CONFIGURATION_URL as g, CREDENTIAL_STATE as _, Checkbox as v, Chip as y, Disclosure as b, ENTRY_LINKS_HELP as x, ENTRY_LINKS_HINT as S, EmptyState as ee, ErrorText as C, ExternalLink as w, FEED_SCHEDULE_KEY as T, FOLLOW_CREDENTIALS_KEY as E, FOLLOW_INITIAL_RANGE_OPTIONS as te, FOLLOW_SCHEDULE_KEY as ne, Fact as D, FactList as O, FieldLabel as k, Footer as A, Help as j, HintText as re, Input as M, LIBRARY_FOLDER_HELP as ie, LIBRARY_PROCESSING_KEY as ae, Label as oe, LinkButton as se, LoadingDots as ce, M6 as le, MEDIA_PROCESSING_KEY as ue, MEDIA_PROCESSING_URL as de, MEDIA_SOURCE_ICONS as fe, MENU_POPOVER_SURFACE as pe, Note as N, PICK_FOLDER_URL as me, POLICY_COLUMNS as he, POLICY_COVER_NOTE as ge, POLICY_MATRIX as _e, POLICY_SUMMARY as ve, PathLine as ye, PillTabList as be, Progress as xe, Rows as P, SEGMENT as Se, SEGMENTED_TRACK as Ce, SETTINGS_KEY as we, SETTINGS_URL as Te, Section as F, SectionSkeleton as Ee, SegmentedRadioGroup as De, Select as Oe, Select$1 as I, SelectItem as L, SettingsCard as ke, SettingsRow as R, SiteLabel as Ae, SourceLabel as z, SourceMark as je, Stack as B, StatusLabel as V, Switch as H, THUMBNAIL_JOBS_KEY as Me, TextField as Ne, TextFieldContext as Pe, __toESM as Fe, apiGet as U, apiSend as W, appSettingsStore as Ie, boundedPreference as Le, busyProps as G, cardClass as Re, cloudProxySkeleton as ze, cn as Be, confirmModal as Ve, credentialDone as He, credentialsSkeleton as Ue, cx as We, errorMessage as K, fetchConfiguration as Ge, fetchCredentials as Ke, fetchFeedSchedule as qe, fetchFollowSchedule as Je, fetchMediaProcessing as Ye, fetchSettings as Xe, fetchThumbnailJobs as Ze, fmtSize as Qe, indexersSkeleton as $e, javBrowserSkeleton as et, momentText as tt, overlayHost as nt, peachHistory$1 as rt, previewLibraryColor as it, providerIcon as at, queryClient as q, randomId as ot, rememberShape as J, require_jsx_runtime as st, require_react as ct, saveCredential as lt, schedulePollInterval as ut, settingsPath as dt, shellNavigate as ft, sortCx as pt, sourceDefaultCost as mt, useAction as Y, useLibraryTints as ht, useMutation as gt, useQuery as X, useRunSchedule as _t, useSaveFollowSchedule as vt, useSaveSettings as yt, useSaveThumbnailMode as bt } from "./peach-app.js";
@@ -233,13 +233,13 @@ function Bt({ initial: e, receipt: t }) {
 //#endregion
 //#region src/react/settings/download-settings.tsx
 var Vt = "/api/configuration/downloads", Ht = "/api/configuration/downloads/check", Ut = "/api/configuration/downloads/folder", Wt = "/api/configuration/downloads/pikpak/login", Gt = "/api/configuration/downloads/pikpak/logout", Kt = "/api/configuration/downloads/pikpak/browser-login", qt = 2e3, Jt = at("pikpak");
-function Yt({ initial: e, receipt: t, panel: n }) {
-	return /* @__PURE__ */ (0, $.jsx)("div", {
+function Yt({ initial: e, receipt: t, panel: n, issues: r }) {
+	return /* @__PURE__ */ (0, $.jsxs)("div", {
 		...Q(n),
-		children: /* @__PURE__ */ (0, $.jsx)(Xt, {
+		children: [r, e ? /* @__PURE__ */ (0, $.jsx)(Xt, {
 			initial: e,
 			receipt: t
-		})
+		}) : null]
 	});
 }
 function Xt({ initial: e, receipt: t }) {
@@ -331,6 +331,11 @@ function Zt({ state: e, settle: t, receipt: n, pikpakAccount: r }) {
 			}, (e) => v(K(e)));
 		},
 		children: [
+			e.problems?.length ? /* @__PURE__ */ (0, $.jsx)(B, { children: /* @__PURE__ */ (0, $.jsx)(N, {
+				tone: "error",
+				title: "云下载配置需要检查",
+				children: e.problems.join("\n")
+			}) }) : null,
 			/* @__PURE__ */ (0, $.jsxs)(B, { children: [
 				/* @__PURE__ */ (0, $.jsx)(M, {
 					label: "CloudDrive2 地址",
@@ -3313,11 +3318,12 @@ var Er = [
 	["direct", "直连"],
 	["proxy", "自定义"]
 ];
-function Dr({ data: e, receipt: t, panel: n }) {
+function Dr({ data: e, receipt: t, panel: n, issues: r }) {
 	return /* @__PURE__ */ (0, $.jsxs)("div", {
 		...Q(n),
 		children: [
-			e.editable && e.port_editable !== !1 ? /* @__PURE__ */ (0, $.jsx)(xr, {
+			r,
+			e.editable && e.port_editable !== !1 && !e.section_errors?.media_sources ? /* @__PURE__ */ (0, $.jsx)(xr, {
 				data: e,
 				receipt: t
 			}) : null,
@@ -3795,8 +3801,8 @@ function Vr({ initial: e, receipt: t }) {
 }
 //#endregion
 //#region src/react/settings/source-settings.tsx
-function Hr({ data: e, receipt: t, panel: n }) {
-	let r = X({
+function Hr({ data: e, receipt: t, panel: n, issues: r }) {
+	let i = X({
 		queryKey: E,
 		queryFn: ({ signal: e }) => Ke(e),
 		enabled: n?.active !== !1,
@@ -3805,20 +3811,21 @@ function Hr({ data: e, receipt: t, panel: n }) {
 	return /* @__PURE__ */ (0, $.jsxs)("div", {
 		...Q(n),
 		children: [
+			r,
 			/* @__PURE__ */ (0, $.jsx)("div", { children: /* @__PURE__ */ (0, $.jsx)(f, {
 				href: "/sources",
 				variant: "secondary",
 				children: "采集来源与登录状态"
 			}) }),
-			r.data ? /* @__PURE__ */ (0, $.jsx)(Fr, {
-				data: r.data,
+			i.data ? /* @__PURE__ */ (0, $.jsx)(Fr, {
+				data: i.data,
 				readOnly: !!e.ledger_read_only,
 				toast: t,
 				embedded: !0
-			}) : r.error ? /* @__PURE__ */ (0, $.jsx)(N, {
+			}) : i.error ? /* @__PURE__ */ (0, $.jsx)(N, {
 				tone: "error",
 				title: "来源凭据未取得",
-				children: K(r.error)
+				children: K(i.error)
 			}) : n?.active === !1 ? null : /* @__PURE__ */ (0, $.jsx)(Ee, {
 				label: "正在读取来源凭据",
 				html: Ue
@@ -3885,12 +3892,16 @@ function Kr({ receipt: e, reopenTutorial: t, section: n = "", diagnostics: r }) 
 		queryKey: h,
 		queryFn: ({ signal: e }) => Ge(e)
 	}), a = i.data;
-	return a ? /* @__PURE__ */ (0, $.jsx)(Jr, {
+	return a ? /* @__PURE__ */ (0, $.jsx)(Yr, {
 		data: a,
 		receipt: e,
 		reopenTutorial: t,
 		section: n,
-		diagnostics: r
+		diagnostics: r,
+		refreshing: i.isFetching,
+		reload: () => {
+			i.refetch({ cancelRefetch: !1 });
+		}
 	}) : /* @__PURE__ */ (0, $.jsx)("div", {
 		className: "ui-configpage",
 		children: /* @__PURE__ */ (0, $.jsx)(N, {
@@ -3900,44 +3911,77 @@ function Kr({ receipt: e, reopenTutorial: t, section: n = "", diagnostics: r }) 
 		})
 	});
 }
-var qr = 0;
-function Jr({ data: e, receipt: t, reopenTutorial: n, section: r, diagnostics: i }) {
-	let [a] = (0, Z.useState)(() => `board-tabs-${++qr}`), [o, s] = (0, Z.useState)(r), c = (0, Z.useRef)(null), l = (0, Z.useRef)(o);
+function qr({ data: e, sections: t, reload: n, refreshing: r }) {
+	return /* @__PURE__ */ (0, $.jsx)($.Fragment, { children: t.map((t) => {
+		let i = e.section_errors?.[t];
+		return i ? /* @__PURE__ */ (0, $.jsx)(N, {
+			tone: "error",
+			title: i.title,
+			action: /* @__PURE__ */ (0, $.jsx)(d, {
+				variant: "secondary",
+				size: "small",
+				onClick: n,
+				...G(r),
+				children: "重新读取"
+			}),
+			children: i.message
+		}, t) : null;
+	}) });
+}
+var Jr = 0;
+function Yr({ data: e, receipt: t, reopenTutorial: n, section: r, diagnostics: i, reload: a, refreshing: o }) {
+	let [s] = (0, Z.useState)(() => `board-tabs-${++Jr}`), [c, l] = (0, Z.useState)(r), u = (0, Z.useRef)(null), d = (0, Z.useRef)(c);
 	(0, Z.useEffect)(() => {
-		s(r);
+		l(r);
 	}, [r]), (0, Z.useEffect)(() => {
 		let t = Ur(e);
 		t && J("downloads", t), J("network", Wr(e)), J("maintenance", Gr(e));
 	}, [e]), (0, Z.useLayoutEffect)(() => {
-		if (l.current === o) return;
-		l.current = o;
-		let e = c.current?.querySelector("[role=\"tablist\"]"), t = c.current?.querySelector(".ui-board-group-active");
+		if (d.current === c) return;
+		d.current = c;
+		let e = u.current?.querySelector("[role=\"tablist\"]"), t = u.current?.querySelector(".ui-board-group-active");
 		if (!e || !t) return;
 		let n = parseFloat(getComputedStyle(e).top);
 		if (!Number.isFinite(n) || e.getBoundingClientRect().top > n + 1) return;
 		let r = matchMedia("(max-width:900px)").matches ? e.getBoundingClientRect().bottom + 8 : n;
 		window.scrollTo(0, Math.max(0, window.scrollY + t.getBoundingClientRect().top - r));
-	}, [o]);
-	let u = (e) => {
-		s(e), ft(dt(e), {
+	}, [c]);
+	let f = (e) => {
+		l(e), ft(dt(e), {
 			replace: !0,
 			state: rt.navigation.location.state
 		});
-	}, [d, f] = (0, Z.useState)(() => matchMedia("(max-width:900px)").matches);
+	}, [p, m] = (0, Z.useState)(() => matchMedia("(max-width:900px)").matches);
 	(0, Z.useEffect)(() => {
-		let e = matchMedia("(max-width:900px)"), t = () => f(e.matches);
+		let e = matchMedia("(max-width:900px)"), t = () => m(e.matches);
 		return e.addEventListener("change", t), () => e.removeEventListener("change", t);
 	}, []);
-	let p = (0, Z.useRef)([]), m = {
+	let h = (0, Z.useRef)([]), g = {
 		data: e,
 		receipt: t
-	}, h = !!(e.peach_proxy || e.access || e.tunnel || e.editable && e.port_editable !== !1), g = e.downloads, _ = [
+	}, _ = (t) => /* @__PURE__ */ (0, $.jsx)(qr, {
+		data: e,
+		sections: t,
+		reload: a,
+		refreshing: o
+	}), v = [
+		"peach_proxy",
+		"access",
+		"tunnel",
+		"push_discovery",
+		...e.editable && e.port_editable !== !1 ? ["media_sources"] : []
+	], y = !!(e.peach_proxy || e.access || e.tunnel || e.editable && e.port_editable !== !1 || v.some((t) => e.section_errors?.[t])), b = e.downloads, x = [
 		{
 			title: "媒体库与入库",
-			body: (e) => /* @__PURE__ */ (0, $.jsxs)("div", {
-				...Q(e),
+			body: (n) => /* @__PURE__ */ (0, $.jsxs)("div", {
+				...Q(n),
 				children: [
-					/* @__PURE__ */ (0, $.jsx)(er, { ...m }),
+					_([
+						"media_sources",
+						"library_count",
+						"mount_dependencies"
+					]),
+					!e.section_errors?.media_sources && !e.section_errors?.library_count ? /* @__PURE__ */ (0, $.jsx)(er, { ...g }) : null,
 					/* @__PURE__ */ (0, $.jsx)(_r, { receipt: t }),
 					/* @__PURE__ */ (0, $.jsx)(ur, { receipt: t })
 				]
@@ -3946,23 +3990,26 @@ function Jr({ data: e, receipt: t, reopenTutorial: n, section: r, diagnostics: i
 		{
 			title: "来源与订阅",
 			body: (e) => /* @__PURE__ */ (0, $.jsx)(Hr, {
-				...m,
-				panel: e
+				...g,
+				panel: e,
+				issues: _(["entry_links"])
 			})
 		},
-		...g ? [{
+		...b || e.section_errors?.downloads ? [{
 			title: "下载渠道",
 			body: (e) => /* @__PURE__ */ (0, $.jsx)(Yt, {
-				initial: g,
+				initial: b,
 				receipt: t,
-				panel: e
+				panel: e,
+				issues: _(["downloads"])
 			})
 		}] : [],
-		...h ? [{
+		...y ? [{
 			title: "网络与访问",
 			body: (e) => /* @__PURE__ */ (0, $.jsx)(Dr, {
-				...m,
-				panel: e
+				...g,
+				panel: e,
+				issues: _(v)
 			})
 		}] : [],
 		{
@@ -3970,10 +4017,21 @@ function Jr({ data: e, receipt: t, reopenTutorial: n, section: r, diagnostics: i
 			body: (e) => /* @__PURE__ */ (0, $.jsxs)("div", {
 				...Q(e),
 				children: [
-					/* @__PURE__ */ (0, $.jsx)(xn, { ...m }),
+					_([
+						"startup",
+						"uninstall",
+						"storage",
+						"remote_reporting",
+						"library_sharing",
+						"updates",
+						"update_job",
+						"automatic_updates",
+						"facts"
+					]),
+					/* @__PURE__ */ (0, $.jsx)(xn, { ...g }),
 					/* @__PURE__ */ (0, $.jsx)(dr, { receipt: t }),
 					/* @__PURE__ */ (0, $.jsx)(fn, {
-						...m,
+						...g,
 						reopenTutorial: n
 					})
 				]
@@ -3986,17 +4044,17 @@ function Jr({ data: e, receipt: t, reopenTutorial: n, section: r, diagnostics: i
 				children: e.active ? i : null
 			})
 		}
-	], v = Math.max(0, _.findIndex((e) => e.title === o)), y = (e, t) => {
-		let n = _.length - 1, r;
+	], S = Math.max(0, x.findIndex((e) => e.title === c)), ee = (e, t) => {
+		let n = x.length - 1, r;
 		if (e.key === "ArrowRight" || e.key === "ArrowDown") r = t === n ? 0 : t + 1;
 		else if (e.key === "ArrowLeft" || e.key === "ArrowUp") r = t === 0 ? n : t - 1;
 		else if (e.key === "Home") r = 0;
 		else if (e.key === "End") r = n;
 		else return;
-		e.preventDefault(), u(_[r].title), p.current[r]?.focus();
+		e.preventDefault(), f(x[r].title), h.current[r]?.focus();
 	};
 	return /* @__PURE__ */ (0, $.jsxs)("div", {
-		ref: c,
+		ref: u,
 		className: "ui-configpage",
 		children: [/* @__PURE__ */ (0, $.jsx)(be, {
 			className: "ui-board-local-nav",
@@ -4005,35 +4063,35 @@ function Jr({ data: e, receipt: t, reopenTutorial: n, section: r, diagnostics: i
 			"data-section-nav": "",
 			"data-section-items": "",
 			"data-pill-nav": "",
-			"aria-orientation": d ? "horizontal" : "vertical",
-			children: _.map(({ title: e }, t) => /* @__PURE__ */ (0, $.jsx)("button", {
+			"aria-orientation": p ? "horizontal" : "vertical",
+			children: x.map(({ title: e }, t) => /* @__PURE__ */ (0, $.jsx)("button", {
 				ref: (e) => {
-					p.current[t] = e;
+					h.current[t] = e;
 				},
 				type: "button",
 				role: "tab",
-				id: `${a}-tab-${t}`,
-				"aria-controls": `${a}-panel-${t}-0`,
-				"aria-selected": t === v,
-				"data-pill-selected": t === v ? "" : void 0,
+				id: `${s}-tab-${t}`,
+				"aria-controls": `${s}-panel-${t}-0`,
+				"aria-selected": t === S,
+				"data-pill-selected": t === S ? "" : void 0,
 				"data-pill-variant": "gray",
-				tabIndex: t === v ? 0 : -1,
-				onClick: () => u(e),
-				onKeyDown: (e) => y(e, t),
+				tabIndex: t === S ? 0 : -1,
+				onClick: () => f(e),
+				onKeyDown: (e) => ee(e, t),
 				children: e
 			}, e))
-		}), _.map(({ title: e, body: t }, n) => /* @__PURE__ */ (0, $.jsxs)(Z.Fragment, { children: [/* @__PURE__ */ (0, $.jsx)("h2", {
+		}), x.map(({ title: e, body: t }, n) => /* @__PURE__ */ (0, $.jsxs)(Z.Fragment, { children: [/* @__PURE__ */ (0, $.jsx)("h2", {
 			className: "ui-configgroup",
 			children: e
 		}), t({
 			index: n,
-			id: `${a}-panel-${n}-0`,
-			labelledBy: `${a}-tab-${n}`,
-			active: n === v
+			id: `${s}-panel-${n}-0`,
+			labelledBy: `${s}-tab-${n}`,
+			active: n === S
 		})] }, e))]
 	});
 }
 //#endregion
 export { Kr as ConfigurationPage };
 
-//# debugId=78aa664a-ede9-4231-94fa-85a243e03341
+//# debugId=de944ccb-4459-4af8-9b8c-e6c4d4ff544a

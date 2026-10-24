@@ -400,6 +400,34 @@ class LandingTests(_Deployment):
 
 
 class SettingsTests(_Deployment):
+    def test_service_addresses_validate_ports_and_preserve_supported_hosts(self):
+        for address in ("http://127.0.0.1:abc", "http://localhost:0", "http://localhost:65536",
+                        "http://localhost:", "http://localhost:19798#fragment", "http://[::1",
+                        "http://127.0.0.1:19 798", "http://@localhost:19798", "http://localhost\x00:19798",
+                        "C:\\CloudDrive2\\CloudDrive2.exe"):
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                dl.clean_address(address)
+        for source, expected in (("localhost:19798", "http://localhost:19798"),
+                                 ("http://[::1]:19798", "http://[::1]:19798"),
+                                 ("https://example.test", "https://example.test")):
+            with self.subTest(source=source):
+                self.assertEqual(dl.clean_address(source), expected)
+
+    def test_invalid_saved_address_is_editable_and_preserves_other_preferences(self):
+        path = self.service.settings.path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        stored = {"clouddrive_address": "http://localhost:bad-port", "targets": {"115": "/115/Movies"},
+                  "pikpak_root": "P:\\", "wait_hours": 48}
+        payload = json.dumps(stored).encode()
+        path.write_bytes(payload)
+        loaded = self.service.settings.load()
+        self.assertEqual(loaded.payload(), stored)
+        self.assertIn("端口", loaded.problems[0])
+        self.assertEqual(path.read_bytes(), payload)
+        corrected = self.service.settings.save({**stored, "clouddrive_address": "localhost:19798"}, None)
+        self.assertEqual(corrected.problems, ())
+        self.assertEqual(corrected.targets, stored["targets"])
+
     def test_snapshot_hides_remote_cancel_when_the_channel_cannot_cancel(self):
         task_id = self.submit()["task"]["id"]
         self.service.channel_catalog = lambda: {"providers": [{

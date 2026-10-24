@@ -234,6 +234,45 @@ class RouteTests(_App):
 class SettingsBlockTests(_App):
     """CloudDrive2 那一侧换成 `self.answer`；没有令牌时走真的 `check`，它在连网之前就停。"""
 
+    def test_invalid_service_address_is_refused_before_settings_or_token_are_saved(self):
+        self.service.save_settings({"clouddrive_address": "localhost:19798", "wait_hours": 48}, self.roots())
+        before = self.service.settings.path.read_bytes()
+        stored_secrets = self.secrets()
+        client = TestClient(self.app, client=("127.0.0.1", 50000), base_url="http://127.0.0.1")
+        response = client.post("/api/configuration/downloads", json={
+            "clouddrive_address": "http://localhost:bad-port", "token": "test-only-new-token"})
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn("端口", response.text)
+        self.assertEqual(self.service.settings.path.read_bytes(), before)
+        self.assertEqual(self.secrets(), stored_secrets)
+
+    def test_saved_invalid_address_and_token_keep_configuration_readable_and_repairable(self):
+        from peach import routes_configuration, settings_file
+        from peach.downloads_channels import LibraryChannels
+
+        self.service.settings.path.parent.mkdir(parents=True, exist_ok=True)
+        raw = {"clouddrive_address": "http://localhost:bad-port", "targets": {"115": "/115/Movies"},
+               "pikpak_root": "", "wait_hours": 48}
+        self.service.settings.path.write_text(json.dumps(raw), encoding="utf-8")
+        before = self.service.settings.path.read_bytes()
+        self.service.config = self.service.settings.load()
+        self.service.credentials.save(dl.CLOUDDRIVE_CREDENTIAL, {"token": "test-only-token"})
+        self.service.landing.declared_roots = {"115": ("R:\\Media",)}
+        self.service.channel_catalog = LibraryChannels(self.service, lambda: {})
+        config = settings_file.PeachConfig(self.root, self.root / "config.toml", present=True)
+        client = TestClient(self.app, client=("127.0.0.1", 50000), base_url="http://127.0.0.1")
+        with mock.patch.object(settings_file, "load_config", return_value=config), \
+                mock.patch.object(routes_configuration, "snapshot", return_value={"port": 8900, "media_dirs": []}):
+            response = client.get("/api/configuration")
+        self.assertEqual(response.status_code, 200, response.text)
+        state = response.json()["downloads"]
+        self.assertEqual(state["config"], raw)
+        self.assertTrue(state["token_set"])
+        self.assertTrue(any("端口" in problem for problem in state["problems"]))
+        self.assertEqual(state["providers"], [])
+        self.assertNotIn("test-only-token", response.text)
+        self.assertEqual(self.service.settings.path.read_bytes(), before)
+
     def setUp(self):
         super().setUp()
         real = downloads_clouddrive.check

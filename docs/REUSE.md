@@ -767,7 +767,11 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 | 本地 NFO 导入 | Kodi／Jellyfin NFO 协议（2026-09-06 核对 [Kodi](https://kodi.wiki/view/NFO_files/Movies)、[Jellyfin](https://jellyfin.org/docs/general/server/metadata/nfo/)），标准库 ElementTree，图片走项目固定版 Pillow；实现在 `library_nfo.py` | 只适配影片、单集与音乐视频（整剧、专辑、播放记录与远端图片引用不套用），拒绝 DTD、超大输入与越目录图片引用。同名边车优先，`movie.nfo` 与通用海报只用于单影片目录；正片和图片同属一组连号（`(1).mp4` 配 `(1).jpg`…）时同名图是图集的一张。已知内容词投影为中文标签，画质、促销、发行属性与演员编成丢弃，未收录的自定义标签保留；远端补厂牌、导演、发行商、时长与图片出处，人物主名精确一致时补 DMM id、假名、罗马字与首次头像，不替换演员真值。网络复用 R18 JSON 入口、SourceTransport、头像缓存与封面解析器。候选按资产 ID 与路径定位，批准时复核目标，时长证据不覆盖探测时长（ADR-0029） |
 | JAV 高清封面 | Javinizer-Go `dd56998328d078c9baf68ff4fde2e6fcaa2a691a`（MIT）的 DMM modern `awsimgsrc.dmm.com/dig/...` 映射与尺寸门槛；Prestige 公开 API 的查询模型参考 MDCX `58e3f930f2e864fceb8a53ceef818716e2a6413d`（GPL-3.0，只作协议证据） | 候选、Range 量尺寸、面积最大者胜出与仅更大才原子升级见 `peach-jav-cover-workflow`。批量流程不请求社区来源，历史快照里的社区站只借厂牌；既有库采集在官方落空时经 `peach.community_catalog` 查 AVBase（取商品号认得出这个番号的店铺条目，名寄せ的标题可能来自合集）、JavBus 与 JavDB，两个图源先按 dHash 求一致，取景不同时用 OpenCV ORB（相似变换内点 ≥60 算同一张）。JavDB 只参与复核，不作为安装候选；其他单一图源留空 `verified_by`，遇验证页不绕过（ADR-0107）。MDC-NG 只证明 Amazon 日本渠道存在，只留 POC 候选。不写 ledger |
 
-CloudDrive2 配置生成复用现有 TOML 模板、mDNS 公布地址和应用服务设置。HTTP 与 HTTPS 按各自默认端口生成 origin，非默认端口完整保留；配置读取、保存与更换密钥共用生成函数。该差异属于 Peach 部署配置，无需引入协议库或新增依赖；模板沿用现有 CloudDrive2 结构。回归用临时服务验证 HTTP 通知接收、密钥和来源校验，真实 ledger 与生产监听设置不参与验证。
+CloudDrive2 配置生成复用现有 TOML 模板、mDNS 公布地址和应用服务设置，origin 由现有 `httpx.URL` 处理 IPv6 方括号及端口。HTTP 与 HTTPS 按各自默认端口生成 origin，非默认端口完整保留；配置读取、保存与更换密钥共用生成函数。该差异属于 Peach 部署配置，无需引入协议库或新增依赖；模板沿用现有 CloudDrive2 结构。回归用临时服务验证 HTTP 通知接收、密钥和来源校验，真实 ledger 与生产监听设置不参与验证。
+
+云下载服务地址统一通过 `downloads.clean_address` 校验协议、主机、端口及凭据隔离；设置保存、gRPC 目标与本机自动发现共用该入口，解析失败转成 `DownloadError`。已保存的无效地址按原值呈现在配置表单，其余有效偏好保留，读取不写文件；修正保存后清除提示。渠道发现分别处理 CloudDrive2 与 PikPak 凭据错误，健康渠道继续提供。
+
+配置读取复用 `_read_section` 隔离可选区域，以 `section_errors` 返回区域名称、操作提示和诊断编号；异常交给现有 `error_reporting.event` 留痕。页面复用 TanStack Query 重新读取和 BoardUI Note、Button，在对应分区提供重试；未知媒体来源或计数时隐藏依赖它们的媒体表单。鉴权、本机访问检查及核心设置校验仍由配置入口执行。无新增依赖、ledger 迁移或后台重试。
 
 依赖的第一个消费者及其隔离测试必须在同一改动落地，否则不引入依赖。
 表里没有单列的 Python 依赖及首个消费者：`numpy`（vision 组，`face_detect.decode` 直接 import）、`socksio`（PikPak 的 SOCKS 代理）、
