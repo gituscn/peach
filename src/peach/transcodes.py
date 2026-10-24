@@ -10,6 +10,7 @@ import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
+from .smb_media import input_url
 
 from .ffmpeg import FFmpegResolver
 from .hardware_transcode import HardwareTranscoder
@@ -245,7 +246,7 @@ class TranscodeService:
         command = (
             str(choice.path), "-v", "error", "-show_entries",
             "stream=codec_type,codec_name,pix_fmt,has_b_frames:format=duration",
-            "-of", "json", str(source),
+            "-of", "json", input_url(source),
         )
         try:
             returncode, stdout, _stderr = self._execute(
@@ -339,7 +340,7 @@ class TranscodeService:
             )
             yield _TranscodeAttempt(
                 "video-copy",
-                prefix + ("-i", str(source)) + mapping + ("-c:v", "copy") + audio + finish,
+                prefix + ("-i", input_url(source)) + mapping + ("-c:v", "copy") + audio + finish,
             )
 
         fast_audio = (
@@ -351,7 +352,7 @@ class TranscodeService:
         for encoder in self.hardware.encoders(ffmpeg):
             for attempt in encoder.attempts(codec):
                 yield _TranscodeAttempt(
-                    attempt.name, prefix + attempt.before_input + ("-i", str(source))
+                    attempt.name, prefix + attempt.before_input + ("-i", input_url(source))
                     + mapping + attempt.output + fast_audio + finish,
                 )
 
@@ -363,10 +364,10 @@ class TranscodeService:
         if decode:
             yield _TranscodeAttempt(
                 "d3d11va-libx264",
-                prefix + decode + ("-i", str(source)) + mapping + software + finish,
+                prefix + decode + ("-i", input_url(source)) + mapping + software + finish,
             )
         yield _TranscodeAttempt(
-            "libx264", prefix + ("-i", str(source)) + mapping + software + finish,
+            "libx264", prefix + ("-i", input_url(source)) + mapping + software + finish,
         )
 
     def _execute(

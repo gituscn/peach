@@ -60,6 +60,8 @@ def probe_file(ffprobe: str, path: str, timeout: float = TIMEOUT_SECONDS) -> tup
     from .processing_traffic import CURRENT as TRAFFIC, media_statistics
     if skip_background_read(path):
         raise ValueError('STRM 和 ISO 不执行视频探测')
+    from .smb_media import input_url
+    path = input_url(path)
     result = subprocess.run(
         [
             ffprobe, "-v", "verbose" if TRAFFIC.get() is not None else "error", "-rw_timeout", "8000000",

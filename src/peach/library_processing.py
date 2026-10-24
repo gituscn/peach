@@ -35,7 +35,7 @@ from . import media_identity
 from . import junk
 from . import sample_followup
 from .metadata_policy import SOURCE_SPECS, preferred_tag_source
-from .platform import root_online, translate_ledger_path
+from .platform import root_online, translate_ledger_path as _local_ledger_path
 from .review_csv import read_rows, write_rows
 from .scan import scan_location
 from .fsutil import atomic_write_text
@@ -51,6 +51,12 @@ from .processing_traffic import ProcessingTraffic
 from .processing_control import (task_control, bind_control, checkpoint_values,
                                  initial_estimate, ProcessingEstimate, interrupted_state,
                                  deadline_after, resume_fields)
+
+
+def translate_ledger_path(raw):
+    from .smb_media import resolve
+    return resolve(raw) or _local_ledger_path(raw)
+
 
 FIELDS = ('item_key', 'code', 'query', 'asset_id', 'asset_path', 'field', 'field_label', 'current_value',
           'candidates_json', 'source_count', 'source_profile', 'policy_version', 'status',
@@ -2293,9 +2299,9 @@ class _LocalEvidenceCache:
             cached = None
         if cached is not None:
             code, verify, payload, entries = cached['local']
-            poster_jobs.extend((row, Path(source), name, Path(target))
+            poster_jobs.extend((row, translate_ledger_path(source), name, Path(target))
                                for source, name, target in cached['posters'])
-            return code, verify, payload, [(source, document, Path(path)) for source, document, path in entries]
+            return code, verify, payload, [(source, document, translate_ledger_path(path)) for source, document, path in entries]
         offset, issues_before = len(poster_jobs), self.state['issue_count']
         local = _read_local_metadata(self.config, self.db_path, row, self.cover_root, self.listing,
                                      self.state, update, issue, poster_jobs, self.code_patterns)

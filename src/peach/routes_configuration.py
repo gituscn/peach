@@ -660,6 +660,41 @@ def restart_update(request: Request, _args=Depends(require_auth)):
         raise HTTPException(409, str(exc)) from exc
 
 
+@router.post('/api/configuration/smb/test')
+def test_smb_connection(request: Request, body: dict[str, Any] = Body(default_factory=dict),
+                        _args=Depends(require_auth)):
+    local_only(request)
+    same_origin(request)
+    from .smb_media import address, canonical, credential_store
+    from .smb_transport import SmbConnection, SmbTransport
+    config = settings_file.load_config()
+    try:
+        host, share, tail, port = address(canonical(str(body.get('path', ''))))
+        values = {}
+        key = str(body.get('root_id', ''))
+        known = config.storage_roots.get(key)
+        if known and known.get('transport') == 'smb' and canonical(known['mount']) == canonical(body['path']):
+            credential = credential_store(config).load('smb-' + key)
+            values = credential.values if credential else {}
+        username = body.get('smb_username', values.get('username', ''))
+        password = body.get('smb_password') or (values.get('password', '') if username == values.get('username', '') else '')
+        if not isinstance(username, str) or not isinstance(password, str):
+            raise ValueError('SMB 账号和密码必须是文字')
+        transport = SmbTransport(SmbConnection(host, share, username=username, password=password, port=port,
+                                             encrypt=body.get('smb_encrypt') is True, timeout=8))
+        try:
+            entries = transport.scandir(tail)
+        finally:
+            transport.close()
+        return {'readable': True, 'directories': [entry.name for entry in entries if entry.is_dir and not entry.is_symlink][:500]}
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from None
+    except PermissionError:
+        raise HTTPException(403, 'SMB 登录失败或没有读取权限，请检查账号、密码和共享权限') from None
+    except OSError:
+        raise HTTPException(502, 'SMB 共享无法读取，请检查地址、共享名和网络连接') from None
+
+
 def _validate(body: dict[str, Any], config) -> tuple[dict[str, Any], dict[str, Any]]:
     """逐项校验，错误按字段归位：文件夹按行、端口一句。全对时第一个返回值为空。"""
     errors: dict[str, Any] = {}
@@ -689,7 +724,7 @@ def _validate(body: dict[str, Any], config) -> tuple[dict[str, Any], dict[str, A
                     problems = [""] * len(body["media_sources"])
                     problems[index] = "媒体库名称请使用 1 到 80 个可见字符"
                     break
-                root = str(media_configuration.PureWindowsPath(row["path"] if os.name == "nt" else row["root"]))
+                root = str(media_configuration.PureWindowsPath(row.get('root') or row['path']))
                 if name:
                     names[root] = name
                 from .media_libraries import LIBRARY_ICONS
@@ -966,7 +1001,9 @@ def save_configuration(request: Request, body: dict[str, Any] = Body(default_fac
             shutil.copy2(config.path, config.path.with_suffix(".previous.toml"))
             settings_file.keep_pre_identity_backup(config.path)
             temporary.write_text(settings_file.render(prepared), encoding="utf-8")
-            os.replace(temporary, config.path)
+            from .smb_media import credential_transaction
+            with credential_transaction(prepared, body.get('media_sources', [])):
+                os.replace(temporary, config.path)
             if body.get("scan_now"):
                 onboarding.request_first_scan(prepared, "configured")
             config.directory("state").mkdir(parents=True, exist_ok=True)

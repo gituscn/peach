@@ -31,6 +31,7 @@
 from __future__ import annotations
 
 import os
+import ntpath
 import hashlib
 import json
 import re
@@ -183,6 +184,17 @@ def ledger_root_for(
     declared = declared_roots.get(location, ())
     location_mounts = tuple(mounts.get(location, ()))
     for declared_root, mount in zip(declared, location_mounts):
+        from .smb_media import is_address, canonical
+        if is_address(str(mount)):
+            if text == declared_root or PureWindowsPath(text).is_relative_to(PureWindowsPath(declared_root)):
+                return text
+            if is_address(text) and canonical(text).startswith(canonical(str(mount)).rstrip('/') + '/'):
+                from urllib.parse import unquote
+                tail = tuple(unquote(part) for part in canonical(text)[len(canonical(str(mount))) + 1:].split('/'))
+                return str(PureWindowsPath(declared_root, *tail))
+            if is_address(text) and canonical(text) == canonical(str(mount)):
+                return declared_root
+            continue
         if not str(mount):
             continue
         try:
@@ -210,6 +222,12 @@ def walk_root_for(
     windows = os.name == "nt" if windows is None else windows
     _location, index, tail = resolve_root(root, declared_roots)
     location_mounts = tuple(mounts.get(location, ()))
+    from .smb_media import is_address, resolve
+    if index < len(location_mounts) and is_address(str(location_mounts[index])):
+        resource = resolve(root)
+        if resource is None:
+            raise ScanTargetError('SMB 目录尚未保存到媒体库配置')
+        return resource
     if index >= len(location_mounts) or str(location_mounts[index]) in ("", ".") or is_unmapped(Path(location_mounts[index])):
         if windows:
             return Path(root)
@@ -379,6 +397,10 @@ def _walk(top: Path, pending: list[str] | None = None, *, onerror=lambda error: 
     列表自带这两项，不必再对每个文件发一次 `os.stat`——网盘挂载上那一次就是一趟往返，
     几万个文件就是几万趟。读不了的目录跳过；符号链接指向的目录列出但不进入。
     """
+    from .smb_media import SmbResource
+    if isinstance(top, SmbResource):
+        yield from _walk_smb(top, pending, onerror)
+        return
     stack = pending if pending is not None else [os.fspath(top)]
     while stack:
         checkpoint('scan')
@@ -407,6 +429,39 @@ def _walk(top: Path, pending: list[str] | None = None, *, onerror=lambda error: 
         # 倒着压栈，弹出来就是字典序，进度行读起来和目录里看到的一致。
         queued = set(stack)
         stack.extend(path for path in sorted(subdirectories, reverse=True) if path not in queued)
+        yield directory, sorted(files, key=lambda entry: entry.name)
+
+
+def _relative_directory(directory, top):
+    from .smb_media import SmbResource
+    return (PureWindowsPath(str(directory)).relative_to(PureWindowsPath(str(top))).parts
+            if isinstance(top, SmbResource) else Path(directory).relative_to(top).parts)
+
+
+def _walk_smb(top, pending, onerror):
+    from types import SimpleNamespace
+    stack = pending if pending is not None else [str(top)]
+    while stack:
+        checkpoint('scan')
+        directory = stack.pop()
+        resource = top.joinpath(*_relative_directory(directory, top))
+        try:
+            entries = resource.scandir()
+        except OSError as error:
+            onerror(error)
+            continue
+        files, children = [], []
+        for entry in entries:
+            if entry.is_symlink:
+                continue
+            path = str(resource / entry.name)
+            if entry.is_dir:
+                if not entry.name.startswith('@') and entry.name.casefold() != '#recycle':
+                    children.append(path)
+            else:
+                stat = SimpleNamespace(st_size=entry.size, st_mtime=entry.mtime, st_mtime_ns=entry.mtime_ns)
+                files.append(SimpleNamespace(name=entry.name, path=path, stat=lambda value=stat: value))
+        stack.extend(path for path in sorted(children, reverse=True) if path not in stack)
         yield directory, sorted(files, key=lambda entry: entry.name)
 
 
@@ -443,9 +498,14 @@ def scan_location(db_path, location, root, **kwargs) -> ScanResult:
 
 def _pending_directories(previous, walk_root):
     """恢复目录栈，并核对本机挂载仍属于当前扫描根。"""
-    pending = list(previous.get('pending', [os.fspath(walk_root)]))
+    pending = list(previous.get('pending', [str(walk_root)]))
     if previous.get('current_directory'):
         pending.append(previous['current_directory'])
+    from .smb_media import SmbResource
+    if isinstance(walk_root, SmbResource):
+        for value in pending:
+            _relative_directory(value, walk_root)
+        return pending
     if any(not Path(value).is_relative_to(walk_root) for value in pending):
         raise ScanTargetError('扫描目录与保存的断点不一致，请核对挂载设置')
     return pending
@@ -468,7 +528,10 @@ def _scan_location(
     walk_root = walk_root_for(
         location, root, declared_roots=declared_roots, mounts=mounts or {}, windows=windows)
     previous = resume_state or {}
-    mapping = str(walk_root)
+    from .smb_media import SmbResource
+    remote = isinstance(walk_root, SmbResource)
+    mapping = f'{walk_root.uri}|{walk_root}' if remote else str(walk_root)
+    path_module = ntpath if remote else os.path
     if previous.get('mapping') != mapping:
         previous = {}
     if previous.get('result'):
@@ -487,8 +550,8 @@ def _scan_location(
     batch: list[tuple] = []
     # 文件批次提交后保存文件名游标；同目录的配对资料随断点保留。
     def save_directory(directory=None, cursor=None, here=None):
-        artwork_parents = {os.path.dirname(value) for value in [*pending, *([directory] if directory else [])]
-                           if os.path.basename(value).casefold() in ARTWORK_DIRS}
+        artwork_parents = {path_module.dirname(value) for value in [*pending, *([directory] if directory else [])]
+                           if path_module.basename(value).casefold() in ARTWORK_DIRS}
         video_dirs.intersection_update(artwork_parents)
         save_checkpoint(dict(mapping=mapping, scan_time=now, pending=list(pending), files=files,
                              total_bytes=total, sidecars=skipped, subtitles=tracks,
@@ -502,7 +565,7 @@ def _scan_location(
         registered = _registered_paths(connection, location, root)
         for directory, entries in _walk(walk_root, pending):
             checkpoint('scan')
-            relative = Path(directory).relative_to(walk_root).parts
+            relative = _relative_directory(directory, walk_root)
             continuing = directory == previous.get('current_directory')
             here = dict(previous.get('here') or {}) if continuing else {}
             cursor = previous.get('cursor') if continuing else None
@@ -510,8 +573,8 @@ def _scan_location(
             if videos:
                 video_dirs.add(directory)
             # 自顶向下遍历，上一层总是先于这一层出来，这时已经知道它有没有视频。
-            artwork_dir = (os.path.basename(directory).casefold() in ARTWORK_DIRS
-                           and os.path.dirname(directory) in video_dirs)
+            artwork_dir = (path_module.basename(directory).casefold() in ARTWORK_DIRS
+                           and path_module.dirname(directory) in video_dirs)
             for entry in entries:
                 checkpoint('scan')
                 name = entry.name

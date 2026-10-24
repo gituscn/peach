@@ -67,6 +67,33 @@ it('不能编辑时只说原因，不画表单', async () => {
 });
 
 describe('媒体目录', () => {
+  it('来源选择 SMB 共享时显示连接字段，切回本地磁盘时隐藏', async () => {
+    const host = await open({ media_sources: [{ location: 'local', root: 'D:\\Media', path: 'D:\\Media' }] });
+    const source = () => host.querySelector('[aria-label="媒体来源 1"]');
+    expect(host.querySelector('[aria-label="SMB 账号 1"]')).toBeNull();
+    await choose(source(), 'SMB 共享');
+    expect(source()?.textContent).toContain('SMB 共享');
+    expect(paths(host)[0]?.value).toBe('smb://');
+    expect(host.querySelector('input[aria-label="SMB 密码 1"]')?.getAttribute('type')).toBe('password');
+    await type(paths(host)[0], '');
+    expect(source()?.textContent).toContain('SMB 共享');
+    expect(host.querySelector('[aria-label="SMB 账号 1"]')).not.toBeNull();
+    await choose(source(), '本地磁盘');
+    expect(host.querySelector('[aria-label="SMB 账号 1"]')).toBeNull();
+  });
+
+  it('保存 SMB 来源保留目录身份，密码输入保持为空', async () => {
+    const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
+    vi.stubGlobal('fetch', fetcher);
+    const host = await open({ media_sources: [{ location: 'local', root: 'P:\\NAS', path: 'smb://nas/Movies',
+      root_id: 'nas-root', library_id: 'nas-library', transport: 'smb', smb_username: 'reader', smb_password_saved: true }] });
+    expect(host.querySelector('[aria-label="媒体来源 1"]')?.textContent).toContain('SMB 共享');
+    expect(host.querySelector<HTMLInputElement>('[aria-label="SMB 密码 1"]')?.value).toBe('');
+    await submit(host.querySelector('form'));
+    expect(sentBody(fetcher).media_sources[0]).toMatchObject({ root_id: 'nas-root', library_id: 'nas-library',
+      transport: 'smb', path: 'smb://nas/Movies', smb_username: 'reader', smb_password: '' });
+  });
+
   it('同一媒体库的文件夹归在一张卡里，名称只填一次，保存时写进全部目录并保留根目录身份', async () => {
     const fetcher = fetchMock(200, { saved: true, url: '/', revision: 'rev-2' });
     vi.stubGlobal('fetch', fetcher);

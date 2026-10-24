@@ -1,4 +1,4 @@
-"""SMB 只读传输的隔离行为与请求期限。"""
+"""SMB 读写传输的隔离行为与请求期限。"""
 
 import errno
 import io
@@ -72,6 +72,56 @@ class SmbTransportTests(unittest.TestCase):
         self.assertNotIn("reader", repr(self.config))
         self.assertNotIn("secret", repr(self.config))
 
+    def test_write_uses_explicit_offsets_and_handles_partial_responses(self):
+        self.conn.max_write_size = 4
+        with patch.object(self.transport, '_set_info') as set_information:
+            writer = self.transport.open_write('folder/new.mp4')
+            fd = self.fds[-1]
+            fd.write.side_effect = lambda data, offset, send: (object(), lambda _: min(2, len(data)))
+            self.assertEqual(writer.write(b'abcdef'), 6)
+            self.assertEqual([call.args[1] for call in fd.write.call_args_list], [0, 2, 4])
+            self.assertEqual(writer.stat().st_size, 6)
+            writer.flush()
+            fd.flush.assert_called_once()
+            writer.close()
+            self.assertEqual(set_information.call_args.args[1]['end_of_file'].get_value(), 0)
+        self.assertTrue(all(not fd.connected for fd in self.fds))
+
+    def test_rename_keeps_both_parent_chains_and_refuses_replacement(self):
+        with patch.object(self.transport, '_set_info') as set_information:
+            self.transport.rename('a/source.mp4', 'b/target.mp4')
+            fd, information = set_information.call_args.args
+            self.assertEqual(fd.file_name, 'a\\source.mp4')
+            self.assertFalse(information['replace_if_exists'].get_value())
+            self.assertEqual(information['file_name'].get_value(), 'b\\target.mp4')
+        self.assertTrue(all(not fd.connected for fd in self.fds))
+
+    def test_write_refuses_reparse_before_truncation(self):
+        self.attrs['link.mp4'] = FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT
+        with patch.object(self.transport, '_set_info') as set_information:
+            with self.assertRaises(PermissionError):
+                self.transport.open_write('link.mp4')
+            set_information.assert_not_called()
+
+    def test_write_permission_failure_and_root_protection(self):
+        for action in (lambda: self.transport.unlink(()), lambda: self.transport.mkdir(()),
+                       lambda: self.transport.rename('a', ())):
+            with self.assertRaises(PermissionError):
+                action()
+        with patch.object(self.transport, '_set_info', side_effect=AccessDenied()):
+            with self.assertRaises(PermissionError):
+                self.transport.unlink('movie.mp4')
+        self.assertTrue(all(not fd.connected for fd in self.fds))
+
+    def test_open_handle_exposes_its_own_size_and_timestamp(self):
+        with self.transport.open('movie.mp4') as reader:
+            info = reader.stat()
+            self.assertEqual(info.st_size, 10)
+            self.assertGreater(info.st_mtime_ns, 0)
+            reader.seek(4)
+            self.assertEqual(reader.stat(), info)
+        self.assertTrue(all(not fd.connected for fd in self.fds))
+
     def test_invalid_paths_never_connect(self):
         for path in ("../x", "/x", "\\x", "C:x", "x/../y", "x//y", "x:stream", "x/", ("a/b",), ("..",), ("x.",)):
             with self.subTest(path=path), self.assertRaises(ValueError):
@@ -140,7 +190,7 @@ class SmbTransportTests(unittest.TestCase):
                                     (SMBAuthenticationError("credential error"), errno.EACCES)):
             with self.subTest(expected=expected):
                 original = self.fd
-                def bad_fd(tree, name):
+                def bad_fd(tree, name, original=original, exception=exception):
                     fd = original(tree, name)
                     fd.create.side_effect = exception
                     return fd

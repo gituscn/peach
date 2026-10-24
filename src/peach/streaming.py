@@ -223,7 +223,8 @@ class SplicedMp4Response(Response):
         registry: StreamSessionRegistry | None = None,
     ) -> None:
         super().__init__(b"", media_type="video/mp4")
-        self.path = Path(path)
+        from .smb_media import SmbResource
+        self.path = path if isinstance(path, SmbResource) else Path(path)
         self.header = header
         self.session = session
         self.registry = registry
@@ -296,7 +297,7 @@ class SplicedMp4Response(Response):
 
     async def _source_chunks(self, begin: int, stop: int):
         """整段共用一个句柄：挂载盘上每开一次文件都要多走一趟握手。"""
-        handle = await asyncio.to_thread(open, self.path, "rb")
+        handle = await asyncio.to_thread(self.path.open, 'rb')
         try:
             await asyncio.to_thread(handle.seek, self.header.payload_start + begin)
             remaining = stop - begin

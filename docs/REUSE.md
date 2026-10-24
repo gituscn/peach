@@ -1,5 +1,13 @@
 # 复用清单
 
+## SMB 媒体读写
+
+采用 [smbprotocol 1.17.0](https://github.com/jborean93/smbprotocol/tree/v1.17.0)（MIT，Python ≥3.10，上游测试包含 Python 3.14 与 Windows、macOS、Linux）。固定传递版本见 `uv.lock`；库 wheel 约 128 kB，另有 cryptography、pyspnego 和平台认证依赖。`opensrc path smbprotocol` 未取得源码，改为核对固定 tag 的 `_pool.py`、`_io.py`、`open.py`、`connection.py`。
+
+复用认证、协议消息与解析器、目录分页和偏移读写，以及 `SMBFileTransaction`、`set_info` 和 `FileRenameInformation`／`FileDispositionInformation`／`FileEndOfFileInformation`。Peach 保留固定根目录授权、绝对请求期限、取消、凭据隔离与媒体会话；整理和永久删除沿用既有计划、账本事务与失败恢复。目录条目的 `stat()` 会额外发请求，扫描消费枚举元数据；传输在库响应事件上施加期限，超时取消并断开独占连接。SDK 认证日志保持 WARNING，DFS 与重解析点拒绝。写入不覆盖改名目标、不跨声明根，写权限由共享服务器判定；工具用的回环 HTTP 仍只读。
+
+未采用 fsspec，其 SMB 底层仍是 smbprotocol，无法替代媒体工具输入和取消；pysmb 的 SMB1/2 能力不覆盖同等 SMB3 需求。FFmpeg 原生 SMB 依赖二进制构建，本机工具没有列出该协议，因此使用 HTTP Range 回环桥。隔离回归覆盖认证、读取、并发偏移、配置与扫描配对；实际 FFmpeg 通过合成视频的尾部索引和 seek 抽帧。真实 NAS 吞吐和兼容性未取得，无真实 ledger 写入。
+
 ## 第三方标识的发行边界
 
 `resources/marks/` 保存用于实体身份展示的内置标识，来源记录与文件哈希见同目录 `manifest.json`。来源可追溯不等于取得图片版权或商标授权，图片也不因与应用同仓库就自动适用 AGPL。

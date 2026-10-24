@@ -46,7 +46,8 @@ def source_roots() -> list[MountRoot]:
     roots = []
     for location, declared_roots in LOCATION_ROOT_DECLARATIONS.items():
         for declared in declared_roots:
-            resolved = translate_ledger_path(declared)
+            from .smb_media import resolve
+            resolved = resolve(declared) or translate_ledger_path(declared)
             roots.append(MountRoot(location, labels.get(location, location), declared,
                                    None if is_unmapped(resolved) else resolved,
                                    **media_identity.ownership(settings_file.active(), declared)))

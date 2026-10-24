@@ -44,6 +44,8 @@ def media_statistics(path, stderr, *, kind=None, successful=False):
     meter = CURRENT.get()
     if meter is None:
         return
+    from .smb_media import source_identity
+    path = source_identity(path)
     text = stderr.decode('utf-8', 'replace') if isinstance(stderr, bytes) else str(stderr or '')
     sizes = STATISTICS.findall(text)
     if sizes:
@@ -76,8 +78,10 @@ class ProcessingTraffic:
         routes = connections(config)
         for location, roots in config.locations.items():
             for root in roots:
-                network = location in CLOUD_LOCATIONS or cost_for(location, root, config) == 'metered'
-                connection = routes.get(_key(root), 'unknown') if network else 'direct'
+                remote = any(value.get('transport') == 'smb' and _key(value['root']) == _key(root)
+                             for value in config.storage_roots.values())
+                network = remote or location in CLOUD_LOCATIONS or cost_for(location, root, config) == 'metered'
+                connection = routes.get(_key(root), 'unknown') if network and not remote else 'direct'
                 self.rows[f'{location}:{_key(root)}'] = dict(
                     label=config.library_names.get(root) or root, root=root, location=location,
                     metered=connection == 'proxy', connection=connection, network=network,

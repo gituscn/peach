@@ -98,6 +98,10 @@ LOGGER = logging.getLogger(__name__)
 
 def _image_response(request: Request, path: Path, media_type: str | None = None):
     """固定图片 URL 使用私有缓存，并按文件 ETag 复验。"""
+    from .smb_media import SmbResource
+    if isinstance(path, SmbResource):
+        from .smb_response import SmbResponse
+        return SmbResponse(path, media_type=media_type)
     response = FileResponse(path, media_type=media_type, stat_result=path.stat())
     response.headers["Cache-Control"] = "private, no-cache"
     if StaticFiles().is_not_modified(response.headers, request.headers):
@@ -225,6 +229,10 @@ def external_stream(request: Request, id: int, ticket: str, origin: str = ''):
     from . import strm, strm_stream
     if strm.is_pointer(path):
         return strm_stream.proxy(request, id, path)
+    from .smb_media import SmbResource
+    if isinstance(path, SmbResource):
+        from .smb_response import SmbResponse
+        return SmbResponse(path)
     return BufferedFileResponse(path, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
@@ -266,6 +274,10 @@ def stream(request: Request, id: int, session: str = "", args: dict[str, str] = 
         LOGGER.exception("browser transcode failed for asset %s", id)
         return JSONResponse({"error": "transcode unavailable"}, status_code=503)
     media_type = "video/mp4" if transcoded else None
+    from .smb_media import SmbResource
+    if isinstance(path, SmbResource):
+        from .smb_response import SmbResponse
+        return SmbResponse(path, session=session, registry=state.stream_sessions, media_type=media_type)
     response = (
         CancellableFileResponse(
             path, session=session, registry=state.stream_sessions, media_type=media_type,

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import threading
 import time
-from pathlib import Path, PureWindowsPath
+from pathlib import PureWindowsPath
 from uuid import uuid4
 
 from .processing_traffic import ProcessingTraffic
@@ -36,7 +36,7 @@ class InventoryPreview:
         self.lock = threading.Lock()
 
     def _files(self, config):
-        from .scan import _walk, medium_of, walk_root_for
+        from .scan import _walk, medium_of, walk_root_for, _relative_directory
         known = {self.meter._media_key(row['path'], row['location']) for row in self.rows}
         seen = set()
         for key, source in self.meter.rows.items():
@@ -51,7 +51,7 @@ class InventoryPreview:
                 continue
             for directory, entries in _walk(top, onerror=self._error):
                 yield None
-                relative = Path(directory).relative_to(top).parts
+                relative = _relative_directory(directory, top)
                 for entry in entries:
                     row = None
                     if medium_of(entry.name) == 'video':

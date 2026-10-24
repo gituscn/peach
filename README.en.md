@@ -114,6 +114,8 @@ See [Docker deployment](docs/DOCKER.md) for setup and supported configurations.
 
 ## FAQ
 
+- **Can I connect a NAS over SMB?** Enter `smb://server/share/folder` as a media folder, set credentials separately, and test the connection. SMB sources support read-only scanning and playback; see [SMB media sources](docs/SMB.md). Compatibility with a particular NAS requires device testing.
+
 - **Will it change my files?** Scanning and filling in details leave originals untouched. Manual organization renames or moves files; emptying the trash deletes files, and resource-sync cleanup removes empty folders. Each requires confirmation.
 - **Which cloud drives work?** Drives mounted as local folders through tools such as CloudDrive2; see [cloud drive mounts](docs/CLOUDDRIVE.md). Cloud download follows the connected provider's reported capabilities, with direct PikPak connections also supported and sign-in tokens stored locally.
 - **How do I watch on my phone?** Allow devices on the same network during setup, connect your phone to that network, open the address shown and set an access password.
