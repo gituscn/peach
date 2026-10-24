@@ -186,6 +186,82 @@ class ErrorReportingTests(unittest.TestCase):
         return [json.loads(line) for path in self.logs.glob("errors-*.log")
                 for line in path.read_text(encoding="utf-8").splitlines()]
 
+    def test_local_context_is_bounded_exported_and_never_sent_remotely(self):
+        from peach import diagnostic_context, remote_reporting
+        from peach.settings_file import PeachConfig
+        context = {'user_agent': 'Chrome/150', 'platform': 'Win32', 'native_codecs': {'h264': '', 'hevc': 'probably'},
+                   'cookie': 'private-cookie', 'viewport_width': 2 ** 10000, 'connection': {'downlink_mbps': float('inf')}}
+        browser = diagnostic_context.browser(context)
+        self.assertNotIn('viewport_width', browser)
+        self.assertNotIn('cookie', browser)
+        media = diagnostic_context.playback({'code': 4, 'ready_state': 0, 'network_state': 3,
+            'source_route': '/stream?token=private-token', 'src': 'https://private.example/movie.mp4',
+            'recent_requests': [{'route': '/stream', 'status': 206, 'duration_ms': 20},
+                                {'route': '/private/movie.mp4', 'status': 403}],
+            'buffered_ranges': [[0, 2], [0, float('nan')]]})
+        self.assertNotIn('source_route', media)
+        self.assertEqual(media['buffered_ranges'], [[0, 2]])
+        self.assertEqual(media['recent_requests'], [{'status': 206, 'duration_ms': 20, 'route': '/stream'}])
+        with mock.patch.object(remote_reporting, 'capture') as capture:
+            for index in range(25):
+                error_reporting.local_event('browser', browser=browser, playback=media, sequence=index)
+            payload = support_bundle.bundle_bytes(config=PeachConfig(self.root, self.root / 'config.toml'))
+        capture.assert_not_called()
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            report = json.loads(archive.read('report.json'))
+            exported = '\n'.join(archive.read(name).decode() for name in archive.namelist())
+        self.assertEqual(len(report['recent_browsers']), 8)
+        self.assertEqual(len(report['recent_playback']), 20)
+        self.assertEqual(report['recent_playback'][-1]['code'], 4)
+        self.assertEqual(report['recent_browsers'][-1]['native_codecs']['h264'], '')
+        self.assertIn('starlette', report['runtime']['packages'])
+        self.assertNotEqual(report['runtime']['packages']['opencv-python-headless'], '<ip>')
+        self.assertEqual(report['browser']['status'], 'unavailable')
+        for private in ('private-cookie', 'private-token', 'private.example', 'movie.mp4'):
+            self.assertNotIn(private, exported)
+
+    def test_browser_header_handles_unicode_invalid_encoding_and_unknown_fields(self):
+        import base64
+        from peach.diagnostic_context import browser_header
+        value = base64.b64encode(json.dumps({'platform': '测试平台', 'native_codecs': {'h264': 'maybe'},
+                                           'password': 'private-password'}, ensure_ascii=False).encode()).decode()
+        self.assertEqual(browser_header(value, user_agent='actual-agent')['platform'], '测试平台')
+        self.assertEqual(browser_header(value, user_agent='actual-agent')['user_agent'], 'actual-agent')
+        self.assertNotIn('password', browser_header(value))
+        for raw in ('not-base64', 'x' * 12001, base64.b64encode(b'not-json').decode()):
+            self.assertEqual(browser_header(raw)['status'], 'unavailable')
+
+    def test_tool_error_category_survives_path_redaction_and_stays_local(self):
+        from peach import remote_reporting
+        with mock.patch.object(remote_reporting, 'capture') as capture:
+            error_reporting.subprocess_failure('media-probe', tool='ffprobe', returncode=1,
+                stderr=b'C:\\private\\movie.mp4: No such file or directory\n')
+        row = self.records()[-1]
+        self.assertEqual(row['reason_code'], 'missing_media')
+        self.assertNotIn('movie.mp4', str(row))
+        self.assertNotIn('reason_code', capture.call_args.kwargs)
+
+    def test_context_snapshots_are_deduplicated_without_spending_the_error_budget(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from types import SimpleNamespace
+        from peach import routes_configuration, remote_reporting
+        app = FastAPI()
+        app.include_router(routes_configuration.router)
+        app.state.settings = SimpleNamespace(mdns_name='peach', token='', access_path=self.root / 'access.json')
+        client = TestClient(app, base_url='http://127.0.0.1', client=('127.0.0.1', 1234))
+        path = '/api/diagnostics/client-error'
+        with mock.patch.object(remote_reporting, 'capture') as capture:
+            replies = [client.post(path, json={'kind': 'context', 'message': 'environment',
+                'browser': {'viewport_width': 1280}}) for _ in range(30)]
+        self.assertTrue(all(reply.status_code == 200 for reply in replies))
+        self.assertEqual(sum(reply.json()['recorded'] for reply in replies), 1)
+        self.assertEqual(len(self.records()), 1)
+        capture.assert_not_called()
+        for index in range(20):
+            self.assertEqual(client.post(path, json={'message': f'failure {index}'}).status_code, 200)
+        self.assertEqual(client.post(path, json={'message': 'another failure'}).status_code, 429)
+
     def test_uncaught_import_and_thread_failures_are_saved_without_a_console(self):
         result = self.probe("import sys, threading; from peach import error_reporting as e; "
                             "e.install(); sys.stderr=None; "
@@ -406,13 +482,36 @@ class ErrorReportingTests(unittest.TestCase):
             response = client.post(path, json={'message': 'request cancelled', 'error_name': 'AbortError',
                                                'stack': 'at peach-app.js:12:34'})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.records()[-1]['error_name'], 'AbortError')
+        self.assertEqual([row for row in self.records() if row['stage'] == 'browser'][-1]['error_name'], 'AbortError')
         send.assert_not_called()
+        with mock.patch.object(remote_reporting, 'capture') as capture:
+            response = client.post(path, json={'kind': 'media', 'message': 'media error',
+                'browser': {'native_codecs': {'h264': ''}}, 'playback': {'code': 4, 'network_state': 3,
+                    'src': 'https://private.example/clip.mp4?token=private-token'}},
+                headers={'User-Agent': 'Chrome/150'})
+            self.assertEqual(response.status_code, 200)
+            response = client.post(path, json={'kind': 'context', 'message': 'browser context',
+                                               'browser': {'platform': 'Win32'}})
+            self.assertEqual(response.status_code, 200)
+        capture.assert_not_called()
+        media = [row for row in self.records() if 'playback' in row][-1]
+        self.assertEqual(media['browser']['user_agent'], 'Chrome/150')
+        self.assertEqual(media['playback']['code'], 4)
+        self.assertNotIn('private.example', str(media))
+        import base64
+        snapshot = base64.b64encode(json.dumps({'native_codecs': {'h264': 'probably'},
+            'client_hints': {'fullVersionList': [{'brand': 'Chrome', 'version': '150.0.1.2'}],
+                             'cookie': 'private-cookie'}}).encode()).decode()
         with mock.patch("peach.diagnostics.report", side_effect=RuntimeError("diagnostics unavailable")):
-            response = client.get("/api/diagnostics/bundle")
+            response = client.get("/api/diagnostics/bundle", headers={'X-Peach-Browser-Diagnostics': snapshot})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["cache-control"], "no-store")
         self.assertTrue(zipfile.is_zipfile(io.BytesIO(response.content)))
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            exported = json.loads(archive.read('report.json'))
+        self.assertEqual(exported['browser']['native_codecs']['h264'], 'probably')
+        self.assertEqual(exported['browser']['client_hints']['fullVersionList'][0]['version'], 'v150.0.1.2')
+        self.assertNotIn('private-cookie', str(exported))
         remote = TestClient(app, base_url="http://127.0.0.1", client=("192.0.2.55", 1234))
         self.assertEqual(remote.post(path, json={"message": "example"}).status_code, 401)
         from peach import access

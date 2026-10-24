@@ -16,7 +16,7 @@ LOG_NAMES = ("tray.log", "tray-lifecycle.log", "tray-setup.err.log", "tray-setup
              'tray-restart.out.log', 'tray-scan.out.log', 'windows-source-sync.log', 'cloudflare-tunnel.log')
 STATE_NAMES = ('library-processing.json', 'runtime-prepare.json', 'standalone-update.json',
                'automatic-updates.json', 'windows-source-sync.json', 'cloudflare-tunnel.json',
-               'remote-reporting-delivery.json', 'library-sharing-attempt.json')
+               'remote-reporting-delivery.json', 'library-sharing-attempt.json', 'media-processing.json')
 #: 发现页封面逐番号处理结果的份数上限；每份只有几十字节，排查缺封面靠它们。
 COVER_ATTEMPT_LIMIT = 500
 TAIL_BYTES = 96 * 1024
@@ -116,8 +116,11 @@ def _archive_covers(archive, directory, entries):
     _archive_files(archive, directory, candidates, 'covers', entries, structured=True)
 
 
-def bundle_bytes(*, report: dict | None = None, config=None) -> bytes:
+def bundle_bytes(*, report: dict | None = None, config=None, browser: dict | None = None) -> bytes:
     facts = {"created_at": datetime.now(timezone.utc).isoformat(), "system": error_reporting.system_facts()}
+    facts['runtime'] = {'status': 'unavailable', 'reason': 'configuration-unavailable'}
+    from . import diagnostic_context
+    facts['browser'] = diagnostic_context.browser(browser)
     directories = error_reporting.log_directories()
     processing_directory = generated_directory = None
     try:
@@ -128,6 +131,10 @@ def bundle_bytes(*, report: dict | None = None, config=None) -> bytes:
         directories.insert(0, config.directory("logs"))
         processing_directory = config.directory('state')
         generated_directory = config.directory('generated')
+        try:
+            facts['runtime'] = diagnostic_context.runtime(config)
+        except Exception as error:
+            facts['runtime'] = {'status': 'unavailable', 'reason': type(error).__name__}
         from .ffmpeg import FFmpegResolver, binary_diagnostics
         resolver = FFmpegResolver(config.directory('tools') / 'ffmpeg')
         facts['media_tools'] = {'ffmpeg': binary_diagnostics(resolver.ffmpeg(), decoders=True),
@@ -144,6 +151,16 @@ def bundle_bytes(*, report: dict | None = None, config=None) -> bytes:
         facts["checks"] = {key: {field: value.get(field) for field in ("status", "reason", "action")}
                            for key, value in report.get("checks", {}).items()
                            if key not in ("media_mounts",)}
+        detail_fields = {'database': ('state',), 'schema': ('schema', 'version', 'pending', 'mismatched', 'unknown_versions'),
+                         'security': ('exposed', 'protected'), 'port': ('port', 'state'), 'tasks': ('id', 'finished_at')}
+        for key, names in detail_fields.items():
+            if key in facts['checks']:
+                details = report['checks'][key].get('details', {})
+                facts['checks'][key]['details'] = {name: details[name] for name in names if name in details}
+        mounts = report.get('checks', {}).get('media_mounts', {}).get('details', {})
+        facts['mounts'] = {'state': mounts.get('state'), 'sources': [
+            {key: row.get(key) for key in ('state', 'online', 'message', 'checked_at')}
+            for row in mounts.get('sources', []) if isinstance(row, dict)]}
         source_fields = ('source', 'status', 'reason', 'last_check_at', 'elapsed_s',
                          'last_success_at', 'cooldown_until')
         facts['sources'] = [{key: row.get(key) for key in source_fields}
@@ -168,6 +185,7 @@ def bundle_bytes(*, report: dict | None = None, config=None) -> bytes:
             except OSError as error:
                 entries.append({'name': '<covers>', 'status': type(error).__name__})
         facts["logs"] = entries
+        facts.update(diagnostic_context.archived_context(archive))
         archive.writestr("report.json", json.dumps(error_reporting.scrub(facts), ensure_ascii=False, indent=2))
     return output.getvalue()
 

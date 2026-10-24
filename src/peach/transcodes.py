@@ -83,6 +83,16 @@ class TranscodeService:
     def needs_transcode(source: Path) -> bool:
         return source.suffix.lower() not in BROWSER_NATIVE_SUFFIXES
 
+    def diagnostic_profile(self, source: Path) -> dict:
+        """只读本次进程已有的探测缓存，不为诊断读取媒体或启动工具。"""
+        from dataclasses import asdict
+        with self._locks_guard:
+            matches = [(key, profile) for key, profile in self._native_profiles.items() if key[0] == str(source)]
+        if not matches:
+            return {'status': 'unavailable', 'reason': 'not-probed'}
+        key, profile = matches[-1]
+        return {'status': 'cached', 'size_bytes': key[1], 'modified_ns': key[2], **asdict(profile)}
+
     def requires_conversion(self, source: Path, *, session: str = "", registry=None) -> bool:
         """按容器和内部编码选择浏览器兼容路径，不生成整片缓存。"""
         if self.needs_transcode(source):

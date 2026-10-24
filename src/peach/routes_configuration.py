@@ -114,7 +114,7 @@ def system_diagnostics(request: Request, args: dict[str, str] = Depends(require_
 
 @router.get("/api/diagnostics/bundle")
 def diagnostic_bundle(request: Request, args: dict[str, str] = Depends(require_auth)):
-    from . import diagnostics, support_bundle
+    from . import diagnostic_context, diagnostics, support_bundle
     local_only(request)
     try:
         report = diagnostics.report(request.app.state.settings, request.app.state.mount_reachability.summary())
@@ -122,12 +122,46 @@ def diagnostic_bundle(request: Request, args: dict[str, str] = Depends(require_a
         from .error_reporting import event
         event("diagnostics-report", error)
         report = None
-    return Response(support_bundle.bundle_bytes(report=report), media_type="application/zip",
+    browser = diagnostic_context.browser_header(request.headers.get('x-peach-browser-diagnostics', ''),
+                                                 user_agent=request.headers.get('user-agent', ''))
+    from .error_reporting import local_event
+    local_event('browser-context', browser=browser, user_agent=browser.get('user_agent', ''))
+    return Response(support_bundle.bundle_bytes(report=report, browser=browser), media_type="application/zip",
                     headers={"Content-Disposition": 'attachment; filename="peach-support.zip"',
                              "Cache-Control": "no-store"})
 
 
 _CLIENT_ERROR_LOCK = threading.Lock()
+
+
+def _client_error_budget(request: Request) -> None:
+    with _CLIENT_ERROR_LOCK:
+        recent = getattr(request.app.state, 'client_error_times', deque(maxlen=20))
+        request.app.state.client_error_times = recent
+        now = time.monotonic()
+        while recent and now - recent[0] >= 60:
+            recent.popleft()
+        if len(recent) >= 20:
+            raise HTTPException(429, '错误记录过于频繁')
+        recent.append(now)
+
+
+def _record_browser_context(request: Request, context: dict) -> bool:
+    """同一份环境每分钟保留一次，环境快照独立于错误记录预算。"""
+    from .error_reporting import local_event
+    key = hashlib.sha256(json.dumps(context, sort_keys=True).encode()).hexdigest()
+    with _CLIENT_ERROR_LOCK:
+        recent = getattr(request.app.state, 'client_context_times', deque(maxlen=64))
+        request.app.state.client_context_times = recent
+        now = time.monotonic()
+        while recent and now - recent[0][0] >= 60:
+            recent.popleft()
+        if any(saved == key for _, saved in recent):
+            return False
+        if local_event('browser-context', **context) is None:
+            raise HTTPException(503, '错误日志无法写入')
+        recent.append((now, key))
+    return True
 
 
 @router.post("/api/diagnostics/client-error")
@@ -137,15 +171,6 @@ async def client_error(request: Request):
     same_origin(request)
     if not local_client(request):
         require_authenticated_client(request)
-    with _CLIENT_ERROR_LOCK:
-        recent = getattr(request.app.state, "client_error_times", deque(maxlen=20))
-        request.app.state.client_error_times = recent
-        now = time.monotonic()
-        while recent and now - recent[0] >= 60:
-            recent.popleft()
-        if len(recent) >= 20:
-            raise HTTPException(429, "错误记录过于频繁")
-        recent.append(now)
     body = bytearray()
     async for part in request.stream():
         body.extend(part)
@@ -167,7 +192,18 @@ async def client_error(request: Request):
         fields['bundle_debug_ids'] = {key: value for key, value in identities.items()
             if shipped(key) and isinstance(value, str) and len(value) == 36}
     fields['user_agent'] = request.headers.get('user-agent', '')[:512]
-    if error_reporting.event("browser", **fields) is None:
+    from . import diagnostic_context
+    context = {'browser': diagnostic_context.browser(data.get('browser'), user_agent=fields['user_agent'])}
+    if data.get('kind') == 'context':
+        return {'recorded': _record_browser_context(request, context)}
+    _client_error_budget(request)
+    if isinstance(data.get('playback'), dict):
+        context['playback'] = diagnostic_context.playback(data['playback'])
+        recorded = error_reporting.local_event('browser', **fields, **context)
+    else:
+        recorded = error_reporting.event('browser', **fields)
+        error_reporting.local_event('browser-context', **context)
+    if recorded is None:
         raise HTTPException(503, "错误日志无法写入")
     return {"recorded": True}
 

@@ -7,6 +7,7 @@ import { SettingsCard, SettingsSectionLabel } from '@/components/application/set
 import { cx } from '@/utils/cx';
 import { errorMessage } from '../../api';
 import { diagnosticsSkeleton } from '../../diagnostics-skeleton';
+import { diagnosticHeaders } from '../../browser-diagnostics';
 import { ErrorExcerpt } from '../activity/error-excerpt';
 import { Note } from '../components/note';
 import { SiteMark } from '../components/site-mark';
@@ -42,7 +43,7 @@ export interface DiagnosticsProps {
 function DownloadReport() {
   const action = useAction();
   const download = () => void action.run('download', async () => {
-    const response = await fetch('/api/diagnostics/bundle', { credentials: 'same-origin' });
+    const response = await fetch('/api/diagnostics/bundle', { credentials: 'same-origin', headers: await diagnosticHeaders() });
     if (!response.ok) throw new Error(`诊断报告下载失败（HTTP ${response.status}）`);
     const url = URL.createObjectURL(await response.blob());
     const anchor = document.createElement('a');

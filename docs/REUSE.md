@@ -171,6 +171,8 @@ DMM / MGS 的只读商品号识别复用 `code_key`、`release_code_from_text`�
 
 响应头策略复用 Starlette 1.8.0（BSD-3-Clause，项目已有固定依赖）的 `MutableHeaders` 与官方 [ASGI 中间件模式](https://www.starlette.io/middleware/#pure-asgi-middleware)，只在 `http.response.start` 阶段设置缓存、安全及机器人策略。文件响应继续使用同一 `receive` 的断连消息，真实异常直接传播，不维护异常文本匹配或统一忽略网络错误的分支。整片转码继续复用 FFmpeg 和现有回退链，Peach 只保留有界本机证据与隐私投影，无新增依赖。
 
+本机诊断继续复用项目的脱敏日志与 ZIP 导出，浏览器使用标准 `canPlayType()`、MSE、Resource Timing 和有界的 [UA Client Hints](https://developer.mozilla.org/en-US/docs/Web/API/NavigatorUAData/getHighEntropyValues)，服务端复用 Python 3.14 标准库的依赖元数据、磁盘余量、系统信息以及现有媒体探测缓存。字段白名单和本机证据汇总属于 Peach 的诊断边界；浏览器监控 SDK 会扩大依赖与采集范围，不承担这条本机导出链路。依赖沿用 Video.js 10.1.0 与现有 FFmpeg，不增加运行时依赖，不为导出执行媒体读取或硬件压力探测。能力声明与真实播放的区别按 [MDN `canPlayType()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/canPlayType) 和 [Video.js 媒体来源契约](https://videojs.org/docs/framework/html/guides/media-sources)核对，隔离回归覆盖无视频请求、编码能力缺失、错误状态、脱敏和仅本机写入。
+
 STRM 采用文本指针、播放时解析的通用行为，参考 SmartStrm 文档、OpenList 的 `drivers/strm` 与 Jellyfin 的 STRM 探测入口；固定 revision、许可证与实际读取位置见 [取证记录](reference-snapshots/strm-source-evidence.md)。SmartStrm 核心闭源，源码未取得。Peach 独立实现受限 HTTP(S) 指针，复用 HTTPX、现有 Range 传输、`m3u8` 解析与播放器计划；无新增运行依赖，也不复制上游应用代码。
 
 光鸭、OneDrive 与其他网盘复用声明挂载根、路径翻译、扫描、文件整理与回滚、隔离删除和空目录清理。所有挂载来源统一开放读写，底层权限或不支持的操作由挂载工具报错；网盘登录与平台 API 由飞牛 OS 原生远程挂载、CloudDrive2 或 OpenList 等挂载工具提供，不新增 SDK 或依赖。本地文件先隔离再提交账本；rclone FUSE 通过挂载表识别并直接删除，避免部分后端的远端改名触发复制，账本事务失败时保留可重试的回收站记录。飞牛 OS 原生挂载 115 的实际文件系统可报告为 `fuse.rclone`，不等于用户单独部署 rclone；其他挂载方式仍须分别验证。临时文件与账本回归覆盖三个来源的整理、回滚、删除、权限拒绝和空目录清理；真实账号兼容性见待办。挂载目录可单独设置代理流量保护，成本投影与批处理使用同一规则。STRM、ISO 跳过后台媒体读取，普通媒体保留按来源策略执行的探测；九宫格和时间轴共用本机视频预览开关。

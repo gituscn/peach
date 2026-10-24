@@ -137,12 +137,17 @@ def exception_facts(error: BaseException) -> dict:
     return {"exception": chain, "frames": frames}
 
 
-def event(stage: str, error: BaseException | None = None, **fields) -> Path | None:
+def event(stage: str, error: BaseException | None = None, *, local_fields: dict | None = None, **fields) -> Path | None:
     try:
         from . import remote_reporting
         remote_reporting.capture(stage, error, **fields)
     except Exception:
         pass
+    return local_event(stage, error, **{**fields, **(local_fields or {})})
+
+
+def local_event(stage: str, error: BaseException | None = None, **fields) -> Path | None:
+    """只写本机脱敏日志，不调用远程上报。"""
     record = {"at": datetime.now(timezone.utc).isoformat(), "stage": stage,
               **system_facts(), 'thread': threading.current_thread().name, **fields}
     if error is not None:
@@ -166,8 +171,10 @@ def subprocess_failure(stage: str, *, tool: str, error: BaseException | None = N
     """媒体子进程仅保留工具名、错误码和有界错误输出，不记录完整命令。"""
     raw = stderr or getattr(error, 'stderr', b'') or b''
     text = raw.decode('utf-8', 'replace') if isinstance(raw, bytes) else str(raw)
+    from .remote_reporting import _media_details
+    reason = _media_details(error, {'stderr': text}, {})
     return event(stage, error, tool=Path(tool).name, returncode=returncode,
-                 stderr=text[-4000:], **fields)
+                 stderr=text[-4000:], local_fields={'reason_code': reason or 'unclassified'}, **fields)
 
 
 class ErrorHandler(logging.Handler):
