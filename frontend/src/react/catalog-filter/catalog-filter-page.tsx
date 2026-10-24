@@ -144,7 +144,8 @@ function Tiers(props: CatalogFilterProps) {
     helpers.wireDrag(studios.current);
   }, [helpers, hasPerformers, hasStudios]);
   return (
-    <div data-catalog-tiers="" hidden={!hasPerformers && !hasStudios} aria-busy={loading || undefined}>
+    <div data-catalog-tiers="" hidden={!hasPerformers && !hasStudios}
+      aria-busy={(loading && props.tiersPending && !props.offscreen) || undefined}>
       {hasPerformers ? (
         <div ref={performers} data-catalog-tier="performers">
           {empty ? <Placeholders kind="performer" /> : (shownPerformers as TierPerformer[]).map((person) => (

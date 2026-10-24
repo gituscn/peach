@@ -89,6 +89,8 @@ export interface CatalogFilterHelpers {
 export interface CatalogFilterProps {
   /** 两排头像。首屏还在等两个聚合查询时为空：两排与标签条摆占位加一道微光，四枚视图与下排照常。 */
   tiers: CatalogTiers | null;
+  /** 壳正有一趟头像取数在路上：只有这时两排挂忙态。不取头像的页面 `tiers` 一直为空，不算在等。 */
+  tiersPending: boolean;
   /** 空馆藏：两排与标签条摆一行占位，说的是「这里将来会有东西」。 */
   empty: boolean;
   /** 标签条成员，已选的排在最前；前 `tagFirst` 枚先摆，其余横滚到右端再续。 */

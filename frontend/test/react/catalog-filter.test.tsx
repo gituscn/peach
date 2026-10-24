@@ -12,7 +12,7 @@ import { mount, mountRoot, pending, settle } from './render';
 
 function props(patch: Partial<CatalogFilterProps> = {}): CatalogFilterProps {
   return {
-    tiers: { key: 'k', performers: [], studios: [] }, empty: false, tags: [], tagFirst: 0,
+    tiers: { key: 'k', performers: [], studios: [] }, tiersPending: false, empty: false, tags: [], tagFirst: 0,
     views: [{ k: '', label: '全部', href: '/' }], state: '', count: { total: 0, shown: 0 }, trash: false,
     sorts: [], layout: null, refreshing: false, offscreen: false, combo: [], comboHidden: true, comboHost: null,
     actions: {
@@ -51,12 +51,20 @@ describe('首屏等待两排头像', () => {
   beforeEach(() => localStorage.clear());
   const rows = (host: HTMLElement) => [...host.querySelectorAll('[data-catalog-tier]')].map((row) => row.getAttribute('data-catalog-tier'));
 
-  it('本机没有记录或记录坏了时两排都铺占位，整块挂忙态', async () => {
+  it('本机没有记录或记录坏了时两排都铺占位，壳在取数时整块挂忙态', async () => {
     for (const saved of [null, 'broken', 'null']) {
       if (saved !== null) localStorage.setItem(TIERS_SHAPE_KEY, saved);
-      const host = await mount(<CatalogFilterPage {...props({ tiers: null })} />);
+      const host = await mount(<CatalogFilterPage {...props({ tiers: null, tiersPending: true })} />);
       expect(rows(host)).toEqual(['performers', 'studios']);
       expect(host.querySelector('[data-catalog-tiers]')?.getAttribute('aria-busy')).toBe('true');
+      document.body.innerHTML = '';
+    }
+  });
+
+  it('不取头像的页面与收起的筛选条不挂忙态：没有一趟取数会来撤它', async () => {
+    for (const patch of [{ tiersPending: false }, { tiersPending: true, offscreen: true }]) {
+      const host = await mount(<CatalogFilterPage {...props({ tiers: null, ...patch })} />);
+      expect(host.querySelector('[data-catalog-tiers]')?.hasAttribute('aria-busy'), JSON.stringify(patch)).toBe(false);
       document.body.innerHTML = '';
     }
   });
@@ -73,7 +81,7 @@ describe('首屏等待两排头像', () => {
   });
 
   it('取回后撤掉忙态，并记下这次画了哪几排；空馆藏两排占位都算画了', async () => {
-    const { host, rerender } = await mountRoot(<CatalogFilterPage {...props({ tiers: null })} />);
+    const { host, rerender } = await mountRoot(<CatalogFilterPage {...props({ tiers: null, tiersPending: true })} />);
     await rerender(<CatalogFilterPage {...props({ tiers: { key: 'k', performers: [], studios: [{ name: 'S1', logo: '', fallback: 'S1' }] } })} />);
     expect(host.querySelector('[data-catalog-tiers]')?.hasAttribute('aria-busy')).toBe(false);
     expect(rows(host)).toEqual(['studios']);
