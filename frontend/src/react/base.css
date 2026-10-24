@@ -5,6 +5,12 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* React Aria 的隐藏输入框绝对定位在所属选项内，随选项一起滚动。
+ * 浏览器聚焦原生输入框时，坐标必须仍在可见标签里。定位工具类可覆盖这条基线。 */
+:where(.peach-react label[data-rac]:has(> span > input:is([type='radio'], [type='checkbox']))) {
+  position: relative;
+}
+
 /* 上游 `--font-sans` 引用 Next.js 字体加载器注入的 `--font-inter`；Peach 的 Inter 由
  * board.css 引入的 `/vendor/inter/` 提供。 */
 :root {

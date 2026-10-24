@@ -180,9 +180,14 @@ export function PendingGenres(
   return (
     <div role="group" aria-label="未收录 genre" className="flex flex-col gap-2 rounded-surface border border-separator-border bg-background-primary-default px-4 py-3">
       <h5 className="text-body-2-medium text-text-secondary">{`未收录 genre · ${genres.length}`}</h5>
-      {genres.map((genre) => (
-        <GenreRow key={genre} genre={genre} tags={tags} locked={locked} toast={toast} />
-      ))}
+      <div role="list" className="flex flex-col">
+        {genres.map((genre, index) => (
+          <div key={genre} role="listitem"
+            className={`py-3 first:pt-0 last:pb-0 ${index ? 'border-t border-separator-border' : ''}`}>
+            <GenreRow genre={genre} tags={tags} locked={locked} toast={toast} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import type { Browser, Locator } from 'playwright-core';
 import { expectBody, settle, visit } from './harness.ts';
 import {
-  DESKTOP, MOBILE, tokenColor, openReview, lightness, WIDE, JUNK_COUNT, openJunk, junkItem, openJunkWith,
+  DESKTOP, MOBILE, tokenColor, openReview, REVIEW_ROW, lightness, WIDE, JUNK_COUNT, openJunk, junkItem, openJunkWith,
   openCatalog, openCatalogFixture, openFollowManage, stubFollowManage, holdApi, controlFaces, disabledTokens,
   waitingActionFaces, assertDisabledFace, installDesignBrowser, PIXEL,
 } from './design-fixture.ts';
@@ -658,6 +658,92 @@ describe('设计决定：作品卡、管理页与复核', () => {
       await opened.close();
     }
   });
+
+  for (const viewport of [DESKTOP, MOBILE]) {
+    it(`未收录词条之间使用分隔线 ${viewport.width}`, { timeout: 60_000 }, async () => {
+      const row = { ...REVIEW_ROW, candidates: [{ ...REVIEW_ROW.candidates[0]!,
+        unmapped_genres: ['アクメ・オーガズム', '美少女電影'] }] };
+      const opened = await openReview(browser, [row], viewport);
+      try {
+        const group = opened.page.getByRole('group', { name: '未收录 genre', exact: true });
+        const rows = group.getByRole('listitem');
+        assert.equal(await rows.count(), 2);
+        const dividers = await rows.evaluateAll(nodes => nodes.map(node => {
+          const style = getComputedStyle(node);
+          const parent = getComputedStyle(node.closest('[role="group"]')!);
+          return { width: style.borderTopWidth, solid: style.borderTopStyle === 'solid',
+            visible: style.borderTopColor !== parent.backgroundColor && style.borderTopColor !== 'rgba(0, 0, 0, 0)' };
+        }));
+        assert.deepEqual(dividers.map(row => row.width), ['0px', '1px']);
+        assert.ok(dividers[1]!.solid && dividers[1]!.visible, '词条分隔线不可见');
+        assert.equal(await rows.nth(0).getByRole('button', { name: '收录', exact: true }).count(), 1);
+        assert.equal(await rows.nth(1).getByRole('button', { name: '不是内容', exact: true }).count(), 1);
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close() }
+    });
+
+    it(`复核来源切换只滚动证据正文，卡头与操作条固定 ${viewport.width}`, { timeout: 60_000 }, async () => {
+      const row = { ...REVIEW_ROW, candidates: ['dmm', 'javdb', 'mgs'].map(source => ({
+        candidate_key: `${source}:studio`, source, display_value: 'プレステージ',
+        catalog_evidence: {
+          title: { display_value: '隣の人妻と過ごす休日' },
+          runtime: { display_value: '120 分钟' },
+          director: { display_value: '田中' },
+          label: { display_value: 'プレステージ' },
+        },
+      })) };
+      const opened = await openReview(browser, [row], viewport);
+      try {
+        const card = opened.page.locator('section[data-review-key]').first();
+        const scroller = card.locator('div[data-overlay-scrollbar]').first();
+        const choices = card.locator('label:has(input[type="radio"])');
+        await card.scrollIntoViewIfNeeded();
+        const geometry = () => card.evaluate(node => {
+          const rect = (element: Element) => {
+            const box = element.getBoundingClientRect();
+            return { top: box.top, height: box.height };
+          };
+          return { page: window.scrollY, scroll: node.scrollTop, card: rect(node),
+            header: rect(node.querySelector('header')!), footer: rect(node.querySelector('footer')!) };
+        });
+        const before = await geometry();
+        const anchored = await card.locator('input[type="radio"], input[type="checkbox"]')
+          .evaluateAll(inputs => inputs.every(input => {
+            const native = input.getBoundingClientRect();
+            const label = input.closest('label')!.getBoundingClientRect();
+            return native.top >= label.top - 1 && native.bottom <= label.bottom + 1
+              && native.left >= label.left - 1 && native.right <= label.right + 1;
+          }));
+        assert.ok(anchored, '隐藏输入框未随所属单选或复选标签定位');
+        for (const at of [1, 2, 0]) {
+          const choice = choices.nth(at);
+          await choice.evaluate(node => {
+            const body = node.closest('div[data-overlay-scrollbar]')!;
+            body.scrollTop += node.getBoundingClientRect().top - body.getBoundingClientRect().top;
+          });
+          await choice.click();
+          assert.equal(await choice.locator('input').isChecked(), true);
+          assert.deepEqual(await geometry(), before, '点击来源移动了页面、卡片或操作条');
+        }
+        await choices.first().locator('input').focus();
+        for (const key of ['ArrowDown', 'ArrowDown', 'ArrowUp']) {
+          await opened.page.keyboard.press(key);
+          assert.deepEqual(await geometry(), before, '方向键移动了页面、卡片或操作条');
+          const visible = await scroller.evaluate(node => {
+            const input = node.querySelector<HTMLInputElement>('input:checked')!;
+            const box = input.getBoundingClientRect();
+            const body = node.getBoundingClientRect();
+            return box.top >= body.top - 1 && box.bottom <= body.bottom + 1;
+          });
+          assert.ok(visible, '键盘选中的来源没有进入正文可见区域');
+        }
+        await opened.page.keyboard.press('Tab');
+        assert.equal(await scroller.evaluate(node => node.contains(document.activeElement)), false,
+          'Tab 未离开候选来源');
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close() }
+    });
+  }
 
   it('复核滚动边缘按方向出现，当前信息在分隔线之间居中', { timeout: 60_000 }, async () => {
     const opened = await openReview(browser);

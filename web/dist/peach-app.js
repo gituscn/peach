@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "d61f8d2e-3895-4b7e-bfa5-ca26a8109e65", e._sentryDebugIdIdentifier = "sentry-dbid-d61f8d2e-3895-4b7e-bfa5-ca26a8109e65");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "f332e5f7-1163-43d1-b1d2-635bf91c19a7", e._sentryDebugIdIdentifier = "sentry-dbid-f332e5f7-1163-43d1-b1d2-635bf91c19a7");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t), e = null), t.exports), s = (e, n) => {
@@ -73806,12 +73806,20 @@ function NIe({ row: e, tags: t, locked: n, toast: r }) {
 		children: [/* @__PURE__ */ (0, D.jsx)("h5", {
 			className: "text-body-2-medium text-text-secondary",
 			children: `未收录 genre · ${i.length}`
-		}), i.map((e) => /* @__PURE__ */ (0, D.jsx)(MIe, {
-			genre: e,
-			tags: t,
-			locked: n,
-			toast: r
-		}, e))]
+		}), /* @__PURE__ */ (0, D.jsx)("div", {
+			role: "list",
+			className: "flex flex-col",
+			children: i.map((e, i) => /* @__PURE__ */ (0, D.jsx)("div", {
+				role: "listitem",
+				className: `py-3 first:pt-0 last:pb-0 ${i ? "border-t border-separator-border" : ""}`,
+				children: /* @__PURE__ */ (0, D.jsx)(MIe, {
+					genre: e,
+					tags: t,
+					locked: n,
+					toast: r
+				})
+			}, e))
+		})]
 	}) : null;
 }
 //#endregion
@@ -116815,4 +116823,4 @@ HSt(USt);
 //#endregion
 export { JT as applyTheme, gP as peachHistory, Qo as popCount, yvt as showToast };
 
-//# debugId=d61f8d2e-3895-4b7e-bfa5-ca26a8109e65
+//# debugId=f332e5f7-1163-43d1-b1d2-635bf91c19a7
