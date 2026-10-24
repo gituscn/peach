@@ -19,6 +19,22 @@
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
+/* 日文片名、简介与别名（`core/text-lang.ts` 按假名标 `lang="ja"`）换日文字体，汉字按日文字形显示。
+ * Windows 用 Yu Gothic UI 与 Meiryo UI：不带 UI 的 Yu Gothic 在 Chrome 里常规字重画成细体。 */
+:lang(ja) {
+  font-family: var(--font-inter), "Yu Gothic UI", "Meiryo UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Noto Sans CJK JP", "Noto Sans JP", "Source Han Sans JP", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* 简介、评论、关注摘要这类成段的馆藏文本：行高放宽，末行不留孤字；中日文两端对齐，英文段落
+ * 不对齐，免得词间拉出大空隙。 */
+.peach-react [data-long-text] {
+  line-height: 1.75;
+  text-wrap: pretty;
+  hanging-punctuation: allow-end;
+}
+.peach-react [data-long-text]:not(:lang(en)) { text-align: justify; }
+
 /* 与文字同行的图标画框，按所在文字字号缩放。雪碧图字形在 24 画框里笔画约占 75%，1.2em 让它和
  * 同排汉字的墨迹一样大。遗留壳 `web/css/01-base.css` 的 `:root` 同名同值。写在这里而不进
  * `styles.css` 的 `@theme`：独立页面包也用 `SourceMark` 与带字按键，而 `@theme` 变量按用量裁剪。 */
@@ -95,6 +111,8 @@
   -moz-osx-font-smoothing: grayscale;
   font-variant-ligatures: contextual;
   font-kerning: normal;
+  /* 独立页面包不带遗留壳的 `html` 规则（`web/css/01-base.css`），中西文间距在这里再给一次。 */
+  text-autospace: normal;
 }
 
 /* `web/board.css` 在 `:root` 上给同名 token 另定了值，旧样式表排在后面会盖过 theme.css。

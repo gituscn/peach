@@ -16,6 +16,7 @@ import { pageSkeletonHtml } from '../../management-placeholder';
 import { Button } from '@/components/base/buttons/button';
 
 import { ApiError, apiSend } from '../../api';
+import { textLang } from '../../core/text-lang';
 import { RetryNote } from '../components/grid-reveal';
 import { MixGroupLabel, MixQueue, MixQueueRow } from '../components/mix-queue';
 import { RelatedSection } from '../components/related-section';
@@ -456,7 +457,7 @@ function Summary({ text }: { text: string }) {
   }, [text, open]);
   return (
     <>
-      <p ref={node} data-follow-detail-summary="" data-clamped={open ? undefined : ''}>{text}</p>
+      <p ref={node} data-follow-detail-summary="" data-long-text="" lang={textLang(text)} data-clamped={open ? undefined : ''}>{text}</p>
       {overflows || open ? (
         <Button variant="ghost" size="small" data-follow-summary-toggle="" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? '收起' : '展开'}

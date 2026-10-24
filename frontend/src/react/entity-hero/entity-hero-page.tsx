@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 're
 import { createPortal } from 'react-dom';
 import { entityFaceImg, facePos } from '@peach/card-art';
 import { entityPath, esc, firstGrapheme, icon } from '@peach/legacy/core';
+import { textLang } from '../../core/text-lang';
 
 import { Button } from '@/components/base/buttons/button';
 
@@ -165,7 +166,7 @@ function AliasLine({ kind, entity, actions }: { kind: string; entity: EntityHero
         {line ? (
           <div data-meta-item="names">
             <Glyph name="id-card" />
-            <span data-alias-names="" title="别名">{line.names.map((one, at) => <span key={at}>{one}</span>)}</span>
+            <span data-alias-names="" title="别名">{line.names.map((one, at) => <span key={at} lang={textLang(one)}>{one}</span>)}</span>
             {line.rest > 0 ? (
               <MorePop id="entityAliasPop" hook="alias" rest={line.rest} label={`另外 ${line.rest.toLocaleString()} 个别名`}
                 heading={`${line.total.toLocaleString()} 个别名`}>
@@ -279,7 +280,7 @@ function NameGroup({ label, names }: { label?: string; names: { name: string; re
       {label ? <dt>{label}</dt> : null}
       <dd data-wide={label ? undefined : ''}>
         {names.map((entry, at) => (
-          <span key={at} data-pop-name="">{entry.name}{entry.reading ? <small>{entry.reading}</small> : null}</span>
+          <span key={at} data-pop-name="" lang={textLang(entry.name)}>{entry.name}{entry.reading ? <small>{entry.reading}</small> : null}</span>
         ))}
       </dd>
     </>

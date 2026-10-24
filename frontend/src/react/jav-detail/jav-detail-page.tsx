@@ -5,6 +5,7 @@ import { entityPath, icon } from '@peach/legacy/core';
 import { tagLabel } from '@peach/legacy/tags';
 import { mountPreviewPlayer } from '../../player';
 import { apiGet, errorMessage } from '../../api';
+import { textLang } from '../../core/text-lang';
 import { Button, ButtonLink } from '@/components/base/buttons/button';
 import { CloudDownloadDialog, type DownloadPrefill } from '../activity/cloud-download-dialog';
 import { Note } from '../components/note';
@@ -90,7 +91,7 @@ function Work({ code, item, actions, readOnly, retry, retrying }: JavDetailProps
       {(item.tag_refs?.length ?? item.tags.length) > 0 ? <div data-stage-tags="" data-jav-tags="">{(item.tag_refs || item.tags.map(name => ({ name, category: 'general', source_name: name }))).map(tag =>
         <span data-detail-tag="" data-tag-cat={tag.category} key={tag.name}><button type="button" data-tag={tag.name}
           title={tagLabel(tag.name)} onClick={() => actions.openTag(tag.name)}>{tagLabel(tag.name)}</button></span>)}</div> : null}
-      {item.summary ? <p data-jav-summary="">{item.summary}</p> : null}
+      {item.summary ? <p data-jav-summary="" data-long-text="" lang={textLang(item.summary)}>{item.summary}</p> : null}
       {item.message ? <Note tone="neutral" action={<Button variant="secondary" {...busyProps(retrying)} onClick={retry}>立即重试</Button>}>{item.message}</Note> : null}
       <div data-jav-actions="">
         {item.source_url ? <ButtonLink data-button-link="" variant="secondary" trailingIcon={RiExternalLinkLine}
@@ -115,7 +116,7 @@ function JavTitle({ item }: { item: JavDetail }) {
   const title = item.title === item.code ? '' : item.title;
   return <div data-item-title=""><h1 data-stage-title="" data-title-line="" data-reveal-line=""><span ref={text} data-detail-title=""
     data-expanded={expanded ? '' : undefined} data-foldable={foldable ? '' : undefined}
-    onClick={() => { if (foldable && !String(getSelection() || '')) toggle() }}><b>{item.code}</b>{title ? ` ${title}` : ''}</span></h1>
+    onClick={() => { if (foldable && !String(getSelection() || '')) toggle() }}><b>{item.code}</b>{title ? <>{' '}<span lang={textLang(title)}>{title}</span></> : null}</span></h1>
     <span data-title-tools=""><button type="button" data-title-fold="" hidden={!foldable} aria-expanded={expanded}
       aria-label={expanded ? '收起标题' : '展开标题'} title={expanded ? '收起标题' : '展开完整标题'} onClick={toggle}><CollapseChevron /></button></span>
   </div>;
@@ -195,7 +196,7 @@ function Reviews({ code, count, released }: { code: string; count: number; relea
     {opened || result.data ? <>
       {items.map(item => <article key={item.id} data-jav-review=""><div data-jav-review-meta=""><b>{item.username}</b>
         {Number(item.score) > 0 ? <SourceRating score={Number(item.score)} review /> : null}
-        <time dateTime={item.created_at} title={item.created_at}>{item.created_at.slice(0, 10)}</time></div><p>{item.content}</p></article>)}
+        <time dateTime={item.created_at} title={item.created_at}>{item.created_at.slice(0, 10)}</time></div><p data-long-text="" lang={textLang(item.content)}>{item.content}</p></article>)}
       {failure ? <Note tone="neutral" action={<Button variant="secondary" {...busyProps(result.isFetching)} onClick={() => { refresh.current = true; void result.refetch() }}>立即重试</Button>}>{failure}</Note>
         : !result.isPending && !items.length ? <Note tone="neutral">暂无评论</Note> : null}
       {!failure && pages.length ? <Button variant="secondary" {...busyProps(result.isFetching)}
