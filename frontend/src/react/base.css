@@ -6,9 +6,17 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* 上游 `--font-sans` 引用 Next.js 字体加载器注入的 `--font-inter`；Peach 的 Inter 由
- * board.css 引入的 `/vendor/inter/` 提供。 */
+ * board.css 引入的 `/vendor/inter/` 提供。
+ *
+ * 上游那串在 Inter 之后直接落到 `system-ui` 与 `sans-serif`，汉字交给系统按区域补字：繁体 Windows
+ * 补的是正黑体，缺的简体字形再由别的字体补上，同一行里混着几套字体。界面文字是简体（`lang="zh-CN"`），
+ * 所以在通用族之前按平台列出简体字体：Windows 雅黑，macOS 苹方，Linux 思源黑体（Noto CJK）。
+ * 与遗留壳的 `--board-font`（`web/board.css`）同一串。 */
 :root {
   --font-inter: "Inter Variable", "Inter";
+  --font-sans: var(--font-inter), "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB",
+    "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
 /* 与文字同行的图标画框，按所在文字字号缩放。雪碧图字形在 24 画框里笔画约占 75%，1.2em 让它和
