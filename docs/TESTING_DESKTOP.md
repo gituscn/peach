@@ -83,7 +83,7 @@ Windows 第一次询问防火墙权限时，只勾选「专用网络」。
 
 ## 采集来源
 
-Windows 完整安装包、免安装包、轻量安装包与应用更新包均随附 amane `0.20.0` 的独立 console 桥，使用者无需安装 Python、uv 或 Git。运行目录位于程序资源中的 `_internal\tools\amane-runtime`；桥属于应用必需资源，不随可选媒体工具拆分。macOS 独立应用在 `Contents/Resources/tools/amane-runtime` 携带对应架构的桥。
+Windows 完整安装包、免安装包、轻量安装包与应用更新包均随附 amane `0.20.0` 的独立 console 桥，使用者无需安装 Python、uv 或 Git。运行目录位于程序资源中的 `_internal\tools\amane-runtime`；桥属于应用必需资源，不随可选媒体工具拆分。macOS 独立应用在 `Contents/Frameworks/tools/amane-runtime` 携带对应架构的桥，数据资源通过应用内链接映射到 `Contents/Resources`。
 
 桌面构建调用 `scripts/build_amane_runtime.py`，按桥的 `uv.lock` 安装独立构建环境，再复用主锁固定的 PyInstaller 生成运行目录。构建会执行 `--self-check`，离线载入运行时与全部 Peach 开放站点类；站点连接检查仍需实际网络。目录中的 `manifest.json` 记录版本、完整 revision 和可执行文件相对路径。GPL-3.0 许可证、来源说明、amane 完整对应源码，以及 zhconv 和 certifi 的固定源码随运行目录一起分发。
 

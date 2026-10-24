@@ -57,7 +57,7 @@ def main() -> int:
                     headers={"Origin": base})
                 with opener.open(request, timeout=10) as response:
                     assert response.status == 200
-                assert_amane_runtime(opener, base, executable.parent.parent / 'Resources/tools/amane-runtime')
+                assert_amane_runtime(opener, base, executable.parent.parent / 'Frameworks/tools/amane-runtime')
                 for path in ("/", "/dist/peach-app.js", "/dist/peach-app.css", "/api/items",
                              "/healthz?ready=1"):
                     with opener.open(base + path, timeout=30) as response:
