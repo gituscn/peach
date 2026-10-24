@@ -89,6 +89,8 @@ describe('文件夹反馈与滚动边界', () => {
       const { page } = opened;
       await page.locator('#catalogFoldersTree [role="treegrid"]').waitFor();
       await settle(page, '#catalogFolderHeader');
+      // 头像排取回之前先画两排占位；这份数据里没有人，取回后两排收起，目录栏才是量的那个高度。
+      await page.locator('[data-catalog-root]:not([data-loading])').waitFor();
       for (const position of [0, 600, Number.MAX_SAFE_INTEGER, 0]) {
         await page.evaluate(async y => { scrollTo(0, y); await new Promise(requestAnimationFrame) }, position);
         for (const end of [false, true]) {

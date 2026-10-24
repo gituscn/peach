@@ -12,6 +12,7 @@ import stat
 import subprocess
 import sys
 import time
+import uuid
 from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
@@ -297,6 +298,56 @@ def holder_path(lock_path: Path) -> Path:
     return lock_path.with_name(lock_path.name + ".holder.json")
 
 
+QUEUE_POLL_SECONDS = 0.1
+#: 没有 psutil 判不了票主是否还活着时，票的最长寿命。
+QUEUE_TICKET_SECONDS = 7200
+
+
+def queue_path(lock_path: Path) -> Path:
+    return lock_path.with_name(lock_path.name + ".queue")
+
+
+def _process_started(pid: int) -> float | None:
+    try:
+        import psutil
+    except ImportError:
+        return None
+    try:
+        return psutil.Process(pid).create_time()
+    except psutil.Error:
+        return -1.0
+
+
+def _ticket_alive(path: Path, now: float) -> bool:
+    """票主进程还在就算活票；同一 pid 被别的进程复用时创建时刻对不上，也算死票。"""
+    try:
+        ticket = json.loads(path.read_text(encoding="utf-8"))
+        pid, created = int(ticket["pid"]), float(ticket["created"])
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError, KeyError, TypeError):
+        # 写到一半或正被别的进程读写：先当它还在，下一轮再看。
+        return True
+    started = _process_started(pid)
+    if started is None:
+        return now - created < QUEUE_TICKET_SECONDS
+    recorded = ticket.get("process_started")
+    return started >= 0 and (not isinstance(recorded, (int, float)) or abs(started - recorded) < 1)
+
+
+def tickets_ahead(lock_path: Path, mine: str) -> list[Path]:
+    """排在 `mine` 前面的活票，按到达先后；死票顺手清掉。"""
+    now, ahead = time.time(), []
+    for path in sorted(queue_path(lock_path).glob("*.json")):
+        if path.name >= mine:
+            break
+        if _ticket_alive(path, now):
+            ahead.append(path)
+        else:
+            path.unlink(missing_ok=True)
+    return ahead
+
+
 @contextmanager
 def held(lock_path: Path, *, wait_seconds: float = 0, **note: object):
     """拿锁，并在旁边留下「谁在持有」的记录，让等锁的人知道在等什么。
@@ -304,17 +355,56 @@ def held(lock_path: Path, *, wait_seconds: float = 0, **note: object):
     互斥只靠 filelock：锁是操作系统层面的句柄，只能被活着的进程持有，进程退出就释放。
     记录是旁证，不参与互斥。持有者正常退出就删掉它；异常退出留下的旧记录会被下一位
     持有者进门时覆盖，而等锁那一侧只在锁真的被占着时才去读，所以读到的总是当前持有者。
+
+    等锁按到达先后排队：每个等待者在 `<锁>.queue/` 里放一张以纳秒时刻开头的票，只有前面
+    没有活票时才去抢锁，拿到就撤票。没有排队时，锁一空出来谁轮询得快谁拿到，几个会话轮番
+    抢的结果是有人连等几轮、满 30 分钟退出。票主进程退出后它的票由后面的人清掉。
     """
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock = FileLock(lock_path)
+    queue = queue_path(lock_path)
+    ticket = queue / f"{time.time_ns():020d}-{os.getpid()}-{uuid.uuid4().hex[:8]}.json"
+    pending = ticket.with_suffix(".tmp")
+    content = json.dumps({"pid": os.getpid(), "created": time.time(),
+                          "process_started": _process_started(os.getpid()),
+                          "started_at": time.strftime("%Y-%m-%d %H:%M:%S"), **note},
+                         ensure_ascii=False, default=str)
+    for attempt in range(3):
+        # 队列空了的那一刻，撤票的人会顺手删掉目录；碰上就重建再写。
+        queue.mkdir(parents=True, exist_ok=True)
+        try:
+            pending.write_text(content, encoding="utf-8")
+            pending.replace(ticket)
+            break
+        except FileNotFoundError:
+            if attempt == 2:
+                raise
+    deadline = time.monotonic() + max(wait_seconds, 0)
+    announced = None
     try:
-        lock.acquire(timeout=0)
-    except Timeout:
-        if wait_seconds <= 0:
-            raise
-        print(f"等待 {lock_path.name}（{describe_holder(lock_path)}），最长 {wait_seconds:g} 秒。",
-              file=sys.stderr, flush=True)
-        lock.acquire(timeout=wait_seconds)
+        while True:
+            ahead = tickets_ahead(lock_path, ticket.name)
+            if not ahead:
+                try:
+                    lock.acquire(timeout=0)
+                    break
+                except Timeout:
+                    pass
+            if wait_seconds <= 0 or time.monotonic() >= deadline:
+                raise Timeout(str(lock_path))
+            if announced != len(ahead):
+                announced = len(ahead)
+                place = f"；前面还有 {announced} 个在排队" if announced else ""
+                print(f"等待 {lock_path.name}（{describe_holder(lock_path)}{place}），最长 {wait_seconds:g} 秒。",
+                      file=sys.stderr, flush=True)
+            time.sleep(min(QUEUE_POLL_SECONDS, max(0.0, deadline - time.monotonic())))
+    finally:
+        ticket.unlink(missing_ok=True)
+        try:
+            queue.rmdir()
+        except OSError:
+            # 还有别人在排队，目录留给他们。
+            pass
     try:
         record = holder_path(lock_path)
         record_lock = FileLock(record.with_suffix(".lock"), timeout=5)
