@@ -17,7 +17,7 @@ import time
 import unittest
 from collections.abc import Iterable
 from contextlib import contextmanager, nullcontext
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 
 
@@ -27,7 +27,7 @@ TESTS = ROOT / "tests"
 if not __package__:
     sys.path.insert(0, str(ROOT))
     __package__ = "scripts"
-from . import change_impact, test_evidence, test_history, test_progress
+from . import change_impact, test_evidence, test_history, test_resume, test_run_progress, test_shard_results
 
 COMMON_PATTERNS = ("test_context_budget.py", "test_test_collection.py", "test_complexity_ratchet.py",
                    "test_source_assertion_ratchet.py", "test_python_lint.py")
@@ -372,10 +372,13 @@ AUTO_SCOPE_PREFIXES: tuple[tuple[str, str | tuple[str, ...]], ...] = (
 
 # AGENTS.md 规定必须跑 `full` 的面：迁移、共享测试设施、依赖清单。命中任一个就不再选域。
 FULL_ONLY_PREFIXES: tuple[str, ...] = (
+    'frontend/node_modules/',
     "pyproject.toml",
     "scripts/test_runner.py", "scripts/test_evidence.py", "scripts/test.ps1", "scripts/test.sh",
-    "scripts/ci_plan.py", "scripts/test_environment.py", "scripts/change_impact.py", "scripts/test_progress.py",
+    "scripts/ci_plan.py", "scripts/test_environment.py", "scripts/change_impact.py", "scripts/test_focus.py",
     "scripts/test_history.py", "uv.lock",
+    "scripts/test_resume.py", "scripts/test_run_progress.py", "scripts/test_environment_identity.py",
+    "scripts/test_shard_results.py",
     "migrations/",
     "tests/support/",
     "package.json",
@@ -697,31 +700,42 @@ class TimedResult(unittest.TextTestResult):
     只量用例本身会漏掉建库、起服务那一段，而分片均衡要的正是整份文件占多久。
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, selection=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.timings = []
         self.files: dict[str, float] = {}
         self.results: list[dict] = []
         self.outcome: dict[str, tuple[str, str | None]] = {}
         self.last = time.monotonic()
+        self.selection = selection or {}
+        self.selection_context = None
 
     def startTestRun(self):
         self.last = time.monotonic()
         super().startTestRun()
 
     def startTest(self, test):
+        if self.selection and test.id() in test_resume.CONTAINERS:
+            self.selection_context = test_resume.selection_environment(
+                self.selection, test_resume.owner('case:' + test.id()))
+            self.selection_context.__enter__()
         self.started = time.monotonic()
         super().startTest(test)
 
     def stopTest(self, test):
-        now = time.monotonic()
-        self.timings.append((round(now - self.started, 3), test.id()))
-        outcome, message = self.outcome.pop(test.id(), ("pass", None))
-        self.results.append(test_history.result(test.id(), outcome, now - self.started, message))
-        module = type(test).__module__
-        self.files[module] = round(self.files.get(module, 0.0) + now - self.last, 3)
-        self.last = now
-        super().stopTest(test)
+        try:
+            now = time.monotonic()
+            self.timings.append((round(now - self.started, 3), test.id()))
+            outcome, message = self.outcome.pop(test.id(), ("pass", None))
+            self.results.append(test_history.result(test.id(), outcome, now - self.started, message))
+            module = type(test).__module__
+            self.files[module] = round(self.files.get(module, 0.0) + now - self.last, 3)
+            self.last = now
+            super().stopTest(test)
+        finally:
+            if self.selection_context is not None:
+                self.selection_context.__exit__(None, None, None)
+                self.selection_context = None
 
     def _mark(self, test, outcome: str, err=None) -> None:
         message = f"{err[0].__name__}: {err[1]}" if err else None
@@ -805,13 +819,15 @@ def resolve_jobs(value: str) -> int:
 
 
 def shard_command(scopes: tuple[str, ...], index: int, count: int, timings: Path,
-                  plan: Path | None = None) -> list[str]:
+                  plan: Path | None = None, resume_plan: Path | None = None) -> list[str]:
     command = [sys.executable, str(ROOT / "scripts" / "test_runner.py"),
             *(item for scope in scopes for item in ("--scope", scope)),
             "--shard-index", str(index), "--shard-count", str(count),
             "--timings", str(timings)]
     if plan is not None:
         command += ["--shard-plan", str(plan)]
+    if resume_plan is not None:
+        command += ['--resume-plan', str(resume_plan)]
     return command
 
 
@@ -853,7 +869,8 @@ def shard_plan(names: Iterable[str], shard_count: int,
 def run_shards(scopes: tuple[str, ...], *, jobs: int, shard_count: int,
                spawn=subprocess.Popen, measured: dict | None = None,
                plan: list[list[str]] | None = None,
-               outcomes: list | None = None) -> tuple[bool, int, list]:
+               outcomes: list | None = None, checkpoint=None,
+               resume_plan: dict | None = None) -> tuple[bool, int, list]:
     """运行独立分片并汇总证明；并发取调用方的 jobs，取消时清理自己的子进程。
 
     `plan` 是父进程定下的逐片文件名，写成文件交给每个子进程，父子用同一份划分；
@@ -861,6 +878,10 @@ def run_shards(scopes: tuple[str, ...], *, jobs: int, shard_count: int,
     """
     folder = Path(tempfile.mkdtemp(prefix="peach-shards-"))
     plan_path = None
+    resume_path = None
+    if resume_plan is not None:
+        resume_path = folder / 'resume.json'
+        resume_path.write_text(json.dumps(resume_plan), encoding='utf8')
     if plan is not None:
         if len(plan) != shard_count:
             raise ValueError("分片划分的片数与分片总数不符")
@@ -868,6 +889,7 @@ def run_shards(scopes: tuple[str, ...], *, jobs: int, shard_count: int,
         plan_path.write_text(json.dumps(plan), encoding="utf-8")
     pending = list(range(shard_count))
     running = {}
+    completed_at = {}
     passed, count, timings = True, 0, []
     try:
         while pending or running:
@@ -876,13 +898,13 @@ def run_shards(scopes: tuple[str, ...], *, jobs: int, shard_count: int,
                 log = open(folder / f"{index}.log", "w+", encoding="utf-8", errors="replace")
                 try:
                     process = spawn(shard_command(scopes, index, shard_count, folder / f"{index}.json",
-                                                  plan_path),
+                                                  plan_path, resume_path),
                                     stdout=log, stderr=subprocess.STDOUT, cwd=str(ROOT))
                 except BaseException:
                     log.close()
                     raise
                 running[index] = (process, log)
-            finished = [index for index, (process, _) in running.items() if process.poll() is not None]
+            finished = test_shard_results.completed_processes(running, folder, completed_at, now=time.monotonic())
             if not finished:
                 time.sleep(0.2)
                 continue
@@ -893,9 +915,13 @@ def run_shards(scopes: tuple[str, ...], *, jobs: int, shard_count: int,
                 sys.stdout.write(log.read())
                 log.close()
                 report_path = folder / f"{index}.json"
-                report = json.loads(report_path.read_text(encoding="utf-8")) \
-                    if report_path.is_file() else {"success": False, "count": 0, "timings": []}
+                report = test_shard_results.read_report(report_path)
                 ok = process.returncode == 0 and bool(report.get("success"))
+                if checkpoint is not None:
+                    assigned = plan[index] if plan is not None else sorted({path.name for scope in scopes
+                               for path in selected_files(scope)})[index::shard_count]
+                    complete = checkpoint(assigned, report, process.returncode == (0 if report.get('success') else 1))
+                    ok = ok and complete
                 passed = passed and ok
                 count += int(report.get("count", 0))
                 timings.extend(tuple(item) for item in report.get("timings", []))
@@ -908,12 +934,7 @@ def run_shards(scopes: tuple[str, ...], *, jobs: int, shard_count: int,
     finally:
         for process, log in running.values():
             if process.poll() is None:
-                if os.name == 'nt':
-                    subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
-                else:
-                    process.terminate()
-                process.wait(timeout=15)
+                test_shard_results.stop_process_tree(process)
             log.close()
         shutil.rmtree(folder, ignore_errors=True)
     return passed, count, timings
@@ -999,9 +1020,16 @@ def rerun_selectors(rows: list[dict]) -> list[str] | None:
         if item.startswith(("e2e:", "vitest:")):
             continue
         name = item.split(" ")[0]
-        if (name.startswith(E2E_CONTAINER) and e2e) or (name == VITEST_CONTAINER and vitest):
+        if (name in CI_BROWSER_TESTS and any('frontend/' + path in test_resume.container_files(ROOT, name)
+                                              for path in e2e)) or (name == VITEST_CONTAINER and vitest):
             continue
-        if not re.fullmatch(r"test_\w+(?:\.\w+)+", name) or name.startswith(E2E_CONTAINER) or name == VITEST_CONTAINER:
+        if not re.fullmatch(r"test_\w+(?:\.\w+)+", name):
+            holder = re.search(r'\((test_\w+)(?:\.\w+)?\)', item)
+            if holder:
+                python.append(holder.group(1))
+                continue
+            return None
+        if name in CI_BROWSER_TESTS or name == VITEST_CONTAINER:
             # 类级准备失败、或浏览器容器整个没起来：没有可单独重跑的那一条。
             return None
         python.append(name)
@@ -1026,9 +1054,15 @@ def rerun_failures(rows: list[dict], spawn=subprocess.run) -> bool:
     return True
 
 
-def run_local_suite(scopes: tuple[str, ...], jobs: int, label: str | None = None) -> tuple[bool, int, list]:
+def run_local_suite(scopes: tuple[str, ...], jobs: int, label: str | None = None,
+                    *, progress=None) -> tuple[bool, int, list]:
     """按调用方选择的并发运行，串行全量通过分片释放测试缓存。"""
     chosen = {path for scope in scopes for path in selected_files(scope)}
+    original = set(chosen)
+    progress_args = {}
+    if progress is not None:
+        chosen = {path for path in chosen if path.name in progress.modules}
+        progress_args = {'checkpoint': progress.checkpoint, 'resume_plan': progress.child_plan(scopes)}
     FLAKY.clear()
     if (jobs > 1 or "full" in scopes) and len(chosen) > 1:
         names = sorted(path.name for path in chosen)
@@ -1040,31 +1074,49 @@ def run_local_suite(scopes: tuple[str, ...], jobs: int, label: str | None = None
         if rest is not names:
             print(f"快速门槛：先跑 {len(gate)} 个秒级检查，有一项不过就不起其余分片", flush=True)
             passed, count, timings = run_shards(scopes, jobs=1, shard_count=1, measured=measured,
-                                                plan=[gate], outcomes=rows)
+                                                plan=[gate], outcomes=rows, **progress_args)
             if not passed:
                 print("快速门槛未通过，其余测试本轮不跑。", flush=True)
                 save_file_seconds(measured)
                 test_history.append(ROOT, scope=label or " ".join(scopes), rows=rows,
                                     files=[name.removesuffix(".py") for name in gate])
                 return False, count, timings
+            if progress is not None:
+                progress_args['resume_plan'] = progress.child_plan(scopes)
         shard_count = min(len(rest), 4 * jobs)
         print(f"本机分片：{shard_count} 片、同时 {min(jobs, shard_count)} 个子进程，按实测耗时先长后短", flush=True)
         plan = shard_plan(rest, shard_count, load_file_seconds())
         passed, more, slow = run_shards(scopes, jobs=jobs, shard_count=shard_count, measured=measured, plan=plan,
-                                        outcomes=rows)
+                                        outcomes=rows, **progress_args)
         save_file_seconds(measured)
         test_history.append(ROOT, scope=label or " ".join(scopes), rows=rows,
                             files=[path.stem for path in sorted(chosen)])
         if not passed:
             passed = rerun_failures(rows)
         return passed, count + more, [*timings, *slow]
-    suite = build_suite(*scopes)
+    return run_serial_suite(scopes, chosen, original, progress, label)
+
+
+def run_serial_suite(scopes, chosen, original, progress, label):
+    """串行执行同一恢复计划，提交与分片相同的文件结果。"""
+    selection = progress.child_plan(scopes) if progress is not None else {}
+    planned = {'assigned_names': [path.name for path in sorted(chosen)]} if chosen != original else {}
+    suite = build_suite(*scopes, **planned)
+    if progress is not None:
+        suite = test_resume.filter_suite(suite, selection, {path.name for path in chosen}, unittest.TestSuite)
     with test_history.running():
-        result = unittest.TextTestRunner(verbosity=2, resultclass=TimedResult).run(suite)
+        result = unittest.TextTestRunner(verbosity=2, resultclass=partial(TimedResult, selection=selection)).run(suite)
     save_file_seconds(result.files)
-    test_history.append(ROOT, scope=label or " ".join(scopes), rows=result.results + test_history.take_external(),
+    rows = result.results + test_history.take_external()
+    test_history.append(ROOT, scope=label or " ".join(scopes), rows=rows,
                         files=[path.stem for path in sorted(chosen)])
-    return result.wasSuccessful() and result.testsRun > 0, result.testsRun, result.timings
+    passed = result.wasSuccessful() and result.testsRun > 0
+    if progress is not None:
+        complete = progress.checkpoint([path.name for path in chosen], {
+            'success': passed, 'count': result.testsRun, 'files': result.files, 'results': rows,
+            'complete': True}, True)
+        passed = passed and complete
+    return passed, result.testsRun, result.timings
 
 
 def run_shard_child(args, requested, scopes, files) -> int:
@@ -1073,16 +1125,32 @@ def run_shard_child(args, requested, scopes, files) -> int:
     if args.shard_plan is not None:
         planned["assigned_names"] = json.loads(
             args.shard_plan.read_text(encoding="utf-8"))[args.shard_index]
+    selection = {}
+    if args.resume_plan is not None:
+        selection = test_resume.validate_child_plan(ROOT,
+            json.loads(args.resume_plan.read_text(encoding='utf8')),
+            state=test_evidence.key(ROOT), valid_seconds=test_evidence.VALID_SECONDS)
+        allowed = {name for scope in scopes for name in SCOPE_TEST_IDS.get(scope, ())}
+        allowed.update(name for names in SCOPE_TEST_IDS.values() for name in names
+                       if test_resume.owner('case:' + name) in {path.name for path in files})
+        allowed.update(case for case in test_resume.CONTAINERS
+                       if test_resume.owner('case:' + case) in {path.name for path in files})
+        if not set(selection.get('case_universe', ())) <= allowed:
+            raise ValueError('恢复计划包含本次范围外的补充用例')
     suite = build_suite(*scopes, shard_index=args.shard_index, shard_count=args.shard_count, **planned)
+    if selection:
+        suite = test_resume.filter_suite(suite, selection, set(planned.get('assigned_names', ())), unittest.TestSuite)
     with test_history.running():
-        result = unittest.TextTestRunner(verbosity=2, resultclass=TimedResult).run(suite)
+        result = unittest.TextTestRunner(verbosity=2, resultclass=partial(TimedResult, selection=selection)).run(suite)
     success = result.wasSuccessful() and result.testsRun > 0
     rows = result.results + test_history.take_external()
     if args.timings is not None:
-        args.timings.write_text(json.dumps({"success": success, "count": result.testsRun,
+        temporary = args.timings.with_suffix('.json.tmp')
+        temporary.write_text(json.dumps({"success": success, "count": result.testsRun,
                                             "timings": result.timings, "files": result.files,
-                                            "results": rows}, ensure_ascii=False),
+                                            "results": rows, 'complete': True}, ensure_ascii=False),
                                 encoding="utf-8")
+        temporary.replace(args.timings)
     if args.shard_plan is None:
         # CI 的独立分片没有父进程替它汇总，自己写一次历史。
         names = [path.name for path in sorted(files)][args.shard_index::args.shard_count]
@@ -1108,6 +1176,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="分片子进程把成败与逐用例耗时写到这个文件，供父进程汇总")
     parser.add_argument("--shard-plan", type=Path, default=None,
                         help="父进程按耗时划好的逐片文件名；不给时按文件名轮转")
+    parser.add_argument('--resume-plan', type=Path, default=None, help=argparse.SUPPRESS)
     parser.add_argument("--jobs", type=resolve_jobs, default=1,
                         help="本机同时跑几个分片子进程；auto 按核数定。默认串行，正式入口传 auto")
     parser.add_argument("--list-scopes", action="store_true")
@@ -1120,6 +1189,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.list_scopes:
         print("\n".join(("full", "auto", *SCOPES)))
         return 0
+    if args.resume_plan is not None and args.shard_plan is None:
+        parser.error('恢复计划仅供正式父运行的分片使用')
     if args.focus:
         return run_focus(parser, args)
     if os.environ.get("PEACH_TEST_FOCUS") or os.environ.get("PEACH_E2E_FILES") or os.environ.get("PEACH_VITEST_FILES"):
@@ -1200,58 +1271,6 @@ def busy(error) -> int:
     return 2
 
 
-def scoped_baseline(record, scopes, needed):
-    """有效域记录只能补齐调用方所需范围，完整基线保留原通过时间。"""
-    if "full" in needed:
-        return None
-    if "full" in record["passed"]:
-        return {"full": record["validated"]["full"]}, needed
-    if "full" in scopes:
-        return None
-    retained = {scope: record["validated"][scope] for scope in scopes
-                if scope in record["passed"] and scope not in needed}
-    if not retained:
-        return None
-    return retained, tuple(scope for scope in scopes if scope not in retained)
-
-
-def incremental_scopes(context, scopes, files, *, failed=()):
-    """选择有效基线，只补测受差异影响或缺少记录的域。"""
-    choices = []
-    if "full" in failed:
-        return None, scopes
-    for record, delta, version_only in test_evidence.baselines(ROOT, context, partial=True):
-        if record.get("cohort") and record.get("coverage"):
-            coverage = test_progress.retained(record, context, scopes_for_changes, selected_files)
-            # 已知失败必须实际补测，不能从其他记录恢复同一批文件。
-            invalid = test_progress.names(selected_files, failed)
-            coverage = {name: stamp for name, stamp in coverage.items() if name not in invalid}
-            if coverage:
-                needed = test_progress.pending(coverage, selected_files, SCOPES)
-                weight = len(test_progress.names(selected_files, needed))
-                if weight <= len(files):
-                    choices.append((weight, {**record, "coverage": coverage, "validated": {}}, needed))
-            continue
-        _, kinds = change_impact.delta(record["manifest"], context["manifest"])
-        needed, _ = scopes_for_changes(delta, kinds=kinds) if delta else ((), "")
-        if version_only and "full" not in needed:
-            needed = tuple(dict.fromkeys((*needed, "tooling")))
-        needed = tuple(dict.fromkeys((*needed, *failed)))
-        reusable = scoped_baseline(record, scopes, needed)
-        if reusable is None:
-            continue
-        retained, needed = reusable
-        weight = len({p for scope in needed for p in selected_files(scope)})
-        if weight <= len(files):
-            choices.append((weight, {**record, "validated": retained}, needed))
-    if not choices:
-        return None, scopes
-    _, baseline, scopes = min(choices, key=lambda item: item[0])
-    print(f"复用基线 {baseline['state'][:12]}（{' '.join(baseline['validated'])}）；"
-          f"差异补测：{' '.join(scopes) or '无'}", flush=True)
-    return baseline, scopes
-
-
 def verified_run(args, requested, scopes, files) -> int:
     """在调用方持有的全量锁内取得快照、验证并签发记录。"""
     context = test_evidence.inputs(ROOT)
@@ -1262,49 +1281,36 @@ def verified_run(args, requested, scopes, files) -> int:
             print("复用本机测试记录：代码、依赖环境和范围匹配（24 小时内）。", flush=True)
             return 0
         previous = test_evidence.read(ROOT, state)
-        baseline = None
-        if requested == ("auto",) and not args.fresh and (not previous or previous.get("passed") or previous.get("coverage")):
-            baseline, scopes = incremental_scopes(context, scopes, files, failed=previous.get("failed_scopes", ()))
-        actual = len({path for scope in scopes for path in selected_files(scope)})
+        records = list(test_evidence.candidates(ROOT, context))
+        progress = test_run_progress.RunProgress(ROOT, context, scopes, selected_files, scopes_for_changes, SCOPES,
+                   supplements=SCOPE_TEST_IDS, records=records, previous=previous,
+                   force=args.fresh or 'full' in requested)
+        if requested == ('auto',) and not args.fresh:
+            choices = ('full', *SCOPES) if 'full' in scopes else scopes
+            scopes = test_resume.choose_scopes(progress.pending, progress.requirements, choices)
+        actual = len(progress.modules)
         print(f"实际运行：{' '.join(scopes) or '无需补测'}（{actual} 个测试文件）", flush=True)
-        folder = test_evidence.evidence_dir(ROOT)
-        (folder / f"{state}.json").unlink(missing_ok=True)
+        if records and not args.fresh:
+            print(f'单项覆盖：复用 {len(progress.required) - len(progress.pending)} 项，待验证 {len(progress.pending)} 项。', flush=True)
+        progress.start()
         FLAKY.clear()
         started = time.monotonic()
-        passed, count, timings = run_local_suite(scopes, args.jobs, f"{' '.join(requested)}:{' '.join(scopes)}") \
-            if scopes else (True, 0, [])
+        passed, count, timings = run_local_suite(scopes, args.jobs, f"{' '.join(requested)}:{' '.join(scopes)}",
+                                                progress=progress) if progress.pending else (True, 0, [])
+        if passed:
+            progress.accept_success(FLAKY)
         stable = state == test_evidence.key(ROOT)
-        success = passed and stable
+        success = passed and stable and progress.complete()
         slowest = sorted(timings, reverse=True)[:20]
-        cohort, coverage = test_progress.after_run(context, scopes, success, previous, baseline,
-                                                   selected_files, time.time())
-        if success and test_progress.completion(coverage, selected_files):
-            previous = {**previous, "validated": {**previous.get("validated", {}), "full": min(coverage.values())}}
-        test_evidence.write(ROOT, state, scopes, success=success, previous=previous,
-                            context=context, baseline=baseline,
-                            cohort=cohort, coverage=coverage,
-                            elapsed=time.monotonic() - started, slowest=slowest, count=count,
-                            flaky=FLAKY if success else None)
+        progress.persist(final=True, success=success, elapsed=time.monotonic() - started,
+                         slowest=slowest, count=count, flaky=FLAKY if success else None)
         for seconds, name in slowest[:5]:
             print(f"慢测试 {seconds:.3f}s：{name}", flush=True)
         if not stable:
-            retain_inflight(context, scopes, passed, previous, baseline, count)
+            kept = progress.retain_current()
+            print(f'验证期间输入改变；保留 {kept} 项未受影响的结果，请运行 auto 补齐。', flush=True)
             return 4
         return 0 if success else 1
-
-
-def retain_inflight(context, scopes, passed, previous, baseline, count):
-    """运行中改动只保留同环境、完整批次中未受影响的结果。"""
-    current = test_evidence.inputs(ROOT)
-    cohort, coverage = test_progress.after_run(context, scopes, passed, previous, baseline,
-                                               selected_files, time.time())
-    source = {**context, "cohort": cohort, "coverage": coverage}
-    kept = test_progress.retained(source, current, scopes_for_changes, selected_files) if passed else {}
-    if kept:
-        test_evidence.write(ROOT, current["state"], (), success=False, previous={}, context=current,
-                            cohort=cohort, coverage=kept, elapsed=0, slowest=[], count=count)
-    print(f"验证期间代码或依赖环境改变；保留 {len(kept)} 个未受影响的文件结果。"
-          "请运行 auto 补齐验证，本次不签发完整通过记录。", flush=True)
 
 
 RUN_TEMP = "PEACH_TEST_RUN_TEMP"

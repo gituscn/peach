@@ -1,5 +1,13 @@
 # 复用清单
 
+## 正式测试记录与中断恢复
+
+测试结果继续复用 Python ≥3.14 标准库 `unittest`、`hashlib`、`json` 和项目的内容快照、影响域映射与外部测试结果。互斥复用既有 `filelock 4.2.0`，分片退出后回收其进程树复用开发依赖 `psutil 7.2.2`；版本与许可沿用锁定依赖及第三方许可清单，不新增运行时依赖。Peach 保留输入身份、逐文件覆盖、完成报告、批次来源和 `ready`／`integrate` 验收规则；串行、并行、浏览器与 Vitest 使用同一个恢复模型。
+
+候选比较包括官方 [pytest 缓存文档](https://doc.pytest.org/en/stable/how-to/cache.html) 与 [Turborepo 缓存文档](https://turborepo.dev/docs/crafting-your-repository/caching)。pytest 的失败项选择不能替代当前内容绑定的成功覆盖，不迁移测试框架；Turborepo 的任务缓存不能直接接管 Python 用例结果及集成门槛，不引入其运行时或源码。外部源码版本与许可证未作为采用依据，本次未复制这些项目的实现。
+
+临时输入实证覆盖跨工作树运行时、安装锁 JSON、CI 运行信息、多域混合失败及多份记录搜索；行为回归覆盖失败与中断恢复、旧失败阻止成功恢复、原时间继承、外部文件完成证明、Python 容器后置检查及全量来源约束。运行时、实际依赖、共享夹具、未知输入、执行模式、过期或未来时间变化仍使相关证明失效。测试设施不读写真实 ledger。
+
 ## 媒体目录与整理路径映射
 
 PikPak 整理复用项目已有 `PushDiscoverySettings`、`CloudPrefix` 与 `map_cloud_path`，与推送发现共用配置，不引入第二份盘符或 CloudDrive 路径表。CloudDrive RPC 继续使用现有固定版本的 gRPC／protobuf；路径归属与账号内 WebDAV 目录核验属于 Peach 的写入边界。不同盘符、子目录、云端名称、越界与冲突由临时夹具和模拟 RPC 验证，不触碰真实账号或账本。

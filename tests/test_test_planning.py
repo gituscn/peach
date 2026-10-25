@@ -445,7 +445,7 @@ class TestPlanningTests(unittest.TestCase):
             plan = json.loads(Path(command[command.index('--shard-plan') + 1]).read_text(encoding='utf-8'))
             seen.append((index, plan[index]))
             Path(command[command.index('--timings') + 1]).write_text(
-                json.dumps({'success': True, 'count': 1, 'timings': []}), encoding='utf-8')
+                json.dumps({'complete': True, 'success': True, 'count': 1, 'timings': []}), encoding='utf-8')
             return Done()
 
         plan = [['test_web_e2e.py'], ['test_a.py', 'test_b.py'], ['test_c.py']]
@@ -493,7 +493,7 @@ class TestPlanningTests(unittest.TestCase):
                 launched.append(command)
                 index = int(command[command.index('--shard-index') + 1])
                 report = Path(command[command.index('--timings') + 1])
-                report.write_text(json.dumps({'success': index != failing, 'count': 10 + index,
+                report.write_text(json.dumps({'complete': True, 'success': index != failing, 'count': 10 + index,
                                               'timings': [[0.5, f'test_{index}']],
                                               'files': {f'test_{index}': 1.0 + index}}), encoding='utf-8')
                 stdout.write(f'分片 {index} 的输出\n')
@@ -611,8 +611,8 @@ class GateAndFlakyRerunTests(unittest.TestCase):
         self.assertEqual(runner.rerun_selectors(rows), [
             'test_feeds_web.FeedsWebTests.test_second_round', 'frontend/e2e/folder-layout.test.ts',
             'frontend/test/react/follow-feed.test.tsx'])
-        self.assertIsNone(runner.rerun_selectors([self.fail('setUpClass (test_web_e2e.WebE2ESmokeTests)')]),
-                          '类级准备失败没有可单独重跑的那一条')
+        self.assertEqual(runner.rerun_selectors([self.fail('setUpClass (test_web_e2e.WebE2ESmokeTests)')]),
+                         ['test_web_e2e'], '类级准备失败选择所属模块')
         self.assertIsNone(runner.rerun_selectors([self.fail(
             'test_web_e2e.WebE2ESmokeTests.test_every_route_holds_the_layout_and_runtime_invariants')]),
             '浏览器容器失败却没有逐条结果：说不清是哪个文件')

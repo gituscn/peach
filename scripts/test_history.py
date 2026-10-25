@@ -75,6 +75,8 @@ def nested() -> bool:
 
 def record_external(rows: list[dict]) -> None:
     """vitest 与浏览器用例在测试进程里交上来的逐条结果。"""
+    if _running > 1:
+        return
     _external.extend(rows)
 
 
@@ -158,6 +160,23 @@ def vitest_rows(report: dict, frontend: Path) -> list[dict]:
             rows.append(result(f"vitest:{title}", status.get(case.get("status"), "error"),
                                (case.get("duration") or 0) / 1000,
                                "\n".join(case.get("failureMessages") or [])))
+    return rows
+
+
+def file_result(kind: str, path: str, success: bool, seconds: float = 0) -> dict:
+    """完整外部文件的终态，区别于尚未收齐的叶子结果。"""
+    return {**result(f'{kind}:{path} > 文件结果', 'pass' if success else 'fail', seconds),
+            'file_complete': True}
+
+
+def vitest_files(report: dict, frontend: Path) -> list[dict]:
+    rows = []
+    for suite in report.get('testResults', ()):
+        try:
+            path = Path(suite['name']).relative_to(frontend).as_posix()
+        except (ValueError, KeyError):
+            continue
+        rows.append(file_result('vitest', path, suite.get('status') == 'passed'))
     return rows
 
 

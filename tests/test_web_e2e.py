@@ -365,8 +365,10 @@ class WebE2ESmokeTests(unittest.TestCase):
         output = f"{completed.stdout}\n{completed.stderr}"
         log_path.write_text(output, encoding="utf-8")
         test_history.record_external(test_history.tap_rows(path, completed.stdout))
-        if (completed.returncode != 0 or not re.search(r"# pass [1-9]\d*", output)
-                or not re.search(r"# fail 0\b", output)):
+        success = (completed.returncode == 0 and bool(re.search(r"# pass [1-9]\d*", output))
+                   and bool(re.search(r"# fail 0\b", output)))
+        test_history.record_external([test_history.file_result('e2e', path, success, time.monotonic() - started)])
+        if not success:
             return path, time.monotonic() - started, \
                 f"{path} 退出码 {completed.returncode}，日志：{log_path}\n{output}"
         return path, time.monotonic() - started, None
@@ -464,6 +466,9 @@ class SetupE2ETests(unittest.TestCase):
         output = f"{completed.stdout}\n{completed.stderr}"
         log_path.write_text(output, encoding="utf-8")
         test_history.record_external(test_history.tap_rows(SETUP_SUITE, completed.stdout))
+        test_history.record_external([test_history.file_result('e2e', SETUP_SUITE,
+            completed.returncode == 0 and bool(re.search(r'# pass 1\b', output))
+            and bool(re.search(r'# skipped 0\b', output)))])
         self.assertEqual(completed.returncode, 0, f"{output}\n--- serve.log ---\n{self._server_log()}")
         self.assertRegex(output, r"# pass 1\b", output)
         self.assertRegex(output, r"# skipped 0\b", output)
@@ -618,11 +623,14 @@ class MissingPrerequisiteTests(unittest.TestCase):
                     mock.patch(__name__ + ".BROWSER_LOGS", log_root), \
                     mock.patch(__name__ + ".e2e_pools", return_value=((files[:3], 2), (files[3:], 1))), \
                     mock.patch.object(case, "_server_log", return_value="serve fixture"), \
+                    mock.patch.object(test_history, 'record_external') as recorded, \
                     mock.patch("subprocess.run", side_effect=run), \
                     contextlib.redirect_stdout(io.StringIO()):
                 with self.assertRaises(AssertionError) as raised:
                     case.test_every_route_holds_the_layout_and_runtime_invariants()
             self.assertCountEqual([command[-1] for command, _ in calls], files)
+            finished = [row for call in recorded.call_args_list for row in call.args[0] if row.get('file_complete')]
+            self.assertCountEqual([row['outcome'] for row in finished], ['pass', 'pass', 'fail', 'fail'])
             self.assertEqual(calls[-1][0][-1], "e2e/fourth.test.ts", "串行池在并发池全部结束后才开始")
             for command, options in calls:
                 self.assertEqual(command[:3], ["node", "--test", "--test-concurrency=1"])

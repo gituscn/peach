@@ -422,8 +422,9 @@ class VitestTests(unittest.TestCase):
                 capture_output=True, text=True, encoding="utf-8", errors="replace",
                 cwd=str(FRONTEND), check=False)
             if report.is_file():
-                test_history.record_external(test_history.vitest_rows(
-                    json.loads(report.read_text(encoding="utf-8")), FRONTEND))
+                data = json.loads(report.read_text(encoding="utf-8"))
+                test_history.record_external(test_history.vitest_rows(data, FRONTEND)
+                                             + test_history.vitest_files(data, FRONTEND))
         output = f"{completed.stdout}\n{completed.stderr}"
         # vitest 的着色随宿主终端能力漂移，计数断言只认去码后的纯文本；
         # 退出码与用例数两道判据不受着色影响。
