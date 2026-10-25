@@ -1,5 +1,11 @@
 # 复用清单
 
+## 首次设置分步框架
+
+首次设置、已有数据恢复与完成态共用 `frontend/src/react/pages/setup/setup-scene.tsx` 的分栏框架。媒体库卡片复用配置页的图标、来源色、处理方式及目录控件，访问范围使用 `ConfigurationChoice`。场景布局参考和来源见 [取证记录](reference-snapshots/arion-onboarding.md)，设备素材见 [素材说明](../resources/setup/README.md)。没有新增运行时依赖；提交、校验和源码文案编辑沿用现有入口。步骤标题、场景说明和操作区随步骤独立挂载，防止文案草稿映射串到其他步骤。
+
+独立页面的编辑工具条共用 `components/selection-dock.css` 与 `batch-dock/batch-dock.css`，由 `pages/copy-editor-page.css` 将页面的 BoardUI token 对应到工具条 token，并为页面底部留出空间。编辑器核心及官网、演示站同步产物不涉及本次样式接入。
+
 ## 扫描路径冲突隔离
 
 路径归组复用 Python 3.14 标准库的 [`PureWindowsPath`](https://docs.python.org/3.14/library/pathlib.html#general-properties) 与现有大小写口径，入库复用 SQLite 的 [UPSERT](https://www.sqlite.org/lang_upsert.html)、扫描检查点和单路径摄取入口，未新增依赖。两者均由现有运行时携带，许可与版本沿用运行时声明。路径相等不决定个人记录归属，Peach 负责将歧义组交给现有任务问题清单，保留每条身份及处置，只更新实际观察到的文件时间；不另建路径解析器或自动合并器。
