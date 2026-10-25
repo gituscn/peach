@@ -68,6 +68,8 @@ class RunProgress:
             for selector in reruns:
                 name = selector if selector.startswith('frontend/') else selector.split('.', 1)[0] + '.py'
                 names.update({name, resume.owner(name), 'case:' + selector})
+                if '.' not in selector and not selector.startswith('frontend/'):
+                    names.update(unit for unit in self.required if resume.owner(unit) == name)
                 names.update('case:' + case for case in resume.CONTAINERS
                              if name in resume.container_files(self.root, case))
         stamp = time.time()

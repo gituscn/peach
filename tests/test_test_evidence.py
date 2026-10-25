@@ -460,6 +460,19 @@ class CheckpointTests(ReceiptFixture, unittest.TestCase):
                                             {'test_catalog.py'}, unittest.TestSuite)
         self.assertEqual(selected.countTestCases(), 0)
 
+    def test_successful_whole_module_rerun_restores_its_nested_coverage(self):
+        folder = self.root / 'frontend/e2e'
+        folder.mkdir(parents=True)
+        (folder / 'one.test.ts').write_text('export {};', encoding='utf8')
+        self.mapping['web'] = (Path('test_web_e2e.py'),)
+        progress = self.progress(('web',))
+        progress.start()
+        progress.checkpoint(['test_web_e2e.py'], {'complete': True, 'success': False, 'count': 0,
+            'results': [{'id': 'setUpClass (test_web_e2e.WebE2ESmokeTests)', 'outcome': 'error'}]}, True)
+        self.assertFalse(progress.complete())
+        progress.accept_success(['test_web_e2e'])
+        self.assertTrue(progress.complete())
+
 
 class ShardReportTests(unittest.TestCase):
     def test_malformed_reports_are_failures(self):
