@@ -118,7 +118,14 @@ describe('检查更新', () => {
     expect(updates.textContent).toContain('最新版本0.10.0');
     expect(updates.querySelector('[role="status"]')?.textContent).toContain('有可用更新');
     expect(buttonNamed('下载并安装', updates)).not.toBeNull();
-    expect(actionOrder(check.parentElement)).toEqual(['查看发布页', '检查更新', '下载并安装']);
+    expect(actionOrder(check.parentElement)).toEqual(['官网', 'GitHub', '查看发布页', '检查更新', '下载并安装']);
+    expect([...updates.querySelectorAll('a')].map((link) => [link.textContent, link.getAttribute('href')]))
+      .toEqual([
+        ['官网', 'https://peach.video/#download'],
+        ['GitHub', 'https://github.com/peach-mitao/peach'],
+        ['查看发布页', 'https://gitgud.io/peach-mitao/peach/-/releases'],
+      ]);
+    expect(updates.textContent).toContain('GitHub暂无法更新');
     expect(document.activeElement).toBe(check);
     vi.stubGlobal('fetch', fetchMock(503, { detail: '连接失败' }));
     await click(check);

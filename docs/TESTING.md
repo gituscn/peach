@@ -252,7 +252,7 @@ PR 的浏览器 CI 根据界面、Web API、认证与浏览器用例选择；普
 的 `environment()` 算成一个摘要：Python 版本、实现与运行时文件内容、规范化的已安装包名称和版本、平台、影响行为的环境变量、前端安装锁的规范化 JSON、实际 Chrome 文件内容，以及 node／npm／git／ffmpeg／ffprobe／openssl 六个外部工具。相同运行时和依赖位于不同工作树、安装锁只有排序或缩进差异、CI 运行编号或工作目录变化，不改变环境身份。CI 工作流和 job 职责、浏览器安装状态与内容变化仍参与判断。
 测试入口强制设置的 `PEACH_REPORTING_TEST_MODE` 防外发标记不参与环境选择；入口源码仍参与代码快照。
 
-GitLab 的作业令牌、容器仓库密码和依赖代理密码按是否存在记录；`CI_REPOSITORY_URL` 保留协议、主机、路径、用户名及认证存在性，密码值不参与身份。`CI_JOB_RETRY_COUNT`、`CI_JOB_STARTED_AT_SLUG` 和 `CI_BUILD_NETWORK_NAME` 表示本次运行的计数、时间与网络名称，不参与身份。作业职责、覆盖模式和应用行为变量仍参与判断。变量含义见 [GitLab 预定义变量](https://docs.gitlab.com/ci/variables/predefined_variables/)。
+GitLab 的作业令牌、容器仓库密码和依赖代理密码按是否存在记录；`CI_REPOSITORY_URL` 保留协议、主机、路径、用户名及认证存在性，密码值不参与身份。`CI_JOB_RETRY_COUNT`、`CI_JOB_STARTED_AT_SLUG` 和 `CI_BUILD_NETWORK_NAME` 表示本次运行的计数、时间与网络名称；`CI_TRACEPARENT` 和 `CI_TRACESTATE` 标识作业的分布式追踪上下文。这些运行元信息不参与身份。作业职责、覆盖模式和应用行为变量仍参与判断。变量含义见 [GitLab 预定义变量](https://docs.gitlab.com/ci/variables/predefined_variables/)。
 
 uv 只探针、不进指纹：它负责建环境，装出来的解释器与包已经逐个记在摘要里，而它自己由
 winget 自动升级。把它的版本也算进去的话，升级当天全部记录一起失效，被验证的那套环境

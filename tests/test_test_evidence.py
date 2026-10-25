@@ -162,10 +162,14 @@ class EnvironmentIdentityTests(unittest.TestCase):
 
     def test_gitlab_retry_metadata_preserves_runtime_identity_and_job_selection(self):
         os.environ.update(CI_JOB_NAME='verify-macos', CI_JOB_RETRY_COUNT='0',
-                          CI_JOB_STARTED_AT_SLUG='first-start', CI_BUILD_NETWORK_NAME='network-one')
+                          CI_JOB_STARTED_AT_SLUG='first-start', CI_BUILD_NETWORK_NAME='network-one',
+                          CI_TRACEPARENT='00-' + '1' * 32 + '-' + '2' * 16 + '-01',
+                          CI_TRACESTATE='gitlab=pipeline:1;job:2')
         first = evidence.environment(self.root)
         os.environ.update(CI_JOB_RETRY_COUNT='1', CI_JOB_STARTED_AT_SLUG='next-start',
-                          CI_BUILD_NETWORK_NAME='network-two')
+                          CI_BUILD_NETWORK_NAME='network-two',
+                          CI_TRACEPARENT='00-' + '1' * 32 + '-' + '3' * 16 + '-01',
+                          CI_TRACESTATE='gitlab=pipeline:1;job:3')
         self.assertEqual(evidence.environment(self.root), first)
         os.environ['CI_JOB_NAME'] = 'verify-linux'
         self.assertNotEqual(evidence.environment(self.root), first)
