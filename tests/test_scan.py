@@ -257,6 +257,21 @@ class PosixShapeTests(_ScanCase):
             second, _ = self._scan('R:\\media', resume_state=json.loads(json.dumps(saved[-1])), **options)
         self.assertEqual(second, first)
 
+    def test_release_checkpoint_without_conflict_count_preserves_completed_work(self):
+        saved = []
+        options = dict(declared_roots={'local': ('R:\\media',)}, mounts={'local': (self.media,)}, windows=False)
+        first, _ = self._scan('R:\\media', save_checkpoint=lambda value: saved.append(value), **options)
+        released = json.loads(json.dumps(saved[-1]))
+        del released['result']['path_conflicts']
+        with closing(sqlite3.connect(self.db)) as connection:
+            before = list(connection.execute('SELECT id,path,first_seen,last_seen FROM asset ORDER BY id'))
+        with patch.object(scan.os, 'scandir', side_effect=AssertionError('已完成目录保留扫描结果')):
+            resumed, _ = self._scan('R:\\media', resume_state=released, **options)
+        self.assertEqual(resumed, first)
+        self.assertEqual(resumed.path_conflicts, 0)
+        with closing(sqlite3.connect(self.db)) as connection:
+            self.assertEqual(list(connection.execute('SELECT id,path,first_seen,last_seen FROM asset ORDER BY id')), before)
+
     def test_file_batch_cursor_resumes_inside_a_directory(self):
         saved = {}
         def save(state):
