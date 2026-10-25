@@ -51,7 +51,9 @@ Watch history, favorites and settings stay on your computer. Scanning leaves ori
 
 Scanning, cloud downloads and media processing share junk checks. Attachments with sufficient evidence go to the recoverable trash; uncertain items await review. You can restore an item and mark it as “not junk”. See [junk files](docs/OPERATIONS.md#垃圾文件) for processing order and protections.
 
-Scanning, follow updates and new-release metadata collection save their progress and continue unfinished items after the app restarts. See [task recovery](docs/OPERATIONS.md#长时任务断点续跑) for recovery boundaries.
+Scanning, follow updates and new-release metadata collection save their progress and continue unfinished items after the app restarts. When metadata or cover requests take too long, skip the current work, keep completed results, and retry unfinished items afterward. See [task recovery](docs/OPERATIONS.md#长时任务断点续跑) for recovery boundaries.
+
+System diagnostics generate reports and selected scraping records in the background, with progress and cancellation. Network settings show local and phone connection addresses; standalone desktop deployments can change access scope and the local network name.
 
 First-time setup lets you choose the Peach proxy for metadata requests and dependency downloads. Windows, macOS and Docker distributions include an isolated amane runtime; source and wheel installations prepare Peach's locked version automatically when first needed. If preparation fails, pending items remain available for retry after fixing the network or runtime.
 

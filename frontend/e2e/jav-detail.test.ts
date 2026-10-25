@@ -507,7 +507,10 @@ describe('库外 JAV 作品详情', () => {
           assert.equal(submitted?.provider, '115');
           assert.equal(submitted?.code, 'EXM-001');
         }
-      } finally { await context.close() }
+      } finally {
+        await Promise.all(context.pages().map(page => page.unrouteAll({ behavior: 'wait' })));
+        await context.close();
+      }
     });
   }
 });

@@ -22,6 +22,10 @@ export function networkShape(data: ConfigurationData): NetworkShape {
   const tunnel = data.tunnel;
   return {
     port: Boolean(data.editable && data.port_editable !== false),
+    addresses: data.network ? 1 + Number(Boolean(data.network.lan_url || data.network.ip_url))
+      + Number(Boolean(data.network.lan_url && data.network.ip_url)) : 0,
+    networkEditable: Boolean(data.network?.editable),
+    lan: data.network?.host === '0.0.0.0',
     proxyAddress: data.peach_proxy?.mode === 'proxy' || Boolean(data.peach_proxy?.needs_selection),
     access: data.access?.mode ?? '',
     tunnelNamed: Boolean(tunnel?.named_available),

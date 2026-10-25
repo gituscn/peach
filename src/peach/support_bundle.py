@@ -7,6 +7,7 @@ import json
 import os
 import re
 import zipfile
+import tempfile
 from datetime import datetime, timezone
 from itertools import islice
 from pathlib import Path
@@ -25,6 +26,7 @@ TAIL_BYTES = 96 * 1024
 JSON_READ_BYTES = 16 * 1024 * 1024
 ACCESS_REQUEST = re.compile(r'^(.*?"(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS) )([^"\s]+)( HTTP/\d(?:\.\d)?" \d{3}[^\r\n]*)$')
 MEDIA_ROUTE = re.compile(r'/(?:stream|follow-stream|preview-stream|stream/hls/\d+/(?:index\.m3u8|\d+\.ts))')
+SCRAPING_INLINE_LIMIT = 100 * 1024 * 1024
 
 
 def _access_log(line: str) -> str:
@@ -221,7 +223,35 @@ def _archive_covers(archive, directory, entries):
     _archive_files(archive, directory, candidates, 'covers', entries, structured=True)
 
 
-def bundle_bytes(*, report: dict | None = None, config=None, browser: dict | None = None) -> bytes:
+def _archive_scraping(archive, config, entries, *, progress, cancelled, include_details):
+    from .scraping_diagnostics import bundle_to, summary, ExportCancelled
+    index = summary(config)
+    state = {'compressed_bytes': 0, 'inline_limit_bytes': SCRAPING_INLINE_LIMIT, 'status': 'summary_only'}
+    if include_details:
+        with tempfile.TemporaryFile() as prepared:
+            bundle_to(config, prepared, include_all=True, progress=progress, cancelled=cancelled)
+            state.update(compressed_bytes=prepared.tell())
+            state['status'] = 'included' if prepared.tell() <= SCRAPING_INLINE_LIMIT else 'separate_export_required'
+            if state['status'] == 'included':
+                prepared.seek(0)
+                with zipfile.ZipFile(prepared) as details:
+                    for item in details.infolist():
+                        with details.open(item) as source, archive.open('scraping/' + item.filename, 'w', force_zip64=True) as target:
+                            while chunk := source.read(256 * 1024):
+                                if cancelled():
+                                    raise ExportCancelled('导出已取消')
+                                target.write(chunk)
+                index['detail'] = '详细刮削记录已包含在 scraping/ 目录'
+            else:
+                index['detail'] = '详细刮削记录超过自动合并上限，请按问题番号单独导出'
+    index['export'] = state
+    archive.writestr('scraping/summary.json', json.dumps(error_reporting.scrub(index), ensure_ascii=False, indent=2))
+    entries.append({'name': 'summary.json', 'section': 'scraping', 'status': 'included'})
+    return state
+
+
+def bundle_to(destination, *, report: dict | None = None, config=None, browser: dict | None = None,
+              progress=lambda **values: None, cancelled=lambda: False, include_scraping=True):
     facts = {"created_at": datetime.now(timezone.utc).isoformat(), "system": error_reporting.system_facts()}
     facts['runtime'] = {'status': 'unavailable', 'reason': 'configuration-unavailable'}
     from . import diagnostic_context
@@ -270,10 +300,13 @@ def bundle_bytes(*, report: dict | None = None, config=None, browser: dict | Non
                          'last_success_at', 'cooldown_until')
         facts['sources'] = [{key: row.get(key) for key in source_fields}
                             for row in report.get('sources', []) if isinstance(row, dict)]
-    output = io.BytesIO()
     entries = []
-    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for index, directory in enumerate(dict.fromkeys(directories)):
+            if cancelled():
+                from .scraping_diagnostics import ExportCancelled
+                raise ExportCancelled('导出已取消')
+            progress(stage='整理诊断日志', done=index, total=len(directories))
             try:
                 candidates = _log_candidates(directory, entries)
                 _archive_files(archive, directory, candidates, f'logs/{index}', entries)
@@ -289,14 +322,26 @@ def bundle_bytes(*, report: dict | None = None, config=None, browser: dict | Non
                 _archive_covers(archive, generated_directory, entries)
             except OSError as error:
                 entries.append({'name': '<covers>', 'status': type(error).__name__})
+        if config is not None:
+            try:
+                facts['scraping'] = _archive_scraping(archive, config, entries, progress=progress,
+                                                     cancelled=cancelled, include_details=include_scraping)
+            except (OSError, ValueError) as error:
+                entries.append({'name': 'scraping/summary.json', 'status': type(error).__name__})
         facts["logs"] = entries
         facts.update(diagnostic_context.archived_context(archive))
         archive.writestr("report.json", json.dumps(error_reporting.scrub(facts), ensure_ascii=False, indent=2))
+
+
+def bundle_bytes(*, report: dict | None = None, config=None, browser: dict | None = None,
+                 include_scraping=True) -> bytes:
+    output = io.BytesIO()
+    bundle_to(output, report=report, config=config, browser=browser, include_scraping=include_scraping)
     return output.getvalue()
 
 
 def save_bundle(destination: Path | None = None) -> Path:
-    payload = bundle_bytes()
+    payload = bundle_bytes(include_scraping=False)
     if destination is not None:
         with Path(destination).open("xb") as stream:
             stream.write(payload)

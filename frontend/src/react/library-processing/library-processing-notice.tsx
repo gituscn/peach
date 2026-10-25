@@ -7,7 +7,8 @@ import { LinkButton } from '@/components/base/buttons/link-button';
 import { cx } from '@/utils/cx';
 import { errorMessage } from '../../api';
 import type { LibraryProcessingProps } from '../bundle';
-import { ALL_CONTENT_URL, DISCONNECTED_TEXT, PARTIAL_RESULT_TEXT, processingActive, processingHasPartialResult, remainingTime, type LibraryProcessingData } from './library-processing';
+import { ALL_CONTENT_URL, DISCONNECTED_TEXT, PARTIAL_RESULT_TEXT, processingActive, processingHasPartialResult, remainingTime, slowItem, type LibraryProcessingData } from './library-processing';
+import { SlowItemInline } from './slow-item';
 import { ProcessingControls } from './processing-controls';
 import { useLibraryProcessingJob } from './use-library-processing';
 import { ProcessingLine } from './processing-line';
@@ -63,7 +64,8 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false, on
     return () => { disposed = true; observer.disconnect(); document.documentElement.style.removeProperty('--processing-toast-space') };
   }, [measure]);
   if (!problem && !active && !failed && !partial) return null;
-  const warning = !!problem || !!state?.stalled || partial;
+  const slow = problem ? null : slowItem(state);
+  const warning = !!problem || !!state?.stalled || partial || !!slow;
   const title = partial ? '处理已结束，部分项目需处理' : failed ? '扫描与采集已中断' : state?.status === 'paused' ? '扫描与采集已暂停' : '扫描与采集';
   return <aside ref={panel} data-processing-dock="" data-processing-tone={failed ? 'error' : warning ? 'warning' : 'neutral'}
     aria-label="扫描任务" role={failed ? 'alert' : 'status'}
@@ -86,6 +88,8 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false, on
         aria-label="隐藏任务提示" onClick={onHide} /> : null}
     </div>
     <TrafficProgress traffic={state?.traffic} detailsOpen={trafficExpanded} onDetailsChange={setTrafficExpanded} />
+    {/* 收起时也露在外面：要人当场拿主意的事不能藏进折叠区。 */}
+    {slow ? <SlowItemInline state={state!} slow={slow} /> : null}
     </div>
     <CollapseRegion id={bodyId} open={expanded} data-processing-body=""><div className="pt-3"><div className={cx('flex min-w-0 flex-col gap-2 border-t pt-3',
       failed ? 'border-border-error-default/20' : warning ? 'border-current/20' : 'border-separator-border')}>
@@ -103,7 +107,7 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false, on
       <p className="text-body-2-regular wrap-anywhere">{problem || (failed || partial ? state?.error || '请查看并处理未完成项' : <ProcessingLine state={state!} />)}</p>
       {partial ? <p className="text-body-2-regular wrap-anywhere">{PARTIAL_RESULT_TEXT}</p> : null}
       {active && state?.stage && !state.steps?.length ? <p className="text-caption-1-regular text-text-tertiary">当前阶段 · {state.stage}</p> : null}
-      {state?.stalled && !problem ? <p className="text-caption-1-regular">当前步骤耗时较长，正在等待进展</p> : null}
+      {state?.stalled && !problem && !slow ? <p className="text-caption-1-regular">当前步骤耗时较长，正在等待进展</p> : null}
     </div></div></CollapseRegion>
     <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
       <LinkButton href="/data-cleanup#libraryProcessing" variant="secondary" size="small" trailingIcon={RiArrowRightLine}>

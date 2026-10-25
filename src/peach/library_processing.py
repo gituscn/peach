@@ -51,7 +51,7 @@ from .record_rehome import reattach_in
 from .processing_traffic import ProcessingTraffic
 from .processing_control import (task_control, bind_control, checkpoint_values,
                                  initial_estimate, ProcessingEstimate, interrupted_state,
-                                 deadline_after, resume_fields)
+                                 deadline_after, resume_fields, processing_item, ItemSkipped)
 
 
 def translate_ledger_path(raw):
@@ -1579,6 +1579,7 @@ class _RemoteSession:
                     continue
             try:
                 # 浏览器来源等人点验证的那段不算进这部片的预算（`LibraryMetadataProvider.excused`）。
+                update(current_source={'key': source, 'label': PROVIDER_NAMES.get(source, source)})
                 found = self._ask(source, code, members, cached, required=required, evidence=evidence,
                                   deadline=_extended(deadline, _excused(self._provider) - mark),
                                   received=results.save)
@@ -1655,7 +1656,7 @@ class _RemoteSession:
             return 0
         budget = ACTION_BUDGETS[action]
         update(stage='采集缺失封面', current_action=action,
-               current_started_at=time.time(), current_deadline_at=time.time() + budget)
+               current_started_at=time.time(), current_deadline_at=time.time() + budget, current_source=None)
         try:
             return int(self.provider().cover(code, cover_root, deadline=deadline_after(budget),
                                              evidence=_studio_evidence(row), snapshots=snapshots,
@@ -1957,10 +1958,17 @@ def _collect_allowed(remote, traffic, row, code, missing, allowed, cover_root, c
     found, covers = [], 0
     if allowed & {'metadata', 'cover'}:
         traffic.start_metadata(code)
-        found, covers = remote.collect(row, code, missing if 'metadata' in allowed else [], cover_root,
-                                       update=update, issue=issue, answered=answered, received=received,
-                                       fetch_cover='cover' in allowed)
-        traffic.finish_work('metadata', code, successful=succeeded())
+        try:
+            with processing_item(row['id']):
+                found, covers = remote.collect(row, code, missing if 'metadata' in allowed else [], cover_root,
+                                               update=update, issue=issue, answered=answered, received=received,
+                                               fetch_cover='cover' in allowed)
+        except ItemSkipped:
+            remote.reset()
+            issue(row, '已跳过这部影片，可在任务结束后重试', action='skipped', retryable=True)
+        finally:
+            traffic.finish_work('metadata', code, successful=succeeded())
+            update(current_source=None)
     if 'people' in allowed:
         covered.append((row['id'], covers))
     return found, covers

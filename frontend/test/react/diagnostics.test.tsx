@@ -3,10 +3,44 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { queryClient } from '../../src/react/query';
 import { DiagnosticsPage } from '../../src/react/diagnostics/diagnostics-page';
 import { DIAGNOSTICS_KEY, type DiagnosticReport } from '../../src/react/diagnostics/diagnostics';
-import { buttonNamed, click, fetchMock, linkNamed, mount, settle } from './render';
+import { ScrapingExport } from '../../src/react/diagnostics/scraping-export';
+import { buttonNamed, click, fetchMock, linkNamed, mount, settle, type } from './render';
 
 notifyManager.setScheduler(notify => notify());
 afterEach(() => queryClient.clear());
+
+it('刮削导出按番号启动任务并保留服务端失败原因', async () => {
+  const fetch = vi.fn(async (_url: string, options?: RequestInit) => options?.method === 'POST'
+    ? new Response(JSON.stringify({ detail: '请填写有效番号，单次最多 20 个' }), { status: 400 })
+    : new Response(JSON.stringify({ status: 'idle' })));
+  vi.stubGlobal('fetch', fetch);
+  const host = await mount(<QueryClientProvider client={queryClient}><ScrapingExport /></QueryClientProvider>);
+  const input = host.querySelector('input')!;
+  await type(input, 'ABC-123, DEF-456');
+  await click(buttonNamed('导出刮削记录', host)!);
+  await settle();
+  const request = fetch.mock.calls.find(([, options]) => options?.method === 'POST')!;
+  expect(request[0]).toBe('/api/diagnostics/exports');
+  expect(JSON.parse(String(request[1]?.body))).toEqual({ kind: 'scraping', codes: 'ABC-123, DEF-456' });
+  expect(host.textContent).toContain('请填写有效番号，单次最多 20 个');
+  expect(buttonNamed('导出刮削记录', host)?.getAttribute('aria-busy')).not.toBe('true');
+});
+
+it('刮削记录显示后台进度并支持取消', async () => {
+  const fetch = vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith('/cancel')
+    ? { status: 'cancelled', job_id: 'export', kind: 'scraping' }
+    : { status: 'running', job_id: 'export', kind: 'scraping', stage: '整理来源快照', done: 2, total: 8 })));
+  vi.stubGlobal('fetch', fetch);
+  const host = await mount(<QueryClientProvider client={queryClient}><ScrapingExport /></QueryClientProvider>);
+  await settle();
+  expect(host.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('2');
+  expect((buttonNamed('导出刮削记录', host) as HTMLButtonElement).disabled).toBe(true);
+  await click(buttonNamed('取消导出', host));
+  await settle();
+  expect(host.textContent).toContain('导出已取消');
+  expect(host.querySelector('[role="progressbar"]')).toBeNull();
+  expect(fetch).toHaveBeenCalledWith('/api/diagnostics/exports/export/cancel', expect.objectContaining({ method: 'POST' }));
+});
 const data = (): DiagnosticReport => ({ version: 'test', status: 'warning', checks: {
   media_mounts: { label: '媒体挂载', status: 'warning', reason: '来源不存在', action: '检查媒体目录', target: '/settings/library', details: {} },
   security: { label: '访问安全', status: 'warning', reason: '密码未开启', action: '开启密码', target: '/settings/library', details: {} },
@@ -86,27 +120,21 @@ it('恢复动作的名称与实际目标一致', async () => {
   expect(linkNamed('打开来源和凭证', host)?.getAttribute('href')).toBe('/sources');
 });
 
-it('诊断报告下载成功生成文件；失败原因保留在入口旁', async () => {
-  const create = vi.fn(() => 'blob:report');
-  const revoke = vi.fn();
-  vi.stubGlobal('URL', { createObjectURL: create, revokeObjectURL: revoke });
-  const clickFile = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-  const fetch = vi.fn().mockResolvedValue(new Response(new Blob(['zip']), { status: 200 }));
+it('诊断报告启动时附浏览器环境，产物使用直接下载链接', async () => {
+  const create = vi.spyOn(URL, 'createObjectURL');
+  const fetch = vi.fn(async (_url: string, options?: RequestInit) => new Response(JSON.stringify(options?.method === 'POST'
+    ? { status: 'complete', kind: 'support', job_id: 'report', bytes: 2048,
+      download_url: '/api/diagnostics/exports/report/download' }
+    : { status: 'idle' })));
   vi.stubGlobal('fetch', fetch);
   const { host } = await open();
   await click(buttonNamed('下载诊断报告', host));
   await settle();
-  expect(fetch).toHaveBeenCalledWith('/api/diagnostics/bundle', expect.objectContaining({ credentials: 'same-origin',
-    headers: { 'X-Peach-Browser-Diagnostics': expect.any(String) } }));
-  const header = fetch.mock.calls[0]![1].headers['X-Peach-Browser-Diagnostics'];
+  const request = fetch.mock.calls.find(([, options]) => options?.method === 'POST')!;
+  expect(request[0]).toBe('/api/diagnostics/exports');
+  const header = new Headers(request[1]?.headers).get('X-Peach-Browser-Diagnostics')!;
   const bytes = Uint8Array.from(atob(header), value => value.charCodeAt(0));
   expect(JSON.parse(new TextDecoder().decode(bytes)).native_codecs).toHaveProperty('h264');
-  expect(create).toHaveBeenCalledTimes(1);
-  expect(clickFile).toHaveBeenCalledTimes(1);
-  expect(document.querySelector('a[download]')).toBeNull();
-  fetch.mockResolvedValueOnce(new Response('', { status: 503 }));
-  await click(buttonNamed('下载诊断报告', host));
-  await settle();
-  expect(host.textContent).toContain('诊断报告下载失败（HTTP 503）');
-  expect(buttonNamed('下载诊断报告', host)).not.toBeNull();
+  expect(create).not.toHaveBeenCalled();
+  expect(linkNamed('下载已生成的文件', host)?.getAttribute('href')).toBe('/api/diagnostics/exports/report/download');
 });
