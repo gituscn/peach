@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
+import math
 import os
 import platform
 import re
@@ -19,7 +20,7 @@ from pathlib import Path
 
 from filelock import FileLock, Timeout
 
-from . import change_impact
+from . import change_impact, test_environment_identity
 
 
 def git(root: Path, *args: str) -> str:
@@ -90,7 +91,12 @@ def interpreter(root: Path) -> Path:
 @lru_cache(maxsize=16)
 def python_identity(executable: str, stamp: int) -> dict:
     return json.loads(subprocess.run(
-        [executable, "-c", "import json,sys,site; print(json.dumps({'version':sys.version,'sites':site.getsitepackages()}))"],
+        [executable, "-c", "import json,sys,site,sysconfig,pathlib; "
+         "library=pathlib.Path(sysconfig.get_config_var('LIBDIR') or pathlib.Path(sys._base_executable).parent)"
+         "/(sysconfig.get_config_var('LDLIBRARY') or 'python'+str(sys.version_info.major)+str(sys.version_info.minor)+'.dll'); "
+         "print(json.dumps({'version':sys.version,'sites':site.getsitepackages(),"
+         "'implementation':sys.implementation.name,'cache_tag':sys.implementation.cache_tag,"
+         "'base_executable':sys._base_executable,'library':str(library) if library.is_file() else None}))"],
         check=True, capture_output=True, text=True, encoding="utf-8").stdout)
 
 
@@ -161,19 +167,17 @@ def environment(root: Path) -> str:
     # 同一个目录可在 sys.path 中出现多次；依赖身份取集合，版本变化仍改变指纹。
     python = interpreter(root)
     identity = python_identity(str(python), python.stat().st_mtime_ns)
-    installed = sorted({(d.metadata.get("Name", ""), d.version)
-                        for d in importlib.metadata.distributions(path=identity["sites"])
-                        if d.metadata.get("Name", "").casefold() != "peach"})
+    installed = test_environment_identity.package_identity(
+        importlib.metadata.distributions(path=identity["sites"]))
     node_lock = root / "frontend/node_modules/.package-lock.json"
     return digest({
-        "schema": 7, "python": identity["version"], "executable": str(python),
+        "schema": 8, "python": test_environment_identity.runtime_identity(identity, python),
         "platform": platform.platform(), "packages": installed, "tools": tools,
-        "node_modules": hashlib.sha256(node_lock.read_bytes()).hexdigest() if node_lock.exists() else None,
+        "node_modules": test_environment_identity.install_identity(node_lock),
+        "browser": test_environment_identity.file_identity(test_environment_identity.chrome_executable()),
         # 测试入口强制设置防外发标记与本次运行独占的临时目录；入口源码已进快照，它们不是调用方
         # 选择的运行环境。临时目录每次都是新路径，算进来的话签出的记录键在 ready 时永远对不上。
-        "flags": {k: v for k, v in os.environ.items()
-                  if k.startswith(("PEACH_", "CI", "GITHUB_", "PYTHON"))
-                  and k not in {"PYTHONPATH", "PEACH_REPORTING_TEST_MODE", "PEACH_TEST_RUN_TEMP"}},
+        "flags": test_environment_identity.environment_flags(),
     })
 
 
@@ -187,7 +191,7 @@ def inputs(root: Path) -> dict:
             "state": digest([digest(content), dependencies])}
 
 
-def recent_records(folder: Path, limit: int = 32) -> list[Path]:
+def recent_records(folder: Path, limit: int | None = None) -> list[Path]:
     """最近写入的测试记录。同目录还有持锁说明 `*.lock.holder.json`，名字不是 state 摘要，
     不算记录；记录和说明都会被别的进程随时删掉，列出后才消失的文件跳过。"""
     found = []
@@ -198,7 +202,8 @@ def recent_records(folder: Path, limit: int = 32) -> list[Path]:
             found.append((path.stat().st_mtime, path))
         except FileNotFoundError:
             continue
-    return [path for _, path in sorted(found, reverse=True)[:limit]]
+    ordered = sorted(found, reverse=True)
+    return [path for _, path in (ordered[:limit] if limit is not None else ordered)]
 
 
 def baselines(root: Path, current: dict, *, partial: bool = False):
@@ -245,17 +250,77 @@ def prune_expired(folder: Path, now: float | None = None) -> int:
 def read(root: Path, state: str) -> dict:
     try:
         record = json.loads((evidence_dir(root) / f"{state}.json").read_text(encoding="utf-8"))
-        if not isinstance(record, dict) or not isinstance(record.get("validated"), dict):
+        if (not isinstance(record, dict) or not isinstance(record.get("validated"), dict)
+                or not isinstance(record.get("coverage", {}), dict)
+                or not valid_manifest(record.get('manifest'))
+                or not isinstance(record.get("environment"), str)
+                or not isinstance(record.get('units', {}), dict)
+                or not valid_record_fields(record)):
             return {}
-        if record.get("state") == state:
+        expected = digest([digest(record['manifest']), record['environment']])
+        if record.get("state") == state == expected:
             record["passed"] = [scope for scope, stamp in record["validated"].items()
                                 if isinstance(stamp, (float, int)) and 0 <= time.time() - stamp < VALID_SECONDS]
             record["coverage"] = {name: stamp for name, stamp in record.get("coverage", {}).items()
                                   if isinstance(stamp, (float, int)) and 0 <= time.time() - stamp < VALID_SECONDS}
+            units = live_units(record.get('units', {}))
+            if units is None:
+                return {}
+            record['units'] = units
             return record
-    except (OSError, ValueError, KeyError, TypeError):
+    except (OSError, ValueError, KeyError, TypeError, RecursionError):
         pass
     return {}
+
+
+def valid_record_fields(record) -> bool:
+    scopes = record.get('failed_scopes', [])
+    cohort = record.get('cohort')
+    finished = record.get('finished', 0)
+    return (isinstance(scopes, list) and all(isinstance(scope, str) for scope in scopes)
+            and all(isinstance(scope, str) for scope in record['validated'])
+            and (cohort is None or isinstance(cohort, str) and bool(_STATE.fullmatch(cohort)))
+            and type(finished) in (int, float) and math.isfinite(finished))
+
+
+def valid_manifest(manifest) -> bool:
+    if not isinstance(manifest, dict) or not isinstance(manifest.get('files'), dict):
+        return False
+    if not isinstance(manifest.get('signatures', {}), dict):
+        return False
+    for name, value in manifest['files'].items():
+        if not isinstance(name, str):
+            return False
+        if isinstance(value, str) and (value == 'deleted' or value.startswith('link:')):
+            continue
+        if (not isinstance(value, list) or len(value) != 3 or type(value[0]) is not int
+                or not isinstance(value[1], str) or not _STATE.fullmatch(value[1])
+                or value[2] not in {'100644', '100755'}):
+            return False
+    return all(isinstance(name, str) and isinstance(value, dict)
+               and all(isinstance(key, str) and isinstance(stamp, str) and _STATE.fullmatch(stamp)
+                       for key, stamp in value.items())
+               for name, value in manifest.get('signatures', {}).items())
+
+
+def live_units(units: dict) -> dict | None:
+    now, kept = time.time(), {}
+    for name, row in units.items():
+        if (not isinstance(name, str) or not isinstance(row, dict)
+                or row.get('outcome') not in {'pass', 'fail', 'unknown'}
+                or type(row.get('at')) not in (int, float) or not math.isfinite(row['at'])):
+            return None
+        if 0 <= now - row['at'] < VALID_SECONDS:
+            kept[name] = row
+    return kept
+
+
+def candidates(root: Path, current: dict):
+    """同环境的有效记录，包括需要继续阻止旧结果复活的失败记录。"""
+    for path in recent_records(evidence_dir(root)):
+        record = read(root, path.stem)
+        if record.get('environment') == current['environment']:
+            yield record
 
 
 def covers(record: dict, scopes: tuple[str, ...]) -> bool:
@@ -266,7 +331,8 @@ def covers(record: dict, scopes: tuple[str, ...]) -> bool:
 def write(root: Path, state: str, scopes: tuple[str, ...], *, success: bool,
           elapsed: float, slowest: list, count: int, previous: dict | None = None,
           context: dict | None = None, baseline: dict | None = None,
-          cohort: str | None = None, coverage: dict | None = None, flaky: list | None = None) -> None:
+          cohort: str | None = None, coverage: dict | None = None, flaky: list | None = None,
+          units: dict | None = None) -> None:
     folder = evidence_dir(root)
     folder.mkdir(parents=True, exist_ok=True)
     prior = previous if previous is not None else read(root, state)
@@ -285,6 +351,7 @@ def write(root: Path, state: str, scopes: tuple[str, ...], *, success: bool,
         validated.update({scope: time.time() for scope in scopes})
     record = {**(context or inputs(root)), "state": state, "validated": validated, "finished": time.time(),
               "cohort": cohort, "coverage": coverage or {},
+              'units': ({} if scopes else prior.get('units', {})) if units is None else units,
               "baseline": baseline.get("state") if baseline else None,
               "failed_scopes": sorted(failed),
               "elapsed": elapsed, "count": count, "slowest": slowest,

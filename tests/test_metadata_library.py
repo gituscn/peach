@@ -319,13 +319,16 @@ class LibraryNfoTests(unittest.TestCase):
         provider.cover.return_value = False
         control = control_for(config)
         paused, requested = threading.Event(), threading.Event()
+        pause_lock = threading.Lock()
         results, errors = [], []
         def report(state):
             if state['status'] == 'paused':
                 paused.set()
-            elif state.get('auto_applied', 0) and not requested.is_set():
-                requested.set()
-                control.request('pause', state['job_id'])
+            elif state.get('auto_applied', 0):
+                with pause_lock:
+                    if not requested.is_set():
+                        requested.set()
+                        control.request('pause', state['job_id'])
         def run():
             try:
                 results.append(process_library(config, db, self.root / 'generated', self.root / 'covers',
@@ -345,7 +348,9 @@ class LibraryNfoTests(unittest.TestCase):
                 self.assertTrue(read_rows(self.root / 'generated/library-metadata-field-candidates.csv'))
                 self.assertEqual(snapshot(config)['status'], 'paused')
             finally:
-                control.request('resume', 'one')
+                with pause_lock:
+                    requested.set()
+                    control.request('resume', 'one')
                 thread.join(5)
         self.assertFalse(thread.is_alive())
         self.assertEqual(errors, [])

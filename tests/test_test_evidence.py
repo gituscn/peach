@@ -18,19 +18,25 @@ from unittest import mock
 from scripts import agent_worktree as coordinator
 from scripts import test_evidence as evidence
 from scripts import test_runner as runner
-from scripts import test_progress
+from scripts import test_resume
+from scripts import test_run_progress
+from scripts import test_shard_results
 from support.gitrepo import seed_repository
 
 
 
 
 class ParallelShardTests(unittest.TestCase):
+    def test_imported_verification_code_belongs_to_this_workspace(self):
+        self.assertEqual(Path(runner.__file__).resolve().parents[1], Path(__file__).resolve().parents[1])
+        self.assertEqual(Path(evidence.__file__).resolve().parents[1], Path(__file__).resolve().parents[1])
+
     def test_requested_parallelism_has_no_machine_slot_ceiling(self):
         live, peak = set(), [0]
         class Shard:
             def __init__(self, command):
                 report = Path(command[command.index('--timings') + 1])
-                report.write_text(json.dumps({'success': True, 'count': 1, 'timings': []}), encoding='utf-8')
+                report.write_text(json.dumps({'complete': True, 'success': True, 'count': 1, 'timings': []}), encoding='utf-8')
                 self.polls, self.returncode = 0, None
                 live.add(self)
                 peak[0] = max(peak[0], len(live))
@@ -47,6 +53,450 @@ class ParallelShardTests(unittest.TestCase):
         self.assertTrue(passed)
         self.assertEqual(count, 12)
         self.assertEqual(peak[0], 6)
+
+
+class EnvironmentIdentityTests(unittest.TestCase):
+    def test_ci_commit_metadata_and_credential_rotation_preserve_environment(self):
+        from scripts.test_environment_identity import environment_flags
+        base = {'GITHUB_ACTIONS': 'true', 'GITHUB_JOB': 'python', 'GITHUB_TOKEN': 'fixture-one'}
+        rotated = {**base, 'GITHUB_TOKEN': 'fixture-two', 'CI_JOB_STARTED_AT': 'another',
+                   'CI_COMMIT_MESSAGE': 'another message'}
+        self.assertEqual(environment_flags(base), environment_flags(rotated))
+        self.assertNotEqual(environment_flags(base), environment_flags({'GITHUB_ACTIONS': 'true', 'GITHUB_JOB': 'python'}))
+        self.assertEqual(environment_flags({'CI_JOB_TOKEN': ''}), environment_flags({}))
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.python = self.root / 'python.exe'
+        self.python.write_bytes(b'runtime-fixture')
+        self.enterContext(mock.patch.dict(os.environ, {}, clear=True))
+        self.enterContext(mock.patch.object(evidence, 'interpreter', return_value=self.python))
+        self.enterContext(mock.patch.object(evidence, 'python_identity', return_value={
+            'version': 'fixture-python', 'sites': []}))
+        self.enterContext(mock.patch.object(evidence, 'tool_identities', return_value={}))
+        self.packages = self.enterContext(mock.patch.object(evidence.importlib.metadata, 'distributions', return_value=[]))
+
+    def test_equivalent_interpreters_in_separate_worktrees_share_identity(self):
+        other = self.root / 'other/python.exe'
+        other.parent.mkdir()
+        other.write_bytes(self.python.read_bytes())
+        first = evidence.environment(self.root)
+        with mock.patch.object(evidence, 'interpreter', return_value=other):
+            self.assertEqual(evidence.environment(self.root), first)
+        other.write_bytes(b'another-runtime')
+        with mock.patch.object(evidence, 'interpreter', return_value=other):
+            self.assertNotEqual(evidence.environment(self.root), first)
+
+    def test_install_lock_identity_uses_json_content(self):
+        lock = self.root / 'frontend/node_modules/.package-lock.json'
+        lock.parent.mkdir(parents=True)
+        lock.write_text('{"name":"app","packages":{"one":{"version":"1"}}}', encoding='utf8')
+        first = evidence.environment(self.root)
+        lock.write_text('{\n "packages": {"one": {"version": "1"}}, "name": "app"\n}', encoding='utf8')
+        self.assertEqual(evidence.environment(self.root), first)
+        lock.write_text('{"name":"app","packages":{"one":{"version":"2"}}}', encoding='utf8')
+        self.assertNotEqual(evidence.environment(self.root), first)
+
+    def test_ci_run_metadata_preserves_identity_and_job_selection_changes_it(self):
+        os.environ.update(GITHUB_RUN_ID='one', GITHUB_RUN_NUMBER='1', GITHUB_JOB='python')
+        first = evidence.environment(self.root)
+        os.environ.update(GITHUB_RUN_ID='two', GITHUB_RUN_NUMBER='2')
+        self.assertEqual(evidence.environment(self.root), first)
+        os.environ['GITHUB_JOB'] = 'web-e2e'
+        self.assertNotEqual(evidence.environment(self.root), first)
+
+    def test_distribution_names_have_canonical_identity(self):
+        from types import SimpleNamespace
+        self.packages.return_value = [SimpleNamespace(metadata={'Name': 'Some_Pkg'}, version='1')]
+        first = evidence.environment(self.root)
+        self.packages.return_value = [SimpleNamespace(metadata={'Name': 'some-pkg'}, version='1')]
+        self.assertEqual(evidence.environment(self.root), first)
+        self.packages.return_value = [SimpleNamespace(metadata={'Name': 'some-pkg'}, version='2')]
+        self.assertNotEqual(evidence.environment(self.root), first)
+
+    def test_browser_paths_share_identity_and_binary_changes_invalidate_it(self):
+        first, second = self.root / 'chrome-one', self.root / 'chrome-two'
+        first.write_bytes(b'browser-fixture')
+        second.write_bytes(first.read_bytes())
+        os.environ['PEACH_E2E_CHROME'] = str(first)
+        identity = evidence.environment(self.root)
+        os.environ['PEACH_E2E_CHROME'] = str(second)
+        self.assertEqual(evidence.environment(self.root), identity)
+        second.write_bytes(b'another-browser')
+        self.assertNotEqual(evidence.environment(self.root), identity)
+
+
+class RecordSelectionTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.now = time.time()
+        self.enterContext(mock.patch.object(evidence, 'evidence_dir', return_value=self.root))
+
+    def record(self, index, *, success=True, **changes):
+        manifest = {'files': {'marker': [420, f'{index:064x}', '100644']}, 'signatures': {}}
+        context = {'manifest': manifest, 'environment': 'fixture'}
+        state = evidence.digest([evidence.digest(manifest), context['environment']])
+        value = {**context, 'state': state, 'validated': {'catalog': self.now} if success else {},
+                 'coverage': {}, **changes}
+        path = self.root / f'{state}.json'
+        path.write_text(json.dumps(value), encoding='utf8')
+        os.utime(path, (self.now - 100 + index, self.now - 100 + index))
+        return context, state, path
+
+    def test_live_baseline_survives_newer_failed_records(self):
+        context, _, _ = self.record(0)
+        for index in range(1, 34):
+            self.record(index, success=False)
+        self.assertEqual(len(list(evidence.baselines(self.root, context, partial=True))), 1)
+
+    def test_malformed_record_does_not_hide_other_candidates(self):
+        context, _, _ = self.record(0)
+        self.record(1, coverage=[])
+        self.assertEqual(len(list(evidence.baselines(self.root, context, partial=True))), 1)
+
+    def test_record_content_is_bound_to_its_identity(self):
+        _, state, path = self.record(0)
+        record = json.loads(path.read_text(encoding='utf8'))
+        record['environment'] = 'another'
+        path.write_text(json.dumps(record), encoding='utf8')
+        self.assertEqual(evidence.read(self.root, state), {})
+
+    def test_malformed_optional_fields_do_not_stop_candidate_selection(self):
+        context, _, _ = self.record(0)
+        for index, fields in enumerate(({'failed_scopes': {}}, {'finished': []}, {'cohort': {}},
+                                       {'units': {'test_a.py': {'outcome': 'pass', 'at': float('nan')}}}), 1):
+            self.record(index, **fields)
+        self.assertEqual(len(list(evidence.candidates(self.root, context))), 1)
+
+
+class ReceiptFixture:
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.now = time.time()
+        self.mapping = {'catalog': (Path('test_catalog.py'),), 'web': (Path('test_web.py'),),
+                        'checks': (), 'full': (Path('test_catalog.py'), Path('test_web.py'))}
+        self.context = {'environment': 'same', 'manifest': {'files': {}, 'signatures': {}}}
+
+    def resolve(self, paths, **kwargs):
+        return (('catalog',), 'fixture')
+
+    def unit(self, outcome='pass', offset=0):
+        return {'outcome': outcome, 'at': self.now + offset}
+
+    def record(self, units, **changes):
+        return {**self.context, 'units': units, **changes}
+
+
+class ReceiptTests(ReceiptFixture, unittest.TestCase):
+    def test_a_failed_file_preserves_successful_sibling_files(self):
+        report = {'success': False, 'count': 2, 'results': [
+            {'id': 'test_catalog.Suite.test_value', 'outcome': 'pass'},
+            {'id': 'test_web.Suite.test_value', 'outcome': 'fail'}]}
+        units = test_resume.report_units(self.mapping['full'], report, clean_exit=True, stamp=self.now)
+        self.assertEqual(units['test_catalog.py']['outcome'], 'pass')
+        self.assertEqual(units['test_web.py']['outcome'], 'fail')
+
+    def test_latest_failure_blocks_an_older_success_from_another_record(self):
+        records = [self.record({'test_web.py': self.unit('fail')}),
+                   self.record({'test_web.py': self.unit(offset=-10)})]
+        kept = test_resume.combine(self.root, records, self.context, {'test_web.py'}, self.resolve, self.mapping.__getitem__)
+        self.assertEqual(kept['test_web.py']['outcome'], 'fail')
+
+    def test_compatible_records_cover_scopes_without_claiming_full(self):
+        records = [self.record({'test_web.py': self.unit()}), self.record({'test_catalog.py': self.unit(offset=-10)})]
+        kept = test_resume.combine(self.root, records, self.context,
+                                  {'test_web.py', 'test_catalog.py'}, self.resolve, self.mapping.__getitem__)
+        requirements = {scope: {path.name for path in files} for scope, files in self.mapping.items()}
+        validated = test_resume.validated(kept, requirements)
+        self.assertEqual(set(validated), {'catalog', 'web'})
+        self.assertEqual(validated['catalog'], self.now - 10)
+
+    def test_a_test_file_change_preserves_an_independent_test_file(self):
+        old = {'files': {'tests/test_catalog.py': [420, 'old', '100644']}, 'signatures': {}}
+        current = {'files': {'tests/test_catalog.py': [420, 'new', '100644']}, 'signatures': {}}
+        record = self.record({'test_web.py': self.unit(), 'test_catalog.py': self.unit()}, manifest=old)
+        kept = test_resume.combine(self.root, [record], {**self.context, 'manifest': current},
+                                  {'test_web.py', 'test_catalog.py'}, self.resolve, self.mapping.__getitem__)
+        self.assertEqual(set(kept), {'test_web.py'})
+
+    def test_actual_source_changes_invalidate_their_domain(self):
+        old = {'files': {'src/peach/catalog.py': [420, 'old', '100644']}, 'signatures': {}}
+        current = {'files': {'src/peach/catalog.py': [420, 'new', '100644']}, 'signatures': {}}
+        record = self.record({'test_web.py': self.unit(), 'test_catalog.py': self.unit()}, manifest=old)
+        kept = test_resume.combine(self.root, [record], {**self.context, 'manifest': current},
+                                  {'test_web.py', 'test_catalog.py'}, self.resolve, self.mapping.__getitem__)
+        self.assertEqual(set(kept), {'test_web.py'})
+
+    def test_missing_or_unclean_completion_cannot_produce_success(self):
+        for report, clean in (({'success': True, 'count': 0}, True),
+                              ({'success': True, 'count': 1}, False)):
+            with self.subTest(report=report, clean=clean):
+                units = test_resume.report_units(['test_web.py'], report, clean_exit=clean, stamp=self.now)
+                self.assertEqual(units['test_web.py']['outcome'], 'unknown')
+
+    def test_browser_failure_retains_other_browser_file_results(self):
+        folder = self.root / 'frontend/e2e'
+        folder.mkdir(parents=True)
+        for name in ('one.test.ts', 'two.test.ts'):
+            (folder / name).write_text('fixture', encoding='utf8')
+        report = {'success': False, 'count': 1, 'results': [
+            {'id': 'test_web_e2e.Suite.test_browser', 'outcome': 'fail'},
+            {'id': 'e2e:e2e/one.test.ts > value', 'outcome': 'pass'},
+            {'id': 'e2e:e2e/one.test.ts > 文件结果', 'outcome': 'pass', 'file_complete': True},
+            {'id': 'e2e:e2e/two.test.ts > value', 'outcome': 'fail'}]}
+        units = test_resume.report_units(['test_web_e2e.py'], report, clean_exit=True, stamp=self.now)
+        plan = test_resume.external_plan(self.root, ['test_web_e2e.py'], units)
+        self.assertEqual(plan, {'test_web_e2e.py': ['frontend/e2e/two.test.ts']})
+
+    def test_partial_external_output_does_not_prove_file_completion(self):
+        report = {'success': False, 'count': 1, 'results': [
+            {'id': 'e2e:e2e/one.test.ts > first', 'outcome': 'pass'}]}
+        units = test_resume.report_units(['test_web_e2e.py'], report, clean_exit=True, stamp=self.now)
+        self.assertEqual(units['frontend/e2e/one.test.ts']['outcome'], 'unknown')
+
+    def test_imported_test_helpers_invalidate_transitive_consumers(self):
+        folder = self.root / 'tests'
+        folder.mkdir()
+        (folder / 'test_middle.py').write_text('from tests import test_catalog\n', encoding='utf8')
+        (folder / 'test_outer.py').write_text('from . import test_middle\n', encoding='utf8')
+        self.assertEqual(test_resume.test_importers(self.root, 'test_catalog.py'),
+                         {'test_catalog.py', 'test_middle.py', 'test_outer.py'})
+
+    def test_comment_only_test_changes_preserve_behavior_coverage(self):
+        behavior = evidence.digest('same')
+        old = {'files': {'tests/test_catalog.py': [420, 'old', '100644']},
+               'signatures': {'tests/test_catalog.py': {'behavior': behavior}}}
+        current = {'files': {'tests/test_catalog.py': [420, 'new', '100644']},
+                   'signatures': old['signatures']}
+        resolve = lambda paths, **kwargs: (('checks',), 'fixture')
+        record = self.record({'test_catalog.py': self.unit()}, manifest=old)
+        kept = test_resume.combine(self.root, [record], {**self.context, 'manifest': current},
+                                  {'test_catalog.py'}, resolve, self.mapping.__getitem__)
+        self.assertEqual(set(kept), {'test_catalog.py'})
+
+    def test_container_class_skip_is_an_environment_bound_result(self):
+        case = next(case for case in test_resume.CONTAINERS if '.WebE2E' in case)
+        report = {'success': True, 'count': 1, 'results': [
+            {'id': 'setUpClass (test_web_e2e.WebE2ESmokeTests)', 'outcome': 'skip'},
+            {'id': 'test_web_e2e.Policy.test_value', 'outcome': 'pass'}]}
+        units = test_resume.report_units(['test_web_e2e.py'], report, clean_exit=True, cases={case})
+        self.assertEqual(units['case:' + case]['outcome'], 'pass')
+
+    def test_class_and_module_cleanup_failures_invalidate_container_proof(self):
+        case = next(case for case in test_resume.CONTAINERS if '.WebE2E' in case)
+        for holder in ('tearDownClass (test_web_e2e.WebE2ESmokeTests)', 'tearDownModule (test_web_e2e)'):
+            report = {'success': False, 'count': 1, 'results': [
+                {'id': case, 'outcome': 'pass'}, {'id': holder, 'outcome': 'error'}]}
+            with self.subTest(holder=holder):
+                units = test_resume.report_units(['test_web_e2e.py'], report, clean_exit=True, cases={case})
+                self.assertEqual(units['case:' + case]['outcome'], 'fail')
+                self.assertEqual(units['test_web_e2e.py']['outcome'], 'fail')
+
+
+class CheckpointTests(ReceiptFixture, unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        manifest = self.context['manifest']
+        self.context['state'] = evidence.digest([evidence.digest(manifest), self.context['environment']])
+        self.enterContext(mock.patch.object(evidence, 'evidence_dir', return_value=self.root / 'records'))
+        self.enterContext(mock.patch.object(evidence, 'inputs', return_value=self.context))
+
+    def progress(self, scopes=('full',), **kwargs):
+        return test_run_progress.RunProgress(self.root, self.context, scopes, self.mapping.__getitem__,
+                self.resolve, ('catalog', 'web', 'checks'), **kwargs)
+
+    def report(self, *names, failure=None):
+        return {'complete': True, 'success': failure is None, 'count': len(names), 'results': [
+            {'id': name.removesuffix('.py') + '.Suite.test_value',
+             'outcome': 'fail' if name == failure else 'pass'} for name in names]}
+
+    def test_interruption_keeps_completed_shards_and_their_original_age(self):
+        progress = self.progress()
+        progress.start()
+        progress.checkpoint(['test_catalog.py'], self.report('test_catalog.py'), True)
+        saved = evidence.read(self.root, self.context['state'])
+        resumed = self.progress(records=[saved])
+        self.assertEqual(resumed.pending, {'test_web.py'})
+        stamp = saved['units']['test_catalog.py']['at']
+        resumed.start()
+        resumed.checkpoint(['test_web.py'], self.report('test_web.py'), True)
+        resumed.persist(final=True, success=resumed.complete())
+        result = evidence.read(self.root, self.context['state'])
+        self.assertTrue(evidence.covers(result, ('full',)))
+        self.assertEqual(result['validated']['full'], stamp)
+
+    def test_failed_batch_resumes_only_failed_files_without_full_until_complete(self):
+        progress = self.progress()
+        progress.start()
+        progress.checkpoint(self.mapping['full'], self.report('test_catalog.py', 'test_web.py', failure='test_web.py'), True)
+        progress.persist(final=True, success=False)
+        saved = evidence.read(self.root, self.context['state'])
+        self.assertFalse(evidence.covers(saved, ('full',)))
+        self.assertTrue(evidence.covers(saved, ('catalog',)))
+        self.assertEqual(self.progress(records=[saved]).pending, {'test_web.py'})
+
+    def test_fresh_discards_positive_coverage_in_the_requested_scope(self):
+        record = self.record({'test_catalog.py': self.unit(), 'test_web.py': self.unit()})
+        progress = self.progress(('catalog',), records=[record], force=True)
+        self.assertEqual(progress.pending, {'test_catalog.py'})
+        self.assertEqual(progress.units['test_web.py']['outcome'], 'pass')
+
+    def test_partial_runs_do_not_supply_full_batch_provenance(self):
+        records = [self.record({'test_catalog.py': self.unit()}), self.record({'test_web.py': self.unit()})]
+        progress = self.progress(records=records)
+        self.assertEqual(progress.pending, {'test_catalog.py', 'test_web.py'})
+        progress.persist(final=True, success=True)
+        self.assertFalse(evidence.covers(evidence.read(self.root, self.context['state']), ('full',)))
+
+    def test_nonfinal_report_cannot_supply_a_checkpoint(self):
+        progress = self.progress()
+        report = self.report('test_catalog.py')
+        report.pop('complete')
+        self.assertFalse(progress.checkpoint(['test_catalog.py'], report, True))
+        self.assertFalse(progress.units)
+
+    def test_coverage_that_expires_during_execution_requires_revalidation(self):
+        record = self.record({'test_catalog.py': self.unit()})
+        progress = self.progress(('catalog',), records=[record])
+        self.assertTrue(progress.complete())
+        with mock.patch.object(evidence.time, 'time', return_value=self.now + 86401):
+            self.assertFalse(progress.complete())
+
+    def test_cached_external_files_require_current_complete_proof(self):
+        folder = self.root / 'frontend/e2e'
+        folder.mkdir(parents=True)
+        for name in ('one.test.ts', 'two.test.ts'):
+            (folder / name).write_text('export {};', encoding='utf8')
+        self.mapping['web'] = (Path('test_web_e2e.py'),)
+        proof = {'frontend/e2e/one.test.ts': self.unit()}
+        progress = self.progress(('web',), records=[self.record(proof)])
+        plan = progress.child_plan()
+        self.assertEqual(plan['external']['test_web_e2e.py'], ['frontend/e2e/two.test.ts'])
+        test_resume.validate_child_plan(self.root, plan, state=self.context['state'], valid_seconds=86400)
+        for bad in ({**plan, 'cached': {}}, {**plan, 'state': 'another'},
+                    {**plan, 'cached': {name: {**row, 'at': self.now - 86401} for name, row in proof.items()}}):
+            with self.subTest(plan=bad), self.assertRaises(ValueError):
+                test_resume.validate_child_plan(self.root, bad, state=self.context['state'], valid_seconds=86400)
+
+    def test_unrelated_python_failure_survives_browser_aggregation(self):
+        smoke = next(case for case in runner.CI_BROWSER_TESTS if '.WebE2E' in case)
+        ids = ['e2e:e2e/smoke.test.ts > failure', smoke,
+               'test_web_e2e.SourcePolicyTests.test_contract']
+        selectors = runner.rerun_selectors([{'id': name, 'outcome': 'fail'} for name in ids])
+        self.assertEqual(selectors, ['test_web_e2e.SourcePolicyTests.test_contract', 'frontend/e2e/smoke.test.ts'])
+
+    def test_setup_failure_selects_the_whole_module(self):
+        self.assertEqual(runner.rerun_selectors([{'id': 'setUpClass (test_catalog.Suite)', 'outcome': 'error'}]),
+                         ['test_catalog'])
+
+    def test_external_success_cannot_hide_python_container_postcondition_failure(self):
+        folder = self.root / 'frontend/e2e'
+        folder.mkdir(parents=True)
+        for name in ('one.test.ts', 'setup.test.ts'):
+            (folder / name).write_text('export {};', encoding='utf8')
+        self.mapping['web'] = (Path('test_web_e2e.py'),)
+        smoke = next(case for case in test_resume.CONTAINERS if '.WebE2E' in case)
+        setup = next(case for case in test_resume.CONTAINERS if '.SetupE2E' in case)
+        proof = {name: self.unit() for name in test_resume.external_files(self.root, 'test_web_e2e.py')}
+        proof.update({'case:' + smoke: self.unit(), 'case:' + setup: self.unit('fail')})
+        plan = self.progress(('web',), records=[self.record(proof)]).child_plan()
+        self.assertEqual(plan['skip_cases'], [smoke])
+        self.assertIn(setup, plan['cases'])
+        test_resume.validate_child_plan(self.root, plan, state=self.context['state'], valid_seconds=86400)
+        self.assertIsNone(runner.rerun_selectors([
+            {'id': setup, 'outcome': 'fail'}, {'id': 'e2e:e2e/smoke.test.ts > error', 'outcome': 'fail'}]))
+
+    def test_input_change_after_a_failure_retains_unaffected_success(self):
+        progress = self.progress()
+        progress.start()
+        progress.checkpoint(self.mapping['full'], self.report('test_catalog.py', 'test_web.py', failure='test_catalog.py'), True)
+        manifest = {'files': {'src/peach/catalog.py': [420, evidence.digest('changed'), '100644']}, 'signatures': {}}
+        current = {**self.context, 'manifest': manifest,
+                   'state': evidence.digest([evidence.digest(manifest), self.context['environment']])}
+        with mock.patch.object(evidence, 'inputs', return_value=current):
+            self.assertEqual(progress.retain_current(), 1)
+        record = evidence.read(self.root, current['state'])
+        self.assertEqual(record['units']['test_web.py']['outcome'], 'pass')
+        self.assertNotIn('test_catalog.py', record['units'])
+
+    def test_narrow_resume_plan_excludes_unselected_containers(self):
+        folder = self.root / 'frontend/e2e'
+        folder.mkdir(parents=True)
+        (folder / 'one.test.ts').write_text('export {};', encoding='utf8')
+        self.mapping['full'] = (Path('test_catalog.py'), Path('test_web_e2e.py'))
+        self.mapping['web'] = (Path('test_web_e2e.py'),)
+        all_units = test_resume.scope_units(self.root, 'full', self.mapping.__getitem__)
+        proof = {name: {**self.unit(), 'cohort': self.context['state']} for name in all_units}
+        proof['test_catalog.py']['outcome'] = 'fail'
+        progress = self.progress(records=[self.record(proof, cohort=self.context['state'])])
+        plan = progress.child_plan(('catalog',))
+        self.assertEqual(plan['case_universe'], [])
+        test_resume.validate_child_plan(self.root, plan, state=self.context['state'], valid_seconds=86400)
+
+    def test_cached_supplement_in_a_resumed_full_run_requires_its_proof(self):
+        case = 'test_extra.Suite.test_value'
+        self.mapping['full'] += (Path('test_extra.py'),)
+        self.mapping['checks'] = (Path('test_catalog.py'),)
+        proof = {name: {**self.unit(), 'cohort': self.context['state']}
+                 for name in ('test_catalog.py', 'test_web.py', 'test_extra.py')}
+        proof['test_catalog.py']['outcome'] = 'fail'
+        progress = self.progress(records=[self.record(proof, cohort=self.context['state'])],
+                                 supplements={'checks': (case,)})
+        plan = progress.child_plan(('checks',))
+        self.assertEqual(plan['case_universe'], [case])
+        self.assertEqual(plan['cases'], [])
+        test_resume.validate_child_plan(self.root, plan, state=self.context['state'], valid_seconds=86400)
+        with self.assertRaises(ValueError):
+            test_resume.validate_child_plan(self.root, {**plan, 'case_cached': {}},
+                                           state=self.context['state'], valid_seconds=86400)
+        test_type = type('Suite', (unittest.TestCase,), {'__module__': 'test_extra', 'test_value': lambda self: None})
+        selected = test_resume.filter_suite(unittest.TestSuite([test_type('test_value')]), plan,
+                                            {'test_catalog.py'}, unittest.TestSuite)
+        self.assertEqual(selected.countTestCases(), 0)
+
+
+class ShardReportTests(unittest.TestCase):
+    def test_malformed_reports_are_failures(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'report.json'
+            base = {'complete': True, 'success': True, 'count': 1, 'timings': [], 'files': {}, 'results': []}
+            invalid = [{'complete': False}, {'count': -1}, {'timings': [[float('nan'), 'id']]},
+                       {'timings': ['invalid']}, {'files': {'test_a': 'invalid'}}, {'results': [None]},
+                       {'results': [{'id': 'test_a.Suite.test_value', 'outcome': 'fail'}]}]
+            for fields in invalid:
+                with self.subTest(fields=fields):
+                    path.write_text(json.dumps({**base, **fields}), encoding='utf8')
+                    self.assertFalse(test_shard_results.read_report(path)['success'])
+
+    def test_a_completed_child_with_a_live_thread_is_reaped(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / '0.json'
+            script = Path(folder) / 'child.py'
+            script.write_text("import json,pathlib,sys,threading\n"
+                "threading.Thread(target=threading.Event().wait).start()\n"
+                "pathlib.Path(sys.argv[1]).write_text(json.dumps({"
+                "'complete': True,'success': True,'count': 1,'timings': []}))\n", encoding='utf8')
+            process = subprocess.Popen([sys.executable, '-X', 'utf8', str(script), str(path)])
+            try:
+                deadline = time.monotonic() + 10
+                while not path.exists() and time.monotonic() < deadline:
+                    time.sleep(.02)
+                self.assertTrue(path.exists())
+                self.assertIsNone(process.poll())
+                with redirect_stdout(io.StringIO()):
+                    finished = test_shard_results.completed_processes({0: (process, None)}, Path(folder),
+                        {0: 0}, now=test_shard_results.EXIT_GRACE_SECONDS + 1)
+                self.assertEqual(finished, [0])
+                self.assertIsNotNone(process.poll())
+            finally:
+                if process.poll() is None:
+                    test_shard_results.stop_process_tree(process)
 
 
 class VerificationTests(unittest.TestCase):
@@ -80,6 +530,19 @@ class VerificationTests(unittest.TestCase):
         state = evidence.key(worker)
         evidence.write(worker, state, scopes, success=success, elapsed=1, slowest=[], count=1)
         return state
+
+    def scope_suite(self, *scopes, fail=False, **planned):
+        suite = unittest.TestSuite()
+        selected = {path for scope in scopes for path in runner.selected_files(scope)}
+        assigned = planned.get('assigned_names')
+        def exercise(case):
+            if fail:
+                case.fail('fixture')
+        for path in sorted(selected):
+            if assigned is None or path.name in assigned:
+                case = type('Suite', (unittest.TestCase,), {'__module__': path.stem, 'test_value': exercise})
+                suite.addTest(case('test_value'))
+        return suite
 
     def test_gate_requires_matching_successful_coverage(self):
         worker, branch = self.worker()
@@ -478,7 +941,7 @@ class VerificationTests(unittest.TestCase):
                 mock.patch.object(evidence, "write", side_effect=publish_locked) as written, \
                 mock.patch.object(runner, "run_local_suite", return_value=(True, 1, [])):
             self.assertEqual(runner.main(["--scope", "full"]), 0)
-        written.assert_called_once()
+        self.assertGreaterEqual(written.call_count, 2)
         self.assertEqual(self.git("rev-parse", "HEAD"), before)
 
     def test_integration_excludes_full_verification(self):
@@ -528,16 +991,14 @@ class VerificationTests(unittest.TestCase):
             self.assertEqual(runner.scopes_for_changes([path])[0], ("full",))
 
     def test_runner_reuses_success_and_fresh_failure_invalidates_it(self):
-        def suite(*_):
-            return unittest.TestSuite([unittest.FunctionTestCase(lambda: None)])
         with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()), \
                 mock.patch.object(runner, "ROOT", self.repo), \
-                mock.patch.object(runner, "build_suite", side_effect=suite) as build:
+                mock.patch.object(runner, "build_suite", side_effect=self.scope_suite) as build:
             self.assertEqual(runner.main(["--scope", "checks"]), 0)
             self.assertEqual(runner.main(["--scope", "checks"]), 0)
             self.assertEqual(build.call_count, 1)
-            def failing(*_):
-                return unittest.TestSuite([unittest.FunctionTestCase(lambda: self.fail("fixture"))])
+            def failing(*scopes, **planned):
+                return self.scope_suite(*scopes, fail=True, **planned)
             build.side_effect = failing
             self.assertEqual(runner.main(["--scope", "checks", "--fresh"]), 1)
             self.assertFalse(evidence.covers(evidence.read(self.repo, evidence.key(self.repo)), ("checks",)))
@@ -607,8 +1068,7 @@ class VerificationTests(unittest.TestCase):
         with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()), \
                 mock.patch.object(runner, "ROOT", self.repo), \
                 mock.patch.object(runner, "resolve_auto_scope", return_value=(("full",), "fixture")), \
-                mock.patch.object(runner, "build_suite", return_value=unittest.TestSuite([
-                    unittest.FunctionTestCase(lambda: None)])) as build:
+                mock.patch.object(runner, "build_suite", side_effect=self.scope_suite) as build:
             self.assertEqual(runner.main(["--scope", "auto"]), 0)
         build.assert_called_once_with("checks", "tooling")
         record = evidence.read(self.repo, evidence.key(self.repo))
@@ -633,10 +1093,12 @@ class VerificationTests(unittest.TestCase):
         with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()), \
                 mock.patch.object(runner, "ROOT", self.repo), \
                 mock.patch.object(runner, "resolve_auto_scope", return_value=(("checks",), "fixture")), \
-                mock.patch.object(runner, "build_suite", return_value=unittest.TestSuite([
-                    unittest.FunctionTestCase(lambda: None)])) as build:
+                mock.patch.object(runner, "build_suite", side_effect=self.scope_suite) as build:
             self.assertEqual(runner.main(["--scope", "auto"]), 0)
-        build.assert_called_once_with("checks")
+        self.assertEqual(build.call_count, 1)
+        self.assertEqual(build.call_args.args, ('checks',))
+        self.assertLessEqual(set(build.call_args.kwargs.get('assigned_names', ())),
+                             {path.name for path in runner.selected_files('checks')})
 
     def test_baseline_distinguishes_version_assignment_and_package_logic(self):
         self.certify(self.repo, ("full",))
@@ -688,7 +1150,7 @@ class VerificationTests(unittest.TestCase):
                    "web": ("test_web.py",)}
         select = lambda scope: tuple(Path(name) for name in mapping.get(scope, ()))
 
-        def mutate(*args):
+        def mutate(*args, **kwargs):
             (self.repo / "README.md").write_text("检查期间的文档修订\n", encoding="utf-8")
             return True, 2, []
 
@@ -721,11 +1183,13 @@ class VerificationTests(unittest.TestCase):
         changed = self.repo / "tests/support/shared.py"
         changed.parent.mkdir(parents=True)
         changed.write_text("value = 1\n", encoding="utf-8")
-        self.assertEqual(test_progress.retained(source, evidence.inputs(self.repo), runner.scopes_for_changes, select), {})
+        self.assertEqual(test_resume.combine(self.repo, [source], evidence.inputs(self.repo), {'test_web.py'},
+                         runner.scopes_for_changes, select), {})
         changed.unlink()
         other = {**context, "environment": "different"}
-        self.assertEqual(test_progress.retained(source, other, runner.scopes_for_changes, select), {})
-        self.assertEqual(test_progress.retained({**source, "cohort": None}, context, runner.scopes_for_changes, select), {})
+        self.assertEqual(test_resume.combine(self.repo, [source], other, {'test_web.py'}, runner.scopes_for_changes, select), {})
+        self.assertEqual(test_resume.combine(self.repo, [{**source, 'cohort': None}], context, {'test_web.py'},
+                         runner.scopes_for_changes, select), {})
 
     def test_content_signatures_preserve_narrow_comment_and_metadata_deltas(self):
         path = self.repo / "tests/support/shared.py"
@@ -753,7 +1217,9 @@ class VerificationTests(unittest.TestCase):
         mapping = {"full": ("a", "b", "c", "d"), "catalog": ("a", "b", "d"),
                    "media": ("b", "c", "d"), "web": ("a", "b", "c")}
         select = lambda scope: tuple(Path(name) for name in mapping[scope])
-        self.assertEqual(test_progress.pending({"d": 100}, select, ("catalog", "media", "web")), ("web",))
+        requirements = {scope: {path.name for path in select(scope)} for scope in mapping}
+        self.assertEqual(test_resume.choose_scopes({'a', 'b', 'c'}, requirements,
+                         ('catalog', 'media', 'web')), ('web',))
 
     def test_partial_baseline_preserves_unaffected_scopes_and_their_age(self):
         original = self.certify(self.repo, ("catalog", "metadata", "web"))
@@ -898,11 +1364,13 @@ class EvidenceExpiryTests(unittest.TestCase):
 
     def test_signing_a_record_prunes_expired_ones_and_keeps_a_fresh_failure(self):
         expired = self.place(f"{self.old}.json", stale=True)
-        context = {"manifest": {}, "environment": "fixture"}
+        manifest = {'files': {}, 'signatures': {}}
+        context = {'manifest': manifest, 'environment': 'fixture'}
+        state = evidence.digest([evidence.digest(manifest), context['environment']])
         with mock.patch.object(evidence, "evidence_dir", return_value=self.folder):
-            evidence.write(self.folder, self.live, ("checks",), success=False, elapsed=0,
+            evidence.write(self.folder, state, ("checks",), success=False, elapsed=0,
                            slowest=[], count=0, previous={}, context=context)
-            record = evidence.read(self.folder, self.live)
+            record = evidence.read(self.folder, state)
 
         self.assertFalse(expired.exists())
         self.assertEqual(record["failed_scopes"], ["checks"])

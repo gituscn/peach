@@ -127,6 +127,7 @@ class HistoryFileTests(unittest.TestCase):
             self.assertTrue(history.nested())
             self.assertIsNone(history.append(runner.ROOT, scope='full:full', files=[], rows=[]))
             self.assertEqual(history.take_external(), [])
+            history.record_external([history.result('vitest:fixture > failure', 'fail', 0.0)])
         self.assertEqual(history._external, [outer], '外层运行收集到一半的结果原样留着')
 
     def test_the_parent_collects_every_shards_rows(self):
@@ -139,7 +140,7 @@ class HistoryFileTests(unittest.TestCase):
         def spawn(command, *, stdout, stderr, cwd):
             index = int(command[command.index('--shard-index') + 1])
             Path(command[command.index('--timings') + 1]).write_text(json.dumps({
-                'success': True, 'count': 1, 'timings': [],
+                'complete': True, 'success': False, 'count': 1, 'timings': [],
                 'results': [history.result(f'test_{index}.T.test_x', 'fail', 0.1, 'boom')]}), encoding='utf-8')
             return Done()
 
@@ -151,6 +152,15 @@ class HistoryFileTests(unittest.TestCase):
 
 
 class ExternalRowsTests(unittest.TestCase):
+    def test_file_completion_preserves_process_and_suite_failures(self):
+        frontend = Path(tempfile.gettempdir()).resolve() / 'frontend'
+        report = {'testResults': [{'name': str(frontend / 'test/a.test.ts'), 'status': 'passed'},
+                                  {'name': str(frontend / 'test/b.test.ts'), 'status': 'failed'}]}
+        rows = history.vitest_files(report, frontend)
+        self.assertEqual([row['outcome'] for row in rows], ['pass', 'fail'])
+        self.assertTrue(all(row['file_complete'] for row in rows))
+        self.assertEqual(history.file_result('e2e', 'e2e/a.test.ts', False)['outcome'], 'fail')
+
     def test_tap_leaves_become_rows_with_their_suite_path(self):
         rows = history.tap_rows('e2e/anchor-navigation.test.ts', TAP)
         self.assertEqual([(row['id'], row['outcome']) for row in rows], [
