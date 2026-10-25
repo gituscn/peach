@@ -326,6 +326,7 @@ class SettingsBlockTests(_App):
         self.assertEqual(payload["report"]["suggested_target"], {"path": "/115open/云下载", "exists": False})
 
     def test_saving_checks_the_folder_the_user_filled_in_and_keeps_it(self):
+        self.service.landing.declared_roots = self.roots()
         self.suggest("/115open/云下载", True)
         payload = web_downloads.save_settings(self.service, {
             "clouddrive_address": "127.0.0.1:19798", "token": "cd2-secret",
@@ -386,6 +387,7 @@ class SettingsBlockTests(_App):
         self.assertEqual((report["suggested_target"], report["suggested_pikpak_root"]), (None, ""))
 
     def test_the_check_takes_the_push_prefixes_and_the_blanks_on_the_form(self):
+        self.service.landing.declared_roots = self.roots()
         web_downloads.save_settings(self.service, {"targets": {"115": "/115open/已保存"}}, self.roots())
         prefixes = (CloudPrefix("/115open", "B:\\"),)
         self.service.landing.push_discovery.config = PushDiscoveryConfig(prefixes=prefixes)
