@@ -118,7 +118,14 @@ export function ReleaseUpdates({ initial, initialJob }: { initial: ReleaseState;
           </div>
         ) : null}
       </Stack>}
-      <Footer status={<ExternalLink href={data.release_url}>查看发布页</ExternalLink>}>
+      <Footer status={<div className="flex flex-wrap items-center gap-3">
+        <ExternalLink href="https://peach.video/#download">官网</ExternalLink>
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <ExternalLink href="https://github.com/peach-mitao/peach">GitHub</ExternalLink>
+          <StatusLabel>暂无法更新</StatusLabel>
+        </span>
+        <ExternalLink href="https://gitgud.io/peach-mitao/peach/-/releases">查看发布页</ExternalLink>
+      </div>}>
         <Button variant={job.state === 'ready' || (data.state === 'available' && data.installation === '独立测试包') ? 'secondary' : 'primary'}
           disabled={running} onClick={check} {...busyProps(action.busy === 'check')}>检查更新</Button>
         {data.state === 'available' && data.installation === '独立测试包' && job.state !== 'ready'
