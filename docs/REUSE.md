@@ -1,5 +1,11 @@
 # 复用清单
 
+## 扫描路径冲突隔离
+
+路径归组复用 Python 3.14 标准库的 [`PureWindowsPath`](https://docs.python.org/3.14/library/pathlib.html#general-properties) 与现有大小写口径，入库复用 SQLite 的 [UPSERT](https://www.sqlite.org/lang_upsert.html)、扫描检查点和单路径摄取入口，未新增依赖。两者均由现有运行时携带，许可与版本沿用运行时声明。路径相等不决定个人记录归属，Peach 负责将歧义组交给现有任务问题清单，保留每条身份及处置，只更新实际观察到的文件时间；不另建路径解析器或自动合并器。
+
+隔离回归使用临时账本与目录，覆盖大小写和斜杠变体、个人记录保留、缺失文件、多根目录、断点配对和自动发现。真实 ledger 未用于修复演练，部署与报告者验收分别记录。
+
 ## 升级自动处理与更新提示
 
 本地补修复用 `catalog_rules` 的用户识别规则、`field_owners.write_owned_fields`、r18 文字修复与复合别名拆分判据。两个维护脚本调用同一领域模块。结构迁移、SQLite 备份、文件锁和原子回执继续使用项目现有入口；后台复用 `TaskRunStore`、`FollowupRunner`、`Attempts`、来源冷却和影片处理检查点，未新增运行依赖。
