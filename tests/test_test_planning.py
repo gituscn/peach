@@ -399,6 +399,22 @@ class TestPlanningTests(unittest.TestCase):
         self.assertEqual(empty[0], ['test_web_e2e.py'])
         self.assertEqual(sorted(len(shard) for shard in empty[1:]), [2, 2, 3])
 
+    def test_zero_duration_files_fill_each_shard_and_run_once(self):
+        for size in (2, 5, 9):
+            names = [f'test_{index}.py' for index in range(size)]
+            seconds = {name.removesuffix('.py'): 0.0 for name in names}
+            for count in (1, 2, 4, 12):
+                with self.subTest(size=size, count=count):
+                    plan = runner.shard_plan(names, count, seconds)
+                    self.assertEqual(len(plan), min(size, count))
+                    self.assertTrue(all(plan))
+                    self.assertCountEqual([name for group in plan for name in group], names)
+                    self.assertLessEqual(max(map(len, plan)) - min(map(len, plan)), 1)
+            seconds['test_0'] = 10.0
+            plan = runner.shard_plan(names, size, seconds)
+            self.assertTrue(all(plan))
+            self.assertCountEqual([name for group in plan for name in group], names)
+
     def test_planned_shards_cover_every_case_once_and_reject_foreign_files(self):
         def ids(suite):
             for case in suite:
