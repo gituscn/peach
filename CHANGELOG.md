@@ -21,7 +21,7 @@ Removed / Fixed / Security。
 
 ## [未发布]
 
-## [0.49.0] - 2026-10-25
+## [0.49.1] - 2026-10-25
 
 ### 新增
 
@@ -728,8 +728,8 @@ Removed / Fixed / Security。
 - **桌面**：独立包使用 UTF-8 启动日志。
 - **配置**：首次设置后的跳转目标取新鲜读到的 mDNS 名。
 
-[未发布]: https://github.com/peach-mitao/peach/compare/v0.49.0...HEAD
-[0.49.0]: https://github.com/peach-mitao/peach/compare/v0.48.2...v0.49.0
+[未发布]: https://github.com/peach-mitao/peach/compare/v0.49.1...HEAD
+[0.49.1]: https://github.com/peach-mitao/peach/compare/v0.48.2...v0.49.1
 [0.48.2]: https://github.com/peach-mitao/peach/compare/v0.48.1...v0.48.2
 [0.48.1]: https://github.com/peach-mitao/peach/compare/v0.48.0...v0.48.1
 [0.48.0]: https://github.com/peach-mitao/peach/compare/v0.47.3...v0.48.0
