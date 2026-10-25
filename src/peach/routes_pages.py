@@ -307,17 +307,18 @@ def index(request: Request, args: dict[str, str] = Depends(require_page_auth)):
         return PlainTextResponse("Peach page missing", status_code=500)
     shape = getattr(request.state, "entity_shape", None)
     editor = "edit" in request.query_params and _copy_editor_available()
-    if shape is not None or editor:
-        html = settings.page_path.read_text(encoding="utf-8")
-        if shape is not None:
-            payload = json.dumps(shape, ensure_ascii=False).replace("<", "\\u003c")
-            script = f'<script type="application/json" id="peach-entity-shape">{payload}</script>'
-            html = html.replace("</head>", script + "</head>", 1) if "</head>" in html else html + script
-        if editor:
-            html = _with_copy_editor(html)
-        response = HTMLResponse(html)
-    else:
-        response = FileResponse(settings.page_path, media_type="text/html")
+    from .client_updates import runtime_identity
+    html = settings.page_path.read_text(encoding="utf-8")
+    entries = {'peach-client-runtime': runtime_identity()}
+    if shape is not None:
+        entries['peach-entity-shape'] = shape
+    for name, entry in entries.items():
+        payload = json.dumps(entry, ensure_ascii=False).replace("<", "\\u003c")
+        script = f'<script type="application/json" id="{name}">{payload}</script>'
+        html = html.replace("</head>", script + "</head>", 1) if "</head>" in html else html + script
+    if editor:
+        html = _with_copy_editor(html)
+    response = HTMLResponse(html)
     response.headers["Cache-Control"] = "no-store"
     set_auth_cookie(response, request)
     return response

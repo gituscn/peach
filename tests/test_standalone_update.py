@@ -3,7 +3,7 @@ import json
 import hashlib
 import os
 import shutil
-from contextlib import nullcontext
+from contextlib import closing, nullcontext
 from pathlib import Path
 import tempfile
 import sqlite3
@@ -81,6 +81,78 @@ class StandaloneUpdateTests(unittest.TestCase):
             for name in names:
                 package.writestr(name, "fixture")
         return archive
+
+    def reader_installation(self):
+        fresh_ledger(self.database.parent)
+        target = self.root / 'app'
+        (target / '_internal').mkdir(parents=True)
+        (target / '_internal/standalone.txt').touch()
+        (target / 'Peach.exe').write_text('old', encoding='utf-8')
+        transaction = self.root / '.app-update-reader'
+        stage = transaction / 'stage/Peach'
+        (stage / '_internal').mkdir(parents=True)
+        shutil.copytree(Path(__file__).resolve().parents[1] / 'migrations', stage / '_internal/migrations')
+        (stage / 'Peach.exe').write_text('new', encoding='utf-8')
+        update.write(dict(id='reader', target=str(target), transaction=str(transaction),
+                          stage=str(stage), version='1.0.0'), state='ready')
+        return target, stage
+
+    def test_reader_with_pending_schema_is_rejected_before_install_or_ledger_writes(self):
+        target, stage = self.reader_installation()
+        with closing(sqlite3.connect(self.database)) as connection, connection:
+            connection.execute('DROP TABLE ledger_upgrade_repair')
+            connection.execute("DELETE FROM ledger_revision WHERE tbl='ledger_upgrade_repair'")
+            connection.execute("DELETE FROM schema_migration WHERE version='0048'")
+        before = self.database.read_bytes()
+        with patch('peach.runtime_prepare.configured_ledger_writer', return_value=(False, '读取端')), patch.object(
+                update.distribution, 'standalone', return_value=True), patch.object(update.sys, 'platform', 'win32'), \
+                patch.object(update.update_tasks, 'reserve') as reserve, patch.object(update, 'preserve_local_state') as preserve, \
+                patch.object(update, 'restore_database') as restore, patch('peach.windows_restart.start_tray') as start:
+            with self.assertRaisesRegex(ValueError, '写入端迁移并同步'):
+                update.request_restart()
+            self.assertEqual(update.apply(update.state_path(), 999), 1)
+        for operation in (reserve, preserve, restore, start):
+            operation.assert_not_called()
+        self.assertEqual(self.database.read_bytes(), before)
+        self.assertEqual((target / 'Peach.exe').read_text(), 'old')
+        self.assertTrue(stage.is_dir())
+
+    def test_compatible_reader_updates_program_without_reserving_or_backing_up_ledger(self):
+        target, _stage = self.reader_installation()
+        before = self.database.read_bytes()
+        health = Mock(status_code=200)
+        health.json.return_value = dict(version='1.0.0', ready=True)
+        with patch('peach.runtime_prepare.configured_ledger_writer', return_value=(False, '读取端')), patch.object(
+                update.distribution, 'standalone', return_value=True), patch.object(update.sys, 'platform', 'win32'), \
+                patch.object(update.update_tasks, 'reserve') as reserve, patch('peach.job_recovery.import_legacy_library') as import_job, \
+                patch('peach.windows_restart.process_alive', return_value=False), patch('peach.windows_restart.start_tray'), \
+                patch('peach.windows_restart.find_tray_windows', return_value=[Mock()]), patch.object(
+                update.httpx, 'get', return_value=health):
+            self.assertEqual(update.request_restart()['state'], 'restarting')
+            self.assertEqual(update.apply(update.state_path(), 999), 0)
+        reserve.assert_not_called()
+        import_job.assert_not_called()
+        self.assertFalse((self.state / 'update-backups/reader/ledger.db').exists())
+        self.assertEqual(self.database.read_bytes(), before)
+        self.assertEqual((target / 'Peach.exe').read_text(), 'new')
+
+    def test_compatible_reader_install_failure_restores_program_without_restoring_ledger(self):
+        target, stage = self.reader_installation()
+        before = self.database.read_bytes()
+        original = update.replace_with_retry
+        def replace(source, destination):
+            if source == stage:
+                raise OSError('occupied')
+            original(source, destination)
+        with patch('peach.runtime_prepare.configured_ledger_writer', return_value=(False, '读取端')), patch.object(
+                update, 'replace_with_retry', side_effect=replace), patch.object(update, 'restore_database') as restore, \
+                patch.object(update.update_tasks, 'reserve') as reserve, patch('peach.windows_restart.process_alive', return_value=False), \
+                patch('peach.windows_restart.start_tray'):
+            self.assertEqual(update.apply(update.state_path(), 999), 1)
+        restore.assert_not_called()
+        reserve.assert_not_called()
+        self.assertEqual(self.database.read_bytes(), before)
+        self.assertEqual((target / 'Peach.exe').read_text(), 'old')
 
     def test_zip_requires_a_complete_standalone_layout_and_reports_progress(self):
         archive = self.archive(["Peach/Peach.exe", "Peach/_internal/standalone.txt"])
@@ -482,3 +554,30 @@ class StandaloneUpdateTests(unittest.TestCase):
         update.restore_database(data)
         with update.closing(sqlite3.connect(self.database)) as connection:
             self.assertEqual(connection.execute("SELECT value FROM fixture").fetchone()[0],"original")
+
+    def test_install_state_restore_preserves_settings_checkpoints_and_absence(self):
+        self.config.path.write_text('original config', encoding='utf-8')
+        recovery = self.state / 'job-recovery'
+        recovery.mkdir()
+        (recovery / 'job.json').write_text('saved checkpoint', encoding='utf-8')
+        update.preserve_local_state({'id':'state-fixture'})
+        self.config.path.write_text('changed config', encoding='utf-8')
+        (recovery / 'job.json').write_text('changed checkpoint', encoding='utf-8')
+        repairs = self.state / 'upgrade-repairs'
+        repairs.mkdir()
+        (repairs / 'receipt.json').write_text('new receipt', encoding='utf-8')
+        update.restore_local_state({'id':'state-fixture'})
+        self.assertEqual(self.config.path.read_text(encoding='utf-8'), 'original config')
+        self.assertEqual((recovery / 'job.json').read_text(encoding='utf-8'), 'saved checkpoint')
+        self.assertFalse(repairs.exists())
+
+    def test_running_installation_is_detected_by_the_current_executable_and_version(self):
+        target = self.root / 'app'
+        with patch.object(update.distribution, 'standalone', return_value=True), patch.object(
+                update.sys, 'executable', str(target / 'Peach.exe')):
+            update.write({'target':str(target), 'version':update.__version__}, state='installing')
+            self.assertTrue(update.installation_pending())
+            update.write(update.read(), state='complete')
+            self.assertFalse(update.installation_pending())
+            update.write({'target':str(target), 'version':'0.0.0'}, state='installing')
+            self.assertFalse(update.installation_pending())

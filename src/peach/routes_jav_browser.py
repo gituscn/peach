@@ -47,6 +47,11 @@ def identify(source_url: str, code: str = "", service=Depends(browser_client)):
         raise HTTPException(400, str(error)) from None
 
 
+def updates(request: Request, service=Depends(browser_client)):
+    from .client_updates import snapshot
+    return JSONResponse(snapshot(request.app.state.automatic_updates), headers={'Cache-Control': 'no-store'})
+
+
 def add(body: dict = Body(...), service=Depends(browser_client)):
     try:
         return JSONResponse(service.add(body), headers={"Cache-Control": "no-store"})
@@ -85,6 +90,7 @@ def create_router(local_only) -> APIRouter:
                         dependencies=[Depends(require_auth)])
     router.add_api_route("/api/jav-browser", status, methods=["GET"])
     router.add_api_route("/api/jav-browser/identify", identify, methods=["GET"])
+    router.add_api_route("/api/jav-browser/updates", updates, methods=["GET"])
     router.add_api_route("/api/jav-browser", add, methods=["POST"])
     router.add_api_route("/api/jav-browser/errors", errors, methods=["POST"])
     permissions = [Depends(require_auth), Depends(local_only)]

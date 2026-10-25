@@ -40,6 +40,7 @@ from .platform import translate_ledger_path as _local_ledger_path
 from .review_csv import read_rows, write_rows
 from .scan import scan_location
 from .fsutil import atomic_write_text
+from . import artifact_rules, upgrade_rules
 from .ffmpeg import FFmpegResolver
 from .jobs import DiskGuard, JobPolicyError
 from .media_probe import probe_unmeasured
@@ -894,10 +895,11 @@ def snapshot(config):
     return decorate(state)
 
 
-def _queue_local_poster(video, code, cover_root, payload=None, posters=None, *, enqueue):
+def _queue_local_poster(video, code, cover_root, payload=None, posters=None, *, enqueue, generated=False):
     """`posters` 是调用方已经从同目录索引里挑出的海报候选，给了就不再列目录。"""
     target = cover_root / (code + '.jpg')
-    if target.is_file():
+    if target.is_file() and (not generated or artifact_rules.current(
+            target, upgrade_rules.LOCAL_POSTERS, source_required=True)):
         return
     if posters is None:
         _, posters = sidecars(video)
@@ -910,31 +912,38 @@ def _queue_local_poster(video, code, cover_root, payload=None, posters=None, *, 
     enqueue(posters[0], code, target)
 
 
-def _read_local_posters(jobs, state, *, update, issue):
+def _read_local_posters(jobs, state, *, update, issue, generated_root=None):
     """按档位领取配套图片，空闲后补位；主线程保存结果并经过安全停点。"""
     from .cover_artwork import install_cover
     from .local_poster import read_jpeg, TIMEOUT_SECONDS
+    def read(source, derived):
+        stamp = artifact_rules.fingerprint(source) if derived else None
+        return (*read_jpeg(source, isolated=True), stamp)
     failed = set()
     done = submitted = 0
     futures = {}
     with ThreadPoolExecutor(max_workers=4, thread_name_prefix='PeachLocalPoster') as executor:
         while submitted < len(jobs) or futures:
             row, started = (jobs[submitted][0], time.time()) if not futures else (
-                next(iter(futures.values()))[0], next(iter(futures.values()))[3])
+                next(iter(futures.values()))[0], next(iter(futures.values()))[4])
             update(stage='读取配套图片', checked=done, total=len(jobs), current_action='reading_local_cover',
                    current_asset_id=row['id'], current_asset_name=row['name'],
                    current_started_at=started, current_deadline_at=started + TIMEOUT_SECONDS)
             workers = {'low': 1, 'standard': 2, 'high': 4}[state['speed_mode']]
             while submitted < len(jobs) and len(futures) < workers:
                 row, source, code, target = jobs[submitted]
-                futures[executor.submit(copy_context().run, read_jpeg, source, isolated=True)] = (
-                    row, code, target, time.time())
+                derived = generated_root is not None and target.parent == generated_root
+                futures[executor.submit(copy_context().run, read, source, derived)] = (
+                    row, code, target, source, time.time())
                 submitted += 1
             completed, _ = wait(futures, return_when=FIRST_COMPLETED)
             for future in completed:
-                row, code, target, _ = futures.pop(future)
+                row, code, target, source, _ = futures.pop(future)
                 try:
-                    data, size = future.result()
+                    data, size, stamp = future.result()
+                    derived = generated_root is not None and target.parent == generated_root
+                    if derived and stamp != artifact_rules.fingerprint(source):
+                        raise OSError('配套图片在读取时发生变化')
                 except InterruptedError:
                     raise
                 except (OSError, ValueError, subprocess.TimeoutExpired) as error:
@@ -943,8 +952,11 @@ def _read_local_posters(jobs, state, *, update, issue):
                                else '配套图片无法读取')
                     issue(row, message, action='reading_local_cover', retryable=True)
                 else:
-                    if not target.is_file():
+                    if not target.is_file() or derived:
                         install_cover(target, code, data, size)
+                        if derived and not artifact_rules.remember(
+                                target, upgrade_rules.LOCAL_POSTERS, source=source, source_fingerprint=stamp):
+                            raise OSError('配套图片在保存时发生变化')
                         state['covers'] += 1
                 done += 1
                 update(checked=done, covers=state['covers'])
@@ -1230,7 +1242,7 @@ class _DirectoryIndex:
 
 #: 记忆文件的格式号。按站记、带各站接入时刻的是这一版；没有这个键的文件是按档记、
 #: 整份绑一个来源目录指纹的写法（`_legacy_fingerprint`）。
-MISS_FORMAT = 2
+MISS_FORMAT = 3
 #: 几站合成一档的档名（`metadata_routes.stages_for_chain`）。按档记的文件里这几个键下的
 #: 「没有」说不清是哪一站说的。
 _MERGED_STAGES = frozenset({'community', 'fc2', 'amane', 'amane_official'})
@@ -1443,6 +1455,7 @@ class _RemoteSession:
 
     def _evidence(self, source, code, payload):
         _save(self._evidence_path(code, source), payload)
+        artifact_rules.remember(self._evidence_path(code, source), str(upgrade_rules.PROVIDER_EVIDENCE))
         entry = (source, payload, self._evidence_path(code, source))
         self._task_evidence[source, code] = entry
         return entry
@@ -1466,6 +1479,8 @@ class _RemoteSession:
                 continue
             path = self._evidence_path(code, name)
             try:
+                if not artifact_rules.current(path, str(upgrade_rules.PROVIDER_EVIDENCE)):
+                    continue
                 if time.time() - path.stat().st_mtime > MISS_TTL_SECONDS:
                     continue
                 entry = (name, json.loads(path.read_text(encoding='utf-8')), path)
@@ -2135,7 +2150,7 @@ def _generate_preview(config, row, database, resolver, *, progress):
     previous = row.get('snapshot_path')
     if previous:
         previous = translate_ledger_path(previous)
-        if previous.is_relative_to(root) and measure_image_file(previous):
+        if previous.is_relative_to(root) and artifact_rules.current(previous) and measure_image_file(previous):
             return False
     choice = resolver.ffmpeg()
     if choice is None:
@@ -2158,7 +2173,7 @@ def _generate_preview(config, row, database, resolver, *, progress):
             connection.execute(media_probe.UPDATE, measured)
     digest = hashlib.sha1(str(row['path']).encode('utf-8')).hexdigest()[:16]
     destination = root / 'local' / digest[:2] / (digest + '.jpg')
-    if not measure_image_file(destination):
+    if not artifact_rules.current(destination) or not measure_image_file(destination):
         with tempfile.TemporaryDirectory(prefix='peach-preview-') as temporary:
             frames = Path(temporary)
             for index in range(9):
@@ -2187,6 +2202,7 @@ def _generate_preview(config, row, database, resolver, *, progress):
                         raise ValueError('预览图无法读取，请重试')
             except OSError as error:
                 raise _ProcessingPersistenceError(f'预览图无法保存：{error}') from error
+    artifact_rules.remember(destination)
     progress()
     with database.write_transaction() as connection:
         result = connection.execute(
@@ -2254,6 +2270,11 @@ class _LibraryCheckpoints:
 
     def __init__(self, state, previous, database):
         previous = previous or {}
+        if previous.get('processing_rule') != upgrade_rules.PROCESSING:
+            state['local_metadata'] = {}
+            previous = {key: value for key, value in previous.items()
+                        if key not in ('completed_previews', 'completed_metadata', 'local_metadata')}
+        state['processing_rule'] = upgrade_rules.PROCESSING
         self.state = state
         self.completed = {phase: set(previous.get(phase) or [])
                           for phase in ('completed_previews', 'completed_metadata')}
@@ -2352,7 +2373,8 @@ def _read_local_metadata(config, db_path, row, cover_root, listing, state, updat
     try:
         poster_root = cover_root if code else config.directory('generated') / 'posters'
         _queue_local_poster(video, code or f"{row['id']}_4", poster_root, payload, posters=posters,
-                            enqueue=lambda source, key, target: poster_jobs.append((row, source, key, target)))
+                            enqueue=lambda source, key, target: poster_jobs.append((row, source, key, target)),
+                            generated=not code)
     except InterruptedError:
         raise
     except (OSError, ValueError):
@@ -2505,7 +2527,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                     report=lambda state: None, provider_factory=None, job_id=None,
                     retry_ids=None, active=lambda: True, stage=ALL_STAGES,
                     database=None, route_overrides=None, state_file=None, asset_ids=None,
-                    resume_state=None, speed_mode=None, protected_ids=()):
+                    resume_state=None, speed_mode=None, protected_ids=(), recheck_existing=False):
     """登记文件与确定的番号，外部资料保留为可复核候选。
 
     `retry_ids` 为 `None` 时处理整个馆藏；给定时只处理这些项目（上一任务记录的
@@ -2702,6 +2724,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 if local is None:
                     continue
                 code, verify_existing, payload, entries = local
+                verify_existing = bool(verify_existing or recheck_existing)
                 local_fields = _fields(payload, genre_decisions) if payload else {}
                 publish(row, code, local_fields, verify_existing, entries)
                 if code or payload:
@@ -2715,7 +2738,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             update(estimate_pending=dict(pending), stage='准备读取配套图片', checked=0, total=0,
                    current_asset_id=None, current_asset_name='', current_action='',
                    current_started_at=None, current_deadline_at=None)
-            poster_failed = _read_local_posters(poster_jobs, state, update=update, issue=issue)
+            poster_failed = _read_local_posters(poster_jobs, state, update=update, issue=issue,
+                                                generated_root=config.directory('generated') / 'posters')
             pending.pop('images')
             update(estimate_pending=dict(pending), stage='检查配套文件', checked=0, total=0,
                    current_asset_id=None, current_asset_name='', current_action='',
