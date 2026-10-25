@@ -31,7 +31,7 @@ class RunProgress:
                           if row.get('cohort') == self.cohort or row.get('outcome') != 'pass'}
         self.observed = 0
         if force:
-            self.units = {name: row for name, row in self.units.items() if name not in self.required}
+            self.units = resume.without_requested(self.units, self.required)
         for case in resume.CONTAINERS:
             if resume.container_files(root, case) - resume.passed_units(self.units):
                 self.units.pop('case:' + case, None)
@@ -56,7 +56,7 @@ class RunProgress:
         current = evidence.inputs(self.root)
         invalid = resume.affected(self.root, self.context, current, self.all_units, self.resolve, self.select)
         self.units.update({name: {**row, 'cohort': self.cohort}
-                           for name, row in completed.items() if name in self.required and name not in invalid})
+                           for name, row in completed.items() if name in self.all_units and name not in invalid})
         self.persist()
         return all(self.units.get(name, {}).get('outcome') == 'pass' for name in assigned)
 
@@ -67,14 +67,19 @@ class RunProgress:
             names = set()
             for selector in reruns:
                 name = selector if selector.startswith('frontend/') else selector.split('.', 1)[0] + '.py'
-                names.update({name, resume.owner(name), 'case:' + selector})
                 if '.' not in selector and not selector.startswith('frontend/'):
-                    names.update(unit for unit in self.required if resume.owner(unit) == name)
-                names.update('case:' + case for case in resume.CONTAINERS
-                             if name in resume.container_files(self.root, case))
+                    names.update(unit for unit in self.all_units if resume.owner(unit) == name)
+                else:
+                    names.add('case:' + selector)
+                    if selector.startswith('frontend/'):
+                        names.add(name)
+                        names.update('case:' + case for case in resume.CONTAINERS
+                                     if name in resume.container_files(self.root, case))
+                    if resume.owner(name) in self.required:
+                        names.add(resume.owner(name))
         stamp = time.time()
         self.units.update({name: {'outcome': 'pass', 'at': stamp, 'cohort': self.cohort}
-                           for name in names if name in self.required})
+                           for name in names if name in self.all_units})
 
     def complete(self):
         return self.required <= resume.passed_units(evidence.live_units(self.units) or {})

@@ -93,6 +93,7 @@ def affected(root: Path, record: dict, context: dict, all_units: set[str], resol
         else:
             scopes, _ = resolve([path], kinds={path: kinds[path]} if path in kinds else {})
             invalid.update(unit for scope in scopes for unit in scope_units(root, scope, select))
+    invalid.update(name for name in all_units if name.startswith('case:') and owner(name) in invalid)
     return invalid & all_units
 
 
@@ -112,6 +113,9 @@ def eligible(root: Path, record: dict, context: dict, all_units: set[str], resol
         for scope in record.get('failed_scopes', ()):
             units.update({name: {'outcome': 'fail', 'at': record.get('finished', 0)}
                           for name in recorded_scope(root, scope, select)})
+    for name in all_units:
+        if name.startswith('case:') and name not in units and owner(name) in units:
+            units[name] = units[owner(name)]
     return {name: row for name, row in units.items() if name in all_units and name not in invalid}
 
 
@@ -130,15 +134,16 @@ def combine(root: Path, records, context: dict, all_units: set[str], resolve, se
             rank = (row['at'], row['outcome'] != 'pass')
             if previous is None or rank > (previous['at'], previous['outcome'] != 'pass'):
                 merged[name] = row
-    for name in all_units:
-        parent = merged.get(owner(name)) if name.startswith('case:') else None
-        if parent is not None and (name not in merged or parent['at'] >= merged[name]['at']):
-            merged[name] = parent
     return merged
 
 
 def passed_units(units: dict) -> set[str]:
     return {name for name, row in units.items() if row.get('outcome') == 'pass'}
+
+
+def without_requested(units: dict, required: set[str]) -> dict:
+    modules = {name for name in required if name.endswith('.py')}
+    return {name: row for name, row in units.items() if name not in required and owner(name) not in modules}
 
 
 def validated(units: dict, requirements: dict[str, set[str]], *, allow_full=False) -> dict:
@@ -167,12 +172,15 @@ def result_cases(identity: str, cases):
     return ()
 
 
-def report_units(assigned, report: dict, *, clean_exit: bool, external=None, cases=(), stamp=None) -> dict:
-    """分片完整报告中有明确结果的文件；缺失或异常报告不产生成功证明。"""
-    stamp = time.time() if stamp is None else stamp
+def unattributed_failure(assigned, report, cases):
+    return any(row.get('outcome') in {'fail', 'error'} and row_unit(str(row.get('id', '')), assigned) is None
+               and not result_cases(str(row.get('id', '')), cases) for row in report.get('results', ()))
+
+
+def grouped_results(assigned, report, cases):
+    """归集叶子结果、补充用例和外部文件终态。"""
     grouped = {}
     completed_files = set()
-    assigned = {Path(item).name for item in assigned}
     for row in report.get('results', ()):
         identity = str(row.get('id', ''))
         for case in result_cases(identity, cases):
@@ -182,6 +190,14 @@ def report_units(assigned, report: dict, *, clean_exit: bool, external=None, cas
             grouped.setdefault(unit, []).append(row.get('outcome'))
             if row.get('file_complete') is True and row.get('outcome') == 'pass':
                 completed_files.add(unit)
+    return grouped, completed_files
+
+
+def report_units(assigned, report: dict, *, clean_exit: bool, external=None, cases=(), stamp=None) -> dict:
+    """分片完整报告中有明确结果的文件；缺失或异常报告不产生成功证明。"""
+    stamp = time.time() if stamp is None else stamp
+    assigned = {Path(item).name for item in assigned}
+    grouped, completed_files = grouped_results(assigned, report, cases)
     result = {}
     for unit, outcomes in grouped.items():
         failed = any(outcome in {'fail', 'error'} for outcome in outcomes)
@@ -199,8 +215,10 @@ def report_units(assigned, report: dict, *, clean_exit: bool, external=None, cas
                     result[unit] = {'outcome': 'pass', 'at': stamp}
         elif module not in grouped:
             result[module] = {'outcome': 'unknown', 'at': stamp}
-    if report.get('success') and not clean_exit:
-        result = {name: {'outcome': 'unknown', 'at': stamp} for name in result}
+    if ((report.get('success') and not clean_exit) or report.get('count', 0) <= 0
+            or unattributed_failure(assigned, report, cases)):
+        result = {name: {**row, 'outcome': 'unknown'} if row['outcome'] == 'pass' else row
+                  for name, row in result.items()}
     return result
 
 

@@ -298,6 +298,42 @@ class ReceiptTests(ReceiptFixture, unittest.TestCase):
                 self.assertEqual(units['case:' + case]['outcome'], 'fail')
                 self.assertEqual(units['test_web_e2e.py']['outcome'], 'fail')
 
+    def test_explicit_case_success_survives_an_unrelated_failure_in_its_module(self):
+        case = 'case:test_catalog.Suite.test_value'
+        proof = {'test_catalog.py': self.unit('fail'), case: self.unit()}
+        kept = test_resume.combine(self.root, [self.record(proof)], self.context, set(proof),
+                                  self.resolve, self.mapping.__getitem__)
+        self.assertEqual(kept[case]['outcome'], 'pass')
+
+    def test_module_aggregation_does_not_refresh_an_explicit_case_timestamp(self):
+        case = 'case:test_catalog.Suite.test_value'
+        proof = {'test_catalog.py': self.unit(), case: self.unit(offset=-100)}
+        kept = test_resume.combine(self.root, [self.record(proof)], self.context, set(proof),
+                                  self.resolve, self.mapping.__getitem__)
+        self.assertEqual(kept[case]['at'], self.now - 100)
+
+    def test_shared_inputs_invalidate_supplemental_cases_with_their_module(self):
+        case = 'case:test_catalog.Suite.test_value'
+        proof = {'test_catalog.py': self.unit(), case: self.unit()}
+        context = {**self.context, 'manifest': {'files': {'scripts/test_runner.py': [420, 'changed', '100644']}}}
+        kept = test_resume.combine(self.root, [self.record(proof)], context, set(proof),
+                                  lambda paths, **kwargs: (('full',), 'fixture'), self.mapping.__getitem__)
+        self.assertEqual(kept, {})
+
+    def test_zero_executed_tests_do_not_produce_positive_coverage(self):
+        case = 'test_catalog.Suite.test_value'
+        report = {'success': False, 'count': 0, 'results': [
+            {'id': 'setUpClass (test_catalog.Suite)', 'outcome': 'skip'}]}
+        units = test_resume.report_units(['test_catalog.py'], report, clean_exit=False, cases={case})
+        self.assertEqual(test_resume.passed_units(units), set())
+
+    def test_unattributed_failure_prevents_success_from_being_inferred(self):
+        report = {'success': False, 'count': 1, 'results': [
+            {'id': 'test_catalog.Suite.test_value', 'outcome': 'pass'},
+            {'id': 'executor bootstrap', 'outcome': 'error'}]}
+        units = test_resume.report_units(['test_catalog.py'], report, clean_exit=False)
+        self.assertEqual(units['test_catalog.py']['outcome'], 'unknown')
+
 
 class CheckpointTests(ReceiptFixture, unittest.TestCase):
     def setUp(self):
@@ -473,6 +509,36 @@ class CheckpointTests(ReceiptFixture, unittest.TestCase):
         progress.accept_success(['test_web_e2e'])
         self.assertTrue(progress.complete())
 
+    def test_failed_full_file_preserves_the_successful_supplement_it_executed(self):
+        case = 'test_extra.Suite.test_value'
+        self.mapping['full'] += (Path('test_extra.py'),)
+        supplements = {'checks': (case,)}
+        progress = self.progress(supplements=supplements)
+        progress.start()
+        progress.checkpoint(['test_extra.py'], {'complete': True, 'success': False, 'count': 2, 'results': [
+            {'id': case, 'outcome': 'pass'}, {'id': 'test_extra.Suite.test_other', 'outcome': 'fail'}]}, True)
+        saved = evidence.read(self.root, self.context['state'])
+        self.assertEqual(saved['units']['case:' + case]['outcome'], 'pass')
+        resumed = self.progress(('checks',), records=[saved], supplements=supplements)
+        self.assertTrue(resumed.complete())
+
+    def test_fresh_file_verification_also_invalidates_its_supplement_receipts(self):
+        case = 'test_catalog.Suite.test_value'
+        record = self.record({'test_catalog.py': self.unit(), 'case:' + case: self.unit()})
+        progress = self.progress(('catalog',), records=[record], supplements={'checks': (case,)}, force=True)
+        self.assertNotIn('case:' + case, progress.units)
+
+    def test_case_only_rerun_does_not_certify_its_entire_module(self):
+        case = 'test_extra.Suite.test_value'
+        self.mapping['full'] += (Path('test_extra.py'),)
+        progress = self.progress(('catalog',), supplements={'catalog': (case,)})
+        progress.start()
+        progress.checkpoint(['test_catalog.py'], {'complete': True, 'success': False, 'count': 2, 'results': [
+            {'id': 'test_catalog.Suite.test_value', 'outcome': 'pass'}, {'id': case, 'outcome': 'fail'}]}, True)
+        progress.accept_success([case])
+        self.assertTrue(progress.complete())
+        self.assertNotIn('test_extra.py', progress.units)
+
 
 class ShardReportTests(unittest.TestCase):
     def test_malformed_reports_are_failures(self):
@@ -510,6 +576,72 @@ class ShardReportTests(unittest.TestCase):
             finally:
                 if process.poll() is None:
                     test_shard_results.stop_process_tree(process)
+
+
+class SubprocessResumeTests(unittest.TestCase):
+    def invoke(self, repo, scope):
+        env = {**os.environ, 'GITHUB_ACTIONS': 'false', 'CI': ''}
+        for key in ('PEACH_TEST_FOCUS', 'PEACH_E2E_FILES', 'PEACH_VITEST_FILES'):
+            env.pop(key, None)
+        process = subprocess.Popen([sys.executable, '-X', 'utf8', str(repo / 'entry.py'),
+                                    '--scope', scope, '--jobs', 'auto'], cwd=repo, env=env,
+                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   text=True, encoding='utf8')
+        try:
+            output, _ = process.communicate(timeout=180)
+        finally:
+            if process.poll() is None:
+                test_shard_results.stop_process_tree(process)
+        return process.returncode, output
+
+    def test_real_parent_and_children_resume_only_the_failed_file(self):
+        source = Path(__file__).resolve().parents[1]
+        modules = ('test_runner', 'test_evidence', 'test_history', 'test_resume', 'test_run_progress',
+                   'test_shard_results', 'test_environment_identity', 'test_focus', 'change_impact')
+        files = {'scripts/__init__.py': '', '.gitignore': 'build/\nruntime/\n__pycache__/\n*.pyc\n',
+                 '.gitattributes': '* text=auto eol=lf\n'}
+        files.update({'scripts/' + name + '.py': (source / 'scripts' / (name + '.py')).read_text(encoding='utf8')
+                      for name in modules})
+        files['entry.py'] = (
+            'from pathlib import Path\nfrom unittest import mock\nfrom scripts import test_runner as runner\n'
+            'with mock.patch.object(runner.test_evidence, "machine_lock_path", '
+            'return_value=Path.cwd()/"runtime/machine.lock"):\n    raise SystemExit(runner.main())\n')
+        sample = ('from pathlib import Path\nimport unittest\nclass Suite(unittest.TestCase):\n'
+                  '    def test_value(self):\n        root=Path(__file__).resolve().parents[1]/"runtime"\n'
+                  '        with (root/(__name__+".calls")).open("a", encoding="utf8") as output:\n'
+                  '            output.write("called\\n")\n'
+                  '        if __name__ == "test_web_library_shortcuts":\n'
+                  '            self.assertFalse((root/"fail").exists())\n')
+        for name in ('test_ad_judgement', 'test_web_library_shortcuts'):
+            files['tests/' + name + '.py'] = sample
+        with tempfile.TemporaryDirectory() as folder:
+            repo = seed_repository(Path(folder).resolve() / 'repo', files, 'fixture')
+            evidence.git(repo, 'checkout', '-b', 'fixture')
+            (repo / 'shared-input').write_text('fixture', encoding='utf8')
+            evidence.git(repo, 'add', 'shared-input')
+            evidence.git(repo, 'commit', '-m', 'fixture')
+            runtime = repo / 'runtime'
+            runtime.mkdir()
+            marker = runtime / 'fail'
+            marker.touch()
+            code, output = self.invoke(repo, 'full')
+            self.assertEqual(code, 1, output)
+            record_file = next(path for path in (repo / 'build/agent-verification').glob('*.json')
+                               if len(path.stem) == 64)
+            before = json.loads(record_file.read_text(encoding='utf8'))
+            self.assertEqual(before['units']['test_ad_judgement.py']['outcome'], 'pass')
+            stamp = before['units']['test_ad_judgement.py']['at']
+            successful_calls = (runtime / 'test_ad_judgement.calls').read_text(encoding='utf8')
+            failed_calls = (runtime / 'test_web_library_shortcuts.calls').read_text(encoding='utf8').splitlines()
+            marker.unlink()
+            code, output = self.invoke(repo, 'auto')
+            self.assertEqual(code, 0, output)
+            after = json.loads(record_file.read_text(encoding='utf8'))
+            self.assertEqual(after['units']['test_ad_judgement.py']['at'], stamp)
+            self.assertEqual(after['validated']['full'], stamp)
+            self.assertEqual((runtime / 'test_ad_judgement.calls').read_text(encoding='utf8'), successful_calls)
+            self.assertEqual(len((runtime / 'test_web_library_shortcuts.calls').read_text(encoding='utf8').splitlines()),
+                             len(failed_calls) + 1)
 
 
 class VerificationTests(unittest.TestCase):
