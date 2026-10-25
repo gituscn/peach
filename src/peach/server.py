@@ -34,6 +34,20 @@ def stop_process(process: subprocess.Popen | None) -> None:
 def initialize() -> None:
     config = settings_file.load_config()
     if config.present:
+        if not (config.directory('database') / 'ledger.db').is_file():
+            raise RuntimeError('已有配置但缺少数据库，请恢复数据库后启动')
+        from .runtime_prepare import configured_ledger_writer
+        writer, _reason = configured_ledger_writer(config)
+        if not writer:
+            return
+        migrate = launch("migrate", "upgrade", "--yes", "--db",
+                         str(config.directory("database") / "ledger.db"))
+        try:
+            code = migrate.wait(timeout=180)
+            if code:
+                raise RuntimeError(f"数据库升级失败，退出码 {code}；服务未启动")
+        finally:
+            stop_process(migrate)
         return
     if config.directory("database").joinpath("ledger.db").exists():
         raise RuntimeError("已有数据库但缺少配置文件，请恢复 config.toml 后启动")

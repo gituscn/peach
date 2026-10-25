@@ -154,6 +154,7 @@ class FollowupRunner:
         self.store = store if store is not None else contract.task_runs
         self._lock = threading.Lock()
         self._threads: dict[str, threading.Thread] = {}
+        self._active: dict[threading.Thread, str] = {}
         self._stopping = False
         self._paused_for_update = False
 
@@ -180,7 +181,7 @@ class FollowupRunner:
                 self._threads[lane] = thread
                 thread.start()
 
-    def stop(self, timeout: float | None = 2.0) -> None:
+    def stop(self, timeout: float | None = 2.0, *, wait_for=()) -> None:
         """不再领新的后继并等在途那一条收工。
 
         在途那一条不打断：它多半正在写账本，中途掐掉留下的是一条停在 `running` 的行，
@@ -189,10 +190,11 @@ class FollowupRunner:
         with self._lock:
             self._stopping = True
             threads = list(self._threads.values())
+            required = {thread for thread, key in self._active.items() if key in wait_for}
             self._threads.clear()
         for thread in threads:
             if thread.is_alive():
-                thread.join(timeout)
+                thread.join(None if thread in required else timeout)
 
     def resume_after_update(self) -> None:
         if self._paused_for_update:
@@ -225,9 +227,17 @@ class FollowupRunner:
                 if isinstance(db, Path) and is_pausing(db):
                     self._paused_for_update = True
                 return
-            self._execute(run)
+            thread = threading.current_thread()
+            with self._lock:
+                self._active[thread] = run.task_key
+            try:
+                self._execute(run)
+            finally:
+                with self._lock:
+                    self._active.pop(thread, None)
 
     def _execute(self, run) -> None:
+        from .jobs import JobPaused
         followup_type = REGISTRY.get(run.task_key)
         handle = TaskRunHandle(self.store, run.id)
         if followup_type is None:
@@ -237,6 +247,10 @@ class FollowupRunner:
             return
         try:
             summary = followup_type.run(self.contract, run.followup_key, handle)
+        except JobPaused as error:
+            self.store.suspend(run.id, label=str(error) or '等待安装完成后继续')
+            self._paused_for_update = True
+            return
         except Exception as error:  # 后继失败只是它自己失败，父任务的结论不动。
             LOGGER.warning("followup failed: %s: %s", run.followup_key, error,
                            exc_info=True)

@@ -36,6 +36,24 @@ def load_script(name: str):
 
 
 class StatusCommandTests(unittest.TestCase):
+    def test_configured_reader_can_inspect_pending_schema_but_cannot_migrate(self):
+        config = settings_file.load_config(environ={'PEACH_DATA_ROOT': str(self.root)})
+        database = config.directory('database') / 'ledger.db'
+        database.parent.mkdir()
+        sqlite3.connect(database).close()
+        before = database.read_bytes()
+        arguments = argparse.Namespace(db=database, action='status', yes=True)
+        with mock.patch.object(cli, '_require_readable_settings'), mock.patch.object(
+                settings_file, 'active', return_value=config), mock.patch(
+                'peach.runtime_prepare.configured_ledger_writer', return_value=(False, '读取端')), \
+                redirect_stdout(io.StringIO()):
+            self.assertEqual(cli._migrate(arguments), 0)
+            arguments.action = 'upgrade'
+            with self.assertRaisesRegex(SystemExit, '写入端迁移并同步'):
+                cli._migrate(arguments)
+        self.assertEqual(database.read_bytes(), before)
+        self.assertEqual(list(database.parent.iterdir()), [database])
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

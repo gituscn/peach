@@ -197,10 +197,31 @@ WARM_AGGREGATES = (("/api/taste", {"window": "all"}), ("/api/review", {}), ("/ap
 def _start_ledger_services(settings: PeachSettings, contract, services) -> bool:
     """只读核对当前账本后，恢复任务并启动依赖账本的后台服务。"""
     status = inspect_database(settings.db_path)
+    repairs = getattr(contract, 'upgrade_repairs', None)
+    if status['schema'] == 'pending' and repairs is not None and repairs.available:
+        from .config import MIGRATIONS_DIR
+        from .migrations import upgrade
+        import time
+        try:
+            upgrade(settings.db_path, MIGRATIONS_DIR,
+                    settings.db_path.with_name(f'ledger.pre-schema-{time.time_ns()}.db'))
+            status = inspect_database(settings.db_path)
+            contract.task_runs.enabled = contract.task_runs.available()
+        except Exception as exc:
+            repairs.error = str(exc)
+            LOGGER.exception('自动迁移失败，后台任务保持停止')
+            return False
     if not status["readable"] or status["schema"] != "current":
         LOGGER.warning("数据库未就绪，依赖数据库的后台任务保持停止（数据库：%s；结构：%s）；数据库准备完成后重启服务。",
                        status["database"], status["schema"])
         return False
+    if repairs is not None:
+        try:
+            repairs.prepare()
+        except Exception as exc:
+            repairs.error = str(exc)
+            LOGGER.exception('升级补修未完成，后台任务保持停止')
+            return False
     _restore_task_center(contract)
     from .web_job_recovery import restore
     if contract.task_runs.enabled:
@@ -233,6 +254,81 @@ def _server_error_headers(request: Request, error: Exception, status_code=500):
     event('http-request', error, error_id=error_id, method=request.method,
           route=getattr(request.scope.get('route'), 'path', '<unmatched>').lstrip('/'), status_code=status_code)
     return {'X-Peach-Error-ID': error_id, 'Cache-Control': 'no-store'}
+
+
+def _configure_upgrade_repairs(settings, contract, sync):
+    from . import settings_file
+    from .upgrade_repairs import UpgradeRepairs
+    config = settings_file.active()
+    enabled = (_writer(sync) and settings.configured and config.present
+               and (config.directory('database') / 'ledger.db').resolve() == settings.db_path.resolve())
+    if enabled:
+        from .runtime_prepare import configured_ledger_writer
+        enabled, _reason = configured_ledger_writer(config)
+    service = UpgradeRepairs(contract, available=enabled, config=config)
+    contract.upgrade_config, contract.upgrade_repairs = config, service
+    return service
+
+
+def _installation_in_progress(database):
+    from . import standalone_update, update_tasks
+    return update_tasks.is_pausing(database) or standalone_update.installation_pending()
+
+
+class _LedgerActivation:
+    """安装确认期只提供网页；确认后启动后台，退出时等待在途准备收尾。"""
+
+    def __init__(self, app, settings, contract, services, automatic_updates, sharing):
+        self.app, self.settings, self.contract = app, settings, contract
+        self.services, self.automatic_updates, self.sharing = services, automatic_updates, sharing
+        self.stopping = asyncio.Event()
+        self.lock = asyncio.Lock()
+        self.automatic_started = False
+        self.task = None
+
+    async def start(self):
+        self.app.state.ledger_background_ready = False
+        self.app.state.ledger_background_deferred = False
+        if not self.settings.configured:
+            return False
+        deferred = await asyncio.to_thread(_installation_in_progress, self.settings.db_path)
+        self.app.state.ledger_background_deferred = deferred
+        if deferred:
+            self.task = asyncio.create_task(self._wait_for_installation())
+            return False
+        return await self.resume()
+
+    async def resume(self):
+        async with self.lock:
+            if self.stopping.is_set() or self.app.state.ledger_background_ready:
+                return self.app.state.ledger_background_ready
+            ready = await asyncio.to_thread(_start_ledger_services, self.settings, self.contract, self.services)
+            self.app.state.ledger_background_ready = ready
+            if not self.automatic_started:
+                self.automatic_updates.start()
+                self.automatic_started = True
+            if ready:
+                self.sharing.start()
+            return ready
+
+    async def _wait_for_installation(self):
+        try:
+            while await asyncio.to_thread(_installation_in_progress, self.settings.db_path):
+                if self.stopping.is_set():
+                    return
+                await asyncio.sleep(1)
+            if not self.stopping.is_set():
+                await self.resume()
+        except Exception as exc:
+            self.contract.upgrade_repairs.error = str(exc)
+            LOGGER.exception('安装后的后台服务未能启动')
+        finally:
+            self.app.state.ledger_background_deferred = False
+
+    async def stop(self):
+        self.stopping.set()
+        if self.task is not None:
+            await self.task
 
 
 def create_app(
@@ -380,6 +476,7 @@ def create_app(
         settings.follow_state_root,
         available=managed_configuration() and bool(settings.configured),
     )
+    upgrade_repairs = _configure_upgrade_repairs(settings, contract, sync)
 
     async def warm_startup_entries():
         """配置页首屏要的开机启动项状态，先在后台问一遍。
@@ -406,15 +503,12 @@ def create_app(
         # 握手要等 cloudflared 连上边缘，断网时会等满 `wait_timeout`；放在后台，本机访问
         # 不等公网入口。连接进度由 `tunnel_manager.snapshot()` 报告。
         tunnel_startup = asyncio.create_task(asyncio.to_thread(_start_tunnel, settings, tunnel_manager))
-        ledger_ready = False
+        services = (follow_scheduler, feed_scheduler, push_discovery, downloads, recovery_service, jav_browser, upgrade_repairs)
+        activation = _LedgerActivation(_app, settings, contract, services, automatic_updates, sharing)
+        _app.state.ledger_activation = activation
+        ledger_ready = await activation.start()
         if settings.configured:
-            ledger_ready = _start_ledger_services(settings, contract,
-                (follow_scheduler, feed_scheduler, push_discovery, downloads, recovery_service, jav_browser))
-            automatic_updates.start()
-            if ledger_ready:
-                sharing.start()
             mount_reachability.start()
-        _app.state.ledger_background_ready = ledger_ready
         warmup = asyncio.create_task(warm_startup_entries())
         aggregate_stop = asyncio.Event()
         aggregate_warmup = asyncio.create_task(_warm_ledger_aggregates(ledger_ready, contract, aggregate_stop))
@@ -427,6 +521,7 @@ def create_app(
         try:
             yield
         finally:
+            await activation.stop()
             _app.state.ledger_background_ready = False
             aggregate_stop.set()
             loop.set_exception_handler(previous_error_handler)
@@ -435,6 +530,7 @@ def create_app(
             follow_scheduler.stop()
             feed_scheduler.stop()
             automatic_updates.stop()
+            await asyncio.to_thread(upgrade_repairs.stop)
             await asyncio.to_thread(sharing.stop)
             push_discovery.stop()
             await asyncio.to_thread(jav_browser.stop)
@@ -490,6 +586,7 @@ def create_app(
     app.state.follow_cover_service = follow_cover_service
     app.state.follow_scheduler = follow_scheduler
     app.state.automatic_updates = automatic_updates
+    app.state.upgrade_repairs = upgrade_repairs
     app.state.push_discovery = push_discovery
     app.state.downloads = downloads
     app.state.jav_browser = jav_browser
@@ -583,7 +680,9 @@ def create_app(
     def healthz(request: Request, ready: bool = False):
         from .health import database_status, readiness
         if ready:
-            result = readiness(settings, background_ready=getattr(request.app.state, "ledger_background_ready", None))
+            deferred = getattr(request.app.state, 'ledger_background_deferred', False)
+            result = readiness(settings, background_ready=None if deferred else getattr(request.app.state, "ledger_background_ready", None))
+            result['background_deferred'] = deferred
             return JSONResponse(result, status_code=200 if result["ready"] else 503,
                                 headers={"Cache-Control": "no-store"})
         # 不探测共享目录或迁移数据库；健康检查必须无副作用。

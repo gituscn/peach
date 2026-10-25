@@ -49,7 +49,7 @@ from .follow_store import FollowStore
 from .follow_stream import (
     FollowMediaUnavailable, FollowProxyError, ResolvedFollowMedia, open_upstream,
 )
-from .media import MediaUnavailable, normalized_path
+from .media import MediaOffline, MediaUnavailable, normalized_path
 from .platform import within_root
 from .previews import ENTITY_THUMB_TYPE, PreviewUnavailable, entity_image_key
 from .remote_media_cache import AVATAR_REFRESH_SECONDS, FAVICON_REFRESH_SECONDS, cache_for
@@ -627,16 +627,19 @@ def photo(request: Request, id: int, args: dict[str, str] = Depends(require_auth
 
 @router.api_route("/photo-thumb", methods=["GET", "HEAD"])
 def photo_thumb(request: Request, id: int, args: dict[str, str] = Depends(require_auth)):
-    """图片墙的缩略图。缓存命中就此返回，不去解析原图。
+    """图片墙的缩略图。缓存复用前核对源文件代际。
 
-    解析原图要在挂载的网盘上确认它还在，实测一次 0.1–0.4 秒；一屏几十张缩略图全部命中
-    缓存，也要为这几十次往返等上好几秒。缩略图缩好之后原图在不在都不改变这次的响应。
+    本地文件用保存的来源签名检查；网络资源由媒体层解析后核对。来源发生变化时生成对应缩略图。
     """
     state = request.app.state
     path = state.photo_service.cached(id)
     if path is None:
         try:
             path = state.photo_service.thumbnail(id, state.media_engine.file_for(id))
+        except MediaOffline:
+            path = state.photo_service.cached(id, offline=True)
+            if path is None:
+                raise
         except PreviewUnavailable:
             return JSONResponse({"error": "unavailable"}, status_code=404)
     return _image_response(request, path, media_type="image/jpeg")

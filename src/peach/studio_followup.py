@@ -95,7 +95,8 @@ def fingerprint(connection: sqlite3.Connection, entity_id: int) -> str:
     links = connection.execute(
         "SELECT count(*) FROM entity_link WHERE entity_id=? AND link_kind IN (?,?)",
         (int(entity_id), *studio_icons.ICON_LINK_KINDS)).fetchone()[0]
-    return f"{assets}/{links}"
+    from .upgrade_rules import CATALOG
+    return f"{CATALOG}/{assets}/{links}"
 
 
 def stock(connection: sqlite3.Connection, logo_root, attempts, *, limit: int,

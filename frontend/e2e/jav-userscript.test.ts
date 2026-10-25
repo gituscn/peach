@@ -11,16 +11,20 @@ interface Site {
 const MANIFEST: { version: number; sites: Site[] } = JSON.parse(readFileSync(
   new URL('../../web/integrations/jav-sites.json', import.meta.url), 'utf8'));
 const SCRIPT = readFileSync(new URL('../../web/integrations/peach-jav.user.js', import.meta.url), 'utf8');
+const VERSION: string = JSON.parse(readFileSync(
+  new URL('../../web/integrations/jav-userscript-release.json', import.meta.url), 'utf8')).version;
+const RELEASE_META = 'https://update.sleazyfork.org/scripts/600821/Peach%20%C2%B7%20JAV%20%E5%85%A5%E5%BA%93.meta.js';
 const TOKEN = 'test-only-peach-jav-secret-8b4d';
 const BASE = 'https://peach.example.invalid';
 const ROOT = '#peach-jav-action';
 type State = 'idle' | 'queued' | 'searching' | 'submitted' | 'ingested' | 'owned' | 'failed' | 'no_match';
 type Body = { ok: boolean; code: string; state: State; message: string };
 type Call = { method: string; url: string; headers: Record<string, string>; anonymous: boolean; data?: string };
-type MockRequest = Call & { onload(value: unknown): void; ontimeout(): void; onerror(): void };
+type MockRequest = Call & { onload(value: unknown): void; ontimeout(): void; onerror(): void; onabort?(): void };
 type Mock = {
   calls: Call[];
   reports: MockRequest[];
+  updates: Call[];
   pending: MockRequest[];
   values: Record<string, string>;
   menu?: () => void;
@@ -46,9 +50,9 @@ async function open(browser: Browser, options: {
   await context.route('**/*', route => route.fulfill({
     contentType: 'text/html; charset=utf-8', body: `<!doctype html><html><head><meta charset="utf-8"><title>${options.title || 'SSIS-057 作品详情'}</title></head><body>${options.html ?? '<h1>SSIS-057 作品详情</h1>'}</body></html>`,
   }));
-  await page.addInitScript(({ configured, token, base, initial, resolved }) => {
+  await page.addInitScript(({ configured, token, base, initial, resolved, version, releaseMeta }) => {
     const mock: Mock = {
-      calls: [], reports: [], pending: [], automatic: true, menus: {},
+      calls: [], reports: [], updates: [], pending: [], automatic: true, menus: {},
       values: configured ? { 'peach.jav.base': base, 'peach.jav.token': token } : {},
       reply(index, value, status = 200) {
         mock.pending[index]!.onload({ status, responseText: JSON.stringify(value) });
@@ -58,11 +62,23 @@ async function open(browser: Browser, options: {
     Object.assign(window, {
       GM_getValue: (key: string, fallback: string) => mock.values[key] ?? fallback,
       GM_setValue: (key: string, value: string) => { mock.values[key] = value; },
+      GM_info: { script: { version } },
       GM_registerMenuCommand: (label: string, callback: () => void) => { mock.menu = callback; mock.menus[label] = callback; },
       GM_xmlhttpRequest: (request: MockRequest) => {
         if (request.url.endsWith('/api/jav-browser/errors')) { mock.reports.push(request); return; }
-        mock.calls.push({ method: request.method, url: request.url, headers: request.headers,
-          anonymous: request.anonymous, ...(request.data ? { data: request.data } : {}) });
+        const call = { method: request.method, url: request.url, headers: request.headers,
+          anonymous: request.anonymous, ...(request.data ? { data: request.data } : {}) };
+        // 更新读取使用独立响应契约，不占用影片查询与提交的编号。
+        if (request.url === releaseMeta || request.url.endsWith('/api/jav-browser/updates')) {
+          mock.updates.push(call);
+          const timer = setTimeout(() => request.onload({ status: 200, finalUrl: request.url,
+            responseText: request.url === releaseMeta
+              ? `// ==UserScript==\n// @name Peach · JAV 入库\n// @namespace https://github.com/peach-mitao/peach-userscript\n// @version ${version}\n// ==/UserScript==`
+              : JSON.stringify({ runtime: { version: '1.0.0', build_id: 'fixture' }, release: { state: 'current' },
+                userscript: { version, minimum_version: '0.5.1', install_url: '/integrations/peach-jav.user.js' } }) }), 0);
+          return { abort: () => { clearTimeout(timer); request.onabort?.(); } };
+        }
+        mock.calls.push(call);
         mock.pending.push(request);
         if (mock.automatic) setTimeout(() => {
           const code = new URL(request.url).searchParams.get('code') || resolved || 'SSIS-057';
@@ -70,15 +86,45 @@ async function open(browser: Browser, options: {
         }, 0);
       },
     });
-  }, { configured: options.configured !== false, token: TOKEN, base: BASE, initial: options.initial || 'idle', resolved: options.resolved });
+  }, { configured: options.configured !== false, token: TOKEN, base: BASE, initial: options.initial || 'idle', resolved: options.resolved,
+    version: VERSION, releaseMeta: RELEASE_META });
   await page.goto(options.url || 'https://missav.ws/en/ssis-057?private=value#player');
   await page.clock.install();
   await page.addScriptTag({ content: options.script ?? SCRIPT });
-  return { page, problems, close: () => context.close() };
+  return { page, problems, close: async () => {
+    try {
+      const { updates, values } = await page.evaluate(() => ({ updates: window.javMock.updates, values: window.javMock.values }));
+      for (const call of updates) {
+        assert.equal(call.method, 'GET');
+        assert.equal(call.anonymous, true);
+        assert.equal(call.data, undefined);
+        if (call.url === RELEASE_META) {
+          assert.deepEqual(call.headers, { Accept: 'text/plain' });
+        } else {
+          assert.equal(call.url, `${values['peach.jav.base']}/api/jav-browser/updates`);
+          assert.deepEqual(call.headers, { Accept: 'application/json', Authorization: `Bearer ${values['peach.jav.token']}` });
+        }
+        assert.equal(call.url.includes(TOKEN), false);
+      }
+    } finally { await context.close(); }
+  } };
 }
 
 const button = (page: Page) => page.locator(ROOT).locator('[data-action="add"]');
 const settingsDialog = (page: Page) => page.locator('#peach-jav-settings').getByRole('dialog');
+async function unpairedStorage(page: Page) {
+  const values = await page.evaluate(() => window.javMock.values);
+  const {
+    'peach.jav.installed-version': installed,
+    'peach.jav.update-attempted-at': attempted,
+    'peach.jav.updates': updates,
+    ...pairing
+  } = values;
+  assert.equal(installed, VERSION);
+  if (attempted !== undefined) assert.match(attempted, /^\d+$/);
+  if (updates !== undefined) assert.deepEqual(JSON.parse(updates), { script: { version: VERSION } });
+  return pairing;
+}
 async function fillSettings(page: Page, base: string, token: string) {
   const dialog = settingsDialog(page);
   await dialog.getByLabel('Peach 地址', { exact: true }).fill(base);
@@ -445,7 +491,7 @@ describe('JAV 用户脚本', () => {
         await button(page).click();
         await fillSettings(page, invalid.base, invalid.token);
         await ready(page, '配置 Peach');
-        assert.deepEqual(await page.evaluate(() => window.javMock.values), {});
+        assert.deepEqual(await unpairedStorage(page), {});
         assert.equal(await page.evaluate(() => window.javMock.calls.length), 0);
         assert.match(await settingsDialog(page).getByRole('alert').innerText(), /请输入/);
       } finally { await opened.close(); }
@@ -535,12 +581,12 @@ describe('JAV 用户脚本', () => {
       await pending(page, 2);
       await reply(page, 1, body('owned', 'ABW-123'));
       await ready(page, '查询 Peach 状态');
-      assert.match(await page.locator(ROOT).getByRole('status').innerText(), /状态无效/);
+      assert.match(await page.locator(ROOT).getByRole('status', { name: 'Peach 任务状态', exact: true }).innerText(), /状态无效/);
       await button(page).click();
       await pending(page, 3);
       await page.evaluate(() => window.javMock.reply(2, {}, 401));
       await ready(page, '查询 Peach 状态');
-      assert.match(await page.locator(ROOT).getByRole('status').innerText(), /令牌无效/);
+      assert.match(await page.locator(ROOT).getByRole('status', { name: 'Peach 任务状态', exact: true }).innerText(), /令牌无效/);
     } finally { await opened.close(); }
   });
 

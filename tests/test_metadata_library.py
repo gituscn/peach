@@ -15,6 +15,7 @@ from contextlib import closing
 
 from filelock import FileLock
 from PIL import Image
+from peach import artifact_rules, upgrade_rules
 
 from peach.field_owners import auto_owner, owner_of, review_owner
 from peach.genre_taxonomy import map_genres
@@ -1974,6 +1975,7 @@ class LibraryNfoTests(unittest.TestCase):
             'id': 'DASS-468', 'title': '甘やかされて', 'maker': 'Das', 'release_date': '2024-09-10',
             'actresses': [{'japanese_name': '胡桃さくら'}], 'source_url': 'https://r18.dev/'}),
             encoding='utf-8')
+        artifact_rules.remember(snapshot_path, str(upgrade_rules.PROVIDER_EVIDENCE))
         provider = stub_provider()
         provider.query.return_value = json.loads(snapshot_path.read_text(encoding='utf-8'))
         provider.cover.return_value = False
@@ -2017,8 +2019,10 @@ class LibraryNfoTests(unittest.TestCase):
                       'source_url': 'https://javdb.com/v/example'},
         }
         for source, payload in documents.items():
-            (directory / f'DASS-468-{source}.json').write_text(
+            path = directory / f'DASS-468-{source}.json'
+            path.write_text(
                 json.dumps(payload, ensure_ascii=False), encoding='utf-8')
+            artifact_rules.remember(path, str(upgrade_rules.PROVIDER_EVIDENCE))
         provider = stub_provider()
         provider.cover.return_value = False
         result = process_library(config, db, self.root / 'generated', self.root / 'covers',
@@ -2078,6 +2082,7 @@ class LibraryNfoTests(unittest.TestCase):
         snapshot_path = config.directory('sources') / 'library-metadata' / 'FC2-PPV-2851534-fc2.json'
         snapshot_path.parent.mkdir(parents=True, exist_ok=True)
         snapshot_path.write_text(json.dumps(product, ensure_ascii=False), encoding='utf-8')
+        artifact_rules.remember(snapshot_path, str(upgrade_rules.PROVIDER_EVIDENCE))
         provider = stub_provider()
         provider.fc2.return_value = [('fc2cmadb', {'id': 'FC2-PPV-2851534', 'actresses': [{'japanese_name': '梨奈'}],
                                                    'source_url': 'https://fc2cmadb.com/articles/2851534'})]
