@@ -25,8 +25,9 @@ variables:
   PEACH_R2_BUCKET: peach-releases
   PEACH_R2_PUBLIC_BASE: https://downloads.peach.video
 
-# 回归口径（ADR-0119）：分支与合并请求跑相对上一次已验证主线的改动域，加上本平台的平台敏感用例，
-# 取不到基线或改动落到必须全量的面时退回全量；版本标签上三个平台都跑全量，构建与发布依赖它们。
+# 回归口径（ADR-0119）：分支与合并请求验证改动域及平台敏感用例，必要时使用全量范围。
+# 版本提交的演练使用三平台全量范围；标签流水线复核同提交的演练结果后构建与发布。
+# 正式验证使用有效证明续跑；缓存缺失或证明失效时执行必要测试。
 # 改动域随时可能退成全量，所以两种作业的时限都按全量定。
 .verify-linux:
   stage: verify
@@ -34,10 +35,13 @@ variables:
   # 全量回归连同装依赖 13–20 分钟。
   timeout: 45m
   cache:
-    when: always
-    key:
-      files: [uv.lock, frontend/package-lock.json]
-    paths: [.uv-cache/, .npm/]
+    - when: always
+      key:
+        files: [uv.lock, frontend/package-lock.json]
+      paths: [.uv-cache/, .npm/]
+    - when: always
+      key: "test-evidence-v1-$CI_JOB_NAME-$CI_COMMIT_REF_SLUG-$CI_COMMIT_REF_PROTECTED"
+      paths: [build/agent-verification/*.json]
   before_script:
     - apt-get update
     - apt-get install -y --no-install-recommends python3-pip chromium ffmpeg xvfb xauth
@@ -79,6 +83,10 @@ verify-linux:
   tags: [peach-windows]
   # 全量回归连同依赖安装约 20–25 分钟；runner 与本机开发会话共用 CPU，并发全量时会翻倍。
   timeout: 1h 30m
+  cache:
+    when: always
+    key: "test-evidence-v1-$CI_JOB_NAME-$CI_COMMIT_REF_SLUG-$CI_COMMIT_REF_PROTECTED"
+    paths: [build/agent-verification/*.json]
   script:
     - '& ./scripts/ci_windows.ps1 verify -Coverage $env:PEACH_CI_COVERAGE'
     - if ($LASTEXITCODE -ne 0) { throw 'Windows 回归未通过' }
@@ -100,6 +108,10 @@ verify-windows:
   tags: [peach-macos]
   # 作业脚本约 3 分钟，新 runner 首次检出完整历史约 16 分钟；下载卡住时提前结束。
   timeout: 45m
+  cache:
+    when: always
+    key: "test-evidence-v1-$CI_JOB_NAME-$CI_COMMIT_REF_SLUG-$CI_COMMIT_REF_PROTECTED"
+    paths: [build/agent-verification/*.json]
   script:
     - bash scripts/ci_macos.sh verify arm64 "$PEACH_CI_COVERAGE"
   artifacts:

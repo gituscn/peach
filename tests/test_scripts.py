@@ -1847,14 +1847,8 @@ class OperationalScriptTests(unittest.TestCase):
     def test_posix_entrypoint_passes_extra_args_through_on_bash_3_2(self):
         """不带额外参数直接跑 `./scripts/test.sh` 必须能跑起来，参数要原样透传。
 
-        macOS 自带 bash 3.2.57，`set -u` 下空数组的 `"${EXTRA[@]}"` 被判成未绑定变量
-        （bash 4.4 起才不报），入口于是在最后一行崩掉。CI 每次都附带
-        `--fresh --base <sha> --shard-*`，数组从不为空，这条路径只有本机会走到——而
-        AGENTS.md 规定 macOS 的唯一测试入口就是这个脚本，崩了等于没有测试门槛。
-
-        文本判据钉住 `set -euo pipefail` 还在：把 `set +u` 当解法会让其余变量的拼写错误
-        没人拦，而行为上看不出来。展开写法由下面的行为判据验：从真实脚本里截出参数处理
-        那一段来跑，CI 的 macOS 行用的就是 bash 3.2，改回裸展开时这一段会崩。
+        macOS 的 bash 3.2 使用严格模式，参数数组支持为空；CI 的恢复、基线与分片参数
+        均按原值交给运行器。行为判据执行真实入口的参数处理与 exec 展开，桩记录 argv。
         """
         source = (ROOT / "scripts" / "test.sh").read_text(encoding="utf-8")
         self.assertIn("set -euo pipefail", source)
@@ -1901,6 +1895,7 @@ class OperationalScriptTests(unittest.TestCase):
             for argv, expected in (
                     ([], ["--scope", "auto", "--jobs", "auto"]),
                     (["auto"], ["--scope", "auto", "--jobs", "auto"]),
+                    (["full", "--resume"], ["--scope", "full", "--jobs", "auto", "--resume"]),
                     (["web", "--fresh", "--base", "a b"],
                      ["--scope", "web", "--jobs", "auto", "--fresh", "--base", "a b"]),
                     (["web", "--jobs", "1"], ["--scope", "web", "--jobs", "1"]),

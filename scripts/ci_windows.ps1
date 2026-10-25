@@ -32,11 +32,11 @@ if ($Mode -eq 'verify') {
         Assert-Exit '无法判定主线选测范围'
     }
     if ($Plan[0] -eq 'full') {
-        & ./scripts/test.ps1 -Scope full -Fresh
+        & ./scripts/test.ps1 -Scope full -Resume
         Assert-Exit 'Windows 全量回归未通过'
         exit 0
     }
-    & ./scripts/test.ps1 -Scope auto -Base $Plan[0] -Fresh
+    & ./scripts/test.ps1 -Scope auto -Base $Plan[0]
     Assert-Exit 'Windows 改动域回归未通过'
     & ./scripts/test.ps1 -Focus @($Plan | Select-Object -Skip 1)
     Assert-Exit 'Windows 平台敏感用例未通过'
@@ -134,6 +134,11 @@ if ($Mode -eq 'docker-push') {
 
 $Version = (Get-Content -LiteralPath release/version.txt -Raw -Encoding utf8).Trim()
 $Packages = (Resolve-Path release).Path
+$ValidationScripts = (Resolve-Path (Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts')).Path
+if (-not (Test-Path -LiteralPath (Join-Path $ValidationScripts 'build_amane_runtime.py'))) {
+    throw '独立制品验收缺少同一检出下的辅助模块'
+}
+$PreviousValidationPythonPath = $env:PYTHONPATH
 $Evidence = Join-Path ([IO.Path]::GetTempPath()) ('peach-release-smoke-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $Evidence | Out-Null
 $Python = (Get-Command python.exe).Source
@@ -142,6 +147,8 @@ $Menu = Join-Path $env:APPDATA 'Microsoft/Windows/Start Menu/Programs/Peach.lnk'
 if ((Test-Path -LiteralPath $Key) -or (Test-Path -LiteralPath $Menu)) { throw '现有 Peach 安装登记需要保留，不能覆盖安装验收' }
 Push-Location $Evidence
 try {
+    # 验收宿主使用同一检出的辅助模块；被测应用清除 PYTHONPATH。
+    $env:PYTHONPATH = $ValidationScripts
     Expand-Archive -LiteralPath "$Packages/Peach-$Version-windows-x64.zip" -DestinationPath candidate
     & $Python "$Packages/smoke_desktop.py" candidate/Peach/Peach.exe
     Assert-Exit '完整包运行验收失败'
@@ -164,6 +171,7 @@ try {
     & $Python "$Packages/smoke_update_tasks.py" candidate/Peach/Peach.exe --installer "$Packages/Peach-$Version-windows-x64-setup.exe" --apply
     Assert-Exit '任务保护与安装恢复验收失败'
 } finally {
+    $env:PYTHONPATH = $PreviousValidationPythonPath
     Pop-Location
     Write-Host "独立制品验收目录：$Evidence"
 }

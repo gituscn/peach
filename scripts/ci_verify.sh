@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GitGud 的 Linux 与 macOS 回归：标签流水线跑全量；主线推送跑改动域，再跑本平台的平台敏感用例。
+# GitGud 的 Linux 与 macOS 正式回归按 full/changed 计划覆盖，并从有效证明续跑。
 # 选测由 scripts/ci_scope.py 判，取不到已验证基线时它给出 full（ADR-0119）。
 set -euo pipefail
 
@@ -23,10 +23,10 @@ if [[ "$coverage" == changed ]]; then
 fi
 base="$(printf '%s\n' "$plan" | head -n 1)"
 if [[ "$base" == full ]]; then
-    ./scripts/test.sh full --fresh
+    ./scripts/test.sh full --resume
     exit 0
 fi
-./scripts/test.sh auto --fresh --base "$base"
+./scripts/test.sh auto --base "$base"
 # bash 3.2 没有 mapfile，逐行读选择器。
 focus=()
 while IFS= read -r selector; do
