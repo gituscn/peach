@@ -1165,7 +1165,9 @@ def main(argv: list[str] | None = None) -> int:
     # `--scope` 可重复：本机并行的父进程把 `auto` 算出来的几个域原样交给每个分片子进程。
     parser.add_argument("--scope", action="append", dest="scopes",
                         choices=("full", "auto", *SCOPES))
-    parser.add_argument("--fresh", action="store_true", help="实际重跑，不复用本机记录")
+    reuse = parser.add_mutually_exclusive_group()
+    reuse.add_argument("--fresh", action="store_true", help="实际重跑，不复用本机记录")
+    reuse.add_argument("--resume", action="store_true", help="正式验证续跑，full 也复用有效的完成证明")
     parser.add_argument("--focus", action="append", default=[], help="定向调试指定 Python/浏览器用例，不签发记录")
     parser.add_argument("--lock-timeout", type=float, default=1800,
                         help="全量锁等待秒数；0 表示锁忙时立即返回")
@@ -1273,10 +1275,11 @@ def busy(error) -> int:
 
 def verified_run(args, requested, scopes, files) -> int:
     """在调用方持有的全量锁内取得快照、验证并签发记录。"""
+    force = args.fresh or ('full' in requested and not args.resume)
     context = test_evidence.inputs(ROOT)
     state = context["state"]
     with test_evidence.run_lock(ROOT, state, scope=" ".join(scopes), root=str(ROOT)):
-        if not args.fresh and "full" not in requested and test_evidence.covers(
+        if not force and test_evidence.covers(
                 test_evidence.read(ROOT, state), scopes):
             print("复用本机测试记录：代码、依赖环境和范围匹配（24 小时内）。", flush=True)
             return 0
@@ -1284,13 +1287,13 @@ def verified_run(args, requested, scopes, files) -> int:
         records = list(test_evidence.candidates(ROOT, context))
         progress = test_run_progress.RunProgress(ROOT, context, scopes, selected_files, scopes_for_changes, SCOPES,
                    supplements=SCOPE_TEST_IDS, records=records, previous=previous,
-                   force=args.fresh or 'full' in requested)
-        if requested == ('auto',) and not args.fresh:
+                   force=force)
+        if requested == ('auto',) and not force:
             choices = ('full', *SCOPES) if 'full' in scopes else scopes
             scopes = test_resume.choose_scopes(progress.pending, progress.requirements, choices)
         actual = len(progress.modules)
         print(f"实际运行：{' '.join(scopes) or '无需补测'}（{actual} 个测试文件）", flush=True)
-        if records and not args.fresh:
+        if records and not force:
             print(f'单项覆盖：复用 {len(progress.required) - len(progress.pending)} 项，待验证 {len(progress.pending)} 项。', flush=True)
         progress.start()
         FLAKY.clear()

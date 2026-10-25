@@ -84,6 +84,31 @@ class ParallelShardTests(unittest.TestCase):
 
 
 class EnvironmentIdentityTests(unittest.TestCase):
+    def test_gitlab_transport_credentials_rotate_without_changing_environment(self):
+        from scripts.test_environment_identity import environment_flags
+        base = {'CI_JOB_NAME': 'verify-windows', 'PEACH_CI_COVERAGE': 'full',
+                'CI_JOB_TOKEN': 'fixture-password-one', 'CI_REGISTRY_PASSWORD': 'fixture-password-one',
+                'CI_DEPENDENCY_PROXY_PASSWORD': 'fixture-password-one',
+                'CI_REPOSITORY_URL': 'https://gitlab-ci-token:fixture-password-one@forge.invalid/group/app.git'}
+        rotated = {**base, 'CI_JOB_ID': 'another', 'CI_JOB_STARTED_AT': 'another',
+                   'CI_JOB_TOKEN': 'fixture-password-two', 'CI_REGISTRY_PASSWORD': 'fixture-password-two',
+                   'CI_DEPENDENCY_PROXY_PASSWORD': 'fixture-password-two',
+                   'CI_REPOSITORY_URL': base['CI_REPOSITORY_URL'].replace('password-one', 'password-two')}
+        flags = environment_flags(base)
+        self.assertEqual(flags, environment_flags(rotated))
+        self.assertNotIn('fixture-password-', json.dumps(flags))
+        for changes in ({'CI_JOB_NAME': 'verify-macos'}, {'PEACH_CI_COVERAGE': 'changed'},
+                        {'CI_REPOSITORY_URL': base['CI_REPOSITORY_URL'].replace('/app.git', '/other.git')},
+                        {'CI_REPOSITORY_URL': base['CI_REPOSITORY_URL'].replace('forge.invalid', 'other.invalid')},
+                        {'CI_REPOSITORY_URL': base['CI_REPOSITORY_URL'].replace('gitlab-ci-token:', 'other-user:')}):
+            with self.subTest(changes=changes):
+                self.assertNotEqual(flags, environment_flags({**base, **changes}))
+
+    def test_invalid_gitlab_clone_urls_keep_distinct_environment_identity(self):
+        from scripts.test_environment_identity import environment_flags
+        self.assertNotEqual(environment_flags({'CI_REPOSITORY_URL': 'https://[invalid-one'}),
+                            environment_flags({'CI_REPOSITORY_URL': 'https://[invalid-two'}))
+
     def test_ci_commit_metadata_and_credential_rotation_preserve_environment(self):
         from scripts.test_environment_identity import environment_flags
         base = {'GITHUB_ACTIONS': 'true', 'GITHUB_JOB': 'python', 'GITHUB_TOKEN': 'fixture-one'}
@@ -632,14 +657,20 @@ class ShardReportTests(unittest.TestCase):
 
 
 class SubprocessResumeTests(unittest.TestCase):
-    def invoke(self, repo, scope):
+    def invoke(self, repo, scope, *options):
         env = {**os.environ, 'GITHUB_ACTIONS': 'false', 'CI': ''}
         for key in ('PEACH_TEST_FOCUS', 'PEACH_E2E_FILES', 'PEACH_VITEST_FILES'):
             env.pop(key, None)
         return fixture_process([sys.executable, '-X', 'utf8', str(repo / 'entry.py'),
-                                '--scope', scope, '--jobs', 'auto'], repo, env)
+                                '--scope', scope, '--jobs', 'auto', *options], repo, env)
 
     def test_real_parent_and_children_resume_only_the_failed_file(self):
+        self.check_resume_after_failure('auto')
+
+    def test_real_full_resume_preserves_coverage_and_requires_current_environment(self):
+        self.check_resume_after_failure('full', '--resume', check_full_modes=True)
+
+    def check_resume_after_failure(self, scope, *options, check_full_modes=False):
         source = Path(__file__).resolve().parents[1]
         modules = ('test_runner', 'test_evidence', 'test_history', 'test_resume', 'test_run_progress',
                    'test_shard_results', 'test_environment_identity', 'test_focus', 'change_impact')
@@ -679,7 +710,7 @@ class SubprocessResumeTests(unittest.TestCase):
             successful_calls = (runtime / 'test_ad_judgement.calls').read_text(encoding='utf8')
             failed_calls = (runtime / 'test_web_library_shortcuts.calls').read_text(encoding='utf8').splitlines()
             marker.unlink()
-            code, output = self.invoke(repo, 'auto')
+            code, output = self.invoke(repo, scope, *options)
             self.assertEqual(code, 0, output)
             after = json.loads(record_file.read_text(encoding='utf8'))
             self.assertEqual(after['units']['test_ad_judgement.py']['at'], stamp)
@@ -687,6 +718,25 @@ class SubprocessResumeTests(unittest.TestCase):
             self.assertEqual((runtime / 'test_ad_judgement.calls').read_text(encoding='utf8'), successful_calls)
             self.assertEqual(len((runtime / 'test_web_library_shortcuts.calls').read_text(encoding='utf8').splitlines()),
                              len(failed_calls) + 1)
+            if check_full_modes:
+                paths = [runtime / (name + '.calls') for name in ('test_ad_judgement', 'test_web_library_shortcuts')]
+                completed = [path.read_text(encoding='utf8') for path in paths]
+                code, output = self.invoke(repo, 'full', '--resume')
+                self.assertEqual(code, 0, output)
+                self.assertEqual([path.read_text(encoding='utf8') for path in paths], completed)
+                cached = json.loads(record_file.read_text(encoding='utf8'))
+                self.assertEqual(cached['validated']['full'], stamp)
+                with mock.patch.dict(os.environ, {'PEACH_TEST_RESUME_FIXTURE': 'another-environment'}):
+                    code, output = self.invoke(repo, 'full', '--resume')
+                self.assertEqual(code, 0, output)
+                self.assertEqual([len(path.read_text(encoding='utf8').splitlines()) for path in paths],
+                                 [len(body.splitlines()) + 1 for body in completed])
+                for flags in ((), ('--fresh',)):
+                    counts = [len(path.read_text(encoding='utf8').splitlines()) for path in paths]
+                    code, output = self.invoke(repo, 'full', *flags)
+                    self.assertEqual(code, 0, output)
+                    self.assertEqual([len(path.read_text(encoding='utf8').splitlines()) for path in paths],
+                                     [count + 1 for count in counts])
 
 
 class SelectionEnvironmentTests(unittest.TestCase):
@@ -1279,6 +1329,11 @@ class VerificationTests(unittest.TestCase):
             build.side_effect = failing
             self.assertEqual(runner.main(["--scope", "checks", "--fresh"]), 1)
             self.assertFalse(evidence.covers(evidence.read(self.repo, evidence.key(self.repo)), ("checks",)))
+
+    def test_fresh_and_resume_are_mutually_exclusive(self):
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+            runner.main(['--scope', 'full', '--fresh', '--resume'])
+        self.assertEqual(error.exception.code, 2)
 
     def test_a_parallel_run_signs_one_record_from_the_merged_shards(self):
         """并行时父进程不自己跑用例，只按分片汇总签一份记录；一片红就没有记录。"""

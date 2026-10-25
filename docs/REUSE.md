@@ -10,6 +10,8 @@
 
 测试结果继续复用 Python ≥3.14 标准库 `unittest`、`hashlib`、`json` 和项目的内容快照、影响域映射与外部测试结果。互斥复用既有 `filelock 4.2.0`，分片退出后回收其进程树复用开发依赖 `psutil 7.2.2`；版本与许可沿用锁定依赖及第三方许可清单，不新增运行时依赖。Peach 保留输入身份、逐文件覆盖、完成报告、批次来源和 `ready`／`integrate` 验收规则；串行、并行、浏览器与 Vitest 使用同一个恢复模型。
 
+CI 跨作业恢复使用 GitLab Runner 19.5 的原生 [缓存](https://docs.gitlab.com/ci/caching/) 与 [`cache:when`](https://docs.gitlab.com/ci/yaml/#cachewhen)，保存正式证明 JSON，按作业、分支及保护状态隔离。缓存可缺失，Peach 仍负责内容、环境、时效与全量批次校验；不引入缓存 SDK 或独立证明存储。GitLab 克隆地址使用标准库 `urllib.parse` 保留仓库身份并规范化认证值，作业令牌及其密码别名按存在性参与环境身份。
+
 候选比较包括官方 [pytest 缓存文档](https://doc.pytest.org/en/stable/how-to/cache.html) 与 [Turborepo 缓存文档](https://turborepo.dev/docs/crafting-your-repository/caching)。pytest 的失败项选择不能替代当前内容绑定的成功覆盖，不迁移测试框架；Turborepo 的任务缓存不能直接接管 Python 用例结果及集成门槛，不引入其运行时或源码。外部源码版本与许可证未作为采用依据，本次未复制这些项目的实现。
 
 临时输入实证覆盖跨工作树运行时、安装锁 JSON、CI 运行信息、多域混合失败及多份记录搜索；行为回归覆盖失败与中断恢复、旧失败阻止成功恢复、原时间继承、外部文件完成证明、Python 容器后置检查及全量来源约束。运行时、实际依赖、共享夹具、未知输入、执行模式、过期或未来时间变化仍使相关证明失效。测试设施不读写真实 ledger。

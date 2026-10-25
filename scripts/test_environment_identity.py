@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import shutil
 import sys
+from urllib.parse import urlsplit, urlunsplit
 
 
 RUN_METADATA = frozenset({
@@ -21,7 +22,8 @@ RUN_METADATA = frozenset({
     'CI_JOB_STARTED_AT', 'CI_COMMIT_BEFORE_SHA', 'CI_COMMIT_MESSAGE', 'CI_COMMIT_TITLE',
     'CI_COMMIT_DESCRIPTION', 'CI_COMMIT_AUTHOR', 'CI_CONCURRENT_ID', 'CI_CONCURRENT_PROJECT_ID',
 })
-CREDENTIAL_FLAGS = frozenset({'GITHUB_TOKEN', 'CI_JOB_TOKEN'})
+CREDENTIAL_FLAGS = frozenset({'GITHUB_TOKEN', 'CI_JOB_TOKEN', 'CI_REGISTRY_PASSWORD',
+                              'CI_DEPENDENCY_PROXY_PASSWORD'})
 ENTRY_FLAGS = frozenset({'PYTHONPATH', 'PEACH_REPORTING_TEST_MODE', 'PEACH_TEST_RUN_TEMP',
                          'PEACH_E2E_CHROME'})
 
@@ -67,9 +69,22 @@ def install_identity(path: Path) -> dict:
         return {'invalid': file_identity(path)}
 
 
+def flag_identity(key: str, value: str):
+    if key in CREDENTIAL_FLAGS:
+        return bool(value)
+    if key != 'CI_REPOSITORY_URL':
+        return value
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return {'invalid': hashlib.sha256(value.encode('utf8')).hexdigest()}
+    public = parsed._replace(netloc=parsed.netloc.rsplit('@', 1)[-1])
+    return {'url': urlunsplit(public), 'username': parsed.username, 'credential': bool(parsed.password)}
+
+
 def environment_flags(environ=None) -> dict:
     values = os.environ if environ is None else environ
-    return {key: bool(value) if key in CREDENTIAL_FLAGS else value for key, value in values.items()
+    return {key: flag_identity(key, value) for key, value in values.items()
             if key.startswith(('PEACH_', 'CI', 'GITHUB_', 'PYTHON'))
             and key not in RUN_METADATA | ENTRY_FLAGS and (key not in CREDENTIAL_FLAGS or value)}
 
