@@ -132,7 +132,7 @@ it('诊断报告启动时附浏览器环境，产物使用直接下载链接', a
   await settle();
   const request = fetch.mock.calls.find(([, options]) => options?.method === 'POST')!;
   expect(request[0]).toBe('/api/diagnostics/exports');
-  const header = (request[1]?.headers as Record<string, string>)['X-Peach-Browser-Diagnostics'];
+  const header = new Headers(request[1]?.headers).get('X-Peach-Browser-Diagnostics')!;
   const bytes = Uint8Array.from(atob(header), value => value.charCodeAt(0));
   expect(JSON.parse(new TextDecoder().decode(bytes)).native_codecs).toHaveProperty('h264');
   expect(create).not.toHaveBeenCalled();

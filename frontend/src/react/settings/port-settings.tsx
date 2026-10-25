@@ -72,7 +72,7 @@ export function PortSettings({ data, receipt }: ConfigurationGroupProps) {
         </ConfigurationChoice>
         {host === '0.0.0.0' ? <ConfigurationInput id="configMdnsName" label="局域网访问地址" value={name} onChange={setName}
           prefix={network.local_url.startsWith('https:') ? 'https://' : 'http://'} suffix=".local"
-          autoComplete="off" spellCheck={false} maxLength={63} isDisabled={Boolean(action.busy)} validationBehavior="aria"
+          autoComplete="off" spellCheck="false" maxLength={63} isDisabled={Boolean(action.busy)} validationBehavior="aria"
           isInvalid={Boolean(fields.mdns_name)} hint={fields.mdns_name || undefined} /> : null}
       </> : null}
       <ConfigurationInput id="configPort" label="端口" prefix="localhost:" inputMode="numeric" value={port} onChange={setPort}

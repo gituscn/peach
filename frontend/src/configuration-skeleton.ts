@@ -297,7 +297,7 @@ const network = () => {
     ? help(TUNNEL_HELP.named) + inputField('公开主机名', 'Cloudflare Zero Trust 里指向这台电脑的主机名。') + inputField('隧道令牌', text('16em'))
     : help(TUNNEL_HELP.quick)) + (on(shape?.tunnelNote) ? block('100%', '64px') : '');
   const addresses = count(shape?.addresses, 3);
-  const addressFields = Array.from({ length: addresses }, (_, i) => `<div class="flex min-w-0 flex-wrap items-end gap-2"><div class="min-w-0 flex-1">${inputField(['本机地址', '手机连接地址', '备用 IP 地址'][i])}</div>${button('复制地址', 'secondary')}</div>`).join('');
+  const addressFields = Array.from({ length: addresses }, (_, i) => `<div class="flex min-w-0 flex-wrap items-end gap-2"><div class="min-w-0 flex-1">${inputField(['本机地址', '手机连接地址', '备用 IP 地址'][i]!)}</div>${button('复制地址', 'secondary')}</div>`).join('');
   return (addresses || on(shape?.port) ? section('访问地址', stack(addressFields + (addresses ? block('100%', '40px') : '')
       + (on(shape?.networkEditable) ? `<div class="flex flex-col gap-1.5">${fieldLabel('谁可以访问')}${block('min(100%, 20em)', '36px')}</div>` + (on(shape?.lan) ? inputField('局域网访问地址') : '') : '')
       + (on(shape?.port) ? inputField('端口') : '')), on(shape?.port) ? button('保存配置') : '',

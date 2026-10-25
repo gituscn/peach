@@ -1,7 +1,7 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "f9f29d38-8484-42c8-97b7-0286fbfd80b8", e._sentryDebugIdIdentifier = "sentry-dbid-f9f29d38-8484-42c8-97b7-0286fbfd80b8");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "34f47ab5-17ee-48af-8cb6-7cf9e651fd7e", e._sentryDebugIdIdentifier = "sentry-dbid-34f47ab5-17ee-48af-8cb6-7cf9e651fd7e");
 	} catch {}
 })();
 import { ApiError as e, Button as t, ButtonLink as n, Chip as r, DIAGNOSTICS_KEY as i, Disclosure as a, EmptyState as o, Fact as s, FactList as c, Fieldset as l, FieldsetTitle as u, Input as d, LOC as f, LinkButton as p, LoadingDots as m, Note as h, Progress as g, Section as _, SettingsCard as v, SettingsSectionLabel as y, Stack as b, __toESM as x, apiGet as S, apiSend as C, busyProps as w, configurationSection as ee, cx as T, diagnosticHeaders as E, diagnosticsSkeleton as D, errorMessage as O, fetchDiagnostics as k, fmtDur as A, fmtSize as j, queryClient as te, require_jsx_runtime as ne, require_react as re, settingsPath as ie, tl as M, useAction as N, useQuery as P } from "./peach-app.js";
@@ -284,7 +284,7 @@ function K() {
 					value: e,
 					onChange: t,
 					autoComplete: "off",
-					spellCheck: !1,
+					spellCheck: "false",
 					maxLength: 1300,
 					placeholder: "例如 ABF-087、SYKH-145…",
 					hint: "多个番号用逗号分隔，最多 20 个；留空导出近期作品。"
@@ -513,4 +513,4 @@ function ae(e) {
 //#endregion
 export { ae as DiagnosticsPage };
 
-//# debugId=f9f29d38-8484-42c8-97b7-0286fbfd80b8
+//# debugId=34f47ab5-17ee-48af-8cb6-7cf9e651fd7e

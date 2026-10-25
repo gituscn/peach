@@ -213,6 +213,11 @@ describe('馆藏 JAV 官方预览', () => {
       assert.ok(await frame.locator('.video-js').isHidden());
       await frame.getByRole('button', { name: '播放正片', exact: true }).click();
       assert.equal(await retry.count(), 0);
+      await frame.locator('#playerNet').evaluate(node => {
+        const badge = node as HTMLElement;
+        badge.hidden = false;
+        badge.textContent = '加载中…';
+      });
       await frame.getByRole('button', { name: '查看图片', exact: true }).click();
       await retry.click();
       await frame.getByRole('button', { name: '预览 1', exact: true }).waitFor();

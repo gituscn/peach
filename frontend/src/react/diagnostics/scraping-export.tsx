@@ -67,7 +67,7 @@ export function ScrapingExport() {
       <FieldsetTitle id="scraping-export-title">刮削记录</FieldsetTitle>
       <p className="text-body-2-regular text-text-secondary">导出作品资料、来源取值及演员、厂牌和系列归属，供排查刮削错误。</p>
       <Input label="问题番号（可选）" name="scraping-codes" value={codes} onChange={setCodes}
-        autoComplete="off" spellCheck={false} maxLength={1300}
+        autoComplete="off" spellCheck="false" maxLength={1300}
         placeholder="例如 ABF-087、SYKH-145…" hint="多个番号用逗号分隔，最多 20 个；留空导出近期作品。" />
     </div>
   </Fieldset>;
