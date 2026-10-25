@@ -37,6 +37,24 @@ def fixture_process(command, root, env):
 
 
 class ParallelShardTests(unittest.TestCase):
+    def test_checkpoint_exit_status_must_match_the_report(self):
+        def exercise(success, code):
+            observed = []
+            def spawn(command, **kwargs):
+                report = Path(command[command.index('--timings') + 1])
+                report.write_text(json.dumps({'complete': True, 'success': success, 'count': 1, 'timings': []}), encoding='utf8')
+                return mock.Mock(returncode=code, poll=lambda: code)
+            def checkpoint(assigned, report, normal):
+                observed.append(normal)
+                return True
+            with redirect_stdout(io.StringIO()):
+                runner.run_shards(('checks',), jobs=1, shard_count=1, plan=[['test_a.py']],
+                                  spawn=spawn, checkpoint=checkpoint)
+            return observed
+        for success, code, expected in ((False, 1, True), (False, 15, False), (True, 1, False), (True, 0, True)):
+            with self.subTest(success=success, code=code):
+                self.assertEqual(exercise(success, code), [expected])
+
     def test_imported_verification_code_belongs_to_this_workspace(self):
         self.assertEqual(Path(runner.__file__).resolve().parents[1], Path(__file__).resolve().parents[1])
         self.assertEqual(Path(evidence.__file__).resolve().parents[1], Path(__file__).resolve().parents[1])
@@ -344,6 +362,14 @@ class ReceiptTests(ReceiptFixture, unittest.TestCase):
         units = test_resume.report_units(['test_catalog.py'], report, clean_exit=False)
         self.assertEqual(units['test_catalog.py']['outcome'], 'unknown')
 
+    def test_abnormal_exit_does_not_preserve_positive_rows_in_a_failed_report(self):
+        report = {'success': False, 'count': 2, 'results': [
+            {'id': 'test_catalog.Suite.test_value', 'outcome': 'pass'},
+            {'id': 'test_web.Suite.test_value', 'outcome': 'fail'}]}
+        units = test_resume.report_units(['test_catalog.py', 'test_web.py'], report, clean_exit=False)
+        self.assertEqual(test_resume.passed_units(units), set())
+        self.assertEqual(units['test_web.py']['outcome'], 'fail')
+
 
 class CheckpointTests(ReceiptFixture, unittest.TestCase):
     def setUp(self):
@@ -548,6 +574,23 @@ class CheckpointTests(ReceiptFixture, unittest.TestCase):
         progress.accept_success([case])
         self.assertTrue(progress.complete())
         self.assertNotIn('test_extra.py', progress.units)
+
+    def test_serial_failure_preserves_the_successful_file(self):
+        progress = self.progress()
+        progress.start()
+        def exercise(case):
+            if type(case).__module__ == 'test_web':
+                case.fail('fixture')
+        suite = unittest.TestSuite(type('Suite', (unittest.TestCase,),
+            {'__module__': name.removesuffix('.py'), 'test_value': exercise})('test_value')
+            for name in ('test_catalog.py', 'test_web.py'))
+        chosen = set(self.mapping['full'])
+        with mock.patch.object(runner, 'build_suite', return_value=suite), \
+                mock.patch.object(runner, 'save_file_seconds'), mock.patch.object(runner.test_history, 'append'), \
+                redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.assertFalse(runner.run_serial_suite(('full',), chosen, chosen, progress, 'fixture')[0])
+        self.assertEqual(progress.units['test_catalog.py']['outcome'], 'pass')
+        self.assertEqual(progress.units['test_web.py']['outcome'], 'fail')
 
 
 class ShardReportTests(unittest.TestCase):

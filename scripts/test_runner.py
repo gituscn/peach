@@ -920,7 +920,7 @@ def run_shards(scopes: tuple[str, ...], *, jobs: int, shard_count: int,
                 if checkpoint is not None:
                     assigned = plan[index] if plan is not None else sorted({path.name for scope in scopes
                                for path in selected_files(scope)})[index::shard_count]
-                    complete = checkpoint(assigned, report, process.returncode == 0)
+                    complete = checkpoint(assigned, report, process.returncode == (0 if report.get('success') else 1))
                     ok = ok and complete
                 passed = passed and ok
                 count += int(report.get("count", 0))
@@ -1114,7 +1114,7 @@ def run_serial_suite(scopes, chosen, original, progress, label):
     if progress is not None:
         complete = progress.checkpoint([path.name for path in chosen], {
             'success': passed, 'count': result.testsRun, 'files': result.files, 'results': rows,
-            'complete': True}, passed)
+            'complete': True}, True)
         passed = passed and complete
     return passed, result.testsRun, result.timings
 

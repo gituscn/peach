@@ -215,7 +215,7 @@ def report_units(assigned, report: dict, *, clean_exit: bool, external=None, cas
                     result[unit] = {'outcome': 'pass', 'at': stamp}
         elif module not in grouped:
             result[module] = {'outcome': 'unknown', 'at': stamp}
-    if ((report.get('success') and not clean_exit) or report.get('count', 0) <= 0
+    if (not clean_exit or report.get('count', 0) <= 0
             or unattributed_failure(assigned, report, cases)):
         result = {name: {**row, 'outcome': 'unknown'} if row['outcome'] == 'pass' else row
                   for name, row in result.items()}
